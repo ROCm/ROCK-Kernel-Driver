@@ -1,13 +1,13 @@
 /*
- *   (c) 2003 Advanced Micro Devices, Inc.
+ *   (c) 2003, 2004 Advanced Micro Devices, Inc.
  *  Your use of this code is subject to the terms and conditions of the
- *  GNU general public license version 2. See "../../../COPYING" or
+ *  GNU general public license version 2. See "COPYING" or
  *  http://www.gnu.org/licenses/gpl.html
  *
  *  Support : paul.devriendt@amd.com
  *
  *  Based on the powernow-k7.c module written by Dave Jones.
- *  (C) 2003 Dave Jones <davej@codemonkey.ork.uk> on behalf of SuSE Labs
+ *  (C) 2003 Dave Jones <davej@codemonkey.org.uk> on behalf of SuSE Labs
  *  (C) 2004 Dominik Brodowski <linux@brodo.de>
  *  (C) 2004 Pavel Machek <pavel@suse.cz>
  *  Licensed under the terms of the GNU GPL License version 2.
@@ -26,6 +26,7 @@
 #include <linux/cpufreq.h>
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <acpi/acpi_bus.h> 	/* For acpi_disabled */
 
 #include <asm/msr.h>
 #include <asm/io.h>
@@ -33,17 +34,53 @@
 
 #define PFX "powernow-k8: "
 #define BFX PFX "BIOS error: "
-#define VERSION "version 1.00.08a"
+#define VERSION "version 1.00.13"
 #include "powernow-k8.h"
 
-static u32 vstable;	/* voltage stabalization time, from PSB, units 20 us */
+/*
+ * Version 1.4 of the PSB table. This table is constructed by BIOS and is
+ * to tell the OS's power management driver which VIDs and FIDs are
+ * supported by this particular processor. This information is obtained from
+ * the data sheets for each processor model by the system vendor and
+ * incorporated into the BIOS.
+ * If the data in the PSB / PST is wrong, then this driver will program the
+ * wrong values into hardware, which is very likely to lead to a crash.
+ */
+
+#define PSB_ID_STRING      "AMDK7PNOW!"
+#define PSB_ID_STRING_LEN  10
+
+#define PSB_VERSION_1_4  0x14
+
+struct psb_s {
+	u8 signature[10];
+	u8 tableversion;
+	u8 flags1;
+	u16 voltagestabilizationtime;
+	u8 flags2;
+	u8 numpst;
+	u32 cpuid;
+	u8 plllocktime;
+	u8 maxfid;
+	u8 maxvid;
+	u8 numpstates;
+};
+
+/* Pairs of fid/vid values are appended to the version 1.4 PSB table. */
+struct pst_s {
+	u8 fid;
+	u8 vid;
+};
+
+static u32 vstable;	/* voltage stabilization time, from PSB, units 20 us */
 static u32 plllock;	/* pll lock time, from PSB, units 1 us */
-static u32 numps;	/* number of p-states, from PSB */
 static u32 rvo;		/* ramp voltage offset, from PSB */
 static u32 irt;		/* isochronous relief time, from PSB */
 static u32 vidmvs;	/* usable value calculated from mvs, from PSB */
-static u32 currvid;	/* keep track of the current fid / vid */
-static u32 currfid;
+
+/* We have only one processor, but this way code can be shared */
+static struct cpu_power single_cpu_power;
+static struct cpu_power *perproc = &single_cpu_power;
 
 static struct cpufreq_frequency_table *powernow_table;
 
@@ -70,153 +107,41 @@ so this is not actually a restriction.
 static u32 batps;	/* limit on the number of p states when on battery */
 			/* - set by BIOS in the PSB/PST                    */
 
- /* Return a frequency in MHz, given an input fid */
-static u32 find_freq_from_fid(u32 fid)
-{
- 	return 800 + (fid * 100);
-}
-
-
-/* Return the vco fid for an input fid */
-static u32
-convert_fid_to_vco_fid(u32 fid)
-{
-	if (fid < HI_FID_TABLE_BOTTOM) {
-		return 8 + (2 * fid);
-	} else {
-		return fid;
-	}
-}
-
-/*
- * Return 1 if the pending bit is set. Unless we are actually just told the
- * processor to transition a state, seeing this bit set is really bad news.
- */
-static inline int
-pending_bit_stuck(void)
-{
-	u32 lo, hi;
-
-	rdmsr(MSR_FIDVID_STATUS, lo, hi);
-	return lo & MSR_S_LO_CHANGE_PENDING ? 1 : 0;
-}
-
-/*
- * Update the global current fid / vid values from the status msr. Returns 1
- * on error.
- */
-static int
-query_current_values_with_pending_wait(void)
-{
-	u32 lo, hi;
-	u32 i = 0;
-
-	lo = MSR_S_LO_CHANGE_PENDING;
-	while (lo & MSR_S_LO_CHANGE_PENDING) {
-		if (i++ > 0x1000000) {
-			printk(KERN_ERR PFX "detected change pending stuck\n");
-			return 1;
-		}
-		rdmsr(MSR_FIDVID_STATUS, lo, hi);
-	}
-
-	currvid = hi & MSR_S_HI_CURRENT_VID;
-	currfid = lo & MSR_S_LO_CURRENT_FID;
-
-	return 0;
-}
-
-/* the isochronous relief time */
-static inline void
-count_off_irt(void)
-{
-	udelay((1 << irt) * 10);
-	return;
-}
-
-/* the voltage stabalization time */
-static inline void
-count_off_vst(void)
-{
-	udelay(vstable * VST_UNITS_20US);
-	return;
-}
-
 /* write the new fid value along with the other control fields to the msr */
 static int
-write_new_fid(u32 fid)
+write_new_fid(struct cpu_power *perproc, u32 idx, u8 fid)
 {
 	u32 lo;
-	u32 savevid = currvid;
+	u32 savevid = perproc->cvid;
 
-	if ((fid & INVALID_FID_MASK) || (currvid & INVALID_VID_MASK)) {
+	if ((fid & INVALID_FID_MASK) || (perproc->cvid & INVALID_VID_MASK)) {
 		printk(KERN_ERR PFX "internal error - overflow on fid write\n");
 		return 1;
 	}
 
-	lo = fid | (currvid << MSR_C_LO_VID_SHIFT) | MSR_C_LO_INIT_FID_VID;
+	lo = fid | (perproc->cvid << MSR_C_LO_VID_SHIFT) | MSR_C_LO_INIT;
 
 	dprintk(KERN_DEBUG PFX "writing fid %x, lo %x, hi %x\n",
 		fid, lo, plllock * PLL_LOCK_CONVERSION);
 
 	wrmsr(MSR_FIDVID_CTL, lo, plllock * PLL_LOCK_CONVERSION);
 
-	if (query_current_values_with_pending_wait())
+	if (query_current_values_with_pending_wait(perproc))
 		return 1;
 
-	count_off_irt();
+	count_off_irt(irt);
 
-	if (savevid != currvid) {
+	if (savevid != perproc->cvid) {
 		printk(KERN_ERR PFX
-		       "vid changed on fid transition, save %x, currvid %x\n",
-		       savevid, currvid);
+		       "vid changed on fid transition, save %x, perproc->cvid %x\n",
+		       savevid, perproc->cvid);
 		return 1;
 	}
 
-	if (fid != currfid) {
+	if (fid != perproc->cfid) {
 		printk(KERN_ERR PFX
-		       "fid transition failed, fid %x, currfid %x\n",
-		        fid, currfid);
-		return 1;
-	}
-
-	return 0;
-}
-
-/* Write a new vid to the hardware */
-static int
-write_new_vid(u32 vid)
-{
-	u32 lo;
-	u32 savefid = currfid;
-
-	if ((currfid & INVALID_FID_MASK) || (vid & INVALID_VID_MASK)) {
-		printk(KERN_ERR PFX "internal error - overflow on vid write\n");
-		return 1;
-	}
-
-	lo = currfid | (vid << MSR_C_LO_VID_SHIFT) | MSR_C_LO_INIT_FID_VID;
-
-	dprintk(KERN_DEBUG PFX "writing vid %x, lo %x, hi %x\n",
-		vid, lo, STOP_GRANT_5NS);
-
-	wrmsr(MSR_FIDVID_CTL, lo, STOP_GRANT_5NS);
-
-	if (query_current_values_with_pending_wait()) {
-		return 1;
-	}
-
-	if (savefid != currfid) {
-		printk(KERN_ERR PFX
-		       "fid changed on vid transition, save %x currfid %x\n",
-		       savefid, currfid);
-		return 1;
-	}
-
-	if (vid != currvid) {
-		printk(KERN_ERR PFX
-		       "vid transition failed, vid %x, currvid %x\n",
-		       vid, currvid);
+		       "fid transition failed, fid %x, perproc->cfid %x\n",
+		        fid, perproc->cfid);
 		return 1;
 	}
 
@@ -231,268 +156,64 @@ write_new_vid(u32 vid)
 static int
 decrease_vid_code_by_step(u32 reqvid, u32 step)
 {
-	if ((currvid - reqvid) > step)
-		reqvid = currvid - step;
+	if ((perproc->cvid - reqvid) > step)
+		reqvid = perproc->cvid - step;
 
-	if (write_new_vid(reqvid))
+	if (write_new_vid(perproc, reqvid))
 		return 1;
 
-	count_off_vst();
+	count_off_vst(vstable);
 
 	return 0;
 }
 
-/* Change the fid and vid, by the 3 phases. */
-static inline int
-transition_fid_vid(u32 reqfid, u32 reqvid)
-{
-	if (core_voltage_pre_transition(reqvid))
-		return 1;
-
-	if (core_frequency_transition(reqfid))
-		return 1;
-
-	if (core_voltage_post_transition(reqvid))
-		return 1;
-
-	if (query_current_values_with_pending_wait())
-		return 1;
-
-	if ((reqfid != currfid) || (reqvid != currvid)) {
-		printk(KERN_ERR PFX "failed: req 0x%x 0x%x, curr 0x%x 0x%x\n",
-		       reqfid, reqvid, currfid, currvid);
-		return 1;
-	}
-
-	dprintk(KERN_INFO PFX
-		"transitioned: new fid 0x%x, vid 0x%x\n", currfid, currvid);
-
-	return 0;
-}
 
 /*
  * Phase 1 - core voltage transition ... setup appropriate voltage for the
  * fid transition.
  */
 static inline int
-core_voltage_pre_transition(u32 reqvid)
+core_voltage_pre_transition(struct cpu_power *perproc, u32 idx, u8 reqvid)
 {
 	u32 rvosteps = rvo;
-	u32 savefid = currfid;
+	u32 savefid = perproc->cfid;
 
 	dprintk(KERN_DEBUG PFX
-		"ph1: start, currfid 0x%x, currvid 0x%x, reqvid 0x%x, rvo %x\n",
-		currfid, currvid, reqvid, rvo);
+		"ph1: start, perproc->cfid 0x%x, perproc->cvid 0x%x, reqvid 0x%x, rvo %x\n",
+		perproc->cfid, perproc->cvid, reqvid, rvo);
 
-	while (currvid > reqvid) {
+	while (perproc->cvid > reqvid) {
 		dprintk(KERN_DEBUG PFX "ph1: curr 0x%x, requesting vid 0x%x\n",
-			currvid, reqvid);
+			perproc->cvid, reqvid);
 		if (decrease_vid_code_by_step(reqvid, vidmvs))
 			return 1;
 	}
 
-	while (rvosteps > 0) {
-		if (currvid == 0) {
+	while (rvosteps) {
+		if (perproc->cvid == 0) {
 			rvosteps = 0;
 		} else {
 			dprintk(KERN_DEBUG PFX
 				"ph1: changing vid for rvo, requesting 0x%x\n",
-				currvid - 1);
-			if (decrease_vid_code_by_step(currvid - 1, 1))
+				perproc->cvid - 1);
+			if (decrease_vid_code_by_step(perproc->cvid - 1, 1))
 				return 1;
 			rvosteps--;
 		}
 	}
 
-	if (query_current_values_with_pending_wait())
+	if (query_current_values_with_pending_wait(perproc))
 		return 1;
 
-	if (savefid != currfid) {
-		printk(KERN_ERR PFX "ph1 err, currfid changed 0x%x\n", currfid);
+	if (savefid != perproc->cfid) {
+		printk(KERN_ERR PFX "ph1 err, perproc->cfid changed 0x%x\n", perproc->cfid);
 		return 1;
 	}
 
-	dprintk(KERN_DEBUG PFX "ph1 complete, currfid 0x%x, currvid 0x%x\n",
-		currfid, currvid);
+	dprintk(KERN_DEBUG PFX "ph1 complete, perproc->cfid 0x%x, perproc->cvid 0x%x\n",
+		perproc->cfid, perproc->cvid);
 
 	return 0;
-}
-
-/* Phase 2 - core frequency transition */
-static inline int
-core_frequency_transition(u32 reqfid)
-{
-	u32 vcoreqfid;
-	u32 vcocurrfid;
-	u32 vcofiddiff;
-	u32 savevid = currvid;
-
-	if ((reqfid < HI_FID_TABLE_BOTTOM) && (currfid < HI_FID_TABLE_BOTTOM)) {
-		printk(KERN_ERR PFX "ph2 illegal lo-lo transition 0x%x 0x%x\n",
-		       reqfid, currfid);
-		return 1;
-	}
-
-	if (currfid == reqfid) {
-		printk(KERN_ERR PFX "ph2 null fid transition 0x%x\n", currfid);
-		return 0;
-	}
-
-	dprintk(KERN_DEBUG PFX
-		"ph2 starting, currfid 0x%x, currvid 0x%x, reqfid 0x%x\n",
-		currfid, currvid, reqfid);
-
-	vcoreqfid = convert_fid_to_vco_fid(reqfid);
-	vcocurrfid = convert_fid_to_vco_fid(currfid);
-	vcofiddiff = vcocurrfid > vcoreqfid ? vcocurrfid - vcoreqfid
-	    : vcoreqfid - vcocurrfid;
-
-	while (vcofiddiff > 2) {
-		if (reqfid > currfid) {
-			if (currfid > LO_FID_TABLE_TOP) {
-				if (write_new_fid(currfid + 2)) {
-					return 1;
-				}
-			} else {
-				if (write_new_fid
-				    (2 + convert_fid_to_vco_fid(currfid))) {
-					return 1;
-				}
-			}
-		} else {
-			if (write_new_fid(currfid - 2))
-				return 1;
-		}
-
-		vcocurrfid = convert_fid_to_vco_fid(currfid);
-		vcofiddiff = vcocurrfid > vcoreqfid ? vcocurrfid - vcoreqfid
-		    : vcoreqfid - vcocurrfid;
-	}
-
-	if (write_new_fid(reqfid))
-		return 1;
-
-	if (query_current_values_with_pending_wait())
-		return 1;
-
-	if (currfid != reqfid) {
-		printk(KERN_ERR PFX
-		       "ph2 mismatch, failed fid transition, curr %x, req %x\n",
-		       currfid, reqfid);
-		return 1;
-	}
-
-	if (savevid != currvid) {
-		printk(KERN_ERR PFX
-		       "ph2 vid changed, save %x, curr %x\n", savevid,
-		       currvid);
-		return 1;
-	}
-
-	dprintk(KERN_DEBUG PFX "ph2 complete, currfid 0x%x, currvid 0x%x\n",
-		currfid, currvid);
-
-	return 0;
-}
-
-/* Phase 3 - core voltage transition flow ... jump to the final vid. */
-static inline int
-core_voltage_post_transition(u32 reqvid)
-{
-	u32 savefid = currfid;
-	u32 savereqvid = reqvid;
-
-	dprintk(KERN_DEBUG PFX "ph3 starting, currfid 0x%x, currvid 0x%x\n",
-		currfid, currvid);
-
-	if (reqvid != currvid) {
-		if (write_new_vid(reqvid))
-			return 1;
-
-		if (savefid != currfid) {
-			printk(KERN_ERR PFX
-			       "ph3: bad fid change, save %x, curr %x\n",
-			       savefid, currfid);
-			return 1;
-		}
-
-		if (currvid != reqvid) {
-			printk(KERN_ERR PFX
-			       "ph3: failed vid transition\n, req %x, curr %x",
-			       reqvid, currvid);
-			return 1;
-		}
-	}
-
-	if (query_current_values_with_pending_wait())
-		return 1;
-
-	if (savereqvid != currvid) {
-		dprintk(KERN_ERR PFX "ph3 failed, currvid 0x%x\n", currvid);
-		return 1;
-	}
-
-	if (savefid != currfid) {
-		dprintk(KERN_ERR PFX "ph3 failed, currfid changed 0x%x\n",
-			currfid);
-		return 1;
-	}
-
-	dprintk(KERN_DEBUG PFX "ph3 complete, currfid 0x%x, currvid 0x%x\n",
-		currfid, currvid);
-
-	return 0;
-}
-
-static inline int
-check_supported_cpu(void)
-{
-	struct cpuinfo_x86 *c = cpu_data;
-	u32 eax, ebx, ecx, edx;
-
-	if (num_online_cpus() != 1) {
-		printk(KERN_INFO PFX "multiprocessor systems not supported\n");
-		return 0;
-	}
-
-	if (c->x86_vendor != X86_VENDOR_AMD) {
-#ifdef MODULE
-		printk(KERN_INFO PFX "Not an AMD processor\n");
-#endif
-		return 0;
-	}
-
-	eax = cpuid_eax(CPUID_PROCESSOR_SIGNATURE);
-	if ((eax & CPUID_XFAM_MOD) == ATHLON64_XFAM_MOD) {
-		dprintk(KERN_DEBUG PFX "AMD Althon 64 Processor found\n");
-		if ((eax & CPUID_F1_STEP) < ATHLON64_REV_C0) {
-			printk(KERN_INFO PFX "Revision C0 or better "
-			       "AMD Athlon 64 processor required\n");
-			return 0;
-		}
-	} else if ((eax & CPUID_XFAM_MOD) == OPTERON_XFAM_MOD) {
-		dprintk(KERN_DEBUG PFX "AMD Opteron Processor found\n");
-	} else {
-		printk(KERN_INFO PFX
-		       "AMD Athlon 64 or AMD Opteron processor required\n");
-		return 0;
-	}
-
-	eax = cpuid_eax(CPUID_GET_MAX_CAPABILITIES);
-	if (eax < CPUID_FREQ_VOLT_CAPABILITIES) {
-		printk(KERN_INFO PFX
-		       "No frequency change capabilities detected\n");
-		return 0;
-	}
-
-	cpuid(CPUID_FREQ_VOLT_CAPABILITIES, &eax, &ebx, &ecx, &edx);
-	if ((edx & P_STATE_TRANSITION_CAPABLE) != P_STATE_TRANSITION_CAPABLE) {
-		printk(KERN_INFO PFX "Power state transitions not supported\n");
-		return 0;
-	}
-
-	printk(KERN_INFO PFX "Found AMD64 processor supporting PowerNow (" VERSION ")\n");
-	return 1;
 }
 
 static int check_pst_table(struct pst_s *pst, u8 maxvid)
@@ -500,7 +221,7 @@ static int check_pst_table(struct pst_s *pst, u8 maxvid)
 	unsigned int j;
 	u8 lastfid = 0xFF;
 
-	for (j = 0; j < numps; j++) {
+	for (j = 0; j < perproc->numps; j++) {
 		if (pst[j].vid > LEAST_VID) {
 			printk(KERN_ERR PFX "vid %d invalid : 0x%x\n", j, pst[j].vid);
 			return -EINVAL;
@@ -547,6 +268,7 @@ find_psb_table(void)
 	unsigned int i, j;
 	u32 mvs;
 	u8 maxvid;
+	int arima = 0;
 
 	for (i = 0xc0000; i < 0xffff0; i += 0x10) {
 		/* Scan BIOS looking for the signature. */
@@ -585,7 +307,7 @@ find_psb_table(void)
 		printk(", isochronous relief time: %d", irt);
 		printk(", maximum voltage step: %d\n", mvs);
 
-		dprintk(KERN_DEBUG PFX "numpst: 0x%x\n", psb->numpst);
+		dprintk(KERN_DEBUG PFX "numpst: 0x%x\n", psb->perproc->numpst);
 		if (psb->numpst != 1) {
 			printk(KERN_ERR BFX "numpst must be 1\n");
 			return -ENODEV;
@@ -598,37 +320,39 @@ find_psb_table(void)
 
 		maxvid = psb->maxvid;
 		printk("maxfid 0x%x (%d MHz), maxvid 0x%x\n", 
-		       psb->maxfid, find_freq_from_fid(psb->maxfid), maxvid);
+		       psb->maxfid, freq_from_fid(psb->maxfid), maxvid);
 
-		numps = psb->numpstates;
-		if (numps < 2) {
+		perproc->numps = arima ? 3 : psb->numpstates;
+		if (perproc->numps < 2) {
 			printk(KERN_ERR BFX "no p states to transition\n");
 			return -ENODEV;
 		}
 
 		if (batps == 0) {
-			batps = numps;
-		} else if (batps > numps) {
-			printk(KERN_ERR BFX "batterypstates > numpstates\n");
-			batps = numps;
+			batps = perproc->numps;
+		} else if (batps > perproc->numps) {
+			printk(KERN_ERR BFX "batterypstates > perproc->numpstates\n");
+			batps = perproc->numps;
 		} else {
 			printk(KERN_ERR PFX
 			       "Restricting operation to %d p-states\n", batps);
 			printk(KERN_ERR PFX
-			       "Check for an updated driver to access all "
-			       "%d p-states\n", numps);
+			       "Use the ACPI driver to access all %d p-states\n",
+			       perproc->numps);
 		}
 
-		if (numps <= 1) {
+		if (perproc->numps <= 1) {
 			printk(KERN_ERR PFX "only 1 p-state to transition\n");
 			return -ENODEV;
 		}
 
 		pst = (struct pst_s *) (psb + 1);
-		if (check_pst_table(pst, maxvid))
-			return -EINVAL;
+		if (check_pst_table(pst, maxvid)) {
+			if (!arima)
+				return -EINVAL;
+		}
 
-		powernow_table = kmalloc((sizeof(struct cpufreq_frequency_table) * (numps + 1)), GFP_KERNEL);
+		powernow_table = kmalloc((sizeof(struct cpufreq_frequency_table) * (perproc->numps + 1)), GFP_KERNEL);
 		if (!powernow_table) {
 			printk(KERN_ERR PFX "powernow_table memory alloc failure\n");
 			return -ENOMEM;
@@ -642,30 +366,36 @@ find_psb_table(void)
 		/* If you want to override your frequency tables, this
 		   is right place. */
 
-		for (j = 0; j < numps; j++) {
-			powernow_table[j].frequency = find_freq_from_fid(powernow_table[j].index & 0xff)*1000;
+		if (arima) {
+			powernow_table[1].index = 0x0608;
+			powernow_table[2].index = 0x020a;
+			powernow_table[3].index = 0x000c;
+		}
+
+		for (j = 0; j < perproc->numps; j++) {
+			powernow_table[j].frequency = freq_from_fid(powernow_table[j].index & 0xff)*1000;
 			printk(KERN_INFO PFX "   %d : fid 0x%x (%d MHz), vid 0x%x\n", j,
 			       powernow_table[j].index & 0xff,
 			       powernow_table[j].frequency/1000,
 			       powernow_table[j].index >> 8);
 		}
 
-		powernow_table[numps].frequency = CPUFREQ_TABLE_END;
-		powernow_table[numps].index = 0;
+		powernow_table[perproc->numps].frequency = CPUFREQ_TABLE_END;
+		powernow_table[perproc->numps].index = 0;
 
-		if (query_current_values_with_pending_wait()) {
+		if (query_current_values_with_pending_wait(perproc)) {
 			kfree(powernow_table);
 			return -EIO;
 		}
 
-		printk(KERN_INFO PFX "currfid 0x%x (%d MHz), currvid 0x%x\n",
-		       currfid, find_freq_from_fid(currfid), currvid);
+		printk(KERN_INFO PFX "perproc->cfid 0x%x (%d MHz), perproc->cvid 0x%x\n",
+		       perproc->cfid, freq_from_fid(perproc->cfid), perproc->cvid);
 
-		for (j = 0; j < numps; j++)
-			if ((pst[j].fid==currfid) && (pst[j].vid==currvid))
+		for (j = 0; j < perproc->numps; j++)
+			if ((pst[j].fid==perproc->cfid) && (pst[j].vid==perproc->cvid))
 				return 0;
 
-		printk(KERN_ERR BFX "currfid/vid do not match PST, ignoring\n");
+		printk(KERN_ERR BFX "perproc->cfid/vid do not match PST, ignoring\n");
 		return 0;
 	}
 
@@ -693,20 +423,20 @@ transition_frequency(unsigned int index)
 	dprintk(KERN_DEBUG PFX "table matched fid 0x%x, giving vid 0x%x\n",
 		fid, vid);
 
-	if (query_current_values_with_pending_wait())
+	if (query_current_values_with_pending_wait(perproc))
 		return 1;
 
-	if ((currvid == vid) && (currfid == fid)) {
+	if ((perproc->cvid == vid) && (perproc->cfid == fid)) {
 		dprintk(KERN_DEBUG PFX
 			"target matches current values (fid 0x%x, vid 0x%x)\n",
 			fid, vid);
 		return 0;
 	}
 
-	if ((fid < HI_FID_TABLE_BOTTOM) && (currfid < HI_FID_TABLE_BOTTOM)) {
+	if ((fid < HI_FID_TABLE_BOTTOM) && (perproc->cfid < HI_FID_TABLE_BOTTOM)) {
 		printk(KERN_ERR PFX
 		       "ignoring illegal change in lo freq table-%x to %x\n",
-		       currfid, fid);
+		       perproc->cfid, fid);
 		return 1;
 	}
 
@@ -714,13 +444,13 @@ transition_frequency(unsigned int index)
 
 	freqs.cpu = 0;	/* only true because SMP not supported */
 
-	freqs.old = find_freq_from_fid(currfid);
-	freqs.new = find_freq_from_fid(fid);
+	freqs.old = freq_from_fid(perproc->cfid);
+	freqs.new = freq_from_fid(fid);
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
-	res = transition_fid_vid(fid, vid);
+	res = transition_fid_vid(perproc, 0, fid, vid);
 
-	freqs.new = find_freq_from_fid(currfid);
+	freqs.new = freq_from_fid(perproc->cfid);
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 
 	return res;
@@ -730,8 +460,8 @@ transition_frequency(unsigned int index)
 static int
 powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsigned relation)
 {
-	u32 checkfid = currfid;
-	u32 checkvid = currvid;
+	u32 checkfid = perproc->cfid;
+	u32 checkvid = perproc->cvid;
 	unsigned int newstate;
 
 	if (pending_bit_stuck()) {
@@ -742,16 +472,16 @@ powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsigned relati
 	dprintk(KERN_DEBUG PFX "targ: %d kHz, min %d, max %d, relation %d\n",
 		targfreq, pol->min, pol->max, relation);
 
-	if (query_current_values_with_pending_wait())
+	if (query_current_values_with_pending_wait(perproc))
 		return -EIO;
 
 	dprintk(KERN_DEBUG PFX "targ: curr fid 0x%x, vid 0x%x\n",
-		currfid, currvid);
+		perproc->cfid, perproc->cvid);
 
-	if ((checkvid != currvid) || (checkfid != currfid)) {
+	if ((checkvid != perproc->cvid) || (checkfid != perproc->cfid)) {
 		printk(KERN_ERR PFX
 		       "error - out of sync, fid 0x%x 0x%x, vid 0x%x 0x%x\n",
-		       checkfid, currfid, checkvid, currvid);
+		       checkfid, perproc->cfid, checkvid, perproc->cvid);
 	}
 
 	if (cpufreq_frequency_table_target(pol, powernow_table, targfreq, relation, &newstate))
@@ -763,7 +493,7 @@ powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsigned relati
 		return 1;
 	}
 
-	pol->cur = 1000 * find_freq_from_fid(currfid);
+	pol->cur = 1000 * freq_from_fid(perproc->cfid);
 
 	return 0;
 }
@@ -792,14 +522,14 @@ powernowk8_cpu_init(struct cpufreq_policy *pol)
 	pol->governor = CPUFREQ_DEFAULT_GOVERNOR;
 
 	/* Take a crude guess here. 
-	 * That guess was in microseconds, so multply with 1000 */
+	 * That guess was in microseconds, so multiply with 1000 */
 	pol->cpuinfo.transition_latency = (((rvo + 8) * vstable * VST_UNITS_20US)
 	    + (3 * (1 << irt) * 10)) * 1000;
 
-	if (query_current_values_with_pending_wait())
+	if (query_current_values_with_pending_wait(perproc))
 		return -EIO;
 
-	pol->cur = 1000 * find_freq_from_fid(currfid);
+	pol->cur = 1000 * freq_from_fid(perproc->cfid);
 	dprintk(KERN_DEBUG PFX "policy current frequency %d kHz\n", pol->cur);
 
 	/* min/max the cpu is capable of */
@@ -812,7 +542,7 @@ powernowk8_cpu_init(struct cpufreq_policy *pol)
 	cpufreq_frequency_table_get_attr(powernow_table, pol->cpu);
 
 	printk(KERN_INFO PFX "cpu_init done, current fid 0x%x, vid 0x%x\n",
-	       currfid, currvid);
+	       perproc->cfid, perproc->cvid);
 
 	return 0;
 }
@@ -851,6 +581,18 @@ static int __init
 powernowk8_init(void)
 {
 	int rc;
+
+#ifdef CONFIG_X86_POWERNOW_K8_ACPI
+	if (!acpi_disabled) {
+		printk(KERN_INFO PFX "Turning off powernow-k8, powernow-k8-acpi will take over\n");
+		return -EINVAL;
+	}
+#endif
+
+	if (num_online_cpus() != 1) {
+		printk(KERN_INFO PFX "multiprocessor systems not supported\n");
+		return -ENODEV;
+	}
 
 	if (check_supported_cpu() == 0)
 		return -ENODEV;
