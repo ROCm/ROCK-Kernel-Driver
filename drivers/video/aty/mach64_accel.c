@@ -3,6 +3,7 @@
  *  ATI Mach64 Hardware Acceleration
  */
 
+#include <linux/sched.h>
 #include <linux/delay.h>
 #include <linux/fb.h>
 
