@@ -2070,7 +2070,7 @@ void swap_buf_le16(u16 *buf, unsigned int buf_words)
 #ifdef __BIG_ENDIAN
 	unsigned int i;
 
-	for (i = 0; i < words; i++)
+	for (i = 0; i < buf_words; i++)
 		buf[i] = le16_to_cpu(buf[i]);
 #endif /* __BIG_ENDIAN */
 }
