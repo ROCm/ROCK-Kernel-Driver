@@ -109,10 +109,20 @@ pfm_mck_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnu
 	if (ctx == NULL) return -EINVAL;
 
 	/*
-	 * we must clear the debug registers if any pmc13.ena_dbrpX bit is enabled
-	 * before they are written (fl_using_dbreg==0) to avoid picking up stale information.
+	 * we must clear the debug registers if pmc13 has a value which enable
+	 * memory pipeline event constraints. In this case we need to clear the
+	 * the debug registers if they have not yet been accessed. This is required
+	 * to avoid picking stale state.
+	 * PMC13 is "active" if:
+	 * 	one of the pmc13.cfg_dbrpXX field is different from 0x3
+	 * AND
+	 * 	at the corresponding pmc13.ena_dbrpXX is set.
+	 *
+	 * For now, we just check on cfg_dbrXX != 0x3.
 	 */
-	if (cnum == 13 && (*val & (0xfUL << 45)) && ctx->ctx_fl_using_dbreg == 0) {
+	if (cnum == 13 && ((*val & 0x18181818UL) != 0x18181818UL) && ctx->ctx_fl_using_dbreg == 0) {
+
+		DPRINT(("pmc[%d]=0x%lx has active pmc13 settings, clearing dbr\n", cnum, *val));
 
 		/* don't mix debug with perfmon */
 		if (task && (task->thread.flags & IA64_THREAD_DBG_VALID) != 0) return -EINVAL;
@@ -128,7 +138,9 @@ pfm_mck_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnu
 	 * we must clear the (instruction) debug registers if any pmc14.ibrpX bit is enabled
 	 * before they are (fl_using_dbreg==0) to avoid picking up stale information.
 	 */
-	if (cnum == 14 && ((*val & 0x2222) != 0x2222) && ctx->ctx_fl_using_dbreg == 0) {
+	if (cnum == 14 && ((*val & 0x2222UL) != 0x2222UL) && ctx->ctx_fl_using_dbreg == 0) {
+
+		DPRINT(("pmc[%d]=0x%lx has active pmc14 settings, clearing ibr\n", cnum, *val));
 
 		/* don't mix debug with perfmon */
 		if (task && (task->thread.flags & IA64_THREAD_DBG_VALID) != 0) return -EINVAL;
@@ -170,7 +182,7 @@ pfm_mck_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnu
 		   && ((((val14>>1) & 0x3) == 0x2 || ((val14>>1) & 0x3) == 0x0)
 		       ||(((val14>>4) & 0x3) == 0x2 || ((val14>>4) & 0x3) == 0x0));
 
-		if (ret) printk("perfmon: failure check_case1\n");
+		if (ret) DPRINT((KERN_DEBUG "perfmon: failure check_case1\n"));
 	}
 
 	return ret ? -EINVAL : 0;
