@@ -105,9 +105,8 @@ void
 call_rtas_display_status(char c)
 {
 	struct rtas_args *args = &(get_paca()->xRtas);
-	unsigned long s;
 
-	spin_lock_irqsave(&rtas.lock, s);
+	local_irq_disable();
 
 	args->token = 10;
 	args->nargs = 1;
@@ -552,8 +551,6 @@ void rtas_stop_self(void)
 	printk("%u %u Ready to die...\n",
 	       smp_processor_id(), hard_smp_processor_id());
 	enter_rtas((void *)__pa(rtas_args));
-	spin_unlock_irqrestore(&rtas.lock, s);
-
 	panic("Alas, I survived.\n");
 }
 #endif /* CONFIG_HOTPLUG_CPU */
