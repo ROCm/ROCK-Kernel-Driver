@@ -333,9 +333,14 @@ enum eeprom_op {
 };
 
 enum eeprom_offsets {
+	eeprom_cnfg_mdix  = 0x03,
 	eeprom_id         = 0x0A,
 	eeprom_config_asf = 0x0D,
 	eeprom_smbus_addr = 0x90,
+};
+
+enum eeprom_cnfg_mdix {
+	eeprom_mdix_enabled = 0x0080,
 };
 
 enum eeprom_id {
@@ -1074,7 +1079,9 @@ static int e100_phy_init(struct nic *nic)
 		mdio_write(netdev, nic->mii.phy_id, MII_NSC_CONG, cong);
 	}
 
-	if(nic->mac >= mac_82550_D102)
+	if((nic->mac >= mac_82550_D102) || ((nic->flags & ich) && 
+		(mdio_read(netdev, nic->mii.phy_id, MII_TPISTATUS) & 0x8000) && 
+		(nic->eeprom[eeprom_cnfg_mdix] & eeprom_mdix_enabled)))
 		/* enable/disable MDI/MDI-X auto-switching */
 		mdio_write(netdev, nic->mii.phy_id, MII_NCONFIG,
 			nic->mii.force_media ? 0 : NCONFIG_AUTO_SWITCH);
