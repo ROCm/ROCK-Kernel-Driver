@@ -141,7 +141,7 @@ rtas_call(int token, int nargs, int nret,
 	rtas_args->rets  = (rtas_arg_t *)&(rtas_args->args[nargs]);
 	va_start(list, outputs);
 	for (i = 0; i < nargs; ++i) {
-	  rtas_args->args[i] = (rtas_arg_t)LONG_LSW(va_arg(list, ulong));
+		rtas_args->args[i] = (rtas_arg_t)LONG_LSW(va_arg(list, ulong));
 		PPCDBG(PPCDBG_RTAS, "\tnarg[%d] = 0x%lx\n", i, rtas_args->args[i]);
 	}
 	va_end(list);
@@ -164,8 +164,8 @@ rtas_call(int token, int nargs, int nret,
 	spin_unlock_irqrestore(&rtas.lock, s);
 #endif
 	ifppcdebug(PPCDBG_RTAS) {
-	for(i=0; i < nret ;i++)
-	  udbg_printf("\tnret[%d] = 0x%lx\n", i, (ulong)rtas_args->rets[i]);
+		for(i=0; i < nret ;i++)
+			udbg_printf("\tnret[%d] = 0x%lx\n", i, (ulong)rtas_args->rets[i]);
 	}
 
 	if (nret > 1 && outputs != NULL)
