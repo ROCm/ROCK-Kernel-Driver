@@ -517,7 +517,7 @@ ext3_new_block(handle_t *handle, struct inode *inode, unsigned long goal,
 		sbi->s_resuid != current->fsuid &&
 		(sbi->s_resgid == 0 || !in_group_p (sbi->s_resgid))) {
 		*errp = -ENOSPC;
-		return 0;
+		goto out;
 	}
 
 	/*
