@@ -701,7 +701,7 @@ static void __init irqstack_early_init(void)
 	int i;
 
 	/* interrupt stacks must be under 256MB, we cannot afford to take SLB misses on them */
-	for (i = 0; i < NR_CPUS; i++) {
+	for_each_cpu(i) {
 		softirq_ctx[i] = (struct thread_info *)__va(lmb_alloc_base(THREAD_SIZE,
 					THREAD_SIZE, 0x10000000));
 		hardirq_ctx[i] = (struct thread_info *)__va(lmb_alloc_base(THREAD_SIZE,
