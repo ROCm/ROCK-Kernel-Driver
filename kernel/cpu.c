@@ -29,26 +29,38 @@ void unregister_cpu_notifier(struct notifier_block *nb)
 int __devinit cpu_up(unsigned int cpu)
 {
 	int ret;
+	void *hcpu = (void *)(long)cpu;
 
-	if ((ret = down_interruptible(&cpucontrol)) != 0) 
+	if ((ret = down_interruptible(&cpucontrol)) != 0)
 		return ret;
 
 	if (cpu_online(cpu)) {
 		ret = -EINVAL;
 		goto out;
 	}
+	ret = notifier_call_chain(&cpu_chain, CPU_UP_PREPARE, hcpu);
+	if (ret == NOTIFY_BAD) {
+		printk("%s: attempt to bring up CPU %u failed\n",
+				__FUNCTION__, cpu);
+		ret = -EINVAL;
+		goto out_notify;
+	}
 
 	/* Arch-specific enabling code. */
 	ret = __cpu_up(cpu);
-	if (ret != 0) goto out;
+	if (ret != 0)
+		goto out_notify;
 	if (!cpu_online(cpu))
 		BUG();
 
 	/* Now call notifier in preparation. */
 	printk("CPU %u IS NOW UP!\n", cpu);
-	notifier_call_chain(&cpu_chain, CPU_ONLINE, (void *)(long)cpu);
+	notifier_call_chain(&cpu_chain, CPU_ONLINE, hcpu);
 
- out:
+out_notify:
+	if (ret != 0)
+		notifier_call_chain(&cpu_chain, CPU_UP_CANCELED, hcpu);
+out:
 	up(&cpucontrol);
 	return ret;
 }

@@ -316,9 +316,8 @@ static int __devinit cpu_callback(struct notifier_block *nfb,
 
 		while (!ksoftirqd_task(hotcpu))
 			yield();
-		return NOTIFY_OK;
  	}
-	return NOTIFY_BAD;
+	return NOTIFY_OK;
 }
 
 static struct notifier_block cpu_nfb = { &cpu_callback, NULL, 0 };
