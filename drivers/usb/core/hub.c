@@ -231,6 +231,8 @@ static void hub_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_hub *hub = (struct usb_hub *)urb->context;
 	int status;
+	int i;
+	unsigned long bits;
 
 	spin_lock(&hub_event_lock);
 	hub->urb_active = 0;
@@ -255,6 +257,11 @@ static void hub_irq(struct urb *urb, struct pt_regs *regs)
 	
 	/* let khubd handle things */
 	case 0:			/* we got data:  port status changed */
+		bits = 0;
+		for (i = 0; i < urb->actual_length; ++i)
+			bits |= ((unsigned long) ((*hub->buffer)[i]))
+					<< (i*8);
+		hub->event_bits[0] = bits;
 		break;
 	}
 
@@ -262,7 +269,7 @@ static void hub_irq(struct urb *urb, struct pt_regs *regs)
 
 	/* Something happened, let khubd figure it out */
 	if (list_empty(&hub->event_list)) {
-		list_add(&hub->event_list, &hub_event_list);
+		list_add_tail(&hub->event_list, &hub_event_list);
 		wake_up(&khubd_wait);
 	}
 
@@ -1776,7 +1783,10 @@ static void hub_events(void)
 			hub->error = 0;
 		}
 
+		/* deal with port status changes */
 		for (i = 0; i < hub->descriptor->bNbrPorts; i++) {
+			if (!test_and_clear_bit(i+1, hub->event_bits))
+				continue;
 			ret = hub_port_status(hdev, i, &portstatus, &portchange);
 			if (ret < 0)
 				continue;
@@ -1846,7 +1856,9 @@ static void hub_events(void)
 		} /* end for i */
 
 		/* deal with hub status changes */
-		if (hub_hub_status(hub, &hubstatus, &hubchange) < 0)
+		if (test_and_clear_bit(0, hub->event_bits) == 0)
+			;	/* do nothing */
+		else if (hub_hub_status(hub, &hubstatus, &hubchange) < 0)
 			dev_err (hub_dev, "get_hub_status failed\n");
 		else {
 			if (hubchange & HUB_CHANGE_LOCAL_POWER) {

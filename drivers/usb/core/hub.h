@@ -203,6 +203,10 @@ struct usb_hub {
 	int			nerrors;	/* track consecutive errors */
 
 	struct list_head	event_list;	/* hubs w/data or errs ready */
+	unsigned long		event_bits[1];	/* status change bitmask */
+#if USB_MAXCHILDREN > 31 /* 8*sizeof(unsigned long) - 1 */
+#error event_bits[] is too short!
+#endif
 
 	struct usb_hub_descriptor *descriptor;	/* class descriptor */
 	struct usb_tt		tt;		/* Transaction Translator */
