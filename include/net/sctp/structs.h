@@ -590,13 +590,16 @@ struct sctp_packet {
 	/* This packet should advertise ECN capability to the network
 	 * via the ECT bit.
 	 */
-	int ecn_capable;
+	char ecn_capable;
 
 	/* This packet contains a COOKIE-ECHO chunk. */
-	int has_cookie_echo;
+	char has_cookie_echo;
+
+	/* This packet containsa SACK chunk. */
+	char has_sack; 
 
 	/* SCTP cannot fragment this packet. So let ip fragment it. */
-	int ipfragok;
+	char ipfragok;
 
 	int malloced;
 };

@@ -357,7 +357,7 @@ void sctp_retransmit(struct sctp_outq *q, struct sctp_transport *transport,
 	__u8 fast_retransmit = 0;
 
 	switch(reason) {
-	case SCTP_RETRANSMIT_T3_RTX:
+	case SCTP_RTXR_T3_RTX:
 		sctp_transport_lower_cwnd(transport, SCTP_LOWER_CWND_T3_RTX);
 		/* Update the retran path if the T3-rtx timer has expired for
 		 * the current retran path.
@@ -365,10 +365,11 @@ void sctp_retransmit(struct sctp_outq *q, struct sctp_transport *transport,
 		if (transport == transport->asoc->peer.retran_path)
 			sctp_assoc_update_retran_path(transport->asoc);
 		break;
-	case SCTP_RETRANSMIT_FAST_RTX:
+	case SCTP_RTXR_FAST_RTX:
 		sctp_transport_lower_cwnd(transport, SCTP_LOWER_CWND_FAST_RTX);
 		fast_retransmit = 1;
 		break;
+	case SCTP_RTXR_PMTUD:
 	default:
 		break;
 	}
@@ -876,7 +877,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 		start_timer = 0;
 		queue = &q->out;
 
-		while (NULL != (chunk = sctp_outq_dequeue_data(q))) {
+		while ((chunk = sctp_outq_dequeue_data(q))) {
 			/* RFC 2960 6.5 Every DATA chunk MUST carry a valid
 			 * stream identifier.
 			 */
@@ -891,9 +892,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 				if (ev)
 					sctp_ulpq_tail_event(&asoc->ulpq, ev);
 
-				/* Free the chunk. This chunk is not on any
-				 * list yet, just free it.
-				 */
+				/* Free the chunk. */
 				sctp_free_chunk(chunk);
 				continue;
 			}
@@ -1572,7 +1571,7 @@ static void sctp_check_transmitted(struct sctp_outq *q,
 
 	if (transport) {
 		if (do_fast_retransmit)
-			sctp_retransmit(q, transport, SCTP_RETRANSMIT_FAST_RTX);
+			sctp_retransmit(q, transport, SCTP_RTXR_FAST_RTX);
 
 		SCTP_DEBUG_PRINTK("%s: transport: %p, cwnd: %d, "
 				  "ssthresh: %d, flight_size: %d, pba: %d\n",
