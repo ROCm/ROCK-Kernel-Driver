@@ -5,14 +5,12 @@ PROG=	aicasm
 CSRCS=	aicasm.c aicasm_symbol.c
 YSRCS=	aicasm_gram.y aicasm_macro_gram.y
 LSRCS=	aicasm_scan.l aicasm_macro_scan.l
+
 GENHDRS=	aicdb.h $(YSRCS:.y=.h)
 GENSRCS=	$(YSRCS:.y=.c) $(LSRCS:.l=.c)
 
 SRCS=	${CSRCS} ${GENSRCS}
-
-# Cleaned up by make clean in kernel build
-clean-files := ${GENSRCS} ${GENHDRS} $(YSRCS:.y=.output) $(PROG)
-
+CLEANFILES= ${GENSRCS} ${GENHDRS} $(YSRCS:.y=.output)
 # Override default kernel CFLAGS.  This is a userland app.
 AICASM_CFLAGS:= -I/usr/include -I. -ldb
 YFLAGS= -d
@@ -46,6 +44,9 @@ aicdb.h:
 	 else							\
 		echo "*** Install db development libraries";	\
 	 fi
+
+clean:
+	rm -f $(CLEANFILES) $(PROG)
 
 aicasm_gram.c aicasm_gram.h: aicasm_gram.y
 	$(YACC) $(YFLAGS) -b $(<:.y=) $<

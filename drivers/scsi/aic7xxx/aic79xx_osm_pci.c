@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm_pci.c#13 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm_pci.c#17 $
  */
 
 #include "aic79xx_osm.h"
@@ -88,7 +88,7 @@ ahd_linux_pci_dev_remove(struct pci_dev *pdev)
 	 * list for extra sanity.
 	 */
 	ahd_list_lock(&l);
-	ahd = ahd_find_softc((struct ahd_softc *)pdev->driver_data);
+	ahd = ahd_find_softc((struct ahd_softc *)pci_get_drvdata(pdev));
 	if (ahd != NULL) {
 		u_long s;
 
@@ -179,7 +179,7 @@ ahd_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		return (-error);
 	}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-	pdev->driver_data = ahd;
+	pci_set_drvdata(pdev, ahd);
 	if (aic79xx_detect_complete)
 		ahd_linux_register_host(ahd, aic79xx_driver_template);
 #endif
@@ -268,8 +268,7 @@ ahd_linux_pci_reserve_mem_region(struct ahd_softc *ahd,
 	if (aic79xx_allow_memio == 0)
 		return (ENOMEM);
 
-	if ((ahd->chip & AHD_BUS_MASK) == AHD_PCIX
-	 && (ahd->bugs & AHD_PCIX_MMAPIO_BUG) != 0)
+	if ((ahd->bugs & AHD_PCIX_MMAPIO_BUG) != 0)
 		return (ENOMEM);
 
 	error = 0;
@@ -330,17 +329,18 @@ ahd_pci_map_registers(struct ahd_softc *ahd)
 		ahd_pci_write_config(ahd->dev_softc, PCIR_COMMAND,
 				     command | PCIM_CMD_MEMEN, 4);
 
-		/*
-		 * Do a quick test to see if memory mapped
-		 * I/O is functioning correctly.
-		 */
-		if (ahd_inb(ahd, HCNTRL) == 0xFF) {
+		if (ahd_pci_test_register_access(ahd) != 0) {
 
 			printf("aic79xx: PCI Device %d:%d:%d "
-			       "failed memory mapped test\n",
+			       "failed memory mapped test.  Using PIO.\n",
 			       ahd_get_pci_bus(ahd->dev_softc),
 			       ahd_get_pci_slot(ahd->dev_softc),
 			       ahd_get_pci_function(ahd->dev_softc));
+			iounmap((void *)((u_long)maddr & PAGE_MASK));
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
+			release_mem_region(ahd->platform_data->mem_busaddr,
+					   0x1000);
+#endif
 			ahd->bshs[0].maddr = NULL;
 			maddr = NULL;
 		} else

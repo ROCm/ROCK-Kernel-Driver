@@ -38,12 +38,11 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aicasm/aicasm_gram.y#24 $
+ * $Id: //depot/aic7xxx/aic7xxx/aicasm/aicasm_gram.y#27 $
  *
  * $FreeBSD$
  */
 
-#include <inttypes.h>
 #include <sys/types.h>
 
 #include <inttypes.h>
@@ -995,6 +994,7 @@ critical_section_start:
 		cs->begin_addr = instruction_ptr;
 		in_critical_section = TRUE;
 	}
+;
 
 critical_section_end:
 	T_END_CS ';'
@@ -1009,6 +1009,7 @@ critical_section_end:
 		cs->end_addr = instruction_ptr;
 		in_critical_section = FALSE;
 	}
+;
 
 export:
 	{ $$ = 0; }
@@ -1250,8 +1251,8 @@ code:
 			 * that can't know the immediate's value and
 			 * otherwise compensate, still work.
 			 */
-			make_expression(&immed, 0xff);
-			format_1_instr(AIC_OP_AND, &$2, &immed, &allzeros, $5);
+			make_expression(&immed, 1);
+			format_1_instr(AIC_OP_BMOV, &$2, &immed, &allzeros, $5);
 		} else {
 			format_1_instr(AIC_OP_OR, &$2, &$4, &allzeros, $5);
 		}

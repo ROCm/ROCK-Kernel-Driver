@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_host.h#10 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_host.h#12 $
  */
 
 #ifndef _AIC7XXX_HOST_H_
@@ -48,8 +48,14 @@ int		 ahc_linux_detect(Scsi_Host_Template *);
 int		 ahc_linux_release(struct Scsi_Host *);
 const char	*ahc_linux_info(struct Scsi_Host *);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-int		 ahc_linux_biosparam(Disk *, struct block_device *, int[]);
+int		 ahc_linux_slave_alloc(Scsi_Device *);
+int		 ahc_linux_slave_configure(Scsi_Device *);
+void		 ahc_linux_slave_destroy(Scsi_Device *);
+int		 ahd_linux_biosparam(struct scsi_device*, struct block_device*,
+				     sector_t, int[]);
 #else
+void		 ahc_linux_select_queue_depth(struct Scsi_Host *host,
+					      Scsi_Device *scsi_devs);
 int		 ahc_linux_biosparam(Disk *, kdev_t, int[]);
 #endif
 int		 ahc_linux_bus_reset(Scsi_Cmnd *);
@@ -67,24 +73,14 @@ int		 ahc_linux_abort(Scsi_Cmnd *);
  * to do with card config are filled in after the card is detected.
  */
 #define AIC7XXX_TEMPLATE_CORE					\
-	next: NULL,						\
-	module: NULL,						\
-	proc_dir: NULL,						\
 	proc_info: ahc_linux_proc_info,				\
-	name: NULL,						\
 	detect: ahc_linux_detect,				\
 	release: ahc_linux_release,				\
 	info: ahc_linux_info,					\
-	command: NULL,						\
 	queuecommand: ahc_linux_queue,				\
-	eh_strategy_handler: NULL,				\
 	eh_abort_handler: ahc_linux_abort,			\
 	eh_device_reset_handler: ahc_linux_dev_reset,		\
 	eh_bus_reset_handler: ahc_linux_bus_reset,		\
-	eh_host_reset_handler: NULL,				\
-	abort: NULL,						\
-	reset: NULL,						\
-	slave_attach: NULL,					\
 	bios_param: AIC7XXX_BIOSPARAM,				\
 	can_queue: AHC_MAX_QUEUE,/* max simultaneous cmds     */\
 	this_id: -1,		 /* scsi id of host adapter   */\
@@ -96,11 +92,15 @@ int		 ahc_linux_abort(Scsi_Cmnd *);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 #define AIC7XXX {						\
-	AIC7XXX_TEMPLATE_CORE					\
+	AIC7XXX_TEMPLATE_CORE,					\
+	slave_alloc: ahc_linux_slave_alloc,			\
+	slave_configure: ahc_linux_slave_configure,		\
+	slave_destroy: ahc_linux_slave_destroy			\
 }
 #else
 #define AIC7XXX {						\
 	AIC7XXX_TEMPLATE_CORE,					\
+	select_queue_depths: ahc_linux_select_queue_depth,	\
 	use_new_eh_code: 1					\
 }
 #endif

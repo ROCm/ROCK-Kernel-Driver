@@ -29,13 +29,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/cam.h#13 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/cam.h#15 $
  */
 
 #ifndef _AIC7XXX_CAM_H
 #define _AIC7XXX_CAM_H 1
 
-/* Provide a mapping from CAM constructs to Linux SCSI constructs */
+#include <linux/types.h>
 
 #define	CAM_BUS_WILDCARD ((u_int)~0)
 #define	CAM_TARGET_WILDCARD ((u_int)~0)
@@ -43,58 +43,34 @@
 
 /* CAM Status field values */
 typedef enum {
-	/* CCB request is in progress */
-	CAM_REQ_INPROG		= 0x3F, /* Some value unused by Linux */
-	/* CCB request completed without error */
-	CAM_REQ_CMP		= DID_OK,
-	/* CCB request aborted by the host */
-	CAM_REQ_ABORTED		= DID_ABORT,
-	/* Unable to abort CCB request */
-	CAM_UA_ABORT		= DID_ERROR,
-	/* CCB request completed with an error */
-	CAM_REQ_CMP_ERR		= DID_ERROR,
-	/* CAM subsytem is busy */
-	CAM_BUSY		= DID_BUS_BUSY,
-	/* CCB request was invalid */
-	CAM_REQ_INVALID		= DID_BAD_TARGET,
-	/* Supplied Path ID is invalid */
-	CAM_PATH_INVALID	= DID_BAD_TARGET,
-	/* Target Selection Timeout */
-	CAM_SEL_TIMEOUT		= DID_NO_CONNECT,
-	/* Command timeout */
-	CAM_CMD_TIMEOUT		= DID_ERROR, /*
-					      * Should never occur in Linux
-					      * as the upper level code
-					      * handles all timeout processing.
-					      */
-	/* SCSI error, look at error code in CCB */
-	CAM_SCSI_STATUS_ERROR	= DID_OK, /* Linux looks at status byte */
-	/* SCSI Bus Reset Sent/Received */
-	CAM_SCSI_BUS_RESET	= DID_RESET,
-	/* Uncorrectable parity error occurred */
-	CAM_UNCOR_PARITY	= DID_PARITY,
-	/* Autosense: request sense cmd fail */
-	CAM_AUTOSENSE_FAIL	= DID_ERROR,
-	/* No HBA Detected Error */
-	CAM_NO_HBA		= DID_ERROR,
-	/* Data Overrun error */
-	CAM_DATA_RUN_ERR	= DID_ERROR,
-	/* Unexpected Bus Free */
-	CAM_UNEXP_BUSFREE	= DID_ERROR,
-	/* Protocol Violation */
-	CAM_SEQUENCE_FAIL	= DID_ERROR,
-	/* CCB length supplied is inadequate */
-	CAM_CCB_LEN_ERR		= DID_ERROR,
-	/* Unable to provide requested capability */
-	CAM_PROVIDE_FAIL	= DID_ERROR,
-	/* A SCSI BDR msg was sent to target */
-	CAM_BDR_SENT		= DID_RESET,
-	/* CCB request terminated by the host */
-	CAM_REQ_TERMIO		= DID_ERROR,
-	/* Unrecoverable Host Bus Adapter Error */
-	CAM_UNREC_HBA_ERROR	= DID_ERROR,
-	/* The request was too large for this host */
-	CAM_REQ_TOO_BIG		= DID_ERROR,
+	CAM_REQ_INPROG,		/* CCB request is in progress */
+	CAM_REQ_CMP,		/* CCB request completed without error */
+	CAM_REQ_ABORTED,	/* CCB request aborted by the host */
+	CAM_UA_ABORT,		/* Unable to abort CCB request */
+	CAM_REQ_CMP_ERR,	/* CCB request completed with an error */
+	CAM_BUSY,		/* CAM subsytem is busy */
+	CAM_REQ_INVALID,	/* CCB request was invalid */
+	CAM_PATH_INVALID,	/* Supplied Path ID is invalid */
+	CAM_SEL_TIMEOUT,	/* Target Selection Timeout */
+	CAM_CMD_TIMEOUT,	/* Command timeout */
+	CAM_SCSI_STATUS_ERROR,	/* SCSI error, look at error code in CCB */
+	CAM_SCSI_BUS_RESET,	/* SCSI Bus Reset Sent/Received */
+	CAM_UNCOR_PARITY,	/* Uncorrectable parity error occurred */
+	CAM_AUTOSENSE_FAIL,	/* Autosense: request sense cmd fail */
+	CAM_NO_HBA,		/* No HBA Detected Error */
+	CAM_DATA_RUN_ERR,	/* Data Overrun error */
+	CAM_UNEXP_BUSFREE,	/* Unexpected Bus Free */
+	CAM_SEQUENCE_FAIL,	/* Protocol Violation */
+	CAM_CCB_LEN_ERR,	/* CCB length supplied is inadequate */
+	CAM_PROVIDE_FAIL,	/* Unable to provide requested capability */
+	CAM_BDR_SENT,		/* A SCSI BDR msg was sent to target */
+	CAM_REQ_TERMIO,		/* CCB request terminated by the host */
+	CAM_UNREC_HBA_ERROR,	/* Unrecoverable Host Bus Adapter Error */
+	CAM_REQ_TOO_BIG,	/* The request was too large for this host */
+	CAM_UA_TERMIO,		/* Unable to terminate I/O CCB request */
+	CAM_MSG_REJECT_REC,	/* Message Reject Received */
+	CAM_DEV_NOT_THERE,	/* SCSI Device Not Installed/there */
+	CAM_RESRC_UNAVAIL,	/* Resource Unavailable */
 	/*
 	 * This request should be requeued to preserve
 	 * transaction ordering.  This typically occurs
@@ -103,7 +79,8 @@ typedef enum {
 	 * requests for the target at the sim level
 	 * back into the XPT queue.
 	 */
-	CAM_REQUEUE_REQ		= 0x3E, /* Another unsued value.*/
+	CAM_REQUEUE_REQ,
+	CAM_DEV_QFRZN		= 0x40,
 
 	CAM_STATUS_MASK		= 0x3F
 } cam_status;

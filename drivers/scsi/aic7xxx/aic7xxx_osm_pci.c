@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm_pci.c#37 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm_pci.c#40 $
  */
 
 #include "aic7xxx_osm.h"
@@ -93,7 +93,7 @@ ahc_linux_pci_dev_remove(struct pci_dev *pdev)
 	 * list for extra sanity.
 	 */
 	ahc_list_lock(&l);
-	ahc = ahc_find_softc((struct ahc_softc *)pdev->driver_data);
+	ahc = ahc_find_softc((struct ahc_softc *)pci_get_drvdata(pdev));
 	if (ahc != NULL) {
 		u_long s;
 
@@ -310,10 +310,10 @@ ahc_pci_map_registers(struct ahc_softc *ahc)
 		 * Do a quick test to see if memory mapped
 		 * I/O is functioning correctly.
 		 */
-		if (ahc_inb(ahc, HCNTRL) == 0xFF) {
+		if (ahc_pci_test_register_access(ahc) != 0) {
 
 			printf("aic7xxx: PCI Device %d:%d:%d "
-			       "failed memory mapped test\n",
+			       "failed memory mapped test.  Using PIO.\n",
 			       ahc_get_pci_bus(ahc->dev_softc),
 			       ahc_get_pci_slot(ahc->dev_softc),
 			       ahc_get_pci_function(ahc->dev_softc));

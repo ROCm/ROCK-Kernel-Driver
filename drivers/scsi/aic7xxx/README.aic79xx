@@ -109,7 +109,7 @@ The following information is available in this file:
        Default Value: disabled
    -----------------------------------------------------------------
               Option: reverse_scan
-          Definition: Probe the scsi bus in reverse oder, starting
+          Definition: Probe the scsi bus in reverse order, starting
                       with target 15
      Possible Values: This option is a flag
        Default Value: disabled
@@ -144,20 +144,20 @@ The following information is available in this file:
      Possible Values: 1 - 253
        Default Value: 32
    -----------------------------------------------------------------
-              Option: rd_strm: {{rd_strm_bitmask}[,{rd_strm_bitmask}...]}
+              Option: rd_strm: {rd_strm_bitmask[,rd_strm_bitmask...]}
           Definition: Enable read streaming on a per target basis.
                       The rd_strm_bitmask is a 16 bit hex value in which
 		      each bit represents a target.  Setting the target's
                       bit to '1' enables read streaming for that
                       target.  Controllers may be ommitted indicating that
 		      they should retain the default read streaming setting.
-	     Example: rd_strm:{{0x0041}}
+	     Example: rd_strm:{0x0041}
 			On Controller 0
 			  enables read streaming for targets 0 and 6.
 			  disables read streaming for targets 1-5,7-15.
 			All other targets retain the default read
 			streaming setting.
-	     Example: rd_strm:{{0x0023},{},{0xFFFF}}
+	     Example: rd_strm:{0x0023,,0xFFFF}
 			On Controller 0
 			  enables read streaming for targets 1,2, and 5.
 			  disables read streaming for targets 3,4,6-15.
@@ -168,6 +168,46 @@ The following information is available in this file:
 		      
      Possible Values: 0x0000 - 0xffff
        Default Value: 0x0000
+   -----------------------------------------------------------------
+              Option: precomp: {value[,value...]}
+          Definition: Set IO Cell precompensation value on a per-controller
+		      basis.
+                      Controllers may be ommitted indicating that
+		      they should retain the default precompensation setting.
+	     Example: precomp:{0x1}
+			On Controller 0 set precompensation to 1.
+	     Example: precomp:{1,,7}
+			On Controller 0 set precompensation to 1.
+			On Controller 2 set precompensation to 8.
+		      
+     Possible Values: 0 - 7
+       Default Value: Varies based on chip revision
+   -----------------------------------------------------------------
+              Option: slewrate: {value[,value...]}
+          Definition: Set IO Cell slew rate on a per-controller basis.
+                      Controllers may be ommitted indicating that
+		      they should retain the default slew rate setting.
+	     Example: slewrate:{0x1}
+			On Controller 0 set slew rate to 1.
+	     Example: slewrate :{1,,8}
+			On Controller 0 set slew rate to 1.
+			On Controller 2 set slew rate to 8.
+		      
+     Possible Values: 0 - 15
+       Default Value: Varies based on chip revision
+   -----------------------------------------------------------------
+              Option: amplitude: {value[,value...]}
+          Definition: Set IO Cell signal amplitude on a per-controller basis.
+                      Controllers may be ommitted indicating that
+		      they should retain the default read streaming setting.
+	     Example: amplitude:{0x1}
+			On Controller 0 set amplitude to 1.
+	     Example: amplitude :{1,,7}
+			On Controller 0 set amplitude to 1.
+			On Controller 2 set amplitude to 7.
+		      
+     Possible Values: 1 - 7
+       Default Value: Varies based on chip revision
    -----------------------------------------------------------------
               Option: seltime:[value]
           Definition: Specifies the selection timeout value

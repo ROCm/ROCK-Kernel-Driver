@@ -168,7 +168,7 @@ The following information is available in this file:
        Default Value: disabled
    -----------------------------------------------------------------
               Option: reverse_scan
-          Definition: Probe the scsi bus in reverse oder, starting
+          Definition: Probe the scsi bus in reverse order, starting
                       with target 15
      Possible Values: This option is a flag
        Default Value: disabled

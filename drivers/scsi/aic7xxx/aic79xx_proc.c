@@ -37,14 +37,13 @@
  * String handling code courtesy of Gerard Roudier's <groudier@club-internet.fr>
  * sym driver.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_proc.c#7 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_proc.c#9 $
  */
 #include "aic79xx_osm.h"
 #include "aic79xx_inline.h"
 
 static void	copy_mem_info(struct info_str *info, char *data, int len);
 static int	copy_info(struct info_str *info, char *fmt, ...);
-static u_int	scsi_calc_syncsrate(u_int period_factor);
 static void	ahd_dump_target_state(struct ahd_softc *ahd,
 				      struct info_str *info,
 				      u_int our_id, char channel,
@@ -96,48 +95,6 @@ copy_info(struct info_str *info, char *fmt, ...)
 	return (len);
 }
 
-/*
- * Table of syncrates that don't follow the "divisible by 4"
- * rule. This table will be expanded in future SCSI specs.
- */
-static struct {
-	u_int period_factor;
-	u_int period;	/* in 100ths of ns */
-} scsi_syncrates[] = {
-	{ 0x08,  625 },	/* FAST-160 */
-	{ 0x09, 1250 },	/* FAST-80 */
-	{ 0x0a, 2500 },	/* FAST-40 40MHz */
-	{ 0x0b, 3030 },	/* FAST-40 33MHz */
-	{ 0x0c, 5000 }	/* FAST-20 */
-};
- 
-/*
- * Return the frequency in kHz corresponding to the given
- * sync period factor.
- */
-static u_int
-scsi_calc_syncsrate(u_int period_factor)
-{
-	int i; 
-	int num_syncrates;
- 
-	num_syncrates = sizeof(scsi_syncrates) / sizeof(scsi_syncrates[0]);
-	/* See if the period is in the "exception" table */
-	for (i = 0; i < num_syncrates; i++) {
-
-		if (period_factor == scsi_syncrates[i].period_factor) {
-       			/* Period in kHz */
-			return (100000000 / scsi_syncrates[i].period);
-		}
-	}
-
-	/*
-	 * Wasn't in the table, so use the standard
-	 * 4 times conversion.
-	 */
-	return (10000000 / (period_factor * 4 * 10));
-}
-
 void
 ahd_format_transinfo(struct info_str *info, struct ahd_transinfo *tinfo)
 {
@@ -145,10 +102,14 @@ ahd_format_transinfo(struct info_str *info, struct ahd_transinfo *tinfo)
 	u_int freq;
 	u_int mb;
 
+	if (tinfo->period == AHD_PERIOD_UNKNOWN) {
+		copy_info(info, "Renegotiation Pending");
+		return;
+	}
         speed = 3300;
         freq = 0;
 	if (tinfo->offset != 0) {
-		freq = scsi_calc_syncsrate(tinfo->period);
+		freq = aic_calc_syncsrate(tinfo->period);
 		speed = freq;
 	}
 	speed *= (0x01 << tinfo->width);
@@ -159,10 +120,28 @@ ahd_format_transinfo(struct info_str *info, struct ahd_transinfo *tinfo)
 		copy_info(info, "%dKB/s transfers", speed);
 
 	if (freq != 0) {
-		copy_info(info, " (%d.%03dMHz%s, offset %d",
-			 freq / 1000, freq % 1000,
-			 (tinfo->ppr_options & MSG_EXT_PPR_DT_REQ) != 0
-			 ? " DT" : "", tinfo->offset);
+		int	printed_options;
+
+		printed_options = 0;
+		copy_info(info, " (%d.%03dMHz", freq / 1000, freq % 1000);
+		if ((tinfo->ppr_options & MSG_EXT_PPR_DT_REQ) != 0) {
+			copy_info(info, " DT");
+			printed_options++;
+		}
+		if ((tinfo->ppr_options & MSG_EXT_PPR_IU_REQ) != 0) {
+			copy_info(info, "%s", printed_options ? "|IU" : " IU");
+			printed_options++;
+		}
+		if ((tinfo->ppr_options & MSG_EXT_PPR_RTI) != 0) {
+			copy_info(info, "%s",
+				  printed_options ? "|RTI" : " RTI");
+			printed_options++;
+		}
+		if ((tinfo->ppr_options & MSG_EXT_PPR_QAS_REQ) != 0) {
+			copy_info(info, "%s",
+				  printed_options ? "|QAS" : " QAS");
+			printed_options++;
+		}
 	}
 
 	if (tinfo->width > 0) {
