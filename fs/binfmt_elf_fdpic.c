@@ -315,7 +315,8 @@ static int load_elf_fdpic_binary(struct linux_binprm *bprm, struct pt_regs *regs
 		goto error_kill;
 
 	if (interpreter_name) {
-		retval = elf_fdpic_map_file(&interp_params, interpreter, NULL, "interpreter");
+		retval = elf_fdpic_map_file(&interp_params, interpreter,
+					    current->mm, "interpreter");
 		if (retval < 0) {
 			printk(KERN_ERR "Unable to load interpreter\n");
 			goto error_kill;
@@ -341,6 +342,7 @@ static int load_elf_fdpic_binary(struct linux_binprm *bprm, struct pt_regs *regs
 	if (stack_size < PAGE_SIZE * 2)
 		stack_size = PAGE_SIZE * 2;
 
+	down_write(&current->mm->mmap_sem);
 	current->mm->start_brk = do_mmap(NULL,
 					 0,
 					 stack_size,
@@ -349,12 +351,12 @@ static int load_elf_fdpic_binary(struct linux_binprm *bprm, struct pt_regs *regs
 					 0);
 
 	if (IS_ERR((void *) current->mm->start_brk)) {
+		up_write(&current->mm->mmap_sem);
 		retval = current->mm->start_brk;
 		current->mm->start_brk = 0;
 		goto error_kill;
 	}
 
-	down_write(&current->mm->mmap_sem);
 	if (do_mremap(current->mm->start_brk,
 		      stack_size,
 		      ksize((char *) current->mm->start_brk),
@@ -381,9 +383,6 @@ static int load_elf_fdpic_binary(struct linux_binprm *bprm, struct pt_regs *regs
 	kdebug("- end_data    %lx",	(long) current->mm->end_data);
 	kdebug("- start_brk   %lx",	(long) current->mm->start_brk);
 	kdebug("- brk         %lx",	(long) current->mm->brk);
-#ifndef CONFIG_MMU
-	kdebug("- end_brk     %lx",	(long) current->mm->end_brk);
-#endif
 	kdebug("- start_stack %lx",	(long) current->mm->start_stack);
 
 #ifdef ELF_FDPIC_PLAT_INIT
@@ -870,8 +869,10 @@ static int elf_fdpic_map_file_constdisp_on_uclinux(struct elf_fdpic_params *para
 	if (params->flags & ELF_FDPIC_FLAG_EXECUTABLE)
 		mflags |= MAP_EXECUTABLE;
 
+	down_write(&mm->mmap_sem);
 	maddr = do_mmap(NULL, load_addr, top - base,
 			PROT_READ | PROT_WRITE | PROT_EXEC, mflags, 0);
+	up_write(&mm->mmap_sem);
 	if (IS_ERR((void *) maddr))
 		return (int) maddr;
 
@@ -957,7 +958,10 @@ static int elf_fdpic_map_file_by_direct_mmap(struct elf_fdpic_params *params,
 			continue;
 
 		kdebug("[LOAD] va=%lx of=%lx fs=%lx ms=%lx",
-		       phdr->p_vaddr, phdr->p_offset, phdr->p_filesz, phdr->p_memsz);
+		       (unsigned long) phdr->p_vaddr,
+		       (unsigned long) phdr->p_offset,
+		       (unsigned long) phdr->p_filesz,
+		       (unsigned long) phdr->p_memsz);
 
 		/* determine the mapping parameters */
 		if (phdr->p_flags & PF_R) prot |= PROT_READ;
@@ -1008,8 +1012,10 @@ static int elf_fdpic_map_file_by_direct_mmap(struct elf_fdpic_params *params,
 
 		/* create the mapping */
 		disp = phdr->p_vaddr & ~PAGE_MASK;
+		down_write(&mm->mmap_sem);
 		maddr = do_mmap(file, maddr, phdr->p_memsz + disp, prot, flags,
 				phdr->p_offset - disp);
+		up_write(&mm->mmap_sem);
 
 		kdebug("mmap[%d] <file> sz=%lx pr=%x fl=%x of=%lx --> %08lx",
 		       loop, phdr->p_memsz + disp, prot, flags, phdr->p_offset - disp,
@@ -1051,7 +1057,9 @@ static int elf_fdpic_map_file_by_direct_mmap(struct elf_fdpic_params *params,
 			unsigned long xmaddr;
 
 			flags |= MAP_FIXED | MAP_ANONYMOUS;
+			down_write(&mm->mmap_sem);
 			xmaddr = do_mmap(NULL, xaddr, excess - excess1, prot, flags, 0);
+			up_write(&mm->mmap_sem);
 
 			kdebug("mmap[%d] <anon>"
 			       " ad=%lx sz=%lx pr=%x fl=%x of=0 --> %08lx",
