@@ -559,10 +559,10 @@ static int dev_ifconf(unsigned int fd, unsigned int cmd, unsigned long arg)
 
 static int ethtool_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-	struct ifreq *ifr;
-	struct ifreq32 *ifr32;
+	struct ifreq __user *ifr;
+	struct ifreq32 __user *ifr32;
 	u32 data;
-	void *datap;
+	void __user *datap;
 	
 	ifr = compat_alloc_user_space(sizeof(*ifr));
 	ifr32 = compat_ptr(arg);
