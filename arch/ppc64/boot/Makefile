@@ -33,7 +33,7 @@ BOOTLFLAGS	:= -Ttext 0x00400000 -e _start -T $(obj)/zImage.lds
 BOOTOBJCOPY	:= $(CROSS32_COMPILE)objcopy
 OBJCOPYFLAGS    := contents,alloc,load,readonly,data
 
-src-boot := crt0.S string.S prom.c main.c zlib.c imagesize.c
+src-boot := crt0.S string.S prom.c main.c zlib.c imagesize.c div64.S
 src-boot := $(addprefix $(obj)/, $(src-boot))
 obj-boot := $(addsuffix .o, $(basename $(src-boot)))
 
