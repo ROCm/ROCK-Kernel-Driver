@@ -4,9 +4,9 @@ SUBLEVEL = 41
 EXTRAVERSION =
 
 # *DOCUMENTATION*
-# Too see a list of typical targets execute "make help"
+# To see a list of typical targets execute "make help"
 # More info can be located in ./Documentation/kbuild
-# Comments in this file is targeted only to the developer, do not
+# Comments in this file are targeted only to the developer, do not
 # expect to learn how to build the kernel reading this file.
 
 # We are using a recursive build, so we need to do a little thinking
