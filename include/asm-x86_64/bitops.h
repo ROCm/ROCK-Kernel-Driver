@@ -338,7 +338,7 @@ static __inline__ int find_first_bit(const unsigned long * addr, unsigned size)
 		"jz 1f\n\t"
 		"leaq -4(%%rdi),%%rdi\n\t"
 		"bsfq (%%rdi),%%rax\n"
-		"1:\tsubl %%ebx,%%edi\n\t"
+		"1:\tsubq %%rbx,%%rdi\n\t"
 		"shll $3,%%edi\n\t"
 		"addl %%edi,%%eax"
 		:"=a" (res), "=&c" (d0), "=&D" (d1)
