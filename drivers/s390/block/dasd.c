@@ -178,6 +178,7 @@ dasd_state_new_to_known(dasd_device_t *device)
 	umode_t devfs_perm;
 	devfs_handle_t dir;
 	int major, minor;
+	char buf[20];
 
 	/* Increase reference count of bdev. */
 	if (bdget(MKDEV(device->gdp->major, device->gdp->first_minor)) == NULL)
@@ -198,7 +199,9 @@ dasd_state_new_to_known(dasd_device_t *device)
 		devfs_perm = S_IFBLK | S_IRUSR;
 	else
 		devfs_perm = S_IFBLK | S_IRUSR | S_IWUSR;
-	device->devfs_entry = devfs_register(dir, "device", DEVFS_FL_DEFAULT,
+
+	snprintf(buf, sizeof(buf), "dasd/%04x/device", device->devno);
+	device->devfs_entry = devfs_register(NULL, buf, 0,
 					     major, minor << DASD_PARTN_BITS,
 					     devfs_perm,
 					     &dasd_device_operations, NULL);

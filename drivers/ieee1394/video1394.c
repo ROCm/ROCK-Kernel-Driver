@@ -1251,7 +1251,7 @@ static int video1394_init(struct ti_ohci *ohci)
 {
 	struct video_card *video;
 	unsigned long flags;
-	char name[16];
+	char name[24];
 	int minor;
 
 	video = kmalloc(sizeof(struct video_card), GFP_KERNEL);
@@ -1270,9 +1270,9 @@ static int video1394_init(struct ti_ohci *ohci)
 	video->id = ohci->id;
 	video->ohci = ohci;
 
-	sprintf(name, "%d", video->id);
+	sprintf(name, "%s/%d", VIDEO1394_DRIVER_NAME, video->id);
 	minor = IEEE1394_MINOR_BLOCK_VIDEO1394 * 16 + video->id;
-	video->devfs = devfs_register(devfs_handle, name, DEVFS_FL_DEFAULT,
+	video->devfs = devfs_register(NULL, name, DEVFS_FL_DEFAULT,
 				      IEEE1394_MAJOR, minor,
 				      S_IFCHR | S_IRUSR | S_IWUSR,
 				      &video1394_fops, NULL);
