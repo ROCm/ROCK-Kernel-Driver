@@ -728,7 +728,7 @@ static int mpu401_end_read(int dev)
 	return 0;
 }
 
-static int mpu401_ioctl(int dev, unsigned cmd, caddr_t arg)
+static int mpu401_ioctl(int dev, unsigned cmd, void __user *arg)
 {
 	struct mpu_config *devc;
 	mpu_command_rec rec;
@@ -742,7 +742,7 @@ static int mpu401_ioctl(int dev, unsigned cmd, caddr_t arg)
 				printk(KERN_WARNING "mpu401: Intelligent mode not supported by the HW\n");
 				return -EINVAL;
 			}
-			if (get_user(val, (int *)arg))
+			if (get_user(val, (int __user *)arg))
 				return -EFAULT;
 			set_uart_mode(dev, devc, !val);
 			return 0;
@@ -772,8 +772,7 @@ static int mpu401_buffer_status(int dev)
 				 */
 }
 
-static int mpu_synth_ioctl(int dev,
-		unsigned int cmd, caddr_t arg)
+static int mpu_synth_ioctl(int dev, unsigned int cmd, void __user *arg)
 {
 	int midi_dev;
 	struct mpu_config *devc;
@@ -789,8 +788,7 @@ static int mpu_synth_ioctl(int dev,
 	{
 
 		case SNDCTL_SYNTH_INFO:
-			if (copy_to_user((&((char *) arg)[0]),
-					(char *) &mpu_synth_info[midi_dev],
+			if (copy_to_user(arg, &mpu_synth_info[midi_dev],
 					sizeof(struct synth_info)))
 				return -EFAULT;
 			return 0;
@@ -1508,17 +1506,19 @@ static unsigned long mpu_timer_get_time(int dev)
 	return curr_ticks;
 }
 
-static int mpu_timer_ioctl(int dev, unsigned int command, caddr_t arg)
+static int mpu_timer_ioctl(int dev, unsigned int command, void __user *arg)
 {
 	int midi_dev = sound_timer_devs[dev]->devlink;
+	int __user *p = (int __user *)arg;
 
 	switch (command)
 	{
 		case SNDCTL_TMR_SOURCE:
 			{
 				int parm;
-	
-				parm = *(int *) arg;
+
+				if (get_user(parm, p))
+					return -EFAULT;
 				parm &= timer_caps;
 
 				if (parm != 0)
@@ -1530,7 +1530,9 @@ static int mpu_timer_ioctl(int dev, unsigned int command, caddr_t arg)
 					else if (timer_mode & TMR_MODE_SMPTE)
 						mpu_cmd(midi_dev, 0x3d, 0);		/* Use SMPTE sync */
 				}
-				return (*(int *) arg = timer_mode);
+				if (put_user(timer_mode, p))
+					return -EFAULT;
+				return timer_mode;
 			}
 			break;
 
@@ -1554,11 +1556,13 @@ static int mpu_timer_ioctl(int dev, unsigned int command, caddr_t arg)
 		case SNDCTL_TMR_TIMEBASE:
 			{
 				int val;
-
-				val = *(int *) arg;
+				if (get_user(val, p))
+					return -EFAULT;
 				if (val)
 					set_timebase(midi_dev, val);
-				return (*(int *) arg = curr_timebase);
+				if (put_user(curr_timebase, p))
+					return -EFAULT;
+				return curr_timebase;
 			}
 			break;
 
@@ -1567,7 +1571,8 @@ static int mpu_timer_ioctl(int dev, unsigned int command, caddr_t arg)
 				int val;
 				int ret;
 
-				val = *(int *) arg;
+				if (get_user(val, p))
+					return -EFAULT;
 
 				if (val)
 				{
@@ -1582,26 +1587,35 @@ static int mpu_timer_ioctl(int dev, unsigned int command, caddr_t arg)
 					}
 					curr_tempo = val;
 				}
-				return (*(int *) arg = curr_tempo);
+				if (put_user(curr_tempo, p))
+					return -EFAULT;
+				return curr_tempo;
 			}
 			break;
 
 		case SNDCTL_SEQ_CTRLRATE:
 			{
 				int val;
+				if (get_user(val, p))
+					return -EFAULT;
 
-				val = *(int *) arg;
 				if (val != 0)		/* Can't change */
 					return -EINVAL;
-				return (*(int *) arg = ((curr_tempo * curr_timebase) + 30) / 60);
+				val = ((curr_tempo * curr_timebase) + 30)/60;
+				if (put_user(val, p))
+					return -EFAULT;
+				return val;
 			}
 			break;
 
 		case SNDCTL_SEQ_GETTIME:
-			return (*(int *) arg = curr_ticks);
+			if (put_user(curr_ticks, p))
+				return -EFAULT;
+			return curr_ticks;
 
 		case SNDCTL_TMR_METRONOME:
-			metronome_mode = *(int *) arg;
+			if (get_user(metronome_mode, p))
+				return -EFAULT;
 			setup_metronome(midi_dev);
 			return 0;
 
