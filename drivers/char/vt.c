@@ -1865,7 +1865,6 @@ static void do_con_trol(struct tty_struct *tty, unsigned int currcons, int c)
  * kernel memory allocation is available.
  */
 char con_buf[PAGE_SIZE];
-#define CON_BUF_SIZE	PAGE_SIZE
 DECLARE_MUTEX(con_buf_sem);
 
 /* acquires console_sem */

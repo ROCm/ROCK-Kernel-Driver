@@ -523,7 +523,7 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 				v.tm.tv_usec = 0;
 			} else {
 				v.tm.tv_sec = sk->sk_rcvtimeo / HZ;
-				v.tm.tv_usec = ((sk->sk_rcvtimeo % HZ) * 1000) / HZ;
+				v.tm.tv_usec = ((sk->sk_rcvtimeo % HZ) * 1000000) / HZ;
 			}
 			break;
 
@@ -534,7 +534,7 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 				v.tm.tv_usec = 0;
 			} else {
 				v.tm.tv_sec = sk->sk_sndtimeo / HZ;
-				v.tm.tv_usec = ((sk->sk_sndtimeo % HZ) * 1000) / HZ;
+				v.tm.tv_usec = ((sk->sk_sndtimeo % HZ) * 1000000) / HZ;
 			}
 			break;
 

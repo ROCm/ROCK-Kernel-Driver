@@ -503,7 +503,7 @@ static int clip_mkip(struct atm_vcc *vcc,int timeout)
 	skb_queue_head_init(&copy);
 	skb_migrate(&vcc->sk->sk_receive_queue, &copy);
 	/* re-process everything received between connection setup and MKIP */
-	while ((skb = skb_dequeue(&copy)))
+	while ((skb = skb_dequeue(&copy)) != NULL)
 		if (!clip_devs) {
 			atm_return(vcc,skb->truesize);
 			kfree_skb(skb);
