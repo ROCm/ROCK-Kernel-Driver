@@ -5029,6 +5029,11 @@ static int tg3_reset_hw(struct tg3 *tp)
 		}
 	}
 
+#if TG3_TSO_SUPPORT != 0
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
+		rdmac_mode |= (1 << 27);
+#endif
+
 	/* Receive/send statistics. */
 	if ((rdmac_mode & RDMAC_MODE_FIFO_SIZE_128) &&
 	    (tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE)) {
@@ -5174,6 +5179,10 @@ static int tg3_reset_hw(struct tg3 *tp)
 	tw32(RCVBDI_MODE, RCVBDI_MODE_ENABLE | RCVBDI_MODE_RCB_ATTN_ENAB);
 	tw32(RCVDBDI_MODE, RCVDBDI_MODE_ENABLE | RCVDBDI_MODE_INV_RING_SZ);
 	tw32(SNDDATAI_MODE, SNDDATAI_MODE_ENABLE);
+#if TG3_TSO_SUPPORT != 0
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
+		tw32(SNDDATAI_MODE, SNDDATAI_MODE_ENABLE | 0x8);
+#endif
 	tw32(SNDBDI_MODE, SNDBDI_MODE_ENABLE | SNDBDI_MODE_ATTN_ENABLE);
 	tw32(SNDBDS_MODE, SNDBDS_MODE_ENABLE | SNDBDS_MODE_ATTN_ENABLE);
 
