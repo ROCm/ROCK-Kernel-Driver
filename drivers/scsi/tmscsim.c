@@ -279,8 +279,6 @@ static irqreturn_t do_DC390_Interrupt( int, void *, struct pt_regs *);
 
 static void   dc390_updateDCB (struct dc390_acb* pACB, struct dc390_dcb* pDCB);
 
-static struct dc390_acb*	dc390_pACB_start= NULL;
-static struct dc390_acb*	dc390_pACB_current = NULL;
 static u32	dc390_laststatus = 0;
 static u8	dc390_adapterCnt = 0;
 
@@ -1242,7 +1240,7 @@ static void __devinit dc390_init_hw(struct dc390_acb *pACB, u8 index)
 static int __devinit dc390_probe_one(struct pci_dev *pdev,
 				    const struct pci_device_id *id)
 {
-	struct dc390_acb *pACB, *pACB2;
+	struct dc390_acb *pACB;
 	struct Scsi_Host *shost;
 	unsigned long io_port;
 	int error = -ENODEV, i;
@@ -1332,18 +1330,6 @@ static int __devinit dc390_probe_one(struct pci_dev *pdev,
 				"tmscsim", pACB)) {
 		printk(KERN_ERR "DC390: register IRQ error!\n");
 		goto out_release_region;
-	}
-
-	if (!dc390_pACB_start) {
-		pACB2 = NULL;
-		dc390_pACB_start = pACB;
-		dc390_pACB_current = pACB;
-		pACB->pNextACB = NULL;
-	} else {
-		pACB2 = dc390_pACB_current;
-		dc390_pACB_current->pNextACB = pACB;
-		dc390_pACB_current = pACB;
-		pACB->pNextACB = NULL;
 	}
 
 	dc390_init_hw(pACB, dc390_adapterCnt);

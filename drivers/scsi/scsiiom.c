@@ -225,7 +225,7 @@ dc390_InvalidCmd(struct dc390_acb* pACB)
 static irqreturn_t __inline__
 DC390_Interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-    struct dc390_acb *pACB, *pACB2;
+    struct dc390_acb *pACB = (struct dc390_acb*)dev_id;
     struct dc390_dcb *pDCB;
     struct dc390_srb *pSRB;
     u8  sstatus=0;
@@ -236,14 +236,6 @@ DC390_Interrupt(int irq, void *dev_id, struct pt_regs *regs)
     u8  dstatus;
 #endif
 
-    pACB = (struct dc390_acb*)dev_id;
-    for (pACB2 = dc390_pACB_start; (pACB2 && pACB2 != pACB); pACB2 = pACB2->pNextACB);
-    if (!pACB2)
-    {
-	printk ("DC390: IRQ called with foreign dev_id %p!\n", pACB);
-	return IRQ_NONE;
-    }
-    
     sstatus = DC390_read8 (Scsi_Status);
     if( !(sstatus & INTERRUPT) )
 	return IRQ_NONE;

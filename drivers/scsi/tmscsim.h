@@ -140,7 +140,6 @@ u8		SyncOffset;	/*;for reg. and nego.(low nibble) */
 struct dc390_acb
 {
 struct Scsi_Host *pScsiHost;
-struct dc390_acb	*pNextACB;
 u16		IOPortBase;
 u8		IRQLevel;
 u8		status;
