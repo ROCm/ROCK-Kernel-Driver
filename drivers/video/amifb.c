@@ -1309,7 +1309,7 @@ static int amifb_set_par(struct fb_info *info)
 		info->fix.ypanstep = 0;
 	} else {
 		info->fix.ywrapstep = 0;
-		if (par->vmode &= FB_VMODE_SMOOTH_XPAN)
+		if (par->vmode & FB_VMODE_SMOOTH_XPAN)
 			info->fix.xpanstep = 1;
 		else
 			info->fix.xpanstep = 16<<maxfmode;
