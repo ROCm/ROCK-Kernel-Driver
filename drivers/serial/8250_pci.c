@@ -11,7 +11,7 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License.
  *
- *  $Id: 8250_pci.c,v 1.24 2002/07/29 14:39:56 rmk Exp $
+ *  $Id: 8250_pci.c,v 1.28 2002/11/02 11:14:18 rmk Exp $
  */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -21,7 +21,6 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/serial.h>
-
 #include <linux/serialP.h>
 
 #include <asm/bitops.h>
@@ -55,14 +54,19 @@ struct serial_private {
 	int line[0];
 };
 
+/*
+ * init_fn returns:
+ *  > 0 - number of ports
+ *  = 0 - use board->num_ports
+ *  < 0 - error
+ */
 struct pci_board {
 	int flags;
 	int num_ports;
 	int base_baud;
 	int uart_offset;
 	int reg_shift;
-	int (*init_fn)(struct pci_dev *dev, struct pci_board *board,
-			int enable);
+	int (*init_fn)(struct pci_dev *dev, int enable);
 	int first_uart_offset;
 };
 
@@ -201,8 +205,7 @@ get_pci_irq(struct pci_dev *dev, struct pci_board *board, int idx)
  * seems to be mainly needed on card using the PLX which also use I/O
  * mapped memory.
  */
-static int __devinit
-pci_plx9050_fn(struct pci_dev *dev, struct pci_board *board, int enable)
+static int __devinit pci_plx9050_fn(struct pci_dev *dev, int enable)
 {
 	u8 *p, irq_config = 0;
 
@@ -264,8 +267,7 @@ pci_plx9050_fn(struct pci_dev *dev, struct pci_board *board, int enable)
 #define PCI_DEVICE_ID_SIIG_1S_10x (PCI_DEVICE_ID_SIIG_1S_10x_550 & 0xfffc)
 #define PCI_DEVICE_ID_SIIG_2S_10x (PCI_DEVICE_ID_SIIG_2S_10x_550 & 0xfff8)
 
-static int __devinit
-pci_siig10x_fn(struct pci_dev *dev, struct pci_board *board, int enable)
+static int __devinit pci_siig10x_fn(struct pci_dev *dev, int enable)
 {
 	u16 data, *p;
 
@@ -296,8 +298,7 @@ pci_siig10x_fn(struct pci_dev *dev, struct pci_board *board, int enable)
 #define PCI_DEVICE_ID_SIIG_2S_20x (PCI_DEVICE_ID_SIIG_2S_20x_550 & 0xfffc)
 #define PCI_DEVICE_ID_SIIG_2S1P_20x (PCI_DEVICE_ID_SIIG_2S1P_20x_550 & 0xfffc)
 
-static int __devinit
-pci_siig20x_fn(struct pci_dev *dev, struct pci_board *board, int enable)
+static int __devinit pci_siig20x_fn(struct pci_dev *dev, int enable)
 {
 	u8 data;
 
@@ -318,8 +319,7 @@ pci_siig20x_fn(struct pci_dev *dev, struct pci_board *board, int enable)
 }
 
 /* Added for EKF Intel i960 serial boards */
-static int __devinit
-pci_inteli960ni_fn(struct pci_dev *dev, struct pci_board *board, int enable)
+static int __devinit pci_inteli960ni_fn(struct pci_dev *dev, int enable)
 {
 	unsigned long oldval;
 
@@ -378,8 +378,7 @@ static struct timedia_struct {
 	{ 0, 0 }
 };
 
-static int __devinit
-pci_timedia_fn(struct pci_dev *dev, struct pci_board *board, int enable)
+static int __devinit pci_timedia_fn(struct pci_dev *dev, int enable)
 {
 	int	i, j;
 	unsigned short *ids;
@@ -389,12 +388,9 @@ pci_timedia_fn(struct pci_dev *dev, struct pci_board *board, int enable)
 
 	for (i = 0; timedia_data[i].num; i++) {
 		ids = timedia_data[i].ids;
-		for (j = 0; ids[j]; j++) {
-			if (pci_get_subdevice(dev) == ids[j]) {
-				board->num_ports = timedia_data[i].num;
-				return 0;
-			}
-		}
+		for (j = 0; ids[j]; j++)
+			if (pci_get_subdevice(dev) == ids[j])
+				return timedia_data[i].num;
 	}
 	return 0;
 }
@@ -406,9 +402,10 @@ pci_timedia_fn(struct pci_dev *dev, struct pci_board *board, int enable)
  * and Keystone have one Diva chip with 3 UARTs.  Some later machines have
  * one Diva chip, but it has been expanded to 5 UARTs.
  */
-static int __devinit
-pci_hp_diva(struct pci_dev *dev, struct pci_board *board, int enable)
+static int __devinit pci_hp_diva(struct pci_dev *dev, int enable)
 {
+	int rc = 0;
+
 	if (!enable)
 		return 0;
 
@@ -417,25 +414,24 @@ pci_hp_diva(struct pci_dev *dev, struct pci_board *board, int enable)
 	case PCI_DEVICE_ID_HP_DIVA_HALFDOME:
 	case PCI_DEVICE_ID_HP_DIVA_KEYSTONE:
 	case PCI_DEVICE_ID_HP_DIVA_EVEREST:
-		board->num_ports = 3;
+		rc = 3;
 		break;
 	case PCI_DEVICE_ID_HP_DIVA_TOSCA2:
-		board->num_ports = 2;
+		rc = 2;
 		break;
 	case PCI_DEVICE_ID_HP_DIVA_MAESTRO:
-		board->num_ports = 4;
+		rc = 4;
 		break;
 	case PCI_DEVICE_ID_HP_DIVA_POWERBAR:
-		board->num_ports = 1;
+		rc = 1;
 		break;
 	}
 
-	return 0;
+	return rc;
 }
 
 
-static int __devinit
-pci_xircom_fn(struct pci_dev *dev, struct pci_board *board, int enable)
+static int __devinit pci_xircom_fn(struct pci_dev *dev, int enable)
 {
 	__set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(HZ/10);
@@ -579,8 +575,11 @@ static struct pci_board pci_boards[] __devinitdata = {
 		0x400, 7, pci_plx9050_fn },
 	{ SPCI_FL_BASE2, 4, 921600,			   /* pbn_plx_romulus */
 		0x20, 2, pci_plx9050_fn, 0x03 },
-		/* This board uses the size of PCI Base region 0 to
-		 * signal now many ports are available */
+
+	/*
+	 * This board uses the size of PCI Base region 0 to
+	 * signal now many ports are available
+	 */
 	{ SPCI_FL_BASE0 | SPCI_FL_REGION_SZ_CAP, 32, 115200 }, /* pbn_oxsemi */
 	{ SPCI_FL_BASE_TABLE, 1, 921600,		   /* pbn_timedia */
 		0, 0, pci_timedia_fn },
@@ -645,9 +644,9 @@ serial_pci_guess_board(struct pci_dev *dev, struct pci_board *board)
 	 * later?) 
 	 */
 	if ((((dev->class >> 8) != PCI_CLASS_COMMUNICATION_SERIAL) &&
-	    ((dev->class >> 8) != PCI_CLASS_COMMUNICATION_MODEM)) ||
+	     ((dev->class >> 8) != PCI_CLASS_COMMUNICATION_MODEM)) ||
 	    (dev->class & 0xff) > 6)
-		return 1;
+		return -ENODEV;
 
 	for (i = 0; i < 6; i++) {
 		if (IS_PCI_REGION_IOPORT(dev, i)) {
@@ -667,20 +666,31 @@ serial_pci_guess_board(struct pci_dev *dev, struct pci_board *board)
 		board->flags = first_port;
 		return 0;
 	}
-	return 1;
+	return -ENODEV;
+}
+
+static inline int
+serial_pci_matches(struct pci_board *board, int index)
+{
+	return
+	    board->base_baud == pci_boards[index].base_baud &&
+	    board->num_ports == pci_boards[index].num_ports &&
+	    board->uart_offset == pci_boards[index].uart_offset &&
+	    board->reg_shift == pci_boards[index].reg_shift &&
+	    board->first_uart_offset == pci_boards[index].first_uart_offset;
 }
 
 /*
- * return an error code to refuse.
- *
- * serial_struct is 60 bytes.
+ * Probe one serial board.  Unfortunately, there is no rhyme nor reason
+ * to the arrangement of serial ports on a PCI card.
  */
-static int __devinit pci_init_one(struct pci_dev *dev, const struct pci_device_id *ent)
+static int __devinit
+pci_init_one(struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	struct serial_private *priv;
 	struct pci_board *board, tmp;
 	struct serial_struct serial_req;
-	int base_baud, rc, k;
+	int base_baud, rc, nr_ports, i;
 
 	if (ent->driver_data >= ARRAY_SIZE(pci_boards)) {
 		printk(KERN_ERR "pci_init_one: invalid driver_data: %ld\n",
@@ -694,67 +704,100 @@ static int __devinit pci_init_one(struct pci_dev *dev, const struct pci_device_i
 	if (rc)
 		return rc;
 
-	if (ent->driver_data == pbn_default &&
-	    serial_pci_guess_board(dev, board)) {
-		pci_disable_device(dev);
-		return -ENODEV;
-	} else if (serial_pci_guess_board(dev, &tmp) == 0) {
-		printk(KERN_INFO "Redundant entry in serial pci_table.  "
-		       "Please send the output of\n"
-		       "lspci -vv, this message (%d,%d,%d,%d)\n"
-		       "and the manufacturer and name of "
-		       "serial board or modem board\n"
-		       "to serial-pci-info@lists.sourceforge.net.\n",
-		       dev->vendor, dev->device,
-		       pci_get_subvendor(dev), pci_get_subdevice(dev));
+	if (ent->driver_data == pbn_default) {
+		/*
+		 * Use a copy of the pci_board entry for this;
+		 * avoid changing entries in the table.
+		 */
+		memcpy(&tmp, board, sizeof(struct pci_board));
+		board = &tmp;
+
+		/*
+		 * We matched one of our class entries.  Try to
+		 * determine the parameters of this board.
+		 */
+		rc = serial_pci_guess_board(dev, board);
+		if (rc)
+			goto disable;
+	} else {
+		/*
+		 * We matched an explicit entry.  If we are able to
+		 * detect this boards settings with our heuristic,
+		 * then we no longer need this entry.
+		 */
+		rc = serial_pci_guess_board(dev, &tmp);
+		if (rc == 0 && serial_pci_matches(board, pbn_default)) {
+			printk(KERN_INFO
+		"Redundant entry in serial pci_table.  Please send the output\n"
+		"of lspci -vv, this message (0x%04x,0x%04x,0x%04x,0x%04x),\n"
+		"the manufacturer and name of serial board or modem board to\n"
+		"rmk@arm.linux.org.uk.\n",
+			       dev->vendor, dev->device,
+			       pci_get_subvendor(dev), pci_get_subdevice(dev));
+		}
+	}
+
+	nr_ports = board->num_ports;
+
+	/*
+	 * Run the initialization function, if any.  The initialization
+	 * function returns:
+	 *  <0  - error
+	 *   0  - use board->num_ports
+	 *  >0  - number of ports
+	 */
+	if (board->init_fn) {
+		rc = board->init_fn(dev, 1);
+		if (rc < 0)
+			goto disable;
+
+		if (rc)
+			nr_ports = rc;
 	}
 
 	priv = kmalloc(sizeof(struct serial_private) +
-			      sizeof(unsigned int) * board->num_ports,
+			      sizeof(unsigned int) * nr_ports,
 			      GFP_KERNEL);
 	if (!priv) {
-		pci_disable_device(dev);
-		return -ENOMEM;
-	}
-
-	/*
-	 * Run the initialization function, if any
-	 */
-	if (board->init_fn) {
-		rc = board->init_fn(dev, board, 1);
-		if (rc != 0) {
-			pci_disable_device(dev);
-			kfree(priv);
-			return rc;
-		}
+		rc = -ENOMEM;
+		goto deinit;
 	}
 
 	base_baud = board->base_baud;
 	if (!base_baud)
 		base_baud = BASE_BAUD;
 	memset(&serial_req, 0, sizeof(serial_req));
-	for (k = 0; k < board->num_ports; k++) {
-		serial_req.irq = get_pci_irq(dev, board, k);
-		if (get_pci_port(dev, board, &serial_req, k))
+	for (i = 0; i < nr_ports; i++) {
+		serial_req.irq = get_pci_irq(dev, board, i);
+		if (get_pci_port(dev, board, &serial_req, i))
 			break;
 #ifdef SERIAL_DEBUG_PCI
-		printk("Setup PCI/PNP port: port %x, irq %d, type %d\n",
+		printk("Setup PCI port: port %x, irq %d, type %d\n",
 		       serial_req.port, serial_req.irq, serial_req.io_type);
 #endif
 		serial_req.flags = ASYNC_SKIP_TEST | ASYNC_AUTOPROBE;
 		serial_req.baud_base = base_baud;
 		
-		priv->line[k] = register_serial(&serial_req);
-		if (priv->line[k] < 0)
+		priv->line[i] = register_serial(&serial_req);
+		if (priv->line[i] < 0)
 			break;
 	}
 
 	priv->board = board;
-	priv->nr = k;
+	priv->nr = i;
 
 	pci_set_drvdata(dev, priv);
 
 	return 0;
+
+ free:
+	kfree(priv);
+ deinit:
+	if (board->init_fn)
+		board->init_fn(dev, 0);
+ disable:
+	pci_disable_device(dev);
+	return rc;
 }
 
 static void __devexit pci_remove_one(struct pci_dev *dev)
@@ -769,7 +812,7 @@ static void __devexit pci_remove_one(struct pci_dev *dev)
 			unregister_serial(priv->line[i]);
 
 		if (priv->board->init_fn)
-			priv->board->init_fn(dev, priv->board, 0);
+			priv->board->init_fn(dev, 0);
 
 		pci_disable_device(dev);
 
@@ -1160,18 +1203,23 @@ static struct pci_device_id serial_pci_tbl[] __devinitdata = {
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
 		pbn_dci_pccom8 },
 
+	/*
+	 * These entries match devices with class
+	 * COMMUNICATION_SERIAL, COMMUNICATION_MODEM
+	 * or COMMUNICATION_MULTISERIAL
+	 */
 	{	PCI_ANY_ID, PCI_ANY_ID,
 		PCI_ANY_ID, PCI_ANY_ID,
 		PCI_CLASS_COMMUNICATION_SERIAL << 8,
-		0xffff00, },
+		0xffff00, pbn_default },
 	{	PCI_ANY_ID, PCI_ANY_ID,
 		PCI_ANY_ID, PCI_ANY_ID,
 		PCI_CLASS_COMMUNICATION_MODEM << 8,
-		0xffff00, },
+		0xffff00, pbn_default },
 	{	PCI_ANY_ID, PCI_ANY_ID,
 		PCI_ANY_ID, PCI_ANY_ID,
 		PCI_CLASS_COMMUNICATION_MULTISERIAL << 8,
-		0xffff00, },
+		0xffff00, pbn_default },
 	{ 0, }
 };
 
