@@ -205,7 +205,7 @@ found:
 	 * of this allocation's buffer? If yes then we can 'merge'
 	 * the previous partial page with this allocation.
 	 */
-	if (align <= PAGE_SIZE
+	if (align < PAGE_SIZE
 	    && bdata->last_offset && bdata->last_pos+1 == start) {
 		offset = (bdata->last_offset+align-1) & ~(align-1);
 		if (offset > PAGE_SIZE)
