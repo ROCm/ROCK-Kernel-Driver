@@ -309,10 +309,10 @@ static inline void ide_std_init_ports(hw_regs_t *hw,
  * ide_init_hwif_ports() is OBSOLETE and will be removed in 2.7 series.
  * New ports shouldn't define IDE_ARCH_OBSOLETE_INIT in <asm/ide.h>.
  *
- * h8300, m68k, m68knommu (broken) and i386-pc9800 (broken)
+ * m68k, m68knommu (broken) and i386-pc9800 (broken)
  * still have their own versions.
  */
-#if !defined(CONFIG_H8300) && !defined(CONFIG_M68K)
+#ifndef CONFIG_M68K
 #ifdef IDE_ARCH_OBSOLETE_INIT
 static inline void ide_init_hwif_ports(hw_regs_t *hw,
 				       unsigned long io_addr,
@@ -337,7 +337,7 @@ static inline void ide_init_hwif_ports(hw_regs_t *hw,
 #else
 # define ide_init_hwif_ports(hw, io, ctl, irq)	do {} while (0)
 #endif /* IDE_ARCH_OBSOLETE_INIT */
-#endif /* !H8300 && !M68K */
+#endif /* !M68K */
 
 /* Currently only m68k, apus and m8xx need it */
 #ifndef IDE_ARCH_ACK_INTR

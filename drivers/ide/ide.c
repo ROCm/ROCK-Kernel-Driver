@@ -2054,6 +2054,8 @@ done:
 	return 1;
 }
 
+extern void h8300_ide_init(void);
+
 /*
  * probe_for_hwifs() finds/initializes "known" IDE interfaces
  */
@@ -2130,6 +2132,9 @@ static void __init probe_for_hwifs (void)
 		pnpide_init(1);
 	}
 #endif /* CONFIG_BLK_DEV_IDEPNP */
+#ifdef CONFIG_H8300
+	h8300_ide_init();
+#endif
 }
 
 /*
