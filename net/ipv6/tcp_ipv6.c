@@ -1142,7 +1142,6 @@ static void tcp_v6_synq_add(struct sock *sk, struct open_request *req)
 	req->sk = NULL;
 	req->expires = jiffies + TCP_TIMEOUT_INIT;
 	req->retrans = 0;
-	req->index = h;
 	req->dl_next = lopt->syn_table[h];
 
 	write_lock(&tp->syn_wait_lock);

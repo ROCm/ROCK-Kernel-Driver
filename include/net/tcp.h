@@ -507,7 +507,7 @@ struct open_request {
 	__u16			rmt_port;
 	__u16			mss;
 	__u8			retrans;
-	__u8			index;
+	__u8			__pad;
 	__u16	snd_wscale : 4, 
 		rcv_wscale : 4, 
 		tstamp_ok : 1,

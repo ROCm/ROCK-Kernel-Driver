@@ -799,7 +799,6 @@ static void tcp_v4_synq_add(struct sock *sk, struct open_request *req)
 	req->expires = jiffies + TCP_TIMEOUT_INIT;
 	req->retrans = 0;
 	req->sk = NULL;
-	req->index = h;
 	req->dl_next = lopt->syn_table[h];
 
 	write_lock(&tp->syn_wait_lock);
