@@ -62,7 +62,6 @@ static struct {
 
 enum ipi_message_type {
 	IPI_RESCHEDULE,
-	IPI_MIGRATION,
 	IPI_CALL_FUNC,
 	IPI_CPU_STOP,
 };
@@ -668,32 +667,20 @@ send_ipi_message(unsigned long to_whom, enum ipi_message_type operation)
 {
 	unsigned long i, set, n;
 
-	set = to_whom & -to_whom;
-	if (to_whom == set) {
+	mb();
+	for (i = to_whom; i ; i &= ~set) {
+		set = i & -i;
 		n = __ffs(set);
-		mb();
 		set_bit(operation, &ipi_data[n].bits);
-		mb();
-		wripir(n);
-	} else {
-		mb();
-		for (i = to_whom; i ; i &= ~set) {
-			set = i & -i;
-			n = __ffs(set);
-			set_bit(operation, &ipi_data[n].bits);
-		}
+	}
 
-		mb();
-		for (i = to_whom; i ; i &= ~set) {
-			set = i & -i;
-			n = __ffs(set);
-			wripir(n);
-		}
+	mb();
+	for (i = to_whom; i ; i &= ~set) {
+		set = i & -i;
+		n = __ffs(set);
+		wripir(n);
 	}
 }
-
-/* Data for IPI_MIGRATION.  */
-static task_t *migration_task;
 
 /* Structure and data for smp_call_function.  This is designed to 
    minimize static memory requirements.  Plus it looks cleaner.  */
@@ -768,15 +755,6 @@ handle_ipi(struct pt_regs *regs)
 			   is done by the interrupt return path.  */
 			break;
 
-		case IPI_MIGRATION:
-		    {
-			task_t *t = migration_task;
-			mb();
-			migration_task = 0;
-			sched_task_migrated(t);
-			break;
-		    }
-
 		case IPI_CALL_FUNC:
 		    {
 			struct smp_call_struct *data;
@@ -832,19 +810,6 @@ smp_send_reschedule(int cpu)
 		       "smp_send_reschedule: Sending IPI to self.\n");
 #endif
 	send_ipi_message(1UL << cpu, IPI_RESCHEDULE);
-}
-
-void
-smp_migrate_task(int cpu, task_t *t)
-{
-#if DEBUG_IPI_MSG
-	if (cpu == hard_smp_processor_id())
-		printk(KERN_WARNING
-		       "smp_migrate_task: Sending IPI to self.\n");
-#endif
-	/* Acquire the migration_task mutex.  */
-	pointer_lock(&migration_task, t, 1);
-	send_ipi_message(1UL << cpu, IPI_MIGRATION);
 }
 
 void
