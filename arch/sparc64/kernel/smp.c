@@ -547,15 +547,18 @@ retry:
 static void smp_cross_call_masked(unsigned long *func, u32 ctx, u64 data1, u64 data2, cpumask_t mask)
 {
 	u64 data0 = (((u64)ctx)<<32 | (((u64)func) & 0xffffffff));
+	int this_cpu = get_cpu();
 
 	cpus_and(mask, mask, cpu_online_map);
-	cpu_clear(smp_processor_id(), mask);
+	cpu_clear(this_cpu, mask);
 
 	if (tlb_type == spitfire)
 		spitfire_xcall_deliver(data0, data1, data2, mask);
 	else
 		cheetah_xcall_deliver(data0, data1, data2, mask);
 	/* NOTE: Caller runs local copy on master. */
+
+	put_cpu();
 }
 
 extern unsigned long xcall_sync_tick;
@@ -685,11 +688,12 @@ static __inline__ void __local_flush_dcache_page(struct page *page)
 void smp_flush_dcache_page_impl(struct page *page, int cpu)
 {
 	cpumask_t mask = cpumask_of_cpu(cpu);
+	int this_cpu = get_cpu();
 
 #ifdef CONFIG_DEBUG_DCFLUSH
 	atomic_inc(&dcpage_flushes);
 #endif
-	if (cpu == smp_processor_id()) {
+	if (cpu == this_cpu) {
 		__local_flush_dcache_page(page);
 	} else if (cpu_online(cpu)) {
 		u64 data0;
@@ -714,14 +718,17 @@ void smp_flush_dcache_page_impl(struct page *page, int cpu)
 		atomic_inc(&dcpage_flushes_xcall);
 #endif
 	}
+
+	put_cpu();
 }
 
 void flush_dcache_page_all(struct mm_struct *mm, struct page *page)
 {
 	cpumask_t mask = cpu_online_map;
 	u64 data0;
+	int this_cpu = get_cpu();
 
-	cpu_clear(smp_processor_id(), mask);
+	cpu_clear(this_cpu, mask);
 
 #ifdef CONFIG_DEBUG_DCFLUSH
 	atomic_inc(&dcpage_flushes);
@@ -747,6 +754,8 @@ void flush_dcache_page_all(struct mm_struct *mm, struct page *page)
 #endif
  flush_self:
 	__local_flush_dcache_page(page);
+
+	put_cpu();
 }
 
 void smp_receive_signal(int cpu)
@@ -842,7 +851,7 @@ void smp_flush_tlb_mm(struct mm_struct *mm)
 
 	{
 		u32 ctx = CTX_HWBITS(mm->context);
-		int cpu = smp_processor_id();
+		int cpu = get_cpu();
 
 		if (atomic_read(&mm->mm_users) == 1) {
 			/* See smp_flush_tlb_page for info about this. */
@@ -856,6 +865,8 @@ void smp_flush_tlb_mm(struct mm_struct *mm)
 
 	local_flush_and_out:
 		__flush_tlb_mm(ctx, SECONDARY_CONTEXT);
+
+		put_cpu();
 	}
 }
 
@@ -863,7 +874,7 @@ void smp_flush_tlb_range(struct mm_struct *mm, unsigned long start,
 			 unsigned long end)
 {
 	u32 ctx = CTX_HWBITS(mm->context);
-	int cpu = smp_processor_id();
+	int cpu = get_cpu();
 
 	start &= PAGE_MASK;
 	end    = PAGE_ALIGN(end);
@@ -880,6 +891,8 @@ void smp_flush_tlb_range(struct mm_struct *mm, unsigned long start,
  local_flush_and_out:
 	__flush_tlb_range(ctx, start, SECONDARY_CONTEXT,
 			  end, PAGE_SIZE, (end-start));
+
+	put_cpu();
 }
 
 void smp_flush_tlb_kernel_range(unsigned long start, unsigned long end)
@@ -898,7 +911,7 @@ void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page)
 {
 	{
 		u32 ctx = CTX_HWBITS(mm->context);
-		int cpu = smp_processor_id();
+		int cpu = get_cpu();
 
 		page &= PAGE_MASK;
 		if (mm == current->active_mm &&
@@ -938,6 +951,8 @@ void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page)
 
 	local_flush_and_out:
 		__flush_tlb_page(ctx, page, SECONDARY_CONTEXT);
+
+		put_cpu();
 	}
 }
 

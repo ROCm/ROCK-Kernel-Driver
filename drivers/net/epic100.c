@@ -1218,13 +1218,8 @@ static int epic_rx(struct net_device *dev)
 							    ep->rx_ring[entry].bufaddr,
 							    ep->rx_buf_sz,
 							    PCI_DMA_FROMDEVICE);
-#if 1 /* HAS_IP_COPYSUM */
 				eth_copy_and_sum(skb, ep->rx_skbuff[entry]->tail, pkt_len, 0);
 				skb_put(skb, pkt_len);
-#else
-				memcpy(skb_put(skb, pkt_len), ep->rx_skbuff[entry]->tail,
-					   pkt_len);
-#endif
 				pci_dma_sync_single_for_device(ep->pci_dev,
 							       ep->rx_ring[entry].bufaddr,
 							       ep->rx_buf_sz,

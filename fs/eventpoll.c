@@ -499,6 +499,11 @@ asmlinkage long sys_epoll_create(int size)
 	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_create(%d)\n",
 		     current, size));
 
+	/* Sanity check on the size parameter */
+	error = -EINVAL;
+	if (size <= 0)
+		goto eexit_1;
+
 	/* Correctly size the hash */
 	hashbits = ep_get_hash_bits((unsigned int) size);
 

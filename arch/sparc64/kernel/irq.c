@@ -174,6 +174,8 @@ void enable_irq(unsigned int irq)
 	if (imap == 0UL)
 		return;
 
+	preempt_disable();
+
 	if (tlb_type == cheetah || tlb_type == cheetah_plus) {
 		unsigned long ver;
 
@@ -214,6 +216,8 @@ void enable_irq(unsigned int irq)
 	 * Things like FFB can now be handled via the new IRQ mechanism.
 	 */
 	upa_writel(tid | IMAP_VALID, imap);
+
+	preempt_enable();
 }
 
 /* This now gets passed true ino's as well. */

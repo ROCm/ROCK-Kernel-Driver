@@ -650,8 +650,8 @@ static unsigned int __devinit init_chipset_piix (struct pci_dev *dev, const char
  *	Set up the ide_hwif_t for the PIIX interface according to the
  *	capabilities of the hardware.
  */
- 
-static void __init init_hwif_piix (ide_hwif_t *hwif)
+
+static void __devinit init_hwif_piix(ide_hwif_t *hwif)
 {
 	u8 reg54h = 0, reg55h = 0, ata66 = 0;
 	u8 mask = hwif->channel ? 0xc0 : 0x30;
@@ -720,8 +720,8 @@ static void __init init_hwif_piix (ide_hwif_t *hwif)
  *	Enable the xp fixup for the PIIX controller and then perform
  *	a standard ide PCI setup
  */
- 
-static void __init init_setup_piix (struct pci_dev *dev, ide_pci_device_t *d)
+
+static void __devinit init_setup_piix(struct pci_dev *dev, ide_pci_device_t *d)
 {
 	ide_setup_pci_device(dev, d);
 }
@@ -749,8 +749,8 @@ static int __devinit piix_init_one(struct pci_dev *dev, const struct pci_device_
  *	Check for the present of 450NX errata #19 and errata #25. If
  *	they are found, disable use of DMA IDE
  */
- 
-static void __init piix_check_450nx(void)
+
+static void __devinit piix_check_450nx(void)
 {
 	struct pci_dev *pdev = NULL;
 	u16 cfg;

@@ -432,10 +432,8 @@ try_again:
 
 			if (np->rxopt.all)
 				datagram_recv_ctl(sk, msg, skb);
-			if (ipv6_addr_type(&sin6->sin6_addr) & IPV6_ADDR_LINKLOCAL) {
-				struct inet6_skb_parm *opt = (struct inet6_skb_parm *) skb->cb;
-				sin6->sin6_scope_id = opt->iif;
-			}
+			if (ipv6_addr_type(&sin6->sin6_addr) & IPV6_ADDR_LINKLOCAL)
+				sin6->sin6_scope_id = IP6CB(skb)->iif;
 		}
   	}
 	err = copied;
@@ -574,34 +572,26 @@ static void udpv6_mcast_deliver(struct udphdr *uh,
 				struct sk_buff *skb)
 {
 	struct sock *sk, *sk2;
-	struct sk_buff *buff;
 	int dif;
 
 	read_lock(&udp_hash_lock);
 	sk = sk_head(&udp_hash[ntohs(uh->dest) & (UDP_HTABLE_SIZE - 1)]);
 	dif = skb->dev->ifindex;
 	sk = udp_v6_mcast_next(sk, uh->dest, daddr, uh->source, saddr, dif);
-	if (!sk)
-		goto free_skb;
+	if (!sk) {
+		kfree_skb(skb);
+		goto out;
+	}
 
-	buff = NULL;
 	sk2 = sk;
 	while ((sk2 = udp_v6_mcast_next(sk_next(sk2), uh->dest, daddr,
 					uh->source, saddr, dif))) {
-		if (!buff) {
-			buff = skb_clone(skb, GFP_ATOMIC);
-			if (!buff)
-				continue;
-		}
-		if (udpv6_queue_rcv_skb(sk2, buff) >= 0)
-			buff = NULL;
+		struct sk_buff *buff = skb_clone(skb, GFP_ATOMIC);
+		if (buff)
+			udpv6_queue_rcv_skb(sk2, buff);
 	}
-	if (buff)
-		kfree_skb(buff);
-	if (udpv6_queue_rcv_skb(sk, skb) < 0) {
-free_skb:
-		kfree_skb(skb);
-	}
+	udpv6_queue_rcv_skb(sk, skb);
+out:
 	read_unlock(&udp_hash_lock);
 }
 

@@ -53,7 +53,9 @@ unsigned int console_device = -1;
 unsigned int console_irq = -1;
 unsigned long memory_size = 0;
 unsigned long machine_flags = 0;
-struct { unsigned long addr, size, type; } memory_chunk[16] = { { 0 } };
+struct {
+	unsigned long addr, size, type;
+} memory_chunk[MEMORY_CHUNKS] = { { 0 } };
 #define CHUNK_READ_WRITE 0
 #define CHUNK_READ_ONLY 1
 int cpus_initialized = 0;

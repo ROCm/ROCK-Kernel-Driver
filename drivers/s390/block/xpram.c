@@ -155,7 +155,7 @@ static int xpram_page_in (unsigned long page_addr, unsigned int xpage_index)
 {
 	int cc;
 
-	__asm__ __volatile(
+	__asm__ __volatile__ (
 		"   lhi   %0,2\n"  /* return unused cc 2 if pgin traps */
 		"   .insn rre,0xb22e0000,%1,%2\n"  /* pgin %1,%2 */
                 "0: ipm   %0\n"
@@ -203,7 +203,7 @@ static long xpram_page_out (unsigned long page_addr, unsigned int xpage_index)
 {
 	int cc;
 
-	__asm__ __volatile(
+	__asm__ __volatile__ (
 		"   lhi   %0,2\n"  /* return unused cc 2 if pgout traps */
 		"   .insn rre,0xb22f0000,%1,%2\n"  /* pgout %1,%2 */
                 "0: ipm   %0\n"
@@ -332,16 +332,16 @@ fail:
 static int xpram_ioctl (struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg)
 {
-	struct hd_geometry *geo;
+	struct hd_geometry __user *geo;
 	unsigned long size;
- 	if (cmd != HDIO_GETGEO)
+	if (cmd != HDIO_GETGEO)
 		return -EINVAL;
 	/*
 	 * get geometry: we have to fake one...  trim the size to a
 	 * multiple of 64 (32k): tell we have 16 sectors, 4 heads,
 	 * whatever cylinders. Tell also that data starts at sector. 4.
 	 */
-	geo = (struct hd_geometry *) arg;
+	geo = (struct hd_geometry __user *) arg;
 	size = (xpram_pages * 8) & ~0x3f;
 	put_user(size >> 6, &geo->cylinders);
 	put_user(4, &geo->heads);
@@ -423,7 +423,7 @@ static int __init xpram_setup_sizes(unsigned long pages)
 	return 0;
 }
 
-static struct request_queue xpram_queue;
+static struct request_queue *xpram_queue;
 
 static int __init xpram_setup_blkdev(void)
 {
@@ -450,8 +450,13 @@ static int __init xpram_setup_blkdev(void)
 	 * Assign the other needed values: make request function, sizes and
 	 * hardsect size. All the minor devices feature the same value.
 	 */
-	blk_queue_make_request(&xpram_queue, xpram_make_request);
-	blk_queue_hardsect_size(&xpram_queue, 4096);
+	xpram_queue = blk_alloc_queue(GFP_KERNEL);
+	if (!xpram_queue) {
+		rc = -ENOMEM;
+		goto out_unreg;
+	}
+	blk_queue_make_request(xpram_queue, xpram_make_request);
+	blk_queue_hardsect_size(xpram_queue, 4096);
 
 	/*
 	 * Setup device structures.
@@ -467,7 +472,7 @@ static int __init xpram_setup_blkdev(void)
 		disk->first_minor = i;
 		disk->fops = &xpram_devops;
 		disk->private_data = &xpram_devices[i];
-		disk->queue = &xpram_queue;
+		disk->queue = xpram_queue;
 		sprintf(disk->disk_name, "slram%d", i);
 		sprintf(disk->devfs_name, "slram/%d", i);
 		set_capacity(disk, xpram_sizes[i] << 1);
@@ -475,6 +480,9 @@ static int __init xpram_setup_blkdev(void)
 	}
 
 	return 0;
+out_unreg:
+	devfs_remove("slram");
+	unregister_blkdev(XPRAM_MAJOR, XPRAM_NAME);
 out:
 	while (i--)
 		put_disk(xpram_disks[i]);
@@ -493,6 +501,7 @@ static void __exit xpram_exit(void)
 	}
 	unregister_blkdev(XPRAM_MAJOR, XPRAM_NAME);
 	devfs_remove("slram");
+	blk_cleanup_queue(xpram_queue);
 	sysdev_unregister(&xpram_sys_device);
 	sysdev_class_unregister(&xpram_sysclass);
 }

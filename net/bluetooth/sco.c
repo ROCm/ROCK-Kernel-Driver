@@ -91,17 +91,13 @@ static void sco_sock_timeout(unsigned long arg)
 static void sco_sock_set_timer(struct sock *sk, long timeout)
 {
 	BT_DBG("sock %p state %d timeout %ld", sk, sk->sk_state, timeout);
-
-	if (!mod_timer(&sk->sk_timer, jiffies + timeout))
-		sock_hold(sk);
+	sk_reset_timer(sk, &sk->sk_timer, jiffies + timeout);
 }
 
 static void sco_sock_clear_timer(struct sock *sk)
 {
 	BT_DBG("sock %p state %d", sk, sk->sk_state);
-
-	if (timer_pending(&sk->sk_timer) && del_timer(&sk->sk_timer))
-		__sock_put(sk);
+	sk_stop_timer(sk, &sk->sk_timer);
 }
 
 static void sco_sock_init_timer(struct sock *sk)

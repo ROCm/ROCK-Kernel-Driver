@@ -253,6 +253,9 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
 	if (restore_sigcontext(regs, &frame->uc.uc_mcontext))
 		goto badframe;
 
+	if (do_sigaltstack(&frame->uc.uc_stack, NULL, regs->ARM_sp) == -EFAULT)
+		goto badframe;
+
 	/* Send SIGTRAP if we're single-stepping */
 	if (current->ptrace & PT_SINGLESTEP) {
 		ptrace_cancel_bpt(current);
@@ -402,6 +405,7 @@ setup_rt_frame(int usig, struct k_sigaction *ka, siginfo_t *info,
 	       sigset_t *set, struct pt_regs *regs)
 {
 	struct rt_sigframe __user *frame = get_sigframe(ka, regs, sizeof(*frame));
+	stack_t stack;
 	int err = 0;
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof (*frame)))
@@ -411,8 +415,14 @@ setup_rt_frame(int usig, struct k_sigaction *ka, siginfo_t *info,
 	__put_user_error(&frame->uc, &frame->puc, err);
 	err |= copy_siginfo_to_user(&frame->info, info);
 
-	/* Clear all the bits of the ucontext we don't use.  */
-	err |= __clear_user(&frame->uc, offsetof(struct ucontext, uc_mcontext));
+	__put_user_error(0, &frame->uc.uc_flags, err);
+	__put_user_error(NULL, &frame->uc.uc_link, err);
+
+	memset(&stack, 0, sizeof(stack));
+	stack.ss_sp = (void *)current->sas_ss_sp;
+	stack.ss_flags = sas_ss_flags(regs->ARM_sp);
+	stack.ss_size = current->sas_ss_size;
+	err |= __copy_to_user(&frame->uc.uc_stack, &stack, sizeof(stack));
 
 	err |= setup_sigcontext(&frame->uc.uc_mcontext, /*&frame->fpstate,*/
 				regs, set->sig[0]);

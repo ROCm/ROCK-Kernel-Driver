@@ -1798,14 +1798,9 @@ static void netdev_rx(struct net_device *dev)
 					np->rx_dma[entry],
 					buflen,
 					PCI_DMA_FROMDEVICE);
-#if HAS_IP_COPYSUM
 				eth_copy_and_sum(skb,
 					np->rx_skbuff[entry]->tail, pkt_len, 0);
 				skb_put(skb, pkt_len);
-#else
-				memcpy(skb_put(skb, pkt_len),
-					np->rx_skbuff[entry]->tail, pkt_len);
-#endif
 				pci_dma_sync_single_for_device(np->pci_dev,
 					np->rx_dma[entry],
 					buflen,

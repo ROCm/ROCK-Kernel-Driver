@@ -20,6 +20,8 @@
 
 #include <asm/types.h>	     // for variable types
 
+#define TAPE_DBF_AREA	tape_core_dbf
+
 #include "tape.h"
 #include "tape_std.h"
 
@@ -39,7 +41,8 @@ static rwlock_t tape_device_lock = RW_LOCK_UNLOCKED;
 /*
  * Pointer to debug area.
  */
-debug_info_t *tape_dbf_area = NULL;
+debug_info_t *TAPE_DBF_AREA = NULL;
+EXPORT_SYMBOL(TAPE_DBF_AREA);
 
 /*
  * Printable strings for tape enumerations.
@@ -1176,12 +1179,12 @@ tape_mtop(struct tape_device *device, int mt_op, int mt_count)
 static int
 tape_init (void)
 {
-	tape_dbf_area = debug_register ( "tape", 1, 2, 4*sizeof(long));
-	debug_register_view(tape_dbf_area, &debug_sprintf_view);
+	TAPE_DBF_AREA = debug_register ( "tape", 1, 2, 4*sizeof(long));
+	debug_register_view(TAPE_DBF_AREA, &debug_sprintf_view);
 #ifdef DBF_LIKE_HELL
-	debug_set_level(tape_dbf_area, 6);
+	debug_set_level(TAPE_DBF_AREA, 6);
 #endif
-	DBF_EVENT(3, "tape init: ($Revision: 1.49 $)\n");
+	DBF_EVENT(3, "tape init: ($Revision: 1.50 $)\n");
 	tape_proc_init();
 	tapechar_init ();
 	tapeblock_init ();
@@ -1200,19 +1203,18 @@ tape_exit(void)
 	tapechar_exit();
 	tapeblock_exit();
 	tape_proc_cleanup();
-	debug_unregister (tape_dbf_area);
+	debug_unregister (TAPE_DBF_AREA);
 }
 
 MODULE_AUTHOR("(C) 2001 IBM Deutschland Entwicklung GmbH by Carsten Otte and "
 	      "Michael Holzheu (cotte@de.ibm.com,holzheu@de.ibm.com)");
 MODULE_DESCRIPTION("Linux on zSeries channel attached "
-		   "tape device driver ($Revision: 1.49 $)");
+		   "tape device driver ($Revision: 1.50 $)");
 MODULE_LICENSE("GPL");
 
 module_init(tape_init);
 module_exit(tape_exit);
 
-EXPORT_SYMBOL(tape_dbf_area);
 EXPORT_SYMBOL(tape_generic_remove);
 EXPORT_SYMBOL(tape_generic_probe);
 EXPORT_SYMBOL(tape_generic_online);

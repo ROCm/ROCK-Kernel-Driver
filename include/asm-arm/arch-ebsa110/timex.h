@@ -15,5 +15,5 @@
  * This is therefore not used to calculate the
  * divisor.
  */
-//#define CLOCK_TICK_RATE		2000000
+#define CLOCK_TICK_RATE		47894000
 

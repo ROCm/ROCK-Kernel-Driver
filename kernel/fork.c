@@ -271,6 +271,7 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 	struct vm_area_struct * mpnt, *tmp, **pprev;
 	struct rb_node **rb_link, *rb_parent;
 	int retval;
+	unsigned long charge;
 	struct mempolicy *pol;
 
 	down_write(&oldmm->mmap_sem);
@@ -303,10 +304,12 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 
 		if(mpnt->vm_flags & VM_DONTCOPY)
 			continue;
+		charge = 0;
 		if (mpnt->vm_flags & VM_ACCOUNT) {
 			unsigned int len = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
 			if (security_vm_enough_memory(len))
 				goto fail_nomem;
+			charge = len;
 		}
 		tmp = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
 		if (!tmp)
@@ -370,8 +373,10 @@ fail_nomem_policy:
 	kmem_cache_free(vm_area_cachep, tmp);
 fail_nomem:
 	retval = -ENOMEM;
+	vm_unacct_memory(charge);
 	goto out;
 }
+
 static inline int mm_alloc_pgd(struct mm_struct * mm)
 {
 	mm->pgd = pgd_alloc(mm);

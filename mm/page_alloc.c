@@ -988,6 +988,23 @@ void get_full_page_state(struct page_state *ret)
 	__get_page_state(ret, sizeof(*ret) / sizeof(unsigned long));
 }
 
+unsigned long __read_page_state(unsigned offset)
+{
+	unsigned long ret = 0;
+	int cpu;
+
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		unsigned long in;
+
+		if (!cpu_possible(cpu))
+			continue;
+
+		in = (unsigned long)&per_cpu(page_states, cpu) + offset;
+		ret += *((unsigned long *)in);
+	}
+	return ret;
+}
+
 void get_zone_counts(unsigned long *active,
 		unsigned long *inactive, unsigned long *free)
 {
