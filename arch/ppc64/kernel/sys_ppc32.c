@@ -86,10 +86,10 @@ asmlinkage long sys32_utime(char * filename, struct utimbuf32 *times)
 	
 	if (!times)
 		return sys_utime(filename, NULL);
-	if (get_user(t.actime, &times->actime) || __get_user(t.modtime, &times->modtime))
+	if (get_user(t.actime, &times->actime) ||
+	    __get_user(t.modtime, &times->modtime))
 		return -EFAULT;
 	filenam = getname(filename);
-
 	ret = PTR_ERR(filenam);
 	if (!IS_ERR(filenam)) {
 		old_fs = get_fs();
@@ -294,7 +294,7 @@ asmlinkage long sys32_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg
 	}
 }
 
-struct ncp_mount_data32 {
+struct ncp_mount_data32_v3 {
         int version;
         unsigned int ncp_fd;
         __kernel_uid_t32 mounted_uid;
@@ -309,18 +309,69 @@ struct ncp_mount_data32 {
         __kernel_mode_t32 dir_mode;
 };
 
+struct ncp_mount_data32_v4 {
+	int version;
+	/* all members below are "long" in ABI ... i.e. 32bit on sparc32, while 64bits on sparc64 */
+	unsigned int flags;
+	unsigned int mounted_uid;
+	int wdog_pid;
+
+	unsigned int ncp_fd;
+	unsigned int time_out;
+	unsigned int retry_count;
+
+	unsigned int uid;
+	unsigned int gid;
+	unsigned int file_mode;
+	unsigned int dir_mode;
+};
+
 static void *do_ncp_super_data_conv(void *raw_data)
 {
-	struct ncp_mount_data *n = (struct ncp_mount_data *)raw_data;
-	struct ncp_mount_data32 *n32 = (struct ncp_mount_data32 *)raw_data;
+	switch (*(int*)raw_data) {
+		case NCP_MOUNT_VERSION:
+			{
+				struct ncp_mount_data news, *n = &news; 
+				struct ncp_mount_data32_v3 *n32 = (struct ncp_mount_data32_v3 *)raw_data;
 
-	n->dir_mode = n32->dir_mode;
-	n->file_mode = n32->file_mode;
-	n->gid = n32->gid;
-	n->uid = n32->uid;
-	memmove (n->mounted_vol, n32->mounted_vol, (sizeof (n32->mounted_vol) + 3 * sizeof (unsigned int)));
-	n->wdog_pid = n32->wdog_pid;
-	n->mounted_uid = n32->mounted_uid;
+				n->version = n32->version;
+				n->ncp_fd = n32->ncp_fd;
+				n->mounted_uid = n32->mounted_uid;
+				n->wdog_pid = n32->wdog_pid;
+				memmove (n->mounted_vol, n32->mounted_vol, sizeof (n32->mounted_vol));
+				n->time_out = n32->time_out;
+				n->retry_count = n32->retry_count;
+				n->flags = n32->flags;
+				n->uid = n32->uid;
+				n->gid = n32->gid;
+				n->file_mode = n32->file_mode;
+				n->dir_mode = n32->dir_mode;
+				memcpy(raw_data, n, sizeof(*n)); 
+			}
+			break;
+		case NCP_MOUNT_VERSION_V4:
+			{
+				struct ncp_mount_data_v4 news, *n = &news; 
+				struct ncp_mount_data32_v4 *n32 = (struct ncp_mount_data32_v4 *)raw_data;
+
+				n->version = n32->version;
+				n->flags = n32->flags;
+				n->mounted_uid = n32->mounted_uid;
+				n->wdog_pid = n32->wdog_pid;
+				n->ncp_fd = n32->ncp_fd;
+				n->time_out = n32->time_out;
+				n->retry_count = n32->retry_count;
+				n->uid = n32->uid;
+				n->gid = n32->gid;
+				n->file_mode = n32->file_mode;
+				n->dir_mode = n32->dir_mode;
+				memcpy(raw_data, n, sizeof(*n)); 
+			}
+			break;
+		default:
+			/* do not touch unknown structures */
+			break;
+	}
 	return raw_data;
 }
 
@@ -335,7 +386,7 @@ struct smb_mount_data32 {
 
 static void *do_smb_super_data_conv(void *raw_data)
 {
-	struct smb_mount_data *s = (struct smb_mount_data *)raw_data;
+	struct smb_mount_data news, *s = &news;
 	struct smb_mount_data32 *s32 = (struct smb_mount_data32 *)raw_data;
 
 	if (s32->version != SMB_MOUNT_OLDVERSION)
@@ -346,6 +397,7 @@ static void *do_smb_super_data_conv(void *raw_data)
 	s->gid = s32->gid;
 	s->file_mode = s32->file_mode;
 	s->dir_mode = s32->dir_mode;
+	memcpy(raw_data, s, sizeof(struct smb_mount_data)); 
 out:
 	return raw_data;
 }
@@ -4279,17 +4331,12 @@ asmlinkage int sys32_ftruncate64(unsigned int fd, u32 reg4, unsigned long high, 
 		return sys_ftruncate(fd, (high << 32) | low);
 }
 
-
-
 asmlinkage long sys32_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-     	if (cmd >= F_GETLK64 && cmd <= F_SETLKW64)
+	if (cmd >= F_GETLK64 && cmd <= F_SETLKW64)
 		return sys_fcntl(fd, cmd + F_GETLK - F_GETLK64, arg);
 	return sys32_fcntl(fd, cmd, arg);
 }
-
-
-
 
 struct __sysctl_args32 {
 	u32 name;
