@@ -73,6 +73,12 @@
 		.macro	writeb, rb
 		str	\rb, [r3, #0x14]	@ UTDR
 		.endm
+#elif defined(CONFIG_ARCH_IXP4XX)
+		.macro	loadsp, rb
+		mov	\rb, #0xc8000000
+		.endm
+		.macro	writeb, rb
+		str	\rb, [r3, #0]
 #elif defined(CONFIG_ARCH_LH7A40X)
 		.macro	loadsp, rb
 		ldr	\rb, =0x80000700	@ UART2 UARTBASE
