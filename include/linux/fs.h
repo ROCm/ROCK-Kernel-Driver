@@ -362,7 +362,6 @@ struct inode {
 	struct list_head	i_dentry;
 	unsigned long		i_ino;
 	atomic_t		i_count;
-	dev_t			i_dev;
 	umode_t			i_mode;
 	unsigned int		i_nlink;
 	uid_t			i_uid;

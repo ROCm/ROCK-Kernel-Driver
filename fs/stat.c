@@ -18,7 +18,7 @@
 
 void generic_fillattr(struct inode *inode, struct kstat *stat)
 {
-	stat->dev = inode->i_dev;
+	stat->dev = inode->i_sb->s_dev;
 	stat->ino = inode->i_ino;
 	stat->mode = inode->i_mode;
 	stat->nlink = inode->i_nlink;

@@ -100,7 +100,7 @@ unsigned short coda_flags_to_cflags(unsigned short flags)
 void coda_vattr_to_iattr(struct inode *inode, struct coda_vattr *attr)
 {
         int inode_type;
-        /* inode's i_dev, i_flags, i_ino are set by iget 
+        /* inode's i_flags, i_ino are set by iget 
            XXX: is this all we need ??
            */
         switch (attr->va_type) {

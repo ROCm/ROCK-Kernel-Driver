@@ -247,8 +247,8 @@ finish_inode:
 	/*
 	 * Read the disk inode attributes into a new inode structure and get
 	 * a new vnode for it.	Initialize the inode lock so we can idestroy
-	 * it soon if it's a dup.  This should also initialize i_dev, i_ino,
-	 * i_bno, i_mount, and i_index.
+	 * it soon if it's a dup.  This should also initialize i_ino, i_bno,
+	 * i_mount, and i_index.
 	 */
 	error = xfs_iread(mp, tp, ino, &ip, bno);
 	if (error) {
