@@ -1663,11 +1663,8 @@ static runqueue_t *find_busiest_queue(struct sched_group *group)
  * tasks if there is an imbalance.
  *
  * Called with this_rq unlocked.
- *
- * This function is marked noinline to work around a compiler
- * bug with gcc 3.3.3-hammer on x86-64.
  */
-static int noinline load_balance(int this_cpu, runqueue_t *this_rq,
+static int load_balance(int this_cpu, runqueue_t *this_rq,
 			struct sched_domain *sd, enum idle_type idle)
 {
 	struct sched_group *group;
