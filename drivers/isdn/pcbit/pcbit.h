@@ -12,6 +12,8 @@
 #ifndef PCBIT_H
 #define PCBIT_H
 
+#include <linux/tqueue.h>
+
 #define MAX_PCBIT_CARDS 4
 
 

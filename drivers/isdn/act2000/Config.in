@@ -2,5 +2,5 @@
 # Config.in for IBM Active 2000 ISDN driver
 #
 
-dep_tristate       'IBM Active 2000 support' CONFIG_ISDN_DRV_ACT2000 $CONFIG_ISDN
+dep_tristate       'IBM Active 2000 support' CONFIG_ISDN_DRV_ACT2000 $CONFIG_ISDN $CONFIG_ISA
 

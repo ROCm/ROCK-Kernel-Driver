@@ -2,4 +2,4 @@
 # Config.in for Spellcaster ISDN driver
 #
 
-dep_tristate       'Spellcaster support' CONFIG_ISDN_DRV_SC $CONFIG_ISDN
+dep_tristate       'Spellcaster support' CONFIG_ISDN_DRV_SC $CONFIG_ISDN $CONFIG_ISA
