@@ -87,7 +87,7 @@ static int max_channel = 3;
 static int init_timeout = 5;
 static int max_requests = 50;
 
-#define IBMVSCSI_VERSION "1.5.3"
+#define IBMVSCSI_VERSION "1.5.4"
 
 MODULE_DESCRIPTION("IBM Virtual SCSI");
 MODULE_AUTHOR("Dave Boutcher");
@@ -467,7 +467,7 @@ static int map_data_for_srp_cmd(struct scsi_cmnd *cmd,
 static int ibmvscsi_send_srp_event(struct srp_event_struct *evt_struct,
 				   struct ibmvscsi_host_data *hostdata)
 {
-	struct scsi_cmnd *cmnd = evt_struct->cmnd;
+	struct scsi_cmnd *cmnd;
 	u64 *crq_as_u64 = (u64 *) &evt_struct->crq;
 	int rc;
 
@@ -479,22 +479,15 @@ static int ibmvscsi_send_srp_event(struct srp_event_struct *evt_struct,
 	if ((evt_struct->crq.format == VIOSRP_SRP_FORMAT) &&
 	    (atomic_dec_if_positive(&hostdata->request_limit) < 0)) {
 		/* See if the adapter is disabled */
-		if (atomic_read(&hostdata->request_limit) < 0) {
-			if (cmnd)
-				cmnd->result = DID_ERROR << 16;
-			if (evt_struct->cmnd_done)
-				evt_struct->cmnd_done(cmnd);
-			unmap_cmd_data(&evt_struct->iu.srp.cmd,
-				       hostdata->dev);
-			free_event_struct(&hostdata->pool, evt_struct);
-			return 0;
-		} else {
-			printk("ibmvscsi: Warning, request_limit exceeded\n");
-			unmap_cmd_data(&evt_struct->iu.srp.cmd,
-				       hostdata->dev);
-			free_event_struct(&hostdata->pool, evt_struct);
-			return SCSI_MLQUEUE_HOST_BUSY;
-		}
+		if (atomic_read(&hostdata->request_limit) < 0)
+			goto send_error;
+	
+		printk(KERN_WARNING 
+		       "ibmvscsi: Warning, request_limit exceeded\n");
+		unmap_cmd_data(&evt_struct->iu.srp.cmd,
+			       hostdata->dev);
+		free_event_struct(&hostdata->pool, evt_struct);
+		return SCSI_MLQUEUE_HOST_BUSY;
 	}
 
 	/* Copy the IU into the transfer area */
@@ -511,17 +504,23 @@ static int ibmvscsi_send_srp_event(struct srp_event_struct *evt_struct,
 	     ibmvscsi_send_crq(hostdata, crq_as_u64[0], crq_as_u64[1])) != 0) {
 		list_del(&evt_struct->list);
 
-		cmnd = evt_struct->cmnd;
 		printk(KERN_ERR "ibmvscsi: failed to send event struct rc %d\n",
 		       rc);
-		unmap_cmd_data(&evt_struct->iu.srp.cmd, hostdata->dev);
-		free_event_struct(&hostdata->pool, evt_struct);
-		if (cmnd)
-			cmnd->result = DID_ERROR << 16;
-		if (evt_struct->cmnd_done)
-			evt_struct->cmnd_done(cmnd);
+		goto send_error;
 	}
 
+	return 0;
+
+ send_error:
+	unmap_cmd_data(&evt_struct->iu.srp.cmd, hostdata->dev);
+
+	if ((cmnd = evt_struct->cmnd) != NULL) {
+		cmnd->result = DID_ERROR << 16;
+		evt_struct->cmnd_done(cmnd);
+	} else if (evt_struct->done)
+		evt_struct->done(evt_struct);
+	
+	free_event_struct(&hostdata->pool, evt_struct);
 	return 0;
 }
 
