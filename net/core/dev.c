@@ -201,6 +201,8 @@ int netdev_fastroute;
 int netdev_fastroute_obstacles;
 #endif
 
+static struct subsystem net_subsys;
+
 
 /*******************************************************************************
 
@@ -2545,7 +2547,10 @@ int register_netdevice(struct net_device *dev)
 	notifier_call_chain(&netdev_chain, NETDEV_REGISTER, dev);
 
 	net_run_sbin_hotplug(dev, "register");
-	ret = 0;
+
+	snprintf(dev->kobj.name,KOBJ_NAME_LEN,dev->name);
+	kobj_set_kset_s(dev,net_subsys);
+	ret = kobject_register(&dev->kobj);
 
 out:
 	return ret;
@@ -2638,7 +2643,7 @@ int unregister_netdevice(struct net_device *dev)
 
 	/* Shutdown queueing discipline. */
 	dev_shutdown(dev);
-	
+
 	net_run_sbin_hotplug(dev, "unregister");
 	
 	/* Notify protocols, that we are about to destroy
@@ -2670,6 +2675,8 @@ int unregister_netdevice(struct net_device *dev)
 #endif
 		goto out;
 	}
+
+	kobject_unregister(&dev->kobj);
 
 	/* Last reference is our one */
 	if (atomic_read(&dev->refcnt) == 1)
@@ -2749,6 +2756,8 @@ extern void ip_auto_config(void);
 extern void dv_init(void);
 #endif /* CONFIG_NET_DIVERT */
 
+static decl_subsys(net,NULL);
+
 
 /*
  *       This is called single threaded during boot, so no need
@@ -2763,6 +2772,8 @@ static int __init net_dev_init(void)
 
 	if (dev_proc_init())
 		goto out;
+
+	subsystem_register(&net_subsys);
 
 #ifdef CONFIG_NET_DIVERT
 	dv_init();

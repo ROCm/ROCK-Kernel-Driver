@@ -28,6 +28,7 @@
 #include <linux/if.h>
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
+#include <linux/kobject.h>
 
 #include <asm/atomic.h>
 #include <asm/cache.h>
@@ -438,6 +439,9 @@ struct net_device
 	/* this will get initialized at each interface type init routine */
 	struct divert_blk	*divert;
 #endif /* CONFIG_NET_DIVERT */
+
+	/* generic object representation */
+	struct kobject kobj;
 };
 
 
