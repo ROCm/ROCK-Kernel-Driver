@@ -607,13 +607,11 @@ static int ip6_fragment(struct sk_buff **pskb, int (*output)(struct sk_buff**))
 				frag->nh.ipv6h->payload_len = htons(frag->len - sizeof(struct ipv6hdr));
 				ip6_copy_metadata(frag, skb);
 			}
-			err = output(pskb);
-			if (err || !frag) {
-				if (unlikely(skb != *pskb))
-					skb = *pskb;
-				break;
-			}
 			
+			err = output(&skb);
+			if (err || !frag)
+				break;
+
 			skb = frag;
 			frag = skb->next;
 			skb->next = NULL;
