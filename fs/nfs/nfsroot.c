@@ -273,7 +273,7 @@ static int __init root_nfs_parse(char *name, char *buf)
  */
 static int __init root_nfs_name(char *name)
 {
-	char buf[NFS_MAXPATHLEN];
+	static char buf[NFS_MAXPATHLEN];
 	char *cp;
 
 	/* Set some default values */
