@@ -22,6 +22,7 @@ struct thread_info {
 	struct exec_domain *exec_domain;	/* execution domain */
 	unsigned long	flags;			/* low level flags */
 	int		cpu;			/* cpu we're on */
+	int		preempt_count;		/* not used at present */
 };
 
 /*
