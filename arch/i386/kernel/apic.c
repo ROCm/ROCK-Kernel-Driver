@@ -877,23 +877,18 @@ static unsigned int __init get_8254_timer_count(void)
 /* next tick in 8254 can be caught by catching timer wraparound */
 static void __init wait_8254_wraparound(void)
 {
-	unsigned int curr_count, prev_count=~0;
-	int delta;
+	unsigned int curr_count, prev_count;
 
 	curr_count = get_8254_timer_count();
-
 	do {
 		prev_count = curr_count;
 		curr_count = get_8254_timer_count();
-		delta = curr_count-prev_count;
 
-	/*
-	 * This limit for delta seems arbitrary, but it isn't, it's
-	 * slightly above the level of error a buggy Mercury/Neptune
-	 * chipset timer can cause.
-	 */
+		/* workaround for broken Mercury/Neptune */
+		if (prev_count >= curr_count + 0x100)
+			curr_count = get_8254_timer_count();
 
-	} while (delta < 300);
+	} while (prev_count >= curr_count);
 }
 
 /*
