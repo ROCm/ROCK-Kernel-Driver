@@ -70,14 +70,15 @@
  *   sleep, so must not be called with any spinlocks held.  If the system is
  *   REALLY out of memory this function returns 0, other wise 1.
 
- * int idr_get_new(struct idr *idp, void *ptr);
+ * int idr_get_new(struct idr *idp, void *ptr, int *id);
  
  *   This is the allocate id function.  It should be called with any
  *   required locks.  In fact, in the SMP case, you MUST lock prior to
- *   calling this function to avoid possible out of memory problems.  If
- *   memory is required, it will return a -1, in which case you should
- *   unlock and go back to the idr_pre_get() call.  ptr is the pointer
- *   you want associated with the id.  In other words:
+ *   calling this function to avoid possible out of memory problems.
+ *   If memory is required, it will return -EAGAIN, you should unlock
+ *   and go back to the idr_pre_get() call.  If the idr is full, it
+ *   will return a -ENOSPC.  ptr is the pointer you want associated
+ *   with the id.  The value is returned in the "id" field.
 
  * void *idr_find(struct idr *idp, int id);
  
@@ -91,6 +92,10 @@
 
  *   removes the given id, freeing that slot and any memory that may
  *   now be unused.  See idr_find() for locking restrictions.
+
+ * int idr_full(struct idr *idp);
+
+ *   Returns true if the idr is full and false if not.
 
  */
 
@@ -276,12 +281,30 @@ build_up:
 }
 EXPORT_SYMBOL(idr_get_new_above);
 
-int idr_get_new(struct idr *idp, void *ptr)
+static int idr_full(struct idr *idp)
 {
-	return idr_get_new_above(idp, ptr, 0);
+	return ((idp->layers >= MAX_LEVEL)
+		&& (idp->top->bitmap == TOP_LEVEL_FULL));
+}
+
+int idr_get_new(struct idr *idp, void *ptr, int *id)
+{
+	int rv;
+	rv = idr_get_new_above(idp, ptr, 0);
+	/*
+	 * This is a cheap hack until the IDR code can be fixed to
+	 * return proper error values.
+	 */
+	if (rv == -1) {
+		if (idr_full(idp))
+			return -ENOSPC;
+		else
+			return -EAGAIN;
+	}
+	*id = rv;
+	return 0;
 }
 EXPORT_SYMBOL(idr_get_new);
-
 
 static void sub_remove(struct idr *idp, int shift, int id)
 {
@@ -314,6 +337,9 @@ static void sub_remove(struct idr *idp, int shift, int id)
 void idr_remove(struct idr *idp, int id)
 {
 	struct idr_layer *p;
+
+	/* Mask off upper bits we don't use for the search. */
+	id &= MAX_ID_MASK;
 
 	sub_remove(idp, (idp->layers - 1) * IDR_BITS, id);
 	if ( idp->top && idp->top->count == 1 && 
@@ -350,6 +376,9 @@ void *idr_find(struct idr *idp, int id)
 	if ( unlikely( (id & ~(~0 << MAX_ID_SHIFT)) >> (n + IDR_BITS)))
 	     return NULL;
 #endif
+	/* Mask off upper bits we don't use for the search. */
+	id &= MAX_ID_MASK;
+
 	while (n > 0 && p) {
 		n -= IDR_BITS;
 		p = p->ary[(id >> n) & IDR_MASK];
