@@ -160,6 +160,9 @@ void sym_calc_value(struct symbol *sym)
 	struct symbol *def_sym;
 	struct expr *e;
 
+	if (!sym)
+		return;
+
 	if (sym->flags & SYMBOL_VALID)
 		return;
 

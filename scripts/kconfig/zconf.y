@@ -27,7 +27,7 @@ struct symbol *symbol_hash[257];
 
 #define YYERROR_VERBOSE
 %}
-%expect 36
+%expect 40
 
 %union
 {
@@ -46,6 +46,7 @@ struct symbol *symbol_hash[257];
 %token T_ENDCHOICE
 %token T_COMMENT
 %token T_CONFIG
+%token T_MENUCONFIG
 %token T_HELP
 %token <string> T_HELPTEXT
 %token T_IF
@@ -104,12 +105,13 @@ common_block:
 	  if_stmt
 	| comment_stmt
 	| config_stmt
+	| menuconfig_stmt
 	| source_stmt
 	| nl_or_eof
 ;
 
 
-/* config entry */
+/* config/menuconfig entry */
 
 config_entry_start: T_CONFIG T_WORD
 {
@@ -121,6 +123,24 @@ config_entry_start: T_CONFIG T_WORD
 
 config_stmt: config_entry_start T_EOL config_option_list
 {
+	menu_end_entry();
+	printd(DEBUG_PARSE, "%s:%d:endconfig\n", zconf_curname(), zconf_lineno());
+};
+
+menuconfig_entry_start: T_MENUCONFIG T_WORD
+{
+	struct symbol *sym = sym_lookup($2, 0);
+	sym->flags |= SYMBOL_OPTIONAL;
+	menu_add_entry(sym);
+	printd(DEBUG_PARSE, "%s:%d:menuconfig %s\n", zconf_curname(), zconf_lineno(), $2);
+};
+
+menuconfig_stmt: menuconfig_entry_start T_EOL config_option_list
+{
+	if (current_entry->prompt)
+		current_entry->prompt->type = P_MENU;
+	else
+		zconfprint("warning: menuconfig statement without prompt");
 	menu_end_entry();
 	printd(DEBUG_PARSE, "%s:%d:endconfig\n", zconf_curname(), zconf_lineno());
 };
