@@ -2147,30 +2147,34 @@ static int eni_proc_read(struct atm_dev *dev,loff_t *pos,char *page)
 		    skb_queue_len(&tx->backlog));
 	}
 	read_lock(&vcc_sklist_lock);
-	sk_for_each(s, node, &vcc_sklist) {
-		struct eni_vcc *eni_vcc;
-		int length;
+	for(i = 0; i < VCC_HTABLE_SIZE; ++i) {
+		struct hlist_head *head = &vcc_hash[i];
 
-		vcc = atm_sk(s);
-		if (vcc->dev != dev)
-			continue;
-		eni_vcc = ENI_VCC(vcc);
-		if (--left) continue;
-		length = sprintf(page,"vcc %4d: ",vcc->vci);
-		if (eni_vcc->rx) {
-			length += sprintf(page+length,"0x%06lx-0x%06lx "
-			    "(%6ld bytes)",
-			    eni_vcc->recv-eni_dev->ram,
-			    eni_vcc->recv-eni_dev->ram+eni_vcc->words*4-1,
-			    eni_vcc->words*4);
-			if (eni_vcc->tx) length += sprintf(page+length,", ");
+		sk_for_each(s, node, head) {
+			struct eni_vcc *eni_vcc;
+			int length;
+
+			vcc = atm_sk(s);
+			if (vcc->dev != dev)
+				continue;
+			eni_vcc = ENI_VCC(vcc);
+			if (--left) continue;
+			length = sprintf(page,"vcc %4d: ",vcc->vci);
+			if (eni_vcc->rx) {
+				length += sprintf(page+length,"0x%06lx-0x%06lx "
+				    "(%6ld bytes)",
+				    eni_vcc->recv-eni_dev->ram,
+				    eni_vcc->recv-eni_dev->ram+eni_vcc->words*4-1,
+				    eni_vcc->words*4);
+				if (eni_vcc->tx) length += sprintf(page+length,", ");
+			}
+			if (eni_vcc->tx)
+				length += sprintf(page+length,"tx[%d], txing %d bytes",
+				    eni_vcc->tx->index,eni_vcc->txing);
+			page[length] = '\n';
+			read_unlock(&vcc_sklist_lock);
+			return length+1;
 		}
-		if (eni_vcc->tx)
-			length += sprintf(page+length,"tx[%d], txing %d bytes",
-			    eni_vcc->tx->index,eni_vcc->txing);
-		page[length] = '\n';
-		read_unlock(&vcc_sklist_lock);
-		return length+1;
 	}
 	read_unlock(&vcc_sklist_lock);
 	for (i = 0; i < eni_dev->free_len; i++) {

@@ -380,7 +380,9 @@ struct atm_skb_data {
 	unsigned long	atm_options;	/* ATM layer options */
 };
 
-extern struct hlist_head vcc_sklist;
+#define VCC_HTABLE_SIZE 32
+
+extern struct hlist_head vcc_hash[VCC_HTABLE_SIZE];
 extern rwlock_t vcc_sklist_lock;
 
 #define ATM_SKB(skb) (((struct atm_skb_data *) (skb)->cb))

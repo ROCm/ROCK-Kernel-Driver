@@ -1071,14 +1071,16 @@ fore200e_find_vcc(struct fore200e* fore200e, struct rpd* rpd)
     struct sock *s;
     struct atm_vcc* vcc;
     struct hlist_node *node;
+    int i;
 
     read_lock(&vcc_sklist_lock);
-    sk_for_each(s, node, &vcc_sklist) {
+
+    sk_for_each(s, node, &vcc_hash[rpd->atm_header.vci & (VCC_HTABLE_SIZE-1)]) {
 	vcc = atm_sk(s);
 	if (vcc->dev != fore200e->atm_dev)
-		continue;
+	    continue;
 	if (vcc->vpi == rpd->atm_header.vpi && vcc->vci == rpd->atm_header.vci) {
-            read_unlock(&vcc_sklist_lock);
+	    read_unlock(&vcc_sklist_lock);
 	    return vcc;
 	}
     }
@@ -2606,7 +2608,7 @@ fore200e_proc_read(struct atm_dev *dev,loff_t* pos,char* page)
     struct sock *s;
     struct hlist_node *node;
     struct fore200e* fore200e  = FORE200E_DEV(dev);
-    int              len, left = *pos;
+    int              i, len, left = *pos;
 
     if (!left--) {
 
@@ -2852,15 +2854,18 @@ fore200e_proc_read(struct atm_dev *dev,loff_t* pos,char* page)
 		      " VCCs:\n  address\tVPI.VCI:AAL\t(min/max tx PDU size) (min/max rx PDU size)\n");
 	
 	read_lock(&vcc_sklist_lock);
-	sk_for_each(s, node, &vcc_sklist) {
-	    vcc = atm_sk(s);
+	for(i = 0; i < VCC_HTABLE_SIZE; ++i) {
+	    struct hlist_head *head = &vcc_hash[i];
 
-	    if (vcc->dev != fore200e->atm_dev)
+	    sk_for_each(s, node, head) {
+		vcc = atm_sk(s);
+
+		if (vcc->dev != fore200e->atm_dev)
 		    continue;
 
-	    fore200e_vcc = FORE200E_VCC(vcc);
+		fore200e_vcc = FORE200E_VCC(vcc);
 	    
-	    len += sprintf(page + len,
+		len += sprintf(page + len,
 			   "  %x\t%d.%d:%d\t\t(%d/%d)\t(%d/%d)\n",
 			   (u32)(unsigned long)vcc,
 			   vcc->vpi, vcc->vci, fore200e_atm2fore_aal(vcc->qos.aal),
@@ -2869,6 +2874,7 @@ fore200e_proc_read(struct atm_dev *dev,loff_t* pos,char* page)
 			   fore200e_vcc->rx_min_pdu > 0xFFFF ? 0 : fore200e_vcc->rx_min_pdu,
 			   fore200e_vcc->rx_max_pdu
 		);
+	    }
 	}
 	read_unlock(&vcc_sklist_lock);
 

@@ -38,13 +38,16 @@
 #define DPRINTK(format,args...)
 #endif
 
-
-HLIST_HEAD(vcc_sklist);
+struct hlist_head vcc_hash[VCC_HTABLE_SIZE];
 rwlock_t vcc_sklist_lock = RW_LOCK_UNLOCKED;
 
 void __vcc_insert_socket(struct sock *sk)
 {
-	sk_add_node(sk, &vcc_sklist);
+	struct atm_vcc *vcc = atm_sk(sk);
+	struct hlist_head *head = &vcc_hash[vcc->vci &
+					(VCC_HTABLE_SIZE - 1)];
+	sk->sk_hashent = vcc->vci & (VCC_HTABLE_SIZE - 1);
+	sk_add_node(sk, head);
 }
 
 void vcc_insert_socket(struct sock *sk)
@@ -80,7 +83,7 @@ static struct sk_buff *alloc_tx(struct atm_vcc *vcc,unsigned int size)
 }
 
 
-EXPORT_SYMBOL(vcc_sklist);
+EXPORT_SYMBOL(vcc_hash);
 EXPORT_SYMBOL(vcc_sklist_lock);
 EXPORT_SYMBOL(vcc_insert_socket);
 EXPORT_SYMBOL(vcc_remove_socket);
@@ -250,11 +253,13 @@ static int adjust_tp(struct atm_trafprm *tp,unsigned char aal)
 
 static int check_ci(struct atm_vcc *vcc, short vpi, int vci)
 {
+	struct hlist_head *head = &vcc_hash[vci &
+					(VCC_HTABLE_SIZE - 1)];
 	struct hlist_node *node;
 	struct sock *s;
 	struct atm_vcc *walk;
 
-	sk_for_each(s, node, &vcc_sklist) {
+	sk_for_each(s, node, head) {
 		walk = atm_sk(s);
 		if (walk->dev != vcc->dev)
 			continue;
