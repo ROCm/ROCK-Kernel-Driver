@@ -736,7 +736,7 @@ static inline void copy_flags(unsigned long clone_flags, struct task_struct *p)
 	p->flags = new_flags;
 }
 
-asmlinkage int sys_set_tid_address(int *tidptr)
+asmlinkage long sys_set_tid_address(int *tidptr)
 {
 	current->clear_child_tid = tidptr;
 

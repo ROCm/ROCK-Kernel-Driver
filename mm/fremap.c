@@ -113,7 +113,7 @@ err:
  * protection is used. Arbitrary protections might be implemented in the
  * future.
  */
-int sys_remap_file_pages(unsigned long start, unsigned long size,
+long sys_remap_file_pages(unsigned long start, unsigned long size,
 	unsigned long __prot, unsigned long pgoff, unsigned long flags)
 {
 	struct mm_struct *mm = current->mm;
