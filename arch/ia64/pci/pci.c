@@ -5,6 +5,7 @@
  *
  * Copyright (C) 2002 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
+ *	Bjorn Helgaas <bjorn_helgaas@hp.com>
  *
  * Note: Above list of copyright holders is incomplete...
  */
@@ -116,38 +117,10 @@ pci_acpi_init (void)
 
 subsys_initcall(pci_acpi_init);
 
-void __init
-pcibios_fixup_device_resources (struct pci_dev *dev, struct pci_bus *bus)
-{
-	struct pci_controller *controller = PCI_CONTROLLER(dev);
-	struct pci_window *window;
-	int i, j;
-
-	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
-		if (!dev->resource[i].start)
-			continue;
-
-#define contains(win, res)	((res)->start >= (win)->start && \
-				 (res)->end   <= (win)->end)
-
-		for (j = 0; j < controller->windows; j++) {
-			window = &controller->window[j];
-			if (((dev->resource[i].flags & IORESOURCE_MEM &&
-			      window->resource.flags & IORESOURCE_MEM) ||
-			     (dev->resource[i].flags & IORESOURCE_IO &&
-			      window->resource.flags & IORESOURCE_IO)) &&
-			    contains(&window->resource, &dev->resource[i])) {
-				dev->resource[i].start += window->offset;
-				dev->resource[i].end   += window->offset;
-			}
-		}
-	}
-}
-
 /* Called by ACPI when it finds a new root bus.  */
 
 static struct pci_controller *
-alloc_pci_controller(int seg)
+alloc_pci_controller (int seg)
 {
 	struct pci_controller *controller;
 
@@ -160,8 +133,8 @@ alloc_pci_controller(int seg)
 	return controller;
 }
 
-struct pci_bus *
-scan_root_bus(int bus, struct pci_ops *ops, void *sysdata)
+static struct pci_bus *
+scan_root_bus (int bus, struct pci_ops *ops, void *sysdata)
 {
 	struct pci_bus *b;
 
@@ -342,6 +315,34 @@ out2:
 	kfree(controller);
 out1:
 	return NULL;
+}
+
+void __init
+pcibios_fixup_device_resources (struct pci_dev *dev, struct pci_bus *bus)
+{
+	struct pci_controller *controller = PCI_CONTROLLER(dev);
+	struct pci_window *window;
+	int i, j;
+
+	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+		if (!dev->resource[i].start)
+			continue;
+
+#define contains(win, res)	((res)->start >= (win)->start && \
+				 (res)->end   <= (win)->end)
+
+		for (j = 0; j < controller->windows; j++) {
+			window = &controller->window[j];
+			if (((dev->resource[i].flags & IORESOURCE_MEM &&
+			      window->resource.flags & IORESOURCE_MEM) ||
+			     (dev->resource[i].flags & IORESOURCE_IO &&
+			      window->resource.flags & IORESOURCE_IO)) &&
+			    contains(&window->resource, &dev->resource[i])) {
+				dev->resource[i].start += window->offset;
+				dev->resource[i].end   += window->offset;
+			}
+		}
+	}
 }
 
 /*
