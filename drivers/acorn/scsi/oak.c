@@ -192,7 +192,6 @@ static struct ecard_driver oakscsi_driver = {
 	.remove		= __devexit_p(oakscsi_remove),
 	.id_table	= oakscsi_cids,
 	.drv = {
-		.devclass	= &shost_devclass,
 		.name		= "oakscsi",
 	},
 };

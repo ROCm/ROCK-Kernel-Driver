@@ -53,29 +53,6 @@ static struct device_attribute *const shost_attrs[] = {
 	&dev_attr_unchecked_isa_dma,
 };
 
-/**
- * scsi_host_class_name_show - copy out the SCSI host name
- * @dev:		device to check
- * @page:		copy data into this area
- * @count:		number of bytes to copy
- * @off:		start at this offset in page
- * Return:
- *     number of bytes written into page.
- **/
-static ssize_t scsi_host_class_name_show(struct device *dev, char *page)
-{
-	struct Scsi_Host *shost;
-
-	shost = to_scsi_host(dev);
-
-	if (!shost)
-		return 0;
-	
-	return snprintf(page, 20, "scsi%d\n", shost->host_no);
-}
-
-DEVICE_ATTR(class_name, S_IRUGO, scsi_host_class_name_show, NULL);
-
 struct class shost_class = {
 	.name		= "scsi-host",
 };
