@@ -374,6 +374,10 @@ struct es1370_state {
 		unsigned subdivision;
 	} dma_dac1, dma_dac2, dma_adc;
 
+	/* The following buffer is used to point the phantom write channel to. */
+	unsigned char *bugbuf_cpu;
+	dma_addr_t bugbuf_dma;
+
 	/* midi stuff */
 	struct {
 		unsigned ird, iwr, icnt;
@@ -391,13 +395,6 @@ struct es1370_state {
 /* --------------------------------------------------------------------- */
 
 static LIST_HEAD(devs);
-
-/*
- * The following buffer is used to point the phantom write channel to,
- * so that it cannot wreak havoc. The attribute makes sure it doesn't
- * cross a page boundary and ensures dword alignment for the DMA engine
- */
-static unsigned char bugbuf[16] __attribute__ ((aligned (16)));
 
 /* --------------------------------------------------------------------- */
 
@@ -2653,8 +2650,9 @@ static int __devinit es1370_probe(struct pci_dev *pcidev, const struct pci_devic
 	outl(s->ctrl, s->io+ES1370_REG_CONTROL);
 	outl(s->sctrl, s->io+ES1370_REG_SERIAL_CONTROL);
 	/* point phantom write channel to "bugbuf" */
+	s->bugbuf_cpu = pci_alloc_consistent(pcidev,16,&s->bugbuf_dma);
 	outl((ES1370_REG_PHANTOM_FRAMEADR >> 8) & 15, s->io+ES1370_REG_MEMPAGE);
-	outl(virt_to_bus(bugbuf), s->io+(ES1370_REG_PHANTOM_FRAMEADR & 0xff));
+	outl(s->bugbuf_dma, s->io+(ES1370_REG_PHANTOM_FRAMEADR & 0xff));
 	outl(0, s->io+(ES1370_REG_PHANTOM_FRAMECNT & 0xff));
 	pci_set_master(pcidev);  /* enable bus mastering */
 	wrcodec(s, 0x16, 3); /* no RST, PD */
@@ -2721,6 +2719,7 @@ static void __devinit es1370_remove(struct pci_dev *dev)
 	unregister_sound_mixer(s->dev_mixer);
 	unregister_sound_dsp(s->dev_dac);
 	unregister_sound_midi(s->dev_midi);
+	pci_free_consistent(dev, 16, s->bugbuf_cpu, s->bugbuf_dma);
 	kfree(s);
 	pci_set_drvdata(dev, NULL);
 }
