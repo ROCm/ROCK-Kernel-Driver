@@ -35,11 +35,13 @@
 #include <linux/security.h>
 #include <linux/mount.h>
 #include <linux/kernel.h>
+#include <linux/init.h>
 #include <asm/uaccess.h>
 
 extern int max_threads;
 
 #ifdef CONFIG_KMOD
+static struct workqueue_struct *khelper_wq;
 
 /*
 	modprobe_path is set via /proc/sys.
@@ -141,9 +143,7 @@ struct subprocess_info {
 	char **argv;
 	char **envp;
 	int wait;
-	int async;
 	int retval;
-	struct work_struct async_work;
 };
 
 /*
@@ -200,19 +200,7 @@ static int wait_for_helper(void *data)
 	return 0;
 }
 
-static void destroy_subinfo(struct subprocess_info *sub_info)
-{
-	if (!sub_info)
-		return;
-	kfree_strvec(sub_info->argv);
-	kfree_strvec(sub_info->envp);
-	kfree(sub_info->path);
-	kfree(sub_info);
-}
-
-/*
- * This is run by keventd.
- */
+/* This is run by khelper thread  */
 static void __call_usermodehelper(void *data)
 {
 	struct subprocess_info *sub_info = data;
@@ -228,54 +216,11 @@ static void __call_usermodehelper(void *data)
 		pid = kernel_thread(____call_usermodehelper, sub_info,
 				    CLONE_VFORK | SIGCHLD);
 
-	if (sub_info->async) {
-		destroy_subinfo(sub_info);
-	} else {
-		if (pid < 0) {
-			sub_info->retval = pid;
-			complete(sub_info->complete);
-		} else if (!sub_info->wait)
-			complete(sub_info->complete);
-	}
-}
-
-/**
- * call_usermodehelper_async - start a usermode application
- *
- * Like call_usermodehelper(), except it is fully asynchronous.  Should only
- * be used in extremis, such as when the caller unavoidably holds locks which
- * keventd might block on.
- */
-static int call_usermodehelper_async(char *path, char **argv,
-				char **envp, int gfp_flags)
-{
-	struct subprocess_info *sub_info;
-
-	if (system_state != SYSTEM_RUNNING)
-		return -EBUSY;
-	if (path[0] == '\0')
-		goto out;
-
-	sub_info = kzmalloc(sizeof(*sub_info), gfp_flags);
-	if (!sub_info)
-		goto enomem;
-	sub_info->async = 1;
-	sub_info->path = kstrdup(path, gfp_flags);
-	if (!sub_info->path)
-		goto enomem;
-	sub_info->argv = kstrdup_vec(argv, gfp_flags);
-	if (!sub_info->argv)
-		goto enomem;
-	sub_info->envp = kstrdup_vec(envp, gfp_flags);
-	if (!sub_info->envp)
-		goto enomem;
-	INIT_WORK(&sub_info->async_work, __call_usermodehelper, sub_info);
-	schedule_work(&sub_info->async_work);
-out:
-	return 0;
-enomem:
-	destroy_subinfo(sub_info);
-	return -ENOMEM;
+	if (pid < 0) {
+		sub_info->retval = pid;
+		complete(sub_info->complete);
+	} else if (!sub_info->wait)
+		complete(sub_info->complete);
 }
 
 /**
@@ -305,23 +250,22 @@ int call_usermodehelper(char *path, char **argv, char **envp, int wait)
 	};
 	DECLARE_WORK(work, __call_usermodehelper, &sub_info);
 
-	if (!wait)
-		return call_usermodehelper_async(path, argv, envp, GFP_NOIO);
-
-	if (0 && system_state != SYSTEM_RUNNING)
+	if (!khelper_wq)
 		return -EBUSY;
 
 	if (path[0] == '\0')
-		goto out;
+		return 0;
 
-	if (current_is_keventd()) {
-		/* We can't wait on keventd! */
-		__call_usermodehelper(&sub_info);
-	} else {
-		schedule_work(&work);
-		wait_for_completion(&done);
-	}
-out:
+	queue_work(khelper_wq, &work);
+	wait_for_completion(&done);
 	return sub_info.retval;
 }
 EXPORT_SYMBOL(call_usermodehelper);
+
+static __init int usermodehelper_init(void)
+{
+	khelper_wq = create_singlethread_workqueue("khelper");
+	BUG_ON(!khelper_wq);
+	return 0;
+}
+__initcall(usermodehelper_init);
