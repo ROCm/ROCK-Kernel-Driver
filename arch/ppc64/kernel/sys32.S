@@ -134,7 +134,7 @@ _STATIC(do_sys_recv) /* sys_recv(int, void *, size_t, unsigned int) */
 	lwz		r6,12(r10)
 	b		.sys_recv
 
-_STATIC(do_sys_sendto) /* sys32_sendto(int, u32, __kernel_size_t32, unsigned int, u32, int) */
+_STATIC(do_sys_sendto) /* sys32_sendto(int, u32, compat_size_t, unsigned int, u32, int) */
 	mr		r10,r4
 	lwa		r3,0(r10)
 	lwz		r4,4(r10)
@@ -144,7 +144,7 @@ _STATIC(do_sys_sendto) /* sys32_sendto(int, u32, __kernel_size_t32, unsigned int
 	lwa		r8,20(r10)
 	b		.sys32_sendto
 
-_STATIC(do_sys_recvfrom) /* sys32_recvfrom(int, u32, __kernel_size_t32, unsigned int, u32, u32) */
+_STATIC(do_sys_recvfrom) /* sys32_recvfrom(int, u32, compat_size_t, unsigned int, u32, u32) */
 	mr		r10,r4
 	lwa		r3,0(r10)
 	lwz		r4,4(r10)

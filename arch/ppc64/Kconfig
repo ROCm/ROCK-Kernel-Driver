@@ -33,6 +33,10 @@ config EARLY_PRINTK
 	bool
 	default y
 
+config COMPAT
+	bool
+	default y
+
 source "init/Kconfig"
 
 

@@ -538,7 +538,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_alarm
 	.llong .sys_ni_syscall		/* old fstat syscall */
 	.llong .sys32_pause
-	.llong .sys32_utime		/* 30 */
+	.llong .compat_sys_utime		/* 30 */
 	.llong .sys_ni_syscall		/* old stty syscall */
 	.llong .sys_ni_syscall		/* old gtty syscall */
 	.llong .sys32_access
@@ -612,8 +612,8 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ioperm
 	.llong .sys32_socketcall
 	.llong .sys32_syslog
-	.llong .sys32_setitimer
-	.llong .sys32_getitimer		/* 105 */
+	.llong .compat_sys_setitimer
+	.llong .compat_sys_getitimer		/* 105 */
 	.llong .sys32_newstat
 	.llong .sys32_newlstat
 	.llong .sys32_newfstat
@@ -670,7 +670,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_sched_get_priority_max
 	.llong .sys32_sched_get_priority_min  /* 160 */
 	.llong .sys32_sched_rr_get_interval
-	.llong .sys32_nanosleep
+	.llong .compat_sys_nanosleep
 	.llong .sys32_mremap
 	.llong .sys_setresuid
 	.llong .sys_getresuid	        /* 165 */

@@ -22,6 +22,7 @@
 #include <linux/signal.h>
 #include <linux/errno.h>
 #include <linux/elf.h>
+#include <linux/compat.h>
 #include <asm/ppc32.h>
 #include <asm/uaccess.h>
 #include <asm/ppcdebug.h>
@@ -52,11 +53,6 @@
  */
 #define MSR_USERCHANGE	0
 #endif
-
-struct timespec32 {
-	s32    tv_sec;
-	s32    tv_nsec;
-};
 
 struct sigregs32 {
 	/*
@@ -635,8 +631,7 @@ long sys32_rt_sigprocmask(u32 how, sigset32_t *set,
 extern long sys_rt_sigpending(sigset_t *set, size_t sigsetsize);
 
 
-long sys32_rt_sigpending(sigset32_t *set,
-		__kernel_size_t32 sigsetsize)
+long sys32_rt_sigpending(sigset32_t *set, compat_size_t sigsetsize)
 {
 	sigset_t s;
 	sigset32_t s32;
@@ -708,7 +703,7 @@ extern long sys_rt_sigtimedwait(const sigset_t *uthese,
 		size_t sigsetsize);
 
 long sys32_rt_sigtimedwait(sigset32_t *uthese, siginfo_t32 *uinfo,
-		struct timespec32 *uts, __kernel_size_t32 sigsetsize)
+		struct compat_timespec *uts, compat_size_t sigsetsize)
 {
 	sigset_t s;
 	sigset32_t s32;

@@ -1,6 +1,7 @@
 #ifndef _PPC64_PPC32_H
 #define _PPC64_PPC32_H
 
+#include <linux/compat.h>
 #include <asm/siginfo.h>
 #include <asm/signal.h>
 
@@ -43,10 +44,7 @@ typedef __kernel_fsid_t __kernel_fsid_t32;
 })
 
 /* These are here to support 32-bit syscalls on a 64-bit kernel. */
-typedef unsigned int	__kernel_size_t32;
-typedef int		__kernel_ssize_t32;
 typedef int		__kernel_ptrdiff_t32;
-typedef int		__kernel_time_t32;
 typedef int		__kernel_clock_t32;
 typedef int		__kernel_pid_t32;
 typedef unsigned short	__kernel_ipc_pid_t32;
@@ -160,7 +158,7 @@ struct sigaction32 {
 typedef struct sigaltstack_32 {
 	unsigned int ss_sp;
 	int ss_flags;
-	__kernel_size_t32 ss_size;
+	compat_size_t ss_size;
 } stack_32_t;
 
 struct flock32 {
@@ -183,11 +181,11 @@ struct stat32 {
 	__kernel_off_t32   st_size; /* 4 */
 	__kernel_off_t32   st_blksize; /* 4 */
 	__kernel_off_t32   st_blocks; /* 4 */
-	__kernel_time_t32  st_atime; /* 4 */
+	compat_time_t    st_atime; /* 4 */
 	unsigned int       __unused1; /* 4 */
-	__kernel_time_t32  st_mtime; /* 4 */
+	compat_time_t    st_mtime; /* 4 */
 	unsigned int       __unused2; /* 4 */
-	__kernel_time_t32  st_ctime; /* 4 */
+	compat_time_t    st_ctime; /* 4 */
 	unsigned int       __unused3; /* 4 */
 	unsigned int  __unused4[2]; /* 2*4 */
 };
