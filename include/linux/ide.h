@@ -1214,13 +1214,6 @@ typedef struct ide_driver_s {
 
 extern int generic_ide_ioctl(struct block_device *, unsigned, unsigned long);
 
-typedef struct ide_devices_s {
-	char			name[4];		/* hdX */
-	unsigned		attached	: 1;	/* native */
-	unsigned		alttached	: 1;	/* alternate */
-	struct ide_devices_s	*next;
-} ide_devices_t;
-
 /*
  * ide_hwifs[] is the master data structure used to keep track
  * of just about everything in ide.c.  Whenever possible, routines
@@ -1231,13 +1224,6 @@ typedef struct ide_devices_s {
  */
 #ifndef _IDE_C
 extern	ide_hwif_t	ide_hwifs[];		/* master data repository */
-
-extern ide_devices_t   *idedisk;
-extern ide_devices_t   *idecd;
-extern ide_devices_t   *idefloppy;
-extern ide_devices_t   *idetape;
-extern ide_devices_t   *idescsi;
-
 #endif
 extern int noautodma;
 

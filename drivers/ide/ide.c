@@ -197,18 +197,6 @@ ide_hwif_t ide_hwifs[MAX_HWIFS];	/* master data repository */
 
 EXPORT_SYMBOL(ide_hwifs);
 
-ide_devices_t *idedisk;
-ide_devices_t *idecd;
-ide_devices_t *idefloppy;
-ide_devices_t *idetape;
-ide_devices_t *idescsi;
-
-EXPORT_SYMBOL(idedisk);
-EXPORT_SYMBOL(idecd);
-EXPORT_SYMBOL(idefloppy);
-EXPORT_SYMBOL(idetape);
-EXPORT_SYMBOL(idescsi);
-
 extern ide_driver_t idedefault_driver;
 static void setup_driver_defaults(ide_driver_t *driver);
 
