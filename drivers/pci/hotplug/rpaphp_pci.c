@@ -341,7 +341,6 @@ exit:
 	return rc;
 }
 
-
 static void rpaphp_eeh_remove_bus_device(struct pci_dev *dev)
 {
 	eeh_remove_device(dev);
@@ -430,10 +429,26 @@ static int setup_pci_slot(struct slot *slot)
 				__FUNCTION__, slot->name);
 			goto exit_rc;
 		}
-		if (init_slot_pci_funcs(slot)) {
-			err("%s: init_slot_pci_funcs failed\n", __FUNCTION__);
+
+		if (slot->hotplug_slot->info->adapter_status == NOT_CONFIGURED) {
+			dbg("%s CONFIGURING pci adapter in slot[%s]\n",  
+				__FUNCTION__, slot->name);
+			if (rpaphp_config_pci_adapter(slot)) {
+				err("%s: CONFIG pci adapter failed\n", __FUNCTION__);
+				goto exit_rc;		
+			}
+		} else if (slot->hotplug_slot->info->adapter_status == CONFIGURED) {
+			if (init_slot_pci_funcs(slot)) {
+				err("%s: init_slot_pci_funcs failed\n", __FUNCTION__);
+				goto exit_rc;
+			}
+
+		} else {
+			err("%s: slot[%s]'s adapter_status is NOT_VALID.\n",
+				__FUNCTION__, slot->name);
 			goto exit_rc;
 		}
+		
 		print_slot_pci_funcs(slot);
 		if (!list_empty(&slot->dev.pci_funcs)) {
 			slot->state = CONFIGURED;

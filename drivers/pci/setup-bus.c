@@ -537,10 +537,11 @@ pci_assign_unassigned_resources(void)
 
 	/* Depth first, calculate sizes and alignments of all
 	   subordinate buses. */
-	for(ln=pci_root_buses.next; ln != &pci_root_buses; ln=ln->next)
+	list_for_each(ln, &pci_root_buses) {
 		pci_bus_size_bridges(pci_bus_b(ln));
+	}
 	/* Depth last, allocate resources and update the hardware. */
-	for(ln=pci_root_buses.next; ln != &pci_root_buses; ln=ln->next) {
+	list_for_each(ln, &pci_root_buses) {
 		pci_bus_assign_resources(pci_bus_b(ln));
 		pci_enable_bridges(pci_bus_b(ln));
 	}
