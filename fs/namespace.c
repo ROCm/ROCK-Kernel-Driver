@@ -19,7 +19,7 @@
 
 #include <asm/uaccess.h>
 
-struct vfsmount *do_kern_mount(char *type, int flags, char *name, void *data);
+struct vfsmount *do_kern_mount(const char *type, int flags, char *name, void *data);
 int do_remount_sb(struct super_block *sb, int flags, void * data);
 void kill_super(struct super_block *sb);
 
@@ -622,9 +622,18 @@ out:
 static int do_add_mount(struct nameidata *nd, char *type, int flags,
 			int mnt_flags, char *name, void *data)
 {
-	struct vfsmount *mnt = do_kern_mount(type, flags, name, data);
-	int err = PTR_ERR(mnt);
+	struct vfsmount *mnt;
+	int err;
 
+	if (!type || !memchr(type, 0, PAGE_SIZE))
+		return -EINVAL;
+
+	/* we need capabilities... */
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	mnt = do_kern_mount(type, flags, name, data);
+	err = PTR_ERR(mnt);
 	if (IS_ERR(mnt))
 		goto out;
 

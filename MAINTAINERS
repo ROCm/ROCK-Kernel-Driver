@@ -1322,8 +1322,10 @@ W:	http://www.torque.net/sg
 S:	Maintained
 
 SCSI SUBSYSTEM
+P:	Jens Axboe
+M:	axboe@suse.de
 L:	linux-scsi@vger.kernel.org
-S:	Unmaintained
+S:	Maintained
 
 SCSI TAPE DRIVER
 P:	Kai Mäkisara

@@ -9,6 +9,7 @@
 #include <linux/config.h>
 #include <linux/vt.h>
 #include <linux/kd.h>
+#include <linux/tty.h>
 
 /*
  * Presently, a lot of graphics programs do not restore the contents of

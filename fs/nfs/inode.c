@@ -107,17 +107,10 @@ nfs_read_inode(struct inode * inode)
 	inode->i_rdev = 0;
 	/* We can't support UPDATE_ATIME(), since the server will reset it */
 	inode->i_flags |= S_NOATIME;
-	NFS_FILEID(inode) = 0;
-	NFS_FSID(inode) = 0;
-	NFS_FLAGS(inode) = 0;
 	INIT_LIST_HEAD(&inode->u.nfs_i.read);
 	INIT_LIST_HEAD(&inode->u.nfs_i.dirty);
 	INIT_LIST_HEAD(&inode->u.nfs_i.commit);
 	INIT_LIST_HEAD(&inode->u.nfs_i.writeback);
-	inode->u.nfs_i.nread = 0;
-	inode->u.nfs_i.ndirty = 0;
-	inode->u.nfs_i.ncommit = 0;
-	inode->u.nfs_i.npages = 0;
 	NFS_CACHEINV(inode);
 	NFS_ATTRTIMEO(inode) = NFS_MINATTRTIMEO(inode);
 	NFS_ATTRTIMEO_UPDATE(inode) = jiffies;
@@ -655,19 +648,6 @@ nfs_fill_inode(struct inode *inode, struct nfs_fh *fh, struct nfs_fattr *fattr)
 			inode->i_op = &nfs_symlink_inode_operations;
 		else
 			init_special_inode(inode, inode->i_mode, fattr->rdev);
-		/*
-		 * Preset the size and mtime, as there's no need
-		 * to invalidate the caches.
-		 */ 
-		inode->i_size  = nfs_size_to_loff_t(fattr->size);
-		inode->i_mtime = nfs_time_to_secs(fattr->mtime);
-		inode->i_atime = nfs_time_to_secs(fattr->atime);
-		inode->i_ctime = nfs_time_to_secs(fattr->ctime);
-		NFS_CACHE_CTIME(inode) = fattr->ctime;
-		NFS_CACHE_MTIME(inode) = fattr->mtime;
-		NFS_CACHE_ISIZE(inode) = fattr->size;
-		NFS_ATTRTIMEO(inode) = NFS_MINATTRTIMEO(inode);
-		NFS_ATTRTIMEO_UPDATE(inode) = jiffies;
 		memcpy(&inode->u.nfs_i.fh, fh, sizeof(inode->u.nfs_i.fh));
 	}
 	nfs_refresh_inode(inode, fattr);
@@ -697,6 +677,9 @@ nfs_find_actor(struct inode *inode, unsigned long ino, void *opaque)
 		return 0;
 	if (memcmp(&inode->u.nfs_i.fh, fh, sizeof(inode->u.nfs_i.fh)) != 0)
 		return 0;
+	/* Force an attribute cache update if inode->i_count == 0 */
+	if (!atomic_read(&inode->i_count))
+		NFS_CACHEINV(inode);
 	return 1;
 }
 
@@ -797,7 +780,9 @@ printk("nfs_notify_change: revalidate failed, error=%d\n", error);
 	if (!S_ISREG(inode->i_mode))
 		attr->ia_valid &= ~ATTR_SIZE;
 
+	filemap_fdatasync(inode->i_mapping);
 	error = nfs_wb_all(inode);
+	filemap_fdatawait(inode->i_mapping);
 	if (error)
 		goto out;
 
@@ -825,6 +810,8 @@ printk("nfs_notify_change: revalidate failed, error=%d\n", error);
 		fattr.pre_ctime = NFS_CACHE_CTIME(inode);
 		fattr.valid |= NFS_ATTR_WCC;
 	}
+	/* Force an attribute cache update */
+	NFS_CACHEINV(inode);
 	error = nfs_refresh_inode(inode, &fattr);
 out:
 	return error;
@@ -966,6 +953,34 @@ out:
 }
 
 /*
+ * nfs_fattr_obsolete - Test if attribute data is newer than cached data
+ * @inode: inode
+ * @fattr: attributes to test
+ *
+ * Avoid stuffing the attribute cache with obsolete information.
+ * We always accept updates if the attribute cache timed out, or if
+ * fattr->ctime is newer than our cached value.
+ * If fattr->ctime matches the cached value, we still accept the update
+ * if it increases the file size.
+ */
+static inline
+int nfs_fattr_obsolete(struct inode *inode, struct nfs_fattr *fattr)
+{
+	s64 cdif;
+
+	if (time_after(jiffies, NFS_READTIME(inode)+NFS_ATTRTIMEO(inode)))
+		goto out_valid;
+	if ((cdif = (s64)fattr->ctime - (s64)NFS_CACHE_CTIME(inode)) > 0)
+		goto out_valid;
+	/* Ugh... */
+	if (cdif == 0 && fattr->size > NFS_CACHE_ISIZE(inode))
+		goto out_valid;
+	return -1;
+ out_valid:
+	return 0;
+}
+
+/*
  * Many nfs protocol calls return the new file attributes after
  * an operation.  Here we update the inode to reflect the state
  * of the server's inode.
@@ -982,6 +997,7 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 {
 	__u64		new_size, new_mtime;
 	loff_t		new_isize;
+	time_t		new_atime;
 	int		invalid = 0;
 
 	dfprintk(VFS, "NFS: refresh_inode(%x/%ld ct=%d info=0x%x)\n",
@@ -1006,6 +1022,11 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
  	new_mtime = fattr->mtime;
 	new_size = fattr->size;
  	new_isize = nfs_size_to_loff_t(fattr->size);
+
+	new_atime = nfs_time_to_secs(fattr->atime);
+	/* Avoid races */
+	if (nfs_fattr_obsolete(inode, fattr))
+		goto out_nochange;
 
 	/*
 	 * Update the read time so we don't revalidate too often.
@@ -1056,7 +1077,7 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	NFS_CACHE_CTIME(inode) = fattr->ctime;
 	inode->i_ctime = nfs_time_to_secs(fattr->ctime);
 
-	inode->i_atime = nfs_time_to_secs(fattr->atime);
+	inode->i_atime = new_atime;
 
 	NFS_CACHE_MTIME(inode) = new_mtime;
 	inode->i_mtime = nfs_time_to_secs(new_mtime);
@@ -1093,7 +1114,10 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	if (invalid)
 		nfs_zap_caches(inode);
 	return 0;
-
+ out_nochange:
+	if (new_atime - inode->i_atime > 0)
+		inode->i_atime = new_atime;
+	return 0;
  out_changed:
 	/*
 	 * Big trouble! The inode has become a different object.

@@ -240,7 +240,7 @@ struct mdk_personality_s
 
 	int (*stop_resync)(mddev_t *mddev);
 	int (*restart_resync)(mddev_t *mddev);
-	int (*sync_request)(mddev_t *mddev, sector_t sector_nr);
+	int (*sync_request)(mddev_t *mddev, sector_t sector_nr, int go_faster);
 };
 
 

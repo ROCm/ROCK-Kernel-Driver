@@ -130,15 +130,16 @@ enum blk_queue_state {
 struct request_queue
 {
 	/*
-	 * the queue request freelist, one for reads and one for writes
-	 */
-	struct request_list	rq[2];
-
-	/*
 	 * Together with queue_head for cacheline sharing
 	 */
 	struct list_head	queue_head;
+	struct list_head	*last_merge;
 	elevator_t		elevator;
+
+	/*
+	 * the queue request freelist, one for reads and one for writes
+	 */
+	struct request_list	rq[2];
 
 	request_fn_proc		*request_fn;
 	merge_request_fn	*back_merge_fn;
@@ -213,26 +214,24 @@ struct request_queue
 
 extern unsigned long blk_max_low_pfn, blk_max_pfn;
 
-#define BLK_BOUNCE_HIGH	(blk_max_low_pfn << PAGE_SHIFT)
-#define BLK_BOUNCE_ANY	(blk_max_pfn << PAGE_SHIFT)
-#define BLK_BOUNCE_ISA	(ISA_DMA_THRESHOLD)
+/*
+ * standard bounce addresses:
+ *
+ * BLK_BOUNCE_HIGH	: bounce all highmem pages
+ * BLK_BOUNCE_ANY	: don't bounce anything
+ * BLK_BOUNCE_ISA	: bounce pages above ISA DMA boundary
+ */
+#define BLK_BOUNCE_HIGH		((blk_max_low_pfn + 1) << PAGE_SHIFT)
+#define BLK_BOUNCE_ANY		((blk_max_pfn + 1) << PAGE_SHIFT)
+#define BLK_BOUNCE_ISA		(ISA_DMA_THRESHOLD)
 
-#ifdef CONFIG_HIGHMEM
-
+extern int init_emergency_isa_pool(void);
 extern void create_bounce(unsigned long pfn, int gfp, struct bio **bio_orig);
-extern void init_emergency_isa_pool(void);
 
 extern inline void blk_queue_bounce(request_queue_t *q, struct bio **bio)
 {
 	create_bounce(q->bounce_pfn, q->bounce_gfp, bio);
 }
-
-#else /* CONFIG_HIGHMEM */
-
-#define blk_queue_bounce(q, bio)	do { } while (0)
-#define init_emergency_isa_pool()	do { } while (0)
-
-#endif /* CONFIG_HIGHMEM */
 
 #define rq_for_each_bio(bio, rq)	\
 	if ((rq->bio))			\
@@ -275,9 +274,8 @@ extern void blk_plug_device(request_queue_t *);
 extern void blk_recount_segments(request_queue_t *, struct bio *);
 extern inline int blk_phys_contig_segment(request_queue_t *q, struct bio *, struct bio *);
 extern inline int blk_hw_contig_segment(request_queue_t *q, struct bio *, struct bio *);
-extern void blk_queue_assign_lock(request_queue_t *q, spinlock_t *);
-
 extern int block_ioctl(kdev_t, unsigned int, unsigned long);
+extern int ll_10byte_cmd_build(request_queue_t *, struct request *);
 
 /*
  * Access functions for manipulating queue properties
@@ -292,6 +290,9 @@ extern void blk_queue_max_hw_segments(request_queue_t *q, unsigned short);
 extern void blk_queue_max_segment_size(request_queue_t *q, unsigned int);
 extern void blk_queue_hardsect_size(request_queue_t *q, unsigned short);
 extern void blk_queue_segment_boundary(request_queue_t *q, unsigned long);
+extern void blk_queue_assign_lock(request_queue_t *q, spinlock_t *);
+extern void blk_queue_prep_rq(request_queue_t *q, prep_rq_fn *pfn);
+
 extern int blk_rq_map_sg(request_queue_t *, struct request *, struct scatterlist *);
 extern void blk_dump_rq_flags(struct request *, char *);
 extern void generic_unplug_device(void *);

@@ -66,7 +66,7 @@ static mdk_personality_t *pers[MAX_PERSONALITY];
 
 /*
  * Current RAID-1,4,5 parallel reconstruction 'guaranteed speed limit'
- * is 100 KB/sec, so the extra system load does not show up that much.
+ * is 1000 KB/sec, so the extra system load does not show up that much.
  * Increase it if you want to have more _guaranteed_ speed. Note that
  * the RAID driver will use the maximum available bandwith if the IO
  * subsystem is idle. There is also an 'absolute maximum' reconstruction
@@ -76,8 +76,8 @@ static mdk_personality_t *pers[MAX_PERSONALITY];
  * you can change it via /proc/sys/dev/raid/speed_limit_min and _max.
  */
 
-static int sysctl_speed_limit_min = 100;
-static int sysctl_speed_limit_max = 100000;
+static int sysctl_speed_limit_min = 1000;
+static int sysctl_speed_limit_max = 200000;
 
 static struct ctl_table_header *raid_table_header;
 
@@ -3336,7 +3336,7 @@ void md_done_sync(mddev_t *mddev, int blocks, int ok)
 int md_do_sync(mddev_t *mddev, mdp_disk_t *spare)
 {
 	mddev_t *mddev2;
-	unsigned int max_sectors, currspeed,
+	unsigned int max_sectors, currspeed = 0,
 		j, window, err, serialize;
 	unsigned long mark[SYNC_MARKS];
 	unsigned long mark_cnt[SYNC_MARKS];
@@ -3376,8 +3376,7 @@ recheck:
 	max_sectors = mddev->sb->size << 1;
 
 	printk(KERN_INFO "md: syncing RAID array md%d\n", mdidx(mddev));
-	printk(KERN_INFO "md: minimum _guaranteed_ reconstruction speed: %d KB/sec/disc.\n",
-						sysctl_speed_limit_min);
+	printk(KERN_INFO "md: minimum _guaranteed_ reconstruction speed: %d KB/sec/disc.\n", sysctl_speed_limit_min);
 	printk(KERN_INFO "md: using maximum available idle IO bandwith "
 	       "(but not more than %d KB/sec) for reconstruction.\n",
 	       sysctl_speed_limit_max);
@@ -3409,7 +3408,7 @@ recheck:
 	for (j = 0; j < max_sectors;) {
 		int sectors;
 
-		sectors = mddev->pers->sync_request(mddev, j);
+		sectors = mddev->pers->sync_request(mddev, j, currspeed < sysctl_speed_limit_min);
 		if (sectors < 0) {
 			err = sectors;
 			goto out;

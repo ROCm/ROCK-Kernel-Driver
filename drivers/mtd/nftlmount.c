@@ -4,7 +4,7 @@
  * Author: Fabrice Bellard (fabrice.bellard@netgem.com) 
  * Copyright (C) 2000 Netgem S.A.
  *
- * $Id: nftlmount.c,v 1.23 2001/09/19 21:42:32 dwmw2 Exp $
+ * $Id: nftlmount.c,v 1.25 2001/11/30 16:46:27 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@
 
 #define SECTORSIZE 512
 
-char nftlmountrev[]="$Revision: 1.23 $";
+char nftlmountrev[]="$Revision: 1.25 $";
 
 /* find_boot_record: Find the NFTL Media Header and its Spare copy which contains the
  *	various device information of the NFTL partition and Bad Unit Table. Update
@@ -94,11 +94,11 @@ static int find_boot_record(struct NFTLrecord *nftl)
 			continue;
 		}
 
-#if 1 /* Some people seem to have devices without ECC or erase marks
+#if 0 /* Some people seem to have devices without ECC or erase marks
 	 on the Media Header blocks. There are enough other sanity
 	 checks in here that we can probably do without it.
       */
-		if (le16_to_cpu ((h1.EraseMark | h1.EraseMark1) != ERASE_MARK)) {
+		if (le16_to_cpu(h1.EraseMark | h1.EraseMark1) != ERASE_MARK) {
 			printk(KERN_NOTICE "ANAND header found at 0x%x in mtd%d, but erase mark not present (0x%04x,0x%04x instead)\n",
 			       block * nftl->EraseSize, nftl->mtd->index, 
 			       le16_to_cpu(h1.EraseMark), le16_to_cpu(h1.EraseMark1));

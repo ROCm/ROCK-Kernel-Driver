@@ -9,8 +9,8 @@ struct mirror_info {
 	int		number;
 	int		raid_disk;
 	kdev_t		dev;
-	int		sect_limit;
-	int		head_position;
+	sector_t	head_position;
+	atomic_t	nr_pending;
 
 	/*
 	 * State bits:
@@ -31,23 +31,21 @@ struct r1_private_data_s {
 	int			raid_disks;
 	int			working_disks;
 	int			last_used;
-	sector_t		next_sect;
-	int			sect_count;
+	sector_t		next_seq_sect;
 	mdk_thread_t		*thread, *resync_thread;
 	int			resync_mirrors;
 	mirror_info_t		*spare;
 	spinlock_t		device_lock;
 
 	/* for use when syncing mirrors: */
-	unsigned long	start_active, start_ready,
-		start_pending, start_future;
-	int	cnt_done, cnt_active, cnt_ready,
-		cnt_pending, cnt_future;
-	int	phase;
-	int	window;
-	wait_queue_head_t	wait_done;
-	wait_queue_head_t	wait_ready;
-	spinlock_t		segment_lock;
+
+	spinlock_t		resync_lock;
+	int nr_pending;
+	int barrier;
+	sector_t		next_resync;
+
+	wait_queue_head_t	wait_idle;
+	wait_queue_head_t	wait_resume;
 
 	mempool_t *r1bio_pool;
 	mempool_t *r1buf_pool;
@@ -62,7 +60,8 @@ typedef struct r1_private_data_s conf_t;
 #define mddev_to_conf(mddev) ((conf_t *) mddev->private)
 
 /*
- * this is our 'private' 'collective' RAID1 buffer head.
+ * this is our 'private' RAID1 bio.
+ *
  * it contains information about what kind of IO operations were started
  * for this RAID1 operation, and about their status:
  */
@@ -83,6 +82,7 @@ struct r1bio_s {
 	 * if the IO is in READ direction, then this bio is used:
 	 */
 	struct bio		*read_bio;
+	int			read_disk;
 	/*
 	 * if the IO is in WRITE direction, then multiple bios are used:
 	 */
@@ -94,5 +94,5 @@ struct r1bio_s {
 
 /* bits for r1bio.state */
 #define	R1BIO_Uptodate	1
-#define	R1BIO_SyncPhase	2
+
 #endif

@@ -213,6 +213,7 @@ nfs_writepage_async(struct file *file, struct inode *inode, struct page *page,
 		    unsigned int offset, unsigned int count)
 {
 	struct nfs_page	*req;
+	loff_t		end;
 	int		status;
 
 	req = nfs_update_request(file, inode, page, offset, count);
@@ -223,6 +224,10 @@ nfs_writepage_async(struct file *file, struct inode *inode, struct page *page,
 		req->wb_cred = get_rpccred(NFS_I(inode)->mm_cred);
 	nfs_unlock_request(req);
 	nfs_strategy(inode);
+	end = ((loff_t)page->index<<PAGE_CACHE_SHIFT) + (loff_t)(offset + count);
+	if (inode->i_size < end)
+		inode->i_size = end;
+
  out:
 	return status;
 }
@@ -781,6 +786,7 @@ nfs_updatepage(struct file *file, struct page *page, unsigned int offset, unsign
 	struct dentry	*dentry = file->f_dentry;
 	struct inode	*inode = dentry->d_inode;
 	struct nfs_page	*req;
+	loff_t		end;
 	int		status = 0;
 
 	dprintk("NFS:      nfs_updatepage(%s/%s %d@%Ld)\n",
@@ -812,6 +818,10 @@ nfs_updatepage(struct file *file, struct page *page, unsigned int offset, unsign
 		goto done;
 
 	status = 0;
+	end = ((loff_t)page->index<<PAGE_CACHE_SHIFT) + (loff_t)(offset + count);
+	if (inode->i_size < end)
+		inode->i_size = end;
+
 	/* If we wrote past the end of the page.
 	 * Call the strategy routine so it can send out a bunch
 	 * of requests.

@@ -111,12 +111,6 @@ extern unsigned long Hash_size, Hash_mask;
 extern int probingmem;
 extern unsigned long loops_per_jiffy;
 
-#ifdef CONFIG_BLK_DEV_RAM
-extern int rd_doload;		/* 1 = load ramdisk, 0 = don't load */
-extern int rd_prompt;		/* 1 = prompt for ramdisk, 0 = don't prompt */
-extern int rd_image_start;	/* starting block # of image */
-#endif
-
 #ifdef CONFIG_SOUND_MODULE
 EXPORT_SYMBOL(ppc_cs4232_dma);
 EXPORT_SYMBOL(ppc_cs4232_dma2);

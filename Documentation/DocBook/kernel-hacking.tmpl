@@ -18,8 +18,8 @@
   </authorgroup>
 
   <copyright>
-   <year>2000</year>
-   <holder>Paul Russell</holder>
+   <year>2001</year>
+   <holder>Rusty Russell</holder>
   </copyright>
 
   <legalnotice>
@@ -651,6 +651,29 @@ printk(KERN_INFO "my ip: %d.%d.%d.%d\n", NIPQUAD(ipaddress));
    </para> 
   </sect1>
  
+  <sect1 id="routines-endian">
+   <title><function>cpu_to_be32()</function>/<function>be32_to_cpu()</function>/<function>cpu_to_le32()</function>/<function>le32_to_cpu()</function>
+     <filename class=headerfile>include/asm/byteorder.h</filename> 
+   </title>
+
+   <para>
+    The <function>cpu_to_be32()</function> family (where the "32" can
+    be replaced by 64 or 16, and the "be" can be replaced by "le") are
+    the general way to do endian conversions in the kernel: they
+    return the converted value.  All variations supply the reverse as
+    well: <function>be32_to_cpu()</function>, etc.
+   </para>
+
+   <para>
+    There are two major variations of these functions: the pointer
+    variation, such as <function>cpu_to_be32p()</function>, which take
+    a pointer to the given type, and return the converted value.  The
+    other variation is the "in-situ" family, such as
+    <function>cpu_to_be32s()</function>, which convert value referred
+    to by the pointer, and return void.
+   </para> 
+  </sect1>
+
   <sect1 id="routines-local-irqs">
    <title><function>local_irq_save()</function>/<function>local_irq_restore()</function>
     <filename class=headerfile>include/asm/system.h</filename>

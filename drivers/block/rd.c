@@ -43,26 +43,12 @@
  */
 
 #include <linux/config.h>
-#include <linux/sched.h>
-#include <linux/fs.h>
-#include <linux/kernel.h>
-#include <linux/hdreg.h>
 #include <linux/string.h>
-#include <linux/mm.h>
-#include <linux/mman.h>
 #include <linux/slab.h>
-#include <linux/ioctl.h>
-#include <linux/fd.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
-#include <linux/smp_lock.h>
-
-#include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/byteorder.h>
-
-extern void wait_for_keypress(void);
 
 /*
  * 35 has been officially registered as the RAMDISK major number, but
@@ -79,6 +65,8 @@ extern void wait_for_keypress(void);
 #ifdef CONFIG_BLK_DEV_INITRD
 static int initrd_users;
 static spinlock_t initrd_users_lock = SPIN_LOCK_UNLOCKED;
+unsigned long initrd_start, initrd_end;
+int initrd_below_start_ok;
 #endif
 
 /* Various static variables go here.  Most are used only in the RAM disk code.
@@ -110,70 +98,6 @@ int rd_size = CONFIG_BLK_DEV_RAM_SIZE;		/* Size of the RAM disks */
  * supposes the filesystem in the image uses a BLOCK_SIZE blocksize).
  */
 int rd_blocksize = BLOCK_SIZE;			/* blocksize of the RAM disks */
-
-#ifndef MODULE
-
-int rd_doload;			/* 1 = load RAM disk, 0 = don't load */
-int rd_prompt = 1;		/* 1 = prompt for RAM disk, 0 = don't prompt */
-int rd_image_start;		/* starting block # of image */
-#ifdef CONFIG_BLK_DEV_INITRD
-unsigned long initrd_start, initrd_end;
-int mount_initrd = 1;		/* zero if initrd should not be mounted */
-int initrd_below_start_ok;
-
-static int __init no_initrd(char *str)
-{
-	mount_initrd = 0;
-	return 1;
-}
-
-__setup("noinitrd", no_initrd);
-
-#endif
-
-static int __init ramdisk_start_setup(char *str)
-{
-	rd_image_start = simple_strtol(str,NULL,0);
-	return 1;
-}
-
-static int __init load_ramdisk(char *str)
-{
-	rd_doload = simple_strtol(str,NULL,0) & 3;
-	return 1;
-}
-
-static int __init prompt_ramdisk(char *str)
-{
-	rd_prompt = simple_strtol(str,NULL,0) & 1;
-	return 1;
-}
-
-static int __init ramdisk_size(char *str)
-{
-	rd_size = simple_strtol(str,NULL,0);
-	return 1;
-}
-
-static int __init ramdisk_size2(char *str)
-{
-	return ramdisk_size(str);
-}
-
-static int __init ramdisk_blocksize(char *str)
-{
-	rd_blocksize = simple_strtol(str,NULL,0);
-	return 1;
-}
-
-__setup("ramdisk_start=", ramdisk_start_setup);
-__setup("load_ramdisk=", load_ramdisk);
-__setup("prompt_ramdisk=", prompt_ramdisk);
-__setup("ramdisk=", ramdisk_size);
-__setup("ramdisk_size=", ramdisk_size2);
-__setup("ramdisk_blocksize=", ramdisk_blocksize);
-
-#endif
 
 /*
  * Copyright (C) 2000 Linus Torvalds.
@@ -492,7 +416,7 @@ static void __exit rd_cleanup (void)
 }
 
 /* This is the registration and initialization section of the RAM disk driver */
-int __init rd_init (void)
+static int __init rd_init (void)
 {
 	int		i;
 
@@ -548,7 +472,28 @@ int __init rd_init (void)
 module_init(rd_init);
 module_exit(rd_cleanup);
 
-/* loadable module support */
+/* options - nonmodular */
+#ifndef MODULE
+static int __init ramdisk_size(char *str)
+{
+	rd_size = simple_strtol(str,NULL,0);
+	return 1;
+}
+static int __init ramdisk_size2(char *str)	/* kludge */
+{
+	return ramdisk_size(str);
+}
+static int __init ramdisk_blocksize(char *str)
+{
+	rd_blocksize = simple_strtol(str,NULL,0);
+	return 1;
+}
+__setup("ramdisk=", ramdisk_size);
+__setup("ramdisk_size=", ramdisk_size2);
+__setup("ramdisk_blocksize=", ramdisk_blocksize);
+#endif
+
+/* options - modular */
 MODULE_PARM     (rd_size, "1i");
 MODULE_PARM_DESC(rd_size, "Size of each RAM disk in kbytes.");
 MODULE_PARM     (rd_blocksize, "i");

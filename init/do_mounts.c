@@ -3,12 +3,8 @@
 #include <linux/slab.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/unistd.h>
-#include <linux/string.h>
 #include <linux/ctype.h>
-#include <linux/init.h>
-#include <linux/smp_lock.h>
 #include <linux/blk.h>
-#include <linux/tty.h>
 #include <linux/fd.h>
 
 #include <linux/nfs_fs.h>
@@ -17,8 +13,6 @@
 #include <linux/minix_fs.h>
 #include <linux/ext2_fs.h>
 #include <linux/romfs_fs.h>
-
-#include <asm/uaccess.h>
 
 #define BUILD_CRAMDISK
 
@@ -38,12 +32,21 @@ asmlinkage long sys_ioctl(int fd, int cmd, unsigned long arg);
 
 #ifdef CONFIG_BLK_DEV_INITRD
 unsigned int real_root_dev;	/* do_proc_dointvec cannot handle kdev_t */
-#endif
-#ifdef CONFIG_BLK_DEV_RAM
-extern int rd_doload;
+static int __initdata mount_initrd = 1;
+
+static int __init no_initrd(char *str)
+{
+	mount_initrd = 0;
+	return 1;
+}
+
+__setup("noinitrd", no_initrd);
 #else
-static int rd_doload = 0;
+static int __initdata mount_initrd = 0;
 #endif
+
+int __initdata rd_doload;	/* 1 = load RAM disk, 0 = don't load */
+
 int root_mountflags = MS_RDONLY | MS_VERBOSE;
 static char root_device_name[64];
 
@@ -51,6 +54,13 @@ static char root_device_name[64];
 kdev_t ROOT_DEV;
 
 static int do_devfs = 0;
+
+static int __init load_ramdisk(char *str)
+{
+	rd_doload = simple_strtol(str,NULL,0) & 3;
+	return 1;
+}
+__setup("load_ramdisk=", load_ramdisk);
 
 static int __init readonly(char *str)
 {
@@ -371,6 +381,24 @@ static void __init change_floppy(char *fmt, ...)
 
 #ifdef CONFIG_BLK_DEV_RAM
 
+int __initdata rd_prompt = 1;	/* 1 = prompt for RAM disk, 0 = don't prompt */
+
+static int __init prompt_ramdisk(char *str)
+{
+	rd_prompt = simple_strtol(str,NULL,0) & 1;
+	return 1;
+}
+__setup("prompt_ramdisk=", prompt_ramdisk);
+
+int __initdata rd_image_start;		/* starting block # of image */
+
+static int __init ramdisk_start_setup(char *str)
+{
+	rd_image_start = simple_strtol(str,NULL,0);
+	return 1;
+}
+__setup("ramdisk_start=", ramdisk_start_setup);
+
 static int __init crd_load(int in_fd, int out_fd);
 
 /*
@@ -588,7 +616,6 @@ out:
 static int __init rd_load_disk(int n)
 {
 #ifdef CONFIG_BLK_DEV_RAM
-	extern int rd_prompt;
 	if (rd_prompt)
 		change_floppy("root floppy disk to be loaded into RAM disk");
 	create_dev("/dev/ram", MKDEV(RAMDISK_MAJOR, n), NULL);
@@ -715,13 +742,10 @@ static int __init initrd_load(void)
  */
 void prepare_namespace(void)
 {
-	int do_initrd = 0;
 	int is_floppy = MAJOR(ROOT_DEV) == FLOPPY_MAJOR;
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (!initrd_start)
 		mount_initrd = 0;
-	if (mount_initrd)
-		do_initrd = 1;
 	real_root_dev = ROOT_DEV;
 #endif
 	sys_mkdir("/dev", 0700);
@@ -732,7 +756,7 @@ void prepare_namespace(void)
 #endif
 
 	create_dev("/dev/root", ROOT_DEV, NULL);
-	if (do_initrd) {
+	if (mount_initrd) {
 		if (initrd_load() && ROOT_DEV != MKDEV(RAMDISK_MAJOR, 0)) {
 			handle_initrd();
 			goto out;

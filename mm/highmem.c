@@ -19,6 +19,19 @@
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/mempool.h>
+#include <linux/blkdev.h>
+
+static mempool_t *page_pool, *isa_page_pool;
+
+static void *page_pool_alloc(int gfp_mask, void *data)
+{
+	return alloc_page(gfp_mask);
+}
+
+static void page_pool_free(void *page, void *data)
+{
+	__free_page(page);
+}
 
 /*
  * Virtual_count is not a pure "count".
@@ -28,6 +41,7 @@
  *    since the last TLB flush - so we can't use it.
  *  n means that there are (n-1) current users of it.
  */
+#ifdef CONFIG_HIGHMEM
 static int pkmap_count[LAST_PKMAP];
 static unsigned int last_pkmap_nr;
 static spinlock_t kmap_lock = SPIN_LOCK_UNLOCKED;
@@ -185,19 +199,6 @@ void kunmap_high(struct page *page)
 }
 
 #define POOL_SIZE	64
-#define ISA_POOL_SIZE	16
-
-static mempool_t *page_pool, *isa_page_pool;
-
-static void *page_pool_alloc(int gfp_mask, void *data)
-{
-	return alloc_page(gfp_mask);
-}
-
-static void page_pool_free(void *page, void *data)
-{
-	__free_page(page);
-}
 
 static __init int init_emergency_pool(void)
 {
@@ -211,10 +212,36 @@ static __init int init_emergency_pool(void)
 	page_pool = mempool_create(POOL_SIZE, page_pool_alloc, page_pool_free, NULL);
 	if (!page_pool)
 		BUG();
-	printk("highmem bounce pool size: %d pages and bhs.\n", POOL_SIZE);
+	printk("highmem bounce pool size: %d pages\n", POOL_SIZE);
 
 	return 0;
 }
+
+__initcall(init_emergency_pool);
+
+/*
+ * highmem version, map in to vec
+ */
+static inline void bounce_copy_vec(struct bio_vec *to, unsigned char *vfrom)
+{
+	unsigned long flags;
+	unsigned char *vto;
+
+	local_irq_save(flags);
+	vto = kmap_atomic(to->bv_page, KM_BOUNCE_READ);
+	memcpy(vto + to->bv_offset, vfrom, to->bv_len);
+	kunmap_atomic(vto, KM_BOUNCE_READ);
+	local_irq_restore(flags);
+}
+
+#else /* CONFIG_HIGHMEM */
+
+#define bounce_copy_vec(to, vfrom)	\
+	memcpy(page_address((to)->bv_page) + (to)->bv_offset, vfrom, (to)->bv_len)
+
+#endif
+
+#define ISA_POOL_SIZE	16
 
 /*
  * gets called "every" time someone init's a queue with BLK_BOUNCE_ISA
@@ -233,8 +260,6 @@ int init_emergency_isa_pool(void)
 	return 0;
 }
 
-__initcall(init_emergency_pool);
-
 /*
  * Simple bounce buffer support for highmem pages. Depending on the
  * queue gfp mask set, *to may or may not be a highmem page. kmap it
@@ -242,8 +267,7 @@ __initcall(init_emergency_pool);
  */
 static inline void copy_to_high_bio_irq(struct bio *to, struct bio *from)
 {
-	unsigned char *vto, *vfrom;
-	unsigned long flags;
+	unsigned char *vfrom;
 	struct bio_vec *tovec, *fromvec;
 	int i;
 
@@ -258,11 +282,7 @@ static inline void copy_to_high_bio_irq(struct bio *to, struct bio *from)
 
 		vfrom = page_address(fromvec->bv_page) + fromvec->bv_offset;
 
-		local_irq_save(flags);
-		vto = kmap_atomic(tovec->bv_page, KM_BOUNCE_READ);
-		memcpy(vto + tovec->bv_offset, vfrom, tovec->bv_len);
-		kunmap_atomic(vto, KM_BOUNCE_READ);
-		local_irq_restore(flags);
+		bounce_copy_vec(tovec, vfrom);
 	}
 }
 
@@ -336,10 +356,25 @@ void create_bounce(unsigned long pfn, int gfp, struct bio **bio_orig)
 
 	BUG_ON((*bio_orig)->bi_idx);
 
+	/*
+	 * for non-isa bounce case, just check if the bounce pfn is equal
+	 * to or bigger than the highest pfn in the system -- in that case,
+	 * don't waste time iterating over bio segments
+	 */
 	if (!(gfp & GFP_DMA)) {
+		if (pfn >= blk_max_pfn)
+			return;
+
+#ifndef CONFIG_HIGHMEM
+		/*
+		 * should not hit for non-highmem case
+		 */
+		BUG();
+#endif
 		bio_gfp = GFP_NOHIGHIO;
 		pool = page_pool;
 	} else {
+		BUG_ON(!isa_page_pool);
 		bio_gfp = GFP_NOIO;
 		pool = isa_page_pool;
 	}

@@ -459,6 +459,8 @@ void __init ide_init_amd74xx (ide_hwif_t *hwif)
 	hwif->tuneproc = &amd74xx_tune_drive;
 	hwif->speedproc = &amd74xx_tune_chipset;
 
+	hwif->highmem = 1;
+
 #ifndef CONFIG_BLK_DEV_IDEDMA
 	hwif->drives[0].autotune = 1;
 	hwif->drives[1].autotune = 1;

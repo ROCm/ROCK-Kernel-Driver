@@ -55,12 +55,6 @@ unsigned char __res[sizeof(bd_t)];
 
 extern void m8xx_ide_init(void);
 
-#ifdef CONFIG_BLK_DEV_RAM
-extern int rd_doload;		/* 1 = load ramdisk, 0 = don't load */
-extern int rd_prompt;		/* 1 = prompt for ramdisk, 0 = don't prompt */
-extern int rd_image_start;	/* starting block # of image */
-#endif
-
 extern unsigned long find_available_memory(void);
 extern void m8xx_cpm_reset(uint);
 

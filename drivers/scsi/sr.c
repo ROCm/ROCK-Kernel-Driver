@@ -287,9 +287,6 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 		return 0;
 	}
 
-	if (rq_data_dir(&SCpnt->request) == WRITE && !scsi_CDs[dev].device->writeable)
-		return 0;
-
 	/*
 	 * we do lazy blocksize switching (when reading XA sectors,
 	 * see CDROMREADMODE2 ioctl) 

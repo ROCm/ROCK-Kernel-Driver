@@ -467,10 +467,11 @@ Scsi_Cmnd	   *icmd;
 static void	    do_ql_ihandl(int irq, void *dev_id, struct pt_regs * regs)
 {
 	unsigned long flags;
+	struct Scsi_Host *host = dev_id;
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(&host->host_lock, flags);
 	ql_ihandl(irq, dev_id, regs);
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(&host->host_lock, flags);
 }
 #endif
 

@@ -270,14 +270,12 @@ nfs_xdr_readres(struct rpc_rqst *req, u32 *p, struct nfs_readres *res)
 
 	count = ntohl(*p++);
 	hdrlen = (u8 *) p - (u8 *) iov->iov_base;
-	recvd = req->rq_rlen - hdrlen;
-	if (p != iov[req->rq_rnr-1].iov_base) {
-		/* Unexpected reply header size. Punt.
-		 * XXX: Move iovec contents to align data on page
-		 * boundary and adjust RPC header size guess */
-		printk(KERN_WARNING "NFS: Odd RPC header size in read reply: %d\n", hdrlen);
-		return -errno_NFSERR_IO;
+	if (iov->iov_len > hdrlen) {
+		dprintk("NFS: READ header is short. iovec will be shifted.\n");
+		xdr_shift_iovec(iov, req->rq_rnr, iov->iov_len - hdrlen);
 	}
+
+	recvd = req->rq_rlen - hdrlen;
 	if (count > recvd) {
 		printk(KERN_WARNING "NFS: server cheating in read reply: "
 			"count %d > recvd %d\n", count, recvd);
@@ -448,27 +446,23 @@ static int
 nfs_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs_readdirres *res)
 {
 	struct iovec		*iov = req->rq_rvec;
+	int			 hdrlen;
 	int			 status, nr;
 	u32			*end, *entry, len;
 
 	if ((status = ntohl(*p++)))
 		return -nfs_stat_to_errno(status);
-	if ((void *) p != ((u8 *) iov->iov_base+iov->iov_len)) {
-		/* Unexpected reply header size. Punt. */
-		printk(KERN_WARNING "NFS: Odd RPC header size in readdirres reply\n");
-		return -errno_NFSERR_IO;
+
+	hdrlen = (u8 *) p - (u8 *) iov->iov_base;
+	if (iov->iov_len > hdrlen) {
+		dprintk("NFS: READDIR header is short. iovec will be shifted.\n");
+		xdr_shift_iovec(iov, req->rq_rnr, iov->iov_len - hdrlen);
 	}
+
 
 	/* Get start and end address of XDR data */
 	p   = (u32 *) iov[1].iov_base;
 	end = (u32 *) ((u8 *) p + iov[1].iov_len);
-
-	/* Get start and end of dirent buffer */
-	if (res->buffer != p) {
-		printk(KERN_ERR "NFS: Bad result buffer in readdir\n");
-		return -errno_NFSERR_IO;
-	}
-
 	for (nr = 0; *p++; nr++) {
 		entry = p - 1;
 		if (p + 2 > end)
@@ -598,13 +592,21 @@ nfs_xdr_readlinkargs(struct rpc_rqst *req, u32 *p, struct nfs_readlinkargs *args
 static int
 nfs_xdr_readlinkres(struct rpc_rqst *req, u32 *p, struct nfs_readlinkres *res)
 {
+	struct iovec *iov = req->rq_rvec;
 	u32	*strlen;
 	char	*string;
+	int	hdrlen;
 	int	status;
 	unsigned int len;
 
 	if ((status = ntohl(*p++)))
 		return -nfs_stat_to_errno(status);
+	hdrlen = (u8 *) p - (u8 *) iov->iov_base;
+	if (iov->iov_len > hdrlen) {
+		dprintk("NFS: READLINK header is short. iovec will be shifted.\n");
+		xdr_shift_iovec(iov, req->rq_rnr, iov->iov_len - hdrlen);
+	}
+
 	strlen = (u32*)res->buffer;
 	/* Convert length of symlink */
 	len = ntohl(*strlen);

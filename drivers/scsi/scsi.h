@@ -548,10 +548,8 @@ extern void print_status (int status);
  */
 
 struct scsi_device {
-/* private: */
 	/*
-	 * This information is private to the scsi mid-layer.  Wrapping it in a
-	 * struct private is a way of marking it in a sort of C++ type of way.
+	 * This information is private to the scsi mid-layer.
 	 */
 	struct scsi_device *next;	/* Used for linked list */
 	struct scsi_device *prev;	/* Used for linked list */
@@ -563,7 +561,6 @@ struct scsi_device {
 	volatile unsigned short device_busy;	/* commands actually active on low-level */
 	Scsi_Cmnd *device_queue;	/* queue of SCSI Command structures */
 
-/* public: */
 	unsigned int id, lun, channel;
 
 	unsigned int manufacturer;	/* Manufacturer of device, for using 
@@ -681,11 +678,7 @@ struct scsi_request {
  */
 struct scsi_cmnd {
 	int     sc_magic;
-/* private: */
-	/*
-	 * This information is private to the scsi mid-layer.  Wrapping it in a
-	 * struct private is a way of marking it in a sort of C++ type of way.
-	 */
+
 	struct Scsi_Host *host;
 	unsigned short state;
 	unsigned short owner;
@@ -726,8 +719,6 @@ struct scsi_cmnd {
 	unsigned volatile char internal_timeout;
 	struct scsi_cmnd *bh_next;	/* To enumerate the commands waiting 
 					   to be processed. */
-
-/* public: */
 
 	unsigned int target;
 	unsigned int lun;
