@@ -146,7 +146,7 @@ static int llc_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 
 	if (llc_backlog_type(skb) == LLC_PACKET) {
 		if (llc->state > 1) /* not closed */
-			rc = llc_pdu_router(llc->sap, sk, skb, LLC_TYPE_2);
+			rc = llc_conn_rcv(sk, skb);
 		else
 			kfree_skb(skb);
 	} else if (llc_backlog_type(skb) == LLC_EVENT) {

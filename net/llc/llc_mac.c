@@ -33,8 +33,9 @@
 #define dprintk(args...)
 #endif
 
-/* function prototypes */
 static void fix_up_incoming_skb(struct sk_buff *skb);
+static void llc_station_rcv(struct sk_buff *skb);
+static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb);
 
 /**
  *	mac_send_pdu - Sends PDU to specific device.
@@ -74,9 +75,9 @@ out:
  *
  *	When the system receives a 802.2 frame this function is called. It
  *	checks SAP and connection of received pdu and passes frame to
- *	llc_pdu_router for sending to proper state machine. If frame is
- *	related to a busy connection (a connection is sending data now),
- *	function queues this frame in connection's backlog.
+ *	llc_{station,sap,conn}_rcv for sending to proper state machine. If
+ *	the frame is related to a busy connection (a connection is sending
+ *	data now), it queues this frame in the connection's backlog.
  */
 int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 		 struct packet_type *pt)
@@ -85,7 +86,8 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 	struct llc_pdu_sn *pdu;
 	u8 dest;
 
-	/* When the interface is in promisc. mode, drop all the crap that it
+	/*
+	 * When the interface is in promisc. mode, drop all the crap that it
 	 * receives, do not try to analyse it.
 	 */
 	if (skb->pkt_type == PACKET_OTHERHOST) {
@@ -98,18 +100,16 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 	fix_up_incoming_skb(skb);
 	pdu = llc_pdu_sn_hdr(skb);
 	if (!pdu->dsap) { /* NULL DSAP, refer to station */
-		if (llc_pdu_router(NULL, NULL, skb, 0))
-			goto drop;
+		llc_station_rcv(skb);
 		goto out;
 	}
 	sap = llc_sap_find(pdu->dsap);
 	if (!sap) /* unknown SAP */
 		goto drop;
 	llc_decode_pdu_type(skb, &dest);
-	if (dest == LLC_DEST_SAP) { /* type 1 services */
-		if (llc_pdu_router(sap, NULL, skb, LLC_TYPE_1))
-			goto drop;
-	} else if (dest == LLC_DEST_CONN) {
+	if (dest == LLC_DEST_SAP) /* type 1 services */
+		llc_sap_rcv(sap, skb);
+	else if (dest == LLC_DEST_CONN) {
 		struct llc_addr saddr, daddr;
 		struct sock *sk;
 		int rc;
@@ -136,10 +136,8 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 		skb->sk = sk;
 		bh_lock_sock(sk);
 		if (!sk->lock.users)
-			rc = llc_pdu_router(llc_sk(sk)->sap, sk, skb,
-					    LLC_TYPE_2);
+			rc = llc_conn_rcv(sk, skb);
 		else {
-			dprintk("%s: add to backlog\n", __FUNCTION__);
 			llc_set_backlog_type(skb, LLC_PACKET);
 			sk_add_backlog(sk, skb);
 			rc = 0;
@@ -184,53 +182,56 @@ static void fix_up_incoming_skb(struct sk_buff *skb)
 	}
 }
 
-/**
- *	llc_pdu_router - routes received pdus to the upper layers
- *	@sap: current sap component structure.
- *	@sk: current connection structure.
- *	@frame: received frame.
- *	@type: type of received frame, that is LLC_TYPE_1 or LLC_TYPE_2
+/*
+ *	llc_station_rcv - send received pdu to the station state machine
+ *	@skb: received frame.
  *
- *	Queues received PDUs from LLC_MAC PDU receive queue until queue is
- *	empty; examines LLC header to determine the destination of PDU, if DSAP
- *	is NULL then data unit destined for station else frame destined for SAP
- *	or connection; finds a matching open SAP, if one, forwards the packet
- *	to it; if no matching SAP, drops the packet. Returns 0 or the return of
- *	llc_conn_state_process (that may well result in the connection being
- *	destroyed)
+ *	Sends data unit to station state machine.
  */
-int llc_pdu_router(struct llc_sap *sap, struct sock* sk,
-		   struct sk_buff *skb, u8 type)
+static void llc_station_rcv(struct sk_buff *skb)
 {
-	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
-	int rc = 0;
+	struct llc_station *station = llc_station_get();
+	struct llc_station_state_ev *ev = llc_station_ev(skb);
 
-	if (!pdu->dsap) {
-		struct llc_station *station = llc_station_get();
-		struct llc_station_state_ev *ev = llc_station_ev(skb);
+	ev->type            = LLC_STATION_EV_TYPE_PDU;
+	ev->data.pdu.reason = 0;
+	llc_station_state_process(station, skb);
+}
 
-		ev->type	    = LLC_STATION_EV_TYPE_PDU;
-		ev->data.pdu.reason = 0;
-		llc_station_state_process(station, skb);
-	} else if (type == LLC_TYPE_1) {
-		struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 
-		ev->type	    = LLC_SAP_EV_TYPE_PDU;
-		ev->data.pdu.reason = 0;
-		llc_sap_state_process(sap, skb);
-	} else if (type == LLC_TYPE_2) {
-		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-		struct llc_opt *llc = llc_sk(sk);
+/**
+ *	llc_conn_rcv - sends received pdus to the connection state machine
+ *	@sk: current connection structure.
+ *	@skb: received frame.
+ *
+ *	Sends received pdus to the connection state machine.
+ */
+int llc_conn_rcv(struct sock* sk, struct sk_buff *skb)
+{
+	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
+	struct llc_opt *llc = llc_sk(sk);
 
-		if (!llc->dev)
-			llc->dev = skb->dev;
+	if (!llc->dev)
+		llc->dev = skb->dev;
+	ev->type	    = LLC_CONN_EV_TYPE_PDU;
+	ev->data.pdu.reason = 0;
+	return llc_conn_state_process(sk, skb);
+}
 
-		ev->type	    = LLC_CONN_EV_TYPE_PDU;
-		ev->data.pdu.reason = 0;
-		rc = llc_conn_state_process(sk, skb);
-	} else
-		rc = -EINVAL;
-	return rc;
+/**
+ *	llc_sap_rcv - sends received pdus to the sap state machine
+ *	@sap: current sap component structure.
+ *	@skb: received frame.
+ *
+ *	Sends received pdus to the sap state machine.
+ */
+static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb)
+{
+	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
+
+	ev->type	    = LLC_SAP_EV_TYPE_PDU;
+	ev->data.pdu.reason = 0;
+	llc_sap_state_process(sap, skb);
 }
 
 /**
