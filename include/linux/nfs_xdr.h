@@ -241,6 +241,17 @@ struct nfs_renameargs {
 	unsigned int		tolen;
 };
 
+struct nfs_setattrargs {
+	struct nfs_fh *                 fh;
+	nfs4_stateid                    stateid;
+	struct iattr *                  iap;
+	struct nfs4_getattr *           attr;
+};
+
+struct nfs_setattrres {
+	struct nfs4_getattr *           attr;
+};
+
 struct nfs_linkargs {
 	struct nfs_fh *		fromfh;
 	struct nfs_fh *		tofh;

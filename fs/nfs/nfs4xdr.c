@@ -150,8 +150,14 @@ extern int			nfs_stat_to_errno(int);
 #define NFS4_dec_close_sz       compound_decode_hdr_maxsz + \
                                 decode_putfh_maxsz + \
                                 op_decode_hdr_maxsz + 4
-
-
+#define NFS4_enc_setattr_sz     compound_encode_hdr_maxsz + \
+                                encode_putfh_maxsz + \
+                                op_encode_hdr_maxsz + 4 + \
+                                nfs4_fattr_bitmap_maxsz + \
+                                encode_getattr_maxsz
+#define NFS4_dec_setattr_sz     compound_decode_hdr_maxsz + \
+                                decode_putfh_maxsz + \
+                                op_decode_hdr_maxsz + 3
 
 
 static struct {
@@ -771,16 +777,16 @@ encode_savefh(struct xdr_stream *xdr)
 }
 
 static int
-encode_setattr(struct xdr_stream *xdr, struct nfs4_setattr *setattr)
+encode_setattr(struct xdr_stream *xdr, struct nfs_setattrargs *arg)
 {
 	int status;
 	uint32_t *p;
 	
         RESERVE_SPACE(4+sizeof(nfs4_stateid));
         WRITE32(OP_SETATTR);
-	WRITEMEM(setattr->st_stateid, sizeof(nfs4_stateid));
+	WRITEMEM(arg->stateid, sizeof(nfs4_stateid));
 
-        if ((status = encode_attrs(xdr, setattr->st_iap)))
+        if ((status = encode_attrs(xdr, arg->iap)))
 		return status;
 
         return 0;
@@ -906,9 +912,6 @@ encode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 			break;
 		case OP_SAVEFH:
 			status = encode_savefh(xdr);
-			break;
-		case OP_SETATTR:
-			status = encode_setattr(xdr, &cp->ops[i].u.setattr);
 			break;
 		case OP_SETCLIENTID:
 			status = encode_setclientid(xdr, &cp->ops[i].u.setclientid);
@@ -1059,6 +1062,31 @@ nfs4_xdr_enc_read(struct rpc_rqst *req, uint32_t *p, struct nfs_readargs *args)
 			 args->pages, args->pgbase, args->count);
 out:
 	return status;
+}
+
+/*
+ * Encode an SETATTR request
+ */
+static int
+nfs4_xdr_enc_setattr(struct rpc_rqst *req, uint32_t *p, struct nfs_setattrargs *args)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr = {
+                .nops   = 3,
+        };
+        int status;
+
+        xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+        encode_compound_hdr(&xdr, &hdr);
+        status = encode_putfh(&xdr, args->fh);
+        if(status)
+                goto out;
+        status = encode_setattr(&xdr, args);
+        if(status)
+                goto out;
+        status = encode_getattr(&xdr, args->attr);
+out:
+        return status;
 }
 
 /*
@@ -1991,7 +2019,7 @@ decode_savefh(struct xdr_stream *xdr)
 }
 
 static int
-decode_setattr(struct xdr_stream *xdr)
+decode_setattr(struct xdr_stream *xdr, struct nfs_setattrres *res)
 {
 	uint32_t *p;
 	uint32_t bmlen;
@@ -2144,9 +2172,6 @@ decode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 		case OP_SAVEFH:
 			status = decode_savefh(xdr);
 			break;
-		case OP_SETATTR:
-			status = decode_setattr(xdr);
-			break;
 		case OP_SETCLIENTID:
 			status = decode_setclientid(xdr, &op->u.setclientid);
 			break;
@@ -2270,6 +2295,31 @@ nfs4_xdr_dec_open_confirm(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_open_c
         if (status)
                 goto out;
         status = decode_open_confirm(&xdr, res);
+out:
+        return status;
+}
+
+/*
+ * Decode SETATTR response
+ */
+static int
+nfs4_xdr_dec_setattr(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_setattrres *res)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr;
+        int status;
+
+        xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+        status = decode_compound_hdr(&xdr, &hdr);
+        if (status)
+                goto out;
+        status = decode_putfh(&xdr);
+        if (status)
+                goto out;
+        status = decode_setattr(&xdr, res);
+        if (status)
+                goto out;
+        status = decode_getattr(&xdr, res->attr);
 out:
         return status;
 }
@@ -2418,7 +2468,8 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(COMMIT,		enc_commit,	dec_commit),
   PROC(OPEN,		enc_open,	dec_open),
   PROC(OPEN_CONFIRM,	enc_open_confirm,	dec_open_confirm),
-  PROC(CLOSE,	enc_close,	dec_close),
+  PROC(CLOSE,		enc_close,	dec_close),
+  PROC(SETATTR,		enc_setattr,	dec_setattr),
 };
 
 struct rpc_version		nfs_version4 = {
