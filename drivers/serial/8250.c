@@ -2205,21 +2205,17 @@ static int __devinit serial8250_probe(struct device *dev)
 }
 
 /*
- * Remove a platform device.  We only remove serial ports from this
- * platform device if it actually added any in the first place (iow,
- * dev->platform_data is non-NULL.)
+ * Remove serial ports registered against a platform device.
  */
 static int __devexit serial8250_remove(struct device *dev)
 {
 	int i;
 
-	if (dev->platform_data) {
-		for (i = 0; i < UART_NR; i++) {
-			struct uart_8250_port *up = &serial8250_ports[i];
+	for (i = 0; i < UART_NR; i++) {
+		struct uart_8250_port *up = &serial8250_ports[i];
 
-			if (up->port.dev == dev)
-				serial8250_unregister_port(i);
-		}
+		if (up->port.dev == dev)
+			serial8250_unregister_port(i);
 	}
 	return 0;
 }
@@ -2394,10 +2390,14 @@ void serial8250_unregister_port(int line)
 
 	down(&serial_sem);
 	uart_remove_one_port(&serial8250_reg, &uart->port);
-	uart->port.flags &= ~UPF_BOOT_AUTOCONF;
-	uart->port.type = PORT_UNKNOWN;
-	uart->port.dev = &serial8250_isa_devs->dev;
-	uart_add_one_port(&serial8250_reg, &uart->port);
+	if (serial8250_isa_devs) {
+		uart->port.flags &= ~UPF_BOOT_AUTOCONF;
+		uart->port.type = PORT_UNKNOWN;
+		uart->port.dev = &serial8250_isa_devs->dev;
+		uart_add_one_port(&serial8250_reg, &uart->port);
+	} else {
+		uart->port.dev = NULL;
+	}
 	up(&serial_sem);
 }
 EXPORT_SYMBOL(serial8250_unregister_port);
@@ -2439,17 +2439,18 @@ static int __init serial8250_init(void)
 
 static void __exit serial8250_exit(void)
 {
+	struct platform_device *isa_dev = serial8250_isa_devs;
 	int i;
 
+	/*
+	 * This tells serial8250_unregister_port() not to re-register
+	 * the ports (thereby making serial8250_isa_driver permanently
+	 * in use.)
+	 */
+	serial8250_isa_devs = NULL;
+
 	driver_unregister(&serial8250_isa_driver);
-
-	for (i = 0; i < UART_NR; i++) {
-		struct uart_8250_port *up = &serial8250_ports[i];
-		if (up->port.dev == &serial8250_isa_devs->dev)
-			uart_remove_one_port(&serial8250_reg, &up->port);
-	}
-
-	platform_device_unregister(serial8250_isa_devs);
+	platform_device_unregister(isa_dev);
 
 	uart_unregister_driver(&serial8250_reg);
 }
