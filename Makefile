@@ -478,17 +478,19 @@ include/linux/autoconf.h: .config scripts/fixdep
 
 uts_len := 64
 
-include/linux/version.h: Makefile
-	@if expr length "$(KERNELRELEASE)" \> $(uts_len) >/dev/null ; then \
+define filechk_version.h
+	if expr length "$(KERNELRELEASE)" \> $(uts_len) >/dev/null ; then \
 	  echo '"$(KERNELRELEASE)" exceeds $(uts_len) characters' >&2; \
 	  exit 1; \
 	fi;
-	@echo -n '  GEN     $@'
-	@(echo \#define UTS_RELEASE \"$(KERNELRELEASE)\"; \
+	(echo \#define UTS_RELEASE \"$(KERNELRELEASE)\"; \
 	  echo \#define LINUX_VERSION_CODE `expr $(VERSION) \\* 65536 + $(PATCHLEVEL) \\* 256 + $(SUBLEVEL)`; \
 	 echo '#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))'; \
-	) > $@.tmp
-	@$(update-if-changed)
+	)
+endef
+
+include/linux/version.h: Makefile
+	$(call filechk,version.h)
 
 # ---------------------------------------------------------------------------
 
@@ -557,7 +559,7 @@ endif # CONFIG_MODULES
 # Generate asm-offsets.h 
 # ---------------------------------------------------------------------------
 
-define generate-asm-offsets.h
+define filechk_gen-asm-offsets
 	(set -e; \
 	 echo "#ifndef __ASM_OFFSETS_H__"; \
 	 echo "#define __ASM_OFFSETS_H__"; \
@@ -572,7 +574,6 @@ define generate-asm-offsets.h
 	 echo ""; \
 	 echo "#endif" )
 endef
-
 
 else # ifdef include_config
 
@@ -881,13 +882,27 @@ if_changed_rule = $(if $(strip $? \
 
 cmd = @$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))' &&) $(cmd_$(1))
 
-define update-if-changed
-	if [ -r $@ ] && cmp -s $@ $@.tmp; then \
-		echo ' (unchanged)'; \
-		rm -f $@.tmp; \
-	else \
-		echo ' (updated)'; \
-		mv -f $@.tmp $@; \
+# filechk is used to check if the content of a generated file is updated.
+# Sample usage:
+# define filechk_sample
+#	echo $KERNELRELEASE
+# endef
+# version.h : Makefile
+#	$(call filechk,sample)
+# The rule defined shall write to stdout the content of the new file.
+# The existing file will be compared with the new one.
+# - If no file exist it is created
+# - If the content differ the new file is used
+# - If they are equal no change, and no timestamp update
+
+define filechk
+	@echo '  CHK     $@';
+	@set -e; $(filechk_$(1)) > $@.tmp
+	if [ -r $@ ] && cmp -s $@ $@.tmp; then	\
+		rm -f $@.tmp;			\
+	else					\
+		echo '  UPD     $@';		\
+		mv -f $@.tmp $@;		\
 	fi
 endef
 
