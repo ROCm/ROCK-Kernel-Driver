@@ -527,12 +527,9 @@ int check_disk_change(struct block_device *bdev)
 	struct block_device_operations * bdops = bdev->bd_op;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 
-	if (!bdops->media_changed) {
-		if (bdops->check_media_change == NULL)
-			return 0;
-		if (!bdops->check_media_change(dev))
-			return 0;
-	} else if (!bdops->media_changed(bdev->bd_disk))
+	if (!bdops->media_changed)
+		return 0;
+	if (!bdops->media_changed(bdev->bd_disk))
 		return 0;
 
 	if (invalidate_device(dev, 0))
@@ -540,8 +537,6 @@ int check_disk_change(struct block_device *bdev)
 
 	if (bdops->revalidate_disk)
 		bdops->revalidate_disk(bdev->bd_disk);
-	else if (bdops->revalidate)
-		bdops->revalidate(dev);
 	if (bdev->bd_disk->minors > 1)
 		bdev->bd_invalidated = 1;
 	return 1;
