@@ -307,7 +307,7 @@ eesoxscsi_dma_stop(struct Scsi_Host *host, Scsi_Pointer *SCp)
 const char *eesoxscsi_info(struct Scsi_Host *host)
 {
 	struct eesoxscsi_info *info = (struct eesoxscsi_info *)host->hostdata;
-	static char string[100], *p;
+	static char string[150], *p;
 
 	p = string;
 	p += sprintf(p, "%s ", host->hostt->name);

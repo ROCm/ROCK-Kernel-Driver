@@ -304,7 +304,7 @@ cumanascsi_2_dma_stop(struct Scsi_Host *host, Scsi_Pointer *SCp)
 const char *cumanascsi_2_info(struct Scsi_Host *host)
 {
 	struct cumanascsi2_info *info = (struct cumanascsi2_info *)host->hostdata;
-	static char string[100], *p;
+	static char string[150], *p;
 
 	p = string;
 	p += sprintf(p, "%s ", host->hostt->name);
