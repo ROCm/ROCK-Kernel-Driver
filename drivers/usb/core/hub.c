@@ -1150,10 +1150,14 @@ static int hub_port_reset(struct usb_device *hdev, int port,
 
 	/* Reset the port */
 	for (i = 0; i < PORT_RESET_TRIES; i++) {
-		set_port_feature(hdev, port + 1, USB_PORT_FEAT_RESET);
+		status = set_port_feature(hdev, port + 1, USB_PORT_FEAT_RESET);
+		if (status)
+			dev_err(hub_dev, "cannot reset port %d (err = %d)\n",
+					port + 1, status);
+		else
+			status = hub_port_wait_reset(hdev, port, udev, delay);
 
 		/* return on disconnect or reset */
-		status = hub_port_wait_reset(hdev, port, udev, delay);
 		if (status == -ENOTCONN || status == 0) {
 			clear_port_feature(hdev,
 				port + 1, USB_PORT_FEAT_C_RESET);
