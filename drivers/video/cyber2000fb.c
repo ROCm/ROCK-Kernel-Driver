@@ -1111,13 +1111,13 @@ static int cyber2000fb_blank(int blank, struct fb_info *info)
 static struct fb_ops cyber2000fb_ops = {
 	owner:		THIS_MODULE,
 	fb_set_var:	cyber2000fb_set_var,
-	fb_set_cmap:	gen_set_cmap,
 	fb_setcolreg:	cyber2000fb_setcolreg,
 	fb_pan_display:	cyber2000fb_pan_display,
 	fb_blank:	cyber2000fb_blank,
 	fb_get_fix:	gen_get_fix,
 	fb_get_var:	gen_get_var,
 	fb_get_cmap:	gen_get_cmap,
+	fb_set_cmap:	gen_set_cmap,
 };
 
 /*

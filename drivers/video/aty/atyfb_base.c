@@ -87,6 +87,9 @@
 #include <linux/adb.h>
 #include <linux/pmu.h>
 #endif
+#ifdef CONFIG_BOOTX_TEXT
+#include <asm/btext.h>
+#endif
 #ifdef CONFIG_NVRAM
 #include <linux/nvram.h>
 #endif
@@ -815,6 +818,13 @@ static void atyfb_set_par(const struct atyfb_par *par,
 	display_info.disp_reg_address = info->ati_regbase_phys;
     }
 #endif /* CONFIG_FB_COMPAT_XPMAC */
+#ifdef CONFIG_BOOTX_TEXT
+	btext_update_display(info->frame_buffer_phys,
+			(((par->crtc.h_tot_disp>>16) & 0xff)+1)*8,
+			((par->crtc.v_tot_disp>>16) & 0x7ff)+1,
+			par->crtc.bpp,
+			par->crtc.vxres*par->crtc.bpp/8);
+#endif /* CONFIG_BOOTX_TEXT */
 }
 
 static int atyfb_decode_var(const struct fb_var_screeninfo *var,

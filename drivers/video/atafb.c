@@ -1596,7 +1596,7 @@ static int falcon_pan_display( struct fb_var_screeninfo *var,
 		var->xoffset = up(var->xoffset, 2);
 	}
 	par->hw.falcon.line_offset = bpp *
-	       	(fb_display[fb_info.currcon].var.xres_virtual - fb_display[currcon].var.xres) / 16;
+	       	(fb_display[fb_info.currcon].var.xres_virtual - fb_display[fb_info.currcon].var.xres) / 16;
 	if (par->hw.falcon.xoffset)
 		par->hw.falcon.line_offset -= bpp;
 	xoffset = var->xoffset - par->hw.falcon.xoffset;
@@ -2840,8 +2840,8 @@ int __init atafb_setup( char *options )
 
     if (!options || !*options)
 		return 0;
-     
-    for(this_opt=strtok(options,","); this_opt; this_opt=strtok(NULL,",")) {
+    
+    while ((this_opt = strsep(options, ",")) != NULL) {	 
 	if (!*this_opt) continue;
 	if ((temp=get_video_mode(this_opt)))
 		default_par=temp;

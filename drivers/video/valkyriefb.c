@@ -260,7 +260,7 @@ static int valkyriefb_switch(int con, struct fb_info *fb)
 			    fb);
 	fb->currcon = con;
 #if 1
-	valkyrie_var_to_par(&fb_display[currcon].var, &par, fb);
+	valkyrie_var_to_par(&fb_display[fb->currcon].var, &par, fb);
 	valkyrie_set_par(&par, info);
 	do_install_cmap(con, fb);
 #else
