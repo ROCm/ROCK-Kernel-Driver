@@ -968,7 +968,7 @@ int vmtruncate(struct inode * inode, loff_t offset)
 	if (inode->i_size < offset)
 		goto do_expand;
 	inode->i_size = offset;
-	spin_lock(&mapping->i_shared_lock);
+	down(&mapping->i_shared_sem);
 	if (list_empty(&mapping->i_mmap) && list_empty(&mapping->i_mmap_shared))
 		goto out_unlock;
 
@@ -979,7 +979,7 @@ int vmtruncate(struct inode * inode, loff_t offset)
 		vmtruncate_list(&mapping->i_mmap_shared, pgoff);
 
 out_unlock:
-	spin_unlock(&mapping->i_shared_lock);
+	up(&mapping->i_shared_sem);
 	truncate_inode_pages(mapping, offset);
 	goto out_truncate;
 

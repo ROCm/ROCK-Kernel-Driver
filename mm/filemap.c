@@ -55,11 +55,14 @@
 /*
  * Lock ordering:
  *
- *  ->i_shared_lock		(vmtruncate)
+ *  ->i_shared_sem		(vmtruncate)
  *    ->private_lock		(__free_pte->__set_page_dirty_buffers)
  *      ->swap_list_lock
  *        ->swap_device_lock	(exclusive_swap_page, others)
  *          ->mapping->page_lock
+ *  ->mmap_sem
+ *    ->i_shared_sem		(various places)
+ *
  *  ->inode_lock
  *    ->sb_lock			(fs/fs-writeback.c)
  *    ->mapping->page_lock	(__sync_single_inode)

@@ -297,7 +297,7 @@ static int hugetlb_vmtruncate(struct inode *inode, loff_t offset)
 		goto do_expand;
 
 	inode->i_size = offset;
-	spin_lock(&mapping->i_shared_lock);
+	down(&mapping->i_shared_sem);
 	if (list_empty(&mapping->i_mmap) && list_empty(&mapping->i_mmap_shared))
 		goto out_unlock;
 	if (!list_empty(&mapping->i_mmap))
@@ -306,7 +306,7 @@ static int hugetlb_vmtruncate(struct inode *inode, loff_t offset)
 		hugetlb_vmtruncate_list(&mapping->i_mmap_shared, pgoff);
 
 out_unlock:
-	spin_unlock(&mapping->i_shared_lock);
+	up(&mapping->i_shared_sem);
 	truncate_hugepages(mapping, offset);
 	return 0;
 

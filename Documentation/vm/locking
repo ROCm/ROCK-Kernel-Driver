@@ -66,10 +66,9 @@ in some cases it is not really needed. Eg, vm_start is modified by
 expand_stack(), it is hard to come up with a destructive scenario without 
 having the vmlist protection in this case.
 
-The page_table_lock nests with the inode i_shared_lock and the kmem cache
-c_spinlock spinlocks. This is okay, since code that holds i_shared_lock 
-never asks for memory, and the kmem code asks for pages after dropping
-c_spinlock. The page_table_lock also nests with pagecache_lock and 
+The page_table_lock nests with the inode i_shared_sem and the kmem cache
+c_spinlock spinlocks.  This is okay, since the kmem code asks for pages after
+dropping c_spinlock.  The page_table_lock also nests with pagecache_lock and
 pagemap_lru_lock spinlocks, and no code asks for memory with these locks
 held.
 

@@ -529,7 +529,6 @@ extern struct vm_area_struct * find_vma_prev(struct mm_struct * mm, unsigned lon
 					     struct vm_area_struct **pprev);
 extern int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 		     unsigned long addr, int new_below);
-extern void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area);
 
 /* Look up the first VMA which intersects the interval start_addr..end_addr-1,
    NULL if none.  Assume start_addr < end_addr. */

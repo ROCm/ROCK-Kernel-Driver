@@ -132,7 +132,9 @@ int vm_enough_memory(long pages)
 	return 0;
 }
 
-/* Remove one vm structure from the inode's i_mapping address space. */
+/*
+ * Remove one vm structure from the inode's i_mapping address space.
+ */
 static void remove_shared_vm_struct(struct vm_area_struct *vma)
 {
 	struct file *file = vma->vm_file;
@@ -140,11 +142,11 @@ static void remove_shared_vm_struct(struct vm_area_struct *vma)
 	if (file) {
 		struct inode *inode = file->f_dentry->d_inode;
 
-		spin_lock(&inode->i_mapping->i_shared_lock);
+		down(&inode->i_mapping->i_shared_sem);
 		if (vma->vm_flags & VM_DENYWRITE)
 			atomic_inc(&inode->i_writecount);
 		list_del_init(&vma->shared);
-		spin_unlock(&inode->i_mapping->i_shared_lock);
+		up(&inode->i_mapping->i_shared_sem);
 	}
 }
 
@@ -346,12 +348,12 @@ static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 		mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
 
 	if (mapping)
-		spin_lock(&mapping->i_shared_lock);
+		down(&mapping->i_shared_sem);
 	spin_lock(&mm->page_table_lock);
 	__vma_link(mm, vma, prev, rb_link, rb_parent);
 	spin_unlock(&mm->page_table_lock);
 	if (mapping)
-		spin_unlock(&mapping->i_shared_lock);
+		up(&mapping->i_shared_sem);
 
 	mm->map_count++;
 	validate_mm(mm);
@@ -955,7 +957,7 @@ no_mmaps:
  * By the time this function is called, the area struct has been
  * removed from the process mapping list.
  */
-void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area)
+static void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area)
 {
 	size_t len = area->vm_end - area->vm_start;
 
@@ -1339,7 +1341,7 @@ void exit_mmap(struct mm_struct * mm)
 
 /* Insert vm structure into process list sorted by address
  * and into the inode's i_mmap ring.  If vm_file is non-NULL
- * then the i_shared_lock must be held here.
+ * then i_shared_sem is taken here.
  */
 void insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
 {
