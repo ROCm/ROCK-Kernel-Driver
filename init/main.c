@@ -536,7 +536,8 @@ static void __init do_initcalls(void)
 	flush_scheduled_work();
 }
 
-int init_elf_binfmt(void);
+extern int init_elf_binfmt(void);
+extern int init_elf32_binfmt(void);
 
 /*
  * Ok, the machine is now initialized. None of the devices
@@ -558,6 +559,13 @@ static void __init do_basic_setup(void)
 
 	init_workqueues();
 	init_elf_binfmt();
+#if defined(__powerpc64__) || \
+	defined(CONFIG_IA32_SUPPORT) || \
+	defined(CONFIG_MIPS32) || \
+	defined(CONFIG_PARISC64) || \
+	defined(CONFIG_BINFMT_ELF32)
+	init_elf32_binfmt();
+#endif
 	do_initcalls();
 }
 
