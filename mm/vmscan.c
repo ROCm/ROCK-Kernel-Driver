@@ -662,17 +662,17 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
 		page = list_entry(l_hold.prev, struct page, lru);
 		list_del(&page->lru);
 		if (page_mapped(page)) {
+			if (!reclaim_mapped) {
+				list_add(&page->lru, &l_active);
+				continue;
+			}
 			pte_chain_lock(page);
-			if (page_mapped(page) && page_referenced(page)) {
+			if (page_referenced(page)) {
 				pte_chain_unlock(page);
 				list_add(&page->lru, &l_active);
 				continue;
 			}
 			pte_chain_unlock(page);
-			if (!reclaim_mapped) {
-				list_add(&page->lru, &l_active);
-				continue;
-			}
 		}
 		/*
 		 * FIXME: need to consider page_count(page) here if/when we
