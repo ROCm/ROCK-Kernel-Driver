@@ -1,3 +1,6 @@
+
+ifndef no-rules.make
+
 #
 # This file contains rules which are shared between multiple Makefiles.
 #
@@ -623,3 +626,5 @@ ifeq ($(KBUILD_VERBOSE),1)
 descend = echo '$(MAKE) -f $(1)/Makefile $(2)';
 endif
 descend += $(MAKE) -f $(1)/Makefile obj=$(1) $(2)
+
+endif

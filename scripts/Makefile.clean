@@ -1,0 +1,42 @@
+
+src := $(obj)
+
+no-rules.make := 1
+
+.PHONY: __clean
+__clean:
+
+include $(obj)/Makefile
+
+__subdir-y	:= $(patsubst %/,%,$(filter %/, $(obj-y)))
+subdir-y	+= $(__subdir-y)
+__subdir-m	:= $(patsubst %/,%,$(filter %/, $(obj-m)))
+subdir-m	+= $(__subdir-m)
+__subdir-n	:= $(patsubst %/,%,$(filter %/, $(obj-n)))
+subdir-n	+= $(__subdir-n)
+__subdir-	:= $(patsubst %/,%,$(filter %/, $(obj-)))
+subdir-		+= $(__subdir-)
+
+subdir-ym	:= $(sort $(subdir-y) $(subdir-m))
+subdir-ymn      := $(sort $(subdir-ym) $(subdir-n) $(subdir-))
+
+EXTRA_TARGETS	:= $(addprefix $(obj)/,$(EXTRA_TARGETS))
+clean-files	:= $(addprefix $(obj)/,$(clean-files))
+host-progs	:= $(addprefix $(obj)/,$(host-progs))
+subdir-ymn	:= $(addprefix $(obj)/,$(subdir-ymn))
+
+__clean-files := $(wildcard $(EXTRA_TARGETS) $(host-progs) $(clean-files))
+
+__clean: $(subdir-ymn)
+ifneq ($(strip $(__clean-files) $(clean-rule)),)
+	rm -f $(__clean-files)
+	$(clean-rule)
+else
+	@/bin/true
+endif
+
+.PHONY: $(subdir-ymn)
+
+$(subdir-ymn):
+	$(MAKE) -rR -f scripts/Makefile.clean obj=$@
+
