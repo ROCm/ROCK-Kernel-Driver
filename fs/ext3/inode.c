@@ -178,10 +178,15 @@ static int ext3_journal_test_restart(handle_t *handle, struct inode *inode)
 
 /*
  * Called at each iput()
+ *
+ * The inode may be "bad" if ext3_read_inode() saw an error from
+ * ext3_get_inode(), so we need to check that to avoid freeing random disk
+ * blocks.
  */
-void ext3_put_inode (struct inode * inode)
+void ext3_put_inode(struct inode *inode)
 {
-	ext3_discard_prealloc (inode);
+	if (!is_bad_inode(inode))
+		ext3_discard_prealloc(inode);
 }
 
 /*
