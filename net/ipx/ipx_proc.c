@@ -5,6 +5,7 @@
  */
 
 #include <linux/config.h>
+#ifdef CONFIG_PROC_FS
 #include <linux/init.h>
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
@@ -12,7 +13,6 @@
 #include <linux/tcp.h>
 #include <net/ipx.h>
 
-#ifdef CONFIG_PROC_FS
 static __inline__ struct ipx_interface *ipx_get_interface_idx(loff_t pos)
 {
 	struct ipx_interface *i;

@@ -1,5 +1,5 @@
 /*
- * IP Payload Compression Protocol (IPComp) - RFC3713.
+ * IP Payload Compression Protocol (IPComp) - RFC3173.
  *
  * Copyright (c) 2003 James Morris <jmorris@intercode.com.au>
  *
@@ -22,20 +22,7 @@
 #include <net/xfrm.h>
 #include <net/icmp.h>
 #include <net/esp.h>
-
-#define IPCOMP_SCRATCH_SIZE	65400
-
-struct ipcomp_hdr {
-	u8 nexthdr;
-	u8 flags;
-	u16 cpi;
-};
-
-struct ipcomp_data {
-	u16 threshold;
-	u8 *scratch;
-	struct crypto_tfm *tfm;
-};
+#include <net/ipcomp.h>
 
 static int ipcomp_decompress(struct xfrm_state *x, struct sk_buff *skb)
 {
@@ -52,7 +39,7 @@ static int ipcomp_decompress(struct xfrm_state *x, struct sk_buff *skb)
 	if (err)
 		goto out;
 
-	if (dlen < (plen + sizeof(struct ipcomp_hdr))) {
+	if (dlen < (plen + sizeof(struct ip_comp_hdr))) {
 		err = -EINVAL;
 		goto out;
 	}
@@ -93,11 +80,11 @@ static int ipcomp_input(struct xfrm_state *x,
 	iph = skb->nh.iph;
 	memcpy(&tmp_iph, iph, iph->ihl * 4);
 	nexthdr = *(u8 *)skb->data;
-	skb_pull(skb, sizeof(struct ipcomp_hdr));
-	skb->nh.raw += sizeof(struct ipcomp_hdr);
+	skb_pull(skb, sizeof(struct ip_comp_hdr));
+	skb->nh.raw += sizeof(struct ip_comp_hdr);
 	memcpy(skb->nh.raw, &tmp_iph, tmp_iph.iph.ihl * 4);
 	iph = skb->nh.iph;
-	iph->tot_len = htons(ntohs(iph->tot_len) - sizeof(struct ipcomp_hdr));
+	iph->tot_len = htons(ntohs(iph->tot_len) - sizeof(struct ip_comp_hdr));
 	iph->protocol = nexthdr;
 	skb->h.raw = skb->data;
 	err = ipcomp_decompress(x, skb);
@@ -122,7 +109,7 @@ static int ipcomp_compress(struct xfrm_state *x, struct sk_buff *skb)
 	if (err)
 		goto out;
 
-	if ((dlen + sizeof(struct ipcomp_hdr)) >= plen) {
+	if ((dlen + sizeof(struct ip_comp_hdr)) >= plen) {
 		err = -EMSGSIZE;
 		goto out;
 	}
@@ -162,7 +149,7 @@ static int ipcomp_output(struct sk_buff *skb)
 	struct dst_entry *dst = skb->dst;
 	struct xfrm_state *x = dst->xfrm;
 	struct iphdr *iph, *top_iph;
-	struct ipcomp_hdr *ipch;
+	struct ip_comp_hdr *ipch;
 	struct ipcomp_data *ipcd = x->data;
 	union {
 		struct iphdr	iph;
@@ -215,13 +202,13 @@ static int ipcomp_output(struct sk_buff *skb)
 	/* Install ipcomp header, convert into ipcomp datagram. */
 	iph = skb->nh.iph;
 	memcpy(&tmp_iph, iph, iph->ihl * 4);
-	top_iph = (struct iphdr *)skb_push(skb, sizeof(struct ipcomp_hdr));
+	top_iph = (struct iphdr *)skb_push(skb, sizeof(struct ip_comp_hdr));
 	memcpy(top_iph, &tmp_iph, iph->ihl * 4);
 	iph = top_iph;
 	iph->tot_len = htons(skb->len);
 	iph->protocol = IPPROTO_COMP;
 	iph->check = 0;
-	ipch = (struct ipcomp_hdr *)((char *)iph + iph->ihl * 4);
+	ipch = (struct ip_comp_hdr *)((char *)iph + iph->ihl * 4);
 	ipch->nexthdr = x->props.mode ? IPPROTO_IPIP : tmp_iph.iph.protocol;
 	ipch->flags = 0;
 	ipch->cpi = htons((u16 )ntohl(x->id.spi));
@@ -252,7 +239,7 @@ static void ipcomp4_err(struct sk_buff *skb, u32 info)
 {
 	u32 spi;
 	struct iphdr *iph = (struct iphdr *)skb->data;
-	struct ipcomp_hdr *ipch = (struct ipcomp_hdr *)(skb->data+(iph->ihl<<2));
+	struct ip_comp_hdr *ipch = (struct ip_comp_hdr *)(skb->data+(iph->ihl<<2));
 	struct xfrm_state *x;
 
 	if (skb->h.icmph->type != ICMP_DEST_UNREACH ||
@@ -356,7 +343,7 @@ static int ipcomp_init_state(struct xfrm_state *x, void *args)
 		goto error;
 
 	memset(ipcd, 0, sizeof(*ipcd));
-	x->props.header_len = sizeof(struct ipcomp_hdr);
+	x->props.header_len = sizeof(struct ip_comp_hdr);
 	if (x->props.mode)
 		x->props.header_len += sizeof(struct iphdr);
 	x->data = ipcd;
@@ -433,6 +420,6 @@ module_init(ipcomp4_init);
 module_exit(ipcomp4_fini);
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("IP Payload Compression Protocol (IPComp) - RFC3713");
+MODULE_DESCRIPTION("IP Payload Compression Protocol (IPComp) - RFC3173");
 MODULE_AUTHOR("James Morris <jmorris@intercode.com.au>");
 

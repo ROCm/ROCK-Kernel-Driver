@@ -198,4 +198,10 @@ struct ip_esp_hdr {
 	__u8  enc_data[0];	/* Variable len but >=8. Mind the 64 bit alignment! */
 };
 
+struct ip_comp_hdr {
+	__u8 nexthdr;
+	__u8 flags;
+	__u16 cpi;
+};
+
 #endif	/* _LINUX_IP_H */

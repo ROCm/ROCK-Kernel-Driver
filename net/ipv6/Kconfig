@@ -33,4 +33,13 @@ config INET6_ESP
 
 	  If unsure, say Y.
 
+config INET6_IPCOMP
+	tristate "IPv6: IPComp transformation"
+	depends on IPV6
+	---help---
+	  Support for IP Paylod Compression (RFC3173), typically needed
+	  for IPsec.
+
+	  If unsure, say Y.
+
 source "net/ipv6/netfilter/Kconfig"

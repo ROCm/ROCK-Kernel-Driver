@@ -315,6 +315,7 @@ extern int			ip6_build_xmit(struct sock *sk,
 					       unsigned length,
 					       struct ipv6_txoptions *opt,
 					       int hlimit, int flags);
+extern int			ip6_found_nexthdr(struct sk_buff *skb, u8 **nexthdr);
 
 extern int			ip6_append_data(struct sock *sk,
 						int getfrag(void *from, char *to, int offset, int len, int odd, struct sk_buff *skb),
