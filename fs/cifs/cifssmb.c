@@ -828,7 +828,7 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 		/* BB where to store pid high? */
 		pSMB->Locks[0].LengthLow = cpu_to_le32((u32)len);
 		pSMB->Locks[0].LengthHigh = cpu_to_le32((u32)(len>>32));
-		pSMB->Locks[0].OffsetLow = cpu_to_le32((u32)offset)
+		pSMB->Locks[0].OffsetLow = cpu_to_le32((u32)offset);
 		pSMB->Locks[0].OffsetHigh = cpu_to_le32((u32)(offset>>32));
 		count = sizeof(LOCKING_ANDX_RANGE);
 	} else {
