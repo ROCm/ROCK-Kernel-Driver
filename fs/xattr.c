@@ -138,10 +138,10 @@ sys_fsetxattr(int fd, char *name, void *value, size_t size, int flags)
 /*
  * Extended attribute GET operations
  */
-static long
+static ssize_t
 getxattr(struct dentry *d, char *name, void *value, size_t size)
 {
-	int error;
+	ssize_t error;
 	void *kvalue;
 	char kname[XATTR_NAME_MAX + 1];
 
@@ -169,11 +169,11 @@ getxattr(struct dentry *d, char *name, void *value, size_t size)
 	return error;
 }
 
-asmlinkage long
+asmlinkage ssize_t
 sys_getxattr(char *path, char *name, void *value, size_t size)
 {
 	struct nameidata nd;
-	int error;
+	ssize_t error;
 
 	error = user_path_walk(path, &nd);
 	if (error)
@@ -183,11 +183,11 @@ sys_getxattr(char *path, char *name, void *value, size_t size)
 	return error;
 }
 
-asmlinkage long
+asmlinkage ssize_t
 sys_lgetxattr(char *path, char *name, void *value, size_t size)
 {
 	struct nameidata nd;
-	int error;
+	ssize_t error;
 
 	error = user_path_walk_link(path, &nd);
 	if (error)
@@ -197,11 +197,11 @@ sys_lgetxattr(char *path, char *name, void *value, size_t size)
 	return error;
 }
 
-asmlinkage long
+asmlinkage ssize_t
 sys_fgetxattr(int fd, char *name, void *value, size_t size)
 {
 	struct file *f;
-	int error = -EBADF;
+	ssize_t error = -EBADF;
 
 	f = fget(fd);
 	if (!f)
@@ -214,10 +214,10 @@ sys_fgetxattr(int fd, char *name, void *value, size_t size)
 /*
  * Extended attribute LIST operations
  */
-static long
+static ssize_t
 listxattr(struct dentry *d, char *list, size_t size)
 {
-	int error;
+	ssize_t error;
 	char *klist;
 
 	klist = (char *)xattr_alloc(size, XATTR_LIST_MAX);
@@ -238,11 +238,11 @@ listxattr(struct dentry *d, char *list, size_t size)
 	return error;
 }
 
-asmlinkage long
+asmlinkage ssize_t
 sys_listxattr(char *path, char *list, size_t size)
 {
 	struct nameidata nd;
-	int error;
+	ssize_t error;
 
 	error = user_path_walk(path, &nd);
 	if (error)
@@ -252,11 +252,11 @@ sys_listxattr(char *path, char *list, size_t size)
 	return error;
 }
 
-asmlinkage long
+asmlinkage ssize_t
 sys_llistxattr(char *path, char *list, size_t size)
 {
 	struct nameidata nd;
-	int error;
+	ssize_t error;
 
 	error = user_path_walk_link(path, &nd);
 	if (error)
@@ -266,11 +266,11 @@ sys_llistxattr(char *path, char *list, size_t size)
 	return error;
 }
 
-asmlinkage long
+asmlinkage ssize_t
 sys_flistxattr(int fd, char *list, size_t size)
 {
 	struct file *f;
-	int error = -EBADF;
+	ssize_t error = -EBADF;
 
 	f = fget(fd);
 	if (!f)
