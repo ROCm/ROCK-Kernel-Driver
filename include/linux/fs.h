@@ -18,6 +18,7 @@
 #include <linux/stat.h>
 #include <linux/cache.h>
 #include <linux/radix-tree.h>
+#include <linux/kobject.h>
 #include <asm/atomic.h>
 
 struct iovec;
@@ -610,6 +611,7 @@ struct super_block {
 
 	char s_id[32];				/* Informational name */
 
+	struct kobject           kobj;          /* anchor for sysfs */
 	void 			*s_fs_info;	/* Filesystem private info */
 
 	/*
@@ -913,6 +915,7 @@ struct export_operations {
 
 struct file_system_type {
 	const char *name;
+	struct subsystem subsys;
 	int fs_flags;
 	struct super_block *(*get_sb) (struct file_system_type *, int, char *, void *);
 	void (*kill_sb) (struct super_block *);
