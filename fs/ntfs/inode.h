@@ -57,11 +57,11 @@ struct _ntfs_inode {
 	ntfschar *name;		/* Attribute name of this fake inode. */
 	u32 name_len;		/* Attribute name length of this fake inode. */
 	runlist runlist;	/* If state has the NI_NonResident bit set,
-				   the run list of the unnamed data attribute
+				   the runlist of the unnamed data attribute
 				   (if a file) or of the index allocation
 				   attribute (directory) or of the attribute
 				   described by the fake inode (if NInoAttr()).
-				   If runlist.rl is NULL, the run list has not
+				   If runlist.rl is NULL, the runlist has not
 				   been read in yet or has been unmapped. If
 				   NI_NonResident is clear, the attribute is
 				   resident (file and fake inode) or there is

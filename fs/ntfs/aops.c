@@ -197,7 +197,7 @@ static int ntfs_read_block(struct page *page)
 
 #ifdef DEBUG
 	if (unlikely(!ni->runlist.rl && !ni->mft_no && !NInoAttr(ni)))
-		panic("NTFS: $MFT/$DATA run list has been unmapped! This is a "
+		panic("NTFS: $MFT/$DATA runlist has been unmapped! This is a "
 				"very serious bug! Cannot continue...");
 #endif
 
@@ -252,11 +252,11 @@ lock_retry_remap:
 			/* It is a hole, need to zero it. */
 			if (lcn == LCN_HOLE)
 				goto handle_hole;
-			/* If first try and run list unmapped, map and retry. */
+			/* If first try and runlist unmapped, map and retry. */
 			if (!is_retry && lcn == LCN_RL_NOT_MAPPED) {
 				is_retry = TRUE;
 				/*
-				 * Attempt to map run list, dropping lock for
+				 * Attempt to map runlist, dropping lock for
 				 * the duration.
 				 */
 				up_read(&ni->runlist.lock);
@@ -659,11 +659,11 @@ lock_retry_remap:
 			err = -EOPNOTSUPP;
 			break;
 		}
-		/* If first try and run list unmapped, map and retry. */
+		/* If first try and runlist unmapped, map and retry. */
 		if (!is_retry && lcn == LCN_RL_NOT_MAPPED) {
 			is_retry = TRUE;
 			/*
-			 * Attempt to map run list, dropping lock for
+			 * Attempt to map runlist, dropping lock for
 			 * the duration.
 			 */
 			up_read(&ni->runlist.lock);
@@ -1439,7 +1439,7 @@ lock_retry_remap:
 						lcn == LCN_RL_NOT_MAPPED) {
 					is_retry = TRUE;
 					/*
-					 * Attempt to map run list, dropping
+					 * Attempt to map runlist, dropping
 					 * lock for the duration.
 					 */
 					up_read(&ni->runlist.lock);

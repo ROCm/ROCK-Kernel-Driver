@@ -575,7 +575,7 @@ int ntfs_read_compressed_block(struct page *page)
 	}
 
 	/*
-	 * We have the run list, and all the destination pages we need to fill.
+	 * We have the runlist, and all the destination pages we need to fill.
 	 * Now read the first compression block.
 	 */
 	cur_page = 0;
@@ -617,7 +617,7 @@ lock_retry_remap:
 				goto rl_err;
 			is_retry = TRUE;
 			/*
-			 * Attempt to map run list, dropping lock for the
+			 * Attempt to map runlist, dropping lock for the
 			 * duration.
 			 */
 			up_read(&ni->runlist.lock);

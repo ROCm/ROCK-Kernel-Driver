@@ -60,7 +60,7 @@ typedef struct {	/* In memory vcn to lcn mapping structure element. */
 
 /**
  * runlist - in memory vcn to lcn mapping array including a read/write lock
- * @rl:		pointer to an array of run list elements
+ * @rl:		pointer to an array of runlist elements
  * @lock:	read/write spinlock for serializing access to @rl
  *
  */

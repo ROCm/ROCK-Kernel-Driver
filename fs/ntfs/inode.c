@@ -680,7 +680,7 @@ static int ntfs_read_locked_inode(struct inode *vi)
 				goto unm_err_out;
 			}
 			/*
-			 * Setup the run list. No need for locking as we have
+			 * Setup the runlist. No need for locking as we have
 			 * exclusive access to the inode at this time.
 			 */
 			ni->attr_list_rl.rl = decompress_mapping_pairs(vol,
@@ -1757,7 +1757,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 						"You should run chkdsk.");
 				goto put_err_out;
 			}
-			/* Setup the run list. */
+			/* Setup the runlist. */
 			ni->attr_list_rl.rl = decompress_mapping_pairs(vol,
 					ctx->attr, NULL);
 			if (IS_ERR(ni->attr_list_rl.rl)) {
@@ -1885,7 +1885,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 		}
 		/*
 		 * Decompress the mapping pairs array of this extent and merge
-		 * the result into the existing run list. No need for locking
+		 * the result into the existing runlist. No need for locking
 		 * as we have exclusive access to the inode at this time and we
 		 * are a mount in progress task, too.
 		 */
@@ -2001,7 +2001,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 		goto put_err_out;
 	}
 	if (highest_vcn && highest_vcn != last_vcn - 1) {
-		ntfs_error(sb, "Failed to load the complete run list "
+		ntfs_error(sb, "Failed to load the complete runlist "
 				"for $MFT/$DATA. Driver bug or "
 				"corrupt $MFT. Run chkdsk.");
 		ntfs_debug("highest_vcn = 0x%llx, last_vcn - 1 = 0x%llx",

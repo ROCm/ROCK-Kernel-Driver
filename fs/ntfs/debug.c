@@ -132,7 +132,7 @@ void __ntfs_debug (const char *file, int line, const char *function,
 	spin_unlock(&err_buf_lock);
 }
 
-/* Dump a run list. Caller has to provide synchronisation for @rl. */
+/* Dump a runlist. Caller has to provide synchronisation for @rl. */
 void ntfs_debug_dump_runlist(const runlist_element *rl)
 {
 	int i;
@@ -141,7 +141,7 @@ void ntfs_debug_dump_runlist(const runlist_element *rl)
 
 	if (!debug_msgs)
 		return;
-	printk(KERN_DEBUG "NTFS-fs DEBUG: Dumping run list (values "
+	printk(KERN_DEBUG "NTFS-fs DEBUG: Dumping runlist (values "
 			"in hex):\n");
 	if (!rl) {
 		printk(KERN_DEBUG "Run list not present.\n");
@@ -159,12 +159,12 @@ void ntfs_debug_dump_runlist(const runlist_element *rl)
 			printk(KERN_DEBUG "%-16Lx %s %-16Lx%s\n",
 				(rl + i)->vcn, lcn_str[index],
 				(rl + i)->length, (rl + i)->length ?
-				"" : " (run list end)");
+				"" : " (runlist end)");
 		} else
 			printk(KERN_DEBUG "%-16Lx %-16Lx  %-16Lx%s\n",
 				(rl + i)->vcn, (rl + i)->lcn,
 				(rl + i)->length, (rl + i)->length ?
-				"" : " (run list end)");
+				"" : " (runlist end)");
 		if (!(rl + i)->length)
 			break;
 	}

@@ -986,7 +986,7 @@ mft_unmap_out:
 	ntfs_unmap_page(mft_page);
 	ntfs_unmap_page(mirr_page);
 
-	/* Construct the mft mirror run list by hand. */
+	/* Construct the mft mirror runlist by hand. */
 	rl2[0].vcn = 0;
 	rl2[0].lcn = vol->mftmirr_lcn;
 	rl2[0].length = (vol->mftmirr_size * vol->mft_record_size +
@@ -996,12 +996,12 @@ mft_unmap_out:
 	rl2[1].length = 0;
 	/*
 	 * Because we have just read all of the mft mirror, we know we have
-	 * mapped the full run list for it.
+	 * mapped the full runlist for it.
 	 */
 	mirr_ni = NTFS_I(vol->mftmirr_ino);
 	down_read(&mirr_ni->runlist.lock);
 	rl = mirr_ni->runlist.rl;
-	/* Compare the two run lists.  They must be identical. */
+	/* Compare the two runlists.  They must be identical. */
 	i = 0;
 	do {
 		if (rl2[i].vcn != rl[i].vcn || rl2[i].lcn != rl[i].lcn ||

@@ -29,7 +29,7 @@
 /**
  * ntfs_rl_mm - runlist memmove
  *
- * It is up to the caller to serialize access to the run list @base.
+ * It is up to the caller to serialize access to the runlist @base.
  */
 static inline void ntfs_rl_mm(runlist_element *base, int dst, int src,
 		int size)
@@ -41,7 +41,7 @@ static inline void ntfs_rl_mm(runlist_element *base, int dst, int src,
 /**
  * ntfs_rl_mc - runlist memory copy
  *
- * It is up to the caller to serialize access to the run lists @dstbase and
+ * It is up to the caller to serialize access to the runlists @dstbase and
  * @srcbase.
  */
 static inline void ntfs_rl_mc(runlist_element *dstbase, int dst,
@@ -53,22 +53,22 @@ static inline void ntfs_rl_mc(runlist_element *dstbase, int dst,
 
 /**
  * ntfs_rl_realloc - Reallocate memory for runlists
- * @rl:		original run list
- * @old_size:	number of run list elements in the original run list @rl
- * @new_size:	number of run list elements we need space for
+ * @rl:		original runlist
+ * @old_size:	number of runlist elements in the original runlist @rl
+ * @new_size:	number of runlist elements we need space for
  *
  * As the runlists grow, more memory will be required.  To prevent the
  * kernel having to allocate and reallocate large numbers of small bits of
  * memory, this function returns and entire page of memory.
  *
- * It is up to the caller to serialize access to the run list @rl.
+ * It is up to the caller to serialize access to the runlist @rl.
  *
  * N.B.  If the new allocation doesn't require a different number of pages in
  *       memory, the function will return the original pointer.
  *
  * On success, return a pointer to the newly allocated, or recycled, memory.
  * On error, return -errno. The following error codes are defined:
- *	-ENOMEM	- Not enough memory to allocate run list array.
+ *	-ENOMEM	- Not enough memory to allocate runlist array.
  *	-EINVAL	- Invalid parameters were passed in.
  */
 static inline runlist_element *ntfs_rl_realloc(runlist_element *rl,
@@ -95,17 +95,17 @@ static inline runlist_element *ntfs_rl_realloc(runlist_element *rl,
 }
 
 /**
- * ntfs_are_rl_mergeable - test if two run lists can be joined together
- * @dst:	original run list
- * @src:	new run list to test for mergeability with @dst
+ * ntfs_are_rl_mergeable - test if two runlists can be joined together
+ * @dst:	original runlist
+ * @src:	new runlist to test for mergeability with @dst
  *
- * Test if two run lists can be joined together. For this, their VCNs and LCNs
+ * Test if two runlists can be joined together. For this, their VCNs and LCNs
  * must be adjacent.
  *
- * It is up to the caller to serialize access to the run lists @dst and @src.
+ * It is up to the caller to serialize access to the runlists @dst and @src.
  *
- * Return: TRUE   Success, the run lists can be merged.
- *	   FALSE  Failure, the run lists cannot be merged.
+ * Return: TRUE   Success, the runlists can be merged.
+ *	   FALSE  Failure, the runlists cannot be merged.
  */
 static inline BOOL ntfs_are_rl_mergeable(runlist_element *dst,
 		runlist_element *src)
@@ -124,15 +124,15 @@ static inline BOOL ntfs_are_rl_mergeable(runlist_element *dst,
 }
 
 /**
- * __ntfs_rl_merge - merge two run lists without testing if they can be merged
- * @dst:	original, destination run list
- * @src:	new run list to merge with @dst
+ * __ntfs_rl_merge - merge two runlists without testing if they can be merged
+ * @dst:	original, destination runlist
+ * @src:	new runlist to merge with @dst
  *
- * Merge the two run lists, writing into the destination run list @dst. The
- * caller must make sure the run lists can be merged or this will corrupt the
- * destination run list.
+ * Merge the two runlists, writing into the destination runlist @dst. The
+ * caller must make sure the runlists can be merged or this will corrupt the
+ * destination runlist.
  *
- * It is up to the caller to serialize access to the run lists @dst and @src.
+ * It is up to the caller to serialize access to the runlists @dst and @src.
  */
 static inline void __ntfs_rl_merge(runlist_element *dst, runlist_element *src)
 {
@@ -140,18 +140,18 @@ static inline void __ntfs_rl_merge(runlist_element *dst, runlist_element *src)
 }
 
 /**
- * ntfs_rl_merge - test if two run lists can be joined together and merge them
- * @dst:	original, destination run list
- * @src:	new run list to merge with @dst
+ * ntfs_rl_merge - test if two runlists can be joined together and merge them
+ * @dst:	original, destination runlist
+ * @src:	new runlist to merge with @dst
  *
- * Test if two run lists can be joined together. For this, their VCNs and LCNs
+ * Test if two runlists can be joined together. For this, their VCNs and LCNs
  * must be adjacent. If they can be merged, perform the merge, writing into
- * the destination run list @dst.
+ * the destination runlist @dst.
  *
- * It is up to the caller to serialize access to the run lists @dst and @src.
+ * It is up to the caller to serialize access to the runlists @dst and @src.
  *
- * Return: TRUE   Success, the run lists have been merged.
- *	   FALSE  Failure, the run lists cannot be merged and have not been
+ * Return: TRUE   Success, the runlists have been merged.
+ *	   FALSE  Failure, the runlists cannot be merged and have not been
  *		  modified.
  */
 static inline BOOL ntfs_rl_merge(runlist_element *dst, runlist_element *src)
@@ -164,27 +164,27 @@ static inline BOOL ntfs_rl_merge(runlist_element *dst, runlist_element *src)
 }
 
 /**
- * ntfs_rl_append - append a run list after a given element
- * @dst:	original run list to be worked on
+ * ntfs_rl_append - append a runlist after a given element
+ * @dst:	original runlist to be worked on
  * @dsize:	number of elements in @dst (including end marker)
- * @src:	run list to be inserted into @dst
+ * @src:	runlist to be inserted into @dst
  * @ssize:	number of elements in @src (excluding end marker)
- * @loc:	append the new run list @src after this element in @dst
+ * @loc:	append the new runlist @src after this element in @dst
  *
- * Append the run list @src after element @loc in @dst.  Merge the right end of
- * the new run list, if necessary. Adjust the size of the hole before the
- * appended run list.
+ * Append the runlist @src after element @loc in @dst.  Merge the right end of
+ * the new runlist, if necessary. Adjust the size of the hole before the
+ * appended runlist.
  *
- * It is up to the caller to serialize access to the run lists @dst and @src.
+ * It is up to the caller to serialize access to the runlists @dst and @src.
  *
- * On success, return a pointer to the new, combined, run list. Note, both
- * run lists @dst and @src are deallocated before returning so you cannot use
- * the pointers for anything any more. (Strictly speaking the returned run list
+ * On success, return a pointer to the new, combined, runlist. Note, both
+ * runlists @dst and @src are deallocated before returning so you cannot use
+ * the pointers for anything any more. (Strictly speaking the returned runlist
  * may be the same as @dst but this is irrelevant.)
  *
- * On error, return -errno. Both run lists are left unmodified. The following
+ * On error, return -errno. Both runlists are left unmodified. The following
  * error codes are defined:
- *	-ENOMEM	- Not enough memory to allocate run list array.
+ *	-ENOMEM	- Not enough memory to allocate runlist array.
  *	-EINVAL	- Invalid parameters were passed in.
  */
 static inline runlist_element *ntfs_rl_append(runlist_element *dst,
@@ -205,7 +205,7 @@ static inline runlist_element *ntfs_rl_append(runlist_element *dst,
 		return dst;
 	/*
 	 * We are guaranteed to succeed from here so can start modifying the
-	 * original run lists.
+	 * original runlists.
 	 */
 
 	/* First, merge the right hand end, if necessary. */
@@ -229,27 +229,27 @@ static inline runlist_element *ntfs_rl_append(runlist_element *dst,
 }
 
 /**
- * ntfs_rl_insert - insert a run list into another
- * @dst:	original run list to be worked on
+ * ntfs_rl_insert - insert a runlist into another
+ * @dst:	original runlist to be worked on
  * @dsize:	number of elements in @dst (including end marker)
- * @src:	new run list to be inserted
+ * @src:	new runlist to be inserted
  * @ssize:	number of elements in @src (excluding end marker)
- * @loc:	insert the new run list @src before this element in @dst
+ * @loc:	insert the new runlist @src before this element in @dst
  *
- * Insert the run list @src before element @loc in the run list @dst. Merge the
- * left end of the new run list, if necessary. Adjust the size of the hole
- * after the inserted run list.
+ * Insert the runlist @src before element @loc in the runlist @dst. Merge the
+ * left end of the new runlist, if necessary. Adjust the size of the hole
+ * after the inserted runlist.
  *
- * It is up to the caller to serialize access to the run lists @dst and @src.
+ * It is up to the caller to serialize access to the runlists @dst and @src.
  *
- * On success, return a pointer to the new, combined, run list. Note, both
- * run lists @dst and @src are deallocated before returning so you cannot use
- * the pointers for anything any more. (Strictly speaking the returned run list
+ * On success, return a pointer to the new, combined, runlist. Note, both
+ * runlists @dst and @src are deallocated before returning so you cannot use
+ * the pointers for anything any more. (Strictly speaking the returned runlist
  * may be the same as @dst but this is irrelevant.)
  *
- * On error, return -errno. Both run lists are left unmodified. The following
+ * On error, return -errno. Both runlists are left unmodified. The following
  * error codes are defined:
- *	-ENOMEM	- Not enough memory to allocate run list array.
+ *	-ENOMEM	- Not enough memory to allocate runlist array.
  *	-EINVAL	- Invalid parameters were passed in.
  */
 static inline runlist_element *ntfs_rl_insert(runlist_element *dst,
@@ -290,7 +290,7 @@ static inline runlist_element *ntfs_rl_insert(runlist_element *dst,
 		return dst;
 	/*
 	 * We are guaranteed to succeed from here so can start modifying the
-	 * original run list.
+	 * original runlist.
 	 */
 
 	if (left)
@@ -336,26 +336,26 @@ static inline runlist_element *ntfs_rl_insert(runlist_element *dst,
 }
 
 /**
- * ntfs_rl_replace - overwrite a runlist element with another run list
- * @dst:	original run list to be worked on
+ * ntfs_rl_replace - overwrite a runlist element with another runlist
+ * @dst:	original runlist to be worked on
  * @dsize:	number of elements in @dst (including end marker)
- * @src:	new run list to be inserted
+ * @src:	new runlist to be inserted
  * @ssize:	number of elements in @src (excluding end marker)
- * @loc:	index in run list @dst to overwrite with @src
+ * @loc:	index in runlist @dst to overwrite with @src
  *
- * Replace the run list element @dst at @loc with @src. Merge the left and
- * right ends of the inserted run list, if necessary.
+ * Replace the runlist element @dst at @loc with @src. Merge the left and
+ * right ends of the inserted runlist, if necessary.
  *
- * It is up to the caller to serialize access to the run lists @dst and @src.
+ * It is up to the caller to serialize access to the runlists @dst and @src.
  *
- * On success, return a pointer to the new, combined, run list. Note, both
- * run lists @dst and @src are deallocated before returning so you cannot use
- * the pointers for anything any more. (Strictly speaking the returned run list
+ * On success, return a pointer to the new, combined, runlist. Note, both
+ * runlists @dst and @src are deallocated before returning so you cannot use
+ * the pointers for anything any more. (Strictly speaking the returned runlist
  * may be the same as @dst but this is irrelevant.)
  *
- * On error, return -errno. Both run lists are left unmodified. The following
+ * On error, return -errno. Both runlists are left unmodified. The following
  * error codes are defined:
- *	-ENOMEM	- Not enough memory to allocate run list array.
+ *	-ENOMEM	- Not enough memory to allocate runlist array.
  *	-EINVAL	- Invalid parameters were passed in.
  */
 static inline runlist_element *ntfs_rl_replace(runlist_element *dst,
@@ -380,7 +380,7 @@ static inline runlist_element *ntfs_rl_replace(runlist_element *dst,
 		return dst;
 	/*
 	 * We are guaranteed to succeed from here so can start modifying the
-	 * original run lists.
+	 * original runlists.
 	 */
 	if (right)
 		__ntfs_rl_merge(src + ssize - 1, dst + loc + 1);
@@ -401,27 +401,27 @@ static inline runlist_element *ntfs_rl_replace(runlist_element *dst,
 }
 
 /**
- * ntfs_rl_split - insert a run list into the centre of a hole
- * @dst:	original run list to be worked on
+ * ntfs_rl_split - insert a runlist into the centre of a hole
+ * @dst:	original runlist to be worked on
  * @dsize:	number of elements in @dst (including end marker)
- * @src:	new run list to be inserted
+ * @src:	new runlist to be inserted
  * @ssize:	number of elements in @src (excluding end marker)
- * @loc:	index in run list @dst at which to split and insert @src
+ * @loc:	index in runlist @dst at which to split and insert @src
  *
- * Split the run list @dst at @loc into two and insert @new in between the two
- * fragments. No merging of run lists is necessary. Adjust the size of the
+ * Split the runlist @dst at @loc into two and insert @new in between the two
+ * fragments. No merging of runlists is necessary. Adjust the size of the
  * holes either side.
  *
- * It is up to the caller to serialize access to the run lists @dst and @src.
+ * It is up to the caller to serialize access to the runlists @dst and @src.
  *
- * On success, return a pointer to the new, combined, run list. Note, both
- * run lists @dst and @src are deallocated before returning so you cannot use
- * the pointers for anything any more. (Strictly speaking the returned run list
+ * On success, return a pointer to the new, combined, runlist. Note, both
+ * runlists @dst and @src are deallocated before returning so you cannot use
+ * the pointers for anything any more. (Strictly speaking the returned runlist
  * may be the same as @dst but this is irrelevant.)
  *
- * On error, return -errno. Both run lists are left unmodified. The following
+ * On error, return -errno. Both runlists are left unmodified. The following
  * error codes are defined:
- *	-ENOMEM	- Not enough memory to allocate run list array.
+ *	-ENOMEM	- Not enough memory to allocate runlist array.
  *	-EINVAL	- Invalid parameters were passed in.
  */
 static inline runlist_element *ntfs_rl_split(runlist_element *dst, int dsize,
@@ -436,7 +436,7 @@ static inline runlist_element *ntfs_rl_split(runlist_element *dst, int dsize,
 		return dst;
 	/*
 	 * We are guaranteed to succeed from here so can start modifying the
-	 * original run lists.
+	 * original runlists.
 	 */
 
 	/* Move the tail of @dst out of the way, then copy in @src. */
@@ -453,16 +453,16 @@ static inline runlist_element *ntfs_rl_split(runlist_element *dst, int dsize,
 
 /**
  * ntfs_merge_runlists - merge two runlists into one
- * @drl:	original run list to be worked on
- * @srl:	new run list to be merged into @drl
+ * @drl:	original runlist to be worked on
+ * @srl:	new runlist to be merged into @drl
  *
- * First we sanity check the two run lists @srl and @drl to make sure that they
- * are sensible and can be merged. The run list @srl must be either after the
- * run list @drl or completely within a hole (or unmapped region) in @drl.
+ * First we sanity check the two runlists @srl and @drl to make sure that they
+ * are sensible and can be merged. The runlist @srl must be either after the
+ * runlist @drl or completely within a hole (or unmapped region) in @drl.
  *
- * It is up to the caller to serialize access to the run lists @drl and @srl.
+ * It is up to the caller to serialize access to the runlists @drl and @srl.
  *
- * Merging of run lists is necessary in two cases:
+ * Merging of runlists is necessary in two cases:
  *   1. When attribute lists are used and a further extent is being mapped.
  *   2. When new clusters are allocated to fill a hole or extend a file.
  *
@@ -471,19 +471,19 @@ static inline runlist_element *ntfs_rl_split(runlist_element *dst, int dsize,
  *	- split the hole in two and be inserted between the two fragments,
  *	- be appended at the end of a hole, or it can
  *	- replace the whole hole.
- * It can also be appended to the end of the run list, which is just a variant
+ * It can also be appended to the end of the runlist, which is just a variant
  * of the insert case.
  *
- * On success, return a pointer to the new, combined, run list. Note, both
- * run lists @drl and @srl are deallocated before returning so you cannot use
- * the pointers for anything any more. (Strictly speaking the returned run list
+ * On success, return a pointer to the new, combined, runlist. Note, both
+ * runlists @drl and @srl are deallocated before returning so you cannot use
+ * the pointers for anything any more. (Strictly speaking the returned runlist
  * may be the same as @dst but this is irrelevant.)
  *
- * On error, return -errno. Both run lists are left unmodified. The following
+ * On error, return -errno. Both runlists are left unmodified. The following
  * error codes are defined:
- *	-ENOMEM	- Not enough memory to allocate run list array.
+ *	-ENOMEM	- Not enough memory to allocate runlist array.
  *	-EINVAL	- Invalid parameters were passed in.
- *	-ERANGE	- The run lists overlap and cannot be merged.
+ *	-ERANGE	- The runlists overlap and cannot be merged.
  */
 runlist_element *ntfs_merge_runlists(runlist_element *drl,
 		runlist_element *srl)
@@ -513,15 +513,15 @@ runlist_element *ntfs_merge_runlists(runlist_element *drl,
 	/* Check for the case where the first mapping is being done now. */
 	if (unlikely(!drl)) {
 		drl = srl;
-		/* Complete the source run list if necessary. */
+		/* Complete the source runlist if necessary. */
 		if (unlikely(drl[0].vcn)) {
-			/* Scan to the end of the source run list. */
+			/* Scan to the end of the source runlist. */
 			for (dend = 0; likely(drl[dend].length); dend++)
 				;
 			drl = ntfs_rl_realloc(drl, dend, dend + 1);
 			if (IS_ERR(drl))
 				return drl;
-			/* Insert start element at the front of the run list. */
+			/* Insert start element at the front of the runlist. */
 			ntfs_rl_mm(drl, 1, 0, dend);
 			drl[0].vcn = 0;
 			drl[0].lcn = LCN_RL_NOT_MAPPED;
@@ -536,7 +536,7 @@ runlist_element *ntfs_merge_runlists(runlist_element *drl,
 	while (srl[si].length && srl[si].lcn < (LCN)LCN_HOLE)
 		si++;
 
-	/* Can't have an entirely unmapped source run list. */
+	/* Can't have an entirely unmapped source runlist. */
 	BUG_ON(!srl[si].length);
 
 	/* Record the starting points. */
@@ -560,7 +560,7 @@ runlist_element *ntfs_merge_runlists(runlist_element *drl,
 		return ERR_PTR(-ERANGE);
 	}
 
-	/* Scan to the end of both run lists in order to know their sizes. */
+	/* Scan to the end of both runlists in order to know their sizes. */
 	for (send = si; srl[send].length; send++)
 		;
 	for (dend = di; drl[dend].length; dend++)
@@ -631,7 +631,7 @@ runlist_element *ntfs_merge_runlists(runlist_element *drl,
 				goto finished;
 			}
 			/*
-			 * We need to create an unmapped run list element in
+			 * We need to create an unmapped runlist element in
 			 * @drl or extend an existing one before adding the
 			 * ENOENT terminator.
 			 */
@@ -640,7 +640,7 @@ runlist_element *ntfs_merge_runlists(runlist_element *drl,
 				slots = 1;
 			}
 			if (drl[ds].lcn != (LCN)LCN_RL_NOT_MAPPED) {
-				/* Add an unmapped run list element. */
+				/* Add an unmapped runlist element. */
 				if (!slots) {
 					/* FIXME/TODO: We need to have the
 					 * extra memory already! (AIA) */
@@ -677,7 +677,7 @@ runlist_element *ntfs_merge_runlists(runlist_element *drl,
 
 finished:
 	/* The merge was completed successfully. */
-	ntfs_debug("Merged run list:");
+	ntfs_debug("Merged runlist:");
 	ntfs_debug_dump_runlist(drl);
 	return drl;
 
@@ -688,32 +688,32 @@ critical_error:
 }
 
 /**
- * decompress_mapping_pairs - convert mapping pairs array to run list
+ * decompress_mapping_pairs - convert mapping pairs array to runlist
  * @vol:	ntfs volume on which the attribute resides
  * @attr:	attribute record whose mapping pairs array to decompress
- * @old_rl:	optional run list in which to insert @attr's run list
+ * @old_rl:	optional runlist in which to insert @attr's runlist
  *
- * It is up to the caller to serialize access to the run list @old_rl.
+ * It is up to the caller to serialize access to the runlist @old_rl.
  *
- * Decompress the attribute @attr's mapping pairs array into a run list. On
- * success, return the decompressed run list.
+ * Decompress the attribute @attr's mapping pairs array into a runlist. On
+ * success, return the decompressed runlist.
  *
- * If @old_rl is not NULL, decompressed run list is inserted into the
- * appropriate place in @old_rl and the resultant, combined run list is
+ * If @old_rl is not NULL, decompressed runlist is inserted into the
+ * appropriate place in @old_rl and the resultant, combined runlist is
  * returned. The original @old_rl is deallocated.
  *
  * On error, return -errno. @old_rl is left unmodified in that case.
  *
  * The following error codes are defined:
- *	-ENOMEM	- Not enough memory to allocate run list array.
- *	-EIO	- Corrupt run list.
+ *	-ENOMEM	- Not enough memory to allocate runlist array.
+ *	-EIO	- Corrupt runlist.
  *	-EINVAL	- Invalid parameters were passed in.
- *	-ERANGE	- The two run lists overlap.
+ *	-ERANGE	- The two runlists overlap.
  *
  * FIXME: For now we take the conceptionally simplest approach of creating the
- * new run list disregarding the already existing one and then splicing the
+ * new runlist disregarding the already existing one and then splicing the
  * two into one, if that is possible (we check for overlap and discard the new
- * run list if overlap present before returning ERR_PTR(-ERANGE)).
+ * runlist if overlap present before returning ERR_PTR(-ERANGE)).
  */
 runlist_element *decompress_mapping_pairs(const ntfs_volume *vol,
 		const ATTR_RECORD *attr, runlist_element *old_rl)
@@ -721,11 +721,11 @@ runlist_element *decompress_mapping_pairs(const ntfs_volume *vol,
 	VCN vcn;		/* Current vcn. */
 	LCN lcn;		/* Current lcn. */
 	s64 deltaxcn;		/* Change in [vl]cn. */
-	runlist_element *rl;	/* The output run list. */
+	runlist_element *rl;	/* The output runlist. */
 	u8 *buf;		/* Current position in mapping pairs array. */
 	u8 *attr_end;		/* End of attribute. */
-	int rlsize;		/* Size of run list buffer. */
-	u16 rlpos;		/* Current run list position in units of
+	int rlsize;		/* Size of runlist buffer. */
+	u16 rlpos;		/* Current runlist position in units of
 				   runlist_elements. */
 	u8 b;			/* Current byte offset in buf. */
 
@@ -748,9 +748,9 @@ runlist_element *decompress_mapping_pairs(const ntfs_volume *vol,
 		ntfs_error(vol->sb, "Corrupt attribute.");
 		return ERR_PTR(-EIO);
 	}
-	/* Current position in run list array. */
+	/* Current position in runlist array. */
 	rlpos = 0;
-	/* Allocate first page and set current run list size to one page. */
+	/* Allocate first page and set current runlist size to one page. */
 	rl = ntfs_malloc_nofs(rlsize = PAGE_SIZE);
 	if (unlikely(!rl))
 		return ERR_PTR(-ENOMEM);
@@ -810,7 +810,7 @@ runlist_element *decompress_mapping_pairs(const ntfs_volume *vol,
 			goto err_out;
 		}
 		/*
-		 * Enter the current run length into the current run list
+		 * Enter the current run length into the current runlist
 		 * element.
 		 */
 		rl[rlpos].length = deltaxcn;
@@ -866,7 +866,7 @@ runlist_element *decompress_mapping_pairs(const ntfs_volume *vol,
 		goto io_error;
 	/*
 	 * If there is a highest_vcn specified, it must be equal to the final
-	 * vcn in the run list - 1, or something has gone badly wrong.
+	 * vcn in the runlist - 1, or something has gone badly wrong.
 	 */
 	deltaxcn = sle64_to_cpu(attr->data.non_resident.highest_vcn);
 	if (unlikely(deltaxcn && vcn - 1 != deltaxcn)) {
@@ -875,7 +875,7 @@ mpa_err:
 				"non-resident attribute.");
 		goto err_out;
 	}
-	/* Setup not mapped run list element if this is the base extent. */
+	/* Setup not mapped runlist element if this is the base extent. */
 	if (!attr->data.non_resident.lowest_vcn) {
 		VCN max_cluster;
 
@@ -885,7 +885,7 @@ mpa_err:
 				vol->cluster_size_bits;
 		/*
 		 * If there is a difference between the highest_vcn and the
-		 * highest cluster, the run list is either corrupt or, more
+		 * highest cluster, the runlist is either corrupt or, more
 		 * likely, there are more extents following this one.
 		 */
 		if (deltaxcn < --max_cluster) {
@@ -911,18 +911,18 @@ mpa_err:
 	/* Setup terminating runlist element. */
 	rl[rlpos].vcn = vcn;
 	rl[rlpos].length = (s64)0;
-	/* If no existing run list was specified, we are done. */
+	/* If no existing runlist was specified, we are done. */
 	if (!old_rl) {
 		ntfs_debug("Mapping pairs array successfully decompressed:");
 		ntfs_debug_dump_runlist(rl);
 		return rl;
 	}
-	/* Now combine the new and old run lists checking for overlaps. */
+	/* Now combine the new and old runlists checking for overlaps. */
 	old_rl = ntfs_merge_runlists(old_rl, rl);
 	if (likely(!IS_ERR(old_rl)))
 		return old_rl;
 	ntfs_free(rl);
-	ntfs_error(vol->sb, "Failed to merge run lists.");
+	ntfs_error(vol->sb, "Failed to merge runlists.");
 	return old_rl;
 io_error:
 	ntfs_error(vol->sb, "Corrupt attribute.");
@@ -932,11 +932,11 @@ err_out:
 }
 
 /**
- * ntfs_map_runlist - map (a part of) a run list of an ntfs inode
- * @ni:		ntfs inode for which to map (part of) a run list
- * @vcn:	map run list part containing this vcn
+ * ntfs_map_runlist - map (a part of) a runlist of an ntfs inode
+ * @ni:		ntfs inode for which to map (part of) a runlist
+ * @vcn:	map runlist part containing this vcn
  *
- * Map the part of a run list containing the @vcn of the ntfs inode @ni.
+ * Map the part of a runlist containing the @vcn of the ntfs inode @ni.
  *
  * Return 0 on success and -errno on error.
  *
@@ -950,7 +950,7 @@ int ntfs_map_runlist(ntfs_inode *ni, VCN vcn)
 	MFT_RECORD *mrec;
 	int err = 0;
 
-	ntfs_debug("Mapping run list part containing vcn 0x%llx.",
+	ntfs_debug("Mapping runlist part containing vcn 0x%llx.",
 			(unsigned long long)vcn);
 
 	if (!NInoAttr(ni))
@@ -994,23 +994,23 @@ err_out:
 }
 
 /**
- * ntfs_vcn_to_lcn - convert a vcn into a lcn given a run list
- * @rl:		run list to use for conversion
+ * ntfs_vcn_to_lcn - convert a vcn into a lcn given a runlist
+ * @rl:		runlist to use for conversion
  * @vcn:	vcn to convert
  *
  * Convert the virtual cluster number @vcn of an attribute into a logical
- * cluster number (lcn) of a device using the run list @rl to map vcns to their
+ * cluster number (lcn) of a device using the runlist @rl to map vcns to their
  * corresponding lcns.
  *
- * It is up to the caller to serialize access to the run list @rl.
+ * It is up to the caller to serialize access to the runlist @rl.
  *
  * Since lcns must be >= 0, we use negative return values with special meaning:
  *
  * Return value			Meaning / Description
  * ==================================================
  *  -1 = LCN_HOLE		Hole / not allocated on disk.
- *  -2 = LCN_RL_NOT_MAPPED	This is part of the run list which has not been
- *				inserted into the run list yet.
+ *  -2 = LCN_RL_NOT_MAPPED	This is part of the runlist which has not been
+ *				inserted into the runlist yet.
  *  -3 = LCN_ENOENT		There is no such vcn in the attribute.
  *
  * Locking: - The caller must have locked the runlist (for reading or writing).
@@ -1022,7 +1022,7 @@ LCN ntfs_vcn_to_lcn(const runlist_element *rl, const VCN vcn)
 
 	BUG_ON(vcn < 0);
 	/*
-	 * If rl is NULL, assume that we have found an unmapped run list. The
+	 * If rl is NULL, assume that we have found an unmapped runlist. The
 	 * caller can then attempt to map it and fail appropriately if
 	 * necessary.
 	 */
@@ -1216,12 +1216,12 @@ BOOL find_attr(const ATTR_TYPES type, const ntfschar *name, const u32 name_len,
 /**
  * load_attribute_list - load an attribute list into memory
  * @vol:		ntfs volume from which to read
- * @runlist:		run list of the attribute list
+ * @runlist:		runlist of the attribute list
  * @al_start:		destination buffer
  * @size:		size of the destination buffer in bytes
  * @initialized_size:	initialized size of the attribute list
  *
- * Walk the run list @runlist and load all clusters from it copying them into
+ * Walk the runlist @runlist and load all clusters from it copying them into
  * the linear buffer @al. The maximum number of bytes copied to @al is @size
  * bytes. Note, @size does not need to be a multiple of the cluster size. If
  * @initialized_size is less than @size, the region in @al between
@@ -1256,7 +1256,7 @@ int load_attribute_list(ntfs_volume *vol, runlist *runlist, u8 *al_start,
 	block_size_bits = sb->s_blocksize_bits;
 	down_read(&runlist->lock);
 	rl = runlist->rl;
-	/* Read all clusters specified by the run list one run at a time. */
+	/* Read all clusters specified by the runlist one run at a time. */
 	while (rl->length) {
 		lcn = ntfs_vcn_to_lcn(rl, rl->vcn);
 		ntfs_debug("Reading vcn = 0x%llx, lcn = 0x%llx.",
