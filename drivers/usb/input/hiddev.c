@@ -232,7 +232,7 @@ static int hiddev_fasync(int fd, struct file *file, int on)
 static struct usb_class_driver hiddev_class;
 static void hiddev_cleanup(struct hiddev *hiddev)
 {
-	hiddev_table[hiddev->hid->minor] = NULL;
+	hiddev_table[hiddev->hid->minor - HIDDEV_MINOR_BASE] = NULL;
 	usb_deregister_dev(hiddev->hid->intf, &hiddev_class);
 	kfree(hiddev);
 }
