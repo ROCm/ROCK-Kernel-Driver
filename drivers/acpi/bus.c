@@ -22,6 +22,7 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/list.h>
@@ -44,8 +45,11 @@ extern void __init acpi_pic_sci_set_trigger(unsigned int irq, u16 trigger);
 #endif
 
 FADT_DESCRIPTOR			acpi_fadt;
+EXPORT_SYMBOL(acpi_fadt);
+
 struct acpi_device		*acpi_root;
 struct proc_dir_entry		*acpi_root_dir;
+EXPORT_SYMBOL(acpi_root_dir);
 
 #define STRUCT_TO_INT(s)	(*((int*)&s))
 
@@ -80,6 +84,7 @@ acpi_bus_get_device (
 
 	return_VALUE(0);
 }
+EXPORT_SYMBOL(acpi_bus_get_device);
 
 int
 acpi_bus_get_status (
@@ -125,6 +130,7 @@ acpi_bus_get_status (
 
 	return_VALUE(0);
 }
+EXPORT_SYMBOL(acpi_bus_get_status);
 
 
 /* --------------------------------------------------------------------------
@@ -182,6 +188,7 @@ acpi_bus_get_power (
 
 	return_VALUE(0);
 }
+EXPORT_SYMBOL(acpi_bus_get_power);
 
 
 int
@@ -270,6 +277,7 @@ end:
 
 	return_VALUE(result);
 }
+EXPORT_SYMBOL(acpi_bus_set_power);
 
 
 
@@ -319,6 +327,7 @@ acpi_bus_generate_event (
 
 	return_VALUE(0);
 }
+EXPORT_SYMBOL(acpi_bus_generate_event);
 
 int
 acpi_bus_receive_event (
@@ -364,6 +373,7 @@ acpi_bus_receive_event (
 
 	return_VALUE(0);
 }
+EXPORT_SYMBOL(acpi_bus_receive_event);
 
 
 /* --------------------------------------------------------------------------

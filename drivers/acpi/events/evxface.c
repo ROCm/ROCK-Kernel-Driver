@@ -41,6 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include <linux/module.h>
 
 #include <acpi/acpi.h>
 #include <acpi/acnamesp.h>
@@ -166,6 +167,7 @@ cleanup:
 	(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_install_fixed_event_handler);
 
 
 /*******************************************************************************
@@ -223,6 +225,7 @@ acpi_remove_fixed_event_handler (
 	(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_remove_fixed_event_handler);
 
 
 /*******************************************************************************
@@ -392,6 +395,7 @@ unlock_and_exit:
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_install_notify_handler);
 
 
 /*******************************************************************************
@@ -550,6 +554,7 @@ unlock_and_exit:
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_remove_notify_handler);
 
 
 /*******************************************************************************
@@ -647,6 +652,7 @@ unlock_and_exit:
 	(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_install_gpe_handler);
 
 
 /*******************************************************************************
@@ -749,6 +755,7 @@ unlock_and_exit:
 	(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_remove_gpe_handler);
 
 
 /*******************************************************************************
@@ -791,6 +798,7 @@ acpi_acquire_global_lock (
 
 	return (status);
 }
+EXPORT_SYMBOL(acpi_acquire_global_lock);
 
 
 /*******************************************************************************
@@ -819,5 +827,5 @@ acpi_release_global_lock (
 	status = acpi_ev_release_global_lock ();
 	return (status);
 }
-
+EXPORT_SYMBOL(acpi_release_global_lock);
 

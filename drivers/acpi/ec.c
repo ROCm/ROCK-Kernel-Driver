@@ -264,6 +264,7 @@ ec_read(u8 addr, u8 *val)
 	else
 		return err;
 }
+EXPORT_SYMBOL(ec_read);
 
 int
 ec_write(u8 addr, u8 val)
@@ -280,6 +281,7 @@ ec_write(u8 addr, u8 val)
 
 	return err;
 }
+EXPORT_SYMBOL(ec_write);
 
 
 static int
