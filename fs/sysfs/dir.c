@@ -193,7 +193,7 @@ int sysfs_rename_dir(struct kobject * kobj, const char *new_name)
 	return error;
 }
 
-EXPORT_SYMBOL(sysfs_create_dir);
-EXPORT_SYMBOL(sysfs_remove_dir);
-EXPORT_SYMBOL(sysfs_rename_dir);
+EXPORT_SYMBOL_GPL(sysfs_create_dir);
+EXPORT_SYMBOL_GPL(sysfs_remove_dir);
+EXPORT_SYMBOL_GPL(sysfs_rename_dir);
 
