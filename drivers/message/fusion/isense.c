@@ -5,7 +5,7 @@
  *      Error Report logging output.  This module implements SCSI-3
  *      Opcode lookup and a sorted table of SCSI-3 ASC/ASCQ strings.
  *
- *  Copyright (c) 1991-2003 Steven J. Ralston
+ *  Copyright (c) 1991-2004 Steven J. Ralston
  *  Written By: Steven J. Ralston
  *  (yes I wrote some of the orig. code back in 1991!)
  *  (mailto:sjralston1@netscape.net)
@@ -66,7 +66,7 @@
 #endif
 
 #define MODULEAUTHOR "Steven J. Ralston"
-#define COPYRIGHT "Copyright (c) 2001-2003 " MODULEAUTHOR
+#define COPYRIGHT "Copyright (c) 2001-2004 " MODULEAUTHOR
 #include "mptbase.h"
 
 #include "isense.h"
