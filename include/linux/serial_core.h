@@ -94,6 +94,9 @@
 /*IBM icom*/
 #define PORT_ICOM      60
 
+/* Samsung S3C2440 SoC */
+#define PORT_S3C2440	61
+
 #ifdef __KERNEL__
 
 #include <linux/config.h>
