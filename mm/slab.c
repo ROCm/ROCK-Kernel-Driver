@@ -1125,8 +1125,7 @@ kmem_cache_create (const char *name, size_t size, size_t align,
 		in_interrupt() ||
 		(size < BYTES_PER_WORD) ||
 		(size > (1<<MAX_OBJ_ORDER)*PAGE_SIZE) ||
-		(dtor && !ctor) ||
-		(align < 0)) {
+		(dtor && !ctor)) {
 			printk(KERN_ERR "%s: Early error in slab %s\n",
 					__FUNCTION__, name);
 			BUG();
@@ -2834,8 +2833,6 @@ static int s_show(struct seq_file *m, void *p)
 	unsigned long	num_slabs;
 	const char *name; 
 	char *error = NULL;
-	mm_segment_t old_fs;
-	char tmp; 
 
 	check_irq_on();
 	spin_lock_irq(&cachep->spinlock);
@@ -2869,17 +2866,6 @@ static int s_show(struct seq_file *m, void *p)
 		error = "free_objects accounting error";
 
 	name = cachep->name; 
-
-	/*
-	 * Check to see if `name' resides inside a module which has been
-	 * unloaded (someone forgot to destroy their cache)
-	 */
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	if (__get_user(tmp, name)) 
-		name = "broken"; 
-	set_fs(old_fs);
-
 	if (error)
 		printk(KERN_ERR "slab: cache %s error: %s\n", name, error);
 

@@ -618,15 +618,15 @@ config SERIAL_LH7A40X_CONSOLE
 	  "console=ttyAM1".
 
 config SERIAL_CPM
-	tristate "CPM2 SCC/SMC serial port support"
+	tristate "CPM SCC/SMC serial port support"
 	depends on CPM2 || 8xx
 	select SERIAL_CORE
 	help
 	  This driver supports the SCC and SMC serial ports on Motorola 
-	  embedded PowerPC that contain a CPM2 (8xxx) or a CPM1 (8xx)
+	  embedded PowerPC that contain a CPM1 (8xx) or CPM2 (8xxx)
 
 config SERIAL_CPM_CONSOLE
-	bool "Support for console on CPM2 SCC/SMC serial port"
+	bool "Support for console on CPM SCC/SMC serial port"
 	depends on SERIAL_CPM=y
 	select SERIAL_CORE_CONSOLE
 	help

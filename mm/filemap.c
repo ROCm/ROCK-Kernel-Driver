@@ -1155,12 +1155,11 @@ retry_find:
 		did_readaround = 1;
 		ra_pages = max_sane_readahead(file->f_ra.ra_pages);
 		if (ra_pages) {
-			long start;
+			pgoff_t start = 0;
 
-			start = pgoff - ra_pages / 2;
-			if (pgoff < 0)
-				pgoff = 0;
-			do_page_cache_readahead(mapping, file, pgoff, ra_pages);
+			if (pgoff > ra_pages / 2)
+				start = pgoff - ra_pages / 2;
+			do_page_cache_readahead(mapping, file, start, ra_pages);
 		}
 		page = find_get_page(mapping, pgoff);
 		if (!page)

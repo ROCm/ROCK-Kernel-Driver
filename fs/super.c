@@ -793,6 +793,7 @@ do_kern_mount(const char *fstype, int flags, const char *name, void *data)
 	mnt->mnt_root = dget(sb->s_root);
 	mnt->mnt_mountpoint = sb->s_root;
 	mnt->mnt_parent = mnt;
+	mnt->mnt_namespace = current->namespace;
 	up_write(&sb->s_umount);
 	put_filesystem(type);
 	return mnt;
@@ -808,6 +809,8 @@ out:
 	put_filesystem(type);
 	return (struct vfsmount *)sb;
 }
+
+EXPORT_SYMBOL_GPL(do_kern_mount);
 
 struct vfsmount *kern_mount(struct file_system_type *type)
 {

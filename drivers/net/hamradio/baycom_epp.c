@@ -58,7 +58,7 @@
 /* prototypes for ax25_encapsulate and ax25_rebuild_header */
 #include <net/ax25.h> 
 #endif /* CONFIG_AX25 || CONFIG_AX25_MODULE */
-#include <linux/crc16.h>
+#include <linux/crc-ccitt.h>
 
 /* --------------------------------------------------------------------- */
 
@@ -281,14 +281,14 @@ static inline void append_crc_ccitt(unsigned char *buffer, int len)
 
 static inline int check_crc_ccitt(const unsigned char *buf, int cnt)
 {
-	return (crc16(0xffff, buf, cnt) & 0xffff) == 0xf0b8;
+	return (crc_ccitt(0xffff, buf, cnt) & 0xffff) == 0xf0b8;
 }
 
 /*---------------------------------------------------------------------------*/
 
 static inline int calc_crc_ccitt(const unsigned char *buf, int cnt)
 {
-	return (crc16(0xffff, buf, cnt) ^ 0xffff) & 0xffff;
+	return (crc_ccitt(0xffff, buf, cnt) ^ 0xffff) & 0xffff;
 }
 
 /* ---------------------------------------------------------------------- */

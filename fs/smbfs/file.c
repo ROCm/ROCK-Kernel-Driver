@@ -271,7 +271,7 @@ smb_file_sendfile(struct file *file, loff_t *ppos,
 
 	status = smb_revalidate_inode(dentry);
 	if (status) {
-		PARANOIA("%s/%s validation failed, error=%zd\n",
+		PARANOIA("%s/%s validation failed, error=%Zd\n",
 			 DENTRY_PATH(dentry), status);
 		goto out;
 	}

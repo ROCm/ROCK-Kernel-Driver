@@ -1424,7 +1424,7 @@ int cfi_intelext_erase_varsize(struct mtd_info *mtd, struct erase_info *instr)
 	ofs = instr->addr;
 	len = instr->len;
 
-	ret = cfi_intelext_varsize_frob(mtd, do_erase_oneblock, ofs, len, 0);
+	ret = cfi_intelext_varsize_frob(mtd, do_erase_oneblock, ofs, len, NULL);
 	if (ret)
 		return ret;
 
