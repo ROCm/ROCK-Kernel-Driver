@@ -41,11 +41,13 @@
 #include <linux/profile.h>
 #include <linux/blkdev.h>
 #include <linux/hugetlb.h>
+#include <linux/jiffies.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 #include <asm/tlb.h>
+#include <asm/div64.h>
 
 #define LOAD_INT(x) ((x) >> FSHIFT)
 #define LOAD_FRAC(x) LOAD_INT(((x) & (FIXED_1-1)) * 100)
@@ -98,34 +100,36 @@ static int loadavg_read_proc(char *page, char **start, off_t off,
 static int uptime_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
-	unsigned long uptime;
-	unsigned long idle;
+	u64 uptime;
+	unsigned long uptime_remainder;
 	int len;
 
-	uptime = jiffies;
-	idle = init_task.utime + init_task.stime;
+	uptime = get_jiffies_64();
+	uptime_remainder = (unsigned long) do_div(uptime, HZ);
 
-	/* The formula for the fraction parts really is ((t * 100) / HZ) % 100, but
-	   that would overflow about every five days at HZ == 100.
-	   Therefore the identity a = (a / b) * b + a % b is used so that it is
-	   calculated as (((t / HZ) * 100) + ((t % HZ) * 100) / HZ) % 100.
-	   The part in front of the '+' always evaluates as 0 (mod 100). All divisions
-	   in the above formulas are truncating. For HZ being a power of 10, the
-	   calculations simplify to the version in the #else part (if the printf
-	   format is adapted to the same number of digits as zeroes in HZ.
-	 */
 #if HZ!=100
-	len = sprintf(page,"%lu.%02lu %lu.%02lu\n",
-		uptime / HZ,
-		(((uptime % HZ) * 100) / HZ) % 100,
-		idle / HZ,
-		(((idle % HZ) * 100) / HZ) % 100);
+	{
+		u64 idle = init_task.utime + init_task.stime;
+		unsigned long idle_remainder;
+
+		idle_remainder = (unsigned long) do_div(idle, HZ);
+		len = sprintf(page,"%lu.%02lu %lu.%02lu\n",
+			(unsigned long) uptime,
+			(uptime_remainder * 100) / HZ,
+			(unsigned long) idle,
+			(idle_remainder * 100) / HZ);
+	}
 #else
-	len = sprintf(page,"%lu.%02lu %lu.%02lu\n",
-		uptime / HZ,
-		uptime % HZ,
-		idle / HZ,
-		idle % HZ);
+	{
+		unsigned long idle = init_task.times.tms_utime
+		                     + init_task.times.tms_stime;
+
+		len = sprintf(page,"%lu.%02lu %lu.%02lu\n",
+			(unsigned long) uptime,
+			uptime_remainder,
+			idle / HZ,
+			idle % HZ);
+	}
 #endif
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
@@ -317,7 +321,7 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 {
 	int i, len;
 	extern unsigned long total_forks;
-	unsigned long jif = jiffies;
+	u64 jif = get_jiffies_64();
 	unsigned int sum = 0, user = 0, nice = 0, system = 0, idle = 0, iowait = 0;
 
 	for (i = 0 ; i < NR_CPUS; i++) {
@@ -358,6 +362,7 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 		len += sprintf(page + len, " %u", kstat_irqs(i));
 #endif
 
+	do_div(jif, HZ);
 	len += sprintf(page + len,
 		"\nctxt %lu\n"
 		"btime %lu\n"
@@ -365,7 +370,7 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 		"procs_running %lu\n"
 		"procs_blocked %lu\n",
 		nr_context_switches(),
-		xtime.tv_sec - jif / HZ,
+		xtime.tv_sec - (unsigned long) jif,
 		total_forks,
 		nr_running(),
 		nr_iowait());
