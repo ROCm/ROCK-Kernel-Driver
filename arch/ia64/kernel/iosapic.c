@@ -644,20 +644,11 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base)
 	}
 }
 
-static void __init
-fixup_vector (int vector, unsigned int gsi, const char *pci_id)
+void
+iosapic_enable_intr (unsigned int vector)
 {
-	struct hw_interrupt_type *irq_type = &irq_type_iosapic_level;
-	irq_desc_t *idesc;
 	unsigned int dest;
 
-	idesc = irq_desc(vector);
-	if (idesc->handler != irq_type) {
-		if (idesc->handler != &no_irq_type)
-			printk(KERN_INFO "IOSAPIC: changing vector %d from %s to %s\n",
-			       vector, idesc->handler->typename, irq_type->typename);
-		idesc->handler = irq_type;
-	}
 #ifdef CONFIG_SMP
 	/*
 	 * For platforms that do not support interrupt redirect via the XTP interface, we
@@ -685,8 +676,8 @@ fixup_vector (int vector, unsigned int gsi, const char *pci_id)
 #endif
 	set_rte(vector, dest);
 
-	printk(KERN_INFO "IOSAPIC: %s -> GSI 0x%x -> CPU 0x%04x vector %d\n",
-	       pci_id, gsi, dest, vector);
+	printk(KERN_INFO "IOSAPIC: vector %d -> CPU 0x%04x, enabled\n",
+	       vector, dest);
 }
 
 void __init
@@ -697,6 +688,8 @@ iosapic_parse_prt (void)
 	unsigned int gsi;
 	int vector;
 	char pci_id[16];
+	struct hw_interrupt_type *irq_type = &irq_type_iosapic_level;
+	irq_desc_t *idesc;
 
 	list_for_each(node, &acpi_prt.entries) {
 		entry = list_entry(node, struct acpi_prt_entry, node);
@@ -724,6 +717,13 @@ iosapic_parse_prt (void)
 		snprintf(pci_id, sizeof(pci_id), "%02x:%02x:%02x[%c]",
 			 entry->id.segment, entry->id.bus, entry->id.device, 'A' + entry->pin);
 
-		fixup_vector(vector, gsi, pci_id);
+		/*
+		 * If vector was previously initialized to a different
+		 * handler, re-initialize.
+		 */
+		idesc = irq_desc(vector);
+		if (idesc->handler != irq_type)
+			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, IOSAPIC_POL_LOW, IOSAPIC_LEVEL);
+
 	}
 }

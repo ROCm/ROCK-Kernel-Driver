@@ -922,8 +922,7 @@ acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
 		return 0;
 
 	/* Turn it on */
-	vector = iosapic_register_intr (gsi, polarity ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
-			trigger ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
+	vector = iosapic_register_intr (gsi, polarity, trigger);
 	return vector;
 }
 
