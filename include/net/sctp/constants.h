@@ -323,7 +323,7 @@ typedef enum {
 #define SCTP_DEFAULT_COOKIE_LIFE_USEC	0  /* microseconds */
 
 #define SCTP_DEFAULT_MINWINDOW	1500	/* default minimum rwnd size */
-#define SCTP_DEFAULT_MAXWINDOW	32768	/* default rwnd size */
+#define SCTP_DEFAULT_MAXWINDOW	65535	/* default rwnd size */
 #define SCTP_DEFAULT_MAXSEGMENT 1500	/* MTU size, this is the limit
                                          * to which we will raise the P-MTU.
 					 */
