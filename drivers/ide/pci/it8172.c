@@ -29,6 +29,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/ioport.h>
@@ -297,29 +298,56 @@ static void __init init_dma_it8172 (ide_hwif_t *hwif, unsigned long dmabase)
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
-static void __init init_setup_it8172 (struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit it8172_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
+	ide_pci_device_t *d = &it8172_chipsets[id->driver_data];
         if ((!(PCI_FUNC(dev->devfn) & 1) ||
             (!((dev->class >> 8) == PCI_CLASS_STORAGE_IDE))))
-                return; /* IT8172 is more than only a IDE controller */
+                return 0; /* IT8172 is more than only a IDE controller */
 	ide_setup_pci_device(dev, d);
-}
-
-static int __init it8172_scan_pcidev (struct pci_dev *dev)
-{
-	ide_pci_device_t *d;
-
-	if (dev->vendor != PCI_VENDOR_ID_ITE)
-		return 0;
-
-	for (d = it8172_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
 	return 0;
 }
 
+/**
+ *	it8172_remove_one	-	called with an IT8172 is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect an IT8172 device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void it8172_remove_one(struct pci_dev *dev)
+{
+	panic("IT8172 removal not yet supported");
+}
+
+static struct pci_device_id it8172_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_ITE, PCI_DEVICE_ID_ITE_IT8172G, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"IT8172IDE",
+	id_table:	it8172_pci_tbl,
+	probe:		it8172_init_one,
+	remove:		__devexit_p(it8172_remove_one),
+};
+
+static int it8172_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void it8172_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(it8172_ide_init);
+module_exit(it8172_ide_exit);
+
+MODULE_AUTHOR("SteveL@mvista.com");
+MODULE_DESCRIPTION("PCI driver module for ITE 8172 IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

@@ -141,7 +141,7 @@ void free_hpsb_packet(struct hpsb_packet *packet)
 int hpsb_reset_bus(struct hpsb_host *host, int type)
 {
         if (!host->in_bus_reset) {
-                host->ops->devctl(host, RESET_BUS, type);
+                host->driver->devctl(host, RESET_BUS, type);
                 return 0;
         } else {
                 return 1;
@@ -354,7 +354,7 @@ void hpsb_selfid_complete(struct hpsb_host *host, int phyid, int isroot)
         }
 
         host->reset_retries = 0;
-        if (isroot) host->ops->devctl(host, ACT_CYCLE_MASTER, 1);
+        if (isroot) host->driver->devctl(host, ACT_CYCLE_MASTER, 1);
 	atomic_inc(&host->generation);
 	host->in_bus_reset = 0;
         highlevel_host_reset(host);
@@ -440,7 +440,7 @@ int hpsb_send_packet(struct hpsb_packet *packet)
         }
 #endif
 
-        return host->ops->transmit_packet(host, packet);
+        return host->driver->transmit_packet(host, packet);
 }
 
 static void send_packet_nocare(struct hpsb_packet *packet)
@@ -736,7 +736,7 @@ void abort_requests(struct hpsb_host *host)
         struct list_head *lh;
         LIST_HEAD(llist);
 
-        host->ops->devctl(host, CANCEL_REQUESTS, 0);
+        host->driver->devctl(host, CANCEL_REQUESTS, 0);
 
         spin_lock_irqsave(&host->pending_pkt_lock, flags);
         list_splice(&host->pending_packets, &llist);
@@ -810,8 +810,8 @@ static rwlock_t ieee1394_chardevs_lock = RW_LOCK_UNLOCKED;
 static int ieee1394_dispatch_open(struct inode *inode, struct file *file);
 
 static struct file_operations ieee1394_chardev_ops = {
-	owner:	THIS_MODULE,
-	open:	ieee1394_dispatch_open,
+	.owner =THIS_MODULE,
+	.open =	ieee1394_dispatch_open,
 };
 
 devfs_handle_t ieee1394_devfs_handle;
@@ -861,19 +861,57 @@ void ieee1394_unregister_chardev(int blocknum)
 	write_unlock(&ieee1394_chardevs_lock);
 }
 
+/*
+  ieee1394_get_chardev() - look up and acquire a character device
+  driver that has previously registered using ieee1394_register_chardev()
+  
+  On success, returns 1 and sets module and file_ops to the driver.
+  The module will have an incremented reference count.
+   
+  On failure, returns 0.
+  The module will NOT have an incremented reference count.
+*/
+
+static int ieee1394_get_chardev(int blocknum,
+				struct module **module,
+				struct file_operations **file_ops)
+{
+	int ret = 0;
+       
+	if( (blocknum < 0) || (blocknum > 15) )
+		return ret;
+
+	read_lock(&ieee1394_chardevs_lock);
+
+	*module = ieee1394_chardevs[blocknum].module;
+	*file_ops = ieee1394_chardevs[blocknum].file_ops;
+
+	if(*file_ops == NULL)
+		goto out;
+
+	/* don't need try_inc_mod_count if the driver is non-modular */
+	if(*module && (try_inc_mod_count(*module) == 0))
+		goto out;
+
+	/* success! */
+	ret = 1;
+	
+out:
+	read_unlock(&ieee1394_chardevs_lock);
+	return ret;
+}
+
 /* the point of entry for open() on any ieee1394 character device */
 static int ieee1394_dispatch_open(struct inode *inode, struct file *file)
 {
 	struct file_operations *file_ops;
 	struct module *module;
 	int blocknum;
-	int retval = -ENODEV;
+	int retval;
 
 	/*
 	  Maintaining correct module reference counts is tricky here!
 
-	  For Linux v2.4 and later:
-	  
 	  The key thing to remember is that the VFS increments the
 	  reference count of ieee1394 before it calls
 	  ieee1394_dispatch_open().
@@ -886,16 +924,7 @@ static int ieee1394_dispatch_open(struct inode *inode, struct file *file)
 	  If the open() fails, then the VFS will drop the
 	  reference count of whatever module file->f_op->owner points
 	  to, immediately after this function returns.
-
-	  The comments below refer to the 2.4 case, since the 2.2
-	  case is trivial.
-	  
 	*/
-
-#define INCREF(mod_) do { struct module *mod = (struct module*) mod_; \
-                          if(mod != NULL) __MOD_INC_USE_COUNT(mod); } while(0)
-#define DECREF(mod_) do { struct module *mod = (struct module*) mod_; \
-                          if(mod != NULL) __MOD_DEC_USE_COUNT(mod); } while(0)
 	
         /* shift away lower four bits of the minor
 	   to get the index of the ieee1394_driver
@@ -903,20 +932,10 @@ static int ieee1394_dispatch_open(struct inode *inode, struct file *file)
 	
 	blocknum = (minor(inode->i_rdev) >> 4) & 0xF;
 
-	/* printk("ieee1394_dispatch_open(%d)", blocknum); */
+	/* look up the driver */
 
-	read_lock(&ieee1394_chardevs_lock);
-	module = ieee1394_chardevs[blocknum].module;
-	/* bump the reference count of the driver that
-	   will receive the open() */
-	INCREF(module);
-	file_ops = ieee1394_chardevs[blocknum].file_ops;
-	read_unlock(&ieee1394_chardevs_lock);
-
-	if(file_ops == NULL) {
-		DECREF(module);
-		goto out_fail;
-	}
+	if(ieee1394_get_chardev(blocknum, &module, &file_ops) == 0)
+		return -ENODEV;
 
 	/* redirect all subsequent requests to the driver's
 	   own file_operations */
@@ -928,42 +947,42 @@ static int ieee1394_dispatch_open(struct inode *inode, struct file *file)
 	/* follow through with the open() */
 	retval = file_ops->open(inode, file);
 
-	if(retval) {
+	if(retval == 0) {
 		
-		/* if the open() failed, then we need to drop the
-                   extra reference we gave to the task-specific
-                   driver */
+		/* If the open() succeeded, then ieee1394 will be left
+		   with an extra module reference, so we discard it here.
 
-		DECREF(module);
-		goto out_fail;
+		   The task-specific driver still has the extra
+		   reference given to it by ieee1394_get_chardev().
+		   This extra reference prevents the module from
+		   unloading while the file is open, and will be
+		   dropped by the VFS when the file is released.
+		*/
 		
+		if(THIS_MODULE)
+			__MOD_DEC_USE_COUNT((struct module*) THIS_MODULE);
+		
+		/* note that if ieee1394 is compiled into the kernel,
+		   THIS_MODULE will be (void*) NULL, hence the if and
+		   the cast are necessary */
+
 	} else {
 
-		/* if the open() succeeded, then ieee1394 will be left
-		   with an extra module reference, so we discard it here.*/
-
-		DECREF(THIS_MODULE);
-
-		/* the task-specific driver still has the extra
-		   reference we gave it. This extra reference prevents
-		   the module from unloading while the file is open,
-		   and will be dropped by the VFS when the file is
-		   released. */
+		/* if the open() failed, then we need to drop the
+		   extra reference we gave to the task-specific
+		   driver */
 		
-		return 0;
-	}
-	       
-out_fail:
-	/* point the file's f_ops back to ieee1394. The VFS will then
-	   decrement ieee1394's reference count immediately after this
-	   function returns. */
+		if(module)
+			__MOD_DEC_USE_COUNT(module);
 	
-	file->f_op = &ieee1394_chardev_ops;
-	return retval;
+		/* point the file's f_ops back to ieee1394. The VFS will then
+		   decrement ieee1394's reference count immediately after this
+		   function returns. */
+		
+		file->f_op = &ieee1394_chardev_ops;
+	}
 
-#undef INCREF
-#undef DECREF
-	     
+	return retval;
 }
 
 struct proc_dir_entry *ieee1394_procfs_entry;
@@ -1024,8 +1043,6 @@ module_init(ieee1394_init);
 module_exit(ieee1394_cleanup);
 
 /* Exported symbols */
-EXPORT_SYMBOL(hpsb_register_lowlevel);
-EXPORT_SYMBOL(hpsb_unregister_lowlevel);
 EXPORT_SYMBOL(hpsb_alloc_host);
 EXPORT_SYMBOL(hpsb_add_host);
 EXPORT_SYMBOL(hpsb_remove_host);

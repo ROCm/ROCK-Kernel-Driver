@@ -127,18 +127,23 @@ struct dma_trm_ctx {
         quadlet_t *branchAddrPtr;
 
 	/* list of packets inserted in the AT FIFO */
-        struct hpsb_packet *fifo_first;
-        struct hpsb_packet *fifo_last;
+	struct list_head fifo_list;
 
 	/* list of pending packets to be inserted in the AT FIFO */
-        struct hpsb_packet *pending_first;
-        struct hpsb_packet *pending_last;
+	struct list_head pending_list;
 
         spinlock_t lock;
         struct tasklet_struct task;
 	int ctrlClear;
 	int ctrlSet;
 	int cmdPtr;
+};
+
+struct ohci1394_iso_tasklet {
+	struct tasklet_struct tasklet;
+	struct list_head link;
+	int context;
+	enum { OHCI_ISO_TRANSMIT, OHCI_ISO_RECEIVE } type;
 };
 
 struct ti_ohci {
@@ -172,21 +177,23 @@ struct ti_ohci {
 	unsigned int max_packet_size;
 
         /* async receive */
-	struct dma_rcv_ctx *ar_resp_context;
-	struct dma_rcv_ctx *ar_req_context;
+	struct dma_rcv_ctx ar_resp_context;
+	struct dma_rcv_ctx ar_req_context;
 
 	/* async transmit */
-	struct dma_trm_ctx *at_resp_context;
-	struct dma_trm_ctx *at_req_context;
+	struct dma_trm_ctx at_resp_context;
+	struct dma_trm_ctx at_req_context;
 
         /* iso receive */
-	struct dma_rcv_ctx *ir_context;
+	struct dma_rcv_ctx ir_context;
+	struct ohci1394_iso_tasklet ir_tasklet;
         spinlock_t IR_channel_lock;
 	int nb_iso_rcv_ctx;
 	unsigned long ir_ctx_usage; /* use test_and_set_bit() for atomicity */
 	
         /* iso transmit */
-	struct dma_trm_ctx *it_context;
+	struct dma_trm_ctx it_context;
+	struct ohci1394_iso_tasklet it_tasklet;
 	int nb_iso_xmit_ctx;
 	unsigned long it_ctx_usage; /* use test_and_set_bit() for atomicity */
 	
@@ -202,16 +209,12 @@ struct ti_ohci {
 
 	int self_id_errors;
 
-	/* IRQ hooks, for video1394 and dv1394 */
+	/* Tasklets for iso receive and transmit, used by video1394,
+	 * amdtp and dv1394 */
 	
-#define OHCI1394_MAX_IRQ_HOOKS 16
+	struct list_head iso_tasklet_list;
+	spinlock_t iso_tasklet_list_lock;
 	
-	struct ohci1394_irq_hook {
-		void (*irq_handler) (int card, quadlet_t isoRecvEvent, 
-				     quadlet_t isoXmitEvent, void *data);
-		void *data;
-	} irq_hooks[OHCI1394_MAX_IRQ_HOOKS];
-
 	/* Swap the selfid buffer? */
 	unsigned int selfid_swap:1;
 	/* Some Apple chipset seem to swap incoming headers for us */
@@ -399,15 +402,17 @@ static inline u32 reg_read(const struct ti_ohci *ohci, int offset)
 
 #define OHCI1394_TCODE_PHY               0xE
 
-void ohci1394_stop_context(struct ti_ohci *ohci, int reg, char *msg);
+void ohci1394_init_iso_tasklet(struct ohci1394_iso_tasklet *tasklet, 
+			       int type,
+			       void (*func)(unsigned long), 
+			       unsigned long data);
+int ohci1394_register_iso_tasklet(struct ti_ohci *ohci,
+				  struct ohci1394_iso_tasklet *tasklet);
+void ohci1394_unregister_iso_tasklet(struct ti_ohci *ohci,
+				     struct ohci1394_iso_tasklet *tasklet);
+
+void ohci1394_stop_context      (struct ti_ohci *ohci, int reg, char *msg);
 struct ti_ohci *ohci1394_get_struct(int card_num);
 
-int ohci1394_hook_irq(struct ti_ohci *ohci,
-		      void (*irq_handler) (int, quadlet_t, quadlet_t, void *),
-		      void *data);
-
-void ohci1394_unhook_irq(struct ti_ohci *ohci,
-			 void (*irq_handler) (int, quadlet_t, quadlet_t, void *),
-			 void *data);
 #endif
 

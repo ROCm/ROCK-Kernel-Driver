@@ -1299,7 +1299,7 @@ static int __init pnpbios_thread_init(void)
 {
 #ifdef CONFIG_HOTPLUG	
 	init_completion(&unload_sem);
-	if(kernel_thread(pnp_dock_thread, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGNAL)>0)
+	if (kernel_thread(pnp_dock_thread, NULL, CLONE_KERNEL) > 0)
 		unloading = 0;
 #endif		
 	return 0;

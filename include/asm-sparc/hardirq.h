@@ -39,8 +39,8 @@ typedef struct {
  * - ( bit 26 is the PREEMPT_ACTIVE flag. )
  *
  * PREEMPT_MASK: 0x000000ff
- * HARDIRQ_MASK: 0x0000ff00
- * SOFTIRQ_MASK: 0x00ff0000
+ * SOFTIRQ_MASK: 0x0000ff00
+ * HARDIRQ_MASK: 0x00ff0000
  */
 
 #define PREEMPT_BITS    8
@@ -90,8 +90,10 @@ typedef struct {
 #define irq_enter()             (preempt_count() += HARDIRQ_OFFSET)
 
 #if CONFIG_PREEMPT
+# define in_atomic()	(preempt_count() != kernel_locked())
 # define IRQ_EXIT_OFFSET (HARDIRQ_OFFSET-1)
 #else
+# define in_atomic()	(preempt_count() != 0)
 # define IRQ_EXIT_OFFSET HARDIRQ_OFFSET
 #endif
 #define irq_exit()                                                      \
@@ -121,7 +123,7 @@ do {                                                                    \
 
 #ifndef CONFIG_SMP
 
-#define synchronize_irq()	barrier()
+#define synchronize_irq(irq)	barrier()
 
 #else /* (CONFIG_SMP) */
 

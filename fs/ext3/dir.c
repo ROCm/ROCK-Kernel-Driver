@@ -54,7 +54,7 @@ int ext3_check_dir_entry (const char * function, struct inode * dir,
 	else if (((char *) de - bh->b_data) + rlen > dir->i_sb->s_blocksize)
 		error_msg = "directory entry across blocks";
 	else if (le32_to_cpu(de->inode) >
-			le32_to_cpu(dir->i_sb->u.ext3_sb.s_es->s_inodes_count))
+			le32_to_cpu(EXT3_SB(dir->i_sb)->s_es->s_inodes_count))
 		error_msg = "inode out of bounds";
 
 	if (error_msg != NULL)

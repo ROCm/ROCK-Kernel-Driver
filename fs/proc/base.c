@@ -1136,7 +1136,7 @@ static int get_pid_list(int index, unsigned int *pids)
 
 	index--;
 	read_lock(&tasklist_lock);
-	for_each_task(p) {
+	for_each_process(p) {
 		int pid = p->pid;
 		if (!pid)
 			continue;

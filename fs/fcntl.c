@@ -493,7 +493,7 @@ void send_sigio(struct fown_struct *fown, int fd, int band)
 		send_sigio_to_task(p, fown, fd, band);
 		goto out_unlock_task;
 	}
-	for_each_task(p) {
+	for_each_process(p) {
 		int match = p->pid;
 		if (pid < 0)
 			match = -p->pgrp;
@@ -531,7 +531,7 @@ int send_sigurg(struct fown_struct *fown)
 		send_sigurg_to_task(p, fown);
 		goto out_unlock_task;
 	}
-	for_each_task(p) {
+	for_each_process(p) {
 		int match = p->pid;
 		if (pid < 0)
 			match = -p->pgrp;

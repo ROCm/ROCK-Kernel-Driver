@@ -122,27 +122,14 @@ struct llc_conn_ev_prim_if {
 
 /* Event LLC_CONN_EV_TYPE_PDU interface */
 struct llc_conn_ev_pdu_if {
-	u8		ev;
-	u8		reason;
-};
-
-/* Event interface for timer-generated events */
-struct llc_conn_ev_tmr_if {
-	struct sock *sk;
-	u32	     component_handle;
-	void	    *timer_specific;
-};
-
-struct llc_conn_ev_rpt_sts_if {
-	u8 status;
+	u8 ev;
+	u8 reason;
 };
 
 union llc_conn_ev_if {
 	struct llc_conn_ev_simple_if  a;	/* 'a' for simple, easy ... */
 	struct llc_conn_ev_prim_if    prim;
 	struct llc_conn_ev_pdu_if     pdu;
-	struct llc_conn_ev_tmr_if     tmr;
-	struct llc_conn_ev_rpt_sts_if rsts;	/* report status */
 };
 
 struct llc_conn_state_ev {

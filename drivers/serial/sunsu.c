@@ -34,6 +34,7 @@
 #include <linux/serio.h>
 #endif
 #include <linux/init.h>
+#include <linux/delay.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -1018,6 +1019,8 @@ static void sunsu_autoconfig(struct uart_sunsu_port *up)
 
 	if (!up->port_node || !up->su_type)
 		return;
+
+	up->port.iotype = SERIAL_IO_MEM;
 
 	/*
 	 * First we look for Ebus-bases su's

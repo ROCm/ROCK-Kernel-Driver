@@ -34,7 +34,6 @@
 #include <asm/segment.h>
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/kgdb.h>
 #include <asm/processor.h>
 #include <asm/oplib.h>
 #include <asm/page.h>
@@ -67,8 +66,6 @@ struct screen_info screen_info = {
  */
 
 extern unsigned long trapbase;
-extern int serial_console;
-extern void breakpoint(void);
 void (*prom_palette)(int);
 asmlinkage void sys_sync(void);	/* it's really int */
 
@@ -105,27 +102,14 @@ void prom_sync_me(void)
 	return;
 }
 
-extern void rs_kgdb_hook(int tty_num); /* sparc/serial.c */
-
 unsigned int boot_flags __initdata = 0;
 #define BOOTME_DEBUG  0x1
 #define BOOTME_SINGLE 0x2
-#define BOOTME_KGDBA  0x4
-#define BOOTME_KGDBB  0x8
-#define BOOTME_KGDB   0xc
 
 static int console_fb __initdata = 0;
 
 /* Exported for mm/init.c:paging_init. */
 unsigned long cmdline_memory_size __initdata = 0;
-
-void kernel_enter_debugger(void)
-{
-	if (boot_flags & BOOTME_KGDB) {
-		printk("KGDB: Entered\n");
-		breakpoint();
-	}
-}
 
 static void
 prom_console_write(struct console *con, const char *s, unsigned n)
@@ -142,11 +126,6 @@ static struct console prom_debug_console = {
 
 int obp_system_intr(void)
 {
-	if (boot_flags & BOOTME_KGDB) {
-		printk("KGDB: system interrupted\n");
-		breakpoint();
-		return 1;
-	}
 	if (boot_flags & BOOTME_DEBUG) {
 		printk("OBP: system interrupted\n");
 		prom_halt();
@@ -196,24 +175,6 @@ static void __init boot_flags_init(char *commands)
 			commands++;
 			while (*commands && *commands != ' ')
 				process_switch(*commands++);
-		} else if (strlen(commands) >= 9
-			   && !strncmp(commands, "kgdb=tty", 8)) {
-			switch (commands[8]) {
-#ifdef CONFIG_SUN_SERIAL
-			case 'a':
-				boot_flags |= BOOTME_KGDBA;
-				prom_printf("KGDB: Using serial line /dev/ttya.\n");
-				break;
-			case 'b':
-				boot_flags |= BOOTME_KGDBB;
-				prom_printf("KGDB: Using serial line /dev/ttyb.\n");
-				break;
-#endif
-			default:
-				printk("KGDB: Unknown tty line.\n");
-				break;
-			}
-			commands += 9;
 		} else {
 			if (!strncmp(commands, "console=", 8)) {
 				commands += 8;
@@ -378,64 +339,47 @@ void __init setup_arch(char **cmdline_p)
 
 	prom_setsync(prom_sync_me);
 
-	{
-#if !CONFIG_SUN_SERIAL
-		serial_console = 0;
+#ifndef CONFIG_SERIAL_CONSOLE	/* Not CONFIG_SERIAL_SUNCORE: to be gone. */
+	serial_console = 0;
 #else
-		switch (console_fb) {
-		case 0: /* Let get our io devices from prom */
-			{
-				int idev = prom_query_input_device();
-				int odev = prom_query_output_device();
-				if (idev == PROMDEV_IKBD && odev == PROMDEV_OSCREEN) {
-					serial_console = 0;
-				} else if (idev == PROMDEV_ITTYA && odev == PROMDEV_OTTYA) {
-					serial_console = 1;
-				} else if (idev == PROMDEV_ITTYB && odev == PROMDEV_OTTYB) {
-					serial_console = 2;
-				} else if (idev == PROMDEV_I_UNK && odev == PROMDEV_OTTYA) {
-					prom_printf("MrCoffee ttya\n");
-					serial_console = 1;
-				} else if (idev == PROMDEV_I_UNK && odev == PROMDEV_OSCREEN) {
-					serial_console = 0;
-					prom_printf("MrCoffee keyboard\n");
-				} else {
-					prom_printf("Inconsistent or unknown console\n");
-					prom_printf("You cannot mix serial and non serial input/output devices\n");
-					prom_halt();
-				}
+	switch (console_fb) {
+	case 0: /* Let get our io devices from prom */
+		{
+			int idev = prom_query_input_device();
+			int odev = prom_query_output_device();
+			if (idev == PROMDEV_IKBD && odev == PROMDEV_OSCREEN) {
+				serial_console = 0;
+			} else if (idev == PROMDEV_ITTYA && odev == PROMDEV_OTTYA) {
+				serial_console = 1;
+			} else if (idev == PROMDEV_ITTYB && odev == PROMDEV_OTTYB) {
+				serial_console = 2;
+			} else if (idev == PROMDEV_I_UNK && odev == PROMDEV_OTTYA) {
+				prom_printf("MrCoffee ttya\n");
+				serial_console = 1;
+			} else if (idev == PROMDEV_I_UNK && odev == PROMDEV_OSCREEN) {
+				serial_console = 0;
+				prom_printf("MrCoffee keyboard\n");
+			} else {
+				prom_printf("Inconsistent or unknown console\n");
+				prom_printf("You cannot mix serial and non serial input/output devices\n");
+				prom_halt();
 			}
-			break;
-		case 1: serial_console = 0; break; /* Force one of the framebuffers as console */
-		case 2: serial_console = 1; break; /* Force ttya as console */
-		case 3: serial_console = 2; break; /* Force ttyb as console */
 		}
+		break;
+	case 1: serial_console = 0; break; /* Force one of the framebuffers as console */
+	case 2: serial_console = 1; break; /* Force ttya as console */
+	case 3: serial_console = 2; break; /* Force ttyb as console */
+	}
 #endif
-	}
-
-	if ((boot_flags & BOOTME_KGDBA)) {
-		rs_kgdb_hook(0);
-	}
-	if ((boot_flags & BOOTME_KGDBB)) {
-		rs_kgdb_hook(1);
-	}
 
 	if((boot_flags&BOOTME_DEBUG) && (linux_dbvec!=0) && 
 	   ((*(short *)linux_dbvec) != -1)) {
 		printk("Booted under KADB. Syncing trap table.\n");
 		(*(linux_dbvec->teach_debugger))();
 	}
-	if((boot_flags & BOOTME_KGDB)) {
-		set_debug_traps();
-		prom_printf ("Breakpoint!\n");
-		breakpoint();
-	}
 
 	init_mm.context = (unsigned long) NO_CONTEXT;
 	init_task.thread.kregs = &fake_swapper_regs;
-
-	if (serial_console)
-		conswitchp = NULL;
 
 	paging_init();
 }
@@ -514,3 +458,19 @@ struct seq_operations cpuinfo_op = {
 	.stop =	c_stop,
 	.show =	show_cpuinfo,
 };
+
+extern int stop_a_enabled;
+
+void sun_do_break(void)
+{
+	if (!stop_a_enabled)
+		return;
+
+	printk("\n");
+	flush_user_windows();
+
+	prom_cmdline();
+}
+
+int serial_console;
+int stop_a_enabled = 1;

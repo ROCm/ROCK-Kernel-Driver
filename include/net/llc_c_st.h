@@ -33,15 +33,15 @@
 
 /* Connection state table structure */
 struct llc_conn_state_trans {
-   llc_conn_ev_t       ev;
-   u8		       next_state;
-   llc_conn_ev_qfyr_t *ev_qualifiers;
-   llc_conn_action_t  *ev_actions;
+	llc_conn_ev_t	   ev;
+	u8		   next_state;
+	llc_conn_ev_qfyr_t *ev_qualifiers;
+	llc_conn_action_t  *ev_actions;
 };
 
 struct llc_conn_state {
-   u8 current_state;
-   struct llc_conn_state_trans **transitions;
+	u8			    current_state;
+	struct llc_conn_state_trans **transitions;
 };
 
 extern struct llc_conn_state llc_conn_state_table[];

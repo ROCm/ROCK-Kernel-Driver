@@ -51,7 +51,11 @@ struct exec_domain;
 #define CLONE_CLEARTID	0x00200000	/* clear the userspace TID */
 #define CLONE_DETACHED	0x00400000	/* parent wants no child-exit signal */
 
-#define CLONE_SIGNAL	(CLONE_SIGHAND | CLONE_THREAD)
+/*
+ * List of flags we want to share for kernel threads,
+ * if only because they are not used by them anyway.
+ */
+#define CLONE_KERNEL	(CLONE_FS | CLONE_FILES | CLONE_SIGHAND)
 
 /*
  * These are the constant used to fake the fixed-point load-average
@@ -169,7 +173,8 @@ struct namespace;
 /* Maximum number of active map areas.. This is a random (large) number */
 #define MAX_MAP_COUNT	(65536)
 
-struct kioctx;
+#include <linux/aio.h>
+
 struct mm_struct {
 	struct vm_area_struct * mmap;		/* list of VMAs */
 	rb_root_t mm_rb;
@@ -202,6 +207,8 @@ struct mm_struct {
 	/* aio bits */
 	rwlock_t		ioctx_list_lock;
 	struct kioctx		*ioctx_list;
+
+	struct kioctx		default_kioctx;
 };
 
 extern int mmlist_nr;
@@ -220,7 +227,7 @@ struct signal_struct {
 	int			group_exit;
 	int			group_exit_code;
 
-	struct completion	group_exit_done;
+	struct task_struct	*group_exit_task;
 };
 
 /*
@@ -316,6 +323,7 @@ struct task_struct {
 	struct task_struct *parent;	/* parent process */
 	struct list_head children;	/* list of my children */
 	struct list_head sibling;	/* linkage in my parent's children list */
+	struct task_struct *group_leader;
 	struct list_head thread_group;
 
 	/* PID hash table linkage. */
@@ -416,6 +424,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_IOTHREAD	0x00020000	/* this thread is needed for doing I/O to swap */
 #define PF_FROZEN	0x00040000	/* frozen for system suspend */
 #define PF_SYNC		0x00080000	/* performing fsync(), etc */
+#define PF_FSTRANS	0x00100000	/* inside a filesystem transaction */
 
 /*
  * Ptrace flags
@@ -550,6 +559,7 @@ extern int dequeue_signal(struct sigpending *pending, sigset_t *mask, siginfo_t 
 extern void block_all_signals(int (*notifier)(void *priv), void *priv,
 			      sigset_t *mask);
 extern void unblock_all_signals(void);
+extern void release_task(struct task_struct * p);
 extern int send_sig_info(int, struct siginfo *, struct task_struct *);
 extern int force_sig_info(int, struct siginfo *, struct task_struct *);
 extern int __kill_pg_info(int sig, struct siginfo *info, pid_t pgrp);
@@ -681,7 +691,11 @@ extern void FASTCALL(add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait));
 extern void FASTCALL(add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t * wait));
 extern void FASTCALL(remove_wait_queue(wait_queue_head_t *q, wait_queue_t * wait));
 
+#ifdef CONFIG_SMP
 extern void wait_task_inactive(task_t * p);
+#else
+#define wait_task_inactive(p)	do { } while (0)
+#endif
 extern void kick_if_running(task_t * p);
 
 #define __wait_event(wq, condition) 					\
@@ -758,14 +772,16 @@ static inline void remove_wait_queue_locked(wait_queue_head_t *q,
 #define remove_parent(p)	list_del_init(&(p)->sibling)
 #define add_parent(p, parent)	list_add_tail(&(p)->sibling,&(parent)->children)
 
-#define REMOVE_LINKS(p) do {				\
-	list_del_init(&(p)->tasks);			\
-	remove_parent(p);				\
+#define REMOVE_LINKS(p) do {					\
+	if (thread_group_leader(p))				\
+		list_del_init(&(p)->tasks);			\
+	remove_parent(p);					\
 	} while (0)
 
-#define SET_LINKS(p) do {				\
-	list_add_tail(&(p)->tasks,&init_task.tasks);	\
-	add_parent(p, (p)->parent);			\
+#define SET_LINKS(p) do {					\
+	if (thread_group_leader(p))				\
+		list_add_tail(&(p)->tasks,&init_task.tasks);	\
+	add_parent(p, (p)->parent);				\
 	} while (0)
 
 static inline struct task_struct *eldest_child(struct task_struct *p)
@@ -795,11 +811,18 @@ static inline struct task_struct *younger_sibling(struct task_struct *p)
 #define next_task(p)	list_entry((p)->tasks.next, struct task_struct, tasks)
 #define prev_task(p)	list_entry((p)->tasks.prev, struct task_struct, tasks)
 
-#define for_each_task(p) \
+#define for_each_process(p) \
 	for (p = &init_task ; (p = next_task(p)) != &init_task ; )
 
-#define for_each_thread(task) \
-	for (task = next_thread(current) ; task != current ; task = next_thread(task))
+/*
+ * Careful: do_each_thread/while_each_thread is a double loop so
+ *          'break' will not work as expected - use goto instead.
+ */
+#define do_each_thread(g, t) \
+	for (g = t = &init_task ; (g = t = next_task(g)) != &init_task ; ) do
+
+#define while_each_thread(g, t) \
+	while ((t = next_thread(t)) != g)
 
 static inline task_t *next_thread(task_t *p)
 {
@@ -826,6 +849,9 @@ static inline task_t *prev_thread(task_t *p)
 }
 
 #define thread_group_leader(p)	(p->pid == p->tgid)
+
+#define delay_group_leader(p) \
+	(p->tgid == p->pid && !list_empty(&p->thread_group))
 
 extern void unhash_process(struct task_struct *p);
 
@@ -934,6 +960,34 @@ static inline void cond_resched(void)
 	if (need_resched())
 		__cond_resched();
 }
+
+#ifdef CONFIG_PREEMPT
+
+/*
+ * cond_resched_lock() - if a reschedule is pending, drop the given lock,
+ * call schedule, and on return reacquire the lock.
+ *
+ * Note: this does not assume the given lock is the _only_ lock held.
+ * The kernel preemption counter gives us "free" checking that we are
+ * atomic -- let's use it.
+ */
+static inline void cond_resched_lock(spinlock_t * lock)
+{
+	if (need_resched() && preempt_count() == 1) {
+		_raw_spin_unlock(lock);
+		preempt_enable_no_resched();
+		__cond_resched();
+		spin_lock(lock);
+	}
+}
+
+#else
+
+static inline void cond_resched_lock(spinlock_t * lock)
+{
+}
+
+#endif
 
 /* Reevaluate whether the task has signals pending delivery.
    This is required every time the blocked sigset_t changes.

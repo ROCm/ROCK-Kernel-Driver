@@ -42,6 +42,7 @@ typedef struct _rwlock_debug rwlock_t;
 #define RW_LOCK_UNLOCKED (rwlock_t) { 0, 0, {0} }
 
 #define rwlock_init(lp)	do { *(lp)= RW_LOCK_UNLOCKED; } while(0)
+#define rwlock_is_locked(lp) ((lp)->lock != 0)
 
 extern void _do_read_lock(rwlock_t *rw, char *str);
 extern void _do_read_unlock(rwlock_t *rw, char *str);
@@ -141,6 +142,7 @@ typedef struct { volatile unsigned int lock; } rwlock_t;
 #define RW_LOCK_UNLOCKED (rwlock_t) { 0 }
 
 #define rwlock_init(lp)	do { *(lp)= RW_LOCK_UNLOCKED; } while(0)
+#define rwlock_is_locked(lp) ((lp)->lock != 0)
 
 
 /* Sort of like atomic_t's on Sparc, but even more clever.

@@ -24,8 +24,6 @@
 
 struct linux_ebus *ebus_chain = 0;
 
-extern void rs_init(void);
-
 /* We are together with pcic.c under CONFIG_PCI. */
 extern unsigned int pcic_pin_to_irq(unsigned int, char *name);
 
@@ -361,6 +359,4 @@ void __init ebus_init(void)
 		ebus->next = 0;
 		++num_ebus;
 	}
-
-	rs_init();
 }

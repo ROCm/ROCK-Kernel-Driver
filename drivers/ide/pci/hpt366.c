@@ -44,6 +44,7 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/timer.h>
@@ -1167,23 +1168,70 @@ static void __init init_setup_hpt366 (struct pci_dev *dev, ide_pci_device_t *d)
 	ide_setup_pci_device(dev, d);
 }
 
-int __init hpt366_scan_pcidev (struct pci_dev *dev)
+
+/**
+ *	hpt366_init_one	-	called when an HPT366 is found
+ *	@dev: the hpt366 device
+ *	@id: the matching pci id
+ *
+ *	Called when the PCI registration layer (or the IDE initialization)
+ *	finds a device matching our IDE device tables.
+ */
+ 
+static int __devinit hpt366_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d;
+	ide_pci_device_t *d = &hpt366_chipsets[id->driver_data];
 
-	if (dev->vendor != PCI_VENDOR_ID_TTI)
-		return 0;
-	if (dev->device == PCI_DEVICE_ID_TTI_HPT343)
-		return 0;
-
-	for (d = hpt366_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
+	if (dev->device != d->device)
+		BUG();
+	d->init_setup(dev, d);
 	return 0;
 }
 
+/**
+ *	hpt366_remove_one	-	called when an HPT366 is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect a HPT366 device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void hpt366_remove_one(struct pci_dev *dev)
+{
+	panic("HPT366 removal not yet supported");
+}
+
+static struct pci_device_id hpt366_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT366, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT372, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
+	{ PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT302, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 2},
+	{ PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT371, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 3},
+	{ PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT374, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 15},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"HPT366 IDE",
+	id_table:	hpt366_pci_tbl,
+	probe:		hpt366_init_one,
+	remove:		__devexit_p(hpt366_remove_one),
+};
+
+static int hpt366_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void hpt366_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(hpt366_ide_init);
+module_exit(hpt366_ide_exit);
+
+MODULE_AUTHOR("Andre Hedrick");
+MODULE_DESCRIPTION("PCI driver module for Highpoint HPT366 IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

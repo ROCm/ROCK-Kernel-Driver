@@ -42,6 +42,7 @@
 #include <linux/highuid.h>
 #include <linux/brlock.h>
 #include <linux/fs.h>
+#include <linux/uio.h>
 #include <linux/tty.h>
 #include <linux/in6.h>
 #include <linux/completion.h>
@@ -278,6 +279,7 @@ EXPORT_SYMBOL(find_lock_page);
 EXPORT_SYMBOL(find_or_create_page);
 EXPORT_SYMBOL(grab_cache_page_nowait);
 EXPORT_SYMBOL(read_cache_page);
+EXPORT_SYMBOL(mark_page_accessed);
 EXPORT_SYMBOL(vfs_readlink);
 EXPORT_SYMBOL(vfs_follow_link);
 EXPORT_SYMBOL(page_readlink);
@@ -343,6 +345,9 @@ EXPORT_SYMBOL(register_disk);
 EXPORT_SYMBOL(read_dev_sector);
 EXPORT_SYMBOL(init_buffer);
 EXPORT_SYMBOL_GPL(generic_file_direct_IO);
+EXPORT_SYMBOL(generic_file_readv);
+EXPORT_SYMBOL(generic_file_writev);
+EXPORT_SYMBOL(iov_shorten);
 
 /* tty routines */
 EXPORT_SYMBOL(tty_hangup);
@@ -601,3 +606,6 @@ EXPORT_SYMBOL(pidhash);
 #if defined(CONFIG_SMP) && defined(__GENERIC_PER_CPU)
 EXPORT_SYMBOL(__per_cpu_offset);
 #endif
+
+/* debug */
+EXPORT_SYMBOL(dump_stack);

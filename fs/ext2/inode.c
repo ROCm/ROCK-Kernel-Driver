@@ -619,11 +619,11 @@ ext2_get_blocks(struct inode *inode, sector_t iblock, unsigned long max_blocks,
 }
 
 static int
-ext2_direct_IO(int rw, struct inode *inode, char *buf,
-			loff_t offset, size_t count)
+ext2_direct_IO(int rw, struct inode *inode, const struct iovec *iov,
+			loff_t offset, unsigned long nr_segs)
 {
-	return generic_direct_IO(rw, inode, buf,
-				offset, count, ext2_get_blocks);
+	return generic_direct_IO(rw, inode, iov,
+				offset, nr_segs, ext2_get_blocks);
 }
 
 static int

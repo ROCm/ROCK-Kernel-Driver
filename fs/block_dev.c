@@ -116,11 +116,11 @@ blkdev_get_blocks(struct inode *inode, sector_t iblock,
 }
 
 static int
-blkdev_direct_IO(int rw, struct inode *inode, char *buf,
-			loff_t offset, size_t count)
+blkdev_direct_IO(int rw, struct inode *inode, const struct iovec *iov,
+			loff_t offset, unsigned long nr_segs)
 {
-	return generic_direct_IO(rw, inode, buf, offset,
-				count, blkdev_get_blocks);
+	return generic_direct_IO(rw, inode, iov, offset,
+				nr_segs, blkdev_get_blocks);
 }
 
 static int blkdev_writepage(struct page * page)
@@ -330,6 +330,29 @@ struct block_device *bdget(dev_t dev)
 		destroy_bdev(new_bdev);
 	}
 	return bdev;
+}
+
+long nr_blockdev_pages(void)
+{
+	long ret = 0;
+	int i;
+
+	spin_lock(&bdev_lock);
+	for (i = 0; i < ARRAY_SIZE(bdev_hashtable); i++) {
+		struct list_head *head = &bdev_hashtable[i];
+		struct list_head *lh;
+
+		if (head == NULL)
+			continue;
+		list_for_each(lh, head) {
+			struct block_device *bdev;
+
+			bdev = list_entry(lh, struct block_device, bd_hash);
+			ret += bdev->bd_inode->i_mapping->nrpages;
+		}
+	}
+	spin_unlock(&bdev_lock);
+	return ret;
 }
 
 static inline void __bd_forget(struct inode *inode)
@@ -787,6 +810,14 @@ static int blkdev_reread_part(struct block_device *bdev)
 	return res;
 }
 
+static ssize_t blkdev_file_write(struct file *file, const char *buf,
+				   size_t count, loff_t *ppos)
+{
+	struct iovec local_iov = { .iov_base = (void *)buf, .iov_len = count };
+
+	return generic_file_write_nolock(file, &local_iov, 1, ppos);
+}
+
 static int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 			unsigned long arg)
 {
@@ -832,26 +863,28 @@ static int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 }
 
 struct address_space_operations def_blk_aops = {
-	readpage: blkdev_readpage,
-	writepage: blkdev_writepage,
-	sync_page: block_sync_page,
-	prepare_write: blkdev_prepare_write,
-	commit_write: blkdev_commit_write,
-	writepages: generic_writepages,
-	vm_writeback: generic_vm_writeback,
-	direct_IO: blkdev_direct_IO,
+	.readpage	= blkdev_readpage,
+	.writepage	= blkdev_writepage,
+	.sync_page	= block_sync_page,
+	.prepare_write	= blkdev_prepare_write,
+	.commit_write	= blkdev_commit_write,
+	.writepages	= generic_writepages,
+	.vm_writeback	= generic_vm_writeback,
+	.direct_IO	= blkdev_direct_IO,
 };
 
 struct file_operations def_blk_fops = {
-	open:		blkdev_open,
-	release:	blkdev_close,
-	llseek:		block_llseek,
-	read:		generic_file_read,
-	write:		generic_file_write_nolock,
-	mmap:		generic_file_mmap,
-	fsync:		block_fsync,
-	ioctl:		blkdev_ioctl,
-	sendfile:	generic_file_sendfile,
+	.open		= blkdev_open,
+	.release	= blkdev_close,
+	.llseek		= block_llseek,
+	.read		= generic_file_read,
+	.write		= blkdev_file_write,
+	.mmap		= generic_file_mmap,
+	.fsync		= block_fsync,
+	.ioctl		= blkdev_ioctl,
+	.readv		= generic_file_readv,
+	.writev		= generic_file_writev,
+	.sendfile	= generic_file_sendfile,
 };
 
 int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)

@@ -196,10 +196,11 @@ repeat_alloc:
 		return element;
 
 	/*
-	 * If the pool is less than 50% full then try harder
-	 * to allocate an element:
+	 * If the pool is less than 50% full and we can perform effective
+	 * page reclaim then try harder to allocate an element.
 	 */
-	if ((gfp_mask != gfp_nowait) && (pool->curr_nr <= pool->min_nr/2)) {
+	if ((gfp_mask & __GFP_FS) && (gfp_mask != gfp_nowait) &&
+				(pool->curr_nr <= pool->min_nr/2)) {
 		element = pool->alloc(gfp_mask, pool->pool_data);
 		if (likely(element != NULL))
 			return element;

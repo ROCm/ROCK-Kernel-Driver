@@ -27,11 +27,7 @@
 #define __ACPI_BUS_H__
 
 #include <linux/version.h>
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,4))
-#include <linux/device.h>
-#define CONFIG_LDM
-#endif
+#include <linux/driverfs_fs.h>
 
 #include "include/acpi.h"
 
@@ -113,7 +109,7 @@ struct acpi_driver {
 	struct list_head	node;
 	char			name[80];
 	char			class[80];
-	int			references;
+	atomic_t		references;
 	char			*ids;		/* Supported Hardware IDs */
 	struct acpi_device_ops	ops;
 };
@@ -249,6 +245,7 @@ struct acpi_device {
 	struct acpi_device	*parent;
 	struct list_head	children;
 	struct list_head	node;
+	struct list_head	g_list;
 	struct acpi_device_status status;
 	struct acpi_device_flags flags;
 	struct acpi_device_pnp	pnp;
@@ -258,9 +255,7 @@ struct acpi_device {
 	struct acpi_device_ops	ops;
 	struct acpi_driver	*driver;
 	void			*driver_data;
-#ifdef CONFIG_LDM
-	struct device		dev;
-#endif
+	struct driver_dir_entry	driverfs_dir;
 };
 
 #define acpi_driver_data(d)	((d)->driver_data)
@@ -292,6 +287,9 @@ int acpi_bus_generate_event (struct acpi_device *device, u8 type, int data);
 int acpi_bus_receive_event (struct acpi_bus_event *event);
 int acpi_bus_register_driver (struct acpi_driver *driver);
 int acpi_bus_unregister_driver (struct acpi_driver *driver);
+
+int acpi_create_dir(struct acpi_device *);
+void acpi_remove_dir(struct acpi_device *);
 
 #endif /*CONFIG_ACPI_BUS*/
 

@@ -1,6 +1,6 @@
 /* $Id: cmd64x.c,v 1.21 2000/01/30 23:23:16
  *
- * linux/drivers/ide/cmd64x.c		Version 1.22	June 9, 2000
+ * linux/drivers/ide/cmd64x.c		Version 1.30	Sept 10, 2002
  *
  * cmd64x.c: Enable interrupts at initialization time on Ultra/PCI machines.
  *           Note, this driver is not used at all on other systems because
@@ -15,6 +15,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
@@ -727,10 +728,12 @@ static void __init init_hwif_cmd64x (ide_hwif_t *hwif)
 	if (dev->device == PCI_DEVICE_ID_CMD_643)
 		hwif->ultra_mask = 0x80;
 	if (dev->device == PCI_DEVICE_ID_CMD_646)
+	{
 		if (class_rev > 0x04)
 			hwif->ultra_mask = 0x07;
 		else
 			hwif->ultra_mask = 0x80;
+	}
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	hwif->ide_dma_check = &cmd64x_config_drive_for_dma;
@@ -758,10 +761,6 @@ static void __init init_hwif_cmd64x (ide_hwif_t *hwif)
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
-/**
- *	FIXME: not required ?
- */
- 
 static void __init init_dma_cmd64x (ide_hwif_t *hwif, unsigned long dmabase)
 {
 	ide_setup_dma(hwif, dmabase, 8);
@@ -769,30 +768,59 @@ static void __init init_dma_cmd64x (ide_hwif_t *hwif, unsigned long dmabase)
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
-/**
- *	FIXME: not required either ?
- */
- 
-static void __init init_setup_cmd64x (struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit cmd64x_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
+	ide_pci_device_t *d = &cmd64x_chipsets[id->driver_data];
+	if (dev->device != d->device)
+		BUG();
 	ide_setup_pci_device(dev, d);
-}
-
-int __init cmd64x_scan_pcidev (struct pci_dev *dev)
-{
-	ide_pci_device_t *d;
-
-	if (dev->vendor != PCI_VENDOR_ID_CMD)
-		return 0;
-
-	for (d = cmd64x_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
 	return 0;
 }
+
+/**
+ *	cmd64x_remove_one	-	called with an CMD64x is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect a CMD64x device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void cmd64x_remove_one(struct pci_dev *dev)
+{
+	panic("CMD64x removal not yet supported");
+}
+
+static struct pci_device_id cmd64x_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_CMD_643, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_CMD_646, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
+	{ PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_CMD_648, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 2},
+	{ PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_CMD_649, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 3},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"CMD64x IDE",
+	id_table:	cmd64x_pci_tbl,
+	probe:		cmd64x_init_one,
+	remove:		__devexit_p(cmd64x_remove_one),
+};
+
+static int cmd64x_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void cmd64x_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(cmd64x_ide_init);
+module_exit(cmd64x_ide_exit);
+
+MODULE_AUTHOR("Eddie Dost, David Miller, Andre Hedrick");
+MODULE_DESCRIPTION("PCI driver module for CMD64x IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;
 

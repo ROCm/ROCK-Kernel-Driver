@@ -286,7 +286,7 @@ int __init hvc_init(void)
 		panic("Couldn't register hvc console driver\n");
 
 	if (hvc_driver.num > 0)
-		kernel_thread(khvcd, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
+		kernel_thread(khvcd, NULL, CLONE_KERNEL);
 
 	return 0;
 }

@@ -592,6 +592,7 @@ void probe_hwif (ide_hwif_t *hwif)
 {
 	unsigned int unit;
 	unsigned long flags;
+	unsigned int irqd;
 
 	if (hwif->noprobe)
 		return;
@@ -623,7 +624,12 @@ void probe_hwif (ide_hwif_t *hwif)
 		return;	
 	}
 
-	if (hwif->hw.ack_intr && hwif->irq)
+	/*
+	 * We must always disable IRQ, as probe_for_drive will assert IRQ, but
+	 * we'll install our IRQ driver much later...
+	 */
+	irqd = hwif->irq;
+	if (irqd)
 		disable_irq(hwif->irq);
 
 	local_irq_set(flags);
@@ -659,8 +665,12 @@ void probe_hwif (ide_hwif_t *hwif)
 
 	}
 	local_irq_restore(flags);
-	if (hwif->hw.ack_intr && hwif->irq)
-		enable_irq(hwif->irq);
+	/*
+	 * Use cached IRQ number. It might be (and is...) changed by probe
+	 * code above
+	 */
+	if (irqd)
+		enable_irq(irqd);
 
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		ide_drive_t *drive = &hwif->drives[unit];

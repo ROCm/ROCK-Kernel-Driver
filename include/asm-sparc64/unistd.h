@@ -203,7 +203,7 @@
 #define __NR_setpgid            185 /* Common                                      */
 #define __NR_fremovexattr       186 /* SunOS: pathconf                             */
 #define __NR_tkill              187 /* SunOS: fpathconf                            */
-/* #define __NR_sysconf         188    SunOS Specific                              */
+#define __NR_exit_group		188 /* Linux specific, sysconf undef SunOS         */
 #define __NR_uname              189 /* Linux Specific                              */
 #define __NR_init_module        190 /* Linux Specific                              */
 #define __NR_personality        191 /* Linux Specific                              */

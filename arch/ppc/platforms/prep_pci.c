@@ -27,7 +27,6 @@
 #include <asm/machdep.h>
 #include <asm/open_pic.h>
 
-#define MAX_DEVNR 22
 
 /* Which PCI interrupt line does a given device [slot] use? */
 /* Note: This really should be two dimensional based in slot/pin used */
@@ -616,47 +615,79 @@ static unsigned char prep_pci_intpins[4][4] __prepdata =
 #define ELCRM_INT7_LVL          0x80
 #define ELCRM_INT5_LVL          0x20
 
-#define CFGPTR(dev) (0x80800000 | (1<<(dev>>3)) | ((dev&7)<<8) | offset)
-#define DEVNO(dev)  (dev>>3)                                  
+/*
+ * PCI config space access.
+ */
+#define CFGADDR(dev)	((1<<(dev>>3)) | ((dev&7)<<8))
+#define DEVNO(dev)	(dev>>3)
 
-#define cfg_read(val, addr, type, op)	*val = op((type)(addr))
-#define cfg_write(val, addr, type, op)	op((type *)(addr), (val))
+#define MIN_DEVNR	11
+#define MAX_DEVNR	22
 
-#define cfg_read_bad(val, size)		*val = bad_##size;
-#define cfg_write_bad(val, size)
+static int __prep
+prep_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
+		 int len, u32 *val)
+{
+	struct pci_controller *hose = bus->sysdata;
+	volatile unsigned char *cfg_data;
 
-#define bad_byte	0xff
-#define bad_word	0xffff
-#define bad_dword	0xffffffffU
+	if (bus->number != 0 || DEVNO(devfn) < MIN_DEVNR
+	    || DEVNO(devfn) > MAX_DEVNR)
+		return PCIBIOS_DEVICE_NOT_FOUND;
 
-#define PREP_PCI_OP(rw, size, type, op)					\
-static int __prep							\
-prep_##rw##_config_##size(struct pci_dev *dev, int offset, type val)	\
-{									\
-	if ((dev->bus->number != 0) || (DEVNO(dev->devfn) > MAX_DEVNR))	\
-	{                   						\
-		cfg_##rw##_bad(val, size)				\
-		return PCIBIOS_DEVICE_NOT_FOUND;    			\
-	}								\
-	cfg_##rw(val, CFGPTR(dev->devfn), type, op);			\
-	return PCIBIOS_SUCCESSFUL;					\
+	/*
+	 * Note: the caller has already checked that offset is
+	 * suitably aligned and that len is 1, 2 or 4.
+	 */
+	cfg_data = hose->cfg_data + CFGADDR(devfn) + offset;
+	switch (len) {
+	case 1:
+		*val = in_8((u8 *)cfg_data);
+		break;
+	case 2:
+		*val = in_le16((u16 *)cfg_data);
+		break;
+	default:
+		*val = in_le32((u32 *)cfg_data);
+		break;
+	}
+	return PCIBIOS_SUCCESSFUL;
 }
 
-PREP_PCI_OP(read, byte, u8 *, in_8)
-PREP_PCI_OP(read, word, u16 *, in_le16)
-PREP_PCI_OP(read, dword, u32 *, in_le32)
-PREP_PCI_OP(write, byte, u8, out_8)
-PREP_PCI_OP(write, word, u16, out_le16)
-PREP_PCI_OP(write, dword, u32, out_le32)
+static int __prep
+prep_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
+		  int len, u32 val)
+{
+	struct pci_controller *hose = bus->sysdata;
+	volatile unsigned char *cfg_data;
+
+	if (bus->number != 0 || DEVNO(devfn) < MIN_DEVNR
+	    || DEVNO(devfn) > MAX_DEVNR)
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	/*
+	 * Note: the caller has already checked that offset is
+	 * suitably aligned and that len is 1, 2 or 4.
+	 */
+	cfg_data = hose->cfg_data + CFGADDR(devfn) + offset;
+	switch (len) {
+	case 1:
+		out_8((u8 *)cfg_data, val);
+		break;
+	case 2:
+		out_le16((u16 *)cfg_data, val);
+		break;
+	default:
+		out_le32((u32 *)cfg_data, val);
+		break;
+	}
+	return PCIBIOS_SUCCESSFUL;
+}
 
 static struct pci_ops prep_pci_ops =
 {
-	prep_read_config_byte,
-	prep_read_config_word,
-	prep_read_config_dword,
-	prep_write_config_byte,
-	prep_write_config_word,
-	prep_write_config_dword
+	prep_read_config,
+	prep_write_config
 };
 
 #define MOTOROLA_CPUTYPE_REG	0x800
@@ -1239,10 +1270,12 @@ prep_find_bridges(void)
 	hose->last_busno = 0xff;
 	hose->pci_mem_offset = PREP_ISA_MEM_BASE;
 	hose->io_base_phys = PREP_ISA_IO_BASE;
-	hose->io_base_virt = (void *)0x80000000; /* see prep_map_io() */
-	prep_init_resource(&hose->io_resource, 0, 0x00ffffff, IORESOURCE_IO);
+	hose->io_base_virt = ioremap(PREP_ISA_IO_BASE, 0x800000);
+	prep_init_resource(&hose->io_resource, 0, 0x007fffff, IORESOURCE_IO);
 	prep_init_resource(&hose->mem_resources[0], 0xc0000000, 0xfeffffff,
 			   IORESOURCE_MEM);
+	/* XXX why can't we use the indirect config space access method? */
+	hose->cfg_data = ioremap(PREP_ISA_IO_BASE + 0x800000, 0x800000);
 	hose->ops = &prep_pci_ops;
 
 	printk("PReP architecture\n");

@@ -56,8 +56,6 @@
 #include "ohci1394.h"
 
 #define ISO_CHANNELS 64
-#define ISO_RECEIVE 0
-#define ISO_TRANSMIT 1
 
 #ifndef virt_to_page
 #define virt_to_page(x) MAP_NR(x)
@@ -84,9 +82,10 @@ struct it_dma_prg {
 
 struct dma_iso_ctx {
 	struct ti_ohci *ohci;
-	int type; /* ISO_TRANSMIT or ISO_RECEIVE */
-	int ctx;
+	int type; /* OHCI_ISO_TRANSMIT or OHCI_ISO_RECEIVE */
+	struct ohci1394_iso_tasklet iso_tasklet;
 	int channel;
+	int ctx;
 	int last_buffer;
 	int * next_buffer;  /* For ISO Transmit of video packets
 			       to write the correct SYT field
@@ -153,8 +152,8 @@ printk(level "video1394: " fmt "\n" , ## args)
 #define PRINT(level, card, fmt, args...) \
 printk(level "video1394_%d: " fmt "\n" , card , ## args)
 
-static void irq_handler(int card, quadlet_t isoRecvIntEvent, 
-			quadlet_t isoXmitIntEvent, void *data);
+void wakeup_dma_ir_ctx(unsigned long l);
+void wakeup_dma_it_ctx(unsigned long l);
 
 static LIST_HEAD(video1394_cards);
 static spinlock_t video1394_cards_lock = SPIN_LOCK_UNLOCKED;
@@ -234,12 +233,12 @@ static void rvfree(void * mem, unsigned long size)
 static int free_dma_iso_ctx(struct dma_iso_ctx *d)
 {
 	int i;
-	unsigned long *usage;
 	
 	DBGMSG(d->ohci->id, "Freeing dma_iso_ctx %d", d->ctx);
 
 	ohci1394_stop_context(d->ohci, d->ctrlClear, NULL);
-	ohci1394_unhook_irq(d->ohci, irq_handler, d);
+	if (d->iso_tasklet.link.next != NULL)
+		ohci1394_unregister_iso_tasklet(d->ohci, &d->iso_tasklet);
 
 	if (d->buf)
 		rvfree((void *)d->buf, d->num_desc * d->buf_size);
@@ -265,11 +264,6 @@ static int free_dma_iso_ctx(struct dma_iso_ctx *d)
 	if (d->next_buffer)
 		kfree(d->next_buffer);
 
-	usage = (d->type == ISO_RECEIVE) ? &d->ohci->ir_ctx_usage :
-		&d->ohci->it_ctx_usage;
-       
-	/* clear the ISO context usage bit */
-	clear_bit(d->ctx, usage);
 	list_del(&d->link);
 
 	kfree(d);
@@ -281,54 +275,27 @@ static struct dma_iso_ctx *
 alloc_dma_iso_ctx(struct ti_ohci *ohci, int type, int num_desc,
 		  int buf_size, int channel, unsigned int packet_size)
 {
-	struct dma_iso_ctx *d=NULL;
+	struct dma_iso_ctx *d;
 	int i;
 
-	unsigned long *usage = (type == ISO_RECEIVE) ? &ohci->ir_ctx_usage :
-		                                       &ohci->it_ctx_usage;
-
-	/* try to claim the ISO context usage bit */
-	for (i = 0; i < ohci->nb_iso_rcv_ctx; i++) {
-		if (!test_and_set_bit(i, usage)) {
-			PRINT(KERN_ERR, ohci->id, "Free iso ctx %d found", i);
-			break;
-		}
-	}
-
-	if (i == ohci->nb_iso_rcv_ctx) {
-		PRINT(KERN_ERR, ohci->id, "No DMA contexts available");
-		return NULL;
-	}
-	
-	d = (struct dma_iso_ctx *)kmalloc(sizeof(struct dma_iso_ctx), 
-					  GFP_KERNEL);
-	if (d==NULL) {
+	d = kmalloc(sizeof(struct dma_iso_ctx), GFP_KERNEL);
+	if (d == NULL) {
 		PRINT(KERN_ERR, ohci->id, "Failed to allocate dma_iso_ctx");
 		return NULL;
 	}
 
-	memset(d, 0, sizeof(struct dma_iso_ctx));
+	memset(d, 0, sizeof *d);
 
-	d->ohci = (void *)ohci;
+	d->ohci = ohci;
 	d->type = type;
-	d->ctx = i;
 	d->channel = channel;
 	d->num_desc = num_desc;
 	d->frame_size = buf_size;
-	if (buf_size%PAGE_SIZE) 
-		d->buf_size = buf_size + PAGE_SIZE - (buf_size%PAGE_SIZE);
-	else
-		d->buf_size = buf_size;
+	d->buf_size = PAGE_ALIGN(buf_size);
 	d->last_buffer = -1;
 	d->buf = NULL;
 	d->ir_prg = NULL;
 	init_waitqueue_head(&d->waitq);
-
-	if (ohci1394_hook_irq(ohci, irq_handler, d) != 0) {
-		PRINT(KERN_ERR, ohci->id, "ohci1394_hook_irq() failed");
-		free_dma_iso_ctx(d);
-		return NULL;
-	}
 
 	d->buf = rvmalloc(d->num_desc * d->buf_size);
 
@@ -339,7 +306,24 @@ alloc_dma_iso_ctx(struct ti_ohci *ohci, int type, int num_desc,
 	}
 	memset(d->buf, 0, d->num_desc * d->buf_size);
 
-	if (type == ISO_RECEIVE) {
+	if (type == OHCI_ISO_RECEIVE)
+		ohci1394_init_iso_tasklet(&d->iso_tasklet, type,
+					  wakeup_dma_ir_ctx,
+					  (unsigned long) d);
+	else
+		ohci1394_init_iso_tasklet(&d->iso_tasklet, type,
+					  wakeup_dma_it_ctx,
+					  (unsigned long) d);
+
+	if (ohci1394_register_iso_tasklet(ohci, &d->iso_tasklet) < 0) {
+		PRINT(KERN_ERR, ohci->id, "no free iso %s contexts",
+		      type == OHCI_ISO_RECEIVE ? "receive" : "transmit");
+		free_dma_iso_ctx(d);
+		return NULL;
+	}
+	d->ctx = d->iso_tasklet.context;
+
+	if (type == OHCI_ISO_RECEIVE) {
 		d->ctrlSet = OHCI1394_IsoRcvContextControlSet+32*d->ctx;
 		d->ctrlClear = OHCI1394_IsoRcvContextControlClear+32*d->ctx;
 		d->cmdPtr = OHCI1394_IsoRcvCommandPtr+32*d->ctx;
@@ -359,7 +343,7 @@ alloc_dma_iso_ctx(struct ti_ohci *ohci, int type, int num_desc,
 		d->nb_cmd = d->buf_size / PAGE_SIZE + 1;
 		d->left_size = (d->frame_size % PAGE_SIZE) ?
 			d->frame_size % PAGE_SIZE : PAGE_SIZE;
-
+ 
 		for (i=0;i<d->num_desc;i++) {
 			d->ir_prg[i] = kmalloc(d->nb_cmd * 
 					       sizeof(struct dma_cmd), 
@@ -371,8 +355,9 @@ alloc_dma_iso_ctx(struct ti_ohci *ohci, int type, int num_desc,
 				return NULL;
 			}
 		}
+
 	}
-	else {  /* ISO_TRANSMIT */
+	else {  /* OHCI_ISO_TRANSMIT */
 		d->ctrlSet = OHCI1394_IsoXmitContextControlSet+16*d->ctx;
 		d->ctrlClear = OHCI1394_IsoXmitContextControlClear+16*d->ctx;
 		d->cmdPtr = OHCI1394_IsoXmitCommandPtr+16*d->ctx;
@@ -458,7 +443,7 @@ alloc_dma_iso_ctx(struct ti_ohci *ohci, int type, int num_desc,
 
 	PRINT(KERN_INFO, ohci->id, "Iso %s DMA: %d buffers "
 	      "of size %d allocated for a frame size %d, each with %d prgs",
-	      (type==ISO_RECEIVE) ? "receive" : "transmit",
+	      (type == OHCI_ISO_RECEIVE) ? "receive" : "transmit",
 	      d->num_desc, d->buf_size, d->frame_size, d->nb_cmd);
 
 	return d;
@@ -563,18 +548,14 @@ find_ctx(struct list_head *list, int type, int channel)
 	return NULL;
 }
 
-int wakeup_dma_ir_ctx(struct ti_ohci *ohci, struct dma_iso_ctx *d) 
+void wakeup_dma_ir_ctx(unsigned long l)
 {
+	struct dma_iso_ctx *d = (struct dma_iso_ctx *) l;
 	int i;
 
-	if (d==NULL) {
-		PRINT(KERN_ERR, ohci->id, "Iso receive event received but "
-		      "context not allocated");
-		return -EFAULT;
-	}
-
 	spin_lock(&d->lock);
-	for (i=0;i<d->num_desc;i++) {
+
+	for (i = 0; i < d->num_desc; i++) {
 		if (d->ir_prg[i][d->nb_cmd-1].status & cpu_to_le32(0xFFFF0000)) {
 			reset_ir_status(d, i);
 			d->buffer_status[i] = VIDEO1394_BUFFER_READY;
@@ -585,9 +566,11 @@ int wakeup_dma_ir_ctx(struct ti_ohci *ohci, struct dma_iso_ctx *d)
 #endif
 		}
 	}
+
 	spin_unlock(&d->lock);
-	if (waitqueue_active(&d->waitq)) wake_up_interruptible(&d->waitq);
-	return 0;
+
+	if (waitqueue_active(&d->waitq))
+		wake_up_interruptible(&d->waitq);
 }
 
 static inline void put_timestamp(struct ti_ohci *ohci, struct dma_iso_ctx * d,
@@ -642,29 +625,28 @@ static inline void put_timestamp(struct ti_ohci *ohci, struct dma_iso_ctx * d,
 #endif	
 }
 
-int wakeup_dma_it_ctx(struct ti_ohci *ohci, struct dma_iso_ctx *d) 
+void wakeup_dma_it_ctx(unsigned long l)
 {
+	struct dma_iso_ctx *d = (struct dma_iso_ctx *) l;
+	struct ti_ohci *ohci = d->ohci;
 	int i;
 
-	if (d==NULL) {
-		PRINT(KERN_ERR, ohci->id, "Iso transmit event received but "
-		      "context not allocated");
-		return -EFAULT;
-	}
-
 	spin_lock(&d->lock);
-	for (i=0;i<d->num_desc;i++) {
-		if (d->it_prg[i][d->last_used_cmd[i]].end.status& 
-			cpu_to_le32(0xFFFF0000)) {
+
+	for (i = 0; i < d->num_desc; i++) {
+		if (d->it_prg[i][d->last_used_cmd[i]].end.status & 
+		    cpu_to_le32(0xFFFF0000)) {
 			int next = d->next_buffer[i];
 			put_timestamp(ohci, d, next);
 			d->it_prg[i][d->last_used_cmd[i]].end.status = 0;
 			d->buffer_status[i] = VIDEO1394_BUFFER_READY;
 		}
 	}
+
 	spin_unlock(&d->lock);
-	if (waitqueue_active(&d->waitq)) wake_up_interruptible(&d->waitq);
-	return 0;
+
+	if (waitqueue_active(&d->waitq))
+		wake_up_interruptible(&d->waitq);
 }
 
 static void initialize_dma_it_prg(struct dma_iso_ctx *d, int n, int sync_tag)
@@ -871,13 +853,13 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 		}
 		ohci->ISO_channel_usage |= mask;
 
-		if (v.buf_size<=0) {
+		if (v.buf_size == 0 || v.buf_size > VIDEO1394_MAX_SIZE) {
 			PRINT(KERN_ERR, ohci->id,
 			      "Invalid %d length buffer requested",v.buf_size);
 			return -EFAULT;
 		}
 
-		if (v.nb_buffers<=0) {
+		if (v.nb_buffers == 0 || v.nb_buffers > VIDEO1394_MAX_SIZE) {
 			PRINT(KERN_ERR, ohci->id,
 			      "Invalid %d buffers requested",v.nb_buffers);
 			return -EFAULT;
@@ -891,7 +873,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 		}
 
 		if (cmd == VIDEO1394_LISTEN_CHANNEL) {
-			d = alloc_dma_iso_ctx(ohci, ISO_RECEIVE,
+			d = alloc_dma_iso_ctx(ohci, OHCI_ISO_RECEIVE,
 					      v.nb_buffers, v.buf_size, 
 					      v.channel, 0);
 
@@ -912,7 +894,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 			      d->ctx, v.channel);
 		}
 		else {
-			d = alloc_dma_iso_ctx(ohci, ISO_TRANSMIT,
+			d = alloc_dma_iso_ctx(ohci, OHCI_ISO_TRANSMIT,
 					      v.nb_buffers, v.buf_size, 
 					      v.channel, v.packet_size);
 
@@ -966,9 +948,9 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 		ohci->ISO_channel_usage &= ~mask;
 
 		if (cmd == VIDEO1394_UNLISTEN_CHANNEL)
-			d = find_ctx(&ctx->context_list, ISO_RECEIVE, channel);
+			d = find_ctx(&ctx->context_list, OHCI_ISO_RECEIVE, channel);
 		else
-			d = find_ctx(&ctx->context_list, ISO_TRANSMIT, channel);
+			d = find_ctx(&ctx->context_list, OHCI_ISO_TRANSMIT, channel);
 
 		if (d == NULL) return -EFAULT;
 		PRINT(KERN_INFO, ohci->id, "Iso context %d "
@@ -985,7 +967,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 		if(copy_from_user(&v, (void *)arg, sizeof(v)))
 			return -EFAULT;
 
-		d = find_ctx(&ctx->context_list, ISO_RECEIVE, v.channel);
+		d = find_ctx(&ctx->context_list, OHCI_ISO_RECEIVE, v.channel);
 
 		if ((v.buffer<0) || (v.buffer>d->num_desc)) {
 			PRINT(KERN_ERR, ohci->id, 
@@ -1047,7 +1029,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 		if(copy_from_user(&v, (void *)arg, sizeof(v)))
 			return -EFAULT;
 
-		d = find_ctx(&ctx->context_list, ISO_RECEIVE, v.channel);
+		d = find_ctx(&ctx->context_list, OHCI_ISO_RECEIVE, v.channel);
 
 		if ((v.buffer<0) || (v.buffer>d->num_desc)) {
 			PRINT(KERN_ERR, ohci->id, 
@@ -1128,7 +1110,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 		if(copy_from_user(&v, (void *)arg, sizeof(v)))
 			return -EFAULT;
 
-		d = find_ctx(&ctx->context_list, ISO_TRANSMIT, v.channel);
+		d = find_ctx(&ctx->context_list, OHCI_ISO_TRANSMIT, v.channel);
 
 		if ((v.buffer<0) || (v.buffer>d->num_desc)) {
 			PRINT(KERN_ERR, ohci->id, 
@@ -1217,7 +1199,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 		if(copy_from_user(&v, (void *)arg, sizeof(v)))
 			return -EFAULT;
 
-		d = find_ctx(&ctx->context_list, ISO_TRANSMIT, v.channel);
+		d = find_ctx(&ctx->context_list, OHCI_ISO_TRANSMIT, v.channel);
 
 		if ((v.buffer<0) || (v.buffer>d->num_desc)) {
 			PRINT(KERN_ERR, ohci->id, 
@@ -1340,7 +1322,7 @@ static int video1394_release(struct inode *inode, struct file *file)
 			ohci->ISO_channel_usage &= ~mask;
 		PRINT(KERN_INFO, ohci->id, "On release: Iso %s context "
 		      "%d stop listening on channel %d",
-		      d->type == ISO_RECEIVE ? "receive" : "transmit",
+		      d->type == OHCI_ISO_RECEIVE ? "receive" : "transmit",
 		      d->ctx, d->channel);
 		free_dma_iso_ctx(d);
 	}
@@ -1352,27 +1334,13 @@ static int video1394_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static void irq_handler(int card, quadlet_t isoRecvIntEvent, 
-			quadlet_t isoXmitIntEvent, void *data)
-{
-	struct dma_iso_ctx *d = (struct dma_iso_ctx *) data;
-
-	DBGMSG(card, "Iso event Recv: %08x Xmit: %08x",
-	       isoRecvIntEvent, isoXmitIntEvent);
-
-	if (d->type == ISO_RECEIVE && isoRecvIntEvent & (1 << d->ctx))
-		wakeup_dma_ir_ctx(d->ohci, d);
-	if (d->type == ISO_TRANSMIT && isoXmitIntEvent & (1 << d->ctx))
-		wakeup_dma_it_ctx(d->ohci, d);
-}
-
 static struct file_operations video1394_fops=
 {
-	owner:		THIS_MODULE,
-	ioctl:		video1394_ioctl,
-	mmap:		video1394_mmap,
-	open:		video1394_open,
-	release:	video1394_release
+	.owner =	THIS_MODULE,
+	.ioctl =	video1394_ioctl,
+	.mmap =		video1394_mmap,
+	.open =		video1394_open,
+	.release =	video1394_release
 };
 
 static int video1394_init(struct ti_ohci *ohci)
@@ -1460,8 +1428,8 @@ static void video1394_add_host (struct hpsb_host *host)
 }
 
 static struct hpsb_highlevel_ops hl_ops = {
-	add_host:	video1394_add_host,
-	remove_host:	video1394_remove_host,
+	.add_host =	video1394_add_host,
+	.remove_host =	video1394_remove_host,
 };
 
 MODULE_AUTHOR("Sebastien Rougeaux <sebastien.rougeaux@anu.edu.au>");

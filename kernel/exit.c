@@ -49,16 +49,14 @@ static struct dentry * __unhash_process(struct task_struct *p)
 	return proc_dentry;
 }
 
-static void release_task(struct task_struct * p)
+void release_task(struct task_struct * p)
 {
 	struct dentry *proc_dentry;
 
 	if (p->state != TASK_ZOMBIE)
 		BUG();
-#ifdef CONFIG_SMP
 	if (p != current)
 		wait_task_inactive(p);
-#endif
 	atomic_dec(&p->user->processes);
 	security_ops->task_free_security(p);
 	free_uid(p->user);
@@ -71,19 +69,19 @@ static void release_task(struct task_struct * p)
 	write_lock_irq(&tasklist_lock);
 	__exit_sighand(p);
 	proc_dentry = __unhash_process(p);
+	p->parent->cutime += p->utime + p->cutime;
+	p->parent->cstime += p->stime + p->cstime;
+	p->parent->cmin_flt += p->min_flt + p->cmin_flt;
+	p->parent->cmaj_flt += p->maj_flt + p->cmaj_flt;
+	p->parent->cnswap += p->nswap + p->cnswap;
+	sched_exit(p);
 	write_unlock_irq(&tasklist_lock);
+
 	if (unlikely(proc_dentry != NULL)) {
 		shrink_dcache_parent(proc_dentry);
 		dput(proc_dentry);
 	}
-
 	release_thread(p);
-	if (p != current) {
-		current->cmin_flt += p->min_flt + p->cmin_flt;
-		current->cmaj_flt += p->maj_flt + p->cmaj_flt;
-		current->cnswap += p->nswap + p->cnswap;
-		sched_exit(p);
-	}
 	put_task_struct(p);
 }
 
@@ -115,7 +113,7 @@ int session_of_pgrp(int pgrp)
 
 	fallback = -1;
 	read_lock(&tasklist_lock);
-	for_each_task(p) {
+	for_each_process(p) {
  		if (p->session <= 0)
  			continue;
 		if (p->pgrp == pgrp) {
@@ -141,7 +139,7 @@ static int __will_become_orphaned_pgrp(int pgrp, struct task_struct * ignored_ta
 {
 	struct task_struct *p;
 
-	for_each_task(p) {
+	for_each_process(p) {
 		if ((p == ignored_task) || (p->pgrp != pgrp) ||
 		    (p->state == TASK_ZOMBIE) ||
 		    (p->parent->pid == 1))
@@ -175,7 +173,7 @@ static inline int __has_stopped_jobs(int pgrp)
 	int retval = 0;
 	struct task_struct * p;
 
-	for_each_task(p) {
+	for_each_process(p) {
 		if (p->pgrp != pgrp)
 			continue;
 		if (p->state != TASK_STOPPED)
@@ -447,11 +445,7 @@ static inline void forget_original_parent(struct task_struct * father)
 	struct task_struct *p, *reaper = father;
 	struct list_head *_p;
 
-	if (father->exit_signal != -1)
-		reaper = prev_thread(reaper);
-	else
-		reaper = child_reaper;
-
+	reaper = father->group_leader;
 	if (reaper == father)
 		reaper = child_reaper;
 
@@ -465,7 +459,8 @@ static inline void forget_original_parent(struct task_struct * father)
 	 */
 	list_for_each(_p, &father->children) {
 		p = list_entry(_p,struct task_struct,sibling);
-		reparent_thread(p, reaper, child_reaper);
+		if (father == p->real_parent)
+			reparent_thread(p, reaper, child_reaper);
 	}
 	list_for_each(_p, &father->ptrace_children) {
 		p = list_entry(_p,struct task_struct,ptrace_list);
@@ -485,9 +480,16 @@ static inline void zap_thread(task_t *p, task_t *father, int traced)
 		p->ptrace = ptrace_flag;
 		__ptrace_link(p, trace_task);
 	} else {
-		/* Otherwise, if we were tracing this thread, untrace it.  */
+		/*
+		 * Otherwise, if we were tracing this thread, untrace it.
+		 * If we were only tracing the thread (i.e. not its real
+		 * parent), stop here.
+		 */
 		ptrace_unlink (p);
-
+		if (p->parent != father) {
+			BUG_ON(p->parent != p->real_parent);
+			return;
+		}
 		list_del_init(&p->sibling);
 		p->parent = p->real_parent;
 		list_add_tail(&p->sibling, &p->parent->children);
@@ -575,7 +577,6 @@ static void exit_notify(void)
 	 *	jobs, send them a SIGHUP and then a SIGCONT.  (POSIX 3.2.2.2)
 	 */
 
-	current->state = TASK_ZOMBIE;
 	if (current->exit_signal != -1)
 		do_notify_parent(current, current->exit_signal);
 
@@ -584,6 +585,8 @@ static void exit_notify(void)
 	while (!list_empty(&current->ptrace_children))
 		zap_thread(list_entry(current->ptrace_children.next,struct task_struct,ptrace_list), current, 1);
 	BUG_ON(!list_empty(&current->children));
+
+	current->state = TASK_ZOMBIE;
 	/*
 	 * No need to unlock IRQs, we'll schedule() immediately
 	 * anyway. In the preemption case this also makes it
@@ -672,26 +675,30 @@ asmlinkage long sys_exit(int error_code)
  */
 asmlinkage long sys_exit_group(int error_code)
 {
-	struct signal_struct *sig = current->sig;
+	unsigned int exit_code = (error_code & 0xff) << 8;
 
-	spin_lock_irq(&sig->siglock);
-	if (sig->group_exit) {
+	if (!list_empty(&current->thread_group)) {
+		struct signal_struct *sig = current->sig;
+
+		spin_lock_irq(&sig->siglock);
+		if (sig->group_exit) {
+			spin_unlock_irq(&sig->siglock);
+
+			/* another thread was faster: */
+			do_exit(sig->group_exit_code);
+		}
+		sig->group_exit = 1;
+		sig->group_exit_code = exit_code;
+		__broadcast_thread_group(current, SIGKILL);
 		spin_unlock_irq(&sig->siglock);
-
-		/* another thread was faster: */
-		do_exit(sig->group_exit_code);
 	}
-	sig->group_exit = 1;
-	sig->group_exit_code = (error_code & 0xff) << 8;
-	__broadcast_thread_group(current, SIGKILL);
-	spin_unlock_irq(&sig->siglock);
 
-	do_exit(sig->group_exit_code);
+	do_exit(exit_code);
 }
 
-static inline int eligible_child(pid_t pid, int options, task_t *p)
+static int eligible_child(pid_t pid, int options, task_t *p)
 {
-	if (pid>0) {
+	if (pid > 0) {
 		if (p->pid != pid)
 			return 0;
 	} else if (!pid) {
@@ -717,6 +724,12 @@ static inline int eligible_child(pid_t pid, int options, task_t *p)
 	if (((p->exit_signal != SIGCHLD) ^ ((options & __WCLONE) != 0))
 	    && !(options & __WALL))
 		return 0;
+	/*
+	 * Do not consider thread group leaders that are
+	 * in a non-empty thread group:
+	 */
+	if (current->tgid != p->tgid && delay_group_leader(p))
+		return 2;
 
 	if (security_ops->task_wait(p))
 		return 0;
@@ -742,11 +755,16 @@ repeat:
 	do {
 		struct task_struct *p;
 		struct list_head *_p;
+		int ret;
+
 		list_for_each(_p,&tsk->children) {
 			p = list_entry(_p,struct task_struct,sibling);
-			if (!eligible_child(pid, options, p))
+
+			ret = eligible_child(pid, options, p);
+			if (!ret)
 				continue;
 			flag = 1;
+
 			switch (p->state) {
 			case TASK_STOPPED:
 				if (!p->exit_code)
@@ -769,12 +787,19 @@ repeat:
 				}
 				goto end_wait4;
 			case TASK_ZOMBIE:
-				current->cutime += p->utime + p->cutime;
-				current->cstime += p->stime + p->cstime;
+				/*
+				 * Eligible but we cannot release it yet:
+				 */
+				if (ret == 2)
+					continue;
 				read_unlock(&tasklist_lock);
 				retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0;
-				if (!retval && stat_addr)
-					retval = put_user(p->exit_code, stat_addr);
+				if (!retval && stat_addr) {
+					if (p->sig->group_exit)
+						retval = put_user(p->sig->group_exit_code, stat_addr);
+					else
+						retval = put_user(p->exit_code, stat_addr);
+				}
 				if (retval)
 					goto end_wait4; 
 				retval = p->pid;

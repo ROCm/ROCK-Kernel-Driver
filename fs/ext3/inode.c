@@ -471,7 +471,7 @@ static inline unsigned long ext3_find_near(struct inode *inode, Indirect *ind)
 	 * the same cylinder group then.
 	 */
 	return (ei->i_block_group * EXT3_BLOCKS_PER_GROUP(inode->i_sb)) +
-	       le32_to_cpu(inode->i_sb->u.ext3_sb.s_es->s_first_data_block);
+	       le32_to_cpu(EXT3_SB(inode->i_sb)->s_es->s_first_data_block);
 }
 
 /**
@@ -1399,13 +1399,15 @@ static int ext3_releasepage(struct page *page, int wait)
  * If the O_DIRECT write is intantiating holes inside i_size and the machine
  * crashes then stale disk data _may_ be exposed inside the file.
  */
-static int ext3_direct_IO(int rw, struct inode *inode, char *buf,
-			loff_t offset, size_t count)
+static int ext3_direct_IO(int rw, struct inode *inode,
+			const struct iovec *iov, loff_t offset,
+			unsigned long nr_segs)
 {
 	struct ext3_inode_info *ei = EXT3_I(inode);
 	handle_t *handle = NULL;
 	int ret;
 	int orphan = 0;
+	size_t count = iov_length(iov, nr_segs);
 
 	if (rw == WRITE) {
 		loff_t final_size = offset + count;
@@ -1428,8 +1430,8 @@ static int ext3_direct_IO(int rw, struct inode *inode, char *buf,
 		}
 	}
 
-	ret = generic_direct_IO(rw, inode, buf, offset,
-				count, ext3_direct_io_get_blocks);
+	ret = generic_direct_IO(rw, inode, iov, offset,
+				nr_segs, ext3_direct_io_get_blocks);
 
 out_stop:
 	if (handle) {
@@ -2139,20 +2141,20 @@ int ext3_get_inode_loc (struct inode *inode, struct ext3_iloc *iloc)
 		inode->i_ino != EXT3_JOURNAL_INO &&
 		inode->i_ino < EXT3_FIRST_INO(inode->i_sb)) ||
 		inode->i_ino > le32_to_cpu(
-			inode->i_sb->u.ext3_sb.s_es->s_inodes_count)) {
+			EXT3_SB(inode->i_sb)->s_es->s_inodes_count)) {
 		ext3_error (inode->i_sb, "ext3_get_inode_loc",
 			    "bad inode number: %lu", inode->i_ino);
 		goto bad_inode;
 	}
 	block_group = (inode->i_ino - 1) / EXT3_INODES_PER_GROUP(inode->i_sb);
-	if (block_group >= inode->i_sb->u.ext3_sb.s_groups_count) {
+	if (block_group >= EXT3_SB(inode->i_sb)->s_groups_count) {
 		ext3_error (inode->i_sb, "ext3_get_inode_loc",
 			    "group >= groups count");
 		goto bad_inode;
 	}
 	group_desc = block_group >> EXT3_DESC_PER_BLOCK_BITS(inode->i_sb);
 	desc = block_group & (EXT3_DESC_PER_BLOCK(inode->i_sb) - 1);
-	bh = inode->i_sb->u.ext3_sb.s_group_desc[group_desc];
+	bh = EXT3_SB(inode->i_sb)->s_group_desc[group_desc];
 	if (!bh) {
 		ext3_error (inode->i_sb, "ext3_get_inode_loc",
 			    "Descriptor not loaded");
@@ -2222,7 +2224,7 @@ void ext3_read_inode(struct inode * inode)
 	 */
 	if (inode->i_nlink == 0) {
 		if (inode->i_mode == 0 ||
-		    !(inode->i_sb->u.ext3_sb.s_mount_state & EXT3_ORPHAN_FS)) {
+		    !(EXT3_SB(inode->i_sb)->s_mount_state & EXT3_ORPHAN_FS)) {
 			/* this inode is deleted */
 			brelse (bh);
 			goto bad_inode;
@@ -2392,7 +2394,7 @@ static int ext3_do_update_inode(handle_t *handle,
 				* created, add a flag to the superblock.
 				*/
 				err = ext3_journal_get_write_access(handle,
-						sb->u.ext3_sb.s_sbh);
+						EXT3_SB(sb)->s_sbh);
 				if (err)
 					goto out_brelse;
 				ext3_update_dynamic_rev(sb);
@@ -2401,7 +2403,7 @@ static int ext3_do_update_inode(handle_t *handle,
 				sb->s_dirt = 1;
 				handle->h_sync = 1;
 				err = ext3_journal_dirty_metadata(handle,
-						sb->u.ext3_sb.s_sbh);
+						EXT3_SB(sb)->s_sbh);
 			}
 		}
 	}

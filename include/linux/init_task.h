@@ -18,15 +18,29 @@
 	.fd_array	= { NULL, } 			\
 }
 
+#define INIT_KIOCTX(name, which_mm) \
+{							\
+	.users		= ATOMIC_INIT(1),		\
+	.dead		= 0,				\
+	.mm		= &which_mm,			\
+	.user_id	= 0,				\
+	.next		= NULL,				\
+	.wait		= __WAIT_QUEUE_HEAD_INITIALIZER(name.wait), \
+	.ctx_lock	= SPIN_LOCK_UNLOCKED,		\
+	.reqs_active	= 0U,				\
+	.max_reqs	= ~0U,				\
+}
+
 #define INIT_MM(name) \
-{			 				\
-	.mm_rb		= RB_ROOT,			\
-	.pgd		= swapper_pg_dir, 		\
-	.mm_users	= ATOMIC_INIT(2), 		\
-	.mm_count	= ATOMIC_INIT(1), 		\
-	.mmap_sem	= __RWSEM_INITIALIZER(name.mmap_sem), \
-	.page_table_lock =  SPIN_LOCK_UNLOCKED, 	\
-	.mmlist		= LIST_HEAD_INIT(name.mmlist),	\
+{			 					\
+	.mm_rb		= RB_ROOT,				\
+	.pgd		= swapper_pg_dir, 			\
+	.mm_users	= ATOMIC_INIT(2), 			\
+	.mm_count	= ATOMIC_INIT(1), 			\
+	.mmap_sem	= __RWSEM_INITIALIZER(name.mmap_sem),	\
+	.page_table_lock =  SPIN_LOCK_UNLOCKED, 		\
+	.mmlist		= LIST_HEAD_INIT(name.mmlist),		\
+	.default_kioctx = INIT_KIOCTX(name.default_kioctx, name),	\
 }
 
 #define INIT_SIGNALS(sig) {	\
@@ -61,6 +75,7 @@
 	.parent		= &tsk,						\
 	.children	= LIST_HEAD_INIT(tsk.children),			\
 	.sibling	= LIST_HEAD_INIT(tsk.sibling),			\
+	.group_leader	= &tsk,						\
 	.thread_group	= LIST_HEAD_INIT(tsk.thread_group),		\
 	.wait_chldexit	= __WAIT_QUEUE_HEAD_INITIALIZER(tsk.wait_chldexit),\
 	.real_timer	= {						\

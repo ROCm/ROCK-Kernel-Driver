@@ -208,6 +208,9 @@ int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 	unsigned long end = vma->vm_end;
 	unsigned long cow = (vma->vm_flags & (VM_SHARED | VM_MAYWRITE)) == VM_MAYWRITE;
 
+	if (is_vm_hugetlb_page(vma))
+		return copy_hugetlb_page_range(dst, src, vma);
+
 	src_pgd = pgd_offset(src, address)-1;
 	dst_pgd = pgd_offset(dst, address)-1;
 
@@ -389,8 +392,8 @@ void unmap_page_range(mmu_gather_t *tlb, struct vm_area_struct *vma, unsigned lo
 {
 	pgd_t * dir;
 
-	if (address >= end)
-		BUG();
+	BUG_ON(address >= end);
+
 	dir = pgd_offset(vma->vm_mm, address);
 	tlb_start_vma(tlb, vma);
 	do {
@@ -401,30 +404,56 @@ void unmap_page_range(mmu_gather_t *tlb, struct vm_area_struct *vma, unsigned lo
 	tlb_end_vma(tlb, vma);
 }
 
-/*
- * remove user pages in a given range.
+/* Dispose of an entire mmu_gather_t per rescheduling point */
+#if defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
+#define ZAP_BLOCK_SIZE	(FREE_PTE_NR * PAGE_SIZE)
+#endif
+
+/* For UP, 256 pages at a time gives nice low latency */
+#if !defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
+#define ZAP_BLOCK_SIZE	(256 * PAGE_SIZE)
+#endif
+
+/* No preempt: go for the best straight-line efficiency */
+#if !defined(CONFIG_PREEMPT)
+#define ZAP_BLOCK_SIZE	(~(0UL))
+#endif
+
+/**
+ * zap_page_range - remove user pages in a given range
+ * @vma: vm_area_struct holding the applicable pages
+ * @address: starting address of pages to zap
+ * @size: number of bytes to zap
  */
 void zap_page_range(struct vm_area_struct *vma, unsigned long address, unsigned long size)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	mmu_gather_t *tlb;
-	unsigned long start = address, end = address + size;
+	unsigned long end, block;
 
-	/*
-	 * This is a long-lived spinlock. That's fine.
-	 * There's no contention, because the page table
-	 * lock only protects against kswapd anyway, and
-	 * even if kswapd happened to be looking at this
-	 * process we _want_ it to get stuck.
-	 */
-	if (address >= end)
-		BUG();
 	spin_lock(&mm->page_table_lock);
-	flush_cache_range(vma, address, end);
 
-	tlb = tlb_gather_mmu(mm, 0);
-	unmap_page_range(tlb, vma, address, end);
-	tlb_finish_mmu(tlb, start, end);
+  	/*
+ 	 * This was once a long-held spinlock.  Now we break the
+ 	 * work up into ZAP_BLOCK_SIZE units and relinquish the
+ 	 * lock after each interation.  This drastically lowers
+ 	 * lock contention and allows for a preemption point.
+  	 */
+	while (size) {
+		block = (size > ZAP_BLOCK_SIZE) ? ZAP_BLOCK_SIZE : size;
+ 		end = address + block;
+ 
+ 		flush_cache_range(vma, address, end);
+ 		tlb = tlb_gather_mmu(mm, 0);
+ 		unmap_page_range(tlb, vma, address, end);
+ 		tlb_finish_mmu(tlb, address, end);
+ 
+ 		cond_resched_lock(&mm->page_table_lock);
+ 
+ 		address += block;
+ 		size -= block;
+ 	}
+
 	spin_unlock(&mm->page_table_lock);
 }
 
@@ -504,6 +533,11 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 				|| !(flags & vma->vm_flags))
 			return i ? : -EFAULT;
 
+		if (is_vm_hugetlb_page(vma)) {
+			i = follow_hugetlb_page(mm, vma, pages, vmas,
+						&start, &len, i);
+			continue;
+		}
 		spin_lock(&mm->page_table_lock);
 		do {
 			struct page *map;

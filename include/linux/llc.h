@@ -78,17 +78,6 @@ enum llc_sockopts {
 #define LLC_SAP_DYN_STOP	0xDE
 #define LLC_SAP_DYN_TRIES	4
 
-struct sock;
-
-struct llc_ui_opt {
-	u16		     link;	/* network layer link number */
-	struct llc_sap	    *sap;	/* pointer to parent SAP */
-	struct sock	    *core_sk;
-	struct net_device   *dev;	/* device to send to remote */
-	struct sockaddr_llc  addr;	/* address sock is bound to */
-};
-
-#define llc_ui_sk(__sk) ((struct llc_ui_opt *)(__sk)->protinfo)
 #define llc_ui_skb_cb(__skb) ((struct sockaddr_llc *)&((__skb)->cb[0]))
 
 #ifdef CONFIG_LLC_UI

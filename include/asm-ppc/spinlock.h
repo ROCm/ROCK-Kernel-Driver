@@ -100,6 +100,8 @@ typedef struct {
 #define RW_LOCK_UNLOCKED (rwlock_t) { 0 RWLOCK_DEBUG_INIT }
 #define rwlock_init(lp) do { *(lp) = RW_LOCK_UNLOCKED; } while(0)
 
+#define rwlock_is_locked(x)	((x)->lock != 0)
+
 #ifndef CONFIG_DEBUG_SPINLOCK
 
 static __inline__ void _raw_read_lock(rwlock_t *rw)

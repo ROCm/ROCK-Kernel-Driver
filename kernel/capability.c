@@ -83,13 +83,13 @@ static inline void cap_set_pg(int pgrp, kernel_cap_t *effective,
 			      kernel_cap_t *inheritable,
 			      kernel_cap_t *permitted)
 {
-     task_t *target;
+     task_t *g, *target;
 
-     for_each_task(target) {
+     do_each_thread(g, target) {
              if (target->pgrp != pgrp)
                      continue;
 	     security_ops->capset_set(target, effective, inheritable, permitted);
-     }
+     } while_each_thread(g, target);
 }
 
 /*
@@ -100,13 +100,13 @@ static inline void cap_set_all(kernel_cap_t *effective,
 			       kernel_cap_t *inheritable,
 			       kernel_cap_t *permitted)
 {
-     task_t *target;
+     task_t *g, *target;
 
-     for_each_task(target) {
+     do_each_thread(g, target) {
              if (target == current || target->pid == 1)
                      continue;
 	     security_ops->capset_set(target, effective, inheritable, permitted);
-     }
+     } while_each_thread(g, target);
 }
 
 /*

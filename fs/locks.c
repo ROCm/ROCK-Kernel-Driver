@@ -1588,7 +1588,7 @@ int fcntl_setlk64(struct file *filp, unsigned int cmd, struct flock64 *l)
 
 	for (;;) {
 		error = posix_lock_file(filp, file_lock);
-		if ((error != -EAGAIN) || (cmd == F_SETLK))
+		if ((error != -EAGAIN) || (cmd == F_SETLK64))
 			break;
 		error = wait_event_interruptible(file_lock->fl_wait,
 				!file_lock->fl_next);
