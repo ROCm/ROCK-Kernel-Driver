@@ -18,6 +18,10 @@
 #include <asm/module.h>
 #include <asm/uaccess.h> /* For struct exception_table_entry */
 
+/* Indirect stringification */
+#define __MODULE_STRING_1(x)	#x
+#define __MODULE_STRING(x)	__MODULE_STRING_1(x)
+
 /* Not Yet Implemented */
 #define MODULE_LICENSE(name)
 #define MODULE_AUTHOR(name)
