@@ -52,7 +52,7 @@ static int __init freebird_init(void)
 __initcall(freebird_init);
 
 static void __init
-fixup_freebird(struct machine_desc *desc, struct param_struct *params,
+fixup_freebird(struct machine_desc *desc, struct tag *tags,
 	       char **cmdline, struct meminfo *mi)
 {
 #ifdef CONFIG_SA1100_FREEBIRD_OLD

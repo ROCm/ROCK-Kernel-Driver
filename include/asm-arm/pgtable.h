@@ -11,7 +11,7 @@
 #define _ASMARM_PGTABLE_H
 
 #include <linux/config.h>
-#include <asm/arch/memory.h>
+#include <asm/memory.h>
 #include <asm/arch/vmalloc.h>
 
 /*
@@ -79,21 +79,12 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
 extern struct page *empty_zero_page;
 #define ZERO_PAGE(vaddr)	(empty_zero_page)
 
+#define pte_pfn(pte)		(pte_val(pte) >> PAGE_SHIFT)
+#define pfn_pte(pfn,prot)	(__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot)))
+
 #define pte_none(pte)		(!pte_val(pte))
 #define pte_clear(ptep)		set_pte((ptep), __pte(0))
-
-#ifndef CONFIG_DISCONTIGMEM
-#define pte_page(x)		(mem_map + (pte_val((x)) >> PAGE_SHIFT) - \
-				 (PHYS_OFFSET >> PAGE_SHIFT))
-#else
-/*
- * I'm not happy with this - we needlessly convert a physical address
- * to a virtual one, and then immediately back to a physical address,
- * which, if __va and __pa are expensive causes twice the expense for
- * zero gain. --rmk
- */
-#define pte_page(x)		(virt_to_page(__va(pte_val((x)))))
-#endif
+#define pte_page(pte)		(pfn_to_page(pte_pfn(pte)))
 
 #define pmd_none(pmd)		(!pmd_val(pmd))
 #define pmd_present(pmd)	(pmd_val(pmd))
@@ -107,12 +98,7 @@ extern struct page *empty_zero_page;
  * Conversion functions: convert a page and protection to a page entry,
  * and a page entry and page directory to the page they refer to.
  */
-static inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
-{
-	return __pte(physpage | pgprot_val(pgprot));
-}
-
-#define mk_pte(page,pgprot)	mk_pte_phys(__pa(page_address(page)), pgprot)
+#define mk_pte(page,prot)	pfn_pte(page_to_pfn(page),prot)
 
 /*
  * The "pgd_xxx()" functions here are trivial for a folded two-level

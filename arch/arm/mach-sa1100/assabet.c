@@ -103,7 +103,6 @@ static int __init assabet_init(void)
 		 * or BCR_clear().
 		 */
 		ASSABET_BCR = BCR_value = ASSABET_BCR_DB1111;
-		NCR_0 = 0;
 
 #ifndef CONFIG_ASSABET_NEPONSET
 		printk( "Warning: Neponset detected but full support "
@@ -159,13 +158,11 @@ static void __init get_assabet_scr(void)
 	SCR_value = scr;
 }
 
-extern void convert_to_tag_list(struct param_struct *params, int mem_init);
-
 static void __init
-fixup_assabet(struct machine_desc *desc, struct param_struct *params,
+fixup_assabet(struct machine_desc *desc, struct tag *tags,
 	      char **cmdline, struct meminfo *mi)
 {
-	struct tag *t = (struct tag *)params;
+	struct tag *t = tags;
 
 	/* This must be done before any call to machine_has_neponset() */
 	map_sa1100_gpio_regs();
@@ -173,12 +170,6 @@ fixup_assabet(struct machine_desc *desc, struct param_struct *params,
 
 	if (machine_has_neponset())
 		printk("Neponset expansion board detected\n");
-
-	/*
-	 * Apparantly bootldr uses a param_struct.  Groan.
-	 */
-	if (t->hdr.tag != ATAG_CORE)
-		convert_to_tag_list(params, 1);
 
 	if (t->hdr.tag != ATAG_CORE) {
 		t->hdr.tag = ATAG_CORE;
@@ -319,17 +310,16 @@ static void __init assabet_map_io(void)
 	sa1100_map_io();
 	iotable_init(assabet_io_desc);
 
-#ifdef CONFIG_ASSABET_NEPONSET
-	/*
-	 * We map Neponset registers even if it isn't present since
-	 * many drivers will try to probe their stuff (and fail).
-	 * This is still more friendly than a kernel paging request
-	 * crash.
-	 */
-	neponset_map_io();
-#endif
-
 	if (machine_has_neponset()) {
+#ifdef CONFIG_ASSABET_NEPONSET
+		/*
+		 * We map Neponset registers even if it isn't present since
+		 * many drivers will try to probe their stuff (and fail).
+		 * This is still more friendly than a kernel paging request
+		 * crash.
+		 */
+		neponset_map_io();
+#endif
 		/*
 		 * When Neponset is attached, the first UART should be
 		 * UART3.  That's what Angel is doing and many documents

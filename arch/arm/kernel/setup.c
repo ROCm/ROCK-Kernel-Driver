@@ -35,10 +35,6 @@
 #define MEM_SIZE	(16*1024*1024)
 #endif
 
-#ifndef CONFIG_CMDLINE
-#define CONFIG_CMDLINE ""
-#endif
-
 #ifdef CONFIG_PREEMPT
 spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 #endif
@@ -57,7 +53,8 @@ __setup("fpe=", fpe_setup);
 
 extern unsigned int mem_fclk_21285;
 extern void paging_init(struct meminfo *, struct machine_desc *desc);
-extern void convert_to_tag_list(struct param_struct *params, int mem_init);
+extern void convert_to_tag_list(struct tag *tags);
+extern void squash_mem_tags(struct tag *tag);
 extern void bootmem_init(struct meminfo *);
 extern void reboot_setup(char *str);
 extern int root_mountflags;
@@ -517,6 +514,20 @@ static int __init parse_tag_initrd(const struct tag *tag)
 
 __tagtable(ATAG_INITRD, parse_tag_initrd);
 
+static int __init parse_tag_initrd2(const struct tag *tag)
+{
+	unsigned long start = 0;
+
+	if (tag->u.initrd.size) {
+		start = (unsigned long)phys_to_virt(tag->u.initrd.start);
+
+		setup_initrd(start, tag->u.initrd.size);
+	}
+	return 0;
+}
+
+__tagtable(ATAG_INITRD2, parse_tag_initrd2);
+
 static int __init parse_tag_serialnr(const struct tag *tag)
 {
 	system_serial_low = tag->u.serialnr.low;
@@ -575,13 +586,28 @@ static void __init parse_tags(const struct tag *t)
 				t->hdr.tag);
 }
 
+/*
+ * This holds our defaults.
+ */
+static struct init_tags {
+	struct tag_header hdr1;
+	struct tag_core   core;
+	struct tag_header hdr2;
+	struct tag_mem32  mem;
+	struct tag_header hdr3;
+} init_tags __initdata = {
+	{ tag_size(tag_core), ATAG_CORE },
+	{ 1, PAGE_SIZE, 0xff },
+	{ tag_size(tag_mem32), ATAG_MEM },
+	{ MEM_SIZE, PHYS_OFFSET },
+	{ 0, ATAG_NONE }
+};
+
 void __init setup_arch(char **cmdline_p)
 {
-	struct tag *tags = NULL;
+	struct tag *tags = (struct tag *)&init_tags;
 	struct machine_desc *mdesc;
 	char *from = default_command_line;
-
-	ROOT_DEV = mk_kdev(0, 255);
 
 	setup_processor();
 	mdesc = setup_machine(machine_arch_type);
@@ -594,28 +620,21 @@ void __init setup_arch(char **cmdline_p)
 		tags = phys_to_virt(mdesc->param_offset);
 
 	/*
-	 * Do the machine-specific fixups before we parse the
-	 * parameters or tags.
-	 */
-	if (mdesc->fixup)
-		mdesc->fixup(mdesc, (struct param_struct *)tags,
-			     &from, &meminfo);
-
-	/*
 	 * If we have the old style parameters, convert them to
-	 * a tag list before.
+	 * a tag list.
 	 */
-	if (tags && tags->hdr.tag != ATAG_CORE)
-		convert_to_tag_list((struct param_struct *)tags,
-				    meminfo.nr_banks == 0);
+	if (tags->hdr.tag != ATAG_CORE)
+		convert_to_tag_list(tags);
+	if (tags->hdr.tag != ATAG_CORE)
+		tags = (struct tag *)&init_tags;
 
-	if (tags && tags->hdr.tag == ATAG_CORE)
+	if (mdesc->fixup)
+		mdesc->fixup(mdesc, tags, &from, &meminfo);
+
+	if (tags->hdr.tag == ATAG_CORE) {
+		if (meminfo.nr_banks != 0)
+			squash_mem_tags(tags);
 		parse_tags(tags);
-
-	if (meminfo.nr_banks == 0) {
-		meminfo.nr_banks      = 1;
-		meminfo.bank[0].start = PHYS_OFFSET;
-		meminfo.bank[0].size  = MEM_SIZE;
 	}
 
 	init_mm.start_code = (unsigned long) &_text;

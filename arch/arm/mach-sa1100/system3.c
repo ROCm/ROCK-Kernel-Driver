@@ -74,7 +74,7 @@
 
 /* init funcs */
 static void __init fixup_system3(struct machine_desc *desc,
-		struct param_struct *params, char **cmdline, struct meminfo *mi);
+		struct tag *tags, char **cmdline, struct meminfo *mi);
 static int __init system3_init(void);
 static void __init system3_init_irq(void);
 static void __init system3_map_io(void);
@@ -86,8 +86,6 @@ static int sdram_notifier(struct notifier_block *nb, unsigned long event, void *
 
 static void system3_lcd_power(int on);
 static void system3_backlight_power(int on);
-
-extern void convert_to_tag_list(struct param_struct *params, int mem_init);
 
 
 /**********************************************************************
@@ -239,7 +237,7 @@ static int sdram_notifier(struct notifier_block *nb, unsigned long event,
  *
  */
 static void __init fixup_system3(struct machine_desc *desc,
-		struct param_struct *params, char **cmdline, struct meminfo *mi)
+		struct tag *tags, char **cmdline, struct meminfo *mi)
 {
 	DPRINTK( "%s\n", "START" );
 

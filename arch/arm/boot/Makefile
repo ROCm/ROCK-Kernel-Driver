@@ -14,14 +14,12 @@ ifeq ($(CONFIG_CPU_26),y)
 ZRELADDR	 = 0x02080000
 PARAMS_PHYS	 = 0x0207c000
 INITRD_PHYS	 = 0x02180000
-INITRD_VIRT	 = 0x02180000
 endif
 
 ifeq ($(CONFIG_ARCH_RPC),y)
 ZRELADDR	 = 0x10008000
 PARAMS_PHYS	 = 0x10000100
 INITRD_PHYS	 = 0x18000000
-INITRD_VIRT	 = 0xc8000000
 endif
 
 ifeq ($(CONFIG_ARCH_CLPS7500),y)
@@ -32,7 +30,6 @@ ifeq ($(CONFIG_ARCH_EBSA110),y)
 ZRELADDR	 = 0x00008000
 PARAMS_PHYS	 = 0x00000400
 INITRD_PHYS	 = 0x00800000
-INITRD_VIRT	 = 0xc0800000
 endif
 
 ifeq ($(CONFIG_ARCH_SHARK),y)
@@ -44,14 +41,12 @@ ifeq ($(CONFIG_FOOTBRIDGE),y)
 ZRELADDR	 = 0x00008000
 PARAMS_PHYS	 = 0x00000100
 INITRD_PHYS	 = 0x00800000
-INITRD_VIRT	 = 0xc0800000
 endif
 
 ifeq ($(CONFIG_ARCH_INTEGRATOR),y)
 ZRELADDR	 = 0x00008000
 PARAMS_PHYS	 = 0x00000100
 INITRD_PHYS	 = 0x00800000
-INITRD_VIRT	 = 0xc0800000
 endif
 
 ifeq ($(CONFIG_ARCH_CAMELOT),y)
@@ -75,11 +70,9 @@ endif
 # Should probably have some agreement on these...
 ifeq ($(CONFIG_ARCH_P720T),y)
 INITRD_PHYS	 = 0xc0400000
-INITRD_VIRT	 = 0xc0400000
 endif
 ifeq ($(CONFIG_ARCH_CDB89712),y)
 INITRD_PHYS	 = 0x00700000
-INITRD_VIRT	 = 0xc0300000
 endif
 
 ifeq ($(CONFIG_ARCH_SA1100),y)
@@ -119,7 +112,7 @@ ZTEXTADDR	=0
 ZBSSADDR	=ALIGN(4)
 endif
 
-export	SYSTEM ZTEXTADDR ZBSSADDR ZRELADDR INITRD_PHYS INITRD_VIRT PARAMS_PHYS
+export	SYSTEM ZTEXTADDR ZBSSADDR ZRELADDR INITRD_PHYS PARAMS_PHYS
 
 Image:	$(CONFIGURE) $(SYSTEM)
 	$(OBJCOPY) -O binary -R .note -R .comment -S $(SYSTEM) $@
@@ -139,7 +132,7 @@ bootp/bootp: zImage initrd
 	@$(MAKE) -C bootp bootp
 
 initrd:
-	@test "$(INITRD_VIRT)" != "" || (echo This architecture does not support INITRD; exit -1)
+	@test "$(INITRD_PHYS)" != "" || (echo This architecture does not support INITRD; exit -1)
 	@test "$(INITRD)" != "" || (echo You must specify INITRD; exit -1)
 
 install: $(CONFIGURE) Image

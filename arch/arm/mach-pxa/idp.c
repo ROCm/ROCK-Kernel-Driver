@@ -69,7 +69,7 @@ static void __init idp_init_irq(void)
 }
 
 static void __init
-fixup_idp(struct machine_desc *desc, struct param_struct *params,
+fixup_idp(struct machine_desc *desc, struct tag *tags,
 		char **cmdline, struct meminfo *mi)
 {
 #ifdef PXA_IDP_REV02

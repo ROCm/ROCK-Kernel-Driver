@@ -40,13 +40,15 @@ static void sa1100_manual_rerun(unsigned int irq)
 	irq_desc[irq].handle(irq, &irq_desc[irq], &regs);
 }
 
+/*
+ * To get the GPIO number from an IRQ number
+ */
+#define GPIO_11_27_IRQ(i)	((i) - 21)
 #define GPIO11_27_MASK(irq)	(1 << GPIO_11_27_IRQ(irq))
 
 static int sa1100_gpio_type(unsigned int irq, unsigned int type)
 {
 	unsigned int mask;
-
-	printk(KERN_DEBUG "IRQ%d: ", irq);
 
 	if (irq <= 10)
 		mask = 1 << irq;
@@ -54,17 +56,13 @@ static int sa1100_gpio_type(unsigned int irq, unsigned int type)
 		mask = GPIO11_27_MASK(irq);
 
 	if (type & __IRQT_RISEDGE) {
-		printk("rising ");
 		GPIO_IRQ_rising_edge |= mask;
 	} else
 		GPIO_IRQ_rising_edge &= ~mask;
 	if (type & __IRQT_FALEDGE) {
-		printk("falling ");
 		GPIO_IRQ_falling_edge |= mask;
 	} else
 		GPIO_IRQ_falling_edge &= ~mask;
-
-	printk("edges\n");
 
 	GRER = GPIO_IRQ_rising_edge & GPIO_IRQ_mask;
 	GFER = GPIO_IRQ_falling_edge & GPIO_IRQ_mask;

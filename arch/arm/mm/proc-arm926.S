@@ -542,5 +542,5 @@ __arm926_proc_info:
 	.long	cpu_arm926_info
 	.long	arm926_processor_functions
 	.long	v4wbi_tlb_fns
-	.long	v4_user_fns
+	.long	v4wb_user_fns
 	.size	__arm926_proc_info, . - __arm926_proc_info

@@ -29,7 +29,7 @@ extern void clps711x_init_irq(void);
 extern void edb7211_map_io(void);
 
 static void __init
-fixup_edb7211(struct machine_desc *desc, struct param_struct *params,
+fixup_edb7211(struct machine_desc *desc, struct tag *tags,
 	      char **cmdline, struct meminfo *mi)
 {
 	/*
