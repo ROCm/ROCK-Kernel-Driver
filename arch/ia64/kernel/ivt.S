@@ -645,7 +645,6 @@ ENTRY(break_fault)
 
 	mov r3=255
 	adds r15=-1024,r15			// r15 contains the syscall number---subtract 1024
-	adds r2=IA64_TASK_PTRACE_OFFSET,r13	// r2 = &current->ptrace
 	;;
 	cmp.geu p6,p7=r3,r15		// (syscall > 0 && syscall <= 1024+255) ?
 	movl r16=sys_call_table
