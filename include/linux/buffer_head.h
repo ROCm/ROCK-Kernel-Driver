@@ -140,7 +140,6 @@ void end_buffer_io_sync(struct buffer_head *bh, int uptodate);
 void buffer_insert_list(spinlock_t *lock,
 			struct buffer_head *, struct list_head *);
 void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode);
-int write_mapping_buffers(struct address_space *mapping);
 int inode_has_buffers(struct inode *);
 void invalidate_inode_buffers(struct inode *);
 int fsync_buffers_list(spinlock_t *lock, struct list_head *);
