@@ -41,14 +41,14 @@
 #define EXI(x,y...)			\
 	99: x,##y;			\
 	.section __ex_table,"a";	\
-	.gprel32 99b;			\
+	.long 99b - .;			\
 	lda $31, $exitin-99b($31);	\
 	.previous
 
 #define EXO(x,y...)			\
 	99: x,##y;			\
 	.section __ex_table,"a";	\
-	.gprel32 99b;			\
+	.long 99b - .;			\
 	lda $31, $exitout-99b($31);	\
 	.previous
 
@@ -58,10 +58,7 @@
 	.ent __copy_user
 				# Pipeline info: Slotting & Comments
 __copy_user:
-	ldgp $29,0($27)		# we do exceptions -- we need the gp.
-				# Macro instruction becomes ldah/lda
-				# .. .. E  E
-	.prologue 1
+	.prologue 0
 	subq $0, 32, $1		# .. E  .. ..	: Is this going to be a small copy?
 	beq $0, $zerolength	# U  .. .. ..	: U L U L
 
