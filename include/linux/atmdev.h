@@ -306,9 +306,6 @@ struct atm_vcc {
 	struct sockaddr_atmsvc local;
 	struct sockaddr_atmsvc remote;
 	void (*callback)(struct atm_vcc *vcc);
-	struct sk_buff_head listenq;
-	int		backlog_quota;	/* number of connection requests we */
-					/* can still accept */
 	int		reply;		/* also used by ATMTCP */
 	/* Multipoint part ------------------------------------------------- */
 	struct atm_vcc	*session;	/* session VCC descriptor */

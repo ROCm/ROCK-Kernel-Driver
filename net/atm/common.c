@@ -127,7 +127,6 @@ int atm_create(struct socket *sock,int protocol,int family)
 	vcc->vpi = vcc->vci = 0; /* no VCI/VPI yet */
 	vcc->atm_options = vcc->aal_options = 0;
 	init_waitqueue_head(&vcc->sleep);
-	skb_queue_head_init(&vcc->listenq);
 	sk->sleep = &vcc->sleep;
 	sock->sk = sk;
 	return 0;
@@ -496,7 +495,7 @@ unsigned int atm_poll(struct file *file,struct socket *sock,poll_table *wait)
 	vcc = ATM_SD(sock);
 	poll_wait(file,&vcc->sleep,wait);
 	mask = 0;
-	if (skb_peek(&vcc->sk->receive_queue) || skb_peek(&vcc->listenq))
+	if (skb_peek(&vcc->sk->receive_queue))
 		mask |= POLLIN | POLLRDNORM;
 	if (test_bit(ATM_VF_RELEASED,&vcc->flags) ||
 	    test_bit(ATM_VF_CLOSE,&vcc->flags))
