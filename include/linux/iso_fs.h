@@ -160,7 +160,6 @@ struct iso_directory_record {
 
 #define ISOFS_BUFFER_SIZE(INODE) ((INODE)->i_sb->s_blocksize)
 #define ISOFS_BUFFER_BITS(INODE) ((INODE)->i_sb->s_blocksize_bits)
-#define ISOFS_ZONE_BITS(INODE)   ((INODE)->i_sb->u.isofs_sb.s_log_zone_size)
 
 #define ISOFS_SUPER_MAGIC 0x9660
 
@@ -171,6 +170,12 @@ struct iso_directory_record {
 #include <asm/byteorder.h>
 #include <asm/unaligned.h>
 #include <linux/iso_fs_i.h>
+#include <linux/iso_fs_sb.h>
+
+static inline struct isofs_sb_info *ISOFS_SB(struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
 
 static inline struct iso_inode_info *ISOFS_I(struct inode *inode)
 {

@@ -84,12 +84,6 @@ int ramcheck_time = 20;    /* time in seconds to wait while ROM code
 int osrun_time = 10;       /* time in seconds we wait for the OS to
 			      start running.
 			   */
-#if 0
-MODULE_AUTHOR("Paul Barton-Davis <pbd@op.net>");
-MODULE_DESCRIPTION("ALSA driver for Turtle Beach WaveFront ICS2215 Synth");
-MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-#endif
 MODULE_PARM(wf_raw,"i");
 MODULE_PARM_DESC(wf_raw, "if non-zero, assume that we need to boot the OS");
 MODULE_PARM(fx_raw,"i");
@@ -1729,7 +1723,7 @@ snd_wavefront_internal_interrupt (snd_wavefront_card_t *card)
 7 Unused
 */
 
-int
+int __init
 snd_wavefront_interrupt_bits (int irq)
 
 {
@@ -1757,7 +1751,7 @@ snd_wavefront_interrupt_bits (int irq)
 	return bits;
 }
 
-static void
+static void __init
 wavefront_should_cause_interrupt (snd_wavefront_t *dev, 
 				  int val, int port, int timeout)
 
@@ -1772,7 +1766,7 @@ wavefront_should_cause_interrupt (snd_wavefront_t *dev,
 	restore_flags (flags);
 }
 
-static int
+static int __init
 wavefront_reset_to_cleanliness (snd_wavefront_t *dev)
 
 {
@@ -1932,7 +1926,7 @@ wavefront_reset_to_cleanliness (snd_wavefront_t *dev)
 
 static int errno;
 
-static int
+static int __init
 wavefront_download_firmware (snd_wavefront_t *dev, char *path)
 
 {
@@ -2027,7 +2021,7 @@ wavefront_download_firmware (snd_wavefront_t *dev, char *path)
 }
 
 
-static int
+static int __init
 wavefront_do_reset (snd_wavefront_t *dev)
 
 {
@@ -2116,7 +2110,7 @@ wavefront_do_reset (snd_wavefront_t *dev)
 	return 1;
 }
 
-int 
+int __init
 snd_wavefront_start (snd_wavefront_t *dev)
 
 {
@@ -2158,7 +2152,7 @@ snd_wavefront_start (snd_wavefront_t *dev)
 	return (0);
 }
 
-int
+int __init
 snd_wavefront_detect (snd_wavefront_card_t *card)
 
 {
@@ -2212,33 +2206,3 @@ snd_wavefront_detect (snd_wavefront_card_t *card)
 
 	return 0;
 }
-
-#if 0
-EXPORT_SYMBOL(snd_wavefront_synth_ioctl);
-EXPORT_SYMBOL(snd_wavefront_synth_open);
-EXPORT_SYMBOL(snd_wavefront_synth_release);
-EXPORT_SYMBOL(snd_wavefront_internal_interrupt);
-EXPORT_SYMBOL(snd_wavefront_interrupt_bits);
-EXPORT_SYMBOL(snd_wavefront_start);
-EXPORT_SYMBOL(snd_wavefront_detect);
-EXPORT_SYMBOL(snd_wavefront_cmd);
-  /* wavefront_midi.c */
-EXPORT_SYMBOL(snd_wavefront_midi_interrupt);
-EXPORT_SYMBOL(snd_wavefront_midi_enable_virtual);
-EXPORT_SYMBOL(snd_wavefront_midi_disable_virtual);
-EXPORT_SYMBOL(snd_wavefront_midi_start);
-EXPORT_SYMBOL(snd_wavefront_midi_input);
-EXPORT_SYMBOL(snd_wavefront_midi_output);
-
-static int __init alsa_wavefront_init(void)
-{
-	return 0;
-}
-
-static void __exit alsa_wavefront_exit(void)
-{
-}
-
-module_init(alsa_wavefront_init)
-module_exit(alsa_wavefront_exit)
-#endif

@@ -687,6 +687,12 @@
 #define A_MUCMD2		0x73
 #define A_MUSTAT2		A_MUCMD2	
 
+/* The next two are the Audigy equivalent of FXWC						*/
+/* the Audigy can record any output (16bit, 48kHz, up to 64 channel simultaneously) 		*/
+/* Each bit selects a channel for recording */
+#define A_FXWC1			0x74            /* Selects 0x7f-0x60 for FX recording           */
+#define A_FXWC2			0x75		/* Selects 0x9f-0x80 for FX recording           */
+
 #define A_SPDIF_SAMPLERATE	0x76		/* Set the sample rate of SPDIF output		*/
 #define A_SPDIF_48000		0x00000080
 #define A_SPDIF_44100		0x00000000
@@ -797,6 +803,7 @@ struct _snd_emu10k1_pcm {
 	unsigned int capture_bs_reg;	/* buffer size register */
 	unsigned int capture_idx_reg;	/* buffer index register */
 	unsigned int capture_cr_val;	/* control value */
+	unsigned int capture_cr_val2;	/* control value2 (for audigy) */
 	unsigned int capture_bs_val;	/* buffer size value */
 	unsigned int capture_bufsize;	/* buffer size in bytes */
 };
@@ -982,7 +989,7 @@ struct _snd_emu10k1 {
 	emu10k1_midi_t midi;
 	emu10k1_midi_t midi2; /* for audigy */
 
-	unsigned int efx_voices_mask;
+	unsigned int efx_voices_mask[2];
 
 	snd_info_entry_t *proc_entry;
 	snd_info_entry_t *proc_entry_fx8010_gpr;
@@ -1209,8 +1216,8 @@ int snd_emu10k1_proc_done(emu10k1_t * emu);
 #define A_EXTOUT_AREAR_R	0x0f	/*             right */
 #define A_EXTOUT_AC97_L		0x10	/* AC97 left (front) */
 #define A_EXTOUT_AC97_R		0x11	/*      right */
-#define A_EXTOUT_ADC_CAP_L	0x12	/* ADC capture buffer left */
-#define A_EXTOUT_ADC_CAP_R	0x13	/*                    right */
+#define A_EXTOUT_ADC_CAP_L	0x16	/* ADC capture buffer left */
+#define A_EXTOUT_ADC_CAP_R	0x17	/*                    right */
 
 /* Audigy constants */
 #define A_C_00000000	0xc0

@@ -4,19 +4,17 @@
 /*
  * The MS-DOS filesystem constants/structures
  */
-#include <linux/msdos_fs_i.h>
-#include <linux/msdos_fs_sb.h>
-
 #include <asm/byteorder.h>
 
-#define MSDOS_ROOT_INO  1 /* == MINIX_ROOT_INO */
-#define SECTOR_SIZE     512 /* sector size (bytes) */
-#define SECTOR_BITS	9 /* log2(SECTOR_SIZE) */
-#define MSDOS_DPB	(MSDOS_DPS) /* dir entries per block */
-#define MSDOS_DPB_BITS	4 /* log2(MSDOS_DPB) */
-#define MSDOS_DPS	(SECTOR_SIZE/sizeof(struct msdos_dir_entry))
-#define MSDOS_DPS_BITS	4 /* log2(MSDOS_DPS) */
-#define MSDOS_DIR_BITS	5 /* log2(sizeof(struct msdos_dir_entry)) */
+#define SECTOR_SIZE	512		/* sector size (bytes) */
+#define SECTOR_BITS	9		/* log2(SECTOR_SIZE) */
+#define MSDOS_DPB	(MSDOS_DPS)	/* dir entries per block */
+#define MSDOS_DPB_BITS	4		/* log2(MSDOS_DPB) */
+#define MSDOS_DPS	(SECTOR_SIZE / sizeof(struct msdos_dir_entry))
+#define MSDOS_DPS_BITS	4		/* log2(MSDOS_DPS) */
+
+#define MSDOS_ROOT_INO	1	/* == MINIX_ROOT_INO */
+#define MSDOS_DIR_BITS	5	/* log2(sizeof(struct msdos_dir_entry)) */
 
 /* directory limit */
 #define FAT_MAX_DIR_ENTRIES	(65536)
@@ -26,6 +24,7 @@
 
 #define FAT_CACHE    8 /* FAT cache size */
 
+#define ATTR_NONE    0 /* no attribute bits */
 #define ATTR_RO      1  /* read-only */
 #define ATTR_HIDDEN  2  /* hidden */
 #define ATTR_SYS     4  /* system */
@@ -33,17 +32,10 @@
 #define ATTR_DIR     16 /* directory */
 #define ATTR_ARCH    32 /* archived */
 
-#define ATTR_NONE    0 /* no attribute bits */
 #define ATTR_UNUSED  (ATTR_VOLUME | ATTR_ARCH | ATTR_SYS | ATTR_HIDDEN)
 	/* attribute bits that are copied "as is" */
 #define ATTR_EXT     (ATTR_RO | ATTR_HIDDEN | ATTR_SYS | ATTR_VOLUME)
 	/* bits that are used by the Windows 95/Windows NT extended FAT */
-
-#define ATTR_DIR_READ_BOTH 512 /* read both short and long names from the
-				* vfat filesystem.  This is used by Samba
-				* to export the vfat filesystem with correct
-				* shortnames. */
-#define ATTR_DIR_READ_SHORT 1024
 
 #define CASE_LOWER_BASE 8	/* base is lower case */
 #define CASE_LOWER_EXT  16	/* extension is lower case */
@@ -53,16 +45,6 @@
 
 #define MSDOS_VALID_MODE (S_IFREG | S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO)
 	/* valid file mode bits */
-
-static inline struct msdos_sb_info *MSDOS_SB(struct super_block *sb)
-{
-	return sb->u.generic_sbp;
-}
-
-static inline struct msdos_inode_info *MSDOS_I(struct inode *inode)
-{
-	return list_entry(inode, struct msdos_inode_info, vfs_inode);
-}
 
 #define MSDOS_NAME 11 /* maximum name length */
 #define MSDOS_LONGNAME 256 /* maximum name length */
@@ -82,11 +64,6 @@ static inline struct msdos_inode_info *MSDOS_I(struct inode *inode)
 #define FAT_FSINFO_SIG2		0x61417272
 #define IS_FSINFO(x)	(CF_LE_L((x)->signature1) == FAT_FSINFO_SIG1	\
 			 && CF_LE_L((x)->signature2) == FAT_FSINFO_SIG2)
-
-/*
- * Inode flags
- */
-#define FAT_BINARY_FL		0x00000001 /* File contains binary data */
 
 /*
  * ioctl commands
@@ -178,11 +155,8 @@ struct msdos_dir_slot {
 };
 
 struct vfat_slot_info {
-	int is_long;		       /* was the found entry long */
 	int long_slots;		       /* number of long slots in filename */
-	int total_slots;	       /* total slots (long and short) */
 	loff_t longname_offset;	       /* dir offset for longname start */
-	loff_t shortname_offset;       /* dir offset for shortname start */
 	int ino;		       /* ino for the file */
 };
 
@@ -196,6 +170,18 @@ struct vfat_slot_info {
 #ifdef __KERNEL__
 
 #include <linux/nls.h>
+#include <linux/msdos_fs_i.h>
+#include <linux/msdos_fs_sb.h>
+
+static inline struct msdos_sb_info *MSDOS_SB(struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
+
+static inline struct msdos_inode_info *MSDOS_I(struct inode *inode)
+{
+	return list_entry(inode, struct msdos_inode_info, vfs_inode);
+}
 
 struct fat_cache {
 	struct super_block *sb; /* fs in question.  NULL means unused */
@@ -326,7 +312,6 @@ extern int fat_scan(struct inode *dir, const char *name,
 		    struct msdos_dir_entry **res_de, int *ino);
 
 /* msdos/namei.c  - these are for Umsdos */
-extern void msdos_put_super(struct super_block *sb);
 extern struct dentry *msdos_lookup(struct inode *dir, struct dentry *);
 extern int msdos_create(struct inode *dir, struct dentry *dentry, int mode);
 extern int msdos_rmdir(struct inode *dir, struct dentry *dentry);

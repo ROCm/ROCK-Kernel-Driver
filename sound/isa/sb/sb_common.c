@@ -191,7 +191,7 @@ static int snd_sbdsp_free(sb_t *chip)
 		disable_dma(chip->dma8);
 		free_dma(chip->dma8);
 	}
-	if (chip->dma16 >= 0) {
+	if (chip->dma16 >= 0 && chip->dma16 != chip->dma8) {
 		disable_dma(chip->dma16);
 		free_dma(chip->dma16);
 	}
@@ -257,9 +257,14 @@ int snd_sbdsp_create(snd_card_t *card,
 		return -EBUSY;
 	}
 	chip->dma8 = dma8;
-	if (dma16 >= 0 && request_dma(dma16, "SoundBlaster - 16bit")) {
-		snd_sbdsp_free(chip);
-		return -EBUSY;
+	if (dma16 >= 0) {
+		if (dma16 < 5 || dma16 > 7) {
+			/* Vibra has no 16bit DMA - no duplex */
+			dma16 = dma8;
+		} else if (request_dma(dma16, "SoundBlaster - 16bit")) {
+			snd_sbdsp_free(chip);
+			return -EBUSY;
+		}
 	}
 	chip->dma16 = dma16;
 #endif

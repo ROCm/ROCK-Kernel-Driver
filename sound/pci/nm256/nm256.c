@@ -1554,7 +1554,7 @@ __error:
 static int __devinit snd_nm256_probe(struct pci_dev *pci,
 				     const struct pci_device_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	snd_card_t *card;
 	nm256_t *chip;
 	int err;

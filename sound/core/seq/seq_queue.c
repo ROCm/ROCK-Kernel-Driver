@@ -48,18 +48,13 @@
 #include "seq_timer.h"
 #include "seq_info.h"
 
-#ifdef SNDRV_SEQ_SYNC_SUPPORT
-/* FIXME: this should be in a header file */
-void snd_seq_sync_info_read(queue_t *q, snd_info_buffer_t *buffer);
-#endif
-
 static void snd_seq_check_queue_in_tasklet(unsigned long private_data);
 
 /* list of allocated queues */
 static queue_t *queue_list[SNDRV_SEQ_MAX_QUEUES];
 static spinlock_t queue_list_lock = SPIN_LOCK_UNLOCKED;
 /* number of queues allocated */
-static int num_queues = 0;
+static int num_queues;
 
 int snd_seq_queue_get_cur_queues(void)
 {
@@ -147,23 +142,12 @@ static queue_t *queue_new(int owner, int locked)
 	q->locked = locked;
 	q->klocked = 0;
 
-#ifdef SNDRV_SEQ_SYNC_SUPPORT
-	q->master_lock = RW_LOCK_UNLOCKED;
-	q->slave_lock = RW_LOCK_UNLOCKED;
-	INIT_LIST_HEAD(&q->master_head);
-	q->slave.format = 0;
-#endif
-
 	return q;
 }
 
 /* delete queue (destructor) */
 static void queue_delete(queue_t *q)
 {
-#ifdef SNDRV_SEQ_SYNC_SUPPORT
-	if (q->info_flags & SNDRV_SEQ_QUEUE_FLG_SYNC)
-		snd_seq_sync_delete_port(q);
-#endif
 	/* stop and release the timer */
 	snd_seq_timer_stop(q->timer);
 	snd_seq_timer_close(q);
@@ -218,12 +202,6 @@ int snd_seq_queue_alloc(int client, int locked, unsigned int info_flags)
 		return -ENOMEM;
 	}
 	snd_seq_queue_use(q->queue, client, 1); /* use this queue */
-#ifdef SNDRV_SEQ_SYNC_SUPPORT
-	if (q->info_flags & SNDRV_SEQ_QUEUE_FLG_SYNC) {
-		if (snd_seq_sync_create_port(q) < 0)
-			q->info_flags &= ~SNDRV_SEQ_QUEUE_FLG_SYNC;
-	}
-#endif
 	return q->queue;
 }
 
@@ -547,9 +525,6 @@ int snd_seq_queue_timer_set_tempo(int queueid, int client, snd_seq_queue_tempo_t
 		result = snd_seq_timer_set_ppq(q->timer, info->ppq);
 	if (result >= 0 && info->skew_base > 0)
 		result = snd_seq_timer_set_skew(q->timer, info->skew_value, info->skew_base);
-#ifdef SNDRV_SEQ_SYNC_SUPPORT
-	snd_seq_sync_update_tempo(q);
-#endif
 	queue_access_unlock(q);
 	queuefree(q);
 	return result;
@@ -724,14 +699,6 @@ static void queue_broadcast_event(queue_t *q, snd_seq_event_t *ev, int from_time
 		sev.dest.client = SNDRV_SEQ_ADDRESS_SUBSCRIBERS;
 		snd_seq_kernel_client_dispatch(SNDRV_SEQ_CLIENT_SYSTEM, &sev, atomic, hop);
 	}
-#ifdef SNDRV_SEQ_SYNC_SUPPORT
-	if (q->info_flags & SNDRV_SEQ_QUEUE_FLG_SYNC) {
-		/* broadcast events also to slave clients */
-		sev.source = q->sync_port;
-		sev.dest.client = SNDRV_SEQ_ADDRESS_SUBSCRIBERS;
-		snd_seq_kernel_client_dispatch(SNDRV_SEQ_CLIENT_SYSTEM, &sev, atomic, hop);
-	}
-#endif
 }
 
 /*
@@ -744,24 +711,13 @@ void snd_seq_queue_process_event(queue_t *q, snd_seq_event_t *ev, int from_timer
 	case SNDRV_SEQ_EVENT_START:
 		snd_seq_prioq_leave(q->tickq, ev->source.client, 1);
 		snd_seq_prioq_leave(q->timeq, ev->source.client, 1);
-#ifdef SNDRV_SEQ_SYNC_SUPPORT
-		snd_seq_sync_clear(q);
-#endif
 		snd_seq_timer_start(q->timer);
 		queue_broadcast_event(q, ev, from_timer_port, atomic, hop);
-#ifdef SNDRV_SEQ_SYNC_SUPPORT
-		q->flags &= ~SNDRV_SEQ_QUEUE_FLG_SYNC_LOST;
-		snd_seq_sync_check(q, 0, atomic, hop); /* trigger the first signal */
-#endif
 		break;
 
 	case SNDRV_SEQ_EVENT_CONTINUE:
 		snd_seq_timer_continue(q->timer);
 		queue_broadcast_event(q, ev, from_timer_port, atomic, hop);
-#ifdef SNDRV_SEQ_SYNC_SUPPORT
-		q->flags &= ~SNDRV_SEQ_QUEUE_FLG_SYNC_LOST;
-		snd_seq_sync_check(q, 0, atomic, hop);
-#endif
 		break;
 
 	case SNDRV_SEQ_EVENT_STOP:
@@ -771,26 +727,17 @@ void snd_seq_queue_process_event(queue_t *q, snd_seq_event_t *ev, int from_timer
 
 	case SNDRV_SEQ_EVENT_TEMPO:
 		snd_seq_timer_set_tempo(q->timer, ev->data.queue.param.value);
-#ifdef SNDRV_SEQ_SYNC_SUPPORT
-		snd_seq_sync_update_tempo(q);
-#endif
 		queue_broadcast_event(q, ev, from_timer_port, atomic, hop);
 		break;
 
 	case SNDRV_SEQ_EVENT_SETPOS_TICK:
 		if (snd_seq_timer_set_position_tick(q->timer, ev->data.queue.param.time.tick) == 0) {
-#ifdef SNDRV_SEQ_SYNC_SUPPORT
-			snd_seq_sync_update_tick(q, 0, atomic, hop);
-#endif
 			queue_broadcast_event(q, ev, from_timer_port, atomic, hop);
 		}
 		break;
 
 	case SNDRV_SEQ_EVENT_SETPOS_TIME:
 		if (snd_seq_timer_set_position_time(q->timer, ev->data.queue.param.time.time) == 0) {
-#ifdef SNDRV_SEQ_SYNC_SUPPORT
-			snd_seq_sync_update_time(q, 0, atomic, hop);
-#endif
 			queue_broadcast_event(q, ev, from_timer_port, atomic, hop);
 		}
 		break;
@@ -864,9 +811,6 @@ void snd_seq_info_queues_read(snd_info_entry_t *entry,
 		snd_iprintf(buffer, "current time       : %d.%09d s\n", tmr->cur_time.tv_sec, tmr->cur_time.tv_nsec);
 		snd_iprintf(buffer, "current tick       : %d\n", tmr->tick.cur_tick);
 		snd_iprintf(buffer, "\n");
-#ifdef SNDRV_SEQ_SYNC_SUPPORT
-		snd_seq_sync_info_read(q, buffer); 
-#endif
 		queuefree(q);
 	}
 }

@@ -183,7 +183,7 @@ static int __init snd_sb8_probe(int dev)
 
 static int __init snd_card_sb8_legacy_auto_probe(unsigned long port)
 {
-        static int dev = 0;
+        static int dev;
         int res;
 
         for ( ; dev < SNDRV_CARDS; dev++) {

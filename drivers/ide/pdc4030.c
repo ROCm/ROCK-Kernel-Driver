@@ -654,14 +654,14 @@ ide_startstop_t promise_rw_disk (ide_drive_t *drive, struct request *rq, unsigne
 
 	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
 	memcpy(args.hobRegister, NULL, sizeof(struct hd_drive_hob_hdr));
-	args.command_type	= ide_cmd_type_parser(&args);
+	ide_cmd_type_parser(&args);
+	/* We don't use the generic inerrupt handlers here? */
 	args.prehandler		= NULL;
 	args.handler		= NULL;
-	args.posthandler	= NULL;
-	args.rq			= (struct request *) rq;
+	args.rq			= rq;
 	args.block		= block;
 	rq->special		= NULL;
-	rq->special		= (ide_task_t *)&args;
+	rq->special		= &args;
 
 	return do_pdc4030_io(drive, &args);
 }

@@ -122,7 +122,6 @@ tristate 'ATA/IDE/MFM/RLL support' CONFIG_IDE
 if [ "$CONFIG_IDE" != "n" ]; then
   source drivers/ide/Config.in
 else
-  define_bool CONFIG_BLK_DEV_IDE_MODES n
   define_bool CONFIG_BLK_DEV_HD n
 fi
 endmenu

@@ -41,16 +41,15 @@
 #include <sound/control.h>
 #include <sound/info.h>
 #include <sound/cs46xx.h>
+#ifndef LINUX_2_2
+#include <linux/gameport.h>
+#endif
 
 #define chip_t cs46xx_t
 
 /*
  *  constants
  */
-
-#if 0
-#define SND_CONFIG_CS46XX_ACCEPT_VALID		/* REQUIRED ONLY FOR OSS EMULATION */
-#endif
 
 #define CS46XX_BA0_SIZE		0x1000
 #define CS46XX_BA1_DATA0_SIZE	0x3000
@@ -1049,10 +1048,6 @@ static void snd_cs46xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static snd_pcm_hardware_t snd_cs46xx_playback =
 {
 	info:			(SNDRV_PCM_INFO_MMAP |
-#ifdef SND_CONFIG_CS46XX_ACCEPT_VALID
-				/* NOT TRUE!!! OSS REQUIRES IT */
-				 SNDRV_PCM_INFO_MMAP_VALID | 
-#endif
 				 SNDRV_PCM_INFO_INTERLEAVED | 
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_RESUME),
@@ -1075,10 +1070,6 @@ static snd_pcm_hardware_t snd_cs46xx_playback =
 static snd_pcm_hardware_t snd_cs46xx_capture =
 {
 	info:			(SNDRV_PCM_INFO_MMAP |
-#ifdef SND_CONFIG_CS46XX_ACCEPT_VALID
-				 /* NOT TRUE!!! OSS REQUIRES IT */
-				 SNDRV_PCM_INFO_MMAP_VALID |
-#endif
 				 SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_RESUME),
@@ -1104,6 +1095,8 @@ static int snd_cs46xx_playback_open(snd_pcm_substream_t * substream)
 		return -ENOMEM;
 	chip->play.substream = substream;
 	substream->runtime->hw = snd_cs46xx_playback;
+	if (chip->accept_valid)
+		substream->runtime->hw.info |= SNDRV_PCM_INFO_MMAP_VALID;
 	chip->active_ctrl(chip, 1);
 	chip->amplifier_ctrl(chip, 1);
 	return 0;
@@ -1117,6 +1110,8 @@ static int snd_cs46xx_capture_open(snd_pcm_substream_t * substream)
 		return -ENOMEM;
 	chip->capt.substream = substream;
 	substream->runtime->hw = snd_cs46xx_capture;
+	if (chip->accept_valid)
+		substream->runtime->hw.info |= SNDRV_PCM_INFO_MMAP_VALID;
 	chip->active_ctrl(chip, 1);
 	chip->amplifier_ctrl(chip, 1);
 	return 0;
@@ -1501,6 +1496,103 @@ int __devinit snd_cs46xx_midi(cs46xx_t *chip, int device, snd_rawmidi_t **rrawmi
 	return 0;
 }
 
+
+/*
+ * gameport interface
+ */
+
+#ifndef LINUX_2_2
+
+typedef struct snd_cs46xx_gameport {
+	struct gameport info;
+	cs46xx_t *chip;
+} cs46xx_gameport_t;
+
+static void snd_cs46xx_gameport_trigger(struct gameport *gameport)
+{
+	cs46xx_gameport_t *gp = (cs46xx_gameport_t *)gameport;
+	cs46xx_t *chip;
+	snd_assert(gp, return);
+	chip = snd_magic_cast(cs46xx_t, gp->chip, return);
+	snd_cs46xx_pokeBA0(chip, BA0_JSPT, 0xFF);  //outb(gameport->io, 0xFF);
+}
+
+static unsigned char snd_cs46xx_gameport_read(struct gameport *gameport)
+{
+	cs46xx_gameport_t *gp = (cs46xx_gameport_t *)gameport;
+	cs46xx_t *chip;
+	snd_assert(gp, return 0);
+	chip = snd_magic_cast(cs46xx_t, gp->chip, return 0);
+	return snd_cs46xx_peekBA0(chip, BA0_JSPT); //inb(gameport->io);
+}
+
+static int snd_cs46xx_gameport_cooked_read(struct gameport *gameport, int *axes, int *buttons)
+{
+	cs46xx_gameport_t *gp = (cs46xx_gameport_t *)gameport;
+	cs46xx_t *chip;
+	unsigned js1, js2, jst;
+	
+	snd_assert(gp, return 0);
+	chip = snd_magic_cast(cs46xx_t, gp->chip, return 0);
+
+	js1 = snd_cs46xx_peekBA0(chip, BA0_JSC1);
+	js2 = snd_cs46xx_peekBA0(chip, BA0_JSC2);
+	jst = snd_cs46xx_peekBA0(chip, BA0_JSPT);
+	
+	*buttons = (~jst >> 4) & 0x0F; 
+	
+	axes[0] = ((js1 & JSC1_Y1V_MASK) >> JSC1_Y1V_SHIFT) & 0xFFFF;
+	axes[1] = ((js1 & JSC1_X1V_MASK) >> JSC1_X1V_SHIFT) & 0xFFFF;
+	axes[2] = ((js2 & JSC2_Y2V_MASK) >> JSC2_Y2V_SHIFT) & 0xFFFF;
+	axes[3] = ((js2 & JSC2_X2V_MASK) >> JSC2_X2V_SHIFT) & 0xFFFF;
+
+	for(jst=0;jst<4;++jst)
+		if(axes[jst]==0xFFFF) axes[jst] = -1;
+	return 0;
+}
+
+static int snd_cs46xx_gameport_open(struct gameport *gameport, int mode)
+{
+	switch (mode) {
+	case GAMEPORT_MODE_COOKED:
+		return 0;
+	case GAMEPORT_MODE_RAW:
+		return 0;
+	default:
+		return -1;
+	}
+	return 0;
+}
+
+void __devinit snd_cs46xx_gameport(cs46xx_t *chip)
+{
+	cs46xx_gameport_t *gp;
+	gp = kmalloc(sizeof(*gp), GFP_KERNEL);
+	if (! gp) {
+		snd_printk("cannot allocate gameport area\n");
+		return;
+	}
+	memset(gp, 0, sizeof(*gp));
+	gp->info.open = snd_cs46xx_gameport_open;
+	gp->info.read = snd_cs46xx_gameport_read;
+	gp->info.trigger = snd_cs46xx_gameport_trigger;
+	gp->info.cooked_read = snd_cs46xx_gameport_cooked_read;
+	gp->chip = chip;
+	chip->gameport = gp;
+
+	snd_cs46xx_pokeBA0(chip, BA0_JSIO, 0xFF); // ?
+	snd_cs46xx_pokeBA0(chip, BA0_JSCTL, JSCTL_SP_MEDIUM_SLOW);
+	gameport_register_port(&gp->info);
+}
+
+#else /* LINUX_2_2 */
+
+void __devinit snd_cs46xx_gameport(cs46xx_t *chip)
+{
+}
+
+#endif /* !LINUX_2_2 */
+
 /*
  *  proc interface
  */
@@ -1635,6 +1727,12 @@ static int snd_cs46xx_free(cs46xx_t *chip)
 	if (chip->active_ctrl)
 		chip->active_ctrl(chip, 1);
 
+#ifndef LINUX_2_2
+	if (chip->gameport) {
+		gameport_unregister_port(&chip->gameport->info);
+		kfree(chip->gameport);
+	}
+#endif
 #ifdef CONFIG_PM
 	if (chip->pm_dev)
 		pm_unregister(chip->pm_dev);

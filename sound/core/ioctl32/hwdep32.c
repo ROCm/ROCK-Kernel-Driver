@@ -1,5 +1,5 @@
 /*
- *   32bit -> 64bit ioctl wrapper for timer API
+ *   32bit -> 64bit ioctl wrapper for hwdep API
  *   Copyright (c) by Takashi Iwai <tiwai@suse.de>
  *
  *   This program is free software; you can redistribute it and/or modify
@@ -25,8 +25,6 @@
 #include <sound/timer.h>
 #include <asm/uaccess.h>
 #include "ioctl32.h"
-
-#define AP(x) snd_ioctl32_##x
 
 struct ioctl32_mapper hwdep_mappers[] = {
 	{ SNDRV_HWDEP_IOCTL_PVERSION, NULL },

@@ -1302,12 +1302,12 @@ int __init snd_pmac_new(snd_card_t *card, pmac_t **chip_return)
  * Save state when going to sleep, restore it afterwards.
  */
 
-static void snd_pmac_suspend(pmac_t *chip, int can_schedule)
+static void snd_pmac_suspend(pmac_t *chip)
 {
 	unsigned long flags;
 	snd_card_t *card = chip->card;
 
-	snd_power_lock(card, can_schedule);
+	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
 		goto __skip;
 
@@ -1327,11 +1327,11 @@ static void snd_pmac_suspend(pmac_t *chip, int can_schedule)
       	snd_power_unlock(card);
 }
 
-static void snd_pmac_resume(pmac_t *chip, int can_schedule)
+static void snd_pmac_resume(pmac_t *chip)
 {
 	snd_card_t *card = chip->card;
 
-	snd_power_lock(card, can_schedule);
+	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D0)
 		goto __skip;
 
@@ -1370,10 +1370,10 @@ static int snd_pmac_sleep_notify(struct pmu_sleep_notifier *self, int when)
 
 	switch (when) {
 	case PBOOK_SLEEP_NOW:
-		snd_pmac_suspend(chip, 0);
+		snd_pmac_suspend(chip);
 		break;
 	case PBOOK_WAKE:
-		snd_pmac_resume(chip, 0);
+		snd_pmac_resume(chip);
 		break;
 	}
 	return PBOOK_SLEEP_OK;
@@ -1416,11 +1416,11 @@ static int snd_pmac_set_power_state(snd_card_t *card, unsigned int power_state)
 	case SNDRV_CTL_POWER_D0:
 	case SNDRV_CTL_POWER_D1:
 	case SNDRV_CTL_POWER_D2:
-		snd_pmac_resume(chip, 1);
+		snd_pmac_resume(chip);
 		break;
 	case SNDRV_CTL_POWER_D3hot:
 	case SNDRV_CTL_POWER_D3cold:
-		snd_pmac_suspend(chip, 1);
+		snd_pmac_suspend(chip);
 		break;
 	default:
 		return -EINVAL;

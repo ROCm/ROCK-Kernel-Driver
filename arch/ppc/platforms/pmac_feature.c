@@ -400,13 +400,17 @@ heathrow_modem_enable(struct device_node* node, int param, int value)
 		LOCK(flags);
 		MACIO_OUT8(HRW_GPIO_MODEM_RESET, gpio | 1);
 		(void)MACIO_IN8(HRW_GPIO_MODEM_RESET);
-	    	UNLOCK(flags); mdelay(250); LOCK(flags);
+	    	UNLOCK(flags);
+		mdelay(250);
+		LOCK(flags);
 		MACIO_OUT8(HRW_GPIO_MODEM_RESET, gpio);
 		(void)MACIO_IN8(HRW_GPIO_MODEM_RESET);
-	    	UNLOCK(flags); mdelay(250); LOCK(flags);
+	    	UNLOCK(flags);
+		mdelay(250);
+		LOCK(flags);
 		MACIO_OUT8(HRW_GPIO_MODEM_RESET, gpio | 1);
 		(void)MACIO_IN8(HRW_GPIO_MODEM_RESET);
-	    	UNLOCK(flags); mdelay(250); LOCK(flags);
+	    	UNLOCK(flags);
 	}
 	return 0;
 }

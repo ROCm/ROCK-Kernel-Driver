@@ -2273,6 +2273,39 @@ EXPORT_SYMBOL(isapnp_resource_change);
 EXPORT_SYMBOL(isapnp_register_driver);
 EXPORT_SYMBOL(isapnp_unregister_driver);
 
+static struct device_driver isapnp_device_driver = {};
+
+static inline int isapnp_init_device_tree(void)
+{
+	struct pci_bus *card;
+	struct pci_dev *parent = pci_find_class(PCI_CLASS_BRIDGE_ISA << 8, NULL);
+
+	isapnp_for_each_card(card) {
+		struct list_head *devlist;
+
+		card->dev = isapnp_alloc(sizeof(*card->dev));
+		if (!card->dev)
+			break;
+		snprintf(card->dev->name, sizeof(card->dev->name), "%s", card->name);
+		sprintf(card->dev->bus_id, "isapnp%d", card->number);
+		card->dev->parent = parent ? &parent->dev : NULL;
+		card->dev->driver = &isapnp_device_driver;
+		device_register(card->dev);
+
+		for (devlist = card->devices.next; devlist != &card->devices; devlist = devlist->next) {
+			struct pci_dev *dev = pci_dev_b(devlist);
+
+			snprintf(dev->dev.name, sizeof(dev->dev.name), "%s", dev->name);
+			sprintf(dev->dev.bus_id, "%d", dev->devfn);
+			dev->dev.parent = card->dev;
+			dev->dev.driver = &isapnp_device_driver;
+			device_register(&dev->dev);
+		}
+	}
+
+	return 0;
+}
+
 int __init isapnp_init(void)
 {
 	int cards;
@@ -2351,6 +2384,9 @@ int __init isapnp_init(void)
 	} else {
 		printk(KERN_INFO "isapnp: No Plug & Play card found\n");
 	}
+
+	isapnp_init_device_tree();
+
 #ifdef CONFIG_PROC_FS
 	isapnp_proc_init();
 #endif
@@ -2361,10 +2397,28 @@ subsys_initcall(isapnp_init);
 
 #ifdef MODULE
 
+static inline void isapnp_cleanup_device_tree(void)
+{
+	struct pci_bus *card;
+
+	isapnp_for_each_card(card) {
+		struct list_head *devlist;
+
+		for (devlist = card->devices.next; devlist != &card->devices; devlist = devlist->next) {
+			struct pci_dev *dev = pci_dev_b(devlist);
+
+			put_device(&dev->dev);
+		}
+		put_device(card->dev);
+	}
+}
+
 void cleanup_module(void)
 {
-	if (isapnp_detected)
+	if (isapnp_detected) {
+		isapnp_cleanup_device_tree();
 		isapnp_free_all_resources();
+	}
 }
 
 #else

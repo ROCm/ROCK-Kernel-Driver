@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: super.c,v 1.62 2002/03/12 16:23:41 dwmw2 Exp $
+ * $Id: super.c,v 1.64 2002/03/17 10:18:42 dwmw2 Exp $
  *
  */
 
@@ -47,6 +47,7 @@
 #include <linux/pagemap.h>
 #include <linux/mtd/mtd.h>
 #include <linux/interrupt.h>
+#include <linux/ctype.h>
 #include "nodelist.h"
 
 void jffs2_put_super (struct super_block *);
@@ -91,45 +92,193 @@ static struct super_operations jffs2_super_operations =
 	clear_inode:	jffs2_clear_inode
 };
 
-
-static int jffs2_blk_fill_super(struct super_block *sb, void *data, int silent)
+static int jffs2_sb_compare(struct super_block *sb, void *data)
 {
+	struct mtd_info *mtd = data;
+	struct jffs2_sb_info *c = JFFS2_SB_INFO(sb);
+
+	/* The superblocks are considered to be equivalent if the underlying MTD
+	   device is the same one */
+	if (c->mtd == mtd) {
+		D1(printk(KERN_DEBUG "jffs2_sb_compare: match on device %d (\"%s\")\n", mtd->index, mtd->name));
+		return 1;
+	} else {
+		D1(printk(KERN_DEBUG "jffs2_sb_compare: No match, device %d (\"%s\"), device %d (\"%s\")\n",
+			  c->mtd->index, c->mtd->name, mtd->index, mtd->name));
+		return 0;
+	}
+}
+
+static int jffs2_sb_set(struct super_block *sb, void *data)
+{
+	struct mtd_info *mtd = data;
+
+	/* For persistence of NFS exports etc. we use the same s_dev
+	   each time we mount the device, don't just use an anonymous
+	   device */
+	sb->s_dev = mk_kdev(MTD_BLOCK_MAJOR, mtd->index);
+
+	return 0;
+}
+
+static struct super_block *jffs2_get_sb_mtd(struct file_system_type *fs_type,
+					      int flags, char *dev_name, 
+					      void *data, struct mtd_info *mtd)
+{
+	struct super_block *sb;
 	struct jffs2_sb_info *c;
 	int ret;
 
-	D1(printk(KERN_DEBUG "jffs2: blk_read_super for device %s\n", sb->s_id));
+	sb = sget(fs_type, jffs2_sb_compare, jffs2_sb_set, mtd);
 
-	if (major(sb->s_dev) != MTD_BLOCK_MAJOR) {
-		if (!silent)
-			printk(KERN_NOTICE "jffs2: attempt to mount non-MTD device %s\n",
-			       sb->s_id);
-		return -EINVAL;
+	if (IS_ERR(sb))
+		goto out_put;
+
+	if (sb->s_root) {
+		/* New mountpoint for JFFS2 which is already mounted */
+		D1(printk(KERN_DEBUG "jffs2_get_sb_mtd(): Device %d (\"%s\") is already mounted\n",
+			  mtd->index, mtd->name));
+		goto out_put;
 	}
 
-	c = JFFS2_SB_INFO(sb);
-	memset(c, 0, sizeof(*c));
-	
+	D1(printk(KERN_DEBUG "jffs2_get_sb_mtd(): New superblock for device %d (\"%s\")\n",
+		  mtd->index, mtd->name));
+
+	c = kmalloc(sizeof(*c), GFP_KERNEL);
+	if (!c) {
+		sb = ERR_PTR(-ENOMEM);
+		goto out_put;
+	}
+
+	sb->u.generic_sbp = c;
 	sb->s_op = &jffs2_super_operations;
 
-	c->mtd = get_mtd_device(NULL, minor(sb->s_dev));
-	if (!c->mtd) {
-		D1(printk(KERN_DEBUG "jffs2: MTD device #%u doesn't appear to exist\n", minor(sb->s_dev)));
-		return -EINVAL;
+	memset(c, 0, sizeof(*c));
+	c->os_priv = sb;
+	c->mtd = mtd;
+
+	ret = jffs2_do_fill_super(sb, data, (flags&MS_VERBOSE)?1:0);
+
+	if (ret) {
+		/* Failure case... */
+		up_write(&sb->s_umount);
+		deactivate_super(sb);
+		sb = ERR_PTR(ret);
+		goto out_put;
 	}
 
-	ret = jffs2_do_fill_super(sb, data, silent);
-	if (ret)
-		put_mtd_device(c->mtd);
+	sb->s_flags |= MS_ACTIVE;
+	return sb;
 
-	return ret;
+ out_put:
+	put_mtd_device(mtd);
+
+	return sb;
 }
+
+static struct super_block *jffs2_get_sb_mtdnr(struct file_system_type *fs_type,
+					      int flags, char *dev_name, 
+					      void *data, int mtdnr)
+{
+	struct mtd_info *mtd;
+
+	mtd = get_mtd_device(NULL, mtdnr);
+	if (!mtd) {
+		D1(printk(KERN_DEBUG "jffs2: MTD device #%u doesn't appear to exist\n", mtdnr));
+		return ERR_PTR(-EINVAL);
+	}
+
+	return jffs2_get_sb_mtd(fs_type, flags, dev_name, data, mtd);
+}
+
+static struct super_block *jffs2_get_sb(struct file_system_type *fs_type,
+					int flags, char *dev_name, void *data)
+{
+	int err;
+	struct nameidata nd;
+	int mtdnr;
+	kdev_t dev;
+
+	if (!dev_name)
+		return ERR_PTR(-EINVAL);
+
+	D1(printk(KERN_DEBUG "jffs2_get_sb(): dev_name \"%s\"\n", dev_name));
+
+	/* The preferred way of mounting in future; especially when
+	   CONFIG_BLK_DEV is implemented - we specify the underlying
+	   MTD device by number or by name, so that we don't require 
+	   block device support to be present in the kernel. */
+
+	/* FIXME: How to do the root fs this way? */
+
+	if (dev_name[0] == 'm' && dev_name[1] == 't' && dev_name[2] == 'd') {
+		/* Probably mounting without the blkdev crap */
+		if (dev_name[3] == ':') {
+			struct mtd_info *mtd;
+
+			/* Mount by MTD device name */
+			D1(printk(KERN_DEBUG "jffs2_get_sb(): mtd:%%s, name \"%s\"\n", dev_name+4));
+			for (mtdnr = 0; mtdnr < MAX_MTD_DEVICES; mtdnr++) {
+				mtd = get_mtd_device(NULL, mtdnr);
+				if (mtd) {
+					if (!strcmp(mtd->name, dev_name+4))
+						return jffs2_get_sb_mtd(fs_type, flags, dev_name, data, mtd);
+					put_mtd_device(mtd);
+				}
+			}
+			printk(KERN_NOTICE "jffs2_get_sb(): MTD device with name \"%s\" not found.\n", dev_name+4);
+		} else if (isdigit(dev_name[3])) {
+			/* Mount by MTD device number name */
+			char *endptr;
+			
+			mtdnr = simple_strtoul(dev_name+3, &endptr, 0);
+			if (!*endptr) {
+				/* It was a valid number */
+				D1(printk(KERN_DEBUG "jffs2_get_sb(): mtd%%d, mtdnr %d\n", mtdnr));
+				return jffs2_get_sb_mtdnr(fs_type, flags, dev_name, data, mtdnr);
+			}
+		}
+	}
+
+	/* Try the old way - the hack where we allowed users to mount 
+	   /dev/mtdblock$(n) but didn't actually _use_ the blkdev */
+
+	err = path_lookup(dev_name, LOOKUP_FOLLOW, &nd);
+
+	D1(printk(KERN_DEBUG "jffs2_get_sb(): path_lookup() returned %d, inode %p\n",
+		  err, nd.dentry->d_inode));
+
+	if (err)
+		return ERR_PTR(err);
+
+	if (!S_ISBLK(nd.dentry->d_inode->i_mode)) {
+		path_release(&nd);
+		return ERR_PTR(-EINVAL);
+	}
+	if (nd.mnt->mnt_flags & MNT_NODEV) {
+		path_release(&nd);
+		return ERR_PTR(-EACCES);
+	}
+
+	dev = nd.dentry->d_inode->i_rdev;
+	path_release(&nd);
+
+	if (major(dev) != MTD_BLOCK_MAJOR) {
+		if (!(flags & MS_VERBOSE)) /* Yes I mean this. Strangely */
+			printk(KERN_NOTICE "Attempt to mount non-MTD device \"%s\" as JFFS2\n",
+			       dev_name);
+		return ERR_PTR(-EINVAL);
+	}
+
+	return jffs2_get_sb_mtdnr(fs_type, flags, dev_name, data, minor(dev));
+}
+
 
 void jffs2_put_super (struct super_block *sb)
 {
 	struct jffs2_sb_info *c = JFFS2_SB_INFO(sb);
 
 	D2(printk(KERN_DEBUG "jffs2: jffs2_put_super()\n"));
-
 
 	if (!(sb->s_flags & MS_RDONLY))
 		jffs2_stop_garbage_collect_thread(c);
@@ -140,22 +289,17 @@ void jffs2_put_super (struct super_block *sb)
 	if (c->mtd->sync)
 		c->mtd->sync(c->mtd);
 	put_mtd_device(c->mtd);
-	
-	D1(printk(KERN_DEBUG "jffs2_put_super returning\n"));
-}
 
-static struct super_block *jffs2_get_sb(struct file_system_type *fs_type,
-					int flags, char *dev_name, void *data)
-{
-	return get_sb_bdev(fs_type, flags, dev_name, data, jffs2_blk_fill_super);
+	kfree(c);
+
+	D1(printk(KERN_DEBUG "jffs2_put_super returning\n"));
 }
  
 static struct file_system_type jffs2_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"jffs2",
 	get_sb:		jffs2_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	kill_sb:	generic_shutdown_super
 };
 
 

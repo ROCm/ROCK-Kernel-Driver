@@ -265,7 +265,7 @@ static void omninet_read_bulk_callback (struct urb *urb)
 		      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
 		      urb->transfer_buffer, urb->transfer_buffer_length,
 		      omninet_read_bulk_callback, port);
-	result = usb_submit_urb(urb, GFP_KERNEL);
+	result = usb_submit_urb(urb, GFP_ATOMIC);
 	if (result)
 		err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
 
@@ -316,7 +316,7 @@ static int omninet_write (struct usb_serial_port *port, int from_user, const uns
 	wport->write_urb->transfer_buffer_length = 64;
 
 	wport->write_urb->dev = serial->dev;
-	result = usb_submit_urb(wport->write_urb, GFP_KERNEL);
+	result = usb_submit_urb(wport->write_urb, GFP_ATOMIC);
 	if (result)
 		err(__FUNCTION__ " - failed submitting write urb, error %d", result);
 	else

@@ -80,7 +80,7 @@ MODULE_DEVICE_TABLE(pci, snd_trident_ids);
 static int __devinit snd_trident_probe(struct pci_dev *pci,
 				       const struct pci_device_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	snd_card_t *card;
 	trident_t *trident;
 	const char *str;
@@ -137,6 +137,8 @@ static int __devinit snd_trident_probe(struct pci_dev *pci,
 		return err;
 	}
 #endif
+
+	snd_trident_gameport(trident);
 
 	switch (trident->device) {
 	case TRIDENT_DEVICE_ID_DX:

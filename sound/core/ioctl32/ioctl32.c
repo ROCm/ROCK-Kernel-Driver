@@ -286,14 +286,21 @@ static int snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsigne
 
 #define AP(x) snd_ioctl32_##x
 
+enum {
+	SNDRV_CTL_IOCTL_ELEM_LIST32 = _IOWR('U', 0x10, struct sndrv_ctl_elem_list32),
+	SNDRV_CTL_IOCTL_ELEM_INFO32 = _IOWR('U', 0x11, struct sndrv_ctl_elem_info32),
+	SNDRV_CTL_IOCTL_ELEM_READ32 = _IOWR('U', 0x12, struct sndrv_ctl_elem_value32),
+	SNDRV_CTL_IOCTL_ELEM_WRITE32 = _IOWR('U', 0x13, struct sndrv_ctl_elem_value32),
+};
+
 static struct ioctl32_mapper control_mappers[] = {
 	/* controls (without rawmidi, hwdep, timer releated ones) */
 	{ SNDRV_CTL_IOCTL_PVERSION, NULL },
 	{ SNDRV_CTL_IOCTL_CARD_INFO , NULL },
-	{ SNDRV_CTL_IOCTL_ELEM_LIST, AP(ctl_elem_list) },
-	{ SNDRV_CTL_IOCTL_ELEM_INFO, AP(ctl_elem_info) },
-	{ SNDRV_CTL_IOCTL_ELEM_READ, AP(ctl_elem_value) },
-	{ SNDRV_CTL_IOCTL_ELEM_WRITE, AP(ctl_elem_value) },
+	{ SNDRV_CTL_IOCTL_ELEM_LIST32, AP(ctl_elem_list) },
+	{ SNDRV_CTL_IOCTL_ELEM_INFO32, AP(ctl_elem_info) },
+	{ SNDRV_CTL_IOCTL_ELEM_READ32, AP(ctl_elem_value) },
+	{ SNDRV_CTL_IOCTL_ELEM_WRITE32, AP(ctl_elem_value) },
 	{ SNDRV_CTL_IOCTL_ELEM_LOCK, NULL },
 	{ SNDRV_CTL_IOCTL_ELEM_UNLOCK, NULL },
 	{ SNDRV_CTL_IOCTL_SUBSCRIBE_EVENTS, NULL },
@@ -314,9 +321,15 @@ extern struct ioctl32_mapper pcm_mappers[];
 extern struct ioctl32_mapper rawmidi_mappers[];
 extern struct ioctl32_mapper timer_mappers[];
 extern struct ioctl32_mapper hwdep_mappers[];
+#ifdef CONFIG_SND_SEQUENCER
+extern struct ioctl32_mapper seq_mappers[];
+#endif
 
 static void snd_ioctl32_done(void)
 {
+#ifdef CONFIG_SND_SEQUENCER
+	snd_ioctl32_unregister(seq_mappers);
+#endif
 	snd_ioctl32_unregister(hwdep_mappers);
 	snd_ioctl32_unregister(timer_mappers);
 	snd_ioctl32_unregister(rawmidi_mappers);
@@ -351,6 +364,13 @@ static int __init snd_ioctl32_init(void)
 		snd_ioctl32_done();
 		return err;
 	}
+#ifdef CONFIG_SND_SEQUENCER
+	err = snd_ioctl32_register(seq_mappers);
+	if (err < 0) {
+		snd_ioctl32_done();
+		return err;
+	}
+#endif
 }
 
 module_init(snd_ioctl32_init)

@@ -131,6 +131,7 @@ static inline int _snd_magic_bad(void *obj, unsigned long magic)
 #define mtpav_port_t_magic			0xa15a3702
 #define korg1212_t_magic			0xa15a3800
 #define opl3sa2_t_magic				0xa15a3900
+#define serialmidi_t_magic			0xa15a3a00
 
 #else
 

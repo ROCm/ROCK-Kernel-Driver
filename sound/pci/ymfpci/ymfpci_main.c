@@ -313,12 +313,12 @@ static void snd_ymfpci_pcm_interrupt(ymfpci_t *chip, ymfpci_voice_t *voice)
 			delta = pos - ypcm->last_pos;
 		ypcm->period_pos += delta;
 		ypcm->last_pos = pos;
-		while (ypcm->period_pos >= ypcm->period_size) {
+		if (ypcm->period_pos >= ypcm->period_size) {
 			// printk("done - active_bank = 0x%x, start = 0x%x\n", chip->active_bank, voice->bank[chip->active_bank].start);
+			ypcm->period_pos %= ypcm->period_size;
 			spin_unlock(&chip->reg_lock);
 			snd_pcm_period_elapsed(ypcm->substream);
 			spin_lock(&chip->reg_lock);
-			ypcm->period_pos -= ypcm->period_size;
 		}
 	}
 	spin_unlock(&chip->reg_lock);
@@ -340,8 +340,8 @@ static void snd_ymfpci_pcm_capture_interrupt(snd_pcm_substream_t *substream)
 			delta = pos - ypcm->last_pos;
 		ypcm->period_pos += delta;
 		ypcm->last_pos = pos;
-		while (ypcm->period_pos >= ypcm->period_size) {
-			ypcm->period_pos = 0;
+		if (ypcm->period_pos >= ypcm->period_size) {
+			ypcm->period_pos %= ypcm->period_size;
 			// printk("done - active_bank = 0x%x, start = 0x%x\n", chip->active_bank, voice->bank[chip->active_bank].start);
 			spin_unlock(&chip->reg_lock);
 			snd_pcm_period_elapsed(substream);

@@ -54,7 +54,7 @@ struct seq_oss_midi_t {
 /*
  * midi device table
  */
-static int max_midi_devs = 0;
+static int max_midi_devs;
 static seq_oss_midi_t *midi_devs[SNDRV_SEQ_OSS_MAX_MIDI_DEVS];
 
 static spinlock_t register_lock = SPIN_LOCK_UNLOCKED;

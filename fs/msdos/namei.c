@@ -6,8 +6,6 @@
  *  Rewritten for constant inumbers 1999 by Al Viro
  */
 
-
-#define __NO_VERSION__
 #include <linux/module.h>
 
 #include <linux/time.h>
@@ -23,8 +21,8 @@ static const char *reserved_names[] = {
     "CON     ","PRN     ","NUL     ","AUX     ",
     "LPT1    ","LPT2    ","LPT3    ","LPT4    ",
     "COM1    ","COM2    ","COM3    ","COM4    ",
-    NULL };
-
+    NULL
+};
 
 /* Characters that are undesirable in an MS-DOS file name */
   
@@ -32,12 +30,6 @@ static char bad_chars[] = "*?<>|\"";
 static char bad_if_strict_pc[] = "+=,; ";
 static char bad_if_strict_atari[] = " "; /* GEMDOS is less restrictive */
 #define	bad_if_strict(opts) ((opts)->atari ? bad_if_strict_atari : bad_if_strict_pc)
-
-/* Must die */
-void msdos_put_super(struct super_block *sb)
-{
-	fat_put_super(sb);
-}
 
 /***** Formats an MS-DOS file name. Rejects invalid names. */
 static int msdos_format_name(const char *name,int len,

@@ -888,14 +888,22 @@ struct snd_m3 {
 #endif
 
 static struct pci_device_id snd_m3_ids[] __devinitdata = {
-	{PCI_VENDOR_ID_ESS, PCI_DEVICE_ID_ESS_ALLEGRO_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{PCI_VENDOR_ID_ESS, PCI_DEVICE_ID_ESS_ALLEGRO, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{PCI_VENDOR_ID_ESS, PCI_DEVICE_ID_ESS_CANYON3D_2LE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{PCI_VENDOR_ID_ESS, PCI_DEVICE_ID_ESS_CANYON3D_2, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{PCI_VENDOR_ID_ESS, PCI_DEVICE_ID_ESS_MAESTRO3, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{PCI_VENDOR_ID_ESS, PCI_DEVICE_ID_ESS_MAESTRO3_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{PCI_VENDOR_ID_ESS, PCI_DEVICE_ID_ESS_MAESTRO3_HW, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{PCI_VENDOR_ID_ESS, PCI_DEVICE_ID_ESS_MAESTRO3_2, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{PCI_VENDOR_ID_ESS, PCI_DEVICE_ID_ESS_ALLEGRO_1, PCI_ANY_ID, PCI_ANY_ID,
+	 PCI_CLASS_MULTIMEDIA_AUDIO << 8, 0xffff00, 0},
+	{PCI_VENDOR_ID_ESS, PCI_DEVICE_ID_ESS_ALLEGRO, PCI_ANY_ID, PCI_ANY_ID,
+	 PCI_CLASS_MULTIMEDIA_AUDIO << 8, 0xffff00, 0},
+	{PCI_VENDOR_ID_ESS, PCI_DEVICE_ID_ESS_CANYON3D_2LE, PCI_ANY_ID, PCI_ANY_ID,
+	 PCI_CLASS_MULTIMEDIA_AUDIO << 8, 0xffff00, 0},
+	{PCI_VENDOR_ID_ESS, PCI_DEVICE_ID_ESS_CANYON3D_2, PCI_ANY_ID, PCI_ANY_ID,
+	 PCI_CLASS_MULTIMEDIA_AUDIO << 8, 0xffff00, 0},
+	{PCI_VENDOR_ID_ESS, PCI_DEVICE_ID_ESS_MAESTRO3, PCI_ANY_ID, PCI_ANY_ID,
+	 PCI_CLASS_MULTIMEDIA_AUDIO << 8, 0xffff00, 0},
+	{PCI_VENDOR_ID_ESS, PCI_DEVICE_ID_ESS_MAESTRO3_1, PCI_ANY_ID, PCI_ANY_ID,
+	 PCI_CLASS_MULTIMEDIA_AUDIO << 8, 0xffff00, 0},
+	{PCI_VENDOR_ID_ESS, PCI_DEVICE_ID_ESS_MAESTRO3_HW, PCI_ANY_ID, PCI_ANY_ID,
+	 PCI_CLASS_MULTIMEDIA_AUDIO << 8, 0xffff00, 0},
+	{PCI_VENDOR_ID_ESS, PCI_DEVICE_ID_ESS_MAESTRO3_2, PCI_ANY_ID, PCI_ANY_ID,
+	 PCI_CLASS_MULTIMEDIA_AUDIO << 8, 0xffff00, 0},
 	{0,},
 };
 
@@ -1481,8 +1489,8 @@ static void snd_m3_update_ptr(m3_t *chip, m3_dma_t *s)
 	diff = (s->dma_size + hwptr - s->hwptr) % s->dma_size;
 	s->hwptr = hwptr;
 	s->count += diff;
-	while (s->count >= (signed)s->period_size) {
-		s->count -= s->period_size;
+	if (s->count >= (signed)s->period_size) {
+		s->count %= s->period_size;
 		spin_unlock(&chip->reg_lock);
 		snd_pcm_period_elapsed(subs);
 		spin_lock(&chip->reg_lock);
@@ -2595,14 +2603,14 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 static int __devinit
 snd_m3_probe(struct pci_dev *pci, const struct pci_device_id *id)
 {
-	static int dev = 0;
+	static int dev;
 	snd_card_t *card;
 	m3_t *chip;
 	int err;
 
 	/* don't pick up modems */
 	if (((pci->class >> 8) & 0xffff) != PCI_CLASS_MULTIMEDIA_AUDIO)
-		return 0;
+		return -ENODEV;
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;

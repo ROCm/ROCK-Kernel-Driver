@@ -1413,12 +1413,17 @@ static int udf_fill_super(struct super_block *sb, void *options, int silent)
 	struct inode *inode=NULL;
 	struct udf_options uopt;
 	lb_addr rootdir, fileset;
+	struct udf_sb_info *sbi;
 
 	uopt.flags = (1 << UDF_FLAG_USE_AD_IN_ICB) | (1 << UDF_FLAG_STRICT);
 	uopt.uid = -1;
 	uopt.gid = -1;
 	uopt.umask = 0;
 
+	sbi = kmalloc(sizeof(struct udf_sb_info), GFP_KERNEL);
+	if (!sbi)
+		return -ENOMEM;
+	sb->u.generic_sbp = sbi;
 	memset(UDF_SB(sb), 0x00, sizeof(struct udf_sb_info));
 
 #if UDFFS_RW != 1
@@ -1607,6 +1612,8 @@ error_out:
 		udf_close_lvid(sb);
 	udf_release_data(UDF_SB_LVIDBH(sb));
 	UDF_SB_FREE(sb);
+	kfree(sbi);
+	sb->u.generic_sbp = NULL;
 	return -EINVAL;
 }
 
@@ -1697,6 +1704,8 @@ udf_put_super(struct super_block *sb)
 		udf_close_lvid(sb);
 	udf_release_data(UDF_SB_LVIDBH(sb));
 	UDF_SB_FREE(sb);
+	kfree(sb->u.generic_sbp);
+	sb->u.generic_sbp = NULL;
 }
 
 /*

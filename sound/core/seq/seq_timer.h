@@ -52,12 +52,6 @@ typedef struct {
 	unsigned int skew;
 	unsigned int skew_base;
 
-#ifdef SNDRV_SEQ_SYNC_SUPPORT
-	int sync_start;
-	struct timeval sync_last_tm;
-	unsigned int sync_time_diff;
-#endif
-
 	struct timeval 		last_update;	 /* time of last clock update, used for interpolation */
 
 	spinlock_t lock;
@@ -144,8 +138,4 @@ int snd_seq_timer_set_skew(seq_timer_t *tmr, unsigned int skew, unsigned int bas
 snd_seq_real_time_t snd_seq_timer_get_cur_time(seq_timer_t *tmr);
 snd_seq_tick_time_t snd_seq_timer_get_cur_tick(seq_timer_t *tmr);
 
-#ifdef SNDRV_SEQ_SYNC_SUPPORT
-u64 snd_seq_timer_get_cur_nsec(seq_timer_t *tmr, struct timeval *tm);
-#endif
-                        
 #endif
