@@ -319,9 +319,6 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 		clear_bit(X86_FEATURE_XMM, c->x86_capability);
 	}
 
-	/* Init Machine Check Exception if available. */
-	mcheck_init(c);
-
 	/* If the model name is still unset, do table lookup. */
 	if ( !c->x86_model_id[0] ) {
 		char *p;
@@ -359,6 +356,9 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	       boot_cpu_data.x86_capability[1],
 	       boot_cpu_data.x86_capability[2],
 	       boot_cpu_data.x86_capability[3]);
+
+	/* Init Machine Check Exception if available. */
+	mcheck_init(c);
 }
 /*
  *	Perform early boot up checks for a valid TSC. See arch/i386/kernel/time.c
