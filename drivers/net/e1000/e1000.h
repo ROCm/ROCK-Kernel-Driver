@@ -107,17 +107,20 @@
 #include <linux/udp.h>
 #include <net/pkt_sched.h>
 #include <linux/list.h>
-#include <asm/uaccess.h>
+#include <linux/reboot.h>
 #include <linux/ethtool.h>
 #ifdef NETIF_F_HW_VLAN_TX
 #include <linux/if_vlan.h>
 #endif
 
+#define BAR_0		0
+#define PCI_DMA_64BIT	0xffffffffffffffffULL
+#define PCI_DMA_32BIT	0x00000000ffffffffULL
+
+
 struct e1000_adapter;
 
 #include "e1000_hw.h"
-
-#define BAR_0 0
 
 #if DBG
 #define E1000_DBG(args...) printk(KERN_DEBUG "e1000: " args)
@@ -156,6 +159,7 @@ struct e1000_buffer {
 	struct sk_buff *skb;
 	uint64_t dma;
 	unsigned long length;
+	unsigned long time_stamp;
 };
 
 struct e1000_desc_ring {
@@ -204,10 +208,13 @@ struct e1000_adapter {
 	spinlock_t stats_lock;
 	atomic_t irq_sem;
 
+#ifdef ETHTOOL_PHYS_ID
+	struct timer_list blink_timer;
+	unsigned long led_status;
+#endif
+
 	/* TX */
 	struct e1000_desc_ring tx_ring;
-	unsigned long trans_finish;
-	spinlock_t tx_lock;
 	uint32_t txd_cmd;
 	int max_data_per_txd;
 
@@ -228,6 +235,9 @@ struct e1000_adapter {
 	struct e1000_hw_stats stats;
 	struct e1000_phy_info phy_info;
 	struct e1000_phy_stats phy_stats;
-};
 
+
+
+	uint32_t pci_state[16];
+};
 #endif /* _E1000_H_ */

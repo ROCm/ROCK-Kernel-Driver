@@ -164,6 +164,9 @@ static char *test_strings[] = {
 };
 
 #endif
+#ifdef	ETHTOOL_PHYS_ID
+static int e100_ethtool_led_blink(struct net_device *, struct ifreq *);
+#endif
 #endif /*E100_ETHTOOL_IOCTL */
 
 #ifdef SIOCGMIIPHY
@@ -182,7 +185,7 @@ static void e100_non_tx_background(unsigned long);
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
 
-#define E100_VERSION  "2.0.27-pre3"
+#define E100_VERSION  "2.0.30-k1"
 
 #define E100_FULL_DRIVER_NAME 	"Intel(R) PRO/100 Fast Ethernet Adapter - Loadable driver, ver "
 
@@ -691,9 +694,10 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 #ifdef ETHTOOL_GWOL
 	/* Disabling all WOLs as initialization */
 	bdp->wolsupported = bdp->wolopts = 0;
-	if (bdp->rev_id >= D101MA_REV_ID) {
-		bdp->wolsupported =
-			WAKE_PHY | WAKE_UCAST | WAKE_ARP | WAKE_MAGIC;
+	if (bdp->rev_id >= D101A4_REV_ID) {
+		bdp->wolsupported = WAKE_PHY | WAKE_MAGIC;
+		if (bdp->rev_id >= D101MA_REV_ID)
+			bdp->wolsupported |= WAKE_UCAST | WAKE_ARP;
 		bdp->wolopts = WAKE_MAGIC;
 	}
 #endif
@@ -3335,6 +3339,11 @@ e100_do_ethtool_ioctl(struct net_device *dev, struct ifreq *ifr)
 		rc = e100_ethtool_gstrings(dev,ifr);
 		break;
 #endif
+#ifdef	ETHTOOL_PHYS_ID
+	case ETHTOOL_PHYS_ID:
+		rc = e100_ethtool_led_blink(dev,ifr);
+		break;
+#endif
 	default:
 		break;
 	}			//switch
@@ -3637,6 +3646,94 @@ e100_ethtool_eeprom(struct net_device *dev, struct ifreq *ifr)
 		if (copy_to_user(ifr->ifr_data, &ecmd, sizeof (ecmd)))
 			return -EFAULT;
 	}
+	return 0;
+}
+#endif
+
+#ifdef ETHTOOL_PHYS_ID
+#define E100_BLINK_INTERVAL	(HZ/4)
+/**
+ * e100_led_control
+ * @bdp: atapter's private data struct
+ * @led_mdi_op: led operation
+ *
+ * Software control over adapter's led. The possible operations are:
+ * TURN LED OFF, TURN LED ON and RETURN LED CONTROL TO HARDWARE.
+ */
+static void
+e100_led_control(struct e100_private *bdp, u16 led_mdi_op)
+{
+	spin_lock_bh(&bdp->mdi_access_lock);
+
+	e100_mdi_write(bdp, PHY_82555_LED_SWITCH_CONTROL,
+		       bdp->phy_addr, led_mdi_op);
+
+	spin_unlock_bh(&bdp->mdi_access_lock);
+}
+/**
+ * e100_led_blink_callback
+ * @data: pointer to atapter's private data struct
+ *
+ * Blink timer callback function. Toggles ON/OFF led status bit and calls
+ * led hardware access function. 
+ */
+static void
+e100_led_blink_callback(unsigned long data)
+{
+	struct e100_private *bdp = (struct e100_private *) data;
+
+	if(bdp->flags & LED_IS_ON) {
+		bdp->flags &= ~LED_IS_ON;
+		e100_led_control(bdp, PHY_82555_LED_OFF);
+	} else {
+		bdp->flags |= LED_IS_ON;
+		if (bdp->rev_id >= D101MA_REV_ID)
+			e100_led_control(bdp, PHY_82555_LED_ON_559);
+		else
+			e100_led_control(bdp, PHY_82555_LED_ON_PRE_559);
+	}
+
+	mod_timer(&bdp->blink_timer, jiffies + E100_BLINK_INTERVAL);
+}
+/**
+ * e100_ethtool_led_blink
+ * @dev: pointer to atapter's net_device struct
+ * @ifr: pointer to ioctl request structure
+ *
+ * Blink led ioctl handler. Initialtes blink timer and sleeps until
+ * blink period expires. Than it kills timer and returns. The led control
+ * is returned back to hardware when blink timer is killed.
+ */
+static int
+e100_ethtool_led_blink(struct net_device *dev, struct ifreq *ifr)
+{
+	struct e100_private *bdp;
+	struct ethtool_value ecmd;
+
+	bdp = dev->priv;
+
+	if (copy_from_user(&ecmd, ifr->ifr_data, sizeof (ecmd)))
+		return -EFAULT;
+
+	if(!bdp->blink_timer.function) {
+		init_timer(&bdp->blink_timer);
+		bdp->blink_timer.function = e100_led_blink_callback;
+		bdp->blink_timer.data = (unsigned long) bdp;
+	}
+
+	mod_timer(&bdp->blink_timer, jiffies);
+
+	set_current_state(TASK_INTERRUPTIBLE);
+
+	if ((!ecmd.data) || (ecmd.data > MAX_SCHEDULE_TIMEOUT / HZ))
+		ecmd.data = MAX_SCHEDULE_TIMEOUT / HZ;
+
+	schedule_timeout(ecmd.data * HZ);
+
+	del_timer_sync(&bdp->blink_timer);
+
+	e100_led_control(bdp, PHY_82555_LED_NORMAL_CONTROL);
+
 	return 0;
 }
 #endif

@@ -548,7 +548,7 @@ read_bundle_max_def(char *page, char **start, off_t off,
 	int len;
 
 	len = read_int_param(page, "CPU Saver Maximum Bundle",
-			     "Sets the value for CPU saver's maximum value",
+			     "Sets CPU saver's maximum value",
 			     E100_DEFAULT_CPUSAVER_BUNDLE_MAX, 0x1, 0xFFFF);
 
 	return generic_read(page, start, off, count, eof, len);

@@ -69,6 +69,7 @@ AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY OR
 TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE 
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *******************************************************************************/
+
 #include "e100.h"
 #include "e100_config.h"
 #ifdef ETHTOOL_TEST
@@ -457,11 +458,4 @@ e100_diag_loopback_free (struct e100_private *bdp)
 }
 
 #endif
-
-
-
-
-
-
-
 
