@@ -32,7 +32,6 @@
 
 #ifdef CONFIG_PROC_FS
 static struct proc_dir_entry *proc_net_devsnmp6;
-#endif
 
 static int fold_prot_inuse(struct proto *proto)
 {
@@ -57,7 +56,6 @@ static int sockstat6_seq_show(struct seq_file *seq, void *v)
 		       ip6_frag_nqueues, atomic_read(&ip6_frag_mem));
 	return 0;
 }
-
 
 struct snmp6_item
 {
@@ -221,9 +219,7 @@ static struct file_operations snmp6_seq_fops = {
 int snmp6_register_dev(struct inet6_dev *idev)
 {
 	int err = -ENOMEM;
-#ifdef CONFIG_PROC_FS
 	struct proc_dir_entry *p;
-#endif
 
 	if (!idev || !idev->dev)
 		return -EINVAL;
@@ -232,7 +228,6 @@ int snmp6_register_dev(struct inet6_dev *idev)
 			   __alignof__(struct icmpv6_mib)) < 0)
 		goto err_icmp;
 
-#ifdef CONFIG_PROC_FS
 	if (!proc_net_devsnmp6) {
 		err = -ENOENT;
 		goto err_proc;
@@ -244,27 +239,22 @@ int snmp6_register_dev(struct inet6_dev *idev)
 	p->proc_fops = &snmp6_seq_fops;
 
 	idev->stats.proc_dir_entry = p;
-#endif
 	return 0;
 
-#ifdef CONFIG_PROC_FS
 err_proc:
 	snmp6_mib_free((void **)idev->stats.icmpv6);
-#endif
 err_icmp:
 	return err;
 }
 
 int snmp6_unregister_dev(struct inet6_dev *idev)
 {
-#ifdef CONFIG_PROC_FS
 	if (!proc_net_devsnmp6)
 		return -ENOENT;
 	if (!idev || !idev->stats.proc_dir_entry)
 		return -EINVAL;
 	remove_proc_entry(idev->stats.proc_dir_entry->name,
 			  proc_net_devsnmp6);
-#endif
 	snmp6_mib_free((void **)idev->stats.icmpv6);
 
 	return 0;
@@ -301,4 +291,32 @@ void ipv6_misc_proc_exit(void)
 	proc_net_remove("dev_snmp6");
 	proc_net_remove("snmp6");
 }
+
+#else	/* CONFIG_PROC_FS */
+
+
+int snmp6_register_dev(struct inet6_dev *idev)
+{
+	int err = -ENOMEM;
+
+	if (!idev || !idev->dev)
+		return -EINVAL;
+
+	if (snmp6_mib_init((void **)idev->stats.icmpv6, sizeof(struct icmpv6_mib),
+			   __alignof__(struct icmpv6_mib)) < 0)
+		goto err_icmp;
+
+	return 0;
+
+err_icmp:
+	return err;
+}
+
+int snmp6_unregister_dev(struct inet6_dev *idev)
+{
+	snmp6_mib_free((void **)idev->stats.icmpv6);
+	return 0;
+}
+
+#endif
 
