@@ -5,6 +5,7 @@
 #include <asm/uaccess.h>
 
 #include <acpi/acpi_bus.h>
+#include <acpi/acpi_drivers.h>
 
 #ifdef CONFIG_X86
 #include <linux/mc146818rtc.h>

@@ -13,6 +13,7 @@
 #include <linux/device.h>
 #include <linux/suspend.h>
 #include <acpi/acpi_bus.h>
+#include <acpi/acpi_drivers.h>
 #include "sleep.h"
 
 #define _COMPONENT		ACPI_SYSTEM_COMPONENT
