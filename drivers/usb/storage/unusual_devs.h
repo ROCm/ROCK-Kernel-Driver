@@ -137,12 +137,12 @@ UNUSUAL_DEV(  0x04da, 0x0901, 0x0100, 0x0200,
 		"LS-120 Camera",
 		US_SC_UFI, US_PR_CBI, NULL, 0),
 
-/* Reported by Peter Wächtler <pwaechtler@loewe-komp.de> */
-UNUSUAL_DEV(  0x04ce, 0x0002, 0x0074, 0x0074,
-		"ScanLogic",
-		"SL11R-IDE 0049SQFP-1.2 A002",
-		US_SC_SCSI, US_PR_BULK, NULL,
-		US_FL_FIX_INQUIRY ),
+/* From Yukihiro Nakai, via zaitcev@yahoo.com.
+ * This is needed for CB instead of CBI */
+UNUSUAL_DEV(  0x04da, 0x0d05, 0x0000, 0x0000,
+		"Sharp CE-CW05",
+		"CD-R/RW Drive",
+		US_SC_8070, US_PR_CB, NULL, 0),
 
 /* Most of the following entries were developed with the help of
  * Shuttle/SCM directly.
