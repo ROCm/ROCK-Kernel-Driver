@@ -178,7 +178,7 @@ static unsigned long ehci_urb_done (
 		if ((qh->hw_info2 & cpu_to_le32 (0x00ff)) != 0) {
 
 			/* ... update hc-wide periodic stats (for usbfs) */
-			ehci->hcd.self.bandwidth_int_reqs--;
+			hcd_to_bus (&ehci->hcd)->bandwidth_int_reqs--;
 
 #ifdef	INTR_AUTOMAGIC
 			if (!((urb->status == -ENOENT)
@@ -215,7 +215,7 @@ static unsigned long ehci_urb_done (
 		int	status;
 
 		resubmit->dev = dev;
-		status = usb_submit_urb (resubmit, SLAB_KERNEL);
+		status = SUBMIT_URB (resubmit, SLAB_KERNEL);
 		if (status != 0)
 			err ("can't resubmit interrupt urb %p: status %d",
 					resubmit, status);
@@ -652,8 +652,8 @@ ehci_qh_make (
 			info2 |= hb_mult (maxp) << 30;
 		}
 		break;
-#ifdef DEBUG
 	default:
+#ifdef DEBUG
 		BUG ();
 #endif
 	}
@@ -841,7 +841,8 @@ submit_async (
 		epnum |= 0x10;
 
 	vdbg ("%s: submit_async urb %p len %d ep %d-%s qtd %p [qh %p]",
-		ehci->hcd.self.bus_name, urb, urb->transfer_buffer_length,
+		hcd_to_bus (&ehci->hcd)->bus_name,
+		urb, urb->transfer_buffer_length,
 		epnum & 0x0f, (epnum & 0x10) ? "in" : "out",
 		qtd, dev ? dev->ep [epnum] : (void *)~0);
 

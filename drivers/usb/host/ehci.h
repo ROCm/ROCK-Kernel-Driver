@@ -391,4 +391,26 @@ struct ehci_fstn {
 	union ehci_shadow	fstn_next;	/* ptr to periodic q entry */
 } __attribute__ ((aligned (32)));
 
+/*-------------------------------------------------------------------------*/
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,32)
+
+#define SUBMIT_URB(urb,mem_flags) usb_submit_urb(urb)
+#define STUB_DEBUG_FILES
+
+#else	/* LINUX_VERSION_CODE */
+
+static inline struct usb_bus *hcd_to_bus (struct usb_hcd *hcd)
+	{ return &hcd->self; }
+
+#define SUBMIT_URB(urb,mem_flags) usb_submit_urb(urb,mem_flags)
+
+#ifndef DEBUG
+#define STUB_DEBUG_FILES
+#endif	/* DEBUG */
+
+#endif	/* LINUX_VERSION_CODE */
+
+/*-------------------------------------------------------------------------*/
+
 #endif /* __LINUX_EHCI_HCD_H */

@@ -41,14 +41,17 @@ static int check_reset_complete (
 	/* if reset finished and it's still not enabled -- handoff */
 	if (!(port_status & PORT_PE)) {
 		dbg ("%s port %d full speed, give to companion, 0x%x",
-			ehci->hcd.self.bus_name, index + 1, port_status);
+			hcd_to_bus (&ehci->hcd)->bus_name,
+			index + 1, port_status);
 
 		// what happens if HCS_N_CC(params) == 0 ?
 		port_status |= PORT_OWNER;
 		writel (port_status, &ehci->regs->port_status [index]);
 
 	} else
-		dbg ("%s port %d high speed", ehci->hcd.self.bus_name, index + 1);
+		dbg ("%s port %d high speed",
+			hcd_to_bus (&ehci->hcd)->bus_name,
+			index + 1);
 
 	return port_status;
 }
@@ -310,11 +313,13 @@ static int ehci_hub_control (
 			if ((temp & (PORT_PE|PORT_CONNECT)) == PORT_CONNECT
 					&& PORT_USB11 (temp)) {
 				dbg ("%s port %d low speed, give to companion",
-					hcd->self.bus_name, wIndex + 1);
+					hcd_to_bus (&ehci->hcd)->bus_name,
+					wIndex + 1);
 				temp |= PORT_OWNER;
 			} else {
 				vdbg ("%s port %d reset",
-					hcd->self.bus_name, wIndex + 1);
+					hcd_to_bus (&ehci->hcd)->bus_name,
+					wIndex + 1);
 				temp |= PORT_RESET;
 				temp &= ~PORT_PE;
 

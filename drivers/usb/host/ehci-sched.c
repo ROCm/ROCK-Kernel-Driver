@@ -273,7 +273,7 @@ static unsigned long intr_deschedule (
 	qh->qh_state = QH_STATE_IDLE;
 
 	/* update per-qh bandwidth utilization (for usbfs) */
-	ehci->hcd.self.bandwidth_allocated -= 
+	hcd_to_bus (&ehci->hcd)->bandwidth_allocated -= 
 		(qh->usecs + qh->c_usecs) / qh->period;
 
 	vdbg ("descheduled qh %p, per = %d frame = %d count = %d, urbs = %d",
@@ -435,7 +435,7 @@ static int qh_schedule (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	} while (frame < ehci->periodic_size);
 
 	/* update per-qh bandwidth for usbfs */
-	ehci->hcd.self.bandwidth_allocated += 
+	hcd_to_bus (&ehci->hcd)->bandwidth_allocated += 
 		(qh->usecs + qh->c_usecs) / qh->period;
 
 	/* maybe enable periodic schedule processing */
@@ -485,7 +485,7 @@ static int intr_submit (
 	BUG_ON (qh == 0);
 
 	/* ... update usbfs periodic stats */
-	ehci->hcd.self.bandwidth_int_reqs++;
+	hcd_to_bus (&ehci->hcd)->bandwidth_int_reqs++;
 
 done:
 	spin_unlock_irqrestore (&ehci->lock, flags);
