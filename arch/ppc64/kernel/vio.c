@@ -157,8 +157,7 @@ static int __init vio_bus_init(void)
 
 	node_vroot = find_devices("vdevice");
 	if ((node_vroot == NULL) || (node_vroot->child == NULL)) {
-		printk(KERN_INFO "VIO: missing or empty /vdevice node; no virtual IO"
-			" devices present.\n");
+		/* this machine doesn't do virtual IO, and that's ok */
 		return 0;
 	}
 
@@ -260,7 +259,7 @@ struct vio_dev * __devinit vio_register_device(struct device_node *of_node)
 	/* init generic 'struct device' fields: */
 	viodev->dev.parent = &vio_bus_device->dev;
 	viodev->dev.bus = &vio_bus_type;
-	snprintf(viodev->dev.bus_id, BUS_ID_SIZE, "%lx", viodev->unit_address);
+	snprintf(viodev->dev.bus_id, BUS_ID_SIZE, "%x", viodev->unit_address);
 	viodev->dev.release = vio_dev_release;
 
 	/* register with generic device framework */
