@@ -57,7 +57,7 @@ static void __init longrun_get_policy(struct cpufreq_policy *policy)
 
 /**
  * longrun_set_policy - sets a new CPUFreq policy
- * @policy - new policy
+ * @policy: new policy
  *
  * Sets a new CPUFreq policy on LongRun-capable processors. This function
  * has to be called with cpufreq_driver locked.
@@ -106,6 +106,7 @@ static int longrun_set_policy(struct cpufreq_policy *policy)
 
 /**
  * longrun_verify_poliy - verifies a new CPUFreq policy
+ * @policy: the policy to verify
  *
  * Validates a new CPUFreq policy. This function has to be called with 
  * cpufreq_driver locked.
@@ -130,6 +131,8 @@ static int longrun_verify_policy(struct cpufreq_policy *policy)
 
 /**
  * longrun_determine_freqs - determines the lowest and highest possible core frequency
+ * @low_freq: an int to put the lowest frequency into
+ * @high_freq: an int to put the highest frequency into
  *
  * Determines the lowest and highest possible core frequencies on this CPU.
  * This is necessary to calculate the performance percentage according to

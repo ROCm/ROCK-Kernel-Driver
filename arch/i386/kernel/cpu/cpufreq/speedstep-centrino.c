@@ -430,7 +430,7 @@ static int centrino_cpu_exit(struct cpufreq_policy *policy)
 
 /**
  * centrino_verify - verifies a new CPUFreq policy
- * @freq: new policy
+ * @policy: new policy
  *
  * Limit must be within this model's frequency range at least one
  * border included.
@@ -443,6 +443,8 @@ static int centrino_verify (struct cpufreq_policy *policy)
 /**
  * centrino_setpolicy - set a new CPUFreq policy
  * @policy: new policy
+ * @target_freq: the target frequency
+ * @relation: how that frequency relates to achieved frequency (CPUFREQ_RELATION_L or CPUFREQ_RELATION_H)
  *
  * Sets a new CPUFreq policy.
  */
