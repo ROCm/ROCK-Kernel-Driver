@@ -495,7 +495,7 @@ isdn_ppp_ioctl(struct inode *ino, struct file *file, unsigned int cmd, unsigned 
 		case PPPIOCGIDLE:	/* get idle time information */
 			if (idev) {
 				struct ppp_idle pidle;
-				pidle.xmit_idle = pidle.recv_idle = idev->local.huptimer;
+				pidle.xmit_idle = pidle.recv_idle = idev->huptimer;
 				if ((r = set_arg((void *) arg, &pidle,sizeof(struct ppp_idle))))
 					 return r;
 			}
@@ -570,13 +570,13 @@ isdn_ppp_ioctl(struct inode *ino, struct file *file, unsigned int cmd, unsigned 
 					strncpy(pci.local_num,idev->local.msn,63);
 					i = 0;
 					list_for_each_entry(phone, &idev->local.phone[1], list) {
-						if (i++ == idev->local.dial) {
+						if (i++ == idev->dial) {
 							strncpy(pci.remote_num,phone->num,63);
 							break;
 						}
 					}
-					pci.charge_units = idev->local.charge;
-					if(idev->local.outgoing)
+					pci.charge_units = idev->charge;
+					if(idev->outgoing)
 						pci.calltype = CALLTYPE_OUTGOING;
 					else
 						pci.calltype = CALLTYPE_INCOMING;
@@ -798,7 +798,7 @@ isdn_ppp_write(struct file *file, const char *buf, size_t count, loff_t *off)
 		}
 		proto = PPP_PROTOCOL(protobuf);
 		if (proto != PPP_LCP)
-			idev->local.huptimer = 0;
+			idev->huptimer = 0;
 
 		if (idev->isdn_slot < 0) {
 			retval = 0;
@@ -976,7 +976,7 @@ static void isdn_ppp_receive(isdn_net_dev *net_dev, isdn_net_local *lp,
 	 * huptimer on LCP packets.
 	 */
 	if (PPP_PROTOCOL(skb->data) != PPP_LCP)
-		isdn_net_reset_huptimer(&net_dev->local,lp);
+		isdn_net_reset_huptimer(net_dev,lp->netdev);
 
 	slot = idev->ppp_slot;
 	if (slot < 0 || slot > ISDN_MAX_CHANNELS) {
@@ -1137,7 +1137,7 @@ isdn_ppp_push_higher(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buff
 	}
 
  	/* Reset hangup-timer */
- 	lp->huptimer = 0;
+ 	idev->huptimer = 0;
 
 	skb->dev = dev;
 	skb->mac.raw = skb->data;
@@ -1241,7 +1241,7 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 		return 0;
 	}
 	ipt = ippp_table[slot];
-	lp->huptimer = 0;
+	idev->huptimer = 0;
 
 	/*
 	 * after this line .. requeueing in the device queue is no longer allowed!!!
@@ -2037,7 +2037,7 @@ isdn_ppp_hangup_slave(char *name)
 	if (!sdev)
 		return 2;
 
-	isdn_net_hangup(mlp);
+	isdn_net_hangup(mlp->netdev);
 	return 0;
 #else
 	return -1;

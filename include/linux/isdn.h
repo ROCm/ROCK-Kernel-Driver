@@ -315,40 +315,20 @@ typedef struct isdn_net_local_s {
   int                    flags;        /* Connection-flags                 */
   int                    dialretry;    /* Counter for Dialout-retries      */
   int                    dialmax;      /* Max. Number of Dial-retries      */
+  int	        	 dialtimeout;  /* How long shall we try on dialing */
+  int			 dialwait;     /* wait after failed attempt        */
+
   int                    cbdelay;      /* Delay before Callback starts     */
   char                   msn[ISDN_MSNLEN]; /* MSNs/EAZs for this interface */
+
   u_char                 cbhup;        /* Flag: Reject Call before Callback*/
-  u_char                 p_encap;      /* Packet encapsulation             */
-                                       /*   0 = Ethernet over ISDN         */
-				       /*   1 = RAW-IP                     */
-                                       /*   2 = IP with type field         */
-  u_char                 l2_proto;     /* Layer-2-protocol                 */
-				       /* See ISDN_PROTO_L2..-constants in */
-                                       /* isdnif.h                         */
-                                       /*   0 = X75/LAPB with I-Frames     */
-				       /*   1 = X75/LAPB with UI-Frames    */
-				       /*   2 = X75/LAPB with BUI-Frames   */
-				       /*   3 = HDLC                       */
-  u_char                 l3_proto;     /* Layer-3-protocol                 */
-				       /* See ISDN_PROTO_L3..-constants in */
-                                       /* isdnif.h                         */
-                                       /*   0 = Transparent                */
-  int                    huptimer;     /* Timeout-counter for auto-hangup  */
-  int                    charge;       /* Counter for charging units       */
-  int                    charge_state; /* ChargeInfo state machine         */
-  ulong                  chargetime;   /* Timer for Charging info          */
   int                    hupflags;     /* Flags for charge-unit-hangup:    */
-				       /* bit0: chargeint is invalid       */
-				       /* bit1: Getting charge-interval    */
-                                       /* bit2: Do charge-unit-hangup      */
-                                       /* bit3: Do hangup even on incoming */
-  int                    outgoing;     /* Flag: outgoing call              */
   int                    onhtime;      /* Time to keep link up             */
-  int                    chargeint;    /* Interval between charge-infos    */
-  int                    onum;         /* Flag: at least 1 outgoing number */
-  int                    cps;          /* current speed of this interface  */
-  int                    transcount;   /* byte-counter for cps-calculation */
-  int                    last_jiffies; /* when transcount was reset        */
+
+  u_char                 p_encap;      /* Packet encapsulation             */
+  u_char                 l2_proto;     /* Layer-2-protocol                 */
+  u_char                 l3_proto;     /* Layer-3-protocol                 */
+
   int                    sqfull;       /* Flag: netdev-queue overloaded    */
   ulong                  sqfull_stamp; /* Start-Time of overload           */
   ulong                  slavedelay;   /* Dynamic bundling delaytime       */
@@ -356,7 +336,6 @@ typedef struct isdn_net_local_s {
   struct list_head       phone[2];     /* List of remote-phonenumbers      */
 				       /* phone[0] = Incoming Numbers      */
 				       /* phone[1] = Outgoing Numbers      */
-  int                    dial;         /* # of phone number just dialed    */
   struct net_device      *master;      /* Ptr to Master device for slaves  */
   struct net_device      *slave;       /* Ptr to Slave device for masters  */
   struct isdn_net_local_s *next;       /* Ptr to next link in bundle       */
@@ -371,11 +350,6 @@ typedef struct isdn_net_local_s {
                                        /* a particular channel (including  */
                                        /* the frame_cnt                    */
 
-  int					dialtimeout;	/* How long shall we try on dialing? (jiffies) */
-  int					dialwait;		/* How long shall we wait after failed attempt? (jiffies) */
-  ulong					dialstarted;	/* jiffies of first dialing-attempt */
-  ulong					dialwait_timer;	/* jiffies of earliest next dialing-attempt */
-  int					huptimeout;		/* How long will the connection be up? (seconds) */
 #ifdef CONFIG_ISDN_X25
   struct concap_device_ops *dops;      /* callbacks used by encapsulator   */
 #endif
@@ -404,7 +378,21 @@ typedef struct isdn_net_dev_s {
   struct timer_list      dial_timer;   /* dial events timer                */
   int                    dial_event;   /* event in case of timer expiry    */
   int                    dialstate;    /* State for dialing                */
+  int                    dial;         /* # of phone number just dialed    */
+  int                    outgoing;     /* Flag: outgoing call              */
+  unsigned long		 dialstarted;	/* first dialing-attempt           */
+  unsigned long		 dialwait_timer;/* earliest next dialing-attempt   */
+
+  int                    cps;          /* current speed of this interface  */
+  int                    transcount;   /* byte-counter for cps-calculation */
+  int                    last_jiffies; /* when transcount was reset        */
+
   struct timer_list      hup_timer;    /* auto hangup timer                */
+  int                    huptimer;     /* Timeout-counter for auto-hangup  */
+  int                    charge;       /* Counter for charging units       */
+  int                    charge_state; /* ChargeInfo state machine         */
+  unsigned long          chargetime;   /* Timer for Charging info          */
+  int                    chargeint;    /* Interval between charge-infos    */
 
   int                    pppbind;      /* ippp device for bindings         */
   int			 ppp_slot;     /* PPPD device slot number          */

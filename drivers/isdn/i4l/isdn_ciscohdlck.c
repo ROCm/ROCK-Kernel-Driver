@@ -371,7 +371,7 @@ isdn_ciscohdlck_receive(isdn_net_dev *idev, isdn_net_local *olp,
 		goto out_free;
 	default:
 		/* no special cisco protocol */
-		isdn_net_reset_huptimer(lp, olp);
+		isdn_net_reset_huptimer(idev, olp->netdev);
 		skb->protocol = htons(type);
 		netif_rx(skb);
 		return;

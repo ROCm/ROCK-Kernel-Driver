@@ -58,10 +58,10 @@ extern void isdn_net_write_super(isdn_net_local *lp, struct sk_buff *skb);
 extern int isdn_net_online(isdn_net_dev *idev);
 
 static inline void
-isdn_net_reset_huptimer(isdn_net_local *lp, isdn_net_local *olp)
+isdn_net_reset_huptimer(isdn_net_dev *idev, isdn_net_dev *idev2)
 {
-	olp->huptimer = 0;
-	lp->huptimer = 0;
+	idev->huptimer = 0;
+	idev2->huptimer = 0;
 }
 
 #define ISDN_NET_MAX_QUEUE_LENGTH 2
