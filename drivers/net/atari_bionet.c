@@ -408,7 +408,7 @@ struct net_device * __init bionet_probe(int unit)
  */
 static int
 bionet_open(struct net_device *dev) {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	if (bionet_debug > 0)
 		printk("bionet_open\n");
@@ -433,7 +433,7 @@ bionet_open(struct net_device *dev) {
 
 static int
 bionet_send_packet(struct sk_buff *skb, struct net_device *dev) {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned long flags;
 
 	/* Block a timer-based transmit from overlapping.  This could better be
@@ -499,7 +499,7 @@ bionet_send_packet(struct sk_buff *skb, struct net_device *dev) {
  */
 static void
 bionet_poll_rx(struct net_device *dev) {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int boguscount = 10;
 	int pkt_len, status;
 	unsigned long flags;
@@ -601,7 +601,7 @@ bionet_poll_rx(struct net_device *dev) {
 static void
 bionet_tick(unsigned long data) {
 	struct net_device	 *dev = (struct net_device *)data;
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	if( bionet_debug > 0 && (lp->open_time++ & 7) == 8 )
 		printk("bionet_tick: %ld\n", lp->open_time);
@@ -616,7 +616,7 @@ bionet_tick(unsigned long data) {
  */
 static int
 bionet_close(struct net_device *dev) {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	if (bionet_debug > 0)
 		printk("bionet_close, open_time=%ld\n", lp->open_time);
@@ -638,7 +638,7 @@ bionet_close(struct net_device *dev) {
  */
 static struct net_device_stats *net_get_stats(struct net_device *dev) 
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	return &lp->stats;
 }
 
