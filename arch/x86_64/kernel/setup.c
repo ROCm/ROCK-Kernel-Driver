@@ -657,9 +657,9 @@ static void __init display_cacheinfo(struct cpuinfo_x86 *c)
 		cpuid(0x80000005, &dummy, &ebx, &ecx, &edx);
 		printk(KERN_INFO "CPU: L1 I Cache: %dK (%d bytes/line), D cache %dK (%d bytes/line)\n",
 			edx>>24, edx&0xFF, ecx>>24, ecx&0xFF);
-		c->x86_cache_size=(ecx>>24)+(edx>>24);	
-		/* DTLB and ITLB together, but only 4K */
-		c->x86_tlbsize = ((ebx>>16)&0xff) + (ebx&0xff);
+		c->x86_cache_size=(ecx>>24)+(edx>>24);
+		/* On K8 L1 TLB is inclusive, so don't count it */
+		c->x86_tlbsize = 0;
 	}
 
 	if (n >= 0x80000006) {
