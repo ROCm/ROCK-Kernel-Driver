@@ -45,7 +45,6 @@
 #include <net/protocol.h>
 #include <net/arp.h>
 #include <net/route.h>
-#include <net/tcp.h>
 #include <net/udp.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
@@ -77,14 +76,9 @@ int rtattr_parse(struct rtattr *tb[], int maxattr, struct rtattr *rta, int len)
 	return 0;
 }
 
-#ifdef CONFIG_RTNETLINK
 struct sock *rtnl;
 
 struct rtnetlink_link * rtnetlink_links[NPROTO];
-
-#define _S	1	/* superuser privileges required */
-#define _X	2	/* exclusive access to tables required */
-#define _G	4	/* GET request */
 
 static const int rtm_min[(RTM_MAX+1-RTM_BASE)/4] =
 {
@@ -533,7 +527,3 @@ void __init rtnetlink_init(void)
 	rtnetlink_links[PF_UNSPEC] = link_rtnetlink_table;
 	rtnetlink_links[PF_PACKET] = link_rtnetlink_table;
 }
-
-
-
-#endif

@@ -304,9 +304,6 @@ static void ingress_destroy(struct Qdisc *sch)
 }
 
 
-#ifdef CONFIG_RTNETLINK
-
-
 static int ingress_dump(struct Qdisc *sch, struct sk_buff *skb)
 {
 	unsigned char *b = skb->tail;
@@ -322,9 +319,6 @@ rtattr_failure:
 	return -1;
 }
 
-#endif
-
-
 static struct Qdisc_class_ops ingress_class_ops =
 {
 	ingress_graft,			/* graft */
@@ -339,9 +333,7 @@ static struct Qdisc_class_ops ingress_class_ops =
 	ingress_bind_filter,		/* bind_tcf */
 	ingress_put,			/* unbind_tcf */
 
-#ifdef CONFIG_RTNETLINK
 	NULL,		/* dump */
-#endif
 };
 
 struct Qdisc_ops ingress_qdisc_ops =
@@ -361,9 +353,7 @@ struct Qdisc_ops ingress_qdisc_ops =
 	ingress_destroy,		/* destroy */
 	NULL,				/* change */
 
-#ifdef CONFIG_RTNETLINK
 	ingress_dump,			/* dump */
-#endif
 };
 
 #ifdef MODULE

@@ -80,6 +80,7 @@ enum rq_flag_bits {
  	*/
 	__REQ_DRIVE_CMD,
 	__REQ_DRIVE_TASK,
+	__REQ_DRIVE_ACB,
 
 	__REQ_PC,	/* packet command (special) */
 	__REQ_BLOCK_PC,	/* queued down pc from block layer */
@@ -99,10 +100,13 @@ enum rq_flag_bits {
 #define REQ_DONTPREP	(1 << __REQ_DONTPREP)
 #define REQ_DRIVE_CMD	(1 << __REQ_DRIVE_CMD)
 #define REQ_DRIVE_TASK	(1 << __REQ_DRIVE_TASK)
+#define REQ_DRIVE_ACB	(1 << __REQ_DRIVE_ACB)
 #define REQ_PC		(1 << __REQ_PC)
 #define REQ_SENSE	(1 << __REQ_SENSE)
 #define REQ_BLOCK_PC	(1 << __REQ_BLOCK_PC)
 #define REQ_SPECIAL	(1 << __REQ_SPECIAL)
+
+#define REQ_DRIVE_TASKFILE	REQ_DRIVE_ACB
 
 #include <linux/elevator.h>
 

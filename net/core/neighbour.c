@@ -1172,9 +1172,6 @@ int neigh_table_clear(struct neigh_table *tbl)
 	return 0;
 }
 
-#ifdef CONFIG_RTNETLINK
-
-
 int neigh_delete(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 {
 	struct ndmsg *ndm = NLMSG_DATA(nlh);
@@ -1438,12 +1435,7 @@ static void neigh_app_notify(struct neighbour *n)
 	netlink_broadcast(rtnl, skb, 0, RTMGRP_NEIGH, GFP_ATOMIC);
 }
 
-
-
-#endif
-
-
-#endif
+#endif /* CONFIG_ARPD */
 
 #ifdef CONFIG_SYSCTL
 

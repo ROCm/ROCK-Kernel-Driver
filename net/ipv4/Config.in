@@ -4,8 +4,6 @@
 bool '  IP: multicasting' CONFIG_IP_MULTICAST
 bool '  IP: advanced router' CONFIG_IP_ADVANCED_ROUTER
 if [ "$CONFIG_IP_ADVANCED_ROUTER" = "y" ]; then
-   define_bool CONFIG_RTNETLINK y	
-   define_bool CONFIG_NETLINK y
    bool '    IP: policy routing' CONFIG_IP_MULTIPLE_TABLES
    if [ "$CONFIG_IP_MULTIPLE_TABLES" = "y" ]; then
       if [ "$CONFIG_NETFILTER" = "y" ]; then
@@ -39,9 +37,7 @@ if [ "$CONFIG_IP_MULTICAST" = "y" ]; then
    fi
 fi
 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-   if [ "$CONFIG_RTNETLINK" = "y" ]; then
-      bool '  IP: ARP daemon support (EXPERIMENTAL)' CONFIG_ARPD
-   fi
+   bool '  IP: ARP daemon support (EXPERIMENTAL)' CONFIG_ARPD
 fi
 bool '  IP: TCP Explicit Congestion Notification support' CONFIG_INET_ECN
 bool '  IP: TCP syncookie support (disabled per default)' CONFIG_SYN_COOKIES

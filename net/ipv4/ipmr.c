@@ -9,7 +9,7 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  *
- *	Version: $Id: ipmr.c,v 1.64 2001/09/18 22:29:09 davem Exp $
+ *	Version: $Id: ipmr.c,v 1.65 2001/10/31 21:55:54 davem Exp $
  *
  *	Fixes:
  *	Michael Chastain	:	Incorrect size of copying.
@@ -294,7 +294,6 @@ static void ipmr_destroy_unres(struct mfc_cache *c)
 	atomic_dec(&cache_resolve_queue_len);
 
 	while((skb=skb_dequeue(&c->mfc_un.unres.unresolved))) {
-#ifdef CONFIG_RTNETLINK
 		if (skb->nh.iph->version == 0) {
 			struct nlmsghdr *nlh = (struct nlmsghdr *)skb_pull(skb, sizeof(struct iphdr));
 			nlh->nlmsg_type = NLMSG_ERROR;
@@ -303,7 +302,6 @@ static void ipmr_destroy_unres(struct mfc_cache *c)
 			((struct nlmsgerr*)NLMSG_DATA(nlh))->error = -ETIMEDOUT;
 			netlink_unicast(rtnl, skb, NETLINK_CB(skb).dst_pid, MSG_DONTWAIT);
 		} else
-#endif
 			kfree_skb(skb);
 	}
 
@@ -501,7 +499,6 @@ static void ipmr_cache_resolve(struct mfc_cache *uc, struct mfc_cache *c)
 	 */
 
 	while((skb=__skb_dequeue(&uc->mfc_un.unres.unresolved))) {
-#ifdef CONFIG_RTNETLINK
 		if (skb->nh.iph->version == 0) {
 			int err;
 			struct nlmsghdr *nlh = (struct nlmsghdr *)skb_pull(skb, sizeof(struct iphdr));
@@ -516,7 +513,6 @@ static void ipmr_cache_resolve(struct mfc_cache *uc, struct mfc_cache *c)
 			}
 			err = netlink_unicast(rtnl, skb, NETLINK_CB(skb).dst_pid, MSG_DONTWAIT);
 		} else
-#endif
 			ip_mr_forward(skb, c, 0);
 	}
 }
@@ -1522,8 +1518,6 @@ int pim_rcv(struct sk_buff * skb)
 }
 #endif
 
-#ifdef CONFIG_RTNETLINK
-
 static int
 ipmr_fill_mroute(struct sk_buff *skb, struct mfc_cache *c, struct rtmsg *rtm)
 {
@@ -1598,7 +1592,6 @@ int ipmr_get_route(struct sk_buff *skb, struct rtmsg *rtm, int nowait)
 	read_unlock(&mrt_lock);
 	return err;
 }
-#endif
 
 #ifdef CONFIG_PROC_FS	
 /*

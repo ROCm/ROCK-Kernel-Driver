@@ -34,10 +34,10 @@ extern void kernel_set_cachemode(unsigned long addr,
 #define cache_push(paddr, len) \
 	do { \
 		unsigned long vaddr = phys_to_virt(paddr); \
-		flush_cache_range(&init_mm, vaddr, vaddr + len); \
+		flush_cache_range(0, vaddr, vaddr + len); \
 	} while(0)
 #define cache_push_v(vaddr, len) \
-			flush_cache_range(&init_mm, vaddr, vaddr + len)
+			flush_cache_range(0, vaddr, vaddr + len)
 
 /*
  * kern_addr_valid(ADDR) tests if ADDR is pointing to valid kernel

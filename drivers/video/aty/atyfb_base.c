@@ -343,7 +343,7 @@ static const struct {
     { 0x4751, 0x4751, 0x00, 0x00, m64n_gtc_ppl, 230, 100, M64F_GT | M64F_INTEGRATED | M64F_RESET_3D | M64F_GTB_DSP | M64F_SDRAM_MAGIC_PLL | M64F_EXTRA_BRIGHT },
 
     /* 3D RAGE XL */
-    { 0x4752, 0x4752, 0x00, 0x00, m64n_xl, 230, 120, M64F_GT | M64F_INTEGRATED | M64F_RESET_3D | M64F_GTB_DSP | M64F_SDRAM_MAGIC_PLL | M64F_EXTRA_BRIGHT | M64F_XL_DLL },
+    { 0x4752, 0x4752, 0x00, 0x00, m64n_xl, 230, 100, M64F_GT | M64F_INTEGRATED | M64F_RESET_3D | M64F_GTB_DSP | M64F_SDRAM_MAGIC_PLL | M64F_EXTRA_BRIGHT | M64F_XL_DLL },
 
     /* Mach64 LT PRO */
     { 0x4c42, 0x4c42, 0x00, 0x00, m64n_ltp_a,   230, 100, M64F_GT | M64F_INTEGRATED | M64F_RESET_3D | M64F_GTB_DSP },
@@ -1394,7 +1394,7 @@ static int atyfb_mmap(struct fb_info *info, struct file *file,
 		pgprot_val(vma->vm_page_prot) &= ~(fb->mmap_map[i].prot_mask);
 		pgprot_val(vma->vm_page_prot) |= fb->mmap_map[i].prot_flag;
 
-		if (remap_page_range(vma->vm_start + page, map_offset,
+		if (remap_page_range(vma, vma->vm_start + page, map_offset,
 				     map_size, vma->vm_page_prot))
 			return -EAGAIN;
 
@@ -1986,7 +1986,7 @@ found:
     disp = &info->disp;
 
     strcpy(info->fb_info.modename, atyfb_name);
-    info->fb_info.node = -1;
+    info->fb_info.node = NODEV;
     info->fb_info.fbops = &atyfb_ops;
     info->fb_info.disp = disp;
     strcpy(info->fb_info.fontname, fontname);

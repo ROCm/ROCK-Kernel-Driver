@@ -336,10 +336,10 @@ static void r3k_flush_cache_mm(struct mm_struct *mm)
 	}
 }
 
-static void r3k_flush_cache_range(struct mm_struct *mm, unsigned long start,
+static void r3k_flush_cache_range(struct vm_area_struct *vma, unsigned long start,
 				  unsigned long end)
 {
-	struct vm_area_struct *vma;
+	struct mm_struct *mm = vma->vm_mm;
 
 	if (mm->context == 0) 
 		return;
@@ -348,10 +348,6 @@ static void r3k_flush_cache_range(struct mm_struct *mm, unsigned long start,
 #ifdef DEBUG_CACHE
 	printk("crange[%d,%08lx,%08lx]", (int)mm->context, start, end);
 #endif
-	vma = find_vma(mm, start);
-	if (!vma)
-		return;
-
 	if (mm->context != current->active_mm->context) {
 		flush_cache_all();
 	} else {
@@ -485,9 +481,11 @@ void flush_tlb_mm(struct mm_struct *mm)
 	}
 }
 
-void flush_tlb_range(struct mm_struct *mm, unsigned long start,
+void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
                      unsigned long end)
 {
+	struct mm_struct *mm = vma->vm_mm;
+
 	if (mm->context != 0) {
 		unsigned long flags;
 		int size;

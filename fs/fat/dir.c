@@ -538,7 +538,6 @@ ParseLong:
 	if (!memcmp(de->name,MSDOS_DOT,11))
 		inum = inode->i_ino;
 	else if (!memcmp(de->name,MSDOS_DOTDOT,11)) {
-/*		inum = fat_parent_ino(inode,0); */
 		inum = filp->f_dentry->d_parent->d_inode->i_ino;
 	} else {
 		struct inode *tmp = fat_iget(sb, ino);
@@ -727,7 +726,13 @@ int fat_add_entries(struct inode *dir,int slots, struct buffer_head **bh,
 	offset = curr = 0;
 	*bh = NULL;
 	row = 0;
-	while (fat_get_entry(dir,&curr,bh,de,ino) > -1) {
+	while (fat_get_entry(dir, &curr, bh, de, ino) > -1) {
+		/* check the maximum size of directory */
+		if (curr >= FAT_MAX_DIR_SIZE) {
+			fat_brelse(sb, *bh);
+			return -ENOSPC;
+		}
+
 		if (IS_FREE((*de)->name)) {
 			if (++row == slots)
 				return offset;
@@ -742,7 +747,10 @@ int fat_add_entries(struct inode *dir,int slots, struct buffer_head **bh,
 	if (!new_bh)
 		return -ENOSPC;
 	fat_brelse(sb, new_bh);
-	do fat_get_entry(dir,&curr,bh,de,ino); while (++row<slots);
+	do {
+		fat_get_entry(dir, &curr, bh, de, ino);
+	} while (++row < slots);
+
 	return offset;
 }
 

@@ -85,7 +85,19 @@ typedef union {
 		unsigned lba		: 1;	/* using LBA instead of CHS */
 		unsigned bit7		: 1;	/* always 1 */
 	} b;
-	} select_t;
+} select_t;
+
+typedef union {
+	unsigned all			: 8;	/* all of the bits together */
+	struct {
+		unsigned bit0		: 1;
+		unsigned nIEN		: 1;	/* device INTRQ to host */
+		unsigned SRST		: 1;	/* host soft reset bit */
+		unsigned bit3		: 1;	/* ATA-2 thingy */
+		unsigned reserved456	: 3;
+		unsigned HOB		: 1;	/* 48-bit address ordering */
+	} b;
+} control_t;
 
 static __inline__ int ide_request_irq(unsigned int irq, void (*handler)(int,void *, struct pt_regs *),
 			unsigned long flags, const char *device, void *dev_id)

@@ -20,6 +20,28 @@ extern int sock_fcntl (struct file *, unsigned int cmd, unsigned long arg);
 extern int fcntl_setlease(unsigned int fd, struct file *filp, long arg);
 extern int fcntl_getlease(struct file *filp);
 
+void set_close_on_exec(unsigned int fd, int flag)
+{
+	struct files_struct *files = current->files;
+	write_lock(&files->file_lock);
+	if (flag)
+		FD_SET(fd, files->close_on_exec);
+	else
+		FD_CLR(fd, files->close_on_exec);
+	write_unlock(&files->file_lock);
+}
+
+static inline int get_close_on_exec(unsigned int fd)
+{
+	struct files_struct *files = current->files;
+	int res;
+	read_lock(&files->file_lock);
+	res = FD_ISSET(fd, files->close_on_exec);
+	read_unlock(&files->file_lock);
+	return res;
+}
+
+
 /* Expand files.  Return <0 on error; 0 nothing done; 1 files expanded,
  * we may have blocked. 
  *

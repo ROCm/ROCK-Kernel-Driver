@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: route.c,v 1.55 2001/09/18 22:29:10 davem Exp $
+ *	$Id: route.c,v 1.56 2001/10/31 21:55:55 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -1407,8 +1407,6 @@ void rt6_mtu_change(struct net_device *dev, unsigned mtu)
 	read_unlock_bh(&rt6_lock);
 }
 
-#ifdef CONFIG_RTNETLINK
-
 static int inet6_rtm_to_rtmsg(struct rtmsg *r, struct rtattr **rta,
 			      struct in6_rtmsg *rtmsg)
 {
@@ -1740,8 +1738,6 @@ void inet6_rt_notify(int event, struct rt6_info *rt)
 	NETLINK_CB(skb).dst_groups = RTMGRP_IPV6_ROUTE;
 	netlink_broadcast(rtnl, skb, 0, RTMGRP_IPV6_ROUTE, gfp_any());
 }
-
-#endif
 
 /*
  *	/proc

@@ -295,7 +295,7 @@ void flush_cache_mm(struct mm_struct *mm)
  * Flushing the cache lines for U0 only isn't enough.
  * We need to flush for P1 too, which may contain aliases.
  */
-void flush_cache_range(struct mm_struct *mm, unsigned long start,
+void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
 		       unsigned long end)
 {
 	/*

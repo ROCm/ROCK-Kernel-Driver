@@ -9,7 +9,7 @@ comment '  IPv6: Netfilter Configuration'
 #  dep_tristate '  FTP protocol support' CONFIG_IP6_NF_FTP $CONFIG_IP6_NF_CONNTRACK
 #fi
 
-#if [ "$CONFIG_EXPERIMENTAL" = "y" -a "$CONFIG_NETLINK" = "y" ]; then
+#if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
 #  tristate 'Userspace queueing via NETLINK (EXPERIMENTAL)' CONFIG_IP6_NF_QUEUE
 #fi
 tristate 'IP6 tables support (required for filtering/masq/NAT)' CONFIG_IP6_NF_IPTABLES

@@ -42,9 +42,9 @@
 			cpu_cache_clean_invalidate_all();		\
 	} while (0)
 
-#define flush_cache_range(_mm,_start,_end)				\
+#define flush_cache_range(_vma,_start,_end)				\
 	do {								\
-		if ((_mm) == current->active_mm)			\
+		if ((_vma)->vm_mm == current->active_mm)		\
 			cpu_cache_clean_invalidate_range((_start), (_end), 1); \
 	} while (0)
 
@@ -214,7 +214,7 @@ static inline void flush_icache_page(struct vm_area_struct *vma, struct page *pa
  *  - flush_tlb_all()			flushes all processes TLBs
  *  - flush_tlb_mm(mm)			flushes the specified mm context TLB's
  *  - flush_tlb_page(vma, vmaddr)	flushes TLB for specified page
- *  - flush_tlb_range(mm, start, end)	flushes TLB for specified range of pages
+ *  - flush_tlb_range(vma, start, end)	flushes TLB for specified range of pages
  *
  * We drain the write buffer in here to ensure that the page tables in ram
  * are really up to date.  It is more efficient to do this here...
@@ -248,9 +248,9 @@ static inline void flush_icache_page(struct vm_area_struct *vma, struct page *pa
  *
  * _mm may not be current->active_mm, but may not be NULL.
  */
-#define flush_tlb_range(_mm,_start,_end)				\
+#define flush_tlb_range(_vma,_start,_end)				\
 	do {								\
-		if ((_mm) == current->active_mm)			\
+		if ((_mm)->vm_mm == current->active_mm)			\
 			cpu_tlb_invalidate_range((_start), (_end));	\
 	} while (0)
 

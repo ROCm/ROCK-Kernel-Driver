@@ -5,7 +5,7 @@
  *
  *		The IP fragmentation functionality.
  *		
- * Version:	$Id: ip_fragment.c,v 1.58 2001/09/01 00:31:50 davem Exp $
+ * Version:	$Id: ip_fragment.c,v 1.59 2002/01/12 07:54:56 davem Exp $
  *
  * Authors:	Fred N. van Kempen <waltje@uWalt.NL.Mugnet.ORG>
  *		Alan Cox <Alan.Cox@linux.org>
@@ -130,19 +130,19 @@ static __inline__ unsigned int ipqhashfn(u16 id, u32 saddr, u32 daddr, u8 prot)
 atomic_t ip_frag_mem = ATOMIC_INIT(0);	/* Memory used for fragments */
 
 /* Memory Tracking Functions. */
-extern __inline__ void frag_kfree_skb(struct sk_buff *skb)
+static __inline__ void frag_kfree_skb(struct sk_buff *skb)
 {
 	atomic_sub(skb->truesize, &ip_frag_mem);
 	kfree_skb(skb);
 }
 
-extern __inline__ void frag_free_queue(struct ipq *qp)
+static __inline__ void frag_free_queue(struct ipq *qp)
 {
 	atomic_sub(sizeof(struct ipq), &ip_frag_mem);
 	kfree(qp);
 }
 
-extern __inline__ struct ipq *frag_alloc_queue(void)
+static __inline__ struct ipq *frag_alloc_queue(void)
 {
 	struct ipq *qp = kmalloc(sizeof(struct ipq), GFP_ATOMIC);
 

@@ -1207,81 +1207,6 @@ int ndisc_rcv(struct sk_buff *skb)
 	return 0;
 }
 
-#ifdef CONFIG_PROC_FS
-#ifndef CONFIG_RTNETLINK
-static int ndisc_get_info(char *buffer, char **start, off_t offset, int length)
-{
-	int len=0;
-	off_t pos=0;
-	int size;
-	unsigned long now = jiffies;
-	int i;
-
-	for (i = 0; i <= NEIGH_HASHMASK; i++) {
-		struct neighbour *neigh;
-
-		read_lock_bh(&nd_tbl.lock);
-		for (neigh = nd_tbl.hash_buckets[i]; neigh; neigh = neigh->next) {
-			int j;
-
-			size = 0;
-			for (j=0; j<16; j++) {
-				sprintf(buffer+len+size, "%02x", neigh->primary_key[j]);
-				size += 2;
-			}
-
-			read_lock(&neigh->lock);
-			size += sprintf(buffer+len+size,
-				       " %02x %02x %02x %02x %08lx %08lx %08x %04x %04x %04x %8s ", i,
-				       128,
-				       neigh->type,
-				       neigh->nud_state,
-				       now - neigh->used,
-				       now - neigh->confirmed,
-				       neigh->parms->reachable_time,
-				       neigh->parms->gc_staletime,
-				       atomic_read(&neigh->refcnt) - 1,
-				       neigh->flags | (!neigh->hh ? 0 : (neigh->hh->hh_output==dev_queue_xmit ? 4 : 2)),
-				       neigh->dev->name);
-
-			if ((neigh->nud_state&NUD_VALID) && neigh->dev->addr_len) {
-				for (j=0; j < neigh->dev->addr_len; j++) {
-					sprintf(buffer+len+size, "%02x", neigh->ha[j]);
-					size += 2;
-				}
-			} else {
-                                size += sprintf(buffer+len+size, "000000000000");
-			}
-			read_unlock(&neigh->lock);
-			size += sprintf(buffer+len+size, "\n");
-			len += size;
-			pos += size;
-		  
-			if (pos <= offset)
-				len=0;
-			if (pos >= offset+length) {
-				read_unlock_bh(&nd_tbl.lock);
-				goto done;
-			}
-		}
-		read_unlock_bh(&nd_tbl.lock);
-	}
-
-done:
-
-	*start = buffer+len-(pos-offset);	/* Start of wanted data */
-	len = pos-offset;			/* Start slop */
-	if (len>length)
-		len = length;			/* Ending slop */
-	if (len<0)
-		len = 0;
-	return len;
-}
-
-#endif
-#endif	/* CONFIG_PROC_FS */
-
-
 int __init ndisc_init(struct net_proto_family *ops)
 {
 	struct sock *sk;
@@ -1319,11 +1244,6 @@ int __init ndisc_init(struct net_proto_family *ops)
 	
 	neigh_table_init(&nd_tbl);
 
-#ifdef CONFIG_PROC_FS
-#ifndef CONFIG_RTNETLINK
-	proc_net_create("ndisc", 0, ndisc_get_info);
-#endif
-#endif
 #ifdef CONFIG_SYSCTL
 	neigh_sysctl_register(NULL, &nd_tbl.parms, NET_IPV6, NET_IPV6_NEIGH, "ipv6");
 #endif
@@ -1333,11 +1253,6 @@ int __init ndisc_init(struct net_proto_family *ops)
 
 void ndisc_cleanup(void)
 {
-#ifdef CONFIG_PROC_FS
-#ifndef CONFIG_RTNETLINK
-        proc_net_remove("ndisc");
-#endif
-#endif
 	neigh_table_clear(&nd_tbl);
 	sock_release(ndisc_socket);
 	ndisc_socket = NULL; /* For safety. */

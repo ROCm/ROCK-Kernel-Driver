@@ -124,10 +124,6 @@
 #endif
 #endif
 
-#ifdef __sparc__
-#error "Sorry, I have no idea how to do this on sparc... There is mapioaddr... With bus_type parameter..."
-#endif
-
 #if defined(__m68k__)
 #define MAP_BUSTOVIRT
 #else

@@ -1138,11 +1138,12 @@ static void ourdone(Scsi_Cmnd *Cmnd)
 		int ok = host_byte(Cmnd->result) == DID_OK;
 		if (Cmnd->cmnd[0] == 0x12 && ok) {
 			unsigned char *iqd;
-			if (Cmnd->use_sg == 0) {
-				iqd = ((unsigned char *)Cmnd->buffer);
-			} else {
-				iqd = ((struct scatterlist *) Cmnd->request_buffer)->address;
-			}
+
+			if (Cmnd->use_sg != 0)
+				BUG();
+
+			iqd = ((unsigned char *)Cmnd->buffer);
+
 			/* tags handled in midlayer */
 			/* enable sync mode? */
 			if (iqd[7] & 0x10) {
@@ -1445,7 +1446,7 @@ static void qpti_intr(int irq, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&qpti->lock);
 
 	if (dq != NULL) {
-		spin_lock(&qpti->qhost->host_lock);
+		spin_lock(qpti->qhost->host_lock);
 		do {
 			Scsi_Cmnd *next;
 
@@ -1453,7 +1454,7 @@ static void qpti_intr(int irq, void *dev_id, struct pt_regs *regs)
 			dq->scsi_done(dq);
 			dq = next;
 		} while (dq != NULL);
-		spin_unlock(&qpti->qhost->host_lock);
+		spin_unlock(qpti->qhost->host_lock);
 	}
 	__restore_flags(flags);
 }

@@ -15,13 +15,13 @@
  *
  *  - flush_tlb_all() flushes all processes TLB entries
  *  - flush_tlb_mm(mm) flushes the specified mm context TLB entries
- *  - flush_tlb_page(mm, vmaddr) flushes a single page
- *  - flush_tlb_range(mm, start, end) flushes a range of pages
+ *  - flush_tlb_page(vma, vmaddr) flushes a single page
+ *  - flush_tlb_range(vma, start, end) flushes a range of pages
  *  - flush_tlb_pgtables(mm, start, end) flushes a range of page tables
  */
 extern void (*_flush_tlb_all)(void);
 extern void (*_flush_tlb_mm)(struct mm_struct *mm);
-extern void (*_flush_tlb_range)(struct mm_struct *mm, unsigned long start,
+extern void (*_flush_tlb_range)(struct vm_area_struct *vma, unsigned long start,
 			       unsigned long end);
 extern void (*_flush_tlb_page)(struct vm_area_struct *vma, unsigned long page);
 
@@ -29,14 +29,14 @@ extern void (*_flush_tlb_page)(struct vm_area_struct *vma, unsigned long page);
 
 #define flush_tlb_all()			_flush_tlb_all()
 #define flush_tlb_mm(mm)		_flush_tlb_mm(mm)
-#define flush_tlb_range(mm,vmaddr,end)	_flush_tlb_range(mm, vmaddr, end)
+#define flush_tlb_range(vma,vmaddr,end)	_flush_tlb_range(vma, vmaddr, end)
 #define flush_tlb_page(vma,page)	_flush_tlb_page(vma, page)
 
 #else /* CONFIG_SMP */
 
 extern void flush_tlb_all(void);
 extern void flush_tlb_mm(struct mm_struct *);
-extern void flush_tlb_range(struct mm_struct *, unsigned long, unsigned long);
+extern void flush_tlb_range(struct vm_area_struct *, unsigned long, unsigned long);
 extern void flush_tlb_page(struct vm_area_struct *, unsigned long);
 
 #endif /* CONFIG_SMP */

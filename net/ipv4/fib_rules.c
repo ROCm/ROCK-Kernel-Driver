@@ -5,7 +5,7 @@
  *
  *		IPv4 Forwarding Information Base: policy rules.
  *
- * Version:	$Id: fib_rules.c,v 1.16 2001/04/30 04:39:14 davem Exp $
+ * Version:	$Id: fib_rules.c,v 1.17 2001/10/31 21:55:54 davem Exp $
  *
  * Authors:	Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
  *
@@ -395,9 +395,7 @@ struct notifier_block fib_rules_notifier = {
 	notifier_call:	fib_rules_event,
 };
 
-#ifdef CONFIG_RTNETLINK
-
-extern __inline__ int inet_fill_rule(struct sk_buff *skb,
+static __inline__ int inet_fill_rule(struct sk_buff *skb,
 				     struct fib_rule *r,
 				     struct netlink_callback *cb)
 {
@@ -462,8 +460,6 @@ int inet_dump_rules(struct sk_buff *skb, struct netlink_callback *cb)
 
 	return skb->len;
 }
-
-#endif /* CONFIG_RTNETLINK */
 
 void __init fib_rules_init(void)
 {

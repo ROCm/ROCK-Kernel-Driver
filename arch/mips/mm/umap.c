@@ -88,20 +88,20 @@ remove_mapping_pmd_range (pgd_t *pgd, unsigned long address, unsigned long size)
  * range of active mappings at this point
  */
 void
-remove_mapping (struct task_struct *task, unsigned long start, unsigned long end)
+remove_mapping (struct vm_area_struct *vma, struct task_struct *task, unsigned long start, unsigned long end)
 {
 	unsigned long beg = start;
 	pgd_t *dir;
 
 	down_write (&task->mm->mmap_sem);
 	dir = pgd_offset (task->mm, start);
-	flush_cache_range (task->mm, beg, end);
+	flush_cache_range (vma, beg, end);
 	while (start < end){
 		remove_mapping_pmd_range (dir, start, end - start);
 		start = (start + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	}
-	flush_tlb_range (task->mm, beg, end);
+	flush_tlb_range (vma, beg, end);
 	up_write (&task->mm->mmap_sem);
 }
 
@@ -192,7 +192,7 @@ vmap_pmd_range (pmd_t *pmd, unsigned long address, unsigned long size, unsigned 
 }
 
 int
-vmap_page_range (unsigned long from, unsigned long size, unsigned long vaddr)
+vmap_page_range (struct vm_area_struct *vma, unsigned long from, unsigned long size, unsigned long vaddr)
 {
 	int error = 0;
 	pgd_t * dir;
@@ -201,7 +201,7 @@ vmap_page_range (unsigned long from, unsigned long size, unsigned long vaddr)
 
 	vaddr -= from;
 	dir = pgd_offset(current->mm, from);
-	flush_cache_range(current->mm, beg, end);
+	flush_cache_range(vma, beg, end);
 	while (from < end) {
 		pmd_t *pmd = pmd_alloc(current->mm, dir, from);
 		error = -ENOMEM;
@@ -213,6 +213,6 @@ vmap_page_range (unsigned long from, unsigned long size, unsigned long vaddr)
 		from = (from + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	}
-	flush_tlb_range(current->mm, beg, end);
+	flush_tlb_range(vma, beg, end);
 	return error;
 }

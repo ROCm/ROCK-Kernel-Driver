@@ -915,7 +915,7 @@ static int raw1394_open(struct inode *inode, struct file *file)
 {
         struct file_info *fi;
 
-        if (MINOR(inode->i_rdev)) {
+        if (minor(inode->i_rdev)) {
                 return -ENXIO;
         }
 

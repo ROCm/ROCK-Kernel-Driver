@@ -125,8 +125,9 @@ __flush_tlb_all (void)
 }
 
 void
-flush_tlb_range (struct mm_struct *mm, unsigned long start, unsigned long end)
+flush_tlb_range (struct vm_area_struct *vma, unsigned long start, unsigned long end)
 {
+	struct mm_struct *mm = vma->vm_mm;
 	unsigned long size = end - start;
 	unsigned long nbits;
 

@@ -632,7 +632,7 @@ static int vfc_mmap(struct inode *inode, struct file *file,
 	vma->vm_flags |=
 		(VM_SHM | VM_LOCKED | VM_IO | VM_MAYREAD | VM_MAYWRITE | VM_MAYSHARE);
 	map_offset = (unsigned int) (long)dev->phys_regs;
-	ret = io_remap_page_range(vma->vm_start, map_offset, map_size, 
+	ret = io_remap_page_range(vma, vma->vm_start, map_offset, map_size, 
 				  vma->vm_page_prot, dev->which_io);
 
 	if(ret)

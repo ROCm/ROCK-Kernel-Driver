@@ -152,7 +152,6 @@ static int fifo_init(struct Qdisc *sch, struct rtattr *opt)
 	return 0;
 }
 
-#ifdef CONFIG_RTNETLINK
 static int fifo_dump(struct Qdisc *sch, struct sk_buff *skb)
 {
 	struct fifo_sched_data *q = (void*)sch->data;
@@ -168,7 +167,6 @@ rtattr_failure:
 	skb_trim(skb, b - skb->data);
 	return -1;
 }
-#endif
 
 struct Qdisc_ops pfifo_qdisc_ops =
 {
@@ -187,9 +185,7 @@ struct Qdisc_ops pfifo_qdisc_ops =
 	NULL,
 	fifo_init,
 
-#ifdef CONFIG_RTNETLINK
 	fifo_dump,
-#endif
 };
 
 struct Qdisc_ops bfifo_qdisc_ops =
@@ -208,7 +204,5 @@ struct Qdisc_ops bfifo_qdisc_ops =
 	fifo_reset,
 	NULL,
 	fifo_init,
-#ifdef CONFIG_RTNETLINK
 	fifo_dump,
-#endif
 };

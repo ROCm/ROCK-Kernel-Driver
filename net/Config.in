@@ -7,11 +7,9 @@ tristate 'Packet socket' CONFIG_PACKET
 if [ "$CONFIG_PACKET" != "n" ]; then
    bool '  Packet socket: mmapped IO' CONFIG_PACKET_MMAP
 fi
-bool 'Kernel/User netlink socket' CONFIG_NETLINK
-if [ "$CONFIG_NETLINK" = "y" ]; then
-   bool '  Routing messages' CONFIG_RTNETLINK
-   tristate '  Netlink device emulation' CONFIG_NETLINK_DEV
-fi
+
+tristate 'Netlink device emulation' CONFIG_NETLINK_DEV
+
 bool 'Network packet filtering (replaces ipchains)' CONFIG_NETFILTER
 if [ "$CONFIG_NETFILTER" = "y" ]; then
    bool '  Network packet filtering debugging' CONFIG_NETFILTER_DEBUG

@@ -1,11 +1,7 @@
 #
 # IPv6 configuration
 # 
-if [ "$CONFIG_NETLINK" = "y" ]; then
-   if [ "$CONFIG_RTNETLINK" = "n" ]; then
-      bool '    IPv6: routing messages via old netlink' CONFIG_IPV6_NETLINK
-   fi
-fi
+
 #bool '    IPv6: flow policy support' CONFIG_RT6_POLICY
 #bool '    IPv6: firewall support' CONFIG_IPV6_FIREWALL
 

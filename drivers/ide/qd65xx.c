@@ -1,14 +1,15 @@
 /*
- *  linux/drivers/ide/qd65xx.c		Version 0.06	Aug 3, 2000
+ *  linux/drivers/ide/qd65xx.c		Version 0.07	Sep 30, 2001
  *
- *  Copyright (C) 1996-2000  Linus Torvalds & author (see below)
+ *  Copyright (C) 1996-2001  Linus Torvalds & author (see below)
  */
 
 /*
  *  Version 0.03	Cleaned auto-tune, added probe
  *  Version 0.04	Added second channel tuning
  *  Version 0.05	Enhanced tuning ; added qd6500 support
- *  Version 0.06	added dos driver's list
+ *  Version 0.06	Added dos driver's list
+ *  Version 0.07	Second channel bug fix 
  *
  * QDI QD6500/QD6580 EIDE controller fast support
  *
@@ -66,6 +67,7 @@
  * upper nibble:
  *        qd6500: 1100
  *        qd6580: either 1010 or 0101
+ *
  *
  * base+0x02: Timer2 (qd6580 only)
  *
@@ -137,12 +139,12 @@ static byte qd6500_compute_timing (ide_hwif_t *hwif, int active_time, int recove
 {
 	byte active_cycle,recovery_cycle;
 
-	if (system_bus_clock()<=33) {
-		active_cycle =   9  - IDE_IN(active_time   * system_bus_clock() / 1000 + 1, 2, 9);
-		recovery_cycle = 15 - IDE_IN(recovery_time * system_bus_clock() / 1000 + 1, 0, 15);
+	if (ide_system_bus_speed()<=33) {
+		active_cycle =   9  - IDE_IN(active_time   * ide_system_bus_speed() / 1000 + 1, 2, 9);
+		recovery_cycle = 15 - IDE_IN(recovery_time * ide_system_bus_speed() / 1000 + 1, 0, 15);
 	} else {
-		active_cycle =   8  - IDE_IN(active_time   * system_bus_clock() / 1000 + 1, 1, 8);
-		recovery_cycle = 18 - IDE_IN(recovery_time * system_bus_clock() / 1000 + 1, 3, 18);
+		active_cycle =   8  - IDE_IN(active_time   * ide_system_bus_speed() / 1000 + 1, 1, 8);
+		recovery_cycle = 18 - IDE_IN(recovery_time * ide_system_bus_speed() / 1000 + 1, 3, 18);
 	}
 
 	return((recovery_cycle<<4) | 0x08 | active_cycle);
@@ -156,8 +158,8 @@ static byte qd6500_compute_timing (ide_hwif_t *hwif, int active_time, int recove
 
 static byte qd6580_compute_timing (int active_time, int recovery_time)
 {
-	byte active_cycle   = 17-IDE_IN(active_time   * system_bus_clock() / 1000 + 1, 2, 17);
-	byte recovery_cycle = 15-IDE_IN(recovery_time * system_bus_clock() / 1000 + 1, 2, 15);
+	byte active_cycle   = 17-IDE_IN(active_time   * ide_system_bus_speed() / 1000 + 1, 2, 17);
+	byte recovery_cycle = 15-IDE_IN(recovery_time * ide_system_bus_speed() / 1000 + 1, 2, 15);
 
 	return((recovery_cycle<<4) | active_cycle);
 }
@@ -427,7 +429,8 @@ int __init probe (int base)
 				ide_hwifs[i].tuneproc = &qd6580_tune_drive;
 
 				for (j=0;j<2;j++) {
-					ide_hwifs[i].drives[j].drive_data = QD6580_DEF_DATA;
+					ide_hwifs[i].drives[j].drive_data =
+					       i?QD6580_DEF_DATA2:QD6580_DEF_DATA;
 					ide_hwifs[i].drives[j].io_32bit = 1;
 				}
 			}

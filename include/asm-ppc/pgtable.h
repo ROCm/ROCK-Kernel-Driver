@@ -18,7 +18,7 @@
 extern void local_flush_tlb_all(void);
 extern void local_flush_tlb_mm(struct mm_struct *mm);
 extern void local_flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr);
-extern void local_flush_tlb_range(struct mm_struct *mm, unsigned long start,
+extern void local_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 				  unsigned long end);
 #define update_mmu_cache(vma, addr, pte)	do { } while (0)
 
@@ -32,7 +32,7 @@ static inline void local_flush_tlb_mm(struct mm_struct *mm)
 static inline void local_flush_tlb_page(struct vm_area_struct *vma,
 				unsigned long vmaddr)
 	{ __tlbia(); }
-static inline void local_flush_tlb_range(struct mm_struct *mm,
+static inline void local_flush_tlb_range(struct vm_area_struct *vma,
 				unsigned long start, unsigned long end)
 	{ __tlbia(); }
 #define update_mmu_cache(vma, addr, pte)	do { } while (0)
@@ -43,7 +43,7 @@ struct vm_area_struct;
 extern void local_flush_tlb_all(void);
 extern void local_flush_tlb_mm(struct mm_struct *mm);
 extern void local_flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr);
-extern void local_flush_tlb_range(struct mm_struct *mm, unsigned long start,
+extern void local_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 			    unsigned long end);
 
 /*
@@ -80,7 +80,7 @@ static inline void flush_tlb_pgtables(struct mm_struct *mm,
  */
 #define flush_cache_all()		do { } while (0)
 #define flush_cache_mm(mm)		do { } while (0)
-#define flush_cache_range(mm, a, b)	do { } while (0)
+#define flush_cache_range(vma, a, b)	do { } while (0)
 #define flush_cache_page(vma, p)	do { } while (0)
 #define flush_icache_page(vma, page)	do { } while (0)
 

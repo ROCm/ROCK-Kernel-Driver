@@ -1457,8 +1457,6 @@ static int cbq_init(struct Qdisc *sch, struct rtattr *opt)
 	return 0;
 }
 
-#ifdef CONFIG_RTNETLINK
-
 static __inline__ int cbq_dump_rate(struct sk_buff *skb, struct cbq_class *cl)
 {
 	unsigned char	 *b = skb->tail;
@@ -1657,8 +1655,6 @@ rtattr_failure:
 	skb_trim(skb, b - skb->data);
 	return -1;
 }
-
-#endif
 
 static int cbq_graft(struct Qdisc *sch, unsigned long arg, struct Qdisc *new,
 		     struct Qdisc **old)
@@ -2082,9 +2078,7 @@ static struct Qdisc_class_ops cbq_class_ops =
 	cbq_bind_filter,
 	cbq_unbind_filter,
 
-#ifdef CONFIG_RTNETLINK
 	cbq_dump_class,
-#endif
 };
 
 struct Qdisc_ops cbq_qdisc_ops =
@@ -2104,9 +2098,7 @@ struct Qdisc_ops cbq_qdisc_ops =
 	cbq_destroy,
 	NULL /* cbq_change */,
 
-#ifdef CONFIG_RTNETLINK
 	cbq_dump,
-#endif
 };
 
 #ifdef MODULE

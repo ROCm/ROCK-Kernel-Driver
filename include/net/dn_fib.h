@@ -113,9 +113,7 @@ struct dn_fib_table {
 	int (*get_info)(struct dn_fib_table *table, char *buf,
 			int first, int count);
 #endif /* CONFIG_PROC_FS */
-#ifdef CONFIG_RTNETLINK
 	int (*dump)(struct dn_fib_table *t, struct sk_buff *skb, struct netlink_callback *cb);
-#endif /* CONFIG_RTNETLINK */
 
 	unsigned char data[0];
 };
@@ -163,7 +161,6 @@ extern int dn_fib_lookup(struct dn_fib_key *key, struct dn_fib_res *res);
 /*
  * rtnetlink interface
  */
-#ifdef CONFIG_RTNETLINK
 extern int dn_fib_rtm_delroute(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg);
 extern int dn_fib_rtm_newroute(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg);
 extern int dn_fib_dump(struct sk_buff *skb, struct netlink_callback *cb);
@@ -171,7 +168,6 @@ extern int dn_fib_dump(struct sk_buff *skb, struct netlink_callback *cb);
 extern int dn_fib_rtm_delrule(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg);
 extern int dn_fib_rtm_newrule(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg);
 extern int dn_fib_dump_rules(struct sk_buff *skb, struct netlink_callback *cb);
-#endif /* CONFIG_RTNETLINK */
 
 #define DN_NUM_TABLES 255
 #define DN_MIN_TABLE 1

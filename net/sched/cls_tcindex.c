@@ -421,8 +421,6 @@ static void tcindex_destroy(struct tcf_proto *tp)
 }
 
 
-#ifdef CONFIG_RTNETLINK
-
 static int tcindex_dump(struct tcf_proto *tp, unsigned long fh,
     struct sk_buff *skb, struct tcmsg *t)
 {
@@ -481,9 +479,6 @@ rtattr_failure:
 	return -1;
 }
 
-#endif
-
-
 struct tcf_proto_ops cls_tcindex_ops = {
 	NULL,
 	"tcindex",
@@ -496,11 +491,7 @@ struct tcf_proto_ops cls_tcindex_ops = {
 	tcindex_change,
 	tcindex_delete,
 	tcindex_walk,
-#ifdef CONFIG_RTNETLINK
 	tcindex_dump
-#else
-	NULL
-#endif
 };
 
 

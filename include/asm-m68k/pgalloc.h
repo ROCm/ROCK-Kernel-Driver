@@ -89,11 +89,11 @@ extern inline void flush_cache_mm(struct mm_struct *mm)
 		__flush_cache_030();
 }
 
-extern inline void flush_cache_range(struct mm_struct *mm,
+extern inline void flush_cache_range(struct vm_area_struct *vma,
 				     unsigned long start,
 				     unsigned long end)
 {
-	if (mm == current->mm)
+	if (vma->vm_mm == current->mm)
 	        __flush_cache_030();
 }
 

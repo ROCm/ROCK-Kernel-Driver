@@ -208,7 +208,7 @@ void fat_put_super(struct super_block *sb)
 }
 
 
-static int parse_options(char *options,int *fat, int *debug,
+static int parse_options(char *options, int *debug,
 			 struct fat_mount_options *opts,
 			 char *cvf_format, char *cvf_options)
 {
@@ -227,7 +227,7 @@ static int parse_options(char *options,int *fat, int *debug,
 	opts->shortname = 0;
 	opts->utf8 = 0;
 	opts->iocharset = NULL;
-	*debug = *fat = 0;
+	*debug = 0;
 
 	if (!options)
 		goto out;
@@ -305,13 +305,8 @@ static int parse_options(char *options,int *fat, int *debug,
 			else *debug = 1;
 		}
 		else if (!strcmp(this_char,"fat")) {
-			if (!value || !*value) ret = 0;
-			else {
-				*fat = simple_strtoul(value,&value,0);
-				if (*value || (*fat != 12 && *fat != 16 &&
-					       *fat != 32)) 
-					ret = 0;
-			}
+			printk("FAT: fat option is obsolete, "
+			       "not supported now\n");
 		}
 		else if (!strcmp(this_char,"quiet")) {
 			if (value) ret = 0;
@@ -328,8 +323,6 @@ static int parse_options(char *options,int *fat, int *debug,
 		else if (!strcmp(this_char,"codepage") && value) {
 			opts->codepage = simple_strtoul(value,&value,0);
 			if (*value) ret = 0;
-			else printk ("MSDOS FS: Using codepage %d\n",
-					opts->codepage);
 		}
 		else if (!strcmp(this_char,"iocharset") && value) {
 			p = value;
@@ -348,7 +341,6 @@ static int parse_options(char *options,int *fat, int *debug,
 					opts->iocharset = buffer;
 					memcpy(buffer, p, len);
 					buffer[len] = 0;
-					printk("MSDOS FS: IO charset %s\n", buffer);
 				} else
 					ret = 0;
 			}
@@ -373,11 +365,37 @@ out:
 	return ret;
 }
 
+static void fat_calc_dir_size(struct inode *inode)
+{
+	struct super_block *sb = inode->i_sb;
+	int nr;
+
+	inode->i_size = 0;
+	if (MSDOS_I(inode)->i_start == 0)
+		return;
+
+	nr = MSDOS_I(inode)->i_start;
+	do {
+		inode->i_size += 1 << MSDOS_SB(sb)->cluster_bits;
+		if (!(nr = fat_access(sb, nr, -1))) {
+			printk("FAT: Directory %ld: bad FAT\n",
+			       inode->i_ino);
+			break;
+		}
+		if (inode->i_size > FAT_MAX_DIR_SIZE) {
+			fat_fs_panic(sb, "Directory %ld: "
+				     "exceeded the maximum size of directory",
+				     inode->i_ino);
+			inode->i_size = FAT_MAX_DIR_SIZE;
+			break;
+		}
+	} while (nr != -1);
+}
+
 static void fat_read_root(struct inode *inode)
 {
 	struct super_block *sb = inode->i_sb;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
-	int nr;
 
 	INIT_LIST_HEAD(&MSDOS_I(inode)->i_fat_hash);
 	MSDOS_I(inode)->i_location = 0;
@@ -391,16 +409,7 @@ static void fat_read_root(struct inode *inode)
 	inode->i_fop = &fat_dir_operations;
 	if (sbi->fat_bits == 32) {
 		MSDOS_I(inode)->i_start = sbi->root_cluster;
-		if ((nr = MSDOS_I(inode)->i_start) != 0) {
-			while (nr != -1) {
-				inode->i_size += 1 << sbi->cluster_bits;
-				if (!(nr = fat_access(sb, nr, -1))) {
-					printk("Directory %ld: bad FAT\n",
-					       inode->i_ino);
-					break;
-				}
-			}
-		}
+		fat_calc_dir_size(inode);
 	} else {
 		MSDOS_I(inode)->i_start = 0;
 		inode->i_size = sbi->dir_entries * sizeof(struct msdos_dir_entry);
@@ -550,11 +559,9 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 	struct buffer_head *bh;
 	struct fat_boot_sector *b;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
-	char *p;
-	int logical_sector_size, hard_blksize, fat_clusters = 0;
+	int logical_sector_size, fat_clusters;
 	unsigned int total_sectors, rootdir_sectors;
-	int fat32, debug, error, fat, cp;
-	struct fat_mount_options opts;
+	int debug, cp;
 	char buf[50];
 	int i;
 	char cvf_format[21];
@@ -562,22 +569,20 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 
 	cvf_format[0] = '\0';
 	cvf_options[0] = '\0';
-	sbi->cvf_format = NULL;
 	sbi->private_data = NULL;
 
-	sbi->dir_ops = fs_dir_inode_ops;
-
-	sb->s_maxbytes = MAX_NON_LFS;
+	sb->s_magic = MSDOS_SUPER_MAGIC;
 	sb->s_op = &fat_sops;
+	sbi->dir_ops = fs_dir_inode_ops;
+	sbi->cvf_format = &default_cvf;
 
-	opts.isvfat = sbi->options.isvfat;
-	if (!parse_options((char *) data, &fat, &debug, &opts,
+	if (!parse_options((char *)data, &debug, &sbi->options,
 			   cvf_format, cvf_options))
 		goto out_fail;
-	/* N.B. we should parse directly into the sb structure */
-	memcpy(&(sbi->options), &opts, sizeof(struct fat_mount_options));
 
 	fat_cache_init();
+	/* set up enough so that it can read an inode */
+	init_MUTEX(&sbi->fat_lock);
 
 	sb_min_blocksize(sb, 512);
 	bh = sb_bread(sb, 0);
@@ -586,37 +591,37 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 		goto out_fail;
 	}
 
-/*
- * The DOS3 partition size limit is *not* 32M as many people think.  
- * Instead, it is 64K sectors (with the usual sector size being
- * 512 bytes, leading to a 32M limit).
- * 
- * DOS 3 partition managers got around this problem by faking a 
- * larger sector size, ie treating multiple physical sectors as 
- * a single logical sector.
- * 
- * We can accommodate this scheme by adjusting our cluster size,
- * fat_start, and data_start by an appropriate value.
- *
- * (by Drew Eckhardt)
- */
-
-
 	b = (struct fat_boot_sector *) bh->b_data;
-	logical_sector_size =
-		CF_LE_W(get_unaligned((unsigned short *) &b->sector_size));
-	if (!logical_sector_size
-	    || (logical_sector_size & (logical_sector_size - 1))) {
-		printk("FAT: bogus logical sector size %d\n",
-		       logical_sector_size);
+	if (!b->secs_track) {
+		if (!silent)
+			printk("FAT: bogus sectors-per-track value\n");
 		brelse(bh);
 		goto out_invalid;
 	}
-
+	if (!b->heads) {
+		if (!silent)
+			printk("FAT: bogus number-of-heads value\n");
+		brelse(bh);
+		goto out_invalid;
+	}
+	logical_sector_size =
+		CF_LE_W(get_unaligned((unsigned short *) &b->sector_size));
+	if (!logical_sector_size
+	    || (logical_sector_size & (logical_sector_size - 1))
+	    || (logical_sector_size < 512)
+	    || (PAGE_CACHE_SIZE < logical_sector_size)) {
+		if (!silent)
+			printk("FAT: bogus logical sector size %d\n",
+			       logical_sector_size);
+		brelse(bh);
+		goto out_invalid;
+	}
 	sbi->cluster_size = b->cluster_size;
 	if (!sbi->cluster_size
 	    || (sbi->cluster_size & (sbi->cluster_size - 1))) {
-		printk("FAT: bogus cluster size %d\n", sbi->cluster_size);
+		if (!silent)
+			printk("FAT: bogus cluster size %d\n",
+			       sbi->cluster_size);
 		brelse(bh);
 		goto out_invalid;
 	}
@@ -625,47 +630,62 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 		printk("FAT: logical sector size too small for device"
 		       " (logical sector size = %d)\n", logical_sector_size);
 		brelse(bh);
-		goto out_invalid;
+		goto out_fail;
+	}
+	if (logical_sector_size > sb->s_blocksize) {
+		brelse(bh);
+
+		if (!sb_set_blocksize(sb, logical_sector_size)) {
+			printk("FAT: unable to set blocksize %d\n",
+			       logical_sector_size);
+			goto out_fail;
+		}
+		bh = sb_bread(sb, 0);
+		if (bh == NULL) {
+			printk("FAT: unable to read boot sector"
+			       " (logical sector size = %lu)\n",
+			       sb->s_blocksize);
+			goto out_fail;
+		}
+		b = (struct fat_boot_sector *) bh->b_data;
 	}
 
-	hard_blksize = sb->s_blocksize;
-
-	sbi->cluster_bits = ffs(logical_sector_size * sbi->cluster_size) - 1;
+	sbi->cluster_bits = ffs(sb->s_blocksize * sbi->cluster_size) - 1;
 	sbi->fats = b->fats;
+	sbi->fat_bits = 0;		/* Don't know yet */
 	sbi->fat_start = CF_LE_W(b->reserved);
-	if (!b->fat_length && b->fat32_length) {
+	sbi->fat_length = CF_LE_W(b->fat_length);
+	sbi->root_cluster = 0;
+	sbi->free_clusters = -1;	/* Don't know yet */
+	sbi->prev_free = 0;
+
+	if (!sbi->fat_length && b->fat32_length) {
 		struct fat_boot_fsinfo *fsinfo;
 		struct buffer_head *fsinfo_bh;
-		int fsinfo_block, fsinfo_offset;
 
 		/* Must be FAT32 */
-		fat32 = 1;
+		sbi->fat_bits = 32;
 		sbi->fat_length = CF_LE_L(b->fat32_length);
 		sbi->root_cluster = CF_LE_L(b->root_cluster);
 
-		sbi->fsinfo_sector = CF_LE_W(b->info_sector);
 		/* MC - if info_sector is 0, don't multiply by 0 */
+		sbi->fsinfo_sector = CF_LE_W(b->info_sector);
 		if (sbi->fsinfo_sector == 0)
 			sbi->fsinfo_sector = 1;
 
-		fsinfo_block =
-			(sbi->fsinfo_sector * logical_sector_size) / hard_blksize;
-		fsinfo_offset =
-			(sbi->fsinfo_sector * logical_sector_size) % hard_blksize;
-		fsinfo_bh = bh;
-		if (fsinfo_block != 0) {
-			fsinfo_bh = sb_bread(sb, fsinfo_block);
-			if (fsinfo_bh == NULL) {
-				printk("FAT: bread failed, FSINFO block"
-				       " (blocknr = %d)\n", fsinfo_block);
-				brelse(bh);
-				goto out_invalid;
-			}
+		fsinfo_bh = sb_bread(sb, sbi->fsinfo_sector);
+		if (fsinfo_bh == NULL) {
+			printk("FAT: bread failed, FSINFO block"
+			       " (sector = %lu)\n", sbi->fsinfo_sector);
+			brelse(bh);
+			goto out_fail;
 		}
-		fsinfo = (struct fat_boot_fsinfo *)&fsinfo_bh->b_data[fsinfo_offset];
+
+		fsinfo = (struct fat_boot_fsinfo *)fsinfo_bh->b_data;
 		if (!IS_FSINFO(fsinfo)) {
 			printk("FAT: Did not find valid FSINFO signature.\n"
-			       "Found signature1 0x%x signature2 0x%x sector=%ld.\n",
+			       "     Found signature1 0x%08x signature2 0x%08x"
+			       " (sector = %lu)\n",
 			       CF_LE_L(fsinfo->signature1),
 			       CF_LE_L(fsinfo->signature2),
 			       sbi->fsinfo_sector);
@@ -673,140 +693,110 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 			sbi->free_clusters = CF_LE_L(fsinfo->free_clusters);
 		}
 
-		if (fsinfo_block != 0)
-			brelse(fsinfo_bh);
-	} else {
-		fat32 = 0;
-		sbi->fat_length = CF_LE_W(b->fat_length);
-		sbi->root_cluster = 0;
-		sbi->free_clusters = -1; /* Don't know yet */
+		brelse(fsinfo_bh);
 	}
 
-	sbi->dir_per_block = logical_sector_size / sizeof(struct msdos_dir_entry);
+	sbi->dir_per_block = sb->s_blocksize / sizeof(struct msdos_dir_entry);
 	sbi->dir_per_block_bits = ffs(sbi->dir_per_block) - 1;
 
 	sbi->dir_start = sbi->fat_start + sbi->fats * sbi->fat_length;
 	sbi->dir_entries =
 		CF_LE_W(get_unaligned((unsigned short *)&b->dir_entries));
+	if (sbi->dir_entries & (sbi->dir_per_block - 1)) {
+		printk("FAT: bogus directroy-entries per block\n");
+		brelse(bh);
+		goto out_invalid;
+	}
+
 	rootdir_sectors = sbi->dir_entries
-		* sizeof(struct msdos_dir_entry) / logical_sector_size;
+		* sizeof(struct msdos_dir_entry) / sb->s_blocksize;
 	sbi->data_start = sbi->dir_start + rootdir_sectors;
 	total_sectors = CF_LE_W(get_unaligned((unsigned short *)&b->sectors));
 	if (total_sectors == 0)
 		total_sectors = CF_LE_L(b->total_sect);
 	sbi->clusters = (total_sectors - sbi->data_start) / sbi->cluster_size;
 
-	error = 0;
-	if (!error) {
-		sbi->fat_bits = fat32 ? 32 :
-			(fat ? fat :
-			 (sbi->clusters > MSDOS_FAT12 ? 16 : 12));
-		fat_clusters =
-			sbi->fat_length * logical_sector_size * 8 / sbi->fat_bits;
-		error = !sbi->fats || (sbi->dir_entries & (sbi->dir_per_block - 1))
-			|| sbi->clusters + 2 > fat_clusters + MSDOS_MAX_EXTRA
-			|| logical_sector_size < 512
-			|| PAGE_CACHE_SIZE < logical_sector_size
-			|| !b->secs_track || !b->heads;
-	}
+	if (sbi->fat_bits != 32)
+		sbi->fat_bits = (sbi->clusters > MSDOS_FAT12) ? 16 : 12;
+
+	/* check that FAT table does not overflow */
+	fat_clusters = sbi->fat_length * sb->s_blocksize * 8 / sbi->fat_bits;
+	if (sbi->clusters > fat_clusters - 2)
+		sbi->clusters = fat_clusters - 2;
+
 	brelse(bh);
 
-	if (error)
-		goto out_invalid;
-
-	sb_set_blocksize(sb, logical_sector_size);
-	sbi->cvf_format = &default_cvf;
 	if (!strcmp(cvf_format, "none"))
 		i = -1;
 	else
-		i = detect_cvf(sb,cvf_format);
-	if (i >= 0)
-		error = cvf_formats[i]->mount_cvf(sb, cvf_options);
-	if (error || debug) {
-		/* The MSDOS_CAN_BMAP is obsolete, but left just to remember */
-		printk("[MS-DOS FS Rel. 12,FAT %d,check=%c,conv=%c,"
-		       "uid=%d,gid=%d,umask=%03o%s]\n",
-		       sbi->fat_bits,opts.name_check,
-		       opts.conversion,opts.fs_uid,opts.fs_gid,opts.fs_umask,
-		       MSDOS_CAN_BMAP(sbi) ? ",bmap" : "");
-		printk("[me=0x%x,cs=%d,#f=%d,fs=%d,fl=%ld,ds=%ld,de=%d,data=%ld,"
-		       "se=%u,ts=%u,ls=%d,rc=%ld,fc=%u]\n",
-		       b->media, sbi->cluster_size, sbi->fats,
-		       sbi->fat_start, sbi->fat_length, sbi->dir_start,
-		       sbi->dir_entries, sbi->data_start,
-		       CF_LE_W(get_unaligned((unsigned short *)&b->sectors)),
-		       CF_LE_L(b->total_sect), logical_sector_size,
-		       sbi->root_cluster, sbi->free_clusters);
-		printk ("hard sector size = %d\n", hard_blksize);
+		i = detect_cvf(sb, cvf_format);
+	if (i >= 0) {
+		if (cvf_formats[i]->mount_cvf(sb, cvf_options))
+			goto out_invalid;
 	}
-	if (i < 0)
-		if (sbi->clusters + 2 > fat_clusters)
-			sbi->clusters = fat_clusters - 2;
-	if (error)
-		goto out_invalid;
 
-	sb->s_magic = MSDOS_SUPER_MAGIC;
-	/* set up enough so that it can read an inode */
-	init_MUTEX(&sbi->fat_lock);
-	sbi->prev_free = 0;
-
-	cp = opts.codepage ? opts.codepage : 437;
+	cp = sbi->options.codepage ? sbi->options.codepage : 437;
 	sprintf(buf, "cp%d", cp);
 	sbi->nls_disk = load_nls(buf);
 	if (! sbi->nls_disk) {
 		/* Fail only if explicit charset specified */
-		if (opts.codepage != 0)
+		if (sbi->options.codepage != 0) {
+			printk("FAT: codepage %s not found\n", buf);
 			goto out_fail;
+		}
 		sbi->options.codepage = 0; /* already 0?? */
 		sbi->nls_disk = load_nls_default();
 	}
+	if (!silent)
+		printk("FAT: Using codepage %s\n", sbi->nls_disk->charset);
 
-	sbi->nls_io = NULL;
-	if (sbi->options.isvfat && !opts.utf8) {
-		p = opts.iocharset ? opts.iocharset : CONFIG_NLS_DEFAULT;
-		sbi->nls_io = load_nls(p);
-		if (! sbi->nls_io)
-			/* Fail only if explicit charset specified */
-			if (opts.iocharset)
-				goto out_unload_nls;
+	if (sbi->options.isvfat && !sbi->options.utf8) {
+		if (sbi->options.iocharset != NULL) {
+			sbi->nls_io = load_nls(sbi->options.iocharset);
+			if (!sbi->nls_io) {
+				printk("FAT: IO charset %s not found\n",
+				       sbi->options.iocharset);
+				goto out_fail;
+			}
+		} else
+			sbi->nls_io = load_nls_default();
+		if (!silent)
+			printk("FAT: Using IO charset %s\n",
+			       sbi->nls_io->charset);
 	}
-	if (! sbi->nls_io)
-		sbi->nls_io = load_nls_default();
 
 	root_inode = new_inode(sb);
 	if (!root_inode)
-		goto out_unload_nls;
+		goto out_fail;
+
 	root_inode->i_ino = MSDOS_ROOT_INO;
 	root_inode->i_version = 0;
 	fat_read_root(root_inode);
 	insert_inode_hash(root_inode);
 	sb->s_root = d_alloc_root(root_inode);
-	if (!sb->s_root)
-		goto out_no_root;
+	if (!sb->s_root) {
+		printk("FAT: get root inode failed\n");
+		iput(root_inode);
+		goto out_fail;
+	}
 	if(i >= 0) {
 		sbi->cvf_format = cvf_formats[i];
 		++cvf_format_use_count[i];
 	}
 	return sb;
 
-out_no_root:
-	printk("FAT: get root inode failed\n");
-	iput(root_inode);
-	unload_nls(sbi->nls_io);
-out_unload_nls:
-	unload_nls(sbi->nls_disk);
-	goto out_fail;
 out_invalid:
-	if (!silent) {
+	if (!silent)
 		printk("VFS: Can't find a valid FAT filesystem on dev %s.\n",
 			sb->s_id);
-	}
 out_fail:
-	if (opts.iocharset) {
-		printk("FAT: freeing iocharset=%s\n", opts.iocharset);
-		kfree(opts.iocharset);
-	}
-	if(sbi->private_data)
+	if (sbi->nls_io)
+		unload_nls(sbi->nls_io);
+	if (sbi->nls_disk)
+		unload_nls(sbi->nls_disk);
+	if (sbi->options.iocharset)
+		kfree(sbi->options.iocharset);
+	if (sbi->private_data)
 		kfree(sbi->private_data);
 	sbi->private_data = NULL;
  
@@ -882,7 +872,6 @@ static void fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 {
 	struct super_block *sb = inode->i_sb;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
-	int nr;
 
 	INIT_LIST_HEAD(&MSDOS_I(inode)->i_fat_hash);
 	MSDOS_I(inode)->i_location = 0;
@@ -913,15 +902,7 @@ static void fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 			inode->i_nlink = 1;
 		}
 #endif
-		if ((nr = MSDOS_I(inode)->i_start) != 0)
-			while (nr != -1) {
-				inode->i_size += 1 << sbi->cluster_bits;
-				if (!(nr = fat_access(sb, nr, -1))) {
-					printk("Directory %ld: bad FAT\n",
-					    inode->i_ino);
-					break;
-				}
-			}
+		fat_calc_dir_size(inode);
 		MSDOS_I(inode)->mmu_private = inode->i_size;
 	} else { /* not a directory */
 		inode->i_generation |= 1;

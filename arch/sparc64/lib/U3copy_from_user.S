@@ -1,4 +1,4 @@
-/* $Id: U3copy_from_user.S,v 1.3 2000/11/01 09:29:19 davem Exp $
+/* $Id: U3copy_from_user.S,v 1.4 2002/01/15 07:16:26 davem Exp $
  * U3memcpy.S: UltraSparc-III optimized copy from userspace.
  *
  * Copyright (C) 1999, 2000 David S. Miller (davem@redhat.com)
@@ -13,7 +13,7 @@
 	.section .fixup;		\
 	.align 4;			\
 99:	VISExitHalf;			\
-	ba,pt %xcc, U3cfu_fixup;	\
+	ba U3cfu_fixup;			\
 	 a, b, %o1;			\
 	.section __ex_table;		\
 	.align 4;			\
@@ -25,7 +25,7 @@
 	.section .fixup;		\
 	.align 4;			\
 99:	VISExitHalf;			\
-	ba,pt %xcc, U3cfu_fixup;	\
+	ba U3cfu_fixup;			\
 	 a, b, %o1;			\
 	.section __ex_table;		\
 	.align 4;			\
@@ -39,7 +39,7 @@
 99:	VISExitHalf;			\
 	and %o2, (0x40 - 1), %o1;	\
 	add %o1, %o4, %o1;		\
-	ba,pt %xcc, U3cfu_fixup;	\
+	ba U3cfu_fixup;			\
 	 add %o1, 0x1c0, %o1;		\
 	.section __ex_table;		\
 	.align 4;			\
@@ -54,7 +54,7 @@
 	and %o2, (0x40 - 1), %o1;	\
 	sll %g3, 6, %g3;		\
 	add %o1, 0x80, %o1;		\
-	ba,pt %xcc, U3cfu_fixup;	\
+	ba U3cfu_fixup;			\
 	 add %o1, %g3, %o1;		\
 	.section __ex_table;		\
 	.align 4;			\
@@ -68,7 +68,7 @@
 99:	VISExitHalf;			\
 	and %o2, (0x40 - 1), %o1;	\
 	add %o1, 0x40, %o1;		\
-	ba,pt %xcc, U3cfu_fixup;	\
+	ba U3cfu_fixup;			\
 	 add %o1, %g3, %o1;		\
 	.section __ex_table;		\
 	.align 4;			\

@@ -71,9 +71,14 @@
  *                       including set_bit patch from Rusty Russel
  * Ver 0.97  Jul 22 01   Merge 0.91-0.96 onto 0.9.sv for ac series
  * Ver 0.97.sv Aug 3 01  Backported from 2.4.7-ac3
+ * Ver 0.98  Oct 26 01   Split idefloppy_transfer_pc into two pieces to
+ *                        fix a lost interrupt problem. It appears the busy
+ *                        bit was being deasserted by my IOMEGA ATAPI ZIP 100
+ *                        drive before the drive was actually ready.
+ * Ver 0.98a Oct 29 01   Expose delay value so we can play.
  */
 
-#define IDEFLOPPY_VERSION "0.97.sv"
+#define IDEFLOPPY_VERSION "0.98a"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -276,6 +281,7 @@ typedef struct {
 	 *	Last error information
 	 */
 	byte sense_key, asc, ascq;
+	byte ticks;		/* delay this long before sending packet command */
 	int progress_indication;
 
 	/*
@@ -289,6 +295,8 @@ typedef struct {
 	unsigned long flags;			/* Status/Action flags */
 } idefloppy_floppy_t;
 
+#define IDEFLOPPY_TICKS_DELAY	3	/* default delay for ZIP 100 */
+
 /*
  *	Floppy flag bits values.
  */
@@ -297,7 +305,7 @@ typedef struct {
 #define IDEFLOPPY_USE_READ12		2	/* Use READ12/WRITE12 or READ10/WRITE10 */
 #define	IDEFLOPPY_FORMAT_IN_PROGRESS	3	/* Format in progress */
 #define IDEFLOPPY_CLIK_DRIVE	        4       /* Avoid commands not supported in Clik drive */
-
+#define IDEFLOPPY_ZIP_DRIVE		5	/* Requires BH algorithm for packets */
 
 /*
  *	ATAPI floppy drive packet commands
@@ -985,6 +993,11 @@ static ide_startstop_t idefloppy_pc_intr (ide_drive_t *drive)
 	return ide_started;
 }
 
+/*
+ * This is the original routine that did the packet transfer.
+ * It fails at high speeds on the Iomega ZIP drive, so there's a slower version
+ * for that drive below. The algorithm is chosen based on drive type
+ */
 static ide_startstop_t idefloppy_transfer_pc (ide_drive_t *drive)
 {
 	ide_startstop_t startstop;
@@ -1005,6 +1018,56 @@ static ide_startstop_t idefloppy_transfer_pc (ide_drive_t *drive)
 	return ide_started;
 }
 
+
+/*
+ * What we have here is a classic case of a top half / bottom half
+ * interrupt service routine. In interrupt mode, the device sends
+ * an interrupt to signal it's ready to receive a packet. However,
+ * we need to delay about 2-3 ticks before issuing the packet or we
+ * gets in trouble.
+ *
+ * So, follow carefully. transfer_pc1 is called as an interrupt (or
+ * directly). In either case, when the device says it's ready for a 
+ * packet, we schedule the packet transfer to occur about 2-3 ticks
+ * later in transfer_pc2.
+ */
+static int idefloppy_transfer_pc2 (ide_drive_t *drive)
+{
+	idefloppy_floppy_t *floppy = drive->driver_data;
+
+	atapi_output_bytes (drive, floppy->pc->c, 12); /* Send the actual packet */
+	return IDEFLOPPY_WAIT_CMD;		/* Timeout for the packet command */
+}
+
+static ide_startstop_t idefloppy_transfer_pc1 (ide_drive_t *drive)
+{
+	idefloppy_floppy_t *floppy = drive->driver_data;
+	ide_startstop_t startstop;
+	idefloppy_ireason_reg_t ireason;
+
+	if (ide_wait_stat (&startstop,drive,DRQ_STAT,BUSY_STAT,WAIT_READY)) {
+		printk (KERN_ERR "ide-floppy: Strange, packet command initiated yet DRQ isn't asserted\n");
+		return startstop;
+	}
+	ireason.all=IN_BYTE (IDE_IREASON_REG);
+	if (!ireason.b.cod || ireason.b.io) {
+		printk (KERN_ERR "ide-floppy: (IO,CoD) != (0,1) while issuing a packet command\n");
+		return ide_do_reset (drive);
+	}
+	/* 
+	 * The following delay solves a problem with ATAPI Zip 100 drives where the
+	 * Busy flag was apparently being deasserted before the unit was ready to
+	 * receive data. This was happening on a 1200 MHz Athlon system. 10/26/01
+	 * 25msec is too short, 40 and 50msec work well. idefloppy_pc_intr will 
+	 * not be actually used until after the packet is moved in about 50 msec.
+	 */
+	ide_set_handler (drive, 
+	  &idefloppy_pc_intr, 		/* service routine for packet command */
+	  floppy->ticks,			/* wait this long before "failing" */
+	  &idefloppy_transfer_pc2);	/* fail == transfer_pc2 */
+	return ide_started;
+}
+
 /*
  *	Issue a packet command
  */
@@ -1013,6 +1076,7 @@ static ide_startstop_t idefloppy_issue_pc (ide_drive_t *drive, idefloppy_pc_t *p
 	idefloppy_floppy_t *floppy = drive->driver_data;
 	idefloppy_bcount_reg_t bcount;
 	int dma_ok = 0;
+	ide_handler_t *pkt_xfer_routine;
 
 #if IDEFLOPPY_DEBUG_BUGS
 	if (floppy->pc->c[0] == IDEFLOPPY_REQUEST_SENSE_CMD && pc->c[0] == IDEFLOPPY_REQUEST_SENSE_CMD) {
@@ -1072,13 +1136,20 @@ static ide_startstop_t idefloppy_issue_pc (ide_drive_t *drive, idefloppy_pc_t *p
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
+	/* Can we transfer the packet when we get the interrupt or wait? */
+	if (test_bit (IDEFLOPPY_ZIP_DRIVE, &floppy->flags)) {
+		pkt_xfer_routine = &idefloppy_transfer_pc1;	/* wait */
+	} else {
+		pkt_xfer_routine = &idefloppy_transfer_pc;	/* immediate */
+	}
+	
 	if (test_bit (IDEFLOPPY_DRQ_INTERRUPT, &floppy->flags)) {
-		ide_set_handler (drive, &idefloppy_transfer_pc, IDEFLOPPY_WAIT_CMD, NULL);
+		ide_set_handler (drive, pkt_xfer_routine, IDEFLOPPY_WAIT_CMD, NULL);
 		OUT_BYTE (WIN_PACKETCMD, IDE_COMMAND_REG);		/* Issue the packet command */
 		return ide_started;
 	} else {
 		OUT_BYTE (WIN_PACKETCMD, IDE_COMMAND_REG);
-		return idefloppy_transfer_pc (drive);
+		return (*pkt_xfer_routine) (drive);
 	}
 }
 
@@ -1979,10 +2050,7 @@ static ide_proc_entry_t idefloppy_proc[] = {
 
 #endif	/* CONFIG_PROC_FS */
 
-static int idefloppy_reinit (ide_drive_t *drive)
-{
-	return 0;
-}
+int idefloppy_reinit(ide_drive_t *drive);
 
 /*
  *	IDE subdriver functions, registered with ide.c
@@ -1995,6 +2063,8 @@ static ide_driver_t idefloppy_driver = {
 	supports_dma:		1,
 	supports_dsc_overlap:	0,
 	cleanup:		idefloppy_cleanup,
+	standby:		NULL,
+	flushcache:		NULL,
 	do_request:		idefloppy_do_request,
 	end_request:		idefloppy_end_request,
 	ioctl:			idefloppy_ioctl,
@@ -2016,6 +2086,40 @@ static ide_module_t idefloppy_module = {
 	&idefloppy_driver,
 	NULL
 };
+
+int idefloppy_reinit (ide_drive_t *drive)
+{
+	idefloppy_floppy_t *floppy;
+	int failed = 0;
+
+	MOD_INC_USE_COUNT;
+	while ((drive = ide_scan_devices (ide_floppy, idefloppy_driver.name, NULL, failed++)) != NULL) {
+		if (!idefloppy_identify_device (drive, drive->id)) {
+			printk (KERN_ERR "ide-floppy: %s: not supported by this version of ide-floppy\n", drive->name);
+			continue;
+		}
+		if (drive->scsi) {
+			printk("ide-floppy: passing drive %s to ide-scsi emulation.\n", drive->name);
+			continue;
+		}
+		if ((floppy = (idefloppy_floppy_t *) kmalloc (sizeof (idefloppy_floppy_t), GFP_KERNEL)) == NULL) {
+			printk (KERN_ERR "ide-floppy: %s: Can't allocate a floppy structure\n", drive->name);
+			continue;
+		}
+		if (ide_register_subdriver (drive, &idefloppy_driver, IDE_SUBDRIVER_VERSION)) {
+			printk (KERN_ERR "ide-floppy: %s: Failed to register the driver with ide.c\n", drive->name);
+			kfree (floppy);
+			continue;
+		}
+		DRIVER(drive)->busy++;
+		idefloppy_setup (drive, floppy);
+		DRIVER(drive)->busy--;
+		failed--;
+	}
+	ide_register_module(&idefloppy_module);
+	MOD_DEC_USE_COUNT;
+	return 0;
+}
 
 MODULE_DESCRIPTION("ATAPI FLOPPY Driver");
 
@@ -2069,7 +2173,9 @@ int idefloppy_init (void)
 			kfree (floppy);
 			continue;
 		}
+		DRIVER(drive)->busy++;
 		idefloppy_setup (drive, floppy);
+		DRIVER(drive)->busy--;
 		failed--;
 	}
 	ide_register_module(&idefloppy_module);

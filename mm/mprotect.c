@@ -72,13 +72,13 @@ static inline void change_pmd_range(pgd_t * pgd, unsigned long address,
 	} while (address && (address < end));
 }
 
-static void change_protection(unsigned long start, unsigned long end, pgprot_t newprot)
+static void change_protection(struct vm_area_struct *vma, unsigned long start, unsigned long end, pgprot_t newprot)
 {
 	pgd_t *dir;
 	unsigned long beg = start;
 
 	dir = pgd_offset(current->mm, start);
-	flush_cache_range(current->mm, beg, end);
+	flush_cache_range(vma, beg, end);
 	if (start >= end)
 		BUG();
 	spin_lock(&current->mm->page_table_lock);
@@ -88,7 +88,7 @@ static void change_protection(unsigned long start, unsigned long end, pgprot_t n
 		dir++;
 	} while (start && (start < end));
 	spin_unlock(&current->mm->page_table_lock);
-	flush_tlb_range(current->mm, beg, end);
+	flush_tlb_range(vma, beg, end);
 	return;
 }
 
@@ -261,7 +261,7 @@ static int mprotect_fixup(struct vm_area_struct * vma, struct vm_area_struct ** 
 	if (error)
 		return error;
 
-	change_protection(start, end, newprot);
+	change_protection(vma, start, end, newprot);
 	return 0;
 }
 

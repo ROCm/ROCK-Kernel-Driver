@@ -2911,11 +2911,7 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
 	return 0;
 }
 
-static
-int ide_cdrom_reinit (ide_drive_t *drive)
-{
-	return 0;
-}
+int ide_cdrom_reinit (ide_drive_t *drive);
 
 static ide_driver_t ide_cdrom_driver = {
 	name:			"ide-cdrom",
@@ -2925,6 +2921,8 @@ static ide_driver_t ide_cdrom_driver = {
 	supports_dma:		1,
 	supports_dsc_overlap:	1,
 	cleanup:		ide_cdrom_cleanup,
+	standby:		NULL,
+	flushcache:		NULL,
 	do_request:		ide_do_rw_cdrom,
 	end_request:		NULL,
 	ioctl:			ide_cdrom_ioctl,
@@ -2952,6 +2950,39 @@ char *ignore = NULL;
 
 MODULE_PARM(ignore, "s");
 MODULE_DESCRIPTION("ATAPI CD-ROM Driver");
+
+int ide_cdrom_reinit (ide_drive_t *drive)
+{
+	struct cdrom_info *info;
+	int failed = 0;
+
+	MOD_INC_USE_COUNT;
+	info = (struct cdrom_info *) kmalloc (sizeof (struct cdrom_info), GFP_KERNEL);
+	if (info == NULL) {
+		printk ("%s: Can't allocate a cdrom structure\n", drive->name);
+		return 1;
+	}
+	if (ide_register_subdriver (drive, &ide_cdrom_driver, IDE_SUBDRIVER_VERSION)) {
+		printk ("%s: Failed to register the driver with ide.c\n", drive->name);
+		kfree (info);
+		return 1;
+	}
+	memset (info, 0, sizeof (struct cdrom_info));
+	drive->driver_data = info;
+	DRIVER(drive)->busy++;
+	if (ide_cdrom_setup (drive)) {
+		DRIVER(drive)->busy--;
+		if (ide_cdrom_cleanup (drive))
+			printk ("%s: ide_cdrom_cleanup failed in ide_cdrom_init\n", drive->name);
+		return 1;
+	}
+	DRIVER(drive)->busy--;
+	failed--;
+
+	ide_register_module(&ide_cdrom_module);
+	MOD_DEC_USE_COUNT;
+	return 0;
+}
 
 static void __exit ide_cdrom_exit(void)
 {

@@ -67,6 +67,8 @@
 #include <linux/netdevice.h>
 #include <linux/proc_fs.h>
 #include <linux/wanrouter.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
 #include <linux/init.h>
 #include <linux/poll.h>
 #include <linux/cache.h>
@@ -79,11 +81,7 @@
 
 #include <asm/uaccess.h>
 
-#include <linux/inet.h>
-#include <net/ip.h>
 #include <net/sock.h>
-#include <net/tcp.h>
-#include <net/udp.h>
 #include <net/scm.h>
 #include <linux/netfilter.h>
 
@@ -1723,7 +1721,7 @@ void __init sock_init(void)
 	 * The netlink device handler may be needed early.
 	 */
 
-#ifdef  CONFIG_RTNETLINK
+#ifdef CONFIG_NET
 	rtnetlink_init();
 #endif
 #ifdef CONFIG_NETLINK_DEV

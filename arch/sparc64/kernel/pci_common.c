@@ -1,4 +1,4 @@
-/* $Id: pci_common.c,v 1.27 2001/08/12 13:18:22 davem Exp $
+/* $Id: pci_common.c,v 1.28 2002/01/14 05:47:02 davem Exp $
  * pci_common.c: PCI controller common support.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -183,6 +183,17 @@ static void __init pdev_cookie_fillin(struct pci_pbm_info *pbm,
 		pcp->prom_name[err] = 0;
 	else
 		pcp->prom_name[0] = 0;
+
+	err = prom_getproperty(device_prom_node,
+			       "assigned-addresses",
+			       (char *)pcp->prom_assignments,
+			       sizeof(pcp->prom_assignments));
+	if (err == 0 || err == -1)
+		pcp->num_prom_assignments = 0;
+	else
+		pcp->num_prom_assignments =
+			(err / sizeof(pcp->prom_assignments[0]));
+
 	if (strcmp(pcp->prom_name, "ebus") == 0) {
 		struct linux_prom_ebus_ranges erng[PROM_PCIRNG_MAX];
 		int iter;
@@ -208,16 +219,6 @@ static void __init pdev_cookie_fillin(struct pci_pbm_info *pbm,
 			ap->size_lo = ep->size;
 		}
 		pcp->num_prom_assignments = err;
-	} else {
-		err = prom_getproperty(device_prom_node,
-				       "assigned-addresses",
-				       (char *)pcp->prom_assignments,
-				       sizeof(pcp->prom_assignments));
-		if (err == 0 || err == -1)
-			pcp->num_prom_assignments = 0;
-		else
-			pcp->num_prom_assignments =
-				(err / sizeof(pcp->prom_assignments[0]));
 	}
 
 	fixup_obp_assignments(pdev, pcp);

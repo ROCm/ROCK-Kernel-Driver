@@ -181,7 +181,7 @@ flush_tlb_mm (struct mm_struct *mm)
 	}
 }
 
-extern void flush_tlb_range (struct mm_struct *mm, unsigned long start, unsigned long end);
+extern void flush_tlb_range (struct vm_area_struct *vma, unsigned long start, unsigned long end);
 
 /*
  * Page-granular tlb flush.
@@ -190,7 +190,7 @@ static inline void
 flush_tlb_page (struct vm_area_struct *vma, unsigned long addr)
 {
 #ifdef CONFIG_SMP
-	flush_tlb_range(vma->vm_mm, (addr & PAGE_MASK), (addr & PAGE_MASK) + PAGE_SIZE);
+	flush_tlb_range(vma, (addr & PAGE_MASK), (addr & PAGE_MASK) + PAGE_SIZE);
 #else
 	if (vma->vm_mm == current->active_mm)
 		asm volatile ("ptc.l %0,%1" :: "r"(addr), "r"(PAGE_SHIFT << 2) : "memory");
@@ -204,9 +204,12 @@ flush_tlb_page (struct vm_area_struct *vma, unsigned long addr)
 static inline void
 flush_tlb_pgtables (struct mm_struct *mm, unsigned long start, unsigned long end)
 {
+	struct vm_area_struct vma;
+
 	if (rgn_index(start) != rgn_index(end))
 		printk("flush_tlb_pgtables: can't flush across regions!!\n");
-	flush_tlb_range(mm, ia64_thash(start), ia64_thash(end));
+	vma.vm_mm = mm;
+	flush_tlb_range(&vma, ia64_thash(start), ia64_thash(end));
 }
 
 /*
@@ -217,7 +220,7 @@ flush_tlb_pgtables (struct mm_struct *mm, unsigned long start, unsigned long end
 /* Caches aren't brain-dead on the IA-64. */
 #define flush_cache_all()			do { } while (0)
 #define flush_cache_mm(mm)			do { } while (0)
-#define flush_cache_range(mm, start, end)	do { } while (0)
+#define flush_cache_range(vma, start, end)	do { } while (0)
 #define flush_cache_page(vma, vmaddr)		do { } while (0)
 #define flush_page_to_ram(page)			do { } while (0)
 

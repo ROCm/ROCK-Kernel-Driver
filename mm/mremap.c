@@ -88,12 +88,13 @@ static int move_one_page(struct mm_struct *mm, unsigned long old_addr, unsigned 
 	return error;
 }
 
-static int move_page_tables(struct mm_struct * mm,
+static int move_page_tables(struct vm_area_struct *vma,
 	unsigned long new_addr, unsigned long old_addr, unsigned long len)
 {
+	struct mm_struct *mm = vma->vm_mm;
 	unsigned long offset = len;
 
-	flush_cache_range(mm, old_addr, old_addr + len);
+	flush_cache_range(vma, old_addr, old_addr + len);
 
 	/*
 	 * This is not the clever way to do this, but we're taking the
@@ -105,7 +106,7 @@ static int move_page_tables(struct mm_struct * mm,
 		if (move_one_page(mm, old_addr + offset, new_addr + offset))
 			goto oops_we_failed;
 	}
-	flush_tlb_range(mm, old_addr, old_addr + len);
+	flush_tlb_range(vma, old_addr, old_addr + len);
 	return 0;
 
 	/*
@@ -116,10 +117,10 @@ static int move_page_tables(struct mm_struct * mm,
 	 * the old page tables)
 	 */
 oops_we_failed:
-	flush_cache_range(mm, new_addr, new_addr + len);
+	flush_cache_range(vma, new_addr, new_addr + len);
 	while ((offset += PAGE_SIZE) < len)
 		move_one_page(mm, new_addr + offset, old_addr + offset);
-	zap_page_range(mm, new_addr, len);
+	zap_page_range(vma, new_addr, len);
 	return -1;
 }
 
@@ -177,7 +178,7 @@ static inline unsigned long move_vma(struct vm_area_struct * vma,
 		allocated_vma = 1;
 	}
 
-	if (!move_page_tables(current->mm, new_addr, addr, old_len)) {
+	if (!move_page_tables(vma, new_addr, addr, old_len)) {
 		if (allocated_vma) {
 			*new_vma = *vma;
 			new_vma->vm_start = new_addr;

@@ -1106,7 +1106,7 @@ static int it8172_mmap(struct file *file, struct vm_area_struct *vma)
 	unlock_kernel();
 	return -EINVAL;
     }
-    if (remap_page_range(vma->vm_start, virt_to_phys(db->rawbuf),
+    if (remap_page_range(vma, vma->vm_start, virt_to_phys(db->rawbuf),
 			 size, vma->vm_page_prot)) {
 	unlock_kernel();
 	return -EAGAIN;

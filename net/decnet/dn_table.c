@@ -267,7 +267,6 @@ static int dn_fib_nh_match(struct rtmsg *r, struct nlmsghdr *nlh, struct dn_kern
 	return 0;
 }
 
-#ifdef CONFIG_RTNETLINK
 static int dn_fib_dump_info(struct sk_buff *skb, u32 pid, u32 seq, int event,
                         u8 tb_id, u8 type, u8 scope, void *dst, int dst_len,
                         struct dn_fib_info *fi)
@@ -434,12 +433,6 @@ static int dn_fib_table_dump(struct dn_fib_table *tb, struct sk_buff *skb,
 
         return skb->len;
 }
-
-#else /* no CONFIG_RTNETLINK */
-
-#define dn_rtmsg_fib(event,f,z,tb_id,nlh,req)
-
-#endif /* CONFIG_RTNETLINK */
 
 static int dn_fib_table_insert(struct dn_fib_table *tb, struct rtmsg *r, struct dn_kern_rta *rta, struct nlmsghdr *n, struct netlink_skb_parms *req)
 {
@@ -860,9 +853,7 @@ from interrupt\n");
 #ifdef CONFIG_PROC_FS
 	t->get_info = dn_fib_table_get_info;
 #endif
-#ifdef CONFIG_RTNETLINK
         t->dump = dn_fib_table_dump;
-#endif
         dn_fib_tables[n] = t;
 
         return t;

@@ -38,15 +38,25 @@ static char ascii_extensions[] =
  * read-only. The file system can be made writable again by remounting it.
  */
 
-void fat_fs_panic(struct super_block *s,const char *msg)
+static char panic_msg[512];
+
+void fat_fs_panic(struct super_block *s, const char *fmt, ...)
 {
 	int not_ro;
+	va_list args;
+
+	va_start (args, fmt);
+	vsnprintf (panic_msg, sizeof(panic_msg), fmt, args);
+	va_end (args);
 
 	not_ro = !(s->s_flags & MS_RDONLY);
-	if (not_ro) s->s_flags |= MS_RDONLY;
-	printk("Filesystem panic (dev %s).\n  %s\n", s->s_id, msg);
 	if (not_ro)
-		printk("  File system has been set read-only\n");
+		s->s_flags |= MS_RDONLY;
+
+	printk("FAT: Filesystem panic (dev %s)\n"
+	       "    %s\n", s->s_id, panic_msg);
+	if (not_ro)
+		printk("    File system has been set read-only\n");
 }
 
 
@@ -102,13 +112,14 @@ void fat_clusters_flush(struct super_block *sb)
 	/* Sanity check */
 	if (!IS_FSINFO(fsinfo)) {
 		printk("FAT: Did not find valid FSINFO signature.\n"
-		       "Found signature1 0x%x signature2 0x%x sector=%ld.\n",
+		       "     Found signature1 0x%08x signature2 0x%08x"
+		       " (sector = %lu)\n",
 		       CF_LE_L(fsinfo->signature1), CF_LE_L(fsinfo->signature2),
 		       MSDOS_SB(sb)->fsinfo_sector);
-		return;
+	} else {
+		fsinfo->free_clusters = CF_LE_L(MSDOS_SB(sb)->free_clusters);
+		fat_mark_buffer_dirty(sb, bh);
 	}
-	fsinfo->free_clusters = CF_LE_L(MSDOS_SB(sb)->free_clusters);
-	fat_mark_buffer_dirty(sb, bh);
 	fat_brelse(sb, bh);
 }
 
@@ -472,17 +483,26 @@ static int raw_scan_nonroot(struct super_block *sb,int start,const char *name,
     int *number,int *ino,struct buffer_head **res_bh,struct msdos_dir_entry
     **res_de)
 {
-	int count,cluster;
+	int count, cluster;
+	unsigned long dir_size;
 
 #ifdef DEBUG
 	printk("raw_scan_nonroot: start=%d\n",start);
 #endif
+	dir_size = 0;
 	do {
 		for (count = 0; count < MSDOS_SB(sb)->cluster_size; count++) {
 			if ((cluster = raw_scan_sector(sb,(start-2)*
 			    MSDOS_SB(sb)->cluster_size+MSDOS_SB(sb)->data_start+
 			    count,name,number,ino,res_bh,res_de)) >= 0)
 				return cluster;
+		}
+		dir_size += 1 << MSDOS_SB(sb)->cluster_bits;
+		if (dir_size > FAT_MAX_DIR_SIZE) {
+			fat_fs_panic(sb, "Directory %d: "
+				     "exceeded the maximum size of directory",
+				     start);
+			break;
 		}
 		if (!(start = fat_access(sb,start,-1))) {
 			fat_fs_panic(sb,"FAT error");
@@ -491,8 +511,8 @@ static int raw_scan_nonroot(struct super_block *sb,int start,const char *name,
 #ifdef DEBUG
 	printk("next start: %d\n",start);
 #endif
-	}
-	while (start != -1);
+	} while (start != -1);
+
 	return -ENOENT;
 }
 

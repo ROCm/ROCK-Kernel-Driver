@@ -206,7 +206,7 @@ int video_mmap(struct file *file, struct vm_area_struct *vma)
 	struct video_device *vfl=video_device[minor(file->f_dentry->d_inode->i_rdev)];
 	if(vfl->mmap) {
 		lock_kernel();
-		ret = vfl->mmap(vfl, (char *)vma->vm_start, 
+		ret = vfl->mmap(vma, vfl, (char *)vma->vm_start, 
 				(unsigned long)(vma->vm_end-vma->vm_start));
 		unlock_kernel();
 	}

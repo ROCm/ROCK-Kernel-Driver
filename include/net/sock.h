@@ -643,9 +643,7 @@ struct sock {
 #if defined(CONFIG_PPPOE) || defined(CONFIG_PPPOE_MODULE)
 		struct pppox_opt	*pppox;
 #endif
-#ifdef CONFIG_NETLINK
 		struct netlink_opt	*af_netlink;
-#endif
 #if defined(CONFIG_ECONET) || defined(CONFIG_ECONET_MODULE)
 		struct econet_opt	*af_econet;
 #endif
@@ -828,6 +826,11 @@ extern struct sk_buff 		*sock_alloc_send_skb(struct sock *sk,
 						     unsigned long size,
 						     int noblock,
 						     int *errcode);
+extern struct sk_buff 		*sock_alloc_send_pskb(struct sock *sk,
+						      unsigned long header_len,
+						      unsigned long data_len,
+						      int noblock,
+						      int *errcode);
 extern void *sock_kmalloc(struct sock *sk, int size, int priority);
 extern void sock_kfree_s(struct sock *sk, void *mem, int size);
 

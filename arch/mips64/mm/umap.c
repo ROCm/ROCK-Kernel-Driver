@@ -86,7 +86,7 @@ static inline void remove_mapping_pmd_range (pgd_t *pgd, unsigned long address,
  * This routine is called from the page fault handler to remove a
  * range of active mappings at this point
  */
-void remove_mapping (struct task_struct *task, unsigned long start,
+void remove_mapping (struct vm_area_struct *vma, struct task_struct *task, unsigned long start,
 		     unsigned long end)
 {
 	unsigned long beg = start;
@@ -94,13 +94,13 @@ void remove_mapping (struct task_struct *task, unsigned long start,
 
 	down_write (&task->mm->mmap_sem);
 	dir = pgd_offset (task->mm, start);
-	flush_cache_range (task->mm, beg, end);
+	flush_cache_range (vma, beg, end);
 	while (start < end){
 		remove_mapping_pmd_range (dir, start, end - start);
 		start = (start + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	}
-	flush_tlb_range (task->mm, beg, end);
+	flush_tlb_range (vma, beg, end);
 	up_write (&task->mm->mmap_sem);
 }
 
@@ -190,7 +190,7 @@ static inline int vmap_pmd_range (pmd_t *pmd, unsigned long address,
 	return 0;
 }
 
-int vmap_page_range (unsigned long from, unsigned long size,
+int vmap_page_range (struct vm_area_struct *vma, unsigned long from, unsigned long size,
 		     unsigned long vaddr)
 {
 	int error = 0;
@@ -200,7 +200,7 @@ int vmap_page_range (unsigned long from, unsigned long size,
 
 	vaddr -= from;
 	dir = pgd_offset(current->mm, from);
-	flush_cache_range(current->mm, beg, end);
+	flush_cache_range(vma, beg, end);
 	while (from < end) {
 		pmd_t *pmd = pmd_alloc(current->mm, dir, from);
 		error = -ENOMEM;
@@ -212,6 +212,6 @@ int vmap_page_range (unsigned long from, unsigned long size,
 		from = (from + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	}
-	flush_tlb_range(current->mm, beg, end);
+	flush_tlb_range(vma, beg, end);
 	return error;
 }

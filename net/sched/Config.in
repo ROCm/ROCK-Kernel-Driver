@@ -1,8 +1,6 @@
 #
 # Traffic control configuration.
 # 
-define_bool CONFIG_NETLINK y
-define_bool CONFIG_RTNETLINK y	
 tristate '  CBQ packet scheduler' CONFIG_NET_SCH_CBQ
 tristate '  CSZ packet scheduler' CONFIG_NET_SCH_CSZ
 #tristate '  H-PFQ packet scheduler' CONFIG_NET_SCH_HPFQ

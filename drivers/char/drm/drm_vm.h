@@ -532,12 +532,12 @@ int DRM(mmap)(struct file *filp, struct vm_area_struct *vma)
 		}
 		offset = DRIVER_GET_REG_OFS();
 #ifdef __sparc__
-		if (io_remap_page_range(vma->vm_start,
+		if (io_remap_page_range(vma, vma->vm_start,
 					VM_OFFSET(vma) + offset,
 					vma->vm_end - vma->vm_start,
 					vma->vm_page_prot, 0))
 #else
-		if (remap_page_range(vma->vm_start,
+		if (remap_page_range(vma, vma->vm_start,
 				     VM_OFFSET(vma) + offset,
 				     vma->vm_end - vma->vm_start,
 				     vma->vm_page_prot))

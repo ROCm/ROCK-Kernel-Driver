@@ -25,7 +25,7 @@
  * shootdown.
  */
 typedef struct free_pte_ctx {
-	struct mm_struct	*mm;
+	struct vm_area_struct	*vma;
 	unsigned long		nr;	/* set to ~0UL means fast mode */
 	unsigned long	start_addr, end_addr;
 	pte_t	ptes[FREE_PTE_NR];
@@ -37,11 +37,12 @@ extern mmu_gather_t	mmu_gathers[NR_CPUS];
 /* tlb_gather_mmu
  *	Return a pointer to an initialized mmu_gather_t.
  */
-static inline mmu_gather_t *tlb_gather_mmu(struct mm_struct *mm)
+static inline mmu_gather_t *tlb_gather_mmu(struct vm_area_struct *vma)
 {
 	mmu_gather_t *tlb = &mmu_gathers[smp_processor_id()];
+	struct mm_struct *mm = vma->vm_mm;
 
-	tlb->mm = mm;
+	tlb->vma = vma;
 	/* Use fast mode if there is only one user of this mm (this process) */
 	tlb->nr = (atomic_read(&(mm)->mm_users) == 1) ? ~0UL : 0UL;
 	return tlb;
@@ -69,7 +70,7 @@ static inline mmu_gather_t *tlb_gather_mmu(struct mm_struct *mm)
 
 /* tlb_finish_mmu
  *	Called at the end of the shootdown operation to free up any resources
- *	that were required.  The page talbe lock is still held at this point.
+ *	that were required.  The page table lock is still held at this point.
  */
 static inline void tlb_finish_mmu(struct free_pte_ctx *ctx, unsigned long start, unsigned long end)
 {
@@ -77,13 +78,13 @@ static inline void tlb_finish_mmu(struct free_pte_ctx *ctx, unsigned long start,
 
 	/* Handle the fast case first. */
 	if (ctx->nr == ~0UL) {
-		flush_tlb_range(ctx->mm, start, end);
+		flush_tlb_range(ctx->vma, start, end);
 		return;
 	}
 	nr = ctx->nr;
 	ctx->nr = 0;
 	if (nr)
-		flush_tlb_range(ctx->mm, ctx->start_addr, ctx->end_addr);
+		flush_tlb_range(ctx->vma, ctx->start_addr, ctx->end_addr);
 	for (i=0; i < nr; i++) {
 		pte_t pte = ctx->ptes[i];
 		__free_pte(pte);
@@ -96,9 +97,9 @@ static inline void tlb_finish_mmu(struct free_pte_ctx *ctx, unsigned long start,
  * attempt to get gcc to generate optimal code since this code is run on each
  * page in a process at exit.
  */
-typedef struct mm_struct mmu_gather_t;
+typedef struct vm_area_struct mmu_gather_t;
 
-#define tlb_gather_mmu(mm)	(mm)
+#define tlb_gather_mmu(vma)	(vma)
 #define tlb_finish_mmu(tlb, start, end)	flush_tlb_range(tlb, start, end)
 #define tlb_remove_page(tlb, ptep, addr)	do {\
 		pte_t __pte = *(ptep);\

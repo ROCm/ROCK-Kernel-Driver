@@ -14,7 +14,7 @@ subdir-y :=	core ethernet
 subdir-m :=	ipv4 # hum?
 
 
-subdir-$(CONFIG_NET)		+= 802 sched
+subdir-$(CONFIG_NET)		+= 802 sched netlink
 subdir-$(CONFIG_INET)		+= ipv4
 subdir-$(CONFIG_NETFILTER)	+= ipv4/netfilter
 subdir-$(CONFIG_UNIX)		+= unix
@@ -27,7 +27,6 @@ endif
 endif
 
 subdir-$(CONFIG_KHTTPD)		+= khttpd
-subdir-$(CONFIG_NETLINK)	+= netlink
 subdir-$(CONFIG_PACKET)		+= packet
 subdir-$(CONFIG_NET_SCHED)	+= sched
 subdir-$(CONFIG_BRIDGE)		+= bridge

@@ -29,7 +29,13 @@
 
 #ifdef CONFIG_BLK_DEV_IDE
 #include <linux/ide.h>	/* IDE xlate */
-#endif /* CONFIG_BLK_DEV_IDE */
+#elif defined(CONFIG_BLK_DEV_IDE_MODULE)
+#include <linux/module.h>
+
+int (*ide_xlate_1024_hook)(kdev_t, int, int, const char *);
+EXPORT_SYMBOL(ide_xlate_1024_hook);
+#define ide_xlate_1024 ide_xlate_1024_hook
+#endif
 
 #include <asm/system.h>
 
@@ -468,7 +474,7 @@ static struct {
  */
 static int handle_ide_mess(struct block_device *bdev)
 {
-#ifdef CONFIG_BLK_DEV_IDE
+#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 	Sector sect;
 	unsigned char *data;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
@@ -476,6 +482,10 @@ static int handle_ide_mess(struct block_device *bdev)
 	int heads = 0;
 	struct partition *p;
 	int i;
+#ifdef CONFIG_BLK_DEV_IDE_MODULE
+	if (!ide_xlate_1024)
+		return 1;
+#endif
 	/*
 	 * The i386 partition handling programs very often
 	 * make partitions end on cylinder boundaries.
@@ -537,7 +547,7 @@ reread:
 	/* Flush the cache */
 	invalidate_bdev(bdev, 1);
 	truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
-#endif /* CONFIG_BLK_DEV_IDE */
+#endif /* defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE) */
 	return 1;
 }
  

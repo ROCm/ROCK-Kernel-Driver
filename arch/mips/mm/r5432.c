@@ -366,10 +366,12 @@ static inline void r5432_flush_cache_all_d32i32(void)
 	blast_dcache32(); blast_icache32();
 }
 
-static void r5432_flush_cache_range_d32i32(struct mm_struct *mm,
+static void r5432_flush_cache_range_d32i32(struct vm_area_struct *vma,
 					 unsigned long start,
 					 unsigned long end)
 {
+	struct mm_struct *mm = vma->vm_mm;
+
 	if (mm->context != 0) {
 #ifdef DEBUG_CACHE
 		printk("crange[%d,%08lx,%08lx]", (int)mm->context, start, end);

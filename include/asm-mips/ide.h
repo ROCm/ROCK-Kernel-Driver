@@ -92,6 +92,26 @@ typedef union {
 	} b;
 } select_t;
 
+typedef union {
+	unsigned all			: 8;	/* all of the bits together */
+	struct {
+#ifdef __MIPSEB__
+		unsigned HOB		: 1;	/* 48-bit address ordering */
+		unsigned reserved456	: 3;
+		unsigned SRST		: 1;	/* host soft reset bit */
+		unsigned nIEN		: 1;	/* device INTRQ to host */
+		unsigned bit0		: 1;
+#else
+		unsigned bit0		: 1;
+		unsigned nIEN		: 1;	/* device INTRQ to host */
+		unsigned SRST		: 1;	/* host soft reset bit */
+		unsigned bit3		: 1;	/* ATA-2 thingy */
+		unsigned reserved456	: 3;
+		unsigned HOB		: 1;	/* 48-bit address ordering */
+#endif
+	} b;
+} control_t;
+
 static __inline__ int ide_request_irq(unsigned int irq, void (*handler)(int,void *, struct pt_regs *),
 			unsigned long flags, const char *device, void *dev_id)
 {

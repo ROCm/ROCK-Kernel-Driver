@@ -2972,7 +2972,7 @@ static int cpia_ioctl(struct video_device *dev, unsigned int ioctlnr, void *arg)
 } 
 
 /* FIXME */
-static int cpia_mmap(struct video_device *dev, const char *adr,
+static int cpia_mmap(struct vm_area_struct *vma, struct video_device *dev, const char *adr,
                      unsigned long size)
 {
 	unsigned long start = (unsigned long)adr;
@@ -3005,7 +3005,7 @@ static int cpia_mmap(struct video_device *dev, const char *adr,
 	pos = (unsigned long)(cam->frame_buf);
 	while (size > 0) {
 		page = kvirt_to_pa(pos);
-		if (remap_page_range(start, page, PAGE_SIZE, PAGE_SHARED)) {
+		if (remap_page_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
 			up(&cam->busy_lock);
 			return -EAGAIN;
 		}

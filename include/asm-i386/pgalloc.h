@@ -165,7 +165,7 @@ extern int do_check_pgt_cache(int, int);
  *  - flush_tlb_all() flushes all processes TLBs
  *  - flush_tlb_mm(mm) flushes the specified mm context TLB's
  *  - flush_tlb_page(vma, vmaddr) flushes one page
- *  - flush_tlb_range(mm, start, end) flushes a range of pages
+ *  - flush_tlb_range(vma, start, end) flushes a range of pages
  *  - flush_tlb_pgtables(mm, start, end) flushes a range of page tables
  *
  * ..but the i386 has somewhat limited tlb flushing capabilities,
@@ -191,10 +191,10 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
 		__flush_tlb_one(addr);
 }
 
-static inline void flush_tlb_range(struct mm_struct *mm,
+static inline void flush_tlb_range(struct vm_area_struct *vma,
 	unsigned long start, unsigned long end)
 {
-	if (mm == current->active_mm)
+	if (vma->vm_mm == current->active_mm)
 		__flush_tlb();
 }
 
@@ -212,9 +212,9 @@ extern void flush_tlb_page(struct vm_area_struct *, unsigned long);
 
 #define flush_tlb()	flush_tlb_current_task()
 
-static inline void flush_tlb_range(struct mm_struct * mm, unsigned long start, unsigned long end)
+static inline void flush_tlb_range(struct vm_area_struct * vma, unsigned long start, unsigned long end)
 {
-	flush_tlb_mm(mm);
+	flush_tlb_mm(vma->vm_mm);
 }
 
 #define TLBSTATE_OK	1

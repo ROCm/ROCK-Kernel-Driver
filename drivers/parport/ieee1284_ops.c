@@ -514,7 +514,8 @@ size_t parport_ieee1284_ecp_read_data (struct parport *port,
 
 	/* Set HostAck low to start accepting data. */
 	ctl = parport_read_control (port);
-	ctl &= ~(PARPORT_CONTROL_STROBE | PARPORT_CONTROL_INIT);
+	ctl &= ~(PARPORT_CONTROL_STROBE | PARPORT_CONTROL_INIT |
+		 PARPORT_CONTROL_AUTOFD);
 	parport_write_control (port,
 			       ctl | PARPORT_CONTROL_AUTOFD);
 	while (count < len) {

@@ -558,7 +558,7 @@ static int __init init_crc32(void)
 /**
  * cleanup_crc32(): frees crc32 data when no longer needed
  */
-static void cleanup_crc32(void)
+static void __exit cleanup_crc32(void)
 {
 	crc32cleanup_le();
 	crc32cleanup_be();

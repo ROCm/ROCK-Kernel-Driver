@@ -21,6 +21,7 @@
 #include <linux/completion.h>
 #include <linux/namespace.h>
 #include <linux/personality.h>
+#include <linux/file.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -706,6 +707,9 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 		expire_task(current);
 	}
 	__restore_flags(flags);
+
+	if (p->policy == SCHED_OTHER)
+		p->prio = MAX_PRIO - 1 - ((MAX_PRIO - 1 - p->prio) * 1) / 3;
 
 	/*
 	 * Ok, add it to the run-queues and make it

@@ -619,8 +619,6 @@ static void atm_tc_destroy(struct Qdisc *sch)
 }
 
 
-#ifdef CONFIG_RTNETLINK
-
 static int atm_tc_dump_class(struct Qdisc *sch, unsigned long cl,
     struct sk_buff *skb, struct tcmsg *tcm)
 {
@@ -668,9 +666,6 @@ static int atm_tc_dump(struct Qdisc *sch, struct sk_buff *skb)
 	return 0;
 }
 
-#endif
-
-
 static struct Qdisc_class_ops atm_class_ops =
 {
 	atm_tc_graft,			/* graft */
@@ -685,9 +680,7 @@ static struct Qdisc_class_ops atm_class_ops =
 	atm_tc_bind_filter,		/* bind_tcf */
 	atm_tc_put,			/* unbind_tcf */
 
-#ifdef CONFIG_RTNETLINK
 	atm_tc_dump_class,		/* dump */
-#endif
 };
 
 struct Qdisc_ops atm_qdisc_ops =
@@ -707,9 +700,7 @@ struct Qdisc_ops atm_qdisc_ops =
 	atm_tc_destroy,			/* destroy */
 	NULL,				/* change */
 
-#ifdef CONFIG_RTNETLINK
 	atm_tc_dump			/* dump */
-#endif
 };
 
 

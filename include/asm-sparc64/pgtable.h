@@ -1,4 +1,4 @@
-/* $Id: pgtable.h,v 1.152 2001/11/12 09:43:39 davem Exp $
+/* $Id: pgtable.h,v 1.155 2001/12/21 04:56:17 davem Exp $
  * pgtable.h: SpitFire page table operations.
  *
  * Copyright 1996,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -18,6 +18,23 @@
 #include <asm/system.h>
 #include <asm/page.h>
 #include <asm/processor.h>
+
+/* The kernel image occupies 0x4000000 to 0x1000000 (4MB --> 16MB).
+ * The page copy blockops use 0x1000000 to 0x18000000 (16MB --> 24MB).
+ * The PROM resides in an area spanning 0xf0000000 to 0x100000000.
+ * The vmalloc area spans 0x140000000 to 0x200000000.
+ * There is a single static kernel PMD which maps from 0x0 to address
+ * 0x400000000.
+ */
+#define	TLBTEMP_BASE		0x0000000001000000
+#define MODULES_VADDR		0x0000000002000000
+#define MODULES_LEN		0x000000007e000000
+#define MODULES_END		0x0000000080000000
+#define VMALLOC_START		0x0000000140000000
+#define VMALLOC_VMADDR(x)	((unsigned long)(x))
+#define VMALLOC_END		0x0000000200000000
+#define LOW_OBP_ADDRESS		0x00000000f0000000
+#define HI_OBP_ADDRESS		0x0000000100000000
 
 /* XXX All of this needs to be rethought so we can take advantage
  * XXX cheetah's full 64-bit virtual address space, ie. no more hole
@@ -76,13 +93,6 @@
 #define USER_PTRS_PER_PGD	((const int)((current->thread.flags & SPARC_FLAG_32BIT) ? \
 				 (1) : (PTRS_PER_PGD)))
 #define FIRST_USER_PGD_NR	0
-
-/* NOTE: TLB miss handlers depend heavily upon where this is. */
-#define VMALLOC_START		0x0000000140000000UL
-#define VMALLOC_VMADDR(x)	((unsigned long)(x))
-#define VMALLOC_END		0x0000000200000000UL
-#define LOW_OBP_ADDRESS		0xf0000000UL
-#define HI_OBP_ADDRESS		0x100000000UL
 
 #define pte_ERROR(e)	__builtin_trap()
 #define pmd_ERROR(e)	__builtin_trap()
@@ -290,8 +300,6 @@ extern inline pte_t mk_pte_io(unsigned long page, pgprot_t prot, int space)
 #define swp_entry_to_pte(x)		((pte_t) { (x).val })
 
 extern unsigned long prom_virt_to_phys(unsigned long, int *);
-#define LOW_OBP_ADDRESS		0xf0000000UL
-#define HI_OBP_ADDRESS		0x100000000UL
 
 extern __inline__ unsigned long
 sun4u_get_pte (unsigned long addr)
@@ -328,7 +336,7 @@ extern unsigned long *sparc64_valid_addr_bitmap;
 #define kern_addr_valid(addr)	\
 	(test_bit(__pa((unsigned long)(addr))>>22, sparc64_valid_addr_bitmap))
 
-extern int io_remap_page_range(unsigned long from, unsigned long offset,
+extern int io_remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned long offset,
 			       unsigned long size, pgprot_t prot, int space);
 
 #include <asm-generic/pgtable.h>

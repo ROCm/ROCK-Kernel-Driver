@@ -166,19 +166,16 @@ ip_nat_out(unsigned int hooknum,
 	return ip_nat_fn(hooknum, pskb, in, out, okfn);
 }
 
-/* FIXME: change in oif may mean change in hh_len.  Check and realloc
-   --RR */
-static int
-route_me_harder(struct sk_buff *skb)
+static int route_me_harder(struct sk_buff **pskb)
 {
-	struct iphdr *iph = skb->nh.iph;
+	struct iphdr *iph = (*pskb)->nh.iph;
 	struct rtable *rt;
 	struct rt_key key = { dst:iph->daddr,
 			      src:iph->saddr,
-			      oif:skb->sk ? skb->sk->bound_dev_if : 0,
+			      oif:(*pskb)->sk ? (*pskb)->sk->bound_dev_if : 0,
 			      tos:RT_TOS(iph->tos)|RTO_CONN,
 #ifdef CONFIG_IP_ROUTE_FWMARK
-			      fwmark:skb->nfmark
+			      fwmark:(*pskb)->nfmark
 #endif
 			    };
 
@@ -188,9 +185,24 @@ route_me_harder(struct sk_buff *skb)
 	}
 
 	/* Drop old route. */
-	dst_release(skb->dst);
+	dst_release((*pskb)->dst);
 
-	skb->dst = &rt->u.dst;
+	(*pskb)->dst = &rt->u.dst;
+
+	/* Change in oif may mean change in hh_len. */
+	if (skb_headroom(*pskb) < (*pskb)->dst->dev->hard_header_len) {
+		struct sk_buff *nskb;
+
+		nskb = skb_realloc_headroom(*pskb,
+					    (*pskb)->dst->dev
+					    ->hard_header_len);
+		if (!nskb)
+			return -ENOMEM;
+		if ((*pskb)->sk)
+			skb_set_owner_w(nskb, (*pskb)->sk);
+		kfree_skb(*pskb);
+		*pskb = nskb;
+	}
 	return 0;
 }
 
@@ -216,7 +228,7 @@ ip_nat_local_fn(unsigned int hooknum,
 	if (ret != NF_DROP && ret != NF_STOLEN
 	    && ((*pskb)->nh.iph->saddr != saddr
 		|| (*pskb)->nh.iph->daddr != daddr))
-		return route_me_harder(*pskb) == 0 ? ret : NF_DROP;
+		return route_me_harder(pskb) == 0 ? ret : NF_DROP;
 	return ret;
 }
 

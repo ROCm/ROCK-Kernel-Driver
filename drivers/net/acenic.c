@@ -208,6 +208,8 @@ static inline void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	(((u64)(mask) & 0xffffffff00000000) == 0 ? 0 : -EIO)
 #define pci_dma_supported(dev, mask)		\
 	(((u64)(mask) & 0xffffffff00000000) == 0 ? 1 : 0)
+#define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)
+#define DECLARE_PCI_UNMAP_LEN(LEN_NAME)
 
 #elif (LINUX_VERSION_CODE < 0x02040d)
 
@@ -231,6 +233,8 @@ pci_map_page(struct pci_dev *cookie, struct page *page, unsigned long off,
 }
 #define pci_unmap_page(cookie, dma_addr, size, dir)	\
 	pci_unmap_single(cookie, dma_addr, size, dir)
+#define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)
+#define DECLARE_PCI_UNMAP_LEN(LEN_NAME)
 #endif
 
 
@@ -839,9 +843,11 @@ static void __exit ace_module_cleanup(void)
 			struct sk_buff *skb = ap->skb->rx_std_skbuff[i].skb;
 
 			if (skb) {
+				struct ring_info *ringp;
 				dma_addr_t mapping;
 
-				mapping = ap->skb->rx_std_skbuff[i].mapping;
+				ringp = &ap->skb->rx_std_skbuff[i];
+				mapping = pci_unmap_addr(ringp, mapping);
 				pci_unmap_page(ap->pdev, mapping,
 					       ACE_STD_BUFSIZE - (2 + 16),
 					       PCI_DMA_FROMDEVICE);
@@ -856,9 +862,11 @@ static void __exit ace_module_cleanup(void)
 				struct sk_buff *skb = ap->skb->rx_mini_skbuff[i].skb;
 
 				if (skb) {
+					struct ring_info *ringp;
 					dma_addr_t mapping;
 
-					mapping = ap->skb->rx_mini_skbuff[i].mapping;
+					ringp = &ap->skb->rx_mini_skbuff[i];
+					mapping = pci_unmap_addr(ringp,mapping);
 					pci_unmap_page(ap->pdev, mapping,
 						       ACE_MINI_BUFSIZE - (2 + 16),
 						       PCI_DMA_FROMDEVICE);
@@ -872,9 +880,11 @@ static void __exit ace_module_cleanup(void)
 		for (i = 0; i < RX_JUMBO_RING_ENTRIES; i++) {
 			struct sk_buff *skb = ap->skb->rx_jumbo_skbuff[i].skb;
 			if (skb) {
+				struct ring_info *ringp;
 				dma_addr_t mapping;
 
-				mapping = ap->skb->rx_jumbo_skbuff[i].mapping;
+				ringp = &ap->skb->rx_jumbo_skbuff[i];
+				mapping = pci_unmap_addr(ringp, mapping);
 				pci_unmap_page(ap->pdev, mapping,
 					       ACE_JUMBO_BUFSIZE - (2 + 16),
 					       PCI_DMA_FROMDEVICE);
@@ -1832,7 +1842,8 @@ static void ace_load_std_rx_ring(struct ace_private *ap, int nr_bufs)
 				       ACE_STD_BUFSIZE - (2 + 16),
 				       PCI_DMA_FROMDEVICE);
 		ap->skb->rx_std_skbuff[idx].skb = skb;
-		ap->skb->rx_std_skbuff[idx].mapping = mapping;
+		pci_unmap_addr_set(&ap->skb->rx_std_skbuff[idx],
+				   mapping, mapping);
 
 		rd = &ap->rx_std_ring[idx];
 		set_aceaddr(&rd->addr, mapping);
@@ -1897,7 +1908,8 @@ static void ace_load_mini_rx_ring(struct ace_private *ap, int nr_bufs)
 				       ACE_MINI_BUFSIZE - (2 + 16),
 				       PCI_DMA_FROMDEVICE);
 		ap->skb->rx_mini_skbuff[idx].skb = skb;
-		ap->skb->rx_mini_skbuff[idx].mapping = mapping;
+		pci_unmap_addr_set(&ap->skb->rx_mini_skbuff[idx],
+				   mapping, mapping);
 
 		rd = &ap->rx_mini_ring[idx];
 		set_aceaddr(&rd->addr, mapping);
@@ -1957,7 +1969,8 @@ static void ace_load_jumbo_rx_ring(struct ace_private *ap, int nr_bufs)
 				       ACE_JUMBO_BUFSIZE - (2 + 16),
 				       PCI_DMA_FROMDEVICE);
 		ap->skb->rx_jumbo_skbuff[idx].skb = skb;
-		ap->skb->rx_jumbo_skbuff[idx].mapping = mapping;
+		pci_unmap_addr_set(&ap->skb->rx_jumbo_skbuff[idx],
+				   mapping, mapping);
 
 		rd = &ap->rx_jumbo_ring[idx];
 		set_aceaddr(&rd->addr, mapping);
@@ -2163,7 +2176,9 @@ static void ace_rx_int(struct net_device *dev, u32 rxretprd, u32 rxretcsm)
 
 		skb = rip->skb;
 		rip->skb = NULL;
-		pci_unmap_page(ap->pdev, rip->mapping, mapsize,
+		pci_unmap_page(ap->pdev,
+			       pci_unmap_addr(rip, mapping),
+			       mapsize,
 			       PCI_DMA_FROMDEVICE);
 		skb_put(skb, retdesc->size);
 
@@ -2229,12 +2244,13 @@ static inline void ace_tx_int(struct net_device *dev,
 
 		info = ap->skb->tx_skbuff + idx;
 		skb = info->skb;
-		mapping = info->mapping;
+		mapping = pci_unmap_addr(info, mapping);
 
 		if (mapping) {
-			pci_unmap_page(ap->pdev, mapping, info->maplen,
+			pci_unmap_page(ap->pdev, mapping,
+				       pci_unmap_len(info, maplen),
 				       PCI_DMA_TODEVICE);
-			info->mapping = 0;
+			pci_unmap_addr_set(info, mapping, 0);
 		}
 
 		if (skb) {
@@ -2518,13 +2534,14 @@ static int ace_close(struct net_device *dev)
 
 		info = ap->skb->tx_skbuff + i;
 		skb = info->skb;
-		mapping = info->mapping;
+		mapping = pci_unmap_addr(info, mapping);
 
 		if (mapping) {
 			memset(ap->tx_ring + i, 0, sizeof(struct tx_desc));
-			pci_unmap_page(ap->pdev, mapping, info->maplen,
+			pci_unmap_page(ap->pdev, mapping,
+				       pci_unmap_len(info, maplen),
 				       PCI_DMA_TODEVICE);
-			info->mapping = 0;
+			pci_unmap_addr_set(info, mapping, 0);
 		}
 		if (skb) {
 			dev_kfree_skb(skb);
@@ -2545,7 +2562,6 @@ static int ace_close(struct net_device *dev)
 	return 0;
 }
 
-
 static inline dma_addr_t
 ace_map_tx_skb(struct ace_private *ap, struct sk_buff *skb,
 	       struct sk_buff *tail, u32 idx)
@@ -2559,8 +2575,8 @@ ace_map_tx_skb(struct ace_private *ap, struct sk_buff *skb,
 
 	info = ap->skb->tx_skbuff + idx;
 	info->skb = tail;
-	info->mapping = mapping;
-	info->maplen = skb->len;
+	pci_unmap_addr_set(info, mapping, mapping);
+	pci_unmap_len_set(info, maplen, skb->len);
 	return mapping;
 }
 
@@ -2661,8 +2677,8 @@ restart:
 			} else {
 				info->skb = NULL;
 			}
-			info->mapping = mapping;
-			info->maplen = frag->size;
+			pci_unmap_addr_set(info, mapping, mapping);
+			pci_unmap_len_set(info, maplen, frag->size);
 			ace_load_tx_bd(desc, mapping, flagsize);
 		}
 	}

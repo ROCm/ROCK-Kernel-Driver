@@ -265,7 +265,6 @@ static int write_queue_task(void *data)
   sigfillset(&tsk->blocked);
   recalc_sigpending(tsk);
   spin_unlock_irq(&tsk->sigmask_lock);
-  exit_sighand(tsk);
 
   if(alloc_kiovec(1, &iobuf))
     return 0;

@@ -2094,7 +2094,7 @@ int filemap_sync(struct vm_area_struct * vma, unsigned long address,
 	spin_lock(&vma->vm_mm->page_table_lock);
 
 	dir = pgd_offset(vma->vm_mm, address);
-	flush_cache_range(vma->vm_mm, end - size, end);
+	flush_cache_range(vma, end - size, end);
 	if (address >= end)
 		BUG();
 	do {
@@ -2102,7 +2102,7 @@ int filemap_sync(struct vm_area_struct * vma, unsigned long address,
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (address && (address < end));
-	flush_tlb_range(vma->vm_mm, end - size, end);
+	flush_tlb_range(vma, end - size, end);
 
 	spin_unlock(&vma->vm_mm->page_table_lock);
 
@@ -2436,7 +2436,7 @@ static long madvise_dontneed(struct vm_area_struct * vma,
 	if (vma->vm_flags & VM_LOCKED)
 		return -EINVAL;
 
-	zap_page_range(vma->vm_mm, start, end - start);
+	zap_page_range(vma, start, end - start);
 	return 0;
 }
 

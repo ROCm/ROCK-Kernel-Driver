@@ -700,12 +700,12 @@ S:      Supported
 IDE DRIVER [GENERAL]
 P:	Andre Hedrick
 M:	andre@linux-ide.org
-M:	andre@aslab.com
-M:	andre@suse.com
+M:	andre@linuxdiskcert.org
 L:	linux-kernel@vger.kernel.org
 W:	http://www.kernel.org/pub/linux/kernel/people/hedrick/
 W:	http://www.linux-ide.org/
-S:	Supported
+W:	http://www.linuxdiskcert.org/
+S:	Maintained
 
 IDE/ATAPI CDROM DRIVER
 P:	Jens Axboe

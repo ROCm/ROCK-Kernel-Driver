@@ -560,9 +560,13 @@ nfsd_get_raparms(kdev_t dev, ino_t ino)
 		return NULL;
 	rap = frap;
 	ra = *frap;
-	memset(ra, 0, sizeof(*ra));
 	ra->p_dev = dev;
 	ra->p_ino = ino;
+	ra->p_reada = 0;
+	ra->p_ramax = 0;
+	ra->p_raend = 0;
+	ra->p_ralen = 0;
+	ra->p_rawin = 0;
 found:
 	if (rap != &raparm_cache) {
 		*rap = ra->p_next;

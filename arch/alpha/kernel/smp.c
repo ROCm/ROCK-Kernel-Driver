@@ -1048,10 +1048,10 @@ flush_tlb_page(struct vm_area_struct *vma, unsigned long addr)
 }
 
 void
-flush_tlb_range(struct mm_struct *mm, unsigned long start, unsigned long end)
+flush_tlb_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)
 {
 	/* On the Alpha we always flush the whole user tlb.  */
-	flush_tlb_mm(mm);
+	flush_tlb_mm(vma->vm_mm);
 }
 
 static void

@@ -232,7 +232,7 @@ pci_mmap_page_range (struct pci_dev *dev, struct vm_area_struct *vma,
 	else
 		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
-	if (remap_page_range(vma->vm_start, vma->vm_pgoff << PAGE_SHIFT,
+	if (remap_page_range(vma, vma->vm_start, vma->vm_pgoff << PAGE_SHIFT,
 			     vma->vm_end - vma->vm_start,
 			     vma->vm_page_prot))
 		return -EAGAIN;

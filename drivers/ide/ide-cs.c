@@ -227,15 +227,14 @@ while ((last_ret=CardServices(last_fn=(fn), args))!=0) goto cs_failed
 #define CFG_CHECK(fn, args...) \
 if (CardServices(fn, args) != 0) goto next_entry
 
-int idecs_register (int io_base, int ctl_base, int irq)
+int idecs_register (int arg1, int arg2, int irq)
 {
         hw_regs_t hw;
-        ide_init_hwif_ports(&hw, (ide_ioreg_t) io_base, (ide_ioreg_t) ctl_base, NULL);
+        ide_init_hwif_ports(&hw, (ide_ioreg_t) arg1, (ide_ioreg_t) arg2, NULL);
         hw.irq = irq;
-        hw.chipset = ide_pci; // this enables IRQ sharing w/ PCI irqs
+        hw.chipset = ide_pci; /* this enables IRQ sharing w/ PCI irqs */
         return ide_register_hw(&hw, NULL);
 }
-
 
 void ide_config(dev_link_t *link)
 {
@@ -338,15 +337,15 @@ void ide_config(dev_link_t *link)
     if (link->io.NumPorts2)
 	release_region(link->io.BasePort2, link->io.NumPorts2);
 
-    /* disable drive interrupts during IDE probe */
-    if(ctl_base)
-    	outb(0x02, ctl_base);
-
     /* retry registration in case device is still spinning up */
     for (i = 0; i < 10; i++) {
+	if (ctl_base)
+	    outb(0x02, ctl_base); /* Set nIEN = disable device interrupts */
 	hd = idecs_register(io_base, ctl_base, link->irq.AssignedIRQ);
 	if (hd >= 0) break;
 	if (link->io.NumPorts1 == 0x20) {
+	    if (ctl_base)
+		outb(0x02, ctl_base+0x10);
 	    hd = idecs_register(io_base+0x10, ctl_base+0x10,
 			      link->irq.AssignedIRQ);
 	    if (hd >= 0) {

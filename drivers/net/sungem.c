@@ -1,4 +1,4 @@
-/* $Id: sungem.c,v 1.44 2001/12/08 04:06:27 davem Exp $
+/* $Id: sungem.c,v 1.48 2002/01/15 06:26:37 davem Exp $
  * sungem.c: Sun GEM ethernet driver.
  *
  * Copyright (C) 2000, 2001 David S. Miller (davem@redhat.com)
@@ -58,6 +58,10 @@
 
 #include "sungem.h"
 
+#define DEFAULT_MSG	(NETIF_MSG_DRV		| \
+			 NETIF_MSG_PROBE	| \
+			 NETIF_MSG_LINK)
+
 #define DRV_NAME	"sungem"
 #define DRV_VERSION	"0.96"
 #define DRV_RELDATE	"11/17/01"
@@ -71,9 +75,11 @@ MODULE_DESCRIPTION("Sun GEM Gbit ethernet driver");
 MODULE_LICENSE("GPL");
 
 MODULE_PARM(gem_debug, "i");
-MODULE_PARM_DESC(gem_debug, "(ignored)");
+MODULE_PARM_DESC(gem_debug, "bitmapped message enable number");
 MODULE_PARM(link_mode, "i");
+MODULE_PARM_DESC(link_mode, "default link mode");
 
+int gem_debug = -1;
 static int link_mode;
 
 static u16 link_modes[] __devinitdata = {
@@ -89,10 +95,9 @@ static u16 link_modes[] __devinitdata = {
 #define GEM_MODULE_NAME	"gem"
 #define PFX GEM_MODULE_NAME ": "
 
-#ifdef GEM_DEBUG
-int gem_debug = GEM_DEBUG;
-#else
-int gem_debug = 1;
+/* Until this gets merged from 2.4.x... */
+#ifndef PCI_DEVICE_ID_APPLE_UNI_N_GMACP
+#define PCI_DEVICE_ID_APPLE_UNI_N_GMACP 0x0024
 #endif
 
 static struct pci_device_id gem_pci_tbl[] __devinitdata = {
@@ -109,6 +114,8 @@ static struct pci_device_id gem_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_SUN, PCI_DEVICE_ID_SUN_RIO_GEM,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_APPLE, PCI_DEVICE_ID_APPLE_UNI_N_GMAC,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_APPLE, PCI_DEVICE_ID_APPLE_UNI_N_GMACP,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{0, }
 };
@@ -175,12 +182,18 @@ static inline void phy_write(struct gem *gp, int reg, u16 val)
 
 static void gem_handle_mif_event(struct gem *gp, u32 reg_val, u32 changed_bits)
 {
+	if (netif_msg_intr(gp))
+		printk(KERN_DEBUG "%s: mif interrupt\n", gp->dev->name);
 }
 
 static int gem_pcs_interrupt(struct net_device *dev, struct gem *gp, u32 gem_status)
 {
 	u32 pcs_istat = readl(gp->regs + PCS_ISTAT);
 	u32 pcs_miistat;
+
+	if (netif_msg_intr(gp))
+		printk(KERN_DEBUG "%s: pcs interrupt, pcs_istat: 0x%x\n",
+			gp->dev->name, pcs_istat);
 
 	if (!(pcs_istat & PCS_ISTAT_LSC)) {
 		printk(KERN_ERR "%s: PCS irq but no link status change???\n",
@@ -231,6 +244,10 @@ static int gem_txmac_interrupt(struct net_device *dev, struct gem *gp, u32 gem_s
 {
 	u32 txmac_stat = readl(gp->regs + MAC_TXSTAT);
 
+	if (netif_msg_intr(gp))
+		printk(KERN_DEBUG "%s: txmac interrupt, txmac_stat: 0x%x\n",
+			gp->dev->name, txmac_stat);
+
 	/* Defer timer expiration is quite normal,
 	 * don't even log the event.
 	 */
@@ -276,6 +293,10 @@ static int gem_rxmac_interrupt(struct net_device *dev, struct gem *gp, u32 gem_s
 {
 	u32 rxmac_stat = readl(gp->regs + MAC_RXSTAT);
 
+	if (netif_msg_intr(gp))
+		printk(KERN_DEBUG "%s: rxmac interrupt, rxmac_stat: 0x%x\n",
+			gp->dev->name, rxmac_stat);
+
 	if (rxmac_stat & MAC_RXSTAT_OFLW) {
 		printk(KERN_ERR "%s: RX MAC fifo overflow.\n",
 		       dev->name);
@@ -301,6 +322,10 @@ static int gem_rxmac_interrupt(struct net_device *dev, struct gem *gp, u32 gem_s
 static int gem_mac_interrupt(struct net_device *dev, struct gem *gp, u32 gem_status)
 {
 	u32 mac_cstat = readl(gp->regs + MAC_CSTAT);
+
+	if (netif_msg_intr(gp))
+		printk(KERN_DEBUG "%s: mac interrupt, mac_cstat: 0x%x\n",
+			gp->dev->name, mac_cstat);
 
 	/* This interrupt is just for pause frame and pause
 	 * tracking.  It is useful for diagnostics and debug
@@ -402,11 +427,17 @@ static int gem_abnormal_irq(struct net_device *dev, struct gem *gp, u32 gem_stat
 {
 	if (gem_status & GREG_STAT_RXNOBUF) {
 		/* Frame arrived, no free RX buffers available. */
+		if (netif_msg_rx_err(gp))
+			printk(KERN_DEBUG "%s: no buffer for rx frame\n",
+				gp->dev->name);
 		gp->net_stats.rx_dropped++;
 	}
 
 	if (gem_status & GREG_STAT_RXTAGERR) {
 		/* corrupt RX tag framing */
+		if (netif_msg_rx_err(gp))
+			printk(KERN_DEBUG "%s: corrupt rx tag framing\n",
+				gp->dev->name);
 		gp->net_stats.rx_errors++;
 
 		goto do_reset;
@@ -455,6 +486,10 @@ static __inline__ void gem_tx(struct net_device *dev, struct gem *gp, u32 gem_st
 {
 	int entry, limit;
 
+	if (netif_msg_intr(gp))
+		printk(KERN_DEBUG "%s: tx interrupt, gem_status: 0x%x\n",
+			gp->dev->name, gem_status);
+
 	entry = gp->tx_old;
 	limit = ((gem_status & GREG_STAT_TXNR) >> GREG_STAT_TXNR_SHIFT);
 	while (entry != limit) {
@@ -464,6 +499,9 @@ static __inline__ void gem_tx(struct net_device *dev, struct gem *gp, u32 gem_st
 		u32 dma_len;
 		int frag;
 
+		if (netif_msg_tx_done(gp))
+			printk(KERN_DEBUG "%s: tx done, slot %d\n",
+				gp->dev->name, entry);
 		skb = gp->tx_skbs[entry];
 		if (skb_shinfo(skb)->nr_frags) {
 			int last = entry + skb_shinfo(skb)->nr_frags;
@@ -534,6 +572,10 @@ static __inline__ void gem_post_rxds(struct gem *gp, int limit)
 static void gem_rx(struct gem *gp)
 {
 	int entry, drops;
+
+	if (netif_msg_intr(gp))
+		printk(KERN_DEBUG "%s: rx interrupt, done: %d, rx_new: %d\n",
+			gp->dev->name, readl(gp->regs + RXDMA_DONE), gp->rx_new);
 
 	entry = gp->rx_new;
 	drops = 0;
@@ -786,6 +828,9 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (TX_BUFFS_AVAIL(gp) <= 0)
 		netif_stop_queue(dev);
 
+	if (netif_msg_tx_queued(gp))
+		printk(KERN_DEBUG "%s: tx queued, slot %d, skblen %d\n",
+		       dev->name, entry, skb->len);
 	writel(gp->tx_new, gp->regs + TXDMA_KICK);
 	spin_unlock_irq(&gp->lock);
 
@@ -993,8 +1038,9 @@ static void gem_set_link_modes(struct gem *gp)
 		speed = 1000;
 	}
 
-	printk(KERN_INFO "%s: Link is up at %d Mbps, %s-duplex.\n",
-	       gp->dev->name, speed, (full_duplex ? "full" : "half"));
+	if (netif_msg_link(gp))
+		printk(KERN_INFO "%s: Link is up at %d Mbps, %s-duplex.\n",
+			gp->dev->name, speed, (full_duplex ? "full" : "half"));
 
 	val = (MAC_TXCFG_EIPG0 | MAC_TXCFG_NGU);
 	if (full_duplex) {
@@ -1059,15 +1105,21 @@ static void gem_set_link_modes(struct gem *gp)
 
 static int gem_mdio_link_not_up(struct gem *gp)
 {
+	u16 val;
+	
 	if (gp->lstate == link_force_ret) {
-		printk(KERN_INFO "%s: Autoneg failed again, keeping"
-			" forced mode\n", gp->dev->name);
+		if (netif_msg_link(gp))
+			printk(KERN_INFO "%s: Autoneg failed again, keeping"
+				" forced mode\n", gp->dev->name);
 		phy_write(gp, MII_BMCR, gp->link_fcntl);
 		gp->timer_ticks = 5;
 		gp->lstate = link_force_ok;
 	} else if (gp->lstate == link_aneg) {
-		u16 val = phy_read(gp, MII_BMCR);
+		val = phy_read(gp, MII_BMCR);
 
+		if (netif_msg_link(gp))
+			printk(KERN_INFO "%s: switching to forced 100bt\n",
+				gp->dev->name);
 		/* Try forced modes. */
 		val &= ~(BMCR_ANRESTART | BMCR_ANENABLE);
 		val &= ~(BMCR_FULLDPLX);
@@ -1080,14 +1132,16 @@ static int gem_mdio_link_not_up(struct gem *gp)
 		 * If already at 10Mbps, warn user about the
 		 * situation every 10 ticks.
 		 */
-		u16 val = phy_read(gp, MII_BMCR);
+		val = phy_read(gp, MII_BMCR);
 		if (val & BMCR_SPEED100) {
 			val &= ~BMCR_SPEED100;
 			phy_write(gp, MII_BMCR, val);
 			gp->timer_ticks = 5;
-		} else {
+			if (netif_msg_link(gp))
+				printk(KERN_INFO "%s: switching to forced 10bt\n",
+					gp->dev->name);
+		} else
 			return 1;
-		}
 	}
 	return 0;
 }
@@ -1140,22 +1194,16 @@ static void gem_link_timer(unsigned long data)
 	if (gp->phy_type == phy_mii_mdio0 ||
 	    gp->phy_type == phy_mii_mdio1) {
 		u16 val = phy_read(gp, MII_BMSR);
+		u16 cntl = phy_read(gp, MII_BMCR);
 		int up;
 
 		/* When using autoneg, we really wait for ANEGCOMPLETE or we may
 		 * get a "transcient" incorrect link state
 		 */
-#if 0
-		{
-			u16 cntl = phy_read(gp, MII_BMCR);
-			if (cntl & BMCR_ANENABLE)
-				up = (val & (BMSR_ANEGCOMPLETE | BMSR_LSTATUS)) == (BMSR_ANEGCOMPLETE | BMSR_LSTATUS);
-			else
-				up = (val & BMSR_LSTATUS) != 0;
-		}
-#else
-		up = (val & BMSR_LSTATUS) != 0;
-#endif
+		if (cntl & BMCR_ANENABLE)
+			up = (val & (BMSR_ANEGCOMPLETE | BMSR_LSTATUS)) == (BMSR_ANEGCOMPLETE | BMSR_LSTATUS);
+		else
+			up = (val & BMSR_LSTATUS) != 0;
 		if (up) {
 			/* Ok, here we got a link. If we had it due to a forced
 			 * fallback, and we were configured for autoneg, we do
@@ -1166,8 +1214,9 @@ static void gem_link_timer(unsigned long data)
 				gp->lstate = link_force_ret;
 				gp->link_fcntl = phy_read(gp, MII_BMCR);
 				gp->timer_ticks = 5;
-				printk(KERN_INFO "%s: Got link after fallback, retrying autoneg"
-				       " once...\n", gp->dev->name);
+				if (netif_msg_link(gp))
+					printk(KERN_INFO "%s: Got link after fallback, retrying"
+						" autoneg once...\n", gp->dev->name);
 				phy_write(gp, MII_BMCR,
 					  gp->link_fcntl | BMCR_ANENABLE | BMCR_ANRESTART);
 			} else if (gp->lstate != link_up) {
@@ -1183,7 +1232,9 @@ static void gem_link_timer(unsigned long data)
 			 */
 			if (gp->lstate == link_up) {
 				gp->lstate = link_down;
-				printk(KERN_INFO "%s: Link down\n", gp->dev->name);
+				if (netif_msg_link(gp))
+					printk(KERN_INFO "%s: Link down\n",
+						gp->dev->name);
 				gp->reset_task_pending = 1;
 				schedule_task(&gp->reset_task);
 				restart = 1;
@@ -1650,6 +1701,48 @@ static void gem_init_dma(struct gem *gp)
 		       gp->regs + RXDMA_BLANK);
 }
 
+static u32
+gem_setup_multicast(struct gem *gp)
+{
+	u32 rxcfg = 0;
+	int i;
+	
+	if ((gp->dev->flags & IFF_ALLMULTI) ||
+	    (gp->dev->mc_count > 256)) {
+	    	for (i=0; i<16; i++)
+			writel(0xffff, gp->regs + MAC_HASH0 + (i << 2));
+		rxcfg |= MAC_RXCFG_HFE;
+	} else if (gp->dev->flags & IFF_PROMISC) {
+		rxcfg |= MAC_RXCFG_PROM;
+	} else {
+		u16 hash_table[16];
+		u32 crc;
+		struct dev_mc_list *dmi = gp->dev->mc_list;
+		int i;
+
+		for (i = 0; i < 16; i++)
+			hash_table[i] = 0;
+
+		for (i = 0; i < gp->dev->mc_count; i++) {
+			char *addrs = dmi->dmi_addr;
+
+			dmi = dmi->next;
+
+			if (!(*addrs & 1))
+				continue;
+
+ 			crc = ether_crc_le(6, addrs);
+			crc >>= 24;
+			hash_table[crc >> 4] |= 1 << (15 - (crc & 0xf));
+		}
+	    	for (i=0; i<16; i++)
+			writel(hash_table[i], gp->regs + MAC_HASH0 + (i << 2));
+		rxcfg |= MAC_RXCFG_HFE;
+	}
+
+	return rxcfg;
+}
+
 static void gem_init_mac(struct gem *gp)
 {
 	unsigned char *e = &gp->dev->dev_addr[0];
@@ -1690,65 +1783,7 @@ static void gem_init_mac(struct gem *gp)
 	writel(0, gp->regs + MAC_AF21MSK);
 	writel(0, gp->regs + MAC_AF0MSK);
 
-	rxcfg = 0;
-	if ((gp->dev->flags & IFF_ALLMULTI) ||
-	    (gp->dev->mc_count > 256)) {
-		writel(0xffff, gp->regs + MAC_HASH0);
-		writel(0xffff, gp->regs + MAC_HASH1);
-		writel(0xffff, gp->regs + MAC_HASH2);
-		writel(0xffff, gp->regs + MAC_HASH3);
-		writel(0xffff, gp->regs + MAC_HASH4);
-		writel(0xffff, gp->regs + MAC_HASH5);
-		writel(0xffff, gp->regs + MAC_HASH6);
-		writel(0xffff, gp->regs + MAC_HASH7);
-		writel(0xffff, gp->regs + MAC_HASH8);
-		writel(0xffff, gp->regs + MAC_HASH9);
-		writel(0xffff, gp->regs + MAC_HASH10);
-		writel(0xffff, gp->regs + MAC_HASH11);
-		writel(0xffff, gp->regs + MAC_HASH12);
-		writel(0xffff, gp->regs + MAC_HASH13);
-		writel(0xffff, gp->regs + MAC_HASH14);
-		writel(0xffff, gp->regs + MAC_HASH15);
-	} else if (gp->dev->flags & IFF_PROMISC) {
-		rxcfg |= MAC_RXCFG_PROM;
-	} else {
-		u16 hash_table[16];
-		u32 crc;
-		struct dev_mc_list *dmi = gp->dev->mc_list;
-		int i;
-
-		for (i = 0; i < 16; i++)
-			hash_table[i] = 0;
-
-		for (i = 0; i < gp->dev->mc_count; i++) {
-			char *addrs = dmi->dmi_addr;
-
-			dmi = dmi->next;
-
-			if (!(*addrs & 1))
-				continue;
-
- 			crc = ether_crc_le(6, addrs);
-			crc >>= 24;
-			hash_table[crc >> 4] |= 1 << (crc & 0xf);
-		}
-		writel(hash_table[0], gp->regs + MAC_HASH0);
-		writel(hash_table[1], gp->regs + MAC_HASH1);
-		writel(hash_table[2], gp->regs + MAC_HASH2);
-		writel(hash_table[3], gp->regs + MAC_HASH3);
-		writel(hash_table[4], gp->regs + MAC_HASH4);
-		writel(hash_table[5], gp->regs + MAC_HASH5);
-		writel(hash_table[6], gp->regs + MAC_HASH6);
-		writel(hash_table[7], gp->regs + MAC_HASH7);
-		writel(hash_table[8], gp->regs + MAC_HASH8);
-		writel(hash_table[9], gp->regs + MAC_HASH9);
-		writel(hash_table[10], gp->regs + MAC_HASH10);
-		writel(hash_table[11], gp->regs + MAC_HASH11);
-		writel(hash_table[12], gp->regs + MAC_HASH12);
-		writel(hash_table[13], gp->regs + MAC_HASH13);
-		writel(hash_table[14], gp->regs + MAC_HASH14);
-		writel(hash_table[15], gp->regs + MAC_HASH15);
-	}
+	rxcfg = gem_setup_multicast(gp);
 
 	writel(0, gp->regs + MAC_NCOLL);
 	writel(0, gp->regs + MAC_FASUCC);
@@ -2041,16 +2076,14 @@ static void gem_shutdown(struct gem *gp)
 		schedule();
 	
 	/* Actually stop the chip */
-	if (gp->pdev->vendor == PCI_VENDOR_ID_APPLE)
+	if (gp->pdev->vendor == PCI_VENDOR_ID_APPLE) {
 		gem_stop_phy(gp);
-	else
-		gem_stop(gp);
-
 #ifdef CONFIG_ALL_PPC
-	/* Power down the chip */
-	if (gp->pdev->vendor == PCI_VENDOR_ID_APPLE)
+		/* Power down the chip */
 		gem_apple_powerdown(gp);
 #endif /* CONFIG_ALL_PPC */
+	} else
+		gem_stop(gp);
 }
 
 static void gem_pm_task(void *data)
@@ -2112,6 +2145,7 @@ static int gem_open(struct net_device *dev)
 	 */
 	if (request_irq(gp->pdev->irq, gem_interrupt,
 			SA_SHIRQ, dev->name, (void *)dev)) {
+		printk(KERN_ERR "%s: failed to request irq !\n", gp->dev->name);
 #ifdef CONFIG_ALL_PPC
 		if (!hw_was_up && gp->pdev->vendor == PCI_VENDOR_ID_APPLE)
 			gem_apple_powerdown(gp);
@@ -2274,81 +2308,28 @@ static struct net_device_stats *gem_get_stats(struct net_device *dev)
 static void gem_set_multicast(struct net_device *dev)
 {
 	struct gem *gp = dev->priv;
-
+	u32 rxcfg, rxcfg_new;
+	int limit = 10000;
+	
 	if (!gp->hw_running)
 		return;
 		
 	netif_stop_queue(dev);
 
-	if ((gp->dev->flags & IFF_ALLMULTI) ||
-	    (gp->dev->mc_count > 256)) {
-		writel(0xffff, gp->regs + MAC_HASH0);
-		writel(0xffff, gp->regs + MAC_HASH1);
-		writel(0xffff, gp->regs + MAC_HASH2);
-		writel(0xffff, gp->regs + MAC_HASH3);
-		writel(0xffff, gp->regs + MAC_HASH4);
-		writel(0xffff, gp->regs + MAC_HASH5);
-		writel(0xffff, gp->regs + MAC_HASH6);
-		writel(0xffff, gp->regs + MAC_HASH7);
-		writel(0xffff, gp->regs + MAC_HASH8);
-		writel(0xffff, gp->regs + MAC_HASH9);
-		writel(0xffff, gp->regs + MAC_HASH10);
-		writel(0xffff, gp->regs + MAC_HASH11);
-		writel(0xffff, gp->regs + MAC_HASH12);
-		writel(0xffff, gp->regs + MAC_HASH13);
-		writel(0xffff, gp->regs + MAC_HASH14);
-		writel(0xffff, gp->regs + MAC_HASH15);
-	} else if (gp->dev->flags & IFF_PROMISC) {
-		u32 rxcfg = readl(gp->regs + MAC_RXCFG);
-		int limit = 10000;
-
-		writel(rxcfg & ~MAC_RXCFG_ENAB, gp->regs + MAC_RXCFG);
-		while (readl(gp->regs + MAC_RXCFG) & MAC_RXCFG_ENAB) {
-			if (!limit--)
-				break;
-			udelay(10);
-		}
-
-		rxcfg |= MAC_RXCFG_PROM;
-		writel(rxcfg, gp->regs + MAC_RXCFG);
-	} else {
-		u16 hash_table[16];
-		u32 crc;
-		struct dev_mc_list *dmi = gp->dev->mc_list;
-		int i;
-
-		for (i = 0; i < 16; i++)
-			hash_table[i] = 0;
-
-		for (i = 0; i < dev->mc_count; i++) {
-			char *addrs = dmi->dmi_addr;
-
-			dmi = dmi->next;
-
-			if (!(*addrs & 1))
-				continue;
-
-			crc = ether_crc_le(6, addrs);
-			crc >>= 24;
-			hash_table[crc >> 4] |= 1 << (crc & 0xf);
-		}
-		writel(hash_table[0], gp->regs + MAC_HASH0);
-		writel(hash_table[1], gp->regs + MAC_HASH1);
-		writel(hash_table[2], gp->regs + MAC_HASH2);
-		writel(hash_table[3], gp->regs + MAC_HASH3);
-		writel(hash_table[4], gp->regs + MAC_HASH4);
-		writel(hash_table[5], gp->regs + MAC_HASH5);
-		writel(hash_table[6], gp->regs + MAC_HASH6);
-		writel(hash_table[7], gp->regs + MAC_HASH7);
-		writel(hash_table[8], gp->regs + MAC_HASH8);
-		writel(hash_table[9], gp->regs + MAC_HASH9);
-		writel(hash_table[10], gp->regs + MAC_HASH10);
-		writel(hash_table[11], gp->regs + MAC_HASH11);
-		writel(hash_table[12], gp->regs + MAC_HASH12);
-		writel(hash_table[13], gp->regs + MAC_HASH13);
-		writel(hash_table[14], gp->regs + MAC_HASH14);
-		writel(hash_table[15], gp->regs + MAC_HASH15);
+	rxcfg = readl(gp->regs + MAC_RXCFG);
+	rxcfg_new = gem_setup_multicast(gp);
+	
+	writel(rxcfg & ~MAC_RXCFG_ENAB, gp->regs + MAC_RXCFG);
+	while (readl(gp->regs + MAC_RXCFG) & MAC_RXCFG_ENAB) {
+		if (!limit--)
+			break;
+		udelay(10);
 	}
+
+	rxcfg &= ~(MAC_RXCFG_PROM | MAC_RXCFG_HFE);
+	rxcfg |= rxcfg_new;
+
+	writel(rxcfg, gp->regs + MAC_RXCFG);
 
 	/* Hrm... we may walk on the reset task here... */
 	netif_wake_queue(dev);
@@ -2470,7 +2451,7 @@ static int gem_ethtool_ioctl(struct net_device *dev, void *ep_user)
 	case ETHTOOL_GMSGLVL: {
 		struct ethtool_value edata = { cmd: ETHTOOL_GMSGLVL };
 
-		edata.data = gem_debug;
+		edata.data = gp->msg_enable;
 		if (copy_to_user(ep_user, &edata, sizeof(edata)))
 			return -EFAULT;
 		return 0;
@@ -2482,7 +2463,7 @@ static int gem_ethtool_ioctl(struct net_device *dev, void *ep_user)
 
 		if (copy_from_user(&edata, ep_user, sizeof(edata)))
 			return -EFAULT;
-		gem_debug = edata.data;
+		gp->msg_enable = edata.data;
 		return 0;
 	}
 
@@ -2678,6 +2659,8 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	dev->base_addr = (long) pdev;
 	gp->dev = dev;
 
+	gp->msg_enable = (gem_debug < 0 ? DEFAULT_MSG : gem_debug);
+
 	spin_lock_init(&gp->lock);
 	init_MUTEX(&gp->pm_sem);
 
@@ -2712,25 +2695,15 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	 * not have properly shut down the PHY.
 	 */
 #ifdef CONFIG_ALL_PPC
-	if (pdev->vendor == PCI_VENDOR_ID_APPLE) {
+	if (pdev->vendor == PCI_VENDOR_ID_APPLE)
 		gem_apple_powerup(gp);
-		if (gem_check_invariants(gp))
-			goto err_out_iounmap;
-		gem_stop(gp);
-		gp->hw_running = 1;
-		gem_init_phy(gp);
-		gem_begin_auto_negotiation(gp, NULL);
-	}
 #endif
-	/* Non Apple hardware, we just reset the chip and check
-	 * for invariants
-	 */
-	if (pdev->vendor != PCI_VENDOR_ID_APPLE) {
-		gem_stop(gp);
-		if (gem_check_invariants(gp))
-			goto err_out_iounmap;
-		gp->hw_running = 1;
-	}
+	gem_stop(gp);
+	if (gem_check_invariants(gp))
+		goto err_out_iounmap;
+	gp->hw_running = 1;
+	gem_init_phy(gp);
+	gem_begin_auto_negotiation(gp, NULL);
 
 	/* It is guarenteed that the returned buffer will be at least
 	 * PAGE_SIZE aligned.
@@ -2838,7 +2811,7 @@ static struct pci_driver gem_driver = {
 	name:		GEM_MODULE_NAME,
 	id_table:	gem_pci_tbl,
 	probe:		gem_init_one,
-	remove:		__devexit_p(gem_remove_one),
+	remove:		gem_remove_one,
 #ifdef CONFIG_PM
 	suspend:	gem_suspend,
 	resume:		gem_resume,

@@ -615,7 +615,6 @@ static void rsvp_walk(struct tcf_proto *tp, struct tcf_walker *arg)
 	}
 }
 
-#ifdef CONFIG_RTNETLINK
 static int rsvp_dump(struct tcf_proto *tp, unsigned long fh,
 		     struct sk_buff *skb, struct tcmsg *t)
 {
@@ -672,7 +671,6 @@ rtattr_failure:
 	skb_trim(skb, b - skb->data);
 	return -1;
 }
-#endif
 
 struct tcf_proto_ops RSVP_OPS = {
 	NULL,
@@ -686,11 +684,7 @@ struct tcf_proto_ops RSVP_OPS = {
 	rsvp_change,
 	rsvp_delete,
 	rsvp_walk,
-#ifdef CONFIG_RTNETLINK
 	rsvp_dump
-#else
-	NULL
-#endif
 };
 
 #ifdef MODULE

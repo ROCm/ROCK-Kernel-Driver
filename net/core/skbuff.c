@@ -4,7 +4,7 @@
  *	Authors:	Alan Cox <iiitac@pyr.swan.ac.uk>
  *			Florian La Roche <rzsfl@rz.uni-sb.de>
  *
- *	Version:	$Id: skbuff.c,v 1.89 2001/08/06 13:25:02 davem Exp $
+ *	Version:	$Id: skbuff.c,v 1.90 2001/11/07 05:56:19 davem Exp $
  *
  *	Fixes:	
  *		Alan Cox	:	Fixed the worst of the load balancer bugs.
@@ -49,15 +49,14 @@
 #include <linux/string.h>
 #include <linux/skbuff.h>
 #include <linux/cache.h>
+#include <linux/rtnetlink.h>
 #include <linux/init.h>
 #include <linux/highmem.h>
 
-#include <net/ip.h>
 #include <net/protocol.h>
 #include <net/dst.h>
-#include <net/tcp.h>
-#include <net/udp.h>
 #include <net/sock.h>
+#include <net/checksum.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>

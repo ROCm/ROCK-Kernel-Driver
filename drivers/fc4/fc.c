@@ -769,10 +769,10 @@ static void fcp_scsi_done (Scsi_Cmnd *SCpnt)
 {
 	unsigned long flags;
 
-	spin_lock_irqsave(&SCpnt->host->host_lock, flags);
+	spin_lock_irqsave(SCpnt->host->host_lock, flags);
 	if (FCP_CMND(SCpnt)->done)
 		FCP_CMND(SCpnt)->done(SCpnt);
-	spin_unlock_irqrestore(&SCpnt->host->host_lock, flags);
+	spin_unlock_irqrestore(SCpnt->host->host_lock, flags);
 }
 
 static int fcp_scsi_queue_it(fc_channel *fc, Scsi_Cmnd *SCpnt, fcp_cmnd *fcmd, int prepare)
@@ -920,9 +920,9 @@ int fcp_scsi_abort(Scsi_Cmnd *SCpnt)
 		unsigned long flags;
 
 		SCpnt->result = DID_ABORT;
-		spin_lock_irqsave(&SCpnt->host->host_lock, flags);
+		spin_lock_irqsave(SCpnt->host->host_lock, flags);
 		fcmd->done(SCpnt);
-		spin_unlock_irqrestore(&SCpnt->host->host_lock, flags);
+		spin_unlock_irqrestore(SCpnt->host->host_lock, flags);
 		printk("FC: soft abort\n");
 		return SUCCESS;
 	} else {

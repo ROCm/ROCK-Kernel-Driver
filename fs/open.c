@@ -772,6 +772,44 @@ out:
 	return error;
 }
 
+static inline void __put_unused_fd(struct files_struct *files, unsigned int fd)
+{
+	__FD_CLR(fd, files->open_fds);
+	if (fd < files->next_fd)
+		files->next_fd = fd;
+}
+
+void put_unused_fd(unsigned int fd)
+{
+	struct files_struct *files = current->files;
+	write_lock(&files->file_lock);
+	__put_unused_fd(files, fd);
+	write_unlock(&files->file_lock);
+}
+
+/*
+ * Install a file pointer in the fd array.  
+ *
+ * The VFS is full of places where we drop the files lock between
+ * setting the open_fds bitmap and installing the file in the file
+ * array.  At any such point, we are vulnerable to a dup2() race
+ * installing a file in the array before us.  We need to detect this and
+ * fput() the struct file we are about to overwrite in this case.
+ *
+ * It should never happen - if we allow dup2() do it, _really_ bad things
+ * will follow.
+ */
+
+void fd_install(unsigned int fd, struct file * file)
+{
+	struct files_struct *files = current->files;
+	write_lock(&files->file_lock);
+	if (unlikely(files->fd[fd] != NULL))
+		BUG();
+	files->fd[fd] = file;
+	write_unlock(&files->file_lock);
+}
+
 asmlinkage long sys_open(const char * filename, int flags, int mode)
 {
 	char * tmp;

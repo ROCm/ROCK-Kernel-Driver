@@ -85,9 +85,6 @@ EXPORT_SYMBOL(do_mmap_pgoff);
 EXPORT_SYMBOL(do_munmap);
 EXPORT_SYMBOL(do_brk);
 EXPORT_SYMBOL(exit_mm);
-EXPORT_SYMBOL(exit_files);
-EXPORT_SYMBOL(exit_fs);
-EXPORT_SYMBOL(exit_sighand);
 
 /* internal kernel memory management */
 EXPORT_SYMBOL(_alloc_pages);

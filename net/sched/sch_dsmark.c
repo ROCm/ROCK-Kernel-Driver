@@ -385,8 +385,6 @@ static void dsmark_destroy(struct Qdisc *sch)
 }
 
 
-#ifdef CONFIG_RTNETLINK
-
 static int dsmark_dump_class(struct Qdisc *sch, unsigned long cl,
     struct sk_buff *skb, struct tcmsg *tcm)
 {
@@ -434,9 +432,6 @@ rtattr_failure:
 	return -1;
 }
 
-#endif
-
-
 static struct Qdisc_class_ops dsmark_class_ops =
 {
 	dsmark_graft,			/* graft */
@@ -451,9 +446,7 @@ static struct Qdisc_class_ops dsmark_class_ops =
 	dsmark_bind_filter,		/* bind_tcf */
 	dsmark_put,			/* unbind_tcf */
 
-#ifdef CONFIG_RTNETLINK
 	dsmark_dump_class,		/* dump */
-#endif
 };
 
 struct Qdisc_ops dsmark_qdisc_ops =
@@ -473,9 +466,7 @@ struct Qdisc_ops dsmark_qdisc_ops =
 	dsmark_destroy,			/* destroy */
 	NULL,				/* change */
 
-#ifdef CONFIG_RTNETLINK
 	dsmark_dump			/* dump */
-#endif
 };
 
 #ifdef MODULE

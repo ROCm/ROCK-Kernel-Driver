@@ -9,7 +9,7 @@
 
 O_TARGET := partitions.o
 
-export-objs := check.o ibm.o
+export-objs := check.o ibm.o msdos.o
 
 obj-y := check.o
 

@@ -356,10 +356,10 @@ struct file *shmem_file_setup(char * name, loff_t size);
 extern void shmem_lock(struct file * file, int lock);
 extern int shmem_zero_setup(struct vm_area_struct *);
 
-extern void zap_page_range(struct mm_struct *mm, unsigned long address, unsigned long size);
+extern void zap_page_range(struct vm_area_struct *vma, unsigned long address, unsigned long size);
 extern int copy_page_range(struct mm_struct *dst, struct mm_struct *src, struct vm_area_struct *vma);
-extern int remap_page_range(unsigned long from, unsigned long to, unsigned long size, pgprot_t prot);
-extern int zeromap_page_range(unsigned long from, unsigned long size, pgprot_t prot);
+extern int remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned long to, unsigned long size, pgprot_t prot);
+extern int zeromap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned long size, pgprot_t prot);
 
 extern int vmtruncate(struct inode * inode, loff_t offset);
 extern pmd_t *FASTCALL(__pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address));

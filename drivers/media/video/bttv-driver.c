@@ -2037,7 +2037,7 @@ static int bttv_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
  *    But e.g. pte_alloc() does not work in modules ... :-(
  */
 
-static int do_bttv_mmap(struct bttv *btv, const char *adr, unsigned long size)
+static int do_bttv_mmap(struct vm_area_struct *vma, struct bttv *btv, const char *adr, unsigned long size)
 {
         unsigned long start=(unsigned long) adr;
         unsigned long page,pos;
@@ -2051,7 +2051,7 @@ static int do_bttv_mmap(struct bttv *btv, const char *adr, unsigned long size)
         pos=(unsigned long) btv->fbuffer;
         while (size > 0) {
                 page = kvirt_to_pa(pos);
-                if (remap_page_range(start, page, PAGE_SIZE, PAGE_SHARED))
+                if (remap_page_range(vma, start, page, PAGE_SIZE, PAGE_SHARED))
                         return -EAGAIN;
                 start+=PAGE_SIZE;
                 pos+=PAGE_SIZE;
@@ -2060,13 +2060,13 @@ static int do_bttv_mmap(struct bttv *btv, const char *adr, unsigned long size)
         return 0;
 }
 
-static int bttv_mmap(struct video_device *dev, const char *adr, unsigned long size)
+static int bttv_mmap(struct vm_area_struct *vma, struct video_device *dev, const char *adr, unsigned long size)
 {
         struct bttv *btv=(struct bttv *)dev;
         int r;
 
         down(&btv->lock);
-        r=do_bttv_mmap(btv, adr, size);
+        r=do_bttv_mmap(vma, btv, adr, size);
         up(&btv->lock);
         return r;
 }

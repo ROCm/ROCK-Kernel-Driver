@@ -11,7 +11,7 @@
  */
 #define flush_cache_all()			do { } while (0)
 #define flush_cache_mm(mm)			do { } while (0)
-#define flush_cache_range(mm,start,end)		do { } while (0)
+#define flush_cache_range(vma,start,end)	do { } while (0)
 #define flush_cache_page(vma,vmaddr)		do { } while (0)
 #define flush_page_to_ram(page)			do { } while (0)
 
@@ -34,12 +34,12 @@
  *  - flush_tlb_all() flushes all processes TLBs
  *  - flush_tlb_mm(mm) flushes the specified mm context TLB's
  *  - flush_tlb_page(vma, vmaddr) flushes one page
- *  - flush_tlb_range(mm, start, end) flushes a range of pages
+ *  - flush_tlb_range(vma, start, end) flushes a range of pages
  */
 #define flush_tlb_all()				memc_update_all()
 #define flush_tlb_mm(mm)			memc_update_mm(mm)
-#define flush_tlb_range(mm,start,end)		\
-		do { memc_update_mm(mm); (void)(start); (void)(end); } while (0)
+#define flush_tlb_range(vma,start,end)		\
+		do { memc_update_mm(vma->vm_mm); (void)(start); (void)(end); } while (0)
 #define flush_tlb_page(vma, vmaddr)		do { } while (0)
 
 /*

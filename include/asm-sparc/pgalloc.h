@@ -1,4 +1,4 @@
-/* $Id: pgalloc.h,v 1.15 2001/10/18 09:06:37 davem Exp $ */
+/* $Id: pgalloc.h,v 1.16 2001/12/21 04:56:17 davem Exp $ */
 #ifndef _SPARC_PGALLOC_H
 #define _SPARC_PGALLOC_H
 
@@ -13,22 +13,22 @@
 #ifdef CONFIG_SMP
 BTFIXUPDEF_CALL(void, local_flush_cache_all, void)
 BTFIXUPDEF_CALL(void, local_flush_cache_mm, struct mm_struct *)
-BTFIXUPDEF_CALL(void, local_flush_cache_range, struct mm_struct *, unsigned long, unsigned long)
+BTFIXUPDEF_CALL(void, local_flush_cache_range, struct vm_area_struct *, unsigned long, unsigned long)
 BTFIXUPDEF_CALL(void, local_flush_cache_page, struct vm_area_struct *, unsigned long)
 
 #define local_flush_cache_all() BTFIXUP_CALL(local_flush_cache_all)()
 #define local_flush_cache_mm(mm) BTFIXUP_CALL(local_flush_cache_mm)(mm)
-#define local_flush_cache_range(mm,start,end) BTFIXUP_CALL(local_flush_cache_range)(mm,start,end)
+#define local_flush_cache_range(vma,start,end) BTFIXUP_CALL(local_flush_cache_range)(vma,start,end)
 #define local_flush_cache_page(vma,addr) BTFIXUP_CALL(local_flush_cache_page)(vma,addr)
 
 BTFIXUPDEF_CALL(void, local_flush_tlb_all, void)
 BTFIXUPDEF_CALL(void, local_flush_tlb_mm, struct mm_struct *)
-BTFIXUPDEF_CALL(void, local_flush_tlb_range, struct mm_struct *, unsigned long, unsigned long)
+BTFIXUPDEF_CALL(void, local_flush_tlb_range, struct vm_area_struct *, unsigned long, unsigned long)
 BTFIXUPDEF_CALL(void, local_flush_tlb_page, struct vm_area_struct *, unsigned long)
 
 #define local_flush_tlb_all() BTFIXUP_CALL(local_flush_tlb_all)()
 #define local_flush_tlb_mm(mm) BTFIXUP_CALL(local_flush_tlb_mm)(mm)
-#define local_flush_tlb_range(mm,start,end) BTFIXUP_CALL(local_flush_tlb_range)(mm,start,end)
+#define local_flush_tlb_range(vma,start,end) BTFIXUP_CALL(local_flush_tlb_range)(vma,start,end)
 #define local_flush_tlb_page(vma,addr) BTFIXUP_CALL(local_flush_tlb_page)(vma,addr)
 
 BTFIXUPDEF_CALL(void, local_flush_page_to_ram, unsigned long)
@@ -39,14 +39,14 @@ BTFIXUPDEF_CALL(void, local_flush_sig_insns, struct mm_struct *, unsigned long)
 
 extern void smp_flush_cache_all(void);
 extern void smp_flush_cache_mm(struct mm_struct *mm);
-extern void smp_flush_cache_range(struct mm_struct *mm,
+extern void smp_flush_cache_range(struct vm_area_struct *vma,
 				  unsigned long start,
 				  unsigned long end);
 extern void smp_flush_cache_page(struct vm_area_struct *vma, unsigned long page);
 
 extern void smp_flush_tlb_all(void);
 extern void smp_flush_tlb_mm(struct mm_struct *mm);
-extern void smp_flush_tlb_range(struct mm_struct *mm,
+extern void smp_flush_tlb_range(struct vm_area_struct *vma,
 				  unsigned long start,
 				  unsigned long end);
 extern void smp_flush_tlb_page(struct vm_area_struct *mm, unsigned long page);
@@ -56,18 +56,18 @@ extern void smp_flush_sig_insns(struct mm_struct *mm, unsigned long insn_addr);
 
 BTFIXUPDEF_CALL(void, flush_cache_all, void)
 BTFIXUPDEF_CALL(void, flush_cache_mm, struct mm_struct *)
-BTFIXUPDEF_CALL(void, flush_cache_range, struct mm_struct *, unsigned long, unsigned long)
+BTFIXUPDEF_CALL(void, flush_cache_range, struct vm_area_struct *, unsigned long, unsigned long)
 BTFIXUPDEF_CALL(void, flush_cache_page, struct vm_area_struct *, unsigned long)
 
 #define flush_cache_all() BTFIXUP_CALL(flush_cache_all)()
 #define flush_cache_mm(mm) BTFIXUP_CALL(flush_cache_mm)(mm)
-#define flush_cache_range(mm,start,end) BTFIXUP_CALL(flush_cache_range)(mm,start,end)
+#define flush_cache_range(vma,start,end) BTFIXUP_CALL(flush_cache_range)(vma,start,end)
 #define flush_cache_page(vma,addr) BTFIXUP_CALL(flush_cache_page)(vma,addr)
 #define flush_icache_range(start, end)		do { } while (0)
 
 BTFIXUPDEF_CALL(void, flush_tlb_all, void)
 BTFIXUPDEF_CALL(void, flush_tlb_mm, struct mm_struct *)
-BTFIXUPDEF_CALL(void, flush_tlb_range, struct mm_struct *, unsigned long, unsigned long)
+BTFIXUPDEF_CALL(void, flush_tlb_range, struct vm_area_struct *, unsigned long, unsigned long)
 BTFIXUPDEF_CALL(void, flush_tlb_page, struct vm_area_struct *, unsigned long)
 
 extern __inline__ void flush_tlb_pgtables(struct mm_struct *mm, unsigned long start, unsigned long end)
@@ -76,7 +76,7 @@ extern __inline__ void flush_tlb_pgtables(struct mm_struct *mm, unsigned long st
 
 #define flush_tlb_all() BTFIXUP_CALL(flush_tlb_all)()
 #define flush_tlb_mm(mm) BTFIXUP_CALL(flush_tlb_mm)(mm)
-#define flush_tlb_range(mm,start,end) BTFIXUP_CALL(flush_tlb_range)(mm,start,end)
+#define flush_tlb_range(vma,start,end) BTFIXUP_CALL(flush_tlb_range)(vma,start,end)
 #define flush_tlb_page(vma,addr) BTFIXUP_CALL(flush_tlb_page)(vma,addr)
 
 BTFIXUPDEF_CALL(void, __flush_page_to_ram, unsigned long)

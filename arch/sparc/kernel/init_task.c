@@ -1,5 +1,6 @@
 #include <linux/mm.h>
 #include <linux/sched.h>
+#include <linux/init_task.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>

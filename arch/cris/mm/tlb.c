@@ -159,10 +159,11 @@ flush_tlb_page(struct vm_area_struct *vma,
 /* invalidate a page range */
 
 void
-flush_tlb_range(struct mm_struct *mm, 
+flush_tlb_range(struct vm_area_struct *vma,
 		unsigned long start,
 		unsigned long end)
 {
+	struct mm_struct *mm = vma->vm_mm;
 	int page_id = mm->context;
 	int i;
 	unsigned long flags;

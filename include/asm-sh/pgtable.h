@@ -23,7 +23,7 @@ extern void paging_init(void);
  *  - flush_cache_all() flushes entire cache
  *  - flush_cache_mm(mm) flushes the specified mm context's cache lines
  *  - flush_cache_page(mm, vmaddr) flushes a single page
- *  - flush_cache_range(mm, start, end) flushes a range of pages
+ *  - flush_cache_range(vma, start, end) flushes a range of pages
  *
  *  - flush_dcache_page(pg) flushes(wback&invalidates) a page for dcache
  *  - flush_page_to_ram(page) write back kernel page to ram
@@ -35,7 +35,7 @@ extern void paging_init(void);
  */
 #define flush_cache_all()			do { } while (0)
 #define flush_cache_mm(mm)			do { } while (0)
-#define flush_cache_range(mm, start, end)	do { } while (0)
+#define flush_cache_range(vma, start, end)	do { } while (0)
 #define flush_cache_page(vma, vmaddr)		do { } while (0)
 #define flush_page_to_ram(page)			do { } while (0)
 #define flush_dcache_page(page)			do { } while (0)
@@ -55,7 +55,7 @@ extern void paging_init(void);
 
 extern void flush_cache_all(void);
 extern void flush_cache_mm(struct mm_struct *mm);
-extern void flush_cache_range(struct mm_struct *mm, unsigned long start,
+extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
 			      unsigned long end);
 extern void flush_cache_page(struct vm_area_struct *vma, unsigned long addr);
 extern void flush_dcache_page(struct page *pg);

@@ -6,7 +6,7 @@
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *	Alexey Kuznetsov	<kuznet@ms2.inr.ac.ru>
  *
- *	$Id: addrconf.c,v 1.68 2001/09/01 00:31:50 davem Exp $
+ *	$Id: addrconf.c,v 1.69 2001/10/31 21:55:54 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -1644,8 +1644,6 @@ restart:
 	mod_timer(&addr_chk_timer, jiffies + ADDR_CHECK_FREQUENCY);
 }
 
-#ifdef CONFIG_RTNETLINK
-
 static int
 inet6_rtm_deladdr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 {
@@ -1806,13 +1804,11 @@ static struct rtnetlink_link inet6_rtnetlink_table[RTM_MAX-RTM_BASE+1] =
 	{ inet6_rtm_getroute,	inet6_dump_fib,		},
 	{ NULL,			NULL,			},
 };
-#endif
 
 static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 {
-#ifdef CONFIG_RTNETLINK
 	inet6_ifa_notify(event ? : RTM_NEWADDR, ifp);
-#endif
+
 	switch (event) {
 	case RTM_NEWADDR:
 		ip6_rt_addr_add(&ifp->addr, ifp->idev->dev);
@@ -2021,9 +2017,7 @@ void __init addrconf_init(void)
 	
 	addr_chk_timer.expires = jiffies + ADDR_CHECK_FREQUENCY;
 	add_timer(&addr_chk_timer);
-#ifdef CONFIG_RTNETLINK
 	rtnetlink_links[PF_INET6] = inet6_rtnetlink_table;
-#endif
 #ifdef CONFIG_SYSCTL
 	addrconf_sysctl.sysctl_header =
 		register_sysctl_table(addrconf_sysctl.addrconf_root_dir, 0);
@@ -2039,9 +2033,7 @@ void addrconf_cleanup(void)
  	struct inet6_ifaddr *ifa;
 	int i;
 
-#ifdef CONFIG_RTNETLINK
 	rtnetlink_links[PF_INET6] = NULL;
-#endif
 #ifdef CONFIG_SYSCTL
 	addrconf_sysctl_unregister(&ipv6_devconf_dflt);
 	addrconf_sysctl_unregister(&ipv6_devconf);

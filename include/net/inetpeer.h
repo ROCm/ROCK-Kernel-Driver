@@ -1,7 +1,7 @@
 /*
  *		INETPEER - A storage for permanent information about peers
  *
- *  Version:	$Id: inetpeer.h,v 1.1 2000/01/06 00:41:51 davem Exp $
+ *  Version:	$Id: inetpeer.h,v 1.2 2002/01/12 07:54:56 davem Exp $
  *
  *  Authors:	Andrey V. Savochkin <saw@msu.ru>
  */
@@ -38,7 +38,7 @@ extern spinlock_t inet_peer_unused_lock;
 extern struct inet_peer *inet_peer_unused_head;
 extern struct inet_peer **inet_peer_unused_tailp;
 /* can be called from BH context or outside */
-extern inline void	inet_putpeer(struct inet_peer *p)
+static inline void	inet_putpeer(struct inet_peer *p)
 {
 	spin_lock_bh(&inet_peer_unused_lock);
 	if (atomic_dec_and_test(&p->refcnt)) {
@@ -53,7 +53,7 @@ extern inline void	inet_putpeer(struct inet_peer *p)
 
 extern spinlock_t inet_peer_idlock;
 /* can be called with or without local BH being disabled */
-extern inline __u16	inet_getid(struct inet_peer *p)
+static inline __u16	inet_getid(struct inet_peer *p)
 {
 	__u16 id;
 

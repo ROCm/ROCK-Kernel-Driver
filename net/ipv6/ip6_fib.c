@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: ip6_fib.c,v 1.24 2001/06/05 11:36:55 davem Exp $
+ *	$Id: ip6_fib.c,v 1.25 2001/10/31 21:55:55 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -466,9 +466,7 @@ static int fib6_add_rt2node(struct fib6_node *fn, struct rt6_info *rt)
 	*ins = rt;
 	rt->rt6i_node = fn;
 	atomic_inc(&rt->rt6i_ref);
-#ifdef CONFIG_RTNETLINK
 	inet6_rt_notify(RTM_NEWROUTE, rt);
-#endif
 	rt6_stats.fib_rt_entries++;
 
 	if ((fn->fn_flags & RTN_RTINFO) == 0) {
@@ -925,9 +923,7 @@ static void fib6_del_route(struct fib6_node *fn, struct rt6_info **rtp)
 		if (atomic_read(&rt->rt6i_ref) != 1) BUG();
 	}
 
-#ifdef CONFIG_RTNETLINK
 	inet6_rt_notify(RTM_DELROUTE, rt);
-#endif
 	rt6_release(rt);
 }
 

@@ -182,8 +182,8 @@ extern void pgtable_cache_init(void);
  * remap a physical address `phys' of size `size' with page protection `prot'
  * into virtual address `from'
  */
-#define io_remap_page_range(from,phys,size,prot) \
-		remap_page_range(from,phys,size,prot)
+#define io_remap_page_range(vma,from,phys,size,prot) \
+		remap_page_range(vma,from,phys,size,prot)
 
 #endif /* !__ASSEMBLY__ */
 

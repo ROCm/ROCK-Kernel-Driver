@@ -86,8 +86,13 @@ static int slc90e66_get_info (char *buffer, char **addr, off_t offset, int count
          * at that point bibma+0x2 et bibma+0xa are byte registers
          * to investigate:
          */
+#ifdef __mips__	/* only for mips? */
+	c0 = inb_p(bibma + 0x02);
+	c1 = inb_p(bibma + 0x0a);
+#else
 	c0 = inb_p((unsigned short)bibma + 0x02);
 	c1 = inb_p((unsigned short)bibma + 0x0a);
+#endif
 
 	p += sprintf(p, "                                SLC90E66 Chipset.\n");
 	p += sprintf(p, "--------------- Primary Channel ---------------- Secondary Channel -------------\n");
@@ -253,7 +258,9 @@ static int slc90e66_tune_chipset (ide_drive_t *drive, byte speed)
 		case XFER_MW_DMA_2:
 		case XFER_MW_DMA_1:
 		case XFER_SW_DMA_2:	break;
+#if 0	/* allow PIO modes */
 		default:		return -1;
+#endif
 	}
 
 	if (speed >= XFER_UDMA_0) {
@@ -291,6 +298,13 @@ static int slc90e66_config_drive_for_dma (ide_drive_t *drive)
 	byte speed		= 0;
 	byte udma_66		= eighty_ninty_three(drive);
 
+#if 1 /* allow PIO modes */
+	if (!HWIF(drive)->autodma) {
+		speed = XFER_PIO_0 + ide_get_best_pio_mode(drive, 255, 5, NULL);
+		(void) slc90e66_tune_chipset(drive, speed);
+		return ((int) ide_dma_off_quietly);
+	}
+#endif
 	if ((id->dma_ultra & 0x0010) && (ultra)) {
 		speed = (udma_66) ? XFER_UDMA_4 : XFER_UDMA_2;
 	} else if ((id->dma_ultra & 0x0008) && (ultra)) {

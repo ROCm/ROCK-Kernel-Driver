@@ -4,20 +4,9 @@
 1) Other documentation....
 
    o Project Home Pages
-       http://www.sucs.swan.ac.uk/~rohan/DECnet/index.html - Kernel info
+       http://www.chygwyn.com/DECnet/                      - Kernel info
        http://linux-decnet.sourceforge.net/                - Userland tools
-
-   o FTP sites
-       ftp://ftp.sucs.swan.ac.uk/pub/Linux/DECnet/
-                - Swansea University Computer Society DECnet Archive
-                  (contains kernel patches and info)
-                - Mirror of userland tools on ftp.dreamtime.org
-                - Mirror of Alexey Kuznetsov's iproute2 package and
-                  other utilities
-
-       ftp://linux-decnet.sourceforge.net/pub/linux-decnet/ 
-                - Patrick Caulfield's archive of userland tools and
-                  Eduardo Serrat's kernel patches
+       http://www.sourceforge.net/projects/linux-decnet/   - Status page
 
 2) Configuring the kernel
 
@@ -31,9 +20,13 @@ if you want to try out router support (not properly debugged yet)
 you'll need the following options as well...
 
     CONFIG_DECNET_ROUTER (to be able to add/delete routes)
-    CONFIG_NETLINK (to allow rtnetlink)
-    CONFIG_RTNETLINK (for communication with the kernel routing layer)
     CONFIG_NETFILTER (will be required for the DECnet routing daemon)
+
+    CONFIG_DECNET_ROUTE_FWMARK is optional
+
+Don't turn on SIOCGIFCONF support for DECnet unless you are really sure
+that you need it, in general you won't and it can cause ifconfig to
+malfunction.
 
 3) Command line options
 

@@ -36,6 +36,7 @@
  *        Steve Whitehouse: Removed unused code. Fix to use sk->allocation
  *                          when required.
  *       Patrick Caulfield: /proc/net/decnet now has object name/number
+ *        Steve Whitehouse: Fixed local port allocation, hashed sk list
  */
 
 
@@ -138,9 +139,13 @@ static void dn_keepalive(struct sock *sk);
 dn_address decnet_address = 0;
 unsigned char decnet_ether_address[ETH_ALEN] = { 0xAA, 0x00, 0x04, 0x00, 0x00, 0x00 };
 
+#define DN_SK_HASH_SHIFT 8
+#define DN_SK_HASH_SIZE (1 << DN_SK_HASH_SHIFT)
+#define DN_SK_HASH_MASK (DN_SK_HASH_SIZE - 1)
+
 static struct proto_ops dn_proto_ops;
 rwlock_t dn_hash_lock = RW_LOCK_UNLOCKED;
-static struct sock *dn_sklist;
+static struct sock *dn_sk_hash[DN_SK_HASH_SIZE];
 static struct sock *dn_wild_sk;
 
 static int __dn_setsockopt(struct socket *sock, int level, int optname, char *optval, int optlen, int flags);
@@ -153,18 +158,38 @@ static struct sock **dn_find_list(struct sock *sk)
 	if (scp->addr.sdn_flags & SDF_WILD)
 		return dn_wild_sk ? NULL : &dn_wild_sk;
 
-	return &dn_sklist;
+	return &dn_sk_hash[scp->addrloc & DN_SK_HASH_MASK];
+}
+
+/* 
+ * Valid ports are those greater than zero and not already in use.
+ */
+static int check_port(unsigned short port)
+{
+	struct sock *sk = dn_sk_hash[port & DN_SK_HASH_MASK];
+	if (port == 0)
+		return -1;
+	while(sk) {
+		struct dn_scp *scp = DN_SK(sk);
+		if (scp->addrloc == port)
+			return -1;
+		sk = sk->next;
+	}
+	return 0;
 }
 
 static unsigned short port_alloc(struct sock *sk)
 {
 	struct dn_scp *scp = DN_SK(sk);
 static unsigned short port = 0x2000;
+	unsigned short i_port = port;
 
-	if (port == 0)
-		port++;
+	while(check_port(++port) != 0) {
+		if (port == i_port)
+			return 0;
+	}
 
-	scp->addrloc = port++;
+	scp->addrloc = port;
 
 	return 1;
 }
@@ -237,6 +262,48 @@ static void dn_unhash_sock_bh(struct sock *sk)
 	sk->pprev = NULL;
 }
 
+struct sock **listen_hash(struct sockaddr_dn *addr)
+{
+	int i;
+	unsigned hash = addr->sdn_objnum;
+
+	if (hash == 0) {
+		hash = addr->sdn_objnamel;
+		for(i = 0; i < addr->sdn_objnamel; i++) {
+			hash ^= addr->sdn_objname[i];
+			hash ^= (hash << 3);
+		}
+	}
+
+	return &dn_sk_hash[hash & DN_SK_HASH_MASK];
+}
+
+/*
+ * Called to transform a socket from bound (i.e. with a local address)
+ * into a listening socket (doesn't need a local port number) and rehashes
+ * based upon the object name/number.
+ */
+static void dn_rehash_sock(struct sock *sk)
+{
+	struct sock **skp = sk->pprev;
+	struct dn_scp *scp = DN_SK(sk);
+
+	if (scp->addr.sdn_flags & SDF_WILD)
+		return;
+
+	write_lock_bh(&dn_hash_lock);
+	while(*skp != sk)
+		skp = &((*skp)->next);
+	*skp = sk->next;
+
+	DN_SK(sk)->addrloc = 0;
+	skp = listen_hash(&DN_SK(sk)->addr);
+
+	sk->next = *skp;
+	sk->pprev = skp;
+	*skp = sk;
+	write_unlock_bh(&dn_hash_lock);
+}
 
 int dn_sockaddr2username(struct sockaddr_dn *sdn, unsigned char *buf, unsigned char type)
 {
@@ -327,10 +394,11 @@ int dn_username2sockaddr(unsigned char *data, int len, struct sockaddr_dn *sdn, 
 
 struct sock *dn_sklist_find_listener(struct sockaddr_dn *addr)
 {
+	struct sock **skp = listen_hash(addr);
 	struct sock *sk;
 
 	read_lock(&dn_hash_lock);
-	for(sk = dn_sklist; sk != NULL; sk = sk->next) {
+	for(sk = *skp; sk != NULL; sk = sk->next) {
 		struct dn_scp *scp = DN_SK(sk);
 		if (sk->state != TCP_LISTEN)
 			continue;
@@ -364,7 +432,8 @@ struct sock *dn_find_by_skb(struct sk_buff *skb)
 	struct dn_scp *scp;
 
 	read_lock(&dn_hash_lock);
-	for(sk = dn_sklist; sk != NULL; sk = sk->next) {
+	sk = dn_sk_hash[cb->dst_port & DN_SK_HASH_MASK];
+	for (; sk != NULL; sk = sk->next) {
 		scp = DN_SK(sk);
 		if (cb->src != dn_saddr2dn(&scp->peer))
 			continue;
@@ -1044,6 +1113,9 @@ static int dn_accept(struct socket *sock, struct socket *newsock, int flags)
 		sizeof(struct optdata_dn));
 
 	lock_sock(newsk);
+	/*
+	 * FIXME: This can fail if we've run out of local ports....
+	 */
 	dn_hash_sock(newsk);
 
 	dn_send_conn_ack(newsk);
@@ -1199,6 +1271,7 @@ static int dn_listen(struct socket *sock, int backlog)
 	sk->ack_backlog     = 0;
 	sk->state           = TCP_LISTEN;
 	err                 = 0;
+	dn_rehash_sock(sk);
 
 out:
 	release_sock(sk);
@@ -2062,44 +2135,47 @@ static int dn_get_info(char *buffer, char **start, off_t offset, int length)
 	char buf2[DN_ASCBUF_LEN];
 	char local_object[DN_MAXOBJL+3];
 	char remote_object[DN_MAXOBJL+3];
+	int i;
 
 	len += sprintf(buffer + len, "Local                                              Remote\n");
 
 	read_lock(&dn_hash_lock);
-	for(sk = dn_sklist; sk != NULL; sk = sk->next) {
-		scp = DN_SK(sk);
+	for(i = 0; i < DN_SK_HASH_SIZE; i++) {
+		for(sk = dn_sk_hash[i]; sk != NULL; sk = sk->next) {
+			scp = DN_SK(sk);
 
-		dn_printable_object(&scp->addr, local_object);
-		dn_printable_object(&scp->peer, remote_object);
+			dn_printable_object(&scp->addr, local_object);
+			dn_printable_object(&scp->peer, remote_object);
 
-		len += sprintf(buffer + len,
-				"%6s/%04X %04d:%04d %04d:%04d %01d %-16s %6s/%04X %04d:%04d %04d:%04d %01d %-16s %4s %s\n",
-				dn_addr2asc(dn_ntohs(dn_saddr2dn(&scp->addr)), buf1),
-				scp->addrloc,
-				scp->numdat,
-				scp->numoth,
-				scp->ackxmt_dat,
-				scp->ackxmt_oth,
-				scp->flowloc_sw,
-				local_object,
-				dn_addr2asc(dn_ntohs(dn_saddr2dn(&scp->peer)), buf2),
-				scp->addrrem,
-				scp->numdat_rcv,
-				scp->numoth_rcv,
-				scp->ackrcv_dat,
-				scp->ackrcv_oth,
-				scp->flowrem_sw,
-				remote_object,
-				dn_state2asc(scp->state),
-				((scp->accept_mode == ACC_IMMED) ? "IMMED" : "DEFER"));
+			len += sprintf(buffer + len,
+					"%6s/%04X %04d:%04d %04d:%04d %01d %-16s %6s/%04X %04d:%04d %04d:%04d %01d %-16s %4s %s\n",
+					dn_addr2asc(dn_ntohs(dn_saddr2dn(&scp->addr)), buf1),
+					scp->addrloc,
+					scp->numdat,
+					scp->numoth,
+					scp->ackxmt_dat,
+					scp->ackxmt_oth,
+					scp->flowloc_sw,
+					local_object,
+					dn_addr2asc(dn_ntohs(dn_saddr2dn(&scp->peer)), buf2),
+					scp->addrrem,
+					scp->numdat_rcv,
+					scp->numoth_rcv,
+					scp->ackrcv_dat,
+					scp->ackrcv_oth,
+					scp->flowrem_sw,
+					remote_object,
+					dn_state2asc(scp->state),
+					((scp->accept_mode == ACC_IMMED) ? "IMMED" : "DEFER"));
 
-		pos = begin + len;
-		if (pos < offset) {
-			len = 0;
-			begin = pos;
+			pos = begin + len;
+			if (pos < offset) {
+				len = 0;
+				begin = pos;
+			}
+			if (pos > (offset + length))
+				break;
 		}
-		if (pos > (offset + length))
-			break;
 	}
 	read_unlock(&dn_hash_lock);
 
@@ -2157,7 +2233,7 @@ MODULE_PARM(addr, "2i");
 MODULE_PARM_DESC(addr, "The DECnet address of this machine: area,node");
 #endif
 
-static char banner[] __initdata = KERN_INFO "NET4: DECnet for Linux: V.2.4.9s (C) 1995-2001 Linux DECnet Project Team\n";
+static char banner[] __initdata = KERN_INFO "NET4: DECnet for Linux: V.2.4.15-pre5s (C) 1995-2001 Linux DECnet Project Team\n";
 
 static int __init decnet_init(void)
 {

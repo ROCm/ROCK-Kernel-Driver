@@ -19,12 +19,13 @@
 #define MSDOS_DPS_BITS	4 /* log2(MSDOS_DPS) */
 #define MSDOS_DIR_BITS	5 /* log2(sizeof(struct msdos_dir_entry)) */
 
+/* directory limit */
+#define FAT_MAX_DIR_ENTRIES	(65536)
+#define FAT_MAX_DIR_SIZE	(FAT_MAX_DIR_ENTRIES << MSDOS_DIR_BITS)
+
 #define MSDOS_SUPER_MAGIC 0x4d44 /* MD */
 
 #define FAT_CACHE    8 /* FAT cache size */
-
-#define MSDOS_MAX_EXTRA	3 /* tolerate up to that number of clusters which are
-			     inaccessible because the FAT is too short */
 
 #define ATTR_RO      1  /* read-only */
 #define ATTR_HIDDEN  2  /* hidden */
@@ -47,11 +48,6 @@
 
 #define CASE_LOWER_BASE 8	/* base is lower case */
 #define CASE_LOWER_EXT  16	/* extension is lower case */
-
-#define SCAN_ANY     0  /* either hidden or not */
-#define SCAN_HID     1  /* only hidden */
-#define SCAN_NOTHID  2  /* only not hidden */
-#define SCAN_NOTANY  3  /* test name, then use SCAN_HID or SCAN_NOTHID */
 
 #define DELETED_FLAG 0xe5 /* marks file as deleted when in name[0] */
 #define IS_FREE(n) (!*(n) || *(const unsigned char *) (n) == DELETED_FLAG)
@@ -78,8 +74,8 @@
 
 #define FAT_FSINFO_SIG1		0x41615252
 #define FAT_FSINFO_SIG2		0x61417272
-#define IS_FSINFO(x)		(CF_LE_L((x)->signature1) == FAT_FSINFO_SIG1	 \
-				 && CF_LE_L((x)->signature2) == FAT_FSINFO_SIG2)
+#define IS_FSINFO(x)	(CF_LE_L((x)->signature1) == FAT_FSINFO_SIG1	\
+			 && CF_LE_L((x)->signature2) == FAT_FSINFO_SIG2)
 
 /*
  * Inode flags
@@ -183,10 +179,6 @@ struct vfat_slot_info {
 	loff_t shortname_offset;       /* dir offset for shortname start */
 	int ino;		       /* ino for the file */
 };
-
-/* Determine whether this FS has kB-aligned data. */
-#define MSDOS_CAN_BMAP(mib) (!(((mib)->cluster_size & 1) || \
-    ((mib)->data_start & 1)))
 
 /* Convert attribute bits and a mask to the UNIX mode. */
 #define MSDOS_MKMODE(a,m) (m & (a & ATTR_RO ? S_IRUGO|S_IXUGO : S_IRWXUGO))
@@ -297,7 +289,7 @@ extern void fat_write_inode(struct inode *inode, int wait);
 extern int fat_notify_change(struct dentry * dentry, struct iattr * attr);
 
 /* fat/misc.c */
-extern void fat_fs_panic(struct super_block *s, const char *msg);
+extern void fat_fs_panic(struct super_block *s, const char *fmt, ...);
 extern int fat_is_binary(char conversion, char *extension);
 extern void lock_fat(struct super_block *sb);
 extern void unlock_fat(struct super_block *sb);

@@ -101,7 +101,7 @@ static void andes_flush_cache_mm(struct mm_struct *mm)
 	/* XXX */
 }
 
-static void andes_flush_cache_range(struct mm_struct *mm,
+static void andes_flush_cache_range(struct vm_area_struct *vma,
 				    unsigned long start,
 				    unsigned long end)
 {
@@ -147,7 +147,7 @@ void flush_tlb_mm(struct mm_struct *mm)
 	/* XXX */
 }
 
-void flush_tlb_range(struct mm_struct *mm, unsigned long start,
+void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 				  unsigned long end)
 {
 	/* XXX */

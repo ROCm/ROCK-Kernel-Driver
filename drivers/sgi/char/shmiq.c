@@ -348,7 +348,7 @@ shmiq_qcntl_mmap (struct file *file, struct vm_area_struct *vma)
 	/* Init the shared memory input queue */
 	spin_unlock( &shmiqs [minor].shmiq_lock );
 	memset (shmiqs [minor].shmiq_vaddr, 0, size);
-	error = vmap_page_range (vma->vm_start, size, mem);
+	error = vmap_page_range (vma, vma->vm_start, size, mem);
 	return error;
 }
 

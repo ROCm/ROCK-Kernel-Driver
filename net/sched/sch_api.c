@@ -41,12 +41,10 @@
 #include <asm/system.h>
 #include <asm/bitops.h>
 
-#ifdef CONFIG_RTNETLINK
 static int qdisc_notify(struct sk_buff *oskb, struct nlmsghdr *n, u32 clid,
 			struct Qdisc *old, struct Qdisc *new);
 static int tclass_notify(struct sk_buff *oskb, struct nlmsghdr *n,
 			 struct Qdisc *q, unsigned long cl, int event);
-#endif
 
 /*
 
@@ -378,8 +376,6 @@ int qdisc_graft(struct net_device *dev, struct Qdisc *parent, u32 classid,
 	}
 	return err;
 }
-
-#ifdef CONFIG_RTNETLINK
 
 /*
    Allocate and initialize new qdisc.
@@ -1055,7 +1051,6 @@ static int tc_dump_tclass(struct sk_buff *skb, struct netlink_callback *cb)
 	dev_put(dev);
 	return skb->len;
 }
-#endif
 
 int psched_us_per_tick = 1;
 int psched_tick_per_us = 1;
@@ -1169,9 +1164,7 @@ int __init psched_calibrate_clock(void)
 
 int __init pktsched_init(void)
 {
-#ifdef CONFIG_RTNETLINK
 	struct rtnetlink_link *link_p;
-#endif
 
 #if PSCHED_CLOCK_SOURCE == PSCHED_CPU
 	if (psched_calibrate_clock() < 0)
@@ -1184,7 +1177,6 @@ int __init pktsched_init(void)
 #endif
 #endif
 
-#ifdef CONFIG_RTNETLINK
 	link_p = rtnetlink_links[PF_UNSPEC];
 
 	/* Setup rtnetlink links. It is made here to avoid
@@ -1201,7 +1193,6 @@ int __init pktsched_init(void)
 		link_p[RTM_GETTCLASS-RTM_BASE].doit = tc_ctl_tclass;
 		link_p[RTM_GETTCLASS-RTM_BASE].dumpit = tc_dump_tclass;
 	}
-#endif
 
 #define INIT_QDISC(name) { \
           extern struct Qdisc_ops name##_qdisc_ops; \

@@ -5949,32 +5949,6 @@ CONFIG_PACKET_MMAP
 
   If unsure, say N.
 
-Kernel/User network link driver
-CONFIG_NETLINK
-  This driver allows for two-way communication between the kernel and
-  user processes.  It does so by creating a new socket family,
-  PF_NETLINK.  Over this socket, the kernel can send and receive
-  datagrams carrying information.  It is documented on many systems in
-  netlink(7).
-
-  So far, the kernel uses this feature to publish some network related
-  information if you say Y to "Routing messages", below. You also need
-  to say Y here if you want to use arpd, a daemon that helps keep the
-  internal ARP cache (a mapping between IP addresses and hardware
-  addresses on the local network) small.  The ethertap device, which
-  lets user space programs read and write raw Ethernet frames, also
-  needs the network link driver.
-
-  If unsure, say Y.
-
-Routing messages
-CONFIG_RTNETLINK
-  If you say Y here, user space programs can receive some network
-  related routing information over the netlink. 'rtmon', supplied
-  with the iproute2 package (<ftp://ftp.inr.ac.ru/>), can read and
-  interpret this data.  Information sent to the kernel over this link
-  is ignored.
-
 Netlink device emulation
 CONFIG_NETLINK_DEV
   This option will be removed soon. Any programs that want to use
@@ -24048,6 +24022,16 @@ CONFIG_CRC32
   kernel tree does. Such modules that use library CRC32 functions
   require M here.
 
+802.1Q VLAN Support
+CONFIG_VLAN_8021Q
+  Select this and you will be able to create 802.1Q VLAN interfaces on your
+  ethernet interfaces.  802.1Q VLAN supports almost everything a regular
+  ethernet interface does, including firewalling, bridging, and of course
+  IP traffic.  You will need the 'vconfig' tool from the VLAN project in
+  order to effectively use VLANs.  See the VLAN web page for more
+  information:  http://www.candelatech.com/~greear/vlan.html  If unsure,
+  you can safely say 'N'.
+
 #
 # A couple of things I keep forgetting:
 #   capitalize: AppleTalk, Ethernet, DOS, DMA, FAT, FTP, Internet,
@@ -24097,10 +24081,10 @@ CONFIG_CRC32
 # LocalWords:  filesystems smbfs ATA ppp PCTech RZ www powerquest txt CMD ESDI
 # LocalWords:  chipset FB multicast MROUTE appletalk ifconfig IBMTR multiport
 # LocalWords:  Multisession STALDRV EasyIO EC EasyConnection ISTALLION ONboard
-# LocalWords:  Brumby pci TNC cis ohio faq usenet NETLINK dev hydra ca Tyne mem
+# LocalWords:  Brumby pci TNC cis ohio faq usenet dev hydra ca Tyne mem
 # LocalWords:  carleton DECstation SUNFD JENSEN Noname XXXM SLiRP LILO's amifb
 # LocalWords:  pppd Zilog ZS SRM bootloader ez mainmenu rarp ipfwadm paride pcd
-# LocalWords:  RTNETLINK mknod xos MTU lwared Macs netatalk macs cs Wolff
+# LocalWords:  mknod xos MTU lwared Macs netatalk macs cs Wolff
 # LocalWords:  dartmouth flowerpt MultiMaster FlashPoint tudelft etherexpress
 # LocalWords:  ICL EtherTeam ETH IDESCSI TXC SmartRAID SmartCache httpd sjc dlp
 # LocalWords:  thesphere TwoServers BOOTP DHCP ncpfs BPQETHER BPQ MG HIPPI cern

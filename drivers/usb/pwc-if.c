@@ -125,7 +125,7 @@ static long pwc_video_read(struct video_device *vdev, char *buf, unsigned long c
 static long pwc_video_write(struct video_device *vdev, const char *buf, unsigned long count, int noblock);
 static unsigned int pwc_video_poll(struct video_device *vdev, struct file *file, poll_table *wait);
 static int  pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *arg);
-static int  pwc_video_mmap(struct video_device *dev, const char *adr, unsigned long size);
+static int  pwc_video_mmap(struct vm_area_struct *vma, struct video_device *dev, const char *adr, unsigned long size);
 
 static struct video_device pwc_template = {
 	owner:		THIS_MODULE,
@@ -1580,7 +1580,7 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 	return 0;
 }	
 
-static int pwc_video_mmap(struct video_device *vdev, const char *adr, unsigned long size)
+static int pwc_video_mmap(struct vm_area_struct *vma, struct video_device *vdev, const char *adr, unsigned long size)
 {
 	struct pwc_device *pdev;
 	unsigned long start = (unsigned long)adr;
@@ -1593,7 +1593,7 @@ static int pwc_video_mmap(struct video_device *vdev, const char *adr, unsigned l
 	pos = (unsigned long)pdev->image_data;
 	while (size > 0) {
 		page = kvirt_to_pa(pos);
-		if (remap_page_range(start, page, PAGE_SIZE, PAGE_SHARED))
+		if (remap_page_range(vma, start, page, PAGE_SIZE, PAGE_SHARED))
 			return -EAGAIN;
 
 		start += PAGE_SIZE;

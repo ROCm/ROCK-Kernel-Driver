@@ -176,11 +176,11 @@ static inline void mips32_flush_cache_all_pc(void)
 }
 
 static void
-mips32_flush_cache_range_sc(struct mm_struct *mm,
+mips32_flush_cache_range_sc(struct vm_area_struct *vma,
 			 unsigned long start,
 			 unsigned long end)
 {
-	struct vm_area_struct *vma;
+	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
 
 	if(mm->context == 0)
@@ -190,8 +190,7 @@ mips32_flush_cache_range_sc(struct mm_struct *mm,
 #ifdef DEBUG_CACHE
 	printk("crange[%d,%08lx,%08lx]", (int)mm->context, start, end);
 #endif
-	vma = find_vma(mm, start);
-	if(vma) {
+	if (vma) {
 		if(mm->context != current->mm->context) {
 			mips32_flush_cache_all_sc();
 		} else {
@@ -214,10 +213,12 @@ mips32_flush_cache_range_sc(struct mm_struct *mm,
 	}
 }
 
-static void mips32_flush_cache_range_pc(struct mm_struct *mm,
+static void mips32_flush_cache_range_pc(struct vm_area_struct *vma,
 				     unsigned long start,
 				     unsigned long end)
 {
+	struct mm_struct *mm = vma->vm_mm;
+
 	if(mm->context != 0) {
 		unsigned long flags;
 

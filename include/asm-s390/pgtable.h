@@ -36,7 +36,7 @@ extern void paging_init(void);
 /* Caches aren't brain-dead on S390. */
 #define flush_cache_all()                       do { } while (0)
 #define flush_cache_mm(mm)                      do { } while (0)
-#define flush_cache_range(mm, start, end)       do { } while (0)
+#define flush_cache_range(vma, start, end)      do { } while (0)
 #define flush_cache_page(vma, vmaddr)           do { } while (0)
 #define flush_page_to_ram(page)                 do { } while (0)
 #define flush_dcache_page(page)			do { } while (0)

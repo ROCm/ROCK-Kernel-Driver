@@ -670,7 +670,7 @@ static int vicam_v4l_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
         return ret;
 }
 
-static int vicam_v4l_mmap(struct video_device *dev, const char *adr, unsigned long size)
+static int vicam_v4l_mmap(struct vm_area_struct *vma, struct video_device *dev, const char *adr, unsigned long size)
 {
 	struct usb_vicam *vicam = (struct usb_vicam *)dev;
 	unsigned long start = (unsigned long)adr;
@@ -691,7 +691,7 @@ static int vicam_v4l_mmap(struct video_device *dev, const char *adr, unsigned lo
 	pos = (unsigned long)vicam->fbuf;
 	while (size > 0) {
 		page = kvirt_to_pa(pos);
-		if (remap_page_range(start, page, PAGE_SIZE, PAGE_SHARED)) {
+		if (remap_page_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
 			up(&vicam->sem);
 			return -EAGAIN;
 		}

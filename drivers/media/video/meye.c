@@ -1240,7 +1240,7 @@ static int meye_ioctl(struct video_device *dev, unsigned int cmd, void *arg) {
 	return 0;
 }
 
-static int meye_mmap(struct video_device *dev, const char *adr, 
+static int meye_mmap(struct vm_area_struct *vma, struct video_device *dev, const char *adr, 
 		     unsigned long size) {
 	unsigned long start=(unsigned long) adr;
 	unsigned long page,pos;
@@ -1263,7 +1263,7 @@ static int meye_mmap(struct video_device *dev, const char *adr,
 
 	while (size > 0) {
 		page = kvirt_to_pa(pos);
-		if (remap_page_range(start, page, PAGE_SIZE, PAGE_SHARED)) {
+		if (remap_page_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
 			up(&meye.lock);
 			return -EAGAIN;
 		}

@@ -5,7 +5,7 @@
  *
  *		IPv4 Forwarding Information Base: semantics.
  *
- * Version:	$Id: fib_semantics.c,v 1.17 2000/08/19 23:22:56 davem Exp $
+ * Version:	$Id: fib_semantics.c,v 1.19 2002/01/12 07:54:56 davem Exp $
  *
  * Authors:	Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
  *
@@ -134,7 +134,7 @@ void fib_release_info(struct fib_info *fi)
 	write_unlock(&fib_info_lock);
 }
 
-extern __inline__ int nh_comp(const struct fib_info *fi, const struct fib_info *ofi)
+static __inline__ int nh_comp(const struct fib_info *fi, const struct fib_info *ofi)
 {
 	const struct fib_nh *onh = ofi->fib_nh;
 
@@ -155,7 +155,7 @@ extern __inline__ int nh_comp(const struct fib_info *fi, const struct fib_info *
 	return 0;
 }
 
-extern __inline__ struct fib_info * fib_find_info(const struct fib_info *nfi)
+static __inline__ struct fib_info * fib_find_info(const struct fib_info *nfi)
 {
 	for_fib_info() {
 		if (fi->fib_nhs != nfi->fib_nhs)
@@ -626,8 +626,6 @@ u32 __fib_res_prefsrc(struct fib_result *res)
 	return inet_select_addr(FIB_RES_DEV(*res), FIB_RES_GW(*res), res->scope);
 }
 
-#ifdef CONFIG_RTNETLINK
-
 int
 fib_dump_info(struct sk_buff *skb, u32 pid, u32 seq, int event,
 	      u8 tb_id, u8 type, u8 scope, void *dst, int dst_len, u8 tos,
@@ -697,8 +695,6 @@ rtattr_failure:
 	skb_trim(skb, b - skb->data);
 	return -1;
 }
-
-#endif /* CONFIG_RTNETLINK */
 
 #ifndef CONFIG_IP_NOSIOCRT
 

@@ -1,4 +1,4 @@
-/* $Id: sunlance.c,v 1.109 2001/10/21 06:35:29 davem Exp $
+/* $Id: sunlance.c,v 1.112 2002/01/15 06:48:55 davem Exp $
  * lance.c: Linux/Sparc/Lance driver
  *
  *	Written 1995, 1996 by Miguel de Icaza
@@ -924,13 +924,13 @@ static int lance_open(struct net_device *dev)
 
 	last_dev = dev;
 
+	STOP_LANCE(lp);
+
 	if (request_irq(dev->irq, &lance_interrupt, SA_SHIRQ,
 			lancestr, (void *) dev)) {
 		printk(KERN_ERR "Lance: Can't get irq %s\n", __irq_itoa(dev->irq));
 		return -EAGAIN;
 	}
-
-	STOP_LANCE(lp);
 
 	/* On the 4m, setup the ledma to provide the upper bits for buffers */
 	if (lp->dregs) {
@@ -1181,7 +1181,7 @@ static void lance_load_multicast(struct net_device *dev)
 	volatile u16 *mcast_table = (u16 *) &ib->filter;
 	struct dev_mc_list *dmi = dev->mc_list;
 	char *addrs;
-	int i, j, bit, byte;
+	int i;
 	u32 crc;
 	
 	/* set all multicast bits */

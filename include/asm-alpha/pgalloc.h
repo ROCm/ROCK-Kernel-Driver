@@ -14,7 +14,7 @@ extern void __load_new_mm_context(struct mm_struct *);
 /* Caches aren't brain-dead on the Alpha. */
 #define flush_cache_all()			do { } while (0)
 #define flush_cache_mm(mm)			do { } while (0)
-#define flush_cache_range(mm, start, end)	do { } while (0)
+#define flush_cache_range(vma, start, end)	do { } while (0)
 #define flush_cache_page(vma, vmaddr)		do { } while (0)
 #define flush_page_to_ram(page)			do { } while (0)
 #define flush_dcache_page(page)			do { } while (0)
@@ -206,10 +206,10 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
  * Flush a specified range of user mapping:  on the
  * Alpha we flush the whole user tlb.
  */
-static inline void flush_tlb_range(struct mm_struct *mm,
+static inline void flush_tlb_range(struct vm_area_struct *vma,
 	unsigned long start, unsigned long end)
 {
-	flush_tlb_mm(mm);
+	flush_tlb_mm(vma->vm_mm);
 }
 
 #else /* CONFIG_SMP */
@@ -217,7 +217,7 @@ static inline void flush_tlb_range(struct mm_struct *mm,
 extern void flush_tlb_all(void);
 extern void flush_tlb_mm(struct mm_struct *);
 extern void flush_tlb_page(struct vm_area_struct *, unsigned long);
-extern void flush_tlb_range(struct mm_struct *, unsigned long, unsigned long);
+extern void flush_tlb_range(struct vm_area_struct *, unsigned long, unsigned long);
 
 #endif /* CONFIG_SMP */
 

@@ -25,7 +25,7 @@ void (*_copy_page)(void * to, void * from);
 
 /* Cache operations. */
 void (*_flush_cache_mm)(struct mm_struct *mm);
-void (*_flush_cache_range)(struct mm_struct *mm, unsigned long start,
+void (*_flush_cache_range)(struct vm_area_struct *vma, unsigned long start,
                            unsigned long end);
 void (*_flush_cache_page)(struct vm_area_struct *vma, unsigned long page);
 void (*_flush_page_to_ram)(struct page * page);
@@ -44,7 +44,7 @@ void (*_dma_cache_inv)(unsigned long start, unsigned long size);
 /* TLB operations. */
 void (*_flush_tlb_all)(void);
 void (*_flush_tlb_mm)(struct mm_struct *mm);
-void (*_flush_tlb_range)(struct mm_struct *mm, unsigned long start,
+void (*_flush_tlb_range)(struct vm_area_struct *vma, unsigned long start,
 			unsigned long end);
 void (*_flush_tlb_page)(struct vm_area_struct *vma, unsigned long page);
 

@@ -1,4 +1,4 @@
-/* $Id: sun4c.c,v 1.210 2001/11/13 03:27:47 davem Exp $
+/* $Id: sun4c.c,v 1.212 2001/12/21 04:56:15 davem Exp $
  * sun4c.c: Doing in software what should be done in hardware.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -1337,7 +1337,7 @@ static __u32 sun4c_get_scsi_one(char *bufptr, unsigned long len, struct sbus_bus
 static void sun4c_get_scsi_sgl(struct scatterlist *sg, int sz, struct sbus_bus *sbus)
 {
 	while (sz >= 0) {
-		sg[sz].dvma_address = (__u32)sun4c_lockarea(sg[sz].address, sg[sz].length);
+		sg[sz].dvma_address = (__u32)sun4c_lockarea(page_address(sg[sz].page) + sg[sz].offset, sg[sz].length);
 		sg[sz].dvma_length = sg[sz].length;
 		sz--;
 	}
@@ -1484,8 +1484,9 @@ static void sun4c_flush_cache_mm_hw(struct mm_struct *mm)
 	}
 }
 
-static void sun4c_flush_cache_range_hw(struct mm_struct *mm, unsigned long start, unsigned long end)
+static void sun4c_flush_cache_range_hw(struct vm_area_struct *vma, unsigned long start, unsigned long end)
 {
+	struct mm_struct *mm = vma->vm_mm;
 	int new_ctx = mm->context;
 	
 	if (new_ctx != NO_CONTEXT) {
@@ -1608,8 +1609,9 @@ static void sun4c_flush_cache_mm_sw(struct mm_struct *mm)
 	}
 }
 
-static void sun4c_flush_cache_range_sw(struct mm_struct *mm, unsigned long start, unsigned long end)
+static void sun4c_flush_cache_range_sw(struct vm_area_struct *vma, unsigned long start, unsigned long end)
 {
+	struct mm_struct *mm = vma->vm_mm;
 	int new_ctx = mm->context;
 
 	if (new_ctx != NO_CONTEXT) {
@@ -1765,8 +1767,9 @@ static void sun4c_flush_tlb_mm_hw(struct mm_struct *mm)
 	}
 }
 
-static void sun4c_flush_tlb_range_hw(struct mm_struct *mm, unsigned long start, unsigned long end)
+static void sun4c_flush_tlb_range_hw(struct vm_area_struct *vma, unsigned long start, unsigned long end)
 {
+	struct mm_struct *mm = vma->vm_mm;
 	int new_ctx = mm->context;
 
 	if (new_ctx != NO_CONTEXT) {
@@ -1848,8 +1851,9 @@ static void sun4c_flush_tlb_mm_sw(struct mm_struct *mm)
 	}
 }
 
-static void sun4c_flush_tlb_range_sw(struct mm_struct *mm, unsigned long start, unsigned long end)
+static void sun4c_flush_tlb_range_sw(struct vm_area_struct *vma, unsigned long start, unsigned long end)
 {
+	struct mm_struct *mm = vma->vm_mm;
 	int new_ctx = mm->context;
 
 	if (new_ctx != NO_CONTEXT) {

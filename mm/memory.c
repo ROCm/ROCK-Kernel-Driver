@@ -355,8 +355,9 @@ static inline int zap_pmd_range(mmu_gather_t *tlb, pgd_t * dir, unsigned long ad
 /*
  * remove user pages in a given range.
  */
-void zap_page_range(struct mm_struct *mm, unsigned long address, unsigned long size)
+void zap_page_range(struct vm_area_struct *vma, unsigned long address, unsigned long size)
 {
+	struct mm_struct *mm = vma->vm_mm;
 	mmu_gather_t *tlb;
 	pgd_t * dir;
 	unsigned long start = address, end = address + size;
@@ -374,8 +375,8 @@ void zap_page_range(struct mm_struct *mm, unsigned long address, unsigned long s
 	if (address >= end)
 		BUG();
 	spin_lock(&mm->page_table_lock);
-	flush_cache_range(mm, address, end);
-	tlb = tlb_gather_mmu(mm);
+	flush_cache_range(vma, address, end);
+	tlb = tlb_gather_mmu(vma);
 
 	do {
 		freed += zap_pmd_range(tlb, dir, address, end - address);
@@ -757,16 +758,16 @@ static inline int zeromap_pmd_range(struct mm_struct *mm, pmd_t * pmd, unsigned 
 	return 0;
 }
 
-int zeromap_page_range(unsigned long address, unsigned long size, pgprot_t prot)
+int zeromap_page_range(struct vm_area_struct *vma, unsigned long address, unsigned long size, pgprot_t prot)
 {
 	int error = 0;
 	pgd_t * dir;
 	unsigned long beg = address;
 	unsigned long end = address + size;
-	struct mm_struct *mm = current->mm;
+	struct mm_struct *mm = vma->vm_mm;
 
 	dir = pgd_offset(mm, address);
-	flush_cache_range(mm, beg, end);
+	flush_cache_range(vma, beg, end);
 	if (address >= end)
 		BUG();
 
@@ -783,7 +784,7 @@ int zeromap_page_range(unsigned long address, unsigned long size, pgprot_t prot)
 		dir++;
 	} while (address && (address < end));
 	spin_unlock(&mm->page_table_lock);
-	flush_tlb_range(mm, beg, end);
+	flush_tlb_range(vma, beg, end);
 	return error;
 }
 
@@ -838,17 +839,17 @@ static inline int remap_pmd_range(struct mm_struct *mm, pmd_t * pmd, unsigned lo
 }
 
 /*  Note: this is only safe if the mm semaphore is held when called. */
-int remap_page_range(unsigned long from, unsigned long phys_addr, unsigned long size, pgprot_t prot)
+int remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned long phys_addr, unsigned long size, pgprot_t prot)
 {
 	int error = 0;
 	pgd_t * dir;
 	unsigned long beg = from;
 	unsigned long end = from + size;
-	struct mm_struct *mm = current->mm;
+	struct mm_struct *mm = vma->vm_mm;
 
 	phys_addr -= from;
 	dir = pgd_offset(mm, from);
-	flush_cache_range(mm, beg, end);
+	flush_cache_range(vma, beg, end);
 	if (from >= end)
 		BUG();
 
@@ -865,7 +866,7 @@ int remap_page_range(unsigned long from, unsigned long phys_addr, unsigned long 
 		dir++;
 	} while (from && (from < end));
 	spin_unlock(&mm->page_table_lock);
-	flush_tlb_range(mm, beg, end);
+	flush_tlb_range(vma, beg, end);
 	return error;
 }
 
@@ -976,7 +977,6 @@ no_mem:
 static void vmtruncate_list(struct vm_area_struct *mpnt, unsigned long pgoff)
 {
 	do {
-		struct mm_struct *mm = mpnt->vm_mm;
 		unsigned long start = mpnt->vm_start;
 		unsigned long end = mpnt->vm_end;
 		unsigned long len = end - start;
@@ -984,7 +984,7 @@ static void vmtruncate_list(struct vm_area_struct *mpnt, unsigned long pgoff)
 
 		/* mapping wholly truncated? */
 		if (mpnt->vm_pgoff >= pgoff) {
-			zap_page_range(mm, start, len);
+			zap_page_range(mpnt, start, len);
 			continue;
 		}
 
@@ -997,7 +997,7 @@ static void vmtruncate_list(struct vm_area_struct *mpnt, unsigned long pgoff)
 		/* Ok, partially affected.. */
 		start += diff << PAGE_SHIFT;
 		len = (len - diff) << PAGE_SHIFT;
-		zap_page_range(mm, start, len);
+		zap_page_range(mpnt, start, len);
 	} while ((mpnt = mpnt->vm_next_share) != NULL);
 }
 
@@ -1238,7 +1238,7 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 			page_cache_release(new_page);
 			return -1;
 		}
-		copy_highpage(page, new_page);
+		copy_user_highpage(page, new_page, address);
 		page_cache_release(new_page);
 		lru_cache_add(page);
 		new_page = page;

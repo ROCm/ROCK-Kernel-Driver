@@ -283,7 +283,7 @@ static int igafb_mmap(struct fb_info *info, struct file *file,
 		pgprot_val(vma->vm_page_prot) &= ~(fb->mmap_map[i].prot_mask);
 		pgprot_val(vma->vm_page_prot) |= fb->mmap_map[i].prot_flag;
 
-		if (remap_page_range(vma->vm_start + page, map_offset,
+		if (remap_page_range(vma, vma->vm_start + page, map_offset,
 				     map_size, vma->vm_page_prot))
 			return -EAGAIN;
 

@@ -430,14 +430,14 @@ pfm_context_free(pfm_context_t *pfc)
 }
 
 static int
-pfm_remap_buffer(unsigned long buf, unsigned long addr, unsigned long size)
+pfm_remap_buffer(struct vm_area_struct *vma, unsigned long buf, unsigned long addr, unsigned long size)
 {
 	unsigned long page;
 
 	while (size > 0) {
 		page = kvirt_to_pa(buf);
 
-		if (remap_page_range(addr, page, PAGE_SIZE, PAGE_SHARED)) return -ENOMEM;
+		if (remap_page_range(vma, addr, page, PAGE_SIZE, PAGE_SHARED)) return -ENOMEM;
 
 		addr  += PAGE_SIZE;
 		buf   += PAGE_SIZE;
@@ -502,13 +502,26 @@ pfm_smpl_buffer_alloc(pfm_context_t *ctx, unsigned long which_pmds, unsigned lon
 	vma = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
 	if (!vma) goto no_vma;
 
+	/*
+	 * initialize the vma for the sampling buffer
+	 */
+	vma->vm_mm	  = mm;
+	vma->vm_start	  = addr;
+	vma->vm_end	  = addr + size;
+	vma->vm_flags	  = VM_READ|VM_MAYREAD;
+	vma->vm_page_prot = PAGE_READONLY; /* XXX may need to change */
+	vma->vm_ops	  = NULL;
+	vma->vm_pgoff	  = 0;
+	vma->vm_file	  = NULL;
+	vma->vm_raend	  = 0;
+
 	/* XXX: see rvmalloc() for page alignment problem */
 	smpl_buf = rvmalloc(size);
 	if (smpl_buf == NULL) goto no_buffer;
 
 	DBprintk((" smpl_buf @%p\n", smpl_buf));
 
-	if (pfm_remap_buffer((unsigned long)smpl_buf, addr, size)) goto cant_remap;
+	if (pfm_remap_buffer(vma, (unsigned long)smpl_buf, addr, size)) goto cant_remap;
 
 	/* allocate sampling buffer descriptor now */
 	psb = vmalloc(sizeof(*psb));
@@ -539,19 +552,6 @@ pfm_smpl_buffer_alloc(pfm_context_t *ctx, unsigned long which_pmds, unsigned lon
 
 	/* link to perfmon context */
 	ctx->ctx_smpl_buf  = psb;
-
-	/*
-	 * initialize the vma for the sampling buffer
-	 */
-	vma->vm_mm	  = mm;
-	vma->vm_start	  = addr;
-	vma->vm_end	  = addr + size;
-	vma->vm_flags	  = VM_READ|VM_MAYREAD;
-	vma->vm_page_prot = PAGE_READONLY; /* XXX may need to change */
-	vma->vm_ops	  = NULL;
-	vma->vm_pgoff	  = 0;
-	vma->vm_file	  = NULL;
-	vma->vm_raend	  = 0;
 
 	vma->vm_private_data = ctx;	/* link to pfm_context(not yet used) */
 

@@ -231,7 +231,7 @@ sgi_graphics_nopage (struct vm_area_struct *vma, unsigned long address, int
 		/* FIXME: save graphics context here, dump it to rendering
 		 * node? */
 
-		remove_mapping(cards[board].g_user, vma->vm_start, vma->vm_end);
+		remove_mapping(vma, cards[board].g_user, vma->vm_start, vma->vm_end);
 	}
 
 	cards [board].g_user = current;
@@ -241,7 +241,7 @@ sgi_graphics_nopage (struct vm_area_struct *vma, unsigned long address, int
 
 	virt_add = address & PAGE_MASK;
 	phys_add = cards[board].g_regs + virt_add - vma->vm_start;
-	remap_page_range(virt_add, phys_add, PAGE_SIZE, vma->vm_page_prot);
+	remap_page_range(vma, virt_add, phys_add, PAGE_SIZE, vma->vm_page_prot);
 
 	pgd = pgd_offset(current->mm, address);
 	pmd = pmd_offset(pgd, address);

@@ -102,7 +102,7 @@ static void ps_tq_int( void *data )
 		spin_unlock_irqrestore(&ps_spinlock,flags);
 		return;
 	}
-        if (!ps_ready || ps_ready() || (jiffies >= ps_timeout)) {
+        if (!ps_ready || ps_ready() || time_after_eq(jiffies, ps_timeout)) {
                 ps_continuation = NULL;
         	spin_unlock_irqrestore(&ps_spinlock,flags);
                 con();
@@ -131,7 +131,7 @@ static void ps_timer_int( unsigned long data)
 	        spin_unlock_irqrestore(&ps_spinlock,flags);
 		return;
 	}
-        if (!ps_ready || ps_ready() || (jiffies >= ps_timeout)) {
+        if (!ps_ready || ps_ready() || time_after_eq(jiffies, ps_timeout)) {
                 ps_continuation = NULL;
 	        spin_unlock_irqrestore(&ps_spinlock,flags);
                 con();

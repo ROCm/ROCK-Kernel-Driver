@@ -5,7 +5,7 @@
  *
  *		IPv4 Forwarding Information Base: FIB frontend.
  *
- * Version:	$Id: fib_frontend.c,v 1.25 2001/05/29 22:16:25 davem Exp $
+ * Version:	$Id: fib_frontend.c,v 1.26 2001/10/31 21:55:54 davem Exp $
  *
  * Authors:	Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
  *
@@ -332,8 +332,6 @@ int ip_rt_ioctl(unsigned int cmd, void *arg)
 
 #endif
 
-#ifdef CONFIG_RTNETLINK
-
 static int inet_check_attr(struct rtmsg *r, struct rtattr **rta)
 {
 	int i;
@@ -408,8 +406,6 @@ int inet_dump_fib(struct sk_buff *skb, struct netlink_callback *cb)
 
 	return skb->len;
 }
-
-#endif
 
 /* Prepare and feed intra-kernel routing request.
    Really, it should be netlink message, but :-( netlink

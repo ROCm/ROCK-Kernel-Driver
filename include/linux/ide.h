@@ -65,13 +65,14 @@ void cmd640_dump_regs (void);
 /*
  * IDE_DRIVE_CMD is used to implement many features of the hdparm utility
  */
-#define IDE_DRIVE_CMD		99	/* (magic) undef to reduce kernel size*/
+#define IDE_DRIVE_CMD			99	/* (magic) undef to reduce kernel size*/
+
+#define IDE_DRIVE_TASK			98
 
 /*
- * IDE_DRIVE_TASK is used to implement many features needed for raw tasks
+ * IDE_DRIVE_TASKFILE is used to implement many features needed for raw tasks
  */
-#define IDE_DRIVE_TASK		98
-#define IDE_DRIVE_CMD_AEB	98
+#define IDE_DRIVE_TASKFILE		97
 
 /*
  *  "No user-serviceable parts" beyond this point  :)
@@ -120,6 +121,17 @@ typedef unsigned char	byte;	/* used everywhere */
 #define IDE_FEATURE_OFFSET	IDE_ERROR_OFFSET
 #define IDE_COMMAND_OFFSET	IDE_STATUS_OFFSET
 
+#define IDE_DATA_OFFSET_HOB	(0)
+#define IDE_ERROR_OFFSET_HOB	(1)
+#define IDE_NSECTOR_OFFSET_HOB	(2)
+#define IDE_SECTOR_OFFSET_HOB	(3)
+#define IDE_LCYL_OFFSET_HOB	(4)
+#define IDE_HCYL_OFFSET_HOB	(5)
+#define IDE_SELECT_OFFSET_HOB	(6)
+#define IDE_CONTROL_OFFSET_HOB	(7)
+
+#define IDE_FEATURE_OFFSET_HOB	IDE_ERROR_OFFSET_HOB
+
 #define IDE_DATA_REG		(HWIF(drive)->io_ports[IDE_DATA_OFFSET])
 #define IDE_ERROR_REG		(HWIF(drive)->io_ports[IDE_ERROR_OFFSET])
 #define IDE_NSECTOR_REG		(HWIF(drive)->io_ports[IDE_NSECTOR_OFFSET])
@@ -130,6 +142,16 @@ typedef unsigned char	byte;	/* used everywhere */
 #define IDE_STATUS_REG		(HWIF(drive)->io_ports[IDE_STATUS_OFFSET])
 #define IDE_CONTROL_REG		(HWIF(drive)->io_ports[IDE_CONTROL_OFFSET])
 #define IDE_IRQ_REG		(HWIF(drive)->io_ports[IDE_IRQ_OFFSET])
+
+#define IDE_DATA_REG_HOB	(HWIF(drive)->io_ports[IDE_DATA_OFFSET])
+#define IDE_ERROR_REG_HOB	(HWIF(drive)->io_ports[IDE_ERROR_OFFSET])
+#define IDE_NSECTOR_REG_HOB	(HWIF(drive)->io_ports[IDE_NSECTOR_OFFSET])
+#define IDE_SECTOR_REG_HOB	(HWIF(drive)->io_ports[IDE_SECTOR_OFFSET])
+#define IDE_LCYL_REG_HOB	(HWIF(drive)->io_ports[IDE_LCYL_OFFSET])
+#define IDE_HCYL_REG_HOB	(HWIF(drive)->io_ports[IDE_HCYL_OFFSET])
+#define IDE_SELECT_REG_HOB	(HWIF(drive)->io_ports[IDE_SELECT_OFFSET])
+#define IDE_STATUS_REG_HOB	(HWIF(drive)->io_ports[IDE_STATUS_OFFSET])
+#define IDE_CONTROL_REG_HOB	(HWIF(drive)->io_ports[IDE_CONTROL_OFFSET])
 
 #define IDE_FEATURE_REG		IDE_ERROR_REG
 #define IDE_COMMAND_REG		IDE_STATUS_REG
@@ -171,10 +193,20 @@ typedef unsigned char	byte;	/* used everywhere */
 #define PARTN_BITS	6	/* number of minor dev bits for partitions */
 #define PARTN_MASK	((1<<PARTN_BITS)-1)	/* a useful bit mask */
 #define MAX_DRIVES	2	/* per interface; 2 assumed by lots of code */
-#define SECTOR_WORDS	(512 / 4)	/* number of 32bit words per sector */
+#define CASCADE_DRIVES	8	/* per interface; 8|2 assumed by lots of code */
+#define SECTOR_SIZE	512
+#define SECTOR_WORDS	(SECTOR_SIZE / 4)	/* number of 32bit words per sector */
 #define IDE_LARGE_SEEK(b1,b2,t)	(((b1) > (b2) + (t)) || ((b2) > (b1) + (t)))
 #define IDE_MIN(a,b)	((a)<(b) ? (a):(b))
 #define IDE_MAX(a,b)	((a)>(b) ? (a):(b))
+
+#ifndef SPLIT_WORD
+#  define SPLIT_WORD(W,HB,LB) ((HB)=(W>>8), (LB)=(W-((W>>8)<<8)))
+#endif
+#ifndef MAKE_WORD
+#  define MAKE_WORD(W,HB,LB) ((W)=((HB<<8)+LB))
+#endif
+
 
 /*
  * Timeouts for various operations:
@@ -185,8 +217,7 @@ typedef unsigned char	byte;	/* used everywhere */
 #else
 #define WAIT_READY	(3*HZ/100)	/* 30msec - should be instantaneous */
 #endif /* CONFIG_APM || CONFIG_APM_MODULE */
-#define WAIT_PIDENTIFY	(10*HZ)	/* 10sec  - should be less than 3ms (?)
-				            if all ATAPI CD is closed at boot */
+#define WAIT_PIDENTIFY	(10*HZ)	/* 10sec  - should be less than 3ms (?), if all ATAPI CD is closed at boot */
 #define WAIT_WORSTCASE	(30*HZ)	/* 30sec  - worst case when spinning up */
 #define WAIT_CMD	(10*HZ)	/* 10sec  - maximum wait for an IRQ to happen */
 #define WAIT_MIN_SLEEP	(2*HZ/100)	/* 20msec - minimum sleep time */
@@ -224,6 +255,11 @@ typedef unsigned char	byte;	/* used everywhere */
 		(drive)->quirk_list = hwif->quirkproc(drive);	\
 }
 
+#define HOST(hwif,chipset)					\
+{								\
+	return ((hwif)->chipset == chipset) ? 1 : 0;		\
+}
+
 #define IDE_DEBUG(lineno) \
 	printk("%s,%s,line=%d\n", __FILE__, __FUNCTION__, (lineno))
 
@@ -249,10 +285,10 @@ typedef enum {  ide_unknown,    ide_generic,    ide_pci,
                 ide_pmac,       ide_etrax100
 } hwif_chipset_t;
 
+
 #define IDE_CHIPSET_PCI_MASK    \
     ((1<<ide_pci)|(1<<ide_cmd646)|(1<<ide_ali14xx))
 #define IDE_CHIPSET_IS_PCI(c)   ((IDE_CHIPSET_PCI_MASK >> (c)) & 1)
-
 
 /*
  * Structure to hold all information about the location of this port
@@ -292,16 +328,20 @@ void ide_setup_ports(	hw_regs_t *hw,
 #ifndef HAVE_ARCH_OUT_BYTE
 #ifdef REALLY_FAST_IO
 #define OUT_BYTE(b,p)          outb((b),(p))
+#define OUT_WORD(w,p)          outw((w),(p))
 #else
 #define OUT_BYTE(b,p)          outb_p((b),(p))
+#define OUT_WORD(w,p)          outw_p((w),(p))
 #endif
 #endif
 
 #ifndef HAVE_ARCH_IN_BYTE
 #ifdef REALLY_FAST_IO
-#define IN_BYTE(p)             (byte)inb_p(p)
-#else
 #define IN_BYTE(p)             (byte)inb(p)
+#define IN_WORD(p)             (short)inw(p)
+#else
+#define IN_BYTE(p)             (byte)inb_p(p)
+#define IN_WORD(p)             (short)inw_p(p)
 #endif
 #endif
 
@@ -361,6 +401,7 @@ typedef struct ide_drive_s {
 	unsigned autotune	: 2;	/* 1=autotune, 2=noautotune, 0=default */
 	unsigned remap_0_to_1	: 2;	/* 0=remap if ezdrive, 1=remap, 2=noremap */
 	unsigned ata_flash	: 1;	/* 1=present, 0=default */
+	unsigned	addressing;	/* : 2; 0=28-bit, 1=48-bit, 2=64-bit */
 	byte		scsi;		/* 0=default, 1=skip current ide-subdriver for ide-scsi emulation */
 	byte		media;		/* disk, cdrom, tape, floppy, ... */
 	select_t	select;		/* basic drive/head select reg value */
@@ -373,7 +414,7 @@ typedef struct ide_drive_s {
 	byte		bad_wstat;	/* used for ignoring WRERR_STAT */
 	byte		nowerr;		/* used for ignoring WRERR_STAT */
 	byte		sect0;		/* offset of first sector for DM6:DDO */
-	byte 		usage;		/* current "open()" count for drive */
+	unsigned int	usage;		/* current "open()" count for drive */
 	byte 		head;		/* "real" number of heads */
 	byte		sect;		/* "real" sectors per track */
 	byte		bios_head;	/* BIOS/fdisk/LILO number of heads */
@@ -381,6 +422,7 @@ typedef struct ide_drive_s {
 	unsigned int	bios_cyl;	/* BIOS/fdisk/LILO number of cyls */
 	unsigned int	cyl;		/* "real" number of cyls */
 	unsigned long	capacity;	/* total number of sectors */
+	unsigned long long capacity48;	/* total number of sectors */
 	unsigned int	drive_data;	/* for use by tuneproc/selectproc as needed */
 	void		  *hwif;	/* actually (ide_hwif_t *) */
 	wait_queue_head_t wqueue;	/* used to wait for drive in open() */
@@ -402,6 +444,8 @@ typedef struct ide_drive_s {
 	byte		init_speed;	/* transfer rate set at boot */
 	byte		current_speed;	/* current transfer rate set */
 	byte		dn;		/* now wide spread use */
+	byte		wcache;		/* status of write cache */
+	byte		acoustic;	/* acoustic management */
 	unsigned int	failures;	/* current failure count */
 	unsigned int	max_failures;	/* maximum allowed failure count */
 } ide_drive_t;
@@ -471,7 +515,7 @@ typedef void (ide_rw_proc_t) (ide_drive_t *, ide_dma_action_t);
 /*
  * ide soft-power support
  */
-typedef int (ide_busproc_t) (struct hwif_s *, int);
+typedef int (ide_busproc_t) (ide_drive_t *, int);
 
 #ifdef CONFIG_BLK_DEV_IDEPCI
 typedef struct ide_pci_devid_s {
@@ -538,7 +582,6 @@ typedef struct hwif_s {
 	byte		bus_state;	/* power state of the IDE bus */
 } ide_hwif_t;
 
-
 /*
  * Status returned from various ide_ functions
  */
@@ -550,7 +593,9 @@ typedef enum {
 /*
  *  internal ide interrupt handler type
  */
+typedef ide_startstop_t (ide_pre_handler_t)(ide_drive_t *, struct request *);
 typedef ide_startstop_t (ide_handler_t)(ide_drive_t *);
+typedef ide_startstop_t (ide_post_handler_t)(ide_drive_t *);
 
 /*
  * when ide_timer_expiry fires, invoke a handler of this type
@@ -572,6 +617,8 @@ typedef struct hwgroup_s {
 	unsigned long		poll_timeout;	/* timeout value during long polls */
 	ide_expiry_t		*expiry;	/* queried upon timeouts */
 } ide_hwgroup_t;
+
+/* structure attached to the request for IDE_TASK_CMDS */
 
 /*
  * configurable drive settings
@@ -623,6 +670,8 @@ typedef struct {
 #ifdef CONFIG_PROC_FS
 void proc_ide_create(void);
 void proc_ide_destroy(void);
+void recreate_proc_ide_device(ide_hwif_t *, ide_drive_t *);
+void destroy_proc_ide_device(ide_hwif_t *, ide_drive_t *);
 void destroy_proc_ide_drives(ide_hwif_t *);
 void create_proc_ide_interfaces(void);
 void ide_add_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p, void *data);
@@ -655,6 +704,8 @@ read_proc_t proc_ide_read_geometry;
 #define IDE_SUBDRIVER_VERSION	1
 
 typedef int		(ide_cleanup_proc)(ide_drive_t *);
+typedef int		(ide_standby_proc)(ide_drive_t *);
+typedef int		(ide_flushcache_proc)(ide_drive_t *);
 typedef ide_startstop_t	(ide_do_request_proc)(ide_drive_t *, struct request *, unsigned long);
 typedef void		(ide_end_request_proc)(byte, ide_hwgroup_t *);
 typedef int		(ide_ioctl_proc)(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
@@ -676,6 +727,8 @@ typedef struct ide_driver_s {
 	unsigned supports_dma		: 1;
 	unsigned supports_dsc_overlap	: 1;
 	ide_cleanup_proc		*cleanup;
+	ide_standby_proc		*standby;
+	ide_flushcache_proc		*flushcache;
 	ide_do_request_proc		*do_request;
 	ide_end_request_proc		*end_request;
 	ide_ioctl_proc			*ioctl;
@@ -733,19 +786,7 @@ extern int noautodma;
 inline int __ide_end_request(ide_hwgroup_t *, int, int);
 int ide_end_request(byte uptodate, ide_hwgroup_t *hwgroup);
 
-/*
- * This is used for (nearly) all data transfers from/to the IDE interface
- * FIXME for 2.5, to a pointer pass verses memcpy........
- */
-void ide_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount);
-void ide_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount);
-
-/*
- * This is used for (nearly) all ATAPI data transfers from/to the IDE interface
- * FIXME for 2.5, to a pointer pass verses memcpy........
- */
-void atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount);
-void atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount);
+int drive_is_ready (ide_drive_t *drive);
 
 /*
  * This is used on exit from the driver, to designate the next irq handler
@@ -768,7 +809,7 @@ ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, byte stat);
  * Issue a simple drive command
  * The drive must be selected beforehand.
  */
-void ide_cmd(ide_drive_t *drive, byte cmd, byte nsect, ide_handler_t *handler);
+void ide_cmd (ide_drive_t *drive, byte cmd, byte nsect, ide_handler_t *handler);
 
 /*
  * ide_fixstring() cleans up and (optionally) byte-swaps a text string,
@@ -883,24 +924,91 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 /*
  * Clean up after success/failure of an explicit drive cmd.
  * stat/err are used only when (HWGROUP(drive)->rq->cmd == IDE_DRIVE_CMD).
+ * stat/err are used only when (HWGROUP(drive)->rq->cmd == IDE_DRIVE_TASK_MASK).
  */
 void ide_end_drive_cmd (ide_drive_t *drive, byte stat, byte err);
 
 /*
- * Issue ATA command and wait for completion.
+ * Issue ATA command and wait for completion. use for implementing commands in kernel
  */
 int ide_wait_cmd (ide_drive_t *drive, int cmd, int nsect, int feature, int sectors, byte *buf);
+
 int ide_wait_cmd_task (ide_drive_t *drive, byte *buf);
+ 
+typedef struct ide_task_s {
+	task_ioreg_t		tfRegister[8];
+	task_ioreg_t		hobRegister[8];
+	ide_reg_valid_t		tf_out_flags;
+	ide_reg_valid_t		tf_in_flags;
+	int			data_phase;
+	int			command_type;
+	ide_pre_handler_t	*prehandler;
+	ide_handler_t		*handler;
+	ide_post_handler_t	*posthandler;
+	void			*special;	/* valid_t generally */
+	struct request		*rq;		/* copy of request */
+	unsigned long		block;		/* copy of block */
+} ide_task_t;
+
+void ata_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount);
+void ata_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount);
+void atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount);
+void atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount);
+void taskfile_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount);
+void taskfile_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount);
+
+/*
+ * taskfile io for disks for now...
+ */
+ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task);
+
+/*
+ * Builds request from ide_ioctl
+ */
+void do_taskfile (ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile, ide_handler_t *handler);
+
+/*
+ * Special Flagged Register Validation Caller
+ */
+// ide_startstop_t flagged_taskfile (ide_drive_t *drive, ide_task_t *task);
+
+ide_startstop_t set_multmode_intr (ide_drive_t *drive);
+ide_startstop_t set_geometry_intr (ide_drive_t *drive);
+ide_startstop_t recal_intr (ide_drive_t *drive);
+ide_startstop_t task_no_data_intr (ide_drive_t *drive);
+ide_startstop_t task_in_intr (ide_drive_t *drive);
+ide_startstop_t task_mulin_intr (ide_drive_t *drive);
+ide_startstop_t pre_task_out_intr (ide_drive_t *drive, struct request *rq);
+ide_startstop_t task_out_intr (ide_drive_t *drive);
+ide_startstop_t task_mulout_intr (ide_drive_t *drive);
+void ide_init_drive_taskfile (struct request *rq);
+
+int ide_wait_taskfile (ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile, byte *buf);
+
+int ide_raw_taskfile (ide_drive_t *drive, ide_task_t *cmd, byte *buf);
+
+ide_pre_handler_t * ide_pre_handler_parser (struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile);
+ide_handler_t * ide_handler_parser (struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile);
+/* Expects args is a full set of TF registers and parses the command type */
+int ide_cmd_type_parser (ide_task_t *args);
+
+int ide_taskfile_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
+int ide_cmd_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
+int ide_task_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
+
+#ifdef CONFIG_PKT_TASK_IOCTL
+int pkt_taskfile_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
+#endif /* CONFIG_PKT_TASK_IOCTL */
 
 void ide_delay_50ms (void);
 int system_bus_clock(void);
 
 byte ide_auto_reduce_xfer (ide_drive_t *drive);
 int ide_driveid_update (ide_drive_t *drive);
-int ide_ata66_check (ide_drive_t *drive, byte cmd, byte nsect, byte feature);
+int ide_ata66_check (ide_drive_t *drive, ide_task_t *args);
 int ide_config_drive_speed (ide_drive_t *drive, byte speed);
 byte eighty_ninty_three (ide_drive_t *drive);
-int set_transfer (ide_drive_t *drive, byte cmd, byte nsect, byte feature);
+int set_transfer (ide_drive_t *drive, ide_task_t *args);
 
 /*
  * ide_system_bus_speed() returns what we think is the system VESA/PCI
@@ -909,12 +1017,6 @@ int set_transfer (ide_drive_t *drive, byte cmd, byte nsect, byte feature);
  * The "idebus=xx" parameter can be used to override this value.
  */
 int ide_system_bus_speed (void);
-
-/*
- * ide_multwrite() transfers a block of up to mcount sectors of data
- * to a drive as part of a disk multwrite operation.
- */
-int ide_multwrite (ide_drive_t *drive, unsigned int mcount);
 
 /*
  * idedisk_input_data() is a wrapper around ide_input_data() which copes
@@ -951,23 +1053,30 @@ extern struct block_device_operations ide_fops[];
 extern ide_proc_entry_t generic_subdriver_entries[];
 #endif
 
+int ide_reinit_drive (ide_drive_t *drive);
+
 #ifdef _IDE_C
 #ifdef CONFIG_BLK_DEV_IDE
 int ideprobe_init (void);
 #endif /* CONFIG_BLK_DEV_IDE */
 #ifdef CONFIG_BLK_DEV_IDEDISK
+int idedisk_reinit (ide_drive_t *drive);
 int idedisk_init (void);
 #endif /* CONFIG_BLK_DEV_IDEDISK */
 #ifdef CONFIG_BLK_DEV_IDECD
+int ide_cdrom_reinit (ide_drive_t *drive);
 int ide_cdrom_init (void);
 #endif /* CONFIG_BLK_DEV_IDECD */
 #ifdef CONFIG_BLK_DEV_IDETAPE
+int idetape_reinit (ide_drive_t *drive);
 int idetape_init (void);
 #endif /* CONFIG_BLK_DEV_IDETAPE */
 #ifdef CONFIG_BLK_DEV_IDEFLOPPY
+int idefloppy_reinit (ide_drive_t *drive);
 int idefloppy_init (void);
 #endif /* CONFIG_BLK_DEV_IDEFLOPPY */
 #ifdef CONFIG_BLK_DEV_IDESCSI
+int idescsi_reinit (ide_drive_t *drive);
 int idescsi_init (void);
 #endif /* CONFIG_BLK_DEV_IDESCSI */
 #endif /* _IDE_C */
@@ -1006,6 +1115,9 @@ unsigned long ide_get_or_set_dma_base (ide_hwif_t *hwif, int extra, const char *
 #endif
 
 void hwif_unregister (ide_hwif_t *hwif);
+
+void export_ide_init_queue (ide_drive_t *drive);
+byte export_probe_for_drive (ide_drive_t *drive);
 
 extern spinlock_t ide_lock;
 

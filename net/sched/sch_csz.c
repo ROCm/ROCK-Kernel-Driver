@@ -795,7 +795,6 @@ static int csz_init(struct Qdisc *sch, struct rtattr *opt)
 	return 0;
 }
 
-#ifdef CONFIG_RTNETLINK
 static int csz_dump(struct Qdisc *sch, struct sk_buff *skb)
 {
 	struct csz_sched_data *q = (struct csz_sched_data *)sch->data;
@@ -817,8 +816,6 @@ rtattr_failure:
 	skb_trim(skb, b - skb->data);
 	return -1;
 }
-#endif
-
 
 static int csz_graft(struct Qdisc *sch, unsigned long cl, struct Qdisc *new,
 		     struct Qdisc **old)
@@ -932,7 +929,6 @@ static int csz_delete(struct Qdisc *sch, unsigned long cl)
 	return 0;
 }
 
-#ifdef CONFIG_RTNETLINK
 static int csz_dump_class(struct Qdisc *sch, unsigned long cl, struct sk_buff *skb, struct tcmsg *tcm)
 {
 	struct csz_sched_data *q = (struct csz_sched_data *)sch->data;
@@ -978,7 +974,6 @@ rtattr_failure:
 	skb_trim(skb, b - skb->data);
 	return -1;
 }
-#endif
 
 static void csz_walk(struct Qdisc *sch, struct qdisc_walker *arg)
 {
@@ -1030,9 +1025,7 @@ struct Qdisc_class_ops csz_class_ops =
 	csz_bind,
 	csz_put,
 
-#ifdef CONFIG_RTNETLINK
 	csz_dump_class,
-#endif
 };
 
 struct Qdisc_ops csz_qdisc_ops =
@@ -1052,9 +1045,7 @@ struct Qdisc_ops csz_qdisc_ops =
 	csz_destroy,
 	NULL /* csz_change */,
 
-#ifdef CONFIG_RTNETLINK
 	csz_dump,
-#endif
 };
 
 

@@ -214,7 +214,7 @@ static int sbusfb_mmap(struct fb_info *info, struct file *file,
 		}
 		if (page + map_size > size)
 			map_size = size - page;
-		r = io_remap_page_range (vma->vm_start+page, map_offset, map_size, vma->vm_page_prot, fb->iospace);
+		r = io_remap_page_range(vma, vma->vm_start+page, map_offset, map_size, vma->vm_page_prot, fb->iospace);
 		if (r)
 			return -EAGAIN;
 		page += map_size;

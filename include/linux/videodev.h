@@ -8,6 +8,7 @@
 
 #include <linux/poll.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/mm.h>
 
 struct video_device
 {
@@ -25,7 +26,7 @@ struct video_device
 	unsigned int (*poll)(struct video_device *, struct file *, poll_table *);
 #endif
 	int (*ioctl)(struct video_device *, unsigned int , void *);
-	int (*mmap)(struct video_device *, const char *, unsigned long);
+	int (*mmap)(struct vm_area_struct *vma, struct video_device *, const char *, unsigned long);
 	int (*initialize)(struct video_device *);	
 	void *priv;		/* Used to be 'private' but that upsets C++ */
 	int busy;

@@ -38,7 +38,9 @@
 /************************************************************************/
 
 #define SECTOR_BITS 		9
+#ifndef SECTOR_SIZE
 #define SECTOR_SIZE		(1 << SECTOR_BITS)
+#endif
 #define SECTORS_PER_FRAME	(CD_FRAMESIZE >> SECTOR_BITS)
 #define SECTOR_BUFFER_SIZE	(CD_FRAMESIZE * 32)
 #define SECTORS_BUFFER		(SECTOR_BUFFER_SIZE >> SECTOR_BITS)

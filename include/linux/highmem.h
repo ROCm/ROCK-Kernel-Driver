@@ -95,17 +95,6 @@ static inline void clear_highpage(struct page *page)
 	kunmap(page);
 }
 
-static inline void memclear_highpage(struct page *page, unsigned int offset, unsigned int size)
-{
-	char *kaddr;
-
-	if (offset + size > PAGE_SIZE)
-		BUG();
-	kaddr = kmap(page);
-	memset(kaddr + offset, 0, size);
-	kunmap(page);
-}
-
 /*
  * Same but also flushes aliased cache contents to RAM.
  */
@@ -117,6 +106,7 @@ static inline void memclear_highpage_flush(struct page *page, unsigned int offse
 		BUG();
 	kaddr = kmap(page);
 	memset(kaddr + offset, 0, size);
+	flush_dcache_page(page);
 	flush_page_to_ram(page);
 	kunmap(page);
 }
@@ -130,17 +120,6 @@ static inline void copy_user_highpage(struct page *to, struct page *from, unsign
 	copy_user_page(vto, vfrom, vaddr);
 	kunmap_atomic(vfrom, KM_USER0);
 	kunmap_atomic(vto, KM_USER1);
-}
-
-static inline void copy_highpage(struct page *to, struct page *from)
-{
-	char *vfrom, *vto;
-
-	vfrom = kmap(from);
-	vto = kmap(to);
-	copy_page(vto, vfrom);
-	kunmap(from);
-	kunmap(to);
 }
 
 #endif /* _LINUX_HIGHMEM_H */

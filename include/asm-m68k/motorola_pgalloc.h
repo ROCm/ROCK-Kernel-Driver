@@ -241,10 +241,10 @@ static inline void flush_tlb_page(struct vm_area_struct *vma, unsigned long addr
 		__flush_tlb_one(addr);
 }
 
-static inline void flush_tlb_range(struct mm_struct *mm,
+static inline void flush_tlb_range(struct vm_area_struct *vma,
 				   unsigned long start, unsigned long end)
 {
-	if (mm == current->mm)
+	if (vma->vm_mm == current->mm)
 		__flush_tlb();
 }
 

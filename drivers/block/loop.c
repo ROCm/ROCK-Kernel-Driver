@@ -534,7 +534,6 @@ static int loop_thread(void *data)
 	struct bio *bio;
 
 	daemonize();
-	exit_files(current);
 
 	sprintf(current->comm, "loop%d", lo->lo_number);
 

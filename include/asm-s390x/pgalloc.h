@@ -192,7 +192,7 @@ extern int do_check_pgt_cache (int, int);
  *    called only from vmalloc/vfree
  *  - flush_tlb_mm(mm) flushes the specified mm context TLB's
  *  - flush_tlb_page(vma, vmaddr) flushes one page
- *  - flush_tlb_range(mm, start, end) flushes a range of pages
+ *  - flush_tlb_range(vma, start, end) flushes a range of pages
  *  - flush_tlb_pgtables(mm, start, end) flushes a range of page tables
  */
 
@@ -232,7 +232,7 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
 {
 	local_flush_tlb();
 }
-static inline void flush_tlb_range(struct mm_struct *mm,
+static inline void flush_tlb_range(struct vm_area_struct *vma,
 				   unsigned long start, unsigned long end)
 {
 	local_flush_tlb();
@@ -291,10 +291,10 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
 {
 	__flush_tlb_mm(vma->vm_mm);
 }
-static inline void flush_tlb_range(struct mm_struct *mm,
+static inline void flush_tlb_range(struct vm_area_struct *vma,
 				   unsigned long start, unsigned long end)
 {
-	__flush_tlb_mm(mm); 
+	__flush_tlb_mm(vma->vm_mm);
 }
 
 #endif

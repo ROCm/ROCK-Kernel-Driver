@@ -1,4 +1,4 @@
-/* $Id: sunqe.c,v 1.53 2001/12/21 00:54:31 davem Exp $
+/* $Id: sunqe.c,v 1.55 2002/01/15 06:48:55 davem Exp $
  * sunqe.c: Sparc QuadEthernet 10baseT SBUS card driver.
  *          Once again I am out to prove that every ethernet
  *          controller out there can be most efficiently programmed
@@ -629,7 +629,7 @@ static void qe_set_multicast(struct net_device *dev)
 	struct dev_mc_list *dmi = dev->mc_list;
 	u8 new_mconfig = qep->mconfig;
 	char *addrs;
-	int i, j, bit, byte;
+	int i;
 	u32 crc;
 
 	/* Lock out others. */

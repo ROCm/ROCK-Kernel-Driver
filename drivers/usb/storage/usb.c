@@ -314,9 +314,6 @@ static int usb_stor_control_thread(void * __us)
 	 * This thread doesn't need any user-level access,
 	 * so get rid of all our resources..
 	 */
-	exit_files(current);
-	current->files = init_task.files;
-	atomic_inc(&current->files->count);
 	daemonize();
 
 	/* set our name for identification purposes */

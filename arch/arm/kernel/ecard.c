@@ -243,6 +243,8 @@ static DECLARE_COMPLETION(ecard_completion);
  */
 static void ecard_init_pgtables(struct mm_struct *mm)
 {
+	struct vm_area_struct vma;
+
 	/* We want to set up the page tables for the following mapping:
 	 *  Virtual	Physical
 	 *  0x03000000	0x03000000
@@ -274,8 +276,10 @@ static void ecard_init_pgtables(struct mm_struct *mm)
 		dst_addr += PGDIR_SIZE;
 	}
 
-	flush_tlb_range(mm, IO_START, IO_START + IO_SIZE);
-	flush_tlb_range(mm, EASI_START, EASI_START + EASI_SIZE);
+	vma.vm_mm = mm;
+
+	flush_tlb_range(&vma, IO_START, IO_START + IO_SIZE);
+	flush_tlb_range(&vma, EASI_START, EASI_START + EASI_SIZE);
 }
 
 static int ecard_init_mm(void)

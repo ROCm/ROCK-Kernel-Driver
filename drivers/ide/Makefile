@@ -10,7 +10,7 @@
 
 O_TARGET := idedriver.o
 
-export-objs		:= ide.o ide-features.o ataraid.o
+export-objs		:= ide-taskfile.o ide.o ide-features.o ide-probe.o ataraid.o
 list-multi		:= ide-mod.o ide-probe-mod.o
 
 obj-y		:=
@@ -24,6 +24,7 @@ obj-$(CONFIG_BLK_DEV_IDEDISK)   += ide-disk.o
 obj-$(CONFIG_BLK_DEV_IDECD)     += ide-cd.o
 obj-$(CONFIG_BLK_DEV_IDETAPE)   += ide-tape.o
 obj-$(CONFIG_BLK_DEV_IDEFLOPPY) += ide-floppy.o
+
 obj-$(CONFIG_BLK_DEV_IT8172)    += it8172.o
 
 ide-obj-$(CONFIG_BLK_DEV_AEC62XX)	+= aec62xx.o
@@ -69,13 +70,13 @@ ide-obj-$(CONFIG_BLK_DEV_MPC8xx_IDE)	+= ide-m8xx.o
 
 # The virtualised raid layers MUST come after the ide itself or bad stuff
 # will happen.
-obj-$(CONFIG_BLK_DEV_ATARAID)	+= ataraid.o
+obj-$(CONFIG_BLK_DEV_ATARAID)		+= ataraid.o
 obj-$(CONFIG_BLK_DEV_ATARAID_PDC)	+= pdcraid.o
 obj-$(CONFIG_BLK_DEV_ATARAID_HPT)	+= hptraid.o
 
 ide-obj-$(CONFIG_PROC_FS)		+= ide-proc.o
 
-ide-mod-objs		:= ide.o ide-features.o $(ide-obj-y)
+ide-mod-objs		:= ide-taskfile.o ide.o ide-features.o $(ide-obj-y)
 ide-probe-mod-objs	:= ide-probe.o ide-geometry.o
 
 include $(TOPDIR)/Rules.make

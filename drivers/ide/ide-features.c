@@ -127,30 +127,14 @@ byte ide_auto_reduce_xfer (ide_drive_t *drive)
 		case XFER_UDMA_3:	return XFER_UDMA_2;
 		case XFER_UDMA_2:	return XFER_UDMA_1;
 		case XFER_UDMA_1:	return XFER_UDMA_0;
+			/*
+			 * OOPS we do not goto non Ultra DMA modes
+			 * without iCRC's available we force
+			 * the system to PIO and make the user
+			 * invoke the ATA-1 ATA-2 DMA modes.
+			 */
 		case XFER_UDMA_0:
-			if (drive->id->dma_mword & 0x0004) return XFER_MW_DMA_2;
-			else if (drive->id->dma_mword & 0x0002) return XFER_MW_DMA_1;
-			else if (drive->id->dma_mword & 0x0001) return XFER_MW_DMA_0;
-			else return XFER_PIO_4;
-		case XFER_MW_DMA_2:	return XFER_MW_DMA_1;
-		case XFER_MW_DMA_1:	return XFER_MW_DMA_0;
-		case XFER_MW_DMA_0:
-			if (drive->id->dma_1word & 0x0004) return XFER_SW_DMA_2;
-			else if (drive->id->dma_1word & 0x0002) return XFER_SW_DMA_1;
-			else if (drive->id->dma_1word & 0x0001) return XFER_SW_DMA_0;
-			else return XFER_PIO_4;
-		case XFER_SW_DMA_2:	return XFER_SW_DMA_1;
-		case XFER_SW_DMA_1:	return XFER_SW_DMA_0;
-		case XFER_SW_DMA_0:
-			{
-				return XFER_PIO_4;
-			}
-		case XFER_PIO_4:	return XFER_PIO_3;
-		case XFER_PIO_3:	return XFER_PIO_2;
-		case XFER_PIO_2:	return XFER_PIO_1;
-		case XFER_PIO_1:	return XFER_PIO_0;
-		case XFER_PIO_0:
-		default:		return XFER_PIO_SLOW;
+		default:		return XFER_PIO_4;
 	}
 }
 
@@ -193,7 +177,7 @@ int ide_driveid_update (ide_drive_t *drive)
 		__restore_flags(flags);	/* local CPU only */
 		return 0;
 	}
-	ide_input_data(drive, id, SECTOR_WORDS);
+	ata_input_data(drive, id, SECTOR_WORDS);
 	(void) GET_STAT();	/* clear drive IRQ */
 	ide__sti();		/* local CPU only */
 	__restore_flags(flags);	/* local CPU only */
@@ -216,11 +200,11 @@ int ide_driveid_update (ide_drive_t *drive)
  * in combination with the device (usually a disk) properly detect
  * and acknowledge each end of the ribbon.
  */
-int ide_ata66_check (ide_drive_t *drive, byte cmd, byte nsect, byte feature)
+int ide_ata66_check (ide_drive_t *drive, ide_task_t *args)
 {
-	if ((cmd == WIN_SETFEATURES) &&
-	    (nsect > XFER_UDMA_2) &&
-	    (feature == SETFEATURES_XFER)) {
+	if ((args->tfRegister[IDE_COMMAND_OFFSET] == WIN_SETFEATURES) &&
+	    (args->tfRegister[IDE_SECTOR_OFFSET] > XFER_UDMA_2) &&
+	    (args->tfRegister[IDE_FEATURE_OFFSET] == SETFEATURES_XFER)) {
 		if (!HWIF(drive)->udma_four) {
 			printk("%s: Speed warnings UDMA 3/4/5 is not functional.\n", HWIF(drive)->name);
 			return 1;
@@ -243,11 +227,11 @@ int ide_ata66_check (ide_drive_t *drive, byte cmd, byte nsect, byte feature)
  * 1 : Safe to update drive->id DMA registers.
  * 0 : OOPs not allowed.
  */
-int set_transfer (ide_drive_t *drive, byte cmd, byte nsect, byte feature)
+int set_transfer (ide_drive_t *drive, ide_task_t *args)
 {
-	if ((cmd == WIN_SETFEATURES) &&
-	    (nsect >= XFER_SW_DMA_0) &&
-	    (feature == SETFEATURES_XFER) &&
+	if ((args->tfRegister[IDE_COMMAND_OFFSET] == WIN_SETFEATURES) &&
+	    (args->tfRegister[IDE_SECTOR_OFFSET] >= XFER_SW_DMA_0) &&
+	    (args->tfRegister[IDE_FEATURE_OFFSET] == SETFEATURES_XFER) &&
 	    (drive->id->dma_ultra ||
 	     drive->id->dma_mword ||
 	     drive->id->dma_1word))
@@ -389,3 +373,4 @@ EXPORT_SYMBOL(ide_ata66_check);
 EXPORT_SYMBOL(set_transfer);
 EXPORT_SYMBOL(eighty_ninty_three);
 EXPORT_SYMBOL(ide_config_drive_speed);
+

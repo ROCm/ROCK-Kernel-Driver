@@ -129,6 +129,18 @@ typedef union {
 	} b;
 } select_t;
 
+typedef union {
+	unsigned all			: 8;	/* all of the bits together */
+	struct {
+		unsigned HOB		: 1;	/* 48-bit address ordering */
+		unsigned reserved456	: 3;
+		unsigned bit3		: 1;	/* ATA-2 thingy */
+		unsigned SRST		: 1;	/* host soft reset bit */
+		unsigned nIEN		: 1;	/* device INTRQ to host */
+		unsigned bit0		: 1;
+	} b;
+} control_t;
+
 #if !defined(ide_request_irq)
 #define ide_request_irq(irq,hand,flg,dev,id)	request_irq((irq),(hand),(flg),(dev),(id))
 #endif

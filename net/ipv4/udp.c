@@ -5,7 +5,7 @@
  *
  *		The User Datagram Protocol (UDP).
  *
- * Version:	$Id: udp.c,v 1.100 2001/10/15 12:34:50 davem Exp $
+ * Version:	$Id: udp.c,v 1.101 2002/01/12 07:39:45 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -886,6 +886,9 @@ int udp_rcv(struct sk_buff *skb)
 	/*
 	 *	Validate the packet and the UDP length.
 	 */
+	if (!pskb_may_pull(skb, sizeof(struct udphdr)))
+		goto no_header;
+
 	ulen = ntohs(skb->h.uh->len);
 
 	if (ulen > len || ulen < sizeof(*uh))
@@ -926,6 +929,7 @@ int udp_rcv(struct sk_buff *skb)
 
 short_packet:
 	NETDEBUG(if (net_ratelimit()) printk(KERN_DEBUG "UDP: short packet: %d/%d\n", ulen, len));
+no_header:
 	UDP_INC_STATS_BH(UdpInErrors);
 	kfree_skb(skb);
 	return(0);

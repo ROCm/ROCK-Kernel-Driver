@@ -1,4 +1,4 @@
-/* $Id: head.S,v 1.82 2001/10/04 23:37:04 davem Exp $
+/* $Id: head.S,v 1.86 2001/12/05 01:02:16 davem Exp $
  * head.S: Initial boot code for the Sparc64 port of Linux.
  *
  * Copyright (C) 1996,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -201,7 +201,7 @@ cheetah_got_tlbentry:
 	 add	%l0, (1 << 3), %l0
 
 	/* Now lock the TTE we created into ITLB-0 and DTLB-0,
-	 * entry 15.
+	 * entry 15 (and maybe 14 too).
 	 */
 	sethi	%hi(KERNBASE), %g3
 	set	(0 << 16) | (15 << 3), %g7
@@ -215,6 +215,29 @@ cheetah_got_tlbentry:
 	membar	#Sync
 	flush	%g3
 	membar	#Sync
+	sethi	%hi(_end), %g3			/* Check for bigkernel case */
+	or	%g3, %lo(_end), %g3
+	srl	%g3, 23, %g3			/* Check if _end > 8M */
+	brz,pt	%g3, 1f
+	 sethi	%hi(KERNBASE), %g3		/* Restore for fixup code below */
+	sethi	%hi(0x400000), %g3
+	or	%g3, %lo(0x400000), %g3
+	add	%g5, %g3, %g5			/* New tte data */
+	andn	%g5, (_PAGE_G), %g5
+	sethi	%hi(KERNBASE+0x400000), %g3
+	or	%g3, %lo(KERNBASE+0x400000), %g3
+	set	(0 << 16) | (14 << 3), %g7
+	stxa	%g3, [%l7] ASI_DMMU
+	membar	#Sync
+	stxa	%g5, [%g7] ASI_DTLB_DATA_ACCESS
+	membar	#Sync
+	stxa	%g3, [%l7] ASI_IMMU
+	membar	#Sync
+	stxa	%g5, [%g7] ASI_ITLB_DATA_ACCESS
+	membar	#Sync
+	flush	%g3
+	membar	#Sync
+	sethi	%hi(KERNBASE), %g3		/* Restore for fixup code below */
 	ba,pt	%xcc, 1f
 	 nop
 
@@ -345,7 +368,7 @@ spitfire_got_tlbentry:
 
 
 	/* PROM never puts any TLB entries into the MMU with the lock bit
-	 * set.  So we gladly use tlb entry 63 for KERNBASE.
+	 * set.  So we gladly use tlb entry 63 for KERNBASE. And maybe 62 too.
 	 */
 
 	sethi	%hi(KERNBASE), %g3
@@ -358,7 +381,28 @@ spitfire_got_tlbentry:
 	membar	#Sync
 	flush	%g3
 	membar	#Sync
-	ba,pt	%xcc, 1f
+	sethi	%hi(_end), %g3			/* Check for bigkernel case */
+	or	%g3, %lo(_end), %g3
+	srl	%g3, 23, %g3			/* Check if _end > 8M */
+	brz,pt	%g3, 2f
+	 sethi	%hi(KERNBASE), %g3		/* Restore for fixup code below */
+	sethi	%hi(0x400000), %g3
+	or	%g3, %lo(0x400000), %g3
+	add	%g5, %g3, %g5			/* New tte data */
+	andn	%g5, (_PAGE_G), %g5
+	sethi	%hi(KERNBASE+0x400000), %g3
+	or	%g3, %lo(KERNBASE+0x400000), %g3
+	mov	(62 << 3), %g7
+	stxa	%g3, [%l7] ASI_DMMU
+	stxa	%g5, [%g7] ASI_DTLB_DATA_ACCESS
+	membar	#Sync
+	stxa	%g3, [%l7] ASI_IMMU
+	stxa	%g5, [%g7] ASI_ITLB_DATA_ACCESS
+	membar	#Sync
+	flush	%g3
+	membar	#Sync
+	sethi	%hi(KERNBASE), %g3		/* Restore for fixup code below */
+2:	ba,pt	%xcc, 1f
 	 nop
 1:
 	set	sun4u_init, %g2

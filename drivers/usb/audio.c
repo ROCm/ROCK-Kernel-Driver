@@ -510,7 +510,7 @@ static int dmabuf_init(struct dmabuf *db)
 	return 0;
 }
 
-static int dmabuf_mmap(struct dmabuf *db, unsigned long start, unsigned long size, pgprot_t prot)
+static int dmabuf_mmap(struct vm_area_struct *vma, struct dmabuf *db, unsigned long start, unsigned long size, pgprot_t prot)
 {
 	unsigned int nr;
 
@@ -522,7 +522,7 @@ static int dmabuf_mmap(struct dmabuf *db, unsigned long start, unsigned long siz
 			return -EINVAL;
 	db->mapped = 1;
 	for(nr = 0; nr < size; nr++) {
-		if (remap_page_range(start, virt_to_phys(db->sgbuf[nr]), PAGE_SIZE, prot))
+		if (remap_page_range(vma, start, virt_to_phys(db->sgbuf[nr]), PAGE_SIZE, prot))
 			return -EAGAIN;
 		start += PAGE_SIZE;
 	}
@@ -2341,7 +2341,7 @@ static int usb_audio_mmap(struct file *file, struct vm_area_struct *vma)
 	if (vma->vm_pgoff != 0)
 		goto out;
 
-	ret = dmabuf_mmap(db,  vma->vm_start, vma->vm_end - vma->vm_start, vma->vm_page_prot);
+	ret = dmabuf_mmap(vma, db,  vma->vm_start, vma->vm_end - vma->vm_start, vma->vm_page_prot);
 out:
 	unlock_kernel();
 	return ret;

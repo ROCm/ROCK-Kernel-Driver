@@ -70,6 +70,7 @@
 #include <linux/smp.h>
 #include <linux/signal.h>
 #include <linux/highmem.h>
+#include <linux/file.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>

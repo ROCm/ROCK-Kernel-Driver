@@ -49,17 +49,18 @@ changes occur:
 	page table operations such as what happens during
 	fork, and exec.
 
-3) void flush_tlb_range(struct mm_struct *mm,
+3) void flush_tlb_range(struct vm_area_struct *vma,
 			unsigned long start, unsigned long end)
 
 	Here we are flushing a specific range of (user) virtual
 	address translations from the TLB.  After running, this
 	interface must make sure that any previous page table
-	modifications for the address space 'mm' in the range 'start'
-	to 'end' will be visible to the cpu.  That is, after running,
-	there will be no entries in the TLB for 'mm' for virtual
-	addresses in the range 'start' to 'end'.
+	modifications for the address space 'vma->vm_mm' in the range
+	'start' to 'end' will be visible to the cpu.  That is, after
+	running, here will be no entries in the TLB for 'mm' for
+	virtual addresses in the range 'start' to 'end'.
 
+	The "vma" is the backing store being used for the region.
 	Primarily, this is used for munmap() type operations.
 
 	The interface is provided in hopes that the port can find
@@ -130,9 +131,9 @@ the sequence will be in one of the following forms:
 	   change_all_page_tables_of(mm);
 	   flush_tlb_mm(mm);
 
-	2) flush_cache_range(mm, start, end);
+	2) flush_cache_range(vma, start, end);
 	   change_range_of_page_tables(mm, start, end);
-	   flush_tlb_range(mm, start, end);
+	   flush_tlb_range(vma, start, end);
 
 	3) flush_cache_page(vma, page);
 	   set_pte(pte_pointer, new_pte_val);
@@ -173,14 +174,15 @@ Here are the routines, one by one:
 	page table operations such as what happens during
 	fork, exit, and exec.
 
-3) void flush_cache_range(struct mm_struct *mm,
+3) void flush_cache_range(struct vm_area_struct *vma,
 			  unsigned long start, unsigned long end)
 
 	Here we are flushing a specific range of (user) virtual
 	addresses from the cache.  After running, there will be no
-	entries in the cache for 'mm' for virtual addresses in the
-	range 'start' to 'end'.
+	entries in the cache for 'vma->vm_mm' for virtual addresses in
+	the range 'start' to 'end'.
 
+	The "vma" is the backing store being used for the region.
 	Primarily, this is used for munmap() type operations.
 
 	The interface is provided in hopes that the port can find
@@ -275,7 +277,7 @@ Here is the new interface:
 	for example, uses this technique.
 
 	The "address" parameter tells the virtual address where the
-	user will ultimately this page mapped.
+	user will ultimately have this page mapped.
 
 	If D-cache aliasing is not an issue, these two routines may
 	simply call memcpy/memset directly and do nothing more.

@@ -179,9 +179,11 @@ static void andes_flush_tlb_mm(struct mm_struct *mm)
 }
 
 static void
-andes_flush_tlb_range(struct mm_struct *mm, unsigned long start,
+andes_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
                       unsigned long end)
 {
+	struct mm_struct *mm = vma->vm_mm;
+
 	if (CPU_CONTEXT(smp_processor_id(), mm) != 0) {
 		unsigned long flags;
 		int size;

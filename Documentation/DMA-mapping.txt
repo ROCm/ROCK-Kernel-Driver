@@ -60,6 +60,9 @@ nor may you use kernel stack addresses for DMA.  Both of these items
 might be mapped somewhere entirely different than the rest of physical
 memory.
 
+Also, this means that you cannot take the return of a kmap()
+call and DMA to/from that.  This is similar to vmalloc().
+
 What about block I/O and networking buffers?  The block I/O and
 networking subsystems make sure that the buffers they use are valid
 for you to DMA from/to.
@@ -685,6 +688,97 @@ the following interfaces are provided:
 
 This is possible with the DAC interfaces purely because they are
 not translated in any way.
+
+		Optimizing Unmap State Space Consumption
+
+On many platforms, pci_unmap_{single,page}() is simply a nop.
+Therefore, keeping track of the mapping address and length is a waste
+of space.  Instead of filling your drivers up with ifdefs and the like
+to "work around" this (which would defeat the whole purpose of a
+portable API) the following facilities are provided.
+
+Actually, instead of describing the macros one by one, we'll
+transform some example code.
+
+1) Use DECLARE_PCI_UNMAP_{ADDR,LEN} in state saving structures.
+   Example, before:
+
+	struct ring_state {
+		struct sk_buff *skb;
+		dma_addr_t mapping;
+		__u32 len;
+	};
+
+   after:
+
+	struct ring_state {
+		struct sk_buff *skb;
+		DECLARE_PCI_UNMAP_ADDR(mapping)
+		DECLARE_PCI_UNMAP_LEN(len)
+	};
+
+   NOTE: DO NOT put a semicolon at the end of the DECLARE_*()
+         macro.
+
+2) Use pci_unmap_{addr,len}_set to set these values.
+   Example, before:
+
+	ringp->mapping = FOO;
+	ringp->len = BAR;
+
+   after:
+
+	pci_unmap_addr_set(ringp, mapping, FOO);
+	pci_unmap_len_set(ringp, len, BAR);
+
+3) Use pci_unmap_{addr,len} to access these values.
+   Example, before:
+
+	pci_unmap_single(pdev, ringp->mapping, ringp->len,
+			 PCI_DMA_FROMDEVICE);
+
+   after:
+
+	pci_unmap_single(pdev,
+			 pci_unmap_addr(ringp, mapping),
+			 pci_unmap_len(ringp, len),
+			 PCI_DMA_FROMDEVICE);
+
+It really should be self-explanatory.  We treat the ADDR and LEN
+seperately, because it is possible for an implementation to only
+need the address in order to perform the unmap operation.
+
+			Platform Issues
+
+If you are just writing drivers for Linux and do not maintain
+an architecture port for the kernel, you can safely skip down
+to "Closing".
+
+1) Struct scatterlist requirements.
+
+   Struct scatterlist must contain, at a minimum, the following
+   members:
+
+	char *address;
+	struct page *page;
+	unsigned int offset;
+	unsigned int length;
+
+   The "address" member will disappear in 2.5.x
+
+   This means that your pci_{map,unmap}_sg() and all other
+   interfaces dealing with scatterlists must be able to cope
+   properly with page being non NULL.
+
+   A scatterlist is in one of two states.  The base address is
+   either specified by "address" or by a "page+offset" pair.
+   If "address" is NULL, then "page+offset" is being used.
+   If "page" is NULL, then "address" is being used.
+
+   In 2.5.x, all scatterlists will use "page+offset".  But during
+   2.4.x we still have to support the old method.
+
+2) More to come...
 
 			   Closing
 

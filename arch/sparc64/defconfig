@@ -869,3 +869,8 @@ CONFIG_MAGIC_SYSRQ=y
 # CONFIG_DEBUG_SPINLOCK is not set
 # CONFIG_DEBUG_BUGVERBOSE is not set
 # CONFIG_DEBUG_DCFLUSH is not set
+
+#
+# Library routines
+#
+CONFIG_CRC32=y

@@ -1,4 +1,4 @@
-/* $Id: flash.c,v 1.24 2001/10/08 22:19:51 davem Exp $
+/* $Id: flash.c,v 1.25 2001/12/21 04:56:16 davem Exp $
  * flash.c: Allow mmap access to the OBP Flash, for OBP updates.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -74,7 +74,7 @@ flash_mmap(struct file *file, struct vm_area_struct *vma)
 	pgprot_val(vma->vm_page_prot) |= _PAGE_E;
 	vma->vm_flags |= (VM_SHM | VM_LOCKED);
 
-	if (remap_page_range(vma->vm_start, addr, size, vma->vm_page_prot))
+	if (remap_page_range(vma, vma->vm_start, addr, size, vma->vm_page_prot))
 		return -EAGAIN;
 		
 	return 0;

@@ -264,7 +264,7 @@ static void sb1_flush_cache_mm(struct mm_struct *mm)
 	/* Don't need to do this, as the dcache is physically tagged */
 }
 
-static void sb1_flush_cache_range(struct mm_struct *mm, 
+static void sb1_flush_cache_range(struct vm_area_struct *vma,
 				  unsigned long start,
 				  unsigned long end)
 {

@@ -30,21 +30,18 @@
 #include <asm/system.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
-#include <linux/in.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/inet.h>
 #include <linux/netdevice.h>
+#include <linux/rtnetlink.h>
 #include <linux/poll.h>
 #include <linux/highmem.h>
 
-#include <net/ip.h>
 #include <net/protocol.h>
-#include <net/route.h>
-#include <net/tcp.h>
-#include <net/udp.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
+#include <net/checksum.h>
 
 
 /*

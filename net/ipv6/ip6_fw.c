@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: ip6_fw.c,v 1.15 1999/08/31 07:04:03 davem Exp $
+ *	$Id: ip6_fw.c,v 1.16 2001/10/31 08:17:58 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -379,16 +379,12 @@ static void ip6_fw_destroy(struct flow_rule *rl)
 
 void __init ip6_fw_init(void)
 {
-#ifdef CONFIG_NETLINK
 	netlink_attach(NETLINK_IP6_FW, ip6_fw_msgrcv);
-#endif
 }
 
 #ifdef MODULE
 void cleanup_module(void)
 {
-#ifdef CONFIG_NETLINK
 	netlink_detach(NETLINK_IP6_FW);
-#endif
 }
 #endif

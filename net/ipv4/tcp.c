@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp.c,v 1.214 2001/10/20 00:00:11 davem Exp $
+ * Version:	$Id: tcp.c,v 1.215 2001/10/31 08:17:58 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -2442,6 +2442,7 @@ int tcp_getsockopt(struct sock *sk, int level, int optname, char *optval,
 
 
 extern void __skb_cb_too_small_for_tcp(int, int);
+extern void tcpdiag_init(void);
 
 void __init tcp_init(void)
 {
@@ -2553,4 +2554,6 @@ void __init tcp_init(void)
 
 	printk("TCP: Hash tables configured (established %d bind %d)\n",
 	       tcp_ehash_size<<1, tcp_bhash_size);
+
+	tcpdiag_init();
 }

@@ -5,7 +5,7 @@
  *
  *		The Internet Protocol (IP) module.
  *
- * Version:	$Id: ip_input.c,v 1.54 2001/11/06 22:33:52 davem Exp $
+ * Version:	$Id: ip_input.c,v 1.55 2002/01/12 07:39:45 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -224,8 +224,7 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 	nf_debug_ip_local_deliver(skb);
 #endif /*CONFIG_NETFILTER_DEBUG*/
 
-	/* Pull out additionl 8 bytes to save some space in protocols. */
-	if (!pskb_may_pull(skb, ihl+8))
+	if (!pskb_may_pull(skb, ihl))
 		goto out;
 	__skb_pull(skb, ihl);
 

@@ -56,9 +56,7 @@ struct net_device *decnet_default_device;
 
 static struct dn_dev *dn_dev_create(struct net_device *dev, int *err);
 static void dn_dev_delete(struct net_device *dev);
-#ifdef CONFIG_RTNETLINK
 static void rtmsg_ifa(int event, struct dn_ifaddr *ifa);
-#endif
 
 static int dn_eth_up(struct net_device *);
 static void dn_send_brd_hello(struct net_device *dev);
@@ -369,9 +367,7 @@ static void dn_dev_del_ifa(struct dn_dev *dn_db, struct dn_ifaddr **ifap, int de
 
 	*ifap = ifa1->ifa_next;
 
-#ifdef CONFIG_RTNETLINK
 	rtmsg_ifa(RTM_DELADDR, ifa1);
-#endif /* CONFIG_RTNETLINK */
 
 	if (destroy) {
 		dn_dev_free_ifa(ifa1);
@@ -390,9 +386,7 @@ static int dn_dev_insert_ifa(struct dn_dev *dn_db, struct dn_ifaddr *ifa)
 	ifa->ifa_next = dn_db->ifa_list;
 	dn_db->ifa_list = ifa;
 
-#ifdef CONFIG_RTNETLINK
 	rtmsg_ifa(RTM_NEWADDR, ifa);
-#endif /* CONFIG_RTNETLINK */
 
 	return 0;
 }
@@ -501,7 +495,6 @@ rarok:
 	return 0;
 }
 
-#ifdef CONFIG_RTNETLINK
 static struct dn_dev *dn_dev_by_index(int ifindex)
 {
 	struct net_device *dev;
@@ -657,8 +650,6 @@ done:
 
 	return skb->len;
 }
-
-#endif /* CONFIG_RTNETLINK */
 
 static void dn_send_endnode_hello(struct net_device *dev)
 {
@@ -1172,7 +1163,6 @@ static int decnet_dev_get_info(char *buffer, char **start, off_t offset, int len
 
 #endif /* CONFIG_PROC_FS */
 
-#ifdef CONFIG_RTNETLINK
 static struct rtnetlink_link dnet_rtnetlink_table[RTM_MAX-RTM_BASE+1] = 
 {
 	{ NULL,			NULL,			},
@@ -1213,7 +1203,6 @@ static struct rtnetlink_link dnet_rtnetlink_table[RTM_MAX-RTM_BASE+1] =
 	{ NULL,			NULL,			}
 #endif
 };
-#endif /* CONFIG_RTNETLINK */
 
 void __init dn_dev_init(void)
 {
@@ -1223,9 +1212,7 @@ void __init dn_dev_init(void)
 	register_gifconf(PF_DECnet, dnet_gifconf);
 #endif /* CONFIG_DECNET_SIOCGIFCONF */
 
-#ifdef CONFIG_RTNETLINK
 	rtnetlink_links[PF_DECnet] = dnet_rtnetlink_table;
-#endif /* CONFIG_RTNETLINK */
 
 #ifdef CONFIG_PROC_FS
 	proc_net_create("decnet_dev", 0, decnet_dev_get_info);
@@ -1242,9 +1229,7 @@ void __init dn_dev_init(void)
 
 void __exit dn_dev_cleanup(void)
 {
-#ifdef CONFIG_RTNETLINK
 	rtnetlink_links[PF_DECnet] = NULL;
-#endif /* CONFIG_RTNETLINK */
 
 #ifdef CONFIG_DECNET_SIOCGIFCONF
 	unregister_gifconf(PF_DECnet);

@@ -10,9 +10,7 @@ tristate 'Bonding driver support' CONFIG_BONDING
 tristate 'EQL (serial line load balancing) support' CONFIG_EQUALIZER
 tristate 'Universal TUN/TAP device driver support' CONFIG_TUN
 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-   if [ "$CONFIG_NETLINK" = "y" ]; then
-      tristate 'Ethertap network tap (OBSOLETE)' CONFIG_ETHERTAP
-   fi
+   tristate 'Ethertap network tap (OBSOLETE)' CONFIG_ETHERTAP
 fi
 
 if [ "$CONFIG_ISAPNP" = "y" -o "$CONFIG_ISAPNP" = "m" ]; then

@@ -776,11 +776,11 @@ static inline void r4k_flush_cache_all_d32i32(void)
 	__restore_flags(flags);
 }
 
-static void r4k_flush_cache_range_s16d16i16(struct mm_struct *mm,
+static void r4k_flush_cache_range_s16d16i16(struct vm_area_struct *vma,
 					    unsigned long start,
 					    unsigned long end)
 {
-	struct vm_area_struct *vma;
+	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
 
 	if (CPU_CONTEXT(smp_processor_id(), mm) == 0)
@@ -790,8 +790,7 @@ static void r4k_flush_cache_range_s16d16i16(struct mm_struct *mm,
 #ifdef DEBUG_CACHE
 	printk("crange[%d,%08lx,%08lx]", (int)mm->context, start, end);
 #endif
-	vma = find_vma(mm, start);
-	if(vma) {
+	if (vma) {
 		if (CPU_CONTEXT(smp_processor_id(), mm) !=
 				CPU_CONTEXT(smp_processor_id(), current->mm)) {
 			r4k_flush_cache_all_s16d16i16();
@@ -815,11 +814,11 @@ static void r4k_flush_cache_range_s16d16i16(struct mm_struct *mm,
 	}
 }
 
-static void r4k_flush_cache_range_s32d16i16(struct mm_struct *mm,
+static void r4k_flush_cache_range_s32d16i16(struct vm_area_struct *vma,
 					    unsigned long start,
 					    unsigned long end)
 {
-	struct vm_area_struct *vma;
+	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
 
 	if (CPU_CONTEXT(smp_processor_id(), mm) == 0)
@@ -829,8 +828,7 @@ static void r4k_flush_cache_range_s32d16i16(struct mm_struct *mm,
 #ifdef DEBUG_CACHE
 	printk("crange[%d,%08lx,%08lx]", (int)mm->context, start, end);
 #endif
-	vma = find_vma(mm, start);
-	if(vma) {
+	if (vma) {
 		if (CPU_CONTEXT(smp_processor_id(), mm) !=
 				CPU_CONTEXT(smp_processor_id(), current->mm)) {
 			r4k_flush_cache_all_s32d16i16();
@@ -854,11 +852,11 @@ static void r4k_flush_cache_range_s32d16i16(struct mm_struct *mm,
 	}
 }
 
-static void r4k_flush_cache_range_s64d16i16(struct mm_struct *mm,
+static void r4k_flush_cache_range_s64d16i16(struct vm_area_struct *vma,
 					    unsigned long start,
 					    unsigned long end)
 {
-	struct vm_area_struct *vma;
+	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
 
 	if (CPU_CONTEXT(smp_processor_id(), mm) == 0)
@@ -868,8 +866,7 @@ static void r4k_flush_cache_range_s64d16i16(struct mm_struct *mm,
 #ifdef DEBUG_CACHE
 	printk("crange[%d,%08lx,%08lx]", (int)mm->context, start, end);
 #endif
-	vma = find_vma(mm, start);
-	if(vma) {
+	if (vma) {
 		if (CPU_CONTEXT(smp_processor_id(), mm) !=
 				CPU_CONTEXT(smp_processor_id(), current->mm)) {
 			r4k_flush_cache_all_s64d16i16();
@@ -893,11 +890,11 @@ static void r4k_flush_cache_range_s64d16i16(struct mm_struct *mm,
 	}
 }
 
-static void r4k_flush_cache_range_s128d16i16(struct mm_struct *mm,
+static void r4k_flush_cache_range_s128d16i16(struct vm_area_struct *vma,
 					     unsigned long start,
 					     unsigned long end)
 {
-	struct vm_area_struct *vma;
+	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
 
 	if (CPU_CONTEXT(smp_processor_id(), mm) == 0)
@@ -907,8 +904,7 @@ static void r4k_flush_cache_range_s128d16i16(struct mm_struct *mm,
 #ifdef DEBUG_CACHE
 	printk("crange[%d,%08lx,%08lx]", (int)mm->context, start, end);
 #endif
-	vma = find_vma(mm, start);
-	if(vma) {
+	if (vma) {
 		if (CPU_CONTEXT(smp_processor_id(), mm) !=
 				CPU_CONTEXT(smp_processor_id(), current->mm)) {
 			r4k_flush_cache_all_s128d16i16();
@@ -932,11 +928,11 @@ static void r4k_flush_cache_range_s128d16i16(struct mm_struct *mm,
 	}
 }
 
-static void r4k_flush_cache_range_s32d32i32(struct mm_struct *mm,
+static void r4k_flush_cache_range_s32d32i32(struct vm_area_struct *vma,
 					    unsigned long start,
 					    unsigned long end)
 {
-	struct vm_area_struct *vma;
+	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
 
 	if (CPU_CONTEXT(smp_processor_id(), mm) == 0)
@@ -946,8 +942,7 @@ static void r4k_flush_cache_range_s32d32i32(struct mm_struct *mm,
 #ifdef DEBUG_CACHE
 	printk("crange[%d,%08lx,%08lx]", (int)mm->context, start, end);
 #endif
-	vma = find_vma(mm, start);
-	if(vma) {
+	if (vma) {
 		if (CPU_CONTEXT(smp_processor_id(), mm) !=
 				CPU_CONTEXT(smp_processor_id(), current->mm)) {
 			r4k_flush_cache_all_s32d32i32();
@@ -971,11 +966,11 @@ static void r4k_flush_cache_range_s32d32i32(struct mm_struct *mm,
 	}
 }
 
-static void r4k_flush_cache_range_s64d32i32(struct mm_struct *mm,
+static void r4k_flush_cache_range_s64d32i32(struct vm_area_struct *vma,
 					    unsigned long start,
 					    unsigned long end)
 {
-	struct vm_area_struct *vma;
+	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
 
 	if (CPU_CONTEXT(smp_processor_id(), mm) == 0)
@@ -985,8 +980,7 @@ static void r4k_flush_cache_range_s64d32i32(struct mm_struct *mm,
 #ifdef DEBUG_CACHE
 	printk("crange[%d,%08lx,%08lx]", (int)mm->context, start, end);
 #endif
-	vma = find_vma(mm, start);
-	if(vma) {
+	if (vma) {
 		if (CPU_CONTEXT(smp_processor_id(), mm) !=
 				CPU_CONTEXT(smp_processor_id(), current->mm)) {
 			r4k_flush_cache_all_s64d32i32();
@@ -1010,11 +1004,11 @@ static void r4k_flush_cache_range_s64d32i32(struct mm_struct *mm,
 	}
 }
 
-static void r4k_flush_cache_range_s128d32i32(struct mm_struct *mm,
+static void r4k_flush_cache_range_s128d32i32(struct vm_area_struct *vma,
 					     unsigned long start,
 					     unsigned long end)
 {
-	struct vm_area_struct *vma;
+	struct mm_struct *mm = vma->vm_mm;
 	unsigned long flags;
 
 	if (CPU_CONTEXT(smp_processor_id(), mm) != 0)
@@ -1024,8 +1018,7 @@ static void r4k_flush_cache_range_s128d32i32(struct mm_struct *mm,
 #ifdef DEBUG_CACHE
 	printk("crange[%d,%08lx,%08lx]", (int)mm->context, start, end);
 #endif
-	vma = find_vma(mm, start);
-	if(vma) {
+	if (vma) {
 		if (CPU_CONTEXT(smp_processor_id(), mm) !=
 				CPU_CONTEXT(smp_processor_id(), current->mm)) {
 			r4k_flush_cache_all_s128d32i32();
@@ -1049,10 +1042,12 @@ static void r4k_flush_cache_range_s128d32i32(struct mm_struct *mm,
 	}
 }
 
-static void r4k_flush_cache_range_d16i16(struct mm_struct *mm,
+static void r4k_flush_cache_range_d16i16(struct vm_area_struct *vma,
 					 unsigned long start,
 					 unsigned long end)
 {
+	struct mm_struct *mm = vma->vm_mm;
+
 	if (CPU_CONTEXT(smp_processor_id(), mm) != 0) {
 		unsigned long flags;
 
@@ -1065,10 +1060,12 @@ static void r4k_flush_cache_range_d16i16(struct mm_struct *mm,
 	}
 }
 
-static void r4k_flush_cache_range_d32i32(struct mm_struct *mm,
+static void r4k_flush_cache_range_d32i32(struct vm_area_struct *vma,
 					 unsigned long start,
 					 unsigned long end)
 {
+	struct mm_struct *mm = vma->vm_mm;
+
 	if (CPU_CONTEXT(smp_processor_id(), mm) != 0) {
 		unsigned long flags;
 
@@ -1913,9 +1910,11 @@ static void r4k_flush_tlb_mm(struct mm_struct *mm)
 	}
 }
 
-static void r4k_flush_tlb_range(struct mm_struct *mm, unsigned long start,
+static void r4k_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 				unsigned long end)
 {
+	struct mm_struct *mm = vma->vm_mm;
+
 	if (CPU_CONTEXT(smp_processor_id(), mm) != 0) {
 		unsigned long flags;
 		int size;

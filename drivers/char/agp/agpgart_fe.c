@@ -638,7 +638,7 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 			AGP_UNLOCK();
 			return -EINVAL;
 		}
-		if (remap_page_range(vma->vm_start,
+		if (remap_page_range(vma, vma->vm_start,
 				     (kerninfo.aper_base + offset),
 				     size, vma->vm_page_prot)) {
 			AGP_UNLOCK();
@@ -652,7 +652,7 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 			AGP_UNLOCK();
 			return -EINVAL;
 		}
-		if (remap_page_range(vma->vm_start, kerninfo.aper_base,
+		if (remap_page_range(vma, vma->vm_start, kerninfo.aper_base,
 				     size, vma->vm_page_prot)) {
 			AGP_UNLOCK();
 			return -EAGAIN;

@@ -1020,7 +1020,6 @@ int dn_route_input(struct sk_buff *skb)
 	return dn_route_input_slow(skb);
 }
 
-#ifdef CONFIG_RTNETLINK
 static int dn_rt_fill_info(struct sk_buff *skb, u32 pid, u32 seq, int event, int nowait)
 {
 	struct dn_route *rt = (struct dn_route *)skb->dst;
@@ -1181,7 +1180,6 @@ done:
 	cb->args[1] = idx;
 	return skb->len;
 }
-#endif /* CONFIG_RTNETLINK */
 
 #ifdef CONFIG_PROC_FS
 

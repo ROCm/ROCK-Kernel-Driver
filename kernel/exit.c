@@ -17,6 +17,7 @@
 #ifdef CONFIG_BSD_PROCESS_ACCT
 #include <linux/acct.h>
 #endif
+#include <linux/file.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>

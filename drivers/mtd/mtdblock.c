@@ -472,20 +472,14 @@ int mtdblock_thread(void *dummy)
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
 
-	tsk->session = 1;
-	tsk->pgrp = 1;
 	/* we might get involved when memory gets low, so use PF_MEMALLOC */
 	tsk->flags |= PF_MEMALLOC;
 	strcpy(tsk->comm, "mtdblockd");
-	tsk->tty = NULL;
 	spin_lock_irq(&tsk->sigmask_lock);
 	sigfillset(&tsk->blocked);
 	recalc_sigpending(tsk);
 	spin_unlock_irq(&tsk->sigmask_lock);
-	exit_mm(tsk);
-	exit_files(tsk);
-	exit_sighand(tsk);
-	exit_fs(tsk);
+	daemonize();
 
 	while (!leaving) {
 		add_wait_queue(&thr_wq, &wait);

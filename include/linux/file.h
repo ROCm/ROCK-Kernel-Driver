@@ -5,31 +5,43 @@
 #ifndef __LINUX_FILE_H
 #define __LINUX_FILE_H
 
-#include <linux/sched.h>
+#ifndef _LINUX_POSIX_TYPES_H	/* __FD_CLR */
+#include <linux/posix_types.h>
+#endif
+#ifndef __LINUX_COMPILER_H	/* unlikely */
+#include <linux/compiler.h>
+#endif
+
+/*
+ * The default fd array needs to be at least BITS_PER_LONG,
+ * as this is the granularity returned by copy_fdset().
+ */
+#define NR_OPEN_DEFAULT BITS_PER_LONG
+
+/*
+ * Open file table structure
+ */
+struct files_struct {
+        atomic_t count;
+        rwlock_t file_lock;     /* Protects all the below members.  Nests inside tsk->alloc_lock */
+        int max_fds;
+        int max_fdset;
+        int next_fd;
+        struct file ** fd;      /* current fd array */
+        fd_set *close_on_exec;
+        fd_set *open_fds;
+        fd_set close_on_exec_init;
+        fd_set open_fds_init;
+        struct file * fd_array[NR_OPEN_DEFAULT];
+};
 
 extern void FASTCALL(fput(struct file *));
 extern struct file * FASTCALL(fget(unsigned int fd));
- 
-static inline int get_close_on_exec(unsigned int fd)
-{
-	struct files_struct *files = current->files;
-	int res;
-	read_lock(&files->file_lock);
-	res = FD_ISSET(fd, files->close_on_exec);
-	read_unlock(&files->file_lock);
-	return res;
-}
+extern void FASTCALL(set_close_on_exec(unsigned int fd, int flag));
+extern void put_filp(struct file *);
+extern int get_unused_fd(void);
+extern void FASTCALL(put_unused_fd(unsigned int fd));
 
-static inline void set_close_on_exec(unsigned int fd, int flag)
-{
-	struct files_struct *files = current->files;
-	write_lock(&files->file_lock);
-	if (flag)
-		FD_SET(fd, files->close_on_exec);
-	else
-		FD_CLR(fd, files->close_on_exec);
-	write_unlock(&files->file_lock);
-}
 
 static inline struct file * fcheck_files(struct files_struct *files, unsigned int fd)
 {
@@ -43,60 +55,9 @@ static inline struct file * fcheck_files(struct files_struct *files, unsigned in
 /*
  * Check whether the specified fd has an open file.
  */
-static inline struct file * fcheck(unsigned int fd)
-{
-	struct file * file = NULL;
-	struct files_struct *files = current->files;
+#define fcheck(fd)	fcheck_files(current->files, fd)
 
-	if (fd < files->max_fds)
-		file = files->fd[fd];
-	return file;
-}
-
-extern void put_filp(struct file *);
-
-extern int get_unused_fd(void);
-
-static inline void __put_unused_fd(struct files_struct *files, unsigned int fd)
-{
-	FD_CLR(fd, files->open_fds);
-	if (fd < files->next_fd)
-		files->next_fd = fd;
-}
-
-static inline void put_unused_fd(unsigned int fd)
-{
-	struct files_struct *files = current->files;
-
-	write_lock(&files->file_lock);
-	__put_unused_fd(files, fd);
-	write_unlock(&files->file_lock);
-}
-
-/*
- * Install a file pointer in the fd array.  
- *
- * The VFS is full of places where we drop the files lock between
- * setting the open_fds bitmap and installing the file in the file
- * array.  At any such point, we are vulnerable to a dup2() race
- * installing a file in the array before us.  We need to detect this and
- * fput() the struct file we are about to overwrite in this case.
- *
- * It should never happen - if we allow dup2() do it, _really_ bad things
- * will follow.
- */
-
-static inline void fd_install(unsigned int fd, struct file * file)
-{
-	struct files_struct *files = current->files;
-	
-	write_lock(&files->file_lock);
-	if (files->fd[fd])
-		BUG();
-	files->fd[fd] = file;
-	write_unlock(&files->file_lock);
-}
-
-void put_files_struct(struct files_struct *fs);
+extern void FASTCALL(fd_install(unsigned int fd, struct file * file));
+void FASTCALL(put_files_struct(struct files_struct *fs));
 
 #endif /* __LINUX_FILE_H */

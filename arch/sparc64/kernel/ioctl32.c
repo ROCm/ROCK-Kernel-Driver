@@ -1,4 +1,4 @@
-/* $Id: ioctl32.c,v 1.135 2002/01/11 08:45:38 davem Exp $
+/* $Id: ioctl32.c,v 1.136 2002/01/14 09:49:52 davem Exp $
  * ioctl32.c: Conversion between 32bit and 64bit native ioctls.
  *
  * Copyright (C) 1997-2000  Jakub Jelinek  (jakub@redhat.com)
@@ -1581,12 +1581,17 @@ static int sg_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long arg)
 	}
 
 	err |= __get_user(sbp32, &sg_io32->sbp);
-	sg_io64.sbp = kmalloc(64, GFP_KERNEL);
+	sg_io64.sbp = kmalloc(sg_io64.mx_sb_len, GFP_KERNEL);
 	if (!sg_io64.sbp) {
 		err = -ENOMEM;
 		goto out;
 	}
-	memset(sg_io64.sbp, 0, 64);
+	if (copy_from_user(sg_io64.sbp,
+			   (void *) A(sbp32),
+			   sg_io64.mx_sb_len)) {
+		err = -EFAULT;
+		goto out;
+	}
 
 	err |= __get_user(dxferp32, &sg_io32->dxferp);
 	if (sg_io64.iovec_count) {
@@ -1634,7 +1639,7 @@ static int sg_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long arg)
 	err |= __put_user(sg_io64.resid, &sg_io32->resid);
 	err |= __put_user(sg_io64.duration, &sg_io32->duration);
 	err |= __put_user(sg_io64.info, &sg_io32->info);
-	err |= copy_to_user((void *)A(sbp32), sg_io64.sbp, 64);
+	err |= copy_to_user((void *)A(sbp32), sg_io64.sbp, sg_io64.mx_sb_len);
 	if (sg_io64.dxferp) {
 		if (sg_io64.iovec_count)
 			err |= copy_back_sg_iovec(&sg_io64, dxferp32);

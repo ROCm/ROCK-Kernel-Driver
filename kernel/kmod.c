@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 #include <linux/namespace.h>
 #include <linux/completion.h>
+#include <linux/file.h>
 
 #include <asm/uaccess.h>
 

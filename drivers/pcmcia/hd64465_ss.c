@@ -673,6 +673,10 @@ static int hs_set_io_map(unsigned int sock, struct pccard_io_map *io)
 	     */
 	    DPRINTK("remap_page_range(vaddr=0x%08lx, paddr=0x%08lx, size=0x%08lxx)\n",
 	    	vaddrbase + pstart, paddrbase + pstart, psize);
+#error This does not work.  Firstly remap_page_range() uses current->mm for
+#error the address space, which is wrong for kernel mappings.  remap_page_range
+#error also does flush_{cache,tlb}_range() which ONLY works for user mappings.
+#error Next, remap_page_range() now wants to take a vm_area_struct arg.
 	    remap_page_range(vaddrbase + pstart, paddrbase + pstart, psize, prot);
 	    
 	    /*

@@ -374,9 +374,11 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 	}
 }
 
-void flush_tlb_range(struct mm_struct *mm, unsigned long start,
+void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 		     unsigned long end)
 {
+	struct mm_struct *mm = vma->vm_mm;
+
 	if (mm->context != NO_CONTEXT) {
 		unsigned long flags;
 		int size;

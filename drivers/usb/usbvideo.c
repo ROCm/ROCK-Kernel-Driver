@@ -1184,7 +1184,7 @@ long usbvideo_v4l_write(struct video_device *dev, const char *buf,
 	return -EINVAL;
 }
 
-int usbvideo_v4l_mmap(struct video_device *dev, const char *adr, unsigned long size)
+int usbvideo_v4l_mmap(struct vm_area_struct *vma, struct video_device *dev, const char *adr, unsigned long size)
 {
 	uvd_t *uvd = (uvd_t *) dev;
 	unsigned long start = (unsigned long) adr;
@@ -1199,7 +1199,7 @@ int usbvideo_v4l_mmap(struct video_device *dev, const char *adr, unsigned long s
 	pos = (unsigned long) uvd->fbuf;
 	while (size > 0) {
 		page = usbvideo_kvirt_to_pa(pos);
-		if (remap_page_range(start, page, PAGE_SIZE, PAGE_SHARED))
+		if (remap_page_range(vma, start, page, PAGE_SIZE, PAGE_SHARED))
 			return -EAGAIN;
 
 		start += PAGE_SIZE;

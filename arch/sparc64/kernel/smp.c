@@ -138,6 +138,15 @@ void __init smp_callin(void)
 {
 	int cpuid = hard_smp_processor_id();
 	unsigned long pstate;
+	extern int bigkernel;
+	extern unsigned long kern_locked_tte_data;
+
+	if (bigkernel) {
+		prom_dtlb_load(sparc64_highest_locked_tlbent()-1, 
+			kern_locked_tte_data + 0x400000, KERNBASE + 0x400000);
+		prom_itlb_load(sparc64_highest_locked_tlbent()-1, 
+			kern_locked_tte_data + 0x400000, KERNBASE + 0x400000);
+	}
 
 	inherit_locked_prom_mappings(0);
 
@@ -796,9 +805,11 @@ void smp_flush_tlb_mm(struct mm_struct *mm)
 	}
 }
 
-void smp_flush_tlb_range(struct mm_struct *mm, unsigned long start,
+void smp_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 			 unsigned long end)
 {
+	struct mm_struct *mm = vma->vm_mm;
+
 	{
 		u32 ctx = CTX_HWBITS(mm->context);
 		int cpu = smp_processor_id();

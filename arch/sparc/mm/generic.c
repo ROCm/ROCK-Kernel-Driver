@@ -1,4 +1,4 @@
-/* $Id: generic.c,v 1.13 2001/07/17 16:17:33 anton Exp $
+/* $Id: generic.c,v 1.14 2001/12/21 04:56:15 davem Exp $
  * generic.c: Generic Sparc mm routines that are not dependent upon
  *            MMU type but are Sparc specific.
  *
@@ -75,18 +75,18 @@ static inline int io_remap_pmd_range(pmd_t * pmd, unsigned long address, unsigne
 	return 0;
 }
 
-int io_remap_page_range(unsigned long from, unsigned long offset, unsigned long size, pgprot_t prot, int space)
+int io_remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned long offset, unsigned long size, pgprot_t prot, int space)
 {
 	int error = 0;
 	pgd_t * dir;
 	unsigned long beg = from;
 	unsigned long end = from + size;
-	struct mm_struct *mm = current->mm;
+	struct mm_struct *mm = vma->vm_mm;
 
 	prot = __pgprot(pg_iobits);
 	offset -= from;
 	dir = pgd_offset(mm, from);
-	flush_cache_range(mm, beg, end);
+	flush_cache_range(vma, beg, end);
 
 	spin_lock(&mm->page_table_lock);
 	while (from < end) {
@@ -102,6 +102,6 @@ int io_remap_page_range(unsigned long from, unsigned long offset, unsigned long 
 	}
 	spin_unlock(&mm->page_table_lock);
 
-	flush_tlb_range(current->mm, beg, end);
+	flush_tlb_range(vma, beg, end);
 	return error;
 }

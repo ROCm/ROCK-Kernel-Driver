@@ -1,4 +1,4 @@
-/* $Id: pci.c,v 1.36 2001/10/06 00:38:25 davem Exp $
+/* $Id: pci.c,v 1.39 2002/01/05 01:13:43 davem Exp $
  * pci.c: UltraSparc PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@redhat.com)
@@ -487,7 +487,7 @@ static void __pci_mmap_set_pgprot(struct pci_dev *dev, struct vm_area_struct *vm
 	/* Our io_remap_page_range takes care of this, do nothing. */
 }
 
-extern int io_remap_page_range(unsigned long from, unsigned long offset,
+extern int io_remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned long offset,
 			       unsigned long size, pgprot_t prot, int space);
 
 /* Perform the actual remap of the pages for a PCI device mapping, as appropriate
@@ -511,7 +511,7 @@ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 	__pci_mmap_set_flags(dev, vma, mmap_state);
 	__pci_mmap_set_pgprot(dev, vma, mmap_state);
 
-	ret = io_remap_page_range(vma->vm_start,
+	ret = io_remap_page_range(vma, vma->vm_start,
 				  (vma->vm_pgoff << PAGE_SHIFT |
 				   (write_combine ? 0x1UL : 0x0UL)),
 				  vma->vm_end - vma->vm_start, vma->vm_page_prot, 0);

@@ -203,7 +203,7 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 	if (offset >= __pa(high_memory) || (file->f_flags & O_SYNC))
 		vma->vm_flags |= VM_IO;
 
-	if (remap_page_range(vma->vm_start, offset, vma->vm_end-vma->vm_start,
+	if (remap_page_range(vma, vma->vm_start, offset, vma->vm_end-vma->vm_start,
 			     vma->vm_page_prot))
 		return -EAGAIN;
 	return 0;
@@ -364,8 +364,8 @@ static inline size_t read_zero_pagealigned(char * buf, size_t size)
 		if (count > size)
 			count = size;
 
-		zap_page_range(mm, addr, count);
-        	zeromap_page_range(addr, count, PAGE_COPY);
+		zap_page_range(vma, addr, count);
+        	zeromap_page_range(vma, addr, count, PAGE_COPY);
 
 		size -= count;
 		buf += count;
@@ -435,7 +435,7 @@ static int mmap_zero(struct file * file, struct vm_area_struct * vma)
 {
 	if (vma->vm_flags & VM_SHARED)
 		return shmem_zero_setup(vma);
-	if (zeromap_page_range(vma->vm_start, vma->vm_end - vma->vm_start, vma->vm_page_prot))
+	if (zeromap_page_range(vma, vma->vm_start, vma->vm_end - vma->vm_start, vma->vm_page_prot))
 		return -EAGAIN;
 	return 0;
 }

@@ -90,7 +90,7 @@ extern inline void flush_cache_mm(struct mm_struct *mm) {
 }
 #endif
 
-#define flush_cache_range(mm, start, end) do { \
+#define flush_cache_range(vma, start, end) do { \
                 __flush_dcache_range(start, (unsigned long)end - (unsigned long)start); \
                 __flush_icache_range(start, (unsigned long)end - (unsigned long)start); \
 } while(0)
@@ -197,10 +197,10 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
 		
 }
 
-static inline void flush_tlb_range(struct mm_struct *mm,
+static inline void flush_tlb_range(struct vm_area_struct *vma,
 	unsigned long start, unsigned long end)
 {
-	__flush_tlb_range(mm->context, start, end - start);
+	__flush_tlb_range(vma->vm_mm->context, start, end - start);
 }
 
 /*

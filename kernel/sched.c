@@ -21,7 +21,7 @@
 #include <asm/mmu_context.h>
 
 #define BITMAP_SIZE ((MAX_PRIO+7)/8)
-#define PRIO_INTERACTIVE	(MAX_RT_PRIO + (MAX_PRIO - MAX_RT_PRIO) / 4)
+#define PRIO_INTERACTIVE	(MAX_RT_PRIO + (MAX_PRIO - MAX_RT_PRIO) / 3)
 #define TASK_INTERACTIVE(p)	((p)->prio >= MAX_RT_PRIO && (p)->prio <= PRIO_INTERACTIVE)
 #define JSLEEP_TO_PRIO(t)	(((t) * 20) / HZ)
 
@@ -126,7 +126,7 @@ static inline void resched_task(task_t *p)
 	need_resched = p->need_resched;
 	wmb();
 	p->need_resched = 1;
-	if (!need_resched)
+	if (!need_resched && (p->cpu != smp_processor_id()))
 		smp_send_reschedule(p->cpu);
 }
 
@@ -188,17 +188,9 @@ static int try_to_wake_up(task_t * p, int synchronous)
 	lock_task_rq(rq, p, flags);
 	p->state = TASK_RUNNING;
 	if (!p->array) {
-		if (!rt_task(p) && synchronous && (smp_processor_id() < p->cpu)) {
-			spin_lock(&this_rq()->lock);
-			p->cpu = smp_processor_id();
-			activate_task(p, this_rq());
-			spin_unlock(&this_rq()->lock);
-		} else {
-			activate_task(p, rq);
-			if ((rq->curr == rq->idle) ||
-					(p->prio < rq->curr->prio))
-				resched_task(rq->curr);
-		}
+		activate_task(p, rq);
+		if ((rq->curr == rq->idle) || (p->prio < rq->curr->prio))
+			resched_task(rq->curr);
 		success = 1;
 	}
 	unlock_task_rq(rq, p, flags);
@@ -440,20 +432,17 @@ void expire_task(task_t *p)
 	 */
 	spin_lock_irqsave(&rq->lock, flags);
 	if ((p->policy != SCHED_FIFO) && !--p->time_slice) {
-		unsigned int time_slice;
+		prio_array_t *array = rq->active;
 		p->need_resched = 1;
 		dequeue_task(p, rq->active);
-		time_slice = RT_PRIO_TO_TIMESLICE(p->prio);
 		if (!rt_task(p)) {
-			time_slice = PRIO_TO_TIMESLICE(p->prio);
 			if (++p->prio >= MAX_PRIO)
 				p->prio = MAX_PRIO - 1;
+			if (!TASK_INTERACTIVE(p))
+				array = rq->expired;
 		}
-		p->time_slice = time_slice;
-		if (TASK_INTERACTIVE(p))
-			enqueue_task(p, rq->active);
-		else
-			enqueue_task(p, rq->expired);
+		enqueue_task(p, array);
+		p->time_slice = NICE_TO_TIMESLICE(p->__nice);
 	}
 	spin_unlock_irqrestore(&rq->lock, flags);
 }
@@ -690,6 +679,8 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	int target_cpu;
 
 	new_mask &= cpu_online_map;
+	if (!new_mask)
+		BUG();
 	p->cpus_allowed = new_mask;
 	/*
 	 * Can the task run on the current CPU? If not then
@@ -703,8 +694,8 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 		spin_lock_irq(&target_rq->lock);
 		spin_lock(&this_rq->lock);
 	} else {
-		spin_lock_irq(&target_rq->lock);
-		spin_lock(&this_rq->lock);
+		spin_lock_irq(&this_rq->lock);
+		spin_lock(&target_rq->lock);
 	}
 	dequeue_task(p, p->array);
 	this_rq->nr_running--;
@@ -861,7 +852,7 @@ static int setscheduler(pid_t pid, int policy, struct sched_param *param)
 		goto out_unlock;
 
 	retval = -EPERM;
-	if ((policy == SCHED_FIFO || policy == SCHED_RR) && 
+	if ((policy == SCHED_FIFO || policy == SCHED_RR) &&
 	    !capable(CAP_SYS_NICE))
 		goto out_unlock;
 	if ((current->euid != p->euid) && (current->euid != p->uid) &&
@@ -890,7 +881,7 @@ out_nounlock:
 	return retval;
 }
 
-asmlinkage long sys_sched_setscheduler(pid_t pid, int policy, 
+asmlinkage long sys_sched_setscheduler(pid_t pid, int policy,
 				      struct sched_param *param)
 {
 	return setscheduler(pid, policy, param);
@@ -1024,7 +1015,7 @@ asmlinkage long sys_sched_rr_get_interval(pid_t pid, struct timespec *interval)
 	p = find_process_by_pid(pid);
 	if (p)
 		jiffies_to_timespec(p->policy & SCHED_FIFO ?
-					 0 : RT_PRIO_TO_TIMESLICE(p->prio), &t);
+					 0 : NICE_TO_TIMESLICE(p->__nice), &t);
 	read_unlock(&tasklist_lock);
 	if (p)
 		retval = copy_to_user(interval, &t, sizeof(t)) ? -EFAULT : 0;

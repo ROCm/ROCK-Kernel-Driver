@@ -195,11 +195,13 @@ int __init init_netlink(void)
 	/*  Someone tell me the official names for the uppercase ones  */
 	make_devfs_entries ("route", 0);
 	make_devfs_entries ("skip", 1);
-	make_devfs_entries ("USERSOCK", 2);
+	make_devfs_entries ("usersock", 2);
 	make_devfs_entries ("fwmonitor", 3);
-	make_devfs_entries ("ARPD", 8);
-	make_devfs_entries ("ROUTE6", 11);
-	make_devfs_entries ("IP6_FW", 13);
+	make_devfs_entries ("tcpdiag", 4);
+	make_devfs_entries ("arpd", 8);
+	make_devfs_entries ("route6", 11);
+	make_devfs_entries ("ip6_fw", 13);
+	make_devfs_entries ("dnrtmsg", 13);
 	devfs_register_series (devfs_handle, "tap%u", 16, DEVFS_FL_DEFAULT,
 			       NETLINK_MAJOR, 16,
 			       S_IFCHR | S_IRUSR | S_IWUSR,

@@ -39,7 +39,7 @@
  *  - flush_tlb_all() flushes all processes TLBs
  *  - flush_tlb_mm(mm) flushes the specified mm context TLB's
  *  - flush_tlb_page(vma, vmaddr) flushes one page
- *  - flush_tlb_range(mm, start, end) flushes a range of pages
+ *  - flush_tlb_range(vma, start, end) flushes a range of pages
  *
  * since the hardware hash table functions as an extension of the
  * tlb as far as the linux tables are concerned, flush it too.
@@ -53,6 +53,8 @@
 void
 local_flush_tlb_all(void)
 {
+	struct vm_area_struct vma;
+
 	/* aargh!!! */
 	/*
 	 * Just flush the kernel part of the address space, that's
@@ -61,7 +63,8 @@ local_flush_tlb_all(void)
 	 * we can and should dispense with flush_tlb_all().
 	 *  -- paulus.
 	 */
-	local_flush_tlb_range(&init_mm, TASK_SIZE, ~0UL);
+	vma.vm_mm = &init_mm;
+	local_flush_tlb_range(&vma, TASK_SIZE, ~0UL);
 
 #ifdef CONFIG_SMP
 	smp_send_tlb_invalidate(0);
@@ -84,9 +87,12 @@ local_flush_tlb_mm(struct mm_struct *mm)
 	if (mm->map_count) {
 		struct vm_area_struct *mp;
 		for (mp = mm->mmap; mp != NULL; mp = mp->vm_next)
-			local_flush_tlb_range(mm, mp->vm_start, mp->vm_end);
-	} else
-		local_flush_tlb_range(mm, 0, TASK_SIZE);
+			local_flush_tlb_range(mp, mp->vm_start, mp->vm_end);
+	} else {
+		struct vm_area_struct vma;
+		vma.vm_mm = mm;
+		local_flush_tlb_range(&vma, 0, TASK_SIZE);
+	}
 
 #ifdef CONFIG_SMP
 	smp_send_tlb_invalidate(0);
@@ -123,8 +129,9 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
  * the corresponding HPTE.
  */
 void
-local_flush_tlb_range(struct mm_struct *mm, unsigned long start, unsigned long end)
+local_flush_tlb_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)
 {
+	struct mm_struct *mm = vma->vm_mm;
 	pmd_t *pmd;
 	pte_t *pte;
 	unsigned long pmd_end;

@@ -418,7 +418,6 @@ static int red_init(struct Qdisc* sch, struct rtattr *opt)
 }
 
 
-#ifdef CONFIG_RTNETLINK
 int red_copy_xstats(struct sk_buff *skb, struct tc_red_xstats *st)
 {
         RTA_PUT(skb, TCA_XSTATS, sizeof(*st), st);
@@ -456,7 +455,6 @@ rtattr_failure:
 	skb_trim(skb, b - skb->data);
 	return -1;
 }
-#endif
 
 static void red_destroy(struct Qdisc *sch)
 {
@@ -480,9 +478,7 @@ struct Qdisc_ops red_qdisc_ops =
 	red_destroy,
 	red_change,
 
-#ifdef CONFIG_RTNETLINK
 	red_dump,
-#endif
 };
 
 

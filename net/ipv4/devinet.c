@@ -1,7 +1,7 @@
 /*
  *	NET3	IP device support routines.
  *
- *	Version: $Id: devinet.c,v 1.43 2001/09/26 22:52:58 davem Exp $
+ *	Version: $Id: devinet.c,v 1.44 2001/10/31 21:55:54 davem Exp $
  *
  *		This program is free software; you can redistribute it and/or
  *		modify it under the terms of the GNU General Public License
@@ -63,11 +63,7 @@
 struct ipv4_devconf ipv4_devconf = { 1, 1, 1, 1, 0, };
 static struct ipv4_devconf ipv4_devconf_dflt = { 1, 1, 1, 1, 1, };
 
-#ifdef CONFIG_RTNETLINK
 static void rtmsg_ifa(int event, struct in_ifaddr *);
-#else
-#define rtmsg_ifa(a,b)	do { } while(0)
-#endif
 
 static struct notifier_block *inetaddr_chain;
 static void inet_del_ifa(struct in_device *in_dev, struct in_ifaddr **ifap, int destroy);
@@ -359,8 +355,6 @@ struct in_ifaddr *inet_ifa_byprefix(struct in_device *in_dev, u32 prefix, u32 ma
 	return NULL;
 }
 
-#ifdef CONFIG_RTNETLINK
-
 int
 inet_rtm_deladdr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 {
@@ -436,8 +430,6 @@ inet_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 
 	return inet_insert_ifa(ifa);
 }
-
-#endif
 
 /* 
  *	Determine a default network mask, based on the IP address. 
@@ -859,8 +851,6 @@ struct notifier_block ip_netdev_notifier = {
 	notifier_call:	inetdev_event,
 };
 
-#ifdef CONFIG_RTNETLINK
-
 static int inet_fill_ifaddr(struct sk_buff *skb, struct in_ifaddr *ifa,
 			    u32 pid, u32 seq, int event)
 {
@@ -993,8 +983,6 @@ static struct rtnetlink_link inet_rtnetlink_table[RTM_MAX-RTM_BASE+1] =
 	{ NULL,			NULL,			},
 #endif
 };
-
-#endif /* CONFIG_RTNETLINK */
 
 
 #ifdef CONFIG_SYSCTL
@@ -1150,9 +1138,7 @@ void __init devinet_init(void)
 {
 	register_gifconf(PF_INET, inet_gifconf);
 	register_netdevice_notifier(&ip_netdev_notifier);
-#ifdef CONFIG_RTNETLINK
 	rtnetlink_links[PF_INET] = inet_rtnetlink_table;
-#endif
 #ifdef CONFIG_SYSCTL
 	devinet_sysctl.sysctl_header =
 		register_sysctl_table(devinet_sysctl.devinet_root_dir, 0);

@@ -1,4 +1,4 @@
-/* $Id: envctrl.c,v 1.24 2001/10/08 22:19:51 davem Exp $
+/* $Id: envctrl.c,v 1.25 2002/01/15 09:01:26 davem Exp $
  * envctrl.c: Temperature and Fan monitoring on Machines providing it.
  *
  * Copyright (C) 1998  Eddie C. Dost  (ecd@skynet.be)
@@ -776,24 +776,19 @@ static void envctrl_set_mon(struct i2c_child_t *pchild,
 static void envctrl_init_adc(struct i2c_child_t *pchild, int node)
 {
 	char chnls_desc[CHANNEL_DESC_SZ];
-	int i, len, j = 0;
-	char *ptr;
+	int i = 0, len;
+	char *pos = chnls_desc;
 
-	/* Firmware describe channels into a stream separated by a '\0'.
-	 * Replace all '\0' with a space.
-	 */
-        len = prom_getproperty(node, "channels-description", chnls_desc,
+	/* Firmware describe channels into a stream separated by a '\0'. */
+	len = prom_getproperty(node, "channels-description", chnls_desc,
 			       CHANNEL_DESC_SZ);
-        for (i = 0; i < len; i++) {
-                if (chnls_desc[i] == '\0')
-                        chnls_desc[i] = ' ';
-        }
+	chnls_desc[CHANNEL_DESC_SZ - 1] = '\0';
 
-	ptr = strtok(chnls_desc, " ");
-	while (ptr != NULL) {
-		envctrl_set_mon(pchild, ptr, j);
-		ptr = strtok(NULL, " ");
-		j++;
+	while (len > 0) {
+		int l = strlen(pos) + 1;
+		envctrl_set_mon(pchild, pos, i++);
+		len -= l;
+		pos += l;
 	}
 
 	/* Get optional properties. */

@@ -2175,7 +2175,7 @@ static int sisfb_mmap (struct fb_info *info, struct file *file, struct vm_area_s
 	if (boot_cpu_data.x86 > 3)
 		pgprot_val (vma->vm_page_prot) |= _PAGE_PCD;
 #endif
-	if (io_remap_page_range(vma->vm_start, off, vma->vm_end - vma->vm_start, vma->vm_page_prot)) 
+	if (io_remap_page_range(vma, vma->vm_start, off, vma->vm_end - vma->vm_start, vma->vm_page_prot)) 
 		return -EAGAIN;
 	return 0;
 

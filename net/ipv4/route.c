@@ -5,7 +5,7 @@
  *
  *		ROUTE - implementation of the IP router.
  *
- * Version:	$Id: route.c,v 1.101 2001/10/20 00:00:11 davem Exp $
+ * Version:	$Id: route.c,v 1.103 2002/01/12 07:44:09 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -214,7 +214,7 @@ static int rt_cache_get_info(char *buffer, char **start, off_t offset,
 {
 	int len = 0;
 	off_t pos = 128;
-	char temp[129];
+	char temp[256];
 	struct rtable *r;
 	int i;
 
@@ -2013,7 +2013,6 @@ int ip_route_output_key(struct rtable **rp, const struct rt_key *key)
 	return ip_route_output_slow(rp, key);
 }	
 
-#ifdef CONFIG_RTNETLINK
 static int rt_fill_info(struct sk_buff *skb, u32 pid, u32 seq, int event,
 			int nowait)
 {
@@ -2218,8 +2217,6 @@ done:
 	cb->args[1] = idx;
 	return skb->len;
 }
-
-#endif /* CONFIG_RTNETLINK */
 
 void ip_rt_multicast_event(struct in_device *in_dev)
 {

@@ -28,7 +28,7 @@ static void pa20_copy_page(unsigned long to, unsigned long from)
 /* Cache operations. */
 static inline void pa20_flush_cache_all(void) { }
 static void pa20_flush_cache_mm(struct mm_struct *mm) { }
-static void pa20_flush_cache_range(struct mm_struct *mm,
+static void pa20_flush_cache_range(struct vm_area_struct *vma,
 				    unsigned long start,
 				    unsigned long end)
 {
@@ -65,10 +65,10 @@ static void pa20_flush_tlb_mm(struct mm_struct *mm)
 		pa20_flush_tlb_all();
 }
 
-static void pa20_flush_tlb_range(struct mm_struct *mm, unsigned long start,
+static void pa20_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 				  unsigned long end)
 {
-	if(mm == current->mm)
+	if (vma == NULL || vma->vm_mm == current->mm)
 		pa20_flush_tlb_all();
 }
 

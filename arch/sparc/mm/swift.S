@@ -1,4 +1,4 @@
-/* $Id: swift.S,v 1.7 2000/07/16 21:48:52 anton Exp $
+/* $Id: swift.S,v 1.9 2002/01/08 11:11:59 davem Exp $
  * swift.S: MicroSparc-II mmu/cache operations.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -108,6 +108,7 @@ swift_flush_cache_mm_out:
 
 	.globl	swift_flush_cache_range
 swift_flush_cache_range:
+	ld	[%o0 + 0x0], %o0		/* XXX vma->vm_mm, GROSS XXX */
 	sub	%o2, %o1, %o2
 	sethi	%hi(4096), %o3
 	cmp	%o2, %o3
@@ -222,8 +223,9 @@ swift_flush_sig_insns:
 	.globl	swift_flush_tlb_mm
 	.globl	swift_flush_tlb_range
 	.globl	swift_flush_tlb_all
-swift_flush_tlb_mm:
 swift_flush_tlb_range:
+	ld	[%o0 + 0x00], %o0	/* XXX vma->vm_mm GROSS XXX */
+swift_flush_tlb_mm:
 #ifndef CONFIG_SMP
 	ld	[%o0 + AOFF_mm_context], %g2
 	cmp	%g2, -1

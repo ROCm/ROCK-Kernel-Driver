@@ -172,6 +172,20 @@ static inline int pci_dma_panic(char *msg)
 #define pci_map_sg(p, sg, n, d)		hppa_dma_ops->map_sg(p, sg, n, d)
 #define pci_unmap_sg(p, sg, n, d)	hppa_dma_ops->unmap_sg(p, sg, n, d)
 
+/* pci_unmap_{single,page} is not a nop, thus... */
+#define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)	\
+	dma_addr_t ADDR_NAME;
+#define DECLARE_PCI_UNMAP_LEN(LEN_NAME)		\
+	__u32 LEN_NAME;
+#define pci_unmap_addr(PTR, ADDR_NAME)			\
+	((PTR)->ADDR_NAME)
+#define pci_unmap_addr_set(PTR, ADDR_NAME, VAL)		\
+	(((PTR)->ADDR_NAME) = (VAL))
+#define pci_unmap_len(PTR, LEN_NAME)			\
+	((PTR)->LEN_NAME)
+#define pci_unmap_len_set(PTR, LEN_NAME, VAL)		\
+	(((PTR)->LEN_NAME) = (VAL))
+
 /* For U2/Astro/Ike based platforms (which are fully I/O coherent)
 ** dma_sync is a NOP. Let's keep the performance path short here.
 */

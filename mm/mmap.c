@@ -569,7 +569,7 @@ unmap_and_free_vma:
 	fput(file);
 
 	/* Undo any partial mapping done by a device driver. */
-	zap_page_range(mm, vma->vm_start, vma->vm_end - vma->vm_start);
+	zap_page_range(vma, vma->vm_start, vma->vm_end - vma->vm_start);
 free_vma:
 	kmem_cache_free(vm_area_cachep, vma);
 	return error;
@@ -967,7 +967,7 @@ int do_munmap(struct mm_struct *mm, unsigned long addr, size_t len)
 		remove_shared_vm_struct(mpnt);
 		mm->map_count--;
 
-		zap_page_range(mm, st, size);
+		zap_page_range(mpnt, st, size);
 
 		/*
 		 * Fix the mapping, and free the old area if it wasn't reused.
@@ -1127,7 +1127,7 @@ void exit_mmap(struct mm_struct * mm)
 		}
 		mm->map_count--;
 		remove_shared_vm_struct(mpnt);
-		zap_page_range(mm, start, size);
+		zap_page_range(mpnt, start, size);
 		if (mpnt->vm_file)
 			fput(mpnt->vm_file);
 		kmem_cache_free(vm_area_cachep, mpnt);

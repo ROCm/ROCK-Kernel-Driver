@@ -97,8 +97,6 @@ int unregister_tcf_proto_ops(struct tcf_proto_ops *ops)
 	return 0;
 }
 
-#ifdef CONFIG_RTNETLINK
-
 static int tfilter_notify(struct sk_buff *oskb, struct nlmsghdr *n,
 			  struct tcf_proto *tp, unsigned long fh, int event);
 
@@ -430,12 +428,9 @@ errout:
 	return skb->len;
 }
 
-#endif
-
 
 int __init tc_filter_init(void)
 {
-#ifdef CONFIG_RTNETLINK
 	struct rtnetlink_link *link_p = rtnetlink_links[PF_UNSPEC];
 
 	/* Setup rtnetlink links. It is made here to avoid
@@ -448,7 +443,6 @@ int __init tc_filter_init(void)
 		link_p[RTM_GETTFILTER-RTM_BASE].doit = tc_ctl_tfilter;
 		link_p[RTM_GETTFILTER-RTM_BASE].dumpit = tc_dump_tfilter;
 	}
-#endif
 #define INIT_TC_FILTER(name) { \
           extern struct tcf_proto_ops cls_##name##_ops; \
           register_tcf_proto_ops(&cls_##name##_ops); \

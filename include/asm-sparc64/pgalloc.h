@@ -1,4 +1,4 @@
-/* $Id: pgalloc.h,v 1.29 2001/10/20 12:38:51 davem Exp $ */
+/* $Id: pgalloc.h,v 1.30 2001/12/21 04:56:17 davem Exp $ */
 #ifndef _SPARC64_PGALLOC_H
 #define _SPARC64_PGALLOC_H
 
@@ -15,8 +15,7 @@
 /* These are the same regardless of whether this is an SMP kernel or not. */
 #define flush_cache_mm(__mm) \
 	do { if ((__mm) == current->mm) flushw_user(); } while(0)
-#define flush_cache_range(mm, start, end) \
-	flush_cache_mm(mm)
+extern void flush_cache_range(struct vm_area_struct *, unsigned long, unsigned long);
 #define flush_cache_page(vma, page) \
 	flush_cache_mm((vma)->vm_mm)
 
@@ -35,8 +34,10 @@ extern void __flush_icache_page(unsigned long);
 extern void flush_dcache_page_impl(struct page *page);
 #ifdef CONFIG_SMP
 extern void smp_flush_dcache_page_impl(struct page *page, int cpu);
+extern void flush_dcache_page_all(struct mm_struct *mm, struct page *page);
 #else
 #define smp_flush_dcache_page_impl(page,cpu) flush_dcache_page_impl(page)
+#define flush_dcache_page_all(mm,page) flush_dcache_page_impl(page)
 #endif
 
 extern void flush_dcache_page(struct page *page);
@@ -62,11 +63,11 @@ do { if(CTX_VALID((__mm)->context)) \
 	__flush_tlb_mm(CTX_HWBITS((__mm)->context), SECONDARY_CONTEXT); \
 } while(0)
 
-#define flush_tlb_range(__mm, start, end) \
-do { if(CTX_VALID((__mm)->context)) { \
+#define flush_tlb_range(__vma, start, end) \
+do { if(CTX_VALID((__vma)->vm_mm->context)) { \
 	unsigned long __start = (start)&PAGE_MASK; \
 	unsigned long __end = PAGE_ALIGN(end); \
-	__flush_tlb_range(CTX_HWBITS((__mm)->context), __start, \
+	__flush_tlb_range(CTX_HWBITS((__vma)->vm_mm->context), __start, \
 			  SECONDARY_CONTEXT, __end, PAGE_SIZE, \
 			  (__end - __start)); \
      } \
@@ -84,15 +85,15 @@ do { struct mm_struct *__mm = (vma)->vm_mm; \
 extern void smp_flush_cache_all(void);
 extern void smp_flush_tlb_all(void);
 extern void smp_flush_tlb_mm(struct mm_struct *mm);
-extern void smp_flush_tlb_range(struct mm_struct *mm, unsigned long start,
+extern void smp_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 				unsigned long end);
 extern void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page);
 
 #define flush_cache_all()	smp_flush_cache_all()
 #define flush_tlb_all()		smp_flush_tlb_all()
 #define flush_tlb_mm(mm)	smp_flush_tlb_mm(mm)
-#define flush_tlb_range(mm, start, end) \
-	smp_flush_tlb_range(mm, start, end)
+#define flush_tlb_range(vma, start, end) \
+	smp_flush_tlb_range(vma, start, end)
 #define flush_tlb_page(vma, page) \
 	smp_flush_tlb_page((vma)->vm_mm, page)
 
@@ -122,9 +123,13 @@ extern __inline__ void flush_tlb_pgtables(struct mm_struct *mm, unsigned long st
 	vpte_base = (tlb_type == spitfire ?
 		     VPTE_BASE_SPITFIRE :
 		     VPTE_BASE_CHEETAH);
-	flush_tlb_range(mm,
-			vpte_base + (s >> (PAGE_SHIFT - 3)),
-			vpte_base + (e >> (PAGE_SHIFT - 3)));
+	{
+		struct vm_area_struct vma;
+		vma.vm_mm = mm;
+		flush_tlb_range(&vma,
+				vpte_base + (s >> (PAGE_SHIFT - 3)),
+				vpte_base + (e >> (PAGE_SHIFT - 3)));
+	}
 }
 #undef VPTE_BASE_SPITFIRE
 #undef VPTE_BASE_CHEETAH

@@ -4274,7 +4274,7 @@ static int zoran_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
  *
  */
 
-static int do_zoran_mmap(struct zoran *zr, const char *adr,
+static int do_zoran_mmap(struct vm_area_struct *vma, struct zoran *zr, const char *adr,
 		      unsigned long size)
 {
 	unsigned long start = (unsigned long) adr;
@@ -4321,7 +4321,7 @@ static int do_zoran_mmap(struct zoran *zr, const char *adr,
 				    frag_tab[2 * j];
 				page = virt_to_phys(bus_to_virt(pos));	/* should just be pos on i386 */
 				if (remap_page_range
-				    (start, page, todo, PAGE_SHARED)) {
+				    (vma, start, page, todo, PAGE_SHARED)) {
 					printk(KERN_ERR
 					       "%s: zoran_mmap(V4L): remap_page_range failed\n",
 					       zr->name);
@@ -4362,7 +4362,7 @@ static int do_zoran_mmap(struct zoran *zr, const char *adr,
 			       ("V4L remap page range %d 0x%lx %ld to 0x%lx\n",
 				i, page, todo, start));
 			if (remap_page_range
-			    (start, page, todo, PAGE_SHARED)) {
+			    (vma, start, page, todo, PAGE_SHARED)) {
 				printk(KERN_ERR
 				       "%s: zoran_mmap(V4L): remap_page_range failed\n",
 				       zr->name);
@@ -4377,14 +4377,14 @@ static int do_zoran_mmap(struct zoran *zr, const char *adr,
 	return 0;
 }
 
-static int zoran_mmap(struct video_device *dev, const char *adr,
+static int zoran_mmap(struct vm_area_struct *vma, struct video_device *dev, const char *adr,
 		      unsigned long size)
 {
 	int err;
 	struct zoran *zr = (struct zoran *) dev;
 	
 	down(&zr->sem);
-	err = do_zoran_mmap(zr, adr, size);
+	err = do_zoran_mmap(vma, zr, adr, size);
 	up(&zr->sem);
 		
 	return err;

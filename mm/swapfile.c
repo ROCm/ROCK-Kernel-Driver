@@ -904,11 +904,12 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 	swap_file = filp_open(name, O_RDWR, 0);
 	putname(name);
 	error = PTR_ERR(swap_file);
-	if (error)
+	if (IS_ERR(swap_file))
 		goto bad_swap_2;
 
 	p->swap_file = swap_file;
 
+	error = -EINVAL;
 	if (S_ISBLK(swap_file->f_dentry->d_inode->i_mode)) {
 		p->swap_device = swap_file->f_dentry->d_inode->i_rdev;
 		set_blocksize(p->swap_device, PAGE_SIZE);

@@ -363,7 +363,6 @@ static void tbf_destroy(struct Qdisc *sch)
 	MOD_DEC_USE_COUNT;
 }
 
-#ifdef CONFIG_RTNETLINK
 static int tbf_dump(struct Qdisc *sch, struct sk_buff *skb)
 {
 	struct tbf_sched_data *q = (struct tbf_sched_data *)sch->data;
@@ -391,7 +390,6 @@ rtattr_failure:
 	skb_trim(skb, b - skb->data);
 	return -1;
 }
-#endif
 
 struct Qdisc_ops tbf_qdisc_ops =
 {
@@ -410,9 +408,7 @@ struct Qdisc_ops tbf_qdisc_ops =
 	tbf_destroy,
 	tbf_change,
 
-#ifdef CONFIG_RTNETLINK
 	tbf_dump,
-#endif
 };
 
 

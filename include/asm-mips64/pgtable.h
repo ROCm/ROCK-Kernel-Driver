@@ -24,11 +24,11 @@
  *  - flush_cache_all() flushes entire cache
  *  - flush_cache_mm(mm) flushes the specified mm context's cache lines
  *  - flush_cache_page(mm, vmaddr) flushes a single page
- *  - flush_cache_range(mm, start, end) flushes a range of pages
+ *  - flush_cache_range(vma, start, end) flushes a range of pages
  *  - flush_page_to_ram(page) write back kernel page to ram
  */
 extern void (*_flush_cache_mm)(struct mm_struct *mm);
-extern void (*_flush_cache_range)(struct mm_struct *mm, unsigned long start,
+extern void (*_flush_cache_range)(struct vm_area_struct *vma, unsigned long start,
                                  unsigned long end);
 extern void (*_flush_cache_page)(struct vm_area_struct *vma, unsigned long page);
 extern void (*_flush_page_to_ram)(struct page * page);
@@ -38,7 +38,7 @@ extern void (*_flush_page_to_ram)(struct page * page);
 
 #ifndef CONFIG_CPU_R10000
 #define flush_cache_mm(mm)		_flush_cache_mm(mm)
-#define flush_cache_range(mm,start,end)	_flush_cache_range(mm,start,end)
+#define flush_cache_range(vma,start,end) _flush_cache_range(vma,start,end)
 #define flush_cache_page(vma,page)	_flush_cache_page(vma, page)
 #define flush_page_to_ram(page)		_flush_page_to_ram(page)
 
@@ -62,7 +62,7 @@ do {									\
  */
 extern void andes_flush_icache_page(unsigned long);
 #define flush_cache_mm(mm)		do { } while(0)
-#define flush_cache_range(mm,start,end)	do { } while(0)
+#define flush_cache_range(vma,start,end) do { } while(0)
 #define flush_cache_page(vma,page)	do { } while(0)
 #define flush_page_to_ram(page)		do { } while(0)
 #define flush_icache_range(start, end)	_flush_cache_l1()

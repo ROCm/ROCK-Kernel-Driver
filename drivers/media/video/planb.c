@@ -1994,7 +1994,7 @@ unimplemented:
 	return 0;
 }
 
-static int planb_mmap(struct video_device *dev, const char *adr, unsigned long size)
+static int planb_mmap(struct vm_area_struct *vma, struct video_device *dev, const char *adr, unsigned long size)
 {
 	int i;
 	struct planb *pb = (struct planb *)dev;
@@ -2008,7 +2008,7 @@ static int planb_mmap(struct video_device *dev, const char *adr, unsigned long s
 			return err;
 	}
 	for (i = 0; i < pb->rawbuf_size; i++) {
-		if (remap_page_range(start, virt_to_phys((void *)pb->rawbuf[i]),
+		if (remap_page_range(vma, start, virt_to_phys((void *)pb->rawbuf[i]),
 						PAGE_SIZE, PAGE_SHARED))
 			return -EAGAIN;
 		start += PAGE_SIZE;

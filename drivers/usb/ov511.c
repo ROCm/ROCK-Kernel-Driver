@@ -5552,7 +5552,7 @@ error:
 }
 
 static int 
-ov511_mmap(struct video_device *vdev, const char *adr, unsigned long size)
+ov511_mmap(struct vm_area_struct *vma, struct video_device *vdev, const char *adr, unsigned long size)
 {
 	struct usb_ov511 *ov511 = vdev->priv;
 	unsigned long start = (unsigned long)adr;
@@ -5574,7 +5574,7 @@ ov511_mmap(struct video_device *vdev, const char *adr, unsigned long size)
 	pos = (unsigned long)ov511->fbuf;
 	while (size > 0) {
 		page = kvirt_to_pa(pos);
-		if (remap_page_range(start, page, PAGE_SIZE, PAGE_SHARED)) {
+		if (remap_page_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
 			up(&ov511->lock);
 			return -EAGAIN;
 		}

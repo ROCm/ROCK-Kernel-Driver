@@ -1101,7 +1101,7 @@ static void idepmac_wake_device(ide_drive_t *drive, int used_dma)
 		HWGROUP(drive)->busy = 1;
 		pmac_ide_check_dma(drive);
 		HWGROUP(drive)->busy = 0;
-		spin_unlock_irq(&io_request_lock);
+		spin_unlock_irq(&ide_lock);
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */
 }
@@ -1220,7 +1220,7 @@ static int idepmac_notify_sleep(struct pmu_sleep_notifier *self, int when)
 			/* Disable irq during sleep */
 			disable_irq(pmac_ide[i].irq);
 			if (unlock)
-				spin_unlock_irq(&io_request_lock);
+				spin_unlock_irq(&ide_lock);
 			
 			/* Check if this is a media bay with an IDE device or not
 			 * a media bay.
@@ -1279,11 +1279,11 @@ static int idepmac_notify_sleep(struct pmu_sleep_notifier *self, int when)
 			drive->using_dma = 0;
 
 			/* We resume processing on the HW group */
-			spin_lock_irqsave(&io_request_lock, flags);
+			spin_lock_irqsave(&ide_lock, flags);
 			enable_irq(pmac_ide[i].irq);
 			if (drive->present)
 				HWGROUP(drive)->busy = 0;
-			spin_unlock_irqrestore(&io_request_lock, flags);
+			spin_unlock_irqrestore(&ide_lock, flags);
 			
 			/* Wake the device
 			 * We could handle the slave here

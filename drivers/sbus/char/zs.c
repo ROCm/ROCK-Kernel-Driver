@@ -1,4 +1,4 @@
-/* $Id: zs.c,v 1.70 2002/01/08 16:00:16 davem Exp $
+/* $Id: zs.c,v 1.71 2002/01/12 07:04:54 davem Exp $
  * zs.c: Zilog serial port driver for the Sparc.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -7,6 +7,10 @@
  *
  * Fixed to use tty_get_baud_rate().
  *   Theodore Ts'o <tytso@mit.edu>, 2001-Oct-12
+ *
+ * /proc/tty/driver/serial now exists and is readable.
+ *   Alex Buell <alex.buell@tahallah.demon.co.uk>, 2001-12-23
+ *
  */
 
 #include <linux/errno.h>
@@ -1653,6 +1657,81 @@ void zs_hangup(struct tty_struct *tty)
 }
 
 /*
+ *
+ * line_info - returns information about each channel
+ *
+ */
+static inline int line_info(char *buf, struct sun_serial *info)
+{
+	unsigned char status;
+	char stat_buf[30];
+	int ret;
+
+	ret = sprintf(buf, "%d: uart:Zilog8530 port:%x irq:%d",
+		info->line, info->port, info->irq);
+
+	cli();
+	status = sbus_readb(&info->zs_channel->control);
+	ZSDELAY();
+	ZSLOG(REGCTRL, status, 0);
+	sti();
+
+	stat_buf[0] = 0;
+	stat_buf[1] = 0;
+	if (info->curregs[5] & RTS)
+		strcat(stat_buf, "|RTS");
+	if (status & CTS)
+		strcat(stat_buf, "|CTS");
+	if (info->curregs[5] & DTR)
+		strcat(stat_buf, "|DTR");
+	if (status & SYNC)
+		strcat(stat_buf, "|DSR");
+	if (status & DCD)
+		strcat(stat_buf, "|CD");
+
+	ret += sprintf(buf + ret, " baud:%d %s\n", info->zs_baud, stat_buf + 1);
+	return ret;
+}
+
+/*
+ *
+ * zs_read_proc() - called when /proc/tty/driver/serial is read.
+ *
+ */
+int zs_read_proc(char *page, char **start, off_t off, int count,
+                 int *eof, void *data)
+{
+	char *revision = "$Revision: 1.71 $";
+	char *version, *p;
+	int i, len = 0, l;
+	off_t begin = 0;
+
+	version = strchr(revision, ' ');
+	p = strchr(++version, ' ');
+	*p = '\0';
+	len += sprintf(page, "serinfo:1.0 driver:%s\n", version);
+	*p = ' ';
+
+	for (i = 0; i < NUM_CHANNELS && len < 4000; i++) {
+		l = line_info(page + len, &zs_soft[i]);
+		len += l;
+		if (len+begin > off+count)
+			goto done;
+		if (len+begin < off) {
+			begin += len;
+			len = 0;
+		}
+	}
+
+	*eof = 1;
+done:
+	if (off >= len+begin)
+		return 0;
+	*start = page + (off-begin);
+	return ((count < begin+len-off) ? count : begin+len-off);
+}
+
+/*
  * ------------------------------------------------------------
  * zs_open() and friends
  * ------------------------------------------------------------
@@ -1887,7 +1966,7 @@ int zs_open(struct tty_struct *tty, struct file * filp)
 
 static void show_serial_version(void)
 {
-	char *revision = "$Revision: 1.70 $";
+	char *revision = "$Revision: 1.71 $";
 	char *version, *p;
 
 	version = strchr(revision, ' ');
@@ -2398,8 +2477,8 @@ int __init zs_init(void)
 	serial_driver.hangup = zs_hangup;
 
 	/* I'm too lazy, someone write versions of this for us. -DaveM */
-	serial_driver.read_proc = 0;
-	serial_driver.proc_entry = 0;
+	/* I just did. :-) -AIB 2001-12-23 */
+	serial_driver.read_proc = zs_read_proc;
 
 	/*
 	 * The callout device is just like normal device except for
@@ -2409,6 +2488,8 @@ int __init zs_init(void)
 	callout_driver.name = "cua/%d";
 	callout_driver.major = TTYAUX_MAJOR;
 	callout_driver.subtype = SERIAL_TYPE_CALLOUT;
+	callout_driver.read_proc = 0;
+	callout_driver.proc_entry = 0;
 
 	if (tty_register_driver(&serial_driver))
 		panic("Couldn't register serial driver\n");

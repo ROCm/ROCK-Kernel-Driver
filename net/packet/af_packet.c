@@ -5,7 +5,7 @@
  *
  *		PACKET - implements raw packet sockets.
  *
- * Version:	$Id: af_packet.c,v 1.58 2001/11/28 21:02:10 davem Exp $
+ * Version:	$Id: af_packet.c,v 1.59 2001/12/21 04:56:17 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -1763,7 +1763,7 @@ static int packet_mmap(struct file *file, struct socket *sock, struct vm_area_st
 	start = vma->vm_start;
 	err = -EAGAIN;
 	for (i=0; i<po->pg_vec_len; i++) {
-		if (remap_page_range(start, __pa(po->pg_vec[i]),
+		if (remap_page_range(vma, start, __pa(po->pg_vec[i]),
 				     po->pg_vec_pages*PAGE_SIZE,
 				     vma->vm_page_prot))
 			goto out;

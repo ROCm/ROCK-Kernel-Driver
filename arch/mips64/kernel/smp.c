@@ -242,15 +242,15 @@ static void flush_tlb_range_ipi(void *info)
 {
 	struct flush_tlb_data *fd = (struct flush_tlb_data *)info;
 
-	_flush_tlb_range(fd->mm, fd->addr1, fd->addr2);
+	_flush_tlb_range(fd->vma, fd->addr1, fd->addr2);
 }
 
-void flush_tlb_range(struct mm_struct *mm, unsigned long start, unsigned long end)
+void flush_tlb_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)
 {
 	if ((atomic_read(&mm->mm_users) != 1) || (current->mm != mm)) {
 		struct flush_tlb_data fd;
 
-		fd.mm = mm;
+		fd.vma = vma;
 		fd.addr1 = start;
 		fd.addr2 = end;
 		smp_call_function(flush_tlb_range_ipi, (void *)&fd, 1, 1);

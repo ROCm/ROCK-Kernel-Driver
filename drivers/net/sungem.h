@@ -1,4 +1,4 @@
-/* $Id: sungem.h,v 1.10 2001/11/29 03:57:33 davem Exp $
+/* $Id: sungem.h,v 1.11 2002/01/12 07:19:55 davem Exp $
  * sungem.h: Definitions for Sun GEM ethernet driver.
  *
  * Copyright (C) 2000 David S. Miller (davem@redhat.com)
@@ -972,6 +972,8 @@ struct gem {
 	struct sk_buff *rx_skbs[RX_RING_SIZE];
 	struct sk_buff *tx_skbs[RX_RING_SIZE];
 
+	u32			msg_enable;
+
 	struct net_device_stats net_stats;
 
 	enum gem_phy_type	phy_type;
@@ -995,8 +997,8 @@ struct gem {
 	volatile int		reset_task_pending;
 	
 	/* Diagnostic counters and state. */
-	u64 pause_entered;
-	u16 pause_last_time_recvd;
+	u64			pause_entered;
+	u16			pause_last_time_recvd;
 
 	dma_addr_t gblock_dvma;
 	struct pci_dev *pdev;

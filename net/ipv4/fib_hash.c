@@ -5,7 +5,7 @@
  *
  *		IPv4 FIB: lookup engine and maintenance routines.
  *
- * Version:	$Id: fib_hash.c,v 1.12 1999/08/31 07:03:27 davem Exp $
+ * Version:	$Id: fib_hash.c,v 1.13 2001/10/31 21:55:54 davem Exp $
  *
  * Authors:	Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
  *
@@ -425,14 +425,9 @@ for ( ; ((f) = *(fp)) != NULL && fn_key_eq((f)->fn_key, (key)) && \
 #endif
 
 
-#ifdef CONFIG_RTNETLINK
 static void rtmsg_fib(int, struct fib_node*, int, int,
 		      struct nlmsghdr *n,
 		      struct netlink_skb_parms *);
-#else
-#define rtmsg_fib(a, b, c, d, e, f)
-#endif
-
 
 static int
 fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
@@ -796,9 +791,7 @@ out:
 #endif
 
 
-#ifdef CONFIG_RTNETLINK
-
-extern __inline__ int
+static __inline__ int
 fn_hash_dump_bucket(struct sk_buff *skb, struct netlink_callback *cb,
 		     struct fib_table *tb,
 		     struct fn_zone *fz,
@@ -823,7 +816,7 @@ fn_hash_dump_bucket(struct sk_buff *skb, struct netlink_callback *cb,
 	return skb->len;
 }
 
-extern __inline__ int
+static __inline__ int
 fn_hash_dump_zone(struct sk_buff *skb, struct netlink_callback *cb,
 		   struct fib_table *tb,
 		   struct fn_zone *fz)
@@ -894,8 +887,6 @@ static void rtmsg_fib(int event, struct fib_node* f, int z, int tb_id,
 		netlink_unicast(rtnl, skb, pid, MSG_DONTWAIT);
 }
 
-#endif /* CONFIG_RTNETLINK */
-
 #ifdef CONFIG_IP_MULTIPLE_TABLES
 struct fib_table * fib_hash_init(int id)
 #else
@@ -920,9 +911,7 @@ struct fib_table * __init fib_hash_init(int id)
 	tb->tb_delete = fn_hash_delete;
 	tb->tb_flush = fn_hash_flush;
 	tb->tb_select_default = fn_hash_select_default;
-#ifdef CONFIG_RTNETLINK
 	tb->tb_dump = fn_hash_dump;
-#endif
 #ifdef CONFIG_PROC_FS
 	tb->tb_get_info = fn_hash_get_info;
 #endif

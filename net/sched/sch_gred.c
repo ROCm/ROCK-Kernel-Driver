@@ -494,7 +494,6 @@ static int gred_init(struct Qdisc *sch, struct rtattr *opt)
 	return -EINVAL;
 }
 
-#ifdef CONFIG_RTNETLINK
 static int gred_dump(struct Qdisc *sch, struct sk_buff *skb)
 {
 	unsigned long qave;
@@ -587,7 +586,6 @@ rtattr_failure:
 	skb_trim(skb, b - skb->data);
 	return -1;
 }
-#endif
 
 static void gred_destroy(struct Qdisc *sch)
 {
@@ -615,9 +613,7 @@ struct Qdisc_ops gred_qdisc_ops =
 	gred_reset,
 	gred_destroy,
 	gred_change, /* change */
-#ifdef CONFIG_RTNETLINK
 	gred_dump,
-#endif
 };
 
 

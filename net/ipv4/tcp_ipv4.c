@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp_ipv4.c,v 1.235 2001/10/26 14:51:13 davem Exp $
+ * Version:	$Id: tcp_ipv4.c,v 1.238 2002/01/15 08:49:21 davem Exp $
  *
  *		IPv4 specific functions
  *
@@ -754,21 +754,19 @@ static __inline__ unsigned tcp_v4_synq_hash(u32 raddr, u16 rport)
 }
 
 static struct open_request *tcp_v4_search_req(struct tcp_opt *tp, 
-					      struct iphdr *iph,
-					      struct tcphdr *th,
-					      struct open_request ***prevp)
+					      struct open_request ***prevp,
+					      __u16 rport,
+					      __u32 raddr, __u32 laddr)
 {
 	struct tcp_listen_opt *lopt = tp->listen_opt;
 	struct open_request *req, **prev;  
-	__u16 rport = th->source;
-	__u32 raddr = iph->saddr;
 
 	for (prev = &lopt->syn_table[tcp_v4_synq_hash(raddr, rport)];
 	     (req = *prev) != NULL;
 	     prev = &req->dl_next) {
 		if (req->rmt_port == rport &&
 		    req->af.v4_req.rmt_addr == raddr &&
-		    req->af.v4_req.loc_addr == iph->daddr &&
+		    req->af.v4_req.loc_addr == laddr &&
 		    TCP_INET_FAMILY(req->class->family)) {
 			BUG_TRAP(req->sk == NULL);
 			*prevp = prev;
@@ -939,7 +937,9 @@ void tcp_v4_err(struct sk_buff *skb, u32 info)
 		if (sk->lock.users != 0)
 			goto out;
 
-		req = tcp_v4_search_req(tp, iph, th, &prev); 
+		req = tcp_v4_search_req(tp, &prev,
+					th->dest,
+					iph->daddr, iph->saddr); 
 		if (!req)
 			goto out;
 
@@ -1473,11 +1473,14 @@ static struct sock *tcp_v4_hnd_req(struct sock *sk,struct sk_buff *skb)
 {
 	struct open_request *req, **prev;
 	struct tcphdr *th = skb->h.th;
+	struct iphdr *iph = skb->nh.iph;
 	struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
 	struct sock *nsk;
 
 	/* Find possible connection requests. */
-	req = tcp_v4_search_req(tp, skb->nh.iph, th, &prev);
+	req = tcp_v4_search_req(tp, &prev,
+				th->source,
+				iph->saddr, iph->daddr);
 	if (req)
 		return tcp_check_req(sk, skb, req, prev);
 
@@ -2061,7 +2064,7 @@ int tcp_get_info(char *buffer, char **start, off_t offset, int length)
 	/* First, walk listening socket table. */
 	tcp_listen_lock();
 	for(i = 0; i < TCP_LHTABLE_SIZE; i++) {
-		struct sock *sk = tcp_listening_hash[i];
+		struct sock *sk;
 		struct tcp_listen_opt *lopt;
 		int k;
 
