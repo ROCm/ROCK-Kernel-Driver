@@ -712,7 +712,7 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  * URB_NO_SETUP_DMA_MAP indicate which buffers have already been mapped.
  * URB_NO_SETUP_DMA_MAP is ignored for non-control URBs.
  *
- * Interrupt UBS must provide an interval, saying how often (in milliseconds
+ * Interrupt URBs must provide an interval, saying how often (in milliseconds
  * or, for highspeed devices, 125 microsecond units)
  * to poll for transfers.  After the URB has been submitted, the interval
  * field reflects how the transfer was actually scheduled.
