@@ -81,6 +81,20 @@ static ssize_t acq_write(struct file *file, const char *buf, size_t count, loff_
 
 	if(count)
 	{
+		if (!nowayout)
+		{
+			size_t i;
+
+			expect_close = 0;
+
+			for (i = 0; i != count; i++) {
+				char c;
+				if (get_user(c, buf + i))
+					return -EFAULT;
+				if (c == 'V')
+					expect_close = 1;
+			}
+		}
 		acq_ping();
 		return 1;
 	}
@@ -99,7 +113,7 @@ static int acq_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 {
 	static struct watchdog_info ident=
 	{
-		WDIOF_KEEPALIVEPING, 1, "Acquire WDT"
+		WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE, 1, "Acquire WDT"
 	};
 	
 	switch(cmd)
@@ -126,39 +140,35 @@ static int acq_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 static int acq_open(struct inode *inode, struct file *file)
 {
-	switch(minor(inode->i_rdev))
-	{
-		case WATCHDOG_MINOR:
-			spin_lock(&acq_lock);
-			if(acq_is_open)
-			{
-				spin_unlock(&acq_lock);
-				return -EBUSY;
-			}
-			if (nowayout) {
-				MOD_INC_USE_COUNT;
-			}
-			/*
-			 *	Activate 
-			 */
-
-			acq_is_open=1;
-			inb_p(WDT_START);      
+	if ((minor(inode->i_rdev) == WATCHDOG_MINOR)) {
+		spin_lock(&acq_lock);
+		if(acq_is_open) {
 			spin_unlock(&acq_lock);
-			return 0;
-		default:
-			return -ENODEV;
+			return -EBUSY;
+		}
+		if (nowayout)
+			MOD_INC_USE_COUNT;
+
+		/* Activate */
+		acq_is_open=1;
+		inb_p(WDT_START);      
+		spin_unlock(&acq_lock);
+		return 0;
+
+	} else {
+		return -ENODEV;
 	}
 }
 
 static int acq_close(struct inode *inode, struct file *file)
 {
-	if(minor(inode->i_rdev)==WATCHDOG_MINOR)
-	{
+	if(minor(inode->i_rdev)==WATCHDOG_MINOR) {
 		spin_lock(&acq_lock);
-		if (!nowayout) {
+		if (expect_close)
 			inb_p(WDT_STOP);
-		}
+		else
+			printk(KERN_CRIT "WDT closed unexpectedly.  WDT will not stop!\n");
+
 		acq_is_open=0;
 		spin_unlock(&acq_lock);
 	}
@@ -173,10 +183,9 @@ static int acq_notify_sys(struct notifier_block *this, unsigned long code,
 	void *unused)
 {
 	if(code==SYS_DOWN || code==SYS_HALT)
-	{
 		/* Turn the card off */
 		inb_p(WDT_STOP);
-	}
+
 	return NOTIFY_DONE;
 }
  
@@ -221,17 +230,15 @@ static int __init acq_init(void)
 	spin_lock_init(&acq_lock);
 	if (misc_register(&acq_miscdev))
 		return -ENODEV;
-	if (!request_region(WDT_STOP, 1, "Acquire WDT"))
-		{
+	if (!request_region(WDT_STOP, 1, "Acquire WDT")) {
 		misc_deregister(&acq_miscdev);
 		return -EIO;
-		}
-	if (!request_region(WDT_START, 1, "Acquire WDT"))
-		{
+	}
+	if (!request_region(WDT_START, 1, "Acquire WDT")) {
 		release_region(WDT_STOP, 1);
 		misc_deregister(&acq_miscdev);
 		return -EIO;
-		}
+	}
 
 	register_reboot_notifier(&acq_notifier);
 	return 0;
