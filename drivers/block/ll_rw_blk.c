@@ -1314,6 +1314,8 @@ static elevator_t *chosen_elevator =
 	&iosched_as;
 #elif defined(CONFIG_IOSCHED_DEADLINE)
 	&iosched_deadline;
+#elif defined(CONFIG_IOSCHED_CFQ)
+	&iosched_cfq;
 #elif defined(CONFIG_IOSCHED_NOOP)
 	&elevator_noop;
 #else
@@ -1331,6 +1333,10 @@ static int __init elevator_setup(char *str)
 #ifdef CONFIG_IOSCHED_AS
 	if (!strcmp(str, "as"))
 		chosen_elevator = &iosched_as;
+#endif
+#ifdef CONFIG_IOSCHED_CFQ
+	if (!strcmp(str, "cfq"))
+		chosen_elevator = &iosched_cfq;
 #endif
 #ifdef CONFIG_IOSCHED_NOOP
 	if (!strcmp(str, "noop"))
