@@ -23,6 +23,15 @@ struct task_struct;
 
 extern struct task_struct *resume(void *, void *);
 
+#ifdef __s390x__
+#define __FLAG_SHIFT 56
+extern void __misaligned_u16(void);
+extern void __misaligned_u32(void);
+extern void __misaligned_u64(void);
+#else /* __s390x__ */
+#define __FLAG_SHIFT 24
+#endif /* __s390x__ */
+
 static inline void save_fp_regs(s390_fp_regs *fpregs)
 {
 	asm volatile (
@@ -88,7 +97,7 @@ static inline void restore_fp_regs(s390_fp_regs *fpregs)
 #define nop() __asm__ __volatile__ ("nop")
 
 #define xchg(ptr,x) \
-  ((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
+  ((__typeof__(*(ptr)))__xchg((unsigned long)(x),(void *)(ptr),sizeof(*(ptr))))
 
 static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 {
@@ -137,6 +146,17 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 			: "memory", "cc", "0" );
 		x = old;
 		break;
+#ifdef __s390x__
+	case 8:
+		asm volatile (
+			"    lg  %0,0(%2)\n"
+			"0:  csg %0,%1,0(%2)\n"
+			"    jl  0b\n"
+			: "=&d" (old) : "d" (x), "a" (ptr)
+			: "memory", "cc", "0" );
+		x = old;
+		break;
+#endif /* __s390x__ */
         }
         return x;
 }
@@ -208,6 +228,14 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 			: "=&d" (prev) : "0" (old), "d" (new), "a" (ptr)
 			: "memory", "cc" );
 		return prev;
+#ifdef __s390x__
+	case 8:
+		asm volatile (
+			"    csg %0,%2,0(%3)\n"
+			: "=&d" (prev) : "0" (old), "d" (new), "a" (ptr)
+			: "memory", "cc" );
+		return prev;
+#endif /* __s390x__ */
         }
         return old;
 }
@@ -241,15 +269,15 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 
 /* interrupt control.. */
 #define local_irq_enable() ({ \
-        __u8 __dummy; \
+        unsigned long  __dummy; \
         __asm__ __volatile__ ( \
                 "stosm 0(%1),0x03" : "=m" (__dummy) : "a" (&__dummy) ); \
         })
 
 #define local_irq_disable() ({ \
-        __u32 __flags; \
+        unsigned long __flags; \
         __asm__ __volatile__ ( \
-                "stnsm 0(%1),0xFC" : "=m" (__flags) : "a" (&__flags) ); \
+                "stnsm 0(%1),0xfc" : "=m" (__flags) : "a" (&__flags) ); \
         __flags; \
         })
 
@@ -263,8 +291,69 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 ({					\
 	unsigned long flags;		\
 	local_save_flags(flags);	\
-        !((flags >> 24) & 3);		\
+        !((flags >> __FLAG_SHIFT) & 3);	\
 })
+
+#ifdef __s390x__
+
+#define __load_psw(psw) \
+        __asm__ __volatile__("lpswe 0(%0)" : : "a" (&psw) : "cc" );
+
+#define __ctl_load(array, low, high) ({ \
+	__asm__ __volatile__ ( \
+		"   la    1,%0\n" \
+		"   bras  2,0f\n" \
+                "   lctlg 0,0,0(1)\n" \
+		"0: ex    %1,0(2)" \
+		: : "m" (array), "a" (((low)<<4)+(high)) : "1", "2" ); \
+	})
+
+#define __ctl_store(array, low, high) ({ \
+	__asm__ __volatile__ ( \
+		"   la    1,%0\n" \
+		"   bras  2,0f\n" \
+		"   stctg 0,0,0(1)\n" \
+		"0: ex    %1,0(2)" \
+		: "=m" (array) : "a" (((low)<<4)+(high)): "1", "2" ); \
+	})
+
+#define __ctl_set_bit(cr, bit) ({ \
+        __u8 __dummy[24]; \
+        __asm__ __volatile__ ( \
+                "    la    1,%0\n"       /* align to 8 byte */ \
+                "    aghi  1,7\n" \
+                "    nill  1,0xfff8\n" \
+                "    bras  2,0f\n"       /* skip indirect insns */ \
+                "    stctg 0,0,0(1)\n" \
+                "    lctlg 0,0,0(1)\n" \
+                "0:  ex    %1,0(2)\n"    /* execute stctl */ \
+                "    lg    0,0(1)\n" \
+                "    ogr   0,%2\n"       /* set the bit */ \
+                "    stg   0,0(1)\n" \
+                "1:  ex    %1,6(2)"      /* execute lctl */ \
+                : "=m" (__dummy) : "a" (cr*17), "a" (1L<<(bit)) \
+                : "cc", "0", "1", "2"); \
+        })
+
+#define __ctl_clear_bit(cr, bit) ({ \
+        __u8 __dummy[24]; \
+        __asm__ __volatile__ ( \
+                "    la    1,%0\n"       /* align to 8 byte */ \
+                "    aghi  1,7\n" \
+                "    nill  1,0xfff8\n" \
+                "    bras  2,0f\n"       /* skip indirect insns */ \
+                "    stctg 0,0,0(1)\n" \
+                "    lctlg 0,0,0(1)\n" \
+                "0:  ex    %1,0(2)\n"    /* execute stctl */ \
+                "    lg    0,0(1)\n" \
+                "    ngr   0,%2\n"       /* set the bit */ \
+                "    stg   0,0(1)\n" \
+                "1:  ex    %1,6(2)"      /* execute lctl */ \
+                : "=m" (__dummy) : "a" (cr*17), "a" (~(1L<<(bit))) \
+                : "cc", "0", "1", "2"); \
+        })
+
+#else /* __s390x__ */
 
 #define __load_psw(psw) \
 	__asm__ __volatile__("lpsw 0(%0)" : : "a" (&psw) : "cc" );
@@ -273,7 +362,7 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 	__asm__ __volatile__ ( \
 		"   la    1,%0\n" \
 		"   bras  2,0f\n" \
-                "   lctl  0,0,0(1)\n" \
+                "   lctl 0,0,0(1)\n" \
 		"0: ex    %1,0(2)" \
 		: : "m" (array), "a" (((low)<<4)+(high)) : "1", "2" ); \
 	})
@@ -324,6 +413,7 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
                 : "=m" (__dummy) : "a" (cr*17), "a" (~(1<<(bit))) \
                 : "cc", "0", "1", "2"); \
         })
+#endif /* __s390x__ */
 
 /* For spinlocks etc */
 #define local_irq_save(x)	((x) = local_irq_disable())

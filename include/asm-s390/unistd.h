@@ -261,6 +261,91 @@
 
 #define NR_syscalls 263
 
+/* 
+ * There are some system calls that are not present on 64 bit, some
+ * have a different name although they do the same (e.g. __NR_chown32
+ * is __NR_chown on 64 bit).
+ */
+#ifdef __s390x__
+#undef  __NR_time
+#undef  __NR_lchown
+#undef  __NR_setuid
+#undef  __NR_getuid
+#undef  __NR_stime
+#undef  __NR_setgid
+#undef  __NR_getgid
+#undef  __NR_geteuid
+#undef  __NR_getegid
+#undef  __NR_setreuid
+#undef  __NR_setregid
+#undef  __NR_getrlimit
+#undef  __NR_getgroups
+#undef  __NR_setgroups
+#undef  __NR_fchown
+#undef  __NR_ioperm
+#undef  __NR_setfsuid
+#undef  __NR_setfsgid
+#undef  __NR__llseek
+#undef  __NR__newselect
+#undef  __NR_setresuid
+#undef  __NR_getresuid
+#undef  __NR_setresgid
+#undef  __NR_getresgid
+#undef  __NR_chown
+#undef  __NR_ugetrlimit
+#undef  __NR_mmap2
+#undef  __NR_truncate64
+#undef  __NR_ftruncate64
+#undef  __NR_stat64
+#undef  __NR_lstat64
+#undef  __NR_fstat64
+#undef  __NR_lchown32
+#undef  __NR_getuid32
+#undef  __NR_getgid32
+#undef  __NR_geteuid32
+#undef  __NR_getegid32
+#undef  __NR_setreuid32
+#undef  __NR_setregid32
+#undef  __NR_getgroups32
+#undef  __NR_setgroups32
+#undef  __NR_fchown32
+#undef  __NR_setresuid32
+#undef  __NR_getresuid32
+#undef  __NR_setresgid32
+#undef  __NR_getresgid32
+#undef  __NR_chown32
+#undef  __NR_setuid32
+#undef  __NR_setgid32
+#undef  __NR_setfsuid32
+#undef  __NR_setfsgid32
+#undef  __NR_getdents64
+#undef  __NR_fcntl64
+#undef  __NR_sendfile64
+
+#define __NR_select		142
+#define __NR_getrlimit		191	/* SuS compliant getrlimit */
+#define __NR_lchown  		198
+#define __NR_getuid  		199
+#define __NR_getgid  		200
+#define __NR_geteuid  		201
+#define __NR_getegid  		202
+#define __NR_setreuid  		203
+#define __NR_setregid  		204
+#define __NR_getgroups  	205
+#define __NR_setgroups  	206
+#define __NR_fchown  		207
+#define __NR_setresuid  	208
+#define __NR_getresuid  	209
+#define __NR_setresgid  	210
+#define __NR_getresgid  	211
+#define __NR_chown  		212
+#define __NR_setuid  		213
+#define __NR_setgid  		214
+#define __NR_setfsuid  		215
+#define __NR_setfsgid  		216
+
+#endif
+
 /* user-visible error numbers are in the range -1 - -122: see <asm-s390/errno.h> */
 
 #define __syscall_return(type, res)			     \
@@ -279,10 +364,10 @@ type name(void) {					     \
 	register long __svcres asm("2");		     \
 	long __res;					     \
 	__asm__ __volatile__ (				     \
-		"    .if %b1 < 256\n"			     \
+		"    .if %1 < 256\n"			     \
 		"    svc %b1\n"				     \
 		"    .else\n"				     \
-		"    lhi %%r1,%b1\n"			     \
+		"    la  %%r1,%1\n"			     \
 		"    svc 0\n"				     \
 		"    .endif"				     \
 		: "=d" (__svcres)			     \
@@ -298,10 +383,10 @@ type name(type1 arg1) {					     \
 	register long __svcres asm("2");		     \
 	long __res;					     \
 	__asm__ __volatile__ (				     \
-		"    .if %b1 < 256\n"			     \
+		"    .if %1 < 256\n"			     \
 		"    svc %b1\n"				     \
 		"    .else\n"				     \
-		"    lhi %%r1,%b1\n"			     \
+		"    la  %%r1,%1\n"			     \
 		"    svc 0\n"				     \
 		"    .endif"				     \
 		: "=d" (__svcres)			     \
@@ -319,10 +404,10 @@ type name(type1 arg1, type2 arg2) {			     \
 	register long __svcres asm("2");		     \
 	long __res;					     \
 	__asm__ __volatile__ (				     \
-		"    .if %b1 < 256\n"			     \
+		"    .if %1 < 256\n"			     \
 		"    svc %b1\n"				     \
 		"    .else\n"				     \
-		"    lhi %%r1,%b1\n"			     \
+		"    la %%r1,%1\n"			     \
 		"    svc 0\n"				     \
 		"    .endif"				     \
 		: "=d" (__svcres)			     \
@@ -342,10 +427,10 @@ type name(type1 arg1, type2 arg2, type3 arg3) {		     \
 	register long __svcres asm("2");		     \
 	long __res;					     \
 	__asm__ __volatile__ (				     \
-		"    .if %b1 < 256\n"			     \
+		"    .if %1 < 256\n"			     \
 		"    svc %b1\n"				     \
 		"    .else\n"				     \
-		"    lhi %%r1,%b1\n"			     \
+		"    la  %%r1,%1\n"			     \
 		"    svc 0\n"				     \
 		"    .endif"				     \
 		: "=d" (__svcres)			     \
@@ -368,10 +453,10 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4) {  \
 	register long __svcres asm("2");		     \
 	long __res;					     \
 	__asm__ __volatile__ (				     \
-		"    .if %b1 < 256\n"			     \
+		"    .if %1 < 256\n"			     \
 		"    svc %b1\n"				     \
 		"    .else\n"				     \
-		"    lhi %%r1,%b1\n"			     \
+		"    la  %%r1,%1\n"			     \
 		"    svc 0\n"				     \
 		"    .endif"				     \
 		: "=d" (__svcres)			     \
@@ -397,10 +482,10 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4,    \
 	register long __svcres asm("2");		     \
 	long __res;					     \
 	__asm__ __volatile__ (				     \
-		"    .if %b1 < 256\n"			     \
+		"    .if %1 < 256\n"			     \
 		"    svc %b1\n"				     \
 		"    .else\n"				     \
-		"    lhi %%r1,%b1\n"			     \
+		"    la  %%r1,%1\n"			     \
 		"    svc 0\n"				     \
 		"    .endif"				     \
 		: "=d" (__svcres)			     \

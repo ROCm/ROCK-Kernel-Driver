@@ -20,9 +20,9 @@
 
 #define QDIO_NAME "qdio "
 
-#ifndef CONFIG_ARCH_S390X
+#ifndef __s390x__
 #define QDIO_32_BIT
-#endif /* CONFIG_ARCH_S390X */
+#endif /* __s390x__ */
 
 /**** CONSTANTS, that are relied on without using these symbols *****/
 #define QDIO_MAX_QUEUES_PER_IRQ 32 /* used in width of unsigned int */

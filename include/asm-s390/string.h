@@ -49,13 +49,24 @@ static inline void * memchr(const void * cs,int c,size_t count)
 {
     void *ptr;
 
-    __asm__ __volatile__ ("   lr    0,%2\n"
+    __asm__ __volatile__ (
+#ifndef __s390x__
+                          "   lr    0,%2\n"
                           "   lr    1,%1\n"
                           "   la    %0,0(%3,%1)\n"
                           "0: srst  %0,1\n"
                           "   jo    0b\n"
                           "   brc   13,1f\n"
                           "   slr   %0,%0\n"
+#else /* __s390x__ */
+                          "   lgr   0,%2\n"
+                          "   lgr   1,%1\n"
+                          "   la    %0,0(%3,%1)\n"
+                          "0: srst  %0,1\n"
+                          "   jo    0b\n"
+                          "   brc   13,1f\n"
+                          "   slgr  %0,%0\n"
+#endif /* __s390x__ */
                           "1:"
                           : "=&a" (ptr) : "a" (cs), "d" (c), "d" (count)
                           : "cc", "0", "1" );
@@ -66,9 +77,16 @@ static __inline__ char *strcpy(char *dest, const char *src)
 {
     char *tmp = dest;
 
-    __asm__ __volatile__ ("   sr    0,0\n"
+    __asm__ __volatile__ (
+#ifndef __s390x__
+                          "   sr    0,0\n"
                           "0: mvst  %0,%1\n"
                           "   jo    0b"
+#else /* __s390x__ */
+                          "   slgr  0,0\n"
+                          "0: mvst  %0,%1\n"
+                          "   jo    0b"
+#endif /* __s390x__ */
                           : "+&a" (dest), "+&a" (src) :
                           : "cc", "memory", "0" );
     return tmp;
@@ -78,12 +96,22 @@ static __inline__ size_t strlen(const char *s)
 {
     size_t len;
 
-    __asm__ __volatile__ ("   sr    0,0\n"
+    __asm__ __volatile__ (
+#ifndef __s390x__
+                          "   sr    0,0\n"
                           "   lr    %0,%1\n"
                           "0: srst  0,%0\n"
                           "   jo    0b\n"
                           "   lr    %0,0\n"
                           "   sr    %0,%1"
+#else /* __s390x__ */
+                          "   slgr  0,0\n"
+                          "   lgr   %0,%1\n"
+                          "0: srst  0,%0\n"
+                          "   jo    0b\n"
+                          "   lgr   %0,0\n"
+                          "   sgr   %0,%1"
+#endif /* __s390x__ */
                           : "=&a" (len) : "a" (s) 
                           : "cc", "0" );
     return len;
@@ -93,25 +121,30 @@ static __inline__ char *strcat(char *dest, const char *src)
 {
     char *tmp = dest;
 
-    __asm__ __volatile__ ("   sr    0,0\n"
+    __asm__ __volatile__ (
+#ifndef __s390x__
+                          "   sr    0,0\n"
                           "0: srst  0,%0\n"
                           "   jo    0b\n"
                           "   lr    %0,0\n"
                           "   sr    0,0\n"
                           "1: mvst  %0,%1\n"
                           "   jo    1b"
+#else /* __s390x__ */
+                          "   slgr  0,0\n"
+                          "0: srst  0,%0\n"
+                          "   jo    0b\n"
+                          "   lgr   %0,0\n"
+                          "   slgr  0,0\n"
+                          "1: mvst  %0,%1\n"
+                          "   jo    1b"
+#endif /* __s390x__ */
                           : "+&a" (dest), "+&a" (src) :
                           : "cc", "memory", "0" );
     return tmp;
 }
 
 extern void *alloca(size_t);
-
 #endif /* __KERNEL__ */
 
 #endif /* __S390_STRING_H_ */
-
-
-
-
-

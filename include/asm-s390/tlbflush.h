@@ -28,7 +28,6 @@
 #define local_flush_tlb() \
 do {  __asm__ __volatile__("ptlb": : :"memory"); } while (0)
 
-
 #ifndef CONFIG_SMP
 
 /*
@@ -70,7 +69,13 @@ extern void smp_ptlb_all(void);
 
 static inline void global_flush_tlb(void)
 {
-	if (MACHINE_HAS_CSP) {
+#ifndef __s390x__
+	if (!MACHINE_HAS_CSP) {
+		smp_ptlb_all();
+		return;
+	}
+#endif /* __s390x__ */
+	{
 		long dummy = 0;
 		__asm__ __volatile__ (
 			"    la   4,1(%0)\n"
@@ -78,8 +83,7 @@ static inline void global_flush_tlb(void)
 			"    slr  3,3\n"
 			"    csp  2,4"
 			: : "a" (&dummy) : "cc", "2", "3", "4" );
-	} else
-		smp_ptlb_all();
+	}
 }
 
 /*

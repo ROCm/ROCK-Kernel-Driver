@@ -18,6 +18,7 @@ typedef __kernel_fsid_t	fsid_t;
 #endif
 
 struct statfs {
+#ifndef __s390x__
 	long f_type;
 	long f_bsize;
 	long f_blocks;
@@ -28,6 +29,18 @@ struct statfs {
 	__kernel_fsid_t f_fsid;
 	long f_namelen;
 	long f_spare[6];
+#else /* __s390x__ */
+	int  f_type;
+	int  f_bsize;
+	long f_blocks;
+	long f_bfree;
+	long f_bavail;
+	long f_files;
+	long f_ffree;
+	__kernel_fsid_t f_fsid;
+	int  f_namelen;
+	int  f_spare[6];
+#endif /* __s390x__ */
 };
 
 #endif

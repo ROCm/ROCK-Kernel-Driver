@@ -72,10 +72,17 @@ signal_processor(__u16 cpu_addr, sigp_order_code order_code)
 	sigp_ccode ccode;
 
 	__asm__ __volatile__(
+#ifndef __s390x__
 		"    sr     1,1\n"        /* parameter=0 in gpr 1 */
 		"    sigp   1,%1,0(%2)\n"
 		"    ipm    %0\n"
 		"    srl    %0,28\n"
+#else /* __s390x__ */
+		"    sgr    1,1\n"        /* parameter=0 in gpr 1 */
+		"    sigp   1,%1,0(%2)\n"
+		"    ipm    %0\n"
+		"    srl    %0,28"
+#endif /* __s390x__ */
 		: "=d" (ccode)
 		: "d" (__cpu_logical_map[cpu_addr]), "a" (order_code)
 		: "cc" , "memory", "1" );
@@ -86,15 +93,23 @@ signal_processor(__u16 cpu_addr, sigp_order_code order_code)
  * Signal processor with parameter
  */
 extern __inline__ sigp_ccode
-signal_processor_p(__u32 parameter,__u16 cpu_addr,sigp_order_code order_code)
+signal_processor_p(unsigned long parameter,__u16 cpu_addr,
+		   sigp_order_code order_code)
 {
 	sigp_ccode ccode;
 	
 	__asm__ __volatile__(
+#ifndef __s390x__
 		"    lr     1,%1\n"       /* parameter in gpr 1 */
 		"    sigp   1,%2,0(%3)\n"
 		"    ipm    %0\n"
 		"    srl    %0,28\n"
+#else /* __s390x__ */
+		"    lgr    1,%1\n"       /* parameter in gpr 1 */
+		"    sigp   1,%2,0(%3)\n"
+		"    ipm    %0\n"
+		"    srl    %0,28\n"
+#endif /* __s390x__ */
 		: "=d" (ccode)
 		: "d" (parameter), "d" (__cpu_logical_map[cpu_addr]),
                   "a" (order_code)
@@ -106,18 +121,27 @@ signal_processor_p(__u32 parameter,__u16 cpu_addr,sigp_order_code order_code)
  * Signal processor with parameter and return status
  */
 extern __inline__ sigp_ccode
-signal_processor_ps(__u32 *statusptr, __u32 parameter,
+signal_processor_ps(__u32 *statusptr, unsigned long parameter,
 		    __u16 cpu_addr, sigp_order_code order_code)
 {
 	sigp_ccode ccode;
 	
 	__asm__ __volatile__(
+#ifndef __s390x__
 		"    sr     2,2\n"        /* clear status so it doesn't contain rubbish if not saved. */
 		"    lr     3,%2\n"       /* parameter in gpr 3 */
 		"    sigp   2,%3,0(%4)\n"
 		"    st     2,%1\n"
 		"    ipm    %0\n"
 		"    srl    %0,28\n"
+#else /* __s390x__ */
+		"    sgr    2,2\n"        /* clear status so it doesn't contain rubbish if not saved. */
+		"    lgr    3,%2\n"       /* parameter in gpr 3 */
+		"    sigp   2,%3,0(%4)\n"
+		"    stg    2,%1\n"
+		"    ipm    %0\n"
+		"    srl    %0,28\n"
+#endif /* __s390x__ */
 		: "=d" (ccode), "=m" (*statusptr)
 		: "d" (parameter), "d" (__cpu_logical_map[cpu_addr]),
                   "a" (order_code)

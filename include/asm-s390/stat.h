@@ -9,6 +9,7 @@
 #ifndef _S390_STAT_H
 #define _S390_STAT_H
 
+#ifndef __s390x__
 struct __old_kernel_stat {
         unsigned short st_dev;
         unsigned short st_ino;
@@ -46,8 +47,6 @@ struct stat {
         unsigned long  __unused5;
 };
 
-#define STAT_HAVE_NSEC 1
-
 /* This matches struct stat64 in glibc2.1, hence the absolutely
  * insane amounts of padding around dev_t's.
  */
@@ -75,5 +74,32 @@ struct stat64 {
         unsigned long   st_ctime_nsec;  /* will be high 32 bits of ctime someday */
         unsigned long long	st_ino;
 };
+
+#else /* __s390x__ */
+
+struct stat {
+        unsigned long  st_dev;
+        unsigned long  st_ino;
+        unsigned long  st_nlink;
+        unsigned int   st_mode;
+        unsigned int   st_uid;
+        unsigned int   st_gid;
+        unsigned int   __pad1;
+        unsigned long  st_rdev;
+        unsigned long  st_size;
+        unsigned long  st_atime;
+	unsigned long  st_atime_nsec;
+        unsigned long  st_mtime;
+	unsigned long  st_mtime_nsec;
+        unsigned long  st_ctime;
+	unsigned long  st_ctime_nsec;
+        unsigned long  st_blksize;
+        long           st_blocks;
+        unsigned long  __unused[3];
+};
+
+#endif /* __s390x__ */
+
+#define STAT_HAVE_NSEC 1
 
 #endif

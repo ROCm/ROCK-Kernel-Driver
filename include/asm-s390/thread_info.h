@@ -13,6 +13,7 @@
 
 #ifndef __ASSEMBLY__
 #include <asm/processor.h>
+#include <asm/lowcore.h>
 
 /*
  * low level task data that entry.S needs immediate access to
@@ -46,25 +47,34 @@ struct thread_info {
 #define init_thread_info	(init_thread_union.thread_info)
 #define init_stack		(init_thread_union.stack)
 
+/*
+ * Size of kernel stack for each process
+ */
+#ifndef __s390x__
+#define THREAD_ORDER 1
+#define ASYNC_ORDER  1
+#else /* __s390x__ */
+#define THREAD_ORDER 2
+#define ASYNC_ORDER  2
+#endif /* __s390x__ */
+
+#define THREAD_SIZE (PAGE_SIZE << THREAD_ORDER)
+#define ASYNC_SIZE  (PAGE_SIZE << ASYNC_ORDER)
+
 /* how to get the thread information struct from C */
 static inline struct thread_info *current_thread_info(void)
 {
-	return (struct thread_info *)((*(unsigned long *) 0xc40)-8192);
+	return (struct thread_info *)((*(unsigned long *) __LC_KERNEL_STACK)-THREAD_SIZE);
 }
 
 /* thread information allocation */
 #define alloc_thread_info() ((struct thread_info *) \
-	__get_free_pages(GFP_KERNEL,1))
-#define free_thread_info(ti) free_pages((unsigned long) (ti), 1)
+	__get_free_pages(GFP_KERNEL,THREAD_ORDER))
+#define free_thread_info(ti) free_pages((unsigned long) (ti),THREAD_ORDER)
 #define get_thread_info(ti) get_task_struct((ti)->task)
 #define put_thread_info(ti) put_task_struct((ti)->task)
 
 #endif
-
-/*
- * Size of kernel stack for each process
- */
-#define THREAD_SIZE (2*PAGE_SIZE)
 
 /*
  * thread information flags bit numbers
@@ -77,6 +87,7 @@ static inline struct thread_info *current_thread_info(void)
 #define TIF_USEDFPU		16	/* FPU was used by this task this quantum (SMP) */
 #define TIF_POLLING_NRFLAG	17	/* true if poll_idle() is polling 
 					   TIF_NEED_RESCHED */
+#define TIF_31BIT		18	/* 32bit process */ 
 
 #define _TIF_SYSCALL_TRACE	(1<<TIF_SYSCALL_TRACE)
 #define _TIF_NOTIFY_RESUME	(1<<TIF_NOTIFY_RESUME)
@@ -85,6 +96,7 @@ static inline struct thread_info *current_thread_info(void)
 #define _TIF_RESTART_SVC	(1<<TIF_RESTART_SVC)
 #define _TIF_USEDFPU		(1<<TIF_USEDFPU)
 #define _TIF_POLLING_NRFLAG	(1<<TIF_POLLING_NRFLAG)
+#define _TIF_31BIT		(1<<TIF_31BIT)
 
 #endif /* __KERNEL__ */
 

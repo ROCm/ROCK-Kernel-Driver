@@ -52,7 +52,11 @@ extern volatile unsigned long cpu_possible_map;
 
 extern inline unsigned int num_online_cpus(void)
 {
+#ifndef __s390x__
 	return hweight32(cpu_online_map);
+#else /* __s390x__ */
+	return hweight64(cpu_online_map);
+#endif /* __s390x__ */
 }
 
 extern inline int any_online_cpu(unsigned int mask)
