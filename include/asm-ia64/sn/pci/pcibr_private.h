@@ -33,7 +33,7 @@ typedef struct pcibr_intr_list_s *pcibr_intr_list_t;
 typedef struct pcibr_intr_wrap_s *pcibr_intr_wrap_t;
 typedef struct pcibr_intr_cbuf_s *pcibr_intr_cbuf_t;
 
-typedef volatile unsigned *cfg_p;
+typedef volatile unsigned int *cfg_p;
 typedef volatile bridgereg_t *reg_p;
 
 /*
@@ -273,7 +273,7 @@ struct pcibr_intr_s {
 #define bi_mustruncpu	bi_pi.pi_mustruncpu /* Where we must run. */
 #define bi_irq		bi_pi.pi_irq	/* IRQ assigned. */
 #define bi_cpu		bi_pi.pi_cpu	/* cpu assigned. */
-    unsigned                bi_ibits;	/* which Bridge interrupt bit(s) */
+    unsigned int                bi_ibits;	/* which Bridge interrupt bit(s) */
     pcibr_soft_t            bi_soft;	/* shortcut to soft info */
     struct pcibr_intr_cbuf_s bi_ibuf;	/* circular buffer of wrap ptrs */
     unsigned		bi_last_intr;	/* For Shub lb lost intr. bug */
@@ -461,7 +461,7 @@ struct pcibr_soft_s {
     /* bs_dma_flags are the forced dma flags used on all DMAs. Used for
      * working around ASIC rev issues and protocol specific requirements
      */
-    unsigned                bs_dma_flags;	/* forced DMA flags */
+    unsigned int            bs_dma_flags;	/* forced DMA flags */
 
     nasid_t		    bs_nasid;		/* nasid this bus is on */
     moduleid_t		    bs_moduleid;	/* io brick moduleid */
@@ -710,8 +710,8 @@ struct pcibr_soft_s {
 struct pcibr_hints_s {
     /* ph_host_slot is actually +1 so "0" means "no host" */
     pciio_slot_t            ph_host_slot[8];	/* REQ/GNT/INT in use by ... */
-    unsigned                ph_rrb_fixed;	/* do not change RRB allocations */
-    unsigned                ph_hands_off;	/* prevent further pcibr operations */
+    unsigned int            ph_rrb_fixed;	/* do not change RRB allocations */
+    unsigned int            ph_hands_off;	/* prevent further pcibr operations */
     rrb_alloc_funct_t       rrb_alloc_funct;	/* do dynamic rrb allocation */
     pcibr_intr_bits_f	   *ph_intr_bits;	/* map PCI INT[ABCD] to Bridge Int(n) */
 };

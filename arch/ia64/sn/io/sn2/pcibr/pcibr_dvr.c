@@ -53,6 +53,8 @@ extern char *pci_space[];
 
 extern void		 do_pcibr_rrb_free_all(pcibr_soft_t, pciio_slot_t);
 extern void              do_pcibr_rrb_autoalloc(pcibr_soft_t, int, int, int);
+extern void		 pcibr_rrb_alloc_more(pcibr_soft_t pcibr_soft, int slot,
+							int vchan, int more_rrbs);
 
 extern int  		 pcibr_wrb_flush(vertex_hdl_t);
 extern int               pcibr_rrb_alloc(vertex_hdl_t, int *, int *);
