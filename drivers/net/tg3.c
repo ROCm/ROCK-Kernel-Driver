@@ -5206,20 +5206,15 @@ static struct net_device_stats *tg3_get_stats(struct net_device *dev)
 	if (!hw_stats)
 		return old_stats;
 
-	/* On the 5705 we can't DMA the stats to memory, thus
-	 * a timer simply keeps tp->stats uptodate with direct
-	 * periodic reads of the statistics registers via a timer.
-	 */
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
-		return stats;
-
 	stats->rx_packets = old_stats->rx_packets +
 		get_stat64(&hw_stats->rx_ucast_packets) +
 		get_stat64(&hw_stats->rx_mcast_packets) +
 		get_stat64(&hw_stats->rx_bcast_packets);
 		
 	stats->tx_packets = old_stats->tx_packets +
-		get_stat64(&hw_stats->COS_out_packets[0]);
+		get_stat64(&hw_stats->tx_ucast_packets) +
+		get_stat64(&hw_stats->tx_mcast_packets) +
+		get_stat64(&hw_stats->tx_bcast_packets);
 
 	stats->rx_bytes = old_stats->rx_bytes +
 		get_stat64(&hw_stats->rx_octets);
