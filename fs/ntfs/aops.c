@@ -849,7 +849,6 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 				return -EOPNOTSUPP;
 			}
 		}
-
 		/* We have to zero every time due to mmap-at-end-of-file. */
 		if (page->index >= (vi->i_size >> PAGE_CACHE_SHIFT)) {
 			/* The page straddles i_size. */
@@ -859,16 +858,14 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 			flush_dcache_page(page);
 			kunmap_atomic(kaddr, KM_USER0);
 		}
-
-		// TODO: Implement and remove this check.
+		/* Handle mst protected attributes. */
 		if (NInoMstProtected(ni)) {
 			unlock_page(page);
-			ntfs_error(vi->i_sb, "Writing to MST protected "
-					"attributes is not supported yet. "
-					"Sorry.");
-			return -EOPNOTSUPP;
+			ntfs_warning(vi->i_sb, "Writing to index allocation "
+					"attribute is not supported yet.  "
+					"Discarding written data.");
+			return 0;
 		}
-
 		/* Normal data stream. */
 		return ntfs_write_block(wbc, page);
 	}
@@ -1800,4 +1797,7 @@ struct address_space_operations ntfs_mst_aops = {
 	.readpage	= ntfs_readpage,	/* Fill page with data. */
 	.sync_page	= block_sync_page,	/* Currently, just unplugs the
 						   disk request queue. */
+#ifdef NTFS_RW
+	.writepage	= ntfs_writepage,	/* Write dirty page to disk. */
+#endif /* NTFS_RW */
 };

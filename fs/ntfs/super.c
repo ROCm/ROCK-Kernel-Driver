@@ -32,6 +32,7 @@
 #include "ntfs.h"
 #include "sysctl.h"
 #include "logfile.h"
+#include "index.h"
 
 /* Number of mounted file systems which have compression enabled. */
 static unsigned long ntfs_nr_compression_users;
@@ -875,6 +876,7 @@ static BOOL load_and_init_mft_mirror(ntfs_volume *vol)
 	struct inode *tmp_ino;
 	ntfs_inode *tmp_ni;
 
+	ntfs_debug("Entering.");
 	/* Get mft mirror inode. */
 	tmp_ino = ntfs_iget(vol->sb, FILE_MFTMirr);
 	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
@@ -906,6 +908,7 @@ static BOOL load_and_init_mft_mirror(ntfs_volume *vol)
 	tmp_ni->itype.index.block_size = vol->mft_record_size;
 	tmp_ni->itype.index.block_size_bits = vol->mft_record_size_bits;
 	vol->mftmirr_ino = tmp_ino;
+	ntfs_debug("Done.");
 	return TRUE;
 }
 
@@ -2018,7 +2021,6 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	init_rwsem(&vol->mftbmp_lock);
 #ifdef NTFS_RW
 	vol->mftmirr_ino = NULL;
-	vol->mftmirr_size = 0;
 	vol->logfile_ino = NULL;
 #endif /* NTFS_RW */
 	vol->lcnbmp_ino = NULL;
@@ -2026,10 +2028,6 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	vol->vol_ino = NULL;
 	vol->root_ino = NULL;
 	vol->secure_ino = NULL;
-	vol->uid = vol->gid = 0;
-	vol->flags = 0;
-	vol->on_errors = 0;
-	vol->mft_zone_multiplier = 0;
 	vol->nls_map = NULL;
 
 	/*
@@ -2178,6 +2176,9 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	}
 	ntfs_error(sb, "Failed to allocate root directory.");
 	/* Clean up after the successful load_system_files() call from above. */
+	// TODO: Use ntfs_put_super() instead of repeating all this code...
+	// FIXME: Should mark the volume clean as the error is most likely
+	// 	  -ENOMEM.
 	iput(vol->vol_ino);
 	vol->vol_ino = NULL;
 	/* NTFS 3.0+ specific clean up. */
@@ -2189,12 +2190,18 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	vol->root_ino = NULL;
 	iput(vol->lcnbmp_ino);
 	vol->lcnbmp_ino = NULL;
-#ifdef NTFS_RW
-	iput(vol->mftmirr_ino);
-	vol->mftmirr_ino = NULL;
-#endif /* NTFS_RW */
 	iput(vol->mftbmp_ino);
 	vol->mftbmp_ino = NULL;
+#ifdef NTFS_RW
+	if (vol->logfile_ino) {
+		iput(vol->logfile_ino);
+		vol->logfile_ino = NULL;
+	}
+	if (vol->mftmirr_ino) {
+		iput(vol->mftmirr_ino);
+		vol->mftmirr_ino = NULL;
+	}
+#endif /* NTFS_RW */
 	vol->upcase_len = 0;
 	if (vol->upcase != default_upcase)
 		ntfs_free(vol->upcase);
@@ -2220,10 +2227,9 @@ unl_upcase_iput_tmp_ino_err_out_now:
 	up(&ntfs_lock);
 iput_tmp_ino_err_out_now:
 	iput(tmp_ino);
-	if (vol->mft_ino && vol->mft_ino != tmp_ino) {
+	if (vol->mft_ino && vol->mft_ino != tmp_ino)
 		iput(vol->mft_ino);
-		vol->mft_ino = NULL;
-	}
+	vol->mft_ino = NULL;
 	/*
 	 * This is needed to get ntfs_clear_extent_inode() called for each
 	 * inode we have ever called ntfs_iget()/iput() on, otherwise we A)
@@ -2270,10 +2276,11 @@ static void ntfs_big_inode_init_once(void *foo, kmem_cache_t *cachep,
 }
 
 /*
- * Slab cache to optimize allocations and deallocations of attribute search
- * contexts.
+ * Slab caches to optimize allocations and deallocations of attribute search
+ * contexts and index contexts, respectively.
  */
 kmem_cache_t *ntfs_attr_ctx_cache;
+kmem_cache_t *ntfs_index_ctx_cache;
 
 /* A global default upcase table and a corresponding reference count. */
 wchar_t *default_upcase = NULL;
@@ -2300,6 +2307,7 @@ static struct file_system_type ntfs_fs_type = {
 };
 
 /* Stable names for the slab caches. */
+static const char ntfs_index_ctx_cache_name[] = "ntfs_index_ctx_cache";
 static const char ntfs_attr_ctx_cache_name[] = "ntfs_attr_ctx_cache";
 static const char ntfs_name_cache_name[] = "ntfs_name_cache";
 static const char ntfs_inode_cache_name[] = "ntfs_inode_cache";
@@ -2326,13 +2334,21 @@ static int __init init_ntfs_fs(void)
 
 	ntfs_debug("Debug messages are enabled.");
 
+	ntfs_index_ctx_cache = kmem_cache_create(ntfs_index_ctx_cache_name,
+			sizeof(ntfs_index_context), 0 /* offset */,
+			SLAB_HWCACHE_ALIGN, NULL /* ctor */, NULL /* dtor */);
+	if (!ntfs_index_ctx_cache) {
+		printk(KERN_CRIT "NTFS: Failed to create %s!\n",
+				ntfs_index_ctx_cache_name);
+		goto ictx_err_out;
+	}
 	ntfs_attr_ctx_cache = kmem_cache_create(ntfs_attr_ctx_cache_name,
 			sizeof(attr_search_context), 0 /* offset */,
 			SLAB_HWCACHE_ALIGN, NULL /* ctor */, NULL /* dtor */);
 	if (!ntfs_attr_ctx_cache) {
 		printk(KERN_CRIT "NTFS: Failed to create %s!\n",
 				ntfs_attr_ctx_cache_name);
-		goto ctx_err_out;
+		goto actx_err_out;
 	}
 
 	ntfs_name_cache = kmem_cache_create(ntfs_name_cache_name,
@@ -2385,7 +2401,9 @@ inode_err_out:
 	kmem_cache_destroy(ntfs_name_cache);
 name_err_out:
 	kmem_cache_destroy(ntfs_attr_ctx_cache);
-ctx_err_out:
+actx_err_out:
+	kmem_cache_destroy(ntfs_index_ctx_cache);
+ictx_err_out:
 	if (!err) {
 		printk(KERN_CRIT "NTFS: Aborting NTFS file system driver "
 				"registration...\n");
@@ -2414,6 +2432,9 @@ static void __exit exit_ntfs_fs(void)
 	if (kmem_cache_destroy(ntfs_attr_ctx_cache) && (err = 1))
 		printk(KERN_CRIT "NTFS: Failed to destory %s.\n",
 				ntfs_attr_ctx_cache_name);
+	if (kmem_cache_destroy(ntfs_index_ctx_cache) && (err = 1))
+		printk(KERN_CRIT "NTFS: Failed to destory %s.\n",
+				ntfs_index_ctx_cache_name);
 	if (err)
 		printk(KERN_CRIT "NTFS: This causes memory to leak! There is "
 				"probably a BUG in the driver! Please report "

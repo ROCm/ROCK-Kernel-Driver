@@ -65,6 +65,17 @@ ToDo/Notes:
 	  collates two data items.  We currently only support COLLATION_BINARY
 	  and COLLATION_NTOFS_ULONG but support for other collation rules will
 	  be added as the need arises.
+	- Add a new type, ntfs_index_context, to allow retrieval of an index
+	  entry using the corresponding index key.  To get an index context,
+	  use ntfs_index_ctx_get() and to release it, use ntfs_index_ctx_put().
+	  This also adds a new slab cache for the index contexts.  To lookup a
+	  key in an index inode, use ntfs_index_lookup().  After modifying an
+	  index entry, call ntfs_index_entry_flush_dcache_page() followed by
+	  ntfs_index_entry_mark_dirty() to ensure the changes are written out
+	  to disk.  For details see fs/ntfs/index.[hc].  Note, at present, if
+	  an index entry is in the index allocation attribute rather than the
+	  index root attribute it will not be written out (you will get a
+	  warning message about discarded changes instead).
 
 2.1.14 - Fix an NFSd caused deadlock reported by several users.
 

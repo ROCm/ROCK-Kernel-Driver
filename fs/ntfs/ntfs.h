@@ -24,6 +24,7 @@
 #ifndef _LINUX_NTFS_H
 #define _LINUX_NTFS_H
 
+#include <linux/stddef.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/compiler.h>
@@ -58,6 +59,7 @@ extern kmem_cache_t *ntfs_name_cache;
 extern kmem_cache_t *ntfs_inode_cache;
 extern kmem_cache_t *ntfs_big_inode_cache;
 extern kmem_cache_t *ntfs_attr_ctx_cache;
+extern kmem_cache_t *ntfs_index_ctx_cache;
 
 /* The various operations structs defined throughout the driver files. */
 extern struct super_operations ntfs_sops;
