@@ -311,6 +311,8 @@ extern int __min_ipl;
 #define local_irq_save(flags)	do { (flags) = swpipl(IPL_MAX); barrier(); } while(0)
 #define local_irq_restore(flags)	do { barrier(); setipl(flags); barrier(); } while(0)
 
+#define irqs_disabled()	(getipl() == IPL_MAX)
+
 /*
  * TB routines..
  */

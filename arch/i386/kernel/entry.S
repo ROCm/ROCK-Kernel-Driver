@@ -759,6 +759,7 @@ ENTRY(sys_call_table)
 	.long sys_io_getevents
 	.long sys_io_submit
 	.long sys_io_cancel
+	.long sys_exit_group	/* 250 */
 
 	.rept NR_syscalls-(.-sys_call_table)/4
 		.long sys_ni_syscall

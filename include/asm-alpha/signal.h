@@ -186,7 +186,6 @@ struct sigstack {
 #ifdef __KERNEL__
 #include <asm/sigcontext.h>
 
-#define HAVE_ARCH_GET_SIGNAL_TO_DELIVER
 #define HAVE_ARCH_SYS_PAUSE
 
 #endif
