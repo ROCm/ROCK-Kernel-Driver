@@ -184,7 +184,8 @@ static __inline__ struct rt6_info *rt6_device_match(struct rt6_info *rt,
 			if (dev->ifindex == oif)
 				return sprt;
 			if (dev->flags & IFF_LOOPBACK) {
-				if (sprt->rt6i_idev->dev->ifindex != oif) {
+				if (sprt->rt6i_idev == NULL ||
+				    sprt->rt6i_idev->dev->ifindex != oif) {
 					if (strict && oif)
 						continue;
 					if (local && (!oif || 
