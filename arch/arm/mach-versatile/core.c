@@ -21,6 +21,7 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/device.h>
+#include <linux/dma-mapping.h>
 #include <linux/sysdev.h>
 #include <linux/interrupt.h>
 
@@ -31,6 +32,7 @@
 #include <asm/leds.h>
 #include <asm/mach-types.h>
 #include <asm/hardware/amba.h>
+#include <asm/hardware/amba_clcd.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/flash.h>
@@ -325,6 +327,213 @@ static struct mmc_platform_data mmc1_plat_data = {
 };
 #endif
 
+/*
+ * CLCD support.
+ */
+#define SYS_CLCD_MODE_MASK	(3 << 0)
+#define SYS_CLCD_MODE_5551	(0 << 0)
+#define SYS_CLCD_MODE_565	(1 << 0)
+#define SYS_CLCD_MODE_888	(2 << 0)
+#define SYS_CLCD_MODE_LT	(3 << 0)
+#define SYS_CLCD_NLCDIOON	(1 << 2)
+#define SYS_CLCD_VDDPOSSWITCH	(1 << 3)
+#define SYS_CLCD_PWR3V5SWITCH	(1 << 4)
+#define SYS_CLCD_ID_MASK	(0x1f << 8)
+#define SYS_CLCD_ID_SANYO_3_8	(0x00 << 8)
+#define SYS_CLCD_ID_UNKNOWN_8_4	(0x01 << 8)
+#define SYS_CLCD_ID_EPSON_2_2	(0x02 << 8)
+#define SYS_CLCD_ID_VGA		(0x1f << 8)
+
+static struct clcd_panel vga = {
+	.mode		= {
+		.name		= "VGA",
+		.refresh	= 60,
+		.xres		= 640,
+		.yres		= 480,
+		.pixclock	= 39721,
+		.left_margin	= 40,
+		.right_margin	= 24,
+		.upper_margin	= 32,
+		.lower_margin	= 11,
+		.hsync_len	= 96,
+		.vsync_len	= 2,
+		.sync		= 0,
+		.vmode		= FB_VMODE_NONINTERLACED,
+	},
+	.width		= -1,
+	.height		= -1,
+	.tim2		= TIM2_BCD | TIM2_IPC,
+	.cntl		= CNTL_LCDTFT | CNTL_LCDVCOMP(1),
+	.bpp		= 16,
+};
+
+static struct clcd_panel sanyo_3_8_in = {
+	.mode		= {
+		.name		= "Sanyo QVGA",
+		.refresh	= 116,
+		.xres		= 320,
+		.yres		= 240,
+		.pixclock	= 100000,
+		.left_margin	= 6,
+		.right_margin	= 6,
+		.upper_margin	= 5,
+		.lower_margin	= 5,
+		.hsync_len	= 6,
+		.vsync_len	= 6,
+		.sync		= 0,
+		.vmode		= FB_VMODE_NONINTERLACED,
+	},
+	.width		= -1,
+	.height		= -1,
+	.tim2		= TIM2_BCD,
+	.cntl		= CNTL_LCDTFT | CNTL_LCDVCOMP(1),
+	.bpp		= 16,
+};
+
+static struct clcd_panel epson_2_2_in = {
+	.mode		= {
+		.name		= "Epson QCIF",
+		.refresh	= 390,
+		.xres		= 176,
+		.yres		= 220,
+		.pixclock	= 62500,
+		.left_margin	= 3,
+		.right_margin	= 2,
+		.upper_margin	= 1,
+		.lower_margin	= 0,
+		.hsync_len	= 3,
+		.vsync_len	= 2,
+		.sync		= 0,
+		.vmode		= FB_VMODE_NONINTERLACED,
+	},
+	.width		= -1,
+	.height		= -1,
+	.tim2		= TIM2_BCD | TIM2_IPC,
+	.cntl		= CNTL_LCDTFT | CNTL_LCDVCOMP(1),
+	.bpp		= 16,
+};
+
+/*
+ * Detect which LCD panel is connected, and return the appropriate
+ * clcd_panel structure.  Note: we do not have any information on
+ * the required timings for the 8.4in panel, so we presently assume
+ * VGA timings.
+ */
+static struct clcd_panel *versatile_clcd_panel(void)
+{
+	unsigned long sys_clcd = IO_ADDRESS(VERSATILE_SYS_BASE) + VERSATILE_SYS_CLCD_OFFSET;
+	struct clcd_panel *panel = &vga;
+	u32 val;
+
+	val = readl(sys_clcd) & SYS_CLCD_ID_MASK;
+	if (val == SYS_CLCD_ID_SANYO_3_8)
+		panel = &sanyo_3_8_in;
+	else if (val == SYS_CLCD_ID_EPSON_2_2)
+		panel = &epson_2_2_in;
+	else if (val == SYS_CLCD_ID_VGA)
+		panel = &vga;
+	else {
+		printk(KERN_ERR "CLCD: unknown LCD panel ID 0x%08x, using VGA\n",
+			val);
+	}
+
+	return &vga;
+}
+
+/*
+ * Disable all display connectors on the interface module.
+ */
+static void versatile_clcd_disable(struct clcd_fb *fb)
+{
+	unsigned long sys_clcd = IO_ADDRESS(VERSATILE_SYS_BASE) + VERSATILE_SYS_CLCD_OFFSET;
+	u32 val;
+
+	val = readl(sys_clcd);
+	val &= ~SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH;
+	writel(val, sys_clcd);
+}
+
+/*
+ * Enable the relevant connector on the interface module.
+ */
+static void versatile_clcd_enable(struct clcd_fb *fb)
+{
+	unsigned long sys_clcd = IO_ADDRESS(VERSATILE_SYS_BASE) + VERSATILE_SYS_CLCD_OFFSET;
+	u32 val;
+
+	val = readl(sys_clcd);
+	val &= ~SYS_CLCD_MODE_MASK;
+
+	switch (fb->fb.var.green.length) {
+	case 5:
+#if 0
+		/*
+		 * For some undocumented reason, we need to select 565 mode
+		 * even when using 555 with VGA.  Maybe this is only true
+		 * for the VGA output and needs to be done for LCD panels?
+		 * I can't get an explaination from the people who should
+		 * know.
+		 */
+		val |= SYS_CLCD_MODE_5551;
+		break;
+#endif
+	case 6:
+		val |= SYS_CLCD_MODE_565;
+		break;
+	case 8:
+		val |= SYS_CLCD_MODE_888;
+		break;
+	}
+
+	/*
+	 * Set the MUX
+	 */
+	writel(val, sys_clcd);
+
+	/*
+	 * And now enable the PSUs
+	 */
+	val |= SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH;
+	writel(val, sys_clcd);
+}
+
+static unsigned long framesize = SZ_1M;
+
+static int versatile_clcd_setup(struct clcd_fb *fb)
+{
+	dma_addr_t dma;
+
+	fb->panel		= versatile_clcd_panel();
+
+	fb->fb.screen_base = dma_alloc_writecombine(&fb->dev->dev, framesize,
+						    &dma, GFP_KERNEL);
+	if (!fb->fb.screen_base) {
+		printk(KERN_ERR "CLCD: unable to map framebuffer\n");
+		return -ENOMEM;
+	}
+
+	fb->fb.fix.smem_start	= dma;
+	fb->fb.fix.smem_len	= framesize;
+
+	return 0;
+}
+
+static void versatile_clcd_remove(struct clcd_fb *fb)
+{
+	dma_free_writecombine(&fb->dev->dev, fb->fb.fix.smem_len,
+			      fb->fb.screen_base, fb->fb.fix.smem_start);
+}
+
+static struct clcd_board clcd_plat_data = {
+	.name		= "Versatile PB",
+	.check		= clcdfb_check,
+	.decode		= clcdfb_decode,
+	.disable	= versatile_clcd_disable,
+	.enable		= versatile_clcd_enable,
+	.setup		= versatile_clcd_setup,
+	.remove		= versatile_clcd_remove,
+};
+
 #define AMBA_DEVICE(name,busid,base,plat)			\
 static struct amba_device name##_device = {			\
 	.dev		= {					\
@@ -417,7 +626,7 @@ AMBA_DEVICE(mmc1,  "fpga:0b", MMCI1,    &mmc1_plat_data);
 /* DevChip Primecells */
 AMBA_DEVICE(smc,   "dev:00",  SMC,      NULL);
 AMBA_DEVICE(mpmc,  "dev:10",  MPMC,     NULL);
-AMBA_DEVICE(clcd,  "dev:20",  CLCD,     NULL);
+AMBA_DEVICE(clcd,  "dev:20",  CLCD,     &clcd_plat_data);
 AMBA_DEVICE(dmac,  "dev:30",  DMAC,     NULL);
 AMBA_DEVICE(sctl,  "dev:e0",  SCTL,     NULL);
 AMBA_DEVICE(wdog,  "dev:e1",  WATCHDOG, NULL);

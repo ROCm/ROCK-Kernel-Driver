@@ -12,6 +12,7 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/device.h>
+#include <linux/dma-mapping.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/sysdev.h>
@@ -23,8 +24,10 @@
 #include <asm/mach-types.h>
 #include <asm/hardware/amba.h>
 #include <asm/hardware/amba_kmi.h>
+#include <asm/hardware/amba_clcd.h>
 #include <asm/hardware/icst525.h>
 
+#include <asm/arch/cm.h>
 #include <asm/arch/lm.h>
 
 #include <asm/mach/arch.h>
@@ -382,10 +385,83 @@ static struct amba_device aaci_device = {
 	.periphid	= 0,
 };
 
+
+/*
+ * CLCD support
+ */
+static struct clcd_panel vga = {
+	.mode		= {
+		.name		= "VGA",
+		.refresh	= 60,
+		.xres		= 640,
+		.yres		= 480,
+		.pixclock	= 39721,
+		.left_margin	= 40,
+		.right_margin	= 24,
+		.upper_margin	= 32,
+		.lower_margin	= 11,
+		.hsync_len	= 96,
+		.vsync_len	= 2,
+		.sync		= 0,
+		.vmode		= FB_VMODE_NONINTERLACED,
+	},
+	.width		= -1,
+	.height		= -1,
+	.tim2		= TIM2_BCD | TIM2_IPC,
+	.cntl		= CNTL_LCDTFT | CNTL_LCDVCOMP(1),
+	.bpp		= 16,
+	.grayscale	= 0,
+};
+
+/*
+ * Ensure VGA is selected.
+ */
+static void cp_clcd_enable(struct clcd_fb *fb)
+{
+	cm_control(CM_CTRL_LCDMUXSEL_MASK, CM_CTRL_LCDMUXSEL_VGA);
+}
+
+static unsigned long framesize = SZ_1M;
+
+static int cp_clcd_setup(struct clcd_fb *fb)
+{
+	dma_addr_t dma;
+
+	fb->panel = &vga;
+
+	fb->fb.screen_base = dma_alloc_writecombine(&fb->dev->dev, framesize,
+						    &dma, GFP_KERNEL);
+	if (!fb->fb.screen_base) {
+		printk(KERN_ERR "CLCD: unable to map framebuffer\n");
+		return -ENOMEM;
+	}
+
+	fb->fb.fix.smem_start	= dma;
+	fb->fb.fix.smem_len	= framesize;
+
+	return 0;
+}
+
+static void cp_clcd_remove(struct clcd_fb *fb)
+{
+	dma_free_writecombine(&fb->dev->dev, fb->fb.fix.smem_len,
+			      fb->fb.screen_base, fb->fb.fix.smem_start);
+}
+
+static struct clcd_board clcd_data = {
+	.name		= "Integrator/CP",
+	.check		= clcdfb_check,
+	.decode		= clcdfb_decode,
+	.enable		= cp_clcd_enable,
+	.setup		= cp_clcd_setup,
+	.remove		= cp_clcd_remove,
+};
+
 static struct amba_device clcd_device = {
 	.dev		= {
 		.bus_id	= "mb:c0",
 		.coherent_dma_mask = ~0,
+		.platform_data = &clcd_data,
 	},
 	.res		= {
 		.start	= INTCP_PA_CLCD_BASE,
