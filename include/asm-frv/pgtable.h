@@ -255,7 +255,7 @@ static inline pmd_t *pmd_offset(pgd_t *dir, unsigned long address)
 #define PAGE_KERNEL_RO		MAKE_GLOBAL(__PAGE_KERNEL_RO)
 #define PAGE_KERNEL_NOCACHE	MAKE_GLOBAL(__PAGE_KERNEL_NOCACHE)
 
-#define _PAGE_TABLE		(_PAGE_PRESENT | xAMPRx_SS_16Kb | xAMPRx_D | _PAGE_ACCESSED)
+#define _PAGE_TABLE		(_PAGE_PRESENT | xAMPRx_SS_16Kb)
 
 #ifndef __ASSEMBLY__
 
@@ -385,7 +385,6 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 
 /* Find an entry in the third-level page table.. */
 #define __pte_index(address) ((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
-#define pte_offset(dir, address) ((pte_t *) pmd_page(*(dir)) + __pte_index(address))
 
 /*
  * the pte page can be thought of an array like this: pte_t[PTRS_PER_PTE]

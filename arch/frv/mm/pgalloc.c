@@ -52,7 +52,7 @@ void __set_pmd(pmd_t *pmdptr, unsigned long pmd)
 		memset(__ste_p, 0, PME_SIZE);
 	}
 	else {
-		BUG_ON(pmd & xAMPRx_SS);
+		BUG_ON(pmd & (0x3f00 | xAMPRx_SS | 0xe));
 
 		for (loop = PME_SIZE; loop > 0; loop -= 4) {
 			*__ste_p++ = pmd;

@@ -315,7 +315,7 @@ asmlinkage void do_page_fault(int datammu, unsigned long esr0, unsigned long ear
 			goto no_context;
 		set_pmd(pmd, *pmd_k);
 
-		pte_k = pte_offset(pmd_k, ear0);
+		pte_k = pte_offset_kernel(pmd_k, ear0);
 		if (!pte_present(*pte_k))
 			goto no_context;
 		return;

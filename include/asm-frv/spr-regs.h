@@ -204,7 +204,7 @@
 #define ESRx_EC_PRIV_INSN	0x00000008	/* - privileged_instruction */
 #define ESRx_EC_ILL_INSN	0x0000000a	/* - illegal_instruction */
 #define ESRx_EC_MP_EXCEP	0x0000001c	/* - mp_exception */
-#define ESRx_EC_DATA_ACCESS	0x00000024	/* - data_access_error */
+#define ESRx_EC_DATA_ACCESS	0x00000020	/* - data_access_error */
 #define ESRx_EC_DIVISION	0x00000026	/* - division_exception */
 #define ESRx_EC_ITLB_MISS	0x00000034	/* - instruction_access_TLB_miss */
 #define ESRx_EC_DTLB_MISS	0x00000036	/* - data_access_TLB_miss */
