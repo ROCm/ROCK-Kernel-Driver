@@ -33,7 +33,7 @@
 #define DPRINTF(x...)
 #endif
 
-module_t	       *modules[MODULE_MAX];
+module_t	       *sn_modules[MODULE_MAX];
 int			nummodules;
 
 #define SN00_SERIAL_FUDGE	0x3b1af409d513c2
@@ -59,9 +59,9 @@ module_lookup(moduleid_t id)
     int			i;
 
     for (i = 0; i < nummodules; i++)
-	if (modules[i]->id == id) {
-	    DPRINTF("module_lookup: found m=0x%p\n", modules[i]);
-	    return modules[i];
+	if (sn_modules[i]->id == id) {
+	    DPRINTF("module_lookup: found m=0x%p\n", sn_modules[i]);
+	    return sn_modules[i];
 	}
 
     return NULL;
@@ -104,10 +104,10 @@ module_add_node(geoid_t geoid, cnodeid_t cnodeid)
 
 	/* Insert in sorted order by module number */
 
-	for (i = nummodules; i > 0 && modules[i - 1]->id > moduleid; i--)
-	    modules[i] = modules[i - 1];
+	for (i = nummodules; i > 0 && sn_modules[i - 1]->id > moduleid; i--)
+	    sn_modules[i] = sn_modules[i - 1];
 
-	modules[i] = m;
+	sn_modules[i] = m;
 	nummodules++;
     }
 
