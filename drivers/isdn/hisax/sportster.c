@@ -178,16 +178,23 @@ Sportster_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_RELEASE:
 			release_io_sportster(cs);
 			return(0);
-		case CARD_INIT:
-			inithscxisac(cs);
-			cs->hw.spt.res_irq |= SPORTSTER_INTE; /* IRQ On */
-			byteout(cs->hw.spt.cfg_reg + SPORTSTER_RES_IRQ, cs->hw.spt.res_irq);
-			return(0);
 		case CARD_TEST:
 			return(0);
 	}
 	return(0);
 }
+
+static void
+sportster_init(struct IsdnCardState *cs)
+{
+	inithscxisac(cs);
+	cs->hw.spt.res_irq |= SPORTSTER_INTE; /* IRQ On */
+	byteout(cs->hw.spt.cfg_reg + SPORTSTER_RES_IRQ, cs->hw.spt.res_irq);
+}
+
+static struct card_ops sportster_ops = {
+	.init = sportster_init,
+};
 
 static int __init
 get_io_range(struct IsdnCardState *cs)
@@ -262,6 +269,7 @@ setup_sportster(struct IsdnCard *card)
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Sportster_card_msg;
 	cs->irq_func = &sportster_interrupt;
+	cs->card_ops = &sportster_ops;
 	ISACVersion(cs, "Sportster:");
 	if (HscxVersion(cs, "Sportster:")) {
 		printk(KERN_WARNING

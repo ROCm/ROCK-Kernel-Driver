@@ -419,21 +419,29 @@ Gazel_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_RELEASE:
 			release_io_gazel(cs);
 			return (0);
-		case CARD_INIT:
-			inithscxisac(cs);
-			if ((cs->subtyp==R647)||(cs->subtyp==R685)) {
-				int i;
-				for (i=0;i<(2+MAX_WAITING_CALLS);i++) {
-					cs->bcs[i].hw.hscx.tsaxr0 = 0x1f;
-					cs->bcs[i].hw.hscx.tsaxr1 = 0x23;
-				}
-			}
-			return (0);
 		case CARD_TEST:
 			return (0);
 	}
 	return (0);
 }
+
+static void
+gazel_init(struct IsdnCardState *cs)
+{
+	int i;
+
+	inithscxisac(cs);
+	if (cs->subtyp == R647 || cs->subtyp == R685) {
+		for (i = 0; i < 2; i++) {
+			cs->bcs[i].hw.hscx.tsaxr0 = 0x1f;
+			cs->bcs[i].hw.hscx.tsaxr1 = 0x23;
+		}
+	}
+}
+
+static struct card_ops gazel_ops = {
+	.init = gazel_init,
+};
 
 static int
 reserve_regions(struct IsdnCard *card, struct IsdnCardState *cs)
@@ -680,6 +688,7 @@ setup_gazel(struct IsdnCard *card)
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Gazel_card_msg;
+	cs->card_ops = &gazel_ops;
 
 	switch (cs->subtyp) {
 		case R647:

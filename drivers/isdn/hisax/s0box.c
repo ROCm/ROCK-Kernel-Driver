@@ -222,14 +222,15 @@ S0Box_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_RELEASE:
 			release_io_s0box(cs);
 			break;
-		case CARD_INIT:
-			inithscxisac(cs);
-			break;
 		case CARD_TEST:
 			break;
 	}
 	return(0);
 }
+
+static struct card_ops s0box_ops = {
+	.init = inithscxisac,
+};
 
 int __init
 setup_s0box(struct IsdnCard *card)
@@ -269,6 +270,7 @@ setup_s0box(struct IsdnCard *card)
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &S0Box_card_msg;
 	cs->irq_func = &s0box_interrupt;
+	cs->card_ops = &s0box_ops;
 	ISACVersion(cs, "S0Box:");
 	if (HscxVersion(cs, "S0Box:")) {
 		printk(KERN_WARNING

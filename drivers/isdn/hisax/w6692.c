@@ -615,33 +615,31 @@ void resetW6692(struct IsdnCardState *cs)
 	}
 }
 
-void __init initW6692(struct IsdnCardState *cs, int part)
+void __init
+w6692_init(struct IsdnCardState *cs)
 {
-	if (part & 1) {
-		INIT_WORK(&cs->work, W6692_bh, cs);
-		cs->setstack_d = setstack_W6692;
-		cs->DC_Close = DC_Close_W6692;
-		cs->dbusytimer.function = (void *) dbusy_timer_handler;
-		cs->dbusytimer.data = (long) cs;
-		init_timer(&cs->dbusytimer);
-		resetW6692(cs);
-		ph_command(cs, W_L1CMD_RST);
-		cs->dc.w6692.ph_state = W_L1CMD_RST;
-		W6692_new_ph(cs);
-		ph_command(cs, W_L1CMD_ECK);
+	INIT_WORK(&cs->work, W6692_bh, cs);
+	cs->setstack_d = setstack_W6692;
+	cs->DC_Close = DC_Close_W6692;
+	cs->dbusytimer.function = (void *) dbusy_timer_handler;
+	cs->dbusytimer.data = (long) cs;
+	init_timer(&cs->dbusytimer);
+	resetW6692(cs);
+	ph_command(cs, W_L1CMD_RST);
+	cs->dc.w6692.ph_state = W_L1CMD_RST;
+	W6692_new_ph(cs);
+	ph_command(cs, W_L1CMD_ECK);
+	
+	W6692Bmode(cs->bcs, 0, 0);
+	W6692Bmode(cs->bcs + 1, 0, 0);
 
-		W6692Bmode(cs->bcs, 0, 0);
-		W6692Bmode(cs->bcs + 1, 0, 0);
-	}
-	if (part & 2) {
-		/* Reenable all IRQ */
-		w6692_write_reg(cs, W_IMASK, 0x18);
-		w6692_write_reg(cs, W_D_EXIM, 0x00);
-		w6692_bc_write_reg(cs, 0, W_B_EXIM, 0x00);
-		w6692_bc_write_reg(cs, 1, W_B_EXIM, 0x00);
-		/* Reset D-chan receiver and transmitter */
-		w6692_write_reg(cs, W_D_CMDR, W_D_CMDR_RRST | W_D_CMDR_XRST);
-	}
+	/* Reenable all IRQ */
+	w6692_write_reg(cs, W_IMASK, 0x18);
+	w6692_write_reg(cs, W_D_EXIM, 0x00);
+	w6692_bc_write_reg(cs, 0, W_B_EXIM, 0x00);
+	w6692_bc_write_reg(cs, 1, W_B_EXIM, 0x00);
+	/* Reset D-chan receiver and transmitter */
+	w6692_write_reg(cs, W_D_CMDR, W_D_CMDR_RRST | W_D_CMDR_XRST);
 }
 
 static int
@@ -658,14 +656,15 @@ w6692_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 				w6692_write_reg(cs, W_XDATA, 0x04);
 			}
 			return (0);
-		case CARD_INIT:
-			initW6692(cs, 3);
-			return (0);
 		case CARD_TEST:
 			return (0);
 	}
 	return (0);
 }
+
+static struct card_ops w6692_ops = {
+	.init = w6692_init,
+};
 
 static struct bc_l1_ops w6692_bc_l1_ops = {
 	.fill_fifo = W6692B_fill_fifo,
@@ -768,6 +767,7 @@ setup_w6692(struct IsdnCard *card)
 	cs->cardmsg = &w6692_card_msg;
 	cs->irq_func = &W6692_interrupt;
 	cs->irq_flags |= SA_SHIRQ;
+	cs->card_ops = &w6692_ops;
 	W6692Version(cs, "W6692:");
 	printk(KERN_INFO "W6692 ISTA=0x%X\n", w6692_read_reg(cs, W_ISTA));
 	printk(KERN_INFO "W6692 IMASK=0x%X\n", w6692_read_reg(cs, W_IMASK));

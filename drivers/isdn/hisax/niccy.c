@@ -234,14 +234,15 @@ niccy_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_RELEASE:
 			release_io_niccy(cs);
 			return(0);
-		case CARD_INIT:
-			niccy_reset(cs);
-			return(0);
 		case CARD_TEST:
 			return(0);
 	}
 	return(0);
 }
+
+static struct card_ops niccy_ops = {
+	.init = niccy_reset,
+};
 
 static struct pci_dev *niccy_dev __initdata = NULL;
 #ifdef __ISAPNP__
@@ -385,6 +386,7 @@ setup_niccy(struct IsdnCard *card)
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &niccy_card_msg;
 	cs->irq_func = &niccy_interrupt;
+	cs->card_ops = &niccy_ops;
 	ISACVersion(cs, "Niccy:");
 	if (HscxVersion(cs, "Niccy:")) {
 		printk(KERN_WARNING

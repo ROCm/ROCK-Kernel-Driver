@@ -248,14 +248,15 @@ Teles_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_RELEASE:
 			release_io_teles3(cs);
 			return(0);
-		case CARD_INIT:
-			inithscxisac(cs);
-			return(0);
 		case CARD_TEST:
 			return(0);
 	}
 	return(0);
 }
+
+static struct card_ops teles3_ops = {
+	.init = inithscxisac,
+};
 
 #ifdef __ISAPNP__
 static struct isapnp_device_id teles_ids[] __initdata = {
@@ -483,6 +484,7 @@ setup_teles3(struct IsdnCard *card)
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Teles_card_msg;
 	cs->irq_func = &teles3_interrupt;
+	cs->card_ops = &teles3_ops;
 	ISACVersion(cs, "Teles3:");
 	if (HscxVersion(cs, "Teles3:")) {
 		printk(KERN_WARNING

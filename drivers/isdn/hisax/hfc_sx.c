@@ -1152,21 +1152,28 @@ hfcsx_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_RELEASE:
 			release_io_hfcsx(cs);
 			return (0);
-		case CARD_INIT:
-			inithfcsx(cs);
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout((80 * HZ) / 1000);	/* Timeout 80ms */
-			/* now switch timer interrupt off */
-			cs->hw.hfcsx.int_m1 &= ~HFCSX_INTS_TIMER;
-			Write_hfc(cs, HFCSX_INT_M1, cs->hw.hfcsx.int_m1);
-			/* reinit mode reg */
-			Write_hfc(cs, HFCSX_MST_MODE, cs->hw.hfcsx.mst_m);
-			return (0);
 		case CARD_TEST:
 			return (0);
 	}
 	return (0);
 }
+
+static void
+hfcsx_init(struct IsdnCardState *cs)
+{
+	inithfcsx(cs);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((80 * HZ) / 1000);	/* Timeout 80ms */
+	/* now switch timer interrupt off */
+	cs->hw.hfcsx.int_m1 &= ~HFCSX_INTS_TIMER;
+	Write_hfc(cs, HFCSX_INT_M1, cs->hw.hfcsx.int_m1);
+	/* reinit mode reg */
+	Write_hfc(cs, HFCSX_MST_MODE, cs->hw.hfcsx.mst_m);
+}
+
+static struct card_ops hfcsx_ops = {
+	.init = hfcsx_init,
+};
 
 #ifdef __ISAPNP__
 static struct isapnp_device_id hfc_ids[] __initdata = {
@@ -1297,5 +1304,6 @@ setup_hfcsx(struct IsdnCard *card)
 	reset_hfcsx(cs);
 	cs->cardmsg = &hfcsx_card_msg;
 	cs->auxcmd = &hfcsx_auxcmd;
+	cs->card_ops = &hfcsx_ops;
 	return (1);
 }

@@ -173,16 +173,23 @@ AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_RELEASE:
 			release_ioregs(cs, 0x3f);
 			return(0);
-		case CARD_INIT:
-			byteout(cs->hw.avm.cfg_reg, 0x16);
-			byteout(cs->hw.avm.cfg_reg, 0x1E);
-			inithscxisac(cs);
-			return(0);
 		case CARD_TEST:
 			return(0);
 	}
 	return(0);
 }
+
+static void
+avm_a1_init(struct IsdnCardState *cs)
+{
+	byteout(cs->hw.avm.cfg_reg, 0x16);
+	byteout(cs->hw.avm.cfg_reg, 0x1E);
+	inithscxisac(cs);
+}
+
+static struct card_ops avm_a1_ops = {
+	.init = avm_a1_init,
+};
 
 int __init
 setup_avm_a1(struct IsdnCard *card)
@@ -306,6 +313,7 @@ setup_avm_a1(struct IsdnCard *card)
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &AVM_card_msg;
 	cs->irq_func = &avm_a1_interrupt;
+	cs->card_ops = &avm_a1_ops;
 	ISACVersion(cs, "AVM A1:");
 	if (HscxVersion(cs, "AVM A1:")) {
 		printk(KERN_WARNING

@@ -254,18 +254,25 @@ BKM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			enable_bkm_int(cs, 0);
 			release_io_sct_quadro(cs);
 			return (0);
-		case CARD_INIT:
-			cs->debug |= L1_DEB_IPAC;
-			set_ipac_active(cs, 1);
-			inithscxisac(cs);
-			/* Enable ints */
-			enable_bkm_int(cs, 1);
-			return (0);
 		case CARD_TEST:
 			return (0);
 	}
 	return (0);
 }
+
+static void
+bkm_a8_init(struct IsdnCardState *cs)
+{
+	cs->debug |= L1_DEB_IPAC;
+	set_ipac_active(cs, 1);
+	inithscxisac(cs);
+	/* Enable ints */
+	enable_bkm_int(cs, 1);
+}
+
+static struct card_ops bkm_a8_ops = {
+	.init = bkm_a8_init,
+};
 
 int __init
 sct_alloc_io(u_int adr, u_int len)
@@ -430,6 +437,7 @@ setup_sct_quadro(struct IsdnCard *card)
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &BKM_card_msg;
 	cs->irq_func = &bkm_interrupt_ipac;
+	cs->card_ops = &bkm_a8_ops;
 
 	printk(KERN_INFO "HiSax: %s (%s): IPAC Version %d\n",
 		CardType[card->typ],

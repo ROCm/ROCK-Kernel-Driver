@@ -207,14 +207,15 @@ ix1_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_RELEASE:
 			release_io_ix1micro(cs);
 			return(0);
-		case CARD_INIT:
-			inithscxisac(cs);
-			return(0);
 		case CARD_TEST:
 			return(0);
 	}
 	return(0);
 }
+
+static struct card_ops ix1_ops = {
+	.init = inithscxisac,
+};
 
 #ifdef __ISAPNP__
 static struct isapnp_device_id itk_ids[] __initdata = {
@@ -308,6 +309,7 @@ setup_ix1micro(struct IsdnCard *card)
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &ix1_card_msg;
 	cs->irq_func = &ix1micro_interrupt;
+	cs->card_ops = &ix1_ops;
 	ISACVersion(cs, "ix1-Micro:");
 	if (HscxVersion(cs, "ix1-Micro:")) {
 		printk(KERN_WARNING

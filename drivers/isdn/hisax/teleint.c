@@ -250,17 +250,24 @@ TeleInt_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_RELEASE:
 			release_io_TeleInt(cs);
 			return(0);
-		case CARD_INIT:
-			inithfc(cs);
-			initisac(cs);
-			cs->hw.hfc.timer.expires = jiffies + 1;
-			add_timer(&cs->hw.hfc.timer);
-			return(0);
 		case CARD_TEST:
 			return(0);
 	}
 	return(0);
 }
+
+static void
+teleint_init(struct IsdnCardState *cs)
+{
+	inithfc(cs);
+	initisac(cs);
+	cs->hw.hfc.timer.expires = jiffies + 1;
+	add_timer(&cs->hw.hfc.timer);
+}
+
+static struct card_ops teleint_ops = {
+	.init = teleint_init,
+};
 
 int __init
 setup_TeleInt(struct IsdnCard *card)
@@ -335,6 +342,7 @@ setup_TeleInt(struct IsdnCard *card)
 	cs->bc_hw_ops = &hfc_ops;
 	cs->cardmsg = &TeleInt_card_msg;
 	cs->irq_func = &TeleInt_interrupt;
+	cs->card_ops = &teleint_ops;
 	ISACVersion(cs, "TeleInt:");
 	return (1);
 }

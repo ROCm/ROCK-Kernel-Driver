@@ -47,7 +47,6 @@
 #define HW_RSYNC	0x0060
 #define HW_TESTLOOP	0x0070
 #define CARD_RESET	0x00F0
-#define CARD_INIT	0x00F2
 #define CARD_RELEASE	0x00F3
 #define CARD_TEST	0x00F4
 #define CARD_AUX_IND	0x00F5
@@ -855,6 +854,12 @@ struct icc_chip {
 
 struct IsdnCardState;
 
+/* Methods provided by driver for a specific card */
+
+struct card_ops {
+	void   (*init)      (struct IsdnCardState *);
+};
+
 /* Card specific drivers provide methods to access the
  * chips to the chip drivers */
 
@@ -896,6 +901,7 @@ struct IsdnCardState {
 	unsigned char typ;
 	unsigned char subtyp;
 	spinlock_t lock;
+	struct card_ops *card_ops;
 	int protocol;
 	unsigned int irq;
 	unsigned long irq_flags;

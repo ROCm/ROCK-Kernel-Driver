@@ -169,10 +169,6 @@ enpci_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_RELEASE:
 			release_io_netjet(cs);
 			break;
-		case CARD_INIT:
-			inittiger(cs);
-			Amd7930_init(cs);
-			break;
 		case CARD_TEST:
 			break;
                 case MDL_ASSIGN:
@@ -218,6 +214,16 @@ enpci_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 	return(0);
 }
 
+static void
+enpci_init(struct IsdnCardState *cs)
+{
+	inittiger(cs);
+	Amd7930_init(cs);
+}
+
+static struct card_ops enpci_ops = {
+	.init = enpci_init,
+};
 
 static void
 enpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
@@ -373,6 +379,7 @@ setup_enternow_pci(struct IsdnCard *card)
 	cs->cardmsg = &enpci_card_msg;
 	cs->irq_func = &enpci_interrupt;
 	cs->irq_flags |= SA_SHIRQ;
+	cs->card_ops = &enpci_ops;
 
         return (1);
 }

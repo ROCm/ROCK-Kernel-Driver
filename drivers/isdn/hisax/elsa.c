@@ -685,17 +685,6 @@ Elsa_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_RELEASE:
 			release_io_elsa(cs);
 			return(0);
-		case CARD_INIT:
-			cs->debug |= L1_DEB_IPAC;
-			if ((cs->subtyp == ELSA_QS1000) ||
-			    (cs->subtyp == ELSA_QS3000))
-			{
-				byteout(cs->hw.elsa.timer, 0);
-			}
-			if (cs->hw.elsa.trig)
-				byteout(cs->hw.elsa.trig, 0xff);
-			inithscxisac(cs);
-			return(0);
 		case CARD_TEST:
 			if ((cs->subtyp == ELSA_PCMCIA) ||
 				(cs->subtyp == ELSA_PCMCIA_IPAC) ||
@@ -787,6 +776,23 @@ Elsa_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 	elsa_led_handler(cs);
 	return(ret);
 }
+
+static void
+elsa_init(struct IsdnCardState *cs)
+{
+	cs->debug |= L1_DEB_IPAC;
+	if (cs->subtyp == ELSA_QS1000 || cs->subtyp == ELSA_QS3000)
+		byteout(cs->hw.elsa.timer, 0);
+
+	if (cs->hw.elsa.trig)
+		byteout(cs->hw.elsa.trig, 0xff);
+
+	inithscxisac(cs);
+}
+
+static struct card_ops elsa_ops = {
+	.init = elsa_init,
+};
 
 static unsigned char
 probe_elsa_adr(unsigned int adr, int typ)
@@ -1170,6 +1176,7 @@ setup_elsa(struct IsdnCard *card)
 	}
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Elsa_card_msg;
+	cs->card_ops = &elsa_ops;
 	reset_elsa(cs);
 	if ((cs->subtyp == ELSA_QS1000PCI) || (cs->subtyp == ELSA_QS3000PCI) || (cs->subtyp == ELSA_PCMCIA_IPAC)) {
 		cs->dc_hw_ops = &ipac_dc_ops;

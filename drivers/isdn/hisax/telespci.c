@@ -240,14 +240,15 @@ TelesPCI_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_RELEASE:
 			release_io_telespci(cs);
 			return(0);
-		case CARD_INIT:
-			inithscxisac(cs);
-			return(0);
 		case CARD_TEST:
 			return(0);
 	}
 	return(0);
 }
+
+static struct card_ops telespci_ops = {
+	.init = inithscxisac,
+};
 
 static struct pci_dev *dev_tel __initdata = NULL;
 
@@ -310,6 +311,7 @@ setup_telespci(struct IsdnCard *card)
 	cs->cardmsg = &TelesPCI_card_msg;
 	cs->irq_func = &telespci_interrupt;
 	cs->irq_flags |= SA_SHIRQ;
+	cs->card_ops = &telespci_ops;
 	ISACVersion(cs, "TelesPCI:");
 	if (HscxVersion(cs, "TelesPCI:")) {
 		printk(KERN_WARNING

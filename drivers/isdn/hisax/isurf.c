@@ -163,11 +163,6 @@ ISurf_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_RELEASE:
 			release_io_isurf(cs);
 			return(0);
-		case CARD_INIT:
-			writeb(0, cs->hw.isurf.isar+ISAR_IRQBIT);mb();
-			initisac(cs);
-			initisar(cs);
-			return(0);
 		case CARD_TEST:
 			return(0);
 	}
@@ -189,6 +184,18 @@ isurf_auxcmd(struct IsdnCardState *cs, isdn_ctrl *ic) {
 	}
 	return(isar_auxcmd(cs, ic));
 }
+
+static void
+isurf_init(struct IsdnCardState *cs)
+{
+	writeb(0, cs->hw.isurf.isar+ISAR_IRQBIT);mb();
+	initisac(cs);
+	initisar(cs);
+}
+
+static struct card_ops isurf_ops = {
+	.init = isurf_init,
+};
 
 #ifdef __ISAPNP__
 static struct pci_bus *pnp_surf __devinitdata = NULL;
@@ -285,6 +292,7 @@ setup_isurf(struct IsdnCard *card)
 	cs->cardmsg = &ISurf_card_msg;
 	cs->irq_func = &isurf_interrupt;
 	cs->auxcmd = &isurf_auxcmd;
+	cs->card_ops = &isurf_ops;
 	cs->dc_hw_ops = &isac_ops;
 	cs->bcs[0].hw.isar.reg = &cs->hw.isurf.isar_r;
 	cs->bcs[1].hw.isar.reg = &cs->hw.isurf.isar_r;

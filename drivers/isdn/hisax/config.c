@@ -854,8 +854,7 @@ static int __devinit init_card(struct IsdnCardState *cs)
 {
 	int irq_cnt, cnt = 3;
 
-	if (!cs->irq)
-		return cs->cardmsg(cs, CARD_INIT, NULL);
+	cs->card_ops->init(cs);
 
 	irq_cnt = kstat_irqs(cs->irq);
 	printk(KERN_INFO "%s: IRQ %d count %d\n", CardType[cs->typ],
@@ -866,7 +865,7 @@ static int __devinit init_card(struct IsdnCardState *cs)
 		return 1;
 	}
 	while (cnt) {
-		cs->cardmsg(cs, CARD_INIT, NULL);
+		cs->card_ops->init(cs);
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		/* Timeout 10ms */
 		schedule_timeout((10 * HZ) / 1000);

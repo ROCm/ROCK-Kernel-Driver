@@ -300,15 +300,22 @@ Asus_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_RELEASE:
 			release_io_asuscom(cs);
 			return(0);
-		case CARD_INIT:
-			cs->debug |= L1_DEB_IPAC;
-			inithscxisac(cs);
-			return(0);
 		case CARD_TEST:
 			return(0);
 	}
 	return(0);
 }
+
+static void
+asuscom_init(struct IsdnCardState *cs)
+{
+	cs->debug |= L1_DEB_IPAC;
+	inithscxisac(cs);
+}
+
+static struct card_ops asuscom_ops = {
+	.init = asuscom_init,
+};
 
 #ifdef __ISAPNP__
 static struct isapnp_device_id asus_ids[] __initdata = {
@@ -398,6 +405,7 @@ setup_asuscom(struct IsdnCard *card)
 		cs->hw.asus.cfg_reg, cs->irq);
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Asus_card_msg;
+	cs->card_ops = &asuscom_ops;
 	cs->hw.asus.adr = cs->hw.asus.cfg_reg + ASUS_IPAC_ALE;
 	val = readreg(cs, cs->hw.asus.cfg_reg + ASUS_IPAC_DATA, IPAC_ID);
 	if ((val == 1) || (val == 2)) {

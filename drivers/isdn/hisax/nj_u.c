@@ -103,17 +103,24 @@ NETjet_U_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_RELEASE:
 			release_io_netjet(cs);
 			return(0);
-		case CARD_INIT:
-			inittiger(cs);
-			initicc(cs);
-			/* Reenable all IRQ */
-			NETjet_WriteIC(cs, ICC_MASK, 0);
-			return(0);
 		case CARD_TEST:
 			return(0);
 	}
 	return(0);
 }
+
+static void
+nj_u_init(struct IsdnCardState *cs)
+{
+	inittiger(cs);
+	initicc(cs);
+	/* Reenable all IRQ */
+	NETjet_WriteIC(cs, ICC_MASK, 0);
+}
+
+static struct card_ops nj_u_ops = {
+	.init = nj_u_init,
+};
 
 static struct pci_dev *dev_netjet __initdata = NULL;
 
@@ -226,6 +233,7 @@ setup_netjet_u(struct IsdnCard *card)
 	cs->cardmsg = &NETjet_U_card_msg;
 	cs->irq_func = &netjet_u_interrupt;
 	cs->irq_flags |= SA_SHIRQ;
+	cs->card_ops = &nj_u_ops;
 	ICCVersion(cs, "NETspider-U:");
 	return (1);
 }

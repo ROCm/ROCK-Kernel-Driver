@@ -186,14 +186,15 @@ mic_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_RELEASE:
 			release_io_mic(cs);
 			return(0);
-		case CARD_INIT:
-			inithscxisac(cs);
-			return(0);
 		case CARD_TEST:
 			return(0);
 	}
 	return(0);
 }
+
+static struct card_ops mic_ops = {
+	.init = inithscxisac,
+};
 
 int __init
 setup_mic(struct IsdnCard *card)
@@ -231,6 +232,7 @@ setup_mic(struct IsdnCard *card)
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &mic_card_msg;
 	cs->irq_func = &mic_interrupt;
+	cs->card_ops = &mic_ops;
 	ISACVersion(cs, "mic:");
 	if (HscxVersion(cs, "mic:")) {
 		printk(KERN_WARNING

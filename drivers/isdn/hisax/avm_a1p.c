@@ -206,11 +206,6 @@ AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		        /* free_irq(cs->irq, cs); */
 			return 0;
 
-		case CARD_INIT:
-			byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET,ASL0_W_TDISABLE|ASL0_W_TRESET|ASL0_W_IRQENABLE);
-			inithscxisac(cs);
-			return 0;
-
 		case CARD_TEST:
 			/* we really don't need it for the PCMCIA Version */
 			return 0;
@@ -221,6 +216,18 @@ AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 	}
 	return 0;
 }
+
+static void
+avm_a1p_init(struct IsdnCardState *cs)
+{
+	byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET,
+		ASL0_W_TDISABLE|ASL0_W_TRESET|ASL0_W_IRQENABLE);
+	inithscxisac(cs);
+}
+
+static struct card_ops avm_a1p_ops = {
+	.init = avm_a1p_init,
+};
 
 int __devinit
 setup_avm_a1_pcmcia(struct IsdnCard *card)
@@ -260,6 +267,7 @@ setup_avm_a1_pcmcia(struct IsdnCard *card)
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &AVM_card_msg;
 	cs->irq_func = &avm_a1p_interrupt;
+	cs->card_ops = &avm_a1p_ops;
 
 	ISACVersion(cs, "AVM A1 PCMCIA:");
 	if (HscxVersion(cs, "AVM A1 PCMCIA:")) {

@@ -628,27 +628,12 @@ diva_led_handler(struct IsdnCardState *cs)
 static int
 Diva_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	u_int *ireg;
-
 	switch (mt) {
 		case CARD_RESET:
 			reset_diva(cs);
 			return(0);
 		case CARD_RELEASE:
 			release_io_diva(cs);
-			return(0);
-		case CARD_INIT:
-			if (cs->subtyp == DIVA_IPACX_PCI) {
-				ireg = (unsigned int *)cs->hw.diva.pci_cfg;
-				*ireg = PITA_INT0_ENABLE;
-			  init_ipacx(cs, 3); // init chip and enable interrupts
-        return (0);
-			}
-			if (cs->subtyp == DIVA_IPAC_PCI) {
-				ireg = (unsigned int *)cs->hw.diva.pci_cfg;
-				*ireg = PITA_INT0_ENABLE;
-			}
-			inithscxisac(cs);
 			return(0);
 		case CARD_TEST:
 			return(0);
@@ -686,6 +671,28 @@ Diva_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		diva_led_handler(cs);
 	return(0);
 }
+
+static void
+diva_init(struct IsdnCardState *cs)
+{
+	unsigned int *ireg;
+
+	if (cs->subtyp == DIVA_IPACX_PCI) {
+		ireg = (unsigned int *)cs->hw.diva.pci_cfg;
+		*ireg = PITA_INT0_ENABLE;
+		init_ipacx(cs, 3); // init chip and enable interrupts
+		return;
+	}
+	if (cs->subtyp == DIVA_IPAC_PCI) {
+		ireg = (unsigned int *)cs->hw.diva.pci_cfg;
+		*ireg = PITA_INT0_ENABLE;
+	}
+	inithscxisac(cs);
+}
+
+static struct card_ops diva_ops = {
+	.init = diva_init,
+};
 
 static struct pci_dev *dev_diva __initdata = NULL;
 static struct pci_dev *dev_diva_u __initdata = NULL;
@@ -923,6 +930,7 @@ ready:
 	reset_diva(cs);
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Diva_card_msg;
+	cs->card_ops = &diva_ops;
 	if (cs->subtyp == DIVA_IPAC_ISA) {
 		cs->dc_hw_ops = &ipac_dc_ops;
 		cs->irq_func = &diva_irq_ipac_isa;

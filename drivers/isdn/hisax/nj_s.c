@@ -101,15 +101,22 @@ NETjet_S_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_RELEASE:
 			release_io_netjet(cs);
 			return(0);
-		case CARD_INIT:
-			inittiger(cs);
-			initisac(cs);
-			return(0);
 		case CARD_TEST:
 			return(0);
 	}
 	return(0);
 }
+
+static void
+nj_s_init(struct IsdnCardState *cs)
+{
+	inittiger(cs);
+	initisac(cs);
+}
+
+static struct card_ops nj_s_ops = {
+	.init = nj_s_init,
+};
 
 static struct pci_dev *dev_netjet __initdata = NULL;
 
@@ -230,6 +237,7 @@ setup_netjet_s(struct IsdnCard *card)
 	cs->cardmsg = &NETjet_S_card_msg;
 	cs->irq_func = &netjet_s_interrupt;
 	cs->irq_flags |= SA_SHIRQ;
+	cs->card_ops = &nj_s_ops;
 	ISACVersion(cs, "NETjet-S:");
 	return (1);
 }

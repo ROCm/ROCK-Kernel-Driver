@@ -238,15 +238,15 @@ saphir_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_RELEASE:
 			release_io_saphir(cs);
 			return(0);
-		case CARD_INIT:
-			inithscxisac(cs);
-			return(0);
 		case CARD_TEST:
 			return(0);
 	}
 	return(0);
 }
 
+static struct card_ops saphir_ops = {
+	.init = inithscxisac,
+};
 
 int __init
 setup_saphir(struct IsdnCard *card)
@@ -292,6 +292,7 @@ setup_saphir(struct IsdnCard *card)
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &saphir_card_msg;
 	cs->irq_func = &saphir_interrupt;
+	cs->card_ops = &saphir_ops;
 	ISACVersion(cs, "saphir:");
 	if (HscxVersion(cs, "saphir:")) {
 		printk(KERN_WARNING

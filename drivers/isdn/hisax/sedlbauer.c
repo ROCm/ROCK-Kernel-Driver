@@ -486,15 +486,6 @@ Sedl_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			}
 			release_io_sedlbauer(cs);
 			return(0);
-		case CARD_INIT:
-			if (cs->hw.sedl.chip == SEDL_CHIP_ISAC_ISAR) {
-				isar_write(cs, 0, ISAR_IRQBIT, 0);
-				initisac(cs);
-				initisar(cs);
-			} else {
-				inithscxisac(cs);
-			}
-			return(0);
 		case CARD_TEST:
 			return(0);
 		case MDL_INFO_CONN:
@@ -518,6 +509,22 @@ Sedl_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 	}
 	return(0);
 }
+
+static void
+sedlbauer_init(struct IsdnCardState *cs)
+{
+	if (cs->hw.sedl.chip == SEDL_CHIP_ISAC_ISAR) {
+		isar_write(cs, 0, ISAR_IRQBIT, 0);
+		initisac(cs);
+		initisar(cs);
+	} else {
+		inithscxisac(cs);
+	}
+}
+
+static struct card_ops sedlbauer_ops = {
+	.init = sedlbauer_init,
+};
 
 static struct pci_dev *dev_sedl __devinitdata = NULL;
 
@@ -706,6 +713,7 @@ ready:
 
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Sedl_card_msg;
+	cs->card_ops = &sedlbauer_ops;
 
 /*
  * testing ISA and PCMCIA Cards for IPAC, default is ISAC
