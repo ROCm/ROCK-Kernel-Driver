@@ -1,7 +1,7 @@
 
 /* Common Flash Interface structures 
  * See http://support.intel.com/design/flash/technote/index.htm
- * $Id: cfi.h,v 1.44 2004/07/13 22:32:52 dwmw2 Exp $
+ * $Id: cfi.h,v 1.45 2004/07/20 02:44:27 dwmw2 Exp $
  */
 
 #ifndef __MTD_CFI_H__
@@ -328,14 +328,12 @@ static inline uint8_t cfi_read_query(struct map_info *map, uint32_t addr)
 
 static inline void cfi_udelay(int us)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
 	unsigned long t = us * HZ / 1000000;
 	if (t) {
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(t);
 		return;
 	}
-#endif
 	udelay(us);
 	cond_resched();
 }

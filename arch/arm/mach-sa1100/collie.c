@@ -141,4 +141,5 @@ MACHINE_START(COLLIE, "Sharp-Collie")
 	MAPIO(collie_map_io)
 	INITIRQ(sa1100_init_irq)
 	INIT_MACHINE(collie_init)
+	INITTIME(sa1100_init_time)
 MACHINE_END

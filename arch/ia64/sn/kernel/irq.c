@@ -188,7 +188,7 @@ sn_irq_desc(unsigned int irq)
 }
 
 u8
-sn_irq_to_vector(u8 irq)
+sn_irq_to_vector(unsigned int irq)
 {
 	return(irq);
 }
