@@ -256,27 +256,41 @@ end_copy:
 	return error;
 }
 
-/* Returns the mtu for the given v4 destination address.  */
-int sctp_v4_get_dst_mtu(const sockaddr_storage_t *address)
+/* Returns the dst cache entry for the given source and destination ip
+ * addresses.
+ */
+struct dst_entry *sctp_v4_get_dst(sockaddr_storage_t *daddr,
+				  sockaddr_storage_t *saddr)
 {
-	int dst_mtu = SCTP_DEFAULT_MAXSEGMENT;
 	struct rtable *rt;
-	struct flowi fl = { .nl_u = { .ip4_u =
-				      { .daddr = address->v4.sin_addr.s_addr } } };
+	struct flowi fl = { .nl_u = { .ip4_u = { .daddr =
+						    daddr->v4.sin_addr.s_addr,
+					       } } };
+
+	if (saddr)
+		fl.fl4_src = saddr->v4.sin_addr.s_addr;
+
+	SCTP_DEBUG_PRINTK("%s: DST:%u.%u.%u.%u, SRC:%u.%u.%u.%u - ",
+			  __FUNCTION__, NIPQUAD(fl.fl4_dst),
+			  NIPQUAD(fl.fl4_src));
 
 	if (ip_route_output_key(&rt, &fl)) {
-		SCTP_DEBUG_PRINTK("sctp_v4_get_dst_mtu:ip_route_output_key"
-				  " failed, returning %d as dst_mtu\n",
-				  dst_mtu);
-	} else {
-		dst_mtu = rt->u.dst.pmtu;
-		SCTP_DEBUG_PRINTK("sctp_v4_get_dst_mtu: "
-				  "ip_route_output_key: dev:%s pmtu:%d\n",
-				  rt->u.dst.dev->name, dst_mtu);
-		ip_rt_put(rt);
+		SCTP_DEBUG_PRINTK("NO ROUTE\n");
+		return NULL;
 	}
 
-	return dst_mtu;
+	SCTP_DEBUG_PRINTK("rt_dst:%u.%u.%u.%u, rt_src:%u.%u.%u.%u\n",
+			  NIPQUAD(rt->rt_src), NIPQUAD(rt->rt_dst));
+
+	return &rt->u.dst;
+}
+
+/* Check if the dst entry's source addr matches the given source addr. */
+int sctp_v4_cmp_saddr(struct dst_entry *dst, sockaddr_storage_t *saddr)
+{
+	struct rtable *rt = (struct rtable *)dst;
+
+	return (rt->rt_src == saddr->v4.sin_addr.s_addr); 
 }
 
 /* Event handler for inet device events.
@@ -438,7 +452,8 @@ sctp_func_t sctp_ipv4_specific = {
 	.queue_xmit     = ip_queue_xmit,
 	.setsockopt     = ip_setsockopt,
 	.getsockopt     = ip_getsockopt,
-	.get_dst_mtu    = sctp_v4_get_dst_mtu,
+	.get_dst	= sctp_v4_get_dst,
+	.cmp_saddr	= sctp_v4_cmp_saddr,
 	.net_header_len = sizeof(struct iphdr),
 	.sockaddr_len   = sizeof(struct sockaddr_in),
 	.sa_family      = AF_INET,
