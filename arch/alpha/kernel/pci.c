@@ -326,7 +326,7 @@ common_swizzle(struct pci_dev *dev, u8 *pinp)
 	return PCI_SLOT(dev->devfn);
 }
 
-void __init
+void __devinit
 pcibios_fixup_pbus_ranges(struct pci_bus * bus,
 			  struct pbus_set_ranges_data * ranges)
 {

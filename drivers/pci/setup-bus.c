@@ -35,7 +35,7 @@
 
 #define ROUND_UP(x, a)		(((x) + (a) - 1) & ~((a) - 1))
 
-static int __init
+static int __devinit
 pbus_assign_resources_sorted(struct pci_bus *bus)
 {
 	struct list_head *ln;
@@ -85,7 +85,7 @@ pbus_assign_resources_sorted(struct pci_bus *bus)
    requires that if there is no I/O ports or memory behind the
    bridge, corresponding range must be turned off by writing base
    value greater than limit to the bridge's base/limit registers.  */
-static void __init
+static void __devinit
 pci_setup_bridge(struct pci_bus *bus)
 {
 	struct pbus_set_ranges_data ranges;
@@ -168,7 +168,7 @@ pci_setup_bridge(struct pci_bus *bus)
 /* Check whether the bridge supports optional I/O and
    prefetchable memory ranges. If not, the respective
    base/limit registers must be read-only and read as 0. */
-static void __init
+static void __devinit
 pci_bridge_check_ranges(struct pci_bus *bus)
 {
 	u16 io;
@@ -210,7 +210,7 @@ pci_bridge_check_ranges(struct pci_bus *bus)
    since these windows have 4K granularity and the IO ranges
    of non-bridge PCI devices are limited to 256 bytes.
    We must be careful with the ISA aliasing though. */
-static void __init
+static void __devinit
 pbus_size_io(struct pci_bus *bus)
 {
 	struct list_head *ln;
@@ -259,7 +259,7 @@ pbus_size_io(struct pci_bus *bus)
 
 /* Calculate the size of the bus and minimal alignment which
    guarantees that all child resources fit in this size. */
-static void __init
+static void __devinit
 pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long type)
 {
 	struct list_head *ln;
@@ -331,7 +331,7 @@ pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long type)
 	b_res->end = size + min_align - 1;
 }
 
-void __init
+void __devinit
 pbus_size_bridges(struct pci_bus *bus)
 {
 	struct list_head *ln;
@@ -358,7 +358,7 @@ pbus_size_bridges(struct pci_bus *bus)
 	pbus_size_mem(bus, mask, type);
 }
 
-void __init
+void __devinit
 pbus_assign_resources(struct pci_bus *bus)
 {
 	struct list_head *ln;
