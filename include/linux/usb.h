@@ -84,6 +84,7 @@
 #include <linux/list.h>		/* for struct list_head */
 #include <linux/device.h>	/* for struct device */
 #include <linux/fs.h>		/* for struct file_operations */
+#include <linux/completion.h>	/* for struct completion */
 
 
 static __inline__ void wait_ms(unsigned int ms)
@@ -1070,6 +1071,57 @@ extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
 #endif
 
 #define USB_CTRL_SET_TIMEOUT	3
+
+
+/**
+ * struct usb_sg_request - support for scatter/gather I/O
+ * @status: zero indicates success, else negative errno
+ * @bytes: counts bytes transferred.
+ *
+ * These requests are initialized using usb_sg_init(), and then are used
+ * as request handles passed to usb_sg_wait() or usb_sg_cancel().  Most
+ * members of the request object aren't for driver access.
+ *
+ * The status and bytecount values are valid only after usb_sg_wait()
+ * returns.  If the status is zero, then the bytecount matches the total
+ * from the request.
+ *
+ * After an error completion, drivers may need to clear a halt condition
+ * on the endpoint.
+ */
+struct usb_sg_request {
+	int			status;
+	size_t			bytes;
+
+	// members not documented above are private to usbcore,
+	// and are not provided for driver access!
+	spinlock_t		lock;
+
+	struct usb_device	*dev;
+	int			pipe;
+	struct scatterlist	*sg;
+	int			nents;
+
+	int			entries;
+	struct urb		**urbs;
+
+	int			count;
+	struct completion	complete;
+};
+
+int usb_sg_init (
+	struct usb_sg_request	*io,
+	struct usb_device	*dev,
+	unsigned		pipe, 
+	unsigned		period,
+	struct scatterlist	*sg,
+	int			nents,
+	size_t			length,
+	int			mem_flags
+);
+void usb_sg_cancel (struct usb_sg_request *io);
+void usb_sg_wait (struct usb_sg_request *io);
+
 
 /* -------------------------------------------------------------------------- */
 

@@ -2,6 +2,7 @@
  * message.c - synchronous message handling
  */
 
+#include <linux/pci.h>	/* for scatterlist macros */
 #include <linux/usb.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -194,6 +195,321 @@ int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe,
 
 	return usb_start_wait_urb(urb,timeout,actual_length);
 }
+
+/*-------------------------------------------------------------------*/
+
+static void sg_clean (struct usb_sg_request *io)
+{
+	if (io->urbs) {
+		while (io->entries--)
+			usb_free_urb (io->urbs [io->entries]);
+		kfree (io->urbs);
+		io->urbs = 0;
+	}
+	usb_buffer_unmap_sg (io->dev, io->pipe, io->sg, io->nents);
+	io->dev = 0;
+}
+
+static void sg_complete (struct urb *urb)
+{
+	struct usb_sg_request	*io = (struct usb_sg_request *) urb->context;
+	unsigned long		flags;
+
+	spin_lock_irqsave (&io->lock, flags);
+
+	/* In 2.5 we require hcds' endpoint queues not to progress after fault
+	 * reports, until the competion callback (this!) returns.  That lets
+	 * device driver code (like this routine) unlink queued urbs first,
+	 * if it needs to, since the HC won't work on them at all.  So it's
+	 * not possible for page N+1 to overwrite page N, and so on.
+	 */
+	if (io->status && urb->actual_length) {
+		err ("driver for bus %s dev %s ep %d-%s corrupted data!",
+			io->dev->bus->bus_name, io->dev->devpath,
+			usb_pipeendpoint (urb->pipe),
+			usb_pipein (urb->pipe) ? "in" : "out");
+		// BUG ();
+	}
+
+	if (urb->status && urb->status != -ECONNRESET) {
+		int		i, found, status;
+
+		io->status = urb->status;
+
+		/* the previous urbs, and this one, completed already.
+		 * unlink the later ones so they won't rx/tx bad data,
+		 *
+		 * FIXME don't bother unlinking urbs that haven't yet been
+		 * submitted; those non-error cases shouldn't be syslogged
+		 */
+		for (i = 0, found = 0; i < io->entries; i++) {
+			if (found) {
+				status = usb_unlink_urb (io->urbs [i]);
+				if (status && status != -EINPROGRESS)
+					err ("sg_complete, unlink --> %d",
+							status);
+			} else if (urb == io->urbs [i])
+				found = 1;
+		}
+	}
+
+	/* on the last completion, signal usb_sg_wait() */
+	io->bytes += urb->actual_length;
+	io->count--;
+	if (!io->count)
+		complete (&io->complete);
+
+	spin_unlock_irqrestore (&io->lock, flags);
+}
+
+
+/**
+ * usb_sg_init - initializes scatterlist-based bulk/interrupt I/O request
+ * @io: request block being initialized.  until usb_sg_wait() returns,
+ *	treat this as a pointer to an opaque block of memory,
+ * @dev: the usb device that will send or receive the data
+ * @pipe: endpoint "pipe" used to transfer the data
+ * @period: polling rate for interrupt endpoints, in frames or
+ * 	(for high speed endpoints) microframes; ignored for bulk
+ * @sg: scatterlist entries
+ * @nents: how many entries in the scatterlist
+ * @length: how many bytes to send from the scatterlist, or zero to
+ * 	send every byte identified in the list.
+ * @mem_flags: SLAB_* flags affecting memory allocations in this call
+ *
+ * Returns zero for success, else a negative errno value.  This initializes a
+ * scatter/gather request, allocating resources such as I/O mappings and urb
+ * memory (except maybe memory used by USB controller drivers).
+ *
+ * The request must be issued using usb_sg_wait(), which waits for the I/O to
+ * complete (or to be canceled) and then cleans up all resources allocated by
+ * usb_sg_init().
+ *
+ * The request may be canceled with usb_sg_cancel(), either before or after
+ * usb_sg_wait() is called.
+ *
+ * NOTE:
+ *
+ * At this writing, don't use the interrupt transfer mode, since the old old
+ * "automagic resubmit" mode hasn't yet been removed.  It should be removed
+ * by the time 2.5 finalizes.
+ */
+int usb_sg_init (
+	struct usb_sg_request	*io,
+	struct usb_device	*dev,
+	unsigned		pipe, 
+	unsigned		period,
+	struct scatterlist	*sg,
+	int			nents,
+	size_t			length,
+	int			mem_flags
+)
+{
+	int			i;
+	int			urb_flags;
+
+	if (!io || !dev || !sg
+			|| usb_pipecontrol (pipe)
+			|| usb_pipeisoc (pipe)
+			|| nents <= 0)
+		return -EINVAL;
+
+	spin_lock_init (&io->lock);
+	io->dev = dev;
+	io->pipe = pipe;
+	io->sg = sg;
+	io->nents = nents;
+
+	/* initialize all the urbs we'll use */
+	io->entries = usb_buffer_map_sg (dev, pipe, sg, nents);
+	if (io->entries <= 0)
+		return io->entries;
+
+	io->count = 0;
+	io->urbs = kmalloc (io->entries * sizeof *io->urbs, mem_flags);
+	if (!io->urbs)
+		goto nomem;
+
+	urb_flags = USB_ASYNC_UNLINK | URB_NO_DMA_MAP | URB_NO_INTERRUPT;
+	if (usb_pipein (pipe))
+		urb_flags |= URB_SHORT_NOT_OK;
+
+	for (i = 0; i < io->entries; i++, io->count = i) {
+		unsigned		len;
+
+		io->urbs [i] = usb_alloc_urb (0, mem_flags);
+		if (!io->urbs [i]) {
+			io->entries = i;
+			goto nomem;
+		}
+
+		io->urbs [i]->dev = dev;
+		io->urbs [i]->pipe = pipe;
+		io->urbs [i]->interval = period;
+		io->urbs [i]->transfer_flags = urb_flags;
+
+		io->urbs [i]->complete = sg_complete;
+		io->urbs [i]->context = io;
+		io->urbs [i]->status = -EINPROGRESS;
+		io->urbs [i]->actual_length = 0;
+
+		io->urbs [i]->transfer_dma = sg_dma_address (sg + i);
+		len = sg_dma_len (sg + i);
+		if (length) {
+			len = min_t (unsigned, len, length);
+			length -= len;
+			if (length == 0)
+				io->entries = i + 1;
+		}
+		io->urbs [i]->transfer_buffer_length = len;
+	}
+	io->urbs [--i]->transfer_flags &= ~URB_NO_INTERRUPT;
+
+	/* transaction state */
+	io->status = 0;
+	io->bytes = 0;
+	init_completion (&io->complete);
+	return 0;
+
+nomem:
+	sg_clean (io);
+	return -ENOMEM;
+}
+
+
+/**
+ * usb_sg_wait - synchronously execute scatter/gather request
+ * @io: request block handle, as initialized with usb_sg_init().
+ * 	some fields become accessible when this call returns.
+ * Context: !in_interrupt ()
+ *
+ * This function blocks until the specified I/O operation completes.  It
+ * leverages the grouping of the related I/O requests to get good transfer
+ * rates, by queueing the requests.  At higher speeds, such queuing can
+ * significantly improve USB throughput.
+ *
+ * There are three kinds of completion for this function.
+ * (1) success, where io->status is zero.  The number of io->bytes
+ *     transferred is as requested.
+ * (2) error, where io->status is a negative errno value.  The number
+ *     of io->bytes transferred before the error is usually less
+ *     than requested, and can be nonzero.
+ * (3) cancelation, a type of error with status -ECONNRESET that
+ *     is initiated by usb_sg_cancel().
+ *
+ * When this function returns, all memory allocated through usb_sg_init() or
+ * this call will have been freed.  The request block parameter may still be
+ * passed to usb_sg_cancel(), or it may be freed.  It could also be
+ * reinitialized and then reused.
+ *
+ * Data Transfer Rates:
+ *
+ * Bulk transfers are valid for full or high speed endpoints.
+ * The best full speed data rate is 19 packets of 64 bytes each
+ * per frame, or 1216 bytes per millisecond.
+ * The best high speed data rate is 13 packets of 512 bytes each
+ * per microframe, or 52 KBytes per millisecond.
+ *
+ * The reason to use interrupt transfers through this API would most likely
+ * be to reserve high speed bandwidth, where up to 24 KBytes per millisecond
+ * could be transferred.  That capability is less useful for low or full
+ * speed interrupt endpoints, which allow at most one packet per millisecond,
+ * of at most 8 or 64 bytes (respectively).
+ */
+void usb_sg_wait (struct usb_sg_request *io)
+{
+	int		i;
+	unsigned long	flags;
+
+	/* queue the urbs.  */
+	spin_lock_irqsave (&io->lock, flags);
+	for (i = 0; i < io->entries && !io->status; i++) {
+		int	retval;
+
+		retval = usb_submit_urb (io->urbs [i], SLAB_ATOMIC);
+
+		/* after we submit, let completions or cancelations fire;
+		 * we handshake using io->status.
+		 */
+		spin_unlock_irqrestore (&io->lock, flags);
+		switch (retval) {
+			/* maybe we retrying will recover */
+		case -ENXIO:	// hc didn't queue this one
+		case -EAGAIN:
+		case -ENOMEM:
+			retval = 0;
+			i--;
+			// FIXME:  should it usb_sg_cancel() on INTERRUPT?
+			// how about imposing a backoff?
+			set_current_state (TASK_UNINTERRUPTIBLE);
+			schedule ();
+			break;
+
+			/* no error? continue immediately.
+			 *
+			 * NOTE: to work better with UHCI (4K I/O buffer may
+			 * need 3K of TDs) it may be good to limit how many
+			 * URBs are queued at once; N milliseconds?
+			 */
+		case 0:
+			cpu_relax ();
+			break;
+
+			/* fail any uncompleted urbs */
+		default:
+			io->urbs [i]->status = retval;
+			dbg ("usb_sg_msg, submit --> %d", retval);
+			usb_sg_cancel (io);
+		}
+		spin_lock_irqsave (&io->lock, flags);
+		if (retval && io->status == -ECONNRESET)
+			io->status = retval;
+	}
+	spin_unlock_irqrestore (&io->lock, flags);
+
+	/* OK, yes, this could be packaged as non-blocking.
+	 * So could the submit loop above ... but it's easier to
+	 * solve neither problem than to solve both!
+	 */
+	wait_for_completion (&io->complete);
+
+	sg_clean (io);
+}
+
+/**
+ * usb_sg_cancel - stop scatter/gather i/o issued by usb_sg_wait()
+ * @io: request block, initialized with usb_sg_init()
+ *
+ * This stops a request after it has been started by usb_sg_wait().
+ * It can also prevents one initialized by usb_sg_init() from starting,
+ * so that call just frees resources allocated to the request.
+ */
+void usb_sg_cancel (struct usb_sg_request *io)
+{
+	unsigned long	flags;
+
+	spin_lock_irqsave (&io->lock, flags);
+
+	/* shut everything down, if it didn't already */
+	if (!io->status) {
+		int	i;
+
+		io->status = -ECONNRESET;
+		for (i = 0; i < io->entries; i++) {
+			int	retval;
+
+			if (!io->urbs [i]->dev)
+				continue;
+			retval = usb_unlink_urb (io->urbs [i]);
+			if (retval && retval != -EINPROGRESS)
+				warn ("usb_sg_cancel, unlink --> %d", retval);
+			// FIXME don't warn on "not yet submitted" error
+		}
+	}
+	spin_unlock_irqrestore (&io->lock, flags);
+}
+
+/*-------------------------------------------------------------------*/
 
 /**
  * usb_get_descriptor - issues a generic GET_DESCRIPTOR request
@@ -665,6 +981,11 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 // synchronous request completion model
 EXPORT_SYMBOL(usb_control_msg);
 EXPORT_SYMBOL(usb_bulk_msg);
+
+EXPORT_SYMBOL(usb_sg_init);
+EXPORT_SYMBOL(usb_sg_cancel);
+EXPORT_SYMBOL(usb_sg_wait);
+
 // synchronous control message convenience routines
 EXPORT_SYMBOL(usb_get_descriptor);
 EXPORT_SYMBOL(usb_get_device_descriptor);
