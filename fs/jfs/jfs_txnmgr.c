@@ -2824,10 +2824,7 @@ restart:
 			 * We can be running indefinately if other processors
 			 * are adding transactions to this list
 			 */
-			if (need_resched()) {
-				current->state = TASK_RUNNING;
-				schedule();
-			}
+			cond_resched();
 			LAZY_LOCK(flags);
 		}
 
@@ -2945,10 +2942,7 @@ int jfs_sync(void)
 				 * Just to be safe.  I don't know how
 				 * long we can run without blocking
 				 */
-				if (need_resched()) {
-					current->state = TASK_RUNNING;
-					schedule();
-				}
+				cond_resched();
 				TXN_LOCK();
 			} else {
 				/* We can't get the write lock.  It may
