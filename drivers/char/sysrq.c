@@ -76,7 +76,7 @@ static struct sysrq_key_op sysrq_SAK_op = {
 };
 #endif
 
-
+#ifdef CONFIG_VT
 /* unraw sysrq handler */
 static void sysrq_handle_unraw(int key, struct pt_regs *pt_regs,
 			       struct tty_struct *tty) 
@@ -91,7 +91,7 @@ static struct sysrq_key_op sysrq_unraw_op = {
 	help_msg:	"unRaw",
 	action_msg:	"Keyboard mode set to XLATE",
 };
-
+#endif /* CONFIG_VT */
 
 /* reboot sysrq handler */
 static void sysrq_handle_reboot(int key, struct pt_regs *pt_regs,
@@ -371,7 +371,11 @@ static struct sysrq_key_op *sysrq_key_table[SYSRQ_KEY_TABLE_LENGTH] = {
 		 as 'Off' at init time */
 /* p */	&sysrq_showregs_op,
 /* q */	NULL,
+#ifdef CONFIG_VT
 /* r */	&sysrq_unraw_op,
+#else
+/* r */ NULL,
+#endif
 /* s */	&sysrq_sync_op,
 /* t */	&sysrq_showstate_op,
 /* u */	&sysrq_mountro_op,
