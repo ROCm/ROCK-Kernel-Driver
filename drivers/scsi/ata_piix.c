@@ -184,7 +184,7 @@ static struct ata_port_info piix_port_info[] = {
 #else
 		.mwdma_mask	= 0x00, /* mwdma broken */
 #endif
-		.udma_mask	= ATA_UDMA_MASK_40C, /* FIXME: cbl det */
+		.udma_mask	= 0x3f, /* udma0-5 */
 		.port_ops	= &piix_pata_ops,
 	},
 
@@ -209,7 +209,7 @@ static struct ata_port_info piix_port_info[] = {
 #else
 		.mwdma_mask	= 0x00, /* mwdma broken */
 #endif
-		.udma_mask	= ATA_UDMA_MASK_40C, /* FIXME: cbl det */
+		.udma_mask	= ATA_UDMA_MASK_40C,
 		.port_ops	= &piix_pata_ops,
 	},
 
@@ -252,7 +252,7 @@ MODULE_DEVICE_TABLE(pci, piix_pci_tbl);
  *	piix_pata_cbl_detect - Probe host controller cable detect info
  *	@ap: Port for which cable detect info is desired
  *
- *	Read 80c cable indicator from SATA PCI device's PCI config
+ *	Read 80c cable indicator from ATA PCI device's PCI config
  *	register.  This register is normally set by firmware (BIOS).
  *
  *	LOCKING:
