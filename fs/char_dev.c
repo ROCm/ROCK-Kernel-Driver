@@ -67,7 +67,7 @@ static struct char_device *cdfind(dev_t dev, struct list_head *head)
 {
 	struct list_head *p;
 	struct char_device *cdev;
-	for (p=head->next; p!=head; p=p->next) {
+	list_for_each(p, head) {
 		cdev = list_entry(p, struct char_device, hash);
 		if (cdev->dev != dev)
 			continue;

@@ -1289,7 +1289,7 @@ out:
      * If possible, get a well-connected one
      */
     spin_lock(&dcache_lock);
-    for (lp = inode->i_dentry.next; lp != &inode->i_dentry ; lp=lp->next) {
+    list_for_each(lp, &inode->i_dentry) {
 	    result = list_entry(lp,struct dentry, d_alias);
 	    if (! (result->d_flags & DCACHE_NFSD_DISCONNECTED)) {
 		    dget_locked(result);
