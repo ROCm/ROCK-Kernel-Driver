@@ -159,12 +159,12 @@ static void elevator_setup_default(void)
 	if (chosen_elevator[0] && elevator_find(chosen_elevator))
 		return;
 
-#if defined(CONFIG_IOSCHED_CFQ)
-	strcpy(chosen_elevator, "cfq");
+#if defined(CONFIG_IOSCHED_AS)
+	strcpy(chosen_elevator, "anticipatory");
 #elif defined(CONFIG_IOSCHED_DEADLINE)
 	strcpy(chosen_elevator, "deadline");
-#elif defined(CONFIG_IOSCHED_AS)
-	strcpy(chosen_elevator, "anticipatory");
+#elif defined(CONFIG_IOSCHED_CFQ)
+	strcpy(chosen_elevator, "cfq");
 #elif defined(CONFIG_IOSCHED_NOOP)
 	strcpy(chosen_elevator, "noop");
 #else
