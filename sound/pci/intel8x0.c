@@ -775,11 +775,14 @@ static void fill_nocache(void *buf, int size, int nocache)
 static inline void snd_intel8x0_update(intel8x0_t *chip, ichdev_t *ichdev)
 {
 	unsigned long port = ichdev->reg_offset;
-	int civ, i, step;
+	int status, civ, i, step;
 	int ack = 0;
 
+	status = igetbyte(chip, port + ichdev->roff_sr);
 	civ = igetbyte(chip, port + ICH_REG_OFF_CIV);
-	if (civ == ichdev->civ) {
+	if (!(status & ICH_BCIS)) {
+		step = 0;
+	} else if (civ == ichdev->civ) {
 		// snd_printd("civ same %d\n", civ);
 		step = 1;
 		ichdev->civ++;
@@ -813,7 +816,8 @@ static inline void snd_intel8x0_update(intel8x0_t *chip, ichdev_t *ichdev)
 		snd_pcm_period_elapsed(ichdev->substream);
 		spin_lock(&chip->reg_lock);
 	}
-	iputbyte(chip, port + ichdev->roff_sr, ICH_FIFOE | ICH_BCIS | ICH_LVBCI);
+	iputbyte(chip, port + ichdev->roff_sr,
+		 status & (ICH_FIFOE | ICH_BCIS | ICH_LVBCI));
 }
 
 static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs *regs)
