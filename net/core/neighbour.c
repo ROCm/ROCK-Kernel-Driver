@@ -133,7 +133,7 @@ static int neigh_forced_gc(struct neigh_table *tbl)
 			if (atomic_read(&n->refcnt) == 1 &&
 			    !(n->nud_state & NUD_PERMANENT) &&
 			    (n->nud_state != NUD_INCOMPLETE ||
-			     jiffies - n->used > n->parms->retrans_time)) {
+			     time_after(jiffies, n->used + n->parms->retrans_time))) {
 				*np	= n->next;
 				n->dead = 1;
 				shrunk	= 1;
@@ -255,7 +255,7 @@ static struct neighbour *neigh_alloc(struct neigh_table *tbl)
 
 	if (tbl->entries > tbl->gc_thresh3 ||
 	    (tbl->entries > tbl->gc_thresh2 &&
-	     now - tbl->last_flush > 5 * HZ)) {
+	     time_after(now, tbl->last_flush + 5 * HZ))) {
 		if (!neigh_forced_gc(tbl) &&
 		    tbl->entries > tbl->gc_thresh3)
 			goto out;
@@ -563,12 +563,12 @@ static void neigh_sync(struct neighbour *n)
 	if (state & (NUD_NOARP | NUD_PERMANENT))
 		return;
 	if (state & NUD_REACHABLE) {
-		if (now - n->confirmed > n->parms->reachable_time) {
+		if (time_after(now, n->confirmed + n->parms->reachable_time)) {
 			n->nud_state = NUD_STALE;
 			neigh_suspect(n);
 		}
 	} else if (state & NUD_VALID) {
-		if (now - n->confirmed < n->parms->reachable_time) {
+		if (time_before(now, n->confirmed + n->parms->reachable_time)) {
 			neigh_del_timer(n);
 			n->nud_state = NUD_REACHABLE;
 			neigh_connect(n);
@@ -589,7 +589,7 @@ static void neigh_periodic_timer(unsigned long arg)
 	 *	periodically recompute ReachableTime from random function
 	 */
 
-	if (now - tbl->last_rand > 300 * HZ) {
+	if (time_after(now, tbl->last_rand + 300 * HZ)) {
 		struct neigh_parms *p;
 		tbl->last_rand = now;
 		for (p = &tbl->parms; p; p = p->next)
@@ -612,12 +612,12 @@ static void neigh_periodic_timer(unsigned long arg)
 				goto next_elt;
 			}
 
-			if ((long)(n->used - n->confirmed) < 0)
+			if (time_before(n->used, n->confirmed))
 				n->used = n->confirmed;
 
 			if (atomic_read(&n->refcnt) == 1 &&
 			    (state == NUD_FAILED ||
-			     now - n->used > n->parms->gc_staletime)) {
+			     time_after(now, n->used + n->parms->gc_staletime))) {
 				*np = n->next;
 				n->dead = 1;
 				write_unlock(&n->lock);
@@ -626,7 +626,7 @@ static void neigh_periodic_timer(unsigned long arg)
 			}
 
 			if (n->nud_state & NUD_REACHABLE &&
-			    now - n->confirmed > n->parms->reachable_time) {
+			    time_after(now, n->confirmed + n->parms->reachable_time)) {
 				n->nud_state = NUD_STALE;
 				neigh_suspect(n);
 			}
@@ -671,7 +671,7 @@ static void neigh_timer_handler(unsigned long arg)
 	}
 
 	if ((state & NUD_VALID) &&
-	    now - neigh->confirmed < neigh->parms->reachable_time) {
+	    time_before(now, neigh->confirmed + neigh->parms->reachable_time)) {
 		neigh->nud_state = NUD_REACHABLE;
 		NEIGH_PRINTK2("neigh %p is still alive.\n", neigh);
 		neigh_connect(neigh);
@@ -1126,26 +1126,25 @@ void pneigh_enqueue(struct neigh_table *tbl, struct neigh_parms *p,
 		    struct sk_buff *skb)
 {
 	unsigned long now = jiffies;
-	long sched_next = net_random() % p->proxy_delay;
+	unsigned long sched_next = now + (net_random() % p->proxy_delay);
 
 	if (tbl->proxy_queue.qlen > p->proxy_qlen) {
 		kfree_skb(skb);
 		return;
 	}
 	skb->stamp.tv_sec  = LOCALLY_ENQUEUED;
-	skb->stamp.tv_usec = now + sched_next;
+	skb->stamp.tv_usec = sched_next;
 
 	spin_lock(&tbl->proxy_queue.lock);
 	if (del_timer(&tbl->proxy_timer)) {
-		long tval = tbl->proxy_timer.expires - now;
-		if (tval < sched_next)
-			sched_next = tval;
+		if (time_before(tbl->proxy_timer.expires, sched_next))
+			sched_next = tbl->proxy_timer.expires;
 	}
 	dst_release(skb->dst);
 	skb->dst = NULL;
 	dev_hold(skb->dev);
 	__skb_queue_tail(&tbl->proxy_queue, skb);
-	mod_timer(&tbl->proxy_timer, now + sched_next);
+	mod_timer(&tbl->proxy_timer, sched_next);
 	spin_unlock(&tbl->proxy_queue.lock);
 }
 
