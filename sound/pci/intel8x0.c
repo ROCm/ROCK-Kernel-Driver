@@ -1766,6 +1766,12 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.name = "Dell",	/* which model?  AD1981B*/
 		.type = AC97_TUNE_HP_ONLY
 	},
+	{
+		.vendor = 0x103c,
+		.device = 0x006d,
+		.name = "HP zv5000",
+		.type = AC97_TUNE_MUTE_LED	/*AD1981B*/
+	},
 	{	/* FIXME: which codec? */
 		.vendor = 0x103c,
 		.device = 0x00c3,
