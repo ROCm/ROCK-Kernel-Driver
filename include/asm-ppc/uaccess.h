@@ -79,16 +79,28 @@ extern void sort_exception_table(void);
  * As we use the same address space for kernel and user data on the
  * PowerPC, we can just do these as direct assignments.  (Of course, the
  * exception handling means that it's no longer "just"...)
+ *
+ * The "user64" versions of the user access functions are versions that 
+ * allow modification of 64-bit data. The "get_user" functions do not 
+ * properly handle 64-bit data because the value gets down cast to a long. 
+ * The "put_user" functions already handle 64-bit data properly but we add 
+ * "user64" versions for completeness
  */
 #define get_user(x,ptr) \
   __get_user_check((x),(ptr),sizeof(*(ptr)))
+#define get_user64(x,ptr) \
+  __get_user64_check((x),(ptr),sizeof(*(ptr)))
 #define put_user(x,ptr) \
   __put_user_check((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
+#define put_user64(x,ptr) put_user(x,ptr)
 
 #define __get_user(x,ptr) \
   __get_user_nocheck((x),(ptr),sizeof(*(ptr)))
+#define __get_user64(x,ptr) \
+  __get_user64_nocheck((x),(ptr),sizeof(*(ptr)))
 #define __put_user(x,ptr) \
   __put_user_nocheck((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
+#define __put_user64(x,ptr) __put_user(x,ptr)
 
 extern long __put_user_bad(void);
 
@@ -168,9 +180,29 @@ struct __large_struct { unsigned long buf[100]; };
 	__gu_err;						\
 })
 
+#define __get_user64_nocheck(x,ptr,size)			\
+({								\
+	long __gu_err;						\
+	long long __gu_val;					\
+	__get_user_size(__gu_val,(ptr),(size),__gu_err);	\
+	(x) = (__typeof__(*(ptr)))__gu_val;			\
+	__gu_err;						\
+})
+
 #define __get_user_check(x,ptr,size)					\
 ({									\
 	long __gu_err = -EFAULT, __gu_val = 0;				\
+	const __typeof__(*(ptr)) *__gu_addr = (ptr);			\
+	if (access_ok(VERIFY_READ,__gu_addr,size))			\
+		__get_user_size(__gu_val,__gu_addr,(size),__gu_err);	\
+	(x) = (__typeof__(*(ptr)))__gu_val;				\
+	__gu_err;							\
+})
+
+#define __get_user64_check(x,ptr,size)					\
+({									\
+	long __gu_err = -EFAULT;					\
+	long long __gu_val = 0;						\
 	const __typeof__(*(ptr)) *__gu_addr = (ptr);			\
 	if (access_ok(VERIFY_READ,__gu_addr,size))			\
 		__get_user_size(__gu_val,__gu_addr,(size),__gu_err);	\
@@ -187,7 +219,7 @@ do {								\
 	  case 1: __get_user_asm(x,ptr,retval,"lbz"); break;	\
 	  case 2: __get_user_asm(x,ptr,retval,"lhz"); break;	\
 	  case 4: __get_user_asm(x,ptr,retval,"lwz"); break;	\
-	  case 8: __get_user_asm2(x, ptr, retval);		\
+	  case 8: __get_user_asm2(x, ptr, retval); break;	\
 	  default: (x) = __get_user_bad();			\
 	}							\
 } while (0)
