@@ -36,8 +36,19 @@ ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -g -DSTATIC="" -DDEBUG -DXFSDEBUG
 endif
 ifeq ($(CONFIG_XFS_TRACE),y)
-	EXTRA_CFLAGS += -DPAGEBUF_TRACE
+	EXTRA_CFLAGS += -DXFS_ALLOC_TRACE
+	EXTRA_CFLAGS += -DXFS_ATTR_TRACE
+	EXTRA_CFLAGS += -DXFS_BLI_TRACE
+	EXTRA_CFLAGS += -DXFS_BMAP_TRACE
+	EXTRA_CFLAGS += -DXFS_BMBT_TRACE
+	EXTRA_CFLAGS += -DXFS_DIR_TRACE
+	EXTRA_CFLAGS += -DXFS_DIR2_TRACE
 	EXTRA_CFLAGS += -DXFS_DQUOT_TRACE
+	EXTRA_CFLAGS += -DXFS_ILOCK_TRACE
+	EXTRA_CFLAGS += -DXFS_LOG_TRACE
+	EXTRA_CFLAGS += -DXFS_RW_TRACE
+	EXTRA_CFLAGS += -DPAGEBUF_TRACE
+	# EXTRA_CFLAGS += -DXFS_VNODE_TRACE
 endif
 
 obj-$(CONFIG_XFS_FS)		+= xfs.o
@@ -80,7 +91,6 @@ xfs-y				+= xfs_alloc.o \
 				   xfs_dir2_leaf.o \
 				   xfs_dir2_node.o \
 				   xfs_dir2_sf.o \
-				   xfs_dir2_trace.o \
 				   xfs_dir_leaf.o \
 				   xfs_error.o \
 				   xfs_extfree_item.o \
@@ -108,6 +118,8 @@ xfs-y				+= xfs_alloc.o \
 				   xfs_vfsops.o \
 				   xfs_vnodeops.o \
 				   xfs_rw.o
+
+xfs-$(CONFIG_XFS_TRACE)		+= xfs_dir2_trace.o
 
 # Objects in pagebuf/
 xfs-y				+= $(addprefix pagebuf/, \
