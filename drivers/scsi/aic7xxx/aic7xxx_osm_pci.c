@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_linux_pci.c#27 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm_pci.c#37 $
  */
 
 #include "aic7xxx_osm.h"
@@ -71,6 +71,7 @@ static struct pci_device_id ahc_linux_pci_id_table[] = {
 	},
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, ahc_linux_pci_id_table);
 
 struct pci_driver aic7xxx_pci_driver = {
@@ -84,20 +85,24 @@ static void
 ahc_linux_pci_dev_remove(struct pci_dev *pdev)
 {
 	struct ahc_softc *ahc;
-	struct ahc_softc *list_ahc;
+	u_long l;
 
 	/*
 	 * We should be able to just perform
 	 * the free directly, but check our
 	 * list for extra sanity.
 	 */
-	ahc = pci_get_drvdata(pdev);
-	TAILQ_FOREACH(list_ahc, &ahc_tailq, links) {
-		if (list_ahc == ahc) {
-			ahc_free(ahc);
-			break;
-		}
+	ahc_list_lock(&l);
+	ahc = ahc_find_softc((struct ahc_softc *)pdev->driver_data);
+	if (ahc != NULL) {
+		u_long s;
+
+		ahc_lock(ahc, &s);
+		ahc_intr_enable(ahc, FALSE);
+		ahc_unlock(ahc, &s);
+		ahc_free(ahc);
 	}
+	ahc_list_unlock(&l);
 }
 #endif /* !LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0) */
 
@@ -156,22 +161,14 @@ ahc_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	pci_set_master(pdev);
 
 	if (sizeof(bus_addr_t) > 4
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,3)
 	 && ahc_linux_get_memsize() > 0x80000000
-	 && pci_set_dma_mask(pdev, 0x7FFFFFFFFFULL) == 0) {
-#else
-	 && ahc_linux_get_memsize() > 0x80000000) {
-
-		ahc->dev_softc->dma_mask = 
-		    (bus_addr_t)(0x7FFFFFFFFFULL & (bus_addr_t)~0);
-#endif
+	 && ahc_pci_set_dma_mask(pdev, 0x7FFFFFFFFFULL) == 0) {
 		ahc->flags |= AHC_39BIT_ADDRESSING;
 		ahc->platform_data->hw_dma_mask =
 		    (bus_addr_t)(0x7FFFFFFFFFULL & (bus_addr_t)~0);
 	}
 #endif
 	ahc->dev_softc = pci;
-	ahc->platform_data->irq = pdev->irq;
 	error = ahc_pci_config(ahc, entry);
 	if (error != 0) {
 		ahc_free(ahc);
@@ -218,13 +215,16 @@ ahc_linux_pci_probe(Scsi_Host_Template *template)
 static int
 ahc_linux_pci_reserve_io_region(struct ahc_softc *ahc, u_long *base)
 {
+	if (aic7xxx_allow_memio == 0)
+		return (ENOMEM);
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
 	*base = pci_resource_start(ahc->dev_softc, 0);
 #else
 	*base = ahc_pci_read_config(ahc->dev_softc, PCIR_MAPS, 4);
 	*base &= PCI_BASE_ADDRESS_IO_MASK;
 #endif
-	if (base == 0)
+	if (*base == 0)
 		return (ENOMEM);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
 	if (check_region(*base, 256) != 0)
@@ -268,9 +268,12 @@ ahc_linux_pci_reserve_mem_region(struct ahc_softc *ahc,
 #endif
 		if (error == 0) {
 			*maddr = ioremap_nocache(base_page, base_offset + 256);
-			if (*maddr == NULL)
+			if (*maddr == NULL) {
 				error = ENOMEM;
-			else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
+				release_mem_region(start, 0x1000);
+#endif
+			} else
 				*maddr += base_offset;
 		}
 	} else
@@ -286,11 +289,9 @@ ahc_pci_map_registers(struct ahc_softc *ahc)
 	u_long	 base;
 	uint8_t	*maddr;
 	int	 error;
-	int	 io_error;
 
 	/*
-	 * We always reserve both our register spaces to avoid
-	 * other devices claiming them.
+	 * If its allowed, we prefer memory mapped access.
 	 */
 	command = ahc_pci_read_config(ahc->dev_softc, PCIR_COMMAND, 4);
 	command &= ~(PCIM_CMD_PORTEN|PCIM_CMD_MEMEN);
@@ -316,39 +317,42 @@ ahc_pci_map_registers(struct ahc_softc *ahc)
 			       ahc_get_pci_bus(ahc->dev_softc),
 			       ahc_get_pci_slot(ahc->dev_softc),
 			       ahc_get_pci_function(ahc->dev_softc));
+			iounmap((void *)((u_long)maddr & PAGE_MASK));
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
+			release_mem_region(ahc->platform_data->mem_busaddr,
+					   0x1000);
+#endif
+			ahc->bsh.maddr = NULL;
 			maddr = NULL;
 		} else
 			command |= PCIM_CMD_MEMEN;
 	} else {
 		printf("aic7xxx: PCI%d:%d:%d MEM region 0x%lx "
-		       "unavailable. Cannot map device.\n",
+		       "unavailable. Cannot memory map device.\n",
 		       ahc_get_pci_bus(ahc->dev_softc),
 		       ahc_get_pci_slot(ahc->dev_softc),
 		       ahc_get_pci_function(ahc->dev_softc),
 		       base);
 	}
-#endif
+#endif /* MMAPIO */
 
 	/*
-	 * We always prefer memory mapped access.  Only
-	 * complain about our ioport conflicting with
-	 * another device if we are going to use it.
+	 * We always prefer memory mapped access.
 	 */
-	io_error = ahc_linux_pci_reserve_io_region(ahc, &base);
 	if (maddr == NULL) {
-		error = io_error;
-		if (error != 0) {
+
+		error = ahc_linux_pci_reserve_io_region(ahc, &base);
+		if (error == 0) {
+			ahc->tag = BUS_SPACE_PIO;
+			ahc->bsh.ioport = base;
+			command |= PCIM_CMD_PORTEN;
+		} else {
 			printf("aic7xxx: PCI%d:%d:%d IO region 0x%lx[0..255] "
 			       "unavailable. Cannot map device.\n",
 			       ahc_get_pci_bus(ahc->dev_softc),
 			       ahc_get_pci_slot(ahc->dev_softc),
 			       ahc_get_pci_function(ahc->dev_softc),
 			       base);
-			base = 0;
-		} else {
-			ahc->tag = BUS_SPACE_PIO;
-			ahc->bsh.ioport = base;
-			command |= PCIM_CMD_PORTEN;
 		}
 	}
 	ahc_pci_write_config(ahc->dev_softc, PCIR_COMMAND, command, 4);
@@ -360,9 +364,10 @@ ahc_pci_map_int(struct ahc_softc *ahc)
 {
 	int error;
 
-	ahc->platform_data->irq = ahc->dev_softc->irq;
-	error = request_irq(ahc->platform_data->irq, ahc_linux_isr,
+	error = request_irq(ahc->dev_softc->irq, ahc_linux_isr,
 			    SA_SHIRQ, "aic7xxx", ahc);
+	if (error == 0)
+		ahc->platform_data->irq = ahc->dev_softc->irq;
 	
 	return (-error);
 }
