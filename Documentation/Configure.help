@@ -14619,6 +14619,14 @@ CONFIG_ISDN_PPP_VJ
   This enables Van Jacobson header compression for synchronous PPP.
   Say Y if the other end of the connection supports it.
 
+CONFIG_ISDN_PPP_BSDCOMP
+  Support for the BSD-Compress compression method for PPP, which uses
+  the LZW compression method to compress each PPP packet before it is
+  sent over the wire. The machine at the other end of the PPP link
+  (usually your ISP) has to support the BSD-Compress compression
+  method as well for this to be useful. Even if they don't support it,
+  it is safe to say Y here.
+
 Support audio via ISDN
 CONFIG_ISDN_AUDIO
   If you say Y here, the modem-emulator will support a subset of the

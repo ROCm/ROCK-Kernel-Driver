@@ -1131,9 +1131,9 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 			proto = PPP_IPX;	/* untested */
 			break;
 		default:
-			dev_kfree_skb(skb);
 			printk(KERN_ERR "isdn_ppp: skipped unsupported protocol: %#x.\n", 
 			       skb->protocol);
+			dev_kfree_skb(skb);
 			return 0;
 	}
 

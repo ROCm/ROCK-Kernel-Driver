@@ -407,6 +407,7 @@ static int exec_mmap(void)
 		/* Add it to the list of mm's */
 		spin_lock(&mmlist_lock);
 		list_add(&mm->mmlist, &init_mm.mmlist);
+		mmlist_nr++;
 		spin_unlock(&mmlist_lock);
 
 		task_lock(current);

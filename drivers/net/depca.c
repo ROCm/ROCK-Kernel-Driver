@@ -1817,7 +1817,9 @@ EISA_signature(char *name, s32 eisa_id)
   ManCode[5]='\0';
 
   for (i=0;(*signatures[i] != '\0') && (*name == '\0');i++) {
-    if (strstr(ManCode, signatures[i]) != NULL) {
+    const char * volatile lhs = ManCode;
+    const char * volatile rhs = signatures[i];		/* egcs-1.1.2 bug */
+    if (strstr(lhs, rhs) != NULL) {
       strcpy(name,ManCode);
       status = 1;
     }

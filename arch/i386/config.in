@@ -33,7 +33,7 @@ choice 'Processor family' \
 	 Pentium-Classic		CONFIG_M586TSC \
 	 Pentium-MMX			CONFIG_M586MMX \
 	 Pentium-Pro/Celeron/Pentium-II	CONFIG_M686 \
-	 Pentium-III			CONFIG_M686FXSR \
+	 Pentium-III			CONFIG_MPENTIUMIII \
 	 Pentium-4			CONFIG_MPENTIUM4 \
 	 K6/K6-II/K6-III		CONFIG_MK6 \
 	 Athlon/K7			CONFIG_MK7 \
@@ -44,8 +44,6 @@ choice 'Processor family' \
 #
 # Define implied options from the CPU selection here
 #
-
-unset CONFIG_X86_FXSR
 
 if [ "$CONFIG_M386" = "y" ]; then
    define_bool CONFIG_X86_CMPXCHG n
@@ -87,14 +85,12 @@ if [ "$CONFIG_M686" = "y" ]; then
    define_bool CONFIG_X86_PGE y
    define_bool CONFIG_X86_USE_PPRO_CHECKSUM y
 fi
-if [ "$CONFIG_M686FXSR" = "y" ]; then
+if [ "$CONFIG_MPENTIUMIII" = "y" ]; then
    define_int  CONFIG_X86_L1_CACHE_SHIFT 5
    define_bool CONFIG_X86_TSC y
    define_bool CONFIG_X86_GOOD_APIC y
    define_bool CONFIG_X86_PGE y
    define_bool CONFIG_X86_USE_PPRO_CHECKSUM y
-   define_bool CONFIG_X86_FXSR y
-   define_bool CONFIG_X86_XMM y
 fi
 if [ "$CONFIG_MPENTIUM4" = "y" ]; then
    define_int  CONFIG_X86_L1_CACHE_SHIFT 7
@@ -102,8 +98,6 @@ if [ "$CONFIG_MPENTIUM4" = "y" ]; then
    define_bool CONFIG_X86_GOOD_APIC y
    define_bool CONFIG_X86_PGE y
    define_bool CONFIG_X86_USE_PPRO_CHECKSUM y
-   define_bool CONFIG_X86_FXSR y
-   define_bool CONFIG_X86_XMM y
 fi
 if [ "$CONFIG_MK6" = "y" ]; then
    define_int  CONFIG_X86_L1_CACHE_SHIFT 5
@@ -158,9 +152,7 @@ if [ "$CONFIG_HIGHMEM64G" = "y" ]; then
    define_bool CONFIG_X86_PAE y
 fi
 
-if [ "$CONFIG_X86_FXSR" != "y" ]; then
-   bool 'Math emulation' CONFIG_MATH_EMULATION
-fi
+bool 'Math emulation' CONFIG_MATH_EMULATION
 bool 'MTRR (Memory Type Range Register) support' CONFIG_MTRR
 bool 'Symmetric multi-processing support' CONFIG_SMP
 if [ "$CONFIG_SMP" != "y" ]; then

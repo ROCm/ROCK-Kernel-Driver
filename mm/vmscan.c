@@ -35,7 +35,7 @@
  * using a process that no longer actually exists (it might
  * have died while we slept).
  */
-static int try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* vma, unsigned long address, pte_t * page_table, int gfp_mask)
+static int try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* vma, unsigned long address, pte_t * page_table)
 {
 	pte_t pte;
 	swp_entry_t entry;
@@ -170,7 +170,7 @@ out_unlock_restore:
  * (C) 1993 Kai Petzke, wpp@marie.physik.tu-berlin.de
  */
 
-static inline int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vma, pmd_t *dir, unsigned long address, unsigned long end, int gfp_mask)
+static inline int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vma, pmd_t *dir, unsigned long address, unsigned long end)
 {
 	pte_t * pte;
 	unsigned long pmd_end;
@@ -192,7 +192,7 @@ static inline int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vm
 	do {
 		int result;
 		mm->swap_address = address + PAGE_SIZE;
-		result = try_to_swap_out(mm, vma, address, pte, gfp_mask);
+		result = try_to_swap_out(mm, vma, address, pte);
 		if (result)
 			return result;
 		address += PAGE_SIZE;
@@ -201,7 +201,7 @@ static inline int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vm
 	return 0;
 }
 
-static inline int swap_out_pgd(struct mm_struct * mm, struct vm_area_struct * vma, pgd_t *dir, unsigned long address, unsigned long end, int gfp_mask)
+static inline int swap_out_pgd(struct mm_struct * mm, struct vm_area_struct * vma, pgd_t *dir, unsigned long address, unsigned long end)
 {
 	pmd_t * pmd;
 	unsigned long pgd_end;
@@ -221,7 +221,7 @@ static inline int swap_out_pgd(struct mm_struct * mm, struct vm_area_struct * vm
 		end = pgd_end;
 	
 	do {
-		int result = swap_out_pmd(mm, vma, pmd, address, end, gfp_mask);
+		int result = swap_out_pmd(mm, vma, pmd, address, end);
 		if (result)
 			return result;
 		address = (address + PMD_SIZE) & PMD_MASK;
@@ -230,7 +230,7 @@ static inline int swap_out_pgd(struct mm_struct * mm, struct vm_area_struct * vm
 	return 0;
 }
 
-static int swap_out_vma(struct mm_struct * mm, struct vm_area_struct * vma, unsigned long address, int gfp_mask)
+static int swap_out_vma(struct mm_struct * mm, struct vm_area_struct * vma, unsigned long address)
 {
 	pgd_t *pgdir;
 	unsigned long end;
@@ -245,7 +245,7 @@ static int swap_out_vma(struct mm_struct * mm, struct vm_area_struct * vma, unsi
 	if (address >= end)
 		BUG();
 	do {
-		int result = swap_out_pgd(mm, vma, pgdir, address, end, gfp_mask);
+		int result = swap_out_pgd(mm, vma, pgdir, address, end);
 		if (result)
 			return result;
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
@@ -254,7 +254,7 @@ static int swap_out_vma(struct mm_struct * mm, struct vm_area_struct * vma, unsi
 	return 0;
 }
 
-static int swap_out_mm(struct mm_struct * mm, int gfp_mask)
+static int swap_out_mm(struct mm_struct * mm)
 {
 	int result = 0;
 	unsigned long address;
@@ -270,13 +270,14 @@ static int swap_out_mm(struct mm_struct * mm, int gfp_mask)
 	 */
 	spin_lock(&mm->page_table_lock);
 	address = mm->swap_address;
+	mm->swap_cnt = mm->rss >> 4;
 	vma = find_vma(mm, address);
 	if (vma) {
 		if (address < vma->vm_start)
 			address = vma->vm_start;
 
 		for (;;) {
-			result = swap_out_vma(mm, vma, address, gfp_mask);
+			result = swap_out_vma(mm, vma, address);
 			if (result)
 				goto out_unlock;
 			vma = vma->vm_next;
@@ -305,76 +306,35 @@ out_unlock:
 static int swap_out(unsigned int priority, int gfp_mask)
 {
 	int counter;
-	int __ret = 0;
+	int retval = 0;
 
-	/* 
-	 * We make one or two passes through the task list, indexed by 
-	 * assign = {0, 1}:
-	 *   Pass 1: select the swappable task with maximal RSS that has
-	 *         not yet been swapped out. 
-	 *   Pass 2: re-assign rss swap_cnt values, then select as above.
-	 *
-	 * With this approach, there's no need to remember the last task
-	 * swapped out.  If the swap-out fails, we clear swap_cnt so the 
-	 * task won't be selected again until all others have been tried.
-	 *
-	 * Think of swap_cnt as a "shadow rss" - it tells us which process
-	 * we want to page out (always try largest first).
-	 */
-	counter = (nr_threads << SWAP_SHIFT) >> priority;
-	if (counter < 1)
-		counter = 1;
-
-	for (; counter >= 0; counter--) {
+	counter = mmlist_nr >> priority;
+	do {
 		struct list_head *p;
-		unsigned long max_cnt = 0;
-		struct mm_struct *best = NULL;
-		int assign = 0;
-		int found_task = 0;
-	select:
+		struct mm_struct *mm;
+
 		spin_lock(&mmlist_lock);
 		p = init_mm.mmlist.next;
-		for (; p != &init_mm.mmlist; p = p->next) {
-			struct mm_struct *mm = list_entry(p, struct mm_struct, mmlist);
-	 		if (mm->rss <= 0)
-				continue;
-			found_task++;
-			/* Refresh swap_cnt? */
-			if (assign == 1) {
-				mm->swap_cnt = (mm->rss >> SWAP_SHIFT);
-				if (mm->swap_cnt < SWAP_MIN)
-					mm->swap_cnt = SWAP_MIN;
-			}
-			if (mm->swap_cnt > max_cnt) {
-				max_cnt = mm->swap_cnt;
-				best = mm;
-			}
-		}
+		if (p == &init_mm.mmlist)
+			goto empty;
 
-		/* Make sure it doesn't disappear */
-		if (best)
-			atomic_inc(&best->mm_users);
+		/* Move it to the back of the queue.. */
+		list_del(p);
+		list_add_tail(p, &init_mm.mmlist);
+		mm = list_entry(p, struct mm_struct, mmlist);
+
+		/* Make sure the mm doesn't disappear when we drop the lock.. */
+		atomic_inc(&mm->mm_users);
 		spin_unlock(&mmlist_lock);
 
-		/*
-		 * We have dropped the tasklist_lock, but we
-		 * know that "mm" still exists: we are running
-		 * with the big kernel lock, and exit_mm()
-		 * cannot race with us.
-		 */
-		if (!best) {
-			if (!assign && found_task > 0) {
-				assign = 1;
-				goto select;
-			}
-			break;
-		} else {
-			__ret = swap_out_mm(best, gfp_mask);
-			mmput(best);
-			break;
-		}
-	}
-	return __ret;
+		retval |= swap_out_mm(mm);
+		mmput(mm);
+	} while (--counter >= 0);
+	return retval;
+
+empty:
+	spin_lock(&mmlist_lock);
+	return 0;
 }
 
 
@@ -808,6 +768,9 @@ int free_shortage(void)
 int inactive_shortage(void)
 {
 	int shortage = 0;
+	pg_data_t *pgdat = pgdat_list;
+
+	/* Is the inactive dirty list too small? */
 
 	shortage += freepages.high;
 	shortage += inactive_target;
@@ -818,7 +781,27 @@ int inactive_shortage(void)
 	if (shortage > 0)
 		return shortage;
 
-	return 0;
+	/* If not, do we have enough per-zone pages on the inactive list? */
+
+	shortage = 0;
+
+	do {
+		int i;
+		for(i = 0; i < MAX_NR_ZONES; i++) {
+			int zone_shortage;
+			zone_t *zone = pgdat->node_zones+ i;
+
+			zone_shortage = zone->pages_high;
+			zone_shortage -= zone->inactive_dirty_pages;
+			zone_shortage -= zone->inactive_clean_pages;
+			zone_shortage -= zone->free_pages;
+			if (zone_shortage > 0)
+				shortage += zone_shortage;
+		}
+		pgdat = pgdat->node_next;
+	} while (pgdat);
+
+	return shortage;
 }
 
 /*
@@ -835,7 +818,7 @@ int inactive_shortage(void)
  */
 static int refill_inactive(unsigned int gfp_mask, int user)
 {
-	int priority, count, start_count, made_progress;
+	int priority, count, start_count;
 
 	count = inactive_shortage() + free_shortage();
 	if (user)
@@ -847,58 +830,19 @@ static int refill_inactive(unsigned int gfp_mask, int user)
 
 	priority = 6;
 	do {
-		made_progress = 0;
-
 		if (current->need_resched) {
 			__set_current_state(TASK_RUNNING);
 			schedule();
 		}
 
 		while (refill_inactive_scan(priority, 1)) {
-			made_progress = 1;
 			if (--count <= 0)
 				goto done;
 		}
 
-		/*
-		 * don't be too light against the d/i cache since
-	   	 * refill_inactive() almost never fail when there's
-	   	 * really plenty of memory free. 
-		 */
-		shrink_dcache_memory(priority, gfp_mask);
-		shrink_icache_memory(priority, gfp_mask);
-
-		/*
-		 * Then, try to page stuff out..
-		 */
-		while (swap_out(priority, gfp_mask)) {
-			made_progress = 1;
-			if (--count <= 0)
-				goto done;
-		}
-
-		/*
-		 * If we either have enough free memory, or if
-		 * page_launder() will be able to make enough
-		 * free memory, then stop.
-		 */
-		if (!inactive_shortage() || !free_shortage())
-			goto done;
-
-		/*
-		 * Only switch to a lower "priority" if we
-		 * didn't make any useful progress in the
-		 * last loop.
-		 */
-		if (!made_progress)
-			priority--;
-	} while (priority >= 0);
-
-	/* Always end on a refill_inactive.., may sleep... */
-	while (refill_inactive_scan(0, 1)) {
-		if (--count <= 0)
-			goto done;
-	}
+		/* If refill_inactive_scan failed, try to page stuff out.. */
+		swap_out(priority, gfp_mask);
+	} while (!inactive_shortage());
 
 done:
 	return (count < start_count);
@@ -922,14 +866,20 @@ static int do_try_to_free_pages(unsigned int gfp_mask, int user)
 
 	/*
 	 * If needed, we move pages from the active list
-	 * to the inactive list. We also "eat" pages from
-	 * the inode and dentry cache whenever we do this.
+	 * to the inactive list.
 	 */
-	if (free_shortage() || inactive_shortage()) {
+	if (inactive_shortage())
+		ret += refill_inactive(gfp_mask, user);
+
+	/* 	
+	 * Delete pages from the inode and dentry cache 
+	 * if memory is low. 
+	 */
+	if (free_shortage()) {
 		shrink_dcache_memory(6, gfp_mask);
 		shrink_icache_memory(6, gfp_mask);
-		ret += refill_inactive(gfp_mask, user);
-	} else {
+	} else { 
+
 		/*
 		 * Reclaim unused slab cache memory.
 		 */

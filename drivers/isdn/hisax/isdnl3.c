@@ -566,7 +566,7 @@ l3_msg(struct PStack *st, int pr, void *arg)
 			} else {
 				struct sk_buff *skb = arg;
 
-				skb_queue_head(&st->l3.squeue, skb);
+				skb_queue_tail(&st->l3.squeue, skb);
 				FsmEvent(&st->l3.l3m, EV_ESTABLISH_REQ, NULL); 
 			}
 			break;

@@ -56,7 +56,7 @@ o  modutils               2.4.0                   # insmod -V
 o  e2fsprogs              1.19                    # tune2fs --version
 o  pcmcia-cs              3.1.21                  # cardmgr -V
 o  PPP                    2.4.0                   # pppd --version
-o  isdn4k-utils           3.1beta7                # isdnctrl 2>&1|grep version
+o  isdn4k-utils           3.1pre1                 # isdnctrl 2>&1|grep version
 			  
 Kernel compilation
 ==================

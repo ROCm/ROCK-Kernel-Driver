@@ -81,6 +81,7 @@ static int ramfs_readpage(struct file *file, struct page * page)
 static int ramfs_writepage(struct page *page)
 {
 	SetPageDirty(page);
+	UnlockPage(page);
 	return 0;
 }
 

@@ -1,8 +1,0 @@
--bad 
--bap 
--nfca
--bl 
--psl 
--di16
--lp
--ip5

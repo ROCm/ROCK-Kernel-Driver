@@ -2325,6 +2325,7 @@ isdn_net_new(char *name, struct net_device *master)
 	memset(netdev, 0, sizeof(isdn_net_dev));
 	if (!(netdev->local = (isdn_net_local *) kmalloc(sizeof(isdn_net_local), GFP_KERNEL))) {
 		printk(KERN_WARNING "isdn_net: Could not allocate device locals\n");
+		kfree(netdev);
 		return NULL;
 	}
 	memset(netdev->local, 0, sizeof(isdn_net_local));

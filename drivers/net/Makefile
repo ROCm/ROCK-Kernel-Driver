@@ -26,7 +26,7 @@ ifeq ($(CONFIG_ISDN_PPP),y)
   obj-$(CONFIG_ISDN) += slhc.o
 endif
 
-subdir-$(CONFIG_PCMCIA) += pcmcia
+subdir-$(CONFIG_NET_PCMCIA) += pcmcia
 subdir-$(CONFIG_TULIP) += tulip
 subdir-$(CONFIG_IRDA) += irda
 subdir-$(CONFIG_TR) += tokenring

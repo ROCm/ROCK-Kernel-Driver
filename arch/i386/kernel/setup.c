@@ -147,6 +147,7 @@ extern char _text, _etext, _edata, _end;
 extern unsigned long cpu_khz;
 
 static int disable_x86_serial_nr __initdata = 1;
+int disable_x86_fxsr __initdata = 0;
 
 /*
  * This is set up by the setup-routine at boot-time
@@ -518,7 +519,7 @@ void __init setup_memory_region(void)
 
 		e820.nr_map = 0;
 		add_memory_region(0, LOWMEMSIZE(), E820_RAM);
-		add_memory_region(HIGH_MEMORY, (mem_size << 10) - HIGH_MEMORY, E820_RAM);
+		add_memory_region(HIGH_MEMORY, mem_size << 10, E820_RAM);
   	}
 	printk("BIOS-provided physical RAM map:\n");
 	print_memory_map(who);
@@ -1795,6 +1796,13 @@ int __init x86_serial_nr_setup(char *s)
 	return 1;
 }
 __setup("serialnumber", x86_serial_nr_setup);
+
+int __init x86_fxsr_setup(char * s)
+{
+	disable_x86_fxsr = 1;
+	return 1;
+}
+__setup("nofxsr", x86_fxsr_setup);
 
 
 /* Standard macro to see if a specific flag is changeable */

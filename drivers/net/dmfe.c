@@ -1596,10 +1596,10 @@ static int __init dmfe_init_module(void)
 		break;
 	}
 
-	rc = pci_register_driver(&dmfe_driver);
+	rc = pci_module_init(&dmfe_driver);
 	if (rc < 0)
 		return rc;
-	if (rc > 0) {
+	if (rc >= 0) {
 		printk (KERN_INFO "Davicom DM91xx net driver loaded, version "
 			DMFE_VERSION "\n");
 		return 0;

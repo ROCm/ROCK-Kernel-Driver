@@ -1151,7 +1151,7 @@ void __bforget(struct buffer_head * buf)
 	/* grab the lru lock here to block bdflush. */
 	spin_lock(&lru_list_lock);
 	write_lock(&hash_table_lock);
-	if (!atomic_dec_and_test(&buf->b_count) || buffer_locked(buf))
+	if (!atomic_dec_and_test(&buf->b_count) || buffer_locked(buf) || buffer_protected(buf))
 		goto in_use;
 	__hash_unlink(buf);
 	remove_inode_queue(buf);

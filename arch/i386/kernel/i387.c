@@ -18,14 +18,6 @@
 #include <asm/ptrace.h>
 #include <asm/uaccess.h>
 
-#if defined(CONFIG_X86_FXSR)
-#define HAVE_FXSR 1
-#elif defined(CONFIG_X86_RUNTIME_FXSR)
-#define HAVE_FXSR (cpu_has_fxsr)
-#else
-#define HAVE_FXSR 0
-#endif
-
 #ifdef CONFIG_MATH_EMULATION
 #define HAVE_HWFP (boot_cpu_data.hard_math)
 #else
@@ -35,13 +27,13 @@
 /*
  * The _current_ task is using the FPU for the first time
  * so initialize it and set the mxcsr to its default
- * value at reset if we support FXSR and then
+ * value at reset if we support XMM instructions and then
  * remeber the current task has used the FPU.
  */
 void init_fpu(void)
 {
 	__asm__("fninit");
-	if ( HAVE_FXSR )
+	if ( HAVE_XMM )
 		load_mxcsr(0x1f80);
 		
 	current->used_math = 1;
@@ -207,7 +199,7 @@ void set_fpu_twd( struct task_struct *tsk, unsigned short twd )
 
 void set_fpu_mxcsr( struct task_struct *tsk, unsigned short mxcsr )
 {
-	if ( HAVE_FXSR ) {
+	if ( HAVE_XMM ) {
 		tsk->thread.i387.fxsave.mxcsr = mxcsr;
 	}
 }
@@ -429,8 +421,9 @@ int set_fpregs( struct task_struct *tsk, struct user_i387_struct *buf )
 int get_fpxregs( struct user_fxsr_struct *buf, struct task_struct *tsk )
 {
 	if ( HAVE_FXSR ) {
-		__copy_to_user( (void *)buf, &tsk->thread.i387.fxsave,
-				sizeof(struct user_fxsr_struct) );
+		if (__copy_to_user( (void *)buf, &tsk->thread.i387.fxsave,
+				    sizeof(struct user_fxsr_struct) ))
+			return -EFAULT;
 		return 0;
 	} else {
 		return -EIO;

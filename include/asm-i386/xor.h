@@ -843,7 +843,7 @@ static struct xor_block_template xor_block_pIII_sse = {
 	do {						\
 		xor_speed(&xor_block_8regs);		\
 		xor_speed(&xor_block_32regs);		\
-	        if (cpu_has_xmm)			\
+	        if (HAVE_XMM)				\
 			xor_speed(&xor_block_pIII_sse);	\
 	        if (md_cpu_has_mmx()) {			\
 	                xor_speed(&xor_block_pII_mmx);	\
@@ -855,4 +855,4 @@ static struct xor_block_template xor_block_pIII_sse = {
    We may also be able to load into the L1 only depending on how the cpu
    deals with a load to a line that is being prefetched.  */
 #define XOR_SELECT_TEMPLATE(FASTEST) \
-	(cpu_has_xmm ? &xor_block_pIII_sse : FASTEST)
+	(HAVE_XMM ? &xor_block_pIII_sse : FASTEST)

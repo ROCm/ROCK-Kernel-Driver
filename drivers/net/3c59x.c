@@ -118,6 +118,14 @@
    LK1.1.11 13 Nov 2000 andrewm
     - Dump MOD_INC/DEC_USE_COUNT, use SET_MODULE_OWNER
 
+   LK1.1.12 1 Jan 2001 andrewm
+    - Call pci_enable_device before we request our IRQ (Tobias Ringstrom)
+    - Add 3c590 PCI latency timer hack to vortex_probe1 (from 0.99Ra)
+    - Added extended wait_for_completion for the 3c905CX.
+    - Look for an MII on PHY index 24 first (3c905CX oddity).
+    - Add HAS_NWAY to 3cSOHO100-TX (Brett Frankenberger)
+    - Don't free skbs we don't own on oom path in vortex_open().
+
     - See http://www.uow.edu.au/~andrewm/linux/#3c59x-2.3 for more details.
     - Also see Documentation/networking/vortex.txt
 */
@@ -203,7 +211,7 @@ static int rx_nocopy = 0, rx_copy = 0, queued_packet = 0, rx_csumhits;
 #include <linux/delay.h>
 
 static char version[] __devinitdata =
-"3c59x.c:LK1.1.11 13 Nov 2000  Donald Becker and others. http://www.scyld.com/network/vortex.html " "$Revision: 1.102.2.46 $\n";
+"3c59x.c:LK1.1.12 06 Jan 2000  Donald Becker and others. http://www.scyld.com/network/vortex.html " "$Revision: 1.102.2.46 $\n";
 
 MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("3Com 3c59x/3c90x/3c575 series Vortex/Boomerang/Cyclone driver");
@@ -424,7 +432,7 @@ static struct vortex_chip_info {
 	 PCI_USES_IO|PCI_USES_MASTER, IS_CYCLONE, 128, },
 
 	{"3cSOHO100-TX Hurricane",
-	 PCI_USES_IO|PCI_USES_MASTER, IS_CYCLONE, 128, },
+	 PCI_USES_IO|PCI_USES_MASTER, IS_CYCLONE|HAS_NWAY, 128, },
 	{"3c555 Laptop Hurricane",
 	 PCI_USES_IO|PCI_USES_MASTER, IS_CYCLONE|EEPROM_8BIT, 128, },
 	{"3c556 Laptop Tornado",
@@ -843,10 +851,15 @@ static int __devinit vortex_init_one (struct pci_dev *pdev,
 {
 	int rc;
 
-	rc = vortex_probe1 (pdev, pci_resource_start (pdev, 0), pdev->irq,
-			    ent->driver_data, vortex_cards_found);
-	if (rc == 0)
-		vortex_cards_found++;
+	/* wake up and enable device */		
+	if (pci_enable_device (pdev)) {
+		rc = -EIO;
+	} else {
+		rc = vortex_probe1 (pdev, pci_resource_start (pdev, 0), pdev->irq,
+				    ent->driver_data, vortex_cards_found);
+		if (rc == 0)
+			vortex_cards_found++;
+	}
 	return rc;
 }
 
@@ -863,7 +876,7 @@ static int __devinit vortex_probe1(struct pci_dev *pdev,
 	struct vortex_private *vp;
 	int option;
 	unsigned int eeprom[0x40], checksum = 0;		/* EEPROM contents */
-	int i;
+	int i, step;
 	struct net_device *dev;
 	static int printed_version;
 	int retval;
@@ -889,7 +902,6 @@ static int __devinit vortex_probe1(struct pci_dev *pdev,
 	       vci->name,
 	       ioaddr);
 
-	/* private struct aligned and zeroed by init_etherdev */
 	vp = dev->priv;
 	dev->base_addr = ioaddr;
 	dev->irq = irq;
@@ -908,19 +920,29 @@ static int __devinit vortex_probe1(struct pci_dev *pdev,
 	if (pdev) {
 		/* EISA resources already marked, so only PCI needs to do this here */
 		/* Ignore return value, because Cardbus drivers already allocate for us */
-		if (request_region(ioaddr, vci->io_size, dev->name) != NULL) {
+		if (request_region(ioaddr, vci->io_size, dev->name) != NULL)
 			vp->must_free_region = 1;
-		}
-
-		/* wake up and enable device */		
-		if (pci_enable_device (pdev)) {
-			retval = -EIO;
-			goto free_region;
-		}
 
 		/* enable bus-mastering if necessary */		
 		if (vci->flags & PCI_USES_MASTER)
 			pci_set_master (pdev);
+
+		if (vci->drv_flags & IS_VORTEX) {
+			u8 pci_latency;
+			u8 new_latency = 248;
+
+			/* Check the PCI latency value.  On the 3c590 series the latency timer
+			   must be set to the maximum value to avoid data corruption that occurs
+			   when the timer expires during a transfer.  This bug exists the Vortex
+			   chip only. */
+			pci_read_config_byte(pdev, PCI_LATENCY_TIMER, &pci_latency);
+			if (pci_latency < new_latency) {
+				printk(KERN_INFO "%s: Overriding PCI latency"
+					" timer (CFLT) setting of %d, new value is %d.\n",
+					dev->name, pci_latency, new_latency);
+					pci_write_config_byte(pdev, PCI_LATENCY_TIMER, new_latency);
+			}
+		}
 	}
 
 	spin_lock_init(&vp->lock);
@@ -1025,6 +1047,13 @@ static int __devinit vortex_probe1(struct pci_dev *pdev,
 			   dev->irq);
 #endif
 
+	EL3WINDOW(4);
+	step = (inb(ioaddr + Wn4_NetDiag) & 0x1e) >> 1;
+	printk(KERN_INFO "  product code '%c%c' rev %02x.%d date %02d-"
+		   "%02d-%02d\n", eeprom[6]&0xff, eeprom[6]>>8, eeprom[0x14],
+		   step, (eeprom[4]>>5) & 15, eeprom[4] & 31, eeprom[4]>>9);
+
+
 	if (pdev && vci->drv_flags & HAS_CB_FNS) {
 		unsigned long fn_st_addr;			/* Cardbus function status space */
 		unsigned short n;
@@ -1089,8 +1118,19 @@ static int __devinit vortex_probe1(struct pci_dev *pdev,
 		mii_preamble_required++;
 		mii_preamble_required++;
 		mdio_read(dev, 24, 1);
-		for (phy = 1; phy <= 32 && phy_idx < sizeof(vp->phys); phy++) {
-			int mii_status, phyx = phy & 0x1f;
+		for (phy = 0; phy < 32 && phy_idx < 1; phy++) {
+			int mii_status, phyx;
+
+			/*
+			 * For the 3c905CX we look at index 24 first, because it bogusly
+			 * reports an external PHY at all indices
+			 */
+			if (phy == 0)
+				phyx = 24;
+			else if (phy <= 24)
+				phyx = phy - 1;
+			else
+				phyx = phy;
 			mii_status = mdio_read(dev, phyx, 1);
 			if (mii_status  &&  mii_status != 0xffff) {
 				vp->phys[phy_idx++] = phyx;
@@ -1135,12 +1175,13 @@ static int __devinit vortex_probe1(struct pci_dev *pdev,
 	dev->set_multicast_list = set_rx_mode;
 	dev->tx_timeout = vortex_tx_timeout;
 	dev->watchdog_timeo = (watchdog * HZ) / 1000;
-
+//	publish_netdev(dev);
 	return 0;
 
 free_region:
 	if (vp->must_free_region)
 		release_region(ioaddr, vci->io_size);
+//	withdraw_netdev(dev);
 	unregister_netdev(dev);
 	kfree (dev);
 	printk(KERN_ERR PFX "vortex_probe1 fails.  Returns %d\n", retval);
@@ -1150,12 +1191,22 @@ out:
 
 static void wait_for_completion(struct net_device *dev, int cmd)
 {
-	int i = 4000;
+	int i;
 
 	outw(cmd, dev->base_addr + EL3_CMD);
-	while (--i > 0) {
+	for (i = 0; i < 2000; i++) {
 		if (!(inw(dev->base_addr + EL3_STATUS) & CmdInProgress))
 			return;
+	}
+
+	/* OK, that didn't work.  Do it the slow way.  One second */
+	for (i = 0; i < 100000; i++) {
+		if (!(inw(dev->base_addr + EL3_STATUS) & CmdInProgress)) {
+			printk(KERN_INFO "%s: command 0x%04x took %d usecs! Please tell andrewm@uow.edu.au\n",
+					   dev->name, cmd, i * 10);
+			return;
+		}
+		udelay(10);
 	}
 	printk(KERN_ERR "%s: command 0x%04x did not complete! Status=0x%x\n",
 			   dev->name, cmd, inw(dev->base_addr + EL3_STATUS));
@@ -1331,6 +1382,7 @@ vortex_up(struct net_device *dev)
 	set_rx_mode(dev);
 	outw(StatsEnable, ioaddr + EL3_CMD); /* Turn on statistics. */
 
+//	wait_for_completion(dev, SetTxStart|0x07ff);
 	outw(RxEnable, ioaddr + EL3_CMD); /* Enable the receiver. */
 	outw(TxEnable, ioaddr + EL3_CMD); /* Enable transmitter. */
 	/* Allow status bits to be seen. */
@@ -1384,7 +1436,8 @@ vortex_open(struct net_device *dev)
 		}
 		if (i != RX_RING_SIZE) {
 			int j;
-			for (j = 0; j < RX_RING_SIZE; j++) {
+			printk(KERN_EMERG "%s: no memory for rx ring\n", dev->name);
+			for (j = 0; j < i; j++) {
 				if (vp->rx_skbuff[j]) {
 					dev_kfree_skb(vp->rx_skbuff[j]);
 					vp->rx_skbuff[j] = 0;
@@ -1532,7 +1585,10 @@ static void vortex_tx_timeout(struct net_device *dev)
 	printk(KERN_ERR "%s: transmit timed out, tx_status %2.2x status %4.4x.\n",
 		   dev->name, inb(ioaddr + TxStatus),
 		   inw(ioaddr + EL3_STATUS));
-
+	EL3WINDOW(4);
+	printk(KERN_ERR "  diagnostics: net %04x media %04x dma %8.8x.\n",
+		   inw(ioaddr + Wn4_NetDiag), inw(ioaddr + Wn4_Media),
+		   inl(ioaddr + PktStatus));
 	/* Slight code bloat to be user friendly. */
 	if ((inb(ioaddr + TxStatus) & 0x88) == 0x88)
 		printk(KERN_ERR "%s: Transmitter encountered 16 collisions --"
@@ -1663,6 +1719,12 @@ vortex_error(struct net_device *dev, int status)
 			   dev->name, fifo_diag);
 		/* Adapter failure requires Tx/Rx reset and reinit. */
 		if (vp->full_bus_master_tx) {
+			int bus_status = inl(ioaddr + PktStatus);
+			/* 0x80000000 PCI master abort. */
+			/* 0x40000000 PCI target abort. */
+			if (vortex_debug)
+				printk(KERN_ERR "%s: PCI bus error, bus status %8.8x\n", dev->name, bus_status);
+
 			/* In this case, blow the card away */
 			vortex_down(dev);
 			wait_for_completion(dev, TotalReset | 0xff);

@@ -226,6 +226,8 @@ struct mm_struct {
 	mm_context_t context;
 };
 
+extern int mmlist_nr;
+
 #define INIT_MM(name) \
 {			 				\
 	mmap:		&init_mmap, 			\

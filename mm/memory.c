@@ -207,7 +207,8 @@ skip_copy_pte_range:		address = (address + PMD_SIZE) & PMD_MASK;
 			
 			src_pte = pte_offset(src_pmd, address);
 			dst_pte = pte_offset(dst_pmd, address);
-			
+
+			spin_lock(&src->page_table_lock);			
 			do {
 				pte_t pte = *src_pte;
 				struct page *ptepage;
@@ -240,16 +241,21 @@ skip_copy_pte_range:		address = (address + PMD_SIZE) & PMD_MASK;
 cont_copy_pte_range:		set_pte(dst_pte, pte);
 cont_copy_pte_range_noset:	address += PAGE_SIZE;
 				if (address >= end)
-					goto out;
+					goto out_unlock;
 				src_pte++;
 				dst_pte++;
 			} while ((unsigned long)src_pte & PTE_TABLE_MASK);
+			spin_unlock(&src->page_table_lock);
 		
 cont_copy_pmd_range:	src_pmd++;
 			dst_pmd++;
 		} while ((unsigned long)src_pmd & PMD_TABLE_MASK);
 	}
 out:
+	return 0;
+
+out_unlock:
+	spin_unlock(&src->page_table_lock);
 	return 0;
 
 nomem:
