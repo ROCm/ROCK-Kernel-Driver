@@ -589,9 +589,7 @@ fi
 
 source drivers/usb/Config.in
 
-if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-   source net/bluetooth/Config.in
-fi
+source net/bluetooth/Config.in
 
 source lib/Config.in
 

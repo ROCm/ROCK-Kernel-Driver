@@ -23,46 +23,58 @@
 */
 
 /*
- * $Id: hci_usb.h,v 1.3 2001/06/02 01:40:08 maxk Exp $
+ * $Id: hci_uart.h,v 1.1.1.1 2002/03/08 21:03:15 maxk Exp $
  */
 
+#ifndef N_HCI
+#define N_HCI	15
+#endif
+
+/* Ioctls */
+#define HCIUARTSETPROTO	_IOW('U', 200, int)
+#define HCIUARTGETPROTO	_IOR('U', 201, int)
+
+/* UART protocols */
+#define HCI_UART_MAX_PROTO	3
+
+#define HCI_UART_H4	0
+#define HCI_UART_BCSP	1
+#define HCI_UART_NCSP	2
+
 #ifdef __KERNEL__
+struct n_hci;
 
-/* Class, SubClass, and Protocol codes that describe a Bluetooth device */
-#define HCI_DEV_CLASS        0xe0	/* Wireless class */
-#define HCI_DEV_SUBCLASS     0x01	/* RF subclass */
-#define HCI_DEV_PROTOCOL     0x01	/* Bluetooth programming protocol */
-
-#define HCI_CTRL_REQ	     0x20
-
-struct hci_usb {
-	struct usb_device 	*udev;
-
-	struct usb_ctrlrequest	dev_req;
-	struct urb 		*ctrl_urb;
-	struct urb		*intr_urb;
-	struct urb		*read_urb;
-	struct urb		*write_urb;
-
-	__u8			*read_buf;
-	__u8			*intr_buf;
-	struct sk_buff		*intr_skb;
-	int			intr_count;
-
-	__u8			bulk_out_ep_addr;
-	__u8			bulk_in_ep_addr;
-	__u8			intr_in_ep_addr;
-	__u8			intr_in_interval;
-
-	struct hci_dev		hdev;
-
-	unsigned long		tx_state;
-	struct sk_buff_head	tx_ctrl_q;
-	struct sk_buff_head	tx_write_q;
+struct hci_uart_proto {
+	unsigned int id;
+	int (*open)(struct n_hci *n_hci);
+	int (*recv)(struct n_hci *n_hci, void *data, int len);
+	int (*send)(struct n_hci *n_hci, void *data, int len);
+	int (*close)(struct n_hci *n_hci);
+	int (*flush)(struct n_hci *n_hci);
+	struct sk_buff* (*preq)(struct n_hci *n_hci, struct sk_buff *skb);
 };
 
-/* Transmit states  */
-#define HCI_TX_CTRL	1
-#define HCI_TX_WRITE	2
+struct n_hci {
+	struct tty_struct  *tty;
+	struct hci_dev     hdev;
+	unsigned long      flags;
+
+	struct hci_uart_proto *proto;
+	void               *priv;
+	
+	struct sk_buff_head txq;
+	unsigned long       tx_state;
+	spinlock_t          rx_lock;
+};
+
+/* N_HCI flag bits */
+#define N_HCI_PROTO_SET		0x00
+
+/* TX states  */
+#define N_HCI_SENDING		1
+#define N_HCI_TX_WAKEUP		2
+
+int hci_uart_register_proto(struct hci_uart_proto *p);
+int hci_uart_unregister_proto(struct hci_uart_proto *p);
 
 #endif /* __KERNEL__ */

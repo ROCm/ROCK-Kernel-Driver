@@ -1,3 +1,4 @@
+Bluetooth subsystem support
 CONFIG_BLUEZ
   Bluetooth is low-cost, low-power, short-range wireless technology.
   It was designed as a replacement for cables and other short-range
@@ -6,11 +7,12 @@ CONFIG_BLUEZ
   Bluetooth can be found at <http://www.bluetooth.com/>.
 
   Linux Bluetooth subsystem consist of several layers:
-               HCI Core (device and connection manager, scheduler)
+               BlueZ Core (HCI device and connection manager, scheduler)
                HCI Device drivers (interface to the hardware)
                L2CAP Module (L2CAP protocol)
+               SCO Module (SCO links)
 
-  Say Y here to enable Linux Bluetooth support and to build HCI Core
+  Say Y here to enable Linux Bluetooth support and to build BlueZ Core
   layer.
 
   To use Linux Bluetooth subsystem, you will need several user-space
@@ -18,8 +20,9 @@ CONFIG_BLUEZ
   Bluetooth kernel modules are provided in the BlueZ package.
   For more information, see <http://bluez.sourceforge.net/>.
 
-  If you want to compile HCI Core as module (hci.o) say M here.
+  If you want to compile BlueZ Core as module (bluez.o) say M here.
 
+L2CAP protocol support
 CONFIG_BLUEZ_L2CAP
   L2CAP (Logical Link Control and Adaptation Protocol) provides
   connection oriented and connection-less data transport.  L2CAP
@@ -27,4 +30,12 @@ CONFIG_BLUEZ_L2CAP
 
   Say Y here to compile L2CAP support into the kernel or say M to
   compile it as module (l2cap.o).
+
+SCO links support
+CONFIG_BLUEZ_SCO
+  SCO link provides voice transport over Bluetooth. SCO support is
+  required for voice applications like Headset and Audio.
+
+  Say Y here to compile SCO support into the kernel or say M to
+  compile it as module (sco.o).
 

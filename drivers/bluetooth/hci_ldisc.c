@@ -25,9 +25,9 @@
 /*
  * BlueZ HCI UART driver.
  *
- * $Id: hci_uart.c,v 1.5 2001/07/05 18:42:44 maxk Exp $    
+ * $Id: hci_ldisc.c,v 1.2 2002/04/17 17:37:20 maxk Exp $    
  */
-#define VERSION "1.0"
+#define VERSION "2.0"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -52,37 +52,68 @@
 #include <linux/skbuff.h>
 
 #include <net/bluetooth/bluetooth.h>
-#include <net/bluetooth/bluez.h>
 #include <net/bluetooth/hci_core.h>
-#include <net/bluetooth/hci_uart.h>
+#include "hci_uart.h"
 
 #ifndef HCI_UART_DEBUG
-#undef  DBG
-#define DBG( A... )
-#undef  DMP
-#define DMP( A... )
+#undef  BT_DBG
+#define BT_DBG( A... )
+#undef  BT_DMP
+#define BT_DMP( A... )
 #endif
+
+static struct hci_uart_proto *hup[HCI_UART_MAX_PROTO];
+
+int hci_uart_register_proto(struct hci_uart_proto *p)
+{
+	if (p->id >= HCI_UART_MAX_PROTO)
+		return -EINVAL;
+
+	if (hup[p->id])
+		return -EEXIST;
+
+	hup[p->id] = p;
+	return 0;
+}
+
+int hci_uart_unregister_proto(struct hci_uart_proto *p)
+{
+	if (p->id >= HCI_UART_MAX_PROTO)
+		return -EINVAL;
+
+	if (!hup[p->id])
+		return -EINVAL;
+
+	hup[p->id] = NULL;
+	return 0;
+}
+
+static struct hci_uart_proto *n_hci_get_proto(unsigned int id)
+{
+	if (id >= HCI_UART_MAX_PROTO)
+		return NULL;
+	return hup[id];
+}
 
 /* ------- Interface to HCI layer ------ */
 /* Initialize device */
-int n_hci_open(struct hci_dev *hdev)
+static int n_hci_open(struct hci_dev *hdev)
 {
-	DBG("%s %p", hdev->name, hdev);
+	BT_DBG("%s %p", hdev->name, hdev);
 
 	/* Nothing to do for UART driver */
 
-	hdev->flags |= HCI_RUNNING;
-
+	set_bit(HCI_RUNNING, &hdev->flags);
 	return 0;
 }
 
 /* Reset device */
-int n_hci_flush(struct hci_dev *hdev)
+static int n_hci_flush(struct hci_dev *hdev)
 {
 	struct n_hci *n_hci  = (struct n_hci *) hdev->driver_data;
 	struct tty_struct *tty = n_hci->tty;
 
-	DBG("hdev %p tty %p", hdev, tty);
+	BT_DBG("hdev %p tty %p", hdev, tty);
 
 	/* Drop TX queue */
 	skb_queue_purge(&n_hci->txq);
@@ -94,168 +125,158 @@ int n_hci_flush(struct hci_dev *hdev)
 	if (tty->driver.flush_buffer)
 		tty->driver.flush_buffer(tty);
 
+	if (n_hci->proto->flush)
+		n_hci->proto->flush(n_hci);
+
 	return 0;
 }
 
 /* Close device */
-int n_hci_close(struct hci_dev *hdev)
+static int n_hci_close(struct hci_dev *hdev)
 {
-	DBG("hdev %p", hdev);
+	BT_DBG("hdev %p", hdev);
 
-	hdev->flags &= ~HCI_RUNNING;
+	if (!test_and_clear_bit(HCI_RUNNING, &hdev->flags))
+		return 0;
 
 	n_hci_flush(hdev);
-
 	return 0;
 }
 
-int n_hci_tx_wakeup(struct n_hci *n_hci)
+static int n_hci_tx_wakeup(struct n_hci *n_hci)
 {
-	register struct tty_struct *tty = n_hci->tty;
-
-	if (test_and_set_bit(TRANS_SENDING, &n_hci->tx_state)) {
-		set_bit(TRANS_WAKEUP, &n_hci->tx_state);
+	struct hci_dev *hdev = &n_hci->hdev;
+	
+	if (test_and_set_bit(N_HCI_SENDING, &n_hci->tx_state)) {
+		set_bit(N_HCI_TX_WAKEUP, &n_hci->tx_state);
 		return 0;
 	}
 
-	DBG("");
+	BT_DBG("");
 	do {
 		register struct sk_buff *skb;
 		register int len;
 
-		clear_bit(TRANS_WAKEUP, &n_hci->tx_state);
+		clear_bit(N_HCI_TX_WAKEUP, &n_hci->tx_state);
 
 		if (!(skb = skb_dequeue(&n_hci->txq)))
 			break;
 
-		DMP(skb->data, skb->len);
-
-		/* Send frame to TTY driver */
-		tty->flags |= (1 << TTY_DO_WRITE_WAKEUP);
-		len = tty->driver.write(tty, 0, skb->data, skb->len);
-
+		len = n_hci->proto->send(n_hci, skb->data, skb->len);
 		n_hci->hdev.stat.byte_tx += len;
 
-		DBG("sent %d", len);
-
 		if (len == skb->len) {
-			/* Full frame was sent */
+			/* Complete frame was sent */
+
+			switch (skb->pkt_type) {
+			case HCI_COMMAND_PKT:
+				hdev->stat.cmd_tx++;
+				break;
+
+			case HCI_ACLDATA_PKT:
+				hdev->stat.acl_tx++;
+				break;
+
+			case HCI_SCODATA_PKT:
+				hdev->stat.cmd_tx++;
+				break;
+			};
+
 			kfree_skb(skb);
 		} else {
 			/* Subtract sent part and requeue  */
 			skb_pull(skb, len);
 			skb_queue_head(&n_hci->txq, skb);
 		}
-	} while (test_bit(TRANS_WAKEUP, &n_hci->tx_state));
-	clear_bit(TRANS_SENDING, &n_hci->tx_state);
-
+	} while (test_bit(N_HCI_TX_WAKEUP, &n_hci->tx_state));
+	clear_bit(N_HCI_SENDING, &n_hci->tx_state);
 	return 0;
 }
 
 /* Send frames from HCI layer */
-int n_hci_send_frame(struct sk_buff *skb)
+static int n_hci_send_frame(struct sk_buff *skb)
 {
 	struct hci_dev* hdev = (struct hci_dev *) skb->dev;
 	struct tty_struct *tty;
 	struct n_hci *n_hci;
 
 	if (!hdev) {
-		ERR("Frame for uknown device (hdev=NULL)");
+		BT_ERR("Frame for uknown device (hdev=NULL)");
 		return -ENODEV;
 	}
 
-	if (!(hdev->flags & HCI_RUNNING))
+	if (!test_bit(HCI_RUNNING, &hdev->flags))
 		return -EBUSY;
 
 	n_hci = (struct n_hci *) hdev->driver_data;
-	tty = n_hci2tty(n_hci);
+	tty = n_hci->tty;
 
-	DBG("%s: type %d len %d", hdev->name, skb->pkt_type, skb->len);
+	BT_DBG("%s: type %d len %d", hdev->name, skb->pkt_type, skb->len);
 
-	switch (skb->pkt_type) {
-		case HCI_COMMAND_PKT:
-			hdev->stat.cmd_tx++;
-			break;
-
-                case HCI_ACLDATA_PKT:
-			hdev->stat.acl_tx++;
-                        break;
-
-		case HCI_SCODATA_PKT:
-			hdev->stat.cmd_tx++;
-                        break;
-	};
-
-	/* Prepend skb with frame type and queue */
-	memcpy(skb_push(skb, 1), &skb->pkt_type, 1);
+	if (n_hci->proto->preq) {
+		skb = n_hci->proto->preq(n_hci, skb);
+		if (!skb)
+			return 0;
+	}
+	
 	skb_queue_tail(&n_hci->txq, skb);
-
 	n_hci_tx_wakeup(n_hci);
-
 	return 0;
 }
 
-/* ------ LDISC part ------ */
+static void n_hci_destruct(struct hci_dev *hdev)
+{
+	struct n_hci *n_hci;
 
+	if (!hdev) return;
+
+	BT_DBG("%s", hdev->name);
+
+	n_hci = (struct n_hci *) hdev->driver_data;
+	kfree(n_hci);
+
+	MOD_DEC_USE_COUNT;
+}
+
+/* ------ LDISC part ------ */
 /* n_hci_tty_open
  * 
  *     Called when line discipline changed to N_HCI.
- *     
- * Arguments:    
+ *
+ * Arguments:
  *     tty    pointer to tty info structure
  * Return Value:    
  *     0 if success, otherwise error code
  */
 static int n_hci_tty_open(struct tty_struct *tty)
 {
-	struct n_hci *n_hci = tty2n_hci(tty);
-	struct hci_dev *hdev;
+	struct n_hci *n_hci = (void *)tty->disc_data;
 
-	DBG("tty %p", tty);
+	BT_DBG("tty %p", tty);
 
 	if (n_hci)
 		return -EEXIST;
 
 	if (!(n_hci = kmalloc(sizeof(struct n_hci), GFP_KERNEL))) {
-		ERR("Can't allocate controll structure");
+		BT_ERR("Can't allocate controll structure");
 		return -ENFILE;
 	}
 	memset(n_hci, 0, sizeof(struct n_hci));
-
-	/* Initialize and register HCI device */
-	hdev = &n_hci->hdev;
-
-	hdev->type = HCI_UART;
-	hdev->driver_data = n_hci;
-
-	hdev->open  = n_hci_open;
-	hdev->close = n_hci_close;
-	hdev->flush = n_hci_flush;
-	hdev->send  = n_hci_send_frame;
-
-	if (hci_register_dev(hdev) < 0) {
-		ERR("Can't register HCI device %s", hdev->name);
-		kfree(n_hci);
-		return -ENODEV;
-	}
 
 	tty->disc_data = n_hci;
 	n_hci->tty = tty;
 
 	spin_lock_init(&n_hci->rx_lock);
-	n_hci->rx_state = WAIT_PACKET_TYPE;
-
 	skb_queue_head_init(&n_hci->txq);
 
-	MOD_INC_USE_COUNT;
-
-	/* Flush any pending characters in the driver and discipline. */
+	/* Flush any pending characters in the driver and line discipline */
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 
 	if (tty->driver.flush_buffer)
 		tty->driver.flush_buffer(tty);
-
+	
+	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -266,22 +287,22 @@ static int n_hci_tty_open(struct tty_struct *tty)
  */
 static void n_hci_tty_close(struct tty_struct *tty)
 {
-	struct n_hci *n_hci = tty2n_hci(tty);
-	struct hci_dev *hdev = &n_hci->hdev;
+	struct n_hci *n_hci = (void *)tty->disc_data;
 
-	DBG("tty %p hdev %p", tty, hdev);
+	BT_DBG("tty %p", tty);
 
-	if (n_hci != NULL) {
+	/* Detach from the tty */
+	tty->disc_data = NULL;
+
+	if (n_hci) {
+		struct hci_dev *hdev = &n_hci->hdev;
 		n_hci_close(hdev);
 
-		if (hci_unregister_dev(hdev) < 0) {
-			ERR("Can't unregister HCI device %s",hdev->name);
+		if (test_and_clear_bit(N_HCI_PROTO_SET, &n_hci->flags)) {
+			n_hci->proto->close(n_hci);
+			hci_unregister_dev(hdev);
 		}
-
-		hdev->driver_data = NULL;
-		tty->disc_data = NULL;
-		kfree(n_hci);
-
+				
 		MOD_DEC_USE_COUNT;
 	}
 }
@@ -296,9 +317,9 @@ static void n_hci_tty_close(struct tty_struct *tty)
  */
 static void n_hci_tty_wakeup( struct tty_struct *tty )
 {
-	struct n_hci *n_hci = tty2n_hci(tty);
+	struct n_hci *n_hci = (void *)tty->disc_data;
 
-	DBG("");
+	BT_DBG("");
 
 	if (!n_hci)
 		return;
@@ -325,135 +346,6 @@ static int n_hci_tty_room (struct tty_struct *tty)
 	return 65536;
 }
 
-static inline int n_hci_check_data_len(struct n_hci *n_hci, int len)
-{
-	register int room = skb_tailroom(n_hci->rx_skb);
-
-	DBG("len %d room %d", len, room);
-	if (!len) {
-		DMP(n_hci->rx_skb->data, n_hci->rx_skb->len);
-		hci_recv_frame(n_hci->rx_skb);
-	} else if (len > room) {
-		ERR("Data length is to large");
-		kfree_skb(n_hci->rx_skb);
-		n_hci->hdev.stat.err_rx++;
-	} else {
-		n_hci->rx_state = WAIT_DATA;
-		n_hci->rx_count = len;
-		return len;
-	}
-
-	n_hci->rx_state = WAIT_PACKET_TYPE;
-	n_hci->rx_skb   = NULL;
-	n_hci->rx_count = 0;
-	return 0;
-}
-
-static inline void n_hci_rx(struct n_hci *n_hci, const __u8 * data, char *flags, int count)
-{
-	register const char *ptr;
-	hci_event_hdr *eh;
-	hci_acl_hdr   *ah;
-	hci_sco_hdr   *sh;
-	register int len, type, dlen;
-
-	DBG("count %d state %ld rx_count %ld", count, n_hci->rx_state, n_hci->rx_count);
-
-	n_hci->hdev.stat.byte_rx += count;
-
-	ptr = data;
-	while (count) {
-		if (n_hci->rx_count) {
-			len = MIN(n_hci->rx_count, count);
-			memcpy(skb_put(n_hci->rx_skb, len), ptr, len);
-			n_hci->rx_count -= len; count -= len; ptr += len;
-
-			if (n_hci->rx_count)
-				continue;
-
-			switch (n_hci->rx_state) {
-				case WAIT_DATA:
-					DBG("Complete data");
-
-					DMP(n_hci->rx_skb->data, n_hci->rx_skb->len);
-
-					hci_recv_frame(n_hci->rx_skb);
-
-					n_hci->rx_state = WAIT_PACKET_TYPE;
-					n_hci->rx_skb = NULL;
-					continue;
-
-				case WAIT_EVENT_HDR:
-					eh = (hci_event_hdr *) n_hci->rx_skb->data;
-
-					DBG("Event header: evt 0x%2.2x plen %d", eh->evt, eh->plen);
-
-					n_hci_check_data_len(n_hci, eh->plen);
-					continue;
-
-				case WAIT_ACL_HDR:
-					ah = (hci_acl_hdr *) n_hci->rx_skb->data;
-					dlen = __le16_to_cpu(ah->dlen);
-
-					DBG("ACL header: dlen %d", dlen);
-
-					n_hci_check_data_len(n_hci, dlen);
-					continue;
-
-				case WAIT_SCO_HDR:
-					sh = (hci_sco_hdr *) n_hci->rx_skb->data;
-
-					DBG("SCO header: dlen %d", sh->dlen);
-
-					n_hci_check_data_len(n_hci, sh->dlen);
-					continue;
-			};
-		}
-
-		/* WAIT_PACKET_TYPE */
-		switch (*ptr) {
-			case HCI_EVENT_PKT:
-				DBG("Event packet");
-				n_hci->rx_state = WAIT_EVENT_HDR;
-				n_hci->rx_count = HCI_EVENT_HDR_SIZE;
-				type = HCI_EVENT_PKT;
-				break;
-
-			case HCI_ACLDATA_PKT:
-				DBG("ACL packet");
-				n_hci->rx_state = WAIT_ACL_HDR;
-				n_hci->rx_count = HCI_ACL_HDR_SIZE;
-				type = HCI_ACLDATA_PKT;
-				break;
-
-			case HCI_SCODATA_PKT:
-				DBG("SCO packet");
-				n_hci->rx_state = WAIT_SCO_HDR;
-				n_hci->rx_count = HCI_SCO_HDR_SIZE;
-				type = HCI_SCODATA_PKT;
-				break;
-
-			default:
-				ERR("Unknown HCI packet type %2.2x", (__u8)*ptr);
-				n_hci->hdev.stat.err_rx++;
-				ptr++; count--;
-				continue;
-		};
-		ptr++; count--;
-
-		/* Allocate packet */
-		if (!(n_hci->rx_skb = bluez_skb_alloc(HCI_MAX_FRAME_SIZE, GFP_ATOMIC))) {
-			ERR("Can't allocate mem for new packet");
-
-			n_hci->rx_state = WAIT_PACKET_TYPE;
-			n_hci->rx_count = 0;
-			return;
-		}
-		n_hci->rx_skb->dev = (void *) &n_hci->hdev;
-		n_hci->rx_skb->pkt_type = type;
-	}
-}
-
 /* n_hci_tty_receive()
  * 
  *     Called by tty low level driver when receive data is
@@ -468,17 +360,70 @@ static inline void n_hci_rx(struct n_hci *n_hci, const __u8 * data, char *flags,
  */
 static void n_hci_tty_receive(struct tty_struct *tty, const __u8 * data, char *flags, int count)
 {
-	struct n_hci *n_hci = tty2n_hci(tty);
-
+	struct n_hci *n_hci = (void *)tty->disc_data;
+	
 	if (!n_hci || tty != n_hci->tty)
 		return;
 
+	if (!test_bit(N_HCI_PROTO_SET, &n_hci->flags))
+		return;
+	
 	spin_lock(&n_hci->rx_lock);
-	n_hci_rx(n_hci, data, flags, count);
+	n_hci->proto->recv(n_hci, (void *) data, count);
+	n_hci->hdev.stat.byte_rx += count;
 	spin_unlock(&n_hci->rx_lock);
 
 	if (test_and_clear_bit(TTY_THROTTLED,&tty->flags) && tty->driver.unthrottle)
 		tty->driver.unthrottle(tty);
+}
+
+static int n_hci_register_dev(struct n_hci *n_hci)
+{
+	struct hci_dev *hdev;
+
+	BT_DBG("");
+
+	/* Initialize and register HCI device */
+	hdev = &n_hci->hdev;
+
+	hdev->type = HCI_UART;
+	hdev->driver_data = n_hci;
+
+	hdev->open  = n_hci_open;
+	hdev->close = n_hci_close;
+	hdev->flush = n_hci_flush;
+	hdev->send  = n_hci_send_frame;
+	hdev->destruct = n_hci_destruct;
+
+	if (hci_register_dev(hdev) < 0) {
+		BT_ERR("Can't register HCI device %s", hdev->name);
+		return -ENODEV;
+	}
+	MOD_INC_USE_COUNT;
+	return 0;
+}
+
+static int n_hci_set_proto(struct n_hci *n_hci, int id)
+{
+	struct hci_uart_proto *p;
+	int err;	
+	
+	p = n_hci_get_proto(id);
+	if (!p)
+		return -EPROTONOSUPPORT;
+
+	err = p->open(n_hci);
+	if (err)
+		return err;
+
+	n_hci->proto = p;
+
+	err = n_hci_register_dev(n_hci);
+	if (err) {
+		p->close(n_hci);
+		return err;
+	}
+	return 0;
 }
 
 /* n_hci_tty_ioctl()
@@ -494,25 +439,41 @@ static void n_hci_tty_receive(struct tty_struct *tty, const __u8 * data, char *f
  *
  * Return Value:    Command dependent
  */
-static int n_hci_tty_ioctl (struct tty_struct *tty, struct file * file,
+static int n_hci_tty_ioctl(struct tty_struct *tty, struct file * file,
                             unsigned int cmd, unsigned long arg)
 {
-	struct n_hci *n_hci = tty2n_hci(tty);
-	int error = 0;
+	struct n_hci *n_hci = (void *)tty->disc_data;
+	int err = 0;
 
-	DBG("");
+	BT_DBG("");
 
 	/* Verify the status of the device */
 	if (!n_hci)
 		return -EBADF;
 
 	switch (cmd) {
-		default:
-			error = n_tty_ioctl(tty, file, cmd, arg);
-			break;
+	case HCIUARTSETPROTO:
+		if (!test_and_set_bit(N_HCI_PROTO_SET, &n_hci->flags)) {
+			err = n_hci_set_proto(n_hci, arg);
+			if (err) {
+				clear_bit(N_HCI_PROTO_SET, &n_hci->flags);
+				return err;
+			}
+			tty->low_latency = 1;
+		} else	
+			return -EBUSY;
+
+	case HCIUARTGETPROTO:
+		if (test_bit(N_HCI_PROTO_SET, &n_hci->flags))
+			return n_hci->proto->id;
+		return -EUNATCH;
+		
+	default:
+		err = n_tty_ioctl(tty, file, cmd, arg);
+		break;
 	};
 
-	return error;
+	return err;
 }
 
 /*
@@ -531,14 +492,19 @@ static unsigned int n_hci_tty_poll(struct tty_struct *tty, struct file *filp, po
 	return 0;
 }
 
+#ifdef CONFIG_BLUEZ_HCIUART_H4
+int h4_init(void);
+int h4_deinit(void);
+#endif
+
 int __init n_hci_init(void)
 {
 	static struct tty_ldisc n_hci_ldisc;
 	int err;
 
-	INF("BlueZ HCI UART driver ver %s Copyright (C) 2000,2001 Qualcomm Inc", 
+	BT_INFO("BlueZ HCI UART driver ver %s Copyright (C) 2000,2001 Qualcomm Inc", 
 		VERSION);
-	INF("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
+	BT_INFO("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
 
 	/* Register the tty discipline */
 
@@ -556,10 +522,14 @@ int __init n_hci_init(void)
 	n_hci_ldisc.write_wakeup= n_hci_tty_wakeup;
 
 	if ((err = tty_register_ldisc(N_HCI, &n_hci_ldisc))) {
-		ERR("Can't register HCI line discipline (%d)", err);
+		BT_ERR("Can't register HCI line discipline (%d)", err);
 		return err;
 	}
 
+#ifdef CONFIG_BLUEZ_HCIUART_H4
+	h4_init();
+#endif
+	
 	return 0;
 }
 
@@ -567,9 +537,13 @@ void n_hci_cleanup(void)
 {
 	int err;
 
+#ifdef CONFIG_BLUEZ_HCIUART_H4
+	h4_deinit();
+#endif
+
 	/* Release tty registration of line discipline */
 	if ((err = tty_register_ldisc(N_HCI, NULL)))
-		ERR("Can't unregister HCI line discipline (%d)", err);
+		BT_ERR("Can't unregister HCI line discipline (%d)", err);
 }
 
 module_init(n_hci_init);
