@@ -576,19 +576,6 @@ int btuart_close(btuart_info_t *info)
 	return 0;
 }
 
-
-
-/* ======================== Card services ======================== */
-
-
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-	error_info_t err = { func, ret };
-
-	CardServices(ReportError, handle, &err);
-}
-
-
 dev_link_t *btuart_attach(void)
 {
 	btuart_info_t *info;

@@ -822,19 +822,6 @@ int bluecard_close(bluecard_info_t *info)
 	return 0;
 }
 
-
-
-/* ======================== Card services ======================== */
-
-
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-	error_info_t err = { func, ret };
-
-	CardServices(ReportError, handle, &err);
-}
-
-
 dev_link_t *bluecard_attach(void)
 {
 	bluecard_info_t *info;

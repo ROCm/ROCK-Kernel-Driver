@@ -273,16 +273,6 @@ static void flush_stale_links(void)
 	}
 }
 
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-#if CS_RELEASE_CODE < 0x2911
-	CardServices(ReportError, dev_info, (void *)func, (void *)ret);
-#else
-	error_info_t err = { func, ret };
-	CardServices(ReportError, handle, &err);
-#endif
-}
-
 /*
 	tc574_attach() creates an "instance" of the driver, allocating
 	local data structures for one device.  The device is registered

@@ -130,11 +130,12 @@ extern struct proc_dir_entry *proc_pccard;
 
 /*====================================================================*/
 
-static void cs_error(client_handle_t handle, int func, int ret)
+void cs_error(client_handle_t handle, int func, int ret)
 {
-    error_info_t err = { func, ret };
-    pcmcia_report_error(handle, &err);
+	error_info_t err = { func, ret };
+	pcmcia_report_error(handle, &err);
 }
+EXPORT_SYMBOL(cs_error);
 
 /*======================================================================*/
 

@@ -261,16 +261,6 @@ static void flush_stale_links(void)
     }
 }
 
-/*====================================================================*/
-
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-    error_info_t err = { func, ret };
-    CardServices(ReportError, handle, &err);
-}
-
-/*====================================================================*/
-
 static dev_link_t *fmvj18x_attach(void)
 {
     local_info_t *lp;
