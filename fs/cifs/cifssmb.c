@@ -389,6 +389,12 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 							 SecurityBlob,
 							 count - 16,
 							 &server->secType);
+				if(rc == 1) {
+				/* BB Need to fill struct for sessetup here */
+					rc = -EOPNOTSUPP;
+				} else {
+					rc = -EINVAL;
+				}
 			}
 		} else
 			server->capabilities &= ~CAP_EXTENDED_SECURITY;
