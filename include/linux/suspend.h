@@ -53,6 +53,7 @@ extern suspend_pagedir_t *pagedir_nosave __nosavedata;
 extern void do_suspend_lowlevel(int resume);
 extern void do_suspend_lowlevel_s4bios(int resume);
 
+extern int software_suspend(void);
 #else	/* CONFIG_SOFTWARE_SUSPEND */
 static inline int software_suspend(void)
 {

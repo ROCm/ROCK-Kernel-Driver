@@ -948,6 +948,17 @@ int swsusp_free(void)
 	return 0;
 }
 
+
+int software_suspend(void)
+{
+	struct pm_ops swsusp_ops = {
+		.pm_disk_mode	= PM_DISK_SHUTDOWN,
+	};
+
+	pm_set_ops(&swsusp_ops);
+	return pm_suspend(PM_SUSPEND_DISK);
+}
+
 static int __init resume_setup(char *str)
 {
 	if (strlen(str))
