@@ -5,7 +5,7 @@ TAIL=tail.tk
 # on soundscript.  This runs fairly fast, and I can't find all the
 # Config.in files to depend on anyways.  So I'll force it to remake.
 
-kconfig.tk: dummy
+kconfig.tk: FORCE
 
 kconfig.tk: ${TOPDIR}/Makefile ${TOPDIR}/arch/${ARCH}/config.in \
 		tkparse ${HEADER} ${TAIL}

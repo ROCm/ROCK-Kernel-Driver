@@ -172,7 +172,7 @@ export	NETWORKS DRIVERS LIBS HEAD LDFLAGS LINKFLAGS MAKEBOOT ASFLAGS
 # ---------------------------------------------------------------------------
 
 boot: vmlinux
-	@$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" -C arch/$(ARCH)/boot
+	@$(MAKE) -C arch/$(ARCH)/boot
 
 # Build vmlinux
 # ---------------------------------------------------------------------------
@@ -202,29 +202,25 @@ define rule_link_vmlinux
 	echo Generating build number
 	. scripts/mkversion > .tmpversion
 	mv -f .tmpversion .version
-	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" -C init
+	$(MAKE) -C init
 	echo $(cmd_link_vmlinux)
 	$(cmd_link_vmlinux)
 	echo 'cmd_$@ := $(cmd_link_vmlinux)' > $(@D)/.$(@F).cmd
 	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
 endef
 
-vmlinux: $(CONFIGURATION) $(vmlinux-objs) dummy
+vmlinux: $(CONFIGURATION) $(vmlinux-objs) FORCE
 	$(call if_changed_rule,link_vmlinux)
 
-#	The actual objects are generated when descending, make sure
-#	no implicit rule kicks in
+#	The actual objects are generated when descending, 
+#	make sure no implicit rule kicks in
 
-$(sort $(vmlinux-objs)): linuxsubdirs
-	@
+$(sort $(vmlinux-objs)): $(SUBDIRS) ;
 
 # 	Handle descending into subdirectories listed in $(SUBDIRS)
 
-.PHONY: linuxsubdirs
-linuxsubdirs: $(patsubst %, _dir_%, $(SUBDIRS))
-
-$(patsubst %, _dir_%, $(SUBDIRS)) : dummy include/linux/version.h include/config/MARKER
-	@$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" -C $(patsubst _dir_%, %, $@)
+$(SUBDIRS): FORCE include/linux/version.h include/config/MARKER
+	@$(MAKE) -C $@
 
 # Configuration
 # ---------------------------------------------------------------------------
@@ -266,8 +262,6 @@ include/linux/version.h: ./Makefile
 	@echo Generating $@
 	@. scripts/mkversion_h $@ $(KERNELRELEASE) $(VERSION) $(PATCHLEVEL) $(SUBLEVEL)
 
-comma	:= ,
-
 # ---------------------------------------------------------------------------
 # Generate dependencies
 
@@ -296,7 +290,7 @@ modules: $(patsubst %, _mod_%, $(SUBDIRS))
 
 .PHONY: $(patsubst %, _mod_%, $(SUBDIRS))
 $(patsubst %, _mod_%, $(SUBDIRS)) : include/linux/version.h include/config/MARKER
-	@$(MAKE) -C $(patsubst _mod_%, %, $@) CFLAGS="$(CFLAGS) $(CFLAGS_MODULE)" AFLAGS="$(AFLAGS) $(AFLAGS_MODULE)" modules
+	@$(MAKE) -C $(patsubst _mod_%, %, $@) modules
 
 #	Install modules
 
@@ -333,7 +327,7 @@ else # CONFIG_MODULES
 # ---------------------------------------------------------------------------
 # Modules not configured
 
-modules modules_install: dummy
+modules modules_install: FORCE
 	@echo
 	@echo "The present kernel configuration has modules disabled."
 	@echo "Type 'make config' and enable loadable module support."
@@ -480,24 +474,17 @@ checkincludes:
 
 # Generate tags for editors
 
-TAGS: dummy
+TAGS: FORCE
 	{ find include/asm-${ARCH} -name '*.h' -print ; \
 	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print ; \
 	find $(SUBDIRS) init -name '*.[ch]' ; } | grep -v SCCS | etags -
 
 # 	Exuberant ctags works better with -I
-tags: dummy
+tags: FORCE
 	CTAGSF=`ctags --version | grep -i exuberant >/dev/null && echo "-I __initdata,__exitdata,EXPORT_SYMBOL,EXPORT_SYMBOL_NOVERS"`; \
 	ctags $$CTAGSF `find include/asm-$(ARCH) -name '*.h'` && \
 	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs ctags $$CTAGSF -a && \
 	find $(SUBDIRS) init -name '*.[ch]' | xargs ctags $$CTAGSF -a
-
-# Targets which will only descend into one subdir, not trying
-# to link vmlinux afterwards
-# FIXME: anybody still using this?
-
-fs lib mm ipc kernel drivers net sound: dummy
-	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" $(subst $@, _dir_$@, $@)
 
 # Make a backup
 # FIXME anybody still using this?

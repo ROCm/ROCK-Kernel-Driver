@@ -102,5 +102,5 @@ FORE200E_FW_CHANGED := $(filter-out $(FORE200E_FW_UP_TO_DATE), \
                        fore200e_pca_fw.c fore200e_sba_fw.c)
 
 ifneq ($(FORE200E_FW_CHANGED),)
-$(FORE200E_FW_CHANGED): dummy
+$(FORE200E_FW_CHANGED): FORCE
 endif
