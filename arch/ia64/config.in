@@ -123,6 +123,7 @@ source drivers/block/Config.in
 source drivers/ieee1394/Config.in
 source drivers/message/i2o/Config.in
 source drivers/md/Config.in
+source drivers/message/fusion/Config.in
 
 mainmenu_option next_comment
 comment 'ATA/IDE/MFM/RLL support'
