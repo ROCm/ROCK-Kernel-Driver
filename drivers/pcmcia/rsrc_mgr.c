@@ -499,14 +499,16 @@ void validate_mem(socket_info_t *s)
 
 void validate_mem(socket_info_t *s)
 {
-    resource_map_t *m;
+    resource_map_t *m, *n;
     static int done = 0;
     
     if (probe_mem && done++ == 0) {
 	down(&rsrc_sem);
-	for (m = mem_db.next; m != &mem_db; m = m->next)
+	for (m = mem_db.next; m != &mem_db; m = n) {
+	    n = m->next;
 	    if (do_mem_probe(m->base, m->num, s))
 		break;
+	}
 	up(&rsrc_sem);
     }
 }
