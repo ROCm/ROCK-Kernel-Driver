@@ -576,6 +576,7 @@ static void snd_complete_urb(struct urb *urb, struct pt_regs *regs)
 	int err;
 
 	clear_bit(ctx->index, &subs->active_mask);
+	clear_bit(ctx->index, &subs->unlink_mask);
 	if (subs->running && subs->ops.retire(subs, substream->runtime, urb))
 		return;
 	if (! subs->running) /* can be stopped during retire callback */
@@ -601,6 +602,7 @@ static void snd_complete_sync_urb(struct urb *urb, struct pt_regs *regs)
 	int err;
 
 	clear_bit(ctx->index + 16, &subs->active_mask);
+	clear_bit(ctx->index + 16, &subs->unlink_mask);
 	if (subs->running && subs->ops.retire_sync(subs, substream->runtime, urb))
 		return;
 	if (! subs->running) /* can be stopped during retire callback */
@@ -1280,6 +1282,9 @@ static int snd_usb_pcm_prepare(snd_pcm_substream_t *substream)
 	/* some unit conversions in runtime */
 	subs->maxframesize = bytes_to_frames(runtime, subs->maxpacksize);
 	subs->curframesize = bytes_to_frames(runtime, subs->curpacksize);
+
+	/* deactivate urbs to be sure */
+	deactivate_urbs(subs, 0, 0);
 
 	return 0;
 }
