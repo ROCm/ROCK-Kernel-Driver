@@ -15,23 +15,10 @@
 #ifndef _SCSI_H
 #define _SCSI_H
 
-#include <linux/config.h>	/* for CONFIG_SCSI_LOGGING */
-#include <linux/devfs_fs_kernel.h>
-#include <linux/proc_fs.h>
-#include <linux/init.h>
-
-
-/*
- * Some of the public constants are being moved to this file.
- * We include it here so that what came from where is transparent.
- */
+#include <linux/config.h>	    /* for CONFIG_SCSI_LOGGING */
+#include <linux/devfs_fs_kernel.h>  /* some morons don't know struct pointers */
 #include <scsi/scsi.h>
 
-#include <linux/random.h>
-
-#include <asm/hardirq.h>
-#include <asm/scatterlist.h>
-#include <asm/io.h>
 
 /*
  * These are the values that the SCpnt->sc_data_direction and 
@@ -396,6 +383,7 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
  * Forward-declaration of structs for prototypes.
  */
 struct Scsi_Host;
+struct scatterlist;
 
 /*
  * Add some typedefs so that we can prototyope a bunch of the functions.
@@ -445,10 +433,6 @@ void scsi_free_sgtable(struct scatterlist *sgl, int index);
  * Prototypes for functions in scsi_lib.c
  */
 extern int scsi_maybe_unblock_host(Scsi_Device * SDpnt);
-extern Scsi_Cmnd *scsi_end_request(Scsi_Cmnd * SCpnt, int uptodate,
-				   int sectors);
-extern struct Scsi_Device_Template *scsi_get_request_dev(struct request *);
-extern int scsi_init_cmd_errh(Scsi_Cmnd * SCpnt);
 extern void scsi_setup_cmd_retry(Scsi_Cmnd *SCpnt);
 extern int scsi_insert_special_cmd(Scsi_Cmnd * SCpnt, int);
 extern void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
@@ -471,7 +455,7 @@ extern void scsi_slave_detach(struct scsi_device *sdev);
 extern void scsi_done(Scsi_Cmnd * SCpnt);
 extern void scsi_finish_command(Scsi_Cmnd *);
 extern int scsi_retry_command(Scsi_Cmnd *);
-extern Scsi_Cmnd *scsi_allocate_device(Scsi_Device *, int, int);
+extern Scsi_Cmnd *scsi_allocate_device(Scsi_Device *, int);
 extern void __scsi_release_command(Scsi_Cmnd *);
 extern void scsi_release_command(Scsi_Cmnd *);
 extern void scsi_do_cmd(Scsi_Cmnd *, const void *cmnd,
@@ -525,6 +509,8 @@ static inline void scsi_proc_host_rm(struct Scsi_Host *);
 extern struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *,
 			uint, uint, uint);
 extern void scsi_free_sdev(struct scsi_device *);
+extern int scsi_add_single_device(uint, uint, uint, uint);
+extern int scsi_remove_single_device(uint, uint, uint, uint);
 
 /*
  * Prototypes for functions in constants.c
@@ -551,7 +537,7 @@ struct dev_info {
 	unsigned flags;
 };
 
-extern struct dev_info scsi_static_device_list[] __initdata;
+extern struct dev_info scsi_static_device_list[];
 
 /*
  * scsi_dev_info_list: structure to hold black/white listed devices.

@@ -1601,7 +1601,7 @@ return -ENOTSUPP;
   scsi_cdb[0] = RELEASE;
 
   // allocate with wait = true, interruptible = false 
-  SCpnt = scsi_allocate_device(ScsiDev, 1, 0);
+  SCpnt = scsi_allocate_device(ScsiDev, 1);
   {
     CPQFC_DECLARE_COMPLETION(wait);
     
