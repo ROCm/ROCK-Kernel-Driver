@@ -213,15 +213,15 @@ static int nfs_proc_write(struct nfs_write_data *wdata)
 }
 
 static struct inode *
-nfs_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
+nfs_proc_create(struct inode *dir, struct dentry *dentry, struct iattr *sattr,
 		int flags)
 {
 	struct nfs_fh		fhandle;
 	struct nfs_fattr	fattr;
 	struct nfs_createargs	arg = {
 		.fh		= NFS_FH(dir),
-		.name		= name->name,
-		.len		= name->len,
+		.name		= dentry->d_name.name,
+		.len		= dentry->d_name.len,
 		.sattr		= sattr
 	};
 	struct nfs_diropok	res = {
@@ -231,7 +231,7 @@ nfs_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	int			status;
 
 	fattr.valid = 0;
-	dprintk("NFS call  create %s\n", name->name);
+	dprintk("NFS call  create %s\n", dentry->d_name.name);
 	status = rpc_call(NFS_CLIENT(dir), NFSPROC_CREATE, &arg, &res, 0);
 	dprintk("NFS reply create: %d\n", status);
 	if (status == 0) {

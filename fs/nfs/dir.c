@@ -986,15 +986,9 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode,
 	if (nd && (nd->flags & LOOKUP_CREATE))
 		open_flags = nd->intent.open.flags;
 
-	/*
-	 * The 0 argument passed into the create function should one day
-	 * contain the O_EXCL flag if requested. This allows NFSv3 to
-	 * select the appropriate create strategy. Currently open_namei
-	 * does not pass the create flags.
-	 */
 	lock_kernel();
 	nfs_begin_data_update(dir);
-	inode = NFS_PROTO(dir)->create(dir, &dentry->d_name, &attr, open_flags);
+	inode = NFS_PROTO(dir)->create(dir, dentry, &attr, open_flags);
 	nfs_end_data_update(dir);
 	if (!IS_ERR(inode)) {
 		d_instantiate(dentry, inode);

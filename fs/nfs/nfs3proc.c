@@ -296,7 +296,7 @@ static int nfs3_proc_commit(struct nfs_write_data *cdata)
  * For now, we don't implement O_EXCL.
  */
 static struct inode *
-nfs3_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
+nfs3_proc_create(struct inode *dir, struct dentry *dentry, struct iattr *sattr,
 		 int flags)
 {
 	struct nfs_fh		fhandle;
@@ -304,8 +304,8 @@ nfs3_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	struct nfs_fattr	dir_attr;
 	struct nfs3_createargs	arg = {
 		.fh		= NFS_FH(dir),
-		.name		= name->name,
-		.len		= name->len,
+		.name		= dentry->d_name.name,
+		.len		= dentry->d_name.len,
 		.sattr		= sattr,
 	};
 	struct nfs3_diropres	res = {
@@ -315,7 +315,7 @@ nfs3_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	};
 	int			status;
 
-	dprintk("NFS call  create %s\n", name->name);
+	dprintk("NFS call  create %s\n", dentry->d_name.name);
 	arg.createmode = NFS3_CREATE_UNCHECKED;
 	if (flags & O_EXCL) {
 		arg.createmode  = NFS3_CREATE_EXCLUSIVE;
@@ -353,7 +353,7 @@ exit:
 	if (status != 0)
 		goto out;
 	if (fhandle.size == 0 || !(fattr.valid & NFS_ATTR_FATTR)) {
-		status = nfs3_proc_lookup(dir, name, &fhandle, &fattr);
+		status = nfs3_proc_lookup(dir, &dentry->d_name, &fhandle, &fattr);
 		if (status != 0)
 			goto out;
 	}

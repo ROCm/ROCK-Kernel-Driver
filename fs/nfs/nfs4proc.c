@@ -1327,7 +1327,7 @@ static int nfs4_proc_commit(struct nfs_write_data *cdata)
  */
 
 static struct inode *
-nfs4_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
+nfs4_proc_create(struct inode *dir, struct dentry *dentry, struct iattr *sattr,
                  int flags)
 {
 	struct inode *inode;
@@ -1335,7 +1335,7 @@ nfs4_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	struct rpc_cred *cred;
 
 	cred = rpcauth_lookupcred(NFS_SERVER(dir)->client->cl_auth, 0);
-	state = nfs4_do_open(dir, name, flags, sattr, cred);
+	state = nfs4_do_open(dir, &dentry->d_name, flags, sattr, cred);
 	put_rpccred(cred);
 	if (!IS_ERR(state)) {
 		inode = state->inode;
