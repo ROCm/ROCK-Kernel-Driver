@@ -404,7 +404,6 @@ CONFIG_NET_ETHERNET=y
 # CONFIG_HAPPYMEAL is not set
 # CONFIG_SUNBMAC is not set
 # CONFIG_SUNQE is not set
-# CONFIG_SUNLANCE is not set
 # CONFIG_SUNGEM is not set
 # CONFIG_NET_VENDOR_3COM is not set
 # CONFIG_LANCE is not set
@@ -518,13 +517,23 @@ CONFIG_PCMCIA_RAYCS=y
 # CONFIG_CD_NO_IDESCSI is not set
 
 #
-# Input core support
+# Input device support
 #
 # CONFIG_INPUT is not set
 # CONFIG_INPUT_KEYBDEV is not set
 # CONFIG_INPUT_MOUSEDEV is not set
 # CONFIG_INPUT_JOYDEV is not set
 # CONFIG_INPUT_EVDEV is not set
+# CONFIG_GAMEPORT is not set
+CONFIG_SOUND_GAMEPORT=y
+# CONFIG_GAMEPORT_NS558 is not set
+# CONFIG_GAMEPORT_L4 is not set
+# CONFIG_INPUT_EMU10K1 is not set
+# CONFIG_GAMEPORT_PCIGAME is not set
+# CONFIG_GAMEPORT_FM801 is not set
+# CONFIG_GAMEPORT_CS461x is not set
+# CONFIG_SERIO is not set
+# CONFIG_SERIO_SERPORT is not set
 
 #
 # Character devices
@@ -551,19 +560,6 @@ CONFIG_MOUSE=y
 CONFIG_PSMOUSE=y
 # CONFIG_82C710_MOUSE is not set
 # CONFIG_PC110_PAD is not set
-
-#
-# Joysticks
-#
-# CONFIG_INPUT_GAMEPORT is not set
-
-#
-# Input core support is needed for gameports
-#
-
-#
-# Input core support is needed for joysticks
-#
 # CONFIG_QIC02_TAPE is not set
 
 #
@@ -721,6 +717,7 @@ CONFIG_SOUND_ES1371=y
 # CONFIG_MIDI_VIA82CXXX is not set
 # CONFIG_SOUND_OSS is not set
 # CONFIG_SOUND_TVMIXER is not set
+CONFIG_INPUT_GAMEPORT=y
 
 #
 # USB support
