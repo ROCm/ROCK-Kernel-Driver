@@ -314,9 +314,10 @@ static void __init init_ide_data (void)
 			ide_init_default_irq(hwif->io_ports[IDE_DATA_OFFSET]);
 #endif
 	}
-
 #ifdef CONFIG_IDE_ARM
+	initializing = 1;
 	ide_arm_init();
+	initializing = 0;
 #endif
 }
 
