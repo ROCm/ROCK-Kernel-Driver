@@ -209,12 +209,10 @@ obj-$(CONFIG_AGP) += agp/
 obj-$(CONFIG_DRM) += drm/
 obj-$(CONFIG_PCMCIA) += pcmcia/
 
-host-progs := conmakehash
-
 include $(TOPDIR)/Rules.make
 
-$(obj)/consolemap_deftbl.c: $(src)/$(FONTMAPFILE) $(obj)/conmakehash
-	$(obj)/conmakehash $< > $@
+$(obj)/consolemap_deftbl.c: $(src)/$(FONTMAPFILE)
+	$(call do_cmd,CONMK  $(echo_target),$(objtree)/scripts/conmakehash $< > $@)
 
 $(obj)/defkeymap.o:  $(obj)/defkeymap.c
 
