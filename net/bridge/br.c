@@ -33,8 +33,6 @@ static int __init br_init(void)
 {
 	br_fdb_init();
 
-	br_sysfs_init();
-
 #ifdef CONFIG_BRIDGE_NETFILTER
 	if (br_netfilter_init())
 		return 1;
@@ -69,7 +67,6 @@ static void __exit br_deinit(void)
 #endif
 
 	br_handle_frame_hook = NULL;
-	br_sysfs_fini();
 	br_fdb_fini();
 }
 

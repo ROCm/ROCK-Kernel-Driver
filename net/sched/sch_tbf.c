@@ -201,7 +201,7 @@ static struct sk_buff *tbf_dequeue(struct Qdisc* sch)
 
 	if (skb) {
 		psched_time_t now;
-		long toks;
+		long toks, delay;
 		long ptoks = 0;
 		unsigned int len = skb->len;
 
@@ -229,14 +229,12 @@ static struct sk_buff *tbf_dequeue(struct Qdisc* sch)
 			return skb;
 		}
 
-		if (!netif_queue_stopped(sch->dev)) {
-			long delay = PSCHED_US2JIFFIE(max_t(long, -toks, -ptoks));
+		delay = PSCHED_US2JIFFIE(max_t(long, -toks, -ptoks));
 
-			if (delay == 0)
-				delay = 1;
+		if (delay == 0)
+			delay = 1;
 
-			mod_timer(&q->wd_timer, jiffies+delay);
-		}
+		mod_timer(&q->wd_timer, jiffies+delay);
 
 		/* Maybe we have a shorter packet in the queue,
 		   which can be sent now. It sounds cool,

@@ -26,6 +26,7 @@
 
 #include <linux/spinlock.h>
 #include <linux/pm.h>
+#include <linux/types.h>
 #include <asm/io.h>
 
 /* SIR Register */
@@ -198,6 +199,8 @@ struct ali_ircc_cb {
 	chipio_t io;               /* IrDA controller information */
 	iobuff_t tx_buff;          /* Transmit buffer */
 	iobuff_t rx_buff;          /* Receive buffer */
+	dma_addr_t tx_buff_dma;
+	dma_addr_t rx_buff_dma;
 
 	__u8 ier;                  /* Interrupt enable register */
 	

@@ -437,5 +437,6 @@ struct tc_dly_qopt
 {
 	__u32	latency;
 	__u32   limit;
-};	
+	__u32	loss;
+};
 #endif

@@ -1721,8 +1721,7 @@ hfsc_dequeue(struct Qdisc *sch)
 		cl = actlist_get_minvt(&q->root, cur_time);
 		if (cl == NULL) {
 			sch->stats.overlimits++;
-			if (!netif_queue_stopped(sch->dev))
-				hfsc_schedule_watchdog(sch, cur_time);
+			hfsc_schedule_watchdog(sch, cur_time);
 			return NULL;
 		}
 	}

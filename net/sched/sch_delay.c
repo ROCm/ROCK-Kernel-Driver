@@ -40,6 +40,7 @@
 struct dly_sched_data {
 	u32	latency;
 	u32	limit;
+	u32	loss;
 	struct timer_list timer;
 	struct Qdisc *qdisc;
 };
@@ -58,6 +59,12 @@ static int dly_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	struct dly_skb_cb *cb = (struct dly_skb_cb *)skb->cb;
 	int ret;
 
+	/* Random packet drop 0 => none, ~0 => all */
+	if (q->loss >= net_random()) {
+		sch->stats.drops++;
+		return 0;	/* lie about loss so TCP doesn't know */
+	}
+
 	PSCHED_GET_TIME(cb->queuetime);
 
 	/* Queue to underlying scheduler */
@@ -69,7 +76,7 @@ static int dly_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 		sch->stats.bytes += skb->len;
 		sch->stats.packets++;
 	}
-	return 0;
+	return ret;
 }
 
 /* Requeue packets but don't change time stamp */
@@ -104,12 +111,14 @@ static unsigned int dly_drop(struct Qdisc *sch)
 static struct sk_buff *dly_dequeue(struct Qdisc *sch)
 {
 	struct dly_sched_data *q = (struct dly_sched_data *)sch->data;
-	struct sk_buff *skb = q->qdisc->dequeue(q->qdisc);
+	struct sk_buff *skb;
 
+ retry:
+	skb = q->qdisc->dequeue(q->qdisc);
 	if (skb) {
 		struct dly_skb_cb *cb = (struct dly_skb_cb *)skb->cb;
 		psched_time_t now;
-		long diff;
+		long diff, delay;
 
 		PSCHED_GET_TIME(now);
 		diff = q->latency - PSCHED_TDIFF(now, cb->queuetime);
@@ -120,17 +129,17 @@ static struct sk_buff *dly_dequeue(struct Qdisc *sch)
 			return skb;
 		}
 
-		if (!netif_queue_stopped(sch->dev)) {
-			long delay = PSCHED_US2JIFFIE(diff);
-			if (delay <= 0)
-				delay = 1;
-			mod_timer(&q->timer, jiffies+delay);
-		}
-
 		if (q->qdisc->ops->requeue(skb, q->qdisc) != NET_XMIT_SUCCESS) {
 			sch->q.qlen--;
 			sch->stats.drops++;
+			goto retry;
 		}
+
+		delay = PSCHED_US2JIFFIE(diff);
+		if (delay <= 0)
+		  delay = 1;
+		mod_timer(&q->timer, jiffies+delay);
+
 		sch->flags |= TCQ_F_THROTTLED;
 	}
 	return NULL;
@@ -195,6 +204,7 @@ static int dly_change(struct Qdisc *sch, struct rtattr *opt)
 	} else {
 		q->latency = qopt->latency;
 		q->limit = qopt->limit;
+		q->loss = qopt->loss;
 	}
 	return err;
 }
@@ -231,6 +241,7 @@ static int dly_dump(struct Qdisc *sch, struct sk_buff *skb)
 
 	qopt.latency = q->latency;
 	qopt.limit = q->limit;
+	qopt.loss = q->loss;
 
 	RTA_PUT(skb, TCA_OPTIONS, sizeof(qopt), &qopt);
 

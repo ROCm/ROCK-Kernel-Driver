@@ -52,6 +52,7 @@
 #include <linux/init.h>
 #include <linux/rtnetlink.h>
 #include <linux/serial_reg.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/io.h>
 #include <asm/dma.h>
@@ -112,6 +113,8 @@ struct smsc_ircc_cb {
 	chipio_t io;               /* IrDA controller information */
 	iobuff_t tx_buff;          /* Transmit buffer */
 	iobuff_t rx_buff;          /* Receive buffer */
+	dma_addr_t tx_buff_dma;
+	dma_addr_t rx_buff_dma;
 
 	struct qos_info qos;       /* QoS capabilities for this device */
 
@@ -413,16 +416,18 @@ static int __init smsc_ircc_open(unsigned int fir_base, unsigned int sir_base, u
 	self->rx_buff.truesize = SMSC_IRCC2_RX_BUFF_TRUESIZE; 
 	self->tx_buff.truesize = SMSC_IRCC2_TX_BUFF_TRUESIZE;
 
-	self->rx_buff.head = (u8 *) kmalloc(self->rx_buff.truesize,
-					      GFP_KERNEL|GFP_DMA);
+	self->rx_buff.head =
+		dma_alloc_coherent(NULL, self->rx_buff.truesize,
+				   &self->rx_buff_dma, GFP_KERNEL);
 	if (self->rx_buff.head == NULL) {
 		ERROR("%s, Can't allocate memory for receive buffer!\n",
                       driver_name);
 		goto err_out2;
 	}
 
-	self->tx_buff.head = (u8 *) kmalloc(self->tx_buff.truesize, 
-					      GFP_KERNEL|GFP_DMA);
+	self->tx_buff.head =
+		dma_alloc_coherent(NULL, self->tx_buff.truesize,
+				   &self->tx_buff_dma, GFP_KERNEL);
 	if (self->tx_buff.head == NULL) {
 		ERROR("%s, Can't allocate memory for transmit buffer!\n",
                       driver_name);
@@ -464,9 +469,11 @@ static int __init smsc_ircc_open(unsigned int fir_base, unsigned int sir_base, u
 
 	return 0;
  err_out4:
-	kfree(self->tx_buff.head);
+	dma_free_coherent(NULL, self->tx_buff.truesize,
+			  self->tx_buff.head, self->tx_buff_dma);
  err_out3:
-	kfree(self->rx_buff.head);
+	dma_free_coherent(NULL, self->rx_buff.truesize,
+			  self->rx_buff.head, self->rx_buff_dma);
  err_out2:
 	free_netdev(self->netdev);
 	dev_self[--dev_count] = NULL;
@@ -1159,7 +1166,7 @@ static void smsc_ircc_dma_xmit(struct smsc_ircc_cb *self, int iobase, int bofs)
 	     IRCC_CFGB_DMA_BURST, iobase+IRCC_SCE_CFGB);
 
 	/* Setup DMA controller (must be done after enabling chip DMA) */
-	irda_setup_dma(self->io.dma, self->tx_buff.data, self->tx_buff.len, 
+	irda_setup_dma(self->io.dma, self->tx_buff_dma, self->tx_buff.len,
 		       DMA_TX_MODE);
 
 	/* Enable interrupt */
@@ -1249,8 +1256,8 @@ static int smsc_ircc_dma_receive(struct smsc_ircc_cb *self, int iobase)
 	outb(2050 & 0xff, iobase+IRCC_RX_SIZE_LO);
 
 	/* Setup DMA controller */
-	irda_setup_dma(self->io.dma, self->rx_buff.data,
-		       self->rx_buff.truesize, DMA_RX_MODE);
+	irda_setup_dma(self->io.dma, self->rx_buff_dma, self->rx_buff.truesize,
+		       DMA_RX_MODE);
 
 	/* Enable burst mode chip Rx DMA */
 	register_bank(iobase, 1);
@@ -1717,10 +1724,12 @@ static int __exit smsc_ircc_close(struct smsc_ircc_cb *self)
 	release_region(self->io.sir_base, self->io.sir_ext);
 
 	if (self->tx_buff.head)
-		kfree(self->tx_buff.head);
+		dma_free_coherent(NULL, self->tx_buff.truesize,
+				  self->tx_buff.head, self->tx_buff_dma);
 	
 	if (self->rx_buff.head)
-		kfree(self->rx_buff.head);
+		dma_free_coherent(NULL, self->rx_buff.truesize,
+				  self->rx_buff.head, self->rx_buff_dma);
 
 	free_netdev(self->netdev);
 

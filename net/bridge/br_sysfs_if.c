@@ -227,7 +227,7 @@ int br_sysfs_addif(struct net_bridge_port *p)
 	kobject_set_name(&p->kobj, SYSFS_BRIDGE_PORT_ATTR);
 	p->kobj.ktype = &brport_ktype;
 	p->kobj.parent = &(p->dev->class_dev.kobj);
-	p->kobj.kset = &bridge_subsys.kset;
+	p->kobj.kset = NULL;
 
 	err = kobject_add(&p->kobj);
 	if(err)

@@ -715,9 +715,11 @@ accept_redirects - BOOLEAN
 			    disabled if local forwarding is enabled.
 
 autoconf - BOOLEAN
-	Configure link-local addresses using L2 hardware addresses.
+	Autoconfigure addresses using Prefix Information in Router 
+	Advertisements.
 
-	Default: TRUE
+	Functional default: enabled if accept_ra is enabled.
+			    disabled if accept_ra is disabled.
 
 dad_transmits - INTEGER
 	The amount of Duplicate Address Detection probes to send.

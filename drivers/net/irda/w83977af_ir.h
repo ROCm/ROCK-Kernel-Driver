@@ -26,6 +26,7 @@
 #define W83977AF_IR_H
 
 #include <asm/io.h>
+#include <linux/types.h>
 
 /* Flags for configuration register CRF0 */
 #define ENBNKSEL	0x01
@@ -179,6 +180,8 @@ struct w83977af_ir {
 	chipio_t io;               /* IrDA controller information */
 	iobuff_t tx_buff;          /* Transmit buffer */
 	iobuff_t rx_buff;          /* Receive buffer */
+	dma_addr_t tx_buff_dma;
+	dma_addr_t rx_buff_dma;
 
 	/* Note : currently locking is *very* incomplete, but this
 	 * will get you started. Check in nsc-ircc.c for a proper

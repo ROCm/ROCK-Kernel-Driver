@@ -217,9 +217,6 @@ extern void br_sysfs_removeif(struct net_bridge_port *p);
 extern void br_sysfs_freeif(struct net_bridge_port *p);
 
 /* br_sysfs_br.c */
-extern struct subsystem bridge_subsys;
-extern void br_sysfs_init(void);
-extern void br_sysfs_fini(void);
 extern int br_sysfs_addbr(struct net_device *dev);
 extern void br_sysfs_delbr(struct net_device *dev);
 
@@ -228,8 +225,6 @@ extern void br_sysfs_delbr(struct net_device *dev);
 #define br_sysfs_addif(p)	(0)
 #define br_sysfs_removeif(p)	do { } while(0)
 #define br_sysfs_freeif(p)	kfree(p)
-#define br_sysfs_init()		do { } while(0)
-#define br_sysfs_fini()		do { } while(0)
 #define br_sysfs_addbr(dev)	(0)
 #define br_sysfs_delbr(dev)	do { } while(0)
 #endif /* CONFIG_SYSFS */
