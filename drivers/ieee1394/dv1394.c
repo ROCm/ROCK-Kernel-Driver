@@ -2875,7 +2875,7 @@ static void dv1394_add_host (struct hpsb_host *host)
 
 #ifdef CONFIG_DEVFS_FS
 {
-	struct dv1394_devfs_entry = devfs_entry = dv1394_devfs_find("dv");
+	struct dv1394_devfs_entry *devfs_entry = dv1394_devfs_find("dv");
 	if (devfs_entry != NULL) {
 		snprintf(buf, sizeof(buf), "host%d", ohci->id);
 		dv1394_devfs_add_dir(buf, devfs_entry, &devfs_entry);
