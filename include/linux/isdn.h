@@ -356,6 +356,24 @@ typedef struct isdn_net_local_s {
 #ifdef CONFIG_ISDN_X25
   struct concap_device_ops *dops;      /* callbacks used by encapsulator   */
 #endif
+#ifdef CONFIG_ISDN_PPP
+  unsigned int           mpppcfg;
+  long                   mp_seqno;
+
+  struct isdn_ppp_compressor *compressor;
+  struct isdn_ppp_compressor *decompressor;
+  void                  *comp_stat;
+  void                  *decomp_stat;
+  unsigned long          compflags;
+  struct ippp_ccp_reset *reset;
+
+  unsigned long          debug;
+#ifdef CONFIG_ISDN_PPP_VJ
+  unsigned char         *cbuf;
+  struct slcompress     *slcomp;
+#endif
+#endif
+
   /* use an own struct for that in later versions */
   ulong cisco_myseq;                   /* Local keepalive seq. for Cisco   */
   ulong cisco_mineseen;                /* returned keepalive seq. from remote */
@@ -415,6 +433,18 @@ typedef struct isdn_net_dev_s {
   char                   name[10];     /* Name of device                   */
   struct list_head       global_list;  /* global list of all isdn_net_devs */
 #ifdef CONFIG_ISDN_PPP
+  unsigned int           pppcfg;
+  unsigned int           pppmru;
+  unsigned int           pppseq;       /* last seq no seen                 */
+
+  struct isdn_ppp_compressor *compressor;
+  struct isdn_ppp_compressor *decompressor;
+  void                  *comp_stat;
+  void                  *decomp_stat;
+  unsigned long          compflags;
+  struct ippp_ccp_reset *reset;
+  unsigned long          debug;
+
   ippp_bundle * pb;		/* pointer to the common bundle structure
    			         * with the per-bundle data */
 #endif

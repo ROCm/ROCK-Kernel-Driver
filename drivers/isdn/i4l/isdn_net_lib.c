@@ -2093,6 +2093,7 @@ isdn_net_tasklet(unsigned long data)
 void
 isdn_net_online(isdn_net_dev *idev)
 {
+	// FIXME check we're connected
 	isdn_net_local *mlp = idev->mlp;
 	unsigned long flags;
 

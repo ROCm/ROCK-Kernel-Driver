@@ -172,7 +172,7 @@ enum ippp_ccp_reset_states {
 
 struct ippp_ccp_reset_state {
   enum ippp_ccp_reset_states state;	/* State of this transaction */
-  struct ipppd *is; 		        /* Backlink to device stuff */
+  struct ippp_ccp_reset *icr;           /* Backlink */
   unsigned char id;			/* Backlink id index */
   unsigned char ta:1;			/* The timer is active (flag) */
   unsigned char expra:1;		/* We expect a ResetAck at all */
@@ -189,6 +189,10 @@ struct ippp_ccp_reset_state {
 struct ippp_ccp_reset {
   struct ippp_ccp_reset_state *rs[256];	/* One per possible id */
   unsigned char lastid;			/* Last id allocated by the engine */
+  void (*xmit_reset)(void *priv, int proto, unsigned char code,
+		     unsigned char id, unsigned char *data, int len);
+  void (*kick_up)(void *priv);
+  void *priv;
 };
 
 #endif /* __KERNEL__ */
