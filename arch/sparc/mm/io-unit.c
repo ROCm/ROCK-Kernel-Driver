@@ -176,12 +176,14 @@ static void iounit_release_scsi_sgl(struct scatterlist *sg, int sz, struct sbus_
 }
 
 #ifdef CONFIG_SBUS
-static void iounit_map_dma_area(unsigned long va, __u32 addr, int len)
+static int iounit_map_dma_area(dma_addr_t *pba, unsigned long va, __u32 addr, int len)
 {
 	unsigned long page, end;
 	pgprot_t dvma_prot;
 	iopte_t *iopte;
 	struct sbus_bus *sbus;
+
+	*pba = addr;
 
 	dvma_prot = __pgprot(SRMMU_CACHE | SRMMU_ET_PTE | SRMMU_PRIV);
 	end = PAGE_ALIGN((addr + len));
@@ -213,6 +215,8 @@ static void iounit_map_dma_area(unsigned long va, __u32 addr, int len)
 	}
 	flush_cache_all();
 	flush_tlb_all();
+
+	return 0;
 }
 
 static void iounit_unmap_dma_area(unsigned long addr, int len)
@@ -221,7 +225,7 @@ static void iounit_unmap_dma_area(unsigned long addr, int len)
 }
 
 /* XXX We do not pass sbus device here, bad. */
-static unsigned long iounit_translate_dvma(unsigned long addr)
+static struct page *iounit_translate_dvma(unsigned long addr)
 {
 	struct sbus_bus *sbus = sbus_root;	/* They are all the same */
 	struct iounit_struct *iounit = (struct iounit_struct *)sbus->iommu;
@@ -230,7 +234,7 @@ static unsigned long iounit_translate_dvma(unsigned long addr)
 
 	i = ((addr - IOUNIT_DMA_BASE) >> PAGE_SHIFT);
 	iopte = (iopte_t *)(iounit->page_table + i);
-	return (iopte_val(*iopte) & 0xFFFFFFF0) << 4; /* XXX sun4d guru, help */
+	return pfn_to_page(iopte_val(*iopte) >> (PAGE_SHIFT-4)); /* XXX sun4d guru, help */
 }
 #endif
 
