@@ -318,6 +318,7 @@ int usb_hcd_pci_suspend (struct pci_dev *dev, u32 state)
 			
 			if (has_pci_pm)
 				retval = pci_set_power_state (dev, state);
+			dev->dev.power.power_state = state;
 			if (retval < 0) {
 				dev_dbg (&dev->dev,
 						"PCI suspend fail, %d\n",
@@ -357,6 +358,7 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 
 	if (has_pci_pm)
 		pci_set_power_state (dev, 0);
+	dev->dev.power.power_state = 0;
 	retval = request_irq (dev->irq, usb_hcd_irq, SA_SHIRQ,
 				hcd->description, hcd);
 	if (retval < 0) {
