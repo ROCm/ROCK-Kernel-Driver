@@ -215,6 +215,14 @@ M:	Juergen Fischer <fischer@norbit.de>
 L:	linux-scsi@vger.kernel.org
 S:	Maintained
 
+ALCATEL SPEEDTOUCH USB DRIVER
+P:	Duncan Sands
+M:	duncan.sands@wanadoo.fr
+L:	linux-usb-users@lists.sourceforge.net
+L:	linux-usb-devel@lists.sourceforge.net
+W:	http://www.linux-usb.org/SpeedTouch/
+S:	Maintained
+
 ALPHA PORT
 P:	Richard Henderson
 M:	rth@twiddle.net

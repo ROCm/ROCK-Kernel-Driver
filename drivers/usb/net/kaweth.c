@@ -130,6 +130,7 @@ static struct usb_device_id usb_klsi_table[] = {
 	{ USB_DEVICE(0x03e8, 0x0008) }, /* AOX Endpoints USB Ethernet */
 	{ USB_DEVICE(0x04bb, 0x0901) }, /* I-O DATA USB-ET/T */
 	{ USB_DEVICE(0x0506, 0x03e8) }, /* 3Com 3C19250 */
+	{ USB_DEVICE(0x0506, 0x11f8) }, /* 3Com 3C460 */
 	{ USB_DEVICE(0x0557, 0x2002) }, /* ATEN USB Ethernet */
 	{ USB_DEVICE(0x0557, 0x4000) }, /* D-Link DSB-650C */
 	{ USB_DEVICE(0x0565, 0x0002) }, /* Peracom Enet */
@@ -712,7 +713,7 @@ static void kaweth_usb_transmit_complete(struct urb *urb, struct pt_regs *regs)
 static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 {
 	struct kaweth_device *kaweth = net->priv;
-	char *private_header;
+	u16 *private_header;
 
 	int res;
 
@@ -744,7 +745,7 @@ static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 	}
 
 	private_header = __skb_push(skb, 2);
-	*private_header = cpu_to_le16(skb->len);
+	*private_header = cpu_to_le16(skb->len-2);
 	kaweth->tx_skb = skb;
 
 	usb_fill_bulk_urb(kaweth->tx_urb,
