@@ -196,13 +196,16 @@ clean_3:
 	hcd->self.op = &usb_hcd_operations;
 	hcd->self.hcpriv = (void *) hcd;
 	hcd->self.release = &hcd_pci_release;
+	init_timer (&hcd->rh_timer);
 
 	INIT_LIST_HEAD (&hcd->dev_list);
 
 	usb_register_bus (&hcd->self);
 
-	if ((retval = driver->start (hcd)) < 0)
+	if ((retval = driver->start (hcd)) < 0) {
+		dev_err (hcd->self.controller, "init error %d\n", retval);
 		usb_hcd_pci_remove (dev);
+	}
 
 	return retval;
 } 

@@ -374,6 +374,10 @@ static int ehci_start (struct usb_hcd *hcd)
 	u32			hcc_params;
 	u8                      tempbyte;
 
+	init_timer (&ehci->watchdog);
+	ehci->watchdog.function = ehci_watchdog;
+	ehci->watchdog.data = (unsigned long) ehci;
+
 	/*
 	 * hw default: 1K periodic list heads, one per frame.
 	 * periodic_size can shrink by USBCMD update if hcc_params allows.
@@ -467,10 +471,6 @@ static int ehci_start (struct usb_hcd *hcd)
 	dbg_cmd (ehci, "init", temp);
 
 	/* set async sleep time = 10 us ... ? */
-
-	init_timer (&ehci->watchdog);
-	ehci->watchdog.function = ehci_watchdog;
-	ehci->watchdog.data = (unsigned long) ehci;
 
 	/* wire up the root hub */
 	bus = hcd_to_bus (hcd);
