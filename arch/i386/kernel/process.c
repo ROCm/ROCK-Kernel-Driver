@@ -625,10 +625,8 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	/*
 	 * Does the userspace VM want any unlock on mm_release()?
 	 */
-	if (clone_flags & CLONE_RELEASE_VM) {
-		childregs->esp -= sizeof(0UL);
-		p->user_vm_lock = (long *) esp;
-	}
+	if (clone_flags & CLONE_RELEASE_VM)
+		p->user_vm_lock = (long *) childregs->edi;
 	return 0;
 }
 
