@@ -1,24 +1,5 @@
 /*
- * Adaptec AIC7xxx device driver for Linux.
- *
- * Copyright (c) 1994 John Aycock
- *   The University of Calgary Department of Computer Science.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; see the file COPYING.  If not, write to
- * the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
- * 
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#90 $
+ * Adaptec AIC79xx device driver for Linux.
  *
  * Copyright (c) 2000-2001 Adaptec Inc.
  * All rights reserved.
@@ -55,11 +36,11 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#90 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#64 $
  *
  */
-#ifndef _AIC7XXX_LINUX_H_
-#define _AIC7XXX_LINUX_H_
+#ifndef _AIC79XX_LINUX_H_
+#define _AIC79XX_LINUX_H_
 
 #include <linux/types.h>
 #include <linux/blk.h>
@@ -68,7 +49,7 @@
 #include <linux/ioport.h>
 #include <linux/pci.h>
 #include <linux/version.h>
-#ifndef AHC_MODVERSION_FILE
+#ifndef AHD_MODVERSION_FILE
 #define __NO_VERSION__
 #endif
 #include <linux/module.h>
@@ -98,40 +79,45 @@
 #include "cam.h"
 #include "queue.h"
 #include "scsi_message.h"
+#include "scsi_iu.h"
 
 /*********************************** Debugging ********************************/
-#ifdef CONFIG_AIC7XXX_DEBUG_ENABLE
-#ifdef CONFIG_AIC7XXX_DEBUG_MASK
-#define AHC_DEBUG 1
-#define AHC_DEBUG_OPTS CONFIG_AIC7XXX_DEBUG_MASK
+#ifdef CONFIG_AIC79XX_DEBUG_ENABLE
+#ifdef CONFIG_AIC79XX_DEBUG_MASK
+#define AHD_DEBUG 1
+#define AHD_DEBUG_OPTS CONFIG_AIC79XX_DEBUG_MASK
 #else
 /*
  * Compile in debugging code, but do not enable any printfs.
  */
-#define AHC_DEBUG 1
+#define AHD_DEBUG 1
 #endif
 /* No debugging code. */
 #endif
 
+/********************************** Misc Macros *******************************/
+#define	roundup(x, y)   ((((x)+((y)-1))/(y))*(y))
+#define	powerof2(x)	((((x)-1)&(x))==0)
+
 /************************* Forward Declarations *******************************/
-struct ahc_softc;
-typedef struct pci_dev *ahc_dev_softc_t;
-typedef Scsi_Cmnd      *ahc_io_ctx_t;
+struct ahd_softc;
+typedef struct pci_dev *ahd_dev_softc_t;
+typedef Scsi_Cmnd      *ahd_io_ctx_t;
 
 /******************************* Byte Order ***********************************/
-#define ahc_htobe16(x)	cpu_to_be16(x)
-#define ahc_htobe32(x)	cpu_to_be32(x)
-#define ahc_htobe64(x)	cpu_to_be64(x)
-#define ahc_htole16(x)	cpu_to_le16(x)
-#define ahc_htole32(x)	cpu_to_le32(x)
-#define ahc_htole64(x)	cpu_to_le64(x)
+#define ahd_htobe16(x)	cpu_to_be16(x)
+#define ahd_htobe32(x)	cpu_to_be32(x)
+#define ahd_htobe64(x)	cpu_to_be64(x)
+#define ahd_htole16(x)	cpu_to_le16(x)
+#define ahd_htole32(x)	cpu_to_le32(x)
+#define ahd_htole64(x)	cpu_to_le64(x)
 
-#define ahc_be16toh(x)	be16_to_cpu(x)
-#define ahc_be32toh(x)	be32_to_cpu(x)
-#define ahc_be64toh(x)	be64_to_cpu(x)
-#define ahc_le16toh(x)	le16_to_cpu(x)
-#define ahc_le32toh(x)	le32_to_cpu(x)
-#define ahc_le64toh(x)	le64_to_cpu(x)
+#define ahd_be16toh(x)	be16_to_cpu(x)
+#define ahd_be32toh(x)	be32_to_cpu(x)
+#define ahd_be64toh(x)	be64_to_cpu(x)
+#define ahd_le16toh(x)	le16_to_cpu(x)
+#define ahd_le32toh(x)	le32_to_cpu(x)
+#define ahd_le64toh(x)	le64_to_cpu(x)
 
 #ifndef LITTLE_ENDIAN
 #define LITTLE_ENDIAN 1234
@@ -151,10 +137,9 @@ typedef Scsi_Cmnd      *ahc_io_ctx_t;
 #endif /* BYTE_ORDER */
 
 /************************* Configuration Data *********************************/
-extern int aic7xxx_no_probe;
-extern int aic7xxx_allow_memio;
-extern int aic7xxx_detect_complete;
-extern Scsi_Host_Template* aic7xxx_driver_template;
+extern int aic79xx_allow_memio;
+extern int aic79xx_detect_complete;
+extern Scsi_Host_Template* aic79xx_driver_template;
 
 /***************************** Bus Space/DMA **********************************/
 
@@ -181,19 +166,19 @@ typedef struct bus_dma_segment
 	bus_size_t	ds_len;
 } bus_dma_segment_t;
 
-struct ahc_linux_dma_tag
+struct ahd_linux_dma_tag
 {
 	bus_size_t	alignment;
 	bus_size_t	boundary;
 	bus_size_t	maxsize;
 };
-typedef struct ahc_linux_dma_tag* bus_dma_tag_t;
+typedef struct ahd_linux_dma_tag* bus_dma_tag_t;
 
-struct ahc_linux_dmamap
+struct ahd_linux_dmamap
 {
 	bus_addr_t	bus_addr;
 };
-typedef struct ahc_linux_dmamap* bus_dmamap_t;
+typedef struct ahd_linux_dmamap* bus_dmamap_t;
 
 typedef int bus_dma_filter_t(void*, bus_addr_t);
 typedef void bus_dmamap_callback_t(void *, bus_dma_segment_t *, int, int);
@@ -210,7 +195,7 @@ typedef void bus_dmamap_callback_t(void *, bus_dma_segment_t *, int, int);
 #define BUS_SPACE_MAXADDR_32BIT	0xFFFFFFFF
 #define BUS_SPACE_MAXSIZE_32BIT	0xFFFFFFFF
 
-int	ahc_dma_tag_create(struct ahc_softc *, bus_dma_tag_t /*parent*/,
+int	ahd_dma_tag_create(struct ahd_softc *, bus_dma_tag_t /*parent*/,
 			   bus_size_t /*alignment*/, bus_size_t /*boundary*/,
 			   bus_addr_t /*lowaddr*/, bus_addr_t /*highaddr*/,
 			   bus_dma_filter_t*/*filter*/, void */*filterarg*/,
@@ -218,27 +203,27 @@ int	ahc_dma_tag_create(struct ahc_softc *, bus_dma_tag_t /*parent*/,
 			   bus_size_t /*maxsegsz*/, int /*flags*/,
 			   bus_dma_tag_t */*dma_tagp*/);
 
-void	ahc_dma_tag_destroy(struct ahc_softc *, bus_dma_tag_t /*tag*/);
+void	ahd_dma_tag_destroy(struct ahd_softc *, bus_dma_tag_t /*tag*/);
 
-int	ahc_dmamem_alloc(struct ahc_softc *, bus_dma_tag_t /*dmat*/,
+int	ahd_dmamem_alloc(struct ahd_softc *, bus_dma_tag_t /*dmat*/,
 			 void** /*vaddr*/, int /*flags*/,
 			 bus_dmamap_t* /*mapp*/);
 
-void	ahc_dmamem_free(struct ahc_softc *, bus_dma_tag_t /*dmat*/,
+void	ahd_dmamem_free(struct ahd_softc *, bus_dma_tag_t /*dmat*/,
 			void* /*vaddr*/, bus_dmamap_t /*map*/);
 
-void	ahc_dmamap_destroy(struct ahc_softc *, bus_dma_tag_t /*tag*/,
+void	ahd_dmamap_destroy(struct ahd_softc *, bus_dma_tag_t /*tag*/,
 			   bus_dmamap_t /*map*/);
 
-int	ahc_dmamap_load(struct ahc_softc *ahc, bus_dma_tag_t /*dmat*/,
+int	ahd_dmamap_load(struct ahd_softc *ahd, bus_dma_tag_t /*dmat*/,
 			bus_dmamap_t /*map*/, void * /*buf*/,
 			bus_size_t /*buflen*/, bus_dmamap_callback_t *,
 			void */*callback_arg*/, int /*flags*/);
 
-int	ahc_dmamap_unload(struct ahc_softc *, bus_dma_tag_t, bus_dmamap_t);
+int	ahd_dmamap_unload(struct ahd_softc *, bus_dma_tag_t, bus_dmamap_t);
 
 /*
- * Operations performed by ahc_dmamap_sync().
+ * Operations performed by ahd_dmamap_sync().
  */
 #define BUS_DMASYNC_PREREAD	0x01	/* pre-read synchronization */
 #define BUS_DMASYNC_POSTREAD	0x02	/* post-read synchronization */
@@ -247,13 +232,13 @@ int	ahc_dmamap_unload(struct ahc_softc *, bus_dma_tag_t, bus_dmamap_t);
 
 /*
  * XXX
- * ahc_dmamap_sync is only used on buffers allocated with
+ * ahd_dmamap_sync is only used on buffers allocated with
  * the pci_alloc_consistent() API.  Although I'm not sure how
  * this works on architectures with a write buffer, Linux does
  * not have an API to sync "coherent" memory.  Perhaps we need
  * to do an mb()?
  */
-#define ahc_dmamap_sync(ahc, dma_tag, dmamap, offset, len, op)
+#define ahd_dmamap_sync(ahd, dma_tag, dmamap, offset, len, op)
 
 /************************** SCSI Constants/Structures *************************/
 #define SCSI_REV_2 2
@@ -439,26 +424,52 @@ struct scsi_inquiry_data
 	uint8_t vendor_specific1[SID_VENDOR_SPECIFIC_1_SIZE];
 };
 
+static __inline uint32_t scsi_4btoul(uint8_t *bytes);
+static __inline uint32_t
+scsi_4btoul(uint8_t *bytes)
+{
+	return ((bytes[0] << 24)|(bytes[1] << 16)|(bytes[2] << 8)|bytes[3]);
+}
+/************************** Timer DataStructures ******************************/
+typedef struct timer_list ahd_timer_t;
+
 /********************************** Includes **********************************/
 /* Host template and function declarations referenced by the template. */
-#include "aic7xxx_host.h"
+#include "aic79xx_host.h"
 
 /* Core driver definitions */
-#if CONFIG_AIC7XXX_REG_PRETTY_PRINT
+#if CONFIG_AIC79XX_REG_PRETTY_PRINT
 #define AIC_DEBUG_REGISTERS 1
 #else
 #define AIC_DEBUG_REGISTERS 0
 #endif
-#include "aic7xxx.h"
+#include "aic79xx.h"
 
-/* SMP support */
+/***************************** Timer Facilities *******************************/
+#define ahd_timer_init init_timer
+#define ahd_timer_stop del_timer
+typedef void ahd_linux_callback_t (u_long);  
+static __inline void
+ahd_timer_reset(ahd_timer_t *timer, int usec, ahd_callback_t *func, void *arg)
+{
+	struct ahd_softc *ahd;
+
+	ahd = (struct ahd_softc *)arg;
+	del_timer(timer);
+	timer->data = (u_long)arg;
+	timer->expires = jiffies + (usec * HZ)/1000000;
+	timer->function = (ahd_linux_callback_t*)func;
+	add_timer(timer);
+}
+
+/***************************** SMP support ************************************/
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,17)
 #include <linux/spinlock.h>
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 #include <linux/smp.h>
 #endif
 
-#define AIC7XXX_DRIVER_VERSION  "6.2.10"
+#define AIC79XX_DRIVER_VERSION "1.1.1"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -467,20 +478,20 @@ struct scsi_inquiry_data
  * plenty of space to hold the links fields as required by the queue
  * macros, but the queue macors require them to have the correct type.
  */
-struct ahc_cmd_internal {
+struct ahd_cmd_internal {
 	/* Area owned by the Linux scsi layer. */
 	uint8_t	private[offsetof(struct scsi_cmnd, SCp.Status)];
 	union {
-		STAILQ_ENTRY(ahc_cmd)	ste;
-		LIST_ENTRY(ahc_cmd)	le;
-		TAILQ_ENTRY(ahc_cmd)	tqe;
+		STAILQ_ENTRY(ahd_cmd)	ste;
+		LIST_ENTRY(ahd_cmd)	le;
+		TAILQ_ENTRY(ahd_cmd)	tqe;
 	} links;
 	uint32_t			end;
 };
 
-struct ahc_cmd {
+struct ahd_cmd {
 	union {
-		struct ahc_cmd_internal	icmd;
+		struct ahd_cmd_internal	icmd;
 		struct scsi_cmnd	scsi_cmd;
 	} un;
 };
@@ -497,21 +508,21 @@ struct ahc_cmd {
  * after a successfully completed inquiry command to the target when
  * that inquiry data indicates a lun is present.
  */
-TAILQ_HEAD(ahc_busyq, ahc_cmd);
+TAILQ_HEAD(ahd_busyq, ahd_cmd);
 typedef enum {
-	AHC_DEV_UNCONFIGURED	 = 0x01,
-	AHC_DEV_FREEZE_TIL_EMPTY = 0x02, /* Freeze queue until active == 0 */
-	AHC_DEV_TIMER_ACTIVE	 = 0x04, /* Our timer is active */
-	AHC_DEV_ON_RUN_LIST	 = 0x08, /* Queued to be run later */
-	AHC_DEV_Q_BASIC		 = 0x10, /* Allow basic device queuing */
-	AHC_DEV_Q_TAGGED	 = 0x20, /* Allow full SCSI2 command queueing */
-	AHC_DEV_PERIODIC_OTAG	 = 0x40	 /* Send OTAG to prevent starvation */
-} ahc_dev_flags;
+	AHD_DEV_UNCONFIGURED	 = 0x01,
+	AHD_DEV_FREEZE_TIL_EMPTY = 0x02, /* Freeze queue until active == 0 */
+	AHD_DEV_TIMER_ACTIVE	 = 0x04, /* Our timer is active */
+	AHD_DEV_ON_RUN_LIST	 = 0x08, /* Queued to be run later */
+	AHD_DEV_Q_BASIC		 = 0x10, /* Allow basic device queuing */
+	AHD_DEV_Q_TAGGED	 = 0x20, /* Allow full SCSI2 command queueing */
+	AHD_DEV_PERIODIC_OTAG	 = 0x40	 /* Send OTAG to prevent starvation */
+} ahd_dev_flags;
 
-struct ahc_linux_target;
-struct ahc_linux_device {
-	TAILQ_ENTRY(ahc_linux_device) links;
-	struct		ahc_busyq busyq;
+struct ahd_linux_target;
+struct ahd_linux_device {
+	TAILQ_ENTRY(ahd_linux_device) links;
+	struct			ahd_busyq busyq;
 
 	/*
 	 * The number of transactions currently
@@ -547,9 +558,9 @@ struct ahc_linux_device {
 	 * this device since the last QUEUE FULL.
 	 */
 	u_int			tag_success_count;
-#define AHC_TAG_SUCCESS_INTERVAL 50
+#define AHD_TAG_SUCCESS_INTERVAL 50
 
-	ahc_dev_flags		flags;
+	ahd_dev_flags		flags;
 
 	/*
 	 * Per device timer.
@@ -574,7 +585,7 @@ struct ahc_linux_device {
 	 * on devices with a fixed number of tags.
 	 */
 	u_int			last_queuefull_same_count;
-#define AHC_LOCK_TAGS_COUNT 50
+#define AHD_LOCK_TAGS_COUNT 50
 
 	/*
 	 * How many transactions have been queued
@@ -582,23 +593,23 @@ struct ahc_linux_device {
 	 * this statistic to determine when to issue
 	 * an ordered tag to prevent transaction
 	 * starvation.  This statistic is only updated
-	 * if the AHC_DEV_PERIODIC_OTAG flag is set
+	 * if the AHD_DEV_PERIODIC_OTAG flag is set
 	 * on this device.
 	 */
 	u_int			commands_since_idle_or_otag;
-#define AHC_OTAG_THRESH	500
+#define AHD_OTAG_THRESH	500
 
 	int			lun;
-	struct			ahc_linux_target *target;
+	struct			ahd_linux_target *target;
 };
 
-struct ahc_linux_target {
-	struct	ahc_linux_device *devices[AHC_NUM_LUNS];
+struct ahd_linux_target {
+	struct	ahd_linux_device *devices[AHD_NUM_LUNS];
 	int	channel;
 	int	target;
 	int	refcount;
-	struct	ahc_transinfo last_tinfo;
-	struct	ahc_softc *ahc;
+	struct	ahd_transinfo last_tinfo;
+	struct	ahd_softc *ahd;
 };
 
 /********************* Definitions Required by the Core ***********************/
@@ -608,13 +619,13 @@ struct ahc_linux_target {
  * manner and are allocated below 4GB, the number of S/G segments is
  * unrestricted.
  */
-#define        AHC_NSEG 128
+#define        AHD_NSEG 128
 
 /*
  * Per-SCB OSM storage.
  */
 struct scb_platform_data {
-	struct ahc_linux_device	*dev;
+	struct ahd_linux_device	*dev;
 	bus_addr_t		 buf_busaddr;
 	uint32_t		 xfer_len;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
@@ -628,14 +639,14 @@ struct scb_platform_data {
  * alignment restrictions of the various platforms supported by
  * this driver.
  */
-TAILQ_HEAD(ahc_completeq, ahc_cmd);
-struct ahc_platform_data {
+TAILQ_HEAD(ahd_completeq, ahd_cmd);
+struct ahd_platform_data {
 	/*
 	 * Fields accessed from interrupt context.
 	 */
-	struct ahc_linux_target *targets[AHC_NUM_TARGETS]; 
-	TAILQ_HEAD(, ahc_linux_device) device_runq;
-	struct ahc_completeq	 completeq;
+	struct ahd_linux_target *targets[AHD_NUM_TARGETS]; 
+	TAILQ_HEAD(, ahd_linux_device) device_runq;
+	struct ahd_completeq	 completeq;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 	spinlock_t		 spin_lock;
@@ -647,7 +658,7 @@ struct ahc_platform_data {
 	struct timer_list	 reset_timer;
 	struct semaphore	 eh_sem;
 	struct Scsi_Host        *host;		/* pointer to scsi host */
-#define AHC_LINUX_NOIRQ	((uint32_t)~0)
+#define AHD_LINUX_NOIRQ	((uint32_t)~0)
 	uint32_t		 irq;		/* IRQ for this adapter */
 	uint32_t		 bios_address;
 	uint32_t		 mem_busaddr;	/* Mem Base Addr */
@@ -661,9 +672,9 @@ struct ahc_platform_data {
 #define malloc(size, type, flags) kmalloc(size, flags)
 #define free(ptr, type) kfree(ptr)
 
-static __inline void ahc_delay(long);
+static __inline void ahd_delay(long);
 static __inline void
-ahc_delay(long usec)
+ahd_delay(long usec)
 {
 	/*
 	 * udelay on Linux can have problems for
@@ -682,62 +693,84 @@ ahc_delay(long usec)
 #define MMAPIO
 #endif
 
-static __inline uint8_t ahc_inb(struct ahc_softc * ahc, long port);
-static __inline void ahc_outb(struct ahc_softc * ahc, long port, uint8_t val);
-static __inline void ahc_outsb(struct ahc_softc * ahc, long port,
+static __inline uint8_t ahd_inb(struct ahd_softc * ahd, long port);
+static __inline uint16_t ahd_inw_atomic(struct ahd_softc * ahd, long port);
+static __inline void ahd_outb(struct ahd_softc * ahd, long port, uint8_t val);
+static __inline void ahd_outw_atomic(struct ahd_softc * ahd,
+				     long port, uint16_t val);
+static __inline void ahd_outsb(struct ahd_softc * ahd, long port,
 			       uint8_t *, int count);
-static __inline void ahc_insb(struct ahc_softc * ahc, long port,
+static __inline void ahd_insb(struct ahd_softc * ahd, long port,
 			       uint8_t *, int count);
 
 static __inline uint8_t
-ahc_inb(struct ahc_softc * ahc, long port)
+ahd_inb(struct ahd_softc * ahd, long port)
 {
 	uint8_t x;
 #ifdef MMAPIO
 
-	if (ahc->tag == BUS_SPACE_MEMIO) {
-		x = readb(ahc->bsh.maddr + port);
+	if (ahd->tags[0] == BUS_SPACE_MEMIO) {
+		x = readb(ahd->bshs[0].maddr + port);
 	} else {
-		x = inb(ahc->bsh.ioport + port);
+		x = inb(ahd->bshs[(port) >> 8].ioport + ((port) & 0xFF));
 	}
 #else
-	x = inb(ahc->bsh.ioport + port);
+	x = inb(ahd->bshs[(port) >> 8].ioport + ((port) & 0xFF));
+#endif
+	mb();
+	return (x);
+}
+
+static __inline uint16_t
+ahd_inw_atomic(struct ahd_softc * ahd, long port)
+{
+	uint8_t x;
+#ifdef MMAPIO
+
+	if (ahd->tags[0] == BUS_SPACE_MEMIO) {
+		x = readw(ahd->bshs[0].maddr + port);
+	} else {
+		x = inw(ahd->bshs[(port) >> 8].ioport + ((port) & 0xFF));
+	}
+#else
+	x = inw(ahd->bshs[(port) >> 8].ioport + ((port) & 0xFF));
 #endif
 	mb();
 	return (x);
 }
 
 static __inline void
-ahc_outb(struct ahc_softc * ahc, long port, uint8_t val)
+ahd_outb(struct ahd_softc * ahd, long port, uint8_t val)
 {
 #ifdef MMAPIO
-	if (ahc->tag == BUS_SPACE_MEMIO) {
-		writeb(val, ahc->bsh.maddr + port);
+	if (ahd->tags[0] == BUS_SPACE_MEMIO) {
+		writeb(val, ahd->bshs[0].maddr + port);
 	} else {
-		outb(val, ahc->bsh.ioport + port);
+		outb(val, ahd->bshs[(port) >> 8].ioport + (port & 0xFF));
 	}
 #else
-	outb(val, ahc->bsh.ioport + port);
+	outb(val, ahd->bshs[(port) >> 8].ioport + (port & 0xFF));
 #endif
 	mb();
 }
 
 static __inline void
-ahc_outsb(struct ahc_softc * ahc, long port, uint8_t *array, int count)
+ahd_outw_atomic(struct ahd_softc * ahd, long port, uint16_t val)
 {
-	int i;
-
-	/*
-	 * There is probably a more efficient way to do this on Linux
-	 * but we don't use this for anything speed critical and this
-	 * should work.
-	 */
-	for (i = 0; i < count; i++)
-		ahc_outb(ahc, port, *array++);
+#ifdef MMAPIO
+	if (ahd->tags[0] == BUS_SPACE_MEMIO) {
+		writew(val, ahd->bshs[0].maddr + port);
+	} else {
+		outw(val, ahd->bshs[(port) >> 8].ioport + (port & 0xFF));
+	}
+#else
+	outw(val, ahd->bshs[(port) >> 8].ioport + (port & 0xFF));
+#endif
+	mb();
 }
 
 static __inline void
-ahc_insb(struct ahc_softc * ahc, long port, uint8_t *array, int count)
+ahd_outsb(struct ahd_softc * ahd, long port, uint8_t *array, int count)
 {
 	int i;
 
@@ -747,14 +780,28 @@ ahc_insb(struct ahc_softc * ahc, long port, uint8_t *array, int count)
 	 * should work.
 	 */
 	for (i = 0; i < count; i++)
-		*array++ = ahc_inb(ahc, port);
+		ahd_outb(ahd, port, *array++);
+}
+
+static __inline void
+ahd_insb(struct ahd_softc * ahd, long port, uint8_t *array, int count)
+{
+	int i;
+
+	/*
+	 * There is probably a more efficient way to do this on Linux
+	 * but we don't use this for anything speed critical and this
+	 * should work.
+	 */
+	for (i = 0; i < count; i++)
+		*array++ = ahd_inb(ahd, port);
 }
 
 /**************************** Initialization **********************************/
-int		ahc_linux_register_host(struct ahc_softc *,
+int		ahd_linux_register_host(struct ahd_softc *,
 					Scsi_Host_Template *);
 
-uint64_t	ahc_linux_get_memsize(void);
+uint64_t	ahd_linux_get_memsize(void);
 
 /*************************** Pretty Printing **********************************/
 struct info_str {
@@ -764,78 +811,78 @@ struct info_str {
 	int pos;
 };
 
-void	ahc_format_transinfo(struct info_str *info,
-			     struct ahc_transinfo *tinfo);
+void	ahd_format_transinfo(struct info_str *info,
+			     struct ahd_transinfo *tinfo);
 
 /******************************** Locking *************************************/
 /* Lock protecting internal data structures */
-static __inline void ahc_lockinit(struct ahc_softc *);
-static __inline void ahc_lock(struct ahc_softc *, unsigned long *flags);
-static __inline void ahc_unlock(struct ahc_softc *, unsigned long *flags);
+static __inline void ahd_lockinit(struct ahd_softc *);
+static __inline void ahd_lock(struct ahd_softc *, unsigned long *flags);
+static __inline void ahd_unlock(struct ahd_softc *, unsigned long *flags);
 
 /* Lock acquisition and release of the above lock in midlayer entry points. */
-static __inline void ahc_midlayer_entrypoint_lock(struct ahc_softc *,
+static __inline void ahd_midlayer_entrypoint_lock(struct ahd_softc *,
 						  unsigned long *flags);
-static __inline void ahc_midlayer_entrypoint_unlock(struct ahc_softc *,
+static __inline void ahd_midlayer_entrypoint_unlock(struct ahd_softc *,
 						    unsigned long *flags);
 
 /* Lock held during command compeletion to the upper layer */
-static __inline void ahc_done_lockinit(struct ahc_softc *);
-static __inline void ahc_done_lock(struct ahc_softc *, unsigned long *flags);
-static __inline void ahc_done_unlock(struct ahc_softc *, unsigned long *flags);
+static __inline void ahd_done_lockinit(struct ahd_softc *);
+static __inline void ahd_done_lock(struct ahd_softc *, unsigned long *flags);
+static __inline void ahd_done_unlock(struct ahd_softc *, unsigned long *flags);
 
-/* Lock held during ahc_list manipulation and ahc softc frees */
-extern spinlock_t ahc_list_spinlock;
-static __inline void ahc_list_lockinit(void);
-static __inline void ahc_list_lock(unsigned long *flags);
-static __inline void ahc_list_unlock(unsigned long *flags);
+/* Lock held during ahd_list manipulation and ahd softc frees */
+extern spinlock_t ahd_list_spinlock;
+static __inline void ahd_list_lockinit(void);
+static __inline void ahd_list_lock(unsigned long *flags);
+static __inline void ahd_list_unlock(unsigned long *flags);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 static __inline void
-ahc_lockinit(struct ahc_softc *ahc)
+ahd_lockinit(struct ahd_softc *ahd)
 {
-	spin_lock_init(&ahc->platform_data->spin_lock);
+	spin_lock_init(&ahd->platform_data->spin_lock);
 }
 
 static __inline void
-ahc_lock(struct ahc_softc *ahc, unsigned long *flags)
+ahd_lock(struct ahd_softc *ahd, unsigned long *flags)
 {
 	*flags = 0;
-	spin_lock_irqsave(&ahc->platform_data->spin_lock, *flags);
+	spin_lock_irqsave(&ahd->platform_data->spin_lock, *flags);
 }
 
 static __inline void
-ahc_unlock(struct ahc_softc *ahc, unsigned long *flags)
+ahd_unlock(struct ahd_softc *ahd, unsigned long *flags)
 {
-	spin_unlock_irqrestore(&ahc->platform_data->spin_lock, *flags);
+	spin_unlock_irqrestore(&ahd->platform_data->spin_lock, *flags);
 }
 
 static __inline void
-ahc_midlayer_entrypoint_lock(struct ahc_softc *ahc, unsigned long *flags)
+ahd_midlayer_entrypoint_lock(struct ahd_softc *ahd, unsigned long *flags)
 {
 	/*
 	 * In 2.5.X, the midlayer takes our lock just before
 	 * calling us, so avoid locking again.
 	 */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	ahc_lock(ahc, flags);
+	ahd_lock(ahd, flags);
 #endif
 }
 
 static __inline void
-ahc_midlayer_entrypoint_unlock(struct ahc_softc *ahc, unsigned long *flags)
+ahd_midlayer_entrypoint_unlock(struct ahd_softc *ahd, unsigned long *flags)
 {
 	/*
 	 * In 2.5.X, the midlayer takes our lock just before
 	 * calling us and unlocks when we return, so let it do the unlock.
 	 */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	ahc_unlock(ahc, flags);
+	ahd_unlock(ahd, flags);
 #endif
 }
 
 static __inline void
-ahc_done_lockinit(struct ahc_softc *ahc)
+ahd_done_lockinit(struct ahd_softc *ahd)
 {
 	/*
 	 * In 2.5.X, our own lock is held during completions.
@@ -845,7 +892,7 @@ ahc_done_lockinit(struct ahc_softc *ahc)
 }
 
 static __inline void
-ahc_done_lock(struct ahc_softc *ahc, unsigned long *flags)
+ahd_done_lock(struct ahd_softc *ahd, unsigned long *flags)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	*flags = 0;
@@ -854,7 +901,7 @@ ahc_done_lock(struct ahc_softc *ahc, unsigned long *flags)
 }
 
 static __inline void
-ahc_done_unlock(struct ahc_softc *ahc, unsigned long *flags)
+ahd_done_unlock(struct ahd_softc *ahd, unsigned long *flags)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	spin_unlock_irqrestore(&io_request_lock, *flags);
@@ -862,33 +909,32 @@ ahc_done_unlock(struct ahc_softc *ahc, unsigned long *flags)
 }
 
 static __inline void
-ahc_list_lockinit()
+ahd_list_lockinit()
 {
-	spin_lock_init(&ahc_list_spinlock);
+	spin_lock_init(&ahd_list_spinlock);
 }
 
 static __inline void
-ahc_list_lock(unsigned long *flags)
+ahd_list_lock(unsigned long *flags)
 {
 	*flags = 0;
-	spin_lock_irqsave(&ahc_list_spinlock, *flags);
+	spin_lock_irqsave(&ahd_list_spinlock, *flags);
 }
 
 static __inline void
-ahc_list_unlock(unsigned long *flags)
+ahd_list_unlock(unsigned long *flags)
 {
-	spin_unlock_irqrestore(&ahc_list_spinlock, *flags);
+	spin_unlock_irqrestore(&ahd_list_spinlock, *flags);
 }
 
-#else /* LINUX_VERSION_CODE < KERNEL_VERSION(2,1,93) */
+#else /* LINUX_VERSION_CODE < KERNEL_VERSION(2,1,0) */
 
-static __inline void
-ahc_lockinit(struct ahc_softc *ahc)
+ahd_lockinit(struct ahd_softc *ahd)
 {
 }
 
 static __inline void
-ahc_lock(struct ahc_softc *ahc, unsigned long *flags)
+ahd_lock(struct ahd_softc *ahd, unsigned long *flags)
 {
 	*flags = 0;
 	save_flags(*flags);
@@ -896,38 +942,37 @@ ahc_lock(struct ahc_softc *ahc, unsigned long *flags)
 }
 
 static __inline void
-ahc_unlock(struct ahc_softc *ahc, unsigned long *flags)
+ahd_unlock(struct ahd_softc *ahd, unsigned long *flags)
 {
 	restore_flags(*flags);
 }
 
-static __inline void
-ahc_done_lockinit(struct ahc_softc *ahc)
+ahd_done_lockinit(struct ahd_softc *ahd)
 {
 }
 
 static __inline void
-ahc_done_lock(struct ahc_softc *ahc, unsigned long *flags)
+ahd_done_lock(struct ahd_softc *ahd, unsigned long *flags)
 {
 	/*
 	 * The done lock is always held while
-	 * the ahc lock is held so blocking
+	 * the ahd lock is held so blocking
 	 * interrupts again would have no effect.
 	 */
 }
 
 static __inline void
-ahc_done_unlock(struct ahc_softc *ahc, unsigned long *flags)
+ahd_done_unlock(struct ahd_softc *ahd, unsigned long *flags)
 {
 }
 
 static __inline void
-ahc_list_lockinit()
+ahd_list_lockinit()
 {
 }
 
 static __inline void
-ahc_list_lock(unsigned long *flags)
+ahd_list_lock(unsigned long *flags)
 {
 	*flags = 0;
 	save_flags(*flags);
@@ -935,7 +980,7 @@ ahc_list_lock(unsigned long *flags)
 }
 
 static __inline void
-ahc_list_unlock(unsigned long *flags)
+ahd_list_unlock(unsigned long *flags)
 {
 	restore_flags(*flags);
 }
@@ -960,6 +1005,7 @@ ahc_list_unlock(unsigned long *flags)
 #define PCIM_CMD_BUSMASTEREN	0x0004
 #define PCIM_CMD_MWRICEN	0x0010
 #define PCIM_CMD_PERRESPEN	0x0040
+#define	PCIM_CMD_SERRESPEN	0x0100
 #define PCIR_STATUS		0x06
 #define PCIR_REVID		0x08
 #define PCIR_PROGIF		0x09
@@ -977,25 +1023,37 @@ ahc_list_unlock(unsigned long *flags)
 #define PCIR_SUBVEND_0	0x2c
 #define PCIR_SUBDEV_0	0x2e
 
+/****************************** PCI-X definitions *****************************/
+#define PCIXR_COMMAND	0x96
+#define PCIXR_DEVADDR	0x98
+#define PCIXM_DEVADDR_FNUM	0x0003	/* Function Number */
+#define PCIXM_DEVADDR_DNUM	0x00F8	/* Device Number */
+#define PCIXM_DEVADDR_BNUM	0xFF00	/* Bus Number */
+#define PCIXR_STATUS	0x9A
+#define PCIXM_STATUS_64BIT	0x0001	/* Active 64bit connection to device. */
+#define PCIXM_STATUS_133CAP	0x0002	/* Device is 133MHz capable */
+#define PCIXM_STATUS_SCDISC	0x0004	/* Split Completion Discarded */
+#define PCIXM_STATUS_UNEXPSC	0x0008	/* Unexpected Split Completion */
+#define PCIXM_STATUS_CMPLEXDEV	0x0010	/* Device Complexity (set == bridge) */
+#define PCIXM_STATUS_MAXMRDBC	0x0060	/* Maximum Burst Read Count */
+#define PCIXM_STATUS_MAXSPLITS	0x0380	/* Maximum Split Transactions */
+#define PCIXM_STATUS_MAXCRDS	0x1C00	/* Maximum Cumulative Read Size */
+#define PCIXM_STATUS_RCVDSCEM	0x2000	/* Received a Split Comp w/Error msg */
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-extern struct pci_driver aic7xxx_pci_driver;
+extern struct pci_driver aic79xx_pci_driver;
 #endif
 
 typedef enum
 {
-	AHC_POWER_STATE_D0,
-	AHC_POWER_STATE_D1,
-	AHC_POWER_STATE_D2,
-	AHC_POWER_STATE_D3
-} ahc_power_state;
+	AHD_POWER_STATE_D0,
+	AHD_POWER_STATE_D1,
+	AHD_POWER_STATE_D2,
+	AHD_POWER_STATE_D3
+} ahd_power_state;
 
-void ahc_power_state_change(struct ahc_softc *ahc,
-			    ahc_power_state new_state);
-/**************************** VL/EISA Routines ********************************/
-int			 aic7770_linux_probe(Scsi_Host_Template *);
-int			 aic7770_map_registers(struct ahc_softc *ahc,
-					       u_int port);
-int			 aic7770_map_int(struct ahc_softc *ahc, u_int irq);
+void ahd_power_state_change(struct ahd_softc *ahd,
+			    ahd_power_state new_state);
 
 /******************************* PCI Routines *********************************/
 /*
@@ -1008,15 +1066,15 @@ int			 aic7770_map_int(struct ahc_softc *ahc, u_int irq);
 #include <linux/bios32.h>
 #endif
 
-int			 ahc_linux_pci_probe(Scsi_Host_Template *);
-int			 ahc_pci_map_registers(struct ahc_softc *ahc);
-int			 ahc_pci_map_int(struct ahc_softc *ahc);
+int			 ahd_linux_pci_probe(Scsi_Host_Template *);
+int			 ahd_pci_map_registers(struct ahd_softc *ahd);
+int			 ahd_pci_map_int(struct ahd_softc *ahd);
 
-static __inline uint32_t ahc_pci_read_config(ahc_dev_softc_t pci,
+static __inline uint32_t ahd_pci_read_config(ahd_dev_softc_t pci,
 					     int reg, int width);
 
 static __inline uint32_t
-ahc_pci_read_config(ahc_dev_softc_t pci, int reg, int width)
+ahd_pci_read_config(ahd_dev_softc_t pci, int reg, int width)
 {
 	switch (width) {
 	case 1:
@@ -1039,18 +1097,18 @@ ahc_pci_read_config(ahc_dev_softc_t pci, int reg, int width)
 		return (retval);
 	}
 	default:
-		panic("ahc_pci_read_config: Read size too big");
+		panic("ahd_pci_read_config: Read size too big");
 		/* NOTREACHED */
 		return (0);
 	}
 }
 
-static __inline void ahc_pci_write_config(ahc_dev_softc_t pci,
+static __inline void ahd_pci_write_config(ahd_dev_softc_t pci,
 					  int reg, uint32_t value,
 					  int width);
 
 static __inline void
-ahc_pci_write_config(ahc_dev_softc_t pci, int reg, uint32_t value, int width)
+ahd_pci_write_config(ahd_dev_softc_t pci, int reg, uint32_t value, int width)
 {
 	switch (width) {
 	case 1:
@@ -1063,38 +1121,38 @@ ahc_pci_write_config(ahc_dev_softc_t pci, int reg, uint32_t value, int width)
 		pci_write_config_dword(pci, reg, value);
 		break;
 	default:
-		panic("ahc_pci_write_config: Write size too big");
+		panic("ahd_pci_write_config: Write size too big");
 		/* NOTREACHED */
 	}
 }
 
-static __inline int ahc_get_pci_function(ahc_dev_softc_t);
+static __inline int ahd_get_pci_function(ahd_dev_softc_t);
 static __inline int
-ahc_get_pci_function(ahc_dev_softc_t pci)
+ahd_get_pci_function(ahd_dev_softc_t pci)
 {
 	return (PCI_FUNC(pci->devfn));
 }
 
-static __inline int ahc_get_pci_slot(ahc_dev_softc_t);
+static __inline int ahd_get_pci_slot(ahd_dev_softc_t);
 static __inline int
-ahc_get_pci_slot(ahc_dev_softc_t pci)
+ahd_get_pci_slot(ahd_dev_softc_t pci)
 {
 	return (PCI_SLOT(pci->devfn));
 }
 
-static __inline int ahc_get_pci_bus(ahc_dev_softc_t);
+static __inline int ahd_get_pci_bus(ahd_dev_softc_t);
 static __inline int
-ahc_get_pci_bus(ahc_dev_softc_t pci)
+ahd_get_pci_bus(ahd_dev_softc_t pci)
 {
 	return (pci->bus->number);
 }
 
-static __inline void ahc_flush_device_writes(struct ahc_softc *);
+static __inline void ahd_flush_device_writes(struct ahd_softc *);
 static __inline void
-ahc_flush_device_writes(struct ahc_softc *ahc)
+ahd_flush_device_writes(struct ahd_softc *ahd)
 {
 	/* XXX Is this sufficient for all architectures??? */
-	ahc_inb(ahc, INTSTAT);
+	ahd_inb(ahd, INTSTAT);
 }
 
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,3,0)
@@ -1108,48 +1166,48 @@ ahc_flush_device_writes(struct ahc_softc *ahc)
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,3)
-#define ahc_pci_set_dma_mask pci_set_dma_mask
+#define ahd_pci_set_dma_mask pci_set_dma_mask
 #else
 /*
  * Always "return" 0 for success.
  */
-#define ahc_pci_set_dma_mask(dev_softc, mask)  			\
+#define ahd_pci_set_dma_mask(dev_softc, mask)	\
 	(((dev_softc)->dma_mask = mask) && 0)
 #endif
 /*********************** Transaction Access Wrappers **************************/
-static __inline void ahc_set_transaction_status(struct scb *, uint32_t);
+static __inline void ahd_set_transaction_status(struct scb *, uint32_t);
 static __inline
-void ahc_set_transaction_status(struct scb *scb, uint32_t status)
+void ahd_set_transaction_status(struct scb *scb, uint32_t status)
 {
 	scb->io_ctx->result &= ~(CAM_STATUS_MASK << 16);
 	scb->io_ctx->result |= status << 16;
 }
 
-static __inline void ahc_set_scsi_status(struct scb *, uint32_t);
+static __inline void ahd_set_scsi_status(struct scb *, uint32_t);
 static __inline
-void ahc_set_scsi_status(struct scb *scb, uint32_t status)
+void ahd_set_scsi_status(struct scb *scb, uint32_t status)
 {
 	scb->io_ctx->result &= ~0xFFFF;
 	scb->io_ctx->result |= status;
 }
 
-static __inline uint32_t ahc_get_transaction_status(struct scb *);
+static __inline uint32_t ahd_get_transaction_status(struct scb *);
 static __inline
-uint32_t ahc_get_transaction_status(struct scb *scb)
+uint32_t ahd_get_transaction_status(struct scb *scb)
 {
 	return ((scb->io_ctx->result >> 16) & CAM_STATUS_MASK);
 }
 
-static __inline uint32_t ahc_get_scsi_status(struct scb *);
+static __inline uint32_t ahd_get_scsi_status(struct scb *);
 static __inline
-uint32_t ahc_get_scsi_status(struct scb *scb)
+uint32_t ahd_get_scsi_status(struct scb *scb)
 {
 	return (scb->io_ctx->result & 0xFFFF);
 }
 
-static __inline void ahc_set_transaction_tag(struct scb *, int, u_int);
+static __inline void ahd_set_transaction_tag(struct scb *, int, u_int);
 static __inline
-void ahc_set_transaction_tag(struct scb *scb, int enabled, u_int type)
+void ahd_set_transaction_tag(struct scb *scb, int enabled, u_int type)
 {
 	/*
 	 * Nothing to do for linux as the incoming transaction
@@ -1157,16 +1215,16 @@ void ahc_set_transaction_tag(struct scb *scb, int enabled, u_int type)
 	 */
 }
 
-static __inline u_long ahc_get_transfer_length(struct scb *);
+static __inline u_long ahd_get_transfer_length(struct scb *);
 static __inline
-u_long ahc_get_transfer_length(struct scb *scb)
+u_long ahd_get_transfer_length(struct scb *scb)
 {
 	return (scb->platform_data->xfer_len);
 }
 
-static __inline int ahc_get_transfer_dir(struct scb *);
+static __inline int ahd_get_transfer_dir(struct scb *);
 static __inline
-int ahc_get_transfer_dir(struct scb *scb)
+int ahd_get_transfer_dir(struct scb *scb)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,40)
 	return (scb->io_ctx->sc_data_direction);
@@ -1189,9 +1247,9 @@ int ahc_get_transfer_dir(struct scb *scb)
 #endif
 }
 
-static __inline void ahc_set_residual(struct scb *, u_long);
+static __inline void ahd_set_residual(struct scb *, u_long);
 static __inline
-void ahc_set_residual(struct scb *scb, u_long resid)
+void ahd_set_residual(struct scb *scb, u_long resid)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
 	scb->io_ctx->resid = resid;
@@ -1200,16 +1258,16 @@ void ahc_set_residual(struct scb *scb, u_long resid)
 #endif
 }
 
-static __inline void ahc_set_sense_residual(struct scb *, u_long);
+static __inline void ahd_set_sense_residual(struct scb *, u_long);
 static __inline
-void ahc_set_sense_residual(struct scb *scb, u_long resid)
+void ahd_set_sense_residual(struct scb *scb, u_long resid)
 {
 	/* This can't be reported in Linux */
 }
 
-static __inline u_long ahc_get_residual(struct scb *);
+static __inline u_long ahd_get_residual(struct scb *);
 static __inline
-u_long ahc_get_residual(struct scb *scb)
+u_long ahd_get_residual(struct scb *scb)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
 	return (scb->io_ctx->resid);
@@ -1218,9 +1276,9 @@ u_long ahc_get_residual(struct scb *scb)
 #endif
 }
 
-static __inline int ahc_perform_autosense(struct scb *);
+static __inline int ahd_perform_autosense(struct scb *);
 static __inline
-int ahc_perform_autosense(struct scb *scb)
+int ahd_perform_autosense(struct scb *scb)
 {
 	/*
 	 * We always perform autosense in Linux.
@@ -1231,57 +1289,59 @@ int ahc_perform_autosense(struct scb *scb)
 }
 
 static __inline uint32_t
-ahc_get_sense_bufsize(struct ahc_softc *ahc, struct scb *scb)
+ahd_get_sense_bufsize(struct ahd_softc *ahd, struct scb *scb)
 {
 	return (sizeof(struct scsi_sense_data));
 }
 
-static __inline void ahc_notify_xfer_settings_change(struct ahc_softc *,
-						     struct ahc_devinfo *);
+static __inline void ahd_notify_xfer_settings_change(struct ahd_softc *,
+						     struct ahd_devinfo *);
 static __inline void
-ahc_notify_xfer_settings_change(struct ahc_softc *ahc,
-				struct ahc_devinfo *devinfo)
+ahd_notify_xfer_settings_change(struct ahd_softc *ahd,
+				struct ahd_devinfo *devinfo)
 {
 	/* Nothing to do here for linux */
 }
 
-static __inline void ahc_platform_scb_free(struct ahc_softc *ahc,
+static __inline void ahd_platform_scb_free(struct ahd_softc *ahd,
 					   struct scb *scb);
 static __inline void
-ahc_platform_scb_free(struct ahc_softc *ahc, struct scb *scb)
+ahd_platform_scb_free(struct ahd_softc *ahd, struct scb *scb)
 {
-	ahc->flags &= ~AHC_RESOURCE_SHORTAGE;
+	ahd->flags &= ~AHD_RESOURCE_SHORTAGE;
 }
 
-int	ahc_platform_alloc(struct ahc_softc *ahc, void *platform_arg);
-void	ahc_platform_free(struct ahc_softc *ahc);
-void	ahc_platform_freeze_devq(struct ahc_softc *ahc, struct scb *scb);
-static __inline void	ahc_freeze_scb(struct scb *scb);
+int	ahd_platform_alloc(struct ahd_softc *ahd, void *platform_arg);
+void	ahd_platform_free(struct ahd_softc *ahd);
+void	ahd_platform_freeze_devq(struct ahd_softc *ahd, struct scb *scb);
+void	ahd_freeze_simq(struct ahd_softc *ahd);
+void	ahd_release_simq(struct ahd_softc *ahd);
+static __inline void	ahd_freeze_scb(struct scb *scb);
 static __inline void
-ahc_freeze_scb(struct scb *scb)
+ahd_freeze_scb(struct scb *scb)
 {
 	/* Noting to do here for linux */
 }
 
-void	ahc_platform_set_tags(struct ahc_softc *ahc,
-			      struct ahc_devinfo *devinfo, ahc_queue_alg);
-int	ahc_platform_abort_scbs(struct ahc_softc *ahc, int target,
+void	ahd_platform_set_tags(struct ahd_softc *ahd,
+			      struct ahd_devinfo *devinfo, ahd_queue_alg);
+int	ahd_platform_abort_scbs(struct ahd_softc *ahd, int target,
 				char channel, int lun, u_int tag,
 				role_t role, uint32_t status);
-void	ahc_linux_isr(int irq, void *dev_id, struct pt_regs * regs);
-void	ahc_platform_flushwork(struct ahc_softc *ahc);
-int	ahc_softc_comp(struct ahc_softc *, struct ahc_softc *);
-void	ahc_done(struct ahc_softc*, struct scb*);
-void	ahc_send_async(struct ahc_softc *, char channel,
+void	ahd_linux_isr(int irq, void *dev_id, struct pt_regs * regs);
+void	ahd_platform_flushwork(struct ahd_softc *ahd);
+int	ahd_softc_comp(struct ahd_softc *, struct ahd_softc *);
+void	ahd_done(struct ahd_softc*, struct scb*);
+void	ahd_send_async(struct ahd_softc *, char channel,
 		       u_int target, u_int lun, ac_code, void *);
-void	ahc_print_path(struct ahc_softc *, struct scb *);
-void	ahc_platform_dump_card_state(struct ahc_softc *ahc);
+void	ahd_print_path(struct ahd_softc *, struct scb *);
+void	ahd_platform_dump_card_state(struct ahd_softc *ahd);
 
 #ifdef CONFIG_PCI
-#define AHC_PCI_CONFIG 1
+#define AHD_PCI_CONFIG 1
 #else
-#define AHC_PCI_CONFIG 0
+#define AHD_PCI_CONFIG 0
 #endif
-#define bootverbose aic7xxx_verbose
-extern int aic7xxx_verbose;
-#endif /* _AIC7XXX_LINUX_H_ */
+#define bootverbose aic79xx_verbose
+extern int aic79xx_verbose;
+#endif /* _AIC79XX_LINUX_H_ */
