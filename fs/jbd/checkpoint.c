@@ -538,7 +538,8 @@ void __journal_remove_checkpoint(struct journal_head *jh)
 	 * checkpoint list is empty, the transaction obviously cannot be
 	 * dropped!
 	 *
-	 * AKPM2: locking here around j_committing_transaction is a bit flakey.
+	 * The locking here around j_committing_transaction is a bit sleazy.
+	 * See the comment at the end of journal_commit_transaction().
 	 */
 	if (transaction == journal->j_committing_transaction) {
 		JBUFFER_TRACE(jh, "belongs to committing transaction");
@@ -608,6 +609,7 @@ void __journal_drop_transaction(journal_t *journal, transaction_t *transaction)
 			journal->j_checkpoint_transactions = NULL;
 	}
 
+	J_ASSERT(transaction->t_state == T_FINISHED);
 	J_ASSERT(transaction->t_buffers == NULL);
 	J_ASSERT(transaction->t_sync_datalist == NULL);
 	J_ASSERT(transaction->t_forget == NULL);
@@ -617,10 +619,9 @@ void __journal_drop_transaction(journal_t *journal, transaction_t *transaction)
 	J_ASSERT(transaction->t_checkpoint_list == NULL);
 	J_ASSERT(transaction->t_updates == 0);
 	J_ASSERT(list_empty(&transaction->t_jcb));
-
 	J_ASSERT(journal->j_committing_transaction != transaction);
+	J_ASSERT(journal->j_running_transaction != transaction);
 
 	jbd_debug(1, "Dropping transaction %d, all done\n", transaction->t_tid);
 	kfree(transaction);
 }
-

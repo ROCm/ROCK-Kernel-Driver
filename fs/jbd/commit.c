@@ -704,14 +704,20 @@ skip_commit: /* The journal should be unlocked by now. */
 
 	J_ASSERT(commit_transaction->t_state == T_COMMIT);
 
+	/*
+	 * This is a bit sleazy.  We borrow j_list_lock to protect
+	 * journal->j_committing_transaction in __journal_remove_checkpoint.
+	 * Really, __jornal_remove_checkpoint should be using j_state_lock but
+	 * it's a bit hassle to hold that across __journal_remove_checkpoint
+	 */
 	spin_lock(&journal->j_state_lock);
+	spin_lock(&journal->j_list_lock);
 	commit_transaction->t_state = T_FINISHED;
 	J_ASSERT(commit_transaction == journal->j_committing_transaction);
 	journal->j_commit_sequence = commit_transaction->t_tid;
 	journal->j_committing_transaction = NULL;
 	spin_unlock(&journal->j_state_lock);
 
-	spin_lock(&journal->j_list_lock);
 	if (commit_transaction->t_checkpoint_list == NULL) {
 		__journal_drop_transaction(journal, commit_transaction);
 	} else {
