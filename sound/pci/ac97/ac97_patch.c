@@ -941,7 +941,7 @@ static int patch_ad1985_specific(ac97_t *ac97)
 
 	if ((err = patch_ad1980_specific(ac97)) < 0)
 		return err;
-	return patch_build_controls(ac97, snd_ac97_ad1985_controls, ARRAY_SIZE(snd_ac97_ad1985_con
+	return patch_build_controls(ac97, snd_ac97_ad1985_controls, ARRAY_SIZE(snd_ac97_ad1985_controls));
 }
 
 static struct snd_ac97_build_ops patch_ad1985_build_ops = {
