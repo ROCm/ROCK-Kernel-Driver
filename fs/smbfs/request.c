@@ -112,6 +112,7 @@ struct smb_request *smb_alloc_request(struct smb_sb_info *server, int bufsize)
 #else
 		/* FIXME: we want something like nfs does above, but that
 		   requires changes to all callers and can wait. */
+		atomic_dec(&server->nr_requests);
 		break;
 #endif
 	}
