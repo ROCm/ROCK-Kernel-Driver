@@ -257,7 +257,7 @@ static inline void rfcomm_set_owner_w(struct sk_buff *skb, struct rfcomm_dev *de
 
 static struct sk_buff *rfcomm_wmalloc(struct rfcomm_dev *dev, unsigned long size, int priority)
 {
-	if (size || atomic_read(&dev->wmem_alloc) < dev->sndbuf) {
+	if (atomic_read(&dev->wmem_alloc) < dev->sndbuf) {
 		struct sk_buff *skb = alloc_skb(size, priority);
 		if (skb) {
 			rfcomm_set_owner_w(skb, dev);
