@@ -391,6 +391,7 @@ nfs_proc_symlink(struct inode *dir, struct qstr *name, struct qstr *path,
 		return -ENAMETOOLONG;
 	dprintk("NFS call  symlink %s -> %s\n", name->name, path->name);
 	fattr->valid = 0;
+	fhandle->size = 0;
 	status = rpc_call(NFS_CLIENT(dir), NFSPROC_SYMLINK, &arg, NULL, 0);
 	dprintk("NFS reply symlink: %d\n", status);
 	return status;
