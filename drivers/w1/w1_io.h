@@ -25,11 +25,14 @@
 #include "w1.h"
 
 void w1_delay(unsigned long);
+u8 w1_touch_bit(struct w1_master *, int);
 void w1_write_bit(struct w1_master *, int);
 void w1_write_8(struct w1_master *, u8);
 u8 w1_read_bit(struct w1_master *);
 u8 w1_read_8(struct w1_master *);
 int w1_reset_bus(struct w1_master *);
 u8 w1_calc_crc8(u8 *, int);
+void w1_write_block(struct w1_master *, u8 *, int);
+u8 w1_read_block(struct w1_master *, u8 *, int);
 
 #endif /* __W1_IO_H */

@@ -124,8 +124,8 @@ static int blacklist[] = {
 
 /* If force_addr is set to anything different from 0, we forcibly enable
    the device at the given address. */
-static int force_addr = 0;
-MODULE_PARM(force_addr, "i");
+static u16 force_addr = 0;
+module_param(force_addr, ushort, 0);
 MODULE_PARM_DESC(force_addr, "Initialize the base address of the i2c controller");
 
 static unsigned short sis5595_base = 0;
@@ -393,7 +393,7 @@ static void __devexit sis5595_remove(struct pci_dev *dev)
 }
 
 static struct pci_driver sis5595_driver = {
-	.name		= "sis5595 smbus",
+	.name		= "sis5595_smbus",
 	.id_table	= sis5595_ids,
 	.probe		= sis5595_probe,
 	.remove		= __devexit_p(sis5595_remove),

@@ -540,7 +540,7 @@ static struct pci_device_id aec62xx_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, aec62xx_pci_tbl);
 
 static struct pci_driver driver = {
-	.name		= "AEC62xx IDE",
+	.name		= "AEC62xx_IDE",
 	.id_table	= aec62xx_pci_tbl,
 	.probe		= aec62xx_init_one,
 };

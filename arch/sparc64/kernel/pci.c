@@ -351,10 +351,6 @@ static int __init pcibios_init(void)
 
 subsys_initcall(pcibios_init);
 
-struct pci_fixup pcibios_fixups[] = {
-	{ 0 }
-};
-
 void pcibios_fixup_bus(struct pci_bus *pbus)
 {
 	struct pci_pbm_info *pbm = pbus->sysdata;

@@ -244,7 +244,7 @@ int register_slot(struct slot *slot)
 
 int rpaphp_get_power_status(struct slot *slot, u8 * value)
 {
-	int rc = 0;
+	int rc = 0, level;
 	
 	if (slot->type == EMBEDDED) {
 		dbg("%s set to POWER_ON for EMBEDDED slot %s\n",
@@ -252,10 +252,14 @@ int rpaphp_get_power_status(struct slot *slot, u8 * value)
 		*value = POWER_ON;
 	}
 	else {
-		rc = rtas_get_power_level(slot->power_domain, (int *) value);
-		if (rc)
+		rc = rtas_get_power_level(slot->power_domain, &level);
+		if (!rc) {
+			dbg("%s the power level of slot %s(pwd-domain:0x%x) is %d\n",
+				__FUNCTION__, slot->name, slot->power_domain, level);
+			*value = level;
+		} else
 			err("failed to get power-level for slot(%s), rc=0x%x\n",
-		    		slot->location, rc);
+				slot->location, rc);
 	}
 
 	return rc;

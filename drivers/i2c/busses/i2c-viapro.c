@@ -92,13 +92,13 @@ static unsigned short smb_cf_hstcfg = 0xD2;
 /* If force is set to anything different from 0, we forcibly enable the
    VT596. DANGEROUS! */
 static int force;
-MODULE_PARM(force, "i");
+module_param(force, bool, 0);
 MODULE_PARM_DESC(force, "Forcibly enable the SMBus. DANGEROUS!");
 
 /* If force_addr is set to anything different from 0, we forcibly enable
    the VT596 at the given address. VERY DANGEROUS! */
-static int force_addr;
-MODULE_PARM(force_addr, "i");
+static u16 force_addr;
+module_param(force_addr, ushort, 0);
 MODULE_PARM_DESC(force_addr,
 		 "Forcibly enable the SMBus at the given address. "
 		 "EXTREMELY DANGEROUS!");
@@ -455,7 +455,7 @@ static struct pci_device_id vt596_ids[] = {
 };
 
 static struct pci_driver vt596_driver = {
-	.name		= "vt596 smbus",
+	.name		= "vt596_smbus",
 	.id_table	= vt596_ids,
 	.probe		= vt596_probe,
 	.remove		= __devexit_p(vt596_remove),

@@ -33,7 +33,3 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 
 	return 3;			/* Everything goes to one irq bit */
 }
-
-struct pci_fixup pcibios_fixups[] = {
-	{0}
-};

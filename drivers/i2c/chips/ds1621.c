@@ -37,7 +37,7 @@ static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 /* Insmod parameters */
 SENSORS_INSMOD_1(ds1621);
 static int polarity = -1;
-MODULE_PARM(polarity, "i");
+module_param(polarity, int, 0);
 MODULE_PARM_DESC(polarity, "Output's polarity: 0 = active high, 1 = active low");
 
 /* Many DS1621 constants specified below */

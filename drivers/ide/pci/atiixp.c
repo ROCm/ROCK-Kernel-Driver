@@ -490,7 +490,7 @@ static struct pci_device_id atiixp_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, atiixp_pci_tbl);
 
 static struct pci_driver driver = {
-	.name		= "ATIIXP IDE",
+	.name		= "ATIIXP_IDE",
 	.id_table	= atiixp_pci_tbl,
 	.probe		= atiixp_init_one,
 };

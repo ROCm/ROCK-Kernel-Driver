@@ -89,6 +89,10 @@ extern int parse_args(const char *name,
 #define __param_check(name, p, type) \
 	static inline type *__check_##name(void) { return(p); }
 
+extern int param_set_byte(const char *val, struct kernel_param *kp);
+extern int param_get_byte(char *buffer, struct kernel_param *kp);
+#define param_check_byte(name, p) __param_check(name, p, unsigned char)
+
 extern int param_set_short(const char *val, struct kernel_param *kp);
 extern int param_get_short(char *buffer, struct kernel_param *kp);
 #define param_check_short(name, p) __param_check(name, p, short)

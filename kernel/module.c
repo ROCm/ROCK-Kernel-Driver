@@ -725,19 +725,6 @@ static inline int sysfs_unload_setup(struct module *mod)
 #endif /* CONFIG_MODULE_UNLOAD */
 
 #ifdef CONFIG_OBSOLETE_MODPARM
-static int param_set_byte(const char *val, struct kernel_param *kp)  
-{
-	char *endp;
-	long l;
-
-	if (!val) return -EINVAL;
-	l = simple_strtol(val, &endp, 0);
-	if (endp == val || *endp || ((char)l != l))
-		return -EINVAL;
-	*((char *)kp->arg) = l;
-	return 0;
-}
-
 /* Bounds checking done below */
 static int obsparm_copy_string(const char *val, struct kernel_param *kp)
 {

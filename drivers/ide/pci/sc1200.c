@@ -565,7 +565,7 @@ static struct pci_device_id sc1200_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, sc1200_pci_tbl);
 
 static struct pci_driver driver = {
-	.name		= "SC1200 IDE",
+	.name		= "SC1200_IDE",
 	.id_table	= sc1200_pci_tbl,
 	.probe		= sc1200_init_one,
 	.suspend	= sc1200_suspend,

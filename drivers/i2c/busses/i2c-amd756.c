@@ -394,7 +394,7 @@ static void __devexit amd756_remove(struct pci_dev *dev)
 }
 
 static struct pci_driver amd756_driver = {
-	.name		= "amd756 smbus",
+	.name		= "amd756_smbus",
 	.id_table	= amd756_ids,
 	.probe		= amd756_probe,
 	.remove		= __devexit_p(amd756_remove),

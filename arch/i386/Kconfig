@@ -1105,7 +1105,7 @@ config PCI_DIRECT
 
 config PCI_MMCONFIG
 	bool
-	depends on PCI && (PCI_GOMMCONFIG || PCI_GOANY)
+	depends on PCI && (PCI_GOMMCONFIG || (PCI_GOANY && ACPI))
 	select ACPI_BOOT
 	default y
 

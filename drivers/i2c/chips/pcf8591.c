@@ -36,7 +36,7 @@ static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 SENSORS_INSMOD_1(pcf8591);
 
 static int input_mode;
-MODULE_PARM(input_mode, "i");
+module_param(input_mode, int, 0);
 MODULE_PARM_DESC(input_mode,
 	"Analog input mode:\n"
 	" 0 = four single ended inputs\n"

@@ -387,7 +387,7 @@ static struct pci_device_id slc90e66_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, slc90e66_pci_tbl);
 
 static struct pci_driver driver = {
-	.name		= "SLC90e66 IDE",
+	.name		= "SLC90e66_IDE",
 	.id_table	= slc90e66_pci_tbl,
 	.probe		= slc90e66_init_one,
 };

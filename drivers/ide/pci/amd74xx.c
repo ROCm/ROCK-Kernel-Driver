@@ -520,7 +520,7 @@ static struct pci_device_id amd74xx_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, amd74xx_pci_tbl);
 
 static struct pci_driver driver = {
-	.name		= "AMD IDE",
+	.name		= "AMD_IDE",
 	.id_table	= amd74xx_pci_tbl,
 	.probe		= amd74xx_probe,
 };

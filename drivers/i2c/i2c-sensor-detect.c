@@ -1,6 +1,6 @@
 /*
-    i2c-sensor.c - Part of lm_sensors, Linux kernel modules for hardware
-                monitoring
+    i2c-sensor-detect.c - Part of lm_sensors, Linux kernel modules for hardware
+            		  monitoring
     Copyright (c) 1998 - 2001 Frodo Looijaard <frodol@dds.nl> and
     Mark D. Studebaker <mdsxyz123@yahoo.com>
 
@@ -162,6 +162,8 @@ int i2c_detect(struct i2c_adapter *adapter,
 
 EXPORT_SYMBOL(i2c_detect);
 
-MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl>");
+MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl>, "
+	      "Rudolf Marek <r.marek@sh.cvut.cz>");
+
 MODULE_DESCRIPTION("i2c-sensor driver");
 MODULE_LICENSE("GPL");
