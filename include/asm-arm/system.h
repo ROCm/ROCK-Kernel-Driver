@@ -64,11 +64,6 @@ extern asmlinkage void __backtrace(void);
 struct thread_info;
 extern struct task_struct *__switch_to(struct thread_info *, struct thread_info *);
 
-#define prepare_arch_schedule(prev)		do { } while(0)
-#define finish_arch_schedule(prev)		do { } while(0)
-#define prepare_arch_switch(rq)			do { } while(0)
-#define finish_arch_switch(rq)			spin_unlock_irq(&(rq)->lock)
-
 #define switch_to(prev,next,last)					\
 	do {			 					\
 		__switch_to(prev->thread_info,next->thread_info);	\
