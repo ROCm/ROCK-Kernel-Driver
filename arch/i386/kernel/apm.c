@@ -214,6 +214,7 @@
 #include <linux/sched.h>
 #include <linux/pm.h>
 #include <linux/kernel.h>
+#include <linux/smp.h>
 #include <linux/smp_lock.h>
 
 #include <asm/system.h>
@@ -419,6 +420,7 @@ static DECLARE_WAIT_QUEUE_HEAD(apm_waitqueue);
 static DECLARE_WAIT_QUEUE_HEAD(apm_suspend_waitqueue);
 static struct apm_user *	user_list;
 static spinlock_t		user_list_lock = SPIN_LOCK_UNLOCKED;
+static struct desc_struct	bad_bios_desc = { 0, 0x00409200 };
 
 static char			driver_version[] = "1.16";	/* no spaces */
 
@@ -568,7 +570,12 @@ static u8 apm_bios_call(u32 func, u32 ebx_in, u32 ecx_in,
 	u32 *eax, u32 *ebx, u32 *ecx, u32 *edx, u32 *esi)
 {
 	APM_DECL_SEGS
-	unsigned long	flags;
+	unsigned long		flags;
+	int			cpu = smp_processor_id();
+	struct desc_struct	save_desc_40;
+
+	save_desc_40 = cpu_gdt_table[cpu][0x40 / 8];
+	cpu_gdt_table[cpu][0x40 / 8] = bad_bios_desc;
 
 	local_save_flags(flags);
 	APM_DO_CLI;
@@ -591,6 +598,7 @@ static u8 apm_bios_call(u32 func, u32 ebx_in, u32 ecx_in,
 		: "memory", "cc");
 	APM_DO_RESTORE_SEGS;
 	local_irq_restore(flags);
+	cpu_gdt_table[cpu][0x40 / 8] = save_desc_40;
 	return *eax & 0xff;
 }
 
@@ -613,6 +621,11 @@ static u8 apm_bios_call_simple(u32 func, u32 ebx_in, u32 ecx_in, u32 *eax)
 	u8		error;
 	APM_DECL_SEGS
 	unsigned long	flags;
+	int			cpu = smp_processor_id();
+	struct desc_struct	save_desc_40;
+
+	save_desc_40 = cpu_gdt_table[cpu][0x40 / 8];
+	cpu_gdt_table[cpu][0x40 / 8] = bad_bios_desc;
 
 	local_save_flags(flags);
 	APM_DO_CLI;
@@ -639,6 +652,7 @@ static u8 apm_bios_call_simple(u32 func, u32 ebx_in, u32 ecx_in, u32 *eax)
 	}
 	APM_DO_RESTORE_SEGS;
 	local_irq_restore(flags);
+	cpu_gdt_table[smp_processor_id()][0x40 / 8] = save_desc_40;
 	return error;
 }
 
@@ -1927,13 +1941,13 @@ static int __init apm_init(void)
 	 * NOTE: on SMP we call into the APM BIOS only on CPU#0, so it's
 	 * enough to modify CPU#0's GDT.
 	 */
-	for (i = 0; i < NR_CPUS; i++) {
-		set_base(cpu_gdt_table[i][APM_40 >> 3],
-			 __va((unsigned long)0x40 << 4));
-		_set_limit((char *)&cpu_gdt_table[i][APM_40 >> 3], 4095 - (0x40 << 4));
+	set_base(bad_bios_desc, __va((unsigned long)0x40 << 4));
+	_set_limit((char *)&bad_bios_desc, 4095 - (0x40 << 4));
 
-		apm_bios_entry.offset = apm_info.bios.offset;
-		apm_bios_entry.segment = APM_CS;
+	apm_bios_entry.offset = apm_info.bios.offset;
+	apm_bios_entry.segment = APM_CS;
+
+	for (i = 0; i < NR_CPUS; i++) {
 		set_base(cpu_gdt_table[i][APM_CS >> 3],
 			 __va((unsigned long)apm_info.bios.cseg << 4));
 		set_base(cpu_gdt_table[i][APM_CS_16 >> 3],
