@@ -120,66 +120,66 @@ extern int isa_sex;
  * be compiled in so the case statement will be optimised away
  */
 
-static inline unsigned long isa_itb(long addr)
+static inline unsigned char *isa_itb(long addr)
 {
   switch(ISA_TYPE)
     {
 #ifdef CONFIG_Q40
-    case Q40_ISA: return Q40_ISA_IO_B(addr);
+    case Q40_ISA: return (unsigned char *)Q40_ISA_IO_B(addr);
 #endif
 #ifdef CONFIG_GG2
-    case GG2_ISA: return GG2_ISA_IO_B(addr);
+    case GG2_ISA: return (unsigned char *)GG2_ISA_IO_B(addr);
 #endif
 #ifdef CONFIG_AMIGA_PCMCIA
-    case AG_ISA: return AG_ISA_IO_B(addr);
+    case AG_ISA: return (unsigned char *)AG_ISA_IO_B(addr);
 #endif
     default: return 0; /* avoid warnings, just in case */
     }
 }
-static inline unsigned long isa_itw(long addr)
+static inline unsigned short *isa_itw(long addr)
 {
   switch(ISA_TYPE)
     {
 #ifdef CONFIG_Q40
-    case Q40_ISA: return Q40_ISA_IO_W(addr);
+    case Q40_ISA: return (unsigned short *)Q40_ISA_IO_W(addr);
 #endif
 #ifdef CONFIG_GG2
-    case GG2_ISA: return GG2_ISA_IO_W(addr);
+    case GG2_ISA: return (unsigned short *)GG2_ISA_IO_W(addr);
 #endif
 #ifdef CONFIG_AMIGA_PCMCIA
-    case AG_ISA: return AG_ISA_IO_W(addr);
+    case AG_ISA: return (unsigned short *)AG_ISA_IO_W(addr);
 #endif
     default: return 0; /* avoid warnings, just in case */
     }
 }
-static inline unsigned long isa_mtb(long addr)
+static inline unsigned char *isa_mtb(long addr)
 {
   switch(ISA_TYPE)
     {
 #ifdef CONFIG_Q40
-    case Q40_ISA: return Q40_ISA_MEM_B(addr);
+    case Q40_ISA: return (unsigned char *)Q40_ISA_MEM_B(addr);
 #endif
 #ifdef CONFIG_GG2
-    case GG2_ISA: return GG2_ISA_MEM_B(addr);
+    case GG2_ISA: return (unsigned char *)GG2_ISA_MEM_B(addr);
 #endif
 #ifdef CONFIG_AMIGA_PCMCIA
-    case AG_ISA: return addr;
+    case AG_ISA: return (unsigned char *)addr;
 #endif
     default: return 0; /* avoid warnings, just in case */
     }
 }
-static inline unsigned long isa_mtw(long addr)
+static inline unsigned short *isa_mtw(long addr)
 {
   switch(ISA_TYPE)
     {
 #ifdef CONFIG_Q40
-    case Q40_ISA: return Q40_ISA_MEM_W(addr);
+    case Q40_ISA: return (unsigned short *)Q40_ISA_MEM_W(addr);
 #endif
 #ifdef CONFIG_GG2
-    case GG2_ISA: return GG2_ISA_MEM_W(addr);
+    case GG2_ISA: return (unsigned short *)GG2_ISA_MEM_W(addr);
 #endif
 #ifdef CONFIG_AMIGA_PCMCIA
-    case AG_ISA: return addr;
+    case AG_ISA: return (unsigned short *)addr;
 #endif
     default: return 0; /* avoid warnings, just in case */
     }
