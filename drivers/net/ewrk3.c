@@ -202,7 +202,6 @@ static int ewrk3_debug = 1;
 #define EWRK3_IOP_INC 0x20	/* I/O address increment */
 #define EWRK3_TOTAL_SIZE 0x20	/* required I/O address length */
 
-/* If you change this, remember to also change MODULE_PARM array limits */
 #ifndef MAX_NUM_EWRK3S
 #define MAX_NUM_EWRK3S 21
 #endif
@@ -1945,8 +1944,8 @@ static int ndevs;
 static int io[MAX_NUM_EWRK3S+1] = { 0x300, 0, };
 
 /* '21' below should really be 'MAX_NUM_EWRK3S' */
-MODULE_PARM(io, "0-21i");
-MODULE_PARM(irq, "0-21i");
+module_param_array(io, int, NULL, 0);
+module_param_array(irq, int, NULL, 0);
 MODULE_PARM_DESC(io, "EtherWORKS 3 I/O base address(es)");
 MODULE_PARM_DESC(irq, "EtherWORKS 3 IRQ number(s)");
 

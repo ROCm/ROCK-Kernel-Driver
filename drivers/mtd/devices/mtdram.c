@@ -29,9 +29,9 @@
 #ifdef MODULE
 static unsigned long total_size = CONFIG_MTDRAM_TOTAL_SIZE;
 static unsigned long erase_size = CONFIG_MTDRAM_ERASE_SIZE;
-MODULE_PARM(total_size,"l");
+module_param(total_size,ulong,0);
 MODULE_PARM_DESC(total_size, "Total device size in KiB");
-MODULE_PARM(erase_size,"l");
+module_param(erase_size,ulong,0);
 MODULE_PARM_DESC(erase_size, "Device erase block size in KiB");
 #define MTDRAM_TOTAL_SIZE (total_size * 1024)
 #define MTDRAM_ERASE_SIZE (erase_size * 1024)

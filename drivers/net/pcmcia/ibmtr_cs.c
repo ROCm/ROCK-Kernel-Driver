@@ -72,7 +72,7 @@
 
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+module_param(pc_debug, int, 0);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 static char *version =
 "ibmtr_cs.c 1.10   1996/01/06 05:19:00 (Steve Kipisz)\n"
@@ -102,12 +102,12 @@ static u_long sramsize = 64;
 /* Ringspeed 4,16 */
 static int ringspeed = 16;
 
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
-MODULE_PARM(mmiobase, "i");
-MODULE_PARM(srambase, "i");
-MODULE_PARM(sramsize, "i");
-MODULE_PARM(ringspeed, "i");
+module_param(irq_mask, int, 0);
+module_param_array(irq_list, int, NULL, 0);
+module_param(mmiobase, ulong, 0);
+module_param(srambase, ulong, 0);
+module_param(sramsize, ulong, 0);
+module_param(ringspeed, int, 0);
 MODULE_LICENSE("GPL");
 
 /*====================================================================*/

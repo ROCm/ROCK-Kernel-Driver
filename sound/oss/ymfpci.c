@@ -2504,8 +2504,8 @@ static int ymf_ac97_init(ymfpci_t *unit, int num_ac97)
 # ifdef MODULE
 static int mpu_io;
 static int synth_io;
-MODULE_PARM(mpu_io, "i");
-MODULE_PARM(synth_io, "i");
+module_param(mpu_io, int, 0);
+module_param(synth_io, int, 0);
 # else
 static int mpu_io     = 0x330;
 static int synth_io   = 0x388;

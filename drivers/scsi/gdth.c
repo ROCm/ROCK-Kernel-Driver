@@ -676,18 +676,18 @@ static int force_dma32 = 0;
 
 #ifdef MODULE
 /* parameters for modprobe/insmod */
-MODULE_PARM(irq, "i");
-MODULE_PARM(disable, "i");
-MODULE_PARM(reserve_mode, "i");
-MODULE_PARM(reserve_list, "4-" __MODULE_STRING(MAX_RES_ARGS) "i");
-MODULE_PARM(reverse_scan, "i");
-MODULE_PARM(hdr_channel, "i");
-MODULE_PARM(max_ids, "i");
-MODULE_PARM(rescan, "i");
-MODULE_PARM(virt_ctr, "i");
-MODULE_PARM(shared_access, "i");
-MODULE_PARM(probe_eisa_isa, "i");
-MODULE_PARM(force_dma32, "i");
+module_param(irq, int, 0);
+module_param(disable, int, 0);
+module_param(reserve_mode, int, 0);
+module_param_array(reserve_list, int, NULL, 0);
+module_param(reverse_scan, int, 0);
+module_param(hdr_channel, int, 0);
+module_param(max_ids, int, 0);
+module_param(rescan, int, 0);
+module_param(virt_ctr, int, 0);
+module_param(shared_access, int, 0);
+module_param(probe_eisa_isa, int, 0);
+module_param(force_dma32, int, 0);
 MODULE_AUTHOR("Achim Leubner");
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,11)
 MODULE_LICENSE("GPL");

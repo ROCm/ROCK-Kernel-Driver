@@ -1020,8 +1020,8 @@ static struct net_device *moddevs[DEVMAX];
 static int irq;
 static int io;
 
-MODULE_PARM(irq, "i");
-MODULE_PARM(io, "i");
+module_param(irq, int, 0);
+module_param(io, int, 0);
 MODULE_PARM_DESC(irq, "IBM LAN/A IRQ number");
 MODULE_PARM_DESC(io, "IBM LAN/A I/O base address");
 MODULE_LICENSE("GPL");

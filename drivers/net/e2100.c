@@ -421,10 +421,10 @@ static int irq[MAX_E21_CARDS];
 static int mem[MAX_E21_CARDS];
 static int xcvr[MAX_E21_CARDS];		/* choose int. or ext. xcvr */
 
-MODULE_PARM(io, "1-" __MODULE_STRING(MAX_E21_CARDS) "i");
-MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_E21_CARDS) "i");
-MODULE_PARM(mem, "1-" __MODULE_STRING(MAX_E21_CARDS) "i");
-MODULE_PARM(xcvr, "1-" __MODULE_STRING(MAX_E21_CARDS) "i");
+module_param_array(io, int, NULL, 0);
+module_param_array(irq, int, NULL, 0);
+module_param_array(mem, int, NULL, 0);
+module_param_array(xcvr, int, NULL, 0);
 MODULE_PARM_DESC(io, "I/O base address(es)");
 MODULE_PARM_DESC(irq, "IRQ number(s)");
 MODULE_PARM_DESC(mem, " memory base address(es)");

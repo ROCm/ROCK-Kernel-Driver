@@ -927,8 +927,8 @@ static struct ethtool_ops netdev_ethtool_ops = {
 
 #ifdef MODULE
 static struct net_device *dev_3c507;
-MODULE_PARM(io, "i");
-MODULE_PARM(irq, "i");
+module_param(io, int, 0);
+module_param(irq, int, 0);
 MODULE_PARM_DESC(io, "EtherLink16 I/O base address");
 MODULE_PARM_DESC(irq, "(ignored)");
 

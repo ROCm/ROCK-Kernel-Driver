@@ -674,7 +674,7 @@ static void __init shaper_setup(struct net_device *dev)
 static int shapers = 1;
 #ifdef MODULE
 
-MODULE_PARM(shapers, "i");
+module_param(shapers, int, 0);
 MODULE_PARM_DESC(shapers, "Traffic shaper: maximum number of shapers");
 
 #else /* MODULE */

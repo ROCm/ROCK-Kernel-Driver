@@ -1420,18 +1420,18 @@ MODULE_DESCRIPTION("ICL EtherTeam 16i/32 driver");
 MODULE_LICENSE("GPL");
 
 
-MODULE_PARM(io, "1-" __MODULE_STRING(MAX_ETH16I_CARDS) "i");
+module_param_array(io, int, NULL, 0);
 MODULE_PARM_DESC(io, "eth16i I/O base address(es)");
 
 #if 0
-MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_ETH16I_CARDS) "i");
+module_param_array(irq, int, NULL, 0);
 MODULE_PARM_DESC(irq, "eth16i interrupt request number");
 #endif
 
-MODULE_PARM(mediatype, "1-" __MODULE_STRING(MAX_ETH16I_CARDS) "s");
+module_param_array(mediatype, charp, NULL, 0);
 MODULE_PARM_DESC(mediatype, "eth16i media type of interface(s) (bnc,tp,dix,auto,eprom)");
 
-MODULE_PARM(debug, "i");
+module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, "eth16i debug level (0-6)");
 
 int init_module(void)
