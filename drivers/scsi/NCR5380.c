@@ -2750,7 +2750,7 @@ static void NCR5380_reselect(struct Scsi_Host *instance) {
 	phase = PHASE_MSGIN;
 	NCR5380_transfer_pio(instance, &phase, &len, &data);
 
-	if (!msg[0] & 0x80) {
+	if (!(msg[0] & 0x80)) {
 		printk(KERN_ERR "scsi%d : expecting IDENTIFY message, got ", instance->host_no);
 		print_msg(msg);
 		abort = 1;

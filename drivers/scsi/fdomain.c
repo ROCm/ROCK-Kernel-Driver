@@ -725,13 +725,13 @@ static int fdomain_isa_detect( int *irq, int *iobase )
       switch (Quantum) {
       case 2:			/* ISA_200S */
       case 3:			/* ISA_250MG */
-	 base = readb(bios_base + 0x1fa2) + (readb(bios_base + 0x1fa3) << 8);
+	 base = isa_readb(bios_base + 0x1fa2) + (isa_readb(bios_base + 0x1fa3) << 8);
 	 break;
       case 4:			/* ISA_200S (another one) */
-	 base = readb(bios_base + 0x1fa3) + (readb(bios_base + 0x1fa4) << 8);
+	 base = isa_readb(bios_base + 0x1fa3) + (isa_readb(bios_base + 0x1fa4) << 8);
 	 break;
       default:
-	 base = readb(bios_base + 0x1fcc) + (readb(bios_base + 0x1fcd) << 8);
+	 base = isa_readb(bios_base + 0x1fcc) + (isa_readb(bios_base + 0x1fcd) << 8);
 	 break;
       }
    
@@ -1777,7 +1777,7 @@ static int fdomain_16x0_biosparam(struct scsi_device *sdev,
 	 offset = bios_base + 0x1f31 + drive * 25;
 	 break;
       }
-      memcpy_fromio( &i, offset, sizeof( struct drive_info ) );
+      isa_memcpy_fromio( &i, offset, sizeof( struct drive_info ) );
       info_array[0] = i.heads;
       info_array[1] = i.sectors;
       info_array[2] = i.cylinders;
