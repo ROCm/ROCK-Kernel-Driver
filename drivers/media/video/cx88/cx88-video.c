@@ -42,17 +42,17 @@ MODULE_LICENSE("GPL");
 
 static unsigned int video_nr[] = {[0 ... (CX88_MAXBOARDS - 1)] = UNSET };
 static unsigned int video_nr_num;
-module_param_array(video_nr,int,video_nr_num,0444);
+module_param_array(video_nr,int,&video_nr_num,0444);
 MODULE_PARM_DESC(video_nr,"video device numbers");
 
 static unsigned int vbi_nr[] = {[0 ... (CX88_MAXBOARDS - 1)] = UNSET };
 static unsigned int vbi_nr_num;
-module_param_array(vbi_nr,int,vbi_nr_num,0444);
+module_param_array(vbi_nr,int,&vbi_nr_num,0444);
 MODULE_PARM_DESC(vbi_nr,"vbi device numbers");
 
 static unsigned int radio_nr[] = {[0 ... (CX88_MAXBOARDS - 1)] = UNSET };
 static unsigned int radio_nr_num;
-module_param_array(radio_nr,int,radio_nr_num,0444);
+module_param_array(radio_nr,int,&radio_nr_num,0444);
 MODULE_PARM_DESC(radio_nr,"radio device numbers");
 
 static unsigned int video_debug = 0;

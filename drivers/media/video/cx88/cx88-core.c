@@ -51,12 +51,12 @@ MODULE_PARM_DESC(latency,"pci latency timer");
 
 static unsigned int tuner[] = {[0 ... (CX88_MAXBOARDS - 1)] = UNSET };
 static int tuner_num;
-module_param_array(tuner,int,tuner_num,0444);
+module_param_array(tuner,int,&tuner_num,0444);
 MODULE_PARM_DESC(tuner,"tuner type");
 
 static unsigned int card[] = {[0 ... (CX88_MAXBOARDS - 1)] = UNSET };
 static int card_num;
-module_param_array(card,int,card_num,0444);
+module_param_array(card,int,&card_num,0444);
 MODULE_PARM_DESC(card,"card type");
 
 static unsigned int nicam = 0;
