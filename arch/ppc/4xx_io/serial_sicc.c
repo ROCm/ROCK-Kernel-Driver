@@ -763,7 +763,7 @@ static void siccuart_change_speed(struct SICC_info *info, struct termios *old_te
 
     cflag = info->tty->termios->c_cflag;
 
-#if DEBUG
+#ifdef DEBUG
     printk("siccuart_set_cflag(0x%x) called\n", cflag);
 #endif
     /* byte size and parity */
@@ -1027,7 +1027,7 @@ static void siccuart_flush_buffer(struct tty_struct *tty)
     struct SICC_info *info = tty->driver_data;
     unsigned long flags;
 
-#if DEBUG
+#ifdef DEBUG
     printk("siccuart_flush_buffer(%d) called\n", tty->index);
 #endif
     save_flags(flags); cli();
@@ -1433,7 +1433,7 @@ static void siccuart_close(struct tty_struct *tty, struct file *filp)
 
     state = info->state;
 
-#if DEBUG
+#ifdef DEBUG
     //printk("siccuart_close() called\n");
 #endif
 
@@ -1544,7 +1544,7 @@ static void siccuart_wait_until_sent(struct tty_struct *tty, int timeout)
         timeout = 2 * info->timeout;
 
     expire = jiffies + timeout;
-#if DEBUG
+#ifdef DEBUG
     printk("siccuart_wait_until_sent(%d), jiff=%lu, expire=%lu  char_time=%lu...\n",
            tty->index, jiffies,
            expire, char_time);
@@ -1831,7 +1831,7 @@ static int siccuart_console_read(struct console *co, const char *s, u_int count)
     unsigned int status;
     char *w;
     int c;
-#if DEBUG
+#ifdef DEBUG
     printk("siccuart_console_read() called\n");
 #endif
 
