@@ -687,11 +687,10 @@ static int try_to_unuse(unsigned int type)
 		if ((*swap_map > 1) && PageDirty(page) && PageSwapCache(page)) {
 			swap_writepage(page);
 			lock_page(page);
-		}
-		if (PageSwapCache(page)) {
 			wait_on_page_writeback(page);
-			delete_from_swap_cache(page);
 		}
+		if (PageSwapCache(page))
+			delete_from_swap_cache(page);
 
 		/*
 		 * So we could skip searching mms once swap count went

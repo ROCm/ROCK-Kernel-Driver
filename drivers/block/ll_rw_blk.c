@@ -964,8 +964,7 @@ void blk_run_queues(void)
 		return;
 	}
 
-	list_splice(&blk_plug_list, &local_plug_list);
-	INIT_LIST_HEAD(&blk_plug_list);
+	list_splice_init(&blk_plug_list, &local_plug_list);
 	spin_unlock_irq(&blk_plug_lock);
 	
 	while (!list_empty(&local_plug_list)) {
