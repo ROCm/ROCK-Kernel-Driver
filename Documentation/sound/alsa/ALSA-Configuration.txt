@@ -809,6 +809,7 @@ Module parameters
     buffer_top       - specify buffer top address
     use_cache        - 0 or 1 (disabled by default)
     vaio_hack        - alias buffer_top=0x25a800
+    reset_workaround - enable AC97 RESET workaround for some laptops
 
     Module supports autoprobe and multiple chips (max 8).
 
@@ -833,6 +834,11 @@ Module parameters
     other drivers, e.g. snd-cs4232 or snd-opl3sa2.  Some has ISA-PnP
     but some doesn't have ISA PnP.  You'll need to speicfy isapnp=0
     and proper hardware parameters in the case without ISA PnP.
+
+    Note: some laptops need a workaround for AC97 RESET.  For the
+    known hardware like Dell Latitude LS and Sony PCG-F305, this
+    workaround is enabled automatically.  For other laptops with a
+    hard freeze, you can try reset_workaround=1 option.
 
     Note: This driver is really crappy.  It's a porting from the
     OSS driver, which is a result of black-magic reverse engineering.
