@@ -44,15 +44,12 @@ static struct sock *llc_get_sk_idx(loff_t pos)
 		read_lock_bh(&sap->sk_list.lock);
 		sk_for_each(sk, node, &sap->sk_list.list) {
 			if (!pos)
-				break;
+				goto found;
 			--pos;
 		}
 		read_unlock_bh(&sap->sk_list.lock);
-		if (!pos) {
-			if (node)
-				goto found;
+		if (!pos)
 			break;
-		}
 	}
 	sk = NULL;
 found:
@@ -105,7 +102,7 @@ out:
 
 static void llc_seq_stop(struct seq_file *seq, void *v)
 {
-	if (v) {
+	if (v && v != SEQ_START_TOKEN) {
 		struct sock *sk = v;
 		struct llc_opt *llc = llc_sk(sk);
 		struct llc_sap *sap = llc->sap;
