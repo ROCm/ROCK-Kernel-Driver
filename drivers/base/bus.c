@@ -549,6 +549,41 @@ struct bus_type * find_bus(char * name)
 	return k ? to_bus(k) : NULL;
 }
 
+
+/**
+ *	bus_add_attrs - Add default attributes for this bus.
+ *	@bus:	Bus that has just been registered.
+ */
+
+static int bus_add_attrs(struct bus_type * bus)
+{
+	int error = 0;
+	int i;
+
+	if (bus->bus_attrs) {
+		for (i = 0; attr_name(bus->bus_attrs[i]); i++) {
+			if ((error = bus_create_file(bus,&bus->bus_attrs[i])))
+				goto Err;
+		}
+	}
+ Done:
+	return error;
+ Err:
+	while (i >= 0)
+		bus_remove_file(bus,&bus->bus_attrs[i]);
+	goto Done;
+}
+
+static void bus_remove_attrs(struct bus_type * bus)
+{
+	int i;
+	
+	if (bus->bus_attrs) {
+		for (i = 0; attr_name(bus->bus_attrs[i]); i++)
+			bus_remove_file(bus,&bus->bus_attrs[i]);
+	}
+}
+
 /**
  *	bus_register - register a bus with the system.
  *	@bus:	bus.
@@ -582,6 +617,7 @@ int bus_register(struct bus_type * bus)
 	retval = kset_register(&bus->drivers);
 	if (retval)
 		goto bus_drivers_fail;
+	bus_add_attrs(bus);
 
 	pr_debug("bus type '%s' registered\n",bus->name);
 	return 0;
@@ -605,6 +641,7 @@ out:
 void bus_unregister(struct bus_type * bus)
 {
 	pr_debug("bus %s: unregistering\n",bus->name);
+	bus_remove_attrs(bus);
 	kset_unregister(&bus->drivers);
 	kset_unregister(&bus->devices);
 	subsystem_unregister(&bus->subsys);
