@@ -43,7 +43,7 @@ csum_partial_copy_from_user(const char __user *src, char *dst,
 				len -= 2;
 			}
 		}
-		isum = csum_partial_copy_generic((void *)src,dst,len,isum,errp,NULL);
+		isum = csum_partial_copy_generic((__force void *)src,dst,len,isum,errp,NULL);
 		if (likely(*errp == 0)) 
 			return isum;
 	} 
@@ -88,7 +88,7 @@ csum_partial_copy_to_user(const char *src, char __user *dst,
 	}
 
 	*errp = 0;
-	return csum_partial_copy_generic(src, (void *)dst,len,isum,NULL,errp); 
+	return csum_partial_copy_generic(src, (void __force *)dst,len,isum,NULL,errp); 
 } 
 
 EXPORT_SYMBOL(csum_partial_copy_to_user);

@@ -43,10 +43,10 @@ unsigned int csum_partial_copy_nocheck ( const char *src, char *dst,
 }
 
 static __inline__
-unsigned int csum_partial_copy_from_user ( const char *src, char *dst,
+unsigned int csum_partial_copy_from_user ( const char __user *src, char *dst,
 						int len, int sum, int *err_ptr)
 {
-	return csum_partial_copy_generic ( src, dst, len, sum, err_ptr, NULL);
+	return csum_partial_copy_generic ( (__force char *)src, dst, len, sum, err_ptr, NULL);
 }
 
 /*
@@ -178,7 +178,7 @@ static __inline__ unsigned int csum_and_copy_to_user(const char *src,
 						     int *err_ptr)
 {
 	if (access_ok(VERIFY_WRITE, dst, len))
-		return csum_partial_copy_generic(src, dst, len, sum, NULL, err_ptr);
+		return csum_partial_copy_generic(src, (__force char *)dst, len, sum, NULL, err_ptr);
 
 	if (len)
 		*err_ptr = -EFAULT;
