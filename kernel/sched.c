@@ -2122,7 +2122,9 @@ static void active_load_balance(runqueue_t *busiest_rq, int busiest_cpu)
 {
 	struct sched_domain *sd;
 	struct sched_group *cpu_group;
+	runqueue_t *target_rq;
 	cpumask_t visited_cpus;
+	int cpu;
 
 	schedstat_inc(busiest_rq, alb_cnt);
 	/*
@@ -2131,46 +2133,43 @@ static void active_load_balance(runqueue_t *busiest_rq, int busiest_cpu)
 	 */
 	visited_cpus = CPU_MASK_NONE;
 	for_each_domain(busiest_cpu, sd) {
-		if (!(sd->flags & SD_LOAD_BALANCE) || busiest_rq->nr_running <= 1)
-			break; /* no more domains to search or no more tasks to move */
+		if (!(sd->flags & SD_LOAD_BALANCE))
+			/* no more domains to search */
+			break;
 
 		cpu_group = sd->groups;
-		do { /* sched_groups should either use list_heads or be merged into the domains structure */
-			int cpu, target_cpu = -1;
-			runqueue_t *target_rq;
-
+		do {
 			for_each_cpu_mask(cpu, cpu_group->cpumask) {
-				if (cpu_isset(cpu, visited_cpus) || cpu == busiest_cpu ||
-				    !cpu_and_siblings_are_idle(cpu)) {
-					cpu_set(cpu, visited_cpus);
+				if (busiest_rq->nr_running <= 1)
+					/* no more tasks left to move */
+					return;
+				if (cpu_isset(cpu, visited_cpus))
 					continue;
+				cpu_set(cpu, visited_cpus);
+				if (!cpu_and_siblings_are_idle(cpu) || cpu == busiest_cpu)
+					continue;
+
+				target_rq = cpu_rq(cpu);
+				/*
+				 * This condition is "impossible", if it occurs
+				 * we need to fix it.  Originally reported by
+				 * Bjorn Helgaas on a 128-cpu setup.
+				 */
+				BUG_ON(busiest_rq == target_rq);
+
+				/* move a task from busiest_rq to target_rq */
+				double_lock_balance(busiest_rq, target_rq);
+				if (move_tasks(target_rq, cpu, busiest_rq,
+						1, sd, SCHED_IDLE)) {
+					schedstat_inc(busiest_rq, alb_lost);
+					schedstat_inc(target_rq, alb_gained);
+				} else {
+					schedstat_inc(busiest_rq, alb_failed);
 				}
-				target_cpu = cpu;
-				break;
+				spin_unlock(&target_rq->lock);
 			}
-			if (target_cpu == -1)
-				goto next_group; /* failed to find a suitable target cpu in this domain */
-
-			target_rq = cpu_rq(target_cpu);
-
-			/*
-			 * This condition is "impossible", if it occurs we need to fix it
-			 * Reported by Bjorn Helgaas on a 128-cpu setup.
-			 */
-			BUG_ON(busiest_rq == target_rq);
-
-			/* move a task from busiest_rq to target_rq */
-			double_lock_balance(busiest_rq, target_rq);
-			if (move_tasks(target_rq, target_cpu, busiest_rq, 1, sd, SCHED_IDLE)) {
-				schedstat_inc(busiest_rq, alb_lost);
-				schedstat_inc(target_rq, alb_gained);
-			} else {
-				schedstat_inc(busiest_rq, alb_failed);
-			}
-			spin_unlock(&target_rq->lock);
-next_group:
 			cpu_group = cpu_group->next;
-		} while (cpu_group != sd->groups && busiest_rq->nr_running > 1);
+		} while (cpu_group != sd->groups);
 	}
 }
 
