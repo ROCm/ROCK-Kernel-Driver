@@ -121,6 +121,19 @@ Kernel traffic:
 	Weekly summary of kernel list activity (much easier to read)
 	http://www.kerneltraffic.org/kernel-traffic/
 
+LWN.net:
+	Weekly summary of kernel development activity - http://lwn.net/
+	2.6 driver porting information:
+		http://lwn.net/Articles/driver-porting/
+
+KernelTrap:
+	Occasional Linux kernel articles and developer interviews
+	http://kerneltrap.org/
+
+KernelNewbies:
+	Documentation and assistance for new kernel programmers
+	http://kernelnewbies.org/
+
 Linux USB project:
 	http://sourceforge.net/projects/linux-usb/
 
