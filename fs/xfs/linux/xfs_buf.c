@@ -321,24 +321,10 @@ _pagebuf_freepages(
  *	state of any associated pages is left unchanged.
  */
 STATIC void
-__pagebuf_free(
+_pagebuf_free(
 	page_buf_t		*pb)
 {
-	pb_hash_t		*hash = pb_hash(pb);
-
 	PB_TRACE(pb, "free", 0);
-
-	spin_lock(&hash->pb_hash_lock);
-	/*
-	 * Someone grabbed a reference while we weren't looking,
-	 * try again later.
-	 */
-	if (unlikely(atomic_read(&pb->pb_hold))) {
-		spin_unlock(&hash->pb_hash_lock);
-		return;
-	} else if (!list_empty(&pb->pb_hash_list))
-		list_del_init(&pb->pb_hash_list);
-	spin_unlock(&hash->pb_hash_lock);
 
 	/* release any virtual mapping */ ;
 	if (pb->pb_flags & _PBF_ADDR_ALLOCATED) {
@@ -371,11 +357,11 @@ void
 pagebuf_free(
 	page_buf_t		*pb)
 {
-	if (unlikely(!atomic_dec_and_test(&pb->pb_hold))) {
-		printk(KERN_ERR "XFS: freeing inuse buffer!\n");
-		dump_stack();
-	} else
-		__pagebuf_free(pb);
+	if (unlikely(!atomic_dec_and_test(&pb->pb_hold)))
+		BUG();
+	if (unlikely(!list_empty(&pb->pb_hash_list)))
+		BUG();
+	_pagebuf_free(pb);
 }
 
 /*
@@ -946,28 +932,35 @@ void
 pagebuf_rele(
 	page_buf_t		*pb)
 {
+	pb_hash_t		*hash = pb_hash(pb);
+
 	PB_TRACE(pb, "rele", pb->pb_relse);
 
-	if (atomic_dec_and_test(&pb->pb_hold)) {
+	if (atomic_dec_and_lock(&pb->pb_hold, &hash->pb_hash_lock)) {
 		int		do_free = 1;
 
 		if (pb->pb_relse) {
 			atomic_inc(&pb->pb_hold);
-			(*(pb->pb_relse)) (pb);
+			spin_unlock(&hash->pb_hash_lock);
+			(*(pb->pb_relse))(pb);
+			spin_lock(&hash->pb_hash_lock);
 			do_free = 0;
 		}
+
 		if (pb->pb_flags & PBF_DELWRI) {
 			pb->pb_flags |= PBF_ASYNC;
 			atomic_inc(&pb->pb_hold);
 			pagebuf_delwri_queue(pb, 0);
 			do_free = 0;
-		} else if (pb->pb_flags & PBF_FS_MANAGED) {
+		} else if (pb->pb_flags & PBF_FS_MANAGED)
 			do_free = 0;
-		}
 
 		if (do_free) {
-			__pagebuf_free(pb);
-		}
+			list_del_init(&pb->pb_hash_list);
+			spin_unlock(&hash->pb_hash_lock);
+			_pagebuf_free(pb);
+		} else
+			spin_unlock(&hash->pb_hash_lock);
 	}
 }
 
