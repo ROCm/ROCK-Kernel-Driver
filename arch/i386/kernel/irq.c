@@ -360,8 +360,9 @@ void __global_cli(void)
 
 	__save_flags(flags);
 	if (flags & (1 << EFLAGS_IF_SHIFT)) {
-		int cpu = smp_processor_id();
+		int cpu;
 		__cli();
+		cpu = smp_processor_id();
 		if (!local_irq_count(cpu))
 			get_irqlock(cpu);
 	}
