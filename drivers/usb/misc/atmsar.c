@@ -285,12 +285,12 @@ struct atmsar_vcc_data *atmsar_open (struct atmsar_vcc_data **list, struct atm_v
 {
 	struct atmsar_vcc_data *new;
 
+	if (!vcc)
+		return NULL;
+
 	new = kmalloc (sizeof (struct atmsar_vcc_data), GFP_KERNEL);
 
 	if (!new)
-		return NULL;
-
-	if (!vcc)
 		return NULL;
 
 	memset (new, 0, sizeof (struct atmsar_vcc_data));
