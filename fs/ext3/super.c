@@ -405,6 +405,12 @@ void ext3_put_super (struct super_block * sb)
 	kfree(sbi->s_group_desc);
 	kfree(sbi->s_debts);
 	brelse(sbi->s_sbh);
+#ifdef CONFIG_QUOTA
+	for (i = 0; i < MAXQUOTAS; i++) {
+		if (sbi->s_qf_names[i])
+			kfree(sbi->s_qf_names[i]);
+	}
+#endif
 
 	/* Debugging code just in case the in-memory inode orphan list
 	 * isn't empty.  The on-disk one can be non-empty if we've
@@ -897,7 +903,8 @@ clear_qf_name:
 		}
 	}
 #ifdef CONFIG_QUOTA
-	if (!sbi->s_jquota_fmt && (sbi->s_qf_names[0] || sbi->s_qf_names[1])) {
+	if (!sbi->s_jquota_fmt && (sbi->s_qf_names[USRQUOTA] ||
+	    sbi->s_qf_names[GRPQUOTA])) {
 		printk(KERN_ERR
 			"EXT3-fs: journalled quota format not specified.\n");
 		return 0;
@@ -2249,7 +2256,8 @@ static int ext3_quota_on(struct super_block *sb, int type, int format_id,
 	struct nameidata nd;
 
 	/* Not journalling quota? */
-	if (!EXT3_SB(sb)->s_qf_names[0] && !EXT3_SB(sb)->s_qf_names[1])
+	if (!EXT3_SB(sb)->s_qf_names[USRQUOTA] &&
+	    !EXT3_SB(sb)->s_qf_names[GRPQUOTA])
 		return vfs_quota_on(sb, type, format_id, path);
 	err = path_lookup(path, LOOKUP_FOLLOW, &nd);
 	if (err)
