@@ -327,6 +327,7 @@ extern PPC_DEVICE *residual_find_device(unsigned long BusMask,
 					unsigned char * DevID, int BaseType,
 					int SubType, int Interface, int n);
 extern int residual_pcidev_irq(struct pci_dev *dev);
+extern void residual_irq_mask(char *irq_edge_mask_lo, char *irq_edge_mask_hi);
 extern PnP_TAG_PACKET *PnP_find_packet(unsigned char *p, unsigned packet_tag,
 				       int n);
 extern PnP_TAG_PACKET *PnP_find_small_vendor_packet(unsigned char *p,

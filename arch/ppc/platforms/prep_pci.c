@@ -901,6 +901,17 @@ ibm43p_pci_map_non0(struct pci_dev *dev)
 }
 
 void __init
+prep_residual_setup_pci(char *irq_edge_mask_lo, char *irq_edge_mask_hi)
+{
+	if (have_residual_data) {
+		Motherboard_map_name = res->VitalProductData.PrintableModel;
+		Motherboard_map = NULL;
+		Motherboard_routes = NULL;
+		residual_irq_mask(irq_edge_mask_lo, irq_edge_mask_hi);
+	}
+}
+
+void __init
 prep_sandalfoot_setup_pci(char *irq_edge_mask_lo, char *irq_edge_mask_hi)
 {
 	Motherboard_map_name = "IBM 6015/7020 (Sandalfoot/Sandalbow)";
@@ -1022,10 +1033,13 @@ prep_route_pci_interrupts(void)
 	}
 
 	/* Set up mapping from slots */
-	for (i = 1;  i <= 4;  i++)
-		ibc_pirq[i-1] = Motherboard_routes[i];
-	/* Enable PCI interrupts */
-	*ibc_pcicon |= 0x20;
+	if (Motherboard_routes) {
+		for (i = 1;  i <= 4;  i++)
+			ibc_pirq[i-1] = Motherboard_routes[i];
+
+		/* Enable PCI interrupts */
+		*ibc_pcicon |= 0x20;
+	}
 }
 
 void __init

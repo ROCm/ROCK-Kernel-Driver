@@ -887,6 +887,36 @@ residual_pcidev_irq(struct pci_dev *dev)
 	return (irq < 0) ? 0 : irq;
 }
 
+void __init residual_irq_mask(char *irq_edge_mask_lo, char *irq_edge_mask_hi)
+{
+	PPC_DEVICE *dev;
+	int i = 0;
+	unsigned short irq_mask = 0x000; /* default to edge */
+
+	while ((dev = residual_find_device(-1, NULL, -1, -1, -1, i++))) {
+		PnP_TAG_PACKET *pkt;
+		unsigned short mask;
+		int size;
+		int offset = dev->AllocatedOffset;
+
+		if (!offset)
+			continue;
+
+		pkt = PnP_find_packet(res->DevicePnPHeap + offset,
+					      IRQFormat, 0);
+		if (!pkt)
+			continue;
+
+		size = tag_small_count(pkt->S1_Pack.Tag) + 1;
+		mask = ld_le16((unsigned short *)pkt->S4_Pack.IRQMask);
+		if (size > 3 && (pkt->S4_Pack.IRQInfo & 0x0c))
+			irq_mask |= mask;
+	}
+
+	*irq_edge_mask_lo = irq_mask & 0xff;
+	*irq_edge_mask_hi = irq_mask >> 8;
+}
+
 PnP_TAG_PACKET *PnP_find_packet(unsigned char *p,
 				unsigned packet_tag,
 				int n)

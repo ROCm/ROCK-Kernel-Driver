@@ -79,6 +79,7 @@ extern void prep_find_bridges(void);
 
 int _prep_type;
 
+extern void prep_residual_setup_pci(char *irq_edge_mask_lo, char *irq_edge_mask_hi);
 extern void prep_sandalfoot_setup_pci(char *irq_edge_mask_lo, char *irq_edge_mask_hi);
 extern void prep_thinkpad_setup_pci(char *irq_edge_mask_lo, char *irq_edge_mask_hi);
 extern void prep_carolina_setup_pci(char *irq_edge_mask_lo, char *irq_edge_mask_hi);
@@ -206,6 +207,13 @@ prep_ibm_cpuinfo(struct seq_file *m)
 		}
 		seq_printf(m, "\n");
 	}
+}
+
+static int __prep
+prep_gen_cpuinfo(struct seq_file *m)
+{
+	prep_ibm_cpuinfo(m);
+	return 0;
 }
 
 static int __prep
@@ -815,7 +823,16 @@ prep_setup_arch(void)
 				ppc_md.show_cpuinfo = prep_thinkpad_cpuinfo;
 				break;
 			default:
-				printk(" -- unknown! Assuming Carolina");
+				if (have_residual_data) {
+					prep_gen_enable_l2();
+					setup_ibm_pci = prep_residual_setup_pci;
+					ppc_md.power_off = prep_halt;
+					ppc_md.show_cpuinfo = prep_gen_cpuinfo;
+					break;
+				}
+				else
+					printk(" - unknown! Assuming Carolina");
+					/* fall through */
 			case PREP_IBM_CAROLINA_IDE_0:
 			case PREP_IBM_CAROLINA_IDE_1:
 			case PREP_IBM_CAROLINA_IDE_2:
