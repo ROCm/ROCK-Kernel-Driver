@@ -367,31 +367,6 @@ static void llc_conn_send_pdus(struct sock *sk)
 }
 
 /**
- *	llc_conn_free_ev - free event
- *	@skb: event to free
- *
- *	Free allocated event.
- */
-void llc_conn_free_ev(struct sk_buff *skb)
-{
-	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-
-	if (ev->type == LLC_CONN_EV_TYPE_PDU) {
-		/* free the frame that is bound to this event */
-		struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
-
-		if (LLC_PDU_TYPE_IS_I(pdu) || !ev->ind_prim)
-			kfree_skb(skb);
-	} else if (ev->type == LLC_CONN_EV_TYPE_PRIM &&
-		   ev->prim != LLC_DATA_PRIM)
-		kfree_skb(skb);
-	else if (ev->type == LLC_CONN_EV_TYPE_P_TMR ||
-		 ev->type == LLC_CONN_EV_TYPE_BUSY_TMR ||
-		 ev->type == LLC_CONN_EV_TYPE_REJ_TMR)
-		kfree_skb(skb);
-}
-
-/**
  *	llc_conn_service - finds transition and changes state of connection
  *	@sk: connection
  *	@skb: happened event
