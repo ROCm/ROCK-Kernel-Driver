@@ -540,11 +540,14 @@ static inline void print_modules(void)
 {
 }
 
-static inline void module_add_driver(struct module *, struct device_driver *)
+struct device_driver;
+struct module;
+
+static inline void module_add_driver(struct module *module, struct device_driver *driver)
 {
 }
 
-static inline void module_remove_driver(struct device_driver *)
+static inline void module_remove_driver(struct device_driver *driver)
 {
 }
 
