@@ -332,7 +332,7 @@ static struct amba_device name##_device = {			\
 		.flags	= IORESOURCE_MEM,			\
 	},							\
 	.irq		= base##_IRQ,				\
-	.dma		= base##_DMA,				\
+	/* .dma		= base##_DMA,*/				\
 }
 
 #define AACI_IRQ	{ IRQ_AACI, NO_IRQ }
