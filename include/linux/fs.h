@@ -751,7 +751,6 @@ struct super_block {
 
 	char s_id[32];				/* Informational name */
 
-	struct kobject           kobj;          /* anchor for sysfs */
 	void 			*s_fs_info;	/* Filesystem private info */
 
 	/*
