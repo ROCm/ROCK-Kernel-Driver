@@ -738,7 +738,7 @@ repeat:
 static void flush_hash_hugepage(mm_context_t context, unsigned long ea,
 				hugepte_t pte, int local)
 {
-	unsigned long vsid, vpn, va, hash, secondary, slot;
+	unsigned long vsid, vpn, va, hash, slot;
 
 	BUG_ON(hugepte_bad(pte));
 	BUG_ON(!in_hugepage_area(context, ea));
@@ -748,8 +748,7 @@ static void flush_hash_hugepage(mm_context_t context, unsigned long ea,
 	va = (vsid << 28) | (ea & 0x0fffffff);
 	vpn = va >> LARGE_PAGE_SHIFT;
 	hash = hpt_hash(vpn, 1);
-	secondary = !!(hugepte_val(pte) & _HUGEPAGE_SECONDARY);
-	if (secondary)
+	if (hugepte_val(pte) & _HUGEPAGE_SECONDARY)
 		hash = ~hash;
 	slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
 	slot += (hugepte_val(pte) & _HUGEPAGE_GROUP_IX) >> 5;
