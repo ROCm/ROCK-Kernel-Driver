@@ -1232,10 +1232,6 @@ L(mmu_init_mac):
 
 	putc	'F'
 
-	lea	%pc@(L(mac_videobase)),%a0
-	lea	%pc@(L(console_video_virtual)),%a1
-	movel	%a0@,%a1@
-
 	is_not_040_or_060(1f)
 
 	moveq	#_PAGE_NOCACHE_S,%d3
@@ -3829,11 +3825,6 @@ L(custom):
 L(iobase):
 	.long 0
 #endif
-
-#ifdef CONFIG_MAC
-L(console_video_virtual):
-	.long	0
-#endif	/* CONFIG_MAC */
 
 #if defined(CONSOLE)
 L(console_globals):
