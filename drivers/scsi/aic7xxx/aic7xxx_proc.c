@@ -37,7 +37,7 @@
  * String handling code courtesy of Gerard Roudier's <groudier@club-internet.fr>
  * sym driver.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_proc.c#26 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_proc.c#27 $
  */
 #include "aic7xxx_osm.h"
 #include "aic7xxx_inline.h"
@@ -330,7 +330,7 @@ ahc_linux_proc_info(char *buffer, char **start, off_t offset,
 	ahc_controller_info(ahc, ahc_info);
 	copy_info(&info, "%s\n", ahc_info);
 	copy_info(&info, "Allocated SCBs: %d, SG List Length: %d\n\n",
-		  ahc->scb_data->numscbs, ahc_linux_nseg);
+		  ahc->scb_data->numscbs, AHC_NSEG);
 
 
 	if (ahc->seep_config == NULL)
