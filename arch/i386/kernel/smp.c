@@ -461,17 +461,6 @@ void smp_send_reschedule(int cpu)
 }
 
 /*
- * this function sends a reschedule IPI to all (other) CPUs.
- * This should only be used if some 'global' task became runnable,
- * such as a RT task, that must be handled now. The first CPU
- * that manages to grab the task will run it.
- */
-void smp_send_reschedule_all(void)
-{
-	send_IPI_allbutself(RESCHEDULE_VECTOR);
-}
-
-/*
  * Structure and data for smp_call_function(). This is designed to minimise
  * static memory requirements. It also looks cleaner.
  */

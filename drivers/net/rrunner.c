@@ -97,13 +97,11 @@ static int __devinit rr_init_one(struct pci_dev *pdev,
 	struct rr_private *rrpriv;
 	void *tmpptr;
 	dma_addr_t ring_dma;
-	int ret;
+	int ret = -ENOMEM;
 
-	dev = init_hippi_dev(NULL, sizeof(struct rr_private));
-	if (!dev) {
-		ret = -ENOMEM;
-		goto out2;
-	}
+	dev = alloc_hippi_dev(sizeof(struct rr_private));
+	if (!dev)
+		goto out3;
 
 	ret = pci_enable_device(pdev);
 	if (ret) {
@@ -210,6 +208,10 @@ static int __devinit rr_init_one(struct pci_dev *pdev,
 	rr_init(dev);
 
 	dev->base_addr = 0;
+
+	ret = register_netdev(dev);
+	if (ret)
+		goto out;
 	return 0;
 
  out:
@@ -225,12 +227,9 @@ static int __devinit rr_init_one(struct pci_dev *pdev,
 		pci_release_regions(pdev);
 		pci_set_drvdata(pdev, NULL);
 	}
-
  out2:
-	if (dev) {
-		unregister_hipdev(dev);
-		kfree(dev);
-	}
+	kfree(dev);
+ out3:
 	return ret;
 }
 
@@ -252,7 +251,7 @@ static void __devexit rr_remove_one (struct pci_dev *pdev)
 				    rr->rx_ring_dma);
 		pci_free_consistent(pdev, TX_TOTAL_SIZE, rr->tx_ring,
 				    rr->tx_ring_dma);
-		unregister_hipdev(dev);
+		unregister_netdev(dev);
 		iounmap(rr->regs);
 		kfree(dev);
 		pci_release_regions(pdev);

@@ -861,12 +861,7 @@ static void __exit lane_module_cleanup(void)
         for (i = 0; i < MAX_LEC_ITF; i++) {
                 if (dev_lec[i] != NULL) {
                         priv = (struct lec_priv *)dev_lec[i]->priv;
-#if defined(CONFIG_TR)
-                	if (priv->is_trdev)
-                        	unregister_trdev(dev_lec[i]);
-                	else
-#endif
-				unregister_netdev(dev_lec[i]);
+			unregister_netdev(dev_lec[i]);
                         kfree(dev_lec[i]);
                         dev_lec[i] = NULL;
                 }

@@ -771,6 +771,10 @@ static inline struct bio *idescsi_dma_bio(ide_drive_t *drive, idescsi_pc_t *pc)
 static inline int should_transform(ide_drive_t *drive, Scsi_Cmnd *cmd)
 {
 	idescsi_scsi_t *scsi = drive_to_idescsi(drive);
+
+	/* this was a layering violation and we can't support it
+	   anymore, sorry. */
+#if 0
 	struct gendisk *disk = cmd->request->rq_disk;
 
 	if (disk) {
@@ -778,6 +782,7 @@ static inline int should_transform(ide_drive_t *drive, Scsi_Cmnd *cmd)
 		if (strcmp((*p)->scsi_driverfs_driver.name, "sg") == 0)
 			return test_bit(IDESCSI_SG_TRANSFORM, &scsi->transform);
 	}
+#endif
 	return test_bit(IDESCSI_TRANSFORM, &scsi->transform);
 }
 

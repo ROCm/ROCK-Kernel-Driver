@@ -205,24 +205,6 @@ smp_send_reschedule (int cpu)
 	platform_send_ipi(cpu, IA64_IPI_RESCHEDULE, IA64_IPI_DM_INT, 0);
 }
 
-/*
- * This function sends a reschedule IPI to all (other) CPUs.  This should only be used if
- * some 'global' task became runnable, such as a RT task, that must be handled now. The
- * first CPU that manages to grab the task will run it.
- */
-void
-smp_send_reschedule_all (void)
-{
-	int i;
-	int cpu = get_cpu(); /* disable preemption */
-
-	for (i = 0; i < NR_CPUS; i++)
-		if (cpu_online(i) && i != cpu)
-			smp_send_reschedule(i);
-	put_cpu();
-}
-
-
 void
 smp_flush_tlb_all (void)
 {

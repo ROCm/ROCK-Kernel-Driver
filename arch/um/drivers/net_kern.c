@@ -292,45 +292,46 @@ static int eth_configure(int n, void *init, char *mac,
 	struct uml_net *device;
 	struct net_device *dev;
 	struct uml_net_private *lp;
-	int save, err, size;
+	int err, size;
 
 	size = transport->private_size + sizeof(struct uml_net_private) + 
 		sizeof(((struct uml_net_private *) 0)->user);
 
 	device = kmalloc(sizeof(*device), GFP_KERNEL);
-	if(device == NULL){
+	if (device == NULL) {
 		printk(KERN_ERR "eth_configure failed to allocate uml_net\n");
 		return(1);
 	}
 
-	*device = ((struct uml_net) { .list 	= LIST_HEAD_INIT(device->list),
-				      .dev 	= NULL,
-				      .index	= n,
-				      .mac	= { [ 0 ... 5 ] = 0 },
-				      .have_mac	= 0 });
+	memset(device, 0, sizeof(*device));
+	device->list = INIT_LIST_HEAD(device->list);
+	device->index = n;
 
 	spin_lock(&devices_lock);
 	list_add(&device->list, &devices);
 	spin_unlock(&devices_lock);
 
-	if(setup_etheraddr(mac, device->mac))
+	if (setup_etheraddr(mac, device->mac))
 		device->have_mac = 1;
 
 	printk(KERN_INFO "Netdevice %d ", n);
-	if(device->have_mac) printk("(%02x:%02x:%02x:%02x:%02x:%02x) ",
-				    device->mac[0], device->mac[1], 
-				    device->mac[2], device->mac[3], 
-				    device->mac[4], device->mac[5]);
+	if (device->have_mac)
+		printk("(%02x:%02x:%02x:%02x:%02x:%02x) ",
+		       device->mac[0], device->mac[1],
+		       device->mac[2], device->mac[3],
+		       device->mac[4], device->mac[5]);
 	printk(": ");
-	dev = kmalloc(sizeof(*dev) + size, GFP_KERNEL);
-	if(dev == NULL){
+	dev = alloc_etherdev(size);
+	if (dev == NULL) {
 		printk(KERN_ERR "eth_configure: failed to allocate device\n");
-		return(1);
+		return 1;
 	}
-	memset(dev, 0, sizeof(*dev) + size);
 
+	/* If this name ends up conflicting with an existing registered
+	 * netdevice, that is OK, register_netdev{,ice}() will notice this
+	 * and fail.
+	 */
 	snprintf(dev->name, sizeof(dev->name), "eth%d", n);
-	dev->priv = (void *) &dev[1];
 	device->dev = dev;
 
         dev->hard_header = uml_net_hard_header;
@@ -357,42 +358,35 @@ static int eth_configure(int n, void *init, char *mac,
 	rtnl_lock();
 	err = register_netdevice(dev);
 	rtnl_unlock();
-	if(err)
-		return(1);
+	if (err)
+		return 1;
 	lp = dev->priv;
 
-	/* lp.user is the first four bytes of the transport data, which
-	 * has already been initialized.  This structure assignment will
-	 * overwrite that, so we make sure that .user gets overwritten with
-	 * what it already has.
-	 */
-	save = lp->user[0];
-	*lp = ((struct uml_net_private) 
-		{ .list  		= LIST_HEAD_INIT(lp->list),
-		  .lock 		= SPIN_LOCK_UNLOCKED,
-		  .dev 			= dev,
-		  .fd 			= -1,
-		  .mac 			= { 0xfe, 0xfd, 0x0, 0x0, 0x0, 0x0},
-		  .have_mac 		= device->have_mac,
-		  .protocol 		= transport->kern->protocol,
-		  .open 		= transport->user->open,
-		  .close 		= transport->user->close,
-		  .remove 		= transport->user->remove,
-		  .read 		= transport->kern->read,
-		  .write 		= transport->kern->write,
-		  .add_address 		= transport->user->add_address,
-		  .delete_address  	= transport->user->delete_address,
-		  .set_mtu 		= transport->user->set_mtu,
-		  .user  		= { save } });
+	lp->list = INIT_LIST_HEAD(lp->list);
+	spin_lock_init(&lp->lock);
+	lp->dev = dev;
+	lp->fd = -1;
+	lp->mac = { 0xfe, 0xfd, 0x0, 0x0, 0x0, 0x0 };
+	lp->have_mac = device->have_mac;
+	lp->protocol = transport->kern->protocol;
+	lp->open = transport->user->open;
+	lp->close = transport->user->close;
+	lp->remove = transport->user->remove;
+	lp->read = transport->kern->read;
+	lp->write = transport->kern->write;
+	lp->add_address = transport->user->add_address;
+	lp->delete_address = transport->user->delete_address;
+	lp->set_mtu = transport->user->set_mtu;
+
 	init_timer(&lp->tl);
 	lp->tl.function = uml_net_user_timer_expire;
-	memset(&lp->stats, 0, sizeof(lp->stats));
-	if(lp->have_mac) memcpy(lp->mac, device->mac, sizeof(lp->mac));
+	if (lp->have_mac)
+		memcpy(lp->mac, device->mac, sizeof(lp->mac));
 
-	if(transport->user->init) 
+	if (transport->user->init) 
 		(*transport->user->init)(&lp->user, dev);
 
-	if(device->have_mac)
+	if (device->have_mac)
 		set_ether_mac(dev, device->mac);
 	return(0);
 }
@@ -538,13 +532,15 @@ static int eth_setup(char *str)
 	if(err) return(1);
 
 	new = alloc_bootmem(sizeof(new));
-	if(new == NULL){
+	if (new == NULL){
 		printk("eth_init : alloc_bootmem failed\n");
 		return(1);
 	}
-	*new = ((struct eth_init) { .list  	= LIST_HEAD_INIT(new->list),
-				    .index  	= n,
-				    .init 	= str });
+
+	new->list = INIT_LIST_HEAD(new->list);
+	new->index = n;
+	new->init = str;
+
 	list_add_tail(&new->list, &eth_cmd_line);
 	return(1);
 }

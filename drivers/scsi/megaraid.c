@@ -723,7 +723,7 @@ mega_query_adapter(adapter_t *adapter)
 {
 	dma_addr_t	prod_info_dma_handle;
 	mega_inquiry3	*inquiry3;
-	u8	raw_mbox[16];
+	u8	raw_mbox[sizeof(mbox_t)];
 	mbox_t	*mbox;
 	int	retval;
 
@@ -732,7 +732,7 @@ mega_query_adapter(adapter_t *adapter)
 	mbox = (mbox_t *)raw_mbox;
 
 	memset((void *)adapter->mega_buffer, 0, MEGA_BUFFER_SIZE);
-	memset(mbox, 0, 16);
+	memset(mbox, 0, sizeof(*mbox));
 
 	/*
 	 * Try to issue Inquiry3 command
@@ -2400,7 +2400,7 @@ megaraid_release(struct Scsi_Host *host)
 {
 	adapter_t	*adapter;
 	mbox_t	*mbox;
-	u_char	raw_mbox[16];
+	u_char	raw_mbox[sizeof(mbox_t)];
 	char	buf[12] = { 0 };
 
 	adapter = (adapter_t *)host->hostdata;
@@ -2409,7 +2409,7 @@ megaraid_release(struct Scsi_Host *host)
 	printk(KERN_NOTICE "megaraid: being unloaded...");
 
 	/* Flush adapter cache */
-	memset(mbox, 0, 16);
+	memset(mbox, 0, sizeof(*mbox));
 	raw_mbox[0] = FLUSH_ADAPTER;
 
 	irq_disable(adapter);
@@ -2419,7 +2419,7 @@ megaraid_release(struct Scsi_Host *host)
 	issue_scb_block(adapter, raw_mbox);
 
 	/* Flush disks cache */
-	memset(mbox, 0, 16);
+	memset(mbox, 0, sizeof(*mbox));
 	raw_mbox[0] = FLUSH_SYSTEM;
 
 	/* Issue a blocking (interrupts disabled) command to the card */
@@ -3881,7 +3881,7 @@ megaraid_reboot_notify (struct notifier_block *this, unsigned long code,
 {
 	adapter_t *adapter;
 	struct Scsi_Host *host;
-	u8 raw_mbox[16];
+	u8 raw_mbox[sizeof(mbox_t)];
 	mbox_t *mbox;
 	int i,j;
 
@@ -3897,7 +3897,7 @@ megaraid_reboot_notify (struct notifier_block *this, unsigned long code,
 		mbox = (mbox_t *)raw_mbox;
 
 		/* Flush adapter cache */
-		memset(mbox, 0, 16);
+		memset(mbox, 0, sizeof(*mbox));
 		raw_mbox[0] = FLUSH_ADAPTER;
 
 		irq_disable(adapter);
@@ -3910,7 +3910,7 @@ megaraid_reboot_notify (struct notifier_block *this, unsigned long code,
 		issue_scb_block(adapter, raw_mbox);
 
 		/* Flush disks cache */
-		memset(mbox, 0, 16);
+		memset(mbox, 0, sizeof(*mbox));
 		raw_mbox[0] = FLUSH_SYSTEM;
 
 		issue_scb_block(adapter, raw_mbox);
@@ -4643,7 +4643,7 @@ mega_n_to_m(void *arg, megacmd_t *mc)
 static int
 mega_is_bios_enabled(adapter_t *adapter)
 {
-	unsigned char	raw_mbox[16];
+	unsigned char	raw_mbox[sizeof(mbox_t)];
 	mbox_t	*mbox;
 	int	ret;
 
@@ -4676,7 +4676,7 @@ mega_is_bios_enabled(adapter_t *adapter)
 static void
 mega_enum_raid_scsi(adapter_t *adapter)
 {
-	unsigned char raw_mbox[16];
+	unsigned char raw_mbox[sizeof(mbox_t)];
 	mbox_t *mbox;
 	int i;
 
@@ -4731,7 +4731,7 @@ static void
 mega_get_boot_drv(adapter_t *adapter)
 {
 	struct private_bios_data	*prv_bios_data;
-	unsigned char	raw_mbox[16];
+	unsigned char	raw_mbox[sizeof(mbox_t)];
 	mbox_t	*mbox;
 	u16	cksum = 0;
 	u8	*cksum_p;
@@ -4797,7 +4797,7 @@ mega_get_boot_drv(adapter_t *adapter)
 static int
 mega_support_random_del(adapter_t *adapter)
 {
-	unsigned char raw_mbox[16];
+	unsigned char raw_mbox[sizeof(mbox_t)];
 	mbox_t *mbox;
 	int rval;
 
@@ -4826,7 +4826,7 @@ mega_support_random_del(adapter_t *adapter)
 static int
 mega_support_ext_cdb(adapter_t *adapter)
 {
-	unsigned char raw_mbox[16];
+	unsigned char raw_mbox[sizeof(mbox_t)];
 	mbox_t *mbox;
 	int rval;
 
@@ -4944,7 +4944,7 @@ mega_do_del_logdrv(adapter_t *adapter, int logdrv)
 static void
 mega_get_max_sgl(adapter_t *adapter)
 {
-	unsigned char	raw_mbox[16];
+	unsigned char	raw_mbox[sizeof(mbox_t)];
 	mbox_t	*mbox;
 
 	mbox = (mbox_t *)raw_mbox;
@@ -4989,7 +4989,7 @@ mega_get_max_sgl(adapter_t *adapter)
 static int
 mega_support_cluster(adapter_t *adapter)
 {
-	unsigned char	raw_mbox[16];
+	unsigned char	raw_mbox[sizeof(mbox_t)];
 	mbox_t	*mbox;
 
 	mbox = (mbox_t *)raw_mbox;

@@ -24,18 +24,13 @@ void daemon_init(struct net_device *dev, void *data)
 	struct daemon_data *dpri;
 	struct daemon_init *init = data;
 
-	init_etherdev(dev, 0);
 	pri = dev->priv;
 	dpri = (struct daemon_data *) pri->user;
-	*dpri = ((struct daemon_data)
-		{ .sock_type 		= init->sock_type,
-		  .ctl_sock 		= init->ctl_sock,
-		  .ctl_addr 		= NULL,
-		  .data_addr 		= NULL,
-		  .local_addr 		= NULL,
-		  .fd 			= -1,
-		  .control 		= -1,
-		  .dev 			= dev });
+	dpri->sock_type = init->sock_type;
+	dpri->ctl_sock = init->ctl_sock;
+	dpri->fd = -1;
+	dpri->control = -1;
+	dpri->dev = dev;
 
 	printk("daemon backend (uml_switch version %d) - %s:%s", 
 	       SWITCH_VERSION, dpri->sock_type, dpri->ctl_sock);
