@@ -6,11 +6,11 @@ obj-$(CONFIG_HIGHMEM) += highmem.o
 export-objs = ksyms.o
 
 USER_OBJS := bugs.o ptrace_user.o sigcontext.o fault.o
+USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
 
-SYMLINKS = semaphore.c checksum.S extable.c highmem.c module.c
+SYMLINKS = semaphore.c extable.c highmem.c module.c
 
 semaphore.c-dir = kernel
-checksum.S-dir = lib
 extable.c-dir = mm
 highmem.c-dir = mm
 module.c-dir = kernel
@@ -22,10 +22,8 @@ endef
 
 include $(TOPDIR)/Rules.make
 
-USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
-
 $(USER_OBJS) : %.o: %.c
-	$(CC) $(CFLAGS_$@) $(USER_CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS_$(notdir $@)) $(USER_CFLAGS) -c -o $@ $<
 
 $(foreach f,$(SYMLINKS),$(src)/$f): 
 	$(call make_link,$@)
