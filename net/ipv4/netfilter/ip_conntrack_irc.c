@@ -41,8 +41,8 @@ static unsigned int dcc_timeout = 300;
 /* This is slow, but it's simple. --RR */
 static char irc_buffer[65536];
 
-MODULE_AUTHOR("Harald Welte <laforge@gnumonks.org>");
-MODULE_DESCRIPTION("IRC (DCC) connection tracking module");
+MODULE_AUTHOR("Harald Welte <laforge@netfilter.org>");
+MODULE_DESCRIPTION("IRC (DCC) connection tracking helper");
 MODULE_LICENSE("GPL");
 #ifdef MODULE_PARM
 MODULE_PARM(ports, "1-" __MODULE_STRING(MAX_PORTS) "i");

@@ -49,7 +49,7 @@ static int
 vcs_size(struct inode *inode)
 {
 	int size;
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	int currcons = minor & 127;
 	if (currcons == 0)
 		currcons = fg_console;
@@ -104,7 +104,7 @@ static ssize_t
 vcs_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
-	unsigned int currcons = minor(inode->i_rdev);
+	unsigned int currcons = iminor(inode);
 	long pos = *ppos;
 	long viewed, attr, read;
 	int col, maxcol;
@@ -273,7 +273,7 @@ static ssize_t
 vcs_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
-	unsigned int currcons = minor(inode->i_rdev);
+	unsigned int currcons = iminor(inode);
 	long pos = *ppos;
 	long viewed, attr, size, written;
 	char *con_buf0;
@@ -456,7 +456,7 @@ unlock_out:
 static int
 vcs_open(struct inode *inode, struct file *filp)
 {
-	unsigned int currcons = minor(inode->i_rdev) & 127;
+	unsigned int currcons = iminor(inode) & 127;
 	if(currcons && !vc_cons_allocated(currcons-1))
 		return -ENXIO;
 	return 0;

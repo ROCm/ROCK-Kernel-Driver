@@ -45,6 +45,7 @@
 #include <linux/pagemap.h>
 #include <linux/vcache.h>
 #include <linux/rmap-locking.h>
+#include <linux/module.h>
 
 #include <asm/pgalloc.h>
 #include <asm/rmap.h>
@@ -810,17 +811,18 @@ static void zeromap_pte_range(pte_t * pte, unsigned long address,
 static inline int zeromap_pmd_range(struct mm_struct *mm, pmd_t * pmd, unsigned long address,
                                     unsigned long size, pgprot_t prot)
 {
-	unsigned long end;
+	unsigned long base, end;
 
+	base = address & PGDIR_MASK;
 	address &= ~PGDIR_MASK;
 	end = address + size;
 	if (end > PGDIR_SIZE)
 		end = PGDIR_SIZE;
 	do {
-		pte_t * pte = pte_alloc_map(mm, pmd, address);
+		pte_t * pte = pte_alloc_map(mm, pmd, base + address);
 		if (!pte)
 			return -ENOMEM;
-		zeromap_pte_range(pte, address, end - address, prot);
+		zeromap_pte_range(pte, base + address, end - address, prot);
 		pte_unmap(pte);
 		address = (address + PMD_SIZE) & PMD_MASK;
 		pmd++;
@@ -1138,6 +1140,7 @@ void invalidate_mmap_range(struct address_space *mapping,
 		invalidate_mmap_range_list(&mapping->i_mmap_shared, hba, hlen);
 	up(&mapping->i_shared_sem);
 }
+EXPORT_SYMBOL_GPL(invalidate_mmap_range);
 
 /*
  * Handle all mappings that got truncated by a "truncate()"
@@ -1384,10 +1387,10 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	unsigned long address, int write_access, pte_t *page_table, pmd_t *pmd)
 {
 	struct page * new_page;
-	struct address_space *mapping;
+	struct address_space *mapping = NULL;
 	pte_t entry;
 	struct pte_chain *pte_chain;
-	int sequence;
+	int sequence = 0;
 	int ret;
 
 	if (!vma->vm_ops || !vma->vm_ops->nopage)
@@ -1396,8 +1399,10 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	pte_unmap(page_table);
 	spin_unlock(&mm->page_table_lock);
 
-	mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
-	sequence = atomic_read(&mapping->truncate_count);
+	if (vma->vm_file) {
+		mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
+		sequence = atomic_read(&mapping->truncate_count);
+	}
 	smp_rmb();  /* Prevent CPU from reordering lock-free ->nopage() */
 retry:
 	new_page = vma->vm_ops->nopage(vma, address & PAGE_MASK, 0);
@@ -1433,7 +1438,8 @@ retry:
 	 * invalidated this page.  If invalidate_mmap_range got called,
 	 * retry getting the page.
 	 */
-	if (unlikely(sequence != atomic_read(&mapping->truncate_count))) {
+	if (mapping &&
+	      (unlikely(sequence != atomic_read(&mapping->truncate_count)))) {
 		sequence = atomic_read(&mapping->truncate_count);
 		spin_unlock(&mm->page_table_lock);
 		page_cache_release(new_page);
@@ -1453,7 +1459,8 @@ retry:
 	 */
 	/* Only go through if we didn't race with anybody else... */
 	if (pte_none(*page_table)) {
-		++mm->rss;
+		if (!PageReserved(new_page))
+			++mm->rss;
 		flush_icache_page(vma, new_page);
 		entry = mk_pte(new_page, vma->vm_page_prot);
 		if (write_access)

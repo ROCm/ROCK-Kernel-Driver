@@ -79,6 +79,7 @@ static inline unsigned int do_gettimeoffset_tsc(void)
 	unsigned long t;
 	unsigned long x;
 	rdtscll_sync(&t);
+	if (t < vxtime.last_tsc) t = vxtime.last_tsc; /* hack */
 	x = ((t - vxtime.last_tsc) * vxtime.tsc_quot) >> 32;
 	return x;
 }

@@ -33,7 +33,6 @@
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
-#include <linux/miscdevice.h>
 #include <linux/random.h>
 #include <linux/poll.h>
 #include <linux/init.h>
@@ -531,12 +530,15 @@ static struct usb_driver rio_driver = {
 
 static int __init usb_rio_init(void)
 {
-	if (usb_register(&rio_driver) < 0)
-		return -1;
+	int retval;
+	retval = usb_register(&rio_driver);
+	if (retval)
+		goto out;
 
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 
-	return 0;
+out:
+	return retval;
 }
 
 

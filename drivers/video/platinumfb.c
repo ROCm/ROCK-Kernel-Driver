@@ -35,6 +35,7 @@
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/pgtable.h>
+#include <asm/of_device.h>
 
 #include "macmodes.h"
 #include "platinumfb.h"
@@ -87,7 +88,6 @@ static int platinumfb_check_var (struct fb_var_screeninfo *var, struct fb_info *
  * internal functions
  */
 
-static void platinum_of_init(struct device_node *dp);
 static inline int platinum_vram_reqd(int video_mode, int color_mode);
 static int read_platinum_sense(struct fb_info_platinum *info);
 static void set_platinum_clock(struct fb_info_platinum *info);
@@ -323,7 +323,7 @@ static void platinum_set_hardware(struct fb_info_platinum *info, const struct fb
 /*
  * Set misc info vars for this driver
  */
-static void __init platinum_init_info(struct fb_info *info, struct fb_info_platinum *p)
+static void __devinit platinum_init_info(struct fb_info *info, struct fb_info_platinum *p)
 {
 	/* Fill fb_info */
 	info->par = &p->par;
@@ -349,7 +349,7 @@ static void __init platinum_init_info(struct fb_info *info, struct fb_info_plati
 }
 
 
-static int __init init_platinum(struct fb_info_platinum *p)
+static int __devinit platinum_init_fb(struct fb_info_platinum *p)
 {
 	struct fb_var_screeninfo var;
 	int sense, rc;
@@ -399,124 +399,19 @@ try_again:
 	/* Apply default var */
 	p->info.var = var;
 	var.activate = FB_ACTIVATE_NOW;
-	rc = fb_set_var(&var, &p->info);
+	rc = fb_set_var(&p->info, &var);
 	if (rc && (default_vmode != VMODE_640_480_60 || default_cmode != CMODE_8))
 		goto try_again;
 
 	/* Register with fbdev layer */
-	if (register_framebuffer(&p->info) < 0)
-		return 0;
+	rc = register_framebuffer(&p->info);
+	if (rc < 0)
+		return rc;
 
 	printk(KERN_INFO "fb%d: platinum frame buffer device\n",
 	       p->info.node);
 
-	return 1;
-}
-
-int __init platinum_init(void)
-{
-	struct device_node *dp;
-
-	dp = find_devices("platinum");
-	if (dp != 0)
-		platinum_of_init(dp);
 	return 0;
-}
-
-#ifdef __powerpc__
-#define invalidate_cache(addr) \
-	asm volatile("eieio; dcbf 0,%1" \
-	: "=m" (*(addr)) : "r" (addr) : "memory");
-#else
-#define invalidate_cache(addr)
-#endif
-
-static void __init platinum_of_init(struct device_node *dp)
-{
-	struct fb_info_platinum	*info;
-	unsigned long		addr, size;
-	volatile __u8		*fbuffer;
-	int			i, bank0, bank1, bank2, bank3;
-
-	if(dp->n_addrs != 2) {
-		printk(KERN_ERR "expecting 2 address for platinum (got %d)", dp->n_addrs);
-		return;
-	}
-
-	info = kmalloc(sizeof(*info), GFP_ATOMIC);
-	if (info == 0)
-		return;
-	memset(info, 0, sizeof(*info));
-
-	/* Map in frame buffer and registers */
-	for (i = 0; i < dp->n_addrs; ++i) {
-		addr = dp->addrs[i].address;
-		size = dp->addrs[i].size;
-		/* Let's assume we can request either all or nothing */
-		if (!request_mem_region(addr, size, "platinumfb")) {
-			kfree(info);
-			return;
-		}
-		if (size >= 0x400000) {
-			/* frame buffer - map only 4MB */
-			info->frame_buffer_phys = addr;
-			info->frame_buffer = __ioremap(addr, 0x400000, _PAGE_WRITETHRU);
-			info->base_frame_buffer = info->frame_buffer;
-		} else {
-			/* registers */
-			info->platinum_regs_phys = addr;
-			info->platinum_regs = ioremap(addr, size);
-		}
-	}
-
-	info->cmap_regs_phys = 0xf301b000;	/* XXX not in prom? */
-	request_mem_region(info->cmap_regs_phys, 0x1000, "platinumfb cmap");
-	info->cmap_regs = ioremap(info->cmap_regs_phys, 0x1000);
-
-	/* Grok total video ram */
-	out_be32(&info->platinum_regs->reg[16].r, (unsigned)info->frame_buffer_phys);
-	out_be32(&info->platinum_regs->reg[20].r, 0x1011);	/* select max vram */
-	out_be32(&info->platinum_regs->reg[24].r, 0);	/* switch in vram */
-
-	fbuffer = info->base_frame_buffer;
-	fbuffer[0x100000] = 0x34;
-	fbuffer[0x100008] = 0x0;
-	invalidate_cache(&fbuffer[0x100000]);
-	fbuffer[0x200000] = 0x56;
-	fbuffer[0x200008] = 0x0;
-	invalidate_cache(&fbuffer[0x200000]);
-	fbuffer[0x300000] = 0x78;
-	fbuffer[0x300008] = 0x0;
-	invalidate_cache(&fbuffer[0x300000]);
-	bank0 = 1; /* builtin 1MB vram, always there */
-	bank1 = fbuffer[0x100000] == 0x34;
-	bank2 = fbuffer[0x200000] == 0x56;
-	bank3 = fbuffer[0x300000] == 0x78;
-	info->total_vram = (bank0 + bank1 + bank2 + bank3) * 0x100000;
-	printk(KERN_INFO "Total VRAM = %dMB %d%d%d%d\n", (int) (info->total_vram / 1024 / 1024), bank3, bank2, bank1, bank0);
-
-	/*
-	 * Try to determine whether we have an old or a new DACula.
-	 */
-	out_8(&info->cmap_regs->addr, 0x40);
-	info->dactype = in_8(&info->cmap_regs->d2);
-	switch (info->dactype) {
-	case 0x3c:
-		info->clktype = 1;
-		break;
-	case 0x84:
-		info->clktype = 0;
-		break;
-	default:
-		info->clktype = 0;
-		printk(KERN_INFO "Unknown DACula type: %x\n", info->dactype);
-		break;
-	}
-
-	if (!init_platinum(info)) {
-		kfree(info);
-		return;
-	}
 }
 
 /*
@@ -630,4 +525,169 @@ int __init platinum_setup(char *options)
 	return 0;
 }
 
+#ifdef __powerpc__
+#define invalidate_cache(addr) \
+	asm volatile("eieio; dcbf 0,%1" \
+	: "=m" (*(addr)) : "r" (addr) : "memory");
+#else
+#define invalidate_cache(addr)
+#endif
+
+static int __devinit platinumfb_probe(struct of_device* odev, const struct of_match *match)
+{
+	struct device_node	*dp = odev->node;
+	struct fb_info_platinum	*info;
+	unsigned long		addr, size;
+	volatile __u8		*fbuffer;
+	int			i, bank0, bank1, bank2, bank3, rc;
+
+	if (dp->n_addrs != 2) {
+		printk(KERN_ERR "expecting 2 address for platinum (got %d)", dp->n_addrs);
+		return -ENXIO;
+	}
+
+	info = kmalloc(sizeof(*info), GFP_ATOMIC);
+	if (info == 0)
+		return -ENOMEM;
+	memset(info, 0, sizeof(*info));
+
+	/* Map in frame buffer and registers */
+	for (i = 0; i < dp->n_addrs; ++i) {
+		addr = dp->addrs[i].address;
+		size = dp->addrs[i].size;
+		/* Let's assume we can request either all or nothing */
+		if (!request_mem_region(addr, size, "platinumfb")) {
+			kfree(info);
+			return -ENXIO;
+		}
+		if (size >= 0x400000) {
+			/* frame buffer - map only 4MB */
+			info->frame_buffer_phys = addr;
+			info->frame_buffer = __ioremap(addr, 0x400000, _PAGE_WRITETHRU);
+			info->base_frame_buffer = info->frame_buffer;
+		} else {
+			/* registers */
+			info->platinum_regs_phys = addr;
+			info->platinum_regs = ioremap(addr, size);
+		}
+	}
+
+	info->cmap_regs_phys = 0xf301b000;	/* XXX not in prom? */
+	request_mem_region(info->cmap_regs_phys, 0x1000, "platinumfb cmap");
+	info->cmap_regs = ioremap(info->cmap_regs_phys, 0x1000);
+
+	/* Grok total video ram */
+	out_be32(&info->platinum_regs->reg[16].r, (unsigned)info->frame_buffer_phys);
+	out_be32(&info->platinum_regs->reg[20].r, 0x1011);	/* select max vram */
+	out_be32(&info->platinum_regs->reg[24].r, 0);	/* switch in vram */
+
+	fbuffer = info->base_frame_buffer;
+	fbuffer[0x100000] = 0x34;
+	fbuffer[0x100008] = 0x0;
+	invalidate_cache(&fbuffer[0x100000]);
+	fbuffer[0x200000] = 0x56;
+	fbuffer[0x200008] = 0x0;
+	invalidate_cache(&fbuffer[0x200000]);
+	fbuffer[0x300000] = 0x78;
+	fbuffer[0x300008] = 0x0;
+	invalidate_cache(&fbuffer[0x300000]);
+	bank0 = 1; /* builtin 1MB vram, always there */
+	bank1 = fbuffer[0x100000] == 0x34;
+	bank2 = fbuffer[0x200000] == 0x56;
+	bank3 = fbuffer[0x300000] == 0x78;
+	info->total_vram = (bank0 + bank1 + bank2 + bank3) * 0x100000;
+	printk(KERN_INFO "Total VRAM = %dMB %d%d%d%d\n", (int) (info->total_vram / 1024 / 1024), bank3, bank2, bank1, bank0);
+
+	/*
+	 * Try to determine whether we have an old or a new DACula.
+	 */
+	out_8(&info->cmap_regs->addr, 0x40);
+	info->dactype = in_8(&info->cmap_regs->d2);
+	switch (info->dactype) {
+	case 0x3c:
+		info->clktype = 1;
+		break;
+	case 0x84:
+		info->clktype = 0;
+		break;
+	default:
+		info->clktype = 0;
+		printk(KERN_INFO "Unknown DACula type: %x\n", info->dactype);
+		break;
+	}
+	dev_set_drvdata(&odev->dev, info);
+	
+	rc = platinum_init_fb(info);
+	if (rc != 0) {
+		dev_set_drvdata(&odev->dev, NULL);
+		kfree(info);
+	}
+
+	return rc;
+}
+
+static int __devexit platinumfb_remove(struct of_device* odev)
+{
+	struct fb_info_platinum	*pinfo = dev_get_drvdata(&odev->dev);
+	struct device_node *dp = odev->node;
+	unsigned long addr, size;
+	int i;
+	
+	if (!pinfo)
+		return 0;
+
+        unregister_framebuffer (&pinfo->info);
+	
+	/* Unmap frame buffer and registers */
+	for (i = 0; i < dp->n_addrs; ++i) {
+		addr = dp->addrs[i].address;
+		size = dp->addrs[i].size;
+		release_mem_region(addr, size);
+	}
+	iounmap((void *)pinfo->frame_buffer);
+	iounmap((void *)pinfo->platinum_regs);
+	release_mem_region(pinfo->cmap_regs_phys, 0x1000);
+	iounmap((void *)pinfo->cmap_regs);
+
+	kfree(pinfo);
+
+	return 0;
+}
+
+static struct of_match platinumfb_match[] = 
+{
+	{
+	.name 		= "platinum",
+	.type		= OF_ANY_MATCH,
+	.compatible	= OF_ANY_MATCH,
+	},
+	{},
+};
+
+static struct of_platform_driver platinum_driver = 
+{
+	.name 		= "platinumfb",
+	.match_table	= platinumfb_match,
+	.probe		= platinumfb_probe,
+	.remove		= platinumfb_remove,
+};
+
+int __init platinum_init(void)
+{
+	of_register_driver(&platinum_driver);
+
+	return 0;
+}
+
+void __exit platinum_exit(void)
+{
+	of_unregister_driver(&platinum_driver);	
+}
+
 MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("framebuffer driver for Apple Platinum video");
+
+#ifdef MODULE
+module_init(platinum_init);
+module_exit(platinum_exit);
+#endif

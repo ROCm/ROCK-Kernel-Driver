@@ -269,9 +269,9 @@
 
 /*
  * The minimum number of bits of entropy before we wake up a read on
- * /dev/random.  Should always be at least 8, or at least 1 byte.
+ * /dev/random.  Should be enough to do a significant reseed.
  */
-static int random_read_wakeup_thresh = 8;
+static int random_read_wakeup_thresh = 64;
 
 /*
  * If the entropy count falls under this number of bits, then we
@@ -483,9 +483,9 @@ struct entropy_store {
 	unsigned	add_ptr;
 	int		entropy_count;
 	int		input_rotate;
-	int		extract_count;
 	struct poolinfo poolinfo;
 	__u32		*pool;
+	spinlock_t lock;
 };
 
 /*
@@ -502,7 +502,7 @@ static int create_entropy_store(int size, struct entropy_store **ret_bucket)
 
 	poolwords = (size + 3) / 4; /* Convert bytes->words */
 	/* The pool size must be a multiple of 16 32-bit words */
-	poolwords = ((poolwords + 15) / 16) * 16; 
+	poolwords = ((poolwords + 15) / 16) * 16;
 
 	for (p = poolinfo_table; p->poolwords; p++) {
 		if (poolwords == p->poolwords)
@@ -524,6 +524,7 @@ static int create_entropy_store(int size, struct entropy_store **ret_bucket)
 		return -ENOMEM;
 	}
 	memset(r->pool, 0, POOLBYTES);
+	r->lock = SPIN_LOCK_UNLOCKED;
 	*ret_bucket = r;
 	return 0;
 }
@@ -534,7 +535,6 @@ static void clear_entropy_store(struct entropy_store *r)
 	r->add_ptr = 0;
 	r->entropy_count = 0;
 	r->input_rotate = 0;
-	r->extract_count = 0;
 	memset(r->pool, 0, r->poolinfo.POOLBYTES);
 }
 #ifdef CONFIG_SYSCTL
@@ -565,6 +565,9 @@ static void add_entropy_words(struct entropy_store *r, const __u32 *in,
 	int new_rotate;
 	int wordmask = r->poolinfo.poolwords - 1;
 	__u32 w;
+	unsigned long flags;
+
+	spin_lock_irqsave(&r->lock, flags);
 
 	while (nwords--) {
 		w = rotate_left(r->input_rotate, *in++);
@@ -589,6 +592,8 @@ static void add_entropy_words(struct entropy_store *r, const __u32 *in,
 		w ^= r->pool[i];
 		r->pool[i] = (w >> 3) ^ twist_table[w & 7];
 	}
+
+	spin_unlock_irqrestore(&r->lock, flags);
 }
 
 /*
@@ -596,6 +601,10 @@ static void add_entropy_words(struct entropy_store *r, const __u32 *in,
  */
 static void credit_entropy_store(struct entropy_store *r, int nbits)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&r->lock, flags);
+
 	if (r->entropy_count + nbits < 0) {
 		DEBUG_ENT("negative entropy/overflow (%d+%d)\n",
 			  r->entropy_count, nbits);
@@ -605,11 +614,15 @@ static void credit_entropy_store(struct entropy_store *r, int nbits)
 	} else {
 		r->entropy_count += nbits;
 		if (nbits)
-			DEBUG_ENT("%s added %d bits, now %d\n",
+			DEBUG_ENT("%04d %04d : added %d bits to %s\n",
+				  random_state->entropy_count,
+				  sec_random_state->entropy_count,
+				  nbits,
 				  r == sec_random_state ? "secondary" :
-				  r == random_state ? "primary" : "unknown",
-				  nbits, r->entropy_count);
+				  r == random_state ? "primary" : "unknown");
 	}
+
+	spin_unlock_irqrestore(&r->lock, flags);
 }
 
 /**********************************************************************
@@ -620,27 +633,33 @@ static void credit_entropy_store(struct entropy_store *r, int nbits)
  *
  **********************************************************************/
 
-static __u32	*batch_entropy_pool;
-static int	*batch_entropy_credit;
-static int	batch_max;
+struct sample {
+	__u32 data[2];
+	int credit;
+};
+
+static struct sample *batch_entropy_pool, *batch_entropy_copy;
 static int	batch_head, batch_tail;
+static spinlock_t batch_lock = SPIN_LOCK_UNLOCKED;
+
+static int	batch_max;
 static void batch_entropy_process(void *private_);
 static DECLARE_WORK(batch_work, batch_entropy_process, NULL);
 
 /* note: the size must be a power of 2 */
 static int __init batch_entropy_init(int size, struct entropy_store *r)
 {
-	batch_entropy_pool = kmalloc(2*size*sizeof(__u32), GFP_KERNEL);
+	batch_entropy_pool = kmalloc(size*sizeof(struct sample), GFP_KERNEL);
 	if (!batch_entropy_pool)
 		return -1;
-	batch_entropy_credit =kmalloc(size*sizeof(int), GFP_KERNEL);
-	if (!batch_entropy_credit) {
+	batch_entropy_copy = kmalloc(size*sizeof(struct sample), GFP_KERNEL);
+	if (!batch_entropy_copy) {
 		kfree(batch_entropy_pool);
 		return -1;
 	}
 	batch_head = batch_tail = 0;
-	batch_max = size;
 	batch_work.data = r;
+	batch_max = size;
 	return 0;
 }
 
@@ -652,27 +671,33 @@ static int __init batch_entropy_init(int size, struct entropy_store *r)
  */
 void batch_entropy_store(u32 a, u32 b, int num)
 {
-	int	new;
+	int new;
+	unsigned long flags;
 
 	if (!batch_max)
 		return;
-	
-	batch_entropy_pool[2*batch_head] = a;
-	batch_entropy_pool[(2*batch_head) + 1] = b;
-	batch_entropy_credit[batch_head] = num;
 
-	new = (batch_head+1) & (batch_max-1);
-	if ((unsigned)(new - batch_tail) >= (unsigned)(batch_max / 2)) {
+	spin_lock_irqsave(&batch_lock, flags);
+
+	batch_entropy_pool[batch_head].data[0] = a;
+	batch_entropy_pool[batch_head].data[1] = b;
+	batch_entropy_pool[batch_head].credit = num;
+
+	if (((batch_head - batch_tail) & (batch_max-1)) >= (batch_max / 2)) {
 		/*
 		 * Schedule it for the next timer tick:
 		 */
 		schedule_delayed_work(&batch_work, 1);
-		batch_head = new;
-	} else if (new == batch_tail) {
+	}
+
+	new = (batch_head+1) & (batch_max-1);
+	if (new == batch_tail) {
 		DEBUG_ENT("batch entropy buffer full\n");
 	} else {
 		batch_head = new;
 	}
+
+	spin_unlock_irqrestore(&batch_lock, flags);
 }
 
 /*
@@ -684,20 +709,34 @@ static void batch_entropy_process(void *private_)
 {
 	struct entropy_store *r	= (struct entropy_store *) private_, *p;
 	int max_entropy = r->poolinfo.POOLBITS;
+	unsigned head, tail;
 
-	if (!batch_max)
-		return;
+	/* Mixing into the pool is expensive, so copy over the batch
+	 * data and release the batch lock. The pool is at least half
+	 * full, so don't worry too much about copying only the used
+	 * part.
+	 */
+	spin_lock_irq(&batch_lock);
+
+	memcpy(batch_entropy_copy, batch_entropy_pool,
+	       batch_max*sizeof(struct sample));
+
+	head = batch_head;
+	tail = batch_tail;
+	batch_tail = batch_head;
+
+	spin_unlock_irq(&batch_lock);
 
 	p = r;
-	while (batch_head != batch_tail) {
+	while (head != tail) {
 		if (r->entropy_count >= max_entropy) {
 			r = (r == sec_random_state) ?	random_state :
 							sec_random_state;
 			max_entropy = r->poolinfo.POOLBITS;
 		}
-		add_entropy_words(r, batch_entropy_pool + 2*batch_tail, 2);
-		credit_entropy_store(r, batch_entropy_credit[batch_tail]);
-		batch_tail = (batch_tail+1) & (batch_max-1);
+		add_entropy_words(r, batch_entropy_copy[tail].data, 2);
+		credit_entropy_store(r, batch_entropy_copy[tail].credit);
+		tail = (tail+1) & (batch_max-1);
 	}
 	if (p->entropy_count >= random_read_wakeup_thresh)
 		wake_up_interruptible(&random_read_wait);
@@ -1216,6 +1255,7 @@ static void MD5Transform(__u32 buf[HASH_BUFFER_SIZE], __u32 const in[16])
 
 #define EXTRACT_ENTROPY_USER		1
 #define EXTRACT_ENTROPY_SECONDARY	2
+#define EXTRACT_ENTROPY_LIMIT		4
 #define TMP_BUF_SIZE			(HASH_BUFFER_SIZE + HASH_EXTRA_SIZE)
 #define SEC_XFER_SIZE			(TMP_BUF_SIZE*4)
 
@@ -1224,36 +1264,28 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
 
 /*
  * This utility inline function is responsible for transfering entropy
- * from the primary pool to the secondary extraction pool.  We pull
- * randomness under two conditions; one is if there isn't enough entropy
- * in the secondary pool.  The other is after we have extracted 1024 bytes,
- * at which point we do a "catastrophic reseeding".
+ * from the primary pool to the secondary extraction pool. We make
+ * sure we pull enough for a 'catastrophic reseed'.
  */
 static inline void xfer_secondary_pool(struct entropy_store *r,
 				       size_t nbytes, __u32 *tmp)
 {
 	if (r->entropy_count < nbytes * 8 &&
 	    r->entropy_count < r->poolinfo.POOLBITS) {
-		int nwords = min_t(int,
-				   r->poolinfo.poolwords - r->entropy_count/32,
-				   sizeof(tmp) / 4);
+		int bytes = max_t(int, random_read_wakeup_thresh / 8,
+				min_t(int, nbytes, TMP_BUF_SIZE));
 
-		DEBUG_ENT("xfer %d from primary to %s (have %d, need %d)\n",
-			  nwords * 32,
+		DEBUG_ENT("%04d %04d : going to reseed %s with %d bits "
+			  "(%d of %d requested)\n",
+			  random_state->entropy_count,
+			  sec_random_state->entropy_count,
 			  r == sec_random_state ? "secondary" : "unknown",
-			  r->entropy_count, nbytes * 8);
+			  bytes * 8, nbytes * 8, r->entropy_count);
 
-		extract_entropy(random_state, tmp, nwords * 4, 0);
-		add_entropy_words(r, tmp, nwords);
-		credit_entropy_store(r, nwords * 32);
-	}
-	if (r->extract_count > 1024) {
-		DEBUG_ENT("reseeding %s with %d from primary\n",
-			  r == sec_random_state ? "secondary" : "unknown",
-			  sizeof(tmp) * 8);
-		extract_entropy(random_state, tmp, sizeof(tmp), 0);
-		add_entropy_words(r, tmp, sizeof(tmp) / 4);
-		r->extract_count = 0;
+		bytes=extract_entropy(random_state, tmp, bytes,
+				      EXTRACT_ENTROPY_LIMIT);
+		add_entropy_words(r, tmp, bytes);
+		credit_entropy_store(r, bytes*8);
 	}
 }
 
@@ -1276,8 +1308,8 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
 	ssize_t ret, i;
 	__u32 tmp[TMP_BUF_SIZE];
 	__u32 x;
+	unsigned long cpuflags;
 
-	add_timer_randomness(&extract_timer_state, nbytes);
 
 	/* Redundant, but just in case... */
 	if (r->entropy_count > r->poolinfo.POOLBITS)
@@ -1286,10 +1318,18 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
 	if (flags & EXTRACT_ENTROPY_SECONDARY)
 		xfer_secondary_pool(r, nbytes, tmp);
 
-	DEBUG_ENT("%s has %d bits, want %d bits\n",
+	/* Hold lock while accounting */
+	spin_lock_irqsave(&r->lock, cpuflags);
+
+	DEBUG_ENT("%04d %04d : trying to extract %d bits from %s\n",
+		  random_state->entropy_count,
+		  sec_random_state->entropy_count,
+		  nbytes * 8,
 		  r == sec_random_state ? "secondary" :
-		  r == random_state ? "primary" : "unknown",
-		  r->entropy_count, nbytes * 8);
+		  r == random_state ? "primary" : "unknown");
+
+	if (flags & EXTRACT_ENTROPY_LIMIT && nbytes >= r->entropy_count / 8)
+		nbytes = r->entropy_count / 8;
 
 	if (r->entropy_count / 8 >= nbytes)
 		r->entropy_count -= nbytes*8;
@@ -1299,8 +1339,16 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
 	if (r->entropy_count < random_write_wakeup_thresh)
 		wake_up_interruptible(&random_write_wait);
 
-	r->extract_count += nbytes;
-	
+	DEBUG_ENT("%04d %04d : debiting %d bits from %s%s\n",
+		  random_state->entropy_count,
+		  sec_random_state->entropy_count,
+		  nbytes * 8,
+		  r == sec_random_state ? "secondary" :
+		  r == random_state ? "primary" : "unknown",
+		  flags & EXTRACT_ENTROPY_LIMIT ? "" : " (unlimited)");
+
+	spin_unlock_irqrestore(&r->lock, cpuflags);
+
 	ret = 0;
 	while (nbytes) {
 		/*
@@ -1312,7 +1360,16 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
 					ret = -ERESTARTSYS;
 				break;
 			}
+
+			DEBUG_ENT("%04d %04d : extract feeling sleepy (%d bytes left)\n",
+				  random_state->entropy_count,
+				  sec_random_state->entropy_count, nbytes);
+
 			schedule();
+
+			DEBUG_ENT("%04d %04d : extract woke up\n",
+				  random_state->entropy_count,
+				  sec_random_state->entropy_count);
 		}
 
 		/* Hash the pool to get the output */
@@ -1361,7 +1418,6 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
 		nbytes -= i;
 		buf += i;
 		ret += i;
-		add_timer_randomness(&extract_timer_state, nbytes);
 	}
 
 	/* Wipe data just returned from memory */
@@ -1488,15 +1544,27 @@ random_read(struct file * file, char * buf, size_t nbytes, loff_t *ppos)
 	if (nbytes == 0)
 		return 0;
 
-	add_wait_queue(&random_read_wait, &wait);
 	while (nbytes > 0) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		
 		n = nbytes;
 		if (n > SEC_XFER_SIZE)
 			n = SEC_XFER_SIZE;
-		if (n > random_state->entropy_count / 8)
-			n = random_state->entropy_count / 8;
+
+		DEBUG_ENT("%04d %04d : reading %d bits, p: %d s: %d\n",
+			  random_state->entropy_count,
+			  sec_random_state->entropy_count,
+			  n*8, random_state->entropy_count,
+			  sec_random_state->entropy_count);
+
+		n = extract_entropy(sec_random_state, buf, n,
+				    EXTRACT_ENTROPY_USER |
+				    EXTRACT_ENTROPY_LIMIT |
+				    EXTRACT_ENTROPY_SECONDARY);
+
+		DEBUG_ENT("%04d %04d : read got %d bits (%d still needed)\n",
+			  random_state->entropy_count,
+			  sec_random_state->entropy_count,
+			  n*8, (nbytes-n)*8);
+
 		if (n == 0) {
 			if (file->f_flags & O_NONBLOCK) {
 				retval = -EAGAIN;
@@ -1506,12 +1574,27 @@ random_read(struct file * file, char * buf, size_t nbytes, loff_t *ppos)
 				retval = -ERESTARTSYS;
 				break;
 			}
-			schedule();
+
+			DEBUG_ENT("%04d %04d : sleeping?\n",
+				  random_state->entropy_count,
+				  sec_random_state->entropy_count);
+
+			set_current_state(TASK_INTERRUPTIBLE);
+			add_wait_queue(&random_read_wait, &wait);
+
+			if (sec_random_state->entropy_count / 8 == 0)
+				schedule();
+
+			set_current_state(TASK_RUNNING);
+			remove_wait_queue(&random_read_wait, &wait);
+
+			DEBUG_ENT("%04d %04d : waking up\n",
+				  random_state->entropy_count,
+				  sec_random_state->entropy_count);
+
 			continue;
 		}
-		n = extract_entropy(sec_random_state, buf, n,
-				    EXTRACT_ENTROPY_USER |
-				    EXTRACT_ENTROPY_SECONDARY);
+
 		if (n < 0) {
 			retval = n;
 			break;
@@ -1522,8 +1605,6 @@ random_read(struct file * file, char * buf, size_t nbytes, loff_t *ppos)
 		break;		/* This break makes the device work */
 				/* like a named pipe */
 	}
-	current->state = TASK_RUNNING;
-	remove_wait_queue(&random_read_wait, &wait);
 
 	/*
 	 * If we gave the user some bytes, update the access time.
@@ -1595,8 +1676,9 @@ static int
 random_ioctl(struct inode * inode, struct file * file,
 	     unsigned int cmd, unsigned long arg)
 {
-	int *p, size, ent_count;
+	int *p, *tmp, size, ent_count;
 	int retval;
+	unsigned long flags;
 	
 	switch (cmd) {
 	case RNDGETENTCNT:
@@ -1621,17 +1703,36 @@ random_ioctl(struct inode * inode, struct file * file,
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		p = (int *) arg;
-		ent_count = random_state->entropy_count;
-		if (put_user(ent_count, p++) ||
-		    get_user(size, p) ||
+		if (get_user(size, p) ||
 		    put_user(random_state->poolinfo.poolwords, p++))
 			return -EFAULT;
 		if (size < 0)
-			return -EINVAL;
+			return -EFAULT;
 		if (size > random_state->poolinfo.poolwords)
 			size = random_state->poolinfo.poolwords;
-		if (copy_to_user(p, random_state->pool, size * sizeof(__u32)))
+
+		/* prepare to atomically snapshot pool */
+
+		tmp = kmalloc(size * sizeof(__u32), GFP_KERNEL);
+
+		if (!tmp)
 			return -EFAULT;
+
+		spin_lock_irqsave(&random_state->lock, flags);
+		ent_count = random_state->entropy_count;
+		memcpy(tmp, random_state->pool, size * sizeof(__u32));
+		spin_unlock_irqrestore(&random_state->lock, flags);
+
+		if (!copy_to_user(p, tmp, size * sizeof(__u32))) {
+			kfree(tmp);
+			return -EFAULT;
+		}
+
+		kfree(tmp);
+
+		if(put_user(ent_count, p++))
+			return -EFAULT;
+
 		return 0;
 	case RNDADDENTROPY:
 		if (!capable(CAP_SYS_ADMIN))

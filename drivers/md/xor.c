@@ -134,7 +134,10 @@ calibrate_xor_block(void)
 	return 0;
 }
 
+static __exit void xor_exit(void) { }
+
 EXPORT_SYMBOL(xor_block);
 MODULE_LICENSE("GPL");
 
 module_init(calibrate_xor_block);
+module_exit(xor_exit);

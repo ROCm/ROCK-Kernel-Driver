@@ -812,7 +812,7 @@ static unsigned int usb_midi_poll(struct file *file, struct poll_table_struct *w
 
 static int usb_midi_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	DECLARE_WAITQUEUE(wait, current);
 	struct list_head      *devs, *mdevs;
 	struct usb_midi_state *s;
@@ -2084,16 +2084,12 @@ static struct usb_driver usb_midi_driver = {
 
 /* ------------------------------------------------------------------------- */
 
-int __init usb_midi_init(void)
+static int __init usb_midi_init(void)
 {
-	if ( usb_register(&usb_midi_driver) < 0 )
-		return -1;
-
-	return 0;
-
+	return usb_register(&usb_midi_driver);
 }
 
-void __exit usb_midi_exit(void)
+static void __exit usb_midi_exit(void)
 {
 	usb_deregister(&usb_midi_driver);
 }

@@ -89,7 +89,6 @@ extern int apne_probe(struct net_device *);
 extern int bionet_probe(struct net_device *);
 extern int pamsnet_probe(struct net_device *);
 extern int cs89x0_probe(struct net_device *dev);
-extern int ethertap_probe(struct net_device *dev);
 extern int hplance_probe(struct net_device *dev);
 extern int bagetlance_probe(struct net_device *);
 extern int mvme147lance_probe(struct net_device *dev);
@@ -386,17 +385,6 @@ static int __init ethif_probe(struct net_device *dev)
 		return 0;
 	return -ENODEV;
 }
-
-#ifdef CONFIG_ETHERTAP
-static struct net_device tap0_dev = {
-	.name		= "tap0",
-	.base_addr	= NETLINK_TAPBASE,
-	.next		= NEXT_DEV,
-	.init		= ethertap_probe,
-};
-#undef NEXT_DEV
-#define NEXT_DEV	(&tap0_dev)
-#endif
 
 #ifdef CONFIG_SDLA
 extern int sdla_init(struct net_device *);

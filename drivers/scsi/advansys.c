@@ -6199,7 +6199,9 @@ advansys_setup(char *str, int *ints)
 
 static Scsi_Host_Template driver_template = {
     .proc_name                  = "advansys",
+#ifdef CONFIG_PROC_FS
     .proc_info                  = advansys_proc_info,
+#endif
     .name                       = "advansys",
     .detect                     = advansys_detect, 
     .release                    = advansys_release,

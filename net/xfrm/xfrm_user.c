@@ -1195,3 +1195,4 @@ static void __exit xfrm_user_exit(void)
 
 module_init(xfrm_user_init);
 module_exit(xfrm_user_exit);
+MODULE_LICENSE("GPL");

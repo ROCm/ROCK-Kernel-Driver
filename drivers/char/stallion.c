@@ -3078,7 +3078,7 @@ static int stl_memioctl(struct inode *ip, struct file *fp, unsigned int cmd, uns
 		(int) fp, cmd, (int) arg);
 #endif
 
-	brdnr = minor(ip->i_rdev);
+	brdnr = iminor(ip);
 	if (brdnr >= STL_MAXBRDS)
 		return(-ENODEV);
 	rc = 0;
@@ -4234,7 +4234,7 @@ static void stl_cd1400mdmisr(stlpanel_t *panelp, int ioaddr)
 	misr = inb(ioaddr + EREG_DATA);
 	if (misr & MISR_DCD) {
 		set_bit(ASYI_DCDCHANGE, &portp->istate);
-		schedule_task(&portp->tqueue);
+		schedule_work(&portp->tqueue);
 		portp->stats.modem++;
 	}
 
@@ -5031,7 +5031,7 @@ static void stl_sc26198txisr(stlport_t *portp)
 	if ((len == 0) || ((len < STL_TXBUFLOW) &&
 	    (test_bit(ASYI_TXLOW, &portp->istate) == 0))) {
 		set_bit(ASYI_TXLOW, &portp->istate);
-		schedule_task(&portp->tqueue); 
+		schedule_work(&portp->tqueue); 
 	}
 
 	if (len == 0) {
@@ -5248,7 +5248,7 @@ static void stl_sc26198otherisr(stlport_t *portp, unsigned int iack)
 		ipr = stl_sc26198getreg(portp, IPR);
 		if (ipr & IPR_DCDCHANGE) {
 			set_bit(ASYI_DCDCHANGE, &portp->istate);
-			schedule_task(&portp->tqueue); 
+			schedule_work(&portp->tqueue); 
 			portp->stats.modem++;
 		}
 		break;

@@ -21,8 +21,6 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
-
 /*
  * Changing this #undef to #define may solve start up problems in some systems.
  */

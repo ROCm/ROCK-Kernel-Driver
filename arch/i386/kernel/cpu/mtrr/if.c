@@ -17,6 +17,22 @@ static int mtrr_seq_show(struct seq_file *seq, void *offset);
 
 #define FILE_FCOUNT(f) (((struct seq_file *)((f)->private_data))->private)
 
+static char *mtrr_strings[MTRR_NUM_TYPES] =
+{
+    "uncachable",               /* 0 */
+    "write-combining",          /* 1 */
+    "?",                        /* 2 */
+    "?",                        /* 3 */
+    "write-through",            /* 4 */
+    "write-protect",            /* 5 */
+    "write-back",               /* 6 */
+};
+
+char *mtrr_attrib_to_str(int x)
+{
+	return (x <= 6) ? mtrr_strings[x] : "?";
+}
+
 static int
 mtrr_file_add(unsigned long base, unsigned long size,
 	      unsigned int type, char increment, struct file *file, int page)
@@ -300,11 +316,6 @@ static struct proc_dir_entry *proc_root_mtrr;
 
 #  endif			/*  CONFIG_PROC_FS  */
 
-char * attrib_to_str(int x)
-{
-	return (x <= 6) ? mtrr_strings[x] : "?";
-}
-
 static int mtrr_seq_show(struct seq_file *seq, void *offset)
 {
 	char factor;
@@ -332,7 +343,7 @@ static int mtrr_seq_show(struct seq_file *seq, void *offset)
 			len += seq_printf(seq, 
 				   "reg%02i: base=0x%05lx000 (%4liMB), size=%4i%cB: %s, count=%d\n",
 			     i, base, base >> (20 - PAGE_SHIFT), size, factor,
-			     attrib_to_str(type), usage_table[i]);
+			     mtrr_attrib_to_str(type), usage_table[i]);
 		}
 	}
 	return 0;

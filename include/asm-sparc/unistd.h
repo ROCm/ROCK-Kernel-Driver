@@ -282,10 +282,11 @@
 #define __NR_timer_gettime	263
 #define __NR_timer_getoverrun	264
 #define __NR_timer_delete	265
-/* WARNING: You MAY NOT add syscall numbers larger than 265, since
+#define __NR_timer_create	266
+/* WARNING: You MAY NOT add syscall numbers larger than 266, since
  *          all of the syscall tables in the Sparc kernel are
- *          sized to have 266 entries (starting at zero).  Therefore
- *          find a free slot in the 0-265 range.
+ *          sized to have 267 entries (starting at zero).  Therefore
+ *          find a free slot in the 0-266 range.
  */
 
 #define _syscall0(type,name) \

@@ -303,7 +303,7 @@
 	"swi	0\n\t"					\
 	"pop	{r7}"
 #else
-#define __syscall(name) "swi\t" __sys1(__NR_##name) "\n\t"
+#define __syscall(name) "swi\t" __sys1(__NR_##name) ""
 #endif
 #endif
 
@@ -318,24 +318,28 @@ do {									\
 
 #define _syscall0(type,name)						\
 type name(void) {							\
-  register long __res __asm__("r0");					\
+  register long __res_r0 __asm__("r0");					\
+  long __res;								\
   __asm__ __volatile__ (						\
   __syscall(name)							\
-	:"=r" (__res)							\
+	: "=r" (__res_r0)						\
 	:								\
 	: "lr");							\
+  __res = __res_r0;							\
   __syscall_return(type,__res);						\
 }
 
 #define _syscall1(type,name,type1,arg1) 				\
 type name(type1 arg1) { 						\
   register long __r0 __asm__("r0") = (long)arg1;			\
-  register long __res __asm__("r0");					\
+  register long __res_r0 __asm__("r0");					\
+  long __res;								\
   __asm__ __volatile__ (						\
   __syscall(name)							\
-	: "=r" (__res)							\
+	: "=r" (__res_r0)						\
 	: "r" (__r0)							\
 	: "lr");							\
+  __res = __res_r0;							\
   __syscall_return(type,__res);						\
 }
 
@@ -343,12 +347,14 @@ type name(type1 arg1) { 						\
 type name(type1 arg1,type2 arg2) {					\
   register long __r0 __asm__("r0") = (long)arg1;			\
   register long __r1 __asm__("r1") = (long)arg2;			\
-  register long __res __asm__("r0");					\
+  register long __res_r0 __asm__("r0");					\
+  long __res;								\
   __asm__ __volatile__ (						\
   __syscall(name)							\
-	: "=r" (__res)							\
+	: "=r" (__res_r0)						\
 	: "r" (__r0),"r" (__r1) 					\
 	: "lr");							\
+  __res = __res_r0;							\
   __syscall_return(type,__res);						\
 }
 
@@ -358,12 +364,14 @@ type name(type1 arg1,type2 arg2,type3 arg3) {				\
   register long __r0 __asm__("r0") = (long)arg1;			\
   register long __r1 __asm__("r1") = (long)arg2;			\
   register long __r2 __asm__("r2") = (long)arg3;			\
-  register long __res __asm__("r0");					\
+  register long __res_r0 __asm__("r0");					\
+  long __res;								\
   __asm__ __volatile__ (						\
   __syscall(name)							\
-	: "=r" (__res)							\
+	: "=r" (__res_r0)						\
 	: "r" (__r0),"r" (__r1),"r" (__r2)				\
 	: "lr");							\
+  __res = __res_r0;							\
   __syscall_return(type,__res);						\
 }
 
@@ -374,12 +382,14 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4) {		\
   register long __r1 __asm__("r1") = (long)arg2;			\
   register long __r2 __asm__("r2") = (long)arg3;			\
   register long __r3 __asm__("r3") = (long)arg4;			\
-  register long __res __asm__("r0");					\
+  register long __res_r0 __asm__("r0");					\
+  long __res;								\
   __asm__ __volatile__ (						\
   __syscall(name)							\
-	: "=r" (__res)							\
+	: "=r" (__res_r0)						\
 	: "r" (__r0),"r" (__r1),"r" (__r2),"r" (__r3)			\
 	: "lr");							\
+  __res = __res_r0;							\
   __syscall_return(type,__res);						\
 }
   
@@ -391,12 +401,14 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5) {	\
   register long __r2 __asm__("r2") = (long)arg3;			\
   register long __r3 __asm__("r3") = (long)arg4;			\
   register long __r4 __asm__("r4") = (long)arg5;			\
-  register long __res __asm__("r0");					\
+  register long __res_r0 __asm__("r0");					\
+  long __res;								\
   __asm__ __volatile__ (						\
   __syscall(name)							\
-	: "=r" (__res)							\
+	: "=r" (__res_r0)						\
 	: "r" (__r0),"r" (__r1),"r" (__r2),"r" (__r3),"r" (__r4)	\
 	: "lr");							\
+  __res = __res_r0;							\
   __syscall_return(type,__res);						\
 }
 
@@ -408,12 +420,14 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5, type6 arg6
   register long __r3 __asm__("r3") = (long)arg4;			\
   register long __r4 __asm__("r4") = (long)arg5;			\
   register long __r5 __asm__("r5") = (long)arg6;			\
-  register long __res __asm__("r0");					\
+  register long __res_r0 __asm__("r0");					\
+  long __res;								\
   __asm__ __volatile__ (						\
   __syscall(name)							\
-	: "=r" (__res)							\
+	: "=r" (__res_r0)						\
 	: "r" (__r0),"r" (__r1),"r" (__r2),"r" (__r3), "r" (__r4),"r" (__r5)		\
 	: "lr");							\
+  __res = __res_r0;							\
   __syscall_return(type,__res);						\
 }
 

@@ -40,6 +40,7 @@
 #include <linux/tty_flip.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>
+#include <linux/interrupt.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 

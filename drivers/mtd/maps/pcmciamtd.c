@@ -344,9 +344,8 @@ static void pcmciamtd_set_vpp(struct map_info *map, int on)
  * still open, this will be postponed until it is closed.
  */
 
-static void pcmciamtd_release(u_long arg)
+static void pcmciamtd_release(dev_link_t *link)
 {
-	dev_link_t *link = (dev_link_t *)arg;
 	struct pcmciamtd_dev *dev = link->priv;
 
 	DEBUG(3, "link = 0x%p", link);
@@ -564,7 +563,7 @@ static void pcmciamtd_config(dev_link_t *link)
 
 	if(!dev->win_size) {
 		err("Cant allocate memory window");
-		pcmciamtd_release((u_long)link);
+		pcmciamtd_release(link);
 		return;
 	}
 	DEBUG(1, "Allocated a window of %dKiB", dev->win_size >> 10);
@@ -576,7 +575,7 @@ static void pcmciamtd_config(dev_link_t *link)
 	dev->win_base = ioremap(req.Base, req.Size);
 	if(!dev->win_base) {
 		err("ioremap(%lu, %u) failed", req.Base, req.Size);
-		pcmciamtd_release((u_long)link);
+		pcmciamtd_release(link);
 		return;
 	}
 	DEBUG(1, "mapped window dev = %p req.base = 0x%lx base = %p size = 0x%x",
@@ -631,7 +630,7 @@ static void pcmciamtd_config(dev_link_t *link)
 	
 	if(!mtd) {
 		DEBUG(1, "Cant find an MTD");
-		pcmciamtd_release((u_long)link);
+		pcmciamtd_release(link);
 		return;
 	}
 
@@ -671,7 +670,7 @@ static void pcmciamtd_config(dev_link_t *link)
 		map_destroy(mtd);
 		dev->mtd_info = NULL;
 		err("Couldnt register MTD device");
-		pcmciamtd_release((u_long)link);
+		pcmciamtd_release(link);
 		return;
 	}
 	snprintf(dev->node.dev_name, sizeof(dev->node.dev_name), "mtd%d", mtd->index);
@@ -683,7 +682,7 @@ static void pcmciamtd_config(dev_link_t *link)
  cs_failed:
 	cs_error(link->handle, last_fn, last_ret);
 	err("CS Error, exiting");
-	pcmciamtd_release((u_long)link);
+	pcmciamtd_release(link);
 	return;
 }
 
@@ -710,7 +709,7 @@ static int pcmciamtd_event(event_t event, int priority,
 				del_mtd_device(dev->mtd_info);
 				info("mtd%d: Removed", dev->mtd_info->index);
 			}
-			mod_timer(&link->release, jiffies + HZ/20);
+			pcmciamtd_release(link);
 		}
 		break;
 	case CS_EVENT_CARD_INSERTION:
@@ -751,10 +750,8 @@ static void pcmciamtd_detach(dev_link_t *link)
 {
 	DEBUG(3, "link=0x%p", link);
 
-	del_timer(&link->release);
-
 	if(link->state & DEV_CONFIG) {
-		pcmciamtd_release((u_long)link);
+		pcmciamtd_release(link);
 	}
 
 	if (link->handle) {
@@ -789,10 +786,6 @@ static dev_link_t *pcmciamtd_attach(void)
 	memset(dev, 0, sizeof(*dev));
 	link = &dev->link;
 	link->priv = dev;
-
-	init_timer(&link->release);
-	link->release.function = &pcmciamtd_release;
-	link->release.data = (u_long)link;
 
 	link->conf.Attributes = 0;
 	link->conf.IntType = INT_MEMORY;

@@ -71,9 +71,9 @@ __setup("ep7312_pxddr=",ep7312_pxddr);
  * Define static partitions for flash device
  */
 static struct mtd_partition partition_info[] = {
-	{ name: "EP7312 Nand Flash",
-		  offset: 0,
-		  size: 8*1024*1024 }
+	{ .name = "EP7312 Nand Flash",
+		  .offset = 0,
+		  .size = 8*1024*1024 }
 };
 #define NUM_PARTITIONS 1
 

@@ -77,9 +77,4 @@ int isp2x00_abort(Scsi_Cmnd *);
 int isp2x00_reset(Scsi_Cmnd *, unsigned int);
 int isp2x00_biosparam(struct scsi_device *, struct block_device *,
 		sector_t, int[]);
-
-#ifndef NULL
-#define NULL (0)
-#endif
-
 #endif /* _QLOGICFC_H */

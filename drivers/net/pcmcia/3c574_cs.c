@@ -253,6 +253,7 @@ static int el3_rx(struct net_device *dev, int worklimit);
 static int el3_close(struct net_device *dev);
 static void el3_tx_timeout(struct net_device *dev);
 static int el3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
+static struct ethtool_ops netdev_ethtool_ops;
 static void set_rx_mode(struct net_device *dev);
 
 static dev_info_t dev_info = "3c574_cs";
@@ -319,6 +320,7 @@ static dev_link_t *tc574_attach(void)
 	dev->hard_start_xmit = &el3_start_xmit;
 	dev->get_stats = &el3_get_stats;
 	dev->do_ioctl = &el3_ioctl;
+	SET_ETHTOOL_OPS(dev, &netdev_ethtool_ops);
 	dev->set_multicast_list = &set_rx_mode;
 	dev->open = &el3_open;
 	dev->stop = &el3_close;
@@ -1202,25 +1204,15 @@ static int el3_rx(struct net_device *dev, int worklimit)
 	return worklimit;
 }
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static void netdev_get_drvinfo(struct net_device *dev,
+			       struct ethtool_drvinfo *info)
 {
-	u32 ethcmd;
-		
-	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-		return -EFAULT;
-	
-	switch (ethcmd) {
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strncpy(info.driver, "3c574_cs", sizeof(info.driver)-1);
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-	}
-	}
-	
-	return -EOPNOTSUPP;
+	strcpy(info->driver, "3c574_cs");
 }
+
+static struct ethtool_ops netdev_ethtool_ops = {
+	.get_drvinfo		= netdev_get_drvinfo,
+};
 
 /* Provide ioctl() calls to examine the MII xcvr state. */
 static int el3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
@@ -1235,11 +1227,9 @@ static int el3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		  data[0], data[1], data[2], data[3]);
 
 	switch(cmd) {
-	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, (void *)rq->ifr_data);
-	case SIOCDEVPRIVATE:		/* Get the address of the PHY in use. */
+	case SIOCGMIIPHY:		/* Get the address of the PHY in use. */
 		data[0] = phy;
-	case SIOCDEVPRIVATE+1:		/* Read the specified MII register. */
+	case SIOCGMIIREG:		/* Read the specified MII register. */
 		{
 			int saved_window;
 			unsigned long flags;
@@ -1252,7 +1242,7 @@ static int el3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			spin_unlock_irqrestore(&lp->window_lock, flags);
 			return 0;
 		}
-	case SIOCDEVPRIVATE+2:		/* Write the specified MII register */
+	case SIOCSMIIREG:		/* Write the specified MII register */
 		{
 			int saved_window;
                        unsigned long flags;

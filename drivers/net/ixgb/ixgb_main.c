@@ -1914,10 +1914,8 @@ ixgb_poll(struct net_device *netdev, int *budget)
 		skb->protocol = eth_type_trans(skb, netdev);
 		if (adapter->vlgrp
 		    && (rx_desc->status & IXGB_RX_DESC_STATUS_VP)) {
-			vlan_hwaccel_rx(skb, adapter->vlgrp,
-					(rx_desc->
-					 special &
-					 IXGB_RX_DESC_SPECIAL_VLAN_MASK));
+			vlan_hwaccel_receive_skb(skb, adapter->vlgrp,
+				(rx_desc-> special & IXGB_RX_DESC_SPECIAL_VLAN_MASK));
 		} else {
 			netif_receive_skb(skb);
 		}

@@ -70,7 +70,7 @@ typedef int (* ioctl32_handler_t)(unsigned int, unsigned int, unsigned long, str
 #define IOCTL_TABLE_START \
 	struct ioctl_trans ioctl_start[] = {
 #define IOCTL_TABLE_END \
-	}; struct ioctl_trans ioctl_end[0];
+	};
 
 IOCTL_TABLE_START
 HANDLE_IOCTL(VFAT_IOCTL_READDIR_BOTH32, vfat_ioctl32)
@@ -79,3 +79,5 @@ HANDLE_IOCTL(VFAT_IOCTL_READDIR_SHORT32, vfat_ioctl32)
 #include "compat_ioctl.c"
 #include <linux/compat_ioctl.h>
 IOCTL_TABLE_END
+
+int ioctl_table_size = ARRAY_SIZE(ioctl_start);

@@ -21,7 +21,6 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
 #include "slc90e66.h"
 
 #if defined(DISPLAY_SLC90E66_TIMINGS) && defined(CONFIG_PROC_FS)

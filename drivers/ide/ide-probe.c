@@ -644,15 +644,26 @@ static inline u8 probe_for_drive (ide_drive_t *drive)
 	return drive->present;
 }
 
+static void hwif_release_dev (struct device *dev)
+{
+	ide_hwif_t *hwif = container_of(dev, ide_hwif_t, gendev);
+
+	up(&hwif->gendev_rel_sem);
+}
+
 static void hwif_register (ide_hwif_t *hwif)
 {
 	/* register with global device tree */
 	strlcpy(hwif->gendev.bus_id,hwif->name,BUS_ID_SIZE);
 	hwif->gendev.driver_data = hwif;
-	if (hwif->pci_dev)
-		hwif->gendev.parent = &hwif->pci_dev->dev;
-	else
-		hwif->gendev.parent = NULL; /* Would like to do = &device_legacy */
+	if (hwif->gendev.parent == NULL) {
+		if (hwif->pci_dev)
+			hwif->gendev.parent = &hwif->pci_dev->dev;
+		else
+			/* Would like to do = &device_legacy */
+			hwif->gendev.parent = NULL;
+	}
+	hwif->gendev.release = hwif_release_dev;
 	device_register(&hwif->gendev);
 }
 
@@ -770,8 +781,7 @@ void probe_hwif (ide_hwif_t *hwif)
 	 */
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		ide_drive_t *drive = &hwif->drives[unit];
-		drive->dn = ((hwif->channel ? 2 : 0) + unit);
-		hwif->drives[unit].dn = ((hwif->channel ? 2 : 0) + unit);
+		drive->dn = (hwif->channel ? 2 : 0) + unit;
 		(void) probe_for_drive(drive);
 		if (drive->present && !hwif->present) {
 			hwif->present = 1;
@@ -945,15 +955,10 @@ static int ide_init_queue(ide_drive_t *drive)
 	if (drive->disk)
 		drive->disk->queue = drive->queue;
 
-	return 0;
-}
-
-/*
- * Setup the drive for request handling.
- */
-static void ide_init_drive(ide_drive_t *drive)
-{
+	/* needs drive->queue to be set */
 	ide_toggle_bounce(drive, 1);
+
+	return 0;
 }
 
 /*
@@ -1068,10 +1073,9 @@ static int init_irq (ide_hwif_t *hwif)
 	}
 
 	/*
-	 * Link any new drives into the hwgroup, allocate
-	 * the block device queue and initialize the drive.
-	 * Note that ide_init_drive sends commands to the new
-	 * drive.
+	 * For any present drive:
+	 * - allocate the block device queue
+	 * - link drive into the hwgroup
 	 */
 	for (index = 0; index < MAX_DRIVES; ++index) {
 		ide_drive_t *drive = &hwif->drives[index];
@@ -1092,7 +1096,6 @@ static int init_irq (ide_hwif_t *hwif)
 			hwgroup->drive->next = drive;
 		}
 		spin_unlock_irq(&ide_lock);
-		ide_init_drive(drive);
 	}
 
 #if !defined(__mc68000__) && !defined(CONFIG_APUS) && !defined(__sparc__)
@@ -1201,6 +1204,13 @@ Enomem:
 	return -ENOMEM;
 }
 
+static void drive_release_dev (struct device *dev)
+{
+	ide_drive_t *drive = container_of(dev, ide_drive_t, gendev);
+
+	up(&drive->gendev_rel_sem);
+}
+
 /*
  * init_gendisk() (as opposed to ide_geninit) is called for each major device,
  * after probing for drives, to allocate partition tables and other data
@@ -1219,6 +1229,7 @@ static void init_gendisk (ide_hwif_t *hwif)
 		drive->gendev.parent = &hwif->gendev;
 		drive->gendev.bus = &ide_bus_type;
 		drive->gendev.driver_data = drive;
+		drive->gendev.release = drive_release_dev;
 		if (drive->present) {
 			device_register(&drive->gendev);
 			sprintf(drive->devfs_name, "ide/host%d/bus%d/target%d/lun%d",
@@ -1303,31 +1314,6 @@ out:
 
 EXPORT_SYMBOL(hwif_init);
 
-int export_ide_init_queue (ide_drive_t *drive)
-{
-	if (ide_init_queue(drive))
-		return 1;
-
-	ide_init_drive(drive);
-	return 0;
-}
-
-EXPORT_SYMBOL(export_ide_init_queue);
-
-u8 export_probe_for_drive (ide_drive_t *drive)
-{
-	return probe_for_drive(drive);
-}
-
-EXPORT_SYMBOL(export_probe_for_drive);
-
-int ideprobe_init (void);
-static ide_module_t ideprobe_module = {
-	IDE_PROBE_MODULE,
-	ideprobe_init,
-	NULL
-};
-
 int ideprobe_init (void)
 {
 	unsigned int index;
@@ -1359,7 +1345,7 @@ int ideprobe_init (void)
 		}
 	}
 	if (!ide_probe)
-		ide_probe = &ideprobe_module;
+		ide_probe = &ideprobe_init;
 	MOD_DEC_USE_COUNT;
 	return 0;
 }

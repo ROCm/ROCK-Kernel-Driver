@@ -54,8 +54,6 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
-
 /*
  * Default speeds.  These can be changed with "auto-tune" and/or hdparm.
  */

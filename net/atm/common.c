@@ -279,6 +279,7 @@ int vcc_create(struct socket *sock, int protocol, int family)
 	if (!sk)
 		return -ENOMEM;
 	sock_init_data(sock, sk);
+	sk_set_owner(sk, THIS_MODULE);
 	sk->sk_state_change = vcc_def_wakeup;
 	sk->sk_write_space = vcc_write_space;
 
@@ -1135,3 +1136,5 @@ module_init(atm_init);
 module_exit(atm_exit);
 
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_NETPROTO(PF_ATMPVC);
+MODULE_ALIAS_NETPROTO(PF_ATMSVC);

@@ -90,14 +90,14 @@ static int show_map(struct seq_file *m, void *v)
 		ino = inode->i_ino;
 	}
 
-	seq_printf(m, "%0*lx-%0*lx %c%c%c%c %0*lx %02x:%02x %lu %n",
-			(int) (2*sizeof(void*)), map->vm_start,
-			(int) (2*sizeof(void*)), map->vm_end,
+	seq_printf(m, "%08lx-%08lx %c%c%c%c %08lx %02x:%02x %lu %n",
+			map->vm_start,
+			map->vm_end,
 			flags & VM_READ ? 'r' : '-',
 			flags & VM_WRITE ? 'w' : '-',
 			flags & VM_EXEC ? 'x' : '-',
 			flags & VM_MAYSHARE ? 's' : 'p',
-			(int) (2*sizeof(void*)), map->vm_pgoff << PAGE_SHIFT,
+			map->vm_pgoff << PAGE_SHIFT,
 			MAJOR(dev), MINOR(dev), ino, &len);
 
 	if (map->vm_file) {

@@ -64,7 +64,7 @@ static ssize_t
 group_write(struct device_driver *drv, const char *buf, size_t count)
 {
 	const char *start, *end;
-	char bus_ids[2][BUS_ID_SIZE], *argv[2];
+	char bus_ids[2][BUS_ID_SIZE+1], *argv[2];
 	int i;
 	int ret;
 	struct ccwgroup_driver *cdrv;
@@ -79,7 +79,7 @@ group_write(struct device_driver *drv, const char *buf, size_t count)
 
 		if (!(end = strchr(start, delim[i])))
 			return count;
-		len = min_t(ptrdiff_t, BUS_ID_SIZE, end - start);
+		len = min_t(ptrdiff_t, BUS_ID_SIZE, end - start)+1;
 		strlcpy (bus_ids[i], start, len);
 		argv[i] = bus_ids[i];
 		start = end + 1;

@@ -136,16 +136,34 @@
 
 #ifdef CONFIG_CARDBUS
 
-static int ti_intctl(struct yenta_socket *socket)
-{
-	u8 new, reg = exca_readb(socket, I365_INTCTL);
+/*
+ * Texas Instruments CardBus controller overrides.
+ */
+#define ti_sysctl(socket)	((socket)->private[0])
+#define ti_cardctl(socket)	((socket)->private[1])
+#define ti_devctl(socket)	((socket)->private[2])
+#define ti_diag(socket)		((socket)->private[3])
+#define ti_irqmux(socket)	((socket)->private[4])
 
-	new = reg & ~I365_INTR_ENA;
-	if (socket->cb_irq)
-		new |= I365_INTR_ENA;
-	if (new != reg)
-		exca_writeb(socket, I365_INTCTL, new);
-	return 0;
+/*
+ * These are the TI specific power management handlers.
+ */
+static void ti_save_state(struct yenta_socket *socket)
+{
+	ti_sysctl(socket) = config_readl(socket, TI113X_SYSTEM_CONTROL);
+	ti_irqmux(socket) = config_readl(socket, TI122X_IRQMUX);
+	ti_cardctl(socket) = config_readb(socket, TI113X_CARD_CONTROL);
+	ti_devctl(socket) = config_readb(socket, TI113X_DEVICE_CONTROL);
+	ti_diag(socket) = config_readb(socket, TI1250_DIAGNOSTIC);
+}
+
+static void ti_restore_state(struct yenta_socket *socket)
+{
+	config_writel(socket, TI113X_SYSTEM_CONTROL, ti_sysctl(socket));
+	config_writel(socket, TI122X_IRQMUX, ti_irqmux(socket));
+	config_writeb(socket, TI113X_CARD_CONTROL, ti_cardctl(socket));
+	config_writeb(socket, TI113X_DEVICE_CONTROL, ti_devctl(socket));
+	config_writeb(socket, TI1250_DIAGNOSTIC, ti_diag(socket));
 }
 
 /*
@@ -185,8 +203,8 @@ static void ti1250_zoom_video(struct pcmcia_socket *sock, int onoff)
 
 	ti_zoom_video(sock, onoff);
 
-	reg = config_readb(socket, 0x84);
-	reg |= (1<<7);	/* ZV bus enable */
+	reg = config_readb(socket, TI1250_MULTIMEDIA_CTL);
+	reg |= TI1250_MMC_ZVOUTEN;	/* ZV bus enable */
 
 	if(PCI_FUNC(socket->dev->devfn)==1)
 		shift = 1;
@@ -204,12 +222,11 @@ static void ti1250_zoom_video(struct pcmcia_socket *sock, int onoff)
 		reg &= ~(1<<shift);	/* Socket zoon video off */
 	}
 
-	config_writeb(socket, 0x84, reg);
+	config_writeb(socket, TI1250_MULTIMEDIA_CTL, reg);
 }
 
-static void ti_set_zv(struct pcmcia_socket *sock)
+static void ti_set_zv(struct yenta_socket *socket)
 {
-	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
 	if(socket->dev->vendor == PCI_VENDOR_ID_TI)
 	{
 		switch(socket->dev->device)
@@ -218,23 +235,15 @@ static void ti_set_zv(struct pcmcia_socket *sock)
 			case PCI_DEVICE_ID_TI_1220:
 			case PCI_DEVICE_ID_TI_1221:
 			case PCI_DEVICE_ID_TI_1225:
-				sock->zoom_video = ti_zoom_video;
+				socket->socket.zoom_video = ti_zoom_video;
 				break;	
 			case PCI_DEVICE_ID_TI_1250:
 			case PCI_DEVICE_ID_TI_1251A:
 			case PCI_DEVICE_ID_TI_1251B:
 			case PCI_DEVICE_ID_TI_1450:
-				sock->zoom_video = ti1250_zoom_video;
+				socket->socket.zoom_video = ti1250_zoom_video;
 		}
 	}
-}
-static int ti_init(struct pcmcia_socket *sock)
-{
-	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
-	yenta_init(sock);
-	ti_set_zv(sock);
-	ti_intctl(socket);
-	return 0;
 }
 
 
@@ -250,6 +259,18 @@ static int ti_init(struct pcmcia_socket *sock)
  *   This makes us correctly get PCI CSC interrupt
  *   events.
  */
+static int ti_init(struct yenta_socket *socket)
+{
+	u8 new, reg = exca_readb(socket, I365_INTCTL);
+
+	new = reg & ~I365_INTR_ENA;
+	if (socket->cb_irq)
+		new |= I365_INTR_ENA;
+	if (new != reg)
+		exca_writeb(socket, I365_INTCTL, new);
+	return 0;
+}
+
 static int ti_override(struct yenta_socket *socket)
 {
 	u8 new, reg = exca_readb(socket, I365_INTCTL);
@@ -257,6 +278,8 @@ static int ti_override(struct yenta_socket *socket)
 	new = reg & ~I365_INTR_ENA;
 	if (new != reg)
 		exca_writeb(socket, I365_INTCTL, new);
+
+	ti_set_zv(socket);
 
 #if 0
 	/*
@@ -285,83 +308,85 @@ static int ti_override(struct yenta_socket *socket)
 	}
 #endif
 
-	socket->socket.ops->init = ti_init;
-	return 0;
-}
-
-#define ti_sysctl(socket)	((socket)->private[0])
-#define ti_cardctl(socket)	((socket)->private[1])
-#define ti_devctl(socket)	((socket)->private[2])
-#define ti_diag(socket)		((socket)->private[3])
-#define ti_irqmux(socket)	((socket)->private[4])
-
-
-static int ti113x_init(struct pcmcia_socket *sock)
-{
-	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
-	yenta_init(sock);
-	ti_set_zv(sock);
-
-	config_writel(socket, TI113X_SYSTEM_CONTROL, ti_sysctl(socket));
-	config_writeb(socket, TI113X_CARD_CONTROL, ti_cardctl(socket));
-	config_writeb(socket, TI113X_DEVICE_CONTROL, ti_devctl(socket));
-	ti_intctl(socket);
 	return 0;
 }
 
 static int ti113x_override(struct yenta_socket *socket)
 {
-	ti_sysctl(socket) = config_readl(socket, TI113X_SYSTEM_CONTROL);
-	ti_cardctl(socket) = config_readb(socket, TI113X_CARD_CONTROL);
-	ti_devctl(socket) = config_readb(socket, TI113X_DEVICE_CONTROL);
+	u8 cardctl;
 
-	ti_cardctl(socket) &= ~(TI113X_CCR_PCI_IRQ_ENA | TI113X_CCR_PCI_IREQ | TI113X_CCR_PCI_CSC);
+	cardctl = config_readb(socket, TI113X_CARD_CONTROL);
+	cardctl &= ~(TI113X_CCR_PCI_IRQ_ENA | TI113X_CCR_PCI_IREQ | TI113X_CCR_PCI_CSC);
 	if (socket->cb_irq)
-		ti_cardctl(socket) |= TI113X_CCR_PCI_IRQ_ENA | TI113X_CCR_PCI_CSC | TI113X_CCR_PCI_IREQ;
-	ti_override(socket);
-	socket->socket.ops->init = ti113x_init;
-	return 0;
-}
+		cardctl |= TI113X_CCR_PCI_IRQ_ENA | TI113X_CCR_PCI_CSC | TI113X_CCR_PCI_IREQ;
+	config_writeb(socket, TI113X_CARD_CONTROL, cardctl);
 
-
-static int ti1250_init(struct pcmcia_socket *sock)
-{
-	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
-	ti113x_init(sock);
-	ti_irqmux(socket) = config_readl(socket, TI122X_IRQMUX);
-#if 0
-	ti_irqmux(socket) = (ti_irqmux(socket) & ~0x0f) | 0x02; /* route INTA */
-	if (!(ti_sysctl(socket) & TI122X_SCR_INTRTIE))
-		ti_irqmux(socket) |= 0x20; /* route INTB */
-#endif
-	
-	config_writel(socket, TI122X_IRQMUX, ti_irqmux(socket));
-		
-	config_writeb(socket, TI1250_DIAGNOSTIC, ti_diag(socket));
-	return 0;
-}
-
-static int ti1250_override(struct yenta_socket *socket)
-{
-	ti_diag(socket) = config_readb(socket, TI1250_DIAGNOSTIC);
-
-	ti_diag(socket) &= ~(TI1250_DIAG_PCI_CSC | TI1250_DIAG_PCI_IREQ);
-	if (socket->cb_irq)
-		ti_diag(socket) |= TI1250_DIAG_PCI_CSC | TI1250_DIAG_PCI_IREQ;
-	ti113x_override(socket);
-	socket->socket.ops->init = ti1250_init;
-	return 0;
+	return ti_override(socket);
 }
 
 
 static int ti12xx_override(struct yenta_socket *socket)
 {
-	/* make sure that memory burst is active */
-	ti_sysctl(socket) = config_readl(socket, TI113X_SYSTEM_CONTROL);
-	ti_sysctl(socket) |= TI122X_SCR_MRBURSTUP;
-	config_writel(socket, TI113X_SYSTEM_CONTROL, ti_sysctl(socket));
+	u32 val;
 
-	return ti113x_override(socket);
+	/* make sure that memory burst is active */
+	val = config_readl(socket, TI113X_SYSTEM_CONTROL);
+	if (!(val & TI122X_SCR_MRBURSTUP)) {
+		printk(KERN_INFO "Yenta: Enabling burst memory read transactions\n");
+		val |= TI122X_SCR_MRBURSTUP;
+		config_writel(socket, TI113X_SYSTEM_CONTROL, val);
+	}
+
+	/*
+	 * Yenta expects controllers to use CSCINT to route
+	 * CSC interrupts to PCI rather than INTVAL.
+	 */
+	val = config_readb(socket, TI1250_DIAGNOSTIC);
+	printk(KERN_INFO "Yenta: Using %s to route CSC interrupts to PCI\n",
+		(val & TI1250_DIAG_PCI_CSC) ? "CSCINT" : "INTVAL");
+	printk(KERN_INFO "Yenta: Routing CardBus interrupts to %s\n",
+		(val & TI1250_DIAG_PCI_IREQ) ? "PCI" : "ISA");
+
+	return ti_override(socket);
+}
+
+
+static int ti1250_override(struct yenta_socket *socket)
+{
+	u8 old, diag;
+
+	old = config_readb(socket, TI1250_DIAGNOSTIC);
+	diag = old & ~(TI1250_DIAG_PCI_CSC | TI1250_DIAG_PCI_IREQ);
+	if (socket->cb_irq)
+		diag |= TI1250_DIAG_PCI_CSC | TI1250_DIAG_PCI_IREQ;
+
+	if (diag != old) {
+		printk(KERN_INFO "Yenta: adjusting diagnostic: %02x -> %02x\n",
+			old, diag);
+		config_writeb(socket, TI1250_DIAGNOSTIC, diag);
+	}
+
+#if 0
+	/*
+	 * This is highly machine specific, and we should NOT touch
+	 * this register - we have no knowledge how the hardware
+	 * is actually wired.
+	 *
+	 * If we're going to do this, we should probably look into
+	 * using the subsystem IDs.
+	 *
+	 * On ThinkPad 380XD, this changes MFUNC0 from the ISA IRQ3
+	 * output (which it is) to IRQ2.  We also change MFUNC1
+	 * from ISA IRQ4 to IRQ6.
+	 */
+	irqmux = config_readl(socket, TI122X_IRQMUX);
+	irqmux = (irqmux & ~0x0f) | 0x02; /* route INTA */
+	if (!(ti_sysctl(socket) & TI122X_SCR_INTRTIE))
+		irqmux = (irqmux & ~0xf0) | 0x20; /* route INTB */
+	config_writel(socket, TI122X_IRQMUX, irqmux);
+#endif
+
+	return ti12xx_override(socket);
 }
 
 #endif /* CONFIG_CARDBUS */

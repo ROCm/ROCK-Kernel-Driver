@@ -1726,6 +1726,7 @@ MODULE_LICENSE("GPL");
 /* An additional parameter that may be passed in... */
 static int debug = -1;
 static int tx_start_pt = -1;
+static int pcnet32_have_pci;
 
 static int __init pcnet32_init_module(void)
 {
@@ -1738,7 +1739,8 @@ static int __init pcnet32_init_module(void)
 	tx_start = tx_start_pt;
 
     /* find the PCI devices */
-    pci_module_init(&pcnet32_driver);
+    if (!pci_module_init(&pcnet32_driver))
+	pcnet32_have_pci = 1;
 
     /* should we find any remaining VLbus devices ? */
     if (pcnet32vlb)
@@ -1747,7 +1749,7 @@ static int __init pcnet32_init_module(void)
     if (cards_found)
 	printk(KERN_INFO PFX "%d cards_found.\n", cards_found);
     
-    return cards_found ? 0 : -ENODEV;
+    return (pcnet32_have_pci + cards_found) ? 0 : -ENODEV;
 }
 
 static void __exit pcnet32_cleanup_module(void)
@@ -1765,6 +1767,9 @@ static void __exit pcnet32_cleanup_module(void)
 	free_netdev(pcnet32_dev);
 	pcnet32_dev = next_dev;
     }
+
+    if (pcnet32_have_pci)
+	pci_unregister_driver(&pcnet32_driver);
 }
 
 module_init(pcnet32_init_module);

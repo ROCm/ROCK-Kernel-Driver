@@ -146,7 +146,7 @@ Private IOCTL to set up for displaying MJPEG
 
 #define ZORAN_NAME    "ZORAN"	/* name of the device */
 
-#define ZR_DEVNAME(zr) pci_name((zr)->pci_dev)
+#define ZR_DEVNAME(zr) ((zr)->name)
 
 #define   BUZ_MAX_WIDTH   (zr->timing->Wa)
 #define   BUZ_MAX_HEIGHT  (zr->timing->Ha)
@@ -383,7 +383,7 @@ struct card_info {
 };
 
 struct zoran {
-	struct video_device video_dev;
+	struct video_device *video_dev;
 
 	struct i2c_adapter i2c_adapter;	/* */
 	struct i2c_algo_bit_data i2c_algo;	/* */
@@ -403,9 +403,7 @@ struct zoran {
 	struct tvnorm *timing;
 
 	unsigned short id;	/* number of this device */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	char name[32];		/* name of this device */
-#endif
 	struct pci_dev *pci_dev;	/* PCI device */
 	unsigned char revision;	/* revision of zr36057 */
 	unsigned int zr36057_adr;	/* bus address of IO mem returned by PCI BIOS */

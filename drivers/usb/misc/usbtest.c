@@ -435,7 +435,7 @@ static int is_good_config (char *buf, int len)
 		return 0;
 	}
 
-	le32_to_cpus (&config->wTotalLength);
+	le16_to_cpus (&config->wTotalLength);
 	if (config->wTotalLength == len)		/* read it all */
 		return 1;
 	return config->wTotalLength >= TBUF_SIZE;	/* max partial read */

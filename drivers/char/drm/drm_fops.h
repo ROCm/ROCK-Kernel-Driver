@@ -51,7 +51,7 @@
  */
 int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 {
-	int	     minor = minor(inode->i_rdev);
+	int	     minor = iminor(inode);
 	drm_file_t   *priv;
 
 	if (filp->f_flags & O_EXCL)   return -EBUSY; /* No exclusive opens */

@@ -1050,14 +1050,14 @@ detect_isa_irq (volatile ucchar *address)
     udelay(5000L);
 
     /* Enable the Tx interrupts on the CD1400 */
-    save_flags(flags); cli();
+    local_irq_save(flags);
 	cy_writeb((u_long)address + (CyCAR<<index), 0);
 	cyy_issue_cmd(address, CyCHAN_CTL|CyENB_XMTR, index);
 
 	cy_writeb((u_long)address + (CyCAR<<index), 0);
 	cy_writeb((u_long)address + (CySRER<<index), 
 		cy_readb(address + (CySRER<<index)) | CyTxRdy);
-    restore_flags(flags);
+    local_irq_restore(flags);
 
     /* Wait ... */
     udelay(5000L);
@@ -5665,7 +5665,7 @@ void
 cy_cleanup_module(void)
 {
     int i;
-    int e1;
+    int e1, e2;
     unsigned long flags;
 
 #ifndef CONFIG_CYZ_INTR
@@ -5675,13 +5675,10 @@ cy_cleanup_module(void)
     }
 #endif /* CONFIG_CYZ_INTR */
 
-    save_flags(flags); cli();
-
     if ((e1 = tty_unregister_driver(cy_serial_driver)))
             printk("cyc: failed to unregister Cyclades serial driver(%d)\n",
 		e1);
 
-    restore_flags(flags);
     put_tty_driver(cy_serial_driver);
 
     for (i = 0; i < NR_CARDS; i++) {

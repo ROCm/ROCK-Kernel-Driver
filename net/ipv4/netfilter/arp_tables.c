@@ -25,6 +25,10 @@
 
 #include <linux/netfilter_arp/arp_tables.h>
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("David S. Miller <davem@redhat.com>");
+MODULE_DESCRIPTION("arptables core");
+
 /*#define DEBUG_ARP_TABLES*/
 /*#define DEBUG_ARP_TABLES_USER*/
 
@@ -1324,4 +1328,3 @@ EXPORT_SYMBOL(arpt_unregister_target);
 
 module_init(init);
 module_exit(fini);
-MODULE_LICENSE("GPL");

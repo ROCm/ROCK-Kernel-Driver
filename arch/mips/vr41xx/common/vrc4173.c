@@ -250,10 +250,10 @@ static int __devinit vrc4173_probe(struct pci_dev *pdev,
 }
 
 static struct pci_driver vrc4173_driver = {
-	name:		"NEC VRC4173",
-	probe:		vrc4173_probe,
-	remove:		NULL,
-	id_table:	vrc4173_table,
+	.name		= "NEC VRC4173",
+	.probe		= vrc4173_probe,
+	.remove		= NULL,
+	.id_table	= vrc4173_table,
 };
 
 static int __devinit vrc4173_init(void)

@@ -123,6 +123,11 @@
 #define USE_IO_OPS 1
 #endif
 
+/* use a 16K rx ring buffer instead of the default 32K */
+#ifdef CONFIG_SH_DREAMCAST
+#define USE_BUF16K 1
+#endif
+
 /* define to 1 to enable copious debugging info */
 #undef RTL8139_DEBUG
 
@@ -165,7 +170,11 @@ static int multicast_filter_limit = 32;
 static int debug = -1;
 
 /* Size of the in-memory receive ring. */
+#ifdef USE_BUF16K
+#define RX_BUF_LEN_IDX	1	/* 0==8K, 1==16K, 2==32K, 3==64K */
+#else
 #define RX_BUF_LEN_IDX	2	/* 0==8K, 1==16K, 2==32K, 3==64K */
+#endif
 #define RX_BUF_LEN	(8192 << RX_BUF_LEN_IDX)
 #define RX_BUF_PAD	16
 #define RX_BUF_WRAP_PAD 2048 /* spare padding to handle lack of packet wrap */
@@ -212,18 +221,7 @@ enum {
 
 typedef enum {
 	RTL8139 = 0,
-	RTL8139_CB,
-	SMC1211TX,
-	/*MPX5030,*/
-	DELTA8139,
-	ADDTRON8139,
-	DFE538TX,
-	DFE690TXD,
-	FE2000VX,
-	ALLIED8139,
 	RTL8129,
-	FNW3603TX,
-	FNW3800TX,
 } board_t;
 
 
@@ -232,36 +230,29 @@ static struct {
 	const char *name;
 	u32 hw_flags;
 } board_info[] __devinitdata = {
-	{ "RealTek RTL8139 Fast Ethernet", RTL8139_CAPS },
-	{ "RealTek RTL8139B PCI/CardBus", RTL8139_CAPS },
-	{ "SMC1211TX EZCard 10/100 (RealTek RTL8139)", RTL8139_CAPS },
-/*	{ MPX5030, "Accton MPX5030 (RealTek RTL8139)", RTL8139_CAPS },*/
-	{ "Delta Electronics 8139 10/100BaseTX", RTL8139_CAPS },
-	{ "Addtron Technolgy 8139 10/100BaseTX", RTL8139_CAPS },
-	{ "D-Link DFE-538TX (RealTek RTL8139)", RTL8139_CAPS },
-	{ "D-Link DFE-690TXD (RealTek RTL8139)", RTL8139_CAPS },
-	{ "AboCom FE2000VX (RealTek RTL8139)", RTL8139_CAPS },
-	{ "Allied Telesyn 8139 CardBus", RTL8139_CAPS },
+	{ "RealTek RTL8139", RTL8139_CAPS },
 	{ "RealTek RTL8129", RTL8129_CAPS },
-	{ "Planex FNW-3603-TX 10/100 CardBus", RTL8139_CAPS },
-	{ "Planex FNW-3800-TX 10/100 CardBus", RTL8139_CAPS },
 };
 
 
 static struct pci_device_id rtl8139_pci_tbl[] = {
 	{0x10ec, 0x8139, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139 },
-	{0x10ec, 0x8138, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139_CB },
-	{0x1113, 0x1211, PCI_ANY_ID, PCI_ANY_ID, 0, 0, SMC1211TX },
-/*	{0x1113, 0x1211, PCI_ANY_ID, PCI_ANY_ID, 0, 0, MPX5030 },*/
-	{0x1500, 0x1360, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DELTA8139 },
-	{0x4033, 0x1360, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ADDTRON8139 },
-	{0x1186, 0x1300, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DFE538TX },
-	{0x1186, 0x1340, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DFE690TXD },
-	{0x13d1, 0xab06, PCI_ANY_ID, PCI_ANY_ID, 0, 0, FE2000VX },
-	{0x1259, 0xa117, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ALLIED8139 },
-	{0x14ea, 0xab06, PCI_ANY_ID, PCI_ANY_ID, 0, 0, FNW3603TX },
-	{0x14ea, 0xab07, PCI_ANY_ID, PCI_ANY_ID, 0, 0, FNW3800TX },
+	{0x10ec, 0x8138, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139 },
+	{0x1113, 0x1211, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139 },
+	{0x1500, 0x1360, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139 },
+	{0x4033, 0x1360, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139 },
+	{0x1186, 0x1300, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139 },
+	{0x1186, 0x1340, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139 },
+	{0x13d1, 0xab06, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139 },
+	{0x1259, 0xa117, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139 },
+	{0x14ea, 0xab06, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139 },
+	{0x14ea, 0xab07, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139 },
+	{0x11db, 0x1234, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139 },
 
+#ifdef CONFIG_SH_SECUREEDGE5410
+	/* Bogus 8139 silicon reports 8129 without external PROM :-( */
+	{0x10ec, 0x8129, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139 },
+#endif
 #ifdef CONFIG_8139TOO_8129
 	{0x10ec, 0x8129, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8129 },
 #endif
@@ -271,8 +262,8 @@ static struct pci_device_id rtl8139_pci_tbl[] = {
 	 * so we simply don't match on the main vendor id.
 	 */
 	{PCI_ANY_ID, 0x8139, 0x10ec, 0x8139, 0, 0, RTL8139 },
-	{PCI_ANY_ID, 0x8139, 0x1186, 0x1300, 0, 0, DFE538TX },
-	{PCI_ANY_ID, 0x8139, 0x13d1, 0xab06, 0, 0, FE2000VX },
+	{PCI_ANY_ID, 0x8139, 0x1186, 0x1300, 0, 0, RTL8139 },
+	{PCI_ANY_ID, 0x8139, 0x13d1, 0xab06, 0, 0, RTL8139 },
 
 	{0,}
 };
@@ -302,7 +293,6 @@ enum RTL8139_registers {
 	IntrMask = 0x3C,
 	IntrStatus = 0x3E,
 	TxConfig = 0x40,
-	ChipVersion = 0x43,
 	RxConfig = 0x44,
 	Timer = 0x48,		/* A general-purpose counter. */
 	RxMissed = 0x4C,	/* 24 bits valid, write clears. */
@@ -461,7 +451,6 @@ enum RxConfigBits {
 	RxNoWrap = (1 << 7),
 };
 
-
 /* Twister tuning parameters from RealTek.
    Completely undocumented, but required to tune bad links on some boards. */
 enum CSCRBits {
@@ -472,36 +461,22 @@ enum CSCRBits {
 	CSCR_LinkDownCmd = 0x0f3c0,
 };
 
-
 enum Cfg9346Bits {
 	Cfg9346_Lock = 0x00,
 	Cfg9346_Unlock = 0xC0,
 };
 
-#ifdef CONFIG_8139TOO_TUNE_TWISTER
-
-enum TwisterParamVals {
-	PARA78_default	= 0x78fa8388,
-	PARA7c_default	= 0xcb38de43,	/* param[0][3] */
-	PARA7c_xxx	= 0xcb38de43,
-};
-
-static const unsigned long param[4][4] = {
-	{0xcb39de43, 0xcb39ce43, 0xfb38de03, 0xcb38de43},
-	{0xcb39de43, 0xcb39ce43, 0xcb39ce83, 0xcb39ce83},
-	{0xcb39de43, 0xcb39ce43, 0xcb39ce83, 0xcb39ce83},
-	{0xbb39de43, 0xbb39ce43, 0xbb39ce83, 0xbb39ce83}
-};
-
-#endif /* CONFIG_8139TOO_TUNE_TWISTER */
-
 typedef enum {
 	CH_8139 = 0,
 	CH_8139_K,
 	CH_8139A,
+	CH_8139A_G,
 	CH_8139B,
 	CH_8130,
 	CH_8139C,
+	CH_8100,
+	CH_8100B_8139D,
+	CH_8101,
 } chip_t;
 
 enum chip_flags {
@@ -509,50 +484,65 @@ enum chip_flags {
 	HasLWake = (1 << 1),
 };
 
+#define HW_REVID(b30, b29, b28, b27, b26, b23, b22) \
+	(b30<<30 | b29<<29 | b28<<28 | b27<<27 | b26<<26 | b23<<23 | b22<<22)
+#define HW_REVID_MASK	HW_REVID(1, 1, 1, 1, 1, 1, 1)
 
 /* directly indexed by chip_t, above */
 const static struct {
 	const char *name;
-	u8 version; /* from RTL8139C docs */
-	u32 RxConfigMask; /* should clear the bits supported by this chip */
+	u32 version; /* from RTL8139C/RTL8139D docs */
 	u32 flags;
 } rtl_chip_info[] = {
 	{ "RTL-8139",
-	  0x40,
-	  0xf0fe0040, /* XXX copied from RTL8139A, verify */
+	  HW_REVID(1, 0, 0, 0, 0, 0, 0),
 	  HasHltClk,
 	},
 
 	{ "RTL-8139 rev K",
-	  0x60,
-	  0xf0fe0040,
+	  HW_REVID(1, 1, 0, 0, 0, 0, 0),
 	  HasHltClk,
 	},
 
 	{ "RTL-8139A",
-	  0x70,
-	  0xf0fe0040,
+	  HW_REVID(1, 1, 1, 0, 0, 0, 0),
+	  HasHltClk, /* XXX undocumented? */
+	},
+
+	{ "RTL-8139A rev G",
+	  HW_REVID(1, 1, 1, 0, 0, 1, 0),
 	  HasHltClk, /* XXX undocumented? */
 	},
 
 	{ "RTL-8139B",
-	  0x78,
-	  0xf0fc0040,
+	  HW_REVID(1, 1, 1, 1, 0, 0, 0),
 	  HasLWake,
 	},
 
 	{ "RTL-8130",
-	  0x7C,
-	  0xf0fe0040, /* XXX copied from RTL8139A, verify */
+	  HW_REVID(1, 1, 1, 1, 1, 0, 0),
 	  HasLWake,
 	},
 
 	{ "RTL-8139C",
-	  0x74,
-	  0xf0fc0040, /* XXX copied from RTL8139B, verify */
+	  HW_REVID(1, 1, 1, 0, 1, 0, 0),
 	  HasLWake,
 	},
 
+	{ "RTL-8100",
+	  HW_REVID(1, 1, 1, 1, 0, 1, 0),
+ 	  HasLWake,
+ 	},
+
+	{ "RTL-8100B/8139D",
+	  HW_REVID(1, 1, 1, 0, 1, 0, 1),
+	  HasLWake,
+	},
+
+	{ "RTL-8101",
+	  HW_REVID(1, 1, 1, 0, 1, 1, 1),
+	  HasLWake,
+	},
 };
 
 struct rtl_extra_stats {
@@ -612,7 +602,7 @@ static int rtl8139_open (struct net_device *dev);
 static int mdio_read (struct net_device *dev, int phy_id, int location);
 static void mdio_write (struct net_device *dev, int phy_id, int location,
 			int val);
-static int rtl8139_thread (void *data);
+static inline void rtl8139_start_thread(struct net_device *dev);
 static void rtl8139_tx_timeout (struct net_device *dev);
 static void rtl8139_init_ring (struct net_device *dev);
 static int rtl8139_start_xmit (struct sk_buff *skb,
@@ -625,6 +615,7 @@ static struct net_device_stats *rtl8139_get_stats (struct net_device *dev);
 static void rtl8139_set_rx_mode (struct net_device *dev);
 static void __set_rx_mode (struct net_device *dev);
 static void rtl8139_hw_start (struct net_device *dev);
+static struct ethtool_ops rtl8139_ethtool_ops;
 
 #ifdef USE_IO_OPS
 
@@ -688,10 +679,17 @@ static const u16 rtl8139_intr_mask =
 	PCIErr | PCSTimeout | RxUnderrun | RxOverflow | RxFIFOOver |
 	TxErr | TxOK | RxErr | RxOK;
 
+#ifdef USE_BUF16K 
+static const unsigned int rtl8139_rx_config =
+	RxCfgRcv16K | RxNoWrap |
+	(RX_FIFO_THRESH << RxCfgFIFOShift) |
+	(RX_DMA_BURST << RxCfgDMAShift);
+#else
 static const unsigned int rtl8139_rx_config =
 	RxCfgRcv32K | RxNoWrap |
 	(RX_FIFO_THRESH << RxCfgFIFOShift) |
 	(RX_DMA_BURST << RxCfgDMAShift);
+#endif
 
 static const unsigned int rtl8139_tx_config =
 	(TX_DMA_BURST << TxDMAShift) | (TX_RETRY << TxRetryShift);
@@ -715,13 +713,6 @@ static void __rtl8139_cleanup_dev (struct net_device *dev)
 
 	/* it's ok to call this even if we have no regions to free */
 	pci_release_regions (pdev);
-
-#ifndef RTL8139_NDEBUG
-	/* poison memory before freeing */
-	memset (dev, 0xBC,
-		sizeof (struct net_device) +
-		sizeof (struct rtl8139_private));
-#endif /* RTL8139_NDEBUG */
 
 	free_netdev(dev);
 
@@ -757,7 +748,7 @@ static int __devinit rtl8139_init_board (struct pci_dev *pdev,
 	unsigned int i;
 	u32 pio_start, pio_end, pio_flags, pio_len;
 	unsigned long mmio_start, mmio_end, mmio_flags, mmio_len;
-	u32 tmp;
+	u32 version;
 
 	assert (pdev != NULL);
 
@@ -859,9 +850,9 @@ static int __devinit rtl8139_init_board (struct pci_dev *pdev,
 	}
 
 	/* identify chip attached to board */
-	tmp = RTL_R8 (ChipVersion);
+	version = RTL_R32 (TxConfig) & HW_REVID_MASK;
 	for (i = 0; i < ARRAY_SIZE (rtl_chip_info); i++)
-		if (tmp == rtl_chip_info[i].version) {
+		if (version == rtl_chip_info[i].version) {
 			tp->chipset = i;
 			goto match;
 		}
@@ -892,8 +883,11 @@ match:
 		}
 		if (rtl_chip_info[tp->chipset].flags & HasLWake) {
 			tmp8 = RTL_R8 (Config4);
-			if (tmp8 & LWPTN)
+			if (tmp8 & LWPTN) {
+				RTL_W8 (Cfg9346, Cfg9346_Unlock);
 				RTL_W8 (Config4, tmp8 & ~LWPTN);
+				RTL_W8 (Cfg9346, Cfg9346_Lock);
+			}
 		}
 	} else {
 		DPRINTK("Old chip wakeup\n");
@@ -971,6 +965,7 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 	dev->get_stats = rtl8139_get_stats;
 	dev->set_multicast_list = rtl8139_set_rx_mode;
 	dev->do_ioctl = netdev_ioctl;
+	dev->ethtool_ops = &rtl8139_ethtool_ops;
 	dev->tx_timeout = rtl8139_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 
@@ -1318,8 +1313,6 @@ static int rtl8139_open (struct net_device *dev)
 
 	tp->mii.full_duplex = tp->mii.force_media;
 	tp->tx_flag = (TX_FIFO_THRESH << 11) & 0x003f0000;
-	tp->twistie = (tp->chipset == CH_8139_K) ? 1 : 0;
-	tp->time_to_die = 0;
 
 	rtl8139_init_ring (dev);
 	rtl8139_hw_start (dev);
@@ -1330,32 +1323,18 @@ static int rtl8139_open (struct net_device *dev)
 			dev->irq, RTL_R8 (MediaStatus),
 			tp->mii.full_duplex ? "full" : "half");
 
-	tp->thr_pid = kernel_thread (rtl8139_thread, dev, CLONE_FS | CLONE_FILES);
-	if (tp->thr_pid < 0)
-		printk (KERN_WARNING "%s: unable to start kernel thread\n",
-			dev->name);
+	rtl8139_start_thread(dev);
 
 	return 0;
 }
 
 
-static void rtl_check_media (struct net_device *dev)
+static void rtl_check_media (struct net_device *dev, unsigned int init_media)
 {
 	struct rtl8139_private *tp = dev->priv;
 
 	if (tp->phys[0] >= 0) {
-		u16 mii_lpa = mdio_read(dev, tp->phys[0], MII_LPA);
-		if (mii_lpa == 0xffff)
-			;					/* Not there */
-		else if ((mii_lpa & LPA_100FULL) == LPA_100FULL
-				 || (mii_lpa & 0x00C0) == LPA_10FULL)
-			tp->mii.full_duplex = 1;
-
-		printk (KERN_INFO"%s: Setting %s%s-duplex based on"
-				" auto-negotiated partner ability %4.4x.\n",
-		        dev->name, mii_lpa == 0 ? "" :
-				(mii_lpa & 0x0180) ? "100mbps " : "10mbps ",
-			tp->mii.full_duplex ? "full" : "half", mii_lpa);
+		mii_check_media(&tp->mii, 1, init_media);
 	}
 }
 
@@ -1390,7 +1369,7 @@ static void rtl8139_hw_start (struct net_device *dev)
 
 	tp->cur_rx = 0;
 
-	rtl_check_media (dev);
+	rtl_check_media (dev, 1);
 
 	if (tp->chipset >= CH_8139B) {
 		/* Disable magic packet scanning, which is enabled
@@ -1452,6 +1431,19 @@ static int next_tick = 3 * HZ;
 static inline void rtl8139_tune_twister (struct net_device *dev,
 				  struct rtl8139_private *tp) {}
 #else
+enum TwisterParamVals {
+	PARA78_default	= 0x78fa8388,
+	PARA7c_default	= 0xcb38de43,	/* param[0][3] */
+	PARA7c_xxx	= 0xcb38de43,
+};
+
+static const unsigned long param[4][4] = {
+	{0xcb39de43, 0xcb39ce43, 0xfb38de03, 0xcb38de43},
+	{0xcb39de43, 0xcb39ce43, 0xcb39ce83, 0xcb39ce83},
+	{0xcb39de43, 0xcb39ce43, 0xcb39ce83, 0xcb39ce83},
+	{0xbb39de43, 0xbb39ce43, 0xbb39ce83, 0xbb39ce83}
+};
+
 static void rtl8139_tune_twister (struct net_device *dev,
 				  struct rtl8139_private *tp)
 {
@@ -1538,7 +1530,6 @@ static void rtl8139_tune_twister (struct net_device *dev,
 }
 #endif /* CONFIG_8139TOO_TUNE_TWISTER */
 
-
 static inline void rtl8139_thread_iter (struct net_device *dev,
 				 struct rtl8139_private *tp,
 				 void *ioaddr)
@@ -1585,7 +1576,6 @@ static inline void rtl8139_thread_iter (struct net_device *dev,
 		 RTL_R8 (Config1));
 }
 
-
 static int rtl8139_thread (void *data)
 {
 	struct net_device *dev = data;
@@ -1619,6 +1609,24 @@ static int rtl8139_thread (void *data)
 	complete_and_exit (&tp->thr_exited, 0);
 }
 
+static inline void rtl8139_start_thread(struct net_device *dev)
+{
+	struct rtl8139_private *tp = dev->priv;
+
+	tp->thr_pid = -1;
+	tp->twistie = 0;
+	tp->time_to_die = 0;
+	if (tp->chipset == CH_8139_K)
+		tp->twistie = 1;
+	else if (tp->drv_flags & HAS_LNK_CHNG)
+		return;
+
+	tp->thr_pid = kernel_thread(rtl8139_thread, dev, CLONE_FS|CLONE_FILES);
+	if (tp->thr_pid < 0) {
+		printk (KERN_WARNING "%s: unable to start kernel thread\n",
+			dev->name);
+	}
+}
 
 static void rtl8139_tx_clear (struct rtl8139_private *tp)
 {
@@ -1999,18 +2007,7 @@ static void rtl8139_weird_interrupt (struct net_device *dev,
 
 	if ((status & RxUnderrun) && link_changed &&
 	    (tp->drv_flags & HAS_LNK_CHNG)) {
-		/* Really link-change on new chips. */
-		int lpar = RTL_R16 (NWayLPAR);
-		int duplex = (lpar & LPA_100FULL) || (lpar & 0x01C0) == 0x0040
-				|| tp->mii.force_media;
-		if (tp->mii.full_duplex != duplex) {
-			tp->mii.full_duplex = duplex;
-#if 0
-			RTL_W8 (Cfg9346, Cfg9346_Unlock);
-			RTL_W8 (Config1, tp->mii.full_duplex ? 0x60 : 0x20);
-			RTL_W8 (Cfg9346, Cfg9346_Lock);
-#endif
-		}
+		rtl_check_media(dev, 0);
 		status &= ~RxUnderrun;
 	}
 
@@ -2173,11 +2170,12 @@ static int rtl8139_close (struct net_device *dev)
 /* Get the ethtool Wake-on-LAN settings.  Assumes that wol points to
    kernel memory, *wol has been initialized as {ETHTOOL_GWOL}, and
    other threads or interrupts aren't messing with the 8139.  */
-static void netdev_get_wol (struct net_device *dev, struct ethtool_wolinfo *wol)
+static void rtl8139_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 {
 	struct rtl8139_private *np = dev->priv;
 	void *ioaddr = np->mmio_addr;
 
+	spin_lock_irq(&np->lock);
 	if (rtl_chip_info[np->chipset].flags & HasLWake) {
 		u8 cfg3 = RTL_R8 (Config3);
 		u8 cfg5 = RTL_R8 (Config5);
@@ -2199,14 +2197,14 @@ static void netdev_get_wol (struct net_device *dev, struct ethtool_wolinfo *wol)
 		if (cfg5 & Cfg5_BWF)
 			wol->wolopts |= WAKE_BCAST;
 	}
+	spin_unlock_irq(&np->lock);
 }
 
 
 /* Set the ethtool Wake-on-LAN settings.  Return 0 or -errno.  Assumes
    that wol points to kernel memory and other threads or interrupts
    aren't messing with the 8139.  */
-static int netdev_set_wol (struct net_device *dev,
-			   const struct ethtool_wolinfo *wol)
+static int rtl8139_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 {
 	struct rtl8139_private *np = dev->priv;
 	void *ioaddr = np->mmio_addr;
@@ -2220,6 +2218,7 @@ static int netdev_set_wol (struct net_device *dev,
 	if (wol->wolopts & ~support)
 		return -EINVAL;
 
+	spin_lock_irq(&np->lock);
 	cfg3 = RTL_R8 (Config3) & ~(Cfg3_LinkUp | Cfg3_Magic);
 	if (wol->wolopts & WAKE_PHY)
 		cfg3 |= Cfg3_LinkUp;
@@ -2240,213 +2239,120 @@ static int netdev_set_wol (struct net_device *dev,
 	if (wol->wolopts & WAKE_BCAST)
 		cfg5 |= Cfg5_BWF;
 	RTL_W8 (Config5, cfg5);	/* need not unlock via Cfg9346 */
+	spin_unlock_irq(&np->lock);
 
 	return 0;
 }
 
-static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
+static void rtl8139_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
 	struct rtl8139_private *np = dev->priv;
-	u32 ethcmd;
-
-	/* dev_ioctl() in ../../net/core/dev.c has already checked
-	   capable(CAP_NET_ADMIN), so don't bother with that here.  */
-
-	if (get_user(ethcmd, (u32 *)useraddr))
-		return -EFAULT;
-
-	switch (ethcmd) {
-
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-		strcpy (info.driver, DRV_NAME);
-		strcpy (info.version, DRV_VERSION);
-		strcpy (info.bus_info, pci_name(np->pci_dev));
-		info.regdump_len = np->regs_len;
-		if (copy_to_user (useraddr, &info, sizeof (info)))
-			return -EFAULT;
-		return 0;
-	}
-
-	/* get settings */
-	case ETHTOOL_GSET: {
-		struct ethtool_cmd ecmd = { ETHTOOL_GSET };
-		spin_lock_irq(&np->lock);
-		mii_ethtool_gset(&np->mii, &ecmd);
-		spin_unlock_irq(&np->lock);
-		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
-			return -EFAULT;
-		return 0;
-	}
-	/* set settings */
-	case ETHTOOL_SSET: {
-		int r;
-		struct ethtool_cmd ecmd;
-		if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
-			return -EFAULT;
-		spin_lock_irq(&np->lock);
-		r = mii_ethtool_sset(&np->mii, &ecmd);
-		spin_unlock_irq(&np->lock);
-		return r;
-	}
-	/* restart autonegotiation */
-	case ETHTOOL_NWAY_RST: {
-		return mii_nway_restart(&np->mii);
-	}
-	/* get link status */
-	case ETHTOOL_GLINK: {
-		struct ethtool_value edata = {ETHTOOL_GLINK};
-		edata.data = mii_link_ok(&np->mii);
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-
-	/* get message-level */
-	case ETHTOOL_GMSGLVL: {
-		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
-		edata.data = debug;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	/* set message-level */
-	case ETHTOOL_SMSGLVL: {
-		struct ethtool_value edata;
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-		debug = edata.data;
-		return 0;
-	}
-
-	case ETHTOOL_GWOL:
-		{
-			struct ethtool_wolinfo wol = { ETHTOOL_GWOL };
-			spin_lock_irq (&np->lock);
-			netdev_get_wol (dev, &wol);
-			spin_unlock_irq (&np->lock);
-			if (copy_to_user (useraddr, &wol, sizeof (wol)))
-				return -EFAULT;
-			return 0;
-		}
-
-	case ETHTOOL_SWOL:
-		{
-			struct ethtool_wolinfo wol;
-			int rc;
-			if (copy_from_user (&wol, useraddr, sizeof (wol)))
-				return -EFAULT;
-			spin_lock_irq (&np->lock);
-			rc = netdev_set_wol (dev, &wol);
-			spin_unlock_irq (&np->lock);
-			return rc;
-		}
-
-/* TODO: we are too slack to do reg dumping for pio, for now */
-#ifndef CONFIG_8139TOO_PIO
-	/* NIC register dump */
-	case ETHTOOL_GREGS: {
-                struct ethtool_regs regs;
-		unsigned int regs_len = np->regs_len;
-                u8 *regbuf = kmalloc(regs_len, GFP_KERNEL);
-                int rc;
-
-		if (!regbuf)
-			return -ENOMEM;
-		memset(regbuf, 0, regs_len);
-
-                rc = copy_from_user(&regs, useraddr, sizeof(regs));
-		if (rc) {
-			rc = -EFAULT;
-			goto err_out_gregs;
-		}
-                
-                if (regs.len > regs_len)
-                        regs.len = regs_len;
-                if (regs.len < regs_len) {
-			rc = -EINVAL;
-			goto err_out_gregs;
-		}
-
-                regs.version = RTL_REGS_VER;
-                rc = copy_to_user(useraddr, &regs, sizeof(regs));
-		if (rc) {
-			rc = -EFAULT;
-			goto err_out_gregs;
-		}
-
-                useraddr += offsetof(struct ethtool_regs, data);
-
-                spin_lock_irq(&np->lock);
-                memcpy_fromio(regbuf, np->mmio_addr, regs_len);
-                spin_unlock_irq(&np->lock);
-
-                if (copy_to_user(useraddr, regbuf, regs_len))
-                        rc = -EFAULT;
-
-err_out_gregs:
-		kfree(regbuf);
-		return rc;
-	}
-#endif /* CONFIG_8139TOO_PIO */
-
-	/* get string list(s) */
-	case ETHTOOL_GSTRINGS: {
-		struct ethtool_gstrings estr = { ETHTOOL_GSTRINGS };
-
-		if (copy_from_user(&estr, useraddr, sizeof(estr)))
-			return -EFAULT;
-		if (estr.string_set != ETH_SS_STATS)
-			return -EINVAL;
-
-		estr.len = RTL_NUM_STATS;
-		if (copy_to_user(useraddr, &estr, sizeof(estr)))
-			return -EFAULT;
-		if (copy_to_user(useraddr + sizeof(estr),
-				 &ethtool_stats_keys,
-				 sizeof(ethtool_stats_keys)))
-			return -EFAULT;
-		return 0;
-	}
-
-	/* get NIC-specific statistics */
-	case ETHTOOL_GSTATS: {
-		struct ethtool_stats estats = { ETHTOOL_GSTATS };
-		u64 *tmp_stats;
-		const unsigned int sz = sizeof(u64) * RTL_NUM_STATS;
-		int i;
-
-		estats.n_stats = RTL_NUM_STATS;
-		if (copy_to_user(useraddr, &estats, sizeof(estats)))
-			return -EFAULT;
-
-		tmp_stats = kmalloc(sz, GFP_KERNEL);
-		if (!tmp_stats)
-			return -ENOMEM;
-		memset(tmp_stats, 0, sz);
-
-		i = 0;
-		tmp_stats[i++] = np->xstats.early_rx;
-		tmp_stats[i++] = np->xstats.tx_buf_mapped;
-		tmp_stats[i++] = np->xstats.tx_timeouts;
-		tmp_stats[i++] = np->xstats.rx_lost_in_ring;
-		if (i != RTL_NUM_STATS)
-			BUG();
-
-		i = copy_to_user(useraddr + sizeof(estats), tmp_stats, sz);
-		kfree(tmp_stats);
-
-		if (i)
-			return -EFAULT;
-		return 0;
-	}
-	default:
-		break;
-	}
-
-	return -EOPNOTSUPP;
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	strcpy(info->bus_info, pci_name(np->pci_dev));
+	info->regdump_len = np->regs_len;
 }
 
+static int rtl8139_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct rtl8139_private *np = dev->priv;
+	spin_lock_irq(&np->lock);
+	mii_ethtool_gset(&np->mii, cmd);
+	spin_unlock_irq(&np->lock);
+	return 0;
+}
+
+static int rtl8139_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct rtl8139_private *np = dev->priv;
+	int rc;
+	spin_lock_irq(&np->lock);
+	rc = mii_ethtool_sset(&np->mii, cmd);
+	spin_unlock_irq(&np->lock);
+	return rc;
+}
+
+static int rtl8139_nway_reset(struct net_device *dev)
+{
+	struct rtl8139_private *np = dev->priv;
+	return mii_nway_restart(&np->mii);
+}
+
+static u32 rtl8139_get_link(struct net_device *dev)
+{
+	struct rtl8139_private *np = dev->priv;
+	return mii_link_ok(&np->mii);
+}
+
+static u32 rtl8139_get_msglevel(struct net_device *dev)
+{
+	return debug;
+}
+
+static void rtl8139_set_msglevel(struct net_device *dev, u32 datum)
+{
+	debug = datum;
+}
+
+/* TODO: we are too slack to do reg dumping for pio, for now */
+#ifdef CONFIG_8139TOO_PIO
+#define rtl8139_get_regs_len	NULL
+#define rtl8139_get_regs	NULL
+#else
+static int rtl8139_get_regs_len(struct net_device *dev)
+{
+	struct rtl8139_private *np = dev->priv;
+	return np->regs_len;
+}
+
+static void rtl8139_get_regs(struct net_device *dev, struct ethtool_regs *regs, void *regbuf)
+{
+	struct rtl8139_private *np = dev->priv;
+
+	regs->version = RTL_REGS_VER;
+
+	spin_lock_irq(&np->lock);
+	memcpy_fromio(regbuf, np->mmio_addr, regs->len);
+	spin_unlock_irq(&np->lock);
+}
+#endif /* CONFIG_8139TOO_MMIO */
+
+static int rtl8139_get_stats_count(struct net_device *dev)
+{
+	return RTL_NUM_STATS;
+}
+
+static void rtl8139_get_ethtool_stats(struct net_device *dev, struct ethtool_stats *stats, u64 *data)
+{
+	struct rtl8139_private *np = dev->priv;
+
+	data[0] = np->xstats.early_rx;
+	data[1] = np->xstats.tx_buf_mapped;
+	data[2] = np->xstats.tx_timeouts;
+	data[3] = np->xstats.rx_lost_in_ring;
+}
+
+static void rtl8139_get_strings(struct net_device *dev, u32 stringset, u8 *data)
+{
+	memcpy(data, ethtool_stats_keys, sizeof(ethtool_stats_keys));
+}
+
+static struct ethtool_ops rtl8139_ethtool_ops = {
+	.get_drvinfo		= rtl8139_get_drvinfo,
+	.get_settings		= rtl8139_get_settings,
+	.set_settings		= rtl8139_set_settings,
+	.get_regs_len		= rtl8139_get_regs_len,
+	.get_regs		= rtl8139_get_regs,
+	.nway_reset		= rtl8139_nway_reset,
+	.get_link		= rtl8139_get_link,
+	.get_msglevel		= rtl8139_get_msglevel,
+	.set_msglevel		= rtl8139_set_msglevel,
+	.get_wol		= rtl8139_get_wol,
+	.set_wol		= rtl8139_set_wol,
+	.get_strings		= rtl8139_get_strings,
+	.get_stats_count	= rtl8139_get_stats_count,
+	.get_ethtool_stats	= rtl8139_get_ethtool_stats,
+};
 
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
@@ -2457,14 +2363,9 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	if (!netif_running(dev))
 		return -EINVAL;
 
-	if (cmd == SIOCETHTOOL)
-		rc = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
-
-	else {
-		spin_lock_irq(&np->lock);
-		rc = generic_mii_ioctl(&np->mii, data, cmd, NULL);
-		spin_unlock_irq(&np->lock);
-	}
+	spin_lock_irq(&np->lock);
+	rc = generic_mii_ioctl(&np->mii, data, cmd, NULL);
+	spin_unlock_irq(&np->lock);
 
 	return rc;
 }

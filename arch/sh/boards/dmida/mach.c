@@ -30,42 +30,42 @@
  */
 
 struct sh_machine_vector mv_dmida __initmv = {
-	mv_name:		"DMIDA",
+	.mv_name		= "DMIDA",
 
-	mv_nr_irqs:		HD64465_IRQ_BASE+HD64465_IRQ_NUM,
+	.mv_nr_irqs		= HD64465_IRQ_BASE+HD64465_IRQ_NUM,
 
-	mv_inb:			hd64465_inb,
-	mv_inw:			hd64465_inw,
-	mv_inl:			hd64465_inl,
-	mv_outb:		hd64465_outb,
-	mv_outw:		hd64465_outw,
-	mv_outl:		hd64465_outl,
+	.mv_inb			= hd64465_inb,
+	.mv_inw			= hd64465_inw,
+	.mv_inl			= hd64465_inl,
+	.mv_outb		= hd64465_outb,
+	.mv_outw		= hd64465_outw,
+	.mv_outl		= hd64465_outl,
 
-	mv_inb_p:		hd64465_inb_p,
-	mv_inw_p:		hd64465_inw,
-	mv_inl_p:		hd64465_inl,
-	mv_outb_p:		hd64465_outb_p,
-	mv_outw_p:		hd64465_outw,
-	mv_outl_p:		hd64465_outl,
+	.mv_inb_p		= hd64465_inb_p,
+	.mv_inw_p		= hd64465_inw,
+	.mv_inl_p		= hd64465_inl,
+	.mv_outb_p		= hd64465_outb_p,
+	.mv_outw_p		= hd64465_outw,
+	.mv_outl_p		= hd64465_outl,
 
-	mv_insb:		hd64465_insb,
-	mv_insw:		hd64465_insw,
-	mv_insl:		hd64465_insl,
-	mv_outsb:		hd64465_outsb,
-	mv_outsw:		hd64465_outsw,
-	mv_outsl:		hd64465_outsl,
+	.mv_insb		= hd64465_insb,
+	.mv_insw		= hd64465_insw,
+	.mv_insl		= hd64465_insl,
+	.mv_outsb		= hd64465_outsb,
+	.mv_outsw		= hd64465_outsw,
+	.mv_outsl		= hd64465_outsl,
 
-	mv_readb:		generic_readb,
-	mv_readw:		generic_readw,
-	mv_readl:		generic_readl,
-	mv_writeb:		generic_writeb,
-	mv_writew:		generic_writew,
-	mv_writel:		generic_writel,
+	.mv_readb		= generic_readb,
+	.mv_readw		= generic_readw,
+	.mv_readl		= generic_readl,
+	.mv_writeb		= generic_writeb,
+	.mv_writew		= generic_writew,
+	.mv_writel		= generic_writel,
 
-	mv_irq_demux:		hd64465_irq_demux,
+	.mv_irq_demux		= hd64465_irq_demux,
 
-	mv_rtc_gettimeofday:	sh_rtc_gettimeofday,
-	mv_rtc_settimeofday:	sh_rtc_settimeofday,
+	.mv_rtc_gettimeofday	= sh_rtc_gettimeofday,
+	.mv_rtc_settimeofday	= sh_rtc_settimeofday,
 };
 ALIAS_MV(dmida)
 

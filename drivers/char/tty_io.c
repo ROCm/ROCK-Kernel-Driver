@@ -177,7 +177,7 @@ char *tty_name(struct tty_struct *tty, char *buf)
 
 EXPORT_SYMBOL(tty_name);
 
-inline int tty_paranoia_check(struct tty_struct *tty, kdev_t device,
+inline int tty_paranoia_check(struct tty_struct *tty, struct inode *inode,
 			      const char *routine)
 {
 #ifdef TTY_PARANOIA_CHECK
@@ -187,11 +187,11 @@ inline int tty_paranoia_check(struct tty_struct *tty, kdev_t device,
 		"Warning: null TTY for (%s) in %s\n";
 
 	if (!tty) {
-		printk(badtty, cdevname(device), routine);
+		printk(badtty, cdevname(inode->i_rdev), routine);
 		return 1;
 	}
 	if (tty->magic != TTY_MAGIC) {
-		printk(badmagic, cdevname(device), routine);
+		printk(badmagic, cdevname(inode->i_rdev), routine);
 		return 1;
 	}
 #endif
@@ -646,7 +646,7 @@ static ssize_t tty_read(struct file * file, char * buf, size_t count,
 
 	tty = (struct tty_struct *)file->private_data;
 	inode = file->f_dentry->d_inode;
-	if (tty_paranoia_check(tty, inode->i_rdev, "tty_read"))
+	if (tty_paranoia_check(tty, inode, "tty_read"))
 		return -EIO;
 	if (!tty || (test_bit(TTY_IO_ERROR, &tty->flags)))
 		return -EIO;
@@ -763,7 +763,7 @@ static ssize_t tty_write(struct file * file, const char * buf, size_t count,
 	}
 
 	tty = (struct tty_struct *)file->private_data;
-	if (tty_paranoia_check(tty, inode->i_rdev, "tty_write"))
+	if (tty_paranoia_check(tty, inode, "tty_write"))
 		return -EIO;
 	if (!tty || !tty->driver->write || (test_bit(TTY_IO_ERROR, &tty->flags)))
 		return -EIO;
@@ -1023,7 +1023,7 @@ static void release_mem(struct tty_struct *tty, int idx)
 		o_tty->magic = 0;
 		o_tty->driver->refcount--;
 		file_list_lock();
-		list_del(&o_tty->tty_files);
+		list_del_init(&o_tty->tty_files);
 		file_list_unlock();
 		free_tty_struct(o_tty);
 	}
@@ -1037,7 +1037,7 @@ static void release_mem(struct tty_struct *tty, int idx)
 	tty->magic = 0;
 	tty->driver->refcount--;
 	file_list_lock();
-	list_del(&tty->tty_files);
+	list_del_init(&tty->tty_files);
 	file_list_unlock();
 	module_put(tty->driver->owner);
 	free_tty_struct(tty);
@@ -1059,7 +1059,7 @@ static void release_dev(struct file * filp)
 	char	buf[64];
 	
 	tty = (struct tty_struct *)filp->private_data;
-	if (tty_paranoia_check(tty, filp->f_dentry->d_inode->i_rdev, "release_dev"))
+	if (tty_paranoia_check(tty, filp->f_dentry->d_inode, "release_dev"))
 		return;
 
 	check_tty_count(tty, "release_dev");
@@ -1439,7 +1439,7 @@ static unsigned int tty_poll(struct file * filp, poll_table * wait)
 	struct tty_struct * tty;
 
 	tty = (struct tty_struct *)filp->private_data;
-	if (tty_paranoia_check(tty, filp->f_dentry->d_inode->i_rdev, "tty_poll"))
+	if (tty_paranoia_check(tty, filp->f_dentry->d_inode, "tty_poll"))
 		return 0;
 
 	if (tty->ldisc.poll)
@@ -1453,7 +1453,7 @@ static int tty_fasync(int fd, struct file * filp, int on)
 	int retval;
 
 	tty = (struct tty_struct *)filp->private_data;
-	if (tty_paranoia_check(tty, filp->f_dentry->d_inode->i_rdev, "tty_fasync"))
+	if (tty_paranoia_check(tty, filp->f_dentry->d_inode, "tty_fasync"))
 		return 0;
 	
 	retval = fasync_helper(fd, filp, on, &tty->fasync);
@@ -1727,7 +1727,7 @@ int tty_ioctl(struct inode * inode, struct file * file,
 	int retval;
 	
 	tty = (struct tty_struct *)file->private_data;
-	if (tty_paranoia_check(tty, inode->i_rdev, "tty_ioctl"))
+	if (tty_paranoia_check(tty, inode, "tty_ioctl"))
 		return -EINVAL;
 
 	real_tty = tty;

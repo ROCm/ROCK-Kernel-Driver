@@ -245,6 +245,7 @@ fail:
 static int rd_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int error;
+	struct block_device *bdev = inode->i_bdev;
 
 	if (cmd != BLKFLSBUF)
 		return -EINVAL;
@@ -253,12 +254,12 @@ static int rd_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 	   it's not like with the other blockdevices where
 	   this ioctl only flushes away the buffer cache. */
 	error = -EBUSY;
-	down(&inode->i_bdev->bd_sem);
-	if (inode->i_bdev->bd_openers <= 2) {
-		truncate_inode_pages(inode->i_mapping, 0);
+	down(&bdev->bd_sem);
+	if (bdev->bd_openers <= 2) {
+		truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
 		error = 0;
 	}
-	up(&inode->i_bdev->bd_sem);
+	up(&bdev->bd_sem);
 	return error;
 }
 
@@ -269,18 +270,18 @@ static struct backing_dev_info rd_backing_dev_info = {
 
 static int rd_open(struct inode * inode, struct file * filp)
 {
-	unsigned unit = minor(inode->i_rdev);
+	unsigned unit = iminor(inode);
 
 	/*
 	 * Immunize device against invalidate_buffers() and prune_icache().
 	 */
 	if (rd_bdev[unit] == NULL) {
 		struct block_device *bdev = inode->i_bdev;
-		atomic_inc(&bdev->bd_count);
+		inode = igrab(bdev->bd_inode);
 		rd_bdev[unit] = bdev;
 		bdev->bd_openers++;
 		bdev->bd_block_size = rd_blocksize;
-		bdev->bd_inode->i_size = get_capacity(rd_disks[unit])<<9;
+		inode->i_size = get_capacity(rd_disks[unit])<<9;
 		inode->i_mapping->a_ops = &ramdisk_aops;
 		inode->i_mapping->backing_dev_info = &rd_backing_dev_info;
 	}

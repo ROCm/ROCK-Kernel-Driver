@@ -375,6 +375,7 @@ again:
 		spin_lock(&dentry->d_lock);
 		if (atomic_read(&dentry->d_count) > 1 ||
 		    permission(inode, MAY_WRITE, NULL) ||
+		    !S_ISREG(inode->i_mode) ||
 		    get_write_access(inode)) {
 			spin_unlock(&dentry->d_lock);
 			d_rehash(dentry);

@@ -234,8 +234,8 @@ config IA64_NODESIZE_256GB
 endchoice
 
 config DISCONTIGMEM
-	bool "Discontiguous memory support" if (IA64_DIG && NUMA)
-	default y if IA64_SGI_SN2 || IA64_GENERIC
+	bool "Discontiguous memory support" if (IA64_DIG || IA64_SGI_SN2 || IA64_GENERIC) && NUMA
+	default y if (IA64_SGI_SN2 || IA64_GENERIC) && NUMA
 	help
 	  Say Y to support efficient handling of discontiguous physical memory,
 	  for architectures which are either NUMA (Non-Uniform Memory Access)
@@ -296,29 +296,6 @@ config IA64_SGI_SN_SIM
 	help
 	  If you are compiling a kernel that will run under SGI's IA-64
 	  simulator (Medusa) then say Y, otherwise say N.
-
-# On IA-64, we always want an ELF /proc/kcore.
-config KCORE_ELF
-	bool
-	default y
-	---help---
-	  If you enabled support for /proc file system then the file
-	  /proc/kcore will contain the kernel core image. This can be used
-	  in gdb:
-
-	  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
-
-	  You have two choices here: ELF and A.OUT. Selecting ELF will make
-	  /proc/kcore appear in ELF core format as defined by the Executable
-	  and Linking Format specification. Selecting A.OUT will choose the
-	  old "a.out" format which may be necessary for some old versions
-	  of binutils or on some architectures.
-
-	  This is especially useful if you have compiled the kernel with the
-	  "-g" option to preserve debugging information. It is mainly used
-	  for examining kernel data structures on the live kernel so if you
-	  don't understand what this means or are not a kernel hacker, just
-	  leave it at its default value ELF.
 
 config FORCE_MAX_ZONEORDER
 	int

@@ -20,6 +20,7 @@
 
 #include <linux/config.h>
 #include <linux/wait.h>
+#include <linux/stringify.h>
 
 struct poll_table_struct;
 struct inode;
@@ -243,6 +244,8 @@ static struct proto_ops name##_ops = {			\
 };
 #endif
 
+#define MODULE_ALIAS_NETPROTO(proto) \
+	MODULE_ALIAS("net-pf-" __stringify(proto))
 
 #endif /* __KERNEL__ */
 #endif	/* _LINUX_NET_H */

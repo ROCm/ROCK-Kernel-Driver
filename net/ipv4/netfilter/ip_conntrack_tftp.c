@@ -17,7 +17,7 @@
 #include <linux/netfilter_ipv4/ip_conntrack_tftp.h>
 
 MODULE_AUTHOR("Magnus Boden <mb@ozaba.mine.nu>");
-MODULE_DESCRIPTION("Netfilter connection tracking module for tftp");
+MODULE_DESCRIPTION("tftp connection tracking helper");
 MODULE_LICENSE("GPL");
 
 #define MAX_PORTS 8
@@ -44,7 +44,7 @@ static int tftp_help(struct sk_buff *skb,
 
 	if (skb_copy_bits(skb, skb->nh.iph->ihl * 4 + sizeof(struct udphdr),
 			  &tftph, sizeof(tftph)) != 0)
-		return -1;
+		return NF_ACCEPT;
 
 	switch (ntohs(tftph.opcode)) {
 	/* RRQ and WRQ works the same way */

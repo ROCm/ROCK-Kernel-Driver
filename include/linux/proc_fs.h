@@ -182,12 +182,6 @@ static inline void proc_net_remove(const char *name)
 	remove_proc_entry(name,proc_net);
 }
 
-/*
- * fs/proc/kcore.c
- */
-extern void kclist_add(struct kcore_list *, void *, size_t);
-extern struct kcore_list *kclist_del(void *);
-
 #else
 
 #define proc_root_driver NULL
@@ -223,6 +217,9 @@ static inline void proc_tty_unregister_driver(struct tty_driver *driver) {};
 
 extern struct proc_dir_entry proc_root;
 
+#endif /* CONFIG_PROC_FS */
+
+#if !defined(CONFIG_PROC_FS)
 static inline void kclist_add(struct kcore_list *new, void *addr, size_t size)
 {
 }
@@ -230,8 +227,10 @@ static inline struct kcore_list * kclist_del(void *addr)
 {
 	return NULL;
 }
-
-#endif /* CONFIG_PROC_FS */
+#else
+extern void kclist_add(struct kcore_list *, void *, size_t);
+extern struct kcore_list *kclist_del(void *);
+#endif
 
 struct proc_inode {
 	struct task_struct *task;

@@ -14,7 +14,6 @@
  * - responding to security challenges on outbound connections
  */
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/completion.h>

@@ -632,7 +632,7 @@ static void sppp_channel_delete(struct channel_data *chan)
 {
 	sppp_detach(chan->pppdev.dev);
 	unregister_netdev(chan->pppdev.dev);
-	free_netdev(chan->ppp.dev);
+	free_netdev(chan->pppdev.dev);
 }
 
 static int cosa_sppp_open(struct net_device *d)
@@ -961,12 +961,12 @@ static int cosa_open(struct inode *inode, struct file *file)
 	unsigned long flags;
 	int n;
 
-	if ((n=minor(file->f_dentry->d_inode->i_rdev)>>CARD_MINOR_BITS)
+	if ((n=iminor(file->f_dentry->d_inode)>>CARD_MINOR_BITS)
 		>= nr_cards)
 		return -ENODEV;
 	cosa = cosa_cards+n;
 
-	if ((n=minor(file->f_dentry->d_inode->i_rdev)
+	if ((n=iminor(file->f_dentry->d_inode)
 		& ((1<<CARD_MINOR_BITS)-1)) >= cosa->nchannels)
 		return -ENODEV;
 	chan = cosa->chan + n;
@@ -1009,7 +1009,7 @@ static struct fasync_struct *fasync[256] = { NULL, };
 /* To be done ... */
 static int cosa_fasync(struct inode *inode, struct file *file, int on)
 {
-        int port = MINOR(inode->i_rdev);
+        int port = iminor(inode);
         int rv = fasync_helper(inode, file, on, &fasync[port]);
         return rv < 0 ? rv : 0;
 }

@@ -171,7 +171,7 @@ __vxfs_iget(ino_t ino, struct inode *ilistp)
 	return NULL;
 
 fail:
-	printk(KERN_WARNING "vxfs: unable to read inode %ld\n", ino);
+	printk(KERN_WARNING "vxfs: unable to read inode %ld\n", (unsigned long)ino);
 	vxfs_put_page(pp);
 	return NULL;
 }

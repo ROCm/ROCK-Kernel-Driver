@@ -25,7 +25,6 @@
 #define _HOSTS_H
 
 #include <linux/config.h>
-#include <linux/proc_fs.h>
 
 #include <scsi/scsi_host.h>
 

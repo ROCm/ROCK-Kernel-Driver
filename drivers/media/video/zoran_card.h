@@ -40,5 +40,6 @@ extern struct video_device zoran_template;
 extern int zoran_check_jpg_settings(struct zoran *zr,
 				    struct zoran_jpg_settings *settings);
 extern void zoran_open_init_params(struct zoran *zr);
+extern void zoran_vdev_release(struct video_device *vdev);
 
 #endif				/* __ZORAN_CARD_H__ */

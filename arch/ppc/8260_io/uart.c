@@ -2462,7 +2462,7 @@ void kgdb_map_scc(void)
 }
 #endif
 
-static kdev_t serial_console_device(struct console *c)
+static struct tty_driver *serial_console_device(struct console *c, int *index)
 {
 	*index = c->index;
 	return serial_driver;

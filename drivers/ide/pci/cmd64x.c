@@ -25,7 +25,6 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
 #include "cmd64x.h"
 
 #if defined(DISPLAY_CMD64X_TIMINGS) && defined(CONFIG_PROC_FS)
@@ -629,10 +628,7 @@ static unsigned int __init init_chipset_cmd64x (struct pci_dev *dev, const char 
 
 	/* Set a good latency timer and cache line size value. */
 	(void) pci_write_config_byte(dev, PCI_LATENCY_TIMER, 64);
-#ifdef __sparc_v9__
-	(void) pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE, 0x10);
-#endif
-
+	/* FIXME: pci_set_master() to ensure a good latency timer value */
 
 	/* Setup interrupts. */
 	(void) pci_read_config_byte(dev, MRDMODE, &mrdmode);

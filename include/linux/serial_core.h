@@ -67,6 +67,9 @@
 #define PORT_PC9861	45
 #define PORT_PC9801_101	46
 
+/* Macintosh Zilog type numbers */
+#define PORT_MAC_ZILOG	50	/* m68k : not yet implemented */
+#define PORT_PMAC_ZILOG	51
 
 #ifdef __KERNEL__
 

@@ -38,4 +38,8 @@ extern struct timer_opts timer_tsc;
 extern struct timer_opts timer_cyclone;
 #endif
 
+#ifdef CONFIG_HPET_TIMER
+extern struct timer_opts timer_hpet;
+#endif
+
 #endif

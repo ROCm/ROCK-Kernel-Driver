@@ -138,7 +138,7 @@ static ssize_t i2cdev_read (struct file *file, char __user *buf, size_t count,
 		return -ENOMEM;
 
 	pr_debug("i2c-dev.o: i2c-%d reading %d bytes.\n",
-		minor(file->f_dentry->d_inode->i_rdev), count);
+		iminor(file->f_dentry->d_inode), count);
 
 	ret = i2c_master_recv(client,tmp,count);
 	if (ret >= 0)
@@ -166,7 +166,7 @@ static ssize_t i2cdev_write (struct file *file, const char __user *buf, size_t c
 	}
 
 	pr_debug("i2c-dev.o: i2c-%d writing %d bytes.\n",
-		minor(file->f_dentry->d_inode->i_rdev), count);
+		iminor(file->f_dentry->d_inode), count);
 
 	ret = i2c_master_send(client,tmp,count);
 	kfree(tmp);
@@ -186,7 +186,7 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned long funcs;
 
 	dev_dbg(&client->dev, "i2c-%d ioctl, cmd: 0x%x, arg: %lx.\n",
-		minor(inode->i_rdev),cmd, arg);
+		iminor(inode),cmd, arg);
 
 	switch ( cmd ) {
 	case I2C_SLAVE:
@@ -373,7 +373,7 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 
 static int i2cdev_open(struct inode *inode, struct file *file)
 {
-	unsigned int minor = minor(inode->i_rdev);
+	unsigned int minor = iminor(inode);
 	struct i2c_client *client;
 	struct i2c_adapter *adap;
 	struct i2c_dev *i2c_dev;

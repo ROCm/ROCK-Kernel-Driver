@@ -22,7 +22,7 @@ config ISDN_BOOL
 
 
 menu "Old ISDN4Linux"
-	depends on NET && ISDN_BOOL
+	depends on NET && ISDN_BOOL && BROKEN_ON_SMP
 
 config ISDN
 	tristate "Old ISDN4Linux (obsolete)"

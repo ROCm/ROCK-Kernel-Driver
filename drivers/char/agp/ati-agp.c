@@ -1,5 +1,5 @@
 /*
- * ALi AGPGART routines.
+ * ATi AGPGART routines.
  */
 
 #include <linux/types.h>
@@ -212,7 +212,7 @@ static int ati_configure(void)
 
 	/* address to map too */
         /*
-	pci_read_config_dword(agp_bridge.dev, ATI_APBASE, &temp);
+	pci_read_config_dword(agp_bridge.dev, AGP_APBASE, &temp);
 	agp_bridge.gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
 	printk(KERN_INFO "IGP320 gart_bus_addr: %x\n", agp_bridge.gart_bus_addr);
         */
@@ -355,7 +355,7 @@ static int ati_create_gatt_table(void)
 	 * This is a bus address even on the alpha, b/c its
 	 * used to program the agp master not the cpu
 	 */
-	pci_read_config_dword(agp_bridge->dev, ATI_APBASE, &temp);
+	pci_read_config_dword(agp_bridge->dev, AGP_APBASE, &temp);
 	addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
 	agp_bridge->gart_bus_addr = addr;
 

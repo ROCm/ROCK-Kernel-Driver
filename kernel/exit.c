@@ -80,6 +80,8 @@ void release_task(struct task_struct * p)
 	p->parent->cmin_flt += p->min_flt + p->cmin_flt;
 	p->parent->cmaj_flt += p->maj_flt + p->cmaj_flt;
 	p->parent->cnswap += p->nswap + p->cnswap;
+	p->parent->cnvcsw += p->nvcsw + p->cnvcsw;
+	p->parent->cnivcsw += p->nivcsw + p->cnivcsw;
 	sched_exit(p);
 	write_unlock_irq(&tasklist_lock);
 	spin_unlock(&p->proc_lock);

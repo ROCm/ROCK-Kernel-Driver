@@ -161,8 +161,6 @@
 #include <asm/io.h>
 #include <asm/bitops.h>
 
-#include "ide_modes.h"
-
 
 /* default maximum number of failures */
 #define IDE_DEFAULT_MAX_FAILURES 	1
@@ -180,7 +178,9 @@ static int initializing;	/* set while initializing built-in drivers */
 DECLARE_MUTEX(ide_cfg_sem);
 spinlock_t ide_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
+#ifdef CONFIG_BLK_DEV_IDEPCI
 static int ide_scan_direction; /* THIS was formerly 2.2.x pci=reverse */
+#endif
 
 #ifdef CONFIG_IDEDMA_AUTO
 int noautodma = 0;
@@ -190,11 +190,7 @@ int noautodma = 1;
 
 EXPORT_SYMBOL(noautodma);
 
-/*
- * ide_modules keeps track of the available IDE chipset/probe/driver modules.
- */
-ide_module_t *ide_chipsets;
-ide_module_t *ide_probe;
+int (*ide_probe)(void);
 
 /*
  * This is declared extern in ide.h, for access by other IDE modules:
@@ -255,6 +251,8 @@ static void init_hwif_data (unsigned int index)
 	hwif->mwdma_mask = 0x80;	/* disable all mwdma */
 	hwif->swdma_mask = 0x80;	/* disable all swdma */
 
+	sema_init(&hwif->gendev_rel_sem, 0);
+
 	default_hwif_iops(hwif);
 	default_hwif_transport(hwif);
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
@@ -277,6 +275,7 @@ static void init_hwif_data (unsigned int index)
 		drive->driver			= &idedefault_driver;
 		drive->vdma			= 0;
 		INIT_LIST_HEAD(&drive->list);
+		sema_init(&drive->gendev_rel_sem, 0);
 	}
 }
 
@@ -452,7 +451,7 @@ void ide_probe_module (void)
 		(void) request_module("ide-probe-mod");
 #endif /* (CONFIG_KMOD) && (CONFIG_BLK_DEV_IDE_MODULE) */
 	} else {
-		(void) ide_probe->init();
+		(void)ide_probe();
 	}
 }
 
@@ -749,6 +748,7 @@ void ide_unregister (unsigned int index)
 		spin_unlock_irq(&ide_lock);
 		blk_cleanup_queue(drive->queue);
 		device_unregister(&drive->gendev);
+		down(&drive->gendev_rel_sem);
 		spin_lock_irq(&ide_lock);
 		drive->queue = NULL;
 	}
@@ -778,6 +778,7 @@ void ide_unregister (unsigned int index)
 	/* More messed up locking ... */
 	spin_unlock_irq(&ide_lock);
 	device_unregister(&hwif->gendev);
+	down(&hwif->gendev_rel_sem);
 
 	/*
 	 * Remove us from the kernel's knowledge
@@ -1044,21 +1045,6 @@ found:
 }
 
 EXPORT_SYMBOL(ide_register_hw);
-
-/*
- * Compatibility function with existing drivers.  If you want
- * something different, use the function above.
- */
-int ide_register (int arg1, int arg2, int irq)
-{
-	hw_regs_t hw;
-	ide_init_hwif_ports(&hw, (unsigned long) arg1, (unsigned long) arg2, NULL);
-	hw.irq = irq;
-	return ide_register_hw(&hw, NULL);
-}
-
-EXPORT_SYMBOL(ide_register);
-
 
 /*
  *	Locks for IDE setting functionality
@@ -1658,11 +1644,15 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 
 		case HDIO_SCAN_HWIF:
 		{
+			hw_regs_t hw;
 			int args[3];
 			if (!capable(CAP_SYS_RAWIO)) return -EACCES;
 			if (copy_from_user(args, (void *)arg, 3 * sizeof(int)))
 				return -EFAULT;
-			if (ide_register(args[0], args[1], args[2]) == -1)
+			ide_init_hwif_ports(&hw, (unsigned long) args[0],
+					    (unsigned long) args[1], NULL);
+			hw.irq = args[2];
+			if (ide_register_hw(&hw, NULL) == -1)
 				return -EIO;
 			return 0;
 		}
@@ -1870,7 +1860,7 @@ static int __initdata is_chipset_set[MAX_HWIFS];
  *				registered. In most cases, only one device
  *				will be present.
  * "hdx=scsi"		: the return of the ide-scsi flag, this is useful for
- *				allowwing ide-floppy, ide-tape, and ide-cdrom|writers
+ *				allowing ide-floppy, ide-tape, and ide-cdrom|writers
  *				to use ide-scsi emulation on a device specific option.
  * "idebus=xx"		: inform IDE driver of VESA/PCI bus speed in MHz,
  *				where "xx" is between 20 and 66 inclusive,

@@ -449,6 +449,7 @@ static struct sock *x25_alloc_socket(void)
 	x25->sk = sk;
 
 	sock_init_data(NULL, sk);
+	sk_set_owner(sk, THIS_MODULE);
 
 	skb_queue_head_init(&x25->ack_queue);
 	skb_queue_head_init(&x25->fragment_queue);
@@ -478,6 +479,7 @@ static int x25_create(struct socket *sock, int protocol)
 	x25 = x25_sk(sk);
 
 	sock_init_data(sock, sk);
+	sk_set_owner(sk, THIS_MODULE);
 
 	init_timer(&x25->timer);
 
@@ -1421,3 +1423,4 @@ module_exit(x25_exit);
 MODULE_AUTHOR("Jonathan Naylor <g4klx@g4klx.demon.co.uk>");
 MODULE_DESCRIPTION("The X.25 Packet Layer network layer protocol");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_NETPROTO(PF_X25);

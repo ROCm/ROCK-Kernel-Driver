@@ -13,7 +13,6 @@
  *	- export ip_conntrack[_expect]_{find_get,put} functions
  * */
 
-#include <linux/version.h>
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/icmp.h>
@@ -285,14 +284,15 @@ static void remove_expectations(struct ip_conntrack *ct, int drop_refcount)
 static void
 clean_from_lists(struct ip_conntrack *ct)
 {
+	unsigned int ho, hr;
+	
 	DEBUGP("clean_from_lists(%p)\n", ct);
 	MUST_BE_WRITE_LOCKED(&ip_conntrack_lock);
-	LIST_DELETE(&ip_conntrack_hash
-		    [hash_conntrack(&ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple)],
-		    &ct->tuplehash[IP_CT_DIR_ORIGINAL]);
-	LIST_DELETE(&ip_conntrack_hash
-		    [hash_conntrack(&ct->tuplehash[IP_CT_DIR_REPLY].tuple)],
-		    &ct->tuplehash[IP_CT_DIR_REPLY]);
+
+	ho = hash_conntrack(&ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple);
+	hr = hash_conntrack(&ct->tuplehash[IP_CT_DIR_REPLY].tuple);
+	LIST_DELETE(&ip_conntrack_hash[ho], &ct->tuplehash[IP_CT_DIR_ORIGINAL]);
+	LIST_DELETE(&ip_conntrack_hash[hr], &ct->tuplehash[IP_CT_DIR_REPLY]);
 
 	/* Destroy all un-established, pending expectations */
 	remove_expectations(ct, 1);
@@ -364,9 +364,10 @@ __ip_conntrack_find(const struct ip_conntrack_tuple *tuple,
 		    const struct ip_conntrack *ignored_conntrack)
 {
 	struct ip_conntrack_tuple_hash *h;
+	unsigned int hash = hash_conntrack(tuple);
 
 	MUST_BE_READ_LOCKED(&ip_conntrack_lock);
-	h = LIST_FIND(&ip_conntrack_hash[hash_conntrack(tuple)],
+	h = LIST_FIND(&ip_conntrack_hash[hash],
 		      conntrack_tuple_cmp,
 		      struct ip_conntrack_tuple_hash *,
 		      tuple, ignored_conntrack);

@@ -174,7 +174,7 @@ static void ne2k_pci_block_input(struct net_device *dev, int count,
 			  struct sk_buff *skb, int ring_offset);
 static void ne2k_pci_block_output(struct net_device *dev, const int count,
 		const unsigned char *buf, const int start_page);
-static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
+static struct ethtool_ops ne2k_pci_ethtool_ops;
 
 
 
@@ -259,7 +259,8 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 		}
 	}
 
-	dev = alloc_etherdev(0);
+	/* Allocate net_device, dev->priv; fill in 8390 specific dev fields. */
+	dev = alloc_ei_netdev();
 	if (!dev) {
 		printk (KERN_ERR PFX "cannot allocate ethernet device\n");
 		goto err_out_free_res;
@@ -331,13 +332,6 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 	dev->base_addr = ioaddr;
 	pci_set_drvdata(pdev, dev);
 
-	/* Allocate dev->priv and fill in 8390 specific dev fields. */
-	if (ethdev_init(dev)) {
-		printk (KERN_ERR "ne2kpci(%s): unable to get memory for dev->priv.\n",
-			pci_name(pdev));
-		goto err_out_free_netdev;
-	}
-
 	ei_status.name = pci_clone_list[chip_idx].name;
 	ei_status.tx_start_page = start_page;
 	ei_status.stop_page = stop_page;
@@ -361,12 +355,12 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 	ei_status.priv = (unsigned long) pdev;
 	dev->open = &ne2k_pci_open;
 	dev->stop = &ne2k_pci_close;
-	dev->do_ioctl = &netdev_ioctl;
+	dev->ethtool_ops = &ne2k_pci_ethtool_ops;
 	NS8390_init(dev, 0);
 
 	i = register_netdev(dev);
 	if (i)
-		goto err_out_free_8390;
+		goto err_out_free_netdev;
 
 	printk("%s: %s found at %#lx, IRQ %d, ",
 		   dev->name, pci_clone_list[chip_idx].name, ioaddr, dev->irq);
@@ -377,10 +371,8 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 
 	return 0;
 
-err_out_free_8390:
-	kfree(dev->priv);
 err_out_free_netdev:
-	kfree (dev);
+	free_netdev (dev);
 err_out_free_res:
 	release_region (ioaddr, NE_IO_EXTENT);
 	pci_set_drvdata (pdev, NULL);
@@ -591,40 +583,22 @@ static void ne2k_pci_block_output(struct net_device *dev, int count,
 	return;
 }
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static void ne2k_pci_get_drvinfo(struct net_device *dev,
+				 struct ethtool_drvinfo *info)
 {
 	struct ei_device *ei = dev->priv;
 	struct pci_dev *pci_dev = (struct pci_dev *) ei->priv;
-	u32 ethcmd;
-		
-	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-		return -EFAULT;
 
-        switch (ethcmd) {
-        case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strcpy(info.driver, DRV_NAME);
-		strcpy(info.version, DRV_VERSION);
-		strcpy(info.bus_info, pci_name(pci_dev));
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-	}
-
-        }
-	
-	return -EOPNOTSUPP;
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	strcpy(info->bus_info, pci_name(pci_dev));
 }
 
-static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
-{
-	switch(cmd) {
-	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
-	default:
-		return -EOPNOTSUPP;
-	}
-}
+static struct ethtool_ops ne2k_pci_ethtool_ops = {
+	.get_drvinfo		= ne2k_pci_get_drvinfo,
+	.get_tx_csum		= ethtool_op_get_tx_csum,
+	.get_sg			= ethtool_op_get_sg,
+};
 
 static void __devexit ne2k_pci_remove_one (struct pci_dev *pdev)
 {
@@ -635,8 +609,8 @@ static void __devexit ne2k_pci_remove_one (struct pci_dev *pdev)
 
 	unregister_netdev(dev);
 	release_region(dev->base_addr, NE_IO_EXTENT);
-	kfree(dev->priv);
 	free_netdev(dev);
+	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
 }
 

@@ -464,6 +464,7 @@ long compat_timer_settime(timer_t timer_id, int flags,
 	if (get_compat_itimerspec(&newts, new))
 		return -EFAULT;	
 	oldfs = get_fs();
+	set_fs(KERNEL_DS);
 	err = sys_timer_settime(timer_id, flags, &newts, &oldts);
 	set_fs(oldfs); 
 	if (!err && old && put_compat_itimerspec(old, &oldts))
@@ -477,6 +478,7 @@ long compat_timer_gettime(timer_t timer_id, struct compat_itimerspec *setting)
 	mm_segment_t oldfs;
 	struct itimerspec ts; 
 	oldfs = get_fs();
+	set_fs(KERNEL_DS);
 	err = sys_timer_gettime(timer_id, &ts); 
 	set_fs(oldfs); 
 	if (!err && put_compat_itimerspec(setting, &ts))
@@ -494,7 +496,8 @@ long compat_clock_settime(clockid_t which_clock,  struct compat_timespec *tp)
 	struct timespec ts; 
 	if (get_compat_timespec(&ts, tp))
 		return -EFAULT; 
-	oldfs = get_fs(); 
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);	
 	err = sys_clock_settime(which_clock, &ts); 
 	set_fs(oldfs);
 	return err;
@@ -508,7 +511,8 @@ long compat_clock_gettime(clockid_t which_clock,  struct compat_timespec *tp)
 	long err;
 	mm_segment_t oldfs;
 	struct timespec ts; 
-	oldfs = get_fs(); 
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);
 	err = sys_clock_gettime(which_clock, &ts); 
 	set_fs(oldfs);
 	if (!err && put_compat_timespec(&ts, tp))
@@ -524,7 +528,8 @@ long compat_clock_getres(clockid_t which_clock,  struct compat_timespec *tp)
 	long err;
 	mm_segment_t oldfs;
 	struct timespec ts; 
-	oldfs = get_fs(); 
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);
 	err = sys_clock_getres(which_clock, &ts); 
 	set_fs(oldfs);
 	if (!err && put_compat_timespec(&ts, tp))
@@ -546,7 +551,8 @@ long compat_clock_nanosleep(clockid_t which_clock, int flags,
 	struct timespec in, out; 
 	if (get_compat_timespec(&in, rqtp)) 
 		return -EFAULT;
-	oldfs = get_fs(); 
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);	
 	err = sys_clock_nanosleep(which_clock, flags, &in, &out);  
 	set_fs(oldfs);
 	if ((err == -ERESTART_RESTARTBLOCK) && rmtp &&

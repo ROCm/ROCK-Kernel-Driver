@@ -276,7 +276,7 @@ static ssize_t wdtpci_read(struct file *file, char *buf, size_t count, loff_t *p
 	if (ptr != &file->f_pos)
 		return -ESPIPE;
 
-	switch(minor(file->f_dentry->d_inode->i_rdev))
+	switch(iminor(file->f_dentry->d_inode))
 	{
 		case TEMP_MINOR:
 			c*=11;
@@ -361,7 +361,7 @@ static int wdtpci_open(struct inode *inode, struct file *file)
 {
 	unsigned long flags;
 
-	switch(minor(inode->i_rdev))
+	switch(iminor(inode))
 	{
 		case WATCHDOG_MINOR:
 			if (down_trylock(&open_sem))
@@ -423,7 +423,7 @@ static int wdtpci_open(struct inode *inode, struct file *file)
 static int wdtpci_release(struct inode *inode, struct file *file)
 {
 
-	if (minor(inode->i_rdev)==WATCHDOG_MINOR) {
+	if (iminor(inode)==WATCHDOG_MINOR) {
 		unsigned long flags;
 		if (expect_close) {
 			spin_lock_irqsave(&wdtpci_lock, flags);

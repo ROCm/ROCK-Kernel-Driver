@@ -345,7 +345,7 @@ int snd_rawmidi_kernel_open(int cardnum, int device, int subdevice,
 
 static int snd_rawmidi_open(struct inode *inode, struct file *file)
 {
-	int maj = major(inode->i_rdev);
+	int maj = imajor(inode);
 	int cardnum;
 	snd_card_t *card;
 	int device, subdevice;
@@ -359,16 +359,16 @@ static int snd_rawmidi_open(struct inode *inode, struct file *file)
 
 	switch (maj) {
 	case CONFIG_SND_MAJOR:
-		cardnum = SNDRV_MINOR_CARD(minor(inode->i_rdev));
+		cardnum = SNDRV_MINOR_CARD(iminor(inode));
 		cardnum %= SNDRV_CARDS;
-		device = SNDRV_MINOR_DEVICE(minor(inode->i_rdev)) - SNDRV_MINOR_RAWMIDI;
+		device = SNDRV_MINOR_DEVICE(iminor(inode)) - SNDRV_MINOR_RAWMIDI;
 		device %= SNDRV_MINOR_RAWMIDIS;
 		break;
 #ifdef CONFIG_SND_OSSEMUL
 	case SOUND_MAJOR:
-		cardnum = SNDRV_MINOR_OSS_CARD(minor(inode->i_rdev));
+		cardnum = SNDRV_MINOR_OSS_CARD(iminor(inode));
 		cardnum %= SNDRV_CARDS;
-		device = SNDRV_MINOR_OSS_DEVICE(minor(inode->i_rdev)) == SNDRV_MINOR_OSS_MIDI ?
+		device = SNDRV_MINOR_OSS_DEVICE(iminor(inode)) == SNDRV_MINOR_OSS_MIDI ?
 			midi_map[cardnum] : amidi_map[cardnum];
 		break;
 #endif

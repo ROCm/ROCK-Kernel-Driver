@@ -670,11 +670,11 @@ static int pt_detect(void)
 	return -1;
 }
 
-#define DEVICE_NR(dev)	(minor(dev) & 0x7F)
+#define DEVICE_NR(inode)	(iminor(inode) & 0x7F)
 
 static int pt_open(struct inode *inode, struct file *file)
 {
-	int unit = DEVICE_NR(inode->i_rdev);
+	int unit = DEVICE_NR(inode);
 
 	if ((unit >= PT_UNITS) || (!PT.present))
 		return -ENODEV;
@@ -696,7 +696,7 @@ static int pt_open(struct inode *inode, struct file *file)
 		return -EROFS;
 	}
 
-	if (!(minor(inode->i_rdev) & 128))
+	if (!(iminor(inode) & 128))
 		PT.flags |= PT_REWIND;
 
 	PT.bufptr = kmalloc(PT_BUFSIZE, GFP_KERNEL);
@@ -715,7 +715,7 @@ static int pt_ioctl(struct inode *inode, struct file *file,
 	int unit;
 	struct mtop mtop;
 
-	unit = DEVICE_NR(inode->i_rdev);
+	unit = DEVICE_NR(inode);
 	if (unit >= PT_UNITS)
 		return -EINVAL;
 	if (!PT.present)
@@ -753,7 +753,7 @@ static int pt_ioctl(struct inode *inode, struct file *file,
 static int
 pt_release(struct inode *inode, struct file *file)
 {
-	int unit = DEVICE_NR(inode->i_rdev);
+	int unit = DEVICE_NR(inode);
 
 	if ((unit >= PT_UNITS) || (atomic_read(&PT.available) > 1))
 		return -EINVAL;
@@ -776,7 +776,7 @@ pt_release(struct inode *inode, struct file *file)
 static ssize_t pt_read(struct file *filp, char *buf, size_t count, loff_t * ppos)
 {
 	struct inode *ino = filp->f_dentry->d_inode;
-	int unit = DEVICE_NR(ino->i_rdev);
+	int unit = DEVICE_NR(ino);
 	char rd_cmd[12] = { ATAPI_READ_6, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 	int k, n, r, p, s, t, b;
 
@@ -873,7 +873,7 @@ static ssize_t pt_read(struct file *filp, char *buf, size_t count, loff_t * ppos
 static ssize_t pt_write(struct file *filp, const char *buf, size_t count, loff_t * ppos)
 {
 	struct inode *ino = filp->f_dentry->d_inode;
-	int unit = DEVICE_NR(ino->i_rdev);
+	int unit = DEVICE_NR(ino);
 	char wr_cmd[12] = { ATAPI_WRITE_6, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 	int k, n, r, p, s, t, b;
 

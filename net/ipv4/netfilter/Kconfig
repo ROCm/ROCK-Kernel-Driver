@@ -74,8 +74,7 @@ config IP_NF_AMANDA
 	  <file:Documentation/modules.txt>.  If unsure, say `Y'.
 
 config IP_NF_QUEUE
-	tristate "Userspace queueing via NETLINK (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
+	tristate "Userspace queueing via NETLINK"
 	help
 	  Netfilter has the ability to queue packets to user space: the
 	  netlink device can be used to access them using this driver.
@@ -102,6 +101,16 @@ config IP_NF_MATCH_LIMIT
 	  limit matching allows you to control the rate at which a rule can be
 	  matched: mainly useful in combination with the LOG target ("LOG
 	  target support", below) and to avoid some Denial of Service attacks.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+config IP_NF_MATCH_IPRANGE
+	tristate "IP range match support"
+	depends on IP_NF_IPTABLES
+	help
+	  This option makes possible to match IP addresses against IP address
+	  ranges.
 
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
@@ -239,7 +248,7 @@ config IP_NF_MATCH_TCPMSS
 
 config IP_NF_MATCH_HELPER
 	tristate "Helper match support"
-	depends on IP_NF_CONNTRACK!=n && IP_NF_IPTABLES
+	depends on IP_NF_CONNTRACK && IP_NF_IPTABLES
 	help
 	  Helper matching allows you to match packets in dynamic connections
 	  tracked by a conntrack-helper, ie. ip_conntrack_ftp
@@ -271,19 +280,9 @@ config IP_NF_MATCH_CONNTRACK
 	  If you want to compile it as a module, say M here and read
 	  Documentation/modules.txt.  If unsure, say `N'.
 
-config IP_NF_MATCH_UNCLEAN
-	tristate "Unclean match support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && IP_NF_IPTABLES
-	help
-	  Unclean packet matching matches any strange or invalid packets, by
-	  looking at a series of fields in the IP, TCP, UDP and ICMP headers.
-
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
-
 config IP_NF_MATCH_OWNER
-	tristate "Owner match support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && IP_NF_IPTABLES
+	tristate "Owner match support"
+	depends on IP_NF_IPTABLES
 	help
 	  Packet owner matching allows you to match locally-generated packets
 	  based on who created them: the user, group, process or session.
@@ -293,7 +292,7 @@ config IP_NF_MATCH_OWNER
 
 config IP_NF_MATCH_PHYSDEV
 	tristate "Physdev match support"
-	depends on IP_NF_IPTABLES!=n && BRIDGE!=n
+	depends on IP_NF_IPTABLES!=n && BRIDGE_NETFILTER
 	help
 	  Physdev packet matching matches against the physical bridge ports
 	  the IP packet arrived on or will leave by.
@@ -320,16 +319,6 @@ config IP_NF_TARGET_REJECT
 	  The REJECT target allows a filtering rule to specify that an ICMP
 	  error should be issued in response to an incoming packet, rather
 	  than silently being dropped.
-
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
-
-config IP_NF_TARGET_MIRROR
-	tristate "MIRROR target support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && IP_NF_FILTER
-	help
-	  The MIRROR target allows a filtering rule to specify that an
-	  incoming packet should be bounced back to the sender.
 
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
@@ -374,6 +363,28 @@ config IP_NF_TARGET_REDIRECT
 
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+config IP_NF_TARGET_NETMAP
+	tristate "NETMAP target support"
+	depends on IP_NF_NAT
+	help
+	  NETMAP is an implementation of static 1:1 NAT mapping of network
+	  addresses. It maps the network address part, while keeping the host
+	  address part intact. It is similar to Fast NAT, except that
+	  Netfilter's connection tracking doesn't work well with Fast NAT.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+config IP_NF_TARGET_SAME
+	tristate "SAME target support"
+	depends on IP_NF_NAT
+	help
+	  This option adds a `SAME' target, which works like the standard SNAT
+	  target, but attempts to give clients the same IP for all connections.
+
+	  If you want to compile it as a module, say M here and read
+	  Documentation/modules.txt.  If unsure, say `N'.
 
 config IP_NF_NAT_LOCAL
 	bool "NAT of local connections (READ HELP)"
@@ -490,6 +501,19 @@ config IP_NF_TARGET_MARK
 	  the routing method (see `Use netfilter MARK value as routing
 	  key') and can also be used by other subsystems to change their
 	  behavior.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+config IP_NF_TARGET_CLASSIFY
+	tristate "CLASSIFY target support"
+	depends on IP_NF_MANGLE
+	help
+	  This option adds a `CLASSIFY' target, which enables the user to set
+	  the priority of a packet. Some qdiscs can use this value for
+	  classification, among these are:
+
+  	  atm, cbq, dsmark, pfifo_fast, htb, prio
 
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.

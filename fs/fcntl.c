@@ -6,6 +6,7 @@
 
 #include <linux/init.h>
 #include <linux/mm.h>
+#include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/dnotify.h>
 #include <linux/smp_lock.h>
@@ -17,9 +18,6 @@
 #include <asm/poll.h>
 #include <asm/siginfo.h>
 #include <asm/uaccess.h>
-
-extern int fcntl_setlease(unsigned int fd, struct file *filp, long arg);
-extern int fcntl_getlease(struct file *filp);
 
 void set_close_on_exec(unsigned int fd, int flag)
 {

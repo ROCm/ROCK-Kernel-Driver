@@ -90,7 +90,7 @@ struct cycx_firmware {
 	unsigned short	    reserved[6];
 	char		    descr[CFM_DESCR_LEN];
 	struct cycx_fw_info info;
-	unsigned char	    image[1];
+	unsigned char	    image[0];
 };
 
 struct cycx_fw_header {

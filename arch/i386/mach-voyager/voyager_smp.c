@@ -130,7 +130,7 @@ send_QIC_CPI(__u32 cpuset, __u8 cpi)
 {
 	int cpu;
 
-	for_each_cpu(cpu, mk_cpumask_const(cpu_online_map)) {
+	for_each_cpu(cpu, cpu_online_map) {
 		if(cpuset & (1<<cpu)) {
 #ifdef VOYAGER_DEBUG
 			if(!cpu_isset(cpu, cpu_online_map))
@@ -874,10 +874,10 @@ leave_mm (unsigned long cpu)
 asmlinkage void 
 smp_invalidate_interrupt(void)
 {
-	__u8 cpu = get_cpu();
+	__u8 cpu = smp_processor_id();
 
-	if (!(smp_invalidate_needed & (1UL << cpu)))
-		goto out;
+	if (!test_bit(cpu, &smp_invalidate_needed))
+		return;
 	/* This will flood messages.  Don't uncomment unless you see
 	 * Problems with cross cpu invalidation
 	VDEBUG(("VOYAGER SMP: CPU%d received INVALIDATE_CPI\n",
@@ -893,9 +893,9 @@ smp_invalidate_interrupt(void)
 		} else
 			leave_mm(cpu);
 	}
-	smp_invalidate_needed |= 1UL << cpu;
- out:
-	put_cpu_no_resched();
+	smp_mb__before_clear_bit();
+	clear_bit(cpu, &smp_invalidate_needed);
+	smp_mb__after_clear_bit();
 }
 
 /* All the new flush operations for 2.4 */
@@ -929,6 +929,7 @@ flush_tlb_others (unsigned long cpumask, struct mm_struct *mm,
 	send_CPI(cpumask, VIC_INVALIDATE_CPI);
 
 	while (smp_invalidate_needed) {
+		mb();
 		if(--stuck == 0) {
 			printk("***WARNING*** Stuck doing invalidate CPI (CPU%d)\n", smp_processor_id());
 			break;
@@ -1464,7 +1465,7 @@ send_CPI(__u32 cpuset, __u8 cpi)
 	cpuset &= 0xff;		/* only first 8 CPUs vaild for VIC CPI */
 	if(cpuset == 0)
 		return;
-	for_each_cpu(cpu, mk_cpumask_const(cpu_online_map)) {
+	for_each_cpu(cpu, cpu_online_map) {
 		if(cpuset & (1<<cpu))
 			set_bit(cpi, &vic_cpi_mailbox[cpu]);
 	}
@@ -1578,7 +1579,7 @@ enable_vic_irq(unsigned int irq)
 	VDEBUG(("VOYAGER: enable_vic_irq(%d) CPU%d affinity 0x%lx\n",
 		irq, cpu, cpu_irq_affinity[cpu]));
 	spin_lock_irqsave(&vic_irq_lock, flags);
-	for_each_cpu(real_cpu, mk_cpumask_const(cpu_online_map)) {
+	for_each_cpu(real_cpu, cpu_online_map) {
 		if(!(voyager_extended_vic_processors & (1<<real_cpu)))
 			continue;
 		if(!(cpu_irq_affinity[real_cpu] & mask)) {
@@ -1723,7 +1724,7 @@ after_handle_vic_irq(unsigned int irq)
 
 			printk("VOYAGER SMP: CPU%d lost interrupt %d\n",
 			       cpu, irq);
-			for_each_cpu(real_cpu, mk_cpumask_const(mask)) {
+			for_each_cpu(real_cpu, mask) {
 
 				outb(VIC_CPU_MASQUERADE_ENABLE | real_cpu,
 				     VIC_PROCESSOR_ID);
@@ -1808,7 +1809,7 @@ set_vic_irq_affinity(unsigned int irq, cpumask_t mask)
 		 * bus) */
 		return;
 
-	for_each_cpu(cpu, mk_cpumask_const(cpu_online_map)) {
+	for_each_cpu(cpu, cpu_online_map) {
 		unsigned long cpu_mask = 1 << cpu;
 		
 		if(cpu_mask & real_mask) {
@@ -1874,7 +1875,7 @@ voyager_smp_dump()
 	int old_cpu = smp_processor_id(), cpu;
 
 	/* dump the interrupt masks of each processor */
-	for_each_cpu(cpu, mk_cpumask_const(cpu_online_map)) {
+	for_each_cpu(cpu, cpu_online_map) {
 		__u16 imr, isr, irr;
 		unsigned long flags;
 

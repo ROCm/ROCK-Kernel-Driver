@@ -795,22 +795,6 @@ config PCI_PERMEDIA
 	bool "PCI for Permedia2"
 	depends on !4xx && !8xx && APUS
 
-# only elf supported, a.out is not -- Cort
-config KCORE_ELF
-	bool
-	depends on PROC_FS
-	default y
-	help
-	  If you enabled support for /proc file system then the file
-	  /proc/kcore will contain the kernel core image in ELF format. This
-	  can be used in gdb:
-
-	  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
-
-	  This is especially useful if you have compiled the kernel with the
-	  "-g" option to preserve debugging information. It is mainly used
-	  for examining kernel data structures on the live kernel.
-
 config KERNEL_ELF
 	bool
 	default y
@@ -1277,16 +1261,11 @@ config MAC_FLOPPY
 	  floppy controller, say Y here. Most commonly found in PowerMacs.
 
 config MAC_SERIAL
-	tristate "Support for PowerMac serial ports"
+	tristate "Support for PowerMac serial ports (OBSOLETE DRIVER)"
 	depends on PPC_PMAC
 	help
-	  If you have Macintosh style serial ports (8 pin mini-DIN), say Y
-	  here. If you also have regular serial ports and enable the driver
-	  for them, you can't currently use the serial console feature.
-
-config SERIAL_CONSOLE
-	bool "Support for console on serial port"
-	depends on PPC_PMAC && MAC_SERIAL=y
+	  This driver is obsolete. Use CONFIG_SERIAL_PMACZILOG in
+	  "Character devices --> Serial drivers --> PowerMac z85c30" option.
 
 config ADB
 	bool "Apple Desktop Bus (ADB) support"

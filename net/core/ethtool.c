@@ -13,6 +13,7 @@
 #include <linux/errno.h>
 #include <linux/ethtool.h>
 #include <linux/netdevice.h>
+#include <asm/uaccess.h>
 
 /* 
  * Some useful ethtool_ops methods that're device independent.
@@ -30,6 +31,16 @@ u32 ethtool_op_get_tx_csum(struct net_device *dev)
 	return (dev->features & NETIF_F_IP_CSUM) != 0;
 }
 
+int ethtool_op_set_tx_csum(struct net_device *dev, u32 data)
+{
+	if (data)
+		dev->features |= NETIF_F_IP_CSUM;
+	else
+		dev->features &= ~NETIF_F_IP_CSUM;
+
+	return 0;
+}
+
 u32 ethtool_op_get_sg(struct net_device *dev)
 {
 	return (dev->features & NETIF_F_SG) != 0;
@@ -41,6 +52,21 @@ int ethtool_op_set_sg(struct net_device *dev, u32 data)
 		dev->features |= NETIF_F_SG;
 	else
 		dev->features &= ~NETIF_F_SG;
+
+	return 0;
+}
+
+u32 ethtool_op_get_tso(struct net_device *dev)
+{
+	return (dev->features & NETIF_F_TSO) != 0;
+}
+
+int ethtool_op_set_tso(struct net_device *dev, u32 data)
+{
+	if (data)
+		dev->features |= NETIF_F_TSO;
+	else
+		dev->features &= ~NETIF_F_TSO;
 
 	return 0;
 }
@@ -454,6 +480,33 @@ static int ethtool_set_sg(struct net_device *dev, char *useraddr)
 	return dev->ethtool_ops->set_sg(dev, edata.data);
 }
 
+static int ethtool_get_tso(struct net_device *dev, char *useraddr)
+{
+	struct ethtool_value edata = { ETHTOOL_GTSO };
+
+	if (!dev->ethtool_ops->get_tso)
+		return -EOPNOTSUPP;
+
+	edata.data = dev->ethtool_ops->get_tso(dev);
+
+	if (copy_to_user(useraddr, &edata, sizeof(edata)))
+		return -EFAULT;
+	return 0;
+}
+
+static int ethtool_set_tso(struct net_device *dev, char *useraddr)
+{
+	struct ethtool_value edata;
+
+	if (!dev->ethtool_ops->set_tso)
+		return -EOPNOTSUPP;
+
+	if (copy_from_user(&edata, useraddr, sizeof(edata)))
+		return -EFAULT;
+
+	return dev->ethtool_ops->set_tso(dev, edata.data);
+}
+
 static int ethtool_self_test(struct net_device *dev, char *useraddr)
 {
 	struct ethtool_test test;
@@ -502,15 +555,15 @@ static int ethtool_get_strings(struct net_device *dev, void *useraddr)
 
 	switch (gstrings.string_set) {
 	case ETH_SS_TEST:
-		if (ops->self_test_count)
-			gstrings.len = ops->self_test_count(dev);
-		else
+		if (!ops->self_test_count)
 			return -EOPNOTSUPP;
+		gstrings.len = ops->self_test_count(dev);
+		break;
 	case ETH_SS_STATS:
-		if (ops->get_stats_count)
-			gstrings.len = ops->get_stats_count(dev);
-		else
+		if (!ops->get_stats_count)
 			return -EOPNOTSUPP;
+		gstrings.len = ops->get_stats_count(dev);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -653,6 +706,10 @@ int dev_ethtool(struct ifreq *ifr)
 		return ethtool_get_sg(dev, useraddr);
 	case ETHTOOL_SSG:
 		return ethtool_set_sg(dev, useraddr);
+	case ETHTOOL_GTSO:
+		return ethtool_get_tso(dev, useraddr);
+	case ETHTOOL_STSO:
+		return ethtool_set_tso(dev, useraddr);
 	case ETHTOOL_TEST:
 		return ethtool_self_test(dev, useraddr);
 	case ETHTOOL_GSTRINGS:

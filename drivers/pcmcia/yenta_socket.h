@@ -95,6 +95,15 @@
  */
 #define CB_MEM_PAGE(map)	(0x40 + (map))
 
+struct yenta_socket;
+
+struct cardbus_type {
+	int	(*override)(struct yenta_socket *);
+	void	(*save_state)(struct yenta_socket *);
+	void	(*restore_state)(struct yenta_socket *);
+	int	(*sock_init)(struct yenta_socket *);
+};
+
 struct yenta_socket {
 	struct pci_dev *dev;
 	int cb_irq, io_irq;
@@ -102,9 +111,13 @@ struct yenta_socket {
 	struct timer_list poll_timer;
 
 	struct pcmcia_socket socket;
+	struct cardbus_type *type;
 
 	/* A few words of private data for special stuff of overrides... */
 	unsigned int private[8];
+
+	/* PCI saved state */
+	u32 saved_state[18];
 };
 
 

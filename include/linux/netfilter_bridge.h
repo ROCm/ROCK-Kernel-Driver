@@ -6,7 +6,7 @@
 
 #include <linux/config.h>
 #include <linux/netfilter.h>
-#if defined(__KERNEL__) && defined(CONFIG_NETFILTER)
+#if defined(__KERNEL__) && defined(CONFIG_BRIDGE_NETFILTER)
 #include <asm/atomic.h>
 #endif
 
@@ -27,11 +27,6 @@
 
 #ifdef __KERNEL__
 
-#define BRNF_PKT_TYPE			0x01
-#define BRNF_BRIDGED_DNAT		0x02
-#define BRNF_DONT_TAKE_PARENT		0x04
-#define BRNF_BRIDGED			0x08
-
 enum nf_br_hook_priorities {
 	NF_BR_PRI_FIRST = INT_MIN,
 	NF_BR_PRI_NAT_DST_BRIDGED = -300,
@@ -43,7 +38,13 @@ enum nf_br_hook_priorities {
 	NF_BR_PRI_LAST = INT_MAX,
 };
 
-#ifdef CONFIG_NETFILTER
+#ifdef CONFIG_BRIDGE_NETFILTER
+
+#define BRNF_PKT_TYPE			0x01
+#define BRNF_BRIDGED_DNAT		0x02
+#define BRNF_DONT_TAKE_PARENT		0x04
+#define BRNF_BRIDGED			0x08
+
 static inline
 struct nf_bridge_info *nf_bridge_alloc(struct sk_buff *skb)
 {
@@ -63,7 +64,7 @@ struct bridge_skb_cb {
 		__u32 ipv4;
 	} daddr;
 };
-#endif /* CONFIG_NETFILTER */
+#endif /* CONFIG_BRIDGE_NETFILTER */
 
 #endif /* __KERNEL__ */
 #endif

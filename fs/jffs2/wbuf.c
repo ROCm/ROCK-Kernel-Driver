@@ -37,8 +37,8 @@
 #define NAND_JFFS2_OOB16_FSDALEN	8
 
 struct nand_oobinfo jffs2_oobinfo = {
-	useecc: 1,
-	eccpos: {JFFS2_OOB_ECCPOS0, JFFS2_OOB_ECCPOS1, JFFS2_OOB_ECCPOS2, JFFS2_OOB_ECCPOS3, JFFS2_OOB_ECCPOS4, JFFS2_OOB_ECCPOS5}
+	.useecc = 1,
+	.eccpos = {JFFS2_OOB_ECCPOS0, JFFS2_OOB_ECCPOS1, JFFS2_OOB_ECCPOS2, JFFS2_OOB_ECCPOS3, JFFS2_OOB_ECCPOS4, JFFS2_OOB_ECCPOS5}
 };
 
 static inline void jffs2_refile_wbuf_blocks(struct jffs2_sb_info *c)

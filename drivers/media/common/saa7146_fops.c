@@ -157,7 +157,7 @@ void saa7146_buffer_timeout(unsigned long data)
 
 static int fops_open(struct inode *inode, struct file *file)
 {
-	unsigned int minor = minor(inode->i_rdev);
+	unsigned int minor = iminor(inode);
 	struct saa7146_dev *h = NULL, *dev = NULL;
 	struct list_head *list;
 	struct saa7146_fh *fh = NULL;

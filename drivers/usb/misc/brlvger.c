@@ -249,17 +249,20 @@ static struct usb_driver brlvger_driver =
 static int
 __init brlvger_init (void)
 {
+	int retval;
 	printk(BANNER);
 
 	if(stall_tries < 1 || write_repeats < 1)
 	  return -EINVAL;
 
-	if (usb_register(&brlvger_driver)) {
+	retval = usb_register(&brlvger_driver);
+	if (retval) {
 		err("USB registration failed");
-		return -ENOSYS;
+		goto out;
 	}
 
-	return 0;
+out:
+	return retval;
 }
 
 static void
@@ -432,7 +435,7 @@ brlvger_disconnect(struct usb_interface *intf)
 static int
 brlvger_open(struct inode *inode, struct file *file)
 {
-	int devnum = minor (inode->i_rdev);
+	int devnum = iminor(inode);
 	struct usb_interface *intf = NULL;
 	struct brlvger_priv *priv = NULL;
 	int n, ret;

@@ -964,7 +964,7 @@ static int capinc_tty_open(struct tty_struct * tty, struct file * file)
 {
 	struct capiminor *mp;
 
-	if ((mp = capiminor_find(minor(file->f_dentry->d_inode->i_rdev))) == 0)
+	if ((mp = capiminor_find(iminor(file->f_dentry->d_inode))) == 0)
 		return -ENXIO;
 	if (mp->nccip == 0)
 		return -ENXIO;

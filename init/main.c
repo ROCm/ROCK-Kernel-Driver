@@ -89,10 +89,6 @@ extern void driver_init(void);
 extern void tc_init(void);
 #endif
 
-#if defined(CONFIG_SYSVIPC)
-extern void ipc_init(void);
-#endif
-
 /*
  * Are we up and running (ie do we have all the infrastructure
  * set up)
@@ -106,6 +102,8 @@ int system_running = 0;
 #define MAX_INIT_ENVS 8
 
 extern void time_init(void);
+/* Default late time init is NULL. archs can override this later. */
+void (*late_time_init)(void) = NULL;
 extern void softirq_init(void);
 
 int rows, cols;
@@ -421,7 +419,6 @@ asmlinkage void __init start_kernel(void)
 	console_init();
 	profile_init();
 	local_irq_enable();
-	calibrate_delay();
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start && !initrd_below_start_ok &&
 			initrd_start < min_low_pfn << PAGE_SHIFT) {
@@ -433,6 +430,9 @@ asmlinkage void __init start_kernel(void)
 	page_address_init();
 	mem_init();
 	kmem_cache_init();
+	if (late_time_init)
+		late_time_init();
+	calibrate_delay();
 	pidmap_init();
 	pgtable_cache_init();
 	pte_chain_init();
@@ -448,9 +448,6 @@ asmlinkage void __init start_kernel(void)
 	populate_rootfs();
 #ifdef CONFIG_PROC_FS
 	proc_root_init();
-#endif
-#if defined(CONFIG_SYSVIPC)
-	ipc_init();
 #endif
 	check_bugs();
 	printk("POSIX conformance testing by UNIFIX\n");

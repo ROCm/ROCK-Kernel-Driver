@@ -318,7 +318,7 @@ static int usblp_check_status(struct usblp *usblp, int err)
 
 static int usblp_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct usblp *usblp;
 	struct usb_interface *intf;
 	int retval;
@@ -1150,10 +1150,13 @@ static struct usb_driver usblp_driver = {
 
 static int __init usblp_init(void)
 {
-	if (usb_register(&usblp_driver))
-		return -1;
+	int retval;
+	retval = usb_register(&usblp_driver);
+	if (retval)
+		goto out;
 	info(DRIVER_VERSION ": " DRIVER_DESC);
-	return 0;
+out:
+	return retval;
 }
 
 static void __exit usblp_exit(void)

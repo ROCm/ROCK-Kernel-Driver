@@ -29,7 +29,6 @@
 
 #include <linux/module.h>
 #include <linux/socket.h>
-#include <linux/miscdevice.h>
 #include <linux/list.h>
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
@@ -583,7 +582,7 @@ static ssize_t dabusb_read (struct file *file, char *buf, size_t count, loff_t *
 
 static int dabusb_open (struct inode *inode, struct file *file)
 {
-	int devnum = minor (inode->i_rdev);
+	int devnum = iminor(inode);
 	pdabusb_t s;
 
 	if (devnum < DABUSB_MINOR || devnum >= (DABUSB_MINOR + NRDABUSB))
@@ -819,6 +818,7 @@ static struct usb_driver dabusb_driver = {
 
 static int __init dabusb_init (void)
 {
+	int retval;
 	unsigned u;
 
 	/* initialize struct */
@@ -836,14 +836,16 @@ static int __init dabusb_init (void)
 	}
 
 	/* register misc device */
-	if (usb_register(&dabusb_driver))
-		return -1;
+	retval = usb_register(&dabusb_driver);
+	if (retval)
+		goto out;
 
 	dbg("dabusb_init: driver registered");
 
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 
-	return 0;
+out:
+	return retval;
 }
 
 static void __exit dabusb_cleanup (void)

@@ -1131,7 +1131,7 @@ static int saa7134_resource(struct saa7134_fh *fh)
 
 static int video_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct saa7134_dev *h,*dev = NULL;
 	struct saa7134_fh *fh;
 	struct list_head *list;

@@ -56,12 +56,14 @@
 #define SONYPI_BASE			0x50
 #define SONYPI_G10A			(SONYPI_BASE+0x14)
 #define SONYPI_TYPE1_REGION_SIZE	0x08
+#define SONYPI_TYPE1_EVTYPE_OFFSET	0x04
 
 /* type2 series specifics */
 #define SONYPI_SIRQ			0x9b
 #define SONYPI_SLOB			0x9c
 #define SONYPI_SHIB			0x9d
 #define SONYPI_TYPE2_REGION_SIZE	0x20
+#define SONYPI_TYPE2_EVTYPE_OFFSET	0x12
 
 /* battery / brightness addresses */
 #define SONYPI_BAT_FLAGS	0x81
@@ -167,6 +169,7 @@ static struct sonypi_irq_list sonypi_type2_irq_list[] = {
 #define SONYPI_THUMBPHRASE_MASK			0x00000200
 #define SONYPI_MEYE_MASK			0x00000400
 #define SONYPI_MEMORYSTICK_MASK			0x00000800
+#define SONYPI_BATTERY_MASK			0x00001000
 
 struct sonypi_event {
 	u8	data;
@@ -293,6 +296,13 @@ static struct sonypi_event sonypi_memorystickev[] = {
 	{ 0, 0 }
 };
 
+/* The set of possible battery events */
+static struct sonypi_event sonypi_batteryev[] = {
+	{ 0x20, SONYPI_EVENT_BATTERY_INSERT },
+	{ 0x30, SONYPI_EVENT_BATTERY_REMOVE },
+	{ 0, 0 }
+};
+
 struct sonypi_eventtypes {
 	int			model;
 	u8			data;
@@ -307,19 +317,22 @@ struct sonypi_eventtypes {
 	{ SONYPI_DEVICE_MODEL_TYPE1, 0x20, SONYPI_FNKEY_MASK, sonypi_fnkeyev },
 	{ SONYPI_DEVICE_MODEL_TYPE1, 0x30, SONYPI_BLUETOOTH_MASK, sonypi_blueev },
 	{ SONYPI_DEVICE_MODEL_TYPE1, 0x40, SONYPI_PKEY_MASK, sonypi_pkeyev },
+	{ SONYPI_DEVICE_MODEL_TYPE1, 0x30, SONYPI_MEMORYSTICK_MASK, sonypi_memorystickev },
+	{ SONYPI_DEVICE_MODEL_TYPE1, 0x40, SONYPI_BATTERY_MASK, sonypi_batteryev },
 
 	{ SONYPI_DEVICE_MODEL_TYPE2, 0, 0xffffffff, sonypi_releaseev },
 	{ SONYPI_DEVICE_MODEL_TYPE2, 0x38, SONYPI_LID_MASK, sonypi_lidev },
-	{ SONYPI_DEVICE_MODEL_TYPE2, 0x08, SONYPI_JOGGER_MASK, sonypi_joggerev },
-	{ SONYPI_DEVICE_MODEL_TYPE2, 0x08, SONYPI_CAPTURE_MASK, sonypi_captureev },
-	{ SONYPI_DEVICE_MODEL_TYPE2, 0x08, SONYPI_FNKEY_MASK, sonypi_fnkeyev },
-	{ SONYPI_DEVICE_MODEL_TYPE2, 0x08, SONYPI_BLUETOOTH_MASK, sonypi_blueev },
+	{ SONYPI_DEVICE_MODEL_TYPE2, 0x11, SONYPI_JOGGER_MASK, sonypi_joggerev },
+	{ SONYPI_DEVICE_MODEL_TYPE2, 0x61, SONYPI_CAPTURE_MASK, sonypi_captureev },
+	{ SONYPI_DEVICE_MODEL_TYPE2, 0x21, SONYPI_FNKEY_MASK, sonypi_fnkeyev },
+	{ SONYPI_DEVICE_MODEL_TYPE2, 0x31, SONYPI_BLUETOOTH_MASK, sonypi_blueev },
 	{ SONYPI_DEVICE_MODEL_TYPE2, 0x08, SONYPI_PKEY_MASK, sonypi_pkeyev },
-	{ SONYPI_DEVICE_MODEL_TYPE2, 0x08, SONYPI_BACK_MASK, sonypi_backev },
+	{ SONYPI_DEVICE_MODEL_TYPE2, 0x11, SONYPI_BACK_MASK, sonypi_backev },
 	{ SONYPI_DEVICE_MODEL_TYPE2, 0x08, SONYPI_HELP_MASK, sonypi_helpev },
 	{ SONYPI_DEVICE_MODEL_TYPE2, 0x08, SONYPI_ZOOM_MASK, sonypi_zoomev },
 	{ SONYPI_DEVICE_MODEL_TYPE2, 0x08, SONYPI_THUMBPHRASE_MASK, sonypi_thumbphraseev },
-	{ SONYPI_DEVICE_MODEL_TYPE2, 0x08, SONYPI_MEMORYSTICK_MASK, sonypi_memorystickev },
+	{ SONYPI_DEVICE_MODEL_TYPE2, 0x31, SONYPI_MEMORYSTICK_MASK, sonypi_memorystickev },
+	{ SONYPI_DEVICE_MODEL_TYPE2, 0x41, SONYPI_BATTERY_MASK, sonypi_batteryev },
 
 	{ 0, 0, 0, 0 }
 };
@@ -354,6 +367,7 @@ struct sonypi_device {
 	u16 ioport1;
 	u16 ioport2;
 	u16 region_size;
+	u16 evtype_offset;
 	int camera_power;
 	int bluetooth_power;
 	struct semaphore lock;

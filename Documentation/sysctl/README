@@ -55,6 +55,7 @@ one part of the kernel, so you can do configuration on a piece
 by piece basis, or just some 'thematic frobbing'.
 
 The subdirs are about:
+abi/		execution domains & personalities
 debug/		<empty>
 dev/		device specific information (eg dev/cdrom/info)
 fs/		specific filesystems

@@ -13,18 +13,6 @@
 #include <linux/mm.h>
 #include "agp.h"
 
-
-/* registers */
-#define NVIDIA_0_APBASE		0x10
-#define NVIDIA_0_APSIZE		0x80
-#define NVIDIA_1_WBC		0xf0
-#define NVIDIA_2_GARTCTRL	0xd0
-#define NVIDIA_2_APBASE		0xd8
-#define NVIDIA_2_APLIMIT	0xdc
-#define NVIDIA_2_ATTBASE(i)	(0xe0 + (i) * 4)
-#define NVIDIA_3_APBASE		0x50
-#define NVIDIA_3_APLIMIT	0x54
-
 static struct _nvidia_private {
 	struct pci_dev *dev_1;
 	struct pci_dev *dev_2;
@@ -73,7 +61,7 @@ static int nvidia_configure(void)
 		current_size->size_value);
 
     /* address to map to */
-	pci_read_config_dword(agp_bridge->dev, NVIDIA_0_APBASE, &apbase);
+	pci_read_config_dword(agp_bridge->dev, AGP_APBASE, &apbase);
 	apbase &= PCI_BASE_ADDRESS_MEM_MASK;
 	agp_bridge->gart_bus_addr = apbase;
 	aplimit = apbase + (current_size->size * 1024 * 1024) - 1;

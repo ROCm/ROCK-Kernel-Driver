@@ -62,14 +62,14 @@
 spinlock_t au1000_dma_spin_lock = SPIN_LOCK_UNLOCKED;
 
 struct dma_chan au1000_dma_table[NUM_AU1000_DMA_CHANNELS] = {
-      {dev_id:-1,},
-      {dev_id:-1,},
-      {dev_id:-1,},
-      {dev_id:-1,},
-      {dev_id:-1,},
-      {dev_id:-1,},
-      {dev_id:-1,},
-      {dev_id:-1,}
+      {.dev_id = -1,},
+      {.dev_id = -1,},
+      {.dev_id = -1,},
+      {.dev_id = -1,},
+      {.dev_id = -1,},
+      {.dev_id = -1,},
+      {.dev_id = -1,},
+      {.dev_id = -1,}
 };
 
 // Device FIFO addresses and default DMA modes
