@@ -486,12 +486,7 @@ isdn_net_dial_timer(unsigned long data)
 static void
 init_dialout(isdn_net_local *lp)
 {
-	unsigned long flags;
-
-	save_flags(flags);
-	cli();
 	lp->dial = 0;
-	restore_flags(flags);
 
 	if (lp->dialtimeout > 0 &&
 	    (lp->dialstarted == 0 || 
@@ -524,9 +519,11 @@ do_dialout(isdn_net_local *lp)
 	if (ISDN_NET_DIALMODE(*lp) == ISDN_NET_DM_OFF)
 		return;
 	
-	if (list_empty(&lp->phone[1]))
+	spin_lock_irqsave(&lp->lock, flags);
+	if (list_empty(&lp->phone[1])) {
+		spin_unlock_irqrestore(&lp->lock, flags);
 		return;
-
+	}
 	i = 0;
 	list_for_each_entry(phone, &lp->phone[1], list) {
 		if (i++ == lp->dial)
@@ -537,6 +534,11 @@ do_dialout(isdn_net_local *lp)
 	lp->dial = 0;
 	lp->dialretry++;
 	
+ found:
+	lp->dial++;
+	dial.phone = phone->num;
+	spin_unlock_irqrestore(&lp->lock, flags);
+
 	if (lp->dialretry > lp->dialmax) {
 		if (lp->dialtimeout == 0) {
 			lp->dialwait_timer = jiffies + lp->dialwait;
@@ -545,17 +547,12 @@ do_dialout(isdn_net_local *lp)
 		isdn_net_hangup(lp);
 		return;
 	}
-
- found:
-	lp->dial++;
-	dial.phone = phone->num;
-
 	if(lp->dialtimeout > 0 &&
 	   time_after(jiffies, lp->dialstarted + lp->dialtimeout)) {
-		   lp->dialwait_timer = jiffies + lp->dialwait;
-		   lp->dialstarted = 0;
-		   isdn_net_hangup(lp);
-		   return;
+		lp->dialwait_timer = jiffies + lp->dialwait;
+		lp->dialstarted = 0;
+		isdn_net_hangup(lp);
+		return;
 	}
 	/*
 	 * Switch to next number or back to start if at end of list.
@@ -2219,10 +2216,14 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 			}
 			dbg_net_icall("n_fi: match2\n");
 			if (lp->flags & ISDN_NET_SECURE) {
+				spin_lock_irqsave(&lp->lock, flags);
 				list_for_each_entry(n, &lp->phone[0], list) {
-					if (!isdn_msncmp(nr, n->num))
+					if (!isdn_msncmp(nr, n->num)) {
+						spin_unlock_irqrestore(&lp->lock, flags);
 						break;
+					}
 				}
+				spin_unlock_irqrestore(&lp->lock, flags);
 				continue;
 			}
 			dbg_net_icall("n_fi: match3\n");
@@ -2557,6 +2558,9 @@ isdn_net_new(char *name, struct net_device *master)
 	init_timer(&netdev->local.hup_timer);
 	netdev->local.hup_timer.data = (unsigned long) &netdev->local;
 	netdev->local.hup_timer.function = isdn_net_hup_timer;
+	spin_lock_init(&netdev->local.lock);
+	INIT_LIST_HEAD(&netdev->local.phone[0]);
+	INIT_LIST_HEAD(&netdev->local.phone[1]);
 
 	/* Put into to netdev-chain */
 	list_add(&netdev->global_list, &isdn_net_devs);
@@ -2889,6 +2893,7 @@ int
 isdn_net_addphone(isdn_net_ioctl_phone * phone)
 {
 	isdn_net_dev *p = isdn_net_findif(phone->name);
+	unsigned long flags;
 	struct isdn_net_phone *n;
 
 	if (!p)
@@ -2899,7 +2904,9 @@ isdn_net_addphone(isdn_net_ioctl_phone * phone)
 		return -ENOMEM;
 
 	strcpy(n->num, phone->phone);
+	spin_lock_irqsave(&p->local.lock, flags);
 	list_add_tail(&n->list, &p->local.phone[phone->outgoing & 1]);
+	spin_unlock_irqrestore(&p->local.lock, flags);
 	return 0;
 }
 
@@ -2911,32 +2918,37 @@ int
 isdn_net_getphones(isdn_net_ioctl_phone * phone, char *phones)
 {
 	isdn_net_dev *p = isdn_net_findif(phone->name);
+	unsigned long flags;
 	int inout = phone->outgoing & 1;
-	int more = 0;
 	int count = 0;
+	char *buf = (char *)__get_free_page(GFP_KERNEL);
 	struct isdn_net_phone *n;
 
 	if (!p)
 		return -ENODEV;
 
-	inout &= 1;
-	list_for_each_entry(n, &p->local.phone[inout], list) {
-		if (more) {
-			if (put_user(' ', phones++))
-				return -EFAULT;
-			count++;
-		}
-		if (copy_to_user(phones, n->num, strlen(n->num) + 1)) {
-			return -EFAULT;
-		}
-		phones += strlen(n->num);
-		count += strlen(n->num);
-		more = 1;
-	}
-	if (put_user(0, phones))
-		return -EFAULT;
+	if (!buf)
+		return -ENOMEM;
 
-	count++;
+	inout &= 1;
+	spin_lock_irqsave(&p->local.lock, flags);
+	list_for_each_entry(n, &p->local.phone[inout], list) {
+		strcpy(&buf[count], n->num);
+		count += strlen(n->num);
+		buf[count++] = ' ';
+		if (count > PAGE_SIZE - ISDN_MSNLEN - 1)
+			break;
+	}
+	spin_unlock_irqrestore(&p->local.lock, flags);
+	if (!count)
+		count++;
+
+	buf[count-1] = 0;
+
+	if (copy_to_user(phones, buf, count))
+		count = -EFAULT;
+
+	free_page((unsigned long)buf);
 	return count;
 }
 
@@ -2976,22 +2988,23 @@ isdn_net_delphone(isdn_net_ioctl_phone * phone)
 	int inout = phone->outgoing & 1;
 	struct isdn_net_phone *n;
 	unsigned long flags;
+	int retval;
 
 	if (!p)
 		return -ENODEV;
 
-	save_flags(flags);
-	cli();
+	retval = -EINVAL;
+	spin_lock_irqsave(&p->local.lock, flags);
 	list_for_each_entry(n, &p->local.phone[inout], list) {
 		if (!strcmp(n->num, phone->phone)) {
 			list_del(&n->list);
 			kfree(n);
-			restore_flags(flags);
-			return 0;
+			retval = 0;
+			break;
 		}
 	}
-	restore_flags(flags);
-	return -EINVAL;
+	spin_unlock_irqrestore(&p->local.lock, flags);
+	return retval;
 }
 
 /*
@@ -3004,8 +3017,7 @@ isdn_net_rmallphone(isdn_net_dev * p)
 	unsigned long flags;
 	int i;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&p->local.lock, flags);
 	for (i = 0; i < 2; i++) {
 		while (!list_empty(&p->local.phone[i])) {
 			n = list_entry(p->local.phone[i].next, struct isdn_net_phone, list);
@@ -3013,8 +3025,7 @@ isdn_net_rmallphone(isdn_net_dev * p)
 			kfree(n);
 		}
 	}
-	p->local.dial = 0;
-	restore_flags(flags);
+	spin_lock_irqsave(&p->local.lock, flags);
 	return 0;
 }
 

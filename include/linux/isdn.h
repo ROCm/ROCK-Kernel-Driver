@@ -281,6 +281,7 @@ struct isdn_net_phone {
 
 /* Local interface-data */
 typedef struct isdn_net_local_s {
+  spinlock_t             lock;
   ulong                  magic;
   char                   name[10];     /* Name of device                   */
   struct timer_list      dial_timer;   /* dial events timer                */

@@ -1599,8 +1599,9 @@ static struct file_operations isdn_ctrl_fops =
 	.release	= isdn_ctrl_release,
 };
 
+
 /*
- * file_operations for major 43, /dev/isdn*
+ * file_operations for major 45, /dev/isdn*
  * stolen from drivers/char/misc.c
  */
 
