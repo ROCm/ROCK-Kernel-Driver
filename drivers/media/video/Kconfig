@@ -274,5 +274,15 @@ config VIDEO_HEXIUM_GEMINI
 	  To compile this driver as a module, choose M here: the
 	  module will be called hexium_gemini.
 
+config VIDEO_CX88
+	tristate "Conexant 2388x (bt878 successor) support"
+	depends on VIDEO_DEV && PCI && I2C_ALGOBIT && EXPERIMENTAL
+	---help---
+	  This is a video4linux driver for Conexant 2388x based
+	  TV cards.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called cx8800
+
 endmenu
 
