@@ -471,7 +471,8 @@ int patch_sigmatel_stac9758(ac97_t * ac97)
 	int i;
 
 	/* Gateway M675 notebook */
-	if (ac97->pci->subsystem_vendor == 0x107b &&
+	if (ac97->pci && 
+	    ac97->pci->subsystem_vendor == 0x107b &&
 	    ac97->pci->subsystem_device == 0x0601)
 	    	pregs = m675_regs;
 
