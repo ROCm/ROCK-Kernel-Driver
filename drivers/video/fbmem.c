@@ -1018,7 +1018,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct fb_con2fbmap con2fb;
 #endif
 	struct fb_cmap cmap;
-	int i, rc;
+	int i;
 	
 	if (!fb)
 		return -ENODEV;
@@ -1060,9 +1060,9 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		return 0;
 	case FBIO_CURSOR:
 		acquire_console_sem();
-		rc = fb_cursor(info, (struct fb_cursor *) arg);
+		i = fb_cursor(info, (struct fb_cursor *) arg);
 		release_console_sem();
-		return rc;
+		return i;
 #ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	case FBIOGET_CON2FBMAP:
 		if (copy_from_user(&con2fb, (void *)arg, sizeof(con2fb)))
