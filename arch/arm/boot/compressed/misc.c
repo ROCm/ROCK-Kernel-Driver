@@ -18,6 +18,8 @@
 
 unsigned int __machine_arch_type;
 
+#include <linux/kernel.h>
+
 #include <asm/uaccess.h>
 #include <asm/arch/uncompress.h>
 #include <asm/proc/uncompress.h>
