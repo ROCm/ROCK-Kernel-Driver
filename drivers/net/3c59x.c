@@ -1076,14 +1076,20 @@ static int __devinit vortex_init_one (struct pci_dev *pdev,
 	int rc;
 
 	/* wake up and enable device */		
-	if (pci_enable_device (pdev)) {
-		rc = -EIO;
-	} else {
-		rc = vortex_probe1 (&pdev->dev, pci_resource_start (pdev, 0),
-							pdev->irq, ent->driver_data, vortex_cards_found);
-		if (rc == 0)
-			vortex_cards_found++;
+	rc = pci_enable_device (pdev);
+	if (rc < 0)
+		goto out;
+
+	rc = vortex_probe1 (&pdev->dev, pci_resource_start (pdev, 0),
+						pdev->irq, ent->driver_data, vortex_cards_found);
+	if (rc < 0) {
+		pci_disable_device (pdev);
+		goto out;
 	}
+
+	vortex_cards_found++;
+
+out:
 	return rc;
 }
 
@@ -3171,6 +3177,7 @@ static void __devexit vortex_remove_one (struct pci_dev *pdev)
 		pci_set_power_state(VORTEX_PCI(vp), PCI_D0);	/* Go active */
 		if (vp->pm_state_valid)
 			pci_restore_state(VORTEX_PCI(vp));
+		pci_disable_device(VORTEX_PCI(vp));
 	}
 	/* Should really use issue_and_wait() here */
 	outw(TotalReset | ((vp->drv_flags & EEPROM_RESET) ? 0x04 : 0x14),
