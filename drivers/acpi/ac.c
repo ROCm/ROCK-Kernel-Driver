@@ -29,6 +29,7 @@
 #include <linux/types.h>
 #include <linux/compatmac.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
 
@@ -53,6 +54,7 @@ MODULE_LICENSE("GPL");
 
 int acpi_ac_add (struct acpi_device *device);
 int acpi_ac_remove (struct acpi_device *device, int type);
+static int acpi_ac_open_fs(struct inode *inode, struct file *file);
 
 static struct acpi_driver acpi_ac_driver = {
 	.name =		ACPI_AC_DRIVER_NAME,
@@ -69,6 +71,12 @@ struct acpi_ac {
 	unsigned long		state;
 };
 
+static struct file_operations acpi_ac_fops = {
+	.open		= acpi_ac_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
 
 /* --------------------------------------------------------------------------
                                AC Adapter Management
@@ -103,53 +111,40 @@ acpi_ac_get_state (
 
 struct proc_dir_entry		*acpi_ac_dir = NULL;
 
-static int
-acpi_ac_read_state (
-	char			*page,
-	char			**start,
-	off_t			off,
-	int 			count,
-	int 			*eof,
-	void			*data)
+int acpi_ac_seq_show(struct seq_file *seq, void *offset)
 {
-	struct acpi_ac		*ac = (struct acpi_ac *) data;
-	char			*p = page;
-	int			len = 0;
+	struct acpi_ac		*ac = (struct acpi_ac *) seq->private;
 
-	ACPI_FUNCTION_TRACE("acpi_ac_read_state");
+	ACPI_FUNCTION_TRACE("acpi_ac_seq_show");
 
-	if (!ac || (off != 0))
-		goto end;
+	if (!ac)
+		return 0;
 
 	if (acpi_ac_get_state(ac)) {
-		p += sprintf(p, "ERROR: Unable to read AC Adapter state\n");
-		goto end;
+		seq_puts(seq, "ERROR: Unable to read AC Adapter state\n");
+		return 0;
 	}
 
-	p += sprintf(p, "state:                   ");
+	seq_puts(seq, "state:                   ");
 	switch (ac->state) {
 	case ACPI_AC_STATUS_OFFLINE:
-		p += sprintf(p, "off-line\n");
+		seq_puts(seq, "off-line\n");
 		break;
 	case ACPI_AC_STATUS_ONLINE:
-		p += sprintf(p, "on-line\n");
+		seq_puts(seq, "on-line\n");
 		break;
 	default:
-		p += sprintf(p, "unknown\n");
+		seq_puts(seq, "unknown\n");
 		break;
 	}
 
-end:
-	len = (p - page);
-	if (len <= off+count) *eof = 1;
-	*start = page + off;
-	len -= off;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-
-	return_VALUE(len);
+	return 0;
 }
-
+	
+static int acpi_ac_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_ac_seq_show, PDE(inode)->data);
+}
 
 static int
 acpi_ac_add_fs (
@@ -180,7 +175,7 @@ acpi_ac_add_fs (
 			"Unable to create '%s' fs entry\n",
 			ACPI_AC_FILE_STATE));
 	else {
-		entry->read_proc = acpi_ac_read_state;
+		entry->proc_fops = &acpi_ac_fops;
 		entry->data = acpi_driver_data(device);
 	}
 
