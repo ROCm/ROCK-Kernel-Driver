@@ -65,11 +65,11 @@ sys_sigsuspend(old_sigset_t mask, int p2, int p3, int p4, int p6, int p7,
 	sigset_t saveset;
 
 	mask &= _BLOCKABLE;
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	saveset = current->blocked;
 	siginitset(&current->blocked, mask);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	regs->result = -EINTR;
 	regs->ccr |= 0x10000000;
@@ -96,11 +96,11 @@ sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, int p3, int p4, int p6,
 		return -EFAULT;
 	sigdelsetmask(&newset, ~_BLOCKABLE);
 
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	saveset = current->blocked;
 	current->blocked = newset;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	regs->result = -EINTR;
 	regs->ccr |= 0x10000000;
@@ -157,7 +157,7 @@ sys_sigaction(int sig, const struct old_sigaction *act,
  * When we have signals to deliver, we set up on the
  * user stack, going down from the original stack pointer:
  *	a sigregs struct
- *	one or more sigcontext structs with
+ *	a sigcontext struct
  *	a gap of __SIGNAL_FRAMESIZE bytes
  *
  * Each of these things must be a multiple of 16 bytes in size.
@@ -196,7 +196,7 @@ int sys_rt_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 		     struct pt_regs *regs)
 {
 	struct rt_sigframe *rt_sf;
-	struct sigcontext_struct sigctx;
+	struct sigcontext sigctx;
 	struct sigregs *sr;
 	elf_gregset_t saved_regs;  /* an array of ELF_NGREG unsigned longs */
 	sigset_t set;
@@ -208,10 +208,10 @@ int sys_rt_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 	    || copy_from_user(&st, &rt_sf->uc.uc_stack, sizeof(st)))
 		goto badframe;
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
 
@@ -297,12 +297,12 @@ badframe:
 int sys_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 		  struct pt_regs *regs)
 {
-	struct sigcontext_struct *sc, sigctx;
+	struct sigcontext *sc, sigctx;
 	struct sigregs *sr;
 	elf_gregset_t saved_regs;  /* an array of ELF_NGREG unsigned longs */
 	sigset_t set;
 
-	sc = (struct sigcontext_struct *)(regs->gpr[1] + __SIGNAL_FRAMESIZE);
+	sc = (struct sigcontext *)(regs->gpr[1] + __SIGNAL_FRAMESIZE);
 	if (copy_from_user(&sigctx, sc, sizeof(sigctx)))
 		goto badframe;
 
@@ -311,10 +311,10 @@ int sys_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 	set.sig[1] = sigctx._unused[3];
 #endif
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	if (regs->msr & MSR_FP )
 		giveup_fpu(current);
 
@@ -344,7 +344,7 @@ static void
 setup_frame(struct pt_regs *regs, struct sigregs *frame,
 	    unsigned long newsp)
 {
-	struct sigcontext_struct *sc = (struct sigcontext_struct *) newsp;
+	struct sigcontext *sc = (struct sigcontext_struct *) newsp;
 
 	if (verify_area(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto badframe;
@@ -387,7 +387,7 @@ static void
 handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	struct pt_regs * regs, unsigned long *newspp, unsigned long frame)
 {
-	struct sigcontext_struct *sc;
+	struct sigcontext *sc;
 	struct rt_sigframe *rt_sf;
 	struct k_sigaction *ka = &current->sig->action[sig-1];
 
@@ -428,7 +428,7 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	} else {
 		/* Put a sigcontext on the stack */
 		*newspp -= sizeof(*sc);
-		sc = (struct sigcontext_struct *) *newspp;
+		sc = (struct sigcontext *) *newspp;
 		if (verify_area(VERIFY_WRITE, sc, sizeof(*sc)))
 			goto badframe;
 		
@@ -446,11 +446,11 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 		ka->sa.sa_handler = SIG_DFL;
 
 	if (!(ka->sa.sa_flags & SA_NODEFER)) {
-		spin_lock_irq(&current->sigmask_lock);
+		spin_lock_irq(&current->sig->siglock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
 		sigaddset(&current->blocked,sig);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sigmask_lock);
+		spin_unlock_irq(&current->sig->siglock);
 	}
 	return;
 
