@@ -60,6 +60,46 @@ config IP6_NF_MATCH_MAC
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
+config IP6_NF_MATCH_RT
+	tristate "Routing header match support"
+	depends on IP6_NF_IPTABLES && EXPERIMENTAL
+	help
+	  rt matching allows you to match packets based on the routing
+	  header of the packet.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+config IP6_NF_MATCH_OPTS
+	tristate "Hop-by-hop and Dst opts header match support"
+	depends on IP6_NF_IPTABLES && EXPERIMENTAL
+	help
+	  This allows one to match packets based on the hop-by-hop
+	  and destination options headers of a packet.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+config IP6_NF_MATCH_FRAG
+	tristate "Fragmentation header match support"
+	depends on IP6_NF_IPTABLES && EXPERIMENTAL
+	help
+	  frag matching allows you to match packets based on the fragmentation
+	  header of the packet.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+config IP6_NF_MATCH_HL
+	tristate "HL match support"
+	depends on IP6_NF_IPTABLES
+	help
+	  HL matching allows you to match packets based on the hop
+	  limit of the packet.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
 config IP6_NF_MATCH_MULTIPORT
 	tristate "Multiple port match support"
 	depends on IP6_NF_IPTABLES
@@ -89,6 +129,25 @@ config IP6_NF_MATCH_MARK
 	  Netfilter mark matching allows you to match packets based on the
 	  `nfmark' value in the packet.  This can be set by the MARK target
 	  (see below).
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+config IP6_NF_MATCH_IPV6HEADER
+	tristate "IPv6 Extension Headers Match (EXPERIMENTAL)"
+	depends on IP6_NF_IPTABLES && EXPERIMENTAL
+	help
+	  This module allows one to match packets based upon
+	  the ipv6 extension headers.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+config IP6_NF_MATCH_AHESP
+	tristate "AH/ESP match support (EXPERIMENTAL)"
+	depends on IP6_NF_IPTABLES && EXPERIMENTAL
+	help
+	  This module allows one to match AH and ESP packets.
 
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
