@@ -903,6 +903,14 @@ int ide_config_drive_speed (ide_drive_t *drive, u8 speed)
          * Select the drive, and issue the SETFEATURES command
          */
 	disable_irq_nosync(hwif->irq);
+	
+	/*
+	 *	FIXME: we race against the running IRQ here if
+	 *	this is called from non IRQ context. If we use
+	 *	disable_irq() we hang on the error path. Work
+	 *	is needed.
+	 */
+	 
 	udelay(1);
 	SELECT_DRIVE(drive);
 	SELECT_MASK(drive, 0);

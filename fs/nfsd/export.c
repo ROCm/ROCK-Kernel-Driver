@@ -496,13 +496,19 @@ exp_parent(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry,
 {
 	svc_export *exp;
 
-	read_lock(&dparent_lock);
+	dget(dentry);
 	exp = exp_get_by_name(clp, mnt, dentry, reqp);
+
 	while (exp == NULL && dentry != dentry->d_parent) {
-		dentry = dentry->d_parent;
+		struct dentry *parent;
+		read_lock(&dparent_lock);
+		parent = dget(dentry->d_parent);
+		dput(dentry);
+		dentry = parent;
+		read_unlock(&dparent_lock);
 		exp = exp_get_by_name(clp, mnt, dentry, reqp);
 	}
-	read_unlock(&dparent_lock);
+	dput(dentry);
 	return exp;
 }
 

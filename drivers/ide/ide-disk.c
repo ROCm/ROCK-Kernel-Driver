@@ -1098,6 +1098,7 @@ static inline int idedisk_supports_host_protected_area(ide_drive_t *drive)
  * in above order (i.e., if value of higher priority is available,
  * reset will be ignored).
  */
+#define IDE_STROKE_LIMIT	(32000*1024*2)
 static void init_idedisk_capacity (ide_drive_t  *drive)
 {
 	struct hd_driveid *id = drive->id;
@@ -1118,7 +1119,7 @@ static void init_idedisk_capacity (ide_drive_t  *drive)
 		drive->cyl = (unsigned int) capacity_2 / (drive->head * drive->sect);
 		drive->select.b.lba	= 1;
 		set_max_ext = idedisk_read_native_max_address_ext(drive);
-		if (set_max_ext > capacity_2) {
+		if (set_max_ext > capacity_2 && capacity_2 > IDE_STROKE_LIMIT) {
 #ifdef CONFIG_IDEDISK_STROKE
 			set_max_ext = idedisk_read_native_max_address_ext(drive);
 			set_max_ext = idedisk_set_max_address_ext(drive, set_max_ext);
@@ -1145,7 +1146,7 @@ static void init_idedisk_capacity (ide_drive_t  *drive)
 		drive->select.b.lba = 1;
 	}
 
-	if (set_max > capacity) {
+	if (set_max > capacity && capacity > IDE_STROKE_LIMIT) {
 #ifdef CONFIG_IDEDISK_STROKE
 		set_max = idedisk_read_native_max_address(drive);
 		set_max = idedisk_set_max_address(drive, set_max);

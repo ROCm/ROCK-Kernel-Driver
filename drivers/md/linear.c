@@ -37,7 +37,11 @@ static inline dev_info_t *which_dev(mddev_t *mddev, sector_t sector)
 	linear_conf_t *conf = mddev_to_conf(mddev);
 	sector_t block = sector >> 1;
 
-	hash = conf->hash_table + sector_div(block, conf->smallest->size);
+	/*
+	 * sector_div(a,b) returns the remainer and sets a to a/b
+	 */
+	(void)sector_div(block, conf->smallest->size);
+	hash = conf->hash_table + block;
 
 	if ((sector>>1) >= (hash->dev0->size + hash->dev0->offset))
 		return hash->dev1;
@@ -74,8 +78,6 @@ static int linear_run (mddev_t *mddev)
 	int size, i, nb_zone, cnt;
 	unsigned int curr_offset;
 	struct list_head *tmp;
-
-	MOD_INC_USE_COUNT;
 
 	conf = kmalloc (sizeof (*conf), GFP_KERNEL);
 	if (!conf)
@@ -163,7 +165,6 @@ static int linear_run (mddev_t *mddev)
 out:
 	if (conf)
 		kfree(conf);
-	MOD_DEC_USE_COUNT;
 	return 1;
 }
 
@@ -173,8 +174,6 @@ static int linear_stop (mddev_t *mddev)
   
 	kfree(conf->hash_table);
 	kfree(conf);
-
-	MOD_DEC_USE_COUNT;
 
 	return 0;
 }
@@ -189,7 +188,7 @@ static int linear_make_request (request_queue_t *q, struct bio *bio)
 	block = bio->bi_sector >> 1;
   
 	if (unlikely(!tmp_dev)) {
-		printk ("linear_make_request : hash->dev1==NULL for block %llu\n",
+		printk("linear_make_request: hash->dev1==NULL for block %llu\n",
 			(unsigned long long)block);
 		bio_io_error(bio, bio->bi_size);
 		return 0;
@@ -199,7 +198,7 @@ static int linear_make_request (request_queue_t *q, struct bio *bio)
 		     || block < tmp_dev->offset)) {
 		char b[BDEVNAME_SIZE];
 
-		printk ("linear_make_request: Block %llu out of bounds on "
+		printk("linear_make_request: Block %llu out of bounds on "
 			"dev %s size %ld offset %ld\n",
 			(unsigned long long)block,
 			bdevname(tmp_dev->rdev->bdev, b),
@@ -242,6 +241,7 @@ static void linear_status (struct seq_file *seq, mddev_t *mddev)
 static mdk_personality_t linear_personality=
 {
 	.name		= "linear",
+	.owner		= THIS_MODULE,
 	.make_request	= linear_make_request,
 	.run		= linear_run,
 	.stop		= linear_stop,

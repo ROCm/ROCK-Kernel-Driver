@@ -245,14 +245,6 @@ static int ide_timing_compute(ide_drive_t *drive, short speed, struct ide_timing
 	}
 
 /*
- * If the drive is an ATAPI device it may need slower address setup timing,
- * so we stay on the safe side.
- */
-
-	if (drive->media != ide_disk)
-		p.setup = 120;
-
-/*
  * Convert the timing to bus clock counts.
  */
 

@@ -510,9 +510,9 @@ long __strncpy_from_user(char *dst, const char *src, long count);
  *
  * Context: User context only.  This function may sleep.
  *
- * Get the size of a NULL-terminated string in user space.
+ * Get the size of a NUL-terminated string in user space.
  *
- * Returns the size of the string INCLUDING the terminating NULL.
+ * Returns the size of the string INCLUDING the terminating NUL.
  * On exception, returns 0.
  *
  * If there is a limit on the length of a valid string, you may wish to
