@@ -54,16 +54,15 @@
 /* 1st Level Abstractions.  */
 
 /* Allocate and initialize a new transport.  */
-struct sctp_transport *sctp_transport_new(const union sctp_addr *addr,
-					  int priority)
+struct sctp_transport *sctp_transport_new(const union sctp_addr *addr, int gfp)
 {
         struct sctp_transport *transport;
 
-        transport = t_new(struct sctp_transport, priority);
+        transport = t_new(struct sctp_transport, gfp);
 	if (!transport)
 		goto fail;
 
-	if (!sctp_transport_init(transport, addr, priority))
+	if (!sctp_transport_init(transport, addr, gfp))
 		goto fail_init;
 
 	transport->malloced = 1;
@@ -81,7 +80,7 @@ fail:
 /* Intialize a new transport from provided memory.  */
 struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
 					   const union sctp_addr *addr,
-					   int priority)
+					   int gfp)
 {
 	struct sctp_protocol *proto = sctp_get_protocol();
 
@@ -199,13 +198,13 @@ void sctp_transport_reset_timers(struct sctp_transport *transport)
  * Register the reference count in the association.
  */
 void sctp_transport_set_owner(struct sctp_transport *transport,
-			      sctp_association_t *asoc)
+			      struct sctp_association *asoc)
 {
 	transport->asoc = asoc;
 	sctp_association_hold(asoc);
 }
 
-/* Initialize the pmtu of a transport. */ 
+/* Initialize the pmtu of a transport. */
 void sctp_transport_pmtu(struct sctp_transport *transport)
 {
 	struct dst_entry *dst;
@@ -225,7 +224,7 @@ void sctp_transport_pmtu(struct sctp_transport *transport)
 void sctp_transport_route(struct sctp_transport *transport,
 			  union sctp_addr *saddr, struct sctp_opt *opt)
 {
-	sctp_association_t *asoc = transport->asoc;
+	struct sctp_association *asoc = transport->asoc;
 	struct sctp_af *af = transport->af_specific;
 	union sctp_addr *daddr = &transport->ipaddr;
 	struct dst_entry *dst;
@@ -238,9 +237,15 @@ void sctp_transport_route(struct sctp_transport *transport,
 		af->get_saddr(asoc, dst, daddr, &transport->saddr);
 
 	transport->dst = dst;
-	if (dst)
+	if (dst) {
 		transport->pmtu = dst_pmtu(dst);
-	else
+
+		/* Initialize sk->rcv_saddr, if the transport is the
+		 * association's active path for getsockname().
+		 */ 
+		if (asoc && (transport == asoc->peer.active_path))
+			af->to_sk_saddr(&transport->saddr, asoc->base.sk);
+	} else
 		transport->pmtu = SCTP_DEFAULT_MAXSEGMENT;
 }
 
@@ -359,7 +364,7 @@ void sctp_transport_raise_cwnd(struct sctp_transport *transport,
 		 * two conditions are met can the cwnd be increased otherwise
 		 * the cwnd MUST not be increased. If these conditions are met
 		 * then cwnd MUST be increased by at most the lesser of
-		 * 1) the total size of the previously outstanding DATA 
+		 * 1) the total size of the previously outstanding DATA
 		 * chunk(s) acknowledged, and 2) the destination's path MTU.
 		 */
 		if (bytes_acked > pmtu)
@@ -373,17 +378,17 @@ void sctp_transport_raise_cwnd(struct sctp_transport *transport,
 				  transport, bytes_acked, cwnd,
 				  ssthresh, flight_size, pba);
 	} else {
-		/* RFC 2960 7.2.2 Whenever cwnd is greater than ssthresh, 
-		 * upon each SACK arrival that advances the Cumulative TSN Ack 
-		 * Point, increase partial_bytes_acked by the total number of 
-		 * bytes of all new chunks acknowledged in that SACK including 
-		 * chunks acknowledged by the new Cumulative TSN Ack and by 
+		/* RFC 2960 7.2.2 Whenever cwnd is greater than ssthresh,
+		 * upon each SACK arrival that advances the Cumulative TSN Ack
+		 * Point, increase partial_bytes_acked by the total number of
+		 * bytes of all new chunks acknowledged in that SACK including
+		 * chunks acknowledged by the new Cumulative TSN Ack and by
 		 * Gap Ack Blocks.
 		 *
-		 * When partial_bytes_acked is equal to or greater than cwnd 
-		 * and before the arrival of the SACK the sender had cwnd or 
-		 * more bytes of data outstanding (i.e., before arrival of the 
-		 * SACK, flightsize was greater than or equal to cwnd), 
+		 * When partial_bytes_acked is equal to or greater than cwnd
+		 * and before the arrival of the SACK the sender had cwnd or
+		 * more bytes of data outstanding (i.e., before arrival of the
+		 * SACK, flightsize was greater than or equal to cwnd),
 		 * increase cwnd by MTU, and reset partial_bytes_acked to
 		 * (partial_bytes_acked - cwnd).
 		 */

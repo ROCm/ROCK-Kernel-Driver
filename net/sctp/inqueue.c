@@ -78,7 +78,7 @@ void sctp_inq_free(struct sctp_inq *queue)
 	sctp_chunk_t *chunk;
 
 	/* Empty the queue.  */
-	while ((chunk = (sctp_chunk_t *) skb_dequeue(&queue->in)) != NULL)
+	while ((chunk = (sctp_chunk_t *) skb_dequeue(&queue->in)))
 		sctp_free_chunk(chunk);
 
 	/* If there is a packet which is currently being worked on,
@@ -123,7 +123,7 @@ sctp_chunk_t *sctp_inq_pop(struct sctp_inq *queue)
 	 * at this time.
 	 */
 
-	if ((chunk = queue->in_progress) != NULL) {
+	if ((chunk = queue->in_progress)) {
 		/* There is a packet that we have been working on.
 		 * Any post processing work to do before we move on?
 		 */

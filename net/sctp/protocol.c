@@ -203,7 +203,7 @@ static void sctp_free_local_addr_list(struct sctp_protocol *proto)
 /* Copy the local addresses which are valid for 'scope' into 'bp'.  */
 int sctp_copy_local_addr_list(struct sctp_protocol *proto,
 			      struct sctp_bind_addr *bp, sctp_scope_t scope,
-			      int priority, int copy_flags)
+			      int gfp, int copy_flags)
 {
 	struct sockaddr_storage_list *addr;
 	int error = 0;
@@ -223,8 +223,8 @@ int sctp_copy_local_addr_list(struct sctp_protocol *proto,
 			    (((AF_INET6 == addr->a.sa.sa_family) &&
 			      (copy_flags & SCTP_ADDR6_ALLOWED) &&
 			      (copy_flags & SCTP_ADDR6_PEERSUPP)))) {
-				error = sctp_add_bind_addr(bp, &addr->a,
-							   priority);
+				error = sctp_add_bind_addr(bp, &addr->a, 
+							   GFP_ATOMIC);
 				if (error)
 					goto end_copy;
 			}
@@ -267,11 +267,16 @@ static void sctp_v4_from_sk(union sctp_addr *addr, struct sock *sk)
 }
 
 /* Initialize sk->rcv_saddr from sctp_addr. */
-static void sctp_v4_to_sk(union sctp_addr *addr, struct sock *sk)
+static void sctp_v4_to_sk_saddr(union sctp_addr *addr, struct sock *sk)
 {
 	inet_sk(sk)->rcv_saddr = addr->v4.sin_addr.s_addr;
 }
 
+/* Initialize sk->daddr from sctp_addr. */
+static void sctp_v4_to_sk_daddr(union sctp_addr *addr, struct sock *sk)
+{
+	inet_sk(sk)->daddr = addr->v4.sin_addr.s_addr;
+}
 
 /* Initialize a sctp_addr from a dst_entry. */
 static void sctp_v4_dst_saddr(union sctp_addr *saddr, struct dst_entry *dst,
@@ -471,21 +476,27 @@ out:
 /* For v4, the source address is cached in the route entry(dst). So no need
  * to cache it separately and hence this is an empty routine.
  */
-void sctp_v4_get_saddr(sctp_association_t *asoc,
+void sctp_v4_get_saddr(struct sctp_association *asoc,
 		       struct dst_entry *dst,
 		       union sctp_addr *daddr,
 		       union sctp_addr *saddr)
 {
+	struct rtable *rt = (struct rtable *)dst;
 
+	if (rt) {
+		saddr->v4.sin_family = AF_INET;
+		saddr->v4.sin_port = asoc->base.bind_addr.port;  
+		saddr->v4.sin_addr.s_addr = rt->rt_src; 
+	}
 }
 
 /* What interface did this skb arrive on? */
-int sctp_v4_skb_iif(const struct sk_buff *skb) 
+int sctp_v4_skb_iif(const struct sk_buff *skb)
 {
-     	return ((struct rtable *)skb->dst)->rt_iif;  
+     	return ((struct rtable *)skb->dst)->rt_iif;
 }
 
-/* Create and initialize a new sk for the socket returned by accept(). */ 
+/* Create and initialize a new sk for the socket returned by accept(). */
 struct sock *sctp_v4_create_accept_sk(struct sock *sk,
 				      struct sctp_association *asoc)
 {
@@ -505,22 +516,27 @@ struct sock *sctp_v4_create_accept_sk(struct sock *sk,
 	newsk->prot = sk->prot;
 	newsk->no_check = sk->no_check;
 	newsk->reuse = sk->reuse;
+	newsk->shutdown = sk->shutdown;
 
 	newsk->destruct = inet_sock_destruct;
 	newsk->zapped = 0;
 	newsk->family = PF_INET;
 	newsk->protocol = IPPROTO_SCTP;
 	newsk->backlog_rcv = sk->prot->backlog_rcv;
-	
+
 	newinet = inet_sk(newsk);
+
+	/* Initialize sk's sport, dport, rcv_saddr and daddr for
+	 * getsockname() and getpeername()
+	 */
 	newinet->sport = inet->sport;
 	newinet->saddr = inet->saddr;
-	newinet->rcv_saddr = inet->saddr;
-	newinet->dport = asoc->peer.port;
+	newinet->rcv_saddr = inet->rcv_saddr;
+	newinet->dport = htons(asoc->peer.port);
 	newinet->daddr = asoc->peer.primary_addr.v4.sin_addr.s_addr;
 	newinet->pmtudisc = inet->pmtudisc;
       	newinet->id = 0;
-	
+
 	newinet->ttl = sysctl_ip_default_ttl;
 	newinet->mc_loop = 1;
 	newinet->mc_ttl = 1;
@@ -567,7 +583,7 @@ int sctp_ctl_sock_init(void)
 
 	if (sctp_get_pf_specific(PF_INET6))
 		family = PF_INET6;
-	else 
+	else
 		family = PF_INET;
 
 	err = sock_create(family, SOCK_SEQPACKET, IPPROTO_SCTP,
@@ -694,7 +710,7 @@ static int sctp_inet_bind_verify(struct sctp_opt *opt, union sctp_addr *addr)
 	return sctp_v4_available(addr);
 }
 
-/* Verify that sockaddr looks sendable.  Common verification has already 
+/* Verify that sockaddr looks sendable.  Common verification has already
  * been taken care of.
  */
 static int sctp_inet_send_verify(struct sctp_opt *opt, union sctp_addr *addr)
@@ -705,7 +721,7 @@ static int sctp_inet_send_verify(struct sctp_opt *opt, union sctp_addr *addr)
 /* Fill in Supported Address Type information for INIT and INIT-ACK
  * chunks.  Returns number of addresses supported.
  */
-static int sctp_inet_supported_addrs(const struct sctp_opt *opt, 
+static int sctp_inet_supported_addrs(const struct sctp_opt *opt,
 				     __u16 *types)
 {
 	types[0] = SCTP_PARAM_IPV4_ADDRESS;
@@ -803,7 +819,8 @@ struct sctp_af sctp_ipv4_specific = {
 	.copy_addrlist  = sctp_v4_copy_addrlist,
 	.from_skb       = sctp_v4_from_skb,
 	.from_sk        = sctp_v4_from_sk,
-	.to_sk          = sctp_v4_to_sk,
+	.to_sk_saddr    = sctp_v4_to_sk_saddr,
+	.to_sk_daddr    = sctp_v4_to_sk_daddr,
 	.dst_saddr      = sctp_v4_dst_saddr,
 	.cmp_addr       = sctp_v4_cmp_addr,
 	.addr_valid     = sctp_v4_addr_valid,

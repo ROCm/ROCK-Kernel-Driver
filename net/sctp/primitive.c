@@ -55,12 +55,12 @@
 
 #define DECLARE_PRIMITIVE(name) \
 /* This is called in the code as sctp_primitive_ ## name.  */ \
-int sctp_primitive_ ## name(sctp_association_t *asoc, \
+int sctp_primitive_ ## name(struct sctp_association *asoc, \
 			    void *arg) { \
 	int error = 0; \
 	sctp_event_t event_type; sctp_subtype_t subtype; \
 	sctp_state_t state; \
-	sctp_endpoint_t *ep; \
+	struct sctp_endpoint *ep; \
 	\
 	event_type = SCTP_EVENT_T_PRIMITIVE; \
 	subtype = SCTP_ST_PRIMITIVE(SCTP_PRIMITIVE_ ## name); \

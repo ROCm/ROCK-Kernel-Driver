@@ -81,8 +81,8 @@ typedef struct {
 	int action;
 } sctp_sm_command_t;
 
-typedef sctp_disposition_t (sctp_state_fn_t) (const sctp_endpoint_t *,
-					      const sctp_association_t *,
+typedef sctp_disposition_t (sctp_state_fn_t) (const struct sctp_endpoint *,
+					      const struct sctp_association *,
 					      const sctp_subtype_t type,
 					      void *arg,
 					      sctp_cmd_seq_t *);
@@ -209,67 +209,67 @@ __u32 sctp_generate_verification_tag(void);
 void sctp_populate_tie_tags(__u8 *cookie, __u32 curTag, __u32 hisTag);
 
 /* Prototypes for chunk-building functions.  */
-sctp_chunk_t *sctp_make_init(const sctp_association_t *,
+sctp_chunk_t *sctp_make_init(const struct sctp_association *,
 			     const sctp_bind_addr_t *,
-			     int priority, int vparam_len);
-sctp_chunk_t *sctp_make_init_ack(const sctp_association_t *,
+			     int gfp, int vparam_len);
+sctp_chunk_t *sctp_make_init_ack(const struct sctp_association *,
 				 const sctp_chunk_t *,
-				 const int priority,
+				 const int gfp,
 				 const int unkparam_len);
-sctp_chunk_t *sctp_make_cookie_echo(const sctp_association_t *,
+sctp_chunk_t *sctp_make_cookie_echo(const struct sctp_association *,
 				    const sctp_chunk_t *);
-sctp_chunk_t *sctp_make_cookie_ack(const sctp_association_t *,
+sctp_chunk_t *sctp_make_cookie_ack(const struct sctp_association *,
 				   const sctp_chunk_t *);
-sctp_chunk_t *sctp_make_cwr(const sctp_association_t *,
+sctp_chunk_t *sctp_make_cwr(const struct sctp_association *,
 				 const __u32 lowest_tsn,
 				 const sctp_chunk_t *);
-sctp_chunk_t *sctp_make_datafrag(sctp_association_t *,
+sctp_chunk_t *sctp_make_datafrag(struct sctp_association *,
 				 const struct sctp_sndrcvinfo *sinfo,
 				 int len, const __u8 *data,
 				 __u8 flags, __u16 ssn);
-sctp_chunk_t * sctp_make_datafrag_empty(sctp_association_t *,
+sctp_chunk_t * sctp_make_datafrag_empty(struct sctp_association *,
 					const struct sctp_sndrcvinfo *sinfo,
 					int len, const __u8 flags,
 					__u16 ssn);
-sctp_chunk_t *sctp_make_data(sctp_association_t *,
+sctp_chunk_t *sctp_make_data(struct sctp_association *,
 			     const struct sctp_sndrcvinfo *sinfo,
 			     int len, const __u8 *data);
-sctp_chunk_t *sctp_make_data_empty(sctp_association_t *,
+sctp_chunk_t *sctp_make_data_empty(struct sctp_association *,
 				   const struct sctp_sndrcvinfo *, int len);
-sctp_chunk_t *sctp_make_ecne(const sctp_association_t *,
+sctp_chunk_t *sctp_make_ecne(const struct sctp_association *,
 				  const __u32);
-sctp_chunk_t *sctp_make_sack(const sctp_association_t *);
-sctp_chunk_t *sctp_make_shutdown(const sctp_association_t *asoc);
-sctp_chunk_t *sctp_make_shutdown_ack(const sctp_association_t *asoc,
+sctp_chunk_t *sctp_make_sack(const struct sctp_association *);
+sctp_chunk_t *sctp_make_shutdown(const struct sctp_association *asoc);
+sctp_chunk_t *sctp_make_shutdown_ack(const struct sctp_association *asoc,
 					  const sctp_chunk_t *);
-sctp_chunk_t *sctp_make_shutdown_complete(const sctp_association_t *,
+sctp_chunk_t *sctp_make_shutdown_complete(const struct sctp_association *,
 					  const sctp_chunk_t *);
 void sctp_init_cause(sctp_chunk_t *, __u16 cause, const void *, size_t);
-sctp_chunk_t *sctp_make_abort(const sctp_association_t *,
+sctp_chunk_t *sctp_make_abort(const struct sctp_association *,
 			      const sctp_chunk_t *,
 			      const size_t hint);
-sctp_chunk_t *sctp_make_abort_no_data(const sctp_association_t *,
+sctp_chunk_t *sctp_make_abort_no_data(const struct sctp_association *,
 				      const sctp_chunk_t *,
 				      __u32 tsn);
-sctp_chunk_t *sctp_make_abort_user(const sctp_association_t *,
+sctp_chunk_t *sctp_make_abort_user(const struct sctp_association *,
 				   const sctp_chunk_t *,
 				   const struct msghdr *);
-sctp_chunk_t *sctp_make_heartbeat(const sctp_association_t *,
+sctp_chunk_t *sctp_make_heartbeat(const struct sctp_association *,
 				  const struct sctp_transport *,
 				  const void *payload,
 				  const size_t paylen);
-sctp_chunk_t *sctp_make_heartbeat_ack(const sctp_association_t *,
+sctp_chunk_t *sctp_make_heartbeat_ack(const struct sctp_association *,
 				      const sctp_chunk_t *,
 				      const void *payload,
 				      const size_t paylen);
-sctp_chunk_t *sctp_make_op_error(const sctp_association_t *,
+sctp_chunk_t *sctp_make_op_error(const struct sctp_association *,
 				 const sctp_chunk_t *chunk,
 				 __u16 cause_code,
 				 const void *payload,
 				 size_t paylen);
 void sctp_chunk_assign_tsn(sctp_chunk_t *);
 void sctp_chunk_assign_ssn(sctp_chunk_t *);
-int sctp_datachunks_from_user(sctp_association_t *,
+int sctp_datachunks_from_user(struct sctp_association *,
 			      const struct sctp_sndrcvinfo *,
 			      struct msghdr *, int len,
 			      struct sk_buff_head *);
@@ -279,34 +279,34 @@ int sctp_datachunks_from_user(sctp_association_t *,
 
 int sctp_do_sm(sctp_event_t event_type, sctp_subtype_t subtype,
 	       sctp_state_t state,
-               sctp_endpoint_t *,
-               sctp_association_t *asoc,
+               struct sctp_endpoint *,
+               struct sctp_association *asoc,
                void *event_arg,
-               int priority);
+               int gfp);
 
 int sctp_side_effects(sctp_event_t event_type, sctp_subtype_t subtype,
 		      sctp_state_t state,
-                      sctp_endpoint_t *,
-                      sctp_association_t *asoc,
+                      struct sctp_endpoint *,
+                      struct sctp_association *asoc,
                       void *event_arg,
                       sctp_disposition_t status,
 		      sctp_cmd_seq_t *commands,
-                      int priority);
+                      int gfp);
 
 /* 2nd level prototypes */
 int
 sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 		     sctp_state_t state,
-		     sctp_endpoint_t *ep,
-		     sctp_association_t *asoc,
+		     struct sctp_endpoint *ep,
+		     struct sctp_association *asoc,
 		     void *event_arg,
 		     sctp_disposition_t status,
 		     sctp_cmd_seq_t *retval,
-		     int priority);
+		     int gfp);
 
 
-int sctp_gen_sack(sctp_association_t *, int force, sctp_cmd_seq_t *);
-void sctp_do_TSNdup(sctp_association_t *, sctp_chunk_t *, long gap);
+int sctp_gen_sack(struct sctp_association *, int force, sctp_cmd_seq_t *);
+void sctp_do_TSNdup(struct sctp_association *, sctp_chunk_t *, long gap);
 
 void sctp_generate_t3_rtx_event(unsigned long peer);
 void sctp_generate_heartbeat_event(unsigned long peer);
@@ -325,21 +325,21 @@ sctp_cookie_param_t *
 sctp_pack_cookie(const struct sctp_endpoint *, const struct sctp_association *,
 		 const struct sctp_chunk *, int *cookie_len,
 		 const __u8 *, int addrs_len);
-sctp_association_t *sctp_unpack_cookie(const sctp_endpoint_t *,
-				       const sctp_association_t *,
-				       sctp_chunk_t *, int priority, int *err,
+struct sctp_association *sctp_unpack_cookie(const struct sctp_endpoint *,
+				       const struct sctp_association *,
+				       sctp_chunk_t *, int gfp, int *err,
 				       sctp_chunk_t **err_chk_p);
-int sctp_addip_addr_config(sctp_association_t *, sctp_param_t,
+int sctp_addip_addr_config(struct sctp_association *, sctp_param_t,
 			   struct sockaddr_storage*, int);
-void sctp_send_stale_cookie_err(const sctp_endpoint_t *ep,
-				const sctp_association_t *asoc,
+void sctp_send_stale_cookie_err(const struct sctp_endpoint *ep,
+				const struct sctp_association *asoc,
 				const sctp_chunk_t *chunk,
 				sctp_cmd_seq_t *commands,
 				sctp_chunk_t *err_chunk);
 
 /* 3rd level prototypes */
-__u32 sctp_generate_tag(const sctp_endpoint_t *);
-__u32 sctp_generate_tsn(const sctp_endpoint_t *);
+__u32 sctp_generate_tag(const struct sctp_endpoint *);
+__u32 sctp_generate_tsn(const struct sctp_endpoint *);
 
 /* 4th level prototypes */
 void sctp_param2sockaddr(union sctp_addr *addr, sctp_addr_param_t *,
@@ -450,7 +450,7 @@ static inline void sctp_add_cmd_sf(sctp_cmd_seq_t *seq, sctp_verb_t verb, sctp_a
  */
 static inline int
 sctp_vtag_verify_either(const sctp_chunk_t *chunk,
-			const sctp_association_t *asoc)
+			const struct sctp_association *asoc)
 {
         /* RFC 2960 Section 8.5.1, sctpimpguide-06 Section 2.13.2
 	 *

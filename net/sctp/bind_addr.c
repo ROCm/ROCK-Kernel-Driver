@@ -80,6 +80,22 @@ int sctp_bind_addr_copy(sctp_bind_addr_t *dest, const sctp_bind_addr_t *src,
 			goto out;
 	}
 
+	/* If there are no addresses matching the scope and
+	 * this is global scope, try to get a link scope address, with
+	 * the assumption that we must be sitting behind a NAT.
+	 */
+	if (list_empty(&dest->address_list) && (SCTP_SCOPE_GLOBAL == scope)) {
+		list_for_each(pos, &src->address_list) {
+			addr = list_entry(pos, struct sockaddr_storage_list,
+					  list);
+			error = sctp_copy_one_addr(dest, &addr->a,
+						   SCTP_SCOPE_LINK, gfp,
+						   flags);
+			if (error < 0)
+				goto out;
+		}
+	}
+
 out:
 	if (error)
 		sctp_bind_addr_clean(dest);
@@ -212,6 +228,14 @@ union sctp_params sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp,
 	/* Allocate enough memory at once. */
 	list_for_each(pos, &bp->address_list) {
 		len += sizeof(sctp_addr_param_t);
+	}
+
+	/* Don't even bother embedding an address if there
+	 * is only one.
+	 */
+	if (len == sizeof(sctp_addr_param_t)) {
+		retval.v = NULL;
+		goto end_raw;
 	}
 
 	retval.v = kmalloc(len, gfp);

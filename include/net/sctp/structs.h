@@ -83,14 +83,11 @@ struct sctp_outq;
 struct sctp_bind_addr;
 struct sctp_ulpq;
 struct sctp_opt;
-struct sctp_endpoint_common;
+struct sctp_ep_common;
 struct sctp_ssnmap;
 
-typedef struct sctp_endpoint sctp_endpoint_t;
-typedef struct sctp_association sctp_association_t;
 typedef struct sctp_chunk sctp_chunk_t;
 typedef struct sctp_bind_addr sctp_bind_addr_t;
-typedef struct sctp_endpoint_common sctp_endpoint_common_t;
 
 #include <net/sctp/tsnmap.h>
 #include <net/sctp/ulpevent.h>
@@ -114,7 +111,7 @@ typedef struct sctp_bind_hashbucket {
 /* Used for hashing all associations.  */
 typedef struct sctp_hashbucket {
 	rwlock_t	lock;
-	sctp_endpoint_common_t  *chain;
+	struct sctp_ep_common  *chain;
 } sctp_hashbucket_t __attribute__((__aligned__(8)));
 
 
@@ -235,7 +232,9 @@ struct sctp_af {
 					 int saddr);
 	void            (*from_sk)      (union sctp_addr *,
 					 struct sock *sk);
-	void            (*to_sk)        (union sctp_addr *,
+	void            (*to_sk_saddr)  (union sctp_addr *,
+					 struct sock *sk);
+	void            (*to_sk_daddr)  (union sctp_addr *,
 					 struct sock *sk);
 	int             (*addr_valid)   (union sctp_addr *);
 	sctp_scope_t    (*scope) (union sctp_addr *);
@@ -283,8 +282,11 @@ struct sctp_opt {
 	/* PF_ family specific functions.  */
 	struct sctp_pf *pf;
 
+	/* Access to HMAC transform. */
+	struct crypto_tfm *hmac;
+
 	/* What is our base endpointer? */
-	sctp_endpoint_t *ep;
+	struct sctp_endpoint *ep;
 
 	/* Various Socket Options.  */
 	__u16 default_stream;
@@ -514,7 +516,7 @@ struct sctp_chunk {
 	struct sctp_association *asoc;
 
 	/* What endpoint received this chunk? */
-	sctp_endpoint_common_t *rcvr;
+	struct sctp_ep_common *rcvr;
 
 	/* We fill this in if we are calculating RTT. */
 	unsigned long sent_at;
@@ -696,7 +698,6 @@ struct sctp_transport {
 	 *              is SACK'd) clear this flag.
          */
 	int rto_pending;
-
 
 	/*
 	 * These are the congestion stats.
@@ -973,7 +974,7 @@ int sctp_is_any(const union sctp_addr *addr);
 int sctp_addr_is_valid(const union sctp_addr *addr);
 
 
-/* What type of sctp_endpoint_common?  */
+/* What type of endpoint?  */
 typedef enum {
 	SCTP_EP_TYPE_SOCKET,
 	SCTP_EP_TYPE_ASSOCIATION,
@@ -995,10 +996,10 @@ typedef enum {
  *
  */
 
-struct sctp_endpoint_common {
+struct sctp_ep_common {
 	/* Fields to help us manage our entries in the hash tables. */
-	sctp_endpoint_common_t *next;
-	sctp_endpoint_common_t **pprev;
+	struct sctp_ep_common *next;
+	struct sctp_ep_common **pprev;
 	int hashent;
 
 	/* Runtime type information.  What kind of endpoint is this? */
@@ -1052,12 +1053,7 @@ struct sctp_endpoint_common {
 
 struct sctp_endpoint {
 	/* Common substructure for endpoint and association. */
-	sctp_endpoint_common_t base;
-
-	/* These are the system-wide defaults and other stuff which is
-	 * endpoint-independent.
-	 */
-	struct sctp_protocol *proto;
+	struct sctp_ep_common base;
 
 	/* Associations: A list of current associations and mappings
 	 *            to the data consumers for each association. This
@@ -1092,28 +1088,29 @@ struct sctp_endpoint {
 };
 
 /* Recover the outter endpoint structure. */
-static inline sctp_endpoint_t *sctp_ep(sctp_endpoint_common_t *base)
+static inline struct sctp_endpoint *sctp_ep(struct sctp_ep_common *base)
 {
-	sctp_endpoint_t *ep;
+	struct sctp_endpoint *ep;
 
-	ep = container_of(base, sctp_endpoint_t, base);
+	ep = container_of(base, struct sctp_endpoint, base);
 	return ep;
 }
 
 /* These are function signatures for manipulating endpoints.  */
-sctp_endpoint_t *sctp_endpoint_new(struct sctp_protocol *, struct sock *, int);
-sctp_endpoint_t *sctp_endpoint_init(struct sctp_endpoint *,
-				    struct sctp_protocol *,
-				    struct sock *, int gfp);
-void sctp_endpoint_free(sctp_endpoint_t *);
-void sctp_endpoint_put(sctp_endpoint_t *);
-void sctp_endpoint_hold(sctp_endpoint_t *);
-void sctp_endpoint_add_asoc(sctp_endpoint_t *, struct sctp_association *asoc);
-struct sctp_association *sctp_endpoint_lookup_assoc(const sctp_endpoint_t *ep,
-					       const union sctp_addr *paddr,
-					       struct sctp_transport **);
-int sctp_endpoint_is_peeled_off(sctp_endpoint_t *, const union sctp_addr *);
-sctp_endpoint_t *sctp_endpoint_is_match(sctp_endpoint_t *,
+struct sctp_endpoint *sctp_endpoint_new(struct sock *, int);
+struct sctp_endpoint *sctp_endpoint_init(struct sctp_endpoint *,
+					 struct sock *, int gfp);
+void sctp_endpoint_free(struct sctp_endpoint *);
+void sctp_endpoint_put(struct sctp_endpoint *);
+void sctp_endpoint_hold(struct sctp_endpoint *);
+void sctp_endpoint_add_asoc(struct sctp_endpoint *, struct sctp_association *);
+struct sctp_association *sctp_endpoint_lookup_assoc(
+	const struct sctp_endpoint *ep,
+	const union sctp_addr *paddr,
+	struct sctp_transport **);
+int sctp_endpoint_is_peeled_off(struct sctp_endpoint *,
+				const union sctp_addr *);
+struct sctp_endpoint *sctp_endpoint_is_match(struct sctp_endpoint *,
 					const union sctp_addr *);
 int sctp_has_association(const union sctp_addr *laddr,
 			 const union sctp_addr *paddr);
@@ -1126,8 +1123,8 @@ int sctp_process_init(struct sctp_association *, sctp_cid_t cid,
 		      sctp_init_chunk_t *init, int gfp);
 int sctp_process_param(struct sctp_association *, union sctp_params param,
 		       const union sctp_addr *from, int gfp);
-__u32 sctp_generate_tag(const sctp_endpoint_t *);
-__u32 sctp_generate_tsn(const sctp_endpoint_t *);
+__u32 sctp_generate_tag(const struct sctp_endpoint *);
+__u32 sctp_generate_tsn(const struct sctp_endpoint *);
 
 
 /* RFC2960
@@ -1150,7 +1147,7 @@ struct sctp_association {
 	 * In this context, it represents the associations's view
 	 * of the local endpoint of the association.
 	 */
-	sctp_endpoint_common_t base;
+	struct sctp_ep_common base;
 
 	/* Associations on the same socket. */
 	struct list_head asocs;
@@ -1162,7 +1159,7 @@ struct sctp_association {
 	__u32 eyecatcher;
 
 	/* This is our parent endpoint.  */
-	sctp_endpoint_t *ep;
+	struct sctp_endpoint *ep;
 
 	/* These are those association elements needed in the cookie.  */
 	sctp_cookie_t c;
@@ -1548,6 +1545,9 @@ struct sctp_association {
 	 * after reaching 4294967295.
 	 */
 	__u32 addip_serial;
+
+	/* Is it a temporary association? */ 
+	__u8 temp;
 };
 
 
@@ -1559,7 +1559,7 @@ enum {
 };
 
 /* Recover the outter association structure. */
-static inline struct sctp_association *sctp_assoc(sctp_endpoint_common_t *base)
+static inline struct sctp_association *sctp_assoc(struct sctp_ep_common *base)
 {
 	struct sctp_association *asoc;
 
@@ -1571,10 +1571,10 @@ static inline struct sctp_association *sctp_assoc(sctp_endpoint_common_t *base)
 
 
 struct sctp_association *
-sctp_association_new(const sctp_endpoint_t *, const struct sock *,
+sctp_association_new(const struct sctp_endpoint *, const struct sock *,
 		     sctp_scope_t scope, int gfp);
 struct sctp_association *
-sctp_association_init(struct sctp_association *, const sctp_endpoint_t *,
+sctp_association_init(struct sctp_association *, const struct sctp_endpoint *,
 		      const struct sock *, sctp_scope_t scope,
 		      int gfp);
 void sctp_association_free(struct sctp_association *);

@@ -125,7 +125,7 @@ extern struct sctp_protocol sctp_proto;
 extern struct sock *sctp_get_ctl_sock(void);
 extern int sctp_copy_local_addr_list(struct sctp_protocol  *,
 				     struct sctp_bind_addr *,
-				     sctp_scope_t, int priority, int flags);
+				     sctp_scope_t, int gfp, int flags);
 extern struct sctp_pf *sctp_get_pf_specific(sa_family_t family);
 extern int sctp_register_pf(struct sctp_pf *, sa_family_t);
 
@@ -141,11 +141,11 @@ extern unsigned int sctp_poll(struct file *file, struct socket *sock,
 /*
  * sctp/primitive.c
  */
-extern int sctp_primitive_ASSOCIATE(sctp_association_t *, void *arg);
-extern int sctp_primitive_SHUTDOWN(sctp_association_t *, void *arg);
-extern int sctp_primitive_ABORT(sctp_association_t *, void *arg);
-extern int sctp_primitive_SEND(sctp_association_t *, void *arg);
-extern int sctp_primitive_REQUESTHEARTBEAT(sctp_association_t *, void *arg);
+extern int sctp_primitive_ASSOCIATE(struct sctp_association *, void *arg);
+extern int sctp_primitive_SHUTDOWN(struct sctp_association *, void *arg);
+extern int sctp_primitive_ABORT(struct sctp_association *, void *arg);
+extern int sctp_primitive_SEND(struct sctp_association *, void *arg);
+extern int sctp_primitive_REQUESTHEARTBEAT(struct sctp_association *, void *arg);
 
 /*
  * sctp/crc32c.c
@@ -153,37 +153,33 @@ extern int sctp_primitive_REQUESTHEARTBEAT(sctp_association_t *, void *arg);
 extern __u32 sctp_start_cksum(__u8 *ptr, __u16 count);
 extern __u32 sctp_update_cksum(__u8 *ptr, __u16 count, __u32 cksum);
 extern __u32 sctp_end_cksum(__u32 cksum);
+extern __u32 sctp_update_copy_cksum(__u8 *, __u8 *, __u16 count, __u32 cksum);
 
 /*
  * sctp/input.c
  */
 extern int sctp_rcv(struct sk_buff *skb);
 extern void sctp_v4_err(struct sk_buff *skb, u32 info);
-extern void sctp_hash_established(sctp_association_t *);
-extern void __sctp_hash_established(sctp_association_t *);
-extern void sctp_unhash_established(sctp_association_t *);
-extern void __sctp_unhash_established(sctp_association_t *);
-extern void sctp_hash_endpoint(sctp_endpoint_t *);
-extern void __sctp_hash_endpoint(sctp_endpoint_t *);
-extern void sctp_unhash_endpoint(sctp_endpoint_t *);
-extern void __sctp_unhash_endpoint(sctp_endpoint_t *);
-extern sctp_association_t *__sctp_lookup_association(const union sctp_addr *,
-						     const union sctp_addr *,
-						     struct sctp_transport **);
+extern void sctp_hash_established(struct sctp_association *);
+extern void __sctp_hash_established(struct sctp_association *);
+extern void sctp_unhash_established(struct sctp_association *);
+extern void __sctp_unhash_established(struct sctp_association *);
+extern void sctp_hash_endpoint(struct sctp_endpoint *);
+extern void __sctp_hash_endpoint(struct sctp_endpoint *);
+extern void sctp_unhash_endpoint(struct sctp_endpoint *);
+extern void __sctp_unhash_endpoint(struct sctp_endpoint *);
+extern struct sctp_association *__sctp_lookup_association(
+	const union sctp_addr *,
+	const union sctp_addr *,
+	struct sctp_transport **);
 extern struct sock *sctp_err_lookup(int family, struct sk_buff *,
-				    struct sctphdr *, struct sctp_endpoint **, 
-				    struct sctp_association **, 
+				    struct sctphdr *, struct sctp_endpoint **,
+				    struct sctp_association **,
 				    struct sctp_transport **);
-extern void sctp_err_finish(struct sock *, struct sctp_endpoint *, 
+extern void sctp_err_finish(struct sock *, struct sctp_endpoint *,
 			    struct sctp_association *);
 extern void sctp_icmp_frag_needed(struct sock *, struct sctp_association *,
 				  struct sctp_transport *t, __u32 pmtu);
-/*
- * sctp/hashdriver.c
- */
-extern void sctp_hash_digest(const char *secret, const int secret_len,
-			     const char *text, const int text_len,
-			     __u8 *digest);
 
 /*
  *  Section:  Macros, externs, and inlines
@@ -334,15 +330,27 @@ static inline void sctp_v6_exit(void) { return; }
 
 #endif /* #if defined(CONFIG_IPV6) */
 
+/* Some wrappers, in case crypto not available. */
+#if defined (CONFIG_CRYPTO_HMAC)
+#define sctp_crypto_alloc_tfm crypto_alloc_tfm
+#define sctp_crypto_free_tfm crypto_free_tfm
+#define sctp_crypto_hmac crypto_hmac
+#else
+#define sctp_crypto_alloc_tfm(x...) NULL
+#define sctp_crypto_free_tfm(x...)
+#define sctp_crypto_hmac(x...)
+#endif
+
+
 /* Map an association to an assoc_id. */
-static inline sctp_assoc_t sctp_assoc2id(const sctp_association_t *asoc)
+static inline sctp_assoc_t sctp_assoc2id(const struct sctp_association *asoc)
 {
 	return (sctp_assoc_t) asoc;
 }
 
 
 /* Look up the association by its id.  */
-sctp_association_t *sctp_id2assoc(struct sock *sk, sctp_assoc_t id);
+struct sctp_association *sctp_id2assoc(struct sock *sk, sctp_assoc_t id);
 
 
 /* A macro to walk a list of skbs.  */
@@ -501,10 +509,10 @@ static inline int ipver2af(__u8 ipver)
 /* Perform some sanity checks. */
 static inline int sctp_sanity_check(void)
 {
-	SCTP_ASSERT(sizeof(struct sctp_ulpevent) <= 
+	SCTP_ASSERT(sizeof(struct sctp_ulpevent) <=
 		    sizeof(((struct sk_buff *)0)->cb),
 		    "SCTP: ulpevent does not fit in skb!\n", return 0);
-	
+
 	return 1;
 }
 

@@ -94,13 +94,13 @@ static inline void sctp_outq_insert_data(struct sctp_outq *q,
 					 struct sctp_chunk *ch,
 					 struct sctp_chunk *pos)
 {
-	__skb_insert((struct sk_buff *)ch, (struct sk_buff *)pos->prev, 
+	__skb_insert((struct sk_buff *)ch, (struct sk_buff *)pos->prev,
 		     (struct sk_buff *)pos, pos->list);
 	q->out_qlen += ch->skb->len;
 }
 
 /* Generate a new outqueue.  */
-struct sctp_outq *sctp_outq_new(sctp_association_t *asoc)
+struct sctp_outq *sctp_outq_new(struct sctp_association *asoc)
 {
 	struct sctp_outq *q;
 
@@ -116,7 +116,7 @@ struct sctp_outq *sctp_outq_new(sctp_association_t *asoc)
  * You still need to define handlers if you really want to DO
  * something with this structure...
  */
-void sctp_outq_init(sctp_association_t *asoc, struct sctp_outq *q)
+void sctp_outq_init(struct sctp_association *asoc, struct sctp_outq *q)
 {
 	q->asoc = asoc;
 	skb_queue_head_init(&q->out);
@@ -417,7 +417,7 @@ static int sctp_outq_flush_rtx(struct sctp_outq *q, struct sctp_packet *pkt,
 	struct sctp_transport *transport = pkt->transport;
 	sctp_xmit_t status;
 	sctp_chunk_t *chunk;
-	sctp_association_t *asoc;
+	struct sctp_association *asoc;
 	int error = 0;
 
 	asoc = q->asoc;
@@ -527,7 +527,7 @@ void sctp_xmit_frag(struct sctp_outq *q, struct sctp_chunk *pos,
 		SCTP_DEBUG_PRINTK("sctp_xmit_frag: q not empty. "
 				  "adding 0x%x to outqueue\n",
 				  ntohl(frag->subh.data_hdr->tsn));
-		if (pos)		
+		if (pos)
 			sctp_outq_insert_data(q, frag, pos);
 		else
 			sctp_outq_tail_data(q, frag);
@@ -584,7 +584,7 @@ void sctp_xmit_frag(struct sctp_outq *q, struct sctp_chunk *pos,
 void sctp_xmit_fragmented_chunks(struct sctp_outq *q, struct sctp_packet *pkt,
 				 sctp_chunk_t *frag)
 {
-	sctp_association_t *asoc = frag->asoc;
+	struct sctp_association *asoc = frag->asoc;
 	struct list_head *lfrag, *frag_list;
 	__u32 tsn;
 	int nfrags = 1;
@@ -618,7 +618,7 @@ void sctp_xmit_fragmented_chunks(struct sctp_outq *q, struct sctp_packet *pkt,
 sctp_chunk_t *sctp_fragment_chunk(sctp_chunk_t *chunk,
 				  size_t max_frag_data_len)
 {
-	sctp_association_t *asoc = chunk->asoc;
+	struct sctp_association *asoc = chunk->asoc;
 	void *data_ptr = chunk->subh.data_hdr;
 	struct sctp_sndrcvinfo *sinfo = &chunk->sinfo;
 	__u16 chunk_data_len = sctp_data_size(chunk);
@@ -724,7 +724,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 {
 	struct sctp_packet *packet;
 	struct sctp_packet singleton;
-	sctp_association_t *asoc = q->asoc;
+	struct sctp_association *asoc = q->asoc;
 	int ecn_capable = asoc->peer.ecn_capable;
 	__u16 sport = asoc->base.bind_addr.port;
 	__u16 dport = asoc->peer.port;
@@ -1077,7 +1077,7 @@ int sctp_outq_set_output_handlers(struct sctp_outq *q,
 }
 
 /* Update unack_data based on the incoming SACK chunk */
-static void sctp_sack_update_unack_data(sctp_association_t *assoc,
+static void sctp_sack_update_unack_data(struct sctp_association *assoc,
 					sctp_sackhdr_t *sack)
 {
 	sctp_sack_variable_t *frags;
@@ -1097,7 +1097,7 @@ static void sctp_sack_update_unack_data(sctp_association_t *assoc,
 
 /* Return the highest new tsn that is acknowledged by the given SACK chunk. */
 static __u32 sctp_highest_new_tsn(sctp_sackhdr_t *sack,
-				  sctp_association_t *asoc)
+				  struct sctp_association *asoc)
 {
 	struct list_head *ltransport, *lchunk;
 	struct sctp_transport *transport;
@@ -1132,7 +1132,7 @@ static __u32 sctp_highest_new_tsn(sctp_sackhdr_t *sack,
  */
 int sctp_outq_sack(struct sctp_outq *q, sctp_sackhdr_t *sack)
 {
-	sctp_association_t *asoc = q->asoc;
+	struct sctp_association *asoc = q->asoc;
 	struct sctp_transport *transport;
 	sctp_chunk_t *tchunk;
 	struct list_head *lchunk, *transport_list, *pos;
