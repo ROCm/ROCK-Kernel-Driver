@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.120 $
+ *   $Revision: 1.124 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -540,6 +540,8 @@ get_disc_ccwdev_by_devno(unsigned int devno, struct ccw_device *sibling)
 	return cdev;
 }
 
+extern int css_get_ssd_info(struct subchannel *sch);
+
 void
 ccw_device_do_unreg_rereg(void *data)
 {
@@ -581,6 +583,8 @@ ccw_device_do_unreg_rereg(void *data)
 				device_unregister(&other_sch->dev);
 			}
 		}
+		/* Update ssd info here. */
+		css_get_ssd_info(sch);
 		cdev->private->devno = sch->schib.pmcw.dev;
 	} else
 		need_rename = 0;
@@ -633,7 +637,8 @@ io_subchannel_register(void *data)
 		sch->dev.driver_data = 0;
 		kfree (cdev->private);
 		kfree (cdev);
-		goto out;
+		put_device(&sch->dev);
+		return;
 	}
 
 	ret = subchannel_add_files(cdev->dev.parent);
@@ -707,18 +712,19 @@ static int
 io_subchannel_recog(struct ccw_device *cdev, struct subchannel *sch)
 {
 	int rc;
+	struct ccw_device_private *priv;
 
 	sch->dev.driver_data = cdev;
 	sch->driver = &io_subchannel_driver;
 	cdev->ccwlock = &sch->lock;
-	*cdev->private = (struct ccw_device_private) {
-		.devno	= sch->schib.pmcw.dev,
-		.irq	= sch->irq,
-		.state	= DEV_STATE_NOT_OPER,
-		.cmb_list = LIST_HEAD_INIT(cdev->private->cmb_list),
-	};
-	init_waitqueue_head(&cdev->private->wait_q);
-	init_timer(&cdev->private->timer);
+	/* Init private data. */
+	priv = cdev->private;
+	priv->devno = sch->schib.pmcw.dev;
+	priv->irq = sch->irq;
+	priv->state = DEV_STATE_NOT_OPER;
+	INIT_LIST_HEAD(&priv->cmb_list);
+	init_waitqueue_head(&priv->wait_q);
+	init_timer(&priv->timer);
 
 	/* Set an initial name for the device. */
 	snprintf (cdev->dev.bus_id, BUS_ID_SIZE, "0.0.%04x",

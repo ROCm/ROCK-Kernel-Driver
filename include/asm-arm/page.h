@@ -133,7 +133,7 @@ extern void __cpu_copy_user_page(void *to, const void *from,
 	} while (0)
 
 #define clear_page(page)	memzero((void *)(page), PAGE_SIZE)
-extern void copy_page(void *to, void *from);
+extern void copy_page(void *to, const void *from);
 
 #undef STRICT_MM_TYPECHECKS
 

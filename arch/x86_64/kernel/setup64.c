@@ -195,7 +195,8 @@ void pda_init(int cpu)
 char boot_exception_stacks[N_EXCEPTION_STACKS * EXCEPTION_STKSZ] 
 __attribute__((section(".bss.page_aligned")));
 
-void __init syscall_init(void)
+/* May not be marked __init: used by software suspend */
+void syscall_init(void)
 {
 	/* 
 	 * LSTAR and STAR live in a bit strange symbiosis.

@@ -593,6 +593,12 @@ proc_types:
 		b	__armv4_cache_off
 		b	__armv4_cache_flush
 
+		.word	0x00070000		@ ARMv6
+		.word	0x000f0000
+		b	__armv4_cache_on
+		b	__armv4_cache_off
+		b	__armv6_cache_flush
+
 		.word	0			@ unrecognised type
 		.word	0
 		mov	pc, lr
@@ -651,6 +657,14 @@ __armv3_cache_off:
 cache_clean_flush:
 		mov	r3, #16
 		b	call_cache_fn
+
+__armv6_cache_flush:
+		mov	r1, #0
+		mcr	p15, 0, r1, c7, c14, 0	@ clean+invalidate D
+		mcr	p15, 0, r1, c7, c5, 0	@ invalidate I+BTB
+		mcr	p15, 0, r1, c7, c15, 0	@ clean+invalidate unified
+		mcr	p15, 0, r1, c7, c10, 4	@ drain WB
+		mov	pc, lr
 
 __armv4_cache_flush:
 		mov	r2, #64*1024		@ default: 32K dcache size (*2)

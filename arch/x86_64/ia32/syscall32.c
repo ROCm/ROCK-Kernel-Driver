@@ -88,7 +88,8 @@ static int __init init_syscall32(void)
 	
 __initcall(init_syscall32); 
 
-void __init syscall32_cpu_init(void)
+/* May not be __init: called during resume */
+void syscall32_cpu_init(void)
 {
 	if (use_sysenter < 0)
  		use_sysenter = (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL);

@@ -24,8 +24,8 @@ struct percpu_data {
 
 /* 
  * Use this to get to a cpu's version of the per-cpu object allocated using
- * alloc_percpu.  If you want to get "this cpu's version", maybe you want
- * to use get_cpu_ptr... 
+ * alloc_percpu.  Non-atomic access to the current CPU's version should
+ * probably be combined with get_cpu()/put_cpu().
  */ 
 #define per_cpu_ptr(ptr, cpu)                   \
 ({                                              \
