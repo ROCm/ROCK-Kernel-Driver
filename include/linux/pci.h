@@ -559,6 +559,8 @@ int pci_get_interrupt_pin(struct pci_dev *dev, struct pci_dev **bridge);
 extern struct pci_dev *pci_get_dev(struct pci_dev *dev);
 extern void pci_put_dev(struct pci_dev *dev);
 
+extern void pci_remove_bus_device(struct pci_dev *dev);
+
 /* Generic PCI functions exported to card drivers */
 
 struct pci_dev *pci_find_device (unsigned int vendor, unsigned int device, const struct pci_dev *from);
