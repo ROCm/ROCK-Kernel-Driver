@@ -704,7 +704,7 @@ static void cpc_tty_rx_work(void * data)
 					ld = tty_ldisc_ref(cpc_tty);
 					if(ld)
 					{
-						if (ld->receive_buf)) {
+						if (ld->receive_buf) {
 							CPC_TTY_DBG("%s: call line disc. receive_buf\n",cpc_tty->name);
 							ld->receive_buf(cpc_tty->tty, (char *)(buf->data), &flags, buf->size);
 						}
