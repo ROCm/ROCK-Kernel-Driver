@@ -733,13 +733,6 @@ static void __rtl8139_cleanup_dev (struct net_device *dev)
 	/* it's ok to call this even if we have no regions to free */
 	pci_release_regions (pdev);
 
-#ifndef RTL8139_NDEBUG
-	/* poison memory before freeing */
-	memset (dev, 0xBC,
-		sizeof (struct net_device) +
-		sizeof (struct rtl8139_private));
-#endif /* RTL8139_NDEBUG */
-
 	free_netdev(dev);
 
 	pci_set_drvdata (pdev, NULL);
