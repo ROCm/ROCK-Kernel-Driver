@@ -223,8 +223,9 @@ static int snd_pcm_lib_preallocate_pages1(snd_pcm_substream_t *substream,
  */
 static inline void setup_pcm_id(snd_pcm_substream_t *subs)
 {
-	subs->dma_device.id = subs->pcm->device << 16 |
-		subs->stream << 8 | subs->number;
+	if (! subs->dma_device.id)
+		subs->dma_device.id = subs->pcm->device << 16 |
+			subs->stream << 8 | (subs->number + 1);
 }
 
 /**
