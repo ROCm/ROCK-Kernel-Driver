@@ -317,7 +317,7 @@ struct task_struct;
 
 /*
  * Free all resources held by a thread. This is called after the
- * parent of DEAD_TASK has collected the exist status of the task via
+ * parent of DEAD_TASK has collected the exit status of the task via
  * wait().
  */
 #define release_thread(dead_task)

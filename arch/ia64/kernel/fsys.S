@@ -655,8 +655,8 @@ fsyscall_table:
 	data8 0				// sched_setaffinity
 	data8 0				// sched_getaffinity
 	data8 fsys_set_tid_address	// set_tid_address
-	data8 0				// unused
-	data8 0				// unused		// 1235
+	data8 0				// fadvise64
+	data8 0				// tgkill		// 1235
 	data8 0				// exit_group
 	data8 0				// lookup_dcookie
 	data8 0				// io_setup

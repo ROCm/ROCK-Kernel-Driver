@@ -1408,7 +1408,7 @@ sys_call_table:
 	data8 sys_sched_getaffinity
 	data8 sys_set_tid_address
 	data8 sys_fadvise64
-	data8 ia64_ni_syscall 			// 1235
+	data8 sys_tgkill 			// 1235
 	data8 sys_exit_group
 	data8 sys_lookup_dcookie
 	data8 sys_io_setup
