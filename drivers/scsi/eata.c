@@ -1,6 +1,36 @@
 /*
  *      eata.c - Low-level driver for EATA/DMA SCSI host adapters.
  *
+ *      03 Jun 2003 Rev. 8.10 for linux-2.5.70
+ *        + Update for new IRQ API.
+ *        + Use "goto" when appropriate.
+ *        + Drop eata.h.
+ *        + Update for new module_param API.
+ *        + Module parameters  can now be specified only in the
+ *          same format as the kernel boot options.
+ *
+ *             boot option    old module param 
+ *             -----------    ------------------
+ *             addr,...       io_port=addr,...
+ *             lc:[y|n]       linked_comm=[1|0]
+ *             mq:xx          max_queue_depth=xx
+ *             tm:[0|1|2]     tag_mode=[0|1|2]
+ *             et:[y|n]       ext_tran=[1|0]
+ *             rs:[y|n]       rev_scan=[1|0]
+ *             ip:[y|n]       isa_probe=[1|0]
+ *             ep:[y|n]       eisa_probe=[1|0]
+ *             pp:[y|n]       pci_probe=[1|0]
+ *
+ *          A valid example using the new parameter format is:
+ *          modprobe eata "eata=0x7410,0x230,lc:y,tm:0,mq:4,ep:n"
+ *
+ *          which is equivalent to the old format:
+ *          modprobe eata io_port=0x7410,0x230 linked_comm=1 tag_mode=0 \
+ *                        max_queue_depth=4 eisa_probe=0
+ *
+ *      12 Feb 2003 Rev. 8.04 for linux 2.5.60
+ *        + Release irq before calling scsi_register.
+ *
  *      12 Nov 2002 Rev. 8.02 for linux 2.5.47
  *        + Release driver_lock before calling scsi_register.
  *
@@ -279,7 +309,7 @@
  *          This driver is based on the CAM (Common Access Method Committee)
  *          EATA (Enhanced AT Bus Attachment) rev. 2.0A, using DMA protocol.
  *
- *  Copyright (C) 1994-2002 Dario Ballabio (ballabio_dario@emc.com)
+ *  Copyright (C) 1994-2003 Dario Ballabio (ballabio_dario@emc.com)
  *
  *  Alternate email: dario.ballabio@inwind.it, dario.ballabio@tiscalinet.it
  *
@@ -447,31 +477,8 @@
  *  the driver sets host->wish_block = TRUE for all ISA boards.
  */
 
-#include <linux/version.h>
-
-#define MAX_INT_PARAM 10
-
-#if defined(MODULE)
-#include <linux/module.h>
-
-MODULE_PARM(boot_options, "s");
-MODULE_PARM(io_port, "1-" __MODULE_STRING(MAX_INT_PARAM) "i");
-MODULE_PARM(linked_comm, "i");
-MODULE_PARM(link_statistics, "i");
-MODULE_PARM(max_queue_depth, "i");
-MODULE_PARM(tag_mode, "i");
-MODULE_PARM(ext_tran, "i");
-MODULE_PARM(rev_scan, "i");
-MODULE_PARM(isa_probe, "i");
-MODULE_PARM(eisa_probe, "i");
-MODULE_PARM(pci_probe, "i");
-MODULE_AUTHOR("Dario Ballabio");
-
-#endif
-
 #include <linux/config.h>
 #include <linux/string.h>
-#include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
@@ -491,8 +498,31 @@ MODULE_AUTHOR("Dario Ballabio");
 #include "hosts.h"
 #include <asm/dma.h>
 #include <asm/irq.h>
-#include "eata.h"
 
+static int eata2x_detect(Scsi_Host_Template *);
+static int eata2x_release(struct Scsi_Host *);
+static int eata2x_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
+static int eata2x_eh_abort(Scsi_Cmnd *);
+static int eata2x_eh_host_reset(Scsi_Cmnd *);
+static int eata2x_bios_param(struct scsi_device *, struct block_device *,
+                             sector_t, int *);
+static int eata2x_slave_configure(Scsi_Device *);
+
+static Scsi_Host_Template driver_template = {
+                .name                    = "EATA/DMA 2.0x rev. 8.10.00 ",
+                .detect                  = eata2x_detect,
+                .release                 = eata2x_release,
+                .queuecommand            = eata2x_queuecommand,
+                .eh_abort_handler        = eata2x_eh_abort,
+                .eh_device_reset_handler = NULL,
+                .eh_bus_reset_handler    = NULL,
+                .eh_host_reset_handler   = eata2x_eh_host_reset,
+                .bios_param              = eata2x_bios_param,
+                .slave_configure         = eata2x_slave_configure,
+                .this_id                 = 7,
+                .unchecked_isa_dma       = 1,
+                .use_clustering          = ENABLE_CLUSTERING
+                };
 #if !defined(__BIG_ENDIAN_BITFIELD) && !defined(__LITTLE_ENDIAN_BITFIELD)
 #error "Adjust your <asm/byteorder.h> defines"
 #endif
@@ -818,7 +848,6 @@ static int setup_done = FALSE;
 static int link_statistics;
 static int ext_tran = FALSE;
 static int rev_scan = TRUE;
-static char *boot_options;
 
 #if defined(CONFIG_SCSI_EATA_TAGGED_QUEUE)
 static int tag_mode = TAG_SIMPLE;
@@ -854,6 +883,23 @@ static int eisa_probe = FALSE;
 static int pci_probe = TRUE;
 #else
 static int pci_probe = FALSE;
+#endif
+
+#define MAX_INT_PARAM 10
+#define MAX_BOOT_OPTIONS_SIZE 256
+static char boot_options[MAX_BOOT_OPTIONS_SIZE];
+
+#if defined(MODULE)
+#include <linux/module.h>
+#include <linux/moduleparam.h>
+
+module_param_string(eata, boot_options, MAX_BOOT_OPTIONS_SIZE, 0);
+MODULE_PARM_DESC(eata, " equivalent to the \"eata=...\" kernel boot option." \
+"            Example: modprobe eata \"eata=0x7410,0x230,lc:y,tm:0,mq:4,ep:n\"");
+MODULE_AUTHOR("Dario Ballabio");
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("EATA/DMA SCSI Driver");
+
 #endif
 
 static int eata2x_slave_configure(Scsi_Device *dev) {
@@ -1011,19 +1057,20 @@ static int port_detect \
 
    sprintf(name, "%s%d", driver_name, j);
 
-   if(!request_region(port_base, REGION_SIZE, driver_name)) {
+   if (!request_region(port_base, REGION_SIZE, driver_name)) {
 #if defined(DEBUG_DETECT)
       printk("%s: address 0x%03lx in use, skipping probe.\n", name, port_base);
 #endif
-      return FALSE;
+      goto fail;
       }
+
+   spin_lock_irq(&driver_lock);
 
    if (do_dma(port_base, 0, READ_CONFIG_PIO)) {
 #if defined(DEBUG_DETECT)
       printk("%s: detect, do_dma failed at 0x%03lx.\n", name, port_base);
 #endif
-      release_region(port_base, REGION_SIZE);
-      return FALSE;
+      goto freelock;
       }
 
    /* Read the info structure */
@@ -1031,8 +1078,7 @@ static int port_detect \
 #if defined(DEBUG_DETECT)
       printk("%s: detect, read_pio failed at 0x%03lx.\n", name, port_base);
 #endif
-      release_region(port_base, REGION_SIZE);
-      return FALSE;
+      goto freelock;
       }
 
    info.data_len = DEV2H(info.data_len);
@@ -1048,15 +1094,13 @@ static int port_detect \
 #if defined(DEBUG_DETECT)
       printk("%s: signature 0x%04x discarded.\n", name, info.sign);
 #endif
-      release_region(port_base, REGION_SIZE);
-      return FALSE;
+      goto freelock;
       }
 
    if (info.data_len < EATA_2_0A_SIZE) {
       printk("%s: config structure size (%d bytes) too short, detaching.\n",
              name, info.data_len);
-      release_region(port_base, REGION_SIZE);
-      return FALSE;
+      goto freelock;
       }
    else if (info.data_len == EATA_2_0A_SIZE)
       protocol_rev = 'A';
@@ -1097,8 +1141,7 @@ static int port_detect \
    if (!info.haaval || info.ata) {
       printk("%s: address 0x%03lx, unusable %s board (%d%d), detaching.\n",
              name, port_base, bus_type, info.haaval, info.ata);
-      release_region(port_base, REGION_SIZE);
-      return FALSE;
+      goto freelock;
       }
 
    if (info.drqvld) {
@@ -1145,16 +1188,13 @@ static int port_detect \
              SA_INTERRUPT | ((subversion == ESA) ? SA_SHIRQ : 0),
              driver_name, (void *) &sha[j])) {
       printk("%s: unable to allocate IRQ %u, detaching.\n", name, irq);
-      release_region(port_base, REGION_SIZE);
-      return FALSE;
+      goto freelock;
       }
 
    if (subversion == ISA && request_dma(dma_channel, driver_name)) {
       printk("%s: unable to allocate DMA channel %u, detaching.\n",
              name, dma_channel);
-      free_irq(irq, &sha[j]);
-      release_region(port_base, REGION_SIZE);
-      return FALSE;
+      goto freeirq;
       }
 
 #if defined(FORCE_CONFIG)
@@ -1166,8 +1206,7 @@ static int port_detect \
 
    if (!cf) {
       printk("%s: config, pci_alloc_consistent failed, detaching.\n", name);
-      release_region(port_base, REGION_SIZE);
-      return FALSE;
+      goto freedma;
       }
 
    /* Set board configuration */
@@ -1178,8 +1217,7 @@ static int port_detect \
    if (do_dma(port_base, cf_dma_addr, SET_CONFIG_DMA)) {
       printk("%s: busy timeout sending configuration, detaching.\n", name);
       pci_free_consistent(pdev, sizeof(struct eata_config), cf, cf_dma_addr);
-      release_region(port_base, REGION_SIZE);
-      return FALSE;
+      goto freedma;
       }
 
    }
@@ -1191,13 +1229,7 @@ static int port_detect \
 
    if (sh[j] == NULL) {
       printk("%s: unable to register host, detaching.\n", name);
-
-      free_irq(irq, &sha[j]);
-
-      if (subversion == ISA) free_dma(dma_channel);
-
-      release_region(port_base, REGION_SIZE);
-      return FALSE;
+      goto freedma;
       }
 
    sh[j]->io_port = port_base;
@@ -1268,6 +1300,8 @@ static int port_detect \
    if (dma_channel == NO_DMA) sprintf(dma_name, "%s", "BMST");
    else                       sprintf(dma_name, "DMA %u", dma_channel);
 
+   spin_unlock_irq(&driver_lock);
+
    for (i = 0; i < sh[j]->can_queue; i++)
       HD(j)->cp[i].cp_dma_addr = pci_map_single(HD(j)->pdev,
             &HD(j)->cp[i], sizeof(struct mscp), PCI_DMA_BIDIRECTIONAL);
@@ -1277,15 +1311,13 @@ static int port_detect \
             sh[j]->sg_tablesize * sizeof(struct sg_list),
             (sh[j]->unchecked_isa_dma ? GFP_DMA : 0) | GFP_ATOMIC))) {
          printk("%s: kmalloc SGlist failed, mbox %d, detaching.\n", BN(j), i);
-         eata2x_release(sh[j]);
-         return FALSE;
+         goto release;
          }
 
    if (! (HD(j)->sp_cpu_addr = pci_alloc_consistent(HD(j)->pdev,
          sizeof(struct mssp), &HD(j)->sp_dma_addr))) {
       printk("%s: pci_alloc_consistent failed, detaching.\n", BN(j));
-      eata2x_release(sh[j]);
-      return FALSE;
+      goto release;
       }
 
    if (max_queue_depth > MAX_TAGGED_CMD_PER_LUN)
@@ -1297,7 +1329,7 @@ static int port_detect \
       tag_mode = TAG_ORDERED;
 
    if (j == 0) {
-      printk("EATA/DMA 2.0x: Copyright (C) 1994-2002 Dario Ballabio.\n");
+      printk("EATA/DMA 2.0x: Copyright (C) 1994-2003 Dario Ballabio.\n");
       printk("%s config options -> tm:%d, lc:%c, mq:%d, rs:%c, et:%c, "\
              "ip:%c, ep:%c, pp:%c.\n", driver_name, tag_mode,
              YESNO(linked_comm), max_queue_depth, YESNO(rev_scan),
@@ -1342,6 +1374,20 @@ static int port_detect \
       }
 
    return TRUE;
+
+freedma:
+   if (subversion == ISA) free_dma(dma_channel);
+freeirq:
+   free_irq(irq, &sha[j]);
+freelock:
+   spin_unlock_irq(&driver_lock);
+   release_region(port_base, REGION_SIZE);
+fail:
+   return FALSE;
+
+release:
+   eata2x_release(sh[j]);
+   return FALSE;
 }
 
 static void internal_setup(char *str, int *ints) {
@@ -1440,11 +1486,9 @@ static void add_pci_ports(void) {
 static int eata2x_detect(Scsi_Host_Template *tpnt) {
    unsigned int j = 0, k;
 
-   spin_lock_irq(&driver_lock);
-
    tpnt->proc_name = "eata2x";
 
-   if(boot_options) option_setup(boot_options);
+   if(strlen(boot_options)) option_setup(boot_options);
 
 #if defined(MODULE)
    /* io_port could have been modified when loading as a module */
@@ -1478,7 +1522,6 @@ static int eata2x_detect(Scsi_Host_Template *tpnt) {
       }
 
    num_boards = j;
-   spin_unlock_irq(&driver_lock);
    return j;
 }
 
@@ -2091,7 +2134,7 @@ static void flush_dev(Scsi_Device *dev, unsigned long cursec, unsigned int j,
 
 }
 
-static void ihdlr(int irq, unsigned int j) {
+static irqreturn_t ihdlr(int irq, unsigned int j) {
    Scsi_Cmnd *SCpnt;
    unsigned int i, k, c, status, tstatus, reg;
    struct mssp *spp;
@@ -2101,7 +2144,7 @@ static void ihdlr(int irq, unsigned int j) {
        panic("%s: ihdlr, irq %d, sh[j]->irq %d.\n", BN(j), irq, sh[j]->irq);
 
    /* Check if this board need to be serviced */
-   if (!(inb(sh[j]->io_port + REG_AUX_STATUS) & IRQ_ASSERTED)) return;
+   if (!(inb(sh[j]->io_port + REG_AUX_STATUS) & IRQ_ASSERTED)) goto none;
 
    HD(j)->iocount++;
 
@@ -2113,7 +2156,7 @@ static void ihdlr(int irq, unsigned int j) {
       reg = inb(sh[j]->io_port + REG_STATUS);
       printk("%s: ihdlr, busy timeout error,  irq %d, reg 0x%x, count %d.\n",
              BN(j), irq, reg, HD(j)->iocount);
-      return;
+      goto none;
       }
 
    spp  = &HD(j)->sp;
@@ -2148,7 +2191,7 @@ static void ihdlr(int irq, unsigned int j) {
       printk("%s: ihdlr, bad spp->cpp_index %d, irq %d, reg 0x%x, count %d.\n",
              BN(j), spp->cpp_index, irq, reg, HD(j)->iocount);
    if (spp->eoc == FALSE || spp->cpp_index < 0
-                         || spp->cpp_index >= sh[j]->can_queue) return;
+                         || spp->cpp_index >= sh[j]->can_queue) goto handled;
 
    /* Find the mailbox to be serviced on this board */
    i = spp->cpp_index;
@@ -2156,23 +2199,23 @@ static void ihdlr(int irq, unsigned int j) {
    cpp = &(HD(j)->cp[i]);
 
 #if defined(DEBUG_GENERATE_ABORTS)
-   if ((HD(j)->iocount > 500) && ((HD(j)->iocount % 500) < 3)) return;
+   if ((HD(j)->iocount > 500) && ((HD(j)->iocount % 500) < 3)) goto handled;
 #endif
 
    if (HD(j)->cp_stat[i] == IGNORE) {
       HD(j)->cp_stat[i] = FREE;
-      return;
+      goto handled;
       }
    else if (HD(j)->cp_stat[i] == LOCKED) {
       HD(j)->cp_stat[i] = FREE;
       printk("%s: ihdlr, mbox %d unlocked, count %d.\n", BN(j), i,
              HD(j)->iocount);
-      return;
+      goto handled;
       }
    else if (HD(j)->cp_stat[i] == FREE) {
       printk("%s: ihdlr, mbox %d is free, count %d.\n", BN(j), i,
              HD(j)->iocount);
-      return;
+      goto handled;
       }
    else if (HD(j)->cp_stat[i] == IN_RESET)
       printk("%s: ihdlr, mbox %d is in reset.\n", BN(j), i);
@@ -2319,22 +2362,25 @@ static void ihdlr(int irq, unsigned int j) {
    if (do_trace) printk("%s: ihdlr, exit, irq %d, count %d.\n", BN(j), irq,
                         HD(j)->iocount);
 
-   return;
+handled:
+   return IRQ_HANDLED;
+none:
+   return IRQ_NONE;
 }
 
 static irqreturn_t do_interrupt_handler(int irq, void *shap,
-					struct pt_regs *regs) {
+                                        struct pt_regs *regs) {
    unsigned int j;
    unsigned long spin_flags;
+   irqreturn_t ret;
 
    /* Check if the interrupt must be processed by this handler */
-   if ((j = (unsigned int)((char *)shap - sha)) >= num_boards)
-	return IRQ_NONE;
+   if ((j = (unsigned int)((char *)shap - sha)) >= num_boards) return IRQ_NONE;
 
    spin_lock_irqsave(sh[j]->host_lock, spin_flags);
-   ihdlr(irq, j);
+   ret = ihdlr(irq, j);
    spin_unlock_irqrestore(sh[j]->host_lock, spin_flags);
-   return IRQ_HANDLED;
+   return ret;
 }
 
 static int eata2x_release(struct Scsi_Host *shpnt) {
@@ -2365,22 +2411,8 @@ static int eata2x_release(struct Scsi_Host *shpnt) {
    return FALSE;
 }
 
-static Scsi_Host_Template driver_template = {
-	.name              	= "EATA/DMA 2.0x rev. " EATA_VERSION " ",
-	.detect                  = eata2x_detect,
-	.release                 = eata2x_release,
-	.queuecommand            = eata2x_queuecommand,
-	.eh_abort_handler        = eata2x_eh_abort,
-	.eh_host_reset_handler   = eata2x_eh_host_reset,
-	.bios_param              = eata2x_bios_param,
-	.slave_configure	 = eata2x_slave_configure,
-	.this_id                 = 7,
-	.unchecked_isa_dma       = 1,
-	.use_clustering          = ENABLE_CLUSTERING,
-};
 #include "scsi_module.c"
 
 #ifndef MODULE
 __setup("eata=", option_setup);
 #endif /* end MODULE */
-MODULE_LICENSE("GPL");
