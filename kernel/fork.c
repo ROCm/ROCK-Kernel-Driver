@@ -1086,6 +1086,8 @@ bad_fork_cleanup_namespace:
 	exit_namespace(p);
 bad_fork_cleanup_mm:
 	exit_mm(p);
+	if (p->active_mm)
+		mmdrop(p->active_mm);
 bad_fork_cleanup_signal:
 	exit_signal(p);
 bad_fork_cleanup_sighand:
