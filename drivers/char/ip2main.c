@@ -186,6 +186,9 @@ static void ip2_unthrottle(PTTY);
 static void ip2_stop(PTTY);
 static void ip2_start(PTTY);
 static void ip2_hangup(PTTY);
+static int  ip2_tiocmget(struct tty_struct *tty, struct file *file);
+static int  ip2_tiocmset(struct tty_struct *tty, struct file *file,
+			 unsigned int set, unsigned int clear);
 
 static void set_irq(int, int);
 static void ip2_interrupt_bh(i2eBordStrPtr pB);
@@ -466,6 +469,8 @@ static struct tty_operations ip2_ops = {
 	.start           = ip2_start,
 	.hangup          = ip2_hangup,
 	.read_proc       = ip2_read_proc,
+	.tiocmget	 = ip2_tiocmget,
+	.tiocmset	 = ip2_tiocmset,
 };
 
 /******************************************************************************/
@@ -1951,6 +1956,80 @@ ip2_stop ( PTTY tty )
 /* Device Ioctl Section                                                       */
 /******************************************************************************/
 
+static int ip2_tiocmget(struct tty_struct *tty, struct file *file)
+{
+	i2ChanStrPtr pCh = DevTable[tty->index];
+	wait_queue_t wait;
+
+	if (pCh == NULL)
+		return -ENODEV;
+
+/*
+	FIXME - the following code is causing a NULL pointer dereference in
+	2.3.51 in an interrupt handler.  It's suppose to prompt the board
+	to return the DSS signal status immediately.  Why doesn't it do
+	the same thing in 2.2.14?
+*/
+
+/*	This thing is still busted in the 1.2.12 driver on 2.4.x
+	and even hoses the serial console so the oops can be trapped.
+		/\/\|=mhw=|\/\/			*/
+
+#ifdef	ENABLE_DSSNOW
+	i2QueueCommands(PTYPE_BYPASS, pCh, 100, 1, CMD_DSS_NOW);
+
+	init_waitqueue_entry(&wait, current);
+	add_wait_queue(&pCh->dss_now_wait, &wait);
+	set_current_state( TASK_INTERRUPTIBLE );
+
+	serviceOutgoingFifo( pCh->pMyBord );
+
+	schedule();
+
+	set_current_state( TASK_RUNNING );
+	remove_wait_queue(&pCh->dss_now_wait, &wait);
+
+	if (signal_pending(current)) {
+		return -EINTR;
+	}
+#endif
+	return  ((pCh->dataSetOut & I2_RTS) ? TIOCM_RTS : 0)
+	      | ((pCh->dataSetOut & I2_DTR) ? TIOCM_DTR : 0)
+	      | ((pCh->dataSetIn  & I2_DCD) ? TIOCM_CAR : 0)
+	      | ((pCh->dataSetIn  & I2_RI)  ? TIOCM_RNG : 0)
+	      | ((pCh->dataSetIn  & I2_DSR) ? TIOCM_DSR : 0)
+	      | ((pCh->dataSetIn  & I2_CTS) ? TIOCM_CTS : 0);
+}
+
+static int ip2_tiocmset(struct tty_struct *tty, struct file *file,
+			unsigned int set, unsigned int clear)
+{
+	i2ChanStrPtr pCh = DevTable[tty->index];
+
+	if (pCh == NULL)
+		return -ENODEV;
+
+	if (set & TIOCM_RTS) {
+		i2QueueCommands(PTYPE_INLINE, pCh, 100, 1, CMD_RTSUP);
+		pCh->dataSetOut |= I2_RTS;
+	}
+	if (set & TIOCM_DTR) {
+		i2QueueCommands(PTYPE_INLINE, pCh, 100, 1, CMD_DTRUP);
+		pCh->dataSetOut |= I2_DTR;
+	}
+
+	if (clear & TIOCM_RTS) {
+		i2QueueCommands(PTYPE_INLINE, pCh, 100, 1, CMD_RTSDN);
+		pCh->dataSetOut &= ~I2_RTS;
+	}
+	if (clear & TIOCM_DTR) {
+		i2QueueCommands(PTYPE_INLINE, pCh, 100, 1, CMD_DTRDN);
+		pCh->dataSetOut &= ~I2_DTR;
+	}
+	serviceOutgoingFifo( pCh->pMyBord );
+	return 0;
+}
+
 /******************************************************************************/
 /* Function:   ip2_ioctl()                                                    */
 /* Parameters: Pointer to tty structure                                       */
@@ -2078,57 +2157,6 @@ ip2_ioctl ( PTTY tty, struct file *pFile, UINT cmd, ULONG arg )
 		
 		break;
 
-	case TIOCMGET:
-
-		ip2trace (CHANN, ITRC_IOCTL, 8, 1, rc );
-
-/*
-	FIXME - the following code is causing a NULL pointer dereference in
-	2.3.51 in an interrupt handler.  It's suppose to prompt the board
-	to return the DSS signal status immediately.  Why doesn't it do
-	the same thing in 2.2.14?
-*/
-
-/*	This thing is still busted in the 1.2.12 driver on 2.4.x
-	and even hoses the serial console so the oops can be trapped.
-		/\/\|=mhw=|\/\/			*/
-
-#ifdef	ENABLE_DSSNOW
-		i2QueueCommands(PTYPE_BYPASS, pCh, 100, 1, CMD_DSS_NOW);
-
-		init_waitqueue_entry(&wait, current);
-		add_wait_queue(&pCh->dss_now_wait, &wait);
-		set_current_state( TASK_INTERRUPTIBLE );
-
-		serviceOutgoingFifo( pCh->pMyBord );
-
-		schedule();
-
-		set_current_state( TASK_RUNNING );
-		remove_wait_queue(&pCh->dss_now_wait, &wait);
-
-		if (signal_pending(current)) {
-			return -EINTR;
-		}
-#endif
-		rc = put_user(
-				    ((pCh->dataSetOut & I2_RTS) ? TIOCM_RTS : 0)
-				  | ((pCh->dataSetOut & I2_DTR) ? TIOCM_DTR : 0)
-				  | ((pCh->dataSetIn  & I2_DCD) ? TIOCM_CAR : 0)
-				  | ((pCh->dataSetIn  & I2_RI)  ? TIOCM_RNG : 0)
-				  | ((pCh->dataSetIn  & I2_DSR) ? TIOCM_DSR : 0)
-				  | ((pCh->dataSetIn  & I2_CTS) ? TIOCM_CTS : 0),
-				(unsigned int *) arg);
-		break;
-
-	case TIOCMBIS:
-	case TIOCMBIC:
-	case TIOCMSET:
-		ip2trace (CHANN, ITRC_IOCTL, 9, 0 );
-
-		rc = set_modem_info(pCh, cmd, (unsigned int *) arg);
-		break;
-
 	/*
 	 * Wait for any of the 4 modem inputs (DCD,RI,DSR,CTS) to change - mask
 	 * passed in arg for lines of interest (use |'ed TIOCM_RNG/DSR/CD/CTS
@@ -2236,70 +2264,6 @@ ip2_ioctl ( PTTY tty, struct file *pFile, UINT cmd, ULONG arg )
 	ip2trace (CHANN, ITRC_IOCTL, ITRC_RETURN, 0 );
 
 	return rc;
-}
-
-/******************************************************************************/
-/* Function:   set_modem_info()                                               */
-/* Parameters: Pointer to channel structure                                   */
-/*             Specific ioctl command                                         */
-/*             Pointer to source for new settings                             */
-/* Returns:    Nothing                                                        */
-/*                                                                            */
-/* Description:                                                               */
-/* This returns the current settings of the dataset signal inputs to the user */
-/* program.                                                                   */
-/******************************************************************************/
-static int
-set_modem_info(i2ChanStrPtr pCh, unsigned cmd, unsigned int *value)
-{
-	int rc;
-	unsigned int arg;
-
-	rc = get_user(arg,value);
-	if (rc)
-		return rc;
-	switch(cmd) {
-	case TIOCMBIS:
-		if (arg & TIOCM_RTS) {
-			i2QueueCommands(PTYPE_INLINE, pCh, 100, 1, CMD_RTSUP);
-			pCh->dataSetOut |= I2_RTS;
-		}
-		if (arg & TIOCM_DTR) {
-			i2QueueCommands(PTYPE_INLINE, pCh, 100, 1, CMD_DTRUP);
-			pCh->dataSetOut |= I2_DTR;
-		}
-		break;
-	case TIOCMBIC:
-		if (arg & TIOCM_RTS) {
-			i2QueueCommands(PTYPE_INLINE, pCh, 100, 1, CMD_RTSDN);
-			pCh->dataSetOut &= ~I2_RTS;
-		}
-		if (arg & TIOCM_DTR) {
-			i2QueueCommands(PTYPE_INLINE, pCh, 100, 1, CMD_DTRDN);
-			pCh->dataSetOut &= ~I2_DTR;
-		}
-		break;
-	case TIOCMSET:
-		if ( (arg & TIOCM_RTS) && !(pCh->dataSetOut & I2_RTS) ) {
-			i2QueueCommands(PTYPE_INLINE, pCh, 100, 1, CMD_RTSUP);
-			pCh->dataSetOut |= I2_RTS;
-		} else if ( !(arg & TIOCM_RTS) && (pCh->dataSetOut & I2_RTS) ) {
-			i2QueueCommands(PTYPE_INLINE, pCh, 100, 1, CMD_RTSDN);
-			pCh->dataSetOut &= ~I2_RTS;
-		}
-		if ( (arg & TIOCM_DTR) && !(pCh->dataSetOut & I2_DTR) ) {
-			i2QueueCommands(PTYPE_INLINE, pCh, 100, 1, CMD_DTRUP);
-			pCh->dataSetOut |= I2_DTR;
-		} else if ( !(arg & TIOCM_DTR) && (pCh->dataSetOut & I2_DTR) ) {
-			i2QueueCommands(PTYPE_INLINE, pCh, 100, 1, CMD_DTRDN);
-			pCh->dataSetOut &= ~I2_DTR;
-		}
-		break;
-	default:
-		return -EINVAL;
-	}
-	serviceOutgoingFifo( pCh->pMyBord );
-	return 0;
 }
 
 /******************************************************************************/
@@ -2964,7 +2928,7 @@ ip2_ipl_ioctl ( struct inode *pInode, struct file *pFile, UINT cmd, ULONG arg )
 			rc = put_user(ip2_throttle, pIndex++ );
 			rc = put_user(ip2_unthrottle, pIndex++ );
 			rc = put_user(ip2_ioctl, pIndex++ );
-			rc = put_user(set_modem_info, pIndex++ );
+			rc = put_user(0, pIndex++ );
 			rc = put_user(get_serial_info, pIndex++ );
 			rc = put_user(set_serial_info, pIndex++ );
 			rc = put_user(ip2_set_termios, pIndex++ );

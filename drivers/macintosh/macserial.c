@@ -1777,47 +1777,65 @@ static int get_lsr_info(struct mac_serial * info, unsigned int *value)
 	return put_user(status,value);
 }
 
-static int get_modem_info(struct mac_serial *info, unsigned int *value)
+static int rs_tiocmget(struct tty_struct *tty, struct file *file)
 {
+	struct mac_serial * info = (struct mac_serial *)tty->driver_data;
 	unsigned char control, status;
-	unsigned int result;
 	unsigned long flags;
+
+#ifdef CONFIG_KGDB
+	if (info->kgdb_channel)
+		return -ENODEV;
+#endif
+	if (serial_paranoia_check(info, tty->name, __FUNCTION__))
+		return -ENODEV;
+
+	if ((cmd != TIOCGSERIAL) && (cmd != TIOCSSERIAL) &&
+	    (cmd != TIOCSERCONFIG) && (cmd != TIOCSERGSTRUCT)) {
+		if (tty->flags & (1 << TTY_IO_ERROR))
+		    return -EIO;
+	}
 
 	spin_lock_irqsave(&info->lock, flags);
 	control = info->curregs[5];
 	status = read_zsreg(info->zs_channel, 0);
 	spin_unlock_irqrestore(&info->lock, flags);
-	result =  ((control & RTS) ? TIOCM_RTS: 0)
+	return    ((control & RTS) ? TIOCM_RTS: 0)
 		| ((control & DTR) ? TIOCM_DTR: 0)
 		| ((status  & DCD) ? TIOCM_CAR: 0)
 		| ((status  & CTS) ? 0: TIOCM_CTS);
-	return put_user(result,value);
 }
 
-static int set_modem_info(struct mac_serial *info, unsigned int cmd,
-			  unsigned int *value)
+static int rs_tiocmset(struct tty_struct *tty, struct file *file,
+		       unsigned int set, unsigned int clear)
 {
+	struct mac_serial * info = (struct mac_serial *)tty->driver_data;
 	unsigned int arg, bits;
 	unsigned long flags;
 
-	if (get_user(arg, value))
-		return -EFAULT;
-	bits = (arg & TIOCM_RTS? RTS: 0) + (arg & TIOCM_DTR? DTR: 0);
-	spin_lock_irqsave(&info->lock, flags);
-	switch (cmd) {
-	case TIOCMBIS:
-		info->curregs[5] |= bits;
-		break;
-	case TIOCMBIC:
-		info->curregs[5] &= ~bits;
-		break;
-	case TIOCMSET:
-		info->curregs[5] = (info->curregs[5] & ~(DTR | RTS)) | bits;
-		break;
-	default:
-		spin_unlock_irqrestore(&info->lock, flags);
-		return -EINVAL;
+#ifdef CONFIG_KGDB
+	if (info->kgdb_channel)
+		return -ENODEV;
+#endif
+	if (serial_paranoia_check(info, tty->name, __FUNCTION__))
+		return -ENODEV;
+
+	if ((cmd != TIOCGSERIAL) && (cmd != TIOCSSERIAL) &&
+	    (cmd != TIOCSERCONFIG) && (cmd != TIOCSERGSTRUCT)) {
+		if (tty->flags & (1 << TTY_IO_ERROR))
+		    return -EIO;
 	}
+
+	spin_lock_irqsave(&info->lock, flags);
+	if (set & TIOCM_RTS)
+		info->curregs[5] |= RTS;
+	if (set & TIOCM_DTR)
+		info->curregs[5] |= DTR;
+	if (clear & TIOCM_RTS)
+		info->curregs[5] &= ~RTS;
+	if (clear & TIOCM_DTR)
+		info->curregs[5] &= ~DTR;
+
 	info->pendregs[5] = info->curregs[5];
 	write_zsreg(info->zs_channel, 5, info->curregs[5]);
 	spin_unlock_irqrestore(&info->lock, flags);
@@ -1863,12 +1881,6 @@ static int rs_ioctl(struct tty_struct *tty, struct file * file,
 	}
 
 	switch (cmd) {
-		case TIOCMGET:
-			return get_modem_info(info, (unsigned int *) arg);
-		case TIOCMBIS:
-		case TIOCMBIC:
-		case TIOCMSET:
-			return set_modem_info(info, cmd, (unsigned int *) arg);
 		case TIOCGSERIAL:
 			return get_serial_info(info,
 					(struct serial_struct __user *) arg);
@@ -2488,6 +2500,8 @@ static struct tty_operations serial_ops = {
 	.break_ctl = rs_break,
 	.wait_until_sent = rs_wait_until_sent,
 	.read_proc = macserial_read_proc,
+	.tiocmget = rs_tiocmget,
+	.tiocmset = rs_tiocmset,
 };
 
 static int macserial_init(void)
