@@ -11,10 +11,10 @@
 
 int numnodes = 1;	/* Initialized for UMA platforms */
 
+#ifndef CONFIG_DISCONTIGMEM
+
 static bootmem_data_t contig_bootmem_data;
 pg_data_t contig_page_data = { .bdata = &contig_bootmem_data };
-
-#ifndef CONFIG_DISCONTIGMEM
 
 /*
  * This is meant to be invoked by platforms whose physical memory starts

@@ -462,12 +462,17 @@ void __invalidate_buffers(kdev_t dev, int destroy_dirty_buffers)
 static void free_more_memory(void)
 {
 	struct zone *zone;
+	pg_data_t *pgdat;
 
-	zone = contig_page_data.node_zonelists[GFP_NOFS&GFP_ZONEMASK].zones[0];
 	wakeup_bdflush(1024);
 	blk_run_queues();
 	yield();
-	try_to_free_pages(zone, GFP_NOFS, 0);
+
+	for_each_pgdat(pgdat) {
+		zone = pgdat->node_zonelists[GFP_NOFS&GFP_ZONEMASK].zones[0];
+		if (zone)
+			try_to_free_pages(zone, GFP_NOFS, 0);
+	}
 }
 
 /*
