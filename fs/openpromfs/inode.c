@@ -327,7 +327,7 @@ static ssize_t property_write(struct file *filp, const char *buf,
 	void *b;
 	openprom_property *op;
 	
-	if (filp->f_pos >= 0xffffff)
+	if ((filp->f_pos + count) >= 0xffffff)
 		return -EINVAL;
 	if (!filp->private_data) {
 		i = property_read (filp, NULL, 0, 0);
