@@ -34,7 +34,6 @@
 #include <sound/core.h>
 #include <pcmcia/version.h>
 #include "vxpocket.h"
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 /*
@@ -81,7 +80,6 @@ MODULE_PARM_SYNTAX(ibl, SNDRV_ENABLED);
  */
 
 #ifdef COMPILE_VXP440
-static dev_info_t dev_info = "snd-vxp440";
 
 /* 1 DSP, 1 sync UER, 1 sync World Clock (NIY) */
 /* SMPTE (NIY) */
@@ -92,9 +90,9 @@ static dev_info_t dev_info = "snd-vxp440";
 
 #define NUM_CODECS	2
 #define CARD_TYPE	VX_TYPE_VXP440
+#define DEV_INFO	"snd-vxp440"
 
 #else
-static dev_info_t dev_info = "snd-vxpocket";
 
 /* 1 DSP, 1 sync UER */
 /* 1 programmable clock (NIY) */
@@ -104,8 +102,11 @@ static dev_info_t dev_info = "snd-vxpocket";
 
 #define NUM_CODECS	1
 #define CARD_TYPE	VX_TYPE_VXPOCKET
+#define DEV_INFO	"snd-vxpocket"
+
 #endif
 
+static dev_info_t dev_info = DEV_INFO;
 
 static struct snd_vx_hardware vxp_hw = {
 	.name = CARD_NAME,
@@ -146,28 +147,28 @@ static void vxp_detach(dev_link_t *link)
 	snd_vxpocket_detach(&hw_entry, link);
 }
 
-
 /*
  * Module entry points
  */
 
+static struct pcmcia_driver vxp_cs_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= DEV_INFO,
+	},
+	.attach		= vxp_attach,
+	.detach		= vxp_detach
+};
+
 static int __init init_vxpocket(void)
 {
-	servinfo_t serv;
-
-	CardServices(GetCardServicesInfo, &serv);
-	if (serv.Revision != CS_RELEASE_CODE) {
-		printk(KERN_WARNING "init_vxpocket: Card Services release does not match (%x != %x)!\n", serv.Revision, CS_RELEASE_CODE);
-		return -1;
-	}
-	register_pccard_driver(&dev_info, vxp_attach, vxp_detach);
-	return 0;
+	return pcmcia_register_driver(&vxp_cs_driver);
 }
 
 static void __exit exit_vxpocket(void)
 {
-        unregister_pccard_driver(&dev_info);
-        snd_vxpocket_detach_all(&hw_entry);
+	pcmcia_unregister_driver(&vxp_cs_driver);
+	snd_vxpocket_detach_all(&hw_entry);
 }
 
 module_init(init_vxpocket);
