@@ -30,27 +30,16 @@
 
 #include <asm/agp.h>	/* for flush_agp_cache() */
 
-extern struct agp_bridge_data *agp_bridge;
-
 #define PFX "agpgart: "
 
-#ifdef CONFIG_SMP
-static void ipi_handler(void *null)
-{
-	flush_agp_cache();
-}
-
-static void __attribute__((unused)) global_cache_flush(void)
-{
-	if (on_each_cpu(ipi_handler, NULL, 1, 1) != 0)
-		panic(PFX "timed out waiting for the other CPUs!\n");
-}
+#define AGP_DEBUG 1
+#ifdef AGP_DEBUG
+#define DBG(x,y...) printk (KERN_DEBUG PFX "%s: " x "\n", __FUNCTION__ , ## y)
 #else
-static void global_cache_flush(void)
-{
-	flush_agp_cache();
-}
-#endif	/* !CONFIG_SMP */
+#define DBG(x,y...) do { } while (0)
+#endif
+
+extern struct agp_bridge_data *agp_bridge;
 
 enum aper_size_type {
 	U8_APER_SIZE,
@@ -101,14 +90,41 @@ struct aper_size_info_fixed {
 	int page_order;
 };
 
+struct agp_bridge_driver {
+	struct module *owner;
+	void *aperture_sizes;
+	int num_aperture_sizes;
+	enum aper_size_type size_type;
+	int cant_use_aperture;
+	int needs_scratch_page;
+	struct gatt_mask *masks;
+	int (*fetch_size)(void);
+	int (*configure)(void);
+	void (*agp_enable)(u32);
+	void (*cleanup)(void);
+	void (*tlb_flush)(agp_memory *);
+	unsigned long (*mask_memory)(unsigned long, int);
+	void (*cache_flush)(void);
+	int (*create_gatt_table)(void);
+	int (*free_gatt_table)(void);
+	int (*insert_memory)(agp_memory *, off_t, int);
+	int (*remove_memory)(agp_memory *, off_t, int);
+	agp_memory *(*alloc_by_type) (size_t, int);
+	void (*free_by_type)(agp_memory *);
+	void *(*agp_alloc_page)(void);
+	void (*agp_destroy_page)(void *);
+	int (*suspend)(void);
+	void (*resume)(void);
+};
+
 struct agp_bridge_data {
 	struct agp_version *version;
-	void *aperture_sizes;
+	struct agp_bridge_driver *driver;
+	struct vm_operations_struct *vm_ops;
 	void *previous_size;
 	void *current_size;
 	void *dev_private_data;
 	struct pci_dev *dev;
-	struct gatt_mask *masks;
 	u32 *gatt_table;
 	u32 *gatt_table_real;
 	unsigned long scratch_page;
@@ -117,38 +133,12 @@ struct agp_bridge_data {
 	unsigned long gatt_bus_addr;
 	u32 mode;
 	enum chipset_type type;
-	enum aper_size_type size_type;
 	unsigned long *key_list;
 	atomic_t current_memory_agp;
 	atomic_t agp_in_use;
 	int max_memory_agp;	/* in number of pages */
-	int needs_scratch_page;
 	int aperture_size_idx;
-	int num_aperture_sizes;
 	int capndx;
-	int cant_use_aperture;
-	struct vm_operations_struct *vm_ops;
-
-	/* Links to driver specific functions */
-
-	int (*fetch_size) (void);
-	int (*configure) (void);
-	void (*agp_enable) (u32);
-	void (*cleanup) (void);
-	void (*tlb_flush) (agp_memory *);
-	unsigned long (*mask_memory) (unsigned long, int);
-	void (*cache_flush) (void);
-	int (*create_gatt_table) (void);
-	int (*free_gatt_table) (void);
-	int (*insert_memory) (agp_memory *, off_t, int);
-	int (*remove_memory) (agp_memory *, off_t, int);
-	agp_memory *(*alloc_by_type) (size_t, int);
-	void (*free_by_type) (agp_memory *);
-	void *(*agp_alloc_page) (void);
-	void (*agp_destroy_page) (void *);
-	int (*suspend)(void);
-	void (*resume)(void);
-	
 };
 
 #define OUTREG64(mmap, addr, val)	__raw_writeq((val), (mmap)+(addr))
@@ -165,20 +155,17 @@ struct agp_bridge_data {
 #define MB(x)	(KB (KB (x)))
 #define GB(x)	(MB (KB (x)))
 
-#define CACHE_FLUSH	agp_bridge->cache_flush
 #define A_SIZE_8(x)	((struct aper_size_info_8 *) x)
 #define A_SIZE_16(x)	((struct aper_size_info_16 *) x)
 #define A_SIZE_32(x)	((struct aper_size_info_32 *) x)
 #define A_SIZE_LVL2(x)	((struct aper_size_info_lvl2 *) x)
 #define A_SIZE_FIX(x)	((struct aper_size_info_fixed *) x)
-#define A_IDX8()	(A_SIZE_8(agp_bridge->aperture_sizes) + i)
-#define A_IDX16()	(A_SIZE_16(agp_bridge->aperture_sizes) + i)
-#define A_IDX32()	(A_SIZE_32(agp_bridge->aperture_sizes) + i)
-#define A_IDXLVL2()	(A_SIZE_LVL2(agp_bridge->aperture_sizes) + i)
-#define A_IDXFIX()	(A_SIZE_FIX(agp_bridge->aperture_sizes) + i)
+#define A_IDX8(bridge)	(A_SIZE_8((bridge)->driver->aperture_sizes) + i)
+#define A_IDX16(bridge)	(A_SIZE_16((bridge)->driver->aperture_sizes) + i)
+#define A_IDX32(bridge)	(A_SIZE_32((bridge)->driver->aperture_sizes) + i)
 #define MAXKEY		(4096 * 32)
 
-#define PGE_EMPTY(p)	(!(p) || (p) == (unsigned long) agp_bridge->scratch_page)
+#define PGE_EMPTY(b, p)	(!(p) || (p) == (unsigned long) (b)->scratch_page)
 
 /* intel register */
 #define INTEL_APBASE	0x10
@@ -374,11 +361,15 @@ struct agp_device_ids {
 	int (*chipset_setup) (struct pci_dev *pdev);	/* used to override generic */
 };
 
-struct agp_driver {
-	struct module *owner;
-	struct pci_dev *dev;
-};
+/* Driver registration */
+struct agp_bridge_data *agp_alloc_bridge(void);
+void agp_put_bridge(struct agp_bridge_data *bridge);
+int agp_add_bridge(struct agp_bridge_data *bridge);
+void agp_remove_bridge(struct agp_bridge_data *bridge);
 
+/* Frontend routines. */
+int agp_frontend_initialize(void);
+void agp_frontend_cleanup(void);
 
 /* Generic routines. */
 void agp_generic_enable(u32 mode);
@@ -395,10 +386,29 @@ int agp_generic_suspend(void);
 void agp_generic_resume(void);
 void agp_free_key(int key);
 int agp_num_entries(void);
-int agp_register_driver (struct agp_driver *drv);
-int agp_unregister_driver(struct agp_driver *drv);
 u32 agp_collect_device_status(u32 mode, u32 command);
 void agp_device_command(u32 command, int agp_v3);
-int agp_3_0_node_enable(u32 mode, u32 minor);
+int agp_3_0_node_enable(struct agp_bridge_data *bridge, u32 mode, u32 minor);
+void global_cache_flush(void);
+
+/* Standard agp registers */
+#define AGPSTAT			0x4
+#define AGPCMD			0x8
+#define AGPNEPG			0x16
+
+#define AGP_MAJOR_VERSION_SHIFT	(20)
+#define AGP_MINOR_VERSION_SHIFT	(16)
+
+#define AGPSTAT_RQ_DEPTH	(0xff000000)
+
+#define AGPSTAT_ARQSZ_SHIFT	13
+
+#define AGPSTAT_AGP_ENABLE	(1<<8)
+#define AGPSTAT_SBA		(1<<9)
+
+#define AGPSTAT2_1X		(1<<0)
+#define AGPSTAT2_2X		(1<<1)
+#define AGPSTAT2_4X		(1<<2)
+#define AGPSTAT_FW		(1<<4)
 
 #endif				/* _AGP_BACKEND_PRIV_H */

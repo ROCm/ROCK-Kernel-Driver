@@ -1,6 +1,6 @@
 config AGP
 	tristate "/dev/agpgart (AGP Support)" if !GART_IOMMU
-	default AGP_GART if GART_IOMMU
+	default y if GART_IOMMU
 	---help---
 	  AGP (Accelerated Graphics Port) is a bus system mainly used to
 	  connect graphics cards to the rest of the system.
@@ -25,67 +25,9 @@ config AGP
 	  a module, say M here and read <file:Documentation/modules.txt>.  The
 	  module will be called agpgart.
 
-config AGP_GART
-	bool "/dev/agpgart (AGP Support)"
-	depends on GART_IOMMU
-
-config AGP_INTEL
-	tristate "Intel 440LX/BX/GX, I8xx and E7x05 support"
-	depends on AGP && !X86_64
-	help
-	  This option gives you AGP support for the GLX component of the
-	  XFree86 4.x on Intel 440LX/BX/GX, 815, 820, 830, 840, 845, 850, 860
-	  E7205 and E7505 chipsets and full support for the 810, 815, 830M, 845G,
-	  852GM, 855GM and 865G integrated graphics chipsets.
-
-	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
-	  use GLX or DRI, or if you have any Intel integrated graphics
-	  chipsets.  If unsure, say Y.
-
-#config AGP_I810
-#	tristate "Intel I810/I815/I830M (on-board) support"
-#	depends on AGP && !X86_64
-#	help
-#	  This option gives you AGP support for the Xserver on the Intel 810
-#	  815 and 830m chipset boards for their on-board integrated graphics. This
-#	  is required to do any useful video modes with these boards.
-
-config AGP_VIA
-	tristate "VIA chipset support"
-	depends on AGP && !X86_64
-	help
-	  This option gives you AGP support for the GLX component of the
-	  XFree86 4.x on VIA MPV3/Apollo Pro chipsets.
-
-	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
-	  use GLX or DRI.  If unsure, say N.
-
-config AGP_AMD
-	tristate "AMD Irongate, 761, and 762 support"
-	depends on AGP && !X86_64
-	help
-	  This option gives you AGP support for the GLX component of the
-	  XFree86 4.x on AMD Irongate, 761, and 762 chipsets.
-
-	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
-	  use GLX or DRI.  If unsure, say N.
-
-config AGP_SIS
-	tristate "Generic SiS support"
-	depends on AGP && !X86_64
-	help
-	  This option gives you AGP support for the GLX component of the "soon
-	  to be released" XFree86 4.x on Silicon Integrated Systems [SiS]
-	  chipsets.
-
-	  Note that 5591/5592 AGP chipsets are NOT supported.
-
-	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
-	  use GLX or DRI.  If unsure, say N.
-
 config AGP_ALI
 	tristate "ALI chipset support"
-	depends on AGP && !X86_64
+	depends on AGP && X86 && !X86_64
 	---help---
 	  This option gives you AGP support for the GLX component of the
 	  XFree86 4.x on the following ALi chipsets.  The supported chipsets
@@ -101,37 +43,91 @@ config AGP_ALI
 	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
 	  use GLX or DRI.  If unsure, say N.
 
-config AGP_SWORKS
-	tristate "Serverworks LE/HE support"
-	depends on AGP && !X86_64
+config AGP_AMD
+	tristate "AMD Irongate, 761, and 762 chipset support"
+	depends on AGP && X86 && !X86_64
 	help
-	  Say Y here to support the Serverworks AGP card.  See 
-	  <http://www.serverworks.com/> for product descriptions and images.
+	  This option gives you AGP support for the GLX component of the
+	  XFree86 4.x on AMD Irongate, 761, and 762 chipsets.
+
+	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+	  use GLX or DRI.  If unsure, say N.
 
 config AGP_AMD_8151
-	tristate "AMD 8151 support"
-	depends on AGP
+	tristate "AMD 8151 chipset support"
+	depends on AGP && X86
 	default GART_IOMMU
 	help
 	  Say Y here to support the AMD 8151 AGP bridge and the builtin
 	  GART on the AMD Athlon64/Opteron ("Hammer") CPUs.
 
+config AGP_INTEL
+	tristate "Intel 440LX/BX/GX, I8xx and E7x05 chipset support"
+	depends on AGP && X86 && !X86_64
+	help
+	  This option gives you AGP support for the GLX component of the
+	  XFree86 4.x on Intel 440LX/BX/GX, 815, 820, 830, 840, 845, 850, 860
+	  E7205 and E7505 chipsets and full support for the 810, 815, 830M, 845G,
+	  852GM, 855GM and 865G integrated graphics chipsets.
+
+	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+	  use GLX or DRI, or if you have any Intel integrated graphics
+	  chipsets.  If unsure, say Y.
+
+config AGP_NVIDIA
+	tristate "NVIDIA nForce/nForce2 chipset support"
+	depends on AGP && X86 && !X86_64
+	help
+	  This option gives you AGP support for the GLX component of the
+	  XFree86 4.x on the following NVIDIA chipsets.  The supported chipsets
+	  include nForce and nForce2
+
+config AGP_SIS
+	tristate "SiS chipset support"
+	depends on AGP && X86 && !X86_64
+	help
+	  This option gives you AGP support for the GLX component of the "soon
+	  to be released" XFree86 4.x on Silicon Integrated Systems [SiS]
+	  chipsets.
+
+	  Note that 5591/5592 AGP chipsets are NOT supported.
+
+	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+	  use GLX or DRI.  If unsure, say N.
+
+config AGP_SWORKS
+	tristate "Serverworks LE/HE chipset support"
+	depends on AGP && X86 && !X86_64
+	help
+	  Say Y here to support the Serverworks AGP card.  See 
+	  <http://www.serverworks.com/> for product descriptions and images.
+
+config AGP_VIA
+	tristate "VIA chipset support"
+	depends on AGP && X86 && !X86_64
+	help
+	  This option gives you AGP support for the GLX component of the
+	  XFree86 4.x on VIA MPV3/Apollo Pro chipsets.
+
+	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+	  use GLX or DRI.  If unsure, say N.
+
 config AGP_I460
-	tristate "Intel 460GX support"
+	tristate "Intel 460GX chipset support"
 	depends on AGP && IA64
 	help
 	  This option gives you AGP GART support for the Intel 460GX chipset
 	  for IA64 processors.
 
 config AGP_HP_ZX1
-	tristate "HP ZX1 AGP support"
+	tristate "HP ZX1 chipset AGP support"
 	depends on AGP && IA64
 	help
 	  This option gives you AGP GART support for the HP ZX1 chipset
 	  for IA64 processors.
 
 config AGP_ALPHA_CORE
-	tristate
+	tristate "Alpha AGP support"
 	depends on AGP && (ALPHA_GENERIC || ALPHA_TITAN || ALPHA_MARVEL)
 	default AGP
 
