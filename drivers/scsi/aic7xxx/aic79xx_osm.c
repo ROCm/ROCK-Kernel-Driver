@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#102 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#103 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -2640,6 +2640,7 @@ ahd_linux_dv_target(struct ahd_softc *ahd, u_int target_offset)
 				      AHD_TRANS_GOAL, /*paused*/FALSE);
 			ahd_unlock(ahd, &s);
 			timeout = 10 * HZ;
+			targ->flags &= ~AHD_INQ_VALID;
 			/* FALLTHROUGH */
 		case AHD_DV_STATE_INQ_VERIFY:
 		{
@@ -2721,6 +2722,25 @@ ahd_linux_dv_target(struct ahd_softc *ahd, u_int target_offset)
 	}
 
 out:
+	if ((targ->flags & AHD_INQ_VALID) != 0
+	 && ahd_linux_get_device(ahd, devinfo.channel - 'A',
+				 devinfo.target, devinfo.lun,
+				 /*alloc*/FALSE) == NULL) {
+		/*
+		 * The DV state machine failed to configure this device.  
+		 * This is normal if DV is disabled.  Since we have inquiry
+		 * data, filter it and use the "optimistic" negotiation
+		 * parameters found in the inquiry string.
+		 */
+		ahd_linux_filter_inquiry(ahd, &devinfo);
+		if ((targ->flags & (AHD_BASIC_DV|AHD_ENHANCED_DV)) != 0) {
+			ahd_print_devinfo(ahd, &devinfo);
+			printf("DV failed to configure device.  "
+			       "Please file a bug report against "
+			       "this driver.\n");
+		}
+	}
+
 	if (cmd != NULL)
 		free(cmd, M_DEVBUF);
 
@@ -2806,24 +2826,21 @@ ahd_linux_dv_transition(struct ahd_softc *ahd, struct scsi_cmnd *cmd,
 				break;
 			}
 
-			if (ahd_linux_user_dv_setting(ahd) == 0) {
-				ahd_linux_filter_inquiry(ahd, devinfo);
-				AHD_SET_DV_STATE(ahd, targ, AHD_DV_STATE_EXIT);
+			AHD_SET_DV_STATE(ahd, targ, targ->dv_state+1);
+			targ->flags |= AHD_INQ_VALID;
+			if (ahd_linux_user_dv_setting(ahd) == 0)
 				break;
-			}
 
 			spi3data = targ->inq_data->spi3data;
 			switch (spi3data & SID_SPI_CLOCK_DT_ST) {
 			default:
 			case SID_SPI_CLOCK_ST:
 				/* Assume only basic DV is supported. */
-				ahd_linux_filter_inquiry(ahd, devinfo);
-				AHD_SET_DV_STATE(ahd, targ,
-						 AHD_DV_STATE_INQ_VERIFY);
+				targ->flags |= AHD_BASIC_DV;
 				break;
 			case SID_SPI_CLOCK_DT:
 			case SID_SPI_CLOCK_DT_ST:
-				AHD_SET_DV_STATE(ahd, targ, AHD_DV_STATE_REBD);
+				targ->flags |= AHD_ENHANCED_DV;
 				break;
 			}
 			break;
@@ -2919,8 +2936,15 @@ ahd_linux_dv_transition(struct ahd_softc *ahd, struct scsi_cmnd *cmd,
 	case AHD_DV_STATE_TUR:
 		switch (status & SS_MASK) {
 		case SS_NOP:
-			AHD_SET_DV_STATE(ahd, targ,
-					 AHD_DV_STATE_INQ_ASYNC);
+			if ((targ->flags & AHD_BASIC_DV) != 0) {
+				ahd_linux_filter_inquiry(ahd, devinfo);
+				AHD_SET_DV_STATE(ahd, targ,
+						 AHD_DV_STATE_INQ_VERIFY);
+			} else if ((targ->flags & AHD_ENHANCED_DV) != 0) {
+				AHD_SET_DV_STATE(ahd, targ, AHD_DV_STATE_REBD);
+			} else {
+				AHD_SET_DV_STATE(ahd, targ, AHD_DV_STATE_EXIT);
+			}
 			break;
 		case SS_RETRY:
 		case SS_TUR:

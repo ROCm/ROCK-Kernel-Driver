@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#97 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#98 $
  *
  */
 #ifndef _AIC79XX_LINUX_H_
@@ -425,16 +425,19 @@ struct ahd_linux_device {
 };
 
 typedef enum {
-	AHD_DV_REQUIRED		 = 0x01
+	AHD_DV_REQUIRED		 = 0x01,
+	AHD_INQ_VALID		 = 0x02,
+	AHD_BASIC_DV		 = 0x04,
+	AHD_ENHANCED_DV		 = 0x08
 } ahd_linux_targ_flags;
 
 /* DV States */
 typedef enum {
 	AHD_DV_STATE_EXIT = 0,
 	AHD_DV_STATE_INQ_SHORT_ASYNC,
-	AHD_DV_STATE_TUR,
 	AHD_DV_STATE_INQ_ASYNC,
 	AHD_DV_STATE_INQ_ASYNC_VERIFY,
+	AHD_DV_STATE_TUR,
 	AHD_DV_STATE_REBD,
 	AHD_DV_STATE_INQ_VERIFY,
 	AHD_DV_STATE_WEB,
