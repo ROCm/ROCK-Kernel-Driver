@@ -110,7 +110,7 @@ xfs_dir_lookup_int(
 		 * reservation in the inactive routine.
 		 */
 		xfs_iunlock(dp, lock_mode);
-		error = xfs_iget(dp->i_mount, NULL, *inum, 0, ipp, 0);
+		error = xfs_iget(dp->i_mount, NULL, *inum, 0, 0, ipp, 0);
 		xfs_ilock(dp, lock_mode);
 
 		if (error) {

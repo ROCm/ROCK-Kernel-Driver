@@ -410,9 +410,9 @@ static void mxser_start(struct tty_struct *);
 static void mxser_hangup(struct tty_struct *);
 static void mxser_rs_break(struct tty_struct *, int);
 static irqreturn_t mxser_interrupt(int, void *, struct pt_regs *);
-static inline void mxser_receive_chars(struct mxser_struct *, int *);
-static inline void mxser_transmit_chars(struct mxser_struct *);
-static inline void mxser_check_modem_status(struct mxser_struct *, int);
+static void mxser_receive_chars(struct mxser_struct *, int *);
+static void mxser_transmit_chars(struct mxser_struct *);
+static void mxser_check_modem_status(struct mxser_struct *, int);
 static int mxser_block_til_ready(struct tty_struct *, struct file *, struct mxser_struct *);
 static int mxser_startup(struct mxser_struct *);
 static void mxser_shutdown(struct mxser_struct *);
@@ -1989,7 +1989,7 @@ static irqreturn_t mxser_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return handled;
 }
 
-static inline void mxser_receive_chars(struct mxser_struct *info, int *status)
+static void mxser_receive_chars(struct mxser_struct *info, int *status)
 {
 	struct tty_struct *tty = info->tty;
 	unsigned char ch, gdl;
@@ -2143,7 +2143,7 @@ intr_old:
 
 }
 
-static inline void mxser_transmit_chars(struct mxser_struct *info)
+static void mxser_transmit_chars(struct mxser_struct *info)
 {
 	int count, cnt;
 	unsigned long flags;
@@ -2206,7 +2206,7 @@ static inline void mxser_transmit_chars(struct mxser_struct *info)
 	spin_unlock_irqrestore(&info->slock, flags);
 }
 
-static inline void mxser_check_modem_status(struct mxser_struct *info, int status)
+static void mxser_check_modem_status(struct mxser_struct *info, int status)
 {
 	/* update input line counters */
 	if (status & UART_MSR_TERI)

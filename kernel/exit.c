@@ -242,9 +242,8 @@ void reparent_to_init(void)
 	memcpy(current->signal->rlim, init_task.signal->rlim,
 	       sizeof(current->signal->rlim));
 	atomic_inc(&(INIT_USER->__count));
-	switch_uid(INIT_USER);
-
 	write_unlock_irq(&tasklist_lock);
+	switch_uid(INIT_USER);
 }
 
 void __set_special_pids(pid_t session, pid_t pgrp)

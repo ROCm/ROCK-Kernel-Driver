@@ -53,12 +53,9 @@
 #include <linux/workqueue.h>
 #include <linux/suspend.h>
 #include <linux/percpu.h>
+#include <linux/blkdev.h>
 
 #include "xfs_linux.h"
-
-#ifndef GFP_READAHEAD
-#define GFP_READAHEAD	(__GFP_NOWARN|__GFP_NORETRY)
-#endif
 
 /*
  * File wide globals
@@ -118,8 +115,8 @@ ktrace_t *pagebuf_trace_buf;
  */
 
 #define pb_to_gfp(flags) \
-	(((flags) & PBF_READ_AHEAD) ? GFP_READAHEAD : \
-	 ((flags) & PBF_DONT_BLOCK) ? GFP_NOFS : GFP_KERNEL)
+	((((flags) & PBF_READ_AHEAD) ? __GFP_NORETRY : \
+	  ((flags) & PBF_DONT_BLOCK) ? GFP_NOFS : GFP_KERNEL) | __GFP_NOWARN)
 
 #define pb_to_km(flags) \
 	 (((flags) & PBF_DONT_BLOCK) ? KM_NOFS : KM_SLEEP)
@@ -387,13 +384,13 @@ _pagebuf_lookup_pages(
 			 */
 			if (!(++retries % 100))
 				printk(KERN_ERR
-					"possible deadlock in %s (mode:0x%x)\n",
+					"XFS: possible memory allocation "
+					"deadlock in %s (mode:0x%x)\n",
 					__FUNCTION__, gfp_mask);
 
 			XFS_STATS_INC(pb_page_retries);
 			pagebuf_daemon_wakeup(0, gfp_mask);
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(10);
+			blk_congestion_wait(WRITE, HZ/50);
 			goto retry;
 		}
 
@@ -486,7 +483,7 @@ _pagebuf_map_pages(
  *	which may imply that this call will block until those buffers
  *	are unlocked.  No I/O is implied by this call.
  */
-STATIC xfs_buf_t *
+xfs_buf_t *
 _pagebuf_find(				/* find buffer for block	*/
 	xfs_buftarg_t		*target,/* target for block		*/
 	loff_t			ioff,	/* starting offset of range	*/
@@ -578,39 +575,14 @@ found:
 	return (pb);
 }
 
-
 /*
- *	pagebuf_find
+ *	xfs_buf_get_flags assembles a buffer covering the specified range.
  *
- *	pagebuf_find returns a buffer matching the specified range of
- *	data for the specified target, if any of the relevant blocks
- *	are in memory.  The buffer may have unallocated holes, if
- *	some, but not all, of the blocks are in memory.  Even where
- *	pages are present in the buffer, not all of every page may be
- *	valid.
+ *	Storage in memory for all portions of the buffer will be allocated,
+ *	although backing storage may not be.
  */
 xfs_buf_t *
-pagebuf_find(				/* find buffer for block	*/
-					/* if the block is in memory	*/
-	xfs_buftarg_t		*target,/* target for block		*/
-	loff_t			ioff,	/* starting offset of range	*/
-	size_t			isize,	/* length of range		*/
-	page_buf_flags_t	flags)	/* PBF_TRYLOCK			*/
-{
-	return _pagebuf_find(target, ioff, isize, flags, NULL);
-}
-
-/*
- *	pagebuf_get
- *
- *	pagebuf_get assembles a buffer covering the specified range.
- *	Some or all of the blocks in the range may be valid.  Storage
- *	in memory for all portions of the buffer will be allocated,
- *	although backing storage may not be.  If PBF_READ is set in
- *	flags, pagebuf_iostart is called also.
- */
-xfs_buf_t *
-pagebuf_get(				/* allocate a buffer		*/
+xfs_buf_get_flags(			/* allocate a buffer		*/
 	xfs_buftarg_t		*target,/* target for buffer		*/
 	loff_t			ioff,	/* starting offset of range	*/
 	size_t			isize,	/* length of range		*/
@@ -640,8 +612,8 @@ pagebuf_get(				/* allocate a buffer		*/
 	if (!(pb->pb_flags & PBF_MAPPED)) {
 		error = _pagebuf_map_pages(pb, flags);
 		if (unlikely(error)) {
-			printk(KERN_WARNING
-			       "pagebuf_get: failed to map pages\n");
+			printk(KERN_WARNING "%s: failed to map pages\n",
+					__FUNCTION__);
 			goto no_buffer;
 		}
 	}
@@ -655,30 +627,50 @@ pagebuf_get(				/* allocate a buffer		*/
 	pb->pb_bn = ioff;
 	pb->pb_count_desired = pb->pb_buffer_length;
 
-	if (flags & PBF_READ) {
+	PB_TRACE(pb, "get", (unsigned long)flags);
+	return pb;
+
+ no_buffer:
+	if (flags & (PBF_LOCK | PBF_TRYLOCK))
+		pagebuf_unlock(pb);
+	pagebuf_rele(pb);
+	return NULL;
+}
+
+xfs_buf_t *
+xfs_buf_read_flags(
+	xfs_buftarg_t		*target,
+	loff_t			ioff,
+	size_t			isize,
+	page_buf_flags_t	flags)
+{
+	xfs_buf_t		*pb;
+
+	flags |= PBF_READ;
+
+	pb = xfs_buf_get_flags(target, ioff, isize, flags);
+	if (pb) {
 		if (PBF_NOT_DONE(pb)) {
-			PB_TRACE(pb, "get_read", (unsigned long)flags);
+			PB_TRACE(pb, "read", (unsigned long)flags);
 			XFS_STATS_INC(pb_get_read);
 			pagebuf_iostart(pb, flags);
 		} else if (flags & PBF_ASYNC) {
-			PB_TRACE(pb, "get_read_async", (unsigned long)flags);
+			PB_TRACE(pb, "read_async", (unsigned long)flags);
 			/*
 			 * Read ahead call which is already satisfied,
 			 * drop the buffer
 			 */
 			goto no_buffer;
 		} else {
-			PB_TRACE(pb, "get_read_done", (unsigned long)flags);
+			PB_TRACE(pb, "read_done", (unsigned long)flags);
 			/* We do not want read in the flags */
 			pb->pb_flags &= ~PBF_READ;
 		}
-	} else {
-		PB_TRACE(pb, "get_write", (unsigned long)flags);
 	}
 
 	return pb;
 
-no_buffer:
+ no_buffer:
 	if (flags & (PBF_LOCK | PBF_TRYLOCK))
 		pagebuf_unlock(pb);
 	pagebuf_rele(pb);
@@ -723,8 +715,8 @@ pagebuf_readahead(
 	if (bdi_write_congested(bdi))
 		return;
 
-	flags |= (PBF_TRYLOCK|PBF_READ|PBF_ASYNC|PBF_READ_AHEAD);
-	pagebuf_get(target, ioff, isize, flags);
+	flags |= (PBF_TRYLOCK|PBF_ASYNC|PBF_READ_AHEAD);
+	xfs_buf_read_flags(target, ioff, isize, flags);
 }
 
 xfs_buf_t *
@@ -1084,7 +1076,7 @@ _pagebuf_wait_unpin(
  *	done with respect to that I/O.	The pb_iodone routine, if
  *	present, will be called as a side-effect.
  */
-void
+STATIC void
 pagebuf_iodone_work(
 	void			*v)
 {
@@ -1263,7 +1255,7 @@ bio_end_io_pagebuf(
 	return 0;
 }
 
-void
+STATIC void
 _pagebuf_ioapply(
 	xfs_buf_t		*pb)
 {
@@ -1472,6 +1464,34 @@ pagebuf_iomove(
 /*
  *	Handling of buftargs.
  */
+
+/*
+ * Wait for any bufs with callbacks that have been submitted but
+ * have not yet returned... walk the hash list for the target.
+ */
+void
+xfs_wait_buftarg(
+	xfs_buftarg_t *target)
+{
+	xfs_buf_t	*pb, *n;
+	pb_hash_t	*h;
+	int		i;
+
+	for (i = 0; i < NHASH; i++) {
+		h = &pbhash[i];
+again:
+		spin_lock(&h->pb_hash_lock);
+		list_for_each_entry_safe(pb, n, &h->pb_hash, pb_hash_list) {
+			if (pb->pb_target == target &&
+					!(pb->pb_flags & PBF_FS_MANAGED)) {
+				spin_unlock(&h->pb_hash_lock);
+				delay(100);
+				goto again;
+			}
+		}
+		spin_unlock(&h->pb_hash_lock);
+	}
+}
 
 void
 xfs_free_buftarg(
