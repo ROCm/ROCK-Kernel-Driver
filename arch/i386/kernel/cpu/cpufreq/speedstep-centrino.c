@@ -40,7 +40,6 @@
 
 struct cpu_id
 {
-	__u8	x86_vendor;     /* CPU vendor */
 	__u8	x86;            /* CPU family */
 	__u8	x86_model;	/* model */
 	__u8	x86_mask;	/* stepping */
@@ -53,9 +52,9 @@ enum {
 };
 
 static const struct cpu_id cpu_ids[] = {
-	[CPU_BANIAS]	= { X86_VENDOR_INTEL,	6,  9, 5 },
-	[CPU_DOTHAN_A1]	= { X86_VENDOR_INTEL,	6, 13, 1 },
-	[CPU_DOTHAN_B0]	= { X86_VENDOR_INTEL,	6, 13, 6 },
+	[CPU_BANIAS]	= { 6,  9, 5 },
+	[CPU_DOTHAN_A1]	= { 6, 13, 1 },
+	[CPU_DOTHAN_B0]	= { 6, 13, 6 },
 };
 #define N_IDS	(sizeof(cpu_ids)/sizeof(cpu_ids[0]))
 
@@ -265,7 +264,6 @@ static inline int centrino_cpu_init_table(struct cpufreq_policy *policy) { retur
 static int centrino_verify_cpu_id(const struct cpuinfo_x86 *c, const struct cpu_id *x)
 {
 	if ((c->x86 == x->x86) &&
-	    (c->x86_vendor == x->x86_vendor) &&
 	    (c->x86_model == x->x86_model) &&
 	    (c->x86_mask == x->x86_mask))
 		return 1;
