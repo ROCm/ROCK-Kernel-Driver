@@ -6,7 +6,7 @@
    		     Arnaldo Carvalho de Melo <acme@conectiva.com.br>
                      Brad Strand <linux@3ware.com>
 
-   Copyright (C) 1999-2002 3ware Inc.
+   Copyright (C) 1999-2003 3ware Inc.
 
    Kernel compatiblity By:	Andre Hedrick <andre@suse.com>
    Non-Copyright (C) 2000	Andre Hedrick <andre@suse.com>
@@ -113,11 +113,11 @@ static unsigned char tw_sense_table[][4] =
   {0x84, 0x0b, 0x47, 0x00}, // Data CRC error               SCSI parity error
   {0xd0, 0x0b, 0x00, 0x00}, // Device busy                  Aborted command
   {0xd1, 0x0b, 0x00, 0x00}, // Device busy                  Aborted command
+  {0x37, 0x02, 0x04, 0x00}, // Unit offline                 Not ready
 
   /* Codes for older firmware */
                             // 3ware Error                  SCSI Error
   {0x09, 0x0b, 0x00, 0x00}, // Unrecovered disk error       Aborted command
-  {0x37, 0x0b, 0x04, 0x00}, // Unit offline                 Logical unit not ready
   {0x51, 0x0b, 0x00, 0x00}  // Unspecified                  Aborted command
 };
 
@@ -219,18 +219,23 @@ static unsigned char tw_sense_table[][4] =
 #define TW_MAX_PCI_BUSES		      255
 #define TW_MAX_RESET_TRIES		      3
 #define TW_UNIT_INFORMATION_TABLE_BASE	      0x300
-#define TW_MAX_CMDS_PER_LUN		      255
+#define TW_MAX_CMDS_PER_LUN		      254 /* 254 for io, 1 for
+                                                     chrdev ioctl, one for
+                                                     internal aen post */
 #define TW_BLOCK_SIZE			      0x200 /* 512-byte blocks */
 #define TW_IOCTL                              0x80
 #define TW_UNIT_ONLINE                        1
 #define TW_IN_INTR                            1
 #define TW_IN_IOCTL                           2
+#define TW_IN_CHRDEV_IOCTL                    3
 #define TW_MAX_SECTORS                        256
 #define TW_AEN_WAIT_TIME                      1000
 #define TW_IOCTL_WAIT_TIME                    (1 * HZ) /* 1 second */
 #define TW_ISR_DONT_COMPLETE                  2
 #define TW_ISR_DONT_RESULT                    3
 #define TW_IOCTL_TIMEOUT                      25 /* 25 seconds */
+#define TW_IOCTL_CHRDEV_TIMEOUT               25 /* 25 seconds */
+#define TW_IOCTL_CHRDEV_FREE                  -1
 
 /* Macros */
 #define TW_STATUS_ERRORS(x) \
@@ -245,6 +250,8 @@ static unsigned char tw_sense_table[][4] =
 #else
 #define dprintk(msg...) do { } while(0)
 #endif
+
+#pragma pack(1)
 
 /* Scatter Gather List Entry */
 typedef struct TAG_TW_SG_Entry {
@@ -295,6 +302,8 @@ typedef struct TW_Command {
 	} byte8;
 } TW_Command;
 
+#pragma pack()
+
 typedef struct TAG_TW_Ioctl {
 	unsigned char opcode;
 	unsigned short table_id;
@@ -303,6 +312,16 @@ typedef struct TAG_TW_Ioctl {
 	unsigned char unit_index;
 	unsigned char data[1];
 } TW_Ioctl;
+
+#pragma pack(1)
+
+/* Structure for new chardev ioctls */
+typedef struct TAG_TW_New_Ioctl {
+	unsigned int data_buffer_length;
+	unsigned char padding [508];
+	TW_Command firmware_command;
+	char data_buffer[1];
+} TW_New_Ioctl;
 
 /* GetParam descriptor */
 typedef struct {
@@ -414,7 +433,11 @@ typedef struct TAG_TW_Device_Extension {
 	unsigned long		*ioctl_data[TW_Q_LENGTH];
 	int			reset_print;
 	char                    online;
+	volatile int		chrdev_request_id;
+	wait_queue_head_t	ioctl_wqueue;
 } TW_Device_Extension;
+
+#pragma pack()
 
 /* Function prototypes */
 int tw_aen_complete(TW_Device_Extension *tw_dev, int request_id);
@@ -463,6 +486,7 @@ int tw_scsiop_read_write(TW_Device_Extension *tw_dev, int request_id);
 int tw_scsiop_request_sense(TW_Device_Extension *tw_dev, int request_id);
 int tw_scsiop_synchronize_cache(TW_Device_Extension *tw_dev, int request_id);
 int tw_scsiop_test_unit_ready(TW_Device_Extension *tw_dev, int request_id);
+int tw_scsiop_test_unit_ready_complete(TW_Device_Extension *tw_dev, int request_id);
 int tw_setfeature(TW_Device_Extension *tw_dev, int parm, int param_size, 
 		  unsigned char *val);
 int tw_setup_irq(TW_Device_Extension *tw_dev);
@@ -483,9 +507,10 @@ void tw_unmask_command_interrupt(TW_Device_Extension *tw_dev);
 	.eh_abort_handler	= tw_scsi_eh_abort,	\
 	.eh_host_reset_handler	= tw_scsi_eh_reset,	\
 	.bios_param	= tw_scsi_biosparam,		\
-	.can_queue	= TW_Q_LENGTH-1,		\
+	.can_queue	= TW_Q_LENGTH-2,		\
 	.this_id	= -1,				\
 	.sg_tablesize	= TW_MAX_SGL_LENGTH,		\
+	.max_sectors    = TW_MAX_SECTORS,		\
 	.cmd_per_lun	= TW_MAX_CMDS_PER_LUN,		\
 	.present	= 0,				\
 	.unchecked_isa_dma	= 0,			\
