@@ -367,9 +367,11 @@ static void pcnet_detach(dev_link_t *link)
 
     /* Unlink device structure, free bits */
     *linkp = link->next;
-    if (link->dev)
+    if (link->dev) {
 	unregister_netdev(&info->dev);
-    kfree(info);
+	free_netdev(&info->dev);
+    } else
+	 kfree(info);
 
 } /* pcnet_detach */
 
