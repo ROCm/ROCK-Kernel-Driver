@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg1 - AML execution - opcodes with 1 argument
- *              $Revision: 144 $
+ *              $Revision: 145 $
  *
  *****************************************************************************/
 
@@ -389,14 +389,16 @@ acpi_ex_opcode_1A_1T_1R (
 			return_ACPI_STATUS (status);
 		}
 
-		/*
-		 * Normally, we would remove a reference on the Operand[0] parameter;
-		 * But since it is being used as the internal return object
-		 * (meaning we would normally increment it), the two cancel out,
-		 * and we simply don't do anything.
-		 */
-		walk_state->result_obj = operand[0];
-		walk_state->operands[0] = NULL; /* Prevent deletion */
+		if (!walk_state->result_obj) {
+			/*
+			 * Normally, we would remove a reference on the Operand[0] parameter;
+			 * But since it is being used as the internal return object
+			 * (meaning we would normally increment it), the two cancel out,
+			 * and we simply don't do anything.
+			 */
+			walk_state->result_obj = operand[0];
+			walk_state->operands[0] = NULL; /* Prevent deletion */
+		}
 		return_ACPI_STATUS (status);
 
 
@@ -461,7 +463,9 @@ acpi_ex_opcode_1A_1T_1R (
 
 cleanup:
 
-	walk_state->result_obj = return_desc;
+	if (!walk_state->result_obj) {
+		walk_state->result_obj = return_desc;
+	}
 
 	/* Delete return object on error */
 

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmisc - common utility procedures
- *              $Revision: 85 $
+ *              $Revision: 86 $
  *
  ******************************************************************************/
 
@@ -685,7 +685,7 @@ acpi_ut_acquire_mutex (
 			 this_thread_id, acpi_ut_get_mutex_name (mutex_id)));
 
 	status = acpi_os_wait_semaphore (acpi_gbl_acpi_mutex_info[mutex_id].mutex,
-			   1, WAIT_FOREVER);
+			   1, ACPI_WAIT_FOREVER);
 	if (ACPI_SUCCESS (status)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX, "Thread %X acquired Mutex [%s]\n",
 				 this_thread_id, acpi_ut_get_mutex_name (mutex_id)));

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdisasm.h - AML disassembler
- *       $Revision: 4 $
+ *       $Revision: 5 $
  *
  *****************************************************************************/
 
@@ -239,6 +239,9 @@ void
 acpi_dm_bit_list (
 	u16                     mask);
 
+void
+acpi_dm_decode_attribute (
+	u8                      attribute);
 
 /*
  * dmresrcl

@@ -443,12 +443,6 @@ acpi_power_add_fs (
 	if (!device)
 		return_VALUE(-EINVAL);
 
-	if (!acpi_power_dir) {
-		acpi_power_dir = proc_mkdir(ACPI_POWER_CLASS, acpi_root_dir);
-		if (!acpi_power_dir)
-			return_VALUE(-ENODEV);
-	}
-
 	if (!acpi_device_dir(device)) {
 		acpi_device_dir(device) = proc_mkdir(acpi_device_bid(device),
 			acpi_power_dir);
@@ -477,9 +471,6 @@ acpi_power_remove_fs (
 	struct acpi_device	*device)
 {
 	ACPI_FUNCTION_TRACE("acpi_power_remove_fs");
-
-	if (!acpi_power_dir)
-		return_VALUE(-ENODEV);
 
 	if (acpi_device_dir(device))
 		remove_proc_entry(acpi_device_bid(device), acpi_power_dir);
@@ -590,6 +581,10 @@ static int __init acpi_power_init (void)
 		return_VALUE(0);
 
 	INIT_LIST_HEAD(&acpi_power_resource_list);
+
+	acpi_power_dir = proc_mkdir(ACPI_POWER_CLASS, acpi_root_dir);
+	if (!acpi_power_dir)
+		return_VALUE(-ENODEV);
 
 	result = acpi_bus_register_driver(&acpi_power_driver);
 	if (result < 0) {

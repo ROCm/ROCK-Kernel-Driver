@@ -27,6 +27,7 @@
 #include <linux/list.h>
 #include <linux/sched.h>
 #include <linux/pm.h>
+#include <linux/device.h>
 #include <linux/proc_fs.h>
 #ifdef CONFIG_X86
 #include <asm/mpspec.h>

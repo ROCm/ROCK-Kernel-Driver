@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exfldio - Aml Field I/O
- *              $Revision: 89 $
+ *              $Revision: 90 $
  *
  *****************************************************************************/
 
@@ -64,6 +64,8 @@ acpi_ex_setup_region (
 
 	rgn_desc = obj_desc->common_field.region_obj;
 
+	/* We must have a valid region */
+
 	if (ACPI_GET_OBJECT_TYPE (rgn_desc) != ACPI_TYPE_REGION) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Needed Region, found type %X (%s)\n",
 			ACPI_GET_OBJECT_TYPE (rgn_desc),
@@ -81,6 +83,12 @@ acpi_ex_setup_region (
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}
+	}
+
+	if (rgn_desc->region.space_id == ACPI_ADR_SPACE_SMBUS) {
+		/* SMBus has a non-linear address space */
+
+		return_ACPI_STATUS (AE_OK);
 	}
 
 	/*
@@ -127,8 +135,10 @@ acpi_ex_setup_region (
  * PARAMETERS:  *Obj_desc               - Field to be read
  *              Field_datum_byte_offset - Byte offset of this datum within the
  *                                        parent field
- *              *Value                  - Where to store value (must be 32 bits)
- *              Read_write              - Read or Write flag
+ *              *Value                  - Where to store value (must at least
+ *                                        the size of acpi_integer)
+ *              Function                - Read or Write flag plus other region-
+ *                                        dependent flags
  *
  * RETURN:      Status
  *
@@ -141,7 +151,7 @@ acpi_ex_access_region (
 	acpi_operand_object     *obj_desc,
 	u32                     field_datum_byte_offset,
 	acpi_integer            *value,
-	u32                     read_write)
+	u32                     function)
 {
 	acpi_status             status;
 	acpi_operand_object     *rgn_desc;
@@ -150,6 +160,15 @@ acpi_ex_access_region (
 
 	ACPI_FUNCTION_TRACE ("Ex_access_region");
 
+
+	/*
+	 * Ensure that the region operands are fully evaluated and verify
+	 * the validity of the request
+	 */
+	status = acpi_ex_setup_region (obj_desc, field_datum_byte_offset);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
 	/*
 	 * The physical address of this field datum is:
@@ -163,7 +182,7 @@ acpi_ex_access_region (
 			 + obj_desc->common_field.base_byte_offset
 			 + field_datum_byte_offset;
 
-	if (read_write == ACPI_READ) {
+	if ((function & ACPI_IO_MASK) == ACPI_READ) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "[READ]"));
 	}
 	else {
@@ -181,7 +200,7 @@ acpi_ex_access_region (
 
 	/* Invoke the appropriate Address_space/Op_region handler */
 
-	status = acpi_ev_address_space_dispatch (rgn_desc, read_write,
+	status = acpi_ev_address_space_dispatch (rgn_desc, function,
 			  address, ACPI_MUL_8 (obj_desc->common_field.access_byte_width), value);
 
 	if (ACPI_FAILURE (status)) {
@@ -191,7 +210,6 @@ acpi_ex_access_region (
 				acpi_ut_get_region_name (rgn_desc->region.space_id),
 				rgn_desc->region.space_id));
 		}
-
 		else if (status == AE_NOT_EXIST) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 				"Region %s(%X) has no handler\n",
@@ -371,11 +389,6 @@ acpi_ex_field_datum_io (
 		 * For simple Region_fields, we just directly access the owning
 		 * Operation Region.
 		 */
-		status = acpi_ex_setup_region (obj_desc, field_datum_byte_offset);
-		if (ACPI_FAILURE (status)) {
-			return_ACPI_STATUS (status);
-		}
-
 		status = acpi_ex_access_region (obj_desc, field_datum_byte_offset, value,
 				  read_write);
 		break;

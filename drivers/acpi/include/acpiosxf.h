@@ -117,7 +117,7 @@ acpi_status
 acpi_os_wait_semaphore (
 	acpi_handle             handle,
 	u32                     units,
-	u32                     timeout);
+	u16                     timeout);
 
 acpi_status
 acpi_os_signal_semaphore (

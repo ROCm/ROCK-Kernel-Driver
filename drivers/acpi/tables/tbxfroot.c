@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbxfroot - Find the root ACPI table (RSDT)
- *              $Revision: 64 $
+ *              $Revision: 65 $
  *
  *****************************************************************************/
 
@@ -302,7 +302,8 @@ acpi_find_root_pointer (
 
 	status = acpi_tb_find_rsdp (&table_info, flags);
 	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "RSDP structure not found\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "RSDP structure not found, %s Flags=%X\n",
+			acpi_format_exception (status), flags));
 		return_ACPI_STATUS (AE_NO_ACPI_TABLES);
 	}
 
@@ -406,6 +407,8 @@ acpi_tb_find_rsdp (
 		status = acpi_os_map_memory ((u64) LO_RSDP_WINDOW_BASE, LO_RSDP_WINDOW_SIZE,
 				  (void **) &table_ptr);
 		if (ACPI_FAILURE (status)) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not map memory at %X for length %X\n",
+				LO_RSDP_WINDOW_BASE, LO_RSDP_WINDOW_SIZE));
 			return_ACPI_STATUS (status);
 		}
 
@@ -428,6 +431,8 @@ acpi_tb_find_rsdp (
 		status = acpi_os_map_memory ((u64) HI_RSDP_WINDOW_BASE, HI_RSDP_WINDOW_SIZE,
 				  (void **) &table_ptr);
 		if (ACPI_FAILURE (status)) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not map memory at %X for length %X\n",
+				HI_RSDP_WINDOW_BASE, HI_RSDP_WINDOW_SIZE));
 			return_ACPI_STATUS (status);
 		}
 

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exutils - interpreter/scanner utilities
- *              $Revision: 105 $
+ *              $Revision: 106 $
  *
  *****************************************************************************/
 
@@ -189,7 +189,7 @@ acpi_ex_acquire_global_lock (
 	if (field_flags & AML_FIELD_LOCK_RULE_MASK) {
 		/* We should attempt to get the lock, wait forever */
 
-		status = acpi_ev_acquire_global_lock (ACPI_UINT32_MAX);
+		status = acpi_ev_acquire_global_lock (ACPI_WAIT_FOREVER);
 		if (ACPI_SUCCESS (status)) {
 			locked = TRUE;
 		}

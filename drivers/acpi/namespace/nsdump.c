@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsdump - table dumping routines for debug
- *              $Revision: 145 $
+ *              $Revision: 146 $
  *
  *****************************************************************************/
 
@@ -180,7 +180,7 @@ acpi_ns_dump_one_object (
 
 	/* Indent the object according to the level */
 
-	acpi_os_printf ("%2d%*s", level - 1, level * 2, " ");
+	acpi_os_printf ("%2d%*s", (u32) level - 1, (int) level * 2, " ");
 
 	/* Check the node type and name */
 
