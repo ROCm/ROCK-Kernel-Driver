@@ -1158,18 +1158,18 @@ void ip_ct_refresh(struct ip_conntrack *ct, unsigned long extra_jiffies)
 {
 	IP_NF_ASSERT(ct->timeout.data == (unsigned long)ct);
 
-	WRITE_LOCK(&ip_conntrack_lock);
 	/* If not in hash table, timer will not be active yet */
 	if (!is_confirmed(ct))
 		ct->timeout.expires = extra_jiffies;
 	else {
+		WRITE_LOCK(&ip_conntrack_lock);
 		/* Need del_timer for race avoidance (may already be dying). */
 		if (del_timer(&ct->timeout)) {
 			ct->timeout.expires = jiffies + extra_jiffies;
 			add_timer(&ct->timeout);
 		}
+		WRITE_UNLOCK(&ip_conntrack_lock);
 	}
-	WRITE_UNLOCK(&ip_conntrack_lock);
 }
 
 /* Returns new sk_buff, or NULL */
