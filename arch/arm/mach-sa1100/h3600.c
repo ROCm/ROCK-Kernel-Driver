@@ -38,6 +38,7 @@
 #include <asm/mach/irq.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/flash.h>
+#include <asm/mach/irda.h>
 #include <asm/mach/map.h>
 #include <asm/mach/serial_sa1100.h>
 
@@ -119,9 +120,34 @@ static struct resource h3xxx_flash_resource = {
 	.flags		= IORESOURCE_MEM,
 };
 
+/*
+ * This turns the IRDA power on or off on the Compaq H3600
+ */
+static int h3600_irda_set_power(struct device *dev, unsigned int state)
+{
+	assign_h3600_egpio( IPAQ_EGPIO_IR_ON, state );
+
+	return 0;
+}
+
+static void h3600_irda_set_speed(struct device *dev, int speed)
+{
+	if (speed < 4000000) {
+		clr_h3600_egpio(IPAQ_EGPIO_IR_FSEL);
+	} else {
+		set_h3600_egpio(IPAQ_EGPIO_IR_FSEL);
+	}
+}
+
+static struct irda_platform_data h3600_irda_data = {
+	.set_power	= h3600_irda_set_power,
+	.set_speed	= h3600_irda_set_speed,
+};
+
 static void h3xxx_mach_init(void)
 {
 	sa11x0_set_flash_data(&h3xxx_flash_data, &h3xxx_flash_resource, 1);
+	sa11x0_set_irda_data(&h3600_irda_data);
 }
 
 /*

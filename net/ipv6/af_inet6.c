@@ -501,7 +501,7 @@ struct proto_ops inet6_dgram_ops = {
 	.socketpair =	sock_no_socketpair,		/* a do nothing	*/
 	.accept =	sock_no_accept,			/* a do nothing	*/
 	.getname =	inet6_getname, 
-	.poll =		datagram_poll,			/* ok		*/
+	.poll =		udp_poll,			/* ok		*/
 	.ioctl =	inet6_ioctl,			/* must change  */
 	.listen =	sock_no_listen,			/* ok		*/
 	.shutdown =	inet_shutdown,			/* ok		*/
@@ -524,11 +524,33 @@ extern void ipv6_sysctl_register(void);
 extern void ipv6_sysctl_unregister(void);
 #endif
 
+/* Same as inet6_dgram_ops, sans udp_poll.  */
+static struct proto_ops inet6_sockraw_ops = {
+	.family =	PF_INET6,
+	.owner =	THIS_MODULE,
+	.release =	inet6_release,
+	.bind =		inet6_bind,
+	.connect =	inet_dgram_connect,		/* ok		*/
+	.socketpair =	sock_no_socketpair,		/* a do nothing	*/
+	.accept =	sock_no_accept,			/* a do nothing	*/
+	.getname =	inet6_getname, 
+	.poll =		datagram_poll,			/* ok		*/
+	.ioctl =	inet6_ioctl,			/* must change  */
+	.listen =	sock_no_listen,			/* ok		*/
+	.shutdown =	inet_shutdown,			/* ok		*/
+	.setsockopt =	sock_common_setsockopt,		/* ok		*/
+	.getsockopt =	sock_common_getsockopt,		/* ok		*/
+	.sendmsg =	inet_sendmsg,			/* ok		*/
+	.recvmsg =	sock_common_recvmsg,		/* ok		*/
+	.mmap =		sock_no_mmap,
+	.sendpage =	sock_no_sendpage,
+};
+
 static struct inet_protosw rawv6_protosw = {
 	.type		= SOCK_RAW,
 	.protocol	= IPPROTO_IP,	/* wild card */
 	.prot		= &rawv6_prot,
-	.ops		= &inet6_dgram_ops,
+	.ops		= &inet6_sockraw_ops,
 	.capability	= CAP_NET_RAW,
 	.no_check	= UDP_CSUM_DEFAULT,
 	.flags		= INET_PROTOSW_REUSE,

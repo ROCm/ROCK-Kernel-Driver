@@ -243,14 +243,16 @@ static void sg_complete (struct urb *urb, struct pt_regs *regs)
 		// BUG ();
 	}
 
-	if (urb->status && urb->status != -ECONNRESET) {
+	if (io->status == 0 && urb->status && urb->status != -ECONNRESET) {
 		int		i, found, status;
 
 		io->status = urb->status;
 
 		/* the previous urbs, and this one, completed already.
 		 * unlink pending urbs so they won't rx/tx bad data.
+		 * careful: unlink can sometimes be synchronous...
 		 */
+		spin_unlock (&io->lock);
 		for (i = 0, found = 0; i < io->entries; i++) {
 			if (!io->urbs [i] || !io->urbs [i]->dev)
 				continue;
@@ -263,6 +265,7 @@ static void sg_complete (struct urb *urb, struct pt_regs *regs)
 			} else if (urb == io->urbs [i])
 				found = 1;
 		}
+		spin_lock (&io->lock);
 	}
 	urb->dev = NULL;
 
@@ -524,6 +527,7 @@ void usb_sg_cancel (struct usb_sg_request *io)
 		int	i;
 
 		io->status = -ECONNRESET;
+		spin_unlock (&io->lock);
 		for (i = 0; i < io->entries; i++) {
 			int	retval;
 
@@ -534,6 +538,7 @@ void usb_sg_cancel (struct usb_sg_request *io)
 				dev_warn (&io->dev->dev, "%s, unlink --> %d\n",
 					__FUNCTION__, retval);
 		}
+		spin_lock (&io->lock);
 	}
 	spin_unlock_irqrestore (&io->lock, flags);
 }

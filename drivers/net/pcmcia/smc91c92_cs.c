@@ -2115,7 +2115,7 @@ static int smc_netdev_set_ecmd(struct net_device *dev, struct ethtool_cmd *ecmd)
 	tmp |= TCR_FDUPLX;
     else
 	tmp &= ~TCR_FDUPLX;
-    outw(ioaddr + TCR, tmp);
+    outw(tmp, ioaddr + TCR);
 	
     return 0;
 }

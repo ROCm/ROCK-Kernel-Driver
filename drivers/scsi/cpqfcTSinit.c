@@ -367,7 +367,7 @@ int cpqfcTS_detect(Scsi_Host_Template *ScsiHostTemplate)
       Cpqfc_initHBAdata( cpqfcHBAdata, PciDev ); // fill MOST fields
      
       cpqfcHBAdata->HBAnum = NumberOfAdapters;
-      cpqfcHBAdata->hba_spinlock = SPIN_LOCK_UNLOCKED;
+      spin_lock_init(&cpqfcHBAdata->hba_spinlock);
 
       // request necessary resources and check for conflicts
       if( request_irq( HostAdapter->irq,

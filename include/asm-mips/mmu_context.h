@@ -126,8 +126,8 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	 * Mark current->active_mm as not "active" anymore.
 	 * We don't want to mislead possible IPI tlb flush routines.
 	 */
-	clear_bit(cpu, &prev->cpu_vm_mask);
-	set_bit(cpu, &next->cpu_vm_mask);
+	cpu_clear(cpu, prev->cpu_vm_mask);
+	cpu_set(cpu, next->cpu_vm_mask);
 
 	local_irq_restore(flags);
 }
@@ -161,8 +161,8 @@ activate_mm(struct mm_struct *prev, struct mm_struct *next)
 	TLBMISS_HANDLER_SETUP_PGD(next->pgd);
 
 	/* mark mmu ownership change */
-	clear_bit(cpu, &prev->cpu_vm_mask);
-	set_bit(cpu, &next->cpu_vm_mask);
+	cpu_clear(cpu, prev->cpu_vm_mask);
+	cpu_set(cpu, next->cpu_vm_mask);
 
 	local_irq_restore(flags);
 }
@@ -178,7 +178,7 @@ drop_mmu_context(struct mm_struct *mm, unsigned cpu)
 
 	local_irq_save(flags);
 
-	if (test_bit(cpu, &mm->cpu_vm_mask))  {
+	if (cpu_isset(cpu, mm->cpu_vm_mask))  {
 		get_new_mmu_context(mm, cpu);
 		write_c0_entryhi(cpu_asid(cpu, mm));
 	} else {

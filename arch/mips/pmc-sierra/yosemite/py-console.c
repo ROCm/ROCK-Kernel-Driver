@@ -48,8 +48,6 @@ struct yo_uartregs {
 #define iu_iir u3.iir
 #define iu_fcr u3.fcr
 
-extern unsigned long uart_base;
-
 #define IO_BASE_64	0x9000000000000000ULL
 
 static unsigned char readb_outer_space(unsigned long phys)
@@ -108,11 +106,6 @@ static void writeb_outer_space(unsigned long phys, unsigned char c)
 	__asm__("sll	$0, $0, 2\n");
 	__asm__("sll	$0, $0, 2\n");
 	__asm__("sll	$0, $0, 2\n");
-}
-
-static inline struct yo_uartregs *console_uart(void)
-{
-	return (struct yo_uartregs *) (uart_base + 8);
 }
 
 void prom_putchar(char c)

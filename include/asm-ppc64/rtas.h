@@ -149,7 +149,7 @@ struct rtas_error_log {
 	unsigned long target:4;			/* Target of failed operation */
 	unsigned long type:8;			/* General event or error*/
 	unsigned long extended_log_length:32;	/* length in bytes */
-	unsigned char buffer[1];		/* allocated by klimit bump */
+	unsigned char buffer[1];
 };
 
 struct flash_block {

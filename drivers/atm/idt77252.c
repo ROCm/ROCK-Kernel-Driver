@@ -3169,7 +3169,7 @@ deinit_card(struct idt77252_dev *card)
 	}
 
 	if (card->membase)
-		iounmap((void *) card->membase);
+		iounmap(card->membase);
 
 	clear_bit(IDT77252_BIT_INIT, &card->flags);
 	DIPRINTK("%s: Card deinitialized.\n", card->name);
@@ -3803,7 +3803,7 @@ err_out_deinit_card:
 	deinit_card(card);
 
 err_out_iounmap:
-	iounmap((void *) card->membase);
+	iounmap(card->membase);
 
 err_out_free_card:
 	kfree(card);

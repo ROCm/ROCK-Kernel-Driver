@@ -235,8 +235,8 @@ static int therm_pm72_detach(struct i2c_adapter *adapter);
 
 static struct i2c_driver therm_pm72_driver =
 {
+	.owner		= THIS_MODULE,
 	.name		= "therm_pm72",
-	.id		= 0xDEADBEEF,
 	.flags		= I2C_DF_NOTIFY,
 	.attach_adapter	= therm_pm72_attach,
 	.detach_adapter	= therm_pm72_detach,
@@ -266,7 +266,6 @@ static struct i2c_client *attach_i2c_chip(int id, const char *name)
 	clt->addr = (id >> 1) & 0x7f;
 	clt->adapter = adap;
 	clt->driver = &therm_pm72_driver;
-	clt->id = 0xDEADBEEF;
 	strncpy(clt->name, name, I2C_NAME_SIZE-1);
 
 	if (i2c_attach_client(clt)) {

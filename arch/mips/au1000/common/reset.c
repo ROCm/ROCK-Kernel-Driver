@@ -43,6 +43,7 @@ extern void (*flush_cache_all)(void);
 void au1000_restart(char *command)
 {
 	/* Set all integrated peripherals to disabled states */
+	extern void board_reset (void);
 	u32 prid = read_c0_prid();
 
 	printk(KERN_NOTICE "\n** Resetting Integrated Peripherals\n");
@@ -154,18 +155,10 @@ void au1000_restart(char *command)
 	flush_cache_all();
 	write_c0_wired(0);
 
-#if defined(CONFIG_MIPS_PB1500) || defined(CONFIG_MIPS_PB1100) || defined(CONFIG_MIPS_DB1000) || defined(CONFIG_MIPS_DB1100) || defined(CONFIG_MIPS_DB1500)
-	/* Do a HW reset if the board can do it */
+	/* Give board a chance to do a hardware reset */
+	board_reset();
 
-	au_writel(0x00000000, 0xAE00001C);
-#endif
-
-#if defined(CONFIG_MIPS_PB1550)
-	 /* reset entire system */
-	au_writew(au_readw(0xAF00001C) & ~(1<<15), 0xAF00001C);
-	au_sync();
-#endif
-
+	/* Jump to the beggining in case board_reset() is empty */
 	__asm__ __volatile__("jr\t%0"::"r"(0xbfc00000));
 }
 

@@ -239,7 +239,7 @@ static void __devinit apple_kiwi_init(struct pci_dev *pdev)
 {
 	struct device_node *np = pci_device_to_OF_node(pdev);
 	unsigned int class_rev = 0;
-	unsigned long mmio;
+	void __iomem *mmio;
 	u8 conf;
 
 	if (np == NULL || !device_is_compatible(np, "kiwi-root"))
@@ -253,7 +253,7 @@ static void __devinit apple_kiwi_init(struct pci_dev *pdev)
 		pci_read_config_byte(pdev, 0x40, &conf);
 		pci_write_config_byte(pdev, 0x40, conf | 0x01);
 	}
-	mmio = (unsigned long)ioremap(pci_resource_start(pdev, 5),
+	mmio = ioremap(pci_resource_start(pdev, 5),
 				      pci_resource_len(pdev, 5));
 
 	/* Setup some PLL stuffs */
@@ -268,7 +268,7 @@ static void __devinit apple_kiwi_init(struct pci_dev *pdev)
 		break;
 	}
 
-	iounmap((void *)mmio);
+	iounmap(mmio);
 }
 #endif /* CONFIG_PPC_PMAC */
 

@@ -90,7 +90,9 @@ startup_continue:
 	sllx		%g2, 32, %g2
 	wr		%g2, 0, %tick_cmpr
 
-	/* Call OBP by hand to lock KERNBASE into i/d tlbs. */
+	/* Call OBP by hand to lock KERNBASE into i/d tlbs.
+	 * We lock 2 consequetive entries if we are 'bigkernel'.
+	 */
 	mov		%o0, %l0
 
 	sethi		%hi(prom_entry_lock), %g2
@@ -136,6 +138,46 @@ startup_continue:
 	call		%o1
 	 add		%sp, (2047 + 128), %o0
 
+	sethi		%hi(bigkernel), %g2
+	lduw		[%g2 + %lo(bigkernel)], %g2
+	cmp		%g2, 0
+	be,pt		%icc, do_dtlb
+	 nop
+
+	sethi		%hi(call_method), %g2
+	or		%g2, %lo(call_method), %g2
+	stx		%g2, [%sp + 2047 + 128 + 0x00]
+	mov		5, %g2
+	stx		%g2, [%sp + 2047 + 128 + 0x08]
+	mov		1, %g2
+	stx		%g2, [%sp + 2047 + 128 + 0x10]
+	sethi		%hi(itlb_load), %g2
+	or		%g2, %lo(itlb_load), %g2
+	stx		%g2, [%sp + 2047 + 128 + 0x18]
+	sethi		%hi(mmu_ihandle_cache), %g2
+	lduw		[%g2 + %lo(mmu_ihandle_cache)], %g2
+	stx		%g2, [%sp + 2047 + 128 + 0x20]
+	sethi		%hi(KERNBASE + 0x400000), %g2
+	stx		%g2, [%sp + 2047 + 128 + 0x28]
+	sethi		%hi(kern_locked_tte_data), %g2
+	ldx		[%g2 + %lo(kern_locked_tte_data)], %g2
+	sethi		%hi(0x400000), %g1
+	add		%g2, %g1, %g2
+	stx		%g2, [%sp + 2047 + 128 + 0x30]
+
+	mov		14, %g2
+	BRANCH_IF_ANY_CHEETAH(g1,g5,1f)
+
+	mov		62, %g2
+1:
+	stx		%g2, [%sp + 2047 + 128 + 0x38]
+	sethi		%hi(p1275buf), %g2
+	or		%g2, %lo(p1275buf), %g2
+	ldx		[%g2 + 0x08], %o1
+	call		%o1
+	 add		%sp, (2047 + 128), %o0
+
+do_dtlb:
 	sethi		%hi(call_method), %g2
 	or		%g2, %lo(call_method), %g2
 	stx		%g2, [%sp + 2047 + 128 + 0x00]
@@ -168,6 +210,47 @@ startup_continue:
 	call		%o1
 	 add		%sp, (2047 + 128), %o0
 
+	sethi		%hi(bigkernel), %g2
+	lduw		[%g2 + %lo(bigkernel)], %g2
+	cmp		%g2, 0
+	be,pt		%icc, do_unlock
+	 nop
+
+	sethi		%hi(call_method), %g2
+	or		%g2, %lo(call_method), %g2
+	stx		%g2, [%sp + 2047 + 128 + 0x00]
+	mov		5, %g2
+	stx		%g2, [%sp + 2047 + 128 + 0x08]
+	mov		1, %g2
+	stx		%g2, [%sp + 2047 + 128 + 0x10]
+	sethi		%hi(dtlb_load), %g2
+	or		%g2, %lo(dtlb_load), %g2
+	stx		%g2, [%sp + 2047 + 128 + 0x18]
+	sethi		%hi(mmu_ihandle_cache), %g2
+	lduw		[%g2 + %lo(mmu_ihandle_cache)], %g2
+	stx		%g2, [%sp + 2047 + 128 + 0x20]
+	sethi		%hi(KERNBASE + 0x400000), %g2
+	stx		%g2, [%sp + 2047 + 128 + 0x28]
+	sethi		%hi(kern_locked_tte_data), %g2
+	ldx		[%g2 + %lo(kern_locked_tte_data)], %g2
+	sethi		%hi(0x400000), %g1
+	add		%g2, %g1, %g2
+	stx		%g2, [%sp + 2047 + 128 + 0x30]
+
+	mov		14, %g2
+	BRANCH_IF_ANY_CHEETAH(g1,g5,1f)
+
+	mov		62, %g2
+1:
+
+	stx		%g2, [%sp + 2047 + 128 + 0x38]
+	sethi		%hi(p1275buf), %g2
+	or		%g2, %lo(p1275buf), %g2
+	ldx		[%g2 + 0x08], %o1
+	call		%o1
+	 add		%sp, (2047 + 128), %o0
+
+do_unlock:
 	sethi		%hi(prom_entry_lock), %g2
 	stb		%g0, [%g2 + %lo(prom_entry_lock)]
 	membar		#StoreStore | #StoreLoad

@@ -122,7 +122,7 @@ EXPORT_SYMBOL(class_simple_destroy);
  * be created, showing the dev_t for the device.  The pointer to the struct
  * class_device will be returned from the call.  Any further sysfs files that
  * might be required can be created using this pointer.
- * Note: the struct class_device passed to this function must have previously been
+ * Note: the struct class_simple passed to this function must have previously been
  * created with a call to class_simple_create().
  */
 struct class_device *class_simple_device_add(struct class_simple *cs, dev_t dev, struct device *device, const char *fmt, ...)

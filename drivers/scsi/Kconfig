@@ -1288,6 +1288,7 @@ config SCSI_QLOGIC_1280
 
 config SCSI_QLOGIC_1280_1040
 	bool "Qlogic QLA 1020/1040 SCSI support"
+	depends on SCSI_QLOGIC_1280 && SCSI_QLOGIC_ISP!=y
 	help
 	  Say Y here if you have a QLogic ISP1020/1040 SCSI host adapter and
 	  do not want to use the old driver.  This option enables support in
@@ -1766,7 +1767,7 @@ config SCSI_SUNESP
 
 config ZFCP
 	tristate "FCP host bus adapter driver for IBM eServer zSeries"
-	depends on ARCH_S390 && SCSI
+	depends on ARCH_S390 && QDIO && SCSI
 	select SCSI_FC_ATTRS
 	help
           If you want to access SCSI devices attached to your IBM eServer

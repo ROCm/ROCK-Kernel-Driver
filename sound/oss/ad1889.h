@@ -104,7 +104,7 @@ typedef struct ad1889_state {
 } ad1889_state_t;
 
 typedef struct ad1889_dev {
-	unsigned long regbase;
+	void __iomem *regbase;
 	struct pci_dev *pci;
 	
 	spinlock_t lock;

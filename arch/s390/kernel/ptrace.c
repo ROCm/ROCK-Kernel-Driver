@@ -640,7 +640,10 @@ do_ptrace(struct task_struct *child, long request, long addr, long data)
 			return -EIO;
 		clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		child->exit_code = data;
-		set_single_step(child);
+		if (data)
+			set_tsk_thread_flag(child, TIF_SINGLE_STEP);
+		else
+			set_single_step(child);
 		/* give it a chance to run. */
 		wake_up_process(child);
 		return 0;

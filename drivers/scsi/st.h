@@ -67,7 +67,7 @@ struct st_partstat {
 	u32 last_block_visited;
 	int drv_block;		/* The block where the drive head is */
 	int drv_file;
-} ST_partstat;
+};
 
 #define ST_NBR_PARTITIONS 4
 

@@ -157,8 +157,10 @@ typedef __u16 __bitwise __le16;
 typedef __u16 __bitwise __be16;
 typedef __u32 __bitwise __le32;
 typedef __u32 __bitwise __be32;
+#if defined(__GNUC__) && !defined(__STRICT_ANSI__)
 typedef __u64 __bitwise __le64;
 typedef __u64 __bitwise __be64;
+#endif
 
 struct ustat {
 	__kernel_daddr_t	f_tfree;

@@ -1605,7 +1605,7 @@ static int __devinit zatm_init_one(struct pci_dev *pci_dev,
 		goto out_disable;
 
 	zatm_dev->pci_dev = pci_dev;
-	ZATM_DEV(dev) = zatm_dev;
+	dev = (struct atm_dev *)zatm_dev;
 	zatm_dev->copper = (int)ent->driver_data;
 	if ((ret = zatm_init(dev)) || (ret = zatm_start(dev)))
 		goto out_release;

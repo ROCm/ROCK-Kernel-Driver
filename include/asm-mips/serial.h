@@ -55,7 +55,7 @@
 
 #define C_P(card,port) (((card)<<6|(port)<<3) + 1)
 
-#ifdef CONFIG_MIPS_JAZZ
+#ifdef CONFIG_MACH_JAZZ
 #include <asm/jazz.h>
 
 #ifndef CONFIG_OLIVETTI_M700
@@ -152,15 +152,82 @@
 
 #ifdef CONFIG_SERIAL_AU1X00
 #include <asm/mach-au1x00/au1000.h>
-#define AU1000_SERIAL_PORT_DEFNS                              \
-    { .baud_base = 0, .port = UART0_ADDR, .irq = AU1000_UART0_INT,  \
-      .flags = STD_COM_FLAGS, .type = 1 },                        \
-    { .baud_base = 0, .port = UART1_ADDR, .irq = AU1000_UART1_INT,  \
-      .flags = STD_COM_FLAGS, .type = 1 },     \
-    { .baud_base = 0, .port = UART2_ADDR, .irq = AU1000_UART2_INT,  \
-      .flags = STD_COM_FLAGS, .type = 1 },    \
-    { .baud_base = 0, .port = UART3_ADDR, .irq = AU1000_UART3_INT,  \
-      .flags = STD_COM_FLAGS, .type = 1 },
+#ifdef CONFIG_SOC_AU1000
+#define AU1000_SERIAL_PORT_DEFNS                       \
+    { .baud_base = 0, .port = UART0_ADDR,              \
+      .iomem_base = (unsigned char *)UART0_ADDR,       \
+      .irq = AU1000_UART0_INT, .flags = STD_COM_FLAGS, \
+      .iomem_reg_shift = 2 },                          \
+    { .baud_base = 0, .port = UART1_ADDR,              \
+      .iomem_base = (unsigned char *)UART1_ADDR,       \
+      .irq = AU1000_UART1_INT, .flags = STD_COM_FLAGS, \
+      .iomem_reg_shift = 2 },                          \
+    { .baud_base = 0, .port = UART2_ADDR,              \
+      .iomem_base = (unsigned char *)UART2_ADDR,       \
+      .irq = AU1000_UART2_INT, .flags = STD_COM_FLAGS, \
+      .iomem_reg_shift = 2 },                          \
+    { .baud_base = 0, .port = UART3_ADDR,              \
+      .iomem_base = (unsigned char *)UART3_ADDR,       \
+      .irq = AU1000_UART3_INT, .flags = STD_COM_FLAGS, \
+      .iomem_reg_shift = 2 },
+#endif
+
+#ifdef CONFIG_SOC_AU1500
+#define AU1000_SERIAL_PORT_DEFNS                       \
+    { .baud_base = 0, .port = UART0_ADDR,              \
+      .iomem_base = (unsigned char *)UART0_ADDR,       \
+      .irq = AU1500_UART0_INT, .flags = STD_COM_FLAGS, \
+      .iomem_reg_shift = 2 },                          \
+    { .baud_base = 0, .port = UART3_ADDR,              \
+      .iomem_base = (unsigned char *)UART3_ADDR,       \
+      .irq = AU1500_UART3_INT, .flags = STD_COM_FLAGS, \
+      .iomem_reg_shift = 2 },
+#endif
+
+#ifdef CONFIG_SOC_AU1100
+#define AU1000_SERIAL_PORT_DEFNS                       \
+    { .baud_base = 0, .port = UART0_ADDR,              \
+      .iomem_base = (unsigned char *)UART0_ADDR,       \
+      .irq = AU1100_UART0_INT, .flags = STD_COM_FLAGS, \
+      .iomem_reg_shift = 2 },                          \
+    { .baud_base = 0, .port = UART1_ADDR,              \
+      .iomem_base = (unsigned char *)UART1_ADDR,       \
+      .irq = AU1100_UART1_INT, .flags = STD_COM_FLAGS, \
+      .iomem_reg_shift = 2 },                          \
+    { .baud_base = 0, .port = UART3_ADDR,              \
+      .iomem_base = (unsigned char *)UART3_ADDR,       \
+      .irq = AU1100_UART3_INT, .flags = STD_COM_FLAGS, \
+      .iomem_reg_shift = 2 },
+#endif
+
+#ifdef CONFIG_SOC_AU1550
+#define AU1000_SERIAL_PORT_DEFNS                       \
+    { .baud_base = 0, .port = UART0_ADDR,              \
+      .iomem_base = (unsigned char *)UART0_ADDR,       \
+      .irq = AU1550_UART0_INT, .flags = STD_COM_FLAGS, \
+      .iomem_reg_shift = 2 },                          \
+    { .baud_base = 0, .port = UART1_ADDR,              \
+      .iomem_base = (unsigned char *)UART1_ADDR,       \
+      .irq = AU1550_UART1_INT, .flags = STD_COM_FLAGS, \
+      .iomem_reg_shift = 2 },                          \
+    { .baud_base = 0, .port = UART3_ADDR,              \
+      .iomem_base = (unsigned char *)UART3_ADDR,       \
+      .irq = AU1550_UART3_INT,  .flags = STD_COM_FLAGS,\
+      .iomem_reg_shift = 2 },
+#endif
+
+#ifdef CONFIG_SOC_AU1200
+#define AU1000_SERIAL_PORT_DEFNS                       \
+    { .baud_base = 0, .port = UART0_ADDR,              \
+      .iomem_base = (unsigned char *)UART0_ADDR,       \
+      .irq = AU1200_UART0_INT, .flags = STD_COM_FLAGS, \
+      .iomem_reg_shift = 2 },                          \
+    { .baud_base = 0, .port = UART1_ADDR,              \
+      .iomem_base = (unsigned char *)UART1_ADDR,       \
+      .irq = AU1200_UART1_INT, .flags = STD_COM_FLAGS, \
+      .iomem_reg_shift = 2 },
+#endif
+
 #else
 #define AU1000_SERIAL_PORT_DEFNS
 #endif
@@ -250,6 +317,23 @@
 	_JAGUAR_ATX_SERIAL_INIT(JAGUAR_ATX_SERIAL1_IRQ, JAGUAR_ATX_SERIAL1_BASE)
 #else
 #define MOMENCO_JAGUAR_ATX_SERIAL_PORT_DEFNS
+#endif
+
+#ifdef CONFIG_MOMENCO_OCELOT_3
+#define OCELOT_3_BASE_BAUD	( 20000000 / 16 )
+#define OCELOT_3_SERIAL_IRQ	6
+#define OCELOT_3_SERIAL_BASE	(signed)0xfd000020
+
+#define _OCELOT_3_SERIAL_INIT(int, base)				\
+	{ baud_base: OCELOT_3_BASE_BAUD, irq: int, 			\
+	  flags: STD_COM_FLAGS,						\
+	  iomem_base: (u8 *) base, iomem_reg_shift: 2,			\
+	  io_type: SERIAL_IO_MEM }
+
+#define MOMENCO_OCELOT_3_SERIAL_PORT_DEFNS				\
+	_OCELOT_3_SERIAL_INIT(OCELOT_3_SERIAL_IRQ, OCELOT_3_SERIAL_BASE)
+#else
+#define MOMENCO_OCELOT_3_SERIAL_PORT_DEFNS
 #endif
 
 #ifdef CONFIG_MOMENCO_OCELOT
@@ -353,6 +437,7 @@
 	MOMENCO_OCELOT_G_SERIAL_PORT_DEFNS		\
 	MOMENCO_OCELOT_C_SERIAL_PORT_DEFNS		\
 	MOMENCO_OCELOT_SERIAL_PORT_DEFNS		\
+	MOMENCO_OCELOT_3_SERIAL_PORT_DEFNS		\
 	TXX927_SERIAL_PORT_DEFNS                        \
 	AU1000_SERIAL_PORT_DEFNS
 

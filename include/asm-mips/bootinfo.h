@@ -122,6 +122,7 @@
 #define  MACH_MOMENCO_OCELOT_G	1
 #define  MACH_MOMENCO_OCELOT_C	2
 #define  MACH_MOMENCO_JAGUAR_ATX 3
+#define  MACH_MOMENCO_OCELOT_3	4
 
 /*
  * Valid machtype for group ITE
@@ -175,6 +176,7 @@
 #define  MACH_XXS1500		6       /* Au1500-based eval board */
 #define  MACH_MTX1		7       /* 4G MTX-1 Au1500-based board */
 #define  MACH_PB1550		8       /* Au1550-based eval board */
+#define  MACH_DB1550		9       /* Au1550-based eval board */
 
 /*
  * Valid machtype for group NEC_VR41XX

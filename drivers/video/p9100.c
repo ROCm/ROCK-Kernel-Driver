@@ -129,7 +129,7 @@ struct p9100_cmd_parameng {
 
 struct p9100_par {
 	spinlock_t		lock;
-	struct p9100_regs	*regs;
+	struct p9100_regs	__iomem *regs;
 
 	u32			flags;
 #define P9100_FLAG_BLANKED	0x00000001
@@ -155,7 +155,7 @@ static int p9100_setcolreg(unsigned regno,
 			   unsigned transp, struct fb_info *info)
 {
 	struct p9100_par *par = (struct p9100_par *) info->par;
-	struct p9100_regs *regs = par->regs;
+	struct p9100_regs __iomem *regs = par->regs;
 	unsigned long flags;
 
 	if (regno >= 256)
@@ -186,7 +186,7 @@ static int
 p9100_blank(int blank, struct fb_info *info)
 {
 	struct p9100_par *par = (struct p9100_par *) info->par;
-	struct p9100_regs *regs = par->regs;
+	struct p9100_regs __iomem *regs = par->regs;
 	unsigned long flags;
 	u32 val;
 
@@ -293,19 +293,17 @@ static void p9100_init_one(struct sbus_dev *sdev)
 				       all->info.var.xres);
 	all->par.fbsize = PAGE_ALIGN(linebytes * all->info.var.yres);
 
-	all->par.regs = (struct p9100_regs *)
-		sbus_ioremap(&sdev->resource[0], 0,
+	all->par.regs = sbus_ioremap(&sdev->resource[0], 0,
 			     sizeof(struct p9100_regs), "p9100 regs");
 
 	all->info.flags = FBINFO_DEFAULT;
 	all->info.fbops = &p9100_ops;
 #ifdef CONFIG_SPARC32
-	all->info.screen_base = (char *)
+	all->info.screen_base = (char __iomem *)
 		prom_getintdefault(sdev->prom_node, "address", 0);
 #endif
 	if (!all->info.screen_base)
-		all->info.screen_base = (char *)
-			sbus_ioremap(&sdev->resource[2], 0,
+		all->info.screen_base = sbus_ioremap(&sdev->resource[2], 0,
 				     all->par.fbsize, "p9100 ram");
 	all->info.par = &all->par;
 

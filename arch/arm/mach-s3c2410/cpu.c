@@ -174,9 +174,15 @@ static int __init s3c_arch_init(void)
 		return ret;
 
 	if (board != NULL) {
-		ret = platform_add_devices(board->devices, board->devices_count);
-		if (ret) {
-			printk(KERN_ERR "s3c24xx: failed to add board devices (%d)\n", ret);
+		struct platform_device **ptr = board->devices;
+		int i;
+
+		for (i = 0; i < board->devices_count; i++, ptr++) {
+			ret = platform_device_register(*ptr);
+
+			if (ret) {
+				printk(KERN_ERR "s3c24xx: failed to add board device %s (%d) @%p\n", (*ptr)->name, ret, *ptr);
+			}
 		}
 
 		/* mask any error, we may not need all these board

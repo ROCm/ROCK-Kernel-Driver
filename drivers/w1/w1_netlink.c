@@ -34,6 +34,9 @@ void w1_netlink_send(struct w1_master *dev, struct w1_netlink_msg *msg)
 	struct w1_netlink_msg *data;
 	struct nlmsghdr *nlh;
 
+	if (!dev->nls)
+		return;
+
 	size = NLMSG_SPACE(sizeof(struct w1_netlink_msg));
 
 	skb = alloc_skb(size, GFP_ATOMIC);

@@ -17,7 +17,7 @@
 
 struct acpi_processor_cx_policy {
 	u32			count;
-	int			state;
+	u32			state;
 	struct {
 		u32			time;
 		u32			ticks;
@@ -38,8 +38,8 @@ struct acpi_processor_cx {
 };
 
 struct acpi_processor_power {
-	int			state;
-	int			default_state;
+	u32			state;
+	u32			default_state;
 	u32			bm_activity;
 	struct acpi_processor_cx states[ACPI_PROCESSOR_MAX_POWER];
 };

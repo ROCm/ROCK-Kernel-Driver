@@ -173,13 +173,12 @@ void __init init_pciasic(void)
  * driver compatibility reasons interrupts 0 - 15 to be the i8295
  * interrupts even if the hardware uses a different interrupt numbering.
  */
-void __init init_IRQ (void)
+void __init arch_init_irq(void)
 {
 	int i;
 
 	set_except_vector(0, sni_rm200_pci_handle_int);
 
-	init_generic_irq();
 	init_i8259_irqs();			/* Integrated i8259  */
 	init_pciasic();
 

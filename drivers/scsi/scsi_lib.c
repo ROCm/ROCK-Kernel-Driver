@@ -728,7 +728,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 				req->sense_len = len;
 			}
 		} else
-			req->data_len -= cmd->bufflen;
+			req->data_len = cmd->resid;
 	}
 
 	/*

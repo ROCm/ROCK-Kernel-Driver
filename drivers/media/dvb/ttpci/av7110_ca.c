@@ -89,20 +89,20 @@ void ci_get_data(struct dvb_ringbuffer *cibuf, u8 *data, int len)
  * CI link layer file ops
  ******************************************************************************/
 
-int ci_ll_init(struct dvb_ringbuffer *cirbuf, struct dvb_ringbuffer *ciwbuf, int size)
+static int ci_ll_init(struct dvb_ringbuffer *cirbuf, struct dvb_ringbuffer *ciwbuf, int size)
 {
 	dvb_ringbuffer_init(cirbuf, vmalloc(size), size);
 	dvb_ringbuffer_init(ciwbuf, vmalloc(size), size);
 	return 0;
 }
 
-void ci_ll_flush(struct dvb_ringbuffer *cirbuf, struct dvb_ringbuffer *ciwbuf)
+static void ci_ll_flush(struct dvb_ringbuffer *cirbuf, struct dvb_ringbuffer *ciwbuf)
 {
 	dvb_ringbuffer_flush_spinlock_wakeup(cirbuf);
 	dvb_ringbuffer_flush_spinlock_wakeup(ciwbuf);
 }
 
-void ci_ll_release(struct dvb_ringbuffer *cirbuf, struct dvb_ringbuffer *ciwbuf)
+static void ci_ll_release(struct dvb_ringbuffer *cirbuf, struct dvb_ringbuffer *ciwbuf)
 {
 	vfree(cirbuf->data);
 	cirbuf->data = NULL;
@@ -110,7 +110,7 @@ void ci_ll_release(struct dvb_ringbuffer *cirbuf, struct dvb_ringbuffer *ciwbuf)
 	ciwbuf->data = NULL;
 }
 
-int ci_ll_reset(struct dvb_ringbuffer *cibuf, struct file *file,
+static int ci_ll_reset(struct dvb_ringbuffer *cibuf, struct file *file,
 		int slots, ca_slot_info_t *slot)
 {
 	int i;

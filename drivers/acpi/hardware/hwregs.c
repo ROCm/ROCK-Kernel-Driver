@@ -43,6 +43,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include <linux/module.h>
 
 #include <acpi/acpi.h>
 #include <acpi/acnamesp.h>
@@ -211,6 +212,7 @@ acpi_get_sleep_type_data (
 	acpi_ut_remove_reference (info.return_object);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_get_sleep_type_data);
 
 
 /*******************************************************************************
@@ -307,6 +309,7 @@ acpi_get_register (
 
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_get_register);
 
 
 /*******************************************************************************
@@ -457,6 +460,7 @@ unlock_and_exit:
 			value, register_value, bit_reg_info->parent_register));
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_set_register);
 
 
 /******************************************************************************

@@ -1487,6 +1487,9 @@ int shpc_init(struct controller * ctrl,
 
 	info("HPC vendor_id %x device_id %x ss_vid %x ss_did %x\n", pdev->vendor, pdev->device, pdev->subsystem_vendor, 
 		pdev->subsystem_device);
+	
+	if (pci_enable_device(pdev))
+		goto abort_free_ctlr;
 
 	if (!request_mem_region(pci_resource_start(pdev, 0) + shpc_base_offset, pci_resource_len(pdev, 0), MY_NAME)) {
 		err("%s: cannot reserve MMIO region\n", __FUNCTION__);

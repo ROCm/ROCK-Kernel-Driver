@@ -3830,10 +3830,15 @@ static int __init aha152x_init(void)
 	if (setup_count<ARRAY_SIZE(setup)) {
 #if !defined(SKIP_BIOSTEST)
 		ok = 0;
-		for (i = 0; i < ARRAY_SIZE(addresses) && !ok; i++)
+		for (i = 0; i < ARRAY_SIZE(addresses) && !ok; i++) {
+			void __iomem *p = ioremap(addresses[i], 0x4000);
+			if (!p)
+				continue;
 			for (j = 0; j<ARRAY_SIZE(signatures) && !ok; j++)
-				ok = isa_check_signature(addresses[i] + signatures[j].sig_offset,
+				ok = check_signature(p + signatures[j].sig_offset,
 								signatures[j].signature, signatures[j].sig_length);
+			iounmap(p);
+		}
 		if (!ok && setup_count == 0)
 			return 0;
 

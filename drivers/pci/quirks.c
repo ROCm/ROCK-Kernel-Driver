@@ -772,6 +772,11 @@ static void __init asus_hides_smbus_hostbridge(struct pci_dev *dev)
 			case 0x1751: /* M2N notebook */
 				asus_hides_smbus = 1;
 			}
+		if (dev->device == PCI_DEVICE_ID_INTEL_82855PM_HB)
+			switch (dev->subsystem_device) {
+			case 0x186a: /* M6Ne notebook */
+				asus_hides_smbus = 1;
+			}
 	} else if (unlikely(dev->subsystem_vendor == PCI_VENDOR_ID_HP)) {
 		if (dev->device ==  PCI_DEVICE_ID_INTEL_82855PM_HB)
 			switch(dev->subsystem_device) {
@@ -861,7 +866,7 @@ static void __init quirk_sis_96x_smbus(struct pci_dev *dev)
 #define EHCI_USBLEGCTLSTS	4		/* legacy control/status */
 #define EHCI_USBLEGCTLSTS_SOOE	(1 << 13)	/* SMI on ownership change */
 
-int usb_early_handoff __initdata = 0;
+int usb_early_handoff __devinitdata = 0;
 static int __init usb_handoff_early(char *str)
 {
 	usb_early_handoff = 1;

@@ -232,11 +232,12 @@ int kobject_set_name(struct kobject * kobj, const char * fmt, ...)
 	va_list args;
 	char * name;
 
-	va_start(args,fmt);
 	/* 
 	 * First, try the static array 
 	 */
+	va_start(args,fmt);
 	need = vsnprintf(kobj->name,limit,fmt,args);
+	va_end(args);
 	if (need < limit) 
 		name = kobj->name;
 	else {
@@ -249,7 +250,9 @@ int kobject_set_name(struct kobject * kobj, const char * fmt, ...)
 			error = -ENOMEM;
 			goto Done;
 		}
+		va_start(args,fmt);
 		need = vsnprintf(name,limit,fmt,args);
+		va_end(args);
 
 		/* Still? Give up. */
 		if (need >= limit) {
@@ -266,7 +269,6 @@ int kobject_set_name(struct kobject * kobj, const char * fmt, ...)
 	/* Now, set the new name */
 	kobj->k_name = name;
  Done:
-	va_end(args);
 	return error;
 }
 

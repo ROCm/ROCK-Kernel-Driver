@@ -2224,8 +2224,7 @@ int cont_prepare_write(struct page *page, unsigned offset,
 		memset(kaddr+zerofrom, 0, PAGE_CACHE_SIZE-zerofrom);
 		flush_dcache_page(new_page);
 		kunmap_atomic(kaddr, KM_USER0);
-		__block_commit_write(inode, new_page,
-				zerofrom, PAGE_CACHE_SIZE);
+		generic_commit_write(NULL, new_page, zerofrom, PAGE_CACHE_SIZE);
 		unlock_page(new_page);
 		page_cache_release(new_page);
 	}

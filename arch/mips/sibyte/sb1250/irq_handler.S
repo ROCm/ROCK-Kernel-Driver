@@ -18,8 +18,8 @@
 
 /*
  * sb1250_handle_int() is the routine that is actually called when an interrupt
- * occurs.  It is installed as the exception vector handler in init_IRQ() in
- * arch/mips/sibyte/sb1250/irq.c
+ * occurs.  It is installed as the exception vector handler in arch_init_irq()
+ * in arch/mips/sibyte/sb1250/irq.c
  *
  * In the handle we figure out which interrupts need handling, and use that to
  * call the dispatcher, which will take care of actually calling registered

@@ -2669,7 +2669,7 @@ static int sctp_getsockopt_sctp_status(struct sock *sk, int len,
 		goto out;
 	}
 
-	SCTP_DEBUG_PRINTK("sctp_getsockopt_sctp_status(%d): %d %d %p\n",
+	SCTP_DEBUG_PRINTK("sctp_getsockopt_sctp_status(%d): %d %d %d\n",
 			  len, status.sstat_state, status.sstat_rwnd,
 			  status.sstat_assoc_id);
 
@@ -4098,12 +4098,8 @@ SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *msg,
 	for (cmsg = CMSG_FIRSTHDR(msg);
 	     cmsg != NULL;
 	     cmsg = CMSG_NXTHDR((struct msghdr*)msg, cmsg)) {
-		/* Check for minimum length.  The SCM code has this check.  */
-		if (cmsg->cmsg_len < sizeof(struct cmsghdr) ||
-		    (unsigned long)(((char*)cmsg - (char*)msg->msg_control)
-				    + cmsg->cmsg_len) > msg->msg_controllen) {
+		if (!CMSG_OK(msg, cmsg))
 			return -EINVAL;
-		}
 
 		/* Should we parse this header or ignore?  */
 		if (cmsg->cmsg_level != IPPROTO_SCTP)

@@ -1037,11 +1037,13 @@ int security_load_policy(void *data, size_t len)
 		avtab_cache_init();
 		if (policydb_read(&policydb, fp)) {
 			LOAD_UNLOCK;
+			avtab_cache_destroy();
 			return -EINVAL;
 		}
 		if (policydb_load_isids(&policydb, &sidtab)) {
 			LOAD_UNLOCK;
 			policydb_destroy(&policydb);
+			avtab_cache_destroy();
 			return -EINVAL;
 		}
 		ss_initialized = 1;

@@ -424,7 +424,7 @@ void dvb_dmx_swfilter_packet(struct dvb_demux *demux, const u8 *buf)
 			feed->cb.ts(buf, 188, NULL, 0, &feed->feed.ts, DMX_OK);
 	}
 }
-
+EXPORT_SYMBOL(dvb_dmx_swfilter_packet);
 
 void dvb_dmx_swfilter_packets(struct dvb_demux *demux, const u8 *buf, size_t count)
 {
@@ -439,6 +439,7 @@ void dvb_dmx_swfilter_packets(struct dvb_demux *demux, const u8 *buf, size_t cou
 
 	spin_unlock(&demux->lock);
 }
+EXPORT_SYMBOL(dvb_dmx_swfilter_packets);
 
 
 void dvb_dmx_swfilter(struct dvb_demux *demux, const u8 *buf, size_t count)
@@ -478,6 +479,7 @@ void dvb_dmx_swfilter(struct dvb_demux *demux, const u8 *buf, size_t count)
 bailout:
 	spin_unlock(&demux->lock);
 }
+EXPORT_SYMBOL(dvb_dmx_swfilter);
 
 void dvb_dmx_swfilter_204(struct dvb_demux *demux, const u8 *buf, size_t count)
 {
@@ -522,6 +524,7 @@ void dvb_dmx_swfilter_204(struct dvb_demux *demux, const u8 *buf, size_t count)
 bailout:
 	spin_unlock(&demux->lock);
 }
+EXPORT_SYMBOL(dvb_dmx_swfilter_204);
 
 
 static struct dvb_demux_filter * dvb_dmx_filter_alloc(struct dvb_demux *demux)
@@ -1163,6 +1166,7 @@ int dvbdmx_connect_frontend(struct dmx_demux *demux, struct dmx_frontend *fronte
 	up(&dvbdemux->mutex);
 	return 0;
 }
+EXPORT_SYMBOL(dvbdmx_connect_frontend);
 
 
 int dvbdmx_disconnect_frontend(struct dmx_demux *demux)
@@ -1176,6 +1180,7 @@ int dvbdmx_disconnect_frontend(struct dmx_demux *demux)
 	up(&dvbdemux->mutex);
 	return 0;
 }
+EXPORT_SYMBOL(dvbdmx_disconnect_frontend);
 
 
 static int dvbdmx_get_pes_pids(struct dmx_demux *demux, u16 *pids)
@@ -1256,6 +1261,7 @@ int dvb_dmx_init(struct dvb_demux *dvbdemux)
 
 	return 0;
 }
+EXPORT_SYMBOL(dvb_dmx_init);
 
 
 int dvb_dmx_release(struct dvb_demux *dvbdemux)
@@ -1269,3 +1275,5 @@ int dvb_dmx_release(struct dvb_demux *dvbdemux)
 		vfree(dvbdemux->feed);
 	return 0;
 }
+EXPORT_SYMBOL(dvb_dmx_release);
+

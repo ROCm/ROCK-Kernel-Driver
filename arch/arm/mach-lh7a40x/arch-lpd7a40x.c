@@ -267,7 +267,7 @@ MACHINE_START (LPD7A400, "Logic Product Development LPD7A400-10")
 	BOOT_PARAMS (0xc0000100)
 	MAPIO (lpd7a400_map_io)
 	INITIRQ (lh7a400_init_irq)
-	.timer		= &lpd7a40x_timer,
+	.timer		= &lh7a40x_timer,
 	INIT_MACHINE (lpd7a40x_init)
 MACHINE_END
 
@@ -281,7 +281,7 @@ MACHINE_START (LPD7A404, "Logic Product Development LPD7A404-10")
 	BOOT_PARAMS (0xc0000100)
 	MAPIO (lpd7a400_map_io)
 	INITIRQ (lh7a404_init_irq)
-	.timer		= &lpd7a40x_timer,
+	.timer		= &lh7a40x_timer,
 	INIT_MACHINE (lpd7a40x_init)
 MACHINE_END
 

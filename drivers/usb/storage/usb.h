@@ -83,13 +83,8 @@ struct us_unusual_dev {
 #define ABORTING_OR_DISCONNECTING	((1UL << US_FLIDX_ABORTING) | \
 					 (1UL << US_FLIDX_DISCONNECTING))
 #define US_FLIDX_RESETTING	22  /* 0x00400000  device reset in progress */
+#define US_FLIDX_TIMED_OUT	23  /* 0x00800000  SCSI midlayer timed out  */
 
-
-/* processing state machine states */
-#define US_STATE_IDLE		1
-#define US_STATE_RUNNING	2
-#define US_STATE_RESETTING	3
-#define US_STATE_ABORTING	4
 
 #define USB_STOR_STRING_LEN 32
 
@@ -148,7 +143,6 @@ struct us_data {
 
 	/* thread information */
 	int			pid;		 /* control thread	 */
-	int			sm_state;	 /* what we are doing	 */
 
 	/* control and bulk communications data */
 	struct urb		*current_urb;	 /* USB requests	 */

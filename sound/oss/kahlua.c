@@ -56,7 +56,7 @@ static int __devinit probe_one(struct pci_dev *pdev, const struct pci_device_id 
 {
 	struct address_info *hw_config;
 	unsigned long base;
-	void *mem;
+	void __iomem *mem;
 	unsigned long io;
 	u16 map;
 	u8 irq, dma8, dma16;

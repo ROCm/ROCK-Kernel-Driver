@@ -130,8 +130,21 @@ static inline int pgd_bad(pgd_t pgd)		{ return 0; }
 static inline int pgd_present(pgd_t pgd)	{ return 1; }
 static inline void pgd_clear(pgd_t *pgdp)	{ }
 
+#if defined(CONFIG_64BIT_PHYS_ADDR) && defined(CONFIG_CPU_MIPS32)
 #define pte_page(x)		pfn_to_page(pte_pfn(x))
+#define pte_pfn(x)		((unsigned long)((x).pte_high >> 6))
+static inline pte_t
+pfn_pte(unsigned long pfn, pgprot_t prot)
+{
+	pte_t pte;
+	pte.pte_high = (pfn << 6) | (pgprot_val(prot) & 0x3f);
+	pte.pte_low = pgprot_val(prot);
+	return pte;
+}
 
+#else
+
+#define pte_page(x)		pfn_to_page(pte_pfn(x))
 
 #ifdef CONFIG_CPU_VR41XX
 #define pte_pfn(x)		((unsigned long)((x).pte >> (PAGE_SHIFT + 2)))
@@ -140,6 +153,7 @@ static inline void pgd_clear(pgd_t *pgdp)	{ }
 #define pte_pfn(x)		((unsigned long)((x).pte >> PAGE_SHIFT))
 #define pfn_pte(pfn, prot)	__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
 #endif
+#endif /* defined(CONFIG_64BIT_PHYS_ADDR) && defined(CONFIG_CPU_MIPS32) */
 
 #define __pgd_offset(address)	pgd_index(address)
 #define __pmd_offset(address)	(((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
@@ -207,11 +221,19 @@ static inline pmd_t *pmd_offset(pgd_t *dir, unsigned long address)
  */
 #define PTE_FILE_MAX_BITS	27
 
+#if defined(CONFIG_64BIT_PHYS_ADDR) && defined(CONFIG_CPU_MIPS32)
+	/* fixme */
+#define pte_to_pgoff(_pte) (((_pte).pte_high >> 6) + ((_pte).pte_high & 0x3f))
+#define pgoff_to_pte(off) \
+ 	((pte_t){(((off) & 0x3f) + ((off) << 6) + _PAGE_FILE)})
+
+#else
 #define pte_to_pgoff(_pte) \
 	((((_pte).pte >> 3) & 0x1f ) + (((_pte).pte >> 9) << 6 ))
 
 #define pgoff_to_pte(off) \
 	((pte_t) { (((off) & 0x1f) << 3) + (((off) >> 6) << 9) + _PAGE_FILE })
+#endif
 
 #endif
 

@@ -42,6 +42,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include <linux/module.h>
 
 #include <acpi/acpi.h>
 #include <acpi/acnamesp.h>
@@ -116,6 +117,7 @@ unlock_and_exit:
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_install_address_space_handler);
 
 
 /*******************************************************************************
@@ -241,5 +243,5 @@ unlock_and_exit:
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return_ACPI_STATUS (status);
 }
-
+EXPORT_SYMBOL(acpi_remove_address_space_handler);
 

@@ -68,11 +68,6 @@ static inline int num_booting_cpus(void)
 extern void core_send_ipi(int cpu, unsigned int action);
 
 /*
- * Detect available CPUs, populate phys_cpu_present_map
- */
-extern void prom_build_cpu_map(void);
-
-/*
  * Firmware CPU startup hook
  */
 extern void prom_boot_secondary(int cpu, struct task_struct *idle);
@@ -84,7 +79,7 @@ extern void prom_boot_secondary(int cpu, struct task_struct *idle);
 extern void prom_init_secondary(void);
 
 /*
- * Callout to firmware before smp_init
+ * Detect available CPUs, populate phys_cpu_present_map before smp_init
  */
 extern void prom_prepare_cpus(unsigned int max_cpus);
 

@@ -6,7 +6,7 @@
  *
  * Copyright 2001-2002 MontaVista Software Inc.
  *
- * Copyright (C) 1996, 1997, 2001  Ralf Baechle
+ * Copyright (C) 1996, 97, 2001, 04  Ralf Baechle (ralf@linux-mips.org)
  * Copyright (C) 2000 RidgeRun, Inc.
  * Author: RidgeRun, Inc.
  *   glonnon@ridgerun.com, skranz@ridgerun.com, stevej@ridgerun.com
@@ -17,7 +17,10 @@
  * Copyright 2002 MontaVista Software Inc.
  * Author: Michael Pruznick, michael_pruznick@mvista.com
  *
- * Copyright (C) 2000-2001 Toshiba Corporation 
+ * Copyright (C) 2000-2001 Toshiba Corporation
+ *
+ * Copyright (C) 2004 MontaVista Software Inc.
+ * Author: Manish Lachwani, mlachwani@mvista.com
  *
  *  This program is free software; you can redistribute it and/or modify it
  *  under the terms of the GNU General Public License as published by the
@@ -61,15 +64,14 @@
 #include <linux/bootmem.h>
 #include <linux/blkdev.h>
 #ifdef CONFIG_RTC_DS1742
-#include <asm/rtc_ds1742.h>
+#include <linux/ds1742rtc.h>
 #endif
 #ifdef CONFIG_TOSHIBA_FPCIB0
-#include <asm/smsc_fdc37m81x.h>
+#include <asm/tx4927/smsc_fdc37m81x.h>
 #endif
 #include <asm/tx4927/toshiba_rbtx4927.h>
 #ifdef CONFIG_PCI
 #include <asm/tx4927/tx4927_pci.h>
-#include <asm/pci_channel.h>
 #endif
 #ifdef CONFIG_BLK_DEV_IDEPCI
 #include <linux/hdreg.h>
@@ -146,49 +148,15 @@ static int tx4927_pcic_trdyto = 0;	/* default: disabled */
 unsigned long tx4927_ce_base[8];
 void tx4927_pci_setup(void);
 void tx4927_reset_pci_pcic(void);
-#ifdef  TX4927_SUPPORT_PCI_66
-void tx4927_pci66_setup(void);
-extern int tx4927_pci66_check(void);
-#endif
 int tx4927_pci66 = 0;		/* 0:auto */
 #endif
 
 char *toshiba_name = "";
 
 #ifdef CONFIG_PCI
-void tx4927_dump_pcic_settings(void)
-{
-	printk("%s pcic settings:",toshiba_name);
-	{
-		int i;
-		unsigned long *preg = (unsigned long *) tx4927_pcicptr;
-		for (i = 0; i < sizeof(struct tx4927_pcic_reg); i += 4) {
-			if (i % 32 == 0)
-				printk("\n%04x:", i);
-			if (preg == &tx4927_pcicptr->g2pintack
-			    || preg == &tx4927_pcicptr->g2pspc
-#ifdef CONFIG_TX4927BUG_WORKAROUND
-			    || preg == &tx4927_pcicptr->g2pcfgadrs
-			    || preg == &tx4927_pcicptr->g2pcfgdata
-#endif
-			    ) {
-				printk(" XXXXXXXX");
-				preg++;
-				continue;
-			}
-			printk(" %08lx", *preg++);
-			if (preg == &tx4927_pcicptr->g2pcfgadrs)
-				break;
-		}
-		printk("\n");
-	}
-}
-
 static void tx4927_pcierr_interrupt(int irq, void *dev_id,
 				    struct pt_regs *regs)
 {
-	extern void tx4927_dump_pcic_settings(void);
-
 #ifdef CONFIG_BLK_DEV_IDEPCI
 	/* ignore MasterAbort for ide probing... */
 	if (irq == TX4927_IRQ_IRC_PCIERR &&
@@ -203,6 +171,7 @@ static void tx4927_pcierr_interrupt(int irq, void *dev_id,
 	}
 #endif
 	printk("PCI error interrupt (irq 0x%x).\n", irq);
+
 	printk("pcistat:%04x, g2pstatus:%08lx, pcicstatus:%08lx\n",
 	       (unsigned short) (tx4927_pcicptr->pcistatus >> 16),
 	       tx4927_pcicptr->g2pstatus, tx4927_pcicptr->pcicstatus);
@@ -211,23 +180,10 @@ static void tx4927_pcierr_interrupt(int irq, void *dev_id,
 	       (unsigned long) (tx4927_ccfgptr->tear >> 32),
 	       (unsigned long) tx4927_ccfgptr->tear);
 	show_regs(regs);
-	//tx4927_dump_pcic_settings();
-	panic("PCI error at PC:%08lx.", regs->cp0_epc);
 }
-
-static struct irqaction pcic_action = {
-	tx4927_pcierr_interrupt, 0, 0, "PCI-C", NULL, NULL
-};
-
-static struct irqaction pcierr_action = {
-	tx4927_pcierr_interrupt, 0, 0, "PCI-ERR", NULL, NULL
-};
-
 
 void __init toshiba_rbtx4927_pci_irq_init(void)
 {
-	setup_irq(TX4927_IRQ_IRC_PCIC, &pcic_action);
-	setup_irq(TX4927_IRQ_IRC_PCIERR, &pcierr_action);
 	return;
 }
 
@@ -245,73 +201,13 @@ void tx4927_reset_pci_pcic(void)
 #endif /* CONFIG_PCI */
 
 #ifdef CONFIG_PCI
-#ifdef  TX4927_SUPPORT_PCI_66
-void tx4927_pci66_setup(void)
-{
-	int pciclk, pciclkin = 1;
-
-	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_PCI66,
-				       "-\n");
-
-	if (tx4927_ccfgptr->ccfg & TX4927_CCFG_PCI66)
-		return;
-
-	tx4927_reset_pci_pcic();
-
-	/* Assert M66EN */
-	tx4927_ccfgptr->ccfg |= TX4927_CCFG_PCI66;
-	/* set PCICLK 66MHz */
-	if (tx4927_ccfgptr->pcfg & TX4927_PCFG_PCICLKEN_ALL) {
-		unsigned int pcidivmode = 0;
-		pcidivmode =
-		    (unsigned long) tx4927_ccfgptr->
-		    ccfg & TX4927_CCFG_PCIDIVMODE_MASK;
-		if (tx4927_cpu_clock >= 170000000) {
-			/* CPU 200MHz */
-			pcidivmode = TX4927_CCFG_PCIDIVMODE_3;
-			pciclk = tx4927_cpu_clock / 3;
-		} else {
-			/* CPU 166MHz */
-			pcidivmode = TX4927_CCFG_PCIDIVMODE_2_5;
-			pciclk = tx4927_cpu_clock * 2 / 5;
-		}
-		tx4927_ccfgptr->ccfg =
-		    (tx4927_ccfgptr->ccfg & ~TX4927_CCFG_PCIDIVMODE_MASK)
-		    | pcidivmode;
-		TOSHIBA_RBTX4927_SETUP_DPRINTK
-		    (TOSHIBA_RBTX4927_SETUP_PCI66,
-		     ":PCICLK: ccfg:0x%08lx\n",
-		     (unsigned long) tx4927_ccfgptr->ccfg);
-	} else {
-		int pciclk_setting = *tx4927_pci_clk_ptr;
-		pciclkin = 0;
-		pciclk = 66666666;
-		pciclk_setting &= ~TX4927_PCI_CLK_MASK;
-		pciclk_setting |= TX4927_PCI_CLK_66;
-		*tx4927_pci_clk_ptr = pciclk_setting;
-		TOSHIBA_RBTX4927_SETUP_DPRINTK
-		    (TOSHIBA_RBTX4927_SETUP_PCI66,
-		     "PCICLK: pci_clk:%02x\n", *tx4927_pci_clk_ptr);
-	}
-
-	udelay(10000);
-
-	/* clear PCIC reset */
-	tx4927_ccfgptr->clkctr &= ~TX4927_CLKCTR_PCIRST;
-	/* clear PCI reset */
-	*tx4927_pcireset_ptr = 0;
-
-	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_PCI66,
-				       "+\n");
-	return;
-}
-#endif				/* TX4927_SUPPORT_PCI_66 */
-
 void print_pci_status(void)
 {
 	printk("PCI STATUS %lx\n", tx4927_pcicptr->pcistatus);
 	printk("PCIC STATUS %lx\n", tx4927_pcicptr->pcicstatus);
 }
+
+extern struct pci_controller tx4927_controller;
 
 static struct pci_dev *fake_pci_dev(struct pci_controller *hose,
 				    int top_bus, int busnr, int devfn)
@@ -319,17 +215,12 @@ static struct pci_dev *fake_pci_dev(struct pci_controller *hose,
 	static struct pci_dev dev;
 	static struct pci_bus bus;
 
-	dev.bus = &bus;
-	dev.sysdata = hose;
+	dev.sysdata = (void *)hose;
 	dev.devfn = devfn;
 	bus.number = busnr;
 	bus.ops = hose->pci_ops;
-
-	if (busnr != top_bus)
-		/* Fake a parent bus structure. */
-		bus.parent = &bus;
-	else
-		bus.parent = NULL;
+	bus.parent = NULL;
+	dev.bus = &bus;
 
 	return &dev;
 }
@@ -350,15 +241,19 @@ EARLY_PCI_OP(write, byte, u8)
 EARLY_PCI_OP(write, word, u16)
 EARLY_PCI_OP(write, dword, u32)
 
-static int __init tx4927_pcibios_init(int busno, struct pci_controller *hose)
+static int __init tx4927_pcibios_init(void)
 {
 	unsigned int id;
 	u32 pci_devfn;
+	int devfn_start = 0;
+	int devfn_stop = 0xff;
+	int busno = 0; /* One bus on the Toshiba */
+	struct pci_controller *hose = &tx4927_controller;
 
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_PCIBIOS,
 				       "-\n");
 
-	for (pci_devfn = 0x0; pci_devfn < 0xff; pci_devfn++) {
+	for (pci_devfn = devfn_start; pci_devfn < devfn_stop; pci_devfn++) {
 		early_read_config_dword(hose, busno, busno, pci_devfn,
 					PCI_VENDOR_ID, &id);
 
@@ -581,11 +476,14 @@ static int __init tx4927_pcibios_init(int busno, struct pci_controller *hose)
 
 	}
 
+	register_pci_controller(&tx4927_controller);
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_PCIBIOS,
 				       "+\n");
 
-	return busno;
+	return 0;
 }
+
+arch_initcall(tx4927_pcibios_init);
 
 extern struct resource pci_io_resource;
 extern struct resource pci_mem_resource;
@@ -596,11 +494,6 @@ void tx4927_pci_setup(void)
 	extern unsigned int tx4927_get_mem_size(void);
 
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_PCI2, "-\n");
-
-#ifndef  TX4927_SUPPORT_PCI_66
-	if (tx4927_ccfgptr->ccfg & TX4927_CCFG_PCI66)
-		printk("PCI 66 current unsupported\n");
-#endif
 
 	mips_memory_upper = tx4927_get_mem_size() << 20;
 	mips_memory_upper += KSEG0;
@@ -736,19 +629,6 @@ void tx4927_pci_setup(void)
 	/* PCI->GB mappings (I/O 256B) */
 	tx4927_pcicptr->p2giopbase = 0;	/* 256B */
 
-
-#ifdef TX4927_SUPPORT_COMMAND_IO
-	tx4927_pcicptr->p2giogbase = 0 | TX4927_PCIC_P2GIOGBASE_TIOEN |
-#ifdef __BIG_ENDIAN
-	    TX4927_PCIC_P2GIOGBASE_TECHG
-#else
-	    TX4927_PCIC_P2GIOGBASE_TBSDIS
-#endif
-	    ;
-#else
-	tx4927_pcicptr->p2giogbase = 0;
-#endif
-
 	/* PCI->GB mappings (MEM 512MB) M0 gets all of memory */
 	tx4927_pcicptr->p2gm0plbase = 0;
 	tx4927_pcicptr->p2gm0pubase = 0;
@@ -791,8 +671,6 @@ void tx4927_pci_setup(void)
 	if (tx4927_pcic_trdyto >= 0) {
 		tx4927_pcicptr->g2ptocnt &= ~0xff;
 		tx4927_pcicptr->g2ptocnt |= (tx4927_pcic_trdyto & 0xff);
-		//printk("%s PCIC -- TRDYTO:%02lx\n",toshiba_name,
-		//      tx4927_pcicptr->g2ptocnt & 0xff);
 	}
 
 	/* Clear All Local Bus Status */
@@ -825,17 +703,10 @@ void tx4927_pci_setup(void)
 
 	tx4927_pcicptr->pcistatus = PCI_COMMAND_MASTER |
 	    PCI_COMMAND_MEMORY |
-#ifdef TX4927_SUPPORT_COMMAND_IO
-	    PCI_COMMAND_IO |
-#endif
 	    PCI_COMMAND_PARITY | PCI_COMMAND_SERR;
 
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_PCI2,
 				       ":pci setup complete:\n");
-	//tx4927_dump_pcic_settings();
-
-	tx4927_pcibios_init(0, &tx4927_controller);
-
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_PCI2, "+\n");
 }
 
@@ -883,6 +754,7 @@ void toshiba_rbtx4927_power_off(void)
 void __init toshiba_rbtx4927_setup(void)
 {
 	vu32 cp0_config;
+	char *argptr;
 
 	printk("CPU is %s\n", toshiba_name);
 
@@ -923,20 +795,15 @@ void __init toshiba_rbtx4927_setup(void)
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_SETUP,
 				       "+\n");
 
-
-
-	mips_io_port_base = KSEG1 + TBTX4927_ISA_IO_OFFSET;
+	set_io_port_base(KSEG1 + TBTX4927_ISA_IO_OFFSET);
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_SETUP,
 				       ":mips_io_port_base=0x%08lx\n",
 				       mips_io_port_base);
 
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_SETUP,
 				       ":Resource\n");
-	ioport_resource.start = 0;
 	ioport_resource.end = 0xffffffff;
-	iomem_resource.start = 0;
 	iomem_resource.end = 0xffffffff;
-
 
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_SETUP,
 				       ":ResetRoutines\n");
@@ -1000,25 +867,11 @@ void __init toshiba_rbtx4927_setup(void)
 		tx4927_sdramcptr->tr |= 0x02000000;	/* RCD:3tck */
 #endif
 
-#ifdef  TX4927_SUPPORT_PCI_66
-	tx4927_pci66_setup();
-#endif
-
 	tx4927_pci_setup();
-#endif
-
-
-	{
-		u32 id = 0;
-		early_read_config_dword(&tx4927_controller, 0, 0, 0x90,
-					PCI_VENDOR_ID, &id);
-		if (id == 0x94601055) {
-			tx4927_using_backplane = 1;
-			printk("backplane board IS installed\n");
-		} else {
-			printk("backplane board NOT installed\n");
-		}
-	}
+	if (tx4927_using_backplane == 1)
+		printk("backplane board IS installed\n");
+	else
+		printk("No Backplane \n");
 
 	/* this is on ISA bus behind PCI bus, so need PCI up first */
 #ifdef CONFIG_TOSHIBA_FPCIB0
@@ -1065,10 +918,40 @@ void __init toshiba_rbtx4927_setup(void)
 	}
 #endif
 
+#endif /* CONFIG_PCI */
+
+#ifdef CONFIG_SERIAL_TXX9_CONSOLE
+        argptr = prom_getcmdline();
+        if (strstr(argptr, "console=") == NULL) {
+                strcat(argptr, " console=ttyS0,38400");
+        }
+#endif
+
+#ifdef CONFIG_ROOT_NFS
+        argptr = prom_getcmdline();
+        if (strstr(argptr, "root=") == NULL) {
+                strcat(argptr, " root=/dev/nfs rw");
+        }
+#endif
+
+
+#ifdef CONFIG_IP_PNP
+        argptr = prom_getcmdline();
+        if (strstr(argptr, "ip=") == NULL) {
+                strcat(argptr, " ip=any");
+        }
+#endif
+
 
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_SETUP,
-				       "+\n");
+			       "+\n");
 }
+
+#ifdef CONFIG_RTC_DS1742
+extern unsigned long rtc_ds1742_get_time(void);
+extern int rtc_ds1742_set_time(unsigned long);
+extern void rtc_ds1742_wait(void);
+#endif
 
 void __init
 toshiba_rbtx4927_time_init(void)

@@ -89,7 +89,7 @@ static struct inst instances[BPP_NO];
 
 #if defined(__i386__)
 
-const unsigned short base_addrs[BPP_NO] = { 0x278, 0x378, 0x3bc };
+static const unsigned short base_addrs[BPP_NO] = { 0x278, 0x378, 0x3bc };
 
 /*
  * These are for data access.
@@ -246,7 +246,7 @@ static unsigned short get_pins(unsigned minor)
 #define P_ERR_IRP       0x0002      /* RW1  1= rising edge */
 #define P_ERR_IRQ_EN    0x0001      /* RW   */
 
-unsigned long base_addrs[BPP_NO];
+static void __iomem *base_addrs[BPP_NO];
 
 #define bpp_outb_p(data, base)	sbus_writeb(data, (base) + BPP_DR)
 #define bpp_inb_p(base)		sbus_readb((base) + BPP_DR)
@@ -254,7 +254,7 @@ unsigned long base_addrs[BPP_NO];
 
 static void set_pins(unsigned short pins, unsigned minor)
 {
-      unsigned long base = base_addrs[minor];
+      void __iomem *base = base_addrs[minor];
       unsigned char bits_tcr = 0, bits_or = 0;
 
       if (instances[minor].direction & 0x20) bits_tcr |= P_TCR_DIR;
@@ -275,7 +275,7 @@ static void set_pins(unsigned short pins, unsigned minor)
  */
 static unsigned short get_pins(unsigned minor)
 {
-      unsigned long base = base_addrs[minor];
+      void __iomem *base = base_addrs[minor];
       unsigned short bits = 0;
       unsigned value_tcr = sbus_readb(base + BPP_TCR);
       unsigned value_ir = sbus_readb(base + BPP_IR);
@@ -940,7 +940,7 @@ static inline void freeLptPort(int idx)
 
 #if defined(__sparc__)
 
-static unsigned long map_bpp(struct sbus_dev *dev, int idx)
+static void __iomem *map_bpp(struct sbus_dev *dev, int idx)
 {
       return sbus_ioremap(&dev->resource[0], 0, BPP_SIZE, "bpp");
 }
@@ -969,7 +969,7 @@ static int collectLptPorts(void)
 
 static void probeLptPort(unsigned idx)
 {
-      unsigned long rp = base_addrs[idx];
+      void __iomem *rp = base_addrs[idx];
       __u32 csr;
       char *brand;
 
@@ -983,7 +983,7 @@ static void probeLptPort(unsigned idx)
       init_timer(&instances[idx].timer_list);
       instances[idx].timer_list.function = bpp_wake_up;
 
-      if (rp == 0) return;
+      if (!rp) return;
 
       instances[idx].present = 1;
       instances[idx].enhanced = 1;   /* Sure */
@@ -1014,7 +1014,7 @@ static void probeLptPort(unsigned idx)
       default:
             brand = "Unknown";
       }
-      printk("bpp%d: %s at 0x%lx\n", idx, brand, rp);
+      printk("bpp%d: %s at %p\n", idx, brand, rp);
 
       /*
        * Leave the port in compat idle mode.

@@ -17,7 +17,7 @@
  *
  * Inputs:	r0 contains the address
  * Outputs:	r0 is the error code
- *		r1, r2 contains the zero-extended value
+ *		r2, r3 contains the zero-extended value
  *		lr corrupted
  *
  * No other registers must be altered.  (see include/asm-arm/uaccess.h
@@ -32,39 +32,39 @@
 
 	.global	__get_user_1
 __get_user_1:
-1:	ldrbt	r1, [r0]
+1:	ldrbt	r2, [r0]
 	mov	r0, #0
 	mov	pc, lr
 
 	.global	__get_user_2
 __get_user_2:
-2:	ldrbt	r1, [r0], #1
-3:	ldrbt	r2, [r0]
+2:	ldrbt	r2, [r0], #1
+3:	ldrbt	r3, [r0]
 #ifndef __ARMEB__
-	orr	r1, r1, r2, lsl #8
+	orr	r2, r2, r3, lsl #8
 #else
-	orr	r1, r2, r1, lsl #8
+	orr	r2, r3, r2, lsl #8
 #endif
 	mov	r0, #0
 	mov	pc, lr
 
 	.global	__get_user_4
 __get_user_4:
-4:	ldrt	r1, [r0]
+4:	ldrt	r2, [r0]
 	mov	r0, #0
 	mov	pc, lr
 
 	.global	__get_user_8
 __get_user_8:
-5:	ldrt	r1, [r0], #4
-6:	ldrt	r2, [r0]
+5:	ldrt	r2, [r0], #4
+6:	ldrt	r3, [r0]
 	mov	r0, #0
 	mov	pc, lr
 
 __get_user_bad_8:
-	mov	r2, #0
+	mov	r3, #0
 __get_user_bad:
-	mov	r1, #0
+	mov	r2, #0
 	mov	r0, #-EFAULT
 	mov	pc, lr
 

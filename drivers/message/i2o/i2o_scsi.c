@@ -299,7 +299,7 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 	cmd = i2o_cntxt_list_get(c, le32_to_cpu(msg->u.s.tcntxt));
 
 	if (msg->u.head[0] & (1 << 13)) {
-		struct i2o_message *pmsg;	/* preserved message */
+		struct i2o_message __iomem *pmsg;	/* preserved message */
 		u32 pm;
 		int err = DID_ERROR;
 
@@ -541,10 +541,11 @@ static int i2o_scsi_queuecommand(struct scsi_cmnd *SCpnt,
 	struct i2o_device *i2o_dev;
 	struct device *dev;
 	int tid;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	u32 scsi_flags, sg_flags;
-	u32 *mptr, *lenptr;
+	u32 __iomem *mptr;
+	u32 __iomem *lenptr;
 	u32 len, reqlen;
 	int i;
 
@@ -721,7 +722,7 @@ static int i2o_scsi_abort(struct scsi_cmnd *SCpnt)
 {
 	struct i2o_device *i2o_dev;
 	struct i2o_controller *c;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	int tid;
 	int status = FAILED;

@@ -281,7 +281,7 @@ typedef struct {
 } socal_port; 
 
 typedef struct {
-	socal_hw_cq		*hw_cq;	/* Related XRAM cq */
+	socal_hw_cq		__iomem *hw_cq;	/* Related XRAM cq */
 	socal_req		*pool;
 	u8			in;
 	u8			out;

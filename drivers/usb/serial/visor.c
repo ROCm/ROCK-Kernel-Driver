@@ -494,10 +494,9 @@ static int visor_write (struct usb_serial_port *port, const unsigned char *buf, 
 	spin_lock_irqsave(&priv->lock, flags);
 	if (priv->outstanding_urbs > URB_UPPER_LIMIT) {
 		spin_unlock_irqrestore(&priv->lock, flags);
-		dev_dbg(&port->dev, "write limit hit\n");
+		dbg("%s - write limit hit\n", __FUNCTION__);
 		return 0;
 	}
-	++priv->outstanding_urbs;
 	spin_unlock_irqrestore(&priv->lock, flags);
 
 	buffer = kmalloc (count, GFP_ATOMIC);
@@ -930,7 +929,7 @@ static int treo_attach (struct usb_serial *serial)
 	if (!((serial->dev->descriptor.idVendor == HANDSPRING_VENDOR_ID) ||
 	      (serial->dev->descriptor.idVendor == KYOCERA_VENDOR_ID)) ||
 	    (serial->num_interrupt_in == 0))
-		return 0;
+		goto generic_startup;
 
 	dbg("%s", __FUNCTION__);
 
@@ -957,6 +956,7 @@ static int treo_attach (struct usb_serial *serial)
 	COPY_PORT(serial->port[1], swap_port);
 	kfree(swap_port);
 
+generic_startup:
 	return generic_startup(serial);
 }
 

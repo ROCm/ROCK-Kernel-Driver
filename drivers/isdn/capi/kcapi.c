@@ -150,7 +150,10 @@ static void register_appl(struct capi_ctr *card, u16 applid, capi_register_param
 {
 	card = capi_ctr_get(card);
 
-	card->register_appl(card, applid, rparam);
+	if (card)
+		card->register_appl(card, applid, rparam);
+	else
+		printk(KERN_WARNING "%s: cannot get card resources\n", __FUNCTION__);
 }
 
 
@@ -173,10 +176,15 @@ static void notify_up(u32 contr)
 	if (showcapimsgs & 1) {
 	        printk(KERN_DEBUG "kcapi: notify up contr %d\n", contr);
 	}
-
+	if (!card) {
+		printk(KERN_WARNING "%s: invalid contr %d\n", __FUNCTION__, contr);
+		return;
+	}
 	for (applid = 1; applid <= CAPI_MAXAPPL; applid++) {
 		ap = get_capi_appl_by_nr(applid);
-		if (ap && ap->callback && !ap->release_in_progress)
+		if (!ap || ap->release_in_progress) continue;
+		register_appl(card, applid, &ap->rparam);
+		if (ap->callback && !ap->release_in_progress)
 			ap->callback(KCI_CONTRUP, contr, &card->profile);
 	}
 }
@@ -319,18 +327,7 @@ EXPORT_SYMBOL(capi_ctr_handle_message);
 
 void capi_ctr_ready(struct capi_ctr * card)
 {
-	u16 appl;
-	struct capi20_appl *ap;
-
 	card->cardstate = CARD_RUNNING;
-
-	down(&controller_sem);
-	for (appl = 1; appl <= CAPI_MAXAPPL; appl++) {
-		ap = get_capi_appl_by_nr(appl);
-		if (!ap || ap->release_in_progress) continue;
-		register_appl(card, appl, &ap->rparam);
-	}
-	up(&controller_sem);
 
         printk(KERN_NOTICE "kcapi: card %d \"%s\" ready.\n",
 	       card->cnr, card->name);

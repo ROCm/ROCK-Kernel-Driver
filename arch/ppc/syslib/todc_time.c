@@ -81,13 +81,13 @@
 u_char
 todc_direct_read_val(int addr)
 {
-	return readb(todc_info->nvram_data + addr);
+	return readb((void __iomem *)(todc_info->nvram_data + addr));
 }
 
 void
 todc_direct_write_val(int addr, unsigned char val)
 {
-	writeb(val, todc_info->nvram_data + addr);
+	writeb(val, (void __iomem *)(todc_info->nvram_data + addr));
 	return;
 }
 

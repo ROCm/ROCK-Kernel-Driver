@@ -818,7 +818,7 @@ acpi_ut_remove_allocation (
  * DESCRIPTION: Print some info about the outstanding allocations.
  *
  ******************************************************************************/
-
+#ifdef ACPI_FUTURE_USAGE
 void
 acpi_ut_dump_allocation_info (
 	void)
@@ -864,6 +864,7 @@ acpi_ut_dump_allocation_info (
 */
 	return_VOID;
 }
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 
 /*******************************************************************************

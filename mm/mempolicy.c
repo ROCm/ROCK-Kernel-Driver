@@ -75,6 +75,7 @@
 #include <linux/init.h>
 #include <linux/compat.h>
 #include <linux/mempolicy.h>
+#include <asm/tlbflush.h>
 #include <asm/uaccess.h>
 
 static kmem_cache_t *policy_cache;
@@ -900,13 +901,13 @@ sp_lookup(struct shared_policy *sp, unsigned long start, unsigned long end)
 
 	while (n) {
 		struct sp_node *p = rb_entry(n, struct sp_node, nd);
-		if (start >= p->end) {
+
+		if (start >= p->end)
 			n = n->rb_right;
-		} else if (end < p->start) {
+		else if (end <= p->start)
 			n = n->rb_left;
-		} else {
+		else
 			break;
-		}
 	}
 	if (!n)
 		return NULL;

@@ -350,7 +350,7 @@ acpi_ds_method_data_set_value (
  * RETURN:      Data type of current value of the selected Arg or Local
  *
  ******************************************************************************/
-
+#ifdef ACPI_FUTURE_USAGE
 acpi_object_type
 acpi_ds_method_data_get_type (
 	u16                             opcode,
@@ -385,6 +385,7 @@ acpi_ds_method_data_get_type (
 
 	return_VALUE (ACPI_GET_OBJECT_TYPE (object));
 }
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 
 /*******************************************************************************

@@ -890,8 +890,14 @@ static ide_startstop_t cdrom_start_packet_command(ide_drive_t *drive,
 		ide_execute_command(drive, WIN_PACKETCMD, handler, ATAPI_WAIT_PC, cdrom_timer_expiry);
 		return ide_started;
 	} else {
+		unsigned long flags;
+
 		/* packet command */
-		HWIF(drive)->OUTB(WIN_PACKETCMD, IDE_COMMAND_REG);
+		spin_lock_irqsave(&ide_lock, flags);
+		hwif->OUTBSYNC(drive, WIN_PACKETCMD, IDE_COMMAND_REG);
+		ndelay(400);
+		spin_unlock_irqrestore(&ide_lock, flags);
+
 		return (*handler) (drive);
 	}
 }
@@ -2353,24 +2359,30 @@ static int cdrom_read_toc(ide_drive_t *drive, struct request_sense *sense)
 	/* Read the multisession information. */
 	if (toc->hdr.first_track != CDROM_LEADOUT) {
 		/* Read the multisession information. */
-		stat = cdrom_read_tocentry(drive, 0, 1, 1, (char *)&ms_tmp,
+		stat = cdrom_read_tocentry(drive, 0, 0, 1, (char *)&ms_tmp,
 					   sizeof(ms_tmp), sense);
 		if (stat) return stat;
+
+		toc->last_session_lba = be32_to_cpu(ms_tmp.ent.addr.lba);
 	} else {
-		ms_tmp.ent.addr.msf.minute = 0;
-		ms_tmp.ent.addr.msf.second = 2;
-		ms_tmp.ent.addr.msf.frame  = 0;
 		ms_tmp.hdr.first_track = ms_tmp.hdr.last_track = CDROM_LEADOUT;
+		toc->last_session_lba = msf_to_lba(0, 2, 0); /* 0m 2s 0f */
 	}
 
 #if ! STANDARD_ATAPI
-	if (CDROM_CONFIG_FLAGS(drive)->tocaddr_as_bcd)
-		msf_from_bcd (&ms_tmp.ent.addr.msf);
-#endif  /* not STANDARD_ATAPI */
+	if (CDROM_CONFIG_FLAGS(drive)->tocaddr_as_bcd) {
+		/* Re-read multisession information using MSF format */
+		stat = cdrom_read_tocentry(drive, 0, 1, 1, (char *)&ms_tmp,
+					   sizeof(ms_tmp), sense);
+		if (stat)
+			return stat;
 
-	toc->last_session_lba = msf_to_lba (ms_tmp.ent.addr.msf.minute,
-					    ms_tmp.ent.addr.msf.second,
-					    ms_tmp.ent.addr.msf.frame);
+		msf_from_bcd (&ms_tmp.ent.addr.msf);
+		toc->last_session_lba = msf_to_lba(ms_tmp.ent.addr.msf.minute,
+					  	   ms_tmp.ent.addr.msf.second,
+						   ms_tmp.ent.addr.msf.frame);
+	}
+#endif  /* not STANDARD_ATAPI */
 
 	toc->xa_flag = (ms_tmp.hdr.first_track != ms_tmp.hdr.last_track);
 

@@ -435,16 +435,14 @@ diva_os_register_io_port(void *adapter, int on, unsigned long port,
 	return (0);
 }
 
-void *divasa_remap_pci_bar(diva_os_xdi_adapter_t *a, int id, unsigned long bar, unsigned long area_length)
+void __iomem *divasa_remap_pci_bar(diva_os_xdi_adapter_t *a, int id, unsigned long bar, unsigned long area_length)
 {
-	void *ret;
-
-	ret = (void *) ioremap(bar, area_length);
-	DBG_TRC(("remap(%08x)->%08x", bar, ret));
+	void __iomem *ret = ioremap(bar, area_length);
+	DBG_TRC(("remap(%08x)->%p", bar, ret));
 	return (ret);
 }
 
-void divasa_unmap_pci_bar(void *bar)
+void divasa_unmap_pci_bar(void __iomem *bar)
 {
 	if (bar) {
 		iounmap(bar);
@@ -454,32 +452,32 @@ void divasa_unmap_pci_bar(void *bar)
 /*********************************************************
  ** I/O port access 
  *********************************************************/
-byte __inline__ inpp(void *addr)
+byte __inline__ inpp(void __iomem *addr)
 {
 	return (inb((unsigned long) addr));
 }
 
-word __inline__ inppw(void *addr)
+word __inline__ inppw(void __iomem *addr)
 {
 	return (inw((unsigned long) addr));
 }
 
-void __inline__ inppw_buffer(void *addr, void *P, int length)
+void __inline__ inppw_buffer(void __iomem *addr, void *P, int length)
 {
 	insw((unsigned long) addr, (word *) P, length >> 1);
 }
 
-void __inline__ outppw_buffer(void *addr, void *P, int length)
+void __inline__ outppw_buffer(void __iomem *addr, void *P, int length)
 {
 	outsw((unsigned long) addr, (word *) P, length >> 1);
 }
 
-void __inline__ outppw(void *addr, word w)
+void __inline__ outppw(void __iomem *addr, word w)
 {
 	outw(w, (unsigned long) addr);
 }
 
-void __inline__ outpp(void *addr, word p)
+void __inline__ outpp(void __iomem *addr, word p)
 {
 	outb(p, (unsigned long) addr);
 }

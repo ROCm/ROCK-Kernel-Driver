@@ -78,6 +78,7 @@ struct s3c24xx_uart_info {
 	unsigned int		fifosize;
 	unsigned long		rx_fifomask;
 	unsigned long		rx_fifoshift;
+	unsigned long		rx_fifofull;
 	unsigned long		tx_fifomask;
 	unsigned long		tx_fifoshift;
 	unsigned long		tx_fifofull;
@@ -282,6 +283,10 @@ static int s3c24xx_serial_rx_fifocnt(struct s3c24xx_uart_port *ourport,
 				     unsigned long ufstat)
 {
 	struct s3c24xx_uart_info *info = ourport->info;
+
+	if (ufstat & info->rx_fifofull)
+		return info->fifosize;
+
 	return (ufstat & info->rx_fifomask) >> info->rx_fifoshift;
 }
 
@@ -1204,6 +1209,7 @@ static struct s3c24xx_uart_info s3c2410_uart_inf = {
 	.fifosize	= 16,
 	.rx_fifomask	= S3C2410_UFSTAT_RXMASK,
 	.rx_fifoshift	= S3C2410_UFSTAT_RXSHIFT,
+	.rx_fifofull	= S3C2410_UFSTAT_RXFULL,
 	.tx_fifofull	= S3C2410_UFSTAT_TXFULL,
 	.tx_fifomask	= S3C2410_UFSTAT_TXMASK,
 	.tx_fifoshift	= S3C2410_UFSTAT_TXSHIFT,
@@ -1313,6 +1319,7 @@ static struct s3c24xx_uart_info s3c2440_uart_inf = {
 	.fifosize	= 64,
 	.rx_fifomask	= S3C2440_UFSTAT_RXMASK,
 	.rx_fifoshift	= S3C2440_UFSTAT_RXSHIFT,
+	.rx_fifofull	= S3C2440_UFSTAT_RXFULL,
 	.tx_fifofull	= S3C2440_UFSTAT_TXFULL,
 	.tx_fifomask	= S3C2440_UFSTAT_TXMASK,
 	.tx_fifoshift	= S3C2440_UFSTAT_TXSHIFT,

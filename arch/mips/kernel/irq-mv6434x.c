@@ -16,7 +16,7 @@
 #include <linux/kernel_stat.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/mv64340.h>
+#include <linux/mv643xx.h>
 
 static unsigned int irq_base;
 

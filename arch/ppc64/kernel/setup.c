@@ -99,6 +99,8 @@ extern void htab_initialize(void);
 extern void early_init_devtree(void *flat_dt);
 extern void unflatten_device_tree(void);
 
+extern void smp_release_cpus(void);
+
 unsigned long decr_overclock = 1;
 unsigned long decr_overclock_proc0 = 1;
 unsigned long decr_overclock_set = 0;
@@ -106,6 +108,7 @@ unsigned long decr_overclock_proc0_set = 0;
 
 int have_of = 1;
 int boot_cpuid = 0;
+int boot_cpuid_phys = 0;
 dev_t boot_dev;
 
 /*
@@ -242,6 +245,7 @@ static void __init setup_cpu_maps(void)
 {
 	struct device_node *dn = NULL;
 	int cpu = 0;
+	int swap_cpuid = 0;
 
 	check_smt_enabled();
 
@@ -266,9 +270,21 @@ static void __init setup_cpu_maps(void)
 				cpu_set(cpu, cpu_present_map);
 				set_hard_smp_processor_id(cpu, intserv[j]);
 			}
+			if (intserv[j] == boot_cpuid_phys)
+				swap_cpuid = cpu;
 			cpu_set(cpu, cpu_possible_map);
 			cpu++;
 		}
+	}
+
+	/* Swap CPU id 0 with boot_cpuid_phys, so we can always assume that
+	 * boot cpu is logical 0.
+	 */
+	if (boot_cpuid_phys != get_hard_smp_processor_id(0)) {
+		u32 tmp;
+		tmp = get_hard_smp_processor_id(0);
+		set_hard_smp_processor_id(0, boot_cpuid_phys);
+		set_hard_smp_processor_id(swap_cpuid, tmp);
 	}
 
 	/*
@@ -630,6 +646,11 @@ void __init setup_system(void)
 	 * iSeries has already initialized the cpu maps at this point.
 	 */
 	setup_cpu_maps();
+
+	/* Release secondary cpus out of their spinloops at 0x60 now that
+	 * we can map physical -> logical CPU ids
+	 */
+	smp_release_cpus();
 #endif /* defined(CONFIG_SMP) && !defined(CONFIG_PPC_ISERIES) */
 
 	printk("Starting Linux PPC64 %s\n", UTS_RELEASE);
@@ -999,10 +1020,10 @@ void __init setup_arch(char **cmdline_p)
 	/* set up the bootmem stuff with available memory */
 	do_init_bootmem();
 
+	ppc_md.setup_arch();
+
 	/* Select the correct idle loop for the platform. */
 	idle_setup();
-
-	ppc_md.setup_arch();
 
 	paging_init();
 	ppc64_boot_msg(0x15, "Setup Done");

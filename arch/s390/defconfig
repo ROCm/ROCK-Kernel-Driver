@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.10-rc1
-# Thu Nov 11 12:54:21 2004
+# Linux kernel version: 2.6.10-rc2
+# Tue Nov 30 14:00:30 2004
 #
 CONFIG_MMU=y
 CONFIG_RWSEM_XCHGADD_ALGORITHM=y
@@ -147,7 +147,6 @@ CONFIG_SCSI_FC_ATTRS=y
 # SCSI low-level drivers
 #
 # CONFIG_SCSI_SATA is not set
-# CONFIG_SCSI_QLOGIC_1280_1040 is not set
 # CONFIG_SCSI_DEBUG is not set
 CONFIG_ZFCP=y
 CONFIG_CCW=y
@@ -197,6 +196,7 @@ CONFIG_MD_RAID1=m
 CONFIG_MD_RAID5=m
 # CONFIG_MD_RAID6 is not set
 CONFIG_MD_MULTIPATH=m
+# CONFIG_MD_FAULTY is not set
 # CONFIG_BLK_DEV_DM is not set
 
 #

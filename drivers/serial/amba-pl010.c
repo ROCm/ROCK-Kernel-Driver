@@ -710,6 +710,24 @@ static struct console amba_console = {
 	.data		= &amba_reg,
 };
 
+static int __init amba_console_init(void)
+{
+	/*
+	 * All port initializations are done statically
+	 */
+	register_console(&amba_console);
+	return 0;
+}
+console_initcall(amba_console_init);
+
+static int __init amba_late_console_init(void)
+{
+	if (!(amba_console.flags & CON_ENABLED))
+		register_console(&amba_console);
+	return 0;
+}
+late_initcall(amba_late_console_init);
+
 #define AMBA_CONSOLE	&amba_console
 #else
 #define AMBA_CONSOLE	NULL

@@ -34,17 +34,6 @@ static inline void lprintk(char *buf)
 	}
 }
 
-static inline int uhci_is_skeleton_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
-{
-	int i;
-
-	for (i = 0; i < UHCI_NUM_SKELQH; i++)
-		if (qh == uhci->skelqh[i])
-			return 1;
-
-	return 0;
-}
-
 static int uhci_show_td(struct uhci_td *td, char *buf, int len, int space)
 {
 	char *out = buf;

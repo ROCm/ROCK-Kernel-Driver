@@ -266,13 +266,6 @@ UNUSUAL_DEV(  0x0525, 0xa140, 0x0100, 0x0100,
 		US_SC_8070, US_PR_BULK, NULL,
 		US_FL_FIX_INQUIRY ),
 
-/* Reported by Iacopo Spalletti <avvisi@spalletti.it> */
-UNUSUAL_DEV(  0x052b, 0x1807, 0x0100, 0x0100,
-		"Tekom Technologies, Inc",
-		"300_CAMERA",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_IGNORE_RESIDUE ),
-
 /* Yakumo Mega Image 37
  * Submitted by Stephan Fuhrmann <atomenergie@t-online.de> */
 UNUSUAL_DEV(  0x052b, 0x1801, 0x0100, 0x0100,
@@ -281,9 +274,32 @@ UNUSUAL_DEV(  0x052b, 0x1801, 0x0100, 0x0100,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_IGNORE_RESIDUE ),
 
+/* Another Yakumo camera.
+ * Reported by Michele Alzetta <michele.alzetta@aliceposta.it> */
+UNUSUAL_DEV(  0x052b, 0x1804, 0x0100, 0x0100,
+		"Tekom Technologies, Inc",
+		"300_CAMERA",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
+
+/* Reported by Iacopo Spalletti <avvisi@spalletti.it> */
+UNUSUAL_DEV(  0x052b, 0x1807, 0x0100, 0x0100,
+		"Tekom Technologies, Inc",
+		"300_CAMERA",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
+
 /* Yakumo Mega Image 47
  * Reported by Bjoern Paetzel <kolrabi@kolrabi.de> */
 UNUSUAL_DEV(  0x052b, 0x1905, 0x0100, 0x0100,
+		"Tekom Technologies, Inc",
+		"400_CAMERA",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
+
+/* Reported by Paul Ortyl <ortylp@3miasto.net>
+ * Note that it's similar to the device above, only different prodID */
+UNUSUAL_DEV(  0x052b, 0x1911, 0x0100, 0x0100,
 		"Tekom Technologies, Inc",
 		"400_CAMERA",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,

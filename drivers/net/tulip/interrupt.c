@@ -14,10 +14,10 @@
 
 */
 
+#include <linux/pci.h>
 #include "tulip.h"
 #include <linux/config.h>
 #include <linux/etherdevice.h>
-#include <linux/pci.h>
 
 int tulip_rx_copybreak;
 unsigned int tulip_max_interrupt_work;

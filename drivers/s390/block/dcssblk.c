@@ -140,7 +140,7 @@ dcssblk_get_device_by_name(char *name)
 }
 
 /*
- * print appropriate error message for segment_load()/segment_info()
+ * print appropriate error message for segment_load()/segment_type()
  * return code
  */
 static void
@@ -179,6 +179,10 @@ dcssblk_segment_warn(int rc, char* seg_name)
 		PRINT_WARN("cannot load/query segment %s, out of memory\n",
 			   seg_name);
 		break;
+	case -ERANGE:
+		PRINT_WARN("cannot load/query segment %s, exceeds kernel "
+			   "mapping range\n", seg_name);
+		break;
 	default:
 		PRINT_WARN("cannot load/query segment %s, return value %i\n",
 			   seg_name, rc);
@@ -214,57 +218,50 @@ dcssblk_shared_store(struct device *dev, const char *inbuf, size_t count)
 	if (atomic_read(&dev_info->use_count)) {
 		PRINT_ERR("share: segment %s is busy!\n",
 			  dev_info->segment_name);
-		up_write(&dcssblk_devices_sem);
-		return -EBUSY;
-	}
-	if ((inbuf[0] == '1') && (dev_info->is_shared == 1)) {
-		PRINT_WARN("Segment %s already loaded in shared mode!\n",
-			   dev_info->segment_name);
-		up_write(&dcssblk_devices_sem);
-		return count;
-	}
-	if ((inbuf[0] == '0') && (dev_info->is_shared == 0)) {
-		PRINT_WARN("Segment %s already loaded in exclusive mode!\n",
-			   dev_info->segment_name);
-		up_write(&dcssblk_devices_sem);
-		return count;
+		rc = -EBUSY;
+		goto out;
 	}
 	if (inbuf[0] == '1') {
 		// reload segment in shared mode
-		segment_unload(dev_info->segment_name);
-		rc = segment_load(dev_info->segment_name, SEGMENT_SHARED,
-					&dev_info->start, &dev_info->end);
+		rc = segment_modify_shared(dev_info->segment_name,
+					   SEGMENT_SHARED);
 		if (rc < 0) {
-			dcssblk_segment_warn(rc, dev_info->segment_name);
-			goto removeseg;
+			BUG_ON(rc == -EINVAL);
+			if (rc == -EIO || rc == -ENOENT)
+				goto removeseg;
+		} else {
+			dev_info->is_shared = 1;
+			switch (dev_info->segment_type) {
+				case SEG_TYPE_SR:
+				case SEG_TYPE_ER:
+				case SEG_TYPE_SC:
+					set_disk_ro(dev_info->gd,1);
+			}
 		}
-		dev_info->is_shared = 1;
-		if (rc == SEG_TYPE_SR || rc == SEG_TYPE_ER || rc == SEG_TYPE_SC)
-			set_disk_ro(dev_info->gd, 1);
 	} else if (inbuf[0] == '0') {
 		// reload segment in exclusive mode
 		if (dev_info->segment_type == SEG_TYPE_SC) {
 			PRINT_ERR("Segment type SC (%s) cannot be loaded in "
 				  "non-shared mode\n", dev_info->segment_name);
-			up_write(&dcssblk_devices_sem);
-			return -EINVAL;
+			rc = -EINVAL;
+			goto out;
 		}
-		segment_unload(dev_info->segment_name);
-		rc = segment_load(dev_info->segment_name, SEGMENT_EXCLUSIVE,
-					&dev_info->start, &dev_info->end);
+		rc = segment_modify_shared(dev_info->segment_name,
+					   SEGMENT_EXCLUSIVE);
 		if (rc < 0) {
-			dcssblk_segment_warn(rc, dev_info->segment_name);
-			goto removeseg;
+			BUG_ON(rc == -EINVAL);
+			if (rc == -EIO || rc == -ENOENT)
+				goto removeseg;
+		} else {
+			dev_info->is_shared = 0;
+			set_disk_ro(dev_info->gd, 0);
 		}
-		dev_info->is_shared = 0;
-		set_disk_ro(dev_info->gd, 0);
 	} else {
-		up_write(&dcssblk_devices_sem);
 		PRINT_WARN("Invalid value, must be 0 or 1\n");
-		return -EINVAL;
+		rc = -EINVAL;
+		goto out;
 	}
 	rc = count;
-	up_write(&dcssblk_devices_sem);
 	goto out;
 
 removeseg:
@@ -278,8 +275,8 @@ removeseg:
 	put_disk(dev_info->gd);
 	device_unregister(dev);
 	put_device(dev);
-	up_write(&dcssblk_devices_sem);
 out:
+	up_write(&dcssblk_devices_sem);
 	return rc;
 }
 

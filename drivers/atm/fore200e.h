@@ -520,7 +520,7 @@ typedef struct cp_cmdq_entry {
 /* host resident transmit queue entry */
 
 typedef struct host_txq_entry {
-    struct cp_txq_entry*    cp_entry;    /* addr of cp resident tx queue entry       */
+    struct cp_txq_entry __iomem *cp_entry;    /* addr of cp resident tx queue entry       */
     enum   status*          status;      /* addr of host resident status             */
     struct tpd*             tpd;         /* addr of transmit PDU descriptor          */
     u32                     tpd_dma;     /* DMA address of tpd                       */
@@ -535,7 +535,7 @@ typedef struct host_txq_entry {
 /* host resident receive queue entry */
 
 typedef struct host_rxq_entry {
-    struct cp_rxq_entry* cp_entry;    /* addr of cp resident rx queue entry */
+    struct cp_rxq_entry __iomem *cp_entry;    /* addr of cp resident rx queue entry */
     enum   status*       status;      /* addr of host resident status       */
     struct rpd*          rpd;         /* addr of receive PDU descriptor     */
     u32                  rpd_dma;     /* DMA address of rpd                 */
@@ -545,7 +545,7 @@ typedef struct host_rxq_entry {
 /* host resident buffer supply queue entry */
 
 typedef struct host_bsq_entry {
-    struct cp_bsq_entry* cp_entry;         /* addr of cp resident buffer supply queue entry */
+    struct cp_bsq_entry __iomem *cp_entry;         /* addr of cp resident buffer supply queue entry */
     enum   status*       status;           /* addr of host resident status                  */
     struct rbd_block*    rbd_block;        /* addr of receive buffer descriptor block       */
     u32                  rbd_block_dma;    /* DMA address od rdb                            */
@@ -555,7 +555,7 @@ typedef struct host_bsq_entry {
 /* host resident command queue entry */
 
 typedef struct host_cmdq_entry {
-    struct cp_cmdq_entry* cp_entry;    /* addr of cp resident cmd queue entry */
+    struct cp_cmdq_entry __iomem *cp_entry;    /* addr of cp resident cmd queue entry */
     enum status *status;	       /* addr of host resident status        */
 } host_cmdq_entry_t;
 
@@ -772,18 +772,18 @@ typedef enum fore200e_state {
 /* PCA-200E registers */
 
 typedef struct fore200e_pca_regs {
-    volatile u32* hcr;    /* address of host control register        */
-    volatile u32* imr;    /* address of host interrupt mask register */
-    volatile u32* psr;    /* address of PCI specific register        */
+    volatile u32 __iomem * hcr;    /* address of host control register        */
+    volatile u32 __iomem * imr;    /* address of host interrupt mask register */
+    volatile u32 __iomem * psr;    /* address of PCI specific register        */
 } fore200e_pca_regs_t;
 
 
 /* SBA-200E registers */
 
 typedef struct fore200e_sba_regs {
-    volatile u32* hcr;    /* address of host control register              */
-    volatile u32* bsr;    /* address of burst transfer size register       */
-    volatile u32* isr;    /* address of interrupt level selection register */
+    volatile u32 __iomem *hcr;    /* address of host control register              */
+    volatile u32 __iomem *bsr;    /* address of burst transfer size register       */
+    volatile u32 __iomem *isr;    /* address of interrupt level selection register */
 } fore200e_sba_regs_t;
 
 
@@ -807,8 +807,8 @@ typedef struct fore200e_bus {
     int                  status_alignment;    /* status words DMA alignment requirement */
     const unsigned char* fw_data;             /* address of firmware data start         */
     const unsigned int*  fw_size;             /* address of firmware data size          */
-    u32                  (*read)(volatile u32*);
-    void                 (*write)(u32, volatile u32*);
+    u32                  (*read)(volatile u32 __iomem *);
+    void                 (*write)(u32, volatile u32 __iomem *);
     u32                  (*dma_map)(struct fore200e*, void*, int, int);
     void                 (*dma_unmap)(struct fore200e*, u32, int, int);
     void                 (*dma_sync_for_cpu)(struct fore200e*, u32, int, int);
@@ -852,12 +852,12 @@ typedef struct fore200e {
     void*                      bus_dev;                /* bus-specific kernel data           */
     int                        irq;                    /* irq number                         */
     unsigned long              phys_base;              /* physical base address              */
-    void*                      virt_base;              /* virtual base address               */
+    void __iomem *             virt_base;              /* virtual base address               */
     
     unsigned char              esi[ ESI_LEN ];         /* end system identifier              */
 
-    struct cp_monitor*         cp_monitor;             /* i960 monitor address               */
-    struct cp_queues*          cp_queues;              /* cp resident queues                 */
+    struct cp_monitor __iomem *         cp_monitor;    /* i960 monitor address               */
+    struct cp_queues __iomem *          cp_queues;              /* cp resident queues                 */
     struct host_cmdq           host_cmdq;              /* host resident cmd queue            */
     struct host_txq            host_txq;               /* host resident tx queue             */
     struct host_rxq            host_rxq;               /* host resident rx queue             */

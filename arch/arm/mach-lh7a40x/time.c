@@ -71,5 +71,5 @@ static void __init lh7a40x_timer_init(void)
 }
 
 struct sys_timer lh7a40x_timer = {
-	.init		= &lh7a40x_timer,
+	.init		= &lh7a40x_timer_init,
 };

@@ -1919,11 +1919,11 @@ static int diva_strace_read_int  (diva_man_var_header_t* pVar, int* var) {
 			break;
 
 		case 2:
-			value = (short)READ_WORD(ptr);
+			value = (short)GET_WORD(ptr);
 			break;
 
 		case 4:
-			value = (int)READ_DWORD(ptr);
+			value = (int)GET_DWORD(ptr);
 			break;
 
 		default:
@@ -1947,16 +1947,16 @@ static int diva_strace_read_uint (diva_man_var_header_t* pVar, dword* var) {
 			break;
 
 		case 2:
-			value = (word)READ_WORD(ptr);
+			value = (word)GET_WORD(ptr);
 			break;
 
 		case 3:
-			value  = (dword)READ_DWORD(ptr);
+			value  = (dword)GET_DWORD(ptr);
 			value &= 0x00ffffff;
 			break;
 
 		case 4:
-			value = (dword)READ_DWORD(ptr);
+			value = (dword)GET_DWORD(ptr);
 			break;
 
 		default:

@@ -346,17 +346,17 @@ struct cs_card {
 	u32 irq;
 	
 	/* mappings */
-	void *ba0;
+	void __iomem *ba0;
 	union
 	{
 		struct
 		{
-			u8 *data0;
-			u8 *data1;
-			u8 *pmem;
-			u8 *reg;
+			u8 __iomem *data0;
+			u8 __iomem *data1;
+			u8 __iomem *pmem;
+			u8 __iomem *reg;
 		} name;
-		u8 *idx[4];
+		u8 __iomem *idx[4];
 	} ba1;
 	
 	/* Function support */
@@ -4309,7 +4309,7 @@ static int __init cs_ac97_init(struct cs_card *card)
 static void cs461x_download_image(struct cs_card *card)
 {
     unsigned i, j, temp1, temp2, offset, count;
-    unsigned char *pBA1 = ioremap(card->ba1_addr, 0x40000);
+    unsigned char __iomem *pBA1 = ioremap(card->ba1_addr, 0x40000);
     for( i=0; i < CLEAR__COUNT; i++)
     {
         offset = ClrStat[i].BA1__DestByteOffset;

@@ -49,4 +49,15 @@ config MMC_PXA
 
 	  If unsure, say N.
 
+config MMC_WBSD
+	tristate "Winbond W83L51xD SD/MMC Card Interface support"
+	depends on MMC
+	help
+	  This selects the Winbond(R) W83L51xD Secure digital and
+          Multimedia card Interface.
+	  If you have a machine with a integrated W83L518D or W83L519D
+	  SD/MMC card reader, say Y or M here.
+
+	  If unsure, say N.
+
 endmenu

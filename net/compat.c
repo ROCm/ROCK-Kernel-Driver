@@ -22,6 +22,7 @@
 #include <linux/filter.h>
 #include <linux/compat.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
+#include <linux/security.h>
 
 #include <net/scm.h>
 #include <net/sock.h>
@@ -123,6 +124,12 @@ int verify_compat_iovec(struct msghdr *kern_msg, struct iovec *kern_iov,
 	 (struct compat_cmsghdr __user *)((msg)->msg_control) :		\
 	 (struct compat_cmsghdr __user *)NULL)
 
+#define CMSG_COMPAT_OK(ucmlen, ucmsg, mhdr) \
+	((ucmlen) >= sizeof(struct cmsghdr) && \
+	 (ucmlen) <= (unsigned long) \
+	 ((mhdr)->msg_controllen - \
+	  ((char *)(ucmsg) - (char *)(mhdr)->msg_control)))
+
 static inline struct compat_cmsghdr __user *cmsg_compat_nxthdr(struct msghdr *msg,
 		struct compat_cmsghdr __user *cmsg, int cmsg_len)
 {
@@ -153,11 +160,7 @@ int cmsghdr_from_user_compat_to_kern(struct msghdr *kmsg,
 			return -EFAULT;
 
 		/* Catch bogons. */
-		if(CMSG_COMPAT_ALIGN(ucmlen) <
-		   CMSG_COMPAT_ALIGN(sizeof(struct compat_cmsghdr)))
-			return -EINVAL;
-		if((unsigned long)(((char __user *)ucmsg - (char __user *)kmsg->msg_control)
-				   + ucmlen) > kmsg->msg_controllen)
+		if (!CMSG_COMPAT_OK(ucmlen, ucmsg, kmsg))
 			return -EINVAL;
 
 		tmp = ((ucmlen - CMSG_COMPAT_ALIGN(sizeof(*ucmsg))) +
@@ -264,6 +267,9 @@ void scm_detach_fds_compat(struct msghdr *kmsg, struct scm_cookie *scm)
 
 	for (i = 0, cmfptr = (int __user *) CMSG_COMPAT_DATA(cm); i < fdmax; i++, cmfptr++) {
 		int new_fd;
+		err = security_file_receive(fp[i]);
+		if (err)
+			break;
 		err = get_unused_fd();
 		if (err < 0)
 			break;

@@ -221,7 +221,8 @@ struct cs4281_state {
 
 	// hardware resources 
 	unsigned int pBA0phys, pBA1phys;
-	char *pBA0, *pBA1;
+	char __iomem *pBA0;
+	char __iomem *pBA1;
 	unsigned int irq;
 
 	// mixer registers 

@@ -28,7 +28,7 @@
  * shift operation instead of having to map the IRQ number to
  * a HW IRQ number.
  */
-#define	IRQ_IXP2000_SWI			0 /* soft interrupt */
+#define	IRQ_IXP2000_SOFT_INT		0 /* soft interrupt */
 #define	IRQ_IXP2000_ERRSUM		1 /* OR of all bits in ErrorStatus reg*/
 #define	IRQ_IXP2000_UART		2
 #define	IRQ_IXP2000_GPIO		3
@@ -46,13 +46,12 @@
 #define	IRQ_IXP2000_PCI   		15 /* PCI INTA or INTB */
 #define	IRQ_IXP2000_THDA0   		16 /* thread 0-31A */
 #define	IRQ_IXP2000_THDA1  		17 /* thread 32-63A */
-#define	IRQ_IXP2000_THDA2		18 /* thread 64-95A */
-#define	IRQ_IXP2000_THDA3 		19 /* thread 96-127A */
-#define	IRQ_IXP2000_THDB0		24 /* thread 0-31 B */
+#define	IRQ_IXP2000_THDA2		18 /* thread 64-95A, IXP2800 only */
+#define	IRQ_IXP2000_THDA3 		19 /* thread 96-127A, IXP2800 only */
+#define	IRQ_IXP2000_THDB0		24 /* thread 0-31B */
 #define	IRQ_IXP2000_THDB1		25 /* thread 32-63B */
-/* only 64 threads supported for IXP2400, rest or for IXP2800*/
-#define	IRQ_IXP2000_THDB2		26 /* thread 64-95B */
-#define	IRQ_IXP2000_THDB3		27 /* thread 96-127B */
+#define	IRQ_IXP2000_THDB2		26 /* thread 64-95B, IXP2800 only */
+#define	IRQ_IXP2000_THDB3		27 /* thread 96-127B, IXP2800 only */
 
 /* define generic GPIOs */
 #define IRQ_IXP2000_GPIO0		32
@@ -68,22 +67,7 @@
 #define IRQ_IXP2000_PCIA		40
 #define IRQ_IXP2000_PCIB		41
 
-/* Int sources from IRQ_ERROR_STATUS */
-#define IRQ_IXP2000_DRAM0_MIN_ERR	42
-#define IRQ_IXP2000_DRAM0_MAJ_ERR	43
-#define IRQ_IXP2000_DRAM1_MIN_ERR	44
-#define IRQ_IXP2000_DRAM1_MAJ_ERR	45
-#define IRQ_IXP2000_DRAM2_MIN_ERR	46
-#define IRQ_IXP2000_DRAM2_MAJ_ERR	47
-#define IRQ_IXP2000_SRAM0_ERR		48
-#define IRQ_IXP2000_SRAM1_ERR		49
-#define IRQ_IXP2000_SRAM2_ERR           50
-#define IRQ_IXP2000_SRAM3_ERR		51
-#define IRQ_IXP2000_MEDIA_ERR		52
-#define IRQ_IXP2000_PCI_ERR		53
-#define IRQ_IXP2000_SP_INT		54
-
-#define NR_IXP2000_IRQS                 55
+#define NR_IXP2000_IRQS                 42
 
 #define	IXP2000_BOARD_IRQ(x)		(NR_IXP2000_IRQS + (x))
 

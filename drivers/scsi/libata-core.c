@@ -582,7 +582,7 @@ static const char * xfer_mode_str[] = {
 
 /**
  *	ata_udma_string - convert UDMA bit offset to string
- *	@udma_mask: mask of bits supported; only highest bit counts.
+ *	@mask: mask of bits supported; only highest bit counts.
  *
  *	Determine string which represents the highest speed
  *	(highest bit in @udma_mask).
@@ -819,7 +819,7 @@ static u8 ata_dev_try_classify(struct ata_port *ap, unsigned int device)
 
 /**
  *	ata_dev_id_string - Convert IDENTIFY DEVICE page into string
- *	@dev: Device whose IDENTIFY DEVICE results we will examine
+ *	@id: IDENTIFY DEVICE results we will examine
  *	@s: string into which data is output
  *	@ofs: offset into identify device page
  *	@len: length of string to return. must be an even number.
@@ -1766,8 +1766,10 @@ static int fgb(u32 bitmap)
 }
 
 /**
- *	ata_choose_xfer_mode -
- *	@ap:
+ *	ata_choose_xfer_mode - attempt to find best transfer mode
+ *	@ap: Port for which an xfer mode will be selected
+ *	@xfer_mode_out: (output) SET FEATURES - XFER MODE code
+ *	@xfer_shift_out: (output) bit shift that selects this mode
  *
  *	LOCKING:
  *
@@ -1948,8 +1950,6 @@ void ata_sg_init_one(struct ata_queued_cmd *qc, void *buf, unsigned int buflen)
 	sg->page = virt_to_page(buf);
 	sg->offset = (unsigned long) buf & ~PAGE_MASK;
 	sg_dma_len(sg) = buflen;
-
-	WARN_ON(buflen > PAGE_SIZE);
 }
 
 void ata_sg_init(struct ata_queued_cmd *qc, struct scatterlist *sg,
@@ -2691,6 +2691,30 @@ void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
 	VPRINTK("EXIT\n");
 }
 
+static inline int ata_should_dma_map(struct ata_queued_cmd *qc)
+{
+	struct ata_port *ap = qc->ap;
+
+	switch (qc->tf.protocol) {
+	case ATA_PROT_DMA:
+	case ATA_PROT_ATAPI_DMA:
+		return 1;
+
+	case ATA_PROT_ATAPI:
+	case ATA_PROT_PIO:
+	case ATA_PROT_PIO_MULT:
+		if (ap->flags & ATA_FLAG_PIO_DMA)
+			return 1;
+
+		/* fall through */
+	
+	default:
+		return 0;
+	}
+
+	/* never reached */
+}
+
 /**
  *	ata_qc_issue - issue taskfile to device
  *	@qc: command to issue to device
@@ -2711,12 +2735,16 @@ int ata_qc_issue(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 
-	if (qc->flags & ATA_QCFLAG_SG) {
-		if (ata_sg_setup(qc))
-			goto err_out;
-	} else if (qc->flags & ATA_QCFLAG_SINGLE) {
-		if (ata_sg_setup_one(qc))
-			goto err_out;
+	if (ata_should_dma_map(qc)) {
+		if (qc->flags & ATA_QCFLAG_SG) {
+			if (ata_sg_setup(qc))
+				goto err_out;
+		} else if (qc->flags & ATA_QCFLAG_SINGLE) {
+			if (ata_sg_setup_one(qc))
+				goto err_out;
+		}
+	} else {
+		qc->flags &= ~ATA_QCFLAG_DMAMAP;
 	}
 
 	ap->ops->qc_prep(qc);

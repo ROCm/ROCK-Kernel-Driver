@@ -246,7 +246,7 @@ static int i2o_cfg_swdl(unsigned long arg)
 	struct i2o_sw_xfer __user *pxfer = (struct i2o_sw_xfer __user *)arg;
 	unsigned char maxfrag = 0, curfrag = 1;
 	struct i2o_dma buffer;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	unsigned int status = 0, swlen = 0, fragsize = 8192;
 	struct i2o_controller *c;
@@ -320,7 +320,7 @@ static int i2o_cfg_swul(unsigned long arg)
 	struct i2o_sw_xfer __user *pxfer = (struct i2o_sw_xfer __user *)arg;
 	unsigned char maxfrag = 0, curfrag = 1;
 	struct i2o_dma buffer;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	unsigned int status = 0, swlen = 0, fragsize = 8192;
 	struct i2o_controller *c;
@@ -400,7 +400,7 @@ static int i2o_cfg_swdel(unsigned long arg)
 	struct i2o_controller *c;
 	struct i2o_sw_xfer kxfer;
 	struct i2o_sw_xfer __user *pxfer = (struct i2o_sw_xfer __user *)arg;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	unsigned int swlen;
 	int token;
@@ -445,7 +445,7 @@ static int i2o_cfg_validate(unsigned long arg)
 {
 	int token;
 	int iop = (int)arg;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	struct i2o_controller *c;
 
@@ -476,7 +476,7 @@ static int i2o_cfg_validate(unsigned long arg)
 
 static int i2o_cfg_evt_reg(unsigned long arg, struct file *fp)
 {
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	struct i2o_evt_id __user *pdesc = (struct i2o_evt_id __user *)arg;
 	struct i2o_evt_id kdesc;
@@ -777,7 +777,7 @@ static int i2o_cfg_passthru(unsigned long arg)
 	u32 i = 0;
 	void *p = NULL;
 	i2o_status_block *sb;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	unsigned int iop;
 

@@ -61,12 +61,12 @@ void __init setup_replication_mask(int maxnodes)
 
 static __init void set_ktext_source(nasid_t client_nasid, nasid_t server_nasid)
 {
-	kern_vars_t *kvp;
 	cnodeid_t client_cnode;
+	kern_vars_t *kvp;
 
 	client_cnode = NASID_TO_COMPACT_NODEID(client_nasid);
 
-	kvp = &(HUB_DATA(client_nasid)->kern_vars);
+	kvp = &hub_data(client_nasid)->kern_vars;
 
 	KERN_VARS_ADDR(client_nasid) = (unsigned long)kvp;
 

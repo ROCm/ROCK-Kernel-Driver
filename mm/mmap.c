@@ -744,12 +744,12 @@ void __vm_stat_account(struct mm_struct *mm, unsigned long flags,
 	}
 #endif /* CONFIG_HUGETLB */
 
-	if (file)
+	if (file) {
 		mm->shared_vm += pages;
-	else if (flags & stack_flags)
+		if ((flags & (VM_EXEC|VM_WRITE)) == VM_EXEC)
+			mm->exec_vm += pages;
+	} else if (flags & stack_flags)
 		mm->stack_vm += pages;
-	if (flags & VM_EXEC)
-		mm->exec_vm += pages;
 	if (flags & (VM_RESERVED|VM_IO))
 		mm->reserved_vm += pages;
 }
@@ -1871,7 +1871,7 @@ void exit_mmap(struct mm_struct *mm)
  * and into the inode's i_mmap tree.  If vm_file is non-NULL
  * then i_mmap_lock is taken here.
  */
-void insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
+int insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
 {
 	struct vm_area_struct * __vma, * prev;
 	struct rb_node ** rb_link, * rb_parent;
@@ -1894,8 +1894,9 @@ void insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
 	}
 	__vma = find_vma_prepare(mm,vma->vm_start,&prev,&rb_link,&rb_parent);
 	if (__vma && __vma->vm_start < vma->vm_end)
-		BUG();
+		return -ENOMEM;
 	vma_link(mm, vma, prev, rb_link, rb_parent);
+	return 0;
 }
 
 /*

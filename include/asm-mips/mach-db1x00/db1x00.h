@@ -29,6 +29,7 @@
 
 #ifdef CONFIG_MIPS_DB1550
 #define BCSR_KSEG1_ADDR 0xAF000000
+#define NAND_PHYS_ADDR  0x20000000
 #else
 #define BCSR_KSEG1_ADDR 0xAE000000
 #endif
@@ -130,15 +131,6 @@ typedef volatile struct
 #define SET_VCC_VPP(VCC, VPP, SLOT)\
 	((((VCC)<<2) | ((VPP)<<0)) << ((SLOT)*8))
 
-/* MTD CONFIG OPTIONS */
-#if defined(CONFIG_MTD_DB1X00_BOOT) && defined(CONFIG_MTD_DB1X00_USER)
-#define DB1X00_BOTH_BANKS
-#elif defined(CONFIG_MTD_DB1X00_BOOT) && !defined(CONFIG_MTD_DB1X00_USER)
-#define DB1X00_BOOT_ONLY
-#elif !defined(CONFIG_MTD_DB1X00_BOOT) && defined(CONFIG_MTD_DB1X00_USER)
-#define DB1X00_USER_ONLY
-#endif
-
 /* SD controller macros */
 /*
  * Detect card.
@@ -181,6 +173,30 @@ typedef volatile struct
 			au_sync(); \
 		} \
 	} while (0)
+
+
+/* NAND defines */
+/* Timing values as described in databook, * ns value stripped of
+ * lower 2 bits.
+ * These defines are here rather than an SOC1550 generic file because
+ * the parts chosen on another board may be different and may require
+ * different timings.
+ */
+#define NAND_T_H			(18 >> 2)
+#define NAND_T_PUL			(30 >> 2)
+#define NAND_T_SU			(30 >> 2)
+#define NAND_T_WH			(30 >> 2)
+
+/* Bitfield shift amounts */
+#define NAND_T_H_SHIFT		0
+#define NAND_T_PUL_SHIFT	4
+#define NAND_T_SU_SHIFT		8
+#define NAND_T_WH_SHIFT		12
+
+#define NAND_TIMING	((NAND_T_H   & 0xF)	<< NAND_T_H_SHIFT)   | \
+			((NAND_T_PUL & 0xF)	<< NAND_T_PUL_SHIFT) | \
+			((NAND_T_SU  & 0xF)	<< NAND_T_SU_SHIFT)  | \
+			((NAND_T_WH  & 0xF)	<< NAND_T_WH_SHIFT)
 
 #endif /* __ASM_DB1X00_H */
 

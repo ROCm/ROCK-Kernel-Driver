@@ -56,8 +56,7 @@ static int irq_affinity_write_proc(struct file *file, const char __user *buffer,
 		return -EINVAL;
 
 	irq_affinity[irq] = new_value;
-	irq_desc[irq].handler->set_affinity(irq,
-					cpumask_of_cpu(first_cpu(new_value)));
+	irq_desc[irq].handler->set_affinity(irq, new_value);
 
 	return full_count;
 }

@@ -4,6 +4,7 @@
 
 #include <linux/init.h>
 #include <linux/acpi.h>
+#include <linux/module.h>
 
 #include <acpi/acpi_drivers.h>
 #include <acpi/acinterp.h>	/* for acpi_ex_eisa_id_to_string() */
@@ -453,6 +454,7 @@ acpi_bus_register_driver (
 
 	return_VALUE(count);
 }
+EXPORT_SYMBOL(acpi_bus_register_driver);
 
 
 /**
@@ -481,6 +483,7 @@ acpi_bus_unregister_driver (
 		error = -EINVAL;
 	return_VALUE(error);
 }
+EXPORT_SYMBOL(acpi_bus_unregister_driver);
 
 /**
  * acpi_bus_find_driver 
@@ -761,7 +764,7 @@ void acpi_device_get_debug_info(struct acpi_device * device, acpi_handle handle,
 #endif /*CONFIG_ACPI_DEBUG_OUTPUT*/
 }
 
-static int 
+int 
 acpi_bus_add (
 	struct acpi_device	**child,
 	struct acpi_device	*parent,
@@ -905,7 +908,7 @@ end:
 
 	return_VALUE(result);
 }
-
+EXPORT_SYMBOL(acpi_bus_add);
 
 
 static int acpi_bus_scan (struct acpi_device	*start)
@@ -1009,6 +1012,7 @@ static int acpi_bus_scan (struct acpi_device	*start)
 
 	return_VALUE(0);
 }
+EXPORT_SYMBOL(acpi_bus_scan);
 
 
 static int

@@ -11,7 +11,7 @@ config MIPS64
 	  only select this option if you have hardware that actually has a
 	  64-bit processor and if your application will actually benefit from
 	  64-bit processing, otherwise say N.  You must say Y for kernels for
-	  SGI IP27 (Origin 200 and 2000).  If in doubt say N.
+	  SGI IP27 (Origin 200 and 2000) and SGI IP32 (O2).  If in doubt say N.
 
 config 64BIT
 	def_bool MIPS64
@@ -64,14 +64,6 @@ config OLIVETTI_M700
 	  This is a machine with a R4000 100 MHz CPU. To compile a Linux
 	  kernel that runs on these, say Y here. For details about Linux on
 	  the MIPS architecture, check out the Linux/MIPS FAQ on the WWW at
-	  <http://www.linux-mips.org/>.
-
-config BAGET_MIPS
-	bool "Support for BAGET MIPS series (EXPERIMENTAL)"
-	depends on MIPS32 && EXPERIMENTAL
-	help
-	  This enables support for the Baget, a Russian embedded system.  For
-	  more details about the Baget see the Linux/MIPS FAQ on
 	  <http://www.linux-mips.org/>.
 
 config MACH_VR41XX
@@ -146,6 +138,7 @@ config TOSHIBA_JMR3927
 	depends on MIPS32
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
+	select SWAP_IO_SPACE
 
 config MIPS_COBALT
 	bool "Support for Cobalt Server (EXPERIMENTAL)"
@@ -198,6 +191,7 @@ config MIPS_EV96100
 	select IRQ_CPU
 	select MIPS_GT96100
 	select RM7000_CPU_SCACHE
+	select SWAP_IO_SPACE
 	help
 	  This is an evaluation board based on the Galileo GT-96100 LAN/WAN
 	  communications controllers containing a MIPS R5000 compatible core
@@ -237,13 +231,6 @@ config LASAT_SYSCTL
 	bool "LASAT sysctl interface"
 	depends on LASAT
 
-config HP_LASERJET
-	bool "Support for Hewlett Packard LaserJet board"
-	depends on BROKEN
-	select DMA_NONCOHERENT
-	select HW_HAS_PCI
-	select IRQ_CPU
-
 config MIPS_ITE8172
 	bool "Support for ITE 8172G board"
 	select DMA_NONCOHERENT
@@ -268,6 +255,7 @@ config MIPS_ATLAS
 	bool "Support for MIPS Atlas board"
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
+	select SWAP_IO_SPACE
 	help
 	  This enables support for the QED R5231-based MIPS Atlas evaluation
 	  board.
@@ -277,6 +265,7 @@ config MIPS_MALTA
 	select HAVE_STD_PC_SERIAL_PORT
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
+	select SWAP_IO_SPACE
 	help
 	  This enables support for the VR5000-based MIPS Malta evaluation
 	  board.
@@ -294,6 +283,7 @@ config MOMENCO_OCELOT
 	select IRQ_CPU
 	select IRQ_CPU_RM7K
 	select RM7000_CPU_SCACHE
+	select SWAP_IO_SPACE
 	help
 	  The Ocelot is a MIPS-based Single Board Computer (SBC) made by
 	  Momentum Computer <http://www.momenco.com/>.
@@ -306,6 +296,7 @@ config MOMENCO_OCELOT_G
 	select IRQ_CPU_RM7K
 	select PCI_MARVELL
 	select RM7000_CPU_SCACHE
+	select SWAP_IO_SPACE
 	help
 	  The Ocelot is a MIPS-based Single Board Computer (SBC) made by
 	  Momentum Computer <http://www.momenco.com/>.
@@ -318,9 +309,24 @@ config MOMENCO_OCELOT_C
 	select IRQ_MV64340
 	select PCI_MARVELL
 	select RM7000_CPU_SCACHE
+	select SWAP_IO_SPACE
 	help
 	  The Ocelot is a MIPS-based Single Board Computer (SBC) made by
 	  Momentum Computer <http://www.momenco.com/>.
+
+config MOMENCO_OCELOT_3
+	bool "Support for Momentum Ocelot-3 board"
+	select DMA_NONCOHERENT
+	select HW_HAS_PCI
+	select IRQ_CPU
+	select IRQ_CPU_RM7K
+	select IRQ_MV64340
+	select PCI_MARVELL
+	select RM7000_CPU_SCACHE
+	select SWAP_IO_SPACE
+	help
+	  The Ocelot-3 is based off Discovery III System Controller and
+	  PMC-Sierra Rm79000 core.
 
 config MOMENCO_JAGUAR_ATX
 	bool "Support for Momentum Jaguar board"
@@ -332,6 +338,7 @@ config MOMENCO_JAGUAR_ATX
 	select LIMITED_DMA
 	select PCI_MARVELL
 	select RM7000_CPU_SCACHE
+	select SWAP_IO_SPACE
 	help
 	  The Jaguar ATX is a MIPS-based Single Board Computer (SBC) made by
 	  Momentum Computer <http://www.momenco.com/>.
@@ -349,6 +356,7 @@ config PMC_YOSEMITE
 	select HW_HAS_PCI
 	select IRQ_CPU
 	select IRQ_CPU_RM7K
+	select SWAP_IO_SPACE
 	help
 	  Yosemite is an evaluation board for the RM9000x2 processor
 	  manufactured by PMC-Sierra
@@ -411,6 +419,7 @@ config SGI_IP22
 	select DMA_NONCOHERENT
 	select IP22_CPU_SCACHE
 	select IRQ_CPU
+	select SWAP_IO_SPACE
 	help
 	  This are the SGI Indy, Challenge S and Indigo2, as well as certain
 	  OEM variants like the Tandem CMN B006S. To compile a Linux kernel
@@ -421,6 +430,7 @@ config SGI_IP27
 	depends on MIPS64
 	select DMA_IP27
 	select HW_HAS_PCI
+	select PCI_DOMAINS
 	help
 	  This are the SGI Origin 200, Origin 2000 and Onyx 2 Graphics
 	  workstations.  To compile a Linux kernel that runs on these, say Y
@@ -462,9 +472,9 @@ config MAPPED_KERNEL
 	bool "Mapped kernel support"
 	depends on SGI_IP27
 	help
-	  Change the way a Linux kernel is loaded unto memory on a MIPS64
+	  Change the way a Linux kernel is loaded into memory on a MIPS64
 	  machine.  This is required in order to support text replication and
-	  NUMA.  If you need to undersatand it, read the source code.
+	  NUMA.  If you need to understand it, read the source code.
 
 config REPLICATE_KTEXT
 	bool "Kernel text replication support"
@@ -483,7 +493,7 @@ config REPLICATE_EXHANDLERS
 
 config SGI_IP32
 	bool "Support for SGI IP32 (O2) (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
+	depends on MIPS64 && EXPERIMENTAL
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
 	select R5000_CPU_SCACHE
@@ -529,24 +539,27 @@ config MIPS_PB1000
 	depends on SOC_AU1000
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
+	select SWAP_IO_SPACE
 
 config MIPS_PB1100
 	bool "PB1100 board"
 	depends on SOC_AU1100
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
+	select SWAP_IO_SPACE
 
 config MIPS_PB1500
 	bool "PB1500 board"
 	depends on SOC_AU1500
-	select DMA_NONCOHERENT
+	select DMA_COHERENT
 	select HW_HAS_PCI
 
 config MIPS_PB1550
 	bool "PB1550 board"
 	depends on SOC_AU1550
-	select DMA_NONCOHERENT
+	select DMA_COHERENT
 	select HW_HAS_PCI
+	select MIPS_DISABLE_OBSOLETE_IDE
 
 config MIPS_DB1000
 	bool "DB1000 board"
@@ -562,13 +575,16 @@ config MIPS_DB1100
 config MIPS_DB1500
 	bool "DB1500 board"
 	depends on SOC_AU1500
-	select DMA_NONCOHERENT
+	select DMA_COHERENT
 	select HW_HAS_PCI
+	select MIPS_DISABLE_OBSOLETE_IDE
 
 config MIPS_DB1550
 	bool "DB1550 board"
 	depends on SOC_AU1550
 	select HW_HAS_PCI
+	select DMA_COHERENT
+	select MIPS_DISABLE_OBSOLETE_IDE
 
 config MIPS_BOSPORUS
 	bool "Bosporus board"
@@ -596,6 +612,7 @@ config SIBYTE_SB1xxx_SOC
 	bool "Support for Broadcom BCM1xxx SOCs (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
 	select DMA_COHERENT
+	select SWAP_IO_SPACE
 
 choice
 	prompt "BCM1xxx SOC-based board"
@@ -817,7 +834,16 @@ config TOSHIBA_RBTX4927
 	depends on MIPS32
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
+	select I8259
 	select ISA
+	select SWAP_IO_SPACE
+	help
+	  This Toshiba board is based on the TX4927 processor. Say Y here to
+	  support this machine type
+
+config TOSHIBA_FPCIB0
+	bool "FPCIB0 Backplane Support"
+	depends on TOSHIBA_RBTX4927
 
 config RWSEM_GENERIC_SPINLOCK
 	bool
@@ -881,10 +907,13 @@ config MIPS_NILE4
 	depends on LASAT
 	default y
 
+config MIPS_DISABLE_OBSOLETE_IDE
+	bool
+
 config CPU_LITTLE_ENDIAN
 	bool "Generate little endian code"
-	default y if ACER_PICA_61 || CASIO_E55 || DDB5074 || DDB5476 || DDB5477 || MACH_DECSTATION || HP_LASERJET || IBM_WORKPAD || LASAT || MIPS_COBALT || MIPS_ITE8172 || MIPS_IVR || SOC_AU1X00 || NEC_OSPREY || OLIVETTI_M700 || SNI_RM200_PCI || VICTOR_MPC30X || ZAO_CAPCELLA
-	default n if BAGET_MIPS || MIPS_EV64120 || MIPS_EV96100 || MOMENCO_OCELOT || MOMENCO_OCELOT_G || SGI_IP22 || SGI_IP27 || SGI_IP32 || TOSHIBA_JMR3927
+	default y if ACER_PICA_61 || CASIO_E55 || DDB5074 || DDB5476 || DDB5477 || MACH_DECSTATION || IBM_WORKPAD || LASAT || MIPS_COBALT || MIPS_ITE8172 || MIPS_IVR || SOC_AU1X00 || NEC_OSPREY || OLIVETTI_M700 || SNI_RM200_PCI || VICTOR_MPC30X || ZAO_CAPCELLA
+	default n if MIPS_EV64120 || MIPS_EV96100 || MOMENCO_OCELOT || MOMENCO_OCELOT_G || SGI_IP22 || SGI_IP27 || SGI_IP32 || TOSHIBA_JMR3927
 	help
 	  Some MIPS machines can be configured for either little or big endian
 	  byte order. These modes require different kernels. Say Y if your
@@ -934,8 +963,6 @@ config ITE_BOARD_GEN
 
 config SWAP_IO_SPACE
 	bool
-	depends on TOSHIBA_JMR3927 || TOSHIBA_RBTX4927 || SIBYTE_SB1xxx_SOC || SGI_IP22 || MOMENCO_OCELOT_C || MOMENCO_OCELOT_G || MOMENCO_OCELOT || MOMENCO_JAGUAR_ATX || MIPS_MALTA || MIPS_ATLAS || MIPS_EV96100 || MIPS_PB1100 || MIPS_PB1000
-	default y
 
 #
 # Unfortunately not all GT64120 systems run the chip at the same clock.
@@ -984,7 +1011,7 @@ config IT8712
 
 config BOOT_ELF32
 	bool
-	depends on MACH_DECSTATION || MIPS_ATLAS || MIPS_MALTA || MOMENCO_JAGUAR_ATX || SIBYTE_SB1xxx_SOC || SGI_IP32 || SGI_IP22 || SNI_RM200_PCI
+	depends on MACH_DECSTATION || MIPS_ATLAS || MIPS_MALTA || MOMENCO_JAGUAR_ATX || MOMENCO_OCELOT_3 || SIBYTE_SB1xxx_SOC || SGI_IP32 || SGI_IP22 || SNI_RM200_PCI
 	default y
 
 config MIPS_L1_CACHE_SHIFT
@@ -1032,11 +1059,6 @@ config FB
 	  running graphical applications that directly touch the hardware
 	  (e.g. an accelerated X server) and that are not frame buffer
 	  device-aware may cause unexpected results. If unsure, say N.
-
-config FB_G364
-	bool
-	depends on MIPS_MAGNUM_4000 || OLIVETTI_M700
-	default y
 
 config HAVE_STD_PC_SERIAL_PORT
 	bool
@@ -1156,9 +1178,9 @@ config CPU_R6000
 	  processors are extremly rare and the support for them is incomplete.
 
 config CPU_NEVADA
-	bool "R52xx"
+	bool "RM52xx"
 	help
-	  MIPS Technologies R52x0-series ("Nevada") processors.
+	  QED / PMC-Sierra RM52xx-series ("Nevada") processors.
 
 config CPU_R8000
 	bool "R8000"
@@ -1333,7 +1355,7 @@ config CPU_HAS_SYNC
 #
 config HIGHMEM
 	bool "High Memory Support"
-	depends on MIPS32 && (CPU_R3000 || CPU_SB1 || CPU_R7000 || CPU_RM9000 || CPU_R10000) && !(BAGET_MIPS || MACH_DECSTATION || MOMENCO_JAGUAR_ATX)
+	depends on MIPS32 && (CPU_R3000 || CPU_SB1 || CPU_R7000 || CPU_RM9000 || CPU_R10000) && !(MACH_DECSTATION || MOMENCO_JAGUAR_ATX)
 
 config SMP
 	bool "Multi-Processing support"
@@ -1420,6 +1442,10 @@ config PCI
 	  information about which PCI hardware does work under Linux and which
 	  doesn't.
 
+config PCI_DOMAINS
+	bool
+	depends on PCI
+
 source "drivers/pci/Kconfig"
 
 #
@@ -1486,9 +1512,24 @@ config TRAD_SIGNALS
 	bool
 	default y if MIPS32
 
+config BUILD_ELF64
+	bool "Use 64-bit ELF format for building"
+	depends on MIPS64
+	help
+	  A 64-bit kernel is usually built using the 64-bit ELF binary object
+	  format as it's one that allows arbitrary 64-bit constructs.  For
+	  kernels that are loaded within the KSEG compatibility segments the
+	  32-bit ELF format can optionally be used resulting in a somewhat
+	  smaller binary, but this option is not explicitly supported by the
+	  toolchain and since binutils 2.14 it does not even work at all.
+
+	  Say Y to use the 64-bit format or N to use the 32-bit one.
+
+	  If unsure say Y.
+
 config BINFMT_IRIX
 	bool "Include IRIX binary compatibility"
-	depends on !CPU_LITTLE_ENDIAN && MIPS32
+	depends on !CPU_LITTLE_ENDIAN && MIPS32 && BROKEN
 
 config MIPS32_COMPAT
 	bool "Kernel support for Linux/MIPS 32-bit binary compatibility"
@@ -1534,24 +1575,6 @@ config PM
 
 endmenu
 
-menu "MIPS initrd options"
-	depends on BLK_DEV_INITRD
-
-config EMBEDDED_RAMDISK
-	bool "Embed root filesystem ramdisk into the kernel"
-
-config EMBEDDED_RAMDISK_IMAGE
-	string "Filename of gziped ramdisk image"
-	depends on EMBEDDED_RAMDISK
-	default "ramdisk.gz"
-	help
-	  This is the filename of the ramdisk image to be built into the
-	  kernel.  Relative pathnames are relative to arch/mips/ramdisk/.
-	  The ramdisk image is not part of the kernel distribution; you must
-	  provide one yourself.
-
-endmenu
-
 source "drivers/Kconfig"
 
 source "fs/Kconfig"
@@ -1563,3 +1586,14 @@ source "security/Kconfig"
 source "crypto/Kconfig"
 
 source "lib/Kconfig"
+
+#
+# Use the generic interrupt handling code in kernel/irq/:
+#
+config GENERIC_HARDIRQS
+	bool
+	default y
+
+config GENERIC_IRQ_PROBE
+	bool
+	default y

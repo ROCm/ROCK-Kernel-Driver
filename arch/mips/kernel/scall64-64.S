@@ -18,6 +18,7 @@
 #include <asm/sysmips.h>
 #include <asm/thread_info.h>
 #include <asm/unistd.h>
+#include <asm/war.h>
 
 #ifndef CONFIG_BINFMT_ELF32
 /* Neither O32 nor N32, so define handle_sys here */
@@ -37,8 +38,7 @@ NESTED(handle_sys64, PT_SIZE, sp)
 	.set	at
 #endif
 
-FEXPORT(__handle_sys64)
-	subu	t0, v0, __NR_64_Linux	# check syscall number
+	dsubu	t0, v0, __NR_64_Linux	# check syscall number
 	sltiu	t0, t0,	__NR_64_Linux_syscalls + 1
 #if !defined(CONFIG_MIPS32_O32) && !defined(CONFIG_MIPS32_N32)
 	ld	t1, PT_EPC(sp)		# skip syscall on return
@@ -63,12 +63,12 @@ FEXPORT(__handle_sys64)
 	sd	t0, PT_R7(sp)		# set error flag
 	beqz	t0, 1f
 
-	negu	v0			# error
+	dnegu	v0			# error
 	sd	v0, PT_R0(sp)		# set flag for syscall
 					# restarting
 1:	sd	v0, PT_R2(sp)		# result
 
-syscall_exit:
+n64_syscall_exit:
 	local_irq_disable		# make sure need_resched and
 					# signals dont change between
 					# sampling and return
@@ -86,24 +86,25 @@ n64_syscall_exit_work:
 
 syscall_trace_entry:
 	SAVE_STATIC
-	sd	t2,PT_R1(sp)
+	move	s0, t2
 	move	a0, sp
 	li	a1, 0
 	jal	do_syscall_trace
-	ld	t2,PT_R1(sp)
 
 	ld	a0, PT_R4(sp)		# Restore argument registers
 	ld	a1, PT_R5(sp)
 	ld	a2, PT_R6(sp)
 	ld	a3, PT_R7(sp)
-	jalr	t2
+	ld	a4, PT_R8(sp)
+	ld	a5, PT_R9(sp)
+	jalr	s0
 
 	li	t0, -EMAXERRNO - 1	# error?
 	sltu	t0, t0, v0
 	sd	t0, PT_R7(sp)		# set error flag
 	beqz	t0, 1f
 
-	negu	v0			# error
+	dnegu	v0			# error
 	sd	v0, PT_R0(sp)		# set flag for syscall restarting
 1:	sd	v0, PT_R2(sp)		# result
 
@@ -115,7 +116,7 @@ illegal_syscall:
 	sd	v0, PT_R2(sp)
 	li	t0, 1				# set error flag
 	sd	t0, PT_R7(sp)
-	j	syscall_exit
+	j	n64_syscall_exit
 	END(handle_sys64)
 
 	LEAF(mips_atomic_set)
@@ -133,7 +134,11 @@ illegal_syscall:
 1:	ll	v0, (a1)
 	move	a0, a2
 2:	sc	a0, (a1)
+#if R10000_LLSC_WAR
+	beqzl	a0, 1b
+#else
 	beqz	a0, 1b
+#endif
 
 	.section __ex_table,"a"
 	PTR	1b, bad_stack
@@ -173,7 +178,7 @@ illegal_syscall:
 	and	t0, a2, t0
 	bnez	t0, 1f
 
-	b	syscall_exit
+	j	n64_syscall_exit
 
 1:	SAVE_STATIC
 	move	a0, sp
@@ -197,17 +202,6 @@ bad_alignment:
 	beq	a0, MIPS_ATOMIC_SET, mips_atomic_set
 	j	_sys_sysmips
 	END(sys_sysmips)
-
-	LEAF(sys_syscall)			/* Quick'n'dirty ... */
-	move	v0, a0
-	move	a0, a1
-	move	a1, a2
-	move	a2, a3
-	move	a3, a4
-	move	a4, a5
-	move	a5, a6
-	j	__handle_sys64
-	END(sys_syscall)
 
 	.align	3
 sys_call_table:
@@ -438,7 +432,7 @@ sys_call_table:
 	PTR	sys_clock_nanosleep
 	PTR	sys_tgkill			/* 5225 */
 	PTR	sys_utimes
-	PTR	sys_ni_syscall			/* sys_mbind */
+	PTR	sys_mbind
 	PTR	sys_ni_syscall			/* sys_get_mempolicy */
 	PTR	sys_ni_syscall			/* sys_set_mempolicy */
 	PTR	sys_mq_open			/* 5230 */
@@ -448,3 +442,8 @@ sys_call_table:
 	PTR	sys_mq_notify
 	PTR	sys_mq_getsetattr		/* 5235 */
 	PTR	sys_ni_syscall			/* sys_vserver */
+	PTR	sys_waitid
+	PTR	sys_ni_syscall			/* available, was setaltroot */
+	PTR	sys_add_key
+	PTR	sys_request_key			/* 5240 */
+	PTR	sys_keyctl

@@ -41,6 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include <linux/module.h>
 
 #include <acpi/acpi.h>
 
@@ -178,6 +179,7 @@ acpi_ut_debug_print (
 	va_start (args, format);
 	acpi_os_vprintf (format, args);
 }
+EXPORT_SYMBOL(acpi_ut_debug_print);
 
 
 /*****************************************************************************
@@ -219,6 +221,7 @@ acpi_ut_debug_print_raw (
 	va_start (args, format);
 	acpi_os_vprintf (format, args);
 }
+EXPORT_SYMBOL(acpi_ut_debug_print_raw);
 
 
 /*****************************************************************************
@@ -250,6 +253,7 @@ acpi_ut_trace (
 	acpi_ut_debug_print (ACPI_LV_FUNCTIONS, line_number, dbg_info,
 			"%s\n", acpi_gbl_fn_entry_str);
 }
+EXPORT_SYMBOL(acpi_ut_trace);
 
 
 /*****************************************************************************
@@ -378,6 +382,7 @@ acpi_ut_exit (
 
 	acpi_gbl_nesting_level--;
 }
+EXPORT_SYMBOL(acpi_ut_exit);
 
 
 /*****************************************************************************
@@ -418,6 +423,7 @@ acpi_ut_status_exit (
 
 	acpi_gbl_nesting_level--;
 }
+EXPORT_SYMBOL(acpi_ut_status_exit);
 
 
 /*****************************************************************************
@@ -451,6 +457,7 @@ acpi_ut_value_exit (
 
 	acpi_gbl_nesting_level--;
 }
+EXPORT_SYMBOL(acpi_ut_value_exit);
 
 
 /*****************************************************************************

@@ -733,6 +733,7 @@ static inline int copy_signal(unsigned long clone_flags, struct task_struct * ts
 	sig->group_exit_code = 0;
 	sig->group_exit_task = NULL;
 	sig->group_stop_count = 0;
+	sig->stop_state = 0;
 	sig->curr_target = NULL;
 	init_sigpending(&sig->shared_pending);
 	INIT_LIST_HEAD(&sig->posix_timers);

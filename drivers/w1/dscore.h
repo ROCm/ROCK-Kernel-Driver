@@ -151,23 +151,23 @@ struct ds_status
 
 };
 
-inline int ds_touch_bit(struct ds_device *, u8, u8 *);
-inline int ds_read_byte(struct ds_device *, u8 *);
-inline int ds_read_bit(struct ds_device *, u8 *);
-inline int ds_write_byte(struct ds_device *, u8);
-inline int ds_write_bit(struct ds_device *, u8);
-inline int ds_start_pulse(struct ds_device *, int);
-inline int ds_set_speed(struct ds_device *, int);
-inline int ds_reset(struct ds_device *, struct ds_status *);
-inline int ds_detect(struct ds_device *, struct ds_status *);
-inline int ds_stop_pulse(struct ds_device *, int);
-inline int ds_send_data(struct ds_device *, unsigned char *, int);
-inline int ds_recv_data(struct ds_device *, unsigned char *, int);
-inline int ds_recv_status(struct ds_device *, struct ds_status *);
-inline struct ds_device * ds_get_device(void);
-inline void ds_put_device(struct ds_device *);
-inline int ds_write_block(struct ds_device *, u8 *, int);
-inline int ds_read_block(struct ds_device *, u8 *, int);
+int ds_touch_bit(struct ds_device *, u8, u8 *);
+int ds_read_byte(struct ds_device *, u8 *);
+int ds_read_bit(struct ds_device *, u8 *);
+int ds_write_byte(struct ds_device *, u8);
+int ds_write_bit(struct ds_device *, u8);
+int ds_start_pulse(struct ds_device *, int);
+int ds_set_speed(struct ds_device *, int);
+int ds_reset(struct ds_device *, struct ds_status *);
+int ds_detect(struct ds_device *, struct ds_status *);
+int ds_stop_pulse(struct ds_device *, int);
+int ds_send_data(struct ds_device *, unsigned char *, int);
+int ds_recv_data(struct ds_device *, unsigned char *, int);
+int ds_recv_status(struct ds_device *, struct ds_status *);
+struct ds_device * ds_get_device(void);
+void ds_put_device(struct ds_device *);
+int ds_write_block(struct ds_device *, u8 *, int);
+int ds_read_block(struct ds_device *, u8 *, int);
 
 #endif /* __DSCORE_H */
 

@@ -68,6 +68,8 @@ To add: #define SO_REUSEPORT 0x0200	/* Allow local address and port reuse.  */
 
 #define SO_PEERSEC		30
 
+#ifdef __KERNEL__
+
 /** sock_type - Socket types
  *
  * Please notice that for binary compat reasons MIPS has to
@@ -93,6 +95,8 @@ enum sock_type {
 
 #define SOCK_MAX (SOCK_PACKET + 1)
 
-#define ARCH_HAS_SOCKET_TYPES
+#define ARCH_HAS_SOCKET_TYPES 1
+
+#endif /* __KERNEL__ */
 
 #endif /* _ASM_SOCKET_H */

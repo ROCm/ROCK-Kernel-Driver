@@ -103,7 +103,7 @@ static int __init init_l440gx(void)
 		/* Allocate the resource region */
 		if (pci_assign_resource(pm_dev, PIIXE_IOBASE_RESOURCE) != 0) {
 			printk(KERN_WARNING "Could not allocate pm iobase resource\n");
-			iounmap((void *)l440gx_map.virt);
+			iounmap(l440gx_map.virt);
 			return -ENXIO;
 		}
 	}
@@ -137,7 +137,7 @@ static int __init init_l440gx(void)
 		return 0;
 	}
 
-	iounmap((void *)l440gx_map.virt);
+	iounmap(l440gx_map.virt);
 	return -ENXIO;
 }
 
@@ -146,7 +146,7 @@ static void __exit cleanup_l440gx(void)
 	del_mtd_device(mymtd);
 	map_destroy(mymtd);
 	
-	iounmap((void *)l440gx_map.virt);
+	iounmap(l440gx_map.virt);
 }
 
 module_init(init_l440gx);

@@ -453,13 +453,13 @@ static twa_message_type twa_error_table[] = {
 
 /* Macros */
 #define TW_CONTROL_REG_ADDR(x) (x->base_addr)
-#define TW_STATUS_REG_ADDR(x) ((unsigned char *)x->base_addr + 0x4)
+#define TW_STATUS_REG_ADDR(x) ((unsigned char __iomem *)x->base_addr + 0x4)
 #if BITS_PER_LONG > 32
-#define TW_COMMAND_QUEUE_REG_ADDR(x) ((unsigned char *)x->base_addr + 0x20)
+#define TW_COMMAND_QUEUE_REG_ADDR(x) ((unsigned char __iomem *)x->base_addr + 0x20)
 #else
-#define TW_COMMAND_QUEUE_REG_ADDR(x) ((unsigned char *)x->base_addr + 0x8)
+#define TW_COMMAND_QUEUE_REG_ADDR(x) ((unsigned char __iomem *)x->base_addr + 0x8)
 #endif
-#define TW_RESPONSE_QUEUE_REG_ADDR(x) ((unsigned char *)x->base_addr + 0xC)
+#define TW_RESPONSE_QUEUE_REG_ADDR(x) ((unsigned char __iomem *)x->base_addr + 0xC)
 #define TW_CLEAR_ALL_INTERRUPTS(x) (writel(TW_STATUS_VALID_INTERRUPT, TW_CONTROL_REG_ADDR(x)))
 #define TW_CLEAR_ATTENTION_INTERRUPT(x) (writel(TW_CONTROL_CLEAR_ATTENTION_INTERRUPT, TW_CONTROL_REG_ADDR(x)))
 #define TW_CLEAR_HOST_INTERRUPT(x) (writel(TW_CONTROL_CLEAR_HOST_INTERRUPT, TW_CONTROL_REG_ADDR(x)))
@@ -655,7 +655,7 @@ typedef struct TAG_TW_Compatibility_Info
 } TW_Compatibility_Info;
 
 typedef struct TAG_TW_Device_Extension {
-	u32                     *base_addr;
+	u32                     __iomem *base_addr;
 	unsigned long	       	*generic_buffer_virt[TW_Q_LENGTH];
 	unsigned long	       	generic_buffer_phys[TW_Q_LENGTH];
 	TW_Command_Full	       	*command_packet_virt[TW_Q_LENGTH];

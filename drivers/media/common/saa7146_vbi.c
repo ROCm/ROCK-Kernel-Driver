@@ -91,7 +91,7 @@ static int vbi_workaround(struct saa7146_dev *dev)
 		saa7146_write(dev, MC2, MASK_04|MASK_20);
 	
 		/* enable rps1 irqs */
-		IER_ENABLE(dev,MASK_28);
+		SAA7146_IER_ENABLE(dev,MASK_28);
 
 		/* prepare to wait to be woken up by the irq-handler */
 		add_wait_queue(&vv->vbi_wq, &wait);
@@ -109,7 +109,7 @@ static int vbi_workaround(struct saa7146_dev *dev)
 		current->state = TASK_RUNNING;
 
 		/* disable rps1 irqs */
-		IER_DISABLE(dev,MASK_28);
+		SAA7146_IER_DISABLE(dev,MASK_28);
 
 		/* stop video-dma3 */
 		saa7146_write(dev, MC1, MASK_20);
@@ -130,7 +130,7 @@ static int vbi_workaround(struct saa7146_dev *dev)
 	return 0;
 }
 
-void saa7146_set_vbi_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, struct saa7146_buf *next)
+static void saa7146_set_vbi_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, struct saa7146_buf *next)
 {
 	struct saa7146_vv *vv = dev->vv_data;
 
@@ -190,7 +190,7 @@ void saa7146_set_vbi_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, s
 	WRITE_RPS1(CMD_STOP);					
 
 	/* enable rps1 irqs */
-	IER_ENABLE(dev, MASK_28);
+	SAA7146_IER_ENABLE(dev, MASK_28);
 
 	/* write the address of the rps-program */
 	saa7146_write(dev, RPS_ADDR1, dev->d_rps1.dma_handle);
@@ -325,7 +325,7 @@ static void vbi_stop(struct saa7146_fh *fh, struct file *file)
 	saa7146_write(dev, MC1, MASK_29);
 
 	/* disable rps1 irqs */
-	IER_DISABLE(dev, MASK_28);
+	SAA7146_IER_DISABLE(dev, MASK_28);
 
 	/* shut down dma 3 transfers */
 	saa7146_write(dev, MC1, MASK_20);

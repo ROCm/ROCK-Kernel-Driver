@@ -1020,7 +1020,9 @@ static void snd_intel8x0_setup_pcm_out(intel8x0_t *chip,
 			 */
 			if (cnt & ICH_PCM_246_MASK) {
 				iputdword(chip, ICHREG(GLOB_CNT), cnt & ~ICH_PCM_246_MASK);
+				spin_unlock_irq(&chip->reg_lock);
 				msleep(50); /* grrr... */
+				spin_lock_irq(&chip->reg_lock);
 			}
 		} else if (chip->device_type == DEVICE_INTEL_ICH4) {
 			if (runtime->sample_bits > 16)
@@ -1878,6 +1880,24 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.type = AC97_TUNE_HP_ONLY
 	},
 #endif
+	{
+		.vendor = 0x1028,
+		.device = 0x012d,
+		.name = "Dell Precision 450",	/* AD1981B*/
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x103c,
+		.device = 0x3008,
+		.name = "HP xw4200",	/* AD1981B*/
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x103c,
+		.device = 0x12f1,
+		.name = "HP xw8200",	/* AD1981B*/
+		.type = AC97_TUNE_HP_ONLY
+	},
 	{ } /* terminator */
 };
 
@@ -2261,6 +2281,7 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 	if (chip->remap_bmaddr)
 		iounmap(chip->remap_bmaddr);
 	pci_release_regions(chip->pci);
+	pci_disable_device(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -2279,6 +2300,7 @@ static int intel8x0_suspend(snd_card_t *card, unsigned int state)
 	for (i = 0; i < 3; i++)
 		if (chip->ac97[i])
 			snd_ac97_suspend(chip->ac97[i]);
+	pci_disable_device(chip->pci);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
@@ -2496,8 +2518,10 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 		return err;
 
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (chip == NULL)
+	if (chip == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	spin_lock_init(&chip->reg_lock);
 	spin_lock_init(&chip->ac97_lock);
 	chip->device_type = device_type;
@@ -2517,6 +2541,7 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 
 	if ((err = pci_request_regions(pci, card->shortname)) < 0) {
 		kfree(chip);
+		pci_disable_device(pci);
 		return err;
 	}
 

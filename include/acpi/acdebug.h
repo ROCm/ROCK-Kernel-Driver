@@ -386,11 +386,6 @@ void ACPI_SYSTEM_XFACE
 acpi_db_execute_thread (
 	void                            *context);
 
-acpi_status
-acpi_db_user_commands (
-	char                            prompt,
-	union acpi_parse_object         *op);
-
 void
 acpi_db_display_help (
 	char                            *help_type);

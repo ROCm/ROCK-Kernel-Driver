@@ -1305,11 +1305,11 @@ video_poll(struct file *file, struct poll_table_struct *wait)
                                 up(&fh->cap.lock);
                                 return POLLERR;
                         }
-                        if (0 != fh->cap.ops->buf_prepare(file->private_data,fh->cap.read_buf,fh->cap.field)) {
+                        if (0 != fh->cap.ops->buf_prepare(&fh->cap,fh->cap.read_buf,fh->cap.field)) {
                                 up(&fh->cap.lock);
                                 return POLLERR;
                         }
-                        fh->cap.ops->buf_queue(file->private_data,fh->cap.read_buf);
+                        fh->cap.ops->buf_queue(&fh->cap,fh->cap.read_buf);
                         fh->cap.read_off = 0;
 		}
 		up(&fh->cap.lock);
@@ -1346,7 +1346,7 @@ static int video_release(struct inode *inode, struct file *file)
 		res_free(dev,fh,RESOURCE_VIDEO);
 	}
 	if (fh->cap.read_buf) {
-		buffer_release(file->private_data,fh->cap.read_buf);
+		buffer_release(&fh->cap,fh->cap.read_buf);
 		kfree(fh->cap.read_buf);
 	}
 

@@ -95,13 +95,13 @@ dump_xlog_buffer (PISDN_ADAPTER IoAdapter, Xdesc *xlogDesc)
  DBG_FTL(("Microcode: %s", &IoAdapter->ProtocolIdString[0]))
  for ( ; logCnt > 0 ; --logCnt )
  {
-  if ( !READ_WORD(&Xlog[logOut]) )
+  if ( !GET_WORD(&Xlog[logOut]) )
   {
    if ( --logCnt == 0 )
     break ;
    logOut = 0 ;
   }
-  if ( READ_WORD(&Xlog[logOut]) <= (logOut * sizeof(*Xlog)) )
+  if ( GET_WORD(&Xlog[logOut]) <= (logOut * sizeof(*Xlog)) )
   {
    if ( logCnt > 2 )
    {
@@ -110,9 +110,9 @@ dump_xlog_buffer (PISDN_ADAPTER IoAdapter, Xdesc *xlogDesc)
    }
    break ;
   }
-  logLen = (dword)(READ_WORD(&Xlog[logOut]) - (logOut * sizeof(*Xlog))) ;
+  logLen = (dword)(GET_WORD(&Xlog[logOut]) - (logOut * sizeof(*Xlog))) ;
   DBG_FTL_MXLOG(( (char *)&Xlog[logOut + 1], (dword)(logLen - 2) ))
-  logOut = (READ_WORD(&Xlog[logOut]) + 1) / sizeof(*Xlog) ;
+  logOut = (GET_WORD(&Xlog[logOut]) + 1) / sizeof(*Xlog) ;
  }
  DBG_FTL(("%s: ***************** end of XLOG *****************",
           &IoAdapter->Name[0]))
@@ -154,10 +154,10 @@ char *(ExceptionCauseTable[]) =
  "VCED"
 } ;
 void
-dump_trap_frame (PISDN_ADAPTER IoAdapter, byte *exceptionFrame)
+dump_trap_frame (PISDN_ADAPTER IoAdapter, byte __iomem *exceptionFrame)
 {
- MP_XCPTC *xcept = (MP_XCPTC *)exceptionFrame ;
- dword    *regs;
+ MP_XCPTC __iomem *xcept = (MP_XCPTC __iomem *)exceptionFrame ;
+ dword    __iomem *regs;
  regs  = &xcept->regs[0] ;
  DBG_FTL(("%s: ***************** CPU TRAPPED *****************",
           &IoAdapter->Name[0]))
@@ -595,26 +595,22 @@ Trapped:
 byte mem_in (ADAPTER *a, void *addr)
 {
  byte val;
- volatile byte* Base;
-
- Base = (volatile byte *)DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
- val = *(Base + (unsigned long)addr);
+ volatile byte __iomem *Base = DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
+ val = READ_BYTE(Base + (unsigned long)addr);
  DIVA_OS_MEM_DETACH_RAM((PISDN_ADAPTER)a->io, Base);
  return (val);
 }
 word mem_inw (ADAPTER *a, void *addr)
 {
  word val;
- volatile byte* Base;
- 
- Base = (volatile byte*)DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
+ volatile byte __iomem *Base = DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
  val = READ_WORD((Base + (unsigned long)addr));
  DIVA_OS_MEM_DETACH_RAM((PISDN_ADAPTER)a->io, Base);
  return (val);
 }
 void mem_in_dw (ADAPTER *a, void *addr, dword* data, int dwords)
 {
- volatile byte* Base = (volatile byte*)DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
+ volatile byte __iomem * Base = DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
  while (dwords--) {
   *data++ = READ_DWORD((Base + (unsigned long)addr));
   addr+=4;
@@ -623,8 +619,8 @@ void mem_in_dw (ADAPTER *a, void *addr, dword* data, int dwords)
 }
 void mem_in_buffer (ADAPTER *a, void *addr, void *buffer, word length)
 {
- volatile byte* Base = (volatile byte*)DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
- memcpy (buffer, (void *)(Base + (unsigned long)addr), length);
+ volatile byte __iomem *Base = DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
+ memcpy_fromio(buffer, (Base + (unsigned long)addr), length);
  DIVA_OS_MEM_DETACH_RAM((PISDN_ADAPTER)a->io, Base);
 }
 void mem_look_ahead (ADAPTER *a, PBUFFER *RBuffer, ENTITY *e)
@@ -637,19 +633,19 @@ void mem_look_ahead (ADAPTER *a, PBUFFER *RBuffer, ENTITY *e)
 }
 void mem_out (ADAPTER *a, void *addr, byte data)
 {
- volatile byte* Base = (volatile byte*)DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
- *(Base + (unsigned long)addr) = data ;
+ volatile byte __iomem *Base = DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
+ WRITE_BYTE(Base + (unsigned long)addr, data);
  DIVA_OS_MEM_DETACH_RAM((PISDN_ADAPTER)a->io, Base);
 }
 void mem_outw (ADAPTER *a, void *addr, word data)
 {
- volatile byte* Base = (volatile byte*)DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
+ volatile byte __iomem * Base = DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
  WRITE_WORD((Base + (unsigned long)addr), data);
  DIVA_OS_MEM_DETACH_RAM((PISDN_ADAPTER)a->io, Base);
 }
 void mem_out_dw (ADAPTER *a, void *addr, const dword* data, int dwords)
 {
- volatile byte* Base = (volatile byte*)DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
+ volatile byte __iomem * Base = DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
  while (dwords--) {
 	WRITE_DWORD((Base + (unsigned long)addr), *data);
   	addr+=4;
@@ -659,15 +655,15 @@ void mem_out_dw (ADAPTER *a, void *addr, const dword* data, int dwords)
 }
 void mem_out_buffer (ADAPTER *a, void *addr, void *buffer, word length)
 {
- volatile byte* Base = (volatile byte*)DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
- memcpy ((void *)(Base + (unsigned long)addr), buffer, length) ;
+ volatile byte __iomem * Base = DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
+ memcpy_toio((Base + (unsigned long)addr), buffer, length) ;
  DIVA_OS_MEM_DETACH_RAM((PISDN_ADAPTER)a->io, Base);
 }
 void mem_inc (ADAPTER *a, void *addr)
 {
- volatile byte* Base = (volatile byte*)DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
- byte  x = *(Base + (unsigned long)addr);
- *(Base + (unsigned long)addr) = x + 1 ;
+ volatile byte __iomem *Base = DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
+ byte  x = READ_BYTE(Base + (unsigned long)addr);
+ WRITE_BYTE(Base + (unsigned long)addr, x + 1);
  DIVA_OS_MEM_DETACH_RAM((PISDN_ADAPTER)a->io, Base);
 }
 /*------------------------------------------------------------------*/
@@ -676,7 +672,7 @@ void mem_inc (ADAPTER *a, void *addr)
 byte io_in(ADAPTER * a, void * adr)
 {
   byte val;
-  byte *Port = (byte*)DIVA_OS_MEM_ATTACH_PORT((PISDN_ADAPTER)a->io);
+  byte __iomem *Port = DIVA_OS_MEM_ATTACH_PORT((PISDN_ADAPTER)a->io);
   outppw(Port + 4, (word)(unsigned long)adr);
   val = inpp(Port);
   DIVA_OS_MEM_DETACH_PORT((PISDN_ADAPTER)a->io, Port);
@@ -685,7 +681,7 @@ byte io_in(ADAPTER * a, void * adr)
 word io_inw(ADAPTER * a, void * adr)
 {
   word val;
-  byte *Port = (byte*)DIVA_OS_MEM_ATTACH_PORT((PISDN_ADAPTER)a->io);
+  byte __iomem *Port = DIVA_OS_MEM_ATTACH_PORT((PISDN_ADAPTER)a->io);
   outppw(Port + 4, (word)(unsigned long)adr);
   val = inppw(Port);
   DIVA_OS_MEM_DETACH_PORT((PISDN_ADAPTER)a->io, Port);
@@ -693,7 +689,7 @@ word io_inw(ADAPTER * a, void * adr)
 }
 void io_in_buffer(ADAPTER * a, void * adr, void * buffer, word len)
 {
-  byte *Port = (byte*)DIVA_OS_MEM_ATTACH_PORT((PISDN_ADAPTER)a->io);
+  byte __iomem *Port = DIVA_OS_MEM_ATTACH_PORT((PISDN_ADAPTER)a->io);
   byte* P = (byte*)buffer;
   if ((long)adr & 1) {
     outppw(Port+4, (word)(unsigned long)adr);
@@ -712,7 +708,7 @@ void io_in_buffer(ADAPTER * a, void * adr, void * buffer, word len)
 }
 void io_look_ahead(ADAPTER * a, PBUFFER * RBuffer, ENTITY * e)
 {
-  byte *Port = (byte*)DIVA_OS_MEM_ATTACH_PORT((PISDN_ADAPTER)a->io);
+  byte __iomem *Port = DIVA_OS_MEM_ATTACH_PORT((PISDN_ADAPTER)a->io);
   outppw(Port+4, (word)(unsigned long)RBuffer);
   ((PISDN_ADAPTER)a->io)->RBuffer.length = inppw(Port);
   inppw_buffer (Port, ((PISDN_ADAPTER)a->io)->RBuffer.P, ((PISDN_ADAPTER)a->io)->RBuffer.length + 1);
@@ -721,21 +717,21 @@ void io_look_ahead(ADAPTER * a, PBUFFER * RBuffer, ENTITY * e)
 }
 void io_out(ADAPTER * a, void * adr, byte data)
 {
-  byte *Port = (byte*)DIVA_OS_MEM_ATTACH_PORT((PISDN_ADAPTER)a->io);
+  byte __iomem *Port = DIVA_OS_MEM_ATTACH_PORT((PISDN_ADAPTER)a->io);
   outppw(Port+4, (word)(unsigned long)adr);
   outpp(Port, data);
   DIVA_OS_MEM_DETACH_PORT((PISDN_ADAPTER)a->io, Port);
 }
 void io_outw(ADAPTER * a, void * adr, word data)
 {
-  byte *Port = (byte*)DIVA_OS_MEM_ATTACH_PORT((PISDN_ADAPTER)a->io);
+  byte __iomem *Port = DIVA_OS_MEM_ATTACH_PORT((PISDN_ADAPTER)a->io);
   outppw(Port+4, (word)(unsigned long)adr);
   outppw(Port, data);
   DIVA_OS_MEM_DETACH_PORT((PISDN_ADAPTER)a->io, Port);
 }
 void io_out_buffer(ADAPTER * a, void * adr, void * buffer, word len)
 {
-  byte *Port = (byte*)DIVA_OS_MEM_ATTACH_PORT((PISDN_ADAPTER)a->io);
+  byte __iomem *Port = DIVA_OS_MEM_ATTACH_PORT((PISDN_ADAPTER)a->io);
   byte* P = (byte*)buffer;
   if ((long)adr & 1) {
     outppw(Port+4, (word)(unsigned long)adr);
@@ -755,7 +751,7 @@ void io_out_buffer(ADAPTER * a, void * adr, void * buffer, word len)
 void io_inc(ADAPTER * a, void * adr)
 {
   byte x;
-  byte *Port = (byte*)DIVA_OS_MEM_ATTACH_PORT((PISDN_ADAPTER)a->io);
+  byte __iomem *Port = DIVA_OS_MEM_ATTACH_PORT((PISDN_ADAPTER)a->io);
   outppw(Port+4, (word)(unsigned long)adr);
   x = inpp(Port);
   outppw(Port+4, (word)(unsigned long)adr);
@@ -865,7 +861,7 @@ void CALLBACK(ADAPTER * a, ENTITY * e)
 /* --------------------------------------------------------------------------
   routines for aligned reading and writing on RISC
   -------------------------------------------------------------------------- */
-void outp_words_from_buffer (word* adr, byte* P, dword len)
+void outp_words_from_buffer (word __iomem * adr, byte* P, dword len)
 {
   dword i = 0;
   word w;
@@ -875,7 +871,7 @@ void outp_words_from_buffer (word* adr, byte* P, dword len)
     outppw (adr, w);
   }
 }
-void inp_words_to_buffer (word* adr, byte* P, dword len)
+void inp_words_to_buffer (word __iomem * adr, byte* P, dword len)
 {
   dword i = 0;
   word w;

@@ -148,13 +148,13 @@ int ixp2000_pci_abort_handler(unsigned long addr, unsigned int fsr, struct pt_re
 	cli();
 	temp = *(IXP2000_PCI_CONTROL);
 	if (temp & ((1 << 8) | (1 << 5))) {
-		*(IXP2000_PCI_CONTROL) = temp;
+		ixp2000_reg_write(IXP2000_PCI_CONTROL, temp);
 	}
 
 	temp = *(IXP2000_PCI_CMDSTAT);
 	if (temp & (1 << 29)) {
 		while (temp & (1 << 29)) {	
-			*(IXP2000_PCI_CMDSTAT) = temp;
+			ixp2000_reg_write(IXP2000_PCI_CMDSTAT, temp);
 			temp = *(IXP2000_PCI_CMDSTAT);
 		}
 	}
@@ -178,13 +178,13 @@ clear_master_aborts(void)
 	cli();
 	temp = *(IXP2000_PCI_CONTROL);
 	if (temp & ((1 << 8) | (1 << 5))) {	
-		*(IXP2000_PCI_CONTROL) = temp;
+		ixp2000_reg_write(IXP2000_PCI_CONTROL, temp);
 	}
 
 	temp = *(IXP2000_PCI_CMDSTAT);
 	if (temp & (1 << 29)) {
 		while (temp & (1 << 29)) {
-			*(IXP2000_PCI_CMDSTAT) = temp;
+			ixp2000_reg_write(IXP2000_PCI_CMDSTAT, temp);
 			temp = *(IXP2000_PCI_CMDSTAT);
 		}
 	}

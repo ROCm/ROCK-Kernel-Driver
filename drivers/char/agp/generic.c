@@ -35,7 +35,10 @@
 #include <linux/pm.h>
 #include <linux/agp_backend.h>
 #include <linux/vmalloc.h>
+#include <linux/mm.h>
 #include <asm/io.h>
+#include <asm/cacheflush.h>
+#include <asm/pgtable.h>
 #include "agp.h"
 
 __u32 *agp_gatt_table;
@@ -46,6 +49,26 @@ int agp_memory_reserved;
  * nice to do this some other way instead of needing this export.
  */
 EXPORT_SYMBOL_GPL(agp_memory_reserved);
+
+#if defined(CONFIG_X86)
+int map_page_into_agp(struct page *page)
+{
+	int i;
+	i = change_page_attr(page, 1, PAGE_KERNEL_NOCACHE);
+	global_flush_tlb();
+	return i;
+}
+EXPORT_SYMBOL_GPL(map_page_into_agp);
+
+int unmap_page_from_agp(struct page *page)
+{
+	int i;
+	i = change_page_attr(page, 1, PAGE_KERNEL);
+	global_flush_tlb();
+	return i;
+}
+EXPORT_SYMBOL_GPL(unmap_page_from_agp);
+#endif
 
 /*
  * Generic routines for handling agp_memory structures -
@@ -181,8 +204,7 @@ struct agp_memory *agp_allocate_memory(size_t page_count, u32 type)
 			agp_free_memory(new);
 			return NULL;
 		}
-		new->memory[i] =
-			agp_bridge->driver->mask_memory(virt_to_phys(addr), type);
+		new->memory[i] = virt_to_phys(addr);
 		new->page_count++;
 	}
 
@@ -507,7 +529,7 @@ u32 agp_collect_device_status(u32 mode, u32 cmd)
 	u32 tmp;
 	u32 agp3;
 
-	while ((device = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, device)) != NULL) {
+	for_each_pci_dev(device) {
 		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
 		if (!cap_ptr)
 			continue;
@@ -551,7 +573,7 @@ void agp_device_command(u32 command, int agp_v3)
 	if (agp_v3)
 		mode *= 4;
 
-	while ((device = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, device)) != NULL) {
+	for_each_pci_dev(device) {
 		u8 agp = pci_find_capability(device, PCI_CAP_ID_AGP);
 		if (!agp)
 			continue;
@@ -737,8 +759,10 @@ int agp_generic_create_gatt_table(void)
 	agp_bridge->gatt_bus_addr = virt_to_phys(agp_bridge->gatt_table_real);
 
 	/* AK: bogus, should encode addresses > 4GB */
-	for (i = 0; i < num_entries; i++)
+	for (i = 0; i < num_entries; i++) {
 		writel(agp_bridge->scratch_page, agp_bridge->gatt_table+i);
+		readl(agp_bridge->gatt_table+i);	/* PCI Posting. */
+	}
 
 	return 0;
 }
@@ -854,8 +878,10 @@ int agp_generic_insert_memory(struct agp_memory * mem, off_t pg_start, int type)
 		mem->is_flushed = TRUE;
 	}
 
-	for (i = 0, j = pg_start; i < mem->page_count; i++, j++)
+	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
 		writel(agp_bridge->driver->mask_memory(mem->memory[i], mem->type), agp_bridge->gatt_table+j);
+		readl(agp_bridge->gatt_table+j);	/* PCI Posting. */
+	}
 
 	agp_bridge->driver->tlb_flush(mem);
 	return 0;
@@ -873,9 +899,12 @@ int agp_generic_remove_memory(struct agp_memory *mem, off_t pg_start, int type)
 	}
 
 	/* AK: bogus, should encode addresses > 4GB */
-	for (i = pg_start; i < (mem->page_count + pg_start); i++)
+	for (i = pg_start; i < (mem->page_count + pg_start); i++) {
 		writel(agp_bridge->scratch_page, agp_bridge->gatt_table+i);
+		readl(agp_bridge->gatt_table+i);	/* PCI Posting. */
+	}
 
+	global_cache_flush();
 	agp_bridge->driver->tlb_flush(mem);
 	return 0;
 }
@@ -958,21 +987,15 @@ void agp_enable(u32 mode)
 EXPORT_SYMBOL(agp_enable);
 
 
-#ifdef CONFIG_SMP
 static void ipi_handler(void *null)
 {
 	flush_agp_cache();
 }
-#endif
 
 void global_cache_flush(void)
 {
-#ifdef CONFIG_SMP
 	if (on_each_cpu(ipi_handler, NULL, 1, 1) != 0)
 		panic(PFX "timed out waiting for the other CPUs!\n");
-#else
-	flush_agp_cache();
-#endif
 }
 EXPORT_SYMBOL(global_cache_flush);
 

@@ -2328,6 +2328,8 @@ static int eepro100_suspend(struct pci_dev *pdev, u32 state)
 	outl(PortPartialReset, ioaddr + SCBPort);
 	
 	/* XXX call pci_set_power_state ()? */
+	pci_disable_device(pdev);
+	pci_set_power_state (pdev, 3);
 	return 0;
 }
 
@@ -2337,7 +2339,10 @@ static int eepro100_resume(struct pci_dev *pdev)
 	struct speedo_private *sp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
+	pci_set_power_state(pdev, 0);
 	pci_restore_state(pdev);
+	pci_enable_device(pdev);
+	pci_set_master(pdev);
 
 	if (!netif_running(dev))
 		return 0;

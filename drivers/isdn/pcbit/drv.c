@@ -859,7 +859,7 @@ static int set_protocol_running(struct pcbit_dev * dev)
 		printk(KERN_DEBUG "Bank3 = %02x\n", 
 		       readb(dev->sh_mem + BANK3));
 #endif
-		*(dev->sh_mem + BANK4) = 0x40U;
+		writeb(0x40, dev->sh_mem + BANK4);
 
 		/* warn the upper layer */
 		ctl.driver = dev->id;

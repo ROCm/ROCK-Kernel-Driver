@@ -32,6 +32,15 @@ config SENSORS_ADM1025
 	  This driver can also be built as a module.  If so, the module
 	  will be called adm1025.
 
+config SENSORS_ADM1026
+	tristate "Analog Devices ADM1026 and compatibles"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for Analog Devices ADM1026
+	  This driver can also be built as a module.  If so, the module
+	  will be called adm1026.
+
 config SENSORS_ADM1031
 	tristate "Analog Devices ADM1031 and compatibles"
 	depends on I2C && EXPERIMENTAL

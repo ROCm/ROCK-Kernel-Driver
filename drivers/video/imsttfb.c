@@ -319,7 +319,7 @@ struct imstt_regvals {
 
 struct imstt_par {
 	struct imstt_regvals init;
-	__u32 *dc_regs;
+	__u32 __iomem *dc_regs;
 	unsigned long cmap_regs_phys;
 	__u8 *cmap_regs;
 	__u32 ramdac;
@@ -406,19 +406,19 @@ static void imsttfb_remove(struct pci_dev *pdev);
 /*
  * Register access
  */
-static inline u32 read_reg_le32(volatile u32 *base, int regindex)
+static inline u32 read_reg_le32(volatile u32 __iomem *base, int regindex)
 {
 #ifdef __powerpc__
-	return in_le32((volatile u32 *) (base + regindex));
+	return in_le32(base + regindex);
 #else
 	return readl(base + regindex);
 #endif
 }
 
-static inline void write_reg_le32(volatile u32 *base, int regindex, u32 val)
+static inline void write_reg_le32(volatile u32 __iomem *base, int regindex, u32 val)
 {
 #ifdef __powerpc__
-	out_le32((volatile u32 *) (base + regindex), val);
+	out_le32(base + regindex, val);
 #else
 	writel(val, base + regindex);
 #endif
@@ -1519,7 +1519,7 @@ imsttfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	info->fix.smem_start = addr;
 	info->screen_base = (__u8 *)ioremap(addr, par->ramdac == IBM ? 0x400000 : 0x800000);
 	info->fix.mmio_start = addr + 0x800000;
-	par->dc_regs = (__u32 *)ioremap(addr + 0x800000, 0x1000);
+	par->dc_regs = ioremap(addr + 0x800000, 0x1000);
 	par->cmap_regs_phys = addr + 0x840000;
 	par->cmap_regs = (__u8 *)ioremap(addr + 0x840000, 0x1000);
 	info->par = par;

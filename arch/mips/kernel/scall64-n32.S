@@ -37,7 +37,7 @@ NESTED(handle_sysn32, PT_SIZE, sp)
 	.set	at
 #endif
 
-	subu	t0, v0, __NR_N32_Linux	# check syscall number
+	dsubu	t0, v0, __NR_N32_Linux	# check syscall number
 	sltiu	t0, t0,	__NR_N32_Linux_syscalls + 1
 
 #ifndef CONFIG_MIPS32_O32
@@ -64,11 +64,10 @@ NESTED(handle_sysn32, PT_SIZE, sp)
 	sd	t0, PT_R7(sp)		# set error flag
 	beqz	t0, 1f
 
-	negu	v0			# error
+	dnegu	v0			# error
 	sd	v0, PT_R0(sp)		# set flag for syscall restarting
 1:	sd	v0, PT_R2(sp)		# result
 
-FEXPORT(n32_syscall_exit)
 	local_irq_disable		# make sure need_resched and
 					# signals dont change between
 					# sampling and return
@@ -86,28 +85,29 @@ n32_syscall_exit_work:
 
 n32_syscall_trace_entry:
 	SAVE_STATIC
-	sd	t2,PT_R1(sp)
+	move	s0, t2
 	move	a0, sp
 	li	a1, 0
 	jal	do_syscall_trace
-	ld	t2,PT_R1(sp)
 
 	ld	a0, PT_R4(sp)		# Restore argument registers
 	ld	a1, PT_R5(sp)
 	ld	a2, PT_R6(sp)
 	ld	a3, PT_R7(sp)
-	jalr	t2
+	ld	a4, PT_R8(sp)
+	ld	a5, PT_R9(sp)
+	jalr	s0
 
 	li	t0, -EMAXERRNO - 1	# error?
 	sltu	t0, t0, v0
 	sd	t0, PT_R7(sp)		# set error flag
 	beqz	t0, 1f
 
-	negu	v0			# error
+	dnegu	v0			# error
 	sd	v0, PT_R0(sp)		# set flag for syscall restarting
 1:	sd	v0, PT_R2(sp)		# result
 
-	j	n32_syscall_exit
+	j	syscall_exit
 
 not_n32_scall:
 	/* This is not an n32 compatibility syscall, pass it on to
@@ -334,8 +334,8 @@ EXPORT(sysn32_call_table)
 	PTR	sys_restart_syscall
 	PTR	sys_semtimedop			/* 6215 */
 	PTR	sys_fadvise64_64
-	PTR	sys_statfs64
-	PTR	sys_fstatfs64
+	PTR	compat_sys_statfs64
+	PTR	compat_sys_fstatfs64
 	PTR	sys_sendfile64
 	PTR	sys_timer_create		/* 6220 */
 	PTR	sys_timer_settime
@@ -356,5 +356,10 @@ EXPORT(sysn32_call_table)
 	PTR	compat_sys_mq_timedsend
 	PTR	compat_sys_mq_timedreceive
 	PTR	compat_sys_mq_notify
-	PTR	compat_sys_mq_getsetattr	/* 6239 */
-	PTR	sys_ni_syscall			/* sys_vserver */
+	PTR	compat_sys_mq_getsetattr
+	PTR	sys_ni_syscall			/* 6240, sys_vserver */
+	PTR	sys_waitid
+	PTR	sys_ni_syscall			/* available, was setaltroot */
+	PTR	sys_add_key
+	PTR	sys_request_key
+	PTR	sys_keyctl			/* 6245 */

@@ -234,6 +234,9 @@ static void __init pSeries_setup_arch(void)
 #endif
 
 	pSeries_nvram_init();
+
+	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR)
+		vpa_init(boot_cpuid);
 }
 
 static int __init pSeries_init_panel(void)

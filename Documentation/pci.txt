@@ -156,11 +156,9 @@ Searching by both vendor/device and subsystem vendor/device ID:
 VENDOR_ID or DEVICE_ID.  This allows searching for any device from a
 specific vendor, for example.
 
-Note that these functions are not hotplug-safe.  Their hotplug-safe
-replacements are pci_get_device(), pci_get_class() and pci_get_subsys().
-They increment the reference count on the pci_dev that they return.
-You must eventually (possibly at module unload) decrement the reference
-count on these devices by calling pci_dev_put().
+   These functions are hotplug-safe. They increment the reference count on
+the pci_dev that they return. You must eventually (possibly at module unload)
+decrement the reference count on these devices by calling pci_dev_put().
 
 
 3. Enabling and disabling devices

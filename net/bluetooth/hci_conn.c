@@ -71,9 +71,10 @@ void hci_acl_connect(struct hci_conn *conn)
 
 	if ((ie = hci_inquiry_cache_lookup(hdev, &conn->dst)) &&
 			inquiry_entry_age(ie) <= INQUIRY_ENTRY_AGE_MAX) {
-		cp.pscan_rep_mode = ie->info.pscan_rep_mode;
-		cp.pscan_mode     = ie->info.pscan_mode;
-		cp.clock_offset   = ie->info.clock_offset | __cpu_to_le16(0x8000);
+		cp.pscan_rep_mode = ie->data.pscan_rep_mode;
+		cp.pscan_mode     = ie->data.pscan_mode;
+		cp.clock_offset   = ie->data.clock_offset | __cpu_to_le16(0x8000);
+		memcpy(conn->dev_class, ie->data.dev_class, 3);
 	}
 
 	cp.pkt_type = __cpu_to_le16(hdev->pkt_type & ACL_PTYPE_MASK);

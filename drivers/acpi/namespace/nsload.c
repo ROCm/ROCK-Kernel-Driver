@@ -321,6 +321,8 @@ acpi_ns_load_namespace (
 }
 
 
+#ifdef ACPI_FUTURE_USAGE
+
 /*******************************************************************************
  *
  * FUNCTION:    acpi_ns_delete_subtree
@@ -451,6 +453,8 @@ acpi_ns_unload_namespace (
 
 	return_ACPI_STATUS (status);
 }
+
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 #endif
 

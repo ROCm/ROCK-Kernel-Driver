@@ -3394,7 +3394,7 @@ static void md_do_sync(mddev_t *mddev)
 			break;
 
 	repeat:
-		if (jiffies >= mark[last_mark] + SYNC_MARK_STEP ) {
+		if (time_after_eq(jiffies, mark[last_mark] + SYNC_MARK_STEP )) {
 			/* step marks */
 			int next = (last_mark+1) % SYNC_MARKS;
 

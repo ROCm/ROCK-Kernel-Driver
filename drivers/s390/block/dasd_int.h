@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.60 $
+ * $Revision: 1.61 $
  */
 
 #ifndef DASD_INT_H
@@ -240,7 +240,7 @@ struct dasd_discipline {
 	int (*term_IO) (struct dasd_ccw_req *);
 	struct dasd_ccw_req *(*format_device) (struct dasd_device *,
 					       struct format_data_t *);
-
+	int (*free_cp) (struct dasd_ccw_req *, struct request *);
         /*
          * Error recovery functions. examine_error() returns a value that
          * indicates what to do for an error condition. If examine_error()
@@ -437,6 +437,8 @@ extern debug_info_t *dasd_debug_area;
 extern struct dasd_profile_info_t dasd_global_profile;
 extern unsigned int dasd_profile_level;
 extern struct block_device_operations dasd_device_operations;
+
+extern kmem_cache_t *dasd_page_cache;
 
 struct dasd_ccw_req *
 dasd_kmalloc_request(char *, int, int, struct dasd_device *);

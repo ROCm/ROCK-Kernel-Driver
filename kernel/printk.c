@@ -142,7 +142,7 @@ static int __init console_setup(char *str)
 		strcpy(name, "ttyS1");
 #endif
 	for(s = name; *s; s++)
-		if (*s >= '0' && *s <= '9')
+		if ((*s >= '0' && *s <= '9') || *s == ',')
 			break;
 	idx = simple_strtoul(s, NULL, 10);
 	*s = 0;

@@ -440,11 +440,11 @@ static int __devinit correct_chipset(struct atyfb_par *par)
 	switch(par->pci_id) {
 #ifdef CONFIG_FB_ATY_GX
 	case PCI_CHIP_MACH64GX:
-		if(type != 0x00d7);
+		if(type != 0x00d7)
 			return -ENODEV;
 		break;
 	case PCI_CHIP_MACH64CX:
-		if(type != 0x0057);
+		if(type != 0x0057)
 			return -ENODEV;
 		break;
 #endif

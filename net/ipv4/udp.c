@@ -1303,6 +1303,52 @@ static int udp_getsockopt(struct sock *sk, int level, int optname,
   	return 0;
 }
 
+/**
+ * 	udp_poll - wait for a UDP event.
+ *	@file - file struct
+ *	@sock - socket
+ *	@wait - poll table
+ *
+ *	This is same as datagram poll, except for the special case of 
+ *	blocking sockets. If application is using a blocking fd
+ *	and a packet with checksum error is in the queue;
+ *	then it could get return from select indicating data available
+ *	but then block when reading it. Add special case code
+ *	to work around these arguably broken applications.
+ */
+unsigned int udp_poll(struct file *file, struct socket *sock, poll_table *wait)
+{
+	unsigned int mask = datagram_poll(file, sock, wait);
+	struct sock *sk = sock->sk;
+	
+	/* Check for false positives due to checksum errors */
+	if ( (mask & POLLRDNORM) &&
+	     !(file->f_flags & O_NONBLOCK) &&
+	     !(sk->sk_shutdown & RCV_SHUTDOWN)){
+		struct sk_buff_head *rcvq = &sk->sk_receive_queue;
+		struct sk_buff *skb;
+
+		spin_lock_irq(&rcvq->lock);
+		while ((skb = skb_peek(rcvq)) != NULL) {
+			if (udp_checksum_complete(skb)) {
+				UDP_INC_STATS_BH(UDP_MIB_INERRORS);
+				__skb_unlink(skb, rcvq);
+				kfree_skb(skb);
+			} else {
+				skb->ip_summed = CHECKSUM_UNNECESSARY;
+				break;
+			}
+		}
+		spin_unlock_irq(&rcvq->lock);
+
+		/* nothing to see, move along */
+		if (skb == NULL)
+			mask &= ~(POLLIN | POLLRDNORM);
+	}
+
+	return mask;
+	
+}
 
 struct proto udp_prot = {
  	.name =		"UDP",
@@ -1517,6 +1563,7 @@ EXPORT_SYMBOL(udp_ioctl);
 EXPORT_SYMBOL(udp_port_rover);
 EXPORT_SYMBOL(udp_prot);
 EXPORT_SYMBOL(udp_sendmsg);
+EXPORT_SYMBOL(udp_poll);
 
 #ifdef CONFIG_PROC_FS
 EXPORT_SYMBOL(udp_proc_register);

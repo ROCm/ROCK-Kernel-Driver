@@ -343,7 +343,7 @@ static int proc_pid_cmdline(struct task_struct *task, char * buffer)
 	if (!mm)
 		goto out;
 	if (!mm->arg_end)
-		goto out;	/* Shh! No looking before we're done */
+		goto out_mm;	/* Shh! No looking before we're done */
 
  	len = mm->arg_end - mm->arg_start;
  
@@ -366,8 +366,8 @@ static int proc_pid_cmdline(struct task_struct *task, char * buffer)
 			res = strnlen(buffer, res);
 		}
 	}
+out_mm:
 	mmput(mm);
-
 out:
 	return res;
 }
@@ -779,11 +779,6 @@ static struct inode_operations proc_pid_link_inode_operations = {
 	.readlink	= proc_pid_readlink,
 	.follow_link	= proc_pid_follow_link
 };
-
-static inline int pid_alive(struct task_struct *p)
-{
-	return p->pids[PIDTYPE_PID].nr != 0;
-}
 
 #define NUMBUF 10
 

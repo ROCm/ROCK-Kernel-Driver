@@ -52,13 +52,13 @@ struct uart_pmac_port {
 	unsigned char			parity_mask;
 	unsigned char			prev_status;
 
-	volatile u8			*control_reg;
-	volatile u8			*data_reg;
+	volatile u8			__iomem *control_reg;
+	volatile u8			__iomem *data_reg;
 
 	unsigned int			tx_dma_irq;
 	unsigned int			rx_dma_irq;
-	volatile struct dbdma_regs	*tx_dma_regs;
-	volatile struct dbdma_regs	*rx_dma_regs;
+	volatile struct dbdma_regs	__iomem *tx_dma_regs;
+	volatile struct dbdma_regs	__iomem *rx_dma_regs;
 
 	struct termios			termios_cache;
 };

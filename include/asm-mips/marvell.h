@@ -11,7 +11,6 @@
 #include <linux/pci.h>
 
 #include <asm/byteorder.h>
-#include <asm/pci_channel.h>
 
 extern unsigned long marvell_base;
 

@@ -287,6 +287,12 @@ P:	Dave Gilbert
 M:	linux@treblig.org
 S:	Maintained
 
+ARM/PLEB SUPPORT
+P:	Peter Chubb
+M:	pleb@gelato.unsw.edu.au
+W:	http://www.disy.cse.unsw.edu.au/Hardware/PLEB
+S:	Maintained
+
 ARM/PT DIGITAL BOARD PORT
 P:	Stefan Eletzhofer
 M:	stefan.eletzhofer@eletztrick.de
@@ -805,7 +811,7 @@ S:	Maintained
 
 EXT3 FILE SYSTEM
 P:	Stephen Tweedie, Andrew Morton
-M:	sct@redhat.com, akpm@digeo.com, adilger@clusterfs.com
+M:	sct@redhat.com, akpm@osdl.org, adilger@clusterfs.com
 L:	ext3-users@redhat.com
 S:	Maintained
 
@@ -1451,11 +1457,8 @@ L:	linux-mips@linux-mips.org
 S:	Maintained
 
 MISCELLANEOUS MCA-SUPPORT
-P:	David Weinehall
-M:	Project MCA Team <mcalinux@acc.umu.se>
-M:	David Weinehall <tao@acc.umu.se>
-W:	http://www.acc.umu.se/~tao/
-W:	http://www.acc.umu.se/~mcalinux/
+P:	James Bottomley
+M:	jejb@steeleye.com
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
@@ -1532,7 +1535,7 @@ S:	Maintained
 
 NETWORK DEVICE DRIVERS
 P:	Andrew Morton
-M:	akpm@digeo.com
+M:	akpm@osdl.org
 P:	Jeff Garzik
 M:	jgarzik@pobox.com
 L:	linux-net@vger.kernel.org
@@ -1726,6 +1729,12 @@ PCNET32 NETWORK DRIVER
 P:	Thomas Bogendörfer
 M:	tsbogend@alpha.franken.de
 L:	linux-net@vger.kernel.org
+S:	Maintained
+
+PHRAM MTD DRIVER
+P:	Jörn Engel
+M:	joern@wh.fh-wedel.de
+L:	linux-mtd@lists.infradead.org
 S:	Maintained
 
 POSIX CLOCKS and TIMERS
@@ -2484,6 +2493,13 @@ W1 DALLAS'S 1-WIRE BUS
 P:	Evgeniy Polyakov
 M:	johnpol@2ka.mipt.ru
 L:	sensors@stimpy.netroedge.com
+S:	Maintained
+
+W83L51xD SD/MMC CARD INTERFACE DRIVER
+P:	Pierre Ossman
+M:	drzeus-wbsd@drzeus.cx
+L:	wbsd-devel@list.drzeus.cx
+W:	http://projects.drzeus.cx/wbsd
 S:	Maintained
 
 W83L785TS HARDWARE MONITOR DRIVER

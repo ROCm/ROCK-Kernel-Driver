@@ -764,8 +764,8 @@ static int viodasd_remove(struct vio_dev *vdev)
 	d = &viodasd_devices[vdev->unit_address];
 	if (d->disk) {
 		del_gendisk(d->disk);
-		put_disk(d->disk);
 		blk_cleanup_queue(d->disk->queue);
+		put_disk(d->disk);
 		d->disk = NULL;
 	}
 	d->dev = NULL;

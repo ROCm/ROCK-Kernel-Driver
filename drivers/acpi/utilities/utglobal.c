@@ -43,6 +43,8 @@
 
 #define DEFINE_ACPI_GLOBALS
 
+#include <linux/module.h>
+
 #include <acpi/acpi.h>
 #include <acpi/acnamesp.h>
 
@@ -143,10 +145,12 @@ unknown:
 
 /* Debug switch - level and trace mask */
 u32                                 acpi_dbg_level = ACPI_DEBUG_DEFAULT;
+EXPORT_SYMBOL(acpi_dbg_level);
 
 /* Debug switch - layer (component) mask */
 
 u32                                 acpi_dbg_layer = ACPI_COMPONENT_DEFAULT | ACPI_ALL_DRIVERS;
+EXPORT_SYMBOL(acpi_dbg_layer);
 u32                                 acpi_gbl_nesting_level = 0;
 
 

@@ -2,7 +2,7 @@
  *  linux/drivers/video/fm2fb.c -- BSC FrameMaster II/Rainbow II frame buffer
  *				   device
  *
- *	Copyright (C) 1998 Steffen A. Mork (mork@ls7.cs.uni-dortmund.de)
+ *	Copyright (C) 1998 Steffen A. Mork (linux-dev@morknet.de)
  *	Copyright (C) 1999 Geert Uytterhoeven
  *
  *  Written for 2.0.x by Steffen A. Mork

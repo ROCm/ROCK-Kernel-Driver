@@ -52,7 +52,7 @@ static irqreturn_t parport_sunbpp_interrupt(int irq, void *dev_id, struct pt_reg
 
 static void parport_sunbpp_disable_irq(struct parport *p)
 {
-	struct bpp_regs *regs = (struct bpp_regs *)p->base;
+	struct bpp_regs __iomem *regs = (struct bpp_regs __iomem *)p->base;
 	u32 tmp;
 
 	tmp = sbus_readl(&regs->p_csr);
@@ -62,7 +62,7 @@ static void parport_sunbpp_disable_irq(struct parport *p)
 
 static void parport_sunbpp_enable_irq(struct parport *p)
 {
-	struct bpp_regs *regs = (struct bpp_regs *)p->base;
+	struct bpp_regs __iomem *regs = (struct bpp_regs __iomem *)p->base;
 	u32 tmp;
 
 	tmp = sbus_readl(&regs->p_csr);
@@ -72,7 +72,7 @@ static void parport_sunbpp_enable_irq(struct parport *p)
 
 static void parport_sunbpp_write_data(struct parport *p, unsigned char d)
 {
-	struct bpp_regs *regs = (struct bpp_regs *)p->base;
+	struct bpp_regs __iomem *regs = (struct bpp_regs __iomem *)p->base;
 
 	sbus_writeb(d, &regs->p_dr);
 	dprintk((KERN_DEBUG "wrote 0x%x\n", d));
@@ -80,7 +80,7 @@ static void parport_sunbpp_write_data(struct parport *p, unsigned char d)
 
 static unsigned char parport_sunbpp_read_data(struct parport *p)
 {
-	struct bpp_regs *regs = (struct bpp_regs *)p->base;
+	struct bpp_regs __iomem *regs = (struct bpp_regs __iomem *)p->base;
 
 	return sbus_readb(&regs->p_dr);
 }
@@ -88,7 +88,7 @@ static unsigned char parport_sunbpp_read_data(struct parport *p)
 #if 0
 static void control_pc_to_sunbpp(struct parport *p, unsigned char status)
 {
-	struct bpp_regs *regs = (struct bpp_regs *)p->base;
+	struct bpp_regs __iomem *regs = (struct bpp_regs __iomem *)p->base;
 	unsigned char value_tcr = sbus_readb(&regs->p_tcr);
 	unsigned char value_or = sbus_readb(&regs->p_or);
 
@@ -108,7 +108,7 @@ static void control_pc_to_sunbpp(struct parport *p, unsigned char status)
 
 static unsigned char status_sunbpp_to_pc(struct parport *p)
 {
-	struct bpp_regs *regs = (struct bpp_regs *)p->base;
+	struct bpp_regs __iomem *regs = (struct bpp_regs __iomem *)p->base;
 	unsigned char bits = 0;
 	unsigned char value_tcr = sbus_readb(&regs->p_tcr);
 	unsigned char value_ir = sbus_readb(&regs->p_ir);
@@ -131,7 +131,7 @@ static unsigned char status_sunbpp_to_pc(struct parport *p)
 
 static unsigned char control_sunbpp_to_pc(struct parport *p)
 {
-	struct bpp_regs *regs = (struct bpp_regs *)p->base;
+	struct bpp_regs __iomem *regs = (struct bpp_regs __iomem *)p->base;
 	unsigned char bits = 0;
 	unsigned char value_tcr = sbus_readb(&regs->p_tcr);
 	unsigned char value_or = sbus_readb(&regs->p_or);
@@ -159,7 +159,7 @@ static unsigned char parport_sunbpp_frob_control(struct parport *p,
 						 unsigned char mask,
 						 unsigned char val)
 {
-	struct bpp_regs *regs = (struct bpp_regs *)p->base;
+	struct bpp_regs __iomem *regs = (struct bpp_regs __iomem *)p->base;
 	unsigned char value_tcr = sbus_readb(&regs->p_tcr);
 	unsigned char value_or = sbus_readb(&regs->p_or);
 
@@ -216,7 +216,7 @@ static unsigned char parport_sunbpp_read_status(struct parport *p)
 
 static void parport_sunbpp_data_forward (struct parport *p)
 {
-	struct bpp_regs *regs = (struct bpp_regs *)p->base;
+	struct bpp_regs __iomem *regs = (struct bpp_regs __iomem *)p->base;
 	unsigned char value_tcr = sbus_readb(&regs->p_tcr);
 
 	dprintk((KERN_DEBUG "forward\n"));
@@ -226,7 +226,7 @@ static void parport_sunbpp_data_forward (struct parport *p)
 
 static void parport_sunbpp_data_reverse (struct parport *p)
 {
-	struct bpp_regs *regs = (struct bpp_regs *)p->base;
+	struct bpp_regs __iomem *regs = (struct bpp_regs __iomem *)p->base;
 	u8 val = sbus_readb(&regs->p_tcr);
 
 	dprintk((KERN_DEBUG "reverse\n"));
@@ -299,9 +299,9 @@ static int __init init_one_port(struct sbus_dev *sdev)
 	struct parport *p;
 	/* at least in theory there may be a "we don't dma" case */
 	struct parport_operations *ops;
-	unsigned long base;
+	void __iomem *base;
 	int irq, dma, err = 0, size;
-	struct bpp_regs *regs;
+	struct bpp_regs __iomem *regs;
 	unsigned char value_tcr;
 	Node *node;
 
@@ -328,7 +328,7 @@ static int __init init_one_port(struct sbus_dev *sdev)
         memcpy (ops, &parport_sunbpp_ops, sizeof (struct parport_operations));
 
 	dprintk(("register_port\n"));
-	if (!(p = parport_register_port(base, irq, dma, ops)))
+	if (!(p = parport_register_port((unsigned long)base, irq, dma, ops)))
 		goto out3;
 
 	p->size = size;
@@ -343,7 +343,7 @@ static int __init init_one_port(struct sbus_dev *sdev)
 	dprintk(("OK\n"));
 	parport_sunbpp_enable_irq(p);
 
-	regs = (struct bpp_regs *)p->base;
+	regs = (struct bpp_regs __iomem *)p->base;
 	dprintk((KERN_DEBUG "forward\n"));
 	value_tcr = sbus_readb(&regs->p_tcr);
 	value_tcr &= ~P_TCR_DIR;
@@ -395,7 +395,7 @@ static void __exit parport_sunbpp_exit(void)
 			parport_sunbpp_disable_irq(p);
 			free_irq(p->irq, p);
 		}
-		sbus_iounmap(p->base, p->size);
+		sbus_iounmap((void __iomem *)p->base, p->size);
 		parport_put_port(p);
 		kfree (ops);
 		list_del(&node->list);

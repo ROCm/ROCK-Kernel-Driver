@@ -970,8 +970,7 @@ static int nsp32_queuecommand(struct scsi_cmnd *SCpnt, void (*done)(struct scsi_
 		data->CurrentSC = NULL;
 		SCpnt->result   = DID_NO_CONNECT << 16;
 		done(SCpnt);
-
-		return SCSI_MLQUEUE_HOST_BUSY;
+		return 0;
 	}
 
 	/* check target ID is not same as this initiator ID */
@@ -979,7 +978,7 @@ static int nsp32_queuecommand(struct scsi_cmnd *SCpnt, void (*done)(struct scsi_
 		nsp32_dbg(NSP32_DEBUG_QUEUECOMMAND, "terget==host???");
 		SCpnt->result = DID_BAD_TARGET << 16;
 		done(SCpnt);
-		return SCSI_MLQUEUE_DEVICE_BUSY;
+		return 0;
 	}
 
 	/* check target LUN is allowable value */
@@ -987,7 +986,7 @@ static int nsp32_queuecommand(struct scsi_cmnd *SCpnt, void (*done)(struct scsi_
 		nsp32_dbg(NSP32_DEBUG_QUEUECOMMAND, "no more lun");
 		SCpnt->result = DID_BAD_TARGET << 16;
 		done(SCpnt);
-		return SCSI_MLQUEUE_DEVICE_BUSY;
+		return 0;
 	}
 
 	show_command(SCpnt);
@@ -1019,7 +1018,7 @@ static int nsp32_queuecommand(struct scsi_cmnd *SCpnt, void (*done)(struct scsi_
 		nsp32_msg(KERN_ERR, "SGT fail");
 		SCpnt->result = DID_ERROR << 16;
 		nsp32_scsi_done(SCpnt);
-		return SCSI_MLQUEUE_HOST_BUSY;
+		return 0;
 	}
 
 	/* Build IDENTIFY */
@@ -1089,7 +1088,6 @@ static int nsp32_queuecommand(struct scsi_cmnd *SCpnt, void (*done)(struct scsi_
 	if (ret != TRUE) {
 		nsp32_dbg(NSP32_DEBUG_QUEUECOMMAND, "selection fail");
 		nsp32_scsi_done(SCpnt);
-		return SCSI_MLQUEUE_DEVICE_BUSY;
 	}
 
 	return 0;

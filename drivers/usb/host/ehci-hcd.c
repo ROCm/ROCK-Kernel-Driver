@@ -379,6 +379,14 @@ static int ehci_hc_reset (struct usb_hcd *hcd)
 	/* cache this readonly data; minimize PCI reads */
 	ehci->hcs_params = readl (&ehci->caps->hcs_params);
 
+	/* at least the Genesys GL880S needs fixup here */
+	temp = HCS_N_CC(ehci->hcs_params) * HCS_N_PCC(ehci->hcs_params);
+	temp &= 0x0f;
+	if (temp && HCS_N_PORTS(ehci->hcs_params) > temp) {
+		temp |= (ehci->hcs_params & ~0xf);
+		ehci->hcs_params = temp;
+	}
+
 	/* force HC to halt state */
 	return ehci_halt (ehci);
 }

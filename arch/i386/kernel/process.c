@@ -99,6 +99,8 @@ void default_idle(void)
 			safe_halt();
 		else
 			local_irq_enable();
+	} else {
+		cpu_relax();
 	}
 }
 

@@ -40,14 +40,19 @@
 #define DCSS_FINDSEG    0x0c
 #define DCSS_LOADNOLY   0x10
 #define DCSS_SEGEXT     0x18
-#define DCSS_QACTV      0x0c
+#define DCSS_FINDSEGA   0x0c
+
+struct qrange {
+	unsigned int  start; // 3byte start address, 1 byte type
+	unsigned int  end;   // 3byte end address, 1 byte reserved
+};
 
 struct qout64 {
 	int segstart;
 	int segend;
 	int segcnt;
 	int segrcnt;
-	char segout[8][6];
+	struct qrange range[6];
 };
 
 struct qin64 {
@@ -67,12 +72,15 @@ struct dcss_segment {
 	unsigned long end;
 	atomic_t ref_count;
 	int do_nonshared;
-	int vm_segtype;
+	unsigned int vm_segtype;
+	struct qrange range[6];
+	int segcnt;
 };
 
 static spinlock_t dcss_lock = SPIN_LOCK_UNLOCKED;
 static struct list_head dcss_list = LIST_HEAD_INIT(dcss_list);
-static char *segtype_string[7] = { "SW", "EW", "SR", "ER", "SN", "EN", "SC" };
+static char *segtype_string[] = { "SW", "EW", "SR", "ER", "SN", "EN", "SC",
+					"EW/EN-MIXED" };
 
 extern struct {
 	unsigned long addr, size, type;
@@ -162,12 +170,12 @@ dcss_diag_translate_rc (int vm_rc) {
  * fills start_address, end and vm_segtype fields
  */
 static int
-query_segment_info (struct dcss_segment *seg)
+query_segment_type (struct dcss_segment *seg)
 {
 	struct qin64  *qin = kmalloc (sizeof(struct qin64), GFP_DMA);
 	struct qout64 *qout = kmalloc (sizeof(struct qout64), GFP_DMA);
 
-	int diag_cc, rc;
+	int diag_cc, rc, i;
 	unsigned long dummy, vmrc;
 
 	if ((qin == NULL) || (qout == NULL)) {
@@ -176,7 +184,7 @@ query_segment_info (struct dcss_segment *seg)
 	}
 
 	/* initialize diag input parameters */
-	qin->qopcode = DCSS_QACTV;
+	qin->qopcode = DCSS_FINDSEGA;
 	qin->qoutptr = (unsigned long) qout;
 	qin->qoutlen = sizeof(struct qout64);
 	memcpy (qin->qname, seg->dcss_name, 8);
@@ -188,16 +196,40 @@ query_segment_info (struct dcss_segment *seg)
 		goto out_free;
 	}
 
-	if (qout->segcnt > 1) {
+	if (qout->segcnt > 6) {
 		rc = -ENOTSUPP;
 		goto out_free;
+	}
+
+	if (qout->segcnt == 1) {
+		seg->vm_segtype = qout->range[0].start & 0xff;
+	} else {
+		/* multi-part segment. only one type supported here:
+		    - all parts are contiguous
+		    - all parts are either EW or EN type
+		    - maximum 6 parts allowed */
+		unsigned long start = qout->segstart >> PAGE_SHIFT;
+		for (i=0; i<qout->segcnt; i++) {
+			if (((qout->range[i].start & 0xff) != SEG_TYPE_EW) &&
+			    ((qout->range[i].start & 0xff) != SEG_TYPE_EN)) {
+				rc = -ENOTSUPP;
+				goto out_free;
+			}
+			if (start != qout->range[i].start >> PAGE_SHIFT) {
+				rc = -ENOTSUPP;
+				goto out_free;
+			}
+			start = (qout->range[i].end >> PAGE_SHIFT) + 1;
+		}
+		seg->vm_segtype = SEG_TYPE_EWEN;
 	}
 
 	/* analyze diag output and update seg */
 	seg->start_addr = qout->segstart;
 	seg->end = qout->segend;
 
-	seg->vm_segtype = qout->segout[0][3];
+	memcpy (seg->range, qout->range, 6*sizeof(struct qrange));
+	seg->segcnt = qout->segcnt;
 
 	rc = 0;
 
@@ -254,6 +286,19 @@ segment_overlaps_others (struct dcss_segment *seg)
 }
 
 /*
+ * check if segment exceeds the kernel mapping range (detected or set via mem=)
+ * returns 1 if this is the case, 0 if segment fits into the range
+ */
+static inline int
+segment_exceeds_range (struct dcss_segment *seg)
+{
+	int seg_last_pfn = (seg->end) >> PAGE_SHIFT;
+	if (seg_last_pfn > max_pfn)
+		return 1;
+	return 0;
+}
+
+/*
  * get info about a segment
  * possible return values:
  * -ENOSYS  : we are not running on VM
@@ -265,7 +310,7 @@ segment_overlaps_others (struct dcss_segment *seg)
  * 0 .. 6   : type of segment as defined in include/asm-s390/extmem.h
  */
 int
-segment_info (char* name)
+segment_type (char* name)
 {
 	int rc;
 	struct dcss_segment seg;
@@ -274,7 +319,7 @@ segment_info (char* name)
 		return -ENOSYS;
 
 	dcss_mkname(name, seg.dcss_name);
-	rc = query_segment_info (&seg);
+	rc = query_segment_type (&seg);
 	if (rc < 0)
 		return rc;
 	return seg.vm_segtype;
@@ -295,9 +340,15 @@ __segment_load (char *name, int do_nonshared, unsigned long *addr, unsigned long
 		goto out;
 	}
 	dcss_mkname (name, seg->dcss_name);
-	rc = query_segment_info (seg);
+	rc = query_segment_type (seg);
 	if (rc < 0)
 		goto out_free;
+	if (segment_exceeds_range(seg)) {
+		PRINT_WARN ("segment_load: not loading segment %s - exceeds"
+				" kernel mapping range\n",name);
+		rc = -ERANGE;
+		goto out_free;
+	}
 	if (segment_overlaps_storage(seg)) {
 		PRINT_WARN ("segment_load: not loading segment %s - overlaps"
 				" storage\n",name);
@@ -362,6 +413,7 @@ __segment_load (char *name, int do_nonshared, unsigned long *addr, unsigned long
  * -ENOTSUPP: multi-part segment cannot be used with linux
  * -ENOSPC  : segment cannot be used (overlaps with storage)
  * -EBUSY   : segment can temporarily not be used (overlaps with dcss)
+ * -ERANGE  : segment cannot be used (exceeds kernel mapping range)
  * -EPERM   : segment is currently loaded with incompatible permissions
  * -ENOMEM  : out of memory
  * 0 .. 6   : type of segment as defined in include/asm-s390/extmem.h
@@ -392,6 +444,70 @@ segment_load (char *name, int do_nonshared, unsigned long *addr,
 		}
 	}
 	spin_unlock (&dcss_lock);
+	return rc;
+}
+
+/*
+ * this function modifies the shared state of a DCSS segment. note that
+ * name         : name of the DCSS
+ * do_nonshared : 0 indicates that the dcss should be shared with other linux images
+ *                1 indicates that the dcss should be exclusive for this linux image
+ * return values:
+ * -EIO     : could not perform load diagnose (segment gone!)
+ * -ENOENT  : no such segment (segment gone!)
+ * -EAGAIN  : segment is in use by other exploiters, try later
+ * -EINVAL  : no segment with the given name is currently loaded - name invalid
+ * 0	    : operation succeeded
+ */
+int
+segment_modify_shared (char *name, int do_nonshared)
+{
+	struct dcss_segment *seg;
+	unsigned long dummy;
+	int dcss_command, rc, diag_cc;
+
+	spin_lock (&dcss_lock);
+	seg = segment_by_name (name);
+	if (seg == NULL) {
+		rc = -EINVAL;
+		goto out_unlock;
+	}
+	if (do_nonshared == seg->do_nonshared) {
+		PRINT_INFO ("segment_modify_shared: not reloading segment %s"
+				" - already in requested mode\n",name);
+		rc = 0;
+		goto out_unlock;
+	}
+	if (atomic_read (&seg->ref_count) != 1) {
+		PRINT_WARN ("segment_modify_shared: not reloading segment %s - "
+				"segment is in use by other driver(s)\n",name);
+		rc = -EAGAIN;
+		goto out_unlock;
+	}
+	dcss_diag(DCSS_PURGESEG, seg->dcss_name,
+		  &dummy, &dummy);
+	if (do_nonshared)
+		dcss_command = DCSS_LOADNSR;
+	else
+	dcss_command = DCSS_LOADNOLY;
+	diag_cc = dcss_diag(dcss_command, seg->dcss_name,
+			&seg->start_addr, &seg->end);
+	if (diag_cc > 1) {
+		PRINT_WARN ("segment_modify_shared: could not reload segment %s"
+				" - diag returned error (%ld)\n",name,seg->end);
+		rc = dcss_diag_translate_rc (seg->end);
+		goto out_del;
+	}
+	seg->do_nonshared = do_nonshared;
+	rc = 0;
+	goto out_unlock;
+ out_del:
+	list_del(&seg->list);
+	dcss_diag(DCSS_PURGESEG, seg->dcss_name,
+		  &dummy, &dummy);
+	kfree (seg);
+ out_unlock:
+	spin_unlock(&dcss_lock);
 	return rc;
 }
 
@@ -434,8 +550,9 @@ void segment_save(char *name)
 	struct dcss_segment *seg;
 	int startpfn = 0;
 	int endpfn = 0;
-	char cmd1[80];
+	char cmd1[160];
 	char cmd2[80];
+	int i;
 
 	if (!MACHINE_IS_VM)
 		return;
@@ -448,10 +565,15 @@ void segment_save(char *name)
 		return;
 	}
 
-	startpfn = seg->start_addr >> 12;
-	endpfn = (seg->end) >> 12;
-	sprintf(cmd1, "DEFSEG %s %X-%X %s", name, startpfn, endpfn,
-			segtype_string[seg->vm_segtype]);
+	startpfn = seg->start_addr >> PAGE_SHIFT;
+	endpfn = (seg->end) >> PAGE_SHIFT;
+	sprintf(cmd1, "DEFSEG %s", name);
+	for (i=0; i<seg->segcnt; i++) {
+		sprintf(cmd1+strlen(cmd1), " %X-%X %s",
+			seg->range[i].start >> PAGE_SHIFT,
+			seg->range[i].end >> PAGE_SHIFT,
+			segtype_string[seg->range[i].start & 0xff]);
+	}
 	sprintf(cmd2, "SAVESEG %s", name);
 	cpcmd(cmd1, NULL, 80);
 	cpcmd(cmd2, NULL, 80);
@@ -461,4 +583,5 @@ void segment_save(char *name)
 EXPORT_SYMBOL(segment_load);
 EXPORT_SYMBOL(segment_unload);
 EXPORT_SYMBOL(segment_save);
-EXPORT_SYMBOL(segment_info);
+EXPORT_SYMBOL(segment_type);
+EXPORT_SYMBOL(segment_modify_shared);

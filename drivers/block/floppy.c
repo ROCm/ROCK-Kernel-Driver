@@ -1787,10 +1787,11 @@ irqreturn_t floppy_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		} while ((ST0 & 0x83) != UNIT(current_drive) && inr == 2
 			 && max_sensei);
 	}
-	if (handler)
-		schedule_bh(handler);
-	else
+	if (!handler) {
 		FDCS->reset = 1;
+		return IRQ_NONE;
+	}
+	schedule_bh(handler);
 	is_alive("normal interrupt end");
 
 	/* FIXME! Was it really for us? */
@@ -4322,6 +4323,12 @@ int __init floppy_init(void)
 		floppy_track_buffer = NULL;
 		max_buffer_sectors = 0;
 	}
+	/*
+	 * Small 10 msec delay to let through any interrupt that
+	 * initialization might have triggered, to not
+	 * confuse detection:
+	 */
+	msleep(10);
 
 	for (i = 0; i < N_FDC; i++) {
 		fdc = i;

@@ -49,10 +49,10 @@ struct ti_lynx {
                have_1394_buffers, have_iomappings, is_host } state;
 
         /* remapped memory spaces */
-        void *registers;
-        void *local_rom;
-        void *local_ram;
-        void *aux_port;
+        void __iomem *registers;
+        void __iomem *local_rom;
+        void __iomem *local_ram;
+        void __iomem *aux_port;
 	quadlet_t bus_info_block[5];
 
 #ifdef CONFIG_IEEE1394_PCILYNX_PORTS

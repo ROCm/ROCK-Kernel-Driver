@@ -1,3 +1,21 @@
+Release Date	: Thu Dec  9 19:02:14 EST 2004 - Sreenivas Bagalkote <sreenib@lsil.com>
+
+Current Version	: 2.20.4.1 (scsi module), 2.20.2.3 (cmm module)
+Older Version	: 2.20.4.1 (scsi module), 2.20.2.2 (cmm module)
+
+i.	Fix a bug in kioc's dma buffer deallocation
+
+Release Date	: Thu Nov  4 18:24:56 EST 2004 - Sreenivas Bagalkote <sreenib@lsil.com>
+
+Current Version	: 2.20.4.1 (scsi module), 2.20.2.2 (cmm module)
+Older Version	: 2.20.4.0 (scsi module), 2.20.2.1 (cmm module)
+
+i.	Handle IOCTL cmd timeouts more properly.
+
+ii.	pci_dma_sync_{sg,single}_for_cpu was introduced into megaraid_mbox
+	incorrectly (instead of _for_device). Changed to appropriate
+	pci_dma_sync_{sg,single}_for_device.
+
 Release Date	: Wed Oct 06 11:15:29 EDT 2004 - Sreenivas Bagalkote <sreenib@lsil.com>
 Current Version	: 2.20.4.0 (scsi module), 2.20.2.1 (cmm module)
 Older Version	: 2.20.4.0 (scsi module), 2.20.2.0 (cmm module)

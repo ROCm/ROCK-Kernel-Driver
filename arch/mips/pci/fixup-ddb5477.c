@@ -75,4 +75,4 @@ static void ddb5477_amd_lance_fixup(struct pci_dev *dev)
 }
 
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_LANCE,
-          ddb5477_amd_lance_fixup);
+	  ddb5477_amd_lance_fixup);

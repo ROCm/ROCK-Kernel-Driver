@@ -943,7 +943,7 @@ static void ndisc_recv_rs(struct sk_buff *skb)
 	}
 
 	/* Don't accept RS if we're not in router mode */
-	if (!idev->cnf.forwarding || idev->cnf.accept_ra)
+	if (!idev->cnf.forwarding)
 		goto out;
 
 	/*

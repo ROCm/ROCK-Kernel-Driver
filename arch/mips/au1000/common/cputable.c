@@ -39,6 +39,7 @@ struct cpu_spec	cpu_specs[] = {
     { 0xffffffff, 0x02030203, "Au1100 BD", 0, 1 },
     { 0xffffffff, 0x02030204, "Au1100 BE", 0, 1 },
     { 0xffffffff, 0x03030200, "Au1550 AA", 0, 1 },
+    { 0xffffffff, 0x04030200, "Au1200 AA", 0, 1 },
     { 0x00000000, 0x00000000, "Unknown Au1xxx", 1, 0 },
 };
 

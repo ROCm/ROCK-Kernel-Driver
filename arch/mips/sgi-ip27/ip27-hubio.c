@@ -8,6 +8,7 @@
 
 #include <linux/bitops.h>
 #include <linux/string.h>
+#include <linux/mmzone.h>
 #include <asm/sn/addrs.h>
 #include <asm/sn/arch.h>
 #include <asm/sn/hub.h>
@@ -44,7 +45,7 @@ unsigned long hub_pio_map(cnodeid_t cnode, xwidgetnum_t widget,
 
 	xtalk_addr &= ~(BWIN_SIZE-1);
 	for (i = 0; i < HUB_NUM_BIG_WINDOW; i++) {
-		if (test_and_set_bit(i, HUB_DATA(cnode)->h_bigwin_used))
+		if (test_and_set_bit(i, hub_data(cnode)->h_bigwin_used))
 			continue;
 
 		/*
@@ -177,7 +178,7 @@ void hub_pio_init(cnodeid_t cnode)
 	unsigned i;
 
 	/* initialize big window piomaps for this hub */
-	bitmap_zero(HUB_DATA(cnode)->h_bigwin_used, HUB_NUM_BIG_WINDOW);
+	bitmap_zero(hub_data(cnode)->h_bigwin_used, HUB_NUM_BIG_WINDOW);
 	for (i = 0; i < HUB_NUM_BIG_WINDOW; i++)
 		IIO_ITTE_DISABLE(nasid, i);
 

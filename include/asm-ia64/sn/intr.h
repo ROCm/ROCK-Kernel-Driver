@@ -12,15 +12,20 @@
 #define SGI_UART_VECTOR		(0xe9)
 #define SGI_PCIBR_ERROR		(0x33)
 
-// These two IRQ's are used by partitioning.
+/* Reserved IRQs : Note, not to exceed IA64_SN2_FIRST_DEVICE_VECTOR */
 #define SGI_XPC_ACTIVATE                (0x30)
 #define SGI_II_ERROR                    (0x31)
 #define SGI_XBOW_ERROR                  (0x32)
 #define SGI_PCIBR_ERROR                 (0x33)
 #define SGI_ACPI_SCI_INT                (0x34)
-#define SGI_MMTIMER_VECTOR		(0x35)
-#define SGI_TIO_ERROR			(0x36)
+#define SGI_TIOCA_ERROR                 (0x35)
+#define SGI_TIO_ERROR                   (0x36)
+#define SGI_TIOCX_ERROR                 (0x37)
+#define SGI_MMTIMER_VECTOR              (0x38)
 #define SGI_XPC_NOTIFY                  (0xe7)
+
+#define IA64_SN2_FIRST_DEVICE_VECTOR    (0x3c)
+#define IA64_SN2_LAST_DEVICE_VECTOR     (0xe6)
 
 #define SN2_IRQ_RESERVED        (0x1)
 #define SN2_IRQ_CONNECTED       (0x2)

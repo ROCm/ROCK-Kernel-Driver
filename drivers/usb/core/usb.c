@@ -656,7 +656,7 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 			return -ENOMEM;
 	}
 
-	envp[i++] = NULL;
+	envp[i] = NULL;
 
 	return 0;
 }

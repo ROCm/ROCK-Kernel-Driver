@@ -139,7 +139,7 @@ parse_unisys_oem (char *oemptr, int oem_entries)
 	} else {
 		printk("\nEnabling ES7000 specific features...\n");
 		es7000_plat = 1;
-		platform_rename_gsi = es7000_rename_gsi;
+		ioapic_renumber_irq = es7000_rename_gsi;
 	}
 	return es7000_plat;
 }
@@ -195,7 +195,7 @@ find_unisys_acpi_oem_table(unsigned long *oem_addr, int *length)
 			}
 		}
 	}
-	printk("ES7000: did not find Unisys ACPI OEM table!\n");
+	Dprintk("ES7000: did not find Unisys ACPI OEM table!\n");
 	return -1;
 }
 

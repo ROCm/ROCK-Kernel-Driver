@@ -162,9 +162,9 @@ struct i2o_controller {
 	struct notifier_block *event_notifer;	/* Events */
 	atomic_t users;
 	struct list_head list;	/* Controller list */
-	void *post_port;	/* Inbout port address */
-	void *reply_port;	/* Outbound port address */
-	void *irq_mask;		/* Interrupt register address */
+	void __iomem *post_port;	/* Inbout port address */
+	void __iomem *reply_port;	/* Outbound port address */
+	void __iomem *irq_mask;		/* Interrupt register address */
 
 	/* Dynamic LCT related data */
 
@@ -241,8 +241,8 @@ struct i2o_sys_tbl {
 extern struct list_head i2o_controllers;
 
 /* Message functions */
-static inline u32 i2o_msg_get(struct i2o_controller *, struct i2o_message **);
-extern u32 i2o_msg_get_wait(struct i2o_controller *, struct i2o_message **,
+static inline u32 i2o_msg_get(struct i2o_controller *, struct i2o_message __iomem **);
+extern u32 i2o_msg_get_wait(struct i2o_controller *, struct i2o_message __iomem **,
 			    int);
 static inline void i2o_msg_post(struct i2o_controller *, u32);
 static inline int i2o_msg_post_wait(struct i2o_controller *, u32,
@@ -443,7 +443,7 @@ static inline void I2O_IRQ_WRITE32(struct i2o_controller *c, u32 val)
  *	available returns I2O_QUEUE_EMPTY and msg is leaved untouched.
  */
 static inline u32 i2o_msg_get(struct i2o_controller *c,
-			      struct i2o_message **msg)
+			      struct i2o_message __iomem **msg)
 {
 	u32 m;
 
@@ -530,7 +530,7 @@ static inline struct i2o_message *i2o_msg_out_to_virt(struct i2o_controller *c,
  *	work for receive side messages as they are kmalloc objects
  *	in a different pool.
  */
-static inline struct i2o_message *i2o_msg_in_to_virt(struct i2o_controller *c,
+static inline struct i2o_message __iomem *i2o_msg_in_to_virt(struct i2o_controller *c,
 						     u32 m)
 {
 	return c->in_queue.virt + m;
@@ -976,7 +976,7 @@ extern void i2o_debug_state(struct i2o_controller *c);
 #define I2O_TIMEOUT_MESSAGE_GET		5
 #define I2O_TIMEOUT_RESET		30
 #define I2O_TIMEOUT_STATUS_GET		5
-#define I2O_TIMEOUT_LCT_GET		20
+#define I2O_TIMEOUT_LCT_GET		360
 #define I2O_TIMEOUT_SCSI_SCB_ABORT	240
 
 /* retries */

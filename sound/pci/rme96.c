@@ -1553,6 +1553,7 @@ snd_rme96_free(void *private_data)
 		pci_release_regions(rme96->pci);
 		rme96->port = 0;
 	}
+	pci_disable_device(rme96->pci);
 }
 
 static void

@@ -421,8 +421,6 @@ struct adapter_ops
 {
 	void (*adapter_interrupt)(struct aac_dev *dev);
 	void (*adapter_notify)(struct aac_dev *dev, u32 event);
-	void (*adapter_enable_int)(struct aac_dev *dev, u32 event);
-	void (*adapter_disable_int)(struct aac_dev *dev, u32 event);
 	int  (*adapter_sync_cmd)(struct aac_dev *dev, u32 command, u32 p1, u32 *status);
 	int  (*adapter_check_health)(struct aac_dev *dev);
 };
@@ -807,6 +805,8 @@ struct aac_adapter_info
 #define AAC_OPT_SGMAP_HOST64		cpu_to_le32(1<<10)
 #define AAC_OPT_ALARM			cpu_to_le32(1<<11)
 #define AAC_OPT_NONDASD			cpu_to_le32(1<<12)
+#define AAC_OPT_SCSI_MANAGED    	cpu_to_le32(1<<13)
+#define AAC_OPT_RAID_SCSI_MODE		cpu_to_le32(1<<14)
 
 struct aac_dev
 {
@@ -879,13 +879,8 @@ struct aac_dev
 	 */
 	u8			nondasd_support; 
 	u8			dac_support;
+	u8			raid_scsi_mode;
 };
-
-#define AllocateAndMapFibSpace(dev, MapFibContext) \
-	(dev)->a_ops.AllocateAndMapFibSpace(dev, MapFibContext)
-
-#define UnmapAndFreeFibSpace(dev, MapFibContext) \
-	(dev)->a_ops.UnmapAndFreeFibSpace(dev, MapFibContext)
 
 #define aac_adapter_interrupt(dev) \
 	(dev)->a_ops.adapter_interrupt(dev)
@@ -893,11 +888,6 @@ struct aac_dev
 #define aac_adapter_notify(dev, event) \
 	(dev)->a_ops.adapter_notify(dev, event)
 
-#define aac_adapter_enable_int(dev, event) \
-	(dev)->a_ops.adapter_enable_int(dev, event)
-
-#define aac_adapter_disable_int(dev, event) \
-	dev->a_ops.adapter_disable_int(dev, event)
 
 #define aac_adapter_check_health(dev) \
 	(dev)->a_ops.adapter_check_health(dev)

@@ -77,7 +77,7 @@ typedef struct tpam_channel {
 typedef struct tpam_card {
 	struct tpam_card *next;		/* next card in list */
 	unsigned int irq;		/* IRQ used by this board */
-	unsigned long bar0;		/* ioremapped bar0 */
+	void __iomem *bar0;		/* ioremapped bar0 */
 	int id;				/* id of the board */
 	isdn_if interface;		/* isdn link-level pointer */
 	int channels_used;		/* number of channels actually used */
@@ -171,12 +171,12 @@ extern tpam_card *tpam_findcard(int);
 extern u32 tpam_findchannel(tpam_card *, u32);
 
 /* Function prototypes from tpam_memory.c */
-extern void copy_to_pam_dword(tpam_card *, const void *, u32);
-extern void copy_to_pam(tpam_card *, void *, const void *, u32);
-extern u32 copy_from_pam_dword(tpam_card *, const void *);
-extern void copy_from_pam(tpam_card *, void *, const void *, u32);
-extern int copy_from_pam_to_user(tpam_card *, void __user *, const void *, u32);
-extern int copy_from_user_to_pam(tpam_card *, void *, const void __user *, u32);
+extern void copy_to_pam_dword(tpam_card *, u32, u32);
+extern void copy_to_pam(tpam_card *, u32, const void *, u32);
+extern u32 copy_from_pam_dword(tpam_card *, u32);
+extern void copy_from_pam(tpam_card *, void *, u32, u32);
+extern int copy_from_pam_to_user(tpam_card *, void __user *, u32, u32);
+extern int copy_from_user_to_pam(tpam_card *, u32, const void __user *, u32);
 extern int tpam_verify_area(u32, u32);
 
 /* Function prototypes from tpam_nco.c */

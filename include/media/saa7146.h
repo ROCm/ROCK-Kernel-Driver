@@ -51,10 +51,12 @@ extern unsigned int saa7146_debug;
 #define DEB_INT(x)  if (0!=(DEBUG_VARIABLE&0x20)) { DEBUG_PROLOG; printk x; } /* interrupt debug messages */
 #define DEB_CAP(x)  if (0!=(DEBUG_VARIABLE&0x40)) { DEBUG_PROLOG; printk x; } /* capture debug messages */
 
-#define IER_DISABLE(x,y) \
+#define SAA7146_IER_DISABLE(x,y) \
 	saa7146_write(x, IER, saa7146_read(x, IER) & ~(y));
-#define IER_ENABLE(x,y) \
+#define SAA7146_IER_ENABLE(x,y) \
 	saa7146_write(x, IER, saa7146_read(x, IER) | (y));
+#define SAA7146_ISR_CLEAR(x,y) \
+	saa7146_write(x, ISR, (y));
 
 struct saa7146_dev;
 struct saa7146_extension;
@@ -123,7 +125,7 @@ struct saa7146_dev
        	spinlock_t                 	slock;
         struct semaphore           	lock;
 
-	unsigned char			*mem;		/* pointer to mapped IO memory */
+	unsigned char			__iomem *mem;	/* pointer to mapped IO memory */
 	int				revision;	/* chip revision; needed for bug-workarounds*/
 
 	/* pci-device & irq stuff*/
@@ -168,7 +170,7 @@ void saa7146_pgtable_free(struct pci_dev *pci, struct saa7146_pgtable *pt);
 int saa7146_pgtable_build_single(struct pci_dev *pci, struct saa7146_pgtable *pt, struct scatterlist *list, int length );
 char *saa7146_vmalloc_build_pgtable(struct pci_dev *pci, long length, struct saa7146_pgtable *pt);
 void saa7146_setgpio(struct saa7146_dev *dev, int port, u32 data);
-int saa7146_wait_for_debi_done(struct saa7146_dev *dev);
+int saa7146_wait_for_debi_done(struct saa7146_dev *dev, int nobusyloop);
 
 /* some memory sizes */
 #define SAA7146_I2C_MEM		( 1*PAGE_SIZE)

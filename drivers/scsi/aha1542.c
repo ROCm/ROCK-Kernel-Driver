@@ -129,8 +129,8 @@ static int setup_dmaspeed[MAXBOARDS] __initdata = { -1, -1, -1, -1 };
  */
 
 #if defined(MODULE)
-int isapnp = 0;
-int aha1542[] = {0x330, 11, 4, -1};
+static int isapnp = 0;
+static int aha1542[] = {0x330, 11, 4, -1};
 MODULE_PARM(aha1542, "1-4i");
 MODULE_PARM(isapnp, "i");
 
@@ -951,7 +951,7 @@ fail:
 static char *setup_str[MAXBOARDS] __initdata;
 static int setup_idx = 0;
 
-void __init aha1542_setup(char *str, int *ints)
+static void __init aha1542_setup(char *str, int *ints)
 {
 	const char *ahausage = "aha1542: usage: aha1542=<PORTBASE>[,<BUSON>,<BUSOFF>[,<DMASPEED>]]\n";
 	int setup_portbase;

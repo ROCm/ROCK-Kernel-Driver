@@ -186,12 +186,12 @@ static struct sc520_par_table par_table[NUM_FLASH_BANKS] =
 
 static void sc520cdp_setup_par(void)
 {
-	volatile unsigned long *mmcr;
+	volatile unsigned long __iomem *mmcr;
 	unsigned long mmcr_val;
 	int i, j;
 
 	/* map in SC520's MMCR area */
-	mmcr = (unsigned long *)ioremap_nocache(SC520_MMCR_BASE, SC520_MMCR_EXTENT);
+	mmcr = ioremap_nocache(SC520_MMCR_BASE, SC520_MMCR_EXTENT);
 	if(!mmcr) { /* ioremap_nocache failed: skip the PAR reprogramming */
 		/* force physical address fields to BIOS defaults: */
 		for(i = 0; i < NUM_FLASH_BANKS; i++)
@@ -223,7 +223,7 @@ static void sc520cdp_setup_par(void)
 			sc520cdp_map[i].phys = par_table[i].default_address;
 		}
 	}
-	iounmap((void *)mmcr);
+	iounmap(mmcr);
 }
 #endif
 
@@ -261,7 +261,7 @@ static int __init init_sc520cdp(void)
 			++devices_found;
 		}
 		else {
-			iounmap((void *)sc520cdp_map[i].virt);
+			iounmap(sc520cdp_map[i].virt);
 		}
 	}
 	if(devices_found >= 2) {
@@ -290,8 +290,8 @@ static void __exit cleanup_sc520cdp(void)
 		if (mymtd[i])
 			map_destroy(mymtd[i]);
 		if (sc520cdp_map[i].virt) {
-			iounmap((void *)sc520cdp_map[i].virt);
-			sc520cdp_map[i].virt = 0;
+			iounmap(sc520cdp_map[i].virt);
+			sc520cdp_map[i].virt = NULL;
 		}
 	}
 }

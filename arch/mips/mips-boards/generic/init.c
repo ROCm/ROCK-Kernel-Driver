@@ -42,8 +42,6 @@ extern char rs_getDebugChar(void);
 extern int saa9730_kgdb_hook(int);
 extern int saa9730_putDebugChar(char);
 extern char saa9730_getDebugChar(void);
-
-int remote_debug = 0;
 #endif
 
 int prom_argc;
@@ -219,7 +217,7 @@ void __init kgdb_config (void)
 				generic_putDebugChar (*s++);
 		}
 
-		remote_debug = 1;
+		kgdb_enabled = 1;
 		/* Breakpoint is invoked after interrupts are initialised */
 	}
 }

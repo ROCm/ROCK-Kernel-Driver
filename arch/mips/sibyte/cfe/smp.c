@@ -28,8 +28,10 @@
  * Use CFE to find out how many CPUs are available, setting up
  * phys_cpu_present_map and the logical/physical mappings.
  * XXXKW will the boot CPU ever not be physical 0?
+ *
+ * Common setup before any secondaries are started
  */
-void __init prom_build_cpu_map(void)
+void __init prom_prepare_cpus(unsigned int max_cpus)
 {
 	int i, num;
 
@@ -46,13 +48,6 @@ void __init prom_build_cpu_map(void)
 		}
 	}
 	printk("Detected %i available secondary CPU(s)\n", num);
-}
-
-/*
- * Common setup before any secondaries are started
- */
-void prom_prepare_cpus(unsigned int max_cpus)
-{
 }
 
 /*

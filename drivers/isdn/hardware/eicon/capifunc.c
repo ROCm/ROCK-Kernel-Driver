@@ -240,13 +240,13 @@ void sendf(APPL * appl, word command, dword Id, word Number, byte * format, ...)
 	DBG_PRV1(("sendf(a=%d,cmd=%x,format=%s)",
 		  appl->Id, command, (byte *) format))
 
-	    WRITE_WORD(&msg.header.appl_id, appl->Id);
-	WRITE_WORD(&msg.header.command, command);
+	PUT_WORD(&msg.header.appl_id, appl->Id);
+	PUT_WORD(&msg.header.command, command);
 	if ((byte) (command >> 8) == 0x82)
 		Number = appl->Number++;
-	WRITE_WORD(&msg.header.number, Number);
+	PUT_WORD(&msg.header.number, Number);
 
-	WRITE_DWORD(((byte *) & msg.header.controller), Id);
+	PUT_DWORD(&msg.header.controller, Id);
 	write = (byte *) & msg;
 	write += 12;
 
@@ -261,13 +261,13 @@ void sendf(APPL * appl, word command, dword Id, word Number, byte * format, ...)
 			break;
 		case 'w':
 			tmp = va_arg(ap, dword);
-			WRITE_WORD(write, (tmp & 0xffff));
+			PUT_WORD(write, (tmp & 0xffff));
 			write += 2;
 			length += 2;
 			break;
 		case 'd':
 			tmp = va_arg(ap, dword);
-			WRITE_DWORD(write, tmp);
+			PUT_DWORD(write, tmp);
 			write += 4;
 			length += 4;
 			break;
@@ -282,11 +282,11 @@ void sendf(APPL * appl, word command, dword Id, word Number, byte * format, ...)
 	}
 	va_end(ap);
 
-	WRITE_WORD(&msg.header.length, length);
+	PUT_WORD(&msg.header.length, length);
 	msg.header.controller = UnMapController(msg.header.controller);
 
 	if (command == _DATA_B3_I)
-		dlength = READ_WORD(
+		dlength = GET_WORD(
 			      ((byte *) & msg.info.data_b3_ind.Data_Length));
 
 	if (!(dmb = diva_os_alloc_message_buffer(length + dlength,
@@ -300,7 +300,7 @@ void sendf(APPL * appl, word command, dword Id, word Number, byte * format, ...)
 
 	/* if DATA_B3_IND, copy data too */
 	if (command == _DATA_B3_I) {
-		dword data = READ_DWORD(&msg.info.data_b3_ind.Data);
+		dword data = GET_DWORD(&msg.info.data_b3_ind.Data);
 		memcpy(write + length, (void *) data, dlength);
 	}
 
@@ -318,7 +318,7 @@ void sendf(APPL * appl, word command, dword Id, word Number, byte * format, ...)
 			if (myDriverDebugHandle.dbgMask & DL_BLK) {
 				xlog("\x00\x02", &msg, 0x81, length);
 				for (i = 0; i < dlength; i += 256) {
-				  DBG_BLK((((char *) READ_DWORD(&msg.info.data_b3_ind.Data)) + i,
+				  DBG_BLK((((char *) GET_DWORD(&msg.info.data_b3_ind.Data)) + i,
 				  	((dlength - i) < 256) ? (dlength - i) : 256))
 				  if (!(myDriverDebugHandle.dbgMask & DL_PRV0))
 					  break; /* not more if not explicitely requested */
@@ -700,7 +700,7 @@ static int diva_add_card(DESCRIPTOR * d)
 	}
 
 	/* profile information */
-	WRITE_WORD(&ctrl->profile.nbchannel, card->d.channels);
+	PUT_WORD(&ctrl->profile.nbchannel, card->d.channels);
 	ctrl->profile.goptions = a->profile.Global_Options;
 	ctrl->profile.support1 = a->profile.B1_Protocols;
 	ctrl->profile.support2 = a->profile.B2_Protocols;
@@ -882,11 +882,11 @@ static u16 diva_send_message(struct capi_ctr *ctrl,
 	word ret = 0;
 	diva_os_spin_lock_magic_t old_irql;
 	CAPI_MSG *msg = (CAPI_MSG *) DIVA_MESSAGE_BUFFER_DATA(dmb);
-	APPL *this = &application[READ_WORD(&msg->header.appl_id) - 1];
+	APPL *this = &application[GET_WORD(&msg->header.appl_id) - 1];
 	diva_card *card = ctrl->driverdata;
 	__u32 length = DIVA_MESSAGE_BUFFER_LEN(dmb);
-	word clength = READ_WORD(&msg->header.length);
-	word command = READ_WORD(&msg->header.command);
+	word clength = GET_WORD(&msg->header.length);
+	word command = GET_WORD(&msg->header.command);
 	u16 retval = CAPI_NOERROR;
 
 	if (diva_os_in_irq()) {
@@ -932,9 +932,9 @@ static u16 diva_send_message(struct capi_ctr *ctrl,
 		if (clength == 24)
 			clength = 22;	/* workaround for PPcom bug */
 		/* header is always 22      */
-		if (READ_WORD(&msg->info.data_b3_req.Data_Length) >
+		if (GET_WORD(&msg->info.data_b3_req.Data_Length) >
 		    this->MaxDataLength
-		    || READ_WORD(&msg->info.data_b3_req.Data_Length) >
+		    || GET_WORD(&msg->info.data_b3_req.Data_Length) >
 		    (length - clength)) {
 			DBG_ERR(("Write - invalid message size"))
 			retval = CAPI_ILLCMDORSUBCMDORMSGTOSMALL;
@@ -952,18 +952,18 @@ static u16 diva_send_message(struct capi_ctr *ctrl,
 
 		this->xbuffer_internal[i] = NULL;
 		memcpy(this->xbuffer_ptr[i], &((__u8 *) msg)[clength],
-		       READ_WORD(&msg->info.data_b3_req.Data_Length));
+		       GET_WORD(&msg->info.data_b3_req.Data_Length));
 
 #ifndef DIVA_NO_DEBUGLIB
 		if ((myDriverDebugHandle.dbgMask & DL_BLK)
 		    && (myDriverDebugHandle.dbgMask & DL_XLOG)) {
 			int j;
 			for (j = 0; j <
-			     READ_WORD(&msg->info.data_b3_req.Data_Length);
+			     GET_WORD(&msg->info.data_b3_req.Data_Length);
 			     j += 256) {
 				DBG_BLK((((char *) this->xbuffer_ptr[i]) + j,
-					((READ_WORD(&msg->info.data_b3_req.Data_Length) - j) <
-					  256) ? (READ_WORD(&msg->info.data_b3_req.Data_Length) - j) : 256))
+					((GET_WORD(&msg->info.data_b3_req.Data_Length) - j) <
+					  256) ? (GET_WORD(&msg->info.data_b3_req.Data_Length) - j) : 256))
 				if (!(myDriverDebugHandle.dbgMask & DL_PRV0))
 					break;	/* not more if not explicitely requested */
 			}
@@ -976,7 +976,7 @@ static u16 diva_send_message(struct capi_ctr *ctrl,
 	mapped_msg->header.controller = MapController(mapped_msg->header.controller);
 	mapped_msg->header.length = clength;
 	mapped_msg->header.command = command;
-	mapped_msg->header.number = READ_WORD(&msg->header.number);
+	mapped_msg->header.number = GET_WORD(&msg->header.number);
 
 	ret = api_put(this, mapped_msg);
 	switch (ret) {

@@ -1494,7 +1494,7 @@
 #define PVCR_CommandDelay (0xf80)
 #define PCFR_PI2C_EN	(0x1 << 6)
 
-#define PSSR_OTGPH	(1 << 7)	/* OTG Peripheral control Hold */
+#define PSSR_OTGPH	(1 << 6)	/* OTG Peripheral control Hold */
 #define PSSR_RDH	(1 << 5)	/* Read Disable Hold */
 #define PSSR_PH		(1 << 4)	/* Peripheral Control Hold */
 #define PSSR_VFS	(1 << 2)	/* VDD Fault Status */

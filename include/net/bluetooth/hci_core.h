@@ -38,10 +38,20 @@ extern struct proc_dir_entry *proc_bt_hci;
 
 /* HCI Core structures */
 
+struct inquiry_data {
+	bdaddr_t	bdaddr;
+	__u8		pscan_rep_mode;
+	__u8		pscan_period_mode;
+	__u8		pscan_mode;
+	__u8		dev_class[3];
+	__u16		clock_offset;
+	__s8		rssi;
+};
+
 struct inquiry_entry {
 	struct inquiry_entry 	*next;
 	__u32			timestamp;
-	struct inquiry_info	info;
+	struct inquiry_data	data;
 };
 
 struct inquiry_cache {
@@ -142,6 +152,7 @@ struct hci_conn {
 	__u16		 state;
 	__u8		 type;
 	__u8		 out;
+	__u8		 dev_class[3];
 	__u32		 link_mode;
 	unsigned long	 pend;
 	
@@ -199,7 +210,7 @@ static inline long inquiry_entry_age(struct inquiry_entry *e)
 }
 
 struct inquiry_entry *hci_inquiry_cache_lookup(struct hci_dev *hdev, bdaddr_t *bdaddr);
-void hci_inquiry_cache_update(struct hci_dev *hdev, struct inquiry_info *info);
+void hci_inquiry_cache_update(struct hci_dev *hdev, struct inquiry_data *data);
 
 /* ----- HCI Connections ----- */
 enum {

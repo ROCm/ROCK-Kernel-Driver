@@ -312,8 +312,24 @@ running once the system is up.
 	condev=		[HW,S390] console device
 	conmode=
  
-	console=	[KNL] Output console
-			Console device and comm spec (speed, control, parity).
+	console=	[KNL] Output console device and options.
+
+		tty<n>	Use the virtual console device <n>.
+
+		ttyS<n>[,options]
+			Use the specified serial port.  The options are of
+			the form "bbbbpn", where "bbbb" is the baud rate,
+			"p" is parity ("n", "o", or "e"), and "n" is bits.
+			Default is "9600n8".
+
+			See also Documentation/serial-console.txt.
+
+		uart,io,<addr>[,options]
+		uart,mmio,<addr>[,options]
+			Start an early, polled-mode console on the 8250/16550
+			UART at the specified I/O port or MMIO address,
+			switching to the matching ttyS device later.  The
+			options are the same as for ttyS, above.
 
 	cpcihp_generic=	[HW,PCI] Generic port I/O CompactPCI driver
 			Format: <first_slot>,<last_slot>,<port>,<enum_bit>[,<debug>]
@@ -657,9 +673,10 @@ running once the system is up.
 	maxcpus=	[SMP] Maximum number of processors that	an SMP kernel
 			should make use of
 
-	max_scsi_luns=	[SCSI]
+	max_luns=	[SCSI] Maximum number of LUNs to probe
+			Should be between 1 and 2^32-1.
 
-	max_scsi_report_luns=
+	max_report_luns=
 			[SCSI] Maximum number of LUNs received
 			Should be between 1 and 16384.
 
@@ -684,6 +701,9 @@ running once the system is up.
 	mem=nn[KMG]	[KNL,BOOT] Force usage of a specific amount of memory
 			Amount of memory to be used when the kernel is not able
 			to see the whole system memory or for test.
+			[IA-32] Use together with memmap= to avoid physical
+			address space collisions. Without memmap= PCI devices
+			could be placed at addresses belonging to unused RAM.
 
 	mem=nopentium	[BUGS=IA-32] Disable usage of 4MB pages for kernel
 			memory.
@@ -788,8 +808,6 @@ running once the system is up.
 			noexec=off: disable nn-executable mappings
 
 	nofxsr		[BUGS=IA-32]
-
-	nohighio	[BUGS=IA-32] Disable highmem block I/O.
 
 	nohlt		[BUGS=ARM]
  
@@ -1000,10 +1018,9 @@ running once the system is up.
 			(param: profile step/bucket size as a power of 2 for
 				statistical time based profiling)
 
-	processor.c2=	[HW, ACPI]
-	processor.c3=	[HW, ACPI]
-			0 - disable C2 or C3 idle power saving state.
-			1 - enable C2 or C3 (default unless DMI blacklist entry)
+	processor.max_cstate=   [HW, ACPI]
+			Limit processor to maximum C-state
+			max_cstate=9 overrides any DMI blacklist limit.
 
 	prompt_ramdisk=	[RAM] List of RAM disks to prompt for floppy disk
 			before loading.
@@ -1263,11 +1280,6 @@ running once the system is up.
 
 	specialix=	[HW,SERIAL] Specialix multi-serial port adapter
 			See Documentation/specialix.txt.
-
-	speedstep_coppermine=
-			[HW,IA-32] Take CPU in your notebook as SpeedStep-capable
-			See comment before function speedstep_setup() in
-			arch/i386/kernel/cpu/cpufreq/speedstep.c.
 
 	spia_io_base=	[HW,MTD]
 	spia_fio_base=

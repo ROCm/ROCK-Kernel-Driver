@@ -82,11 +82,11 @@ static unsigned long get_purr(void)
 
 	for_each_cpu(cpu) {
 		lpaca = paca + cpu;
-		sum_purr += lpaca->xLpPaca.xEmulatedTimeBase;
+		sum_purr += lpaca->lppaca.xEmulatedTimeBase;
 
 #ifdef PURR_DEBUG
 		printk(KERN_INFO "get_purr for cpu (%d) has value (%ld) \n",
-			cpu, lpaca->xLpPaca.xEmulatedTimeBase);
+			cpu, lpaca->lppaca.xEmulatedTimeBase);
 #endif
 	}
 	return sum_purr;

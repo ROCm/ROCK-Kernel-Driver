@@ -239,7 +239,7 @@ struct ymf_capture {
 
 struct ymf_unit {
 	u8 rev;				/* PCI revision */
-	void *reg_area_virt;
+	void __iomem *reg_area_virt;
 	void *dma_area_va;
 	dma_addr_t dma_area_ba;
 	unsigned int dma_area_size;

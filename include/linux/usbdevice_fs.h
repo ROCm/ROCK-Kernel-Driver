@@ -144,29 +144,4 @@ struct usbdevfs_hub_portinfo {
 #define USBDEVFS_DISCONNECT        _IO('U', 22)
 #define USBDEVFS_CONNECT           _IO('U', 23)
 
-/* --------------------------------------------------------------------- */
-
-#ifdef __KERNEL__
-
-#include <linux/list.h>
-#include <asm/semaphore.h>
-
-
-struct dev_state {
-	struct list_head list;      /* state list */
-	struct usb_device *dev;
-	struct file *file;
-	spinlock_t lock;            /* protects the async urb lists */
-	struct list_head async_pending;
-	struct list_head async_completed;
-	wait_queue_head_t wait;     /* wake up if a request completed */
-	unsigned int discsignr;
-	struct task_struct *disctask;
-	void __user *disccontext;
-	unsigned long ifclaimed;
-};
-
-#endif /* __KERNEL__ */
-
-/* --------------------------------------------------------------------- */
 #endif /* _LINUX_USBDEVICE_FS_H */

@@ -56,14 +56,14 @@ struct fb_info_platinum {
 	}				palette[256];
 	u32				pseudo_palette[17];
 	
-	volatile struct cmap_regs	*cmap_regs;
+	volatile struct cmap_regs	__iomem *cmap_regs;
 	unsigned long			cmap_regs_phys;
 	
-	volatile struct platinum_regs	*platinum_regs;
+	volatile struct platinum_regs	__iomem *platinum_regs;
 	unsigned long			platinum_regs_phys;
 	
-	__u8				*frame_buffer;
-	volatile __u8			*base_frame_buffer;
+	__u8				__iomem *frame_buffer;
+	volatile __u8			__iomem *base_frame_buffer;
 	unsigned long			frame_buffer_phys;
 	
 	unsigned long			total_vram;
@@ -141,7 +141,7 @@ static int platinumfb_set_par (struct fb_info *info)
 	
 	if (pinfo->vmode == 13 && pinfo->cmode > 0)
 		offset = 0x10;
-	info->screen_base = (char *) pinfo->frame_buffer + init->fb_offset + offset;
+	info->screen_base = pinfo->frame_buffer + init->fb_offset + offset;
 	info->fix.smem_start = (pinfo->frame_buffer_phys) + init->fb_offset + offset;
 	info->fix.visual = (pinfo->cmode == CMODE_8) ?
 		FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
@@ -184,7 +184,7 @@ static int platinumfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 			      u_int transp, struct fb_info *info)
 {
 	struct fb_info_platinum *pinfo = info->par;
-	volatile struct cmap_regs *cmap_regs = pinfo->cmap_regs;
+	volatile struct cmap_regs __iomem *cmap_regs = pinfo->cmap_regs;
 
 	if (regno > 255)
 		return 1;
@@ -232,7 +232,7 @@ static inline int platinum_vram_reqd(int video_mode, int color_mode)
 
 static void set_platinum_clock(struct fb_info_platinum *pinfo)
 {
-	volatile struct cmap_regs *cmap_regs = pinfo->cmap_regs;
+	volatile struct cmap_regs __iomem *cmap_regs = pinfo->cmap_regs;
 	struct platinum_regvals	*init;
 
 	init = platinum_reg_init[pinfo->vmode-1];
@@ -259,8 +259,8 @@ static void set_platinum_clock(struct fb_info_platinum *pinfo)
 /* Some things in here probably don't need to be done each time. */
 static void platinum_set_hardware(struct fb_info_platinum *pinfo)
 {
-	volatile struct platinum_regs	*platinum_regs = pinfo->platinum_regs;
-	volatile struct cmap_regs	*cmap_regs = pinfo->cmap_regs;
+	volatile struct platinum_regs	__iomem *platinum_regs = pinfo->platinum_regs;
+	volatile struct cmap_regs	__iomem *cmap_regs = pinfo->cmap_regs;
 	struct platinum_regvals		*init;
 	int				i;
 	int				vmode, cmode;
@@ -312,7 +312,7 @@ static void __devinit platinum_init_info(struct fb_info *info, struct fb_info_pl
 	info->fbops = &platinumfb_ops;
 	info->pseudo_palette = pinfo->pseudo_palette;
         info->flags = FBINFO_DEFAULT;
-	info->screen_base = (char *) pinfo->frame_buffer + 0x20;
+	info->screen_base = pinfo->frame_buffer + 0x20;
 
 	fb_alloc_cmap(&info->cmap, 256, 0);
 
@@ -404,7 +404,7 @@ try_again:
  */
 static int read_platinum_sense(struct fb_info_platinum *info)
 {
-	volatile struct platinum_regs *platinum_regs = info->platinum_regs;
+	volatile struct platinum_regs __iomem *platinum_regs = info->platinum_regs;
 	int sense;
 
 	out_be32(&platinum_regs->reg[23].r, 7);	/* turn off drivers */
@@ -637,10 +637,10 @@ static int __devexit platinumfb_remove(struct of_device* odev)
 		size = dp->addrs[i].size;
 		release_mem_region(addr, size);
 	}
-	iounmap((void *)pinfo->frame_buffer);
-	iounmap((void *)pinfo->platinum_regs);
+	iounmap(pinfo->frame_buffer);
+	iounmap(pinfo->platinum_regs);
 	release_mem_region(pinfo->cmap_regs_phys, 0x1000);
-	iounmap((void *)pinfo->cmap_regs);
+	iounmap(pinfo->cmap_regs);
 
 	framebuffer_release(info);
 

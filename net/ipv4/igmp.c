@@ -1778,12 +1778,12 @@ int ip_mc_source(int add, int omode, struct sock *sk, struct
 			goto done;
 		rv = !0;
 		for (i=0; i<psl->sl_count; i++) {
-			rv = memcmp(&psl->sl_addr, &mreqs->imr_multiaddr,
+			rv = memcmp(&psl->sl_addr[i], &mreqs->imr_sourceaddr,
 				sizeof(__u32));
-			if (rv >= 0)
+			if (rv == 0)
 				break;
 		}
-		if (!rv)	/* source not found */
+		if (rv)		/* source not found */
 			goto done;
 
 		/* update the interface filter */
@@ -1825,9 +1825,9 @@ int ip_mc_source(int add, int omode, struct sock *sk, struct
 	}
 	rv = 1;	/* > 0 for insert logic below if sl_count is 0 */
 	for (i=0; i<psl->sl_count; i++) {
-		rv = memcmp(&psl->sl_addr, &mreqs->imr_multiaddr,
+		rv = memcmp(&psl->sl_addr[i], &mreqs->imr_sourceaddr,
 			sizeof(__u32));
-		if (rv >= 0)
+		if (rv == 0)
 			break;
 	}
 	if (rv == 0)		/* address already there is an error */

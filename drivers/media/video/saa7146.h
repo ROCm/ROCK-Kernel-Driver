@@ -78,7 +78,7 @@ struct saa7146
 	unsigned char boardcfg[64];	/* 64 bytes of config from eeprom */
 	unsigned long saa7146_adr;   /* bus address of IO mem from PCI BIOS */
 	struct saa7146_window win;
-	unsigned char *saa7146_mem; /* pointer to mapped IO memory */
+	unsigned char __iomem *saa7146_mem; /* pointer to mapped IO memory */
 	struct device_open open_data[MAX_OPENS];
 #define MAX_MARKS 16
 	/* for a/v sync */
@@ -95,10 +95,10 @@ struct saa7146
 #endif
 
 #ifdef _ALPHA_SAA7146
-#define saawrite(dat,adr)    writel((dat),(char *) (saa->saa7146_adr+(adr)))
+#define saawrite(dat,adr)    writel((dat), saa->saa7146_adr+(adr))
 #define saaread(adr)         readl(saa->saa7146_adr+(adr))
 #else
-#define saawrite(dat,adr)    writel((dat), (char *) (saa->saa7146_mem+(adr)))
+#define saawrite(dat,adr)    writel((dat), saa->saa7146_mem+(adr))
 #define saaread(adr)         readl(saa->saa7146_mem+(adr))
 #endif
 

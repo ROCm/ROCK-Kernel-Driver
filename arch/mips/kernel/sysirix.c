@@ -287,9 +287,9 @@ asmlinkage int irix_syssgi(struct pt_regs *regs)
 		int pid = (int) regs->regs[base + 5];
 		char *buf = (char *) regs->regs[base + 6];
 		struct task_struct *p;
-		char comm[16];
+		char tcomm[sizeof(current->comm)];
 
-		retval = verify_area(VERIFY_WRITE, buf, 16);
+		retval = verify_area(VERIFY_WRITE, buf, sizeof(tcomm));
 		if (retval)
 			break;
 		read_lock(&tasklist_lock);
@@ -299,11 +299,11 @@ asmlinkage int irix_syssgi(struct pt_regs *regs)
 			retval = -ESRCH;
 			break;
 		}
-		memcpy(comm, p->comm, 16);
+		get_task_comm(tcomm, p);
 		read_unlock(&tasklist_lock);
 
 		/* XXX Need to check sizes. */
-		copy_to_user(buf, p->comm, 16);
+		copy_to_user(buf, tcomm, sizeof(tcomm));
 		retval = 0;
 		break;
 	}
@@ -924,8 +924,8 @@ asmlinkage int irix_getdomainname(char *name, int len)
 		return error;
 
 	down_read(&uts_sem);
-	if(len > (__NEW_UTS_LEN - 1))
-		len = __NEW_UTS_LEN - 1;
+	if (len > __NEW_UTS_LEN)
+		len = __NEW_UTS_LEN;
 	error = 0;
 	if (copy_to_user(name, system_utsname.domainname, len))
 		error = -EFAULT;

@@ -1,5 +1,5 @@
 /*
- * linux/include/asm-arm/arch-ixp2400/system.h
+ * linux/include/asm-arm/arch-ixp2000/system.h
  *
  * Copyright (C) 2002 Intel Corp.
  *

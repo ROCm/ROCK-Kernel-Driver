@@ -143,6 +143,7 @@ typedef struct {			/* Card handler routines	*/
 #define ecard_resource_end(ec,nr)	((ec)->resource[nr].end)
 #define ecard_resource_len(ec,nr)	((ec)->resource[nr].end - \
 					 (ec)->resource[nr].start + 1)
+#define ecard_resource_flags(ec,nr)	((ec)->resource[nr].flags)
 
 /*
  * This contains all the info needed on an expansion card

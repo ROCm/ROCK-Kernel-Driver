@@ -44,7 +44,7 @@
 #include "dmxdev.h"
 #include "dvbdev.h"
 #include "bt878.h"
-#include "dst-bt878.h"
+#include "dst_priv.h"
 
 
 /**************************************/
@@ -559,22 +559,11 @@ static struct pci_driver bt878_pci_driver = {
 
 static int bt878_pci_driver_registered = 0;
 
-/* This will be used later by dvb-bt8xx to only use the audio
- * dma of certain cards */
-int bt878_find_audio_dma(void)
-{
-	// pci_register_driver(&bt878_pci_driver);
-	bt878_pci_driver_registered = 1;
-	return 0;
-}
-
-EXPORT_SYMBOL(bt878_find_audio_dma);
-
 /*******************************/
 /* Module management functions */
 /*******************************/
 
-int bt878_init_module(void)
+static int bt878_init_module(void)
 {
 	bt878_num = 0;
 	bt878_pci_driver_registered = 0;
@@ -586,13 +575,13 @@ int bt878_init_module(void)
 /*
         bt878_check_chipset();
 */
-	/* later we register inside of bt878_find_audio_dma
+	/* later we register inside of bt878_find_audio_dma()
 	 * because we may want to ignore certain cards */
 	bt878_pci_driver_registered = 1;
 	return pci_module_init(&bt878_pci_driver);
 }
 
-void bt878_cleanup_module(void)
+static void bt878_cleanup_module(void)
 {
 	if (bt878_pci_driver_registered) {
 		bt878_pci_driver_registered = 0;
@@ -601,12 +590,10 @@ void bt878_cleanup_module(void)
 	return;
 }
 
-EXPORT_SYMBOL(bt878_init_module);
-EXPORT_SYMBOL(bt878_cleanup_module);
 module_init(bt878_init_module);
 module_exit(bt878_cleanup_module);
 
-
+//MODULE_AUTHOR("XXX");
 MODULE_LICENSE("GPL");
 
 /*

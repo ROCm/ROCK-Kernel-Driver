@@ -72,11 +72,6 @@ struct pxamci_host {
 	unsigned int		dma_dir;
 };
 
-/*
- * The base MMC clock rate
- */
-#define CLOCKRATE	20000000
-
 static inline unsigned int ns_to_clocks(unsigned int ns)
 {
 	return (ns * (CLOCKRATE / 1000000) + 999) / 1000;
@@ -127,7 +122,7 @@ static void pxamci_setup_data(struct pxamci_host *host, struct mmc_data *data)
 	unsigned int nob = data->blocks;
 	unsigned int timeout;
 	u32 dcmd;
-	int i, len;
+	int i;
 
 	host->data = data;
 
@@ -244,7 +239,24 @@ static int pxamci_cmd_done(struct pxamci_host *host, unsigned int stat)
 	if (stat & STAT_TIME_OUT_RESPONSE) {
 		cmd->error = MMC_ERR_TIMEOUT;
 	} else if (stat & STAT_RES_CRC_ERR && cmd->flags & MMC_RSP_CRC) {
+#ifdef CONFIG_PXA27x
+		/*
+		 * workaround for erratum #42:
+		 * Intel PXA27x Family Processor Specification Update Rev 001
+		 */
+		if (cmd->opcode == MMC_ALL_SEND_CID ||
+		    cmd->opcode == MMC_SEND_CSD ||
+		    cmd->opcode == MMC_SEND_CID) {
+			/* a bogus CRC error can appear if the msb of
+			   the 15 byte response is a one */
+			if ((cmd->resp[0] & 0x80000000) == 0)
+				cmd->error = MMC_ERR_BADCRC;
+		} else {
+			DBG("ignoring CRC from command %d - *risky*\n",cmd->opcode);
+		}
+#else
 		cmd->error = MMC_ERR_BADCRC;
+#endif
 	}
 
 	pxamci_disable_irq(host, END_CMD_RES);
@@ -363,15 +375,14 @@ static void pxamci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		if (CLOCKRATE / clk > ios->clock)
 			clk <<= 1;
 		host->clkrt = fls(clk) - 1;
+		pxa_set_cken(CKEN12_MMC, 1);
 
 		/*
 		 * we write clkrt on the next command
 		 */
-	} else if (readl(host->base + MMC_STAT) & STAT_CLK_EN) {
-		/*
-		 * Ensure that the clock is off.
-		 */
-		writel(STOP_CLOCK, host->base + MMC_STRPCL);
+	} else {
+		pxamci_stop_clock(host);
+		pxa_set_cken(CKEN12_MMC, 0);
 	}
 
 	if (host->power_mode != ios->power_mode) {
@@ -429,8 +440,8 @@ static int pxamci_probe(struct device *dev)
 	}
 
 	mmc->ops = &pxamci_ops;
-	mmc->f_min = 312500;
-	mmc->f_max = 20000000;
+	mmc->f_min = CLOCKRATE_MIN;
+	mmc->f_max = CLOCKRATE_MAX;
 
 	/*
 	 * We can do SG-DMA, but we don't because we never know how much
@@ -460,8 +471,7 @@ static int pxamci_probe(struct device *dev)
 	spin_lock_init(&host->lock);
 	host->res = r;
 	host->irq = irq;
-	host->imask = TXFIFO_WR_REQ|RXFIFO_RD_REQ|CLK_IS_OFF|STOP_CMD|
-		      END_CMD_RES|PRG_DONE|DATA_TRAN_DONE;
+	host->imask = MMC_I_MASK_ALL;
 
 	host->base = ioremap(r->start, SZ_4K);
 	if (!host->base) {
@@ -477,10 +487,6 @@ static int pxamci_probe(struct device *dev)
 	writel(0, host->base + MMC_SPI);
 	writel(64, host->base + MMC_RESTO);
 	writel(host->imask, host->base + MMC_I_MASK);
-
-	pxa_gpio_mode(GPIO6_MMCCLK_MD);
-	pxa_gpio_mode(GPIO8_MMCCS0_MD);
-	pxa_set_cken(CKEN12_MMC, 1);
 
 	host->dma = pxa_request_dma(DRIVER_NAME, DMA_PRIO_LOW,
 				    pxamci_dma_irq, host);
@@ -536,14 +542,13 @@ static int pxamci_remove(struct device *dev)
 		       END_CMD_RES|PRG_DONE|DATA_TRAN_DONE,
 		       host->base + MMC_I_MASK);
 
-		pxa_set_cken(CKEN12_MMC, 0);
+		DRCMRRXMMC = 0;
+		DRCMRTXMMC = 0;
 
 		free_irq(host->irq, host);
 		pxa_free_dma(host->dma);
 		iounmap(host->base);
 		dma_free_coherent(dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
-
-		pxa_set_cken(CKEN12_MMC, 0);
 
 		release_resource(host->res);
 

@@ -42,6 +42,8 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include <linux/module.h>
+
 #include <acpi/acpi.h>
 
 #define _COMPONENT          ACPI_HARDWARE
@@ -112,6 +114,7 @@ acpi_get_timer (
 
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_get_timer);
 
 
 /******************************************************************************
@@ -196,5 +199,5 @@ acpi_get_timer_duration (
 	*time_elapsed = (u32) quotient;
 	return_ACPI_STATUS (status);
 }
-
+EXPORT_SYMBOL(acpi_get_timer_duration);
 

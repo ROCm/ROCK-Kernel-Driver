@@ -562,7 +562,8 @@ tgafb_imageblit(struct fb_info *info, const struct fb_image *image)
 	unsigned long rincr, line_length, shift, pos, is8bpp;
 	unsigned long i, j;
 	const unsigned char *data;
-	void *regs_base, *fb_base;
+	void __iomem *regs_base;
+	void __iomem *fb_base;
 
 	dx = image->dx;
 	dy = image->dy;
@@ -785,7 +786,8 @@ tgafb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 	int is8bpp = info->var.bits_per_pixel == 8;
 	u32 dx, dy, width, height, vxres, vyres, color;
 	unsigned long pos, align, line_length, i, j;
-	void *regs_base, *fb_base;
+	void __iomem *regs_base;
+	void __iomem *fb_base;
 
 	dx = rect->dx;
 	dy = rect->dy;
@@ -912,7 +914,7 @@ copyarea_line_8bpp(struct fb_info *info, u32 dy, u32 sy,
 		   u32 height, u32 width)
 {
 	struct tga_par *par = (struct tga_par *) info->par;
-	void *tga_regs = par->tga_regs_base;
+	void __iomem *tga_regs = par->tga_regs_base;
 	unsigned long dpos, spos, i, n64;
 
 	/* Set up the MODE and PIXELSHIFT registers.  */
@@ -957,9 +959,10 @@ copyarea_line_32bpp(struct fb_info *info, u32 dy, u32 sy,
 		    u32 height, u32 width)
 {
 	struct tga_par *par = (struct tga_par *) info->par;
-	void *tga_regs = par->tga_regs_base;
-	void *tga_fb = par->tga_fb_base;
-	void *src, *dst;
+	void __iomem *tga_regs = par->tga_regs_base;
+	void __iomem *tga_fb = par->tga_fb_base;
+	void __iomem *src;
+	void __iomem *dst;
 	unsigned long i, n16;
 
 	/* Set up the MODE and PIXELSHIFT registers.  */
@@ -1010,7 +1013,8 @@ copyarea_foreward_8bpp(struct fb_info *info, u32 dx, u32 dy, u32 sx, u32 sy,
 	u32 smask_first, dmask_first, dmask_last;
 	int pixel_shift, need_prime, need_second;
 	unsigned long n64, n32, xincr_first;
-	void *tga_regs, *tga_fb;
+	void __iomem *tga_regs;
+	void __iomem *tga_fb;
 
 	yincr = line_length;
 	if (dy > sy) {
@@ -1098,7 +1102,8 @@ copyarea_foreward_8bpp(struct fb_info *info, u32 dx, u32 dy, u32 sx, u32 sy,
 
 	for (i = 0; i < height; ++i) {
 		unsigned long j;
-		void *sfb, *dfb;
+		void __iomem *sfb;
+		void __iomem *dfb;
 
 		sfb = tga_fb + spos;
 		dfb = tga_fb + dpos;
@@ -1120,7 +1125,7 @@ copyarea_foreward_8bpp(struct fb_info *info, u32 dx, u32 dy, u32 sx, u32 sy,
 			dfb += 32;
 		}
 
-		if (n64 && (((long)sfb | (long)dfb) & 63))
+		if (n64 && (((unsigned long)sfb | (unsigned long)dfb) & 63))
 			printk(KERN_ERR
 			       "tgafb: misaligned copy64 (s:%p, d:%p)\n",
 			       sfb, dfb);
@@ -1169,7 +1174,8 @@ copyarea_backward_8bpp(struct fb_info *info, u32 dx, u32 dy, u32 sx, u32 sy,
 	unsigned long depos, sepos, dealign, sealign;
 	u32 mask_first, mask_last;
 	unsigned long n32;
-	void *tga_regs, *tga_fb;
+	void __iomem *tga_regs;
+	void __iomem *tga_fb;
 
 	yincr = line_length;
 	if (dy > sy) {
@@ -1223,7 +1229,8 @@ copyarea_backward_8bpp(struct fb_info *info, u32 dx, u32 dy, u32 sx, u32 sy,
 
 	for (i = 0; i < height; ++i) {
 		unsigned long j;
-		void *sfb, *dfb;
+		void __iomem *sfb;
+		void __iomem *dfb;
 
 		sfb = tga_fb + sepos;
 		dfb = tga_fb + depos;
@@ -1380,7 +1387,7 @@ tgafb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
 		u32 pseudo_palette[16];
 	} *all;
 
-	void *mem_base;
+	void __iomem *mem_base;
 	unsigned long bar0_start, bar0_len;
 	u8 tga_type;
 	int ret;
@@ -1429,7 +1436,7 @@ tgafb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
 	all->info.flags = FBINFO_DEFAULT | FBINFO_HWACCEL_COPYAREA |
                           FBINFO_HWACCEL_IMAGEBLIT | FBINFO_HWACCEL_FILLRECT;
 	all->info.fbops = &tgafb_ops;
-	all->info.screen_base = (char *) all->par.tga_fb_base;
+	all->info.screen_base = all->par.tga_fb_base;
 	all->info.par = &all->par;
 	all->info.pseudo_palette = all->pseudo_palette;
 

@@ -79,11 +79,8 @@ extern asmlinkage void ddb5477_handle_int(void);
 extern int setup_irq(unsigned int irq, struct irqaction *irqaction);  
 static struct irqaction irq_cascade = { no_action, 0, CPU_MASK_NONE, "cascade", NULL, NULL };
 
-void
-ddb5477_irq_setup(void)
+void __init arch_init_irq(void)
 {
-	db_run(printk("ddb5477_irq_setup invoked.\n"));
-
 	/* by default, we disable all interrupts and route all vrc5477
 	 * interrupts to pin 0 (irq 2) */
 	ddb_out32(DDB_INTCTRL0, 0);

@@ -313,19 +313,19 @@ struct inquiry_entry *hci_inquiry_cache_lookup(struct hci_dev *hdev, bdaddr_t *b
 	BT_DBG("cache %p, %s", cache, batostr(bdaddr));
 
 	for (e = cache->list; e; e = e->next)
-		if (!bacmp(&e->info.bdaddr, bdaddr))
+		if (!bacmp(&e->data.bdaddr, bdaddr))
 			break;
 	return e;
 }
 
-void hci_inquiry_cache_update(struct hci_dev *hdev, struct inquiry_info *info)
+void hci_inquiry_cache_update(struct hci_dev *hdev, struct inquiry_data *data)
 {
 	struct inquiry_cache *cache = &hdev->inq_cache;
 	struct inquiry_entry *e;
 
-	BT_DBG("cache %p, %s", cache, batostr(&info->bdaddr));
+	BT_DBG("cache %p, %s", cache, batostr(&data->bdaddr));
 
-	if (!(e = hci_inquiry_cache_lookup(hdev, &info->bdaddr))) {
+	if (!(e = hci_inquiry_cache_lookup(hdev, &data->bdaddr))) {
 		/* Entry not in the cache. Add new one. */
 		if (!(e = kmalloc(sizeof(struct inquiry_entry), GFP_ATOMIC)))
 			return;
@@ -334,7 +334,7 @@ void hci_inquiry_cache_update(struct hci_dev *hdev, struct inquiry_info *info)
 		cache->list = e;
 	}
 
-	memcpy(&e->info, info, sizeof(*info));
+	memcpy(&e->data, data, sizeof(*data));
 	e->timestamp = jiffies;
 	cache->timestamp = jiffies;
 }
@@ -346,8 +346,16 @@ static int inquiry_cache_dump(struct hci_dev *hdev, int num, __u8 *buf)
 	struct inquiry_entry *e;
 	int copied = 0;
 
-	for (e = cache->list; e && copied < num; e = e->next, copied++)
-		memcpy(info++, &e->info, sizeof(*info));
+	for (e = cache->list; e && copied < num; e = e->next, copied++) {
+		struct inquiry_data *data = &e->data;
+		bacpy(&info->bdaddr, &data->bdaddr);
+		info->pscan_rep_mode	= data->pscan_rep_mode;
+		info->pscan_period_mode	= data->pscan_period_mode;
+		info->pscan_mode	= data->pscan_mode;
+		memcpy(info->dev_class, data->dev_class, 3);
+		info->clock_offset	= data->clock_offset;
+		info++;
+	}
 
 	BT_DBG("cache %p, copied %d", cache, copied);
 	return copied;

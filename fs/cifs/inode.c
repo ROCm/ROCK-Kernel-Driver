@@ -85,6 +85,13 @@ cifs_get_inode_info_unix(struct inode **pinode,
 			*pinode = new_inode(sb);
 			if(*pinode == NULL) 
 				return -ENOMEM;
+			/* Is an i_ino of zero legal? */
+			/* Are there sanity checks we can use to ensure that
+			the server is really filling in that field? */
+			if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SERVER_INUM) {
+				(*pinode)->i_ino = 
+					(unsigned long)findData.UniqueId;
+			} /* note ino incremented to unique num in new_inode */
 			insert_inode_hash(*pinode);
 		}
 			
@@ -244,6 +251,21 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 			*pinode = new_inode(sb);
 			if(*pinode == NULL)
 				return -ENOMEM;
+			/* Is an i_ino of zero legal? */
+			/* Are there sanity checks we can use to ensure that
+			the server is really filling in that field? */
+
+			/* We can not use the IndexNumber from either
+			Windows or Samba as it is frequently set to zero */
+			/* There may be higher info levels that work but
+			Are there Windows server or network appliances
+			for which IndexNumber field is not guaranteed unique? */
+		
+			/* if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SERVER_INUM) {
+				(*pinode)->i_ino = 
+					(unsigned long)pfindData->IndexNumber;
+			} */ /*NB: ino incremented to unique num in new_inode*/
+
 			insert_inode_hash(*pinode);
 		}
 		inode = *pinode;
@@ -273,10 +295,10 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 			/* new inode, can safely set these fields */
 			inode->i_mode = cifs_sb->mnt_file_mode;
 
-		if (attr & ATTR_REPARSE) {
-	/* Can IFLNK be set as it basically is on windows with IFREG or IFDIR? */
-			inode->i_mode |= S_IFLNK;
-		} else if (attr & ATTR_DIRECTORY) {
+/*		if (attr & ATTR_REPARSE)  */
+/* 		We no longer handle these as symlinks because we could not */
+/* 		follow them due to the absolute path with drive letter */
+		if (attr & ATTR_DIRECTORY) {
 	/* override default perms since we do not do byte range locking on dirs */
 			inode->i_mode = cifs_sb->mnt_dir_mode;
 			inode->i_mode |= S_IFDIR;
@@ -958,6 +980,16 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 			 via Handle (SetFileInfo) instead of by path */
 		rc = CIFSSMBSetTimes(xid, pTcon, full_path, &time_buf,
 				cifs_sb->local_nls);
+		if(rc == -EOPNOTSUPP) {
+			cFYI(1,("OS2 level of SetPathInfo not implemented"));
+			/* Need to convert time_buf into old format, 
+			but probably better to do that inside the function
+			below rather than here */
+			/* Better to return EOPNOTSUPP until function
+			below is ready */
+			/* CIFSSMBSetTimesLegacy(xid, pTcon, full_path,
+        	        FILE_INFO_STANDARD * data, cifs_sb->local_nls); */
+		}
 	}
 
 	/* do not  need local check to inode_check_ok since the server does that */

@@ -216,7 +216,7 @@ static void __exit ixp4xx_wdt_exit(void)
 module_init(ixp4xx_wdt_init);
 module_exit(ixp4xx_wdt_exit);
 
-MODULE_AUTHOR("Deepak Saxena <dsaxena@plexity.net">);
+MODULE_AUTHOR("Deepak Saxena <dsaxena@plexity.net>");
 MODULE_DESCRIPTION("IXP4xx Network Processor Watchdog");
 
 module_param(heartbeat, int, 0);

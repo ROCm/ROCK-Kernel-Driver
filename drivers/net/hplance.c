@@ -76,25 +76,31 @@ static int __devinit hplance_init_one(struct dio_dev *d,
 				const struct dio_device_id *ent)
 {
 	struct net_device *dev;
-	int err;
+	int err = -ENOMEM;
 
 	dev = alloc_etherdev(sizeof(struct hplance_private));
 	if (!dev)
-		return -ENOMEM;
+		goto out;
 
-	if (!request_mem_region(d->resource.start, d->resource.end-d->resource.start, d->name))
-		return -EBUSY;
+	err = -EBUSY;
+	if (!request_mem_region(dio_resource_start(d),
+				dio_resource_len(d), d->name))
+		goto out_free_netdev;
 
-	SET_MODULE_OWNER(dev);
-        
 	hplance_init(dev, d);
 	err = register_netdev(dev);
-	if (err) {
-		free_netdev(dev);
-		return err;
-	}
+	if (err)
+		goto out_release_mem_region;
+
 	dio_set_drvdata(d, dev);
 	return 0;
+
+ out_release_mem_region:
+	release_mem_region(dio_resource_start(d), dio_resource_len(d));
+ out_free_netdev:
+	free_netdev(dev);
+ out:
+	return err;
 }
 
 static void __devexit hplance_remove_one(struct dio_dev *d)
@@ -102,6 +108,7 @@ static void __devexit hplance_remove_one(struct dio_dev *d)
 	struct net_device *dev = dio_get_drvdata(d);
 
 	unregister_netdev(dev);
+	release_mem_region(dio_resource_start(d), dio_resource_len(d));
 	free_netdev(dev);
 }
 

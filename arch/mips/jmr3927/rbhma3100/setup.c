@@ -184,17 +184,12 @@ unsigned long jmr3927_do_gettimeoffset(void)
 }
 
 
-#if defined(CONFIG_BLK_DEV_INITRD)
-extern unsigned long __rd_start, __rd_end, initrd_start, initrd_end;
-#endif
-
 //#undef DO_WRITE_THROUGH
 #define DO_WRITE_THROUGH
 #define DO_ENABLE_CACHE
 
 extern char * __init prom_getcmdline(void);
 static void jmr3927_board_init(void);
-extern void jmr3927_irq_setup(void);
 extern struct resource pci_io_resource;
 extern struct resource pci_mem_resource;
 
@@ -203,7 +198,6 @@ static void __init jmr3927_setup(void)
 	extern int panic_timeout;
 	char *argptr;
 
-	irq_setup = jmr3927_irq_setup;
 	set_io_port_base(JMR3927_PORT_BASE + JMR3927_PCIIO);
 
 	board_time_init = jmr3927_time_init;

@@ -466,6 +466,8 @@ static int unix_dgram_recvmsg(struct kiocb *, struct socket *,
 			      struct msghdr *, size_t, int);
 static int unix_dgram_connect(struct socket *, struct sockaddr *,
 			      int, int);
+static int unix_seqpacket_sendmsg(struct kiocb *, struct socket *,
+				  struct msghdr *, size_t);
 
 static struct proto_ops unix_stream_ops = {
 	.family =	PF_UNIX,
@@ -524,7 +526,7 @@ static struct proto_ops unix_seqpacket_ops = {
 	.shutdown =	unix_shutdown,
 	.setsockopt =	sock_no_setsockopt,
 	.getsockopt =	sock_no_getsockopt,
-	.sendmsg =	unix_dgram_sendmsg,
+	.sendmsg =	unix_seqpacket_sendmsg,
 	.recvmsg =	unix_dgram_recvmsg,
 	.mmap =		sock_no_mmap,
 	.sendpage =	sock_no_sendpage,
@@ -1354,9 +1356,11 @@ restart:
 	if (other->sk_shutdown & RCV_SHUTDOWN)
 		goto out_unlock;
 
-	err = security_unix_may_send(sk->sk_socket, other->sk_socket);
-	if (err)
-		goto out_unlock;
+	if (sk->sk_type != SOCK_SEQPACKET) {
+		err = security_unix_may_send(sk->sk_socket, other->sk_socket);
+		if (err)
+			goto out_unlock;
+	}
 
 	if (unix_peer(other) != sk &&
 	    (skb_queue_len(&other->sk_receive_queue) >
@@ -1506,6 +1510,25 @@ out_err:
 	return sent ? : err;
 }
 
+static int unix_seqpacket_sendmsg(struct kiocb *kiocb, struct socket *sock,
+				  struct msghdr *msg, size_t len)
+{
+	int err;
+	struct sock *sk = sock->sk;
+	
+	err = sock_error(sk);
+	if (err)
+		return err;
+
+	if (sk->sk_state != TCP_ESTABLISHED)
+		return -ENOTCONN;
+
+	if (msg->msg_namelen)
+		msg->msg_namelen = 0;
+
+	return unix_dgram_sendmsg(kiocb, sock, msg, len);
+}
+                                                                                            
 static void unix_copy_addr(struct msghdr *msg, struct sock *sk)
 {
 	struct unix_sock *u = unix_sk(sk);

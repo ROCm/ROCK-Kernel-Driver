@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2001,2002,2003 Broadcom Corporation
+ * Copyright (C) 2004 by Ralf Baechle (ralf@linux-mips.org)
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -36,9 +37,9 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/console.h>
+#include <linux/tty.h>
 
 #include <asm/io.h>
-#include <asm/pci_channel.h>
 
 #include <asm/sibyte/sb1250_defs.h>
 #include <asm/sibyte/sb1250_regs.h>
@@ -87,6 +88,12 @@ static inline void WRITECFG32(u32 addr, u32 data)
 int pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
 	return dev->irq;
+}
+
+/* Do platform specific device initialization at pci_enable_device() time */
+int pcibios_plat_dev_init(struct pci_dev *dev)
+{
+	return 0;
 }
 
 /*
@@ -181,22 +188,22 @@ struct pci_ops sb1250_pci_ops = {
 
 static struct resource sb1250_mem_resource = {
 	.name	= "SB1250 PCI MEM",
-	.start	= 0x14000000UL,
-	.end	= 0x17ffffffUL,
+	.start	= 0x40000000UL,
+	.end	= 0x5fffffffUL,
 	.flags	= IORESOURCE_MEM,
 };
                                                                                 
 static struct resource sb1250_io_resource = {
-	.name	= "SB1250 IO MEM",
-	.start	= 0x14000000UL,
-	.end	= 0x17ffffffUL,
+	.name	= "SB1250 PCI I/O",
+	.start	= 0x00000000UL,
+	.end	= 0x01ffffffUL,
 	.flags	= IORESOURCE_IO,
 };
 
 struct pci_controller sb1250_controller = {
 	.pci_ops	= &sb1250_pci_ops,
 	.mem_resource	= &sb1250_mem_resource,
-	.io_resource	= &sb1250_io_resource
+	.io_resource	= &sb1250_io_resource,
 };
 
 static int __init sb1250_pcibios_init(void)
@@ -208,8 +215,8 @@ static int __init sb1250_pcibios_init(void)
 	/* CFE will assign PCI resources */
 	pci_probe_only = 1;
 
-	/* set resource limit to avoid errors */
-	ioport_resource.end = 0x0000ffff;	/* 32MB reserved by sb1250 */
+	/* Set I/O resource limits.  */
+	ioport_resource.end = 0x01ffffff;	/* 32MB accessible by sb1250 */
 	iomem_resource.end = 0xffffffff;	/* no HT support yet */
 
 	cfg_space =

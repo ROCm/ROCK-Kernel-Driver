@@ -1481,7 +1481,7 @@ static inline struct lanai_vcc *new_lanai_vcc(void)
 	struct lanai_vcc *lvcc;
 	lvcc = (struct lanai_vcc *) kmalloc(sizeof(*lvcc), GFP_KERNEL);
 	if (likely(lvcc != NULL)) {
-		lvcc->vbase = 0;
+		lvcc->vbase = NULL;
 		lvcc->rx.atmvcc = lvcc->tx.atmvcc = NULL;
 		lvcc->nref = 0;
 		memset(&lvcc->stats, 0, sizeof lvcc->stats);
@@ -1565,7 +1565,7 @@ static inline void host_vcc_unbind(struct lanai_dev *lanai,
 	if (lvcc->vbase == 0)
 		return;	/* This vcc was never bound */
 	DPRINTK("Unbinding vci %d\n", lvcc->vci);
-	lvcc->vbase = 0;
+	lvcc->vbase = NULL;
 	lanai->vccs[lvcc->vci] = NULL;
 #ifdef USE_POWERDOWN
 	if (--lanai->nbound == 0) {
@@ -2279,7 +2279,7 @@ static int __init lanai_dev_open(struct atm_dev *atmdev)
 	lanai->conf1 = reg_read(lanai, Config1_Reg) | CONFIG1_POWERDOWN;
 	conf1_write(lanai);
 #endif
-	iounmap((void *) lanai->base);
+	iounmap(lanai->base);
     error_pci:
 	pci_disable_device(lanai->pci);
     error:
@@ -2309,7 +2309,7 @@ static void lanai_dev_close(struct atm_dev *atmdev)
 	pci_disable_device(lanai->pci);
 	vcc_table_deallocate(lanai);
 	service_buffer_deallocate(lanai);
-	iounmap((void *) lanai->base);
+	iounmap(lanai->base);
 	kfree(lanai);
 }
 

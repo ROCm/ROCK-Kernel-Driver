@@ -15,10 +15,8 @@
 
 #define MAX_ADAPTER_NUM 	4
 #define MAX_SG_LIST_BUF 	16	/* Not used */
-#define MAX_CMD_PER_LUN 	32
-#define MAX_CMD_QUEUE		MAX_CMD_PER_LUN+MAX_CMD_PER_LUN/2+1	
 #define MAX_SCSI_ID		8
-#define MAX_SRB_CNT		MAX_CMD_QUEUE+1	/* Max number of started commands */
+#define MAX_SRB_CNT		50	/* Max number of started commands */
 
 #define SEL_TIMEOUT		153	/* 250 ms selection timeout (@ 40 MHz) */
 
@@ -90,8 +88,6 @@ struct dc390_srb	*pGoingSRB;
 struct dc390_srb	*pGoingLast;
 struct dc390_srb	*pActiveSRB;
 u8		GoingSRBCnt;
-
-u8		MaxCommand;
 
 u32		TagMask;
 

@@ -118,12 +118,7 @@ void atlas_hw0_irqdispatch(struct pt_regs *regs)
 	do_IRQ(irq, regs);
 }
 
-#ifdef CONFIG_KGDB
-extern void breakpoint(void);
-extern int remote_debug;
-#endif
-
-void __init init_IRQ(void)
+void __init arch_init_irq(void)
 {
 	int i;
 
@@ -145,11 +140,4 @@ void __init init_IRQ(void)
 		irq_desc[i].handler	= &atlas_irq_type;
 		spin_lock_init(&irq_desc[i].lock);
 	}
-
-#ifdef CONFIG_KGDB
-	if (remote_debug) {
-		set_debug_traps();
-		breakpoint();
-	}
-#endif
 }

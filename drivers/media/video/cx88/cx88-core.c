@@ -1121,7 +1121,7 @@ struct cx88_core* cx88_core_get(struct pci_dev *pci)
 	cx88_pci_quirks(core->name, pci);
 	core->lmmio = ioremap(pci_resource_start(pci,0),
 			      pci_resource_len(pci,0));
-	core->bmmio = (u8*)core->lmmio;
+	core->bmmio = (u8 __iomem *)core->lmmio;
 
 	/* board config */
 	core->board = UNSET;

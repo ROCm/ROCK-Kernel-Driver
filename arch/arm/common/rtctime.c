@@ -179,7 +179,7 @@ EXPORT_SYMBOL(rtc_update);
 
 
 static ssize_t
-rtc_read(struct file *file, char *buf, size_t count, loff_t *ppos)
+rtc_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long data;
@@ -215,7 +215,7 @@ rtc_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 	remove_wait_queue(&rtc_wait, &wait);
 
 	if (ret == 0) {
-		ret = put_user(data, (unsigned long *)buf);
+		ret = put_user(data, (unsigned long __user *)buf);
 		if (ret == 0)
 			ret = sizeof(unsigned long);
 	}
@@ -241,6 +241,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct rtc_ops *ops = file->private_data;
 	struct rtc_time tm;
 	struct rtc_wkalrm alrm;
+	void __user *uarg = (void __user *)arg;
 	int ret = -EINVAL;
 
 	switch (cmd) {
@@ -248,13 +249,13 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		ret = rtc_read_alarm(ops, &alrm);
 		if (ret)
 			break;
-		ret = copy_to_user((void *)arg, &alrm.time, sizeof(tm));
+		ret = copy_to_user(uarg, &alrm.time, sizeof(tm));
 		if (ret)
 			ret = -EFAULT;
 		break;
 
 	case RTC_ALM_SET:
-		ret = copy_from_user(&alrm.time, (void *)arg, sizeof(tm));
+		ret = copy_from_user(&alrm.time, uarg, sizeof(tm));
 		if (ret) {
 			ret = -EFAULT;
 			break;
@@ -272,7 +273,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	case RTC_RD_TIME:
 		rtc_read_time(ops, &tm);
-		ret = copy_to_user((void *)arg, &tm, sizeof(tm));
+		ret = copy_to_user(uarg, &tm, sizeof(tm));
 		if (ret)
 			ret = -EFAULT;
 		break;
@@ -282,11 +283,12 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			ret = -EACCES;
 			break;
 		}
-		ret = copy_from_user(&tm, (void *)arg, sizeof(tm));
-		if (ret == 0)
-			ret = rtc_set_time(ops, &tm);
-		else
+		ret = copy_from_user(&tm, uarg, sizeof(tm));
+		if (ret) {
 			ret = -EFAULT;
+			break;
+		}
+		ret = rtc_set_time(ops, &tm);
 		break;
 
 	case RTC_EPOCH_SET:
@@ -308,11 +310,11 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		break;
 
 	case RTC_EPOCH_READ:
-		ret = put_user(rtc_epoch, (unsigned long *)arg);
+		ret = put_user(rtc_epoch, (unsigned long __user *)uarg);
 		break;
 
 	case RTC_WKALM_SET:
-		ret = copy_from_user(&alrm, (void *)arg, sizeof(alrm));
+		ret = copy_from_user(&alrm, uarg, sizeof(alrm));
 		if (ret) {
 			ret = -EFAULT;
 			break;
@@ -324,7 +326,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		ret = rtc_read_alarm(ops, &alrm);
 		if (ret)
 			break;
-		ret = copy_to_user((void *)arg, &alrm, sizeof(alrm));
+		ret = copy_to_user(uarg, &alrm, sizeof(alrm));
 		if (ret)
 			ret = -EFAULT;
 		break;
@@ -478,7 +480,7 @@ int register_rtc(struct rtc_ops *ops)
 
 		ret = misc_register(&rtc_miscdev);
 		if (ret == 0)
-			create_proc_read_entry("driver/rtc", 0, 0,
+			create_proc_read_entry("driver/rtc", 0, NULL,
 					       rtc_read_proc, ops);
 	}
 	up(&rtc_sem);

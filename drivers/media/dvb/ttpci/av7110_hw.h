@@ -65,6 +65,9 @@ enum av7110_video_output_mode
 #define HPQOver		0x0008
 #define OSDQFull	0x0010		/* OSD Queue Full */
 #define OSDQOver	0x0020
+#define GPMQBusy	0x0040		/* Queue not empty, FW >= 261d */
+#define HPQBusy		0x0080
+#define OSDQBusy	0x0100
 
 /* hw section filter flags */
 #define	SECTION_EIT		0x01
@@ -368,6 +371,7 @@ extern int av7110_firmversion(struct av7110 *av7110);
 #define FW_4M_SDRAM(arm_app)      ((arm_app) & 0x40000000)
 #define FW_VERSION(arm_app)	  ((arm_app) & 0x0000FFFF)
 
+extern int av7110_wait_msgstate(struct av7110 *av7110, u16 flags);
 extern int av7110_fw_cmd(struct av7110 *av7110, int type, int com, int num, ...);
 extern int __av7110_send_fw_cmd(struct av7110 *av7110, u16* buf, int length);
 extern int av7110_send_fw_cmd(struct av7110 *av7110, u16* buf, int length);

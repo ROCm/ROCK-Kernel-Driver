@@ -1347,6 +1347,9 @@ int pcie_init(struct controller * ctrl,
 	info("HPC vendor_id %x device_id %x ss_vid %x ss_did %x\n", pdev->vendor, pdev->device, 
 		pdev->subsystem_vendor, pdev->subsystem_device);
 
+	if (pci_enable_device(pdev))
+		goto abort_free_ctlr;
+	
 	init_MUTEX(&ctrl->crit_sect);
 	/* setup wait queue */
 	init_waitqueue_head(&ctrl->queue);

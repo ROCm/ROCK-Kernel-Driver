@@ -176,6 +176,143 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 	return rc;
 }
 
+#ifdef CIFS_EXPERIMENTAL
+/* BB finish off this function, adding support for writing set of pages as iovec */
+/* and also adding support for operations that need to parse the response smb    */
+int
+CIFSSendRcv(const unsigned int xid, struct cifsSesInfo *ses,
+	    struct smb_hdr *in_buf, struct kvec * write_vector /* page list */, int *pbytes_returned, const int long_op)
+{
+	int rc = 0;
+	unsigned long timeout = 15 * HZ;
+	struct mid_q_entry *midQ = NULL;
+
+	if (ses == NULL) {
+		cERROR(1,("Null smb session"));
+		return -EIO;
+	}
+	if(ses->server == NULL) {
+		cERROR(1,("Null tcp session"));
+		return -EIO;
+	}
+	if(pbytes_returned == NULL)
+		return -EIO;
+	else
+		*pbytes_returned = 0;
+
+  
+
+	/* Ensure that we do not send more than 50 overlapping requests 
+	   to the same server. We may make this configurable later or
+	   use ses->maxReq */
+	if(long_op == -1) {
+		/* oplock breaks must not be held up */
+		atomic_inc(&ses->server->inFlight);
+	} else {
+		spin_lock(&GlobalMid_Lock); 
+		while(1) {        
+			if(atomic_read(&ses->server->inFlight) >= cifs_max_pending){
+				spin_unlock(&GlobalMid_Lock);
+				wait_event(ses->server->request_q,
+					atomic_read(&ses->server->inFlight)
+					 < cifs_max_pending);
+				spin_lock(&GlobalMid_Lock);
+			} else {
+				if(ses->server->tcpStatus == CifsExiting) {
+					spin_unlock(&GlobalMid_Lock);
+					return -ENOENT;
+				}
+
+			/* can not count locking commands against total since
+			   they are allowed to block on server */
+					
+				if(long_op < 3) {
+				/* update # of requests on the wire to server */
+					atomic_inc(&ses->server->inFlight);
+				}
+				spin_unlock(&GlobalMid_Lock);
+				break;
+			}
+		}
+	}
+	/* make sure that we sign in the same order that we send on this socket 
+	   and avoid races inside tcp sendmsg code that could cause corruption
+	   of smb data */
+
+	down(&ses->server->tcpSem); 
+
+	if (ses->server->tcpStatus == CifsExiting) {
+		rc = -ENOENT;
+		goto cifs_out_label;
+	} else if (ses->server->tcpStatus == CifsNeedReconnect) {
+		cFYI(1,("tcp session dead - return to caller to retry"));
+		rc = -EAGAIN;
+		goto cifs_out_label;
+	} else if (ses->status != CifsGood) {
+		/* check if SMB session is bad because we are setting it up */
+		if((in_buf->Command != SMB_COM_SESSION_SETUP_ANDX) && 
+			(in_buf->Command != SMB_COM_NEGOTIATE)) {
+			rc = -EAGAIN;
+			goto cifs_out_label;
+		} /* else ok - we are setting up session */
+	}
+	midQ = AllocMidQEntry(in_buf, ses);
+	if (midQ == NULL) {
+		up(&ses->server->tcpSem);
+		/* If not lock req, update # of requests on wire to server */
+		if(long_op < 3) {
+			atomic_dec(&ses->server->inFlight); 
+			wake_up(&ses->server->request_q);
+		}
+		return -ENOMEM;
+	}
+
+	if (in_buf->smb_buf_length > CIFSMaxBufSize + MAX_CIFS_HDR_SIZE - 4) {
+		up(&ses->server->tcpSem);
+		cERROR(1,
+		       ("Illegal length, greater than maximum frame, %d ",
+			in_buf->smb_buf_length));
+		DeleteMidQEntry(midQ);
+		/* If not lock req, update # of requests on wire to server */
+		if(long_op < 3) {
+			atomic_dec(&ses->server->inFlight); 
+			wake_up(&ses->server->request_q);
+		}
+		return -EIO;
+	}
+
+	/* BB can we sign efficiently in this path? */
+	rc = cifs_sign_smb(in_buf, ses, &midQ->sequence_number);
+
+	midQ->midState = MID_REQUEST_SUBMITTED;
+/*	rc = smb_send2(ses->server->ssocket, in_buf, in_buf->smb_buf_length, piovec,
+		      (struct sockaddr *) &(ses->server->addr.sockAddr));*/
+	if(rc < 0) {
+		DeleteMidQEntry(midQ);
+		up(&ses->server->tcpSem);
+		/* If not lock req, update # of requests on wire to server */
+		if(long_op < 3) {
+			atomic_dec(&ses->server->inFlight); 
+			wake_up(&ses->server->request_q);
+		}
+		return rc;
+	} else
+		up(&ses->server->tcpSem);
+cifs_out_label:
+	if(midQ)
+	        DeleteMidQEntry(midQ);
+                                                                                                                           
+	if(long_op < 3) {
+		atomic_dec(&ses->server->inFlight);
+		wake_up(&ses->server->request_q);
+	}
+
+	return rc;
+}
+
+
+#endif /* CIFS_EXPERIMENTAL */
+
 int
 SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	    struct smb_hdr *in_buf, struct smb_hdr *out_buf,
@@ -204,11 +341,11 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	} else {
 		spin_lock(&GlobalMid_Lock); 
 		while(1) {        
-			if(atomic_read(&ses->server->inFlight) >= CIFS_MAX_REQ){
+			if(atomic_read(&ses->server->inFlight) >= cifs_max_pending){
 				spin_unlock(&GlobalMid_Lock);
 				wait_event(ses->server->request_q,
 					atomic_read(&ses->server->inFlight)
-					 < CIFS_MAX_REQ);
+					 < cifs_max_pending);
 				spin_lock(&GlobalMid_Lock);
 			} else {
 				if(ses->server->tcpStatus == CifsExiting) {
@@ -260,7 +397,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		return -ENOMEM;
 	}
 
-	if (in_buf->smb_buf_length > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE - 4) {
+	if (in_buf->smb_buf_length > CIFSMaxBufSize + MAX_CIFS_HDR_SIZE - 4) {
 		up(&ses->server->tcpSem);
 		cERROR(1,
 		       ("Illegal length, greater than maximum frame, %d ",
@@ -307,20 +444,19 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		/* if signal pending do not hold up user for full smb timeout
 		but we still give response a change to complete */
 		timeout = 2 * HZ;
-		
 	}   
 
 	/* No user interrupts in wait - wreaks havoc with performance */
 	if(timeout != MAX_SCHEDULE_TIMEOUT) {
 		timeout += jiffies;
 		wait_event(ses->server->response_q,
-			(midQ->midState & MID_RESPONSE_RECEIVED) || 
+			(!(midQ->midState & MID_REQUEST_SUBMITTED)) || 
 			time_after(jiffies, timeout) || 
 			((ses->server->tcpStatus != CifsGood) &&
 			 (ses->server->tcpStatus != CifsNew)));
 	} else {
 		wait_event(ses->server->response_q,
-			(midQ->midState & MID_RESPONSE_RECEIVED) || 
+			(!(midQ->midState & MID_REQUEST_SUBMITTED)) || 
 			((ses->server->tcpStatus != CifsGood) &&
 			 (ses->server->tcpStatus != CifsNew)));
 	}
@@ -358,7 +494,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		return rc;
 	}
   
-	if (receive_len > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE) {
+	if (receive_len > CIFSMaxBufSize + MAX_CIFS_HDR_SIZE) {
 		cERROR(1,
 		       ("Frame too large received.  Length: %d  Xid: %d",
 			receive_len, xid));

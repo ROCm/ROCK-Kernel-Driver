@@ -13,6 +13,8 @@
 #ifdef __KERNEL__
 
 #include <linux/list.h>
+#include <linux/spinlock.h>
+#include <asm/atomic.h>
 
 #define MNT_NOSUID	1
 #define MNT_NODEV	2

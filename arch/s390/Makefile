@@ -34,8 +34,20 @@ cflags-$(CONFIG_MARCH_G5)   += $(call cc-option,-march=g5)
 cflags-$(CONFIG_MARCH_Z900) += $(call cc-option,-march=z900)
 cflags-$(CONFIG_MARCH_Z990) += $(call cc-option,-march=z990)
 
+# old style option for packed stacks
 ifeq ($(call cc-option-yn,-mkernel-backchain),y)
 cflags-$(CONFIG_PACK_STACK)  += -mkernel-backchain -D__PACK_STACK
+aflags-$(CONFIG_PACK_STACK)  += -D__PACK_STACK
+cflags-$(CONFIG_SMALL_STACK) += -D__SMALL_STACK
+aflags-$(CONFIG_SMALL_STACK) += -D__SMALL_STACK
+ifdef CONFIG_SMALL_STACK
+STACK_SIZE := $(shell echo $$(($(STACK_SIZE)/2)) )
+endif
+endif
+
+# new style option for packed stacks
+ifeq ($(call cc-option-yn,-mpacked-stack),y)
+cflags-$(CONFIG_PACK_STACK)  += -mpacked-stack -D__PACK_STACK
 aflags-$(CONFIG_PACK_STACK)  += -D__PACK_STACK
 cflags-$(CONFIG_SMALL_STACK) += -D__SMALL_STACK
 aflags-$(CONFIG_SMALL_STACK) += -D__SMALL_STACK

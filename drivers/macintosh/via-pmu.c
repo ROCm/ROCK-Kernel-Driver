@@ -72,7 +72,7 @@
 /* How many iterations between battery polls */
 #define BATTERY_POLLING_COUNT	2
 
-static volatile unsigned char *via;
+static volatile unsigned char __iomem *via;
 
 /* VIA registers - spaced 0x200 bytes apart */
 #define RS		0x200		/* skip between registers */
@@ -141,7 +141,7 @@ static struct device_node *vias;
 static int pmu_kind = PMU_UNKNOWN;
 static int pmu_fully_inited = 0;
 static int pmu_has_adb;
-static unsigned char *gpio_reg = NULL;
+static unsigned char __iomem *gpio_reg = NULL;
 static int gpio_irq = -1;
 static int gpio_irq_enabled = -1;
 static volatile int pmu_suspended = 0;
@@ -352,7 +352,7 @@ find_via_pmu(void)
 	} else
 		pmu_kind = PMU_UNKNOWN;
 
-	via = (volatile unsigned char *) ioremap(vias->addrs->address, 0x2000);
+	via = ioremap(vias->addrs->address, 0x2000);
 	
 	out_8(&via[IER], IER_CLR | 0x7f);	/* disable all intrs */
 	out_8(&via[IFR], 0x7f);			/* clear IFR */
@@ -1164,7 +1164,7 @@ wait_for_ack(void)
 static inline void
 send_byte(int x)
 {
-	volatile unsigned char *v = via;
+	volatile unsigned char __iomem *v = via;
 
 	out_8(&v[ACR], in_8(&v[ACR]) | SR_OUT | SR_EXT);
 	out_8(&v[SR], x);
@@ -1175,7 +1175,7 @@ send_byte(int x)
 static inline void
 recv_byte(void)
 {
-	volatile unsigned char *v = via;
+	volatile unsigned char __iomem *v = via;
 
 	out_8(&v[ACR], (in_8(&v[ACR]) & ~SR_OUT) | SR_EXT);
 	in_8(&v[SR]);		/* resets SR */
@@ -2630,8 +2630,8 @@ powerbook_sleep_3400(void)
 	unsigned int hid0;
 	unsigned long p;
 	struct adb_request sleep_req;
-	char *mem_ctrl;
-	unsigned int *mem_ctrl_sleep;
+	void __iomem *mem_ctrl;
+	unsigned int __iomem *mem_ctrl_sleep;
 
 	/* first map in the memory controller registers */
 	mem_ctrl = ioremap(PB3400_MEM_CTRL, 0x100);
@@ -2639,7 +2639,7 @@ powerbook_sleep_3400(void)
 		printk("powerbook_sleep_3400: ioremap failed\n");
 		return -ENOMEM;
 	}
-	mem_ctrl_sleep = (unsigned int *) (mem_ctrl + PB3400_MEM_CTRL_SLEEP);
+	mem_ctrl_sleep = mem_ctrl + PB3400_MEM_CTRL_SLEEP;
 
 	/* Allocate room for PCI save */
 	pbook_alloc_pci_save();
@@ -2977,7 +2977,7 @@ void pmu_device_init(void)
 
 #ifdef DEBUG_SLEEP
 static inline void  __pmac
-polled_handshake(volatile unsigned char *via)
+polled_handshake(volatile unsigned char __iomem *via)
 {
 	via[B] &= ~TREQ; eieio();
 	while ((via[B] & TACK) != 0)
@@ -2988,7 +2988,7 @@ polled_handshake(volatile unsigned char *via)
 }
 
 static inline void  __pmac
-polled_send_byte(volatile unsigned char *via, int x)
+polled_send_byte(volatile unsigned char __iomem *via, int x)
 {
 	via[ACR] |= SR_OUT | SR_EXT; eieio();
 	via[SR] = x; eieio();
@@ -2996,7 +2996,7 @@ polled_send_byte(volatile unsigned char *via, int x)
 }
 
 static inline int __pmac
-polled_recv_byte(volatile unsigned char *via)
+polled_recv_byte(volatile unsigned char __iomem *via)
 {
 	int x;
 
@@ -3012,7 +3012,7 @@ pmu_polled_request(struct adb_request *req)
 {
 	unsigned long flags;
 	int i, l, c;
-	volatile unsigned char *v = via;
+	volatile unsigned char __iomem *v = via;
 
 	req->complete = 1;
 	c = req->data[0];

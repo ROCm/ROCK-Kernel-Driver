@@ -200,7 +200,7 @@ config M586
 	bool "586/K5/5x86/6x86/6x86MX"
 	help
 	  Select this for an 586 or 686 series processor such as the AMD K5,
-	  the Intel 5x86 or 6x86, or the Intel 6x86MX.  This choice does not
+	  the Cyrix 5x86, 6x86 and 6x86MX.  This choice does not
 	  assume the RDTSC (Read Time Stamp Counter) instruction.
 
 config M586TSC
@@ -590,7 +590,7 @@ config X86_MCE_NONFATAL
 
 config X86_MCE_P4THERMAL
 	bool "check for P4 thermal throttling interrupt."
-	depends on X86_MCE && (X86_UP_APIC || SMP)
+	depends on X86_MCE && (X86_UP_APIC || SMP) && !X86_VISWS
 	help
 	  Enabling this feature will cause a message to be printed when the P4
 	  enters thermal throttling.
@@ -885,7 +885,7 @@ source kernel/power/Kconfig
 source "drivers/acpi/Kconfig"
 
 menu "APM (Advanced Power Management) BIOS Support"
-depends on PM
+depends on PM && !X86_VISWS
 
 config APM
 	tristate "APM (Advanced Power Management) BIOS support"

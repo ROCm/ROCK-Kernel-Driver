@@ -109,7 +109,7 @@ ret_from_solaris:
 	sra		%o0, 0, %o0
 	mov		%ulo(TSTATE_XCARRY | TSTATE_ICARRY), %g2
 	ldx		[%sp + PTREGS_OFF + PT_V9_TSTATE], %g3
-	cmp		%o0, -ENOIOCTLCMD
+	cmp		%o0, -ERESTART_RESTARTBLOCK
 	sllx		%g2, 32, %g2
 	bgeu,pn		%xcc, 1f
 	 andcc		%l6, _TIF_SYSCALL_TRACE, %l6	

@@ -11,8 +11,6 @@
 #include <asm/reboot.h>
 #include <asm/delay.h>
 
-#define jazz_kh ((keyboard_hardware *) JAZZ_KEYBOARD_ADDRESS)
-
 #define KBD_STAT_IBF		0x02	/* Keyboard input buffer full */
 
 static void jazz_write_output(unsigned char val)

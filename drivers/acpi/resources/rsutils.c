@@ -175,7 +175,7 @@ acpi_rs_get_crs_method_data (
  *              and the contents of the callers buffer is undefined.
  *
  ******************************************************************************/
-
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_rs_get_prs_method_data (
 	acpi_handle                     handle,
@@ -210,6 +210,7 @@ acpi_rs_get_prs_method_data (
 	acpi_ut_remove_reference (obj_desc);
 	return_ACPI_STATUS (status);
 }
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 
 /*******************************************************************************

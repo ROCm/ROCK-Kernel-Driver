@@ -600,6 +600,7 @@ static void ether1394_add_host (struct hpsb_host *host)
         }
 
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &host->device);
 
 	priv = netdev_priv(dev);
 

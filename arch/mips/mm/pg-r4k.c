@@ -224,7 +224,7 @@ static inline void build_cdex_p(void)
 	emit_instruction(mi);
 }
 
-static void __build_store_reg(int reg)
+static void __init __build_store_reg(int reg)
 {
 	union mips_instruction mi;
 	unsigned int width;
@@ -356,7 +356,7 @@ void __init build_clear_page(void)
 		case CPU_R10000:
 		case CPU_R12000:
 			pref_src_mode = Pref_LoadStreamed;
-			pref_dst_mode = Pref_StoreRetained;
+			pref_dst_mode = Pref_StoreStreamed;
 			break;
 
 		default:

@@ -17,10 +17,6 @@
 #define MAX_HWIFS	4
 #endif
 
-#if defined(CONFIG_ARCH_SA1100)
-# include <asm/arch/ide.h>	/* obsolete + broken */
-#endif
-
 #if !defined(CONFIG_ARCH_L7200)
 # define IDE_ARCH_OBSOLETE_INIT
 # ifdef CONFIG_ARCH_CLPS7500

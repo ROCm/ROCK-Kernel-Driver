@@ -42,6 +42,8 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include <linux/module.h>
+
 #include <acpi/acpi.h>
 
 #define _COMPONENT          ACPI_HARDWARE
@@ -110,7 +112,7 @@ acpi_set_firmware_waking_vector (
  * DESCRIPTION: Access function for firmware_waking_vector field in FACS
  *
  ******************************************************************************/
-
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_get_firmware_waking_vector (
 	acpi_physical_address *physical_address)
@@ -136,6 +138,7 @@ acpi_get_firmware_waking_vector (
 
 	return_ACPI_STATUS (AE_OK);
 }
+#endif
 
 
 /******************************************************************************
@@ -391,6 +394,7 @@ acpi_enter_sleep_state (
 
 	return_ACPI_STATUS (AE_OK);
 }
+EXPORT_SYMBOL(acpi_enter_sleep_state);
 
 
 /******************************************************************************
@@ -456,6 +460,7 @@ acpi_enter_sleep_state_s4bios (
 
 	return_ACPI_STATUS (AE_OK);
 }
+EXPORT_SYMBOL(acpi_enter_sleep_state_s4bios);
 
 
 /******************************************************************************

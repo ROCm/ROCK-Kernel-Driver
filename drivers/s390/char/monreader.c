@@ -116,7 +116,7 @@ dcss_mkname(char *ascii_name, char *ebcdic_name)
 }
 
 /*
- * print appropriate error message for segment_load()/segment_info()
+ * print appropriate error message for segment_load()/segment_type()
  * return code
  */
 static void
@@ -154,6 +154,10 @@ mon_segment_warn(int rc, char* seg_name)
 	case -ENOMEM:
 		P_WARNING("cannot load/query segment %s, out of memory\n",
 			  seg_name);
+		break;
+	case -ERANGE:
+		P_WARNING("cannot load/query segment %s, exceeds kernel "
+			  "mapping range\n", seg_name);
 		break;
 	default:
 		P_WARNING("cannot load/query segment %s, return value %i\n",
@@ -234,6 +238,7 @@ mon_send_reply(struct mon_msg *monmsg, struct mon_private *monpriv)
 	atomic_dec(&monpriv->msglim_count);
 	if (likely(!monmsg->msglim_reached)) {
 		monmsg->pos = 0;
+		monmsg->mca_offset = 0;
 		monpriv->read_index = (monpriv->read_index + 1) %
 				      MON_MSGLIM;
 		atomic_dec(&monpriv->read_ready);
@@ -325,6 +330,7 @@ mon_next_message(struct mon_private *monpriv)
 		monmsg->replied_msglim = 0;
 		monmsg->msglim_reached = 0;
 		monmsg->pos = 0;
+		monmsg->mca_offset = 0;
 		P_WARNING("read, message limit reached\n");
 		monpriv->read_index = (monpriv->read_index + 1) %
 				      MON_MSGLIM;
@@ -444,7 +450,7 @@ mon_open(struct inode *inode, struct file *filp)
 	}
 	P_INFO("open, established connection to *MONITOR service\n\n");
 	filp->private_data = monpriv;
-	return 0;
+	return nonseekable_open(inode, filp);
 
 out_unregister:
 	iucv_unregister_program(monpriv->iucv_handle);
@@ -497,6 +503,7 @@ mon_read(struct file *filp, char __user *data, size_t count, loff_t *ppos)
 	struct mon_private *monpriv = filp->private_data;
 	struct mon_msg *monmsg;
 	int ret;
+	u32 mce_start;
 
 	monmsg = mon_next_message(monpriv);
 	if (IS_ERR(monmsg))
@@ -516,13 +523,28 @@ mon_read(struct file *filp, char __user *data, size_t count, loff_t *ppos)
 	}
 
 	if (!monmsg->pos) {
-		monmsg->pos = mon_rec_start(monmsg);
+		monmsg->pos = mon_mca_start(monmsg) + monmsg->mca_offset;
 		mon_read_debug(monmsg, monpriv);
 	}
 	if (mon_check_mca(monmsg))
 		goto reply;
 
-	if (mon_rec_end(monmsg) > monmsg->pos) {
+	/* read monitor control element (12 bytes) first */
+	mce_start = mon_mca_start(monmsg) + monmsg->mca_offset;
+	if ((monmsg->pos >= mce_start) && (monmsg->pos < mce_start + 12)) {
+		count = min(count, (size_t) mce_start + 12 - monmsg->pos);
+		ret = copy_to_user(data, (void *) (unsigned long) monmsg->pos,
+				   count);
+		if (ret)
+			return -EFAULT;
+		monmsg->pos += count;
+		if (monmsg->pos == mce_start + 12)
+			monmsg->pos = mon_rec_start(monmsg);
+		goto out_copy;
+	}
+
+	/* read records */
+	if (monmsg->pos <= mon_rec_end(monmsg)) {
 		count = min(count, (size_t) mon_rec_end(monmsg) - monmsg->pos
 					    + 1);
 		ret = copy_to_user(data, (void *) (unsigned long) monmsg->pos,
@@ -530,14 +552,17 @@ mon_read(struct file *filp, char __user *data, size_t count, loff_t *ppos)
 		if (ret)
 			return -EFAULT;
 		monmsg->pos += count;
-		*ppos += count;
-		if (mon_rec_end(monmsg) == monmsg->pos)
+		if (monmsg->pos > mon_rec_end(monmsg))
 			mon_next_mca(monmsg);
-		return count;
+		goto out_copy;
 	}
 reply:
 	ret = mon_send_reply(monmsg, monpriv);
 	return ret;
+
+out_copy:
+	*ppos += count;
+	return count;
 }
 
 static unsigned int
@@ -581,7 +606,7 @@ mon_init(void)
 		return -ENODEV;
 	}
 
-	rc = segment_info(mon_dcss_name);
+	rc = segment_type(mon_dcss_name);
 	if (rc < 0) {
 		mon_segment_warn(rc, mon_dcss_name);
 		return rc;

@@ -34,8 +34,7 @@
 #ifndef ZFCP_DEF_H
 #define ZFCP_DEF_H
 
-/* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_DEF_REVISION "$Revision: 1.107 $"
+#define ZFCP_DEF_REVISION "$Revision: 1.111 $"
 
 /*************************** INCLUDES *****************************************/
 
@@ -70,6 +69,7 @@
 
 /********************* GENERAL DEFINES *********************************/
 
+/* zfcp version number, it consists of major, minor, and patch-level number */
 #define ZFCP_VERSION		"4.2.0"
 
 /**
@@ -1117,30 +1117,5 @@ zfcp_adapter_wait(struct zfcp_adapter *adapter)
 {
 	wait_event(adapter->remove_wq, atomic_read(&adapter->refcount) == 0);
 }
-
-
-/*
- *  stuff needed for callback handling
- */
-
-typedef void (*zfcp_cb_incoming_els_t) (struct zfcp_adapter *, void *);
-typedef void (*zfcp_cb_link_down_t) (struct zfcp_adapter *);
-typedef void (*zfcp_cb_link_up_t) (struct zfcp_adapter *);
-typedef void (*zfcp_cb_adapter_add_t) (struct zfcp_adapter *);
-typedef void (*zfcp_cb_port_add_t) (struct zfcp_port *);
-typedef void (*zfcp_cb_unit_add_t) (struct zfcp_unit *);
-
-struct zfcp_callbacks {
-	atomic_t refcount;
-	wait_queue_head_t wq;
-	zfcp_cb_incoming_els_t incoming_els;
-	zfcp_cb_link_down_t link_down;
-	zfcp_cb_link_up_t link_up;
-	zfcp_cb_adapter_add_t adapter_add;
-	zfcp_cb_port_add_t port_add;
-	zfcp_cb_unit_add_t unit_add;
-};
-
-extern struct zfcp_callbacks zfcp_callbacks;
 
 #endif /* ZFCP_DEF_H */

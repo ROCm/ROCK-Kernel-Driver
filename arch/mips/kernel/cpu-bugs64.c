@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003  Maciej W. Rozycki
+ * Copyright (C) 2003, 2004  Maciej W. Rozycki
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -13,6 +13,7 @@
 #include <linux/stddef.h>
 
 #include <asm/bugs.h>
+#include <asm/compiler.h>
 #include <asm/cpu.h>
 #include <asm/fpu.h>
 #include <asm/mipsregs.h>
@@ -82,7 +83,7 @@ static inline void mult_sh_align_mod(long *v1, long *v2, long *w,
 		".set	pop"
 		: "=&r" (lv1), "=r" (lw)
 		: "r" (m1), "r" (m2), "r" (s), "I" (0)
-		: "hi", "lo", "accum");
+		: "hi", "lo", GCC_REG_ACCUM);
 	/* We have to use single integers for m1 and m2 and a double
 	 * one for p to be sure the mulsidi3 gcc's RTL multiplication
 	 * instruction has the workaround applied.  Older versions of

@@ -28,15 +28,13 @@
  *	Firmware Version 7.65.00 (14:17 Jul 20, 1999)
  */
 
-unsigned short risc_code_version = 7*1024+65;
-
-unsigned char firmware_version[] = {7,65,0};
+static unsigned char firmware_version[] = {7,65,0};
 
 #define FW_VERSION_STRING "7.65.0"
 
-unsigned short risc_code_addr01 = 0x1000 ;
+static unsigned short risc_code_addr01 = 0x1000 ;
 
-unsigned short risc_code01[] = { 
+static unsigned short risc_code01[] = { 
 	0x0078, 0x103a, 0x0000, 0x4057, 0x0000, 0x2043, 0x4f50, 0x5952,
 	0x4947, 0x4854, 0x2031, 0x3939, 0x3520, 0x514c, 0x4f47, 0x4943,
 	0x2043, 0x4f52, 0x504f, 0x5241, 0x5449, 0x4f4e, 0x2049, 0x5350,
@@ -2097,5 +2095,5 @@ unsigned short risc_code01[] = {
 	0x0014, 0x878e, 0x0016, 0xa21c, 0x1035, 0xa8af, 0xa210, 0x3807,
 	0x300c, 0x817e, 0x872b, 0x8772, 0xa8a8, 0x0000, 0xdf21
 };
-unsigned short   risc_code_length01 = 0x4057;
+static unsigned short   risc_code_length01 = 0x4057;
 

@@ -203,7 +203,10 @@ struct smc_local {
 	u32	msg_enable;
 	u32	phy_type;
 	struct mii_if_info mii;
+
+	/* work queue */
 	struct work_struct phy_configure;
+	int	work_pending;
 
 	spinlock_t lock;
 
@@ -903,7 +906,7 @@ static void smc_phy_write(struct net_device *dev, int phyaddr, int phyreg,
 /*
  * Finds and reports the PHY address
  */
-static void smc_detect_phy(struct net_device *dev)
+static void smc_phy_detect(struct net_device *dev)
 {
 	struct smc_local *lp = netdev_priv(dev);
 	int phyaddr;
@@ -1155,6 +1158,7 @@ static void smc_phy_configure(void *data)
 
 smc_phy_configure_exit:
 	spin_unlock_irq(&lp->lock);
+	lp->work_pending = 0;
 }
 
 /*
@@ -1239,6 +1243,11 @@ static irqreturn_t smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	DBG(3, "%s: %s\n", dev->name, __FUNCTION__);
 
 	spin_lock(&lp->lock);
+
+	/* A preamble may be used when there is a potential race
+	 * between the interruptible transmit functions and this
+	 * ISR. */
+	SMC_INTERRUPT_PREAMBLE;
 
 	saved_pointer = SMC_GET_PTR();
 	mask = SMC_GET_INT_MASK();
@@ -1350,10 +1359,13 @@ static void smc_timeout(struct net_device *dev)
 	/*
 	 * Reconfiguring the PHY doesn't seem like a bad idea here, but
 	 * smc_phy_configure() calls msleep() which calls schedule_timeout()
-	 * which calls schedule().  Ence we use a work queue.
+	 * which calls schedule().  Hence we use a work queue.
 	 */
-	if (lp->phy_type != 0)
-		schedule_work(&lp->phy_configure);
+	if (lp->phy_type != 0) {
+		if (schedule_work(&lp->phy_configure)) {
+			lp->work_pending = 1;
+		}
+	}
 
 	/* We can accept TX packets again */
 	dev->trans_start = jiffies;
@@ -1537,7 +1549,18 @@ static int smc_close(struct net_device *dev)
 	smc_shutdown(dev);
 
 	if (lp->phy_type != 0) {
-		flush_scheduled_work();
+		/* We need to ensure that no calls to
+		   smc_phy_configure are pending.
+
+		   flush_scheduled_work() cannot be called because we
+		   are running with the netlink semaphore held (from
+		   devinet_ioctl()) and the pending work queue
+		   contains linkwatch_event() (scheduled by
+		   netif_carrier_off() above). linkwatch_event() also
+		   wants the netlink semaphore.
+		*/
+		while(lp->work_pending)
+			schedule();
 		smc_phy_powerdown(dev, lp->mii.phy_id);
 	}
 
@@ -1904,7 +1927,7 @@ static int __init smc_probe(struct net_device *dev, unsigned long ioaddr)
 	 * Locate the phy, if any.
 	 */
 	if (lp->version >= (CHIP_91100 << 4))
-		smc_detect_phy(dev);
+		smc_phy_detect(dev);
 
 	/* Set default parameters */
 	lp->msg_enable = NETIF_MSG_LINK;

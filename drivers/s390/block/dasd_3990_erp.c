@@ -5,7 +5,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 2000, 2001
  *
- * $Revision: 1.33 $
+ * $Revision: 1.34 $
  */
 
 #include <linux/timer.h>
@@ -461,6 +461,12 @@ dasd_3990_erp_action_4(struct dasd_ccw_req * erp, char *sense)
 			
 			dasd_3990_erp_block_queue(erp, 30*HZ);
 
+                } else if (sense[25] == 0x1E) {	/* busy */
+			DEV_MESSAGE(KERN_INFO, device,
+				    "busy - redriving request later, "
+				    "%d retries left",
+				    erp->retries);
+                        dasd_3990_erp_block_queue(erp, HZ);
 		} else {
 
 			/* no state change pending - retry */
@@ -1304,8 +1310,8 @@ dasd_3990_erp_data_check(struct dasd_ccw_req * erp, char *sense)
 			    "fetch mode active");
 
 		/* not possible to handle this situation in Linux */
-		panic("No way to inform appliction about the possibly "
-		      "incorret data");
+		panic("No way to inform application about the possibly "
+		      "incorrect data");
 
 	} else if (sense[2] & SNS2_ENV_DATA_PRESENT) {
 
@@ -2201,6 +2207,13 @@ dasd_3990_erp_inspect_32(struct dasd_ccw_req * erp, char *sense)
 				    "for the subsystem or device");
 
 			erp = dasd_3990_erp_action_4(erp, sense);
+			break;
+
+		case 0x1E:	/* busy */
+                        DEV_MESSAGE(KERN_DEBUG, device, "%s",
+				    "Busy condition exists "
+				    "for the subsystem or device");
+                        erp = dasd_3990_erp_action_4(erp, sense);
 			break;
 
 		default:	/* all others errors - default erp  */

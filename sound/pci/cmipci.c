@@ -2550,6 +2550,7 @@ static int snd_cmipci_free(cmipci_t *cm)
 	}
 #endif
 	pci_release_regions(cm->pci);
+	pci_disable_device(cm->pci);
 	kfree(cm);
 	return 0;
 }
@@ -2583,8 +2584,10 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 		return err;
 
 	cm = kcalloc(1, sizeof(*cm), GFP_KERNEL);
-	if (cm == NULL)
+	if (cm == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 
 	spin_lock_init(&cm->reg_lock);
 	init_MUTEX(&cm->open_mutex);
@@ -2598,6 +2601,7 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 
 	if ((err = pci_request_regions(pci, card->driver)) < 0) {
 		kfree(cm);
+		pci_disable_device(pci);
 		return err;
 	}
 	cm->iobase = pci_resource_start(pci, 0);

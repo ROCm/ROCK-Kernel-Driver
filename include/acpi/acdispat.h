@@ -62,10 +62,12 @@ acpi_ds_obj_stack_pop (
 	u32                             pop_count,
 	struct acpi_walk_state          *walk_state);
 
+#ifdef ACPI_FUTURE_USAGE
 void *
 acpi_ds_obj_stack_get_value (
 	u32                             index,
 	struct acpi_walk_state          *walk_state);
+#endif
 
 acpi_status
 acpi_ds_obj_stack_pop_object (
@@ -248,11 +250,13 @@ u8
 acpi_ds_is_method_value (
 	union acpi_operand_object       *obj_desc);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_object_type
 acpi_ds_method_data_get_type (
 	u16                             opcode,
 	u32                             index,
 	struct acpi_walk_state          *walk_state);
+#endif
 
 acpi_status
 acpi_ds_method_data_get_value (
@@ -440,9 +444,11 @@ acpi_ds_init_aml_walk (
 	struct acpi_parameter_info      *info,
 	u32                             pass_number);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_ds_obj_stack_delete_all (
 	struct acpi_walk_state          *walk_state);
+#endif
 
 acpi_status
 acpi_ds_obj_stack_pop_and_delete (
@@ -482,6 +488,7 @@ void
 acpi_ds_delete_walk_state_cache (
 	void);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_ds_result_insert (
 	void                            *object,
@@ -493,6 +500,7 @@ acpi_ds_result_remove (
 	union acpi_operand_object       **object,
 	u32                             index,
 	struct acpi_walk_state          *walk_state);
+#endif
 
 acpi_status
 acpi_ds_result_pop (

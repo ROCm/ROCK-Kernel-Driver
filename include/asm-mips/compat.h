@@ -132,10 +132,10 @@ static inline void *compat_ptr(compat_uptr_t uptr)
 
 static inline void *compat_alloc_user_space(long len)
 {
-	unsigned long sp = (unsigned long) current_thread_info() +
-	                    THREAD_SIZE - 32;
+	struct pt_regs *regs = (struct pt_regs *)
+		((unsigned long) current_thread_info() + THREAD_SIZE - 32) - 1;
 
-	return (void *) (sp - len);
+	return (void *) (regs->regs[29] - len);
 }
 
 #endif /* _ASM_COMPAT_H */

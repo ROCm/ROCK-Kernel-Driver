@@ -3,7 +3,6 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 
-#include <asm/pci_channel.h>
 #include <asm/debug.h>
 
 #include <asm/ddb5xxx/ddb5xxx.h>
@@ -52,6 +51,12 @@ static unsigned char irq_map[MAX_SLOT_NUM] = {
 int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
 	return irq_map[slot];
+}
+
+/* Do platform specific device initialization at pci_enable_device() time */
+int pcibios_plat_dev_init(struct pci_dev *dev)
+{
+	return 0;
 }
 
 void __init ddb_pci_reset_bus(void)

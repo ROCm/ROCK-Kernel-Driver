@@ -42,3 +42,9 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 
 	return irq_tab_mpc30x[slot];
 }
+
+/* Do platform specific device initialization at pci_enable_device() time */
+int pcibios_plat_dev_init(struct pci_dev *dev)
+{
+	return 0;
+}

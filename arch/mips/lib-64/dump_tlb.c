@@ -190,7 +190,7 @@ unsigned int vtop(void *address)
 	pgd = pgd_offset(current->mm, addr);
 	pmd = pmd_offset(pgd, addr);
 	pte = pte_offset(pmd, addr);
-	paddr = (KSEG1 | (unsigned int) pte_val(*pte)) & PAGE_MASK;
+	paddr = (CKSEG1 | (unsigned int) pte_val(*pte)) & PAGE_MASK;
 	paddr |= (addr & ~PAGE_MASK);
 
 	return paddr;

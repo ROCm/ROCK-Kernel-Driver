@@ -6,6 +6,8 @@
  * Carsten Langgaard, carstenl@mips.com
  * Copyright (C) 1999,2000 MIPS Technologies, Inc.  All rights reserved.
  *
+ * Copyright (C) 2004 by Ralf Baechle (ralf@linux-mips.org)
+ *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
  *  Free Software Foundation;  either version 2 of the  License, or (at your
@@ -30,8 +32,6 @@
 #include <linux/pci.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
-
-#include <asm/pci_channel.h>
 
 static struct resource pci_io_resource = {
 	.name	= "io pci IO space",

@@ -1778,7 +1778,7 @@ ret_sys_call:
 	 stx		%l0, [%curptr + TI_FLAGS]
 
 1:
-	cmp		%o0, -ENOIOCTLCMD
+	cmp		%o0, -ERESTART_RESTARTBLOCK
 	bgeu,pn		%xcc, 1f
 	 andcc		%l0, _TIF_SYSCALL_TRACE, %l6	
 80:

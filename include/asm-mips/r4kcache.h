@@ -26,7 +26,7 @@
  *  - We need a properly sign extended address for 64-bit code.  To get away
  *    without ifdefs we let the compiler do it by a type cast.
  */
-#define INDEX_BASE	((int) KSEG0)
+#define INDEX_BASE	CKSEG0
 
 #define cache_op(op,addr)						\
 	__asm__ __volatile__(						\

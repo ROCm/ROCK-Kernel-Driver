@@ -3,19 +3,20 @@
 #include <linux/string.h>
 #include "dvb_filter.h"
 
-unsigned int bitrates[3][16] =
+#if 0
+static unsigned int bitrates[3][16] =
 {{0,32,64,96,128,160,192,224,256,288,320,352,384,416,448,0},
  {0,32,48,56,64,80,96,112,128,160,192,224,256,320,384,0},
  {0,32,40,48,56,64,80,96,112,128,160,192,224,256,320,0}};
+#endif
 
-u32 freq[4] = {441, 480, 320, 0};
+static u32 freq[4] = {480, 441, 320, 0};
 
-unsigned int ac3_bitrates[32] =
+static unsigned int ac3_bitrates[32] =
     {32,40,48,56,64,80,96,112,128,160,192,224,256,320,384,448,512,576,640,
      0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-u32 ac3_freq[4] = {480, 441, 320, 0};
-u32 ac3_frames[3][32] =
+static u32 ac3_frames[3][32] =
     {{64,80,96,112,128,160,192,224,256,320,384,448,512,640,768,896,1024,
       1152,1280,0,0,0,0,0,0,0,0,0,0,0,0,0},
      {69,87,104,121,139,174,208,243,278,348,417,487,557,696,835,975,1114,
@@ -389,6 +390,7 @@ int dvb_filter_get_ac3info(u8 *mbuf, int count, struct dvb_audio_info *ai, int p
 
 	return 0;
 }
+EXPORT_SYMBOL(dvb_filter_get_ac3info);
 
 
 #if 0
@@ -563,6 +565,7 @@ void dvb_filter_pes2ts_init(struct dvb_filter_pes2ts *p2ts, unsigned short pid,
 	p2ts->cb=cb;
 	p2ts->priv=priv;
 }
+EXPORT_SYMBOL(dvb_filter_pes2ts_init);
 
 int dvb_filter_pes2ts(struct dvb_filter_pes2ts *p2ts, unsigned char *pes,
 		      int len, int payload_start)
@@ -597,4 +600,5 @@ int dvb_filter_pes2ts(struct dvb_filter_pes2ts *p2ts, unsigned char *pes,
 	memcpy(buf+5+rest, pes, len);
 	return p2ts->cb(p2ts->priv, buf);
 }
+EXPORT_SYMBOL(dvb_filter_pes2ts);
 

@@ -268,7 +268,7 @@ void sysfs_remove_subdir(struct dentry * d)
 void sysfs_remove_dir(struct kobject * kobj)
 {
 	struct dentry * dentry = dget(kobj->dentry);
-	struct sysfs_dirent * parent_sd = dentry->d_fsdata;
+	struct sysfs_dirent * parent_sd;
 	struct sysfs_dirent * sd, * tmp;
 
 	if (!dentry)
@@ -276,6 +276,7 @@ void sysfs_remove_dir(struct kobject * kobj)
 
 	pr_debug("sysfs %s: removing dir\n",dentry->d_name.name);
 	down(&dentry->d_inode->i_sem);
+	parent_sd = dentry->d_fsdata;
 	list_for_each_entry_safe(sd, tmp, &parent_sd->s_children, s_sibling) {
 		if (!sd->s_element || !(sd->s_type & SYSFS_NOT_PINNED))
 			continue;
@@ -349,6 +350,8 @@ static int sysfs_dir_close(struct inode *inode, struct file *file)
 	down(&dentry->d_inode->i_sem);
 	list_del_init(&cursor->s_sibling);
 	up(&dentry->d_inode->i_sem);
+
+	release_sysfs_dirent(cursor);
 
 	return 0;
 }

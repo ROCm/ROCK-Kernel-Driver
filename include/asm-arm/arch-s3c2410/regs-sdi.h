@@ -11,6 +11,8 @@
  *
  *  Changelog:
  *    18-Aug-2004 Ben Dooks      Created initial file
+ *    29-Nov-2004 Koen Martens   Added some missing defines, fixed duplicates
+ *    29-Nov-2004 Ben Dooks	 Updated Koen's patch
 */
 
 #ifndef __ASM_ARM_REGS_SDI
@@ -62,8 +64,10 @@
 #define S3C2410_SDIDCON_WIDEBUS       (1<<16)
 #define S3C2410_SDIDCON_DMAEN         (1<<15)
 #define S3C2410_SDIDCON_STOP          (1<<14)
+#define S3C2410_SDIDCON_DATMODE	      (3<<12)
+#define S3C2410_SDIDCON_BLKNUM        (0x7ff)
 
-#define S3C2410_SDIDCON_XFER_MASK     (3<<12)
+/* constants for S3C2410_SDIDCON_DATMODE */
 #define S3C2410_SDIDCON_XFER_READY    (0<<12)
 #define S3C2410_SDIDCON_XFER_CHKSTART (1<<12)
 #define S3C2410_SDIDCON_XFER_RXSTART  (2<<12)
@@ -73,22 +77,23 @@
 
 #define S3C2410_SDIDSTA_RDYWAITREQ    (1<<10)
 #define S3C2410_SDIDSTA_SDIOIRQDETECT (1<<9)
-#define S3C2410_SDIDSTA_FIFOFAIL      (1<<8)
+#define S3C2410_SDIDSTA_FIFOFAIL      (1<<8)	/* reserved on 2440 */
 #define S3C2410_SDIDSTA_CRCFAIL       (1<<7)
 #define S3C2410_SDIDSTA_RXCRCFAIL     (1<<6)
 #define S3C2410_SDIDSTA_DATATIMEOUT   (1<<5)
 #define S3C2410_SDIDSTA_XFERFINISH    (1<<4)
 #define S3C2410_SDIDSTA_BUSYFINISH    (1<<3)
+#define S3C2410_SDIDSTA_SBITERR       (1<<2)	/* reserved on 2410a/2440 */
 #define S3C2410_SDIDSTA_TXDATAON      (1<<1)
 #define S3C2410_SDIDSTA_RXDATAON      (1<<0)
 
-#define S3C2410_SDIFSTA_TXFULL         (1<<13)
-#define S3C2410_SDIFSTA_RXFULL         (1<<12)
+#define S3C2410_SDIFSTA_TFDET          (1<<13)
+#define S3C2410_SDIFSTA_RFDET          (1<<12)
 #define S3C2410_SDIFSTA_TXHALF         (1<<11)
 #define S3C2410_SDIFSTA_TXEMPTY        (1<<10)
-#define S3C2410_SDIFSTA_RXLAST         (1<<9)
-#define S3C2410_SDIFSTA_RXFULL         (1<<8)
-#define S3C2410_SDIFSTA_RXHALF         (1<<7)
+#define S3C2410_SDIFSTA_RFLAST         (1<<9)
+#define S3C2410_SDIFSTA_RFFULL         (1<<8)
+#define S3C2410_SDIFSTA_RFHALF         (1<<7)
 #define S3C2410_SDIFSTA_COUNTMASK      (0x7f)
 
 #define S3C2410_SDIIMSK_RESPONSECRC    (1<<17)
@@ -103,6 +108,7 @@
 #define S3C2410_SDIIMSK_DATATIMEOUT    (1<<8)
 #define S3C2410_SDIIMSK_DATAFINISH     (1<<7)
 #define S3C2410_SDIIMSK_BUSYFINISH     (1<<6)
+#define S3C2410_SDIIMSK_SBITERR        (1<<5)	/* reserved 2440/2410a */
 #define S3C2410_SDIIMSK_TXFIFOHALF     (1<<4)
 #define S3C2410_SDIIMSK_TXFIFOEMPTY    (1<<3)
 #define S3C2410_SDIIMSK_RXFIFOLAST     (1<<2)

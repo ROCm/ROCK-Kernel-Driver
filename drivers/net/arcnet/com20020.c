@@ -117,7 +117,7 @@ int com20020_check(struct net_device *dev)
 	lp->config = 0x21 | (lp->timeout << 3) | (lp->backplane << 2);
 	/* set node ID to 0x42 (but transmitter is disabled, so it's okay) */
 	SETCONF;
-	outb(0x42, ioaddr + 7);
+	outb(0x42, ioaddr + BUS_ALIGN*7);
 
 	status = ASTATUS();
 
@@ -129,7 +129,7 @@ int com20020_check(struct net_device *dev)
 
 	/* Enable TX */
 	outb(0x39, _CONFIG);
-	outb(inb(ioaddr + 8), ioaddr + 7);
+	outb(inb(ioaddr + BUS_ALIGN*8), ioaddr + BUS_ALIGN*7);
 
 	ACOMMAND(CFLAGScmd | RESETclear | CONFIGclear);
 
@@ -173,7 +173,7 @@ int com20020_found(struct net_device *dev, int shared)
 	dev->set_multicast_list = com20020_set_mc_list;
 
 	if (!dev->dev_addr[0])
-		dev->dev_addr[0] = inb(ioaddr + 8);	/* FIXME: do this some other way! */
+		dev->dev_addr[0] = inb(ioaddr + BUS_ALIGN*8);	/* FIXME: do this some other way! */
 
 	SET_SUBADR(SUB_SETUP1);
 	outb(lp->setup, _XREG);
@@ -187,7 +187,6 @@ int com20020_found(struct net_device *dev, int shared)
 		mdelay(1);
 		outb(0x18, _COMMAND);
 	}
-
 
 	lp->config = 0x20 | (lp->timeout << 3) | (lp->backplane << 2) | 1;
 	/* Default 0x38 + register: Node ID */
@@ -235,15 +234,19 @@ int com20020_found(struct net_device *dev, int shared)
 static int com20020_reset(struct net_device *dev, int really_reset)
 {
 	struct arcnet_local *lp = (struct arcnet_local *) dev->priv;
-	short ioaddr = dev->base_addr;
+	u_int ioaddr = dev->base_addr;
 	u_char inbyte;
 
+	BUGMSG(D_DEBUG, "%s: %d: %s: dev: %p, lp: %p, dev->name: %s\n",
+		__FILE__,__LINE__,__FUNCTION__,dev,lp,dev->name);
 	BUGMSG(D_INIT, "Resetting %s (status=%02Xh)\n",
 	       dev->name, ASTATUS());
 
+	BUGMSG(D_DEBUG, "%s: %d: %s\n",__FILE__,__LINE__,__FUNCTION__);
 	lp->config = TXENcfg | (lp->timeout << 3) | (lp->backplane << 2);
 	/* power-up defaults */
 	SETCONF;
+	BUGMSG(D_DEBUG, "%s: %d: %s\n",__FILE__,__LINE__,__FUNCTION__);
 
 	if (really_reset) {
 		/* reset the card */
@@ -251,17 +254,22 @@ static int com20020_reset(struct net_device *dev, int really_reset)
 		mdelay(RESETtime * 2);	/* COM20020 seems to be slower sometimes */
 	}
 	/* clear flags & end reset */
+	BUGMSG(D_DEBUG, "%s: %d: %s\n",__FILE__,__LINE__,__FUNCTION__);
 	ACOMMAND(CFLAGScmd | RESETclear | CONFIGclear);
 
 	/* verify that the ARCnet signature byte is present */
+	BUGMSG(D_DEBUG, "%s: %d: %s\n",__FILE__,__LINE__,__FUNCTION__);
 
 	com20020_copy_from_card(dev, 0, 0, &inbyte, 1);
+	BUGMSG(D_DEBUG, "%s: %d: %s\n",__FILE__,__LINE__,__FUNCTION__);
 	if (inbyte != TESTvalue) {
+		BUGMSG(D_DEBUG, "%s: %d: %s\n",__FILE__,__LINE__,__FUNCTION__);
 		BUGMSG(D_NORMAL, "reset failed: TESTvalue not present.\n");
 		return 1;
 	}
 	/* enable extended (512-byte) packets */
 	ACOMMAND(CONFIGcmd | EXTconf);
+	BUGMSG(D_DEBUG, "%s: %d: %s\n",__FILE__,__LINE__,__FUNCTION__);
 
 	/* done!  return success. */
 	return 0;
@@ -270,22 +278,24 @@ static int com20020_reset(struct net_device *dev, int really_reset)
 
 static void com20020_setmask(struct net_device *dev, int mask)
 {
-	short ioaddr = dev->base_addr;
+	u_int ioaddr = dev->base_addr;
+	BUGMSG(D_DURING, "Setting mask to %x at %x\n",mask,ioaddr);
 	AINTMASK(mask);
 }
 
 
 static void com20020_command(struct net_device *dev, int cmd)
 {
-	short ioaddr = dev->base_addr;
+	u_int ioaddr = dev->base_addr;
 	ACOMMAND(cmd);
 }
 
 
 static int com20020_status(struct net_device *dev)
 {
-	short ioaddr = dev->base_addr;
-	return ASTATUS();
+	u_int ioaddr = dev->base_addr;
+
+	return ASTATUS() + (ADIAGSTATUS()<<8);
 }
 
 static void com20020_close(struct net_device *dev)

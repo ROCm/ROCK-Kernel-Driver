@@ -641,10 +641,8 @@ static void nv3UpdateArbitrationSettings
     {
         int  b = fifo_data.graphics_burst_size >> 4;
         *burst = 0;
-        while (b) {
+        while (b >>= 1)
 	    (*burst)++;
-	    b >>= 1;
-	}
         *lwm   = fifo_data.graphics_lwm >> 3;
     }
     else
@@ -834,10 +832,8 @@ static void nv4UpdateArbitrationSettings
     {
         int  b = fifo_data.graphics_burst_size >> 4;
         *burst = 0;
-        while (b) {
+        while (b >>= 1)
 	    (*burst)++;
-	    b >>= 1;
-	}
         *lwm   = fifo_data.graphics_lwm >> 3;
     }
 }
@@ -1101,10 +1097,8 @@ static void nv10UpdateArbitrationSettings
     {
         int  b = fifo_data.graphics_burst_size >> 4;
         *burst = 0;
-        while (b) {
+        while (b >>= 1)
 	    (*burst)++;
-	    b >>= 1;
-	}
         *lwm   = fifo_data.graphics_lwm >> 3;
     }
 }
@@ -1155,10 +1149,8 @@ static void nForceUpdateArbitrationSettings
     {
         int  b = fifo_data.graphics_burst_size >> 4;
         *burst = 0;
-        while (b) {
+        while (b >>= 1)
 	    (*burst)++;
-	    b >>= 1;
-	}
         *lwm   = fifo_data.graphics_lwm >> 3;
     }
 }
@@ -1556,7 +1548,7 @@ static void LoadStateExt
         NV_WR32(chip->PGRAPH, 0x0000085C, state->pitch3);
         NV_WR32(chip->PGRAPH, 0x00000860, state->pitch3);
         NV_WR32(chip->PGRAPH, 0x00000864, state->pitch3);
-        NV_WR32(chip->PGRAPH, 0x000009A, NV_RD32(chip->PFB, 0x00000200));
+        NV_WR32(chip->PGRAPH, 0x000009A4, NV_RD32(chip->PFB, 0x00000200));
         NV_WR32(chip->PGRAPH, 0x000009A8, NV_RD32(chip->PFB, 0x00000204));
         }
             if(chip->twoHeads) {

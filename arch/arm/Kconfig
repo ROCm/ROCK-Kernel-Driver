@@ -317,31 +317,40 @@ config ISA_DMA
 
 config FIQ
 	bool
-	depends on ARCH_ACORN || ARCH_L7200 || ARCH_LH7A400
+	depends on ARCH_ACORN || ARCH_L7200
 	default y
 
 # Compressed boot loader in ROM.  Yes, we really want to ask about
 # TEXT and BSS so we preserve their values in the config files.
-config ZBOOT_ROM
-	bool "Compressed boot loader in ROM/flash"
-	help
-	  Say Y here if you intend to execute your compressed kernel image (zImage)
-	  directly from ROM or flash.  If unsure, say N.
-
 config ZBOOT_ROM_TEXT
 	hex "Compressed ROM boot loader base address"
 	default "0"
 	help
-	  The base address for zImage.  Unless you have special requirements, you
-	  should not change this value.
+	  The physical address at which the ROM-able zImage is to be
+	  placed in the target.  Platforms which normally make use of
+	  ROM-able zImage formats normally set this to a suitable
+	  value in their defconfig file.
+
+	  If ZBOOT_ROM is not enabled, this has no effect.
 
 config ZBOOT_ROM_BSS
 	hex "Compressed ROM boot loader BSS address"
 	default "0"
 	help
-	  The base address of 64KiB of read/write memory, which must be available
-	  while the decompressor is running.  Unless you have special requirements,
-	  you should not change this value.
+	  The base address of 64KiB of read/write memory in the target
+	  for the ROM-able zImage, which must be available while the
+	  decompressor is running.  Platforms which normally make use of
+	  ROM-able zImage formats normally set this to a suitable
+	  value in their defconfig file.
+
+	  If ZBOOT_ROM is not enabled, this has no effect.
+
+config ZBOOT_ROM
+	bool "Compressed boot loader in ROM/flash"
+	depends on ZBOOT_ROM_TEXT != ZBOOT_ROM_BSS
+	help
+	  Say Y here if you intend to execute your compressed kernel image
+	  (zImage) directly from ROM or flash.  If unsure, say N.
 
 config XIP_KERNEL
 	bool "Kernel Execute-In-Place from ROM"
@@ -393,7 +402,7 @@ source "drivers/cpufreq/Kconfig"
 
 config CPU_FREQ_SA1100
 	bool
-	depends on CPU_FREQ && SA1100_LART
+	depends on CPU_FREQ && (SA1100_LART || SA1100_PLEB)
 	default y
 
 config CPU_FREQ_SA1110

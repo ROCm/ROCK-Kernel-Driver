@@ -47,8 +47,6 @@
 /* Local Prototypes. */
 static inline uint32_t qla2x00_to_handle(uint16_t, uint16_t, uint16_t);
 static inline uint16_t qla2x00_handle_to_idx(uint32_t);
-static inline uint16_t qla2x00_handle_to_iter(uint32_t);
-static inline uint16_t qla2x00_handle_to_type(uint32_t);
 static inline uint32_t qla2x00_iodesc_to_handle(struct io_descriptor *);
 static inline struct io_descriptor *qla2x00_handle_to_iodesc(scsi_qla_host_t *,
     uint32_t);
@@ -127,30 +125,6 @@ static inline uint16_t
 qla2x00_handle_to_idx(uint32_t handle)
 {
 	return ((uint16_t)(((handle) >> HDL_INDEX_SHIFT) & HDL_INDEX_MASK));
-}
-
-/**
- * qla2x00_handle_to_type() - Retrive the descriptor type for a given handle.
- * @handle: descriptor handle
- *
- * Returns the descriptor type specified by the @handle.
- */
-static inline uint16_t
-qla2x00_handle_to_type(uint32_t handle)
-{
-	return ((uint16_t)(((handle) >> HDL_TYPE_SHIFT) & HDL_TYPE_MASK));
-}
-
-/**
- * qla2x00_handle_to_iter() - Retrive the rolling signature for a given handle.
- * @handle: descriptor handle
- *
- * Returns the signature specified by the @handle.
- */
-static inline uint16_t
-qla2x00_handle_to_iter(uint32_t handle)
-{
-	return ((uint16_t)(((handle) >> HDL_ITER_SHIFT) & HDL_ITER_MASK));
 }
 
 /**

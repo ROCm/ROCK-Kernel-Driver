@@ -1362,6 +1362,7 @@ static int snd_cs4281_free(cs4281_t *chip)
 	if (chip->ba1)
 		iounmap(chip->ba1);
 	pci_release_regions(chip->pci);
+	pci_disable_device(chip->pci);
 
 	kfree(chip);
 	return 0;
@@ -1395,8 +1396,10 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (chip == NULL)
+	if (chip == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	spin_lock_init(&chip->reg_lock);
 	chip->card = card;
 	chip->pci = pci;
@@ -1410,6 +1413,7 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 
 	if ((err = pci_request_regions(pci, "CS4281")) < 0) {
 		kfree(chip);
+		pci_disable_device(pci);
 		return err;
 	}
 	chip->ba0_addr = pci_resource_start(pci, 0);
@@ -2074,6 +2078,7 @@ static int cs4281_suspend(snd_card_t *card, unsigned int state)
 	ulCLK &= ~CLKCR1_CKRA;
 	snd_cs4281_pokeBA0(chip, BA0_CLKCR1, ulCLK);
 
+	pci_disable_device(chip->pci);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
@@ -2085,6 +2090,7 @@ static int cs4281_resume(snd_card_t *card, unsigned int state)
 	u32 ulCLK;
 
 	pci_enable_device(chip->pci);
+	pci_set_master(chip->pci);
 
 	ulCLK = snd_cs4281_peekBA0(chip, BA0_CLKCR1);
 	ulCLK |= CLKCR1_CKRA;

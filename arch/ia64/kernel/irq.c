@@ -215,11 +215,6 @@ int show_interrupts(struct seq_file *p, void *v)
 skip:
 		spin_unlock_irqrestore(&idesc->lock, flags);
 	} else if (i == NR_IRQS) {
-		seq_puts(p, "NMI: ");
-		for (j = 0; j < NR_CPUS; j++)
-			if (cpu_online(j))
-				seq_printf(p, "%10u ", nmi_count(j));
-		seq_putc(p, '\n');
 #ifdef CONFIG_X86_LOCAL_APIC
 		seq_puts(p, "LOC: ");
 		for (j = 0; j < NR_CPUS; j++)

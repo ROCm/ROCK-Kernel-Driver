@@ -1,5 +1,5 @@
 /*
- * linux/include/asm-arm/arch-ixdp2400/dma.h
+ * linux/include/asm-arm/arch-ixp2000/dma.h
  *
  * Copyright (C) 2002 Intel Corp.
  *

@@ -26,11 +26,6 @@
 #include <asm/ddb5xxx/ddb5074.h>
 #include <asm/ddb5xxx/ddb5xxx.h>
 
-#ifdef CONFIG_KGDB
-extern void rs_kgdb_hook(int);
-extern void breakpoint(void);
-#endif
-
 static void (*back_to_prom) (void) = (void (*)(void)) 0xbfc00000;
 
 static void ddb_machine_restart(char *command)
@@ -63,7 +58,6 @@ static void ddb_machine_power_off(void)
 	} while (1);
 }
 
-extern void ddb_irq_setup(void);
 extern void rtc_ds1386_init(unsigned long base);
 
 extern void (*board_timer_setup) (struct irqaction * irq);
@@ -96,7 +90,6 @@ static void __init ddb5074_setup(void)
 {
 	extern int panic_timeout;
 
-	irq_setup = ddb_irq_setup;
 	set_io_port_base(NILE4_PCI_IO_BASE);
 	isa_slot_offset = NILE4_PCI_MEM_BASE;
 	board_timer_setup = ddb_timer_init;

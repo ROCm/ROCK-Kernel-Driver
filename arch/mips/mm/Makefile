@@ -2,7 +2,8 @@
 # Makefile for the Linux/MIPS-specific parts of the memory manager.
 #
 
-obj-y				+= cache.o extable.o fault.o init.o pgtable.o
+obj-y				+= cache.o extable.o fault.o init.o pgtable.o \
+				   tlbex.o
 
 obj-$(CONFIG_MIPS32)		+= ioremap.o pgtable-32.o
 obj-$(CONFIG_MIPS64)		+= pgtable-64.o
@@ -41,22 +42,22 @@ obj-$(CONFIG_CPU_R5432)		+= tlbex32-r4k.o
 obj-$(CONFIG_CPU_RM7000)	+= tlbex32-r4k.o
 obj-$(CONFIG_CPU_RM9000)	+= tlbex32-r4k.o
 obj-$(CONFIG_CPU_R10000)	+= tlbex32-r4k.o
-obj-$(CONFIG_CPU_MIPS32)	+= tlbex32-r4k.o
+obj-$(CONFIG_CPU_MIPS32)	+= tlbex32-mips32.o
 obj-$(CONFIG_CPU_MIPS64)	+= tlbex32-r4k.o
 obj-$(CONFIG_CPU_SB1)		+= tlbex32-r4k.o
 obj-$(CONFIG_CPU_TX39XX)	+= tlbex32-r3k.o
 endif
 ifdef CONFIG_MIPS64
-obj-$(CONFIG_CPU_R4300)		+= tlb64-glue-r4k.o tlbex64-r4k.o
-obj-$(CONFIG_CPU_R4X00)		+= tlb64-glue-r4k.o tlbex64-r4k.o
-obj-$(CONFIG_CPU_R5000)		+= tlb64-glue-r4k.o tlbex64-r4k.o
-obj-$(CONFIG_CPU_NEVADA)	+= tlb64-glue-r4k.o tlbex64-r4k.o
-obj-$(CONFIG_CPU_R5432)		+= tlb64-glue-r4k.o tlbex64-r4k.o
-obj-$(CONFIG_CPU_RM7000)	+= tlb64-glue-r4k.o tlbex64-r4k.o
-obj-$(CONFIG_CPU_RM9000)	+= tlb64-glue-r4k.o tlbex64-r4k.o
-obj-$(CONFIG_CPU_R10000)	+= tlb64-glue-r4k.o tlbex64-r4k.o
-obj-$(CONFIG_CPU_SB1)		+= tlb64-glue-sb1.o tlbex64-r4k.o
-obj-$(CONFIG_CPU_MIPS64)	+= tlb64-glue-r4k.o tlbex64-r4k.o
+obj-$(CONFIG_CPU_R4300)		+= tlb64-glue-r4k.o
+obj-$(CONFIG_CPU_R4X00)		+= tlb64-glue-r4k.o
+obj-$(CONFIG_CPU_R5000)		+= tlb64-glue-r4k.o
+obj-$(CONFIG_CPU_NEVADA)	+= tlb64-glue-r4k.o
+obj-$(CONFIG_CPU_R5432)		+= tlb64-glue-r4k.o
+obj-$(CONFIG_CPU_RM7000)	+= tlb64-glue-r4k.o
+obj-$(CONFIG_CPU_RM9000)	+= tlb64-glue-r4k.o
+obj-$(CONFIG_CPU_R10000)	+= tlb64-glue-r4k.o
+obj-$(CONFIG_CPU_SB1)		+= tlb64-glue-sb1.o
+obj-$(CONFIG_CPU_MIPS64)	+= tlb64-glue-r4k.o
 endif
 
 

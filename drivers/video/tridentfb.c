@@ -38,7 +38,7 @@ static struct tridentfb_par default_par;
 
 /* FIXME:kmalloc these 3 instead */
 static struct fb_info fb_info;
-static int pseudo_pal[16];
+static u32 pseudo_pal[16];
 
 
 static struct fb_var_screeninfo default_var;
@@ -460,7 +460,7 @@ static void tridentfb_fillrect(struct fb_info * info, const struct fb_fillrect *
 		default:
 		case 8: col = fr->color;
 			break;
-		case 16: col = ((u16 *)(info->pseudo_palette))[fr->color];
+		case 16: col = ((u32 *)(info->pseudo_palette))[fr->color];
 			 break;
 		case 32: col = ((u32 *)(info->pseudo_palette))[fr->color];
 			 break;
@@ -990,7 +990,7 @@ static int tridentfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 	} else
 	if (bpp == 16) 			/* RGB 565 */
-			((u16*)info->pseudo_palette)[regno] = (red & 0xF800) |
+			((u32*)info->pseudo_palette)[regno] = (red & 0xF800) |
 			((green & 0xFC00) >> 5) | ((blue & 0xF800) >> 11);
 	else
 	if (bpp == 32)		/* ARGB 8888 */

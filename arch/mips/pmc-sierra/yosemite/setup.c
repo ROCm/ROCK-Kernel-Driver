@@ -2,6 +2,8 @@
  *  Copyright (C) 2003 PMC-Sierra Inc.
  *  Author: Manish Lachwani (lachwani@pmc-sierra.com)
  *
+ * Copyright (C) 2004 by Ralf Baechle (ralf@linux-mips.org)
+ *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
  *  Free Software Foundation;  either version 2 of the  License, or (at your
@@ -37,13 +39,11 @@
 #include <asm/time.h>
 #include <asm/bootinfo.h>
 #include <asm/page.h>
-#include <asm/bootinfo.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/reboot.h>
-#include <asm/pci_channel.h>
 #include <asm/serial.h>
 #include <linux/termios.h>
 #include <linux/tty.h>

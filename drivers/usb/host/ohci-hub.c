@@ -305,18 +305,26 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 {
 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
 	int		ports, i, changed = 0, length = 1;
-	int		can_suspend = 1;
+	int		can_suspend = hcd->can_wakeup;
+	unsigned long	flags;
 
-	/* if !USB_SUSPEND, root hub timers won't get shut down ... */
-	if (!HCD_IS_RUNNING(ohci->hcd.state))
-		return 0;
+	spin_lock_irqsave (&ohci->lock, flags);
+
+	/* handle autosuspended root:  finish resuming before
+	 * letting khubd or root hub timer see state changes.
+	 */
+	if ((ohci->hc_control & OHCI_CTRL_HCFS) != OHCI_USB_OPER
+			|| !HCD_IS_RUNNING(ohci->hcd.state)) {
+		can_suspend = 0;
+		goto done;
+	}
 
 	ports = roothub_a (ohci) & RH_A_NDP; 
 	if (ports > MAX_ROOT_PORTS) {
 		ohci_err (ohci, "bogus NDP=%d, rereads as NDP=%d\n", ports,
 			  ohci_readl (ohci, &ohci->regs->roothub.a) & RH_A_NDP);
 		/* retry later; "should not happen" */
-		return 0;
+		goto done;
 	}
 
 	/* init status */
@@ -352,6 +360,8 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 			continue;
 		can_suspend = 0;
 	}
+done:
+	spin_unlock_irqrestore (&ohci->lock, flags);
 
 #ifdef CONFIG_PM
 	/* save power by suspending idle root hubs;

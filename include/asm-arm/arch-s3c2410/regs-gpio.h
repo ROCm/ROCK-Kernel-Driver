@@ -16,6 +16,8 @@
  *    20-07-2004     BJD     Added GPIO pin numbers, added Port A definitions
  *    04-10-2004     BJD     Fixed number of bugs, added EXT IRQ filter defs
  *    17-10-2004     BJD     Added GSTATUS1 register definitions
+ *    18-11-2004     BJD     Fixed definitions of GPE3, GPE4, GPE5 and GPE6
+ *    18-11-2004     BJD     Added S3C2440 AC97 controls
 */
 
 
@@ -424,12 +426,14 @@
 #define S3C2410_GPE3_INP       (0x00 << 6)
 #define S3C2410_GPE3_OUTP      (0x01 << 6)
 #define S3C2410_GPE3_I2SSDI    (0x02 << 6)
+#define S3C2410_GPE3_nSS0      (0x03 << 6)
 #define S3C2410_GPE3_MASK      (0x03 << 6)
 
 #define S3C2410_GPE4           S3C2410_GPIONO(S3C2410_GPIO_BANKE, 4)
 #define S3C2410_GPE4_INP       (0x00 << 8)
 #define S3C2410_GPE4_OUTP      (0x01 << 8)
 #define S3C2410_GPE4_I2SSDO    (0x02 << 8)
+#define S3C2410_GPE4_I2SSDI    (0x03 << 8)
 #define S3C2410_GPE4_MASK      (0x03 << 8)
 
 #define S3C2410_GPE5           S3C2410_GPIONO(S3C2410_GPIO_BANKE, 5)
@@ -440,12 +444,12 @@
 #define S3C2410_GPE6           S3C2410_GPIONO(S3C2410_GPIO_BANKE, 6)
 #define S3C2410_GPE6_INP       (0x00 << 12)
 #define S3C2410_GPE6_OUTP      (0x01 << 12)
-#define S3C2410_GPE6_SDCLK     (0x02 << 12)
+#define S3C2410_GPE6_SDCMD     (0x02 << 12)
 
 #define S3C2410_GPE7           S3C2410_GPIONO(S3C2410_GPIO_BANKE, 7)
 #define S3C2410_GPE7_INP       (0x00 << 14)
 #define S3C2410_GPE7_OUTP      (0x01 << 14)
-#define S3C2410_GPE7_SDCMD     (0x02 << 14)
+#define S3C2410_GPE7_SDDAT0    (0x02 << 14)
 
 #define S3C2410_GPE8           S3C2410_GPIONO(S3C2410_GPIO_BANKE, 8)
 #define S3C2410_GPE8_INP       (0x00 << 16)
@@ -488,6 +492,12 @@
 #define S3C2410_GPE15_OUTP     (0x01 << 30)
 #define S3C2410_GPE15_IICSDA   (0x02 << 30)
 #define S3C2410_GPE15_MASK     (0x03 << 30)
+
+#define S3C2440_GPE0_ACSYNC    (0x03 << 0)
+#define S3C2440_GPE1_ACBITCLK  (0x03 << 2)
+#define S3C2440_GPE2_ACRESET   (0x03 << 4)
+#define S3C2440_GPE3_ACIN      (0x03 << 6)
+#define S3C2440_GPE4_ACOUT     (0x03 << 8)
 
 #define S3C2410_GPE_PUPDIS(x)  (1<<(x))
 

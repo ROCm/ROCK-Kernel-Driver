@@ -33,6 +33,32 @@
  * unpredictable things.  The code (when it is written) to deal with
  * this problem will be in the update_mmu_cache() code for the r4k.
  */
+#if defined(CONFIG_CPU_MIPS32) && defined(CONFIG_64BIT_PHYS_ADDR)
+
+#define _PAGE_PRESENT               (1<<6)  /* implemented in software */
+#define _PAGE_READ                  (1<<7)  /* implemented in software */
+#define _PAGE_WRITE                 (1<<8)  /* implemented in software */
+#define _PAGE_ACCESSED              (1<<9)  /* implemented in software */
+#define _PAGE_MODIFIED              (1<<10) /* implemented in software */
+#define _PAGE_FILE                  (1<<10)  /* set:pagecache unset:swap */
+
+#define _PAGE_R4KBUG                (1<<0)  /* workaround for r4k bug  */
+#define _PAGE_GLOBAL                (1<<0)
+#define _PAGE_VALID                 (1<<1)
+#define _PAGE_SILENT_READ           (1<<1)  /* synonym                 */
+#define _PAGE_DIRTY                 (1<<2)  /* The MIPS dirty bit      */
+#define _PAGE_SILENT_WRITE          (1<<2)
+#define _CACHE_MASK                 (7<<3)
+
+/* MIPS32 defines only values 2 and 3. The rest are implementation
+ * dependent.
+ */
+#define _CACHE_UNCACHED             (2<<3)
+#define _CACHE_CACHABLE_NONCOHERENT (3<<3)
+#define _CACHE_CACHABLE_COW         (3<<3)  /* Au1x                    */
+
+#else
+
 #define _PAGE_PRESENT               (1<<0)  /* implemented in software */
 #define _PAGE_READ                  (1<<1)  /* implemented in software */
 #define _PAGE_WRITE                 (1<<2)  /* implemented in software */
@@ -97,6 +123,7 @@
 
 #endif
 #endif
+#endif /* defined(CONFIG_CPU_MIPS32) && defined(CONFIG_64BIT_PHYS_ADDR) */
 
 #define __READABLE	(_PAGE_READ | _PAGE_SILENT_READ | _PAGE_ACCESSED)
 #define __WRITEABLE	(_PAGE_WRITE | _PAGE_SILENT_WRITE | _PAGE_MODIFIED)
@@ -108,11 +135,15 @@
 #elif defined(CONFIG_DMA_NONCOHERENT)
 #define PAGE_CACHABLE_DEFAULT	_CACHE_CACHABLE_NONCOHERENT
 #elif defined(CONFIG_CPU_RM9000)
-#define PAGE_CACHABLE_DEFAULT	_CACHE_CWBEA
+#define PAGE_CACHABLE_DEFAULT	_CACHE_CWB
 #else
 #define PAGE_CACHABLE_DEFAULT	_CACHE_CACHABLE_COW
 #endif
 
+#if defined(CONFIG_CPU_MIPS32) && defined(CONFIG_64BIT_PHYS_ADDR)
+#define CONF_CM_DEFAULT		(PAGE_CACHABLE_DEFAULT >> 3)
+#else
 #define CONF_CM_DEFAULT		(PAGE_CACHABLE_DEFAULT >> 9)
+#endif
 
 #endif /* _ASM_PGTABLE_BITS_H */

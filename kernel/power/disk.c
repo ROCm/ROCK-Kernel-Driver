@@ -43,7 +43,7 @@ char resume_file[256] = CONFIG_PM_STD_PARTITION;
  *	there ain't no turning back.
  */
 
-static void power_down(u32 mode)
+static void power_down(suspend_disk_method_t mode)
 {
 	unsigned long flags;
 	int error = 0;

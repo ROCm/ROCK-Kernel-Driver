@@ -363,7 +363,7 @@ static int blackbird_load_firmware(struct cx8802_dev *dev)
 	}
 
 	if (firmware->size != BLACKBIRD_FIRM_IMAGE_SIZE) {
-		dprintk(0, "ERROR: Firmware size mismatch (have %ld, expected %d)\n",
+		dprintk(0, "ERROR: Firmware size mismatch (have %zd, expected %d)\n",
 			firmware->size, BLACKBIRD_FIRM_IMAGE_SIZE);
 		return -1;
 	}
@@ -721,7 +721,7 @@ static int mpeg_release(struct inode *inode, struct file *file)
 }
 
 static ssize_t
-mpeg_read(struct file *file, char *data, size_t count, loff_t *ppos)
+mpeg_read(struct file *file, char __user *data, size_t count, loff_t *ppos)
 {
 	struct cx8802_fh *fh = file->private_data;
 

@@ -159,7 +159,6 @@ static irqreturn_t gt64240_p0int_irq(int irq, void *dev, struct pt_regs *regs)
  */
 void gt64240_time_init(void)
 {
-	extern irq_desc_t irq_desc[NR_IRQS];
 	static struct irqaction timer;
 
 	/* Stop the timer -- we'll use timer #0 */

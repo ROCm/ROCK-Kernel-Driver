@@ -1350,6 +1350,7 @@ static void snd_rme32_free(void *private_data)
 		pci_release_regions(rme32->pci);
 		rme32->port = 0;
 	}
+	pci_disable_device(rme32->pci);
 }
 
 static void snd_rme32_free_spdif_pcm(snd_pcm_t * pcm)

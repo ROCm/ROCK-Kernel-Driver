@@ -91,11 +91,14 @@
 /* MPC52xx type numbers */
 #define PORT_MPC52xx	59
 
-/*IBM icom*/
-#define PORT_ICOM      60
+/* IBM icom */
+#define PORT_ICOM	60
 
 /* Samsung S3C2440 SoC */
 #define PORT_S3C2440	61
+
+/* Motorola i.MX SoC */
+#define PORT_IMX	62
 
 #ifdef __KERNEL__
 
@@ -241,11 +244,11 @@ struct uart_port {
  * within.
  */
 struct uart_state {
-	unsigned int		close_delay;
-	unsigned int		closing_wait;
+	unsigned int		close_delay;		/* msec */
+	unsigned int		closing_wait;		/* msec */
 
 #define USF_CLOSING_WAIT_INF	(0)
-#define USF_CLOSING_WAIT_NONE	(65535)
+#define USF_CLOSING_WAIT_NONE	(~0U)
 
 	int			count;
 	int			pm_state;

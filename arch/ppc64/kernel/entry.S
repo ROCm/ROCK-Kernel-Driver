@@ -162,7 +162,7 @@ syscall_error_cont:
 
 	/* check for syscall tracing or audit */
 	ld	r9,TI_FLAGS(r12)
-	andi.	r0,r9,_TIF_SYSCALL_T_OR_A
+	andi.	r0,r9,(_TIF_SYSCALL_T_OR_A|_TIF_SINGLESTEP)
 	bne-	syscall_exit_trace
 syscall_exit_trace_cont:
 
@@ -265,16 +265,21 @@ _GLOBAL(save_nvgprs)
 _GLOBAL(ppc32_sigsuspend)
 	bl	.save_nvgprs
 	bl	.sys32_sigsuspend
-	b	syscall_exit
+	b	70f
 
 _GLOBAL(ppc64_rt_sigsuspend)
 	bl	.save_nvgprs
 	bl	.sys_rt_sigsuspend
-	b	syscall_exit
+	b	70f
 
 _GLOBAL(ppc32_rt_sigsuspend)
 	bl	.save_nvgprs
 	bl	.sys32_rt_sigsuspend
+	/* If sigsuspend() returns zero, we are going into a signal handler */
+70:	cmpdi	0,r3,0
+	beq	.ret_from_except
+	/* If it returned -EINTR, we need to return via syscall_exit to set
+	   the SO bit in cr0 and potentially stop for ptrace. */
 	b	syscall_exit
 
 _GLOBAL(ppc_fork)
@@ -317,7 +322,7 @@ _GLOBAL(ppc64_rt_sigreturn)
 	blt	syscall_exit
 	clrrdi	r4,r1,THREAD_SHIFT
 	ld	r4,TI_FLAGS(r4)
-	andi.	r4,r4,_TIF_SYSCALL_T_OR_A
+	andi.	r4,r4,(_TIF_SYSCALL_T_OR_A|_TIF_SINGLESTEP)
 	beq+	81f
 	bl	.do_syscall_trace_leave
 81:	b	.ret_from_except
@@ -497,10 +502,11 @@ restore:
 
 	li	r3,0
 	stb	r3,PACAPROCENABLED(r13)	/* ensure we are soft-disabled */
+	ori	r10,r10,MSR_EE
 	mtmsrd	r10			/* hard-enable again */
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	.do_IRQ
-	b	.ret_from_except		/* loop back and handle more */
+	b	.ret_from_except_lite		/* loop back and handle more */
 
 4:	stb	r5,PACAPROCENABLED(r13)
 #endif
@@ -574,6 +580,7 @@ do_work:
 	li	r0,1
 	stb	r0,PACAPROCENABLED(r13)
 #endif
+	ori	r10,r10,MSR_EE
 	mtmsrd	r10,1		/* reenable interrupts */
 	bl	.schedule
 	mfmsr	r10
@@ -591,6 +598,7 @@ do_work:
 user_work:
 #endif
 	/* Enable interrupts */
+	ori	r10,r10,MSR_EE
 	mtmsrd	r10,1
 
 	andi.	r0,r4,_TIF_NEED_RESCHED

@@ -319,7 +319,7 @@ restore_user_regs(struct pt_regs *regs, struct mcontext __user *sr, int sig)
 	if (!__get_user(msr, &sr->mc_gregs[PT_MSR]) && (msr & MSR_SPE) != 0) {
 		/* restore spe registers from the stack */
 		if (__copy_from_user(current->thread.evr, &sr->mc_vregs,
-				     sizeof(sr->mc_vregs)))
+				     ELF_NEVRREG * sizeof(u32)))
 			return 1;
 	} else if (current->thread.used_spe)
 		memset(&current->thread.evr, 0, ELF_NEVRREG * sizeof(u32));

@@ -28,7 +28,7 @@
 #define APC_OBPNAME	"power-management"
 #define APC_DEVNAME "apc"
 
-volatile static u8 *regs; 
+volatile static u8 __iomem *regs; 
 static int apc_regsize;
 static int apc_no_idle __initdata = 0;
 
@@ -70,7 +70,7 @@ void apc_swift_idle(void)
 
 static inline void apc_free(void)
 {
-	sbus_iounmap((unsigned long)regs, apc_regsize);
+	sbus_iounmap(regs, apc_regsize);
 }
 
 static int apc_open(struct inode *inode, struct file *f)
@@ -155,9 +155,9 @@ sbus_done:
 	}
 
 	apc_regsize = sdev->reg_addrs[0].reg_size;
-	regs = (u8*) sbus_ioremap(&sdev->resource[0], 0, 
+	regs = sbus_ioremap(&sdev->resource[0], 0, 
 				   apc_regsize, APC_OBPNAME);
-	if(NULL == regs) {
+	if(!regs) {
 		printk(KERN_ERR "%s: unable to map registers\n", APC_DEVNAME);
 		return -ENODEV;
 	}

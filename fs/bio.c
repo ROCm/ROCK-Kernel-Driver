@@ -461,11 +461,10 @@ struct bio *bio_copy_user(request_queue_t *q, unsigned long uaddr,
 
 	bmd->userptr = (void __user *) uaddr;
 
+	ret = -ENOMEM;
 	bio = bio_alloc(GFP_KERNEL, end - start);
-	if (!bio) {
-		bio_free_map_data(bmd);
-		return ERR_PTR(-ENOMEM);
-	}
+	if (!bio)
+		goto out_bmd;
 
 	bio->bi_rw |= (!write_to_vm << BIO_RW);
 
@@ -519,6 +518,8 @@ cleanup:
 		__free_page(bvec->bv_page);
 
 	bio_put(bio);
+out_bmd:
+	bio_free_map_data(bmd);
 	return ERR_PTR(ret);
 }
 

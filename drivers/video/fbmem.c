@@ -725,7 +725,10 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 			fb_set_cmap(&info->cmap, info);
 
 			fb_var_to_videomode(&mode, &info->var);
-			fb_add_videomode(&mode, &info->modelist);
+
+			if (info->modelist.prev && info->modelist.next &&
+			    !list_empty(&info->modelist))
+				fb_add_videomode(&mode, &info->modelist);
 
 			if (info->flags & FBINFO_MISC_MODECHANGEUSER) {
 				struct fb_event event;

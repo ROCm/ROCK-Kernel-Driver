@@ -741,6 +741,7 @@ static int init_or_cleanup(int init)
 		goto cleanup_nothing;
 
 #ifdef CONFIG_PROC_FS
+	ret = -ENOMEM;
 	proc = proc_net_fops_create("ip_conntrack", 0440, &ct_file_ops);
 	if (!proc) goto cleanup_init;
 
@@ -882,6 +883,7 @@ void need_ip_conntrack(void)
 
 EXPORT_SYMBOL(ip_conntrack_protocol_register);
 EXPORT_SYMBOL(ip_conntrack_protocol_unregister);
+EXPORT_SYMBOL(ip_ct_get_tuple);
 EXPORT_SYMBOL(invert_tuplepr);
 EXPORT_SYMBOL(ip_conntrack_alter_reply);
 EXPORT_SYMBOL(ip_conntrack_destroyed);

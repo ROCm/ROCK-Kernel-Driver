@@ -504,6 +504,7 @@ acpi_ex_dump_operands (
 	char                            *module_name,
 	u32                             line_number);
 
+#ifdef ACPI_FUTURE_USAGE
 void
 acpi_ex_dump_object_descriptor (
 	union acpi_operand_object       *object,
@@ -533,7 +534,7 @@ void
 acpi_ex_out_address (
 	char                            *title,
 	acpi_physical_address           value);
-
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 /*
  * exnames - interpreter/scanner name load/execute

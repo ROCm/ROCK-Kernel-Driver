@@ -122,7 +122,7 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CON
 #define WDT_WRST_ENB	0x4000	/* [14] Watchdog Timer Reset Enable */
 #define WDT_ENB		0x8000	/* [15] Watchdog Timer Enable */
 
-static __u16 *wdtmrctl;
+static __u16 __iomem *wdtmrctl;
 
 static void wdt_timer_ping(unsigned long);
 static struct timer_list timer;

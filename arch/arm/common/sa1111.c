@@ -950,8 +950,10 @@ static int sa1111_remove(struct device *dev)
 		__sa1111_remove(sachip);
 		dev_set_drvdata(dev, NULL);
 
+#ifdef CONFIG_PM
 		kfree(dev->power.saved_state);
 		dev->power.saved_state = NULL;
+#endif
 	}
 
 	return 0;

@@ -18,6 +18,7 @@
 #include <linux/mii.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/pci.h>
 #include "tulip.h"
 
 

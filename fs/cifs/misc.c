@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/misc.c
  *
- *   Copyright (C) International Business Machines  Corp., 2002,2003
+ *   Copyright (C) International Business Machines  Corp., 2002,2004
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -29,6 +29,7 @@
 #include "smberr.h"
 #include "nterr.h"
 
+extern mempool_t *cifs_sm_req_poolp;
 extern mempool_t *cifs_req_poolp;
 extern struct task_struct * oplockThread;
 
@@ -160,8 +161,9 @@ cifs_buf_get(void)
 	    (struct smb_hdr *) mempool_alloc(cifs_req_poolp, SLAB_KERNEL | SLAB_NOFS);
 
 	/* clear the first few header bytes */
+	/* for most paths, more is cleared in header_assemble */
 	if (ret_buf) {
-		memset(ret_buf, 0, sizeof (struct smb_hdr));
+		memset(ret_buf, 0, sizeof(struct smb_hdr) + 3);
 		atomic_inc(&bufAllocCount);
 	}
 
@@ -173,7 +175,7 @@ cifs_buf_release(void *buf_to_free)
 {
 
 	if (buf_to_free == NULL) {
-		cFYI(1, ("Null buffer passed to cifs_buf_release"));
+		/* cFYI(1, ("Null buffer passed to cifs_buf_release"));*/
 		return;
 	}
 	mempool_free(buf_to_free,cifs_req_poolp);
@@ -182,20 +184,49 @@ cifs_buf_release(void *buf_to_free)
 	return;
 }
 
+struct smb_hdr *
+cifs_small_buf_get(void)
+{
+	struct smb_hdr *ret_buf = NULL;
+
+/* We could use negotiated size instead of max_msgsize - 
+   but it may be more efficient to always alloc same size 
+   albeit slightly larger than necessary and maxbuffersize 
+   defaults to this and can not be bigger */
+	ret_buf =
+	    (struct smb_hdr *) mempool_alloc(cifs_sm_req_poolp, SLAB_KERNEL | SLAB_NOFS);
+	if (ret_buf) {
+	/* No need to clear memory here, cleared in header assemble */
+	/*	memset(ret_buf, 0, sizeof(struct smb_hdr) + 27);*/
+		atomic_inc(&smBufAllocCount);
+	}
+	return ret_buf;
+}
+
+void
+cifs_small_buf_release(void *buf_to_free)
+{
+
+	if (buf_to_free == NULL) {
+		cFYI(1, ("Null buffer passed to cifs_small_buf_release"));
+		return;
+	}
+	mempool_free(buf_to_free,cifs_sm_req_poolp);
+
+	atomic_dec(&smBufAllocCount);
+	return;
+}
+
 void
 header_assemble(struct smb_hdr *buffer, char smb_command /* command */ ,
 		const struct cifsTconInfo *treeCon, int word_count
-		/* length of fixed section (word count) in two byte units  */
-    )
+		/* length of fixed section (word count) in two byte units  */)
 {
-	int i;
 	struct list_head* temp_item;
 	struct cifsSesInfo * ses;
 	char *temp = (char *) buffer;
 
-	for (i = 0; i < MAX_CIFS_HDR_SIZE; i++) {
-		temp[i] = 0;	/* BB is this needed ?? */
-	}
+	memset(temp,0,MAX_CIFS_HDR_SIZE);
 
 	buffer->smb_buf_length =
 	    (2 * word_count) + sizeof (struct smb_hdr) -
@@ -320,7 +351,7 @@ checkSMB(struct smb_hdr *smb, __u16 mid, int length)
 	     ("Entering checkSMB with Length: %x, smb_buf_length: %x ",
 	      length, len));
 	if (((unsigned int)length < 2 + sizeof (struct smb_hdr)) ||
-	    (len > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE - 4)) {
+	    (len > CIFSMaxBufSize + MAX_CIFS_HDR_SIZE - 4)) {
 		if ((unsigned int)length < 2 + sizeof (struct smb_hdr)) {
 			cERROR(1, ("Length less than 2 + sizeof smb_hdr "));
 			if (((unsigned int)length >= sizeof (struct smb_hdr) - 1)
@@ -328,9 +359,9 @@ checkSMB(struct smb_hdr *smb, __u16 mid, int length)
 				return 0;	/* some error cases do not return wct and bcc */
 
 		}
-		if (len > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE - 4)
+		if (len > CIFSMaxBufSize + MAX_CIFS_HDR_SIZE - 4)
 			cERROR(1,
-			       ("smb_buf_length greater than CIFS_MAX_MSGSIZE ... "));
+			       ("smb_buf_length greater than MaxBufSize"));
 		cERROR(1,
 		       ("bad smb detected. Illegal length. The mid=%d",
 			smb->Mid));
@@ -359,8 +390,29 @@ is_valid_oplock_break(struct smb_hdr *buf)
 	struct cifsTconInfo *tcon;
 	struct cifsFileInfo *netfile;
 
-	/* could add check for smb response flag 0x80 */
-	cFYI(1,("Checking for oplock break"));    
+	cFYI(1,("Checking for oplock break or dnotify response"));
+	if((pSMB->hdr.Command == SMB_COM_NT_TRANSACT) &&
+	   (pSMB->hdr.Flags & SMBFLG_RESPONSE)) {
+		struct smb_com_transaction_change_notify_rsp * pSMBr =
+			(struct smb_com_transaction_change_notify_rsp *)buf;
+		struct file_notify_information * pnotify;
+		__u32 data_offset = 0;
+		if(pSMBr->ByteCount > sizeof(struct file_notify_information)) {
+			data_offset = le32_to_cpu(pSMBr->DataOffset);
+
+			pnotify = (struct file_notify_information *)((char *)&pSMBr->hdr.Protocol
+				+ data_offset);
+			cFYI(1,("dnotify on %s with action: 0x%x",pnotify->FileName,
+				pnotify->Action));  /* BB removeme BB */
+	             /*   cifs_dump_mem("Received notify Data is: ",buf,sizeof(struct smb_hdr)+60); */
+			return TRUE;
+		}
+		if(pSMBr->hdr.Status.CifsError) {
+			cFYI(1,("notify err 0x%d",pSMBr->hdr.Status.CifsError));
+			return TRUE;
+		}
+		return FALSE;
+	}  
 	if(pSMB->hdr.Command != SMB_COM_LOCKING_ANDX)
 		return FALSE;
 	if(pSMB->hdr.Flags & SMBFLG_RESPONSE) {

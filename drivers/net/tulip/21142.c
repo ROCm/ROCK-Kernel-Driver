@@ -14,9 +14,9 @@
 
 */
 
-#include "tulip.h"
 #include <linux/pci.h>
 #include <linux/delay.h>
+#include "tulip.h"
 
 
 static u16 t21142_csr13[] = { 0x0001, 0x0009, 0x0009, 0x0000, 0x0001, };

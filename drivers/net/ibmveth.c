@@ -96,6 +96,7 @@ static void ibmveth_proc_unregister_driver(void);
 static void ibmveth_proc_register_adapter(struct ibmveth_adapter *adapter);
 static void ibmveth_proc_unregister_adapter(struct ibmveth_adapter *adapter);
 static irqreturn_t ibmveth_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
+static inline void ibmveth_schedule_replenishing(struct ibmveth_adapter*);
 
 #ifdef CONFIG_PROC_FS
 #define IBMVETH_PROC_DIR "ibmveth"
@@ -104,7 +105,7 @@ static struct proc_dir_entry *ibmveth_proc_dir;
 
 static const char ibmveth_driver_name[] = "ibmveth";
 static const char ibmveth_driver_string[] = "IBM i/pSeries Virtual Ethernet Driver";
-#define ibmveth_driver_version "1.02"
+#define ibmveth_driver_version "1.03"
 
 MODULE_AUTHOR("Santiago Leon <santil@us.ibm.com>");
 MODULE_DESCRIPTION("IBM i/pSeries Virtual Ethernet Driver");
@@ -271,6 +272,8 @@ static void ibmveth_replenish_task(struct ibmveth_adapter *adapter)
 	adapter->rx_no_buffer = *(u64*)(((char*)adapter->buffer_list_addr) + 4096 - 8);
 
 	atomic_inc(&adapter->not_replenishing);
+
+	ibmveth_schedule_replenishing(adapter);
 }
 
 /* kick the replenish tasklet if we need replenishing and it isn't already running */
@@ -598,7 +601,7 @@ static void netdev_get_drvinfo (struct net_device *dev, struct ethtool_drvinfo *
 }
 
 static u32 netdev_get_link(struct net_device *dev) {
-	return 0;
+	return 1;
 }
 
 static struct ethtool_ops netdev_ethtool_ops = {

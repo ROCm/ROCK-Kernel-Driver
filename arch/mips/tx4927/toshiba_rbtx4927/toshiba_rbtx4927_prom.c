@@ -6,6 +6,9 @@
  *
  * Copyright 2001-2002 MontaVista Software Inc.
  *
+ * Copyright (C) 2004 MontaVista Software Inc.
+ * Author: Manish Lachwani, mlachwani@mvista.com
+ *
  *  This program is free software; you can redistribute it and/or modify it
  *  under the terms of the GNU General Public License as published by the
  *  Free Software Foundation; either version 2 of the License, or (at your
@@ -86,3 +89,9 @@ const char *get_system_type(void)
 {
 	return "Toshiba RBTX4927/RBTX4937";
 }
+
+char * __init prom_getcmdline(void)
+{
+        return &(arcs_cmdline[0]);
+}
+

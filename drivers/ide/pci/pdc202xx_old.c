@@ -230,7 +230,7 @@ static u8 pdc202xx_old_cable_detect (ide_hwif_t *hwif)
 {
 	u16 CIS = 0, mask = (hwif->channel) ? (1<<11) : (1<<10);
 	pci_read_config_word(hwif->pci_dev, 0x50, &CIS);
-	return ((u8)(CIS & mask));
+	return (CIS & mask) ? 1 : 0;
 }
 
 /*

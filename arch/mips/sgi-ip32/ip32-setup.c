@@ -80,8 +80,8 @@ void __init ip32_time_init(void)
 {
 	printk(KERN_INFO "Calibrating system timer... ");
 	write_c0_count(0);
-	crime_write(0, CRIME_TIMER);
-	while (crime_read(CRIME_TIMER) < CRIME_MASTER_FREQ * WAIT_MS / 1000) ;
+	crime->timer = 0;
+	while (crime->timer < CRIME_MASTER_FREQ * WAIT_MS / 1000) ;
 	mips_hpt_frequency = read_c0_count() * 1000 / WAIT_MS;
 	printk("%d MHz CPU detected\n", mips_hpt_frequency * 2 / 1000000);
 }
@@ -114,7 +114,7 @@ static int __init ip32_setup(void)
 		o2_serial[0].type	= PORT_16550A;
 		o2_serial[0].line	= 0;
 		o2_serial[0].irq	= MACEISA_SERIAL1_IRQ;
-		o2_serial[0].flags	= STD_COM_FLAGS | UPF_RESOURCES;
+		o2_serial[0].flags	= STD_COM_FLAGS;
 		o2_serial[0].uartclk	= BASE_BAUD * 16;
 		o2_serial[0].iotype	= UPIO_MEM;
 		o2_serial[0].membase	= (char *)&mace->isa.serial1;
@@ -125,7 +125,7 @@ static int __init ip32_setup(void)
 		o2_serial[1].type	= PORT_16550A;
 		o2_serial[1].line	= 1;
 		o2_serial[1].irq	= MACEISA_SERIAL2_IRQ;
-		o2_serial[1].flags	= STD_COM_FLAGS | UPF_RESOURCES;
+		o2_serial[1].flags	= STD_COM_FLAGS;
 		o2_serial[1].uartclk	= BASE_BAUD * 16;
 		o2_serial[1].iotype	= UPIO_MEM;
 		o2_serial[1].membase	= (char *)&mace->isa.serial2;

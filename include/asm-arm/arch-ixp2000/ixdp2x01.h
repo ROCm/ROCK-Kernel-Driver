@@ -50,4 +50,8 @@
 
 #define	IXDP2X01_UART_CLK		1843200
 
+#define	IXDP2X01_GPIO_I2C_ENABLE	0x02
+#define	IXDP2X01_GPIO_SCL		0x07
+#define	IXDP2X01_GPIO_SDA		0x06
+
 #endif /* __IXDP2x01_H__ */

@@ -75,6 +75,9 @@ static int dongle_id = 0;	/* default: probe */
 /* We can't guess the type of connected dongle, user *must* supply it. */
 MODULE_PARM(dongle_id, "i");
 
+/* FIXME : we should not need this, because instances should be automatically
+ * managed by the PCI layer. Especially that we seem to only be using the
+ * first entry. Jean II */
 /* Max 4 instances for now */
 static struct via_ircc_cb *dev_self[] = { NULL, NULL, NULL, NULL };
 
@@ -153,11 +156,9 @@ static int __init via_ircc_init(void)
 	IRDA_DEBUG(3, "%s()\n", __FUNCTION__);
 
 	rc = pci_register_driver(&via_driver);
-	if (rc < 1) {
+	if (rc < 0) {
 		IRDA_DEBUG(0, "%s(): error rc = %d, returning  -ENODEV...\n",
 			   __FUNCTION__, rc);
-		if (rc == 0)
-			pci_unregister_driver (&via_driver);
 		return -ENODEV;
 	}
 	return 0;
@@ -288,15 +289,27 @@ static void __exit via_remove_one (struct pci_dev *pdev)
 {
 	IRDA_DEBUG(3, "%s()\n", __FUNCTION__);
 
+	/* FIXME : This is ugly. We should use pci_get_drvdata(pdev);
+	 * to get our driver instance and call directly via_ircc_close().
+	 * See vlsi_ir for details...
+	 * Jean II */
 	via_ircc_clean();
 
+	/* FIXME : This should be in via_ircc_close(), because here we may
+	 * theoritically disable still configured devices :-( - Jean II */
+	pci_disable_device(pdev);
 }
 
 static void __exit via_ircc_cleanup(void)
 {
 	IRDA_DEBUG(3, "%s()\n", __FUNCTION__);
 
+	/* FIXME : This should be redundant, as pci_unregister_driver()
+	 * should call via_remove_one() on each device.
+	 * Jean II */
 	via_ircc_clean();
+
+	/* Cleanup all instances of the driver */
 	pci_unregister_driver (&via_driver); 
 }
 
@@ -323,6 +336,10 @@ static __devinit int via_ircc_open(int i, chipio_t * info, unsigned int id)
 	self->netdev = dev;
 	spin_lock_init(&self->lock);
 
+	/* FIXME : We should store our driver instance in the PCI layer,
+	 * using pci_set_drvdata(), not in this array.
+	 * See vlsi_ir for details... - Jean II */
+	/* FIXME : 'i' is always 0 (see via_init_one()) :-( - Jean II */
 	/* Need to store self somewhere */
 	dev_self[i] = self;
 	self->index = i;

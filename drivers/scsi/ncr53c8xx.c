@@ -950,11 +950,11 @@ struct ncb {
 	**	Virtual and physical bus addresses of the chip.
 	**----------------------------------------------------------------
 	*/
-	unsigned long	vaddr;		/* Virtual and bus address of	*/
+	void __iomem *vaddr;		/* Virtual and bus address of	*/
 	unsigned long	paddr;		/*  chip's IO registers.	*/
 	unsigned long	paddr2;		/* On-chip RAM bus address.	*/
 	volatile			/* Pointer to volatile for 	*/
-	struct ncr_reg	*reg;		/*  memory mapped IO.		*/
+	struct ncr_reg	__iomem *reg;	/*  memory mapped IO.		*/
 
 	/*----------------------------------------------------------------
 	**	SCRIPTS virtual and physical bus addresses.
@@ -7517,6 +7517,7 @@ printk("ncr53c8xx : command successfully queued\n");
      if (sts != DID_OK) {
           unmap_scsi_data(np, cmd);
           done(cmd);
+	  sts = 0;
      }
 
      return sts;
@@ -7838,7 +7839,7 @@ struct Scsi_Host * __init ncr_attach(struct scsi_host_template *tpnt,
 	if (device->slot.base_v)
 		np->vaddr = device->slot.base_v;
 	else
-		np->vaddr = (unsigned long)ioremap(device->slot.base_c, 128);
+		np->vaddr = ioremap(device->slot.base_c, 128);
 
 	if (!np->vaddr) {
 		printk(KERN_ERR
@@ -7854,7 +7855,7 @@ struct Scsi_Host * __init ncr_attach(struct scsi_host_template *tpnt,
 	 * OUTB OUTW OUTL macros can be used safely.
 	 */
 
-	np->reg = (struct ncr_reg*) np->vaddr;
+	np->reg = (struct ncr_reg __iomem *)np->vaddr;
 
 	/* Do chip dependent initialization.  */
 	ncr_prepare_setting(np);

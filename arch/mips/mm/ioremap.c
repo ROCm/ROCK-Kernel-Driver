@@ -97,6 +97,15 @@ static int remap_area_pages(unsigned long address, phys_t phys_addr,
 }
 
 /*
+ * Allow physical addresses to be fixed up to help 36 bit peripherals.
+ */
+phys_t __attribute__ ((weak))
+fixup_bigphys_addr(phys_t phys_addr, phys_t size)
+{
+	return phys_addr;
+}
+
+/*
  * Generic mapping function (not visible outside):
  */
 
@@ -110,7 +119,7 @@ static int remap_area_pages(unsigned long address, phys_t phys_addr,
  * caller shouldn't need to know that small detail.
  */
 
-#define IS_LOW512(addr) (!((phys_t)(addr) & ~0x1fffffffUL))
+#define IS_LOW512(addr) (!((phys_t)(addr) & (phys_t) ~0x1fffffffULL))
 
 void * __ioremap(phys_t phys_addr, phys_t size, unsigned long flags)
 {
@@ -118,6 +127,8 @@ void * __ioremap(phys_t phys_addr, phys_t size, unsigned long flags)
 	unsigned long offset;
 	phys_t last_addr;
 	void * addr;
+
+	phys_addr = fixup_bigphys_addr(phys_addr, size);
 
 	/* Don't allow wraparound or zero size */
 	last_addr = phys_addr + size - 1;
@@ -171,15 +182,14 @@ void * __ioremap(phys_t phys_addr, phys_t size, unsigned long flags)
 
 #define IS_KSEG1(addr) (((unsigned long)(addr) & ~0x1fffffffUL) == KSEG1)
 
-void __iounmap(void *addr)
+void __iounmap(volatile void __iomem *addr)
 {
 	struct vm_struct *p;
 
 	if (IS_KSEG1(addr))
 		return;
 
-	vfree((void *) (PAGE_MASK & (unsigned long) addr));
-	p = remove_vm_area((void *) (PAGE_MASK & (unsigned long) addr));
+	p = remove_vm_area((void *) (PAGE_MASK & (unsigned long __force) addr));
 	if (!p) {
 		printk(KERN_ERR "iounmap: bad address %p\n", addr);
 		return;

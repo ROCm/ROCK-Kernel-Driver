@@ -1429,16 +1429,16 @@ static int wd7000_detect(struct scsi_host_template *tpnt)
 						break;
 
 				if (i == pass) {
-					void *biosaddr = ioremap(wd7000_biosaddr[biosaddr_ptr] + signatures[sig_ptr].ofs,
+					void __iomem *biosaddr = ioremap(wd7000_biosaddr[biosaddr_ptr] + signatures[sig_ptr].ofs,
 								 signatures[sig_ptr].len);
-					short bios_match = 0;
+					short bios_match = 1;
 
 					if (biosaddr)
-						bios_match = memcmp((char *) biosaddr, signatures[sig_ptr].sig, signatures[sig_ptr].len);
+						bios_match = check_signature(biosaddr, signatures[sig_ptr].sig, signatures[sig_ptr].len);
 
 					iounmap(biosaddr);
 
-					if (!bios_match)
+					if (bios_match)
 						goto bios_matched;
 				}
 			}

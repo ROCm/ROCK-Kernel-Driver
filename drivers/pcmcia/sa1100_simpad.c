@@ -48,7 +48,7 @@ simpad_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
 			   struct pcmcia_state *state)
 {
 	unsigned long levels = GPLR;
-	unsigned long *cs3reg = CS3_BASE;
+	long cs3reg = get_cs3_shadow();
 
 	state->detect=((levels & GPIO_CF_CD)==0)?1:0;
 	state->ready=(levels & GPIO_CF_IRQ)?1:0;
@@ -56,7 +56,7 @@ simpad_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
 	state->bvd2=1; /* Not available on Simpad. */
 	state->wrprot=0; /* Not available on Simpad. */
   
-	if((*cs3reg & 0x0c) == 0x0c) {
+	if((cs3reg & 0x0c) == 0x0c) {
 		state->vs_3v=0;
 		state->vs_Xv=0;
 	} else {

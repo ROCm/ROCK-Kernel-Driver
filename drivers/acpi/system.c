@@ -24,6 +24,7 @@
  */
 
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/init.h>
 #include <asm/uaccess.h>
 
@@ -48,34 +49,25 @@ extern FADT_DESCRIPTOR		acpi_fadt;
    -------------------------------------------------------------------------- */
 
 static int
-acpi_system_read_info (
-	char			*page,
-	char			**start,
-	off_t			off,
-	int 			count,
-	int 			*eof,
-	void			*data)
+acpi_system_read_info (struct seq_file *seq, void *offset)
 {
-	char			*p = page;
-	int			size = 0;
-
 	ACPI_FUNCTION_TRACE("acpi_system_read_info");
 
-	if (off != 0)
-		goto end;
-
-	p += sprintf(p, "version:                 %x\n", ACPI_CA_VERSION);
-
-end:
-	size = (p - page);
-	if (size <= off+count) *eof = 1;
-	*start = page + off;
-	size -= off;
-	if (size>count) size = count;
-	if (size<0) size = 0;
-
-	return_VALUE(size);
+	seq_printf(seq, "version:                 %x\n", ACPI_CA_VERSION);
+	return_VALUE(0);
 }
+
+static int acpi_system_info_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_system_read_info, PDE(inode)->data);
+}
+
+static struct file_operations acpi_system_info_ops = {
+	.open		= acpi_system_info_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
 
 static ssize_t acpi_system_read_dsdt (struct file*, char __user *, size_t, loff_t*);
 
@@ -152,10 +144,13 @@ static int __init acpi_system_init (void)
 
 	/* 'info' [R] */
 	name = ACPI_SYSTEM_FILE_INFO;
-	entry = create_proc_read_entry(name,
-		S_IRUGO, acpi_root_dir, acpi_system_read_info,NULL);
+	entry = create_proc_entry(name,
+		S_IRUGO, acpi_root_dir);
 	if (!entry)
 		goto Error;
+	else {
+		entry->proc_fops = &acpi_system_info_ops;
+	}
 
 	/* 'dsdt' [R] */
 	name = ACPI_SYSTEM_FILE_DSDT;

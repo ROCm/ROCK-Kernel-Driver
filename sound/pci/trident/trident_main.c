@@ -3537,12 +3537,15 @@ int __devinit snd_trident_create(snd_card_t * card,
 	if (pci_set_dma_mask(pci, 0x3fffffff) < 0 ||
 	    pci_set_consistent_dma_mask(pci, 0x3fffffff) < 0) {
 		snd_printk("architecture does not support 30bit PCI busmaster DMA\n");
+		pci_disable_device(pci);
 		return -ENXIO;
 	}
 	
 	trident = kcalloc(1, sizeof(*trident), GFP_KERNEL);
-	if (trident == NULL)
+	if (trident == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	trident->device = (pci->vendor << 16) | pci->device;
 	trident->card = card;
 	trident->pci = pci;
@@ -3564,6 +3567,7 @@ int __devinit snd_trident_create(snd_card_t * card,
 
 	if ((err = pci_request_regions(pci, "Trident Audio")) < 0) {
 		kfree(trident);
+		pci_disable_device(pci);
 		return err;
 	}
 	trident->port = pci_resource_start(pci, 0);
@@ -3682,6 +3686,7 @@ int snd_trident_free(trident_t *trident)
 	if (trident->irq >= 0)
 		free_irq(trident->irq, (void *)trident);
 	pci_release_regions(trident->pci);
+	pci_disable_device(trident->pci);
 	kfree(trident);
 	return 0;
 }
@@ -3949,6 +3954,7 @@ static int snd_trident_suspend(snd_card_t *card, unsigned int state)
 	case TRIDENT_DEVICE_ID_SI7018:
 		break;
 	}
+	pci_disable_device(trident->pci);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }

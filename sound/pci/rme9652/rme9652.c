@@ -1812,6 +1812,7 @@ static int snd_rme9652_free(rme9652_t *rme9652)
 	if (rme9652->port)
 		pci_release_regions(rme9652->pci);
 
+	pci_disable_device(rme9652->pci);
 	return 0;
 }
 

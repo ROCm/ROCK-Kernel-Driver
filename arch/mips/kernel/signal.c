@@ -20,9 +20,10 @@
 #include <linux/ptrace.h>
 #include <linux/suspend.h>
 #include <linux/unistd.h>
-#include <linux/bitops.h>
+#include <linux/compiler.h>
 
 #include <asm/asm.h>
+#include <linux/bitops.h>
 #include <asm/cacheflush.h>
 #include <asm/fpu.h>
 #include <asm/sim.h>
@@ -41,7 +42,8 @@ extern asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs);
 
 #ifdef CONFIG_TRAD_SIGNALS
 save_static_function(sys_sigsuspend);
-static_unused int _sys_sigsuspend(struct pt_regs regs)
+__attribute_used__ noinline static int
+_sys_sigsuspend(nabi_no_regargs struct pt_regs regs)
 {
 	sigset_t *uset, saveset, newset;
 
@@ -68,7 +70,8 @@ static_unused int _sys_sigsuspend(struct pt_regs regs)
 #endif
 
 save_static_function(sys_rt_sigsuspend);
-static_unused int _sys_rt_sigsuspend(nabi_no_regargs struct pt_regs regs)
+__attribute_used__ noinline static int
+_sys_rt_sigsuspend(nabi_no_regargs struct pt_regs regs)
 {
 	sigset_t *unewset, saveset, newset;
 	size_t sigsetsize;
@@ -178,6 +181,8 @@ asmlinkage int restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
 
 	err |= __get_user(current->used_math, &sc->sc_used_math);
 
+	preempt_disable();
+
 	if (current->used_math) {
 		/* restore fpu context if we have used it before */
 		own_fpu();
@@ -187,22 +192,30 @@ asmlinkage int restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
 		lose_fpu();
 	}
 
+	preempt_enable();
+
 	return err;
 }
+
+#if PLAT_TRAMPOLINE_STUFF_LINE
+#define __tramp __attribute__((aligned(PLAT_TRAMPOLINE_STUFF_LINE)))
+#else
+#define __tramp
+#endif
 
 #ifdef CONFIG_TRAD_SIGNALS
 struct sigframe {
 	u32 sf_ass[4];			/* argument save space for o32 */
-	u32 sf_code[2];			/* signal trampoline */
-	struct sigcontext sf_sc;
+	u32 sf_code[2] __tramp;		/* signal trampoline */
+	struct sigcontext sf_sc __tramp;
 	sigset_t sf_mask;
 };
 #endif
 
 struct rt_sigframe {
 	u32 rs_ass[4];			/* argument save space for o32 */
-	u32 rs_code[2];			/* signal trampoline */
-	struct siginfo rs_info;
+	u32 rs_code[2] __tramp;		/* signal trampoline */
+	struct siginfo rs_info __tramp;
 	struct ucontext rs_uc;
 };
 
@@ -320,11 +333,15 @@ inline int setup_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
 	 * Save FPU state to signal context.  Signal handler will "inherit"
 	 * current FPU state.
 	 */
+	preempt_disable();
+
 	if (!is_fpu_owner()) {
 		own_fpu();
 		restore_fp(current);
 	}
 	err |= save_fp_context(sc);
+
+	preempt_enable();
 
 out:
 	return err;
@@ -336,7 +353,7 @@ out:
 static inline void *get_sigframe(struct k_sigaction *ka, struct pt_regs *regs,
 	size_t frame_size)
 {
-	unsigned long sp;
+	unsigned long sp, almask;
 
 	/* Default to using normal stack */
 	sp = regs->regs[29];
@@ -352,7 +369,12 @@ static inline void *get_sigframe(struct k_sigaction *ka, struct pt_regs *regs,
 	if ((ka->sa.sa_flags & SA_ONSTACK) && (sas_ss_flags (sp) == 0))
 		sp = current->sas_ss_sp + current->sas_ss_size;
 
-	return (void *)((sp - frame_size) & ALMASK);
+	if (PLAT_TRAMPOLINE_STUFF_LINE)
+		almask = ~(PLAT_TRAMPOLINE_STUFF_LINE - 1);
+	else
+		almask = ALMASK;
+
+	return (void *)((sp - frame_size) & ~(PLAT_TRAMPOLINE_STUFF_LINE - 1));
 }
 
 #ifdef CONFIG_TRAD_SIGNALS
@@ -372,6 +394,9 @@ static void inline setup_frame(struct k_sigaction * ka, struct pt_regs *regs,
 	 *         li      v0, __NR_sigreturn
 	 *         syscall
 	 */
+	if (PLAT_TRAMPOLINE_STUFF_LINE)
+		__builtin_memset(frame->sf_code, '0',
+		                 PLAT_TRAMPOLINE_STUFF_LINE);
 	err |= __put_user(0x24020000 + __NR_sigreturn, frame->sf_code + 0);
 	err |= __put_user(0x0000000c                 , frame->sf_code + 1);
 	flush_cache_sigtramp((unsigned long) frame->sf_code);
@@ -426,6 +451,9 @@ static void inline setup_rt_frame(struct k_sigaction * ka, struct pt_regs *regs,
 	 *         li      v0, __NR_rt_sigreturn
 	 *         syscall
 	 */
+	if (PLAT_TRAMPOLINE_STUFF_LINE)
+		__builtin_memset(frame->rs_code, '0',
+		                 PLAT_TRAMPOLINE_STUFF_LINE);
 	err |= __put_user(0x24020000 + __NR_rt_sigreturn, frame->rs_code + 0);
 	err |= __put_user(0x0000000c                    , frame->rs_code + 1);
 	flush_cache_sigtramp((unsigned long) frame->rs_code);
@@ -517,8 +545,6 @@ static inline void handle_signal(unsigned long sig, siginfo_t *info,
 		setup_frame(ka, regs, sig, oldset);
 #endif
 
-	if (ka->sa.sa_flags & SA_ONESHOT)
-		ka->sa.sa_handler = SIG_DFL;
 	if (!(ka->sa.sa_flags & SA_NODEFER)) {
 		spin_lock_irq(&current->sighand->siglock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);

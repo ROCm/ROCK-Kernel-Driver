@@ -12,6 +12,7 @@
  * published by the Free Software Foundation.
  *
  * Changelog:
+ *  18-Nov-2004 BJD  Removed error for loading onto stopped channel
  *  10-Nov-2004 BJD  Ensure all external symbols exported for modules
  *  10-Nov-2004 BJD  Use sys_device and sysdev_class for power management
  *  08-Aug-2004 BJD  Apply rmk's suggestions
@@ -493,10 +494,6 @@ int s3c2410_dma_enqueue(unsigned int channel, void *id,
 	} else if (chan->state == S3C2410_DMA_IDLE) {
 		if (chan->flags & S3C2410_DMAF_AUTOSTART) {
 			s3c2410_dma_ctrl(chan->number, S3C2410_DMAOP_START);
-		} else {
-			printk(KERN_DEBUG "dma%d: cannot load onto stopped channel'n", chan->number);
-			local_irq_restore(flags);
-			return -EINVAL;
 		}
 	}
 
@@ -653,6 +650,9 @@ s3c2410_dma_irq(int irq, void *devpw, struct pt_regs *regs)
 
 			break;
 
+		case S3C2410_DMALOAD_1LOADED_1RUNNING:
+			goto no_load;
+
 		default:
 			printk(KERN_ERR "dma%d: unknown load_state in irq, %d\n",
 			       chan->number, chan->load_state);
@@ -673,6 +673,7 @@ s3c2410_dma_irq(int irq, void *devpw, struct pt_regs *regs)
 		}
 	}
 
+ no_load:
 	return IRQ_HANDLED;
 }
 

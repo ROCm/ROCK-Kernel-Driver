@@ -95,6 +95,7 @@ xfs_trans_iget(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_ino_t	ino,
+	uint		flags,
 	uint		lock_flags,
 	xfs_inode_t	**ipp)
 {
@@ -106,9 +107,8 @@ xfs_trans_iget(
 	 * If the transaction pointer is NULL, just call the normal
 	 * xfs_iget().
 	 */
-	if (tp == NULL) {
-		return (xfs_iget(mp, NULL, ino, lock_flags, ipp, 0));
-	}
+	if (tp == NULL)
+		return xfs_iget(mp, NULL, ino, flags, lock_flags, ipp, 0);
 
 	/*
 	 * If we find the inode in core with this transaction
@@ -148,7 +148,7 @@ xfs_trans_iget(
 	}
 
 	ASSERT(lock_flags & XFS_ILOCK_EXCL);
-	error = xfs_iget(tp->t_mountp, tp, ino, lock_flags, &ip, 0);
+	error = xfs_iget(tp->t_mountp, tp, ino, flags, lock_flags, &ip, 0);
 	if (error) {
 		return error;
 	}
@@ -185,7 +185,6 @@ xfs_trans_iget(
 	*ipp = ip;
 	return 0;
 }
-
 
 /*
  * Add the locked inode to the transaction.

@@ -243,7 +243,7 @@ struct clk s3c24xx_dclk1 = {
 };
 
 struct clk s3c24xx_clkout0 = {
-	.name		= "clkout1",
+	.name		= "clkout0",
 	.id		= -1,
 };
 

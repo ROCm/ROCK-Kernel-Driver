@@ -142,8 +142,10 @@ typedef struct uioc {
 
 	caddr_t			buf_vaddr;
 	dma_addr_t		buf_paddr;
-	uint8_t			pool_index;
+	int8_t			pool_index;
 	uint8_t			free_buf;
+
+	uint8_t			timedout;
 
 } __attribute__ ((aligned(1024),packed)) uioc_t;
 
@@ -247,6 +249,7 @@ typedef struct mm_dmapool {
  * @pdev		: pci dev; used for allocating dma'ble memory
  * @issue_uioc		: Driver supplied routine to issue uioc_t commands
  *			: issue_uioc(drvr_data, kioc, ISSUE/ABORT, uioc_done)
+ * @quiescent		: flag to indicate if ioctl can be issued to this adp
  * @list		: attach with the global list of adapters
  * @kioc_list		: block of mem for @max_kioc number of kiocs
  * @kioc_pool		: pool of free kiocs
@@ -264,7 +267,7 @@ typedef struct mraid_mmadp {
 	uint32_t		unique_id;
 	uint32_t		drvr_type;
 	unsigned long		drvr_data;
-	uint8_t			timeout;
+	uint16_t		timeout;
 	uint8_t			max_kioc;
 
 	struct pci_dev		*pdev;
@@ -272,6 +275,7 @@ typedef struct mraid_mmadp {
 	int(*issue_uioc)(unsigned long, uioc_t *, uint32_t);
 
 /* Maintained by common module */
+	uint32_t		quiescent;
 
 	struct list_head	list;
 	uioc_t			*kioc_list;

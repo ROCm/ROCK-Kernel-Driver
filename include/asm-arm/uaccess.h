@@ -108,35 +108,35 @@ extern int __get_user_4(void *);
 extern int __get_user_8(void *);
 extern int __get_user_bad(void);
 
-#define __get_user_x(__r1,__p,__e,__s,__i...)				\
+#define __get_user_x(__r2,__p,__e,__s,__i...)				\
 	   __asm__ __volatile__ (					\
-		__asmeq("%0", "r0") __asmeq("%1", "r1")			\
+		__asmeq("%0", "r0") __asmeq("%1", "r2")			\
 		"bl	__get_user_" #__s				\
-		: "=&r" (__e), "=r" (__r1)				\
+		: "=&r" (__e), "=r" (__r2)				\
 		: "0" (__p)						\
 		: __i, "cc")
 
 #define get_user(x,p)							\
 	({								\
 		const register typeof(*(p)) __user *__p asm("r0") = (p);\
-		register typeof(*(p)) __r1 asm("r1");			\
+		register typeof(*(p)) __r2 asm("r2");			\
 		register int __e asm("r0");				\
 		switch (sizeof(*(__p))) {				\
 		case 1:							\
-			__get_user_x(__r1, __p, __e, 1, "lr");		\
+			__get_user_x(__r2, __p, __e, 1, "lr");		\
 	       		break;						\
 		case 2:							\
-			__get_user_x(__r1, __p, __e, 2, "r2", "lr");	\
+			__get_user_x(__r2, __p, __e, 2, "r3", "lr");	\
 			break;						\
 		case 4:							\
-	       		__get_user_x(__r1, __p, __e, 4, "lr");		\
+	       		__get_user_x(__r2, __p, __e, 4, "lr");		\
 			break;						\
 		case 8:							\
-			__get_user_x(__r1, __p, __e, 8, "lr");		\
+			__get_user_x(__r2, __p, __e, 8, "lr");		\
 	       		break;						\
 		default: __e = __get_user_bad(); break;			\
 		}							\
-		x = __r1;						\
+		x = __r2;						\
 		__e;							\
 	})
 
@@ -227,31 +227,31 @@ extern int __put_user_4(void *, unsigned int);
 extern int __put_user_8(void *, unsigned long long);
 extern int __put_user_bad(void);
 
-#define __put_user_x(__r1,__p,__e,__s)					\
+#define __put_user_x(__r2,__p,__e,__s)					\
 	   __asm__ __volatile__ (					\
-		__asmeq("%0", "r0") __asmeq("%2", "r1")			\
+		__asmeq("%0", "r0") __asmeq("%2", "r2")			\
 		"bl	__put_user_" #__s				\
 		: "=&r" (__e)						\
-		: "0" (__p), "r" (__r1)					\
+		: "0" (__p), "r" (__r2)					\
 		: "ip", "lr", "cc")
 
 #define put_user(x,p)							\
 	({								\
-		const register typeof(*(p)) __r1 asm("r1") = (x);	\
+		const register typeof(*(p)) __r2 asm("r2") = (x);	\
 		const register typeof(*(p)) __user *__p asm("r0") = (p);\
 		register int __e asm("r0");				\
 		switch (sizeof(*(__p))) {				\
 		case 1:							\
-			__put_user_x(__r1, __p, __e, 1);		\
+			__put_user_x(__r2, __p, __e, 1);		\
 			break;						\
 		case 2:							\
-			__put_user_x(__r1, __p, __e, 2);		\
+			__put_user_x(__r2, __p, __e, 2);		\
 			break;						\
 		case 4:							\
-			__put_user_x(__r1, __p, __e, 4);		\
+			__put_user_x(__r2, __p, __e, 4);		\
 			break;						\
 		case 8:							\
-			__put_user_x(__r1, __p, __e, 8);		\
+			__put_user_x(__r2, __p, __e, 8);		\
 			break;						\
 		default: __e = __put_user_bad(); break;			\
 		}							\

@@ -56,28 +56,17 @@ static volatile struct NS16550 __iomem *udbg_comport;
 
 void udbg_init_uart(void __iomem *comport, unsigned int speed)
 {
-	u8 dll = 12;
+	u16 dll = speed ? (115200 / speed) : 12;
 
-	switch(speed) {
-	case 115200:
-		dll = 1;
-		break;
-	case 57600:
-		dll = 2;
-		break;
-	case 38400:
-		dll = 3;
-		break;
-	}
 	if (comport) {
 		udbg_comport = (struct NS16550 __iomem *)comport;
 		out_8(&udbg_comport->lcr, 0x00);
 		out_8(&udbg_comport->ier, 0xff);
 		out_8(&udbg_comport->ier, 0x00);
 		out_8(&udbg_comport->lcr, 0x80);	/* Access baud rate */
-		out_8(&udbg_comport->dll,  dll);	/* 1 = 115200,  2 = 57600,
+		out_8(&udbg_comport->dll, dll & 0xff);	/* 1 = 115200,  2 = 57600,
 							   3 = 38400, 12 = 9600 baud */
-		out_8(&udbg_comport->dlm, 0x00);	/* dll >> 8 which should be zero
+		out_8(&udbg_comport->dlm, dll >> 8);	/* dll >> 8 which should be zero
 							   for fast rates; */
 		out_8(&udbg_comport->lcr, 0x03);	/* 8 data, 1 stop, no parity */
 		out_8(&udbg_comport->mcr, 0x03);	/* RTS/DTR */

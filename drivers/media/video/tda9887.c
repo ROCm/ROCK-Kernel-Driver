@@ -246,6 +246,7 @@ static void dump_read_message(unsigned char *buf)
 	printk(PREFIX "read: 0x%2x\n", buf[0]);
 	printk("  after power on : %s\n", (buf[0] & 0x01) ? "yes" : "no");
 	printk("  afc            : %s\n", afc[(buf[0] >> 1) & 0x0f]);
+	printk("  fmif level     : %s\n", (buf[0] & 0x20) ? "high" : "low");
 	printk("  afc window     : %s\n", (buf[0] & 0x40) ? "in" : "out");
 	printk("  vfi level      : %s\n", (buf[0] & 0x80) ? "high" : "low");
 }

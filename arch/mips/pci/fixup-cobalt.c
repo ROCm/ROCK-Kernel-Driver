@@ -77,7 +77,7 @@ static void qube_raq_galileo_fixup(struct pci_dev *dev)
 }
 
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_GALILEO, PCI_ANY_ID,
-	qube_raq_galileo_fixup);
+	 qube_raq_galileo_fixup);
 
 static char irq_tab_cobalt[] __initdata = {
   [COBALT_PCICONF_CPU]     = 0,
@@ -103,4 +103,10 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 		return irq_tab_raq2[slot];
 
 	return irq_tab_cobalt[slot];
+}
+
+/* Do platform specific device initialization at pci_enable_device() time */
+int pcibios_plat_dev_init(struct pci_dev *dev)
+{
+	return 0;
 }

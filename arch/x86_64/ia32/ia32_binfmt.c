@@ -334,7 +334,7 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 	unsigned long stack_base;
 	struct vm_area_struct *mpnt;
 	struct mm_struct *mm = current->mm;
-	int i;
+	int i, ret;
 
 	stack_base = IA32_STACK_TOP - MAX_ARG_PAGES * PAGE_SIZE;
 	mm->arg_start = bprm->p + stack_base;
@@ -368,7 +368,11 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 			mpnt->vm_flags = VM_STACK_FLAGS;
  		mpnt->vm_page_prot = (mpnt->vm_flags & VM_EXEC) ? 
  			PAGE_COPY_EXEC : PAGE_COPY;
-		insert_vm_struct(mm, mpnt);
+		if ((ret = insert_vm_struct(mm, mpnt))) {
+			up_write(&mm->mmap_sem);
+			kmem_cache_free(vm_area_cachep, mpnt);
+			return ret;
+		}
 		mm->stack_vm = mm->total_vm = vma_pages(mpnt);
 	} 
 

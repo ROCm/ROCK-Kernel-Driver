@@ -52,7 +52,7 @@ typedef enum {
 struct keywest_iface
 {
 	struct device_node	*node;
-	unsigned long		base;
+	void __iomem *		base;
 	unsigned		bsteps;
 	int			irq;
 	spinlock_t		lock;
@@ -89,13 +89,13 @@ struct keywest_chan
 
 static inline u8 __read_reg(struct keywest_iface *iface, reg_t reg)
 {
-	return in_8(((volatile u8 *)iface->base)
+	return in_8(iface->base
 		+ (((unsigned)reg) << iface->bsteps));
 }
 
 static inline void __write_reg(struct keywest_iface *iface, reg_t reg, u8 val)
 {
-	out_8(((volatile u8 *)iface->base)
+	out_8(iface->base
 		+ (((unsigned)reg) << iface->bsteps), val);
 	(void)__read_reg(iface, reg_subaddr);
 }

@@ -409,28 +409,38 @@ acpi_parse_nmi_src (
 void __init
 acpi_pic_sci_set_trigger(unsigned int irq, u16 trigger)
 {
-	unsigned char mask = 1 << (irq & 7);
-	unsigned int port = 0x4d0 + (irq >> 3);
-	unsigned char val = inb(port);
+	unsigned int mask = 1 << irq;
+	unsigned int old, new;
 
-	
-	printk(PREFIX "IRQ%d SCI:", irq);
-	if (!(val & mask)) {
-		printk(" Edge");
+	/* Real old ELCR mask */
+	old = inb(0x4d0) | (inb(0x4d1) << 8);
 
-		if (trigger == 3) {
-			printk(" set to Level");
-			outb(val | mask, port);
-		}
-	} else {
-		printk(" Level");
+	/*
+	 * If we use ACPI to set PCI irq's, then we should clear ELCR
+	 * since we will set it correctly as we enable the PCI irq
+	 * routing.
+	 */
+	new = acpi_noirq ? old : 0;
 
-		if (trigger == 1) {
-			printk(" set to Edge");
-			outb(val & ~mask, port);
-		}
+	/*
+	 * Update SCI information in the ELCR, it isn't in the PCI
+	 * routing tables..
+	 */
+	switch (trigger) {
+	case 1:	/* Edge - clear */
+		new &= ~mask;
+		break;
+	case 3: /* Level - set */
+		new |= mask;
+		break;
 	}
-	printk(" Trigger.\n");
+
+	if (old == new)
+		return;
+
+	printk(PREFIX "setting ELCR to %04x (from %04x)\n", new, old);
+	outb(new, 0x4d0);
+	outb(new >> 8, 0x4d1);
 }
 
 
@@ -743,7 +753,7 @@ acpi_process_madt(void)
 	int count, error;
 
 	count = acpi_table_parse(ACPI_APIC, acpi_parse_madt);
-	if (count == 1) {
+	if (count >= 1) {
 
 		/*
 		 * Parse MADT LAPIC entries
@@ -817,6 +827,10 @@ acpi_boot_init (void)
 		disable_acpi();
 		return error;
 	}
+
+#ifdef __i386__
+	check_acpi_pci();
+#endif
 
 	acpi_table_parse(ACPI_BOOT, acpi_parse_sbf);
 

@@ -13,9 +13,6 @@
 
 #include <asm/offset.h>
 
-/* Used in declaration of save_static functions.  */
-#define static_unused static __attribute__((unused))
-
 #define __str2(x) #x
 #define __str(x) __str2(x)
 
@@ -39,6 +36,7 @@ __asm__ (								\
 	"sw\t$22,"__str(PT_R22)"($29)\n\t"				\
 	"sw\t$23,"__str(PT_R23)"($29)\n\t"				\
 	"sw\t$30,"__str(PT_R30)"($29)\n\t"				\
+	"j\t_" #symbol "\n\t"						\
 	".end\t" #symbol "\n\t"						\
 	".size\t" #symbol",. - " #symbol)
 
@@ -66,6 +64,7 @@ __asm__ (								\
 	"sd\t$22,"__str(PT_R22)"($29)\n\t"				\
 	"sd\t$23,"__str(PT_R23)"($29)\n\t"				\
 	"sd\t$30,"__str(PT_R30)"($29)\n\t"				\
+	"j\t_" #symbol "\n\t"						\
 	".end\t" #symbol "\n\t"						\
 	".size\t" #symbol",. - " #symbol)
 

@@ -50,10 +50,12 @@
 #define SIZE_IN_HEADER          0
 
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_tb_handle_to_object (
 	u16                             table_id,
 	struct acpi_table_desc          **table_desc);
+#endif
 
 /*
  * tbconvrt - Table conversion routines

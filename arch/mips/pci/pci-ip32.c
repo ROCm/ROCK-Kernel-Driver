@@ -4,6 +4,7 @@
  * for more details.
  *
  * Copyright (C) 2000, 2001 Keith M Wesolowski
+ * Copyright (C) 2004 by Ralf Baechle (ralf@linux-mips.org)
  */
 #include <linux/config.h>
 #include <linux/kernel.h>
@@ -11,7 +12,6 @@
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/types.h>
-#include <asm/pci_channel.h>
 #include <asm/ip32/mace.h>
 #include <asm/ip32/ip32_ints.h>
 

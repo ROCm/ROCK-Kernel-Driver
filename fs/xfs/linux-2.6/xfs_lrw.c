@@ -244,6 +244,7 @@ xfs_read(
 	cred_t			*credp)
 {
 	struct file		*file = iocb->ki_filp;
+	struct inode		*inode = file->f_mapping->host;
 	size_t			size = 0;
 	ssize_t			ret;
 	xfs_fsize_t		n;
@@ -272,7 +273,7 @@ xfs_read(
 	}
 	/* END copy & waste from filemap.c */
 
-	if (ioflags & IO_ISDIRECT) {
+	if (unlikely(ioflags & IO_ISDIRECT)) {
 		xfs_buftarg_t	*target =
 			(ip->i_d.di_flags & XFS_DIFLAG_REALTIME) ?
 				mp->m_rtdev_targp : mp->m_ddev_targp;
@@ -296,18 +297,20 @@ xfs_read(
 		return -EIO;
 	}
 
+	if (unlikely(ioflags & IO_ISDIRECT))
+		down(&inode->i_sem);
 	xfs_ilock(ip, XFS_IOLOCK_SHARED);
 
 	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
 	    !(ioflags & IO_INVIS)) {
 		vrwlock_t locktype = VRWLOCK_READ;
 
-		ret = XFS_SEND_DATA(mp, DM_EVENT_READ,
+		ret = -XFS_SEND_DATA(mp, DM_EVENT_READ,
 					BHV_TO_VNODE(bdp), *offset, size,
 					FILP_DELAY_FLAG(file), &locktype);
 		if (ret) {
 			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
-			return -ret;
+			goto unlock_isem;
 		}
 	}
 
@@ -316,15 +319,17 @@ xfs_read(
 	ret = __generic_file_aio_read(iocb, iovp, segs, offset);
 	if (ret == -EIOCBQUEUED)
 		ret = wait_on_sync_kiocb(iocb);
-
-	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
-
 	if (ret > 0)
 		XFS_STATS_ADD(xs_read_bytes, ret);
+
+	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	if (likely(!(ioflags & IO_INVIS)))
 		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
 
+unlock_isem:
+	if (unlikely(ioflags & IO_ISDIRECT))
+		up(&inode->i_sem);
 	return ret;
 }
 

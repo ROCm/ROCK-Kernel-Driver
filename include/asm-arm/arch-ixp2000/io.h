@@ -24,7 +24,7 @@
 #define ___io(p)		((unsigned long)((p)+IXP2000_PCI_IO_VIRT_BASE))
 
 /*
- * IXP200 does not do proper byte-lane conversion for PCI addresses,
+ * IXP2000 does not do proper byte-lane conversion for PCI addresses,
  * so we need to override standard functions.
  */
 #define alignb(addr)		((addr & ~3) + (3 - (addr & 3)))

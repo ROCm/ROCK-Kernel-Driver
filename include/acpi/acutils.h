@@ -666,12 +666,14 @@ acpi_ut_create_update_state_and_push (
 	u16                             action,
 	union acpi_generic_state        **state_list);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_ut_create_pkg_state_and_push (
 	void                            *internal_object,
 	void                            *external_object,
 	u16                             index,
 	union acpi_generic_state        **state_list);
+#endif
 
 union acpi_generic_state *
 acpi_ut_create_control_state (
@@ -730,9 +732,11 @@ acpi_ut_strtoul64 (
 
 #define ACPI_ANY_BASE        0
 
+#ifdef ACPI_FUTURE_USAGE
 char *
 acpi_ut_strupr (
 	char                            *src_string);
+#endif
 
 u8 *
 acpi_ut_get_resource_end_tag (
@@ -851,9 +855,11 @@ acpi_ut_remove_allocation (
 	char                            *module,
 	u32                             line);
 
+#ifdef ACPI_FUTURE_USAGE
 void
 acpi_ut_dump_allocation_info (
 	void);
+#endif
 
 void
 acpi_ut_dump_allocations (

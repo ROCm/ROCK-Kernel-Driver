@@ -243,6 +243,7 @@ extern int  x25_validate_nr(struct sock *, unsigned short);
 extern void x25_write_internal(struct sock *, int);
 extern int  x25_decode(struct sock *, struct sk_buff *, int *, int *, int *, int *, int *);
 extern void x25_disconnect(struct sock *, int, unsigned char, unsigned char);
+extern int x25_check_calluserdata(struct x25_calluserdata *,struct x25_calluserdata *);
 
 /* x25_timer.c */
 extern void x25_start_heartbeat(struct sock *);

@@ -20,14 +20,7 @@
 #define __ARCH_IRQ_STAT	1
 
 #define softirq_pending(cpu)		(cpu_data(cpu)->softirq_pending)
-#define syscall_count(cpu)		/* unused on IA-64 */
-#define ksoftirqd_task(cpu)		(cpu_data(cpu)->ksoftirqd)
-#define nmi_count(cpu)			0
-
 #define local_softirq_pending()		(local_cpu_data->softirq_pending)
-#define local_syscall_count()		/* unused on IA-64 */
-#define local_ksoftirqd_task()		(local_cpu_data->ksoftirqd)
-#define local_nmi_count()		0
 
 #define HARDIRQ_BITS	14
 

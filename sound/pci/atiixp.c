@@ -1420,6 +1420,7 @@ static int snd_atiixp_resume(snd_card_t *card, unsigned int state)
 
 	pci_enable_device(chip->pci);
 	pci_set_power_state(chip->pci, 0);
+	pci_set_master(chip->pci);
 
 	snd_atiixp_aclink_reset(chip);
 	snd_atiixp_chip_start(chip);
@@ -1473,6 +1474,7 @@ static int snd_atiixp_free(atiixp_t *chip)
 	if (chip->remap_addr)
 		iounmap(chip->remap_addr);
 	pci_release_regions(chip->pci);
+	pci_disable_device(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -1500,8 +1502,10 @@ static int __devinit snd_atiixp_create(snd_card_t *card,
 		return err;
 
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (chip == NULL)
+	if (chip == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 
 	spin_lock_init(&chip->reg_lock);
 	spin_lock_init(&chip->ac97_lock);
@@ -1510,6 +1514,7 @@ static int __devinit snd_atiixp_create(snd_card_t *card,
 	chip->pci = pci;
 	chip->irq = -1;
 	if ((err = pci_request_regions(pci, "ATI IXP AC97")) < 0) {
+		pci_disable_device(pci);
 		kfree(chip);
 		return err;
 	}

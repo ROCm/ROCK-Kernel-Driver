@@ -1002,7 +1002,7 @@ static int video_open(struct inode *inode, struct file *file)
 }
 
 static ssize_t
-video_read(struct file *file, char *data, size_t count, loff_t *ppos)
+video_read(struct file *file, char __user *data, size_t count, loff_t *ppos)
 {
 	struct cx8800_fh *fh = file->private_data;
 
@@ -1070,7 +1070,7 @@ static int video_release(struct inode *inode, struct file *file)
 		res_free(dev,fh,RESOURCE_VIDEO);
 	}
 	if (fh->vidq.read_buf) {
-		buffer_release(file->private_data,fh->vidq.read_buf);
+		buffer_release(&fh->vidq,fh->vidq.read_buf);
 		kfree(fh->vidq.read_buf);
 	}
 

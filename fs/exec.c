@@ -342,7 +342,7 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 	unsigned long stack_base;
 	struct vm_area_struct *mpnt;
 	struct mm_struct *mm = current->mm;
-	int i;
+	int i, ret;
 	long arg_size;
 
 #ifdef CONFIG_STACK_GROWSUP
@@ -413,7 +413,6 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 
 	down_write(&mm->mmap_sem);
 	{
-		struct vm_area_struct *vma;
 		mpnt->vm_mm = mm;
 #ifdef CONFIG_STACK_GROWSUP
 		mpnt->vm_start = stack_base;
@@ -434,13 +433,11 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 			mpnt->vm_flags = VM_STACK_FLAGS;
 		mpnt->vm_flags |= mm->def_flags;
 		mpnt->vm_page_prot = protection_map[mpnt->vm_flags & 0x7];
-		vma = find_vma(mm, mpnt->vm_start);
-		if (vma) {
+		if ((ret = insert_vm_struct(mm, mpnt))) {
 			up_write(&mm->mmap_sem);
 			kmem_cache_free(vm_area_cachep, mpnt);
-			return -ENOMEM;
+			return ret;
 		}
-		insert_vm_struct(mm, mpnt);
 		mm->stack_vm = mm->total_vm = vma_pages(mpnt);
 	}
 
@@ -1097,19 +1094,18 @@ int do_execve(char * filename,
 	int retval;
 	int i;
 
-	file = open_exec(filename);
-
-	retval = PTR_ERR(file);
-	if (IS_ERR(file))
-		return retval;
-
-	sched_exec();
-
 	retval = -ENOMEM;
 	bprm = kmalloc(sizeof(*bprm), GFP_KERNEL);
 	if (!bprm)
 		goto out_ret;
 	memset(bprm, 0, sizeof(*bprm));
+
+	file = open_exec(filename);
+	retval = PTR_ERR(file);
+	if (IS_ERR(file))
+		goto out_kfree;
+
+	sched_exec();
 
 	bprm->p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
 
@@ -1117,6 +1113,7 @@ int do_execve(char * filename,
 	bprm->filename = filename;
 	bprm->interp = filename;
 	bprm->mm = mm_alloc();
+	retval = -ENOMEM;
 	if (!bprm->mm)
 		goto out_file;
 
@@ -1183,6 +1180,8 @@ out_file:
 		allow_write_access(bprm->file);
 		fput(bprm->file);
 	}
+
+out_kfree:
 	kfree(bprm);
 
 out_ret:

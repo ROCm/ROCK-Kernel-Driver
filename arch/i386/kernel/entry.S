@@ -235,6 +235,7 @@ sysenter_past_esp:
 /* if something modifies registers it must also disable sysexit */
 	movl EIP(%esp), %edx
 	movl OLDESP(%esp), %ecx
+	xorl %ebp,%ebp
 	sti
 	sysexit
 

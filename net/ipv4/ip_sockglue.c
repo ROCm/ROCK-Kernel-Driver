@@ -146,11 +146,8 @@ int ip_cmsg_send(struct msghdr *msg, struct ipcm_cookie *ipc)
 	struct cmsghdr *cmsg;
 
 	for (cmsg = CMSG_FIRSTHDR(msg); cmsg; cmsg = CMSG_NXTHDR(msg, cmsg)) {
-		if (cmsg->cmsg_len < sizeof(struct cmsghdr) ||
-		    (unsigned long)(((char*)cmsg - (char*)msg->msg_control)
-				    + cmsg->cmsg_len) > msg->msg_controllen) {
+		if (!CMSG_OK(msg, cmsg))
 			return -EINVAL;
-		}
 		if (cmsg->cmsg_level != SOL_IP)
 			continue;
 		switch (cmsg->cmsg_type) {

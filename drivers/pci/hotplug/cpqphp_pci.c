@@ -194,7 +194,7 @@ static int PCI_ScanBusNonBridge (u8 bus, u8 device)
 
 static int PCI_ScanBusForNonBridge(struct controller *ctrl, u8 bus_num, u8 * dev_num)
 {
-	u8 tdevice;
+	u16 tdevice;
 	u32 work;
 	u8 tbus;
 

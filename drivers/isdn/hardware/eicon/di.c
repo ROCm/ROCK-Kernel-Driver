@@ -952,10 +952,10 @@ static void xdi_xlog_rc_event (byte Adapter,
                                byte Id, byte Ch, byte Rc, byte cb, byte type) {
 #if defined(XDI_USE_XLOG)
   word LogInfo[4];
-  WRITE_WORD(&LogInfo[0], ((word)Adapter | (word)(xdi_xlog_sec++ << 8)));
-  WRITE_WORD(&LogInfo[1], ((word)Id | (word)(Ch << 8)));
-  WRITE_WORD(&LogInfo[2], ((word)Rc | (word)(type << 8)));
-  WRITE_WORD(&LogInfo[3], cb);
+  PUT_WORD(&LogInfo[0], ((word)Adapter | (word)(xdi_xlog_sec++ << 8)));
+  PUT_WORD(&LogInfo[1], ((word)Id | (word)(Ch << 8)));
+  PUT_WORD(&LogInfo[2], ((word)Rc | (word)(type << 8)));
+  PUT_WORD(&LogInfo[3], cb);
   xdi_xlog ((byte*)&LogInfo[0], 221, sizeof(LogInfo));
 #endif
 }
@@ -976,9 +976,9 @@ static void xdi_xlog_request (byte Adapter, byte Id,
                               byte Ch, byte Req, byte type) {
 #if defined(XDI_USE_XLOG)
   word LogInfo[3];
-  WRITE_WORD(&LogInfo[0], ((word)Adapter | (word)(xdi_xlog_sec++ << 8)));
-  WRITE_WORD(&LogInfo[1], ((word)Id | (word)(Ch << 8)));
-  WRITE_WORD(&LogInfo[2], ((word)Req | (word)(type << 8)));
+  PUT_WORD(&LogInfo[0], ((word)Adapter | (word)(xdi_xlog_sec++ << 8)));
+  PUT_WORD(&LogInfo[1], ((word)Id | (word)(Ch << 8)));
+  PUT_WORD(&LogInfo[2], ((word)Req | (word)(type << 8)));
   xdi_xlog ((byte*)&LogInfo[0], 220, sizeof(LogInfo));
 #endif
 }
@@ -1020,10 +1020,10 @@ static void xdi_xlog_ind (byte Adapter,
                           byte type) {
 #if defined(XDI_USE_XLOG)
   word LogInfo[4];
-  WRITE_WORD(&LogInfo[0], ((word)Adapter | (word)(xdi_xlog_sec++ << 8)));
-  WRITE_WORD(&LogInfo[1], ((word)Id | (word)(Ch << 8)));
-  WRITE_WORD(&LogInfo[2], ((word)Ind | (word)(type << 8)));
-  WRITE_WORD(&LogInfo[3], ((word)rnr | (word)(rnr_valid << 8)));
+  PUT_WORD(&LogInfo[0], ((word)Adapter | (word)(xdi_xlog_sec++ << 8)));
+  PUT_WORD(&LogInfo[1], ((word)Id | (word)(Ch << 8)));
+  PUT_WORD(&LogInfo[2], ((word)Ind | (word)(type << 8)));
+  PUT_WORD(&LogInfo[3], ((word)rnr | (word)(rnr_valid << 8)));
   xdi_xlog ((byte*)&LogInfo[0], 222, sizeof(LogInfo));
 #endif
 }

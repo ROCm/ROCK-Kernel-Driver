@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_main.c ($Revision: 1.155 $)
+ * linux/drivers/s390/net/qeth_main.c ($Revision: 1.170 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  *
@@ -12,7 +12,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Thomas Spatzier <tspat@de.ibm.com>
  *
- *    $Revision: 1.155 $	 $Date: 2004/10/21 13:27:46 $
+ *    $Revision: 1.170 $	 $Date: 2004/11/17 09:54:06 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,7 +78,7 @@ qeth_eyecatcher(void)
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-#define VERSION_QETH_C "$Revision: 1.155 $"
+#define VERSION_QETH_C "$Revision: 1.170 $"
 static const char *version = "qeth S/390 OSA-Express driver";
 
 /**
@@ -158,6 +158,9 @@ qeth_set_online(struct ccwgroup_device *);
 
 static struct qeth_ipaddr *
 qeth_get_addr_buffer(enum qeth_prot_versions);
+
+static void
+qeth_set_multicast_list(struct net_device *);
 
 static void
 qeth_notify_processes(void)
@@ -249,6 +252,7 @@ qeth_free_card(struct qeth_card *card)
 		free_netdev(card->dev);
 	qeth_clear_ip_list(card, 0, 0);
 	qeth_clear_ipato_list(card);
+	kfree(card->ip_tbd_list);
 	qeth_free_qdio_buffers(card);
 	kfree(card);
 }
@@ -660,7 +664,10 @@ __qeth_insert_ip_todo(struct qeth_card *card, struct qeth_ipaddr *addr, int add)
 	struct qeth_ipaddr *tmp, *t;
 	int found = 0;
 
-	list_for_each_entry_safe(tmp, t, &card->ip_tbd_list, entry) {
+	list_for_each_entry_safe(tmp, t, card->ip_tbd_list, entry) {
+		if ((addr->type == QETH_IP_TYPE_DEL_ALL_MC) &&
+		    (tmp->type == QETH_IP_TYPE_DEL_ALL_MC))
+			return 0;
 		if ((tmp->proto        == QETH_PROT_IPV4)     &&
 		    (addr->proto       == QETH_PROT_IPV4)     &&
 		    (tmp->type         == addr->type)         &&
@@ -692,14 +699,18 @@ __qeth_insert_ip_todo(struct qeth_card *card, struct qeth_ipaddr *addr, int add)
 		}
 		return 0;
 	} else {
-		if (addr->users == 0)
-			addr->users += add? 1:-1;
-		if (add && (addr->type == QETH_IP_TYPE_NORMAL) &&
-		    qeth_is_addr_covered_by_ipato(card, addr)){
-			QETH_DBF_TEXT(trace, 2, "tkovaddr");
-			addr->set_flags |= QETH_IPA_SETIP_TAKEOVER_FLAG;
+		if (addr->type == QETH_IP_TYPE_DEL_ALL_MC)
+			list_add(&addr->entry, card->ip_tbd_list);
+		else {
+			if (addr->users == 0)
+				addr->users += add? 1:-1;
+			if (add && (addr->type == QETH_IP_TYPE_NORMAL) &&
+			    qeth_is_addr_covered_by_ipato(card, addr)){
+				QETH_DBF_TEXT(trace, 2, "tkovaddr");
+				addr->set_flags |= QETH_IPA_SETIP_TAKEOVER_FLAG;
+			}
+			list_add_tail(&addr->entry, card->ip_tbd_list);
 		}
-		list_add_tail(&addr->entry, &card->ip_tbd_list);
 		return 1;
 	}
 }
@@ -717,8 +728,8 @@ qeth_delete_ip(struct qeth_card *card, struct qeth_ipaddr *addr)
 	if (addr->proto == QETH_PROT_IPV4)
 		QETH_DBF_HEX(trace,4,&addr->u.a4.addr,4);
 	else {
-		QETH_DBF_HEX(trace,4,&addr->u.a6.addr,4);
-		QETH_DBF_HEX(trace,4,((char *)&addr->u.a6.addr)+4,4);
+		QETH_DBF_HEX(trace,4,&addr->u.a6.addr,8);
+		QETH_DBF_HEX(trace,4,((char *)&addr->u.a6.addr)+8,8);
 	}
 	spin_lock_irqsave(&card->ip_lock, flags);
 	rc = __qeth_insert_ip_todo(card, addr, 0);
@@ -736,8 +747,8 @@ qeth_add_ip(struct qeth_card *card, struct qeth_ipaddr *addr)
 	if (addr->proto == QETH_PROT_IPV4)
 		QETH_DBF_HEX(trace,4,&addr->u.a4.addr,4);
 	else {
-		QETH_DBF_HEX(trace,4,&addr->u.a6.addr,4);
-		QETH_DBF_HEX(trace,4,((char *)&addr->u.a6.addr)+4,4);
+		QETH_DBF_HEX(trace,4,&addr->u.a6.addr,8);
+		QETH_DBF_HEX(trace,4,((char *)&addr->u.a6.addr)+8,8);
 	}
 	spin_lock_irqsave(&card->ip_lock, flags);
 	rc = __qeth_insert_ip_todo(card, addr, 1);
@@ -745,19 +756,21 @@ qeth_add_ip(struct qeth_card *card, struct qeth_ipaddr *addr)
 	return rc;
 }
 
-static void
-qeth_reinsert_todos(struct qeth_card *card, struct list_head *todos)
+static inline void
+__qeth_delete_all_mc(struct qeth_card *card, unsigned long *flags)
 {
-	struct qeth_ipaddr *todo, *tmp;
+	struct qeth_ipaddr *addr, *tmp;
+	int rc;
 
-	list_for_each_entry_safe(todo, tmp, todos, entry){
-		list_del_init(&todo->entry);
-		if (todo->users < 0) {
-			if (!qeth_delete_ip(card, todo))
-				kfree(todo);
-		} else {
-			if (!qeth_add_ip(card, todo))
-				kfree(todo);
+	list_for_each_entry_safe(addr, tmp, &card->ip_list, entry) {
+		if (addr->is_multicast) {
+			spin_unlock_irqrestore(&card->ip_lock, *flags);
+			rc = qeth_deregister_addr_entry(card, addr);
+			spin_lock_irqsave(&card->ip_lock, *flags);
+			if (!rc) {
+				list_del(&addr->entry);
+				kfree(addr);
+			}
 		}
 	}
 }
@@ -765,7 +778,7 @@ qeth_reinsert_todos(struct qeth_card *card, struct list_head *todos)
 static void
 qeth_set_ip_addr_list(struct qeth_card *card)
 {
-	struct list_head failed_todos;
+	struct list_head *tbd_list;
 	struct qeth_ipaddr *todo, *addr;
 	unsigned long flags;
 	int rc;
@@ -773,13 +786,25 @@ qeth_set_ip_addr_list(struct qeth_card *card)
 	QETH_DBF_TEXT(trace, 2, "sdiplist");
 	QETH_DBF_HEX(trace, 2, &card, sizeof(void *));
 
-	INIT_LIST_HEAD(&failed_todos);
-
 	spin_lock_irqsave(&card->ip_lock, flags);
-	while (!list_empty(&card->ip_tbd_list)) {
-		todo = list_entry(card->ip_tbd_list.next,
-				  struct qeth_ipaddr, entry);
-		list_del_init(&todo->entry);
+	tbd_list = card->ip_tbd_list;
+	card->ip_tbd_list = kmalloc(sizeof(struct list_head), GFP_ATOMIC);
+	if (!card->ip_tbd_list) {
+		QETH_DBF_TEXT(trace, 0, "silnomem");
+		card->ip_tbd_list = tbd_list;
+		spin_unlock_irqrestore(&card->ip_lock, flags);
+		return;
+	} else
+		INIT_LIST_HEAD(card->ip_tbd_list);
+
+	while (!list_empty(tbd_list)){
+		todo = list_entry(tbd_list->next, struct qeth_ipaddr, entry);
+		list_del(&todo->entry);
+		if (todo->type == QETH_IP_TYPE_DEL_ALL_MC){
+			__qeth_delete_all_mc(card, &flags);
+			kfree(todo);
+			continue;
+		}
 		rc = __qeth_ref_ip_on_card(card, todo, &addr);
 		if (rc == 0) {
 			/* nothing to be done; only adjusted refcount */
@@ -792,24 +817,22 @@ qeth_set_ip_addr_list(struct qeth_card *card)
 			if (!rc)
 				list_add_tail(&todo->entry, &card->ip_list);
 			else
-				list_add_tail(&todo->entry, &failed_todos);
+				kfree(todo);
 		} else if (rc == -1) {
 			/* on-card entry to be removed */
 			list_del_init(&addr->entry);
 			spin_unlock_irqrestore(&card->ip_lock, flags);
 			rc = qeth_deregister_addr_entry(card, addr);
 			spin_lock_irqsave(&card->ip_lock, flags);
-			if (!rc) {
+			if (!rc)
 				kfree(addr);
-				kfree(todo);
-			} else {
+			else
 				list_add_tail(&addr->entry, &card->ip_list);
-				list_add_tail(&todo->entry, &failed_todos);
-			}
+			kfree(todo);
 		}
 	}
 	spin_unlock_irqrestore(&card->ip_lock, flags);
-	qeth_reinsert_todos(card, &failed_todos);
+	kfree(tbd_list);
 }
 
 static void qeth_delete_mc_addresses(struct qeth_card *);
@@ -887,28 +910,7 @@ qeth_do_run_thread(struct qeth_card *card, unsigned long thread)
 }
 
 static int
-qeth_register_mc_addresses(void *ptr)
-{
-	struct qeth_card *card;
-
-	card = (struct qeth_card *) ptr;
-	daemonize("qeth_reg_mcaddrs");
-	QETH_DBF_TEXT(trace,4,"regmcth1");
-	if (!qeth_do_run_thread(card, QETH_SET_MC_THREAD))
-		return 0;
-	QETH_DBF_TEXT(trace,4,"regmcth2");
-	qeth_delete_mc_addresses(card);
-	qeth_add_multicast_ipv4(card);
-#ifdef CONFIG_QETH_IPV6
-	qeth_add_multicast_ipv6(card);
-#endif
-	qeth_set_ip_addr_list(card);
-	qeth_clear_thread_running_bit(card, QETH_SET_MC_THREAD);
-	return 0;
-}
-
-static int
-qeth_register_ip_address(void *ptr)
+qeth_register_ip_addresses(void *ptr)
 {
 	struct qeth_card *card;
 
@@ -988,9 +990,7 @@ qeth_start_kernel_thread(struct qeth_card *card)
 		return;
 
 	if (qeth_do_start_thread(card, QETH_SET_IP_THREAD))
-		kernel_thread(qeth_register_ip_address, (void *) card, SIGCHLD);
-	if (qeth_do_start_thread(card, QETH_SET_MC_THREAD))
-		kernel_thread(qeth_register_mc_addresses, (void *)card,SIGCHLD);
+		kernel_thread(qeth_register_ip_addresses, (void *)card,SIGCHLD);
 	if (qeth_do_start_thread(card, QETH_RECOVER_THREAD))
 		kernel_thread(qeth_recover, (void *) card, SIGCHLD);
 }
@@ -1041,7 +1041,12 @@ qeth_setup_card(struct qeth_card *card)
 	INIT_WORK(&card->kernel_thread_starter,
 		  (void *)qeth_start_kernel_thread,card);
 	INIT_LIST_HEAD(&card->ip_list);
-	INIT_LIST_HEAD(&card->ip_tbd_list);
+	card->ip_tbd_list = kmalloc(sizeof(struct list_head), GFP_KERNEL);
+	if (!card->ip_tbd_list) {
+		QETH_DBF_TEXT(setup, 0, "iptbdnom");
+		return -ENOMEM;
+	}
+	INIT_LIST_HEAD(card->ip_tbd_list);
 	INIT_LIST_HEAD(&card->cmd_waiter_list);
 	init_waitqueue_head(&card->wait_q);
 	/* intial options */
@@ -1575,9 +1580,8 @@ qeth_reset_ip_addresses(struct qeth_card *card)
 	QETH_DBF_TEXT(trace, 2, "rstipadd");
 
 	qeth_clear_ip_list(card, 0, 1);
-	if ( (qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD) == 0) ||
-	     (qeth_set_thread_start_bit(card, QETH_SET_MC_THREAD) == 0) )
-		schedule_work(&card->kernel_thread_starter);
+	/* this function will also schedule the SET_IP_THREAD */
+	qeth_set_multicast_list(card->dev);
 }
 
 static struct qeth_ipa_cmd *
@@ -1600,10 +1604,7 @@ qeth_check_ipa_data(struct qeth_card *card, struct qeth_cmd_buffer *iob)
 					   card->info.if_name,
 					   card->info.chpid);
 				card->lan_online = 0;
-				if (netif_carrier_ok(card->dev)) {
-					netif_carrier_off(card->dev);
-					netif_stop_queue(card->dev);
-				}
+				netif_carrier_off(card->dev);
 				return NULL;
 			case IPA_CMD_STARTLAN:
 				PRINT_INFO("Link reestablished on %s "
@@ -1612,10 +1613,7 @@ qeth_check_ipa_data(struct qeth_card *card, struct qeth_cmd_buffer *iob)
 					   card->info.if_name,
 					   card->info.chpid);
 				card->lan_online = 1;
-				if (!netif_carrier_ok(card->dev)) {
-					netif_carrier_on(card->dev);
-					netif_wake_queue(card->dev);
-				}
+				netif_carrier_on(card->dev);
 				qeth_reset_ip_addresses(card);
 				return NULL;
 			case IPA_CMD_REGISTER_LOCAL_ADDR:
@@ -2238,9 +2236,11 @@ qeth_rebuild_skb_vlan(struct qeth_card *card, struct sk_buff *skb,
 #ifdef CONFIG_QETH_VLAN
 	u16 *vlan_tag;
 
-	if (hdr->hdr.l3.ext_flags & QETH_HDR_EXT_VLAN_FRAME) {
+	if (hdr->hdr.l3.ext_flags &
+	    (QETH_HDR_EXT_VLAN_FRAME | QETH_HDR_EXT_INCLUDE_VLAN_TAG)) {
 		vlan_tag = (u16 *) skb_push(skb, VLAN_HLEN);
-		*vlan_tag = hdr->hdr.l3.vlan_id;
+		*vlan_tag = (hdr->hdr.l3.ext_flags & QETH_HDR_EXT_VLAN_FRAME)?
+			hdr->hdr.l3.vlan_id : *((u16 *)&hdr->hdr.l3.dest_addr[12]);
 		*(vlan_tag + 1) = skb->protocol;
 		skb->protocol = __constant_htons(ETH_P_8021Q);
 	}
@@ -2807,7 +2807,8 @@ qeth_qdio_output_handler(struct ccw_device * ccwdev, unsigned int status,
 	}
 	atomic_sub(count, &queue->used_buffers);
 	/* check if we need to do something on this outbound queue */
-	qeth_check_outbound_queue(queue);
+	if (card->info.type != QETH_CARD_TYPE_IQD)
+		qeth_check_outbound_queue(queue);
 
 	netif_wake_queue(card->dev);
 #ifdef CONFIG_QETH_PERF_STATS
@@ -3381,13 +3382,16 @@ qeth_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (skb==NULL) {
 		card->stats.tx_dropped++;
 		card->stats.tx_errors++;
-		return -EIO;
+		/* return OK; otherwise ksoftirqd goes to 100% */
+		return NETDEV_TX_OK;
 	}
-	if ((card->state != CARD_STATE_UP) || !netif_carrier_ok(dev)) {
+	if ((card->state != CARD_STATE_UP) || !card->lan_online) {
 		card->stats.tx_dropped++;
 		card->stats.tx_errors++;
 		card->stats.tx_carrier_errors++;
-		return -EIO;
+		dev_kfree_skb_any(skb);
+		/* return OK; otherwise ksoftirqd goes to 100% */
+		return NETDEV_TX_OK;
 	}
 #ifdef CONFIG_QETH_PERF_STATS
 	card->perf_stats.outbound_cnt++;
@@ -3398,8 +3402,18 @@ qeth_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	 * got our own synchronization on queues we can keep the stack's
 	 * queue running.
 	 */
-	if ((rc = qeth_send_packet(card, skb)))
-		netif_stop_queue(dev);
+	if ((rc = qeth_send_packet(card, skb))){
+		if (rc == -EBUSY) {
+			netif_stop_queue(dev);
+			rc = NETDEV_TX_BUSY;
+		} else {
+			card->stats.tx_errors++;
+			card->stats.tx_dropped++;
+			dev_kfree_skb_any(skb);
+			/* set to OK; otherwise ksoftirqd goes to 100% */
+			rc = NETDEV_TX_OK;
+		}
+	}
 
 #ifdef CONFIG_QETH_PERF_STATS
 	card->perf_stats.outbound_time += qeth_get_micros() -
@@ -3503,7 +3517,6 @@ qeth_open(struct net_device *dev)
 	if (!card->lan_online){
 		if (netif_carrier_ok(dev))
 			netif_carrier_off(dev);
-		netif_stop_queue(dev);
 	}
 	return 0;
 }
@@ -3778,8 +3791,8 @@ qeth_fill_header(struct qeth_card *card, struct qeth_hdr *hdr,
 	 */
 	if (card->vlangrp && vlan_tx_tag_present(skb)) {
 		hdr->hdr.l3.ext_flags = (ipv == 4) ?
-			QETH_EXT_HDR_VLAN_FRAME :
-			QETH_EXT_HDR_INCLUDE_VLAN_TAG;
+			QETH_HDR_EXT_VLAN_FRAME :
+			QETH_HDR_EXT_INCLUDE_VLAN_TAG;
 		hdr->hdr.l3.vlan_id = vlan_tx_tag_get(skb);
 	}
 #endif /* CONFIG_QETH_VLAN */
@@ -4988,11 +5001,27 @@ qeth_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
 	spin_unlock_irqrestore(&card->vlanlock, flags);
 	if (card->options.layer2)
 		qeth_layer2_send_setdelvlan(card, vid, IPA_CMD_DELVLAN);
- 	if ( (qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD) == 0) ||
-	     (qeth_set_thread_start_bit(card, QETH_SET_MC_THREAD) == 0) )
-		schedule_work(&card->kernel_thread_starter);
+	qeth_set_multicast_list(card->dev);
 }
 #endif
+
+/**
+ * set multicast address on card
+ */
+static void
+qeth_set_multicast_list(struct net_device *dev)
+{
+	struct qeth_card *card = (struct qeth_card *) dev->priv;
+
+	QETH_DBF_TEXT(trace,3,"setmulti");
+	qeth_delete_mc_addresses(card);
+	qeth_add_multicast_ipv4(card);
+#ifdef CONFIG_QETH_IPV6
+	qeth_add_multicast_ipv6(card);
+#endif
+ 	if (qeth_set_thread_start_bit(card, QETH_SET_IP_THREAD) == 0)
+		schedule_work(&card->kernel_thread_starter);
+}
 
 static int
 qeth_neigh_setup(struct net_device *dev, struct neigh_parms *np)
@@ -5049,24 +5078,19 @@ qeth_get_addr_buffer(enum qeth_prot_versions prot)
 static void
 qeth_delete_mc_addresses(struct qeth_card *card)
 {
-	struct qeth_ipaddr *ipm, *iptodo;
+	struct qeth_ipaddr *iptodo;
 	unsigned long flags;
 
 	QETH_DBF_TEXT(trace,4,"delmc");
-	spin_lock_irqsave(&card->ip_lock, flags);
-	list_for_each_entry(ipm, &card->ip_list, entry){
-		if (!ipm->is_multicast)
-			continue;
-		iptodo = qeth_get_addr_buffer(ipm->proto);
-		if (!iptodo) {
-			QETH_DBF_TEXT(trace, 2, "dmcnomem");
-			continue;
-		}
-		memcpy(iptodo, ipm, sizeof(struct qeth_ipaddr));
-		iptodo->users = iptodo->users * -1;
-		if (!__qeth_insert_ip_todo(card, iptodo, 0))
-			kfree(iptodo);
+	iptodo = qeth_get_addr_buffer(QETH_PROT_IPV4);
+	if (!iptodo) {
+		QETH_DBF_TEXT(trace, 2, "dmcnomem");
+		return;
 	}
+	iptodo->type = QETH_IP_TYPE_DEL_ALL_MC;
+	spin_lock_irqsave(&card->ip_lock, flags);
+	if (!__qeth_insert_ip_todo(card, iptodo, 0))
+		kfree(iptodo);
 	spin_unlock_irqrestore(&card->ip_lock, flags);
 }
 
@@ -5276,20 +5300,6 @@ qeth_layer2_set_mac_address(struct net_device *dev, void *p)
 		   dev->name);
 
 	return rc;
-}
-/**
- * set multicast address on card
- */
-static void
-qeth_set_multicast_list(struct net_device *dev)
-{
-	struct qeth_card *card;
-
-	QETH_DBF_TEXT(trace,3,"setmulti");
-	card = (struct qeth_card *) dev->priv;
-
-	if (qeth_set_thread_start_bit(card, QETH_SET_MC_THREAD) == 0)
-		schedule_work(&card->kernel_thread_starter);
 }
 
 static void
@@ -6635,7 +6645,7 @@ qeth_clear_ip_list(struct qeth_card *card, int clean, int recover)
 	QETH_DBF_TEXT(trace,4,"clearip");
 	spin_lock_irqsave(&card->ip_lock, flags);
 	/* clear todo list */
-	list_for_each_entry_safe(addr, tmp, &card->ip_tbd_list, entry){
+	list_for_each_entry_safe(addr, tmp, card->ip_tbd_list, entry){
 		list_del(&addr->entry);
 		kfree(addr);
 	}
@@ -6653,7 +6663,7 @@ qeth_clear_ip_list(struct qeth_card *card, int clean, int recover)
 			kfree(addr);
 			continue;
 		}
-		list_add_tail(&addr->entry, &card->ip_tbd_list);
+		list_add_tail(&addr->entry, card->ip_tbd_list);
 	}
 	spin_unlock_irqrestore(&card->ip_lock, flags);
 }
@@ -6694,7 +6704,6 @@ qeth_wait_for_threads(struct qeth_card *card, unsigned long threads)
 static int
 qeth_stop_card(struct qeth_card *card)
 {
-	int recover_flag = 0;
 	int rc = 0;
 
 	QETH_DBF_TEXT(setup ,2,"stopcard");
@@ -6706,7 +6715,6 @@ qeth_stop_card(struct qeth_card *card)
 	if (card->read.state == CH_STATE_UP &&
 	    card->write.state == CH_STATE_UP &&
 	    (card->state == CARD_STATE_UP)) {
-		recover_flag = 1;
 		rtnl_lock();
 		dev_close(card->dev);
 		rtnl_unlock();
@@ -6725,7 +6733,7 @@ qeth_stop_card(struct qeth_card *card)
 		if (card->options.layer2)
 			qeth_layer2_process_vlans(card, 1);
 #endif
-		qeth_clear_ip_list(card, !card->use_hard_stop, recover_flag);
+		qeth_clear_ip_list(card, !card->use_hard_stop, 1);
 		qeth_clear_ipacmd_list(card);
 		card->state = CARD_STATE_HARDSETUP;
 	}
@@ -6893,8 +6901,8 @@ qeth_start_again(struct qeth_card *card)
 	rtnl_lock();
 	dev_open(card->dev);
 	rtnl_unlock();
- 	if (qeth_set_thread_start_bit(card, QETH_SET_MC_THREAD) == 0)
-		schedule_work(&card->kernel_thread_starter);
+	/* this also sets saved unicast addresses */
+	qeth_set_multicast_list(card->dev);
 }
 
 
@@ -7008,9 +7016,7 @@ qeth_set_online(struct ccwgroup_device *gdev)
 /*maybe it was set offline without ifconfig down
  * we can also use this state for recovery purposes*/
 	if (card->options.layer2)
-		qeth_set_allowed_threads(card,
-					 QETH_RECOVER_THREAD |
-					 QETH_SET_MC_THREAD,0);
+		qeth_set_allowed_threads(card, QETH_RECOVER_THREAD, 0);
 	else
 		qeth_set_allowed_threads(card, 0xffffffff, 0);
 	if (recover_flag == CARD_STATE_RECOVER)
@@ -7339,7 +7345,7 @@ qeth_add_vipa(struct qeth_card *card, enum qeth_prot_versions proto,
 		return -ENOMEM;
 	spin_lock_irqsave(&card->ip_lock, flags);
 	if (__qeth_address_exists_in_list(&card->ip_list, ipaddr, 0) ||
-	    __qeth_address_exists_in_list(&card->ip_tbd_list, ipaddr, 0))
+	    __qeth_address_exists_in_list(card->ip_tbd_list, ipaddr, 0))
 		rc = -EEXIST;
 	spin_unlock_irqrestore(&card->ip_lock, flags);
 	if (rc){
@@ -7412,7 +7418,7 @@ qeth_add_rxip(struct qeth_card *card, enum qeth_prot_versions proto,
 		return -ENOMEM;
 	spin_lock_irqsave(&card->ip_lock, flags);
 	if (__qeth_address_exists_in_list(&card->ip_list, ipaddr, 0) ||
-	    __qeth_address_exists_in_list(&card->ip_tbd_list, ipaddr, 0))
+	    __qeth_address_exists_in_list(card->ip_tbd_list, ipaddr, 0))
 		rc = -EEXIST;
 	spin_unlock_irqrestore(&card->ip_lock, flags);
 	if (rc){

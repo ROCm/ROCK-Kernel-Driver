@@ -231,6 +231,8 @@ sysc_sigpending:
 	brasl	%r14,do_signal    # call do_signal
 	tm	__TI_flags+7(%r9),_TIF_RESTART_SVC
 	jo	sysc_restart
+	tm	__TI_flags+7(%r9),_TIF_SINGLE_STEP
+	jo	sysc_singlestep
 	j	sysc_leave        # out of here, do NOT recheck
 
 #

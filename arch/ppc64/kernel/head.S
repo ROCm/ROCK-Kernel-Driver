@@ -26,6 +26,7 @@
 #define SECONDARY_PROCESSORS
 
 #include <linux/config.h>
+#include <linux/threads.h>
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/mmu.h>
@@ -1192,7 +1193,7 @@ unrecov_slb:
 
 /*
  * On pSeries, secondary processors spin in the following code.
- * At entry, r3 = this processor's number (in Linux terms, not hardware).
+ * At entry, r3 = this processor's number (physical cpu id)
  */
 _GLOBAL(pseries_secondary_smp_init)
 	mr	r24,r3
@@ -1204,13 +1205,27 @@ _GLOBAL(pseries_secondary_smp_init)
 	/* Copy some CPU settings from CPU 0 */
 	bl	.__restore_cpu_setup
 
-	/* Set up a paca value for this processor. */
-	LOADADDR(r5, paca) 		/* Get base vaddr of paca array	 */
-	mulli	r13,r24,PACA_SIZE	/* Calculate vaddr of right paca */
-	add	r13,r13,r5		/* for this processor.		 */
-	mtspr	SPRG3,r13		/* Save vaddr of paca in SPRG3	 */
-1:
-	HMT_LOW
+	/* Set up a paca value for this processor. Since we have the
+	 * physical cpu id in r3, we need to search the pacas to find
+	 * which logical id maps to our physical one.
+	 */
+	LOADADDR(r13, paca) 		/* Get base vaddr of paca array	 */
+	li	r5,0			/* logical cpu id                */
+1:	lhz	r6,PACAHWCPUID(r13)	/* Load HW procid from paca      */
+	cmpw	r6,r24			/* Compare to our id             */
+	beq	2f
+	addi	r13,r13,PACA_SIZE	/* Loop to next PACA on miss     */
+	addi	r5,r5,1
+	cmpwi	r5,NR_CPUS
+	blt	1b
+
+99:	HMT_LOW				/* Couldn't find our CPU id      */
+	b	99b
+
+2:	mtspr	SPRG3,r13		/* Save vaddr of paca in SPRG3	 */
+	/* From now on, r24 is expected to be logica cpuid */
+	mr	r24,r5
+3:	HMT_LOW
 	lbz	r23,PACAPROCSTART(r13)	/* Test if this processor should */
 					/* start.			 */
 	sync
@@ -1225,7 +1240,7 @@ _GLOBAL(pseries_secondary_smp_init)
 	bne	.__secondary_start
 #endif
 #endif
-	b 	1b			/* Loop until told to go	 */
+	b 	3b			/* Loop until told to go	 */
 #ifdef CONFIG_PPC_ISERIES
 _STATIC(__start_initialization_iSeries)
 	/* Clear out the BSS */
@@ -1921,19 +1936,6 @@ _STATIC(start_here_multiplatform)
 	bl	.__save_cpu_setup
 	sync
 
-#ifdef CONFIG_SMP
-	/* All secondary cpus are now spinning on a common
-	 * spinloop, release them all now so they can start
-	 * to spin on their individual paca spinloops.
-	 * For non SMP kernels, the secondary cpus never
-	 * get out of the common spinloop.
-	 */
-	li	r3,1
-	LOADADDR(r5,__secondary_hold_spinloop)
-	tophys(r4,r5)
-	std	r3,0(r4)
-#endif
-
 	/* Setup a valid physical PACA pointer in SPRG3 for early_setup
 	 * note that boot_cpuid can always be 0 nowadays since there is
 	 * nowhere it can be initialized differently before we reach this
@@ -2130,6 +2132,22 @@ _GLOBAL(hmt_start_secondary)
 	mtspr	CTRLT, r4
 	blr
 #endif
+
+#if defined(CONFIG_SMP) && !defined(CONFIG_PPC_ISERIES)
+_GLOBAL(smp_release_cpus)
+	/* All secondary cpus are spinning on a common
+	 * spinloop, release them all now so they can start
+	 * to spin on their individual paca spinloops.
+	 * For non SMP kernels, the secondary cpus never
+	 * get out of the common spinloop.
+	 */
+	li	r3,1
+	LOADADDR(r5,__secondary_hold_spinloop)
+	std	r3,0(r5)
+	sync
+	blr
+#endif /* CONFIG_SMP && !CONFIG_PPC_ISERIES */
+
 
 /*
  * We put a few things here that have to be page-aligned.

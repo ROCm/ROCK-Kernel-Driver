@@ -382,8 +382,8 @@ struct saa7134_dev {
 	int                        nr;
 	struct pci_dev             *pci;
 	unsigned char              pci_rev,pci_lat;
-	__u32                      *lmmio;
-	__u8                       *bmmio;
+	__u32                      __iomem *lmmio;
+	__u8                       __iomem *bmmio;
 
 	/* config info */
 	unsigned int               board;

@@ -57,8 +57,8 @@ struct bbc_i2c_bus {
 	struct bbc_i2c_bus		*next;
 	int				index;
 	spinlock_t			lock;
-	void				*i2c_bussel_reg;
-	void				*i2c_control_regs;
+	void				__iomem *i2c_bussel_reg;
+	void				__iomem *i2c_control_regs;
 	unsigned char			own, clock;
 
 	wait_queue_head_t		wq;

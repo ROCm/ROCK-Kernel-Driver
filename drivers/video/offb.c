@@ -47,19 +47,13 @@ enum {
 };
 
 struct offb_par {
-	volatile unsigned char *cmap_adr;
-	volatile unsigned char *cmap_data;
+	volatile void __iomem *cmap_adr;
+	volatile void __iomem *cmap_data;
 	int cmap_type;
 	int blanked;
 };
 
 struct offb_par default_par;
-
-#ifdef __powerpc__
-#define mach_eieio()	eieio()
-#else
-#define mach_eieio()	do {} while (0)
-#endif
 
     /*
      *  Interface used by the world
@@ -110,44 +104,36 @@ static int offb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 
 	switch (par->cmap_type) {
 	case cmap_m64:
-		*par->cmap_adr = regno;
-		mach_eieio();
-		*par->cmap_data = red;
-		mach_eieio();
-		*par->cmap_data = green;
-		mach_eieio();
-		*par->cmap_data = blue;
-		mach_eieio();
+		writeb(regno, par->cmap_adr);
+		writeb(red, par->cmap_data);
+		writeb(green, par->cmap_data);
+		writeb(blue, par->cmap_data);
 		break;
 	case cmap_M3A:
 		/* Clear PALETTE_ACCESS_CNTL in DAC_CNTL */
-		out_le32((unsigned *) (par->cmap_adr + 0x58),
-			 in_le32((unsigned *) (par->cmap_adr +
-					       0x58)) & ~0x20);
+		out_le32(par->cmap_adr + 0x58,
+			 in_le32(par->cmap_adr + 0x58) & ~0x20);
 	case cmap_r128:
 		/* Set palette index & data */
 		out_8(par->cmap_adr + 0xb0, regno);
-		out_le32((unsigned *) (par->cmap_adr + 0xb4),
+		out_le32(par->cmap_adr + 0xb4,
 			 (red << 16 | green << 8 | blue));
 		break;
 	case cmap_M3B:
 		/* Set PALETTE_ACCESS_CNTL in DAC_CNTL */
-		out_le32((unsigned *) (par->cmap_adr + 0x58),
-			 in_le32((unsigned *) (par->cmap_adr +
-					       0x58)) | 0x20);
+		out_le32(par->cmap_adr + 0x58,
+			 in_le32(par->cmap_adr + 0x58) | 0x20);
 		/* Set palette index & data */
 		out_8(par->cmap_adr + 0xb0, regno);
-		out_le32((unsigned *) (par->cmap_adr + 0xb4),
-			 (red << 16 | green << 8 | blue));
+		out_le32(par->cmap_adr + 0xb4, (red << 16 | green << 8 | blue));
 		break;
 	case cmap_radeon:
 		/* Set palette index & data (could be smarter) */
 		out_8(par->cmap_adr + 0xb0, regno);
-		out_le32((unsigned *) (par->cmap_adr + 0xb4),
-			 (red << 16 | green << 8 | blue));
+		out_le32(par->cmap_adr + 0xb4, (red << 16 | green << 8 | blue));
 		break;
 	case cmap_gxt2000:
-		out_le32((unsigned *) par->cmap_adr + regno,
+		out_le32((unsigned __iomem *) par->cmap_adr + regno,
 			 (red << 16 | green << 8 | blue));
 		break;
 	}
@@ -191,47 +177,33 @@ static int offb_blank(int blank, struct fb_info *info)
 		for (i = 0; i < 256; i++) {
 			switch (par->cmap_type) {
 			case cmap_m64:
-				*par->cmap_adr = i;
-				mach_eieio();
-				for (j = 0; j < 3; j++) {
-					*par->cmap_data = 0;
-					mach_eieio();
-				}
+				writeb(i, par->cmap_adr);
+				for (j = 0; j < 3; j++)
+					writeb(0, par->cmap_data);
 				break;
 			case cmap_M3A:
 				/* Clear PALETTE_ACCESS_CNTL in DAC_CNTL */
-				out_le32((unsigned *) (par->cmap_adr +
-						       0x58),
-					 in_le32((unsigned *) (par->
-							       cmap_adr +
-							       0x58)) &
-					 ~0x20);
+				out_le32(par->cmap_adr + 0x58,
+					 in_le32(par->cmap_adr + 0x58) & ~0x20);
 			case cmap_r128:
 				/* Set palette index & data */
 				out_8(par->cmap_adr + 0xb0, i);
-				out_le32((unsigned *) (par->cmap_adr +
-						       0xb4), 0);
+				out_le32(par->cmap_adr + 0xb4, 0);
 				break;
 			case cmap_M3B:
 				/* Set PALETTE_ACCESS_CNTL in DAC_CNTL */
-				out_le32((unsigned *) (par->cmap_adr +
-						       0x58),
-					 in_le32((unsigned *) (par->
-							       cmap_adr +
-							       0x58)) |
-					 0x20);
+				out_le32(par->cmap_adr + 0x58,
+					 in_le32(par->cmap_adr + 0x58) | 0x20);
 				/* Set palette index & data */
 				out_8(par->cmap_adr + 0xb0, i);
-				out_le32((unsigned *) (par->cmap_adr +
-						       0xb4), 0);
+				out_le32(par->cmap_adr + 0xb4, 0);
 				break;
 			case cmap_radeon:
 				out_8(par->cmap_adr + 0xb0, i);
-				out_le32((unsigned *) (par->cmap_adr +
-						       0xb4), 0);
+				out_le32(par->cmap_adr + 0xb4, 0);
 				break;
 			case cmap_gxt2000:
-				out_le32((unsigned *) par->cmap_adr + i,
+				out_le32((unsigned __iomem *) par->cmap_adr + i,
 					 0);
 				break;
 			}

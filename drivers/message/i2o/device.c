@@ -35,7 +35,7 @@ extern struct bus_type i2o_bus_type;
 static inline int i2o_device_issue_claim(struct i2o_device *dev, u32 cmd,
 					 u32 type)
 {
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 
 	m = i2o_msg_get_wait(dev->iop, &msg, I2O_TIMEOUT_MESSAGE_GET);
@@ -446,7 +446,7 @@ static struct class_interface i2o_device_class_interface = {
 int i2o_parm_issue(struct i2o_device *i2o_dev, int cmd, void *oplist,
 		   int oplen, void *reslist, int reslen)
 {
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	u32 *res32 = (u32 *) reslist;
 	u32 *restmp = (u32 *) reslist;

@@ -328,19 +328,10 @@ asmlinkage void do_unexp_fiq (struct pt_regs *regs)
  */
 asmlinkage void bad_mode(struct pt_regs *regs, int reason, int proc_mode)
 {
-	unsigned int vectors = vectors_base();
-
 	console_verbose();
 
 	printk(KERN_CRIT "Bad mode in %s handler detected: mode %s\n",
 		handler[reason], processor_modes[proc_mode]);
-
-	/*
-	 * Dump out the vectors and stub routines.  Maybe a better solution
-	 * would be to dump them out only if we detect that they are corrupted.
-	 */
-	dump_mem(KERN_CRIT "Vectors: ", vectors, vectors + 0x40);
-	dump_mem(KERN_CRIT "Stubs: ", vectors + 0x200, vectors + 0x4b8);
 
 	die("Oops - bad mode", regs, 0);
 	local_irq_disable();
@@ -537,7 +528,7 @@ EXPORT_SYMBOL(__bug);
 
 void __readwrite_bug(const char *fn)
 {
-	printk("%s called, but not implemented", fn);
+	printk("%s called, but not implemented\n", fn);
 	BUG();
 }
 EXPORT_SYMBOL(__readwrite_bug);
@@ -575,13 +566,9 @@ EXPORT_SYMBOL(abort);
 
 void __init trap_init(void)
 {
-	extern void __trap_init(unsigned long);
-	unsigned long base = vectors_base();
+	extern void __trap_init(void);
 
-	__trap_init(base);
-	flush_icache_range(base, base + PAGE_SIZE);
-	if (base != 0)
-		printk(KERN_DEBUG "Relocating machine vectors to 0x%08lx\n",
-			base);
+	__trap_init();
+	flush_icache_range(0xffff0000, 0xffff0000 + PAGE_SIZE);
 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
 }

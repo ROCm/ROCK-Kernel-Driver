@@ -205,6 +205,8 @@ void kobject_hotplug(struct kobject *kobj, enum kobject_action action)
 	static struct kset_hotplug_ops null_hotplug_ops;
 	struct kset_hotplug_ops *hotplug_ops = &null_hotplug_ops;
 
+	/* If this kobj does not belong to a kset,
+	   try to find a parent that does. */
 	if (!top_kobj->kset && top_kobj->parent) {
 		do {
 			top_kobj = top_kobj->parent;

@@ -187,6 +187,8 @@ static void s3c2410_pm_debug_init(void)
 #define DBG(fmt...) printk(KERN_DEBUG fmt)
 
 #define s3c2410_pm_debug_init() do { } while(0)
+
+static struct sleep_save uart_save[] = {};
 #endif
 
 #if defined(CONFIG_S3C2410_PM_CHECK) && CONFIG_S3C2410_PM_CHECK_CHUNKSIZE != 0
@@ -377,8 +379,6 @@ static void s3c2410_pm_check_restore(void)
 }
 
 #else
-
-static struct sleep_save uart_save[] = {};
 
 #define s3c2410_pm_check_prepare() do { } while(0)
 #define s3c2410_pm_check_restore() do { } while(0)

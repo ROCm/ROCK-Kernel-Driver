@@ -45,7 +45,7 @@
 #endif
 
 #define MB_FCR32(bay, r)	((bay)->base + ((r) >> 2))
-#define MB_FCR8(bay, r)		(((volatile __iomem u8*)((bay)->base)) + (r))
+#define MB_FCR8(bay, r)		(((volatile u8 __iomem *)((bay)->base)) + (r))
 
 #define MB_IN32(bay,r)		(in_le32(MB_FCR32(bay,r)))
 #define MB_OUT32(bay,r,v)	(out_le32(MB_FCR32(bay,r), (v)))

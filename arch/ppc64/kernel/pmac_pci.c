@@ -739,8 +739,8 @@ void __init pmac_pci_init(void)
 
 	pmac_check_ht_link();
 
-	/* Tell pci.c to use the common resource allocation mecanism */
-	pci_probe_only = 0;
+	/* Tell pci.c to not use the common resource allocation mecanism */
+	pci_probe_only = 1;
 	
 	/* Allow all IO */
 	io_page_mask = -1;

@@ -17,6 +17,7 @@
 #include <asm/sysmips.h>
 #include <asm/thread_info.h>
 #include <asm/unistd.h>
+#include <asm/war.h>
 #include <asm/offset.h>
 
 /* Highest syscall used of any syscall flavour */
@@ -65,7 +66,7 @@ stack_done:
 					# restarting
 1:	sw	v0, PT_R2(sp)		# result
 
-EXPORT(o32_syscall_exit)
+o32_syscall_exit:
 	local_irq_disable		# make sure need_resched and
 					# signals dont change between
 					# sampling and return
@@ -83,17 +84,16 @@ o32_syscall_exit_work:
 
 syscall_trace_entry:
 	SAVE_STATIC
-	sw	t2, PT_R1(sp)
+	move	s0, t2
 	move	a0, sp
 	li	a1, 0
 	jal	do_syscall_trace
-	lw	t2, PT_R1(sp)
 
 	lw	a0, PT_R4(sp)		# Restore argument registers
 	lw	a1, PT_R5(sp)
 	lw	a2, PT_R6(sp)
 	lw	a3, PT_R7(sp)
-	jalr	t2
+	jalr	s0
 
 	li	t0, -EMAXERRNO - 1	# error?
 	sltu	t0, t0, v0
@@ -199,7 +199,11 @@ illegal_syscall:
 1:	ll	v0, (a1)
 	move	a0, a2
 2:	sc	a0, (a1)
+#if R10000_LLSC_WAR
+	beqzl	a0, 1b
+#else
 	beqz	a0, 1b
+#endif
 
 	.section __ex_table,"a"
 	PTR	1b, bad_stack
@@ -618,7 +622,7 @@ out:	jr	ra
 	sys	sys_clock_nanosleep	4	/* 4265 */
 	sys	sys_tgkill		3
 	sys	sys_utimes		2
-	sys	sys_ni_syscall		0	/* sys_mbind */
+	sys	sys_mbind		4
 	sys	sys_ni_syscall		0	/* sys_get_mempolicy */
 	sys	sys_ni_syscall		0	/* 4270 sys_set_mempolicy */
 	sys	sys_mq_open		4
@@ -628,6 +632,11 @@ out:	jr	ra
 	sys	sys_mq_notify		2	/* 4275 */
 	sys	sys_mq_getsetattr	3
 	sys	sys_ni_syscall		0	/* sys_vserver */
+	sys	sys_waitid		4
+	sys	sys_ni_syscall		0	/* available, was setaltroot */
+	sys	sys_add_key		5
+	sys	sys_request_key		4
+	sys	sys_keyctl		5
 
 	.endm
 

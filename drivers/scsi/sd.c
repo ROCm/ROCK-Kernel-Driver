@@ -198,8 +198,8 @@ static struct scsi_disk *scsi_disk_get(struct gendisk *disk)
 static void scsi_disk_put(struct scsi_disk *sdkp)
 {
 	down(&sd_ref_sem);
-	scsi_device_put(sdkp->device);
 	kref_put(&sdkp->kref, scsi_disk_release);
+	scsi_device_put(sdkp->device);
 	up(&sd_ref_sem);
 }
 
@@ -1103,6 +1103,11 @@ repeat:
 		sector_size = (buffer[8] << 24) |
 			(buffer[9] << 16) | (buffer[10] << 8) | buffer[11];
 	}	
+
+	/* Some devices return the total number of sectors, not the
+	 * highest sector number.  Make the necessary adjustment. */
+	if (sdp->fix_capacity)
+		--sdkp->capacity;
 
 got_data:
 	if (sector_size == 0) {

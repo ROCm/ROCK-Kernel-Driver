@@ -11,6 +11,7 @@
 
 #include <linux/config.h>
 #include <asm/idprom.h>
+#include <asm/io.h>
 
 /*       M48T02 Register Map (adapted from Sun NVRAM/Hostid FAQ)
  *
@@ -38,8 +39,8 @@
  * other than the control register are in binary coded decimal. Some
  * control bits also live outside the control register.
  */
-#define mostek_read(_addr)		(*((volatile u8 *)(_addr)))
-#define mostek_write(_addr,_val)	((*((volatile u8 *)(_addr))) = (_val))
+#define mostek_read(_addr)		readb(_addr)
+#define mostek_write(_addr,_val)	writeb(_val, _addr)
 #define MOSTEK_EEPROM		0x0000UL
 #define MOSTEK_IDPROM		0x07d8UL
 #define MOSTEK_CREG		0x07f8UL
@@ -65,7 +66,7 @@ struct mostek48t02 {
 };
 
 extern spinlock_t mostek_lock;
-extern unsigned long mstk48t02_regs;
+extern void __iomem *mstk48t02_regs;
 
 /* Control register values. */
 #define	MSTK_CREG_WRITE	0x80	/* Must set this before placing values. */

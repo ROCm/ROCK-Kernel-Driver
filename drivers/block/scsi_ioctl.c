@@ -127,6 +127,7 @@ static int verify_command(struct file *file, unsigned char *cmd)
 		safe_for_read(INQUIRY),
 		safe_for_read(MODE_SENSE),
 		safe_for_read(MODE_SENSE_10),
+		safe_for_read(LOG_SENSE),
 		safe_for_read(START_STOP),
 		safe_for_read(GPCMD_VERIFY_10),
 		safe_for_read(VERIFY_16),
@@ -169,6 +170,7 @@ static int verify_command(struct file *file, unsigned char *cmd)
 		safe_for_write(ERASE),
 		safe_for_write(GPCMD_MODE_SELECT_10),
 		safe_for_write(MODE_SELECT),
+		safe_for_write(LOG_SELECT),
 		safe_for_write(GPCMD_BLANK),
 		safe_for_write(GPCMD_CLOSE_TRACK),
 		safe_for_write(GPCMD_FLUSH_CACHE),
@@ -354,7 +356,7 @@ static int sg_scsi_ioctl(struct file *file, request_queue_t *q,
 
 	bytes = max(in_len, out_len);
 	if (bytes) {
-		buffer = kmalloc(bytes, q->bounce_gfp | GFP_USER);
+		buffer = kmalloc(bytes, q->bounce_gfp | GFP_USER| __GFP_NOWARN);
 		if (!buffer)
 			return -ENOMEM;
 

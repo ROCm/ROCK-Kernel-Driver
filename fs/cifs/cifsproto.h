@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/cifsproto.h
  *
- *   Copyright (c) International Business Machines  Corp., 2002
+ *   Copyright (c) International Business Machines  Corp., 2002,2004
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -32,6 +32,8 @@ struct statfs;
 
 extern struct smb_hdr *cifs_buf_get(void);
 extern void cifs_buf_release(void *);
+extern struct smb_hdr *cifs_small_buf_get(void);
+extern void cifs_small_buf_release(void *);
 extern int smb_send(struct socket *, struct smb_hdr *,
 			unsigned int /* length */ , struct sockaddr *);
 extern unsigned int _GetXid(void);
@@ -190,7 +192,8 @@ extern int CIFSSMBRead(const int xid, struct cifsTconInfo *tcon,
 extern int CIFSSMBWrite(const int xid, struct cifsTconInfo *tcon,
 			const int netfid, const unsigned int count,
 			const __u64 lseek, unsigned int *nbytes,
-			const char *buf, const int long_op);
+			const char *buf, const char __user *ubuf, 
+			const int long_op);
 extern int CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 			const __u16 netfid, const __u64 len,
 			const __u64 offset, const __u32 numUnlock,
@@ -232,5 +235,13 @@ extern ssize_t CIFSSMBQueryEA(const int xid,struct cifsTconInfo * tcon,
 extern int CIFSSMBSetEA(const int xid, struct cifsTconInfo *tcon, 
 		const char *fileName, const char * ea_name, 
 		const void * ea_value, const __u16 ea_value_len, 
+		const struct nls_table *nls_codepage);
+extern int CIFSSMBGetPosixACL(const int xid, struct cifsTconInfo *tcon,
+		const unsigned char *searchName,
+		char *acl_inf, const int buflen,const int acl_type,
+		const struct nls_table *nls_codepage);
+extern int CIFSSMBSetPosixACL(const int xid, struct cifsTconInfo *tcon,
+		const unsigned char *fileName,
+		const char *local_acl, const int buflen, const int acl_type,
 		const struct nls_table *nls_codepage);
 #endif			/* _CIFSPROTO_H */

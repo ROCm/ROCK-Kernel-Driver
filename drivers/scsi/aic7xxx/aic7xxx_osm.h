@@ -545,7 +545,7 @@ struct ahc_platform_data {
 	uint32_t		 irq;		/* IRQ for this adapter */
 	uint32_t		 bios_address;
 	uint32_t		 mem_busaddr;	/* Mem Base Addr */
-	dma_addr_t		 hw_dma_mask;
+	uint64_t		 hw_dma_mask;
 	ahc_linux_softc_flags	 flags;
 };
 

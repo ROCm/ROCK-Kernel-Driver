@@ -37,8 +37,8 @@
 /* ---------------------------------------------------------------------- */
 /* insmod args                                                            */
 
-MODULE_PARM(debug,"i");
 static int debug = 0;	/* insmod parameter */
+module_param(debug, int, 0644);
 
 MODULE_DESCRIPTION("device driver for various i2c TV sound decoder / audiomux chips");
 MODULE_AUTHOR("Eric Sandeen, Steve VanDeBogart, Greg Alexander, Gerd Knorr");
@@ -764,9 +764,9 @@ static int tda9874a_dic = -1;		/* device id. code */
 static unsigned int tda9874a_SIF   = UNSET;
 static unsigned int tda9874a_AMSEL = UNSET;
 static unsigned int tda9874a_STD   = UNSET;
-MODULE_PARM(tda9874a_SIF,"i");
-MODULE_PARM(tda9874a_AMSEL,"i");
-MODULE_PARM(tda9874a_STD,"i");
+module_param(tda9874a_SIF, int, 0444);
+module_param(tda9874a_AMSEL, int, 0444);
+module_param(tda9874a_STD, int, 0444);
 
 /*
  * initialization table for tda9874 decoder:
@@ -1218,16 +1218,16 @@ int tea6420  = 1;
 int pic16c54 = 1;
 int ta8874z  = 0;  // address clash with tda9840
 
-MODULE_PARM(tda8425,"i");
-MODULE_PARM(tda9840,"i");
-MODULE_PARM(tda9850,"i");
-MODULE_PARM(tda9855,"i");
-MODULE_PARM(tda9873,"i");
-MODULE_PARM(tda9874a,"i");
-MODULE_PARM(tea6300,"i");
-MODULE_PARM(tea6420,"i");
-MODULE_PARM(pic16c54,"i");
-MODULE_PARM(ta8874z,"i");
+module_param(tda8425, int, 0444);
+module_param(tda9840, int, 0444);
+module_param(tda9850, int, 0444);
+module_param(tda9855, int, 0444);
+module_param(tda9873, int, 0444);
+module_param(tda9874a, int, 0444);
+module_param(tea6300, int, 0444);
+module_param(tea6420, int, 0444);
+module_param(pic16c54, int, 0444);
+module_param(ta8874z, int, 0444);
 
 static struct CHIPDESC chiplist[] = {
 	{

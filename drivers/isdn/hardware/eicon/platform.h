@@ -235,12 +235,12 @@ int diva_os_register_io_port (void *adapter, int register, unsigned long port,
 /*
 **  I/O port access abstraction
 */
-byte inpp (void*);
-word inppw (void*);
-void inppw_buffer (void*, void*, int);
-void outppw (void*, word);
-void outppw_buffer (void* , void*, int);
-void outpp (void*, word);
+byte inpp (void __iomem *);
+word inppw (void __iomem *);
+void inppw_buffer (void __iomem *, void*, int);
+void outppw (void __iomem *, word);
+void outppw_buffer (void __iomem * , void*, int);
+void outpp (void __iomem *, word);
 
 /*
 **  IRQ 
@@ -335,12 +335,34 @@ diva_os_atomic_decrement(diva_os_atomic_t* pv)
 
 /*
 ** endian macros
+**
+** If only...  In some cases we did use them for endianness conversion;
+** unfortunately, other uses were real iomem accesses.
 */
+#define READ_BYTE(addr)   readb(addr)
 #define READ_WORD(addr)   readw(addr)
 #define READ_DWORD(addr)  readl(addr)
 
+#define WRITE_BYTE(addr,v)  writeb(v,addr)
 #define WRITE_WORD(addr,v)  writew(v,addr)
 #define WRITE_DWORD(addr,v) writel(v,addr)
+
+static inline __u16 GET_WORD(void *addr)
+{
+	return le16_to_cpu(*(__le16 *)addr);
+}
+static inline __u32 GET_DWORD(void *addr)
+{
+	return le32_to_cpu(*(__le32 *)addr);
+}
+static inline void PUT_WORD(void *addr, __u16 v)
+{
+	*(__le16 *)addr = cpu_to_le16(v);
+}
+static inline void PUT_DWORD(void *addr, __u32 v)
+{
+	*(__le32 *)addr = cpu_to_le32(v);
+}
 
 /*
 ** 32/64 bit macors

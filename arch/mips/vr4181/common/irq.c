@@ -184,10 +184,9 @@ static struct irqaction cascade =
 static struct irqaction reserved =
 	{ no_action, SA_INTERRUPT, CPU_MASK_NONE, "cascade", NULL, NULL };
 
-void __init init_IRQ(void)
+void __init arch_init_irq(void)
 {
 	int i;
-	extern irq_desc_t irq_desc[];
 
 	set_except_vector(0, vr4181_handle_irq);
 
@@ -237,13 +236,4 @@ void __init init_IRQ(void)
 	 */
 	setup_irq(VR4181_IRQ_RTCL1, &reserved);
 	setup_irq(VR4181_IRQ_RTCL2, &reserved);
-
-#ifdef CONFIG_KGDB
-	printk("Setting debug traps - please connect the remote debugger.\n");
-
-	set_debug_traps();
-
-	// you may move this line to whereever you want
-	breakpoint();
-#endif
 }

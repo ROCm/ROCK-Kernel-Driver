@@ -2495,6 +2495,7 @@ static int snd_ice1712_free(ice1712_t *ice)
 	if (ice->port)
 		pci_release_regions(ice->pci);
 	snd_ice1712_akm4xxx_free(ice);
+	pci_disable_device(ice->pci);
 	kfree(ice);
 	return 0;
 }
@@ -2527,12 +2528,15 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 	if (pci_set_dma_mask(pci, 0x0fffffff) < 0 ||
 	    pci_set_consistent_dma_mask(pci, 0x0fffffff) < 0) {
 		snd_printk("architecture does not support 28bit PCI busmaster DMA\n");
+		pci_disable_device(pci);
 		return -ENXIO;
 	}
 
 	ice = kcalloc(1, sizeof(*ice), GFP_KERNEL);
-	if (ice == NULL)
+	if (ice == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	ice->omni = omni ? 1 : 0;
 	if (cs8427_timeout < 1)
 		cs8427_timeout = 1;
@@ -2562,6 +2566,7 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 
 	if ((err = pci_request_regions(pci, "ICE1712")) < 0) {
 		kfree(ice);
+		pci_disable_device(pci);
 		return err;
 	}
 	ice->port = pci_resource_start(pci, 0);

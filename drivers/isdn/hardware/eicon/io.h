@@ -97,15 +97,15 @@ struct _ISDN_ADAPTER {
  dword               downloadAddrTable[4] ; /* add. for MultiMaster */
  dword               MemoryBase ;
  dword               MemorySize ;
- byte                *Address ;
- byte                *Config ;
- byte                *Control ;
- byte                *reset ;
- byte                *port ;
- byte                *ram ;
- byte                *cfg ;
- byte                *prom ;
- byte                *ctlReg ;
+ byte                __iomem *Address ;
+ byte                __iomem *Config ;
+ byte                __iomem *Control ;
+ byte                __iomem *reset ;
+ byte                __iomem *port ;
+ byte                __iomem *ram ;
+ byte                __iomem *cfg ;
+ byte                __iomem *prom ;
+ byte                __iomem *ctlReg ;
  struct pc_maint  *pcm ;
  diva_os_dependent_devica_name_t os_name;
  byte                Name[32] ;
@@ -254,8 +254,8 @@ struct s_load {
 /* ---------------------------------------------------------------------
   Functions for port io
    --------------------------------------------------------------------- */
-void outp_words_from_buffer (word* adr, byte* P, dword len);
-void inp_words_to_buffer    (word* adr, byte* P, dword len);
+void outp_words_from_buffer (word __iomem * adr, byte* P, dword len);
+void inp_words_to_buffer    (word __iomem * adr, byte* P, dword len);
 /* ---------------------------------------------------------------------
   platform specific conversions
    --------------------------------------------------------------------- */
@@ -307,7 +307,7 @@ typedef struct {
  word  cnt ;
  word  out ;
 } Xdesc ;
-extern void     dump_trap_frame  (PISDN_ADAPTER IoAdapter, byte *exception) ;
+extern void     dump_trap_frame  (PISDN_ADAPTER IoAdapter, byte __iomem *exception) ;
 extern void     dump_xlog_buffer (PISDN_ADAPTER IoAdapter, Xdesc *xlogDesc) ;
 /* --------------------------------------------------------------------- */
 #endif  /* } __DIVA_XDI_COMMON_IO_H_INC__ */

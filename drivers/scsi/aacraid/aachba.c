@@ -645,9 +645,31 @@ int aac_get_adapter_info(struct aac_dev* dev)
 			dev->adapter_info.serial[1]);
 
 	dev->nondasd_support = 0;
+	dev->raid_scsi_mode = 0;
 	if(dev->adapter_info.options & AAC_OPT_NONDASD){
 		dev->nondasd_support = 1;
 	}
+
+	/*
+	 * If the firmware supports ROMB RAID/SCSI mode and we are currently
+	 * in RAID/SCSI mode, set the flag. For now if in this mode we will
+	 * force nondasd support on. If we decide to allow the non-dasd flag
+	 * additional changes changes will have to be made to support
+	 * RAID/SCSI.  the function aac_scsi_cmd in this module will have to be
+	 * changed to support the new dev->raid_scsi_mode flag instead of
+	 * leaching off of the dev->nondasd_support flag. Also in linit.c the
+	 * function aac_detect will have to be modified where it sets up the
+	 * max number of channels based on the aac->nondasd_support flag only.
+	 */
+	if ((dev->adapter_info.options & AAC_OPT_SCSI_MANAGED) &&
+	    (dev->adapter_info.options & AAC_OPT_RAID_SCSI_MODE)) {
+		dev->nondasd_support = 1;
+		dev->raid_scsi_mode = 1;
+	}
+	if (dev->raid_scsi_mode != 0)
+		printk(KERN_INFO "%s%d: ROMB RAID/SCSI mode enabled\n",
+				dev->name, dev->id);
+		
 	if(nondasd != -1) {  
 		dev->nondasd_support = (nondasd!=0);
 	}
@@ -894,7 +916,7 @@ int aac_read(struct scsi_cmnd * scsicmd, int cid)
 	aac_io_done(scsicmd);
 	fib_complete(cmd_fibcontext);
 	fib_free(cmd_fibcontext);
-	return -1;
+	return 0;
 }
 
 static int aac_write(struct scsi_cmnd * scsicmd, int cid)
@@ -928,7 +950,7 @@ static int aac_write(struct scsi_cmnd * scsicmd, int cid)
 	if (!(cmd_fibcontext = fib_alloc(dev))) {
 		scsicmd->result = DID_ERROR << 16;
 		aac_io_done(scsicmd);
-		return -1;
+		return 0;
 	}
 	fib_init(cmd_fibcontext);
 
@@ -1004,7 +1026,7 @@ static int aac_write(struct scsi_cmnd * scsicmd, int cid)
 
 	fib_complete(cmd_fibcontext);
 	fib_free(cmd_fibcontext);
-	return -1;
+	return 0;
 }
 
 
@@ -1137,7 +1159,7 @@ int aac_scsi_cmd(struct scsi_cmnd * scsicmd)
 		char *cp;
 
 		dprintk((KERN_DEBUG "READ CAPACITY command.\n"));
-		if (fsa_dev_ptr[cid].size <= 0x100000000)
+		if (fsa_dev_ptr[cid].size <= 0x100000000LL)
 			capacity = fsa_dev_ptr[cid].size - 1;
 		else
 			capacity = (u32)-1;
@@ -1446,8 +1468,17 @@ static void aac_srb_callback(void *context, struct fib * fibptr)
 			if( b==TYPE_TAPE || b==TYPE_WORM || b==TYPE_ROM || b==TYPE_MOD|| b==TYPE_MEDIUM_CHANGER 
 					|| (b==TYPE_DISK && (b1&0x80)) ){
 				scsicmd->result = DID_OK << 16 | COMMAND_COMPLETE << 8;
+			/*
+			 * We will allow disk devices if in RAID/SCSI mode and
+			 * the channel is 2
+			 */
+			} else if ((dev->raid_scsi_mode) &&
+					(scsicmd->device->channel == 2)) {
+				scsicmd->result = DID_OK << 16 | 
+						COMMAND_COMPLETE << 8;
 			} else {
-				scsicmd->result = DID_NO_CONNECT << 16 | COMMAND_COMPLETE << 8;
+				scsicmd->result = DID_NO_CONNECT << 16 | 
+						COMMAND_COMPLETE << 8;
 			}
 		} else {
 			scsicmd->result = DID_OK << 16 | COMMAND_COMPLETE << 8;
@@ -1479,8 +1510,17 @@ static void aac_srb_callback(void *context, struct fib * fibptr)
 			if( b==TYPE_TAPE || b==TYPE_WORM || b==TYPE_ROM || b==TYPE_MOD|| b==TYPE_MEDIUM_CHANGER
 					|| (b==TYPE_DISK && (b1&0x80)) ){
 				scsicmd->result = DID_OK << 16 | COMMAND_COMPLETE << 8;
+			/*
+			 * We will allow disk devices if in RAID/SCSI mode and
+			 * the channel is 2
+			 */
+			} else if ((dev->raid_scsi_mode) &&
+					(scsicmd->device->channel == 2)) {
+				scsicmd->result = DID_OK << 16 | 
+						COMMAND_COMPLETE << 8;
 			} else {
-				scsicmd->result = DID_NO_CONNECT << 16 | COMMAND_COMPLETE << 8;
+				scsicmd->result = DID_NO_CONNECT << 16 | 
+						COMMAND_COMPLETE << 8;
 			}
 			break;
 		}

@@ -2,7 +2,7 @@
 
 static int max_memory = 32;
 
-MODULE_PARM(max_memory,"i");
+module_param(max_memory, int, 0644);
 MODULE_PARM_DESC(max_memory, "maximum memory usage for capture buffers (default: 32Mb)");
 
 #define IS_CAPTURE_ACTIVE(fh) \
@@ -760,7 +760,7 @@ static int video_begin(struct saa7146_fh *fh)
 	saa7146_write(dev, MC2, MASK_27 );
 
 	/* enable rps0 irqs */
-	IER_ENABLE(dev, MASK_27);
+	SAA7146_IER_ENABLE(dev, MASK_27);
 
 	vv->video_fh = fh;
 	vv->video_status = STATUS_CAPTURE;
@@ -805,7 +805,7 @@ static int video_end(struct saa7146_fh *fh, struct file *file)
 	saa7146_write(dev, MC1, MASK_28);
 
 	/* disable rps0 irqs */
-	IER_DISABLE(dev, MASK_27);
+	SAA7146_IER_DISABLE(dev, MASK_27);
 
 	/* shut down all used video dma transfers */
 	saa7146_write(dev, MC1, dmas);

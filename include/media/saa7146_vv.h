@@ -219,8 +219,6 @@ extern struct saa7146_use_ops saa7146_vbi_uops;
 
 /* resource management functions */
 int saa7146_res_get(struct saa7146_fh *fh, unsigned int bit);
-int saa7146_res_check(struct saa7146_fh *fh, unsigned int bit);
-int saa7146_res_locked(struct saa7146_dev *dev, unsigned int bit);
 void saa7146_res_free(struct saa7146_fh *fh, unsigned int bits);
 
 #define RESOURCE_DMA1_HPS	0x1

@@ -177,6 +177,14 @@
 #endif
 
 /*
+ * ON the R10000 upto version 2.6 (not sure about 2.7) there is a bug that
+ * may cause ll / sc and lld / scd sequences to execute non-atomically.
+ */
+#ifdef CONFIG_SGI_IP27
+#define R10000_LLSC_WAR 1
+#endif
+
+/*
  * Workarounds default to off
  */
 #ifndef R4600_V1_INDEX_ICACHEOP_WAR
@@ -208,6 +216,9 @@
 #endif
 #ifndef RM9000_CDEX_SMP_WAR
 #define RM9000_CDEX_SMP_WAR		0
+#endif
+#ifndef R10000_LLSC_WAR
+#define R10000_LLSC_WAR			0
 #endif
 
 #endif /* _ASM_WAR_H */

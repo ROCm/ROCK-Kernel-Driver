@@ -38,16 +38,6 @@
 #endif
 
 /*
- * Memory segments (32bit kernel mode addresses)
- * These are the traditional names used in the 32-bit universe.
- */
-#define KUSEG			0x00000000
-#define KSEG0			0x80000000
-#define KSEG1			0xa0000000
-#define KSEG2			0xc0000000
-#define KSEG3			0xe0000000
-
-/*
  * Returns the kernel segment base of a given address
  */
 #define KSEGX(a)		((_ACAST32_ (a)) & 0xe0000000)
@@ -58,18 +48,7 @@
 #define CPHYSADDR(a)		((_ACAST32_ (a)) & 0x1fffffff)
 #define XPHYSADDR(a)            ((_ACAST64_ (a)) & 0x000000ffffffffff)
 
-/*
- * Map an address to a certain kernel segment
- */
-#define KSEG0ADDR(a)		(CPHYSADDR(a) | KSEG0)
-#define KSEG1ADDR(a)		(CPHYSADDR(a) | KSEG1)
-#define KSEG2ADDR(a)		(CPHYSADDR(a) | KSEG2)
-#define KSEG3ADDR(a)		(CPHYSADDR(a) | KSEG3)
-
-#define CKSEG0ADDR(a)		(CPHYSADDR(a) | CKSEG0)
-#define CKSEG1ADDR(a)		(CPHYSADDR(a) | CKSEG1)
-#define CKSEG2ADDR(a)		(CPHYSADDR(a) | CKSEG2)
-#define CKSEG3ADDR(a)		(CPHYSADDR(a) | CKSEG3)
+#ifdef CONFIG_MIPS64
 
 /*
  * Memory segments (64bit kernel mode addresses)
@@ -84,6 +63,44 @@
 #define CKSEG1			0xffffffffa0000000
 #define CKSSEG			0xffffffffc0000000
 #define CKSEG3			0xffffffffe0000000
+
+#define CKSEG0ADDR(a)		(CPHYSADDR(a) | CKSEG0)
+#define CKSEG1ADDR(a)		(CPHYSADDR(a) | CKSEG1)
+#define CKSEG2ADDR(a)		(CPHYSADDR(a) | CKSEG2)
+#define CKSEG3ADDR(a)		(CPHYSADDR(a) | CKSEG3)
+
+#else
+
+#define CKSEG0ADDR(a)		(CPHYSADDR(a) | KSEG0)
+#define CKSEG1ADDR(a)		(CPHYSADDR(a) | KSEG1)
+#define CKSEG2ADDR(a)		(CPHYSADDR(a) | KSEG2)
+#define CKSEG3ADDR(a)		(CPHYSADDR(a) | KSEG3)
+
+/*
+ * Map an address to a certain kernel segment
+ */
+#define KSEG0ADDR(a)		(CPHYSADDR(a) | KSEG0)
+#define KSEG1ADDR(a)		(CPHYSADDR(a) | KSEG1)
+#define KSEG2ADDR(a)		(CPHYSADDR(a) | KSEG2)
+#define KSEG3ADDR(a)		(CPHYSADDR(a) | KSEG3)
+
+/*
+ * Memory segments (32bit kernel mode addresses)
+ * These are the traditional names used in the 32-bit universe.
+ */
+#define KUSEG			0x00000000
+#define KSEG0			0x80000000
+#define KSEG1			0xa0000000
+#define KSEG2			0xc0000000
+#define KSEG3			0xe0000000
+
+#define CKUSEG			0x00000000
+#define CKSEG0			0x80000000
+#define CKSEG1			0xa0000000
+#define CKSEG2			0xc0000000
+#define CKSEG3			0xe0000000
+
+#endif
 
 /*
  * Cache modes for XKPHYS address conversion macros

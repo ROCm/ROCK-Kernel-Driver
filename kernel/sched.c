@@ -217,7 +217,16 @@ struct runqueue {
 	unsigned long cpu_load;
 #endif
 	unsigned long long nr_switches;
-	unsigned long expired_timestamp, nr_uninterruptible;
+
+	/*
+	 * This is part of a global counter where only the total sum
+	 * over all CPUs matters. A task can increase this counter on
+	 * one CPU and if it got migrated afterwards it may decrease
+	 * it on another CPU. Always updated under the runqueue lock:
+	 */
+	unsigned long nr_uninterruptible;
+
+	unsigned long expired_timestamp;
 	unsigned long long timestamp_last_tick;
 	task_t *curr, *idle;
 	struct mm_struct *prev_mm;
@@ -762,8 +771,6 @@ static void activate_task(task_t *p, runqueue_t *rq, int local)
 static void deactivate_task(struct task_struct *p, runqueue_t *rq)
 {
 	rq->nr_running--;
-	if (p->state == TASK_UNINTERRUPTIBLE)
-		rq->nr_uninterruptible++;
 	dequeue_task(p, p->array);
 	p->array = NULL;
 }
@@ -983,14 +990,14 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 	int cpu, this_cpu, success = 0;
 	unsigned long flags;
 	long old_state;
-	runqueue_t *rq, *old_rq;
+	runqueue_t *rq;
 #ifdef CONFIG_SMP
 	unsigned long load, this_load;
 	struct sched_domain *sd;
 	int new_cpu;
 #endif
 
-	old_rq = rq = task_rq_lock(p, &flags);
+	rq = task_rq_lock(p, &flags);
 	schedstat_inc(rq, ttwu_cnt);
 	old_state = p->state;
 	if (!(old_state & state))
@@ -1085,7 +1092,7 @@ out_set_cpu:
 out_activate:
 #endif /* CONFIG_SMP */
 	if (old_state == TASK_UNINTERRUPTIBLE) {
-		old_rq->nr_uninterruptible--;
+		rq->nr_uninterruptible--;
 		/*
 		 * Tasks on involuntary sleep don't earn
 		 * sleep_avg beyond just interactive state.
@@ -1414,6 +1421,13 @@ unsigned long nr_uninterruptible(void)
 
 	for_each_cpu(i)
 		sum += cpu_rq(i)->nr_uninterruptible;
+
+	/*
+	 * Since we read the counters lockless, it might be slightly
+	 * inaccurate. Do not allow it to go below zero though:
+	 */
+	if (unlikely((long)sum < 0))
+		sum = 0;
 
 	return sum;
 }
@@ -2581,8 +2595,11 @@ need_resched_nonpreemptible:
 		if (unlikely((prev->state & TASK_INTERRUPTIBLE) &&
 				unlikely(signal_pending(prev))))
 			prev->state = TASK_RUNNING;
-		else
+		else {
+			if (prev->state == TASK_UNINTERRUPTIBLE)
+				rq->nr_uninterruptible++;
 			deactivate_task(prev, rq);
+		}
 	}
 
 	cpu = smp_processor_id();
@@ -3914,6 +3931,26 @@ static void move_task_off_dead_cpu(int dead_cpu, struct task_struct *tsk)
 	__migrate_task(tsk, dead_cpu, dest_cpu);
 }
 
+/*
+ * While a dead CPU has no uninterruptible tasks queued at this point,
+ * it might still have a nonzero ->nr_uninterruptible counter, because
+ * for performance reasons the counter is not stricly tracking tasks to
+ * their home CPUs. So we just add the counter to another CPU's counter,
+ * to keep the global sum constant after CPU-down:
+ */
+static void migrate_nr_uninterruptible(runqueue_t *rq_src)
+{
+	runqueue_t *rq_dest = cpu_rq(any_online_cpu(CPU_MASK_ALL));
+	unsigned long flags;
+
+	local_irq_save(flags);
+	double_rq_lock(rq_src, rq_dest);
+	rq_dest->nr_uninterruptible += rq_src->nr_uninterruptible;
+	rq_src->nr_uninterruptible = 0;
+	double_rq_unlock(rq_src, rq_dest);
+	local_irq_restore(flags);
+}
+
 /* Run through task list and migrate tasks from the dead cpu. */
 static void migrate_live_tasks(int src_cpu)
 {
@@ -4048,6 +4085,7 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 		__setscheduler(rq->idle, SCHED_NORMAL, 0);
 		migrate_dead_tasks(cpu);
 		task_rq_unlock(rq, &flags);
+		migrate_nr_uninterruptible(rq);
 		BUG_ON(rq->nr_running != 0);
 
 		/* No need to migrate the tasks: it was best-effort if
@@ -4408,6 +4446,7 @@ static void sched_domain_debug(void)
 				if (sd->parent)
 					printk(" ERROR !SD_LOAD_BALANCE domain has parent");
 				printk("\n");
+				break;
 			}
 
 			printk("span %s\n", str);
@@ -4416,8 +4455,6 @@ static void sched_domain_debug(void)
 				printk(KERN_DEBUG "ERROR domain->span does not contain CPU%d\n", i);
 			if (!cpu_isset(i, group->cpumask))
 				printk(KERN_DEBUG "ERROR domain->groups does not contain CPU%d\n", i);
-			if (!group->cpu_power)
-				printk(KERN_DEBUG "ERROR domain->cpu_power not set\n");
 
 			printk(KERN_DEBUG);
 			for (j = 0; j < level + 2; j++)
@@ -4428,6 +4465,9 @@ static void sched_domain_debug(void)
 					printk(" ERROR: NULL");
 					break;
 				}
+				
+				if (!group->cpu_power)
+					printk(KERN_DEBUG "ERROR group->cpu_power not set\n");
 
 				if (!cpus_weight(group->cpumask))
 					printk(" ERROR empty group:");

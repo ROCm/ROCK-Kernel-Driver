@@ -128,7 +128,7 @@ void gt64120_irq_setup(void)
 	set_c0_status(IE_IRQ2);
 }
 
-void __init init_IRQ(void)
+void __init arch_init_irq(void)
 {
 	int i;
 

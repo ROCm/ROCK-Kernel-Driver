@@ -283,6 +283,38 @@ void sa11x0_set_flash_data(struct flash_platform_data *flash,
 	sa11x0mtd_device.num_resources = nr;
 }
 
+static struct resource sa11x0ir_resources[] = {
+	{
+		.start	= __PREG(Ser2UTCR0),
+		.end	= __PREG(Ser2UTCR0) + 0x24 - 1,
+		.flags	= IORESOURCE_MEM,
+	}, {
+		.start	= __PREG(Ser2HSCR0),
+		.end	= __PREG(Ser2HSCR0) + 0x1c - 1,
+		.flags	= IORESOURCE_MEM,
+	}, {
+		.start	= __PREG(Ser2HSCR2),
+		.end	= __PREG(Ser2HSCR2) + 0x04 - 1,
+		.flags	= IORESOURCE_MEM,
+	}, {
+		.start	= IRQ_Ser2ICP,
+		.end	= IRQ_Ser2ICP,
+		.flags	= IORESOURCE_IRQ,
+	}
+};
+
+static struct platform_device sa11x0ir_device = {
+	.name		= "sa11x0-ir",
+	.id		= -1,
+	.num_resources	= ARRAY_SIZE(sa11x0ir_resources),
+	.resource	= sa11x0ir_resources,
+};
+
+void sa11x0_set_irda_data(struct irda_platform_data *irda)
+{
+	sa11x0ir_device.dev.platform_data = irda;
+}
+
 static struct platform_device *sa11x0_devices[] __initdata = {
 	&sa11x0udc_device,
 	&sa11x0uart1_device,
@@ -297,6 +329,9 @@ static struct platform_device *sa11x0_devices[] __initdata = {
 static int __init sa1100_init(void)
 {
 	pm_power_off = sa1100_power_off;
+
+	if (sa11x0ir_device.dev.platform_data)
+		platform_device_register(&sa11x0ir_device);
 
 	return platform_add_devices(sa11x0_devices, ARRAY_SIZE(sa11x0_devices));
 }

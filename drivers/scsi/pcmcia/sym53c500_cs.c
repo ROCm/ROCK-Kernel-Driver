@@ -85,7 +85,7 @@ static int pc_debug = PCMCIA_DEBUG;
 module_param(pc_debug, int, 0);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 static char *version =
-"sym53c500_cs.c 0.9b 2004/05/10 (Bob Tracy)";
+"sym53c500_cs.c 0.9c 2004/10/27 (Bob Tracy)";
 #else
 #define DEBUG(n, args...)
 #endif
@@ -95,7 +95,7 @@ static char *version =
 /* Parameters that can be set with 'insmod' */
 
 /* Bit map of interrupts to choose from */
-static unsigned int irq_mask = 0xdeb8;	/* 3, 6, 7, 9-12, 14, 15 */
+static unsigned int irq_mask = 0xdeb8;	/* 3-5, 7, 9-12, 14, 15 */
 static int irq_list[4] = { -1 };
 
 module_param(irq_mask, int, 0);
@@ -829,7 +829,7 @@ next_entry:
 	data = (struct sym53c500_data *)host->hostdata;
 
 	if (irq_level > 0) {
-		if (request_irq(irq_level, SYM53C500_intr, 0, "SYM53C500", host)) {
+		if (request_irq(irq_level, SYM53C500_intr, SA_SHIRQ, "SYM53C500", host)) {
 			printk("SYM53C500: unable to allocate IRQ %d\n", irq_level);
 			goto err_free_scsi;
 		}

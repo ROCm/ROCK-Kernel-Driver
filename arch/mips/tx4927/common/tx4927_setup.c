@@ -92,15 +92,6 @@ void __init tx4927_time_init(void)
 	}
 #endif
 
-#ifdef CONFIG_KGDB
-	{
-		printk("Calling breakpoint() -- start remote kgdb\n");
-		set_debug_traps();
-		breakpoint();
-		printk("Calling breakpoint() -- done\n");
-	}
-#endif
-
 	return;
 }
 

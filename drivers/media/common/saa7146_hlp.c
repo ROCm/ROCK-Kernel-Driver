@@ -9,11 +9,6 @@ static void calculate_output_format_register(struct saa7146_dev* saa, u32 palett
 	*clip_format |=  (( ((palette&0xf00)>>8) << 30) | ((palette&0x00f) << 24) | (((palette&0x0f0)>>4) << 16));
 }
 
-static void calculate_bcs_ctrl_register(struct saa7146_dev *dev, int brightness, int contrast, int colour, u32 *bcs_ctrl)
-{
-	*bcs_ctrl = ((brightness << 24) | (contrast << 16) | (colour <<  0));
-}
-
 static void calculate_hps_source_and_sync(struct saa7146_dev *dev, int source, int sync, u32* hps_ctrl)
 {
 	*hps_ctrl &= ~(MASK_30 | MASK_31 | MASK_28);
@@ -62,7 +57,7 @@ static struct {
 };
 
 /* table of attenuation values for horizontal scaling */
-u8 h_attenuation[] = { 1, 2, 4, 8, 2, 4, 8, 16, 0};
+static u8 h_attenuation[] = { 1, 2, 4, 8, 2, 4, 8, 16, 0};
 
 /* calculate horizontal scale registers */
 static int calculate_h_scale_registers(struct saa7146_dev *dev,
@@ -208,7 +203,7 @@ static struct {
 };
 
 /* table of attenuation values for vertical scaling */
-u16 v_attenuation[] = { 2, 4, 8, 16, 32, 64, 128, 256, 0};
+static u16 v_attenuation[] = { 2, 4, 8, 16, 32, 64, 128, 256, 0};
 
 /* calculate vertical scale registers */
 static int calculate_v_scale_registers(struct saa7146_dev *dev, enum v4l2_field field,
@@ -619,18 +614,6 @@ static void saa7146_set_output_format(struct saa7146_dev *dev, unsigned long pal
 	saa7146_write(dev, CLIP_FORMAT_CTRL, clip_format);
       	saa7146_write(dev, MC2, (MASK_05 | MASK_21));
 }
-
-void saa7146_set_picture_prop(struct saa7146_dev *dev, int brightness, int contrast, int colour)
-{
-	u32	bcs_ctrl = 0;
-	
-	calculate_bcs_ctrl_register(dev, brightness, contrast, colour, &bcs_ctrl);
-	saa7146_write(dev, BCS_CTRL, bcs_ctrl);
-	
-	/* update the bcs register */
-      	saa7146_write(dev, MC2, (MASK_06 | MASK_22));
-}
-
 
 /* select input-source */
 void saa7146_set_hps_source_and_sync(struct saa7146_dev *dev, int source, int sync)

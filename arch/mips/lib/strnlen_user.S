@@ -3,13 +3,12 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 1996, 1998, 1999 by Ralf Baechle
+ * Copyright (c) 1996, 1998, 1999, 2004 by Ralf Baechle
  * Copyright (c) 1999 Silicon Graphics, Inc.
  */
 #include <asm/asm.h>
 #include <asm/offset.h>
 #include <asm/regdef.h>
-#include <asm/sgidefs.h>
 
 #define EX(insn,reg,addr,handler)			\
 9:	insn	reg, addr;				\

@@ -195,7 +195,7 @@ u32 vfp_double_normaliseround(int dd, struct vfp_double *vd, u32 fpscr, u32 exce
 			 dd, d, exceptions);
 		vfp_put_double(dd, d);
 	}
-	return exceptions;
+	return exceptions & ~VFP_NAN_FLAG;
 }
 
 /*
@@ -240,7 +240,7 @@ vfp_propagate_nan(struct vfp_double *vdd, struct vfp_double *vdn,
 	/*
 	 * If one was a signalling NAN, raise invalid operation.
 	 */
-	return tn == VFP_SNAN || tm == VFP_SNAN ? FPSCR_IOC : 0x100;
+	return tn == VFP_SNAN || tm == VFP_SNAN ? FPSCR_IOC : VFP_NAN_FLAG;
 }
 
 /*

@@ -242,9 +242,8 @@ void reparent_to_init(void)
 	memcpy(current->signal->rlim, init_task.signal->rlim,
 	       sizeof(current->signal->rlim));
 	atomic_inc(&(INIT_USER->__count));
-	switch_uid(INIT_USER);
-
 	write_unlock_irq(&tasklist_lock);
+	switch_uid(INIT_USER);
 }
 
 void __set_special_pids(pid_t session, pid_t pgrp)
@@ -529,7 +528,6 @@ static inline void reparent_thread(task_t *p, task_t *father, int traced)
 	/* We don't want people slaying init.  */
 	if (p->exit_signal != -1)
 		p->exit_signal = SIGCHLD;
-	p->self_exec_id++;
 
 	if (p->pdeath_signal)
 		/* We already hold the tasklist_lock here.  */
@@ -1320,6 +1318,10 @@ static long do_wait(pid_t pid, int options, struct siginfo __user *infop,
 
 	add_wait_queue(&current->wait_chldexit,&wait);
 repeat:
+	/*
+	 * We will set this flag if we see any child that might later
+	 * match our criteria, even if we are not able to reap it yet.
+	 */
 	flag = 0;
 	current->state = TASK_INTERRUPTIBLE;
 	read_lock(&tasklist_lock);
@@ -1338,11 +1340,14 @@ repeat:
 
 			switch (p->state) {
 			case TASK_TRACED:
-				flag = 1;
 				if (!my_ptrace_child(p))
 					continue;
 				/*FALLTHROUGH*/
 			case TASK_STOPPED:
+				/*
+				 * It's stopped now, so it might later
+				 * continue, exit, or stop again.
+				 */
 				flag = 1;
 				if (!(options & WUNTRACED) &&
 				    !my_ptrace_child(p))
@@ -1378,8 +1383,12 @@ repeat:
 						goto end;
 					break;
 				}
-				flag = 1;
 check_continued:
+				/*
+				 * It's running now, so it might later
+				 * exit, stop, or stop and then continue.
+				 */
+				flag = 1;
 				if (!unlikely(options & WCONTINUED))
 					continue;
 				retval = wait_task_continued(

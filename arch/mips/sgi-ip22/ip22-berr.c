@@ -65,7 +65,7 @@ static void print_buserr(void)
 			cpu_err_stat & SGIMC_CSTAT_BAD_DATA ? "BAD_DATA " : "",
 			cpu_err_addr);
 	if (gio_err_stat & GIO_ERRMASK)
-		printk(KERN_ERR "GIO error 0x%x:<%s%s%s%s%s%s%s%s> @ 0x08%x\n",
+		printk(KERN_ERR "GIO error 0x%x:<%s%s%s%s%s%s%s%s> @ 0x%08x\n",
 			gio_err_stat,
 			gio_err_stat & SGIMC_GSTAT_RD ? "RD " : "",
 			gio_err_stat & SGIMC_GSTAT_WR ? "WR " : "",

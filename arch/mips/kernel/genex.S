@@ -19,14 +19,25 @@
 #include <asm/stackframe.h>
 #include <asm/war.h>
 
+#define PANIC_PIC(msg)					\
+		.set push;				\
+		.set	reorder;			\
+		PTR_LA	a0,8f;				\
+		.set	noat;				\
+		PTR_LA	AT, panic;			\
+		jr	AT;				\
+9:		b	9b;				\
+		.set	pop;				\
+		TEXT(msg)
+
 	__INIT
 
 NESTED(except_vec0_generic, 0, sp)
-	PANIC("Exception vector 0 called")
+	PANIC_PIC("Exception vector 0 called")
 	END(except_vec0_generic)
 
 NESTED(except_vec1_generic, 0, sp)
-	PANIC("Exception vector 1 called")
+	PANIC_PIC("Exception vector 1 called")
 	END(except_vec1_generic)
 
 /*
@@ -142,19 +153,17 @@ NESTED(except_vec_ejtag_debug, 0, sp)
 NESTED(ejtag_debug_handler, PT_SIZE, sp)
 	.set	push
 	.set	noat
-	.set	noreorder
 	MTC0	k0, CP0_DESAVE
 	mfc0	k0, CP0_DEBUG
 
 	sll	k0, k0, 30	# Check for SDBBP.
 	bgez	k0, ejtag_return
-	nop
 
 	PTR_LA	k0, ejtag_debug_buffer
 	LONG_S	k1, 0(k0)
 	SAVE_ALL
+	move	a0, sp
 	jal	ejtag_exception_handler
-	 move	a0, sp
 	RESTORE_ALL
 	PTR_LA	k0, ejtag_debug_buffer
 	LONG_L	k1, 0(k0)
@@ -163,7 +172,6 @@ ejtag_return:
 	MFC0	k0, CP0_DESAVE
 	.set	mips32
 	deret
- 	 nop
 	.set pop
 	END(ejtag_debug_handler)
 

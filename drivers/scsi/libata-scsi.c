@@ -156,6 +156,7 @@ struct ata_queued_cmd *ata_scsi_qc_new(struct ata_port *ap,
 /**
  *	ata_to_sense_error - convert ATA error to SCSI error
  *	@qc: Command that we are erroring out
+ *	@drv_stat: value contained in ATA status register
  *
  *	Converts an ATA error into a SCSI error. While we are at it
  *	we decode and dump the ATA error for the user so that they
@@ -735,6 +736,7 @@ static unsigned int ata_scsi_rbuf_get(struct scsi_cmnd *cmd, u8 **buf_out)
 /**
  *	ata_scsi_rbuf_put - Unmap response buffer.
  *	@cmd: SCSI command containing buffer to be unmapped.
+ *	@buf: buffer to unmap
  *
  *	Unmaps response buffer contained within @cmd.
  *
@@ -896,7 +898,7 @@ unsigned int ata_scsiop_inq_80(struct ata_scsi_args *args, u8 *rbuf,
 	};
 	memcpy(rbuf, hdr, sizeof(hdr));
 
-	if (buflen > (ATA_SERNO_LEN + 4))
+	if (buflen > (ATA_SERNO_LEN + 4 - 1))
 		ata_dev_id_string(args->id, (unsigned char *) &rbuf[4],
 				  ATA_ID_SERNO_OFS, ATA_SERNO_LEN);
 
@@ -925,7 +927,7 @@ unsigned int ata_scsiop_inq_83(struct ata_scsi_args *args, u8 *rbuf,
 	rbuf[3] = 4 + strlen(inq_83_str);	/* page len */
 
 	/* our one and only identification descriptor (vendor-specific) */
-	if (buflen > (strlen(inq_83_str) + 4 + 4)) {
+	if (buflen > (strlen(inq_83_str) + 4 + 4 - 1)) {
 		rbuf[4 + 0] = 2;	/* code set: ASCII */
 		rbuf[4 + 3] = strlen(inq_83_str);
 		memcpy(rbuf + 4 + 4, inq_83_str, strlen(inq_83_str));
@@ -1334,7 +1336,7 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 /**
  *	ata_scsi_find_dev - lookup ata_device from scsi_cmnd
  *	@ap: ATA port to which the device is attached
- *	@cmd: SCSI command to be sent to the device
+ *	@scsidev: SCSI device from which we derive the ATA device
  *
  *	Given various information provided in struct scsi_cmnd,
  *	map that onto an ATA bus, and using that mapping

@@ -103,7 +103,7 @@ firmware_class_hotplug(struct class_device *class_dev, char **envp,
 			"FIRMWARE=%s", fw_priv->fw_id))
 		return -ENOMEM;
 
-	envp[i++] = NULL;
+	envp[i] = NULL;
 
 	return 0;
 }

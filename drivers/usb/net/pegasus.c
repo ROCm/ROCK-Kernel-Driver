@@ -322,7 +322,7 @@ static int write_mii_word(pegasus_t * pegasus, __u8 phy, __u8 indx, __u16 regd)
 
 	*(data + 1) = cpu_to_le16p(&regd);
 	set_register(pegasus, PhyCtrl, 0);
-	set_registers(pegasus, PhyAddr, 4, data);
+	set_registers(pegasus, PhyAddr, sizeof(data), data);
 	set_register(pegasus, PhyCtrl, (indx | PHY_WRITE));
 	for (i = 0; i < REG_TIMEOUT; i++) {
 		get_registers(pegasus, PhyCtrl, 1, data);
@@ -388,8 +388,8 @@ static inline void disable_eprom_write(pegasus_t * pegasus)
 
 static int write_eprom_word(pegasus_t * pegasus, __u8 index, __u16 data)
 {
-	int i, tmp;
-	__u8 d[4] = { 0x3f, 0, 0, EPROM_WRITE };
+	int i;
+	__u8 tmp, d[4] = { 0x3f, 0, 0, EPROM_WRITE };
 
 	set_registers(pegasus, EpromOffset, 4, d);
 	enable_eprom_write(pegasus);
@@ -1114,7 +1114,7 @@ static __u8 mii_phy_probe(pegasus_t * pegasus)
 
 static inline void setup_pegasus_II(pegasus_t * pegasus)
 {
-	u16 data = 0xa5;
+	__u8 data = 0xa5;
 	
 	set_register(pegasus, Reg1d, 0);
 	set_register(pegasus, Reg7b, 1);

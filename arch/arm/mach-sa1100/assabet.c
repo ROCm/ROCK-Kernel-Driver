@@ -31,6 +31,7 @@
 
 #include <asm/mach/arch.h>
 #include <asm/mach/flash.h>
+#include <asm/mach/irda.h>
 #include <asm/mach/map.h>
 #include <asm/mach/serial_sa1100.h>
 #include <asm/arch/assabet.h>
@@ -94,6 +95,11 @@ static void assabet_lcd_power(int on)
 		ASSABET_BCR_clear(ASSABET_BCR_LCD_ON);
 }
 
+
+/*
+ * Assabet flash support code.
+ */
+
 #ifdef ASSABET_REV_4
 /*
  * Phase 4 Assabet has two 28F160B3 flash parts in bank 0:
@@ -156,6 +162,42 @@ static struct resource assabet_flash_resources[] = {
 	}
 };
 
+
+/*
+ * Assabet IrDA support code.
+ */
+
+static int assabet_irda_set_power(struct device *dev, unsigned int state)
+{
+	static unsigned int bcr_state[4] = {
+		ASSABET_BCR_IRDA_MD0,
+		ASSABET_BCR_IRDA_MD1|ASSABET_BCR_IRDA_MD0,
+		ASSABET_BCR_IRDA_MD1,
+		0
+	};
+
+	if (state < 4) {
+		state = bcr_state[state];
+		ASSABET_BCR_clear(state ^ (ASSABET_BCR_IRDA_MD1|
+					   ASSABET_BCR_IRDA_MD0));
+		ASSABET_BCR_set(state);
+	}
+	return 0;
+}
+
+static void assabet_irda_set_speed(struct device *dev, unsigned int speed)
+{
+	if (speed < 4000000)
+		ASSABET_BCR_clear(ASSABET_BCR_IRDA_FSEL);
+	else
+		ASSABET_BCR_set(ASSABET_BCR_IRDA_FSEL);
+}
+
+static struct irda_platform_data assabet_irda_data = {
+	.set_power	= assabet_irda_set_power,
+	.set_speed	= assabet_irda_set_speed,
+};
+
 static void __init assabet_init(void)
 {
 	/*
@@ -203,6 +245,7 @@ static void __init assabet_init(void)
 
 	sa11x0_set_flash_data(&assabet_flash_data, assabet_flash_resources,
 			      ARRAY_SIZE(assabet_flash_resources));
+	sa11x0_set_irda_data(&assabet_irda_data);
 }
 
 /*

@@ -16,7 +16,7 @@
  * __put_user_X
  *
  * Inputs:	r0 contains the address
- *		r1, r2 contains the value
+ *		r2, r3 contains the value
  * Outputs:	r0 is the error code
  *		lr corrupted
  *
@@ -32,33 +32,33 @@
 
 	.global	__put_user_1
 __put_user_1:
-1:	strbt	r1, [r0]
+1:	strbt	r2, [r0]
 	mov	r0, #0
 	mov	pc, lr
 
 	.global	__put_user_2
 __put_user_2:
-	mov	ip, r1, lsr #8
+	mov	ip, r2, lsr #8
 #ifndef __ARMEB__
-2:	strbt	r1, [r0], #1
+2:	strbt	r2, [r0], #1
 3:	strbt	ip, [r0]
 #else
 2:	strbt	ip, [r0], #1
-3:	strbt	r1, [r0]
+3:	strbt	r2, [r0]
 #endif
 	mov	r0, #0
 	mov	pc, lr
 
 	.global	__put_user_4
 __put_user_4:
-4:	strt	r1, [r0]
+4:	strt	r2, [r0]
 	mov	r0, #0
 	mov	pc, lr
 
 	.global	__put_user_8
 __put_user_8:
-5:	strt	r1, [r0], #4
-6:	strt	r2, [r0]
+5:	strt	r2, [r0], #4
+6:	strt	r3, [r0]
 	mov	r0, #0
 	mov	pc, lr
 

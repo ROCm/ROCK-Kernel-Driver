@@ -18,7 +18,7 @@ http://developer.intel.com/design/network/products/npfamily/ixp2xxx.htm
 
 2. Linux Support
 
-Linux currently supports the following features on the IXP2000 NPUS:
+Linux currently supports the following features on the IXP2000 NPUs:
 
 - On-chip serial
 - PCI
@@ -30,10 +30,10 @@ That is about all we can support under Linux ATM b/c the core networking
 components of the chip are accessed via Intel's closed source SDK. 
 Please contact Intel directly on issues with using those. There is
 also a mailing list run by some folks at Princeton University that might
-be of helpful:  https://lists.cs.princeton.edu/mailman/listinfo/ixp2xxx
+be of help:  https://lists.cs.princeton.edu/mailman/listinfo/ixp2xxx
 
 WHATEVER YOU DO, DO NOT POST EMAIL TO THE LINUX-ARM OR LINUX-ARM-KERNEL
-MAILINNG LISTS REGARDING THE INTEL SDK.
+MAILING LISTS REGARDING THE INTEL SDK.
 
 3. Supported Platforms
 
@@ -47,12 +47,12 @@ MAILINNG LISTS REGARDING THE INTEL SDK.
 
 - The IXP2000 platforms ususally have rather complex PCI bus topologies
   with large memory space requirements. In addition, b/c of the way the
-  Intel SDK is designed, devices are enumerated in a vert specific
+  Intel SDK is designed, devices are enumerated in a very specific
   way. B/c of this this, we use "pci=firmware" option in the kernel
   command line so that we do not re-enumerate the bus.
 
 - IXDP2x01 systems have variable clock tick rates that we cannot determine 
-  via HW registers. The "ixdp2x01_clk=XXX" cmd line options allows you
+  via HW registers. The "ixdp2x01_clk=XXX" cmd line options allow you
   to pass the clock rate to the board port.
 
 5. Thanks

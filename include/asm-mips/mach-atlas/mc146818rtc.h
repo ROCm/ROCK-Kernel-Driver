@@ -29,7 +29,7 @@
 #define RTC_EXTENT	16
 #define RTC_IRQ		ATLASINT_RTC
 
-#if CONFIG_CPU_LITTLE_ENDIAN
+#ifdef CONFIG_CPU_LITTLE_ENDIAN
 #define ATLAS_RTC_PORT(x) (RTC_PORT(x) + 0)
 #else
 #define ATLAS_RTC_PORT(x) (RTC_PORT(x) + 3)

@@ -1532,6 +1532,7 @@ static int __init sunsu_serial_init(void)
 	if (ret < 0)
 		return ret;
 
+	sunsu_serial_console_init();
 	for (i = 0; i < UART_NR; i++) {
 		struct uart_sunsu_port *up = &sunsu_ports[i];
 
@@ -1704,7 +1705,6 @@ static int __init sunsu_probe(void)
 	 * Console must be initiated after the generic initialization.
 	 */
        	sunsu_serial_init();
-	sunsu_serial_console_init();
 
 	return 0;
 }

@@ -2116,6 +2116,13 @@ static struct pci_device_id serial_pci_tbl[] = {
 		pbn_b0_bt_1_460800 },
 
 	/*
+	 * Dell Remote Access Card 4 - Tim_T_Murphy@Dell.com
+	 */
+	{	PCI_VENDOR_ID_DELL, PCI_DEVICE_ID_DELL_RAC4,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_b1_1_1382400 },
+
+	/*
 	 * Dell Remote Access Card III - Tim_T_Murphy@Dell.com
 	 */
 	{	PCI_VENDOR_ID_DELL, PCI_DEVICE_ID_DELL_RACIII,

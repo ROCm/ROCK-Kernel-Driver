@@ -66,15 +66,14 @@ static hw_irq_controller vrc5476_irq_controller = {
 void __init
 vrc5476_irq_init(u32 base)
 {
-	extern irq_desc_t irq_desc[];
 	u32 i;
 
 	irq_base = base;
 	for (i= base; i< base + NUM_VRC5476_IRQ; i++) {
 		irq_desc[i].status = IRQ_DISABLED;
 		irq_desc[i].action = NULL;
-		 irq_desc[i].depth = 1;
-		 irq_desc[i].handler = &vrc5476_irq_controller;
+		irq_desc[i].depth = 1;
+		irq_desc[i].handler = &vrc5476_irq_controller;
 	}
 }
 

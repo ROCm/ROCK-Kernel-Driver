@@ -53,7 +53,7 @@
 
 /*
  * PCI devfns for on-board devices. We need these to be able to
- * properly translte IRQs and for device removal.
+ * properly translate IRQs and for device removal.
  */
 #define	IXDP2400_SLAVE_ENET_DEVFN	0x18	/* Bus 1 */
 #define	IXDP2400_MASTER_ENET_DEVFN	0x20	/* Bus 1 */

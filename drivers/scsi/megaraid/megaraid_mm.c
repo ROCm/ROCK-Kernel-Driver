@@ -10,7 +10,7 @@
  *	   2 of the License, or (at your option) any later version.
  *
  * FILE		: megaraid_mm.c
- * Version	: v2.20.2.1 (Oct 06 2004)
+ * Version	: v2.20.2.3 (Dec 09 2004)
  *
  * Common management module
  */
@@ -156,6 +156,17 @@ mraid_mm_ioctl(struct inode *inode, struct file *filep, unsigned int cmd,
 	}
 
 	/*
+	 * Check if adapter can accept ioctl. We may have marked it offline
+	 * if any previous kioc had timedout on this controller.
+	 */
+	if (!adp->quiescent) {
+		con_log(CL_ANN, (KERN_WARNING
+			"megaraid cmm: controller cannot accept cmds due to "
+			"earlier errors\n" ));
+		return -EFAULT;
+	}
+
+	/*
 	 * The following call will block till a kioc is available
 	 */
 	kioc = mraid_mm_alloc_kioc(adp);
@@ -171,10 +182,15 @@ mraid_mm_ioctl(struct inode *inode, struct file *filep, unsigned int cmd,
 	kioc->done = ioctl_done;
 
 	/*
-	 * Issue the IOCTL to the low level driver
+	 * Issue the IOCTL to the low level driver. After the IOCTL completes
+	 * release the kioc if and only if it was _not_ timedout. If it was
+	 * timedout, that means that resources are still with low level driver.
 	 */
 	if ((rval = lld_ioctl(adp, kioc))) {
-		mraid_mm_dealloc_kioc(adp, kioc);
+
+		if (!kioc->timedout)
+			mraid_mm_dealloc_kioc(adp, kioc);
+
 		return rval;
 	}
 
@@ -581,6 +597,7 @@ mraid_mm_alloc_kioc(mraid_mmadp_t *adp)
 	kioc->user_data		= NULL;
 	kioc->user_data_len	= 0;
 	kioc->user_pthru	= NULL;
+	kioc->timedout		= 0;
 
 	return kioc;
 }
@@ -597,23 +614,27 @@ mraid_mm_dealloc_kioc(mraid_mmadp_t *adp, uioc_t *kioc)
 	mm_dmapool_t	*pool;
 	unsigned long	flags;
 
-	pool = &adp->dma_pool_list[kioc->pool_index];
+	if (kioc->pool_index != -1) {
+		pool = &adp->dma_pool_list[kioc->pool_index];
 
-	/* This routine may be called in non-isr context also */
-	spin_lock_irqsave(&pool->lock, flags);
+		/* This routine may be called in non-isr context also */
+		spin_lock_irqsave(&pool->lock, flags);
 
-	/*
-	 * While attaching the dma buffer, if we didn't get the required
-	 * buffer from the pool, we would have allocated it at the run time
-	 * and set the free_buf flag. We must free that buffer. Otherwise,
-	 * just mark that the buffer is not in use
-	 */
-	if (kioc->free_buf == 1)
-		pci_pool_free(pool->handle, kioc->buf_vaddr, kioc->buf_paddr);
-	else
-		pool->in_use = 0;
+		/*
+		 * While attaching the dma buffer, if we didn't get the 
+		 * required buffer from the pool, we would have allocated 
+		 * it at the run time and set the free_buf flag. We must 
+		 * free that buffer. Otherwise, just mark that the buffer is 
+		 * not in use
+		 */
+		if (kioc->free_buf == 1)
+			pci_pool_free(pool->handle, kioc->buf_vaddr, 
+							kioc->buf_paddr);
+		else
+			pool->in_use = 0;
 
-	spin_unlock_irqrestore(&pool->lock, flags);
+		spin_unlock_irqrestore(&pool->lock, flags);
+	}
 
 	/* Return the kioc to the free pool */
 	spin_lock_irqsave(&adp->kioc_pool_lock, flags);
@@ -667,6 +688,14 @@ lld_ioctl(mraid_mmadp_t *adp, uioc_t *kioc)
 		del_timer_sync(tp);
 	}
 
+	/*
+	 * If the command had timedout, we mark the controller offline
+	 * before returning
+	 */
+	if (kioc->timedout) {
+		adp->quiescent = 0;
+	}
+
 	return kioc->status;
 }
 
@@ -679,6 +708,10 @@ lld_ioctl(mraid_mmadp_t *adp, uioc_t *kioc)
 static void
 ioctl_done(uioc_t *kioc)
 {
+	uint32_t	adapno;
+	int		iterator;
+	mraid_mmadp_t*	adapter;
+
 	/*
 	 * When the kioc returns from driver, make sure it still doesn't
 	 * have ENODATA in status. Otherwise, driver will hang on wait_event
@@ -691,7 +724,32 @@ ioctl_done(uioc_t *kioc)
 		kioc->status = -EINVAL;
 	}
 
-	wake_up(&wait_q);
+	/*
+	 * Check if this kioc was timedout before. If so, nobody is waiting
+	 * on this kioc. We don't have to wake up anybody. Instead, we just
+	 * have to free the kioc
+	 */
+	if (kioc->timedout) {
+		iterator	= 0;
+		adapter		= NULL;
+		adapno		= kioc->adapno;
+
+		con_log(CL_ANN, ( KERN_WARNING "megaraid cmm: completed "
+					"ioctl that was timedout before\n"));
+
+		list_for_each_entry(adapter, &adapters_list_g, list) {
+			if (iterator++ == adapno) break;
+		}
+
+		kioc->timedout = 0;
+
+		if (adapter) {
+			mraid_mm_dealloc_kioc( adapter, kioc );
+		}
+	}
+	else {
+		wake_up(&wait_q);
+	}
 }
 
 
@@ -706,6 +764,7 @@ lld_timedout(unsigned long ptr)
 	uioc_t *kioc	= (uioc_t *)ptr;
 
 	kioc->status 	= -ETIME;
+	kioc->timedout	= 1;
 
 	con_log(CL_ANN, (KERN_WARNING "megaraid cmm: ioctl timed out\n"));
 
@@ -850,6 +909,7 @@ mraid_mm_register_adp(mraid_mmadp_t *lld_adp)
 	adapter->issue_uioc	= lld_adp->issue_uioc;
 	adapter->timeout	= lld_adp->timeout;
 	adapter->max_kioc	= lld_adp->max_kioc;
+	adapter->quiescent	= 1;
 
 	/*
 	 * Allocate single blocks of memory for all required kiocs,

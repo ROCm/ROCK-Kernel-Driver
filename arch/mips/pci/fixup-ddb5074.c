@@ -18,4 +18,4 @@ static void ddb5074_fixup(struct pci_dev *dev)
 }
 
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M7101,
-	ddb5074_fixup);
+	  ddb5074_fixup);

@@ -1161,11 +1161,11 @@ static void EvaluateStatus(int st)
 	return;
 }
 /*==========================================================================*/
+static int cmd_out_T(void);
+
 static int get_state_T(void)
 {
 	int i;
-	
-	static int cmd_out_T(void);
 
 	clr_cmdbuf();
 	current_drive->n_bytes=1;
@@ -1308,13 +1308,14 @@ static int cc_ReadError(void)
 	return (i);
 }
 /*==========================================================================*/
+static int cc_DriveReset(void);
+
 static int cmd_out_T(void)
 {
 #undef CMDT_TRIES
 #define CMDT_TRIES 1000
 #define TEST_FALSE_FF 1
-	
-	static int cc_DriveReset(void);
+
 	int i, j, l=0, m, ntries;
 	unsigned long flags;
 

@@ -92,7 +92,7 @@ static u8 evbuffer_init;
 static u8 evbuffer_length;
 static u8 evbuffer[1024];
 
-static void *compaq_int15_entry_point;
+static void __iomem *compaq_int15_entry_point;
 
 static spinlock_t int15_lock;		/* lock for ordering int15_bios_call() */
 
@@ -141,7 +141,7 @@ static u32 add_dword( u32 **p_buffer, u32 value, u32 *used, u32 *avail)
  *
  * returns 0 for non-Compaq ROM, 1 for Compaq ROM
  */
-static int check_for_compaq_ROM (void *rom_start)
+static int check_for_compaq_ROM (void __iomem *rom_start)
 {
 	u8 temp1, temp2, temp3, temp4, temp5, temp6;
 	int result = 0;
@@ -197,7 +197,7 @@ static u32 access_EV (u16 operation, u8 *ev_name, u8 *buffer, u32 *buf_size)
  *
  * Read the hot plug Resource Table from NVRAM
  */
-static int load_HRT (void *rom_start)
+static int load_HRT (void __iomem *rom_start)
 {
 	u32 available;
 	u32 temp_dword;
@@ -231,7 +231,7 @@ static int load_HRT (void *rom_start)
  *
  * Save the hot plug Resource Table in NVRAM
  */
-static u32 store_HRT (void *rom_start)
+static u32 store_HRT (void __iomem *rom_start)
 {
 	u32 *buffer;
 	u32 *pFill;
@@ -423,7 +423,7 @@ static u32 store_HRT (void *rom_start)
 }
 
 
-void compaq_nvram_init (void *rom_start)
+void compaq_nvram_init (void __iomem *rom_start)
 {
 	if (rom_start) {
 		compaq_int15_entry_point = (rom_start + ROM_INT15_PHY_ADDR - ROM_PHY_ADDR);
@@ -435,7 +435,7 @@ void compaq_nvram_init (void *rom_start)
 }
 
 
-int compaq_nvram_load (void *rom_start, struct controller *ctrl)
+int compaq_nvram_load (void __iomem *rom_start, struct controller *ctrl)
 {
 	u8 bus, device, function;
 	u8 nummem, numpmem, numio, numbus;
@@ -648,7 +648,7 @@ int compaq_nvram_load (void *rom_start, struct controller *ctrl)
 }
 
 	
-int compaq_nvram_store (void *rom_start)
+int compaq_nvram_store (void __iomem *rom_start)
 {
 	int rc = 1;
 

@@ -163,9 +163,9 @@ CONFIG_MACH_ and CONFIG_ARCH_
 
     <http://www.arm.linux.org.uk/developer/machines/>
 
-Kernel entry (head-armv.S)
+Kernel entry (head.S)
 --------------------------
-  The initial entry into the kernel is via head-armv.S, which uses machine
+  The initial entry into the kernel is via head.S, which uses machine
   independent code.  The machine is selected by the value of 'r1' on
   entry, which must be kept unique.
 

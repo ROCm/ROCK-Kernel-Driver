@@ -1274,6 +1274,7 @@ static int nm256_suspend(snd_card_t *card, unsigned int state)
 	snd_pcm_suspend_all(chip->pcm);
 	snd_ac97_suspend(chip->ac97);
 	chip->coeffs_current = 0;
+	pci_disable_device(chip->pci);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
@@ -1319,6 +1320,7 @@ static int snd_nm256_free(nm256_t *chip)
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void*)chip);
 
+	pci_disable_device(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -1346,9 +1348,14 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 
 	*chip_ret = NULL;
 
+	if ((err = pci_enable_device(pci)) < 0)
+		return err;
+
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (chip == NULL)
+	if (chip == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 
 	chip->card = card;
 	chip->pci = pci;
@@ -1534,9 +1541,6 @@ static int __devinit snd_nm256_probe(struct pci_dev *pci,
 	unsigned int xbuffer_top;
 	struct nm256_quirk *q;
 	u16 subsystem_vendor, subsystem_device;
-
-	if ((err = pci_enable_device(pci)) < 0)
-		return err;
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;

@@ -58,6 +58,7 @@ extern unsigned long __toc_start;
 	.stab_real = (asrr), 		/* Real pointer to segment table */ \
 	.stab_addr = (asrv),		/* Virt pointer to segment table */ \
 	.cpu_start = (start),		/* Processor start */		    \
+	.hw_cpu_id = 0xffff,						    \
 	.lppaca = {							    \
 		.xDesc = 0xd397d781,	/* "LpPa" */			    \
 		.xSize = sizeof(struct ItLpPaca),			    \

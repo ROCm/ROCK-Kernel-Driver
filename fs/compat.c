@@ -541,14 +541,7 @@ asmlinkage long compat_sys_fcntl64(unsigned int fd, unsigned int cmd,
 		set_fs(KERNEL_DS);
 		ret = sys_fcntl(fd, cmd, (unsigned long)&f);
 		set_fs(old_fs);
-		if ((cmd == F_GETLK) && (ret == 0)) {
-			/* POSIX-2001 now defines negative l_len */
-			if (f.l_len < 0) {
-				f.l_start += f.l_len;
-				f.l_len = -f.l_len;
-			}
-			if (f.l_start < 0)
-				return -EINVAL;
+		if (cmd == F_GETLK && ret == 0) {
 			if ((f.l_start >= COMPAT_OFF_T_MAX) ||
 			    ((f.l_start + f.l_len) > COMPAT_OFF_T_MAX))
 				ret = -EOVERFLOW;
@@ -569,14 +562,7 @@ asmlinkage long compat_sys_fcntl64(unsigned int fd, unsigned int cmd,
 				((cmd == F_SETLK64) ? F_SETLK : F_SETLKW),
 				(unsigned long)&f);
 		set_fs(old_fs);
-		if ((cmd == F_GETLK64) && (ret == 0)) {
-			/* POSIX-2001 now defines negative l_len */
-			if (f.l_len < 0) {
-				f.l_start += f.l_len;
-				f.l_len = -f.l_len;
-			}
-			if (f.l_start < 0)
-				return -EINVAL;
+		if (cmd == F_GETLK64 && ret == 0) {
 			if ((f.l_start >= COMPAT_LOFF_T_MAX) ||
 			    ((f.l_start + f.l_len) > COMPAT_LOFF_T_MAX))
 				ret = -EOVERFLOW;
@@ -1401,25 +1387,25 @@ int compat_do_execve(char * filename,
 	int retval;
 	int i;
 
-	file = open_exec(filename);
-
-	retval = PTR_ERR(file);
-	if (IS_ERR(file))
-		return retval;
-
-	sched_exec();
-
 	retval = -ENOMEM;
 	bprm = kmalloc(sizeof(*bprm), GFP_KERNEL);
 	if (!bprm)
 		goto out_ret;
 	memset(bprm, 0, sizeof(*bprm));
 
+	file = open_exec(filename);
+	retval = PTR_ERR(file);
+	if (IS_ERR(file))
+		goto out_kfree;
+
+	sched_exec();
+
 	bprm->p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
 	bprm->file = file;
 	bprm->filename = filename;
 	bprm->interp = filename;
 	bprm->mm = mm_alloc();
+	retval = -ENOMEM;
 	if (!bprm->mm)
 		goto out_file;
 
@@ -1486,6 +1472,8 @@ out_file:
 		allow_write_access(bprm->file);
 		fput(bprm->file);
 	}
+
+out_kfree:
 	kfree(bprm);
 
 out_ret:

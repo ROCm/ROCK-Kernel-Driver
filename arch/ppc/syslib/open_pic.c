@@ -53,7 +53,6 @@ static int (*openpic_cascade_fn)(struct pt_regs *);
 
 /* Global Operations */
 static void openpic_disable_8259_pass_through(void);
-static void openpic_set_priority(u_int pri);
 static void openpic_set_spurious(u_int vector);
 
 #ifdef CONFIG_SMP
@@ -477,7 +476,7 @@ static u_int openpic_get_priority(void)
 }
 #endif /* notused */
 
-static void __init openpic_set_priority(u_int pri)
+void openpic_set_priority(u_int pri)
 {
 	DECL_THIS_CPU;
 
@@ -955,6 +954,8 @@ int openpic_suspend(struct sys_device *sysdev, u32 state)
 		return 0;
 	}
 
+ 	openpic_set_priority(0xf);
+
 	open_pic.enable = openpic_cached_enable_irq;
 	open_pic.disable = openpic_cached_disable_irq;
 
@@ -1027,6 +1028,8 @@ int openpic_resume(struct sys_device *sysdev)
 
 	open_pic.enable = openpic_enable_irq;
 	open_pic.disable = openpic_disable_irq;
+
+ 	openpic_set_priority(0);
 
 	spin_unlock_irqrestore(&openpic_setup_lock, flags);
 

@@ -1075,7 +1075,7 @@ static int dn_accept(struct socket *sock, struct socket *newsock, int flags)
 		skb = dn_wait_for_connect(sk, &timeo);
 		if (IS_ERR(skb)) {
 			release_sock(sk);
-			return PTR_ERR(sk);
+			return PTR_ERR(skb);
 		}
 	}
 

@@ -253,6 +253,13 @@
 #define ST0_CE			0x00020000
 
 /*
+ * Setting c0_status.co enables Hit_Writeback and Hit_Writeback_Invalidate
+ * cacheops in userspace.  This bit exists only on RM7000 and RM9000
+ * processors.
+ */
+#define ST0_CO			0x08000000
+
+/*
  * Bitfields in the R[23]000 cp0 status register.
  */
 #define ST0_IEC                 0x00000001

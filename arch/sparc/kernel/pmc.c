@@ -30,7 +30,7 @@
 #define PMC_IDLE_REG	0x00
 #define PMC_IDLE_ON		0x01
 
-volatile static u8 *regs; 
+volatile static u8 __iomem *regs; 
 static int pmc_regsize;
 
 #define pmc_readb(offs)			(sbus_readb(regs+offs))
@@ -55,7 +55,7 @@ void pmc_swift_idle(void)
 
 static inline void pmc_free(void)
 {
-	sbus_iounmap((unsigned long)regs, pmc_regsize);
+	sbus_iounmap(regs, pmc_regsize);
 }
 
 static int __init pmc_probe(void)
@@ -76,9 +76,9 @@ sbus_done:
 	}
 
 	pmc_regsize = sdev->reg_addrs[0].reg_size;
-	regs = (u8*) sbus_ioremap(&sdev->resource[0], 0, 
+	regs = sbus_ioremap(&sdev->resource[0], 0, 
 				   pmc_regsize, PMC_OBPNAME);
-	if(NULL == regs) {
+	if (!regs) {
 		printk(KERN_ERR "%s: unable to map registers\n", PMC_DEVNAME);
 		return -ENODEV;
 	}

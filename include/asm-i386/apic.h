@@ -89,6 +89,7 @@ extern void clear_local_APIC(void);
 extern void connect_bsp_APIC (void);
 extern void disconnect_bsp_APIC (void);
 extern void disable_local_APIC (void);
+extern void lapic_shutdown (void);
 extern int verify_local_APIC (void);
 extern void cache_APIC_registers (void);
 extern void sync_Arb_IDs (void);
@@ -117,6 +118,9 @@ extern unsigned int nmi_watchdog;
 #define NMI_LOCAL_APIC	2
 #define NMI_INVALID	3
 
-#endif /* CONFIG_X86_LOCAL_APIC */
+#else /* !CONFIG_X86_LOCAL_APIC */
+static inline void lapic_shutdown(void) { }
+
+#endif /* !CONFIG_X86_LOCAL_APIC */
 
 #endif /* __ASM_APIC_H */

@@ -4,7 +4,6 @@
 
 #ifdef __KERNEL__
 #include <asm/ptrace.h>
-#endif
 
 #ifndef __ASSEMBLY__
 
@@ -58,5 +57,7 @@ typedef struct {
 } __siginfo_fpu_t;
 
 #endif /* !(__ASSEMBLY__) */
+
+#endif /* (__KERNEL__) */
 
 #endif /* !(__SPARC_SIGCONTEXT_H) */

@@ -1147,21 +1147,26 @@ static int ibm_handle_init(char *name,
 		object##_paths, sizeof(object##_paths)/sizeof(char*), required)
 
 
-static void ibm_param(char *feature, char *cmd)
+static int set_ibm_param(const char *val, struct kernel_param *kp)
 {
-	int i;
+	unsigned int i;
+	char arg_with_comma[32];
 
-	strcat(cmd, ",");
+	if (strlen(val) > 30)
+		return -ENOSPC;
+
+	strcpy(arg_with_comma, val);
+	strcat(arg_with_comma, ",");
+
 	for (i=0; i<NUM_IBMS; i++)
-		if (strcmp(ibms[i].name, feature) == 0)
-			ibms[i].write(&ibms[i], cmd);
-}	
+		if (strcmp(ibms[i].name, kp->name) == 0)
+			return ibms[i].write(&ibms[i], arg_with_comma);
+	BUG();
+	return -EINVAL;
+}
 
-#define IBM_PARAM(feature) do {					\
-	static char cmd[32];					\
-	module_param_string(feature, cmd, sizeof(cmd) - 1, 0);	\
-	ibm_param(#feature, cmd);				\
-} while (0)
+#define IBM_PARAM(feature) \
+	module_param_call(feature, set_ibm_param, NULL, NULL, 0)
 
 static void __exit acpi_ibm_exit(void)
 {
@@ -1216,16 +1221,6 @@ static int __init acpi_ibm_init(void)
 		}
 	}
 
-	IBM_PARAM(hotkey);
-	IBM_PARAM(bluetooth);
-	IBM_PARAM(video);
-	IBM_PARAM(light);
-	IBM_PARAM(dock);
-	IBM_PARAM(bay);
-	IBM_PARAM(cmos);
-	IBM_PARAM(led);
-	IBM_PARAM(beep);
-
 	return 0;
 }
 
@@ -1235,3 +1230,13 @@ module_exit(acpi_ibm_exit);
 MODULE_AUTHOR("Borislav Deianov");
 MODULE_DESCRIPTION(IBM_DESC);
 MODULE_LICENSE("GPL");
+
+IBM_PARAM(hotkey);
+IBM_PARAM(bluetooth);
+IBM_PARAM(video);
+IBM_PARAM(light);
+IBM_PARAM(dock);
+IBM_PARAM(bay);
+IBM_PARAM(cmos);
+IBM_PARAM(led);
+IBM_PARAM(beep);

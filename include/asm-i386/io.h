@@ -184,7 +184,7 @@ static inline void memset_io(volatile void __iomem *addr, unsigned char val, int
 {
 	memset((void __force *) addr, val, count);
 }
-static inline void memcpy_fromio(void *dst, volatile void __iomem *src, int count)
+static inline void memcpy_fromio(void *dst, const volatile void __iomem *src, int count)
 {
 	__memcpy(dst, (void __force *) src, count);
 }
@@ -238,36 +238,6 @@ static inline int check_signature(volatile void __iomem * io_addr,
 	int retval = 0;
 	do {
 		if (readb(io_addr) != *signature)
-			goto out;
-		io_addr++;
-		signature++;
-		length--;
-	} while (length);
-	retval = 1;
-out:
-	return retval;
-}
-
-/**
- *	isa_check_signature		-	find BIOS signatures
- *	@io_addr: mmio address to check 
- *	@signature:  signature block
- *	@length: length of signature
- *
- *	Perform a signature comparison with the ISA mmio address io_addr.
- *	Returns 1 on a match.
- *
- *	This function is deprecated. New drivers should use ioremap and
- *	check_signature.
- */
- 
-
-static inline int isa_check_signature(unsigned long io_addr,
-	const unsigned char *signature, int length)
-{
-	int retval = 0;
-	do {
-		if (isa_readb(io_addr) != *signature)
 			goto out;
 		io_addr++;
 		signature++;

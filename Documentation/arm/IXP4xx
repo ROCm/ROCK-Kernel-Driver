@@ -122,6 +122,15 @@ http://developer.intel.com/design/network/products/npfamily/ixdp425.htm
    also known as the Richfield board. It contains 4 PCI slots, 16MB
    of flash, two 10/100 ports and one ADSL port.
 
+Intel IXDPG425 Development Platform
+
+   This is basically and ADI Coyote board with a NEC EHCI controller
+   added. One issue with this board is that the mini-PCI slots only
+   have the 3.3v line connected, so you can't use a PCI to mini-PCI
+   adapter with an E100 card. So to NFS root you need to use either
+   the CSR or a WiFi card and a ramdisk that BOOTPs and then does
+   a pivot_root to NFS.
+
 Motorola PrPMC1100 Processor Mezanine Card
 http://www.fountainsys.com/datasheet/PrPMC1100.pdf
 
@@ -152,4 +161,4 @@ Robert E. Ranslam
 
 -------------------------------------------------------------------------
 
-Last Update: 5/13/2004
+Last Update: 11/16/2004

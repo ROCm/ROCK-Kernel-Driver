@@ -133,10 +133,8 @@ setup_irix_rt_frame(struct k_sigaction * ka, struct pt_regs *regs,
 }
 
 static inline void handle_signal(unsigned long sig, siginfo_t *info,
-	sigset_t *oldset, struct pt_regs * regs)
+	struct k_sigaction *ka, sigset_t *oldset, struct pt_regs * regs)
 {
-	struct k_sigaction *ka = &current->sighand->action[sig-1];
-
 	switch(regs->regs[0]) {
 	case ERESTARTNOHAND:
 		regs->regs[2] = EINTR;
@@ -158,8 +156,6 @@ static inline void handle_signal(unsigned long sig, siginfo_t *info,
 	else
 		setup_irix_frame(ka, regs, sig, oldset);
 
-	if (ka->sa.sa_flags & SA_ONESHOT)
-		ka->sa.sa_handler = SIG_DFL;
 	if (!(ka->sa.sa_flags & SA_NODEFER)) {
 		spin_lock_irq(&current->sighand->siglock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
@@ -171,6 +167,7 @@ static inline void handle_signal(unsigned long sig, siginfo_t *info,
 
 asmlinkage int do_irix_signal(sigset_t *oldset, struct pt_regs *regs)
 {
+	struct k_sigaction ka;
 	siginfo_t info;
 	int signr;
 
@@ -190,9 +187,9 @@ asmlinkage int do_irix_signal(sigset_t *oldset, struct pt_regs *regs)
 	if (!oldset)
 		oldset = &current->blocked;
 
-	signr = get_signal_to_deliver(&info, regs, NULL);
+	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
 	if (signr > 0) {
-		handle_signal(signr, &info, oldset, regs);
+		handle_signal(signr, &info, &ka, oldset, regs);
 		return 1;
 	}
 
@@ -543,9 +540,9 @@ out:
 }
 
 /* This is here because of irix5_siginfo definition. */
-#define P_PID    0
-#define P_PGID   2
-#define P_ALL    7
+#define IRIX_P_PID    0
+#define IRIX_P_PGID   2
+#define IRIX_P_ALL    7
 
 extern int getrusage(struct task_struct *, int, struct rusage __user *);
 
@@ -582,7 +579,7 @@ asmlinkage int irix_waitsys(int type, int pid, struct irix5_siginfo *info,
 		retval = -EINVAL;
 		goto out;
 	}
-	if (type != P_PID && type != P_PGID && type != P_ALL) {
+	if (type != IRIX_P_PID && type != IRIX_P_PGID && type != IRIX_P_ALL) {
 		retval = -EINVAL;
 		goto out;
 	}
@@ -594,9 +591,9 @@ repeat:
 	tsk = current;
 	list_for_each(_p,&tsk->children) {
 		p = list_entry(_p,struct task_struct,sibling);
-		if ((type == P_PID) && p->pid != pid)
+		if ((type == IRIX_P_PID) && p->pid != pid)
 			continue;
-		if ((type == P_PGID) && process_group(p) != pid)
+		if ((type == IRIX_P_PGID) && process_group(p) != pid)
 			continue;
 		if ((p->exit_signal != SIGCHLD))
 			continue;
@@ -631,8 +628,8 @@ repeat:
 			goto end_waitsys;
 
 		case TASK_ZOMBIE:
-			current->cutime += p->utime + p->cutime;
-			current->cstime += p->stime + p->cstime;
+			current->signal->cutime += p->utime + p->signal->cutime;
+			current->signal->cstime += p->stime + p->signal->cstime;
 			if (ru != NULL)
 				getrusage(p, RUSAGE_BOTH, ru);
 			__put_user(SIGCHLD, &info->sig);

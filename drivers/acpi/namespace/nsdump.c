@@ -550,6 +550,8 @@ cleanup:
 }
 
 
+#ifdef ACPI_FUTURE_USAGE
+
 /*******************************************************************************
  *
  * FUNCTION:    acpi_ns_dump_objects
@@ -634,6 +636,8 @@ acpi_ns_dump_tables (
 			ACPI_UINT32_MAX, search_handle);
 	return_VOID;
 }
+
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 
 /*******************************************************************************

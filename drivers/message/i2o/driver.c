@@ -175,7 +175,7 @@ void i2o_driver_unregister(struct i2o_driver *drv)
  *	negative error code on failure (the message will be flushed too).
  */
 int i2o_driver_dispatch(struct i2o_controller *c, u32 m,
-			struct i2o_message *msg)
+			struct i2o_message __iomem *msg)
 {
 	struct i2o_driver *drv;
 	u32 context = readl(&msg->u.s.icntxt);

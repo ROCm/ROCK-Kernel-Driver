@@ -13,6 +13,8 @@
 #include <linux/config.h>
 #include <linux/param.h>
 
+#include <asm/compiler.h>
+
 extern unsigned long loops_per_jiffy;
 
 static inline void __delay(unsigned long loops)
@@ -69,11 +71,13 @@ static inline void __udelay(unsigned long usecs, unsigned long lpj)
 	if (sizeof(long) == 4)
 		__asm__("multu\t%2, %3"
 		: "=h" (usecs), "=l" (lo)
-		: "r" (usecs),"r" (lpj));
+		: "r" (usecs), "r" (lpj)
+		: GCC_REG_ACCUM);
 	else if (sizeof(long) == 8)
 		__asm__("dmultu\t%2, %3"
 		: "=h" (usecs), "=l" (lo)
-		: "r" (usecs),"r" (lpj));
+		: "r" (usecs), "r" (lpj)
+		: GCC_REG_ACCUM);
 
 	__delay(usecs);
 }

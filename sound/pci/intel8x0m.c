@@ -1074,6 +1074,7 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
 	pci_release_regions(chip->pci);
+	pci_disable_device(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -1091,6 +1092,7 @@ static int intel8x0m_suspend(snd_card_t *card, unsigned int state)
 		snd_pcm_suspend_all(chip->pcm[i]);
 	if (chip->ac97)
 		snd_ac97_suspend(chip->ac97);
+	pci_disable_device(chip->pci);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
@@ -1172,8 +1174,10 @@ static int __devinit snd_intel8x0m_create(snd_card_t * card,
 		return err;
 
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (chip == NULL)
+	if (chip == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	spin_lock_init(&chip->reg_lock);
 	spin_lock_init(&chip->ac97_lock);
 	chip->device_type = device_type;
@@ -1183,6 +1187,7 @@ static int __devinit snd_intel8x0m_create(snd_card_t * card,
 
 	if ((err = pci_request_regions(pci, card->shortname)) < 0) {
 		kfree(chip);
+		pci_disable_device(pci);
 		return err;
 	}
 

@@ -204,7 +204,7 @@ int ibmvscsi_init_crq_queue(struct crq_queue *queue,
 	}
 
 	queue->cur = 0;
-	queue->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&queue->lock);
 
 	tasklet_init(&hostdata->srp_task, (void *)ibmvscsi_task,
 		     (unsigned long)hostdata);

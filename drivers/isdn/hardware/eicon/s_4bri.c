@@ -45,7 +45,7 @@
 		Recovery XLOG from QBRI Card
 	 -------------------------------------------------------------------------- */
 static void qBri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
-	byte  *base ;
+	byte  __iomem *base ;
 	word *Xlog ;
 	dword   regs[4], TrapID, offset, size ;
 	Xdesc   xlogDesc ;
@@ -66,10 +66,10 @@ static void qBri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
 		IoAdapter->trapped = 1 ;
 	}
 
-	regs[0] = READ_DWORD((&base + offset) + 0x70);
-	regs[1] = READ_DWORD((&base + offset) + 0x74);
-	regs[2] = READ_DWORD((&base + offset) + 0x78);
-	regs[3] = READ_DWORD((&base + offset) + 0x7c);
+	regs[0] = READ_DWORD((base + offset) + 0x70);
+	regs[1] = READ_DWORD((base + offset) + 0x74);
+	regs[2] = READ_DWORD((base + offset) + 0x78);
+	regs[3] = READ_DWORD((base + offset) + 0x7c);
 	regs[0] &= IoAdapter->MemorySize - 1 ;
 
 	if ( (regs[0] >= offset)
@@ -83,7 +83,7 @@ static void qBri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
 		size = offset + (IoAdapter->MemorySize >> factor) - regs[0] ;
 		if ( size > MAX_XLOG_SIZE )
 			size = MAX_XLOG_SIZE ;
-		memcpy (Xlog, &base[regs[0]], size) ;
+		memcpy_fromio (Xlog, &base[regs[0]], size) ;
 		xlogDesc.buf = Xlog ;
 		xlogDesc.cnt = READ_WORD(&base[regs[1] & (IoAdapter->MemorySize - 1)]) ;
 		xlogDesc.out = READ_WORD(&base[regs[2] & (IoAdapter->MemorySize - 1)]) ;
@@ -98,11 +98,11 @@ static void qBri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
 		Reset QBRI Hardware
 	 -------------------------------------------------------------------------- */
 static void reset_qBri_hardware (PISDN_ADAPTER IoAdapter) {
-	word volatile *qBriReset ;
-	byte  volatile *qBriCntrl ;
-	byte  volatile *p ;
+	word volatile __iomem *qBriReset ;
+	byte  volatile __iomem *qBriCntrl ;
+	byte  volatile __iomem *p ;
 
-	qBriReset = (word volatile *)DIVA_OS_MEM_ATTACH_PROM(IoAdapter);
+	qBriReset = (word volatile __iomem *)DIVA_OS_MEM_ATTACH_PROM(IoAdapter);
 	WRITE_WORD(qBriReset, READ_WORD(qBriReset) | PLX9054_SOFT_RESET) ;
 	diva_os_wait (1) ;
 	WRITE_WORD(qBriReset, READ_WORD(qBriReset) & ~PLX9054_SOFT_RESET) ;
@@ -126,10 +126,10 @@ static void reset_qBri_hardware (PISDN_ADAPTER IoAdapter) {
 		Start Card CPU
 	 -------------------------------------------------------------------------- */
 void start_qBri_hardware (PISDN_ADAPTER IoAdapter) {
-	byte volatile *qBriReset ;
-	byte volatile *p ;
+	byte volatile __iomem *qBriReset ;
+	byte volatile __iomem *p ;
 
-	p = (byte volatile *)DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
+	p = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
 	qBriReset = &p[(DIVA_4BRI_REVISION(IoAdapter)) ? (MQ2_BREG_RISC) : (MQ_BREG_RISC)];
 	WRITE_DWORD(qBriReset, MQ_RISC_COLD_RESET_MASK) ;
 	diva_os_wait (2) ;
@@ -144,10 +144,10 @@ void start_qBri_hardware (PISDN_ADAPTER IoAdapter) {
 		Stop Card CPU
 	 -------------------------------------------------------------------------- */
 static void stop_qBri_hardware (PISDN_ADAPTER IoAdapter) {
-	byte volatile *p ;
-	dword volatile *qBriReset ;
-	dword volatile *qBriIrq ;
-	dword volatile *qBriIsacDspReset ;
+	byte volatile __iomem *p ;
+	dword volatile __iomem *qBriReset ;
+	dword volatile __iomem *qBriIrq ;
+	dword volatile __iomem *qBriIsacDspReset ;
 	int rev2 = DIVA_4BRI_REVISION(IoAdapter);
 	int reset_offset = rev2 ? (MQ2_BREG_RISC)      : (MQ_BREG_RISC);
 	int irq_offset   = rev2 ? (MQ2_BREG_IRQ_TEST)  : (MQ_BREG_IRQ_TEST);
@@ -155,9 +155,9 @@ static void stop_qBri_hardware (PISDN_ADAPTER IoAdapter) {
 
 	if ( IoAdapter->ControllerNumber > 0 )
 		return ;
-	p = (byte volatile *)DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
-	qBriReset = (dword volatile *)&p[reset_offset];
-	qBriIsacDspReset = (dword volatile *)&p[hw_offset];
+	p = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
+	qBriReset = (dword volatile __iomem *)&p[reset_offset];
+	qBriIsacDspReset = (dword volatile __iomem *)&p[hw_offset];
 /*
  *	clear interrupt line (reset Local Interrupt Test Register)
  */
@@ -165,12 +165,12 @@ static void stop_qBri_hardware (PISDN_ADAPTER IoAdapter) {
  	WRITE_DWORD(qBriIsacDspReset, 0) ;
 	DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
 	
-	p = (byte volatile *)DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
-	p[PLX9054_INTCSR] = 0x00 ;	/* disable PCI interrupts */
+	p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
+	WRITE_BYTE(&p[PLX9054_INTCSR], 0x00);	/* disable PCI interrupts */
 	DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
 	
-	p = (byte volatile *)DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
-	qBriIrq   = (dword volatile *)&p[irq_offset];
+	p = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
+	qBriIrq   = (dword volatile __iomem *)&p[irq_offset];
 	WRITE_DWORD(qBriIrq, MQ_IRQ_REQ_OFF) ;
 	DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
 
@@ -276,7 +276,7 @@ int qBri_FPGA_download (PISDN_ADAPTER IoAdapter) {
 	int            bit ;
 	byte           *File ;
 	dword          code, FileLength ;
-	word volatile *addr = (word volatile *)DIVA_OS_MEM_ATTACH_PROM(IoAdapter);
+	word volatile __iomem *addr = (word volatile __iomem *)DIVA_OS_MEM_ATTACH_PROM(IoAdapter);
 	word           val, baseval = FPGA_CS | FPGA_PROG ;
 
 
@@ -864,17 +864,17 @@ static int load_qBri_hardware (PISDN_ADAPTER IoAdapter) {
 		Card ISR
 	 -------------------------------------------------------------------------- */
 static int qBri_ISR (struct _ISDN_ADAPTER* IoAdapter) {
-	dword volatile     *qBriIrq ;
+	dword volatile     __iomem *qBriIrq ;
 
 	PADAPTER_LIST_ENTRY QuadroList = IoAdapter->QuadroList ;
 
 	word              	i ;
 	int             	serviced = 0 ;
-	byte *p;
+	byte __iomem *p;
 
 	p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
 
-	if ( !(p[PLX9054_INTCSR] & 0x80) ) {
+	if ( !(READ_BYTE(&p[PLX9054_INTCSR]) & 0x80) ) {
 		DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
 		return (0) ;
 	}
@@ -884,7 +884,7 @@ static int qBri_ISR (struct _ISDN_ADAPTER* IoAdapter) {
  *	clear interrupt line (reset Local Interrupt Test Register)
  */
 	p = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
-	qBriIrq = (dword volatile *)(&p[DIVA_4BRI_REVISION(IoAdapter) ? (MQ2_BREG_IRQ_TEST)  : (MQ_BREG_IRQ_TEST)]);
+	qBriIrq = (dword volatile __iomem *)(&p[DIVA_4BRI_REVISION(IoAdapter) ? (MQ2_BREG_IRQ_TEST)  : (MQ_BREG_IRQ_TEST)]);
 	WRITE_DWORD(qBriIrq, MQ_IRQ_REQ_OFF) ;
 	DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
 
@@ -908,8 +908,8 @@ static int qBri_ISR (struct _ISDN_ADAPTER* IoAdapter) {
 		Does disable the interrupt on the card
 	 -------------------------------------------------------------------------- */
 static void disable_qBri_interrupt (PISDN_ADAPTER IoAdapter) {
-	dword volatile *qBriIrq ;
-	byte *p;
+	dword volatile __iomem *qBriIrq ;
+	byte __iomem *p;
 
 	if ( IoAdapter->ControllerNumber > 0 )
 		return ;
@@ -917,11 +917,11 @@ static void disable_qBri_interrupt (PISDN_ADAPTER IoAdapter) {
  *	clear interrupt line (reset Local Interrupt Test Register)
  */
 	p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
-	p[PLX9054_INTCSR] = 0x00 ;	/* disable PCI interrupts */
+	WRITE_BYTE(&p[PLX9054_INTCSR], 0x00);	/* disable PCI interrupts */
 	DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
 
 	p = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
-	qBriIrq = (dword volatile *)(&p[DIVA_4BRI_REVISION(IoAdapter) ? (MQ2_BREG_IRQ_TEST)  : (MQ_BREG_IRQ_TEST)]);
+	qBriIrq = (dword volatile __iomem *)(&p[DIVA_4BRI_REVISION(IoAdapter) ? (MQ2_BREG_IRQ_TEST)  : (MQ_BREG_IRQ_TEST)]);
 	WRITE_DWORD(qBriIrq, MQ_IRQ_REQ_OFF) ;
 	DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
 }

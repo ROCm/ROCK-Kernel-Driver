@@ -192,6 +192,8 @@ static struct pci_device_id rivafb_pci_tbl[] = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_QUADRO4_700XGL,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE_FX_GO_5200,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ 0, } /* terminate list */
 };
 MODULE_DEVICE_TABLE(pci, rivafb_pci_tbl);
@@ -1110,7 +1112,8 @@ static int rivafb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 	}
 
 	if (!strictmode) {
-		if (!fb_validate_mode(var, info))
+		if (!info->monspecs.vfmax || !info->monspecs.hfmax ||
+		    !info->monspecs.dclkmax || !fb_validate_mode(var, info))
 			mode_valid = 1;
 	}
 
@@ -1894,31 +1897,37 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 {
 	struct riva_par *default_par;
 	struct fb_info *info;
+	int ret;
 
 	NVTRACE_ENTER();
 	assert(pd != NULL);
 
 	info = framebuffer_alloc(sizeof(struct riva_par), &pd->dev);
-
-	if (!info)
-		goto err_out;
-
+	if (!info) {
+		printk (KERN_ERR PFX "could not allocate memory\n");
+		ret = -ENOMEM;
+		goto err_ret;
+	}
 	default_par = (struct riva_par *) info->par;
 	default_par->pdev = pd;
 
 	info->pixmap.addr = kmalloc(8 * 1024, GFP_KERNEL);
-	if (info->pixmap.addr == NULL)
-		goto err_out_kfree;
+	if (info->pixmap.addr == NULL) {
+	    	ret = -ENOMEM;
+		goto err_framebuffer_release;
+	}
 	memset(info->pixmap.addr, 0, 8 * 1024);
 
-	if (pci_enable_device(pd)) {
+	ret = pci_enable_device(pd);
+	if (ret < 0) {
 		printk(KERN_ERR PFX "cannot enable PCI device\n");
-		goto err_out_enable;
+		goto err_free_pixmap;
 	}
 
-	if (pci_request_regions(pd, "rivafb")) {
+	ret = pci_request_regions(pd, "rivafb");
+	if (ret < 0) {
 		printk(KERN_ERR PFX "cannot request PCI regions\n");
-		goto err_out_request;
+		goto err_disable_device;
 	}
 
 	default_par->riva.Architecture = riva_get_arch(pd);
@@ -1932,7 +1941,8 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 
 	if(default_par->riva.Architecture == 0) {
 		printk(KERN_ERR PFX "unknown NV_ARCH\n");
-		goto err_out_free_base0;
+		ret=-ENODEV;
+		goto err_release_region;
 	}
 	if(default_par->riva.Architecture == NV_ARCH_10 ||
 	   default_par->riva.Architecture == NV_ARCH_20 ||
@@ -1966,10 +1976,9 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 					 rivafb_fix.mmio_len);
 	if (!default_par->ctrl_base) {
 		printk(KERN_ERR PFX "cannot ioremap MMIO base\n");
-		goto err_out_free_base0;
+		ret = -EIO;
+		goto err_release_region;
 	}
-
-	info->par = default_par;
 
 	switch (default_par->riva.Architecture) {
 	case NV_ARCH_03:
@@ -1980,7 +1989,8 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 		default_par->riva.PRAMIN = ioremap(rivafb_fix.smem_start + 0x00C00000, 0x00008000);
 		if (!default_par->riva.PRAMIN) {
 			printk(KERN_ERR PFX "cannot ioremap PRAMIN region\n");
-			goto err_out_free_nv3_pramin;
+			ret = -EIO;
+			goto err_iounmap_ctrl_base;
 		}
 		break;
 	case NV_ARCH_04:
@@ -2006,7 +2016,8 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 				    rivafb_fix.smem_len);
 	if (!info->screen_base) {
 		printk(KERN_ERR PFX "cannot ioremap FB base\n");
-		goto err_out_free_base1;
+		ret = -EIO;
+		goto err_iounmap_pramin;
 	}
 
 #ifdef CONFIG_MTRR
@@ -2029,17 +2040,19 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 	riva_get_EDID(info, pd);
 	riva_get_edidinfo(info);
 
-	if (riva_set_fbinfo(info) < 0) {
+	ret=riva_set_fbinfo(info);
+	if (ret < 0) {
 		printk(KERN_ERR PFX "error setting initial video mode\n");
-		goto err_out_iounmap_fb;
+		goto err_iounmap_screen_base;
 	}
 
 	fb_destroy_modedb(info->monspecs.modedb);
 	info->monspecs.modedb = NULL;
-	if (register_framebuffer(info) < 0) {
+	ret = register_framebuffer(info);
+	if (ret < 0) {
 		printk(KERN_ERR PFX
 			"error registering riva framebuffer\n");
-		goto err_out_iounmap_fb;
+		goto err_iounmap_screen_base;
 	}
 
 	pci_set_drvdata(pd, info);
@@ -2058,26 +2071,26 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 	NVTRACE_LEAVE();
 	return 0;
 
-err_out_iounmap_fb:
+err_iounmap_screen_base:
 #ifdef CONFIG_FB_RIVA_I2C
 	riva_delete_i2c_busses((struct riva_par *) info->par);
 #endif
 	iounmap(info->screen_base);
-err_out_free_base1:
+err_iounmap_pramin:
 	if (default_par->riva.Architecture == NV_ARCH_03) 
 		iounmap(default_par->riva.PRAMIN);
-err_out_free_nv3_pramin:
+err_iounmap_ctrl_base:
 	iounmap(default_par->ctrl_base);
-err_out_free_base0:
+err_release_region:
 	pci_release_regions(pd);
-err_out_request:
+err_disable_device:
 	pci_disable_device(pd);
-err_out_enable:
+err_free_pixmap:
 	kfree(info->pixmap.addr);
-err_out_kfree:
+err_framebuffer_release:
 	framebuffer_release(info);
-err_out:
-	return -ENODEV;
+err_ret:
+	return ret;
 }
 
 static void __exit rivafb_remove(struct pci_dev *pd)
@@ -2197,9 +2210,9 @@ module_exit(rivafb_exit);
 
 module_param(noaccel, bool, 0);
 MODULE_PARM_DESC(noaccel, "bool: disable acceleration");
-module_param(flatpanel, int, -1);
+module_param(flatpanel, int, 0);
 MODULE_PARM_DESC(flatpanel, "Enables experimental flat panel support for some chipsets. (0 or 1=enabled) (default=0)");
-module_param(forceCRTC, int, -1);
+module_param(forceCRTC, int, 0);
 MODULE_PARM_DESC(forceCRTC, "Forces usage of a particular CRTC in case autodetection fails. (0 or 1) (default=autodetect)");
 #ifdef CONFIG_MTRR
 module_param(nomtrr, bool, 0);

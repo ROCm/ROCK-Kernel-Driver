@@ -800,11 +800,11 @@ static inline void socal_init(struct sbus_dev *sdev, int no)
 	s->rsp[1].pool = s->rsp[0].pool + SOCAL_CQ_RSP0_SIZE;
 	s->rsp[2].pool = s->rsp[1].pool + SOCAL_CQ_RSP1_SIZE;
 	
-	s->req[0].hw_cq = (socal_hw_cq *)(s->xram + SOCAL_CQ_REQ_OFFSET);
-	s->req[1].hw_cq = (socal_hw_cq *)(s->xram + SOCAL_CQ_REQ_OFFSET + sizeof(socal_hw_cq));
-	s->rsp[0].hw_cq = (socal_hw_cq *)(s->xram + SOCAL_CQ_RSP_OFFSET);
-	s->rsp[1].hw_cq = (socal_hw_cq *)(s->xram + SOCAL_CQ_RSP_OFFSET + sizeof(socal_hw_cq));
-	s->rsp[2].hw_cq = (socal_hw_cq *)(s->xram + SOCAL_CQ_RSP_OFFSET + 2 * sizeof(socal_hw_cq));
+	s->req[0].hw_cq = (socal_hw_cq __iomem *)(s->xram + SOCAL_CQ_REQ_OFFSET);
+	s->req[1].hw_cq = (socal_hw_cq __iomem *)(s->xram + SOCAL_CQ_REQ_OFFSET + sizeof(socal_hw_cq));
+	s->rsp[0].hw_cq = (socal_hw_cq __iomem *)(s->xram + SOCAL_CQ_RSP_OFFSET);
+	s->rsp[1].hw_cq = (socal_hw_cq __iomem *)(s->xram + SOCAL_CQ_RSP_OFFSET + sizeof(socal_hw_cq));
+	s->rsp[2].hw_cq = (socal_hw_cq __iomem *)(s->xram + SOCAL_CQ_RSP_OFFSET + 2 * sizeof(socal_hw_cq));
 	
 	cq[1].address = cq[0].address + (SOCAL_CQ_REQ0_SIZE * sizeof(socal_req));
 	cq[4].address = cq[1].address + (SOCAL_CQ_REQ1_SIZE * sizeof(socal_req));

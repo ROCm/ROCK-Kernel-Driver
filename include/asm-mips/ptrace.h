@@ -60,6 +60,8 @@ struct pt_regs {
 
 #ifdef __KERNEL__
 
+#include <linux/linkage.h>
+
 /*
  * Does the process account for user or for system time?
  */

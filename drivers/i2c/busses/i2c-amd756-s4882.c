@@ -35,6 +35,7 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/i2c.h>
 
@@ -156,7 +157,9 @@ static int __init amd756_s4882_init(void)
 	/* Unregister physical bus */
 	error = i2c_del_adapter(&amd756_smbus);
 	if (error) {
-		if (error != -EINVAL)
+		if (error == -EINVAL)
+			error = -ENODEV;
+		else
 			dev_err(&amd756_smbus.dev, "Physical bus removal "
 				"failed\n");
 		goto ERROR0;
@@ -200,7 +203,7 @@ static int __init amd756_s4882_init(void)
 					      I2C_SMBUS_WRITE, 0x03,
 					      I2C_SMBUS_BYTE_DATA, &ioconfig);
 	if (error) {
-		dev_dbg(&amd756_smbus.dev, "PCA9556 configuration failed\n");
+		dev_err(&amd756_smbus.dev, "PCA9556 configuration failed\n");
 		error = -EIO;
 		goto ERROR3;
 	}

@@ -209,7 +209,7 @@ spurious_8259A_irq:
 		 * lets ACK and report it. [once per IRQ]
 		 */
 		if (!(spurious_irq_mask & irqmask)) {
-			printk("spurious 8259A interrupt: IRQ%d.\n", irq);
+			printk(KERN_DEBUG "spurious 8259A interrupt: IRQ%d.\n", irq);
 			spurious_irq_mask |= irqmask;
 		}
 		atomic_inc(&irq_err_count);
@@ -295,7 +295,7 @@ void __init init_8259A(int auto_eoi)
  * IRQ2 is cascade interrupt to second interrupt controller
  */
 static struct irqaction irq2 = {
-	no_action, 0, 0, "cascade", NULL, NULL
+	no_action, 0, CPU_MASK_NONE, "cascade", NULL, NULL
 };
 
 static struct resource pic1_io_resource = {

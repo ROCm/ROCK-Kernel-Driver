@@ -48,6 +48,10 @@
     !!! I shall not define symbols starting with CONFIG_ !!!
 #endif
 
+void board_reset (void)
+{
+}
+
 void __init board_setup(void)
 {
 	u32 pin_func, static_cfg0;

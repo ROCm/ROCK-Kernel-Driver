@@ -26,7 +26,6 @@
 #define INITRD_SIZE (*(unsigned long *) (PARAM+0x21c))
 
 extern int _ftext, _end;		/* begin and end of kernel image */
-extern void *__rd_start, *__rd_end;	/* begin and end of ramdisk image */
 extern void kernel_entry(int, char **, unsigned long, int *);
 
 void * memcpy(void * dest, const void *src, unsigned int count)
@@ -80,12 +79,6 @@ void dec_entry(int argc, char **argv,
 		rex_clear_cache = (void (*)(void)) * (prom_vec + REX_PROM_CLEARCACHE);
 		rex_clear_cache();
 	}
-
-#ifdef CONFIG_BLK_DEV_INITRD
-	LOADER_TYPE = 1;
-	INITRD_START = (long)&__rd_start;
-	INITRD_SIZE = (long)&__rd_end - (long)&__rd_start;
-#endif
 
 	kernel_entry(argc, argv, magic, prom_vec);
 }

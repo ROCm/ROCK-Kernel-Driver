@@ -293,7 +293,7 @@ struct bttv {
 	/* pci device config */
 	unsigned short id;
 	unsigned char revision;
-	unsigned char *bt848_mmio;   /* pointer to mmio */
+	unsigned char __iomem *bt848_mmio;   /* pointer to mmio */
 
 	/* card configuration info */
 	unsigned int cardid;   /* pci subsystem id (bt878 based ones) */
@@ -407,7 +407,7 @@ struct bttv {
 
 #endif
 
-#define btwrite(dat,adr)    writel((dat), (char *) (btv->bt848_mmio+(adr)))
+#define btwrite(dat,adr)    writel((dat), btv->bt848_mmio+(adr))
 #define btread(adr)         readl(btv->bt848_mmio+(adr))
 
 #define btand(dat,adr)      btwrite((dat) & btread(adr), adr)

@@ -90,6 +90,10 @@ struct cmsghdr {
 				  (struct cmsghdr *)(ctl) : \
 				  (struct cmsghdr *)NULL)
 #define CMSG_FIRSTHDR(msg)	__CMSG_FIRSTHDR((msg)->msg_control, (msg)->msg_controllen)
+#define CMSG_OK(mhdr, cmsg) ((cmsg)->cmsg_len >= sizeof(struct cmsghdr) && \
+			     (cmsg)->cmsg_len <= (unsigned long) \
+			     ((mhdr)->msg_controllen - \
+			      ((char *)(cmsg) - (char *)(mhdr)->msg_control)))
 
 /*
  *	This mess will go away with glibc

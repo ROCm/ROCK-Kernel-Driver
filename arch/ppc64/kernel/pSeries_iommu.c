@@ -321,19 +321,16 @@ static void iommu_table_setparms(struct pci_controller *phb,
 
 	node = (struct device_node *)phb->arch_data;
 
-	if (get_property(node, "linux,has-tce-table", NULL) == NULL) {
-		printk(KERN_ERR "PCI_DMA: iommu_table_setparms: %s has no tce table !\n",
-		      dn->full_name);
-		return;
-	}
 	basep = (unsigned long *)get_property(node, "linux,tce-base", NULL);
 	sizep = (unsigned int *)get_property(node, "linux,tce-size", NULL);
 	if (basep == NULL || sizep == NULL) {
-		printk(KERN_ERR "PCI_DMA: iommu_table_setparms: %s has missing tce"
-		       " entries !\n", dn->full_name);
+		printk(KERN_ERR "PCI_DMA: iommu_table_setparms: %s has "
+				"missing tce entries !\n", dn->full_name);
 		return;
 	}
-	memset((void *)(*basep), 0, *sizep);
+
+	tbl->it_base = (unsigned long)__va(*basep);
+	memset((void *)tbl->it_base, 0, *sizep);
 
 	tbl->it_busno = phb->bus->number;
 	
@@ -357,7 +354,6 @@ static void iommu_table_setparms(struct pci_controller *phb,
 	if (phb->dma_window_base_cur > (1 << 19))
 		panic("PCI_DMA: Unexpected number of IOAs under this PHB.\n"); 
 	
-	tbl->it_base = *basep;
 	tbl->it_index = 0;
 	tbl->it_entrysize = sizeof(union tce_entry);
 	tbl->it_blocksize = 16;

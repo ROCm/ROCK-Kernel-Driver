@@ -1370,7 +1370,7 @@ static int acpi_gpe_irq_setup(struct smi_info *info)
 	status = acpi_install_gpe_handler(NULL,
 					  info->irq,
 					  ACPI_GPE_LEVEL_TRIGGERED,
-					  ipmi_acpi_gpe,
+					  &ipmi_acpi_gpe,
 					  info);
 	if (status != AE_OK) {
 		printk(KERN_WARNING
@@ -1390,7 +1390,7 @@ static void acpi_gpe_irq_cleanup(struct smi_info *info)
 	if (!info->irq)
 		return;
 
-	acpi_remove_gpe_handler(NULL, info->irq, ipmi_acpi_gpe);
+	acpi_remove_gpe_handler(NULL, info->irq, &ipmi_acpi_gpe);
 }
 
 /*

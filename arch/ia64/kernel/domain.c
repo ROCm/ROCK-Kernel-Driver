@@ -2,7 +2,8 @@
  * arch/ia64/kernel/domain.c
  * Architecture specific sched-domains builder.
  *
- * Copyright (C) 2004  Linus Torvalds
+ * Copyright (C) 2004 Jesse Barnes
+ * Copyright (C) 2004 Silicon Graphics, Inc.
  */
 
 #include <linux/sched.h>

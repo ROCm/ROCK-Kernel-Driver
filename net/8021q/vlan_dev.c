@@ -527,7 +527,7 @@ int vlan_dev_change_mtu(struct net_device *dev, int new_mtu)
 
 	dev->mtu = new_mtu;
 
-	return new_mtu;
+	return 0;
 }
 
 int vlan_dev_set_ingress_priority(char *dev_name, __u32 skb_prio, short vlan_prio)

@@ -872,7 +872,7 @@ restart:
 		if (!buffer_uptodate(bh)) {
 			/* read error, skip block & hope for the best */
 			ext3_error(sb, __FUNCTION__, "reading directory #%lu "
-				   "offset %lu\n", dir->i_ino, block);
+				   "offset %lu", dir->i_ino, block);
 			brelse(bh);
 			goto next;
 		}

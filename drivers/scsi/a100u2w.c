@@ -1078,7 +1078,7 @@ static int __devinit inia100_probe_one(struct pci_dev *pdev,
 	pHCB->pdev = pdev;
 	pHCB->HCS_Base = port;
 	pHCB->HCS_BIOS = bios;
-	pHCB->BitAllocFlagLock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&pHCB->BitAllocFlagLock);
 
 	/* Get total memory needed for SCB */
 	sz = ORC_MAXQUEUE * sizeof(ORC_SCB);

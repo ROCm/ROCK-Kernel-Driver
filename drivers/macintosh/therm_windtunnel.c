@@ -353,12 +353,12 @@ do_detach( struct i2c_client *client )
 }
 
 static struct i2c_driver g4fan_driver = {  
-	.name		= "Apple G4 Thermostat/Fan",
+	.owner		= THIS_MODULE,
+	.name		= "therm_windtunnel",
 	.id		= I2C_DRIVERID_G4FAN,
 	.flags		= I2C_DF_NOTIFY,
-	.attach_adapter = &do_attach,
-	.detach_client	= &do_detach,
-	.command	= NULL,
+	.attach_adapter = do_attach,
+	.detach_client	= do_detach,
 };
 
 static int

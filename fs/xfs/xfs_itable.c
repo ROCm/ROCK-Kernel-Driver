@@ -102,7 +102,7 @@ xfs_bulkstat_one(
 		/* We're not being passed a pointer to a dinode.  This happens
 		 * if BULKSTAT_FG_IGET is selected.  Do the iget.
 		 */
-		error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &ip, bno);
+		error = xfs_iget(mp, NULL, ino, 0, XFS_ILOCK_SHARED, &ip, bno);
 		if (error) {
 			*stat = BULKSTAT_RV_NOTHING;
 			return error;

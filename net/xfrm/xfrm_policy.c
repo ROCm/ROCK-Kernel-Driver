@@ -353,6 +353,7 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 			newpos = p;
 		if (delpol)
 			break;
+		p = &pol->next;
 	}
 	if (newpos)
 		p = newpos;
@@ -547,6 +548,8 @@ void xfrm_policy_delete(struct xfrm_policy *pol, int dir)
 		xfrm_policy_kill(pol);
 	}
 }
+
+EXPORT_SYMBOL(xfrm_policy_delete);
 
 int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol)
 {

@@ -47,7 +47,8 @@ static int mlock_fixup(struct vm_area_struct * vma,
 	pages = (end - start) >> PAGE_SHIFT;
 	if (newflags & VM_LOCKED) {
 		pages = -pages;
-		ret = make_pages_present(start, end);
+		if (!(newflags & VM_IO))
+			ret = make_pages_present(start, end);
 	}
 
 	vma->vm_mm->locked_vm -= pages;
@@ -210,10 +211,10 @@ int user_shm_lock(size_t size, struct user_struct *user)
 	unsigned long lock_limit, locked;
 	int allowed = 0;
 
-	spin_lock(&shmlock_user_lock);
-	locked = size >> PAGE_SHIFT;
+	locked = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	lock_limit = current->signal->rlim[RLIMIT_MEMLOCK].rlim_cur;
 	lock_limit >>= PAGE_SHIFT;
+	spin_lock(&shmlock_user_lock);
 	if (locked + user->locked_shm > lock_limit && !capable(CAP_IPC_LOCK))
 		goto out;
 	get_uid(user);
@@ -227,7 +228,7 @@ out:
 void user_shm_unlock(size_t size, struct user_struct *user)
 {
 	spin_lock(&shmlock_user_lock);
-	user->locked_shm -= (size >> PAGE_SHIFT);
+	user->locked_shm -= (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	spin_unlock(&shmlock_user_lock);
 	free_uid(user);
 }

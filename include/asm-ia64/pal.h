@@ -1531,7 +1531,7 @@ static inline s64
 ia64_pal_tr_read (u64 reg_num, u64 tr_type, u64 *tr_buffer, pal_tr_valid_u_t *tr_valid)
 {
 	struct ia64_pal_retval iprv;
-	PAL_CALL_PHYS_STK(iprv, PAL_VM_TR_READ, reg_num, tr_type,(u64)__pa(tr_buffer));
+	PAL_CALL_PHYS_STK(iprv, PAL_VM_TR_READ, reg_num, tr_type,(u64)ia64_tpa(tr_buffer));
 	if (tr_valid)
 		tr_valid->piv_val = iprv.v0;
 	return iprv.status;

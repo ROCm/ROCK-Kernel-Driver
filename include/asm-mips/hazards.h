@@ -13,7 +13,7 @@
 #ifdef __ASSEMBLY__
 
 	.macro	_ssnop
-	sll	$0, $2, 1
+	sll	$0, $0, 1
 	.endm
 
 /*

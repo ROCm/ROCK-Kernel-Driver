@@ -1,17 +1,6 @@
 #
 # DECnet configuration
 #
-config DECNET_SIOCGIFCONF
-	bool "DECnet: SIOCGIFCONF support"
-	depends on DECNET
-	help
-	  This option should only be turned on if you are really sure that
-	  you know what you are doing. It can break other applications which
-	  use this system call and the proper way to get the information
-	  provided by this call is to use rtnetlink.
-
-	  If unsure, say N.
-
 config DECNET_ROUTER
 	bool "DECnet: router support (EXPERIMENTAL)"
 	depends on DECNET && EXPERIMENTAL

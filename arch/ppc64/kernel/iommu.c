@@ -59,13 +59,18 @@ static int __init setup_iommu(char *str)
 
 __setup("iommu=", setup_iommu);
 
-static unsigned long iommu_range_alloc(struct iommu_table *tbl, unsigned long npages,
-				       unsigned long *handle)
+static unsigned long iommu_range_alloc(struct iommu_table *tbl,
+                                       unsigned long npages,
+                                       unsigned long *handle,
+                                       unsigned int align_order)
 { 
 	unsigned long n, end, i, start;
 	unsigned long limit;
 	int largealloc = npages > 15;
 	int pass = 0;
+	unsigned long align_mask;
+
+	align_mask = 0xffffffffffffffffl >> (64 - align_order);
 
 	/* This allocator was derived from x86_64's bit string search */
 
@@ -97,6 +102,10 @@ static unsigned long iommu_range_alloc(struct iommu_table *tbl, unsigned long np
  again:
 
 	n = find_next_zero_bit(tbl->it_map, limit, start);
+
+	/* Align allocation */
+	n = (n + align_mask) & ~align_mask;
+
 	end = n + npages;
 
 	if (unlikely(end >= limit)) {
@@ -141,14 +150,15 @@ static unsigned long iommu_range_alloc(struct iommu_table *tbl, unsigned long np
 }
 
 static dma_addr_t iommu_alloc(struct iommu_table *tbl, void *page,
-		       unsigned int npages, enum dma_data_direction direction)
+		       unsigned int npages, enum dma_data_direction direction,
+		       unsigned int align_order)
 {
 	unsigned long entry, flags;
 	dma_addr_t ret = DMA_ERROR_CODE;
 	
 	spin_lock_irqsave(&(tbl->it_lock), flags);
 
-	entry = iommu_range_alloc(tbl, npages, NULL);
+	entry = iommu_range_alloc(tbl, npages, NULL, align_order);
 
 	if (unlikely(entry == DMA_ERROR_CODE)) {
 		spin_unlock_irqrestore(&(tbl->it_lock), flags);
@@ -264,7 +274,7 @@ int iommu_map_sg(struct device *dev, struct iommu_table *tbl,
 		vaddr = (unsigned long)page_address(s->page) + s->offset;
 		npages = PAGE_ALIGN(vaddr + slen) - (vaddr & PAGE_MASK);
 		npages >>= PAGE_SHIFT;
-		entry = iommu_range_alloc(tbl, npages, &handle);
+		entry = iommu_range_alloc(tbl, npages, &handle, 0);
 
 		DBG("  - vaddr: %lx, size: %lx\n", vaddr, slen);
 
@@ -478,7 +488,7 @@ dma_addr_t iommu_map_single(struct iommu_table *tbl, void *vaddr,
 	npages >>= PAGE_SHIFT;
 
 	if (tbl) {
-		dma_handle = iommu_alloc(tbl, vaddr, npages, direction);
+		dma_handle = iommu_alloc(tbl, vaddr, npages, direction, 0);
 		if (dma_handle == DMA_ERROR_CODE) {
 			if (printk_ratelimit())  {
 				printk(KERN_INFO "iommu_alloc failed, "
@@ -537,7 +547,7 @@ void *iommu_alloc_consistent(struct iommu_table *tbl, size_t size,
 	memset(ret, 0, size);
 
 	/* Set up tces to cover the allocated range */
-	mapping = iommu_alloc(tbl, ret, npages, DMA_BIDIRECTIONAL);
+	mapping = iommu_alloc(tbl, ret, npages, DMA_BIDIRECTIONAL, order);
 	if (mapping == DMA_ERROR_CODE) {
 		free_pages((unsigned long)ret, order);
 		ret = NULL;

@@ -1,6 +1,7 @@
 #ifndef _LINUX_HDREG_H
 #define _LINUX_HDREG_H
 
+#ifdef __KERNEL__
 #include <linux/ata.h>
 
 /*
@@ -57,7 +58,7 @@
 #define IO			0x02
 #define REL			0x04
 #define TAG_MASK		0xf8
-
+#endif /* __KERNEL__ */
 
 /*
  * Command Header sizes for IOCTL commands

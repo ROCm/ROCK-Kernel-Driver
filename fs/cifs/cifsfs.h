@@ -63,10 +63,10 @@ extern struct file_operations cifs_file_ops;
 extern int cifs_open(struct inode *inode, struct file *file);
 extern int cifs_close(struct inode *inode, struct file *file);
 extern int cifs_closedir(struct inode *inode, struct file *file);
-extern ssize_t cifs_read(struct file *file, char *read_data,
+extern ssize_t cifs_user_read(struct file *file, char __user *read_data,
 			 size_t read_size, loff_t * poffset);
-extern ssize_t cifs_write(struct file *file, const char *write_data,
-			  size_t write_size, loff_t * poffset);
+extern ssize_t cifs_user_write(struct file *file, const char __user *write_data,
+			 size_t write_size, loff_t * poffset);
 extern int cifs_lock(struct file *, int, struct file_lock *);
 extern int cifs_fsync(struct file *, struct dentry *, int);
 extern int cifs_flush(struct file *);
@@ -90,5 +90,5 @@ extern int 	cifs_setxattr(struct dentry *, const char *, const void *,
 			 size_t, int);
 extern ssize_t	cifs_getxattr(struct dentry *, const char *, void *, size_t);
 extern ssize_t	cifs_listxattr(struct dentry *, char *, size_t);
-#define CIFS_VERSION   "1.20"
+#define CIFS_VERSION   "1.28"
 #endif				/* _CIFSFS_H */

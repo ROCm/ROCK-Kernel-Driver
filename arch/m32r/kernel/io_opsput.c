@@ -9,7 +9,6 @@
  *  This file is subject to the terms and conditions of the GNU General
  *  Public License.  See the file "COPYING" in the main directory of this
  *  archive for more details.
- *
  */
 
 #include <linux/config.h>
@@ -35,7 +34,7 @@ extern void pcc_iowrite_word(int, unsigned long, void *, size_t, size_t, int);
 #define PORT2ADDR(port)  _port2addr(port)
 #define PORT2ADDR_USB(port) _port2addr_usb(port)
 
-static __inline__ void *_port2addr(unsigned long port)
+static inline void *_port2addr(unsigned long port)
 {
 	return (void *)(port + NONCACHE_OFFSET);
 }
@@ -47,16 +46,16 @@ static __inline__ void *_port2addr(unsigned long port)
  */
 #define LAN_IOSTART	0x300
 #define LAN_IOEND	0x320
-static __inline__ void *_port2addr_ne(unsigned long port)
+static inline void *_port2addr_ne(unsigned long port)
 {
 	return (void *)(port + NONCACHE_OFFSET + 0x10000000);
 }
-static __inline__ void *_port2addr_usb(unsigned long port)
+static inline void *_port2addr_usb(unsigned long port)
 {
-  return (void *)((port & 0x0f) + NONCACHE_OFFSET + 0x10303000);
+	return (void *)((port & 0x0f) + NONCACHE_OFFSET + 0x10303000);
 }
 
-static __inline__ void delay(void)
+static inline void delay(void)
 {
 	__asm__ __volatile__ ("push r0; \n\t pop r0;" : : :"memory");
 }
@@ -67,29 +66,30 @@ static __inline__ void delay(void)
 
 #define PORT2ADDR_NE(port)  _port2addr_ne(port)
 
-static __inline__ unsigned char _ne_inb(void *portp)
+static inline unsigned char _ne_inb(void *portp)
 {
 	return *(volatile unsigned char *)portp;
 }
 
-static __inline__ unsigned short _ne_inw(void *portp)
+static inline unsigned short _ne_inw(void *portp)
 {
 	return (unsigned short)le16_to_cpu(*(volatile unsigned short *)portp);
 }
 
-static __inline__ void _ne_insb(void *portp, void * addr, unsigned long count)
+static inline void _ne_insb(void *portp, void *addr, unsigned long count)
 {
 	unsigned char *buf = (unsigned char *)addr;
 
-	while (count--) *buf++ = _ne_inb(portp);
+	while (count--)
+		*buf++ = _ne_inb(portp);
 }
 
-static __inline__ void _ne_outb(unsigned char b, void *portp)
+static inline void _ne_outb(unsigned char b, void *portp)
 {
 	*(volatile unsigned char *)portp = b;
 }
 
-static __inline__ void _ne_outw(unsigned short w, void *portp)
+static inline void _ne_outw(unsigned short w, void *portp)
 {
 	*(volatile unsigned short *)portp = cpu_to_le16(w);
 }
@@ -101,9 +101,9 @@ unsigned char _inb(unsigned long port)
 
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
 	else if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
-	   unsigned char b;
-	   pcc_ioread_byte(0, port, &b, sizeof(b), 1, 0);
-	   return b;
+		unsigned char b;
+		pcc_ioread_byte(0, port, &b, sizeof(b), 1, 0);
+		return b;
 	} else
 #endif
 
@@ -116,14 +116,14 @@ unsigned short _inw(unsigned long port)
 		return _ne_inw(PORT2ADDR_NE(port));
 #if defined(CONFIG_USB)
 	else if(port >= 0x340 && port < 0x3a0)
-	  return *(volatile unsigned short *)PORT2ADDR_USB(port);
+		return *(volatile unsigned short *)PORT2ADDR_USB(port);
 #endif
 
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
-	  else if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
-	   unsigned short w;
-	   pcc_ioread_word(0, port, &w, sizeof(w), 1, 0);
-	   return w;
+	else if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
+		unsigned short w;
+		pcc_ioread_word(0, port, &w, sizeof(w), 1, 0);
+		return w;
 	} else
 #endif
 	return *(volatile unsigned short *)PORT2ADDR(port);
@@ -133,9 +133,9 @@ unsigned long _inl(unsigned long port)
 {
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
 	if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
-	   unsigned long l;
-	   pcc_ioread_word(0, port, &l, sizeof(l), 1, 0);
-	   return l;
+		unsigned long l;
+		pcc_ioread_word(0, port, &l, sizeof(l), 1, 0);
+		return l;
 	} else
 #endif
 	return *(volatile unsigned long *)PORT2ADDR(port);
@@ -150,9 +150,9 @@ unsigned char _inb_p(unsigned long port)
 	else
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
 	if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
-	   unsigned char b;
-	   pcc_ioread_byte(0, port, &b, sizeof(b), 1, 0);
-	   return b;
+		unsigned char b;
+		pcc_ioread_byte(0, port, &b, sizeof(b), 1, 0);
+		return b;
 	} else
 #endif
 		v = *(volatile unsigned char *)PORT2ADDR(port);
@@ -169,16 +169,16 @@ unsigned short _inw_p(unsigned long port)
 		v = _ne_inw(PORT2ADDR_NE(port));
 	else
 #if defined(CONFIG_USB)
-	  if(port >= 0x340 && port < 0x3a0)
-	    return *(volatile unsigned short *)PORT2ADDR_USB(port);
+	if(port >= 0x340 && port < 0x3a0)
+		return *(volatile unsigned short *)PORT2ADDR_USB(port);
 	else
 #endif
 
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
 	if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
-	   unsigned short w;
-	   pcc_ioread_word(0, port, &w, sizeof(w), 1, 0);
-	   return w;
+		unsigned short w;
+		pcc_ioread_word(0, port, &w, sizeof(w), 1, 0);
+		return w;
 	} else
 #endif
 		v = *(volatile unsigned short *)PORT2ADDR(port);
@@ -203,7 +203,7 @@ void _outb(unsigned char b, unsigned long port)
 	else
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
 	if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
-	   pcc_iowrite_byte(0, port, &b, sizeof(b), 1, 0);
+		pcc_iowrite_byte(0, port, &b, sizeof(b), 1, 0);
 	} else
 #endif
 		*(volatile unsigned char *)PORT2ADDR(port) = b;
@@ -216,13 +216,13 @@ void _outw(unsigned short w, unsigned long port)
 	else
 #if defined(CONFIG_USB)
 	if(port >= 0x340 && port < 0x3a0)
-	  *(volatile unsigned short *)PORT2ADDR_USB(port) = w;
+		*(volatile unsigned short *)PORT2ADDR_USB(port) = w;
 	else
 #endif
 
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
 	if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
-	   pcc_iowrite_word(0, port, &w, sizeof(w), 1, 0);
+		pcc_iowrite_word(0, port, &w, sizeof(w), 1, 0);
 	} else
 #endif
 		*(volatile unsigned short *)PORT2ADDR(port) = w;
@@ -232,7 +232,7 @@ void _outl(unsigned long l, unsigned long port)
 {
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
 	if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
-	   pcc_iowrite_word(0, port, &l, sizeof(l), 1, 0);
+		pcc_iowrite_word(0, port, &l, sizeof(l), 1, 0);
 	} else
 #endif
 	*(volatile unsigned long *)PORT2ADDR(port) = l;
@@ -245,7 +245,7 @@ void _outb_p(unsigned char b, unsigned long port)
 	else
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
 	if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
-	   pcc_iowrite_byte(0, port, &b, sizeof(b), 1, 0);
+		pcc_iowrite_byte(0, port, &b, sizeof(b), 1, 0);
 	} else
 #endif
 		*(volatile unsigned char *)PORT2ADDR(port) = b;
@@ -259,14 +259,14 @@ void _outw_p(unsigned short w, unsigned long port)
 		_ne_outw(w, PORT2ADDR_NE(port));
 	else
 #if defined(CONFIG_USB)
-	  if(port >= 0x340 && port < 0x3a0)
-	    *(volatile unsigned short *)PORT2ADDR_USB(port) = w;
+	if(port >= 0x340 && port < 0x3a0)
+		*(volatile unsigned short *)PORT2ADDR_USB(port) = w;
 	else
 #endif
 
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
 	if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
-	   pcc_iowrite_word(0, port, &w, sizeof(w), 1, 0);
+		pcc_iowrite_word(0, port, &w, sizeof(w), 1, 0);
 	} else
 #endif
 		*(volatile unsigned short *)PORT2ADDR(port) = w;
@@ -280,23 +280,25 @@ void _outl_p(unsigned long l, unsigned long port)
 	delay();
 }
 
-void _insb(unsigned int port, void * addr, unsigned long count)
+void _insb(unsigned int port, void *addr, unsigned long count)
 {
 	if (port >= LAN_IOSTART && port < LAN_IOEND)
 		_ne_insb(PORT2ADDR_NE(port), addr, count);
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
-	  else if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
-	   pcc_ioread_byte(0, port, (void *)addr, sizeof(unsigned char), count, 1);
+	else if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
+		pcc_ioread_byte(0, port, (void *)addr, sizeof(unsigned char),
+				count, 1);
 	}
 #endif
 	else {
 		unsigned char *buf = addr;
 		unsigned char *portp = PORT2ADDR(port);
-		while(count--) *buf++ = *(volatile unsigned char *)portp;
+		while (count--)
+			*buf++ = *(volatile unsigned char *)portp;
 	}
 }
 
-void _insw(unsigned int port, void * addr, unsigned long count)
+void _insw(unsigned int port, void *addr, unsigned long count)
 {
 	unsigned short *buf = addr;
 	unsigned short *portp;
@@ -307,45 +309,52 @@ void _insw(unsigned int port, void * addr, unsigned long count)
 		 * from the DATA_REG. Do not swap the data.
 		 */
 		portp = PORT2ADDR_NE(port);
-		while (count--) *buf++ = *(volatile unsigned short *)portp;
+		while (count--)
+			*buf++ = *(volatile unsigned short *)portp;
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
 	} else if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
-	   pcc_ioread_word(9, port, (void *)addr, sizeof(unsigned short), count, 1);
+		pcc_ioread_word(9, port, (void *)addr, sizeof(unsigned short),
+				count, 1);
 #endif
 	} else {
 		portp = PORT2ADDR(port);
-		while (count--) *buf++ = *(volatile unsigned short *)portp;
+		while (count--)
+			*buf++ = *(volatile unsigned short *)portp;
 	}
 }
 
-void _insl(unsigned int port, void * addr, unsigned long count)
+void _insl(unsigned int port, void *addr, unsigned long count)
 {
 	unsigned long *buf = addr;
 	unsigned long *portp;
 
 	portp = PORT2ADDR(port);
-	while (count--) *buf++ = *(volatile unsigned long *)portp;
+	while (count--)
+		*buf++ = *(volatile unsigned long *)portp;
 }
 
-void _outsb(unsigned int port, const void * addr, unsigned long count)
+void _outsb(unsigned int port, const void *addr, unsigned long count)
 {
 	const unsigned char *buf = addr;
 	unsigned char *portp;
 
 	if (port >= LAN_IOSTART && port < LAN_IOEND) {
 		portp = PORT2ADDR_NE(port);
-		while (count--) _ne_outb(*buf++, portp);
+		while (count--)
+			_ne_outb(*buf++, portp);
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
 	} else if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
-	   pcc_iowrite_byte(0, port, (void *)addr, sizeof(unsigned char), count, 1);
+		pcc_iowrite_byte(0, port, (void *)addr, sizeof(unsigned char),
+				 count, 1);
 #endif
 	} else {
 		portp = PORT2ADDR(port);
-		while(count--) *(volatile unsigned char *)portp = *buf++;
+		while (count--)
+			*(volatile unsigned char *)portp = *buf++;
 	}
 }
 
-void _outsw(unsigned int port, const void * addr, unsigned long count)
+void _outsw(unsigned int port, const void *addr, unsigned long count)
 {
 	const unsigned short *buf = addr;
 	unsigned short *portp;
@@ -356,22 +365,26 @@ void _outsw(unsigned int port, const void * addr, unsigned long count)
 		 * into the DATA_REG. Do not swap the data.
 		 */
 		portp = PORT2ADDR_NE(port);
-		while(count--) *(volatile unsigned short *)portp = *buf++;
+		while (count--)
+			*(volatile unsigned short *)portp = *buf++;
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
 	} else if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
-	   pcc_iowrite_word(9, port, (void *)addr, sizeof(unsigned short), count, 1);
+		pcc_iowrite_word(9, port, (void *)addr, sizeof(unsigned short),
+				 count, 1);
 #endif
 	} else {
 		portp = PORT2ADDR(port);
-		while(count--) *(volatile unsigned short *)portp = *buf++;
+		while (count--)
+			*(volatile unsigned short *)portp = *buf++;
 	}
 }
 
-void _outsl(unsigned int port, const void * addr, unsigned long count)
+void _outsl(unsigned int port, const void *addr, unsigned long count)
 {
 	const unsigned long *buf = addr;
 	unsigned char *portp;
 
 	portp = PORT2ADDR(port);
-	while(count--) *(volatile unsigned long *)portp = *buf++;
+	while (count--)
+		*(volatile unsigned long *)portp = *buf++;
 }

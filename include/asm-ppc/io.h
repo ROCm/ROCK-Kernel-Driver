@@ -452,13 +452,6 @@ out:
 	return retval;
 }
 
-/* Make some pcmcia drivers happy */
-static inline int isa_check_signature(unsigned long io_addr,
-	const unsigned char *signature, int length)
-{
-	return 0;
-}
-
 /*
  * Here comes the ppc implementation of the IOMAP 
  * interfaces.

@@ -768,6 +768,8 @@ inline int resize_screen(int currcons, int width, int height)
  * [this is to be used together with some user program
  * like resize that changes the hardware videomode]
  */
+#define VC_RESIZE_MAXCOL (32767)
+#define VC_RESIZE_MAXROW (32767)
 int vc_resize(int currcons, unsigned int cols, unsigned int lines)
 {
 	unsigned long old_origin, new_origin, new_scr_end, rlth, rrem, err = 0;
@@ -779,6 +781,9 @@ int vc_resize(int currcons, unsigned int cols, unsigned int lines)
 
 	if (!vc_cons_allocated(currcons))
 		return -ENXIO;
+
+	if (cols > VC_RESIZE_MAXCOL || lines > VC_RESIZE_MAXROW)
+		return -EINVAL;
 
 	new_cols = (cols ? cols : video_num_columns);
 	new_rows = (lines ? lines : video_num_lines);

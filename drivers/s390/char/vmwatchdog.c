@@ -168,7 +168,7 @@ static int vmwdt_open(struct inode *i, struct file *f)
 	ret = vmwdt_keepalive();
 	if (ret)
 		clear_bit(0, &vmwdt_is_open);
-	return ret;
+	return ret ? ret : nonseekable_open(i, f);
 }
 
 static int vmwdt_close(struct inode *i, struct file *f)
@@ -238,10 +238,6 @@ static int vmwdt_ioctl(struct inode *i, struct file *f,
 static ssize_t vmwdt_write(struct file *f, const char __user *buf,
 				size_t count, loff_t *ppos)
 {
-	/* We can't seek */
-	if(ppos != &f->f_pos)
-		return -ESPIPE;
-
 	if(count) {
 		if (!vmwdt_nowayout) {
 			size_t i;

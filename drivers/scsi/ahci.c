@@ -184,6 +184,7 @@ static inline int ahci_host_intr(struct ata_port *ap, struct ata_queued_cmd *qc)
 static Scsi_Host_Template ahci_sht = {
 	.module			= THIS_MODULE,
 	.name			= DRV_NAME,
+	.ioctl			= ata_scsi_ioctl,
 	.queuecommand		= ata_scsi_queuecmd,
 	.eh_strategy_handler	= ata_scsi_error,
 	.can_queue		= ATA_DEF_QUEUE,
@@ -228,7 +229,8 @@ static struct ata_port_info ahci_port_info[] = {
 	{
 		.sht		= &ahci_sht,
 		.host_flags	= ATA_FLAG_SATA | ATA_FLAG_NO_LEGACY |
-				  ATA_FLAG_SATA_RESET | ATA_FLAG_MMIO,
+				  ATA_FLAG_SATA_RESET | ATA_FLAG_MMIO |
+				  ATA_FLAG_PIO_DMA,
 		.pio_mask	= 0x03, /* pio3-4 */
 		.udma_mask	= 0x7f, /* udma0-6 ; FIXME */
 		.port_ops	= &ahci_ops,
@@ -944,10 +946,6 @@ static int ahci_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (!printed_version++)
 		printk(KERN_DEBUG DRV_NAME " version " DRV_VERSION "\n");
 
-	/*
-	 * If this driver happens to only be useful on Apple's K2, then
-	 * we should check that here as it has a normal Serverworks ID
-	 */
 	rc = pci_enable_device(pdev);
 	if (rc)
 		return rc;

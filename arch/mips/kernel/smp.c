@@ -44,6 +44,7 @@ cpumask_t cpu_online_map;		/* Bitmask of currently online CPUs */
 int __cpu_number_map[NR_CPUS];		/* Map physical to logical */
 int __cpu_logical_map[NR_CPUS];		/* Map logical to physical */
 
+EXPORT_SYMBOL(phys_cpu_present_map);
 EXPORT_SYMBOL(cpu_online_map);
 
 cycles_t cacheflush_time;
@@ -235,7 +236,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	init_new_context(current, &init_mm);
 	current_thread_info()->cpu = 0;
 	smp_tune_scheduling();
-	prom_build_cpu_map();
 	prom_prepare_cpus(max_cpus);
 }
 

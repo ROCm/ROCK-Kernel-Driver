@@ -78,7 +78,7 @@ module_param(restricted, bool, 0);
 MODULE_PARM_DESC(restricted, "Allow fan control if SYS_ADMIN capability set");
 
 static int power_status;
-module_param(power_status, bool, 600);
+module_param(power_status, bool, 0600);
 MODULE_PARM_DESC(power_status, "Report power status in /proc/i8k");
 
 static ssize_t i8k_read(struct file *, char __user *, size_t, loff_t *);

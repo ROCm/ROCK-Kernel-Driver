@@ -273,9 +273,9 @@ static enum tcp_conntrack tcp_conntracks[2][6][TCP_CONNTRACK_MAX] = {
  *	sCL -> sCL
  */
 /* 	     sNO, sSS, sSR, sES, sFW, sCW, sLA, sTW, sCL, sLI	*/
-/*ack*/	   { sIV, sIV, sIV, sES, sCW, sCW, sTW, sTW, sCL, sIV },
+/*ack*/	   { sIV, sIG, sIV, sES, sCW, sCW, sTW, sTW, sCL, sIV },
 /*
- *	sSS -> sIV	ACK is invalid: we haven't seen a SYN/ACK yet.
+ *	sSS -> sIG	Might be a half-open connection.
  *	sSR -> sIV	Simultaneous open.
  *	sES -> sES	:-)
  *	sFW -> sCW	Normal close request answered by ACK.
@@ -436,7 +436,7 @@ static void tcp_options(const struct sk_buff *skb,
 					state->td_scale = 14;
 				}
 				state->flags |=
-					IP_CT_TCP_STATE_FLAG_WINDOW_SCALE;
+					IP_CT_TCP_FLAG_WINDOW_SCALE;
 			}
 			ptr += opsize - 2;
 			length -= opsize;
@@ -552,8 +552,8 @@ static int tcp_in_window(struct ip_ct_tcp *state,
 			 * Both sides must send the Window Scale option
 			 * to enable window scaling in either direction.
 			 */
-			if (!(sender->flags & IP_CT_TCP_STATE_FLAG_WINDOW_SCALE
-			      && receiver->flags & IP_CT_TCP_STATE_FLAG_WINDOW_SCALE))
+			if (!(sender->flags & IP_CT_TCP_FLAG_WINDOW_SCALE
+			      && receiver->flags & IP_CT_TCP_FLAG_WINDOW_SCALE))
 				sender->td_scale = 
 				receiver->td_scale = 0;
 		} else {
@@ -566,9 +566,11 @@ static int tcp_in_window(struct ip_ct_tcp *state,
 			sender->td_maxwin = (win == 0 ? 1 : win);
 			sender->td_maxend = end + sender->td_maxwin;
 		}
-	} else if (state->state == TCP_CONNTRACK_SYN_SENT
-		   && dir == IP_CT_DIR_ORIGINAL
-		   && after(end, sender->td_end)) {
+	} else if (((state->state == TCP_CONNTRACK_SYN_SENT
+		     && dir == IP_CT_DIR_ORIGINAL)
+		    || (state->state == TCP_CONNTRACK_SYN_RECV
+		        && dir == IP_CT_DIR_REPLY))
+		    && after(end, sender->td_end)) {
 		/*
 		 * RFC 793: "if a TCP is reinitialized ... then it need
 		 * not wait at all; it must only be sure to use sequence 
@@ -685,7 +687,7 @@ static int tcp_in_window(struct ip_ct_tcp *state,
 			"ip_ct_tcp: %s ",
 			before(end, sender->td_maxend + 1) ?
 			after(seq, sender->td_end - receiver->td_maxwin - 1) ?
-			before(ack, receiver->td_end + 1) ?
+			before(sack, receiver->td_end + 1) ?
 			after(ack, receiver->td_end - MAXACKWINDOW(sender)) ? "BUG"
 			: "ACK is under the lower bound (possibly overly delayed ACK)"
 			: "ACK is over the upper bound (ACKed data has never seen yet)"
@@ -846,7 +848,9 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 
 	switch (new_state) {
 	case TCP_CONNTRACK_IGNORE:
-		/* Either SYN in ORIGINAL, or SYN/ACK in REPLY direction. */
+		/* Either SYN in ORIGINAL
+		 * or SYN/ACK in REPLY
+		 * or ACK in REPLY direction (half-open connection). */
 		if (index == TCP_SYNACK_SET
 		    && conntrack->proto.tcp.last_index == TCP_SYN_SET
 		    && conntrack->proto.tcp.last_dir != dir
@@ -875,7 +879,7 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 		WRITE_UNLOCK(&tcp_lock);
 		if (LOG_INVALID(IPPROTO_TCP))
 			nf_log_packet(PF_INET, 0, skb, NULL, NULL, 
-				  "ip_ct_tcp: invalid SYN (ignored) ");
+				  "ip_ct_tcp: invalid packet ignored ");
 		return NF_ACCEPT;
 	case TCP_CONNTRACK_MAX:
 		/* Invalid packet */
@@ -900,11 +904,12 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 		break;
 	case TCP_CONNTRACK_CLOSE:
 		if (index == TCP_RST_SET
-		    && test_bit(IPS_SEEN_REPLY_BIT, &conntrack->status)
-		    && conntrack->proto.tcp.last_index <= TCP_SYNACK_SET
+		    && ((test_bit(IPS_SEEN_REPLY_BIT, &conntrack->status)
+		         && conntrack->proto.tcp.last_index <= TCP_SYNACK_SET)
+		        || conntrack->proto.tcp.last_index == TCP_ACK_SET)
 		    && after(ntohl(th->ack_seq),
 		    	     conntrack->proto.tcp.last_seq)) {
-			/* Ignore RST closing down invalid SYN 
+			/* Ignore RST closing down invalid SYN or ACK
 			   we had let trough. */ 
 		    	WRITE_UNLOCK(&tcp_lock);
 			if (LOG_INVALID(IPPROTO_TCP))

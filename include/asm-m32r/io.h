@@ -167,7 +167,7 @@ static inline void _writel(unsigned long l, unsigned long addr)
 #define flush_write_buffers() do { } while (0)  /* M32R_FIXME */
 
 /**
- *	isa_check_signature		-	find BIOS signatures
+ *	check_signature		-	find BIOS signatures
  *	@io_addr: mmio address to check
  *	@signature:  signature block
  *	@length: length of signature
@@ -179,14 +179,14 @@ static inline void _writel(unsigned long l, unsigned long addr)
  *	check_signature.
  */
 
-static inline int isa_check_signature(unsigned long io_addr,
+static inline int check_signature(void __iomem *io_addr,
         const unsigned char *signature, int length)
 {
         int retval = 0;
 #if 0
-printk("isa_check_signature\n");
+printk("check_signature\n");
         do {
-                if (isa_readb(io_addr) != *signature)
+                if (readb(io_addr) != *signature)
                         goto out;
                 io_addr++;
                 signature++;

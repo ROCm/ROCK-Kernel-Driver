@@ -325,7 +325,7 @@ static void intr_deschedule (
 		status = disable_periodic (ehci);
 	else {
 		status = 0;
-		vdbg ("periodic schedule still enabled");
+		ehci_vdbg (ehci, "periodic schedule still enabled\n");
 	}
 
 	/*
@@ -342,7 +342,7 @@ static void intr_deschedule (
 			 * the race is very short.  then if qh also isn't
 			 * rescheduled soon, it won't matter.  otherwise...
 			 */
-			vdbg ("intr_deschedule...");
+			ehci_vdbg (ehci, "intr_deschedule...\n");
 		}
 	} else
 		qh->hw_next = EHCI_LIST_END;
@@ -450,6 +450,7 @@ static int qh_schedule (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	__le32		c_mask;
 	unsigned	frame;		/* 0..(qh->period - 1), or NO_FRAME */
 
+	qh_refresh(ehci, qh);
 	qh->hw_next = EHCI_LIST_END;
 	frame = qh->start;
 

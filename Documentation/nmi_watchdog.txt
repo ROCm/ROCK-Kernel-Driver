@@ -54,6 +54,20 @@ then the system has crashed so hard (eg. hardware-wise) that either it
 cannot even accept NMI interrupts, or the crash has made the kernel
 unable to print messages.
 
+Be aware that when using local APIC, the frequency of NMI interrupts
+it generates, depends on the system load. The local APIC NMI watchdog,
+lacking a better source, uses the "cycles unhalted" event. As you may
+guess it doesn't tick when the CPU is in the halted state (which happens
+when the system is idle), but if your system locks up on anything but the
+"hlt" processor instruction, the watchdog will trigger very soon as the
+"cycles unhalted" event will happen every clock tick. If it locks up on
+"hlt", then you are out of luck -- the event will not happen at all and the
+watchdog won't trigger. This is a shortcoming of the local APIC watchdog
+-- unfortunately there is no "clock ticks" event that would work all the
+time. The I/O APIC watchdog is driven externally and has no such shortcoming.  
+But its NMI frequency is much higher, resulting in a more significant hit
+to the overall system performance.
+
 NOTE: starting with 2.4.2-ac18 the NMI-oopser is disabled by default,
 you have to enable it with a boot time parameter.  Prior to 2.4.2-ac18
 the NMI-oopser is enabled unconditionally on x86 SMP boxes.

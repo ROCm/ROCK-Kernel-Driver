@@ -171,8 +171,8 @@ static inline char * task_state(struct task_struct *p, char *buffer)
 		get_task_state(p),
 		(p->sleep_avg/1024)*100/(1020000000/1024),
 	       	p->tgid,
-		p->pid, p->pid ? p->group_leader->real_parent->tgid : 0,
-		p->pid && p->ptrace ? p->parent->pid : 0,
+		p->pid, pid_alive(p) ? p->group_leader->real_parent->tgid : 0,
+		pid_alive(p) && p->ptrace ? p->parent->pid : 0,
 		p->uid, p->euid, p->suid, p->fsuid,
 		p->gid, p->egid, p->sgid, p->fsgid);
 	read_unlock(&tasklist_lock);
@@ -370,7 +370,7 @@ static int do_task_stat(struct task_struct *task, char * buffer, int whole)
 			stime += task->signal->stime;
 		}
 	}
-	ppid = task->pid ? task->group_leader->real_parent->tgid : 0;
+	ppid = pid_alive(task) ? task->group_leader->real_parent->tgid : 0;
 	read_unlock(&tasklist_lock);
 
 	if (!whole || num_threads<2)

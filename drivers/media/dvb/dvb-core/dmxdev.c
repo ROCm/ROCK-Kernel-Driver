@@ -42,16 +42,10 @@ MODULE_PARM_DESC(debug, "Turn on/off debugging (default:off).");
 
 #define dprintk	if (debug) printk
 
-inline struct dmxdev_filter *
+static inline struct dmxdev_filter *
 dvb_dmxdev_file_to_filter(struct file *file)
 {
 	return (struct dmxdev_filter *) file->private_data;
-}
-
-inline struct dmxdev_dvr *
-dvb_dmxdev_file_to_dvr(struct dmxdev *dmxdev, struct file *file)
-{
-	return (struct dmxdev_dvr *) file->private_data;
 }
 
 static inline void dvb_dmxdev_buffer_init(struct dmxdev_buffer *buffer) 
@@ -846,7 +840,7 @@ static ssize_t dvb_dmxdev_read_sec(struct dmxdev_filter *dfil,
 }
 
 
-ssize_t 
+static ssize_t
 dvb_demux_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct dmxdev_filter *dmxdevfilter=dvb_dmxdev_file_to_filter(file);
@@ -1122,6 +1116,7 @@ dvb_dmxdev_init(struct dmxdev *dmxdev, struct dvb_adapter *dvb_adapter)
 
 	return 0;
 }
+EXPORT_SYMBOL(dvb_dmxdev_init);
 
 void 
 dvb_dmxdev_release(struct dmxdev *dmxdev)
@@ -1138,5 +1133,5 @@ dvb_dmxdev_release(struct dmxdev *dmxdev)
 	}
 	dmxdev->demux->close(dmxdev->demux);
 }
-
+EXPORT_SYMBOL(dvb_dmxdev_release);
 

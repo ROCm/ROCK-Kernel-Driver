@@ -20,11 +20,10 @@
 #include <linux/sched.h>
 #include <linux/init.h>
 #include <asm/atomic.h>
-#include <asm/semaphore.h>
+#include <asm/cpu-features.h>
 #include <asm/errno.h>
-
-#ifdef CONFIG_CPU_HAS_LLSC
-
+#include <asm/semaphore.h>
+#include <asm/war.h>
 /*
  * Atomically update sem->count.
  * This does the equivalent of the following:
@@ -33,49 +32,50 @@
  *	tmp = MAX(old_count, 0) + incr;
  *	sem->count = tmp;
  *	return old_count;
- */
-static inline int __sem_update_count(struct semaphore *sem, int incr)
-{
-	int old_count, tmp;
-
-	__asm__ __volatile__(
-	"1:	ll	%0, %2					\n"
-	"	sra	%1, %0, 31				\n"
-	"	not	%1					\n"
-	"	and	%1, %0, %1				\n"
-	"	add	%1, %1, %3				\n"
-	"	sc	%1, %2					\n"
-	"	beqz	%1, 1b					\n"
-	: "=&r" (old_count), "=&r" (tmp), "=m" (sem->count)
-	: "r" (incr), "m" (sem->count));
-
-	return old_count;
-}
-
-#else
-
-/*
+ *
  * On machines without lld/scd we need a spinlock to make the manipulation of
  * sem->count and sem->waking atomic.  Scalability isn't an issue because
  * this lock is used on UP only so it's just an empty variable.
  */
-static spinlock_t semaphore_lock = SPIN_LOCK_UNLOCKED;
-
 static inline int __sem_update_count(struct semaphore *sem, int incr)
 {
-	unsigned long flags;
 	int old_count, tmp;
 
-	spin_lock_irqsave(&semaphore_lock, flags);
-	old_count = atomic_read(&sem->count);
-	tmp = max_t(int, old_count, 0) + incr;
-	atomic_set(&sem->count, tmp);
-	spin_unlock_irqrestore(&semaphore_lock, flags);
+	if (cpu_has_llsc && R10000_LLSC_WAR) {
+		__asm__ __volatile__(
+		"1:	ll	%0, %2					\n"
+		"	sra	%1, %0, 31				\n"
+		"	not	%1					\n"
+		"	and	%1, %0, %1				\n"
+		"	add	%1, %1, %3				\n"
+		"	sc	%1, %2					\n"
+		"	beqzl	%1, 1b					\n"
+		: "=&r" (old_count), "=&r" (tmp), "=m" (sem->count)
+		: "r" (incr), "m" (sem->count));
+	} else if (cpu_has_llsc) {
+		__asm__ __volatile__(
+		"1:	ll	%0, %2					\n"
+		"	sra	%1, %0, 31				\n"
+		"	not	%1					\n"
+		"	and	%1, %0, %1				\n"
+		"	add	%1, %1, %3				\n"
+		"	sc	%1, %2					\n"
+		"	beqz	%1, 1b					\n"
+		: "=&r" (old_count), "=&r" (tmp), "=m" (sem->count)
+		: "r" (incr), "m" (sem->count));
+	} else {
+		static spinlock_t semaphore_lock = SPIN_LOCK_UNLOCKED;
+		unsigned long flags;
+
+		spin_lock_irqsave(&semaphore_lock, flags);
+		old_count = atomic_read(&sem->count);
+		tmp = max_t(int, old_count, 0) + incr;
+		atomic_set(&sem->count, tmp);
+		spin_unlock_irqrestore(&semaphore_lock, flags);
+	}
 
 	return old_count;
 }
-
-#endif
 
 void __up(struct semaphore *sem)
 {

@@ -70,11 +70,11 @@ struct ncr_slot {
 	u_long	base_2;
 	u_long	base_c;
 	u_long	base_2_c;
-	u_long	base_v;
-	u_long	base_2_v;
+	void __iomem *base_v;
+	void __iomem *base_2_v;
 	int	irq;
 /* port and reg fields to use INB, OUTB macros */
-	volatile struct ncr_reg	*reg;
+	volatile struct ncr_reg	__iomem *reg;
 };
 
 /*==========================================================

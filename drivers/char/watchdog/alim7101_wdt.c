@@ -12,6 +12,11 @@
  *  because this particular WDT has a very short timeout (1.6
  *  seconds) and it would be insane to count on any userspace
  *  daemon always getting scheduled within that time frame.
+ *
+ *  Additions:
+ *   Aug 23, 2004 - Added use_gpio module parameter for use on revision a1d PMUs
+ *                  found on very old cobalt hardware.
+ *                  -- Mike Waychison <michael.waychison@sun.com>
  */
 
 #include <linux/module.h>
@@ -38,6 +43,8 @@
 #define WDT_DISABLE 0x8C
 
 #define ALI_7101_WDT    0x92
+#define ALI_7101_GPIO   0x7D
+#define ALI_7101_GPIO_O 0x7E
 #define ALI_WDT_ARM     0x01
 
 /*
@@ -56,6 +63,10 @@
 static int timeout = WATCHDOG_TIMEOUT; /* in seconds, will be multiplied by HZ to get seconds to wait for a ping */
 module_param(timeout, int, 0);
 MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds. (1<=timeout<=3600, default=" __MODULE_STRING(WATCHDOG_TIMEOUT) ")");
+
+static int use_gpio = 0; /* Use the pic (for a1d revision alim7101) */
+module_param(use_gpio, int, 0);
+MODULE_PARM_DESC(use_gpio, "Use the gpio watchdog.  (required by old cobalt boards)");
 
 static void wdt_timer_ping(unsigned long);
 static struct timer_list timer;
@@ -90,6 +101,13 @@ static void wdt_timer_ping(unsigned long data)
 		pci_read_config_byte(alim7101_pmu, 0x92, &tmp);
 		pci_write_config_byte(alim7101_pmu, ALI_7101_WDT, (tmp & ~ALI_WDT_ARM));
 		pci_write_config_byte(alim7101_pmu, ALI_7101_WDT, (tmp | ALI_WDT_ARM));
+		if (use_gpio) {
+			pci_read_config_byte(alim7101_pmu, ALI_7101_GPIO_O, &tmp);
+			pci_write_config_byte(alim7101_pmu, ALI_7101_GPIO_O, tmp
+					| 0x20);
+			pci_write_config_byte(alim7101_pmu, ALI_7101_GPIO_O, tmp
+					& ~0x20);
+		}
 	} else {
 		printk(KERN_WARNING PFX "Heartbeat lost! Will not ping the watchdog\n");
 	}
@@ -106,11 +124,21 @@ static void wdt_change(int writeval)
 {
 	char	tmp;
 
-	pci_read_config_byte(alim7101_pmu, 0x92, &tmp);
-	if (writeval == WDT_ENABLE)
+	pci_read_config_byte(alim7101_pmu, ALI_7101_WDT, &tmp);
+	if (writeval == WDT_ENABLE) {
 		pci_write_config_byte(alim7101_pmu, ALI_7101_WDT, (tmp | ALI_WDT_ARM));
-	else
+		if (use_gpio) {
+			pci_read_config_byte(alim7101_pmu, ALI_7101_GPIO_O, &tmp);
+			pci_write_config_byte(alim7101_pmu, ALI_7101_GPIO_O, tmp & ~0x20);
+		}
+
+	} else {
 		pci_write_config_byte(alim7101_pmu, ALI_7101_WDT, (tmp & ~ALI_WDT_ARM));
+		if (use_gpio) {
+			pci_read_config_byte(alim7101_pmu, ALI_7101_GPIO_O, &tmp);
+			pci_write_config_byte(alim7101_pmu, ALI_7101_GPIO_O, tmp | 0x20);
+		}
+	}
 }
 
 static void wdt_startup(void)
@@ -334,7 +362,13 @@ static int __init alim7101_wdt_init(void)
 		return -EBUSY;
 	}
 	pci_read_config_byte(ali1543_south, 0x5e, &tmp);
-	if ((tmp & 0x1e) != 0x12) {
+	if ((tmp & 0x1e) == 0x00) {
+		if (!use_gpio) {
+			printk(KERN_INFO PFX "Detected old alim7101 revision 'a1d'.  If this is a cobalt board, set the 'use_gpio' module parameter.\n");
+			return -EBUSY;
+		} 
+		nowayout = 1;
+	} else if ((tmp & 0x1e) != 0x12 && (tmp & 0x1e) != 0x00) {
 		printk(KERN_INFO PFX "ALi 1543 South-Bridge does not have the correct revision number (???1001?) - WDT not set\n");
 		return -EBUSY;
 	}
@@ -362,6 +396,10 @@ static int __init alim7101_wdt_init(void)
 		printk(KERN_ERR PFX "cannot register reboot notifier (err=%d)\n",
 			rc);
 		goto err_out_miscdev;
+	}
+
+	if (nowayout) {
+		__module_get(THIS_MODULE);
 	}
 
 	printk(KERN_INFO PFX "WDT driver for ALi M7101 initialised. timeout=%d sec (nowayout=%d)\n",

@@ -1602,7 +1602,10 @@ static void uhci_free_pending_tds(struct uhci_hcd *uhci)
 	}
 }
 
-static void uhci_finish_urb(struct usb_hcd *hcd, struct urb *urb, struct pt_regs *regs)
+static void
+uhci_finish_urb(struct usb_hcd *hcd, struct urb *urb, struct pt_regs *regs)
+__releases(uhci->schedule_lock)
+__acquires(uhci->schedule_lock)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 

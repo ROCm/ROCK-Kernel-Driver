@@ -1610,7 +1610,7 @@ xfs_vget(
 	if (ino == 0)
 		return XFS_ERROR(ESTALE);
 
-	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
+	error = xfs_iget(mp, NULL, ino, 0, XFS_ILOCK_SHARED, &ip, 0);
 	if (error) {
 		*vpp = NULL;
 		return error;

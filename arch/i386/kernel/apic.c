@@ -513,12 +513,25 @@ void __init setup_local_APIC (void)
 	apic_pm_activate();
 }
 
+/*
+ * If Linux enabled the LAPIC against the BIOS default
+ * disable it down before re-entering the BIOS on shutdown.
+ * Otherwise the BIOS may get confused and not power-off.
+ */
+void
+lapic_shutdown()
+{
+	if (!cpu_has_apic || !enabled_via_apicbase)
+		return;
+
+	local_irq_disable();
+	disable_local_APIC();
+	local_irq_enable();
+}
+
 #ifdef CONFIG_PM
 
 static struct {
-	/* 'active' is true if the local APIC was enabled by us and
-	   not the BIOS; this signifies that we are also responsible
-	   for disabling it before entering apm/acpi suspend */
 	int active;
 	/* r/w apic fields */
 	unsigned int apic_id;
@@ -606,6 +619,10 @@ static int lapic_resume(struct sys_device *dev)
 	return 0;
 }
 
+/*
+ * This device has no shutdown method - fully functioning local APICs
+ * are needed on every CPU up until machine_halt/restart/poweroff.
+ */
 
 static struct sysdev_class lapic_sysclass = {
 	set_kset_name("lapic"),
@@ -1149,7 +1166,7 @@ inline void smp_local_timer_interrupt(struct pt_regs * regs)
  *   interrupt as well. Thus we cannot inline the local irq ... ]
  */
 
-void smp_apic_timer_interrupt(struct pt_regs regs)
+fastcall void smp_apic_timer_interrupt(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
 
@@ -1169,14 +1186,14 @@ void smp_apic_timer_interrupt(struct pt_regs regs)
 	 * interrupt lock, which is the WrongThing (tm) to do.
 	 */
 	irq_enter();
-	smp_local_timer_interrupt(&regs);
+	smp_local_timer_interrupt(regs);
 	irq_exit();
 }
 
 /*
  * This interrupt should _never_ happen with our APIC/SMP architecture
  */
-asmlinkage void smp_spurious_interrupt(void)
+fastcall void smp_spurious_interrupt(struct pt_regs *regs)
 {
 	unsigned long v;
 
@@ -1200,7 +1217,7 @@ asmlinkage void smp_spurious_interrupt(void)
  * This interrupt should never happen with our APIC/SMP architecture
  */
 
-asmlinkage void smp_error_interrupt(void)
+fastcall void smp_error_interrupt(struct pt_regs *regs)
 {
 	unsigned long v, v1;
 

@@ -49,6 +49,7 @@ struct dvb_adapter {
 	struct list_head device_list;
 	const char *name;
 	u8 proposed_mac [6];
+	void* priv;
 
 	struct module *module;
 };

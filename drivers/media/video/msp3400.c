@@ -1436,7 +1436,7 @@ static struct i2c_driver driver = {
         .attach_adapter = msp_probe,
         .detach_client  = msp_detach,
         .command        = msp_command,
-	.driver {
+	.driver = {
 		.suspend = msp_suspend,
 		.resume  = msp_resume,
 	},
@@ -1511,9 +1511,12 @@ static int msp_attach(struct i2c_adapter *adap, int addr, int kind)
 
 	msp->opmode = opmode;
 	if (OPMODE_AUTO == msp->opmode) {
+#if 0 /* seems to work for ivtv only, disable by default for now ... */
 		if (HAVE_SIMPLER(msp))
 			msp->opmode = OPMODE_SIMPLER;
-		else if (HAVE_SIMPLE(msp))
+		else
+#endif
+		if (HAVE_SIMPLE(msp))
 			msp->opmode = OPMODE_SIMPLE;
 		else
 			msp->opmode = OPMODE_MANUAL;

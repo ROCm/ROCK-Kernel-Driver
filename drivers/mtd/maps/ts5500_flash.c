@@ -79,7 +79,7 @@ static int __init init_ts5500_map(void)
 {
 	int rc = 0;
 
-	ts5500_map.virt = (void*)ioremap_nocache(ts5500_map.phys, ts5500_map.size);
+	ts5500_map.virt = ioremap_nocache(ts5500_map.phys, ts5500_map.size);
 
 	if(!ts5500_map.virt) {
 		printk(KERN_ERR "Failed to ioremap_nocache\n");
@@ -110,7 +110,7 @@ static int __init init_ts5500_map(void)
 err_out_map:
 	map_destroy(mymtd);
 err_out_ioremap:
-	iounmap((void *)ts5500_map.virt);
+	iounmap(ts5500_map.virt);
 
 	return rc;
 }
@@ -127,8 +127,8 @@ static void __exit cleanup_ts5500_map(void)
 	}
 
 	if (ts5500_map.virt) {
-		iounmap((void *)ts5500_map.virt);
-		ts5500_map.virt = 0;
+		iounmap(ts5500_map.virt);
+		ts5500_map.virt = NULL;
 	}
 }
 

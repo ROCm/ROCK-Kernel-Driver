@@ -101,8 +101,6 @@ static struct acpi_driver acpi_processor_driver = {
 			},
 };
 
-static int c2 = -1;
-static int c3 = -1;
 
 struct acpi_processor_errata {
 	u8			smp;
@@ -144,8 +142,6 @@ static struct file_operations acpi_processor_limit_fops = {
 
 static struct acpi_processor	*processors[NR_CPUS];
 static struct acpi_processor_errata errata;
-module_param_named(c2, c2, bool, 0);
-module_param_named(c3, c3, bool, 0);
 static void (*pm_idle_save)(void);
 
 
@@ -343,8 +339,8 @@ acpi_processor_idle (void)
 {
 	struct acpi_processor	*pr = NULL;
 	struct acpi_processor_cx *cx = NULL;
-	int			next_state = 0;
-	int			sleep_ticks = 0;
+	unsigned int			next_state = 0;
+	unsigned int		sleep_ticks = 0;
 	u32			t1, t2 = 0;
 
 	pr = processors[smp_processor_id()];
@@ -356,6 +352,15 @@ acpi_processor_idle (void)
 	 * for C2/C3 transitions.
 	 */
 	local_irq_disable();
+
+	/*
+	 * Check whether we truly need to go idle, or should
+	 * reschedule:
+	 */
+	if (unlikely(need_resched())) {
+		local_irq_enable();
+		return;
+	}
 
 	cx = &(pr->power.states[pr->power.state]);
 
@@ -480,9 +485,9 @@ acpi_processor_idle (void)
 	 * Track the number of longs (time asleep is greater than threshold)
 	 * and promote when the count threshold is reached.  Note that bus
 	 * mastering activity may prevent promotions.
-	 * Do not promote above acpi_cstate_limit.
+	 * Do not promote above max_cstate.
 	 */
-	if (cx->promotion.state && (cx->promotion.state <= acpi_cstate_limit)) {
+	if (cx->promotion.state && (cx->promotion.state <= max_cstate)) {
 		if (sleep_ticks > cx->promotion.threshold.ticks) {
 			cx->promotion.count++;
  			cx->demotion.count = 0;
@@ -520,10 +525,10 @@ acpi_processor_idle (void)
 
 end:
 	/*
-	 * Demote if current state exceeds acpi_cstate_limit
+	 * Demote if current state exceeds max_cstate
 	 */
-	if (pr->power.state > acpi_cstate_limit) {
-		next_state = acpi_cstate_limit;
+	if (pr->power.state > max_cstate) {
+		next_state = max_cstate;
 	}
 
 	/*
@@ -677,11 +682,6 @@ acpi_processor_get_power_info (
 		else if (errata.smp)
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				"C2 not supported in SMP mode\n"));
-
-
-		else if (!c2) 
-			printk(KERN_INFO "C2 disabled\n");
-
 		/*
 		 * Otherwise we've met all of our C2 requirements.
 		 * Normalize the C2 latency to expidite policy.
@@ -737,9 +737,6 @@ acpi_processor_get_power_info (
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				"C3 not supported on PIIX4 with Type-F DMA\n"));
 		}
-		else if (!c3)
-			printk(KERN_INFO "C3 disabled\n");
-
 		/*
 		 * Otherwise we've met all of our C3 requirements.  
 		 * Normalize the C2 latency to expidite policy.  Enable
@@ -1007,7 +1004,7 @@ acpi_processor_get_performance_states (
 	struct acpi_buffer	format = {sizeof("NNNNNN"), "NNNNNN"};
 	struct acpi_buffer	state = {0, NULL};
 	union acpi_object 	*pss = NULL;
-	int			i = 0;
+	unsigned int		i;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_get_performance_states");
 
@@ -1196,7 +1193,7 @@ static struct file_operations acpi_processor_perf_fops = {
 static int acpi_processor_perf_seq_show(struct seq_file *seq, void *offset)
 {
 	struct acpi_processor	*pr = (struct acpi_processor *)seq->private;
-	int			i = 0;
+	unsigned int		i;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_perf_seq_show");
 
@@ -1956,7 +1953,7 @@ static int acpi_processor_info_open_fs(struct inode *inode, struct file *file)
 static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 {
 	struct acpi_processor	*pr = (struct acpi_processor *)seq->private;
-	int			i = 0;
+	unsigned int		i;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_power_seq_show");
 
@@ -1965,9 +1962,11 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 
 	seq_printf(seq, "active state:            C%d\n"
 			"default state:           C%d\n"
+			"max_cstate:              C%d\n"
 			"bus master activity:     %08x\n",
 			pr->power.state,
 			pr->power.default_state,
+			max_cstate,
 			pr->power.bm_activity);
 
 	seq_puts(seq, "states:\n");
@@ -2554,17 +2553,22 @@ acpi_processor_remove (
 	return_VALUE(0);
 }
 
-/* IBM ThinkPad R40e crashes mysteriously when going into C2 or C3. 
-   For now disable this. Probably a bug somewhere else. */
+/*
+ * IBM ThinkPad R40e crashes mysteriously when going into C2 or C3. 
+ * For now disable this. Probably a bug somewhere else.
+ *
+ * To skip this limit, boot/load with a large max_cstate limit.
+ */
 static int no_c2c3(struct dmi_system_id *id)
 {
-	printk(KERN_INFO 
-	       "%s detected - C2,C3 disabled. Overwrite with \"processor.c2=1 processor.c3=1\n\"",
-	       id->ident);
-	if (c2 == -1) 
-		c2 = 0;
-	if (c3 == -1) 
-		c3 = 0; 
+	if (max_cstate > ACPI_C_STATES_MAX)
+		return 0;
+
+	printk(KERN_NOTICE PREFIX "%s detected - C2,C3 disabled."
+		" Override with \"processor.max_cstate=9\"\n", id->ident);
+
+	max_cstate = 1;
+
 	return 0;
 }
 
@@ -2609,6 +2613,9 @@ acpi_processor_init (void)
 
 	dmi_check_system(processor_dmi_table); 
 
+	if (max_cstate < ACPI_C_STATES_MAX)
+		printk(KERN_NOTICE "ACPI: processor limited to max C-state %d\n", max_cstate);
+
 	return_VALUE(0);
 }
 
@@ -2632,6 +2639,6 @@ acpi_processor_exit (void)
 
 module_init(acpi_processor_init);
 module_exit(acpi_processor_exit);
-module_param_named(acpi_cstate_limit, acpi_cstate_limit, uint, 0);
+module_param_named(max_cstate, max_cstate, uint, 0);
 
 EXPORT_SYMBOL(acpi_processor_set_thermal_limit);

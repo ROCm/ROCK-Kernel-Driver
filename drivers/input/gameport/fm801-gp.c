@@ -98,8 +98,8 @@ static int __devinit fm801_gp_probe(struct pci_dev *pci, const struct pci_device
 	pci_enable_device(pci);
 	gp->gameport.io = pci_resource_start(pci, 0);
 	if ((gp->res_port = request_region(gp->gameport.io, 0x10, "FM801 GP")) == NULL) {
-		kfree(gp);
 		printk("unable to grab region 0x%x-0x%x\n", gp->gameport.io, gp->gameport.io + 0x0f);
+		kfree(gp);
 		return -1;
 	}
 

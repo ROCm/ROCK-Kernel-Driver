@@ -250,11 +250,11 @@ struct bt_regs {
 
 struct cg6_par {
 	spinlock_t		lock;
-	struct bt_regs		*bt;
-	struct cg6_fbc		*fbc;
-	struct cg6_thc		*thc;
-	struct cg6_tec		*tec;
-	volatile u32		*fhc;
+	struct bt_regs		__iomem *bt;
+	struct cg6_fbc		__iomem *fbc;
+	struct cg6_thc		__iomem *thc;
+	struct cg6_tec		__iomem *tec;
+	volatile u32		__iomem *fhc;
 
 	u32			flags;
 #define CG6_FLAG_BLANKED	0x00000001
@@ -269,7 +269,7 @@ struct cg6_par {
 static int cg6_sync(struct fb_info *info)
 {
 	struct cg6_par *par = (struct cg6_par *) info->par;
-	struct cg6_fbc *fbc = par->fbc;
+	struct cg6_fbc __iomem *fbc = par->fbc;
 	int limit = 10000;
 
 	do {
@@ -292,7 +292,7 @@ static int cg6_sync(struct fb_info *info)
 static void cg6_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
 	struct cg6_par *par = (struct cg6_par *) info->par;
-	struct cg6_fbc *fbc = par->fbc;
+	struct cg6_fbc __iomem *fbc = par->fbc;
 	unsigned long flags;
 	s32 val;
 
@@ -327,7 +327,7 @@ static void cg6_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 static void cg6_imageblit(struct fb_info *info, const struct fb_image *image)
 {
 	struct cg6_par *par = (struct cg6_par *) info->par;
-	struct cg6_fbc *fbc = par->fbc;
+	struct cg6_fbc __iomem *fbc = par->fbc;
 	const u8 *data = image->data;
 	unsigned long flags;
 	u32 x, y;
@@ -418,7 +418,7 @@ static int cg6_setcolreg(unsigned regno,
 			 unsigned transp, struct fb_info *info)
 {
 	struct cg6_par *par = (struct cg6_par *) info->par;
-	struct bt_regs *bt = par->bt;
+	struct bt_regs __iomem *bt = par->bt;
 	unsigned long flags;
 
 	if (regno >= 256)
@@ -449,7 +449,7 @@ static int
 cg6_blank(int blank, struct fb_info *info)
 {
 	struct cg6_par *par = (struct cg6_par *) info->par;
-	struct cg6_thc *thc = par->thc;
+	struct cg6_thc __iomem *thc = par->thc;
 	unsigned long flags;
 	u32 val;
 
@@ -593,7 +593,7 @@ cg6_init_fix(struct fb_info *info, int linebytes)
 /* Initialize Brooktree DAC */
 static void cg6_bt_init(struct cg6_par *par)
 {
-	struct bt_regs *bt = par->bt;
+	struct bt_regs __iomem *bt = par->bt;
 
 	sbus_writel(0x04 << 24, &bt->addr);         /* color planes */
 	sbus_writel(0xff << 24, &bt->control);
@@ -608,8 +608,8 @@ static void cg6_bt_init(struct cg6_par *par)
 static void cg6_chip_init(struct fb_info *info)
 {
 	struct cg6_par *par = (struct cg6_par *) info->par;
-	struct cg6_tec *tec = par->tec;
-	struct cg6_fbc *fbc = par->fbc;
+	struct cg6_tec __iomem *tec = par->tec;
+	struct cg6_fbc __iomem *fbc = par->fbc;
 	u32 rev, conf, mode, tmp;
 	int i;
 	
@@ -696,31 +696,26 @@ static void cg6_init_one(struct sbus_dev *sdev)
 	if (prom_getbool(sdev->prom_node, "dblbuf"))
 		all->par.fbsize *= 4;
 
-	all->par.fbc = (struct cg6_fbc *)
-		sbus_ioremap(&sdev->resource[0], CG6_FBC_OFFSET,
+	all->par.fbc = sbus_ioremap(&sdev->resource[0], CG6_FBC_OFFSET,
 			     4096, "cgsix fbc");
-	all->par.tec = (struct cg6_tec *)
-		sbus_ioremap(&sdev->resource[0], CG6_TEC_OFFSET,
+	all->par.tec = sbus_ioremap(&sdev->resource[0], CG6_TEC_OFFSET,
 			     sizeof(struct cg6_tec), "cgsix tec");
-	all->par.thc = (struct cg6_thc *)
-		sbus_ioremap(&sdev->resource[0], CG6_THC_OFFSET,
+	all->par.thc = sbus_ioremap(&sdev->resource[0], CG6_THC_OFFSET,
 			     sizeof(struct cg6_thc), "cgsix thc");
-	all->par.bt = (struct bt_regs *)
-		sbus_ioremap(&sdev->resource[0], CG6_BROOKTREE_OFFSET,
+	all->par.bt = sbus_ioremap(&sdev->resource[0], CG6_BROOKTREE_OFFSET,
 			     sizeof(struct bt_regs), "cgsix dac");
-	all->par.fhc = (u32 *)
-		sbus_ioremap(&sdev->resource[0], CG6_FHC_OFFSET,
+	all->par.fhc = sbus_ioremap(&sdev->resource[0], CG6_FHC_OFFSET,
 			     sizeof(u32), "cgsix fhc");
 
 	all->info.flags = FBINFO_DEFAULT | FBINFO_HWACCEL_IMAGEBLIT |
                           FBINFO_HWACCEL_COPYAREA | FBINFO_HWACCEL_FILLRECT;
 	all->info.fbops = &cg6_ops;
 #ifdef CONFIG_SPARC32
-	all->info.screen_base = (char *)
+	all->info.screen_base = (char __iomem *)
 		prom_getintdefault(sdev->prom_node, "address", 0);
 #endif
 	if (!all->info.screen_base)
-		all->info.screen_base = (char *)
+		all->info.screen_base = 
 			sbus_ioremap(&sdev->resource[0], CG6_RAM_OFFSET,
 				     all->par.fbsize, "cgsix ram");
 	all->info.par = &all->par;

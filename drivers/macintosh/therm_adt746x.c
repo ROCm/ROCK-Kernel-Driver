@@ -23,6 +23,8 @@
 #include <linux/smp_lock.h>
 #include <linux/wait.h>
 #include <linux/suspend.h>
+#include <linux/kthread.h>
+#include <linux/moduleparam.h>
 
 #include <asm/prom.h>
 #include <asm/machdep.h>
@@ -30,7 +32,6 @@
 #include <asm/system.h>
 #include <asm/sections.h>
 #include <asm/of_device.h>
-#include <linux/kthread.h>
 
 #undef DEBUG
 
@@ -56,11 +57,11 @@ MODULE_DESCRIPTION("Driver for ADT746x thermostat in iBook G4 and "
 		   "Powerbook G4 Alu");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(limit_adjust,"i");
+module_param(limit_adjust, int, 0644);
 MODULE_PARM_DESC(limit_adjust,"Adjust maximum temperatures (50 cpu, 70 gpu) "
 		 "by N degrees.");
 
-MODULE_PARM(fan_speed,"i");
+module_param(fan_speed, int, 0644);
 MODULE_PARM_DESC(fan_speed,"Specify starting fan speed (0-255) "
 		 "(default 64)");
 
@@ -169,11 +170,11 @@ detach_thermostat(struct i2c_adapter *adapter)
 }
 
 static struct i2c_driver thermostat_driver = {  
-	.name		="Apple Thermostat ADT746x",
-	.id		=0xDEAD7467,
-	.flags		=I2C_DF_NOTIFY,
-	.attach_adapter	=&attach_thermostat,
-	.detach_adapter	=&detach_thermostat,
+	.owner		= THIS_MODULE,
+	.name		= "therm_adt746x",
+	.flags		= I2C_DF_NOTIFY,
+	.attach_adapter	= attach_thermostat,
+	.detach_adapter	= detach_thermostat,
 };
 
 static int read_fan_speed(struct thermostat *th, u8 addr)
@@ -380,7 +381,6 @@ static int attach_one_thermostat(struct i2c_adapter *adapter, int addr,
 	th->clt.addr = addr;
 	th->clt.adapter = adapter;
 	th->clt.driver = &thermostat_driver;
-	th->clt.id = 0xDEAD7467;
 	strcpy(th->clt.name, "thermostat");
 
 	rc = read_reg(th, 0);

@@ -631,10 +631,12 @@ static inline u16 socket_type_to_security_class(int family, int type, int protoc
 	case PF_UNIX:
 		switch (type) {
 		case SOCK_STREAM:
+		case SOCK_SEQPACKET:
 			return SECCLASS_UNIX_STREAM_SOCKET;
 		case SOCK_DGRAM:
 			return SECCLASS_UNIX_DGRAM_SOCKET;
 		}
+		break;
 	case PF_INET:
 	case PF_INET6:
 		switch (type) {
@@ -645,6 +647,7 @@ static inline u16 socket_type_to_security_class(int family, int type, int protoc
 		case SOCK_RAW:
 			return SECCLASS_RAWIP_SOCKET;
 		}
+		break;
 	case PF_NETLINK:
 		switch (protocol) {
 		case NETLINK_ROUTE:

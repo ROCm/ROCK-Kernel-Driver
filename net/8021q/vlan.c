@@ -96,13 +96,18 @@ static int __init vlan_proto_init(void)
 		printk(KERN_ERR 
 		       "%s %s: can't create entry in proc filesystem!\n",
 		       __FUNCTION__, VLAN_NAME);
-		return 1;
+		return err;
 	}
 
 	dev_add_pack(&vlan_packet_type);
 
 	/* Register us to receive netdevice events */
-	register_netdevice_notifier(&vlan_notifier_block);
+	err = register_netdevice_notifier(&vlan_notifier_block);
+	if (err < 0) {
+		dev_remove_pack(&vlan_packet_type);
+		vlan_proc_cleanup();
+		return err;
+	}
 
 	vlan_ioctl_set(vlan_ioctl_handler);
 
@@ -743,7 +748,7 @@ static int vlan_ioctl_handler(void __user *arg)
 		break;
 	case GET_VLAN_REALDEV_NAME_CMD:
 		err = vlan_dev_get_realdev_name(args.device1, args.u.device2);
-		if (copy_to_user((void*)arg, &args,
+		if (copy_to_user(arg, &args,
 				 sizeof(struct vlan_ioctl_args))) {
 			err = -EFAULT;
 		}
@@ -752,7 +757,7 @@ static int vlan_ioctl_handler(void __user *arg)
 	case GET_VLAN_VID_CMD:
 		err = vlan_dev_get_vid(args.device1, &vid);
 		args.u.VID = vid;
-		if (copy_to_user((void*)arg, &args,
+		if (copy_to_user(arg, &args,
 				 sizeof(struct vlan_ioctl_args))) {
                       err = -EFAULT;
 		}

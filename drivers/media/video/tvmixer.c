@@ -20,7 +20,7 @@
 #define DEV_MAX  4
 
 static int devnr = -1;
-MODULE_PARM(devnr,"i");
+module_param(devnr, int, 0644);
 
 MODULE_AUTHOR("Gerd Knorr");
 MODULE_LICENSE("GPL");

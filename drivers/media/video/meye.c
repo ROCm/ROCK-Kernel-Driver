@@ -110,18 +110,19 @@ static void rvfree(void * mem, unsigned long size)
 /*
  * return a page table pointing to N pages of locked memory
  *
- * NOTE: The meye device expects dma_addr_t size to be 32 bits
- * (the toc must be exactly 1024 entries each of them being 4 bytes
- * in size, the whole result being 4096 bytes). We're using here
- * dma_addr_t for correctness but the compilation of this driver is
- * disabled for HIGHMEM64G=y, where sizeof(dma_addr_t) != 4
+ * NOTE: The meye device expects DMA addresses on 32 bits, we build
+ * a table of 1024 entries = 4 bytes * 1024 = 4096 bytes.
  */
 static int ptable_alloc(void)
 {
-	dma_addr_t *pt;
+	u32 *pt;
 	int i;
 
 	memset(meye.mchip_ptable, 0, sizeof(meye.mchip_ptable));
+
+	/* give only 32 bit DMA addresses */
+	if (dma_set_mask(&meye.mchip_dev->dev, 0xffffffff))
+		return -1;
 
 	meye.mchip_ptable_toc = dma_alloc_coherent(&meye.mchip_dev->dev,
 						   PAGE_SIZE,
@@ -134,17 +135,19 @@ static int ptable_alloc(void)
 
 	pt = meye.mchip_ptable_toc;
 	for (i = 0; i < MCHIP_NB_PAGES; i++) {
+		dma_addr_t dma;
 		meye.mchip_ptable[i] = dma_alloc_coherent(&meye.mchip_dev->dev,
 							  PAGE_SIZE,
-							  pt,
+							  &dma,
 							  GFP_KERNEL);
 		if (!meye.mchip_ptable[i]) {
 			int j;
 			pt = meye.mchip_ptable_toc;
 			for (j = 0; j < i; ++j) {
+				dma = (dma_addr_t) *pt;
 				dma_free_coherent(&meye.mchip_dev->dev,
 						  PAGE_SIZE,
-						  meye.mchip_ptable[j], *pt);
+						  meye.mchip_ptable[j], dma);
 				pt++;
 			}
 			dma_free_coherent(&meye.mchip_dev->dev,
@@ -155,6 +158,7 @@ static int ptable_alloc(void)
 			meye.mchip_dmahandle = 0;
 			return -1;
 		}
+		*pt = (u32) dma;
 		pt++;
 	}
 	return 0;
@@ -162,15 +166,16 @@ static int ptable_alloc(void)
 
 static void ptable_free(void)
 {
-	dma_addr_t *pt;
+	u32 *pt;
 	int i;
 
 	pt = meye.mchip_ptable_toc;
 	for (i = 0; i < MCHIP_NB_PAGES; i++) {
+		dma_addr_t dma = (dma_addr_t) *pt;
 		if (meye.mchip_ptable[i])
 			dma_free_coherent(&meye.mchip_dev->dev,
 					  PAGE_SIZE,
-					  meye.mchip_ptable[i], *pt);
+					  meye.mchip_ptable[i], dma);
 		pt++;
 	}
 
@@ -520,11 +525,11 @@ static void mchip_vrj_setup(u8 mode)
 }
 
 /* sets the DMA parameters into the chip */
-static void mchip_dma_setup(u32 dma_addr)
+static void mchip_dma_setup(dma_addr_t dma_addr)
 {
 	int i;
 
-	mchip_set(MCHIP_MM_PT_ADDR, dma_addr);
+	mchip_set(MCHIP_MM_PT_ADDR, (u32)dma_addr);
 	for (i = 0; i < 4; i++)
 		mchip_set(MCHIP_MM_FIR(i), 0);
 	meye.mchip_fnum = 0;
@@ -1842,7 +1847,12 @@ static int __devinit meye_probe(struct pci_dev *pcidev,
 	memcpy(meye.video_dev, &meye_template, sizeof(meye_template));
 	meye.video_dev->dev = &meye.mchip_dev->dev;
 
-	sonypi_camera_command(SONYPI_COMMAND_SETCAMERA, 1);
+	if ((ret = sonypi_camera_command(SONYPI_COMMAND_SETCAMERA, 1))) {
+		printk(KERN_ERR "meye: unable to power on the camera\n");
+		printk(KERN_ERR "meye: did you enable the camera in "
+				"sonypi using the module options ?\n");
+		goto outsonypienable;
+	}
 
 	ret = -EIO;
 	if ((ret = pci_enable_device(meye.mchip_dev))) {
@@ -1943,6 +1953,7 @@ outregions:
 	pci_disable_device(meye.mchip_dev);
 outenabledev:
 	sonypi_camera_command(SONYPI_COMMAND_SETCAMERA, 0);
+outsonypienable:
 	kfifo_free(meye.doneq);
 outkfifoalloc2:
 	kfifo_free(meye.grabq);

@@ -83,17 +83,57 @@ qtd_fill (struct ehci_qtd *qtd, dma_addr_t buf, size_t len,
 
 /*-------------------------------------------------------------------------*/
 
-/* update halted (but potentially linked) qh */
-
 static inline void
 qh_update (struct ehci_hcd *ehci, struct ehci_qh *qh, struct ehci_qtd *qtd)
 {
+	/* writes to an active overlay are unsafe */
+	BUG_ON(qh->qh_state != QH_STATE_IDLE);
+
 	qh->hw_qtd_next = QTD_NEXT (qtd->qtd_dma);
 	qh->hw_alt_next = EHCI_LIST_END;
+
+	/* Except for control endpoints, we make hardware maintain data
+	 * toggle (like OHCI) ... here (re)initialize the toggle in the QH,
+	 * and set the pseudo-toggle in udev. Only usb_clear_halt() will
+	 * ever clear it.
+	 */
+	if (!(qh->hw_info1 & cpu_to_le32(1 << 14))) {
+		unsigned	is_out, epnum;
+
+		is_out = !(qtd->hw_token & cpu_to_le32(1 << 8));
+		epnum = (le32_to_cpup(&qh->hw_info1) >> 8) & 0x0f;
+		if (unlikely (!usb_gettoggle (qh->dev, epnum, is_out))) {
+			qh->hw_token &= ~__constant_cpu_to_le32 (QTD_TOGGLE);
+			usb_settoggle (qh->dev, epnum, is_out, 1);
+		}
+	}
 
 	/* HC must see latest qtd and qh data before we clear ACTIVE+HALT */
 	wmb ();
 	qh->hw_token &= __constant_cpu_to_le32 (QTD_TOGGLE | QTD_STS_PING);
+}
+
+/* if it weren't for a common silicon quirk (writing the dummy into the qh
+ * overlay, so qh->hw_token wrongly becomes inactive/halted), only fault
+ * recovery (including urb dequeue) would need software changes to a QH...
+ */
+static void
+qh_refresh (struct ehci_hcd *ehci, struct ehci_qh *qh)
+{
+	struct ehci_qtd *qtd;
+
+	if (list_empty (&qh->qtd_list))
+		qtd = qh->dummy;
+	else {
+		qtd = list_entry (qh->qtd_list.next,
+				struct ehci_qtd, qtd_list);
+		/* first qtd may already be partially processed */
+		if (cpu_to_le32 (qtd->qtd_dma) == qh->hw_current)
+			qtd = NULL;
+	}
+
+	if (qtd)
+		qh_update (ehci, qh, qtd);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -175,6 +215,8 @@ static void qtd_copy_status (
 
 static void
 ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb, struct pt_regs *regs)
+__releases(ehci->lock)
+__acquires(ehci->lock)
 {
 	if (likely (urb->hcpriv != 0)) {
 		struct ehci_qh	*qh = (struct ehci_qh *) urb->hcpriv;
@@ -224,6 +266,11 @@ ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb, struct pt_regs *regs)
 	spin_lock (&ehci->lock);
 }
 
+static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh);
+
+static void intr_deschedule (struct ehci_hcd *ehci,
+				struct ehci_qh *qh, int wait);
+static int qh_schedule (struct ehci_hcd *ehci, struct ehci_qh *qh);
 
 /*
  * Process and free completed qtds for a qh, returning URBs to drivers.
@@ -367,21 +414,27 @@ halt:
 	/* restore original state; caller must unlink or relink */
 	qh->qh_state = state;
 
-	/* update qh after fault cleanup */
-	if (unlikely (stopped != 0)
-			/* some EHCI 0.95 impls will overlay dummy qtds */ 
-			|| qh->hw_qtd_next == EHCI_LIST_END) {
-		if (list_empty (&qh->qtd_list))
-			end = qh->dummy;
-		else {
-			end = list_entry (qh->qtd_list.next,
-					struct ehci_qtd, qtd_list);
-			/* first qtd may already be partially processed */
-			if (cpu_to_le32 (end->qtd_dma) == qh->hw_current)
-				end = NULL;
+	/* be sure the hardware's done with the qh before refreshing
+	 * it after fault cleanup, or recovering from silicon wrongly
+	 * overlaying the dummy qtd (which reduces DMA chatter).
+	 */
+	if (stopped != 0 || qh->hw_qtd_next == EHCI_LIST_END) {
+		switch (state) {
+		case QH_STATE_IDLE:
+			qh_refresh(ehci, qh);
+			break;
+		case QH_STATE_LINKED:
+			/* should be rare for periodic transfers,
+			 * except maybe high bandwidth ...
+			 */
+			if (qh->period) {
+				intr_deschedule (ehci, qh, 1);
+				(void) qh_schedule (ehci, qh);
+			} else
+				start_unlink_async (ehci, qh);
+			break;
+		/* otherwise, unlink already started */
 		}
-		if (end)
-			qh_update (ehci, qh, end);
 	}
 
 	return count;
@@ -555,21 +608,6 @@ cleanup:
 
 /*-------------------------------------------------------------------------*/
 
-/*
- * Hardware maintains data toggle (like OHCI) ... here we (re)initialize
- * the hardware data toggle in the QH, and set the pseudo-toggle in udev
- * so we can see if usb_clear_halt() was called.  NOP for control, since
- * we set up qh->hw_info1 to always use the QTD toggle bits. 
- */
-static inline void
-clear_toggle (struct usb_device *udev, int ep, int is_out, struct ehci_qh *qh)
-{
-	vdbg ("clear toggle, dev %d ep 0x%x-%s",
-		udev->devnum, ep, is_out ? "out" : "in");
-	qh->hw_token &= ~__constant_cpu_to_le32 (QTD_TOGGLE);
-	usb_settoggle (udev, ep, is_out, 1);
-}
-
 // Would be best to create all qh's from config descriptors,
 // when each interface/altsetting is established.  Unlink
 // any previous qh and cancel its urbs first; endpoints are
@@ -649,10 +687,10 @@ qh_make (
 
 			qh->period = urb->interval;
 		}
-
-		/* support for tt scheduling */
-		qh->dev = usb_get_dev (urb->dev);
 	}
+
+	/* support for tt scheduling, and access to toggles */
+	qh->dev = usb_get_dev (urb->dev);
 
 	/* using TT? */
 	switch (urb->dev->speed) {
@@ -713,8 +751,8 @@ done:
 	qh->qh_state = QH_STATE_IDLE;
 	qh->hw_info1 = cpu_to_le32 (info1);
 	qh->hw_info2 = cpu_to_le32 (info2);
-	qh_update (ehci, qh, qh->dummy);
 	usb_settoggle (urb->dev, usb_pipeendpoint (urb->pipe), !is_input, 1);
+	qh_refresh (ehci, qh);
 	return qh;
 }
 
@@ -743,7 +781,9 @@ static void qh_link_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 		}
 	}
 
-	qh->hw_token &= ~HALT_BIT;
+	/* clear halt and/or toggle; and maybe recover from silicon quirk */
+	if (qh->qh_state == QH_STATE_IDLE)
+		qh_refresh (ehci, qh);
 
 	/* splice right after start */
 	qh->qh_next = head->qh_next;
@@ -818,27 +858,8 @@ static struct ehci_qh *qh_append_tds (
                                 qh->hw_info1 &= ~QH_ADDR_MASK;
 		}
 
-		/* usb_clear_halt() means qh data toggle gets reset */
-		if (unlikely (!usb_gettoggle (urb->dev,
-					(epnum & 0x0f), !(epnum & 0x10)))
-				&& !usb_pipecontrol (urb->pipe)) {
-			/* "never happens": drivers do stall cleanup right */
-			if (qh->qh_state != QH_STATE_IDLE
-					&& !list_empty (&qh->qtd_list)
-					&& qh->qh_state != QH_STATE_COMPLETING)
-				ehci_warn (ehci, "clear toggle dev%d "
-						"ep%d%s: not idle\n",
-						usb_pipedevice (urb->pipe),
-						epnum & 0x0f,
-						usb_pipein (urb->pipe)
-							? "in" : "out");
-			/* else we know this overlay write is safe */
-			clear_toggle (urb->dev,
-				epnum & 0x0f, !(epnum & 0x10), qh);
-		}
-
 		/* just one way to queue requests: swap with the dummy qtd.
-		 * only hc or qh_completions() usually modify the overlay.
+		 * only hc or qh_refresh() ever modify the overlay.
 		 */
 		if (likely (qtd != 0)) {
 			struct ehci_qtd		*dummy;
@@ -933,8 +954,6 @@ submit_async (
 /*-------------------------------------------------------------------------*/
 
 /* the async qh for the qtds being reclaimed are now unlinked from the HC */
-
-static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh);
 
 static void end_unlink_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 {

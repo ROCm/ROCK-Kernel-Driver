@@ -808,7 +808,6 @@ void __init find_smp_config (void)
 		smp_scan_config(address, 0x400);
 }
 
-
 /* --------------------------------------------------------------------------
                             ACPI-based MP Configuration
    -------------------------------------------------------------------------- */
@@ -1055,8 +1054,6 @@ void __init mp_config_acpi_legacy_irqs (void)
 	}
 }
 
-int (*platform_rename_gsi)(int ioapic, int gsi);
-
 int mp_register_gsi (u32 gsi, int edge_level, int active_high_low)
 {
 	int			ioapic = -1;
@@ -1077,8 +1074,8 @@ int mp_register_gsi (u32 gsi, int edge_level, int active_high_low)
 
 	ioapic_pin = gsi - mp_ioapic_routing[ioapic].gsi_base;
 
-	if (platform_rename_gsi)
-		gsi = platform_rename_gsi(ioapic, gsi);
+	if (ioapic_renumber_irq)
+		gsi = ioapic_renumber_irq(ioapic, gsi);
 
 	/* 
 	 * Avoid pin reprogramming.  PRTs typically include entries  

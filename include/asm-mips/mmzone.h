@@ -8,9 +8,6 @@
 #include <asm/page.h>
 #include <mmzone.h>
 
-extern struct pglist_data *node_data[];
-
-#define NODE_DATA(n)		(node_data[(n)])
 #define kvaddr_to_nid(kvaddr)	pa_to_nid(__pa(kvaddr))
 #define pfn_to_nid(pfn)		pa_to_nid((pfn) << PAGE_SHIFT)
 

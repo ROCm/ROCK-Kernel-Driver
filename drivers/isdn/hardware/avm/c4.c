@@ -662,15 +662,16 @@ static void c4_handle_rx(avmcard *card)
 
 static irqreturn_t c4_handle_interrupt(avmcard *card)
 {
+	unsigned long flags;
 	u32 status;
 
-	spin_lock(&card->lock);
+	spin_lock_irqsave(&card->lock, flags);
 	status = c4inmeml(card->mbase+DOORBELL);
 
 	if (status & DBELL_RESET_HOST) {
 		u_int i;
 		c4outmeml(card->mbase+PCI_OUT_INT_MASK, 0x0c);
-		spin_unlock(&card->lock);
+		spin_unlock_irqrestore(&card->lock, flags);
 		if (card->nlogcontr == 0)
 			return IRQ_HANDLED;
 		printk(KERN_ERR "%s: unexpected reset\n", card->name);
@@ -686,7 +687,7 @@ static irqreturn_t c4_handle_interrupt(avmcard *card)
 
 	status &= (DBELL_UP_HOST | DBELL_DOWN_HOST);
 	if (!status) {
-		spin_unlock(&card->lock);
+		spin_unlock_irqrestore(&card->lock, flags);
 		return IRQ_HANDLED;
 	}
 	c4outmeml(card->mbase+DOORBELL, status);
@@ -709,7 +710,7 @@ static irqreturn_t c4_handle_interrupt(avmcard *card)
 			c4_dispatch_tx(card);
 		}
 	}
-	spin_unlock(&card->lock);
+	spin_unlock_irqrestore(&card->lock, flags);
 	return IRQ_HANDLED;
 }
 

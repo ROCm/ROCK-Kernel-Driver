@@ -13,7 +13,7 @@
 #define _ASM_PCI_BRIDGE_H
 
 #include <linux/types.h>
-#include <asm/pci_channel.h>
+#include <linux/pci.h>
 #include <asm/xtalk/xwidget.h>		/* generic widget header */
 
 /* I/O page size */
@@ -830,7 +830,6 @@ typedef union ate_u {
 
 #define BRIDGE_INTERNAL_ATES	128
 
-
 struct bridge_controller {
 	struct pci_controller	pc;
 	struct resource		mem;
@@ -840,9 +839,13 @@ struct bridge_controller {
 	unsigned int		widget_id;
 	unsigned int 		irq_cpu;
 	dma64_addr_t		baddr;
+	unsigned int		pci_int[8];
 };
 
 #define BRIDGE_CONTROLLER(bus) \
 	((struct bridge_controller *)((bus)->sysdata))
+
+extern void register_bridge_irq(unsigned int irq);
+extern int request_bridge_irq(struct bridge_controller *bc);
 
 #endif /* _ASM_PCI_BRIDGE_H */

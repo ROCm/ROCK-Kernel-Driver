@@ -43,8 +43,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/hardware.h>
-#include <asm/arch/serial.h>
-#include <asm/mach-types.h>
 
 /* We've been assigned a range on the "Low-density serial ports" major */
 #define SERIAL_IMX_MAJOR	204

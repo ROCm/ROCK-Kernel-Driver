@@ -21,7 +21,7 @@
 use File::Temp qw/ tempdir /;
 use IO::Handle;
 
-@components = ( "alps_tdlb7", "sp887x", "tda10045", "tda10046", "av7110", "dec2000t", "dec2540t", "dec3000s", "vp7041", "dibusb" );
+@components = ( "sp8870", "sp887x", "tda10045", "tda10046", "av7110", "dec2000t", "dec2540t", "dec3000s", "vp7041", "dibusb" );
 
 # Check args
 syntax() if (scalar(@ARGV) != 1);
@@ -32,7 +32,7 @@ for($i=0; $i < scalar(@components); $i++) {
     if ($cid eq $components[$i]) {
 	$outfile = eval($cid);
 	die $@ if $@;
-	print STDERR "Firmware $outfile extracted successfully. Now copy it to /usr/lib/hotplug/firmware/.\n";
+	print STDERR "Firmware $outfile extracted successfully. Now copy it to either /lib/firmware or /usr/lib/hotplug/firmware/ (depending on your hotplug version).\n";
 	exit(0);
     }
 }
@@ -47,11 +47,11 @@ syntax();
 # ---------------------------------------------------------------
 # Firmware-specific extraction subroutines
 
-sub alps_tdlb7 {
+sub sp8870 {
     my $sourcefile = "tt_Premium_217g.zip";
     my $url = "http://www.technotrend.de/new/217g/$sourcefile";
     my $hash = "53970ec17a538945a6d8cb608a7b3899";
-    my $outfile = "dvb-fe-tdlb7.fw";
+    my $outfile = "dvb-fe-sp8870.fw";
     my $tmpdir = tempdir(DIR => "/tmp", CLEANUP => 1);
 
     checkstandard();

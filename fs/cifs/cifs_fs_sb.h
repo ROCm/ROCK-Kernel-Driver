@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/cifs_fs_sb.h
  *
- *   Copyright (c) International Business Machines  Corp., 2002
+ *   Copyright (c) International Business Machines  Corp., 2002,2004
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -18,8 +18,10 @@
 #ifndef _CIFS_FS_SB_H
 #define _CIFS_FS_SB_H
 
-#define CIFS_MOUNT_NO_PERM	1 /* do not do client vfs_perm check */
+#define CIFS_MOUNT_NO_PERM      1 /* do not do client vfs_perm check */
 #define CIFS_MOUNT_SET_UID      2 /* set current->euid in create etc. */
+#define CIFS_MOUNT_SERVER_INUM  4 /* inode numbers from uniqueid from server */
+#define CIFS_MOUNT_DIRECT_IO          8 /* do not write nor read through page cache */
 
 struct cifs_sb_info {
 	struct cifsTconInfo *tcon;	/* primary mount */

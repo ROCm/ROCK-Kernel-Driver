@@ -22,11 +22,13 @@ static inline long cede_processor(void)
 	return(0); 
 }
 
-static inline long register_vpa(unsigned long flags, unsigned long proc, unsigned long vpa)
+static inline long register_vpa(unsigned long flags, unsigned long proc,
+				unsigned long vpa)
 {
-	plpar_hcall_norets(H_REGISTER_VPA, flags, proc, vpa);
-	return(0); 
+	return plpar_hcall_norets(H_REGISTER_VPA, flags, proc, vpa);
 }
+
+void vpa_init(int cpu);
 
 static inline long plpar_pte_remove(unsigned long flags,
 				    unsigned long ptex,

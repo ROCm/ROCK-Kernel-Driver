@@ -1,5 +1,6 @@
 /*
- * Debug macros for run-time debugging.  Turned on/off with CONFIG_RUNTIME_DEBUG option.
+ * Debug macros for run-time debugging.
+ * Turned on/off with CONFIG_RUNTIME_DEBUG option.
  *
  * Copyright (C) 2001 MontaVista Software Inc.
  * Author: Jun Sun, jsun@mvista.com or jsun@junsun.net

@@ -138,7 +138,7 @@ __arm710_setup:	mov	r0, #0
 		bic	r0, r0, #0x0e00			@ ..V. ..RS BLDP WCAM
 		orr	r0, r0, #0x0100			@ .... .... .111 .... (old)
 		orr	r0, r0, #0x003d			@ .... ..01 ..11 1101 (new)
-		mov	pc, lr				@ __ret (head-armv.S)
+		mov	pc, lr				@ __ret (head.S)
 		.size	__arm710_setup, . - __arm710_setup
 
 		.type	__arm720_setup, #function
@@ -153,7 +153,7 @@ __arm720_setup:	mov	r0, #0
 		bic	r0, r0, #0x0e00			@ ..V. ..RS BLDP WCAM
 		orr	r0, r0, #0x2100			@ .... .... .111 .... (old)
 		orr	r0, r0, #0x003d			@ ..1. ..01 ..11 1101 (new)
-		mov	pc, lr				@ __ret (head-armv.S)
+		mov	pc, lr				@ __ret (head.S)
 		.size	__arm720_setup, . - __arm720_setup
 
 		__INITDATA

@@ -156,8 +156,8 @@ static inline struct scsi_cd *scsi_cd_get(struct gendisk *disk)
 static inline void scsi_cd_put(struct scsi_cd *cd)
 {
 	down(&sr_ref_sem);
-	scsi_device_put(cd->device);
 	kref_put(&cd->kref, sr_kref_release);
+	scsi_device_put(cd->device);
 	up(&sr_ref_sem);
 }
 

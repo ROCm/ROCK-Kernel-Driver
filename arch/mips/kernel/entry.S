@@ -16,6 +16,7 @@
 #include <asm/stackframe.h>
 #include <asm/isadep.h>
 #include <asm/thread_info.h>
+#include <asm/war.h>
 
 #ifdef CONFIG_PREEMPT
 	.macro	preempt_stop reg=t0
@@ -139,7 +140,11 @@ LEAF(spurious_interrupt)
 1:	ll      t0, %lo(irq_err_count)(t1)
 	addiu   t0, 1
 	sc      t0, %lo(irq_err_count)(t1)
+#if R10000_LLSC_WAR
+	beqzl	t0, 1b
+#else
 	beqz	t0, 1b
+#endif
 #else
 	lui     t1, %hi(irq_err_count)
 	lw      t0, %lo(irq_err_count)(t1)

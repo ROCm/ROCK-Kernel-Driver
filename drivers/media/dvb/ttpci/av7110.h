@@ -24,8 +24,20 @@
 #include "dvb_filter.h"
 #include "dvb_net.h"
 #include "dvb_ringbuffer.h"
+#include "dvb_frontend.h"
+#include "ves1820.h"
+#include "ves1x93.h"
+#include "stv0299.h"
+#include "tda8083.h"
+#include "sp8870.h"
+#include "stv0297.h"
 
 #include <media/saa7146_vv.h>
+
+
+#define ANALOG_TUNER_VES1820 1
+#define ANALOG_TUNER_STV0297 2
+#define ANALOG_TUNER_VBI     0x100
 
 extern int av7110_debug;
 
@@ -75,7 +87,7 @@ struct av7110 {
 	char			*card_name;
 
 	/* support for analog module of dvb-c */
-	int			has_analog_tuner;
+	int			analog_tuner_flags;
 	int			current_input;
 	u32			current_freq;
 				
@@ -115,8 +127,8 @@ struct av7110 {
 
         spinlock_t              debilock;
         struct semaphore        dcomlock;
-        int                     debitype;
-        int                     debilen;
+	volatile int		debitype;
+	volatile int		debilen;
 
 
         /* Recording and playback flags */
@@ -217,6 +229,18 @@ struct av7110 {
 
 	unsigned char *bin_root;
 	unsigned long size_root;
+
+	struct dvb_frontend* fe;
+	fe_status_t fe_status;
+	int (*fe_init)(struct dvb_frontend* fe);
+	int (*fe_read_status)(struct dvb_frontend* fe, fe_status_t* status);
+	int (*fe_diseqc_reset_overload)(struct dvb_frontend* fe);
+	int (*fe_diseqc_send_master_cmd)(struct dvb_frontend* fe, struct dvb_diseqc_master_cmd* cmd);
+	int (*fe_diseqc_send_burst)(struct dvb_frontend* fe, fe_sec_mini_cmd_t minicmd);
+	int (*fe_set_tone)(struct dvb_frontend* fe, fe_sec_tone_mode_t tone);
+	int (*fe_set_voltage)(struct dvb_frontend* fe, fe_sec_voltage_t voltage);
+	int (*fe_dishnetwork_send_legacy_command)(struct dvb_frontend* fe, unsigned int cmd);
+	int (*fe_set_frontend)(struct dvb_frontend* fe, struct dvb_frontend_parameters* params);
 };
 
 

@@ -170,24 +170,22 @@ ahd_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	if (sizeof(dma_addr_t) > 4) {
 		uint64_t   memsize;
-		dma_addr_t mask_64bit;
-		dma_addr_t mask_39bit;
+		const uint64_t mask_39bit = 0x7FFFFFFFFFULL;
 
 		memsize = ahd_linux_get_memsize();
-		mask_64bit = (dma_addr_t)0xFFFFFFFFFFFFFFFFULL;
-		mask_39bit = (dma_addr_t)0x7FFFFFFFFFULL;
+
 		if (memsize >= 0x8000000000ULL
-	 	 && pci_set_dma_mask(pdev, mask_64bit) == 0) {
+	 	 && pci_set_dma_mask(pdev, DMA_64BIT_MASK) == 0) {
 			ahd->flags |= AHD_64BIT_ADDRESSING;
-			ahd->platform_data->hw_dma_mask = mask_64bit;
+			ahd->platform_data->hw_dma_mask = DMA_64BIT_MASK;
 		} else if (memsize > 0x80000000
 			&& pci_set_dma_mask(pdev, mask_39bit) == 0) {
 			ahd->flags |= AHD_39BIT_ADDRESSING;
 			ahd->platform_data->hw_dma_mask = mask_39bit;
 		}
 	} else {
-		pci_set_dma_mask(pdev, 0xFFFFFFFF);
-		ahd->platform_data->hw_dma_mask = 0xFFFFFFFF;
+		pci_set_dma_mask(pdev, DMA_32BIT_MASK);
+		ahd->platform_data->hw_dma_mask = DMA_32BIT_MASK;
 	}
 	ahd->dev_softc = pci;
 	error = ahd_pci_config(ahd, entry);

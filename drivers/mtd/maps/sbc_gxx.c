@@ -189,7 +189,7 @@ static void cleanup_sbc_gxx(void)
 		map_destroy( all_mtd );
 	}
 
-	iounmap((void *)iomapadr);
+	iounmap(iomapadr);
 	release_region(PAGE_IO,PAGE_IO_SIZE);
 }
 
@@ -206,7 +206,7 @@ static int __init init_sbc_gxx(void)
 		printk( KERN_ERR"%s: IO ports 0x%x-0x%x in use\n",
 			sbc_gxx_map.name,
 			PAGE_IO, PAGE_IO+PAGE_IO_SIZE-1 );
-		iounmap((void *)iomapadr);
+		iounmap(iomapadr);
 		return -EAGAIN;
 	}
 		

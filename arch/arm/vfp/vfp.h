@@ -337,3 +337,8 @@ extern u32 vfp_get_sys(unsigned int reg);
 extern void vfp_put_sys(unsigned int reg, u32 val);
 
 u32 vfp_estimate_sqrt_significand(u32 exponent, u32 significand);
+
+/*
+ * A special flag to tell the normalisation code not to normalise.
+ */
+#define VFP_NAN_FLAG	0x100
