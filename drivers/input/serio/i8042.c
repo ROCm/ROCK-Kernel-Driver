@@ -63,7 +63,7 @@ struct timer_list i8042_timer;
 
 extern struct pt_regs *kbd_pt_regs;
 
-static unsigned long i8042_unxlate_seen[128 / BITS_PER_LONG];
+static unsigned long i8042_unxlate_seen[256 / BITS_PER_LONG];
 static unsigned char i8042_unxlate_table[128] = {
 	  0,118, 22, 30, 38, 37, 46, 54, 61, 62, 70, 69, 78, 85,102, 13,
 	 21, 29, 36, 45, 44, 53, 60, 67, 68, 77, 84, 91, 90, 20, 28, 27,
@@ -407,14 +407,14 @@ static void i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		}
 
 		if (data > 0x7f) {
-			if (test_and_clear_bit(data & 0x7f, i8042_unxlate_seen)) {
+			if (test_and_clear_bit((data & 0x7f) | (i8042_last_e0 << 7), i8042_unxlate_seen)) {
 				serio_interrupt(&i8042_kbd_port, 0xf0, dfl);
 				if (i8042_last_e0 && (data == 0xaa || data == 0xb6))
-					set_bit(data & 0x7f, i8042_unxlate_seen);
+					set_bit((data & 0x7f) | (i8042_last_e0 << 7), i8042_unxlate_seen);
 				data = i8042_unxlate_table[data & 0x7f];
 			}
 		} else {
-			set_bit(data, i8042_unxlate_seen);
+			set_bit(data | (i8042_last_e0 << 7), i8042_unxlate_seen);
 			data = i8042_unxlate_table[data];
 		}
 
