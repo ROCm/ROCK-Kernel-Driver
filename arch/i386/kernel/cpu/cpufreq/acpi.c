@@ -108,7 +108,7 @@ acpi_processor_get_performance_control (
 	}
 
 	perf->control_register = (u16) reg->address;
-
+	perf->control_register_bit_width = reg->bit_width;
 	/*
 	 * status_register
 	 */
@@ -135,6 +135,7 @@ acpi_processor_get_performance_control (
 	}
 
 	perf->status_register = (u16) reg->address;
+	perf->status_register_bit_width = reg->bit_width;
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
 		"control_register[0x%04x] status_register[0x%04x]\n",
@@ -224,6 +225,42 @@ end:
 	return_VALUE(result);
 }
 
+static int
+acpi_processor_write_port(
+	u16	port,
+	u8	bit_width,
+	u32	value)
+{
+	if (bit_width <= 8) {
+		outb(value, port);
+	} else if (bit_width <= 16) {
+		outw(value, port);
+	} else if (bit_width <= 32) {
+		outl(value, port);
+	} else {
+		return -ENODEV;
+	}
+	return 0;
+}
+
+static int
+acpi_processor_read_port(
+	u16	port,
+	u8	bit_width,
+	u32	*ret)
+{
+	*ret = 0;
+	if (bit_width <= 8) {
+		*ret = inb(port);
+	} else if (bit_width <= 16) {
+		*ret = inw(port);
+	} else if (bit_width <= 32) {
+		*ret = inl(port);
+	} else {
+		return -ENODEV;
+	}
+	return 0;
+}
 
 static int
 acpi_processor_set_performance (
@@ -231,7 +268,9 @@ acpi_processor_set_performance (
 	int			state)
 {
 	u16			port = 0;
-	u16			value = 0;
+	u8			bit_width = 0;
+	int			ret = 0;
+	u32			value = 0;
 	int			i = 0;
 	struct cpufreq_freqs    cpufreq_freqs;
 
@@ -279,12 +318,18 @@ acpi_processor_set_performance (
 	 */
 
 	port = perf->control_register;
-	value = (u16) perf->states[state].control;
+	bit_width = perf->control_register_bit_width;
+	value = (u32) perf->states[state].control;
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
-		"Writing 0x%04x to port 0x%04x\n", value, port));
+		"Writing 0x%08x to port 0x%04x\n", value, port));
 
-	outw(value, port); 
+	ret = acpi_processor_write_port(port, bit_width, value);
+	if (ret) {
+		ACPI_DEBUG_PRINT((ACPI_DB_WARN,
+			"Invalid port width 0x%04x\n", bit_width));
+		return_VALUE(ret);
+	}
 
 	/*
 	 * Then we read the 'status_register' and compare the value with the
@@ -294,14 +339,20 @@ acpi_processor_set_performance (
 	 */
 
 	port = perf->status_register;
+	bit_width = perf->status_register_bit_width;
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
-		"Looking for 0x%04x from port 0x%04x\n",
-		(u16) perf->states[state].status, port));
+		"Looking for 0x%08x from port 0x%04x\n",
+		(u32) perf->states[state].status, port));
 
 	for (i=0; i<100; i++) {
-		value = inw(port);
-		if (value == (u16) perf->states[state].status)
+		ret = acpi_processor_read_port(port, bit_width, &value);
+		if (ret) {	
+			ACPI_DEBUG_PRINT((ACPI_DB_WARN,
+				"Invalid port width 0x%04x\n", bit_width));
+			return_VALUE(ret);
+		}
+		if (value == (u32) perf->states[state].status)
 			break;
 		udelay(10);
 	}
@@ -309,7 +360,7 @@ acpi_processor_set_performance (
 	/* notify cpufreq */
 	cpufreq_notify_transition(&cpufreq_freqs, CPUFREQ_POSTCHANGE);
 
-	if (value != (u16) perf->states[state].status) {
+	if (value != (u32) perf->states[state].status) {
 		unsigned int tmp = cpufreq_freqs.new;
 		cpufreq_freqs.new = cpufreq_freqs.old;
 		cpufreq_freqs.old = tmp;
