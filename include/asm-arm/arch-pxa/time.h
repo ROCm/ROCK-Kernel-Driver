@@ -33,13 +33,17 @@ static int pxa_set_rtc(void)
 /* IRQs are disabled before entering here from do_gettimeofday() */
 static unsigned long pxa_gettimeoffset (void)
 {
-	unsigned long ticks_to_match, elapsed, usec;
+	long ticks_to_match, elapsed, usec;
 
 	/* Get ticks before next timer match */
 	ticks_to_match = OSMR0 - OSCR;
 
 	/* We need elapsed ticks since last match */
 	elapsed = LATCH - ticks_to_match;
+
+	/* don't get fooled by the workaround in pxa_timer_interrupt() */
+	if (elapsed <= 0)
+		return 0;
 
 	/* Now convert them to usec */
 	usec = (unsigned long)(elapsed * (tick_nsec / 1000))/LATCH;
@@ -59,6 +63,15 @@ pxa_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 * IRQs are disabled inside the loop to ensure coherence between
 	 * lost_ticks (updated in do_timer()) and the match reg value, so we
 	 * can use do_gettimeofday() from interrupt handlers.
+	 *
+	 * HACK ALERT: it seems that the PXA timer regs aren't updated right
+	 * away in all cases when a write occurs.  We therefore compare with
+	 * 8 instead of 0 in the while() condition below to avoid missing a
+	 * match if OSCR has already reached the next OSMR value.
+	 * Experience has shown that up to 6 ticks are needed to work around
+	 * this problem, but let's use 8 to be conservative.  Note that this
+	 * affect things only when the timer IRQ has been delayed by nearly
+	 * exactly one tick period which should be a pretty rare event.
 	 */
 	do {
 		do_leds();
@@ -66,7 +79,7 @@ pxa_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		do_timer(regs);
 		OSSR = OSSR_M0;  /* Clear match on timer 0 */
 		next_match = (OSMR0 += LATCH);
-	} while( (signed long)(next_match - OSCR) <= 0 );
+	} while( (signed long)(next_match - OSCR) <= 8 );
 
 	return IRQ_HANDLED;
 }
