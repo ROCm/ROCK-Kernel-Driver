@@ -57,17 +57,20 @@ static int use_kmalloc;
 
 extern unsigned long *interrupt_redirect_table;
 
+#define CPU_VECTOR ((unsigned long *)0x000000)
+#define ADDR_MASK (0xffffff)
+
 static inline unsigned long *get_vector_address(void)
 {
-	unsigned long *rom_vector = (unsigned long *)0x000000;
+	unsigned long *rom_vector = CPU_VECTOR;
 	unsigned long base,tmp;
 	int vec_no;
 
-	base = rom_vector[EXT_IRQ0];
+	base = rom_vector[EXT_IRQ0] & ADDR_MASK;
 	
 	/* check romvector format */
 	for (vec_no = EXT_IRQ1; vec_no <= EXT_IRQ5; vec_no++) {
-		if ((base+(vec_no - EXT_IRQ0)*4) != rom_vector[vec_no])
+		if ((base+(vec_no - EXT_IRQ0)*4) != (rom_vector[vec_no] & ADDR_MASK))
 			return NULL;
 	}
 
