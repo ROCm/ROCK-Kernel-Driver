@@ -2,8 +2,8 @@
  *
  * Name:	skdim.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.4 $
- * Date:	$Date: 2003/07/07 09:45:47 $
+ * Version:	$Revision: 1.2 $
+ * Date:	$Date: 2003/08/21 12:35:05 $
  * Purpose:	All functions to maintain interrupt moderation
  *
  ******************************************************************************/
@@ -26,6 +26,12 @@
  * History:
  *	
  *	$Log: skdim.c,v $
+ *	Revision 1.2  2003/08/21 12:35:05  mlindner
+ *	Fix: Corrected CPU detection and compile errors on single CPU machines
+ *	
+ *	Revision 1.1  2003/07/18 13:39:55  rroesler
+ *	Fix: Re-enter after CVS crash
+ *	
  *	Revision 1.4  2003/07/07 09:45:47  rroesler
  *	Fix: Compiler warnings corrected
  *	
@@ -56,7 +62,7 @@
 
 #ifndef	lint
 static const char SysKonnectFileId[] =
-	"@(#) $Id: skdim.c,v 1.4 2003/07/07 09:45:47 rroesler Exp $ (C) SysKonnect.";
+	"@(#) $Id: skdim.c,v 1.2 2003/08/21 12:35:05 mlindner Exp $ (C) SysKonnect.";
 #endif
 
 #define __SKADDR_C
@@ -312,6 +318,12 @@ GetCurrentSystemLoad(SK_AC *pAC) {
 	unsigned int  TotalTime   = 0;
 	unsigned int  UsedTime    = 0;
 	unsigned int  SystemLoad  = 0;
+#ifdef CONFIG_SMP
+	unsigned int  SKNumCpus   = smp_num_cpus;
+#else
+	unsigned int  SKNumCpus   = 1;
+#endif
+
 	/* unsigned int  NbrCpu      = 0; */
 
 	/*
