@@ -520,7 +520,7 @@ int full_check_disk_change(struct block_device *bdev)
 	if (bdev->bd_contains != bdev)
 		BUG();
 	down(&bdev->bd_sem);
-	if (check_disk_change(bdev)) {
+	if (check_disk_change(bdev) && bdev->bd_invalidated) {
 		rescan_partitions(bdev->bd_disk, bdev);
 		res = 1;
 	}

@@ -449,8 +449,6 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 	struct parsed_partitions *state;
 	int p, res;
 
-	if (!bdev->bd_invalidated)
-		return 0;
 	if (bdev->bd_part_count)
 		return -EBUSY;
 	res = invalidate_device(dev, 1);
