@@ -260,13 +260,14 @@ static struct buffer_head * sysv_update_inode(struct inode * inode)
 	return bh;
 }
 
-void sysv_write_inode(struct inode * inode, int wait)
+int sysv_write_inode(struct inode * inode, int wait)
 {
 	struct buffer_head *bh;
 	lock_kernel();
 	bh = sysv_update_inode(inode);
 	brelse(bh);
 	unlock_kernel();
+	return 0;
 }
 
 int sysv_sync_inode(struct inode * inode)

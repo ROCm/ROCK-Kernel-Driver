@@ -960,7 +960,7 @@ struct super_operations {
 	void (*read_inode) (struct inode *);
   
    	void (*dirty_inode) (struct inode *);
-	void (*write_inode) (struct inode *, int);
+	int (*write_inode) (struct inode *, int);
 	void (*put_inode) (struct inode *);
 	void (*drop_inode) (struct inode *);
 	void (*delete_inode) (struct inode *);

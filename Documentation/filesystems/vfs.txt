@@ -176,7 +176,7 @@ filesystem. As of kernel 2.1.99, the following members are defined:
 
 struct super_operations {
 	void (*read_inode) (struct inode *);
-	void (*write_inode) (struct inode *, int);
+	int (*write_inode) (struct inode *, int);
 	void (*put_inode) (struct inode *);
 	void (*drop_inode) (struct inode *);
 	void (*delete_inode) (struct inode *);

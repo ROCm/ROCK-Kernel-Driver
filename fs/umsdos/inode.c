@@ -312,11 +312,12 @@ out:
 /*
  * Update the disk with the inode content
  */
-void UMSDOS_write_inode (struct inode *inode, int wait)
+int UMSDOS_write_inode (struct inode *inode, int wait)
 {
 	struct iattr newattrs;
+	int ret;
 
-	fat_write_inode (inode, wait);
+	ret = fat_write_inode (inode, wait);
 	newattrs.ia_mtime = inode->i_mtime;
 	newattrs.ia_atime = inode->i_atime;
 	newattrs.ia_ctime = inode->i_ctime;
@@ -330,6 +331,7 @@ void UMSDOS_write_inode (struct inode *inode, int wait)
  * UMSDOS_notify_change (inode, &newattrs);
 
  * inode->i_state &= ~I_DIRTY; / * FIXME: this doesn't work.  We need to remove ourselves from list on dirty inodes. /mn/ */
+	return ret;
 }
 
 

@@ -94,20 +94,20 @@ static void hfsplus_read_inode(struct inode *inode)
 	make_bad_inode(inode);
 }
 
-void hfsplus_write_inode(struct inode *inode, int unused)
+int hfsplus_write_inode(struct inode *inode, int unused)
 {
 	struct hfsplus_vh *vhdr;
+	int ret = 0;
 
 	dprint(DBG_INODE, "hfsplus_write_inode: %lu\n", inode->i_ino);
 	hfsplus_ext_write_extent(inode);
 	if (inode->i_ino >= HFSPLUS_FIRSTUSER_CNID) {
-		hfsplus_cat_write_inode(inode);
-		return;
+		return hfsplus_cat_write_inode(inode);
 	}
 	vhdr = HFSPLUS_SB(inode->i_sb).s_vhdr;
 	switch (inode->i_ino) {
 	case HFSPLUS_ROOT_CNID:
-		hfsplus_cat_write_inode(inode);
+		ret = hfsplus_cat_write_inode(inode);
 		break;
 	case HFSPLUS_EXT_CNID:
 		if (vhdr->ext_file.total_size != cpu_to_be64(inode->i_size)) {
@@ -148,6 +148,7 @@ void hfsplus_write_inode(struct inode *inode, int unused)
 		hfs_btree_write(HFSPLUS_SB(inode->i_sb).attr_tree);
 		break;
 	}
+	return ret;
 }
 
 static void hfsplus_clear_inode(struct inode *inode)

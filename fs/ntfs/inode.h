@@ -286,7 +286,6 @@ extern void ntfs_truncate(struct inode *vi);
 extern int ntfs_setattr(struct dentry *dentry, struct iattr *attr);
 
 extern int ntfs_write_inode(struct inode *vi, int sync);
-extern void ntfs_write_inode_vfs(struct inode *vi, int sync);
 
 static inline void ntfs_commit_inode(struct inode *vi)
 {

@@ -1248,9 +1248,9 @@ static int ext2_update_inode(struct inode * inode, int do_sync)
 	return err;
 }
 
-void ext2_write_inode(struct inode *inode, int wait)
+int ext2_write_inode(struct inode *inode, int wait)
 {
-	ext2_update_inode(inode, wait);
+	return ext2_update_inode(inode, wait);
 }
 
 int ext2_sync_inode(struct inode *inode)

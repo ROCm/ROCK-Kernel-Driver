@@ -788,11 +788,13 @@ static int ufs_update_inode(struct inode * inode, int do_sync)
 	return 0;
 }
 
-void ufs_write_inode (struct inode * inode, int wait)
+int ufs_write_inode (struct inode * inode, int wait)
 {
+	int ret;
 	lock_kernel();
-	ufs_update_inode (inode, wait);
+	ret = ufs_update_inode (inode, wait);
 	unlock_kernel();
+	return ret;
 }
 
 int ufs_sync_inode (struct inode *inode)
