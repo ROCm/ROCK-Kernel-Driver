@@ -1,6 +1,8 @@
 #ifndef __PMAC_ZILOG_H__
 #define __PMAC_ZILOG_H__
 
+#define pmz_debug(fmt,arg...)	dev_dbg(&uap->dev->ofdev.dev, fmt, ## arg)
+
 /*
  * At most 2 ESCCs with 2 ports each
  */
