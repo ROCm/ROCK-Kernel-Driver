@@ -63,35 +63,16 @@
 
 #include <linux/module.h>
 
-#include <linux/sched.h>
-#include <linux/string.h>
-#include <linux/fs.h>
-#include <linux/fcntl.h>
-#include <linux/kernel.h>
-#include <linux/timer.h>
 #include <linux/fd.h>
-#include <linux/errno.h>
-#include <linux/types.h>
 #include <linux/delay.h>
-#include <linux/mm.h>
-#include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/buffer_head.h>		/* for invalidate_buffers() */
-
-#include <asm/setup.h>
-#include <asm/system.h>
-#include <asm/bitops.h>
-#include <asm/irq.h>
-#include <asm/pgtable.h>
-#include <asm/uaccess.h>
+#include <linux/blkdev.h>
 
 #include <asm/atafd.h>
 #include <asm/atafdreg.h>
-#include <asm/atarihw.h>
 #include <asm/atariints.h>
 #include <asm/atari_stdma.h>
 #include <asm/atari_stram.h>
-#include <linux/blkpg.h>
 
 #define	FD_MAX_UNITS 2
 
