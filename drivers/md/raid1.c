@@ -339,7 +339,7 @@ static int read_balance(conf_t *conf, r1bio_t *r1_bio)
 	const int sectors = r1_bio->sectors;
 	sector_t new_distance, current_distance;
 
-	spin_lock_irq(&conf->device_lock);
+	rcu_read_lock();
 	/*
 	 * Check if it if we can balance. We can balance on the whole
 	 * device if no resync is going on, or below the resync window.
@@ -416,7 +416,7 @@ rb_out:
 		conf->last_used = new_disk;
 		atomic_inc(&conf->mirrors[new_disk].rdev->nr_pending);
 	}
-	spin_unlock_irq(&conf->device_lock);
+	rcu_read_unlock();
 
 	return new_disk;
 }
@@ -425,26 +425,26 @@ static void unplug_slaves(mddev_t *mddev)
 {
 	conf_t *conf = mddev_to_conf(mddev);
 	int i;
-	unsigned long flags;
 
-	spin_lock_irqsave(&conf->device_lock, flags);
+	rcu_read_lock();
 	for (i=0; i<mddev->raid_disks; i++) {
 		mdk_rdev_t *rdev = conf->mirrors[i].rdev;
 		if (rdev && !rdev->faulty && atomic_read(&rdev->nr_pending)) {
 			request_queue_t *r_queue = bdev_get_queue(rdev->bdev);
 
 			atomic_inc(&rdev->nr_pending);
-			spin_unlock_irqrestore(&conf->device_lock, flags);
+			rcu_read_unlock();
 
 			if (r_queue->unplug_fn)
 				r_queue->unplug_fn(r_queue);
 
-			spin_lock_irqsave(&conf->device_lock, flags);
 			rdev_dec_pending(rdev, mddev);
+			rcu_read_lock();
 		}
 	}
-	spin_unlock_irqrestore(&conf->device_lock, flags);
+	rcu_read_unlock();
 }
+
 static void raid1_unplug(request_queue_t *q)
 {
 	unplug_slaves(q->queuedata);
@@ -455,10 +455,9 @@ static int raid1_issue_flush(request_queue_t *q, struct gendisk *disk,
 {
 	mddev_t *mddev = q->queuedata;
 	conf_t *conf = mddev_to_conf(mddev);
-	unsigned long flags;
 	int i, ret = 0;
 
-	spin_lock_irqsave(&conf->device_lock, flags);
+	rcu_read_lock();
 	for (i=0; i<mddev->raid_disks && ret == 0; i++) {
 		mdk_rdev_t *rdev = conf->mirrors[i].rdev;
 		if (rdev && !rdev->faulty) {
@@ -467,12 +466,17 @@ static int raid1_issue_flush(request_queue_t *q, struct gendisk *disk,
 
 			if (!r_queue->issue_flush_fn)
 				ret = -EOPNOTSUPP;
-			else
+			else {
+				atomic_inc(&rdev->nr_pending);
+				rcu_read_unlock();
 				ret = r_queue->issue_flush_fn(r_queue, bdev->bd_disk,
 							      error_sector);
+				rdev_dec_pending(rdev, mddev);
+				rcu_read_lock();
+			}
 		}
 	}
-	spin_unlock_irqrestore(&conf->device_lock, flags);
+	rcu_read_unlock();
 	return ret;
 }
 
@@ -579,7 +583,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 	 * bios[x] to bio
 	 */
 	disks = conf->raid_disks;
-	spin_lock_irq(&conf->device_lock);
+	rcu_read_lock();
 	for (i = 0;  i < disks; i++) {
 		if (conf->mirrors[i].rdev &&
 		    !conf->mirrors[i].rdev->faulty) {
@@ -588,7 +592,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 		} else
 			r1_bio->bios[i] = NULL;
 	}
-	spin_unlock_irq(&conf->device_lock);
+	rcu_read_unlock();
 
 	atomic_set(&r1_bio->remaining, 1);
 	md_write_start(mddev);
@@ -710,7 +714,6 @@ static int raid1_spare_active(mddev_t *mddev)
 	conf_t *conf = mddev->private;
 	mirror_info_t *tmp;
 
-	spin_lock_irq(&conf->device_lock);
 	/*
 	 * Find all failed disks within the RAID1 configuration 
 	 * and mark them readable
@@ -725,7 +728,6 @@ static int raid1_spare_active(mddev_t *mddev)
 			tmp->rdev->in_sync = 1;
 		}
 	}
-	spin_unlock_irq(&conf->device_lock);
 
 	print_conf(conf);
 	return 0;
@@ -739,10 +741,8 @@ static int raid1_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 	int mirror;
 	mirror_info_t *p;
 
-	spin_lock_irq(&conf->device_lock);
 	for (mirror=0; mirror < mddev->raid_disks; mirror++)
 		if ( !(p=conf->mirrors+mirror)->rdev) {
-			p->rdev = rdev;
 
 			blk_queue_stack_limits(mddev->queue,
 					       rdev->bdev->bd_disk->queue);
@@ -757,9 +757,9 @@ static int raid1_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 			p->head_position = 0;
 			rdev->raid_disk = mirror;
 			found = 1;
+			p->rdev = rdev;
 			break;
 		}
-	spin_unlock_irq(&conf->device_lock);
 
 	print_conf(conf);
 	return found;
@@ -768,24 +768,27 @@ static int raid1_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 static int raid1_remove_disk(mddev_t *mddev, int number)
 {
 	conf_t *conf = mddev->private;
-	int err = 1;
+	int err = 0;
+	mdk_rdev_t *rdev;
 	mirror_info_t *p = conf->mirrors+ number;
 
 	print_conf(conf);
-	spin_lock_irq(&conf->device_lock);
-	if (p->rdev) {
-		if (p->rdev->in_sync ||
-		    atomic_read(&p->rdev->nr_pending)) {
+	rdev = p->rdev;
+	if (rdev) {
+		if (rdev->in_sync ||
+		    atomic_read(&rdev->nr_pending)) {
 			err = -EBUSY;
 			goto abort;
 		}
 		p->rdev = NULL;
-		err = 0;
+		synchronize_kernel();
+		if (atomic_read(&rdev->nr_pending)) {
+			/* lost the race, try later */
+			err = -EBUSY;
+			p->rdev = rdev;
+		}
 	}
-	if (err)
-		MD_BUG();
 abort:
-	spin_unlock_irq(&conf->device_lock);
 
 	print_conf(conf);
 	return err;
@@ -1022,7 +1025,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 	 */
 	disk = conf->last_used;
 	/* make sure disk is operational */
-	spin_lock_irq(&conf->device_lock);
+
 	while (conf->mirrors[disk].rdev == NULL ||
 	       !conf->mirrors[disk].rdev->in_sync) {
 		if (disk <= 0)
@@ -1033,7 +1036,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 	}
 	conf->last_used = disk;
 	atomic_inc(&conf->mirrors[disk].rdev->nr_pending);
-	spin_unlock_irq(&conf->device_lock);
+
 
 	mirror = conf->mirrors + disk;
 

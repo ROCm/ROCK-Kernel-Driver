@@ -61,16 +61,16 @@ static int multipath_map (multipath_conf_t *conf)
 	 * now we use the first available disk.
 	 */
 
-	spin_lock_irq(&conf->device_lock);
+	rcu_read_lock();
 	for (i = 0; i < disks; i++) {
 		mdk_rdev_t *rdev = conf->multipaths[i].rdev;
 		if (rdev && rdev->in_sync) {
 			atomic_inc(&rdev->nr_pending);
-			spin_unlock_irq(&conf->device_lock);
+			rcu_read_unlock();
 			return i;
 		}
 	}
-	spin_unlock_irq(&conf->device_lock);
+	rcu_read_unlock();
 
 	printk(KERN_ERR "multipath_map(): no more operational IO paths?\n");
 	return (-1);
@@ -135,26 +135,26 @@ static void unplug_slaves(mddev_t *mddev)
 {
 	multipath_conf_t *conf = mddev_to_conf(mddev);
 	int i;
-	unsigned long flags;
 
-	spin_lock_irqsave(&conf->device_lock, flags);
+	rcu_read_lock();
 	for (i=0; i<mddev->raid_disks; i++) {
 		mdk_rdev_t *rdev = conf->multipaths[i].rdev;
 		if (rdev && !rdev->faulty && atomic_read(&rdev->nr_pending)) {
 			request_queue_t *r_queue = bdev_get_queue(rdev->bdev);
 
 			atomic_inc(&rdev->nr_pending);
-			spin_unlock_irqrestore(&conf->device_lock, flags);
+			rcu_read_unlock();
 
 			if (r_queue->unplug_fn)
 				r_queue->unplug_fn(r_queue);
 
-			spin_lock_irqsave(&conf->device_lock, flags);
 			rdev_dec_pending(rdev, mddev);
+			rcu_read_lock();
 		}
 	}
-	spin_unlock_irqrestore(&conf->device_lock, flags);
+	rcu_read_unlock();
 }
+
 static void multipath_unplug(request_queue_t *q)
 {
 	unplug_slaves(q->queuedata);
@@ -219,6 +219,7 @@ static int multipath_issue_flush(request_queue_t *q, struct gendisk *disk,
 	multipath_conf_t *conf = mddev_to_conf(mddev);
 	int i, ret = 0;
 
+	rcu_read_lock();
 	for (i=0; i<mddev->raid_disks && ret == 0; i++) {
 		mdk_rdev_t *rdev = conf->multipaths[i].rdev;
 		if (rdev && !rdev->faulty) {
@@ -227,11 +228,17 @@ static int multipath_issue_flush(request_queue_t *q, struct gendisk *disk,
 
 			if (!r_queue->issue_flush_fn)
 				ret = -EOPNOTSUPP;
-			else
+			else {
+				atomic_inc(&rdev->nr_pending);
+				rcu_read_unlock();
 				ret = r_queue->issue_flush_fn(r_queue, bdev->bd_disk,
 							      error_sector);
+				rdev_dec_pending(rdev, mddev);
+				rcu_read_lock();
+			}
 		}
 	}
+	rcu_read_unlock();
 	return ret;
 }
 
@@ -302,10 +309,9 @@ static int multipath_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 	struct multipath_info *p;
 
 	print_multipath_conf(conf);
-	spin_lock_irq(&conf->device_lock);
+
 	for (path=0; path<mddev->raid_disks; path++) 
 		if ((p=conf->multipaths+path)->rdev == NULL) {
-			p->rdev = rdev;
 			blk_queue_stack_limits(mddev->queue,
 					       rdev->bdev->bd_disk->queue);
 
@@ -322,9 +328,9 @@ static int multipath_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 			conf->working_disks++;
 			rdev->raid_disk = path;
 			rdev->in_sync = 1;
+			p->rdev = rdev;
 			found = 1;
 		}
-	spin_unlock_irq(&conf->device_lock);
 
 	print_multipath_conf(conf);
 	return found;
@@ -333,26 +339,29 @@ static int multipath_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 static int multipath_remove_disk(mddev_t *mddev, int number)
 {
 	multipath_conf_t *conf = mddev->private;
-	int err = 1;
+	int err = 0;
+	mdk_rdev_t *rdev;
 	struct multipath_info *p = conf->multipaths + number;
 
 	print_multipath_conf(conf);
-	spin_lock_irq(&conf->device_lock);
 
-	if (p->rdev) {
-		if (p->rdev->in_sync ||
-		    atomic_read(&p->rdev->nr_pending)) {
+	rdev = p->rdev;
+	if (rdev) {
+		if (rdev->in_sync ||
+		    atomic_read(&rdev->nr_pending)) {
 			printk(KERN_ERR "hot-remove-disk, slot %d is identified"				" but is still operational!\n", number);
 			err = -EBUSY;
 			goto abort;
 		}
 		p->rdev = NULL;
-		err = 0;
+		synchronize_kernel();
+		if (atomic_read(&rdev->nr_pending)) {
+			/* lost the race, try later */
+			err = -EBUSY;
+			p->rdev = rdev;
+		}
 	}
-	if (err)
-		MD_BUG();
 abort:
-	spin_unlock_irq(&conf->device_lock);
 
 	print_multipath_conf(conf);
 	return err;
