@@ -1668,6 +1668,16 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 		goto out;
 	}
 
+	/*
+	 * If the task is not on a runqueue, then it is sufficient
+	 * to simply update the task's cpu field.
+	 */
+	if (!p->array) {
+		p->cpu = __ffs(p->cpus_allowed);
+		task_rq_unlock(rq, &flags);
+		goto out;
+	}
+
 	init_MUTEX_LOCKED(&req.sem);
 	req.task = p;
 	list_add(&req.list, &rq->migration_queue);
