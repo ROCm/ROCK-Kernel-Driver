@@ -65,7 +65,7 @@ CONFIG_KMOD=y
 # CONFIG_ARCH_SHARK is not set
 # CONFIG_ARCH_S3C2410 is not set
 # CONFIG_ARCH_OMAP is not set
-CONFIG_ARCH_VERSATILE_PB=y
+CONFIG_ARCH_VERSATILE=y
 
 #
 # CLPS711X/EP721X Implementations
@@ -108,6 +108,12 @@ CONFIG_ARCH_VERSATILE_PB=y
 #
 # S3C2410 Implementations
 #
+
+#
+# Versatile platform type
+#
+CONFIG_ARCH_VERSATILE_PB=y
+# CONFIG_MACH_VERSATILE_AB is not set
 
 #
 # Processor Type
