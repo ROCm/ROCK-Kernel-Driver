@@ -362,61 +362,6 @@ struct ffb_par {
 	struct list_head	list;
 };
 
-#undef FFB_DO_DEBUG_LOG
-
-#ifdef FFB_DO_DEBUG_LOG
-#define FFB_DEBUG_LOG_ENTS	32
-static struct ffb_log {
-	int op;
-#define OP_FILLRECT	1
-#define OP_IMAGEBLIT	2
-
-	int depth, x, y, w, h;
-} ffb_debug_log[FFB_DEBUG_LOG_ENTS];
-static int ffb_debug_log_ent;
-
-static void ffb_do_log(unsigned long unused)
-{
-	int i;
-
-	for (i = 0; i < FFB_DEBUG_LOG_ENTS; i++) {
-		struct ffb_log *p = &ffb_debug_log[i];
-
-		printk("FFB_LOG: OP[%s] depth(%d) x(%d) y(%d) w(%d) h(%d)\n",
-		       (p->op == OP_FILLRECT ? "FILLRECT" : "IMAGEBLIT"),
-		       p->depth, p->x, p->y, p->w, p->h);
-	}
-}
-static struct timer_list ffb_log_timer =
-	TIMER_INITIALIZER(ffb_do_log, 0, 0);
-
-static void ffb_log(int op, int depth, int x, int y, int w, int h)
-{
-	if (ffb_debug_log_ent < FFB_DEBUG_LOG_ENTS) {
-		struct ffb_log *p = &ffb_debug_log[ffb_debug_log_ent];
-
-		if (ffb_debug_log_ent != 0 &&
-		    p[-1].op == op && p[-1].depth == depth)
-			return;
-		p->op = op;
-		p->depth = depth;
-		p->x = x;
-		p->y = y;
-		p->w = w;
-		p->h = h;
-
-		if (++ffb_debug_log_ent == FFB_DEBUG_LOG_ENTS) {
-			ffb_log_timer.expires = jiffies + 2;
-			add_timer(&ffb_log_timer);
-		}
-	}
-}
-#else
-#define ffb_log(a,b,c,d,e,f)	do { } while(0)
-#endif
-
-#undef FORCE_WAIT_EVERY_ROP
-
 static void FFBFifo(struct ffb_par *par, int n)
 {
 	struct ffb_fbc *fbc;
@@ -479,7 +424,7 @@ static void ffb_switch_from_graph(struct ffb_par *par)
 	upa_writel(0x2000707f, &fbc->fbc);
 	upa_writel(par->rop_cache, &fbc->rop);
 	upa_writel(0xffffffff, &fbc->pmask);
-	upa_writel((0 << 16) | (32 << 0), &fbc->fontinc);
+	upa_writel((1 << 16) | (0 << 0), &fbc->fontinc);
 	upa_writel(par->fg_cache, &fbc->fg);
 	upa_writel(par->bg_cache, &fbc->bg);
 	FFBWait(par);
@@ -526,8 +471,6 @@ static void ffb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 	if (rect->rop != ROP_COPY && rect->rop != ROP_XOR)
 		BUG();
 
-	ffb_log(OP_FILLRECT, 0, rect->dx, rect->dy, rect->width, rect->height);
-
 	fg = ((u32 *)info->pseudo_palette)[rect->color];
 
 	spin_lock_irqsave(&par->lock, flags);
@@ -548,9 +491,6 @@ static void ffb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 	upa_writel(rect->dx, &fbc->bx);
 	upa_writel(rect->height, &fbc->bh);
 	upa_writel(rect->width, &fbc->bw);
-#ifdef FORCE_WAIT_EVERY_ROP
-	FFBWait(par);
-#endif
 
 	spin_unlock_irqrestore(&par->lock, flags);
 }
@@ -609,10 +549,7 @@ static void ffb_imageblit(struct fb_info *info, const struct fb_image *image)
 	unsigned long flags;
 	u32 fg, bg, xy;
 	u64 fgbg;
-	int i, width;
-
-	ffb_log(OP_IMAGEBLIT, image->depth,
-		image->dx, image->dy, image->width, image->height);
+	int i, width, stride;
 
 	if (image->depth > 1) {
 		cfb_imageblit(info, image);
@@ -623,6 +560,8 @@ static void ffb_imageblit(struct fb_info *info, const struct fb_image *image)
 	bg = ((u32 *)info->pseudo_palette)[image->bg_color];
 	fgbg = ((u64) fg << 32) | (u64) bg;
 	xy = (image->dy << 16) | image->dx;
+	width = image->width;
+	stride = ((width + 7) >> 3);
 
 	spin_lock_irqsave(&par->lock, flags);
 
@@ -632,55 +571,49 @@ static void ffb_imageblit(struct fb_info *info, const struct fb_image *image)
 		*(u64 *)&par->fg_cache = fgbg;
 	}
 
-	ffb_rop(par, FFB_ROP_NEW);
+	if (width >= 32) {
+		FFBFifo(par, 1);
+		upa_writel(32, &fbc->fontw);
+	}
 
-	for (i = 0; i < image->height; i++) {
-		width = image->width;
+	while (width >= 32) {
+		const u8 *next_data = data + 4;
 
 		FFBFifo(par, 1);
 		upa_writel(xy, &fbc->fontxy);
-		xy += (1 << 16);
+		xy += (32 << 0);
 
-		while (width >= 32) {
-			u32 val;
-
-			FFBFifo(par, 2);
-			upa_writel(32, &fbc->fontw);
-
-			val = ((u32)data[0] << 24) |
-			      ((u32)data[1] << 16) |
-			      ((u32)data[2] <<  8) |
-			      ((u32)data[3] <<  0);
+		for (i = 0; i < image->height; i++) {
+			u32 val = (((u32)data[0] << 24) |
+				   ((u32)data[1] << 16) |
+				   ((u32)data[2] <<  8) |
+				   ((u32)data[3] <<  0));
+			FFBFifo(par, 1);
 			upa_writel(val, &fbc->font);
 
-			data += 4;
-			width -= 32;
+			data += stride;
 		}
 
-		if (width) {
-			u32 val;
+		data = next_data;
+		width -= 32;
+	}
 
-			FFBFifo(par, 2);
-			upa_writel(width, &fbc->fontw);
-			if (width <= 8) {
-				val = (u32) data[0] << 24;
-				data += 1;
-			} else if (width <= 16) {
-				val = ((u32) data[0] << 24) |
-				      ((u32) data[1] << 16);
-				data += 2;
-			} else {
-				val = ((u32) data[0] << 24) |
-				      ((u32) data[1] << 16) |
-				      ((u32) data[2] <<  8);
-				data += 3;
-			}
+	if (width) {
+		FFBFifo(par, 2);
+		upa_writel(width, &fbc->fontw);
+		upa_writel(xy, &fbc->fontxy);
+
+		for (i = 0; i < image->height; i++) {
+			u32 val = (((u32)data[0] << 24) |
+				   ((u32)data[1] << 16) |
+				   ((u32)data[2] <<  8) |
+				   ((u32)data[3] <<  0));
+			FFBFifo(par, 1);
 			upa_writel(val, &fbc->font);
+
+			data += stride;
 		}
 	}
-#ifdef FORCE_WAIT_EVERY_ROP
-	FFBWait(par);
-#endif
 
 	spin_unlock_irqrestore(&par->lock, flags);
 }
