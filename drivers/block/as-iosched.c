@@ -1842,6 +1842,7 @@ elevator_t iosched_as = {
 	.elevator_exit_fn =		as_exit,
 
 	.elevator_ktype =		&as_ktype,
+	.elevator_name =		"anticipatory scheduling",
 };
 
 EXPORT_SYMBOL(iosched_as);
