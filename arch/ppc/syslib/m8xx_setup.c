@@ -57,8 +57,10 @@ unsigned char __res[sizeof(bd_t)];
 extern void m8xx_ide_init(void);
 
 extern unsigned long find_available_memory(void);
-extern void m8xx_cpm_reset(uint);
+extern void m8xx_cpm_reset(uint cpm_page);
+extern void m8xx_wdt_handler_install(bd_t *bp);
 extern void rpxfb_alloc_pages(void);
+extern void cpm_interrupt_init(void);
 
 void __attribute__ ((weak))
 board_init(void)
@@ -123,10 +125,18 @@ abort(void)
 }
 
 /* A place holder for time base interrupts, if they are ever enabled. */
-void timebase_interrupt(int irq, void * dev, struct pt_regs * regs)
+irqreturn_t timebase_interrupt(int irq, void * dev, struct pt_regs * regs)
 {
 	printk ("timebase_interrupt()\n");
+
+	return IRQ_HANDLED;
 }
+
+static struct irqaction tbint_irqaction = {
+	.handler = timebase_interrupt,
+	.mask = CPU_MASK_NONE,
+	.name = "tbint",
+};
 
 /* The decrementer counts at the system (internal) clock frequency divided by
  * sixteen, or external oscillator divided by four.  We force the processor
@@ -192,8 +202,15 @@ void __init m8xx_calibrate_decr(void)
 				((mk_int_int_mask(DEC_INTERRUPT) << 8) |
 					 (TBSCR_TBF | TBSCR_TBE));
 
-	if (request_8xxirq(DEC_INTERRUPT, timebase_interrupt, 0, "tbint", NULL) != 0)
+	if (setup_irq(DEC_INTERRUPT, &tbint_irqaction))
 		panic("Could not allocate timer IRQ!");
+
+#ifdef CONFIG_8xx_WDT
+	/* Install watchdog timer handler early because it might be
+	 * already enabled by the bootloader
+	 */
+	m8xx_wdt_handler_install(binfo);
+#endif
 }
 
 /* The RTC on the MPC8xx is an internal register.
@@ -261,6 +278,14 @@ m8xx_show_percpuinfo(struct seq_file *m, int i)
 	return 0;
 }
 
+#ifdef CONFIG_PCI
+static struct irqaction mbx_i8259_irqaction = {
+	.handler = mbx_i8259_action,
+	.mask = CPU_MASK_NONE,
+	.name = "i8259 cascade",
+};
+#endif
+
 /* Initialize the internal interrupt controller.  The number of
  * interrupts supported can vary with the processor type, and the
  * 82xx family can have up to 64.
@@ -271,25 +296,26 @@ static void __init
 m8xx_init_IRQ(void)
 {
 	int i;
-	void cpm_interrupt_init(void);
 
-        for ( i = 0 ; i < NR_SIU_INTS ; i++ )
-                irq_desc[i].handler = &ppc8xx_pic;
+	for (i = SIU_IRQ_OFFSET ; i < SIU_IRQ_OFFSET + NR_SIU_INTS ; i++)
+		irq_desc[i].handler = &ppc8xx_pic;
 
-	/* We could probably incorporate the CPM into the multilevel
-	 * interrupt structure.
-	 */
 	cpm_interrupt_init();
-        unmask_irq(CPM_INTERRUPT);
 
 #if defined(CONFIG_PCI)
-        for ( i = NR_SIU_INTS ; i < (NR_SIU_INTS + NR_8259_INTS) ; i++ )
-                irq_desc[i].handler = &i8259_pic;
-        i8259_pic.irq_offset = NR_SIU_INTS;
-        i8259_init();
-        request_8xxirq(ISA_BRIDGE_INT, mbx_i8259_action, 0, "8259 cascade", NULL);
-        enable_irq(ISA_BRIDGE_INT);
-#endif
+	for (i = I8259_IRQ_OFFSET ; i < I8259_IRQ_OFFSET + NR_8259_INTS ; i++)
+		irq_desc[i].handler = &i8259_pic;
+
+	i8259_pic_irq_offset = I8259_IRQ_OFFSET;
+	i8259_init(0);
+
+	/* The i8259 cascade interrupt must be level sensitive. */
+	((immap_t *)IMAP_ADDR)->im_siu_conf.sc_siel &=
+		~(0x80000000 >> ISA_BRIDGE_INT);
+
+	if (setup_irq(ISA_BRIDGE_INT, &mbx_i8259_irqaction))
+		enable_irq(ISA_BRIDGE_INT);
+#endif	/* CONFIG_PCI */
 }
 
 /* -------------------------------------------------------------------- */
@@ -340,7 +366,7 @@ m8xx_map_io(void)
 	io_block_mapping(_IO_BASE,_IO_BASE,_IO_BASE_SIZE, _PAGE_IO);
 #endif
 #endif
-#ifdef CONFIG_HTDMSOUND
+#if defined(CONFIG_HTDMSOUND) || defined(CONFIG_RPXTOUCH) || defined(CONFIG_FB_RPX)
 	io_block_mapping(HIOX_CSR_ADDR, HIOX_CSR_ADDR, HIOX_CSR_SIZE, _PAGE_IO);
 #endif
 #ifdef CONFIG_FADS
@@ -348,6 +374,9 @@ m8xx_map_io(void)
 #endif
 #ifdef CONFIG_PCI
         io_block_mapping(PCI_CSR_ADDR, PCI_CSR_ADDR, PCI_CSR_SIZE, _PAGE_IO);
+#endif
+#if defined(CONFIG_NETTA)
+	io_block_mapping(_IO_BASE,_IO_BASE,_IO_BASE_SIZE, _PAGE_IO);
 #endif
 }
 

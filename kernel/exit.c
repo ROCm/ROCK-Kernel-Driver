@@ -1201,8 +1201,15 @@ static int wait_task_stopped(task_t *p, int delayed_group_leader, int noreap,
 		write_unlock_irq(&tasklist_lock);
 bail_ref:
 		put_task_struct(p);
-		read_lock(&tasklist_lock);
-		return 0;
+		/*
+		 * We are returning to the wait loop without having successfully
+		 * removed the process and having released the lock. We cannot
+		 * continue, since the "p" task pointer is potentially stale.
+		 *
+		 * Return -EAGAIN, and do_wait() will restart the loop from the
+		 * beginning. Do _not_ re-acquire the lock.
+		 */
+		return -EAGAIN;
 	}
 
 	/* move to end of parent's list to avoid starvation */
@@ -1343,6 +1350,8 @@ repeat:
 							   (options & WNOWAIT),
 							   infop,
 							   stat_addr, ru);
+				if (retval == -EAGAIN)
+					goto repeat;
 				if (retval != 0) /* He released the lock.  */
 					goto end;
 				break;

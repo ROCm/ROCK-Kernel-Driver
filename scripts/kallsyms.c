@@ -132,7 +132,17 @@ read_symbol(FILE *in, struct sym_entry *s)
 		_sinittext = s->addr;
 	else if (strcmp(str, "_einittext") == 0)
 		_einittext = s->addr;
-	else if (toupper(s->type) == 'A' || toupper(s->type) == 'U' ||
+	else if (toupper(s->type) == 'A')
+	{
+		/* Keep these useful absolute symbols */
+		if (strcmp(str, "__kernel_syscall_via_break") &&
+		    strcmp(str, "__kernel_syscall_via_epc") &&
+		    strcmp(str, "__kernel_sigtramp") &&
+		    strcmp(str, "__gp"))
+			return -1;
+
+	}
+	else if (toupper(s->type) == 'U' ||
 		 is_arm_mapping_symbol(str))
 		return -1;
 

@@ -73,18 +73,15 @@ typedef unsigned int   U032;
 /*
  * HW access macros.
  */
-#if defined(__powerpc__)
 #include <asm/io.h>
-#define NV_WR08(p,i,d)	out_8(p+i, d)
-#define NV_RD08(p,i)	in_8(p+i)
-#else
-#define NV_WR08(p,i,d)  (writeb((d), (u8 __iomem *)(p) + (i)))
-#define NV_RD08(p,i)    (readb((u8 __iomem *)(p) + (i)))
-#endif
-#define NV_WR16(p,i,d)  (writew((d), (u16 __iomem *)(p) + (i)/2))
-#define NV_RD16(p,i)    (readw((u16 __iomem *)(p) + (i)/2))
-#define NV_WR32(p,i,d)  (writel((d), (u32 __iomem *)(p) + (i)/4))
-#define NV_RD32(p,i)    (readl((u32 __iomem *)(p) + (i)/4))
+
+#define NV_WR08(p,i,d)  (__raw_writeb((d), (void __iomem *)(p) + (i)))
+#define NV_RD08(p,i)    (__raw_readb((void __iomem *)(p) + (i)))
+#define NV_WR16(p,i,d)  (__raw_writew((d), (void __iomem *)(p) + (i)))
+#define NV_RD16(p,i)    (__raw_readw((void __iomem *)(p) + (i)))
+#define NV_WR32(p,i,d)  (__raw_writel((d), (void __iomem *)(p) + (i)))
+#define NV_RD32(p,i)    (__raw_readl((void __iomem *)(p) + (i)))
+
 #define VGA_WR08(p,i,d) NV_WR08(p,i,d)
 #define VGA_RD08(p,i)   NV_RD08(p,i)
 

@@ -86,8 +86,8 @@ config SMP
 	depends on BROKEN
 	---help---
 	  This enables support for systems with more than one CPU. If you have
-	  a system with only one CPU, like most personal computers, say N. If
-	  you have a system with more than one CPU, say Y.
+	  a system with only one CPU, say N. If you have a system with more
+	  than one CPU, say Y.
 
 	  If you say N here, the kernel will run on single and multiprocessor
 	  machines, but will use only one CPU of a multiprocessor machine. If
@@ -95,17 +95,11 @@ config SMP
 	  singleprocessor machines. On a singleprocessor machine, the kernel
 	  will run faster if you say N here.
 
-	  Note that if you say Y here and choose architecture "586" or
-	  "Pentium" under "Processor family", the kernel will not work on 486
-	  architectures. Similarly, multiprocessor kernels for the "PPro"
-	  architecture may not work on all Pentium based boards.
-
 	  People using multiprocessor machines who say Y here should also say
 	  Y to "Enhanced Real Time Clock Support", below. The "Advanced Power
 	  Management" code will be disabled if you say Y here.
 
 	  See also the <file:Documentation/smp.txt>,
-	  <file:Documentation/i386/IO-APIC.txt>,
 	  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
 	  <http://www.tldp.org/docs.html#howto>.
 
@@ -189,10 +183,10 @@ config SERIAL_CONSOLE
 	  (/dev/tty0) will still be used as the system console by default, but
 	  you can alter that using a kernel command line option such as
 	  "console=ttyS1". (Try "man bootparam" or see the documentation of
-	  your boot loader (lilo or loadlin) about how to pass options to the
-	  kernel at boot time.)
+	  your boot loader (silo) about how to pass options to the kernel at
+	  boot time.)
 
-	  If you don't have a VGA card installed and you say Y here, the
+	  If you don't have a graphics card installed and you say Y here, the
 	  kernel will automatically use the first serial line, /dev/ttyS0, as
 	  system console.
 
@@ -223,6 +217,7 @@ config SUN_PM
 config SUN4
 	bool "Support for SUN4 machines (disables SUN4[CDM] support)"
 	depends on !SMP
+	default n
 	help
 	  Say Y here if, and only if, your machine is a sun4. Note that
 	  a kernel compiled with this option will run only on sun4.
@@ -249,7 +244,10 @@ config SUN_OPENPROMFS
 	  -t openpromfs none /proc/openprom".
 
 	  To compile the /proc/openprom support as a module, choose M here: the
-	  module will be called openpromfs.  If unsure, choose M.
+	  module will be called openpromfs.
+
+	  Only choose N if you know in advance that you will not need to modify
+	  OpenPROM settings on the running system.
 
 source "fs/Kconfig.binfmt"
 
@@ -282,9 +280,9 @@ config PRINTER
 
 	  If you have several parallel ports, you can specify which ports to
 	  use with the "lp" kernel command line option.  (Try "man bootparam"
-	  or see the documentation of your boot loader (lilo or loadlin) about
-	  how to pass options to the kernel at boot time.)  The syntax of the
-	  "lp" command line option can be found in <file:drivers/char/lp.c>.
+	  or see the documentation of your boot loader (silo) about how to pass
+	  options to the kernel at boot time.)  The syntax of the "lp" command
+	  line option can be found in <file:drivers/char/lp.c>.
 
 	  If you have more than 8 printers, you need to increase the LP_NO
 	  macro in lp.c and the PARPORT_MAX macro in parport.h.

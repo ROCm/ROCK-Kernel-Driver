@@ -70,6 +70,8 @@ struct uart_cpm_port {
 	/* helpers */
 	int			 baud;
 	int			 bits;
+	/* Keep track of 'odd' SMC2 wirings */
+	int			is_portb;
 };
 
 extern int cpm_uart_port_map[UART_NR];
