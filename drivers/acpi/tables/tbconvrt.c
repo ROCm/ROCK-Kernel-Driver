@@ -75,14 +75,10 @@ acpi_tb_get_table_count (
 	ACPI_FUNCTION_ENTRY ();
 
 
-#if ACPI_MACHINE_WIDTH != 64
-
 	if (RSDP->revision < 2) {
 		pointer_size = sizeof (u32);
 	}
-	else
-#endif
-	{
+	else {
 		pointer_size = sizeof (u64);
 	}
 

@@ -357,9 +357,9 @@ acpi_set_register (
 
 	/*
 	 * Decode the Register ID
-	 * Register id = Register block id | bit id
+	 * Register ID = [Register block ID] | [bit ID]
 	 *
-	 * Check bit id to fine locate Register offset.
+	 * Check bit ID to fine locate Register offset.
 	 * Check Mask to determine Register offset, and then read-write.
 	 */
 	switch (bit_reg_info->parent_register) {
@@ -367,9 +367,9 @@ acpi_set_register (
 
 		/*
 		 * Status Registers are different from the rest.  Clear by
-		 * writing 1, writing 0 has no effect.  So, the only relevant
+		 * writing 1, and writing 0 has no effect.  So, the only relevant
 		 * information is the single bit we're interested in, all others should
-		 * be written as 0 so they will be left unchanged
+		 * be written as 0 so they will be left unchanged.
 		 */
 		value = ACPI_REGISTER_PREPARE_BITS (value,
 				 bit_reg_info->bit_position, bit_reg_info->access_bit_mask);
@@ -394,17 +394,17 @@ acpi_set_register (
 	case ACPI_REGISTER_PM1_CONTROL:
 
 		/*
-		 * Read the PM1 Control register.
+		 * Write the PM1 Control register.
 		 * Note that at this level, the fact that there are actually TWO
-		 * registers (A and B - and that B may not exist) is abstracted.
+		 * registers (A and B - and B may not exist) is abstracted.
 		 */
 		ACPI_DEBUG_PRINT ((ACPI_DB_IO, "PM1 control: Read %X\n", register_value));
 
 		ACPI_REGISTER_INSERT_VALUE (register_value, bit_reg_info->bit_position,
 				bit_reg_info->access_bit_mask, value);
 
-		status = acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK, register_id,
-				(u16) register_value);
+		status = acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK,
+				  ACPI_REGISTER_PM1_CONTROL, (u16) register_value);
 		break;
 
 
@@ -724,7 +724,7 @@ acpi_hw_low_level_read (
 
 	/*
 	 * Three address spaces supported:
-	 * Memory, Io, or PCI config.
+	 * Memory, IO, or PCI_Config.
 	 */
 	switch (reg->address_space_id) {
 	case ACPI_ADR_SPACE_SYSTEM_MEMORY:
@@ -808,9 +808,10 @@ acpi_hw_low_level_write (
 		(!reg->address)) {
 		return (AE_OK);
 	}
+
 	/*
 	 * Three address spaces supported:
-	 * Memory, Io, or PCI config.
+	 * Memory, IO, or PCI_Config.
 	 */
 	switch (reg->address_space_id) {
 	case ACPI_ADR_SPACE_SYSTEM_MEMORY:
