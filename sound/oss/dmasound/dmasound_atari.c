@@ -19,7 +19,7 @@
 #include <linux/init.h>
 #include <linux/soundcard.h>
 #include <linux/mm.h>
-
+#include <linux/spinlock.h>
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
 #include <asm/atariints.h>
@@ -1262,7 +1262,7 @@ static void AtaInterrupt(int irq, void *dummy, struct pt_regs *fp)
 			return;
 		}
 #endif
-
+	spin_lock(&dmasound.lock);
 	if (write_sq_ignore_int && is_falcon) {
 		/* ++TeSche: Falcon only: ignore first irq because it comes
 		 * immediately after starting a frame. after that, irqs come
@@ -1314,6 +1314,7 @@ static void AtaInterrupt(int irq, void *dummy, struct pt_regs *fp)
 	/* We are not playing after AtaPlay(), so there
 	   is nothing to play any more. Wake up a process
 	   waiting for audio output to drain. */
+	spin_unlock(&dmasound.lock);
 }
 
 
@@ -1349,14 +1350,15 @@ static void __init FalconMixerInit(void)
 static int AtaMixerIoctl(u_int cmd, u_long arg)
 {
 	int data;
+	unsigned long flags;
 	switch (cmd) {
 	    case SOUND_MIXER_READ_SPEAKER:
 		    if (is_falcon || MACH_IS_TT) {
 			    int porta;
-			    cli();
+			    spin_lock_irqsave(&dmasound.lock, flags);
 			    sound_ym.rd_data_reg_sel = 14;
 			    porta = sound_ym.rd_data_reg_sel;
-			    sti();
+			    spin_unlock_irqrestore(&dmasound.lock, flags);
 			    return IOCTL_OUT(arg, porta & 0x40 ? 0 : 100);
 		    }
 		    break;
@@ -1367,12 +1369,12 @@ static int AtaMixerIoctl(u_int cmd, u_long arg)
 		    if (is_falcon || MACH_IS_TT) {
 			    int porta;
 			    IOCTL_IN(arg, data);
-			    cli();
+			    spin_lock_irqsave(&dmasound.lock, flags);
 			    sound_ym.rd_data_reg_sel = 14;
 			    porta = (sound_ym.rd_data_reg_sel & ~0x40) |
 				    (data < 50 ? 0x40 : 0);
 			    sound_ym.wd_data = porta;
-			    sti();
+			    spin_unlock_irqrestore(&dmasound.lock, flags);
 			    return IOCTL_OUT(arg, porta & 0x40 ? 0 : 100);
 		    }
 	}
