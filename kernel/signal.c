@@ -1346,6 +1346,9 @@ do_notify_parent_cldstop(struct task_struct *tsk, struct task_struct *parent)
 	spin_unlock_irqrestore(&sighand->siglock, flags);
 }
 
+
+#ifndef HAVE_ARCH_GET_SIGNAL_TO_DELIVER
+
 static void
 finish_stop(int stop_count)
 {
@@ -1459,9 +1462,6 @@ do_signal_stop(int signr)
 
 	finish_stop(stop_count);
 }
-
-
-#ifndef HAVE_ARCH_GET_SIGNAL_TO_DELIVER
 
 /*
  * Do appropriate magic when group_stop_count > 0.
