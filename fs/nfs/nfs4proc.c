@@ -1940,9 +1940,11 @@ renew_done(struct rpc_task *task)
 	if (task->tk_status < 0) {
 		switch (task->tk_status) {
 			case -NFS4ERR_STALE_CLIENTID:
+			case -NFS4ERR_EXPIRED:
+			case -NFS4ERR_CB_PATH_DOWN:
 				nfs4_schedule_state_recovery(clp);
-				return;
 		}
+		return;
 	}
 	spin_lock(&clp->cl_lock);
 	if (time_before(clp->cl_last_renewal,timestamp))
@@ -1975,11 +1977,13 @@ nfs4_proc_renew(struct nfs4_client *clp)
 	int status;
 
 	status = rpc_call_sync(clp->cl_rpcclient, &msg, 0);
+	if (status < 0)
+		return status;
 	spin_lock(&clp->cl_lock);
 	if (time_before(clp->cl_last_renewal,now))
 		clp->cl_last_renewal = now;
 	spin_unlock(&clp->cl_lock);
-	return status;
+	return 0;
 }
 
 /*

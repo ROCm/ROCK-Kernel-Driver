@@ -193,6 +193,30 @@ restart:
 	spin_unlock(&clp->cl_lock);
 }
 
+/*
+ * Return all delegations following an NFS4ERR_CB_PATH_DOWN error.
+ */
+void nfs_handle_cb_pathdown(struct nfs4_client *clp)
+{
+	struct nfs_delegation *delegation;
+	struct inode *inode;
+
+	if (clp == NULL)
+		return;
+restart:
+	spin_lock(&clp->cl_lock);
+	list_for_each_entry(delegation, &clp->cl_delegations, super_list) {
+		inode = igrab(delegation->inode);
+		if (inode == NULL)
+			continue;
+		spin_unlock(&clp->cl_lock);
+		nfs_inode_return_delegation(inode);
+		iput(inode);
+		goto restart;
+	}
+	spin_unlock(&clp->cl_lock);
+}
+
 struct recall_threadargs {
 	struct inode *inode;
 	struct nfs4_client *clp;

@@ -842,7 +842,7 @@ static int reclaimer(void *ptr)
 	struct reclaimer_args *args = (struct reclaimer_args *)ptr;
 	struct nfs4_client *clp = args->clp;
 	struct nfs4_state_owner *sp;
-	int status;
+	int status = 0;
 
 	daemonize("%u.%u.%u.%u-reclaim", NIPQUAD(clp->cl_addr));
 	allow_signal(SIGKILL);
@@ -858,7 +858,7 @@ static int reclaimer(void *ptr)
 		goto out;
 restart_loop:
 	status = nfs4_proc_renew(clp);
-	if (status == 0)
+	if (status == 0 || status == -NFS4ERR_CB_PATH_DOWN)
 		goto out;
 	status = nfs4_init_client(clp);
 	if (status)
@@ -881,6 +881,8 @@ out:
 	unlock_kernel();
 	wake_up_all(&clp->cl_waitq);
 	rpc_wake_up(&clp->cl_rpcwaitq);
+	if (status == -NFS4ERR_CB_PATH_DOWN)
+		nfs_handle_cb_pathdown(clp);
 	nfs4_put_client(clp);
 	return 0;
 out_error:
