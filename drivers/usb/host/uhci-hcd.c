@@ -105,12 +105,10 @@ static void wakeup_hc(struct uhci_hcd *uhci);
 /* to make sure it doesn't hog all of the bandwidth */
 #define DEPTH_INTERVAL 5
 
-#define MAX_URB_LOOP	2048		/* Maximum number of linked URB's */
-
 /*
  * Technically, updating td->status here is a race, but it's not really a
  * problem. The worst that can happen is that we set the IOC bit again
- * generating a spurios interrupt. We could fix this by creating another
+ * generating a spurious interrupt. We could fix this by creating another
  * QH and leaving the IOC bit always set, but then we would have to play
  * games with the FSBR code to make sure we get the correct order in all
  * the cases. I don't think it's worth the effort
@@ -273,7 +271,7 @@ out:
 /*
  * Inserts a td into qh list at the top.
  */
-static void uhci_insert_tds_in_qh(struct uhci_qh *qh, struct urb *urb, int breadth)
+static void uhci_insert_tds_in_qh(struct uhci_qh *qh, struct urb *urb, u32 breadth)
 {
 	struct list_head *tmp, *head;
 	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
@@ -290,7 +288,7 @@ static void uhci_insert_tds_in_qh(struct uhci_qh *qh, struct urb *urb, int bread
 	td = list_entry(tmp, struct uhci_td, list);
 
 	/* Add the first TD to the QH element pointer */
-	qh->element = cpu_to_le32(td->dma_handle) | (breadth ? 0 : UHCI_PTR_DEPTH);
+	qh->element = cpu_to_le32(td->dma_handle) | breadth;
 
 	ptd = td;
 
@@ -301,7 +299,7 @@ static void uhci_insert_tds_in_qh(struct uhci_qh *qh, struct urb *urb, int bread
 
 		tmp = tmp->next;
 
-		ptd->link = cpu_to_le32(td->dma_handle) | (breadth ? 0 : UHCI_PTR_DEPTH);
+		ptd->link = cpu_to_le32(td->dma_handle) | breadth;
 
 		ptd = td;
 	}
@@ -311,10 +309,6 @@ static void uhci_insert_tds_in_qh(struct uhci_qh *qh, struct urb *urb, int bread
 
 static void uhci_free_td(struct uhci_hcd *uhci, struct uhci_td *td)
 {
-/*
-	if (!list_empty(&td->list) || !list_empty(&td->fl_list))
-		dbg("td %p is still in URB list!", td);
-*/
 	if (!list_empty(&td->list))
 		dbg("td %p is still in list!", td);
 	if (!list_empty(&td->fl_list))
@@ -365,43 +359,57 @@ static void uhci_free_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
 }
 
 /*
+ * Append this urb's qh after the last qh in skelqh->list
  * MUST be called with uhci->frame_list_lock acquired
+ *
+ * Note that urb_priv.queue_list doesn't have a separate queue head;
+ * it's a ring with every element "live".
  */
 static void _uhci_insert_qh(struct uhci_hcd *uhci, struct uhci_qh *skelqh, struct urb *urb)
 {
 	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
-	struct list_head *head, *tmp;
+	struct list_head *tmp;
 	struct uhci_qh *lqh;
 
 	/* Grab the last QH */
 	lqh = list_entry(skelqh->list.prev, struct uhci_qh, list);
 
+	/* Patch this endpoint's URBs' QHs to point to the next skelQH:
+	 *    SkelQH --> ... lqh --> NewQH --> NextSkelQH
+	 * Do this first, so the HC always sees the right QH after this one.
+	 */
+	list_for_each (tmp, &urbp->queue_list) {
+		struct urb_priv *turbp =
+			list_entry(tmp, struct urb_priv, queue_list);
+
+		turbp->qh->link = lqh->link;
+	}
+	urbp->qh->link = lqh->link;
+	wmb();				/* Ordering is important */
+
+	/* Patch QHs for previous endpoint's queued URBs?  HC goes
+	 * here next, not to the NextSkelQH it now points to.
+	 *
+	 *    lqh --> td ... --> qh ... --> td --> qh ... --> td
+	 *     |                 |                 |
+	 *     v                 v                 v
+	 *     +<----------------+-----------------+
+	 *     v
+	 *    NewQH --> td ... --> td
+	 *     |
+	 *     v
+	 *    ...
+	 *
+	 * The HC could see (and use!) any of these as we write them.
+	 */
 	if (lqh->urbp) {
-		head = &lqh->urbp->queue_list;
-		tmp = head->next;
-		while (head != tmp) {
+		list_for_each (tmp, &lqh->urbp->queue_list) {
 			struct urb_priv *turbp =
 				list_entry(tmp, struct urb_priv, queue_list);
-
-			tmp = tmp->next;
 
 			turbp->qh->link = cpu_to_le32(urbp->qh->dma_handle) | UHCI_PTR_QH;
 		}
 	}
-
-	head = &urbp->queue_list;
-	tmp = head->next;
-	while (head != tmp) {
-		struct urb_priv *turbp =
-			list_entry(tmp, struct urb_priv, queue_list);
-
-		tmp = tmp->next;
-
-		turbp->qh->link = lqh->link;
-	}
-
-	urbp->qh->link = lqh->link;
-	mb();				/* Ordering is important */
 	lqh->link = cpu_to_le32(urbp->qh->dma_handle) | UHCI_PTR_QH;
 
 	list_add_tail(&urbp->qh->list, &skelqh->list);
@@ -416,6 +424,9 @@ static void uhci_insert_qh(struct uhci_hcd *uhci, struct uhci_qh *skelqh, struct
 	spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
 }
 
+/* start removal of qh from schedule; it finishes next frame.
+ * TDs should be unlinked before this is called.
+ */
 static void uhci_remove_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
 {
 	unsigned long flags;
@@ -869,12 +880,12 @@ static int uhci_submit_control(struct uhci_hcd *uhci, struct urb *urb)
 	urbp->qh = qh;
 	qh->urbp = urbp;
 
-	/* Low speed or small transfers gets a different queue and treatment */
+	/* Low speed transfers get a different queue, and won't hog the bus */
 	if (urb->dev->speed == USB_SPEED_LOW) {
-		uhci_insert_tds_in_qh(qh, urb, 0);
+		uhci_insert_tds_in_qh(qh, urb, UHCI_PTR_DEPTH);
 		uhci_insert_qh(uhci, uhci->skel_ls_control_qh, urb);
 	} else {
-		uhci_insert_tds_in_qh(qh, urb, 1);
+		uhci_insert_tds_in_qh(qh, urb, UHCI_PTR_BREADTH);
 		uhci_insert_qh(uhci, uhci->skel_hs_control_qh, urb);
 		uhci_inc_fsbr(uhci, urb);
 	}
@@ -914,9 +925,9 @@ static int usb_control_retrigger_status(struct uhci_hcd *uhci, struct urb *urb)
 	urbp->qh->urbp = urbp;
 
 	/* One TD, who cares about Breadth first? */
-	uhci_insert_tds_in_qh(urbp->qh, urb, 0);
+	uhci_insert_tds_in_qh(urbp->qh, urb, UHCI_PTR_DEPTH);
 
-	/* Low speed or small transfers gets a different queue and treatment */
+	/* Low speed transfers get a different queue */
 	if (urb->dev->speed == USB_SPEED_LOW)
 		uhci_insert_qh(uhci, uhci->skel_ls_control_qh, urb);
 	else
@@ -1242,8 +1253,8 @@ static int uhci_submit_bulk(struct uhci_hcd *uhci, struct urb *urb, struct urb *
 	urbp->qh = qh;
 	qh->urbp = urbp;
 
-	/* Always assume breadth first */
-	uhci_insert_tds_in_qh(qh, urb, 1);
+	/* Always breadth first */
+	uhci_insert_tds_in_qh(qh, urb, UHCI_PTR_BREADTH);
 
 	if (eurb)
 		uhci_append_queued_urb(uhci, eurb, urb);
