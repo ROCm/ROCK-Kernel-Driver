@@ -1351,6 +1351,9 @@ int dev_queue_xmit(struct sk_buff *skb)
 	/* Grab device queue */
 	spin_lock_bh(&dev->queue_lock);
 	q = dev->qdisc;
+#ifdef CONFIG_NET_CLS_ACT
+	skb->tc_verd = SET_TC_AT(skb->tc_verd,AT_EGRESS);
+#endif
 	if (q->enqueue) {
 		rc = q->enqueue(skb, q);
 
@@ -1731,6 +1734,48 @@ static inline int __handle_bridge(struct sk_buff *skb,
 	return 0;
 }
 
+
+#ifdef CONFIG_NET_CLS_ACT
+/* TODO: Maybe we should just force sch_ingress to be compiled in
+ * when CONFIG_NET_CLS_ACT is? otherwise some useless instructions
+ * a compare and 2 stores extra right now if we dont have it on
+ * but have CONFIG_NET_CLS_ACT
+ * NOTE: This doesnt stop any functionality; if you dont have 
+ * the ingress scheduler, you just cant add policies on ingress.
+ *
+ */
+int ing_filter(struct sk_buff *skb) 
+{
+	struct Qdisc *q;
+	struct net_device *dev = skb->dev;
+	int result = TC_ACT_OK;
+	
+	if (dev->qdisc_ingress) {
+		__u32 ttl = (__u32) G_TC_RTTL(skb->tc_verd);
+		if (MAX_RED_LOOP < ttl++) {
+			printk("Redir loop detected Dropping packet (%s->%s)\n",
+				skb->input_dev?skb->input_dev->name:"??",skb->dev->name);
+			return TC_ACT_SHOT;
+		}
+
+		skb->tc_verd = SET_TC_RTTL(skb->tc_verd,ttl);
+
+		skb->tc_verd = SET_TC_AT(skb->tc_verd,AT_INGRESS);
+		if (NULL == skb->input_dev) {
+			skb->input_dev = skb->dev;
+			printk("ing_filter:  fixed  %s out %s\n",skb->input_dev->name,skb->dev->name);
+		}
+		spin_lock(&dev->ingress_lock);
+		if ((q = dev->qdisc_ingress) != NULL)
+			result = q->enqueue(skb, q);
+		spin_unlock(&dev->ingress_lock);
+
+	}
+
+	return result;
+}
+#endif
+
 int netif_receive_skb(struct sk_buff *skb)
 {
 	struct packet_type *ptype, *pt_prev;
@@ -1762,6 +1807,13 @@ int netif_receive_skb(struct sk_buff *skb)
 	skb->mac_len = skb->nh.raw - skb->mac.raw;
 
 	pt_prev = NULL;
+#ifdef CONFIG_NET_CLS_ACT
+	if (skb->tc_verd & TC_NCLS) {
+		skb->tc_verd = CLR_TC_NCLS(skb->tc_verd);
+		goto ncls;
+	}
+ #endif
+
 	rcu_read_lock();
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
 		if (!ptype->dev || ptype->dev == skb->dev) {
@@ -1770,6 +1822,26 @@ int netif_receive_skb(struct sk_buff *skb)
 			pt_prev = ptype;
 		}
 	}
+
+#ifdef CONFIG_NET_CLS_ACT
+	if (pt_prev) {
+		atomic_inc(&skb->users);
+		ret = pt_prev->func(skb, skb->dev, pt_prev);
+		pt_prev = NULL; /* noone else should process this after*/
+	} else {
+		skb->tc_verd = SET_TC_OK2MUNGE(skb->tc_verd);
+	}
+
+	ret = ing_filter(skb);
+
+	if (ret == TC_ACT_SHOT || (ret == TC_ACT_STOLEN)) {
+		kfree_skb(skb);
+		goto out;
+	}
+
+	skb->tc_verd = 0;
+ncls:
+#endif
 
 	handle_diverter(skb);
 
@@ -2824,6 +2896,10 @@ int register_netdevice(struct net_device *dev)
 	spin_lock_init(&dev->queue_lock);
 	spin_lock_init(&dev->xmit_lock);
 	dev->xmit_lock_owner = -1;
+#ifdef CONFIG_NET_CLS_ACT
+	spin_lock_init(&dev->ingress_lock);
+#endif
+
 #ifdef CONFIG_NET_FASTROUTE
 	dev->fastpath_lock = RW_LOCK_UNLOCKED;
 #endif
@@ -3357,5 +3433,10 @@ EXPORT_SYMBOL(netdev_unregister_fc);
 EXPORT_SYMBOL(netdev_fastroute);
 EXPORT_SYMBOL(netdev_fastroute_obstacles);
 #endif
+
+#ifdef CONFIG_NET_CLS_ACT
+EXPORT_SYMBOL(ing_filter);
+#endif
+
 
 EXPORT_PER_CPU_SYMBOL(softnet_data);

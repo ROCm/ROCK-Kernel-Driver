@@ -155,6 +155,7 @@ struct skb_shared_info {
  *	@sk: Socket we are owned by
  *	@stamp: Time we arrived
  *	@dev: Device we arrived on/are leaving by
+ *	@input_dev: Device we arrived on
  *      @real_dev: The real device we are using
  *	@h: Transport layer header
  *	@nh: Network layer header
@@ -197,6 +198,7 @@ struct sk_buff {
 	struct sock		*sk;
 	struct timeval		stamp;
 	struct net_device	*dev;
+	struct net_device	*input_dev;
 	struct net_device	*real_dev;
 
 	union {
@@ -262,8 +264,14 @@ struct sk_buff {
 	} private;
 #endif
 #ifdef CONFIG_NET_SCHED
-       __u32			tc_index;               /* traffic control index */
+       __u32			tc_index;        /* traffic control index */
+#ifdef CONFIG_NET_CLS_ACT
+	__u32           tc_verd;               /* traffic control verdict */
+	__u32           tc_classid;            /* traffic control classid */
+ #endif
+
 #endif
+
 
 	/* These elements must be at the end, see alloc_skb() for details.  */
 	unsigned int		truesize;

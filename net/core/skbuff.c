@@ -49,6 +49,9 @@
 #include <linux/inet.h>
 #include <linux/slab.h>
 #include <linux/netdevice.h>
+#ifdef CONFIG_NET_CLS_ACT
+#include <net/pkt_sched.h>
+#endif
 #include <linux/string.h>
 #include <linux/skbuff.h>
 #include <linux/cache.h>
@@ -241,6 +244,15 @@ void __kfree_skb(struct sk_buff *skb)
 	nf_bridge_put(skb->nf_bridge);
 #endif
 #endif
+/* XXX: IS this still necessary? - JHS */
+#ifdef CONFIG_NET_SCHED
+	skb->tc_index = 0;
+#ifdef CONFIG_NET_CLS_ACT
+	skb->tc_verd = 0;
+	skb->tc_classid = 0;
+#endif
+#endif
+
 	kfree_skbmem(skb);
 }
 
@@ -312,6 +324,14 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 #endif
 #ifdef CONFIG_NET_SCHED
 	C(tc_index);
+#ifdef CONFIG_NET_CLS_ACT
+	n->tc_verd = SET_TC_VERD(skb->tc_verd,0);
+	n->tc_verd = CLR_TC_OK2MUNGE(skb->tc_verd);
+	n->tc_verd = CLR_TC_MUNGED(skb->tc_verd);
+	C(input_dev);
+	C(tc_classid);
+#endif
+
 #endif
 	C(truesize);
 	atomic_set(&n->users, 1);
@@ -366,6 +386,9 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 #endif
 #endif
 #ifdef CONFIG_NET_SCHED
+#ifdef CONFIG_NET_CLS_ACT
+	new->tc_verd = old->tc_verd;
+#endif
 	new->tc_index	= old->tc_index;
 #endif
 	atomic_set(&new->users, 1);
