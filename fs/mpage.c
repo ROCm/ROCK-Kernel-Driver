@@ -431,7 +431,7 @@ page_is_mapped:
 		unsigned nr_bvecs = MPAGE_BIO_MAX_SIZE / PAGE_CACHE_SIZE;
 
 		bio = mpage_alloc(bdev, blocks[0] << (blkbits - 9),
-					nr_bvecs, GFP_NOFS);
+					nr_bvecs, GFP_NOFS|__GFP_HIGH);
 		if (bio == NULL)
 			goto confused;
 	}
