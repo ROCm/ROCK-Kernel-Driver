@@ -1988,7 +1988,7 @@ NCR_700_bus_reset(struct scsi_cmnd * SCp)
 	 * reset via sg or something */
 	while(hostdata->eh_complete != NULL) {
 		spin_unlock_irq(SCp->device->host->host_lock);
-		schedule_timeout(HZ/10);
+		msleep_interruptible(100);
 		spin_lock_irq(SCp->device->host->host_lock);
 	}
 	hostdata->eh_complete = &complete;

@@ -146,6 +146,7 @@ static struct pci_device_id dmx3191d_pci_tbl[] = {
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 4},
 	{ }
 };
+MODULE_DEVICE_TABLE(pci, dmx3191d_pci_tbl);
 
 static struct pci_driver dmx3191d_pci_driver = {
 	.name		= DMX3191D_DRIVER_NAME,
