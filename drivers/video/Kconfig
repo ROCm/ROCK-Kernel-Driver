@@ -367,7 +367,7 @@ config BUS_I2C
 
 config FB_SUN3
 	bool "Sun3 framebuffer support"
-	depends on FB && (SUN3 || SUN3X)
+	depends on FB && (SUN3 || SUN3X) && BROKEN
 
 config FB_BW2
 	bool "BWtwo support"
