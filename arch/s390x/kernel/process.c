@@ -257,15 +257,12 @@ asmlinkage int sys_execve(struct pt_regs regs)
         error = PTR_ERR(filename);
         if (IS_ERR(filename))
                 goto out;
-        error = do_execve(filename, (char **) regs.gprs[3], (char **) regs.gprs[4], &regs);
-	if (error == 0)
-	{
+        error = do_execve(filename, (char **) regs.gprs[3],
+			  (char **) regs.gprs[4], &regs);
+	if (error == 0) {
 		current->ptrace &= ~PT_DTRACE;
-		current->thread.fp_regs.fpc=0;
-		__asm__ __volatile__
-		        ("sr  0,0\n\t"
-		         "sfpc 0,0\n\t"
-			 : : :"0");
+		current->thread.fp_regs.fpc = 0;
+		asm volatile("sfpc %0,%0" : : "d" (0));
 	}
         putname(filename);
 out:

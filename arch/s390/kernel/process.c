@@ -199,8 +199,13 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
 
         /* fake return stack for resume(), don't go back to schedule */
         frame->gprs[9]  = (unsigned long) frame;
-        /* save fprs, if used in last task */
-	save_fp_regs(&p->thread.fp_regs);
+        /*
+	 * save fprs to current->thread.fp_regs to merge them with
+	 * the emulated registers and then copy the result to the child.
+	 */
+	save_fp_regs(&current->thread.fp_regs);
+	memcpy(&p->thread.fp_regs, &current->thread.fp_regs,
+	       sizeof(s390_fp_regs));
         p->thread.user_seg = __pa((unsigned long) p->mm->pgd) | _SEGMENT_TABLE;
 	/* start process with ar4 pointing to the correct address space */
 	p->thread.ar4 = get_fs().ar4;
@@ -262,20 +267,13 @@ asmlinkage int sys_execve(struct pt_regs regs)
         error = PTR_ERR(filename);
         if (IS_ERR(filename))
                 goto out;
-        error = do_execve(filename, (char **) regs.gprs[3], (char **) regs.gprs[4], &regs);
-	if (error == 0)
-	{
+        error = do_execve(filename, (char **) regs.gprs[3],
+			  (char **) regs.gprs[4], &regs);
+	if (error == 0) {
 		current->ptrace &= ~PT_DTRACE;
-		current->thread.fp_regs.fpc=0;
-		if(MACHINE_HAS_IEEE)
-		{
-			__asm__ __volatile__
-			("sr  0,0\n\t"
-			 "sfpc 0,0\n\t"
-				:
-			        :
-                                :"0");
-		}
+		current->thread.fp_regs.fpc = 0;
+		if (MACHINE_HAS_IEEE)
+			asm volatile("sfpc %0,%0" : : "d" (0));
 	}
         putname(filename);
 out:
@@ -288,7 +286,12 @@ out:
  */
 int dump_fpu (struct pt_regs * regs, s390_fp_regs *fpregs)
 {
-	save_fp_regs(fpregs);
+        /*
+	 * save fprs to current->thread.fp_regs to merge them with
+	 * the emulated registers and then copy the result to the dump.
+	 */
+	save_fp_regs(&current->thread.fp_regs);
+	memcpy(fpregs, &current->thread.fp_regs, sizeof(s390_fp_regs));
 	return 1;
 }
 

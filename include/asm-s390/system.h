@@ -12,21 +12,78 @@
 #define __ASM_SYSTEM_H
 
 #include <linux/config.h>
-#include <asm/types.h>
-#ifdef __KERNEL__
-#include <asm/lowcore.h>
-#endif
 #include <linux/kernel.h>
+#include <asm/types.h>
+#include <asm/ptrace.h>
+#include <asm/setup.h>
+
+#ifdef __KERNEL__
+
+struct task_struct;
+
+extern struct task_struct *resume(void *, void *);
+
+static inline void save_fp_regs(s390_fp_regs *fpregs)
+{
+	asm volatile (
+		"   std   0,8(%0)\n"
+		"   std   2,24(%0)\n"
+		"   std   4,40(%0)\n"
+		"   std   6,56(%0)"
+		: : "a" (fpregs) : "memory" );
+	if (!MACHINE_HAS_IEEE)
+		return;
+	asm volatile(
+		"   stfpc 0(%0)\n"
+		"   std   1,16(%0)\n"
+		"   std   3,32(%0)\n"
+		"   std   5,48(%0)\n"
+		"   std   7,64(%0)\n"
+		"   std   8,72(%0)\n"
+		"   std   9,80(%0)\n"
+		"   std   10,88(%0)\n"
+		"   std   11,96(%0)\n"
+		"   std   12,104(%0)\n"
+		"   std   13,112(%0)\n"
+		"   std   14,120(%0)\n"
+		"   std   15,128(%0)\n"
+		: : "a" (fpregs) : "memory" );
+}
+
+static inline void restore_fp_regs(s390_fp_regs *fpregs)
+{
+	asm volatile (
+		"   ld    0,8(%0)\n"
+		"   ld    2,24(%0)\n"
+		"   ld    4,40(%0)\n"
+		"   ld    6,56(%0)"
+		: : "a" (fpregs));
+	if (!MACHINE_HAS_IEEE)
+		return;
+	asm volatile(
+		"   lfpc  0(%0)\n"
+		"   ld    1,16(%0)\n"
+		"   ld    3,32(%0)\n"
+		"   ld    5,48(%0)\n"
+		"   ld    7,64(%0)\n"
+		"   ld    8,72(%0)\n"
+		"   ld    9,80(%0)\n"
+		"   ld    10,88(%0)\n"
+		"   ld    11,96(%0)\n"
+		"   ld    12,104(%0)\n"
+		"   ld    13,112(%0)\n"
+		"   ld    14,120(%0)\n"
+		"   ld    15,128(%0)\n"
+		: : "a" (fpregs));
+}
 
 #define switch_to(prev,next,last) do {					     \
 	if (prev == next)						     \
 		break;							     \
-	save_fp_regs1(&prev->thread.fp_regs);				     \
-	restore_fp_regs1(&next->thread.fp_regs);			     \
+	save_fp_regs(&prev->thread.fp_regs);				     \
+	restore_fp_regs(&next->thread.fp_regs);				     \
 	resume(prev,next);						     \
 } while (0)
-
-struct task_struct;
 
 #define nop() __asm__ __volatile__ ("nop")
 
@@ -281,23 +338,13 @@ extern void smp_ctl_clear_bit(int cr, int bit);
 #define ctl_set_bit(cr, bit) __ctl_set_bit(cr, bit)
 #define ctl_clear_bit(cr, bit) __ctl_clear_bit(cr, bit)
 
-#endif
-
-#ifdef __KERNEL__
-extern struct task_struct *resume(void *, void *);
-
-extern int save_fp_regs1(s390_fp_regs *fpregs);
-extern void save_fp_regs(s390_fp_regs *fpregs);
-extern int restore_fp_regs1(s390_fp_regs *fpregs);
-extern void restore_fp_regs(s390_fp_regs *fpregs);
+#endif /* CONFIG_SMP */
 
 extern void (*_machine_restart)(char *command);
 extern void (*_machine_halt)(void);
 extern void (*_machine_power_off)(void);
 
-#endif
+#endif /* __KERNEL__ */
 
 #endif
-
-
 

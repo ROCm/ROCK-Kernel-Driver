@@ -32,7 +32,11 @@
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
+#define _ADDR_31 0x80000000
+#define _USER_PSW_MASK_EMU32 0x070DC000
 #define _USER_PSW_MASK32 0x0705C00080000000
+#define PSW_MASK_DEBUGCHANGE32 0x00003000UL
+#define PSW_ADDR_DEBUGCHANGE32 0x7FFFFFFFUL
 
 typedef struct 
 {
@@ -290,55 +294,48 @@ sys32_sigaltstack(const stack_t32 *uss, stack_t32 *uoss, struct pt_regs *regs)
 
 static int save_sigregs32(struct pt_regs *regs,_sigregs32 *sregs)
 {
-	int err = 0;
-	s390_fp_regs fpregs;
-	int i;
+	_s390_regs_common32 regs32;
+	int err, i;
 
-	for(i=0; i<NUM_GPRS; i++) 
-		err |= __put_user(regs->gprs[i], &sregs->regs.gprs[i]);  
-	for(i=0; i<NUM_ACRS; i++)
-		err |= __put_user(regs->acrs[i], &sregs->regs.acrs[i]);  
-	err |= __copy_to_user(&sregs->regs.psw.mask, &regs->psw.mask, 4);
-	err |= __copy_to_user(&sregs->regs.psw.addr, ((char*)&regs->psw.addr)+4, 4);
-	if(!err)
-	{
-		save_fp_regs(&fpregs);
-		__put_user(fpregs.fpc, &sregs->fpregs.fpc);
-		for(i=0; i<NUM_FPRS; i++)
-			err |= __put_user(fpregs.fprs[i].d, &sregs->fpregs.fprs[i].d);  
-	}
-	return(err);
-	
+	regs32.psw.mask = _USER_PSW_MASK_EMU32 |
+		(__u32)((regs->psw.mask & PSW_MASK_DEBUGCHANGE) >> 32);
+	regs32.psw.addr = _ADDR_31 | (__u32) regs->psw.addr;
+	for (i = 0; i < NUM_GPRS; i++)
+		regs32.gprs[i] = (__u32) regs->gprs[i];
+	memcpy(regs32.acrs, regs->acrs, sizeof(regs32.acrs));
+	err = __copy_to_user(&sregs->regs, &regs32, sizeof(regs32));
+	if (err)
+		return err;
+	save_fp_regs(&current->thread.fp_regs);
+	/* s390_fp_regs and _s390_fp_regs32 are the same ! */
+	return __copy_to_user(&sregs->fpregs, &current->thread.fp_regs,
+			      sizeof(_s390_fp_regs32));
 }
 
 static int restore_sigregs32(struct pt_regs *regs,_sigregs32 *sregs)
 {
-	int err = 0;
-	s390_fp_regs fpregs;
-	psw_t saved_psw=regs->psw;
-	int i;
+	_s390_regs_common32 regs32;
+	int err, i;
 
-	for(i=0; i<NUM_GPRS; i++)
-		err |= __get_user(regs->gprs[i], &sregs->regs.gprs[i]);  
-	for(i=0; i<NUM_ACRS; i++)
-		err |= __get_user(regs->acrs[i], &sregs->regs.acrs[i]);  
-	err |= __copy_from_user(&regs->psw.mask, &sregs->regs.psw.mask, 4);
-	err |= __copy_from_user(((char*)&regs->psw.addr)+4, &sregs->regs.psw.addr, 4);
+	err = __copy_from_user(&regs32, &sregs->regs, sizeof(regs32));
+	if (err)
+		return err;
+	regs->psw.mask = _USER_PSW_MASK32 |
+		(__u64)(regs32.psw.mask & PSW_MASK_DEBUGCHANGE32) << 32;
+	regs->psw.addr = (__u64)(regs32.psw.addr & PSW_ADDR_DEBUGCHANGE32);
+	for (i = 0; i < NUM_GPRS; i++)
+		regs->gprs[i] = (__u64) regs32.gprs[i];
+	memcpy(regs->acrs, regs32.acrs, sizeof(regs32.acrs));
 
-	if(!err)
-	{
-		regs->trap = -1;		/* disable syscall checks */
-		regs->psw.mask=(saved_psw.mask&~PSW_MASK_DEBUGCHANGE)|
-		(regs->psw.mask&PSW_MASK_DEBUGCHANGE);
-		regs->psw.addr=(saved_psw.addr&~PSW_ADDR_DEBUGCHANGE)|
-		(regs->psw.addr&PSW_ADDR_DEBUGCHANGE);
-		__get_user(fpregs.fpc, &sregs->fpregs.fpc);
-                for(i=0; i<NUM_FPRS; i++)
-                        err |= __get_user(fpregs.fprs[i].d, &sregs->fpregs.fprs[i].d);              
-		if(!err)
-			restore_fp_regs(&fpregs);
-	}
-	return(err);
+	err = __copy_from_user(&current->thread.fp_regs, &sregs->fpregs,
+			       sizeof(_s390_fp_regs32));
+	current->thread.fp_regs.fpc &= FPC_VALID_MASK;
+	if (err)
+		return err;
+
+	restore_fp_regs(&current->thread.fp_regs);
+	regs->trap = -1;	/* disable syscall checks */
+	return 0;
 }
 
 asmlinkage long sys32_sigreturn(struct pt_regs *regs)

@@ -49,13 +49,14 @@ typedef struct
 	struct ucontext uc;
 } rt_sigframe;
 
-asmlinkage int FASTCALL(do_signal(struct pt_regs *regs, sigset_t *oldset));
+int do_signal(struct pt_regs *regs, sigset_t *oldset);
 
 /*
  * Atomically swap in the new signal mask, and wait for a signal.
  */
 asmlinkage int
-sys_sigsuspend(struct pt_regs * regs,int history0, int history1, old_sigset_t mask)
+sys_sigsuspend(struct pt_regs * regs, int history0, int history1,
+	       old_sigset_t mask)
 {
 	sigset_t saveset;
 
@@ -147,37 +148,39 @@ sys_sigaltstack(const stack_t *uss, stack_t *uoss, struct pt_regs *regs)
 static int save_sigregs(struct pt_regs *regs,_sigregs *sregs)
 {
 	int err;
-	s390_fp_regs fpregs;
   
-	err = __copy_to_user(&sregs->regs,regs,sizeof(_s390_regs_common));
-	if(!err)
-	{
-		save_fp_regs(&fpregs);
-		err=__copy_to_user(&sregs->fpregs,&fpregs,sizeof(fpregs));
-	}
-	return(err);
-	
+	err = __copy_to_user(&sregs->regs, regs, sizeof(_s390_regs_common));
+	if (err != 0)
+		return err;
+	/* 
+	 * We have to store the fp registers to current->thread.fp_regs
+	 * to merge them with the emulated registers.
+	 */
+	save_fp_regs(&current->thread.fp_regs);
+	return __copy_to_user(&sregs->fpregs, &current->thread.fp_regs, 
+			      sizeof(s390_fp_regs));
 }
 
 /* Returns positive number on error */
 static int restore_sigregs(struct pt_regs *regs,_sigregs *sregs)
 {
 	int err;
-	s390_fp_regs fpregs;
-	psw_t saved_psw=regs->psw;
-	err=__copy_from_user(regs,&sregs->regs,sizeof(_s390_regs_common));
-	if(!err)
-	{
-		regs->trap = -1;		/* disable syscall checks */
-		regs->psw.mask=(saved_psw.mask&~PSW_MASK_DEBUGCHANGE)|
-		(regs->psw.mask&PSW_MASK_DEBUGCHANGE);
-		regs->psw.addr=(saved_psw.addr&~PSW_ADDR_DEBUGCHANGE)|
-		(regs->psw.addr&PSW_ADDR_DEBUGCHANGE);
-		err=__copy_from_user(&fpregs,&sregs->fpregs,sizeof(fpregs));
-		if(!err)
-			restore_fp_regs(&fpregs);
-	}
-	return(err);
+
+	err = __copy_from_user(regs, &sregs->regs, sizeof(_s390_regs_common));
+	regs->psw.mask = _USER_PSW_MASK | (regs->psw.mask & PSW_MASK_DEBUGCHANGE);
+	regs->psw.addr |= _ADDR_31;
+	if (err)
+		return err;
+
+	err = __copy_from_user(&current->thread.fp_regs, &sregs->fpregs,
+			       sizeof(s390_fp_regs));
+	current->thread.fp_regs.fpc &= FPC_VALID_MASK;
+	if (err)
+		return err;
+
+	restore_fp_regs(&current->thread.fp_regs);
+	regs->trap = -1;	/* disable syscall checks */
+	return 0;
 }
 
 asmlinkage long sys_sigreturn(struct pt_regs *regs)
