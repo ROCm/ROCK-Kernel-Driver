@@ -38,7 +38,6 @@ struct gameport {
 	void *driver;	/* Private pointer for gameport drivers */
 	char *name;
 	char *phys;
-	int number;
 
 	unsigned short idbus;
 	unsigned short idvendor;
