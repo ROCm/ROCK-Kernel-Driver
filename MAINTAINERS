@@ -328,16 +328,64 @@ M:	axboe@suse.de
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
-BLUETOOTH SUBSYSTEM (BlueZ)
+BLUETOOTH SUBSYSTEM
 P:	Maxim Krasnyansky
 M:	maxk@qualcomm.com
 W:	http://bluez.sf.net
 S:	Maintained
 
-BLUETOOTH SUBSYSTEM (PC Card Drivers)
+BLUETOOTH RFCOMM LAYER
+P:	Maxim Krasnyansky
+M:	maxk@qualcomm.com
+W:	http://bluez.sf.net
+S:	Maintained
+
+BLUETOOTH BNEP LAYER
+P:	Maxim Krasnyansky
+M:	maxk@qualcomm.com
+W:	http://bluez.sf.net
+S:	Maintained
+
+BLUETOOTH HCI USB DRIVER
+P:	Maxim Krasnyansky
+M:	maxk@qualcomm.com
+W:	http://bluez.sf.net
+S:	Maintained
+
+BLUETOOTH HCI UART DRIVER
+P:	Maxim Krasnyansky
+M:	maxk@qualcomm.com
+W:	http://bluez.sf.net
+S:	Maintained
+
+BLUETOOTH HCI DTL1 DRIVER
 P:	Marcel Holtmann
 M:	marcel@holtmann.org
 W:	http://www.holtmann.org/linux/bluetooth/
+S:	Maintained
+
+BLUETOOTH HCI BLUECARD DRIVER
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
+W:	http://www.holtmann.org/linux/bluetooth/
+S:	Maintained
+
+BLUETOOTH HCI BT3C DRIVER
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
+W:	http://www.holtmann.org/linux/bluetooth/
+S:	Maintained
+
+BLUETOOTH HCI BTUART DRIVER
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
+W:	http://www.holtmann.org/linux/bluetooth/
+S:	Maintained
+
+BLUETOOTH HCI VHCI DRIVER
+P:	Maxim Krasnyansky
+M:	maxk@qualcomm.com
+W:	http://bluez.sf.net
 S:	Maintained
 
 BONDING DRIVER

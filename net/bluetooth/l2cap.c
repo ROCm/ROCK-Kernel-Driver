@@ -289,7 +289,7 @@ static void __l2cap_sock_close(struct sock *sk, int reason)
 			struct l2cap_disconn_req req;
 
 			sk->sk_state = BT_DISCONN;
-			l2cap_sock_set_timer(sk, HZ * 5);
+			l2cap_sock_set_timer(sk, sk->sk_sndtimeo);
 
 			req.dcid = __cpu_to_le16(l2cap_pi(sk)->dcid);
 			req.scid = __cpu_to_le16(l2cap_pi(sk)->scid);
@@ -314,11 +314,9 @@ static void __l2cap_sock_close(struct sock *sk, int reason)
 static void l2cap_sock_close(struct sock *sk)
 {
 	l2cap_sock_clear_timer(sk);
-
 	lock_sock(sk);
 	__l2cap_sock_close(sk, ECONNRESET);
 	release_sock(sk);
-
 	l2cap_sock_kill(sk);
 }
 
@@ -530,8 +528,8 @@ static int l2cap_sock_connect(struct socket *sock, struct sockaddr *addr, int al
 		goto done;
 
 wait:
-	err = bt_sock_w4_connect(sk, flags);
-
+	err = bt_sock_wait_state(sk, BT_CONNECTED,
+			sock_sndtimeo(sk, flags & O_NONBLOCK));
 done:
 	release_sock(sk);
 	return err;
@@ -831,32 +829,39 @@ static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname, ch
 static int l2cap_sock_shutdown(struct socket *sock, int how)
 {
 	struct sock *sk = sock->sk;
+	int err = 0;
 
 	BT_DBG("sock %p, sk %p", sock, sk);
 
 	if (!sk) return 0;
 
-	l2cap_sock_clear_timer(sk);
-
 	lock_sock(sk);
-	sk->sk_shutdown = SHUTDOWN_MASK;
-	__l2cap_sock_close(sk, ECONNRESET);
-	release_sock(sk);
+	if (!sk->sk_shutdown) {
+		sk->sk_shutdown = SHUTDOWN_MASK;
+		l2cap_sock_clear_timer(sk);
+		__l2cap_sock_close(sk, 0);
 
-	return 0;
+		if (sock_flag(sk, SOCK_LINGER) && sk->sk_lingertime)
+			err = bt_sock_wait_state(sk, BT_CLOSED, sk->sk_lingertime);
+	}
+	release_sock(sk);
+	return err;
 }
 
 static int l2cap_sock_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
+	int err;
 
 	BT_DBG("sock %p, sk %p", sock, sk);
 
 	if (!sk) return 0;
 
+	err = l2cap_sock_shutdown(sock, 2);
+
 	sock_orphan(sk);
-	l2cap_sock_close(sk);
-	return 0;
+	l2cap_sock_kill(sk);
+	return err;
 }
 
 /* ---- L2CAP channels ---- */
@@ -980,9 +985,11 @@ static void l2cap_chan_del(struct sock *sk, int err)
 		hci_conn_put(conn->hcon);
 	}
 
-	sk->sk_state = BT_CLOSED;
-	sk->sk_err   = err;
+	sk->sk_state  = BT_CLOSED;
 	sk->sk_zapped = 1;
+	
+	if (err)
+		sk->sk_err = err;
 
 	if (parent)
 		parent->sk_data_ready(parent, 0);
@@ -1518,18 +1525,35 @@ static inline int l2cap_config_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hdr
 	if (!(sk = l2cap_get_chan_by_scid(&conn->chan_list, scid)))
 		return -ENOENT;
 
-	if (result) {
-		struct l2cap_disconn_req req;
+	switch (result) {
+	case L2CAP_CONF_SUCCESS:
+		break;
 
-		/* They didn't like our options. Well... we do not negotiate.
-		 * Close channel.
-		 */
+	case L2CAP_CONF_UNACCEPT:
+		if (++l2cap_pi(sk)->conf_retry < L2CAP_CONF_MAX_RETRIES) {
+			char req[128];
+			/* 
+			   It does not make sense to adjust L2CAP parameters 
+			   that are currently defined in the spec. We simply 
+			   resend config request that we sent earlier. It is
+			   stupid :) but it helps qualification testing
+			   which expects at least some response from us.
+			*/
+			l2cap_send_req(conn, L2CAP_CONF_REQ,
+				l2cap_build_conf_req(sk, req), req);
+			goto done;
+		}
+
+	default: 
 		sk->sk_state = BT_DISCONN;
+		sk->sk_err   = ECONNRESET;
 		l2cap_sock_set_timer(sk, HZ * 5);
-
-		req.dcid = __cpu_to_le16(l2cap_pi(sk)->dcid);
-		req.scid = __cpu_to_le16(l2cap_pi(sk)->scid);
-		l2cap_send_req(conn, L2CAP_DISCONN_REQ, sizeof(req), &req);
+		{
+			struct l2cap_disconn_req req;
+			req.dcid = __cpu_to_le16(l2cap_pi(sk)->dcid);
+			req.scid = __cpu_to_le16(l2cap_pi(sk)->scid);
+			l2cap_send_req(conn, L2CAP_DISCONN_REQ, sizeof(req), &req);
+		}
 		goto done;
 	}
 
@@ -1590,7 +1614,7 @@ static inline int l2cap_disconnect_rsp(struct l2cap_conn *conn, struct l2cap_cmd
 
 	if (!(sk = l2cap_get_chan_by_scid(&conn->chan_list, scid)))
 		return 0;
-	l2cap_chan_del(sk, ECONNABORTED);
+	l2cap_chan_del(sk, 0);
 	bh_unlock_sock(sk);
 
 	l2cap_sock_kill(sk);
