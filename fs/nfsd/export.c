@@ -32,9 +32,9 @@
 typedef struct svc_client	svc_client;
 typedef struct svc_export	svc_export;
 
-static svc_export *	exp_parent(svc_client *clp, kdev_t dev,
+static svc_export *	exp_parent(svc_client *clp, struct super_block *sb,
 					struct dentry *dentry);
-static svc_export *	exp_child(svc_client *clp, kdev_t dev,
+static svc_export *	exp_child(svc_client *clp, struct super_block *sb,
 					struct dentry *dentry);
 static void		exp_unexport_all(svc_client *clp);
 static void		exp_do_unexport(svc_export *unexp);
@@ -91,14 +91,14 @@ out:
  * Find the export entry for a given dentry.  <gam3@acm.org>
  */
 static svc_export *
-exp_parent(svc_client *clp, kdev_t dev, struct dentry *dentry)
+exp_parent(svc_client *clp, struct super_block *sb, struct dentry *dentry)
 {
 	svc_export      *exp;
 
 	if (clp == NULL)
 		return NULL;
 
-	for (exp = clp->cl_export[EXPORT_HASH(dev)]; exp; exp = exp->ex_next)
+	for (exp = clp->cl_export[EXPORT_HASH(sb->s_dev)]; exp; exp = exp->ex_next)
 		if (is_subdir(dentry, exp->ex_dentry))
 			break;
 	return exp;
@@ -110,14 +110,14 @@ exp_parent(svc_client *clp, kdev_t dev, struct dentry *dentry)
  * <gam3@acm.org>
  */
 static svc_export *
-exp_child(svc_client *clp, kdev_t dev, struct dentry *dentry)
+exp_child(svc_client *clp, struct super_block *sb, struct dentry *dentry)
 {
 	svc_export      *exp;
 
 	if (clp == NULL)
 		return NULL;
 
-	for (exp = clp->cl_export[EXPORT_HASH(dev)]; exp; exp = exp->ex_next) {
+	for (exp = clp->cl_export[EXPORT_HASH(sb->s_dev)]; exp; exp = exp->ex_next) {
 		struct dentry	*ndentry = exp->ex_dentry;
 		if (ndentry && is_subdir(ndentry->d_parent, dentry))
 			break;
@@ -205,12 +205,12 @@ exp_export(struct nfsctl_export *nxp)
 		goto finish;
 	}
 
-	if ((parent = exp_child(clp, dev, nd.dentry)) != NULL) {
+	if ((parent = exp_child(clp, inode->i_sb, nd.dentry)) != NULL) {
 		dprintk("exp_export: export not valid (Rule 3).\n");
 		goto finish;
 	}
 	/* Is this is a sub-export, must be a proper subset of FS */
-	if ((parent = exp_parent(clp, dev, nd.dentry)) != NULL) {
+	if ((parent = exp_parent(clp, inode->i_sb, nd.dentry)) != NULL) {
 		dprintk("exp_export: sub-export not valid (Rule 2).\n");
 		goto finish;
 	}
@@ -386,7 +386,7 @@ exp_rootfh(struct svc_client *clp, char *path, struct knfsd_fh *f, int maxsize)
 	dprintk("nfsd: exp_rootfh(%s [%p] %s:%02x:%02x/%ld)\n",
 		 path, nd.dentry, clp->cl_ident,
 		 major(dev), minor(dev), (long) inode->i_ino);
-	exp = exp_parent(clp, dev, nd.dentry);
+	exp = exp_parent(clp, inode->i_sb, nd.dentry);
 	if (!exp) {
 		dprintk("nfsd: exp_rootfh export not found.\n");
 		goto out;
