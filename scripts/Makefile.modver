@@ -2,3 +2,92 @@
 # Module versions
 # ===========================================================================
 
+.PHONY: __modversions
+__modversions:
+
+include scripts/Makefile.lib
+
+#
+
+modules := $(patsubst ./%,%,$(shell cd $(MODVERDIR); find . -name \*.ko))
+
+__modversions: $(modules)
+	@:
+
+quiet_cmd_ld_ko_o = LD [M]  $@
+      cmd_ld_ko_o = $(LD) $(LDFLAGS) $(LDFLAGS_MODULE) -o $@ 		\
+			  $(filter-out FORCE,$^)
+
+init/vermagic.o: ;
+
+$(modules): %.ko :%.o $(MODVERDIR)/%.o init/vermagic.o FORCE
+	$(call if_changed,ld_ko_o)
+
+targets += $(modules)
+
+
+quiet_cmd_cc_o_c = CC      $@
+      cmd_cc_o_c = $(CC) $(CFLAGS) -c -o $@ $<
+
+$(addprefix $(MODVERDIR)/,$(modules:.ko=.o)): %.o: %.c FORCE
+	$(call if_changed,cc_o_c)
+
+targets += $(addprefix $(MODVERDIR)/,$(modules:.ko=.o))
+
+define rule_mkver_o_c
+	echo '  MKVER   $@';						\
+	( echo "#include <linux/module.h>";				\
+	  echo "";							\
+	  echo "static const struct modversion_info ____versions[]";	\
+	  echo "__attribute__((section(\"__versions\"))) = {"; 	\
+	  for sym in `nm -u $<`; do					\
+		grep "\"$$sym\"" .tmp_all-versions			\
+		|| echo "*** Warning: $(<:.o=.ko): \"$$sym\" unresolved!" >&2;\
+	  done;								\
+	  echo "};";							\
+	) > $@
+endef
+
+$(addprefix $(MODVERDIR)/,$(modules:.ko=.c)):				\
+$(MODVERDIR)/%.c: %.o .tmp_all-versions FORCE
+	$(call if_changed_rule,mkver_o_c)
+
+targets += $(addprefix $(MODVERDIR)/,$(modules:.ko=.o.c))
+
+export-objs := $(shell for m in vmlinux $(modules:.ko=.o); do objdump -h $$m | grep -q __ksymtab && echo $$m; done)
+
+cmd_gen-all-versions = mksyms $(export-objs)
+define rule_gen-all-versions
+	echo '  MKSYMS  $@';						\
+	for mod in $(export-objs); do					\
+		modname=`basename $$mod`;				\
+		nm $$mod 						\
+		| grep ' __crc_'					\
+		| sed "s/\([^ ]*\) A __crc_\(.*\)/{ 0x\1, \"\2\" }, \/* $$modname *\//g;s/.* w __crc_\(.*\)/{ 0x0       , \"\1\" }, \/* $$modname *\//g"; \
+	done > $@;							\
+	echo 'cmd_$@ := $(cmd_$(1))' > $(@D)/.$(@F).cmd
+endef
+
+.tmp_all-versions: $(export-objs) FORCE
+	$(call if_changed_rule,gen-all-versions)
+
+targets += .tmp_all-versions
+
+# Add FORCE to the prequisites of a target to force it to be always rebuilt.
+# ---------------------------------------------------------------------------
+
+.PHONY: FORCE
+
+FORCE:
+
+# Read all saved command lines and dependencies for the $(targets) we
+# may be building above, using $(if_changed{,_dep}). As an
+# optimization, we don't need to read them if the target does not
+# exist, we will rebuild anyway in that case.
+
+targets := $(wildcard $(sort $(targets)))
+cmd_files := $(wildcard $(foreach f,$(targets),$(dir $(f)).$(notdir $(f)).cmd))
+
+ifneq ($(cmd_files),)
+  include $(cmd_files)
+endif

@@ -33,10 +33,17 @@
 #endif
 
 #define MODULE_NAME_LEN (64 - sizeof(unsigned long))
+
 struct kernel_symbol
 {
 	unsigned long value;
 	const char *name;
+};
+
+struct modversion_info
+{
+	unsigned long crc;
+	char name[MODULE_NAME_LEN];
 };
 
 /* These are either module local, or the kernel's dummy ones. */

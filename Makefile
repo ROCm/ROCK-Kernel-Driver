@@ -262,7 +262,7 @@ endif
 
 #	When we're building modules with modversions, we need to consider
 #	the built-in objects during the descend as well, in order to
-#	make sure the checksums are uptodate before we use them.
+#	make sure the checksums are uptodate before we record them.
 
 ifdef CONFIG_MODVERSIONING
 ifeq ($(KBUILD_MODULES),1)
@@ -508,8 +508,16 @@ ifdef CONFIG_MODULES
 
 #	Build modules
 
-.PHONY: modules
-modules: $(SUBDIRS)
+.PHONY: modules __modversions
+modules: $(SUBDIRS) __modversions
+
+ifdef CONFIG_MODVERSIONING
+
+__modversions: vmlinux $(SUBDIRS)
+	@echo '  Recording module symbol versions.';
+	$(Q)$(MAKE) -rR -f scripts/Makefile.modver
+
+endif
 
 #	Install modules
 
@@ -690,6 +698,7 @@ MRPROPER_FILES += \
 
 # Directories removed with 'make mrproper'
 MRPROPER_DIRS += \
+	$(MODVERDIR) \
 	.tmp_export-objs \
 	include/config \
 	include/linux/modules
