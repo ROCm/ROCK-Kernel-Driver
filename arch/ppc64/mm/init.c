@@ -52,7 +52,6 @@
 #include <asm/smp.h>
 #include <asm/machdep.h>
 #include <asm/tlb.h>
-#include <asm/naca.h>
 #include <asm/eeh.h>
 #include <asm/processor.h>
 #include <asm/mmzone.h>

@@ -41,7 +41,6 @@
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/smp.h>
-#include <asm/naca.h>
 #include <asm/paca.h>
 #include <asm/time.h>
 #include <asm/ppcdebug.h>

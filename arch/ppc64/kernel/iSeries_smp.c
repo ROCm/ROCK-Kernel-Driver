@@ -37,7 +37,6 @@
 #include <asm/pgtable.h>
 #include <asm/io.h>
 #include <asm/smp.h>
-#include <asm/naca.h>
 #include <asm/paca.h>
 #include <asm/iSeries/LparData.h>
 #include <asm/iSeries/HvCall.h>

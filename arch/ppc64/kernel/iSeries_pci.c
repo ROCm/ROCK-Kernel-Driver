@@ -35,7 +35,6 @@
 #include <asm/machdep.h>
 #include <asm/pci-bridge.h>
 #include <asm/ppcdebug.h>
-#include <asm/naca.h>
 #include <asm/iommu.h>
 
 #include <asm/iSeries/HvCallPci.h>
