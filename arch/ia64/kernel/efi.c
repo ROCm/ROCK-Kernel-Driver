@@ -250,7 +250,7 @@ efi_map_pal_code (void)
 		 * dedicated ITR for the PAL code.
 		 */
 		if ((vaddr & mask) == (KERNEL_START & mask)) {
-			printk(__FUNCTION__ ": no need to install ITR for PAL code\n");
+			printk("%s: no need to install ITR for PAL code\n", __FUNCTION__);
 			continue;
 		}
 

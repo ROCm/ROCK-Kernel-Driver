@@ -334,7 +334,7 @@ setup_arch (char **cmdline_p)
 		printk("No I/O port range found in EFI memory map, falling back to AR.KR0\n");
 		printk("I/O port base = 0x%lx\n", phys_iobase);
 	}
-	ia64_iobase = ioremap(phys_iobase);
+	ia64_iobase = (unsigned long) ioremap(phys_iobase, 0);
 
 #ifdef CONFIG_SMP
 	cpu_physical_id(0) = hard_smp_processor_id();

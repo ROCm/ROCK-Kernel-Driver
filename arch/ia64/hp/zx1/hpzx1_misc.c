@@ -191,8 +191,8 @@ typedef struct {
 
 #define HP_CCSR_LENGTH 0x21
 #define HP_CCSR_TYPE 0x2
-#define HP_CCSR_GUID \
-    ((efi_guid_t) { 0x69e9adf9, 0x924f, 0xab5f, { 0xf6, 0x4a, 0x24, 0xd2, 0x01, 0x37, 0x0e, 0xad }})
+#define HP_CCSR_GUID EFI_GUID(0x69e9adf9, 0x924f, 0xab5f,			\
+			      0xf6, 0x4a, 0x24, 0xd2, 0x01, 0x37, 0x0e, 0xad)
 
 extern acpi_status acpi_get_crs(acpi_handle, acpi_buffer *);
 extern acpi_resource *acpi_get_crs_next(acpi_buffer *, int *);
@@ -577,7 +577,7 @@ hpzx1_fake_pci_dev(unsigned long addr, unsigned int bus, unsigned int size)
 	 * Drivers should ioremap what they need, but we have to do
 	 * it here, too, so PCI config accesses work.
 	 */
-	dev->mapped_csrs = ioremap(dev->csr_base, dev->csr_size);
+	dev->mapped_csrs = (unsigned long) ioremap(dev->csr_base, dev->csr_size);
 
 	return dev;
 }
