@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -251,7 +251,7 @@ ismrlocked(mrlock_t *mrp, int type)	/* No need to lock since info can change */
 	else if (type == MR_UPDATE)
 		return (mrp->mr_count < 0); /* Write lock */
 	else if (type == (MR_UPDATE | MR_ACCESS))
-		return (mrp->mr_count); /* Any type of lock held */
+		return (mrp->mr_count);	/* Any type of lock held */
 	else /* Any waiters */
 		return (mrp->mr_reads_waiting | mrp->mr_writes_waiting);
 }

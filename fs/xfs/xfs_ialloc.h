@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_IALLOC_H__
-#define __XFS_IALLOC_H__
+#define	__XFS_IALLOC_H__
 
 struct xfs_buf;
 struct xfs_dinode;
@@ -42,15 +42,15 @@ struct xfs_trans;
  */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_IALLOC_INODES)
 int xfs_ialloc_inodes(struct xfs_mount *mp);
-#define XFS_IALLOC_INODES(mp)	xfs_ialloc_inodes(mp)
+#define	XFS_IALLOC_INODES(mp)	xfs_ialloc_inodes(mp)
 #else
-#define XFS_IALLOC_INODES(mp)	((mp)->m_ialloc_inos)
+#define	XFS_IALLOC_INODES(mp)	((mp)->m_ialloc_inos)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_IALLOC_BLOCKS)
 xfs_extlen_t xfs_ialloc_blocks(struct xfs_mount *mp);
-#define XFS_IALLOC_BLOCKS(mp)	xfs_ialloc_blocks(mp)
+#define	XFS_IALLOC_BLOCKS(mp)	xfs_ialloc_blocks(mp)
 #else
-#define XFS_IALLOC_BLOCKS(mp)	((mp)->m_ialloc_blks)
+#define	XFS_IALLOC_BLOCKS(mp)	((mp)->m_ialloc_blks)
 #endif
 
 /*
@@ -60,18 +60,18 @@ xfs_extlen_t xfs_ialloc_blocks(struct xfs_mount *mp);
  * around for xfs_dilocate().  We choose which one to use in
  * xfs_mount_int().
  */
-#define XFS_INODE_BIG_CLUSTER_SIZE	8192
-#define XFS_INODE_SMALL_CLUSTER_SIZE	4096
-#define XFS_INODE_CLUSTER_SIZE(mp)	(mp)->m_inode_cluster_size
+#define	XFS_INODE_BIG_CLUSTER_SIZE	8192
+#define	XFS_INODE_SMALL_CLUSTER_SIZE	4096
+#define	XFS_INODE_CLUSTER_SIZE(mp)	(mp)->m_inode_cluster_size
 
 /*
  * Make an inode pointer out of the buffer/offset.
  */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_MAKE_IPTR)
 struct xfs_dinode *xfs_make_iptr(struct xfs_mount *mp, struct xfs_buf *b, int o);
-#define XFS_MAKE_IPTR(mp,b,o)		xfs_make_iptr(mp,b,o)
+#define	XFS_MAKE_IPTR(mp,b,o)		xfs_make_iptr(mp,b,o)
 #else
-#define XFS_MAKE_IPTR(mp,b,o) \
+#define	XFS_MAKE_IPTR(mp,b,o) \
 	((xfs_dinode_t *)(xfs_buf_offset(b, (o) << (mp)->m_sb.sb_inodelog)))
 #endif
 
@@ -80,9 +80,9 @@ struct xfs_dinode *xfs_make_iptr(struct xfs_mount *mp, struct xfs_buf *b, int o)
  */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_IALLOC_FIND_FREE)
 int xfs_ialloc_find_free(xfs_inofree_t *fp);
-#define XFS_IALLOC_FIND_FREE(fp)	xfs_ialloc_find_free(fp)
+#define	XFS_IALLOC_FIND_FREE(fp)	xfs_ialloc_find_free(fp)
 #else
-#define XFS_IALLOC_FIND_FREE(fp)	xfs_lowbit64(*(fp))
+#define	XFS_IALLOC_FIND_FREE(fp)	xfs_lowbit64(*(fp))
 #endif
 
 
@@ -99,17 +99,17 @@ int xfs_ialloc_find_free(xfs_inofree_t *fp);
  *
  * To work within the constraint of one allocation per transaction,
  * xfs_dialloc() is designed to be called twice if it has to do an
- * allocation to make more free inodes.	 If an inode is
+ * allocation to make more free inodes.  If an inode is
  * available without an allocation, agbp would be set to the current
  * agbp and alloc_done set to false.
  * If an allocation needed to be done, agbp would be set to the
  * inode header of the allocation group and alloc_done set to true.
  * The caller should then commit the current transaction and allocate a new
- * transaction.	 xfs_dialloc() should then be called again with
+ * transaction.  xfs_dialloc() should then be called again with
  * the agbp value returned from the previous call.
  *
  * Once we successfully pick an inode its number is returned and the
- * on-disk data structures are updated.	 The inode itself is not read
+ * on-disk data structures are updated.  The inode itself is not read
  * in, since doing so would break ordering constraints with xfs_reclaim.
  *
  * *agbp should be set to NULL on the first call, *alloc_done set to FALSE.

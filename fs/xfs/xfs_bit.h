@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_BIT_H__
-#define __XFS_BIT_H__
+#define	__XFS_BIT_H__
 
 /*
  * XFS bit manipulation routines.
@@ -41,27 +41,27 @@
  */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_MASK32HI)
 __uint32_t xfs_mask32hi(int n);
-#define XFS_MASK32HI(n)		xfs_mask32hi(n)
+#define	XFS_MASK32HI(n)		xfs_mask32hi(n)
 #else
-#define XFS_MASK32HI(n)		((__uint32_t)-1 << (32 - (n)))
+#define	XFS_MASK32HI(n)		((__uint32_t)-1 << (32 - (n)))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_MASK64HI)
 __uint64_t xfs_mask64hi(int n);
-#define XFS_MASK64HI(n)		xfs_mask64hi(n)
+#define	XFS_MASK64HI(n)		xfs_mask64hi(n)
 #else
-#define XFS_MASK64HI(n)		((__uint64_t)-1 << (64 - (n)))
+#define	XFS_MASK64HI(n)		((__uint64_t)-1 << (64 - (n)))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_MASK32LO)
 __uint32_t xfs_mask32lo(int n);
-#define XFS_MASK32LO(n)		xfs_mask32lo(n)
+#define	XFS_MASK32LO(n)		xfs_mask32lo(n)
 #else
-#define XFS_MASK32LO(n)		(((__uint32_t)1 << (n)) - 1)
+#define	XFS_MASK32LO(n)		(((__uint32_t)1 << (n)) - 1)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_MASK64LO)
 __uint64_t xfs_mask64lo(int n);
-#define XFS_MASK64LO(n)		xfs_mask64lo(n)
+#define	XFS_MASK64LO(n)		xfs_mask64lo(n)
 #else
-#define XFS_MASK64LO(n)		(((__uint64_t)1 << (n)) - 1)
+#define	XFS_MASK64LO(n)		(((__uint64_t)1 << (n)) - 1)
 #endif
 
 /* Get high bit set out of 32-bit argument, -1 if none set */

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,21 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs.h>
+#include "xfs.h"
+#include "xfs_macros.h"
+#include "xfs_types.h"
+#include "xfs_inum.h"
+#include "xfs_log.h"
+#include "xfs_trans.h"
+#include "xfs_buf_item.h"
+#include "xfs_sb.h"
+#include "xfs_ag.h"
+#include "xfs_dir.h"
+#include "xfs_dmapi.h"
+#include "xfs_mount.h"
+#include "xfs_trans_priv.h"
+#include "xfs_error.h"
+#include "xfs_rw.h"
 
 
 STATIC xfs_buf_t *xfs_trans_buf_item_match(xfs_trans_t *, xfs_buftarg_t *,
@@ -41,7 +55,7 @@ STATIC xfs_buf_t *xfs_trans_buf_item_match_all(xfs_trans_t *, xfs_buftarg_t *,
 
 /*
  * Get and lock the buffer for the caller if it is not already
- * locked within the given transaction.	 If it is already locked
+ * locked within the given transaction.  If it is already locked
  * within the transaction, just increment its lock recursion count
  * and return a pointer to it.
  *
@@ -258,7 +272,7 @@ int	xfs_error_mod = 33;
 
 /*
  * Get and lock the buffer for the caller if it is not already
- * locked within the given transaction.	 If it has not yet been
+ * locked within the given transaction.  If it has not yet been
  * read in, read it from disk. If it is already locked
  * within the transaction and already read in, just increment its
  * lock recursion count and return a pointer to it.
@@ -489,7 +503,7 @@ shutdown_abort:
  * xfs_trans_... buffer allocation routines if the buffer has not
  * been modified within this transaction.  If the buffer is modified
  * within this transaction, do decrement the recursion count but do
- * not release the buffer even if the count goes to 0.	If the buffer is not
+ * not release the buffer even if the count goes to 0.  If the buffer is not
  * modified within the transaction, decrement the recursion count and
  * release the buffer if the recursion count goes to 0.
  *
@@ -566,7 +580,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	/*
 	 * If the buffer has been invalidated, then we can't release
 	 * it until the transaction commits to disk unless it is re-dirtied
-	 * as part of this transaction.	 This prevents us from pulling
+	 * as part of this transaction.  This prevents us from pulling
 	 * the item from the AIL before we should.
 	 */
 	if (bip->bli_flags & XFS_BLI_STALE) {
@@ -701,7 +715,7 @@ xfs_trans_bhold(xfs_trans_t	*tp,
 
 /*
  * This function is used to indicate that the buffer should not be
- * unlocked until the transaction is committed to disk.	 Since we
+ * unlocked until the transaction is committed to disk.  Since we
  * are going to keep the lock held, make the transaction synchronous
  * so that the lock is not held too long.
  *
@@ -807,7 +821,7 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
  * This called to invalidate a buffer that is being used within
  * a transaction.  Typically this is because the blocks in the
  * buffer are being freed, so we need to prevent it from being
- * written out when we're done.	 Allowing it to be written again
+ * written out when we're done.  Allowing it to be written again
  * might overwrite data in the free blocks if they are reallocated
  * to a file.
  *
@@ -857,7 +871,7 @@ xfs_trans_binval(
 
 	/*
 	 * Clear the dirty bit in the buffer and set the STALE flag
-	 * in the buf log item.	 The STALE flag will be used in
+	 * in the buf log item.  The STALE flag will be used in
 	 * xfs_buf_item_unpin() to determine if it should clean up
 	 * when the last reference to the buf item is given up.
 	 * We set the XFS_BLI_CANCEL flag in the buf log format structure
@@ -1018,7 +1032,7 @@ xfs_trans_buf_item_match(
 			    (XFS_BUF_ADDR(bp) == blkno) &&
 			    (XFS_BUF_COUNT(bp) == len)) {
 				/*
-				 * We found it.	 Break out and
+				 * We found it.  Break out and
 				 * return the pointer to the buffer.
 				 */
 				break;
@@ -1075,7 +1089,7 @@ xfs_trans_buf_item_match_all(
 			    (XFS_BUF_ADDR(bp) == blkno) &&
 			    (XFS_BUF_COUNT(bp) == len)) {
 				/*
-				 * We found it.	 Break out and
+				 * We found it.  Break out and
 				 * return the pointer to the buffer.
 				 */
 				return bp;

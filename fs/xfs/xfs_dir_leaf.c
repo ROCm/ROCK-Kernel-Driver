@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -36,8 +36,33 @@
  * GROT: figure out how to recover gracefully when bmap returns ENOSPC.
  */
 
-#include <xfs.h>
+#include "xfs.h"
 
+#include "xfs_macros.h"
+#include "xfs_types.h"
+#include "xfs_inum.h"
+#include "xfs_log.h"
+#include "xfs_trans.h"
+#include "xfs_sb.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
+#include "xfs_dmapi.h"
+#include "xfs_mount.h"
+#include "xfs_alloc_btree.h"
+#include "xfs_bmap_btree.h"
+#include "xfs_ialloc_btree.h"
+#include "xfs_alloc.h"
+#include "xfs_btree.h"
+#include "xfs_attr_sf.h"
+#include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
+#include "xfs_dinode.h"
+#include "xfs_inode_item.h"
+#include "xfs_inode.h"
+#include "xfs_bmap.h"
+#include "xfs_da_btree.h"
+#include "xfs_dir_leaf.h"
+#include "xfs_error.h"
 
 /*
  * xfs_dir_leaf.c
@@ -461,7 +486,7 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 		    ((char *)sfe >= ((char *)sf + dp->i_df.if_bytes)) ||
 		    (sfe->namelen >= MAXNAMELEN))) {
 			xfs_dir_trace_g_du("sf: corrupted", dp, uio);
-			XFS_CORRUPTION_ERROR("xfs_dir_shortform_getdents", 
+			XFS_CORRUPTION_ERROR("xfs_dir_shortform_getdents",
 					     XFS_ERRLEVEL_LOW, mp, sfe);
 			kmem_free(sbuf, sbsize);
 			return XFS_ERROR(EFSCORRUPTED);
@@ -924,7 +949,7 @@ xfs_dir_leaf_add(xfs_dabuf_t *bp, xfs_da_args_t *args, int index)
 		return(error);
 	/*
 	 * After compaction, the block is guaranteed to have only one
-	 * free region, in freemap[0].	If it is not big enough, give up.
+	 * free region, in freemap[0].  If it is not big enough, give up.
 	 */
 	if (INT_GET(hdr->freemap[0].size, ARCH_CONVERT) <
 	    (entsize + (uint)sizeof(xfs_dir_leaf_entry_t)))
@@ -1649,7 +1674,7 @@ xfs_dir_leaf_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 		memset(tmpbuffer, 0, state->blocksize);
 		tmp_leaf = (xfs_dir_leafblock_t *)tmpbuffer;
 		tmp_hdr = &tmp_leaf->hdr;
-		tmp_hdr->info = save_hdr->info; /* struct copy */
+		tmp_hdr->info = save_hdr->info;	/* struct copy */
 		INT_ZERO(tmp_hdr->count, ARCH_CONVERT);
 		INT_SET(tmp_hdr->firstused, ARCH_CONVERT, state->blocksize);
 		if (INT_ISZERO(tmp_hdr->firstused, ARCH_CONVERT))
@@ -1978,7 +2003,7 @@ xfs_dir_leaf_getdents_int(
 		    ((char *)namest < (char *)leaf) ||
 		    ((char *)namest >= (char *)leaf + XFS_LBSIZE(mp)) ||
 		    (entry->namelen >= MAXNAMELEN))) {
-			XFS_CORRUPTION_ERROR("xfs_dir_leaf_getdents_int(1)", 
+			XFS_CORRUPTION_ERROR("xfs_dir_leaf_getdents_int(1)",
 					     XFS_ERRLEVEL_LOW, mp, leaf);
 			xfs_dir_trace_g_du("leaf: corrupted", dp, uio);
 			return XFS_ERROR(EFSCORRUPTED);
@@ -2121,7 +2146,7 @@ xfs_dir_leaf_getdents_int(
 		 * of same hashval entries.   For this, lastoffset is set
 		 * to the first in the run of equal hashvals so we don't
 		 * include any entries unless we can include all entries
-		 * that share the same hashval.	 Hopefully the buffer
+		 * that share the same hashval.  Hopefully the buffer
 		 * provided is big enough to handle it (see pv763517).
 		 */
 #if (BITS_PER_LONG == 32)

@@ -9,7 +9,7 @@
 
    The GNU C Library is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
    Lesser General Public License for more details.
 
    You should have received a copy of the GNU Lesser General Public
@@ -55,12 +55,12 @@ typedef struct
    upper bound for log (total_elements):
    bits per byte (CHAR_BIT) * sizeof(size_t).  */
 #define STACK_SIZE	(8 * sizeof(unsigned long int))
-#define PUSH(low, high) ((void) ((top->lo = (low)), (top->hi = (high)), ++top))
-#define POP(low, high)	((void) (--top, (low = top->lo), (high = top->hi)))
-#define STACK_NOT_EMPTY (stack < top)
+#define PUSH(low, high)	((void) ((top->lo = (low)), (top->hi = (high)), ++top))
+#define	POP(low, high)	((void) (--top, (low = top->lo), (high = top->hi)))
+#define	STACK_NOT_EMPTY	(stack < top)
 
 
-/* Order size using quicksort.	This implementation incorporates
+/* Order size using quicksort.  This implementation incorporates
    four optimizations discussed in Sedgewick:
 
    1. Non-recursive, using an explicit stack of pointer that store the

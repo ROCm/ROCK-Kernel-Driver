@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -47,4 +47,4 @@ static __inline int capable_cred(cred_t *cr, int cid)
 	return (cr == sys_cred) ? 1 : capable(cid);
 }
 
-#endif	/* __XFS_CRED_H__ */
+#endif  /* __XFS_CRED_H__ */

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -36,10 +36,13 @@ typedef struct {
 	unsigned char	__u_bits[16];
 } uuid_t;
 
+void uuid_init(void);
 void uuid_create_nil(uuid_t *uuid);
 int uuid_is_nil(uuid_t *uuid);
 int uuid_equal(uuid_t *uuid1, uuid_t *uuid2);
 void uuid_getnodeuniq(uuid_t *uuid, int fsid [2]);
 __uint64_t uuid_hash64(uuid_t *uuid);
+int uuid_table_insert(uuid_t *uuid);
+void uuid_table_remove(uuid_t *uuid);
 
 #endif	/* __XFS_SUPPORT_UUID_H__ */

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,13 +30,13 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_DIR_H__
-#define __XFS_DIR_H__
+#define	__XFS_DIR_H__
 
 /*
  * Large directories are structured around Btrees where all the data
  * elements are in the leaf nodes.  Filenames are hashed into an int,
  * then that int is used as the index into the Btree.  Since the hashval
- * of a filename may not be unique, we may have duplicate keys.	 The
+ * of a filename may not be unique, we may have duplicate keys.  The
  * internal links in the Btree are logical block offsets into the file.
  *
  * Small directories use a different format and are packed as tightly
@@ -44,7 +44,7 @@
  */
 
 #ifdef XFS_ALL_TRACE
-#define XFS_DIR_TRACE
+#define	XFS_DIR_TRACE
 #endif
 
 #if !defined(DEBUG)
@@ -132,31 +132,31 @@ typedef struct xfs_dirops {
  */
 void	xfs_dir_startup(void);	/* called exactly once */
 
-#define XFS_DIR_MOUNT(mp)	\
+#define	XFS_DIR_MOUNT(mp)	\
 	((mp)->m_dirops.xd_mount(mp))
-#define XFS_DIR_ISEMPTY(mp,dp)	\
+#define	XFS_DIR_ISEMPTY(mp,dp)	\
 	((mp)->m_dirops.xd_isempty(dp))
-#define XFS_DIR_INIT(mp,tp,dp,pdp)	\
+#define	XFS_DIR_INIT(mp,tp,dp,pdp)	\
 	((mp)->m_dirops.xd_init(tp,dp,pdp))
-#define XFS_DIR_CREATENAME(mp,tp,dp,name,namelen,inum,first,flist,total) \
+#define	XFS_DIR_CREATENAME(mp,tp,dp,name,namelen,inum,first,flist,total) \
 	((mp)->m_dirops.xd_createname(tp,dp,name,namelen,inum,first,flist,\
 				      total))
-#define XFS_DIR_LOOKUP(mp,tp,dp,name,namelen,inum)	\
+#define	XFS_DIR_LOOKUP(mp,tp,dp,name,namelen,inum)	\
 	((mp)->m_dirops.xd_lookup(tp,dp,name,namelen,inum))
-#define XFS_DIR_REMOVENAME(mp,tp,dp,name,namelen,ino,first,flist,total) \
+#define	XFS_DIR_REMOVENAME(mp,tp,dp,name,namelen,ino,first,flist,total)	\
 	((mp)->m_dirops.xd_removename(tp,dp,name,namelen,ino,first,flist,total))
-#define XFS_DIR_GETDENTS(mp,tp,dp,uio,eofp)	\
+#define	XFS_DIR_GETDENTS(mp,tp,dp,uio,eofp)	\
 	((mp)->m_dirops.xd_getdents(tp,dp,uio,eofp))
-#define XFS_DIR_REPLACE(mp,tp,dp,name,namelen,inum,first,flist,total)	\
+#define	XFS_DIR_REPLACE(mp,tp,dp,name,namelen,inum,first,flist,total)	\
 	((mp)->m_dirops.xd_replace(tp,dp,name,namelen,inum,first,flist,total))
-#define XFS_DIR_CANENTER(mp,tp,dp,name,namelen) \
+#define	XFS_DIR_CANENTER(mp,tp,dp,name,namelen)	\
 	((mp)->m_dirops.xd_canenter(tp,dp,name,namelen))
-#define XFS_DIR_SHORTFORM_VALIDATE_ONDISK(mp,dip)	\
+#define	XFS_DIR_SHORTFORM_VALIDATE_ONDISK(mp,dip)	\
 	((mp)->m_dirops.xd_shortform_validate_ondisk(mp,dip))
-#define XFS_DIR_SHORTFORM_TO_SINGLE(mp,args)	\
+#define	XFS_DIR_SHORTFORM_TO_SINGLE(mp,args)	\
 	((mp)->m_dirops.xd_shortform_to_single(args))
 
-#define XFS_DIR_IS_V1(mp)	((mp)->m_dirversion == 1)
+#define	XFS_DIR_IS_V1(mp)	((mp)->m_dirversion == 1)
 extern xfs_dirops_t xfsv1_dirops;
 
 #endif	/* __XFS_DIR_H__ */
