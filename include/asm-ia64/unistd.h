@@ -248,9 +248,9 @@
 #define __NR_clock_nanosleep		1256
 #define __NR_fstatfs64			1257
 #define __NR_statfs64			1258
-#define __NR_reserved1			1259	/* reserved for NUMA interface */
-#define __NR_reserved2			1260	/* reserved for NUMA interface */
-#define __NR_reserved3			1261	/* reserved for NUMA interface */
+#define __NR_mbind			1259
+#define __NR_get_mempolicy		1260
+#define __NR_set_mempolicy		1261
 #define __NR_mq_open			1262
 #define __NR_mq_unlink			1263
 #define __NR_mq_timedsend		1264
