@@ -227,7 +227,7 @@ static struct gendisk mcd_gendisk = {
 	.minor_shift	= 0,
 	.major_name	= "mcd",
 	.fops		= &mcd_bdops,
-	.flags		= GENHD_FL_CD;
+	.flags		= GENHD_FL_CD,
 };
 
 #ifndef MODULE

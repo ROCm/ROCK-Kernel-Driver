@@ -3193,10 +3193,10 @@ static struct gendisk scd_gendisk = {
 	.major		= MAJOR_NR,
 	.first_minor	= 0,
 	.minor_shift	= 0,
-	.major_name	= "cdu31a"
+	.major_name	= "cdu31a",
 	.fops		= &scd_bdops,
 	.flags		= GENHD_FL_CD,
-}
+};
 
 /* The different types of disc loading mechanisms supported */
 static char *load_mech[] __initdata =
