@@ -117,13 +117,13 @@
  */
 
 #ifdef DEBUG
-static unsigned long i8042_start;
-#define dbg_init() do { i8042_start = jiffies; } while (0)
+static unsigned long i8042_start_time;
+#define dbg_init() do { i8042_start_time = jiffies; } while (0)
 #define dbg(format, arg...) 							\
 	do { 									\
 		if (i8042_debug)						\
 			printk(KERN_DEBUG __FILE__ ": " format " [%d]\n" ,	\
-	 			## arg, (int) (jiffies - i8042_start));		\
+	 			## arg, (int) (jiffies - i8042_start_time));	\
 	} while (0)
 #else
 #define dbg_init() do { } while (0)

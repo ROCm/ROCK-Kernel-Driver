@@ -1478,6 +1478,9 @@ void hid_init_reports(struct hid_device *hid)
 #define USB_VENDOR_ID_DELORME		0x1163
 #define USB_DEVICE_ID_DELORME_EARTHMATE 0x0100
 
+#define USB_VENDOR_ID_DELORME		0x1163
+#define USB_DEVICE_ID_DELORME_EARTHMATE 0x0100
+
 static struct hid_blacklist {
 	__u16 idVendor;
 	__u16 idProduct;

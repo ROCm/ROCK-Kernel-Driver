@@ -42,6 +42,8 @@ struct serio {
 	int (*write)(struct serio *, unsigned char);
 	int (*open)(struct serio *);
 	void (*close)(struct serio *);
+	int (*start)(struct serio *);
+	void (*stop)(struct serio *);
 
 	struct serio *parent, *child;
 

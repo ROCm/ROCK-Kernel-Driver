@@ -119,12 +119,27 @@ static DECLARE_WAIT_QUEUE_HEAD(serio_wait);
 static DECLARE_COMPLETION(serio_exited);
 static int serio_pid;
 
-static void serio_queue_event(struct serio *serio, int event_type)
+static void serio_queue_event(struct serio *serio, enum serio_event_type event_type)
 {
 	unsigned long flags;
 	struct serio_event *event;
 
 	spin_lock_irqsave(&serio_event_lock, flags);
+
+	/*
+ 	 * Scan event list for the other events for the same serio port,
+	 * starting with the most recent one. If event is the same we
+	 * do not need add new one. If event is of different type we
+	 * need to add this event and should not look further because
+	 * we need to preseve sequence of distinct events.
+ 	 */
+	list_for_each_entry_reverse(event, &serio_event_list, node) {
+		if (event->serio == serio) {
+			if (event->type == event_type)
+				goto out;
+			break;
+		}
+	}
 
 	if ((event = kmalloc(sizeof(struct serio_event), GFP_ATOMIC))) {
 		event->type = event_type;
@@ -134,8 +149,36 @@ static void serio_queue_event(struct serio *serio, int event_type)
 		wake_up(&serio_wait);
 	}
 
+out:
 	spin_unlock_irqrestore(&serio_event_lock, flags);
 }
+
+static void serio_remove_duplicate_events(struct serio_event *event)
+{
+	struct list_head *node, *next;
+	struct serio_event *e;
+	unsigned long flags;
+
+	spin_lock_irqsave(&serio_event_lock, flags);
+
+	list_for_each_safe(node, next, &serio_event_list) {
+		e = container_of(node, struct serio_event, node);
+		if (event->serio == e->serio) {
+			/*
+			 * If this event is of different type we should not
+			 * look further - we only suppress duplicate events
+			 * that were sent back-to-back.
+			 */
+			if (event->type != e->type)
+				break;	/* Stop, when need to preserve event flow */
+			list_del_init(node);
+			kfree(e);
+		}
+	}
+
+	spin_unlock_irqrestore(&serio_event_lock, flags);
+}
+
 
 static struct serio_event *serio_get_event(void)
 {
@@ -191,6 +234,7 @@ static void serio_handle_events(void)
 		}
 
 		up(&serio_sem);
+		serio_remove_duplicate_events(event);
 		kfree(event);
 	}
 }
@@ -326,7 +370,10 @@ static void serio_create_port(struct serio *serio)
 	serio->dev.release = serio_release_port;
 	if (serio->parent)
 		serio->dev.parent = &serio->parent->dev;
-	device_register(&serio->dev);
+	device_initialize(&serio->dev);
+	if (serio->start)
+		serio->start(serio);
+	device_add(&serio->dev);
 }
 
 /*
@@ -348,6 +395,9 @@ static void serio_destroy_port(struct serio *serio)
 		up_write(&serio_bus.subsys.rwsem);
 		put_driver(&drv->driver);
 	}
+
+	if (serio->stop)
+		serio->stop(serio);
 
 	if (serio->parent) {
 		spin_lock_irqsave(&serio->parent->lock, flags);
@@ -629,14 +679,9 @@ irqreturn_t serio_interrupt(struct serio *serio,
 
         if (likely(serio->drv)) {
                 ret = serio->drv->interrupt(serio, data, dfl, regs);
-	} else {
-		if (!dfl) {
-			if ((serio->type != SERIO_8042 &&
-			     serio->type != SERIO_8042_XL) || (data == 0xaa)) {
-				serio_rescan(serio);
-				ret = IRQ_HANDLED;
-			}
-		}
+	} else if (!dfl) {
+		serio_rescan(serio);
+		ret = IRQ_HANDLED;
 	}
 
 	spin_unlock_irqrestore(&serio->lock, flags);
