@@ -607,7 +607,7 @@ static int konicawc_set_video_mode(struct uvd *uvd, struct video_window *vw)
 	}
 
 	if(newsize > MAX_FRAME_SIZE) {
-		DEBUG(1, "couldnt find size %d,%d", x, y);
+		DEBUG(1, "couldn't find size %d,%d", x, y);
 		return -EINVAL;
 	}
 

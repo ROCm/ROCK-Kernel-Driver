@@ -2290,7 +2290,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 				}
 				err = set_array_info(mddev, &info);
 				if (err) {
-					printk(KERN_WARNING "md: couldnt set array info. %d\n", err);
+					printk(KERN_WARNING "md: couldn't set array info. %d\n", err);
 					goto abort_unlock;
 				}
 			}
