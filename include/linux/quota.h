@@ -45,7 +45,6 @@
 typedef __kernel_uid32_t qid_t; /* Type in which we store ids in memory */
 typedef __u64 qsize_t;          /* Type in which we store sizes */
 
-extern spinlock_t dq_list_lock;
 extern spinlock_t dq_data_lock;
 
 /* Size of blocks in which are counted size limits */
