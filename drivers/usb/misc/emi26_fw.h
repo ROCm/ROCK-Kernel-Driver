@@ -12,6 +12,10 @@
  * and which may not be reproduced, used, sold or transferred to
  * any third party without Emagic's written consent. All Rights Reserved.
  *
+ * Permission is hereby granted for the distribution of this firmware 
+ * image as part of a Linux or other Open Source operating system kernel 
+ * in text or binary form as required. 
+ *
  * This firmware may not be modified and may only be used with the
  * Emagic EMI 2|6 Audio Interface. Distribution and/or Modification of
  * any driver which includes this firmware, in whole or in part,
