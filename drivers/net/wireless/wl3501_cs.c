@@ -1449,18 +1449,6 @@ fail:
 	goto out;
 }
 
-/**
- * wl3501_init - "initialize" board
- * @dev - network device
- *
- * We never need to do anything when a wl3501 device is "initialized" by the net
- * software, because we only register already-found cards.
- */
-static int wl3501_init(struct net_device *dev)
-{
-	return 0;
-}
-
 struct net_device_stats *wl3501_get_stats(struct net_device *dev)
 {
 	struct wl3501_card *this = dev->priv;
@@ -2056,7 +2044,6 @@ static dev_link_t *wl3501_attach(void)
 	dev = alloc_etherdev(sizeof(struct wl3501_card));
 	if (!dev)
 		goto out_link;
-	dev->init		= wl3501_init;
 	dev->open		= wl3501_open;
 	dev->stop		= wl3501_close;
 	dev->hard_start_xmit	= wl3501_hard_start_xmit;
