@@ -36,7 +36,7 @@
 #include "hcd.h"
 #include "hub.h"
 
-/* Protect all struct usb_device state members */
+/* Protect struct usb_device state and children members */
 static spinlock_t device_state_lock = SPIN_LOCK_UNLOCKED;
 
 /* Wakes up khubd */
@@ -143,7 +143,7 @@ static void led_work (void *__hub)
 	unsigned		changed = 0;
 	int			cursor = -1;
 
-	if (hdev->state != USB_STATE_CONFIGURED)
+	if (hdev->state != USB_STATE_CONFIGURED || hub->quiescing)
 		return;
 
 	for (i = 0; i < hub->descriptor->bNbrPorts; i++) {
@@ -269,6 +269,9 @@ static void hub_irq(struct urb *urb, struct pt_regs *regs)
 	spin_unlock(&hub_event_lock);
 
 resubmit:
+	if (hub->quiescing)
+		return;
+
 	if ((status = usb_submit_urb (hub->urb, GFP_ATOMIC)) != 0
 			&& status != -ENODEV && status != -EPERM)
 		dev_err (&hub->intf->dev, "resubmit --> %d\n", status);
@@ -623,6 +626,33 @@ fail:
 
 static unsigned highspeed_hubs;
 
+static void hub_quiesce(struct usb_hub *hub)
+{
+	/* stop khubd and related activity */
+	hub->quiescing = 1;
+	usb_kill_urb(hub->urb);
+	if (hub->has_indicators)
+		cancel_delayed_work(&hub->leds);
+	if (hub->has_indicators || hub->tt.hub)
+		flush_scheduled_work();
+}
+
+#ifdef	CONFIG_USB_SUSPEND
+
+static void hub_reactivate(struct usb_hub *hub)
+{
+	int	status;
+
+	hub->quiescing = 0;
+	status = usb_submit_urb(hub->urb, GFP_NOIO);
+	if (status < 0)
+		dev_err(&hub->intf->dev, "reactivate --> %d\n", status);
+	if (hub->has_indicators && blinkenlights)
+		schedule_delayed_work(&hub->leds, LED_CYCLE_PERIOD);
+}
+
+#endif
+
 static void hub_disconnect(struct usb_interface *intf)
 {
 	struct usb_hub *hub = usb_get_intfdata (intf);
@@ -637,21 +667,13 @@ static void hub_disconnect(struct usb_interface *intf)
 
 	usb_set_intfdata (intf, NULL);
 
-	if (hub->urb) {
-		usb_kill_urb(hub->urb);
-		usb_free_urb(hub->urb);
-		hub->urb = NULL;
-	}
+	hub_quiesce(hub);
+	usb_free_urb(hub->urb);
+	hub->urb = NULL;
 
 	spin_lock_irq(&hub_event_lock);
 	list_del_init(&hub->event_list);
 	spin_unlock_irq(&hub_event_lock);
-
-	/* assuming we used keventd, it must quiesce too */
-	if (hub->has_indicators)
-		cancel_delayed_work (&hub->leds);
-	if (hub->has_indicators || hub->tt.hub)
-		flush_scheduled_work ();
 
 	if (hub->descriptor) {
 		kfree(hub->descriptor);
@@ -772,6 +794,7 @@ hub_ioctl(struct usb_interface *intf, unsigned int code, void *user_data)
 	}
 }
 
+/* caller has locked the hub */
 static int hub_reset(struct usb_hub *hub)
 {
 	struct usb_device *hdev = hub->hdev;
@@ -801,6 +824,7 @@ static int hub_reset(struct usb_hub *hub)
 	return 0;
 }
 
+/* caller has locked the hub */
 /* FIXME!  This routine should be subsumed into hub_reset */
 static void hub_start_disconnect(struct usb_device *hdev)
 {
@@ -832,12 +856,65 @@ static void recursively_mark_NOTATTACHED(struct usb_device *udev)
 	udev->state = USB_STATE_NOTATTACHED;
 }
 
+/* grab device/port lock, returning index of that port (zero based).
+ * protects the upstream link used by this device from concurrent
+ * tree operations like suspend, resume, reset, and disconnect, which
+ * apply to everything downstream of a given port.
+ */
+static int locktree(struct usb_device *udev)
+{
+	int			t;
+	struct usb_device	*hdev;
+
+	if (!udev)
+		return -ENODEV;
+
+	/* root hub is always the first lock in the series */
+	hdev = udev->parent;
+	if (!hdev) {
+		down(&udev->serialize);
+		return 0;
+	}
+
+	/* on the path from root to us, lock everything from
+	 * top down, dropping parent locks when not needed
+	 *
+	 * NOTE: if disconnect were to ignore the locking, we'd need
+	 * to get extra refcounts to everything since hdev->children
+	 * and udev->parent could be invalidated while we work...
+	 */
+	t = locktree(hdev);
+	if (t < 0)
+		return t;
+	spin_lock_irq(&device_state_lock);
+	for (t = 0; t < hdev->maxchild; t++) {
+		if (hdev->children[t] == udev) {
+			/* everything is fail-fast once disconnect
+			 * processing starts
+			 */
+			if (udev->state == USB_STATE_NOTATTACHED)
+				break;
+
+			/* when everyone grabs locks top->bottom,
+			 * non-overlapping work may be concurrent
+			 */
+			spin_unlock_irq(&device_state_lock);
+			down(&udev->serialize);
+			up(&hdev->serialize);
+			return t;
+		}
+	}
+	spin_unlock_irq(&device_state_lock);
+	up(&hdev->serialize);
+	return -ENODEV;
+}
+
 /**
  * usb_set_device_state - change a device's current state (usbcore-internal)
  * @udev: pointer to device whose state should be changed
  * @new_state: new state value to be stored
  *
- * udev->state is _not_ protected by the udev->serialize semaphore.  This
+ * udev->state is _not_ protected by the device lock.  This
  * is so that devices can be marked as disconnected as soon as possible,
  * without having to wait for the semaphore to be released.  Instead,
  * changes to the state must be protected by the device_state_lock spinlock.
@@ -897,7 +974,7 @@ static void release_address(struct usb_device *udev)
 
 /**
  * usb_disconnect - disconnect a device (usbcore-internal)
- * @pdev: pointer to device being disconnected
+ * @pdev: pointer to device being disconnected, into a locked hub
  * Context: !in_interrupt ()
  *
  * Something got disconnected. Get rid of it, and all of its children.
@@ -921,7 +998,8 @@ void usb_disconnect(struct usb_device **pdev)
 	}
 
 	/* mark the device as inactive, so any further urb submissions for
-	 * this device will fail.
+	 * this device (and any of its children) will fail immediately.
+	 * this quiesces everyting except pending urbs.
 	 */
 	usb_set_device_state(udev, USB_STATE_NOTATTACHED);
 
@@ -940,6 +1018,7 @@ void usb_disconnect(struct usb_device **pdev)
 
 	/* deallocate hcd/hardware state ... nuking all pending urbs and
 	 * cleaning up all state associated with the current configuration
+	 * so that the hardware is now fully quiesced.
 	 */
 	usb_disable_device(udev, 0);
 
@@ -952,7 +1031,7 @@ void usb_disconnect(struct usb_device **pdev)
 	usbfs_remove_device(udev);
 	usb_remove_sysfs_dev_files(udev);
 
-	/* Avoid races with recursively_mark_NOTATTACHED() */
+	/* Avoid races with recursively_mark_NOTATTACHED() and locktree() */
 	spin_lock_irq(&device_state_lock);
 	*pdev = NULL;
 	spin_unlock_irq(&device_state_lock);
@@ -1203,6 +1282,7 @@ static int hub_port_reset(struct usb_device *hdev, int port,
 		if (status == -ENOTCONN || status == 0) {
 			clear_port_feature(hdev,
 				port + 1, USB_PORT_FEAT_C_RESET);
+			/* FIXME need disconnect() for NOTATTACHED device */
 			usb_set_device_state(udev, status
 					? USB_STATE_NOTATTACHED
 					: USB_STATE_DEFAULT);
@@ -1226,9 +1306,11 @@ static int hub_port_disable(struct usb_device *hdev, int port)
 {
 	int ret;
 
-	if (hdev->children[port])
+	if (hdev->children[port]) {
+		/* FIXME need disconnect() for NOTATTACHED device */
 		usb_set_device_state(hdev->children[port],
 				USB_STATE_NOTATTACHED);
+	}
 	ret = clear_port_feature(hdev, port + 1, USB_PORT_FEAT_ENABLE);
 	if (ret)
 		dev_err(hubdev(hdev), "cannot disable port %d (err = %d)\n",
@@ -2057,6 +2139,7 @@ hub_power_remaining (struct usb_hub *hub)
  *	a port enable-change occurs (often caused by EMI);
  *	usb_reset_device() encounters changed descriptors (as from
  *		a firmware download)
+ * caller already locked the hub
  */
 static void hub_port_connect_change(struct usb_hub *hub, int port,
 					u16 portstatus, u16 portchange)
@@ -2263,7 +2346,8 @@ static void hub_events(void)
 
 		/* Lock the device, then check to see if we were
 		 * disconnected while waiting for the lock to succeed. */
-		down(&hdev->serialize);
+		if (locktree(hdev) < 0)
+			break;
 		if (hdev->state != USB_STATE_CONFIGURED ||
 				!hdev->actconfig ||
 				hub != usb_get_intfdata(
@@ -2517,7 +2601,7 @@ static int config_descriptors_changed(struct usb_device *udev)
 }
 
 /**
- * usb_reset_devce - perform a USB port reset to reinitialize a device
+ * usb_reset_device - perform a USB port reset to reinitialize a device
  * @udev: device to reset (not in SUSPENDED or NOTATTACHED state)
  *
  * WARNING - don't reset any device unless drivers for all of its
@@ -2606,7 +2690,7 @@ int __usb_reset_device(struct usb_device *udev)
 		struct usb_interface *intf = udev->actconfig->interface[i];
 		struct usb_interface_descriptor *desc;
 
-		/* set_interface resets host side toggle and halt status even
+		/* set_interface resets host side toggle even
 		 * for altsetting zero.  the interface may have no driver.
 		 */
 		desc = &intf->cur_altsetting->desc;
