@@ -7,7 +7,7 @@ src := $(obj)
 .PHONY: __build
 __build:
 
-ifdef include-config
+ifdef include_config
 include .config
 endif
 
