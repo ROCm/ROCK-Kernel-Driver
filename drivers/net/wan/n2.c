@@ -159,11 +159,6 @@ static __inline__ void openwin(card_t *card, u8 page)
 }
 
 
-static __inline__ void close_windows(card_t *card)
-{
-	outb(inb(card->io + N2_PCR) & ~PCR_ENWIN, card->io + N2_PCR);
-}
-
 
 #include "hd6457x.c"
 
