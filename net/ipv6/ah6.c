@@ -315,7 +315,7 @@ int ah6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_bu
 	skb->nh.ipv6h->hop_limit   = 0;
 
         {
-		u8 auth_data[ahp->icv_trunc_len];
+		u8 auth_data[MAX_AH_AUTH_LEN];
 
 		memcpy(auth_data, ah->auth_data, ahp->icv_trunc_len);
 		memset(ah->auth_data, 0, ahp->icv_trunc_len);
@@ -419,6 +419,8 @@ static int ah6_init_state(struct xfrm_state *x, void *args)
 	
 	ahp->icv_full_len = aalg_desc->uinfo.auth.icv_fullbits/8;
 	ahp->icv_trunc_len = aalg_desc->uinfo.auth.icv_truncbits/8;
+	
+	BUG_ON(ahp->icv_trunc_len > MAX_AH_AUTH_LEN);
 	
 	ahp->work_icv = kmalloc(ahp->icv_full_len, GFP_KERNEL);
 	if (!ahp->work_icv)
