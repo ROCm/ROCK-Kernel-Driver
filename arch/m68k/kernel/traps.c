@@ -303,7 +303,7 @@ static inline int do_040writeback1(unsigned short wbs, unsigned long wba,
 	return res;
 }
 
-/* after an exception in a writeback the stack frame coresponding
+/* after an exception in a writeback the stack frame corresponding
  * to that exception is discarded, set a few bits in the old frame 
  * to simulate what it should look like
  */
@@ -333,7 +333,7 @@ static inline void do_040writebacks(struct frame *fp)
 			fp->un.fmt7.wb2s = 0;
 	}
 
-	/* do the 2nd wb only if the first one was succesful (except for a kernel wb) */
+	/* do the 2nd wb only if the first one was successful (except for a kernel wb) */
 	if (fp->un.fmt7.wb3s & WBV_040 && (!res || fp->un.fmt7.wb3s & 4)) {
 		res = do_040writeback1(fp->un.fmt7.wb3s, fp->un.fmt7.wb3a,
 				       fp->un.fmt7.wb3d);

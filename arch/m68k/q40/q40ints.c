@@ -7,7 +7,7 @@
  * License.  See the file COPYING in the main directory of this archive
  * for more details.
  *
- * .. used to be losely based on bvme6000ints.c
+ * .. used to be loosely based on bvme6000ints.c
  *
  */
 
@@ -441,7 +441,7 @@ void q40_disable_irq (unsigned int irq)
 {
   /* disable ISA iqs : only do something if the driver has been
    * verified to be Q40 "compatible" - right now IDE, NE2K
-   * Any driver should not attempt to sleep accross disable_irq !!
+   * Any driver should not attempt to sleep across disable_irq !!
    */
 
   if ( irq>=5 && irq<=15 ) {

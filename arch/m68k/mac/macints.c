@@ -30,7 +30,7 @@
  *		  - slot 0: SCSI interrupt
  *		  - slot 1: Sound interrupt
  *
- * Levels 3-6 vary by machine type. For VIA or RBV Macintohes:
+ * Levels 3-6 vary by machine type. For VIA or RBV Macintoshes:
  *
  *	3	- unused (?)
  *
@@ -494,7 +494,7 @@ int mac_irq_pending( unsigned int irq )
  * Add an interrupt service routine to an interrupt source.
  * Returns 0 on success.
  *
- * FIXME: You can register interrupts on nonexistant source (ie PSC4 on a
+ * FIXME: You can register interrupts on nonexistent source (ie PSC4 on a
  *        non-PSC machine). We should return -EINVAL in those cases.
  */
  

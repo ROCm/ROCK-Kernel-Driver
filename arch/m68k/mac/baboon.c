@@ -1,5 +1,5 @@
 /*
- * Baboon Custom IC Managment
+ * Baboon Custom IC Management
  *
  * The Baboon custom IC controls the IDE, PCMCIA and media bay on the
  * PowerBook 190. It multiplexes multiple interrupt sources onto the

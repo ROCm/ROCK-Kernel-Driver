@@ -190,7 +190,7 @@
  *
  * options
  * -------
- *	There are many options availble in a build of this file.  I've
+ *	There are many options available in a build of this file.  I've
  * taken the time to describe them here to save you the time of searching
  * for them and trying to understand what they mean.
  *
