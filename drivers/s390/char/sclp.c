@@ -8,82 +8,99 @@
  *		 Martin Schwidefsky <schwidefsky@de.ibm.com>
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
-#include <linux/kmod.h>
-#include <linux/bootmem.h>
 #include <linux/err.h>
-#include <linux/ptrace.h>
-#include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/timer.h>
-#include <linux/init.h>
-#include <linux/cpumask.h>
 #include <linux/reboot.h>
+#include <linux/jiffies.h>
+#include <asm/types.h>
 #include <asm/s390_ext.h>
-#include <asm/processor.h>
 
 #include "sclp.h"
 
-#define SCLP_CORE_PRINT_HEADER "sclp low level driver: "
+#define SCLP_HEADER		"sclp: "
 
 /* Structure for register_early_external_interrupt. */
 static ext_int_info_t ext_int_info_hwc;
 
-/* spinlock to protect global variables of sclp_core */
-static spinlock_t sclp_lock;
+/* Lock to protect internal data consistency. */
+static spinlock_t sclp_lock = SPIN_LOCK_UNLOCKED;
 
-/* Mask of valid sclp events */
+/* Mask of events that we can receive from the sclp interface. */
 static sccb_mask_t sclp_receive_mask;
+
+/* Mask of events that we can send to the sclp interface. */
 static sccb_mask_t sclp_send_mask;
 
-/* List of registered event types */
+/* List of registered event listeners and senders. */
 static struct list_head sclp_reg_list;
 
-/* sccb queue */
+/* List of queued requests. */
 static struct list_head sclp_req_queue;
 
-/* sccb for unconditional read */
+/* Data for read and and init requests. */
 static struct sclp_req sclp_read_req;
+static struct sclp_req sclp_init_req;
 static char sclp_read_sccb[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
-/* sccb for write mask sccb */
 static char sclp_init_sccb[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
 
-/* Timer for init mask retries. */
-static struct timer_list retry_timer;
+/* Timer for request retries. */
+static struct timer_list sclp_request_timer;
 
-/* Timer for busy retries. */
-static struct timer_list sclp_busy_timer;
+/* Internal state: is the driver initialized? */
+static volatile enum sclp_init_state_t {
+	sclp_init_state_uninitialized,
+	sclp_init_state_initializing,
+	sclp_init_state_initialized
+} sclp_init_state = sclp_init_state_uninitialized;
 
-static volatile unsigned long sclp_status = 0;
-/* some status flags */
-#define SCLP_INIT		0
-#define SCLP_RUNNING		1
-#define SCLP_READING		2
-#define SCLP_SHUTDOWN		3
+/* Internal state: is a request active at the sclp? */
+static volatile enum sclp_running_state_t {
+	sclp_running_state_idle,
+	sclp_running_state_running
+} sclp_running_state = sclp_running_state_idle;
 
-#define SCLP_INIT_POLL_INTERVAL	1
-#define SCLP_BUSY_POLL_INTERVAL	1
+/* Internal state: is a read request pending? */
+static volatile enum sclp_reading_state_t {
+	sclp_reading_state_idle,
+	sclp_reading_state_reading
+} sclp_reading_state = sclp_reading_state_idle;
 
-#define SCLP_COMMAND_INITIATED	0
-#define SCLP_BUSY		2
-#define SCLP_NOT_OPERATIONAL	3
+/* Internal state: is the driver currently serving requests? */
+static volatile enum sclp_activation_state_t {
+	sclp_activation_state_active,
+	sclp_activation_state_deactivating,
+	sclp_activation_state_inactive,
+	sclp_activation_state_activating
+} sclp_activation_state = sclp_activation_state_active;
 
-/*
- * assembler instruction for Service Call
- */
+/* Internal state: is an init mask request pending? */
+static volatile enum sclp_mask_state_t {
+	sclp_mask_state_idle,
+	sclp_mask_state_initializing
+} sclp_mask_state = sclp_mask_state_idle;
+
+/* Maximum retry counts */
+#define SCLP_INIT_RETRY		3
+#define SCLP_MASK_RETRY		3
+#define SCLP_REQUEST_RETRY	3
+
+/* Timeout intervals in seconds.*/
+#define SCLP_BUSY_INTERVAL	2
+#define SCLP_RETRY_INTERVAL	5
+
+static void sclp_process_queue(void);
+static int sclp_init_mask(int calculate);
+static int sclp_init(void);
+
+/* Perform service call. Return 0 on success, non-zero otherwise. */
 static int
-__service_call(sclp_cmdw_t command, void *sccb)
+service_call(sclp_cmdw_t command, void *sccb)
 {
 	int cc;
 
-	/*
-	 *  Mnemonic:	SERVC	Rx, Ry	[RRE]
-	 *
-	 *  Rx: SCLP command word
-	 *  Ry: address of SCCB
-	 */
 	__asm__ __volatile__(
 		"   .insn rre,0xb2200000,%1,%2\n"  /* servc %1,%2 */
 		"   ipm	  %0\n"
@@ -91,61 +108,94 @@ __service_call(sclp_cmdw_t command, void *sccb)
 		: "=&d" (cc)
 		: "d" (command), "a" (__pa(sccb))
 		: "cc", "memory" );
-	/*
-	 * cc == 0:   Service Call succesful initiated
-	 * cc == 2:   SCLP busy, new Service Call not initiated,
-	 *	      new SCCB unchanged
-	 * cc == 3:   SCLP function not operational
-	 */
-	if (cc == SCLP_NOT_OPERATIONAL)
+	if (cc == 3)
 		return -EIO;
-	if (cc == SCLP_BUSY)
+	if (cc == 2)
 		return -EBUSY;
 	return 0;
 }
 
+/* Request timeout handler. Restart the request queue. If DATA is non-zero,
+ * force restart of running request. */
 static void
-sclp_start_request(void)
+sclp_request_timeout(unsigned long data)
+{
+	unsigned long flags;
+
+	if (data) {
+		spin_lock_irqsave(&sclp_lock, flags);
+		sclp_running_state = sclp_running_state_idle;
+		spin_unlock_irqrestore(&sclp_lock, flags);
+	}
+	sclp_process_queue();
+}
+
+/* Set up request retry timer. Called while sclp_lock is locked. */
+static inline void
+__sclp_set_request_timer(unsigned long time, void (*function)(unsigned long),
+			 unsigned long data)
+{
+	del_timer(&sclp_request_timer);
+	sclp_request_timer.function = function;
+	sclp_request_timer.data = data;
+	sclp_request_timer.expires = jiffies + time;
+	add_timer(&sclp_request_timer);
+}
+
+/* Try to start a request. Return zero if the request was successfully
+ * started or if it will be started at a later time. Return non-zero otherwise.
+ * Called while sclp_lock is locked. */
+static int
+__sclp_start_request(struct sclp_req *req)
+{
+	int rc;
+
+	if (sclp_running_state != sclp_running_state_idle)
+		return 0;
+	del_timer(&sclp_request_timer);
+	if (req->start_count <= SCLP_REQUEST_RETRY) {
+		rc = service_call(req->command, req->sccb);
+		req->start_count++;
+	} else
+		rc = -EIO;
+	if (rc == 0) {
+		/* Sucessfully started request */
+		req->status = SCLP_REQ_RUNNING;
+		sclp_running_state = sclp_running_state_running;
+		__sclp_set_request_timer(SCLP_RETRY_INTERVAL * HZ,
+					 sclp_request_timeout, 1);
+		return 0;
+	} else if (rc == -EBUSY) {
+		/* Try again later */
+		__sclp_set_request_timer(SCLP_BUSY_INTERVAL * HZ,
+					 sclp_request_timeout, 0);
+		return 0;
+	}
+	/* Request failed */
+	req->status = SCLP_REQ_FAILED;
+	return rc;
+}
+
+/* Try to start queued requests. */
+static void
+sclp_process_queue(void)
 {
 	struct sclp_req *req;
 	int rc;
 	unsigned long flags;
 
 	spin_lock_irqsave(&sclp_lock, flags);
-	/* quick exit if sclp is already in use */
-	if (test_bit(SCLP_RUNNING, &sclp_status)) {
+	if (sclp_running_state != sclp_running_state_idle) {
 		spin_unlock_irqrestore(&sclp_lock, flags);
 		return;
 	}
-	/* Try to start requests from the request queue. */
+	del_timer(&sclp_request_timer);
 	while (!list_empty(&sclp_req_queue)) {
 		req = list_entry(sclp_req_queue.next, struct sclp_req, list);
-		rc = __service_call(req->command, req->sccb);
-		if (rc == 0) {
-			/* Sucessfully started request. */
-			req->status = SCLP_REQ_RUNNING;
-			/* Request active. Set running indication. */
-			set_bit(SCLP_RUNNING, &sclp_status);
+		rc = __sclp_start_request(req);
+		if (rc == 0)
 			break;
-		}
-		if (rc == -EBUSY) {
-			/**
-			 * SCLP is busy but no request is running.
-			 * Try again later.
-			 */
-			if (!timer_pending(&sclp_busy_timer) ||
-			    !mod_timer(&sclp_busy_timer,
-				       jiffies + SCLP_BUSY_POLL_INTERVAL*HZ)) {
-				sclp_busy_timer.function =
-					(void *) sclp_start_request;
-				sclp_busy_timer.expires =
-					jiffies + SCLP_BUSY_POLL_INTERVAL*HZ;
-				add_timer(&sclp_busy_timer);
-			}
-			break;
-		}
 		/* Request failed. */
-		req->status = SCLP_REQ_FAILED;
 		list_del(&req->list);
 		if (req->callback) {
 			spin_unlock_irqrestore(&sclp_lock, flags);
@@ -156,265 +206,258 @@ sclp_start_request(void)
 	spin_unlock_irqrestore(&sclp_lock, flags);
 }
 
-static int
-sclp_process_evbufs(struct sccb_header *sccb)
+/* Queue a new request. Return zero on success, non-zero otherwise. */
+int
+sclp_add_request(struct sclp_req *req)
 {
-	int result;
+	unsigned long flags;
+	int rc;
+
+	spin_lock_irqsave(&sclp_lock, flags);
+	if ((sclp_init_state != sclp_init_state_initialized ||
+	     sclp_activation_state != sclp_activation_state_active) &&
+	    req != &sclp_init_req) {
+		spin_unlock_irqrestore(&sclp_lock, flags);
+		return -EIO;
+	}
+	req->status = SCLP_REQ_QUEUED;
+	req->start_count = 0;
+	list_add_tail(&req->list, &sclp_req_queue);
+	rc = 0;
+	/* Start if request is first in list */
+	if (req->list.prev == &sclp_req_queue) {
+		rc = __sclp_start_request(req);
+		if (rc)
+			list_del(&req->list);
+	}
+	spin_unlock_irqrestore(&sclp_lock, flags);
+	return rc;
+}
+
+EXPORT_SYMBOL(sclp_add_request);
+
+/* Dispatch events found in request buffer to registered listeners. Return 0
+ * if all events were dispatched, non-zero otherwise. */
+static int
+sclp_dispatch_evbufs(struct sccb_header *sccb)
+{
 	unsigned long flags;
 	struct evbuf_header *evbuf;
 	struct list_head *l;
-	struct sclp_register *t;
+	struct sclp_register *reg;
+	int offset;
+	int rc;
 
 	spin_lock_irqsave(&sclp_lock, flags);
-	evbuf = (struct evbuf_header *) (sccb + 1);
-	result = 0;
-	while ((addr_t) evbuf < (addr_t) sccb + sccb->length) {
-		/* check registered event */
-		t = NULL;
+	rc = 0;
+	for (offset = sizeof(struct sccb_header); offset < sccb->length;
+	     offset += evbuf->length) {
+		/* Search for event handler */
+		evbuf = (struct evbuf_header *) ((addr_t) sccb + offset);
+		reg = NULL;
 		list_for_each(l, &sclp_reg_list) {
-			t = list_entry(l, struct sclp_register, list);
-			if (t->receive_mask & (1 << (32 - evbuf->type))) {
-				if (t->receiver_fn != NULL) {
-					spin_unlock_irqrestore(&sclp_lock,
-							       flags);
-					t->receiver_fn(evbuf);
-					spin_lock_irqsave(&sclp_lock, flags);
-				}
+			reg = list_entry(l, struct sclp_register, list);
+			if (reg->receive_mask & (1 << (32 - evbuf->type)))
 				break;
-			}
 			else
-				t = NULL;
+				reg = NULL;
 		}
-		/* Check for unrequested event buffer */
-		if (t == NULL)
-			result = -ENOSYS;
-		evbuf = (struct evbuf_header *)
-				((addr_t) evbuf + evbuf->length);
+		if (reg && reg->receiver_fn) {
+			spin_unlock_irqrestore(&sclp_lock, flags);
+			reg->receiver_fn(evbuf);
+			spin_lock_irqsave(&sclp_lock, flags);
+		} else if (reg == NULL)
+			rc = -ENOSYS;
 	}
 	spin_unlock_irqrestore(&sclp_lock, flags);
-	return result;
+	return rc;
 }
 
-char *
-sclp_error_message(u16 rc)
-{
-	static struct {
-		u16 code; char *msg;
-	} sclp_errors[] = {
-		{ 0x0000, "No response code stored (machine malfunction)" },
-		{ 0x0020, "Normal Completion" },
-		{ 0x0040, "SCLP equipment check" },
-		{ 0x0100, "SCCB boundary violation" },
-		{ 0x01f0, "Invalid command" },
-		{ 0x0220, "Normal Completion; suppressed buffers pending" },
-		{ 0x0300, "Insufficient SCCB length" },
-		{ 0x0340, "Contained SCLP equipment check" },
-		{ 0x05f0, "Target resource in improper state" },
-		{ 0x40f0, "Invalid function code/not installed" },
-		{ 0x60f0, "No buffers stored" },
-		{ 0x62f0, "No buffers stored; suppressed buffers pending" },
-		{ 0x70f0, "Invalid selection mask" },
-		{ 0x71f0, "Event buffer exceeds available space" },
-		{ 0x72f0, "Inconsistent lengths" },
-		{ 0x73f0, "Event buffer syntax error" }
-	};
-	int i;
-	for (i = 0; i < sizeof(sclp_errors)/sizeof(sclp_errors[0]); i++)
-		if (rc == sclp_errors[i].code)
-			return sclp_errors[i].msg;
-	return "Invalid response code";
-}
-
-/*
- * postprocessing of unconditional read service call
- */
+/* Read event data request callback. */
 static void
-sclp_unconditional_read_cb(struct sclp_req *read_req, void *data)
+sclp_read_cb(struct sclp_req *req, void *data)
+{
+	unsigned long flags;
+	struct sccb_header *sccb;
+
+	sccb = (struct sccb_header *) req->sccb;
+	if (req->status == SCLP_REQ_DONE && (sccb->response_code == 0x20 ||
+	    sccb->response_code == 0x220))
+		sclp_dispatch_evbufs(sccb);
+	spin_lock_irqsave(&sclp_lock, flags);
+	sclp_reading_state = sclp_reading_state_idle;
+	spin_unlock_irqrestore(&sclp_lock, flags);
+}
+
+/* Prepare read event data request. Called while sclp_lock is locked. */
+static inline void
+__sclp_make_read_req(void)
 {
 	struct sccb_header *sccb;
 
-	sccb = read_req->sccb;
-	if (sccb->response_code == 0x0020 ||
-	    sccb->response_code == 0x0220) {
-		if (sclp_process_evbufs(sccb) != 0)
-			printk(KERN_WARNING SCLP_CORE_PRINT_HEADER
-			       "unconditional read: "
-			       "unrequested event buffer received.\n");
-	}
-
-	if (sccb->response_code != 0x0020)
-		printk(KERN_WARNING SCLP_CORE_PRINT_HEADER
-		       "unconditional read: %s (response code=0x%x).\n",
-		       sclp_error_message(sccb->response_code),
-		       sccb->response_code);
-
-	clear_bit(SCLP_READING, &sclp_status);
-}
-
-/*
- * Function to queue Read Event Data/Unconditional Read
- */
-static void
-__sclp_unconditional_read(void)
-{
-	struct sccb_header *sccb;
-	struct sclp_req *read_req;
-
-	/*
-	 * Don't try to initiate Unconditional Read if we are not able to
-	 * receive anything
-	 */
-	if (sclp_receive_mask == 0)
-		return;
-	/* Don't try reading if a read is already outstanding */
-	if (test_and_set_bit(SCLP_READING, &sclp_status))
-		return;
-	/* Initialize read sccb */
 	sccb = (struct sccb_header *) sclp_read_sccb;
 	clear_page(sccb);
+	memset(&sclp_read_req, 0, sizeof(struct sclp_req));
+	sclp_read_req.command = SCLP_CMDW_READDATA;
+	sclp_read_req.status = SCLP_REQ_QUEUED;
+	sclp_read_req.start_count = 0;
+	sclp_read_req.callback = sclp_read_cb;
+	sclp_read_req.sccb = sccb;
 	sccb->length = PAGE_SIZE;
-	sccb->function_code = 0;	/* unconditional read */
-	sccb->control_mask[2] = 0x80;	/* variable length response */
-	/* Initialize request structure */
-	read_req = &sclp_read_req;
-	read_req->command = SCLP_CMDW_READDATA;
-	read_req->status = SCLP_REQ_QUEUED;
-	read_req->callback = sclp_unconditional_read_cb;
-	read_req->sccb = sccb;
-	/* Add read request to the head of queue */
-	list_add(&read_req->list, &sclp_req_queue);
+	sccb->function_code = 0;
+	sccb->control_mask[2] = 0x80;
 }
 
-/* Bit masks to interpret external interruption parameter contents. */
-#define EXT_INT_SCCB_MASK		0xfffffff8
-#define EXT_INT_STATECHANGE_PENDING	0x00000002
-#define EXT_INT_EVBUF_PENDING		0x00000001
+/* Search request list for request with matching sccb. Return request if found,
+ * NULL otherwise. Called while sclp_lock is locked. */
+static inline struct sclp_req *
+__sclp_find_req(u32 sccb)
+{
+	struct list_head *l;
+	struct sclp_req *req;
 
-/*
- * Handler for service-signal external interruptions
- */
+	list_for_each(l, &sclp_req_queue) {
+		req = list_entry(l, struct sclp_req, list);
+		if (sccb == (u32) (addr_t) req->sccb)
+				return req;
+	}
+	return NULL;
+}
+
+/* Handler for external interruption. Perform request post-processing.
+ * Prepare read event data request if necessary. Start processing of next
+ * request on queue. */
 static void
 sclp_interrupt_handler(struct pt_regs *regs, __u16 code)
 {
-	u32 ext_int_param, finished_sccb, evbuf_pending;
-	struct list_head *l;
-	struct sclp_req *req, *tmp;
+	struct sclp_req *req;
+	u32 finished_sccb;
+	u32 evbuf_pending;
 
 	spin_lock(&sclp_lock);
-	/*
-	 * Only process interrupt if sclp is initialized.
-	 * This avoids strange effects for a pending request
-	 * from before the last re-ipl.
-	 */
-	if (!test_bit(SCLP_INIT, &sclp_status)) {
-		/* Now clear the running bit */
-		clear_bit(SCLP_RUNNING, &sclp_status);
-		spin_unlock(&sclp_lock);
-		return;
-	}
-	ext_int_param = S390_lowcore.ext_params;
-	finished_sccb = ext_int_param & EXT_INT_SCCB_MASK;
-	evbuf_pending = ext_int_param & (EXT_INT_EVBUF_PENDING |
-					 EXT_INT_STATECHANGE_PENDING);
-	req = NULL;
-	if (finished_sccb != 0U) {
-		list_for_each(l, &sclp_req_queue) {
-			tmp = list_entry(l, struct sclp_req, list);
-			if (finished_sccb == (u32)(addr_t) tmp->sccb) {
-				list_del(&tmp->list);
-				req = tmp;
-				break;
+	finished_sccb = S390_lowcore.ext_params & 0xfffffff8;
+	evbuf_pending = S390_lowcore.ext_params & 0x3;
+	if (finished_sccb) {
+		req = __sclp_find_req(finished_sccb);
+		if (req) {
+			/* Request post-processing */
+			list_del(&req->list);
+			req->status = SCLP_REQ_DONE;
+			if (req->callback) {
+				spin_unlock(&sclp_lock);
+				req->callback(req, req->callback_data);
+				spin_lock(&sclp_lock);
 			}
 		}
+		sclp_running_state = sclp_running_state_idle;
+	}
+	if (evbuf_pending && sclp_receive_mask != 0 &&
+	    sclp_reading_state == sclp_reading_state_idle &&
+	    sclp_activation_state == sclp_activation_state_active ) {
+		sclp_reading_state = sclp_reading_state_reading;
+		__sclp_make_read_req();
+		/* Add request to head of queue */
+		list_add(&sclp_read_req.list, &sclp_req_queue);
 	}
 	spin_unlock(&sclp_lock);
-	/* Perform callback */
-	if (req != NULL) {
-		req->status = SCLP_REQ_DONE;
-		if (req->callback != NULL)
-			req->callback(req, req->callback_data);
-	}
-	spin_lock(&sclp_lock);
-	/* Head queue a read sccb if an event buffer is pending */
-	if (evbuf_pending)
-		__sclp_unconditional_read();
-	/* Now clear the running bit if SCLP indicated a finished SCCB */
-	if (finished_sccb != 0U)
-		clear_bit(SCLP_RUNNING, &sclp_status);
-	spin_unlock(&sclp_lock);
-	/* and start next request on the queue */
-	sclp_start_request();
+	sclp_process_queue();
 }
 
-/*
- * Wait synchronously for external interrupt of sclp. We may not receive
- * any other external interrupt, so we disable all other external interrupts
- * in control register 0.
- */
+/* Return current Time-Of-Day clock. */
+static inline u64
+sclp_get_clock(void)
+{
+	u64 result;
+
+	asm volatile ("STCK 0(%1)" : "=m" (result) : "a" (&(result)) : "cc");
+	return result;
+}
+
+/* Convert interval in jiffies to TOD ticks. */
+static inline u64
+sclp_tod_from_jiffies(unsigned long jiffies)
+{
+	return (u64) (jiffies / HZ) << 32;
+}
+
+/* Wait until a currently running request finished. Note: while this function
+ * is running, no timers are served on the calling CPU. */
 void
 sclp_sync_wait(void)
 {
 	unsigned long psw_mask;
 	unsigned long cr0, cr0_sync;
+	u64 timeout;
 
-	/* Prevent BH from executing. */
+	/* We'll be disabling timer interrupts, so we need a custom timeout
+	 * mechanism */
+	timeout = 0;
+	if (timer_pending(&sclp_request_timer)) {
+		/* Get timeout TOD value */
+		timeout = sclp_get_clock() +
+			  sclp_tod_from_jiffies(sclp_request_timer.expires -
+						jiffies);
+	}
+	/* Prevent bottom half from executing once we force interrupts open */
 	local_bh_disable();
-	/*
-	 * save cr0
-	 * enable service signal external interruption (cr0.22)
-	 * disable cr0.20-21, cr0.25, cr0.27, cr0.30-31
-	 * don't touch any other bit in cr0
-	 */
+	/* Enable service-signal interruption, disable timer interrupts */
 	__ctl_store(cr0, 0, 0);
 	cr0_sync = cr0;
 	cr0_sync |= 0x00000200;
 	cr0_sync &= 0xFFFFF3AC;
 	__ctl_load(cr0_sync, 0, 0);
-
-	/* enable external interruptions (PSW-mask.7) */
 	asm volatile ("STOSM 0(%1),0x01"
 		      : "=m" (psw_mask) : "a" (&psw_mask) : "memory");
-
-	/* wait until ISR signals receipt of interrupt */
-	while (test_bit(SCLP_RUNNING, &sclp_status)) {
+	/* Loop until driver state indicates finished request */
+	while (sclp_running_state != sclp_running_state_idle) {
+		/* Check for expired request timer */
+		if (timer_pending(&sclp_request_timer) &&
+		    sclp_get_clock() > timeout &&
+		    del_timer(&sclp_request_timer))
+			sclp_request_timer.function(sclp_request_timer.data);
 		barrier();
 		cpu_relax();
 	}
-
-	/* disable external interruptions */
+	/* Restore interrupt settings */
 	asm volatile ("SSM 0(%0)"
 		      : : "a" (&psw_mask) : "memory");
-
-	/* restore cr0 */
 	__ctl_load(cr0, 0, 0);
 	__local_bh_enable();
 }
 
-/*
- * Queue an SCLP request. Request will immediately be processed if queue is
- * empty.
- */
-void
-sclp_add_request(struct sclp_req *req)
-{
-	unsigned long flags;
+EXPORT_SYMBOL(sclp_sync_wait);
 
-	if (!test_bit(SCLP_INIT, &sclp_status)) {
-		req->status = SCLP_REQ_FAILED;
-		if (req->callback != NULL)
-			req->callback(req, req->callback_data);
-		return;
-	}
-	spin_lock_irqsave(&sclp_lock, flags);
-	/* queue the request */
-	req->status = SCLP_REQ_QUEUED;
-	list_add_tail(&req->list, &sclp_req_queue);
-	spin_unlock_irqrestore(&sclp_lock, flags);
-	/* try to start the first request on the queue */
-	sclp_start_request();
+/* Dispatch changes in send and receive mask to registered listeners. */
+static inline void
+sclp_dispatch_state_change(void)
+{
+	struct list_head *l;
+	struct sclp_register *reg;
+	unsigned long flags;
+	sccb_mask_t receive_mask;
+	sccb_mask_t send_mask;
+
+	do {
+		spin_lock_irqsave(&sclp_lock, flags);
+		reg = NULL;
+		list_for_each(l, &sclp_reg_list) {
+			reg = list_entry(l, struct sclp_register, list);
+			receive_mask = reg->receive_mask & sclp_receive_mask;
+			send_mask = reg->send_mask & sclp_send_mask;
+			if (reg->sclp_receive_mask != receive_mask ||
+			    reg->sclp_send_mask != send_mask) {
+				reg->sclp_receive_mask = receive_mask;
+				reg->sclp_send_mask = send_mask;
+				break;
+			} else
+				reg = NULL;
+		}
+		spin_unlock_irqrestore(&sclp_lock, flags);
+		if (reg && reg->state_change_fn)
+			reg->state_change_fn(reg);
+	} while (reg);
 }
 
-/* state change notification */
 struct sclp_statechangebuf {
 	struct evbuf_header	header;
 	u8		validity_sclp_active_facility_mask : 1;
@@ -429,377 +472,84 @@ struct sclp_statechangebuf {
 	u32		read_data_function_mask;
 } __attribute__((packed));
 
-static inline void
-__sclp_notify_state_change(void)
-{
-	struct list_head *l;
-	struct sclp_register *t;
-	sccb_mask_t receive_mask, send_mask;
 
-	list_for_each(l, &sclp_reg_list) {
-		t = list_entry(l, struct sclp_register, list);
-		receive_mask = t->receive_mask & sclp_receive_mask;
-		send_mask = t->send_mask & sclp_send_mask;
-		if (t->sclp_receive_mask != receive_mask ||
-		    t->sclp_send_mask != send_mask) {
-			t->sclp_receive_mask = receive_mask;
-			t->sclp_send_mask = send_mask;
-			if (t->state_change_fn != NULL)
-				t->state_change_fn(t);
-		}
-	}
-}
-
+/* State change event callback. Inform listeners of changes. */
 static void
-sclp_state_change(struct evbuf_header *evbuf)
+sclp_state_change_cb(struct evbuf_header *evbuf)
 {
 	unsigned long flags;
 	struct sclp_statechangebuf *scbuf;
 
-	spin_lock_irqsave(&sclp_lock, flags);
 	scbuf = (struct sclp_statechangebuf *) evbuf;
-
-	if (scbuf->validity_sclp_receive_mask) {
-		if (scbuf->mask_length != sizeof(sccb_mask_t))
-			printk(KERN_WARNING SCLP_CORE_PRINT_HEADER
-			       "state change event with mask length %i\n",
-			       scbuf->mask_length);
-		else
-			/* set new receive mask */
-			sclp_receive_mask = scbuf->sclp_receive_mask;
-	}
-
-	if (scbuf->validity_sclp_send_mask) {
-		if (scbuf->mask_length != sizeof(sccb_mask_t))
-			printk(KERN_WARNING SCLP_CORE_PRINT_HEADER
-			       "state change event with mask length %i\n",
-			       scbuf->mask_length);
-		else
-			/* set new send mask */
-			sclp_send_mask = scbuf->sclp_send_mask;
-	}
-
-	__sclp_notify_state_change();
+	if (scbuf->mask_length != sizeof(sccb_mask_t))
+		return;
+	spin_lock_irqsave(&sclp_lock, flags);
+	if (scbuf->validity_sclp_receive_mask)
+		sclp_receive_mask = scbuf->sclp_receive_mask;
+	if (scbuf->validity_sclp_send_mask)
+		sclp_send_mask = scbuf->sclp_send_mask;
 	spin_unlock_irqrestore(&sclp_lock, flags);
+	sclp_dispatch_state_change();
 }
 
 static struct sclp_register sclp_state_change_event = {
 	.receive_mask = EvTyp_StateChange_Mask,
-	.receiver_fn = sclp_state_change
+	.receiver_fn = sclp_state_change_cb
 };
 
-
-/*
- * SCLP quiesce event handler
- */
-#ifdef CONFIG_SMP
-static void
-do_load_quiesce_psw(void * __unused)
+/* Calculate receive and send mask of currently registered listeners.
+ * Called while sclp_lock is locked. */
+static inline void
+__sclp_get_mask(sccb_mask_t *receive_mask, sccb_mask_t *send_mask)
 {
-	static atomic_t cpuid = ATOMIC_INIT(-1);
-	psw_t quiesce_psw;
-	__u32 status;
-	int i;
-
-	if (atomic_compare_and_swap(-1, smp_processor_id(), &cpuid))
-		signal_processor(smp_processor_id(), sigp_stop);
-	/* Wait for all other cpus to enter stopped state */
-	i = 1;
-	while (i < NR_CPUS) {
-		if (!cpu_online(i)) {
-			i++;
-			continue;
-		}
-		switch (signal_processor_ps(&status, 0, i, sigp_sense)) {
-		case sigp_order_code_accepted:
-		case sigp_status_stored:
-			/* Check for stopped and check stop state */
-			if (status & 0x50)
-				i++;
-			break;
-		case sigp_busy:
-			break;
-		case sigp_not_operational:
-			i++;
-			break;
-		}
-	}
-	/* Quiesce the last cpu with the special psw */
-	quiesce_psw.mask = PSW_BASE_BITS | PSW_MASK_WAIT;
-	quiesce_psw.addr = 0xfff;
-	__load_psw(quiesce_psw);
-}
-
-static void
-do_machine_quiesce(void)
-{
-	on_each_cpu(do_load_quiesce_psw, NULL, 0, 0);
-}
-#else
-static void
-do_machine_quiesce(void)
-{
-	psw_t quiesce_psw;
-
-	quiesce_psw.mask = PSW_BASE_BITS | PSW_MASK_WAIT;
-	quiesce_psw.addr = 0xfff;
-	__load_psw(quiesce_psw);
-}
-#endif
-
-extern void ctrl_alt_del(void);
-
-static void
-sclp_quiesce(struct evbuf_header *evbuf)
-{
-	/*
-	 * We got a "shutdown" request.
-	 * Add a call to an appropriate "shutdown" routine here. This
-	 * routine should set all PSWs to 'disabled-wait', 'stopped'
-	 * or 'check-stopped' - except 1 PSW which needs to carry a
-	 * special bit pattern called 'quiesce PSW'.
-	 */
-	_machine_restart = (void *) do_machine_quiesce;
-	_machine_halt = do_machine_quiesce;
-	_machine_power_off = do_machine_quiesce;
-	ctrl_alt_del();
-}
-
-static struct sclp_register sclp_quiesce_event = {
-	.receive_mask = EvTyp_SigQuiesce_Mask,
-	.receiver_fn = sclp_quiesce
-};
-
-/* initialisation of SCLP */
-struct init_sccb {
-	struct sccb_header header;
-	u16 _reserved;
-	u16 mask_length;
-	sccb_mask_t receive_mask;
-	sccb_mask_t send_mask;
-	sccb_mask_t sclp_send_mask;
-	sccb_mask_t sclp_receive_mask;
-} __attribute__((packed));
-
-static void sclp_init_mask_retry(unsigned long);
-
-static int
-sclp_init_mask(void)
-{
-	unsigned long flags;
-	struct init_sccb *sccb;
-	struct sclp_req *req;
 	struct list_head *l;
 	struct sclp_register *t;
-	int rc;
 
-	sccb = (struct init_sccb *) sclp_init_sccb;
-	/* stick the request structure to the end of the init sccb page */
-	req = (struct sclp_req *) ((addr_t) sccb + PAGE_SIZE) - 1;
-
-	/* SCLP setup concerning receiving and sending Event Buffers */
-	req->command = SCLP_CMDW_WRITEMASK;
-	req->status = SCLP_REQ_QUEUED;
-	req->callback = NULL;
-	req->sccb = sccb;
-	/* setup sccb for writemask command */
-	memset(sccb, 0, sizeof(struct init_sccb));
-	sccb->header.length = sizeof(struct init_sccb);
-	sccb->mask_length = sizeof(sccb_mask_t);
-	/* copy in the sccb mask of the registered event types */
-	spin_lock_irqsave(&sclp_lock, flags);
-	if (!test_bit(SCLP_SHUTDOWN, &sclp_status)) {
-		list_for_each(l, &sclp_reg_list) {
-			t = list_entry(l, struct sclp_register, list);
-			sccb->receive_mask |= t->receive_mask;
-			sccb->send_mask |= t->send_mask;
-		}
+	*receive_mask = 0;
+	*send_mask = 0;
+	list_for_each(l, &sclp_reg_list) {
+		t = list_entry(l, struct sclp_register, list);
+		*receive_mask |= t->receive_mask;
+		*send_mask |= t->send_mask;
 	}
-	sccb->sclp_receive_mask = 0;
-	sccb->sclp_send_mask = 0;
-	if (test_bit(SCLP_INIT, &sclp_status)) {
-		/* add request to sclp queue */
-		list_add_tail(&req->list, &sclp_req_queue);
-		spin_unlock_irqrestore(&sclp_lock, flags);
-		/* and start if SCLP is idle */
-		sclp_start_request();
-		/* now wait for completion */
-		while (req->status != SCLP_REQ_DONE &&
-		       req->status != SCLP_REQ_FAILED)
-			sclp_sync_wait();
-		spin_lock_irqsave(&sclp_lock, flags);
-	} else {
-		/*
-		 * Special case for the very first write mask command.
-		 * The interrupt handler is not removing request from
-		 * the request queue and doesn't call callbacks yet
-		 * because there might be an pending old interrupt
-		 * after a Re-IPL. We have to receive and ignore it.
-		 */
-		do {
-			rc = __service_call(req->command, req->sccb);
-			if (rc == 0)
-				set_bit(SCLP_RUNNING, &sclp_status);
-			spin_unlock_irqrestore(&sclp_lock, flags);
-			if (rc == -EIO)
-				return -ENOSYS;
-			sclp_sync_wait();
-			spin_lock_irqsave(&sclp_lock, flags);
-		} while (rc == -EBUSY);
-	}
-	if (sccb->header.response_code != 0x0020) {
-		/* WRITEMASK failed - we cannot rely on receiving a state
-		   change event, so initially, polling is the only alternative
-		   for us to ever become operational. */
-		if (!test_bit(SCLP_SHUTDOWN, &sclp_status) &&
-		    (!timer_pending(&retry_timer) ||
-		     !mod_timer(&retry_timer,
-			       jiffies + SCLP_INIT_POLL_INTERVAL*HZ))) {
-			retry_timer.function = sclp_init_mask_retry;
-			retry_timer.data = 0;
-			retry_timer.expires = jiffies +
-				SCLP_INIT_POLL_INTERVAL*HZ;
-			add_timer(&retry_timer);
-		}
-	} else {
-		sclp_receive_mask = sccb->sclp_receive_mask;
-		sclp_send_mask = sccb->sclp_send_mask;
-		__sclp_notify_state_change();
-	}
-	spin_unlock_irqrestore(&sclp_lock, flags);
-	return 0;
 }
 
-static void
-sclp_init_mask_retry(unsigned long data) 
-{
-	sclp_init_mask();
-}
-
-/* Reboot event handler - reset send and receive mask to prevent pending SCLP
- * events from interfering with rebooted system. */
-static int
-sclp_reboot_event(struct notifier_block *this, unsigned long event, void *ptr)
-{
-	unsigned long flags;
-
-	/* Note: need spinlock to maintain atomicity when accessing global
-         * variables. */
-	spin_lock_irqsave(&sclp_lock, flags);
-	set_bit(SCLP_SHUTDOWN, &sclp_status);
-	spin_unlock_irqrestore(&sclp_lock, flags);
-	sclp_init_mask();
-	return NOTIFY_DONE;
-}
-
-static struct notifier_block sclp_reboot_notifier = {
-	.notifier_call = sclp_reboot_event
-};
-
-/*
- * sclp setup function. Called early (no kmalloc!) from sclp_console_init().
- */
-static int
-sclp_init(void)
-{
-	int rc;
-
-	if (test_bit(SCLP_INIT, &sclp_status))
-		/* Already initialized. */
-		return 0;
-
-	spin_lock_init(&sclp_lock);
-	INIT_LIST_HEAD(&sclp_req_queue);
-
-	/* init event list */
-	INIT_LIST_HEAD(&sclp_reg_list);
-	list_add(&sclp_state_change_event.list, &sclp_reg_list);
-	list_add(&sclp_quiesce_event.list, &sclp_reg_list);
-
-	rc = register_reboot_notifier(&sclp_reboot_notifier);
-	if (rc)
-		return rc;
-
-	/*
-	 * request the 0x2401 external interrupt
-	 * The sclp driver is initialized early (before kmalloc works). We
-	 * need to use register_early_external_interrupt.
-	 */
-	if (register_early_external_interrupt(0x2401, sclp_interrupt_handler,
-					      &ext_int_info_hwc) != 0)
-		return -EBUSY;
-
-	/* enable service-signal external interruptions,
-	 * Control Register 0 bit 22 := 1
-	 * (besides PSW bit 7 must be set to 1 sometimes for external
-	 * interruptions)
-	 */
-	ctl_set_bit(0, 9);
-
-	init_timer(&retry_timer);
-	init_timer(&sclp_busy_timer);
-	/* do the initial write event mask */
-	rc = sclp_init_mask();
-	if (rc == 0) {
-		/* Ok, now everything is setup right. */
-		set_bit(SCLP_INIT, &sclp_status);
-		return 0;
-	}
-
-	/* The sclp_init_mask failed. SCLP is broken, unregister and exit. */
-	ctl_clear_bit(0,9);
-	unregister_early_external_interrupt(0x2401, sclp_interrupt_handler,
-					    &ext_int_info_hwc);
-
-	return rc;
-}
-
-/*
- * Register the SCLP event listener identified by REG. Return 0 on success.
- * Some error codes and their meaning:
- *
- *  -ENODEV = SCLP interface is not supported on this machine
- *   -EBUSY = there is already a listener registered for the requested
- *            event type
- *     -EIO = SCLP interface is currently not operational
- */
+/* Register event listener. Return 0 on success, non-zero otherwise. */
 int
 sclp_register(struct sclp_register *reg)
 {
 	unsigned long flags;
-	struct list_head *l;
-	struct sclp_register *t;
+	sccb_mask_t receive_mask;
+	sccb_mask_t send_mask;
+	int rc;
 
-	if (!MACHINE_HAS_SCLP)
-		return -ENODEV;
-
-	if (!test_bit(SCLP_INIT, &sclp_status))
-		sclp_init();
+	rc = sclp_init();
+	if (rc)
+		return rc;
 	spin_lock_irqsave(&sclp_lock, flags);
-	/* check already registered event masks for collisions */
-	list_for_each(l, &sclp_reg_list) {
-		t = list_entry(l, struct sclp_register, list);
-		if (t->receive_mask & reg->receive_mask ||
-		    t->send_mask & reg->send_mask) {
-			spin_unlock_irqrestore(&sclp_lock, flags);
-			return -EBUSY;
-		}
+	/* Check event mask for collisions */
+	__sclp_get_mask(&receive_mask, &send_mask);
+	if (reg->receive_mask & receive_mask || reg->send_mask & send_mask) {
+		spin_unlock_irqrestore(&sclp_lock, flags);
+		return -EBUSY;
 	}
-	/*
-	 * set present mask to 0 to trigger state change
-	 * callback in sclp_init_mask
-	 */
+	/* Trigger initial state change callback */
 	reg->sclp_receive_mask = 0;
 	reg->sclp_send_mask = 0;
 	list_add(&reg->list, &sclp_reg_list);
 	spin_unlock_irqrestore(&sclp_lock, flags);
-	sclp_init_mask();
-	return 0;
+	rc = sclp_init_mask(1);
+	if (rc) {
+		spin_lock_irqsave(&sclp_lock, flags);
+		list_del(&reg->list);
+		spin_unlock_irqrestore(&sclp_lock, flags);
+	}
+	return rc;
 }
 
-/*
- * Unregister the SCLP event listener identified by REG.
- */
+EXPORT_SYMBOL(sclp_register);
+
+/* Unregister event listener. */
 void
 sclp_unregister(struct sclp_register *reg)
 {
@@ -808,15 +558,13 @@ sclp_unregister(struct sclp_register *reg)
 	spin_lock_irqsave(&sclp_lock, flags);
 	list_del(&reg->list);
 	spin_unlock_irqrestore(&sclp_lock, flags);
-	sclp_init_mask();
+	sclp_init_mask(1);
 }
 
-#define	SCLP_EVBUF_PROCESSED	0x80
+EXPORT_SYMBOL(sclp_unregister);
 
-/*
- * Traverse array of event buffers contained in SCCB and remove all buffers
- * with a set "processed" flag. Return the number of unprocessed buffers.
- */
+/* Remove event buffers which are marked processed. Return the number of
+ * remaining event buffers. */
 int
 sclp_remove_processed(struct sccb_header *sccb)
 {
@@ -829,10 +577,9 @@ sclp_remove_processed(struct sccb_header *sccb)
 	remaining = sccb->length - sizeof(struct sccb_header);
 	while (remaining > 0) {
 		remaining -= evbuf->length;
-		if (evbuf->flags & SCLP_EVBUF_PROCESSED) {
+		if (evbuf->flags & 0x80) {
 			sccb->length -= evbuf->length;
-			memcpy((void *) evbuf,
-			       (void *) ((addr_t) evbuf + evbuf->length),
+			memcpy(evbuf, (void *) ((addr_t) evbuf + evbuf->length),
 			       remaining);
 		} else {
 			unprocessed++;
@@ -840,14 +587,329 @@ sclp_remove_processed(struct sccb_header *sccb)
 					((addr_t) evbuf + evbuf->length);
 		}
 	}
-
 	return unprocessed;
 }
 
-module_init(sclp_init);
+EXPORT_SYMBOL(sclp_remove_processed);
 
-EXPORT_SYMBOL(sclp_add_request);
-EXPORT_SYMBOL(sclp_sync_wait);
-EXPORT_SYMBOL(sclp_register);
-EXPORT_SYMBOL(sclp_unregister);
-EXPORT_SYMBOL(sclp_error_message);
+struct init_sccb {
+	struct sccb_header header;
+	u16 _reserved;
+	u16 mask_length;
+	sccb_mask_t receive_mask;
+	sccb_mask_t send_mask;
+	sccb_mask_t sclp_send_mask;
+	sccb_mask_t sclp_receive_mask;
+} __attribute__((packed));
+
+/* Prepare init mask request. Called while sclp_lock is locked. */
+static inline void
+__sclp_make_init_req(u32 receive_mask, u32 send_mask)
+{
+	struct init_sccb *sccb;
+
+	sccb = (struct init_sccb *) sclp_init_sccb;
+	clear_page(sccb);
+	memset(&sclp_init_req, 0, sizeof(struct sclp_req));
+	sclp_init_req.command = SCLP_CMDW_WRITEMASK;
+	sclp_init_req.status = SCLP_REQ_FILLED;
+	sclp_init_req.start_count = 0;
+	sclp_init_req.callback = NULL;
+	sclp_init_req.callback_data = NULL;
+	sclp_init_req.sccb = sccb;
+	sccb->header.length = sizeof(struct init_sccb);
+	sccb->mask_length = sizeof(sccb_mask_t);
+	sccb->receive_mask = receive_mask;
+	sccb->send_mask = send_mask;
+	sccb->sclp_receive_mask = 0;
+	sccb->sclp_send_mask = 0;
+}
+
+/* Start init mask request. If calculate is non-zero, calculate the mask as
+ * requested by registered listeners. Use zero mask otherwise. Return 0 on
+ * success, non-zero otherwise. */
+static int
+sclp_init_mask(int calculate)
+{
+	unsigned long flags;
+	struct init_sccb *sccb = (struct init_sccb *) sclp_init_sccb;
+	sccb_mask_t receive_mask;
+	sccb_mask_t send_mask;
+	int retry;
+	int rc;
+	unsigned long wait;
+
+	spin_lock_irqsave(&sclp_lock, flags);
+	/* Check if interface is in appropriate state */
+	if (sclp_mask_state != sclp_mask_state_idle) {
+		spin_unlock_irqrestore(&sclp_lock, flags);
+		return -EBUSY;
+	}
+	if (sclp_activation_state == sclp_activation_state_inactive) {
+		spin_unlock_irqrestore(&sclp_lock, flags);
+		return -EINVAL;
+	}
+	sclp_mask_state = sclp_mask_state_initializing;
+	/* Determine mask */
+	if (calculate)
+		__sclp_get_mask(&receive_mask, &send_mask);
+	else {
+		receive_mask = 0;
+		send_mask = 0;
+	}
+	rc = -EIO;
+	for (retry = 0; retry <= SCLP_MASK_RETRY; retry++) {
+		/* Prepare request */
+		__sclp_make_init_req(receive_mask, send_mask);
+		spin_unlock_irqrestore(&sclp_lock, flags);
+		if (sclp_add_request(&sclp_init_req)) {
+			/* Try again later */
+			wait = jiffies + SCLP_BUSY_INTERVAL * HZ;
+			while (time_before(jiffies, wait))
+				sclp_sync_wait();
+			spin_lock_irqsave(&sclp_lock, flags);
+			continue;
+		}
+		while (sclp_init_req.status != SCLP_REQ_DONE &&
+		       sclp_init_req.status != SCLP_REQ_FAILED)
+			sclp_sync_wait();
+		spin_lock_irqsave(&sclp_lock, flags);
+		if (sclp_init_req.status == SCLP_REQ_DONE &&
+		    sccb->header.response_code == 0x20) {
+			/* Successful request */
+			if (calculate) {
+				sclp_receive_mask = sccb->sclp_receive_mask;
+				sclp_send_mask = sccb->sclp_send_mask;
+			} else {
+				sclp_receive_mask = 0;
+				sclp_send_mask = 0;
+			}
+			spin_unlock_irqrestore(&sclp_lock, flags);
+			sclp_dispatch_state_change();
+			spin_lock_irqsave(&sclp_lock, flags);
+			rc = 0;
+			break;
+		}
+	}
+	sclp_mask_state = sclp_mask_state_idle;
+	spin_unlock_irqrestore(&sclp_lock, flags);
+	return rc;
+}
+
+/* Deactivate SCLP interface. On success, new requests will be rejected,
+ * events will no longer be dispatched. Return 0 on success, non-zero
+ * otherwise. */
+int
+sclp_deactivate(void)
+{
+	unsigned long flags;
+	int rc;
+
+	spin_lock_irqsave(&sclp_lock, flags);
+	/* Deactivate can only be called when active */
+	if (sclp_activation_state != sclp_activation_state_active) {
+		spin_unlock_irqrestore(&sclp_lock, flags);
+		return -EINVAL;
+	}
+	sclp_activation_state = sclp_activation_state_deactivating;
+	spin_unlock_irqrestore(&sclp_lock, flags);
+	rc = sclp_init_mask(0);
+	spin_lock_irqsave(&sclp_lock, flags);
+	if (rc == 0)
+		sclp_activation_state = sclp_activation_state_inactive;
+	else
+		sclp_activation_state = sclp_activation_state_active;
+	spin_unlock_irqrestore(&sclp_lock, flags);
+	return rc;
+}
+
+EXPORT_SYMBOL(sclp_deactivate);
+
+/* Reactivate SCLP interface after sclp_deactivate. On success, new
+ * requests will be accepted, events will be dispatched again. Return 0 on
+ * success, non-zero otherwise. */
+int
+sclp_reactivate(void)
+{
+	unsigned long flags;
+	int rc;
+
+	spin_lock_irqsave(&sclp_lock, flags);
+	/* Reactivate can only be called when inactive */
+	if (sclp_activation_state != sclp_activation_state_inactive) {
+		spin_unlock_irqrestore(&sclp_lock, flags);
+		return -EINVAL;
+	}
+	sclp_activation_state = sclp_activation_state_activating;
+	spin_unlock_irqrestore(&sclp_lock, flags);
+	rc = sclp_init_mask(1);
+	spin_lock_irqsave(&sclp_lock, flags);
+	if (rc == 0)
+		sclp_activation_state = sclp_activation_state_active;
+	else
+		sclp_activation_state = sclp_activation_state_inactive;
+	spin_unlock_irqrestore(&sclp_lock, flags);
+	return rc;
+}
+
+EXPORT_SYMBOL(sclp_reactivate);
+
+/* Handler for external interruption used during initialization. Modify
+ * request state to done. */
+static void
+sclp_check_handler(struct pt_regs *regs, __u16 code)
+{
+	u32 finished_sccb;
+
+	finished_sccb = S390_lowcore.ext_params & 0xfffffff8;
+	/* Is this the interrupt we are waiting for? */
+	if (finished_sccb == 0)
+		return;
+	if (finished_sccb != (u32) (addr_t) sclp_init_sccb) {
+		printk(KERN_WARNING SCLP_HEADER "unsolicited interrupt "
+		       "for buffer at 0x%x\n", finished_sccb);
+		return;
+	}
+	spin_lock(&sclp_lock);
+	if (sclp_running_state == sclp_running_state_running) {
+		sclp_init_req.status = SCLP_REQ_DONE;
+		sclp_running_state = sclp_running_state_idle;
+	}
+	spin_unlock(&sclp_lock);
+}
+
+/* Initial init mask request timed out. Modify request state to failed. */
+static void
+sclp_check_timeout(unsigned long data)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&sclp_lock, flags);
+	if (sclp_running_state == sclp_running_state_running) {
+		sclp_init_req.status = SCLP_REQ_FAILED;
+		sclp_running_state = sclp_running_state_idle;
+	}
+	spin_unlock_irqrestore(&sclp_lock, flags);
+}
+
+/* Perform a check of the SCLP interface. Return zero if the interface is
+ * available and there are no pending requests from a previous instance.
+ * Return non-zero otherwise. */
+static int
+sclp_check_interface(void)
+{
+	struct init_sccb *sccb;
+	unsigned long flags;
+	int retry;
+	int rc;
+
+	spin_lock_irqsave(&sclp_lock, flags);
+	/* Prepare init mask command */
+	rc = register_early_external_interrupt(0x2401, sclp_check_handler,
+					       &ext_int_info_hwc);
+	if (rc) {
+		spin_unlock_irqrestore(&sclp_lock, flags);
+		return rc;
+	}
+	for (retry = 0; retry <= SCLP_INIT_RETRY; retry++) {
+		__sclp_make_init_req(0, 0);
+		sccb = (struct init_sccb *) sclp_init_req.sccb;
+		rc = service_call(sclp_init_req.command, sccb);
+		if (rc == -EIO)
+			break;
+		sclp_init_req.status = SCLP_REQ_RUNNING;
+		sclp_running_state = sclp_running_state_running;
+		__sclp_set_request_timer(SCLP_RETRY_INTERVAL * HZ,
+					 sclp_check_timeout, 0);
+		spin_unlock_irqrestore(&sclp_lock, flags);
+		/* Enable service-signal interruption - needs to happen
+		 * with IRQs enabled. */
+		ctl_set_bit(0, 9);
+		/* Wait for signal from interrupt or timeout */
+		sclp_sync_wait();
+		/* Disable service-signal interruption - needs to happen
+		 * with IRQs enabled. */
+		ctl_clear_bit(0,9);
+		spin_lock_irqsave(&sclp_lock, flags);
+		del_timer(&sclp_request_timer);
+		if (sclp_init_req.status == SCLP_REQ_DONE &&
+		    sccb->header.response_code == 0x20) {
+			rc = 0;
+			break;
+		} else
+			rc = -EBUSY;
+	}
+	unregister_early_external_interrupt(0x2401, sclp_check_handler,
+					    &ext_int_info_hwc);
+	spin_unlock_irqrestore(&sclp_lock, flags);
+	return rc;
+}
+
+/* Reboot event handler. Reset send and receive mask to prevent pending SCLP
+ * events from interfering with rebooted system. */
+static int
+sclp_reboot_event(struct notifier_block *this, unsigned long event, void *ptr)
+{
+	sclp_deactivate();
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block sclp_reboot_notifier = {
+	.notifier_call = sclp_reboot_event
+};
+
+/* Initialize SCLP driver. Return zero if driver is operational, non-zero
+ * otherwise. */
+static int
+sclp_init(void)
+{
+	unsigned long flags;
+	int rc;
+
+	if (!MACHINE_HAS_SCLP)
+		return -ENODEV;
+	spin_lock_irqsave(&sclp_lock, flags);
+	/* Check for previous or running initialization */
+	if (sclp_init_state != sclp_init_state_uninitialized) {
+		spin_unlock_irqrestore(&sclp_lock, flags);
+		return 0;
+	}
+	sclp_init_state = sclp_init_state_initializing;
+	/* Set up variables */
+	INIT_LIST_HEAD(&sclp_req_queue);
+	INIT_LIST_HEAD(&sclp_reg_list);
+	list_add(&sclp_state_change_event.list, &sclp_reg_list);
+	init_timer(&sclp_request_timer);
+	/* Check interface */
+	spin_unlock_irqrestore(&sclp_lock, flags);
+	rc = sclp_check_interface();
+	spin_lock_irqsave(&sclp_lock, flags);
+	if (rc) {
+		sclp_init_state = sclp_init_state_uninitialized;
+		spin_unlock_irqrestore(&sclp_lock, flags);
+		return rc;
+	}
+	/* Register reboot handler */
+	rc = register_reboot_notifier(&sclp_reboot_notifier);
+	if (rc) {
+		sclp_init_state = sclp_init_state_uninitialized;
+		spin_unlock_irqrestore(&sclp_lock, flags);
+		return rc;
+	}
+	/* Register interrupt handler */
+	rc = register_early_external_interrupt(0x2401, sclp_interrupt_handler,
+					       &ext_int_info_hwc);
+	if (rc) {
+		unregister_reboot_notifier(&sclp_reboot_notifier);
+		sclp_init_state = sclp_init_state_uninitialized;
+		spin_unlock_irqrestore(&sclp_lock, flags);
+		return rc;
+	}
+	sclp_init_state = sclp_init_state_initialized;
+	spin_unlock_irqrestore(&sclp_lock, flags);
+	/* Enable service-signal external interruption - needs to happen with
+	 * IRQs enabled. */
+	ctl_set_bit(0, 9);
+	sclp_init_mask(1);
+	return 0;
+}
