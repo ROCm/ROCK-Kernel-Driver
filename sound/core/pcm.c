@@ -371,6 +371,7 @@ static void snd_pcm_substream_proc_status_read(snd_info_entry_t *entry, snd_info
 		snd_iprintf(buffer, "closed\n");
 		return;
 	}
+	memset(&status, 0, sizeof(status));
 	err = snd_pcm_status(substream, &status);
 	if (err < 0) {
 		snd_iprintf(buffer, "error %d\n", err);
