@@ -31,7 +31,8 @@
 #include <asm/pgalloc.h>
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
-#include "mach_apic.h"
+
+#include <mach_apic.h>
 
 void __init apic_intr_init(void)
 {
