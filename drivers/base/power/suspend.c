@@ -39,16 +39,11 @@ int suspend_device(struct device * dev, u32 state)
 {
 	int error = 0;
 
-	if (dev->bus && dev->bus->suspend)
+	dev_dbg(dev, "suspending\n");
+
+	if (dev->bus && dev->bus->suspend && !dev->power.power_state)
 		error = dev->bus->suspend(dev,state);
 
-	if (!error) {
-		list_del(&dev->power.entry);
-		list_add(&dev->power.entry,&dpm_off);
-	} else if (error == -EAGAIN) {
-		list_del(&dev->power.entry);
-		list_add(&dev->power.entry,&dpm_off_irq);
-	}
 	return error;
 }
 
@@ -81,11 +76,18 @@ int device_suspend(u32 state)
 	while(!list_empty(&dpm_active)) {
 		struct list_head * entry = dpm_active.prev;
 		struct device * dev = to_device(entry);
-		if ((error = suspend_device(dev,state))) {
-			if (error != -EAGAIN)
-				goto Error;
-			else
-				error = 0;
+		error = suspend_device(dev,state);
+
+		if (!error) {
+			list_del(&dev->power.entry);
+			list_add(&dev->power.entry,&dpm_off);
+		} else if (error == -EAGAIN) {
+			list_del(&dev->power.entry);
+			list_add(&dev->power.entry,&dpm_off_irq);
+		} else {
+			printk(KERN_ERR "Could not suspend device %s: "
+				"error %d\n", kobject_name(&dev->kobj), error);
+			goto Error;
 		}
 	}
  Done:

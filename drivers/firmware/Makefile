@@ -3,4 +3,3 @@
 #
 obj-$(CONFIG_EDD)             	+= edd.o
 obj-$(CONFIG_EFI_VARS)		+= efivars.o
-obj-$(CONFIG_SMBIOS)            += smbios.o
