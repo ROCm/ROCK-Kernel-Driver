@@ -26,7 +26,6 @@
 #include <linux/types.h>
 #include <linux/timex.h>
 #include <linux/config.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/delay.h>
@@ -300,7 +299,6 @@ void account_ticks(struct pt_regs *regs)
 	 * Spread it over all cpus instead.
 	 */
 	write_seqlock(&xtime_lock);
-	TRIG_EVENT(timer_hook, regs);
 	if (S390_lowcore.jiffy_timer > xtime_cc) {
 		__u32 xticks;
 

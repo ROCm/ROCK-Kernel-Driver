@@ -46,7 +46,6 @@
 #include <linux/security.h>
 #include <linux/syscalls.h>
 #include <linux/objrmap.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -1151,9 +1150,6 @@ int do_execve(char * filename,
 
 	retval = search_binary_handler(&bprm,regs);
 	if (retval >= 0) {
-		TRIG_EVENT(exec_hook, file->f_dentry->d_name.len,
-			file->f_dentry->d_name.name, regs);
-
 		free_arg_pages(&bprm);
 
 		/* execve success */
@@ -1420,4 +1416,3 @@ fail:
 	unlock_kernel();
 	return retval;
 }
-EXPORT_SYMBOL(do_coredump);

@@ -34,8 +34,6 @@
 #include <linux/vermagic.h>
 #include <linux/notifier.h>
 #include <linux/stop_machine.h>
-#include <linux/trigevent_hooks.h>
-#include <linux/dprobes.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #include <asm/pgalloc.h>
@@ -66,8 +64,6 @@ static LIST_HEAD(modules);
 
 static DECLARE_MUTEX(notify_mutex);
 static struct notifier_block * module_notify_list;
-static DECLARE_MUTEX(rmmod_notify_mutex);
-static struct notifier_block * rmmodule_notify_list;
 
 int register_module_notifier(struct notifier_block * nb)
 {
@@ -88,26 +84,6 @@ int unregister_module_notifier(struct notifier_block * nb)
 	return err;
 }
 EXPORT_SYMBOL(unregister_module_notifier);
-
-int register_rmmodule_notifier(struct notifier_block * nb)
-{
-	int err;
-	down(&rmmod_notify_mutex);
-	err = notifier_chain_register(&rmmodule_notify_list, nb);
-	up(&rmmod_notify_mutex);
-	return err;
-}
-EXPORT_SYMBOL(register_rmmodule_notifier);
-
-int unregister_rmmodule_notifier(struct notifier_block * nb)
-{
-	int err;
-	down(&rmmod_notify_mutex);
-	err = notifier_chain_unregister(&module_notify_list, nb);
-	up(&rmmod_notify_mutex);
-	return err;
-}
-EXPORT_SYMBOL(unregister_rmmodule_notifier);
 
 /* We require a truly strong try_module_get() */
 static inline int strong_try_module_get(struct module *mod)
@@ -969,16 +945,10 @@ static unsigned long resolve_symbol(Elf_Shdr *sechdrs,
 /* Free a module, remove from lists, etc (must hold module mutex). */
 static void free_module(struct module *mod)
 {
-	TRIG_EVENT(free_module_hook, mod);
-
 	/* Delete from various lists */
 	spin_lock_irq(&modlist_lock);
 	list_del(&mod->list);
 	spin_unlock_irq(&modlist_lock);
-
-	down(&rmmod_notify_mutex);
-	notifier_call_chain(&rmmodule_notify_list, MODULE_STATE_GOING, mod);
-	up(&rmmod_notify_mutex);
 
 	/* Arch-specific cleanup. */
 	module_arch_cleanup(mod);
@@ -1655,8 +1625,6 @@ sys_init_module(void __user *umod,
 	notifier_call_chain(&module_notify_list, MODULE_STATE_COMING, mod);
 	up(&notify_mutex);
 
-	TRIG_EVENT(module_init_hook, mod);
-
 	/* Start the module */
 	ret = mod->init();
 	if (ret < 0) {
@@ -1664,20 +1632,15 @@ sys_init_module(void __user *umod,
                    buggy refcounters. */
 		mod->state = MODULE_STATE_GOING;
 		synchronize_kernel();
-		if (mod->unsafe) {
+		if (mod->unsafe)
 			printk(KERN_ERR "%s: module is now stuck!\n",
 			       mod->name);
-			down(&rmmod_notify_mutex);
-			notifier_call_chain(&rmmodule_notify_list, MODULE_STATE_GOING, mod);
-			up(&rmmod_notify_mutex);
-		}
 		else {
 			module_put(mod);
 			down(&module_mutex);
 			free_module(mod);
 			up(&module_mutex);
 		}
-		TRIG_EVENT(module_init_failed_hook, mod);
 		return ret;
 	}
 

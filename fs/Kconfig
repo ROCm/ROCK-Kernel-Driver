@@ -957,56 +957,6 @@ config RAMFS
 	  To compile this as a module, choose M here: the module will be called
 	  ramfs.
 
-config RELAYFS_FS
-	tristate "Relayfs file system support"
-	---help---
-	  Relayfs is a high-speed data relay filesystem designed to provide
-	  an efficient mechanism for tools and facilities to relay large
-	  amounts of data from kernel space to user space.  It's not useful
-	  on its own, and should only be enabled if other facilities that
-	  need it are enabled, such as for example klog or the Linux Trace
-	  Toolkit.
-
-	  See <file:Documentation/filesystems/relayfs.txt> for further
-	  information.
-
-	  This file system is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called relayfs.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
-
-	  If unsure, say N.
-
-config KLOG_CHANNEL
-	bool "Enable klog debugging support"
-	depends on RELAYFS_FS
-	help
-	  If you say Y to this, a relayfs channel named klog will be created
-	  in the root of the relayfs file system.  You can write to the klog
-	  channel using klog() or klog_raw() from within the kernel or
-	  kernel modules, and read from the klog channel by mounting relayfs
-	  and using read(2) to read from it (or using cat).  If you're not  
-	  sure, say N.
-
-config KLOG_CHANNEL_AUTOENABLE
-	bool "Enable klog logging on startup"
-	depends on KLOG_CHANNEL
-	default y
-	help
-	  If you say Y to this, the klog channel will be automatically enabled
-	  on startup.  Otherwise, to turn klog logging on, you need use
-	  sysctl (fs.relayfs.klog_enabled).  This option is used in cases where
-	  you don't actually want the channel to be written to until it's
-	  enabled.  If you're not sure, say Y.
-
-config KLOG_CHANNEL_SHIFT
-	depends on KLOG_CHANNEL
-	int "klog debugging channel size (14 => 16KB, 22 => 4MB)"
-	range 14 22
-	default 21
-	help
-	  Select klog debugging channel size as a power of 2.
-
 endmenu
 
 menu "Miscellaneous filesystems"
@@ -1271,6 +1221,8 @@ config HPFS_FS
 	  To compile this file system support as a module, choose M here: the
 	  module will be called hpfs.  If unsure, say N.
 
+
+
 config QNX4FS_FS
 	tristate "QNX4 file system support (read only)"
 	help
@@ -1295,6 +1247,8 @@ config QNX4FS_RW
 
 	  It's currently broken, so for now:
 	  answer N.
+
+
 
 config SYSV_FS
 	tristate "System V/Xenix/V7/Coherent file system support"
@@ -1331,6 +1285,8 @@ config SYSV_FS
 	  sysv.
 
 	  If you haven't heard about all of this before, it's safe to say N.
+
+
 
 config UFS_FS
 	tristate "UFS file system support (read only)"

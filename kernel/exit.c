@@ -25,8 +25,6 @@
 #ifdef	CONFIG_KDB
 #include <linux/kdb.h>
 #endif
-#include <linux/trigevent_hooks.h>
-#include <linux/ltt.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -780,9 +778,6 @@ asmlinkage NORET_TYPE void do_exit(long code)
 	acct_process(code);
 	__exit_mm(tsk);
 
-	TRACE_CLEANUP();  
-	TRIG_EVENT(process_exit_hook, tsk->pid);
-
 	exit_sem(tsk);
 	__exit_files(tsk);
 	__exit_fs(tsk);
@@ -1088,8 +1083,6 @@ asmlinkage long sys_wait4(pid_t pid,unsigned int * stat_addr, int options, struc
 
 	if (options & ~(WNOHANG|WUNTRACED|__WNOTHREAD|__WCLONE|__WALL))
 		return -EINVAL;
-
-	TRIG_EVENT(process_wait_hook, pid);
 
 	add_wait_queue(&current->wait_chldexit,&wait);
 repeat:

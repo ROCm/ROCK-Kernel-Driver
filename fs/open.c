@@ -22,7 +22,6 @@
 #include <asm/uaccess.h>
 #include <linux/fs.h>
 #include <linux/pagemap.h>
-#include <linux/trigevent_hooks.h>
 
 int vfs_statfs(struct super_block *sb, struct kstatfs *buf)
 {
@@ -945,9 +944,6 @@ asmlinkage long sys_open(const char __user * filename, int flags, int mode)
 			error = PTR_ERR(f);
 			if (IS_ERR(f))
 				goto out_error;
-			TRIG_EVENT(open_hook, fd,
-				  f->f_dentry->d_name.len,
-				  f->f_dentry->d_name.name); 
 			fd_install(fd, f);
 		}
 out:
@@ -1023,7 +1019,6 @@ asmlinkage long sys_close(unsigned int fd)
 	filp = files->fd[fd];
 	if (!filp)
 		goto out_unlock;
-	TRIG_EVENT(close_hook, fd);
 	files->fd[fd] = NULL;
 	FD_CLR(fd, files->close_on_exec);
 	__put_unused_fd(files, fd);

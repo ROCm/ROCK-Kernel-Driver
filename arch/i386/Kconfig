@@ -1274,37 +1274,6 @@ config EARLY_PRINTK
 	  with klogd/syslogd or the X server. You should normally N here,
 	  unless you want to debug such a crash.
 
-config KPROBES
-	bool "Kprobes"
-	depends on DEBUG_KERNEL
-	help
-	  Kprobes allows you to trap at almost any kernel address, using
-	  register_kprobe(), and providing a callback function.  This is useful
-	  for kernel debugging, non-intrusive instrumentation and testing.  If
-	  in doubt, say "N".
-
-config DEBUGREG
-	bool "Global Debug Registers"
-	depends on DEBUG_KERNEL
-	help
-	  Global debug register settings will be honoured if this is turned on.
-	  If in doubt, say "N".
-
-config KWATCH
-	bool "Kwatch points"
-	depends on DEBUG_KERNEL && DEBUGREG
-	help
-	  This enables kernel-space watchpoints using processor's debug
-	  registers. If in doubt, say "N".
-
-config DPROBES
-	tristate "Dynamic Probes"
-	depends on DEBUG_KERNEL && MODULES && KPROBES
-	help
-	  DProbes provides a higher level interface to kprobes. DProbes
-	  enables you to write probe programs in a RPN language. If
-	  in doubt, say "N".
-
 config DEBUG_STACKOVERFLOW
 	bool "Check for stack overflows"
 	depends on DEBUG_KERNEL
@@ -1475,78 +1444,6 @@ config X86_MPPARSE
 	bool
 	depends on X86_LOCAL_APIC && !X86_VISWS
 	default y
-
-config HOOK
-	tristate "Kernel Hook support"
-	depends on DEBUG_KERNEL 
-	help
-	 The Kernel Hooks Interface is a generalised facility for placing hooks in
-	 arbitrary kernel locations. A hook is a location in the kernel that
-	 calls out of the kernel to a kernel module routine - a hook exit routine.
-	 Read Documentation/hook/HOWTO for more details.
-
-config ASM_HOOK
-	bool
-	default y
-	depends on DEBUG_KERNEL && HOOK
-
-config HOOK_PROCFS
-	bool "/proc interface for hooks" 
-	depends on DEBUG_KERNEL && HOOK
-	
-config TRIGEVENT_HOOKS
-	bool "RAS Instrumentation Hooks"
-	depends on HOOK=y 
-	help 
-	RAS Instrumentation Hooks are kernel hooks to trace system calls and
-	 events used by Linux Trace Toolkit. These hooks may be used by other tools 
-	 also.
-
-	 RAS hooks trace Interprocess communication routines (sys_ipc, sys_msgget, 
-	 sys_semget, sys_shmget etc), IRQ's entry and exit points, Kernel timer 
-	 routines, Kernel threads create routine, Process Management routines (such as 
-	 fork, exec, exit, wait etc), Process Scheduling switch and dispatch routines, 
-	 Signals, Memory Management routines(such as __get_free_pages, __free_pages_ok, 
-	 do_swap_page, swap_writepage etc), Network packets transmit and receive 
-	 routines, Sockets  create, send, receive routines, tasklets, Trap 
-	 entry and exit routines etc.
-
-	 To enable RAS Instrumentation Hooks, say Y. If in doubt, Say N.	
-
-config TRIGEVENT_SYSCALL_HOOK
-	bool " Enable syscall entry/exit hooks"
-	depends on TRIGEVENT_HOOKS
-	help 
-	RAS hooks to enable tracing of system call entry and exit points.
-	 To enable RAS Syscall Hooks, say Y. If in doubt, Say N.	
-
-config LTT
-	bool "Tracing support"
-	depends on TRIGEVENT_HOOKS
-	select RELAYFS_FS
-	---help---
-	  It is possible for the kernel to log important events to a trace
-	  facility. Doing so, enables the use of the generated traces in order
-	  to reconstruct the dynamic behavior of the kernel, and hence the
-	  whole system.
-
-	  The tracing process contains 4 parts :
-	      1) The logging of events by key parts of the kernel.
-	      2) The tracer that keeps the events in a data buffer.
-	      3) A trace daemon that interacts with the tracer and is
-	         notified every time there is a certain quantity of data to
-	         read from the tracer.
-	      4) A trace event data decoder that reads the accumulated data
-	         and formats it in a human-readable format.
-
-	  If you say Y, the first two components will be built into the kernel.
-	  Critical parts of the kernel will call upon the kernel tracing
-	  function. The data is then recorded by the tracer if a trace daemon
-	  is running in user-space and has issued a "start" command.
-
-	  For more information on kernel tracing, the trace daemon or the event
-	  decoder, please check the following address :
-	       http://www.opersys.com/LTT
 
 endmenu
 

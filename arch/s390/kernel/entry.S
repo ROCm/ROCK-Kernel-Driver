@@ -7,7 +7,6 @@
  *    Author(s): Martin Schwidefsky (schwidefsky@de.ibm.com),
  *               Hartmut Penner (hp@de.ibm.com),
  *               Denis Joseph Barrow (djbarrow@de.ibm.com,barrow_dj@yahoo.com),
- *  Portions added by T. Halloran: (C) Copyright 2002 IBM Poughkeepsie, IBM Corporation
  */
 
 #include <linux/sys.h>
@@ -185,14 +184,6 @@ system_call:
 	lh	%r7,0x8a	  # get svc number from lowcore
         stosm   24(%r15),0x03     # reenable interrupts
         GET_THREAD_INFO           # load pointer to task_struct to R9
-/* call to ltt trace done here.  R8 has the syscall (svc) number to trace */
-#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK /* tjh - ltt port */              
-        /* add call to pre_syscall */                          
-	la      %r2,SP_PTREGS(%r15)   # load pt_regs as first parameter     
-	l       %r1,BASED(.Lpresyscall)                                    
-	basr    %r14,%r1                                                    
-	lm      %r0,%r6,SP_R0(%r15) /* restore call clobbered regs tjh */   
-#endif
 	sla	%r7,2             # *4 and test for svc 0
 	bnz	BASED(sysc_do_restart)  # svc number > 0
 	# svc 0: system call number in %r1
@@ -209,13 +200,6 @@ sysc_do_restart:
                                   # ATTENTION: check sys_execve_glue before
                                   # changing anything here !!
 
-#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK /* tjh - ltt port *            
-        /* add call to post_syscall */ 
-        la      %r2,SP_PTREGS(%r15)   # load pt_regs as first parameter  
-        l       %r1,BASED(.Lpostsyscall)                                 
-        basr    %r14,%r1                                                 
-        lm      %r0,%r6,SP_R0(%r15) /* restore call clobbered regs */
-#endif                                                                   
 sysc_return:
 	stnsm   24(%r15),0xfc     # disable I/O and ext. interrupts
 	tm	SP_PSW+1(%r15),0x01	# returning to user ?
@@ -726,9 +710,6 @@ restart_go:
 .Lsigaltstack: .long  sys_sigaltstack
 .Ltrace:       .long  syscall_trace
 .Lvfork:       .long  sys_vfork
-.Lpresyscall:  .long  pre_syscall
-.Lpostsyscall: .long  post_syscall 
-
 .Lschedtail:   .long  schedule_tail
 
 

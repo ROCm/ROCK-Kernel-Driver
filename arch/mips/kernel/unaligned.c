@@ -78,7 +78,6 @@
 #include <linux/signal.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/asm.h>
 #include <asm/branch.h>
@@ -498,18 +497,14 @@ asmlinkage void do_ade(struct pt_regs *regs)
 	mm_segment_t seg;
 	unsigned long pc;
 
-	TRIG_EVENT(trap_entry_hook, CAUSE_EXCCODE(regs), CAUSE_EPC(regs));
-
 	/*
 	 * Address errors may be deliberately induced by the FPU emulator to
 	 * retake control of the CPU after executing the instruction in the
 	 * delay slot of an emulated branch.
 	 */
 	/* Terminate if exception was recognized as a delay slot return */
-	if (do_dsemulret(regs)) {
-		TRIG_EVENT(trap_exit_hook);
+	if (do_dsemulret(regs))
 		return;
-	}
 
 	/* Otherwise handle as normal */
 
@@ -543,7 +538,6 @@ asmlinkage void do_ade(struct pt_regs *regs)
 	}
 	set_fs(seg);
 
-	TRIG_EVENT(trap_exit_hook);
 	return;
 
 sigbus:
@@ -553,5 +547,4 @@ sigbus:
 	/*
 	 * XXX On return from the signal handler we should advance the epc
 	 */
-	TRIG_EVENT(trap_exit_hook);
 }

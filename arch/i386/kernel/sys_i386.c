@@ -19,7 +19,6 @@
 #include <linux/mman.h>
 #include <linux/file.h>
 #include <linux/utsname.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/ipc.h>
@@ -136,8 +135,6 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 
 	version = call >> 16; /* hack for backward compatibility */
 	call &= 0xffff;
-
-	TRIG_EVENT(ipc_call_hook, call, first);
 
 	switch (call) {
 	case SEMOP:

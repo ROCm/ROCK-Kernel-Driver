@@ -15,7 +15,6 @@
 #include <linux/kernel.h>
 #include <linux/spinlock.h>
 #include <linux/sysdev.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/i8259.h>
 #include <asm/io.h>
@@ -146,9 +145,6 @@ static inline int i8259A_irq_real(unsigned int irq)
 	outb(0x0B,0xA0);		/* ISR register */
 	value = inb(0xA0) & (irqmask >> 8);
 	outb(0x0A,0xA0);		/* back to the IRR register */
-
-	TRIG_EVENT(irq_entry_hook, irq, regs, !user_mode(regs));
-	TRIG_EVENT(irq_exit_hook, irq, regs);
 	return value;
 }
 

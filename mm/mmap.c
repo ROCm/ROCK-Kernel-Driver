@@ -32,7 +32,6 @@
 #include <linux/module.h>
 #include <linux/mount.h>
 #include <linux/objrmap.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -285,7 +284,6 @@ __vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 	__vma_link_rb(mm, vma, rb_link, rb_parent);
 	__vma_link_file(vma);
 	__anon_vma_link(vma);
-	TRIG_EVENT(mmap_hook, vma);
 }
 
 static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,

@@ -40,7 +40,6 @@
 #include <linux/cpu.h>
 #include <linux/percpu.h>
 #include <linux/kthread.h>
-#include <linux/trigevent_hooks.h>
 
 #ifdef CONFIG_NUMA
 #define cpu_to_node_mask(cpu) node_to_cpumask(cpu_to_node(cpu))
@@ -440,8 +439,6 @@ static inline void activate_task(task_t *p, runqueue_t *rq)
 	unsigned long long now = sched_clock();
 
 	recalc_task_prio(p, now);
-
-	TRIG_EVENT(process_wakeup_hook, p->pid, p->state);
 
 	/*
 	 * This checks to make sure it's not an uninterruptible task
@@ -1703,8 +1700,6 @@ switch_tasks:
 		prepare_arch_switch(rq, next);
 		prev = context_switch(rq, prev, next);
 		barrier();
-		
-		TRIG_EVENT(sched_switch_hook, prev, next);
 
 		finish_task_switch(prev);
 	} else
@@ -1712,9 +1707,6 @@ switch_tasks:
 
 	reacquire_kernel_lock(current);
 	preempt_enable_no_resched();
-	
-	TRIG_EVENT(sched_dispatch_hook, prev, next);
-
 	if (test_thread_flag(TIF_NEED_RESCHED))
 		goto need_resched;
 

@@ -18,7 +18,6 @@
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/delay.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/bitops.h>
 #include <asm/bootinfo.h>
@@ -183,8 +182,6 @@ static void do_IRQ(int irq, struct pt_regs * regs)
 	struct irqaction *action;
 	int do_random, cpu;
 
-	TRIG_EVENT(irq_entry_hook, irq, regs, !user_mode(regs));
-
 	cpu = smp_processor_id();
 	irq_enter();
 	kstat_cpus(cpu).irqs[irq]++;
@@ -209,8 +206,6 @@ static void do_IRQ(int irq, struct pt_regs * regs)
 	}
 	unmask_irq(irq);
 	irq_exit();
-
-	TRIG_EVENT(irq_exit_hook, irq, regs);
 
 	/* unmasking and bottom half handling is done magically for us. */
 }

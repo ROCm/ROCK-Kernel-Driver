@@ -35,32 +35,6 @@
 #undef SHOW_SYSCALLS
 #undef SHOW_SYSCALLS_TASK
 
-/* syscall hooks for LTT */
-#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
-#define ASM_PRE_SYSCALL	\
-	addi	r3,r1,STACK_FRAME_OVERHEAD;  	/* Put pointer to registers into r3 */	\
-	mflr	r29;				/* Save LR */ \
-	bl	pre_syscall;			/* Call real trace function */ \
-	mtlr	r29;				/* Restore LR */ \
-	lwz	r0,GPR0(r1);			/* Restore original registers */ \
-	lwz	r3,GPR3(r1);	\
-	lwz	r4,GPR4(r1);	\
-	lwz	r5,GPR5(r1);	\
-	lwz	r6,GPR6(r1);	\
-	lwz	r7,GPR7(r1);	\
-	lwz	r8,GPR8(r1);
-#define ASM_POST_SYSCALL \
-	bl	post_syscall;			/* Call real trace function */ \
-	lwz	r0,GPR0(r1);			/* Restore original registers */ \
-	lwz	r3,RESULT(r1); \
-	lwz	r4,GPR4(r1); \
-	lwz	r5,GPR5(r1); \
-	lwz	r6,GPR6(r1); \
-	lwz	r7,GPR7(r1); \
-	lwz	r8,GPR8(r1); \
-	addi	r9,r1,STACK_FRAME_OVERHEAD;
-#endif
-
 /*
  * MSR_KERNEL is > 0x10000 on 4xx since it include MSR_CE.
  */
@@ -210,16 +184,10 @@ syscall_dotrace_cont:
 	bge-	66f
 	lwzx	r10,r10,r0	/* Fetch system call handler [ptr] */
 	mtlr	r10
-#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
-	ASM_PRE_SYSCALL ;
-#endif
 	addi	r9,r1,STACK_FRAME_OVERHEAD
 	blrl			/* Call handler */
 	.globl	ret_from_syscall
 ret_from_syscall:
-#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
-	ASM_POST_SYSCALL ;
-#endif
 #ifdef SHOW_SYSCALLS
 	bl	do_show_syscall_exit
 #endif

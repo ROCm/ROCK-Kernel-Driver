@@ -42,8 +42,6 @@
 #include <linux/random.h>
 #include <linux/kallsyms.h>
 
-#include <linux/trigevent_hooks.h>
-
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
 #include <asm/system.h>
@@ -489,8 +487,6 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	irq_desc_t *desc = get_irq_desc(irq);
 	irqreturn_t action_ret;
 
-	TRIG_EVENT(irq_entry_hook, irq, regs, !(user_mode(regs)));
-	
 	kstat_cpu(cpu).irqs[irq]++;
 
 	if (desc->status & IRQ_PER_CPU) {
@@ -498,7 +494,6 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 		ack_irq(irq);
 		action_ret = handle_irq_event(irq, regs, desc->action);
 		desc->handler->end(irq);
-		TRIG_EVENT(irq_exit_hook, irq, regs);
 		return;
 	}
 
@@ -578,8 +573,6 @@ out:
 			desc->handler->enable(irq);
 	}
 	spin_unlock(&desc->lock);
-	
-	TRIG_EVENT(irq_exit_hook, irq, regs);
 }
 
 #ifdef CONFIG_PPC_ISERIES
