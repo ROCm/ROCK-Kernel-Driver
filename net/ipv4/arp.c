@@ -829,7 +829,7 @@ out:
 
 int arp_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 {
-	struct arphdr *arp = skb->nh.arph;
+	struct arphdr *arp;
 
 	/* ARP header, plus 2 device addresses, plus 2 IP addresses.  */
 	if (!pskb_may_pull(skb, (sizeof(struct arphdr) +
@@ -837,6 +837,7 @@ int arp_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 				 (2 * sizeof(u32)))))
 		goto freeskb;
 
+	arp = skb->nh.arph;
 	if (arp->ar_hln != dev->addr_len ||
 	    dev->flags & IFF_NOARP ||
 	    skb->pkt_type == PACKET_OTHERHOST ||
