@@ -810,14 +810,15 @@ wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 
 extern unsigned long cpu_initialized;
 
-static void __init do_boot_cpu (int apicid) 
+static int __init do_boot_cpu(int apicid)
 /*
  * NOTE - on most systems this is a PHYSICAL apic ID, but on multiquad
  * (ie clustered apic addressing mode), this is a LOGICAL apic ID.
+ * Returns zero if CPU booted OK, else error code from wakeup_secondary_cpu.
  */
 {
 	struct task_struct *idle;
-	unsigned long boot_error = 0;
+	unsigned long boot_error;
 	int timeout, cpu;
 	unsigned long start_eip;
 	unsigned short nmi_high, nmi_low;
@@ -883,14 +884,9 @@ static void __init do_boot_cpu (int apicid)
 	}
 
 	/*
-	 * Status is now clean
-	 */
-	boot_error = 0;
-
-	/*
 	 * Starting actual IPI sequence...
 	 */
-	wakeup_secondary_cpu(apicid, start_eip);
+	boot_error = wakeup_secondary_cpu(apicid, start_eip);
 
 	if (!boot_error) {
 		/*
@@ -946,6 +942,7 @@ static void __init do_boot_cpu (int apicid)
 		*((volatile unsigned short *) TRAMPOLINE_HIGH) = nmi_high;
 		*((volatile unsigned short *) TRAMPOLINE_LOW) = nmi_low;
 	}
+	return boot_error;
 }
 
 cycles_t cacheflush_time;
@@ -1117,13 +1114,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		if (max_cpus <= cpucount+1)
 			continue;
 
-		do_boot_cpu(apicid);
-
-		/*
-		 * Make sure we unmap all failed CPUs
-		 */
-		if ((boot_apicid_to_cpu(apicid) == -1) &&
-				(phys_cpu_present_map & (1 << bit)))
+		if (do_boot_cpu(apicid))
 			printk("CPU #%d not responding - cannot use it.\n",
 								apicid);
 	}
