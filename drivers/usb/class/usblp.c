@@ -626,6 +626,12 @@ static ssize_t usblp_write(struct file *file, const char __user *buffer, size_t 
 				}
 			}
 			remove_wait_queue(&usblp->wait, &wait);
+			if (!timeout) {
+				/* we timed out and need to bail out cleanly */
+				usb_unlink_urb(usblp->writeurb);
+				return writecount ? writecount : -EIO;
+			}
+
 		}
 
 		down (&usblp->sem);
