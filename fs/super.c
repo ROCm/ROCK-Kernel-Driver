@@ -623,12 +623,8 @@ do_kern_mount(const char *fstype, int flags, char *name, void *data)
 	if (IS_ERR(sb))
 		goto out_mnt;
  	error = security_sb_kern_mount(sb);
- 	if (error) {
- 		up_write(&sb->s_umount);
- 		deactivate_super(sb);
- 		sb = ERR_PTR(error);
- 		goto out_mnt;
- 	}
+ 	if (error) 
+ 		goto out_sb;
 	mnt->mnt_sb = sb;
 	mnt->mnt_root = dget(sb->s_root);
 	mnt->mnt_mountpoint = sb->s_root;
@@ -636,6 +632,10 @@ do_kern_mount(const char *fstype, int flags, char *name, void *data)
 	up_write(&sb->s_umount);
 	put_filesystem(type);
 	return mnt;
+out_sb:
+	up_write(&sb->s_umount);
+	deactivate_super(sb);
+	sb = ERR_PTR(error);
 out_mnt:
 	free_vfsmnt(mnt);
 out:
