@@ -50,8 +50,6 @@
 #include <asm/smp.h>
 #include <asm/machdep.h>
 
-extern int get_pteptr(struct mm_struct *mm, unsigned long addr, pte_t **ptep);
-
 /* This function will allocate the requested contiguous pages and
  * map them into the kernel's vmalloc() space.  This is done so we
  * get unique mapping for these pages, outside of the kernel's 1:1
@@ -157,6 +155,6 @@ size_t size, int direction)
 {
 	unsigned long start;
 
-	start = (unsigned long)(page->virtual) + offset; 
+	start = page_address(page) + offset;
 	consistent_sync(start, size, direction);
 }

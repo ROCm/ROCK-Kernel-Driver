@@ -288,15 +288,12 @@ ret_from_syscall_2:
  */	
 _GLOBAL(_switch)
 	stwu	r1,-INT_FRAME_SIZE(r1)
-	stw	r0,GPR0(r1)
-	lwz	r0,0(r1)
-	stw	r0,GPR1(r1)
+	mflr	r0
+	stw	r0,INT_FRAME_SIZE+4(r1)
 	/* r3-r13 are caller saved -- Cort */
-	SAVE_GPR(2, r1)
 	SAVE_8GPRS(14, r1)
 	SAVE_10GPRS(22, r1)
-	mflr	r20		/* Return to switch caller */
-	stw	r20,INT_FRAME_SIZE+4(r1)
+	stw	r0,_NIP(r1)	/* Return to switch caller */
 	mfmsr	r22
 	li	r0,MSR_FP	/* Disable floating-point */
 #ifdef CONFIG_ALTIVEC
@@ -309,17 +306,9 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	andc	r22,r22,r0
 	mtmsr	r22
 	isync
-1:	stw	r20,_NIP(r1)
-	stw	r22,_MSR(r1)
-	stw	r20,_LINK(r1)
+1:	stw	r22,_MSR(r1)
 	mfcr	r20
-	mfctr	r22
-	mfspr	r23,XER
 	stw	r20,_CCR(r1)
-	stw	r22,_CTR(r1)
-	stw	r23,_XER(r1)
-	li	r0,0x0ff0
-	stw	r0,TRAP(r1)
 	stw	r1,KSP(r3)	/* Set old stack pointer */
 
 	tophys(r0,r4)
