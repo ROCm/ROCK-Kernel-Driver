@@ -64,8 +64,8 @@ static int debug = -1;			/* The debug level */
 
 /* A few values that may be tweaked. */
 /* The ring sizes should be a power of two for efficiency. */
-#define TX_RING_SIZE	32
-#define RX_RING_SIZE	32
+#define TX_RING_SIZE	64
+#define RX_RING_SIZE	64
 /* How much slots multicast filter setup may take.
    Do not descrease without changing set_rx_mode() implementaion. */
 #define TX_MULTICAST_SIZE   2
