@@ -18,8 +18,6 @@
 LIST_HEAD(pci_root_buses);
 LIST_HEAD(pci_devices);
 
-extern struct device_driver pci_device_driver;
-
 /*
  * Translate the low bits of the PCI base
  * to the resource type
@@ -512,7 +510,6 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 	dev0.bus = bus;
 	dev0.sysdata = bus->sysdata;
 	dev0.dev.parent = bus->dev;
-	dev0.dev.driver = &pci_device_driver;
 	dev0.dev.bus = &pci_bus_type;
 
 	/* Go find them, Rover! */
