@@ -193,39 +193,34 @@ static void pci_do_settimeofday(struct timeval *tv);
 
 #define CONFIG_CMD(bus, device_fn, where) (0x80000000 | (((unsigned int)bus) << 16) | (((unsigned int)device_fn) << 8) | (where & ~3))
 
-static int pcic_read_config_dword(struct pci_dev *dev, int where, u32 *value);
-static int pcic_write_config_dword(struct pci_dev *dev, int where, u32 value);
-
-static int pcic_read_config_byte(struct pci_dev *dev, int where, u8 *value)
+static int pcic_read_config(struct pci_bus *bus, unsigned int devfn,
+			    int where, int size, u32 *value)
 {
 	unsigned int v;
-
-	pcic_read_config_dword(dev, where&~3, &v);
-	*value = 0xff & (v >> (8*(where & 3)));
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int pcic_read_config_word(struct pci_dev *dev, int where, u16 *value)
-{
-	unsigned int v;
-	if (where&1) return PCIBIOS_BAD_REGISTER_NUMBER;
-
-	pcic_read_config_dword(dev, where&~3, &v);
-	*value = 0xffff & (v >> (8*(where & 3)));
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int pcic_read_config_dword(struct pci_dev *dev, int where, u32 *value)
-{
-	unsigned char bus = dev->bus->number;
-	unsigned char device_fn = dev->devfn;
-	/* unsigned char where; */
-
+	unsigned char busnum = bus->number;
 	struct linux_pcic *pcic;
 	unsigned long flags;
+	/* unsigned char where; */
 
+	switch (size) {
+	case 1:
+		pcic_read_config(bus, devfn, where&~3, 4, &v);
+		*value = 0xff & (v >> (8*(where & 3)));
+		return PCIBIOS_SUCCESSFUL;
+		break;
+
+	case 2:
+		if (where&1) return PCIBIOS_BAD_REGISTER_NUMBER;
+
+		pcic_read_config(bus, devfn, where&~3, 4, &v);
+		*value = 0xffff & (v >> (8*(where & 3)));
+		return PCIBIOS_SUCCESSFUL;
+		break;
+	}
+
+	/* size == 4, i.e. dword */
 	if (where&3) return PCIBIOS_BAD_REGISTER_NUMBER;
-	if (bus != 0) return PCIBIOS_DEVICE_NOT_FOUND;
+	if (busnum != 0) return PCIBIOS_DEVICE_NOT_FOUND;
 	pcic = &pcic0;
 
 	save_and_cli(flags);
@@ -233,7 +228,7 @@ static int pcic_read_config_dword(struct pci_dev *dev, int where, u32 *value)
 	pcic_speculative = 1;
 	pcic_trapped = 0;
 #endif
-	writel(CONFIG_CMD(bus,device_fn,where), pcic->pcic_config_space_addr);
+	writel(CONFIG_CMD(busnum,devfn,where), pcic->pcic_config_space_addr);
 #if 0 /* does not fail here */
 	nop();
 	if (pcic_trapped) {
@@ -257,52 +252,46 @@ static int pcic_read_config_dword(struct pci_dev *dev, int where, u32 *value)
 	return PCIBIOS_SUCCESSFUL;
 }
 
-static int pcic_write_config_byte(struct pci_dev *dev, int where, u8 value)
+static int pcic_write_config(struct pci_bus *bus, unsigned int devfn,
+			     int where, int size, u32 value)
 {
 	unsigned int v;
-
-	pcic_read_config_dword(dev, where&~3, &v);
-        v = (v & ~(0xff << (8*(where&3)))) |
-            ((0xff&(unsigned)value) << (8*(where&3)));
-	return pcic_write_config_dword(dev, where&~3, v);
-}
-
-static int pcic_write_config_word(struct pci_dev *dev, int where, u16 value)
-{
-	unsigned int v;
-
-	if (where&1) return PCIBIOS_BAD_REGISTER_NUMBER;
-	pcic_read_config_dword(dev, where&~3, &v);
-	v = (v & ~(0xffff << (8*(where&3)))) |
-	    ((0xffff&(unsigned)value) << (8*(where&3)));
-	return pcic_write_config_dword(dev, where&~3, v);
-}
-
-static int pcic_write_config_dword(struct pci_dev *dev, int where, u32 value)
-{
-	unsigned char bus = dev->bus->number;
-	unsigned char devfn = dev->devfn;
+	unsigned char busnum = bus->number;
 	struct linux_pcic *pcic;
 	unsigned long flags;
 
+	switch (size) {
+	case 1:
+		pcic_read_config(bus, devfn, where&~3, 4, &v);
+	        v = (v & ~(0xff << (8*(where&3)))) |
+	            ((0xff&(unsigned)value) << (8*(where&3)));
+		return pcic_write_config(bus, devfn, where&~3, 4, v);
+		break;
+
+	case 2:
+		if (where&1) return PCIBIOS_BAD_REGISTER_NUMBER;
+		pcic_read_config(bus, devfn, where&~3, 4, &v);
+		v = (v & ~(0xffff << (8*(where&3)))) |
+		    ((0xffff&(unsigned)value) << (8*(where&3)));
+		return pcic_write_config(bus, devfn, where&~3, 4, v);
+		break;
+	}
+
+	/* size == 4, i.e. dword */
 	if (where&3) return PCIBIOS_BAD_REGISTER_NUMBER;
-	if (bus != 0) return PCIBIOS_DEVICE_NOT_FOUND;
+	if (busnum != 0) return PCIBIOS_DEVICE_NOT_FOUND;
 	pcic = &pcic0;
 
 	save_and_cli(flags);
-	writel(CONFIG_CMD(bus,devfn,where), pcic->pcic_config_space_addr);
+	writel(CONFIG_CMD(busnum,devfn,where), pcic->pcic_config_space_addr);
 	writel(value, pcic->pcic_config_space_data + (where&4));
 	restore_flags(flags);
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static struct pci_ops pcic_ops = {
-	pcic_read_config_byte,
-	pcic_read_config_word,
-	pcic_read_config_dword,
-	pcic_write_config_byte,
-	pcic_write_config_word,
-	pcic_write_config_dword,
+	.read =		pcic_read_config,
+	.write =	pcic_write_config,
 };
 
 /*
