@@ -99,10 +99,6 @@ endmenu
 
 source drivers/block/Config.in
 
-if [ "$CONFIG_NET" = "y" ]; then
-  source net/Config.in
-fi
-
 mainmenu_option next_comment
 comment 'SCSI support'
 
@@ -149,6 +145,8 @@ fi
 endmenu
 
 if [ "$CONFIG_NET" = "y" ]; then
+  source net/Config.in
+
   mainmenu_option next_comment
   comment 'Network device support'
 

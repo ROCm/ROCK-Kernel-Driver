@@ -118,10 +118,6 @@ fi # !HP_SIM
 
 endmenu
 
-if [ "$CONFIG_NET" = "y" ]; then
-  source net/Config.in
-fi
-
 if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
   source drivers/mtd/Config.in
   source drivers/pnp/Config.in
@@ -153,6 +149,10 @@ if [ "$CONFIG_SCSI" != "n" ]; then
   source drivers/scsi/Config.in
 fi
 endmenu
+
+if [ "$CONFIG_NET" = "y" ]; then
+  source net/Config.in
+fi
 
 if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
   if [ "$CONFIG_NET" = "y" ]; then

@@ -95,10 +95,6 @@ dep_bool '  Initial RAM disk (initrd) support' CONFIG_BLK_DEV_INITRD $CONFIG_BLK
 
 endmenu
 
-if [ "$CONFIG_NET" = "y" ]; then
-   source net/Config.in
-fi
-
 mainmenu_option next_comment
 comment 'ATA/ATAPI/MFM/RLL device support'
 
@@ -207,6 +203,8 @@ fi
 source drivers/ieee1394/Config.in
 
 if [ "$CONFIG_NET" = "y" ]; then
+   source net/Config.in
+
    mainmenu_option next_comment
    comment 'Network device support'
 

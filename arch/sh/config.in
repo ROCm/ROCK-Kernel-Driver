@@ -207,10 +207,6 @@ source drivers/block/Config.in
 
 source drivers/md/Config.in
 
-if [ "$CONFIG_NET" = "y" ]; then
-   source net/Config.in
-fi
-
 mainmenu_option next_comment
 comment 'ATA/ATAPI/MFM/RLL support'
 
@@ -236,6 +232,8 @@ endmenu
 source drivers/ieee1394/Config.in
 
 if [ "$CONFIG_NET" = "y" ]; then
+   source net/Config.in
+
    mainmenu_option next_comment
    comment 'Network device support'
 
