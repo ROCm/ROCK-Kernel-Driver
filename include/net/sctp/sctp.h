@@ -83,6 +83,7 @@
 #include <asm/uaccess.h>
 #include <asm/page.h>
 #include <net/sock.h>
+#include <net/snmp.h>
 #include <net/sctp/structs.h>
 #include <net/sctp/constants.h>
 #include <net/sctp/sm.h>
@@ -201,6 +202,11 @@ extern void sctp_hash_digest(const char *secret, const int secret_len,
 #define SCTP_SOCK_SLEEP_PRE(sk) SOCK_SLEEP_PRE(sk)
 #define SCTP_SOCK_SLEEP_POST(sk) SOCK_SLEEP_POST(sk)
 
+/* SCTP SNMP MIB stats handlers */
+extern struct sctp_mib sctp_statistics[NR_CPUS * 2];
+#define SCTP_INC_STATS(field)		SNMP_INC_STATS(sctp_statistics, field)
+#define SCTP_INC_STATS_BH(field)	SNMP_INC_STATS_BH(sctp_statistics, field)
+#define SCTP_INC_STATS_USER(field)	SNMP_INC_STATS_USER(sctp_statistics, field)
 
 /* Determine if this is a valid kernel address.  */
 static inline int sctp_is_valid_kaddr(unsigned long addr)
