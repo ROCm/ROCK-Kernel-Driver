@@ -41,10 +41,10 @@
  * of bytes.  No alignment or length assumptions are made about
  * the input key.
  */
-static inline u32 jhash(void *key, u32 length, u32 initval)
+static inline u32 jhash(const void *key, u32 length, u32 initval)
 {
 	u32 a, b, c, len;
-	u8 *k = key;
+	const u8 *k = key;
 
 	len = length;
 	a = b = JHASH_GOLDEN_RATIO;
