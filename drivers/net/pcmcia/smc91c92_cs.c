@@ -120,7 +120,7 @@ struct smc_private {
     dev_node_t			node;
     struct sk_buff		*saved_skb;
     int				packets_waiting;
-    caddr_t			base;
+    void			__iomem *base;
     u_short			cfg;
     struct timer_list		media;
     int				watchdog, tx_err;

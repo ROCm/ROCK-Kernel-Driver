@@ -623,7 +623,7 @@ static int fmvj18x_get_hwinfo(dev_link_t *link, u_char *node_id)
 {
     win_req_t req;
     memreq_t mem;
-    u_char *base;
+    u_char __iomem *base;
     int i, j;
 
     /* Allocate a small memory window */
@@ -676,7 +676,7 @@ static int fmvj18x_setup_mfc(dev_link_t *link)
 {
     win_req_t req;
     memreq_t mem;
-    u_char *base;
+    u_char __iomem *base;
     int i, j;
     struct net_device *dev = link->priv;
     ioaddr_t ioaddr;
