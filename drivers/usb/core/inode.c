@@ -715,6 +715,7 @@ void usbfs_remove_device(struct usb_device *dev)
 	}
 	while (!list_empty(&dev->filelist)) {
 		ds = list_entry(dev->filelist.next, struct dev_state, list);
+		wake_up_all(&ds->wait);
 		list_del_init(&ds->list);
 		if (ds->discsignr) {
 			sinfo.si_signo = SIGPIPE;
