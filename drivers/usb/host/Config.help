@@ -35,3 +35,57 @@ CONFIG_USB_OHCI_HCD
   inserted in and removed from the running kernel whenever you want).
   The module will be called ohci-hcd.o. If you want to compile it
   as a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_UHCI
+  The Universal Host Controller Interface is a standard by Intel for
+  accessing the USB hardware in the PC (which is also called the USB
+  host controller). If your USB host controller conforms to this
+  standard, you may want to say Y, but see below. All recent boards
+  with Intel PCI chipsets (like intel 430TX, 440FX, 440LX, 440BX,
+  i810, i820) conform to this standard. Also all VIA PCI chipsets
+  (like VIA VP2, VP3, MVP3, Apollo Pro, Apollo Pro II or Apollo Pro
+  133).
+
+  Currently there exist two drivers for UHCI host controllers: this
+  one and the so-called JE driver, which you can get from
+  "UHCI alternate (JE) support", below. You need only one.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called usb-uhci.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_UHCI_ALT
+  The Universal Host Controller Interface is a standard by Intel for
+  accessing the USB hardware in the PC (which is also called the USB
+  host controller). If your USB host controller conforms to this
+  standard, you may want to say Y, but see below. All recent boards
+  with Intel PCI chipsets (like intel 430TX, 440FX, 440LX, 440BX,
+  i810, i820) conform to this standard. Also all VIA PCI chipsets
+  (like VIA VP2, VP3, MVP3, Apollo Pro, Apollo Pro II or Apollo Pro
+  133). If unsure, say Y.
+
+  Currently there exist two drivers for UHCI host controllers: this
+  so-called JE driver, and the one you get from "UHCI support", above.
+  You need only one.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called uhci.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_OHCI
+  The Open Host Controller Interface is a standard by
+  Compaq/Microsoft/National for accessing the USB PC hardware (also
+  called USB host controller). If your USB host controller conforms to
+  this standard, say Y. The USB host controllers on most non-Intel
+  architectures and on several x86 compatibles with non-Intel chipsets
+  -- like SiS (aktual 610, 610 and so on) or ALi (ALi IV, ALi V,
+  Aladdin Pro..) -- conform to this standard.
+
+  You may want to read <file:Documentation/usb/ohci.txt>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called usb-ohci.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
