@@ -8,6 +8,8 @@
 
 #include "sysdep/ptrace.h"
 
+extern int mode_tt;
+
 extern int grantpt(int __fd);
 extern int unlockpt(int __fd);
 extern char *ptsname(int __fd);
