@@ -97,7 +97,6 @@ static int  w83977af_hard_xmit(struct sk_buff *skb, struct net_device *dev);
 static int  w83977af_pio_write(int iobase, __u8 *buf, int len, int fifo_size);
 static void w83977af_dma_write(struct w83977af_ir *self, int iobase);
 static void w83977af_change_speed(struct w83977af_ir *self, __u32 speed);
-static void w83977af_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static int  w83977af_is_receiving(struct w83977af_ir *self);
 
 static int  w83977af_net_init(struct net_device *dev);
@@ -1118,7 +1117,8 @@ static __u8 w83977af_fir_interrupt(struct w83977af_ir *self, int isr)
  *    An interrupt from the chip has arrived. Time to do some work
  *
  */
-static void w83977af_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t w83977af_interrupt(int irq, void *dev_id,
+					struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct w83977af_ir *self;
@@ -1128,7 +1128,7 @@ static void w83977af_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (!dev) {
 		printk(KERN_WARNING "%s: irq %d for unknown device.\n", 
 			driver_name, irq);
-		return;
+		return IRQ_NONE;
 	}
 	self = (struct w83977af_ir *) dev->priv;
 
@@ -1153,7 +1153,7 @@ static void w83977af_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	outb(icr, iobase+ICR);    /* Restore (new) interrupts */
 	outb(set, iobase+SSR);    /* Restore bank register */
-
+	return IRQ_HANDLED;
 }
 
 /*

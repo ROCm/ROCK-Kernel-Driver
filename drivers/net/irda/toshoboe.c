@@ -349,7 +349,7 @@ toshoboe_hard_xmit (struct sk_buff *skb, struct net_device *dev)
 }
 
 /*interrupt handler */
-static void
+static irqreturn_t
 toshoboe_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
   struct toshoboe_cb *self = (struct toshoboe_cb *) dev_id;
@@ -360,7 +360,7 @@ toshoboe_interrupt (int irq, void *dev_id, struct pt_regs *regs)
     {
       printk (KERN_WARNING "%s: irq %d for unknown device.\n",
               driver_name, irq);
-      return;
+      return IRQ_NONE;
     }
 
   IRDA_DEBUG (4, "%s()\n", __FUNCTION__ );
@@ -369,7 +369,7 @@ toshoboe_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 
 /* woz it us */
   if (!(irqstat & 0xf8))
-    return;
+    return IRQ_NONE;
 
   outb_p (irqstat, OBOE_ISR);   /*Acknologede it */
 
@@ -456,8 +456,7 @@ toshoboe_interrupt (int irq, void *dev_id, struct pt_regs *regs)
       self->stats.rx_errors++;
 
     }
-
-
+  return IRQ_HANDLED;
 }
 
 static int
