@@ -110,8 +110,8 @@ EXPORT_SYMBOL(system_state);
 /*
  * Boot command-line arguments
  */
-#define MAX_INIT_ARGS 8
-#define MAX_INIT_ENVS 8
+#define MAX_INIT_ARGS 32
+#define MAX_INIT_ENVS 32
 
 extern void time_init(void);
 /* Default late time init is NULL. archs can override this later. */
