@@ -852,6 +852,8 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 		np->cork.hop_limit = hlimit;
 		inet->cork.fragsize = mtu = dst_pmtu(&rt->u.dst);
 		inet->cork.length = 0;
+		sk->sk_sndmsg_page = NULL;
+		sk->sk_sndmsg_off = 0;
 		exthdrlen = rt->u.dst.header_len + (opt ? opt->opt_flen : 0);
 		length += exthdrlen;
 		transhdrlen += exthdrlen;
@@ -1123,7 +1125,5 @@ void ip6_flush_pending_frames(struct sock *sk)
 		dst_release(&np->cork.rt->u.dst);
 		np->cork.rt = NULL;
 	}
-	sk->sk_sndmsg_page = NULL;
-	sk->sk_sndmsg_off = 0;
 	memset(&inet->cork.fl, 0, sizeof(inet->cork.fl));
 }
