@@ -716,13 +716,18 @@ EXPORT_SYMBOL(cpufreq_get_policy);
 int cpufreq_set_policy(struct cpufreq_policy *policy)
 {
 	int ret = 0;
+	struct cpufreq_policy *data;
 
-	if (!policy || !cpufreq_cpu_get(policy->cpu))
+	if (!policy)
+		return -EINVAL;
+
+	data = cpufreq_cpu_get(policy->cpu);
+	if (!data)
 		return -EINVAL;
 
 	down(&cpufreq_driver_sem);
 	memcpy(&policy->cpuinfo, 
-	       &cpufreq_driver->policy[policy->cpu].cpuinfo, 
+	       &data->cpuinfo, 
 	       sizeof(struct cpufreq_cpuinfo));
 	up(&cpufreq_driver_sem);
 
@@ -757,37 +762,41 @@ int cpufreq_set_policy(struct cpufreq_policy *policy)
 
 	/* from here on we limit it to one limit and/or governor change running at the moment */
 	down(&cpufreq_driver_sem);
-	cpufreq_driver->policy[policy->cpu].min    = policy->min;
-	cpufreq_driver->policy[policy->cpu].max    = policy->max;
+	data->min    = policy->min;
+	data->max    = policy->max;
 
 	if (cpufreq_driver->setpolicy) {
-		cpufreq_driver->policy[policy->cpu].policy = policy->policy;
+		data->policy = policy->policy;
 		ret = cpufreq_driver->setpolicy(policy);
 	} else {
-		if ((policy->policy != cpufreq_driver->policy[policy->cpu].policy) || 
-		    ((policy->policy == CPUFREQ_POLICY_GOVERNOR) && (policy->governor != cpufreq_driver->policy[policy->cpu].governor))) {
-			unsigned int old_pol = cpufreq_driver->policy[policy->cpu].policy;
-			struct cpufreq_governor *old_gov = cpufreq_driver->policy[policy->cpu].governor;
+		if ((policy->policy != data->policy) || 
+		    ((policy->policy == CPUFREQ_POLICY_GOVERNOR) && (policy->governor != data->governor))) {
+			/* save old, working values */
+			unsigned int old_pol = data->policy;
+			struct cpufreq_governor *old_gov = data->governor;
+
 			/* end old governor */
-			cpufreq_governor(policy->cpu, CPUFREQ_GOV_STOP);
-			cpufreq_driver->policy[policy->cpu].policy = policy->policy;
-			cpufreq_driver->policy[policy->cpu].governor = policy->governor;
+			cpufreq_governor(data->cpu, CPUFREQ_GOV_STOP);
+
 			/* start new governor */
-			if (cpufreq_governor(policy->cpu, CPUFREQ_GOV_START)) {
-				cpufreq_driver->policy[policy->cpu].policy = old_pol;
-				cpufreq_driver->policy[policy->cpu].governor = old_gov;
-				cpufreq_governor(policy->cpu, CPUFREQ_GOV_START);
+			data->policy = policy->policy;
+			data->governor = policy->governor;
+			if (cpufreq_governor(data->cpu, CPUFREQ_GOV_START)) {
+				/* new governor failed, so re-start old one */
+				data->policy = old_pol;
+				data->governor = old_gov;
+				cpufreq_governor(data->cpu, CPUFREQ_GOV_START);
 			}
 			/* might be a policy change, too */
-			cpufreq_governor(policy->cpu, CPUFREQ_GOV_LIMITS);
+			cpufreq_governor(data->cpu, CPUFREQ_GOV_LIMITS);
 		} else {
-			cpufreq_governor(policy->cpu, CPUFREQ_GOV_LIMITS);
+			cpufreq_governor(data->cpu, CPUFREQ_GOV_LIMITS);
 		}
 	}
 	up(&cpufreq_driver_sem);
 
  error_out:	
-	cpufreq_cpu_put(policy->cpu);
+	cpufreq_cpu_put(data->cpu);
 
 	return ret;
 }
