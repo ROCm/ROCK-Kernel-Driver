@@ -616,11 +616,11 @@ static void NCR5380_print_phase(struct Scsi_Host *instance)
 
     status = NCR5380_read(STATUS_REG);
     if (!(status & SR_REQ)) 
-	printk("scsi%d: REQ not asserted, phase unknown.\n", HOSTNO);
+	printk(KERN_DEBUG "scsi%d: REQ not asserted, phase unknown.\n", HOSTNO);
     else {
 	for (i = 0; (phases[i].value != PHASE_UNKNOWN) && 
 	    (phases[i].value != (status & PHASE_MASK)); ++i); 
-	printk("scsi%d: phase %s\n", HOSTNO, phases[i].name);
+	printk(KERN_DEBUG "scsi%d: phase %s\n", HOSTNO, phases[i].name);
     }
 }
 
