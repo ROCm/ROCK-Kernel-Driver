@@ -34,7 +34,7 @@
  * Note that @nr may be almost arbitrarily large; this function is not
  * restricted to acting on a single-word quantity.
  */
-static __inline__ void set_bit(int nr, volatile void * addr)
+static __inline__ void set_bit(int nr, volatile unsigned long * addr)
 {
 	__asm__ __volatile__( LOCK_PREFIX
 		"btsl %1,%0"
@@ -51,7 +51,7 @@ static __inline__ void set_bit(int nr, volatile void * addr)
  * If it's called on the same region of memory simultaneously, the effect
  * may be that only one operation succeeds.
  */
-static __inline__ void __set_bit(int nr, volatile void * addr)
+static __inline__ void __set_bit(int nr, volatile unsigned long * addr)
 {
 	__asm__(
 		"btsl %1,%0"
@@ -69,7 +69,7 @@ static __inline__ void __set_bit(int nr, volatile void * addr)
  * you should call smp_mb__before_clear_bit() and/or smp_mb__after_clear_bit()
  * in order to ensure changes are visible on other processors.
  */
-static __inline__ void clear_bit(int nr, volatile void * addr)
+static __inline__ void clear_bit(int nr, volatile unsigned long * addr)
 {
 	__asm__ __volatile__( LOCK_PREFIX
 		"btrl %1,%0"
@@ -77,7 +77,7 @@ static __inline__ void clear_bit(int nr, volatile void * addr)
 		:"Ir" (nr));
 }
 
-static __inline__ void __clear_bit(int nr, volatile void * addr)
+static __inline__ void __clear_bit(int nr, volatile unsigned long * addr)
 {
 	__asm__ __volatile__(
 		"btrl %1,%0"
@@ -96,7 +96,7 @@ static __inline__ void __clear_bit(int nr, volatile void * addr)
  * If it's called on the same region of memory simultaneously, the effect
  * may be that only one operation succeeds.
  */
-static __inline__ void __change_bit(int nr, volatile void * addr)
+static __inline__ void __change_bit(int nr, volatile unsigned long * addr)
 {
 	__asm__ __volatile__(
 		"btcl %1,%0"
@@ -113,7 +113,7 @@ static __inline__ void __change_bit(int nr, volatile void * addr)
  * Note that @nr may be almost arbitrarily large; this function is not
  * restricted to acting on a single-word quantity.
  */
-static __inline__ void change_bit(int nr, volatile void * addr)
+static __inline__ void change_bit(int nr, volatile unsigned long * addr)
 {
 	__asm__ __volatile__( LOCK_PREFIX
 		"btcl %1,%0"
@@ -129,7 +129,7 @@ static __inline__ void change_bit(int nr, volatile void * addr)
  * This operation is atomic and cannot be reordered.  
  * It also implies a memory barrier.
  */
-static __inline__ int test_and_set_bit(int nr, volatile void * addr)
+static __inline__ int test_and_set_bit(int nr, volatile unsigned long * addr)
 {
 	int oldbit;
 
@@ -149,7 +149,7 @@ static __inline__ int test_and_set_bit(int nr, volatile void * addr)
  * If two examples of this operation race, one can appear to succeed
  * but actually fail.  You must protect multiple accesses with a lock.
  */
-static __inline__ int __test_and_set_bit(int nr, volatile void * addr)
+static __inline__ int __test_and_set_bit(int nr, volatile unsigned long * addr)
 {
 	int oldbit;
 
@@ -168,7 +168,7 @@ static __inline__ int __test_and_set_bit(int nr, volatile void * addr)
  * This operation is atomic and cannot be reordered.  
  * It also implies a memory barrier.
  */
-static __inline__ int test_and_clear_bit(int nr, volatile void * addr)
+static __inline__ int test_and_clear_bit(int nr, volatile unsigned long * addr)
 {
 	int oldbit;
 
@@ -188,7 +188,7 @@ static __inline__ int test_and_clear_bit(int nr, volatile void * addr)
  * If two examples of this operation race, one can appear to succeed
  * but actually fail.  You must protect multiple accesses with a lock.
  */
-static __inline__ int __test_and_clear_bit(int nr, volatile void * addr)
+static __inline__ int __test_and_clear_bit(int nr, volatile unsigned long *addr)
 {
 	int oldbit;
 
@@ -200,7 +200,7 @@ static __inline__ int __test_and_clear_bit(int nr, volatile void * addr)
 }
 
 /* WARNING: non atomic and it can be reordered! */
-static __inline__ int __test_and_change_bit(int nr, volatile void * addr)
+static __inline__ int __test_and_change_bit(int nr, volatile unsigned long *addr)
 {
 	int oldbit;
 
@@ -219,7 +219,7 @@ static __inline__ int __test_and_change_bit(int nr, volatile void * addr)
  * This operation is atomic and cannot be reordered.  
  * It also implies a memory barrier.
  */
-static __inline__ int test_and_change_bit(int nr, volatile void * addr)
+static __inline__ int test_and_change_bit(int nr, volatile unsigned long* addr)
 {
 	int oldbit;
 
@@ -239,12 +239,12 @@ static __inline__ int test_and_change_bit(int nr, volatile void * addr)
 static int test_bit(int nr, const volatile void * addr);
 #endif
 
-static __inline__ int constant_test_bit(int nr, const volatile void * addr)
+static __inline__ int constant_test_bit(int nr, const volatile unsigned long * addr)
 {
 	return ((1UL << (nr & 31)) & (((const volatile unsigned int *) addr)[nr >> 5])) != 0;
 }
 
-static __inline__ int variable_test_bit(int nr, volatile void * addr)
+static __inline__ int variable_test_bit(int nr, volatile unsigned long * addr)
 {
 	int oldbit;
 
@@ -268,7 +268,7 @@ static __inline__ int variable_test_bit(int nr, volatile void * addr)
  * Returns the bit-number of the first zero bit, not the number of the byte
  * containing a bit.
  */
-static __inline__ int find_first_zero_bit(void * addr, unsigned size)
+static __inline__ int find_first_zero_bit(unsigned long * addr, unsigned size)
 {
 	int d0, d1, d2;
 	int res;
@@ -300,7 +300,7 @@ static __inline__ int find_first_zero_bit(void * addr, unsigned size)
  * Returns the bit-number of the first set bit, not the number of the byte
  * containing a bit.
  */
-static __inline__ int find_first_bit(void * addr, unsigned size)
+static __inline__ int find_first_bit(unsigned long * addr, unsigned size)
 {
 	int d0, d1;
 	int res;
@@ -326,7 +326,7 @@ static __inline__ int find_first_bit(void * addr, unsigned size)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static __inline__ int find_next_zero_bit (void * addr, int size, int offset)
+static __inline__ int find_next_zero_bit(unsigned long * addr, int size, int offset)
 {
 	unsigned long * p = ((unsigned long *) addr) + (offset >> 5);
 	int set = 0, bit = offset & 31, res;
@@ -359,9 +359,9 @@ static __inline__ int find_next_zero_bit (void * addr, int size, int offset)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static __inline__ int find_next_bit(void * addr, int size, int offset)
+static __inline__ int find_next_bit(unsigned long *addr, int size, int offset)
 {
-	unsigned long * p = ((unsigned long *) addr) + (offset >> 5);
+	unsigned long * p = addr + (offset >> 5);
 	int set = 0, bit = offset & 31, res;
 
 	if (bit) {
@@ -382,7 +382,7 @@ static __inline__ int find_next_bit(void * addr, int size, int offset)
 	/*
 	 * No set bit yet, search remaining full words for a bit
 	 */
-	res = find_first_bit (p, size - 32 * (p - (unsigned long *) addr));
+	res = find_first_bit (p, size - 32 * (p - addr));
 	return (offset + set + res);
 }
 
