@@ -1122,7 +1122,7 @@ config SKMC
 
 config NE2_MCA
 	tristate "NE/2 (ne2000 MCA version) support"
-	depends on NET_ETHERNET && MCA
+	depends on NET_ETHERNET && MCA_LEGACY
 	select CRC32
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
