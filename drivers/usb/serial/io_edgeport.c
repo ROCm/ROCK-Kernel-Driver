@@ -3051,15 +3051,36 @@ static void edge_shutdown (struct usb_serial *serial)
  * edgeport_init
  *	This is called by the module subsystem, or on startup to initialize us
  ****************************************************************************/
-int __init edgeport_init(void)
+static int __init edgeport_init(void)
 {
-	usb_serial_register (&edgeport_1port_device);
-	usb_serial_register (&edgeport_2port_device);
-	usb_serial_register (&edgeport_4port_device);
-	usb_serial_register (&edgeport_8port_device);
-	usb_register (&io_driver);
+	int retval;
+	retval = usb_serial_register(&edgeport_1port_device);
+	if (retval) 
+		goto failed_1port_device_register;
+	retval = usb_serial_register(&edgeport_2port_device);
+	if (retval)
+		goto failed_2port_device_register;
+	retval = usb_serial_register(&edgeport_4port_device);
+	if (retval)
+		goto failed_4port_device_register;
+	retval = usb_serial_register(&edgeport_8port_device);
+	if (retval)
+		goto failed_8port_device_register;
+	retval = usb_register(&io_driver);
+	if (retval) 
+		goto failed_usb_register;
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&edgeport_8port_device);
+failed_8port_device_register:
+	usb_serial_deregister(&edgeport_4port_device);
+failed_4port_device_register:
+	usb_serial_deregister(&edgeport_2port_device);
+failed_2port_device_register:
+	usb_serial_deregister(&edgeport_1port_device);
+failed_1port_device_register:
+	return retval;
 }
 
 
@@ -3068,7 +3089,7 @@ int __init edgeport_init(void)
  * edgeport_exit
  *	Called when the driver is about to be unloaded.
  ****************************************************************************/
-void __exit edgeport_exit (void)
+static void __exit edgeport_exit (void)
 {
 	usb_deregister (&io_driver);
 	usb_serial_deregister (&edgeport_1port_device);

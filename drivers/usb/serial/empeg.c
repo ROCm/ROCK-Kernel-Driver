@@ -558,7 +558,7 @@ static void empeg_set_termios (struct usb_serial_port *port, struct termios *old
 static int __init empeg_init (void)
 {
 	struct urb *urb;
-	int i;
+	int i, retval;
 
 	/* create our write urb pool and transfer buffers */ 
 	spin_lock_init (&write_urb_pool_lock);
@@ -570,7 +570,6 @@ static int __init empeg_init (void)
 			continue;
 		}
 
-		urb->transfer_buffer = NULL;
 		urb->transfer_buffer = kmalloc (URB_TRANSFER_BUFFER_SIZE, GFP_KERNEL);
 		if (!urb->transfer_buffer) {
 			err("%s - out of memory for urb buffers.", 
@@ -579,12 +578,27 @@ static int __init empeg_init (void)
 		}
 	}
 
-	usb_serial_register (&empeg_device);
-	usb_register (&empeg_driver);
+	retval = usb_serial_register(&empeg_device);
+	if (retval)
+		goto failed_usb_serial_register;
+	retval = usb_register(&empeg_driver);
+	if (retval)
+		goto failed_usb_register;
 
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&empeg_device);
+failed_usb_serial_register:
+	for (i = 0; i < NUM_URBS; ++i) {
+		if (write_urb_pool[i]) {
+			if (write_urb_pool[i]->transfer_buffer)
+				kfree(write_urb_pool[i]->transfer_buffer);
+			usb_free_urb(write_urb_pool[i]);
+		}
+	}
+	return retval;
 }
 
 
@@ -593,7 +607,7 @@ static void __exit empeg_exit (void)
 	int i;
 	unsigned long flags;
 
-	usb_register (&empeg_driver);
+	usb_deregister(&empeg_driver);
 	usb_serial_deregister (&empeg_device);
 
 	spin_lock_irqsave (&write_urb_pool_lock, flags);

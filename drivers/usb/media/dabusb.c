@@ -29,7 +29,6 @@
 
 #include <linux/module.h>
 #include <linux/socket.h>
-#include <linux/miscdevice.h>
 #include <linux/list.h>
 #include <linux/vmalloc.h>
 #include <linux/slab.h>

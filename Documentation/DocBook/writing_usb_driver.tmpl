@@ -111,12 +111,12 @@
   </para>
   <programlisting>
 static struct usb_driver skel_driver = {
-        name:        "skeleton",
-        probe:       skel_probe,
-        disconnect:  skel_disconnect,
-        fops:        &amp;skel_fops,
-        minor:       USB_SKEL_MINOR_BASE,
-        id_table:    skel_table,
+        .name        = "skeleton",
+        .probe       = skel_probe,
+        .disconnect  = skel_disconnect,
+        .fops        = &amp;skel_fops,
+        .minor       = USB_SKEL_MINOR_BASE,
+        .id_table    = skel_table,
 };
   </programlisting>
   <para>
@@ -202,41 +202,21 @@ MODULE_DEVICE_TABLE (usb, skel_table);
      are passed to the function:
   </para>
   <programlisting>
-static void * skel_probe(struct usb_device *dev,
-unsigned int ifnum, const struct usb_device_id *id)
+static int skel_probe(struct usb_interface *interface,
+    const struct usb_device_id *id)
   </programlisting>
   <para>
      The driver now needs to verify that this device is actually one that it
-     can accept. If not, or if any error occurs during initialization, a NULL
-     value is returned from the probe function. Otherwise a pointer to a
-     private data structure containing the driver's state for this device is
-     returned. That pointer is stored in the usb_device structure, and all
-     callbacks to the driver pass that pointer.
+     can accept. If so, it returns 0.
+     If not, or if any error occurs during initialization, an errorcode
+     (such as <literal>-ENOMEM<literal> or <literal>-ENODEV<literal>)
+     is returned from the probe function.
   </para>
   <para>
      In the skeleton driver, we determine what end points are marked as bulk-in
      and bulk-out. We create buffers to hold the data that will be sent and
      received from the device, and a USB urb to write data to the device is
-     initialized. Also, we register the device with the devfs subsystem,
-     allowing users of devfs to access our device. That registration looks like
-     the following:
-  </para>
-  <programlisting>
-/* initialize the devfs node for this device and register it */
-sprintf(name, &quot;skel%d&quot;, skel->minor);
-skel->devfs = devfs_register (usb_devfs_handle,
-                              name,
-                              DEVFS_FL_DEFAULT,
-                              USB_MAJOR,
-                              USB_SKEL_MINOR_BASE + skel->minor,
-                              S_IFCHR | S_IRUSR | S_IWUSR |
-                              S_IRGRP | S_IWGRP | S_IROTH,
-                              &amp;skel_fops,
-                              NULL);
-  </programlisting>
-  <para>
-     If the devfs_register function fails, we do not care, as the devfs
-     subsystem will report this to the user.
+     initialized.
   </para>
   <para>
      Conversely, when the device is removed from the USB bus, the disconnect
@@ -254,23 +234,18 @@ devfs_unregister(skel->devfs);
      the device, any of the functions in the file_operations structure that
      were passed to the USB subsystem will be called from a user program trying
      to talk to the device. The first function called will be open, as the
-     program tries to open the device for I/O. Within the skeleton driver's
-     open function we increment the driver's usage count if it is a module with
-     a call to MODULE_INC_USE_COUNT. With this macro call, if the driver is
-     compiled as a module, the driver cannot be unloaded until a corresponding
-     MODULE_DEC_USE_COUNT macro is called.  We also increment our private usage
+     program tries to open the device for I/O. We increment our private usage
      count and save off a pointer to our internal structure in the file
      structure. This is done so that future calls to file operations will
-     enable the driver to determine which device the user is addressing. All of
-     this is done with the following code:
+     enable the driver to determine which device the user is addressing.  All
+     of this is done with the following code:
   </para>
   <programlisting>
 /* increment our usage count for the module */
-MOD_INC_USE_COUNT;
 ++skel->open_count;
 
 /* save our object in the file's private structure */
-file->private_data = skel;
+file->private_data = dev;
   </programlisting>
   <para>
      After the open function is called, the read and write functions are called
@@ -349,75 +324,47 @@ if (!retval) {
   </para>
   <para>
      When the user program releases the file handle that it has been using to
-     talk to the device, the release function in the driver is called.  In this
-     function we decrement the module usage count with a call to
-     MOD_DEC_USE_COUNT (to match our previous call to MOD_INC_USE_COUNT).  We
-     also determine if there are any other programs that are currently talking
-     to the device (a device may be opened by more than one program at one
-     time). If this is the last user of the device, then we shut down any
-     possible pending writes that might be currently occurring.  This is all
-     done with:
-  </para>
+     talk to the device, the release function in the driver is called. In this
+     function we decrement our private usage count and wait for possible
+     pending writes:
   <programlisting>
 /* decrement our usage count for the device */
 --skel->open_count;
-if (skel->open_count &lt;= 0) {
-        /* shutdown any bulk writes that might be going on */
-        usb_unlink_urb (skel->write_urb);
-        skel->open_count = 0;
-}
-/* decrement our usage count for the module */
-MOD_DEC_USE_COUNT;
   </programlisting>
   <para>
      One of the more difficult problems that USB drivers must be able to handle
      smoothly is the fact that the USB device may be removed from the system at
      any point in time, even if a program is currently talking to it. It needs
      to be able to shut down any current reads and writes and notify the
-     user-space programs that the device is no longer there.  The following
-     code is an example of how to do this: </para>
+     user-space programs that the device is no longer there. The following
+     code (function <function>skel_delete</function>)
+     is an example of how to do this: </para>
   <programlisting>
-/* if the device is not opened, then we clean right now */
-if (skel->open_count) {
-        minor_table[skel->minor] = NULL;
-        if (skel->bulk_in_buffer != NULL)
-                kfree (skel->bulk_in_buffer);
-        if (skel->bulk_out_buffer != NULL)
-                kfree (skel->bulk_out_buffer);
-        if (skel->write_urb != NULL)
-                usb_free_urb (skel->write_urb);
-        kfree (skel);
-} else {
-        skel->dev = NULL;
-        up (&amp;skel->sem);
+static inline void skel_delete (struct usb_skel *dev)
+{
+    if (dev->bulk_in_buffer != NULL)
+        kfree (dev->bulk_in_buffer);
+    if (dev->bulk_out_buffer != NULL)
+        usb_buffer_free (dev->udev, dev->bulk_out_size,
+            dev->bulk_out_buffer,
+            dev->write_urb->transfer_dma);
+    if (dev->write_urb != NULL)
+        usb_free_urb (dev->write_urb);
+    kfree (dev);
 }
   </programlisting>
   <para>
-     If a program currently has an open handle to the device, we only null the
-     usb_device structure in our local structure, as it has now gone away. For
+     If a program currently has an open handle to the device, we reset the flag
+     <literal>device_present</literal>. For
      every read, write, release and other functions that expect a device to be
-     present, the driver first checks to see if this usb_device structure is
+     present, the driver first checks this flag to see if the device is
      still present. If not, it releases that the device has disappeared, and a
-     -ENODEV error is returned to the user-space program.  When the release
-     function is eventually called, it determines if there is no usb_device
-     structure and if not, it does the cleanup that the skel_disconnect
+     -ENODEV error is returned to the user-space program. When the release
+     function is eventually called, it determines if there is no device
+     and if not, it does the cleanup that the skel_disconnect
      function normally does if there are no open files on the device (see
      Listing 5).
   </para>
-  <programlisting>
-if (skel->dev == NULL) {
-        /* the device was unplugged before the file was released */
-        minor_table[skel->minor] = NULL;
-        if (skel->bulk_in_buffer != NULL)
-                kfree (skel->bulk_in_buffer);
-        if (skel->bulk_out_buffer != NULL)
-                kfree (skel->bulk_out_buffer);
-        if (skel->write_urb != NULL)
-                usb_free_urb (skel->write_urb);
-        kfree (skel);
-        goto exit;
-}
-  </programlisting>
   </chapter>
 
   <chapter id="iso">

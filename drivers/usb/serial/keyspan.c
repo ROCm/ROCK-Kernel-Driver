@@ -197,15 +197,36 @@ struct keyspan_port_private {
 /* Functions used by new usb-serial code. */
 static int __init keyspan_init (void)
 {
-	usb_serial_register (&keyspan_pre_device);
-	usb_serial_register (&keyspan_1port_device);
-	usb_serial_register (&keyspan_2port_device);
-	usb_serial_register (&keyspan_4port_device);
-	usb_register (&keyspan_driver);
+	int retval;
+	retval = usb_serial_register(&keyspan_pre_device);
+	if (retval)
+		goto failed_pre_device_register;
+	retval = usb_serial_register(&keyspan_1port_device);
+	if (retval)
+		goto failed_1port_device_register;
+	retval = usb_serial_register(&keyspan_2port_device);
+	if (retval)
+		goto failed_2port_device_register;
+	retval = usb_serial_register(&keyspan_4port_device);
+	if (retval)
+		goto failed_4port_device_register;
+	retval = usb_register(&keyspan_driver);
+	if (retval) 
+		goto failed_usb_register;
 
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&keyspan_4port_device);
+failed_4port_device_register:
+	usb_serial_deregister(&keyspan_2port_device);
+failed_2port_device_register:
+	usb_serial_deregister(&keyspan_1port_device);
+failed_1port_device_register:
+	usb_serial_deregister(&keyspan_pre_device);
+failed_pre_device_register:
+	return retval;
 }
 
 static void __exit keyspan_exit (void)

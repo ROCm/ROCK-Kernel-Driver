@@ -1486,11 +1486,24 @@ static void rx_data_softint(void *private)
  *****************************************************************************/
 static int __init whiteheat_init (void)
 {
-	usb_serial_register (&whiteheat_fake_device);
-	usb_serial_register (&whiteheat_device);
-	usb_register (&whiteheat_driver);
+	int retval;
+	retval = usb_serial_register(&whiteheat_fake_device);
+	if (retval)
+		goto failed_fake_register;
+	retval = usb_serial_register(&whiteheat_device);
+	if (retval)
+		goto failed_device_register;
+	retval = usb_register(&whiteheat_driver);
+	if (retval)
+		goto failed_usb_register;
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&whiteheat_device);
+failed_device_register:
+	usb_serial_deregister(&whiteheat_fake_device);
+failed_fake_register:
+	return retval;
 }
 
 

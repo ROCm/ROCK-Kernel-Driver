@@ -2,6 +2,8 @@
  * USB Host-to-Host Links
  * Copyright (C) 2000-2002 by David Brownell <dbrownell@users.sourceforge.net>
  * Copyright (C) 2002 Pavel Machek <pavel@ucw.cz>
+ * Copyright (C) 2003 David Hollis <dhollis@davehollis.com>
+ * Copyright (c) 2002-2003 TiVo Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -142,6 +144,14 @@
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
 
+#ifdef CONFIG_USB_AX8817X
+#define NEED_MII
+#endif
+
+#ifdef NEED_MII
+#include <linux/mii.h>
+#endif
+
 // #define	DEBUG			// error path messages, extra info
 // #define	VERBOSE			// more; success messages
 #define	REALLY_QUEUE
@@ -217,6 +227,10 @@ struct usbnet {
 	struct net_device_stats	stats;
 	int			msg_level;
 	unsigned long		data [5];
+
+#ifdef NEED_MII
+	struct mii_if_info	mii;
+#endif
 
 	// various kinds of pending driver work
 	struct sk_buff_head	rxq;
@@ -398,6 +412,274 @@ static const struct driver_info	an2720_info = {
 };
 
 #endif	/* CONFIG_USB_AN2720 */
+
+
+#ifdef CONFIG_USB_AX8817X
+/* ASIX AX8817X based USB 2.0 Ethernet Devices */
+
+#define HAVE_HARDWARE
+
+#include <linux/crc32.h>
+
+#define AX_CMD_SET_SW_MII		0x06
+#define AX_CMD_READ_MII_REG		0x07
+#define AX_CMD_WRITE_MII_REG		0x08
+#define AX_CMD_SET_HW_MII		0x0a
+#define AX_CMD_WRITE_RX_CTL		0x10
+#define AX_CMD_READ_IPG012		0x11
+#define AX_CMD_WRITE_IPG0		0x12
+#define AX_CMD_WRITE_IPG1		0x13
+#define AX_CMD_WRITE_IPG2		0x14
+#define AX_CMD_WRITE_MULTI_FILTER	0x16
+#define AX_CMD_READ_NODE_ID		0x17
+#define AX_CMD_READ_PHY_ID		0x19
+#define AX_CMD_WRITE_MEDIUM_MODE	0x1b
+#define AX_CMD_WRITE_GPIOS		0x1f
+
+#define AX_MCAST_FILTER_SIZE		8
+#define AX_MAX_MCAST			64
+
+static int ax8817x_read_cmd(struct usbnet *dev, u8 cmd, u16 value, u16 index,
+			    u16 size, void *data)
+{
+	return usb_control_msg(
+		dev->udev,
+		usb_rcvctrlpipe(dev->udev, 0),
+		cmd,
+		USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		value,
+		index,
+		data,
+		size,
+		CONTROL_TIMEOUT_JIFFIES);
+}
+
+static int ax8817x_write_cmd(struct usbnet *dev, u8 cmd, u16 value, u16 index,
+			     u16 size, void *data)
+{
+	return usb_control_msg(
+		dev->udev,
+		usb_sndctrlpipe(dev->udev, 0),
+		cmd,
+		USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		value,
+		index,
+		data,
+		size,
+		CONTROL_TIMEOUT_JIFFIES);
+}
+
+static void ax8817x_async_cmd_callback(struct urb *urb, struct pt_regs *regs)
+{
+	struct usb_ctrlrequest *req = (struct usb_ctrlrequest *)urb->context;
+	
+	if (urb->status < 0)
+		printk(KERN_DEBUG "ax8817x_async_cmd_callback() failed with %d",
+			urb->status);
+	
+	kfree(req);
+	usb_free_urb(urb);
+}
+
+static void ax8817x_write_cmd_async(struct usbnet *dev, u8 cmd, u16 value, u16 index,
+				    u16 size, void *data)
+{
+	struct usb_ctrlrequest *req;
+	int status;
+	struct urb *urb;
+	
+	if ((urb = usb_alloc_urb(0, GFP_ATOMIC)) == NULL) {
+		devdbg(dev, "Error allocating URB in write_cmd_async!");
+		return;
+	}
+	
+	if ((req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_ATOMIC)) == NULL) {
+		deverr(dev, "Failed to allocate memory for control request");
+		usb_free_urb(urb);
+		return;
+	}
+
+	req->bRequestType = USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE;
+	req->bRequest = cmd;
+	req->wValue = cpu_to_le16(value);
+	req->wIndex = cpu_to_le16(index); 
+	req->wLength = cpu_to_le16(size);
+
+	usb_fill_control_urb(urb, dev->udev,
+			     usb_sndctrlpipe(dev->udev, 0),
+			     (void *)req, data, size,
+			     ax8817x_async_cmd_callback, req);
+
+	if((status = usb_submit_urb(urb, GFP_ATOMIC)) < 0)
+		deverr(dev, "Error submitting the control message: status=%d", status);
+}
+
+static void ax8817x_set_multicast(struct net_device *net)
+{
+	struct usbnet *dev = (struct usbnet *) net->priv;
+	u8 rx_ctl = 0x8c;
+
+	if (net->flags & IFF_PROMISC) {
+		rx_ctl |= 0x01;
+	} else if (net->flags & IFF_ALLMULTI
+		   || net->mc_count > AX_MAX_MCAST) {
+		rx_ctl |= 0x02;
+	} else if (net->mc_count == 0) {
+		/* just broadcast and directed */
+	} else {
+		struct dev_mc_list *mc_list = net->mc_list;
+		u8 *multi_filter;
+		u32 crc_bits;
+		int i;
+
+		multi_filter = kmalloc(AX_MCAST_FILTER_SIZE, GFP_ATOMIC);
+		if (multi_filter == NULL) {
+			/* Oops, couldn't allocate a buffer for setting the multicast
+			   filter. Try all multi mode. */
+			rx_ctl |= 0x02;
+		} else {
+			memset(multi_filter, 0, AX_MCAST_FILTER_SIZE);
+
+			/* Build the multicast hash filter. */
+			for (i = 0; i < net->mc_count; i++) {
+				crc_bits =
+				    ether_crc(ETH_ALEN,
+					      mc_list->dmi_addr) >> 26;
+				multi_filter[crc_bits >> 3] |=
+				    1 << (crc_bits & 7);
+				mc_list = mc_list->next;
+			}
+
+			ax8817x_write_cmd_async(dev, AX_CMD_WRITE_MULTI_FILTER, 0, 0,
+					   AX_MCAST_FILTER_SIZE, multi_filter);
+
+			rx_ctl |= 0x10;
+		}
+	}
+
+	ax8817x_write_cmd_async(dev, AX_CMD_WRITE_RX_CTL, rx_ctl, 0, 0, NULL);
+}
+
+static int ax8817x_mdio_read(struct net_device *netdev, int phy_id, int loc)
+{
+	struct usbnet *dev = netdev->priv;
+	u16 res;
+	u8 buf[4];
+
+	ax8817x_write_cmd(dev, AX_CMD_SET_SW_MII, 0, 0, 0, &buf);
+	ax8817x_read_cmd(dev, AX_CMD_READ_MII_REG, phy_id, (__u16)loc, 2, (u16 *)&res);
+	ax8817x_write_cmd(dev, AX_CMD_SET_HW_MII, 0, 0, 0, &buf);
+
+	return res & 0xffff;
+}
+
+static void ax8817x_mdio_write(struct net_device *netdev, int phy_id, int loc, int val)
+{
+	struct usbnet *dev = netdev->priv;
+	u16 res = val;
+	u8 buf[4];
+
+	ax8817x_write_cmd(dev, AX_CMD_SET_SW_MII, 0, 0, 0, &buf);
+	ax8817x_write_cmd(dev, AX_CMD_WRITE_MII_REG, phy_id, (__u16)loc, 2, (u16 *)&res);
+	ax8817x_write_cmd(dev, AX_CMD_SET_HW_MII, 0, 0, 0, &buf);
+}
+
+static int ax8817x_bind(struct usbnet *dev, struct usb_interface *intf)
+{
+	int ret;
+	u8 buf[6];
+	u16 *buf16 = (u16 *) buf;
+	int i;
+
+	dev->in = usb_rcvbulkpipe(dev->udev, 3);
+	dev->out = usb_sndbulkpipe(dev->udev, 2);
+
+	if ((ret = ax8817x_write_cmd(dev, AX_CMD_WRITE_RX_CTL, 0x80, 0, 0, buf)) < 0) {
+		dbg("send AX_CMD_WRITE_RX_CTL failed: %d", ret);
+		return ret;
+	}
+
+	/* Get the MAC address */
+	memset(buf, 0, ETH_ALEN);
+	if ((ret = ax8817x_read_cmd(dev, AX_CMD_READ_NODE_ID, 0, 0, 6, buf)) < 0) {
+		dbg("read AX_CMD_READ_NODE_ID failed: %d", ret);
+		return ret;
+	}
+	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
+
+	/* Get IPG values */
+	if ((ret = ax8817x_read_cmd(dev, AX_CMD_READ_IPG012, 0, 0, 3, buf)) < 0) {
+		dbg("Error reading IPG values: %d", ret);
+		return ret;
+	}
+
+	for(i = 0;i < 3;i++) {
+		ax8817x_write_cmd(dev, AX_CMD_WRITE_IPG0 + i, 0, 0, 1, &buf[i]);
+	}
+
+	/* Get the PHY id */
+	if ((ret = ax8817x_read_cmd(dev, AX_CMD_READ_PHY_ID, 0, 0, 2, buf)) < 0) {
+		dbg("error on read AX_CMD_READ_PHY_ID: %02x", ret);
+		return ret;
+	} else if (ret < 2) {
+		/* this should always return 2 bytes */
+		dbg("AX_CMD_READ_PHY_ID returned less than 2 bytes: ret=%02x", ret);
+		return -EIO;
+	}
+
+	/* Initialize MII structure */
+	dev->mii.dev = dev->net;
+	dev->mii.mdio_read = ax8817x_mdio_read;
+	dev->mii.mdio_write = ax8817x_mdio_write;
+	dev->mii.phy_id_mask = 0x3f;
+	dev->mii.reg_num_mask = 0x1f;
+	dev->mii.phy_id = buf[1];
+
+	if ((ret = ax8817x_write_cmd(dev, AX_CMD_SET_SW_MII, 0, 0, 0, &buf)) < 0) {
+		dbg("Failed to go to software MII mode: %02x", ret);
+		return ret;
+	}
+
+	*buf16 = cpu_to_le16(BMCR_RESET);
+	if ((ret = ax8817x_write_cmd(dev, AX_CMD_WRITE_MII_REG,
+				     dev->mii.phy_id, MII_BMCR, 2, buf16)) < 0) {
+		dbg("Failed to write MII reg - MII_BMCR: %02x", ret);
+		return ret;
+	}
+
+	/* Advertise that we can do full-duplex pause */
+	*buf16 = cpu_to_le16(ADVERTISE_ALL | ADVERTISE_CSMA | 0x0400);
+	if ((ret = ax8817x_write_cmd(dev, AX_CMD_WRITE_MII_REG,
+			   	     dev->mii.phy_id, MII_ADVERTISE, 
+				     2, buf16)) < 0) {
+		dbg("Failed to write MII_REG advertisement: %02x", ret);
+		return ret;
+	}
+
+	*buf16 = cpu_to_le16(BMCR_ANENABLE | BMCR_ANRESTART);
+	if ((ret = ax8817x_write_cmd(dev, AX_CMD_WRITE_MII_REG,
+			  	     dev->mii.phy_id, MII_BMCR, 
+				     2, buf16)) < 0) {
+		dbg("Failed to write MII reg autonegotiate: %02x", ret);
+		return ret;
+	}
+
+	if ((ret = ax8817x_write_cmd(dev, AX_CMD_SET_HW_MII, 0, 0, 0, &buf)) < 0) {
+		dbg("Failed to set hardware MII: %02x", ret);
+		return ret;
+	}
+
+	dev->net->set_multicast_list = ax8817x_set_multicast;
+
+	return 0;
+}
+
+static const struct driver_info ax8817x_info = {
+	.description = "ASIX AX8817x USB 2.0 Ethernet",
+	.bind = ax8817x_bind,
+	.flags =  FLAG_ETHER,
+};
+#endif /* CONFIG_USB_AX8817X */
 
 
 
@@ -2173,12 +2455,16 @@ usbnet_ethtool_ioctl (struct net_device *net, void __user *useraddr)
 
 static int usbnet_ioctl (struct net_device *net, struct ifreq *rq, int cmd)
 {
-	switch (cmd) {
-	case SIOCETHTOOL:
+	if (cmd == SIOCETHTOOL)
 		return usbnet_ethtool_ioctl (net, (void __user *)rq->ifr_data);
-	default:
-		return -EOPNOTSUPP;
-	}
+
+#ifdef NEED_MII
+	struct usbnet *dev = (struct usbnet *)net->priv;
+
+	if (dev->mii.mdio_read != NULL && dev->mii.mdio_write != NULL)
+		return generic_mii_ioctl(&dev->mii, (struct mii_ioctl_data *) &rq->ifr_data, cmd, NULL);
+#endif
+	return -EOPNOTSUPP;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -2342,7 +2628,7 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 		if (!((skb->len + sizeof *trailer) & 0x01))
 			*skb_put (skb, 1) = PAD_BYTE;
 		trailer = (struct nc_trailer *) skb_put (skb, sizeof *trailer);
-	} 
+	}
 #endif	/* CONFIG_USB_NET1080 */
 
 	usb_fill_bulk_urb (urb, dev->udev, dev->out,
@@ -2668,6 +2954,30 @@ static const struct usb_device_id	products [] = {
 	USB_DEVICE (0x0525, 0x9901),	// Advance USBNET (eTEK)
 	.driver_info =	(unsigned long) &belkin_info,
 },
+#endif
+
+#ifdef CONFIG_USB_AX8817X
+{
+	// Linksys USB200M
+	USB_DEVICE (0x077b, 0x2226),
+	.driver_info =	(unsigned long) &ax8817x_info,
+}, {
+	// Netgear FA120
+	USB_DEVICE (0x0846, 0x1040),
+	.driver_info =	(unsigned long) &ax8817x_info,
+}, {
+	// DLink DUB-E100
+	USB_DEVICE (0x2001, 0x1a00),
+	.driver_info =	(unsigned long) &ax8817x_info,
+}, {
+	// Intellinet, ST Lab USB Ethernet
+	USB_DEVICE (0x0b95, 0x1720),
+	.driver_info =	(unsigned long) &ax8817x_info,
+}, {
+	// Hawking UF200, TrendNet TU2-ET100
+	USB_DEVICE (0x07b8, 0x420a),
+	.driver_info =	(unsigned long) &ax8817x_info,
+}, 
 #endif
 
 #ifdef	CONFIG_USB_EPSON2888
