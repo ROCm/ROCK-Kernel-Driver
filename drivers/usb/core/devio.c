@@ -555,8 +555,10 @@ static int proc_control(struct dev_state *ps, void __user *arg)
 		snoop(&dev->dev, "control read: bRequest=%02x bRrequestType=%02x wValue=%04x wIndex=%04x\n", 
 			ctrl.bRequest, ctrl.bRequestType, ctrl.wValue, ctrl.wIndex);
 
+		up(&dev->serialize);
 		i = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0), ctrl.bRequest, ctrl.bRequestType,
 				       ctrl.wValue, ctrl.wIndex, tbuf, ctrl.wLength, tmo);
+		down(&dev->serialize);
 		if ((i > 0) && ctrl.wLength) {
 			if (usbfs_snoop) {
 				dev_info(&dev->dev, "control read: data ");
@@ -584,8 +586,10 @@ static int proc_control(struct dev_state *ps, void __user *arg)
 				printk ("%02x ", (unsigned char)(tbuf)[j]);
 			printk("\n");
 		}
+		up(&dev->serialize);
 		i = usb_control_msg(dev, usb_sndctrlpipe(dev, 0), ctrl.bRequest, ctrl.bRequestType,
 				       ctrl.wValue, ctrl.wIndex, tbuf, ctrl.wLength, tmo);
+		down(&dev->serialize);
 	}
 	free_page((unsigned long)tbuf);
 	if (i<0) {
@@ -627,7 +631,9 @@ static int proc_bulk(struct dev_state *ps, void __user *arg)
 			kfree(tbuf);
 			return -EINVAL;
 		}
+		up(&dev->serialize);
 		i = usb_bulk_msg(dev, pipe, tbuf, len1, &len2, tmo);
+		down(&dev->serialize);
 		if (!i && len2) {
 			if (copy_to_user(bulk.data, tbuf, len2)) {
 				kfree(tbuf);
@@ -641,7 +647,9 @@ static int proc_bulk(struct dev_state *ps, void __user *arg)
 				return -EFAULT;
 			}
 		}
+		up(&dev->serialize);
 		i = usb_bulk_msg(dev, pipe, tbuf, len1, &len2, tmo);
+		down(&dev->serialize);
 	}
 	kfree(tbuf);
 	if (i < 0) {
