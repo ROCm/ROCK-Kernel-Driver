@@ -328,7 +328,7 @@ static inline void prune_one_dentry(struct dentry * dentry)
  * all the dentries are in use.
  */
  
-void prune_dcache(int count)
+static void prune_dcache(int count)
 {
 	spin_lock(&dcache_lock);
 	for (; count ; count--) {
@@ -572,25 +572,24 @@ void shrink_dcache_anon(struct list_head *head)
  * This is called from kswapd when we think we need some
  * more memory. 
  */
-int shrink_dcache_memory(int ratio, unsigned int gfp_mask)
+static int shrink_dcache_memory(int nr, unsigned int gfp_mask)
 {
-	int entries = dentry_stat.nr_dentry / ratio + 1;
-	/*
-	 * Nasty deadlock avoidance.
-	 *
-	 * ext2_new_block->getblk->GFP->shrink_dcache_memory->prune_dcache->
-	 * prune_one_dentry->dput->dentry_iput->iput->inode->i_sb->s_op->
-	 * put_inode->ext2_discard_prealloc->ext2_free_blocks->lock_super->
-	 * DEADLOCK.
-	 *
-	 * We should make sure we don't hold the superblock lock over
-	 * block allocations, but for now:
-	 */
-	if (!(gfp_mask & __GFP_FS))
-		return 0;
-
-	prune_dcache(entries);
-	return entries;
+	if (nr) {
+		/*
+		 * Nasty deadlock avoidance.
+		 *
+	 	 * ext2_new_block->getblk->GFP->shrink_dcache_memory->
+		 * prune_dcache->prune_one_dentry->dput->dentry_iput->iput->
+		 * inode->i_sb->s_op->put_inode->ext2_discard_prealloc->
+		 * ext2_free_blocks->lock_super->DEADLOCK.
+	 	 *
+	 	 * We should make sure we don't hold the superblock lock over
+	 	 * block allocations, but for now:
+		 */
+		if (gfp_mask & __GFP_FS)
+			prune_dcache(nr);
+	}
+	return dentry_stat.nr_dentry;
 }
 
 #define NAME_ALLOC_LEN(len)	((len+16) & ~15)
@@ -1330,6 +1329,8 @@ static void __init dcache_init(unsigned long mempages)
 					 NULL, NULL);
 	if (!dentry_cache)
 		panic("Cannot create dentry cache");
+	
+	set_shrinker(DEFAULT_SEEKS, shrink_dcache_memory);
 
 #if PAGE_SHIFT < 13
 	mempages >>= (13 - PAGE_SHIFT);
@@ -1375,9 +1376,6 @@ kmem_cache_t *names_cachep;
 /* SLAB cache for file structures */
 kmem_cache_t *filp_cachep;
 
-/* SLAB cache for dquot structures */
-kmem_cache_t *dquot_cachep;
-
 EXPORT_SYMBOL(d_genocide);
 
 extern void bdev_cache_init(void);
@@ -1396,14 +1394,6 @@ void __init vfs_caches_init(unsigned long mempages)
 			SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if(!filp_cachep)
 		panic("Cannot create filp SLAB cache");
-
-#if defined (CONFIG_QUOTA)
-	dquot_cachep = kmem_cache_create("dquot", 
-			sizeof(struct dquot), sizeof(unsigned long) * 4,
-			SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!dquot_cachep)
-		panic("Cannot create dquot SLAB cache");
-#endif
 
 	dcache_init(mempages);
 	inode_init(mempages);

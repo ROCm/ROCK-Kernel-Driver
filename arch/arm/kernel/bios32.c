@@ -599,7 +599,7 @@ void pcibios_align_resource(void *data, struct resource *res,
  * pcibios_enable_device - Enable I/O and memory.
  * @dev: PCI device to be enabled
  */
-int pcibios_enable_device(struct pci_dev *dev)
+int pcibios_enable_device(struct pci_dev *dev, int mask)
 {
 	u16 cmd, old_cmd;
 	int idx;
@@ -608,6 +608,10 @@ int pcibios_enable_device(struct pci_dev *dev)
 	pci_read_config_word(dev, PCI_COMMAND, &cmd);
 	old_cmd = cmd;
 	for (idx = 0; idx < 6; idx++) {
+		/* Only set up the requested stuff */
+		if (!(mask & (1 << idx)))
+			continue;
+
 		r = dev->resource + idx;
 		if (!r->start && r->end) {
 			printk(KERN_ERR "PCI: Device %s not available because"
@@ -624,5 +628,31 @@ int pcibios_enable_device(struct pci_dev *dev)
 		       dev->slot_name, old_cmd, cmd);
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 	}
+	return 0;
+}
+
+int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+			enum pci_mmap_state mmap_state, int write_combine)
+{
+	struct pci_sys_data *root = dev->sysdata;
+	unsigned long prot, phys;
+
+	if (mmap_state == pci_mmap_io) {
+		return -EINVAL;
+	} else {
+		phys = root->mem_offset + (vma->vm_pgoff << PAGE_SHIFT);
+	}
+
+	/*
+	 * Mark this as IO
+	 */
+	vma->vm_flags |= VM_SHM | VM_LOCKED | VM_IO;
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+
+	if (remap_page_range(vma, vma->vm_start, phys,
+			     vma->vm_end - vma->vm_start,
+			     vma->vm_page_prot))
+		return -EAGAIN;
+
 	return 0;
 }

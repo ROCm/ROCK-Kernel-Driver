@@ -12,8 +12,6 @@
 
 #ifndef __ASSEMBLY__
 
-#include <asm/proc-fns.h>
-
 struct cpu_tlb_fns;
 struct cpu_user_fns;
 struct processor;

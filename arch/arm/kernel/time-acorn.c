@@ -25,44 +25,37 @@ extern unsigned long (*gettimeoffset)(void);
 
 static unsigned long ioctime_gettimeoffset(void)
 {
-	unsigned int count1, count2, status1, status2;
-	unsigned long offset = 0;
+	unsigned int count1, count2, status;
+	long offset;
 
-	status1 = ioc_readb(IOC_IRQREQA);
-	barrier ();
 	ioc_writeb (0, IOC_T0LATCH);
 	barrier ();
 	count1 = ioc_readb(IOC_T0CNTL) | (ioc_readb(IOC_T0CNTH) << 8);
 	barrier ();
-	status2 = ioc_readb(IOC_IRQREQA);
+	status = ioc_readb(IOC_IRQREQA);
 	barrier ();
 	ioc_writeb (0, IOC_T0LATCH);
 	barrier ();
 	count2 = ioc_readb(IOC_T0CNTL) | (ioc_readb(IOC_T0CNTH) << 8);
 
+	offset = count2;
 	if (count2 < count1) {
 		/*
-		 * This means that we haven't just had an interrupt
-		 * while reading into status2.
+		 * We have not had an interrupt between reading count1
+		 * and count2.
 		 */
-		if (status2 & (1 << 5))
-			offset = tick;
-		count1 = count2;
+		if (status & (1 << 5))
+			offset -= LATCH;
 	} else if (count2 > count1) {
 		/*
-		 * We have just had another interrupt while reading
-		 * status2.
+		 * We have just had another interrupt between reading
+		 * count1 and count2.
 		 */
-		offset += tick;
-		count1 = count2;
+		offset -= LATCH;
 	}
 
-	count1 = LATCH - count1;
-	/*
-	 * count1 = number of clock ticks since last interrupt
-	 */
-	offset += count1 * tick / LATCH;
-	return offset;
+	offset = (LATCH - offset) * (tick_nsec / 1000);
+	return (offset + LATCH/2) / LATCH;
 }
 
 void __init ioctime_init(void)

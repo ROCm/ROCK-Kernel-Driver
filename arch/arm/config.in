@@ -94,6 +94,8 @@ if [ "$CONFIG_ASSABET_NEPONSET" = "y" -o \
      "$CONFIG_SA1100_XP860" = "y" ]; then
    define_bool CONFIG_SA1111 y
    define_int CONFIG_FORCE_MAX_ZONEORDER 9
+else
+   define_bool CONFIG_SA1111 n
 fi
 
 comment 'Processor Type'
@@ -231,6 +233,8 @@ if [ "$CONFIG_CPU_ARM720T" = "y" -o "$CONFIG_CPU_ARM920T" = "y" -o \
      "$CONFIG_CPU_ARM922T" = "y" -o "$CONFIG_CPU_ARM926T" = "y" -o \
      "$CONFIG_CPU_ARM1020" = "y" -o "$CONFIG_CPU_XSCALE" = "y" ]; then
    dep_bool 'Support Thumb instructions (EXPERIMENTAL)' CONFIG_ARM_THUMB $CONFIG_EXPERIMENTAL
+else
+   define_bool CONFIG_ARM_THUMB n
 fi
 if [ "$CONFIG_CPU_ARM920T" = "y" -o "$CONFIG_CPU_ARM922T" = "y" -o \
      "$CONFIG_CPU_ARM926T" = "y" -o "$CONFIG_CPU_ARM1020" = "y" ]; then

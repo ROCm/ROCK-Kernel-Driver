@@ -137,6 +137,9 @@ static int msync_interval(struct vm_area_struct * vma,
 	int ret = 0;
 	struct file * file = vma->vm_file;
 
+	if ((flags & MS_INVALIDATE) && (vma->vm_flags & VM_LOCKED))
+		return -EBUSY;
+
 	if (file && (vma->vm_flags & VM_SHARED)) {
 		ret = filemap_sync(vma, start, end-start, flags);
 
@@ -172,6 +175,8 @@ asmlinkage long sys_msync(unsigned long start, size_t len, int flags)
 	if (flags & ~(MS_ASYNC | MS_INVALIDATE | MS_SYNC))
 		goto out;
 	if (start & ~PAGE_MASK)
+		goto out;
+	if ((flags & MS_ASYNC) && (flags & MS_SYNC))
 		goto out;
 	error = -ENOMEM;
 	len = (len + ~PAGE_MASK) & PAGE_MASK;

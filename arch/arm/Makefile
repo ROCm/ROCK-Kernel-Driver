@@ -8,6 +8,7 @@
 # Copyright (C) 1995-2001 by Russell King
 
 LDFLAGS_vmlinux	:=-p -X
+AFLAGS_vmlinux.lds.o = -DTEXTADDR=$(TEXTADDR) -DDATAADDR=$(DATAADDR)
 OBJCOPYFLAGS	:=-O binary -R .note -R .comment -S
 GZFLAGS		:=-9
 #CFLAGS		+=-pipe
@@ -50,18 +51,29 @@ tune-$(CONFIG_CPU_SA110)	:=-mtune=strongarm110
 tune-$(CONFIG_CPU_SA1100)	:=-mtune=strongarm1100
 tune-$(CONFIG_CPU_XSCALE)	:=-mtune=strongarm #-mtune=xscale
 
-CFLAGS_BOOT	:=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float
-CFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float
-AFLAGS		+=$(apcs-y) $(arch-y) -mno-fpu -msoft-float
+# Force -mno-fpu to be passed to the assembler.  Some versions of gcc don't
+# do this with -msoft-float
+CFLAGS_BOOT	:=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu
+CFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu
+AFLAGS		+=$(apcs-y) $(arch-y) -mno-fpu -msoft-float -Wa,-mno-fpu
 
 ifeq ($(CONFIG_CPU_26),y)
 PROCESSOR	:= armo
 HEAD		:= arch/arm/mach-arc/head.o arch/arm/kernel/init_task.o
+  ifeq ($(CONFIG_ROM_KERNEL),y)
+    DATAADDR	 = 0x02080000
+    TEXTADDR	 = 0x03800000
+    LDSCRIPT	 = arch/arm/vmlinux-armo-rom.lds.in
+  else
+    TEXTADDR	 = 0x02080000
+    LDSCRIPT	 = arch/arm/vmlinux-armo.lds.in
+  endif
 endif
 
 ifeq ($(CONFIG_CPU_32),y)
 PROCESSOR	 = armv
 HEAD		:= arch/arm/kernel/head.o arch/arm/kernel/init_task.o
+TEXTADDR	 = 0xC0008000
 endif
 
 ifeq ($(CONFIG_ARCH_ARCA5K),y)
@@ -175,7 +187,7 @@ core-$(CONFIG_FPE_NWFPE)	+= arch/arm/nwfpe/
 core-$(CONFIG_FPE_FASTFPE)	+= $(FASTFPE_OBJ)
 
 drivers-$(CONFIG_ARCH_CLPS7500)	+= drivers/acorn/char/
-drivers-$(CONFIG_ARCH_L7200))	+= drivers/acorn/char/
+drivers-$(CONFIG_ARCH_L7200)	+= drivers/acorn/char/
 
 libs-y				+= arch/arm/lib/
 

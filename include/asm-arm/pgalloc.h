@@ -11,9 +11,6 @@
 #define _ASMARM_PGALLOC_H
 
 #include <asm/processor.h>
-#include <asm/cacheflush.h>
-#include <asm/tlbflush.h>
-
 #include <asm/proc/pgalloc.h>
 
 /*

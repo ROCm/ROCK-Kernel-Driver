@@ -248,6 +248,10 @@ void *pci_pool_alloc (struct pci_pool *pool, int flags, dma_addr_t *handle);
 void pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t addr);
 #endif
 
+#define HAVE_PCI_MMAP
+extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+                               enum pci_mmap_state mmap_state, int write_combine);
+
 #endif /* __KERNEL__ */
  
 #endif

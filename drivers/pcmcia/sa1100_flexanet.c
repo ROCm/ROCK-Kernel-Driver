@@ -11,6 +11,7 @@
 #include <linux/init.h>
 
 #include <asm/hardware.h>
+#include <asm/mach-types.h>
 #include <asm/irq.h>
 #include "sa1100_generic.h"
 
@@ -221,14 +222,14 @@ static int flexanet_pcmcia_socket_suspend(int sock)
  *
  */
 static struct pcmcia_low_level flexanet_pcmcia_ops = {
-  init:			flexanet_pcmcia_init,
-  shutdown:		flexanet_pcmcia_shutdown,
-  socket_state:		flexanet_pcmcia_socket_state,
-  get_irq_info:		flexanet_pcmcia_get_irq_info,
-  configure_socket:	flexanet_pcmcia_configure_socket,
+  .init			= flexanet_pcmcia_init,
+  .shutdown		= flexanet_pcmcia_shutdown,
+  .socket_state		= flexanet_pcmcia_socket_state,
+  .get_irq_info		= flexanet_pcmcia_get_irq_info,
+  .configure_socket	= flexanet_pcmcia_configure_socket,
 
-  socket_init:		flexanet_pcmcia_socket_init,
-  socket_suspend:	flexanet_pcmcia_socket_suspend,
+  .socket_init		= flexanet_pcmcia_socket_init,
+  .socket_suspend	= flexanet_pcmcia_socket_suspend,
 };
 
 int __init pcmcia_flexanet_init(void)

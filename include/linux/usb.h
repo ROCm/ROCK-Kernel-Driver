@@ -222,12 +222,42 @@ struct usb_interface_descriptor {
 	int extralen;
 };
 
+/**
+ * struct usb_interface - what usb device drivers talk to
+ * @altsetting: array of interface descriptors, one for each alternate
+ * 	setting that may be selected.  each one includes a set of
+ * 	endpoint configurations.
+ * @num_altsetting: number of altsettings defined.
+ * @act_altsetting: index of current altsetting.  this number is always
+ *	less than num_altsetting.  after the device is configured, each
+ *	interface uses its default setting of zero.
+ * @dev: driver model's view of this device
+ *
+ * USB device drivers attach to interfaces on a physical device.  Each
+ * interface encapsulates a single high level function, such as feeding
+ * an audio stream to a speaker or reporting a change in a volume control.
+ * Many USB devices only have one interface.  The protocol used to talk to
+ * an interface's endpoints can be defined in a usb "class" specification,
+ * or by a product's vendor.  The (default) control endpoint is part of
+ * every interface, but is never listed among the interface's descriptors.
+ *
+ * The driver that is bound to the interface can use standard driver model
+ * calls such as dev_get_drvdata() on the dev member of this structure.
+ *
+ * Each interface may have alternate settings.  The initial configuration
+ * of a device sets the first of these, but the device driver can change
+ * that setting using usb_set_interface().  Alternate settings are often
+ * used to control the the use of periodic endpoints, such as by having
+ * different endpoints use different amounts of reserved USB bandwidth.
+ * All standards-conformant USB devices that use isochronous endpoints
+ * will use them in non-default settings.
+ */
 struct usb_interface {
 	struct usb_interface_descriptor *altsetting;
 
-	int act_altsetting;		/* active alternate setting */
-	int num_altsetting;		/* number of alternate settings */
-	int max_altsetting;		/* total memory allocated */
+	unsigned act_altsetting;	/* active alternate setting */
+	unsigned num_altsetting;	/* number of alternate settings */
+	unsigned max_altsetting;	/* total memory allocated */
 
 	struct usb_driver *driver;	/* driver */
 	struct device dev;		/* interface specific device info */
@@ -670,6 +700,7 @@ extern void usb_deregister_dev(int num_minors, int start_minor);
 
 extern int usb_device_probe(struct device *dev);
 extern int usb_device_remove(struct device *dev);
+extern int usb_disabled(void);
 
 /* -------------------------------------------------------------------------- */
 

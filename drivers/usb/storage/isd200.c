@@ -408,13 +408,13 @@ static int isd200_transfer_partial( struct us_data *us,
 {
         int result;
         int partial;
-        int pipe;
+        unsigned int pipe;
 
         /* calculate the appropriate pipe information */
 	if (dataDirection == SCSI_DATA_READ)
-                pipe = usb_rcvbulkpipe(us->pusb_dev, us->ep_in);
+                pipe = us->recv_bulk_pipe;
         else
-                pipe = usb_sndbulkpipe(us->pusb_dev, us->ep_out);
+                pipe = us->send_bulk_pipe;
 
         /* transfer the data */
         US_DEBUGP("isd200_transfer_partial(): xfer %d bytes\n", length);
@@ -546,7 +546,6 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
         struct bulk_cb_wrap bcb;
         struct bulk_cs_wrap bcs;
         int result;
-        int pipe;
         int partial;
         unsigned int transfer_amount;
 
@@ -566,9 +565,6 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
 
         bcb.Length = AtaCdbLength;
     
-        /* construct the pipe handle */
-        pipe = usb_sndbulkpipe(us->pusb_dev, us->ep_out);
-    
         /* copy the command payload */
         memset(bcb.CDB, 0, sizeof(bcb.CDB));
         memcpy(bcb.CDB, AtaCdb, bcb.Length);
@@ -578,8 +574,8 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
                   le32_to_cpu(bcb.Signature), bcb.Tag,
                   (bcb.Lun >> 4), (bcb.Lun & 0xFF), 
                   le32_to_cpu(bcb.DataTransferLength), bcb.Flags, bcb.Length);
-        result = usb_stor_bulk_msg(us, &bcb, pipe, US_BULK_CB_WRAP_LEN, 
-				   &partial);
+        result = usb_stor_bulk_msg(us, &bcb, us->send_bulk_pipe,
+				US_BULK_CB_WRAP_LEN, &partial);
         US_DEBUGP("Bulk command transfer result=%d\n", result);
     
 	/* did we abort this command? */
@@ -589,8 +585,9 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
 
 	else if (result == -EPIPE) {
 		/* if we stall, we need to clear it before we go on */
-                US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
-                if (usb_stor_clear_halt(us, pipe) < 0)
+                US_DEBUGP("clearing endpoint halt for pipe 0x%x\n",
+				us->send_bulk_pipe);
+                if (usb_stor_clear_halt(us, us->send_bulk_pipe) < 0)
 			return ISD200_TRANSPORT_ERROR;
 	} else if (result)  
                 return ISD200_TRANSPORT_ERROR;
@@ -608,13 +605,10 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
          * an explanation of how this code works.
          */
     
-        /* construct the pipe handle */
-        pipe = usb_rcvbulkpipe(us->pusb_dev, us->ep_in);
-    
         /* get CSW for device status */
         US_DEBUGP("Attempting to get CSW...\n");
-        result = usb_stor_bulk_msg(us, &bcs, pipe, US_BULK_CS_WRAP_LEN, 
-				   &partial);
+        result = usb_stor_bulk_msg(us, &bcs, us->recv_bulk_pipe,
+				US_BULK_CS_WRAP_LEN, &partial);
 	/* did we abort this command? */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 		return ISD200_TRANSPORT_ABORTED;
@@ -622,13 +616,14 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
 
         /* did the attempt to read the CSW fail? */
         if (result == -EPIPE) {
-                US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
-                if (usb_stor_clear_halt(us, pipe) < 0)
+                US_DEBUGP("clearing endpoint halt for pipe 0x%x\n",
+				us->recv_bulk_pipe);
+                if (usb_stor_clear_halt(us, us->recv_bulk_pipe) < 0)
 			return ISD200_TRANSPORT_ERROR;
            
                 /* get the status again */
                 US_DEBUGP("Attempting to get CSW (2nd try)...\n");
-                result = usb_stor_bulk_msg(us, &bcs, pipe,
+                result = usb_stor_bulk_msg(us, &bcs, us->recv_bulk_pipe,
                                            US_BULK_CS_WRAP_LEN, &partial);
 
                 /* if the command was aborted, indicate that */
@@ -638,8 +633,9 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
         
                 /* if it fails again, we need a reset and return an error*/
                 if (result == -EPIPE) {
-                        US_DEBUGP("clearing halt for pipe 0x%x\n", pipe);
-                        usb_stor_clear_halt(us, pipe);
+                        US_DEBUGP("clearing halt for pipe 0x%x\n",
+					us->recv_bulk_pipe);
+                        usb_stor_clear_halt(us, us->recv_bulk_pipe);
                         return ISD200_TRANSPORT_ERROR;
                 }
         }
@@ -937,7 +933,7 @@ int isd200_write_config( struct us_data *us )
 	/* let's send the command via the control pipe */
 	result = usb_stor_control_msg(
                 us, 
-                usb_sndctrlpipe(us->pusb_dev,0),
+                us->send_ctrl_pipe,
                 0x01, 
                 USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_OUT,
                 0x0000, 
@@ -978,7 +974,7 @@ int isd200_read_config( struct us_data *us )
 
 	result = usb_stor_control_msg(
                 us, 
-                usb_rcvctrlpipe(us->pusb_dev,0),
+                us->recv_ctrl_pipe,
                 0x02, 
                 USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_IN,
                 0x0000, 

@@ -145,7 +145,7 @@ iop310_pri_read_config(struct pci_bus *bus, unsigned int devfn, int where,
 }
 
 static int
-iop310_pri_write_config(struct pci_bus *bus, unsigned int devfn, int where
+iop310_pri_write_config(struct pci_bus *bus, unsigned int devfn, int where,
 			int size, u32 value)
 {
 	unsigned long addr = iop310_cfg_address(bus, devfn, where);
@@ -163,7 +163,7 @@ iop310_pri_write_config(struct pci_bus *bus, unsigned int devfn, int where
 		else
 			val &= ~(0xffff << where);
 
-		*IOP310_POCCDR = val | v << where;
+		*IOP310_POCCDR = val | value << where;
 	} else {
 		asm volatile(
 			"str	%1, [%2]\n\t"
@@ -173,7 +173,7 @@ iop310_pri_write_config(struct pci_bus *bus, unsigned int devfn, int where
 			"nop\n\t"
 			"nop\n\t"
 			:
-			: "r" (val), "r" (addr),
+			: "r" (value), "r" (addr),
 			  "r" (IOP310_POCCAR), "r" (IOP310_POCCDR));
 	}
 
@@ -246,7 +246,7 @@ iop310_sec_read_config(struct pci_bus *bus, unsigned int devfn, int where,
 }
 
 static int
-iop310_sec_write_config(struct pci_bus *bus, unsigned int devfn, int where
+iop310_sec_write_config(struct pci_bus *bus, unsigned int devfn, int where,
 			int size, u32 value)
 {
 	unsigned long addr = iop310_cfg_address(bus, devfn, where);
@@ -265,7 +265,7 @@ iop310_sec_write_config(struct pci_bus *bus, unsigned int devfn, int where
 		else
 			val &= ~(0xffff << where);
 
-		*IOP310_SOCCDR = val | v << where;
+		*IOP310_SOCCDR = val | value << where;
 	} else {
 		asm volatile(
 			"str	%1, [%2]\n\t"
@@ -275,7 +275,7 @@ iop310_sec_write_config(struct pci_bus *bus, unsigned int devfn, int where
 			"nop\n\t"
 			"nop\n\t"
 			:
-			: "r" (val), "r" (addr),
+			: "r" (value), "r" (addr),
 			  "r" (IOP310_SOCCAR), "r" (IOP310_SOCCDR));
 	}
 

@@ -61,6 +61,7 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/device.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 
@@ -75,12 +76,6 @@ static char version[] __initdata = "ether3 ethernet driver (c) 1995-2000 R.M.Kin
 #include "ether3.h"
 
 static unsigned int net_debug = NET_DEBUG;
-static const card_ids __init ether3_cids[] = {
-	{ MANU_ANT2, PROD_ANT_ETHER3 },
-	{ MANU_ANT,  PROD_ANT_ETHER3 },
-	{ MANU_ANT,  PROD_ANT_ETHERB },
-	{ 0xffff, 0xffff }
-};
 
 static void	ether3_setmulticastlist(struct net_device *dev);
 static int	ether3_rx(struct net_device *dev, struct dev_priv *priv, unsigned int maxcnt);
@@ -417,6 +412,12 @@ ether3_probe_bus_16(struct net_device *dev, int val)
 static int
 ether3_open(struct net_device *dev)
 {
+	if (!is_valid_ether_addr(dev->dev_addr)) {
+		printk(KERN_WARNING "%s: invalid ethernet MAC address\n",
+			dev->name);
+		return -EINVAL;
+	}
+
 	if (request_irq(dev->irq, ether3_interrupt, 0, "ether3", dev))
 		return -EAGAIN;
 
@@ -458,6 +459,23 @@ static struct net_device_stats *ether3_getstats(struct net_device *dev)
 {
 	struct dev_priv *priv = (struct dev_priv *)dev->priv;
 	return &priv->stats;
+}
+
+static int
+ether3_set_mac_address(struct net_device *dev, void *p)
+{
+	struct sockaddr *addr = p;
+
+	if (netif_running(dev))
+		return -EBUSY;
+
+	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
+
+	/*
+	 * We'll set the MAC address on the chip when we open it.
+	 */
+
+	return 0;
 }
 
 /*
@@ -784,6 +802,7 @@ static const char * __init
 ether3_get_dev(struct net_device *dev, struct expansion_card *ec)
 {
 	const char *name = "ether3";
+
 	dev->base_addr = ecard_address(ec, ECARD_MEMC, 0);
 	dev->irq = ec->irq;
 
@@ -796,38 +815,44 @@ ether3_get_dev(struct net_device *dev, struct expansion_card *ec)
 	ec->irqaddr = (volatile unsigned char *)ioaddr(dev->base_addr);
 	ec->irqmask = 0xf0;
 
-	if (ether3_addr(dev->dev_addr, ec))
-		name = NULL;
+	ether3_addr(dev->dev_addr, ec);
 
 	return name;
 }
 
-static struct net_device * __init ether3_init_one(struct expansion_card *ec)
+static int __devinit
+ether3_probe(struct expansion_card *ec, const struct ecard_id *id)
 {
 	struct net_device *dev;
 	struct dev_priv *priv;
 	const char *name;
-	int i, bus_type;
+	int i, bus_type, ret;
 
 	ether3_banner();
 
 	ecard_claim(ec);
 
 	dev = init_etherdev(NULL, sizeof(struct dev_priv));
-	if (!dev)
+	if (!dev) {
+		ret = -ENOMEM;
 		goto out;
+	}
 
 	SET_MODULE_OWNER(dev);
 
 	name = ether3_get_dev(dev, ec);
-	if (!name)
+	if (!name) {
+		ret = -ENODEV;
 		goto free;
+	}
 
 	/*
 	 * this will not fail - the nature of the bus ensures this
 	 */
-	if (!request_region(dev->base_addr, 128, dev->name))
+	if (!request_region(dev->base_addr, 128, dev->name)) {
+		ret = -EBUSY;
 		goto free;
+	}
 
 	priv = (struct dev_priv *) dev->priv;
 
@@ -852,11 +877,13 @@ static struct net_device * __init ether3_init_one(struct expansion_card *ec)
 	switch (bus_type) {
 	case BUS_UNKNOWN:
 		printk(KERN_ERR "%s: unable to identify bus width\n", dev->name);
+		ret = -ENODEV;
 		goto failed;
 
 	case BUS_8:
 		printk(KERN_ERR "%s: %s found, but is an unsupported "
 			"8-bit card\n", dev->name, name);
+		ret = -ENODEV;
 		goto failed;
 
 	default:
@@ -867,16 +894,21 @@ static struct net_device * __init ether3_init_one(struct expansion_card *ec)
 	for (i = 0; i < 6; i++)
 		printk("%2.2x%c", dev->dev_addr[i], i == 5 ? '\n' : ':');
 
-	if (ether3_init_2(dev))
+	if (ether3_init_2(dev)) {
+		ret = -ENODEV;
 		goto failed;
+	}
 
 	dev->open		= ether3_open;
 	dev->stop		= ether3_close;
 	dev->hard_start_xmit	= ether3_sendpacket;
 	dev->get_stats		= ether3_getstats;
 	dev->set_multicast_list	= ether3_setmulticastlist;
+	dev->set_mac_address	= ether3_set_mac_address;
 	dev->tx_timeout		= ether3_timeout;
 	dev->watchdog_timeo	= 5 * HZ / 100;
+
+	ecard_set_drvdata(ec, dev);
 	return 0;
 
 failed:
@@ -886,54 +918,46 @@ free:
 	kfree(dev);
 out:
 	ecard_release(ec);
-	return NULL;
-}
-
-static struct expansion_card	*e_card[MAX_ECARDS];
-static struct net_device	*e_dev[MAX_ECARDS];
-
-static int ether3_init(void)
-{
-	int i, ret = -ENODEV;
-
-	ecard_startfind();
-
-	for (i = 0; i < MAX_ECARDS; i++) {
-		struct net_device *dev;
-		struct expansion_card *ec;
-
-		ec = ecard_find(0, ether3_cids);
-		if (!ec)
-			break;
-
-		dev = ether3_init_one(ec);
-		if (!dev)
-			break;
-
-		e_card[i] = ec;
-		e_dev[i]  = dev;
-		ret = 0;
-	}
-
 	return ret;
 }
 
-static void ether3_exit(void)
+static void __devexit ether3_remove(struct expansion_card *ec)
 {
-	int i;
+	struct net_device *dev = ecard_get_drvdata(ec);
 
-	for (i = 0; i < MAX_ECARDS; i++) {
-		if (e_dev[i]) {
-			unregister_netdev(e_dev[i]);
-			release_region(e_dev[i]->base_addr, 128);
-			kfree(e_dev[i]);
-			e_dev[i] = NULL;
-		}
-		if (e_card[i]) {
-			ecard_release(e_card[i]);
-			e_card[i] = NULL;
-		}
-	}
+	ecard_set_drvdata(ec, NULL);
+
+	unregister_netdev(dev);
+	release_region(dev->base_addr, 128);
+	kfree(dev);
+
+	ecard_release(ec);
+}
+
+static const struct ecard_id ether3_ids[] = {
+	{ MANU_ANT2, PROD_ANT_ETHER3 },
+	{ MANU_ANT,  PROD_ANT_ETHER3 },
+	{ MANU_ANT,  PROD_ANT_ETHERB },
+	{ 0xffff, 0xffff }
+};
+
+static struct ecard_driver ether3_driver = {
+	.probe		= ether3_probe,
+	.remove		= __devexit_p(ether3_remove),
+	.id_table	= ether3_ids,
+	.drv = {
+		.name	= "ether3",
+	},
+};
+
+static int __init ether3_init(void)
+{
+	return ecard_register_driver(&ether3_driver);
+}
+
+static void __exit ether3_exit(void)
+{
+	ecard_remove_driver(&ether3_driver);
 }
 
 module_init(ether3_init);

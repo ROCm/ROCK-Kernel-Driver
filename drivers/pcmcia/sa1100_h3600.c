@@ -10,6 +10,9 @@
 
 #include <asm/hardware.h>
 #include <asm/irq.h>
+#include <asm/mach-types.h>
+#include <asm/arch/h3600.h>
+
 #include "sa1100_generic.h"
 
 static struct irqs {
@@ -185,13 +188,27 @@ static int h3600_pcmcia_socket_suspend(int sock)
 }
 
 struct pcmcia_low_level h3600_pcmcia_ops = { 
-	init:			h3600_pcmcia_init,
-	shutdown:		h3600_pcmcia_shutdown,
-	socket_state:		h3600_pcmcia_socket_state,
-	get_irq_info:		h3600_pcmcia_get_irq_info,
-	configure_socket:	h3600_pcmcia_configure_socket,
+	.init			= h3600_pcmcia_init,
+	.shutdown		= h3600_pcmcia_shutdown,
+	.socket_state		= h3600_pcmcia_socket_state,
+	.get_irq_info		= h3600_pcmcia_get_irq_info,
+	.configure_socket	= h3600_pcmcia_configure_socket,
 
-	socket_init:		h3600_pcmcia_socket_init,
-	socket_suspend:		h3600_pcmcia_socket_suspend,
+	.socket_init		= h3600_pcmcia_socket_init,
+	.socket_suspend		= h3600_pcmcia_socket_suspend,
 };
 
+int __init pcmcia_h3600_init(void)
+{
+	int ret = -ENODEV;
+
+	if (machine_is_h3600())
+		ret = sa1100_register_pcmcia(&h3600_pcmcia_ops);
+
+	return ret;
+}
+
+void __exit pcmcia_h3600_exit(void)
+{
+	sa1100_unregister_pcmcia(&h3600_pcmcia_ops);
+}
