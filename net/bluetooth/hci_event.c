@@ -358,7 +358,7 @@ static inline void hci_cs_create_conn(struct hci_dev *hdev, __u8 status)
 			status, batostr(&cp->bdaddr), conn);
 
 	if (status) {
-		if (conn) {
+		if (conn && conn->state == BT_CONNECT) {
 			conn->state = BT_CLOSED;
 			hci_proto_connect_cfm(conn, status);
 			hci_conn_del(conn);
