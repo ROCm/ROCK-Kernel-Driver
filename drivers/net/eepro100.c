@@ -116,6 +116,7 @@ static int options[] = {-1, -1, -1, -1, -1, -1, -1, -1};
 
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/rtnetlink.h>
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
 #include <linux/mii.h>
@@ -670,7 +671,7 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 	if (tx_ring_space == NULL)
 		return -1;
 
-	dev = init_etherdev(NULL, sizeof(struct speedo_private));
+	dev = alloc_etherdev(sizeof(struct speedo_private));
 	if (dev == NULL) {
 		printk(KERN_ERR "eepro100: Could not allocate ethernet device.\n");
 		pci_free_consistent(pdev, size, tx_ring_space, tx_ring_dma);
@@ -686,6 +687,10 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 		option = options[card_idx];
 	else
 		option = 0;
+
+	rtnl_lock();
+	if (dev_alloc_name(dev, dev->name) < 0) 
+		goto err_free_unlock;
 
 	/* Read the station address EEPROM before doing the reset.
 	   Nominally his should even be done before accepting the device, but
@@ -881,7 +886,16 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 	dev->set_multicast_list = &set_rx_mode;
 	dev->do_ioctl = &speedo_ioctl;
 
+	if (register_netdevice(dev))
+		goto err_free_unlock;
+	rtnl_unlock();
+
 	return 0;
+
+ err_free_unlock:
+	rtnl_unlock();
+	kfree(dev);
+	return -1;
 }
 
 static void do_slow_command(struct net_device *dev, int cmd)
