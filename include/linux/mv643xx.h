@@ -977,12 +977,9 @@
 /* I2C Registers                        */
 /****************************************/
 
-#define MV64340_I2C_SLAVE_ADDR                                      0xc000
-#define MV64340_I2C_EXTENDED_SLAVE_ADDR                             0xc010
-#define MV64340_I2C_DATA                                            0xc004
-#define MV64340_I2C_CONTROL                                         0xc008
-#define MV64340_I2C_STATUS_BAUDE_RATE                               0xc00C
-#define MV64340_I2C_SOFT_RESET                                      0xc01c
+#define MV64XXX_I2C_CTLR_NAME					"mv64xxx i2c"
+#define MV64XXX_I2C_OFFSET                                          0xc000
+#define MV64XXX_I2C_REG_BLOCK_SIZE                                  0x0020
 
 /****************************************/
 /* GPP Interface Registers              */
@@ -1083,6 +1080,14 @@ struct mpsc_pdata {
 	u8	brg_can_tune;
 	u8	brg_clk_src;
 	u32	brg_clk_freq;
+};
+
+/* i2c Platform Device, Driver Data */
+struct mv64xxx_i2c_pdata {
+	u32	freq_m;
+	u32	freq_n;
+	u32	timeout;	/* In milliseconds */
+	u32	retries;
 };
 
 #endif /* __ASM_MV64340_H */

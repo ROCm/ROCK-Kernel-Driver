@@ -287,7 +287,7 @@ config I2C_PARPORT_LIGHT
 
 config I2C_PIIX4
 	tristate "Intel PIIX4"
-	depends on I2C && PCI && EXPERIMENTAL && !64BIT
+	depends on I2C && PCI && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for the Intel
 	  PIIX4 family of mainboard I2C interfaces.  Specifically, the following
@@ -485,5 +485,15 @@ config I2C_PCA_ISA
 	  
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-pca-isa.
+
+config I2C_MV64XXX
+	tristate "Marvell mv64xxx I2C Controller"
+	depends on I2C && MV64X60 && EXPERIMENTAL
+	help
+	  If you say yes to this option, support will be included for the
+	  built-in I2C interface on the Marvell 64xxx line of host bridges.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-mv64xxx.
 
 endmenu
