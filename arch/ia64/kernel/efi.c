@@ -674,8 +674,7 @@ efi_get_iobase (void)
 	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
 		md = p;
 		if (md->type == EFI_MEMORY_MAPPED_IO_PORT_SPACE) {
-			/* paranoia attribute checking */
-			if (md->attribute == (EFI_MEMORY_UC | EFI_MEMORY_RUNTIME))
+			if (md->attribute & EFI_MEMORY_UC)
 				return md->phys_addr;
 		}
 	}

@@ -36,7 +36,7 @@ walk_parents_mkdir(
 		memcpy(buf, *path, len);
 		buf[len] = '\0';
 
-		error = link_path_walk(buf, nd); 
+		error = path_walk(buf, nd);
 		if (unlikely(error))
 			return error;
 
@@ -83,7 +83,7 @@ hwgfs_decode(
 	if (unlikely(error))
 		return error;
 
-	error = link_path_walk(name, &nd);
+	error = path_walk(name, &nd);
 	if (unlikely(error))
 		return error;
 
@@ -274,7 +274,7 @@ hwgfs_find_handle(
 	nd.dentry = dget(base ? base : hwgfs_vfsmount->mnt_sb->s_root);
 	nd.flags = (traverse_symlinks ? LOOKUP_FOLLOW : 0);
 
-	error = link_path_walk(name, &nd);
+	error = path_walk(name, &nd);
 	if (likely(!error)) {
 		dentry = nd.dentry;
 		path_release(&nd);		/* stale data from here! */

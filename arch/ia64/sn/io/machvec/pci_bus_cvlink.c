@@ -811,7 +811,6 @@ sn_pci_init (void)
 	/*
 	 * set pci_raw_ops, etc.
 	 */
-
 	sgi_master_io_infr_init();
 
 	for (cnode = 0; cnode < numnodes; cnode++) {
@@ -826,16 +825,16 @@ sn_pci_init (void)
 #endif
 
 	controller = kmalloc(sizeof(struct pci_controller), GFP_KERNEL);
-	if (controller) {
-		memset(controller, 0, sizeof(struct pci_controller));
-		/* just allocate some devices and fill in the pci_dev structs */
-		for (i = 0; i < PCI_BUSES_TO_SCAN; i++)
-			pci_scan_bus(i, &sn_pci_ops, controller);
+	if (!controller) {
+		printk(KERN_WARNING "cannot allocate PCI controller\n");
+		return 0;
 	}
 
-	/*
-	 * actually find devices and fill in hwgraph structs
-	 */
+	memset(controller, 0, sizeof(struct pci_controller));
+
+	for (i = 0; i < PCI_BUSES_TO_SCAN; i++)
+		if (pci_bus_to_vertex(i))
+			pci_scan_bus(i, &sn_pci_ops, controller);
 
 	done_probing = 1;
 
@@ -857,13 +856,8 @@ sn_pci_init (void)
 	 * set the root start and end so that drivers calling check_region()
 	 * won't see a conflict
 	 */
-
-#ifdef CONFIG_IA64_SGI_SN_SIM
-	if (! IS_RUNNING_ON_SIMULATOR()) {
-		ioport_resource.start  = 0xc000000000000000;
-		ioport_resource.end =    0xcfffffffffffffff;
-	}
-#endif
+	ioport_resource.start = 0xc000000000000000;
+	ioport_resource.end = 0xcfffffffffffffff;
 
 	/*
 	 * Set the root start and end for Mem Resource.
