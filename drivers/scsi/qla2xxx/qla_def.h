@@ -89,13 +89,9 @@
 
 #if defined(CONFIG_SCSI_QLA6312) || defined(CONFIG_SCSI_QLA6312_MODULE)
 #define IS_QLA6312(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP6312)
-#else
-#define IS_QLA6312(ha)	0
-#endif
-
-#if defined(CONFIG_SCSI_QLA6322) || defined(CONFIG_SCSI_QLA6322_MODULE)
 #define IS_QLA6322(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP6322)
 #else
+#define IS_QLA6312(ha)	0
 #define IS_QLA6322(ha)	0
 #endif
 

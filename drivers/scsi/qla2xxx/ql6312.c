@@ -35,6 +35,11 @@ static struct qla_board_info qla_board_tbl[] = {
 		.isp_name	= "ISP6312",
 		.fw_info	= qla_fw_tbl,
 	},
+	{
+		.drv_name	= qla_driver_name,
+		.isp_name	= "ISP6322",
+		.fw_info	= qla_fw_tbl,
+	},
 };
 
 static struct pci_device_id qla6312_pci_tbl[] = {
@@ -44,6 +49,13 @@ static struct pci_device_id qla6312_pci_tbl[] = {
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
 		.driver_data	= (unsigned long)&qla_board_tbl[0],
+	},
+	{
+		.vendor		= PCI_VENDOR_ID_QLOGIC,
+		.device		= PCI_DEVICE_ID_QLOGIC_ISP6322,
+		.subvendor	= PCI_ANY_ID,
+		.subdevice	= PCI_ANY_ID,
+		.driver_data	= (unsigned long)&qla_board_tbl[1],
 	},
 	{0, 0},
 };
@@ -85,6 +97,6 @@ module_init(qla6312_init);
 module_exit(qla6312_exit);
 
 MODULE_AUTHOR("QLogic Corporation");
-MODULE_DESCRIPTION("QLogic ISP6312 FC-SCSI Host Bus Adapter driver");
+MODULE_DESCRIPTION("QLogic ISP63xx FC-SCSI Host Bus Adapter driver");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(QLA2XXX_VERSION);
