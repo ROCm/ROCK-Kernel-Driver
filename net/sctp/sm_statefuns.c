@@ -925,16 +925,16 @@ static int sctp_sf_send_restart_abort(union sctp_addr *ssa,
 {
 	int len;
 	struct sctp_packet *pkt;
-	sctp_addr_param_t *addrparm;
-	sctp_errhdr_t *errhdr;
+	union sctp_addr_param *addrparm;
+	struct sctp_errhdr *errhdr;
 	struct sctp_endpoint *ep;
-	char buffer[sizeof(sctp_errhdr_t) + sizeof(sctp_addr_param_t)];
+	char buffer[sizeof(struct sctp_errhdr)+sizeof(union sctp_addr_param)];
 
 	/* Build the error on the stack.   We are way to malloc crazy
 	 * throughout the code today.
 	 */
-	errhdr = (sctp_errhdr_t *)buffer;
-	addrparm = (sctp_addr_param_t *)errhdr->variable;
+	errhdr = (struct sctp_errhdr *)buffer;
+	addrparm = (union sctp_addr_param *)errhdr->variable;
 
 	/* Copy into a parm format. */
 	len = sockaddr2sctp_addr(ssa, addrparm);
@@ -3204,82 +3204,6 @@ sctp_disposition_t sctp_sf_pdiscard(const struct sctp_endpoint *ep,
 	return SCTP_DISPOSITION_CONSUME;
 }
 
-#if 0
-/*
- * We did something stupid but got lucky.  Namely, we sent a HEARTBEAT
- * before the association was all the way up and we did NOT get an
- * ABORT.
- *
- * Log the fact and then process normally.
- *
- * Section: Not specified
- * Verification Tag:  8.5 Verification Tag [Normal verification]
- * Inputs
- * (endpoint, asoc, chunk)
- *
- * Outputs
- * (asoc, reply_msg, msg_up, timers, counters)
- *
- * The return value is the disposition of the chunk.
- */
-sctp_disposition_t lucky(const struct sctp_endpoint *ep,
-			 const struct sctp_association *asoc,
-			 const sctp_subtype_t type,
-			 void *arg,
-			 sctp_cmd_seq_t *commands)
-{
-	struct sctp_chunk *chunk = arg;
-
-	/* 8.5 When receiving an SCTP packet, the endpoint MUST ensure
-	 * that the value in the Verification Tag field of the
-	 * received SCTP packet matches its own Tag. ...
-	 */
-	if (chunk->sctp_hdr->vtag != asoc->c.my_vtag)
-		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
-
-	return SCTP_DISPOSITION_CONSUME;
-
-nomem:
-	return SCTP_DISPOSITION_NOMEM;
-}
-#endif /* 0 */
-
-#if 0
-/*
- * The other end is doing something very stupid.  We'll ignore them
- * after logging their idiocy. :-)
- *
- * Section: Not specified
- * Verification Tag:  8.5 Verification Tag [Normal verification]
- * Inputs
- * (endpoint, asoc, chunk)
- *
- * Outputs
- * (asoc, reply_msg, msg_up, timers, counters)
- *
- * The return value is the disposition of the chunk.
- */
-sctp_disposition_t other_stupid(const struct sctp_endpoint *ep,
-				const struct sctp_association *asoc,
-				const sctp_subtype_t type,
-				void *arg,
-				sctp_cmd_seq_t *commands)
-{
-	struct sctp_chunk *chunk = arg;
-
-	/* 8.5 When receiving an SCTP packet, the endpoint MUST ensure
-	 * that the value in the Verification Tag field of the
-	 * received SCTP packet matches its own Tag. ...
-	 */
-	if (chunk->sctp_hdr->vtag != asoc->c.my_vtag)
-		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
-
-	return SCTP_DISPOSITION_CONSUME;
-
-nomem:
-	return SCTP_DISPOSITION_NOMEM;
-}
-#endif /* 0 */
 
 /*
  * The other end is violating protocol.

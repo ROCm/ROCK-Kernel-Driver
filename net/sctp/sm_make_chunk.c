@@ -2022,7 +2022,7 @@ __u32 sctp_generate_tsn(const struct sctp_endpoint *ep)
  ********************************************************************/
 
 /* Convert from an SCTP IP parameter to a union sctp_addr.  */
-void sctp_param2sockaddr(union sctp_addr *addr, sctp_addr_param_t *param,
+void sctp_param2sockaddr(union sctp_addr *addr, union sctp_addr_param *param,
 			 __u16 port, int iif)
 {
 	switch(param->v4.param_hdr.type) {
@@ -2073,7 +2073,7 @@ int sctp_addr2sockaddr(union sctp_params p, union sctp_addr *sa)
 /* Convert a sockaddr_in to an IP address in an SCTP param.
  * Returns len if a valid conversion was possible.
  */
-int sockaddr2sctp_addr(const union sctp_addr *sa, sctp_addr_param_t *p)
+int sockaddr2sctp_addr(const union sctp_addr *sa, union sctp_addr_param *p)
 {
 	int len = 0;
 

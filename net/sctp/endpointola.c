@@ -313,13 +313,13 @@ int sctp_endpoint_is_peeled_off(struct sctp_endpoint *ep,
 				const union sctp_addr *paddr)
 {
 	struct list_head *pos;
-	struct sockaddr_storage_list *addr;
+	struct sctp_sockaddr_entry *addr;
 	struct sctp_bind_addr *bp;
 
 	sctp_read_lock(&ep->base.addr_lock);
 	bp = &ep->base.bind_addr;
 	list_for_each(pos, &bp->address_list) {
-		addr = list_entry(pos, struct sockaddr_storage_list, list);
+		addr = list_entry(pos, struct sctp_sockaddr_entry, list);
 		if (sctp_has_association(&addr->a, paddr)) {
 			sctp_read_unlock(&ep->base.addr_lock);
 			return 1;

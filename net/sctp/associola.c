@@ -126,7 +126,6 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 	asoc->base.addr_lock = RW_LOCK_UNLOCKED;
 
 	asoc->state = SCTP_STATE_CLOSED;
-	asoc->state_timestamp = jiffies;
 
 	/* Set these values from the socket values, a conversion between
 	 * millsecons to seconds/microseconds must also be done.

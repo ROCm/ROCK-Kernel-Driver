@@ -185,7 +185,7 @@ extern struct sctp_globals {
 	 * We actively maintain this complete list of interfaces on
 	 * the system by catching routing events.
 	 *
-	 * It is a list of struct sockaddr_storage_list.
+	 * It is a list of sctp_sockaddr_entry.
 	 */
 	struct list_head local_addr_list;
 	spinlock_t local_addr_lock;
@@ -409,10 +409,10 @@ struct sctp_signed_cookie {
  * params for the maximum size and pass such structures around
  * internally.
  */
-typedef union {
+union sctp_addr_param {
 	struct sctp_ipv4addr_param v4;
 	struct sctp_ipv6addr_param v6;
-} sctp_addr_param_t;
+};
 
 /* A convenience type to allow walking through the various
  * parameters and avoid casting all over the place.
@@ -426,7 +426,7 @@ union sctp_params {
 	struct sctp_supported_addrs_param *sat;
 	struct sctp_ipv4addr_param *v4;
 	struct sctp_ipv6addr_param *v6;
-	struct sctp_addr_param *addr;
+	union sctp_addr_param *addr;
 };
 
 /* RFC 2960.  Section 3.3.5 Heartbeat.
@@ -633,7 +633,7 @@ const union sctp_addr *sctp_source(const struct sctp_chunk *chunk);
  * sin_port -- ordinary port number
  * sin_addr -- cast to either (struct in_addr) or (struct in6_addr)
  */
-struct sockaddr_storage_list {
+struct sctp_sockaddr_entry {
 	struct list_head list;
 	union sctp_addr a;
 };
@@ -1400,9 +1400,6 @@ struct sctp_association {
 	 *		State takes values from SCTP_STATE_*.
 	 */
 	sctp_state_t state;
-
-	/* When did we enter this state?  */
-	int state_timestamp;
 
 	/* The cookie life I award for any cookie.  */
 	struct timeval cookie_life;

@@ -608,13 +608,13 @@ static void sctp_cmd_setup_t2(sctp_cmd_seq_t *cmds,
 }
 
 /* Helper function to change the state of an association. */
-static void sctp_cmd_new_state(sctp_cmd_seq_t *cmds, struct sctp_association *asoc,
+static void sctp_cmd_new_state(sctp_cmd_seq_t *cmds, 
+			       struct sctp_association *asoc,
 			       sctp_state_t state)
 {
 	struct sock *sk = asoc->base.sk;
 
 	asoc->state = state;
-	asoc->state_timestamp = jiffies;
 
 	if (sctp_style(sk, TCP)) {
 		/* Change the sk->sk_state of a TCP-style socket that has 
@@ -702,7 +702,7 @@ int sctp_do_sm(sctp_event_t event_type, sctp_subtype_t subtype,
 	       int gfp)
 {
 	sctp_cmd_seq_t commands;
-	sctp_sm_table_entry_t *state_fn;
+	const sctp_sm_table_entry_t *state_fn;
 	sctp_disposition_t status;
 	int error = 0;
 	typedef const char *(printfn_t)(sctp_subtype_t);

@@ -2724,7 +2724,7 @@ static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
 	struct list_head *pos;
 	int cnt = 0;
 	struct sctp_getaddrs getaddrs;
-	struct sockaddr_storage_list *from;
+	struct sctp_sockaddr_entry *from;
 	struct sockaddr_storage *to;
 
 	if (len != sizeof(struct sctp_getaddrs))
@@ -2752,7 +2752,7 @@ static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
 	to = getaddrs.addrs;
 	list_for_each(pos, &bp->address_list) {
 		from = list_entry(pos,
-				struct sockaddr_storage_list,
+				struct sctp_sockaddr_entry,
 				list);
 		if (copy_to_user(to, &from->a, sizeof(from->a)))
 			return -EFAULT;

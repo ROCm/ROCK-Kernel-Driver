@@ -65,7 +65,7 @@ int sctp_bind_addr_copy(struct sctp_bind_addr *dest,
 			const struct sctp_bind_addr *src,
 			sctp_scope_t scope, int gfp, int flags)
 {
-	struct sockaddr_storage_list *addr;
+	struct sctp_sockaddr_entry *addr;
 	struct list_head *pos;
 	int error = 0;
 
@@ -74,7 +74,7 @@ int sctp_bind_addr_copy(struct sctp_bind_addr *dest,
 
 	/* Extract the addresses which are relevant for this scope.  */
 	list_for_each(pos, &src->address_list) {
-		addr = list_entry(pos, struct sockaddr_storage_list, list);
+		addr = list_entry(pos, struct sctp_sockaddr_entry, list);
 		error = sctp_copy_one_addr(dest, &addr->a, scope,
 					   gfp, flags);
 		if (error < 0)
@@ -87,7 +87,7 @@ int sctp_bind_addr_copy(struct sctp_bind_addr *dest,
 	 */
 	if (list_empty(&dest->address_list) && (SCTP_SCOPE_GLOBAL == scope)) {
 		list_for_each(pos, &src->address_list) {
-			addr = list_entry(pos, struct sockaddr_storage_list,
+			addr = list_entry(pos, struct sctp_sockaddr_entry,
 					  list);
 			error = sctp_copy_one_addr(dest, &addr->a,
 						   SCTP_SCOPE_LINK, gfp,
@@ -135,12 +135,12 @@ void sctp_bind_addr_init(struct sctp_bind_addr *bp, __u16 port)
 /* Dispose of the address list. */
 static void sctp_bind_addr_clean(struct sctp_bind_addr *bp)
 {
-	struct sockaddr_storage_list *addr;
+	struct sctp_sockaddr_entry *addr;
 	struct list_head *pos, *temp;
 
 	/* Empty the bind address list. */
 	list_for_each_safe(pos, temp, &bp->address_list) {
-		addr = list_entry(pos, struct sockaddr_storage_list, list);
+		addr = list_entry(pos, struct sctp_sockaddr_entry, list);
 		list_del(pos);
 		kfree(addr);
 		SCTP_DBG_OBJCNT_DEC(addr);
@@ -163,10 +163,10 @@ void sctp_bind_addr_free(struct sctp_bind_addr *bp)
 int sctp_add_bind_addr(struct sctp_bind_addr *bp, union sctp_addr *new,
 		       int gfp)
 {
-	struct sockaddr_storage_list *addr;
+	struct sctp_sockaddr_entry *addr;
 
 	/* Add the address to the bind address list.  */
-	addr = t_new(struct sockaddr_storage_list, gfp);
+	addr = t_new(struct sctp_sockaddr_entry, gfp);
 	if (!addr)
 		return -ENOMEM;
 
@@ -191,10 +191,10 @@ int sctp_add_bind_addr(struct sctp_bind_addr *bp, union sctp_addr *new,
 int sctp_del_bind_addr(struct sctp_bind_addr *bp, union sctp_addr *del_addr)
 {
 	struct list_head *pos, *temp;
-	struct sockaddr_storage_list *addr;
+	struct sctp_sockaddr_entry *addr;
 
 	list_for_each_safe(pos, temp, &bp->address_list) {
-		addr = list_entry(pos, struct sockaddr_storage_list, list);
+		addr = list_entry(pos, struct sctp_sockaddr_entry, list);
 		if (sctp_cmp_addr_exact(&addr->a, del_addr)) {
 			/* Found the exact match. */
 			list_del(pos);
@@ -219,22 +219,22 @@ union sctp_params sctp_bind_addrs_to_raw(const struct sctp_bind_addr *bp,
 	union sctp_params addrparms;
 	union sctp_params retval;
 	int addrparms_len;
-	sctp_addr_param_t rawaddr;
+	union sctp_addr_param rawaddr;
 	int len;
-	struct sockaddr_storage_list *addr;
+	struct sctp_sockaddr_entry *addr;
 	struct list_head *pos;
 	addrparms_len = 0;
 	len = 0;
 
 	/* Allocate enough memory at once. */
 	list_for_each(pos, &bp->address_list) {
-		len += sizeof(sctp_addr_param_t);
+		len += sizeof(union sctp_addr_param);
 	}
 
 	/* Don't even bother embedding an address if there
 	 * is only one.
 	 */
-	if (len == sizeof(sctp_addr_param_t)) {
+	if (len == sizeof(union sctp_addr_param)) {
 		retval.v = NULL;
 		goto end_raw;
 	}
@@ -246,7 +246,7 @@ union sctp_params sctp_bind_addrs_to_raw(const struct sctp_bind_addr *bp,
 	addrparms = retval;
 
 	list_for_each(pos, &bp->address_list) {
-		addr = list_entry(pos, struct sockaddr_storage_list, list);
+		addr = list_entry(pos, struct sctp_sockaddr_entry, list);
 		len = sockaddr2sctp_addr(&addr->a, &rawaddr);
 		memcpy(addrparms.v, &rawaddr, len);
 		addrparms.v += len;
@@ -265,16 +265,16 @@ end_raw:
 int sctp_raw_to_bind_addrs(struct sctp_bind_addr *bp, __u8 *raw_addr_list,
 			   int addrs_len, __u16 port, int gfp)
 {
-	sctp_addr_param_t *rawaddr;
-	sctp_paramhdr_t *param;
+	union sctp_addr_param *rawaddr;
+	struct sctp_paramhdr *param;
 	union sctp_addr addr;
 	int retval = 0;
 	int len;
 
 	/* Convert the raw address to standard address format */
 	while (addrs_len) {
-		param = (sctp_paramhdr_t *)raw_addr_list;
-		rawaddr = (sctp_addr_param_t *)raw_addr_list;
+		param = (struct sctp_paramhdr *)raw_addr_list;
+		rawaddr = (union sctp_addr_param *)raw_addr_list;
 
 		switch (param->type) {
 		case SCTP_PARAM_IPV4_ADDRESS:
@@ -312,11 +312,11 @@ int sctp_bind_addr_match(struct sctp_bind_addr *bp,
 			 const union sctp_addr *addr,
 			 struct sctp_opt *opt)
 {
-	struct sockaddr_storage_list *laddr;
+	struct sctp_sockaddr_entry *laddr;
 	struct list_head *pos;
 
 	list_for_each(pos, &bp->address_list) {
-		laddr = list_entry(pos, struct sockaddr_storage_list, list);
+		laddr = list_entry(pos, struct sctp_sockaddr_entry, list);
 		if (opt->pf->cmp_addr(&laddr->a, addr, opt))
  			return 1;
 	}
