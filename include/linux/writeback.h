@@ -51,10 +51,10 @@ struct writeback_control {
 	loff_t start;
 	loff_t end;
 
-	int nonblocking:1;		/* Don't get stuck on request queues */
-	int encountered_congestion:1;	/* An output: a queue is full */
-	int for_kupdate:1;		/* A kupdate writeback */
-	int for_reclaim:1;		/* Invoked from the page allocator */
+	unsigned nonblocking:1;			/* Don't get stuck on request queues */
+	unsigned encountered_congestion:1;	/* An output: a queue is full */
+	unsigned for_kupdate:1;			/* A kupdate writeback */
+	unsigned for_reclaim:1;			/* Invoked from the page allocator */
 };
 
 /*
