@@ -358,8 +358,7 @@ static struct sk_buff *udsl_decode_aal5 (struct udsl_vcc_data *ctx, struct sk_bu
 
 	/* is skb long enough ? */
 	if (skb->len < pdu_length) {
-		if (ctx->vcc->stats)
-			atomic_inc (&ctx->vcc->stats->rx_err);
+		atomic_inc (&ctx->vcc->stats->rx_err);
 		return NULL;
 	}
 
@@ -378,8 +377,7 @@ static struct sk_buff *udsl_decode_aal5 (struct udsl_vcc_data *ctx, struct sk_bu
 	/* check crc */
 	if (pdu_crc != crc) {
 		dbg ("udsl_decode_aal5: crc check failed!");
-		if (ctx->vcc->stats)
-			atomic_inc (&ctx->vcc->stats->rx_err);
+		atomic_inc (&ctx->vcc->stats->rx_err);
 		return NULL;
 	}
 
@@ -387,8 +385,7 @@ static struct sk_buff *udsl_decode_aal5 (struct udsl_vcc_data *ctx, struct sk_bu
 	skb_trim (skb, length);
 
 	/* update stats */
-	if (ctx->vcc->stats)
-		atomic_inc (&ctx->vcc->stats->rx);
+	atomic_inc (&ctx->vcc->stats->rx);
 
 	vdbg ("udsl_decode_aal5 returns pdu 0x%p with length %d", skb, skb->len);
 	return skb;
@@ -760,8 +757,7 @@ made_progress:
 			dev_kfree_skb (skb);
 		instance->current_skb = NULL;
 
-		if (vcc->stats)
-			atomic_inc (&vcc->stats->tx);
+		atomic_inc (&vcc->stats->tx);
 	}
 
 	goto made_progress;
