@@ -298,7 +298,7 @@ static int longhaul_get_cpu_mult (void)
 
 static void longhaul_setstate (unsigned int clock_ratio_index)
 {
-	int vidindex, i, speed, mult;
+	int speed, mult;
 	struct cpufreq_freqs freqs;
 	union msr_longhaul longhaul;
 	union msr_bcr2 bcr2;
@@ -336,6 +336,14 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 		wrmsrl (MSR_VIA_BCR2, bcr2.val);
 		break;
 
+	/*
+	 * Longhaul v2. (Ezra [C5C])
+	 * We can scale voltage with this too, but that's currently
+	 * disabled until we come up with a decent 'match freq to voltage'
+	 * algorithm.
+	 * We also need to do the voltage/freq setting in order depending
+	 * on the direction of scaling (like we do in powernow-k7.c)
+	 */
 	case 2:
 		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 		longhaul.bits.SoftBusRatio = clock_ratio_index & 0xf;
@@ -344,39 +352,16 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 		/* We must program the revision key only with values we
 		 * know about, not blindly copy it from 0:3 */
 		longhaul.bits.RevisionKey = 1;
-
-		if (can_scale_voltage) {
-			/* PB: TODO fix this up */
-			vidindex = (((highest_speed-lowest_speed) / (fsb/2)) -
-					((highest_speed-((clock_ratio[clock_ratio_index] * fsb * 100)/1000)) / (fsb/2)));
-			for (i=0;i<32;i++) {
-				dprintk (KERN_INFO "VID hunting. Looking for %d, found %d\n",
-						minvid+(vidindex*25), voltage_table[i]);
-				if (voltage_table[i]==(minvid + (vidindex * 25)))
-					break;
-			}
-			if (i==32)
-				goto bad_voltage;
-
-			dprintk (KERN_INFO PFX "Desired vid index=%d\n", i);
-#if 0
-			longhaul.bits.SoftVID = i;
-			longhaul.bits.EnableSoftVID = 1;
-#endif
-		}
-/* FIXME: Do voltage and freq seperatly like we do in powernow-k7 */
-bad_voltage:
 		wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 		__hlt();
 
-		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
-		longhaul.bits.EnableSoftBusRatio = 0;
-		if (can_scale_voltage)
-			longhaul.bits.EnableSoftVID = 0;
-		longhaul.bits.RevisionKey = 1;
-		wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 		break;
 
+	/*
+	 * Longhaul v3. (Ezra-T [C5M], Nehemiag [C5N])
+	 * This can also do voltage scaling, but see above.
+	 * Ezra-T was alleged to do FSB scaling too, but it never worked in practice.
+	 */
 	case 3:
 		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 		longhaul.bits.SoftBusRatio = clock_ratio_index & 0xf;
@@ -385,7 +370,6 @@ bad_voltage:
 		/* We must program the revision key only with values we
 		 * know about, not blindly copy it from 0:3 */
 		longhaul.bits.RevisionKey = 3;	/* SoftVID & SoftBSEL */
-
 		wrmsrl(MSR_VIA_LONGHAUL, longhaul.val);
 		__hlt();
 
