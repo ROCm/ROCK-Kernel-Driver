@@ -1547,8 +1547,7 @@ static inline void __kmem_cache_free (kmem_cache_t *cachep, void* objp)
 		STATS_INC_FREEMISS(cachep);
 		batchcount = cachep->batchcount;
 		cc->avail -= batchcount;
-		free_block(cachep,
-					&cc_entry(cc)[cc->avail],batchcount);
+		free_block(cachep, &cc_entry(cc)[cc->avail], batchcount);
 		cc_entry(cc)[cc->avail++] = objp;
 		return;
 	} else {
@@ -1729,8 +1728,13 @@ static int kmem_tune_cpucache (kmem_cache_t* cachep, int limit, int batchcount)
 	return 0;
 }
 
+/* 
+ * If slab debugging is enabled, don't batch slabs
+ * on the per-cpu lists by defaults.
+ */
 static void enable_cpucache (kmem_cache_t *cachep)
 {
+#ifndef CONFIG_DEBUG_SLAB
 	int err;
 	int limit;
 
@@ -1748,6 +1752,7 @@ static void enable_cpucache (kmem_cache_t *cachep)
 	if (err)
 		printk(KERN_ERR "enable_cpucache failed for %s, error %d.\n",
 					cachep->name, -err);
+#endif
 }
 
 static void enable_all_cpucaches (void)
