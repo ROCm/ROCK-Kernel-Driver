@@ -1356,6 +1356,7 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 	} else {
 		memcpy(&fifo->fifo[fifo->head], data, firsthalf);
 	}  
+	usb_serial_debug_data (__FILE__, __FUNCTION__, firsthalf, &fifo->fifo[fifo->head]);
 
 	// update the index and size
 	fifo->head  += firsthalf;
@@ -1376,14 +1377,11 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 		} else {
 			memcpy(&fifo->fifo[fifo->head], &data[firsthalf], secondhalf);
 		}
+		usb_serial_debug_data (__FILE__, __FUNCTION__, secondhalf, &fifo->fifo[fifo->head]);
 		// update the index and size
 		fifo->count += secondhalf;
 		fifo->head  += secondhalf;
 		// No need to check for wrap since we can not get to end of fifo in this part
-	}
-
-	if (copySize) {
-		usb_serial_debug_data (__FILE__, __FUNCTION__, copySize, data);
 	}
 
 	send_more_port_data((struct edgeport_serial *)usb_get_serial_data(port->serial), edge_port);
