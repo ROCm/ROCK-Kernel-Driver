@@ -78,8 +78,6 @@ static inline int mpc_apic_id(struct mpc_config_processor *m, int quad)
 	return (m->mpc_apicid);
 }
 
-#define WAKE_SECONDARY_VIA_INIT
-
 static inline void setup_portio_remap(void)
 {
 }

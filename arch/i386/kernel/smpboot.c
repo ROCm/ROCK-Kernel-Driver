@@ -53,6 +53,7 @@
 #include "smpboot_hooks.h"
 
 #include <mach_apic.h>
+#include <mach_wakecpu.h>
 
 /* Set if we find a B stepping CPU */
 static int __initdata smp_b_stepping;
@@ -348,8 +349,7 @@ void __init smp_callin(void)
 	 * our local APIC.  We have to wait for the IPI or we'll
 	 * lock up on an APIC access.
 	 */
-	if (!clustered_apic_mode) 
-		while (!atomic_read(&init_deasserted));
+	wait_for_init_deassert(&init_deasserted);
 
 	/*
 	 * (This works even if the APIC is not enabled.)
@@ -398,12 +398,7 @@ void __init smp_callin(void)
 	 */
 
 	Dprintk("CALLIN, before setup_local_APIC().\n");
-	/*
-	 * Because we use NMIs rather than the INIT-STARTUP sequence to
-	 * bootstrap the CPUs, the APIC may be in a weird state. Kick it.
-	 */
-	if (clustered_apic_mode)
-		clear_local_APIC();
+	smp_callin_clear_local_apic();
 	setup_local_APIC();
 	map_cpu_to_logical_apicid();
 
@@ -555,7 +550,7 @@ void unmap_cpu_to_logical_apicid(int cpu)
 }
 
 #if APIC_DEBUG
-static inline void inquire_remote_apic(int apicid)
+static inline void __inquire_remote_apic(int apicid)
 {
 	int i, regs[] = { APIC_ID >> 4, APIC_LVR >> 4, APIC_SPIV >> 4 };
 	char *names[] = { "ID", "VERSION", "SPIV" };
@@ -649,6 +644,15 @@ wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 {
 	unsigned long send_status = 0, accept_status = 0;
 	int maxlvt, timeout, num_starts, j;
+
+	/*
+	 * Be paranoid about clearing APIC errors.
+	 */
+	if (APIC_INTEGRATED(apic_version[phys_apicid])) {
+		apic_read_around(APIC_SPIV);
+		apic_write(APIC_ESR, 0);
+		apic_read(APIC_ESR);
+	}
 
 	Dprintk("Asserting INIT.\n");
 
@@ -819,11 +823,7 @@ static int __init do_boot_cpu(int apicid)
 
 	Dprintk("Setting warm reset code and vector.\n");
 
-	if (clustered_apic_mode) {
-		/* stash the current NMI vector, so we can put things back */
-		nmi_high = *((volatile unsigned short *) TRAMPOLINE_HIGH);
-		nmi_low = *((volatile unsigned short *) TRAMPOLINE_LOW);
-	} 
+	store_NMI_vector(&nmi_high, &nmi_low);
 
 	CMOS_WRITE(0xa, 0xf);
 	local_flush_tlb();
@@ -832,15 +832,6 @@ static int __init do_boot_cpu(int apicid)
 	Dprintk("2.\n");
 	*((volatile unsigned short *) TRAMPOLINE_LOW) = start_eip & 0xf;
 	Dprintk("3.\n");
-
-	/*
-	 * Be paranoid about clearing APIC errors.
-	 */
-	if (!clustered_apic_mode && APIC_INTEGRATED(apic_version[apicid])) {
-		apic_read_around(APIC_SPIV);
-		apic_write(APIC_ESR, 0);
-		apic_read(APIC_ESR);
-	}
 
 	/*
 	 * Starting actual IPI sequence...
@@ -879,10 +870,7 @@ static int __init do_boot_cpu(int apicid)
 			else
 				/* trampoline code not run */
 				printk("Not responding.\n");
-#if APIC_DEBUG
-			if (!clustered_apic_mode)
-				inquire_remote_apic(apicid);
-#endif
+			inquire_remote_apic(apicid);
 		}
 	}
 	if (boot_error) {
@@ -896,11 +884,6 @@ static int __init do_boot_cpu(int apicid)
 	/* mark "stuck" area as not stuck */
 	*((volatile unsigned long *)phys_to_virt(8192)) = 0;
 
-	if(clustered_apic_mode) {
-		printk("Restoring NMI vector\n");
-		*((volatile unsigned short *) TRAMPOLINE_HIGH) = nmi_high;
-		*((volatile unsigned short *) TRAMPOLINE_LOW) = nmi_low;
-	}
 	return boot_error;
 }
 
