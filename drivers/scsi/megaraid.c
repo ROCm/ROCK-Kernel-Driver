@@ -49,7 +49,7 @@
 #include <scsi/scsicam.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 
 #include "megaraid.h"
 
@@ -3815,7 +3815,8 @@ mega_n_to_m(void *arg, megacmd_t *mc)
 
 			umc = MBOX_P(uiocp);
 
-			upthru = (mega_passthru *)umc->xferaddr;
+			if (get_user(upthru, (mega_passthru **)&umc->xferaddr))
+				return (-EFAULT);
 
 			if( put_user(mc->status, (u8 *)&upthru->scsistatus) )
 				return (-EFAULT);
@@ -3831,7 +3832,8 @@ mega_n_to_m(void *arg, megacmd_t *mc)
 
 			umc = (megacmd_t *)uioc_mimd->mbox;
 
-			upthru = (mega_passthru *)umc->xferaddr;
+			if (get_user(upthru, (mega_passthru **)&umc->xferaddr))
+				return (-EFAULT);
 
 			if( put_user(mc->status, (u8 *)&upthru->scsistatus) )
 				return (-EFAULT);
@@ -4068,7 +4070,6 @@ mega_support_ext_cdb(adapter_t *adapter)
 static int
 mega_del_logdrv(adapter_t *adapter, int logdrv)
 {
-	DECLARE_WAIT_QUEUE_HEAD(wq);
 	unsigned long flags;
 	scb_t *scb;
 	int rval;
@@ -4083,11 +4084,9 @@ mega_del_logdrv(adapter_t *adapter, int logdrv)
 	 * Wait till all the issued commands are complete and there are no
 	 * commands in the pending queue
 	 */
-	while( atomic_read(&adapter->pend_cmds) > 0 ||
-			!list_empty(&adapter->pending_list) ) {
-
-		sleep_on_timeout( &wq, 1*HZ );	/* sleep for 1s */
-	}
+	while (atomic_read(&adapter->pend_cmds) > 0 ||
+	       !list_empty(&adapter->pending_list))
+		msleep(1000);	/* sleep for 1s */
 
 	rval = mega_do_del_logdrv(adapter, logdrv);
 
@@ -4610,6 +4609,26 @@ megaraid_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	pci_bus = pdev->bus->number;
 	pci_dev_func = pdev->devfn;
+
+	/*
+	 * The megaraid3 stuff reports the ID of the Intel part which is not
+	 * remotely specific to the megaraid
+	 */
+	if (pdev->vendor == PCI_VENDOR_ID_INTEL) {
+		u16 magic;
+		/*
+		 * Don't fall over the Compaq management cards using the same
+		 * PCI identifier
+		 */
+		if (pdev->subsystem_vendor == PCI_VENDOR_ID_COMPAQ &&
+		    pdev->subsystem_device == 0xC000)
+		   	return -ENODEV;
+		/* Now check the magic signature byte */
+		pci_read_config_word(pdev, PCI_CONF_AMISIG, &magic);
+		if (magic != HBA_SIGNATURE_471 && magic != HBA_SIGNATURE)
+			return -ENODEV;
+		/* Ok it is probably a megaraid */
+	}
 
 	/*
 	 * For these vendor and device ids, signature offsets are not

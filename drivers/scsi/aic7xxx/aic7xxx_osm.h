@@ -85,7 +85,7 @@
 /* Core SCSI definitions */
 #define AIC_LIB_PREFIX ahc
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 
 /* Name space conflict with BSD queue macros */
 #ifdef LIST_HEAD

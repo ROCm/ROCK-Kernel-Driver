@@ -59,7 +59,7 @@
 #include <asm/io.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "pci2220i.h"
 #include "psi_dale.h"
 

@@ -41,7 +41,7 @@
 #define REAL_DMA
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "sun3_scsi.h"
 #include "NCR5380.h"
 

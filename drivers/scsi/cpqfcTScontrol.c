@@ -45,7 +45,7 @@
 #include <linux/spinlock.h>
 
 #include "scsi.h"
-#include "hosts.h"   // Scsi_Host definition for INT handler
+#include <scsi/scsi_host.h>   // Scsi_Host definition for INT handler
 #include "cpqfcTSchip.h"
 #include "cpqfcTSstructs.h"
 

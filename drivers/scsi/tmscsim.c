@@ -172,6 +172,11 @@
  *	2.1b1 04/01/31	GL	(applied 05.04) Remove internal		*
  *				command-queuing.			*
  *	2.1b2 04/02/01	CH	(applied 05.04) Fix error-handling	*
+ *	2.1c  04/05/23  GL	Update to use the new pci_driver API,	*
+ *				some scsi EH updates, more cleanup.	*
+ *	2.1d  04/05/27	GL	Moved setting of scan_devices to	*
+ *				slave_alloc/_configure/_destroy, as	*
+ *				suggested by CH.			*
  ***********************************************************************/
 
 /* Uncomment SA_INTERRUPT, if the driver refuses to share its IRQ with other devices */
@@ -239,7 +244,7 @@
 #include <linux/interrupt.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <linux/stat.h>
 #include <scsi/scsicam.h>
 
@@ -267,7 +272,6 @@
 #include <linux/init.h>
 #include <linux/spinlock.h>
 
-#if defined(MODULE)
 static struct pci_device_id tmscsim_pci_tbl[] = {
 	{
 		.vendor		= PCI_VENDOR_ID_AMD,
@@ -278,8 +282,7 @@ static struct pci_device_id tmscsim_pci_tbl[] = {
 	{ }		/* Terminating entry */
 };
 MODULE_DEVICE_TABLE(pci, tmscsim_pci_tbl);
-#endif
-	
+
 #define USE_SPINLOCKS 1
 
 #define DC390_IFLAGS unsigned long iflags
@@ -342,6 +345,8 @@ static void   dc390_updateDCB (PACB pACB, PDCB pDCB);
 
 static int DC390_release(struct Scsi_Host *host);
 static int dc390_shutdown (struct Scsi_Host *host);
+static int DC390_proc_info (struct Scsi_Host *shpnt, char *buffer, char **start,
+			    off_t offset, int length, int inout);
 
 static PACB	dc390_pACB_start= NULL;
 static PACB	dc390_pACB_current = NULL;
@@ -351,16 +356,14 @@ static UCHAR	dc390_adapterCnt = 0;
 
 /* Startup values, to be overriden on the commandline */
 static int tmscsim[] = {-2, -2, -2, -2, -2, -2};
+static int tmscsim_paramnum = ARRAY_SIZE(tmscsim);
 
-#if defined(MODULE)
-MODULE_PARM(tmscsim, "1-6i");
+module_param_array(tmscsim, int, tmscsim_paramnum, 0);
 MODULE_PARM_DESC(tmscsim, "Host SCSI ID, Speed (0=10MHz), Device Flags, Adapter Flags, Max Tags (log2(tags)-1), DelayReset (s)");
 MODULE_AUTHOR("C.L. Huang / Kurt Garloff");
 MODULE_DESCRIPTION("SCSI host adapter driver for Tekram DC390 and other AMD53C974A based PCI SCSI adapters");
 MODULE_LICENSE("GPL");
-
 MODULE_SUPPORTED_DEVICE("sd,sr,sg,st");
-#endif
 
 static PVOID dc390_phase0[]={
        dc390_DataOut_0,
@@ -913,6 +916,14 @@ static void dc390_SendSRB( PACB pACB, PSRB pSRB )
     }
 }
 
+static struct scatterlist* dc390_sg_build_single(struct scatterlist *sg, void *addr, unsigned int length)
+{
+	memset(sg, 0, sizeof(struct scatterlist));
+	sg->page	= virt_to_page(addr);
+	sg->length	= length;
+	sg->offset	= (unsigned long)addr & ~PAGE_MASK;
+	return sg;
+}
 
 /* Create pci mapping */
 static int dc390_pci_map (PSRB pSRB)
@@ -921,40 +932,43 @@ static int dc390_pci_map (PSRB pSRB)
 	Scsi_Cmnd *pcmd = pSRB->pcmd;
 	struct pci_dev *pdev = pSRB->pSRBDCB->pDCBACB->pdev;
 	dc390_cmd_scp_t* cmdp = ((dc390_cmd_scp_t*)(&pcmd->SCp));
+
 	/* Map sense buffer */
 	if (pSRB->SRBFlag & AUTO_REQSENSE) {
-		sg_dma_address(&pSRB->Segmentx) = cmdp->saved_dma_handle = 
-			pci_map_page(pdev, virt_to_page(pcmd->sense_buffer),
-				     (unsigned long)pcmd->sense_buffer & ~PAGE_MASK, sizeof(pcmd->sense_buffer),
-				     DMA_FROM_DEVICE);
-		sg_dma_len(&pSRB->Segmentx) = sizeof(pcmd->sense_buffer);
-		pSRB->SGcount = 1;
-		pSRB->pSegmentList = (PSGL) &pSRB->Segmentx;
+		pSRB->pSegmentList	= dc390_sg_build_single(&pSRB->Segmentx, pcmd->sense_buffer, sizeof(pcmd->sense_buffer));
+		pSRB->SGcount		= pci_map_sg(pdev, pSRB->pSegmentList, 1,
+						     DMA_FROM_DEVICE);
+		cmdp->saved_dma_handle	= sg_dma_address(pSRB->pSegmentList);
+
+		/* TODO: error handling */
+		if (pSRB->SGcount != 1)
+			error = 1;
 		DEBUG1(printk("%s(): Mapped sense buffer %p at %x\n", __FUNCTION__, pcmd->sense_buffer, cmdp->saved_dma_handle));
-	/* Make SG list */	
+	/* Map SG list */
 	} else if (pcmd->use_sg) {
-		pSRB->pSegmentList = (PSGL) pcmd->request_buffer;
-		pSRB->SGcount = pci_map_sg(pdev, pSRB->pSegmentList,
-					   pcmd->use_sg,
-					   scsi_to_pci_dma_dir(pcmd->sc_data_direction));
+		pSRB->pSegmentList	= (PSGL) pcmd->request_buffer;
+		pSRB->SGcount		= pci_map_sg(pdev, pSRB->pSegmentList, pcmd->use_sg,
+						     scsi_to_pci_dma_dir(pcmd->sc_data_direction));
 		/* TODO: error handling */
 		if (!pSRB->SGcount)
 			error = 1;
-		DEBUG1(printk("%s(): Mapped SG %p with %d (%d) elements\n", __FUNCTION__, pcmd->request_buffer, pSRB->SGcount, pcmd->use_sg));
+		DEBUG1(printk("%s(): Mapped SG %p with %d (%d) elements\n",\
+			      __FUNCTION__, pcmd->request_buffer, pSRB->SGcount, pcmd->use_sg));
 	/* Map single segment */
 	} else if (pcmd->request_buffer && pcmd->request_bufflen) {
-		sg_dma_address(&pSRB->Segmentx) = cmdp->saved_dma_handle =
-			pci_map_page(pdev, virt_to_page(pcmd->request_buffer),
-				     (unsigned long)pcmd->request_buffer & ~PAGE_MASK,
-				     pcmd->request_bufflen, scsi_to_pci_dma_dir(pcmd->sc_data_direction));
+		pSRB->pSegmentList	= dc390_sg_build_single(&pSRB->Segmentx, pcmd->request_buffer, pcmd->request_bufflen);
+		pSRB->SGcount		= pci_map_sg(pdev, pSRB->pSegmentList, 1,
+						     scsi_to_pci_dma_dir(pcmd->sc_data_direction));
+		cmdp->saved_dma_handle	= sg_dma_address(pSRB->pSegmentList);
+
 		/* TODO: error handling */
-		sg_dma_len(&pSRB->Segmentx) = pcmd->request_bufflen;
-		pSRB->SGcount = 1;
-		pSRB->pSegmentList = (PSGL) &pSRB->Segmentx;
+		if (pSRB->SGcount != 1)
+			error = 1;
 		DEBUG1(printk("%s(): Mapped request buffer %p at %x\n", __FUNCTION__, pcmd->request_buffer, cmdp->saved_dma_handle));
 	/* No mapping !? */	
     	} else
 		pSRB->SGcount = 0;
+
 	return error;
 }
 
@@ -963,21 +977,16 @@ static void dc390_pci_unmap (PSRB pSRB)
 {
 	Scsi_Cmnd* pcmd = pSRB->pcmd;
 	struct pci_dev *pdev = pSRB->pSRBDCB->pDCBACB->pdev;
-	dc390_cmd_scp_t* cmdp = ((dc390_cmd_scp_t*)(&pcmd->SCp));
+	DEBUG1(dc390_cmd_scp_t* cmdp = ((dc390_cmd_scp_t*)(&pcmd->SCp)));
 
 	if (pSRB->SRBFlag) {
-		pci_unmap_page(pdev, cmdp->saved_dma_handle,
-			       sizeof(pcmd->sense_buffer), DMA_FROM_DEVICE);
+		pci_unmap_sg(pdev, &pSRB->Segmentx, 1, DMA_FROM_DEVICE);
 		DEBUG1(printk("%s(): Unmapped sense buffer at %x\n", __FUNCTION__, cmdp->saved_dma_handle));
 	} else if (pcmd->use_sg) {
-		pci_unmap_sg(pdev, pcmd->request_buffer, pcmd->use_sg,
-			     scsi_to_pci_dma_dir(pcmd->sc_data_direction));
+		pci_unmap_sg(pdev, pcmd->request_buffer, pcmd->use_sg, scsi_to_pci_dma_dir(pcmd->sc_data_direction));
 		DEBUG1(printk("%s(): Unmapped SG at %p with %d elements\n", __FUNCTION__, pcmd->request_buffer, pcmd->use_sg));
 	} else if (pcmd->request_buffer && pcmd->request_bufflen) {
-		pci_unmap_page(pdev,
-			       cmdp->saved_dma_handle,
-			       pcmd->request_bufflen,
-			       scsi_to_pci_dma_dir(pcmd->sc_data_direction));
+		pci_unmap_sg(pdev, &pSRB->Segmentx, 1, scsi_to_pci_dma_dir(pcmd->sc_data_direction));
 		DEBUG1(printk("%s(): Unmapped request buffer at %x\n", __FUNCTION__, cmdp->saved_dma_handle));
 	}
 }
@@ -1031,15 +1040,15 @@ static void dc390_BuildSRB (Scsi_Cmnd* pcmd, PDCB pDCB, PSRB pSRB)
  * 2.0.x: always return 0
  * 2.1.x: old model: (use_new_eh_code == 0): like 2.0.x
  *	  TO BE DONE:
- *	  new model: return 0 if successful
- *	  	     return 1 if command cannot be queued (queue full)
+ *	  new model: return 0 if successful, or must not be re-queued
+ *		     return 1 if command cannot be queued (queue full)
  *		     command will be inserted in midlevel queue then ...
  *
  ***********************************************************************/
 
 static int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
 {
-    PDCB   pDCB;
+    PDCB   pDCB = (PDCB) cmd->device->hostdata;
     PSRB   pSRB;
     PACB   pACB = (PACB) cmd->device->host->hostdata;
 
@@ -1050,42 +1059,19 @@ static int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
     /* TODO: Change the policy: Always accept TEST_UNIT_READY or INQUIRY 
      * commands and alloc a DCB for the device if not yet there. DCB will
      * be removed in dc390_SRBdone if SEL_TIMEOUT */
-
-    if( (pACB->scan_devices == END_SCAN) && (cmd->cmnd[0] != INQUIRY) )
-	pACB->scan_devices = 0;
-
-    else if( (pACB->scan_devices) && (cmd->cmnd[0] == READ_6) )
-	pACB->scan_devices = 0;
-
-    if( (pACB->scan_devices || cmd->cmnd[0] == TEST_UNIT_READY || cmd->cmnd[0] == INQUIRY) && 
-       !(pACB->DCBmap[cmd->device->id] & (1 << cmd->device->lun)) )
-    {
-        pACB->scan_devices = 1;
-
-	dc390_initDCB( pACB, &pDCB, cmd->device->id, cmd->device->lun );
-	if (!pDCB)
-	  {
-	    printk (KERN_ERR "DC390: kmalloc for DCB failed, target %02x lun %02x\n", 
-		    cmd->device->id, cmd->device->lun);
-	    goto fail;
-	  }
-            
-    }
-    else if( !(pACB->scan_devices) && !(pACB->DCBmap[cmd->device->id] & (1 << cmd->device->lun)) )
-    {
+    if (!(pACB->scan_devices) && !(pACB->DCBmap[cmd->device->id] & (1 << cmd->device->lun))) {
 	printk(KERN_INFO "DC390: Ignore target %02x lun %02x\n",
 		cmd->device->id, cmd->device->lun); 
 	goto fail;
     }
-    else
-    {
-	pDCB = dc390_findDCB (pACB, cmd->device->id, cmd->device->lun);
-	if (!pDCB)
-	 {  /* should never happen */
-	    printk (KERN_ERR "DC390: no DCB failed, target %02x lun %02x\n", 
-		    cmd->device->id, cmd->device->lun);
-	    goto fail;
-	 }
+
+    /* Should it be: BUG_ON(!pDCB); ? */
+
+    if (!pDCB)
+    {  /* should never happen */
+	printk (KERN_ERR "DC390: no DCB found, target %02x lun %02x\n", 
+		cmd->device->id, cmd->device->lun);
+	goto fail;
     }
 
     pACB->Cmds++;
@@ -1304,7 +1290,7 @@ static void dc390_dumpinfo (PACB pACB, PDCB pDCB, PSRB pSRB)
 
 static int DC390_abort (Scsi_Cmnd *cmd)
 {
-    PDCB  pDCB;
+    PDCB  pDCB = (PDCB) cmd->device->hostdata;
     PSRB  pSRB, psrb;
     UINT  count, i;
     int   status;
@@ -1314,7 +1300,6 @@ static int DC390_abort (Scsi_Cmnd *cmd)
     printk ("DC390: Abort command (pid %li, Device %02i-%02i)\n",
 	    cmd->pid, cmd->device->id, cmd->device->lun);
 
-    pDCB = dc390_findDCB (pACB, cmd->device->id, cmd->device->lun);
     if( !pDCB ) goto  NOT_RUN;
 
     /* Added 98/07/02 KG */
@@ -1561,15 +1546,16 @@ static void dc390_initDCB( PACB pACB, PDCB *ppDCB, UCHAR id, UCHAR lun )
 {
     PEEprom	prom;
     UCHAR	index;
-    PDCB pDCB, pDCB2;
+    PDCB	pDCB, pDCB2 = 0;
 
     pDCB = kmalloc (sizeof(DC390_DCB), GFP_ATOMIC);
     DCBDEBUG(printk (KERN_INFO "DC390: alloc mem for DCB (ID %i, LUN %i): %p\n",	\
 		     id, lun, pDCB));
- 
+
     *ppDCB = pDCB;
-    if (!pDCB) return;
-    pDCB2 = 0;
+    if (!pDCB)
+	return;
+
     if( pACB->DCBCnt == 0 )
     {
 	pACB->pLinkDCB = pDCB;
@@ -1745,8 +1731,6 @@ static void __init dc390_initACB (PSH psh, ULONG io_port, UCHAR Irq, UCHAR index
     pACB->SRBCount = MAX_SRB_CNT;
     pACB->AdapterIndex = index;
     pACB->status = 0;
-    psh->this_id = dc390_eepromBuf[index][EE_ADAPT_SCSI_ID];
-    pACB->DeviceCnt = 0;
     pACB->DCBCnt = 0;
     pACB->TagMaxNum = 2 << dc390_eepromBuf[index][EE_TAG_CMD_NUM];
     pACB->ACBFlag = 0;
@@ -1856,7 +1840,7 @@ static int __init dc390_initAdapter (PSH psh, ULONG io_port, UCHAR Irq, UCHAR in
  *
  * Inputs : host - pointer to this host adapter's structure
  *	    io_port - IO ports mapped to this adapter
- *	    Irq - IRQ assigned to this adpater
+ *	    irq - IRQ assigned to this adpater
  *	    struct pci_dev - PCI access handle
  *	    index - Adapter index
  *
@@ -1865,10 +1849,8 @@ static int __init dc390_initAdapter (PSH psh, ULONG io_port, UCHAR Irq, UCHAR in
  * Note: written in capitals, because the locking is only done here,
  *	not in DC390_detect, called from outside 
  ***********************************************************************/
-
-static int __init DC390_init (PSHT psht, ULONG io_port, UCHAR Irq, struct pci_dev *pdev, UCHAR index)
+static int __init dc390_init (PSH psh, unsigned long io_port, u8 irq, struct pci_dev *pdev, UCHAR index)
 {
-    PSH   psh;
     PACB  pACB;
 
     if (dc390_CheckEEpromCheckSum (PDEV, index))
@@ -1890,25 +1872,16 @@ static int __init DC390_init (PSHT psht, ULONG io_port, UCHAR Irq, struct pci_de
 	dc390_check_for_safe_settings ();
 	dc390_EEprom_Override (index);
     }
-   
-    psh = scsi_register( psht, sizeof(DC390_ACB) );
-    if( !psh ) return( -1 );
-	
-    scsi_set_device(psh, &pdev->dev);
     pACB = (PACB) psh->hostdata;
 
     DEBUG0(printk(KERN_INFO "DC390: pSH = %8x, Index %02i\n", (UINT) psh, index));
 
-    dc390_initACB( psh, io_port, Irq, index );
+    dc390_initACB( psh, io_port, irq, index );
         
     PDEVSET;
 
-    if( !dc390_initAdapter( psh, io_port, Irq, index ) )
+    if( !dc390_initAdapter( psh, io_port, irq, index ) )
     {
-	DEBUG0(printk("DC390: pACB = %8x, pDCBmap = %8x, pSRB_array = %8x\n",\
-		      (UINT) pACB, (UINT) pACB->DCBmap, (UINT) pACB->SRB_array));
-	DEBUG0(printk("DC390: ACB size= %4x, DCB size= %4x, SRB size= %4x\n",\
-		      sizeof(DC390_ACB), sizeof(DC390_DCB), sizeof(DC390_SRB) ));
         return (0);
     }
     else
@@ -1927,42 +1900,131 @@ static void __init dc390_set_pci_cfg (PDEVDECL)
 	PCI_WRITE_CONFIG_WORD (PDEV, PCI_STATUS, (PCI_STATUS_SIG_SYSTEM_ERROR | PCI_STATUS_DETECTED_PARITY));
 }
 
-int __init DC390_detect (Scsi_Host_Template *psht)
+/**
+ * dc390_slave_alloc - Called by the scsi mid layer to tell us about a new
+ * scsi device that we need to deal with.
+ *
+ * @scsi_device: The new scsi device that we need to handle.
+ */
+static int dc390_slave_alloc(struct scsi_device *scsi_device)
 {
-    struct pci_dev *pdev = NULL;
-    UCHAR   irq;
-    ULONG   io_port;
-
-    dc390_pACB_start = NULL;
-
-    if ( PCI_PRESENT )
-	    while ((pdev = pci_find_device(PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD53C974, pdev)))
-	{
-	    if (pci_enable_device (pdev))
-		continue;
-
-	    if (pci_set_dma_mask(pdev, 0xffffffff)) {
-		    printk(KERN_ERR "DC390(%i): No suitable DMA available.\n", dc390_adapterCnt);
-		    continue;
-	    }
-	    PCI_GET_IO_AND_IRQ;
-	    DEBUG0(printk(KERN_INFO "DC390(%i): IO_PORT=%04x,IRQ=%x\n", dc390_adapterCnt, (UINT) io_port, irq));
-
-	    if( !DC390_init(psht, io_port, irq, PDEV, dc390_adapterCnt))
-	    {
-		pci_set_master(pdev);
-		dc390_set_pci_cfg (PDEV);
-		dc390_adapterCnt++;
-	    }
+	PDCB pDCB;
+	PACB pACB = (PACB) scsi_device->host->hostdata;
+	dc390_initDCB(pACB, &pDCB, scsi_device->id, scsi_device->lun);
+	if (pDCB != NULL) {
+		scsi_device->hostdata = pDCB;
+		pACB->scan_devices = 1;
+		return 0;
 	}
-    else
-	printk (KERN_ERR "DC390: No PCI BIOS found!\n");
-   
-    if (dc390_adapterCnt)
-	psht->proc_name = "tmscsim";
+	return -ENOMEM;
+}
 
-    printk(KERN_INFO "DC390: %i adapters found\n", dc390_adapterCnt);
-    return( dc390_adapterCnt );
+/**
+ * dc390_slave_destroy - Called by the scsi mid layer to tell us about a
+ * device that is going away.
+ *
+ * @scsi_device: The scsi device that we need to remove.
+ */
+static void dc390_slave_destroy(struct scsi_device *scsi_device)
+{
+	PACB pACB = (PACB) scsi_device->host->hostdata;
+	PDCB pDCB = (PDCB) scsi_device->hostdata;
+	pACB->scan_devices = 0;
+	if (pDCB != NULL)
+		dc390_remove_dev(pACB, pDCB);
+	else
+		printk(KERN_ERR"%s() called for non-existing device!\n", __FUNCTION__);
+}
+
+static int dc390_slave_configure(struct scsi_device *scsi_device)
+{
+	PACB pACB = (PACB) scsi_device->host->hostdata;
+	pACB->scan_devices = 0;
+	return 0;
+}
+
+static Scsi_Host_Template driver_template = {
+	.module			= THIS_MODULE,
+	.proc_name		= "tmscsim", 
+	.proc_info		= DC390_proc_info,
+	.name			= DC390_BANNER " V" DC390_VERSION,
+	.slave_alloc		= dc390_slave_alloc,
+	.slave_configure	= dc390_slave_configure,
+	.slave_destroy		= dc390_slave_destroy,
+	.queuecommand		= DC390_queue_command,
+	.eh_abort_handler	= DC390_abort,
+	.eh_bus_reset_handler	= DC390_reset,
+	.bios_param		= DC390_bios_param,
+	.can_queue		= 42,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 16,
+	.use_clustering		= DISABLE_CLUSTERING,
+};
+
+static int __devinit dc390_init_one(struct pci_dev *dev,
+				    const struct pci_device_id *id)
+{
+	struct Scsi_Host *scsi_host;
+	unsigned long io_port;
+	u8 irq;
+	PACB  pACB;
+	int ret = -ENOMEM;
+
+	if (pci_enable_device(dev))
+		return -ENODEV;
+
+	io_port = pci_resource_start(dev, 0);
+	irq = dev->irq;
+
+	/* allocate scsi host information (includes out adapter) */
+	scsi_host = scsi_host_alloc(&driver_template, sizeof(struct _ACB));
+	if (!scsi_host)
+		goto nomem;
+
+	pACB = (PACB) scsi_host->hostdata;
+
+	if (dc390_init(scsi_host, io_port, irq, dev, dc390_adapterCnt)) {
+		ret = -EBUSY;
+		goto busy;
+	}
+
+	pci_set_master(dev);
+	dc390_set_pci_cfg(dev);
+	dc390_adapterCnt++;
+
+	/* get the scsi mid level to scan for new devices on the bus */
+	if (scsi_add_host(scsi_host, &dev->dev)) {
+		ret = -ENODEV;
+		goto nodev;
+	}
+	pci_set_drvdata(dev, scsi_host);
+	scsi_scan_host(scsi_host);
+
+	return 0;
+
+nodev:
+busy:
+	scsi_host_put(scsi_host);
+nomem:
+	pci_disable_device(dev);
+	return ret;
+}
+
+/**
+ * dc390_remove_one - Called to remove a single instance of the adapter.
+ *
+ * @dev: The PCI device to remove.
+ */
+static void __devexit dc390_remove_one(struct pci_dev *dev)
+{
+	struct Scsi_Host *scsi_host = pci_get_drvdata(dev);
+
+	scsi_remove_host(scsi_host);
+	DC390_release(scsi_host);
+	pci_disable_device(dev);
+	scsi_host_put(scsi_host);
+	pci_set_drvdata(dev, NULL);
 }
 
 /********************************************************************
@@ -2035,7 +2097,7 @@ static int DC390_proc_info (struct Scsi_Host *shpnt, char *buffer, char **start,
   SPRINTF("            Lost arbitrations %i, Sel. connected %i, Connected: %s\n", 
 	  pACB->SelLost, pACB->SelConn, pACB->Connected? "Yes": "No");
    
-  SPRINTF("Nr of attached devices: %i, Nr of DCBs: %i\n", pACB->DeviceCnt, pACB->DCBCnt);
+  SPRINTF("Nr of DCBs: %i\n", pACB->DCBCnt);
   SPRINTF("Map of attached LUNs: %02x %02x %02x %02x %02x %02x %02x %02x\n",
 	  pACB->DCBmap[0], pACB->DCBmap[1], pACB->DCBmap[2], pACB->DCBmap[3], 
 	  pACB->DCBmap[4], pACB->DCBmap[5], pACB->DCBmap[6], pACB->DCBmap[7]);
@@ -2122,7 +2184,7 @@ static int DC390_proc_info (struct Scsi_Host *shpnt, char *buffer, char **start,
 static int dc390_shutdown (struct Scsi_Host *host)
 {
     UCHAR    bval;
-    PACB pACB = (PACB)(host->hostdata);
+    PACB pACB = (PACB) host->hostdata;
    
 /*  pACB->soft_reset(host); */
 
@@ -2142,7 +2204,7 @@ static int dc390_shutdown (struct Scsi_Host *host)
 static void dc390_freeDCBs (struct Scsi_Host *host)
 {
     PDCB pDCB, nDCB;
-    PACB pACB = (PACB)(host->hostdata);
+    PACB pACB = (PACB) host->hostdata;
     
     pDCB = pACB->pLinkDCB;
     if (!pDCB) return;
@@ -2161,7 +2223,7 @@ static void dc390_freeDCBs (struct Scsi_Host *host)
 static int DC390_release (struct Scsi_Host *host)
 {
     DC390_IFLAGS;
-    PACB pACB = (PACB)(host->hostdata);
+    PACB pACB = (PACB) host->hostdata;
 
     DC390_LOCK_IO(host);
 
@@ -2177,24 +2239,25 @@ static int DC390_release (struct Scsi_Host *host)
     release_region(host->io_port,host->n_io_port);
     dc390_freeDCBs (host);
     DC390_UNLOCK_IO(host);
-    scsi_unregister(host);
     return( 1 );
 }
 
-static Scsi_Host_Template driver_template = {
-   .proc_name      = "tmscsim", 
-   .proc_info      = DC390_proc_info,
-   .name           = DC390_BANNER " V" DC390_VERSION,
-   .detect         = DC390_detect,
-   .release        = DC390_release,
-   .queuecommand   = DC390_queue_command,
-   .eh_abort_handler		= DC390_abort,
-   .eh_bus_reset_handler	= DC390_reset,
-   .bios_param     = DC390_bios_param,
-   .can_queue      = 42,
-   .this_id        = 7,
-   .sg_tablesize   = SG_ALL,
-   .cmd_per_lun    = 16,
-   .use_clustering = DISABLE_CLUSTERING,
+static struct pci_driver dc390_driver = {
+	.name           = "tmscsim",
+	.id_table       = tmscsim_pci_tbl,
+	.probe          = dc390_init_one,
+	.remove         = __devexit_p(dc390_remove_one),
 };
-#include "scsi_module.c"
+
+static int __init dc390_module_init(void)
+{
+	return pci_module_init(&dc390_driver);
+}
+
+static void __exit dc390_module_exit(void)
+{
+	pci_unregister_driver(&dc390_driver);
+}
+
+module_init(dc390_module_init);
+module_exit(dc390_module_exit);

@@ -45,6 +45,11 @@
 	" SCSI scanning, some SCSI devices might not be configured\n"
 
 /*
+ * Default timeout
+ */
+#define SCSI_TIMEOUT (2*HZ)
+
+/*
  * Prefix values for the SCSI id's (stored in driverfs name field)
  */
 #define SCSI_UID_SER_NUM 'S'

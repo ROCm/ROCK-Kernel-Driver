@@ -54,7 +54,7 @@
 #include <asm/io.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "pci2000.h"
 #include "psi_roy.h"
 

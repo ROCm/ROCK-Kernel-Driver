@@ -55,7 +55,11 @@
 #define MPTBASE_H_INCLUDED
 /*{-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
-#include "linux_compat.h"	/* linux-2.2.x (vs. -2.4.x) tweaks */
+#include <linux/version.h>
+#include <linux/config.h>
+#include <linux/kernel.h>
+#include <linux/pci.h>
+
 #include "scsi3.h"		/* SCSI defines */
 
 #include "lsi/mpi_type.h"
@@ -81,8 +85,8 @@
 #define COPYRIGHT	"Copyright (c) 1999-2004 " MODULEAUTHOR
 #endif
 
-#define MPT_LINUX_VERSION_COMMON	"3.01.06"
-#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-3.01.06"
+#define MPT_LINUX_VERSION_COMMON	"3.01.07"
+#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-3.01.07"
 #define WHAT_MAGIC_STRING		"@" "(" "#" ")"
 
 #define show_mptmod_ver(s,ver)  \

@@ -145,7 +145,7 @@
 
 #define ULTRASTOR_PRIVATE	/* Get the private stuff from ultrastor.h */
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "ultrastor.h"
 
 #define FALSE 0

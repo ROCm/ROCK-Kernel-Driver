@@ -46,7 +46,7 @@
 #include <linux/interrupt.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "../qlogicfas408.h"
 
 #include <pcmcia/version.h>
