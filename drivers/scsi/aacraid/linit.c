@@ -64,15 +64,6 @@ MODULE_DESCRIPTION("Dell PERC2, 2/Si, 3/Si, 3/Di, "
 MODULE_LICENSE("GPL");
 MODULE_VERSION(AAC_DRIVER_VERSION);
 
-
-int nondasd = -1;
-module_param(nondasd, int, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC(nondasd, "Control scanning of hba for nondasd devices. 0=off, 1=on");
-
-int paemode = -1;
-module_param(paemode, int, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC(paemode, "Control whether dma addressing is using PAE. 0=off, 1=on");
-
 struct aac_dev *aac_devices[MAXIMUM_NUM_ADAPTERS];
 static unsigned aac_count;
 static int aac_cfg_major = -1;

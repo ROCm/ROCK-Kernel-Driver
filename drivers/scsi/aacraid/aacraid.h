@@ -28,10 +28,7 @@
 #define aac_phys_to_logical(x)  (x+1)
 #define aac_logical_to_phys(x)  (x?x-1:0)
 
-#define AAC_DETAILED_STATUS_INFO
-
-extern int nondasd;
-extern int paemode;
+/* #define AAC_DETAILED_STATUS_INFO */
 
 struct diskparm
 {
@@ -841,7 +838,7 @@ struct aac_dev
 	 * lets break them out so we don't have to do an AND to check them
 	 */
 	u8			nondasd_support; 
-	u8			pae_support;
+	u8			dac_support;
 };
 
 #define AllocateAndMapFibSpace(dev, MapFibContext) \
