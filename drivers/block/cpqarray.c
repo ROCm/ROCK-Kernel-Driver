@@ -16,7 +16,7 @@
  *    along with this program; if not, write to the Free Software
  *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- *    Questions/Comments/Bugfixes to arrays@compaq.com
+ *    Questions/Comments/Bugfixes to Cpqarray-discuss@lists.sourceforge.net
  *
  */
 #include <linux/config.h>	/* CONFIG_PROC_FS */
@@ -46,13 +46,13 @@
 
 #define SMART2_DRIVER_VERSION(maj,min,submin) ((maj<<16)|(min<<8)|(submin))
 
-#define DRIVER_NAME "Compaq SMART2 Driver (v 2.4.5)"
-#define DRIVER_VERSION SMART2_DRIVER_VERSION(2,4,5)
+#define DRIVER_NAME "Compaq SMART2 Driver (v 2.6.0)"
+#define DRIVER_VERSION SMART2_DRIVER_VERSION(2,6,0)
 
 /* Embedded module documentation macros - see modules.h */
 /* Original author Chris Frantz - Compaq Computer Corporation */
 MODULE_AUTHOR("Compaq Computer Corporation");
-MODULE_DESCRIPTION("Driver for Compaq Smart2 Array Controllers");
+MODULE_DESCRIPTION("Driver for Compaq Smart2 Array Controllers version 2.6.0");
 MODULE_LICENSE("GPL");
 
 #include "cpqarray.h"
