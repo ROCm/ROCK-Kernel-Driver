@@ -108,7 +108,7 @@ typedef struct {
 	unsigned long :     2; /* Software use */
 	unsigned long bolted: 1; /* HPTE is "bolted" */
 	unsigned long :     1; /* Software use */
-	unsigned long :     1; /* Reserved */
+	unsigned long l:    1; /* Virtual page is large (L=1) or 4 KB (L=0) */
 	unsigned long h:    1; /* Hash function identifier */
 	unsigned long v:    1; /* Valid (v=1) or invalid (v=0) */
 } Hpte_dword0;
