@@ -758,91 +758,64 @@ static int rtl8150_close(struct net_device *netdev)
 	return res;
 }
 
-static int rtl8150_ethtool_ioctl(struct net_device *netdev, void __user *uaddr)
+static void rtl8150_get_drvinfo(struct net_device *netdev, struct ethtool_drvinfo *info)
 {
 	rtl8150_t *dev = netdev_priv(netdev);
-	int cmd;
 
-	if (get_user(cmd, (int __user *) uaddr))
-		return -EFAULT;
-
-	switch (cmd) {
-	case ETHTOOL_GDRVINFO:{
-		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-
-		strncpy(info.driver, driver_name, ETHTOOL_BUSINFO_LEN);
-		strncpy(info.version, DRIVER_VERSION, ETHTOOL_BUSINFO_LEN);
-		usb_make_path(dev->udev, info.bus_info, sizeof info.bus_info);
-		if (copy_to_user(uaddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-		}
-	case ETHTOOL_GSET:{
-		struct ethtool_cmd ecmd;
-		short lpa, bmcr;
-
-		if (copy_from_user(&ecmd, uaddr, sizeof(ecmd)))
-			return -EFAULT;
-		ecmd.supported = (SUPPORTED_10baseT_Half |
-				  SUPPORTED_10baseT_Full |
-				  SUPPORTED_100baseT_Half |
-				  SUPPORTED_100baseT_Full |
-				  SUPPORTED_Autoneg |
-				  SUPPORTED_TP | SUPPORTED_MII);
-		ecmd.port = PORT_TP;
-		ecmd.transceiver = XCVR_INTERNAL;
-		ecmd.phy_address = dev->phy;
-		get_registers(dev, BMCR, 2, &bmcr);
-		get_registers(dev, ANLP, 2, &lpa);
-		if (bmcr & BMCR_ANENABLE) {
-			ecmd.autoneg = AUTONEG_ENABLE;
-			ecmd.speed = (lpa & (LPA_100HALF | LPA_100FULL)) ?
-			             SPEED_100 : SPEED_10;
-			if (ecmd.speed == SPEED_100)
-				ecmd.duplex = (lpa & LPA_100FULL) ?
-				    DUPLEX_FULL : DUPLEX_HALF;
-			else
-				ecmd.duplex = (lpa & LPA_10FULL) ?
-				    DUPLEX_FULL : DUPLEX_HALF;
-		} else {
-			ecmd.autoneg = AUTONEG_DISABLE;
-			ecmd.speed = (bmcr & BMCR_SPEED100) ?
-			    SPEED_100 : SPEED_10;
-			ecmd.duplex = (bmcr & BMCR_FULLDPLX) ?
-			    DUPLEX_FULL : DUPLEX_HALF;
-		}
-		if (copy_to_user(uaddr, &ecmd, sizeof(ecmd)))
-			return -EFAULT;
-		return 0;
-		}
-	case ETHTOOL_SSET:
-		return -ENOTSUPP;
-	case ETHTOOL_GLINK:{
-		struct ethtool_value edata = { ETHTOOL_GLINK };
-
-		edata.data = netif_carrier_ok(netdev);
-		if (copy_to_user(uaddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-		}
-	default:
-		return -EOPNOTSUPP;
-	}
+	strncpy(info->driver, driver_name, ETHTOOL_BUSINFO_LEN);
+	strncpy(info->version, DRIVER_VERSION, ETHTOOL_BUSINFO_LEN);
+	usb_make_path(dev->udev, info->bus_info, sizeof info->bus_info);
 }
+
+static int rtl8150_get_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
+{
+	rtl8150_t *dev = netdev_priv(netdev);
+	short lpa, bmcr;
+
+	ecmd->supported = (SUPPORTED_10baseT_Half |
+			  SUPPORTED_10baseT_Full |
+			  SUPPORTED_100baseT_Half |
+			  SUPPORTED_100baseT_Full |
+			  SUPPORTED_Autoneg |
+			  SUPPORTED_TP | SUPPORTED_MII);
+	ecmd->port = PORT_TP;
+	ecmd->transceiver = XCVR_INTERNAL;
+	ecmd->phy_address = dev->phy;
+	get_registers(dev, BMCR, 2, &bmcr);
+	get_registers(dev, ANLP, 2, &lpa);
+	if (bmcr & BMCR_ANENABLE) {
+		ecmd->autoneg = AUTONEG_ENABLE;
+		ecmd->speed = (lpa & (LPA_100HALF | LPA_100FULL)) ?
+			     SPEED_100 : SPEED_10;
+		if (ecmd->speed == SPEED_100)
+			ecmd->duplex = (lpa & LPA_100FULL) ?
+			    DUPLEX_FULL : DUPLEX_HALF;
+		else
+			ecmd->duplex = (lpa & LPA_10FULL) ?
+			    DUPLEX_FULL : DUPLEX_HALF;
+	} else {
+		ecmd->autoneg = AUTONEG_DISABLE;
+		ecmd->speed = (bmcr & BMCR_SPEED100) ?
+		    SPEED_100 : SPEED_10;
+		ecmd->duplex = (bmcr & BMCR_FULLDPLX) ?
+		    DUPLEX_FULL : DUPLEX_HALF;
+	}
+	return 0;
+}
+
+static struct ethtool_ops ops = {
+	.get_drvinfo = rtl8150_get_drvinfo,
+	.get_settings = rtl8150_get_settings,
+	.get_link = ethtool_op_get_link
+};
 
 static int rtl8150_ioctl(struct net_device *netdev, struct ifreq *rq, int cmd)
 {
 	rtl8150_t *dev = netdev_priv(netdev);
-	u16 *data;
-	int res;
-
-	data = (u16 *) & rq->ifr_ifru;
-	res = 0;
+	u16 *data = (u16 *) & rq->ifr_ifru;
+	int res = 0;
 
 	switch (cmd) {
-	case SIOCETHTOOL:
-		res = rtl8150_ethtool_ioctl(netdev, rq->ifr_data);
-		break;
 	case SIOCDEVPRIVATE:
 		data[0] = dev->phy;
 	case SIOCDEVPRIVATE + 1:
@@ -898,6 +871,7 @@ static int rtl8150_probe(struct usb_interface *intf,
 	netdev->set_mac_address = rtl8150_set_mac_address;
 	netdev->get_stats = rtl8150_netdev_stats;
 	netdev->mtu = RTL8150_MTU;
+	SET_ETHTOOL_OPS(netdev, &ops);
 	dev->intr_interval = 100;	/* 100ms */
 
 	if (!alloc_all_urbs(dev)) {
