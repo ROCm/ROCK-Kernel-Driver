@@ -1596,12 +1596,16 @@ struct net_device *init_airo_card( unsigned short irq, int port, int is_pcmcia )
 		}
 	}
 
-	if (probe && setup_card( ai, dev->dev_addr ) != SUCCESS ) {
-		printk( KERN_ERR "airo: MAC could not be enabled\n" );
-		rc = -EIO;
-		goto err_out_res;
-	} else
+	if (probe) {
+		if ( setup_card( ai, dev->dev_addr ) != SUCCESS ) {
+			printk( KERN_ERR "airo: MAC could not be enabled\n" );
+			rc = -EIO;
+			goto err_out_res;
+		}
+	} else {
 		ai->bap_read = fast_bap_read;
+		ai->flags |= FLAG_FLASHING;
+	}
 
 	rc = register_netdev(dev);
 	if (rc)
