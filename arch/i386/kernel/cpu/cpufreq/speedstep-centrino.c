@@ -22,6 +22,8 @@
 #include <linux/init.h>
 #include <linux/cpufreq.h>
 #include <linux/config.h>
+#include <linux/delay.h>
+#include <linux/compiler.h>
 
 #ifdef CONFIG_X86_SPEEDSTEP_CENTRINO_ACPI
 #include <linux/acpi.h>
@@ -277,7 +279,7 @@ static int centrino_verify_cpu_id(const struct cpuinfo_x86 *c, const struct cpu_
 }
 
 /* To be called only after centrino_model is initialized */
-static unsigned extract_clock(unsigned msr, unsigned int cpu)
+static unsigned extract_clock(unsigned msr, unsigned int cpu, int failsafe)
 {
 	int i;
 
@@ -299,15 +301,19 @@ static unsigned extract_clock(unsigned msr, unsigned int cpu)
 	msr &= 0xffff;
 	for (i=0;centrino_model[cpu]->op_points[i].frequency != CPUFREQ_TABLE_END; i++) {
 		if (msr == centrino_model[cpu]->op_points[i].index)
-		return centrino_model[cpu]->op_points[i].frequency;
+			return centrino_model[cpu]->op_points[i].frequency;
 	}
-	return 0;
+	if (failsafe)
+		return centrino_model[cpu]->op_points[i-1].frequency;
+	else
+		return 0;
 }
 
 /* Return the current CPU frequency in kHz */
 static unsigned int get_cur_freq(unsigned int cpu)
 {
 	unsigned l, h;
+	unsigned clock_freq;
 	cpumask_t saved_mask;
 
 	saved_mask = current->cpus_allowed;
@@ -316,8 +322,34 @@ static unsigned int get_cur_freq(unsigned int cpu)
 		return 0;
 
 	rdmsr(MSR_IA32_PERF_STATUS, l, h);
+	clock_freq = extract_clock(l, cpu, 0);
+
+	if (unlikely(clock_freq == 0)) {
+		/*
+		 * On some CPUs, we can see transient MSR values (which are
+		 * not present in _PSS), while CPU is doing some automatic
+		 * P-state transition (like TM2). Allow CPU to stabilize at
+		 * some freq and retry.
+		 * If we continue to see transients for long time, just return
+		 * the lowest possible frequency as best guess.
+		 */
+		int retries = 0;
+#define MAX_EXTRACT_CLOCK_RETRIES	5
+		while (clock_freq == 0 && retries < MAX_EXTRACT_CLOCK_RETRIES) {
+			udelay(100);
+			retries++;
+			rdmsr(MSR_IA32_PERF_STATUS, l, h);
+			clock_freq = extract_clock(l, cpu, 0);
+		}
+
+		if (clock_freq == 0) {
+			rdmsr(MSR_IA32_PERF_STATUS, l, h);
+			clock_freq = extract_clock(l, cpu, 1);
+		}
+	}
+
 	set_cpus_allowed(current, saved_mask);
-	return extract_clock(l, cpu);
+	return clock_freq;
 }
 
 
@@ -426,10 +458,10 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
 			continue;
 		}
 		
-		if (extract_clock(centrino_model[cpu]->op_points[i].index, cpu) !=
+		if (extract_clock(centrino_model[cpu]->op_points[i].index, cpu, 0) !=
 		    (centrino_model[cpu]->op_points[i].frequency)) {
 			dprintk("Invalid encoded frequency (%u vs. %u)\n",
-				extract_clock(centrino_model[cpu]->op_points[i].index, cpu),
+				extract_clock(centrino_model[cpu]->op_points[i].index, cpu, 0),
 				centrino_model[cpu]->op_points[i].frequency);
 			result = -EINVAL;
 			goto err_kfree_all;
@@ -609,8 +641,8 @@ static int centrino_target (struct cpufreq_policy *policy,
 	}
 
 	freqs.cpu = cpu;
-	freqs.old = extract_clock(oldmsr, cpu);
-	freqs.new = extract_clock(msr, cpu);
+	freqs.old = extract_clock(oldmsr, cpu, 0);
+	freqs.new = extract_clock(msr, cpu, 0);
 
 	dprintk("target=%dkHz old=%d new=%d msr=%04x\n",
 		target_freq, freqs.old, freqs.new, msr);
