@@ -45,6 +45,7 @@ extern int cap_capset_check (struct task_struct *target, kernel_cap_t *effective
 extern void cap_capset_set (struct task_struct *target, kernel_cap_t *effective, kernel_cap_t *inheritable, kernel_cap_t *permitted);
 extern int cap_bprm_set_security (struct linux_binprm *bprm);
 extern void cap_bprm_compute_creds (struct linux_binprm *bprm);
+extern int cap_bprm_secureexec(struct linux_binprm *bprm);
 extern int cap_task_post_setuid (uid_t old_ruid, uid_t old_euid, uid_t old_suid, int flags);
 extern void cap_task_reparent_to_init (struct task_struct *p);
 extern int cap_syslog (int type);
@@ -131,6 +132,12 @@ struct swap_info_struct;
  * 	first.
  * 	@bprm contains the linux_binprm structure.
  *	Return 0 if the hook is successful and permission is granted.
+ * @bprm_secureexec:
+ *      Return a boolean value (0 or 1) indicating whether a "secure exec" 
+ *      is required.  The flag is passed in the auxiliary table
+ *      on the initial stack to the ELF interpreter to indicate whether libc 
+ *      should enable secure mode.
+ *      @bprm contains the linux_binprm structure.
  *
  * Security hooks for filesystem operations.
  *
@@ -988,6 +995,7 @@ struct security_operations {
 	void (*bprm_compute_creds) (struct linux_binprm * bprm);
 	int (*bprm_set_security) (struct linux_binprm * bprm);
 	int (*bprm_check_security) (struct linux_binprm * bprm);
+	int (*bprm_secureexec) (struct linux_binprm * bprm);
 
 	int (*sb_alloc_security) (struct super_block * sb);
 	void (*sb_free_security) (struct super_block * sb);
@@ -1246,9 +1254,15 @@ static inline int security_bprm_set (struct linux_binprm *bprm)
 {
 	return security_ops->bprm_set_security (bprm);
 }
+
 static inline int security_bprm_check (struct linux_binprm *bprm)
 {
 	return security_ops->bprm_check_security (bprm);
+}
+
+static inline int security_bprm_secureexec (struct linux_binprm *bprm)
+{
+	return security_ops->bprm_secureexec (bprm);
 }
 
 static inline int security_sb_alloc (struct super_block *sb)
@@ -1905,6 +1919,11 @@ static inline int security_bprm_set (struct linux_binprm *bprm)
 static inline int security_bprm_check (struct linux_binprm *bprm)
 {
 	return 0;
+}
+
+static inline int security_bprm_secureexec (struct linux_binprm *bprm)
+{
+	return cap_bprm_secureexec(bprm);
 }
 
 static inline int security_sb_alloc (struct super_block *sb)
