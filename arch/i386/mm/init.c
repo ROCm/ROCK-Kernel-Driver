@@ -509,15 +509,27 @@ void __init mem_init(void)
 }
 
 #if CONFIG_X86_PAE
-struct kmem_cache_s *pae_pgd_cachep;
+#include <linux/slab.h>
+
+kmem_cache_t *pae_pmd_cachep;
+kmem_cache_t *pae_pgd_cachep;
+
+void pae_pmd_ctor(void *, kmem_cache_t *, unsigned long);
+void pae_pgd_ctor(void *, kmem_cache_t *, unsigned long);
 
 void __init pgtable_cache_init(void)
 {
         /*
          * PAE pgds must be 16-byte aligned:
          */
+	pae_pmd_cachep = kmem_cache_create("pae_pmd", 4096, 0,
+		SLAB_HWCACHE_ALIGN | SLAB_MUST_HWCACHE_ALIGN, pae_pmd_ctor, NULL);
+
+	if (!pae_pmd_cachep)
+		panic("init_pae(): cannot allocate pae_pmd SLAB cache");
+
         pae_pgd_cachep = kmem_cache_create("pae_pgd", 32, 0,
-                SLAB_HWCACHE_ALIGN | SLAB_MUST_HWCACHE_ALIGN, NULL, NULL);
+                SLAB_HWCACHE_ALIGN | SLAB_MUST_HWCACHE_ALIGN, pae_pgd_ctor, NULL);
         if (!pae_pgd_cachep)
                 panic("init_pae(): Cannot alloc pae_pgd SLAB cache");
 }

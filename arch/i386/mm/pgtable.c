@@ -168,38 +168,57 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 
 #if CONFIG_X86_PAE
 
+extern kmem_cache_t *pae_pmd_cachep;
+
+void pae_pmd_ctor(void *__pmd, kmem_cache_t *pmd_cache, unsigned long flags)
+{
+	clear_page(__pmd);
+}
+
+void pae_pgd_ctor(void *__pgd, kmem_cache_t *pgd_cache, unsigned long flags)
+{
+	pgd_t *pgd = __pgd;
+
+	memcpy(pgd + USER_PTRS_PER_PGD,
+		swapper_pg_dir + USER_PTRS_PER_PGD,
+		(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
+}
+
 pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	int i;
-	pgd_t *pgd = kmem_cache_alloc(pae_pgd_cachep, GFP_KERNEL);
+	pgd_t *pgd = kmem_cache_alloc(pae_pgd_cachep, SLAB_KERNEL);
 
-	if (pgd) {
-		for (i = 0; i < USER_PTRS_PER_PGD; i++) {
-			unsigned long pmd = __get_free_page(GFP_KERNEL);
-			if (!pmd)
-				goto out_oom;
-			clear_page(pmd);
-			set_pgd(pgd + i, __pgd(1 + __pa(pmd)));
+	if (!pgd)
+		return NULL;
+
+	for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
+		pmd_t *pmd = kmem_cache_alloc(pae_pmd_cachep, SLAB_KERNEL);
+		if (!pmd)
+			goto out_oom;
+		else if ((unsigned long)pmd & ~PAGE_MASK) {
+			printk("kmem_cache_alloc did wrong! death ensues!\n");
+			goto out_oom;
 		}
-		memcpy(pgd + USER_PTRS_PER_PGD,
-			swapper_pg_dir + USER_PTRS_PER_PGD,
-			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
+		set_pgd(pgd + i, __pgd(1 + __pa((unsigned long long)((unsigned long)pmd))));
 	}
 	return pgd;
+
 out_oom:
-	for (i--; i >= 0; i--)
-		free_page((unsigned long)__va(pgd_val(pgd[i])-1));
-	kmem_cache_free(pae_pgd_cachep, pgd);
+	for (i--; i >= 0; --i)
+		kmem_cache_free(pae_pmd_cachep, (void *)__va(pgd_val(pgd[i])-1));
+	kmem_cache_free(pae_pgd_cachep, (void *)pgd);
 	return NULL;
 }
 
 void pgd_free(pgd_t *pgd)
 {
 	int i;
-
-	for (i = 0; i < USER_PTRS_PER_PGD; i++)
-		free_page((unsigned long)__va(pgd_val(pgd[i])-1));
-	kmem_cache_free(pae_pgd_cachep, pgd);
+	for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
+		kmem_cache_free(pae_pmd_cachep, (void *)__va(pgd_val(pgd[i])-1));
+		set_pgd(pgd + i, __pgd(0));
+	}
+	kmem_cache_free(pae_pgd_cachep, (void *)pgd);
 }
 
 #else
