@@ -65,6 +65,7 @@ struct fbcon_ops {
 	struct fb_cursor cursor_state;
         int    currcon;	                /* Current VC. */
 	int    cursor_flash;
+	int    cursor_reset;
 	char  *cursor_data;
 };
     /*

@@ -182,7 +182,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code,
 			goto bad_area;
 	}
 #endif
-	if (expand_stack(vma, address, NULL))
+	if (expand_stack(vma, address))
 		goto bad_area;
 /*
  * Ok, we have a good vm_area for this memory access, so

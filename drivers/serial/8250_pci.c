@@ -283,7 +283,7 @@ static int __devinit pci_plx9050_init(struct pci_dev *dev)
 
 static void __devexit pci_plx9050_exit(struct pci_dev *dev)
 {
-	u8 *p;
+	u8 __iomem *p;
 
 	if ((pci_resource_flags(dev, 0) & IORESOURCE_MEM) == 0)
 		return;
@@ -336,7 +336,7 @@ sbs_setup(struct pci_dev *dev, struct pci_board *board,
 
 static int __devinit sbs_init(struct pci_dev *dev)
 {
-	u8 * p;
+	u8 __iomem *p;
 
 	p = ioremap(pci_resource_start(dev, 0),pci_resource_len(dev,0));
 
@@ -360,7 +360,7 @@ static int __devinit sbs_init(struct pci_dev *dev)
 
 static void __devexit sbs_exit(struct pci_dev *dev)
 {
-	u8 * p;
+	u8 __iomem *p;
 
 	p = ioremap(pci_resource_start(dev, 0),pci_resource_len(dev,0));
 	if (p != NULL) {
@@ -2114,6 +2114,13 @@ static struct pci_device_id serial_pci_tbl[] = {
 	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_PORT_650,
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
 		pbn_b0_bt_1_460800 },
+
+	/*
+	 * Dell Remote Access Card 4 - Tim_T_Murphy@Dell.com
+	 */
+	{	PCI_VENDOR_ID_DELL, PCI_DEVICE_ID_DELL_RAC4,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_b1_1_1382400 },
 
 	/*
 	 * Dell Remote Access Card III - Tim_T_Murphy@Dell.com

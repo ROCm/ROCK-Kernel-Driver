@@ -1,5 +1,5 @@
 /*
- * $Id: mtdcore.c,v 1.43 2004/07/23 15:20:46 dwmw2 Exp $
+ * $Id: mtdcore.c,v 1.44 2004/11/16 18:28:59 dwmw2 Exp $
  *
  * Core registration and callback routines for MTD
  * drivers and users.
@@ -382,7 +382,7 @@ done:
 /*====================================================================*/
 /* Init code */
 
-int __init init_mtd(void)
+static int __init init_mtd(void)
 {
 #ifdef CONFIG_PROC_FS
 	if ((proc_mtd = create_proc_entry( "mtd", 0, NULL )))

@@ -852,10 +852,10 @@ static int sym53c416_bios_param(struct scsi_device *sdev,
 MODULE_AUTHOR("Lieven Willems");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(sym53c416, "1-2i");
-MODULE_PARM(sym53c416_1, "1-2i");
-MODULE_PARM(sym53c416_2, "1-2i");
-MODULE_PARM(sym53c416_3, "1-2i");
+module_param_array(sym53c416, uint, NULL, 0);
+module_param_array(sym53c416_1, uint, NULL, 0);
+module_param_array(sym53c416_2, uint, NULL, 0);
+module_param_array(sym53c416_3, uint, NULL, 0);
 
 #endif
 

@@ -290,12 +290,10 @@ setup_sigcontext (struct sigcontext __user *sc, sigset_t *mask, struct sigscratc
 
 	if (on_sig_stack((unsigned long) sc))
 		flags |= IA64_SC_FLAG_ONSTACK;
-	if ((ifs & (1UL << 63)) == 0) {
-		/* if cr_ifs isn't valid, we got here through a syscall */
+	if ((ifs & (1UL << 63)) == 0)
+		/* if cr_ifs doesn't have the valid bit set, we got here through a syscall */
 		flags |= IA64_SC_FLAG_IN_SYSCALL;
-		cfm = scr->ar_pfs & ((1UL << 38) - 1);
-	} else
-		cfm = ifs & ((1UL << 38) - 1);
+	cfm = ifs & ((1UL << 38) - 1);
 	ia64_flush_fph(current);
 	if ((current->thread.flags & IA64_THREAD_FPH_VALID)) {
 		flags |= IA64_SC_FLAG_FPH_VALID;

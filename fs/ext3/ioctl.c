@@ -155,7 +155,7 @@ flags_err:
 	case EXT3_IOC_GETRSVSZ:
 		if (test_opt(inode->i_sb, RESERVATION) && S_ISREG(inode->i_mode)) {
 			rsv_window_size = atomic_read(&ei->i_rsv_window.rsv_goal_size);
-			return put_user(rsv_window_size, (int *)arg);
+			return put_user(rsv_window_size, (int __user *)arg);
 		}
 		return -ENOTTY;
 	case EXT3_IOC_SETRSVSZ:
@@ -168,7 +168,7 @@ flags_err:
 		if ((current->fsuid != inode->i_uid) && !capable(CAP_FOWNER))
 			return -EACCES;
 
-		if (get_user(rsv_window_size, (int *)arg))
+		if (get_user(rsv_window_size, (int __user *)arg))
 			return -EFAULT;
 
 		if (rsv_window_size > EXT3_MAX_RESERVE_BLOCKS)
@@ -186,7 +186,7 @@ flags_err:
 		if (IS_RDONLY(inode))
 			return -EROFS;
 
-		if (get_user(n_blocks_count, (__u32 *)arg))
+		if (get_user(n_blocks_count, (__u32 __user *)arg))
 			return -EFAULT;
 
 		err = ext3_group_extend(sb, EXT3_SB(sb)->s_es, n_blocks_count);
@@ -207,7 +207,7 @@ flags_err:
 		if (IS_RDONLY(inode))
 			return -EROFS;
 
-		if (copy_from_user(&input, (struct ext3_new_group_input *)arg,
+		if (copy_from_user(&input, (struct ext3_new_group_input __user *)arg,
 				sizeof(input)))
 			return -EFAULT;
 

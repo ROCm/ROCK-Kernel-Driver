@@ -3579,7 +3579,7 @@ static ssize_t show_file(struct device *dev, char *buf)
 }
 
 
-ssize_t store_ro(struct device *dev, const char *buf, size_t count)
+static ssize_t store_ro(struct device *dev, const char *buf, size_t count)
 {
 	ssize_t		rc = count;
 	struct lun	*curlun = dev_to_lun(dev);
@@ -3603,7 +3603,7 @@ ssize_t store_ro(struct device *dev, const char *buf, size_t count)
 	return rc;
 }
 
-ssize_t store_file(struct device *dev, const char *buf, size_t count)
+static ssize_t store_file(struct device *dev, const char *buf, size_t count)
 {
 	struct lun	*curlun = dev_to_lun(dev);
 	struct fsg_dev	*fsg = (struct fsg_dev *) dev_get_drvdata(dev);

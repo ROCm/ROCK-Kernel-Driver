@@ -2339,10 +2339,10 @@ int irq  = 0;
 int irq1 = 0;
 int irq2 = 0;
 int irq3 = 0;
-MODULE_PARM(irq , "i");
-MODULE_PARM(irq1, "i");
-MODULE_PARM(irq2, "i");
-MODULE_PARM(irq3, "i");
+module_param(irq , int, 0);
+module_param(irq1, int, 0);
+module_param(irq2, int, 0);
+module_param(irq3, int, 0);
 
 static int __init aurora_init(void) 
 {

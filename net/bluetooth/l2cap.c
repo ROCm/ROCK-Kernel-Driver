@@ -57,7 +57,7 @@
 #define BT_DBG(D...)
 #endif
 
-#define VERSION "2.5"
+#define VERSION "2.6"
 
 static struct proto_ops l2cap_sock_ops;
 
@@ -964,6 +964,7 @@ static inline struct sock *l2cap_get_chan_by_ident(struct l2cap_chan_list *l, u8
 	struct sock *s;
 	read_lock(&l->lock);
 	s = __l2cap_get_chan_by_ident(l, ident);
+	if (s) bh_lock_sock(s);
 	read_unlock(&l->lock);
 	return s;
 }
@@ -1096,6 +1097,22 @@ static void l2cap_conn_ready(struct l2cap_conn *conn)
 		bh_unlock_sock(sk);
 	}
 
+	read_unlock(&l->lock);
+}
+
+/* Notify sockets that we cannot guaranty reliability anymore */
+static void l2cap_conn_unreliable(struct l2cap_conn *conn, int err)
+{
+	struct l2cap_chan_list *l = &conn->chan_list;
+	struct sock *sk;
+
+	BT_DBG("conn %p", conn);
+
+	read_lock(&l->lock);
+	for (sk = l->head; sk; sk = l2cap_pi(sk)->next_c) {
+		if (l2cap_pi(sk)->link_mode & L2CAP_LM_RELIABLE)
+			sk->sk_err = err;
+	}
 	read_unlock(&l->lock);
 }
 
@@ -1427,7 +1444,8 @@ static inline int l2cap_connect_req(struct l2cap_conn *conn, struct l2cap_cmd_hd
 	sk->sk_state = BT_CONNECT2;
 	l2cap_pi(sk)->ident = cmd->ident;
 
-	if (l2cap_pi(sk)->link_mode & L2CAP_LM_ENCRYPT) {
+	if ((l2cap_pi(sk)->link_mode & L2CAP_LM_ENCRYPT) ||
+			(l2cap_pi(sk)->link_mode & L2CAP_LM_SECURE)) {
 		if (!hci_conn_encrypt(conn->hcon))
 			goto done;
 	} else if (l2cap_pi(sk)->link_mode & L2CAP_LM_AUTH) {
@@ -1946,7 +1964,8 @@ static int l2cap_auth_cfm(struct hci_conn *hcon, u8 status)
 		bh_lock_sock(sk);
 
 		if (sk->sk_state != BT_CONNECT2 ||
-				(l2cap_pi(sk)->link_mode & L2CAP_LM_ENCRYPT)) {
+				(l2cap_pi(sk)->link_mode & L2CAP_LM_ENCRYPT) ||
+				(l2cap_pi(sk)->link_mode & L2CAP_LM_SECURE)) {
 			bh_unlock_sock(sk);
 			continue;
 		}
@@ -2014,6 +2033,9 @@ static int l2cap_encrypt_cfm(struct hci_conn *hcon, u8 status)
 		l2cap_send_cmd(conn, l2cap_pi(sk)->ident,
 				L2CAP_CONN_RSP, sizeof(rsp), &rsp);
 
+		if (l2cap_pi(sk)->link_mode & L2CAP_LM_SECURE)
+			hci_conn_change_link_key(hcon);
+
 		bh_unlock_sock(sk);
 	}
 
@@ -2039,10 +2061,12 @@ static int l2cap_recv_acldata(struct hci_conn *hcon, struct sk_buff *skb, u16 fl
 			kfree_skb(conn->rx_skb);
 			conn->rx_skb = NULL;
 			conn->rx_len = 0;
+			l2cap_conn_unreliable(conn, ECOMM);
 		}
 
 		if (skb->len < 2) {
 			BT_ERR("Frame is too short (len %d)", skb->len);
+			l2cap_conn_unreliable(conn, ECOMM);
 			goto drop;
 		}
 
@@ -2060,6 +2084,7 @@ static int l2cap_recv_acldata(struct hci_conn *hcon, struct sk_buff *skb, u16 fl
 		if (skb->len > len) {
 			BT_ERR("Frame is too long (len %d, expected len %d)",
 				skb->len, len);
+			l2cap_conn_unreliable(conn, ECOMM);
 			goto drop;
 		}
 
@@ -2074,6 +2099,7 @@ static int l2cap_recv_acldata(struct hci_conn *hcon, struct sk_buff *skb, u16 fl
 
 		if (!conn->rx_len) {
 			BT_ERR("Unexpected continuation frame (len %d)", skb->len);
+			l2cap_conn_unreliable(conn, ECOMM);
 			goto drop;
 		}
 
@@ -2083,6 +2109,7 @@ static int l2cap_recv_acldata(struct hci_conn *hcon, struct sk_buff *skb, u16 fl
 			kfree_skb(conn->rx_skb);
 			conn->rx_skb = NULL;
 			conn->rx_len = 0;
+			l2cap_conn_unreliable(conn, ECOMM);
 			goto drop;
 		}
 

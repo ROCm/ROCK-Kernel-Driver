@@ -273,7 +273,7 @@ static struct tty_struct *pmz_receive_chars(struct uart_pmac_port *uap,
 			uap->flags &= ~PMACZILOG_FLAG_BREAK;
 		}
 
-#ifdef CONFIG_MAGIC_SYSRQ
+#if defined(CONFIG_MAGIC_SYSRQ) && defined(CONFIG_SERIAL_CORE_CONSOLE)
 #ifdef USE_CTRL_O_SYSRQ
 		/* Handle the SysRq ^O Hack */
 		if (ch == '\x0f') {
@@ -289,7 +289,7 @@ static struct tty_struct *pmz_receive_chars(struct uart_pmac_port *uap,
 			if (swallow)
 				goto next_char;
  		}
-#endif /* CONFIG_MAGIC_SYSRQ */
+#endif /* CONFIG_MAGIC_SYSRQ && CONFIG_SERIAL_CORE_CONSOLE */
 
 		/* A real serial line, record the character and status.  */
 		if (drop)
@@ -1439,7 +1439,7 @@ static int __init pmz_init_port(struct uart_pmac_port *uap)
 	uap->port.mapbase = np->addrs[0].address;
 	uap->port.membase = ioremap(uap->port.mapbase, 0x1000);
       
-	uap->control_reg = (volatile u8 *)uap->port.membase;
+	uap->control_reg = uap->port.membase;
 	uap->data_reg = uap->control_reg + 0x10;
 	
 	/*
@@ -1450,16 +1450,14 @@ static int __init pmz_init_port(struct uart_pmac_port *uap)
 		uap->flags |= PMACZILOG_FLAG_HAS_DMA;
 #endif	
 	if (ZS_HAS_DMA(uap)) {
-		uap->tx_dma_regs = (volatile struct dbdma_regs *)
-			ioremap(np->addrs[np->n_addrs - 2].address, 0x1000);
+		uap->tx_dma_regs = ioremap(np->addrs[np->n_addrs - 2].address, 0x1000);
 		if (uap->tx_dma_regs == NULL) {	
 			uap->flags &= ~PMACZILOG_FLAG_HAS_DMA;
 			goto no_dma;
 		}
-		uap->rx_dma_regs = (volatile struct dbdma_regs *)
-			ioremap(np->addrs[np->n_addrs - 1].address, 0x1000);
+		uap->rx_dma_regs = ioremap(np->addrs[np->n_addrs - 1].address, 0x1000);
 		if (uap->rx_dma_regs == NULL) {	
-			iounmap((void *)uap->tx_dma_regs);
+			iounmap(uap->tx_dma_regs);
 			uap->tx_dma_regs = NULL;
 			uap->flags &= ~PMACZILOG_FLAG_HAS_DMA;
 			goto no_dma;
@@ -1536,9 +1534,9 @@ static void pmz_dispose_port(struct uart_pmac_port *uap)
 	struct device_node *np;
 
 	np = uap->node;
-	iounmap((void *)uap->rx_dma_regs);
-	iounmap((void *)uap->tx_dma_regs);
-	iounmap((void *)uap->control_reg);
+	iounmap(uap->rx_dma_regs);
+	iounmap(uap->tx_dma_regs);
+	iounmap(uap->control_reg);
 	uap->node = NULL;
 	of_node_put(np);
 	memset(uap, 0, sizeof(struct uart_pmac_port));
@@ -1603,7 +1601,7 @@ static int pmz_suspend(struct macio_dev *mdev, u32 pm_state)
 		return 0;
 	}
 
-	if (pm_state == mdev->ofdev.dev.power_state || pm_state < 2)
+	if (pm_state == mdev->ofdev.dev.power.power_state || pm_state < 2)
 		return 0;
 
 	pmz_debug("suspend, switching to state %d\n", pm_state);
@@ -1647,7 +1645,7 @@ static int pmz_suspend(struct macio_dev *mdev, u32 pm_state)
 
 	pmz_debug("suspend, switching complete\n");
 
-	mdev->ofdev.dev.power_state = pm_state;
+	mdev->ofdev.dev.power.power_state = pm_state;
 
 	return 0;
 }
@@ -1663,7 +1661,7 @@ static int pmz_resume(struct macio_dev *mdev)
 	if (uap == NULL)
 		return 0;
 
-	if (mdev->ofdev.dev.power_state == 0)
+	if (mdev->ofdev.dev.power.power_state == 0)
 		return 0;
 	
 	pmz_debug("resume, switching to state 0\n");
@@ -1716,7 +1714,7 @@ static int pmz_resume(struct macio_dev *mdev)
 
 	pmz_debug("resume, switching complete\n");
 
-	mdev->ofdev.dev.power_state = 0;
+	mdev->ofdev.dev.power.power_state = 0;
 
 	return 0;
 }

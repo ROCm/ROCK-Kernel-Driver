@@ -31,6 +31,7 @@
 #include <asm/ppcdebug.h>
 #include <asm/cputable.h>
 #include <asm/rtas.h>
+#include <asm/sstep.h>
 
 #include "nonstdio.h"
 #include "privinst.h"
@@ -39,7 +40,7 @@
 #define skipbl	xmon_skipbl
 
 #ifdef CONFIG_SMP
-volatile cpumask_t cpus_in_xmon = CPU_MASK_NONE;
+cpumask_t cpus_in_xmon = CPU_MASK_NONE;
 static unsigned long xmon_taken = 1;
 static int xmon_owner;
 static int xmon_gate;
@@ -85,9 +86,6 @@ static unsigned bpinstr = 0x7fe00008;	/* trap */
 
 #define BP_NUM(bp)	((bp) - bpts + 1)
 
-/* Bits in SRR1 that are copied from MSR */
-#define MSR_MASK	0xffffffff87c0ffff
-
 /* Prototypes */
 static int cmds(struct pt_regs *);
 static int mread(unsigned long, void *, int);
@@ -132,7 +130,6 @@ static void csum(void);
 static void bootcmds(void);
 void dump_segments(void);
 static void symbol_lookup(void);
-static int emulate_step(struct pt_regs *regs, unsigned int instr);
 static void xmon_print_symbol(unsigned long address, const char *mid,
 			      const char *after);
 static const char *getvecname(unsigned long vec);
@@ -148,7 +145,6 @@ extern int xmon_read_poll(void);
 extern int setjmp(long *);
 extern void longjmp(long *, int);
 extern unsigned long _ASR;
-extern char SystemCall_common[];
 
 pte_t *find_linux_pte(pgd_t *pgdir, unsigned long va);	/* from htab.c */
 
@@ -401,9 +397,11 @@ int xmon_core(struct pt_regs *regs, int fromipi)
 		if (ncpus > 1) {
 			smp_send_debugger_break(MSG_ALL_BUT_SELF);
 			/* wait for other cpus to come in */
-			for (timeout = 100000000; timeout != 0; --timeout)
+			for (timeout = 100000000; timeout != 0; --timeout) {
 				if (cpus_weight(cpus_in_xmon) >= ncpus)
 					break;
+				barrier();
+			}
 		}
 		remove_bpts();
 		disable_surveillance();
@@ -488,6 +486,9 @@ int xmon_core(struct pt_regs *regs, int fromipi)
 			if (stepped == 0) {
 				regs->nip = (unsigned long) &bp->instr[0];
 				atomic_inc(&bp->ref_count);
+			} else if (stepped < 0) {
+				printf("Couldn't single-step %s instruction\n",
+				    (IS_RFID(bp->instr[0])? "rfid": "mtmsrd"));
 			}
 		}
 	}
@@ -755,108 +756,6 @@ static void remove_cpu_bpts(void)
 		set_iabr(0);
 }
 
-static int branch_taken(unsigned int instr, struct pt_regs *regs)
-{
-	unsigned int bo = (instr >> 21) & 0x1f;
-	unsigned int bi;
-
-	if ((bo & 4) == 0) {
-		/* decrement counter */
-		--regs->ctr;
-		if (((bo >> 1) & 1) ^ (regs->ctr == 0))
-			return 0;
-	}
-	if ((bo & 0x10) == 0) {
-		/* check bit from CR */
-		bi = (instr >> 16) & 0x1f;
-		if (((regs->ccr >> (31 - bi)) & 1) != ((bo >> 3) & 1))
-			return 0;
-	}
-	return 1;
-}
-
-/*
- * Emulate instructions that cause a transfer of control.
- * Returns 1 if the step was emulated, 0 if not,
- * or -1 if the instruction is one that should not be stepped,
- * such as an rfid, or a mtmsrd that would clear MSR_RI.
- */
-static int emulate_step(struct pt_regs *regs, unsigned int instr)
-{
-	unsigned int opcode, rd;
-	unsigned long int imm;
-
-	opcode = instr >> 26;
-	switch (opcode) {
-	case 16:	/* bc */
-		imm = (signed short)(instr & 0xfffc);
-		if ((instr & 2) == 0)
-			imm += regs->nip;
-		regs->nip += 4;		/* XXX check 32-bit mode */
-		if (instr & 1)
-			regs->link = regs->nip;
-		if (branch_taken(instr, regs))
-			regs->nip = imm;
-		return 1;
-	case 17:	/* sc */
-		regs->gpr[9] = regs->gpr[13];
-		regs->gpr[11] = regs->nip + 4;
-		regs->gpr[12] = regs->msr & MSR_MASK;
-		regs->gpr[13] = (unsigned long) get_paca();
-		regs->nip = (unsigned long) &SystemCall_common;
-		regs->msr = MSR_KERNEL;
-		return 1;
-	case 18:	/* b */
-		imm = instr & 0x03fffffc;
-		if (imm & 0x02000000)
-			imm -= 0x04000000;
-		if ((instr & 2) == 0)
-			imm += regs->nip;
-		if (instr & 1)
-			regs->link = regs->nip + 4;
-		regs->nip = imm;
-		return 1;
-	case 19:
-		switch (instr & 0x7fe) {
-		case 0x20:	/* bclr */
-		case 0x420:	/* bcctr */
-			imm = (instr & 0x400)? regs->ctr: regs->link;
-			regs->nip += 4;		/* XXX check 32-bit mode */
-			if (instr & 1)
-				regs->link = regs->nip;
-			if (branch_taken(instr, regs))
-				regs->nip = imm;
-			return 1;
-		case 0x24:	/* rfid, scary */
-			printf("Can't single-step an rfid instruction\n");
-			return -1;
-		}
-	case 31:
-		rd = (instr >> 21) & 0x1f;
-		switch (instr & 0x7fe) {
-		case 0xa6:	/* mfmsr */
-			regs->gpr[rd] = regs->msr & MSR_MASK;
-			regs->nip += 4;
-			return 1;
-		case 0x164:	/* mtmsrd */
-			/* only MSR_EE and MSR_RI get changed if bit 15 set */
-			/* mtmsrd doesn't change MSR_HV and MSR_ME */
-			imm = (instr & 0x10000)? 0x8002: 0xefffffffffffefffUL;
-			imm = (regs->msr & MSR_MASK & ~imm)
-				| (regs->gpr[rd] & imm);
-			if ((imm & MSR_RI) == 0) {
-				printf("Can't step an instruction that would "
-				       "clear MSR.RI\n");
-				return -1;
-			}
-			regs->msr = imm;
-			regs->nip += 4;
-			return 1;
-		}
-	}
-	return 0;
-}
-
 /* Command interpreting routine */
 static char *last_cmd;
 
@@ -988,8 +887,11 @@ static int do_step(struct pt_regs *regs)
 	if ((regs->msr & (MSR_SF|MSR_PR|MSR_IR)) == (MSR_SF|MSR_IR)) {
 		if (mread(regs->nip, &instr, 4) == 4) {
 			stepped = emulate_step(regs, instr);
-			if (stepped < 0)
+			if (stepped < 0) {
+				printf("Couldn't single-step %s instruction\n",
+				       (IS_RFID(instr)? "rfid": "mtmsrd"));
 				return 0;
+			}
 			if (stepped > 0) {
 				regs->trap = 0xd00 | (regs->trap & 1);
 				printf("stepped to ");

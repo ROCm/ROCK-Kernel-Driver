@@ -56,17 +56,21 @@ static int copy_ucontext_to_user(struct ucontext *uc, void *fp, sigset_t *set,
 }
 
 int setup_signal_stack_si(unsigned long stack_top, int sig, 
-			  unsigned long handler, void (*restorer)(void), 
-			  struct pt_regs *regs, siginfo_t *info, 
-			  sigset_t *mask)
+			  struct k_sigaction *ka, struct pt_regs *regs,
+			  siginfo_t *info, sigset_t *mask)
 {
 	unsigned long start;
+	void *restorer;
 	void *sip, *ucp, *fp;
 
 	start = stack_top - signal_frame_si.common.len;
 	sip = (void *) (start + signal_frame_si.si_index);
 	ucp = (void *) (start + signal_frame_si.uc_index);
 	fp = (void *) (((unsigned long) ucp) + sizeof(struct ucontext));
+
+	restorer = NULL;
+	if(ka->sa.sa_flags & SA_RESTORER)
+		restorer = ka->sa.sa_restorer;
 
 	if(restorer == NULL)
 		panic("setup_signal_stack_si - no restorer");
@@ -85,20 +89,25 @@ int setup_signal_stack_si(unsigned long stack_top, int sig,
 			 signal_frame_si.common.sr_relative))
 		return(1);
 	
-	PT_REGS_IP(regs) = handler;
+	PT_REGS_IP(regs) = (unsigned long) ka->sa.sa_handler;
 	PT_REGS_SP(regs) = start + signal_frame_si.common.sp_index;
 	return(0);
 }
 
 int setup_signal_stack_sc(unsigned long stack_top, int sig, 
-			  unsigned long handler, void (*restorer)(void), 
-			  struct pt_regs *regs, sigset_t *mask)
+			  struct k_sigaction *ka, struct pt_regs *regs,
+			  sigset_t *mask)
 {
 	struct frame_common *frame = &signal_frame_sc_sr.common;
+	void *restorer;
 	void *user_sc;
 	int sig_size = (_NSIG_WORDS - 1) * sizeof(unsigned long);
 	unsigned long sigs, sr;
 	unsigned long start = stack_top - frame->len - sig_size;
+
+	restorer = NULL;
+	if(ka->sa.sa_flags & SA_RESTORER)
+		restorer = ka->sa.sa_restorer;
 
 	user_sc = (void *) (start + signal_frame_sc_sr.sc_index);
 	if(restorer == NULL){
@@ -121,7 +130,7 @@ int setup_signal_stack_sc(unsigned long stack_top, int sig,
 	   copy_restorer(restorer, start, frame->sr_index, frame->sr_relative))
 		return(1);
 
-	PT_REGS_IP(regs) = handler;
+	PT_REGS_IP(regs) = (unsigned long) ka->sa.sa_handler;
 	PT_REGS_SP(regs) = start + frame->sp_index;
 
 	return(0);

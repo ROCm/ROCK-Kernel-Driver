@@ -200,6 +200,9 @@ config USB_EGALAX
 	  The driver has been tested on a Xenarc 700TSV monitor
 	  with eGalax touchscreen.
 
+	  Have a look at http://linux.chapter7.ch/touchkit/ for
+	  a usage description and the required user-space stuff.
+
 	  To compile this driver as a module, choose M here: the
 	  module will be called touchkitusb.
 

@@ -470,16 +470,16 @@ ia32_syscall_table:
 	data8 sys_remap_file_pages
 	data8 sys_set_tid_address
  	data8 sys32_timer_create
- 	data8 compat_timer_settime	/* 260 */
- 	data8 compat_timer_gettime
+ 	data8 compat_sys_timer_settime	/* 260 */
+ 	data8 compat_sys_timer_gettime
  	data8 sys_timer_getoverrun
  	data8 sys_timer_delete
- 	data8 compat_clock_settime
- 	data8 compat_clock_gettime /* 265 */
- 	data8 compat_clock_getres
- 	data8 compat_clock_nanosleep
-	data8 compat_statfs64
-	data8 compat_fstatfs64
+ 	data8 compat_sys_clock_settime
+ 	data8 compat_sys_clock_gettime /* 265 */
+ 	data8 compat_sys_clock_getres
+ 	data8 compat_sys_clock_nanosleep
+	data8 compat_sys_statfs64
+	data8 compat_sys_fstatfs64
  	data8 sys_tgkill	/* 270 */
  	data8 compat_sys_utimes
  	data8 sys32_fadvise64_64

@@ -33,6 +33,7 @@
 #include <asm/arch/lubbock.h>
 #include <asm/arch/udc.h>
 #include <asm/arch/pxafb.h>
+#include <asm/arch/mmc.h>
 #include <asm/hardware/sa1111.h>
 
 #include "generic.h"
@@ -183,10 +184,25 @@ static struct pxafb_mach_info sharp_lm8v31 __initdata = {
 	.lccr3		= LCCR3_PCP | LCCR3_Acb(255),
 };
 
+static int lubbock_mci_init(struct device *dev, irqreturn_t (*lubbock_detect_int)(int, void *, struct pt_regs *), void *data)
+{
+	/* setup GPIO for PXA25x MMC controller	*/
+	pxa_gpio_mode(GPIO6_MMCCLK_MD);
+	pxa_gpio_mode(GPIO8_MMCCS0_MD);
+
+	return 0;
+}
+
+static struct pxamci_platform_data lubbock_mci_platform_data = {
+	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+	.init 		= lubbock_mci_init,
+};
+
 static void __init lubbock_init(void)
 {
 	pxa_set_udc_info(&udc_info);
 	set_pxa_fb_info(&sharp_lm8v31);
+	pxa_set_mci_info(&lubbock_mci_platform_data);
 	(void) platform_add_devices(devices, ARRAY_SIZE(devices));
 }
 

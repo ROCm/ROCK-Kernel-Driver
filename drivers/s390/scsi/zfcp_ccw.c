@@ -27,7 +27,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_CCW_C_REVISION "$Revision: 1.57 $"
+#define ZFCP_CCW_C_REVISION "$Revision: 1.58 $"
 
 #include "zfcp_ext.h"
 
@@ -302,9 +302,11 @@ zfcp_ccw_shutdown(struct device *dev)
 {
 	struct zfcp_adapter *adapter;
 
+	down(&zfcp_data.config_sema);
 	adapter = dev_get_drvdata(dev);
 	zfcp_erp_adapter_shutdown(adapter, 0);
 	zfcp_erp_wait(adapter);
+	up(&zfcp_data.config_sema);
 }
 
 #undef ZFCP_LOG_AREA

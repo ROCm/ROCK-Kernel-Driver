@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2004 Embedded Edge, LLC
  *
- * $Id: au1550nd.c,v 1.9 2004/10/20 05:58:30 ppopov Exp $
+ * $Id: au1550nd.c,v 1.11 2004/11/04 12:53:10 gleixner Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -314,12 +314,12 @@ static void au1550_hwcontrol(struct mtd_info *mtd, int cmd)
 
 	case NAND_CTL_SETNCE: 
 		/* assert (force assert) chip enable */
-		au_writel(au_readl(MEM_STNDCTL) | (1<<(4+NAND_CS)) , MEM_STNDCTL);
+		au_writel((1<<(4+NAND_CS)) , MEM_STNDCTL); break;
 		break;
 
 	case NAND_CTL_CLRNCE: 
  		/* deassert chip enable */
-		au_writel(au_readl(MEM_STNDCTL) & ~(1<<(4+NAND_CS)), MEM_STNDCTL);
+		au_writel(0, MEM_STNDCTL); break;
 		break;
 	}
 
@@ -365,10 +365,7 @@ int __init au1550_init (void)
 
 
 	/* MEM_STNDCTL: disable ints, disable nand boot */
-	/* disable interrupts */
-	au_writel(au_readl(MEM_STNDCTL) & ~(1<<8), MEM_STNDCTL);
-	/* disable NAND boot */
-	au_writel(au_readl(MEM_STNDCTL) & ~(1<<0), MEM_STNDCTL);
+	au_writel(0, MEM_STNDCTL);
 
 #ifdef CONFIG_MIPS_PB1550
 	/* set gpio206 high */
@@ -412,7 +409,7 @@ int __init au1550_init (void)
 			MEM_STADDR1);
 	au_sync();
 
-	p_nand = (void __iomem *)ioremap(NAND_PHYS_ADDR, 0x1000);
+	p_nand = ioremap(NAND_PHYS_ADDR, 0x1000);
 
 	/* Set address of hardware control function */
 	this->hwcontrol = au1550_hwcontrol;

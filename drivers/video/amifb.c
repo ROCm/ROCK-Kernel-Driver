@@ -2469,6 +2469,7 @@ static void amifb_deinit(void)
 static int amifb_blank(int blank, struct fb_info *info)
 {
 	do_blank = blank ? blank : -1;
+
 	return 0;
 }
 
@@ -3247,20 +3248,20 @@ static void ami_do_blank(void)
 		custom.dmacon = DMAF_RASTER | DMAF_SPRITE;
 		red = green = blue = 0;
 		if (!IS_OCS && do_blank > 1) {
-			switch (do_blank-1) {
-				case VESA_VSYNC_SUSPEND:
+			switch (do_blank) {
+				case FB_BLANK_VSYNC_SUSPEND:
 					custom.hsstrt = hsstrt2hw(par->hsstrt);
 					custom.hsstop = hsstop2hw(par->hsstop);
 					custom.vsstrt = vsstrt2hw(par->vtotal+4);
 					custom.vsstop = vsstop2hw(par->vtotal+4);
 					break;
-				case VESA_HSYNC_SUSPEND:
+				case FB_BLANK_HSYNC_SUSPEND:
 					custom.hsstrt = hsstrt2hw(par->htotal+16);
 					custom.hsstop = hsstop2hw(par->htotal+16);
 					custom.vsstrt = vsstrt2hw(par->vsstrt);
 					custom.vsstop = vsstrt2hw(par->vsstop);
 					break;
-				case VESA_POWERDOWN:
+				case FB_BLANK_POWERDOWN:
 					custom.hsstrt = hsstrt2hw(par->htotal+16);
 					custom.hsstop = hsstop2hw(par->htotal+16);
 					custom.vsstrt = vsstrt2hw(par->vtotal+4);

@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-cards.c,v 1.44 2004/10/12 07:33:22 kraxel Exp $
+ * $Id: cx88-cards.c,v 1.47 2004/11/03 09:04:50 kraxel Exp $
  *
  * device driver for Conexant 2388x based TV cards
  * card-specific stuff.
@@ -336,11 +336,11 @@ struct cx88_board cx88_boards[] = {
 		.tuner_type     = TUNER_ABSENT, /* No analog tuner */
 		.input          = {{
 			.type   = CX88_VMUX_COMPOSITE1,
-			.vmux   = 0,
+			.vmux   = 1,
 			.gpio0  = 0x000027df,
 		 },{
 			.type   = CX88_VMUX_SVIDEO,
-			.vmux   = 1,
+			.vmux   = 2,
 			.gpio0  = 0x000027df,
 		}},
 		.dvb            = 1,
@@ -438,6 +438,20 @@ struct cx88_board cx88_boards[] = {
 		}},
 		.blackbird = 1,
 	},
+	[CX88_BOARD_DVICO_FUSIONHDTV_DVB_T_PLUS] = {
+		.name           = "DVICO FusionHDTV DVB-T Plus",
+		.tuner_type     = TUNER_ABSENT, /* No analog tuner */
+		.input          = {{
+			.type   = CX88_VMUX_COMPOSITE1,
+			.vmux   = 1,
+			.gpio0  = 0x000027df,
+		 },{
+			.type   = CX88_VMUX_SVIDEO,
+			.vmux   = 2,
+			.gpio0  = 0x000027df,
+		}},
+		.dvb            = 1,
+	},
 };
 const unsigned int cx88_bcount = ARRAY_SIZE(cx88_boards);
 
@@ -525,6 +539,10 @@ struct cx88_subid cx88_subids[] = {
 		.subvendor = 0x1540,
 		.subdevice = 0x2580,
 		.card      = CX88_BOARD_PROVIDEO_PV259,
+	},{
+		.subvendor = 0x18AC,
+		.subdevice = 0xDB10,
+		.card      = CX88_BOARD_DVICO_FUSIONHDTV_DVB_T_PLUS,
 	}
 };
 const unsigned int cx88_idcount = ARRAY_SIZE(cx88_subids);
@@ -612,7 +630,7 @@ static struct {
 	{ TUNER_ABSENT,        "Philips TD1536D_FH_44"},
 	{ TUNER_LG_NTSC_FM,    "LG TPI8NSR01F"},
 	{ TUNER_LG_PAL_FM,     "LG TPI8PSB01D"},
-	{ TUNER_LG_PAL,        "LG TPI8PSB11D"},	
+	{ TUNER_LG_PAL,        "LG TPI8PSB11D"},
 	{ TUNER_LG_PAL_I_FM,   "LG TAPC-I001D"},
 	{ TUNER_LG_PAL_I,      "LG TAPC-I701D"}
 };
@@ -634,12 +652,12 @@ static void hauppauge_eeprom(struct cx88_core *core, u8 *eeprom_data)
 	model = eeprom_data[12] << 8 | eeprom_data[11];
 	tuner = eeprom_data[9];
 	radio = eeprom_data[blk2-1] & 0x01;
-	
+
         if (tuner < ARRAY_SIZE(hauppauge_tuner))
                 core->tuner_type = hauppauge_tuner[tuner].id;
 	if (radio)
 		core->has_radio = 1;
-	
+
 	printk(KERN_INFO "%s: hauppauge eeprom: model=%d, "
 	       "tuner=%s (%d), radio=%s\n",
 	       core->name, model, (tuner < ARRAY_SIZE(hauppauge_tuner)
@@ -804,7 +822,7 @@ void cx88_card_list(struct cx88_core *core, struct pci_dev *pci)
 void cx88_card_setup(struct cx88_core *core)
 {
 	static u8 eeprom[128];
-		
+
 	switch (core->board) {
 	case CX88_BOARD_HAUPPAUGE:
 		if (0 == core->i2c_rc)

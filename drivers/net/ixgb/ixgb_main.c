@@ -1613,13 +1613,14 @@ static irqreturn_t ixgb_intr(int irq, void *data, struct pt_regs *regs)
 		__netif_rx_schedule(netdev);
 	}
 #else
-	for (i = 0; i < IXGB_MAX_INTR; i++)
-		if (ixgb_clean_rx_irq(adapter) == FALSE)
+	/* yes, that is actually a & and it is meant to make sure that
+	 * every pass through this for loop checks both receive and
+	 * transmit queues for completed descriptors, intended to
+	 * avoid starvation issues and assist tx/rx fairness. */
+	for(i = 0; i < IXGB_MAX_INTR; i++)
+		if(!ixgb_clean_rx_irq(adapter) &
+		   !ixgb_clean_tx_irq(adapter))
 			break;
-	for (i = 0; i < IXGB_MAX_INTR; i++)
-		if (ixgb_clean_tx_irq(adapter) == FALSE)
-			break;
-
 	/* if RAIDC:EN == 1 and ICR:RXDMT0 == 1, we need to
 	 * set IMS:RXDMT0 to 1 to restart the RBD timer (POLL)
 	 */

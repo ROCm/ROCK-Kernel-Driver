@@ -1,6 +1,6 @@
 /*
  * MTD map driver for BIOS Flash on Intel SCB2 boards
- * $Id: scb2_flash.c,v 1.9 2004/09/16 23:27:14 gleixner Exp $
+ * $Id: scb2_flash.c,v 1.10 2004/11/16 18:29:02 dwmw2 Exp $
  * Copyright (C) 2002 Sun Microsystems, Inc.
  * Tim Hockin <thockin@sun.com>
  *
@@ -62,9 +62,9 @@
 #define SCB2_WINDOW	0x00100000
 
 
-static void *scb2_ioaddr;
+static void __iomem *scb2_ioaddr;
 static struct mtd_info *scb2_mtd;
-struct map_info scb2_map = {
+static struct map_info scb2_map = {
 	.name =      "SCB2 BIOS Flash",
 	.size =      0,
 	.bankwidth =  1,
@@ -163,7 +163,7 @@ scb2_flash_probe(struct pci_dev *dev, const struct pci_device_id *ent)
 	}
 
 	scb2_map.phys = SCB2_ADDR;
-	scb2_map.virt = (void __iomem *)scb2_ioaddr;
+	scb2_map.virt = scb2_ioaddr;
 	scb2_map.size = SCB2_WINDOW;
 
 	simple_map_init(&scb2_map);

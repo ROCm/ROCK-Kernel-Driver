@@ -500,7 +500,7 @@ int ipv6_flowlabel_opt(struct sock *sk, char __user *optval, int optlen)
 					goto release;
 
 				err = -EINVAL;
-				if (ipv6_addr_cmp(&fl1->dst, &fl->dst) ||
+				if (!ipv6_addr_equal(&fl1->dst, &fl->dst) ||
 				    ipv6_opt_cmp(fl1->opt, fl->opt))
 					goto release;
 

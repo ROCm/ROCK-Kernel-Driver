@@ -539,7 +539,7 @@ out_unreg_class:
 out_unreg_chrdev:
 	unregister_chrdev(I2C_MAJOR, "i2c");
 out:
-	printk(KERN_ERR "%s: Driver Initialisation failed", __FILE__);
+	printk(KERN_ERR "%s: Driver Initialisation failed\n", __FILE__);
 	return res;
 }
 

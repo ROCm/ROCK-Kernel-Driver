@@ -201,11 +201,13 @@ static int numports[] 	=	{0, 0, 0, 0};
 MODULE_AUTHOR("William Chen");
 MODULE_DESCRIPTION("MOXA Intellio Family Multiport Board Device Driver");
 MODULE_LICENSE("GPL");
-MODULE_PARM(type, "1-4i");
-MODULE_PARM(baseaddr, "1-4i");
-MODULE_PARM(numports, "1-4i");
-MODULE_PARM(ttymajor, "i");
-MODULE_PARM(verbose, "i");
+#ifdef MODULE
+module_param_array(type, int, NULL, 0);
+module_param_array(baseaddr, int, NULL, 0);
+module_param_array(numports, int, NULL, 0);
+#endif
+module_param(ttymajor, int, 0);
+module_param(verbose, bool, 0644);
 
 static struct tty_driver *moxaDriver;
 static struct moxa_str moxaChannels[MAX_PORTS];

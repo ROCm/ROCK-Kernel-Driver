@@ -111,6 +111,7 @@ struct scsi_device {
 	unsigned allow_restart:1; /* issue START_UNIT in error handler */
 	unsigned no_uld_attach:1; /* disable connecting to upper level drivers */
 	unsigned select_no_atn:1;
+	unsigned fix_capacity:1;	/* READ_CAPACITY is too high by 1 */
 
 	unsigned int device_blocked;	/* Device returned QUEUE_FULL. */
 

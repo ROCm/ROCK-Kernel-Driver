@@ -1,5 +1,5 @@
 /*
- * $Id: pmc551.c,v 1.28 2004/08/09 13:19:44 dwmw2 Exp $
+ * $Id: pmc551.c,v 1.29 2004/11/16 18:29:01 dwmw2 Exp $
  *
  * PMC551 PCI Mezzanine Ram Device
  *
@@ -648,7 +648,7 @@ static int asize=0;
 /*
  * PMC551 Card Initialization
  */
-int __init init_pmc551(void)
+static int __init init_pmc551(void)
 {
         struct pci_dev *PCI_Device = NULL;
         struct mypriv *priv;

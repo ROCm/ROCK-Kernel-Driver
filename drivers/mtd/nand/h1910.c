@@ -7,7 +7,7 @@
  *       Copyright (C) 2002 Marius Gröger (mag@sysgo.de)
  *       Copyright (c) 2001 Thomas Gleixner (gleixner@autronix.de)
  *
- * $Id: h1910.c,v 1.4 2004/10/05 13:50:20 gleixner Exp $
+ * $Id: h1910.c,v 1.5 2004/11/04 12:53:10 gleixner Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -112,7 +112,7 @@ static int __init h1910_init (void)
 	if (!machine_is_h1900())
 		return -ENODEV;
 		
-	nandaddr = (void __iomem *)__ioremap(0x08000000, 0x1000, 0, 1);
+	nandaddr = __ioremap(0x08000000, 0x1000, 0, 1);
 	if (!nandaddr) {
 		printk("Failed to ioremap nand flash.\n");
 		return -ENOMEM;

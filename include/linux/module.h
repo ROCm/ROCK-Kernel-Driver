@@ -559,7 +559,7 @@ struct obsolete_modparm {
 	void *addr;
 };
 
-static inline void __deprecated MODULE_PARM_(void) { }
+static inline void MODULE_PARM_(void) { }
 #ifdef MODULE
 /* DEPRECATED: Do not use. */
 #define MODULE_PARM(var,type)						    \

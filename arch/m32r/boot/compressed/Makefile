@@ -5,10 +5,10 @@
 #
 
 targets		:= vmlinux vmlinux.bin vmlinux.bin.gz head.o misc.o \
-		   m32r-sio.o piggy.o vmlinux.lds
+		   piggy.o vmlinux.lds
 EXTRA_AFLAGS	:= -traditional
 
-OBJECTS = $(obj)/head.o $(obj)/misc.o $(obj)/m32r_sio.o
+OBJECTS = $(obj)/head.o $(obj)/misc.o
 
 #
 # IMAGE_OFFSET is the load offset of the compression loader
@@ -27,6 +27,8 @@ $(obj)/vmlinux.bin: vmlinux FORCE
 
 $(obj)/vmlinux.bin.gz: $(obj)/vmlinux.bin FORCE
 	$(call if_changed,gzip)
+
+CFLAGS_misc.o += -fpic
 
 LDFLAGS_piggy.o := -r --format binary --oformat elf32-m32r-linux -T
 OBJCOPYFLAGS += -R .empty_zero_page

@@ -83,11 +83,13 @@ udp_unique_tuple(struct ip_conntrack_tuple *tuple,
 
 static int
 udp_manip_pkt(struct sk_buff **pskb,
-	      unsigned int hdroff,
+	      unsigned int iphdroff,
 	      const struct ip_conntrack_manip *manip,
 	      enum ip_nat_manip_type maniptype)
 {
+	struct iphdr *iph = (struct iphdr *)((*pskb)->data + iphdroff);
 	struct udphdr *hdr;
+	unsigned int hdroff = iphdroff + iph->ihl*4;
 	u_int32_t oldip;
 	u_int16_t *portptr;
 
@@ -97,11 +99,11 @@ udp_manip_pkt(struct sk_buff **pskb,
 	hdr = (void *)(*pskb)->data + hdroff;
 	if (maniptype == IP_NAT_MANIP_SRC) {
 		/* Get rid of src ip and src pt */
-		oldip = (*pskb)->nh.iph->saddr;
+		oldip = iph->saddr;
 		portptr = &hdr->source;
 	} else {
 		/* Get rid of dst ip and dst pt */
-		oldip = (*pskb)->nh.iph->daddr;
+		oldip = iph->daddr;
 		portptr = &hdr->dest;
 	}
 	if (hdr->check) /* 0 is a special case meaning no checksum */

@@ -509,7 +509,7 @@ static struct cache_names __initdata cache_names[] = {
 
 static struct arraycache_init initarray_cache __initdata =
 	{ { 0, BOOT_CPUCACHE_ENTRIES, 1, 0} };
-static struct arraycache_init initarray_generic __initdata =
+static struct arraycache_init initarray_generic =
 	{ { 0, BOOT_CPUCACHE_ENTRIES, 1, 0} };
 
 /* internal cache of cache description objs */

@@ -33,24 +33,19 @@
 static int ehci_hub_suspend (struct usb_hcd *hcd)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
-	struct usb_device	*root = hcd_to_bus (&ehci->hcd)->root_hub;
 	int			port;
 
-	if (root->dev.power.power_state != 0)
-		return 0;
 	if (time_before (jiffies, ehci->next_statechange))
-		return -EAGAIN;
+		msleep(5);
 
 	port = HCS_N_PORTS (ehci->hcs_params);
 	spin_lock_irq (&ehci->lock);
 
-	/* for hcd->state HCD_STATE_SUSPENDED, also stop the non-USB side */
-	root->dev.power.power_state = 3;
-	root->state = USB_STATE_SUSPENDED;
-
 	/* stop schedules, clean any completed work */
-	if (HCD_IS_RUNNING(hcd->state))
+	if (HCD_IS_RUNNING(hcd->state)) {
 		ehci_quiesce (ehci);
+		ehci->hcd.state = USB_STATE_QUIESCING;
+	}
 	ehci->command = readl (&ehci->regs->command);
 	if (ehci->reclaim)
 		ehci->reclaim_ready = 1;
@@ -78,6 +73,7 @@ static int ehci_hub_suspend (struct usb_hcd *hcd)
 
 	/* turn off now-idle HC */
 	ehci_halt (ehci);
+	ehci->hcd.state = HCD_STATE_SUSPENDED;
 
 	ehci->next_statechange = jiffies + msecs_to_jiffies(10);
 	spin_unlock_irq (&ehci->lock);
@@ -89,27 +85,27 @@ static int ehci_hub_suspend (struct usb_hcd *hcd)
 static int ehci_hub_resume (struct usb_hcd *hcd)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
-	struct usb_device	*root = hcd_to_bus (&ehci->hcd)->root_hub;
 	u32			temp;
 	int			i;
+	int			intr_enable;
 
-	if (!root->dev.power.power_state)
-		return 0;
 	if (time_before (jiffies, ehci->next_statechange))
-		return -EAGAIN;
+		msleep(5);
+	spin_lock_irq (&ehci->lock);
 
 	/* re-init operational registers in case we lost power */
 	if (readl (&ehci->regs->intr_enable) == 0) {
-		temp = 1;
-		writel (INTR_MASK, &ehci->regs->intr_enable);
+ 		/* at least some APM implementations will try to deliver
+		 * IRQs right away, so delay them until we're ready.
+ 		 */
+ 		intr_enable = 1;
 		writel (0, &ehci->regs->segment);
 		writel (ehci->periodic_dma, &ehci->regs->frame_list);
 		writel ((u32)ehci->async->qh_dma, &ehci->regs->async_next);
-		/* FIXME will this work even if (pci) vAUX was lost? */
 	} else
-		temp = 0;
+		intr_enable = 0;
 	ehci_dbg(ehci, "resume root hub%s\n",
-			temp ? " after power loss" : "");
+			intr_enable ? " after power loss" : "");
 
 	/* restore CMD_RUN, framelist size, and irq threshold */
 	writel (ehci->command, &ehci->regs->command);
@@ -148,9 +144,14 @@ static int ehci_hub_resume (struct usb_hcd *hcd)
 		writel (ehci->command, &ehci->regs->command);
 	}
 
-	root->dev.power.power_state = 0;
 	ehci->next_statechange = jiffies + msecs_to_jiffies(5);
 	ehci->hcd.state = USB_STATE_RUNNING;
+
+	/* Now we can safely re-enable irqs */
+	if (intr_enable)
+		writel (INTR_MASK, &ehci->regs->intr_enable);
+
+	spin_unlock_irq (&ehci->lock);
 	return 0;
 }
 
@@ -210,6 +211,10 @@ ehci_hub_status_data (struct usb_hcd *hcd, char *buf)
 	int		ports, i, retval = 1;
 	unsigned long	flags;
 
+	/* if !USB_SUSPEND, root hub timers won't get shut down ... */
+	if (!HCD_IS_RUNNING(ehci->hcd.state))
+		return 0;
+
 	/* init status to no-changes */
 	buf [0] = 0;
 	ports = HCS_N_PORTS (ehci->hcs_params);
@@ -246,6 +251,7 @@ ehci_hub_status_data (struct usb_hcd *hcd, char *buf)
 			status = STS_PCD;
 		}
 	}
+	/* FIXME autosuspend idle root hubs */
 	spin_unlock_irqrestore (&ehci->lock, flags);
 	return status ? retval : 0;
 }

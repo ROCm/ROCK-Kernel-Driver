@@ -36,7 +36,7 @@ I2C_CLIENT_INSMOD;
 
 /* insmod options */
 static unsigned int debug = 0;
-MODULE_PARM(debug,"i");
+module_param(debug, int, 0644);
 MODULE_LICENSE("GPL");
 
 /* ---------------------------------------------------------------------- */
@@ -246,6 +246,7 @@ static void dump_read_message(unsigned char *buf)
 	printk(PREFIX "read: 0x%2x\n", buf[0]);
 	printk("  after power on : %s\n", (buf[0] & 0x01) ? "yes" : "no");
 	printk("  afc            : %s\n", afc[(buf[0] >> 1) & 0x0f]);
+	printk("  fmif level     : %s\n", (buf[0] & 0x20) ? "high" : "low");
 	printk("  afc window     : %s\n", (buf[0] & 0x40) ? "in" : "out");
 	printk("  vfi level      : %s\n", (buf[0] & 0x80) ? "high" : "low");
 }
@@ -377,10 +378,10 @@ static unsigned int port1  = 1;
 static unsigned int port2  = 1;
 static unsigned int qss    = UNSET;
 static unsigned int adjust = 0x10;
-MODULE_PARM(port1,"i");
-MODULE_PARM(port2,"i");
-MODULE_PARM(qss,"i");
-MODULE_PARM(adjust,"i");
+module_param(port1, int, 0644);
+module_param(port2, int, 0644);
+module_param(qss, int, 0644);
+module_param(adjust, int, 0644);
 
 static int tda9887_set_insmod(struct tda9887 *t, char *buf)
 {
@@ -460,10 +461,10 @@ static int tda9887_set_pinnacle(struct tda9887 *t, char *buf)
 
 /* ---------------------------------------------------------------------- */
 
-static char *pal = "-";
-MODULE_PARM(pal,"s");
-static char *secam = "-";
-MODULE_PARM(secam,"s");
+static char pal[] = "-";
+module_param_string(pal, pal, 0644, sizeof(pal));
+static char secam[] = "-";
+module_param_string(secam, secam, 0644, sizeof(secam));
 
 static int tda9887_fixup_std(struct tda9887 *t)
 {

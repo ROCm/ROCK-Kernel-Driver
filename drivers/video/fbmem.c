@@ -745,9 +745,8 @@ fb_blank(struct fb_info *info, int blank)
 {	
 	int err = -EINVAL;
 	
-	/* Workaround for broken X servers */
-	if (blank > VESA_POWERDOWN)
-		blank = VESA_POWERDOWN;
+ 	if (blank > FB_BLANK_POWERDOWN)
+ 		blank = FB_BLANK_POWERDOWN;
 
 	if (info->fbops->fb_blank)
  		err = info->fbops->fb_blank(blank, info);
@@ -907,9 +906,8 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 	off += start;
 	vma->vm_pgoff = off >> PAGE_SHIFT;
 	/* This is an IO map - tell maydump to skip this VMA */
-	vma->vm_flags |= VM_IO;
+	vma->vm_flags |= VM_IO | VM_RESERVED;
 #if defined(__sparc_v9__)
-	vma->vm_flags |= (VM_SHM | VM_LOCKED);
 	if (io_remap_page_range(vma, vma->vm_start, off,
 				vma->vm_end - vma->vm_start, vma->vm_page_prot, 0))
 		return -EAGAIN;

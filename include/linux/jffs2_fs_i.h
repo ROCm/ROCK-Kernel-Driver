@@ -1,10 +1,11 @@
-/* $Id: jffs2_fs_i.h,v 1.16 2003/01/09 14:03:21 dwmw2 Exp $ */
+/* $Id: jffs2_fs_i.h,v 1.17 2004/11/11 23:51:27 dwmw2 Exp $ */
 
 #ifndef _JFFS2_FS_I
 #define _JFFS2_FS_I
 
 #include <linux/version.h>
 #include <linux/rbtree.h>
+#include <asm/semaphore.h>
 
 struct jffs2_inode_info {
 	/* We need an internal semaphore similar to inode->i_sem.

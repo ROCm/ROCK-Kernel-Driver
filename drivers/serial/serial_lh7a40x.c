@@ -28,22 +28,23 @@
  */
 
 #include <linux/config.h>
-#include <linux/module.h>
-#include <linux/tty.h>
-#include <linux/ioport.h>
-#include <linux/init.h>
-#include <linux/serial.h>
-#include <linux/console.h>
-#include <linux/sysrq.h>
-
-#include <asm/io.h>
-#include <asm/irq.h>
 
 #if defined(CONFIG_SERIAL_LH7A40X_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
 #endif
 
+#include <linux/module.h>
+#include <linux/ioport.h>
+#include <linux/init.h>
+#include <linux/console.h>
+#include <linux/sysrq.h>
+#include <linux/tty.h>
+#include <linux/tty_flip.h>
 #include <linux/serial_core.h>
+#include <linux/serial.h>
+
+#include <asm/io.h>
+#include <asm/irq.h>
 
 #define DEV_MAJOR	204
 #define DEV_MINOR	16
@@ -145,21 +146,20 @@ lh7a40xuart_rx_chars (struct uart_port* port)
 {
 	struct tty_struct* tty = port->info->tty;
 	int cbRxMax = 256;	/* (Gross) limit on receive */
-	unsigned int data;	/* Received data and status */
+	unsigned int data, flag;/* Received data and status */
 
 	while (!(UR (port, UART_R_STATUS) & nRxRdy) && --cbRxMax) {
 		if (tty->flip.count >= TTY_FLIPBUF_SIZE) {
-			tty->flip.work.func((void*)tty);
-			if (tty->flip.count >= TTY_FLIPBUF_SIZE) {
-				printk(KERN_WARNING "TTY_DONT_FLIP set\n");
-				return;
-			}
+			if (tty->low_latency)
+				tty_flip_buffer_push(tty);
+			/*
+			 * If this failed then we will throw away the
+			 * bytes but must do so to clear interrupts
+			 */
 		}
 
 		data = UR (port, UART_R_DATA);
-
-		*tty->flip.char_buf_ptr = (unsigned char) data;
-		*tty->flip.flag_buf_ptr = TTY_NORMAL;
+		flag = TTY_NORMAL;
 		++port->icount.rx;
 
 		if (data & RxError) {	/* Quick check, short-circuit */
@@ -180,20 +180,18 @@ lh7a40xuart_rx_chars (struct uart_port* port)
 			data &= port->read_status_mask | 0xff;
 
 			if (data & RxBreak)
-				*tty->flip.flag_buf_ptr = TTY_BREAK;
+				flag = TTY_BREAK;
 			else if (data & RxParityError)
-				*tty->flip.flag_buf_ptr = TTY_PARITY;
+				flag = TTY_PARITY;
 			else if (data & RxFramingError)
-				*tty->flip.flag_buf_ptr = TTY_FRAME;
+				flag = TTY_FRAME;
 		}
 
 		if (uart_handle_sysrq_char (port, (unsigned char) data, regs))
 			continue;
 
 		if ((data & port->ignore_status_mask) == 0) {
-			++tty->flip.flag_buf_ptr;
-			++tty->flip.char_buf_ptr;
-			++tty->flip.count;
+			tty_insert_flip_char(tty, data, flag);
 		}
 		if ((data & RxOverrunError)
 		    && tty->flip.count < TTY_FLIPBUF_SIZE) {
@@ -202,9 +200,7 @@ lh7a40xuart_rx_chars (struct uart_port* port)
 			 * immediately, and doesn't affect the current
 			 * character
 			 */
-			*tty->flip.char_buf_ptr++ = 0;
-			*tty->flip.flag_buf_ptr++ = TTY_OVERRUN;
-			++tty->flip.count;
+			tty_insert_flip_char(tty, 0, TTY_OVERRUN);
 		}
 	}
 	tty_flip_buffer_push (tty);

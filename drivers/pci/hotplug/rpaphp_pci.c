@@ -31,18 +31,17 @@
 
 struct pci_dev *rpaphp_find_pci_dev(struct device_node *dn)
 {
-	struct pci_dev *retval_dev = NULL, *dev = NULL;
+	struct pci_dev *dev = NULL;
 	char bus_id[BUS_ID_SIZE];
 
-	sprintf(bus_id, "%04x:%02x:%02x.%d",dn->phb->global_number,
+	sprintf(bus_id, "%04x:%02x:%02x.%d", dn->phb->global_number,
 		dn->busno, PCI_SLOT(dn->devfn), PCI_FUNC(dn->devfn));
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+	for_each_pci_dev(dev) {
 		if (!strcmp(pci_name(dev), bus_id)) {
-			retval_dev = dev;
 			break;
 		}
 	}
-	return retval_dev;
+	return dev;
 }
 
 EXPORT_SYMBOL_GPL(rpaphp_find_pci_dev);

@@ -55,6 +55,7 @@
 #include <asm/iSeries/IoHriMainStore.h>
 #include <asm/iSeries/iSeries_proc.h>
 #include <asm/iSeries/mf.h>
+#include <asm/iSeries/HvLpEvent.h>
 
 extern void hvlog(char *fmt, ...);
 
@@ -732,7 +733,7 @@ void iSeries_restart(char *cmd)
  */
 void iSeries_power_off(void)
 {
-	mf_powerOff();
+	mf_power_off();
 }
 
 /*
@@ -740,7 +741,7 @@ void iSeries_power_off(void)
  */
 void iSeries_halt(void)
 {
-	mf_powerOff();
+	mf_power_off();
 }
 
 /* JDH Hack */
@@ -796,9 +797,9 @@ void __init iSeries_progress(char * st, unsigned short code)
 	printk("Progress: [%04x] - %s\n", (unsigned)code, st);
 	if (!piranha_simulator && mf_initialized) {
 		if (code != 0xffff)
-			mf_displayProgress(code);
+			mf_display_progress(code);
 		else
-			mf_clearSrc();
+			mf_clear_src();
 	}
 }
 

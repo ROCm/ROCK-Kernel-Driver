@@ -109,7 +109,7 @@ static void __init prpmc750_pcibios_fixup(void)
 	 * resource subsystem doesn't fixup the
 	 * PCI mem resources on the CL5446.
 	 */
-	if ((dev = pci_find_device(PCI_VENDOR_ID_CIRRUS,
+	if ((dev = pci_get_device(PCI_VENDOR_ID_CIRRUS,
 				   PCI_DEVICE_ID_CIRRUS_5446, 0))) {
 		dev->resource[0].start += PRPMC750_PCI_PHY_MEM_OFFSET;
 		dev->resource[0].end += PRPMC750_PCI_PHY_MEM_OFFSET;
@@ -121,6 +121,7 @@ static void __init prpmc750_pcibios_fixup(void)
 		outb(0x0f, 0x3c4);
 		/* Set proper DRAM config */
 		outb(0xdf, 0x3c5);
+		pci_dev_put(dev);
 	}
 }
 

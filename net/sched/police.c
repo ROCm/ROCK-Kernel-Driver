@@ -576,6 +576,7 @@ int tcf_police_dump_stats(struct sk_buff *skb, struct tcf_police *p)
 	
 	if (gnet_stats_start_copy_compat(skb, TCA_STATS2, TCA_STATS,
 			TCA_XSTATS, p->stats_lock, &d) < 0)
+		goto errout;
 	
 	if (gnet_stats_copy_basic(&d, &p->bstats) < 0 ||
 #ifdef CONFIG_NET_ESTIMATOR

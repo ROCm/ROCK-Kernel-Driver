@@ -9,7 +9,7 @@
  *
  * Based on work Copyright (C) 2002-2003 Intel Corporation
  * 
- * This file is licensed under  the terms of the GNU General Public 
+ * This file is licensed under the terms of the GNU General Public
  * License version 2. This program is licensed "as is" without any 
  * warranty of any kind, whether express or implied.
  */
@@ -309,41 +309,6 @@ static struct irqchip ixp2000_pci_irq_chip = {
 	.unmask	= ixp2000_pci_irq_unmask
 };
 
-/*
- * Error interrupts. These are used extensively by the microengine drivers
- */
-static void ixp2000_err_irq_handler(unsigned int irq, struct irqdesc *desc,  struct pt_regs *regs)
-{
-	int i;
-	unsigned long status = *IXP2000_IRQ_ERR_STATUS;
-
-
-	for (i = 0; i <= 12; i++) {
-		if (status & (1 << i)) {
-			desc = irq_desc + IRQ_IXP2000_DRAM0_MIN_ERR + i;
-			desc->handle(IRQ_IXP2000_DRAM0_MIN_ERR + i, desc, regs);
-		}
-	}
-}
-
-static void ixp2000_err_irq_mask(unsigned int irq)
-{
-	ixp2000_reg_write(IXP2000_IRQ_ERR_ENABLE_CLR,
-			(1 << (irq - IRQ_IXP2000_DRAM0_MIN_ERR)));
-}
-
-static void ixp2000_err_irq_unmask(unsigned int irq)
-{
-	ixp2000_reg_write(IXP2000_IRQ_ERR_ENABLE_SET,
-			(1 << (irq - IRQ_IXP2000_DRAM0_MIN_ERR)));
-}
-
-static struct irqchip ixp2000_err_irq_chip = {
-	.ack	= ixp2000_err_irq_mask,
-	.mask	= ixp2000_err_irq_mask,
-	.unmask	= ixp2000_err_irq_unmask
-};
-
 static void ixp2000_irq_mask(unsigned int irq)
 {
 	ixp2000_reg_write(IXP2000_IRQ_ENABLE_CLR, (1 << irq));
@@ -387,7 +352,7 @@ void __init ixp2000_init_irq(void)
 	 * we mark the reserved IRQs as invalid. This makes
 	 * our mask/unmask code much simpler.
 	 */
-	for (irq = IRQ_IXP2000_SWI; irq <= IRQ_IXP2000_THDB3; irq++) {
+	for (irq = IRQ_IXP2000_SOFT_INT; irq <= IRQ_IXP2000_THDB3; irq++) {
 		if((1 << irq) & IXP2000_VALID_IRQ_MASK) {
 			set_irq_chip(irq, &ixp2000_irq_chip);
 			set_irq_handler(irq, do_level_IRQ);
@@ -409,18 +374,11 @@ void __init ixp2000_init_irq(void)
 	/*
 	 * Enable PCI irq
 	 */
-	*(IXP2000_IRQ_ENABLE_SET) = (1 << IRQ_IXP2000_PCI);
+	ixp2000_reg_write(IXP2000_IRQ_ENABLE_SET, (1 << IRQ_IXP2000_PCI));
 	for (irq = IRQ_IXP2000_PCIA; irq <= IRQ_IXP2000_PCIB; irq++) {
 		set_irq_chip(irq, &ixp2000_pci_irq_chip);
 		set_irq_handler(irq, do_level_IRQ);
 		set_irq_flags(irq, IRQF_VALID);
 	}
-
-	for (irq = IRQ_IXP2000_DRAM0_MIN_ERR; irq <= IRQ_IXP2000_SP_INT; irq++) {
-		set_irq_chip(irq, &ixp2000_err_irq_chip);
-		set_irq_handler(irq, do_level_IRQ);
-		set_irq_flags(irq, IRQF_VALID);
-	}       
-	set_irq_chained_handler(IRQ_IXP2000_ERRSUM, ixp2000_err_irq_handler);
 }
 

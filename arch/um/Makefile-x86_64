@@ -1,0 +1,1 @@
+ARCH_USER_CFLAGS := -D__x86_64__

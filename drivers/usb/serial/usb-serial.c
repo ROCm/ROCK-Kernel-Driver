@@ -463,6 +463,7 @@ static void destroy_serial(struct kref *kref)
 			kfree(port->bulk_in_buffer);
 			kfree(port->bulk_out_buffer);
 			kfree(port->interrupt_in_buffer);
+			kfree(port->interrupt_out_buffer);
 		}
 	}
 
@@ -480,45 +481,51 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 	struct usb_serial *serial;
 	struct usb_serial_port *port;
 	unsigned int portNumber;
-	int retval = -ENODEV;
+	int retval;
 	
 	dbg("%s", __FUNCTION__);
 
-	/* initialize the pointer incase something fails */
-	tty->driver_data = NULL;
-
 	/* get the serial object associated with this tty pointer */
 	serial = usb_serial_get_by_index(tty->index);
-	if (!serial)
-		goto bailout;
-
-	/* set up our port structure making the tty driver remember our port object, and us it */
-	portNumber = tty->index - serial->minor;
-	port = serial->port[portNumber];
-	tty->driver_data = port;
-
-	port->tty = tty;
-	 
-	/* lock this module before we call it,
-	   this may, which means we must bail out, safe because we are called with BKL held */
-	if (!try_module_get(serial->type->owner)) {
-		kref_put(&serial->kref, destroy_serial);
-		goto bailout;
+	if (!serial) {
+		tty->driver_data = NULL;
+		return -ENODEV;
 	}
 
-	retval = 0;
+	portNumber = tty->index - serial->minor;
+	port = serial->port[portNumber];
+	 
 	++port->open_count;
+
 	if (port->open_count == 1) {
+
+		/* set up our port structure making the tty driver
+		 * remember our port object, and us it */
+		tty->driver_data = port;
+		port->tty = tty;
+
+		/* lock this module before we call it
+		 * this may fail, which means we must bail out,
+		 * safe because we are called with BKL held */
+		if (!try_module_get(serial->type->owner)) {
+			retval = -ENODEV;
+			goto bailout_kref_put;
+		}
+
 		/* only call the device specific open if this 
 		 * is the first time the port is opened */
 		retval = serial->type->open(port, filp);
-		if (retval) {
-			port->open_count = 0;
-			module_put(serial->type->owner);
-			kref_put(&serial->kref, destroy_serial);
-		}
+		if (retval)
+			goto bailout_module_put;
 	}
-bailout:
+
+	return 0;
+
+bailout_module_put:
+	module_put(serial->type->owner);
+bailout_kref_put:
+	kref_put(&serial->kref, destroy_serial);
+	port->open_count = 0;
 	return retval;
 }
 
@@ -531,21 +538,24 @@ static void serial_close(struct tty_struct *tty, struct file * filp)
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
+	if (port->open_count == 0)
+		return;
+
 	--port->open_count;
-	if (port->open_count <= 0) {
+	if (port->open_count == 0) {
 		/* only call the device specific close if this 
 		 * port is being closed by the last owner */
 		port->serial->type->close(port, filp);
-		port->open_count = 0;
 
 		if (port->tty) {
 			if (port->tty->driver_data)
 				port->tty->driver_data = NULL;
 			port->tty = NULL;
 		}
+
+		module_put(port->serial->type->owner);
 	}
 
-	module_put(port->serial->type->owner);
 	kref_put(&port->serial->kref, destroy_serial);
 }
 
@@ -805,6 +815,7 @@ static void port_release(struct device *dev)
 	kfree(port->bulk_in_buffer);
 	kfree(port->bulk_out_buffer);
 	kfree(port->interrupt_in_buffer);
+	kfree(port->interrupt_out_buffer);
 	kfree(port);
 }
 

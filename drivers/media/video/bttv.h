@@ -230,9 +230,6 @@ extern void bttv_init_card2(struct bttv *btv);
 extern void tea5757_set_freq(struct bttv *btv, unsigned short freq);
 extern void bttv_tda9880_setnorm(struct bttv *btv, int norm);
 
-/* kernel cmd line parse helper */
-extern int bttv_parse(char *str, int max, int *vals);
-
 /* extra tweaks for some chipsets */
 extern void bttv_check_chipset(void);
 extern int bttv_handle_chipset(struct bttv *btv);

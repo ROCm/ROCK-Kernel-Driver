@@ -8,7 +8,7 @@
 
 
 /*** Version/name ***/
-#define INTELFB_VERSION			"0.9.1"
+#define INTELFB_VERSION			"0.9.2"
 #define INTELFB_MODULE_NAME		"intelfb"
 #define SUPPORTED_CHIPSETS		"830M/845G/852GM/855GM/865G"
 
@@ -199,9 +199,12 @@ struct intelfb_info {
 	struct intelfb_hwstate save_state;
 
 	/* agpgart structs */
-	struct agp_memory *gtt_fb_mem;     // use all stolen memory
+	struct agp_memory *gtt_fb_mem;     // use all stolen memory or vram
 	struct agp_memory *gtt_ring_mem;   // ring buffer
 	struct agp_memory *gtt_cursor_mem; // hw cursor
+
+	/* use a gart reserved fb mem */
+	u8 fbmem_gart;
 
 	/* mtrr support */
 	u32 mtrr_reg;

@@ -1,5 +1,5 @@
 /*
- * $Id: ixp2000.c,v 1.3 2004/09/16 23:27:13 gleixner Exp $
+ * $Id: ixp2000.c,v 1.5 2004/11/16 17:15:48 dsaxena Exp $
  *
  * drivers/mtd/maps/ixp2000.c
  *
@@ -208,9 +208,8 @@ static int ixp2000_flash_probe(struct device *_dev)
 		goto Error;
 	}
 
-	info->map.map_priv_1 =
-	    (void __iomem *) ioremap(dev->resource->start, 
-				    dev->resource->end - dev->resource->start + 1);
+	info->map.map_priv_1 = ioremap(dev->resource->start, 
+			    	dev->resource->end - dev->resource->start + 1);
 	if (!info->map.map_priv_1) {
 		dev_err(_dev, "Failed to ioremap flash region\n");
 		err = -EIO;
@@ -227,7 +226,7 @@ static int ixp2000_flash_probe(struct device *_dev)
 	 * Enable erratum 44 workaround for NPUs with broken slowport
 	 */
 
-	errata44_workaround = ixp2000_has_broken_slowport();
+	erratum44_workaround = ixp2000_has_broken_slowport();
 	dev_info(_dev, "Erratum 44 workaround %s\n",
 	       erratum44_workaround ? "enabled" : "disabled");
 #endif

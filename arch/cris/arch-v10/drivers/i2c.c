@@ -12,6 +12,12 @@
 *!                                 don't use PB_I2C if DS1302 uses same bits,
 *!                                 use PB.
 *! $Log: i2c.c,v $
+*! Revision 1.9  2004/08/24 06:49:14  starvik
+*! Whitespace cleanup
+*!
+*! Revision 1.8  2004/06/08 08:48:26  starvik
+*! Removed unused code
+*!
 *! Revision 1.7  2004/05/28 09:26:59  starvik
 *! Modified I2C initialization to work in 2.6.
 *!
@@ -69,7 +75,7 @@
 *! (C) Copyright 1999-2002 Axis Communications AB, LUND, SWEDEN
 *!
 *!***************************************************************************/
-/* $Id: i2c.c,v 1.7 2004/05/28 09:26:59 starvik Exp $ */
+/* $Id: i2c.c,v 1.9 2004/08/24 06:49:14 starvik Exp $ */
 
 /****************** INCLUDE FILES SECTION ***********************************/
 
@@ -109,14 +115,6 @@ static const char i2c_name[] = "i2c";
 #define I2C_CLOCK_LOW 0
 #define I2C_DATA_HIGH 1
 #define I2C_DATA_LOW 0
-
-#if 0
-/* TODO: fix this so the CONFIG_ETRAX_I2C_USES... is set in Config.in instead */
-#if defined(CONFIG_DS1302) && (CONFIG_DS1302_SDABIT==0) && \
-           (CONFIG_DS1302_SCLBIT == 1)
-#define CONFIG_ETRAX_I2C_USES_PB_NOT_PB_I2C
-#endif
-#endif
 
 #ifdef CONFIG_ETRAX_I2C_USES_PB_NOT_PB_I2C
 /* Use PB and not PB_I2C */
@@ -441,7 +439,7 @@ i2c_sendack(void)
 	 */
 	i2c_data(I2C_DATA_HIGH);
 	i2c_delay(CLOCK_LOW_TIME);
-	
+
 	i2c_dir_in();
 }
 

@@ -399,7 +399,7 @@ source "drivers/scsi/megaraid/Kconfig.megaraid"
 
 config SCSI_SATA
 	bool "Serial ATA (SATA) support"
-	depends on SCSI && EXPERIMENTAL
+	depends on SCSI
 	help
 	  This driver family supports Serial ATA host controllers
 	  and devices.
@@ -408,15 +408,15 @@ config SCSI_SATA
 
 config SCSI_SATA_AHCI
 	tristate "AHCI SATA support"
-	depends on SCSI_SATA && PCI && EXPERIMENTAL
+	depends on SCSI_SATA && PCI
 	help
 	  This option enables support for AHCI Serial ATA.
 
 	  If unsure, say N.
 
 config SCSI_SATA_SVW
-	tristate "ServerWorks Frodo / Apple K2 SATA support (EXPERIMENTAL)"
-	depends on SCSI_SATA && PCI && EXPERIMENTAL
+	tristate "ServerWorks Frodo / Apple K2 SATA support"
+	depends on SCSI_SATA && PCI
 	help
 	  This option enables support for Broadcom/Serverworks/Apple K2
 	  SATA support.
@@ -467,7 +467,7 @@ config SCSI_SATA_SIL
 
 config SCSI_SATA_SIS
 	tristate "SiS 964/180 SATA support"
-	depends on SCSI_SATA && PCI
+	depends on SCSI_SATA && PCI && EXPERIMENTAL
 	help
 	  This option enables support for SiS Serial ATA 964/180.
 
@@ -483,7 +483,7 @@ config SCSI_SATA_ULI
 
 config SCSI_SATA_VIA
 	tristate "VIA SATA support"
-	depends on SCSI_SATA && PCI && EXPERIMENTAL
+	depends on SCSI_SATA && PCI
 	help
 	  This option enables support for VIA Serial ATA.
 
@@ -491,7 +491,7 @@ config SCSI_SATA_VIA
 
 config SCSI_SATA_VITESSE
 	tristate "VITESSE VSC-7174 SATA support"
-	depends on SCSI_SATA && PCI && EXPERIMENTAL
+	depends on SCSI_SATA && PCI
 	help
 	  This option enables support for Vitesse VSC7174 Serial ATA.
 
@@ -1288,6 +1288,7 @@ config SCSI_QLOGIC_1280
 
 config SCSI_QLOGIC_1280_1040
 	bool "Qlogic QLA 1020/1040 SCSI support"
+	depends on SCSI_QLOGIC_1280 && SCSI_QLOGIC_ISP!=y
 	help
 	  Say Y here if you have a QLogic ISP1020/1040 SCSI host adapter and
 	  do not want to use the old driver.  This option enables support in

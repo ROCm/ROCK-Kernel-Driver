@@ -4,7 +4,7 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * (c) 1999, 2000 David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: doc2000.c,v 1.62 2004/08/09 14:04:02 dwmw2 Exp $
+ * $Id: doc2000.c,v 1.64 2004/11/16 18:29:01 dwmw2 Exp $
  */
 
 #include <linux/kernel.h>
@@ -89,7 +89,7 @@ static void DoC_Delay(struct DiskOnChip *doc, unsigned short cycles)
 /* DOC_WaitReady: Wait for RDY line to be asserted by the flash chip */
 static int _DoC_WaitReady(struct DiskOnChip *doc)
 {
-	unsigned long docptr = doc->virtadr;
+	void __iomem *docptr = doc->virtadr;
 	unsigned long timeo = jiffies + (HZ * 10);
 
 	DEBUG(MTD_DEBUG_LEVEL3,
@@ -114,7 +114,8 @@ static int _DoC_WaitReady(struct DiskOnChip *doc)
 
 static inline int DoC_WaitReady(struct DiskOnChip *doc)
 {
-	unsigned long docptr = doc->virtadr;
+	void __iomem *docptr = doc->virtadr;
+
 	/* This is inline, to optimise the common case, where it's ready instantly */
 	int ret = 0;
 
@@ -140,7 +141,7 @@ static inline int DoC_WaitReady(struct DiskOnChip *doc)
 static inline int DoC_Command(struct DiskOnChip *doc, unsigned char command,
 			      unsigned char xtraflags)
 {
-	unsigned long docptr = doc->virtadr;
+	void __iomem *docptr = doc->virtadr;
 
 	if (DoC_is_2000(doc))
 		xtraflags |= CDSN_CTRL_FLASH_IO;
@@ -172,10 +173,8 @@ static inline int DoC_Command(struct DiskOnChip *doc, unsigned char command,
 static int DoC_Address(struct DiskOnChip *doc, int numbytes, unsigned long ofs,
 		       unsigned char xtraflags1, unsigned char xtraflags2)
 {
-	unsigned long docptr;
 	int i;
-
-	docptr = doc->virtadr;
+	void __iomem *docptr = doc->virtadr;
 
 	if (DoC_is_2000(doc))
 		xtraflags1 |= CDSN_CTRL_FLASH_IO;
@@ -240,10 +239,8 @@ static void DoC_ReadBuf(struct DiskOnChip *doc, u_char * buf, int len)
 {
 	volatile int dummy;
 	int modulus = 0xffff;
-	unsigned long docptr;
+	void __iomem *docptr = doc->virtadr;
 	int i;
-
-	docptr = doc->virtadr;
 
 	if (len <= 0)
 		return;
@@ -271,10 +268,8 @@ static void DoC_ReadBuf(struct DiskOnChip *doc, u_char * buf, int len)
 /* Write a buffer to DoC, taking care of Millennium odditys */
 static void DoC_WriteBuf(struct DiskOnChip *doc, const u_char * buf, int len)
 {
-	unsigned long docptr;
+	void __iomem *docptr = doc->virtadr;
 	int i;
-
-	docptr = doc->virtadr;
 
 	if (len <= 0)
 		return;
@@ -292,7 +287,7 @@ static void DoC_WriteBuf(struct DiskOnChip *doc, const u_char * buf, int len)
 
 static inline int DoC_SelectChip(struct DiskOnChip *doc, int chip)
 {
-	unsigned long docptr = doc->virtadr;
+	void __iomem *docptr = doc->virtadr;
 
 	/* Software requirement 11.4.4 before writing DeviceSelect */
 	/* Deassert the CE line to eliminate glitches on the FCE# outputs */
@@ -316,7 +311,7 @@ static inline int DoC_SelectChip(struct DiskOnChip *doc, int chip)
 
 static inline int DoC_SelectFloor(struct DiskOnChip *doc, int floor)
 {
-	unsigned long docptr = doc->virtadr;
+	void __iomem *docptr = doc->virtadr;
 
 	/* Select the floor (bank) of chips required */
 	WriteDOC(floor, docptr, FloorSelect);
@@ -639,14 +634,12 @@ static int doc_read_ecc(struct mtd_info *mtd, loff_t from, size_t len,
 			size_t * retlen, u_char * buf, u_char * eccbuf, struct nand_oobinfo *oobsel)
 {
 	struct DiskOnChip *this = (struct DiskOnChip *) mtd->priv;
-	unsigned long docptr;
+	void __iomem *docptr = this->virtadr;
 	struct Nand *mychip;
 	unsigned char syndrome[6];
 	volatile char dummy;
 	int i, len256 = 0, ret=0;
 	size_t left = len;
-
-	docptr = this->virtadr;
 
 	/* Don't allow read past end of device */
 	if (from >= this->totlen)
@@ -799,14 +792,12 @@ static int doc_write_ecc(struct mtd_info *mtd, loff_t to, size_t len,
 {
 	struct DiskOnChip *this = (struct DiskOnChip *) mtd->priv;
 	int di; /* Yes, DI is a hangover from when I was disassembling the binary driver */
-	unsigned long docptr;
+	void __iomem *docptr = this->virtadr;
 	volatile char dummy;
 	int len256 = 0;
 	struct Nand *mychip;
 	size_t left = len;
 	int status;
-
-	docptr = this->virtadr;
 
 	/* Don't allow write past end of device */
 	if (to >= this->totlen)
@@ -1044,12 +1035,9 @@ static int doc_read_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 {
 	struct DiskOnChip *this = (struct DiskOnChip *) mtd->priv;
 	int len256 = 0, ret;
-	unsigned long docptr;
 	struct Nand *mychip;
 
 	down(&this->lock);
-
-	docptr = this->virtadr;
 
 	mychip = &this->chips[ofs >> this->chipshift];
 
@@ -1105,7 +1093,7 @@ static int doc_write_oob_nolock(struct mtd_info *mtd, loff_t ofs, size_t len,
 {
 	struct DiskOnChip *this = (struct DiskOnChip *) mtd->priv;
 	int len256 = 0;
-	unsigned long docptr = this->virtadr;
+	void __iomem *docptr = this->virtadr;
 	struct Nand *mychip = &this->chips[ofs >> this->chipshift];
 	volatile int dummy;
 	int status;
@@ -1222,7 +1210,7 @@ static int doc_erase(struct mtd_info *mtd, struct erase_info *instr)
 	__u32 ofs = instr->addr;
 	__u32 len = instr->len;
 	volatile int dummy;
-	unsigned long docptr;
+	void __iomem *docptr = this->virtadr;
 	struct Nand *mychip;
 	int status;
 
@@ -1235,8 +1223,6 @@ static int doc_erase(struct mtd_info *mtd, struct erase_info *instr)
 
 	instr->state = MTD_ERASING;
 		
-	docptr = this->virtadr;
-
 	/* FIXME: Do this in the background. Use timers or schedule_task() */
 	while(len) {
 		mychip = &this->chips[ofs >> this->chipshift];
@@ -1290,7 +1276,7 @@ static int doc_erase(struct mtd_info *mtd, struct erase_info *instr)
  *
  ****************************************************************************/
 
-int __init init_doc2000(void)
+static int __init init_doc2000(void)
 {
        inter_module_register(im_name, THIS_MODULE, &DoC2k_init);
        return 0;

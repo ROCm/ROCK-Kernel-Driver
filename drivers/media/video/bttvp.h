@@ -1,5 +1,5 @@
 /*
-    $Id: bttvp.h,v 1.11 2004/10/13 10:39:00 kraxel Exp $
+    $Id: bttvp.h,v 1.12 2004/10/25 11:26:36 kraxel Exp $
 
     bttv - Bt848 frame grabber driver
 
@@ -293,7 +293,7 @@ struct bttv {
 	/* pci device config */
 	unsigned short id;
 	unsigned char revision;
-	unsigned char *bt848_mmio;   /* pointer to mmio */
+	unsigned char __iomem *bt848_mmio;   /* pointer to mmio */
 
 	/* card configuration info */
 	unsigned int cardid;   /* pci subsystem id (bt878 based ones) */
@@ -407,7 +407,7 @@ struct bttv {
 
 #endif
 
-#define btwrite(dat,adr)    writel((dat), (char *) (btv->bt848_mmio+(adr)))
+#define btwrite(dat,adr)    writel((dat), btv->bt848_mmio+(adr))
 #define btread(adr)         readl(btv->bt848_mmio+(adr))
 
 #define btand(dat,adr)      btwrite((dat) & btread(adr), adr)

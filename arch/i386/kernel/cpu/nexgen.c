@@ -32,7 +32,7 @@ static void __init init_nexgen(struct cpuinfo_x86 * c)
 	c->x86_cache_size = 256; /* A few had 1 MB... */
 }
 
-static void nexgen_identify(struct cpuinfo_x86 * c)
+static void __init nexgen_identify(struct cpuinfo_x86 * c)
 {
 	/* Detect NexGen with old hypercode */
 	if ( deep_magic_nexgen_probe() ) {

@@ -2,7 +2,9 @@
 
 extern int pci_hotplug (struct device *dev, char **envp, int num_envp,
 			 char *buffer, int buffer_size);
-extern void pci_create_sysfs_dev_files(struct pci_dev *pdev);
+extern int pci_create_sysfs_dev_files(struct pci_dev *pdev);
+extern void pci_remove_sysfs_dev_files(struct pci_dev *pdev);
+extern void pci_cleanup_rom(struct pci_dev *dev);
 extern int pci_bus_alloc_resource(struct pci_bus *bus, struct resource *res,
 				  unsigned long size, unsigned long align,
 				  unsigned long min, unsigned int type_mask,
@@ -61,7 +63,7 @@ extern int pci_visit_dev(struct pci_visit *fn,
 /* Lock for read/write access to pci device and bus lists */
 extern spinlock_t pci_bus_lock;
 
-extern int pciehp_msi_quirk;
+extern int pcie_mch_quirk;
 extern struct device_attribute pci_dev_attrs[];
 
 /**

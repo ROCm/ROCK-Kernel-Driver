@@ -24,26 +24,25 @@
  *
  */
 #include <linux/config.h>
-#include <linux/module.h>
-#include <linux/tty.h>
-#include <linux/ioport.h>
-#include <linux/init.h>
-#include <linux/serial.h>
-#include <linux/console.h>
-#include <linux/sysrq.h>
-#include <linux/device.h>
-
-#include <asm/io.h>
-#include <asm/irq.h>
-#include <asm/hardware.h>
-#include <asm/arch/serial.h>
-#include <asm/mach-types.h>
 
 #if defined(CONFIG_SERIAL_IMX_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
 #endif
 
+#include <linux/module.h>
+#include <linux/ioport.h>
+#include <linux/init.h>
+#include <linux/console.h>
+#include <linux/sysrq.h>
+#include <linux/device.h>
+#include <linux/tty.h>
+#include <linux/tty_flip.h>
 #include <linux/serial_core.h>
+#include <linux/serial.h>
+
+#include <asm/io.h>
+#include <asm/irq.h>
+#include <asm/hardware.h>
 
 /* We've been assigned a range on the "Low-density serial ports" major */
 #define SERIAL_IMX_MAJOR	204
@@ -237,9 +236,7 @@ static irqreturn_t imx_rxint(int irq, void *dev_id, struct pt_regs *regs)
 			goto handle_error;
 
 	error_return:
-		*tty->flip.flag_buf_ptr++ = flg;
-		*tty->flip.char_buf_ptr++ = (unsigned char)rx;
-		tty->flip.count++;
+		tty_insert_flip_char(tty, rx, flg);
 
 		if (tty->flip.count >= TTY_FLIPBUF_SIZE)
 			goto out;

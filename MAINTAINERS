@@ -287,6 +287,12 @@ P:	Dave Gilbert
 M:	linux@treblig.org
 S:	Maintained
 
+ARM/PLEB SUPPORT
+P:	Peter Chubb
+M:	pleb@gelato.unsw.edu.au
+W:	http://www.disy.cse.unsw.edu.au/Hardware/PLEB
+S:	Maintained
+
 ARM/PT DIGITAL BOARD PORT
 P:	Stefan Eletzhofer
 M:	stefan.eletzhofer@eletztrick.de
@@ -558,8 +564,8 @@ W:     http://sourceforge.net/projects/cramfs/
 S:     Orphan
 
 CRIS PORT
-P:	Bjorn Wesen
-M:	bjornw@axis.com
+P:	Mikael Starvik
+M:	starvik@axis.com
 L:	dev-etrax@axis.com
 W:	http://developer.axis.com
 S:	Maintained
@@ -805,7 +811,7 @@ S:	Maintained
 
 EXT3 FILE SYSTEM
 P:	Stephen Tweedie, Andrew Morton
-M:	sct@redhat.com, akpm@digeo.com, adilger@clusterfs.com
+M:	sct@redhat.com, akpm@osdl.org, adilger@clusterfs.com
 L:	ext3-users@redhat.com
 S:	Maintained
 
@@ -1294,14 +1300,14 @@ LINUX FOR POWERPC
 P:	Paul Mackerras
 M:	paulus@samba.org
 W:	http://www.penguinppc.org/
-L:	linuxppc-dev@lists.linuxppc.org
+L:	linuxppc-dev@ozlabs.org
 S:	Supported
 
 LINUX FOR POWER MACINTOSH
 P:	Benjamin Herrenschmidt
 M:	benh@kernel.crashing.org
 W:	http://www.penguinppc.org/
-L:	linuxppc-dev@lists.linuxppc.org
+L:	linuxppc-dev@ozlabs.org
 S:	Maintained
 
 LINUX FOR POWERPC EMBEDDED MPC52XX
@@ -1317,21 +1323,21 @@ LINUX FOR POWERPC EMBEDDED PPC4XX
 P:	Matt Porter
 M:	mporter@kernel.crashing.org
 W:	http://www.penguinppc.org/
-L:	linuxppc-embedded@lists.linuxppc.org
+L:	linuxppc-embedded@ozlabs.org
 S:	Maintained
 
 LINUX FOR POWERPC EMBEDDED PPC8XX AND BOOT CODE
 P:	Tom Rini
 M:	trini@kernel.crashing.org
 W:	http://www.penguinppc.org/
-L:	linuxppc-embedded@lists.linuxppc.org
+L:	linuxppc-embedded@ozlabs.org
 S:	Maintained
 
 LINUX FOR POWERPC EMBEDDED PPC85XX
 P:     Kumar Gala
 M:     kumar.gala@freescale.com
 W:     http://www.penguinppc.org/
-L:     linuxppc-embedded@lists.linuxppc.org
+L:     linuxppc-embedded@ozlabs.org
 S:     Maintained
 
 LLC (802.2)
@@ -1347,7 +1353,7 @@ P:	Anton Blanchard
 M:	anton@samba.org
 M:	anton@au.ibm.com
 W:	http://linuxppc64.org
-L:	linuxppc64-dev@lists.linuxppc.org
+L:	linuxppc64-dev@ozlabs.org
 S:	Supported
 
 LINUX SECURITY MODULE (LSM) FRAMEWORK
@@ -1532,7 +1538,7 @@ S:	Maintained
 
 NETWORK DEVICE DRIVERS
 P:	Andrew Morton
-M:	akpm@digeo.com
+M:	akpm@osdl.org
 P:	Jeff Garzik
 M:	jgarzik@pobox.com
 L:	linux-net@vger.kernel.org

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2001 Sistina Software (UK) Limited.
+ * Copyright (C) 2004 Red Hat, Inc. All rights reserved.
  *
  * This file is released under the GPL.
  */
@@ -575,7 +576,7 @@ static char **realloc_argv(unsigned *array_size, char **old_argv)
 /*
  * Destructively splits up the argument list to pass to ctr.
  */
-static int split_args(int *argc, char ***argvp, char *input)
+int dm_split_args(int *argc, char ***argvp, char *input)
 {
 	char *start, *end = input, *out, **argv = NULL;
 	unsigned array_size = 0;
@@ -663,14 +664,14 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 
 	if (!len) {
 		tgt->error = "zero-length target";
-		DMERR(": %s\n", tgt->error);
+		DMERR("%s", tgt->error);
 		return -EINVAL;
 	}
 
 	tgt->type = dm_get_target_type(type);
 	if (!tgt->type) {
 		tgt->error = "unknown target type";
-		DMERR(": %s\n", tgt->error);
+		DMERR("%s", tgt->error);
 		return -EINVAL;
 	}
 
@@ -688,7 +689,7 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 		goto bad;
 	}
 
-	r = split_args(&argc, &argv, params);
+	r = dm_split_args(&argc, &argv, params);
 	if (r) {
 		tgt->error = "couldn't split parameters (insufficient memory)";
 		goto bad;
@@ -707,7 +708,7 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 	return 0;
 
  bad:
-	DMERR(": %s\n", tgt->error);
+	DMERR("%s", tgt->error);
 	dm_put_target_type(tgt->type);
 	return r;
 }

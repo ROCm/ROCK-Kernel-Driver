@@ -249,6 +249,28 @@ int unregister_chrdev(unsigned int major, const char *name)
 }
 
 static spinlock_t cdev_lock = SPIN_LOCK_UNLOCKED;
+
+static struct kobject *cdev_get(struct cdev *p)
+{
+	struct module *owner = p->owner;
+	struct kobject *kobj;
+
+	if (owner && !try_module_get(owner))
+		return NULL;
+	kobj = kobject_get(&p->kobj);
+	if (!kobj)
+		module_put(owner);
+	return kobj;
+}
+
+void cdev_put(struct cdev *p)
+{
+	if (p) {
+		kobject_put(&p->kobj);
+		module_put(p->owner);
+	}
+}
+
 /*
  * Called every time a character special file is opened
  */
@@ -357,26 +379,6 @@ void cdev_del(struct cdev *p)
 	kobject_put(&p->kobj);
 }
 
-struct kobject *cdev_get(struct cdev *p)
-{
-	struct module *owner = p->owner;
-	struct kobject *kobj;
-
-	if (owner && !try_module_get(owner))
-		return NULL;
-	kobj = kobject_get(&p->kobj);
-	if (!kobj)
-		module_put(owner);
-	return kobj;
-}
-
-void cdev_put(struct cdev *p)
-{
-	if (p) {
-		kobject_put(&p->kobj);
-		module_put(p->owner);
-	}
-}
 
 static decl_subsys(cdev, NULL, NULL);
 
@@ -415,6 +417,7 @@ struct cdev *cdev_alloc(void)
 
 void cdev_init(struct cdev *cdev, struct file_operations *fops)
 {
+	memset(cdev, 0, sizeof *cdev);
 	INIT_LIST_HEAD(&cdev->list);
 	cdev->kobj.ktype = &ktype_cdev_default;
 	kobject_init(&cdev->kobj);
@@ -447,8 +450,6 @@ EXPORT_SYMBOL(unregister_chrdev_region);
 EXPORT_SYMBOL(alloc_chrdev_region);
 EXPORT_SYMBOL(cdev_init);
 EXPORT_SYMBOL(cdev_alloc);
-EXPORT_SYMBOL(cdev_get);
-EXPORT_SYMBOL(cdev_put);
 EXPORT_SYMBOL(cdev_del);
 EXPORT_SYMBOL(cdev_add);
 EXPORT_SYMBOL(register_chrdev);

@@ -58,14 +58,10 @@ static struct map_desc smdk2410_iodesc[] __initdata = {
 #define ULCON S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB
 #define UFCON S3C2410_UFCON_RXTRIG8 | S3C2410_UFCON_FIFOMODE
 
-/* base baud rate for all our UARTs */
-static unsigned long smdk2410_serial_clock = 24*1000*1000;
-
 static struct s3c2410_uartcfg smdk2410_uartcfgs[] = {
 	[0] = {
 		.hwport	     = 0,
 		.flags	     = 0,
-		.clock	     = &smdk2410_serial_clock,
 		.ucon	     = UCON,
 		.ulcon	     = ULCON,
 		.ufcon	     = UFCON,
@@ -73,7 +69,6 @@ static struct s3c2410_uartcfg smdk2410_uartcfgs[] = {
 	[1] = {
 		.hwport	     = 1,
 		.flags	     = 0,
-		.clock	     = &smdk2410_serial_clock,
 		.ucon	     = UCON,
 		.ulcon	     = ULCON,
 		.ufcon	     = UFCON,
@@ -81,7 +76,6 @@ static struct s3c2410_uartcfg smdk2410_uartcfgs[] = {
 	[2] = {
 		.hwport	     = 2,
 		.flags	     = 0,
-		.clock	     = &smdk2410_serial_clock,
 		.ucon	     = UCON,
 		.ulcon	     = ULCON,
 		.ufcon	     = UFCON,

@@ -23,7 +23,7 @@
 
 static unsigned long anslcd_short_delay = 80;
 static unsigned long anslcd_long_delay = 3280;
-static volatile unsigned char* anslcd_ptr;
+static volatile unsigned char __iomem *anslcd_ptr;
 
 #undef DEBUG
 
@@ -151,12 +151,12 @@ anslcd_init(void)
 	if (strcmp(node->parent->name, "gc"))
 		return -ENODEV;
 
-	anslcd_ptr = (volatile unsigned char*)ioremap(ANSLCD_ADDR, 0x20);
+	anslcd_ptr = ioremap(ANSLCD_ADDR, 0x20);
 	
 	retval = misc_register(&anslcd_dev);
 	if(retval < 0){
 		printk(KERN_INFO "LCD: misc_register failed\n");
-		iounmap((void *)anslcd_ptr);
+		iounmap(anslcd_ptr);
 		return retval;
 	}
 
@@ -179,7 +179,7 @@ static void __exit
 anslcd_exit(void)
 {
 	misc_deregister(&anslcd_dev);
-	iounmap((void *)anslcd_ptr);
+	iounmap(anslcd_ptr);
 }
 
 module_init(anslcd_init);

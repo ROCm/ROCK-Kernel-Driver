@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-mpeg.c,v 1.11 2004/10/12 07:33:22 kraxel Exp $
+ * $Id: cx88-mpeg.c,v 1.14 2004/10/25 11:26:36 kraxel Exp $
  *
  *  Support for the mpeg transport stream transfers
  *  PCI function #2 of the cx2388x.
@@ -239,7 +239,6 @@ static void cx8802_timeout(unsigned long data)
 	if (debug)
 		cx88_sram_channel_dump(dev->core, &cx88_sram_channels[SRAM_CH28]);
 	cx8802_stop_dma(dev);
-	dev->timeout_count++;
 	do_cancel_buffers(dev,"timeout",1);
 }
 
@@ -276,7 +275,6 @@ static void cx8802_mpeg_irq(struct cx8802_dev *dev)
 	/* risc2 y */
 	if (status & 0x10) {
 		spin_lock(&dev->slock);
-		dev->stopper_count++;
 		cx8802_restart_queue(dev,&dev->mpegq);
 		spin_unlock(&dev->slock);
 	}
@@ -284,7 +282,6 @@ static void cx8802_mpeg_irq(struct cx8802_dev *dev)
         /* other general errors */
         if (status & 0x1f0100) {
                 spin_lock(&dev->slock);
-		dev->error_count++;
 		cx8802_stop_dma(dev);
                 cx8802_restart_queue(dev,&dev->mpegq);
                 spin_unlock(&dev->slock);

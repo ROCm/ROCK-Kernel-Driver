@@ -9,28 +9,32 @@
 Index
 =====
 1.  Copyright
-2.  License
-3.  Overview
-4.  Module dependencies
-5.  Module loading
-6.  Module parameters
-7.  Optional device control through "sysfs"
-8.  Supported devices
-9.  How to add support for new image sensors
-10. Notes for V4L2 application developers
-11. Contact information
-12. Credits
+2.  Disclaimer
+3.  License
+4.  Overview
+5.  Driver installation
+6.  Module loading
+7.  Module parameters
+8.  Optional device control through "sysfs"
+9.  Supported devices
+10. How to add support for new image sensors
+11. Notes for V4L2 application developers
+12. Contact information
+13. Credits
 
 
 1. Copyright
 ============
 Copyright (C) 2004 by Luca Risolia <luca.risolia@studio.unibo.it>
 
+
+2. Disclaimer
+=============
 SONiX is a trademark of SONiX Technology Company Limited, inc.
-This driver is not sponsored or developed by SONiX.
+This software is not sponsored or developed by SONiX.
 
 
-2. License
+3. License
 ==========
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -47,29 +51,52 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 
-3. Overview
+4. Overview
 ===========
 This driver attempts to support the video and audio streaming capabilities of
 the devices mounting the SONiX SN9C101, SN9C102 and SN9C103 (or SUI-102) PC
 Camera Controllers.
 
-- It's worth to note that SONiX has never collaborated with me during the
+It's worth to note that SONiX has never collaborated with the author during the
 development of this project, despite several requests for enough detailed
 specifications of the register tables, compression engine and video data format
-of the above chips -
-
-Up to 64 cameras can be handled at the same time. They can be connected and
-disconnected from the host many times without turning off the computer, if
-your system supports hotplugging.
+of the above chips.
 
 The driver relies on the Video4Linux2 and USB core modules. It has been
 designed to run properly on SMP systems as well.
 
 The latest version of the SN9C10x driver can be found at the following URL:
-http://go.lamarinapunto.com/
+http://www.linux-projects.org/
+
+Some of the features of the driver are:
+
+- full compliance with the Video4Linux2 API (see also "Notes for V4L2
+  application developers" paragraph);
+- available mmap or read/poll methods for video streaming through isochronous
+  data transfers;
+- automatic detection of image sensor;
+- support for any window resolutions and optional panning within the maximum
+  pixel area of image sensor;
+- image downscaling with arbitrary scaling factors from 1, 2 and 4 in both
+  directions (see "Notes for V4L2 application developers" paragraph);
+- two different video formats for uncompressed or compressed data (see also
+  "Notes for V4L2 application developers" paragraph);
+- full support for the capabilities of many of the possible image sensors that
+  can be connected to the SN9C10x bridges, including, for istance, red, green,
+  blue and global gain adjustments and exposure (see "Supported devices"
+  paragraph for details);
+- use of default color settings for sunlight conditions;
+- dynamic I/O interface for both SN9C10x and image sensor control (see
+  "Optional device control through 'sysfs'" paragraph);
+- dynamic driver control thanks to various module parameters (see "Module
+  parameters" paragraph);
+- up to 64 cameras can be handled at the same time; they can be connected and
+  disconnected from the host many times without turning off the computer, if
+  your system supports hotplugging;
+- no known bugs.
 
 
-4. Module dependencies
+5. Module dependencies
 ======================
 For it to work properly, the driver needs kernel support for Video4Linux and
 USB.
@@ -101,7 +128,7 @@ And finally:
 	CONFIG_USB_SN9C102=m
 
 
-5. Module loading
+6. Module loading
 =================
 To use the driver, it is necessary to load the "sn9c102" module into memory
 after every other module required: "videodev", "usbcore" and, depending on
@@ -109,7 +136,6 @@ the USB host controller you have, "ehci-hcd", "uhci-hcd" or "ohci-hcd".
 
 Loading can be done as shown below:
 
-	[root@localhost home]# modprobe usbcore
 	[root@localhost home]# modprobe sn9c102
 
 At this point the devices should be recognized. You can invoke "dmesg" to
@@ -118,7 +144,7 @@ analyze kernel messages and verify that the loading process has gone well:
 	[user@localhost home]$ dmesg
 
 
-6. Module parameters
+7. Module parameters
 ====================
 Module parameters are listed below:
 -------------------------------------------------------------------------------
@@ -144,12 +170,14 @@ Description:    Debugging information level, from 0 to 3:
                 2 = significant informations
                 3 = more verbose messages
                 Level 3 is useful for testing only, when only one device
-                is used.
+                is used. It also shows some more informations about the
+                hardware being detected. This parameter can be changed at
+                runtime thanks to the /sys filesystem.
 Default:        2
 -------------------------------------------------------------------------------
 
 
-7. Optional device control through "sysfs"
+8. Optional device control through "sysfs"
 ==========================================
 It is possible to read and write both the SN9C10x and the image sensor
 registers by using the "sysfs" filesystem interface.
@@ -191,10 +219,10 @@ Note that the SN9C10x always returns 0 when some of its registers are read.
 To avoid race conditions, all the I/O accesses to the files are serialized.
 
 
-8. Supported devices
+9. Supported devices
 ====================
-- I won't mention any of the names of the companies as well as their products
-here. They have never collaborated with me, so no advertising -
+None of the names of the companies as well as their products will be mentioned
+here. They have never collaborated with the author, so no advertising.
 
 From the point of view of a driver, what unambiguously identify a device are
 its vendor and product USB identifiers. Below is a list of known identifiers of
@@ -241,7 +269,7 @@ Vendor ID  Product ID
 0x0c45     0x60bc
 0x0c45     0x60be
 
-The list above does NOT imply that all those devices work with this driver: up
+The list above does not imply that all those devices work with this driver: up
 until now only the ones that mount the following image sensors are supported;
 kernel messages will always tell you whether this is the case:
 
@@ -259,16 +287,16 @@ If you think your camera is based on the above hardware and is not actually
 listed in the above table, you may try to add the specific USB VendorID and
 ProductID identifiers to the sn9c102_id_table[] in the file "sn9c102_sensor.h";
 then compile, load the module again and look at the kernel output.
-If this works, please send an email to me reporting the kernel messages, so
-that I can add a new entry in the list of supported devices.
+If this works, please send an email to the author reporting the kernel
+messages, so that a new entry in the list of supported devices can be added.
 
 Donations of new models for further testing and support would be much
-appreciated. I won't add official support for hardware that I don't actually
-have.
+appreciated. Non-available hardware won't be supported by the author of this
+driver.
 
 
-9. How to add support for new image sensors
-===========================================
+10. How to add support for new image sensors
+============================================
 It should be easy to write code for new sensors by using the small API that I
 have created for this purpose, which is present in "sn9c102_sensor.h"
 (documentation is included there). As an example, have a look at the code in
@@ -278,7 +306,7 @@ At the moment, possible unsupported image sensors are: HV7131x series (VGA),
 MI03x series (VGA), OV7620 (VGA), OV7630 (VGA), CIS-VF10 (VGA).
 
 
-10. Notes for V4L2 application developers
+11. Notes for V4L2 application developers
 =========================================
 This driver follows the V4L2 API specifications. In particular, it enforces two
 rules:
@@ -301,8 +329,18 @@ factor can be chosen arbitrarily by the "negotiation" of the "source" and
 that, during the negotiation, whenever the "VIDIOC_S_CROP" ioctl is issued, the
 scaling factor is restored to 1.
 
+This driver supports two different video formats: the first one is the "8-bit
+Sequential Bayer" format and can be used to obtain uncompressed video data
+from the device through the current I/O method, while the second one provides
+"raw" compressed video data (without the initial and final frame headers). The
+compression quality may vary from 0 to 1 and can be selected or queried thanks
+to the VIDIOC_S_JPEGCOMP and VIDIOC_G_JPEGCOMP V4L2 ioctl's. For maximum
+flexibility, the default active video format depends on how the image sensor
+being used is initialized (as described in the documentation of the API for the
+image sensors supplied by this driver).
 
-11. Contact information
+
+12. Contact information
 =======================
 I may be contacted by e-mail at <luca.risolia@studio.unibo.it>.
 
@@ -311,7 +349,7 @@ My public 1024-bit key should be available at any keyserver; the fingerprint
 is: '88E8 F32F 7244 68BA 3958  5D40 99DA 5D2A FCE6 35A4'.
 
 
-12. Credits
+13. Credits
 ===========
 I would thank the following persons:
 

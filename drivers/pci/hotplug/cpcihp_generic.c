@@ -63,7 +63,7 @@
 
 /* local variables */
 static int debug;
-static char* bridge;
+static char *bridge;
 static u8 bridge_busnr;
 static u8 bridge_slot;
 static struct pci_bus *bus;
@@ -209,15 +209,15 @@ module_exit(cpcihp_generic_exit);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debugging mode enabled or not");
-MODULE_PARM(bridge, "s");
+module_param(bridge, charp, 0);
 MODULE_PARM_DESC(bridge, "Hotswap bus bridge device, <bus>:<slot> (bus and slot are in hexadecimal)");
-MODULE_PARM(first_slot, "b");
+module_param(first_slot, byte, 0);
 MODULE_PARM_DESC(first_slot, "Hotswap bus first slot number");
-MODULE_PARM(last_slot, "b");
+module_param(last_slot, byte, 0);
 MODULE_PARM_DESC(last_slot, "Hotswap bus last slot number");
-MODULE_PARM(port, "h");
+module_param(port, ushort, 0);
 MODULE_PARM_DESC(port, "#ENUM signal I/O port");
-MODULE_PARM(enum_bit, "i");
+module_param(enum_bit, uint, 0);
 MODULE_PARM_DESC(enum_bit, "#ENUM signal bit (0-7)");

@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-blackbird.c,v 1.14 2004/10/12 07:33:22 kraxel Exp $
+ * $Id: cx88-blackbird.c,v 1.17 2004/11/07 13:17:15 kraxel Exp $
  *
  *  Support for a cx23416 mpeg encoder via cx2388x host port.
  *  "blackbird" reference design.
@@ -363,7 +363,7 @@ static int blackbird_load_firmware(struct cx8802_dev *dev)
 	}
 
 	if (firmware->size != BLACKBIRD_FIRM_IMAGE_SIZE) {
-		dprintk(0, "ERROR: Firmware size mismatch (have %ld, expected %d)\n",
+		dprintk(0, "ERROR: Firmware size mismatch (have %zd, expected %d)\n",
 			firmware->size, BLACKBIRD_FIRM_IMAGE_SIZE);
 		return -1;
 	}
@@ -543,9 +543,10 @@ static int blackbird_initialize_codec(struct cx8802_dev *dev)
 
 /* ------------------------------------------------------------------ */
 
-static int bb_buf_setup(void *priv, unsigned int *count, unsigned int *size)
+static int bb_buf_setup(struct videobuf_queue *q,
+			unsigned int *count, unsigned int *size)
 {
-	struct cx8802_fh *fh = priv;
+	struct cx8802_fh *fh = q->priv_data;
 
 	fh->dev->ts_packet_size  = 512;
 	fh->dev->ts_packet_count = 100;
@@ -561,23 +562,24 @@ static int bb_buf_setup(void *priv, unsigned int *count, unsigned int *size)
 }
 
 static int
-bb_buf_prepare(void *priv, struct videobuf_buffer *vb,
-		 enum v4l2_field field)
+bb_buf_prepare(struct videobuf_queue *q, struct videobuf_buffer *vb,
+	       enum v4l2_field field)
 {
-	struct cx8802_fh *fh = priv;
+	struct cx8802_fh *fh = q->priv_data;
 	return cx8802_buf_prepare(fh->dev, (struct cx88_buffer*)vb);
 }
 
 static void
-bb_buf_queue(void *priv, struct videobuf_buffer *vb)
+bb_buf_queue(struct videobuf_queue *q, struct videobuf_buffer *vb)
 {
-	struct cx8802_fh *fh = priv;
+	struct cx8802_fh *fh = q->priv_data;
 	cx8802_buf_queue(fh->dev, (struct cx88_buffer*)vb);
 }
 
-static void bb_buf_release(void *priv, struct videobuf_buffer *vb)
+static void
+bb_buf_release(struct videobuf_queue *q, struct videobuf_buffer *vb)
 {
-	struct cx8802_fh *fh = priv;
+	struct cx8802_fh *fh = q->priv_data;
 	cx88_free_buffer(fh->dev->pci, (struct cx88_buffer*)vb);
 }
 
@@ -635,23 +637,23 @@ static int mpeg_do_ioctl(struct inode *inode, struct file *file,
 
 	/* --- streaming capture ------------------------------------- */
 	case VIDIOC_REQBUFS:
-		return videobuf_reqbufs(file->private_data, &fh->mpegq, arg);
+		return videobuf_reqbufs(&fh->mpegq, arg);
 
 	case VIDIOC_QUERYBUF:
 		return videobuf_querybuf(&fh->mpegq, arg);
 
 	case VIDIOC_QBUF:
-		return videobuf_qbuf(file->private_data, &fh->mpegq, arg);
+		return videobuf_qbuf(&fh->mpegq, arg);
 
 	case VIDIOC_DQBUF:
-		return videobuf_dqbuf(file->private_data, &fh->mpegq, arg,
+		return videobuf_dqbuf(&fh->mpegq, arg,
 				      file->f_flags & O_NONBLOCK);
 
 	case VIDIOC_STREAMON:
-		return videobuf_streamon(file->private_data, &fh->mpegq);
+		return videobuf_streamon(&fh->mpegq);
 
 	case VIDIOC_STREAMOFF:
-		return videobuf_streamoff(file->private_data, &fh->mpegq);
+		return videobuf_streamoff(&fh->mpegq);
 
 	default:
 		return -EINVAL;
@@ -696,9 +698,8 @@ static int mpeg_open(struct inode *inode, struct file *file)
 			    dev->pci, &dev->slock,
 			    V4L2_BUF_TYPE_VIDEO_CAPTURE,
 			    V4L2_FIELD_TOP,
-			    sizeof(struct cx88_buffer));
-	init_MUTEX(&fh->mpegq.lock);
-
+			    sizeof(struct cx88_buffer),
+			    fh);
 	return 0;
 }
 
@@ -710,9 +711,9 @@ static int mpeg_release(struct inode *inode, struct file *file)
 
 	/* stop mpeg capture */
 	if (fh->mpegq.streaming)
-		videobuf_streamoff(file->private_data,&fh->mpegq);
+		videobuf_streamoff(&fh->mpegq);
 	if (fh->mpegq.reading)
-		videobuf_read_stop(file->private_data,&fh->mpegq);
+		videobuf_read_stop(&fh->mpegq);
 
 	file->private_data = NULL;
 	kfree(fh);
@@ -720,12 +721,11 @@ static int mpeg_release(struct inode *inode, struct file *file)
 }
 
 static ssize_t
-mpeg_read(struct file *file, char *data, size_t count, loff_t *ppos)
+mpeg_read(struct file *file, char __user *data, size_t count, loff_t *ppos)
 {
 	struct cx8802_fh *fh = file->private_data;
 
-	return videobuf_read_stream(file->private_data,
-				    &fh->mpegq, data, count, ppos, 0,
+	return videobuf_read_stream(&fh->mpegq, data, count, ppos, 0,
 				    file->f_flags & O_NONBLOCK);
 }
 
@@ -734,8 +734,7 @@ mpeg_poll(struct file *file, struct poll_table_struct *wait)
 {
 	struct cx8802_fh *fh = file->private_data;
 
-	return videobuf_poll_stream(file, file->private_data,
-				    &fh->mpegq, wait);
+	return videobuf_poll_stream(file, &fh->mpegq, wait);
 }
 
 static int
@@ -743,7 +742,7 @@ mpeg_mmap(struct file *file, struct vm_area_struct * vma)
 {
 	struct cx8802_fh *fh = file->private_data;
 
-	return videobuf_mmap_mapper(vma, &fh->mpegq);
+	return videobuf_mmap_mapper(&fh->mpegq, vma);
 }
 
 static struct file_operations mpeg_fops =
@@ -871,7 +870,7 @@ static struct pci_driver blackbird_pci_driver = {
         .name     = "cx88-blackbird",
         .id_table = cx8802_pci_tbl,
         .probe    = blackbird_probe,
-        .remove   = blackbird_remove,
+        .remove   = __devexit_p(blackbird_remove),
 	.suspend  = cx8802_suspend_common,
 	.resume   = cx8802_resume_common,
 };

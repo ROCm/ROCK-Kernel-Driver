@@ -26,15 +26,9 @@
  */
 
 #ifdef UNIQUE_FW_NAME
-unsigned short fw12160i_version = 10*1024+4;
+static unsigned char fw12160i_version_str[] = {10,4,32};
 #else
-unsigned short risc_code_version = 10*1024+4;
-#endif
-
-#ifdef UNIQUE_FW_NAME
-unsigned char fw12160i_version_str[] = {10,4,32};
-#else
-unsigned char firmware_version[] = {10,4,32};
+static unsigned char firmware_version[] = {10,4,32};
 #endif
 
 #ifdef UNIQUE_FW_NAME
@@ -44,15 +38,15 @@ unsigned char firmware_version[] = {10,4,32};
 #endif
 
 #ifdef UNIQUE_FW_NAME
-unsigned short fw12160i_addr01 = 0x1000;
+static unsigned short fw12160i_addr01 = 0x1000;
 #else
-unsigned short risc_code_addr01 = 0x1000;
+static unsigned short risc_code_addr01 = 0x1000;
 #endif
 
 #ifdef UNIQUE_FW_NAME
-unsigned short fw12160i_code01[] = {
+static unsigned short fw12160i_code01[] = {
 #else
-unsigned short risc_code01[] = {
+static unsigned short risc_code01[] = {
 #endif
 	0x0804, 0x1041, 0x0000, 0x35e6, 0x0000, 0x2043, 0x4f50, 0x5952,
 	0x4947, 0x4854, 0x2031, 0x3939, 0x312c, 0x3139, 0x3932, 0x2c31,
@@ -1781,7 +1775,7 @@ unsigned short risc_code01[] = {
 	0x681f, 0x000c, 0x70a0, 0x70a2, 0x0005, 0x7c12
 };
 #ifdef UNIQUE_FW_NAME
-unsigned short   fw12160i_length01 = 0x35e6;
+static unsigned short   fw12160i_length01 = 0x35e6;
 #else
-unsigned short   risc_code_length01 = 0x35e6;
+static unsigned short   risc_code_length01 = 0x35e6;
 #endif

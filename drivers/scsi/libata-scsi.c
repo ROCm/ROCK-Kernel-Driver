@@ -678,7 +678,7 @@ static void ata_scsi_translate(struct ata_port *ap, struct ata_device *dev,
 			ata_sg_init_one(qc, cmd->request_buffer,
 					cmd->request_bufflen);
 
-		qc->pci_dma_dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
+		qc->dma_dir = cmd->sc_data_direction;
 	}
 
 	qc->complete_fn = ata_scsi_qc_complete;

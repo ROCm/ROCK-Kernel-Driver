@@ -11,6 +11,7 @@ ifeq ($(CONFIG_MODE_SKAS),y)
 endif
 
 CFLAGS += -U__$(SUBARCH)__ -U$(SUBARCH)
+ARCH_USER_CFLAGS :=
 
 ifneq ($(CONFIG_GPROF),y)
 ARCH_CFLAGS += -DUM_FASTCALL

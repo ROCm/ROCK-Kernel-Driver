@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2001 Sistina Software (UK) Limited.
+ * Copyright (C) 2004 Red Hat, Inc. All rights reserved.
  *
  * This file is released under the LGPL.
  */
@@ -57,6 +58,8 @@ typedef void (*dm_resume_fn) (struct dm_target *ti);
 typedef int (*dm_status_fn) (struct dm_target *ti, status_type_t status_type,
 			     char *result, unsigned int maxlen);
 
+typedef int (*dm_message_fn) (struct dm_target *ti, unsigned argc, char **argv);
+
 void dm_error(const char *message);
 
 /*
@@ -82,6 +85,7 @@ struct target_type {
 	dm_suspend_fn suspend;
 	dm_resume_fn resume;
 	dm_status_fn status;
+	dm_message_fn message;
 };
 
 struct io_restrictions {

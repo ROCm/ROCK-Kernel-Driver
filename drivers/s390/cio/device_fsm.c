@@ -93,6 +93,18 @@ ccw_device_set_timeout(struct ccw_device *cdev, int expires)
 	add_timer(&cdev->private->timer);
 }
 
+/* Kill any pending timers after machine check. */
+void
+device_kill_pending_timer(struct subchannel *sch)
+{
+	struct ccw_device *cdev;
+
+	if (!sch->dev.driver_data)
+		return;
+	cdev = sch->dev.driver_data;
+	ccw_device_set_timeout(cdev, 0);
+}
+
 /*
  * Cancel running i/o. This is called repeatedly since halt/clear are
  * asynchronous operations. We do one try with cio_cancel, two tries
@@ -452,7 +464,8 @@ ccw_device_nopath_notify(void *data)
 					     (void *)cdev);
 				queue_work(ccw_device_work,
 					   &cdev->private->kick_work);
-			}
+			} else
+				put_device(&sch->dev);
 		}
 	} else {
 		cio_disable_subchannel(sch);
@@ -1190,8 +1203,8 @@ io_subchannel_irq (struct device *pdev)
 
 	CIO_TRACE_EVENT (3, "IRQ");
 	CIO_TRACE_EVENT (3, pdev->bus_id);
-
-	dev_fsm_event(cdev, DEV_EVENT_INTERRUPT);
+	if (cdev)
+		dev_fsm_event(cdev, DEV_EVENT_INTERRUPT);
 }
 
 EXPORT_SYMBOL_GPL(ccw_device_set_timeout);

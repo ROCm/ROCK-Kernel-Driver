@@ -32,9 +32,6 @@
 #define DBG(x...)
 #endif
 
-extern int pci_probe_only;
-extern int pci_read_irq_line(struct pci_dev *pci_dev);
-
 static struct pci_controller *u3_agp, *u3_ht;
 
 static int __init fixup_one_level_bus_range(struct device_node *node, int higher)
@@ -328,15 +325,17 @@ static int __init add_bridge(struct device_node *dev)
        			       dev->full_name);
        	}
 
-       	hose = pci_alloc_pci_controller(phb_type_apple);
-       	if (!hose)
-       		return -ENOMEM;
+	hose = alloc_bootmem(sizeof(struct pci_controller));
+	if (hose == NULL)
+		return -ENOMEM;
+       	pci_setup_pci_controller(hose);
+
        	hose->arch_data = dev;
        	hose->first_busno = bus_range ? bus_range[0] : 0;
        	hose->last_busno = bus_range ? bus_range[1] : 0xff;
 
-	of_prop = (struct property *)alloc_bootmem(sizeof(struct property) +
-			sizeof(hose->global_number));        
+	of_prop = alloc_bootmem(sizeof(struct property) +
+				sizeof(hose->global_number));
 	if (of_prop) {
 		memset(of_prop, 0, sizeof(struct property));
 		of_prop->name = "linux,pci-domain";
@@ -377,7 +376,7 @@ void __init maple_pcibios_fixup(void)
 
 	DBG(" -> maple_pcibios_fixup\n");
 
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL)
+	for_each_pci_dev(dev)
 		pci_read_irq_line(dev);
 
 	/* Do the mapping of the IO space */

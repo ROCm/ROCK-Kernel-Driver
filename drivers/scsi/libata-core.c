@@ -67,6 +67,7 @@ static struct workqueue_struct *ata_wq;
 MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("Library module for ATA devices");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(DRV_VERSION);
 
 /**
  *	ata_tf_load - send taskfile registers to host controller
@@ -1017,7 +1018,7 @@ static void ata_dev_identify(struct ata_port *ap, unsigned int device)
 	BUG_ON(qc == NULL);
 
 	ata_sg_init_one(qc, dev->id, sizeof(dev->id));
-	qc->pci_dma_dir = PCI_DMA_FROMDEVICE;
+	qc->dma_dir = DMA_FROM_DEVICE;
 	qc->tf.protocol = ATA_PROT_PIO;
 	qc->nsect = 1;
 
@@ -1849,7 +1850,7 @@ static void ata_sg_clean(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 	struct scatterlist *sg = qc->sg;
-	int dir = qc->pci_dma_dir;
+	int dir = qc->dma_dir;
 
 	assert(qc->flags & ATA_QCFLAG_DMAMAP);
 	assert(sg != NULL);
@@ -1860,9 +1861,9 @@ static void ata_sg_clean(struct ata_queued_cmd *qc)
 	DPRINTK("unmapping %u sg elements\n", qc->n_elem);
 
 	if (qc->flags & ATA_QCFLAG_SG)
-		pci_unmap_sg(ap->host_set->pdev, sg, qc->n_elem, dir);
+		dma_unmap_sg(ap->host_set->dev, sg, qc->n_elem, dir);
 	else
-		pci_unmap_single(ap->host_set->pdev, sg_dma_address(&sg[0]),
+		dma_unmap_single(ap->host_set->dev, sg_dma_address(&sg[0]),
 				 sg_dma_len(&sg[0]), dir);
 
 	qc->flags &= ~ATA_QCFLAG_DMAMAP;
@@ -1973,13 +1974,13 @@ void ata_sg_init(struct ata_queued_cmd *qc, struct scatterlist *sg,
 static int ata_sg_setup_one(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
-	int dir = qc->pci_dma_dir;
+	int dir = qc->dma_dir;
 	struct scatterlist *sg = qc->sg;
 	dma_addr_t dma_address;
 
-	dma_address = pci_map_single(ap->host_set->pdev, qc->buf_virt,
+	dma_address = dma_map_single(ap->host_set->dev, qc->buf_virt,
 				     sg_dma_len(sg), dir);
-	if (pci_dma_mapping_error(dma_address))
+	if (dma_mapping_error(dma_address))
 		return -1;
 
 	sg_dma_address(sg) = dma_address;
@@ -2010,8 +2011,8 @@ static int ata_sg_setup(struct ata_queued_cmd *qc)
 	VPRINTK("ENTER, ata%u\n", ap->id);
 	assert(qc->flags & ATA_QCFLAG_SG);
 
-	dir = qc->pci_dma_dir;
-	n_elem = pci_map_sg(ap->host_set->pdev, sg, qc->n_elem, dir);
+	dir = qc->dma_dir;
+	n_elem = dma_map_sg(ap->host_set->dev, sg, qc->n_elem, dir);
 	if (n_elem < 1)
 		return -1;
 
@@ -2416,7 +2417,7 @@ static void atapi_request_sense(struct ata_port *ap, struct ata_device *dev,
 	memset(cmd->sense_buffer, 0, sizeof(cmd->sense_buffer));
 
 	ata_sg_init_one(qc, cmd->sense_buffer, sizeof(cmd->sense_buffer));
-	qc->pci_dma_dir = PCI_DMA_FROMDEVICE;
+	qc->dma_dir = DMA_FROM_DEVICE;
 
 	memset(&qc->cdb, 0, sizeof(ap->cdb_len));
 	qc->cdb[0] = REQUEST_SENSE;
@@ -3104,9 +3105,9 @@ err_out:
 
 int ata_port_start (struct ata_port *ap)
 {
-	struct pci_dev *pdev = ap->host_set->pdev;
+	struct device *dev = ap->host_set->dev;
 
-	ap->prd = pci_alloc_consistent(pdev, ATA_PRD_TBL_SZ, &ap->prd_dma);
+	ap->prd = dma_alloc_coherent(dev, ATA_PRD_TBL_SZ, &ap->prd_dma, GFP_KERNEL);
 	if (!ap->prd)
 		return -ENOMEM;
 
@@ -3117,9 +3118,9 @@ int ata_port_start (struct ata_port *ap)
 
 void ata_port_stop (struct ata_port *ap)
 {
-	struct pci_dev *pdev = ap->host_set->pdev;
+	struct device *dev = ap->host_set->dev;
 
-	pci_free_consistent(pdev, ATA_PRD_TBL_SZ, ap->prd, ap->prd_dma);
+	dma_free_coherent(dev, ATA_PRD_TBL_SZ, ap->prd, ap->prd_dma);
 }
 
 /**
@@ -3165,7 +3166,7 @@ static void ata_host_init(struct ata_port *ap, struct Scsi_Host *host,
 	host->max_channel = 1;
 	host->unique_id = ata_unique_id++;
 	host->max_cmd_len = 12;
-	scsi_set_device(host, &ent->pdev->dev);
+	scsi_set_device(host, ent->dev);
 	scsi_assign_lock(host, &host_set->lock);
 
 	ap->flags = ATA_FLAG_PORT_DISABLED;
@@ -3252,7 +3253,7 @@ err_out:
 int ata_device_add(struct ata_probe_ent *ent)
 {
 	unsigned int count = 0, i;
-	struct pci_dev *pdev = ent->pdev;
+	struct device *dev = ent->dev;
 	struct ata_host_set *host_set;
 
 	DPRINTK("ENTER\n");
@@ -3264,7 +3265,7 @@ int ata_device_add(struct ata_probe_ent *ent)
 	memset(host_set, 0, sizeof(struct ata_host_set) + (ent->n_ports * sizeof(void *)));
 	spin_lock_init(&host_set->lock);
 
-	host_set->pdev = pdev;
+	host_set->dev = dev;
 	host_set->n_ports = ent->n_ports;
 	host_set->irq = ent->irq;
 	host_set->mmio_base = ent->mmio_base;
@@ -3332,7 +3333,7 @@ int ata_device_add(struct ata_probe_ent *ent)
 			 */
 		}
 
-		rc = scsi_add_host(ap->host, &pdev->dev);
+		rc = scsi_add_host(ap->host, dev);
 		if (rc) {
 			printk(KERN_ERR "ata%u: scsi_add_host failed\n",
 			       ap->id);
@@ -3352,7 +3353,7 @@ int ata_device_add(struct ata_probe_ent *ent)
 		scsi_scan_host(ap->host);
 	}
 
-	pci_set_drvdata(pdev, host_set);
+	dev_set_drvdata(dev, host_set);
 
 	VPRINTK("EXIT, returning %u\n", ent->n_ports);
 	return ent->n_ports; /* success */
@@ -3413,7 +3414,7 @@ void ata_std_ports(struct ata_ioports *ioaddr)
 }
 
 static struct ata_probe_ent *
-ata_probe_ent_alloc(int n, struct pci_dev *pdev, struct ata_port_info **port)
+ata_probe_ent_alloc(int n, struct device *dev, struct ata_port_info **port)
 {
 	struct ata_probe_ent *probe_ent;
 	int i;
@@ -3421,7 +3422,7 @@ ata_probe_ent_alloc(int n, struct pci_dev *pdev, struct ata_port_info **port)
 	probe_ent = kmalloc(sizeof(*probe_ent) * n, GFP_KERNEL);
 	if (!probe_ent) {
 		printk(KERN_ERR DRV_NAME "(%s): out of memory\n",
-		       pci_name(pdev));
+		       kobject_name(&(dev->kobj)));
 		return NULL;
 	}
 
@@ -3429,7 +3430,7 @@ ata_probe_ent_alloc(int n, struct pci_dev *pdev, struct ata_port_info **port)
 
 	for (i = 0; i < n; i++) {
 		INIT_LIST_HEAD(&probe_ent[i].node);
-		probe_ent[i].pdev = pdev;
+		probe_ent[i].dev = dev;
 
 		probe_ent[i].sht = port[i]->sht;
 		probe_ent[i].host_flags = port[i]->host_flags;
@@ -3443,10 +3444,12 @@ ata_probe_ent_alloc(int n, struct pci_dev *pdev, struct ata_port_info **port)
 	return probe_ent;
 }
 
+#ifdef CONFIG_PCI
 struct ata_probe_ent *
 ata_pci_init_native_mode(struct pci_dev *pdev, struct ata_port_info **port)
 {
-	struct ata_probe_ent *probe_ent = ata_probe_ent_alloc(1, pdev, port);
+	struct ata_probe_ent *probe_ent =
+		ata_probe_ent_alloc(1, pci_dev_to_dev(pdev), port);
 	if (!probe_ent)
 		return NULL;
 
@@ -3475,7 +3478,8 @@ ata_pci_init_native_mode(struct pci_dev *pdev, struct ata_port_info **port)
 struct ata_probe_ent *
 ata_pci_init_legacy_mode(struct pci_dev *pdev, struct ata_port_info **port)
 {
-	struct ata_probe_ent *probe_ent = ata_probe_ent_alloc(2, pdev, port);
+	struct ata_probe_ent *probe_ent =
+		ata_probe_ent_alloc(2, pci_dev_to_dev(pdev), port);
 	if (!probe_ent)
 		return NULL;
 
@@ -3651,7 +3655,8 @@ err_out:
 
 void ata_pci_remove_one (struct pci_dev *pdev)
 {
-	struct ata_host_set *host_set = pci_get_drvdata(pdev);
+	struct device *dev = pci_dev_to_dev(pdev);
+	struct ata_host_set *host_set = dev_get_drvdata(dev);
 	struct ata_port *ap;
 	unsigned int i;
 
@@ -3692,7 +3697,7 @@ void ata_pci_remove_one (struct pci_dev *pdev)
 
 	kfree(host_set);
 	pci_disable_device(pdev);
-	pci_set_drvdata(pdev, NULL);
+	dev_set_drvdata(dev, NULL);
 }
 
 /* move to PCI subsystem */
@@ -3728,6 +3733,7 @@ int pci_test_config_bits(struct pci_dev *pdev, struct pci_bits *bits)
 
 	return (tmp == bits->val) ? 1 : 0;
 }
+#endif /* CONFIG_PCI */
 
 
 /**
@@ -3764,7 +3770,6 @@ module_exit(ata_exit);
  * Do not depend on ABI/API stability.
  */
 
-EXPORT_SYMBOL_GPL(pci_test_config_bits);
 EXPORT_SYMBOL_GPL(ata_std_bios_param);
 EXPORT_SYMBOL_GPL(ata_std_ports);
 EXPORT_SYMBOL_GPL(ata_device_add);
@@ -3779,8 +3784,6 @@ EXPORT_SYMBOL_GPL(ata_noop_dev_select);
 EXPORT_SYMBOL_GPL(ata_std_dev_select);
 EXPORT_SYMBOL_GPL(ata_tf_to_fis);
 EXPORT_SYMBOL_GPL(ata_tf_from_fis);
-EXPORT_SYMBOL_GPL(ata_pci_init_legacy_mode);
-EXPORT_SYMBOL_GPL(ata_pci_init_native_mode);
 EXPORT_SYMBOL_GPL(ata_check_status);
 EXPORT_SYMBOL_GPL(ata_exec_command);
 EXPORT_SYMBOL_GPL(ata_port_start);
@@ -3795,8 +3798,6 @@ EXPORT_SYMBOL_GPL(sata_phy_reset);
 EXPORT_SYMBOL_GPL(__sata_phy_reset);
 EXPORT_SYMBOL_GPL(ata_bus_reset);
 EXPORT_SYMBOL_GPL(ata_port_disable);
-EXPORT_SYMBOL_GPL(ata_pci_init_one);
-EXPORT_SYMBOL_GPL(ata_pci_remove_one);
 EXPORT_SYMBOL_GPL(ata_scsi_ioctl);
 EXPORT_SYMBOL_GPL(ata_scsi_queuecmd);
 EXPORT_SYMBOL_GPL(ata_scsi_error);
@@ -3806,3 +3807,11 @@ EXPORT_SYMBOL_GPL(ata_host_intr);
 EXPORT_SYMBOL_GPL(ata_dev_classify);
 EXPORT_SYMBOL_GPL(ata_dev_id_string);
 EXPORT_SYMBOL_GPL(ata_scsi_simulate);
+
+#ifdef CONFIG_PCI
+EXPORT_SYMBOL_GPL(pci_test_config_bits);
+EXPORT_SYMBOL_GPL(ata_pci_init_legacy_mode);
+EXPORT_SYMBOL_GPL(ata_pci_init_native_mode);
+EXPORT_SYMBOL_GPL(ata_pci_init_one);
+EXPORT_SYMBOL_GPL(ata_pci_remove_one);
+#endif /* CONFIG_PCI */

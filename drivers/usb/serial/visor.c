@@ -930,7 +930,7 @@ static int treo_attach (struct usb_serial *serial)
 	if (!((serial->dev->descriptor.idVendor == HANDSPRING_VENDOR_ID) ||
 	      (serial->dev->descriptor.idVendor == KYOCERA_VENDOR_ID)) ||
 	    (serial->num_interrupt_in == 0))
-		return 0;
+		goto generic_startup;
 
 	dbg("%s", __FUNCTION__);
 
@@ -957,6 +957,7 @@ static int treo_attach (struct usb_serial *serial)
 	COPY_PORT(serial->port[1], swap_port);
 	kfree(swap_port);
 
+generic_startup:
 	return generic_startup(serial);
 }
 

@@ -133,8 +133,8 @@ ip6ip6_tnl_lookup(struct in6_addr *remote, struct in6_addr *local)
 	struct ip6_tnl *t;
 
 	for (t = tnls_r_l[h0 ^ h1]; t; t = t->next) {
-		if (!ipv6_addr_cmp(local, &t->parms.laddr) &&
-		    !ipv6_addr_cmp(remote, &t->parms.raddr) &&
+		if (ipv6_addr_equal(local, &t->parms.laddr) &&
+		    ipv6_addr_equal(remote, &t->parms.raddr) &&
 		    (t->dev->flags & IFF_UP))
 			return t;
 	}
@@ -284,8 +284,8 @@ ip6ip6_tnl_locate(struct ip6_tnl_parm *p, struct ip6_tnl **pt, int create)
 		return -EINVAL;
 
 	for (t = *ip6ip6_bucket(p); t; t = t->next) {
-		if (!ipv6_addr_cmp(local, &t->parms.laddr) &&
-		    !ipv6_addr_cmp(remote, &t->parms.raddr)) {
+		if (ipv6_addr_equal(local, &t->parms.laddr) &&
+		    ipv6_addr_equal(remote, &t->parms.raddr)) {
 			*pt = t;
 			return (create ? -EEXIST : 0);
 		}
@@ -602,7 +602,7 @@ static inline struct ipv6_txoptions *create_tel(__u8 encap_limit)
 static inline int
 ip6ip6_tnl_addr_conflict(struct ip6_tnl *t, struct ipv6hdr *hdr)
 {
-	return !ipv6_addr_cmp(&t->parms.raddr, &hdr->saddr);
+	return ipv6_addr_equal(&t->parms.raddr, &hdr->saddr);
 }
 
 /**

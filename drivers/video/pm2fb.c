@@ -971,23 +971,23 @@ static int pm2fb_blank(int blank_mode, struct fb_info *info)
 	DPRINTK("blank_mode %d\n", blank_mode);
 
 	switch (blank_mode) {
-	case 0:
+	case FB_BLANK_UNBLANK:
 		/* Screen: On */
 		video |= PM2F_VIDEO_ENABLE;
 		break;
-	case VESA_NO_BLANKING + 1:
+	case FB_BLANK_NORMAL:
 		/* Screen: Off */
 		video &= ~PM2F_VIDEO_ENABLE;
 		break;
-	case VESA_VSYNC_SUSPEND + 1:
+	case FB_BLANK_VSYNC_SUSPEND:
 		/* VSync: Off */
 		video &= ~(PM2F_VSYNC_MASK | PM2F_BLANK_LOW );
 		break;
-	case VESA_HSYNC_SUSPEND + 1:
+	case FB_BLANK_HSYNC_SUSPEND:
 		/* HSync: Off */
 		video &= ~(PM2F_HSYNC_MASK | PM2F_BLANK_LOW );
 		break;
-	case VESA_POWERDOWN + 1:
+	case FB_BLANK_POWERDOWN:
 		/* HSync: Off, VSync: Off */
 		video &= ~(PM2F_VSYNC_MASK | PM2F_HSYNC_MASK| PM2F_BLANK_LOW);
 		break;

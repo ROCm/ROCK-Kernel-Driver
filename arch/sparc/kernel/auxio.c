@@ -17,7 +17,7 @@
 /* auxio_register is not static because it is referenced 
  * in entry.S::floppy_tdone
  */
-unsigned long auxio_register = 0UL;
+void __iomem *auxio_register = NULL;
 static spinlock_t auxio_lock = SPIN_LOCK_UNLOCKED;
 
 void __init auxio_probe(void)
@@ -63,7 +63,7 @@ void __init auxio_probe(void)
 	/* Fix the address on sun4m and sun4c. */
 	if((((unsigned long) auxregs[0].phys_addr) & 3) == 3 ||
 	   sparc_cpu_model == sun4c)
-		auxio_register |= 3;
+		auxio_register += (3 - ((unsigned long)auxio_register & 3));
 
 	set_auxio(AUXIO_LED, 0);
 }

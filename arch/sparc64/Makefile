@@ -8,7 +8,7 @@
 # Copyright (C) 1998 Jakub Jelinek (jj@ultra.linux.cz)
 #
 
-CHECKFLAGS	+= -D__sparc__ -D__sparc_v9__
+CHECKFLAGS	+= -D__sparc__ -D__sparc_v9__ -m64
 
 CPPFLAGS_vmlinux.lds += -Usparc
 

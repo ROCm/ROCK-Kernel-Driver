@@ -891,7 +891,7 @@ abort:
 	if (rq) kfree (rq);
 	cmd->result = DID_ERROR << 16;
 	done(cmd);
-	return 1;
+	return 0;
 }
 
 static int idescsi_eh_abort (struct scsi_cmnd *cmd)

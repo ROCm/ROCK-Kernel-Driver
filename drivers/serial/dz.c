@@ -28,12 +28,13 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/tty.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/console.h>
-#include <linux/serial.h>
+#include <linux/tty.h>
+#include <linux/tty_flip.h>
 #include <linux/serial_core.h>
+#include <linux/serial.h>
 
 #include <asm/bootinfo.h>
 #include <asm/dec/interrupts.h>
@@ -186,7 +187,7 @@ static inline void dz_receive_chars(struct dz_port *dport)
 	struct uart_icount *icount;
 	int ignore = 0;
 	unsigned short status, tmp;
-	unsigned char ch;
+	unsigned char ch, flag;
 
 	/* this code is going to be a problem...
 	   the call to tty_flip_buffer is going to need
@@ -201,6 +202,7 @@ static inline void dz_receive_chars(struct dz_port *dport)
 
 
 		ch = UCHAR(status);	/* grab the char */
+		flag = TTY_NORMAL;
 
 #if 0
 		if (info->is_console) {
@@ -217,8 +219,6 @@ static inline void dz_receive_chars(struct dz_port *dport)
 		if (tty->flip.count >= TTY_FLIPBUF_SIZE)
 			break;
 
-		*tty->flip.char_buf_ptr = ch;
-		*tty->flip.flag_buf_ptr = 0;
 		icount->rx++;
 
 		/* keep track of the statistics */
@@ -243,12 +243,12 @@ static inline void dz_receive_chars(struct dz_port *dport)
 			tmp = status & dport->port.read_status_mask;
 
 			if (tmp & DZ_PERR) {
-				*tty->flip.flag_buf_ptr = TTY_PARITY;
+				flag = TTY_PARITY;
 #ifdef DEBUG_DZ
 				debug_console("PERR\n", 5);
 #endif
 			} else if (tmp & DZ_FERR) {
-				*tty->flip.flag_buf_ptr = TTY_FRAME;
+				flag = TTY_FRAME;
 #ifdef DEBUG_DZ
 				debug_console("FERR\n", 5);
 #endif
@@ -257,17 +257,12 @@ static inline void dz_receive_chars(struct dz_port *dport)
 #ifdef DEBUG_DZ
 				debug_console("OERR\n", 5);
 #endif
-				if (tty->flip.count < TTY_FLIPBUF_SIZE) {
-					tty->flip.count++;
-					tty->flip.flag_buf_ptr++;
-					tty->flip.char_buf_ptr++;
-					*tty->flip.flag_buf_ptr = TTY_OVERRUN;
-				}
+				tty_insert_flip_char(tty, ch, flag);
+				ch = 0;
+				flag = TTY_OVERRUN;
 			}
 		}
-		tty->flip.flag_buf_ptr++;
-		tty->flip.char_buf_ptr++;
-		tty->flip.count++;
+		tty_insert_flip_char(tty, ch, flag);
 	      ignore_char:
 	} while (status & DZ_DVAL);
 
