@@ -475,9 +475,7 @@ nextnode:
 
 	if (systemcfg->platform == PLATFORM_PSERIES) {
 #ifdef CONFIG_SMP
-		for (i = 0; i < NR_CPUS; ++i) {
-			if (!cpu_possible(i))
-				continue;
+		for_each_cpu(i) {
 			xics_per_cpu[i] = __ioremap((ulong)inodes[get_hard_smp_processor_id(i)].addr, 
 						    (ulong)inodes[get_hard_smp_processor_id(i)].size,
 						    _PAGE_NO_CACHE);

@@ -30,6 +30,7 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
+#include <linux/stringify.h>
 #include <linux/delay.h>
 #include <asm/prom.h>
 #include <asm/rtas.h>
@@ -1073,6 +1074,10 @@ prom_hold_cpus(unsigned long mem)
 
 			if (*acknowledge == cpuid) {
 				prom_print(RELOC("ok\n"));
+				/* We have to get every CPU out of OF,
+				 * even if we never start it. */
+				if (cpuid >= NR_CPUS)
+					goto next;
 #ifdef CONFIG_SMP
 				/* Set the number of active processors. */
 				_systemcfg->processorCount++;
@@ -1099,9 +1104,12 @@ prom_hold_cpus(unsigned long mem)
 			cpu_set(cpuid, RELOC(cpu_present_at_boot));
 		}
 
+	next:
 		/* Init paca for secondary threads.   They start later. */
 		for (i=1; i < cpu_threads; i++) {
 			cpuid++;
+			if (cpuid >= NR_CPUS)
+				continue;
 			_xPaca[cpuid].xHwProcNum = interrupt_server[i];
 			prom_print_hex(interrupt_server[i]);
 			prom_print(RELOC(" : preparing thread ... "));
@@ -1146,7 +1154,11 @@ prom_hold_cpus(unsigned long mem)
 		prom_print(RELOC("Processor is not HMT capable\n"));
 	}
 #endif
-	
+
+	if (cpuid >= NR_CPUS)
+		prom_print(RELOC("WARNING: maximum CPUs (" __stringify(NR_CPUS)
+				 ") exceeded: ignoring extras\n"));
+
 #ifdef DEBUG_PROM
 	prom_print(RELOC("prom_hold_cpus: end...\n"));
 #endif

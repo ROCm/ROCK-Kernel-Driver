@@ -95,20 +95,25 @@ void iSeries_smp_message_recv( struct pt_regs * regs )
 			smp_message_recv( msg, regs );
 }
 
-static void smp_iSeries_message_pass(int target, int msg, unsigned long data, int wait)
+static inline void smp_iSeries_do_message(int cpu, int msg)
+{
+	set_bit(msg, &iSeries_smp_message[cpu]);
+	HvCall_sendIPI(&(paca[cpu]));
+}
+
+static void
+smp_iSeries_message_pass(int target, int msg, long data, int wait)
 {
 	int i;
 
-	for (i = 0; i < NR_CPUS; ++i) {
-		if (!cpu_online(i))
-			continue;
-
-		if ((target == MSG_ALL) || 
-		    (target == i) || 
-		    ((target == MSG_ALL_BUT_SELF) &&
-		     (i != smp_processor_id())) ) {
-			set_bit(msg, &iSeries_smp_message[i]);
-			HvCall_sendIPI(&(paca[i]));
+	if (target < NR_CPUS)
+		smp_iSeries_do_message(target, msg);
+	else {
+		for_each_online_cpu(i) {
+			if (target == MSG_ALL_BUT_SELF
+			    && i == smp_processor_id())
+				continue;
+			smp_iSeries_do_message(i, msg);
 		}
 	}
 }
@@ -151,20 +156,13 @@ static int smp_iSeries_probe(void)
 static void smp_iSeries_kick_cpu(int nr)
 {
 	struct ItLpPaca * lpPaca;
-	/* Verify we have a Paca for processor nr */
-	if ( ( nr <= 0 ) ||
-	     ( nr >= NR_CPUS ) )
-		return;
+
+	BUG_ON(nr < 0 || nr >= NR_CPUS);
+
 	/* Verify that our partition has a processor nr */
 	lpPaca = paca[nr].xLpPacaPtr;
-	if ( lpPaca->xDynProcStatus >= 2 )
+	if (lpPaca->xDynProcStatus >= 2)
 		return;
-
-	/* The information for processor bringup must
-	 * be written out to main store before we release
-	 * the processor.
-	 */
-	mb();
 
 	/* The processor is currently spinning, waiting
 	 * for the xProcStart field to become non-zero
@@ -219,13 +217,9 @@ void smp_openpic_message_pass(int target, int msg, unsigned long data, int wait)
 
 static int __init smp_openpic_probe(void)
 {
-	int i;
-	int nr_cpus = 0;
+	int nr_cpus;
 
-	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_possible(i))
-			nr_cpus++;
-	}
+	nr_cpus = cpus_weight(cpu_possible_map);
 
 	if (nr_cpus > 1)
 		openpic_request_IPIs();
@@ -240,16 +234,7 @@ static void __devinit smp_openpic_setup_cpu(int cpu)
 
 static void smp_pSeries_kick_cpu(int nr)
 {
-	/* Verify we have a Paca for processor nr */
-	if ( ( nr <= 0 ) ||
-	     ( nr >= NR_CPUS ) )
-		return;
-
-	/* The information for processor bringup must
-	 * be written out to main store before we release
-	 * the processor.
-	 */
-	mb();
+	BUG_ON(nr < 0 || nr >= NR_CPUS);
 
 	/* The processor is currently spinning, waiting
 	 * for the xProcStart field to become non-zero
@@ -266,8 +251,8 @@ static void __init smp_space_timers(unsigned int max_cpus)
 	unsigned long offset = tb_ticks_per_jiffy / max_cpus;
 	unsigned long previous_tb = paca[boot_cpuid].next_jiffy_update_tb;
 
-	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_possible(i) && i != boot_cpuid) {
+	for_each_cpu(i) {
+		if (i != boot_cpuid) {
 			paca[i].next_jiffy_update_tb =
 				previous_tb + offset;
 			previous_tb = paca[i].next_jiffy_update_tb;
@@ -287,20 +272,25 @@ void vpa_init(int cpu)
 	register_vpa(flags, cpu, __pa((unsigned long)&(paca[cpu].xLpPaca))); 
 }
 
+static inline void smp_xics_do_message(int cpu, int msg)
+{
+	set_bit(msg, &xics_ipi_message[cpu].value);
+	mb();
+	xics_cause_IPI(cpu);
+}
+
 static void smp_xics_message_pass(int target, int msg, unsigned long data, int wait)
 {
-	int i;
+	unsigned int i;
 
-	for (i = 0; i < NR_CPUS; ++i) {
-		if (!cpu_online(i))
-			continue;
-
-		if (target == MSG_ALL || target == i
-		    || (target == MSG_ALL_BUT_SELF
-			&& i != smp_processor_id())) {
-			set_bit(msg, &xics_ipi_message[i].value);
-			mb();
-			xics_cause_IPI(i);
+	if (target < NR_CPUS) {
+		smp_xics_do_message(target, msg);
+	} else {
+		for_each_online_cpu(i) {
+			if (target == MSG_ALL_BUT_SELF
+			    && i == smp_processor_id())
+				continue;
+			smp_xics_do_message(i, msg);
 		}
 	}
 }
@@ -309,18 +299,11 @@ extern void xics_request_IPIs(void);
 
 static int __init smp_xics_probe(void)
 {
-	int i;
-	int nr_cpus = 0;
-
-	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_possible(i))
-			nr_cpus++;
-	}
 #ifdef CONFIG_SMP
 	xics_request_IPIs();
 #endif
 
-	return nr_cpus;
+	return cpus_weight(cpu_possible_map);
 }
 
 static void __devinit smp_xics_setup_cpu(int cpu)
@@ -659,6 +642,12 @@ int __devinit __cpu_up(unsigned int cpu)
 
 	paca[cpu].xCurrent = (u64)p;
 	current_set[cpu] = p->thread_info;
+
+	/* The information for processor bringup must
+	 * be written out to main store before we release
+	 * the processor.
+	 */
+	mb();
 
 	/* wake up cpus */
 	smp_ops->kick_cpu(cpu);
