@@ -701,7 +701,7 @@ static void arcnet_timeout(struct net_device *dev)
  * interrupts. Establish which device needs attention, and call the correct
  * chipset interrupt handler.
  */
-void arcnet_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t arcnet_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct arcnet_local *lp;
@@ -726,7 +726,7 @@ void arcnet_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			ACOMMAND(CFLAGScmd | RESETclear);
 		AINTMASK(0);
 		spin_unlock(&arcnet_lock);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	BUGMSG(D_DURING, "in arcnet_inthandler (status=%Xh, intmask=%Xh)\n",
@@ -894,6 +894,7 @@ void arcnet_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	AINTMASK(lp->intmask);
 	
 	spin_unlock(&arcnet_lock);
+	return IRQ_RETVAL(didsomething);
 }
 
 

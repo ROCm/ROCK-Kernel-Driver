@@ -77,7 +77,7 @@ static int mace_xmit_start(struct sk_buff *skb, struct net_device *dev);
 static struct net_device_stats *mace_stats(struct net_device *dev);
 static void mace_set_multicast(struct net_device *dev);
 static int mace_set_address(struct net_device *dev, void *addr);
-static void mace_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t mace_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void mace_dma_intr(int irq, void *dev_id, struct pt_regs *regs);
 static void mace_tx_timeout(struct net_device *dev);
 
@@ -561,7 +561,7 @@ static void mace_recv_interrupt(struct net_device *dev)
  * Process the chip interrupt
  */
  
-static void mace_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t mace_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct mace_data *mp = (struct mace_data *) dev->priv;
@@ -577,6 +577,7 @@ static void mace_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (ir & RCVINT) {
 		mace_recv_interrupt(dev);
 	}
+	return IRQ_HANDLED;
 }
 
 static void mace_tx_timeout(struct net_device *dev)

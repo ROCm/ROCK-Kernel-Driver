@@ -134,7 +134,7 @@ clone_list[] __initdata  = {
 	{0,}
 };
 
-static void tachyon_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t tachyon_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void tachyon_interrupt_handler(int irq, void* dev_id, struct pt_regs* regs);
 
 static int initialize_register_pointers(struct fc_info *fi);
@@ -623,7 +623,7 @@ u_int bus_addr, bus_indx_addr, i;
 }
 
 
-static void tachyon_interrupt(int irq, void* dev_id, struct pt_regs* regs)
+static irqreturn_t tachyon_interrupt(int irq, void* dev_id, struct pt_regs* regs)
 {
 struct Scsi_Host *host = dev_id;
 struct iph5526_hostdata *hostdata = (struct iph5526_hostdata *)host->hostdata;
@@ -632,6 +632,7 @@ u_long flags;
 	spin_lock_irqsave(&fi->fc_lock, flags);
 	tachyon_interrupt_handler(irq, dev_id, regs);
 	spin_unlock_irqrestore(&fi->fc_lock, flags);
+	return IRQ_HANDLED;
 }
 
 static void tachyon_interrupt_handler(int irq, void* dev_id, struct pt_regs* regs)
@@ -3721,12 +3722,13 @@ struct fc_info *fi = (struct fc_info*)dev->priv;
 
 int iph5526_detect(Scsi_Host_Template *tmpt)
 {
-struct Scsi_Host *host = NULL;
-struct iph5526_hostdata *hostdata;
-struct fc_info *fi = NULL;
-int no_of_hosts = 0, timeout, i, j, count = 0;
-u_int pci_maddr = 0;
-struct pci_dev *pdev = NULL;
+	struct Scsi_Host *host = NULL;
+	struct iph5526_hostdata *hostdata;
+	struct fc_info *fi = NULL;
+	int no_of_hosts = 0, i, j, count = 0;
+	u_int pci_maddr = 0;
+	struct pci_dev *pdev = NULL;
+	unsigned long timeout;
 
 	tmpt->proc_name = "iph5526";
 	if (pci_present() == 0) {

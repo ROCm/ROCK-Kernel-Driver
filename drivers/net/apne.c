@@ -85,7 +85,7 @@ static void apne_block_input(struct net_device *dev, int count,
 								struct sk_buff *skb, int ring_offset);
 static void apne_block_output(struct net_device *dev, const int count,
 							const unsigned char *buf, const int start_page);
-static void apne_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t apne_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 static int init_pcmcia(void);
 
@@ -511,18 +511,18 @@ apne_block_output(struct net_device *dev, int count,
     return;
 }
 
-static void apne_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t apne_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     unsigned char pcmcia_intreq;
 
     if (!(gayle.inten & GAYLE_IRQ_IRQ))
-        return;
+        return IRQ_NONE;
 
     pcmcia_intreq = pcmcia_get_intreq();
 
     if (!(pcmcia_intreq & GAYLE_IRQ_IRQ)) {
         pcmcia_ack_int(pcmcia_intreq);
-        return;
+        return IRQ_NONE;
     }
     if (ei_debug > 3)
         printk("pcmcia intreq = %x\n", pcmcia_intreq);
@@ -530,6 +530,7 @@ static void apne_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     ei_interrupt(irq, dev_id, regs);
     pcmcia_ack_int(pcmcia_get_intreq());
     pcmcia_enable_irq();
+    return IRQ_HANDLED;
 }
 
 #ifdef MODULE
