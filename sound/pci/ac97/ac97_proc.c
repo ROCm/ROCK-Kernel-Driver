@@ -37,15 +37,12 @@
 static void snd_ac97_proc_read_main(ac97_t *ac97, snd_info_buffer_t * buffer, int subidx)
 {
 	char name[64];
-	unsigned int id;
 	unsigned short val, tmp, ext, mext;
 	static const char *spdif_slots[4] = { " SPDIF=3/4", " SPDIF=7/8", " SPDIF=6/9", " SPDIF=res" };
 	static const char *spdif_rates[4] = { " Rate=44.1kHz", " Rate=res", " Rate=48kHz", " Rate=32kHz" };
 	static const char *spdif_rates_cs4205[4] = { " Rate=48kHz", " Rate=44.1kHz", " Rate=res", " Rate=res" };
 
-	id = snd_ac97_read(ac97, AC97_VENDOR_ID1) << 16;
-	id |= snd_ac97_read(ac97, AC97_VENDOR_ID2);
-	snd_ac97_get_name(NULL, id, name, 0);
+	snd_ac97_get_name(NULL, ac97->id, name, 0);
 	snd_iprintf(buffer, "%d-%d/%d: %s\n\n", ac97->addr, ac97->num, subidx, name);
 	if ((ac97->scaps & AC97_SCAP_AUDIO) == 0)
 		goto __modem;
@@ -299,21 +296,67 @@ static void snd_ac97_proc_regs_read(snd_info_entry_t *entry,
 	}	
 }
 
-void snd_ac97_proc_init(snd_card_t * card, ac97_t * ac97, const char *prefix)
+void snd_ac97_proc_init(ac97_t * ac97)
+{
+	snd_info_entry_t *entry;
+	char name[32];
+	const char *prefix;
+
+	if (ac97->bus->proc == NULL)
+		return;
+	prefix = ac97_is_audio(ac97) ? "ac97" : "mc97";
+	sprintf(name, "%s#%d-%d", prefix, ac97->addr, ac97->num);
+	if ((entry = snd_info_create_card_entry(ac97->bus->card, name, ac97->bus->proc)) != NULL) {
+		snd_info_set_text_ops(entry, ac97, 1024, snd_ac97_proc_read);
+		if (snd_info_register(entry) < 0) {
+			snd_info_free_entry(entry);
+			entry = NULL;
+		}
+	}
+	ac97->proc = entry;
+	sprintf(name, "%s#%d-%d+regs", prefix, ac97->addr, ac97->num);
+	if ((entry = snd_info_create_card_entry(ac97->bus->card, name, ac97->bus->proc)) != NULL) {
+		snd_info_set_text_ops(entry, ac97, 1024, snd_ac97_proc_regs_read);
+		if (snd_info_register(entry) < 0) {
+			snd_info_free_entry(entry);
+			entry = NULL;
+		}
+	}
+	ac97->proc_regs = entry;
+}
+
+void snd_ac97_proc_done(ac97_t * ac97)
+{
+	if (ac97->proc_regs) {
+		snd_info_unregister(ac97->proc_regs);
+		ac97->proc_regs = NULL;
+	}
+	if (ac97->proc) {
+		snd_info_unregister(ac97->proc);
+		ac97->proc = NULL;
+	}
+}
+
+void snd_ac97_bus_proc_init(ac97_bus_t * bus)
 {
 	snd_info_entry_t *entry;
 	char name[32];
 
-	if (ac97->num)
-		sprintf(name, "%s#%d-%d", prefix, ac97->addr, ac97->num);
-	else
-		sprintf(name, "%s#%d", prefix, ac97->addr);
-	if (! snd_card_proc_new(card, name, &entry))
-		snd_info_set_text_ops(entry, ac97, snd_ac97_proc_read);
-	if (ac97->num)
-		sprintf(name, "%s#%d-%dregs", prefix, ac97->addr, ac97->num);
-	else
-		sprintf(name, "%s#%dregs", prefix, ac97->addr);
-	if (! snd_card_proc_new(card, name, &entry))
-		snd_info_set_text_ops(entry, ac97, snd_ac97_proc_regs_read);
+	sprintf(name, "codec97#%d", bus->num);
+	if ((entry = snd_info_create_card_entry(bus->card, name, bus->card->proc_root)) != NULL) {
+		entry->mode = S_IFDIR | S_IRUGO | S_IXUGO;
+		if (snd_info_register(entry) < 0) {
+			snd_info_free_entry(entry);
+			entry = NULL;
+		}
+	}
+	bus->proc = entry;
+}
+
+void snd_ac97_bus_proc_done(ac97_bus_t * bus)
+{
+	if (bus->proc) {
+		snd_info_unregister(bus->proc);
+		bus->proc = NULL;
+	}
 }

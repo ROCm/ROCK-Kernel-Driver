@@ -1712,6 +1712,7 @@ struct _snd_cs46xx {
 
 
 	int nr_ac97_codecs;
+	ac97_bus_t *ac97_bus;
 	ac97_t *ac97[MAX_NR_AC97];
 
 	struct pci_dev *pci;

@@ -1402,7 +1402,7 @@ static int __devinit snd_es1938_create(snd_card_t * card,
                 snd_printk("architecture does not support 24bit PCI busmaster DMA\n");
                 return -ENXIO;
         }
-	pci_set_dma_mask(pci, 0x00ffffff);
+	pci_set_consistent_dma_mask(pci, 0x00ffffff);
 
 	chip = snd_magic_kcalloc(es1938_t, 0, GFP_KERNEL);
 	if (chip == NULL)

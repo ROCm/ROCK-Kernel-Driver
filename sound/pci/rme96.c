@@ -1524,21 +1524,21 @@ snd_rme96_playback_pointer(snd_pcm_substream_t *substream)
 		bytes = diff << rme96->playback_frlog;
 		
 		if (bytes > RME96_BUFFER_SIZE - rme96->playback_ptr) {
-			memcpy_toio(rme96->iobase + RME96_IO_PLAY_BUFFER +
-				    rme96->playback_ptr,
+			memcpy_toio((void *)(rme96->iobase + RME96_IO_PLAY_BUFFER +
+					     rme96->playback_ptr),
 				    runtime->dma_area + rme96->playback_ptr,
 				    RME96_BUFFER_SIZE - rme96->playback_ptr);
 		        bytes -= RME96_BUFFER_SIZE - rme96->playback_ptr;
 			if (bytes > RME96_BUFFER_SIZE) {
 			        bytes = RME96_BUFFER_SIZE;
 			}
-			memcpy_toio(rme96->iobase + RME96_IO_PLAY_BUFFER,
+			memcpy_toio((void *)(rme96->iobase + RME96_IO_PLAY_BUFFER),
 				    runtime->dma_area,
 				    bytes);
 			rme96->playback_ptr = bytes;
 		} else if (bytes != 0) {
-			memcpy_toio(rme96->iobase + RME96_IO_PLAY_BUFFER +
-				    rme96->playback_ptr,
+			memcpy_toio((void *)(rme96->iobase + RME96_IO_PLAY_BUFFER +
+					     rme96->playback_ptr),
 				    runtime->dma_area + rme96->playback_ptr,
 				    bytes);
 			rme96->playback_ptr += bytes;
@@ -1560,17 +1560,17 @@ snd_rme96_capture_pointer(snd_pcm_substream_t *substream)
 		ptr = frameptr << rme96->capture_frlog;
 		if (ptr > rme96->capture_ptr) {
 			memcpy_fromio(runtime->dma_area + rme96->capture_ptr,
-				      rme96->iobase + RME96_IO_REC_BUFFER +
-				      rme96->capture_ptr,
+				      (void *)(rme96->iobase + RME96_IO_REC_BUFFER +
+					       rme96->capture_ptr),
 				      ptr - rme96->capture_ptr);
 			rme96->capture_ptr += ptr - rme96->capture_ptr;
 		} else if (ptr < rme96->capture_ptr) {
 			memcpy_fromio(runtime->dma_area + rme96->capture_ptr,
-				      rme96->iobase + RME96_IO_REC_BUFFER +
-				      rme96->capture_ptr,
+				      (void *)(rme96->iobase + RME96_IO_REC_BUFFER +
+					       rme96->capture_ptr),
 				      RME96_BUFFER_SIZE - rme96->capture_ptr);
 			memcpy_fromio(runtime->dma_area,
-				      rme96->iobase + RME96_IO_REC_BUFFER,
+				      (void *)(rme96->iobase + RME96_IO_REC_BUFFER),
 				      ptr);
 			rme96->capture_ptr = ptr;
 		}
@@ -1930,7 +1930,7 @@ snd_rme96_proc_init(rme96_t *rme96)
 	snd_info_entry_t *entry;
 
 	if (! snd_card_proc_new(rme96->card, "rme96", &entry))
-		snd_info_set_text_ops(entry, rme96, snd_rme96_proc_read);
+		snd_info_set_text_ops(entry, rme96, 1024, snd_rme96_proc_read);
 }
 
 /*

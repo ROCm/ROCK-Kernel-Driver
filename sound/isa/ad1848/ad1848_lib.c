@@ -736,11 +736,13 @@ static int snd_ad1848_probe(ad1848_t * chip)
 			snd_ad1848_out(chip, AD1848_RIGHT_INPUT, 0x45);
 			rev = snd_ad1848_in(chip, AD1848_RIGHT_INPUT);
 			if (rev == 0x65) {
+				spin_unlock_irqrestore(&chip->reg_lock, flags);
 				id = 1;
 				ad1847 = 1;
 				break;
 			}
 			if (snd_ad1848_in(chip, AD1848_LEFT_INPUT) == 0xaa && rev == 0x45) {
+				spin_unlock_irqrestore(&chip->reg_lock, flags);
 				id = 1;
 				break;
 			}

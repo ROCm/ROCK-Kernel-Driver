@@ -341,10 +341,10 @@ static int __init alsa_card_sgalaxy_setup(char *str)
 	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&sbport[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&wssport[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&irq[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&dma1[nr_dev]) == 2);
+	       get_option_long(&str,&sbport[nr_dev]) == 2 &&
+	       get_option_long(&str,&wssport[nr_dev]) == 2 &&
+	       get_option(&str,&irq[nr_dev]) == 2 &&
+	       get_option(&str,&dma1[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

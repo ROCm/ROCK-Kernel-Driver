@@ -425,7 +425,7 @@ static void snd_ak4531_proc_init(snd_card_t * card, ak4531_t * ak4531)
 	snd_info_entry_t *entry;
 
 	if (! snd_card_proc_new(card, "ak4531", &entry))
-		snd_info_set_text_ops(entry, ak4531, snd_ak4531_proc_read);
+		snd_info_set_text_ops(entry, ak4531, 1024, snd_ak4531_proc_read);
 }
 
 EXPORT_SYMBOL(snd_ak4531_mixer);

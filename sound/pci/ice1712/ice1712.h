@@ -353,6 +353,8 @@ struct _snd_ice1712 {
 		void (*set_dir)(ice1712_t *ice, unsigned int data);
 		void (*set_data)(ice1712_t *ice, unsigned int data);
 		unsigned int (*get_data)(ice1712_t *ice);
+		/* misc operators - move to another place? */
+		void (*set_pro_rate)(ice1712_t *ice, unsigned int rate);
 	} gpio;
 	struct semaphore gpio_mutex;
 };
