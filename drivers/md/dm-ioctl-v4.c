@@ -769,6 +769,7 @@ static int dev_wait(struct dm_ioctl *param, size_t param_size)
 {
 	int r;
 	struct mapped_device *md;
+	struct dm_table *table;
 	DECLARE_WAITQUEUE(wq, current);
 
 	md = find_device(param);
@@ -791,7 +792,16 @@ static int dev_wait(struct dm_ioctl *param, size_t param_size)
 	 * him and save an ioctl.
 	 */
 	r = __dev_status(md, param);
+	if (r)
+		goto out;
 
+	table = dm_get_table(md);
+	if (table) {
+		retrieve_status(table, param, param_size);
+		dm_table_put(table);
+	}
+
+ out:
 	dm_put(md);
 	return r;
 }
