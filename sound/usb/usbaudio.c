@@ -1953,7 +1953,6 @@ static int snd_usb_roland_ua100_hack_intf(snd_usb_audio_t *chip, int ifnum)
 static int snd_usb_roland_ua100_hack(snd_usb_audio_t *chip)
 {
 	static const snd_usb_midi_endpoint_info_t ep_quirk = {
-		.epnum = -1,
 		.out_cables = 0x0007,
 		.in_cables  = 0x0007
 	};

@@ -1,7 +1,7 @@
 /*
  *   ALSA driver for RME Digi32, Digi32/8 and Digi32 PRO audio interfaces
  *
- *	Copyright (c) 2002 Martin Langer <martin-langer@gmx.de>
+ *	Copyright (c) 2002, 2003 Martin Langer <martin-langer@gmx.de>
  *
  *      Thanks to :        Anders Torger <torger@ludd.luth.se>,
  *                         Henk Hesselink <henk@anda.nl>
@@ -70,6 +70,7 @@
 #include <sound/asoundef.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
+#include <sound/info.h>
 
 #include <asm/io.h>
 
@@ -255,8 +256,6 @@ static snd_pcm_uframes_t
 snd_rme32_capture_pointer(snd_pcm_substream_t * substream);
 
 static void snd_rme32_proc_init(rme32_t * rme32);
-
-static void snd_rme32_proc_done(rme32_t * rme32);
 
 static int snd_rme32_create_switches(snd_card_t * card, rme32_t * rme32);
 
@@ -1830,7 +1829,7 @@ static snd_kcontrol_new_t snd_rme32_controls[] = {
 	},
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_PCM,
-		.name =	"Clock Mode",
+		.name =	"Sample Clock Source",
 		.info =	snd_rme32_info_clockmode_control,
 		.get =	snd_rme32_get_clockmode_control,
 		.put =	snd_rme32_put_clockmode_control

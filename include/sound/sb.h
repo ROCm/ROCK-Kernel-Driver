@@ -314,4 +314,49 @@ int snd_sb16_capture_open(snd_pcm_substream_t *substream);
 int snd_sb16_playback_close(snd_pcm_substream_t *substream);
 int snd_sb16_capture_close(snd_pcm_substream_t *substream);
 
+/* exported mixer stuffs */
+enum {
+	SB_MIX_SINGLE,
+	SB_MIX_DOUBLE,
+	SB_MIX_INPUT_SW,
+	SB_MIX_CAPTURE_PRO,
+	SB_MIX_CAPTURE_DT019X
+};
+
+#define SB_MIXVAL_DOUBLE(left_reg, right_reg, left_shift, right_shift, mask) \
+  ((left_reg) | ((right_reg) << 8) | ((left_shift) << 16) | ((right_shift) << 19) | ((mask) << 24))
+#define SB_MIXVAL_SINGLE(reg, shift, mask) \
+  ((reg) | ((shift) << 16) | ((mask) << 24))
+#define SB_MIXVAL_INPUT_SW(reg1, reg2, left_shift, right_shift) \
+  ((reg1) | ((reg2) << 8) | ((left_shift) << 16) | ((right_shift) << 24))
+
+int snd_sbmixer_add_ctl(sb_t *chip, const char *name, int index, int type, unsigned long value);
+
+/* for ease of use */
+struct sbmix_elem {
+	const char *name;
+	int type;
+	unsigned long private_value;
+};
+
+#define SB_SINGLE(xname, reg, shift, mask) \
+{ .name = xname, \
+  .type = SB_MIX_SINGLE, \
+  .private_value = SB_MIXVAL_SINGLE(reg, shift, mask) }
+
+#define SB_DOUBLE(xname, left_reg, right_reg, left_shift, right_shift, mask) \
+{ .name = xname, \
+  .type = SB_MIX_DOUBLE, \
+  .private_value = SB_MIXVAL_DOUBLE(left_reg, right_reg, left_shift, right_shift, mask) }
+
+#define SB16_INPUT_SW(xname, reg1, reg2, left_shift, right_shift) \
+{ .name = xname, \
+  .type = SB_MIX_INPUT_SW, \
+  .private_value = SB_MIXVAL_INPUT_SW(reg1, reg2, left_shift, right_shift) }
+
+static inline int snd_sbmixer_add_ctl_elem(sb_t *chip, const struct sbmix_elem *c)
+{
+	return snd_sbmixer_add_ctl(chip, c->name, 0, c->type, c->private_value);
+}
+
 #endif /* __SOUND_SB_H */

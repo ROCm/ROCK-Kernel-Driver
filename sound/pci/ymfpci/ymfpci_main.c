@@ -1170,6 +1170,7 @@ static void snd_ymfpci_pcm_spdif_free(snd_pcm_t *pcm)
 {
 	ymfpci_t *chip = snd_magic_cast(ymfpci_t, pcm->private_data, return);
 	chip->pcm_spdif = NULL;
+	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
 
 int __devinit snd_ymfpci_pcm_spdif(ymfpci_t *chip, int device, snd_pcm_t ** rpcm)
@@ -1190,6 +1191,9 @@ int __devinit snd_ymfpci_pcm_spdif(ymfpci_t *chip, int device, snd_pcm_t ** rpcm
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "YMFPCI - IEC958");
 	chip->pcm_spdif = pcm;
+
+	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 256*1024);
+
 	if (rpcm)
 		*rpcm = pcm;
 	return 0;
@@ -1210,6 +1214,7 @@ static void snd_ymfpci_pcm_4ch_free(snd_pcm_t *pcm)
 {
 	ymfpci_t *chip = snd_magic_cast(ymfpci_t, pcm->private_data, return);
 	chip->pcm_4ch = NULL;
+	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
 
 int __devinit snd_ymfpci_pcm_4ch(ymfpci_t *chip, int device, snd_pcm_t ** rpcm)
@@ -1230,6 +1235,9 @@ int __devinit snd_ymfpci_pcm_4ch(ymfpci_t *chip, int device, snd_pcm_t ** rpcm)
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "YMFPCI - Rear PCM");
 	chip->pcm_4ch = pcm;
+
+	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 256*1024);
+
 	if (rpcm)
 		*rpcm = pcm;
 	return 0;

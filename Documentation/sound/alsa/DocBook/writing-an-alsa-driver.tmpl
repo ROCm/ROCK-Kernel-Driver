@@ -4539,28 +4539,13 @@
           <programlisting>
 <![CDATA[
   #include <linux/vmalloc.h>
-  #include <linux/pagemap.h>
 
   /* get the physical page pointer on the given offset */
-  static struct page *mychip_page(snd_pcm_substream_t *subs,
+  static struct page *mychip_page(snd_pcm_substream_t *substream,
                                   unsigned long offset)
   {
-          pgd_t *pgd;
-          pmd_t *pmd;
-          pte_t *pte;
-          unsigned long lpage;
-          void *pageptr = subs->runtime->dma_area + offset;
-          struct page *page = NOPAGE_SIGBUS;
-
-          lpage = VMALLOC_VMADDR(pageptr);
-          spin_lock(&init_mm.page_table_lock);
-          pgd = pgd_offset(&init_mm, lpage);
-          pmd = pmd_offset(pgd, lpage);
-          pte = pte_offset(pmd, lpage);
-          page = pte_page(*pte);
-          spin_unlock(&init_mm.page_table_lock);
-
-          return page;
+          void *pageptr = substream->runtime->dma_area + offset;
+          return vmalloc_to_page(pageptr);
   }
 ]]>
           </programlisting>

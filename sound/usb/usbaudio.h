@@ -165,7 +165,7 @@ struct snd_usb_audio_quirk {
 
 /* data for QUIRK_MIDI_FIXED_ENDPOINT */
 struct snd_usb_midi_endpoint_info {
-	int16_t epnum;		/* ep number, -1 autodetect */
+	int8_t out_ep, in_ep;	/* ep number, 0 autodetect */
 	uint16_t out_cables;	/* bitmask */
 	uint16_t in_cables;	/* bitmask */
 };

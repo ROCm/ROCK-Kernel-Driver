@@ -245,7 +245,6 @@
 		.ifnum = 2,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.epnum = -1,
 			.out_cables = 0x000f,
 			.in_cables  = 0x000f
 		}
@@ -259,7 +258,6 @@
 		.ifnum = 2,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.epnum = -1,
 			.out_cables = 0x003f,
 			.in_cables  = 0x003f
 		}
@@ -273,7 +271,6 @@
 		.ifnum = 2,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.epnum = -1,
 			.out_cables = 0x0003,
 			.in_cables  = 0x0003
 		}
@@ -287,7 +284,6 @@
 		.ifnum = 2,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.epnum = -1,
 			.out_cables = 0x0003,
 			.in_cables  = 0x0003
 		}
@@ -301,7 +297,6 @@
 		.ifnum = 2,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.epnum = -1,
 			.out_cables = 0x0013,
 			.in_cables  = 0x0013
 		}
@@ -315,7 +310,6 @@
 		.ifnum = 2,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.epnum = -1,
 			.out_cables = 0x0001,
 			.in_cables  = 0x0001
 		}
@@ -329,7 +323,6 @@
 		.ifnum = 2,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.epnum = -1,
 			.out_cables = 0x0001,
 			.in_cables  = 0x0001
 		}
@@ -343,7 +336,6 @@
 		.ifnum = 2,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.epnum = -1,
 			.out_cables = 0x0013,
 			.in_cables  = 0x0013
 		}
@@ -357,7 +349,6 @@
 		.ifnum = 2,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.epnum = -1,
 			.out_cables = 0x0007,
 			.in_cables  = 0x0007
 		}
@@ -371,7 +362,6 @@
 		.ifnum = 0,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.epnum = -1,
 			.out_cables = 0x0001,
 			.in_cables  = 0x0001
 		}
@@ -385,7 +375,6 @@
 		.ifnum = 0,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.epnum = -1,
 			.out_cables = 0x01ff,
 			.in_cables  = 0x01ff
 		}
@@ -399,7 +388,6 @@
 		.ifnum = 2,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.epnum = -1,
 			.out_cables = 0x000f,
 			.in_cables  = 0x000f
 		}
@@ -413,7 +401,6 @@
 		.ifnum = 0,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.epnum = -1,
 			.out_cables = 0x003f,
 			.in_cables  = 0x003f
 		}
@@ -427,7 +414,6 @@
 		.ifnum = 3,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.epnum = -1,
 			.out_cables = 0x0001,
 			.in_cables  = 0x0001
 		}
@@ -441,7 +427,6 @@
 		.ifnum = 0,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.epnum = -1,
 			.out_cables = 0x0003,
 			.in_cables  = 0x0007
 		}
@@ -455,7 +440,6 @@
 		.ifnum = 0,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.epnum = -1,
 			.out_cables = 0x000f,
 			.in_cables  = 0x000f
 		}
@@ -469,7 +453,6 @@
 		.ifnum = 3,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.epnum = -1,
 			.out_cables = 0x0003,
 			.in_cables  = 0x0003
 		}
@@ -483,7 +466,6 @@
 		.ifnum = 0,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.epnum = -1,
 			.out_cables = 0x0003,
 			.in_cables  = 0x0007
 		}

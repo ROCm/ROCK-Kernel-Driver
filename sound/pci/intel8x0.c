@@ -1278,6 +1278,9 @@ static int __devinit snd_intel8x0_pcm_mic(intel8x0_t *chip, int device, snd_pcm_
 	sprintf(pcm->name, "%s - MIC ADC", chip->card->shortname);
 
 	chip->pcm_mic = pcm;	
+
+	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 0, 128*1024);
+
 	if (rpcm)
 		*rpcm = pcm;
 	return 0;
@@ -1312,6 +1315,9 @@ static int __devinit snd_intel8x0_pcm_mic2(intel8x0_t *chip, int device, snd_pcm
 	sprintf(pcm->name, "%s - MIC2 ADC", chip->card->shortname);
 
 	chip->pcm_mic2 = pcm;	
+
+	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 0, 128*1024);
+
 	if (rpcm)
 		*rpcm = pcm;
 	return 0;
@@ -1346,6 +1352,9 @@ static int __devinit snd_intel8x0_pcm_capture2(intel8x0_t *chip, int device, snd
 	sprintf(pcm->name, "%s - ADC2", chip->card->shortname);
 
 	chip->pcm2 = pcm;	
+
+	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 0, 128*1024);
+
 	if (rpcm)
 		*rpcm = pcm;
 	return 0;
@@ -1380,6 +1389,9 @@ static int __devinit snd_intel8x0_pcm_spdif(intel8x0_t *chip, int device, snd_pc
 	sprintf(pcm->name, "%s - IEC958", chip->card->shortname);
 
 	chip->pcm_spdif = pcm;	
+
+	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 128*1024);
+
 	if (rpcm)
 		*rpcm = pcm;
 	return 0;
@@ -1415,6 +1427,9 @@ static int __devinit snd_intel8x0_ali_spdif(intel8x0_t *chip, int device, snd_pc
 	sprintf(pcm->name, "%s - IEC958", chip->card->shortname);
 
 	chip->pcm_spdif = pcm;	
+
+	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 128*1024);
+
 	if (rpcm)
 		*rpcm = pcm;
 	return 0;
@@ -1449,6 +1464,9 @@ static int __devinit snd_intel8x0_ali_ac97spdif(intel8x0_t *chip, int device, sn
 	sprintf(pcm->name, "%s - AC97 IEC958", chip->card->shortname);
 
 	chip->pcm_ac97spdif = pcm;	
+
+	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 128*1024);
+
 	if (rpcm)
 		*rpcm = pcm;
 	return 0;
@@ -1790,6 +1808,10 @@ static int snd_intel8x0_ich_chip_init(intel8x0_t *chip)
 	} while (time_after_eq(end_time, jiffies));
 
       __ok3:      
+	if (chip->device_type == DEVICE_SIS) {
+		/* unmute the output on SIS7012 */
+		iputword(chip, 0x4c, igetword(chip, 0x4c) | 1);
+	}
       	return 0;
 }
 
@@ -2476,6 +2498,8 @@ static struct pci_driver joystick_driver = {
 	.id_table = snd_intel8x0_joystick_ids,
 	.probe = snd_intel8x0_joystick_probe,
 };
+
+static int have_joystick;
 #endif
 
 static int __init alsa_card_intel8x0_init(void)
@@ -2489,7 +2513,13 @@ static int __init alsa_card_intel8x0_init(void)
                 return err;
         }
 #if defined(SUPPORT_JOYSTICK) || defined(SUPPORT_MIDI)
-	pci_module_init(&joystick_driver);
+	if (pci_module_init(&joystick_driver) < 0) {
+		snd_printdd(KERN_INFO "no joystick found\n");
+		have_joystick = 0;
+	} else {
+		snd_printdd(KERN_INFO "joystick(s) found\n");
+		have_joystick = 1;
+	}
 #endif
         return 0;
 
@@ -2499,7 +2529,8 @@ static void __exit alsa_card_intel8x0_exit(void)
 {
 	pci_unregister_driver(&driver);
 #if defined(SUPPORT_JOYSTICK) || defined(SUPPORT_MIDI)
-	pci_unregister_driver(&joystick_driver);
+	if (have_joystick)
+		pci_unregister_driver(&joystick_driver);
 #endif
 }
 

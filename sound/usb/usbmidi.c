@@ -579,9 +579,9 @@ static int snd_usbmidi_in_endpoint_create(snd_usb_midi_t* umidi,
 		return -ENOMEM;
 	}
 	if (int_epd)
-		pipe = usb_rcvintpipe(umidi->chip->dev, ep_info->epnum);
+		pipe = usb_rcvintpipe(umidi->chip->dev, ep_info->in_ep);
 	else
-		pipe = usb_rcvbulkpipe(umidi->chip->dev, ep_info->epnum);
+		pipe = usb_rcvbulkpipe(umidi->chip->dev, ep_info->in_ep);
 	length = usb_maxpacket(umidi->chip->dev, pipe, 0);
 	buffer = kmalloc(length, GFP_KERNEL);
 	if (!buffer) {
@@ -652,7 +652,7 @@ static int snd_usbmidi_out_endpoint_create(snd_usb_midi_t* umidi,
 		snd_usbmidi_out_endpoint_delete(ep);
 		return -ENOMEM;
 	}
-	pipe = usb_sndbulkpipe(umidi->chip->dev, ep_info->epnum);
+	pipe = usb_sndbulkpipe(umidi->chip->dev, ep_info->out_ep);
 	ep->max_transfer = usb_maxpacket(umidi->chip->dev, pipe, 1) & ~3;
 	buffer = kmalloc(ep->max_transfer, GFP_KERNEL);
 	if (!buffer) {
@@ -737,8 +737,6 @@ static int snd_usbmidi_create_endpoints(snd_usb_midi_t* umidi,
 	int out_ports = 0, in_ports = 0;
 
 	for (i = 0; i < MIDI_MAX_ENDPOINTS; ++i) {
-		if (!endpoints[i].epnum)
-			continue;
 		if (endpoints[i].out_cables) {
 			err = snd_usbmidi_out_endpoint_create(umidi, &endpoints[i],
 							      &umidi->endpoints[i]);
@@ -812,50 +810,64 @@ static int snd_usbmidi_get_ms_info(snd_usb_midi_t* umidi,
 		    ms_ep->bDescriptorType != USB_DT_CS_ENDPOINT ||
 		    ms_ep->bDescriptorSubtype != MS_GENERAL)
 			continue;
-		if (endpoints[epidx].epnum != 0 &&
-		    endpoints[epidx].epnum != (ep->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK)) {
-			++epidx;
-			if (epidx >= MIDI_MAX_ENDPOINTS) {
-				printk(KERN_WARNING "snd-usb-midi: too many endpoints\n");
-				break;
+		if ((ep->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK) == USB_DIR_OUT) {
+			if (endpoints[epidx].out_ep) {
+				if (++epidx >= MIDI_MAX_ENDPOINTS) {
+					printk(KERN_WARNING "snd-usb-midi: too many endpoints\n");
+					break;
+				}
 			}
-		}
-		endpoints[epidx].epnum = ep->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
-		if (ep->bEndpointAddress & USB_DIR_IN) {
-			endpoints[epidx].in_cables = (1 << ms_ep->bNumEmbMIDIJack) - 1;
-		} else {
+			endpoints[epidx].out_ep = ep->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
 			endpoints[epidx].out_cables = (1 << ms_ep->bNumEmbMIDIJack) - 1;
+			printk(KERN_INFO "snd-usb-midi: EP %02X: %d jack(s)\n",
+			       ep->bEndpointAddress, ms_ep->bNumEmbMIDIJack);
+		} else {
+			if (endpoints[epidx].in_ep) {
+				if (++epidx >= MIDI_MAX_ENDPOINTS) {
+					printk(KERN_WARNING "snd-usb-midi: too many endpoints\n");
+					break;
+				}
+			}
+			endpoints[epidx].in_ep = ep->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
+			endpoints[epidx].in_cables = (1 << ms_ep->bNumEmbMIDIJack) - 1;
+			printk(KERN_INFO "snd-usb-midi: EP %02X: %d jack(s)\n",
+			       ep->bEndpointAddress, ms_ep->bNumEmbMIDIJack);
 		}
-		printk(KERN_INFO "snd-usb-midi: detected %d %s jack(s) on endpoint %d\n",
-		       ms_ep->bNumEmbMIDIJack,
-		       ep->bEndpointAddress & USB_DIR_IN ? "input" : "output",
-		       endpoints[epidx].epnum);
 	}
 	return 0;
 }
 
 /*
- * If the first endpoint isn't specified, use the first endpoint in the
+ * If the endpoints aren't specified, use the first bulk endpoints in the
  * first alternate setting of the interface.
  */
 static int snd_usbmidi_detect_endpoint(snd_usb_midi_t* umidi, 
-			       	       snd_usb_midi_endpoint_info_t* endpoint)
+				       snd_usb_midi_endpoint_info_t* endpoint)
 {
 	struct usb_interface* intf;
 	struct usb_host_interface *hostif;
 	struct usb_interface_descriptor* intfd;
 	struct usb_endpoint_descriptor* epd;
+	int i;
 
-	if (endpoint->epnum == -1) {
-		intf = umidi->iface;
-		if (!intf || intf->num_altsetting < 1)
-			return -ENOENT;
-		hostif = intf->altsetting;
-		intfd = get_iface_desc(hostif);
-		if (intfd->bNumEndpoints < 1)
-			return -ENOENT;
-		epd = get_endpoint(hostif, 0);
-		endpoint->epnum = epd->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
+	intf = umidi->iface;
+	if (!intf || intf->num_altsetting < 1)
+		return -ENOENT;
+	hostif = intf->altsetting;
+	intfd = get_iface_desc(hostif);
+	if (intfd->bNumEndpoints < 1)
+		return -ENOENT;
+
+	for (i = 0; i < intfd->bNumEndpoints; ++i) {
+		epd = get_endpoint(hostif, i);
+		if ((epd->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) != USB_ENDPOINT_XFER_BULK)
+			continue;
+		if (!endpoint->out_ep && endpoint->out_cables &&
+		    (epd->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_OUT)
+			endpoint->out_ep = epd->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
+		if (!endpoint->in_ep && endpoint->in_cables &&
+		    (epd->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_IN)
+			endpoint->in_ep = epd->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
 	}
 	return 0;
 }
@@ -892,7 +904,6 @@ static int snd_usbmidi_detect_yamaha(snd_usb_midi_t* umidi,
 	if (!endpoint->in_cables && !endpoint->out_cables)
 		return -ENOENT;
 
-	endpoint->epnum = -1;
 	return snd_usbmidi_detect_endpoint(umidi, endpoint);
 }
 
@@ -940,13 +951,13 @@ static int snd_usbmidi_create_endpoints_midiman(snd_usb_midi_t* umidi,
 		}
 	}
 
-	ep_info.epnum = get_endpoint(hostif, 2)->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
+	ep_info.out_ep = get_endpoint(hostif, 2)->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
 	ep_info.out_cables = endpoint->out_cables & 0x5555;
 	err = snd_usbmidi_out_endpoint_create(umidi, &ep_info, &umidi->endpoints[0]);
 	if (err < 0)
 		return err;
 
-	ep_info.epnum = get_endpoint(hostif, 0)->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
+	ep_info.in_ep = get_endpoint(hostif, 0)->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
 	ep_info.in_cables = endpoint->in_cables;
 	err = snd_usbmidi_in_endpoint_create(umidi, &ep_info, &umidi->endpoints[0]);
 	if (err < 0)
@@ -954,7 +965,7 @@ static int snd_usbmidi_create_endpoints_midiman(snd_usb_midi_t* umidi,
 	umidi->endpoints[0].in->urb->complete = snd_usb_complete_callback(snd_usbmidi_in_midiman_complete);
 
 	if (endpoint->out_cables > 0x0001) {
-		ep_info.epnum = get_endpoint(hostif, 4)->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
+		ep_info.out_ep = get_endpoint(hostif, 4)->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
 		ep_info.out_cables = endpoint->out_cables & 0xaaaa;
 		err = snd_usbmidi_out_endpoint_create(umidi, &ep_info, &umidi->endpoints[1]);
 		if (err < 0)

@@ -1061,7 +1061,7 @@ snd_info_entry_t *snd_info_create_device(const char *name, unsigned int number, 
 		return NULL;
 	entry->content = SNDRV_INFO_CONTENT_DEVICE;
 	entry->mode = mode;
-	entry->c.device.major = major;
+	entry->c.device.major = _major;
 	entry->c.device.minor = minor;
 	down(&info_mutex);
 	p = create_proc_entry(entry->name, entry->mode, snd_proc_dev);
@@ -1085,7 +1085,7 @@ snd_info_entry_t *snd_info_create_device(const char *name, unsigned int number, 
 		char dname[32];
 		sprintf(dname, "snd/%s", name);
 		devfs_register(NULL, dname, DEVFS_FL_DEFAULT,
-				major, minor, mode,
+				_major, minor, mode,
 				&snd_fops, NULL);
 	}
 #endif
