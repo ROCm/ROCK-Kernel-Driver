@@ -792,14 +792,14 @@ static int jfs_link(struct dentry *old_dentry,
 		goto out;
 
 	if ((rc = dtSearch(dir, &dname, &ino, &btstack, JFS_CREATE)))
-		goto out;
+		goto free_dname;
 
 	/*
 	 * create entry for new link in parent directory
 	 */
 	ino = ip->i_ino;
 	if ((rc = dtInsert(tid, dir, &dname, &ino, &btstack)))
-		goto out;
+		goto free_dname;
 
 	/* update object inode */
 	ip->i_nlink++;		/* for new link */
@@ -811,6 +811,9 @@ static int jfs_link(struct dentry *old_dentry,
 	iplist[0] = ip;
 	iplist[1] = dir;
 	rc = txCommit(tid, 2, &iplist[0], 0);
+
+      free_dname:
+	free_UCSname(&dname);
 
       out:
 	txEnd(tid);
