@@ -215,7 +215,7 @@ static void dio_complete(struct dio *dio, loff_t offset, ssize_t bytes)
 {
 	if (dio->end_io && dio->result)
 		dio->end_io(dio->inode, offset, bytes, dio->map_bh.b_private);
-	if (dio->lock_type != DIO_NO_LOCKING)
+	if (dio->lock_type == DIO_LOCKING)
 		up_read(&dio->inode->i_alloc_sem);
 }
 
@@ -1201,8 +1201,8 @@ __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	 *	readers need to grab i_sem and i_alloc_sem
 	 *	writers need to grab i_alloc_sem only (i_sem is already held)
 	 * For regular files using DIO_OWN_LOCKING,
-	 *	readers need to grab i_alloc_sem only (i_sem is already held)
-	 *	writers need to grab i_alloc_sem only
+	 *	neither readers nor writers take any locks here
+	 *	(i_sem is already held and release for writers here)
 	 */
 	dio->lock_type = dio_lock_type;
 	if (dio_lock_type != DIO_NO_LOCKING) {
@@ -1219,14 +1219,15 @@ __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 				kfree(dio);
 				goto out;
 			}
-			down_read(&inode->i_alloc_sem);
+
 			if (dio_lock_type == DIO_OWN_LOCKING) {
 				up(&inode->i_sem);
 				reader_with_isem = 0;
 			}
-		} else {
-			down_read(&inode->i_alloc_sem);
 		}
+
+		if (dio_lock_type == DIO_LOCKING)
+			down_read(&inode->i_alloc_sem);
 	}
 
 	/*

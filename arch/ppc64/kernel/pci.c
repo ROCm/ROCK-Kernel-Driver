@@ -91,7 +91,7 @@ void  pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region
 			      struct resource *res)
 {
 	unsigned long offset = 0;
-	struct pci_controller *hose = PCI_GET_PHB_PTR(dev);
+	struct pci_controller *hose = pci_bus_to_host(dev->bus);
 
 	if (!hose)
 		return;
@@ -127,7 +127,7 @@ void pcibios_align_resource(void *data, struct resource *res,
 			    unsigned long size, unsigned long align)
 {
 	struct pci_dev *dev = data;
-	struct pci_controller *hose = PCI_GET_PHB_PTR(dev);
+	struct pci_controller *hose = pci_bus_to_host(dev->bus);
 	unsigned long start = res->start;
 	unsigned long alignto;
 
@@ -292,7 +292,7 @@ int pci_domain_nr(struct pci_bus *bus)
 #ifdef CONFIG_PPC_ISERIES
 	return 0;
 #else
-	struct pci_controller *hose = PCI_GET_PHB_PTR(bus);
+	struct pci_controller *hose = pci_bus_to_host(bus);
 
 	return hose->global_number;
 #endif
@@ -304,7 +304,7 @@ EXPORT_SYMBOL(pci_domain_nr);
 int pci_name_bus(char *name, struct pci_bus *bus)
 {
 #ifndef CONFIG_PPC_ISERIES
-	struct pci_controller *hose = PCI_GET_PHB_PTR(bus);
+	struct pci_controller *hose = pci_bus_to_host(bus);
 
 	if (hose->buid)
 		sprintf(name, "%04x:%02x", pci_domain_nr(bus), bus->number);
@@ -336,7 +336,7 @@ static __inline__ int __pci_mmap_make_offset(struct pci_dev *dev,
 					     struct vm_area_struct *vma,
 					     enum pci_mmap_state mmap_state)
 {
-	struct pci_controller *hose = PCI_GET_PHB_PTR(dev);
+	struct pci_controller *hose = pci_bus_to_host(dev->bus);
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
 	unsigned long io_offset = 0;
 	int i, res_bit;
@@ -643,7 +643,7 @@ void __devinit pci_setup_phb_io_dynamic(struct pci_controller *hose)
 static int get_bus_io_range(struct pci_bus *bus, unsigned long *start_phys,
 				unsigned long *start_virt, unsigned long *size)
 {
-	struct pci_controller *hose = PCI_GET_PHB_PTR(bus);
+	struct pci_controller *hose = pci_bus_to_host(bus);
 	struct pci_bus_region region;
 	struct resource *res;
 
@@ -728,23 +728,6 @@ void phbs_remap_io(void)
 		remap_bus_range(hose->bus);
 }
 
-
-/*
- * This function finds the PHB that matching device_node in the 
- * OpenFirmware by scanning all the pci_controllers.
- */
-struct pci_controller* pci_find_hose_for_OF_device(struct device_node *node)
-{
-	while (node) {
-		struct pci_controller *hose, *tmp;
-		list_for_each_entry_safe(hose, tmp, &hose_list, list_node)
-			if (hose->arch_data == node)
-				return hose;
-		node=node->parent;
-	}
-	return NULL;
-}
-
 /*
  * ppc64 can have multifunction devices that do not respond to function 0.
  * In this case we must scan all functions.
@@ -778,7 +761,7 @@ void __devinit pcibios_fixup_device_resources(struct pci_dev *dev,
 					   struct pci_bus *bus)
 {
 	/* Update device resources.  */
-	struct pci_controller *hose = PCI_GET_PHB_PTR(bus);
+	struct pci_controller *hose = pci_bus_to_host(bus);
 	int i;
 
 	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
@@ -814,7 +797,7 @@ EXPORT_SYMBOL(pcibios_fixup_device_resources);
 
 void __devinit pcibios_fixup_bus(struct pci_bus *bus)
 {
-	struct pci_controller *hose = PCI_GET_PHB_PTR(bus);
+	struct pci_controller *hose = pci_bus_to_host(bus);
 	struct pci_dev *dev = bus->self;
 	struct resource *res;
 	int i;

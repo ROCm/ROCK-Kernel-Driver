@@ -120,27 +120,35 @@ __change_page_attr(struct page *page, pgprot_t prot)
 	kpte_page = virt_to_page(kpte);
 	if (pgprot_val(prot) != pgprot_val(PAGE_KERNEL)) { 
 		if ((pte_val(*kpte) & _PAGE_PSE) == 0) { 
-			pte_t old = *kpte;
-			pte_t standard = mk_pte(page, PAGE_KERNEL); 
 			set_pte_atomic(kpte, mk_pte(page, prot)); 
-			if (pte_same(old,standard))
-				get_page(kpte_page);
 		} else {
 			struct page *split = split_large_page(address, prot); 
 			if (!split)
 				return -ENOMEM;
-			get_page(kpte_page);
 			set_pmd_pte(kpte,address,mk_pte(split, PAGE_KERNEL));
+			kpte_page = split;
 		}	
+		get_page(kpte_page);
 	} else if ((pte_val(*kpte) & _PAGE_PSE) == 0) { 
 		set_pte_atomic(kpte, mk_pte(page, PAGE_KERNEL));
 		__put_page(kpte_page);
-	}
+	} else
+		BUG();
 
-	if (cpu_has_pse && (page_count(kpte_page) == 1)) {
-		list_add(&kpte_page->lru, &df_list);
-		revert_page(kpte_page, address);
-	} 
+	/*
+	 * If the pte was reserved, it means it was created at boot
+	 * time (not via split_large_page) and in turn we must not
+	 * replace it with a largepage.
+	 */
+	if (!PageReserved(kpte_page)) {
+		/* memleak and potential failed 2M page regeneration */
+		BUG_ON(!page_count(kpte_page));
+
+		if (cpu_has_pse && (page_count(kpte_page) == 1)) {
+			list_add(&kpte_page->lru, &df_list);
+			revert_page(kpte_page, address);
+		}
+	}
 	return 0;
 } 
 

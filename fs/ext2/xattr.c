@@ -137,17 +137,6 @@ ext2_xattr_handler(int name_index)
 }
 
 /*
- * Inode operation listxattr()
- *
- * dentry->d_inode->i_sem: don't care
- */
-ssize_t
-ext2_listxattr(struct dentry *dentry, char *buffer, size_t size)
-{
-	return ext2_xattr_list(dentry->d_inode, buffer, size);
-}
-
-/*
  * ext2_xattr_get()
  *
  * Copy an extended attribute into the buffer
@@ -260,7 +249,7 @@ cleanup:
  * Returns a negative error number on failure, or the number of bytes
  * used / required on success.
  */
-int
+static int
 ext2_xattr_list(struct inode *inode, char *buffer, size_t buffer_size)
 {
 	struct buffer_head *bh = NULL;
@@ -332,6 +321,17 @@ cleanup:
 	up_read(&EXT2_I(inode)->xattr_sem);
 
 	return error;
+}
+
+/*
+ * Inode operation listxattr()
+ *
+ * dentry->d_inode->i_sem: don't care
+ */
+ssize_t
+ext2_listxattr(struct dentry *dentry, char *buffer, size_t size)
+{
+	return ext2_xattr_list(dentry->d_inode, buffer, size);
 }
 
 /*

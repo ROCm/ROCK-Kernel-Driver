@@ -91,6 +91,7 @@ char *ircomm_tty_state[] = {
 	"*** ERROR *** ",
 };
 
+#ifdef CONFIG_IRDA_DEBUG
 static char *ircomm_tty_event[] = {
 	"IRCOMM_TTY_ATTACH_CABLE",
 	"IRCOMM_TTY_DETACH_CABLE",
@@ -107,6 +108,7 @@ static char *ircomm_tty_event[] = {
 	"IRCOMM_TTY_GOT_LSAPSEL",
 	"*** ERROR ****",
 };
+#endif /* CONFIG_IRDA_DEBUG */
 
 static int (*state[])(struct ircomm_tty_cb *self, IRCOMM_TTY_EVENT event,
 		      struct sk_buff *skb, struct ircomm_tty_info *info) = 

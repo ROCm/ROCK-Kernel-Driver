@@ -111,19 +111,19 @@ irqreturn_t um_timer(int irq, void *dev, struct pt_regs *regs)
 	return(IRQ_HANDLED);
 }
 
-long um_time(int * tloc)
+long um_time(int __user *tloc)
 {
 	struct timeval now;
 
 	do_gettimeofday(&now);
 	if (tloc) {
- 		if (put_user(now.tv_sec,tloc))
+ 		if (put_user(now.tv_sec, tloc))
 			now.tv_sec = -EFAULT;
 	}
 	return now.tv_sec;
 }
 
-long um_stime(int * tptr)
+long um_stime(int __user *tptr)
 {
 	int value;
 	struct timespec new;
@@ -136,22 +136,7 @@ long um_stime(int * tptr)
 	return 0;
 }
 
-/* XXX Needs to be moved under sys-i386 */
-void __delay(um_udelay_t time)
-{
-	/* Stolen from the i386 __loop_delay */
-	int d0;
-	__asm__ __volatile__(
-		"\tjmp 1f\n"
-		".align 16\n"
-		"1:\tjmp 2f\n"
-		".align 16\n"
-		"2:\tdecl %0\n\tjns 2b"
-		:"=&a" (d0)
-		:"0" (time));
-}
-
-void __udelay(um_udelay_t usecs)
+void __udelay(unsigned long usecs)
 {
 	int i, n;
 
@@ -159,7 +144,7 @@ void __udelay(um_udelay_t usecs)
 	for(i=0;i<n;i++) ;
 }
 
-void __const_udelay(um_udelay_t usecs)
+void __const_udelay(unsigned long usecs)
 {
 	int i, n;
 

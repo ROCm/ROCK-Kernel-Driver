@@ -17,6 +17,8 @@
 #include <linux/types.h>
 #include <linux/timex.h>
 #include <linux/notifier.h>
+#include <linux/kernel_stat.h>
+#include <linux/rcupdate.h>
 
 #include <asm/s390_ext.h>
 #include <asm/timer.h>
@@ -25,7 +27,95 @@
 static ext_int_info_t ext_int_info_timer;
 DEFINE_PER_CPU(struct vtimer_queue, virt_cpu_timer);
 
-void start_cpu_timer(void)
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING
+/*
+ * Update process times based on virtual cpu times stored by entry.S
+ * to the lowcore fields user_timer, system_timer & steal_clock.
+ */
+void account_user_vtime(struct task_struct *tsk)
+{
+	cputime_t cputime;
+	__u64 timer, clock;
+	int rcu_user_flag;
+
+	timer = S390_lowcore.last_update_timer;
+	clock = S390_lowcore.last_update_clock;
+	asm volatile ("  STPT %0\n"    /* Store current cpu timer value */
+		      "  STCK %1"      /* Store current tod clock value */
+		      : "=m" (S390_lowcore.last_update_timer),
+		        "=m" (S390_lowcore.last_update_clock) );
+	S390_lowcore.system_timer += timer - S390_lowcore.last_update_timer;
+	S390_lowcore.steal_clock += S390_lowcore.last_update_clock - clock;
+
+	cputime = S390_lowcore.user_timer >> 12;
+	rcu_user_flag = cputime != 0;
+	S390_lowcore.user_timer -= cputime << 12;
+	S390_lowcore.steal_clock -= cputime << 12;
+	account_user_time(tsk, cputime);
+
+	cputime =  S390_lowcore.system_timer >> 12;
+	S390_lowcore.system_timer -= cputime << 12;
+	S390_lowcore.steal_clock -= cputime << 12;
+	account_system_time(tsk, HARDIRQ_OFFSET, cputime);
+
+	cputime = S390_lowcore.steal_clock;
+	if ((__s64) cputime > 0) {
+		cputime >>= 12;
+		S390_lowcore.steal_clock -= cputime << 12;
+		account_steal_time(tsk, cputime);
+	}
+
+	run_local_timers();
+	if (rcu_pending(smp_processor_id()))
+		rcu_check_callbacks(smp_processor_id(), rcu_user_flag);
+	scheduler_tick();
+}
+
+/*
+ * Update process times based on virtual cpu times stored by entry.S
+ * to the lowcore fields user_timer, system_timer & steal_clock.
+ */
+void account_system_vtime(struct task_struct *tsk)
+{
+	cputime_t cputime;
+	__u64 timer;
+
+	timer = S390_lowcore.last_update_timer;
+	asm volatile ("  STPT %0"    /* Store current cpu timer value */
+		      : "=m" (S390_lowcore.last_update_timer) );
+	S390_lowcore.system_timer += timer - S390_lowcore.last_update_timer;
+
+	cputime =  S390_lowcore.system_timer >> 12;
+	S390_lowcore.system_timer -= cputime << 12;
+	S390_lowcore.steal_clock -= cputime << 12;
+	account_system_time(tsk, 0, cputime);
+}
+
+static inline void set_vtimer(__u64 expires)
+{
+	__u64 timer;
+
+	asm volatile ("  STPT %0\n"  /* Store current cpu timer value */
+		      "  SPT %1"     /* Set new value immediatly afterwards */
+		      : "=m" (timer) : "m" (expires) );
+	S390_lowcore.system_timer += S390_lowcore.last_update_timer - timer;
+	S390_lowcore.last_update_timer = expires;
+
+	/* store expire time for this CPU timer */
+	per_cpu(virt_cpu_timer, smp_processor_id()).to_expire = expires;
+}
+#else
+static inline void set_vtimer(__u64 expires)
+{
+	S390_lowcore.last_update_timer = expires;
+	asm volatile ("SPT %0" : : "m" (S390_lowcore.last_update_timer));
+
+	/* store expire time for this CPU timer */
+	per_cpu(virt_cpu_timer, smp_processor_id()).to_expire = expires;
+}
+#endif
+
+static void start_cpu_timer(void)
 {
 	struct vtimer_queue *vt_list;
 
@@ -33,7 +123,7 @@ void start_cpu_timer(void)
 	set_vtimer(vt_list->idle);
 }
 
-void stop_cpu_timer(void)
+static void stop_cpu_timer(void)
 {
 	__u64 done;
 	struct vtimer_queue *vt_list;
@@ -71,19 +161,11 @@ void stop_cpu_timer(void)
 	set_vtimer(VTIMER_MAX_SLICE);
 }
 
-void set_vtimer(__u64 expires)
-{
-	asm volatile ("SPT %0" : : "m" (expires));
-
-	/* store expire time for this CPU timer */
-	per_cpu(virt_cpu_timer, smp_processor_id()).to_expire = expires;
-}
-
 /*
  * Sorted add to a list. List is linear searched until first bigger
  * element is found.
  */
-void list_add_sorted(struct vtimer_list *timer, struct list_head *head)
+static void list_add_sorted(struct vtimer_list *timer, struct list_head *head)
 {
 	struct vtimer_list *event;
 
@@ -429,11 +511,12 @@ void init_cpu_vtimer(void)
 {
 	struct vtimer_queue *vt_list;
 	unsigned long cr0;
-	__u64 timer;
 
 	/* kick the virtual timer */
-	timer = VTIMER_MAX_SLICE;
-	asm volatile ("SPT %0" : : "m" (timer));
+	S390_lowcore.exit_timer = VTIMER_MAX_SLICE;
+	S390_lowcore.last_update_timer = VTIMER_MAX_SLICE;
+	asm volatile ("SPT %0" : : "m" (S390_lowcore.last_update_timer));
+	asm volatile ("STCK %0" : "=m" (S390_lowcore.last_update_clock));
 	__ctl_store(cr0, 0, 0);
 	cr0 |= 0x400;
 	__ctl_load(cr0, 0, 0);

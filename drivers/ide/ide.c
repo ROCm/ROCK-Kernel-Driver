@@ -1380,7 +1380,7 @@ int ata_attach(ide_drive_t *drive)
 	return 1;
 }
 
-static int generic_ide_suspend(struct device *dev, u32 state)
+static int generic_ide_suspend(struct device *dev, pm_message_t state)
 {
 	ide_drive_t *drive = dev->driver_data;
 	struct request rq;

@@ -475,3 +475,67 @@ EXPORT_SYMBOL(sn_pci_alloc_consistent);
 EXPORT_SYMBOL(sn_pci_free_consistent);
 EXPORT_SYMBOL(sn_pci_dma_supported);
 EXPORT_SYMBOL(sn_dma_mapping_error);
+
+char *sn_pci_get_legacy_mem(struct pci_bus *bus)
+{
+	if (!SN_PCIBUS_BUSSOFT(bus))
+		return ERR_PTR(-ENODEV);
+
+	return (char *)(SN_PCIBUS_BUSSOFT(bus)->bs_legacy_mem | __IA64_UNCACHED_OFFSET);
+}
+
+int sn_pci_legacy_read(struct pci_bus *bus, u16 port, u32 *val, u8 size)
+{
+	unsigned long addr;
+	int ret;
+
+	if (!SN_PCIBUS_BUSSOFT(bus))
+		return -ENODEV;
+
+	addr = SN_PCIBUS_BUSSOFT(bus)->bs_legacy_io | __IA64_UNCACHED_OFFSET;
+	addr += port;
+
+	ret = ia64_sn_probe_mem(addr, (long)size, (void *)val);
+
+	if (ret == 2)
+		return -EINVAL;
+
+	if (ret == 1)
+		*val = -1;
+
+	return size;
+}
+
+int sn_pci_legacy_write(struct pci_bus *bus, u16 port, u32 val, u8 size)
+{
+	int ret = size;
+	unsigned long paddr;
+	unsigned long *addr;
+
+	if (!SN_PCIBUS_BUSSOFT(bus)) {
+		ret = -ENODEV;
+		goto out;
+	}
+
+	/* Put the phys addr in uncached space */
+	paddr = SN_PCIBUS_BUSSOFT(bus)->bs_legacy_io | __IA64_UNCACHED_OFFSET;
+	paddr += port;
+	addr = (unsigned long *)paddr;
+
+	switch (size) {
+	case 1:
+		*(volatile u8 *)(addr) = (u8)(val);
+		break;
+	case 2:
+		*(volatile u16 *)(addr) = (u16)(val);
+		break;
+	case 4:
+		*(volatile u32 *)(addr) = (u32)(val);
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+ out:
+	return ret;
+}

@@ -85,6 +85,20 @@ extern int pcibios_prep_mwi (struct pci_dev *);
 #define HAVE_PCI_MMAP
 extern int pci_mmap_page_range (struct pci_dev *dev, struct vm_area_struct *vma,
 				enum pci_mmap_state mmap_state, int write_combine);
+#define HAVE_PCI_LEGACY
+extern int pci_mmap_legacy_page_range(struct pci_bus *bus,
+				      struct vm_area_struct *vma);
+extern ssize_t pci_read_legacy_io(struct kobject *kobj, char *buf, loff_t off,
+				  size_t count);
+extern ssize_t pci_write_legacy_io(struct kobject *kobj, char *buf, loff_t off,
+				   size_t count);
+extern int pci_mmap_legacy_mem(struct kobject *kobj,
+			       struct bin_attribute *attr,
+			       struct vm_area_struct *vma);
+
+#define pci_get_legacy_mem platform_pci_get_legacy_mem
+#define pci_legacy_read platform_pci_legacy_read
+#define pci_legacy_write platform_pci_legacy_write
 
 struct pci_window {
 	struct resource resource;

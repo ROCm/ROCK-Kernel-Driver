@@ -172,7 +172,7 @@ do {									\
 
 /* FIXME: this hack is definitely wrong -AK */
 struct __large_struct { unsigned long buf[100]; };
-#define __m(x) (*(struct __large_struct *)(x))
+#define __m(x) (*(struct __large_struct __user *)(x))
 
 /*
  * Tell gcc we read from memory instead of writing: this is because

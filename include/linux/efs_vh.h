@@ -47,23 +47,6 @@ struct volume_header {
 struct pt_types {
 	int	pt_type;
 	char	*pt_name;
-} sgi_pt_types[] = {
-	{0x00,		"SGI vh"},
-	{0x01,		"SGI trkrepl"},
-	{0x02,		"SGI secrepl"},
-	{0x03,		"SGI raw"},
-	{0x04,		"SGI bsd"},
-	{SGI_SYSV,	"SGI sysv"},
-	{0x06,		"SGI vol"},
-	{SGI_EFS,	"SGI efs"},
-	{0x08,		"SGI lv"},
-	{0x09,		"SGI rlv"},
-	{0x0A,		"SGI xfs"},
-	{0x0B,		"SGI xfslog"},
-	{0x0C,		"SGI xlv"},
-	{0x82,		"Linux swap"},
-	{0x83,		"Linux native"},
-	{0,		NULL}
 };
 
 #endif /* __EFS_VH_H__ */

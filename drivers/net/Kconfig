@@ -691,6 +691,7 @@ config ELMC_II
 config VORTEX
 	tristate "3c590/3c900 series (592/595/597) \"Vortex/Boomerang\" support"
 	depends on NET_VENDOR_3COM && (PCI || EISA)
+	select MII
 	---help---
 	  This option enables driver support for a large number of 10mbps and
 	  10/100mbps EISA, PCI and PCMCIA 3Com network cards:

@@ -1,6 +1,6 @@
 /* linux/arch/arm/mach-s3c2410/s3c2440-dsc.c
  *
- * Copyright (c) 2004 Simtec Electronics
+ * Copyright (c) 2004-2005 Simtec Electronics
  *   Ben Dooks <ben@simtec.co.uk>
  *
  * Samsung S3C2440 Drive Strength Control support
@@ -12,6 +12,7 @@
  * Modifications:
  *     29-Aug-2004 BJD  Start of drive-strength control
  *     09-Nov-2004 BJD  Added symbol export
+ *     11-Jan-2005 BJD  Include fix
 */
 
 #include <linux/kernel.h>
@@ -31,8 +32,8 @@
 #include <asm/arch/regs-gpio.h>
 #include <asm/arch/regs-dsc.h>
 
-#include "s3c2440.h"
 #include "cpu.h"
+#include "s3c2440.h"
 
 int s3c2440_set_dsc(unsigned int pin, unsigned int value)
 {

@@ -16,6 +16,7 @@
 #include <linux/threads.h>
 #include <linux/sched.h>
 #include <linux/cache.h>
+#include <linux/interrupt.h>
 #include <asm/lowcore.h>
 
 /* irq_cpustat_t is unused currently, but could be converted

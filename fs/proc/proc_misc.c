@@ -101,10 +101,10 @@ static int uptime_read_proc(char *page, char **start, off_t off,
 	struct timespec uptime;
 	struct timespec idle;
 	int len;
-	u64 idle_jiffies = init_task.utime + init_task.stime;
+	cputime_t idletime = cputime_add(init_task.utime, init_task.stime);
 
 	do_posix_clock_monotonic_gettime(&uptime);
-	jiffies_to_timespec(idle_jiffies, &idle);
+	cputime_to_timespec(idletime, &idle);
 	len = sprintf(page,"%lu.%02lu %lu.%02lu\n",
 			(unsigned long) uptime.tv_sec,
 			(uptime.tv_nsec / (NSEC_PER_SEC / 100)),
@@ -322,9 +322,11 @@ static int show_stat(struct seq_file *p, void *v)
 {
 	int i;
 	unsigned long jif;
-	u64	sum = 0, user = 0, nice = 0, system = 0,
-		idle = 0, iowait = 0, irq = 0, softirq = 0;
+	cputime64_t user, nice, system, idle, iowait, irq, softirq, steal;
+	u64 sum = 0;
 
+	user = nice = system = idle = iowait =
+		irq = softirq = steal = cputime64_zero;
 	jif = - wall_to_monotonic.tv_sec;
 	if (wall_to_monotonic.tv_nsec)
 		--jif;
@@ -332,25 +334,27 @@ static int show_stat(struct seq_file *p, void *v)
 	for_each_cpu(i) {
 		int j;
 
-		user += kstat_cpu(i).cpustat.user;
-		nice += kstat_cpu(i).cpustat.nice;
-		system += kstat_cpu(i).cpustat.system;
-		idle += kstat_cpu(i).cpustat.idle;
-		iowait += kstat_cpu(i).cpustat.iowait;
-		irq += kstat_cpu(i).cpustat.irq;
-		softirq += kstat_cpu(i).cpustat.softirq;
+		user = cputime64_add(user, kstat_cpu(i).cpustat.user);
+		nice = cputime64_add(nice, kstat_cpu(i).cpustat.nice);
+		system = cputime64_add(system, kstat_cpu(i).cpustat.system);
+		idle = cputime64_add(idle, kstat_cpu(i).cpustat.idle);
+		iowait = cputime64_add(iowait, kstat_cpu(i).cpustat.iowait);
+		irq = cputime64_add(irq, kstat_cpu(i).cpustat.irq);
+		softirq = cputime64_add(softirq, kstat_cpu(i).cpustat.softirq);
+		steal = cputime64_add(steal, kstat_cpu(i).cpustat.steal);
 		for (j = 0 ; j < NR_IRQS ; j++)
 			sum += kstat_cpu(i).irqs[j];
 	}
 
-	seq_printf(p, "cpu  %llu %llu %llu %llu %llu %llu %llu\n",
-		(unsigned long long)jiffies_64_to_clock_t(user),
-		(unsigned long long)jiffies_64_to_clock_t(nice),
-		(unsigned long long)jiffies_64_to_clock_t(system),
-		(unsigned long long)jiffies_64_to_clock_t(idle),
-		(unsigned long long)jiffies_64_to_clock_t(iowait),
-		(unsigned long long)jiffies_64_to_clock_t(irq),
-		(unsigned long long)jiffies_64_to_clock_t(softirq));
+	seq_printf(p, "cpu  %llu %llu %llu %llu %llu %llu %llu %llu\n",
+		(unsigned long long)cputime64_to_clock_t(user),
+		(unsigned long long)cputime64_to_clock_t(nice),
+		(unsigned long long)cputime64_to_clock_t(system),
+		(unsigned long long)cputime64_to_clock_t(idle),
+		(unsigned long long)cputime64_to_clock_t(iowait),
+		(unsigned long long)cputime64_to_clock_t(irq),
+		(unsigned long long)cputime64_to_clock_t(softirq),
+		(unsigned long long)cputime64_to_clock_t(steal));
 	for_each_online_cpu(i) {
 
 		/* Copy values here to work around gcc-2.95.3, gcc-2.96 */
@@ -361,15 +365,17 @@ static int show_stat(struct seq_file *p, void *v)
 		iowait = kstat_cpu(i).cpustat.iowait;
 		irq = kstat_cpu(i).cpustat.irq;
 		softirq = kstat_cpu(i).cpustat.softirq;
-		seq_printf(p, "cpu%d %llu %llu %llu %llu %llu %llu %llu\n",
+		steal = kstat_cpu(i).cpustat.steal;
+		seq_printf(p, "cpu%d %llu %llu %llu %llu %llu %llu %llu %llu\n",
 			i,
-			(unsigned long long)jiffies_64_to_clock_t(user),
-			(unsigned long long)jiffies_64_to_clock_t(nice),
-			(unsigned long long)jiffies_64_to_clock_t(system),
-			(unsigned long long)jiffies_64_to_clock_t(idle),
-			(unsigned long long)jiffies_64_to_clock_t(iowait),
-			(unsigned long long)jiffies_64_to_clock_t(irq),
-			(unsigned long long)jiffies_64_to_clock_t(softirq));
+			(unsigned long long)cputime64_to_clock_t(user),
+			(unsigned long long)cputime64_to_clock_t(nice),
+			(unsigned long long)cputime64_to_clock_t(system),
+			(unsigned long long)cputime64_to_clock_t(idle),
+			(unsigned long long)cputime64_to_clock_t(iowait),
+			(unsigned long long)cputime64_to_clock_t(irq),
+			(unsigned long long)cputime64_to_clock_t(softirq),
+			(unsigned long long)cputime64_to_clock_t(steal));
 	}
 	seq_printf(p, "intr %llu", (unsigned long long)sum);
 

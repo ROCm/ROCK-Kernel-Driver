@@ -198,6 +198,37 @@ int line_ioctl(struct tty_struct *tty, struct file * file,
 
 	ret = 0;
 	switch(cmd) {
+#ifdef TIOCGETP
+	case TIOCGETP:
+	case TIOCSETP:
+	case TIOCSETN:
+#endif
+#ifdef TIOCGETC
+	case TIOCGETC:
+	case TIOCSETC:
+#endif
+#ifdef TIOCGLTC
+	case TIOCGLTC:
+	case TIOCSLTC:
+#endif
+	case TCGETS:
+	case TCSETSF:
+	case TCSETSW:
+	case TCSETS:
+	case TCGETA:
+	case TCSETAF:
+	case TCSETAW:
+	case TCSETA:
+	case TCXONC:
+	case TCFLSH:
+	case TIOCOUTQ:
+	case TIOCINQ:
+	case TIOCGLCKTRMIOS:
+	case TIOCSLCKTRMIOS:
+	case TIOCPKT:
+	case TIOCGSOFTCAR:
+	case TIOCSSOFTCAR:
+		return -ENOIOCTLCMD;
 #if 0
 	case TCwhatever:
 		/* do something */

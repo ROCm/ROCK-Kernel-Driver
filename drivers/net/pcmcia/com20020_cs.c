@@ -211,7 +211,6 @@ static dev_link_t *com20020_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.EventMask =
         CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
         CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -394,6 +393,7 @@ static void com20020_config(dev_link_t *link)
 
     link->dev = &info->node;
     link->state &= ~DEV_CONFIG_PENDING;
+    SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 
     i = com20020_found(dev, 0);	/* calls register_netdev */
     
@@ -513,8 +513,7 @@ static int __init init_com20020_cs(void)
 static void __exit exit_com20020_cs(void)
 {
 	pcmcia_unregister_driver(&com20020_cs_driver);
-	while (dev_list != NULL)
-		com20020_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_com20020_cs);

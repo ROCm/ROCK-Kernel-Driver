@@ -79,14 +79,6 @@
 /* #define SYM_CONF_IARB_SUPPORT */
 
 /*
- *  Number of lists for the optimization of the IO timeout handling.
- *  Not used under FreeBSD and Linux.
- */
-#ifndef SYM_CONF_TIMEOUT_ORDER_MAX
-#define SYM_CONF_TIMEOUT_ORDER_MAX	(8)
-#endif
-
-/*
  *  Only relevant if IARB support configured.
  *  - Max number of successive settings of IARB hints.
  *  - Set IARB on arbitration lost.

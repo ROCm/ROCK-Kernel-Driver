@@ -87,7 +87,7 @@ zalon_probe(struct parisc_device *dev)
 {
 	struct gsc_irq gsc_irq;
 	u32 zalon_vers;
-	int irq, error = -ENODEV;
+	int error = -ENODEV;
 	unsigned long zalon = dev->hpa;
 	unsigned long io_port = zalon + GSC_SCSI_ZALON_OFFSET;
 	static int unit = 0;
@@ -107,10 +107,10 @@ zalon_probe(struct parisc_device *dev)
 	/* Setup the interrupts first.
 	** Later on request_irq() will register the handler.
 	*/
-	irq = gsc_alloc_irq(&gsc_irq);
+	dev->irq = gsc_alloc_irq(&gsc_irq);
 
 	printk("%s: Zalon vers field is 0x%x, IRQ %d\n", __FUNCTION__,
-		zalon_vers, irq);
+		zalon_vers, dev->irq);
 
 	__raw_writel(gsc_irq.txn_addr | gsc_irq.txn_data, dev->hpa + IO_MODULE_EIM);
 
@@ -130,16 +130,16 @@ zalon_probe(struct parisc_device *dev)
 	device.dev		= &dev->dev;
 	device.slot.base	= (u_long)io_port;
 	device.slot.base_c	= (u_long)io_port;
-	device.slot.irq		= irq;
+	device.slot.irq		= dev->irq;
 	device.differential	= 2;
 
 	host = ncr_attach(&zalon7xx_template, unit, &device);
 	if (!host)
 		goto fail;
 
-	if (request_irq(irq, ncr53c8xx_intr, SA_SHIRQ, dev->dev.bus_id, host)) {
+	if (request_irq(dev->irq, ncr53c8xx_intr, SA_SHIRQ, "zalon", host)) {
 		printk(KERN_ERR "%s: irq problem with %d, detaching\n ",
-			dev->dev.bus_id, irq);
+			dev->dev.bus_id, dev->irq);
 		goto fail;
 	}
 
@@ -155,7 +155,7 @@ zalon_probe(struct parisc_device *dev)
 	return 0;
 
  fail_free_irq:
-	free_irq(irq, host);
+	free_irq(dev->irq, host);
  fail:
 	ncr53c8xx_release(host);
 	return error;
@@ -171,18 +171,16 @@ MODULE_DEVICE_TABLE(parisc, zalon_tbl);
 static int __exit zalon_remove(struct parisc_device *dev)
 {
 	struct Scsi_Host *host = dev_get_drvdata(&dev->dev);
-	int irq = host->irq;
 
 	scsi_remove_host(host);
 	ncr53c8xx_release(host);
-	free_irq(irq, host);
+	free_irq(dev->irq, host);
 
 	return 0;
 }
-	
 
 static struct parisc_driver zalon_driver = {
-	.name =		"GSC SCSI (Zalon)",
+	.name =		"zalon",
 	.id_table =	zalon_tbl,
 	.probe =	zalon_probe,
 	.remove =	__devexit_p(zalon_remove),
@@ -201,6 +199,7 @@ static int __init zalon7xx_init(void)
 static void __exit zalon7xx_exit(void)
 {
 	unregister_parisc_driver(&zalon_driver);
+	ncr53c8xx_exit();
 }
 
 module_init(zalon7xx_init);

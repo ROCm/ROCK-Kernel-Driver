@@ -1691,6 +1691,9 @@ static struct module *load_module(void __user *umod,
 				 / sizeof(struct kernel_param),
 				 NULL);
 	}
+	if (err < 0)
+		goto arch_cleanup;
+
 	err = mod_sysfs_setup(mod, 
 			      (struct kernel_param *)
 			      sechdrs[setupindex].sh_addr,

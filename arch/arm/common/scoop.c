@@ -100,11 +100,13 @@ int __init scoop_probe(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct resource *mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
-	if (!mem) return -EINVAL;
+	if (!mem)
+		return -EINVAL;
 
 	inf = dev->platform_data;
 	scoop_io_base = ioremap(mem->start, 0x1000);
-	if (!scoop_io_base) return -ENOMEM;
+	if (!scoop_io_base)
+		return -ENOMEM;
 
 	SCOOP_REG(SCOOP_MCR) = 0x0140;
 

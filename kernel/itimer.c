@@ -16,11 +16,10 @@
 
 int do_getitimer(int which, struct itimerval *value)
 {
-	register unsigned long val, interval;
+	register unsigned long val;
 
 	switch (which) {
 	case ITIMER_REAL:
-		interval = current->it_real_incr;
 		val = 0;
 		/* 
 		 * FIXME! This needs to be atomic, in case the kernel timer happens!
@@ -32,20 +31,20 @@ int do_getitimer(int which, struct itimerval *value)
 			if ((long) val <= 0)
 				val = 1;
 		}
+		jiffies_to_timeval(val, &value->it_value);
+		jiffies_to_timeval(current->it_real_incr, &value->it_interval);
 		break;
 	case ITIMER_VIRTUAL:
-		val = current->it_virt_value;
-		interval = current->it_virt_incr;
+		cputime_to_timeval(current->it_virt_value, &value->it_value);
+		cputime_to_timeval(current->it_virt_incr, &value->it_interval);
 		break;
 	case ITIMER_PROF:
-		val = current->it_prof_value;
-		interval = current->it_prof_incr;
+		cputime_to_timeval(current->it_prof_value, &value->it_value);
+		cputime_to_timeval(current->it_prof_incr, &value->it_interval);
 		break;
 	default:
 		return(-EINVAL);
 	}
-	jiffies_to_timeval(val, &value->it_value);
-	jiffies_to_timeval(interval, &value->it_interval);
 	return 0;
 }
 
@@ -81,37 +80,43 @@ void it_real_fn(unsigned long __data)
 
 int do_setitimer(int which, struct itimerval *value, struct itimerval *ovalue)
 {
-	register unsigned long i, j;
+	unsigned long expire;
+	cputime_t cputime;
 	int k;
 
-	i = timeval_to_jiffies(&value->it_interval);
-	j = timeval_to_jiffies(&value->it_value);
 	if (ovalue && (k = do_getitimer(which, ovalue)) < 0)
 		return k;
 	switch (which) {
 		case ITIMER_REAL:
 			del_timer_sync(&current->real_timer);
-			current->it_real_value = j;
-			current->it_real_incr = i;
-			if (!j)
+			expire = timeval_to_jiffies(&value->it_value);
+			current->it_real_value = expire;
+			current->it_real_incr =
+				timeval_to_jiffies(&value->it_interval);
+			if (!expire)
 				break;
-			if (j > (unsigned long) LONG_MAX)
-				j = LONG_MAX;
-			i = j + jiffies;
-			current->real_timer.expires = i;
+			if (expire > (unsigned long) LONG_MAX)
+				expire = LONG_MAX;
+			current->real_timer.expires = jiffies + expire;
 			add_timer(&current->real_timer);
 			break;
 		case ITIMER_VIRTUAL:
-			if (j)
-				j++;
-			current->it_virt_value = j;
-			current->it_virt_incr = i;
+			cputime = timeval_to_cputime(&value->it_value);
+			if (cputime_gt(cputime, cputime_zero))
+				cputime = cputime_add(cputime,
+						      jiffies_to_cputime(1));
+			current->it_virt_value = cputime;
+			cputime = timeval_to_cputime(&value->it_interval);
+			current->it_virt_incr = cputime;
 			break;
 		case ITIMER_PROF:
-			if (j)
-				j++;
-			current->it_prof_value = j;
-			current->it_prof_incr = i;
+			cputime = timeval_to_cputime(&value->it_value);
+			if (cputime_gt(cputime, cputime_zero))
+				cputime = cputime_add(cputime,
+						      jiffies_to_cputime(1));
+			current->it_prof_value = cputime;
+			cputime = timeval_to_cputime(&value->it_interval);
+			current->it_prof_incr = cputime;
 			break;
 		default:
 			return -EINVAL;

@@ -372,7 +372,7 @@ static int set_ltchars(struct tty_struct * tty, struct ltchars __user * ltchars)
 /*
  * Send a high priority character to the tty.
  */
-void send_prio_char(struct tty_struct *tty, char ch)
+static void send_prio_char(struct tty_struct *tty, char ch)
 {
 	int	was_stopped = tty->stopped;
 

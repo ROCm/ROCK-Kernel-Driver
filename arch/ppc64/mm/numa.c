@@ -345,8 +345,6 @@ new_range:
 			numa_domain = 0;
 		}
 
-		node_set_online(numa_domain);
-
 		if (max_domain < numa_domain)
 			max_domain = numa_domain;
 
@@ -361,14 +359,19 @@ new_range:
 				init_node_data[numa_domain].node_start_pfn +
 				init_node_data[numa_domain].node_spanned_pages;
 			if (shouldstart != (start / PAGE_SIZE)) {
-				printk(KERN_ERR "WARNING: Hole in node, "
-						"disabling region start %lx "
-						"length %lx\n", start, size);
-				continue;
+				/* Revert to non-numa for now */
+				printk(KERN_ERR
+				       "WARNING: Unexpected node layout: "
+				       "region start %lx length %lx\n",
+				       start, size);
+				printk(KERN_ERR "NUMA is disabled\n");
+				goto err;
 			}
 			init_node_data[numa_domain].node_spanned_pages +=
 				size / PAGE_SIZE;
 		} else {
+			node_set_online(numa_domain);
+
 			init_node_data[numa_domain].node_start_pfn =
 				start / PAGE_SIZE;
 			init_node_data[numa_domain].node_spanned_pages =
@@ -388,6 +391,14 @@ new_range:
 		node_set_online(i);
 
 	return 0;
+err:
+	/* Something has gone wrong; revert any setup we've done */
+	for_each_node(i) {
+		node_set_offline(i);
+		init_node_data[i].node_start_pfn = 0;
+		init_node_data[i].node_spanned_pages = 0;
+	}
+	return -1;
 }
 
 static void __init setup_nonnuma(void)

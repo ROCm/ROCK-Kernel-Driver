@@ -793,25 +793,15 @@ extern void ext3_error (struct super_block *, const char *, const char *, ...)
 extern void __ext3_std_error (struct super_block *, const char *, int);
 extern void ext3_abort (struct super_block *, const char *, const char *, ...)
 	__attribute__ ((format (printf, 3, 4)));
-extern NORET_TYPE void ext3_panic (struct super_block *, const char *,
-				   const char *, ...)
-	__attribute__ ((NORET_AND format (printf, 3, 4)));
 extern void ext3_warning (struct super_block *, const char *, const char *, ...)
 	__attribute__ ((format (printf, 3, 4)));
 extern void ext3_update_dynamic_rev (struct super_block *sb);
-extern void ext3_put_super (struct super_block *);
-extern void ext3_write_super (struct super_block *);
-extern void ext3_write_super_lockfs (struct super_block *);
-extern void ext3_unlockfs (struct super_block *);
-extern int ext3_remount (struct super_block *, int *, char *);
-extern int ext3_statfs (struct super_block *, struct kstatfs *);
 
 #define ext3_std_error(sb, errno)				\
 do {								\
 	if ((errno))						\
 		__ext3_std_error((sb), __FUNCTION__, (errno));	\
 } while (0)
-extern const char *ext3_decode_error(struct super_block *sb, int errno, char nbuf[16]);
 
 /*
  * Inodes and files operations

@@ -20,7 +20,8 @@
  *     18-Jan-2003 BJD  Added serial port configuration
  *     05-Oct-2004 BJD  Power management code
  *     04-Nov-2004 BJD  Updated serial port clocks
- *     04-Jan-2004 BJD  New uart init call
+ *     04-Jan-2006 BJD  New uart init call
+ *     10-Jan-2005 BJD  Removed include of s3c2410.h
 */
 
 #include <linux/kernel.h>
@@ -48,7 +49,6 @@
 #include <asm/arch/regs-gpio.h>
 #include <asm/arch/regs-mem.h>
 
-#include "s3c2410.h"
 #include "clock.h"
 #include "devs.h"
 #include "cpu.h"
@@ -270,7 +270,7 @@ void __init bast_map_io(void)
 
 void __init bast_init_irq(void)
 {
-	s3c2410_init_irq();
+	s3c24xx_init_irq();
 }
 
 #ifdef CONFIG_PM
@@ -307,5 +307,5 @@ MACHINE_START(BAST, "Simtec-BAST")
      MAPIO(bast_map_io)
      INITIRQ(bast_init_irq)
 	.init_machine	= bast_init_machine,
-     .timer		= &s3c2410_timer,
+	.timer		= &s3c24xx_timer,
 MACHINE_END

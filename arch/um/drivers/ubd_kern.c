@@ -172,7 +172,7 @@ static struct proc_dir_entry *proc_ide = NULL;
 
 static void make_proc_ide(void)
 {
-	proc_ide_root = proc_mkdir("ide", 0);
+	proc_ide_root = proc_mkdir("ide", NULL);
 	proc_ide = proc_mkdir("ide0", proc_ide_root);
 }
 
@@ -1087,7 +1087,7 @@ static void do_ubd_request(request_queue_t *q)
 static int ubd_ioctl(struct inode * inode, struct file * file,
 		     unsigned int cmd, unsigned long arg)
 {
-	struct hd_geometry *loc = (struct hd_geometry *) arg;
+	struct hd_geometry __user *loc = (struct hd_geometry __user *) arg;
 	struct ubd *dev = inode->i_bdev->bd_disk->private_data;
 	struct hd_driveid ubd_id = {
 		.cyls		= 0,
@@ -1108,19 +1108,19 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 
 	case HDIO_GET_IDENTITY:
 		ubd_id.cyls = dev->size / (128 * 32 * 512);
-		if(copy_to_user((char *) arg, (char *) &ubd_id, 
+		if(copy_to_user((char __user *) arg, (char *) &ubd_id,
 				 sizeof(ubd_id)))
 			return(-EFAULT);
 		return(0);
 		
 	case CDROMVOLREAD:
-		if(copy_from_user(&volume, (char *) arg, sizeof(volume)))
+		if(copy_from_user(&volume, (char __user *) arg, sizeof(volume)))
 			return(-EFAULT);
 		volume.channel0 = 255;
 		volume.channel1 = 255;
 		volume.channel2 = 255;
 		volume.channel3 = 255;
-		if(copy_to_user((char *) arg, &volume, sizeof(volume)))
+		if(copy_to_user((char __user *) arg, &volume, sizeof(volume)))
 			return(-EFAULT);
 		return(0);
 	}

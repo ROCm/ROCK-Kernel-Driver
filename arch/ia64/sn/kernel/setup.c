@@ -28,6 +28,7 @@
 #include <linux/compiler.h>
 #include <linux/sched.h>
 #include <linux/root_dev.h>
+#include <linux/nodemask.h>
 
 #include <asm/io.h>
 #include <asm/sal.h>
@@ -504,15 +505,15 @@ static void __init scan_for_ionodes(void)
 
 	/* Setup ionodes with memory */
 	for (nasid = 0; nasid < MAX_PHYSNODE_ID; nasid += 2) {
-		u64 klgraph_header;
+		char *klgraph_header;
 		cnodeid_t cnodeid;
 
 		if (physical_node_map[nasid] == -1)
 			continue;
 
-		klgraph_header = cnodeid = -1;
-		klgraph_header = ia64_sn_get_klconfig_addr(nasid);
-		if (klgraph_header <= 0) {
+		cnodeid = -1;
+		klgraph_header = __va(ia64_sn_get_klconfig_addr(nasid));
+		if (!klgraph_header) {
 			if (IS_RUNNING_ON_SIMULATOR())
 				continue;
 			BUG();	/* All nodes must have klconfig tables! */

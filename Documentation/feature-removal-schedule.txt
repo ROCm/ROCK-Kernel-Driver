@@ -17,10 +17,18 @@ Who:	Greg Kroah-Hartman <greg@kroah.com>
 
 ---------------------------
 
-What:	/proc/sys/cpu and the sysctl interface to cpufreq (2.4.x interfaces)
+What:	/proc/sys/cpu/*, sysctl and /proc/cpufreq interfaces to cpufreq (2.4.x interfaces)
 When:	January 2005
 Files:	drivers/cpufreq/: cpufreq_userspace.c, proc_intf.c
-	function calls throughout the kernel tree
-Why:	Deprecated, has been replaced/superseded by (what?)....
+Why:	/proc/sys/cpu/* has been deprecated since inclusion of cpufreq into
+	the main kernel tree. It bloats /proc/ unnecessarily and doesn't work
+	well with the "governor"-based design of cpufreq.
+	/proc/cpufreq/* has also been deprecated for a long time and was only
+	meant for usage during 2.5. until the new sysfs-based interface became
+	ready. It has an inconsistent interface which doesn't work well with
+	userspace setting the frequency. The output from /proc/cpufreq/* can
+	be emulated using "cpufreq-info --proc" (cpufrequtils).
+	Both interfaces are superseded by the cpufreq interface in
+	/sys/devices/system/cpu/cpu%n/cpufreq/.
 Who:	Dominik Brodowski <linux@brodo.de>
 

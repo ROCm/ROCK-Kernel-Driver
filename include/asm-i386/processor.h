@@ -65,6 +65,7 @@ struct cpuinfo_x86 {
 	int	f00f_bug;
 	int	coma_bug;
 	unsigned long loops_per_jiffy;
+	unsigned char x86_num_cores;
 } __attribute__((__aligned__(SMP_CACHE_BYTES)));
 
 #define X86_VENDOR_INTEL 0
@@ -96,12 +97,19 @@ extern struct cpuinfo_x86 cpu_data[];
 #define current_cpu_data boot_cpu_data
 #endif
 
+extern	int phys_proc_id[NR_CPUS];
 extern char ignore_fpu_irq;
 
 extern void identify_cpu(struct cpuinfo_x86 *);
 extern void print_cpu_info(struct cpuinfo_x86 *);
 extern unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c);
 extern void dodgy_tsc(void);
+
+#ifdef CONFIG_X86_HT
+extern void detect_ht(struct cpuinfo_x86 *c);
+#else
+static inline void detect_ht(struct cpuinfo_x86 *c) {}
+#endif
 
 /*
  * EFLAGS bits

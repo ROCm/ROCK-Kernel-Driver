@@ -664,8 +664,6 @@ void __init pmac_pcibios_fixup(void)
 
 	for_each_pci_dev(dev)
 		pci_read_irq_line(dev);
-
-	pci_fix_bus_sysdata();
 }
 
 static void __init pmac_fixup_phb_resources(void)
