@@ -25,3 +25,6 @@
 
 #define MA620_VENDOR_ID		0x0df7
 #define MA620_PRODUCT_ID	0x0620
+
+#define RATOC_VENDOR_ID		0x0584
+#define RATOC_PRODUCT_ID	0xb000

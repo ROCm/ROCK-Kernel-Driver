@@ -115,7 +115,7 @@ static int usb_get_port_status(struct usb_device *dev, int port, void *data)
 }
 
 /* completion function, fires on port status changes and various faults */
-static void hub_irq(struct urb *urb)
+static void hub_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_hub *hub = (struct usb_hub *)urb->context;
 	unsigned long flags;

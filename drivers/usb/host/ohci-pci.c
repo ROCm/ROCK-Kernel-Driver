@@ -271,7 +271,7 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 			enable_irq (hcd->pdev->irq);
 #endif
 		if (ohci->hcca->done_head)
-			dl_done_list (ohci, dl_reverse_done_list (ohci));
+			dl_done_list (ohci, dl_reverse_done_list (ohci), NULL);
 		writel (OHCI_INTR_WDH, &ohci->regs->intrenable); 
 
 		/* assume there are TDs on the bulk and control lists */

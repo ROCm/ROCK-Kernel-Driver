@@ -72,10 +72,10 @@ struct powermate_device {
 static char pm_name_powermate[] = "Griffin PowerMate";
 static char pm_name_soundknob[] = "Griffin SoundKnob";
 
-static void powermate_config_complete(struct urb *urb); /* forward declararation of callback */
+static void powermate_config_complete(struct urb *urb, struct pt_regs *regs);
 
 /* Callback for data arriving from the PowerMate over the USB interrupt pipe */
-static void powermate_irq(struct urb *urb)
+static void powermate_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct powermate_device *pm = urb->context;
 	int retval;
@@ -182,7 +182,7 @@ static void powermate_sync_state(struct powermate_device *pm)
 }
 
 /* Called when our asynchronous control message completes. We may need to issue another immediately */
-static void powermate_config_complete(struct urb *urb)
+static void powermate_config_complete(struct urb *urb, struct pt_regs *regs)
 {
 	struct powermate_device *pm = urb->context;
 

@@ -104,7 +104,7 @@ struct aiptek_features {
 	int y_max;
 	int pressure_min;
 	int pressure_max;
-	void (*irq) (struct urb * urb);
+	usb_complete_t irq;
 	unsigned long evbit;
 	unsigned long absbit;
 	unsigned long relbit;
@@ -125,7 +125,7 @@ struct aiptek {
 };
 
 static void
-aiptek_irq(struct urb *urb)
+aiptek_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct aiptek *aiptek = urb->context;
 	unsigned char *data = aiptek->data;

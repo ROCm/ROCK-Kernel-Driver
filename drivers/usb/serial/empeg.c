@@ -100,8 +100,8 @@ static int  empeg_ioctl			(struct usb_serial_port *port,
 					unsigned int cmd,
 					unsigned long arg);
 static void empeg_set_termios		(struct usb_serial_port *port, struct termios *old_termios);
-static void empeg_write_bulk_callback	(struct urb *urb);
-static void empeg_read_bulk_callback	(struct urb *urb);
+static void empeg_write_bulk_callback	(struct urb *urb, struct pt_regs *regs);
+static void empeg_read_bulk_callback	(struct urb *urb, struct pt_regs *regs);
 
 static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(EMPEG_VENDOR_ID, EMPEG_PRODUCT_ID) },
@@ -348,7 +348,7 @@ static int empeg_chars_in_buffer (struct usb_serial_port *port)
 }
 
 
-static void empeg_write_bulk_callback (struct urb *urb)
+static void empeg_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 
@@ -366,7 +366,7 @@ static void empeg_write_bulk_callback (struct urb *urb)
 }
 
 
-static void empeg_read_bulk_callback (struct urb *urb)
+static void empeg_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);

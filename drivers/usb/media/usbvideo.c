@@ -1820,7 +1820,7 @@ static int usbvideo_CompressIsochronous(struct uvd *uvd, struct urb *urb)
 	return totlen;
 }
 
-static void usbvideo_IsocIrq(struct urb *urb)
+static void usbvideo_IsocIrq(struct urb *urb, struct pt_regs *regs)
 {
 	int i, ret, len;
 	struct uvd *uvd = urb->context;

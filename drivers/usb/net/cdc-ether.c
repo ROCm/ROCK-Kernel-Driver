@@ -52,7 +52,7 @@ static int multicast_filter_limit = 32767;
 // Callback routines from USB device /////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-static void read_bulk_callback( struct urb *urb )
+static void read_bulk_callback( struct urb *urb, struct pt_regs *regs )
 {
 	ether_dev_t *ether_dev = urb->context;
 	struct net_device *net;
@@ -140,7 +140,7 @@ goon:
 	ether_dev->flags &= ~CDC_ETHER_RX_BUSY;
 }
 
-static void write_bulk_callback( struct urb *urb )
+static void write_bulk_callback( struct urb *urb, struct pt_regs *regs )
 {
 	ether_dev_t *ether_dev = urb->context;
 
