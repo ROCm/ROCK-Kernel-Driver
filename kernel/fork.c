@@ -923,6 +923,22 @@ bad_fork_free:
 	goto fork_out;
 }
 
+static inline int fork_traceflag (unsigned clone_flags)
+{
+	if (clone_flags & (CLONE_UNTRACED | CLONE_IDLETASK))
+		return 0;
+	else if (clone_flags & CLONE_VFORK) {
+		if (current->ptrace & PT_TRACE_VFORK)
+			return PTRACE_EVENT_VFORK;
+	} else if ((clone_flags & CSIGNAL) != SIGCHLD) {
+		if (current->ptrace & PT_TRACE_CLONE)
+			return PTRACE_EVENT_CLONE;
+	} else if (current->ptrace & PT_TRACE_FORK)
+		return PTRACE_EVENT_FORK;
+
+	return 0;
+}
+
 /*
  *  Ok, this is the main fork-routine.
  *
@@ -936,6 +952,13 @@ struct task_struct *do_fork(unsigned long clone_flags,
 			    int *user_tid)
 {
 	struct task_struct *p;
+	int trace = 0;
+
+	if (unlikely(current->ptrace)) {
+		trace = fork_traceflag (clone_flags);
+		if (trace)
+			clone_flags |= CLONE_PTRACE;
+	}
 
 	p = copy_process(clone_flags, stack_start, regs, stack_size, user_tid);
 	if (!IS_ERR(p)) {
@@ -951,6 +974,12 @@ struct task_struct *do_fork(unsigned long clone_flags,
 
 		wake_up_forked_process(p);		/* do this last */
 		++total_forks;
+
+		if (unlikely (trace)) {
+			current->ptrace_message = (unsigned long) p->pid;
+			ptrace_notify ((trace << 8) | SIGTRAP);
+		}
+
 		if (clone_flags & CLONE_VFORK)
 			wait_for_completion(&vfork);
 		else

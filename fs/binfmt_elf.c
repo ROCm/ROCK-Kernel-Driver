@@ -792,8 +792,12 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 #endif
 
 	start_thread(regs, elf_entry, bprm->p);
-	if (current->ptrace & PT_PTRACED)
-		send_sig(SIGTRAP, current, 0);
+	if (unlikely(current->ptrace & PT_PTRACED)) {
+		if (current->ptrace & PT_TRACE_EXEC)
+			ptrace_notify ((PTRACE_EVENT_EXEC << 8) | SIGTRAP);
+		else
+			send_sig(SIGTRAP, current, 0);
+	}
 	retval = 0;
 out:
 	return retval;
