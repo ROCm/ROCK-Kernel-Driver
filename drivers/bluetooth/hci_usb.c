@@ -113,12 +113,15 @@ static struct usb_device_id blacklist_ids[] = {
 	/* ISSC Bluetooth Adapter v3.1 */
 	{ USB_DEVICE(0x1131, 0x1001), .driver_info = HCI_RESET },
 
+	/* RTX Telecom based adapter with buggy SCO support */
+	{ USB_DEVICE(0x0400, 0x0807), .driver_info = HCI_BROKEN_ISOC },
+
 	/* Digianswer devices */
 	{ USB_DEVICE(0x08fd, 0x0001), .driver_info = HCI_DIGIANSWER },
 	{ USB_DEVICE(0x08fd, 0x0002), .driver_info = HCI_IGNORE },
 
-	/* RTX Telecom based adapter with buggy SCO support */
-	{ USB_DEVICE(0x0400, 0x0807), .driver_info = HCI_BROKEN_ISOC },
+	/* CSR BlueCore Bluetooth Sniffer */
+	{ USB_DEVICE(0x0a12, 0x0002), .driver_info = HCI_SNIFFER },
 
 	{ }	/* Terminating entry */
 };
@@ -968,6 +971,11 @@ static int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id 
 
 	if (reset || id->driver_info & HCI_RESET)
 		set_bit(HCI_QUIRK_RESET_ON_INIT, &hdev->quirks);
+
+	if (id->driver_info & HCI_SNIFFER) {
+		if (le16_to_cpu(udev->descriptor.bcdDevice) > 0x997)
+			set_bit(HCI_QUIRK_RAW_DEVICE, &hdev->quirks);
+	}
 
 	if (hci_register_dev(hdev) < 0) {
 		BT_ERR("Can't register HCI device");

@@ -179,6 +179,9 @@ static inline int hci_sock_bound_ioctl(struct sock *sk, unsigned int cmd, unsign
 		if (!capable(CAP_NET_ADMIN))
 			return -EACCES;
 
+		if (test_bit(HCI_QUIRK_RAW_DEVICE, &hdev->quirks))
+			return -EPERM;
+
 		if (arg)
 			set_bit(HCI_RAW, &hdev->flags);
 		else
