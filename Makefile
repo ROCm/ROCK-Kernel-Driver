@@ -372,7 +372,7 @@ MRPROPER_DIRS += \
 
 
 clean:	archclean
-	find . \( -name '*.[oas]' -o -name core -o -name '.*.flags' \) -type f -print \
+	find . \( -name '*.[oas]' -o -name core -o -name '.*.cmd' \) -type f -print \
 		| grep -v lxdialog/ | xargs rm -f
 	rm -f $(CLEAN_FILES)
 	rm -rf $(CLEAN_DIRS)
