@@ -187,7 +187,8 @@
 #define CS8427_VER8427A		0x71
 
 int snd_cs8427_detect(snd_i2c_bus_t *bus, unsigned char addr);
-int snd_cs8427_create(snd_i2c_bus_t *bus, unsigned char addr, snd_i2c_device_t **r_cs8427);
+int snd_cs8427_create(snd_i2c_bus_t *bus, unsigned char addr,
+		      unsigned int reset_timeout, snd_i2c_device_t **r_cs8427);
 void snd_cs8427_reset(snd_i2c_device_t *cs8427);
 int snd_cs8427_reg_write(snd_i2c_device_t *device, unsigned char reg, unsigned char val);
 int snd_cs8427_reg_read(snd_i2c_device_t *device, unsigned char reg);
