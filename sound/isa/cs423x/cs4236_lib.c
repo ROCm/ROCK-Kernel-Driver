@@ -143,19 +143,19 @@ static unsigned char snd_cs4236_ctrl_in(cs4231_t *chip, unsigned char reg)
 #define CLOCKS 8
 
 static ratnum_t clocks[CLOCKS] = {
-	{ num: 16934400, den_min: 353, den_max: 353, den_step: 1 },
-	{ num: 16934400, den_min: 529, den_max: 529, den_step: 1 },
-	{ num: 16934400, den_min: 617, den_max: 617, den_step: 1 },
-	{ num: 16934400, den_min: 1058, den_max: 1058, den_step: 1 },
-	{ num: 16934400, den_min: 1764, den_max: 1764, den_step: 1 },
-	{ num: 16934400, den_min: 2117, den_max: 2117, den_step: 1 },
-	{ num: 16934400, den_min: 2558, den_max: 2558, den_step: 1 },
-	{ num: 16934400/16, den_min: 21, den_max: 192, den_step: 1 }
+	{ .num = 16934400, .den_min = 353, .den_max = 353, .den_step = 1 },
+	{ .num = 16934400, .den_min = 529, .den_max = 529, .den_step = 1 },
+	{ .num = 16934400, .den_min = 617, .den_max = 617, .den_step = 1 },
+	{ .num = 16934400, .den_min = 1058, .den_max = 1058, .den_step = 1 },
+	{ .num = 16934400, .den_min = 1764, .den_max = 1764, .den_step = 1 },
+	{ .num = 16934400, .den_min = 2117, .den_max = 2117, .den_step = 1 },
+	{ .num = 16934400, .den_min = 2558, .den_max = 2558, .den_step = 1 },
+	{ .num = 16934400/16, .den_min = 21, .den_max = 192, .den_step = 1 }
 };
 
 static snd_pcm_hw_constraint_ratnums_t hw_constraints_clocks = {
-	nrats: CLOCKS,
-	rats: clocks,
+	.nrats = CLOCKS,
+	.rats = clocks,
 };
 
 static int snd_cs4236_xrate(snd_pcm_runtime_t *runtime)
@@ -366,9 +366,9 @@ int snd_cs4236_pcm(cs4231_t *chip, int device, snd_pcm_t **rpcm)
  */
 
 #define CS4236_SINGLE(xname, xindex, reg, shift, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_cs4236_info_single, \
-  get: snd_cs4236_get_single, put: snd_cs4236_put_single, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
+  .info = snd_cs4236_info_single, \
+  .get = snd_cs4236_get_single, put: snd_cs4236_put_single, \
   private_value: reg | (shift << 8) | (mask << 16) | (invert << 24) }
 
 static int snd_cs4236_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -423,9 +423,9 @@ static int snd_cs4236_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 }
 
 #define CS4236_SINGLEC(xname, xindex, reg, shift, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_cs4236_info_single, \
-  get: snd_cs4236_get_singlec, put: snd_cs4236_put_singlec, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
+  .info = snd_cs4236_info_single, \
+  .get = snd_cs4236_get_singlec, put: snd_cs4236_put_singlec, \
   private_value: reg | (shift << 8) | (mask << 16) | (invert << 24) }
 
 static int snd_cs4236_get_singlec(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
@@ -469,9 +469,9 @@ static int snd_cs4236_put_singlec(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 }
 
 #define CS4236_DOUBLE(xname, xindex, left_reg, right_reg, shift_left, shift_right, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_cs4236_info_double, \
-  get: snd_cs4236_get_double, put: snd_cs4236_put_double, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
+  .info = snd_cs4236_info_double, \
+  .get = snd_cs4236_get_double, put: snd_cs4236_put_double, \
   private_value: left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
 
 static int snd_cs4236_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -545,9 +545,9 @@ static int snd_cs4236_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 }
 
 #define CS4236_DOUBLE1(xname, xindex, left_reg, right_reg, shift_left, shift_right, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_cs4236_info_double, \
-  get: snd_cs4236_get_double1, put: snd_cs4236_put_double1, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
+  .info = snd_cs4236_info_double, \
+  .get = snd_cs4236_get_double1, put: snd_cs4236_put_double1, \
   private_value: left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
 
 static int snd_cs4236_get_double1(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
@@ -604,9 +604,9 @@ static int snd_cs4236_put_double1(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 }
 
 #define CS4236_MASTER_DIGITAL(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_cs4236_info_double, \
-  get: snd_cs4236_get_master_digital, put: snd_cs4236_put_master_digital, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
+  .info = snd_cs4236_info_double, \
+  .get = snd_cs4236_get_master_digital, put: snd_cs4236_put_master_digital, \
   private_value: 71 << 24 }
 
 static inline int snd_cs4236_mixer_master_digital_invert_volume(int vol)
@@ -646,9 +646,9 @@ static int snd_cs4236_put_master_digital(snd_kcontrol_t * kcontrol, snd_ctl_elem
 }
 
 #define CS4235_OUTPUT_ACCU(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_cs4236_info_double, \
-  get: snd_cs4235_get_output_accu, put: snd_cs4235_put_output_accu, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
+  .info = snd_cs4236_info_double, \
+  .get = snd_cs4235_get_output_accu, put: snd_cs4235_put_output_accu, \
   private_value: 3 << 24 }
 
 static inline int snd_cs4235_mixer_output_accu_get_volume(int vol)
@@ -807,9 +807,9 @@ CS4231_DOUBLE("Analog Loopback Switch", 0, CS4231_LEFT_INPUT, CS4231_RIGHT_INPUT
 };
 
 #define CS4236_IEC958_ENABLE(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_cs4236_info_single, \
-  get: snd_cs4236_get_iec958_switch, put: snd_cs4236_put_iec958_switch, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
+  .info = snd_cs4236_info_single, \
+  .get = snd_cs4236_get_iec958_switch, put: snd_cs4236_put_iec958_switch, \
   private_value: 1 << 16 }
 
 static int snd_cs4236_get_iec958_switch(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)

@@ -259,6 +259,7 @@ struct _snd_intel8x0 {
 	int multi4: 1,
 	    multi6: 1;
 	int in_ac97_init: 1;
+	int no_codec_check: 1;
 
 	ac97_t *ac97;
 	ac97_t *ac97sec;
@@ -308,8 +309,10 @@ static int snd_intel8x0_codec_semaphore(intel8x0_t *chip, unsigned int codec)
 	int time;
 
 	/* codec ready ? */
-	if ((inl(ICHREG(chip, GLOB_STA)) & (codec ? ICH_SCR : ICH_PCR)) == 0)
-		return -EIO;
+	if (! chip->no_codec_check) {
+		if ((inl(ICHREG(chip, GLOB_STA)) & (codec ? ICH_SCR : ICH_PCR)) == 0)
+			return -EIO;
+	}
 
 	/* Anyone holding a semaphore for 1 msec should be shot... */
 	time = 100;
@@ -1005,6 +1008,18 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
  *
  */
 
+static void do_delay(intel8x0_t *chip)
+{
+#ifdef CONFIG_PM
+	if (chip->in_suspend) {
+		mdelay((1000 + HZ - 1) / HZ);
+		return;
+	}
+#endif
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(1);
+}
+
 static int snd_intel8x0_chip_init(intel8x0_t *chip)
 {
 	signed long end_time;
@@ -1025,14 +1040,7 @@ static int snd_intel8x0_chip_init(intel8x0_t *chip)
 	do {
 		if ((inl(ICHREG(chip, GLOB_CNT)) & ICH_AC97WARM) == 0)
 			goto __ok;
-#ifdef CONFIG_PM
-		if (chip->in_suspend) {
-			mdelay(10);
-			continue;
-		}
-#endif
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1);
+		do_delay(chip);
 	} while (end_time - (signed long)jiffies >= 0);
 	snd_printk("AC'97 warm reset still in progress? [0x%x]\n", inl(ICHREG(chip, GLOB_CNT)));
 	return -EIO;
@@ -1042,20 +1050,26 @@ static int snd_intel8x0_chip_init(intel8x0_t *chip)
 	 * Once it becomes ready it should remain ready
 	 * as long as we do not disable the ac97 link.
  	 */
+	end_time = jiffies + HZ / 10;
+	do {
+		if (inl(ICHREG(chip, GLOB_STA)) & ICH_PCR)
+			goto __ok1;
+		do_delay(chip);
+	} while (end_time - (signed long)jiffies >= 0);
+	if (chip->pci->device == PCI_DEVICE_ID_INTEL_ICH4) {
+		/* FIXME: ICH4 may have no PCR and SCR bits...  */
+		snd_printd(KERN_INFO "intel8x0: no codec is probed, perhaps PCR and SCR bits are deactivated.\n");
+		chip->no_codec_check = 1;
+		goto __ok2;
+	}
+	/* check a bit longer... */
 	end_time = jiffies + HZ;
 	do {
 		if (inl(ICHREG(chip, GLOB_STA)) & ICH_PCR)
 			goto __ok1;
-#ifdef CONFIG_PM
-		if (chip->in_suspend) {
-			mdelay(10);
-			continue;
-		}
-#endif
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1);
+		do_delay(chip);
 	} while (end_time - (signed long)jiffies >= 0);
-	snd_printk("codec_ready: primary codec is not ready [0x%x]\n", inl(ICHREG(chip, GLOB_STA)));
+	snd_printk(KERN_ERR "codec_ready: primary codec is not ready [0x%x]\n", inl(ICHREG(chip, GLOB_STA)));
 	return -EIO;
 
       __ok1:
@@ -1064,16 +1078,10 @@ static int snd_intel8x0_chip_init(intel8x0_t *chip)
 	do {
 		if (inl(ICHREG(chip, GLOB_STA)) & ICH_SCR)
 			break;
-#ifdef CONFIG_PM
-		if (chip->in_suspend) {
-			mdelay(10);
-			continue;
-		}
-#endif
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1);
+		do_delay(chip);
 	} while (end_time - (signed long)jiffies >= 0);
 
+      __ok2:
 	inw(chip->port);	/* clear semaphore flag */
 
 	/* disable interrupts */

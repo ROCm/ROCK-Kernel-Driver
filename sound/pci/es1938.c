@@ -454,22 +454,22 @@ static void snd_es1938_reset_fifo(es1938_t *chip)
 
 static ratnum_t clocks[2] = {
 	{
-		num: 793800,
-		den_min: 1,
-		den_max: 128,
-		den_step: 1,
+		.num = 793800,
+		.den_min = 1,
+		.den_max = 128,
+		.den_step = 1,
 	},
 	{
-		num: 768000,
-		den_min: 1,
-		den_max: 128,
-		den_step: 1,
+		.num = 768000,
+		.den_min = 1,
+		.den_max = 128,
+		.den_step = 1,
 	}
 };
 
 static snd_pcm_hw_constraint_ratnums_t hw_constraints_clocks = {
-	nrats: 2,
-	rats: clocks,
+	.nrats = 2,
+	.rats = clocks,
 };
 
 
@@ -843,20 +843,20 @@ static int snd_es1938_capture_copy(snd_pcm_substream_t *substream,
  * ----------------------------------------------------------------------*/
 static snd_pcm_hardware_t snd_es1938_capture =
 {
-	info:			(SNDRV_PCM_INFO_INTERLEAVED |
-				 SNDRV_PCM_INFO_BLOCK_TRANSFER),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U16_LE,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		6000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	65536,
-	period_bytes_min:	64,
-	period_bytes_max:	65536,
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		256,
+	.info =			(SNDRV_PCM_INFO_INTERLEAVED |
+				SNDRV_PCM_INFO_BLOCK_TRANSFER),
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U16_LE,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		6000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	65536,
+	.period_bytes_min =	64,
+	.period_bytes_max =	65536,
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		256,
 };
 
 /* -----------------------------------------------------------------------
@@ -864,21 +864,21 @@ static snd_pcm_hardware_t snd_es1938_capture =
  * -----------------------------------------------------------------------*/
 static snd_pcm_hardware_t snd_es1938_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U16_LE,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		6000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	65536,
-	period_bytes_min:	64,
-	period_bytes_max:	65536,
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		256,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U16_LE,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		6000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	65536,
+	.period_bytes_min =	64,
+	.period_bytes_max =	65536,
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		256,
 };
 
 static int snd_es1938_capture_open(snd_pcm_substream_t * substream)
@@ -958,22 +958,22 @@ static int snd_es1938_playback_close(snd_pcm_substream_t * substream)
 }
 
 static snd_pcm_ops_t snd_es1938_playback_ops = {
-	open:		snd_es1938_playback_open,
-	close:		snd_es1938_playback_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	prepare:	snd_es1938_playback_prepare,
-	trigger:	snd_es1938_playback_trigger,
-	pointer:	snd_es1938_playback_pointer,
+	.open =		snd_es1938_playback_open,
+	.close =	snd_es1938_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.prepare =	snd_es1938_playback_prepare,
+	.trigger =	snd_es1938_playback_trigger,
+	.pointer =	snd_es1938_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_es1938_capture_ops = {
-	open:		snd_es1938_capture_open,
-	close:		snd_es1938_capture_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	prepare:	snd_es1938_capture_prepare,
-	trigger:	snd_es1938_capture_trigger,
-	pointer:	snd_es1938_capture_pointer,
-	copy:		snd_es1938_capture_copy,
+	.open =		snd_es1938_capture_open,
+	.close =	snd_es1938_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.prepare =	snd_es1938_capture_prepare,
+	.trigger =	snd_es1938_capture_trigger,
+	.pointer =	snd_es1938_capture_pointer,
+	.copy =		snd_es1938_capture_copy,
 };
 
 static void snd_es1938_free_pcm(snd_pcm_t *pcm)
@@ -1136,10 +1136,10 @@ static int snd_es1938_reg_read(es1938_t *chip, unsigned char reg)
 }
 
 #define ES1938_SINGLE(xname, xindex, reg, shift, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_es1938_info_single, \
-  get: snd_es1938_get_single, put: snd_es1938_put_single, \
-  private_value: reg | (shift << 8) | (mask << 16) | (invert << 24) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_es1938_info_single, \
+  .get = snd_es1938_get_single, .put = snd_es1938_put_single, \
+  .private_value = reg | (shift << 8) | (mask << 16) | (invert << 24) }
 
 static int snd_es1938_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -1186,10 +1186,10 @@ static int snd_es1938_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 }
 
 #define ES1938_DOUBLE(xname, xindex, left_reg, right_reg, shift_left, shift_right, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_es1938_info_double, \
-  get: snd_es1938_get_double, put: snd_es1938_put_double, \
-  private_value: left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_es1938_info_double, \
+  .get = snd_es1938_get_double, .put = snd_es1938_put_double, \
+  .private_value = left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
 
 static int snd_es1938_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -1266,18 +1266,18 @@ static snd_kcontrol_new_t snd_es1938_controls[] = {
 ES1938_DOUBLE("Master Playback Volume", 0, 0x60, 0x62, 0, 0, 63, 0),
 ES1938_DOUBLE("Master Playback Switch", 0, 0x60, 0x62, 6, 6, 1, 1),
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Hardware Master Playback Volume",
-	access: SNDRV_CTL_ELEM_ACCESS_READ,
-	info: snd_es1938_info_hw_volume,
-	get: snd_es1938_get_hw_volume,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Hardware Master Playback Volume",
+	.access = SNDRV_CTL_ELEM_ACCESS_READ,
+	.info = snd_es1938_info_hw_volume,
+	.get = snd_es1938_get_hw_volume,
 },
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Hardware Master Playback Switch",
-	access: SNDRV_CTL_ELEM_ACCESS_READ,
-	info: snd_es1938_info_hw_switch,
-	get: snd_es1938_get_hw_switch,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Hardware Master Playback Switch",
+	.access = SNDRV_CTL_ELEM_ACCESS_READ,
+	.info = snd_es1938_info_hw_switch,
+	.get = snd_es1938_get_hw_switch,
 },
 ES1938_SINGLE("Hardware Volume Split", 0, 0x64, 7, 1, 0),
 ES1938_DOUBLE("Line Playback Volume", 0, 0x3e, 0x3e, 4, 0, 15, 0),
@@ -1291,11 +1291,11 @@ ES1938_SINGLE("PC Speaker Volume", 0, 0x3c, 0, 7, 0),
 ES1938_SINGLE("Record Monitor", 0, 0xa8, 3, 1, 0),
 ES1938_SINGLE("Capture Switch", 0, 0x1c, 4, 1, 1),
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Capture Source",
-	info: snd_es1938_info_mux,
-	get: snd_es1938_get_mux,
-	put: snd_es1938_put_mux,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Capture Source",
+	.info = snd_es1938_info_mux,
+	.get = snd_es1938_get_mux,
+	.put = snd_es1938_put_mux,
 },
 ES1938_DOUBLE("Mono Input Playback Volume", 0, 0x6d, 0x6d, 4, 0, 15, 0),
 ES1938_DOUBLE("PCM Capture Volume", 0, 0x69, 0x69, 4, 0, 15, 0),
@@ -1309,11 +1309,11 @@ ES1938_DOUBLE("PCM Playback Volume", 0, 0x7c, 0x7c, 4, 0, 15, 0),
 ES1938_DOUBLE("PCM Playback Volume", 1, 0x14, 0x14, 4, 0, 15, 0),
 ES1938_SINGLE("3D Control - Level", 0, 0x52, 0, 63, 0),
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "3D Control - Switch",
-	info: snd_es1938_info_spatializer_enable,
-	get: snd_es1938_get_spatializer_enable,
-	put: snd_es1938_put_spatializer_enable,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "3D Control - Switch",
+	.info = snd_es1938_info_spatializer_enable,
+	.get = snd_es1938_get_spatializer_enable,
+	.put = snd_es1938_put_spatializer_enable,
 },
 ES1938_SINGLE("Mic Boost (+26dB)", 0, 0x7d, 3, 1, 0)
 };
@@ -1369,7 +1369,7 @@ static int __init snd_es1938_create(snd_card_t * card,
 	es1938_t *chip;
 	int err;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_es1938_dev_free,
+		.dev_free =	snd_es1938_dev_free,
 	};
 
 	*rchip = NULL;
@@ -1670,10 +1670,10 @@ static void __devexit snd_es1938_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	name: "ESS ES1938 (Solo-1)",
-	id_table: snd_es1938_ids,
-	probe: snd_es1938_probe,
-	remove: __devexit_p(snd_es1938_remove),
+	.name = "ESS ES1938 (Solo-1)",
+	.id_table = snd_es1938_ids,
+	.probe = snd_es1938_probe,
+	.remove = __devexit_p(snd_es1938_remove),
 };
 
 static int __init alsa_card_es1938_init(void)

@@ -864,15 +864,19 @@ static int __devinit snd_via686a_chip_init(via686a_t *chip)
 	pci_write_config_byte(chip->pci, 0x42, 0);
 #endif
 
-	/* deassert ACLink reset, force SYNC */
-	pci_write_config_byte(chip->pci, 0x41, 0xe0);
-	udelay(100);
-	pci_write_config_byte(chip->pci, 0x41, 0x00);
-	udelay(100);
-	/* ACLink on, deassert ACLink reset, VSR, SGD data out */
-	/* note - FM data out has trouble with non VRA codecs !! */
-	pci_write_config_byte(chip->pci, 0x41, 0xcc);
-	udelay(100);
+	/* cold reset only when link is down */
+	pci_read_config_byte(chip->pci, 0x40, &pval);
+	if ((pval & 0x01) == 0) {
+		/* deassert ACLink reset, force SYNC */
+		pci_write_config_byte(chip->pci, 0x41, 0xe0);
+		udelay(100);
+		pci_write_config_byte(chip->pci, 0x41, 0x00);
+		udelay(100);
+		/* ACLink on, deassert ACLink reset, VSR, SGD data out */
+		/* note - FM data out has trouble with non VRA codecs !! */
+		pci_write_config_byte(chip->pci, 0x41, 0xcc);
+		udelay(100);
+	}
 
 	/* wait until codec ready */
 	max_count = ((3 * HZ) / 4) + 1;

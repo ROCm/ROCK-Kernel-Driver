@@ -531,14 +531,14 @@ static int snd_cmipci_hw_free(snd_pcm_substream_t * substream)
 
 static unsigned int hw_channels[] = {1, 2, 4, 5, 6};
 static snd_pcm_hw_constraint_list_t hw_constraints_channels_4 = {
-	count: 3,
-	list: hw_channels,
-	mask: 0,
+	.count = 3,
+	.list = hw_channels,
+	.mask = 0,
 };
 static snd_pcm_hw_constraint_list_t hw_constraints_channels_6 = {
-	count: 5,
-	list: hw_channels,
-	mask: 0,
+	.count = 5,
+	.list = hw_channels,
+	.mask = 0,
 };
 
 static int set_dac_channels(cmipci_t *cm, cmipci_pcm_t *rec, int channels)
@@ -943,11 +943,11 @@ static int snd_cmipci_spdif_default_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_cmipci_spdif_default __devinitdata =
 {
-	iface:		SNDRV_CTL_ELEM_IFACE_PCM,
-	name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
-	info:		snd_cmipci_spdif_default_info,
-	get:		snd_cmipci_spdif_default_get,
-	put:		snd_cmipci_spdif_default_put
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
+	.info =		snd_cmipci_spdif_default_info,
+	.get =		snd_cmipci_spdif_default_get,
+	.put =		snd_cmipci_spdif_default_put
 };
 
 static int snd_cmipci_spdif_mask_info(snd_kcontrol_t *kcontrol,
@@ -970,11 +970,11 @@ static int snd_cmipci_spdif_mask_get(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_cmipci_spdif_mask __devinitdata =
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READ,
-	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),
-	info:		snd_cmipci_spdif_mask_info,
-	get:		snd_cmipci_spdif_mask_get,
+	.access =	SNDRV_CTL_ELEM_ACCESS_READ,
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),
+	.info =		snd_cmipci_spdif_mask_info,
+	.get =		snd_cmipci_spdif_mask_get,
 };
 
 static int snd_cmipci_spdif_stream_info(snd_kcontrol_t *kcontrol,
@@ -1019,12 +1019,12 @@ static int snd_cmipci_spdif_stream_put(snd_kcontrol_t *kcontrol,
 
 static snd_kcontrol_new_t snd_cmipci_spdif_stream __devinitdata =
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-	iface:		SNDRV_CTL_ELEM_IFACE_PCM,
-	name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
-	info:		snd_cmipci_spdif_stream_info,
-	get:		snd_cmipci_spdif_stream_get,
-	put:		snd_cmipci_spdif_stream_put
+	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
+	.info =		snd_cmipci_spdif_stream_info,
+	.get =		snd_cmipci_spdif_stream_get,
+	.put =		snd_cmipci_spdif_stream_put
 };
 
 /*
@@ -1284,100 +1284,100 @@ static void snd_cmipci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 /* playback on channel A */
 static snd_pcm_hardware_t snd_cmipci_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_5512 | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		5512,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		2,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_5512 | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		5512,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		2,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 /* capture on channel B */
 static snd_pcm_hardware_t snd_cmipci_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_5512 | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		5512,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		2,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_5512 | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		5512,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		2,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 /* playback on channel B - stereo 16bit only? */
 static snd_pcm_hardware_t snd_cmipci_playback2 =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_5512 | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		5512,
-	rate_max:		48000,
-	channels_min:		2,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		2,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_5512 | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		5512,
+	.rate_max =		48000,
+	.channels_min =		2,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		2,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 /* spdif playback on channel A */
 static snd_pcm_hardware_t snd_cmipci_playback_spdif =
 {
-	info:			(SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER),
-	formats:		SNDRV_PCM_FMTBIT_S16_LE /*| SNDRV_PCM_FMTBIT_S32_LE*/,
-	rates:			SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000,
-	rate_min:		44100,
-	rate_max:		48000,
-	channels_min:		2,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		2,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_S16_LE /*| SNDRV_PCM_FMTBIT_S32_LE*/,
+	.rates =		SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000,
+	.rate_min =		44100,
+	.rate_max =		48000,
+	.channels_min =		2,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		2,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 /* spdif capture on channel B */
 static snd_pcm_hardware_t snd_cmipci_capture_spdif =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:	        SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000,
-	rate_min:		44100,
-	rate_max:		48000,
-	channels_min:		2,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		2,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =	        SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000,
+	.rate_min =		44100,
+	.rate_max =		48000,
+	.channels_min =		2,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		2,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 /*
@@ -1556,62 +1556,62 @@ static int snd_cmipci_capture_spdif_close(snd_pcm_substream_t * substream)
  */
 
 static snd_pcm_ops_t snd_cmipci_playback_ops = {
-	open:		snd_cmipci_playback_open,
-	close:		snd_cmipci_playback_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_cmipci_hw_params,
-	hw_free:	snd_cmipci_playback_hw_free,
-	prepare:	snd_cmipci_playback_prepare,
-	trigger:	snd_cmipci_playback_trigger,
-	pointer:	snd_cmipci_playback_pointer,
+	.open =		snd_cmipci_playback_open,
+	.close =	snd_cmipci_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_cmipci_hw_params,
+	.hw_free =	snd_cmipci_playback_hw_free,
+	.prepare =	snd_cmipci_playback_prepare,
+	.trigger =	snd_cmipci_playback_trigger,
+	.pointer =	snd_cmipci_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_cmipci_capture_ops = {
-	open:		snd_cmipci_capture_open,
-	close:		snd_cmipci_capture_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_cmipci_hw_params,
-	hw_free:	snd_cmipci_hw_free,
-	prepare:	snd_cmipci_capture_prepare,
-	trigger:	snd_cmipci_capture_trigger,
-	pointer:	snd_cmipci_capture_pointer,
+	.open =		snd_cmipci_capture_open,
+	.close =	snd_cmipci_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_cmipci_hw_params,
+	.hw_free =	snd_cmipci_hw_free,
+	.prepare =	snd_cmipci_capture_prepare,
+	.trigger =	snd_cmipci_capture_trigger,
+	.pointer =	snd_cmipci_capture_pointer,
 };
 
 static snd_pcm_ops_t snd_cmipci_playback2_ops = {
-	open:		snd_cmipci_playback2_open,
-	close:		snd_cmipci_playback2_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_cmipci_hw_params,
-	hw_free:	snd_cmipci_hw_free,
-	prepare:	snd_cmipci_capture_prepare,	/* channel B */
-	trigger:	snd_cmipci_capture_trigger,	/* channel B */
-	pointer:	snd_cmipci_capture_pointer,	/* channel B */
+	.open =		snd_cmipci_playback2_open,
+	.close =	snd_cmipci_playback2_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_cmipci_hw_params,
+	.hw_free =	snd_cmipci_hw_free,
+	.prepare =	snd_cmipci_capture_prepare,	/* channel B */
+	.trigger =	snd_cmipci_capture_trigger,	/* channel B */
+	.pointer =	snd_cmipci_capture_pointer,	/* channel B */
 };
 
 static snd_pcm_ops_t snd_cmipci_playback_spdif_ops = {
-	open:		snd_cmipci_playback_spdif_open,
-	close:		snd_cmipci_playback_spdif_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_cmipci_hw_params,
-	hw_free:	snd_cmipci_playback_hw_free,
-	prepare:	snd_cmipci_playback_spdif_prepare,	/* set up rate */
-	trigger:	snd_cmipci_playback_trigger,
-	pointer:	snd_cmipci_playback_pointer,
+	.open =		snd_cmipci_playback_spdif_open,
+	.close =	snd_cmipci_playback_spdif_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_cmipci_hw_params,
+	.hw_free =	snd_cmipci_playback_hw_free,
+	.prepare =	snd_cmipci_playback_spdif_prepare,	/* set up rate */
+	.trigger =	snd_cmipci_playback_trigger,
+	.pointer =	snd_cmipci_playback_pointer,
 #ifdef DO_SOFT_AC3
-	copy:		snd_cmipci_ac3_copy,
-	silence:	snd_cmipci_ac3_silence,
+	.copy =		snd_cmipci_ac3_copy,
+	.silence =	snd_cmipci_ac3_silence,
 #endif
 };
 
 static snd_pcm_ops_t snd_cmipci_capture_spdif_ops = {
-	open:		snd_cmipci_capture_spdif_open,
-	close:		snd_cmipci_capture_spdif_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_cmipci_hw_params,
-	hw_free:	snd_cmipci_capture_spdif_hw_free,
-	prepare:	snd_cmipci_capture_spdif_prepare,
-	trigger:	snd_cmipci_capture_trigger,
-	pointer:	snd_cmipci_capture_pointer,
+	.open =		snd_cmipci_capture_spdif_open,
+	.close =	snd_cmipci_capture_spdif_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_cmipci_hw_params,
+	.hw_free =	snd_cmipci_capture_spdif_hw_free,
+	.prepare =	snd_cmipci_capture_spdif_prepare,
+	.trigger =	snd_cmipci_capture_trigger,
+	.pointer =	snd_cmipci_capture_pointer,
 };
 
 
@@ -1730,10 +1730,10 @@ typedef struct cmipci_sb_reg {
  ((lreg) | ((rreg) << 8) | (lshift << 16) | (rshift << 19) | (mask << 24) | (invert << 22) | (stereo << 23))
 
 #define CMIPCI_DOUBLE(xname, left_reg, right_reg, left_shift, right_shift, mask, invert, stereo) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, \
-  info: snd_cmipci_info_volume, \
-  get: snd_cmipci_get_volume, put: snd_cmipci_put_volume, \
-  private_value: COMPOSE_SB_REG(left_reg, right_reg, left_shift, right_shift, mask, invert, stereo), \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
+  .info = snd_cmipci_info_volume, \
+  .get = snd_cmipci_get_volume, .put = snd_cmipci_put_volume, \
+  .private_value = COMPOSE_SB_REG(left_reg, right_reg, left_shift, right_shift, mask, invert, stereo), \
 }
 
 #define CMIPCI_SB_VOL_STEREO(xname,reg,shift,mask) CMIPCI_DOUBLE(xname, reg, reg+1, shift, shift, mask, 0, 1)
@@ -1830,10 +1830,10 @@ static int snd_cmipci_put_volume(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
  * input route (left,right) -> (left,right)
  */
 #define CMIPCI_SB_INPUT_SW(xname, left_shift, right_shift) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, \
-  info: snd_cmipci_info_input_sw, \
-  get: snd_cmipci_get_input_sw, put: snd_cmipci_put_input_sw, \
-  private_value: COMPOSE_SB_REG(SB_DSP4_INPUT_LEFT, SB_DSP4_INPUT_RIGHT, left_shift, right_shift, 1, 0, 1), \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
+  .info = snd_cmipci_info_input_sw, \
+  .get = snd_cmipci_get_input_sw, .put = snd_cmipci_put_input_sw, \
+  .private_value = COMPOSE_SB_REG(SB_DSP4_INPUT_LEFT, SB_DSP4_INPUT_RIGHT, left_shift, right_shift, 1, 0, 1), \
 }
 
 static int snd_cmipci_info_input_sw(snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -1894,31 +1894,31 @@ static int snd_cmipci_put_input_sw(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
  */
 
 #define CMIPCI_MIXER_SW_STEREO(xname, reg, lshift, rshift, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, \
-  info: snd_cmipci_info_native_mixer, \
-  get: snd_cmipci_get_native_mixer, put: snd_cmipci_put_native_mixer, \
-  private_value: COMPOSE_SB_REG(reg, reg, lshift, rshift, 1, invert, 1), \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
+  .info = snd_cmipci_info_native_mixer, \
+  .get = snd_cmipci_get_native_mixer, .put = snd_cmipci_put_native_mixer, \
+  .private_value = COMPOSE_SB_REG(reg, reg, lshift, rshift, 1, invert, 1), \
 }
 
 #define CMIPCI_MIXER_SW_MONO(xname, reg, shift, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, \
-  info: snd_cmipci_info_native_mixer, \
-  get: snd_cmipci_get_native_mixer, put: snd_cmipci_put_native_mixer, \
-  private_value: COMPOSE_SB_REG(reg, reg, shift, shift, 1, invert, 0), \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
+  .info = snd_cmipci_info_native_mixer, \
+  .get = snd_cmipci_get_native_mixer, .put = snd_cmipci_put_native_mixer, \
+  .private_value = COMPOSE_SB_REG(reg, reg, shift, shift, 1, invert, 0), \
 }
 
 #define CMIPCI_MIXER_VOL_STEREO(xname, reg, lshift, rshift, mask) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, \
-  info: snd_cmipci_info_native_mixer, \
-  get: snd_cmipci_get_native_mixer, put: snd_cmipci_put_native_mixer, \
-  private_value: COMPOSE_SB_REG(reg, reg, lshift, rshift, mask, 0, 1), \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
+  .info = snd_cmipci_info_native_mixer, \
+  .get = snd_cmipci_get_native_mixer, .put = snd_cmipci_put_native_mixer, \
+  .private_value = COMPOSE_SB_REG(reg, reg, lshift, rshift, mask, 0, 1), \
 }
 
 #define CMIPCI_MIXER_VOL_MONO(xname, reg, shift, mask) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, \
-  info: snd_cmipci_info_native_mixer, \
-  get: snd_cmipci_get_native_mixer, put: snd_cmipci_put_native_mixer, \
-  private_value: COMPOSE_SB_REG(reg, reg, shift, shift, mask, 0, 0), \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
+  .info = snd_cmipci_info_native_mixer, \
+  .get = snd_cmipci_get_native_mixer, .put = snd_cmipci_put_native_mixer, \
+  .private_value = COMPOSE_SB_REG(reg, reg, shift, shift, mask, 0, 0), \
 }
 
 static int snd_cmipci_info_native_mixer(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
@@ -2013,12 +2013,12 @@ static snd_kcontrol_new_t snd_cmipci_mixers[] __devinitdata = {
 	CMIPCI_SB_VOL_STEREO("PCM Playback Volume", SB_DSP4_PCM_DEV, 3, 31),
 	//CMIPCI_MIXER_SW_MONO("PCM Playback Switch", CM_REG_MIXER1, CM_WSMUTE_SHIFT, 1),
 	{ /* switch with sensitivity */
-		iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-		name: "PCM Playback Switch",
-		info: snd_cmipci_info_native_mixer,
-		get: snd_cmipci_get_native_mixer_sensitive,
-		put: snd_cmipci_put_native_mixer_sensitive,
-		private_value: COMPOSE_SB_REG(CM_REG_MIXER1, CM_REG_MIXER1, CM_WSMUTE_SHIFT, CM_WSMUTE_SHIFT, 1, 1, 0),
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "PCM Playback Switch",
+		.info = snd_cmipci_info_native_mixer,
+		.get = snd_cmipci_get_native_mixer_sensitive,
+		.put = snd_cmipci_put_native_mixer_sensitive,
+		.private_value = COMPOSE_SB_REG(CM_REG_MIXER1, CM_REG_MIXER1, CM_WSMUTE_SHIFT, CM_WSMUTE_SHIFT, 1, 1, 0),
 	},
 	CMIPCI_MIXER_SW_STEREO("PCM Capture Switch", CM_REG_MIXER1, CM_WAVEINL_SHIFT, CM_WAVEINR_SHIFT, 0),
 	CMIPCI_SB_VOL_STEREO("Synth Playback Volume", SB_DSP4_SYNTH_DEV, 3, 31),
@@ -2132,11 +2132,11 @@ static int snd_cmipci_uswitch_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 
 #define DEFINE_SWITCH_ARG(sname, xreg, xmask, xmask_on, xis_byte, xac3) \
 static snd_cmipci_switch_args_t cmipci_switch_arg_##sname = { \
-  reg: xreg, \
-  mask: xmask, \
-  mask_on: xmask_on, \
-  is_byte: xis_byte, \
-  ac3_sensitive: xac3, \
+  .reg = xreg, \
+  .mask = xmask, \
+  .mask_on = xmask_on, \
+  .is_byte = xis_byte, \
+  .ac3_sensitive = xac3, \
 }
 	
 #define DEFINE_BIT_SWITCH_ARG(sname, xreg, xmask, xis_byte, xac3) \
@@ -2172,12 +2172,12 @@ DEFINE_BIT_SWITCH_ARG(joystick, CM_REG_FUNCTRL1, CM_JYSTK_EN, 0, 0);
 DEFINE_SWITCH_ARG(modem, CM_REG_MISC_CTRL, CM_FLINKON|CM_FLINKOFF, CM_FLINKON, 0, 0);
 
 #define DEFINE_SWITCH(sname, stype, sarg) \
-{ name: sname, \
-  iface: stype, \
-  info: snd_cmipci_uswitch_info, \
-  get: snd_cmipci_uswitch_get, \
-  put: snd_cmipci_uswitch_put, \
-  private_value: (unsigned long)&cmipci_switch_arg_##sarg,\
+{ .name = sname, \
+  .iface = stype, \
+  .info = snd_cmipci_uswitch_info, \
+  .get = snd_cmipci_uswitch_get, \
+  .put = snd_cmipci_uswitch_put, \
+  .private_value = (unsigned long)&cmipci_switch_arg_##sarg,\
 }
 
 #define DEFINE_CARD_SWITCH(sname, sarg) DEFINE_SWITCH(sname, SNDRV_CTL_ELEM_IFACE_CARD, sarg)
@@ -2232,11 +2232,11 @@ static snd_kcontrol_new_t snd_cmipci_8738_mixer_switches[] __devinitdata = {
 	DEFINE_MIXER_SWITCH("IEC958 Out To DAC", spdo2dac),
 #endif
 	// DEFINE_MIXER_SWITCH("IEC958 Output Switch", spdif_enable),
-	{ name: "IEC958 Output Switch",
-	  iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	  info: snd_cmipci_uswitch_info,
-	  get: snd_cmipci_spdout_enable_get,
-	  put: snd_cmipci_spdout_enable_put,
+	{ .name = "IEC958 Output Switch",
+	  .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .info = snd_cmipci_uswitch_info,
+	  .get = snd_cmipci_spdout_enable_get,
+	  .put = snd_cmipci_spdout_enable_put,
 	},
 	DEFINE_MIXER_SWITCH("IEC958 In Valid", spdi_valid),
 	DEFINE_MIXER_SWITCH("IEC958 Copyright", spdif_copyright),
@@ -2743,10 +2743,10 @@ static void __devexit snd_cmipci_remove(struct pci_dev *pci)
 
 
 static struct pci_driver driver = {
-	name: "C-Media PCI",
-	id_table: snd_cmipci_ids,
-	probe: snd_cmipci_probe,
-	remove: __devexit_p(snd_cmipci_remove),
+	.name = "C-Media PCI",
+	.id_table = snd_cmipci_ids,
+	.probe = snd_cmipci_probe,
+	.remove = __devexit_p(snd_cmipci_remove),
 };
 	
 static int __init alsa_card_cmipci_init(void)

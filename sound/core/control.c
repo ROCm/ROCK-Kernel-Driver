@@ -766,20 +766,20 @@ static int snd_ctl_fasync(int fd, struct file * file, int on)
 static struct file_operations snd_ctl_f_ops =
 {
 #ifndef LINUX_2_2
-	owner:		THIS_MODULE,
+	.owner =	THIS_MODULE,
 #endif
-	read:		snd_ctl_read,
-	open:		snd_ctl_open,
-	release:	snd_ctl_release,
-	poll:		snd_ctl_poll,
-	ioctl:		snd_ctl_ioctl,
-	fasync:		snd_ctl_fasync,
+	.read =		snd_ctl_read,
+	.open =		snd_ctl_open,
+	.release =	snd_ctl_release,
+	.poll =		snd_ctl_poll,
+	.ioctl =	snd_ctl_ioctl,
+	.fasync =	snd_ctl_fasync,
 };
 
 static snd_minor_t snd_ctl_reg =
 {
-	comment:	"ctl",
-	f_ops:		&snd_ctl_f_ops,
+	.comment =	"ctl",
+	.f_ops =	&snd_ctl_f_ops,
 };
 
 int snd_ctl_register(snd_card_t *card)

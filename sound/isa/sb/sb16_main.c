@@ -466,38 +466,38 @@ static snd_pcm_uframes_t snd_sb16_capture_pointer(snd_pcm_substream_t * substrea
 
 static snd_pcm_hardware_t snd_sb16_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		0,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_44100,
-	rate_min:		4000,
-	rate_max:		44100,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		0,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_44100,
+	.rate_min =		4000,
+	.rate_max =		44100,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_sb16_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		0,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_44100,
-	rate_min:		4000,
-	rate_max:		44100,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		0,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_44100,
+	.rate_min =		4000,
+	.rate_max =		44100,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 /*
@@ -724,11 +724,11 @@ static int snd_sb16_dma_control_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_valu
 }
 
 snd_kcontrol_new_t snd_sb16_dma_control = {
-	iface: SNDRV_CTL_ELEM_IFACE_PCM,
-	name: "16-bit DMA Allocation",
-	info: snd_sb16_dma_control_info,
-	get: snd_sb16_dma_control_get,
-	put: snd_sb16_dma_control_put
+	.iface = SNDRV_CTL_ELEM_IFACE_PCM,
+	.name = "16-bit DMA Allocation",
+	.info = snd_sb16_dma_control_info,
+	.get = snd_sb16_dma_control_get,
+	.put = snd_sb16_dma_control_put
 };
 
 /*
@@ -825,25 +825,25 @@ int snd_sb16dsp_configure(sb_t * chip)
 }
 
 static snd_pcm_ops_t snd_sb16_playback_ops = {
-	open:			snd_sb16_playback_open,
-	close:			snd_sb16_playback_close,
-	ioctl:			snd_pcm_lib_ioctl,
-	hw_params:		snd_sb16_hw_params,
-	hw_free:		snd_sb16_hw_free,
-	prepare:		snd_sb16_playback_prepare,
-	trigger:		snd_sb16_playback_trigger,
-	pointer:		snd_sb16_playback_pointer,
+	.open =		snd_sb16_playback_open,
+	.close =	snd_sb16_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_sb16_hw_params,
+	.hw_free =	snd_sb16_hw_free,
+	.prepare =	snd_sb16_playback_prepare,
+	.trigger =	snd_sb16_playback_trigger,
+	.pointer =	snd_sb16_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_sb16_capture_ops = {
-	open:			snd_sb16_capture_open,
-	close:			snd_sb16_capture_close,
-	ioctl:			snd_pcm_lib_ioctl,
-	hw_params:		snd_sb16_hw_params,
-	hw_free:		snd_sb16_hw_free,
-	prepare:		snd_sb16_capture_prepare,
-	trigger:		snd_sb16_capture_trigger,
-	pointer:		snd_sb16_capture_pointer,
+	.open =		snd_sb16_capture_open,
+	.close =	snd_sb16_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_sb16_hw_params,
+	.hw_free =	snd_sb16_hw_free,
+	.prepare =	snd_sb16_capture_prepare,
+	.trigger =	snd_sb16_capture_trigger,
+	.pointer =	snd_sb16_capture_pointer,
 };
 
 static void snd_sb16dsp_pcm_free(snd_pcm_t *pcm)

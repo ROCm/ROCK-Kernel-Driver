@@ -1869,6 +1869,7 @@ static snd_kcontrol_new_t snd_cs46xx_controls[] __devinitdata = {
 #endif
 };
 
+#ifdef CONFIG_SND_CS46XX_NEW_DSP
 /* Only available on the Hercules Game Theater XP soundcard */
 static snd_kcontrol_new_t snd_hercules_controls[] __devinitdata = {
 {
@@ -1879,6 +1880,7 @@ static snd_kcontrol_new_t snd_hercules_controls[] __devinitdata = {
 	put: snd_herc_spdif_select_put,
 },
 };
+#endif
 
 int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 {
@@ -2930,14 +2932,17 @@ static void amp_hercules(cs46xx_t *chip, int change)
 
 static void hercules_mixer_init (cs46xx_t *chip)
 {
+#ifdef CONFIG_SND_CS46XX_NEW_DSP
 	int idx,err;
 	snd_card_t *card = chip->card;
+#endif
 
 	/* set EGPIO to default */
 	hercules_init(chip);
 
 	snd_printdd ("initializing Hercules mixer\n");
 
+#ifdef CONFIG_SND_CS46XX_NEW_DSP
 	for (idx = 0 ; idx < sizeof(snd_hercules_controls) / 
 		     sizeof(snd_hercules_controls[0]) ; idx++) {
 		snd_kcontrol_t *kctl;
@@ -2948,6 +2953,7 @@ static void hercules_mixer_init (cs46xx_t *chip)
 			break;
 		}
 	}
+#endif
 }
 
 #if 0

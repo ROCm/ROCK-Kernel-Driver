@@ -1280,20 +1280,20 @@ static void snd_rawmidi_proc_info_read(snd_info_entry_t *entry,
 static struct file_operations snd_rawmidi_f_ops =
 {
 #ifndef LINUX_2_2
-	owner:		THIS_MODULE,
+	.owner =	THIS_MODULE,
 #endif
-	read:		snd_rawmidi_read,
-	write:		snd_rawmidi_write,
-	open:		snd_rawmidi_open,
-	release:	snd_rawmidi_release,
-	poll:		snd_rawmidi_poll,
-	ioctl:		snd_rawmidi_ioctl,
+	.read =		snd_rawmidi_read,
+	.write =	snd_rawmidi_write,
+	.open =		snd_rawmidi_open,
+	.release =	snd_rawmidi_release,
+	.poll =		snd_rawmidi_poll,
+	.ioctl =	snd_rawmidi_ioctl,
 };
 
 static snd_minor_t snd_rawmidi_reg =
 {
-	comment:	"raw midi",
-	f_ops:		&snd_rawmidi_f_ops,
+	.comment =	"raw midi",
+	.f_ops =	&snd_rawmidi_f_ops,
 };
 
 static int snd_rawmidi_alloc_substreams(snd_rawmidi_t *rmidi,
@@ -1326,9 +1326,9 @@ int snd_rawmidi_new(snd_card_t * card, char *id, int device,
 	snd_rawmidi_t *rmidi;
 	int err;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_rawmidi_dev_free,
-		dev_register:	snd_rawmidi_dev_register,
-		dev_unregister:	snd_rawmidi_dev_unregister
+		.dev_free = snd_rawmidi_dev_free,
+		.dev_register = snd_rawmidi_dev_register,
+		.dev_unregister = snd_rawmidi_dev_unregister
 	};
 
 	snd_assert(rrawmidi != NULL, return -EINVAL);

@@ -531,16 +531,16 @@ static int snd_info_entry_mmap(struct file *file, struct vm_area_struct *vma)
 static struct file_operations snd_info_entry_operations =
 {
 #ifndef LINUX_2_2
-	owner:		THIS_MODULE,
+	.owner =	THIS_MODULE,
 #endif
-	llseek:		snd_info_entry_llseek,
-	read:		snd_info_entry_read,
-	write:		snd_info_entry_write,
-	poll:		snd_info_entry_poll,
-	ioctl:		snd_info_entry_ioctl,
-	mmap:		snd_info_entry_mmap,
-	open:		snd_info_entry_open,
-	release:	snd_info_entry_release,
+	.llseek =	snd_info_entry_llseek,
+	.read =		snd_info_entry_read,
+	.write =	snd_info_entry_write,
+	.poll =		snd_info_entry_poll,
+	.ioctl =	snd_info_entry_ioctl,
+	.mmap =		snd_info_entry_mmap,
+	.open =		snd_info_entry_open,
+	.release =	snd_info_entry_release,
 };
 
 #ifdef LINUX_2_2
@@ -602,10 +602,10 @@ static struct file_operations snd_info_card_link_operations =
 struct inode_operations snd_info_card_link_inode_operations =
 {
 #ifdef LINUX_2_2
-	default_file_ops:	&snd_info_card_link_operations,
+	.default_file_ops =	&snd_info_card_link_operations,
 #endif
-	readlink:		snd_info_card_readlink,
-	follow_link:		snd_info_card_followlink,
+	.readlink =		snd_info_card_readlink,
+	.follow_link =		snd_info_card_followlink,
 };
 
 struct proc_dir_entry *snd_create_proc_entry(const char *name, mode_t mode,

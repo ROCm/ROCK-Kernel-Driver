@@ -559,15 +559,15 @@ snd_wavefront_midi_start (snd_wavefront_card_t *card)
 
 snd_rawmidi_ops_t snd_wavefront_midi_output =
 {
-	open:		snd_wavefront_midi_output_open,
-	close:		snd_wavefront_midi_output_close,
-	trigger:	snd_wavefront_midi_output_trigger,
+	.open =		snd_wavefront_midi_output_open,
+	.close =	snd_wavefront_midi_output_close,
+	.trigger =	snd_wavefront_midi_output_trigger,
 };
 
 snd_rawmidi_ops_t snd_wavefront_midi_input =
 {
-	open:		snd_wavefront_midi_input_open,
-	close:		snd_wavefront_midi_input_close,
-	trigger:	snd_wavefront_midi_input_trigger,
+	.open =		snd_wavefront_midi_input_open,
+	.close =	snd_wavefront_midi_input_close,
+	.trigger =	snd_wavefront_midi_input_trigger,
 };
 

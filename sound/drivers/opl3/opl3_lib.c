@@ -259,20 +259,20 @@ static int snd_opl3_timer2_stop(snd_timer_t * timer)
 
 static struct _snd_timer_hardware snd_opl3_timer1 =
 {
-	flags:		SNDRV_TIMER_HW_STOP,
-	resolution:	80000,
-	ticks:		256,
-	start:		snd_opl3_timer1_start,
-	stop:		snd_opl3_timer1_stop,
+	.flags =	SNDRV_TIMER_HW_STOP,
+	.resolution =	80000,
+	.ticks =	256,
+	.start =	snd_opl3_timer1_start,
+	.stop =		snd_opl3_timer1_stop,
 };
 
 static struct _snd_timer_hardware snd_opl3_timer2 =
 {
-	flags:		SNDRV_TIMER_HW_STOP,
-	resolution:	320000,
-	ticks:		256,
-	start:		snd_opl3_timer2_start,
-	stop:		snd_opl3_timer2_stop,
+	.flags =	SNDRV_TIMER_HW_STOP,
+	.resolution =	320000,
+	.ticks =	256,
+	.start =	snd_opl3_timer2_start,
+	.stop =		snd_opl3_timer2_stop,
 };
 
 static int snd_opl3_timer1_init(opl3_t * opl3, int timer_no)
@@ -380,7 +380,7 @@ int snd_opl3_create(snd_card_t * card,
 	opl3_t *opl3;
 	int err;
 	static snd_device_ops_t ops = {
-		dev_free: snd_opl3_dev_free,
+		.dev_free = snd_opl3_dev_free,
 	};
 
 	*ropl3 = NULL;

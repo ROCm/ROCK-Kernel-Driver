@@ -123,7 +123,7 @@ static int snd_open(struct inode *inode, struct file *file)
 	struct file_operations *old_fops;
 	int err = 0;
 
-	if (dev != SNDRV_MINOR_SEQUENCER) {
+	if (dev != SNDRV_MINOR_SEQUENCER && dev != SNDRV_MINOR_TIMER) {
 		if (snd_cards[card] == NULL) {
 #ifdef CONFIG_KMOD
 			snd_request_card(card);
@@ -154,9 +154,9 @@ static int snd_open(struct inode *inode, struct file *file)
 struct file_operations snd_fops =
 {
 #ifndef LINUX_2_2
-	owner:		THIS_MODULE,
+	.owner =	THIS_MODULE,
 #endif
-	open:		snd_open
+	.open =		snd_open
 };
 
 static int snd_kernel_minor(int type, snd_card_t * card, int dev)

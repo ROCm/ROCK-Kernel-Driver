@@ -363,42 +363,42 @@ static int snd_es18xx_reset_fifo(es18xx_t *chip)
 
 static ratnum_t new_clocks[2] = {
 	{
-		num: 793800,
-		den_min: 1,
-		den_max: 128,
-		den_step: 1,
+		.num = 793800,
+		.den_min = 1,
+		.den_max = 128,
+		.den_step = 1,
 	},
 	{
-		num: 768000,
-		den_min: 1,
-		den_max: 128,
-		den_step: 1,
+		.num = 768000,
+		.den_min = 1,
+		.den_max = 128,
+		.den_step = 1,
 	}
 };
 
 static snd_pcm_hw_constraint_ratnums_t new_hw_constraints_clocks = {
-	nrats: 2,
-	rats: new_clocks,
+	.nrats = 2,
+	.rats = new_clocks,
 };
 
 static ratnum_t old_clocks[2] = {
 	{
-		num: 795444,
-		den_min: 1,
-		den_max: 128,
-		den_step: 1,
+		.num = 795444,
+		.den_min = 1,
+		.den_max = 128,
+		.den_step = 1,
 	},
 	{
-		num: 397722,
-		den_min: 1,
-		den_max: 128,
-		den_step: 1,
+		.num = 397722,
+		.den_min = 1,
+		.den_max = 128,
+		.den_step = 1,
 	}
 };
 
 static snd_pcm_hw_constraint_ratnums_t old_hw_constraints_clocks  = {
-	nrats: 2,
-	rats: old_clocks,
+	.nrats = 2,
+	.rats = old_clocks,
 };
 
 
@@ -826,40 +826,40 @@ static snd_pcm_uframes_t snd_es18xx_capture_pointer(snd_pcm_substream_t * substr
 
 static snd_pcm_hardware_t snd_es18xx_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S8 | 
+	.formats =		(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S8 | 
 				 SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_U16_LE),
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	65536,
-	period_bytes_min:	64,
-	period_bytes_max:	65536,
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	65536,
+	.period_bytes_min =	64,
+	.period_bytes_max =	65536,
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_es18xx_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S8 | 
+	.formats =		(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S8 | 
 				 SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_U16_LE),
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	65536,
-	period_bytes_min:	64,
-	period_bytes_max:	65536,
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	65536,
+	.period_bytes_min =	64,
+	.period_bytes_max =	65536,
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static int snd_es18xx_playback_open(snd_pcm_substream_t * substream)
@@ -1067,10 +1067,10 @@ static int snd_es18xx_reg_read(es18xx_t *chip, unsigned char reg)
 }
 
 #define ES18XX_SINGLE(xname, xindex, reg, shift, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_es18xx_info_single, \
-  get: snd_es18xx_get_single, put: snd_es18xx_put_single, \
-  private_value: reg | (shift << 8) | (mask << 16) | (invert << 24) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_es18xx_info_single, \
+  .get = snd_es18xx_get_single, .put = snd_es18xx_put_single, \
+  .private_value = reg | (shift << 8) | (mask << 16) | (invert << 24) }
 
 static int snd_es18xx_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -1117,10 +1117,10 @@ static int snd_es18xx_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 }
 
 #define ES18XX_DOUBLE(xname, xindex, left_reg, right_reg, shift_left, shift_right, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_es18xx_info_double, \
-  get: snd_es18xx_get_double, put: snd_es18xx_put_double, \
-  private_value: left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_es18xx_info_double, \
+  .get = snd_es18xx_get_double, .put = snd_es18xx_put_double, \
+  .private_value = left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
 
 static int snd_es18xx_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -1207,11 +1207,11 @@ ES18XX_SINGLE("Record Monitor", 0, 0xa8, 3, 1, 0),
 ES18XX_DOUBLE("Capture Volume", 0, 0xb4, 0xb4, 4, 0, 15, 0),
 ES18XX_SINGLE("Capture Switch", 0, 0x1c, 4, 1, 1),
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Capture Source",
-	info: snd_es18xx_info_mux,
-	get: snd_es18xx_get_mux,
-	put: snd_es18xx_put_mux,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Capture Source",
+	.info = snd_es18xx_info_mux,
+	.get = snd_es18xx_get_mux,
+	.put = snd_es18xx_put_mux,
 }
 };
 
@@ -1240,11 +1240,11 @@ ES18XX_DOUBLE("PCM Playback Volume", 1, 0x14, 0x14, 4, 0, 15, 0)
 static snd_kcontrol_new_t snd_es18xx_spatializer_controls[] = {
 ES18XX_SINGLE("3D Control - Level", 0, 0x52, 0, 63, 0),
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "3D Control - Switch",
-	info: snd_es18xx_info_spatializer_enable,
-	get: snd_es18xx_get_spatializer_enable,
-	put: snd_es18xx_put_spatializer_enable,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "3D Control - Switch",
+	.info = snd_es18xx_info_spatializer_enable,
+	.get = snd_es18xx_get_spatializer_enable,
+	.put = snd_es18xx_put_spatializer_enable,
 }
 };
 
@@ -1256,18 +1256,18 @@ ES18XX_SINGLE("Mic Boost (+26dB)", 0, 0x7d, 3, 1, 0);
 
 static snd_kcontrol_new_t snd_es18xx_hw_volume_controls[] = {
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Hardware Master Playback Volume",
-	access: SNDRV_CTL_ELEM_ACCESS_READ,
-	info: snd_es18xx_info_hw_volume,
-	get: snd_es18xx_get_hw_volume,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Hardware Master Playback Volume",
+	.access = SNDRV_CTL_ELEM_ACCESS_READ,
+	.info = snd_es18xx_info_hw_volume,
+	.get = snd_es18xx_get_hw_volume,
 },
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Hardware Master Playback Switch",
-	access: SNDRV_CTL_ELEM_ACCESS_READ,
-	info: snd_es18xx_info_hw_switch,
-	get: snd_es18xx_get_hw_switch,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Hardware Master Playback Switch",
+	.access = SNDRV_CTL_ELEM_ACCESS_READ,
+	.info = snd_es18xx_info_hw_switch,
+	.get = snd_es18xx_get_hw_switch,
 },
 ES18XX_SINGLE("Hardware Master Volume Split", 0, 0x64, 7, 1, 0),
 };
@@ -1548,23 +1548,23 @@ static int __init snd_es18xx_probe(es18xx_t *chip)
 }
 
 static snd_pcm_ops_t snd_es18xx_playback_ops = {
-	open:		snd_es18xx_playback_open,
-	close:		snd_es18xx_playback_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_es18xx_playback_hw_params,
-	prepare:	snd_es18xx_playback_prepare,
-	trigger:	snd_es18xx_playback_trigger,
-	pointer:	snd_es18xx_playback_pointer,
+	.open =		snd_es18xx_playback_open,
+	.close =	snd_es18xx_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_es18xx_playback_hw_params,
+	.prepare =	snd_es18xx_playback_prepare,
+	.trigger =	snd_es18xx_playback_trigger,
+	.pointer =	snd_es18xx_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_es18xx_capture_ops = {
-	open:		snd_es18xx_capture_open,
-	close:		snd_es18xx_capture_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_es18xx_capture_hw_params,
-	prepare:	snd_es18xx_capture_prepare,
-	trigger:	snd_es18xx_capture_trigger,
-	pointer:	snd_es18xx_capture_pointer,
+	.open =		snd_es18xx_capture_open,
+	.close =	snd_es18xx_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_es18xx_capture_hw_params,
+	.prepare =	snd_es18xx_capture_prepare,
+	.trigger =	snd_es18xx_capture_trigger,
+	.pointer =	snd_es18xx_capture_pointer,
 };
 
 static void snd_es18xx_pcm_free(snd_pcm_t *pcm)
@@ -1732,7 +1732,7 @@ static int __init snd_es18xx_new_device(snd_card_t * card,
 {
         es18xx_t *chip;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_es18xx_dev_free,
+		.dev_free =	snd_es18xx_dev_free,
         };
 	int err;
 

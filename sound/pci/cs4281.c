@@ -890,52 +890,52 @@ static snd_pcm_uframes_t snd_cs4281_pointer(snd_pcm_substream_t * substream)
 
 static snd_pcm_hardware_t snd_cs4281_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP |
+	.info =			(SNDRV_PCM_INFO_MMAP |
 				 SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_PAUSE |
 				 SNDRV_PCM_INFO_SYNC_START),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S8 |
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S8 |
 				SNDRV_PCM_FMTBIT_U16_LE | SNDRV_PCM_FMTBIT_S16_LE |
 				SNDRV_PCM_FMTBIT_U16_BE | SNDRV_PCM_FMTBIT_S16_BE |
 				SNDRV_PCM_FMTBIT_U32_LE | SNDRV_PCM_FMTBIT_S32_LE |
 				SNDRV_PCM_FMTBIT_U32_BE | SNDRV_PCM_FMTBIT_S32_BE,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(512*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(512*1024),
-	periods_min:		1,
-	periods_max:		2,
-	fifo_size:		CS4281_FIFO_SIZE,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(512*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(512*1024),
+	.periods_min =		1,
+	.periods_max =		2,
+	.fifo_size =		CS4281_FIFO_SIZE,
 };
 
 static snd_pcm_hardware_t snd_cs4281_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP |
+	.info =			(SNDRV_PCM_INFO_MMAP |
 				 SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_PAUSE |
 				 SNDRV_PCM_INFO_SYNC_START),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S8 |
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S8 |
 				SNDRV_PCM_FMTBIT_U16_LE | SNDRV_PCM_FMTBIT_S16_LE |
 				SNDRV_PCM_FMTBIT_U16_BE | SNDRV_PCM_FMTBIT_S16_BE |
 				SNDRV_PCM_FMTBIT_U32_LE | SNDRV_PCM_FMTBIT_S32_LE |
 				SNDRV_PCM_FMTBIT_U32_BE | SNDRV_PCM_FMTBIT_S32_BE,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(512*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(512*1024),
-	periods_min:		1,
-	periods_max:		2,
-	fifo_size:		CS4281_FIFO_SIZE,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(512*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(512*1024),
+	.periods_min =		1,
+	.periods_max =		2,
+	.fifo_size =		CS4281_FIFO_SIZE,
 };
 
 static int snd_cs4281_playback_open(snd_pcm_substream_t * substream)
@@ -995,25 +995,25 @@ static int snd_cs4281_capture_close(snd_pcm_substream_t * substream)
 }
 
 static snd_pcm_ops_t snd_cs4281_playback_ops = {
-	open:		snd_cs4281_playback_open,
-	close:		snd_cs4281_playback_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_cs4281_hw_params,
-	hw_free:	snd_cs4281_hw_free,
-	prepare:	snd_cs4281_playback_prepare,
-	trigger:	snd_cs4281_trigger,
-	pointer:	snd_cs4281_pointer,
+	.open =		snd_cs4281_playback_open,
+	.close =	snd_cs4281_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_cs4281_hw_params,
+	.hw_free =	snd_cs4281_hw_free,
+	.prepare =	snd_cs4281_playback_prepare,
+	.trigger =	snd_cs4281_trigger,
+	.pointer =	snd_cs4281_pointer,
 };
 
 static snd_pcm_ops_t snd_cs4281_capture_ops = {
-	open:		snd_cs4281_capture_open,
-	close:		snd_cs4281_capture_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_cs4281_hw_params,
-	hw_free:	snd_cs4281_hw_free,
-	prepare:	snd_cs4281_capture_prepare,
-	trigger:	snd_cs4281_trigger,
-	pointer:	snd_cs4281_pointer,
+	.open =		snd_cs4281_capture_open,
+	.close =	snd_cs4281_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_cs4281_hw_params,
+	.hw_free =	snd_cs4281_hw_free,
+	.prepare =	snd_cs4281_capture_prepare,
+	.trigger =	snd_cs4281_trigger,
+	.pointer =	snd_cs4281_pointer,
 };
 
 static void snd_cs4281_pcm_free(snd_pcm_t *pcm)
@@ -1106,22 +1106,22 @@ static int snd_cs4281_put_volume(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 
 static snd_kcontrol_new_t snd_cs4281_fm_vol = 
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Synth Playback Volume",
-	info: snd_cs4281_info_volume, 
-	get: snd_cs4281_get_volume,
-	put: snd_cs4281_put_volume, 
-	private_value: ((BA0_FMLVC << 16) | BA0_FMRVC),
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Synth Playback Volume",
+	.info = snd_cs4281_info_volume, 
+	.get = snd_cs4281_get_volume,
+	.put = snd_cs4281_put_volume, 
+	.private_value = ((BA0_FMLVC << 16) | BA0_FMRVC),
 };
 
 static snd_kcontrol_new_t snd_cs4281_pcm_vol = 
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "PCM Stream Playback Volume",
-	info: snd_cs4281_info_volume, 
-	get: snd_cs4281_get_volume,
-	put: snd_cs4281_put_volume, 
-	private_value: ((BA0_PPLVC << 16) | BA0_PPRVC),
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "PCM Stream Playback Volume",
+	.info = snd_cs4281_info_volume, 
+	.get = snd_cs4281_get_volume,
+	.put = snd_cs4281_put_volume, 
+	.private_value = ((BA0_PPLVC << 16) | BA0_PPRVC),
 };
 
 static void snd_cs4281_mixer_free_ac97(ac97_t *ac97)
@@ -1232,11 +1232,11 @@ static long snd_cs4281_BA1_read(snd_info_entry_t *entry, void *file_private_data
 }
 
 static struct snd_info_entry_ops snd_cs4281_proc_ops_BA0 = {
-	read: snd_cs4281_BA0_read,
+	.read = snd_cs4281_BA0_read,
 };
 
 static struct snd_info_entry_ops snd_cs4281_proc_ops_BA1 = {
-	read: snd_cs4281_BA1_read,
+	.read = snd_cs4281_BA1_read,
 };
 
 static void __devinit snd_cs4281_proc_init(cs4281_t * chip)
@@ -1456,7 +1456,7 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 	unsigned int tmp;
 	int err;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_cs4281_dev_free,
+		.dev_free =	snd_cs4281_dev_free,
 	};
 
 	*rchip = NULL;
@@ -1878,16 +1878,16 @@ static void snd_cs4281_midi_output_trigger(snd_rawmidi_substream_t * substream, 
 
 static snd_rawmidi_ops_t snd_cs4281_midi_output =
 {
-	open:           snd_cs4281_midi_output_open,
-	close:          snd_cs4281_midi_output_close,
-	trigger:        snd_cs4281_midi_output_trigger,
+	.open =		snd_cs4281_midi_output_open,
+	.close =	snd_cs4281_midi_output_close,
+	.trigger =	snd_cs4281_midi_output_trigger,
 };
 
 static snd_rawmidi_ops_t snd_cs4281_midi_input =
 {
-	open:           snd_cs4281_midi_input_open,
-	close:          snd_cs4281_midi_input_close,
-	trigger:        snd_cs4281_midi_input_trigger,
+	.open = 	snd_cs4281_midi_input_open,
+	.close =	snd_cs4281_midi_input_close,
+	.trigger =	snd_cs4281_midi_input_trigger,
 };
 
 static int __devinit snd_cs4281_midi(cs4281_t * chip, int device, snd_rawmidi_t **rrawmidi)
@@ -2212,13 +2212,13 @@ static int snd_cs4281_set_power_state(snd_card_t *card, unsigned int power_state
 #endif /* CONFIG_PM */
 
 static struct pci_driver driver = {
-	name: "CS4281",
-	id_table: snd_cs4281_ids,
-	probe: snd_cs4281_probe,
-	remove: __devexit_p(snd_cs4281_remove),
+	.name = "CS4281",
+	.id_table = snd_cs4281_ids,
+	.probe = snd_cs4281_probe,
+	.remove = __devexit_p(snd_cs4281_remove),
 #ifdef CONFIG_PM
-	suspend: snd_cs4281_suspend,
-	resume: snd_cs4281_resume,
+	.suspend = snd_cs4281_suspend,
+	.resume = snd_cs4281_resume,
 #endif
 };
 	

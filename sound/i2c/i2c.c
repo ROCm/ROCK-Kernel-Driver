@@ -37,9 +37,9 @@ static int snd_i2c_bit_readbytes(snd_i2c_device_t *device, unsigned char *bytes,
 static int snd_i2c_bit_probeaddr(snd_i2c_bus_t *bus, unsigned short addr);
 
 static snd_i2c_ops_t snd_i2c_bit_ops = {
-	sendbytes: snd_i2c_bit_sendbytes,
-	readbytes: snd_i2c_bit_readbytes,
-	probeaddr: snd_i2c_bit_probeaddr,
+	.sendbytes = snd_i2c_bit_sendbytes,
+	.readbytes = snd_i2c_bit_readbytes,
+	.probeaddr = snd_i2c_bit_probeaddr,
 };
 
 static int snd_i2c_bus_free(snd_i2c_bus_t *bus)
@@ -77,7 +77,7 @@ int snd_i2c_bus_create(snd_card_t *card, const char *name, snd_i2c_bus_t *master
 	snd_i2c_bus_t *bus;
 	int err;
 	static snd_device_ops_t ops = {
-		dev_free:       snd_i2c_bus_dev_free,
+		.dev_free =	snd_i2c_bus_dev_free,
 	};
 
 	*ri2c = NULL;
@@ -220,7 +220,7 @@ static int snd_i2c_bit_ack(snd_i2c_bus_t *bus)
 	ack = snd_i2c_bit_data(bus, 1);
 	snd_i2c_bit_direction(bus, 1, 1);	/* SCL - wr, SDA - wr */
 	snd_i2c_bit_set(bus, 0, 1);
-	return ack ? -EREMOTEIO : 0;
+	return ack ? -EIO : 0;
 }
 
 static int snd_i2c_bit_sendbyte(snd_i2c_bus_t *bus, unsigned char data)

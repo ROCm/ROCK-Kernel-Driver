@@ -59,21 +59,21 @@ static void snd_emu8000_tweak_voice(emu8000_t *emu, int ch);
  * set up operators
  */
 static snd_emux_operators_t emu8000_ops = {
-	owner:		THIS_MODULE,
-	get_voice:	get_voice,
-	prepare:	start_voice,
-	trigger:	trigger_voice,
-	release:	release_voice,
-	update:		update_voice,
-	terminate:	terminate_voice,
-	reset:		reset_voice,
-	sample_new:	snd_emu8000_sample_new,
-	sample_free:	snd_emu8000_sample_free,
-	sample_reset:	snd_emu8000_sample_reset,
-	load_fx:	load_fx,
-	sysex:		sysex,
+	.owner =	THIS_MODULE,
+	.get_voice =	get_voice,
+	.prepare =	start_voice,
+	.trigger =	trigger_voice,
+	.release =	release_voice,
+	.update =	update_voice,
+	.terminate =	terminate_voice,
+	.reset =	reset_voice,
+	.sample_new =	snd_emu8000_sample_new,
+	.sample_free =	snd_emu8000_sample_free,
+	.sample_reset = snd_emu8000_sample_reset,
+	.load_fx =	load_fx,
+	.sysex =	sysex,
 #ifdef CONFIG_SND_SEQUENCER_OSS
-	oss_ioctl:	oss_ioctl,
+	.oss_ioctl =	oss_ioctl,
 #endif
 };
 

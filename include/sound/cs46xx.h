@@ -1802,6 +1802,7 @@ struct _snd_cs46xx {
 	int amplifier;
 	void (*amplifier_ctrl)(cs46xx_t *, int);
 	void (*active_ctrl)(cs46xx_t *, int);
+  	void (*mixer_init)(cs46xx_t *);
 	struct pci_dev *acpi_dev;
 	int acpi_port;
 	snd_kcontrol_t *eapd_switch; /* for amplifier hack */
@@ -1816,7 +1817,6 @@ struct _snd_cs46xx {
   int current_gpio;
 #endif
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
-  	void (*mixer_init)(cs46xx_t *);
 	dsp_spos_instance_t * dsp_spos_instance;
 #else /* for compatibility */
 	cs46xx_pcm_t *playback_pcm;

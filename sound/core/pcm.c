@@ -598,9 +598,9 @@ int snd_pcm_new(snd_card_t * card, char *id, int device,
 	snd_pcm_t *pcm;
 	int err;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_pcm_dev_free,
-		dev_register:	snd_pcm_dev_register,
-		dev_unregister:	snd_pcm_dev_unregister
+		.dev_free = snd_pcm_dev_free,
+		.dev_register =	snd_pcm_dev_register,
+		.dev_unregister = snd_pcm_dev_unregister
 	};
 
 	snd_assert(rpcm != NULL, return -EINVAL);

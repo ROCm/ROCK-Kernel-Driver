@@ -460,8 +460,8 @@ static int soundcore_open(struct inode *, struct file *);
 static struct file_operations soundcore_fops=
 {
 	/* We must have an owner or the module locking fails */
-	owner:	THIS_MODULE,
-	open:	soundcore_open,
+	.owner	= THIS_MODULE,
+	.open	= soundcore_open,
 };
 
 static struct sound_unit *__look_for_unit(int chain, int unit)

@@ -74,9 +74,9 @@ static unsigned int rates[14] = {
 };
 
 static snd_pcm_hw_constraint_list_t hw_constraints_rates = {
-	count: 14,
-	list: rates,
-	mask: 0,
+	.count = 14,
+	.list = rates,
+	.mask = 0,
 };
 
 static int snd_cs4231_xrate(snd_pcm_runtime_t *runtime)
@@ -795,14 +795,14 @@ static int snd_cs4231_timer_close(snd_timer_t * timer)
 
 static struct _snd_timer_hardware snd_cs4231_timer_table =
 {
-	flags:		SNDRV_TIMER_HW_AUTO,
-	resolution:	9945,
-	ticks:		65535,
-	open:		snd_cs4231_timer_open,
-	close:		snd_cs4231_timer_close,
-	c_resolution:	snd_cs4231_timer_resolution,
-	start:		snd_cs4231_timer_start,
-	stop:		snd_cs4231_timer_stop,
+	.flags =	SNDRV_TIMER_HW_AUTO,
+	.resolution =	9945,
+	.ticks =	65535,
+	.open =		snd_cs4231_timer_open,
+	.close =	snd_cs4231_timer_close,
+	.c_resolution = snd_cs4231_timer_resolution,
+	.start =	snd_cs4231_timer_start,
+	.stop =		snd_cs4231_timer_stop,
 };
 
 /*
@@ -1127,40 +1127,40 @@ static int snd_cs4231_probe(cs4231_t *chip)
 
 static snd_pcm_hardware_t snd_cs4231_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID | SNDRV_PCM_INFO_SYNC_START),
-	formats:		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW | SNDRV_PCM_FMTBIT_IMA_ADPCM |
+	.formats =		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW | SNDRV_PCM_FMTBIT_IMA_ADPCM |
 				 SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S16_BE),
-	rates:			SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		5510,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		5510,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_cs4231_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID | SNDRV_PCM_INFO_SYNC_START),
-	formats:		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW | SNDRV_PCM_FMTBIT_IMA_ADPCM |
+	.formats =		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW | SNDRV_PCM_FMTBIT_IMA_ADPCM |
 				 SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S16_BE),
-	rates:			SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		5510,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		5510,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 /*
@@ -1395,8 +1395,8 @@ int snd_cs4231_create(snd_card_t * card,
 		      cs4231_t ** rchip)
 {
 	static snd_device_ops_t ops = {
-		dev_free:       snd_cs4231_dev_free,
-	};                                
+		.dev_free =	snd_cs4231_dev_free,
+	};
 	cs4231_t *chip;
 	int err;
 
@@ -1481,25 +1481,25 @@ int snd_cs4231_create(snd_card_t * card,
 }
 
 static snd_pcm_ops_t snd_cs4231_playback_ops = {
-	open:		snd_cs4231_playback_open,
-	close:		snd_cs4231_playback_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_cs4231_playback_hw_params,
-	hw_free:	snd_cs4231_playback_hw_free,
-	prepare:	snd_cs4231_playback_prepare,
-	trigger:	snd_cs4231_trigger,
-	pointer:	snd_cs4231_playback_pointer,
+	.open =		snd_cs4231_playback_open,
+	.close =	snd_cs4231_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_cs4231_playback_hw_params,
+	.hw_free =	snd_cs4231_playback_hw_free,
+	.prepare =	snd_cs4231_playback_prepare,
+	.trigger =	snd_cs4231_trigger,
+	.pointer =	snd_cs4231_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_cs4231_capture_ops = {
-	open:		snd_cs4231_capture_open,
-	close:		snd_cs4231_capture_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_cs4231_capture_hw_params,
-	hw_free:	snd_cs4231_capture_hw_free,
-	prepare:	snd_cs4231_capture_prepare,
-	trigger:	snd_cs4231_trigger,
-	pointer:	snd_cs4231_capture_pointer,
+	.open =		snd_cs4231_capture_open,
+	.close =	snd_cs4231_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_cs4231_capture_hw_params,
+	.hw_free =	snd_cs4231_capture_hw_free,
+	.prepare =	snd_cs4231_capture_prepare,
+	.trigger =	snd_cs4231_trigger,
+	.pointer =	snd_cs4231_capture_pointer,
 };
 
 static void snd_cs4231_pcm_free(snd_pcm_t *pcm)
@@ -1773,11 +1773,11 @@ CS4231_SINGLE("Mono Output Playback Switch", 0, CS4231_MONO_CTRL, 6, 1, 1),
 CS4231_SINGLE("Mono Output Playback Bypass", 0, CS4231_MONO_CTRL, 5, 1, 0),
 CS4231_DOUBLE("Capture Volume", 0, CS4231_LEFT_INPUT, CS4231_RIGHT_INPUT, 0, 0, 15, 0),
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Capture Source",
-	info: snd_cs4231_info_mux,
-	get: snd_cs4231_get_mux,
-	put: snd_cs4231_put_mux,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Capture Source",
+	.info = snd_cs4231_info_mux,
+	.get = snd_cs4231_get_mux,
+	.put = snd_cs4231_put_mux,
 },
 CS4231_DOUBLE("Mic Boost", 0, CS4231_LEFT_INPUT, CS4231_RIGHT_INPUT, 5, 5, 1, 0),
 CS4231_SINGLE("Loopback Capture Switch", 0, CS4231_LOOPBACK, 0, 1, 0),

@@ -46,12 +46,12 @@ static inline void snd_leave_user(mm_segment_t fs)
 extern snd_midi_op_t opl3_ops;
 
 static snd_seq_oss_callback_t oss_callback = {
-	owner: THIS_MODULE,
-	open: snd_opl3_open_seq_oss,
-	close: snd_opl3_close_seq_oss,
-	ioctl: snd_opl3_ioctl_seq_oss,
-	load_patch: snd_opl3_load_patch_seq_oss,
-	reset: snd_opl3_reset_seq_oss,
+	.owner = 	THIS_MODULE,
+	.open =		snd_opl3_open_seq_oss,
+	.close =	snd_opl3_close_seq_oss,
+	.ioctl =	snd_opl3_ioctl_seq_oss,
+	.load_patch =	snd_opl3_load_patch_seq_oss,
+	.reset =	snd_opl3_reset_seq_oss,
 };
 
 static int snd_opl3_oss_event_input(snd_seq_event_t *ev, int direct,

@@ -105,12 +105,12 @@ static int snd_pcm_timer_stop(snd_timer_t * timer)
 
 static struct _snd_timer_hardware snd_pcm_timer =
 {
-	flags:		SNDRV_TIMER_HW_AUTO | SNDRV_TIMER_HW_SLAVE,
-	resolution:	0,
-	ticks:		1,
-	c_resolution:	snd_pcm_timer_resolution,
-	start:		snd_pcm_timer_start,
-	stop:		snd_pcm_timer_stop,
+	.flags =	SNDRV_TIMER_HW_AUTO | SNDRV_TIMER_HW_SLAVE,
+	.resolution =	0,
+	.ticks =	1,
+	.c_resolution =	snd_pcm_timer_resolution,
+	.start =	snd_pcm_timer_start,
+	.stop =		snd_pcm_timer_stop,
 };
 
 /*

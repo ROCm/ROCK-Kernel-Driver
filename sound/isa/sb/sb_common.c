@@ -221,7 +221,7 @@ int snd_sbdsp_create(snd_card_t *card,
 	sb_t *chip;
 	int err;
 	static snd_device_ops_t ops = {
-		dev_free:       snd_sbdsp_dev_free,
+		.dev_free =	snd_sbdsp_dev_free,
 	};
 
 	snd_assert(r_chip != NULL, return -EINVAL);

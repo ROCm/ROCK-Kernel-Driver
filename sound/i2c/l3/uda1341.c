@@ -16,7 +16,7 @@
  * 2002-04-12	Tomas Kasparek	Proc interface update, code cleanup
  */
 
-/* $Id: uda1341.c,v 1.2 2002/04/18 07:47:59 perex Exp $ */
+/* $Id: uda1341.c,v 1.3 2002/08/13 16:13:36 perex Exp $ */
 
 #include <sound/driver.h>
 #include <linux/module.h>
@@ -459,8 +459,8 @@ static void snd_uda1341_proc_done(struct l3_client *clnt)
 /* {{{ UDA1341 single functions */
 
 #define UDA1341_SINGLE(xname, where, reg, shift, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, info: snd_uda1341_info_single, \
-  get: snd_uda1341_get_single, put: snd_uda1341_put_single, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, info: snd_uda1341_info_single, \
+  .get = snd_uda1341_get_single, put: snd_uda1341_put_single, \
   private_value: where | reg << 5 | (shift << 9) | (mask << 12) | (invert << 18) \
 }
 
@@ -521,8 +521,8 @@ static int snd_uda1341_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 /* {{{ UDA1341 enum functions */
 
 #define UDA1341_ENUM(xname, where, reg, shift, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, info: snd_uda1341_info_enum, \
-  get: snd_uda1341_get_enum, put: snd_uda1341_put_enum, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, info: snd_uda1341_info_enum, \
+  .get = snd_uda1341_get_enum, put: snd_uda1341_put_enum, \
   private_value: where | reg << 5 | (shift << 9) | (mask << 12) | (invert << 18) \
 }
 
@@ -583,8 +583,8 @@ static int snd_uda1341_put_enum(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 /* {{{ UDA1341 2regs functions */
 
 #define UDA1341_2REGS(xname, where, reg_1, reg_2, shift_1, shift_2, mask_1, mask_2, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: (xname), info: snd_uda1341_info_2regs, \
-  get: snd_uda1341_get_2regs, put: snd_uda1341_put_2regs, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: (xname), info: snd_uda1341_info_2regs, \
+  .get = snd_uda1341_get_2regs, put: snd_uda1341_put_2regs, \
   private_value: where | (reg_1 << 5) | (reg_2 << 9) | (shift_1 << 13) | (shift_2 << 16) | \
                          (mask_1 << 19) | (mask_2 << 25) | (invert << 31) \
 }
@@ -839,17 +839,17 @@ static void uda1341_close(struct l3_client *clnt)
 /* {{{ Module and L3 initialization */
 
 static struct l3_ops uda1341_ops = {
-	open:		uda1341_open,
-	command:	uda1341_command,
-	close:		uda1341_close,
+	.open =		uda1341_open,
+	.command =	uda1341_command,
+	.close =	uda1341_close,
 };
 
 static struct l3_driver uda1341_driver = {
-	name:		UDA1341_ALSA_NAME,
-	attach_client:	uda1341_attach,
-	detach_client:	uda1341_detach,
-	ops:		&uda1341_ops,
-	owner:		THIS_MODULE,
+	.name =		UDA1341_ALSA_NAME,
+	.attach_client = uda1341_attach,
+	.detach_client = uda1341_detach,
+	.ops =		&uda1341_ops,
+	.owner =	THIS_MODULE,
 };
 
 static int __init uda1341_init(void)

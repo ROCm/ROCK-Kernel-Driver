@@ -69,9 +69,9 @@ static unsigned int rates[14] = {
 };
 
 static snd_pcm_hw_constraint_list_t hw_constraints_rates = {
-	count: 14,
-	list: rates,
-	mask: 0,
+	.count = 14,
+	.list = rates,
+	.mask = 0,
 };
 
 static unsigned char snd_ad1848_original_image[16] =
@@ -702,40 +702,40 @@ static int snd_ad1848_probe(ad1848_t * chip)
 
 static snd_pcm_hardware_t snd_ad1848_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW |
+	.formats =		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW |
 				 SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE),
-	rates:			SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		5510,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		5510,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_ad1848_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW |
+	.formats =		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW |
 				 SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE),
-	rates:			SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		5510,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		5510,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 /*
@@ -834,7 +834,7 @@ int snd_ad1848_create(snd_card_t * card,
 		      ad1848_t ** rchip)
 {
 	static snd_device_ops_t ops = {
-		dev_free:       snd_ad1848_dev_free,
+		.dev_free =	snd_ad1848_dev_free,
 	};
 	ad1848_t *chip;
 	int err;
@@ -883,25 +883,25 @@ int snd_ad1848_create(snd_card_t * card,
 }
 
 static snd_pcm_ops_t snd_ad1848_playback_ops = {
-	open:		snd_ad1848_playback_open,
-	close:		snd_ad1848_playback_close,
-	ioctl:		snd_ad1848_ioctl,
-	hw_params:	snd_ad1848_playback_hw_params,
-	hw_free:	snd_ad1848_playback_hw_free,
-	prepare:	snd_ad1848_playback_prepare,
-	trigger:	snd_ad1848_playback_trigger,
-	pointer:	snd_ad1848_playback_pointer,
+	.open =		snd_ad1848_playback_open,
+	.close =	snd_ad1848_playback_close,
+	.ioctl =	snd_ad1848_ioctl,
+	.hw_params =	snd_ad1848_playback_hw_params,
+	.hw_free =	snd_ad1848_playback_hw_free,
+	.prepare =	snd_ad1848_playback_prepare,
+	.trigger =	snd_ad1848_playback_trigger,
+	.pointer =	snd_ad1848_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_ad1848_capture_ops = {
-	open:		snd_ad1848_capture_open,
-	close:		snd_ad1848_capture_close,
-	ioctl:		snd_ad1848_ioctl,
-	hw_params:	snd_ad1848_capture_hw_params,
-	hw_free:	snd_ad1848_capture_hw_free,
-	prepare:	snd_ad1848_capture_prepare,
-	trigger:	snd_ad1848_capture_trigger,
-	pointer:	snd_ad1848_capture_pointer,
+	.open =		snd_ad1848_capture_open,
+	.close =	snd_ad1848_capture_close,
+	.ioctl =	snd_ad1848_ioctl,
+	.hw_params =	snd_ad1848_capture_hw_params,
+	.hw_free =	snd_ad1848_capture_hw_free,
+	.prepare =	snd_ad1848_capture_prepare,
+	.trigger =	snd_ad1848_capture_trigger,
+	.pointer =	snd_ad1848_capture_pointer,
 };
 
 static void snd_ad1848_pcm_free(snd_pcm_t *pcm)
@@ -1121,11 +1121,11 @@ AD1848_DOUBLE("Aux Playback Switch", 1, AD1848_AUX2_LEFT_INPUT, AD1848_AUX2_RIGH
 AD1848_DOUBLE("Aux Playback Volume", 1, AD1848_AUX2_LEFT_INPUT, AD1848_AUX2_RIGHT_INPUT, 0, 0, 31, 1),
 AD1848_DOUBLE("Capture Volume", 0, AD1848_LEFT_INPUT, AD1848_RIGHT_INPUT, 0, 0, 15, 0),
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Capture Source",
-	info: snd_ad1848_info_mux,
-	get: snd_ad1848_get_mux,
-	put: snd_ad1848_put_mux,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Capture Source",
+	.info = snd_ad1848_info_mux,
+	.get = snd_ad1848_get_mux,
+	.put = snd_ad1848_put_mux,
 },
 AD1848_SINGLE("Loopback Capture Switch", 0, AD1848_LOOPBACK, 0, 1, 0),
 AD1848_SINGLE("Loopback Capture Volume", 0, AD1848_LOOPBACK, 1, 63, 0)

@@ -2466,20 +2466,20 @@ void snd_seq_info_clients_read(snd_info_entry_t *entry,
 static struct file_operations snd_seq_f_ops =
 {
 #ifndef LINUX_2_2
-	owner:		THIS_MODULE,
+	.owner =	THIS_MODULE,
 #endif
-	read:		snd_seq_read,
-	write:		snd_seq_write,
-	open:		snd_seq_open,
-	release:	snd_seq_release,
-	poll:		snd_seq_poll,
-	ioctl:		snd_seq_ioctl,
+	.read =		snd_seq_read,
+	.write =	snd_seq_write,
+	.open =		snd_seq_open,
+	.release =	snd_seq_release,
+	.poll =		snd_seq_poll,
+	.ioctl =	snd_seq_ioctl,
 };
 
 static snd_minor_t snd_seq_reg =
 {
-	comment:	"sequencer",
-	f_ops:		&snd_seq_f_ops,
+	.comment =	"sequencer",
+	.f_ops =	&snd_seq_f_ops,
 };
 
 

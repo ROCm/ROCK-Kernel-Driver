@@ -70,6 +70,7 @@ static const ac97_codec_id_t snd_ac97_codec_id_vendors[] = {
 { 0x45838300, 0xffffff00, "ESS Technology",	NULL },
 { 0x48525300, 0xffffff00, "Intersil",		NULL },
 { 0x49434500, 0xffffff00, "ICEnsemble",		NULL },
+{ 0x49544500, 0xffffff00, "ITE Tech.Inc",	NULL },
 { 0x4e534300, 0xffffff00, "National Semiconductor", NULL },
 { 0x53494c00, 0xffffff00, "Silicon Laboratory",	NULL },
 { 0x54524100, 0xffffff00, "TriTech",		NULL },
@@ -116,6 +117,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x48525300, 0xffffff00, "HMP9701",		NULL },
 { 0x49434501, 0xffffffff, "ICE1230",		NULL },
 { 0x49434511, 0xffffffff, "ICE1232",		NULL }, // alias VIA VT1611A?
+{ 0x49544520, 0xffffffff, "IT2226E",		NULL },
 { 0x4e534300, 0xffffffff, "LM4540/43/45/46/48",	NULL }, // only guess --jk
 { 0x4e534331, 0xffffffff, "LM4549",		NULL },
 { 0x53494c22, 0xffffffff, "Si3036",		NULL },
@@ -181,6 +183,9 @@ static const char *snd_ac97_stereo_enhancements[] =
 
 static int snd_ac97_valid_reg(ac97_t *ac97, unsigned short reg)
 {
+	if (ac97->limited_regs && ! test_bit(reg, ac97->reg_accessed))
+  		return 0;
+
 	/* filter some registers for buggy codecs */
 	switch (ac97->id) {
 	case AC97_ID_AK4540:
@@ -242,8 +247,6 @@ void snd_ac97_write_cache(ac97_t *ac97, unsigned short reg, unsigned short value
 
 static void snd_ac97_write_cache_test(ac97_t *ac97, unsigned short reg, unsigned short value)
 {
-	if (ac97->limited_regs && ! test_bit(reg, ac97->reg_accessed))
-  		return;
 #if 0
 	if (!snd_ac97_valid_reg(ac97, reg))
 		return;
@@ -361,9 +364,9 @@ static int snd_ac97_put_mux(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * uc
 }
 
 #define AC97_ENUM_DOUBLE(xname, reg, shift, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, info: snd_ac97_info_enum_double, \
-  get: snd_ac97_get_enum_double, put: snd_ac97_put_enum_double, \
-  private_value: reg | (shift << 8) | (invert << 24) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .info = snd_ac97_info_enum_double, \
+  .get = snd_ac97_get_enum_double, .put = snd_ac97_put_enum_double, \
+  .private_value = reg | (shift << 8) | (invert << 24) }
 
 static int snd_ac97_info_enum_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -423,9 +426,9 @@ static int snd_ac97_put_enum_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_valu
 }
 
 #define AC97_SINGLE(xname, reg, shift, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, info: snd_ac97_info_single, \
-  get: snd_ac97_get_single, put: snd_ac97_put_single, \
-  private_value: reg | (shift << 8) | (mask << 16) | (invert << 24) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .info = snd_ac97_info_single, \
+  .get = snd_ac97_get_single, .put = snd_ac97_put_single, \
+  .private_value = reg | (shift << 8) | (mask << 16) | (invert << 24) }
 
 static int snd_ac97_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -468,9 +471,9 @@ static int snd_ac97_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *
 }
 
 #define AC97_DOUBLE(xname, reg, shift_left, shift_right, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: (xname), info: snd_ac97_info_double, \
-  get: snd_ac97_get_double, put: snd_ac97_put_double, \
-  private_value: reg | (shift_left << 8) | (shift_right << 12) | (mask << 16) | (invert << 24) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = (xname), .info = snd_ac97_info_double, \
+  .get = snd_ac97_get_double, .put = snd_ac97_put_double, \
+  .private_value = reg | (shift_left << 8) | (shift_right << 12) | (mask << 16) | (invert << 24) }
 
 static int snd_ac97_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -757,25 +760,25 @@ static int snd_ac97_spdif_default_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 
 static const snd_kcontrol_new_t snd_ac97_controls_spdif[5] = {
 	{
-		access: SNDRV_CTL_ELEM_ACCESS_READ,
-		iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-		name: SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),
-		info: snd_ac97_spdif_mask_info,
-		get: snd_ac97_spdif_cmask_get,
+		.access = SNDRV_CTL_ELEM_ACCESS_READ,
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),
+		.info = snd_ac97_spdif_mask_info,
+		.get = snd_ac97_spdif_cmask_get,
 	},
 	{
-		access: SNDRV_CTL_ELEM_ACCESS_READ,
-		iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-		name: SNDRV_CTL_NAME_IEC958("",PLAYBACK,PRO_MASK),
-		info: snd_ac97_spdif_mask_info,
-		get: snd_ac97_spdif_pmask_get,
+		.access = SNDRV_CTL_ELEM_ACCESS_READ,
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = SNDRV_CTL_NAME_IEC958("",PLAYBACK,PRO_MASK),
+		.info = snd_ac97_spdif_mask_info,
+		.get = snd_ac97_spdif_pmask_get,
 	},
 	{
-		iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-		name: SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
-		info: snd_ac97_spdif_mask_info,
-		get: snd_ac97_spdif_default_get,
-		put: snd_ac97_spdif_default_put,
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
+		.info = snd_ac97_spdif_mask_info,
+		.get = snd_ac97_spdif_default_get,
+		.put = snd_ac97_spdif_default_put,
 	},
 
 	AC97_SINGLE(SNDRV_CTL_NAME_IEC958("",PLAYBACK,SWITCH),AC97_EXTENDED_STATUS, 2, 1, 0),
@@ -792,9 +795,9 @@ static const snd_kcontrol_new_t snd_ac97_conexant_controls_spdif[2] = {
 };
 
 #define AD18XX_PCM_BITS(xname, codec, shift, mask) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, info: snd_ac97_ad18xx_pcm_info_bits, \
-  get: snd_ac97_ad18xx_pcm_get_bits, put: snd_ac97_ad18xx_pcm_put_bits, \
-  private_value: codec | (shift << 8) | (mask << 16) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .info = snd_ac97_ad18xx_pcm_info_bits, \
+  .get = snd_ac97_ad18xx_pcm_get_bits, .put = snd_ac97_ad18xx_pcm_put_bits, \
+  .private_value = codec | (shift << 8) | (mask << 16) }
 
 static int snd_ac97_ad18xx_pcm_info_bits(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -831,9 +834,9 @@ static int snd_ac97_ad18xx_pcm_put_bits(snd_kcontrol_t * kcontrol, snd_ctl_elem_
 }
 
 #define AD18XX_PCM_VOLUME(xname, codec) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, info: snd_ac97_ad18xx_pcm_info_volume, \
-  get: snd_ac97_ad18xx_pcm_get_volume, put: snd_ac97_ad18xx_pcm_put_volume, \
-  private_value: codec }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .info = snd_ac97_ad18xx_pcm_info_volume, \
+  .get = snd_ac97_ad18xx_pcm_get_volume, .put = snd_ac97_ad18xx_pcm_put_volume, \
+  .private_value = codec }
 
 static int snd_ac97_ad18xx_pcm_info_volume(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -911,7 +914,7 @@ static int snd_ac97_try_volume_mix(ac97_t * ac97, int reg)
 {
 	unsigned short val, mask = 0x8000;
 
-	if (ac97->limited_regs && ! test_bit(reg, ac97->reg_accessed))
+	if (! snd_ac97_valid_reg(ac97, reg))
 		return 0;
 
 	switch (reg) {
@@ -1452,7 +1455,7 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 	char name[64];
 	signed long end_time;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_ac97_dev_free,
+		.dev_free =	snd_ac97_dev_free,
 	};
 
 	snd_assert(rac97 != NULL, return -EINVAL);
@@ -1752,10 +1755,7 @@ static void snd_ac97_proc_regs_read_main(ac97_t *ac97, snd_info_buffer_t * buffe
 	int reg, val;
 
 	for (reg = 0; reg < 0x80; reg += 2) {
-		if (ac97->limited_regs && ! test_bit(reg, ac97->reg_accessed))
-			val = 0xffff;
-		else
-			val = snd_ac97_read(ac97, reg);
+		val = snd_ac97_read(ac97, reg);
 		snd_iprintf(buffer, "%i:%02x = %04x\n", subidx, reg, val);
 	}
 }

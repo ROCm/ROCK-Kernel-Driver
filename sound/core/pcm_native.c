@@ -2523,9 +2523,9 @@ static unsigned long snd_pcm_mmap_status_nopage(struct vm_area_struct *area, uns
 
 static struct vm_operations_struct snd_pcm_vm_ops_status =
 {
-	nopage:		snd_pcm_mmap_status_nopage,
+	.nopage =	snd_pcm_mmap_status_nopage,
 #ifndef VM_RESERVED
-	swapout:	snd_pcm_mmap_swapout,
+	.swapout =	snd_pcm_mmap_swapout,
 #endif
 };
 
@@ -2577,9 +2577,9 @@ static unsigned long snd_pcm_mmap_control_nopage(struct vm_area_struct *area, un
 
 static struct vm_operations_struct snd_pcm_vm_ops_control =
 {
-	nopage:		snd_pcm_mmap_control_nopage,
+	.nopage =	snd_pcm_mmap_control_nopage,
 #ifndef VM_RESERVED
-	swapout:	snd_pcm_mmap_swapout,
+	.swapout =	snd_pcm_mmap_swapout,
 #endif
 };
 
@@ -2662,11 +2662,11 @@ static unsigned long snd_pcm_mmap_data_nopage(struct vm_area_struct *area, unsig
 
 static struct vm_operations_struct snd_pcm_vm_ops_data =
 {
-	open:		snd_pcm_mmap_data_open,
-	close:		snd_pcm_mmap_data_close,
-	nopage:		snd_pcm_mmap_data_nopage,
+	.open =		snd_pcm_mmap_data_open,
+	.close =	snd_pcm_mmap_data_close,
+	.nopage =	snd_pcm_mmap_data_nopage,
 #ifndef VM_RESERVED
-	swapout:	snd_pcm_mmap_swapout,
+	.swapout =	snd_pcm_mmap_swapout,
 #endif
 };
 
@@ -2842,44 +2842,44 @@ static int snd_pcm_hw_params_old_user(snd_pcm_substream_t * substream, struct sn
 
 static struct file_operations snd_pcm_f_ops_playback = {
 #ifndef LINUX_2_2
-	owner:		THIS_MODULE,
+	.owner =	THIS_MODULE,
 #endif
-	write:		snd_pcm_write,
+	.write =	snd_pcm_write,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 3, 44)
-	writev:		snd_pcm_writev,
+	.writev =	snd_pcm_writev,
 #endif
-	open:		snd_pcm_open,
-	release:	snd_pcm_release,
-	poll:		snd_pcm_playback_poll,
-	ioctl:		snd_pcm_playback_ioctl,
-	mmap:		snd_pcm_mmap,
-	fasync:		snd_pcm_fasync,
+	.open =		snd_pcm_open,
+	.release =	snd_pcm_release,
+	.poll =		snd_pcm_playback_poll,
+	.ioctl =	snd_pcm_playback_ioctl,
+	.mmap =		snd_pcm_mmap,
+	.fasync =	snd_pcm_fasync,
 };
 
 static struct file_operations snd_pcm_f_ops_capture = {
 #ifndef LINUX_2_2
-	owner:		THIS_MODULE,
+	.owner =	THIS_MODULE,
 #endif
-	read:		snd_pcm_read,
+	.read =		snd_pcm_read,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 3, 44)
-	readv:		snd_pcm_readv,
+	.readv =	snd_pcm_readv,
 #endif
-	open:		snd_pcm_open,
-	release:	snd_pcm_release,
-	poll:		snd_pcm_capture_poll,
-	ioctl:		snd_pcm_capture_ioctl,
-	mmap:		snd_pcm_mmap,
-	fasync:		snd_pcm_fasync,
+	.open =		snd_pcm_open,
+	.release =	snd_pcm_release,
+	.poll =		snd_pcm_capture_poll,
+	.ioctl =	snd_pcm_capture_ioctl,
+	.mmap =		snd_pcm_mmap,
+	.fasync =	snd_pcm_fasync,
 };
 
 snd_minor_t snd_pcm_reg[2] =
 {
 	{
-		comment:	"digital audio playback",
-		f_ops:		&snd_pcm_f_ops_playback,
+		.comment =	"digital audio playback",
+		.f_ops =	&snd_pcm_f_ops_playback,
 	},
 	{
-		comment:	"digital audio capture",
-		f_ops:		&snd_pcm_f_ops_capture,
+		.comment =	"digital audio capture",
+		.f_ops =	&snd_pcm_f_ops_capture,
 	}
 };
