@@ -1381,7 +1381,7 @@ static struct request *get_request_wait(request_queue_t *q, int rw)
 			 * no wakeup will be delivered.  So now we're on the
 			 * waitqueue, go check for that.
 			 */
-			rq = get_request(q, rw, GFP_ATOMIC & ~__GFP_HIGH);
+			rq = get_request(q, rw, GFP_NOIO);
 			if (!rq)
 				io_schedule();
 			finish_wait(&rl->wait[rw], &wait);
