@@ -72,7 +72,6 @@ struct rfcomm_dev {
 	struct tasklet_struct   wakeup_task;
 
 	atomic_t 		wmem_alloc;
-	unsigned int 		sndbuf;
 };
 
 static LIST_HEAD(rfcomm_dev_list);
@@ -200,8 +199,6 @@ static int rfcomm_dev_add(struct rfcomm_dev_req *req, struct rfcomm_dlc *dlc)
 	dev->flags = req->flags & 
 		((1 << RFCOMM_RELEASE_ONHUP) | (1 << RFCOMM_REUSE_DLC));
 
-	dev->sndbuf = RFCOMM_MAX_CREDITS * RFCOMM_DEFAULT_MTU * 10;
-
 	init_waitqueue_head(&dev->wait);
 	tasklet_init(&dev->wakeup_task, rfcomm_tty_wakeup, (unsigned long) dev);
 
@@ -238,6 +235,13 @@ static void rfcomm_dev_del(struct rfcomm_dev *dev)
 }
 
 /* ---- Send buffer ---- */
+static inline unsigned int rfcomm_room(struct rfcomm_dlc *dlc)
+{
+	/* We can't let it be zero, because we don't get a callback
+	   when tx_credits becomes nonzero, hence we'd never wake up */
+	return dlc->mtu * (dlc->tx_credits?:1);
+}
+
 static void rfcomm_wfree(struct sk_buff *skb)
 {
 	struct rfcomm_dev *dev = (void *) skb->sk;
@@ -257,7 +261,7 @@ static inline void rfcomm_set_owner_w(struct sk_buff *skb, struct rfcomm_dev *de
 
 static struct sk_buff *rfcomm_wmalloc(struct rfcomm_dev *dev, unsigned long size, int priority)
 {
-	if (atomic_read(&dev->wmem_alloc) < dev->sndbuf) {
+	if (atomic_read(&dev->wmem_alloc) < rfcomm_room(dev->dlc)) {
 		struct sk_buff *skb = alloc_skb(size, priority);
 		if (skb) {
 			rfcomm_set_owner_w(skb, dev);
@@ -651,11 +655,14 @@ static int rfcomm_tty_write(struct tty_struct *tty, int from_user, const unsigne
 static int rfcomm_tty_write_room(struct tty_struct *tty)
 {
 	struct rfcomm_dev *dev = (struct rfcomm_dev *) tty->driver_data;
-	struct rfcomm_dlc *dlc = dev->dlc;
+	int room;
 
 	BT_DBG("tty %p", tty);
 
-	return dlc->mtu * (dlc->tx_credits ? : 10);
+	room = rfcomm_room(dev->dlc) - atomic_read(&dev->wmem_alloc);
+	if (room < 0)
+		room = 0;
+	return room;
 }
 
 static int rfcomm_tty_set_modem_status(uint cmd, struct rfcomm_dlc *dlc, uint status)
