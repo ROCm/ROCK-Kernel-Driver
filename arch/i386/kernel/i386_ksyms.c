@@ -29,6 +29,7 @@
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
+#include <asm/nmi.h>
 
 extern void dump_thread(struct pt_regs *, struct user *);
 extern spinlock_t rtc_lock;
@@ -151,6 +152,10 @@ EXPORT_SYMBOL(smp_call_function);
 EXPORT_SYMBOL(flush_tlb_page);
 #endif
 
+#if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_PM)
+EXPORT_SYMBOL_GPL(set_nmi_pm_callback);
+EXPORT_SYMBOL_GPL(unset_nmi_pm_callback);
+#endif
 #ifdef CONFIG_X86_IO_APIC
 EXPORT_SYMBOL(IO_APIC_get_PCI_irq_vector);
 #endif
@@ -169,6 +174,8 @@ EXPORT_SYMBOL(rtc_lock);
 
 EXPORT_SYMBOL_GPL(register_profile_notifier);
 EXPORT_SYMBOL_GPL(unregister_profile_notifier);
+EXPORT_SYMBOL_GPL(set_nmi_callback);
+EXPORT_SYMBOL_GPL(unset_nmi_callback);
  
 #undef memcpy
 #undef memset
