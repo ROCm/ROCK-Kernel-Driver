@@ -27,10 +27,13 @@
 #include "mach.h"
 
 
-/* SRAM and SDRAM are vaguely contiguous (with a hole in between; see
-   mach_reserve_bootmem for details), so just use both as one big area.  */
+/* SRAM and SDRAM are vaguely contiguous (with a big hole in between; see
+   mach_reserve_bootmem for details); use both as one big area.  */
 #define RAM_START 	SRAM_ADDR
 #define RAM_END		(SDRAM_ADDR + SDRAM_SIZE)
+
+/* The bits of this port are connected to an 8-LED bar-graph.  */
+#define LEDS_PORT	0
 
 
 static void anna_led_tick (void);
@@ -44,7 +47,7 @@ void __init mach_early_init (void)
 	ANNA_BPC    = 0;
 	ANNA_BSC    = 0xAAAA;
 	ANNA_BEC    = 0;
-	ANNA_BHC    = 0x00FF;	/* icache all memory, dcache none */
+	ANNA_BHC    = 0xFFFF;	/* icache all memory, dcache all */
 	ANNA_BCT(0) = 0xB088;
 	ANNA_BCT(1) = 0x0008;
 	ANNA_DWC(0) = 0x0027;
@@ -64,7 +67,7 @@ void __init mach_setup (char **cmdline)
 	nb85e_uart_cons_init (1);
 #endif
 
-	ANNA_PORT_PM (0) = 0;	/* Make all LED pins output pins.  */
+	ANNA_PORT_PM (LEDS_PORT) = 0;	/* Make all LED pins output pins.  */
 	mach_tick = anna_led_tick;
 }
 
@@ -132,7 +135,7 @@ void machine_halt (void)
 	disable_reset_guard ();
 #endif
 	local_irq_disable ();	/* Ignore all interrupts.  */
-	ANNA_PORT_IO(0) = 0xAA;	/* Note that we halted.  */
+	ANNA_PORT_IO(LEDS_PORT) = 0xAA;	/* Note that we halted.  */
 	for (;;)
 		asm ("halt; nop; nop; nop; nop; nop");
 }
@@ -185,9 +188,9 @@ static void anna_led_tick ()
 
 			if (pos + dir <= max_pos) {
 				/* Each bit of port 0 has a LED. */
-				clear_bit (pos, &ANNA_PORT_IO(0));
+				clear_bit (pos, &ANNA_PORT_IO(LEDS_PORT));
 				pos += dir;
-				set_bit (pos, &ANNA_PORT_IO(0));
+				set_bit (pos, &ANNA_PORT_IO(LEDS_PORT));
 			}
 		}
 
