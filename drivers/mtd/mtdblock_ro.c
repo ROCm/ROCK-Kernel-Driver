@@ -267,7 +267,6 @@ int __init init_mtdblock(void)
 	}
 	
 	/* Allow the block size to default to BLOCK_SIZE. */
-	blksize_size[MAJOR_NR] = NULL;
 	blk_size[MAJOR_NR] = mtd_sizes;
 	
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), &mtdblock_request);
@@ -277,7 +276,6 @@ int __init init_mtdblock(void)
 static void __exit cleanup_mtdblock(void)
 {
 	unregister_blkdev(MAJOR_NR,DEVICE_NAME);
-	blksize_size[MAJOR_NR] = NULL;
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 }
 

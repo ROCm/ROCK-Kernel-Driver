@@ -81,7 +81,6 @@
 static int max_loop = 8;
 static struct loop_device *loop_dev;
 static int *loop_sizes;
-static int *loop_blksizes;
 static devfs_handle_t devfs_handle;      /*  For the directory */
 
 /*
@@ -284,7 +283,7 @@ static int lo_receive(struct loop_device *lo, struct bio *bio, int bsize, loff_t
 
 static inline int loop_get_bs(struct loop_device *lo)
 {
-	return block_size(to_kdev_t(lo->lo_device->bd_dev));
+	return block_size(lo->lo_device);
 }
 
 static inline unsigned long loop_get_iv(struct loop_device *lo,
@@ -649,7 +648,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	lo->old_gfp_mask = inode->i_mapping->gfp_mask;
 	inode->i_mapping->gfp_mask = GFP_NOIO;
 
-	set_blocksize(dev, block_size(to_kdev_t(lo_device->bd_dev)));
+	set_blocksize(bdev, block_size(lo_device));
 
 	lo->lo_bio = lo->lo_biotail = NULL;
 	kernel_thread(loop_thread, lo, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
@@ -989,10 +988,6 @@ int __init loop_init(void)
 	if (!loop_sizes)
 		goto out_mem;
 
-	loop_blksizes = kmalloc(max_loop * sizeof(int), GFP_KERNEL);
-	if (!loop_blksizes)
-		goto out_mem;
-
 	blk_queue_make_request(BLK_DEFAULT_QUEUE(MAJOR_NR), loop_make_request);
 	blk_queue_bounce_limit(BLK_DEFAULT_QUEUE(MAJOR_NR), BLK_BOUNCE_HIGH);
 
@@ -1007,9 +1002,7 @@ int __init loop_init(void)
 	}
 
 	memset(loop_sizes, 0, max_loop * sizeof(int));
-	memset(loop_blksizes, 0, max_loop * sizeof(int));
 	blk_size[MAJOR_NR] = loop_sizes;
-	blksize_size[MAJOR_NR] = loop_blksizes;
 	for (i = 0; i < max_loop; i++)
 		register_disk(NULL, mk_kdev(MAJOR_NR, i), 1, &lo_fops, 0);
 
@@ -1031,7 +1024,6 @@ void loop_exit(void)
 
 	kfree(loop_dev);
 	kfree(loop_sizes);
-	kfree(loop_blksizes);
 }
 
 module_init(loop_init);

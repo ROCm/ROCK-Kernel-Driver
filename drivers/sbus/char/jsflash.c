@@ -135,7 +135,6 @@ struct jsflash {
 
 /*
  */
-static int jsfd_blksizes[JSF_MAX];
 static int jsfd_sizes[JSF_MAX];
 static u64 jsfd_bytesizes[JSF_MAX];
 
@@ -665,7 +664,6 @@ int jsfd_init(void) {
 		return -EIO;
 	}
 
-	blksize_size[JSFD_MAJOR] = jsfd_blksizes;
 	blk_size[JSFD_MAJOR] = jsfd_sizes;
 
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
@@ -676,7 +674,6 @@ int jsfd_init(void) {
 
 		jdp->refcnt = 0;
 
-		jsfd_blksizes[i] = 1024;
 		jsfd_bytesizes[i] = jdp->dsize;
 		jsfd_sizes[i] = jsfd_bytesizes[i] >> 10;
 		register_disk(NULL, MKDEV(JSFD_MAJOR, i), 1, &jsfd_fops,

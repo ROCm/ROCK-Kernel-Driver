@@ -123,7 +123,6 @@
  *	Some of these can be made smaller later
  */
 
-static int i2ob_blksizes[MAX_I2OB<<4];
 static int i2ob_sizes[MAX_I2OB<<4];
 static int i2ob_media_change_flag[MAX_I2OB];
 
@@ -1815,7 +1814,6 @@ int i2o_block_init(void)
 	 *	Now fill in the boiler plate
 	 */
 	 
-	blksize_size[MAJOR_NR] = i2ob_blksizes;
 	blk_size[MAJOR_NR] = i2ob_sizes;
 	blk_dev[MAJOR_NR].queue = i2ob_get_queue;
 	
@@ -1830,7 +1828,6 @@ int i2o_block_init(void)
 		i2ob_dev[i].head = NULL;
 		i2ob_dev[i].tail = NULL;
 		i2ob_dev[i].depth = MAX_I2OB_DEPTH;
-		i2ob_blksizes[i] = 1024;
 	}
 	
 	/*

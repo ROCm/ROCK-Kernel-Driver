@@ -195,7 +195,6 @@ struct mfm_info {
 
 static struct hd_struct mfm[MFM_MAXDRIVES << 6];
 static int mfm_sizes[MFM_MAXDRIVES << 6];
-static int mfm_blocksizes[MFM_MAXDRIVES << 6];
 static DECLARE_WAIT_QUEUE_HEAD(mfm_wait_open);
 
 /* Stuff from the assembly routines */
@@ -1314,12 +1313,6 @@ static struct block_device_operations mfm_fops =
 static void mfm_geninit (void)
 {
 	int i;
-
-	for (i = 0; i < (MFM_MAXDRIVES << 6); i++) {
-		/* Can't increase this - if you do all hell breaks loose */
-		mfm_blocksizes[i] = 1024;
-	}
-	blksize_size[MAJOR_NR] = mfm_blocksizes;
 
 	mfm_drives = mfm_initdrives();
 

@@ -310,14 +310,13 @@ extern void blk_queue_hardsect_size(request_queue_t *q, unsigned short);
 extern void blk_queue_segment_boundary(request_queue_t *q, unsigned long);
 extern void blk_queue_assign_lock(request_queue_t *q, spinlock_t *);
 extern void blk_queue_prep_rq(request_queue_t *q, prep_rq_fn *pfn);
-extern unsigned long *blk_get_ra_pages(kdev_t kdev);
+extern unsigned long *blk_get_ra_pages(struct block_device *bdev);
 
 extern int blk_rq_map_sg(request_queue_t *, struct request *, struct scatterlist *);
 extern void blk_dump_rq_flags(struct request *, char *);
 extern void generic_unplug_device(void *);
 
 extern int * blk_size[MAX_BLKDEV];	/* in units of 1024 bytes */
-extern int * blksize_size[MAX_BLKDEV];
 
 #define MAX_PHYS_SEGMENTS 128
 #define MAX_HW_SEGMENTS 128
@@ -335,7 +334,6 @@ extern inline void blk_clear(int major)
 #if 0
 	blk_size_in_bytes[major] = NULL;
 #endif
-	blksize_size[major] = NULL;
 }
 
 extern inline int queue_hardsect_size(request_queue_t *q)
@@ -372,17 +370,9 @@ extern inline unsigned int blksize_bits(unsigned int size)
 	return bits;
 }
 
-extern inline unsigned int block_size(kdev_t dev)
+extern inline unsigned int block_size(struct block_device *bdev)
 {
-	int retval = BLOCK_SIZE;
-	int major = major(dev);
-
-	if (blksize_size[major]) {
-		int minor = minor(dev);
-		if (blksize_size[major][minor])
-			retval = blksize_size[major][minor];
-	}
-	return retval;
+	return bdev->bd_block_size;
 }
 
 static inline loff_t blkdev_size_in_bytes(kdev_t dev)

@@ -105,7 +105,6 @@ static ctl_table raid_root_table[] = {
  * subsystems want to have a pre-defined structure
  */
 struct hd_struct md_hd_struct[MAX_MD_DEVS];
-static int md_blocksizes[MAX_MD_DEVS];
 static int md_maxreadahead[MAX_MD_DEVS];
 static mdk_thread_t *md_recovery_thread;
 
@@ -1579,7 +1578,7 @@ static int device_size_calculation(mddev_t * mddev)
 		md_size[mdidx(mddev)] = sb->size * data_disks;
 
 	readahead = (VM_MAX_READAHEAD * 1024) / PAGE_SIZE;
-	ra_pages = blk_get_ra_pages(rdev->dev);
+	ra_pages = blk_get_ra_pages(rdev->bdev);
 	if (ra_pages)
 		readahead = (*ra_pages * PAGE_CACHE_SIZE) / PAGE_SIZE;
 	if (!sb->level || (sb->level == 4) || (sb->level == 5)) {
@@ -1714,9 +1713,18 @@ static int do_md_run(mddev_t * mddev)
 		if (rdev->faulty)
 			continue;
 		invalidate_device(rdev->dev, 1);
+#if 0
+	/*
+	 * Aside of obvious breakage (code below results in block size set
+	 * according to the sector size of last component instead of the
+	 * maximal sector size), we have more interesting problem here.
+	 * Namely, we actually ought to set _sector_ size for the array
+	 * and that requires per-array request queues.  Disabled for now.
+	 */
 		md_blocksizes[mdidx(mddev)] = 1024;
 		if (bdev_hardsect_size(rdev->bdev) > md_blocksizes[mdidx(mddev)])
 			md_blocksizes[mdidx(mddev)] = bdev_hardsect_size(rdev->bdev);
+#endif
 	}
 	mddev->pers = pers[pnum];
 
@@ -3613,11 +3621,9 @@ static void md_geninit(void)
 	int i;
 
 	for(i = 0; i < MAX_MD_DEVS; i++) {
-		md_blocksizes[i] = 1024;
 		md_size[i] = 0;
 		md_maxreadahead[i] = 32;
 	}
-	blksize_size[MAJOR_NR] = md_blocksizes;
 	blk_size[MAJOR_NR] = md_size;
 
 	dprintk("md: sizeof(mdp_super_t) = %d\n", (int)sizeof(mdp_super_t));

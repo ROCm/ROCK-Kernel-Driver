@@ -478,7 +478,6 @@ static struct floppy_struct *current_type[N_DRIVE];
 static struct floppy_struct user_params[N_DRIVE];
 
 static int floppy_sizes[256];
-static int floppy_blocksizes[256];
 
 /*
  * The driver is trying to determine the correct media format
@@ -3881,6 +3880,12 @@ static int floppy_revalidate(kdev_t dev)
 		if (cf)
 			UDRS->generation++;
 		if (NO_GEOM){
+#if 0
+	/*
+	 * What the devil is going on here?  We are not guaranteed to do
+	 * any IO and ENXIO case is nothing but ENOMEM in disguise - it
+	 * happens if and only if buffer cache is out of memory.  WTF?
+	 */
 			/* auto-sensing */
 			int size = floppy_blocksizes[minor(dev)];
 			if (!size)
@@ -3894,6 +3899,9 @@ static int floppy_revalidate(kdev_t dev)
 			process_fd_request();
 			wait_on_buffer(bh);
 			brelse(bh);
+			return 0;
+#endif
+			process_fd_request();
 			return 0;
 		}
 		if (cf)
@@ -4183,7 +4191,6 @@ int __init floppy_init(void)
 			floppy_sizes[i] = MAX_DISK_SIZE;
 
 	blk_size[MAJOR_NR] = floppy_sizes;
-	blksize_size[MAJOR_NR] = floppy_blocksizes;
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request, &floppy_lock);
 	reschedule_timeout(MAXTIMEOUT, "floppy init", MAXTIMEOUT);
 	config_types();

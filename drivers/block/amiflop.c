@@ -141,7 +141,6 @@ static int num_dr_types = sizeof(drive_types) / sizeof(drive_types[0]);
 
 /* defaults for 3 1/2" HD-Disks */
 static int floppy_sizes[256]={880,880,880,880,720,720,720,720,};
-static int floppy_blocksizes[256];
 /* hardsector size assumed to be 512 */
 
 static int amiga_read(int), dos_read(int);
@@ -1858,7 +1857,6 @@ int __init amiga_floppy_init(void)
 	post_write_timer.function = post_write;
   
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request, &amiflop_lock);
-	blksize_size[MAJOR_NR] = floppy_blocksizes;
 	blk_size[MAJOR_NR] = floppy_sizes;
 
 	for (i = 0; i < 128; i++)

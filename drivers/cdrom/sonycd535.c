@@ -1471,8 +1471,6 @@ static struct block_device_operations cdu_fops =
 	check_media_change:	cdu535_check_media_change,
 };
 
-static int sonycd535_block_size = CDU535_BLOCK_SIZE;
-
 /*
  * Initialize the driver.
  */
@@ -1599,8 +1597,7 @@ sony535_init(void)
 				blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR),
 						do_cdu535_request,
 						&sonycd535_lock);
-				blksize_size[MAJOR_NR] = &sonycd535_block_size;
-
+				blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), CDU535_BLOCK_SIZE);
 				sony_toc = (struct s535_sony_toc *)
 					kmalloc(sizeof *sony_toc, GFP_KERNEL);
 				if (sony_toc == NULL) {
