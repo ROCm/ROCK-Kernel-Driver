@@ -5807,6 +5807,7 @@ int __devinit dc395x_init_one(struct pci_dev *dev,
 	u8 irq;
 	struct Scsi_Host *scsi_host;
 	static int banner_done = 0;
+	int error = 0;
 
 	dprintkdbg(DBG_0, "Init one instance of the dc395x\n");
 	if (!banner_done)
@@ -5832,20 +5833,21 @@ int __devinit dc395x_init_one(struct pci_dev *dev,
 		dprintkdbg(DBG_0, "host_init failed\n");
 		return -ENOMEM;
 	}
-
-	pci_set_master(dev);
-
-	/* store pci devices in out host data object. */
 	((struct AdapterCtlBlk *)(scsi_host->hostdata))->dev = dev;
-
-	/* store ptr to scsi host in the PCI device structure */
+	pci_set_master(dev);
 	pci_set_drvdata(dev, scsi_host);
 
 	/* get the scsi mid level to scan for new devices on the bus */
-	scsi_add_host(scsi_host, &dev->dev);	/* XXX handle failure */
-	scsi_scan_host(scsi_host);
-
-	return 0;
+	error = scsi_add_host(scsi_host, &dev->dev);
+	if (error) {
+		dprintkl(KERN_ERR, "scsi_add_host failed\n");
+                error = -ENODEV;
+                host_release(scsi_host);
+                scsi_host_put(scsi_host);
+	} else
+        	scsi_scan_host(scsi_host);
+        	
+	return error;
 }
 
 
@@ -5858,9 +5860,18 @@ int __devinit dc395x_init_one(struct pci_dev *dev,
 static void __devexit dc395x_remove_one(struct pci_dev *dev)
 {
 	struct Scsi_Host *host = pci_get_drvdata(dev);
+
 	dprintkdbg(DBG_0, "Removing instance\n");
-	scsi_remove_host(host);
+	if (!host) {
+		dprintkl(KERN_ERR, "no host allocated\n");
+		return;
+	}
+	if (scsi_remove_host(host)) {
+		dprintkl(KERN_ERR, "scsi_remove_host failed\n");
+		return;
+	}
 	host_release(host);
+	scsi_host_put(host);
 	pci_set_drvdata(dev, NULL);
 }
 
