@@ -2770,8 +2770,10 @@ static int end_bio_bh_io_sync(struct bio *bio, unsigned int bytes_done, int err)
 	if (bio->bi_size)
 		return 1;
 
-	if (err == -EOPNOTSUPP)
+	if (err == -EOPNOTSUPP) {
 		set_bit(BIO_EOPNOTSUPP, &bio->bi_flags);
+		set_bit(BH_Eopnotsupp, &bh->b_state);
+	}
 
 	bh->b_end_io(bh, test_bit(BIO_UPTODATE, &bio->bi_flags));
 	bio_put(bio);
