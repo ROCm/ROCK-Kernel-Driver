@@ -173,6 +173,11 @@ static inline void e1000_rx_checksum(struct e1000_adapter *adapter,
                                      struct e1000_rx_desc *rx_desc,
                                      struct sk_buff *skb);
 void e1000_enable_WOL(struct e1000_adapter *adapter);
+#ifdef NETIF_F_HW_VLAN_TX
+static void e1000_vlan_rx_register(struct net_device *netdev, struct vlan_group *grp);
+static void e1000_vlan_rx_add_vid(struct net_device *netdev, uint16_t vid);
+static void e1000_vlan_rx_kill_vid(struct net_device *netdev, uint16_t vid);
+#endif
 
 /* Exported from other modules */
 
@@ -366,6 +371,11 @@ e1000_probe(struct pci_dev *pdev,
 	netdev->do_ioctl = &e1000_ioctl;
 	netdev->tx_timeout = &e1000_tx_timeout;
 	netdev->watchdog_timeo = HZ;
+#ifdef NETIF_F_HW_VLAN_TX
+	netdev->vlan_rx_register = e1000_vlan_rx_register;
+	netdev->vlan_rx_add_vid = e1000_vlan_rx_add_vid;
+	netdev->vlan_rx_kill_vid = e1000_vlan_rx_kill_vid;
+#endif
 
 	netdev->irq = pdev->irq;
 	netdev->base_addr = mmio_start;
@@ -378,7 +388,15 @@ e1000_probe(struct pci_dev *pdev,
 	e1000_sw_init(adapter);
 
 	if(adapter->hw.mac_type >= e1000_82543) {
+#ifdef NETIF_F_HW_VLAN_TX
+		netdev->features = NETIF_F_SG |
+			           NETIF_F_HW_CSUM |
+		       	           NETIF_F_HW_VLAN_TX |
+		                   NETIF_F_HW_VLAN_RX |
+				   NETIF_F_HW_VLAN_FILTER;
+#else
 		netdev->features = NETIF_F_SG | NETIF_F_HW_CSUM;
+#endif
 	} else {
 		netdev->features = NETIF_F_SG;
 	}
@@ -1254,6 +1272,9 @@ e1000_watchdog(unsigned long data)
 }
 
 #define E1000_TX_FLAGS_CSUM		0x00000001
+#define E1000_TX_FLAGS_VLAN		0x00000002
+#define E1000_TX_FLAGS_VLAN_MASK	0xffff0000
+#define E1000_TX_FLAGS_VLAN_SHIFT	16
 
 static inline boolean_t
 e1000_tx_csum(struct e1000_adapter *adapter, struct sk_buff *skb)
@@ -1358,6 +1379,11 @@ e1000_tx_queue(struct e1000_adapter *adapter, int count, int tx_flags)
 		txd_upper |= E1000_TXD_POPTS_TXSM << 8;
 	}
 
+	if(tx_flags & E1000_TX_FLAGS_VLAN) {
+		txd_lower |= E1000_TXD_CMD_VLE;
+		txd_upper |= (tx_flags & E1000_TX_FLAGS_VLAN_MASK);
+	}
+
 	i = tx_ring->next_to_use;
 
 	while(count--) {
@@ -1415,6 +1441,13 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	if(e1000_tx_csum(adapter, skb))
 		tx_flags |= E1000_TX_FLAGS_CSUM;
 
+#ifdef NETIF_F_HW_VLAN_TX
+	if(adapter->vlgrp && vlan_tx_tag_present(skb)) {
+		tx_flags |= E1000_TX_FLAGS_VLAN;
+		tx_flags |= (vlan_tx_tag_get(skb) << E1000_TX_FLAGS_VLAN_SHIFT);
+	}
+#endif
+	
 	count = e1000_tx_map(adapter, skb);
 
 	e1000_tx_queue(adapter, count, tx_flags);
@@ -1841,7 +1874,17 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 		e1000_rx_checksum(adapter, rx_desc, skb);
 
 		skb->protocol = eth_type_trans(skb, netdev);
+#ifdef NETIF_F_HW_VLAN_TX
+		if(adapter->vlgrp && (rx_desc->status & E1000_RXD_STAT_VP)) {
+			vlan_hwaccel_rx(skb, adapter->vlgrp,
+				(rx_desc->special & E1000_RXD_SPC_VLAN_MASK));
+		} else {
+			netif_rx(skb);
+		}
+#else
 		netif_rx(skb);
+#endif
+		netdev->last_rx = jiffies;
 
 		memset(rx_desc, 0, sizeof(struct e1000_rx_desc));
 		mb();
@@ -2008,7 +2051,84 @@ e1000_write_pci_cfg(struct e1000_hw *hw,
 	struct e1000_adapter *adapter = hw->back;
 
 	pci_write_config_word(adapter->pdev, reg, *value);
-	return;
 }
+
+#ifdef NETIF_F_HW_VLAN_TX
+static void
+e1000_vlan_rx_register(struct net_device *netdev, struct vlan_group *grp)
+{
+	struct e1000_adapter *adapter = netdev->priv;
+	uint32_t ctrl, rctl;
+
+	e1000_irq_disable(adapter);
+	adapter->vlgrp = grp;
+
+	if(grp) {
+		/* enable VLAN tag insert/strip */
+
+		E1000_WRITE_REG(&adapter->hw, VET, ETHERNET_IEEE_VLAN_TYPE);
+
+		ctrl = E1000_READ_REG(&adapter->hw, CTRL);
+		ctrl |= E1000_CTRL_VME;
+		E1000_WRITE_REG(&adapter->hw, CTRL, ctrl);
+
+		/* enable VLAN receive filtering */
+
+		rctl = E1000_READ_REG(&adapter->hw, RCTL);
+		rctl |= E1000_RCTL_VFE;
+		rctl &= ~E1000_RCTL_CFIEN;
+		E1000_WRITE_REG(&adapter->hw, RCTL, rctl);
+	} else {
+		/* disable VLAN tag insert/strip */
+
+		ctrl = E1000_READ_REG(&adapter->hw, CTRL);
+		ctrl &= ~E1000_CTRL_VME;
+		E1000_WRITE_REG(&adapter->hw, CTRL, ctrl);
+
+		/* disable VLAN filtering */
+
+		rctl = E1000_READ_REG(&adapter->hw, RCTL);
+		rctl &= ~E1000_RCTL_VFE;
+		E1000_WRITE_REG(&adapter->hw, RCTL, rctl);
+	}
+
+	e1000_irq_enable(adapter);
+}
+
+static void
+e1000_vlan_rx_add_vid(struct net_device *netdev, uint16_t vid)
+{
+	struct e1000_adapter *adapter = netdev->priv;
+	uint32_t vfta, index;
+
+	/* add VID to filter table */
+
+	index = (vid >> 5) & 0x7F;
+	vfta = E1000_READ_REG_ARRAY(&adapter->hw, VFTA, index);
+	vfta |= (1 << (vid & 0x1F));
+	e1000_write_vfta(&adapter->hw, index, vfta);
+}
+
+static void
+e1000_vlan_rx_kill_vid(struct net_device *netdev, uint16_t vid)
+{
+	struct e1000_adapter *adapter = netdev->priv;
+	uint32_t vfta, index;
+
+	e1000_irq_disable(adapter);
+	
+	if(adapter->vlgrp)
+		adapter->vlgrp->vlan_devices[vid] = NULL;
+	
+	e1000_irq_enable(adapter);
+
+	/* remove VID from filter table*/
+
+	index = (vid >> 5) & 0x7F;
+	vfta = E1000_READ_REG_ARRAY(&adapter->hw, VFTA, index);
+	vfta &= ~(1 << (vid & 0x1F));
+	e1000_write_vfta(&adapter->hw, index, vfta);
+}
+#endif
 
 /* e1000_main.c */

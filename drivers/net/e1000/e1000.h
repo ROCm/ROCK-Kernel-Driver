@@ -108,6 +108,10 @@
 #include <net/pkt_sched.h>
 #include <linux/list.h>
 #include <asm/uaccess.h>
+#include <linux/ethtool.h>
+#ifdef NETIF_F_HW_VLAN_TX
+#include <linux/if_vlan.h>
+#endif
 
 struct e1000_adapter;
 
@@ -184,6 +188,9 @@ struct e1000_adapter {
 	struct timer_list phy_info_timer;
 #ifdef CONFIG_PROC_FS
 	struct list_head proc_list_head;
+#endif
+#ifdef NETIF_F_HW_VLAN_TX
+	struct vlan_group *vlgrp;
 #endif
 	char *id_string;
 	uint32_t bd_number;
