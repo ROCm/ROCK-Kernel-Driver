@@ -271,7 +271,6 @@ struct scsi_lun {
 #define IGNORE_WIDE_RESIDUE 0x23
 #define ACA                 0x24
 #define QAS_REQUEST         0x55
-#define IDENTIFY            0x80
 
 /* Old SCSI2 names, don't use in new code */
 #define BUS_DEVICE_RESET    TARGET_RESET
