@@ -1,7 +1,7 @@
 /*
  * Moxa C101 synchronous serial card driver for Linux
  *
- * Copyright (C) 2000 Krzysztof Halasa <khc@pm.waw.pl>
+ * Copyright (C) 2000-2001 Krzysztof Halasa <khc@pm.waw.pl>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -15,6 +15,7 @@
  *    Moxa C101 User's Manual
  */
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -29,10 +30,8 @@
 
 #include "hd64570.h"
 
-#define DEBUG_RINGS
-/* #define DEBUG_PKT */
 
-static const char* version = "Moxa C101 driver revision: 1.02 for Linux 2.4";
+static const char* version = "Moxa C101 driver version: 1.09";
 static const char* devname = "C101";
 
 #define C101_PAGE 0x1D00
@@ -51,12 +50,12 @@ static char *hw;		/* pointer to hw=xxx command line string */
 typedef struct card_s {
 	hdlc_device hdlc;	/* HDLC device struct - must be first */
 	spinlock_t lock;	/* TX lock */
-	int clkmode;		/* clock mode */
-	int clkrate;		/* clock speed */
-	int line;		/* loopback only */
 	u8 *win0base;		/* ISA window base address */
 	u32 phy_winbase;	/* ISA physical base address */
 	u16 buff_offset;	/* offset of first buffer of first channel */
+	sync_serial_settings settings;
+	unsigned short encoding;
+	unsigned short parity;
 	u8 rxs, txs, tmc;	/* SCA registers */
 	u8 irq;			/* IRQ (3-15) */
 	u8 ring_buffers;	/* number of buffers in a ring */
@@ -71,6 +70,9 @@ typedef struct card_s {
 }card_t;
 
 typedef card_t port_t;
+
+static card_t *first_card;
+static card_t **new_card = &first_card;
 
 
 #define sca_in(reg, card)	   readb((card)->win0base + C101_SCA + (reg))
@@ -105,13 +107,13 @@ static inline void openwin(card_t *card, u8 page)
 #include "hd6457x.c"
 
 
-static int c101_set_clock(port_t *port, int value)
+static int c101_set_iface(port_t *port)
 {
 	u8 msci = get_msci(port);
 	u8 rxs = port->rxs & CLK_BRG_MASK;
 	u8 txs = port->txs & CLK_BRG_MASK;
 
-	switch(value) {
+	switch(port->settings.clock_type) {
 	case CLOCK_EXT:
 		rxs |= CLK_LINE_RX; /* RXC input */
 		txs |= CLK_LINE_TX; /* TXC input */
@@ -140,76 +142,85 @@ static int c101_set_clock(port_t *port, int value)
 	port->txs = txs;
 	sca_out(rxs, msci + RXS, port);
 	sca_out(txs, msci + TXS, port);
-	port->clkmode = value;
+	sca_set_port(port);
 	return 0;
 }
 
 
-static int c101_open(hdlc_device *hdlc)
+static int c101_open(struct net_device *dev)
 {
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 	port_t *port = hdlc_to_port(hdlc);
+	int result = hdlc_open(hdlc);
+	if (result)
+		return result;
 
 	MOD_INC_USE_COUNT;
 	writeb(1, port->win0base + C101_DTR);
 	sca_out(0, MSCI1_OFFSET + CTL, port); /* RTS uses ch#2 output */
 	sca_open(hdlc);
-	c101_set_clock(port, port->clkmode);
-	return 0;
+	return c101_set_iface(port);
 }
 
 
-static void c101_close(hdlc_device *hdlc)
+static int c101_close(struct net_device *dev)
 {
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 	port_t *port = hdlc_to_port(hdlc);
 
 	sca_close(hdlc);
 	writeb(0, port->win0base + C101_DTR);
 	sca_out(CTL_NORTS, MSCI1_OFFSET + CTL, port);
+	hdlc_close(hdlc);
 	MOD_DEC_USE_COUNT;
+	return 0;
 }
 
 
-static int c101_ioctl(hdlc_device *hdlc, struct ifreq *ifr, int cmd)
+static int c101_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	int value = ifr->ifr_ifru.ifru_ivalue;
-	int result = 0;
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 	port_t *port = hdlc_to_port(hdlc);
+	const size_t size = sizeof(sync_serial_settings);
 
-	if(!capable(CAP_NET_ADMIN))
-		return -EPERM;
-
-	switch(cmd) {
-	case HDLCSCLOCK:
-		result = c101_set_clock(port, value);
-	case HDLCGCLOCK:
-		value = port->clkmode;
-		break;
-
-	case HDLCSCLOCKRATE:
-		port->clkrate = value;
-		sca_set_clock(port);
-	case HDLCGCLOCKRATE:
-		value = port->clkrate;
-		break;
-
-	case HDLCSLINE:
-		result = sca_set_loopback(port, value);
-	case HDLCGLINE:
-		value = port->line;
-		break;
-
-#ifdef DEBUG_RINGS
-	case HDLCRUN:
+#ifdef CONFIG_HDLC_DEBUG_RINGS
+	if (cmd == SIOCDEVPRIVATE) {
 		sca_dump_rings(hdlc);
 		return 0;
-#endif /* DEBUG_RINGS */
+	}
+#endif
+	if (cmd != SIOCDEVICE)
+		return hdlc_ioctl(dev, ifr, cmd);
+
+	switch(ifr->ifr_settings.type) {
+	case IF_GET_IFACE:
+		ifr->ifr_settings.type = IF_IFACE_SYNC_SERIAL;
+		if (ifr->ifr_settings.data_length == 0)
+			return 0; /* return interface type only */
+		if (ifr->ifr_settings.data_length < size)
+			return -ENOMEM;	/* buffer too small */
+		if (copy_to_user(ifr->ifr_settings.data,
+				 &port->settings, size))
+			return -EFAULT;
+		ifr->ifr_settings.data_length = size;
+		return 0;
+
+	case IF_IFACE_SYNC_SERIAL:
+		if(!capable(CAP_NET_ADMIN))
+			return -EPERM;
+
+		if (ifr->ifr_settings.data_length != size)
+			return -ENOMEM;	/* incorrect data length */
+
+		if (copy_from_user(&port->settings,
+				   ifr->ifr_settings.data, size))
+			return -EFAULT;
+		/* FIXME - put sanity checks here */
+		return c101_set_iface(port);
 
 	default:
-		return -EINVAL;
+		return hdlc_ioctl(dev, ifr, cmd);
 	}
-
-	ifr->ifr_ifru.ifru_ivalue = value;
-	return result;
 }
 
 
@@ -231,6 +242,7 @@ static void c101_destroy_card(card_t *card)
 
 static int c101_run(unsigned long irq, unsigned long winbase)
 {
+	struct net_device *dev;
 	card_t *card;
 	int result;
 
@@ -284,15 +296,19 @@ static int c101_run(unsigned long irq, unsigned long winbase)
 
 	sca_init(card, 0);
 
+	dev = hdlc_to_dev(&card->hdlc);
+
 	spin_lock_init(&card->lock);
-	hdlc_to_dev(&card->hdlc)->irq = irq;
-	hdlc_to_dev(&card->hdlc)->mem_start = winbase;
-	hdlc_to_dev(&card->hdlc)->mem_end = winbase + C101_MAPPED_RAM_SIZE - 1;
-	hdlc_to_dev(&card->hdlc)->tx_queue_len = 50;
-	card->hdlc.ioctl = c101_ioctl;
-	card->hdlc.open = c101_open;
-	card->hdlc.close = c101_close;
+	dev->irq = irq;
+	dev->mem_start = winbase;
+	dev->mem_end = winbase + C101_MAPPED_RAM_SIZE - 1;
+	dev->tx_queue_len = 50;
+	dev->do_ioctl = c101_ioctl;
+	dev->open = c101_open;
+	dev->stop = c101_close;
+	card->hdlc.attach = sca_attach;
 	card->hdlc.xmit = sca_xmit;
+	card->settings.clock_type = CLOCK_EXT;
 
 	result = register_hdlc_device(&card->hdlc);
 	if (result) {
@@ -319,7 +335,7 @@ static int __init c101_init(void)
 		return -ENOSYS;	/* no parameters specified, abort */
 	}
 
-	printk(KERN_INFO "%s\n", version);
+	printk(KERN_INFO "%s (SCA-%s)\n", version, sca_version);
 
 	do {
 		unsigned long irq, ram;

@@ -48,6 +48,29 @@
 /* Private (from user) interface flags (netdevice->priv_flags). */
 #define IFF_802_1Q_VLAN 0x1             /* 802.1Q VLAN device.          */
 
+
+#define IF_GET_IFACE	0x0001		/* for querying only */
+#define IF_GET_PROTO	0x0002
+
+/* For definitions see hdlc.h */
+#define IF_IFACE_V35	0x1000		/* V.35 serial interface	*/
+#define IF_IFACE_V24	0x1001		/* V.24 serial interface	*/
+#define IF_IFACE_X21	0x1002		/* X.21 serial interface	*/
+#define IF_IFACE_T1	0x1003		/* T1 telco serial interface	*/
+#define IF_IFACE_E1	0x1004		/* E1 telco serial interface	*/
+#define IF_IFACE_SYNC_SERIAL 0x1005	/* cant'b be set by software	*/
+
+/* For definitions see hdlc.h */
+#define IF_PROTO_HDLC	0x2000		/* raw HDLC protocol		*/
+#define IF_PROTO_PPP	0x2001		/* PPP protocol			*/
+#define IF_PROTO_CISCO	0x2002		/* Cisco HDLC protocol		*/
+#define IF_PROTO_FR	0x2003		/* Frame Relay protocol		*/
+#define IF_PROTO_FR_ADD_PVC 0x2004	/*    Create FR PVC		*/
+#define IF_PROTO_FR_DEL_PVC 0x2005	/*    Delete FR PVC		*/
+#define IF_PROTO_X25	0x2006		/* X.25				*/
+
+
+
 /*
  *	Device mapping structure. I'd just gone off and designed a 
  *	beautiful scheme using only loadable modules with arguments
@@ -68,6 +91,14 @@ struct ifmap
 	unsigned char port;
 	/* 3 bytes spare */
 };
+
+struct if_settings
+{
+	unsigned int type;	/* Type of physical device or protocol */
+	unsigned int data_length; /* device/protocol data length */
+	void * data;		/* pointer to data, ignored if length = 0 */
+};
+
 
 /*
  * Interface request structure used for socket
@@ -98,6 +129,7 @@ struct ifreq
 		char	ifru_slave[IFNAMSIZ];	/* Just fits the size */
 		char	ifru_newname[IFNAMSIZ];
 		char *	ifru_data;
+		struct	if_settings ifru_settings;
 	} ifr_ifru;
 };
 
@@ -117,6 +149,7 @@ struct ifreq
 #define ifr_bandwidth	ifr_ifru.ifru_ivalue    /* link bandwidth	*/
 #define ifr_qlen	ifr_ifru.ifru_ivalue	/* Queue length 	*/
 #define ifr_newname	ifr_ifru.ifru_newname	/* New name		*/
+#define ifr_settings	ifr_ifru.ifru_settings	/* Device/proto settings*/
 
 /*
  * Structure used in SIOCGIFCONF request.

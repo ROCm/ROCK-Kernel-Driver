@@ -1,7 +1,7 @@
 /*
  * SDL Inc. RISCom/N2 synchronous serial card driver for Linux
  *
- * Copyright (C) 1998-2000 Krzysztof Halasa <khc@pm.waw.pl>
+ * Copyright (C) 1998-2001 Krzysztof Halasa <khc@pm.waw.pl>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -17,6 +17,7 @@
  *    SDL Inc. PPP/HDLC/CISCO driver
  */
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -33,10 +34,8 @@
 #include <asm/io.h>
 #include "hd64570.h"
 
-#define DEBUG_RINGS
-/* #define DEBUG_PKT */
 
-static const char* version = "SDL RISCom/N2 driver revision: 1.02 for Linux 2.4";
+static const char* version = "SDL RISCom/N2 driver version: 1.09";
 static const char* devname = "RISCom/N2";
 
 #define USE_WINDOWSIZE 16384
@@ -87,9 +86,9 @@ typedef struct port_s {
 	hdlc_device hdlc;	/* HDLC device struct - must be first */
 	struct card_s *card;
 	spinlock_t lock;	/* TX lock */
-	int clkmode;		/* clock mode */
-	int clkrate;		/* clock rate */
-	int line;		/* loopback only */
+	sync_serial_settings settings;
+	unsigned short encoding;
+	unsigned short parity;
 	u8 rxs, txs, tmc;	/* SCA registers */
 	u8 valid;		/* port enabled */
 	u8 phy_node;		/* physical port # - 0 or 1 */
@@ -115,6 +114,9 @@ typedef struct card_s {
 	struct card_s *next_card;
 }card_t;
 
+
+static card_t *first_card;
+static card_t **new_card = &first_card;
 
 
 #define sca_reg(reg, card) (0x8000 | (card)->io | \
@@ -157,7 +159,7 @@ static __inline__ void close_windows(card_t *card)
 
 
 
-static int n2_set_clock(port_t *port, int value)
+static int n2_set_iface(port_t *port)
 {
 	card_t *card = port->card;
 	int io = card->io;
@@ -166,7 +168,7 @@ static int n2_set_clock(port_t *port, int value)
 	u8 rxs = port->rxs & CLK_BRG_MASK;
 	u8 txs = port->txs & CLK_BRG_MASK;
 
-	switch(value) {
+	switch(port->settings.clock_type) {
 	case CLOCK_EXT:
 		mcr &= port->phy_node ? ~CLOCK_OUT_PORT1 : ~CLOCK_OUT_PORT0;
 		rxs |= CLK_LINE_RX; /* RXC input */
@@ -200,17 +202,22 @@ static int n2_set_clock(port_t *port, int value)
 	port->txs = txs;
 	sca_out(rxs, msci + RXS, card);
 	sca_out(txs, msci + TXS, card);
-	port->clkmode = value;
+	sca_set_port(port);
 	return 0;
 }
 
 
 
-static int n2_open(hdlc_device *hdlc)
+static int n2_open(struct net_device *dev)
 {
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 	port_t *port = hdlc_to_port(hdlc);
 	int io = port->card->io;
-	u8 mcr = inb(io + N2_MCR) | (port->phy_node ? TX422_PORT1 : TX422_PORT0);
+	u8 mcr = inb(io + N2_MCR) | (port->phy_node ? TX422_PORT1:TX422_PORT0);
+
+	int result = hdlc_open(hdlc);
+	if (result)
+		return result;
 
 	MOD_INC_USE_COUNT;
 	mcr &= port->phy_node ? ~DTR_PORT1 : ~DTR_PORT0; /* set DTR ON */
@@ -219,14 +226,14 @@ static int n2_open(hdlc_device *hdlc)
 	outb(inb(io + N2_PCR) | PCR_ENWIN, io + N2_PCR); /* open window */
 	outb(inb(io + N2_PSR) | PSR_DMAEN, io + N2_PSR); /* enable dma */
 	sca_open(hdlc);
-	n2_set_clock(port, port->clkmode);
-	return 0;
+	return n2_set_iface(port);
 }
 
 
 
-static void n2_close(hdlc_device *hdlc)
+static int n2_close(struct net_device *dev)
 {
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 	port_t *port = hdlc_to_port(hdlc);
 	int io = port->card->io;
 	u8 mcr = inb(io+N2_MCR) | (port->phy_node ? TX422_PORT1 : TX422_PORT0);
@@ -234,52 +241,57 @@ static void n2_close(hdlc_device *hdlc)
 	sca_close(hdlc);
 	mcr |= port->phy_node ? DTR_PORT1 : DTR_PORT0; /* set DTR OFF */
 	outb(mcr, io + N2_MCR);
+	hdlc_close(hdlc);
 	MOD_DEC_USE_COUNT;
+	return 0;
 }
 
 
 
-static int n2_ioctl(hdlc_device *hdlc, struct ifreq *ifr, int cmd)
+static int n2_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	int value = ifr->ifr_ifru.ifru_ivalue;
-	int result = 0;
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 	port_t *port = hdlc_to_port(hdlc);
+	const size_t size = sizeof(sync_serial_settings);
 
-	if(!capable(CAP_NET_ADMIN))
-		return -EPERM;
-
-	switch(cmd) {
-	case HDLCSCLOCK:
-		result = n2_set_clock(port, value);
-	case HDLCGCLOCK:
-		value = port->clkmode;
-		break;
-
-	case HDLCSCLOCKRATE:
-		port->clkrate = value;
-		sca_set_clock(port);
-	case HDLCGCLOCKRATE:
-		value = port->clkrate;
-		break;
-
-	case HDLCSLINE:
-		result = sca_set_loopback(port, value);
-	case HDLCGLINE:
-		value = port->line;
-		break;
-
-#ifdef DEBUG_RINGS
-	case HDLCRUN:
+#ifdef CONFIG_HDLC_DEBUG_RINGS
+	if (cmd == SIOCDEVPRIVATE) {
 		sca_dump_rings(hdlc);
 		return 0;
-#endif /* DEBUG_RINGS */
+	}
+#endif
+	if (cmd != SIOCDEVICE)
+		return hdlc_ioctl(dev, ifr, cmd);
+
+	switch(ifr->ifr_settings.type) {
+	case IF_GET_IFACE:
+		ifr->ifr_settings.type = IF_IFACE_SYNC_SERIAL;
+		if (ifr->ifr_settings.data_length == 0)
+			return 0; /* return interface type only */
+		if (ifr->ifr_settings.data_length < size)
+			return -ENOMEM;	/* buffer too small */
+		if (copy_to_user(ifr->ifr_settings.data,
+				 &port->settings, size))
+			return -EFAULT;
+		ifr->ifr_settings.data_length = size;
+		return 0;
+
+	case IF_IFACE_SYNC_SERIAL:
+		if(!capable(CAP_NET_ADMIN))
+			return -EPERM;
+
+		if (ifr->ifr_settings.data_length != size)
+			return -ENOMEM;	/* incorrect data length */
+
+		if (copy_from_user(&port->settings,
+				   ifr->ifr_settings.data, size))
+			return -EFAULT;
+		/* FIXME - put sanity checks here */
+		return n2_set_iface(port);
 
 	default:
-		return -EINVAL;
+		return hdlc_ioctl(dev, ifr, cmd);
 	}
-
-	ifr->ifr_ifru.ifru_ivalue = value;
-	return result;
 }
 
 
@@ -465,6 +477,7 @@ static int n2_run(unsigned long io, unsigned long irq, unsigned long winbase,
 	sca_init(card, 0);
 	for (cnt = 0; cnt < 2; cnt++) {
 		port_t *port = &card->ports[cnt];
+		struct net_device *dev = hdlc_to_dev(&port->hdlc);
 
 		if ((cnt == 0 && !valid0) || (cnt == 1 && !valid1))
 			continue;
@@ -476,14 +489,16 @@ static int n2_run(unsigned long io, unsigned long irq, unsigned long winbase,
 			port->log_node = 1;
 
 		spin_lock_init(&port->lock);
-		hdlc_to_dev(&port->hdlc)->irq = irq;
-		hdlc_to_dev(&port->hdlc)->mem_start = winbase;
-		hdlc_to_dev(&port->hdlc)->mem_end = winbase + USE_WINDOWSIZE-1;
-		hdlc_to_dev(&port->hdlc)->tx_queue_len = 50;
-		port->hdlc.ioctl = n2_ioctl;
-		port->hdlc.open = n2_open;
-		port->hdlc.close = n2_close;
+		dev->irq = irq;
+		dev->mem_start = winbase;
+		dev->mem_end = winbase + USE_WINDOWSIZE-1;
+		dev->tx_queue_len = 50;
+		dev->do_ioctl = n2_ioctl;
+		dev->open = n2_open;
+		dev->stop = n2_close;
+		port->hdlc.attach = sca_attach;
 		port->hdlc.xmit = sca_xmit;
+		port->settings.clock_type = CLOCK_EXT;
 
 		if (register_hdlc_device(&port->hdlc)) {
 			printk(KERN_WARNING "n2: unable to register hdlc "
@@ -515,7 +530,7 @@ static int __init n2_init(void)
 		return -ENOSYS;	/* no parameters specified, abort */
 	}
 
-	printk(KERN_INFO "%s\n", version);
+	printk(KERN_INFO "%s (SCA-%s)\n", version, sca_version);
 
 	do {
 		unsigned long io, irq, ram;

@@ -39,9 +39,6 @@ if [ "$CONFIG_WAN" = "y" ]; then
 
    dep_tristate '  Etinc PCISYNC serial board support (EXPERIMENTAL)' CONFIG_DSCC4 m
 
-# FarSite Communications' cards
-
-   tristate '  FarSync T-Series X.21 (and V.35/V.24) cards' CONFIG_FARSYNC
 
 #
 # Lan Media's board. Currently 1000, 1200, 5200, 5245
@@ -55,8 +52,13 @@ if [ "$CONFIG_WAN" = "y" ]; then
 
    tristate '  SyncLink HDLC/SYNCPPP support' CONFIG_SYNCLINK_SYNCPPP
 
-   tristate '  Generic HDLC driver' CONFIG_HDLC
+# Generic HDLC
+
+   tristate '  Generic HDLC layer' CONFIG_HDLC
    if [ "$CONFIG_HDLC" != "n" ]; then
+      bool '    Raw HDLC support' CONFIG_HDLC_RAW
+      bool '    Cisco HDLC support' CONFIG_HDLC_CISCO
+      bool '    Frame Relay support' CONFIG_HDLC_FR
       bool '    Synchronous Point-to-Point Protocol (PPP) support' CONFIG_HDLC_PPP
       if [ "$CONFIG_LAPB" = "m" -a "$CONFIG_HDLC" = "m" -o "$CONFIG_LAPB" = "y" ]; then
 	 bool '    X.25 protocol support' CONFIG_HDLC_X25
@@ -65,6 +67,11 @@ if [ "$CONFIG_WAN" = "y" ]; then
       fi
       dep_tristate '    SDL RISCom/N2 support' CONFIG_N2 $CONFIG_HDLC
       dep_tristate '    Moxa C101 support' CONFIG_C101 $CONFIG_HDLC
+      dep_tristate '    FarSync T-Series support' CONFIG_FARSYNC $CONFIG_HDLC
+      bool '    Debug received/transmitted packets' CONFIG_HDLC_DEBUG_PKT
+      bool '    Debug hard_header routines' CONFIG_HDLC_DEBUG_HARD_HEADER
+      bool '    Debug FECN/BECN conditions' CONFIG_HDLC_DEBUG_ECN
+      bool '    Debug RX/TX packet rings' CONFIG_HDLC_DEBUG_RINGS
    fi
 
    tristate '  Frame relay DLCI support' CONFIG_DLCI

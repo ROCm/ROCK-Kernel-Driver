@@ -1,5 +1,5 @@
 /*
- *      FarSync X21 driver for Linux (2.4.x kernel version)
+ *      FarSync X21 driver for Linux (generic HDLC version)
  *
  *      Actually sync driver for X.21, V.35 and V.24 on FarSync T-series cards
  *
@@ -18,11 +18,10 @@
 #include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/ioport.h>
-#include <linux/netdevice.h>
 #include <linux/init.h>
-#include <linux/if_arp.h>
 #include <asm/uaccess.h>
-#include <net/syncppp.h>
+#include <linux/if.h>
+#include <linux/hdlc.h>
 
 #include "farsync.h"
 
@@ -32,6 +31,7 @@
  */
 MODULE_AUTHOR("R.J.Dunlop <bob.dunlop@farsite.co.uk>");
 MODULE_DESCRIPTION("FarSync T-Series X21 driver. FarSite Communications Ltd.");
+MODULE_LICENSE("GPL");
 
 EXPORT_NO_SYMBOLS;
 
@@ -331,26 +331,15 @@ struct buf_window {
 /*      Per port (line or channel) information
  */
 struct fst_port_info {
-        void                   *if_ptr; /* Some drivers describe this as a
-                                         * general purpose pointer. However if
-                                         * using syncPPP it has a very specific
-                                         * purpose: it must be the first item in
-                                         * the structure pointed to by dev->priv
-                                         * and must in turn point to the
-                                         * associated ppp_device structure.
-                                         */
+        hdlc_device             hdlc;   /* HDLC device struct - must be first */
         struct fst_card_info   *card;   /* Card we're associated with */
         int                     index;  /* Port index on the card */
-        int                     proto;  /* Protocol we are running */
         int                     hwif;   /* Line hardware (lineInterface copy) */
         int                     run;    /* Port is running */
         int                     rxpos;  /* Next Rx buffer to use */
         int                     txpos;  /* Next Tx buffer to use */
         int                     txipos; /* Next Tx buffer to check for free */
         int                     txcnt;  /* Count of Tx buffers in use */
-        struct net_device      *dev;    /* Kernel network device entry */
-        struct net_device_stats stats;  /* Standard statistics */
-        struct ppp_device       pppdev; /* Link to syncPPP */
 };
 
 /*      Per card information
@@ -369,6 +358,11 @@ struct fst_card_info {
                                         /* Per port info */
         struct fst_port_info ports[ FST_MAX_PORTS ];
 };
+
+/* Convert an HDLC device pointer into a port info pointer and similar */
+#define hdlc_to_port(H) ((struct fst_port_info *)(H))
+#define dev_to_port(D)  hdlc_to_port(dev_to_hdlc(D))
+#define port_to_dev(P)  hdlc_to_dev(&(P)->hdlc)
 
 
 /*
@@ -632,25 +626,18 @@ fst_intr_ctlchg ( struct fst_card_info *card, struct fst_port_info *port )
 
         if ( signals & (( port->hwif == X21 ) ? IPSTS_INDICATE : IPSTS_DCD ))
         {
-                if ( ! netif_carrier_ok ( port->dev ))
+                if ( ! netif_carrier_ok ( port_to_dev ( port )))
                 {
                         dbg ( DBG_INTR,"DCD active\n");
-
-                        /* Poke sPPP to renegotiate */
-                        if ( port->proto == FST_HDLC || port->proto == FST_PPP )
-                        {
-                                sppp_reopen ( port->dev );
-                        }
-
-                        netif_carrier_on ( port->dev );
+                        netif_carrier_on ( port_to_dev ( port ));
                 }
         }
         else
         {
-                if ( netif_carrier_ok ( port->dev ))
+                if ( netif_carrier_ok ( port_to_dev ( port )))
                 {
                         dbg ( DBG_INTR,"DCD lost\n");
-                        netif_carrier_off ( port->dev );
+                        netif_carrier_off ( port_to_dev ( port ));
                 }
         }
 }
@@ -693,24 +680,24 @@ fst_intr_rx ( struct fst_card_info *card, struct fst_port_info *port )
                                         len );
         if ( dmabits != ( RX_STP | RX_ENP ) || len > LEN_RX_BUFFER - 2 )
         {
-                port->stats.rx_errors++;
+                port->hdlc.stats.rx_errors++;
 
                 /* Update error stats and discard buffer */
                 if ( dmabits & RX_OFLO )
                 {
-                        port->stats.rx_fifo_errors++;
+                        port->hdlc.stats.rx_fifo_errors++;
                 }
                 if ( dmabits & RX_CRC )
                 {
-                        port->stats.rx_crc_errors++;
+                        port->hdlc.stats.rx_crc_errors++;
                 }
                 if ( dmabits & RX_FRAM )
                 {
-                        port->stats.rx_frame_errors++;
+                        port->hdlc.stats.rx_frame_errors++;
                 }
                 if ( dmabits == ( RX_STP | RX_ENP ))
                 {
-                        port->stats.rx_length_errors++;
+                        port->hdlc.stats.rx_length_errors++;
                 }
 
                 /* Discard buffer descriptors until we see the end of packet
@@ -747,7 +734,7 @@ fst_intr_rx ( struct fst_card_info *card, struct fst_port_info *port )
         {
                 dbg ( DBG_RX,"intr_rx: can't allocate buffer\n");
 
-                port->stats.rx_dropped++;
+                port->hdlc.stats.rx_dropped++;
 
                 /* Return descriptor to card */
                 FST_WRB ( card, rxDescrRing[pi][rxp].bits, DMA_OWN );
@@ -771,29 +758,16 @@ fst_intr_rx ( struct fst_card_info *card, struct fst_port_info *port )
                 port->rxpos = rxp;
 
         /* Update stats */
-        port->stats.rx_packets++;
-        port->stats.rx_bytes += len;
+        port->hdlc.stats.rx_packets++;
+        port->hdlc.stats.rx_bytes += len;
 
         /* Push upstream */
-        if ( port->proto == FST_HDLC || port->proto == FST_PPP )
-        {
-                /* Mark for further processing by sPPP module */
-                skb->protocol = htons ( ETH_P_WAN_PPP );
-        }
-        else
-        {
-                /* DEC customer specific protocol (since nothing defined for
-                 * marking raw data), at least one other driver uses this value
-                 * for this purpose.
-                 */
-                skb->protocol = htons ( ETH_P_CUST );
-                skb->pkt_type = PACKET_HOST;
-        }
         skb->mac.raw = skb->data;
-        skb->dev = port->dev;
+        skb->dev = hdlc_to_dev ( &port->hdlc );
+        skb->protocol = htons ( ETH_P_HDLC );
         netif_rx ( skb );
 
-        port->dev->last_rx = jiffies;
+        port_to_dev ( port )->last_rx = jiffies;
 }
 
 
@@ -844,7 +818,7 @@ fst_intr ( int irq, void *dev_id, struct pt_regs *regs )
                 case CTLB_CHG:
                 case CTLC_CHG:
                 case CTLD_CHG:
-                        if ( port->run && port->dev != NULL )
+                        if ( port->run )
                                 fst_intr_ctlchg ( card, port );
                         break;
 
@@ -863,9 +837,8 @@ fst_intr ( int irq, void *dev_id, struct pt_regs *regs )
                          * always load up the entire packet for DMA.
                          */
                         dbg ( DBG_TX,"Tx underflow port %d\n", event & 0x03 );
-
-                        port->stats.tx_errors++;
-                        port->stats.tx_fifo_errors++;
+                        port->hdlc.stats.tx_errors++;
+                        port->hdlc.stats.tx_fifo_errors++;
                         break;
 
                 case INIT_CPLT:
@@ -890,7 +863,7 @@ fst_intr ( int irq, void *dev_id, struct pt_regs *regs )
 
         for ( pi = 0, port = card->ports ; pi < card->nports ; pi++, port++ )
         {
-                if ( port->dev == NULL || ! port->run )
+                if ( ! port->run )
                         continue;
 
                 /* Check for rx completions */
@@ -907,7 +880,7 @@ fst_intr ( int irq, void *dev_id, struct pt_regs *regs )
                         --port->txcnt;
                         if ( ++port->txipos >= NUM_TX_BUFFER )
                                 port->txipos = 0;
-                        netif_wake_queue ( port->dev );
+                        netif_wake_queue ( port_to_dev ( port ));
                 }
         }
 
@@ -969,145 +942,28 @@ check_started_ok ( struct fst_card_info *card )
 
 
 static int
-fst_change_mtu ( struct net_device *dev, int new_mtu )
-{
-        if ( new_mtu < 128 || new_mtu > FST_MAX_MTU )
-                return -EINVAL;
-        dev->mtu = new_mtu;
-        return 0;
-}
-
-
-/* Sooner or later you can't avoid a forward declaration */
-static int fst_ioctl ( struct net_device *dev, struct ifreq *ifr, int cmd );
-
-static int
-switch_proto ( struct fst_port_info *port, int new_proto )
-{
-        int err;
-        int orig_mtu;
-        struct net_device *dev;
-
-        dev = port->dev;
-
-        /* Turn off sPPP module ? */
-        if (( new_proto != FST_HDLC && new_proto != FST_PPP )
-                && ( port->proto == FST_HDLC || port->proto == FST_PPP ))
-        {
-                sppp_close ( port->pppdev.dev );
-                sppp_detach ( port->pppdev.dev );
-
-                /* Reset some fields overwritten by sPPP */
-                dev->hard_header     = NULL;
-                dev->rebuild_header  = NULL;
-                dev->tx_queue_len    = FST_TX_QUEUE_LEN;
-                dev->type            = ARPHRD_MYTYPE;
-                dev->addr_len        = 0;
-                dev->hard_header_len = 0;
-                dev->do_ioctl        = fst_ioctl;
-                dev->change_mtu      = fst_change_mtu;
-                dev->flags           = IFF_POINTOPOINT|IFF_NOARP;
-
-                return 0;
-        }
-
-        /* Turn on sPPP ? */
-        if (( new_proto == FST_HDLC || new_proto == FST_PPP )
-                && ( port->proto != FST_HDLC && port->proto != FST_PPP ))
-        {
-                orig_mtu = dev->mtu;
-
-                /* Attach to sync PPP module */
-                port->pppdev.dev = dev;
-                sppp_attach ( &port->pppdev );
-
-                if ( orig_mtu < dev->mtu )
-                        dev->change_mtu ( dev, orig_mtu );
-
-                /* Claw back the ioctl routine. We promise to be good and call
-                 * the sync PPP routines once we've eliminated our functions.
-                 */
-                dev->do_ioctl = fst_ioctl;
-
-                /* Set the mode */
-                if ( new_proto == FST_HDLC )
-                {
-                        err = sppp_do_ioctl ( port->pppdev.dev, NULL,
-                                                                SPPPIOCCISCO );
-                }
-                else
-                {
-                        err = sppp_do_ioctl ( port->pppdev.dev, NULL,
-                                                                SPPPIOCPPP );
-                }
-
-                /* Open the device */
-                if ( err == 0 )
-                {
-                        (void) sppp_open ( port->dev );
-                }
-
-                return err;
-        }
-
-        /* Switch sPPP mode to that desired */
-        err = 0;
-        if ( new_proto == FST_HDLC && port->pppdev.dev != NULL )
-        {
-                err = sppp_do_ioctl ( port->pppdev.dev, NULL, SPPPIOCCISCO );
-        }
-        else if ( new_proto == FST_PPP && port->pppdev.dev != NULL )
-        {
-                err = sppp_do_ioctl ( port->pppdev.dev, NULL, SPPPIOCPPP );
-        }
-
-        /* Anything else is switching from one raw mode to another which is
-         * basically a NOP
-         */
-
-        return err;
-}
-
-
-static int
 set_conf_from_info ( struct fst_card_info *card, struct fst_port_info *port,
                 struct fstioc_info *info )
 {
         int err;
 
-        /* Set things according to the user set valid flags */
+        /* Set things according to the user set valid flags.
+         * Several of the old options have been invalidated/replaced by the
+         * generic HDLC package.
+         */
         err = 0;
         if ( info->valid & FSTVAL_PROTO )
-        {
-                if ( port->proto != info->proto )
-                {
-                        err = switch_proto ( port, info->proto );
-                        if ( err == 0 )
-                                port->proto = info->proto;
-                }
-        }
+                err = -EINVAL;
         if ( info->valid & FSTVAL_CABLE )
-        {
-                FST_WRB ( card, portConfig[port->index].lineInterface,
-                                        info->lineInterface );
-                port->hwif = info->lineInterface;
-        }
+                err = -EINVAL;
         if ( info->valid & FSTVAL_SPEED )
-        {
-                FST_WRL ( card, portConfig[port->index].lineSpeed,
-                                        info->lineSpeed );
-                FST_WRB ( card, portConfig[port->index].internalClock,
-                                        info->internalClock );
-        }
+                err = -EINVAL;
+
         if ( info->valid & FSTVAL_MODE )
-        {
                 FST_WRW ( card, cardMode, info->cardMode );
-        }
 #if FST_DEBUG
         if ( info->valid & FSTVAL_DEBUG )
-        {
                 fst_debug_mask = info->debug;
-        }
 #endif
 
         return err;
@@ -1125,7 +981,7 @@ gather_conf_info ( struct fst_card_info *card, struct fst_port_info *port,
         info->nports = card->nports;
         info->type   = card->type;
         info->state  = card->state;
-        info->proto  = port->proto;
+        info->proto  = FST_GEN_HDLC;
         info->index  = i;
 #if FST_DEBUG
         info->debug  = fst_debug_mask;
@@ -1154,6 +1010,119 @@ gather_conf_info ( struct fst_card_info *card, struct fst_port_info *port,
 
 
 static int
+fst_set_iface ( struct fst_card_info *card, struct fst_port_info *port,
+                struct ifreq *ifr )
+{
+        sync_serial_settings sync;
+        int i;
+
+        if ( ifr->ifr_settings.data_length != sizeof ( sync ))
+        {
+                return -ENOMEM;
+        }
+
+        if ( copy_from_user ( &sync, ifr->ifr_settings.data, sizeof ( sync )))
+        {
+                return -EFAULT;
+        }
+
+        if ( sync.loopback )
+                return -EINVAL;
+
+        i = port->index;
+
+        switch ( ifr->ifr_settings.type )
+        {
+        case IF_IFACE_V35:
+                FST_WRW ( card, portConfig[i].lineInterface, V35 );
+                port->hwif = V35;
+                break;
+
+        case IF_IFACE_V24:
+                FST_WRW ( card, portConfig[i].lineInterface, V24 );
+                port->hwif = V24;
+                break;
+
+        case IF_IFACE_X21:
+                FST_WRW ( card, portConfig[i].lineInterface, X21 );
+                port->hwif = X21;
+                break;
+
+        case IF_IFACE_SYNC_SERIAL:
+                break;
+
+        default:
+                return -EINVAL;
+        }
+
+        switch ( sync.clock_type )
+        {
+        case CLOCK_EXT:
+                FST_WRB ( card, portConfig[i].internalClock, EXTCLK );
+                break;
+
+        case CLOCK_INT:
+                FST_WRB ( card, portConfig[i].internalClock, INTCLK );
+                break;
+
+        default:
+                return -EINVAL;
+        }
+        FST_WRL ( card, portConfig[i].lineSpeed, sync.clock_rate );
+        return 0;
+}
+
+static int
+fst_get_iface ( struct fst_card_info *card, struct fst_port_info *port,
+                struct ifreq *ifr )
+{
+        sync_serial_settings sync;
+        int i;
+
+        /* First check what line type is set, we'll default to reporting X.21
+         * if nothing is set as IF_IFACE_SYNC_SERIAL implies it can't be
+         * changed
+         */
+        switch ( port->hwif )
+        {
+        case V35:
+                ifr->ifr_settings.type = IF_IFACE_V35;
+                break;
+        case V24:
+                ifr->ifr_settings.type = IF_IFACE_V24;
+                break;
+        case X21:
+        default:
+                ifr->ifr_settings.type = IF_IFACE_X21;
+                break;
+        }
+        if ( ifr->ifr_settings.data_length == 0 )
+        {
+                return 0;       /* only type requested */
+        }
+
+        if ( ifr->ifr_settings.data_length < sizeof ( sync ))
+        {
+                return -ENOMEM;
+        }
+
+        i = port->index;
+        sync.clock_rate = FST_RDL ( card, portConfig[i].lineSpeed );
+        /* Lucky card and linux use same encoding here */
+        sync.clock_type = FST_RDB ( card, portConfig[i].internalClock );
+        sync.loopback = 0;
+
+        if ( copy_to_user ( ifr->ifr_settings.data, &sync, sizeof ( sync )))
+        {
+                return -EFAULT;
+        }
+
+        ifr->ifr_settings.data_length = sizeof ( sync );
+        return 0;
+}
+
+
+static int
 fst_ioctl ( struct net_device *dev, struct ifreq *ifr, int cmd )
 {
         struct fst_card_info *card;
@@ -1164,7 +1133,7 @@ fst_ioctl ( struct net_device *dev, struct ifreq *ifr, int cmd )
 
         dbg ( DBG_IOCTL,"ioctl: %x, %p\n", cmd, ifr->ifr_data );
 
-        port = dev->priv;
+        port = dev_to_port ( dev );
         card = port->card;
 
         if ( !capable ( CAP_NET_ADMIN ))
@@ -1201,7 +1170,7 @@ fst_ioctl ( struct net_device *dev, struct ifreq *ifr, int cmd )
                  * when going over the top
                  */
                 if ( wrthdr.size > FST_MEMSIZE || wrthdr.offset > FST_MEMSIZE
-                                || wrthdr.size + wrthdr.offset > FST_MEMSIZE )
+				|| wrthdr.size + wrthdr.offset > FST_MEMSIZE )
                 {
                         return -ENXIO;
                 }
@@ -1261,6 +1230,9 @@ fst_ioctl ( struct net_device *dev, struct ifreq *ifr, int cmd )
 
         case FSTSETCONF:
 
+                /* Most of the setting have been moved to the generic ioctls
+                 * this just covers debug and board ident mode now
+                 */
                 if ( copy_from_user ( &info,  ifr->ifr_data, sizeof ( info )))
                 {
                         return -EFAULT;
@@ -1268,12 +1240,25 @@ fst_ioctl ( struct net_device *dev, struct ifreq *ifr, int cmd )
 
                 return set_conf_from_info ( card, port, &info );
 
+        case SIOCDEVICE:
+                switch ( ifr->ifr_settings.type )
+                {
+                case IF_GET_IFACE:
+                        return fst_get_iface ( card, port, ifr );
+
+                case IF_IFACE_SYNC_SERIAL:
+                case IF_IFACE_V35:
+                case IF_IFACE_V24:
+                case IF_IFACE_X21:
+                        return fst_set_iface ( card, port, ifr );
+
+                default:
+                        return hdlc_ioctl ( dev, ifr, cmd );
+                }
+
         default:
-                /* Not one of ours. Pass it through to sPPP package */
-                if ( port->proto == FST_HDLC || port->proto == FST_PPP )
-                        return sppp_do_ioctl ( dev, ifr, cmd );
-                else
-                        return -EINVAL;
+                /* Not one of ours. Pass through to HDLC package */
+                return hdlc_ioctl ( dev, ifr, cmd );
         }
 }
 
@@ -1306,9 +1291,9 @@ fst_openport ( struct fst_port_info *port )
                 signals = FST_RDL ( port->card, v24DebouncedSts[port->index]);
                 if ( signals & (( port->hwif == X21 ) ? IPSTS_INDICATE
                                                       : IPSTS_DCD ))
-                        netif_carrier_on ( port->dev );
+                        netif_carrier_on ( port_to_dev ( port ));
                 else
-                        netif_carrier_off ( port->dev );
+                        netif_carrier_off ( port_to_dev ( port ));
         }
 }
 
@@ -1335,64 +1320,15 @@ fst_closeport ( struct fst_port_info *port )
 static int
 fst_open ( struct net_device *dev )
 {
-        struct fst_card_info *card;
-        struct fst_port_info *port;
-        int orig_mtu;
         int err;
+
+        err = hdlc_open ( dev_to_hdlc ( dev ));
+        if ( err )
+                return err;
 
         MOD_INC_USE_COUNT;
 
-        port = dev->priv;
-        card = port->card;
-
-        switch ( port->proto )
-        {
-        case FST_HDLC:
-        case FST_PPP:
-
-                orig_mtu = dev->mtu;
-
-                /* Attach to sync PPP module */
-                port->pppdev.dev = dev;
-                sppp_attach ( &port->pppdev );
-
-                if ( orig_mtu < dev->mtu )
-                        dev->change_mtu ( dev, orig_mtu );
-
-                /* Claw back the ioctl routine. We promise to be good and call
-                 * the sync PPP routines once we've eliminated our functions.
-                 */
-                dev->do_ioctl = fst_ioctl;
-
-                err = sppp_do_ioctl ( dev, NULL, port->proto == FST_HDLC
-                                                ? SPPPIOCCISCO : SPPPIOCPPP );
-                if ( err )
-		{
-			sppp_detach ( dev );
-			MOD_DEC_USE_COUNT;
-			return err;
-		}
-
-                err = sppp_open ( dev );
-                if ( err )
-		{
-			sppp_detach ( dev );
-			MOD_DEC_USE_COUNT;
-			return err;
-		}
-                break;
-
-        case FST_MONITOR:
-        case FST_RAW:
-                break;
-
-        default:
-                dbg ( DBG_OPEN,"open: Unknown proto %d\n", port->proto );
-                break;
-        }
-
-        fst_openport ( port );
-
+        fst_openport ( dev_to_port ( dev ));
         netif_wake_queue ( dev );
         return 0;
 }
@@ -1400,31 +1336,19 @@ fst_open ( struct net_device *dev )
 static int
 fst_close ( struct net_device *dev )
 {
-        struct fst_port_info *port;
-
-        port = dev->priv;
-
         netif_stop_queue ( dev );
-        switch ( port->proto )
-        {
-        case FST_HDLC:
-        case FST_PPP:
-                sppp_close ( dev );
-                sppp_detach ( dev );
-                break;
-
-        case FST_MONITOR:
-        case FST_RAW:
-                break;
-
-        default:
-                dbg ( DBG_OPEN,"close: Unknown proto %d\n", port->proto );
-                break;
-        }
-
-        fst_closeport ( port );
-
+        fst_closeport ( dev_to_port ( dev ));
+        hdlc_close ( dev_to_hdlc  ( dev ));
         MOD_DEC_USE_COUNT;
+        return 0;
+}
+
+static int
+fst_attach ( hdlc_device *hdlc, unsigned short encoding, unsigned short parity )
+{
+        /* Setting currently fixed in FarSync card so we check and forget */
+        if ( encoding != ENCODING_NRZ || parity != PARITY_CRC16_PR1_CCITT )
+                return -EINVAL;
         return 0;
 }
 
@@ -1436,10 +1360,10 @@ fst_tx_timeout ( struct net_device *dev )
 
         dbg ( DBG_INTR | DBG_TX,"tx_timeout\n");
 
-        port = dev->priv;
+        port = dev_to_port ( dev );
 
-        port->stats.tx_errors++;
-        port->stats.tx_aborted_errors++;
+        port->hdlc.stats.tx_errors++;
+        port->hdlc.stats.tx_aborted_errors++;
 
         if ( port->txcnt > 0 )
                 fst_issue_cmd ( port, ABORTTX );
@@ -1459,22 +1383,15 @@ fst_start_xmit ( struct sk_buff *skb, struct net_device *dev )
         int pi;
         int txp;
 
-        port = dev->priv;
+        port = dev_to_port ( dev );
         card = port->card;
-
-        /* Drop packet if in monitor (rx only) mode */
-        if ( port->proto == FST_MONITOR )
-        {
-                dev_kfree_skb ( skb );
-                return 0;
-        }
 
         /* Drop packet with error if we don't have carrier */
         if ( ! netif_carrier_ok ( dev ))
         {
                 dev_kfree_skb ( skb );
-                port->stats.tx_errors++;
-                port->stats.tx_carrier_errors++;
+                port->hdlc.stats.tx_errors++;
+                port->hdlc.stats.tx_carrier_errors++;
                 return 0;
         }
 
@@ -1484,7 +1401,7 @@ fst_start_xmit ( struct sk_buff *skb, struct net_device *dev )
                 dbg ( DBG_TX,"Packet too large %d vs %d\n", skb->len,
                                                 LEN_TX_BUFFER );
                 dev_kfree_skb ( skb );
-                port->stats.tx_errors++;
+                port->hdlc.stats.tx_errors++;
                 return 0;
         }
 
@@ -1498,7 +1415,7 @@ fst_start_xmit ( struct sk_buff *skb, struct net_device *dev )
                 spin_unlock_irqrestore ( &card->card_lock, flags );
                 dbg ( DBG_TX,"Out of Tx buffers\n");
                 dev_kfree_skb ( skb );
-                port->stats.tx_errors++;
+                port->hdlc.stats.tx_errors++;
                 return 0;
         }
         if ( ++port->txpos >= NUM_TX_BUFFER )
@@ -1518,25 +1435,13 @@ fst_start_xmit ( struct sk_buff *skb, struct net_device *dev )
         FST_WRW ( card, txDescrRing[pi][txp].bcnt, cnv_bcnt ( skb->len ));
         FST_WRB ( card, txDescrRing[pi][txp].bits, DMA_OWN | TX_STP | TX_ENP );
 
-        port->stats.tx_packets++;
-        port->stats.tx_bytes += skb->len;
+        port->hdlc.stats.tx_packets++;
+        port->hdlc.stats.tx_bytes += skb->len;
 
         dev_kfree_skb ( skb );
 
         dev->trans_start = jiffies;
         return 0;
-}
-
-
-static struct net_device_stats *
-fst_get_stats ( struct net_device *dev )
-{
-        struct fst_port_info *port;
-
-        if (( port = dev->priv ) != NULL )
-                return &port->stats;
-        else
-                return NULL;
 }
 
 
@@ -1566,34 +1471,13 @@ fst_init_card ( struct fst_card_info *card )
          */
         for ( i = 0 ; i < card->nports ; i++ )
         {
-                card->ports[i].if_ptr = &card->ports[i].pppdev;
                 card->ports[i].card   = card;
                 card->ports[i].index  = i;
-                card->ports[i].proto  = FST_HDLC;
                 card->ports[i].run    = 0;
 
-                dev = kmalloc ( sizeof ( struct net_device ), GFP_KERNEL );
-                if ( dev == NULL )
-                {
-                        printk_err ("Cannot allocate net_device for port %d\n",
-                                        i );
-                        /* No point going any further */
-                        card->nports = i;
-                        break;
-                }
-                memset ( dev, 0, sizeof ( struct net_device ));
-                card->ports[i].dev = dev;
+                dev = hdlc_to_dev ( &card->ports[i].hdlc );
 
-                if ( dev_alloc_name ( dev, FST_NDEV_NAME "%d") < 0 )
-                {
-                        printk_err ("Cannot allocate i/f name for port %d\n",
-                                        i );
-                        kfree ( dev );
-                        card->nports = i;
-                        break;
-                }
-
-                /* Fill in remainder of the net device info */
+                /* Fill in the net device info */
                                 /* Since this is a PCI setup this is purely
                                  * informational. Give them the buffer addresses
                                  * and basic card I/O.
@@ -1609,26 +1493,19 @@ fst_init_card ( struct fst_card_info *card )
                 dev->base_addr   = card->pci_conf;
                 dev->irq         = card->irq;
 
-                dev->get_stats          = fst_get_stats;
-                dev->mtu                = FST_DEF_MTU;
-                dev->change_mtu         = fst_change_mtu;
-                dev->priv               = &card->ports[i];
-                dev->tx_queue_len       = FST_TX_QUEUE_LEN;
-                dev->type               = ARPHRD_MYTYPE;
-                dev->addr_len           = 0;
-                dev->open               = fst_open;
-                dev->stop               = fst_close;
-                dev->hard_start_xmit    = fst_start_xmit;
-                dev->do_ioctl           = fst_ioctl;
-                dev->watchdog_timeo     = FST_TX_TIMEOUT;
-                dev->tx_timeout         = fst_tx_timeout;
-                dev->flags              = IFF_POINTOPOINT|IFF_NOARP;
+                dev->tx_queue_len          = FST_TX_QUEUE_LEN;
+                dev->open                  = fst_open;
+                dev->stop                  = fst_close;
+                dev->do_ioctl              = fst_ioctl;
+                dev->watchdog_timeo        = FST_TX_TIMEOUT;
+                dev->tx_timeout            = fst_tx_timeout;
+                card->ports[i].hdlc.attach = fst_attach;
+                card->ports[i].hdlc.xmit   = fst_start_xmit;
 
-                if (( err = register_netdev ( dev )) < 0 )
+                if (( err = register_hdlc_device ( &card->ports[i].hdlc )) < 0 )
                 {
-                        printk_err ("Cannot register %s (errno %d)\n",
-                                        dev->name, -err );
-                        kfree ( dev );
+                        printk_err ("Cannot register HDLC device for port %d"
+                                    " (errno %d)\n", i, -err );
                         card->nports = i;
                         break;
                 }
@@ -1637,8 +1514,8 @@ fst_init_card ( struct fst_card_info *card )
         spin_lock_init ( &card->card_lock );
 
         printk ( KERN_INFO "%s-%s: %s IRQ%d, %d ports\n",
-                        card->ports[0].dev->name,
-                        card->ports[card->nports-1].dev->name,
+                        hdlc_to_dev(&card->ports[0].hdlc)->name,
+                        hdlc_to_dev(&card->ports[card->nports-1].hdlc)->name,
                         type_strings[card->type], card->irq, card->nports );
 }
 
@@ -1789,8 +1666,7 @@ fst_remove_one ( struct pci_dev *pdev )
 
         for ( i = 0 ; i < card->nports ; i++ )
         {
-                unregister_netdev ( card->ports[i].dev );
-                kfree ( card->ports[i].dev );
+                unregister_hdlc_device ( &card->ports[i].hdlc );
         }
 
         fst_disable_intr ( card );
@@ -1830,4 +1706,3 @@ fst_cleanup_module(void)
 module_init ( fst_init );
 module_exit ( fst_cleanup_module );
 
-MODULE_LICENSE("GPL");
