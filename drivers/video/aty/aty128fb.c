@@ -2363,7 +2363,7 @@ static int aty128_pci_suspend(struct pci_dev *pdev, u32 state)
 		state = 2;
 #endif /* CONFIG_PPC_PMAC */
 	 
-	if (state != 2 || state == pdev->dev.power_state)
+	if (state != 2 || state == pdev->dev.power.power_state)
 		return 0;
 
 	printk(KERN_DEBUG "aty128fb: suspending...\n");
@@ -2394,7 +2394,7 @@ static int aty128_pci_suspend(struct pci_dev *pdev, u32 state)
 
 	release_console_sem();
 
-	pdev->dev.power_state = state;
+	pdev->dev.power.power_state = state;
 
 	return 0;
 }
@@ -2404,13 +2404,13 @@ static int aty128_pci_resume(struct pci_dev *pdev)
 	struct fb_info *info = pci_get_drvdata(pdev);
 	struct aty128fb_par *par = info->par;
 
-	if (pdev->dev.power_state == 0)
+	if (pdev->dev.power.power_state == 0)
 		return 0;
 
 	acquire_console_sem();
 
 	/* Wakeup chip */
-	if (pdev->dev.power_state == 2)
+	if (pdev->dev.power.power_state == 2)
 		aty128_set_suspend(par, 0);
 	par->asleep = 0;
 
@@ -2430,7 +2430,7 @@ static int aty128_pci_resume(struct pci_dev *pdev)
 
 	release_console_sem();
 
-	pdev->dev.power_state = 0;
+	pdev->dev.power.power_state = 0;
 
 	printk(KERN_DEBUG "aty128fb: resumed !\n");
 
