@@ -73,14 +73,15 @@ static DEFINE_PER_CPU(struct tasklet_struct, rcu_tasklet) = {NULL};
 static int maxbatch = 10;
 
 /**
- * call_rcu - Queue an RCU update request.
+ * call_rcu - Queue an RCU callback for invocation after a grace period.
  * @head: structure to be used for queueing the RCU updates.
  * @func: actual update function to be invoked after the grace period
  *
- * The update function will be invoked as soon as all CPUs have performed 
- * a context switch or been seen in the idle loop or in a user process. 
- * The read-side of critical section that use call_rcu() for updation must 
- * be protected by rcu_read_lock()/rcu_read_unlock().
+ * The update function will be invoked some time after a full grace
+ * period elapses, in other words after all currently executing RCU
+ * read-side critical sections have completed.  RCU read-side critical
+ * sections are delimited by rcu_read_lock() and rcu_read_unlock(),
+ * and may be nested.
  */
 void fastcall call_rcu(struct rcu_head *head,
 				void (*func)(struct rcu_head *rcu))
@@ -98,17 +99,20 @@ void fastcall call_rcu(struct rcu_head *head,
 }
 
 /**
- * call_rcu_bh - Queue an RCU update request for which softirq handler
- * completion is a quiescent state.
+ * call_rcu_bh - Queue an RCU for invocation after a quicker grace period.
  * @head: structure to be used for queueing the RCU updates.
  * @func: actual update function to be invoked after the grace period
  *
- * The update function will be invoked as soon as all CPUs have performed
- * a context switch or been seen in the idle loop or in a user process
- * or has exited a softirq handler that it may have been executing.
- * The read-side of critical section that use call_rcu_bh() for updation must
- * be protected by rcu_read_lock_bh()/rcu_read_unlock_bh() if it is
- * in process context.
+ * The update function will be invoked some time after a full grace
+ * period elapses, in other words after all currently executing RCU
+ * read-side critical sections have completed. call_rcu_bh() assumes
+ * that the read-side critical sections end on completion of a softirq
+ * handler. This means that read-side critical sections in process
+ * context must not be interrupted by softirqs. This interface is to be
+ * used when most of the read-side critical sections are in softirq context.
+ * RCU read-side critical sections are delimited by rcu_read_lock() and
+ * rcu_read_unlock(), * if in interrupt context or rcu_read_lock_bh()
+ * and rcu_read_unlock_bh(), if in process context. These may be nested.
  */
 void fastcall call_rcu_bh(struct rcu_head *head,
 				void (*func)(struct rcu_head *rcu))
@@ -439,8 +443,13 @@ static void wakeme_after_rcu(struct rcu_head  *head)
 }
 
 /**
- * synchronize-kernel - wait until all the CPUs have gone
- * through a "quiescent" state. It may sleep.
+ * synchronize_kernel - wait until a grace period has elapsed.
+ *
+ * Control will return to the caller some time after a full grace
+ * period has elapsed, in other words after all currently executing RCU
+ * read-side critical sections have completed.  RCU read-side critical
+ * sections are delimited by rcu_read_lock() and rcu_read_unlock(),
+ * and may be nested.
  */
 void synchronize_kernel(void)
 {

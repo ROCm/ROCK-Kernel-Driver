@@ -154,9 +154,72 @@ static inline int rcu_pending(int cpu)
 		__rcu_pending(&rcu_bh_ctrlblk, &per_cpu(rcu_bh_data, cpu));
 }
 
+/**
+ * rcu_read_lock - mark the beginning of an RCU read-side critical section.
+ *
+ * When synchronize_kernel() is invoked on one CPU while other CPUs
+ * are within RCU read-side critical sections, then the
+ * synchronize_kernel() is guaranteed to block until after all the other
+ * CPUs exit their critical sections.  Similarly, if call_rcu() is invoked
+ * on one CPU while other CPUs are within RCU read-side critical
+ * sections, invocation of the corresponding RCU callback is deferred
+ * until after the all the other CPUs exit their critical sections.
+ *
+ * Note, however, that RCU callbacks are permitted to run concurrently
+ * with RCU read-side critical sections.  One way that this can happen
+ * is via the following sequence of events: (1) CPU 0 enters an RCU
+ * read-side critical section, (2) CPU 1 invokes call_rcu() to register
+ * an RCU callback, (3) CPU 0 exits the RCU read-side critical section,
+ * (4) CPU 2 enters a RCU read-side critical section, (5) the RCU
+ * callback is invoked.  This is legal, because the RCU read-side critical
+ * section that was running concurrently with the call_rcu() (and which
+ * therefore might be referencing something that the corresponding RCU
+ * callback would free up) has completed before the corresponding
+ * RCU callback is invoked.
+ *
+ * RCU read-side critical sections may be nested.  Any deferred actions
+ * will be deferred until the outermost RCU read-side critical section
+ * completes.
+ *
+ * It is illegal to block while in an RCU read-side critical section.
+ */
 #define rcu_read_lock()		preempt_disable()
+
+/**
+ * rcu_read_unlock - marks the end of an RCU read-side critical section.
+ *
+ * See rcu_read_lock() for more information.
+ */
 #define rcu_read_unlock()	preempt_enable()
+
+/*
+ * So where is rcu_write_lock()?  It does not exist, as there is no
+ * way for writers to lock out RCU readers.  This is a feature, not
+ * a bug -- this property is what provides RCU's performance benefits.
+ * Of course, writers must coordinate with each other.  The normal
+ * spinlock primitives work well for this, but any other technique may be
+ * used as well.  RCU does not care how the writers keep out of each
+ * others' way, as long as they do so.
+ */
+
+/**
+ * rcu_read_lock_bh - mark the beginning of a softirq-only RCU critical section
+ *
+ * This is equivalent of rcu_read_lock(), but to be used when updates
+ * are being done using call_rcu_bh(). Since call_rcu_bh() callbacks
+ * consider completion of a softirq handler to be a quiescent state,
+ * a process in RCU read-side critical section must be protected by
+ * disabling softirqs. Read-side critical sections in interrupt context
+ * can use just rcu_read_lock().
+ *
+ */
 #define rcu_read_lock_bh()	local_bh_disable()
+
+/*
+ * rcu_read_unlock_bh - marks the end of a softirq-only RCU critical section
+ *
+ * See rcu_read_lock_bh() for more information.
+ */
 #define rcu_read_unlock_bh()	local_bh_enable()
 
 extern void rcu_init(void);
