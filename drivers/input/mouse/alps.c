@@ -342,7 +342,7 @@ static int alps_reconnect(struct psmouse *psmouse)
 	unsigned char param[4];
 	int version;
 
-	if ((priv->i = alps_get_model(psmouse, &version)) < 0)
+	if (!(priv->i = alps_get_model(psmouse, &version)))
 		return -1;
 
 	if (priv->i->flags & ALPS_PASS && alps_passthrough_mode(psmouse, 1))
@@ -384,7 +384,7 @@ int alps_init(struct psmouse *psmouse)
 		goto init_fail;
 	memset(priv, 0, sizeof(struct alps_data));
 
-	if ((priv->i = alps_get_model(psmouse, &version)) < 0)
+	if (!(priv->i = alps_get_model(psmouse, &version)))
 		goto init_fail;
 
 	if ((priv->i->flags & ALPS_PASS) && alps_passthrough_mode(psmouse, 1))

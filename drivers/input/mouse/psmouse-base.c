@@ -175,6 +175,12 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		printk(KERN_WARNING "psmouse.c: %s at %s lost synchronization, throwing %d bytes away.\n",
 		       psmouse->name, psmouse->phys, psmouse->pktcnt);
 		psmouse->pktcnt = 0;
+
+		if (++psmouse->out_of_sync == psmouse->resetafter) {
+			psmouse->state = PSMOUSE_IGNORE;
+			printk(KERN_NOTICE "psmouse.c: issuing reconnect request\n");
+			serio_reconnect(psmouse->ps2dev.serio);
+		}
 	}
 
 	psmouse->last = jiffies;
