@@ -245,9 +245,6 @@ static int is_php_dn(struct device_node *dn, int **indexes, int **names, int **t
 static int is_dr_dn(struct device_node *dn, int **indexes, int **names, int **types,
 	  int **power_domains, int **my_drc_index)
 {
-	if (!is_hotplug_capable(dn))
-		return (0);
-
 	*my_drc_index = (int *) get_property(dn, "ibm,my-drc-index", NULL);
 	if(!*my_drc_index) 		
 		return (0);
@@ -293,6 +290,12 @@ char *rpaphp_get_drc_name(struct device_node *dn)
 	return ptr;
 }
 
+static int is_dlpar_drc_type(const char *type_str)
+{
+	/* Only register DLPAR-capable nodes of drc-type PHB or SLOT */
+	return (!strcmp(type_str, "PHB") || !strcmp(type_str, "SLOT"));
+}
+
 /****************************************************************
  *	rpaphp not only registers PCI hotplug slots(HOTPLUG), 
  *	but also logical DR slots(EMBEDDED).
@@ -329,15 +332,18 @@ int rpaphp_add_slot(struct device_node *dn)
 		for (i = 0; i < indexes[0]; i++,
 	     		name += (strlen(name) + 1), type += (strlen(type) + 1)) {
 
-			if ( slot_type == HOTPLUG || 
-				(slot_type == EMBEDDED && indexes[i + 1] == my_drc_index[0])) {
-				
+			if (slot_type == HOTPLUG ||
+			    (slot_type == EMBEDDED &&
+			     indexes[i + 1] == my_drc_index[0] &&
+			     is_dlpar_drc_type(type))) {
 				if (!(slot = alloc_slot_struct(dn, indexes[i + 1], name,
 					       power_domains[i + 1]))) {
 					retval = -ENOMEM;
 					goto exit;
 				}
-				if (slot_type == EMBEDDED)
+				if (!strcmp(type, "PHB"))
+					slot->type = PHB;
+				else if (slot_type == EMBEDDED)
 					slot->type = EMBEDDED;
 				else
 					slot->type = simple_strtoul(type, NULL, 10);

@@ -408,15 +408,52 @@ static int setup_pci_hotplug_slot_info(struct slot *slot)
 	return 0;
 }
 
+static int set_phb_slot_name(struct slot *slot)
+{
+	struct device_node *dn;
+	struct pci_controller *phb;
+	struct pci_bus *bus;
+
+	dn = slot->dn;
+	if (!dn) {
+		return 1;
+	}
+	phb = dn->phb;
+	if (!phb) {
+		return 1;
+	}
+	bus = phb->bus;
+	if (!bus) {
+		return 1;
+	}
+
+	sprintf(slot->name, "%04x:%02x:%02x.%x", pci_domain_nr(bus),
+			bus->number, 0, 0);
+	return 0;
+}
+
 static int setup_pci_slot(struct slot *slot)
 {
-	slot->bridge = rpaphp_find_bridge_pdev(slot);
-	if (!slot->bridge) {	/* slot being added doesn't have pci_dev yet */
-		err("%s: no pci_dev for bridge dn %s\n", __FUNCTION__, slot->name);
-		goto exit_rc;
+	int rc;
+
+	if (slot->type == PHB) {
+		rc = set_phb_slot_name(slot);
+		if (rc) {
+			err("%s: failed to set phb slot name\n", __FUNCTION__);
+			goto exit_rc;
+		}
+	} else {
+		slot->bridge = rpaphp_find_bridge_pdev(slot);
+		if (!slot->bridge) {
+			/* slot being added doesn't have pci_dev yet */
+			err("%s: no pci_dev for bridge dn %s\n",
+					__FUNCTION__, slot->name);
+			goto exit_rc;
+		}
+		dbg("%s set slot->name to %s\n",  __FUNCTION__,
+				pci_name(slot->bridge));
+		strcpy(slot->name, pci_name(slot->bridge));
 	}
-	dbg("%s set slot->name to %s\n",  __FUNCTION__, pci_name(slot->bridge));
-	strcpy(slot->name, pci_name(slot->bridge));
 
 	/* find slot's pci_dev if it's not empty */
 	if (slot->hotplug_slot->info->adapter_status == EMPTY) {
@@ -470,10 +507,10 @@ int register_pci_slot(struct slot *slot)
 	int rc = 1;
 
 	slot->dev_type = PCI_DEV;
-	if (slot->type == EMBEDDED)
-		slot->removable = EMBEDDED;
+	if ((slot->type == EMBEDDED) || (slot->type == PHB))
+		slot->removable = 0;
 	else
-		slot->removable = HOTPLUG;
+		slot->removable = 1;
 	INIT_LIST_HEAD(&slot->dev.pci_funcs);
 	if (setup_pci_hotplug_slot_info(slot))
 		goto exit_rc;

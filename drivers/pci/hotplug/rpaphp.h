@@ -30,6 +30,7 @@
 #include <linux/pci.h>
 #include "pci_hotplug.h"
 
+#define	PHB     2
 #define	HOTPLUG	1
 #define	EMBEDDED 0
 
