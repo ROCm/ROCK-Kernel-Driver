@@ -3725,6 +3725,9 @@ xfs_iaccess(
 	if (!(orgmode & S_IXUSR) || (inode->i_mode & S_IXUGO))
 		if (capable_cred(cr, CAP_DAC_OVERRIDE))
 			return 0;
+	if ((orgmode & S_IXUSR) && S_ISDIR(inode->i_mode))
+		if (capable_cred(cr, CAP_DAC_OVERRIDE))
+			return 0;
 
 	if ((orgmode == S_IRUSR) ||
 	    (((ip->i_d.di_mode & S_IFMT) == S_IFDIR) &&

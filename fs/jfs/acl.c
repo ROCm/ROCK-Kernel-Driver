@@ -195,6 +195,9 @@ check_capabilities:
 		if (capable(CAP_DAC_OVERRIDE))
 			return 0;
 
+	if ((mask & MAY_EXEC) && S_ISDIR(inode->i_mode))
+		if (capable(CAP_DAC_OVERRIDE))
+			return 0;
 	/*
 	 * Searching includes executable on directories, else just read.
 	 */

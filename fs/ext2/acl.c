@@ -325,6 +325,9 @@ check_capabilities:
 	if (!(mask & MAY_EXEC) || (inode->i_mode & S_IXUGO))
 		if (capable(CAP_DAC_OVERRIDE))
 			return 0;
+	if ((mask & MAY_EXEC) && S_ISDIR(inode->i_mode))
+		if (capable(CAP_DAC_OVERRIDE))
+			return 0;
 	/* Read and search granted if capable(CAP_DAC_READ_SEARCH) */
 	if (capable(CAP_DAC_READ_SEARCH) && ((mask == MAY_READ) ||
 	    (S_ISDIR(inode->i_mode) && !(mask & MAY_WRITE))))

@@ -194,6 +194,21 @@ int vfs_permission(struct inode * inode, int mask)
 		if (capable(CAP_DAC_OVERRIDE))
 			return 0;
 
+	/* The real fix would be this:
+	if (capable(CAP_DAC_READ_SEARCH)) {
+		mask &= S_ISDIR(inode->i_mode) ?
+			~(MAY_READ|MAY_EXEC) : ~MAY_READ;
+	}
+
+	if (capable(CAP_DAC_WRITE))
+		mask &= ~MAY_WRITE;
+
+	return mask ? -EACCESS : 0;
+	*/
+	if ((mask & MAY_EXEC) && S_ISDIR(inode->i_mode))
+		if (capable(CAP_DAC_OVERRIDE))
+			return 0;
+
 	/*
 	 * Searching includes executable on directories, else just read.
 	 */
