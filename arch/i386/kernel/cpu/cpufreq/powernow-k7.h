@@ -8,14 +8,6 @@
  *
  */
 
-#ifndef MSR_K7_FID_VID_CTL
-#define MSR_K7_FID_VID_CTL		0xc0010041
-#endif
-#ifndef MSR_K7_FID_VID_STATUS
-#define MSR_K7_FID_VID_STATUS	0xc0010042
-#endif
-
-
 union msr_fidvidctl {
 	struct {
 		unsigned FID:5,			// 4:0

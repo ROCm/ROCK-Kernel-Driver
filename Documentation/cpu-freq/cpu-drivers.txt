@@ -41,15 +41,16 @@ on what is necessary:
 1.1 Initialization
 ------------------
 
-First of all, in an __initcall level 7 or later (preferrably
-module_init() so that your driver is modularized) function check
-whether this kernel runs on the right CPU and the right chipset. If
-so, register a struct cpufreq_driver with the CPUfreq core using
-cpufreq_register_driver()
+First of all, in an __initcall level 7 (module_init()) or later
+function check whether this kernel runs on the right CPU and the right
+chipset. If so, register a struct cpufreq_driver with the CPUfreq core
+using cpufreq_register_driver()
 
 What shall this struct cpufreq_driver contain? 
 
 cpufreq_driver.name -		The name of this driver.
+
+cpufreq_driver.owner -		THIS_MODULE;
 
 cpufreq_driver.init -		A pointer to the per-CPU initialization 
 				function.
@@ -76,8 +77,7 @@ cpufreq driver registers itself, the per-CPU initialization function
 cpufreq_driver.init is called. It takes a struct cpufreq_policy
 *policy as argument. What to do now?
 
-If necessary, activate the CPUfreq support on your CPU (unlock that
-register etc.).
+If necessary, activate the CPUfreq support on your CPU.
 
 Then, the driver must fill in the following values:
 
