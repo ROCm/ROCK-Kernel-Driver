@@ -1451,7 +1451,7 @@ static int set_serial_info(struct async_struct * info,
 		goto check_and_exit;
 	}
 
-	new_serial.irq = irq_cannonicalize(new_serial.irq);
+	new_serial.irq = irq_canonicalize(new_serial.irq);
 
 	if ((new_serial.irq >= NR_IRQS) || (new_serial.irq < 0) || 
 	    (new_serial.baud_base < 9600)|| (new_serial.type < PORT_UNKNOWN) ||
@@ -2662,7 +2662,7 @@ static int __init rs_init(void)
 		state->icount.rx = state->icount.tx = 0;
 		state->icount.frame = state->icount.parity = 0;
 		state->icount.overrun = state->icount.brk = 0;
-		state->irq = irq_cannonicalize(state->irq);
+		state->irq = irq_canonicalize(state->irq);
 		if (state->hub6)
 			state->io_type = SERIAL_IO_HUB6;
 		if (state->port && check_region(state->port,8)) {

@@ -167,7 +167,7 @@ static int __init ac_probe1(int ioaddr, struct net_device *dev)
 		dev->irq = config2irq(inb(ioaddr + AC_CONFIG));
 		printk(", using");
 	} else {
-		dev->irq = irq_cannonicalize(dev->irq);
+		dev->irq = irq_canonicalize(dev->irq);
 		printk(", assigning");
 	}
 

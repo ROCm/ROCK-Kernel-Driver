@@ -683,7 +683,7 @@ uart_set_info(struct uart_state *state, struct serial_struct *newinfo)
 	if (HIGH_BITS_OFFSET)
 		new_port += (unsigned long) new_serial.port_high << HIGH_BITS_OFFSET;
 
-	new_serial.irq = irq_cannonicalize(new_serial.irq);
+	new_serial.irq = irq_canonicalize(new_serial.irq);
 
 	/*
 	 * This semaphore protects state->count.  It is also

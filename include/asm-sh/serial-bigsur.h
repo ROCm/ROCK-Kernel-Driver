@@ -25,6 +25,6 @@
 #define SERIAL_PORT_DFNS STD_SERIAL_PORT_DEFNS
 
 /* XXX: This should be moved ino irq.h */
-#define irq_cannonicalize(x) (x)
+#define irq_canonicalize(x) (x)
 
 #endif /* _ASM_SERIAL_BIGSUR_H */

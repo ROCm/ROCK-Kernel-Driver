@@ -1830,7 +1830,7 @@ static void __init serial8250_isa_init_ports(void)
 	for (i = 0, up = serial8250_ports; i < ARRAY_SIZE(old_serial_port);
 	     i++, up++) {
 		up->port.iobase   = old_serial_port[i].port;
-		up->port.irq      = irq_cannonicalize(old_serial_port[i].irq);
+		up->port.irq      = irq_canonicalize(old_serial_port[i].irq);
 		up->port.uartclk  = old_serial_port[i].baud_base * 16;
 		up->port.flags    = old_serial_port[i].flags |
 				    UPF_RESOURCES;

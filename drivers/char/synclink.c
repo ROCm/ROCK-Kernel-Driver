@@ -4608,7 +4608,7 @@ int mgsl_enum_isa_devices()
 		/* Copy user configuration info to device instance data */
 		info->io_base = (unsigned int)io[i];
 		info->irq_level = (unsigned int)irq[i];
-		info->irq_level = irq_cannonicalize(info->irq_level);
+		info->irq_level = irq_canonicalize(info->irq_level);
 		info->dma_level = (unsigned int)dma[i];
 		info->bus_type = MGSL_BUS_TYPE_ISA;
 		info->io_addr_size = 16;

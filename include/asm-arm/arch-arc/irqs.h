@@ -57,4 +57,4 @@
  */
 #define FIQ_START		64
 
-#define irq_cannonicalize(i)	(i)
+#define irq_canonicalize(i)	(i)

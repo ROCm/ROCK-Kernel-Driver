@@ -25,7 +25,7 @@ struct machdep_calls {
 	int		(*show_cpuinfo)(struct seq_file *m);
 	int		(*show_percpuinfo)(struct seq_file *m, int i);
 	/* Optional, may be NULL. */
-	unsigned int	(*irq_cannonicalize)(unsigned int irq);
+	unsigned int	(*irq_canonicalize)(unsigned int irq);
 	void		(*init_IRQ)(void);
 	int		(*get_irq)(struct pt_regs *);
 	

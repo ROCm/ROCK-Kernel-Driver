@@ -26,4 +26,4 @@
 #define IRQ_EXPMODCS0		12
 #define IRQ_EXPMODCS1		13
 
-#define irq_cannonicalize(i)	(i)
+#define irq_canonicalize(i)	(i)
