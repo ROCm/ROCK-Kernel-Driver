@@ -482,7 +482,7 @@ cmd_gzip = gzip -f -9 < $< > $@
 .PHONY: $(subdir-ym)
 
 $(subdir-ym):
-	@$(call descend,$@,$(MAKECMDGOALS))
+	+@$(call descend,$@,$(MAKECMDGOALS))
 
 # Add FORCE to the prequisites of a target to force it to be always rebuilt.
 # ---------------------------------------------------------------------------

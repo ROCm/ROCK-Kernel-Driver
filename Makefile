@@ -187,7 +187,7 @@ scripts/docproc scripts/fixdep scripts/split-include : scripts ;
 
 .PHONY: scripts
 scripts:
-	@$(call descend,scripts,)
+	+@$(call descend,scripts,)
 
 # Objects we will link into vmlinux / subdirs we need to visit
 # ---------------------------------------------------------------------------
@@ -374,7 +374,7 @@ $(sort $(vmlinux-objs)): $(SUBDIRS) ;
 
 .PHONY: $(SUBDIRS)
 $(SUBDIRS): .hdepend prepare
-	@$(call descend,$@,)
+	+@$(call descend,$@,)
 
 #	Things we need done before we descend to build or make
 #	module versions are listed in "prepare"
@@ -397,17 +397,17 @@ targets += arch/$(ARCH)/vmlinux.lds.s
 # ---------------------------------------------------------------------------
 
 %.s: %.c FORCE
-	@$(call descend,$(@D),$(@F))
+	+@$(call descend,$(@D),$(@F))
 %.i: %.c FORCE
-	@$(call descend,$(@D),$(@F))
+	+@$(call descend,$(@D),$(@F))
 %.o: %.c FORCE
-	@$(call descend,$(@D),$(@F))
+	+@$(call descend,$(@D),$(@F))
 %.lst: %.c FORCE
-	@$(call descend,$(@D),$(@F))
+	+@$(call descend,$(@D),$(@F))
 %.s: %.S FORCE
-	@$(call descend,$(@D),$(@F))
+	+@$(call descend,$(@D),$(@F))
 %.o: %.S FORCE
-	@$(call descend,$(@D),$(@F))
+	+@$(call descend,$(@D),$(@F))
 
 # 	FIXME: The asm symlink changes when $(ARCH) changes. That's
 #	hard to detect, but I suppose "make mrproper" is a good idea
@@ -492,7 +492,7 @@ include/linux/modversions.h: scripts/fixdep prepare FORCE
 	$(update-if-changed)
 
 $(patsubst %,_sfdep_%,$(SUBDIRS)): FORCE
-	@$(call descend,$(patsubst _sfdep_%,%,$@),fastdep)
+	+@$(call descend,$(patsubst _sfdep_%,%,$@),fastdep)
 
 else # !CONFIG_MODVERSIONS
 
@@ -544,7 +544,7 @@ _modinst_post:
 
 .PHONY: $(patsubst %, _modinst_%, $(SUBDIRS))
 $(patsubst %, _modinst_%, $(SUBDIRS)) :
-	@$(call descend,$(patsubst _modinst_%,%,$@),modules_install)
+	+@$(call descend,$(patsubst _modinst_%,%,$@),modules_install)
 
 else # CONFIG_MODULES
 
@@ -642,11 +642,11 @@ ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 	make_with_config
 
 xconfig:
-	@$(call descend,scripts,scripts/kconfig.tk)
+	+@$(call descend,scripts,scripts/kconfig.tk)
 	wish -f scripts/kconfig.tk
 
 menuconfig:
-	@$(call descend,scripts,lxdialog)
+	+@$(call descend,scripts,lxdialog)
 	$(CONFIG_SHELL) $(src)/scripts/Menuconfig arch/$(ARCH)/config.in
 
 config:
@@ -732,7 +732,7 @@ clean:	archclean
 		-name .\*.tmp -o -name .\*.d \) -type f -print \
 		| grep -v lxdialog/ | xargs rm -f
 	@rm -f $(CLEAN_FILES)
-	@$(call descend,Documentation/DocBook,clean)
+	+@$(call descend,Documentation/DocBook,clean)
 
 mrproper: clean archmrproper
 	@echo 'Making mrproper'
@@ -741,8 +741,8 @@ mrproper: clean archmrproper
 		-type f -print | xargs rm -f
 	@rm -rf $(MRPROPER_DIRS)
 	@rm -f $(MRPROPER_FILES)
-	@$(call descend,scripts,mrproper)
-	@$(call descend,Documentation/DocBook,mrproper)
+	+@$(call descend,scripts,mrproper)
+	+@$(call descend,Documentation/DocBook,mrproper)
 
 distclean: mrproper
 	@echo 'Making distclean'
@@ -829,7 +829,7 @@ help:
 # Documentation targets
 # ---------------------------------------------------------------------------
 sgmldocs psdocs pdfdocs htmldocs: scripts
-	@$(call descend,Documentation/DocBook,$@)
+	+@$(call descend,Documentation/DocBook,$@)
 
 # Scripts to check various things for consistency
 # ---------------------------------------------------------------------------
