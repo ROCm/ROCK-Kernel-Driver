@@ -1111,7 +1111,7 @@ config HIGHMEM_START
 
 config LOWMEM_SIZE_BOOL
 	bool "Set maximum low memory"
-	depends on ADVANCED_OPTIONS && HIGHMEM
+	depends on ADVANCED_OPTIONS
 	help
 	  This option allows you to set the maximum amount of memory which
 	  will be used as "low memory", that is, memory which the kernel can
