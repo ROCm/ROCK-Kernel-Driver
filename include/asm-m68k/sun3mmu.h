@@ -1,12 +1,11 @@
 /*
  * Definitions for Sun3 custom MMU.
  */
-#include <asm/movs.h>
-
 #ifndef __SUN3_MMU_H__
 #define __SUN3_MMU_H__
 
-#define FC_CONTROL 3
+#include <asm/movs.h>
+#include <asm/sun3-head.h>
 
 /* MMU characteristics. */
 #define SUN3_SEGMAPS_PER_CONTEXT	2048

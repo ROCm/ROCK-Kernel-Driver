@@ -31,8 +31,6 @@ struct linux_romvec *romvec;
 /* prom vector table */
 e_vector *sun3x_prom_vbr;
 
-extern e_vector vectors[256];  /* arch/m68k/kernel/traps.c */
-
 /* Handle returning to the prom */
 void sun3x_halt(void)
 {
