@@ -2884,8 +2884,7 @@ S: Minto, NSW, 2566
 S: Australia
 
 N: Stephen Smalley
-E: sds@tislabs.com
-E: ssmalley@nai.com
+E: sds@epoch.ncsc.mil
 D: portions of the Linux Security Module (LSM) framework and security modules
 
 N: Chris Smith
