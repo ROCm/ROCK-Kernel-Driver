@@ -998,7 +998,6 @@ typedef struct hwif_s {
  */
 typedef ide_startstop_t (ide_pre_handler_t)(ide_drive_t *, struct request *);
 typedef ide_startstop_t (ide_handler_t)(ide_drive_t *);
-typedef ide_startstop_t (ide_post_handler_t)(ide_drive_t *);
 typedef int (ide_expiry_t)(ide_drive_t *);
 
 typedef struct hwgroup_s {
@@ -1360,7 +1359,6 @@ typedef struct ide_task_s {
 	int			command_type;
 	ide_pre_handler_t	*prehandler;
 	ide_handler_t		*handler;
-	ide_post_handler_t	*posthandler;
 	struct request		*rq;		/* copy of request */
 	void			*special;	/* valid_t generally */
 } ide_task_t;
@@ -1458,15 +1456,6 @@ extern ide_startstop_t task_mulout_intr(ide_drive_t *);
 extern void ide_init_drive_taskfile(struct request *);
 
 extern int ide_raw_taskfile(ide_drive_t *, ide_task_t *, u8 *);
-
-extern ide_pre_handler_t * ide_pre_handler_parser(struct hd_drive_task_hdr *, struct hd_drive_hob_hdr *);
-
-extern ide_handler_t * ide_handler_parser(struct hd_drive_task_hdr *, struct hd_drive_hob_hdr *);
-
-extern ide_post_handler_t * ide_post_handler_parser(struct hd_drive_task_hdr *, struct hd_drive_hob_hdr *);
-
-/* Expects args is a full set of TF registers and parses the command type */
-extern int ide_cmd_type_parser(ide_task_t *);
 
 int ide_taskfile_ioctl(ide_drive_t *, unsigned int, unsigned long);
 int ide_cmd_ioctl(ide_drive_t *, unsigned int, unsigned long);
