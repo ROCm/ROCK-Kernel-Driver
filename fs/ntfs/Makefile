@@ -8,9 +8,9 @@ ntfs-objs := aops.o attrib.o compress.o debug.o dir.o file.o inode.o logfile.o \
 EXTRA_CFLAGS = -DNTFS_VERSION=\"2.1.8-WIP\"
 
 ifeq ($(CONFIG_NTFS_DEBUG),y)
-#EXTRA_CFLAGS += -DDEBUG
+EXTRA_CFLAGS += -DDEBUG
 endif
 
 ifeq ($(CONFIG_NTFS_RW),y)
-#EXTRA_CFLAGS += -DNTFS_RW
+EXTRA_CFLAGS += -DNTFS_RW
 endif
