@@ -52,6 +52,7 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/wrapper.h>
+#include <linux/mm.h>
 #include <asm/io.h>
 
 #include "pwc.h"
@@ -177,37 +178,6 @@ static struct video_device pwc_template = {
 /***************************************************************************/
 /* Private functions */
 
-/* Memory management functions, nicked from cpia.c, which nicked them from
-   bttv.c. So far, I've counted duplication of this code 6 times 
-   (bttv, cpia, ibmcam, ov511, pwc, ieee1394).
- */
-
-/* Given PGD from the address space's page table, return the kernel
- * virtual mapping of the physical memory mapped at ADR.
- */
-static inline unsigned long uvirt_to_kva(pgd_t *pgd, unsigned long adr)
-{
-        unsigned long ret = 0UL;
-	pmd_t *pmd;
-	pte_t *ptep, pte;
-  
-	if (!pgd_none(*pgd)) {
-                pmd = pmd_offset(pgd, adr);
-                if (!pmd_none(*pmd)) {
-                        ptep = pte_offset(pmd, adr);
-                        pte = *ptep;
-                        if(pte_present(pte)) {
-				ret  = (unsigned long) page_address(pte_page(pte));
-				ret |= (adr & (PAGE_SIZE - 1));
-				
-			}
-                }
-        }
-	return ret;
-}
-
-
-
 /* Here we want the physical address of the memory.
  * This is used when initializing the contents of the
  * area and marking the pages as reserved.
@@ -217,7 +187,7 @@ static inline unsigned long kvirt_to_pa(unsigned long adr)
         unsigned long va, kva, ret;
 
         va = VMALLOC_VMADDR(adr);
-        kva = uvirt_to_kva(pgd_offset_k(va), va);
+	kva = page_address(vmalloc_to_page(pgd_offset_k(va), va));
 	ret = __pa(kva);
         return ret;
 }

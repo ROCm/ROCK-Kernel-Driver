@@ -271,15 +271,18 @@ void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long a
 	pmd = pmd_alloc(tsk->mm, pgd, address);
 	if (!pmd)
 		goto out;
-	pte = pte_alloc(tsk->mm, pmd, address);
+	pte = pte_alloc_map(tsk->mm, pmd, address);
 	if (!pte)
 		goto out;
-	if (!pte_none(*pte))
+	if (!pte_none(*pte)) {
+		pte_unmap(pte);
 		goto out;
+	}
 	lru_cache_add(page);
 	flush_dcache_page(page);
 	flush_page_to_ram(page);
 	set_pte(pte, pte_mkdirty(pte_mkwrite(mk_pte(page, PAGE_COPY))));
+	pte_unmap(pte);
 	tsk->mm->rss++;
 	spin_unlock(&tsk->mm->page_table_lock);
 

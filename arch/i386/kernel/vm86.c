@@ -93,7 +93,7 @@ static void mark_screen_rdonly(struct task_struct * tsk)
 {
 	pgd_t *pgd;
 	pmd_t *pmd;
-	pte_t *pte;
+	pte_t *pte, *mapped;
 	int i;
 
 	pgd = pgd_offset(tsk->mm, 0xA0000);
@@ -112,12 +112,15 @@ static void mark_screen_rdonly(struct task_struct * tsk)
 		pmd_clear(pmd);
 		return;
 	}
-	pte = pte_offset(pmd, 0xA0000);
+	preempt_disable();
+	pte = mapped = pte_offset_map(pmd, 0xA0000);
 	for (i = 0; i < 32; i++) {
 		if (pte_present(*pte))
 			set_pte(pte, pte_wrprotect(*pte));
 		pte++;
 	}
+	pte_unmap(mapped);
+	preempt_enable();
 	flush_tlb();
 }
 

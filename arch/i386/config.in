@@ -153,14 +153,25 @@ tristate '/dev/cpu/*/msr - Model-specific register support' CONFIG_X86_MSR
 tristate '/dev/cpu/*/cpuid - CPU information support' CONFIG_X86_CPUID
 
 choice 'High Memory Support' \
-	"off    CONFIG_NOHIGHMEM \
-	 4GB    CONFIG_HIGHMEM4G \
-	 64GB   CONFIG_HIGHMEM64G" off
+	"off           CONFIG_NOHIGHMEM \
+	 4GB           CONFIG_HIGHMEM4G \
+	 4GB-highpte   CONFIG_HIGHMEM4G_HIGHPTE \
+	 64GB          CONFIG_HIGHMEM64G \
+	 64GB-highpte  CONFIG_HIGHMEM64G_HIGHPTE" off
 if [ "$CONFIG_HIGHMEM4G" = "y" ]; then
    define_bool CONFIG_HIGHMEM y
 fi
+if [ "$CONFIG_HIGHMEM4G_HIGHPTE" = "y" ]; then
+   define_bool CONFIG_HIGHMEM y
+   define_bool CONFIG_HIGHPTE y
+fi
 if [ "$CONFIG_HIGHMEM64G" = "y" ]; then
    define_bool CONFIG_HIGHMEM y
+   define_bool CONFIG_X86_PAE y
+fi
+if [ "$CONFIG_HIGHMEM64G_HIGHPTE" = "y" ]; then
+   define_bool CONFIG_HIGHMEM y
+   define_bool CONFIG_HIGHPTE y
    define_bool CONFIG_X86_PAE y
 fi
 
@@ -397,11 +408,13 @@ comment 'Kernel hacking'
 
 bool 'Kernel debugging' CONFIG_DEBUG_KERNEL
 if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
-   bool '  Debug high memory support' CONFIG_DEBUG_HIGHMEM
    bool '  Debug memory allocations' CONFIG_DEBUG_SLAB
    bool '  Memory mapped I/O debugging' CONFIG_DEBUG_IOVIRT
    bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ
    bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK
+   if [ "$CONFIG_HIGHMEM" = "y" ]; then
+      bool '  Highmem debugging' CONFIG_DEBUG_HIGHMEM
+   fi
 fi
 
 endmenu

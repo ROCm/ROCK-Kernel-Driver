@@ -145,7 +145,6 @@ void cpu_idle (void)
 		while (!need_resched())
 			idle();
 		schedule();
-		check_pgt_cache();
 	}
 }
 

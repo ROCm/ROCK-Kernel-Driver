@@ -215,8 +215,11 @@ static inline struct page *uvirt_to_page(pgd_t *pgd, unsigned long adr)
 	if (!pgd_none(*pgd)) {
                 pmd = pmd_offset(pgd, adr);
                 if (!pmd_none(*pmd)) {
-                        ptep = pte_offset(pmd, adr);
+			preempt_disable();
+                        ptep = pte_offset_map(pmd, adr);
                         pte = *ptep;
+			pte_unmap(pte);
+			preempt_enable();
                         if(pte_present(pte))
 				ret = pte_page(pte);
                 }

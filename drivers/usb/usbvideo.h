@@ -330,7 +330,6 @@ void usbvideo_TestPattern(uvd_t *uvd, int fullframe, int pmode);
 void usbvideo_VideosizeToString(char *buf, int bufLen, videosize_t vs);
 
 /* Memory allocation routines */
-unsigned long usbvideo_uvirt_to_kva(pgd_t *pgd, unsigned long adr);
 unsigned long usbvideo_kvirt_to_pa(unsigned long adr);
 void *usbvideo_rvmalloc(unsigned long size);
 void usbvideo_rvfree(void *mem, unsigned long size);

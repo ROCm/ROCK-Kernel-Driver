@@ -4,7 +4,6 @@
 #include <linux/config.h>
 #include <linux/bio.h>
 #include <linux/fs.h>
-#include <asm/pgalloc.h>
 
 #ifdef CONFIG_HIGHMEM
 
@@ -16,6 +15,7 @@ extern struct page *highmem_start_page;
 unsigned int nr_free_highpages(void);
 
 extern void create_bounce(unsigned long pfn, int gfp, struct bio **bio_orig);
+extern void check_highmem_ptes(void);
 
 static inline char *bh_kmap(struct buffer_head *bh)
 {
@@ -92,8 +92,9 @@ static inline void clear_user_highpage(struct page *page, unsigned long vaddr)
 
 static inline void clear_highpage(struct page *page)
 {
-	clear_page(kmap(page));
-	kunmap(page);
+	void *kaddr = kmap_atomic(page, KM_USER0);
+	clear_page(kaddr);
+	kunmap_atomic(kaddr, KM_USER0);
 }
 
 /*
@@ -101,15 +102,16 @@ static inline void clear_highpage(struct page *page)
  */
 static inline void memclear_highpage_flush(struct page *page, unsigned int offset, unsigned int size)
 {
-	char *kaddr;
+	void *kaddr;
 
 	if (offset + size > PAGE_SIZE)
 		BUG();
-	kaddr = kmap(page);
-	memset(kaddr + offset, 0, size);
+
+	kaddr = kmap_atomic(page, KM_USER0);
+	memset((char *)kaddr + offset, 0, size);
 	flush_dcache_page(page);
 	flush_page_to_ram(page);
-	kunmap(page);
+	kunmap_atomic(kaddr, KM_USER0);
 }
 
 static inline void copy_user_highpage(struct page *to, struct page *from, unsigned long vaddr)

@@ -21,6 +21,7 @@
 #include <linux/completion.h>
 #include <asm/mmu_context.h>
 #include <linux/kernel_stat.h>
+#include <linux/highmem.h>
 
 /*
  * Priority of a process goes from 0 to 139. The 0-99
@@ -410,7 +411,7 @@ void sched_exit(task_t * p)
 }
 
 #if CONFIG_SMP
-asmlinkage void schedule_tail(task_t *prev)
+asmlinkage void schedule_tail(void)
 {
 	spin_unlock_irq(&this_rq()->lock);
 }
@@ -761,6 +762,9 @@ asmlinkage void schedule(void)
 
 	if (unlikely(in_interrupt()))
 		BUG();
+#if CONFIG_DEBUG_HIGHMEM
+	check_highmem_ptes();
+#endif
 need_resched:
 	preempt_disable();
 	prev = current;

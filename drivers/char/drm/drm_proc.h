@@ -449,7 +449,8 @@ static int DRM(_vma_info)(char *buf, char **start, off_t offset, int request,
 		for (i = vma->vm_start; i < vma->vm_end; i += PAGE_SIZE) {
 			pgd = pgd_offset(vma->vm_mm, i);
 			pmd = pmd_offset(pgd, i);
-			pte = pte_offset(pmd, i);
+			preempt_disable();
+			pte = pte_offset_map(pmd, i);
 			if (pte_present(*pte)) {
 				address = __pa(pte_page(*pte))
 					+ (i & (PAGE_SIZE-1));
@@ -465,6 +466,8 @@ static int DRM(_vma_info)(char *buf, char **start, off_t offset, int request,
 			} else {
 				DRM_PROC_PRINT("      0x%08lx\n", i);
 			}
+			pte_unmap(pte);
+			preempt_enable();
 		}
 #endif
 	}

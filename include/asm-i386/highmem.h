@@ -26,12 +26,6 @@
 #include <asm/kmap_types.h>
 #include <asm/pgtable.h>
 
-#ifdef CONFIG_DEBUG_HIGHMEM
-#define HIGHMEM_DEBUG 1
-#else
-#define HIGHMEM_DEBUG 0
-#endif
-
 /* declarations for highmem.c */
 extern unsigned long highstart_pfn, highend_pfn;
 
@@ -94,7 +88,7 @@ static inline void *kmap_atomic(struct page *page, enum km_type type)
 
 	idx = type + KM_TYPE_NR*smp_processor_id();
 	vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
-#if HIGHMEM_DEBUG
+#if CONFIG_DEBUG_HIGHMEM
 	if (!pte_none(*(kmap_pte-idx)))
 		BUG();
 #endif
@@ -106,8 +100,8 @@ static inline void *kmap_atomic(struct page *page, enum km_type type)
 
 static inline void kunmap_atomic(void *kvaddr, enum km_type type)
 {
-#if HIGHMEM_DEBUG
-	unsigned long vaddr = (unsigned long) kvaddr;
+#if CONFIG_DEBUG_HIGHMEM
+	unsigned long vaddr = (unsigned long) kvaddr & PAGE_MASK;
 	enum fixed_addresses idx = type + KM_TYPE_NR*smp_processor_id();
 
 	if (vaddr < FIXADDR_START) { // FIXME
