@@ -748,6 +748,32 @@ static inline void ace_set_txprd(struct ace_regs *regs,
 }
 
 
+static inline void ace_mask_irq(struct net_device *dev)
+{
+	struct ace_private *ap = dev->priv;
+	struct ace_regs *regs = ap->regs;
+
+	if (ACE_IS_TIGON_I(ap))
+		writel(1, &regs->MaskInt);
+	else
+		writel(readl(&regs->HostCtrl) | MASK_INTS, &regs->HostCtrl);
+
+	ace_sync_irq(dev->irq);
+}
+
+
+static inline void ace_unmask_irq(struct net_device *dev)
+{
+	struct ace_private *ap = dev->priv;
+	struct ace_regs *regs = ap->regs;
+ 
+	if (ACE_IS_TIGON_I(ap))
+		writel(0, &regs->MaskInt);
+	else
+		writel(readl(&regs->HostCtrl) &= ~MASK_INTS, &regs->HostCtrl);
+}
+
+
 /*
  * Prototypes
  */
