@@ -160,6 +160,49 @@ SMC_outw(u16 val, unsigned long ioaddr, int reg)
 #define SMC_insw(a, r, p, l)	insw((a) + (r), p, l)
 #define SMC_outsw(a, r, p, l)	outsw((a) + (r), p, l)
 
+#elif	defined(CONFIG_MACH_LPD7A400) || defined(CONFIG_MACH_LPD7A404)
+
+#include <asm/arch/constants.h>	/* IOBARRIER_VIRT */
+
+#define SMC_CAN_USE_8BIT	0
+#define SMC_CAN_USE_16BIT	1
+#define SMC_CAN_USE_32BIT	0
+#define SMC_NOWAIT		0
+#define SMC_IOBARRIER		({ barrier (); readl (IOBARRIER_VIRT); })
+
+static inline unsigned short SMC_inw (unsigned long a, int r)
+{
+	unsigned short v;
+	v = readw (a + r);
+	SMC_IOBARRIER;
+	return v;
+}
+
+static inline void SMC_outw (unsigned short v, unsigned long a, int r)
+{
+	writew (v, a + r);
+	SMC_IOBARRIER;
+}
+
+static inline void SMC_insw (unsigned long a, int r, unsigned char* p, int l)
+{
+	while (l-- > 0) {
+		*((unsigned short*)p)++ = readw (a + r);
+		SMC_IOBARRIER;
+	}
+}
+
+static inline void SMC_outsw (unsigned long a, int r, unsigned char* p, int l)
+{
+	while (l-- > 0) {
+		writew (*((unsigned short*)p)++, a + r);
+		SMC_IOBARRIER;
+	}
+}
+
+#define RPC_LSA_DEFAULT		RPC_LED_TX_RX
+#define RPC_LSB_DEFAULT		RPC_LED_100_10
+
 #elif   defined(CONFIG_M32R)
 
 #define SMC_CAN_USE_8BIT	0

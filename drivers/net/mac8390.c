@@ -42,10 +42,6 @@
 
 #include "8390.h"
 
-#if (LINUX_VERSION_CODE < 0x02030e)
-#define net_device device
-#endif
-
 #define WD_START_PG			0x00	/* First page of TX buffer */
 #define CABLETRON_RX_START_PG		0x00    /* First page of RX buffer */
 #define CABLETRON_RX_STOP_PG		0x30    /* Last page +1 of RX ring */

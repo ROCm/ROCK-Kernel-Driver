@@ -1730,7 +1730,7 @@ config VIA_RHINE
 	  (e.g. VT8235).
 
 	  To compile this driver as a module, choose M here. The module
-	  will be called via-rhine.
+	  will be called via-velocity.
 
 config VIA_RHINE_MMIO
 	bool "Use MMIO instead of PIO"
@@ -1741,18 +1741,6 @@ config VIA_RHINE_MMIO
 	  processing time in parts of the driver.
 
 	  If unsure, say Y.
-
-config VIA_VELOCITY
-	tristate "VIA Velocity support"
-	depends on NET_PCI && PCI
-	select CRC32
-	select CRC_CCITT
-	select MII
-	help
-	  If you have a VIA "Velocity" based network card say Y here.
-
-	  To compile this driver as a module, choose M here. The module
-	  will be called via-velocity.
 
 config LAN_SAA9730
 	bool "Philips SAA9730 Ethernet support (EXPERIMENTAL)"
@@ -2139,6 +2127,18 @@ config SK98LIN
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read Documentation/kbuild/modules.txt. The module will
 	  be called sk98lin. This is recommended.
+
+config VIA_VELOCITY
+	tristate "VIA Velocity support"
+	depends on NET_PCI && PCI
+	select CRC32
+	select CRC_CCITT
+	select MII
+	help
+	  If you have a VIA "Velocity" based network card say Y here.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called via-velocity.
 
 config TIGON3
 	tristate "Broadcom Tigon3 support"
