@@ -1659,17 +1659,16 @@ static int e100_up(struct nic *nic)
 		goto err_clean_cbs;
 	e100_set_multicast_list(nic->netdev);
 	e100_start_receiver(nic);
-	netif_start_queue(nic->netdev);
 	mod_timer(&nic->watchdog, jiffies);
 	if((err = request_irq(nic->pdev->irq, e100_intr, SA_SHIRQ,
 		nic->netdev->name, nic->netdev)))
 		goto err_no_irq;
 	e100_enable_irq(nic);
+	netif_wake_queue(nic->netdev);
 	return 0;
 
 err_no_irq:
 	del_timer_sync(&nic->watchdog);
-	netif_stop_queue(nic->netdev);
 err_clean_cbs:
 	e100_clean_cbs(nic);
 err_rx_clean_list:
