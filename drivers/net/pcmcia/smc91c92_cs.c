@@ -357,6 +357,7 @@ static dev_link_t *smc91c92_attach(void)
     memset(smc, 0, sizeof(struct smc_private));
     link = &smc->link; dev = &smc->dev;
     spin_lock_init(&smc->lock);
+    init_timer(&link->release);
     link->release.function = &smc91c92_release;
     link->release.data = (u_long)link;
     link->io.NumPorts1 = 16;
