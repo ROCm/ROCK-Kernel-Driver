@@ -54,7 +54,7 @@ fixup_omnimeter(struct machine_desc *desc, struct param_struct *params,
 
 static struct map_desc omnimeter_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
-  { 0xd2000000, 0x10000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* TS */
+  { 0xd2000000, 0x10000000, 0x02000000, DOMAIN_IO, 0, 1, 0, 0 }, /* TS */
   LAST_DESC
 };
 

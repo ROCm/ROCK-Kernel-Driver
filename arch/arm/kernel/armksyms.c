@@ -169,10 +169,6 @@ EXPORT_SYMBOL(__virt_to_bus);
 EXPORT_SYMBOL(__bus_to_virt);
 #endif
 
-#ifndef CONFIG_NO_PGT_CACHE
-EXPORT_SYMBOL(quicklists);
-#endif
-
 	/* string / mem functions */
 EXPORT_SYMBOL_NOVERS(strcpy);
 EXPORT_SYMBOL_NOVERS(strncpy);

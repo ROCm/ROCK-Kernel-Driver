@@ -34,9 +34,9 @@ fixup_nanoengine(struct machine_desc *desc, struct param_struct *params,
 
 static struct map_desc nanoengine_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
-  { 0xe8000000, 0x00000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 0 */
-  { 0xf0000000, 0x10000000, 0x00100000, DOMAIN_IO, 1, 1, 0, 0 }, /* System Registers */
-  { 0xf1000000, 0x18A00000, 0x00100000, DOMAIN_IO, 1, 1, 0, 0 }, /* Internal PCI Config Space */
+  { 0xe8000000, 0x00000000, 0x02000000, DOMAIN_IO, 0, 1, 0, 0 }, /* Flash bank 0 */
+  { 0xf0000000, 0x10000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* System Registers */
+  { 0xf1000000, 0x18A00000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* Internal PCI Config Space */
   LAST_DESC
 };
 

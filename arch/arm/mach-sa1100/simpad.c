@@ -58,7 +58,7 @@ fixup_simpad(struct machine_desc *desc, struct param_struct *params,
 
 static struct map_desc simpad_io_desc[] __initdata = {
   /* virtual	physical    length	domain	   r  w  c  b */
-  { 0xf2800000, 0x4b800000, 0x00800000, DOMAIN_IO, 1, 1, 0, 0 }, /* MQ200 */  
+  { 0xf2800000, 0x4b800000, 0x00800000, DOMAIN_IO, 0, 1, 0, 0 }, /* MQ200 */  
   { 0xf1000000, 0x18000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* Paules CS3, write only */
   LAST_DESC
 };
