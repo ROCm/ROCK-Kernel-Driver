@@ -338,12 +338,9 @@ extern int i2c_check_addr (struct i2c_adapter *adapter, int addr);
  * It will only call found_proc if some client is connected at the
  * specific address (unless a 'force' matched);
  */
-typedef int i2c_client_found_addr_proc (struct i2c_adapter *adapter,
-                                     int addr, unsigned short flags,int kind);
-
 extern int i2c_probe(struct i2c_adapter *adapter, 
 		struct i2c_client_address_data *address_data,
-		i2c_client_found_addr_proc *found_proc);
+		int (*found_proc) (struct i2c_adapter *, int, int));
 
 /* An ioctl like call to set div. parameters of the adapter.
  */
