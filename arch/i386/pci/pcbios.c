@@ -556,4 +556,4 @@ static int __init pci_pcbios_init(void)
 	return 0;
 }
 
-subsys_initcall(pci_pcbios_init);
+arch_initcall(pci_pcbios_init);

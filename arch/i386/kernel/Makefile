@@ -10,7 +10,7 @@
 EXTRA_AFLAGS	:= -traditional
 USE_STANDARD_AS_RULE	:= true
 
-all: first_rule kernel.o head.o init_task.o
+all: kernel.o head.o init_task.o
 
 O_TARGET := kernel.o
 
@@ -31,9 +31,5 @@ obj-$(CONFIG_APM)		+= apm.o
 obj-$(CONFIG_X86_SMP)		+= smp.o smpboot.o trampoline.o
 obj-$(CONFIG_X86_LOCAL_APIC)	+= apic.o nmi.o
 obj-$(CONFIG_X86_IO_APIC)	+= io_apic.o
-
-kernel-subdir-$(CONFIG_PCI)	+= pci
-subdir-y			:= $(kernel-subdir-y)
-obj-y				+= $(foreach dir,$(subdir-y),$(dir)/$(dir).o)
 
 include $(TOPDIR)/Rules.make

@@ -59,12 +59,16 @@ static int acpi_lookup_irq (
 static int __init pci_acpi_init(void)
 {
 	if (!(pci_probe & PCI_NO_ACPI_ROUTING)) {
-		printk(KERN_INFO "PCI: Using ACPI for IRQ routing\n");
-		printk(KERN_INFO "PCI: if you experience problems, try using option 'pci=noacpi'\n");
-		pci_use_acpi_routing = 1;
-		pci_lookup_irq = acpi_lookup_irq;
+		if (acpi_prts.count) {
+			printk(KERN_INFO "PCI: Using ACPI for IRQ routing\n");
+			printk(KERN_INFO "PCI: if you experience problems, try using option 'pci=noacpi'\n");
+			pci_use_acpi_routing = 1;
+			pci_lookup_irq = acpi_lookup_irq;
+		} else
+			printk(KERN_WARNING "PCI: Invalid ACPI-PCI IRQ routing table\n");
+
 	}
 	return 0;
 }
 
-subsys_initcall(pci_acpi_init);
+arch_initcall(pci_acpi_init);
