@@ -577,9 +577,9 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_sigsuspend
 	.llong .compat_sys_sigpending
 	.llong .sys32_sethostname
-	.llong .sys32_setrlimit	        /* 75 */
-	.llong .sys32_old_getrlimit
-	.llong .sys32_getrusage
+	.llong .compat_sys_setrlimit	        /* 75 */
+	.llong .compat_sys_old_getrlimit
+	.llong .compat_sys_getrusage
 	.llong .sys32_gettimeofday
 	.llong .sys32_settimeofday
 	.llong .sys32_getgroups	        /* 80 */
@@ -616,7 +616,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_vhangup
 	.llong .sys_ni_syscall		/* old idle syscall */
 	.llong .sys_ni_syscall		/* old vm86 syscall */
-	.llong .sys32_wait4
+	.llong .compat_sys_wait4
 	.llong .sys_swapoff		/* 115 */
 	.llong .sys32_sysinfo
 	.llong .sys32_ipc
@@ -692,7 +692,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall		/* reserved for streams1 */
 	.llong .sys_ni_syscall		/* reserved for streams2 */
 	.llong .sys_vfork
-	.llong .sys32_getrlimit	        /* 190 */
+	.llong .compat_sys_getrlimit	        /* 190 */
 	.llong .sys32_readahead
 	.llong .sys32_mmap2
 	.llong .sys32_truncate64

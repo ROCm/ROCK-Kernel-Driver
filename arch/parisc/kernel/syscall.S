@@ -431,9 +431,9 @@ sys_call_table:
 	ENTRY_COMP(sigpending)
 	ENTRY_SAME(sethostname)
 	/* Following 3 have linux-common-code structs containing longs -( */
-	ENTRY_DIFF(setrlimit)		/* 75 */
-	ENTRY_DIFF(getrlimit)
-	ENTRY_DIFF(getrusage)
+	ENTRY_COMP(setrlimit)		/* 75 */
+	ENTRY_COMP(getrlimit)
+	ENTRY_COMP(getrusage)
 	/* struct timeval and timezone are maybe?? consistent wide and narrow */
 	ENTRY_DIFF(gettimeofday)
 	ENTRY_DIFF(settimeofday)
@@ -476,7 +476,7 @@ sys_call_table:
 	ENTRY_SAME(fstat64)
 	ENTRY_SAME(vfork_wrapper)
 	/* struct rusage contains longs... */
-	ENTRY_DIFF(wait4)
+	ENTRY_COMP(wait4)
 	ENTRY_SAME(swapoff)		/* 115 */
 	ENTRY_DIFF(sysinfo)
 	ENTRY_SAME(shutdown)

@@ -93,6 +93,9 @@ struct compat_statfs {
 	int		f_spare[6];
 };
 
+#define COMPAT_RLIM_OLD_INFINITY	0x7fffffff
+#define COMPAT_RLIM_INFINITY		0xffffffff
+
 typedef u32		compat_old_sigset_t;
 
 #define _COMPAT_NSIG		64

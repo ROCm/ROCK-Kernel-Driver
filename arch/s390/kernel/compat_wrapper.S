@@ -299,34 +299,34 @@ sys32_sethostname_wrapper:
 	lgfr	%r3,%r3			# int
 	jg	sys_sethostname		# branch to system call
 
-	.globl  sys32_setrlimit_wrapper 
-sys32_setrlimit_wrapper:
+	.globl  compat_sys_setrlimit_wrapper 
+compat_sys_setrlimit_wrapper:
 	llgfr	%r2,%r2			# unsigned int
 	llgtr	%r3,%r3			# struct rlimit_emu31 *
-	jg	sys32_setrlimit		# branch to system call
+	jg	compat_sys_setrlimit	# branch to system call
 
-	.globl  sys32_old_getrlimit_wrapper 
-sys32_old_getrlimit_wrapper:
+	.globl  compat_sys_old_getrlimit_wrapper 
+compat_sys_old_getrlimit_wrapper:
 	llgfr	%r2,%r2			# unsigned int
 	llgtr	%r3,%r3			# struct rlimit_emu31 *
-	jg	sys32_old_getrlimit	# branch to system call
+	jg	compat_sys_old_getrlimit # branch to system call
 
-	.globl  sys32_getrlimit_wrapper 
-sys32_getrlimit_wrapper:
+	.globl  compat_sys_getrlimit_wrapper 
+compat_sys_getrlimit_wrapper:
 	llgfr	%r2,%r2			# unsigned int
 	llgtr	%r3,%r3			# struct rlimit_emu31 *
-	jg	sys32_getrlimit		# branch to system call
+	jg	compat_sys_getrlimit	# branch to system call
 
 	.globl  sys32_mmap2_wrapper 
 sys32_mmap2_wrapper:
 	llgtr	%r2,%r2			# struct mmap_arg_struct_emu31 *
 	jg	sys32_mmap2			# branch to system call
 
-	.globl  sys32_getrusage_wrapper 
-sys32_getrusage_wrapper:
+	.globl  compat_sys_getrusage_wrapper 
+compat_sys_getrusage_wrapper:
 	lgfr	%r2,%r2			# int
 	llgtr	%r3,%r3			# struct rusage_emu31 *
-	jg	sys32_getrusage		# branch to system call
+	jg	compat_sys_getrusage	# branch to system call
 
 	.globl  sys32_gettimeofday_wrapper 
 sys32_gettimeofday_wrapper:
@@ -498,13 +498,13 @@ compat_sys_newfstat_wrapper:
 
 #sys32_vhangup_wrapper			# void 
 
-	.globl  sys32_wait4_wrapper 
-sys32_wait4_wrapper:
+	.globl  compat_sys_wait4_wrapper 
+compat_sys_wait4_wrapper:
 	lgfr	%r2,%r2			# pid_t
 	llgtr	%r3,%r3			# unsigned int *
 	lgfr	%r4,%r4			# int
 	llgtr	%r5,%r5			# struct rusage *
-	jg	sys32_wait4		# branch to system call
+	jg	compat_sys_wait4	# branch to system call
 
 	.globl  sys32_swapoff_wrapper 
 sys32_swapoff_wrapper:

@@ -1492,26 +1492,6 @@ static int put_rusage (struct rusage32 *ru, struct rusage *r)
 	return err;
 }
 
-asmlinkage int sys32_wait4(compat_pid_t pid, unsigned int *stat_addr, int options, struct rusage32 *ru)
-{
-	if (!ru)
-		return sys_wait4(pid, stat_addr, options, NULL);
-	else {
-		struct rusage r;
-		int ret;
-		unsigned int status;
-		mm_segment_t old_fs = get_fs();
-		
-		set_fs (KERNEL_DS);
-		ret = sys_wait4(pid, stat_addr ? &status : NULL, options, &r);
-		set_fs (old_fs);
-		if (put_rusage (ru, &r)) return -EFAULT;
-		if (stat_addr && put_user (status, stat_addr))
-			return -EFAULT;
-		return ret;
-	}
-}
-
 struct sysinfo32 {
         s32 uptime;
         u32 loads[3];
@@ -1730,87 +1710,6 @@ sys32_rt_sigqueueinfo(int pid, int sig, siginfo_t32 *uinfo)
 	set_fs (KERNEL_DS);
 	ret = sys_rt_sigqueueinfo(pid, sig, &info);
 	set_fs (old_fs);
-	return ret;
-}
-
-#define RLIM_OLD_INFINITY32	0x7fffffff
-#define RLIM_INFINITY32		0xffffffff
-#define RESOURCE32_OLD(x)	((x > RLIM_OLD_INFINITY32) ? RLIM_OLD_INFINITY32 : x)
-#define RESOURCE32(x) 		((x > RLIM_INFINITY32) ? RLIM_INFINITY32 : x)
-
-struct rlimit32 {
-	u32	rlim_cur;
-	u32	rlim_max;
-};
-
-extern asmlinkage long sys_getrlimit(unsigned int resource, struct rlimit *rlim);
-
-asmlinkage int sys32_old_getrlimit(unsigned int resource, struct rlimit32 *rlim)
-{
-	struct rlimit r;
-	int ret;
-	mm_segment_t old_fs = get_fs ();
-	
-	set_fs (KERNEL_DS);
-	ret = sys_getrlimit(resource, &r);
-	set_fs (old_fs);
-	if (!ret) {
-		ret = put_user (RESOURCE32_OLD(r.rlim_cur), &rlim->rlim_cur);
-		ret |= __put_user (RESOURCE32_OLD(r.rlim_max), &rlim->rlim_max);
-	}
-	return ret;
-}
-
-asmlinkage int sys32_getrlimit(unsigned int resource, struct rlimit32 *rlim)
-{
-	struct rlimit r;
-	int ret;
-	mm_segment_t old_fs = get_fs ();
-	
-	set_fs (KERNEL_DS);
-	ret = sys_getrlimit(resource, &r);
-	set_fs (old_fs);
-	if (!ret) {
-		ret = put_user (RESOURCE32(r.rlim_cur), &rlim->rlim_cur);
-		ret |= __put_user (RESOURCE32(r.rlim_max), &rlim->rlim_max);
-	}
-	return ret;
-}
-
-extern asmlinkage int sys_setrlimit(unsigned int resource, struct rlimit *rlim);
-
-asmlinkage int sys32_setrlimit(unsigned int resource, struct rlimit32 *rlim)
-{
-	struct rlimit r;
-	int ret;
-	mm_segment_t old_fs = get_fs ();
-
-	if (resource >= RLIM_NLIMITS) return -EINVAL;	
-	if (get_user (r.rlim_cur, &rlim->rlim_cur) ||
-	    __get_user (r.rlim_max, &rlim->rlim_max))
-		return -EFAULT;
-	if (r.rlim_cur == RLIM_INFINITY32)
-		r.rlim_cur = RLIM_INFINITY;
-	if (r.rlim_max == RLIM_INFINITY32)
-		r.rlim_max = RLIM_INFINITY;
-	set_fs (KERNEL_DS);
-	ret = sys_setrlimit(resource, &r);
-	set_fs (old_fs);
-	return ret;
-}
-
-extern asmlinkage int sys_getrusage(int who, struct rusage *ru);
-
-asmlinkage int sys32_getrusage(int who, struct rusage32 *ru)
-{
-	struct rusage r;
-	int ret;
-	mm_segment_t old_fs = get_fs();
-		
-	set_fs (KERNEL_DS);
-	ret = sys_getrusage(who, &r);
-	set_fs (old_fs);
-	if (put_rusage (ru, &r)) return -EFAULT;
 	return ret;
 }
 
