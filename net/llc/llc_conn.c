@@ -23,7 +23,6 @@
 #include <net/llc_c_ev.h>
 #include <net/llc_c_ac.h>
 #include <net/llc_c_st.h>
-#include <net/llc_mac.h>
 #include <net/llc_pdu.h>
 #include <net/llc_s_ev.h>
 

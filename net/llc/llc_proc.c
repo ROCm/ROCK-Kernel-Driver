@@ -24,7 +24,6 @@
 #include <net/llc_c_ev.h>
 #include <net/llc_c_st.h>
 #include <net/llc_conn.h>
-#include <net/llc_mac.h>
 #include <net/llc_main.h>
 #include <net/llc_sap.h>
 

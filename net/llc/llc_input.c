@@ -1,5 +1,5 @@
 /*
- * llc_mac.c - Manages interface between LLC and MAC
+ * llc_input.c - Minimal input path for LLC
  *
  * Copyright (c) 1997 by Procom Technology, Inc.
  * 		 2001-2003 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
@@ -12,7 +12,7 @@
  * See the GNU General Public License for more details.
  */
 #include <linux/netdevice.h>
-#include <net/llc_mac.h>
+#include <net/llc.h>
 #include <net/llc_pdu.h>
 #include <net/llc_sap.h>
 #include <net/llc_main.h>
