@@ -264,6 +264,16 @@ write_out_data_locked:
 				jbd_unlock_bh_state(bh);
 				journal_remove_journal_head(bh);
 				__brelse(bh);
+				if (need_resched() && commit_transaction->
+							t_sync_datalist) {
+					commit_transaction->t_sync_datalist =
+								next_jh;
+					if (bufs)
+						break;
+					spin_unlock(&journal->j_list_lock);
+					cond_resched();
+					goto write_out_data;
+				}
 			}
 		}
 		if (bufs == ARRAY_SIZE(wbuf)) {
@@ -284,8 +294,7 @@ write_out_data_locked:
 		cond_resched();
 		journal_brelse_array(wbuf, bufs);
 		spin_lock(&journal->j_list_lock);
-		if (bufs)
-			goto write_out_data_locked;
+		goto write_out_data_locked;
 	}
 
 	/*
