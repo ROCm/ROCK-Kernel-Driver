@@ -123,7 +123,9 @@ void __wait_on_buffer(struct buffer_head * bh)
 	wait_queue_head_t *wqh = bh_waitq_head(bh);
 	DEFINE_WAIT(wait);
 
-	get_bh(bh);
+	if (atomic_read(&bh->b_count) == 0)
+		buffer_error();
+
 	do {
 		prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
 		if (buffer_locked(bh)) {
@@ -131,7 +133,6 @@ void __wait_on_buffer(struct buffer_head * bh)
 			io_schedule();
 		}
 	} while (buffer_locked(bh));
-	put_bh(bh);
 	finish_wait(wqh, &wait);
 }
 

@@ -1260,7 +1260,7 @@ void __init inode_init(unsigned long mempages)
 		init_waitqueue_head(&i_wait_queue_heads[i].wqh);
 
 	mempages >>= (14 - PAGE_SHIFT);
-	mempages *= sizeof(struct list_head);
+	mempages *= sizeof(struct hlist_head);
 	for (order = 0; ((1UL << order) << PAGE_SHIFT) < mempages; order++)
 		;
 

@@ -52,8 +52,8 @@ struct irda_sock {
 	__u8  max_header_size;
 	struct qos_info qos_tx;
 
-	__u16 mask;           /* Hint bits mask */
-	__u16 hints;          /* Hint bits */
+	__u16_host_order mask;           /* Hint bits mask */
+	__u16_host_order hints;          /* Hint bits */
 
 	void *ckey;           /* IrLMP client handle */
 	void *skey;           /* IrLMP service handle */
@@ -63,7 +63,7 @@ struct irda_sock {
 	struct ias_value *ias_result; /* Result of remote IAS query */
 
 	hashbin_t *cachelog;		/* Result of discovery query */
-	struct discovery_t *cachediscovery;	/* Result of selective discovery query */
+	__u32 cachedaddr;	/* Result of selective discovery query */
 
 	int nslots;           /* Number of slots to use for discovery */
 

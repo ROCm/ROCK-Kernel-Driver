@@ -82,14 +82,6 @@ int vm_enough_memory(long pages)
 		free += nr_swap_pages;
 
 		/*
-		 * This double-counts: the nrpages are both in the
-		 * page-cache and in the swapper space. At the same time,
-		 * this compensates for the swap-space over-allocation
-		 * (ie "nr_swap_pages" being too small).
-		 */
-		free += total_swapcache_pages;
-
-		/*
 		 * The code below doesn't account for free space in the
 		 * inode and dentry slab cache, slab cache fragmentation,
 		 * inodes and dentries which will become freeable under
@@ -374,6 +366,8 @@ static int
 can_vma_merge_before(struct vm_area_struct *vma, unsigned long vm_flags,
 	struct file *file, unsigned long vm_pgoff, unsigned long size)
 {
+	if ((vma->vm_flags & VM_DONTEXPAND) || (vm_flags & VM_DONTEXPAND))
+		return 0;
 	if (vma->vm_file == file && vma->vm_flags == vm_flags) {
 		if (!file)
 			return 1;	/* anon mapping */
@@ -391,6 +385,8 @@ static int
 can_vma_merge_after(struct vm_area_struct *vma, unsigned long vm_flags,
 	struct file *file, unsigned long vm_pgoff)
 {
+	if ((vma->vm_flags & VM_DONTEXPAND) || (vm_flags & VM_DONTEXPAND))
+		return 0;
 	if (vma->vm_file == file && vma->vm_flags == vm_flags) {
 		unsigned long vma_size;
 

@@ -266,12 +266,12 @@ drm_agp_head_t *DRM(agp_init)(void)
 		head->cant_use_aperture = head->agp_info.cant_use_aperture;
 		head->page_mask = head->agp_info.page_mask;
 #endif
-		
-		DRM_DEBUG("AGP %d.%d, aperture @ 0x%08lx %ZuMB\n",
-			  head->agp_info.version.major,
-			  head->agp_info.version.minor,
-			  head->agp_info.aper_base,
-			  head->agp_info.aper_size);
+
+		DRM_INFO("AGP %d.%d aperture @ 0x%08lx %ZuMB\n",
+			 head->agp_info.version.major,
+			 head->agp_info.version.minor,
+			 head->agp_info.aper_base,
+			 head->agp_info.aper_size);
 	}
 	return head;
 }

@@ -260,7 +260,6 @@ int log_do_checkpoint (journal_t *journal, int nblocks)
 {
 	transaction_t *transaction, *last_transaction, *next_transaction;
 	int result;
-	int target;
 	int batch_count = 0;
 	struct buffer_head *bhs[NR_BATCH];
 
@@ -284,8 +283,6 @@ int log_do_checkpoint (journal_t *journal, int nblocks)
 	 * AKPM: check this code.  I had a feeling a while back that it
 	 * degenerates into a busy loop at unmount time.
 	 */
-	target = (journal->j_last - journal->j_first) / 4;
-
 	spin_lock(&journal_datalist_lock);
 repeat:
 	transaction = journal->j_checkpoint_transactions;
@@ -443,11 +440,8 @@ int __journal_clean_checkpoint_list(journal_t *journal)
 			struct journal_head *last_jh = jh->b_cpprev;
 			struct journal_head *next_jh = jh;
 			do {
-				struct buffer_head *bh;
-
 				jh = next_jh;
 				next_jh = jh->b_cpnext;
-				bh = jh2bh(jh);
 				ret += __try_to_free_cp_buf(jh);
 			} while (jh != last_jh);
 		}
