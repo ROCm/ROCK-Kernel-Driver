@@ -3030,6 +3030,9 @@ static int addrconf_sysctl_forward_strategy(ctl_table *table,
 			idev = NULL;
 		*valp = new;
 		addrconf_forward_change(idev);
+
+		if (*valp)
+			rt6_purge_dflt_routers(0);
 	} else
 		*valp = new;
 

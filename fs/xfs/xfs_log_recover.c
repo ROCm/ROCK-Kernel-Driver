@@ -1553,7 +1553,7 @@ xlog_recover_reorder_trans(
 		case XFS_LI_BUF:
 		case XFS_LI_6_1_BUF:
 		case XFS_LI_5_3_BUF:
-			if ((!flags & XFS_BLI_CANCEL)) {
+			if (!(flags & XFS_BLI_CANCEL)) {
 				xlog_recover_insert_item_frontq(&trans->r_itemq,
 								itemq);
 				break;

@@ -352,6 +352,14 @@ static int mtrr_seq_show(struct seq_file *seq, void *offset)
 
 static int __init mtrr_if_init(void)
 {
+	struct cpuinfo_x86 *c = &boot_cpu_data;
+
+	if ((!cpu_has(c, X86_FEATURE_MTRR)) &&
+	    (!cpu_has(c, X86_FEATURE_K6_MTRR)) &&
+	    (!cpu_has(c, X86_FEATURE_CYRIX_ARR)) &&
+	    (!cpu_has(c, X86_FEATURE_CENTAUR_MCR)))
+		return -ENODEV;
+
 	proc_root_mtrr =
 	    create_proc_entry("mtrr", S_IWUSR | S_IRUGO, &proc_root);
 	if (proc_root_mtrr) {

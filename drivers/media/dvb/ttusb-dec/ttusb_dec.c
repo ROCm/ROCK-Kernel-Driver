@@ -1146,7 +1146,7 @@ static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 		    0x00, 0x00, 0x00, 0x00,
 		    0x61, 0x00 };
 	u8 b1[] = { 0x61 };
-	u8 b[ARM_PACKET_SIZE];
+	u8 *b;
 	char idstring[21];
 	u8 *firmware = NULL;
 	size_t firmware_size = 0;
@@ -1203,6 +1203,10 @@ static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 	trans_count = 0;
 	j = 0;
 
+	b = kmalloc(ARM_PACKET_SIZE, GFP_KERNEL);
+	if (b == NULL)
+		return -ENOMEM;
+
 	for (i = 0; i < firmware_size; i += COMMAND_PACKET_SIZE) {
 		size = firmware_size - i;
 		if (size > COMMAND_PACKET_SIZE)
@@ -1229,6 +1233,8 @@ static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 	}
 
 	result = ttusb_dec_send_command(dec, 0x43, sizeof(b1), b1, NULL, NULL);
+
+	kfree(b);
 
 	return result;
 }
