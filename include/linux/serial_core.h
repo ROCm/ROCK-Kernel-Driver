@@ -51,6 +51,10 @@
 #define PORT_UART00	35
 #define PORT_21285	37
 
+/* Sparc type numbers.  */
+#define PORT_SUNZILOG	38
+#define PORT_SUNSAB	39
+
 #ifdef __KERNEL__
 
 #include <linux/config.h>

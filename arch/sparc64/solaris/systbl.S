@@ -250,8 +250,8 @@ solaris_sys_table:
 	.word solaris_fstatvfs64	/* fstatvfs64	dP	219	*/
 	.word solaris_setrlimit64	/* setrlimit64	dP	220	*/
 	.word solaris_getrlimit64	/* getrlimit64	dP	221	*/
-	.word CHAIN(pread)		/* pread64	dpdD	222	*/
-	.word CHAIN(pwrite)		/* pwrite64	dpdD	223	*/
+	.word CHAIN(pread64)		/* pread64	dpdD	222	*/
+	.word CHAIN(pwrite64)		/* pwrite64	dpdD	223	*/
 	.word CHAIN(creat)		/* creat64	so	224	*/
 	.word solaris_open		/* open64	soo	225	*/
 	.word solaris_unimplemented	/* 			226	*/
