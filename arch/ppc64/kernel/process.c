@@ -529,7 +529,7 @@ void show_stack(struct task_struct *p, unsigned long *_sp)
 		newsp = _sp[0];
 		ip = _sp[2];
 		if (!firstframe || ip != lr) {
-			printk("[%016lx] ", ip);
+			printk("[%016lx] [%016lx] ", sp, ip);
 			print_symbol("%s", ip);
 			if (firstframe)
 				printk(" (unreliable)");
