@@ -21,7 +21,6 @@
  *
  */
 
-#include <asm/uaccess.h>
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
@@ -29,6 +28,7 @@
 #include <linux/poll.h>
 #include <linux/string.h>
 	#include <linux/crc32.h>
+#include <asm/uaccess.h>
 
 #include "dvb_demux.h"
 #include "dvb_functions.h"
@@ -75,22 +75,19 @@ struct list_head *dmx_get_demuxes(void)
  ******************************************************************************/
 
 
-static inline
-u16 section_length(const u8 *buf)
+static inline u16 section_length(const u8 *buf)
 {
 	return 3+((buf[1]&0x0f)<<8)+buf[2];
 }
 
 
-static inline
-u16 ts_pid(const u8 *buf)
+static inline u16 ts_pid(const u8 *buf)
 {
 	return ((buf[1]&0x1f)<<8)+buf[2];
 }
 
 
-static inline
-int payload(const u8 *tsp)
+static inline int payload(const u8 *tsp)
 {
 	if (!(tsp[3]&0x10)) // no payload?
 		return 0;
@@ -117,15 +114,13 @@ void dvb_set_crc32(u8 *data, int length)
 }
 
 
-static
-u32 dvb_dmx_crc32 (struct dvb_demux_feed *f, const u8 *src, size_t len)
+static u32 dvb_dmx_crc32 (struct dvb_demux_feed *f, const u8 *src, size_t len)
 {
 	return (f->feed.sec.crc_val = crc32_le (f->feed.sec.crc_val, src, len));
 }
 
 
-static
-void dvb_dmx_memcopy (struct dvb_demux_feed *f, u8 *d, const u8 *s, size_t len)
+static void dvb_dmx_memcopy (struct dvb_demux_feed *f, u8 *d, const u8 *s, size_t len)
 {
 	memcpy (d, s, len);
 }
@@ -135,8 +130,7 @@ void dvb_dmx_memcopy (struct dvb_demux_feed *f, u8 *d, const u8 *s, size_t len)
  * Software filter functions
  ******************************************************************************/
 
-static inline
-int dvb_dmx_swfilter_payload (struct dvb_demux_feed *feed, const u8 *buf) 
+static inline int dvb_dmx_swfilter_payload (struct dvb_demux_feed *feed, const u8 *buf) 
 {
 	int count = payload(buf);
 	int p;
@@ -165,8 +159,7 @@ int dvb_dmx_swfilter_payload (struct dvb_demux_feed *feed, const u8 *buf)
 }
 
 
-static
-int dvb_dmx_swfilter_sectionfilter (struct dvb_demux_feed *feed, 
+static int dvb_dmx_swfilter_sectionfilter (struct dvb_demux_feed *feed, 
 				    struct dvb_demux_filter *f)
 {
 	u8 neq = 0;
@@ -189,8 +182,7 @@ int dvb_dmx_swfilter_sectionfilter (struct dvb_demux_feed *feed,
 }
 
 
-static inline
-int dvb_dmx_swfilter_section_feed (struct dvb_demux_feed *feed)
+static inline int dvb_dmx_swfilter_section_feed (struct dvb_demux_feed *feed)
 {
 	struct dvb_demux *demux = feed->demux;
 	struct dvb_demux_filter *f = feed->filter;
@@ -222,8 +214,7 @@ int dvb_dmx_swfilter_section_feed (struct dvb_demux_feed *feed)
 }
 
 
-static
-int dvb_dmx_swfilter_section_packet(struct dvb_demux_feed *feed, const u8 *buf) 
+static int dvb_dmx_swfilter_section_packet(struct dvb_demux_feed *feed, const u8 *buf) 
 {
 	struct dvb_demux *demux = feed->demux;
 	struct dmx_section_feed *sec = &feed->feed.sec;
@@ -349,8 +340,7 @@ int dvb_dmx_swfilter_section_packet(struct dvb_demux_feed *feed, const u8 *buf)
 }
 
 
-static inline
-void dvb_dmx_swfilter_packet_type(struct dvb_demux_feed *feed, const u8 *buf)
+static inline void dvb_dmx_swfilter_packet_type(struct dvb_demux_feed *feed, const u8 *buf)
 {
 	switch(feed->type) {
 	case DMX_TYPE_TS:
@@ -442,8 +432,7 @@ void dvb_dmx_swfilter(struct dvb_demux *demux, const u8 *buf, size_t count)
 }
 
 
-static
-struct dvb_demux_filter* dvb_dmx_filter_alloc(struct dvb_demux *demux)
+static struct dvb_demux_filter * dvb_dmx_filter_alloc(struct dvb_demux *demux)
 {
 	int i;
 
@@ -459,8 +448,7 @@ struct dvb_demux_filter* dvb_dmx_filter_alloc(struct dvb_demux *demux)
 	return &demux->filter[i];
 }
 
-static
-struct dvb_demux_feed* dvb_dmx_feed_alloc(struct dvb_demux *demux)
+static struct dvb_demux_feed * dvb_dmx_feed_alloc(struct dvb_demux *demux)
 {
 	int i;
 
@@ -477,8 +465,7 @@ struct dvb_demux_feed* dvb_dmx_feed_alloc(struct dvb_demux *demux)
 }
 
 
-static
-int dmx_pid_set (u16 pid, struct dvb_demux_feed *feed)
+static int dmx_pid_set (u16 pid, struct dvb_demux_feed *feed)
 {
 	struct dvb_demux *demux = feed->demux;
 	struct list_head *pos, *n, *head=&demux->feed_list;
@@ -505,8 +492,7 @@ int dmx_pid_set (u16 pid, struct dvb_demux_feed *feed)
 }
 
 
-static
-int dmx_ts_feed_set (struct dmx_ts_feed* ts_feed, u16 pid, int ts_type, 
+static int dmx_ts_feed_set (struct dmx_ts_feed* ts_feed, u16 pid, int ts_type, 
 		     enum dmx_ts_pes pes_type, size_t callback_length, 
 		     size_t circular_buffer_size, int descramble, 
 		     struct timespec timeout)
@@ -581,8 +567,7 @@ int dmx_ts_feed_set (struct dmx_ts_feed* ts_feed, u16 pid, int ts_type,
 }
 
 
-static
-int dmx_ts_feed_start_filtering(struct dmx_ts_feed* ts_feed)
+static int dmx_ts_feed_start_filtering(struct dmx_ts_feed* ts_feed)
 {
 	struct dvb_demux_feed *feed = (struct dvb_demux_feed *) ts_feed;
 	struct dvb_demux *demux = feed->demux;
@@ -615,8 +600,7 @@ int dmx_ts_feed_start_filtering(struct dmx_ts_feed* ts_feed)
 	return 0;
 }
  
-static
-int dmx_ts_feed_stop_filtering(struct dmx_ts_feed* ts_feed)
+static int dmx_ts_feed_stop_filtering(struct dmx_ts_feed* ts_feed)
 {
 	struct dvb_demux_feed *feed = (struct dvb_demux_feed *) ts_feed;
 	struct dvb_demux *demux = feed->demux;
@@ -646,8 +630,7 @@ int dmx_ts_feed_stop_filtering(struct dmx_ts_feed* ts_feed)
 	return ret;
 }
 
-static
-int dvbdmx_allocate_ts_feed (struct dmx_demux *dmx, struct dmx_ts_feed **ts_feed, 
+static int dvbdmx_allocate_ts_feed (struct dmx_demux *dmx, struct dmx_ts_feed **ts_feed, 
 			     dmx_ts_cb callback)
 {
 	struct dvb_demux *demux = (struct dvb_demux *) dmx;
@@ -692,8 +675,7 @@ int dvbdmx_allocate_ts_feed (struct dmx_demux *dmx, struct dmx_ts_feed **ts_feed
 	return 0;
 }
 
-static
-int dvbdmx_release_ts_feed(struct dmx_demux *dmx, struct dmx_ts_feed *ts_feed)
+static int dvbdmx_release_ts_feed(struct dmx_demux *dmx, struct dmx_ts_feed *ts_feed)
 {
 	struct dvb_demux *demux = (struct dvb_demux *) dmx;
 	struct dvb_demux_feed *feed = (struct dvb_demux_feed *) ts_feed;
@@ -738,8 +720,7 @@ int dvbdmx_release_ts_feed(struct dmx_demux *dmx, struct dmx_ts_feed *ts_feed)
  * dmx_section_feed API calls
  ******************************************************************************/
 
-static int 
-dmx_section_feed_allocate_filter(struct dmx_section_feed* feed, 
+static int dmx_section_feed_allocate_filter(struct dmx_section_feed* feed, 
 				     struct dmx_section_filter** filter) 
 {
 	struct dvb_demux_feed *dvbdmxfeed=(struct dvb_demux_feed *) feed;
@@ -771,8 +752,7 @@ dmx_section_feed_allocate_filter(struct dmx_section_feed* feed,
 }
 
 
-static int 
-dmx_section_feed_set(struct dmx_section_feed* feed, 
+static int dmx_section_feed_set(struct dmx_section_feed* feed, 
 		     u16 pid, size_t circular_buffer_size, 
 		     int descramble, int check_crc) 
 {
@@ -843,8 +823,7 @@ static void prepare_secfilters(struct dvb_demux_feed *dvbdmxfeed)
 }
 
 
-static int 
-dmx_section_feed_start_filtering(struct dmx_section_feed *feed)
+static int dmx_section_feed_start_filtering(struct dmx_section_feed *feed)
 {
 	struct dvb_demux_feed *dvbdmxfeed=(struct dvb_demux_feed *) feed;
 	struct dvb_demux *dvbdmx=dvbdmxfeed->demux;
@@ -885,8 +864,7 @@ dmx_section_feed_start_filtering(struct dmx_section_feed *feed)
 }
 
 
-static int 
-dmx_section_feed_stop_filtering(struct dmx_section_feed* feed)
+static int dmx_section_feed_stop_filtering(struct dmx_section_feed* feed)
 {
 	struct dvb_demux_feed *dvbdmxfeed=(struct dvb_demux_feed *) feed;
 	struct dvb_demux *dvbdmx=dvbdmxfeed->demux;
@@ -909,8 +887,7 @@ dmx_section_feed_stop_filtering(struct dmx_section_feed* feed)
 }
 
 
-static int 
-dmx_section_feed_release_filter(struct dmx_section_feed *feed, 
+static int dmx_section_feed_release_filter(struct dmx_section_feed *feed, 
 				struct dmx_section_filter* filter)
 {
 	struct dvb_demux_filter *dvbdmxfilter=(struct dvb_demux_filter *) filter, *f;
@@ -1071,8 +1048,7 @@ static int dvbdmx_add_frontend(struct dmx_demux *demux, struct dmx_frontend *fro
 }
 
 
-static int 
-dvbdmx_remove_frontend(struct dmx_demux *demux, struct dmx_frontend *frontend)
+static int dvbdmx_remove_frontend(struct dmx_demux *demux, struct dmx_frontend *frontend)
 {
 	struct dvb_demux *dvbdemux=(struct dvb_demux *) demux;
 	struct list_head *pos, *n, *head=&dvbdemux->frontend_list;
@@ -1087,8 +1063,7 @@ dvbdmx_remove_frontend(struct dmx_demux *demux, struct dmx_frontend *frontend)
 }
 
 
-static struct list_head *
-dvbdmx_get_frontends(struct dmx_demux *demux)
+static struct list_head * dvbdmx_get_frontends(struct dmx_demux *demux)
 {
 	struct dvb_demux *dvbdemux=(struct dvb_demux *) demux;
 

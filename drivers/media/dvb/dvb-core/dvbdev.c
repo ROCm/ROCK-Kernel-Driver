@@ -21,8 +21,7 @@
  *
  */
 
-#include <asm/types.h>
-#include <asm/semaphore.h>
+#include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/module.h>
@@ -31,6 +30,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/version.h>
+#include <asm/semaphore.h>
 
 #include "dvbdev.h"
 #include "dvb_functions.h"
@@ -51,8 +51,7 @@ static char *dnames[] = {
 #define DVB_MAX_IDS              4
 #define nums2minor(num,type,id)  ((num << 6) | (id << 4) | type)
 
-static
-struct dvb_device* dvbdev_find_device (int minor)
+static struct dvb_device* dvbdev_find_device (int minor)
 {
 	struct list_head *entry;
 
@@ -72,8 +71,7 @@ struct dvb_device* dvbdev_find_device (int minor)
 }
 
 
-static
-int dvb_device_open(struct inode *inode, struct file *file)
+static int dvb_device_open(struct inode *inode, struct file *file)
 {
 	struct dvb_device *dvbdev;
 	
@@ -157,8 +155,7 @@ int dvb_generic_ioctl(struct inode *inode, struct file *file,
 }
 
 
-static
-int dvbdev_get_free_id (struct dvb_adapter *adap, int type)
+static int dvbdev_get_free_id (struct dvb_adapter *adap, int type)
 {
 	u32 id = 0;
 
@@ -234,8 +231,7 @@ void dvb_unregister_device(struct dvb_device *dvbdev)
 }
 
 
-static
-int dvbdev_get_free_adapter_num (void)
+static int dvbdev_get_free_adapter_num (void)
 {
 	int num = 0;
 
@@ -303,8 +299,7 @@ int dvb_unregister_adapter(struct dvb_adapter *adap)
 }
 
 
-static
-int __init init_dvbdev(void)
+static int __init init_dvbdev(void)
 {
 	devfs_mk_dir("dvb");
 
@@ -317,8 +312,7 @@ int __init init_dvbdev(void)
 }
 
 
-static 
-void __exit exit_dvbdev(void)
+static void __exit exit_dvbdev(void)
 {
 	unregister_chrdev(DVB_MAJOR, "DVB");
         devfs_remove("dvb");

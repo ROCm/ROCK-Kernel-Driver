@@ -24,7 +24,7 @@
 #ifndef _DVBDEV_H_
 #define _DVBDEV_H_
 
-#include <asm/types.h>
+#include <linux/types.h>
 #include <linux/poll.h>
 #include <linux/fs.h>
 #include <linux/devfs_fs_kernel.h>

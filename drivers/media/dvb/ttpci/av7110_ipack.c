@@ -40,8 +40,7 @@ void av7110_ipack_free(struct ipack * p)
 }
 
 
-static
-void send_ipack(struct ipack *p)
+static void send_ipack(struct ipack *p)
 {
 	int off;
 	struct dvb_audio_info ai;
@@ -122,8 +121,7 @@ void av7110_ipack_flush(struct ipack *p)
 }
 
 
-static 
-void write_ipack(struct ipack *p, const u8 *data, int count)
+static void write_ipack(struct ipack *p, const u8 *data, int count)
 {
 	u8 headr[3] = { 0x00, 0x00, 0x01} ;
 

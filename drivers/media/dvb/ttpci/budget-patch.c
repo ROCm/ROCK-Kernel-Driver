@@ -39,16 +39,14 @@ static struct saa7146_extension budget_extension;
 
 MAKE_BUDGET_INFO(fs_1_3,"Siemens/Technotrend/Hauppauge PCI rev1.3+Budget_Patch", BUDGET_PATCH);
 
-static
-struct pci_device_id pci_tbl[] = {
+static struct pci_device_id pci_tbl[] = {
         MAKE_EXTENSION_PCI(fs_1_3,0x13c2, 0x0000),
         {
                 .vendor    = 0,
         }
 };
 
-static
-int wdebi(struct budget_patch *budget, u32 config, int addr, u32 val, int count)
+static int wdebi(struct budget_patch *budget, u32 config, int addr, u32 val, int count)
 {
         struct saa7146_dev *dev=budget->dev;
 
@@ -68,8 +66,7 @@ int wdebi(struct budget_patch *budget, u32 config, int addr, u32 val, int count)
 }
 
 
-static
-int SOutCommand(struct budget_patch *budget, u16* buf, int length)
+static int SOutCommand(struct budget_patch *budget, u16* buf, int length)
 {
         int i;
 
@@ -88,8 +85,7 @@ int SOutCommand(struct budget_patch *budget, u16* buf, int length)
 }
 
 
-static
-void av7110_set22k(struct budget_patch *budget, int state)
+static void av7110_set22k(struct budget_patch *budget, int state)
 {
         u16 buf[2] = {( COMTYPE_AUDIODAC << 8) | (state ? ON22K : OFF22K), 0};
         
@@ -98,8 +94,7 @@ void av7110_set22k(struct budget_patch *budget, int state)
 }
 
 
-static int
-av7110_send_diseqc_msg(struct budget_patch *budget, int len, u8 *msg, int burst)
+static int av7110_send_diseqc_msg(struct budget_patch *budget, int len, u8 *msg, int burst)
 {
         int i;
         u16 buf[18] = { ((COMTYPE_AUDIODAC << 8) | SendDiSEqC),
@@ -166,12 +161,10 @@ int budget_patch_diseqc_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *
 }
 
 
-static
-int budget_patch_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_data *info)
+static int budget_patch_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_data *info)
 {
         struct budget_patch *budget;
         int err;
-        int cnt;
 
         if (!(budget = kmalloc (sizeof(struct budget_patch), GFP_KERNEL)))
                 return -ENOMEM;
@@ -195,9 +188,8 @@ int budget_patch_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_d
 **      which seems that can be done perfectly without this :-)).
 */                                                      
 
-#define WRITE_RPS1(x) dev->d_rps1.cpu_addr[ cnt++ ] = cpu_to_le32(x)
+	// Setup RPS1 "program" (p35)
 
-        cnt = 0;                                // Setup RPS1 "program" (p35)
         // Wait reset Source Line Counter Threshold                     (p36)
         WRITE_RPS1(cpu_to_le32(CMD_PAUSE | RPS_INV | EVT_HS));
         // Wait Source Line Counter Threshold                           (p36)
@@ -236,8 +228,7 @@ int budget_patch_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_d
 }
 
 
-static
-int budget_patch_detach (struct saa7146_dev* dev)
+static int budget_patch_detach (struct saa7146_dev* dev)
 {
         struct budget_patch *budget = (struct budget_patch*) dev->ext_priv;
         int err;
@@ -253,8 +244,7 @@ int budget_patch_detach (struct saa7146_dev* dev)
 }
 
 
-static
-int __init budget_patch_init(void) 
+static int __init budget_patch_init(void) 
 {
         if (saa7146_register_extension(&budget_extension))
                 return -ENODEV;
@@ -263,16 +253,14 @@ int __init budget_patch_init(void)
 }
 
 
-static
-void __exit budget_patch_exit(void)
+static void __exit budget_patch_exit(void)
 {
         DEB_EE((".\n"));
         saa7146_unregister_extension(&budget_extension); 
 }
 
 
-static
-struct saa7146_extension budget_extension = {
+static struct saa7146_extension budget_extension = {
         .name           = "budget_patch dvb\0",
         .flags          = 0,
         .ext_vv_data    = NULL,

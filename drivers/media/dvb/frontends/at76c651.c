@@ -74,8 +74,7 @@ static struct dvb_frontend_info at76c651_info = {
 };
 
 #if ! defined(__powerpc__)
-static __inline__ int
-__ilog2(unsigned long x)
+static __inline__ int __ilog2(unsigned long x)
 {
 	int i;
 
@@ -89,8 +88,7 @@ __ilog2(unsigned long x)
 }
 #endif
 
-static int
-at76c651_writereg(struct dvb_i2c_bus *i2c, u8 reg, u8 data)
+static int at76c651_writereg(struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 {
 
 	int ret;
@@ -110,8 +108,7 @@ at76c651_writereg(struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 
 }
 
-static u8
-at76c651_readreg(struct dvb_i2c_bus *i2c, u8 reg)
+static u8 at76c651_readreg(struct dvb_i2c_bus *i2c, u8 reg)
 {
 
 	int ret;
@@ -129,8 +126,7 @@ at76c651_readreg(struct dvb_i2c_bus *i2c, u8 reg)
 
 }
 
-static int
-at76c651_set_auto_config(struct dvb_i2c_bus *i2c)
+static int at76c651_set_auto_config(struct dvb_i2c_bus *i2c)
 {
 
 	at76c651_writereg(i2c, 0x06, 0x01);
@@ -149,8 +145,7 @@ at76c651_set_auto_config(struct dvb_i2c_bus *i2c)
 
 }
 
-static int
-at76c651_set_bbfreq(struct dvb_i2c_bus *i2c)
+static int at76c651_set_bbfreq(struct dvb_i2c_bus *i2c)
 {
 
 	at76c651_writereg(i2c, 0x04, 0x3f);
@@ -160,24 +155,21 @@ at76c651_set_bbfreq(struct dvb_i2c_bus *i2c)
 
 }
 
-static int
-at76c651_reset(struct dvb_i2c_bus *i2c)
+static int at76c651_reset(struct dvb_i2c_bus *i2c)
 {
 
 	return at76c651_writereg(i2c, 0x07, 0x01);
 
 }
 
-static int
-at76c651_disable_interrupts(struct dvb_i2c_bus *i2c)
+static int at76c651_disable_interrupts(struct dvb_i2c_bus *i2c)
 {
 
 	return at76c651_writereg(i2c, 0x0b, 0x00);
 
 }
 
-static int
-at76c651_switch_tuner_i2c(struct dvb_i2c_bus *i2c, u8 enable)
+static int at76c651_switch_tuner_i2c(struct dvb_i2c_bus *i2c, u8 enable)
 {
 
 	if (enable)
@@ -187,8 +179,7 @@ at76c651_switch_tuner_i2c(struct dvb_i2c_bus *i2c, u8 enable)
 
 }
 
-static int
-dat7021_write(struct dvb_i2c_bus *i2c, u32 tw)
+static int dat7021_write(struct dvb_i2c_bus *i2c, u32 tw)
 {
 
 	int ret;
@@ -210,8 +201,7 @@ dat7021_write(struct dvb_i2c_bus *i2c, u32 tw)
 
 }
 
-static int
-dat7021_set_tv_freq(struct dvb_i2c_bus *i2c, u32 freq)
+static int dat7021_set_tv_freq(struct dvb_i2c_bus *i2c, u32 freq)
 {
 
 	u32 dw;
@@ -239,8 +229,7 @@ dat7021_set_tv_freq(struct dvb_i2c_bus *i2c, u32 freq)
 
 }
 
-static int
-at76c651_set_symbolrate(struct dvb_i2c_bus *i2c, u32 symbolrate)
+static int at76c651_set_symbolrate(struct dvb_i2c_bus *i2c, u32 symbolrate)
 {
 
 	u8 exponent;
@@ -266,8 +255,7 @@ at76c651_set_symbolrate(struct dvb_i2c_bus *i2c, u32 symbolrate)
 
 }
 
-static int
-at76c651_set_qam(struct dvb_i2c_bus *i2c, fe_modulation_t qam)
+static int at76c651_set_qam(struct dvb_i2c_bus *i2c, fe_modulation_t qam)
 {
 
 	u8 qamsel = 0;
@@ -309,8 +297,7 @@ at76c651_set_qam(struct dvb_i2c_bus *i2c, fe_modulation_t qam)
 
 }
 
-static int
-at76c651_set_inversion(struct dvb_i2c_bus *i2c,
+static int at76c651_set_inversion(struct dvb_i2c_bus *i2c,
 		       fe_spectral_inversion_t inversion)
 {
 
@@ -338,8 +325,7 @@ at76c651_set_inversion(struct dvb_i2c_bus *i2c,
 
 }
 
-static int
-at76c651_set_parameters(struct dvb_i2c_bus *i2c,
+static int at76c651_set_parameters(struct dvb_i2c_bus *i2c,
 			struct dvb_frontend_parameters *p)
 {
 
@@ -352,8 +338,7 @@ at76c651_set_parameters(struct dvb_i2c_bus *i2c,
 
 }
 
-static int
-at76c651_set_defaults(struct dvb_i2c_bus *i2c)
+static int at76c651_set_defaults(struct dvb_i2c_bus *i2c)
 {
 
 	at76c651_set_symbolrate(i2c, 6900000);
@@ -366,8 +351,7 @@ at76c651_set_defaults(struct dvb_i2c_bus *i2c)
 
 }
 
-static int
-at76c651_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
+static int at76c651_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 {
 
 	switch (cmd) {
@@ -463,8 +447,7 @@ at76c651_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 
 }
 
-static int
-at76c651_attach(struct dvb_i2c_bus *i2c)
+static int at76c651_attach(struct dvb_i2c_bus *i2c)
 {
 
 	if (at76c651_readreg(i2c, 0x0e) != 0x65) {
@@ -503,8 +486,7 @@ at76c651_attach(struct dvb_i2c_bus *i2c)
 
 }
 
-static void
-at76c651_detach(struct dvb_i2c_bus *i2c)
+static void at76c651_detach(struct dvb_i2c_bus *i2c)
 {
 
 	dvb_unregister_frontend(at76c651_ioctl, i2c);
@@ -513,8 +495,7 @@ at76c651_detach(struct dvb_i2c_bus *i2c)
 
 }
 
-static int __init
-at76c651_init(void)
+static int __init at76c651_init(void)
 {
 
 	return dvb_register_i2c_device(THIS_MODULE, at76c651_attach,
@@ -522,8 +503,7 @@ at76c651_init(void)
 
 }
 
-static void __exit
-at76c651_exit(void)
+static void __exit at76c651_exit(void)
 {
 
 	dvb_unregister_i2c_device(at76c651_attach);

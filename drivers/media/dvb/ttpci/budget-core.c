@@ -6,8 +6,7 @@ int budget_debug = 0;
  * TT budget / WinTV Nova
  ****************************************************************************/
 
-static
-int stop_ts_capture(struct budget *budget)
+static int stop_ts_capture(struct budget *budget)
 {
 	DEB_EE(("budget: %p\n",budget));
 
@@ -20,8 +19,7 @@ int stop_ts_capture(struct budget *budget)
 }
 
 
-static
-int start_ts_capture (struct budget *budget)
+static int start_ts_capture (struct budget *budget)
 {
         struct saa7146_dev *dev=budget->dev;
 
@@ -62,8 +60,7 @@ int start_ts_capture (struct budget *budget)
 }
 
 
-static
-void vpeirq (unsigned long data)
+static void vpeirq (unsigned long data)
 {
         struct budget *budget = (struct budget*) data;
         u8 *mem = (u8 *)(budget->grabbing);
@@ -100,8 +97,7 @@ void vpeirq (unsigned long data)
  * DVB API SECTION
  ****************************************************************************/
 
-static
-int budget_start_feed(struct dvb_demux_feed *feed)
+static int budget_start_feed(struct dvb_demux_feed *feed)
 {
         struct dvb_demux *demux = feed->demux;
         struct budget *budget = (struct budget*) demux->priv;
@@ -114,8 +110,7 @@ int budget_start_feed(struct dvb_demux_feed *feed)
 	return start_ts_capture (budget); 
 }
 
-static
-int budget_stop_feed(struct dvb_demux_feed *feed)
+static int budget_stop_feed(struct dvb_demux_feed *feed)
 {
         struct dvb_demux *demux = feed->demux;
         struct budget *budget = (struct budget *) demux->priv;
@@ -126,8 +121,7 @@ int budget_stop_feed(struct dvb_demux_feed *feed)
 }
 
 
-static
-int budget_register(struct budget *budget)
+static int budget_register(struct budget *budget)
 {
         struct dvb_demux *dvbdemux=&budget->demux;
         int ret;
@@ -178,8 +172,7 @@ int budget_register(struct budget *budget)
 }
 
 
-static
-void budget_unregister(struct budget *budget)
+static void budget_unregister(struct budget *budget)
 {
         struct dvb_demux *dvbdemux=&budget->demux;
 
@@ -196,8 +189,7 @@ void budget_unregister(struct budget *budget)
 }
 
 
-static
-int master_xfer (struct dvb_i2c_bus *i2c, const struct i2c_msg msgs[], int num)
+static int master_xfer (struct dvb_i2c_bus *i2c, const struct i2c_msg msgs[], int num)
 {
 	struct saa7146_dev *dev = i2c->data;
 	return saa7146_i2c_transfer(dev, msgs, num, 6);

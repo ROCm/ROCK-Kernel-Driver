@@ -24,12 +24,12 @@
  * 
  */
 
-#include <asm/uaccess.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/ioctl.h>
 #include <linux/slab.h>
+#include <asm/uaccess.h>
 
 #include <linux/dvb/net.h>
 
@@ -98,8 +98,7 @@ unsigned short my_eth_type_trans(struct sk_buff *skb, struct net_device *dev)
 	return htons(ETH_P_802_2);
 }
 
-static void 
-dvb_net_sec(struct net_device *dev, const u8 *pkt, int pkt_len)
+static void dvb_net_sec(struct net_device *dev, const u8 *pkt, int pkt_len)
 {
         u8 *eth;
         struct sk_buff *skb;
@@ -135,8 +134,7 @@ dvb_net_sec(struct net_device *dev, const u8 *pkt, int pkt_len)
         netif_rx(skb);
 }
  
-static int 
-dvb_net_callback(const u8 *buffer1, size_t buffer1_len,
+static int dvb_net_callback(const u8 *buffer1, size_t buffer1_len,
 		 const u8 *buffer2, size_t buffer2_len,
 		 struct dmx_section_filter *filter,
 		 enum dmx_success success)
@@ -149,8 +147,7 @@ dvb_net_callback(const u8 *buffer1, size_t buffer1_len,
 	return 0;
 }
 
-static int
-dvb_net_tx(struct sk_buff *skb, struct net_device *dev)
+static int dvb_net_tx(struct sk_buff *skb, struct net_device *dev)
 {
 	return 0;
 }
@@ -160,8 +157,7 @@ static u8 mask_allmulti[6]={0xff, 0xff, 0xff, 0x00, 0x00, 0x00};
 static u8 mac_allmulti[6]={0x01, 0x00, 0x5e, 0x00, 0x00, 0x00};
 static u8 mask_promisc[6]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
-static int 
-dvb_net_filter_set(struct net_device *dev, 
+static int dvb_net_filter_set(struct net_device *dev, 
 		   struct dmx_section_filter **secfilter,
 		   u8 *mac, u8 *mac_mask)
 {
@@ -203,8 +199,7 @@ dvb_net_filter_set(struct net_device *dev,
 	return 0;
 }
 
-static int
-dvb_net_feed_start(struct net_device *dev)
+static int dvb_net_feed_start(struct net_device *dev)
 {
 	int ret, i;
 	struct dvb_net_priv *priv = (struct dvb_net_priv*) dev->priv;
@@ -255,8 +250,7 @@ dvb_net_feed_start(struct net_device *dev)
 	return 0;
 }
 
-static void
-dvb_net_feed_stop(struct net_device *dev)
+static void dvb_net_feed_stop(struct net_device *dev)
 {
 	struct dvb_net_priv *priv = (struct dvb_net_priv*) dev->priv;
 	int i;
@@ -286,8 +280,7 @@ dvb_net_feed_stop(struct net_device *dev)
 		printk("%s: no feed to stop\n", dev->name);
 }
 
-static int
-dvb_add_mc_filter(struct net_device *dev, struct dev_mc_list *mc)
+static int dvb_add_mc_filter(struct net_device *dev, struct dev_mc_list *mc)
 {
 	struct dvb_net_priv *priv = (struct dvb_net_priv*) dev->priv;
 	int ret;
@@ -303,8 +296,7 @@ dvb_add_mc_filter(struct net_device *dev, struct dev_mc_list *mc)
 	return ret;
 }
 
-static void
-dvb_net_set_multi(struct net_device *dev)
+static void dvb_net_set_multi(struct net_device *dev)
 {
 	struct dvb_net_priv *priv = (struct dvb_net_priv*) dev->priv;
 	struct dev_mc_list *mc;
@@ -346,16 +338,14 @@ dvb_net_set_multi(struct net_device *dev)
 	}
 }
 
-static int
-dvb_net_set_config(struct net_device *dev, struct ifmap *map)
+static int dvb_net_set_config(struct net_device *dev, struct ifmap *map)
 {
 	if (netif_running(dev))
 		return -EBUSY;
 	return 0;
 }
 
-static int
-dvb_net_set_mac(struct net_device *dev, void *p)
+static int dvb_net_set_mac(struct net_device *dev, void *p)
 {
 	struct sockaddr *addr=p;
 	int update;
@@ -370,29 +360,25 @@ dvb_net_set_mac(struct net_device *dev, void *p)
 }
 
 
-static int
-dvb_net_open(struct net_device *dev)
+static int dvb_net_open(struct net_device *dev)
 {
 	dvb_net_feed_start(dev);
 	return 0;
 }
 
-static int
-dvb_net_stop(struct net_device *dev)
+static int dvb_net_stop(struct net_device *dev)
 {
         dvb_net_feed_stop(dev);
 	return 0;
 }
 
-static struct net_device_stats *
-dvb_net_get_stats(struct net_device *dev)
+static struct net_device_stats * dvb_net_get_stats(struct net_device *dev)
 {
         return &((struct dvb_net_priv*) dev->priv)->stats;
 }
 
 
-static int
-dvb_net_init_dev(struct net_device *dev)
+static int dvb_net_init_dev(struct net_device *dev)
 {
 	ether_setup(dev);
 
@@ -414,8 +400,7 @@ dvb_net_init_dev(struct net_device *dev)
 	return 0;
 }
 
-static int 
-get_if(struct dvb_net *dvbnet)
+static int get_if(struct dvb_net *dvbnet)
 {
 	int i;
 
@@ -534,8 +519,7 @@ int dvb_net_do_ioctl(struct inode *inode, struct file *file,
 	return 0;
 }
 
-static int 
-dvb_net_ioctl(struct inode *inode, struct file *file,
+static int dvb_net_ioctl(struct inode *inode, struct file *file,
 	      unsigned int cmd, unsigned long arg)
 {
 	return dvb_usercopy(inode, file, cmd, arg, dvb_net_do_ioctl);

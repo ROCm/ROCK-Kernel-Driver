@@ -70,8 +70,7 @@ static char * mcfile = "/usr/lib/DVB/driver/frontends/Sc_main.mc";
 
 static int errno;
 
-static
-struct dvb_frontend_info tdlb7_info = {
+static struct dvb_frontend_info tdlb7_info = {
 	.name			 = "Alps TDLB7",
 	.type			 = FE_OFDM,
 	.frequency_min		 = 470000000,
@@ -90,8 +89,7 @@ struct dvb_frontend_info tdlb7_info = {
 };
 
 
-static
-int sp8870_writereg (struct dvb_i2c_bus *i2c, u16 reg, u16 data)
+static int sp8870_writereg (struct dvb_i2c_bus *i2c, u16 reg, u16 data)
 {
         u8 buf [] = { reg >> 8, reg & 0xff, data >> 8, data & 0xff };
 	struct i2c_msg msg = { .addr = 0x71, .flags = 0, .buf =  buf, .len = 4 };
@@ -106,8 +104,7 @@ int sp8870_writereg (struct dvb_i2c_bus *i2c, u16 reg, u16 data)
 }
 
 
-static
-u16 sp8870_readreg (struct dvb_i2c_bus *i2c, u16 reg)
+static u16 sp8870_readreg (struct dvb_i2c_bus *i2c, u16 reg)
 {
 	int ret;
 	u8 b0 [] = { reg >> 8 , reg & 0xff };
@@ -124,8 +121,7 @@ u16 sp8870_readreg (struct dvb_i2c_bus *i2c, u16 reg)
 }
 
 
-static
-int sp5659_write (struct dvb_i2c_bus *i2c, u8 data [4])
+static int sp5659_write (struct dvb_i2c_bus *i2c, u8 data [4])
 {
         int ret;
         struct i2c_msg msg = { .addr = 0x60, .flags = 0, .buf = data, .len = 4 };
@@ -139,8 +135,7 @@ int sp5659_write (struct dvb_i2c_bus *i2c, u8 data [4])
 }
 
 
-static
-int sp5659_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
+static int sp5659_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 {
         u32 div = (freq + 36200000) / 166666;
         u8 buf [4];
@@ -160,8 +155,7 @@ int sp5659_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 }
 
 
-static
-int sp8870_read_code(const char *fn, char **fp)
+static int sp8870_read_code(const char *fn, char **fp)
 {
         int fd;
 	loff_t l;
@@ -197,8 +191,7 @@ int sp8870_read_code(const char *fn, char **fp)
 }
 
 
-static 
-int sp8870_load_code(struct dvb_i2c_bus *i2c)
+static int sp8870_load_code(struct dvb_i2c_bus *i2c)
 {
 	/* this takes a long time. is there a way to do it faster? */
 	char *lcode;
@@ -245,8 +238,7 @@ int sp8870_load_code(struct dvb_i2c_bus *i2c)
 };
 
 
-static
-int sp8870_init (struct dvb_i2c_bus *i2c)
+static int sp8870_init (struct dvb_i2c_bus *i2c)
 {
 
 	dprintk ("%s\n", __FUNCTION__);
@@ -285,8 +277,7 @@ int sp8870_init (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-int tdlb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
+static int tdlb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 {
 	struct dvb_i2c_bus *i2c = fe->i2c;
 
@@ -415,8 +406,7 @@ int tdlb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 }
 
 
-static
-int tdlb7_attach (struct dvb_i2c_bus *i2c)
+static int tdlb7_attach (struct dvb_i2c_bus *i2c)
 {
 
 	struct i2c_msg msg = { .addr = 0x71, .flags = 0, .buf = NULL, .len = 0 };
@@ -440,8 +430,7 @@ int tdlb7_attach (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-void tdlb7_detach (struct dvb_i2c_bus *i2c)
+static void tdlb7_detach (struct dvb_i2c_bus *i2c)
 {
 	dprintk ("%s\n", __FUNCTION__);
 
@@ -449,8 +438,7 @@ void tdlb7_detach (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-int __init init_tdlb7 (void)
+static int __init init_tdlb7 (void)
 {
 	dprintk ("%s\n", __FUNCTION__);
 
@@ -458,8 +446,7 @@ int __init init_tdlb7 (void)
 }
 
 
-static
-void __exit exit_tdlb7 (void)
+static void __exit exit_tdlb7 (void)
 {
 	dprintk ("%s\n", __FUNCTION__);
 

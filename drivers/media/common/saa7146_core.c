@@ -49,8 +49,7 @@ static void dump_registers(struct saa7146_dev* dev)
  ****************************************************************************/
 
 /* this is videobuf_vmalloc_to_sg() from video-buf.c */
-static
-struct scatterlist* vmalloc_to_sg(unsigned char *virt, int nr_pages)
+static struct scatterlist* vmalloc_to_sg(unsigned char *virt, int nr_pages)
 {
 	struct scatterlist *sglist;
 	struct page *pg;
@@ -255,8 +254,7 @@ static irqreturn_t interrupt_hw(int irq, void *dev_id, struct pt_regs *regs)
 /*********************************************************************************/
 /* configuration-functions                                                       */
 
-static
-int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent)
+static int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent)
 {
 	unsigned long adr = 0, len = 0;
 	struct saa7146_dev* dev = kmalloc (sizeof(struct saa7146_dev),GFP_KERNEL);
@@ -418,8 +416,7 @@ out:
 	return err;
 }
 
-static
-void saa7146_remove_one(struct pci_dev *pdev)
+static void saa7146_remove_one(struct pci_dev *pdev)
 {
 	struct saa7146_dev* dev = (struct saa7146_dev*) pci_get_drvdata(pdev);
 	DEB_EE(("dev:%p\n",dev));
@@ -478,8 +475,7 @@ int saa7146_unregister_extension(struct saa7146_extension* ext)
 	return 0;
 }
 
-static
-int __init saa7146_init_module(void)
+static int __init saa7146_init_module(void)
 {
 	if( 0 == initialized ) {
 		INIT_LIST_HEAD(&saa7146_devices);
@@ -489,8 +485,7 @@ int __init saa7146_init_module(void)
 	return 0;
 }
 
-static
-void __exit saa7146_cleanup_module(void)
+static void __exit saa7146_cleanup_module(void)
 {
 }
 

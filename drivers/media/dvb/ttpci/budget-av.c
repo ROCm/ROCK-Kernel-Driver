@@ -46,8 +46,7 @@ struct budget_av {
  ****************************************************************************/
 
 
-static
-u8 i2c_readreg (struct dvb_i2c_bus *i2c, u8 id, u8 reg)
+static u8 i2c_readreg (struct dvb_i2c_bus *i2c, u8 id, u8 reg)
 {
 	u8 mm1[] = {0x00};
 	u8 mm2[] = {0x00};
@@ -66,8 +65,7 @@ u8 i2c_readreg (struct dvb_i2c_bus *i2c, u8 id, u8 reg)
 }
 
 
-static
-int i2c_writereg (struct dvb_i2c_bus *i2c, u8 id, u8 reg, u8 val)
+static int i2c_writereg (struct dvb_i2c_bus *i2c, u8 id, u8 reg, u8 val)
 {
         u8 msg[2]={ reg, val }; 
         struct i2c_msg msgs;
@@ -80,8 +78,7 @@ int i2c_writereg (struct dvb_i2c_bus *i2c, u8 id, u8 reg, u8 val)
 }
 
 
-static const
-u8 saa7113_tab[] = {
+static const u8 saa7113_tab[] = {
 	0x01, 0x08,
 	0x02, 0xc0,
 	0x03, 0x33,
@@ -111,8 +108,7 @@ u8 saa7113_tab[] = {
 };
 
 
-static
-int saa7113_init (struct budget_av *budget_av)
+static int saa7113_init (struct budget_av *budget_av)
 {
 	struct budget *budget = &budget_av->budget;
 	const u8 *data = saa7113_tab;
@@ -136,8 +132,7 @@ int saa7113_init (struct budget_av *budget_av)
 }
 
 
-static
-int saa7113_setinput (struct budget_av *budget_av, int input)
+static int saa7113_setinput (struct budget_av *budget_av, int input)
 {
 	struct budget *budget = &budget_av->budget;
 
@@ -155,8 +150,7 @@ int saa7113_setinput (struct budget_av *budget_av, int input)
 }
 
 
-static
-int budget_av_detach (struct saa7146_dev *dev)
+static int budget_av_detach (struct saa7146_dev *dev)
 {
 	struct budget_av *budget_av = (struct budget_av*) dev->ext_priv;
 	int err;
@@ -177,8 +171,7 @@ int budget_av_detach (struct saa7146_dev *dev)
 }
 
 
-static
-int budget_av_attach (struct saa7146_dev* dev,
+static int budget_av_attach (struct saa7146_dev* dev,
 		      struct saa7146_pci_extension_data *info)
 {
 	struct budget_av *budget_av;
@@ -255,8 +248,7 @@ static struct v4l2_input knc1_inputs[KNC1_INPUTS] = {
 };
 
 
-static
-struct saa7146_extension_ioctls ioctls[] = {
+static struct saa7146_extension_ioctls ioctls[] = {
 	{ VIDIOC_ENUMINPUT, 	SAA7146_EXCLUSIVE },
 	{ VIDIOC_G_INPUT,	SAA7146_EXCLUSIVE },
 	{ VIDIOC_S_INPUT,	SAA7146_EXCLUSIVE },
@@ -264,8 +256,7 @@ struct saa7146_extension_ioctls ioctls[] = {
 };
 
 
-static
-int av_ioctl(struct saa7146_dev *dev, unsigned int cmd, void *arg) 
+static int av_ioctl(struct saa7146_dev *dev, unsigned int cmd, void *arg) 
 {
 	struct budget_av *budget_av = (struct budget_av*) dev->ext_priv;
 /*
@@ -307,15 +298,13 @@ int av_ioctl(struct saa7146_dev *dev, unsigned int cmd, void *arg)
 	return 0;
 }
 
-static
-struct saa7146_standard standard[] = {
+static struct saa7146_standard standard[] = {
 	{ "PAL",	V4L2_STD_PAL,	SAA7146_PAL_VALUES },
 	{ "NTSC",	V4L2_STD_NTSC,	SAA7146_NTSC_VALUES },
 };
 
 
-static
-struct saa7146_ext_vv vv_data = {
+static struct saa7146_ext_vv vv_data = {
 	.inputs		= 2,
 	.capabilities	= 0, // perhaps later: V4L2_CAP_VBI_CAPTURE, but that need tweaking with the saa7113
 	.flags		= 0,
@@ -332,8 +321,7 @@ static struct saa7146_extension budget_extension;
 
 MAKE_BUDGET_INFO(knc1, "KNC1 DVB-S", BUDGET_KNC1);
 
-static
-struct pci_device_id pci_tbl [] = {
+static struct pci_device_id pci_tbl [] = {
 	MAKE_EXTENSION_PCI(knc1, 0x1131, 0x4f56),
 	{
 		.vendor    = 0,
@@ -342,8 +330,7 @@ struct pci_device_id pci_tbl [] = {
 
 MODULE_DEVICE_TABLE(pci, pci_tbl);
 
-static
-struct saa7146_extension budget_extension = {
+static struct saa7146_extension budget_extension = {
 	.name		= "budget dvb /w video in\0",
 	.pci_tbl	= pci_tbl,
 
@@ -358,8 +345,7 @@ struct saa7146_extension budget_extension = {
 };	
 
 
-static
-int __init budget_av_init(void) 
+static int __init budget_av_init(void) 
 {
 	DEB_EE((".\n"));
 
@@ -370,8 +356,7 @@ int __init budget_av_init(void)
 }
 
 
-static
-void __exit budget_av_exit(void)
+static void __exit budget_av_exit(void)
 {
 	DEB_EE((".\n"));
 	saa7146_unregister_extension(&budget_extension); 

@@ -32,12 +32,12 @@
 
 
 #define __KERNEL_SYSCALLS__
-#include <asm/uaccess.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/string.h>
+#include <asm/uaccess.h>
 
 #include "dvb_ringbuffer.h"
 

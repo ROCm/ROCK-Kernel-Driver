@@ -1,9 +1,9 @@
-#include <asm/uaccess.h>
 #include <linux/errno.h>
 #include <linux/module.h>
 #include <linux/ioctl.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
+#include <asm/uaccess.h>
 
 #include "dmxdev.h"
 #include "dvb_demux.h"

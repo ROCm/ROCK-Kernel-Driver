@@ -1,9 +1,9 @@
-#include <asm/types.h>
-#include <asm/bitops.h>
+#include <linux/types.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/input.h>
 #include <linux/proc_fs.h>
+#include <asm/bitops.h>
 
 #include "av7110.h"
 
@@ -18,8 +18,7 @@ static struct input_dev input_dev;
 
 static u32 ir_config;
 
-static
-u16 key_map [256] = {
+static u16 key_map [256] = {
 	KEY_0, KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7,
 	KEY_8, KEY_9, KEY_BACK, 0, KEY_POWER, KEY_MUTE, 0, KEY_INFO,
 	KEY_VOLUMEUP, KEY_VOLUMEDOWN, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
@@ -43,8 +42,7 @@ u16 key_map [256] = {
 };
 
 
-static
-void av7110_emit_keyup (unsigned long data)
+static void av7110_emit_keyup (unsigned long data)
 {
 	if (!data || !test_bit (data, input_dev.key))
 		return;
@@ -53,12 +51,10 @@ void av7110_emit_keyup (unsigned long data)
 }
 
 
-static
-struct timer_list keyup_timer = { function: av7110_emit_keyup };
+static struct timer_list keyup_timer = { function: av7110_emit_keyup };
 
 
-static
-void av7110_emit_key (u32 ircom)
+static void av7110_emit_key (u32 ircom)
 {
 	u8 data;
 	u8 addr;
@@ -117,8 +113,7 @@ void av7110_emit_key (u32 ircom)
 	old_toggle = new_toggle;
 }
 
-static
-void input_register_keys (void)
+static void input_register_keys (void)
 {
 	int i;
 
@@ -139,8 +134,7 @@ static void input_repeat_key(unsigned long data)
 }
 
 
-static
-int av7110_ir_write_proc (struct file *file, const char *buffer,
+static int av7110_ir_write_proc (struct file *file, const char *buffer,
 	                  unsigned long count, void *data)
 {
 	char *page;

@@ -25,7 +25,7 @@
 #ifndef _DVB_FRONTEND_H_
 #define _DVB_FRONTEND_H_
 
-#include <asm/types.h>
+#include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/ioctl.h>
 #include <linux/i2c.h>

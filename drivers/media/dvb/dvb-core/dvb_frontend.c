@@ -22,8 +22,6 @@
  * Or, point your browser to http://www.gnu.org/copyleft/gpl.html
  */
 
-#include <asm/processor.h>
-#include <asm/semaphore.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -32,6 +30,8 @@
 #include <linux/poll.h>
 #include <linux/module.h>
 #include <linux/list.h>
+#include <asm/processor.h>
+#include <asm/semaphore.h>
 
 #include "dvb_frontend.h"
 #include "dvbdev.h"
@@ -102,8 +102,7 @@ static LIST_HEAD(frontend_notifier_list);
 static DECLARE_MUTEX(frontend_mutex);
 
 
-static
-int dvb_frontend_internal_ioctl (struct dvb_frontend *frontend, 
+static int dvb_frontend_internal_ioctl (struct dvb_frontend *frontend, 
 				 unsigned int cmd, void *arg)
 {
 	int err = -EOPNOTSUPP;
@@ -131,8 +130,7 @@ int dvb_frontend_internal_ioctl (struct dvb_frontend *frontend,
  *  should make it still possible to receive the requested transponder 
  *  on both tuners...
  */
-static
-void dvb_bend_frequency (struct dvb_frontend_data *this_fe, int recursive)
+static void dvb_bend_frequency (struct dvb_frontend_data *this_fe, int recursive)
 {
 	struct list_head *entry;
 	int stepsize = this_fe->info->frequency_stepsize;
@@ -185,8 +183,7 @@ done:
 }
 
 
-static
-void dvb_call_frontend_notifiers (struct dvb_frontend_data *fe,
+static void dvb_call_frontend_notifiers (struct dvb_frontend_data *fe,
 				  fe_status_t s)
 {
 	dprintk ("%s\n", __FUNCTION__);
@@ -210,8 +207,7 @@ void dvb_call_frontend_notifiers (struct dvb_frontend_data *fe,
 }
 
 
-static
-void dvb_frontend_add_event (struct dvb_frontend_data *fe, fe_status_t status)
+static void dvb_frontend_add_event (struct dvb_frontend_data *fe, fe_status_t status)
 {
 	struct dvb_fe_events *events = &fe->events;
 	struct dvb_frontend_event *e;
@@ -249,8 +245,7 @@ void dvb_frontend_add_event (struct dvb_frontend_data *fe, fe_status_t status)
 }
 
 
-static
-int dvb_frontend_get_event (struct dvb_frontend_data *fe,
+static int dvb_frontend_get_event (struct dvb_frontend_data *fe,
 			    struct dvb_frontend_event *event, int flags)
 {
         struct dvb_fe_events *events = &fe->events;
@@ -288,8 +283,7 @@ int dvb_frontend_get_event (struct dvb_frontend_data *fe,
 }
 
 
-static
-int dvb_frontend_set_parameters (struct dvb_frontend_data *fe,
+static int dvb_frontend_set_parameters (struct dvb_frontend_data *fe,
 				 struct dvb_frontend_parameters *param,
 				 int first_trial)
 {
@@ -321,8 +315,7 @@ int dvb_frontend_set_parameters (struct dvb_frontend_data *fe,
 	return err;
 }
 
-static
-void dvb_frontend_init (struct dvb_frontend_data *fe)
+static void dvb_frontend_init (struct dvb_frontend_data *fe)
 {
 	struct dvb_frontend *frontend = &fe->frontend;
 
@@ -334,8 +327,7 @@ void dvb_frontend_init (struct dvb_frontend_data *fe)
 }
 
 
-static
-void update_delay (int *quality, int *delay, int locked)
+static void update_delay (int *quality, int *delay, int locked)
 {
 	int q2;
 
@@ -360,8 +352,7 @@ void update_delay (int *quality, int *delay, int locked)
  *  here we only come when we have lost the lock bit, 
  *  let's try to do something useful...
  */
-static
-void dvb_frontend_recover (struct dvb_frontend_data *fe)
+static void dvb_frontend_recover (struct dvb_frontend_data *fe)
 {
 	dprintk ("%s\n", __FUNCTION__);
 
@@ -409,8 +400,7 @@ void dvb_frontend_recover (struct dvb_frontend_data *fe)
 
 
 
-static
-int dvb_frontend_is_exiting (struct dvb_frontend_data *fe)
+static int dvb_frontend_is_exiting (struct dvb_frontend_data *fe)
 {
 	if (fe->exit)
 		return 1;
@@ -423,8 +413,7 @@ int dvb_frontend_is_exiting (struct dvb_frontend_data *fe)
 }
 
 
-static
-int dvb_frontend_thread (void *data)
+static int dvb_frontend_thread (void *data)
 {
 	struct dvb_frontend_data *fe = (struct dvb_frontend_data *) data;
 	char name [15];
@@ -502,8 +491,7 @@ int dvb_frontend_thread (void *data)
 }
 
 
-static
-void dvb_frontend_stop (struct dvb_frontend_data *fe)
+static void dvb_frontend_stop (struct dvb_frontend_data *fe)
 {
 	dprintk ("%s\n", __FUNCTION__);
 
@@ -532,8 +520,7 @@ void dvb_frontend_stop (struct dvb_frontend_data *fe)
 }
 
 
-static
-int dvb_frontend_start (struct dvb_frontend_data *fe)
+static int dvb_frontend_start (struct dvb_frontend_data *fe)
 {
 	int ret;
 
@@ -567,8 +554,7 @@ int dvb_frontend_start (struct dvb_frontend_data *fe)
 }
 
 
-static
-int dvb_frontend_ioctl (struct inode *inode, struct file *file,
+static int dvb_frontend_ioctl (struct inode *inode, struct file *file,
 			unsigned int cmd, void *parg)
 {
 	struct dvb_device *dvbdev = file->private_data;
@@ -611,8 +597,7 @@ int dvb_frontend_ioctl (struct inode *inode, struct file *file,
 }
 
 
-static
-unsigned int dvb_frontend_poll (struct file *file, struct poll_table_struct *wait)
+static unsigned int dvb_frontend_poll (struct file *file, struct poll_table_struct *wait)
 {
 	struct dvb_device *dvbdev = file->private_data;
 	struct dvb_frontend_data *fe = dvbdev->priv;
@@ -628,8 +613,7 @@ unsigned int dvb_frontend_poll (struct file *file, struct poll_table_struct *wai
 }
 
 
-static
-int dvb_frontend_open (struct inode *inode, struct file *file)
+static int dvb_frontend_open (struct inode *inode, struct file *file)
 {
 	struct dvb_device *dvbdev = file->private_data;
 	struct dvb_frontend_data *fe = dvbdev->priv;
@@ -653,8 +637,7 @@ int dvb_frontend_open (struct inode *inode, struct file *file)
 }
 
 
-static
-int dvb_frontend_release (struct inode *inode, struct file *file)
+static int dvb_frontend_release (struct inode *inode, struct file *file)
 {
 	struct dvb_device *dvbdev = file->private_data;
 	struct dvb_frontend_data *fe = dvbdev->priv;
@@ -855,8 +838,7 @@ dvb_remove_frontend_notifier (struct dvb_adapter *adapter,
 }
 
 
-static
-struct file_operations dvb_frontend_fops = {
+static struct file_operations dvb_frontend_fops = {
 	.owner		= THIS_MODULE,
 	.ioctl		= dvb_generic_ioctl,
 	.poll		= dvb_frontend_poll,

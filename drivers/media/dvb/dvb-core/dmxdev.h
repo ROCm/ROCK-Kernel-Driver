@@ -24,14 +24,14 @@
 #ifndef _DMXDEV_H_
 #define _DMXDEV_H_
 
-#include <asm/types.h>
-#include <asm/semaphore.h>
+#include <linux/types.h>
 #include <linux/spinlock.h>
 #include <linux/kernel.h>
 #include <linux/timer.h>
 #include <linux/wait.h>
 #include <linux/fs.h>
 #include <linux/string.h>
+#include <asm/semaphore.h>
 
 #include <linux/dvb/dmx.h>
 

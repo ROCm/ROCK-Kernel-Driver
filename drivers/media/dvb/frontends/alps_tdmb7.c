@@ -34,8 +34,7 @@ static int debug = 0;
 #define dprintk	if (debug) printk
 
 
-static
-struct dvb_frontend_info tdmb7_info = {
+static struct dvb_frontend_info tdmb7_info = {
 	.name 			= "Alps TDMB7",
 	.type 			= FE_OFDM,
 	.frequency_min 		= 470000000,
@@ -55,8 +54,7 @@ struct dvb_frontend_info tdmb7_info = {
 };
 
 
-static
-u8 init_tab [] = {
+static u8 init_tab [] = {
 	0x04, 0x10,
 	0x05, 0x09,
 	0x06, 0x00,
@@ -78,8 +76,7 @@ u8 init_tab [] = {
 };
 
 
-static
-int cx22700_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
+static int cx22700_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 {
 	int ret;
 	u8 buf [] = { reg, data };
@@ -97,8 +94,7 @@ int cx22700_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 }
 
 
-static
-u8 cx22700_readreg (struct dvb_i2c_bus *i2c, u8 reg)
+static u8 cx22700_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 {
 	int ret;
 	u8 b0 [] = { reg };
@@ -117,8 +113,7 @@ u8 cx22700_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 }
 
 
-static
-int pll_write (struct dvb_i2c_bus *i2c, u8 data [4])
+static int pll_write (struct dvb_i2c_bus *i2c, u8 data [4])
 {
 	struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = data, .len = 4 };
 	int ret;
@@ -138,8 +133,7 @@ int pll_write (struct dvb_i2c_bus *i2c, u8 data [4])
  *   set up the downconverter frequency divisor for a 
  *   reference clock comparision frequency of 125 kHz.
  */
-static
-int pll_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
+static int pll_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 {
 	u32 div = (freq + 36166667) / 166667;
 #if 1 //ALPS_SETTINGS
@@ -156,8 +150,7 @@ int pll_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 }
 
 
-static
-int cx22700_init (struct dvb_i2c_bus *i2c)
+static int cx22700_init (struct dvb_i2c_bus *i2c)
 {
 	int i;
 
@@ -177,8 +170,7 @@ int cx22700_init (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-int cx22700_set_inversion (struct dvb_i2c_bus *i2c, int inversion)
+static int cx22700_set_inversion (struct dvb_i2c_bus *i2c, int inversion)
 {
 	u8 val;
 
@@ -199,8 +191,7 @@ int cx22700_set_inversion (struct dvb_i2c_bus *i2c, int inversion)
 }
 
 
-static
-int cx22700_set_tps (struct dvb_i2c_bus *i2c, struct dvb_ofdm_parameters *p)
+static int cx22700_set_tps (struct dvb_i2c_bus *i2c, struct dvb_ofdm_parameters *p)
 {
 	static const u8 qam_tab [4] = { 0, 1, 0, 2 };
 	static const u8 fec_tab [6] = { 0, 1, 2, 0, 3, 4 };
@@ -263,8 +254,7 @@ int cx22700_set_tps (struct dvb_i2c_bus *i2c, struct dvb_ofdm_parameters *p)
 }
 
 
-static
-int cx22700_get_tps (struct dvb_i2c_bus *i2c, struct dvb_ofdm_parameters *p)
+static int cx22700_get_tps (struct dvb_i2c_bus *i2c, struct dvb_ofdm_parameters *p)
 {
 	static const fe_modulation_t qam_tab [3] = { QPSK, QAM_16, QAM_64 };
 	static const fe_code_rate_t fec_tab [5] = { FEC_1_2, FEC_2_3, FEC_3_4,
@@ -311,8 +301,7 @@ int cx22700_get_tps (struct dvb_i2c_bus *i2c, struct dvb_ofdm_parameters *p)
 }
 
 
-static
-int tdmb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
+static int tdmb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 {
 	struct dvb_i2c_bus *i2c = fe->i2c;
 
@@ -413,8 +402,7 @@ int tdmb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 
 
 
-static
-int tdmb7_attach (struct dvb_i2c_bus *i2c)
+static int tdmb7_attach (struct dvb_i2c_bus *i2c)
 {
 	struct i2c_msg msg = { .addr = 0x43, .flags = 0, .buf = NULL,. len = 0 };
 
@@ -429,8 +417,7 @@ int tdmb7_attach (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-void tdmb7_detach (struct dvb_i2c_bus *i2c)
+static void tdmb7_detach (struct dvb_i2c_bus *i2c)
 {
 	dprintk ("%s\n", __FUNCTION__);
 
@@ -438,8 +425,7 @@ void tdmb7_detach (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-int __init init_tdmb7 (void)
+static int __init init_tdmb7 (void)
 {
 	dprintk ("%s\n", __FUNCTION__);
 
@@ -447,8 +433,7 @@ int __init init_tdmb7 (void)
 }
 
 
-static 
-void __exit exit_tdmb7 (void)
+static void __exit exit_tdmb7 (void)
 {
 	dprintk ("%s\n", __FUNCTION__);
 

@@ -144,8 +144,7 @@ void saa7146_buffer_timeout(unsigned long data)
 /********************************************************************************/
 /* file operations */
 
-static
-int fops_open(struct inode *inode, struct file *file)
+static int fops_open(struct inode *inode, struct file *file)
 {
 	unsigned int minor = minor(inode->i_rdev);
 	struct saa7146_dev *h = NULL, *dev = NULL;
@@ -463,15 +462,13 @@ int saa7146_unregister_device(struct video_device *vid, struct saa7146_dev* dev)
 	return 0;
 }
 
-static
-int __init saa7146_vv_init_module(void)
+static int __init saa7146_vv_init_module(void)
 {
 	return 0;
 }
 
 
-static
-void __exit saa7146_vv_cleanup_module(void)
+static void __exit saa7146_vv_cleanup_module(void)
 {
 }
 

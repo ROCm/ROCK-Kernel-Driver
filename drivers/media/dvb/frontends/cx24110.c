@@ -44,8 +44,7 @@ static int debug = 0;
 #define dprintk	if (debug) printk
 
 
-static
-struct dvb_frontend_info cx24110_info = {
+static struct dvb_frontend_info cx24110_info = {
 	.name = "Conexant CX24110 with CX24108 tuner, aka HM1221/HM1811",
 	.type = FE_QPSK,
 	.frequency_min = 950000,
@@ -66,8 +65,7 @@ struct dvb_frontend_info cx24110_info = {
 /* fixme: are these values correct? especially ..._tolerance and caps */
 
 
-static
-struct {u8 reg; u8 data;} cx24110_regdata[]=
+static struct {u8 reg; u8 data;} cx24110_regdata[]=
                       /* Comments beginning with @ denote this value should
                          be the default */
         {{0x09,0x01}, /* SoftResetAll */
@@ -130,8 +128,7 @@ struct {u8 reg; u8 data;} cx24110_regdata[]=
 	};
 
 
-static
-int cx24110_writereg (struct dvb_i2c_bus *i2c, int reg, int data)
+static int cx24110_writereg (struct dvb_i2c_bus *i2c, int reg, int data)
 {
         u8 buf [] = { reg, data };
 	struct i2c_msg msg = { .addr = 0x55, .flags = 0, .buf = buf, .len = 2 };
@@ -148,8 +145,7 @@ int cx24110_writereg (struct dvb_i2c_bus *i2c, int reg, int data)
 }
 
 
-static
-u8 cx24110_readreg (struct dvb_i2c_bus *i2c, u8 reg)
+static u8 cx24110_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 {
 	int ret;
 	u8 b0 [] = { reg };
@@ -166,8 +162,7 @@ u8 cx24110_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 }
 
 
-static
-int cx24108_write (struct dvb_i2c_bus *i2c, u32 data)
+static int cx24108_write (struct dvb_i2c_bus *i2c, u32 data)
 {
 /* tuner data is 21 bits long, must be left-aligned in data */
 /* tuner cx24108 is written through a dedicated 3wire interface on the demod chip */
@@ -201,8 +196,7 @@ dprintk("cx24110 debug: cx24108_write(%8.8x)\n",data);
 }
 
 
-static
-int cx24108_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
+static int cx24108_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 {
 /* fixme (low): error handling */
         int i, a, n, pump;
@@ -266,8 +260,7 @@ int cx24108_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 }
 
 
-static
-int cx24110_init (struct dvb_i2c_bus *i2c)
+static int cx24110_init (struct dvb_i2c_bus *i2c)
 {
 /* fixme (low): error handling */
         int i;
@@ -282,8 +275,7 @@ int cx24110_init (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-int cx24110_set_inversion (struct dvb_i2c_bus *i2c, fe_spectral_inversion_t inversion)
+static int cx24110_set_inversion (struct dvb_i2c_bus *i2c, fe_spectral_inversion_t inversion)
 {
 /* fixme (low): error handling */
 
@@ -318,8 +310,7 @@ int cx24110_set_inversion (struct dvb_i2c_bus *i2c, fe_spectral_inversion_t inve
 }
 
 
-static
-int cx24110_set_fec (struct dvb_i2c_bus *i2c, fe_code_rate_t fec)
+static int cx24110_set_fec (struct dvb_i2c_bus *i2c, fe_code_rate_t fec)
 {
 /* fixme (low): error handling */
 
@@ -365,8 +356,7 @@ int cx24110_set_fec (struct dvb_i2c_bus *i2c, fe_code_rate_t fec)
 }
 
 
-static
-fe_code_rate_t cx24110_get_fec (struct dvb_i2c_bus *i2c)
+static fe_code_rate_t cx24110_get_fec (struct dvb_i2c_bus *i2c)
 {
 	int i;
 
@@ -383,8 +373,7 @@ fe_code_rate_t cx24110_get_fec (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-int cx24110_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
+static int cx24110_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
 {
 /* fixme (low): add error handling */
         u32 ratio;
@@ -466,8 +455,7 @@ dprintk("cx24110 debug: entering %s(%d)\n",__FUNCTION__,srate);
 }
 
 
-static
-int cx24110_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltage)
+static int cx24110_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltage)
 {
 	switch (voltage) {
 	case SEC_VOLTAGE_13:
@@ -494,8 +482,7 @@ static void sendDiSEqCMessage(struct dvb_i2c_bus *i2c, struct dvb_diseqc_master_
 }
 
 
-static
-int cx24110_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
+static int cx24110_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 {
 	struct dvb_i2c_bus *i2c = fe->i2c;
 	static int lastber=0, lastbyer=0,lastbler=0, lastesn0=0, sum_bler=0;
@@ -656,8 +643,7 @@ int cx24110_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 }
 
 
-static
-int cx24110_attach (struct dvb_i2c_bus *i2c)
+static int cx24110_attach (struct dvb_i2c_bus *i2c)
 {
 	u8 sig;
 
@@ -671,22 +657,19 @@ int cx24110_attach (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-void cx24110_detach (struct dvb_i2c_bus *i2c)
+static void cx24110_detach (struct dvb_i2c_bus *i2c)
 {
 	dvb_unregister_frontend (cx24110_ioctl, i2c);
 }
 
 
-static
-int __init init_cx24110 (void)
+static int __init init_cx24110 (void)
 {
 	return dvb_register_i2c_device (THIS_MODULE, cx24110_attach, cx24110_detach);
 }
 
 
-static
-void __exit exit_cx24110 (void)
+static void __exit exit_cx24110 (void)
 {
 	dvb_unregister_i2c_device (cx24110_attach);
 }

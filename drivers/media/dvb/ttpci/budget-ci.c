@@ -68,8 +68,7 @@ void gpio_set(struct saa7146_dev* saa, u8 pin, u8 data)
 
 
 
-static
-int wait_for_debi_done(struct saa7146_dev *saa)
+static int wait_for_debi_done(struct saa7146_dev *saa)
 {
 	int start = jiffies;
 
@@ -103,8 +102,7 @@ int wait_for_debi_done(struct saa7146_dev *saa)
 }
 
 
-static
-u32 debiread (struct saa7146_dev *saa, u32 config, int addr, int count)
+static u32 debiread (struct saa7146_dev *saa, u32 config, int addr, int count)
 {
 	u32 result = 0;
 
@@ -131,8 +129,7 @@ u32 debiread (struct saa7146_dev *saa, u32 config, int addr, int count)
 
 
 /* DEBI during interrupt */
-static inline
-u32 irdebi(struct saa7146_dev *saa, u32 config, int addr, u32 val, int count)
+static inline u32 irdebi(struct saa7146_dev *saa, u32 config, int addr, u32 val, int count)
 {
 	u32 res;
 	res = debiread(saa, config, addr, count);
@@ -148,8 +145,7 @@ u32 irdebi(struct saa7146_dev *saa, u32 config, int addr, u32 val, int count)
    Hauppauge (from NOVA-CI-s box product)
    i've taken a "middle of the road" approach and note the differences
 */
-static
- u16 key_map[64] = {
+static  u16 key_map[64] = {
 	/* 0x0X */
 	KEY_0, KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8,
 	KEY_9,
@@ -199,8 +195,7 @@ static
 };
 
 
-static
-void msp430_ir_debounce (unsigned long data)
+static void msp430_ir_debounce (unsigned long data)
 {
 	struct input_dev *dev = (struct input_dev *) data;
 
@@ -217,8 +212,7 @@ void msp430_ir_debounce (unsigned long data)
 
 
 
-static
-void msp430_ir_interrupt (unsigned long data)
+static void msp430_ir_interrupt (unsigned long data)
 {
 	struct budget_ci *budget_ci = (struct budget_ci*) data;
 	struct saa7146_dev *saa = budget_ci->budget.dev;
@@ -256,8 +250,7 @@ void msp430_ir_interrupt (unsigned long data)
 }
 
 
-static
-int msp430_ir_init (struct budget_ci *budget_ci)
+static int msp430_ir_init (struct budget_ci *budget_ci)
 {
 	struct saa7146_dev *saa = budget_ci->budget.dev;
 	int i;
@@ -284,8 +277,7 @@ int msp430_ir_init (struct budget_ci *budget_ci)
 }
 
 
-static
-void msp430_ir_deinit (struct budget_ci *budget_ci)
+static void msp430_ir_deinit (struct budget_ci *budget_ci)
 {
 	struct saa7146_dev *saa = budget_ci->budget.dev;
 	struct input_dev *dev = &budget_ci->input_dev;
@@ -301,8 +293,7 @@ void msp430_ir_deinit (struct budget_ci *budget_ci)
 }
 
 
-static
-void budget_ci_irq (struct saa7146_dev *dev, u32 *isr)
+static void budget_ci_irq (struct saa7146_dev *dev, u32 *isr)
 {
         struct budget_ci *budget_ci = (struct budget_ci*) dev->ext_priv;
 
@@ -317,8 +308,7 @@ void budget_ci_irq (struct saa7146_dev *dev, u32 *isr)
 
 
 
-static
-int budget_ci_attach (struct saa7146_dev* dev,
+static int budget_ci_attach (struct saa7146_dev* dev,
 		      struct saa7146_pci_extension_data *info)
 {
 	struct budget_ci *budget_ci;
@@ -346,8 +336,7 @@ int budget_ci_attach (struct saa7146_dev* dev,
 
 
 
-static
-int budget_ci_detach (struct saa7146_dev* dev)
+static int budget_ci_detach (struct saa7146_dev* dev)
 {
 	struct budget_ci *budget_ci = (struct budget_ci*) dev->ext_priv;
 	int err;
@@ -369,8 +358,7 @@ static struct saa7146_extension budget_extension;
 
 MAKE_BUDGET_INFO(ttbci,	"TT-Budget/WinTV-NOVA-CI PCI",	BUDGET_TT_HW_DISEQC);
 
-static
-struct pci_device_id pci_tbl[] = {
+static struct pci_device_id pci_tbl[] = {
 	MAKE_EXTENSION_PCI(ttbci, 0x13c2, 0x100c),
 	MAKE_EXTENSION_PCI(ttbci, 0x13c2, 0x100f),
 	{
@@ -380,8 +368,7 @@ struct pci_device_id pci_tbl[] = {
 
 MODULE_DEVICE_TABLE(pci, pci_tbl);
 
-static
-struct saa7146_extension budget_extension = {
+static struct saa7146_extension budget_extension = {
 	.name		= "budget_ci dvb\0",
 	.flags	 	= 0,
 	.ext_vv_data	= NULL,
@@ -396,8 +383,7 @@ struct saa7146_extension budget_extension = {
 };	
 
 
-static
-int __init budget_ci_init(void) 
+static int __init budget_ci_init(void) 
 {
 	if (saa7146_register_extension(&budget_extension))
 		return -ENODEV;
@@ -406,8 +392,7 @@ int __init budget_ci_init(void)
 }
 
 
-static
-void __exit budget_ci_exit(void)
+static void __exit budget_ci_exit(void)
 {
 	DEB_EE((".\n"));
 	saa7146_unregister_extension(&budget_extension); 

@@ -25,7 +25,7 @@
 #ifndef __DEMUX_H 
 #define __DEMUX_H 
 
-#include <asm/types.h>
+#include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/list.h> 
 #include <linux/time.h> 

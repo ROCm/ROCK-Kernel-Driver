@@ -2,17 +2,14 @@
 
 static int vbi_pixel_to_capture = 720 * 2;
 
-#define WRITE_RPS1(x) dev->d_rps1.cpu_addr[ count++ ] = cpu_to_le32(x)
-
-static
-int vbi_workaround(struct saa7146_dev *dev)
+static int vbi_workaround(struct saa7146_dev *dev)
 {
 	struct saa7146_vv *vv = dev->vv_data;
 
         u32          *cpu;
         dma_addr_t   dma_addr;
 	
-	int i, count;
+	int i;
 
 	DECLARE_WAITQUEUE(wait, current);
 	
@@ -35,19 +32,6 @@ int vbi_workaround(struct saa7146_dev *dev)
 	saa7146_write(dev, BASE_PAGE3,	0x0);
 	saa7146_write(dev, NUM_LINE_BYTE3, (2<<16)|((vbi_pixel_to_capture)<<0));
 	saa7146_write(dev, MC2, MASK_04|MASK_20);
-
-
-	/* we have to do the workaround two times to be sure that
-	   everything is ok */
-	for(i = 0; i < 2; i++) {
-
-		/* indicate to the irq handler that we do the workaround */
-		saa7146_write(dev, MC2, MASK_31|MASK_15);
-
-		saa7146_write(dev, NUM_LINE_BYTE3, (1<<16)|(2<<0));
-		saa7146_write(dev, MC2, MASK_04|MASK_20);
-	
-		count = 0;
 
 		/* load brs-control register */
 		WRITE_RPS1(CMD_WR_REG | (1 << 8) | (BRS_CTRL/4));
@@ -84,6 +68,16 @@ int vbi_workaround(struct saa7146_dev *dev)
 		WRITE_RPS1(CMD_INTERRUPT);
 		/* stop rps1 */
 		WRITE_RPS1(CMD_STOP);
+	
+	/* we have to do the workaround twice to be sure that
+	   everything is ok */
+	for(i = 0; i < 2; i++) {
+
+		/* indicate to the irq handler that we do the workaround */
+		saa7146_write(dev, MC2, MASK_31|MASK_15);
+
+		saa7146_write(dev, NUM_LINE_BYTE3, (1<<16)|(2<<0));
+		saa7146_write(dev, MC2, MASK_04|MASK_20);
 	
 		/* enable rps1 irqs */
 		IER_ENABLE(dev,MASK_28);
@@ -194,8 +188,7 @@ void saa7146_set_vbi_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, s
 	saa7146_write(dev, MC1, (MASK_13 | MASK_29));	
 }
 
-static
-int buffer_activate(struct saa7146_dev *dev,
+static int buffer_activate(struct saa7146_dev *dev,
 			   struct saa7146_buf *buf,
 			   struct saa7146_buf *next)
 {
@@ -209,8 +202,7 @@ int buffer_activate(struct saa7146_dev *dev,
 	return 0;
 }
 
-static
-int buffer_prepare(struct file *file, struct videobuf_buffer *vb,enum v4l2_field field)
+static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,enum v4l2_field field)
 {
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
@@ -259,8 +251,7 @@ int buffer_prepare(struct file *file, struct videobuf_buffer *vb,enum v4l2_field
 	return err;
 }
 
-static int
-buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
+static int buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
 {
 	int llength,lines;
 	
@@ -275,8 +266,7 @@ buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
 	return 0;
 }
 
-static
-void buffer_queue(struct file *file, struct videobuf_buffer *vb)
+static void buffer_queue(struct file *file, struct videobuf_buffer *vb)
 {
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
@@ -287,8 +277,7 @@ void buffer_queue(struct file *file, struct videobuf_buffer *vb)
 	saa7146_buffer_queue(dev,&vv->vbi_q,buf);
 }
 
-static
-void buffer_release(struct file *file, struct videobuf_buffer *vb)
+static void buffer_release(struct file *file, struct videobuf_buffer *vb)
 {
 	struct saa7146_fh *fh   = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
@@ -298,8 +287,7 @@ void buffer_release(struct file *file, struct videobuf_buffer *vb)
 	saa7146_dma_free(dev,buf);
 }
 
-static
-struct videobuf_queue_ops vbi_qops = {
+static struct videobuf_queue_ops vbi_qops = {
 	.buf_setup    = buffer_setup,
 	.buf_prepare  = buffer_prepare,
 	.buf_queue    = buffer_queue,
@@ -308,8 +296,7 @@ struct videobuf_queue_ops vbi_qops = {
 
 /* ------------------------------------------------------------------ */
 
-static
-void vbi_stop(struct saa7146_fh *fh)
+static void vbi_stop(struct saa7146_fh *fh)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -331,8 +318,7 @@ void vbi_stop(struct saa7146_fh *fh)
 	spin_unlock_irqrestore(&dev->slock, flags);
 }
 
-static
-void vbi_read_timeout(unsigned long data)
+static void vbi_read_timeout(unsigned long data)
 {
 	struct saa7146_fh *fh = (struct saa7146_fh *)data;
 	struct saa7146_dev *dev = fh->dev;
@@ -342,8 +328,7 @@ void vbi_read_timeout(unsigned long data)
 	vbi_stop(fh);
 }
 
-static
-void vbi_init(struct saa7146_dev *dev, struct saa7146_vv *vv)
+static void vbi_init(struct saa7146_dev *dev, struct saa7146_vv *vv)
 {
 	DEB_VBI(("dev:%p\n",dev));
 
@@ -357,8 +342,7 @@ void vbi_init(struct saa7146_dev *dev, struct saa7146_vv *vv)
 	init_waitqueue_head(&vv->vbi_wq);
 }
 
-static
-void vbi_open(struct saa7146_dev *dev, struct saa7146_fh *fh)
+static void vbi_open(struct saa7146_dev *dev, struct saa7146_fh *fh)
 {
 	DEB_VBI(("dev:%p, fh:%p\n",dev,fh));
 
@@ -389,8 +373,7 @@ void vbi_open(struct saa7146_dev *dev, struct saa7146_fh *fh)
 	vbi_workaround(dev);
 }
 
-static
-void vbi_close(struct saa7146_dev *dev, struct saa7146_fh *fh, struct file *file)
+static void vbi_close(struct saa7146_dev *dev, struct saa7146_fh *fh, struct file *file)
 {
 	struct saa7146_vv *vv = dev->vv_data;
 	DEB_VBI(("dev:%p, fh:%p\n",dev,fh));
@@ -400,8 +383,7 @@ void vbi_close(struct saa7146_dev *dev, struct saa7146_fh *fh, struct file *file
 	}
 }
 
-static
-void vbi_irq_done(struct saa7146_dev *dev, unsigned long status)
+static void vbi_irq_done(struct saa7146_dev *dev, unsigned long status)
 {
 	struct saa7146_vv *vv = dev->vv_data;
 	spin_lock(&dev->slock);
@@ -420,8 +402,7 @@ void vbi_irq_done(struct saa7146_dev *dev, unsigned long status)
 	spin_unlock(&dev->slock);
 }
 
-static
-ssize_t vbi_read(struct file *file, char *data, size_t count, loff_t *ppos)
+static ssize_t vbi_read(struct file *file, char *data, size_t count, loff_t *ppos)
 {
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;

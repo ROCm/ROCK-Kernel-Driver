@@ -60,8 +60,7 @@
 /* Master Clock = 88 MHz */
 #define M_CLK (88000000UL) 
 
-static
-struct dvb_frontend_info uni0299_info = {
+static struct dvb_frontend_info uni0299_info = {
 	.name			= "STV0299/TSA5059/SL1935 based",
 	.type			= FE_QPSK,
 	.frequency_min		= 950000,
@@ -80,8 +79,7 @@ struct dvb_frontend_info uni0299_info = {
 };
 
 
-static
-u8 init_tab [] = {
+static u8 init_tab [] = {
 	0x04, 0x7d,   /* F22FR = 0x7d                                 */
 		      /* F22 = f_VCO / 128 / 0x7d = 22 kHz            */
 
@@ -144,8 +142,7 @@ u8 init_tab [] = {
 };
 
 
-static
-int stv0299_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
+static int stv0299_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 {
 	int ret;
 	u8 buf [] = { reg, data };
@@ -161,8 +158,7 @@ int stv0299_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 }
 
 
-static
-u8 stv0299_readreg (struct dvb_i2c_bus *i2c, u8 reg)
+static u8 stv0299_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 {
 	int ret;
 	u8 b0 [] = { reg };
@@ -179,8 +175,7 @@ u8 stv0299_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 }
 
 
-static
-int stv0299_readregs (struct dvb_i2c_bus *i2c, u8 reg1, u8 *b, u8 len)
+static int stv0299_readregs (struct dvb_i2c_bus *i2c, u8 reg1, u8 *b, u8 len)
 {
         int ret;
         struct i2c_msg msg [] = { { .addr = 0x68, .flags = 0, .buf = &reg1, .len = 1 },
@@ -195,8 +190,7 @@ int stv0299_readregs (struct dvb_i2c_bus *i2c, u8 reg1, u8 *b, u8 len)
 }
 
 
-static
-int pll_write (struct dvb_i2c_bus *i2c, u8 addr, u8 *data, int len)
+static int pll_write (struct dvb_i2c_bus *i2c, u8 addr, u8 *data, int len)
 {
 	int ret;
 	u8 rpt1 [] = { 0x05, 0xb5 };  /*  enable i2c repeater on stv0299  */
@@ -214,8 +208,7 @@ int pll_write (struct dvb_i2c_bus *i2c, u8 addr, u8 *data, int len)
 }
 
 
-static
-int sl1935_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq, int ftype)
+static int sl1935_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq, int ftype)
 {
 	u8 buf[4];
 	u32 div;
@@ -245,8 +238,7 @@ int sl1935_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq, int ftype)
  *   set up the downconverter frequency divisor for a 
  *   reference clock comparision frequency of 125 kHz.
  */
-static
-int tsa5059_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq, int ftype)
+static int tsa5059_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq, int ftype)
 {
 	u8 addr = (ftype == PHILIPS_SU1278SH) ? 0x60 : 0x61;
         u32 div = freq / 125;
@@ -270,8 +262,7 @@ int tsa5059_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq, int ftype)
 #define MIN2(a,b) ((a) < (b) ? (a) : (b))
 #define MIN3(a,b,c) MIN2(MIN2(a,b),c)
 
-static
-int tua6100_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq,
+static int tua6100_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq,
 			 int ftype, int srate)
 {
 	u8 reg0 [2] = { 0x00, 0x00 };
@@ -392,8 +383,7 @@ int tua6100_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq,
 }
 
 
-static
-int pll_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq, int ftype, int srate)
+static int pll_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq, int ftype, int srate)
 {
 	if (ftype == LG_TDQF_S001F)
 		return sl1935_set_tv_freq(i2c, freq, ftype);
@@ -404,8 +394,7 @@ int pll_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq, int ftype, int srate)
 }
 
 #if 0
-static
-int tsa5059_read_status	(struct dvb_i2c_bus *i2c)
+static int tsa5059_read_status	(struct dvb_i2c_bus *i2c)
 {
 	int ret;
 	u8 rpt1 [] = { 0x05, 0xb5 };
@@ -426,8 +415,7 @@ int tsa5059_read_status	(struct dvb_i2c_bus *i2c)
 #endif
 
 
-static
-int stv0299_init (struct dvb_i2c_bus *i2c, int ftype)
+static int stv0299_init (struct dvb_i2c_bus *i2c, int ftype)
 {
 	int i;
 
@@ -452,8 +440,7 @@ int stv0299_init (struct dvb_i2c_bus *i2c, int ftype)
 }
 
 
-static
-int stv0299_check_inversion (struct dvb_i2c_bus *i2c)
+static int stv0299_check_inversion (struct dvb_i2c_bus *i2c)
 {
 	dprintk ("%s\n", __FUNCTION__);
 
@@ -469,8 +456,7 @@ int stv0299_check_inversion (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-int stv0299_set_FEC (struct dvb_i2c_bus *i2c, fe_code_rate_t fec)
+static int stv0299_set_FEC (struct dvb_i2c_bus *i2c, fe_code_rate_t fec)
 {
 	dprintk ("%s\n", __FUNCTION__);
 
@@ -493,8 +479,7 @@ int stv0299_set_FEC (struct dvb_i2c_bus *i2c, fe_code_rate_t fec)
 }
 
 
-static
-fe_code_rate_t stv0299_get_fec (struct dvb_i2c_bus *i2c)
+static fe_code_rate_t stv0299_get_fec (struct dvb_i2c_bus *i2c)
 {
 	static fe_code_rate_t fec_tab [] = { FEC_2_3, FEC_3_4, FEC_5_6,
 					     FEC_7_8, FEC_1_2 };
@@ -512,8 +497,7 @@ fe_code_rate_t stv0299_get_fec (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-int stv0299_wait_diseqc_fifo (struct dvb_i2c_bus *i2c, int timeout)
+static int stv0299_wait_diseqc_fifo (struct dvb_i2c_bus *i2c, int timeout)
 {
 	unsigned long start = jiffies;
 
@@ -531,8 +515,7 @@ int stv0299_wait_diseqc_fifo (struct dvb_i2c_bus *i2c, int timeout)
 }
 
 
-static
-int stv0299_wait_diseqc_idle (struct dvb_i2c_bus *i2c, int timeout)
+static int stv0299_wait_diseqc_idle (struct dvb_i2c_bus *i2c, int timeout)
 {
 	unsigned long start = jiffies;
 
@@ -550,8 +533,7 @@ int stv0299_wait_diseqc_idle (struct dvb_i2c_bus *i2c, int timeout)
 }
 
 
-static
-int stv0299_send_diseqc_msg (struct dvb_i2c_bus *i2c,
+static int stv0299_send_diseqc_msg (struct dvb_i2c_bus *i2c,
 			     struct dvb_diseqc_master_cmd *m)
 {
 	u8 val;
@@ -582,8 +564,7 @@ int stv0299_send_diseqc_msg (struct dvb_i2c_bus *i2c,
 }
 
 
-static
-int stv0299_send_diseqc_burst (struct dvb_i2c_bus *i2c, fe_sec_mini_cmd_t burst)
+static int stv0299_send_diseqc_burst (struct dvb_i2c_bus *i2c, fe_sec_mini_cmd_t burst)
 {
 	u8 val;
 
@@ -610,8 +591,7 @@ int stv0299_send_diseqc_burst (struct dvb_i2c_bus *i2c, fe_sec_mini_cmd_t burst)
 }
 
 
-static
-int stv0299_set_tone (struct dvb_i2c_bus *i2c, fe_sec_tone_mode_t tone)
+static int stv0299_set_tone (struct dvb_i2c_bus *i2c, fe_sec_tone_mode_t tone)
 {
 	u8 val;
 
@@ -635,8 +615,7 @@ int stv0299_set_tone (struct dvb_i2c_bus *i2c, fe_sec_tone_mode_t tone)
 }
 
 
-static
-int stv0299_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltage)
+static int stv0299_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltage)
 {
 	u8 reg0x08;
 	u8 reg0x0c;
@@ -672,8 +651,7 @@ int stv0299_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltage)
 }
 
 
-static
-int stv0299_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
+static int stv0299_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
 {
 	u32 ratio;
 	u32 tmp;
@@ -711,8 +689,7 @@ int stv0299_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
 }
 
 
-static
-int stv0299_get_symbolrate (struct dvb_i2c_bus *i2c)
+static int stv0299_get_symbolrate (struct dvb_i2c_bus *i2c)
 {
 	u32 Mclk = M_CLK / 4096L;
 	u32 srate;
@@ -743,8 +720,7 @@ int stv0299_get_symbolrate (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-int uni0299_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
+static int uni0299_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 {
         int tuner_type = (long) fe->data;
 	struct dvb_i2c_bus *i2c = fe->i2c;
@@ -881,8 +857,7 @@ int uni0299_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 	return 0;
 }
 
-static
-long probe_tuner (struct dvb_i2c_bus *i2c)
+static long probe_tuner (struct dvb_i2c_bus *i2c)
 {
         /* read the status register of TSA5059 */
 	u8 rpt[] = { 0x05, 0xb5 };
@@ -935,8 +910,7 @@ long probe_tuner (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-int uni0299_attach (struct dvb_i2c_bus *i2c)
+static int uni0299_attach (struct dvb_i2c_bus *i2c)
 {
         long tuner_type;
 	u8 id = stv0299_readreg (i2c, 0x00);
@@ -958,8 +932,7 @@ int uni0299_attach (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-void uni0299_detach (struct dvb_i2c_bus *i2c)
+static void uni0299_detach (struct dvb_i2c_bus *i2c)
 {
 	dprintk ("%s\n", __FUNCTION__);
 
@@ -967,16 +940,14 @@ void uni0299_detach (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-int __init init_uni0299 (void)
+static int __init init_uni0299 (void)
 {
 	dprintk ("%s\n", __FUNCTION__);
 	return dvb_register_i2c_device (NULL, uni0299_attach, uni0299_detach);
 }
 
 
-static 
-void __exit exit_uni0299 (void)
+static void __exit exit_uni0299 (void)
 {
 	dprintk ("%s\n", __FUNCTION__);
 

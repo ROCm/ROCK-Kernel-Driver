@@ -1,8 +1,7 @@
 #include <media/saa7146_vv.h>
 
 /* helper function */
-static
-void my_wait(struct saa7146_dev *dev, long ms)
+static void my_wait(struct saa7146_dev *dev, long ms)
 {
 	set_current_state(TASK_INTERRUPTIBLE);
 	schedule_timeout((((ms+10)/10)*HZ)/1000);
@@ -19,8 +18,7 @@ u32 saa7146_i2c_func(struct i2c_adapter *adapter)
 }
 
 /* this function returns the status-register of our i2c-device */
-static inline
-u32 saa7146_i2c_status(struct saa7146_dev *dev) 
+static inline u32 saa7146_i2c_status(struct saa7146_dev *dev) 
 {
 	u32 iicsta = saa7146_read(dev, I2C_STATUS);
 /*
@@ -33,8 +31,7 @@ u32 saa7146_i2c_status(struct saa7146_dev *dev)
    sent through the saa7146. have a look at the specifications p. 122 ff 
    to understand this. it returns the number of u32s to send, or -1
    in case of an error. */
-static
-int saa7146_i2c_msg_prepare(const struct i2c_msg m[], int num, u32 *op)
+static int saa7146_i2c_msg_prepare(const struct i2c_msg m[], int num, u32 *op)
 {
 	int h1, h2;
 	int i, j, addr;
@@ -98,8 +95,7 @@ int saa7146_i2c_msg_prepare(const struct i2c_msg m[], int num, u32 *op)
    which bytes were read through the adapter and write them back to the corresponding
    i2c-message. but instead, we simply write back all bytes.
    fixme: this could be improved. */
-static
-int saa7146_i2c_msg_cleanup(const struct i2c_msg m[], int num, u32 *op)
+static int saa7146_i2c_msg_cleanup(const struct i2c_msg m[], int num, u32 *op)
 {
 	int i, j;
 	int op_count = 0;
@@ -121,8 +117,7 @@ int saa7146_i2c_msg_cleanup(const struct i2c_msg m[], int num, u32 *op)
 }
 
 /* this functions resets the i2c-device and returns 0 if everything was fine, otherwise -1 */
-static
-int saa7146_i2c_reset(struct saa7146_dev *dev) 
+static int saa7146_i2c_reset(struct saa7146_dev *dev) 
 {
 	/* get current status */
 	u32 status = saa7146_i2c_status(dev);
@@ -186,8 +181,7 @@ int saa7146_i2c_reset(struct saa7146_dev *dev)
 /* this functions writes out the data-byte 'dword' to the i2c-device.
    it returns 0 if ok, -1 if the transfer failed, -2 if the transfer
    failed badly (e.g. address error) */
-static
-int saa7146_i2c_writeout(struct saa7146_dev *dev, u32* dword)
+static int saa7146_i2c_writeout(struct saa7146_dev *dev, u32* dword)
 {
 	u32 status = 0, mc2 = 0;
 	int timeout;
@@ -373,8 +367,7 @@ out:
 }
 
 /* utility functions */
-static
-int saa7146_i2c_xfer(struct i2c_adapter* adapter, struct i2c_msg msg[], int num)
+static int saa7146_i2c_xfer(struct i2c_adapter* adapter, struct i2c_msg msg[], int num)
 {
 	struct saa7146_dev* dev = i2c_get_adapdata(adapter);
 	
@@ -388,8 +381,7 @@ int saa7146_i2c_xfer(struct i2c_adapter* adapter, struct i2c_msg msg[], int num)
 #include <linux/i2c-id.h>
 
 /* exported algorithm data */
-static
-struct i2c_algorithm saa7146_algo = {
+static struct i2c_algorithm saa7146_algo = {
 	.name		= "saa7146 i2c algorithm",
 	.id		= I2C_ALGO_SAA7146,
 	.master_xfer	= saa7146_i2c_xfer,

@@ -26,8 +26,7 @@ u32 ac3_frames[3][32] =
 
 
 #if 0
-static
-void setup_ts2pes(ipack *pa, ipack *pv, u16 *pida, u16 *pidv, 
+static void setup_ts2pes(ipack *pa, ipack *pv, u16 *pida, u16 *pidv, 
 		  void (*pes_write)(u8 *buf, int count, void *data),
 		  void *priv)
 {
@@ -41,8 +40,7 @@ void setup_ts2pes(ipack *pa, ipack *pv, u16 *pida, u16 *pidv,
 #endif
 
 #if 0
-static
-void ts_to_pes(ipack *p, u8 *buf) // don't need count (=188)
+static void ts_to_pes(ipack *p, u8 *buf) // don't need count (=188)
 {
 	u8 off = 0;
 
@@ -68,8 +66,7 @@ void ts_to_pes(ipack *p, u8 *buf) // don't need count (=188)
 
 #if 0
 /* needs 5 byte input, returns picture coding type*/
-static
-int read_picture_header(u8 *headr, struct mpg_picture *pic, int field, int pr)
+static int read_picture_header(u8 *headr, struct mpg_picture *pic, int field, int pr)
 {
 	u8 pct;
 
@@ -115,8 +112,7 @@ int read_picture_header(u8 *headr, struct mpg_picture *pic, int field, int pr)
 
 #if 0
 /* needs 4 byte input */
-static
-int read_gop_header(u8 *headr, struct mpg_picture *pic, int pr)
+static int read_gop_header(u8 *headr, struct mpg_picture *pic, int pr)
 {
 	if (pr) printk("GOP header: "); 
 
@@ -147,8 +143,7 @@ int read_gop_header(u8 *headr, struct mpg_picture *pic, int pr)
 
 #if 0
 /* needs 8 byte input */
-static
-int read_sequence_header(u8 *headr, struct dvb_video_info *vi, int pr)
+static int read_sequence_header(u8 *headr, struct dvb_video_info *vi, int pr)
 {
         int sw;
 	int form = -1;
@@ -262,8 +257,7 @@ int read_sequence_header(u8 *headr, struct dvb_video_info *vi, int pr)
 
 
 #if 0
-static
-int get_vinfo(u8 *mbuf, int count, struct dvb_video_info *vi, int pr)
+static int get_vinfo(u8 *mbuf, int count, struct dvb_video_info *vi, int pr)
 {
 	u8 *headr;
 	int found = 0;
@@ -292,8 +286,7 @@ int get_vinfo(u8 *mbuf, int count, struct dvb_video_info *vi, int pr)
 
 
 #if 0
-static
-int get_ainfo(u8 *mbuf, int count, struct dvb_audio_info *ai, int pr)
+static int get_ainfo(u8 *mbuf, int count, struct dvb_audio_info *ai, int pr)
 {
 	u8 *headr;
 	int found = 0;
@@ -399,8 +392,7 @@ int dvb_filter_get_ac3info(u8 *mbuf, int count, struct dvb_audio_info *ai, int p
 
 
 #if 0
-static
-u8 *skip_pes_header(u8 **bufp)
+static u8 *skip_pes_header(u8 **bufp)
 {
         u8 *inbuf = *bufp;
         u8 *buf = inbuf;
@@ -438,8 +430,7 @@ u8 *skip_pes_header(u8 **bufp)
 #endif
 
 #if 0
-static
-void initialize_quant_matrix( u32 *matrix )
+static void initialize_quant_matrix( u32 *matrix )
 {
         int i;
 
@@ -466,8 +457,7 @@ void initialize_quant_matrix( u32 *matrix )
 #endif
 
 #if 0
-static
-void initialize_mpg_picture(struct mpg_picture *pic)
+static void initialize_mpg_picture(struct mpg_picture *pic)
 {
         int i;
 
@@ -494,8 +484,7 @@ void initialize_mpg_picture(struct mpg_picture *pic)
 #endif
 
 #if 0
-static
-void mpg_set_picture_parameter( int32_t field_type, struct mpg_picture *pic )
+static void mpg_set_picture_parameter( int32_t field_type, struct mpg_picture *pic )
 {
         int16_t last_h_offset;
         int16_t last_v_offset;
@@ -533,8 +522,7 @@ void mpg_set_picture_parameter( int32_t field_type, struct mpg_picture *pic )
 #endif
 
 #if 0
-static
-void init_mpg_picture( struct mpg_picture *pic, int chan, int32_t field_type)
+static void init_mpg_picture( struct mpg_picture *pic, int chan, int32_t field_type)
 {
         pic->picture_header = 0;
         pic->sequence_header_data

@@ -52,8 +52,7 @@ struct dvb_frontend_info grundig_29504_401_info = {
 };
 
 
-static
-int l64781_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
+static int l64781_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 {
 	int ret;
 	u8 buf [] = { reg, data };
@@ -67,8 +66,7 @@ int l64781_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 }
 
 
-static
-u8 l64781_readreg (struct dvb_i2c_bus *i2c, u8 reg)
+static u8 l64781_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 {
 	int ret;
 	u8 b0 [] = { reg };
@@ -85,8 +83,7 @@ u8 l64781_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 }
 
 
-static
-int tsa5060_write (struct dvb_i2c_bus *i2c, u8 data [4])
+static int tsa5060_write (struct dvb_i2c_bus *i2c, u8 data [4])
 {
 	int ret;
 	struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = data, .len = 4 };
@@ -103,8 +100,7 @@ int tsa5060_write (struct dvb_i2c_bus *i2c, u8 data [4])
  *   reference clock comparision frequency of 166666 Hz.
  *   frequency offset is 36125000 Hz.
  */
-static
-int tsa5060_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
+static int tsa5060_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 {
 	u32 div;
 	u8 buf [4];
@@ -127,8 +123,7 @@ int tsa5060_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 }
 
 
-static
-void apply_tps (struct dvb_i2c_bus *i2c)
+static void apply_tps (struct dvb_i2c_bus *i2c)
 {
 	l64781_writereg (i2c, 0x2a, 0x00);
 	l64781_writereg (i2c, 0x2a, 0x01);
@@ -142,8 +137,7 @@ void apply_tps (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-void reset_afc (struct dvb_i2c_bus *i2c)
+static void reset_afc (struct dvb_i2c_bus *i2c)
 {
 	/* Set AFC stall for the AFC_INIT_FRQ setting, TIM_STALL for
 	   timing offset */
@@ -161,8 +155,7 @@ void reset_afc (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-int apply_frontend_param (struct dvb_i2c_bus *i2c,
+static int apply_frontend_param (struct dvb_i2c_bus *i2c,
 			  struct dvb_frontend_parameters *param)
 {
 	/* The coderates for FEC_NONE, FEC_4_5 and FEC_FEC_6_7 are arbitrary */
@@ -274,8 +267,7 @@ int apply_frontend_param (struct dvb_i2c_bus *i2c,
 }
 
 
-static
-void reset_and_configure (struct dvb_i2c_bus *i2c)
+static void reset_and_configure (struct dvb_i2c_bus *i2c)
 {
 	u8 buf [] = { 0x06 };
 	struct i2c_msg msg = { .addr = 0x00, .flags = 0, .buf = buf, .len = 1 };
@@ -285,8 +277,7 @@ void reset_and_configure (struct dvb_i2c_bus *i2c)
 
 
 
-static
-int init (struct dvb_i2c_bus *i2c)
+static int init (struct dvb_i2c_bus *i2c)
 {
         reset_and_configure (i2c);
 
@@ -424,8 +415,7 @@ int grundig_29504_401_ioctl (struct dvb_frontend *fe,
 } 
 
 
-static
-int l64781_attach (struct dvb_i2c_bus *i2c)
+static int l64781_attach (struct dvb_i2c_bus *i2c)
 {
 	u8 b0 [] = { 0x1a };
 	u8 b1 [] = { 0x00 };
@@ -449,23 +439,20 @@ int l64781_attach (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-void l64781_detach (struct dvb_i2c_bus *i2c)
+static void l64781_detach (struct dvb_i2c_bus *i2c)
 {
 	dvb_unregister_frontend (grundig_29504_401_ioctl, i2c);
 }
 
 
-static
-int __init init_grundig_29504_401 (void)
+static int __init init_grundig_29504_401 (void)
 {
 	return dvb_register_i2c_device (THIS_MODULE,
 					l64781_attach, l64781_detach);
 }
 
 
-static
-void __exit exit_grundig_29504_401 (void)
+static void __exit exit_grundig_29504_401 (void)
 {
 	dvb_unregister_i2c_device (l64781_attach);
 }

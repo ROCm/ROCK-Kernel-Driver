@@ -58,18 +58,18 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/pci.h>
+#include <linux/init.h>
+#include <linux/vmalloc.h>
+#include <linux/netdevice.h>
+#include <linux/inetdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/skbuff.h>
+
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/semaphore.h>
-#include <linux/init.h>
-#include <linux/vmalloc.h>
-
-#include <linux/netdevice.h>
-#include <linux/inetdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
 
 #include <linux/dvb/frontend.h>
 
@@ -119,8 +119,7 @@ int av7110_num = 0;
 /* This DEBI code is based on the Stradis driver 
    by Nathan Laredo <laredo@gnu.org> */
 
-static
-int wait_for_debi_done(struct av7110 *av7110)
+static int wait_for_debi_done(struct av7110 *av7110)
 {
 	struct saa7146_dev *dev = av7110->dev;
 	int start;
@@ -199,16 +198,14 @@ static u32 debiread(struct av7110 *av7110, u32 config, int addr, int count)
 
 /* fixme: val can be a pointer to a memory or an u32 value -- this 
    won't work on 64bit platforms! */
-static inline void 
-iwdebi(struct av7110 *av7110, u32 config, int addr, u32 val, int count)
+static inline void iwdebi(struct av7110 *av7110, u32 config, int addr, u32 val, int count)
 {
         if (count>4 && val)
                 memcpy(av7110->debi_virt, (char *) val, count);
         debiwrite(av7110, config, addr, val, count);
 }
 
-static inline u32 
-irdebi(struct av7110 *av7110, u32 config, int addr, u32 val, int count)
+static inline u32 irdebi(struct av7110 *av7110, u32 config, int addr, u32 val, int count)
 {
         u32 res;
 
@@ -220,8 +217,7 @@ irdebi(struct av7110 *av7110, u32 config, int addr, u32 val, int count)
 
 /* DEBI outside interrupts, only for count<=4! */
 
-static inline void 
-wdebi(struct av7110 *av7110, u32 config, int addr, u32 val, int count)
+static inline void wdebi(struct av7110 *av7110, u32 config, int addr, u32 val, int count)
 {
         unsigned long flags;
 
@@ -230,8 +226,7 @@ wdebi(struct av7110 *av7110, u32 config, int addr, u32 val, int count)
         spin_unlock_irqrestore(&av7110->debilock, flags);
 }
 
-static inline u32 
-rdebi(struct av7110 *av7110, u32 config, int addr, u32 val, int count)
+static inline u32 rdebi(struct av7110 *av7110, u32 config, int addr, u32 val, int count)
 {
         unsigned long flags;
         u32 res;
@@ -243,8 +238,7 @@ rdebi(struct av7110 *av7110, u32 config, int addr, u32 val, int count)
 }
 
 
-static inline char 
-chtrans(char c)
+static inline char chtrans(char c)
 {
         if (c<32 || c>126)
                 c=0x20;
@@ -254,8 +248,7 @@ chtrans(char c)
 
 /* handle mailbox registers of the dual ported RAM */
 
-static inline void 
-ARM_ResetMailBox(struct av7110 *av7110)
+static inline void ARM_ResetMailBox(struct av7110 *av7110)
 {
         unsigned long flags;
 
@@ -268,20 +261,17 @@ ARM_ResetMailBox(struct av7110 *av7110)
         spin_unlock_irqrestore(&av7110->debilock, flags);
 }
 
-static inline void 
-ARM_ClearMailBox(struct av7110 *av7110)
+static inline void ARM_ClearMailBox(struct av7110 *av7110)
 {
         iwdebi(av7110, DEBINOSWAP, IRQ_RX, 0, 2);
 }
 
-static inline void 
-ARM_ClearIrq(struct av7110 *av7110)
+static inline void ARM_ClearIrq(struct av7110 *av7110)
 {
 	irdebi(av7110, DEBINOSWAP, IRQ_RX, 0, 2);
 }
 
-static void 
-reset_arm(struct av7110 *av7110)
+static void reset_arm(struct av7110 *av7110)
 {
         saa7146_setgpio(av7110->dev, RESET_LINE, SAA7146_GPIO_OUTLO);
 
@@ -307,8 +297,7 @@ reset_arm(struct av7110 *av7110)
         printk("av7110: ARM RESET\n");
 }
 
-static void 
-recover_arm(struct av7110 *av7110)
+static void recover_arm(struct av7110 *av7110)
 {
 	DEB_EE(("av7110: %p\n",av7110));
 
@@ -324,8 +313,7 @@ recover_arm(struct av7110 *av7110)
         outcom(av7110, COMTYPE_PIDFILTER, SetIR, 1, av7110->ir_config);
 }
 
-static void 
-arm_error(struct av7110 *av7110)
+static void arm_error(struct av7110 *av7110)
 {
 	DEB_EE(("av7110: %p\n",av7110));
 
@@ -376,8 +364,7 @@ static int arm_thread(void *data)
 }
 
 
-static int
-record_cb(struct dvb_filter_pes2ts *p2t, u8 *buf, size_t len)
+static int record_cb(struct dvb_filter_pes2ts *p2t, u8 *buf, size_t len)
 {
         struct dvb_demux_feed *dvbdmxfeed=(struct dvb_demux_feed *) p2t->priv;
 
@@ -394,8 +381,7 @@ record_cb(struct dvb_filter_pes2ts *p2t, u8 *buf, size_t len)
                 return dvb_filter_pes2ts(p2t, buf, len);
 }
 
-static int 
-dvb_filter_pes2ts_cb(void *priv, unsigned char *data)
+static int dvb_filter_pes2ts_cb(void *priv, unsigned char *data)
 {
         struct dvb_demux_feed *dvbdmxfeed=(struct dvb_demux_feed *) priv;
 
@@ -407,8 +393,7 @@ dvb_filter_pes2ts_cb(void *priv, unsigned char *data)
         return 0;
 }
 
-static int 
-AV_StartRecord(struct av7110 *av7110, int av,
+static int AV_StartRecord(struct av7110 *av7110, int av,
                struct dvb_demux_feed *dvbdmxfeed)
 {
         struct dvb_demux *dvbdmx=dvbdmxfeed->demux;
@@ -453,8 +438,7 @@ AV_StartRecord(struct av7110 *av7110, int av,
         return 0;
 }
 
-static int 
-AV_StartPlay(struct av7110 *av7110, int av)
+static int AV_StartPlay(struct av7110 *av7110, int av)
 {
 	DEB_EE(("av7110: %p\n",av7110));
 	
@@ -487,8 +471,7 @@ AV_StartPlay(struct av7110 *av7110, int av)
         return av7110->playing;
 }
 
-static void 
-AV_Stop(struct av7110 *av7110, int av)
+static void AV_Stop(struct av7110 *av7110, int av)
 {
 	DEB_EE(("av7110: %p\n",av7110));
 
@@ -613,8 +596,7 @@ void CI_handle(struct av7110 *av7110, u8 *data, u16 len)
 
 }
 
-static inline int
-DvbDmxFilterCallback(u8 * buffer1, size_t buffer1_len,
+static inline int DvbDmxFilterCallback(u8 * buffer1, size_t buffer1_len,
                      u8 * buffer2, size_t buffer2_len,
                      struct dvb_demux_filter *dvbdmxfilter,
                      enum dmx_success success,
@@ -675,8 +657,7 @@ u8 pshead[0x26] = {
 
 
 //#define DEBUG_TIMING
-inline static void 
-print_time(char *s)
+static inline void print_time(char *s)
 {
 #ifdef DEBUG_TIMING
         struct timeval tv;
@@ -685,8 +666,7 @@ print_time(char *s)
 #endif
 }
 
-static void 
-ci_get_data(struct dvb_ringbuffer *cibuf, u8 *data, int len)
+static void ci_get_data(struct dvb_ringbuffer *cibuf, u8 *data, int len)
 {
         if (dvb_ringbuffer_free(cibuf) < len+2)
                 return;
@@ -699,8 +679,7 @@ ci_get_data(struct dvb_ringbuffer *cibuf, u8 *data, int len)
         wake_up_interruptible(&cibuf->queue);
 }
 
-static
-void debiirq (unsigned long data)
+static void debiirq (unsigned long data)
 {
 	struct av7110 *av7110 = (struct av7110*) data;
         int type=av7110->debitype;
@@ -830,8 +809,7 @@ void debiirq (unsigned long data)
         spin_unlock(&av7110->debilock);
 }
 
-static int
-pes_play(void *dest, struct dvb_ringbuffer *buf, int dlen)
+static int pes_play(void *dest, struct dvb_ringbuffer *buf, int dlen)
 {
         int len;
         u32 sync;
@@ -875,8 +853,7 @@ pes_play(void *dest, struct dvb_ringbuffer *buf, int dlen)
 }
 
 
-static
-void gpioirq (unsigned long data)
+static void gpioirq (unsigned long data)
 {
 	struct av7110 *av7110 = (struct av7110*) data;
         u32 rxbuf, txbuf;
@@ -1185,8 +1162,7 @@ static int OutCommand(struct av7110 *av7110, u16* buf, int length)
         return 0;
 }
 
-inline static int 
-SOutCommand(struct av7110 *av7110, u16* buf, int length)
+static inline int SOutCommand(struct av7110 *av7110, u16* buf, int length)
 {
         int ret;
         
@@ -1327,8 +1303,7 @@ static int CommandRequest(struct av7110 *av7110, u16 *Buff, int length, u16 *buf
 }
 
 
-static inline int 
-RequestParameter(struct av7110 *av7110, u16 tag, u16* Buff, s16 length)
+static inline int  RequestParameter(struct av7110 *av7110, u16 tag, u16* Buff, s16 length)
 {
 	int ret;
         ret = CommandRequest(av7110, &tag, 0, Buff, length);
@@ -1342,8 +1317,7 @@ RequestParameter(struct av7110 *av7110, u16 tag, u16* Buff, s16 length)
  * Firmware commands 
  ****************************************************************************/
 
-static inline int
-msp_writereg(struct av7110 *av7110, u8 dev, u16 reg, u16 val)
+static inline int msp_writereg(struct av7110 *av7110, u8 dev, u16 reg, u16 val)
 {
         u8 msg[5]={ dev, reg>>8, reg&0xff, val>>8 , val&0xff }; 
         struct dvb_i2c_bus *i2c = av7110->i2c_bus;
@@ -1356,16 +1330,14 @@ msp_writereg(struct av7110 *av7110, u8 dev, u16 reg, u16 val)
         return i2c->xfer(i2c, &msgs, 1);
 }
 
-inline static int 
-SendDAC(struct av7110 *av7110, u8 addr, u8 data)
+static inline int SendDAC(struct av7110 *av7110, u8 addr, u8 data)
 {
  	DEB_EE(("av7110: %p\n",av7110));
 
         return outcom(av7110, COMTYPE_AUDIODAC, AudioDAC, 2, addr, data);
 }
 
-static int
-SetVolume(struct av7110 *av7110, int volleft, int volright)
+static int SetVolume(struct av7110 *av7110, int volleft, int volright)
 {
         int err, vol, val, balance = 0;
         
@@ -1406,41 +1378,41 @@ SetVolume(struct av7110 *av7110, int volleft, int volright)
 
 #ifdef CONFIG_DVB_AV7110_OSD
 
-inline static int ResetBlend(struct av7110 *av7110, u8 windownr)
+static inline int ResetBlend(struct av7110 *av7110, u8 windownr)
 {
         return outcom(av7110, COMTYPE_OSD, SetNonBlend, 1, windownr);
 }
 
-inline static int SetColorBlend(struct av7110 *av7110, u8 windownr)
+static inline int SetColorBlend(struct av7110 *av7110, u8 windownr)
 {
         return outcom(av7110, COMTYPE_OSD, SetCBlend, 1, windownr); 
 }
 
-inline static int SetWindowBlend(struct av7110 *av7110, u8 windownr, u8 blending)
+static inline int SetWindowBlend(struct av7110 *av7110, u8 windownr, u8 blending)
 {
         return outcom(av7110, COMTYPE_OSD, SetWBlend, 2, windownr, blending); 
 }
 
-inline static int SetBlend_(struct av7110 *av7110, u8 windownr,
+static inline int SetBlend_(struct av7110 *av7110, u8 windownr,
                      enum av7110_osd_palette_type colordepth, u16 index, u8 blending)
 {
         return outcom(av7110, COMTYPE_OSD, SetBlend, 4,
                       windownr, colordepth, index, blending);
 } 
 
-inline static int SetColor_(struct av7110 *av7110, u8 windownr,
+static inline int SetColor_(struct av7110 *av7110, u8 windownr,
                      enum av7110_osd_palette_type colordepth, u16 index, u16 colorhi, u16 colorlo)
 {
         return outcom(av7110, COMTYPE_OSD, SetColor, 5,
                       windownr, colordepth, index, colorhi, colorlo);
 } 
 
-inline static int BringToTop(struct av7110 *av7110, u8 windownr)
+static inline int BringToTop(struct av7110 *av7110, u8 windownr)
 {
         return outcom(av7110, COMTYPE_OSD, WTop, 1, windownr);
 } 
 
-inline static int SetFont(struct av7110 *av7110, u8 windownr, u8 fontsize,
+static inline int SetFont(struct av7110 *av7110, u8 windownr, u8 fontsize,
                    u16 colorfg, u16 colorbg)
 {
         return outcom(av7110, COMTYPE_OSD, Set_Font, 4,
@@ -1508,36 +1480,36 @@ static int WriteText(struct av7110 *av7110, u8 win, u16 x, u16 y, u8* buf)
         return ret;
 }
 
-inline static int DrawLine(struct av7110 *av7110, u8 windownr, 
+static inline int DrawLine(struct av7110 *av7110, u8 windownr, 
                     u16 x, u16 y, u16 dx, u16 dy, u16 color)
 {
         return outcom(av7110, COMTYPE_OSD, DLine, 6,
                       windownr, x, y, dx, dy, color);
 } 
 
-inline static int DrawBlock(struct av7110 *av7110, u8 windownr, 
+static inline int DrawBlock(struct av7110 *av7110, u8 windownr, 
                     u16 x, u16 y, u16 dx, u16 dy, u16 color)
 {
         return outcom(av7110, COMTYPE_OSD, DBox, 6,
                       windownr, x, y, dx, dy, color);
 } 
 
-inline static int HideWindow(struct av7110 *av7110, u8 windownr)
+static inline int HideWindow(struct av7110 *av7110, u8 windownr)
 {
         return outcom(av7110, COMTYPE_OSD, WHide, 1, windownr);
 } 
 
-inline static int MoveWindowRel(struct av7110 *av7110, u8 windownr, u16 x, u16 y)
+static inline int MoveWindowRel(struct av7110 *av7110, u8 windownr, u16 x, u16 y)
 {
         return outcom(av7110, COMTYPE_OSD, WMoveD, 3, windownr, x, y);
 } 
 
-inline static int MoveWindowAbs(struct av7110 *av7110, u8 windownr, u16 x, u16 y)
+static inline int MoveWindowAbs(struct av7110 *av7110, u8 windownr, u16 x, u16 y)
 {
         return outcom(av7110, COMTYPE_OSD, WMoveA, 3, windownr, x, y);
 } 
 
-inline static int DestroyOSDWindow(struct av7110 *av7110, u8 windownr)
+static inline int DestroyOSDWindow(struct av7110 *av7110, u8 windownr)
 {
         return outcom(av7110, COMTYPE_OSD, WDestroy, 1, windownr);
 } 
@@ -1552,8 +1524,7 @@ static void DestroyOSDWindows(struct av7110 *av7110)
 } 
 #endif
 
-static inline int 
-CreateOSDWindow(struct av7110 *av7110, u8 windownr,
+static inline int CreateOSDWindow(struct av7110 *av7110, u8 windownr,
                            enum av7110_window_display_type disptype, u16 width, u16 height)
 {
         return outcom(av7110, COMTYPE_OSD, WCreate, 4,
@@ -1564,8 +1535,7 @@ CreateOSDWindow(struct av7110 *av7110, u8 windownr,
 static enum av7110_osd_palette_type bpp2pal[8]={Pal1Bit, Pal2Bit, 0, Pal4Bit, 0, 0, 0, Pal8Bit}; 
 static enum av7110_window_display_type   bpp2bit[8]={BITMAP1, BITMAP2, 0, BITMAP4, 0, 0, 0, BITMAP8}; 
 
-static inline int 
-LoadBitmap(struct av7110 *av7110, u16 format, u16 dx, u16 dy, int inc, u8* data)
+static inline int LoadBitmap(struct av7110 *av7110, u16 format, u16 dx, u16 dy, int inc, u8* data)
 {
         int bpp;
         int i;
@@ -1624,8 +1594,7 @@ LoadBitmap(struct av7110 *av7110, u16 format, u16 dx, u16 dy, int inc, u8* data)
         return outcom(av7110, COMTYPE_OSD, LoadBmp, 3, format, dx, dy);
 } 
 
-static int 
-BlitBitmap(struct av7110 *av7110, u16 win, u16 x, u16 y, u16 trans)
+static int BlitBitmap(struct av7110 *av7110, u16 win, u16 x, u16 y, u16 trans)
 {
         DECLARE_WAITQUEUE(wait, current);
         
@@ -1650,8 +1619,7 @@ BlitBitmap(struct av7110 *av7110, u16 win, u16 x, u16 y, u16 trans)
         return -1;
 } 
 
-static inline int 
-ReleaseBitmap(struct av7110 *av7110)
+static inline int  ReleaseBitmap(struct av7110 *av7110)
 {
  	DEB_EE(("av7110: %p\n",av7110));
 
@@ -1677,8 +1645,7 @@ static u32 RGB2YUV(u16 R, u16 G, u16 B)
         return Cr|(Cb<<16)|(Y<<8);
 }
 
-static void
-OSDSetColor(struct av7110 *av7110, u8 color, u8 r, u8 g, u8 b, u8 blend)
+static void OSDSetColor(struct av7110 *av7110, u8 color, u8 r, u8 g, u8 b, u8 blend)
 {
         u16 ch, cl;
         u32 yuv;
@@ -1692,8 +1659,7 @@ OSDSetColor(struct av7110 *av7110, u8 color, u8 r, u8 g, u8 b, u8 blend)
                   color, ((blend>>4)&0x0f));
 }
 
-static int
-OSDSetBlock(struct av7110 *av7110, int x0, int y0, int x1, int y1, int inc, u8 *data)
+static int OSDSetBlock(struct av7110 *av7110, int x0, int y0, int x1, int y1, int inc, u8 *data)
 {
         uint w, h, bpp, bpl, size, lpb, bnum, brest;
         int i;
@@ -1723,8 +1689,7 @@ OSDSetBlock(struct av7110 *av7110, int x0, int y0, int x1, int y1, int inc, u8 *
         return 0;
 }
 
-static int 
-OSD_DrawCommand(struct av7110 *av7110, osd_cmd_t *dc)
+static int OSD_DrawCommand(struct av7110 *av7110, osd_cmd_t *dc)
 {
         switch (dc->cmd) {
         case OSD_Close:
@@ -1830,8 +1795,7 @@ OSD_DrawCommand(struct av7110 *av7110, osd_cmd_t *dc)
 }
 
 
-static int 
-dvb_osd_ioctl(struct inode *inode, struct file *file,
+static int dvb_osd_ioctl(struct inode *inode, struct file *file,
             unsigned int cmd, void *parg)
 {
 	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
@@ -1866,8 +1830,7 @@ static struct dvb_device dvbdev_osd = {
 
 /* get version of the firmware ROM, RTSL, video ucode and ARM application  */
 
-static void 
-firmversion(struct av7110 *av7110)
+static void firmversion(struct av7110 *av7110)
 {
         u16 buf[20];
 
@@ -1898,8 +1861,7 @@ firmversion(struct av7110 *av7110)
         return;
 }
 
-static int 
-waitdebi(struct av7110 *av7110, int adr, int state)
+static int waitdebi(struct av7110 *av7110, int adr, int state)
 {
         int k;
         
@@ -1913,8 +1875,7 @@ waitdebi(struct av7110 *av7110, int adr, int state)
 }
 
 
-static int 
-load_dram(struct av7110 *av7110, u32 *data, int len)
+static int load_dram(struct av7110 *av7110, u32 *data, int len)
 {
         int i;
         int blocks, rest;
@@ -1962,8 +1923,7 @@ load_dram(struct av7110 *av7110, u32 *data, int len)
 }
 
 
-static u8 
-bootcode[] = {
+static u8 bootcode[] = {
         0xea, 0x00, 0x00, 0x0e, 0xe1, 0xb0, 0xf0, 0x0e, /* 0x0000 */
         0xe2, 0x5e, 0xf0, 0x04, 0xe2, 0x5e, 0xf0, 0x04,
         0xe2, 0x5e, 0xf0, 0x08, 0xe2, 0x5e, 0xf0, 0x04,
@@ -1989,8 +1949,7 @@ bootcode[] = {
 
 #include "av7110_firm.h"
 
-static int 
-bootarm(struct av7110 *av7110)
+static int bootarm(struct av7110 *av7110)
 {
 	struct saa7146_dev *dev= av7110->dev;
         u32 ret;
@@ -2069,8 +2028,7 @@ bootarm(struct av7110 *av7110)
         return 0;
 }
 
-static inline int
-SetPIDs(struct av7110 *av7110, u16 vpid, u16 apid, u16 ttpid, 
+static inline int SetPIDs(struct av7110 *av7110, u16 vpid, u16 apid, u16 ttpid, 
         u16 subpid, u16 pcrpid)
 {
  	DEB_EE(("av7110: %p\n",av7110));
@@ -2088,8 +2046,7 @@ SetPIDs(struct av7110 *av7110, u16 vpid, u16 apid, u16 ttpid,
                       pcrpid, vpid, apid, ttpid, subpid);
 }
 
-static void
-ChangePIDs(struct av7110 *av7110, u16 vpid, u16 apid, u16 ttpid, 
+static void ChangePIDs(struct av7110 *av7110, u16 vpid, u16 apid, u16 ttpid, 
         u16 subpid, u16 pcrpid)
 {
  	DEB_EE(("av7110: %p\n",av7110));
@@ -2113,8 +2070,7 @@ ChangePIDs(struct av7110 *av7110, u16 vpid, u16 apid, u16 ttpid,
 }
 
 
-static void 
-SetMode(struct av7110 *av7110, int mode)
+static void SetMode(struct av7110 *av7110, int mode)
 {
  	DEB_EE(("av7110: %p\n",av7110));
 
@@ -2129,23 +2085,20 @@ SetMode(struct av7110 *av7110, int mode)
         }
 }
 
-inline static void 
-TestMode(struct av7110 *av7110, int mode)
+static inline void TestMode(struct av7110 *av7110, int mode)
 {
  	DEB_EE(("av7110: %p\n",av7110));
         outcom(av7110, COMTYPE_ENCODER, SetTestMode, 1, mode);
 }
 
-inline static void 
-VidMode(struct av7110 *av7110, int mode)
+static inline void VidMode(struct av7110 *av7110, int mode)
 {
  	DEB_EE(("av7110: %p\n",av7110));
         outcom(av7110, COMTYPE_ENCODER, SetVidMode, 1, mode);
 }
            
 
-static int inline
-vidcom(struct av7110 *av7110, u32 com, u32 arg)
+static inline int vidcom(struct av7110 *av7110, u32 com, u32 arg)
 {
  	DEB_EE(("av7110: %p\n",av7110));
         return outcom(av7110, 0x80, 0x02, 4, 
@@ -2153,24 +2106,21 @@ vidcom(struct av7110 *av7110, u32 com, u32 arg)
                       (arg>>16), (arg&0xffff));
 }
 
-static int inline
-audcom(struct av7110 *av7110, u32 com)
+static inline int audcom(struct av7110 *av7110, u32 com)
 {
 	DEB_EE(("av7110: %p\n",av7110));
 	return outcom(av7110, 0x80, 0x03, 4, 
                       (com>>16), (com&0xffff));
 }
 
-inline static void 
-Set22K(struct av7110 *av7110, int state)
+static inline void Set22K(struct av7110 *av7110, int state)
 {
  	DEB_EE(("av7110: %p\n",av7110));
 	outcom(av7110, COMTYPE_AUDIODAC, (state ? ON22K : OFF22K), 0);
 }
 
 
-static
-int SendDiSEqCMsg(struct av7110 *av7110, int len, u8 *msg, unsigned long burst)
+static int SendDiSEqCMsg(struct av7110 *av7110, int len, u8 *msg, unsigned long burst)
 {
         int i;
 	u16 buf[18] = { ((COMTYPE_AUDIODAC << 8) + SendDiSEqC),
@@ -2202,8 +2152,7 @@ int SendDiSEqCMsg(struct av7110 *av7110, int len, u8 *msg, unsigned long burst)
  * I2C client commands
  ****************************************************************************/
 
-static inline int
-i2c_writereg(struct av7110 *av7110, u8 id, u8 reg, u8 val)
+static inline int i2c_writereg(struct av7110 *av7110, u8 id, u8 reg, u8 val)
 {
         u8 msg[2]={ reg, val }; 
         struct dvb_i2c_bus *i2c = av7110->i2c_bus;
@@ -2216,8 +2165,7 @@ i2c_writereg(struct av7110 *av7110, u8 id, u8 reg, u8 val)
         return i2c->xfer (i2c, &msgs, 1);
 }
 
-static inline u8
-i2c_readreg(struct av7110 *av7110, u8 id, u8 reg)
+static inline u8 i2c_readreg(struct av7110 *av7110, u8 id, u8 reg)
 {
         struct dvb_i2c_bus *i2c = av7110->i2c_bus;
         u8 mm1[] = {0x00};
@@ -2247,8 +2195,7 @@ static int sw2mode[16] = {
         VIDEO_MODE_PAL, VIDEO_MODE_PAL, VIDEO_MODE_PAL, VIDEO_MODE_PAL,
 };
 
-static void
-get_video_format(struct av7110 *av7110, u8 *buf, int count)
+static void get_video_format(struct av7110 *av7110, u8 *buf, int count)
 {
         int i;
 	int hsize,vsize;
@@ -2274,8 +2221,7 @@ get_video_format(struct av7110 *av7110, u8 *buf, int count)
         }
 }
 
-static inline long
-aux_ring_buffer_write(struct dvb_ringbuffer *rbuf, const char *buf, unsigned long count)
+static inline long aux_ring_buffer_write(struct dvb_ringbuffer *rbuf, const char *buf, unsigned long count)
 {
         unsigned long todo = count;
         int free;
@@ -2297,8 +2243,7 @@ aux_ring_buffer_write(struct dvb_ringbuffer *rbuf, const char *buf, unsigned lon
 	return count-todo;
 }
 
-static void
-play_video_cb(u8 *buf, int count, void *priv)
+static void play_video_cb(u8 *buf, int count, void *priv)
 {
         struct av7110 *av7110=(struct av7110 *) priv;
  	DEB_EE(("av7110: %p\n",av7110));
@@ -2310,8 +2255,7 @@ play_video_cb(u8 *buf, int count, void *priv)
                 aux_ring_buffer_write(&av7110->aout, buf, count);
 }
 
-static void
-play_audio_cb(u8 *buf, int count, void *priv)
+static void play_audio_cb(u8 *buf, int count, void *priv)
 {
         struct av7110 *av7110=(struct av7110 *) priv;
  	DEB_EE(("av7110: %p\n",av7110));
@@ -2321,8 +2265,7 @@ play_audio_cb(u8 *buf, int count, void *priv)
 
 #define FREE_COND (dvb_ringbuffer_free(&av7110->avout)>=20*1024 && dvb_ringbuffer_free(&av7110->aout)>=20*1024)
 
-static ssize_t 
-dvb_play(struct av7110 *av7110, const u8 *buf,
+static ssize_t dvb_play(struct av7110 *av7110, const u8 *buf,
          unsigned long count, int nonblock, int type, int umem)
 {
         unsigned long todo = count, n;
@@ -2360,8 +2303,7 @@ dvb_play(struct av7110 *av7110, const u8 *buf,
 	return count-todo;
 }
 
-static ssize_t 
-dvb_aplay(struct av7110 *av7110, const u8 *buf,
+static ssize_t dvb_aplay(struct av7110 *av7110, const u8 *buf,
          unsigned long count, int nonblock, int type)
 {
         unsigned long todo = count, n;
@@ -2678,8 +2620,7 @@ int av7110_ioctl(struct saa7146_dev *dev, unsigned int cmd, void *arg)
 	return 0;
 }	
 
-static
-unsigned int dvb_audio_poll(struct file *file, poll_table *wait)
+static unsigned int dvb_audio_poll(struct file *file, poll_table *wait)
 {
 	struct dvb_device *dvbdev = (struct dvb_device *) file->private_data;
         struct av7110 *av7110 = (struct av7110 *) dvbdev->priv;
@@ -2713,8 +2654,7 @@ unsigned int dvb_audio_poll(struct file *file, poll_table *wait)
  * hardware filter functions
  ******************************************************************************/
 
-static int 
-StartHWFilter(struct dvb_demux_filter *dvbdmxfilter)
+static int StartHWFilter(struct dvb_demux_filter *dvbdmxfilter)
 {
         struct dvb_demux_feed *dvbdmxfeed=dvbdmxfilter->feed;
         struct av7110 *av7110=(struct av7110 *) dvbdmxfeed->demux->priv;
@@ -2757,8 +2697,7 @@ StartHWFilter(struct dvb_demux_filter *dvbdmxfilter)
         return ret;
 }
 
-static int 
-StopHWFilter(struct dvb_demux_filter *dvbdmxfilter)
+static int StopHWFilter(struct dvb_demux_filter *dvbdmxfilter)
 {
         struct av7110 *av7110=(struct av7110 *) dvbdmxfilter->feed->demux->priv;
         u16 buf[3];
@@ -2793,8 +2732,7 @@ StopHWFilter(struct dvb_demux_filter *dvbdmxfilter)
 }
 
 
-static int 
-av7110_write_to_decoder(struct dvb_demux_feed *feed, const u8 *buf, size_t len)
+static int av7110_write_to_decoder(struct dvb_demux_feed *feed, const u8 *buf, size_t len)
 {
         struct dvb_demux *demux = feed->demux;
         struct av7110 *av7110 = (struct av7110 *) demux->priv;
@@ -2833,8 +2771,7 @@ av7110_write_to_decoder(struct dvb_demux_feed *feed, const u8 *buf, size_t len)
 }
 
 
-static void
-dvb_feed_start_pid(struct dvb_demux_feed *dvbdmxfeed)
+static void dvb_feed_start_pid(struct dvb_demux_feed *dvbdmxfeed)
 {
         struct dvb_demux *dvbdmx=dvbdmxfeed->demux;
         struct av7110 *av7110=(struct av7110 *) dvbdmx->priv;
@@ -2872,8 +2809,7 @@ dvb_feed_start_pid(struct dvb_demux_feed *dvbdmxfeed)
         }
 }
 
-static void
-dvb_feed_stop_pid(struct dvb_demux_feed *dvbdmxfeed)
+static void dvb_feed_stop_pid(struct dvb_demux_feed *dvbdmxfeed)
 {
         struct dvb_demux *dvbdmx=dvbdmxfeed->demux;
         struct av7110 *av7110=(struct av7110 *) dvbdmx->priv;
@@ -2910,8 +2846,7 @@ dvb_feed_stop_pid(struct dvb_demux_feed *dvbdmxfeed)
         ChangePIDs(av7110, npids[1], npids[0], npids[2], npids[3], npids[4]);
 }
 
-static int 
-av7110_start_feed(struct dvb_demux_feed *feed)
+static int av7110_start_feed(struct dvb_demux_feed *feed)
 {
         struct dvb_demux *demux = feed->demux;
         struct av7110 *av7110 = (struct av7110 *) demux->priv;
@@ -2969,8 +2904,7 @@ av7110_start_feed(struct dvb_demux_feed *feed)
 }
 
 
-static int 
-av7110_stop_feed(struct dvb_demux_feed *feed)
+static int av7110_stop_feed(struct dvb_demux_feed *feed)
 {
         struct dvb_demux *demux = feed->demux;
         struct av7110 *av7110 = (struct av7110 *) demux->priv;
@@ -3010,8 +2944,7 @@ av7110_stop_feed(struct dvb_demux_feed *feed)
 }
 
 
-static void 
-restart_feeds(struct av7110 *av7110)
+static void restart_feeds(struct av7110 *av7110)
 {
         struct dvb_demux *dvbdmx=&av7110->demux;
         struct dvb_demux_feed *feed;
@@ -3078,8 +3011,7 @@ static int dvb_get_stc(struct dmx_demux *demux, unsigned int num,
  * SEC device file operations
  ******************************************************************************/
 
-static
-int av7110_diseqc_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
+static int av7110_diseqc_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 {
 	struct av7110 *av7110 = fe->before_after_data;
 
@@ -3169,8 +3101,7 @@ int ci_ll_reset(struct dvb_ringbuffer *cibuf, struct file *file,
 	return 0;
 }
 
-static ssize_t 
-ci_ll_write(struct dvb_ringbuffer *cibuf, struct file *file, const char *buf, size_t count, loff_t *ppos)
+static ssize_t ci_ll_write(struct dvb_ringbuffer *cibuf, struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
         int free;
         int non_blocking=file->f_flags&O_NONBLOCK;
@@ -3192,8 +3123,7 @@ ci_ll_write(struct dvb_ringbuffer *cibuf, struct file *file, const char *buf, si
         return dvb_ringbuffer_write(cibuf,buf,count,1);
 }
 
-static ssize_t 
-ci_ll_read(struct dvb_ringbuffer *cibuf, struct file *file, char *buf, size_t count, loff_t *ppos)
+static ssize_t ci_ll_read(struct dvb_ringbuffer *cibuf, struct file *file, char *buf, size_t count, loff_t *ppos)
 {
 	int avail;
 	int non_blocking=file->f_flags&O_NONBLOCK;
@@ -3218,8 +3148,7 @@ ci_ll_read(struct dvb_ringbuffer *cibuf, struct file *file, char *buf, size_t co
 	return dvb_ringbuffer_read(cibuf,buf,len,1);
 }
 
-static int 
-dvb_ca_open(struct inode *inode, struct file *file)
+static int dvb_ca_open(struct inode *inode, struct file *file)
 {
 	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         struct av7110 *av7110=(struct av7110 *) dvbdev->priv;
@@ -3233,8 +3162,7 @@ dvb_ca_open(struct inode *inode, struct file *file)
         return 0;
 }
 
-static
-unsigned int dvb_ca_poll (struct file *file, poll_table *wait)
+static unsigned int dvb_ca_poll (struct file *file, poll_table *wait)
 {
 	struct dvb_device *dvbdev = (struct dvb_device *) file->private_data;
         struct av7110 *av7110 = (struct av7110 *) dvbdev->priv;
@@ -3255,8 +3183,7 @@ unsigned int dvb_ca_poll (struct file *file, poll_table *wait)
         return mask;
 }
 
-static
-int dvb_ca_ioctl(struct inode *inode, struct file *file, 
+static int dvb_ca_ioctl(struct inode *inode, struct file *file, 
                  unsigned int cmd, void *parg)
 {
 	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
@@ -3344,8 +3271,7 @@ int dvb_ca_ioctl(struct inode *inode, struct file *file,
         return 0;
 }
 
-static ssize_t 
-dvb_ca_write(struct file *file, const char *buf, 
+static ssize_t dvb_ca_write(struct file *file, const char *buf, 
              size_t count, loff_t *ppos)
 {
 	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
@@ -3355,8 +3281,7 @@ dvb_ca_write(struct file *file, const char *buf,
         return ci_ll_write(&av7110->ci_wbuffer, file, buf, count, ppos);
 }
 
-static ssize_t 
-dvb_ca_read(struct file *file, char *buf, size_t count, loff_t *ppos)
+static ssize_t dvb_ca_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
 	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         struct av7110 *av7110=(struct av7110 *) dvbdev->priv;
@@ -3370,8 +3295,7 @@ dvb_ca_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 /******************************************************************************
  * Video MPEG decoder events
  ******************************************************************************/
-static
-void dvb_video_add_event (struct av7110 *av7110, struct video_event *event)
+static void dvb_video_add_event (struct av7110 *av7110, struct video_event *event)
 {
 	struct dvb_video_events *events = &av7110->video_events;
 	int wp;
@@ -3398,8 +3322,7 @@ void dvb_video_add_event (struct av7110 *av7110, struct video_event *event)
 }
 
 
-static
-int dvb_video_get_event (struct av7110 *av7110, struct video_event *event, int flags)
+static int dvb_video_get_event (struct av7110 *av7110, struct video_event *event, int flags)
 {
 	struct dvb_video_events *events = &av7110->video_events;
 
@@ -3439,8 +3362,7 @@ int dvb_video_get_event (struct av7110 *av7110, struct video_event *event, int f
  * DVB device file operations
  ******************************************************************************/
 
-static
-unsigned int dvb_video_poll(struct file *file, poll_table *wait)
+static unsigned int dvb_video_poll(struct file *file, poll_table *wait)
 {
 	struct dvb_device *dvbdev = (struct dvb_device *) file->private_data;
         struct av7110 *av7110 = (struct av7110 *) dvbdev->priv;
@@ -3463,8 +3385,7 @@ unsigned int dvb_video_poll(struct file *file, poll_table *wait)
         return mask;
 }
 
-static ssize_t 
-dvb_video_write(struct file *file, const char *buf, 
+static ssize_t dvb_video_write(struct file *file, const char *buf, 
                 size_t count, loff_t *ppos)
 {
 	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
@@ -3478,8 +3399,7 @@ dvb_video_write(struct file *file, const char *buf,
 	return dvb_play(av7110, buf, count, file->f_flags&O_NONBLOCK, 1, 1);
 }
 
-static ssize_t 
-dvb_audio_write(struct file *file, const char *buf, 
+static ssize_t dvb_audio_write(struct file *file, const char *buf, 
                 size_t count, loff_t *ppos)
 {
 	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
@@ -3498,8 +3418,7 @@ u8 iframe_header[] = { 0x00, 0x00, 0x01, 0xe0, 0x00, 0x00, 0x80, 0x00, 0x00 };
 
 #define MIN_IFRAME 400000
 
-static int
-play_iframe(struct av7110 *av7110, u8 *buf, unsigned int len, int nonblock)
+static int play_iframe(struct av7110 *av7110, u8 *buf, unsigned int len, int nonblock)
 {
         int i, n=1;
        
@@ -3522,8 +3441,7 @@ play_iframe(struct av7110 *av7110, u8 *buf, unsigned int len, int nonblock)
 }
 
 
-static int 
-dvb_video_ioctl(struct inode *inode, struct file *file,
+static int dvb_video_ioctl(struct inode *inode, struct file *file,
             unsigned int cmd, void *parg)
 {
 	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
@@ -3718,8 +3636,7 @@ dvb_video_ioctl(struct inode *inode, struct file *file,
         return ret;
 }
 
-static int 
-dvb_audio_ioctl(struct inode *inode, struct file *file,
+static int dvb_audio_ioctl(struct inode *inode, struct file *file,
             unsigned int cmd, void *parg)
 {
 	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
@@ -3959,8 +3876,7 @@ static struct dvb_device dvbdev_ca = {
 };
 
 
-static
-void av7110_before_after_tune (fe_status_t s, void *data)
+static void av7110_before_after_tune (fe_status_t s, void *data)
 {
 	struct av7110 *av7110 = data;
 
@@ -3987,8 +3903,7 @@ void av7110_before_after_tune (fe_status_t s, void *data)
 }
 
 
-static
-int av7110_register(struct av7110 *av7110)
+static int av7110_register(struct av7110 *av7110)
 {
         int ret, i;
         struct dvb_demux *dvbdemux=&av7110->demux;
@@ -4098,8 +4013,7 @@ int av7110_register(struct av7110 *av7110)
 }
 
 
-static void 
-dvb_unregister(struct av7110 *av7110)
+static void dvb_unregister(struct av7110 *av7110)
 {
         struct dvb_demux *dvbdemux=&av7110->demux;
 
@@ -4133,8 +4047,7 @@ dvb_unregister(struct av7110 *av7110)
 //        }
 }
 
-static
-int master_xfer (struct dvb_i2c_bus *i2c, const struct i2c_msg msgs[], int num)
+static int master_xfer (struct dvb_i2c_bus *i2c, const struct i2c_msg msgs[], int num)
 {
 	struct saa7146_dev *dev = i2c->data;
 	return saa7146_i2c_transfer(dev, msgs, num, 6);
@@ -4151,8 +4064,7 @@ struct saa7146_extension_ioctls ioctls[] = {
 	{ 0, 0 }
 };
 
-static
-int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_data *pci_ext)
+static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_data *pci_ext)
 {
 	struct av7110 *av7110 = NULL;
 	int ret = 0;
@@ -4356,8 +4268,7 @@ err:
 	return ret;
 }
 
-static
-int av7110_detach (struct saa7146_dev* saa)
+static int av7110_detach (struct saa7146_dev* saa)
 {
 	struct av7110 *av7110 = (struct av7110*)saa->ext_priv;
 	DEB_EE(("av7110: %p\n",av7110));
@@ -4397,8 +4308,7 @@ int av7110_detach (struct saa7146_dev* saa)
 }
 
 
-static
-void av7110_irq(struct saa7146_dev* dev, u32 *isr) 
+static void av7110_irq(struct saa7146_dev* dev, u32 *isr) 
 {
 	struct av7110 *av7110 = (struct av7110*)dev->ext_priv;
 
@@ -4414,15 +4324,13 @@ void av7110_irq(struct saa7146_dev* dev, u32 *isr)
 
 /* FIXME: these values are experimental values that look better than the
    values from the latest "official" driver -- at least for me... (MiHu) */
-static
-struct saa7146_standard standard[] = {
+static struct saa7146_standard standard[] = {
 	{ "PAL", V4L2_STD_PAL, 0x15, 288, 576, 0x4a, 708, 709, 576, 768 },
 //	{ "PAL", V4L2_STD_PAL, 0x15, 288, 576, 0x3a, 720, 721, 576, 768 },
 	{ "NTSC", V4L2_STD_NTSC, 0x10, 244, 480, 0x40, 708, 709, 480, 640 },
 };
 
-static
-struct saa7146_extension av7110_extension;
+static struct saa7146_extension av7110_extension;
 
 #define MAKE_AV7110_INFO(x_var,x_name) \
 static struct saa7146_pci_extension_data x_var = { \
@@ -4439,8 +4347,7 @@ MAKE_AV7110_INFO(unkwn1, "Technotrend/Hauppauge PCI rev?(unknown1)?");
 MAKE_AV7110_INFO(unkwn2, "Technotrend/Hauppauge PCI rev?(unknown2)?");
 MAKE_AV7110_INFO(nexus,  "Technotrend/Hauppauge Nexus PCI DVB-S");
 
-static
-struct pci_device_id pci_tbl[] = {
+static struct pci_device_id pci_tbl[] = {
 	MAKE_EXTENSION_PCI(fs_1_5, 0x110a, 0xffff),
 	MAKE_EXTENSION_PCI(fs_1_5, 0x110a, 0x0000),
 	MAKE_EXTENSION_PCI(fs_1_3, 0x13c2, 0x0000),
@@ -4480,8 +4387,7 @@ static int std_callback(struct saa7146_dev* dev, struct saa7146_standard *std)
 }
 
 
-static
-struct saa7146_ext_vv av7110_vv_data = {
+static struct saa7146_ext_vv av7110_vv_data = {
 	.inputs		= 1,
 	.audios 	= 1,
 	.capabilities	= 0,
@@ -4495,8 +4401,7 @@ struct saa7146_ext_vv av7110_vv_data = {
 	.ioctl		= av7110_ioctl,
 };
 
-static
-struct saa7146_extension av7110_extension = {
+static struct saa7146_extension av7110_extension = {
 	.name		= "dvb\0",
 	.ext_vv_data	= &av7110_vv_data,
 
@@ -4510,8 +4415,7 @@ struct saa7146_extension av7110_extension = {
 };	
 
 
-static
-int __init av7110_init(void) 
+static int __init av7110_init(void) 
 {
 	if (saa7146_register_extension(&av7110_extension))
 		return -ENODEV;
@@ -4522,8 +4426,7 @@ int __init av7110_init(void)
 }
 
 
-static
-void __exit av7110_exit(void)
+static void __exit av7110_exit(void)
 {
 	av7110_ir_exit();
 	saa7146_unregister_extension(&av7110_extension);

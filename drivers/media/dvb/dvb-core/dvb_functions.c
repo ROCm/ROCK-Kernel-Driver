@@ -1,16 +1,12 @@
-#include <linux/smp_lock.h>
 #include <linux/version.h>
-#include <asm/uaccess.h>
 #include <linux/string.h>
 #include <linux/smp_lock.h>
-#include <linux/version.h>
 #include <linux/fs.h>
-#include <asm/uaccess.h>
 #include <linux/errno.h>
 #include <linux/module.h>
 #include <linux/ioctl.h>
 #include <linux/slab.h>
-#include <linux/fs.h>
+#include <asm/uaccess.h>
 
 void dvb_kernel_thread_setup (const char *thread_name)
 {
