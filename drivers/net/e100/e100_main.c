@@ -614,6 +614,22 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 		goto err_dealloc;
 	}
 
+	dev->vlan_rx_register = e100_vlan_rx_register;
+	dev->vlan_rx_add_vid = e100_vlan_rx_add_vid;
+	dev->vlan_rx_kill_vid = e100_vlan_rx_kill_vid;
+	dev->irq = pcid->irq;
+	dev->open = &e100_open;
+	dev->hard_start_xmit = &e100_xmit_frame;
+	dev->stop = &e100_close;
+	dev->change_mtu = &e100_change_mtu;
+	dev->get_stats = &e100_get_stats;
+	dev->set_multicast_list = &e100_set_multi;
+	dev->set_mac_address = &e100_set_mac;
+	dev->do_ioctl = &e100_ioctl;
+	if (bdp->flags & USE_IPCB)
+		dev->features = NETIF_F_SG | NETIF_F_HW_CSUM |
+				NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
+
 	if ((rc = register_netdev(dev)) != 0) {
 		goto err_pci;
 	}
@@ -660,23 +676,6 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
                 goto err_unregister_netdev;
 	}
 	
-	dev->vlan_rx_register = e100_vlan_rx_register;
-	dev->vlan_rx_add_vid = e100_vlan_rx_add_vid;
-	dev->vlan_rx_kill_vid = e100_vlan_rx_kill_vid;
-	dev->irq = pcid->irq;
-	dev->open = &e100_open;
-	dev->hard_start_xmit = &e100_xmit_frame;
-	dev->stop = &e100_close;
-	dev->change_mtu = &e100_change_mtu;
-	dev->get_stats = &e100_get_stats;
-	dev->set_multicast_list = &e100_set_multi;
-	dev->set_mac_address = &e100_set_mac;
-	dev->do_ioctl = &e100_ioctl;
-
-	if (bdp->flags & USE_IPCB)
-	dev->features = NETIF_F_SG | NETIF_F_HW_CSUM |
-			NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
-		
 	e100nics++;
 
 	e100_get_speed_duplex_caps(bdp);
