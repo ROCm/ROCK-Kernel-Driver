@@ -37,6 +37,9 @@
 #define DEBUGP(fmt , a...)
 #endif
 
+#define symbol_is(literal, string)				\
+	(strcmp(MODULE_SYMBOL_PREFIX literal, (string)) == 0)
+
 /* List of modules, protected by module_mutex */
 static DECLARE_MUTEX(module_mutex);
 LIST_HEAD(modules); /* FIXME: Accessed w/o lock on oops by some archs */
@@ -630,10 +633,10 @@ static int grab_private_symbols(Elf_Shdr *sechdrs,
 	unsigned int i;
 
 	for (i = 1; i < sechdrs[symbolsec].sh_size/sizeof(*sym); i++) {
-		if (strcmp("__initfn", strtab + sym[i].st_name) == 0)
+		if (symbol_is("__initfn", strtab + sym[i].st_name))
 			mod->init = (void *)sym[i].st_value;
 #ifdef CONFIG_MODULE_UNLOAD
-		if (strcmp("__exitfn", strtab + sym[i].st_name) == 0)
+		if (symbol_is("__exitfn", strtab + sym[i].st_name))
 			mod->exit = (void *)sym[i].st_value;
 #endif
 	}
@@ -770,7 +773,7 @@ static void simplify_symbols(Elf_Shdr *sechdrs,
 						       mod,
 						       &ksg);
 			/* We fake up "__this_module" */
-			if (strcmp(strtab+sym[i].st_name, "__this_module")==0)
+			if (symbol_is("__this_module", strtab+sym[i].st_name))
 				sym[i].st_value = (unsigned long)mod;
 		}
 	}

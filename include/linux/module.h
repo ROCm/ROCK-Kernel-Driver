@@ -32,6 +32,11 @@
 #define MODULE_PARM_DESC(var,desc)
 #define print_modules()
 
+/* v850 toolchain uses a `_' prefix for all user symbols */
+#ifndef MODULE_SYMBOL_PREFIX
+#define MODULE_SYMBOL_PREFIX ""
+#endif
+
 #define MODULE_NAME_LEN (64 - sizeof(unsigned long))
 struct kernel_symbol
 {
@@ -90,13 +95,13 @@ struct exception_table
 /* Get/put a kernel symbol (calls must be symmetric) */
 void *__symbol_get(const char *symbol);
 void *__symbol_get_gpl(const char *symbol);
-#define symbol_get(x) ((typeof(&x))(__symbol_get(#x)))
+#define symbol_get(x) ((typeof(&x))(__symbol_get(MODULE_SYMBOL_PREFIX #x)))
 
 /* For every exported symbol, place a struct in the __ksymtab section */
 #define EXPORT_SYMBOL(sym)				\
 	const struct kernel_symbol __ksymtab_##sym	\
 	__attribute__((section("__ksymtab")))		\
-	= { (unsigned long)&sym, #sym }
+	= { (unsigned long)&sym, MODULE_SYMBOL_PREFIX #sym }
 
 #define EXPORT_SYMBOL_NOVERS(sym) EXPORT_SYMBOL(sym)
 #define EXPORT_SYMBOL_GPL(sym) EXPORT_SYMBOL(sym)
@@ -170,7 +175,7 @@ struct module
 #ifdef CONFIG_MODULE_UNLOAD
 
 void __symbol_put(const char *symbol);
-#define symbol_put(x) __symbol_put(#x)
+#define symbol_put(x) __symbol_put(MODULE_SYMBOL_PREFIX #x)
 void symbol_put_addr(void *addr);
 
 /* We only need protection against local interrupts. */
