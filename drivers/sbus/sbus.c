@@ -309,6 +309,10 @@ static void __init sbus_fixup_all_regs(struct sbus_dev *first_sdev)
 extern void register_proc_sparc_ioport(void);
 extern void firetruck_init(void);
 
+#ifdef CONFIG_SUN4
+extern void sun4_dvma_init(void);
+#endif
+
 static int __init sbus_init(void)
 {
 	int nd, this_sbus, sbus_devs, topnd, iommund;
