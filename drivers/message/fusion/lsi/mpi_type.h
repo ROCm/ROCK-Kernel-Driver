@@ -47,18 +47,13 @@ typedef signed   short  S16;
 typedef unsigned short  U16;
 
 
-#if defined(unix) || defined(__arm) || defined(ALPHA)
+typedef int32_t   S32;
+typedef u_int32_t U32;
 
-    typedef signed   int   S32;
-    typedef unsigned int   U32;
-
-#else
-
-    typedef signed   long  S32;
-    typedef unsigned long  U32;
-
-#endif
-
+/*
+ *  The only way crap below could work on big-endian boxen would be if it
+ *  wasn't used at all.
+ */
 
 typedef struct _S64
 {
