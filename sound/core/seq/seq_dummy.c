@@ -124,14 +124,7 @@ dummy_input(snd_seq_event_t *ev, int direct, void *private_data, int atomic, int
 	if (ev->source.client == SNDRV_SEQ_CLIENT_SYSTEM ||
 	    ev->type == SNDRV_SEQ_EVENT_KERNEL_ERROR)
 		return 0; /* ignore system messages */
-	/* save the original sender */
-	tmpev.type = SNDRV_SEQ_EVENT_KERNEL_QUOTE;
-	tmpev.flags = (ev->flags & ~SNDRV_SEQ_EVENT_LENGTH_MASK)
-		| SNDRV_SEQ_EVENT_LENGTH_FIXED;
-	tmpev.tag = ev->tag;
-	tmpev.time = ev->time;
-	tmpev.data.quote.origin = ev->source;
-	tmpev.data.quote.event = ev;
+	tmpev = *ev;
 	if (p->duplex)
 		tmpev.source.port = p->connect;
 	else
