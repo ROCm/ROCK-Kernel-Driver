@@ -34,6 +34,7 @@
 #include <linux/config.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/types.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
@@ -70,43 +71,12 @@ static int nowayout = 1;
 static int nowayout = 0;
 #endif
 
-MODULE_PARM(nowayout,"i");
+module_param(nowayout, int, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
-#ifndef MODULE
-
-/**
- *	wdt_setup:
- *	@str: command line string
- *
- *	Setup options. The board isn't really probe-able so we have to
- *	get the user to tell us the configuration. Sane people build it
- *	modular but the others come here.
- */
-
-static int __init wdt_setup(char *str)
-{
-	int ints[4];
-
-	str = get_options (str, ARRAY_SIZE(ints), ints);
-
-	if (ints[0] > 0)
-	{
-		io = ints[1];
-		if(ints[0] > 1)
-			irq = ints[2];
-	}
-
-	return 1;
-}
-
-__setup("wdt=", wdt_setup);
-
-#endif /* !MODULE */
-
-MODULE_PARM(io, "i");
+module_param(io, int, 0);
 MODULE_PARM_DESC(io, "WDT io port (default=0x240)");
-MODULE_PARM(irq, "i");
+module_param(irq, int, 0);
 MODULE_PARM_DESC(irq, "WDT irq (default=11)");
 
 /*
