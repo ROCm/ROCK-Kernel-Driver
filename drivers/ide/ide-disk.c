@@ -1605,8 +1605,8 @@ static void idedisk_setup (ide_drive_t *drive)
 	if (drive->addressing == 0 && drive->capacity64 > 1ULL << 28) {
 		printk("%s: cannot use LBA48 - full capacity "
 		       "%llu sectors (%llu MB)\n",
-		       drive->name,
-		       drive->capacity64, sectors_to_MB(drive->capacity64));
+		       drive->name, (unsigned long long)drive->capacity64,
+		       sectors_to_MB(drive->capacity64));
 		drive->capacity64 = 1ULL << 28;
 	}
 
