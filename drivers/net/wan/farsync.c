@@ -1636,7 +1636,7 @@ fst_intr(int irq, void *dev_id, struct pt_regs *regs)
 			 */
 			dbg(DBG_TX, "Tx underflow port %d\n", port->index);
                         hdlc_stats(port_to_dev(port))->tx_errors++;
-                        hdlc_stats(port_to_dev(port))->tx_fifo_errors;
+                        hdlc_stats(port_to_dev(port))->tx_fifo_errors++;
 			dbg(DBG_ASS, "Tx underflow on card %d port %d\n",
 			    card->card_no, port->index);
 			break;
