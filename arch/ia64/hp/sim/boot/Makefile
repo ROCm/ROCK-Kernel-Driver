@@ -5,7 +5,7 @@
 # License.  See the file "COPYING" in the main directory of this archive
 # for more details.
 #
-# Copyright (C) 1998 by David Mosberger-Tang <davidm@hpl.hp.com>
+# Copyright (C) 1998, 2003 by David Mosberger-Tang <davidm@hpl.hp.com>
 #
 
 targets-$(CONFIG_IA64_HP_SIM)  += bootloader
@@ -32,6 +32,6 @@ $(obj)/vmlinux.bin: vmlinux FORCE
 
 LDFLAGS_bootloader = -static -T
 
-$(obj)/bootloader: $(src)/bootloader.lds $(obj)/bootloader.o \
+$(obj)/bootloader: $(src)/bootloader.lds $(obj)/bootloader.o $(obj)/boot_head.o $(obj)/fw-emu.o \
                    lib/lib.a arch/ia64/lib/lib.a FORCE
 	$(call if_changed,ld)

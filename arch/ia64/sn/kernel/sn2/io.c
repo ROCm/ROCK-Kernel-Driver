@@ -11,81 +11,73 @@
 
 #include <asm/sn/sn2/io.h>
 
+#undef __sn_inb
+#undef __sn_inw
+#undef __sn_inl
+#undef __sn_outb
+#undef __sn_outw
+#undef __sn_outl
+#undef __sn_readb
+#undef __sn_readw
+#undef __sn_readl
+#undef __sn_readq
+
 unsigned int
-sn_inb (unsigned long port)
+__sn_inb (unsigned long port)
 {
-	return __sn_inb(port);
+	return ___sn_inb(port);
 }
 
 unsigned int
-sn_inw (unsigned long port)
+__sn_inw (unsigned long port)
 {
-	return __sn_inw(port);
+	return ___sn_inw(port);
 }
 
 unsigned int
-sn_inl (unsigned long port)
+__sn_inl (unsigned long port)
 {
-	return __sn_inl(port);
+	return ___sn_inl(port);
 }
 
 void
-sn_outb (unsigned char val, unsigned long port)
+__sn_outb (unsigned char val, unsigned long port)
 {
-	__sn_outb(val, port);
+	___sn_outb(val, port);
 }
 
 void
-sn_outw (unsigned short val, unsigned long port)
+__sn_outw (unsigned short val, unsigned long port)
 {
-	__sn_outw(val, port);
+	___sn_outw(val, port);
 }
 
 void
-sn_outl (unsigned int val, unsigned long port)
+__sn_outl (unsigned int val, unsigned long port)
 {
-	__sn_outl(val, port);
+	___sn_outl(val, port);
 }
 
 unsigned char
-sn_readb (void *addr)
+__sn_readb (void *addr)
 {
-	return __sn_readb (addr);
+	return ___sn_readb (addr);
 }
 
 unsigned short
-sn_readw (void *addr)
+__sn_readw (void *addr)
 {
-	return __sn_readw (addr);
+	return ___sn_readw (addr);
 }
 
 unsigned int
-sn_readl (void *addr)
+__sn_readl (void *addr)
 {
-	return __sn_readl (addr);
+	return ___sn_readl (addr);
 }
 
 unsigned long
-sn_readq (void *addr)
+__sn_readq (void *addr)
 {
-	return __sn_readq (addr);
+	return ___sn_readq (addr);
 }
-
-
-/* define aliases: */
-
-asm (".global __sn_inb, __sn_inw, __sn_inl");
-asm ("__sn_inb = sn_inb");
-asm ("__sn_inw = sn_inw");
-asm ("__sn_inl = sn_inl");
-
-asm (".global __sn_outb, __sn_outw, __sn_outl");
-asm ("__sn_outb = sn_outb");
-asm ("__sn_outw = sn_outw");
-asm ("__sn_outl = sn_outl");
-
-asm (".global __sn_readb, __sn_readw, __sn_readl, __sn_readq");
-asm ("__sn_readb = sn_readb");
-asm ("__sn_readw = sn_readw");
-asm ("__sn_readl = sn_readl");
-asm ("__sn_readq = sn_readq");

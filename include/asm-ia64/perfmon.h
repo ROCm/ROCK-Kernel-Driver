@@ -70,64 +70,70 @@ typedef unsigned char pfm_uuid_t[16];	/* custom sampling buffer identifier type 
  * Request structure used to define a context
  */
 typedef struct {
-	pfm_uuid_t    ctx_smpl_buf_id;	/* which buffer format to use (if needed) */
-	unsigned long ctx_flags;	/* noblock/block */
-	unsigned int  ctx_nextra_sets;	/* number of extra event sets (you always get 1) */
-	int	      ctx_fd;		/* return arg: unique identification for context */
-	void	      *ctx_smpl_vaddr;	/* return arg: virtual address of sampling buffer, is used */
-	unsigned long ctx_reserved[11];	/* for future use */
+	pfm_uuid_t     ctx_smpl_buf_id;	 /* which buffer format to use (if needed) */
+	unsigned long  ctx_flags;	 /* noblock/block */
+	unsigned short ctx_nextra_sets;	 /* number of extra event sets (you always get 1) */
+	unsigned short ctx_reserved1;	 /* for future use */
+	int	       ctx_fd;		 /* return arg: unique identification for context */
+	void	       *ctx_smpl_vaddr;	 /* return arg: virtual address of sampling buffer, is used */
+	unsigned long  ctx_reserved2[11];/* for future use */
 } pfarg_context_t;
 
 /*
  * Request structure used to write/read a PMC or PMD
  */
 typedef struct {
-	unsigned int	reg_num;	   /* which register                             */
-	unsigned int	reg_set;	   /* event set for this register                */
+	unsigned int	reg_num;	   /* which register */
+	unsigned short	reg_set;	   /* event set for this register */
+	unsigned short	reg_reserved1;	   /* for future use */
 
-	unsigned long	reg_value;	   /* initial pmc/pmd value                      */
-	unsigned long	reg_flags;	   /* input: pmc/pmd flags, return: reg error    */
+	unsigned long	reg_value;	   /* initial pmc/pmd value */
+	unsigned long	reg_flags;	   /* input: pmc/pmd flags, return: reg error */
 
-	unsigned long	reg_long_reset;	   /* reset after buffer overflow notification   */
-	unsigned long	reg_short_reset;   /* reset after counter overflow               */
+	unsigned long	reg_long_reset;	   /* reset after buffer overflow notification */
+	unsigned long	reg_short_reset;   /* reset after counter overflow */
 
-	unsigned long	reg_reset_pmds[4]; /* which other counters to reset on overflow  */
-	unsigned long	reg_random_seed;   /* seed value when randomization is used      */
-	unsigned long	reg_random_mask;   /* bitmask used to limit random value         */
-	unsigned long   reg_last_reset_val;/* return: PMD last reset value               */
+	unsigned long	reg_reset_pmds[4]; /* which other counters to reset on overflow */
+	unsigned long	reg_random_seed;   /* seed value when randomization is used */
+	unsigned long	reg_random_mask;   /* bitmask used to limit random value */
+	unsigned long   reg_last_reset_val;/* return: PMD last reset value */
 
 	unsigned long	reg_smpl_pmds[4];  /* which pmds are accessed when PMC overflows */
-	unsigned long	reg_smpl_eventid;  /* opaque sampling event identifier           */
+	unsigned long	reg_smpl_eventid;  /* opaque sampling event identifier */
 
-	unsigned long   reserved[3];	   /* for future use                             */
+	unsigned long   reg_reserved2[3];   /* for future use */
 } pfarg_reg_t;
 
 typedef struct {
-	unsigned int	dbreg_num;		/* which debug register        */
-	unsigned int 	dbreg_set;		/* event set for this register */
-	unsigned long	dbreg_value;		/* value for debug register    */
-	unsigned long	dbreg_flags;		/* return: dbreg error         */
-	unsigned long	dbreg_reserved[1];	/* for future use              */
+	unsigned int	dbreg_num;		/* which debug register */
+	unsigned short	dbreg_set;		/* event set for this register */
+	unsigned short	dbreg_reserved1;	/* for future use */
+	unsigned long	dbreg_value;		/* value for debug register */
+	unsigned long	dbreg_flags;		/* return: dbreg error */
+	unsigned long	dbreg_reserved2[1];	/* for future use */
 } pfarg_dbreg_t;
 
 typedef struct {
 	unsigned int	ft_version;	/* perfmon: major [16-31], minor [0-15] */
-	unsigned int	ft_reserved;	/* reserved for future use              */
-	unsigned long	reserved[4];	/* for future use                       */
+	unsigned int	ft_reserved;	/* reserved for future use */
+	unsigned long	reserved[4];	/* for future use */
 } pfarg_features_t;
 
 typedef struct {
-	pid_t		load_pid;	  /* process to load the context into */
-	unsigned int	load_set;	  /* first event set to load          */
-	unsigned long	load_reserved[2]; /* for future use                   */
+	pid_t		load_pid;	   /* process to load the context into */
+	unsigned short	load_set;	   /* first event set to load */
+	unsigned short	load_reserved1;	   /* for future use */
+	unsigned long	load_reserved2[3]; /* for future use */
 } pfarg_load_t;
 
 typedef struct {
 	int		msg_type;		/* generic message header */
 	int		msg_ctx_fd;		/* generic message header */
-	unsigned long	msg_tstamp;		/* for perf tuning */
-	unsigned int	msg_active_set;		/* active set at the time of overflow */
 	unsigned long	msg_ovfl_pmds[4];	/* which PMDs overflowed */
+	unsigned short  msg_active_set;		/* active set at the time of overflow */
+	unsigned short  msg_reserved1;		/* for future use */
+	unsigned int    msg_reserved2;		/* for future use */
+	unsigned long	msg_tstamp;		/* for perf tuning/debug */
 } pfm_ovfl_msg_t;
 
 typedef struct {
@@ -192,25 +198,28 @@ extern void pfm_handle_work(void);
 #define PFM_PMD_LONG_RESET	1
 #define PFM_PMD_SHORT_RESET	2
 
-typedef struct {
-	unsigned int notify_user:1;	/* notify user program of overflow                           */
-	unsigned int reset_pmds :2;	/* PFM_PMD_NO_RESET, PFM_PMD_LONG_RESET, PFM_PMD_SHORT_RESET */
-	unsigned int block:1;		/* block monitored task on kernel exit                       */
-	unsigned int stop_monitoring:1; /* will mask monitoring via PMCx.plm                         */
-	unsigned int reserved:26;	/* for future use                                            */
+typedef union {
+	unsigned int val;
+	struct {
+		unsigned int notify_user:1;	/* notify user program of overflow */
+		unsigned int reset_ovfl_pmds:1;	/* reset overflowed PMDs */
+		unsigned int block_task:1;	/* block monitored task on kernel exit */
+		unsigned int mask_monitoring:1; /* mask monitors via PMCx.plm */
+		unsigned int reserved:28;	/* for future use */
+	} bits;
 } pfm_ovfl_ctrl_t;
 
 typedef struct {
-	unsigned long   ovfl_pmds[4];	/* bitmask of overflowed pmds                            */
-	unsigned long   ovfl_notify[4];	/* bitmask of overflow pmds which asked for notification */
-	unsigned long   pmd_value;	/* current 64-bit value of 1st pmd which overflowed      */
-	unsigned long   pmd_last_reset;	/* last reset value of 1st pmd which overflowed          */
-	unsigned long	pmd_eventid;	/* eventid associated with 1st pmd which overflowed      */
-	unsigned int    active_set;	/* event set active at the time of the overflow          */
-	unsigned int    reserved1;
-	unsigned long	smpl_pmds[4];
-	unsigned long   smpl_pmds_values[PMU_MAX_PMDS];
-	pfm_ovfl_ctrl_t ovfl_ctrl;	/* return: perfmon controls to set by handler            */
+	unsigned char	ovfl_pmd;			/* index of overflowed PMD  */
+	unsigned char   ovfl_notify;			/* =1 if monitor requested overflow notification */
+	unsigned short  active_set;			/* event set active at the time of the overflow */
+	pfm_ovfl_ctrl_t ovfl_ctrl;			/* return: perfmon controls to set by handler */
+
+	unsigned long   pmd_last_reset;			/* last reset value of of the PMD */
+	unsigned long	smpl_pmds[4];			/* bitmask of other PMD of interest on overflow */
+	unsigned long   smpl_pmds_values[PMU_MAX_PMDS]; /* values for the other PMDs of interest */
+	unsigned long   pmd_value;			/* current 64-bit value of the PMD */
+	unsigned long	pmd_eventid;			/* eventid associated with PMD */
 } pfm_ovfl_arg_t;
 
 
@@ -223,7 +232,7 @@ typedef struct _pfm_buffer_fmt_t {
 	int		(*fmt_validate)(struct task_struct *task, unsigned int flags, int cpu, void *arg);
 	int		(*fmt_getsize)(struct task_struct *task, unsigned int flags, int cpu, void *arg, unsigned long *size);
 	int 		(*fmt_init)(struct task_struct *task, void *buf, unsigned int flags, int cpu, void *arg);
-	int		(*fmt_handler)(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg, struct pt_regs *regs);
+	int		(*fmt_handler)(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg, struct pt_regs *regs, unsigned long stamp);
 	int		(*fmt_restart)(struct task_struct *task, pfm_ovfl_ctrl_t *ctrl, void *buf, struct pt_regs *regs);
 	int		(*fmt_restart_active)(struct task_struct *task, pfm_ovfl_ctrl_t *ctrl, void *buf, struct pt_regs *regs);
 	int		(*fmt_exit)(struct task_struct *task, void *buf, struct pt_regs *regs);

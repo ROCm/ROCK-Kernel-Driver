@@ -395,7 +395,7 @@ sn_cpu_init(void)
 		return;
 
 	cpuid = smp_processor_id();
-	cpuphyid = ((ia64_get_lid() >> 16) & 0xffff);
+	cpuphyid = ((ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xffff);
 	nasid = cpu_physical_id_to_nasid(cpuphyid);
 	cnode = nasid_to_cnodeid(nasid);
 	slice = cpu_physical_id_to_slice(cpuphyid);

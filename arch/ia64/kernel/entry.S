@@ -471,6 +471,18 @@ GLOBAL_ENTRY(__ia64_syscall)
 	br.ret.sptk.many rp
 END(__ia64_syscall)
 
+GLOBAL_ENTRY(execve)
+	mov r15=__NR_execve			// put syscall number in place
+	break __BREAK_SYSCALL
+	br.ret.sptk.many rp
+END(execve)
+
+GLOBAL_ENTRY(clone)
+	mov r15=__NR_clone			// put syscall number in place
+	break __BREAK_SYSCALL
+	br.ret.sptk.many rp
+END(clone)
+
 	/*
 	 * We invoke syscall_trace through this intermediate function to
 	 * ensure that the syscall input arguments are not clobbered.  We
