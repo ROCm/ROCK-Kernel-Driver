@@ -585,9 +585,11 @@ static void __devinit pci_process_ISA_OF_ranges(struct device_node *isa_node,
 	int rlen = 0;
 
 	range = (struct isa_range *) get_property(isa_node, "ranges", &rlen);
-	if (rlen < sizeof(struct isa_range)) {
-		printk(KERN_ERR "unexpected isa range size: %s\n", 
-				__FUNCTION__);
+	if (range == NULL || (rlen < sizeof(struct isa_range))) {
+		printk(KERN_ERR "no ISA ranges or unexpected isa range size,"
+		       "mapping 64k\n");
+		__ioremap_explicit(phb_io_base_phys, (unsigned long)phb_io_base_virt, 
+				   0x10000, _PAGE_NO_CACHE);
 		return;	
 	}
 	
@@ -652,8 +654,7 @@ void __devinit pci_process_bridge_OF_ranges(struct pci_controller *hose,
 			cpu_phys_addr = cpu_phys_addr << 32 | ranges[4];
 
 		size = (unsigned long)ranges[na+3] << 32 | ranges[na+4];
-
-		switch (ranges[0] >> 24) {
+		switch ((ranges[0] >> 24) & 0x3) {
 		case 1:		/* I/O space */
 			hose->io_base_phys = cpu_phys_addr;
 			hose->pci_io_size = size;
@@ -861,6 +862,9 @@ int pcibios_scan_all_fns(struct pci_bus *bus, int devfn)
                busdn = pci_device_to_OF_node(bus->self);
        else
                busdn = bus->sysdata;   /* must be a phb */
+
+       if (busdn == NULL)
+	       return 0;
 
        /*
         * Check to see if there is any of the 8 functions are in the
