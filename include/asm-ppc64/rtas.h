@@ -22,12 +22,13 @@
 /* Buffer size for ppc_rtas system call. */
 #define RTAS_RMOBUF_MAX (64 * 1024)
 
-/* RTAS return codes */
-#define RTAS_BUSY		-2	/* RTAS Return Status - Busy */
-#define RTAS_EXTENDED_DELAY_MIN 9900
-#define RTAS_EXTENDED_DELAY_MAX 9905
+/* RTAS return status codes */
+#define RTAS_BUSY		-2    /* RTAS Busy */
+#define RTAS_NO_SUCH_INDICATOR	-3    /* No such indicator implemented */
+#define RTAS_EXTENDED_DELAY_MIN	9900
+#define RTAS_EXTENDED_DELAY_MAX	9905
 
-#define RTAS_UNKNOWN_OP		-1099	/* Return Status - Unknown RTAS Token */
+#define RTAS_UNKNOWN_OP		-1099 /* Unknown RTAS Token */
 
 /*
  * In general to call RTAS use rtas_token("string") to lookup
