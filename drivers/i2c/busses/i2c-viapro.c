@@ -45,6 +45,8 @@
 #include <linux/init.h>
 #include <asm/io.h>
 
+static struct pci_dev *vt596_pdev;
+
 #define SMBBA1	   	 0x90
 #define SMBBA2     	 0x80
 #define SMBBA3     	 0xD0
@@ -381,17 +383,21 @@ static int __devinit vt596_probe(struct pci_dev *pdev,
 	snprintf(vt596_adapter.name, I2C_NAME_SIZE,
 			"SMBus Via Pro adapter at %04x", vt596_smba);
 	
-	return i2c_add_adapter(&vt596_adapter);
+	vt596_pdev = pci_dev_get(pdev);
+	if (i2c_add_adapter(&vt596_adapter)) {
+		pci_dev_put(vt596_pdev);
+		vt596_pdev = NULL;
+	}
+
+	/* Always return failure here.  This is to allow other drivers to bind
+	 * to this pci device.  We don't really want to have control over the
+	 * pci device, we only wanted to read as few register values from it.
+	 */
+	return -ENODEV;
 
  release_region:
 	release_region(vt596_smba, 8);
 	return error;
-}
-
-static void __devexit vt596_remove(struct pci_dev *pdev)
-{
-	i2c_del_adapter(&vt596_adapter);
-	release_region(vt596_smba, 8);
 }
 
 static struct pci_device_id vt596_ids[] = {
@@ -420,7 +426,6 @@ static struct pci_driver vt596_driver = {
 	.name		= "vt596_smbus",
 	.id_table	= vt596_ids,
 	.probe		= vt596_probe,
-	.remove		= __devexit_p(vt596_remove),
 };
 
 static int __init i2c_vt596_init(void)
@@ -432,6 +437,12 @@ static int __init i2c_vt596_init(void)
 static void __exit i2c_vt596_exit(void)
 {
 	pci_unregister_driver(&vt596_driver);
+	if (vt596_pdev != NULL) {
+		i2c_del_adapter(&vt596_adapter);
+		release_region(vt596_smba, 8);
+		pci_dev_put(vt596_pdev);
+		vt596_pdev = NULL;
+	}
 }
 
 MODULE_AUTHOR(
