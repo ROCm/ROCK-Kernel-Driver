@@ -124,13 +124,13 @@ static inline void set_pml4(pml4_t *dst, pml4_t val)
 
 
 #ifndef __ASSEMBLY__
-#define VMALLOC_START    0xffffff0000000000
-#define VMALLOC_END      0xffffff7fffffffff
-#define MODULES_VADDR    0xffffffffa0000000
-#define MODULES_END      0xffffffffafffffff
+#define VMALLOC_START    0xffffff0000000000UL
+#define VMALLOC_END      0xffffff7fffffffffUL
+#define MODULES_VADDR    0xffffffffa0000000UL
+#define MODULES_END      0xffffffffafffffffUL
 #define MODULES_LEN   (MODULES_END - MODULES_VADDR)
 
-#define IOMAP_START      0xfffffe8000000000
+#define IOMAP_START      0xfffffe8000000000UL
 
 #define _PAGE_BIT_PRESENT	0
 #define _PAGE_BIT_RW		1
