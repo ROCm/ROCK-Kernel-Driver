@@ -41,7 +41,7 @@ extern int sysctl_legacy_va_layout;
 #define MM_VM_SIZE(mm)	TASK_SIZE
 #endif
 
-#define nth_page(page,n) pfn_to_page(page_to_pfn((page)) + n)
+#define nth_page(page,n) pfn_to_page(page_to_pfn((page)) + (n))
 
 /*
  * Linux kernel virtual memory manager primitives.
