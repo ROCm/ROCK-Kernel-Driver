@@ -1735,6 +1735,8 @@ static int __initdata is_chipset_set[MAX_HWIFS];
  * "hdx=nowerr"		: ignore the WRERR_STAT bit on this drive
  * "hdx=cdrom"		: drive is present, and is a cdrom drive
  * "hdx=cyl,head,sect"	: disk drive is present, with specified geometry
+ * "hdx=remap63"	: add 63 to all sector numbers (for OnTrack DM)
+ * "hdx=remap"		: remap 0->1 (for EZDrive)
  * "hdx=noremap"	: do not remap 0->1 even though EZD was detected
  * "hdx=autotune"	: driver will attempt to tune interface speed
  *				to the fastest PIO mode supported,
@@ -1854,11 +1856,11 @@ int __init ide_setup (char *s)
 	 * Look for drive options:  "hdx="
 	 */
 	if (s[0] == 'h' && s[1] == 'd' && s[2] >= 'a' && s[2] <= max_drive) {
-		const char *hd_words[] = {"none", "noprobe", "nowerr", "cdrom",
-				"serialize", "autotune", "noautotune",
-				"slow", "swapdata", "bswap", "flash",
-				"remap", "noremap", "scsi", "biostimings",
-				NULL};
+		const char *hd_words[] = {
+			"none", "noprobe", "nowerr", "cdrom", "serialize",
+			"autotune", "noautotune", "slow", "swapdata", "bswap",
+			"flash", "remap", "noremap", "scsi", "biostimings",
+			"remap63", NULL };
 		unit = s[2] - 'a';
 		hw   = unit / MAX_DRIVES;
 		unit = unit % MAX_DRIVES;
@@ -1908,8 +1910,8 @@ int __init ide_setup (char *s)
 			case -8: /* "slow" */
 				drive->slow = 1;
 				goto done;
-			case -9: /* "swapdata" or "bswap" */
-			case -10:
+			case -9: /* "swapdata" */
+			case -10: /* "bswap" */
 				drive->bswap = 1;
 				goto done;
 			case -11: /* "flash" */
@@ -1931,6 +1933,9 @@ int __init ide_setup (char *s)
 #endif /* defined(CONFIG_BLK_DEV_IDESCSI) && defined(CONFIG_SCSI) */
 			case -15: /* "biostimings" */
 				drive->autotune = IDE_TUNE_BIOS;
+				goto done;
+			case -16: /* "remap63" */
+				drive->sect0 = 63;
 				goto done;
 			case 3: /* cyl,head,sect */
 				drive->media	= ide_disk;

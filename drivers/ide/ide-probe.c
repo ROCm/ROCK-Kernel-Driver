@@ -1443,8 +1443,6 @@ int ideprobe_init (void)
 }
 
 #ifdef MODULE
-extern int (*ide_xlate_1024_hook)(struct block_device *, int, int, const char *);
-
 int init_module (void)
 {
 	unsigned int index;
@@ -1453,14 +1451,12 @@ int init_module (void)
 		ide_unregister(index);
 	ideprobe_init();
 	create_proc_ide_interfaces();
-	ide_xlate_1024_hook = ide_xlate_1024;
 	return 0;
 }
 
 void cleanup_module (void)
 {
 	ide_probe = NULL;
-	ide_xlate_1024_hook = 0;
 }
 MODULE_LICENSE("GPL");
 #endif /* MODULE */
