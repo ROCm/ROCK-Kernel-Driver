@@ -384,10 +384,10 @@ acpi_system_wakeup_device_seq_show(struct seq_file *seq, void *offset)
 	return 0;
 }
 
-static int
+static ssize_t
 acpi_system_write_wakeup_device (
 	struct file		*file,
-	const char		*buffer,
+	const char __user	*buffer,
 	size_t			count,
 	loff_t			*ppos)
 {
