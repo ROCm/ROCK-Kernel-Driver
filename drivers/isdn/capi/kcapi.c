@@ -68,6 +68,11 @@ struct capi_appl {
 	unsigned long nrecvdatapkt;
 	unsigned long nsentctlpkt;
 	unsigned long nsentdatapkt;
+
+	/* ugly hack to allow for notification of added/removed
+	 * controllers. The Right Way (tm) is known. XXX
+	 */
+	void (*callback) (unsigned int cmd, __u32 contr, void *data);
 };
 
 struct capi_notifier {
@@ -548,35 +553,33 @@ static int notify_push(unsigned int cmd, u32 controller,
 
 static void notify_up(u32 contr)
 {
-	struct list_head *l;
-	struct capi_interface_user *p;
 	struct capi_ctr *card = get_capi_ctr_by_nr(contr);
+	struct capi_appl *ap;
+	u16 applid;
 
-        printk(KERN_NOTICE "kcapi: notify up contr %d\n", contr);
-	spin_lock(&users_lock);
-	list_for_each(l, &users) {
-		p = list_entry(l, struct capi_interface_user, user_list);
-		if (!p->callback) continue;
-		(*p->callback) (KCI_CONTRUP, contr, &card->profile);
+        printk(KERN_DEBUG "kcapi: notify up contr %d\n", contr);
+
+	for (applid = 1; applid <= CAPI_MAXAPPL; applid++) {
+		ap = get_capi_appl_by_nr(applid);
+		if (ap && ap->callback)
+			ap->callback(KCI_CONTRUP, contr, &card->profile);
 	}
-	spin_unlock(&users_lock);
 }
 
 /* -------- KCI_CONTRDOWN ------------------------------------- */
 
 static void notify_down(u32 contr)
 {
-	struct list_head *l;
-	struct capi_interface_user *p;
+	struct capi_appl *ap;
+	u16 applid;
 
-        printk(KERN_NOTICE "kcapi: notify down contr %d\n", contr);
-	spin_lock(&users_lock);
-	list_for_each(l, &users) {
-		p = list_entry(l, struct capi_interface_user, user_list);
-		if (!p->callback) continue;
-		(*p->callback) (KCI_CONTRDOWN, contr, 0);
+        printk(KERN_DEBUG "kcapi: notify down contr %d\n", contr);
+
+	for (applid = 1; applid <= CAPI_MAXAPPL; applid++) {
+		ap = get_capi_appl_by_nr(applid);
+		if (ap && ap->callback)
+			ap->callback(KCI_CONTRDOWN, contr, 0);
 	}
-	spin_unlock(&users_lock);
 }
 
 /* ------------------------------------------------------------ */
@@ -1317,6 +1320,16 @@ int capi20_manufacturer(unsigned int cmd, void *data)
 }
 
 EXPORT_SYMBOL(capi20_manufacturer);
+
+/* temporary hack */
+void capi20_set_callback(u16 applid, void (*callback) (unsigned int cmd, __u32 contr, void *data))
+{
+	struct capi_appl *ap = get_capi_appl_by_nr(applid);
+
+	ap->callback = callback;
+}
+
+EXPORT_SYMBOL(capi20_set_callback);
 
 /* ------------------------------------------------------------- */
 /* -------- Exported Functions --------------------------------- */

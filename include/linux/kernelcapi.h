@@ -54,7 +54,6 @@ typedef struct kcapi_carddef {
 
 struct capi_interface_user {
 	char name[20];
-	void (*callback) (unsigned int cmd, __u32 contr, void *data);
 	/* internal */
 	struct list_head user_list;
 };
@@ -75,6 +74,11 @@ u16 capi20_get_version(u32 contr, struct capi_version *verp);
 u16 capi20_get_serial(u32 contr, u8 serial[CAPI_SERIAL_LEN]);
 u16 capi20_get_profile(u32 contr, struct capi_profile *profp);
 int capi20_manufacturer(unsigned int cmd, void *data);
+
+/* temporary hack XXX */
+void capi20_set_callback(u16 applid, void (*callback) (unsigned int cmd, __u32 contr, void *data));
+
+
 
 #define CAPI_NOERROR                      0x0000
 

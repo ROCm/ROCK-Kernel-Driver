@@ -2293,7 +2293,6 @@ static void __exit proc_exit(void)
 
 static struct capi_interface_user cuser = {
 	name: "capidrv",
-	callback: lower_callback
 };
 
 static int __init capidrv_init(void)
@@ -2326,6 +2325,8 @@ static int __init capidrv_init(void)
 		MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
+
+	capi20_set_callback(global.appid, lower_callback);
 
 	errcode = capi20_get_profile(0, &profile);
 	if (errcode != CAPI_NOERROR) {
