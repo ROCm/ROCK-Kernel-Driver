@@ -632,7 +632,8 @@ static inline void __epic_pci_commit(long ioaddr)
 #endif
 }
 
-static void epic_napi_irq_off(struct net_device *dev, struct epic_private *ep)
+static inline void epic_napi_irq_off(struct net_device *dev,
+				     struct epic_private *ep)
 {
 	long ioaddr = dev->base_addr;
 
@@ -640,7 +641,8 @@ static void epic_napi_irq_off(struct net_device *dev, struct epic_private *ep)
 	__epic_pci_commit(ioaddr);
 }
 
-static void epic_napi_irq_on(struct net_device *dev, struct epic_private *ep)
+static inline void epic_napi_irq_on(struct net_device *dev,
+				    struct epic_private *ep)
 {
 	long ioaddr = dev->base_addr;
 
@@ -1370,20 +1372,24 @@ rx_action:
 
 	if (netif_running(dev) && (work_done < orig_budget)) {
 		unsigned long flags;
+		int more;
+
+		/* A bit baroque but it avoids a (space hungry) spin_unlock */
 
 		spin_lock_irqsave(&ep->napi_lock, flags);
 
-		if (ep->reschedule_in_poll) {
+		more = ep->reschedule_in_poll;
+		if (!more) {
+			__netif_rx_complete(dev);
+			outl(EpicNapiEvent, ioaddr + INTSTAT);
+			epic_napi_irq_on(dev, ep);
+		} else
 			ep->reschedule_in_poll--;
-			spin_unlock_irqrestore(&ep->napi_lock, flags);
-			goto rx_action;
-		}
-
-		outl(EpicNapiEvent, ioaddr + INTSTAT);
-		epic_napi_irq_on(dev, ep);
-		__netif_rx_complete(dev);
 
 		spin_unlock_irqrestore(&ep->napi_lock, flags);
+
+		if (more)
+			goto rx_action;
 	}
 
 	return (work_done >= orig_budget);
