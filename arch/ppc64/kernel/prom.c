@@ -140,9 +140,6 @@ extern struct rtas_t rtas;
 extern unsigned long klimit;
 extern unsigned long embedded_sysmap_end;
 extern struct lmb lmb;
-#ifdef CONFIG_MSCHUNKS
-extern struct msChunks msChunks;
-#endif /* CONFIG_MSCHUNKS */
 
 #define MAX_PHB 16 * 3  // 16 Towers * 3 PHBs/tower
 struct _of_tce_table of_tce_table[MAX_PHB + 1] = {{0, 0, 0}};
@@ -173,12 +170,6 @@ static struct bi_record * prom_bi_rec_verify(struct bi_record *);
 static unsigned long prom_bi_rec_reserve(unsigned long);
 static struct device_node *find_phandle(phandle);
 
-#ifdef CONFIG_MSCHUNKS
-static unsigned long prom_initialize_mschunks(unsigned long);
-#ifdef DEBUG_PROM
-void prom_dump_mschunks_mapping(void);
-#endif /* DEBUG_PROM */
-#endif /* CONFIG_MSCHUNKS */
 #ifdef DEBUG_PROM
 void prom_dump_lmb(void);
 #endif
@@ -515,20 +506,6 @@ prom_initialize_lmb(unsigned long mem)
 	unsigned long lmb_base, lmb_size;
 	unsigned long num_regs, bytes_per_reg = (_prom->encode_phys_size*2)/8;
 
-#ifdef CONFIG_MSCHUNKS
-	unsigned long max_addr = 0;
-#if 1
-	/* Fix me: 630 3G-4G IO hack here... -Peter (PPPBBB) */
-	unsigned long io_base = 3UL<<30;
-	unsigned long io_size = 1UL<<30;
-	unsigned long have_630 = 1;	/* assume we have a 630 */
-
-#else
-	unsigned long io_base = <real io base here>;
-	unsigned long io_size = <real io size here>;
-#endif
-#endif /* CONFIG_MSCHUNKS */
-
 	lmb_init();
 
         for (node = 0; prom_next_node(&node); ) {
@@ -551,41 +528,16 @@ prom_initialize_lmb(unsigned long mem)
 				lmb_size = reg.addr64[i].size;
 			}
 
-#ifdef CONFIG_MSCHUNKS
-			if ( lmb_addrs_overlap(lmb_base,lmb_size,
-						io_base,io_size) ) {
-				/* If we really have dram here, then we don't
-			 	 * have a 630! -Peter
-			 	 */
-				have_630 = 0;
-			}
-#endif /* CONFIG_MSCHUNKS */
 			if ( lmb_add(lmb_base, lmb_size) < 0 )
 				prom_print(RELOC("Too many LMB's, discarding this one...\n"));
-#ifdef CONFIG_MSCHUNKS
-			else if ( max_addr < (lmb_base+lmb_size-1) )
-				max_addr = lmb_base+lmb_size-1;
-#endif /* CONFIG_MSCHUNKS */
 		}
 
 	}
-
-#ifdef CONFIG_MSCHUNKS
-	if ( have_630 && lmb_addrs_overlap(0,max_addr,io_base,io_size) )
-		lmb_add_io(io_base, io_size);
-#endif /* CONFIG_MSCHUNKS */
 
 	lmb_analyze();
 #ifdef DEBUG_PROM
 	prom_dump_lmb();
 #endif /* DEBUG_PROM */
-
-#ifdef CONFIG_MSCHUNKS
-	mem = prom_initialize_mschunks(mem);
-#ifdef DEBUG_PROM
-	prom_dump_mschunks_mapping();
-#endif /* DEBUG_PROM */
-#endif /* CONFIG_MSCHUNKS */
 
 	return mem;
 }
@@ -687,96 +639,6 @@ unsigned long prom_strtoul(const char *cp)
 
 	return result;
 }
-
-
-#ifdef CONFIG_MSCHUNKS
-static unsigned long
-prom_initialize_mschunks(unsigned long mem)
-{
-        unsigned long offset = reloc_offset();
-	struct lmb *_lmb  = PTRRELOC(&lmb);
-	struct msChunks *_msChunks = PTRRELOC(&msChunks);
-	unsigned long i, pchunk = 0;
-	unsigned long addr_range = _lmb->memory.size + _lmb->memory.iosize;
-	unsigned long chunk_size = _lmb->memory.lcd_size;
-
-
-	mem = msChunks_alloc(mem, addr_range / chunk_size, chunk_size);
-
-	/* First create phys -> abs mapping for memory/dram */
-	for (i=0; i < _lmb->memory.cnt ;i++) {
-		unsigned long base = _lmb->memory.region[i].base;
-		unsigned long size = _lmb->memory.region[i].size;
-		unsigned long achunk = addr_to_chunk(base);
-		unsigned long end_achunk = addr_to_chunk(base+size);
-
-		if(_lmb->memory.region[i].type != LMB_MEMORY_AREA)
-			continue;
-
-		_lmb->memory.region[i].physbase = chunk_to_addr(pchunk);
-		for (; achunk < end_achunk ;) {
-			PTRRELOC(_msChunks->abs)[pchunk++] = achunk++;
-		}
-	}
-
-#ifdef CONFIG_MSCHUNKS
-	/* Now create phys -> abs mapping for IO */
-	for (i=0; i < _lmb->memory.cnt ;i++) {
-		unsigned long base = _lmb->memory.region[i].base;
-		unsigned long size = _lmb->memory.region[i].size;
-		unsigned long achunk = addr_to_chunk(base);
-		unsigned long end_achunk = addr_to_chunk(base+size);
-
-		if(_lmb->memory.region[i].type != LMB_IO_AREA)
-			continue;
-
-		_lmb->memory.region[i].physbase = chunk_to_addr(pchunk);
-		for (; achunk < end_achunk ;) {
-			PTRRELOC(_msChunks->abs)[pchunk++] = achunk++;
-		}
-	}
-#endif /* CONFIG_MSCHUNKS */
-
-	return mem;
-}
-
-#ifdef DEBUG_PROM
-void
-prom_dump_mschunks_mapping(void)
-{
-        unsigned long offset = reloc_offset();
-	struct msChunks *_msChunks = PTRRELOC(&msChunks);
-	unsigned long chunk;
-
-        prom_print(RELOC("\nprom_dump_mschunks_mapping:\n"));
-        prom_print(RELOC("    msChunks.num_chunks         = 0x"));
-        prom_print_hex(_msChunks->num_chunks);
-	prom_print_nl();
-        prom_print(RELOC("    msChunks.chunk_size         = 0x"));
-        prom_print_hex(_msChunks->chunk_size);
-	prom_print_nl();
-        prom_print(RELOC("    msChunks.chunk_shift        = 0x"));
-        prom_print_hex(_msChunks->chunk_shift);
-	prom_print_nl();
-        prom_print(RELOC("    msChunks.chunk_mask         = 0x"));
-        prom_print_hex(_msChunks->chunk_mask);
-	prom_print_nl();
-        prom_print(RELOC("    msChunks.abs                = 0x"));
-        prom_print_hex(_msChunks->abs);
-	prom_print_nl();
-
-        prom_print(RELOC("    msChunks mapping:\n"));
-	for(chunk=0; chunk < _msChunks->num_chunks ;chunk++) {
-        	prom_print(RELOC("        phys 0x"));
-        	prom_print_hex(chunk);
-        	prom_print(RELOC(" -> abs 0x"));
-        	prom_print_hex(PTRRELOC(_msChunks->abs)[chunk]);
-		prom_print_nl();
-	}
-
-}
-#endif /* DEBUG_PROM */
-#endif /* CONFIG_MSCHUNKS */
 
 #ifdef DEBUG_PROM
 void
