@@ -1261,11 +1261,6 @@ config FRAME_POINTER
 	  If you don't debug the kernel, you can say N, but we may not be able
 	  to solve problems without frame pointers.
 
-config X86_EXTRA_IRQS
-	bool
-	depends on X86_LOCAL_APIC || X86_VOYAGER
-	default y
-
 config X86_FIND_SMP_CONFIG
 	bool
 	depends on X86_LOCAL_APIC || X86_VOYAGER
