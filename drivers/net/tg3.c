@@ -60,8 +60,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"3.20"
-#define DRV_MODULE_RELDATE	"February 2, 2005"
+#define DRV_MODULE_VERSION	"3.21"
+#define DRV_MODULE_RELDATE	"February 8, 2005"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -893,7 +893,7 @@ static void tg3_frob_aux_power(struct tg3 *tp)
 			      GRC_LCLCTRL_GPIO_OUTPUT1));
 			udelay(100);
 		} else {
-			int no_gpio2;
+			u32 no_gpio2;
 			u32 grc_local_ctrl;
 
 			if (tp_peer != tp &&
@@ -901,8 +901,8 @@ static void tg3_frob_aux_power(struct tg3 *tp)
 				return;
 
 			/* On 5753 and variants, GPIO2 cannot be used. */
-			no_gpio2 = (tp->nic_sram_data_cfg &
-				    NIC_SRAM_DATA_CFG_NO_GPIO2) != 0;
+			no_gpio2 = tp->nic_sram_data_cfg &
+				    NIC_SRAM_DATA_CFG_NO_GPIO2;
 
 			grc_local_ctrl = GRC_LCLCTRL_GPIO_OE0 |
 					 GRC_LCLCTRL_GPIO_OE1 |
@@ -914,29 +914,17 @@ static void tg3_frob_aux_power(struct tg3 *tp)
 						    GRC_LCLCTRL_GPIO_OUTPUT2);
 			}
 			tw32_f(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
-			       grc_local_ctrl);
+						grc_local_ctrl);
 			udelay(100);
 
-			grc_local_ctrl = GRC_LCLCTRL_GPIO_OE0 |
-					 GRC_LCLCTRL_GPIO_OE1 |
-					 GRC_LCLCTRL_GPIO_OE2 |
-					 GRC_LCLCTRL_GPIO_OUTPUT0 |
-					 GRC_LCLCTRL_GPIO_OUTPUT1 |
-					 GRC_LCLCTRL_GPIO_OUTPUT2;
-			if (no_gpio2) {
-				grc_local_ctrl &= ~(GRC_LCLCTRL_GPIO_OE2 |
-						    GRC_LCLCTRL_GPIO_OUTPUT2);
-			}
+			grc_local_ctrl |= GRC_LCLCTRL_GPIO_OUTPUT0;
+
 			tw32_f(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
-			       grc_local_ctrl);
+						grc_local_ctrl);
 			udelay(100);
 
-			grc_local_ctrl = GRC_LCLCTRL_GPIO_OE0 |
-					 GRC_LCLCTRL_GPIO_OE1 |
-					 GRC_LCLCTRL_GPIO_OE2 |
-					 GRC_LCLCTRL_GPIO_OUTPUT0 |
-					 GRC_LCLCTRL_GPIO_OUTPUT1;
 			if (!no_gpio2) {
+				grc_local_ctrl &= ~GRC_LCLCTRL_GPIO_OUTPUT2;
 				tw32_f(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
 				       grc_local_ctrl);
 				udelay(100);

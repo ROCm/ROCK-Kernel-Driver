@@ -48,7 +48,9 @@ alloc_zeroed_user_highpage(struct vm_area_struct *vma, unsigned long vaddr)
 {
 	struct page *page = alloc_page_vma(GFP_HIGHUSER, vma, vaddr);
 
-	clear_user_highpage(page, vaddr);
+	if (page)
+		clear_user_highpage(page, vaddr);
+
 	return page;
 }
 #endif

@@ -3760,8 +3760,7 @@ tcp_collapse(struct sock *sk, struct sk_buff *head,
 	while (before(start, end)) {
 		struct sk_buff *nskb;
 		int header = skb_headroom(skb);
-		int copy = (PAGE_SIZE - sizeof(struct sk_buff) -
-			    sizeof(struct skb_shared_info) - header - 31)&~15;
+		int copy = SKB_MAX_ORDER(header, 0);
 
 		/* Too big header? This can happen with IPv6. */
 		if (copy < 0)
