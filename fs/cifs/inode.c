@@ -353,8 +353,9 @@ cifs_unlink(struct inode *inode, struct dentry *direntry)
 				CREATE_NOT_DIR | CREATE_DELETE_ON_CLOSE,
 				&netfid, &oplock, NULL, cifs_sb->local_nls);
 		if(rc==0) {
+			CIFSSMBRenameOpenFile(xid,pTcon,netfid,
+				NULL, cifs_sb->local_nls);
 			CIFSSMBClose(xid, pTcon, netfid);
-			/* BB In the future chain close with the NTCreateX to narrow window */
 			direntry->d_inode->i_nlink--;
 		}
 	} else if (rc == -EACCES) {
@@ -370,8 +371,22 @@ cifs_unlink(struct inode *inode, struct dentry *direntry)
 		}
 		if(rc==0) {
 			rc = CIFSSMBDelFile(xid, pTcon, full_path, cifs_sb->local_nls);
-			if (!rc)
+			if (!rc) {
 				direntry->d_inode->i_nlink--;
+			} else if (rc == -ETXTBSY) {
+				int oplock = FALSE;
+				__u16 netfid;
+
+				rc = CIFSSMBOpen(xid, pTcon, full_path, FILE_OPEN, DELETE,
+                                	CREATE_NOT_DIR | CREATE_DELETE_ON_CLOSE,
+	                                &netfid, &oplock, NULL, cifs_sb->local_nls);
+				if(rc==0) {
+					CIFSSMBRenameOpenFile(xid,pTcon,netfid,NULL,cifs_sb->local_nls);
+					CIFSSMBClose(xid, pTcon, netfid);
+		                        direntry->d_inode->i_nlink--;
+				}
+			/* BB if rc = -ETXTBUSY goto the rename logic BB */
+			}
 		}
 	}
 	cifsInode = CIFS_I(direntry->d_inode);
@@ -510,6 +525,20 @@ cifs_rename(struct inode *source_inode, struct dentry *source_direntry,
 		cifs_unlink(target_inode, target_direntry);
 		rc = CIFSSMBRename(xid, pTcon, fromName, toName,
 				   cifs_sb_source->local_nls);
+	}
+
+	if((rc == -EIO)||(rc == -EEXIST)) {
+                int oplock = FALSE;
+                __u16 netfid;
+
+                rc = CIFSSMBOpen(xid, pTcon, fromName, FILE_OPEN, GENERIC_READ,
+                                CREATE_NOT_DIR,
+                                &netfid, &oplock, NULL, cifs_sb_source->local_nls);
+                if(rc==0) {
+                        CIFSSMBRenameOpenFile(xid,pTcon,netfid,
+                                toName, cifs_sb_source->local_nls);
+                        CIFSSMBClose(xid, pTcon, netfid);
+                }
 	}
 	if (fromName)
 		kfree(fromName);

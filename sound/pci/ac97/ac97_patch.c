@@ -759,6 +759,19 @@ int patch_ad1980(ac97_t * ac97)
 	return 0;
 }
 
+int patch_ad1985(ac97_t * ac97)
+{
+	unsigned short misc;
+	
+	patch_ad1881(ac97);
+	ac97->build_ops = &patch_ad1980_build_ops;
+	misc = snd_ac97_read(ac97, AC97_AD_MISC);
+	/* switch front/surround line-out/hp-out */
+	/* center/LFE, surround in High-Z mode */
+	snd_ac97_write_cache(ac97, AC97_AD_MISC, misc | 0x1c28);
+	return 0;
+}
+
 static const snd_kcontrol_new_t snd_ac97_controls_alc650[] = {
 	AC97_SINGLE("Duplicate Front", AC97_ALC650_MULTICH, 0, 1, 0),
 	AC97_SINGLE("Surround Down Mix", AC97_ALC650_MULTICH, 1, 1, 0),
