@@ -22,7 +22,7 @@ static int init_dir(struct inode * inode)
 
 
 static struct dentry * 
-create_dir(struct kobject * k, struct dentry * p, char * n)
+create_dir(struct kobject * k, struct dentry * p, const char * n)
 {
 	struct dentry * dentry;
 
@@ -47,7 +47,7 @@ create_dir(struct kobject * k, struct dentry * p, char * n)
 }
 
 
-struct dentry * sysfs_create_subdir(struct kobject * k, char * n)
+struct dentry * sysfs_create_subdir(struct kobject * k, const char * n)
 {
 	return create_dir(k,k->dentry,n);
 }
@@ -155,7 +155,7 @@ void sysfs_remove_dir(struct kobject * kobj)
 	dput(dentry);
 }
 
-void sysfs_rename_dir(struct kobject * kobj, char *new_name)
+void sysfs_rename_dir(struct kobject * kobj, const char *new_name)
 {
 	struct dentry * new_dentry, * parent;
 

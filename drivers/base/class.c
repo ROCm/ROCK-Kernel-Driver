@@ -59,7 +59,7 @@ static struct kobj_type ktype_class = {
 static decl_subsys(class,&ktype_class,NULL);
 
 
-int class_create_file(struct class * cls, struct class_attribute * attr)
+int class_create_file(struct class * cls, const struct class_attribute * attr)
 {
 	int error;
 	if (cls) {
@@ -69,7 +69,7 @@ int class_create_file(struct class * cls, struct class_attribute * attr)
 	return error;
 }
 
-void class_remove_file(struct class * cls, struct class_attribute * attr)
+void class_remove_file(struct class * cls, const struct class_attribute * attr)
 {
 	if (cls)
 		sysfs_remove_file(&cls->subsys.kset.kobj,&attr->attr);
@@ -110,7 +110,7 @@ void class_unregister(struct class * cls)
 /* Class Device Stuff */
 
 int class_device_create_file(struct class_device * class_dev,
-			     struct class_device_attribute * attr)
+			     const struct class_device_attribute * attr)
 {
 	int error = -EINVAL;
 	if (class_dev)
@@ -119,7 +119,7 @@ int class_device_create_file(struct class_device * class_dev,
 }
 
 void class_device_remove_file(struct class_device * class_dev,
-			      struct class_device_attribute * attr)
+			      const struct class_device_attribute * attr)
 {
 	if (class_dev)
 		sysfs_remove_file(&class_dev->kobj, &attr->attr);
