@@ -347,9 +347,8 @@ extern long usb_calc_bus_time (int speed, int is_input,
 /*-------------------------------------------------------------------------*/
 
 extern struct usb_bus *usb_alloc_bus (struct usb_operations *);
-extern void usb_free_bus (struct usb_bus *);
 
-extern void usb_register_bus (struct usb_bus *);
+extern int usb_register_bus (struct usb_bus *);
 extern void usb_deregister_bus (struct usb_bus *);
 
 extern int usb_register_root_hub (struct usb_device *usb_dev,
@@ -369,7 +368,7 @@ static inline int hcd_register_root (struct usb_hcd *hcd)
 extern struct list_head usb_bus_list;
 extern struct semaphore usb_bus_list_lock;
 
-extern void usb_bus_get (struct usb_bus *bus);
+extern struct usb_bus *usb_bus_get (struct usb_bus *bus);
 extern void usb_bus_put (struct usb_bus *bus);
 
 extern int usb_find_interface_driver (struct usb_device *dev,

@@ -54,6 +54,8 @@ extern int  usb_hub_init(void);
 extern void usb_hub_cleanup(void);
 extern int usb_major_init(void);
 extern void usb_major_cleanup(void);
+extern int usb_host_init(void);
+extern void usb_host_cleanup(void);
 
 
 int nousb;		/* Disable USB when built into kernel image */
@@ -652,10 +654,14 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 
 	memset(dev, 0, sizeof(*dev));
 
+	bus = usb_bus_get(bus);
+	if (!bus) {
+		kfree(dev);
+		return NULL;
+	}
+
 	device_initialize(&dev->dev);
 	dev->state = USB_STATE_ATTACHED;
-
-	usb_bus_get(bus);
 
 	if (!parent)
 		dev->devpath [0] = '0';
@@ -1531,6 +1537,7 @@ static int __init usb_init(void)
 	}
 
 	bus_register(&usb_bus_type);
+	usb_host_init();
 	usb_major_init();
 	usbfs_init();
 	usb_hub_init();
@@ -1553,6 +1560,7 @@ static void __exit usb_exit(void)
 	usb_major_cleanup();
 	usbfs_cleanup();
 	usb_hub_cleanup();
+	usb_host_cleanup();
 	bus_unregister(&usb_bus_type);
 }
 

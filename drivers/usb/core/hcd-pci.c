@@ -38,6 +38,14 @@
 
 /*-------------------------------------------------------------------------*/
 
+static void hcd_pci_release(struct usb_bus *bus)
+{
+	struct usb_hcd *hcd = bus->hcpriv;
+
+	if (hcd)
+		hcd->driver->hcd_free(hcd);
+}
+
 /* configure so an HC device and id are always provided */
 /* always called with process context; sleeping is OK */
 
@@ -172,6 +180,7 @@ clean_3:
 	usb_bus_init (&hcd->self);
 	hcd->self.op = &usb_hcd_operations;
 	hcd->self.hcpriv = (void *) hcd;
+	hcd->self.release = &hcd_pci_release;
 
 	INIT_LIST_HEAD (&hcd->dev_list);
 
@@ -234,13 +243,6 @@ void usb_hcd_pci_remove (struct pci_dev *dev)
 	}
 
 	usb_deregister_bus (&hcd->self);
-	if (atomic_read (&hcd->self.refcnt) != 1) {
-		dev_warn (hcd->controller,
-			"dangling refs (%d) to bus %d!\n",
-			atomic_read (&hcd->self.refcnt) - 1,
-			hcd->self.busnum);
-	}
-	hcd->driver->hcd_free (hcd);
 }
 EXPORT_SYMBOL (usb_hcd_pci_remove);
 

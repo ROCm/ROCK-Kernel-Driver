@@ -557,19 +557,51 @@ void usb_rh_status_dequeue (struct usb_hcd *hcd, struct urb *urb)
 /*-------------------------------------------------------------------------*/
 
 /* exported only within usbcore */
-void usb_bus_get (struct usb_bus *bus)
+struct usb_bus *usb_bus_get (struct usb_bus *bus)
 {
-	atomic_inc (&bus->refcnt);
+	struct class_device *tmp;
+
+	if (!bus)
+		return NULL;
+
+	tmp = class_device_get(&bus->class_dev);
+	if (tmp)        
+		return to_usb_bus(tmp);
+	else
+		return NULL;
 }
 
 /* exported only within usbcore */
 void usb_bus_put (struct usb_bus *bus)
 {
-	if (atomic_dec_and_test (&bus->refcnt))
-		kfree (bus);
+	if (bus)
+		class_device_put(&bus->class_dev);
 }
 
 /*-------------------------------------------------------------------------*/
+
+static void usb_host_release(struct class_device *class_dev)
+{
+	struct usb_bus *bus = to_usb_bus(class_dev);
+
+	if (bus->release)
+		bus->release(bus);
+}
+
+static struct class usb_host_class = {
+	.name		= "usb_host",
+	.release	= &usb_host_release,
+};
+
+void usb_host_init(void)
+{
+	class_register(&usb_host_class);
+}
+
+void usb_host_cleanup(void)
+{
+	class_unregister(&usb_host_class);
+}
 
 /**
  * usb_bus_init - shared initialization code
@@ -592,8 +624,6 @@ void usb_bus_init (struct usb_bus *bus)
 	bus->bandwidth_isoc_reqs = 0;
 
 	INIT_LIST_HEAD (&bus->bus_list);
-
-	atomic_set (&bus->refcnt, 1);
 }
 EXPORT_SYMBOL (usb_bus_init);
 
@@ -607,7 +637,7 @@ EXPORT_SYMBOL (usb_bus_init);
  *
  * If no memory is available, NULL is returned.
  *
- * The caller should call usb_free_bus() when it is finished with the structure.
+ * The caller should call usb_put_bus() when it is finished with the structure.
  */
 struct usb_bus *usb_alloc_bus (struct usb_operations *op)
 {
@@ -616,31 +646,12 @@ struct usb_bus *usb_alloc_bus (struct usb_operations *op)
 	bus = kmalloc (sizeof *bus, GFP_KERNEL);
 	if (!bus)
 		return NULL;
+	memset(bus, 0, sizeof(struct usb_bus));
 	usb_bus_init (bus);
 	bus->op = op;
 	return bus;
 }
 EXPORT_SYMBOL (usb_alloc_bus);
-
-/**
- * usb_free_bus - frees the memory used by a bus structure
- * @bus: pointer to the bus to free
- *
- * To be invoked by a HCD, only as the last step of decoupling from
- * hardware.  It is an error to call this if the reference count is
- * anything but one.  That would indicate that some system component
- * did not correctly shut down, and thought the hardware was still
- * accessible.
- */
-void usb_free_bus (struct usb_bus *bus)
-{
-	if (!bus)
-		return;
-	if (atomic_read (&bus->refcnt) != 1)
-		err ("usb_free_bus #%d, count != 1", bus->busnum);
-	usb_bus_put (bus);
-}
-EXPORT_SYMBOL (usb_free_bus);
 
 /*-------------------------------------------------------------------------*/
 
@@ -652,9 +663,10 @@ EXPORT_SYMBOL (usb_free_bus);
  * Assigns a bus number, and links the controller into usbcore data
  * structures so that it can be seen by scanning the bus list.
  */
-void usb_register_bus(struct usb_bus *bus)
+int usb_register_bus(struct usb_bus *bus)
 {
 	int busnum;
+	int retval;
 
 	down (&usb_bus_list_lock);
 	busnum = find_next_zero_bit (busmap.busmap, USB_MAXBUS, 1);
@@ -664,15 +676,24 @@ void usb_register_bus(struct usb_bus *bus)
 	} else
 		warn ("too many buses");
 
-	usb_bus_get (bus);
+	snprintf(bus->class_dev.class_id, BUS_ID_SIZE, "usb%d", busnum);
+	bus->class_dev.class = &usb_host_class;
+	bus->class_dev.dev = bus->controller;
+	retval = class_device_register(&bus->class_dev);
+	if (retval) {
+		clear_bit(busnum, busmap.busmap);
+		up(&usb_bus_list_lock);
+		return retval;
+	}
 
-	/* Add it to the list of buses */
+	/* Add it to the local list of buses */
 	list_add (&bus->bus_list, &usb_bus_list);
 	up (&usb_bus_list_lock);
 
 	usbfs_add_bus (bus);
 
 	dev_info (bus->controller, "new USB bus registered, assigned bus number %d\n", bus->busnum);
+	return 0;
 }
 EXPORT_SYMBOL (usb_register_bus);
 
@@ -701,7 +722,7 @@ void usb_deregister_bus (struct usb_bus *bus)
 
 	clear_bit (bus->busnum, busmap.busmap);
 
-	usb_bus_put (bus);
+	class_device_unregister(&bus->class_dev);
 }
 EXPORT_SYMBOL (usb_deregister_bus);
 
