@@ -161,7 +161,7 @@ static int parse_options(char *options, struct hfs_sb_info *hsb)
 	if (!options)
 		return 1;
 
-	while ((this_char = strsep(&options, ","))) {
+	while ((this_char = strsep(&options, ",")) != 0) {
 		if (!*this_char)
 			continue;
 		value = strchr(this_char, '=');

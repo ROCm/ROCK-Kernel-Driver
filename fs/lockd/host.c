@@ -76,7 +76,7 @@ nlm_lookup_host(int server, struct sockaddr_in *sin,
 	if (time_after_eq(jiffies, next_gc))
 		nlm_gc_hosts();
 
-	for (hp = &nlm_hosts[hash]; (host = *hp); hp = &host->h_next) {
+	for (hp = &nlm_hosts[hash]; (host = *hp) != 0; hp = &host->h_next) {
 		if (host->h_proto != proto)
 			continue;
 		if (host->h_version != version)
@@ -145,7 +145,7 @@ nlm_find_client(void)
 	down(&nlm_host_sema);
 	for (hash = 0 ; hash < NLM_HOST_NRHASH; hash++) {
 		struct nlm_host *host, **hp;
-		for (hp = &nlm_hosts[hash]; (host = *hp) ; hp = &host->h_next) {
+		for (hp = &nlm_hosts[hash]; (host = *hp) != 0; hp = &host->h_next) {
 			if (host->h_server &&
 			    host->h_killed == 0) {
 				nlm_get_host(host);
