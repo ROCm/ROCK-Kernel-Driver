@@ -554,6 +554,7 @@ static int snd_pcm_oss_prepare(snd_pcm_substream_t *substream)
 	runtime->oss.prepare = 0;
 	runtime->oss.prev_hw_ptr_interrupt = 0;
 	runtime->oss.period_ptr = 0;
+	runtime->oss.buffer_used = 0;
 
 	return 0;
 }
@@ -882,12 +883,13 @@ static ssize_t snd_pcm_oss_read1(snd_pcm_substream_t *substream, char *buf, size
 				if (tmp <= 0)
 					return xfer > 0 ? (snd_pcm_sframes_t)xfer : tmp;
 				runtime->oss.bytes += tmp;
+				runtime->oss.period_ptr = tmp;
 				runtime->oss.buffer_used = tmp;
 			}
 			tmp = bytes;
 			if ((size_t) tmp > runtime->oss.buffer_used)
 				tmp = runtime->oss.buffer_used;
-			if (copy_to_user(buf, runtime->oss.buffer + (runtime->oss.period_bytes - runtime->oss.buffer_used), tmp))
+			if (copy_to_user(buf, runtime->oss.buffer + (runtime->oss.period_ptr - runtime->oss.buffer_used), tmp))
 				return xfer > 0 ? (snd_pcm_sframes_t)xfer : -EFAULT;
 			buf += tmp;
 			bytes -= tmp;
