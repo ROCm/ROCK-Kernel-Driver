@@ -49,7 +49,6 @@ static void mce_checkregs (void *info)
 
 static void do_mce_timer(void *data)
 { 
-	mce_checkregs (NULL);
 	smp_call_function (mce_checkregs, NULL, 1, 1);
 } 
 
@@ -57,11 +56,10 @@ static DECLARE_WORK(mce_work, do_mce_timer, NULL);
 
 static void mce_timerfunc (unsigned long data)
 {
+	mce_checkregs (NULL);
 #ifdef CONFIG_SMP
 	if (num_online_cpus() > 1) 
 		schedule_work (&mce_work); 
-#else
-	mce_checkregs (NULL);
 #endif
 	mce_timer.expires = jiffies + MCE_RATE;
 	add_timer (&mce_timer);
