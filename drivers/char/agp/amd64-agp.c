@@ -357,11 +357,18 @@ static __init int cache_nbs (struct pci_dev *pdev, u32 cap_ptr)
 		}
 		hammers[i++] = loop_dev;
 		nr_garts = i;
+#ifdef CONFIG_SMP
 		if (i == MAX_HAMMER_GARTS) { 
 			printk(KERN_INFO PFX "Too many northbridges for AGP\n");
 			return -1;
 		}
+#else
+		/* Uniprocessor case, return after finding first bridge.
+		   (There may be more, but in UP, we don't care). */
+		return 0;
+#endif
 	}
+
 	return i == 0 ? -1 : 0;
 }
 
