@@ -507,7 +507,8 @@ static int do_get_sock_timeout(int fd, int level, int optname,
 asmlinkage long compat_sys_getsockopt(int fd, int level, int optname,
 				char __user *optval, int __user *optlen)
 {
-	if (optname == SO_RCVTIMEO || optname == SO_SNDTIMEO)
+	if (level == SOL_SOCKET &&
+	    (optname == SO_RCVTIMEO || optname == SO_SNDTIMEO))
 		return do_get_sock_timeout(fd, level, optname, optval, optlen);
 	return sys_getsockopt(fd, level, optname, optval, optlen);
 }
