@@ -843,6 +843,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	 * number of msecs off until someone does a settimeofday()
 	 */
 	do_gtod.tb_orig_stamp = tb_last_stamp;
+	systemcfg->tb_orig_stamp = tb_last_stamp;
 
 	look_for_more_cpus();
 #endif

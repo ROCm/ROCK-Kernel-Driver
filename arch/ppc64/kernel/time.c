@@ -101,6 +101,8 @@ extern unsigned long wall_jiffies;
 extern unsigned long lpevent_count;
 extern int smp_tb_synchronized;
 
+extern struct timezone sys_tz;
+
 void ppc_adjtimex(void);
 
 static unsigned adjusting_time = 0;
@@ -233,6 +235,8 @@ static void iSeries_tb_recal(void)
 				do_gtod.tb_ticks_per_sec = tb_ticks_per_sec;
 				tb_to_xs = divres.result_low;
 				do_gtod.varp->tb_to_xs = tb_to_xs;
+				systemcfg->tb_ticks_per_sec = tb_ticks_per_sec;
+				systemcfg->tb_to_xs = tb_to_xs;
 			}
 			else {
 				printk( "Titan recalibrate: FAILED (difference > 4 percent)\n"
@@ -408,6 +412,7 @@ int do_settimeofday(struct timespec *tv)
 	new_xsec += new_sec * XSEC_PER_SEC;
 	if ( new_xsec > delta_xsec ) {
 		do_gtod.varp->stamp_xsec = new_xsec - delta_xsec;
+		systemcfg->stamp_xsec = new_xsec - delta_xsec;
 	}
 	else {
 		/* This is only for the case where the user is setting the time
@@ -416,7 +421,12 @@ int do_settimeofday(struct timespec *tv)
 		 * the time to Jan 5, 1970 */
 		do_gtod.varp->stamp_xsec = new_xsec;
 		do_gtod.tb_orig_stamp = tb_last_stamp;
+		systemcfg->stamp_xsec = new_xsec;
+		systemcfg->tb_orig_stamp = tb_last_stamp;
 	}
+
+	systemcfg->tz_minuteswest = sys_tz.tz_minuteswest;
+	systemcfg->tz_dsttime = sys_tz.tz_dsttime;
 
 	write_sequnlock_irqrestore(&xtime_lock, flags);
 	clock_was_set();
@@ -520,6 +530,11 @@ void __init time_init(void)
 	do_gtod.tb_ticks_per_sec = tb_ticks_per_sec;
 	do_gtod.varp->tb_to_xs = tb_to_xs;
 	do_gtod.tb_to_us = tb_to_us;
+	systemcfg->tb_orig_stamp = tb_last_stamp;
+	systemcfg->tb_update_count = 0;
+	systemcfg->tb_ticks_per_sec = tb_ticks_per_sec;
+	systemcfg->stamp_xsec = xtime.tv_sec * XSEC_PER_SEC;
+	systemcfg->tb_to_xs = tb_to_xs;
 
 	xtime_sync_interval = tb_ticks_per_sec - (tb_ticks_per_sec/8);
 	next_xtime_sync_tb = tb_last_stamp + xtime_sync_interval;
@@ -654,6 +669,22 @@ void ppc_adjtimex(void)
 	mb();
 	do_gtod.varp = temp_varp;
 	do_gtod.var_idx = temp_idx;
+
+	/*
+	 * tb_update_count is used to allow the problem state gettimeofday code
+	 * to assure itself that it sees a consistent view of the tb_to_xs and
+	 * stamp_xsec variables.  It reads the tb_update_count, then reads
+	 * tb_to_xs and stamp_xsec and then reads tb_update_count again.  If
+	 * the two values of tb_update_count match and are even then the
+	 * tb_to_xs and stamp_xsec values are consistent.  If not, then it
+	 * loops back and reads them again until this criteria is met.
+	 */
+	++(systemcfg->tb_update_count);
+	wmb();
+	systemcfg->tb_to_xs = new_tb_to_xs;
+	systemcfg->stamp_xsec = new_stamp_xsec;
+	wmb();
+	++(systemcfg->tb_update_count);
 
 	write_sequnlock_irqrestore( &xtime_lock, flags );
 
