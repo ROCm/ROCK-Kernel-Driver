@@ -901,7 +901,6 @@ static int ext3_check_descriptors (struct super_block * sb)
 	struct ext3_sb_info *sbi = EXT3_SB(sb);
 	unsigned long block = le32_to_cpu(sbi->s_es->s_first_data_block);
 	struct ext3_group_desc * gdp = NULL;
-	unsigned long total_free;
 	int desc_block = 0;
 	int i;
 
@@ -949,23 +948,8 @@ static int ext3_check_descriptors (struct super_block * sb)
 		gdp++;
 	}
 
-	total_free = ext3_count_free_blocks(sb);
-	if (total_free != le32_to_cpu(EXT3_SB(sb)->s_es->s_free_blocks_count)) {
-		printk("EXT3-fs: invalid s_free_blocks_count %u (real %lu)\n",
-				le32_to_cpu(EXT3_SB(sb)->s_es->s_free_blocks_count),
-				total_free);
-		EXT3_SB(sb)->s_es->s_free_blocks_count = cpu_to_le32(total_free);
-	}
-
-	total_free = ext3_count_free_inodes(sb);
-	if (total_free != le32_to_cpu(EXT3_SB(sb)->s_es->s_free_inodes_count)) {
-		printk("EXT3-fs: invalid s_free_inodes_count %u (real %lu)\n",
-			le32_to_cpu(EXT3_SB(sb)->s_es->s_free_inodes_count),
-			total_free);
-		EXT3_SB(sb)->s_es->s_free_inodes_count = cpu_to_le32(total_free);
-	}
-
-
+	sbi->s_es->s_free_blocks_count=cpu_to_le32(ext3_count_free_blocks(sb));
+	sbi->s_es->s_free_inodes_count=cpu_to_le32(ext3_count_free_inodes(sb));
 	return 1;
 }
 
