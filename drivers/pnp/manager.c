@@ -193,7 +193,6 @@ static int pnp_assign_dma(struct pnp_dev *dev, struct pnp_dma *rule, int idx)
 void pnp_init_resource_table(struct pnp_resource_table *table)
 {
 	int idx;
-	down(&pnp_res_mutex);
 	for (idx = 0; idx < PNP_MAX_IRQ; idx++) {
 		table->irq_resource[idx].name = NULL;
 		table->irq_resource[idx].start = -1;
@@ -218,7 +217,6 @@ void pnp_init_resource_table(struct pnp_resource_table *table)
 		table->mem_resource[idx].end = 0;
 		table->mem_resource[idx].flags = IORESOURCE_AUTO;
 	}
-	up(&pnp_res_mutex);
 }
 
 /**
