@@ -66,11 +66,9 @@ void put_driver(struct device_driver * drv)
 	struct bus_type * bus = drv->bus;
 	if (!atomic_dec_and_lock(&drv->refcount,&device_lock))
 		return;
-	list_del_init(&drv->bus_list);
 	spin_unlock(&device_lock);
 	BUG_ON(drv->present);
-	driver_detach(drv);
-	driver_remove_dir(drv);
+	bus_remove_driver(drv);
 	if (drv->release)
 		drv->release(drv);
 	put_bus(bus);
@@ -94,11 +92,7 @@ int driver_register(struct device_driver * drv)
 	rwlock_init(&drv->lock);
 	INIT_LIST_HEAD(&drv->devices);
 	drv->present = 1;
-	spin_lock(&device_lock);
-	list_add(&drv->bus_list,&drv->bus->drivers);
-	spin_unlock(&device_lock);
-	driver_make_dir(drv);
-	driver_attach(drv);
+	bus_add_driver(drv);
 	put_driver(drv);
 	return 0;
 }

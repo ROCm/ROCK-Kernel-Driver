@@ -23,132 +23,6 @@ spinlock_t device_lock = SPIN_LOCK_UNLOCKED;
 
 #define to_dev(node) container_of(node,struct device,driver_list)
 
-static int probe(struct device * dev, struct device_driver * drv)
-{
-	dev->driver = drv;
-	return drv->probe ? drv->probe(dev) : 0;
-}
-
-static void attach(struct device * dev)
-{
-	spin_lock(&device_lock);
-	list_add_tail(&dev->driver_list,&dev->driver->devices);
-	spin_unlock(&device_lock);
-	devclass_add_device(dev);
-}
-
-/**
- * found_match - do actual binding of device to driver
- * @dev:	device 
- * @drv:	driver
- *
- * We're here because the bus's match callback returned success for this 
- * pair. We call the driver's probe callback to verify they're really a
- * match made in heaven.
- *
- * In the future, we may want to notify userspace of the binding. (But, 
- * we might not want to do it here).
- * 
- * We may also want to create a symlink in the driver's directory to the 
- * device's physical directory.
- */
-static int found_match(struct device * dev, struct device_driver * drv)
-{
-	int error = 0;
-
-	if (!(error = probe(dev,get_driver(drv)))) {
-		pr_debug("bound device '%s' to driver '%s'\n",
-			 dev->bus_id,drv->name);
-		attach(dev);
-	} else {
-		put_driver(drv);
-		dev->driver = NULL;
-	}
-	return error;
-}
-
-/**
- * device_attach - try to associated device with a driver
- * @drv:	current driver to try
- * @data:	device in disguise
- *
- * This function is used as a callback to bus_for_each_drv.
- * It calls the bus's match callback to check if the driver supports
- * the device. If so, it calls the found_match() function above to 
- * take care of all the details.
- */
-static int do_device_attach(struct device_driver * drv, void * data)
-{
-	struct device * dev = (struct device *)data;
-	int error = 0;
-
-	if (drv->bus->match && drv->bus->match(dev,drv))
-		error = found_match(dev,drv);
-	return error;
-}
-
-static int device_attach(struct device * dev)
-{
-	int error = 0;
-	if (!dev->driver) {
-		if (dev->bus)
-			error = bus_for_each_drv(dev->bus,dev,do_device_attach);
-	} else
-		attach(dev);
-	return error;
-}
-
-static void device_detach(struct device * dev)
-{
-	struct device_driver * drv = dev->driver;
-
-	if (drv) {
-		devclass_remove_device(dev);
-		if (drv && drv->remove)
-			drv->remove(dev);
-		dev->driver = NULL;
-	}
-}
-
-static int do_driver_attach(struct device * dev, void * data)
-{
-	struct device_driver * drv = (struct device_driver *)data;
-	int error = 0;
-
-	if (!dev->driver) {
-		if (dev->bus->match && dev->bus->match(dev,drv))
-			error = found_match(dev,drv);
-	}
-	return error;
-}
-
-int driver_attach(struct device_driver * drv)
-{
-	return bus_for_each_dev(drv->bus,drv,do_driver_attach);
-}
-
-void driver_detach(struct device_driver * drv)
-{
-	struct list_head * node;
-	struct device * prev = NULL;
-
-	spin_lock(&device_lock);
-	list_for_each(node,&drv->devices) {
-		struct device * dev = get_device_locked(to_dev(node));
-		if (dev) {
-			if (prev)
-				list_del_init(&prev->driver_list);
-			spin_unlock(&device_lock);
-			device_detach(dev);
-			if (prev)
-				put_device(prev);
-			prev = dev;
-			spin_lock(&device_lock);
-		}
-	}
-	spin_unlock(&device_lock);
-}
-
 int device_add(struct device *dev)
 {
 	int error;
@@ -173,9 +47,6 @@ int device_add(struct device *dev)
 
 	bus_add_device(dev);
 
-	/* bind to driver */
-	device_attach(dev);
-
 	/* notify platform of device entry */
 	if (platform_notify)
 		platform_notify(dev);
@@ -183,6 +54,7 @@ int device_add(struct device *dev)
 	/* notify userspace of device entry */
 	dev_hotplug(dev, "add");
 
+	devclass_add_device(dev);
  register_done:
 	if (error) {
 		spin_lock(&device_lock);
@@ -284,7 +156,6 @@ void device_del(struct device * dev)
 	/* notify userspace that this device is about to disappear */
 	dev_hotplug (dev, "remove");
 
-	device_detach(dev);
 	bus_remove_device(dev);
 
 	/* remove the driverfs directory */

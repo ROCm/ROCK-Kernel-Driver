@@ -20,6 +20,9 @@ extern void device_remove_dir(struct device * dev);
 extern int bus_make_dir(struct bus_type * bus);
 extern void bus_remove_dir(struct bus_type * bus);
 
+extern int bus_add_driver(struct device_driver *);
+extern void bus_remove_driver(struct device_driver *);
+
 extern int driver_make_dir(struct device_driver * drv);
 extern void driver_remove_dir(struct device_driver * drv);
 
@@ -47,9 +50,6 @@ extern void intf_dev_unlink(struct intf_data *);
 extern int interface_add(struct device_class *, struct device *);
 extern void interface_remove(struct device_class *, struct device *);
 
-
-extern int driver_attach(struct device_driver * drv);
-extern void driver_detach(struct device_driver * drv);
 
 #ifdef CONFIG_HOTPLUG
 extern int dev_hotplug(struct device *dev, const char *action);

@@ -94,6 +94,104 @@ int bus_for_each_drv(struct bus_type * bus, void * data,
 	return error;
 }
 
+static void attach(struct device * dev)
+{
+	pr_debug("bound device '%s' to driver '%s'\n",
+		 dev->bus_id,dev->driver->name);
+	list_add_tail(&dev->driver_list,&dev->driver->devices);
+}
+
+static int bus_match(struct device * dev, struct device_driver * drv)
+{
+	int error = 0;
+	if (dev->bus->match(dev,drv)) {
+		dev->driver = drv;
+		if (drv->probe) {
+			if (!(error = drv->probe(dev)))
+				attach(dev);
+			else
+				dev->driver = NULL;
+		}
+	}
+	return error;
+}
+
+static int device_attach(struct device * dev)
+{
+	struct bus_type * bus = dev->bus;
+	struct list_head * entry;
+	int error = 0;
+
+	if (dev->driver) {
+		attach(dev);
+		return 0;
+	}
+
+	if (!bus->match)
+		return 0;
+
+	list_for_each(entry,&bus->drivers) {
+		struct device_driver * drv = 
+			get_driver(container_of(entry,struct device_driver,bus_list));
+		if (!drv)
+			continue;
+		error = bus_match(dev,drv);
+		put_driver(drv);
+		if (!error)
+			break;
+	}
+	return error;
+}
+
+static int driver_attach(struct device_driver * drv)
+{
+	struct bus_type * bus = drv->bus;
+	struct list_head * entry;
+	int error = 0;
+
+	if (!bus->match)
+		return 0;
+
+	list_for_each(entry,&bus->devices) {
+		struct device * dev = container_of(entry,struct device,bus_list);
+		if (get_device(dev)) {
+			if (!bus_match(dev,drv) && dev->driver)
+				devclass_add_device(dev);
+			put_device(dev);
+		}
+	}
+	return error;
+}
+
+static void detach(struct device * dev, struct device_driver * drv)
+{
+	if (drv) {
+		list_del_init(&dev->driver_list);
+		devclass_remove_device(dev);
+		if (drv->remove)
+			drv->remove(dev);
+		dev->driver = NULL;
+	}
+}
+
+static void device_detach(struct device * dev)
+{
+	detach(dev,dev->driver);
+}
+
+static void driver_detach(struct device_driver * drv)
+{
+	struct list_head * entry;
+	list_for_each(entry,&drv->devices) {
+		struct device * dev = container_of(entry,struct device,driver_list);
+		if (get_device(dev)) {
+			detach(dev,drv);
+			put_device(dev);
+		}
+	}
+	
+}
+
 /**
  * bus_add_device - add device to bus
  * @dev:	device being added
@@ -105,11 +203,12 @@ int bus_for_each_drv(struct bus_type * bus, void * data,
  */
 int bus_add_device(struct device * dev)
 {
-	if (dev->bus) {
+	struct bus_type * bus = get_bus(dev->bus);
+	if (bus) {
 		down_write(&dev->bus->rwsem);
-		pr_debug("registering %s with bus '%s'\n",dev->bus_id,dev->bus->name);
-		get_bus(dev->bus);
+		pr_debug("bus %s: add device %s\n",bus->name,dev->bus_id);
 		list_add_tail(&dev->bus_list,&dev->bus->devices);
+		device_attach(dev);
 		up_write(&dev->bus->rwsem);
 		device_bus_link(dev);
 	}
@@ -127,10 +226,37 @@ void bus_remove_device(struct device * dev)
 {
 	if (dev->bus) {
 		down_write(&dev->bus->rwsem);
-		list_del_init(&dev->bus_list);
+		pr_debug("bus %s: remove device %s\n",dev->bus->name,dev->bus_id);
 		device_remove_symlink(&dev->bus->device_dir,dev->bus_id);
+		device_detach(dev);
+		list_del_init(&dev->bus_list);
 		up_write(&dev->bus->rwsem);
 		put_bus(dev->bus);
+	}
+}
+
+int bus_add_driver(struct device_driver * drv)
+{
+	struct bus_type * bus = get_bus(drv->bus);
+	if (bus) {
+		down_write(&bus->rwsem);
+		pr_debug("bus %s: add driver %s\n",bus->name,drv->name);
+		list_add_tail(&drv->bus_list,&bus->drivers);
+		driver_attach(drv);
+		up_write(&bus->rwsem);
+		driver_make_dir(drv);
+	}
+	return 0;
+}
+
+void bus_remove_driver(struct device_driver * drv)
+{
+	if (drv->bus) {
+		down_write(&drv->bus->rwsem);
+		pr_debug("bus %s: remove driver %s\n",drv->bus->name,drv->name);
+		driver_detach(drv);
+		list_del_init(&drv->bus_list);
+		up_write(&drv->bus->rwsem);
 	}
 }
 
