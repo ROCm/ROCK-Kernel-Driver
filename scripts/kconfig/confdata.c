@@ -117,7 +117,6 @@ int conf_read(const char *name)
 			*p++ = 0;
 			if (strncmp(p, "is not set", 10))
 				continue;
-			//printf("%s -> n\n", line + 9);
 			sym = sym_lookup(line + 9, 0);
 			switch (sym->type) {
 			case S_BOOLEAN:
@@ -139,23 +138,29 @@ int conf_read(const char *name)
 			p2 = strchr(p, '\n');
 			if (p2)
 				*p2 = 0;
-			//printf("%s -> %s\n", line + 7, p);
 			sym = sym_find(line + 7);
 			if (!sym) {
 				fprintf(stderr, "%s:%d: trying to assign nonexistent symbol %s\n", name, lineno, line + 7);
 				break;
 			}
 			switch (sym->type) {
-			case S_BOOLEAN:
-				sym->def = symbol_yes.curr;
-				sym->flags &= ~SYMBOL_NEW;
-				break;
 			case S_TRISTATE:
-				if (p[0] == 'm')
-					sym->def = symbol_mod.curr;
-				else
-					sym->def = symbol_yes.curr;
-				sym->flags &= ~SYMBOL_NEW;
+				if (p[0] == 'm') {
+					S_TRI(sym->def) = mod;
+					sym->flags &= ~SYMBOL_NEW;
+					break;
+				}
+			case S_BOOLEAN:
+				if (p[0] == 'y') {
+					S_TRI(sym->def) = yes;
+					sym->flags &= ~SYMBOL_NEW;
+					break;
+				}
+				if (p[0] == 'n') {
+					S_TRI(sym->def) = no;
+					sym->flags &= ~SYMBOL_NEW;
+					break;
+				}
 				break;
 			case S_STRING:
 				if (*p++ != '"')

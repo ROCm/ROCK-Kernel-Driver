@@ -91,8 +91,6 @@ extern int pmac_pci_enable_device_hook(struct pci_dev *dev, int initial);
 extern void pmac_pcibios_after_init(void);
 extern int of_show_percpuinfo(struct seq_file *m, int i);
 
-extern kdev_t sd_find_target(void *host, int tgt);
-
 struct device_node *memory_node;
 
 unsigned char drive_info;
@@ -406,13 +404,6 @@ find_ide_boot(void)
 void __init
 find_boot_device(void)
 {
-#if defined(CONFIG_SCSI) && defined(CONFIG_BLK_DEV_SD)
-	if (boot_host != NULL) {
-		boot_dev = sd_find_target(boot_host, boot_target);
-		if (!kdev_same(boot_dev, NODEV))
-			return;
-	}
-#endif
 #if defined(CONFIG_BLK_DEV_IDE) && defined(CONFIG_BLK_DEV_IDE_PMAC)
 	boot_dev = find_ide_boot();
 #endif

@@ -280,27 +280,3 @@ void __init MMU_init_hw(void)
 
 	if ( ppc_md.progress ) ppc_md.progress("hash:done", 0x205);
 }
-
-/*
- * This is called at the end of handling a user page fault, when the
- * fault has been handled by updating a PTE in the linux page tables.
- * We use it to preload an HPTE into the hash table corresponding to
- * the updated linux PTE.
- */
-void update_mmu_cache(struct vm_area_struct *vma, unsigned long address,
-		      pte_t pte)
-{
-	struct mm_struct *mm;
-	pmd_t *pmd;
-	static int nopreload;
-
-	if (Hash == 0 || nopreload)
-		return;
-	/* We only want HPTEs for linux PTEs that have _PAGE_ACCESSED set */
-	if (!pte_young(pte))
-		return;
-	mm = (address < TASK_SIZE)? vma->vm_mm: &init_mm;
-	pmd = pmd_offset(pgd_offset(mm, address), address);
-	if (!pmd_none(*pmd))
-		add_hash_page(mm->context, address, pmd_val(*pmd));
-}

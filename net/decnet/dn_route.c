@@ -109,7 +109,8 @@ static struct dn_rt_hash_bucket *dn_rt_hash_table;
 static unsigned dn_rt_hash_mask;
 
 static struct timer_list dn_route_timer;
-static struct timer_list dn_rt_flush_timer = { .function = dn_run_flush };
+static struct timer_list dn_rt_flush_timer =
+		TIMER_INITIALIZER(dn_run_flush, 0, 0);
 int decnet_dst_gc_interval = 2;
 
 static struct dst_ops dn_dst_ops = {
@@ -1260,6 +1261,7 @@ void __init dn_route_init(void)
 	if (!dn_dst_ops.kmem_cachep)
 		panic("DECnet: Failed to allocate dn_dst_cache\n");
 
+	init_timer(&dn_route_timer);
 	dn_route_timer.function = dn_dst_check_expire;
 	dn_route_timer.expires = jiffies + decnet_dst_gc_interval * HZ;
 	add_timer(&dn_route_timer);

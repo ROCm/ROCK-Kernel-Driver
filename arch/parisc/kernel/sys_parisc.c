@@ -149,24 +149,42 @@ long sys_shmat_wrapper(int shmid, char *shmaddr, int shmflag)
 
 /* Fucking broken ABI */
 
-extern asmlinkage long sys_truncate64(const char *, loff_t);
-extern asmlinkage long sys_ftruncate64(unsigned int, loff_t);
-extern asmlinkage ssize_t sys_pread64(unsigned int fd, char *buf,
-					size_t count, loff_t pos);
-extern asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char *buf,
-					size_t count, loff_t pos);
-
+#ifdef CONFIG_PARISC64
+extern asmlinkage long sys_truncate(const char *, unsigned long);
+extern asmlinkage long sys_ftruncate(unsigned int, unsigned long);
 asmlinkage long parisc_truncate64(const char * path,
 					unsigned int high, unsigned int low)
 {
-	return sys_truncate(path, (loff_t)high << 32 | low);
+	return sys_truncate(path, (long)high << 32 | low);
 }
 
 asmlinkage long parisc_ftruncate64(unsigned int fd,
 					unsigned int high, unsigned int low)
 {
-	return sys_ftruncate(fd, (loff_t)high << 32 | low);
+	return sys_ftruncate(fd, (long)high << 32 | low);
 }
+#else
+
+extern asmlinkage long sys_truncate64(const char *, loff_t);
+extern asmlinkage long sys_ftruncate64(unsigned int, loff_t);
+
+asmlinkage long parisc_truncate64(const char * path,
+					unsigned int high, unsigned int low)
+{
+	return sys_truncate64(path, (loff_t)high << 32 | low);
+}
+
+asmlinkage long parisc_ftruncate64(unsigned int fd,
+					unsigned int high, unsigned int low)
+{
+	return sys_ftruncate64(fd, (loff_t)high << 32 | low);
+}
+#endif
+
+extern asmlinkage ssize_t sys_pread64(unsigned int fd, char *buf,
+					size_t count, loff_t pos);
+extern asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char *buf,
+					size_t count, loff_t pos);
 
 asmlinkage ssize_t parisc_pread64(unsigned int fd, char *buf, size_t count,
 					unsigned int high, unsigned int low)

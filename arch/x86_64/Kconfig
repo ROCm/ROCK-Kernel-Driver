@@ -1,6 +1,6 @@
 #
 # For a description of the syntax of this configuration file,
-# see Documentation/kbuild/config-language.txt.
+# see Documentation/kbuild/kconfig-language.txt.
 #
 # Note: ISA is disabled and will hopefully never be enabled.
 # If you managed to buy an ISA x86-64 box you'll have to fix all the

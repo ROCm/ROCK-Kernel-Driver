@@ -115,6 +115,7 @@ static void conf_askvalue(struct symbol *sym, const char *def)
 			exit(1);
 		}
 	case ask_all:
+		fflush(stdout);
 		fgets(line, 128, stdin);
 		return;
 	case set_default:
@@ -366,7 +367,7 @@ static int conf_choice(struct menu *menu)
 			for (cmenu = menu->list; cmenu; cmenu = cmenu->next) {
 				if (!cmenu->sym || !menu_is_visible(cmenu))
 					continue;
-				if (!strncmp(line, menu_get_prompt(cmenu), len)) {
+				if (!strncasecmp(line, menu_get_prompt(cmenu), len)) {
 					def_menu = cmenu;
 					break;
 				}

@@ -72,7 +72,7 @@
 #include <asm/superio.h>
 
 static struct superio_device sio_dev = {
-	iosapic_irq: -1
+	.iosapic_irq = -1
 };
 
 
@@ -318,10 +318,10 @@ superio_unmask_irq(void *dev, int local_irq)
 }
 
 static struct irq_region_ops superio_irq_ops = {
-	disable_irq:	superio_disable_irq,
-	enable_irq:	superio_enable_irq,
-	mask_irq:	superio_mask_irq,
-	unmask_irq:	superio_unmask_irq
+	.disable_irq =	superio_disable_irq,
+	.enable_irq =	superio_enable_irq,
+	.mask_irq =	superio_mask_irq,
+	.unmask_irq =	superio_unmask_irq
 };
 
 #ifdef DEBUG_INIT
@@ -523,9 +523,9 @@ static struct pci_device_id superio_tbl[] __devinitdata = {
 };
 
 static struct pci_driver superio_driver = {
-	name:		"SuperIO",
-	id_table:	superio_tbl,
-	probe:		superio_probe,
+	.name =		"SuperIO",
+	.id_table =	superio_tbl,
+	.probe =	superio_probe,
 };
 
 static int __init superio_modinit(void)

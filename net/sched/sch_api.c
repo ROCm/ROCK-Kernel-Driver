@@ -1105,8 +1105,7 @@ PSCHED_WATCHER psched_time_mark;
 
 static void psched_tick(unsigned long);
 
-static struct timer_list psched_timer =
-	{ function: psched_tick };
+static struct timer_list psched_timer = TIMER_INITIALIZER(psched_tick, 0, 0);
 
 static void psched_tick(unsigned long dummy)
 {

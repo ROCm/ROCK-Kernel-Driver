@@ -272,6 +272,25 @@ out:
 	write_unlock_bh(&policy->lock);
 }
 
+/* Generate new index... KAME seems to generate them ordered by cost
+ * of an absolute inpredictability of ordering of rules. This will not pass. */
+static u32 xfrm_gen_index(int dir)
+{
+	u32 idx;
+	struct xfrm_policy *p;
+	static u32 pol_id;
+
+	for (;;) {
+		idx = (++pol_id ? : ++pol_id);
+		for (p = xfrm_policy_list[dir]; p; p = p->next) {
+			if (p->index == idx)
+				break;
+		}
+		if (!p)
+			return idx;
+	}
+}
+
 int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 {
 	struct xfrm_policy *pol, **p;
@@ -290,6 +309,7 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 	policy->next = pol ? pol->next : NULL;
 	*p = policy;
 	xfrm_policy_genid++;
+	policy->index = pol ? pol->index : xfrm_gen_index(dir);
 	write_unlock_bh(&xfrm_policy_lock);
 
 	if (pol) {

@@ -97,7 +97,7 @@ static int rxrpc_initialise(void)
 /*
  * clean up the Rx module
  */
-static void rxrpc_cleanup(void)
+static void __exit rxrpc_cleanup(void)
 {
 	kenter("");
 

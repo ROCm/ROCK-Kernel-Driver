@@ -44,6 +44,7 @@
 #include <asm/time.h>
 #include <asm/cputable.h>
 #include <asm/btext.h>
+#include <asm/div64.h>
 
 #ifdef  CONFIG_8xx
 #include <asm/commproc.h>
@@ -119,6 +120,7 @@ EXPORT_SYMBOL(strnlen);
 EXPORT_SYMBOL(strcmp);
 EXPORT_SYMBOL(strncmp);
 EXPORT_SYMBOL(strcasecmp);
+EXPORT_SYMBOL(__div64_32);
 
 /* EXPORT_SYMBOL(csum_partial); already in net/netsyms.c */
 EXPORT_SYMBOL(csum_partial_copy_generic);
@@ -195,7 +197,6 @@ EXPORT_SYMBOL(enable_kernel_fp);
 EXPORT_SYMBOL(flush_icache_range);
 EXPORT_SYMBOL(flush_dcache_range);
 EXPORT_SYMBOL(flush_icache_user_range);
-EXPORT_SYMBOL(flush_icache_page);
 EXPORT_SYMBOL(flush_dcache_page);
 #ifdef CONFIG_ALTIVEC
 EXPORT_SYMBOL(last_task_used_altivec);

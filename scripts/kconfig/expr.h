@@ -169,7 +169,7 @@ struct menu {
 	//char *help;
 	struct file *file;
 	int lineno;
-	//void *data;
+	void *data;
 };
 
 #ifndef SWIG

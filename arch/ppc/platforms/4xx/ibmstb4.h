@@ -42,7 +42,7 @@
 #define __ASM_IBMSTB4_H__
 
 #include <linux/config.h>
-#include <platforms/ibm_ocp.h>
+#include <platforms/4xx/ibm_ocp.h>
 
 /* serial port defines */
 #define STB04xxx_IO_BASE	((uint)0xe0000000)
@@ -262,7 +262,7 @@
 #define DCRN_BESR0	(DCRN_EBIMC_BASE + 0x21)	/* Bus Error Status Register */
 #define DCRN_BIUCR	(DCRN_EBIMC_BASE + 0x2A)	/* Bus Interfac Unit Ctrl Reg */
 
-#include <platforms/ibm405.h>
+#include <asm/ibm405.h>
 
 #endif				/* __ASM_IBMSTB4_H__ */
 #endif				/* __KERNEL__ */

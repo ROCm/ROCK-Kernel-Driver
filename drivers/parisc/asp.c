@@ -125,7 +125,7 @@ static struct parisc_device_id asp_tbl[] = {
 };
 
 struct parisc_driver asp_driver = {
-	name:		"Asp",
-	id_table:	asp_tbl,
-	probe:		asp_init_chip,
+	.name =		"Asp",
+	.id_table =	asp_tbl,
+	.probe =	asp_init_chip,
 };

@@ -50,7 +50,7 @@
 #define __ASM_IBM405GP_H__
 
 #include <linux/config.h>
-#include <platforms/ibm_ocp.h>
+#include <platforms/4xx/ibm_ocp.h>
 
 /* ibm405.h at bottom of this file */
 
@@ -189,7 +189,7 @@
 #define DCRN_UIC0_BASE		0x0C0
 #define UIC0 DCRN_UIC0_BASE
 
-#include <platforms/ibm405.h>
+#include <asm/ibm405.h>
 
 #endif				/* __ASM_IBM405GP_H__ */
 #endif				/* __KERNEL__ */

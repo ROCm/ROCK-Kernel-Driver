@@ -57,6 +57,7 @@ static void setup_iSeries_cache_sizes( void );
 extern void iSeries_pci_Initialize(void);
 static int iSeries_show_cpuinfo(struct seq_file *m);
 static int iSeries_show_percpuinfo(struct seq_file *m, int i);
+extern void iSeries_idle(void);
 extern struct pci_ops iSeries_pci_ops;
 
 /* Global Variables */
@@ -537,6 +538,8 @@ iSeries_setup_arch(void)
 	mf_init();
 	viopath_init();
 */
+
+	ppc_md.idle = iSeries_idle;
 }
 
 /*

@@ -207,53 +207,6 @@ ssize_t vfs_read(struct file *file, char *buf, size_t count, loff_t *pos)
 	return ret;
 }
 
-ssize_t vfs_readv(struct file *file, struct iovec *vec, int vlen, size_t count, loff_t *pos)
-{
-	struct inode *inode = file->f_dentry->d_inode;
-	ssize_t ret;
-
-	if (!(file->f_mode & FMODE_READ))
-		return -EBADF;
-	if (!file->f_op || (!file->f_op->read && !file->f_op->aio_read))
-		return -EINVAL;
-
-	ret = locks_verify_area(FLOCK_VERIFY_READ, inode, file, *pos, count);
-	if (!ret) {
-		ret = security_ops->file_permission (file, MAY_READ);
-		if (!ret) {
-			if (file->f_op->readv)
-				ret = file->f_op->readv(file, vec, vlen, pos);
-			else {
-				/* do it by hand */
-				struct iovec *vector = vec;
-				ret = 0;
-				while (vlen > 0) {
-					void * base =  vector->iov_base;
-					size_t len = vector->iov_len;
-					ssize_t nr;
-					vector++;
-					vlen--;
-					if (file->f_op->read)
-						nr = file->f_op->read(file, base, len, pos);
-					else
-						nr = do_sync_read(file, base, len, pos);
-					if (nr < 0) {
-						if (!ret) ret = nr;
-						break;
-					}
-					ret += nr;
-					if (nr != len)
-						break;
-				}
-			}
-			if (ret > 0)
-				dnotify_parent(file->f_dentry, DN_ACCESS);
-		}
-	}
-
-	return ret;
-}
-
 ssize_t do_sync_write(struct file *filp, const char *buf, size_t len, loff_t *ppos)
 {
 	struct kiocb kiocb;
@@ -286,53 +239,6 @@ ssize_t vfs_write(struct file *file, const char *buf, size_t count, loff_t *pos)
 				ret = file->f_op->write(file, buf, count, pos);
 			else
 				ret = do_sync_write(file, buf, count, pos);
-			if (ret > 0)
-				dnotify_parent(file->f_dentry, DN_MODIFY);
-		}
-	}
-
-	return ret;
-}
-
-ssize_t vfs_writev(struct file *file, const struct iovec *vec, int vlen, size_t count, loff_t *pos)
-{
-	struct inode *inode = file->f_dentry->d_inode;
-	ssize_t ret;
-
-	if (!(file->f_mode & FMODE_WRITE))
-		return -EBADF;
-	if (!file->f_op || (!file->f_op->write && !file->f_op->aio_write))
-		return -EINVAL;
-
-	ret = locks_verify_area(FLOCK_VERIFY_WRITE, inode, file, *pos, count);
-	if (!ret) {
-		ret = security_ops->file_permission (file, MAY_WRITE);
-		if (!ret) {
-			if (file->f_op->writev)
-				ret = file->f_op->writev(file, vec, vlen, pos);
-			else {
-				/* do it by hand */
-				const struct iovec *vector = vec;
-				ret = 0;
-				while (vlen > 0) {
-					void * base = vector->iov_base;
-					size_t len = vector->iov_len;
-					ssize_t nr;
-					vector++;
-					vlen--;
-					if (file->f_op->write)
-						nr = file->f_op->write(file, base, len, pos);
-					else
-						nr = do_sync_write(file, base, len, pos);
-					if (nr < 0) {
-						if (!ret) ret = nr;
-						break;
-					}
-					ret += nr;
-					if (nr != len)
-						break;
-				}
-			}
 			if (ret > 0)
 				dnotify_parent(file->f_dentry, DN_MODIFY);
 		}
@@ -427,7 +333,7 @@ unsigned long iov_shorten(struct iovec *iov, unsigned long nr_segs, size_t to)
 
 static ssize_t do_readv_writev(int type, struct file *file,
 			       const struct iovec * vector,
-			       unsigned long nr_segs)
+			       unsigned long nr_segs, loff_t *pos)
 {
 	typedef ssize_t (*io_fn_t)(struct file *, char *, size_t, loff_t *);
 	typedef ssize_t (*iov_fn_t)(struct file *, const struct iovec *, unsigned long, loff_t *);
@@ -496,7 +402,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
 	/* VERIFY_WRITE actually means a read, as we write to user space */
 	ret = locks_verify_area((type == READ 
 				 ? FLOCK_VERIFY_READ : FLOCK_VERIFY_WRITE),
-				inode, file, file->f_pos, tot_len);
+				inode, file, *pos, tot_len);
 	if (ret)
 		goto out;
 
@@ -509,7 +415,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
 		fnv = file->f_op->writev;
 	}
 	if (fnv) {
-		ret = fnv(file, iov, nr_segs, &file->f_pos);
+		ret = fnv(file, iov, nr_segs, pos);
 		goto out;
 	}
 
@@ -526,7 +432,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
 		vector++;
 		nr_segs--;
 
-		nr = fn(file, base, len, &file->f_pos);
+		nr = fn(file, base, len, pos);
 
 		if (nr < 0) {
 			if (!ret) ret = nr;
@@ -545,50 +451,56 @@ out:
 	return ret;
 }
 
+ssize_t vfs_readv(struct file *file, const struct iovec *vec,
+		  unsigned long vlen, loff_t *pos)
+{
+	if (!(file->f_mode & FMODE_READ))
+		return -EBADF;
+	if (!file->f_op || (!file->f_op->readv && !file->f_op->read))
+		return -EINVAL;
+
+	return do_readv_writev(READ, file, vec, vlen, pos);
+}
+
+ssize_t vfs_writev(struct file *file, const struct iovec *vec,
+		   unsigned long vlen, loff_t *pos)
+{
+	if (!(file->f_mode & FMODE_WRITE))
+		return -EBADF;
+	if (!file->f_op || (!file->f_op->writev && !file->f_op->write))
+		return -EINVAL;
+
+	return do_readv_writev(WRITE, file, vec, vlen, pos);
+}
+
 
 asmlinkage ssize_t
-sys_readv(unsigned long fd, const struct iovec *vector, unsigned long nr_segs)
+sys_readv(unsigned long fd, const struct iovec *vec, unsigned long vlen)
 {
-	struct file * file;
-	ssize_t ret;
+	struct file *file;
+	ssize_t ret = -EBADF;
 
-
-	ret = -EBADF;
 	file = fget(fd);
-	if (!file)
-		goto bad_file;
-	if (file->f_op && (file->f_mode & FMODE_READ) &&
-	    (file->f_op->readv || file->f_op->read)) {
-		ret = security_ops->file_permission (file, MAY_READ);
-		if (!ret)
-			ret = do_readv_writev(READ, file, vector, nr_segs);
+	if (file) {
+		ret = vfs_readv(file, vec, vlen, &file->f_pos);
+		fput(file);
 	}
-	fput(file);
 
-bad_file:
 	return ret;
 }
 
 asmlinkage ssize_t
-sys_writev(unsigned long fd, const struct iovec * vector, unsigned long nr_segs)
+sys_writev(unsigned long fd, const struct iovec *vec, unsigned long vlen)
 {
-	struct file * file;
-	ssize_t ret;
+	struct file *file;
+	ssize_t ret = -EBADF;
 
-
-	ret = -EBADF;
 	file = fget(fd);
-	if (!file)
-		goto bad_file;
-	if (file->f_op && (file->f_mode & FMODE_WRITE) &&
-	    (file->f_op->writev || file->f_op->write)) {
-		ret = security_ops->file_permission (file, MAY_WRITE);
-		if (!ret)
-			ret = do_readv_writev(WRITE, file, vector, nr_segs);
+	if (file) {
+		ret = vfs_writev(file, vec, vlen, &file->f_pos);
+		fput(file);
 	}
-	fput(file);
 
-bad_file:
 	return ret;
 }
 

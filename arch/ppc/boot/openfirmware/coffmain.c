@@ -6,6 +6,7 @@
  * as published by the Free Software Foundation; either version
  * 2 of the License, or (at your option) any later version.
  */
+#include <linux/string.h>
 #include <asm/processor.h>
 #include <asm/page.h>
 
@@ -35,7 +36,7 @@ char *avail_high;
 #define RAM_END		(RAM_START + 0x800000)	/* only 8M mapped with BATs */
 
 #define PROG_START	RAM_START
-#define PROG_SIZE	0x00400000
+#define PROG_SIZE	0x00700000
 
 #define SCRATCH_SIZE	(128 << 10)
 

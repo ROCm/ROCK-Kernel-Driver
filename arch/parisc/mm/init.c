@@ -38,20 +38,20 @@ unsigned int maxchunkmap;
 #endif
 
 static struct resource data_resource = {
-	name:	"Kernel data",
-	flags:	IORESOURCE_BUSY | IORESOURCE_MEM,
+	.name	= "Kernel data",
+	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM,
 };
 
 static struct resource code_resource = {
-	name:	"Kernel code",
-	flags:	IORESOURCE_BUSY | IORESOURCE_MEM,
+	.name	= "Kernel code",
+	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM,
 };
 
 static struct resource pdcdata_resource = {
-	name:	"PDC data (Page Zero)",
-	start:	0,
-	end:	0x9ff,
-	flags:	IORESOURCE_BUSY | IORESOURCE_MEM,
+	.name	= "PDC data (Page Zero)",
+	.start	= 0,
+	.end	= 0x9ff,
+	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM,
 };
 
 static struct resource sysram_resources[MAX_PHYSMEM_RANGES];

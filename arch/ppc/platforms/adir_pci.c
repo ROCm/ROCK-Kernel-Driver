@@ -18,7 +18,7 @@
 #include <asm/machdep.h>
 #include <asm/pci-bridge.h>
 
-#include "cpc710.h"
+#include <syslib/cpc710.h>
 #include "adir.h"
 
 #undef DEBUG

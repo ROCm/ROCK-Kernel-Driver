@@ -13,8 +13,6 @@
 #include <asm/cache.h>
 #include <asm/bitops.h>
 
-#define ARCH_STACK_GROWSUP
-
 /*
  * kern_addr_valid(ADDR) tests if ADDR is pointing to valid kernel
  * memory.  For the return value to be meaningful, ADDR must be >=

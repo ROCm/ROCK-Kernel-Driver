@@ -398,8 +398,8 @@ extern void nfs_readdata_release(struct rpc_task *);
  * linux/fs/mount_clnt.c
  * (Used only by nfsroot module)
  */
-extern int  nfs_mount(struct sockaddr_in *, char *, struct nfs_fh *);
-extern int  nfs3_mount(struct sockaddr_in *, char *, struct nfs_fh *);
+extern int  nfsroot_mount(struct sockaddr_in *, char *, struct nfs_fh *,
+		int, int);
 
 /*
  * inline functions

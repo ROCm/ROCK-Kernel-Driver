@@ -134,6 +134,7 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 	if (!(ia_valid & ATTR_MTIME_SET))
 		attr->ia_mtime = now;
 	if (ia_valid & ATTR_KILL_SUID) {
+		attr->ia_valid &= ~ATTR_KILL_SUID;
 		if (mode & S_ISUID) {
 			if (!(ia_valid & ATTR_MODE)) {
 				ia_valid = attr->ia_valid |= ATTR_MODE;
@@ -143,6 +144,7 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 		}
 	}
 	if (ia_valid & ATTR_KILL_SGID) {
+		attr->ia_valid &= ~ ATTR_KILL_SGID;
 		if ((mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP)) {
 			if (!(ia_valid & ATTR_MODE)) {
 				ia_valid = attr->ia_valid |= ATTR_MODE;
@@ -151,6 +153,8 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 			attr->ia_mode &= ~S_ISGID;
 		}
 	}
+	if (!attr->ia_valid)
+		return 0;
 
 	if (inode->i_op && inode->i_op->setattr) {
 		error = security_ops->inode_setattr(dentry, attr);
