@@ -816,8 +816,8 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 		pSMB->Timeout = 0;
 	}
 
-	pSMB->NumberOfLocks = cpu_to_le32(numLock);
-	pSMB->NumberOfUnlocks = cpu_to_le32(numUnlock);
+	pSMB->NumberOfLocks = cpu_to_le16(numLock);
+	pSMB->NumberOfUnlocks = cpu_to_le16(numUnlock);
 	pSMB->LockType = lockType;
 	pSMB->AndXCommand = 0xFF;	/* none */
 	pSMB->Fid = smb_file_id; /* netfid stays le */
