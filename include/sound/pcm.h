@@ -427,6 +427,10 @@ struct _snd_pcm_str {
 	snd_minor_t *reg;
 	snd_info_entry_t *proc_root;
 	snd_info_entry_t *proc_info_entry;
+#ifdef CONFIG_SND_DEBUG
+	unsigned int xrun_debug: 1;
+	snd_info_entry_t *proc_xrun_debug_entry;
+#endif
 };
 
 struct _snd_pcm {

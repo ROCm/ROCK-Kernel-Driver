@@ -390,6 +390,22 @@ static void snd_pcm_substream_proc_status_read(snd_info_entry_t *entry, snd_info
 	snd_iprintf(buffer, "appl_ptr    : %ld\n", runtime->control->appl_ptr);
 }
 
+#ifdef CONFIG_SND_DEBUG
+static void snd_pcm_xrun_debug_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
+{
+	snd_pcm_str_t *pstr = (snd_pcm_str_t *)entry->private_data;
+	snd_iprintf(buffer, "%d\n", pstr->xrun_debug);
+}
+
+static void snd_pcm_xrun_debug_write(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
+{
+	snd_pcm_str_t *pstr = (snd_pcm_str_t *)entry->private_data;
+	char line[64];
+	if (!snd_info_get_line(buffer, line, sizeof(line)))
+		pstr->xrun_debug = !!simple_strtoul(line, NULL, 10);
+}
+#endif
+
 static int snd_pcm_stream_proc_init(snd_pcm_str_t *pstr)
 {
 	snd_pcm_t *pcm = pstr->pcm;
@@ -416,11 +432,31 @@ static int snd_pcm_stream_proc_init(snd_pcm_str_t *pstr)
 	}
 	pstr->proc_info_entry = entry;
 
+#ifdef CONFIG_SND_DEBUG
+	if ((entry = snd_info_create_card_entry(pcm->card, "xrun_debug", pstr->proc_root)) != NULL) {
+		entry->c.text.read_size = 64;
+		entry->c.text.read = snd_pcm_xrun_debug_read;
+		entry->c.text.write_size = 64;
+		entry->c.text.write = snd_pcm_xrun_debug_write;
+		entry->private_data = pstr;
+		if (snd_info_register(entry) < 0) {
+			snd_info_free_entry(entry);
+			entry = NULL;
+		}
+	}
+	pstr->proc_xrun_debug_entry = entry;
+#endif
 	return 0;
 }
 
 static int snd_pcm_stream_proc_done(snd_pcm_str_t *pstr)
 {
+#ifdef CONFIG_SND_DEBUG
+	if (pstr->proc_xrun_debug_entry) {
+		snd_info_unregister(pstr->proc_xrun_debug_entry);
+		pstr->proc_xrun_debug_entry = NULL;
+	}
+#endif
 	if (pstr->proc_info_entry) {
 		snd_info_unregister(pstr->proc_info_entry);
 		pstr->proc_info_entry = NULL;
