@@ -16,6 +16,7 @@
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
+#include <linux/kallsyms.h>
 #include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
@@ -284,6 +285,7 @@ void __show_regs(struct pt_regs * regs)
 #endif
 	printk("TSTATE: %016lx TPC: %016lx TNPC: %016lx Y: %08x    %s\n", regs->tstate,
 	       regs->tpc, regs->tnpc, regs->y, print_tainted());
+	print_symbol("TPC: <%s>\n", regs->tpc);
 	printk("g0: %016lx g1: %016lx g2: %016lx g3: %016lx\n",
 	       regs->u_regs[0], regs->u_regs[1], regs->u_regs[2],
 	       regs->u_regs[3]);
