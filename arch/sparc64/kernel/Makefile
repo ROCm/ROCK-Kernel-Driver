@@ -3,7 +3,7 @@
 #
 
 EXTRA_AFLAGS := -ansi
-# EXTRA_CFLAGS := -Werror
+EXTRA_CFLAGS := -Werror
 
 extra-y		:= head.o init_task.o vmlinux.lds.s
 

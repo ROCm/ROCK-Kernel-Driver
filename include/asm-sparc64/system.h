@@ -205,7 +205,7 @@ do {	if (test_thread_flag(TIF_PERFCTR)) {				\
 	"ldx	[%%g6 + %7], %%g4\n\t"					\
 	"wrpr	%%g0, 0x96, %%pstate\n\t"				\
 	"andcc	%%o7, %6, %%g0\n\t"					\
-	"beq,pn %%icc, 1f\n\t"						\
+	"beq,pt %%icc, 1f\n\t"						\
 	" mov	%%g5, %0\n\t"						\
 	"b,a ret_from_syscall\n\t"					\
 	"1:\n\t"							\
