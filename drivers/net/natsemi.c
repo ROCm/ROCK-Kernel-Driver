@@ -127,6 +127,8 @@
 		* hands_off instead of playing with netif_device_{de,a}ttach
 		  (Manfred Spraul)
 		* be sure to write the MAC back to the chip (Manfred Spraul)
+		* lengthen EEPROM timeout, and always warn about timeouts
+		  (Manfred Spraul)
 
 	TODO:
 	* big endian support with CFG:BEM instead of cpu_to_le32
@@ -1001,7 +1003,7 @@ static void natsemi_reset(struct net_device *dev)
 			break;
 		udelay(5);
 	}
-	if (i==NATSEMI_HW_TIMEOUT && netif_msg_hw(np)) {
+	if (i==NATSEMI_HW_TIMEOUT) {
 		printk(KERN_INFO "%s: reset did not complete in %d usec.\n",
 		   dev->name, i*5);
 	} else if (netif_msg_hw(np)) {
@@ -1038,16 +1040,16 @@ static void natsemi_reload_eeprom(struct net_device *dev)
 
 	writel(EepromReload, dev->base_addr + PCIBusCfg);
 	for (i=0;i<NATSEMI_HW_TIMEOUT;i++) {
+		udelay(50);
 		if (!(readl(dev->base_addr + PCIBusCfg) & EepromReload))
 			break;
-		udelay(5);
 	}
-	if (i==NATSEMI_HW_TIMEOUT && netif_msg_hw(np)) {
+	if (i==NATSEMI_HW_TIMEOUT) {
 		printk(KERN_INFO "%s: EEPROM did not reload in %d usec.\n",
-		   dev->name, i*5);
+		   dev->name, i*50);
 	} else if (netif_msg_hw(np)) {
 		printk(KERN_DEBUG "%s: EEPROM reloaded in %d usec.\n",
-		   dev->name, i*5);
+		   dev->name, i*50);
 	}
 }
 
@@ -1063,7 +1065,7 @@ static void natsemi_stop_rxtx(struct net_device *dev)
 			break;
 		udelay(5);
 	}
-	if (i==NATSEMI_HW_TIMEOUT && netif_msg_hw(np)) {
+	if (i==NATSEMI_HW_TIMEOUT) {
 		printk(KERN_INFO "%s: Tx/Rx process did not stop in %d usec.\n",
 				dev->name, i*5);
 	} else if (netif_msg_hw(np)) {
