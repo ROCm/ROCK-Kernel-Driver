@@ -52,13 +52,6 @@
 #define DPRINTK(format,args...)
 #endif
 
-#ifndef __i386__
-#ifdef CONFIG_ATM_ZATM_EXACT_TS
-#warning Precise timestamping only available on i386 platform
-#undef CONFIG_ATM_ZATM_EXACT_TS
-#endif
-#endif
-
 #ifndef CONFIG_ATM_ZATM_DEBUG
 
 
@@ -347,150 +340,6 @@ static void zatm_feedback(struct atm_vcc *vcc,struct sk_buff *skb,
 	restore_flags(flags);
 }
 
-
-/*----------------------- high-precision timestamps -------------------------*/
-
-
-#ifdef CONFIG_ATM_ZATM_EXACT_TS
-
-static struct timer_list sync_timer;
-
-
-/*
- * Note: the exact time is not normalized, i.e. tv_usec can be > 1000000.
- * This must be handled by higher layers.
- */
-
-static inline struct timeval exact_time(struct zatm_dev *zatm_dev,u32 ticks)
-{
-	struct timeval tmp;
-
-	tmp = zatm_dev->last_time;
-	tmp.tv_usec += ((s64) (ticks-zatm_dev->last_clk)*
-	    (s64) zatm_dev->factor) >> TIMER_SHIFT;
-	return tmp;
-}
-
-
-static void zatm_clock_sync(unsigned long dummy)
-{
-	struct atm_dev *atm_dev;
-	struct zatm_dev *zatm_dev;
-
-	for (atm_dev = zatm_boards; atm_dev; atm_dev = zatm_dev->more) {
-		unsigned long flags,interval;
-		int diff;
-		struct timeval now,expected;
-		u32 ticks;
-
-		zatm_dev = ZATM_DEV(atm_dev);
-		save_flags(flags);
-		cli();
-		ticks = zpeekl(zatm_dev,uPD98401_TSR);
-		do_gettimeofday(&now);
-		restore_flags(flags);
-		expected = exact_time(zatm_dev,ticks);
-		diff = 1000000*(expected.tv_sec-now.tv_sec)+
-		    (expected.tv_usec-now.tv_usec);
-		zatm_dev->timer_history[zatm_dev->th_curr].real = now;
-		zatm_dev->timer_history[zatm_dev->th_curr].expected = expected;
-		zatm_dev->th_curr = (zatm_dev->th_curr+1) &
-		    (ZATM_TIMER_HISTORY_SIZE-1);
-		interval = 1000000*(now.tv_sec-zatm_dev->last_real_time.tv_sec)
-		    +(now.tv_usec-zatm_dev->last_real_time.tv_usec);
-		if (diff >= -ADJ_REP_THRES && diff <= ADJ_REP_THRES)
-			zatm_dev->timer_diffs = 0;
-		else
-#ifndef AGGRESSIVE_DEBUGGING
-			if (++zatm_dev->timer_diffs >= ADJ_MSG_THRES)
-#endif
-			{
-			zatm_dev->timer_diffs = 0;
-			printk(KERN_INFO DEV_LABEL ": TSR update after %ld us:"
-			    " calculation differed by %d us\n",interval,diff);
-#ifdef AGGRESSIVE_DEBUGGING
-			printk(KERN_DEBUG "  %d.%08d -> %d.%08d (%lu)\n",
-			    zatm_dev->last_real_time.tv_sec,
-			    zatm_dev->last_real_time.tv_usec,
-			    now.tv_sec,now.tv_usec,interval);
-			printk(KERN_DEBUG "  %u -> %u (%d)\n",
-			    zatm_dev->last_clk,ticks,ticks-zatm_dev->last_clk);
-			printk(KERN_DEBUG "  factor %u\n",zatm_dev->factor);
-#endif
-		}
-		if (diff < -ADJ_IGN_THRES || diff > ADJ_IGN_THRES) {
-		    /* filter out any major changes (e.g. time zone setup and
-		       such) */
-			zatm_dev->last_time = now;
-			zatm_dev->factor =
-			    (1000 << TIMER_SHIFT)/(zatm_dev->khz+1);
-		}
-		else {
-			zatm_dev->last_time = expected;
-			/*
-			 * Is the accuracy of udelay really only about 1:300 on
-			 * a 90 MHz Pentium ? Well, the following line avoids
-			 * the problem, but ...
-			 *
-			 * What it does is simply:
-			 *
-			 * zatm_dev->factor = (interval << TIMER_SHIFT)/
-			 *     (ticks-zatm_dev->last_clk);
-			 */
-#define S(x) #x		/* "stringification" ... */
-#define SX(x) S(x)
-			asm("movl %2,%%ebx\n\t"
-			    "subl %3,%%ebx\n\t"
-			    "xorl %%edx,%%edx\n\t"
-			    "shldl $" SX(TIMER_SHIFT) ",%1,%%edx\n\t"
-			    "shl $" SX(TIMER_SHIFT) ",%1\n\t"
-			    "divl %%ebx\n\t"
-			    : "=a" (zatm_dev->factor)
-			    : "0" (interval-diff),"g" (ticks),
-			      "g" (zatm_dev->last_clk)
-			    : "ebx","edx","cc");
-#undef S
-#undef SX
-#ifdef AGGRESSIVE_DEBUGGING
-			printk(KERN_DEBUG "  (%ld << %d)/(%u-%u) = %u\n",
-			    interval,TIMER_SHIFT,ticks,zatm_dev->last_clk,
-			    zatm_dev->factor);
-#endif
-		}
-		zatm_dev->last_real_time = now;
-		zatm_dev->last_clk = ticks;
-	}
-	mod_timer(&sync_timer,sync_timer.expires+POLL_INTERVAL*HZ);
-}
-
-
-static void __init zatm_clock_init(struct zatm_dev *zatm_dev)
-{
-	static int start_timer = 1;
-	unsigned long flags;
-
-	zatm_dev->factor = (1000 << TIMER_SHIFT)/(zatm_dev->khz+1);
-	zatm_dev->timer_diffs = 0;
-	memset(zatm_dev->timer_history,0,sizeof(zatm_dev->timer_history));
-	zatm_dev->th_curr = 0;
-	save_flags(flags);
-	cli();
-	do_gettimeofday(&zatm_dev->last_time);
-	zatm_dev->last_clk = zpeekl(zatm_dev,uPD98401_TSR);
-	if (start_timer) {
-		start_timer = 0;
-		init_timer(&sync_timer);
-		sync_timer.expires = jiffies+POLL_INTERVAL*HZ;
-		sync_timer.function = zatm_clock_sync;
-		add_timer(&sync_timer);
-	}
-	restore_flags(flags);
-}
-
-
-#endif
-
-
 /*----------------------------------- RX ------------------------------------*/
 
 
@@ -581,11 +430,7 @@ unsigned long *x;
 EVENT("error code 0x%x/0x%x\n",(here[3] & uPD98401_AAL5_ES) >>
   uPD98401_AAL5_ES_SHIFT,error);
 		skb = ((struct rx_buffer_head *) bus_to_virt(here[2]))->skb;
-#ifdef CONFIG_ATM_ZATM_EXACT_TS
-		skb->stamp = exact_time(zatm_dev,here[1]);
-#else
 		do_gettimeofday(&skb->stamp);
-#endif
 #if 0
 printk("[-3..0] 0x%08lx 0x%08lx 0x%08lx 0x%08lx\n",((unsigned *) skb->data)[-3],
   ((unsigned *) skb->data)[-2],((unsigned *) skb->data)[-1],
@@ -1455,9 +1300,6 @@ static int __init zatm_init(struct atm_dev *dev)
 	    "MHz\n",dev->number,
 	    (zin(VER) & uPD98401_MAJOR) >> uPD98401_MAJOR_SHIFT,
             zin(VER) & uPD98401_MINOR,zatm_dev->khz/1000,zatm_dev->khz % 1000);
-#ifdef CONFIG_ATM_ZATM_EXACT_TS
-	zatm_clock_init(zatm_dev);
-#endif
 	return uPD98402_init(dev);
 }
 
@@ -1699,22 +1541,6 @@ static int zatm_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 				restore_flags(flags);
 				return 0;
 			}
-#ifdef CONFIG_ATM_ZATM_EXACT_TS
-		case ZATM_GETTHIST:
-			{
-				int i;
-				struct zatm_t_hist hs[ZATM_TIMER_HISTORY_SIZE];
-				save_flags(flags);
-				cli();
-				for (i = 0; i < ZATM_TIMER_HISTORY_SIZE; i++)
-					hs[i] = zatm_dev->timer_history[
-					    (zatm_dev->th_curr+i) &
-					    (ZATM_TIMER_HISTORY_SIZE-1)];
-				restore_flags(flags);
-				return copy_to_user((struct zatm_t_hist *) arg,
-				    hs, sizeof(hs)) ? -EFAULT : 0;
-			}
-#endif
 		default:
         		if (!dev->phy->ioctl) return -ENOIOCTLCMD;
 		        return dev->phy->ioctl(dev,cmd,arg);
