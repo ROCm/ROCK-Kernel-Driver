@@ -23,7 +23,6 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/device.h>
-#include <linux/i2c.h>
 
 #include <asm/hardware.h>
 #include <asm/mach-types.h>

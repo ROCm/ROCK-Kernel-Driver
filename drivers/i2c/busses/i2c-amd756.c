@@ -28,10 +28,12 @@
     2002-04-08: Added nForce support. (Csaba Halasz)
     2002-10-03: Fixed nForce PnP I/O port. (Michael Steil)
     2002-12-28: Rewritten into something that resembles a Linux driver (hch)
+    2003-11-29: Added back AMD8111 removed by the previous rewrite.
+                (Philip Pokorny)
 */
 
 /*
-   Supports AMD756, AMD766, AMD768 and nVidia nForce
+   Supports AMD756, AMD766, AMD768, AMD8111 and nVidia nForce
    Note: we assume there can only be one device, with one SMBus interface.
 */
 
@@ -213,9 +215,8 @@ static s32 amd756_access(struct i2c_adapter * adap, u16 addr,
 	case I2C_SMBUS_BYTE:
 		outw_p(((addr & 0x7f) << 1) | (read_write & 0x01),
 		       SMB_HOST_ADDRESS);
-		/* TODO: Why only during write? */
 		if (read_write == I2C_SMBUS_WRITE)
-			outb_p(command, SMB_HOST_COMMAND);
+			outb_p(command, SMB_HOST_DATA);
 		size = AMD756_BYTE;
 		break;
 	case I2C_SMBUS_BYTE_DATA:
@@ -308,12 +309,13 @@ static struct i2c_adapter amd756_adapter = {
 	.name		= "unset",
 };
 
-enum chiptype { AMD756, AMD766, AMD768, NFORCE };
+enum chiptype { AMD756, AMD766, AMD768, NFORCE, AMD8111 };
 
 static struct pci_device_id amd756_ids[] = {
 	{PCI_VENDOR_ID_AMD, 0x740B, PCI_ANY_ID, PCI_ANY_ID, 0, 0, AMD756 },
 	{PCI_VENDOR_ID_AMD, 0x7413, PCI_ANY_ID, PCI_ANY_ID, 0, 0, AMD766 },
 	{PCI_VENDOR_ID_AMD, 0x7443, PCI_ANY_ID, PCI_ANY_ID, 0, 0, AMD768 },
+	{PCI_VENDOR_ID_AMD, 0x746B, PCI_ANY_ID, PCI_ANY_ID, 0, 0, AMD8111 },
 	{PCI_VENDOR_ID_NVIDIA, 0x01B4, PCI_ANY_ID, PCI_ANY_ID, 0, 0, NFORCE },
 	{ 0, }
 };
@@ -321,7 +323,8 @@ static struct pci_device_id amd756_ids[] = {
 static int __devinit amd756_probe(struct pci_dev *pdev,
 				  const struct pci_device_id *id)
 {
-	int nforce = (id->driver_data == NFORCE), error;
+	int nforce = (id->driver_data == NFORCE);
+	int error;
 	u8 temp;
 	
 	if (amd756_ioport) {
@@ -368,7 +371,7 @@ static int __devinit amd756_probe(struct pci_dev *pdev,
 	amd756_adapter.dev.parent = &pdev->dev;
 
 	snprintf(amd756_adapter.name, I2C_NAME_SIZE,
-		"SMBus AMD75x adapter at %04x", amd756_ioport);
+		"SMBus AMD756 adapter at %04x", amd756_ioport);
 
 	error = i2c_add_adapter(&amd756_adapter);
 	if (error) {
@@ -391,7 +394,7 @@ static void __devexit amd756_remove(struct pci_dev *dev)
 }
 
 static struct pci_driver amd756_driver = {
-	.name		= "amd75x smbus",
+	.name		= "amd756 smbus",
 	.id_table	= amd756_ids,
 	.probe		= amd756_probe,
 	.remove		= __devexit_p(amd756_remove),
@@ -408,7 +411,7 @@ static void __exit amd756_exit(void)
 }
 
 MODULE_AUTHOR("Merlin Hughes <merlin@merlin.org>");
-MODULE_DESCRIPTION("AMD756/766/768/nVidia nForce SMBus driver");
+MODULE_DESCRIPTION("AMD756/766/768/8111 and nVidia nForce SMBus driver");
 MODULE_LICENSE("GPL");
 
 module_init(amd756_init)
