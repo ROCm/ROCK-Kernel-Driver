@@ -189,6 +189,11 @@ running once the system is up.
 			Disable APC CPU standby support. SPARCstation-Fox does
 			not play well with APC CPU idle - disable it if you have
 			APC and your system crashes randomly.
+
+	apic=		[APIC,i386] Change the output verbosity  whilst booting
+			Format: { quiet (default) | verbose | debug }
+			Change the amount of debugging information output
+			when initialising the APIC and IO-APIC components.
  
 	apm=		[APM] Advanced Power Management
 			See header of arch/i386/kernel/apm.c.
