@@ -43,9 +43,6 @@ subdir-$(CONFIG_PNP)		+= pnp
 subdir-$(CONFIG_ISDN)		+= isdn
 subdir-$(CONFIG_ATM)		+= atm
 subdir-$(CONFIG_FC4)		+= fc4
-
-# CONFIG_HAMRADIO can be set without CONFIG_NETDEVICE being set  -- ch
-subdir-$(CONFIG_HAMRADIO)	+= net/hamradio
 subdir-$(CONFIG_I2C)		+= i2c
 subdir-$(CONFIG_ACPI)		+= acpi
 
