@@ -92,7 +92,7 @@ static int dummy_quotactl (int cmds, int type, int id, struct super_block *sb)
 	return 0;
 }
 
-static int dummy_quota_on (struct file *f)
+static int dummy_quota_on (struct dentry *dentry)
 {
 	return 0;
 }
