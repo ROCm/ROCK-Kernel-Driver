@@ -1736,11 +1736,12 @@ qla1280_biosparam(struct scsi_device *sdev, struct block_device *bdev,
  * qla1280_intr_handler
  *   Handles the H/W interrupt
  **************************************************************************/
-void
+irqreturn_t
 qla1280_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct scsi_qla_host *ha;
 	struct device_reg *reg;
+	int handled = 0;
 	u16 data;
 
 	ENTER_INTR ("qla1280_intr_handler");
@@ -1757,6 +1758,7 @@ qla1280_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 	/* Check for pending interrupts. */
 	if (data & RISC_INT) {
 		qla1280_isr(ha, &ha->done_q_first, &ha->done_q_last);
+		handled = 1;
 	} else {
 		/* spurious interrupts can happen legally */
 		dprintk(1, "scsi(%ld): Spurious interrupt - ignoring\n",
@@ -1772,6 +1774,7 @@ qla1280_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 	WRT_REG_WORD(&reg->ictrl, (ISP_EN_INT | ISP_EN_RISC));
 
 	LEAVE_INTR("qla1280_intr_handler");
+	return IRQ_RETVAL(handled);
 }
 
 /**************************************************************************

@@ -217,7 +217,7 @@ static int use_virtual_dma;
 static spinlock_t floppy_lock = SPIN_LOCK_UNLOCKED;
 
 static unsigned short virtual_dma_port=0x3f0;
-void floppy_interrupt(int irq, void *dev_id, struct pt_regs * regs);
+irqreturn_t floppy_interrupt(int irq, void *dev_id, struct pt_regs * regs);
 static int set_dor(int fdc, char mask, char data);
 static void register_devfs_entries (int drive) __init;
 
@@ -1743,7 +1743,7 @@ static void print_result(char *message, int inr)
 }
 
 /* interrupt handler. Note that this can be called externally on the Sparc */
-void floppy_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+irqreturn_t floppy_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	void (*handler)(void) = do_floppy;
 	int do_print;
@@ -1764,7 +1764,7 @@ void floppy_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		printk("floppy interrupt on bizarre fdc %d\n",fdc);
 		printk("handler=%p\n", handler);
 		is_alive("bizarre fdc");
-		return;
+		return IRQ_NONE;
 	}
 
 	FDCS->reset = 0;
@@ -1797,6 +1797,9 @@ void floppy_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	} else
 		FDCS->reset = 1;
 	is_alive("normal interrupt end");
+
+	/* FIXME! Was it really for us? */
+	return IRQ_HANDLED;
 }
 
 static void recalibrate_floppy(void)

@@ -599,7 +599,7 @@ int find_mem_region(u_long *base, u_long num, u_long align,
 
 #ifdef CONFIG_PCMCIA_PROBE
 
-static void fake_irq(int i, void *d, struct pt_regs *r) { }
+static irqreturn_t fake_irq(int i, void *d, struct pt_regs *r) { return IRQ_NONE; }
 static inline int check_irq(int irq)
 {
     if (request_irq(irq, fake_irq, 0, "bogus", NULL) != 0)

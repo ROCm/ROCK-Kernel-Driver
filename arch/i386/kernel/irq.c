@@ -74,7 +74,8 @@ static void register_irq_proc (unsigned int irq);
  * Special irq handlers.
  */
 
-void no_action(int cpl, void *dev_id, struct pt_regs *regs) { }
+irqreturn_t no_action(int cpl, void *dev_id, struct pt_regs *regs)
+{ return IRQ_NONE; }
 
 /*
  * Generic no controller code
@@ -205,18 +206,30 @@ inline void synchronize_irq(unsigned int irq)
 int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction * action)
 {
 	int status = 1;	/* Force the "do bottom halves" bit */
+	int retval = 0;
 
 	if (!(action->flags & SA_INTERRUPT))
 		local_irq_enable();
 
 	do {
 		status |= action->flags;
-		action->handler(irq, action->dev_id, regs);
+		retval |= action->handler(irq, action->dev_id, regs).val;
 		action = action->next;
 	} while (action);
 	if (status & SA_SAMPLE_RANDOM)
 		add_interrupt_randomness(irq);
 	local_irq_disable();
+	if (retval != 1) {
+		static int count = 100;
+		while (count) {
+			count--;
+			printk(retval
+				? "irq event %d: bogus retval mask %x\n"
+				: "irq %d: nobody cared!n",
+				irq, 
+				retval);
+		}
+	}
 
 	return status;
 }
@@ -447,7 +460,7 @@ out:
  */
  
 int request_irq(unsigned int irq, 
-		void (*handler)(int, void *, struct pt_regs *),
+		irqreturn_t (*handler)(int, void *, struct pt_regs *),
 		unsigned long irqflags, 
 		const char * devname,
 		void *dev_id)

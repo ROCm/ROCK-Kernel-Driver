@@ -1568,7 +1568,7 @@ extern void ide_stall_queue(ide_drive_t *drive, unsigned long timeout);
 
 extern int ide_spin_wait_hwgroup(ide_drive_t *);
 extern void ide_timer_expiry(unsigned long);
-extern void ide_intr(int irq, void *dev_id, struct pt_regs *regs);
+extern irqreturn_t ide_intr(int irq, void *dev_id, struct pt_regs *regs);
 extern void do_ide_request(request_queue_t *);
 extern void ide_init_subdrivers(void);
 

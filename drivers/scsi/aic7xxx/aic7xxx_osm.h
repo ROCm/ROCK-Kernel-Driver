@@ -1224,7 +1224,7 @@ void	ahc_platform_set_tags(struct ahc_softc *ahc,
 int	ahc_platform_abort_scbs(struct ahc_softc *ahc, int target,
 				char channel, int lun, u_int tag,
 				role_t role, uint32_t status);
-void	ahc_linux_isr(int irq, void *dev_id, struct pt_regs * regs);
+irqreturn_t ahc_linux_isr(int irq, void *dev_id, struct pt_regs * regs);
 void	ahc_platform_flushwork(struct ahc_softc *ahc);
 int	ahc_softc_comp(struct ahc_softc *, struct ahc_softc *);
 void	ahc_done(struct ahc_softc*, struct scb*);

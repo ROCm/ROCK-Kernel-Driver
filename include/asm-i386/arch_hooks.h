@@ -1,6 +1,8 @@
 #ifndef _ASM_ARCH_HOOKS_H
 #define _ASM_ARCH_HOOKS_H
 
+#include <linux/interrupt.h>
+
 /*
  *	linux/include/asm/arch_hooks.h
  *
@@ -12,7 +14,7 @@
 extern void init_ISA_irqs(void);
 extern void apic_intr_init(void);
 extern void smp_intr_init(void);
-extern void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+extern irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 /* these are the defined hooks */
 extern void intr_init_hook(void);
