@@ -173,6 +173,17 @@ struct nfsd4_lockt {
 	struct nfsd4_lock_denied  	lt_denied;
 };
 
+ 
+struct nfsd4_locku {
+	u32             lu_type;
+	u32             lu_seqid;
+	stateid_t       lu_stateid;
+	u64             lu_offset;
+	u64             lu_length;
+	struct nfs4_stateowner  *lu_stateowner;
+};
+
+
 struct nfsd4_lookup {
 	u32		lo_len;             /* request */
 	char *		lo_name;            /* request */
@@ -330,6 +341,7 @@ struct nfsd4_op {
 		struct nfsd4_link		link;
 		struct nfsd4_lock		lock;
 		struct nfsd4_lockt		lockt;
+		struct nfsd4_locku		locku;
 		struct nfsd4_lookup		lookup;
 		struct nfsd4_verify		nverify;
 		struct nfsd4_open		open;
@@ -425,6 +437,8 @@ extern int nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh,
 		struct nfsd4_lock *lock);
 extern int nfsd4_lockt(struct svc_rqst *rqstp, struct svc_fh *current_fh, 
 		struct nfsd4_lockt *lockt);
+extern int nfsd4_locku(struct svc_rqst *rqstp, struct svc_fh *current_fh, 
+		struct nfsd4_locku *locku);
 #endif
 
 /*

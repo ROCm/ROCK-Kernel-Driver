@@ -2033,6 +2033,65 @@ out:
 	return status;
 }
 
+int
+nfsd4_locku(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_locku *locku)
+{
+	struct nfs4_stateid *stp;
+	struct file *filp = NULL;
+	struct file_lock file_lock;
+	int status;
+						        
+	dprintk("NFSD: nfsd4_locku: start=%Ld length=%Ld\n",
+		locku->lu_offset, locku->lu_length);
+	nfs4_lock_state();
+									        
+	if ((status = nfs4_preprocess_seqid_op(current_fh, 
+					locku->lu_seqid, 
+					&locku->lu_stateid, 
+					CHECK_FH | LOCK_STATE, 
+					&locku->lu_stateowner, &stp)))
+		goto out;
+
+	filp = &stp->st_vfs_file;
+	BUG_ON(!filp);
+	file_lock.fl_type = F_UNLCK;
+	file_lock.fl_owner = (fl_owner_t) locku->lu_stateowner;
+	file_lock.fl_pid = lockownerid_hashval(locku->lu_stateowner->so_id);
+	file_lock.fl_file = filp;
+	file_lock.fl_flags = FL_POSIX; 
+	file_lock.fl_notify = NULL;
+	file_lock.fl_insert = NULL;
+	file_lock.fl_remove = NULL;
+	file_lock.fl_start = locku->lu_offset;
+
+	if ((locku->lu_length == ~(u64)0) || LOFF_OVERFLOW(locku->lu_offset, locku->lu_length))
+		file_lock.fl_end = ~(u64)0;
+	else
+		file_lock.fl_end = locku->lu_offset + locku->lu_length - 1;
+	nfs4_transform_lock_offset(&file_lock);
+
+	/*
+	*  Try to unlock the file in the VFS.
+	*/
+	status = posix_lock_file(filp, &file_lock); 
+	if (status) {
+		printk("NFSD: nfs4_locku: posix_lock_file failed!\n");
+		goto out_nfserr;
+	}
+	/*
+	* OK, unlock succeeded; the only thing left to do is update the stateid.
+	*/
+	update_stateid(&stp->st_stateid);
+	memcpy(&locku->lu_stateid, &stp->st_stateid, sizeof(stateid_t));
+
+out:
+	nfs4_unlock_state();
+	return status;
+
+out_nfserr:
+	status = nfserrno(status);
+	goto out;
+}
 
 /* 
  * Start and stop routines

@@ -625,6 +625,24 @@ nfsd4_decode_lockt(struct nfsd4_compoundargs *argp, struct nfsd4_lockt *lockt)
 }
 
 static int
+nfsd4_decode_locku(struct nfsd4_compoundargs *argp, struct nfsd4_locku *locku)
+{
+	DECODE_HEAD;
+
+	READ_BUF(24 + sizeof(stateid_t));
+	READ32(locku->lu_type);
+	if ((locku->lu_type < NFS4_READ_LT) || (locku->lu_type > NFS4_WRITEW_LT))
+		goto xdr_error;
+	READ32(locku->lu_seqid);
+	READ32(locku->lu_stateid.si_generation);
+	COPYMEM(&locku->lu_stateid.si_opaque, sizeof(stateid_opaque_t));
+	READ64(locku->lu_offset);
+	READ64(locku->lu_length);
+
+	DECODE_TAIL;
+}
+
+static int
 nfsd4_decode_lookup(struct nfsd4_compoundargs *argp, struct nfsd4_lookup *lookup)
 {
 	DECODE_HEAD;
@@ -1051,6 +1069,9 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 			break;
 		case OP_LOCKT:
 			op->status = nfsd4_decode_lockt(argp, &op->u.lockt);
+			break;
+		case OP_LOCKU:
+			op->status = nfsd4_decode_locku(argp, &op->u.locku);
 			break;
 		case OP_LOOKUP:
 			op->status = nfsd4_decode_lookup(argp, &op->u.lookup);
@@ -1815,6 +1836,21 @@ nfsd4_encode_lockt(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_lock
 		nfsd4_encode_lock_denied(resp, &lockt->lt_denied);
 }
 
+static void
+nfsd4_encode_locku(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_locku *locku)
+{
+	ENCODE_SEQID_OP_HEAD;
+
+	if (!nfserr) {
+		RESERVE_SPACE(sizeof(stateid_t));
+		WRITE32(locku->lu_stateid.si_generation);
+		WRITEMEM(&locku->lu_stateid.si_opaque, sizeof(stateid_opaque_t));
+		ADJUST_ARGS();
+	}
+				        
+	ENCODE_SEQID_OP_TAIL(locku->lu_stateowner);
+}
+
 
 static void
 nfsd4_encode_link(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_link *link)
@@ -2231,6 +2267,9 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 		break;
 	case OP_LOCKT:
 		nfsd4_encode_lockt(resp, op->status, &op->u.lockt);
+		break;
+	case OP_LOCKU:
+		nfsd4_encode_locku(resp, op->status, &op->u.locku);
 		break;
 	case OP_LOOKUP:
 		break;
