@@ -13,16 +13,16 @@
 
 #include <linux/types.h>
 
-static int wd7000_set_info (char *buffer, int length, struct Scsi_Host *host);
-static int wd7000_proc_info (char *buffer, char **start, off_t offset, int length, int hostno, int inout);
-static int wd7000_detect (Scsi_Host_Template *);
-static int wd7000_command (Scsi_Cmnd *);
-static int wd7000_queuecommand (Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-static int wd7000_abort (Scsi_Cmnd *);
-static int wd7000_bus_reset (Scsi_Cmnd *);
-static int wd7000_host_reset (Scsi_Cmnd *);
-static int wd7000_device_reset (Scsi_Cmnd *);
-static int wd7000_biosparam (Disk *, struct block_device *, int *);
+static int wd7000_set_info(char *buffer, int length, struct Scsi_Host *host);
+static int wd7000_proc_info(char *buffer, char **start, off_t offset, int length, int hostno, int inout);
+static int wd7000_detect(Scsi_Host_Template *);
+static int wd7000_command(Scsi_Cmnd *);
+static int wd7000_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
+static int wd7000_abort(Scsi_Cmnd *);
+static int wd7000_bus_reset(Scsi_Cmnd *);
+static int wd7000_host_reset(Scsi_Cmnd *);
+static int wd7000_device_reset(Scsi_Cmnd *);
+static int wd7000_biosparam(Disk *, struct block_device *, int *);
 
 #ifndef NULL
 #define NULL 0L
