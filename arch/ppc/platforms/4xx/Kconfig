@@ -13,6 +13,9 @@ choice
 config ASH
 	bool "Ash"
 
+config BEECH
+	bool "Beech"
+
 config CEDAR
 	bool "Cedar"
 
@@ -75,7 +78,7 @@ config IBM405_ERR51
 
 config IBM_OCP
 	bool
-	depends on ASH || CEDAR || CPCI405 || EP405 || REDWOOD_4 || REDWOOD_5 || WALNUT
+	depends on ASH || BEECH || CEDAR || CPCI405 || EP405 || REDWOOD_4 || REDWOOD_5 || WALNUT
 	default y
 
 config NP405L
@@ -110,7 +113,7 @@ config EMBEDDEDBOOT
 
 config IBM_OPENBIOS
 	bool
-	depends on ASH || CEDAR || REDWOOD_4 || REDWOOD_5 || WALNUT
+	depends on ASH || BEECH || CEDAR || REDWOOD_4 || REDWOOD_5 || WALNUT
 	default y
 
 config 405_DMA
