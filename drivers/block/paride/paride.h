@@ -93,6 +93,7 @@ extern void pi_connect(PIA *pi);
 extern void pi_disconnect(PIA *pi);
 
 extern void pi_do_claimed(PIA *pi, void (*cont)(void));
+extern int pi_schedule_claimed(PIA *pi, void (*cont)(void));
 
 /* macros and functions exported to the protocol modules */
 

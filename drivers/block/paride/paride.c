@@ -102,7 +102,7 @@ static void pi_wake_up(void *p)
 
 #endif
 
-void pi_do_claimed(PIA * pi, void (*cont) (void))
+int pi_schedule_claimed(PIA * pi, void (*cont) (void))
 {
 #ifdef CONFIG_PARPORT
 	unsigned long flags;
@@ -111,12 +111,19 @@ void pi_do_claimed(PIA * pi, void (*cont) (void))
 	if (pi->pardev && parport_claim(pi->pardev)) {
 		pi->claim_cont = cont;
 		spin_unlock_irqrestore(&pi_spinlock, flags);
-		return;
+		return 0;
 	}
 	pi->claimed = 1;
 	spin_unlock_irqrestore(&pi_spinlock, flags);
 #endif
-	cont();
+	return 1;
+}
+EXPORT_SYMBOL(pi_schedule_claimed);
+
+void pi_do_claimed(PIA * pi, void (*cont) (void))
+{
+	if (pi_schedule_claimed(pi, cont))
+		cont();
 }
 
 EXPORT_SYMBOL(pi_do_claimed);
