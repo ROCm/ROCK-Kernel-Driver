@@ -33,8 +33,10 @@ long sys_fadvise64(int fd, loff_t offset, size_t len, int advice)
 
 	inode = file->f_dentry->d_inode;
 	mapping = inode->i_mapping;
-	if (!mapping)
-		return -EINVAL;
+	if (!mapping) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	bdi = mapping->backing_dev_info;
 
@@ -69,6 +71,7 @@ long sys_fadvise64(int fd, loff_t offset, size_t len, int advice)
 	default:
 		ret = -EINVAL;
 	}
+out:
 	fput(file);
 	return ret;
 }
