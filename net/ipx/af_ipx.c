@@ -1683,7 +1683,7 @@ out:
 }
 
 static int ipx_sendmsg(struct kiocb *iocb, struct socket *sock,
-	struct msghdr *msg, int len)
+	struct msghdr *msg, size_t len)
 {
 	struct sock *sk = sock->sk;
 	struct ipx_opt *ipxs = ipx_sk(sk);
@@ -1696,6 +1696,10 @@ static int ipx_sendmsg(struct kiocb *iocb, struct socket *sock,
 /*	if (sk->sk_zapped)
 		return -EIO; */	/* Socket not bound */
 	if (flags & ~MSG_DONTWAIT)
+		goto out;
+
+	/* Max possible packet size limited by 16 bit pktsize in header */
+	if (len >= 65535 - sizeof(struct ipxhdr))
 		goto out;
 
 	if (usipx) {
@@ -1744,7 +1748,7 @@ out:
 
 
 static int ipx_recvmsg(struct kiocb *iocb, struct socket *sock,
-		struct msghdr *msg, int size, int flags)
+		struct msghdr *msg, size_t size, int flags)
 {
 	struct sock *sk = sock->sk;
 	struct ipx_opt *ipxs = ipx_sk(sk);

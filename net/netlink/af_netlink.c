@@ -601,7 +601,7 @@ static inline void netlink_rcv_wake(struct sock *sk)
 }
 
 static int netlink_sendmsg(struct kiocb *kiocb, struct socket *sock,
-			   struct msghdr *msg, int len)
+			   struct msghdr *msg, size_t len)
 {
 	struct sock_iocb *siocb = kiocb_to_siocb(kiocb);
 	struct sock *sk = sock->sk;
@@ -641,7 +641,7 @@ static int netlink_sendmsg(struct kiocb *kiocb, struct socket *sock,
 	}
 
 	err = -EMSGSIZE;
-	if ((unsigned)len > sk->sk_sndbuf - 32)
+	if (len > sk->sk_sndbuf - 32)
 		goto out;
 	err = -ENOBUFS;
 	skb = alloc_skb(len, GFP_KERNEL);
@@ -683,7 +683,7 @@ out:
 }
 
 static int netlink_recvmsg(struct kiocb *kiocb, struct socket *sock,
-			   struct msghdr *msg, int len,
+			   struct msghdr *msg, size_t len,
 			   int flags)
 {
 	struct sock_iocb *siocb = kiocb_to_siocb(kiocb);
@@ -691,7 +691,7 @@ static int netlink_recvmsg(struct kiocb *kiocb, struct socket *sock,
 	struct sock *sk = sock->sk;
 	struct netlink_opt *nlk = nlk_sk(sk);
 	int noblock = flags&MSG_DONTWAIT;
-	int copied;
+	size_t copied;
 	struct sk_buff *skb;
 	int err;
 

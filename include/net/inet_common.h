@@ -23,11 +23,11 @@ extern int			inet_accept(struct socket *sock,
 extern int			inet_recvmsg(struct kiocb *iocb,
 					     struct socket *sock, 
 					     struct msghdr *ubuf, 
-					     int size, int flags);
+					     size_t size, int flags);
 extern int			inet_sendmsg(struct kiocb *iocb,
 					     struct socket *sock, 
 					     struct msghdr *msg, 
-					     int size);
+					     size_t size);
 extern int			inet_shutdown(struct socket *sock, int how);
 extern unsigned int		inet_poll(struct file * file, struct socket *sock, struct poll_table_struct *wait);
 extern int			inet_setsockopt(struct socket *sock, int level,

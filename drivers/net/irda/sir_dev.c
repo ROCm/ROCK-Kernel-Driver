@@ -31,7 +31,9 @@ void sirdev_enable_rx(struct sir_dev *dev)
 
 	/* flush rx-buffer - should also help in case of problems with echo cancelation */
 	dev->rx_buff.data = dev->rx_buff.head;
-	dev->tx_buff.len = 0;
+	dev->rx_buff.len = 0;
+	dev->rx_buff.in_frame = FALSE;
+	dev->rx_buff.state = OUTSIDE_FRAME;
 	atomic_set(&dev->enable_rx, 1);
 }
 
@@ -62,24 +64,34 @@ int sirdev_set_dongle(struct sir_dev *dev, IRDA_DONGLE type)
 
 int sirdev_raw_write(struct sir_dev *dev, const char *buf, int len)
 {
+	unsigned long flags;
 	int ret;
 
 	if (unlikely(len > dev->tx_buff.truesize))
 		return -ENOSPC;
 
-	spin_lock_bh(&dev->tx_lock);		/* serialize with other tx operations */
-	while (dev->tx_buff.len > 0) {		/* wait until tx idle */
-		spin_unlock_bh(&dev->tx_lock);
+	spin_lock_irqsave(&dev->tx_lock, flags);	/* serialize with other tx operations */
+	while (dev->tx_buff.len > 0) {			/* wait until tx idle */
+		spin_unlock_irqrestore(&dev->tx_lock, flags);
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(MSECS_TO_JIFFIES(10));
-		spin_lock_bh(&dev->tx_lock);
+		spin_lock_irqsave(&dev->tx_lock, flags);
 	}
 
 	dev->tx_buff.data = dev->tx_buff.head;
 	memcpy(dev->tx_buff.data, buf, len);	
+	dev->tx_buff.len = len;
 
 	ret = dev->drv->do_write(dev, dev->tx_buff.data, dev->tx_buff.len);
-	spin_unlock_bh(&dev->tx_lock);
+	if (ret > 0) {
+		IRDA_DEBUG(3, "%s(), raw-tx started\n", __FUNCTION__);
+
+		dev->tx_buff.data += ret;
+		dev->tx_buff.len -= ret;
+		dev->raw_tx = 1;
+		ret = len;		/* all data is going to be sent */
+	}
+	spin_unlock_irqrestore(&dev->tx_lock, flags);
 	return ret;
 }
 
@@ -94,13 +106,13 @@ int sirdev_raw_read(struct sir_dev *dev, char *buf, int len)
 
 	count = (len < dev->rx_buff.len) ? len : dev->rx_buff.len;
 
-	if (count > 0)
-		memcpy(buf, dev->rx_buff.head, count);
+	if (count > 0) {
+		memcpy(buf, dev->rx_buff.data, count);
+		dev->rx_buff.data += count;
+		dev->rx_buff.len -= count;
+	}
 
-	/* forget trailing stuff */
-	dev->rx_buff.data = dev->rx_buff.head;
-	dev->rx_buff.len = 0;
-	dev->rx_buff.state = OUTSIDE_FRAME;
+	/* remaining stuff gets flushed when re-enabling normal rx */
 
 	return count;
 }
@@ -114,11 +126,12 @@ int sirdev_raw_read(struct sir_dev *dev, char *buf, int len)
 
 void sirdev_write_complete(struct sir_dev *dev)
 {
+	unsigned long flags;
 	struct sk_buff *skb;
 	int actual = 0;
 	int err;
 	
-	spin_lock_bh(&dev->tx_lock);
+	spin_lock_irqsave(&dev->tx_lock, flags);
 
 	IRDA_DEBUG(3, "%s() - dev->tx_buff.len = %d\n",
 		   __FUNCTION__, dev->tx_buff.len);
@@ -143,9 +156,22 @@ void sirdev_write_complete(struct sir_dev *dev)
 			dev->tx_buff.len = 0;
 		}
 		if (dev->tx_buff.len > 0) {
-			spin_unlock_bh(&dev->tx_lock);
+			spin_unlock_irqrestore(&dev->tx_lock, flags);
 			return;
 		}
+	}
+
+	if (unlikely(dev->raw_tx != 0)) {
+		/* in raw mode we are just done now after the buffer was sent
+		 * completely. Since this was requested by some dongle driver
+		 * running under the control of the irda-thread we must take
+		 * care here not to re-enable the queue. The queue will be
+		 * restarted when the irda-thread has completed the request.
+		 */
+
+		IRDA_DEBUG(3, "%s(), raw-tx done\n", __FUNCTION__);
+		dev->raw_tx = 0;
+		return;
 	}
 
 	/* we have finished now sending this skb.
@@ -190,7 +216,7 @@ void sirdev_write_complete(struct sir_dev *dev)
 		netif_wake_queue(dev->netdev);
 	}
 
-	spin_unlock_bh(&dev->tx_lock);
+	spin_unlock_irqrestore(&dev->tx_lock, flags);
 }
 
 /* called from client driver - likely with bh-context - to give us
@@ -258,6 +284,7 @@ static struct net_device_stats *sirdev_get_stats(struct net_device *ndev)
 static int sirdev_hard_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
 	struct sir_dev *dev = ndev->priv;
+	unsigned long flags;
 	int actual = 0;
 	int err;
 	s32 speed;
@@ -307,7 +334,7 @@ static int sirdev_hard_xmit(struct sk_buff *skb, struct net_device *ndev)
 	}
 
 	/* serialize with write completion */
-	spin_lock_bh(&dev->tx_lock);
+	spin_lock_irqsave(&dev->tx_lock, flags);
 
         /* Copy skb to tx_buff while wrapping, stuffing and making CRC */
 	dev->tx_buff.len = async_wrap_skb(skb, dev->tx_buff.data, dev->tx_buff.truesize); 
@@ -337,7 +364,7 @@ static int sirdev_hard_xmit(struct sk_buff *skb, struct net_device *ndev)
 		dev->stats.tx_dropped++;		      
 		netif_wake_queue(ndev);
 	}
-	spin_unlock_bh(&dev->tx_lock);
+	spin_unlock_irqrestore(&dev->tx_lock, flags);
 
 	return 0;
 }
@@ -479,6 +506,7 @@ static int sirdev_open(struct net_device *ndev)
 		goto errout_free;
 
 	sirdev_enable_rx(dev);
+	dev->raw_tx = 0;
 
 	netif_start_queue(ndev);
 	dev->irlap = irlap_open(ndev, &dev->qos, dev->hwname);

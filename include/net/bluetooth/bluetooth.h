@@ -129,7 +129,7 @@ int  bt_sock_unregister(int proto);
 struct sock *bt_sock_alloc(struct socket *sock, int proto, int pi_size, int prio);
 void bt_sock_link(struct bt_sock_list *l, struct sock *s);
 void bt_sock_unlink(struct bt_sock_list *l, struct sock *s);
-int  bt_sock_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, int len, int flags);
+int  bt_sock_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, size_t len, int flags);
 uint bt_sock_poll(struct file * file, struct socket *sock, poll_table *wait);
 int  bt_sock_wait_state(struct sock *sk, int state, unsigned long timeo);
 
