@@ -2668,10 +2668,11 @@ static int selinux_socket_unix_may_send(struct socket *sock,
 static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 {
 	int err = 0;
-	u32 netif_perm;
+	u32 netif_perm, node_perm, node_sid;
 	struct socket *sock;
 	struct inode *inode;
 	struct net_device *dev;
+	struct iphdr *iph;
 	struct sel_netif *netif;
 	struct netif_security_struct *nsec;
 	struct inode_security_struct *isec;
@@ -2707,14 +2708,17 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	switch (isec->sclass) {
 	case SECCLASS_UDP_SOCKET:
 		netif_perm = NETIF__UDP_RECV;
+		node_perm = NODE__UDP_RECV;
 		break;
 	
 	case SECCLASS_TCP_SOCKET:
 		netif_perm = NETIF__TCP_RECV;
+		node_perm = NODE__TCP_RECV;
 		break;
 	
 	default:
 		netif_perm = NETIF__RAWIP_RECV;
+		node_perm = NODE__RAWIP_RECV;
 		break;
 	}
 
@@ -2724,8 +2728,18 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 
 	err = avc_has_perm(isec->sid, nsec->if_sid, SECCLASS_NETIF,
 	                   netif_perm, &nsec->avcr, &ad);
-
 	sel_netif_put(netif);
+	if (err)
+		goto out;
+	
+	/* Fixme: this lookup is inefficient */
+	iph = skb->nh.iph;
+	err = security_node_sid(PF_INET, &iph->saddr, sizeof(iph->saddr), &node_sid);
+	if (err)
+		goto out;
+	
+	err = avc_has_perm(isec->sid, node_sid, SECCLASS_NODE, node_perm, NULL, &ad);
+
 out:	
 	return err;
 }
@@ -2738,9 +2752,10 @@ static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
                                               int (*okfn)(struct sk_buff *))
 {
 	int err = NF_ACCEPT;
-	u32 netif_perm;
+	u32 netif_perm, node_perm, node_sid;
 	struct socket *sock;
 	struct inode *inode;
+	struct iphdr *iph;
 	struct sel_netif *netif;
 	struct sk_buff *skb = *pskb;
 	struct netif_security_struct *nsec;
@@ -2771,14 +2786,17 @@ static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
 	switch (isec->sclass) {
 	case SECCLASS_UDP_SOCKET:
 		netif_perm = NETIF__UDP_SEND;
+		node_perm = NODE__UDP_SEND;
 		break;
 	
 	case SECCLASS_TCP_SOCKET:
 		netif_perm = NETIF__TCP_SEND;
+		node_perm = NODE__TCP_SEND;
 		break;
 	
 	default:
 		netif_perm = NETIF__RAWIP_SEND;
+		node_perm = NODE__RAWIP_SEND;
 		break;
 	}
 
@@ -2788,8 +2806,18 @@ static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
 
 	err = avc_has_perm(isec->sid, nsec->if_sid, SECCLASS_NETIF,
 	                   netif_perm, &nsec->avcr, &ad) ? NF_DROP : NF_ACCEPT;
-
 	sel_netif_put(netif);
+	if (err != NF_ACCEPT)
+		goto out;
+		
+	/* Fixme: this lookup is inefficient */
+	iph = skb->nh.iph;
+	err = security_node_sid(PF_INET, &iph->daddr, sizeof(iph->daddr), &node_sid);
+	if (err)
+		goto out;
+	
+	err = avc_has_perm(isec->sid, node_sid, SECCLASS_NODE,
+	                   node_perm, NULL, &ad) ? NF_DROP : NF_ACCEPT;
 out:
 	return err;
 }
