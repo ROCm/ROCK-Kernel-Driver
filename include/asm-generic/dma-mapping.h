@@ -10,6 +10,8 @@
 /* we implement the API below in terms of the existing PCI one,
  * so include it */
 #include <linux/pci.h>
+/* need struct page definitions */
+#include <linux/mm.h>
 
 static inline int
 dma_supported(struct device *dev, u64 mask)
