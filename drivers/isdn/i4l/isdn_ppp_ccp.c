@@ -259,11 +259,14 @@ ippp_ccp_free(struct ippp_ccp *ccp)
 {
 	int id;
 
-	if (ccp->comp_stat)
+	if (ccp->comp_stat) {
 		ccp->compressor->free(ccp->comp_stat);
-	if (ccp->decomp_stat)
+		module_put(ccp->compressor->owner);
+	}
+	if (ccp->decomp_stat) {
 		ccp->decompressor->free(ccp->decomp_stat);
-
+		module_put(ccp->decompressor->owner);
+	}
 	for (id = 0; id < 256; id++) {
 		if (ccp->reset->rs[id])
 			ippp_ccp_reset_free_state(ccp, id);
@@ -553,13 +556,14 @@ ippp_ccp_send_ccp(struct ippp_ccp *ccp, struct sk_buff *skb)
 	}
 }
 
-static struct isdn_ppp_compressor *ipc_head = NULL;
+static LIST_HEAD(ipc_head);
+static spinlock_t ipc_head_lock;
 
 int
 ippp_ccp_set_compressor(struct ippp_ccp *ccp, int unit,
 			struct isdn_ppp_comp_data *data)
 {
-	struct isdn_ppp_compressor *ipc = ipc_head;
+	struct isdn_ppp_compressor *ipc;
 	int ret;
 	void *stat;
 	int num = data->num;
@@ -568,34 +572,48 @@ ippp_ccp_set_compressor(struct ippp_ccp *ccp, int unit,
 		printk(KERN_DEBUG "[%d] Set %scompressor type %d\n", unit,
 		       data->flags & IPPP_COMP_FLAG_XMIT ? "" : "de", num);
 
-	for (ipc = ipc_head; ipc; ipc = ipc->next) {
-		if (ipc->num != num)
-			continue;
-		
-		stat = ipc->alloc(data);
-		if (!stat) {
-			printk(KERN_ERR "Can't alloc (de)compression!\n");
-			break;
+	spin_lock(&ipc_head_lock);
+	list_for_each_entry(ipc, &ipc_head, list) {
+		if (ipc->num == num &&
+		    try_module_get(ipc->owner))
+			goto found;
+	}
+	spin_unlock(&ipc_head_lock);
+	return -EINVAL;
+
+ found:
+	spin_unlock(&ipc_head_lock);
+
+	stat = ipc->alloc(data);
+	if (!stat) {
+		printk(KERN_ERR "Can't alloc (de)compression!\n");
+		goto err;
+	}
+	ret = ipc->init(stat, data, unit, 0);
+	if(!ret) {
+		printk(KERN_ERR "Can't init (de)compression!\n");
+		ipc->free(stat);
+		goto err;
+	}
+	if (data->flags & IPPP_COMP_FLAG_XMIT) {
+		if (ccp->comp_stat) {
+			ccp->compressor->free(ccp->comp_stat);
+			module_put(ccp->compressor->owner);
 		}
-		ret = ipc->init(stat, data, unit, 0);
-		if(!ret) {
-			printk(KERN_ERR "Can't init (de)compression!\n");
-			ipc->free(stat);
-			break;
-		}
-		if (data->flags & IPPP_COMP_FLAG_XMIT) {
-			if (ccp->comp_stat)
-				ccp->compressor->free(ccp->comp_stat);
 			ccp->comp_stat = stat;
 			ccp->compressor = ipc;
-		} else {
-			if (ccp->decomp_stat)
-				ccp->decompressor->free(ccp->decomp_stat);
-			ccp->decomp_stat = stat;
-			ccp->decompressor = ipc;
+	} else {
+		if (ccp->decomp_stat) {
+			ccp->decompressor->free(ccp->decomp_stat);
+			module_put(ccp->decompressor->owner);
 		}
-		return 0;
+		ccp->decomp_stat = stat;
+		ccp->decompressor = ipc;
 	}
+	return 0;
+
+ err:
+	module_put(ipc->owner);
 	return -EINVAL;
 }
 
@@ -606,36 +624,34 @@ ippp_ccp_get_compressors(unsigned long protos[8])
 	int i, j;
 
 	memset(protos, 0, sizeof(unsigned long) * 8);
-	for (ipc = ipc_head; ipc; ipc = ipc->next) {
+
+	spin_lock(&ipc_head_lock);
+	list_for_each_entry(ipc, &ipc_head, list) {
 		j = ipc->num / (sizeof(long)*8);
 		i = ipc->num % (sizeof(long)*8);
 		if (j < 8)
 			protos[j] |= 1 << i;
 	}
+	spin_unlock(&ipc_head_lock);
 }
 
 int
 isdn_ppp_register_compressor(struct isdn_ppp_compressor *ipc)
 {
-	ipc->next = ipc_head;
-	ipc->prev = NULL;
-	if (ipc_head) {
-		ipc_head->prev = ipc;
-	}
-	ipc_head = ipc;
+	spin_lock(&ipc_head_lock);
+	list_add_tail(&ipc->list, &ipc_head);
+	spin_unlock(&ipc_head_lock);
+
 	return 0;
 }
 
 int
 isdn_ppp_unregister_compressor(struct isdn_ppp_compressor *ipc)
 {
-	if (ipc->prev)
-		ipc->prev->next = ipc->next;
-	else
-		ipc_head = ipc->next;
-	if (ipc->next)
-		ipc->next->prev = ipc->prev;
-	ipc->prev = ipc->next = NULL;
+	spin_lock(&ipc_head_lock);
+	list_del(&ipc->list);
+	spin_unlock(&ipc_head_lock);
+
 	return 0;
 }
 
