@@ -1063,7 +1063,7 @@ static int process_changeinstatus (struct slot *pslot, struct slot *poldslot)
 	if (disable) {
 		debug ("process_changeinstatus - disable slot\n");
 		pslot->flag = FALSE;
-		rc = ibmphp_disable_slot (pslot->hotplug_slot);
+		rc = ibmphp_do_disable_slot (pslot);
 	}
 
 	if (update || disable) {

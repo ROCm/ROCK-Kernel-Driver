@@ -18,7 +18,7 @@ endif
 
 cpqphp-objs		:=	cpqphp_core.o	\
 				cpqphp_ctrl.o	\
-				cpqphp_proc.o	\
+				cpqphp_sysfs.o	\
 				cpqphp_pci.o
 
 ibmphp-objs		:=	ibmphp_core.o	\

@@ -10,6 +10,7 @@
 #define DBG(x...)
 #endif
 
+static void pci_free_resources(struct pci_dev *dev);
 
 #ifdef CONFIG_HOTPLUG
 int pci_hotplug (struct device *dev, char **envp, int num_envp,
@@ -185,7 +186,13 @@ int pci_remove_device_safe(struct pci_dev *dev)
 {
 	if (pci_dev_driver(dev))
 		return -EBUSY;
-	pci_remove_device(dev);
+	device_unregister(&dev->dev);
+	list_del(&dev->bus_list);
+	list_del(&dev->global_list);
+	pci_free_resources(dev);
+#ifdef CONFIG_PROC_FS
+	pci_proc_detach_device(dev);
+#endif
 	return 0;
 }
 EXPORT_SYMBOL(pci_remove_device_safe);
@@ -233,15 +240,33 @@ pci_free_resources(struct pci_dev *dev)
 }
 
 /**
- * pci_remove_device - remove a pci device
+ * pci_remove_bus_device - remove a PCI device and any children
  * @dev: the device to remove
  *
- * Delete the device structure from the device lists,
- * remove the /proc entry, and notify userspace (/sbin/hotplug).
+ * Remove a PCI device from the device lists, informing the drivers
+ * that the device has been removed.  We also remove any subordinate
+ * buses and children in a depth-first manner.
+ *
+ * For each device we remove, delete the device structure from the
+ * device lists, remove the /proc entry, and notify userspace
+ * (/sbin/hotplug).
  */
-void
-pci_remove_device(struct pci_dev *dev)
+void pci_remove_bus_device(struct pci_dev *dev)
 {
+	if (dev->subordinate) {
+		struct pci_bus *b = dev->subordinate;
+
+		pci_remove_behind_bridge(dev);
+
+#ifdef CONFIG_PROC_FS
+		pci_proc_detach_bus(b);
+#endif
+
+		list_del(&b->node);
+		kfree(b);
+		dev->subordinate = NULL;
+	}
+
 	device_unregister(&dev->dev);
 	list_del(&dev->bus_list);
 	list_del(&dev->global_list);
@@ -249,9 +274,33 @@ pci_remove_device(struct pci_dev *dev)
 #ifdef CONFIG_PROC_FS
 	pci_proc_detach_device(dev);
 #endif
+
+	kfree(dev);
+}
+
+/**
+ * pci_remove_behind_bridge - remove all devices behind a PCI bridge
+ * @dev: PCI bridge device
+ *
+ * Remove all devices on the bus, except for the parent bridge.
+ * This also removes any child buses, and any devices they may
+ * contain in a depth-first manner.
+ */
+void pci_remove_behind_bridge(struct pci_dev *dev)
+{
+	struct list_head *l, *n;
+
+	if (dev->subordinate) {
+		list_for_each_safe(l, n, &dev->subordinate->devices) {
+			struct pci_dev *dev = pci_dev_b(l);
+
+			pci_remove_bus_device(dev);
+		}
+	}
 }
 
 #ifdef CONFIG_HOTPLUG
 EXPORT_SYMBOL(pci_insert_device);
-EXPORT_SYMBOL(pci_remove_device);
+EXPORT_SYMBOL(pci_remove_bus_device);
+EXPORT_SYMBOL(pci_remove_behind_bridge);
 #endif

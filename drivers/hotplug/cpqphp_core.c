@@ -1038,6 +1038,7 @@ static int cpqhpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dbg ("    pcix_support           %s\n", ctrl->pcix_support == 0 ? "not supported" : "supported");
 
 	ctrl->pci_dev = pdev;
+	pci_set_drvdata(pdev, ctrl);
 
 	/* make our own copy of the pci bus structure, as we like tweaking it a lot */
 	ctrl->pci_bus = kmalloc (sizeof (*ctrl->pci_bus), GFP_KERNEL);
@@ -1231,11 +1232,7 @@ static int cpqhpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	// Done with exclusive hardware access
 	up(&ctrl->crit_sect);
 
-	rc = cpqhp_proc_create_ctrl (ctrl);
-	if (rc) {
-		err("cpqhp_proc_create_ctrl failed\n");
-		goto err_free_irq;
-	}
+	cpqhp_create_ctrl_files (ctrl);
 
 	return 0;
 
@@ -1309,10 +1306,6 @@ static int one_time_init(void)
 		goto error;
 	}
 
-	retval = cpqhp_proc_init_ctrl();
-	if (retval)
-		goto error;
-
 	initialized = 1;
 
 	return retval;
@@ -1343,8 +1336,6 @@ static void unload_cpqphpd(void)
 	ctrl = cpqhp_ctrl_list;
 
 	while (ctrl) {
-		cpqhp_proc_remove_ctrl (ctrl);
-
 		if (ctrl->hpc_reg) {
 			u16 misc;
 			rc = read_slot_enable (ctrl);
@@ -1431,8 +1422,6 @@ static void unload_cpqphpd(void)
 		}
 	}
 
-	remove_proc_entry("hpc", 0);
-
 	// Stop the notification mechanism
 	cpqhp_event_stop_thread();
 
@@ -1490,9 +1479,6 @@ static int __init cpqhpc_init(void)
 
 static void __exit cpqhpc_cleanup(void)
 {
-	dbg("cleaning up proc entries\n");
-	cpqhp_proc_destroy_ctrl();
-
 	dbg("unload_cpqphpd()\n");
 	unload_cpqphpd();
 
