@@ -44,7 +44,7 @@ static struct signal_struct init_signals = INIT_SIGNALS;
 struct mm_struct init_mm = INIT_MM(init_mm);
 
 union task_union init_task_union
-__attribute__((section("init_task"), aligned(KTHREAD_SIZE)))
+__attribute__((section("init_task"), aligned(THREAD_SIZE)))
 	= { task: INIT_TASK(init_task_union.task) };
 
 asmlinkage void ret_from_fork(void);
@@ -148,7 +148,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	   : "=d" (retval)
 	   : "0" (__NR_clone), "i" (__NR_exit),
 	     "r" (arg), "a" (fn), "d" (clone_arg), "r" (current),
-	     "i" (-KTHREAD_SIZE)
+	     "i" (-THREAD_SIZE)
 	   : "d0", "d2");
 	pid = retval;
 	}
@@ -206,8 +206,8 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	struct switch_stack * childstack, *stack;
 	unsigned long stack_offset, *retp;
 
-	stack_offset = KTHREAD_SIZE - sizeof(struct pt_regs);
-	childregs = (struct pt_regs *) ((unsigned long) p + stack_offset);
+	stack_offset = THREAD_SIZE - sizeof(struct pt_regs);
+	childregs = (struct pt_regs *) ((unsigned long) (p->thread_info) + stack_offset);
 
 	*childregs = *regs;
 	childregs->d0 = 0;
