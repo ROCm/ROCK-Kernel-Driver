@@ -241,6 +241,7 @@ int hfsplus_create(struct inode *dir, struct dentry *dentry, int mode,
 	res = hfsplus_create_cat(inode->i_ino, dir, &dentry->d_name, inode);
 	if (res) {
 		inode->i_nlink = 0;
+		hfsplus_delete_inode(inode);
 		iput(inode);
 		return res;
 	}
@@ -357,6 +358,7 @@ int hfsplus_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	res = hfsplus_create_cat(inode->i_ino, dir, &dentry->d_name, inode);
 	if (res) {
 		inode->i_nlink = 0;
+		hfsplus_delete_inode(inode);
 		iput(inode);
 		return res;
 	}
@@ -397,7 +399,8 @@ int hfsplus_symlink(struct inode *dir, struct dentry *dentry, const char *symnam
 	res = page_symlink(inode, symname, strlen(symname) + 1);
 	if (res) {
 		inode->i_nlink = 0;
-		iput (inode);
+		hfsplus_delete_inode(inode);
+		iput(inode);
 		return res;
 	}
 
@@ -426,6 +429,7 @@ int hfsplus_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev
 	res = hfsplus_create_cat(inode->i_ino, dir, &dentry->d_name, inode);
 	if (res) {
 		inode->i_nlink = 0;
+		hfsplus_delete_inode(inode);
 		iput(inode);
 		return res;
 	}
