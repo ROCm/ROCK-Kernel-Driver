@@ -490,14 +490,14 @@ ENTRY(xscale_dtlb_unlock)
 #define PTE_CACHE_WRITE_ALLOCATE 0
 
 /*
- * cpu_xscale_set_pgd(pgd)
+ * cpu_xscale_switch_mm(pgd)
  *
  * Set the translation base pointer to be as described by pgd.
  *
  * pgd: new page tables
  */
 	.align	5
-ENTRY(cpu_xscale_set_pgd)
+ENTRY(cpu_xscale_switch_mm)
 	clean_d_cache r1, r2
 	mcr	p15, 0, ip, c7, c5, 0		@ Invalidate I cache & BTB
 	mcr	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
@@ -617,7 +617,7 @@ ENTRY(xscale_processor_functions)
 	.word	cpu_xscale_reset
 	.word	cpu_xscale_do_idle
 	.word	cpu_xscale_dcache_clean_area
-	.word	cpu_xscale_set_pgd
+	.word	cpu_xscale_switch_mm
 	.word	cpu_xscale_set_pte
 	.size	xscale_processor_functions, . - xscale_processor_functions
 

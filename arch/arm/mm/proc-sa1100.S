@@ -158,14 +158,14 @@ ENTRY(cpu_sa1100_dcache_clean_area)
 /* =============================== PageTable ============================== */
 
 /*
- * cpu_sa1100_set_pgd(pgd)
+ * cpu_sa1100_switch_mm(pgd)
  *
  * Set the translation base pointer to be as described by pgd.
  *
  * pgd: new page tables
  */
 	.align	5
-ENTRY(cpu_sa1100_set_pgd)
+ENTRY(cpu_sa1100_switch_mm)
 	flush_1100_dcache r3, ip, r1
 	mov	ip, #0
 	mcr	p15, 0, ip, c7, c5, 0		@ invalidate I cache
@@ -247,7 +247,7 @@ ENTRY(sa1100_processor_functions)
 	.word	cpu_sa1100_reset
 	.word	cpu_sa1100_do_idle
 	.word	cpu_sa1100_dcache_clean_area
-	.word	cpu_sa1100_set_pgd
+	.word	cpu_sa1100_switch_mm
 	.word	cpu_sa1100_set_pte
 	.size	sa1100_processor_functions, . - sa1100_processor_functions
 

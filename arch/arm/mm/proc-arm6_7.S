@@ -206,13 +206,13 @@ ENTRY(cpu_arm7_do_idle)
 		mov	pc, lr
 
 /*
- * Function: arm6_7_set_pgd(unsigned long pgd_phys)
+ * Function: arm6_7_switch_mm(unsigned long pgd_phys)
  * Params  : pgd_phys	Physical address of page table
  * Purpose : Perform a task switch, saving the old processes state, and restoring
  *	     the new.
  */
-ENTRY(cpu_arm6_set_pgd)
-ENTRY(cpu_arm7_set_pgd)
+ENTRY(cpu_arm6_switch_mm)
+ENTRY(cpu_arm7_switch_mm)
 		mov	r1, #0
 		mcr	p15, 0, r1, c7, c0, 0		@ flush cache
 		mcr	p15, 0, r0, c2, c0, 0		@ update page table ptr
@@ -319,7 +319,7 @@ ENTRY(arm6_processor_functions)
 		.word	cpu_arm6_icache_invalidate_page
 
 		/* pgtable */
-		.word	cpu_arm6_set_pgd
+		.word	cpu_arm6_switch_mm
 		.word	cpu_arm6_set_pte
 
 		.size	arm6_processor_functions, . - arm6_processor_functions
@@ -351,7 +351,7 @@ ENTRY(arm7_processor_functions)
 		.word	cpu_arm7_icache_invalidate_page
 
 		/* pgtable */
-		.word	cpu_arm7_set_pgd
+		.word	cpu_arm7_switch_mm
 		.word	cpu_arm7_set_pte
 
 		.size	arm7_processor_functions, . - arm7_processor_functions

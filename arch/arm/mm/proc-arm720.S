@@ -67,12 +67,12 @@ ENTRY(cpu_arm720_do_idle)
 		mov	pc, lr
 
 /*
- * Function: arm720_set_pgd(unsigned long pgd_phys)
+ * Function: arm720_switch_mm(unsigned long pgd_phys)
  * Params  : pgd_phys	Physical address of page table
  * Purpose : Perform a task switch, saving the old process' state and restoring
  *	     the new.
  */
-ENTRY(cpu_arm720_set_pgd)
+ENTRY(cpu_arm720_switch_mm)
 		mov	r1, #0
 		mcr	p15, 0, r1, c7, c7, 0		@ invalidate cache
 		mcr	p15, 0, r0, c2, c0, 0		@ update page table ptr
@@ -154,7 +154,7 @@ ENTRY(arm720_processor_functions)
 		.word	cpu_arm720_reset
 		.word	cpu_arm720_do_idle
 		.word	cpu_arm720_dcache_clean_area
-		.word	cpu_arm720_set_pgd
+		.word	cpu_arm720_switch_mm
 		.word	cpu_arm720_set_pte
 		.size	arm720_processor_functions, . - arm720_processor_functions
 

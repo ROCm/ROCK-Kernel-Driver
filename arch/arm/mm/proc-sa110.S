@@ -135,14 +135,14 @@ ENTRY(cpu_sa110_dcache_clean_area)
 /* =============================== PageTable ============================== */
 
 /*
- * cpu_sa110_set_pgd(pgd)
+ * cpu_sa110_switch_mm(pgd)
  *
  * Set the translation base pointer to be as described by pgd.
  *
  * pgd: new page tables
  */
 	.align	5
-ENTRY(cpu_sa110_set_pgd)
+ENTRY(cpu_sa110_switch_mm)
 	flush_110_dcache	r3, ip, r1
 	mov	r1, #0
 	mcr	p15, 0, r1, c7, c5, 0		@ invalidate I cache
@@ -222,7 +222,7 @@ ENTRY(sa110_processor_functions)
 	.word	cpu_sa110_dcache_clean_area
 
 	/* pgtable */
-	.word	cpu_sa110_set_pgd
+	.word	cpu_sa110_switch_mm
 	.word	cpu_sa110_set_pte
 
 	.size	sa110_processor_functions, . - sa110_processor_functions

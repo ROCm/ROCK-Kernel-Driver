@@ -297,14 +297,14 @@ ENTRY(cpu_arm922_dcache_clean_area)
 /* =============================== PageTable ============================== */
 
 /*
- * cpu_arm922_set_pgd(pgd)
+ * cpu_arm922_switch_mm(pgd)
  *
  * Set the translation base pointer to be as described by pgd.
  *
  * pgd: new page tables
  */
 	.align	5
-ENTRY(cpu_arm922_set_pgd)
+ENTRY(cpu_arm922_switch_mm)
 	mov	ip, #0
 #ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
 	mcr	p15, 0, ip, c7, c6, 0		@ invalidate D cache
@@ -426,7 +426,7 @@ arm922_processor_functions:
 	.word	cpu_arm922_reset
 	.word   cpu_arm922_do_idle
 	.word	cpu_arm922_dcache_clean_area
-	.word	cpu_arm922_set_pgd
+	.word	cpu_arm922_switch_mm
 	.word	cpu_arm922_set_pte
 	.size	arm922_processor_functions, . - arm922_processor_functions
 

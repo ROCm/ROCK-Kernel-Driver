@@ -293,14 +293,14 @@ ENTRY(cpu_arm920_dcache_clean_area)
 /* =============================== PageTable ============================== */
 
 /*
- * cpu_arm920_set_pgd(pgd)
+ * cpu_arm920_switch_mm(pgd)
  *
  * Set the translation base pointer to be as described by pgd.
  *
  * pgd: new page tables
  */
 	.align	5
-ENTRY(cpu_arm920_set_pgd)
+ENTRY(cpu_arm920_switch_mm)
 	mov	ip, #0
 #ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
 	mcr	p15, 0, ip, c7, c6, 0		@ invalidate D cache
@@ -422,7 +422,7 @@ arm920_processor_functions:
 	.word	cpu_arm920_reset
 	.word   cpu_arm920_do_idle
 	.word	cpu_arm920_dcache_clean_area
-	.word	cpu_arm920_set_pgd
+	.word	cpu_arm920_switch_mm
 	.word	cpu_arm920_set_pte
 	.size	arm920_processor_functions, . - arm920_processor_functions
 

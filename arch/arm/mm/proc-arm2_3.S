@@ -162,7 +162,7 @@ memc_phys_table_32:
  * and inaccessible (0x01f00000).
  * Params  : r0 = page table pointer
  */
-clear_tables:	ldr	r1, _arm3_set_pgd - 4
+clear_tables:	ldr	r1, _arm3_switch_mm - 4
 		ldr	r2, [r1]
 		sub	r1, r0, #256 * 4		@ start of MEMC tables
 		add	r2, r1, r2, lsl #2		@ end of tables
@@ -186,14 +186,16 @@ clear_tables:	ldr	r1, _arm3_set_pgd - 4
 		mov	pc, lr
 
 /*
- * Function: *_set_pgd(pgd_t *pgd)
+ * Function: *_switch_mm(pgd_t *pgd)
  * Params  : pgd	New page tables/MEMC mapping
  * Purpose : update MEMC hardware with new mapping
  */
 		.word	page_nr
-_arm3_set_pgd:	mcr	p15, 0, r1, c1, c0, 0		@ flush cache
-_arm2_set_pgd:	stmfd	sp!, {lr}
-		ldr	r1, _arm3_set_pgd - 4
+_arm3_switch_mm:
+		mcr	p15, 0, r1, c1, c0, 0		@ flush cache
+_arm2_switch_mm:
+		stmfd	sp!, {lr}
+		ldr	r1, _arm3_switch_mm - 4
 		ldr	r2, [r1]
 		sub	r0, r0, #256 * 4		@ start of MEMC tables
 		add	r1, r0, r2, lsl #2		@ end of tables
@@ -289,7 +291,7 @@ cpu_arm3_name:
 arm2_processor_functions:
 		.word	_arm2_proc_init
 		.word	_arm2_proc_fin
-		.word	_arm2_set_pgd
+		.word	_arm2_switch_mm
 		.word	_arm2_xchg_1
 		.word	_arm2_xchg_4
 
@@ -297,7 +299,7 @@ arm2_processor_functions:
 arm250_processor_functions:
 		.word	_arm2_proc_init
 		.word	_arm2_proc_fin
-		.word	_arm2_set_pgd
+		.word	_arm2_switch_mm
 		.word	_arm3_xchg_1
 		.word	_arm3_xchg_4
 
@@ -305,7 +307,7 @@ arm250_processor_functions:
 arm3_processor_functions:
 		.word	_arm3_proc_init
 		.word	_arm3_proc_fin
-		.word	_arm3_set_pgd
+		.word	_arm3_switch_mm
 		.word	_arm3_xchg_1
 		.word	_arm3_xchg_4
 

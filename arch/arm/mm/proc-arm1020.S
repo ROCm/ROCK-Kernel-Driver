@@ -335,14 +335,14 @@ ENTRY(cpu_arm1020_dcache_clean_area)
 /* =============================== PageTable ============================== */
 
 /*
- * cpu_arm1020_set_pgd(pgd)
+ * cpu_arm1020_switch_mm(pgd)
  *
  * Set the translation base pointer to be as described by pgd.
  *
  * pgd: new page tables
  */
 	.align	5
-ENTRY(cpu_arm1020_set_pgd)
+ENTRY(cpu_arm1020_switch_mm)
 #ifndef CONFIG_CPU_DCACHE_DISABLE
 	mcr	p15, 0, r3, c7, c10, 4
 	mov	r1, #0xF			@ 16 segments
@@ -482,7 +482,7 @@ arm1020_processor_functions:
 	.word	cpu_arm1020_reset
 	.word	cpu_arm1020_do_idle
 	.word	cpu_arm1020_dcache_clean_area
-	.word	cpu_arm1020_set_pgd
+	.word	cpu_arm1020_switch_mm
 	.word	cpu_arm1020_set_pte
 
 	.size	arm1020_processor_functions, . - arm1020_processor_functions

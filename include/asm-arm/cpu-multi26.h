@@ -24,7 +24,7 @@ extern struct processor {
 	/* Disable any processor specifics */
 	void (*_proc_fin)(void);
 	/* set the MEMC hardware mappings */
-	void (*_set_pgd)(pgd_t *pgd);
+	void (*_switch_mm)(pgd_t *pgd);
 	/* XCHG */
 	unsigned long (*_xchg_1)(unsigned long x, volatile void *ptr);
 	unsigned long (*_xchg_4)(unsigned long x, volatile void *ptr);
@@ -37,7 +37,7 @@ extern const struct processor arm3_processor_functions;
 #define cpu_proc_init()				processor._proc_init()
 #define cpu_proc_fin()				processor._proc_fin()
 #define cpu_do_idle()				do { } while (0)
-#define cpu_switch_mm(pgd,mm)			processor._set_pgd(pgd)
+#define cpu_switch_mm(pgd,mm)			processor._switch_mm(pgd)
 #define cpu_xchg_1(x,ptr)			processor._xchg_1(x,ptr)
 #define cpu_xchg_4(x,ptr)			processor._xchg_4(x,ptr)
 
