@@ -886,7 +886,7 @@ int prepare_binprm(struct linux_binprm *bprm)
 	mode = inode->i_mode;
 	/*
 	 * Check execute perms again - if the caller has CAP_DAC_OVERRIDE,
-	 * vfs_permission lets a non-executable through
+	 * generic_permission lets a non-executable through
 	 */
 	if (!(mode & 0111))	/* with at least _one_ execute bit set */
 		return -EACCES;

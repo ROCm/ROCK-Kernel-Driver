@@ -260,7 +260,7 @@ static int hfsplus_permission(struct inode *inode, int mask, struct nameidata *n
 	 */
 	if (S_ISREG(inode->i_mode) && mask & MAY_EXEC && !(inode->i_mode & 0111))
 		return 0;
-	return vfs_permission(inode, mask);
+	return generic_permission(inode, mask, NULL);
 }
 
 

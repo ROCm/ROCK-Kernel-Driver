@@ -152,15 +152,19 @@ char * getname(const char __user * filename)
 	return result;
 }
 
-/*
- *	vfs_permission()
+/**
+ * generic_permission  -  check for access rights on a Posix-like filesystem
+ * @inode:	inode to check access rights for
+ * @mask:	right to check for (%MAY_READ, %MAY_WRITE, %MAY_EXEC)
+ * @check_acl:	optional callback to check for Posix ACLs
  *
- * is used to check for read/write/execute permissions on a file.
+ * Used to check for read/write/execute permissions on a file.
  * We use "fsuid" for this, letting us set arbitrary permissions
  * for filesystem access without changing the "normal" uids which
  * are used for other things..
  */
-int vfs_permission(struct inode * inode, int mask)
+int generic_permission(struct inode *inode, int mask,
+		int (*check_acl)(struct inode *inode, int mask))
 {
 	umode_t			mode = inode->i_mode;
 
@@ -181,8 +185,18 @@ int vfs_permission(struct inode * inode, int mask)
 
 	if (current->fsuid == inode->i_uid)
 		mode >>= 6;
-	else if (in_group_p(inode->i_gid))
-		mode >>= 3;
+	else {
+		if (IS_POSIXACL(inode) && (mode & S_IRWXG) && check_acl) {
+			int error = check_acl(inode, mask);
+			if (error == -EACCES)
+				goto check_capabilities;
+			else if (error != -EAGAIN)
+				return error;
+		}
+
+		if (in_group_p(inode->i_gid))
+			mode >>= 3;
+	}
 
 	/*
 	 * If the DACs are ok we don't need any capability check.
@@ -190,6 +204,7 @@ int vfs_permission(struct inode * inode, int mask)
 	if (((mode & mask & (MAY_READ|MAY_WRITE|MAY_EXEC)) == mask))
 		return 0;
 
+ check_capabilities:
 	/*
 	 * Read/write DACs are always overridable.
 	 * Executable DACs are overridable if at least one exec bit is set.
@@ -220,7 +235,7 @@ int permission(struct inode * inode,int mask, struct nameidata *nd)
 	if (inode->i_op && inode->i_op->permission)
 		retval = inode->i_op->permission(inode, submask, nd);
 	else
-		retval = vfs_permission(inode, submask);
+		retval = generic_permission(inode, submask, NULL);
 	if (retval)
 		return retval;
 
@@ -315,7 +330,7 @@ static struct dentry * cached_lookup(struct dentry * parent, struct qstr * name,
 /*
  * Short-cut version of permission(), for calling by
  * path_walk(), when dcache lock is held.  Combines parts
- * of permission() and vfs_permission(), and tests ONLY for
+ * of permission() and generic_permission(), and tests ONLY for
  * MAY_EXEC permission.
  *
  * If appropriate, check DAC only.  If not appropriate, or
@@ -2456,7 +2471,7 @@ EXPORT_SYMBOL(vfs_follow_link);
 EXPORT_SYMBOL(vfs_link);
 EXPORT_SYMBOL(vfs_mkdir);
 EXPORT_SYMBOL(vfs_mknod);
-EXPORT_SYMBOL(vfs_permission);
+EXPORT_SYMBOL(generic_permission);
 EXPORT_SYMBOL(vfs_readlink);
 EXPORT_SYMBOL(vfs_rename);
 EXPORT_SYMBOL(vfs_rmdir);

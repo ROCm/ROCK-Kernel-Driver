@@ -7,8 +7,8 @@ or out of order NULL pointer checks in little used error paths).
 
 Version 1.21
 ------------
-Add new mount parm to control whether mode check (vfs_permission) is done on
-the client.  If Unix extensions are enabled and the uids on the client
+Add new mount parm to control whether mode check (generic_permission) is done
+on the client.  If Unix extensions are enabled and the uids on the client
 and server do not match, client permission checks are meaningless on
 server uids that do not exist on the client (this does not affect the
 normal ACL check which occurs on the server).  Fix default uid

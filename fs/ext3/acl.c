@@ -285,60 +285,24 @@ ext3_set_acl(handle_t *handle, struct inode *inode, int type,
 	return error;
 }
 
-/*
- * Inode operation permission().
- *
- * inode->i_sem: don't care
- */
+static int
+ext3_check_acl(struct inode *inode, int mask)
+{
+	struct posix_acl *acl = ext3_get_acl(inode, ACL_TYPE_ACCESS);
+
+	if (acl) {
+		int error = posix_acl_permission(inode, acl, mask);
+		posix_acl_release(acl);
+		return error;
+	}
+
+	return -EAGAIN;
+}
+
 int
 ext3_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
-	int mode = inode->i_mode;
-
-	/* Nobody gets write access to a read-only fs */
-	if ((mask & MAY_WRITE) && IS_RDONLY(inode) &&
-	    (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode)))
-		return -EROFS;
-	/* Nobody gets write access to an immutable file */
-	if ((mask & MAY_WRITE) && IS_IMMUTABLE(inode))
-	    return -EACCES;
-	if (current->fsuid == inode->i_uid) {
-		mode >>= 6;
-	} else if (test_opt(inode->i_sb, POSIX_ACL)) {
-		struct posix_acl *acl;
-
-		/* The access ACL cannot grant access if the group class
-		   permission bits don't contain all requested permissions. */
-		if (((mode >> 3) & mask & S_IRWXO) != mask)
-			goto check_groups;
-		acl = ext3_get_acl(inode, ACL_TYPE_ACCESS);
-		if (acl) {
-			int error = posix_acl_permission(inode, acl, mask);
-			posix_acl_release(acl);
-			if (error == -EACCES)
-				goto check_capabilities;
-			return error;
-		} else
-			goto check_groups;
-	} else {
-check_groups:
-		if (in_group_p(inode->i_gid))
-			mode >>= 3;
-	}
-	if ((mode & mask & S_IRWXO) == mask)
-		return 0;
-
-check_capabilities:
-	/* Allowed to override Discretionary Access Control? */
-	if (!(mask & MAY_EXEC) ||
-	    (inode->i_mode & S_IXUGO) || S_ISDIR(inode->i_mode))
-		if (capable(CAP_DAC_OVERRIDE))
-			return 0;
-	/* Read and search granted if capable(CAP_DAC_READ_SEARCH) */
-	if (capable(CAP_DAC_READ_SEARCH) && ((mask == MAY_READ) ||
-	    (S_ISDIR(inode->i_mode) && !(mask & MAY_WRITE))))
-		return 0;
-	return -EACCES;
+	return generic_permission(inode, mask, ext3_check_acl);
 }
 
 /*
