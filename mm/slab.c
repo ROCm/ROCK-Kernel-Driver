@@ -688,7 +688,7 @@ static inline void kmem_freepages (kmem_cache_t *cachep, void *addr)
 }
 
 #if DEBUG
-static inline void poison_obj (kmem_cache_t *cachep, void *addr)
+static void poison_obj (kmem_cache_t *cachep, void *addr)
 {
 	int size = cachep->objsize;
 	if (cachep->flags & SLAB_RED_ZONE) {
@@ -699,7 +699,7 @@ static inline void poison_obj (kmem_cache_t *cachep, void *addr)
 	*(unsigned char *)(addr+size-1) = POISON_END;
 }
 
-static inline int check_poison_obj (kmem_cache_t *cachep, void *addr)
+static int check_poison_obj (kmem_cache_t *cachep, void *addr)
 {
 	int size = cachep->objsize;
 	void *end;
