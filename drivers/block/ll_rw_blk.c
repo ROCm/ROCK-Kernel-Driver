@@ -1254,7 +1254,7 @@ get_rq:
 	req->buffer = bio_data(bio);	/* see ->buffer comment above */
 	req->waiting = NULL;
 	req->bio = req->biotail = bio;
-	req->rq_dev = bio->bi_dev;
+	req->rq_dev = to_kdev_t(bio->bi_bdev->bd_dev);
 	add_request(q, req, insert_here);
 out:
 	if (freereq)
@@ -1273,23 +1273,19 @@ end_io:
  */
 static inline void blk_partition_remap(struct bio *bio)
 {
-	int major, minor, drive, minor0;
+	struct block_device *bdev = bio->bi_bdev;
 	struct gendisk *g;
-	kdev_t dev0;
 
-	major = major(bio->bi_dev);
-	if ((g = get_gendisk(bio->bi_dev))) {
-		minor = minor(bio->bi_dev);
-		drive = (minor >> g->minor_shift);
-		minor0 = (drive << g->minor_shift); /* whole disk device */
-		/* that is, minor0 = (minor & ~((1<<g->minor_shift)-1)); */
-		dev0 = mk_kdev(major, minor0);
-		if (!kdev_same(dev0, bio->bi_dev)) {
-			bio->bi_dev = dev0;
-			bio->bi_sector += g->part[minor].start_sect;
-		}
-		/* lots of checks are possible */
-	}
+	if (bdev == bdev->bd_contains)
+		return;
+
+	g = get_gendisk(to_kdev_t(bdev->bd_dev));
+	if (!g)
+		BUG();
+
+	bio->bi_sector += g->part[minor(to_kdev_t((bdev->bd_dev)))].start_sect;
+	bio->bi_bdev = bdev->bd_contains;
+	/* lots of checks are possible */
 }
 
 /**
@@ -1324,7 +1320,7 @@ void generic_make_request(struct bio *bio)
 	int ret, nr_sectors = bio_sectors(bio);
 
 	/* Test device or partition size, when known. */
-	maxsector = (blkdev_size_in_bytes(bio->bi_dev) >> 9);
+	maxsector = bio->bi_bdev->bd_inode->i_size >> 9;
 	if (maxsector) {
 		sector_t sector = bio->bi_sector;
 
@@ -1336,7 +1332,8 @@ void generic_make_request(struct bio *bio)
 			printk(KERN_INFO
 			       "attempt to access beyond end of device\n");
 			printk(KERN_INFO "%s: rw=%ld, want=%ld, limit=%Lu\n",
-			       kdevname(bio->bi_dev), bio->bi_rw,
+			       kdevname(to_kdev_t(bio->bi_bdev->bd_dev)),
+			       bio->bi_rw,
 			       sector + nr_sectors,
 			       (long long) maxsector);
 
@@ -1354,11 +1351,12 @@ void generic_make_request(struct bio *bio)
 	 * Stacking drivers are expected to know what they are doing.
 	 */
 	do {
-		q = blk_get_queue(bio->bi_dev);
+		q = blk_get_queue(to_kdev_t(bio->bi_bdev->bd_dev));
 		if (!q) {
 			printk(KERN_ERR
 			       "generic_make_request: Trying to access nonexistent block-device %s (%Lu)\n",
-			       kdevname(bio->bi_dev), (long long) bio->bi_sector);
+			       kdevname(to_kdev_t(bio->bi_bdev->bd_dev)),
+			       (long long) bio->bi_sector);
 end_io:
 			bio->bi_end_io(bio);
 			break;
@@ -1445,7 +1443,7 @@ int submit_bh(int rw, struct buffer_head * bh)
 	bio = bio_alloc(GFP_NOIO, 1);
 
 	bio->bi_sector = bh->b_blocknr * (bh->b_size >> 9);
-	bio->bi_dev = bh->b_dev;
+	bio->bi_bdev = bh->b_bdev;
 	bio->bi_io_vec[0].bv_page = bh->b_page;
 	bio->bi_io_vec[0].bv_len = bh->b_size;
 	bio->bi_io_vec[0].bv_offset = bh_offset(bh);

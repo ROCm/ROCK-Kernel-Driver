@@ -111,7 +111,8 @@ inline int elv_rq_merge_ok(struct request *rq, struct bio *bio)
 	/*
 	 * same device and no special stuff set, merge is ok
 	 */
-	if (kdev_same(rq->rq_dev, bio->bi_dev) && !rq->waiting && !rq->special)
+	if (kdev_same(rq->rq_dev, to_kdev_t(bio->bi_bdev->bd_dev)) &&
+	    !rq->waiting && !rq->special)
 		return 1;
 
 	return 0;

@@ -1,3 +1,4 @@
+#error Broken until maintainers will sanitize kdev_t handling
 /*
  * kernel/lvm.c
  *

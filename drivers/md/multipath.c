@@ -137,7 +137,7 @@ static void multipath_shrink_mpbh(multipath_conf_t *conf)
 }
 
 
-static int multipath_map (mddev_t *mddev, kdev_t *dev)
+static int multipath_map (mddev_t *mddev, struct block_device **bdev)
 {
 	multipath_conf_t *conf = mddev_to_conf(mddev);
 	int i, disks = MD_SB_DISKS;
@@ -149,7 +149,7 @@ static int multipath_map (mddev_t *mddev, kdev_t *dev)
 
 	for (i = 0; i < disks; i++) {
 		if (conf->multipaths[i].operational) {
-			*dev = conf->multipaths[i].dev;
+			*bdev = conf->multipaths[i].bdev;
 			return (0);
 		}
 	}
@@ -198,7 +198,7 @@ void multipath_end_request(struct bio *bio)
 	 * this branch is our 'one multipath IO has finished' event handler:
 	 */
 	if (!uptodate)
-		md_error (mp_bh->mddev, bio->bi_dev);
+		md_error (mp_bh->mddev, to_kdev_t(bio->bi_bdev->bd_dev));
 	else
 		/*
 		 * Set MPBH_Uptodate in our master buffer_head, so that
@@ -220,7 +220,7 @@ void multipath_end_request(struct bio *bio)
 	 * oops, IO error:
 	 */
 	printk(KERN_ERR "multipath: %s: rescheduling sector %lu\n", 
-		 partition_name(bio->bi_dev), bio->bi_sector);
+		 bdev_partition_name(bio->bi_bdev), bio->bi_sector);
 	multipath_reschedule_retry(mp_bh);
 	return;
 }
@@ -269,7 +269,7 @@ static int multipath_make_request (mddev_t *mddev, int rw, struct bio * bio)
 	multipath = conf->multipaths + multipath_read_balance(conf);
 
 	real_bio = bio_clone(bio, GFP_NOIO);
-	real_bio->bi_dev = multipath->dev;
+	real_bio->bi_bdev = multipath->bdev;
 	real_bio->bi_rw = rw;
 	real_bio->bi_end_io = multipath_end_request;
 	real_bio->bi_private = mp_bh;
@@ -692,7 +692,7 @@ static void multipathd (void *data)
 	struct bio *bio;
 	unsigned long flags;
 	mddev_t *mddev;
-	kdev_t dev;
+	struct block_device *bdev;
 
 	for (;;) {
 		spin_lock_irqsave(&retry_list_lock, flags);
@@ -709,16 +709,16 @@ static void multipathd (void *data)
 			md_update_sb(mddev);
 		}
 		bio = mp_bh->bio;
-		dev = bio->bi_dev;
+		bdev = bio->bi_bdev;
 		
-		multipath_map (mddev, &bio->bi_dev);
-		if (kdev_same(bio->bi_dev, dev)) {
+		multipath_map (mddev, &bio->bi_bdev);
+		if (bio->bi_bdev == bdev) {
 			printk(IO_ERROR,
-				partition_name(bio->bi_dev), bio->bi_sector);
+				bdev_partition_name(bio->bi_bdev), bio->bi_sector);
 			multipath_end_bh_io(mp_bh, 0);
 		} else {
 			printk(REDIRECT_SECTOR,
-				partition_name(bio->bi_dev), bio->bi_sector);
+				bdev_partition_name(bio->bi_bdev), bio->bi_sector);
 			generic_make_request(bio);
 		}
 	}

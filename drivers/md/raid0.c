@@ -264,7 +264,7 @@ static int raid0_make_request (mddev_t *mddev, int rw, struct bio *bio)
 	 * The new BH_Lock semantics in ll_rw_blk.c guarantee that this
 	 * is the only IO operation happening on this bh.
 	 */
-	bio->bi_dev = tmp_dev->dev;
+	bio->bi_bdev = tmp_dev->bdev;
 	bio->bi_sector = rsect;
 
 	/*

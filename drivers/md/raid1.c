@@ -186,7 +186,7 @@ static inline void put_buf(r1bio_t *r1_bio)
 	mempool_free(r1_bio, conf->r1buf_pool);
 }
 
-static int map(mddev_t *mddev, kdev_t *rdev)
+static int map(mddev_t *mddev, struct block_device **bdev)
 {
 	conf_t *conf = mddev_to_conf(mddev);
 	int i, disks = MD_SB_DISKS;
@@ -198,7 +198,7 @@ static int map(mddev_t *mddev, kdev_t *rdev)
 
 	for (i = 0; i < disks; i++) {
 		if (conf->mirrors[i].operational) {
-			*rdev = conf->mirrors[i].dev;
+			*bdev = conf->mirrors[i].bdev;
 			return 0;
 		}
 	}
@@ -255,7 +255,7 @@ static void end_request(struct bio *bio)
 	 * this branch is our 'one mirror IO has finished' event handler:
 	 */
 	if (!uptodate)
-		md_error(r1_bio->mddev, bio->bi_dev);
+		md_error(r1_bio->mddev, to_kdev_t(bio->bi_bdev->bd_dev));
 	else
 		/*
 		 * Set R1BIO_Uptodate in our master bio, so that
@@ -283,7 +283,7 @@ static void end_request(struct bio *bio)
 		 * oops, read error:
 		 */
 		printk(KERN_ERR "raid1: %s: rescheduling sector %lu\n",
-			partition_name(bio->bi_dev), r1_bio->sector);
+			bdev_partition_name(bio->bi_bdev), r1_bio->sector);
 		reschedule_retry(r1_bio);
 		return;
 	}
@@ -479,7 +479,7 @@ static int make_request(mddev_t *mddev, int rw, struct bio * bio)
 		r1_bio->read_bio = read_bio;
 
 		read_bio->bi_sector = r1_bio->sector;
-		read_bio->bi_dev = mirror->dev;
+		read_bio->bi_bdev = mirror->bdev;
 		read_bio->bi_end_io = end_request;
 		read_bio->bi_rw = rw;
 		read_bio->bi_private = r1_bio;
@@ -503,7 +503,7 @@ static int make_request(mddev_t *mddev, int rw, struct bio * bio)
 		r1_bio->write_bios[i] = mbio;
 
 		mbio->bi_sector	= r1_bio->sector;
-		mbio->bi_dev = conf->mirrors[i].dev;
+		mbio->bi_bdev = conf->mirrors[i].bdev;
 		mbio->bi_end_io	= end_request;
 		mbio->bi_rw = rw;
 		mbio->bi_private = r1_bio;
@@ -947,7 +947,7 @@ static void end_sync_read(struct bio *bio)
 	 * We don't do much here, just schedule handling by raid1d
 	 */
 	if (!uptodate)
-		md_error (r1_bio->mddev, bio->bi_dev);
+		md_error (r1_bio->mddev, to_kdev_t(bio->bi_bdev->bd_dev));
 	else
 		set_bit(R1BIO_Uptodate, &r1_bio->state);
 	reschedule_retry(r1_bio);
@@ -961,7 +961,7 @@ static void end_sync_write(struct bio *bio)
 	int i;
 
 	if (!uptodate)
-		md_error(mddev, bio->bi_dev);
+		md_error(mddev, to_kdev_t(bio->bi_bdev->bd_dev));
 
 	for (i = 0; i < MD_SB_DISKS; i++)
 		if (r1_bio->write_bios[i] == bio) {
@@ -995,7 +995,7 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		 * There is no point trying a read-for-reconstruct as
 		 * reconstruct is about to be aborted
 		 */
-		printk(IO_ERROR, partition_name(bio->bi_dev), r1_bio->sector);
+		printk(IO_ERROR, bdev_partition_name(bio->bi_bdev), r1_bio->sector);
 		md_done_sync(mddev, r1_bio->master_bio->bi_size >> 9, 0);
 		resume_device(conf);
 		put_buf(r1_bio);
@@ -1020,7 +1020,7 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		if (r1_bio->write_bios[i])
 			BUG();
 		r1_bio->write_bios[i] = mbio;
-		mbio->bi_dev = conf->mirrors[i].dev;
+		mbio->bi_bdev = conf->mirrors[i].bdev;
 		mbio->bi_sector = r1_bio->sector;
 		mbio->bi_end_io	= end_sync_write;
 		mbio->bi_rw = WRITE;
@@ -1038,7 +1038,7 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		 * Nowhere to write this to... I guess we
 		 * must be done
 		 */
-		printk(IO_ERROR, partition_name(bio->bi_dev), r1_bio->sector);
+		printk(IO_ERROR, bdev_partition_name(bio->bi_bdev), r1_bio->sector);
 		md_done_sync(mddev, r1_bio->master_bio->bi_size >> 9, 0);
 		resume_device(conf);
 		put_buf(r1_bio);
@@ -1049,7 +1049,7 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		if (!mbio)
 			continue;
 
-		md_sync_acct(mbio->bi_dev, mbio->bi_size >> 9);
+		md_sync_acct(to_kdev_t(mbio->bi_bdev->bd_dev), mbio->bi_size >> 9);
 		generic_make_request(mbio);
 		atomic_inc(&conf->mirrors[i].nr_pending);
 	}
@@ -1071,7 +1071,7 @@ static void raid1d(void *data)
 	unsigned long flags;
 	mddev_t *mddev;
 	conf_t *conf;
-	kdev_t dev;
+	struct block_device *bdev;
 
 
 	for (;;) {
@@ -1096,15 +1096,15 @@ static void raid1d(void *data)
 			break;
 		case READ:
 		case READA:
-			dev = bio->bi_dev;
-			map(mddev, &bio->bi_dev);
-			if (kdev_same(bio->bi_dev, dev)) {
-				printk(IO_ERROR, partition_name(bio->bi_dev), r1_bio->sector);
+			bdev = bio->bi_bdev;
+			map(mddev, &bio->bi_bdev);
+			if (bio->bi_bdev == bdev) {
+				printk(IO_ERROR, bdev_partition_name(bio->bi_bdev), r1_bio->sector);
 				raid_end_bio_io(r1_bio, 0);
 				break;
 			}
 			printk(REDIRECT_SECTOR,
-				partition_name(bio->bi_dev), r1_bio->sector);
+				bdev_partition_name(bio->bi_bdev), r1_bio->sector);
 			bio->bi_sector = r1_bio->sector;
 			bio->bi_rw = r1_bio->cmd;
 
@@ -1235,7 +1235,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 	read_bio = bio_clone(r1_bio->master_bio, GFP_NOIO);
 
 	read_bio->bi_sector = sector_nr;
-	read_bio->bi_dev = mirror->dev;
+	read_bio->bi_bdev = mirror->bdev;
 	read_bio->bi_end_io = end_sync_read;
 	read_bio->bi_rw = READ;
 	read_bio->bi_private = r1_bio;
@@ -1244,7 +1244,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 		BUG();
 	r1_bio->read_bio = read_bio;
 
-	md_sync_acct(read_bio->bi_dev, nr_sectors);
+	md_sync_acct(to_kdev_t(read_bio->bi_bdev->bd_dev), nr_sectors);
 
 	generic_make_request(read_bio);
 	atomic_inc(&conf->mirrors[conf->last_used].nr_pending);

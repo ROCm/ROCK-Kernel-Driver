@@ -202,7 +202,7 @@ inline void __bio_clone(struct bio *bio, struct bio *bio_src)
 	bio->bi_io_vec = bio_src->bi_io_vec;
 
 	bio->bi_sector = bio_src->bi_sector;
-	bio->bi_dev = bio_src->bi_dev;
+	bio->bi_bdev = bio_src->bi_bdev;
 	bio->bi_flags |= 1 << BIO_CLONED;
 	bio->bi_rw = bio_src->bi_rw;
 
@@ -300,7 +300,7 @@ struct bio *bio_copy(struct bio *bio, int gfp_mask, int copy)
 	}
 
 	b->bi_sector = bio->bi_sector;
-	b->bi_dev = bio->bi_dev;
+	b->bi_bdev = bio->bi_bdev;
 	b->bi_rw = bio->bi_rw;
 
 	b->bi_vcnt = bio->bi_vcnt;
@@ -383,7 +383,7 @@ next_chunk:
 	}
 
 	bio->bi_sector = sector;
-	bio->bi_dev = dev;
+	bio->bi_bdev = bdev;
 	bio->bi_idx = 0;
 	bio->bi_end_io = bio_end_io_kio;
 	bio->bi_private = kio;

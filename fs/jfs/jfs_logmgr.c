@@ -1773,7 +1773,7 @@ static int lbmRead(log_t * log, int pn, lbuf_t ** bpp)
 	bio = bio_alloc(GFP_NOFS, 1);
 
 	bio->bi_sector = bp->l_blkno << (log->l2bsize - 9);
-	bio->bi_dev = to_kdev_t(log->bdev->bd_dev);
+	bio->bi_bdev = log->bdev;
 	bio->bi_io_vec[0].bv_page = virt_to_page(bp->l_ldata);
 	bio->bi_io_vec[0].bv_len = LOGPSIZE;
 	bio->bi_io_vec[0].bv_offset = 0;
@@ -1915,7 +1915,7 @@ void lbmStartIO(lbuf_t * bp)
 
 	bio = bio_alloc(GFP_NOFS, 1);
 	bio->bi_sector = bp->l_blkno << (log->l2bsize - 9);
-	bio->bi_dev = to_kdev_t(log->bdev->bd_dev);
+	bio->bi_bdev = log->bdev;
 	bio->bi_io_vec[0].bv_page = virt_to_page(bp->l_ldata);
 	bio->bi_io_vec[0].bv_len = LOGPSIZE;
 	bio->bi_io_vec[0].bv_offset = 0;

@@ -380,7 +380,7 @@ static struct bio *loop_get_bio(struct loop_device *lo)
 static void loop_end_io_transfer(struct bio *bio)
 {
 	struct bio *rbh = bio->bi_private;
-	struct loop_device *lo = &loop_dev[minor(rbh->bi_dev)];
+	struct loop_device *lo = &loop_dev[minor(to_kdev_t(rbh->bi_bdev->bd_dev))];
 	int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 
 	if (!uptodate || bio_rw(bio) == WRITE) {
@@ -413,7 +413,7 @@ out_bh:
 	bio->bi_sector = rbh->bi_sector + (lo->lo_offset >> 9);
 	bio->bi_rw = rbh->bi_rw;
 	spin_lock_irq(&lo->lo_lock);
-	bio->bi_dev = to_kdev_t(lo->lo_device->bd_dev);
+	bio->bi_bdev = lo->lo_device;
 	spin_unlock_irq(&lo->lo_lock);
 
 	return bio;
@@ -425,11 +425,12 @@ static int loop_make_request(request_queue_t *q, struct bio *rbh)
 	struct loop_device *lo;
 	unsigned long IV;
 	int rw = bio_rw(rbh);
+	int unit = minor(to_kdev_t(rbh->bi_bdev->bd_dev));
 
-	if (minor(rbh->bi_dev) >= max_loop)
+	if (unit >= max_loop)
 		goto out;
 
-	lo = &loop_dev[minor(rbh->bi_dev)];
+	lo = &loop_dev[unit];
 	spin_lock_irq(&lo->lo_lock);
 	if (lo->lo_state != Lo_bound)
 		goto inactive;

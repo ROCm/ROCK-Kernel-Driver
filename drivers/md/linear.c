@@ -156,7 +156,7 @@ static int linear_make_request (mddev_t *mddev, int rw, struct bio *bio)
 		bio_io_error(bio);
 		return 0;
 	}
-	bio->bi_dev = tmp_dev->dev;
+	bio->bi_bdev = tmp_dev->bdev;
 	bio->bi_sector = bio->bi_sector - (tmp_dev->offset << 1);
 
 	return 1;

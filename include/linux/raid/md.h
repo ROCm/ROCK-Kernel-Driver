@@ -67,6 +67,10 @@ extern struct hd_struct md_hd_struct[MAX_MD_DEVS];
 extern void add_mddev_mapping (mddev_t *mddev, kdev_t dev, void *data);
 extern void del_mddev_mapping (mddev_t *mddev, kdev_t dev);
 extern char * partition_name (kdev_t dev);
+extern inline char * bdev_partition_name (struct block_device *bdev)
+{
+	return partition_name(to_kdev_t(bdev->bd_dev));
+}
 extern int register_md_personality (int p_num, mdk_personality_t *p);
 extern int unregister_md_personality (int p_num);
 extern mdk_thread_t * md_register_thread (void (*run) (void *data),
