@@ -198,16 +198,64 @@ static int fib_seq_show(struct seq_file *seq, void *v)
 
 /* ------------------------------------------------------------------------ */
 
+#define UDP_HASH_POS_BITS (sizeof(loff_t) * 8 - 8)
+#define UDP_HASH_BITS (((loff_t)127) << UDP_HASH_POS_BITS)
+#define UDP_HASH_BUCKET(p) ((p & UDP_HASH_BITS) >> UDP_HASH_POS_BITS)
+
+static __inline__ struct sock *udp_get_bucket(struct seq_file *seq, loff_t *pos)
+{
+	struct sock *sk = NULL;
+	loff_t ppos = *pos & ~UDP_HASH_BITS, l = ppos;
+	loff_t bucket = UDP_HASH_BUCKET(*pos);
+
+	for (; bucket < UDP_HTABLE_SIZE; ++bucket)
+		for (sk = udp_hash[bucket]; sk; sk = sk->next) {
+			if (sk->family != PF_INET)
+				continue;
+			if (l--)
+				continue;
+			*pos = (bucket << UDP_HASH_POS_BITS) | ppos;
+			/*
+			 * temporary HACK till we have a solution to
+			 * get more state passed to seq_show -acme
+			 */
+			seq->private = (void *)(int)bucket;
+			goto out;
+		}
+out:
+	return sk;
+}
+
 static void *udp_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&udp_hash_lock);
-	return (void *)(unsigned long)++*pos;
+	return *pos ? udp_get_bucket(seq, pos) : (void *)1;
 }
 
 static void *udp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-	return (void *)(unsigned long)((++*pos) >=
-				       (UDP_HTABLE_SIZE - 1) ? 0 : *pos);
+	int next_bucket;
+	struct sock *sk;
+
+	if (v == (void *)1) {
+		sk = udp_get_bucket(seq, pos);
+		goto out;
+	}
+
+	sk = v;
+	sk = sk->next;
+	if (sk) 
+		goto out;
+
+	next_bucket = UDP_HASH_BUCKET(*pos) + 1;
+	if (next_bucket >= UDP_HTABLE_SIZE) 
+		goto out;
+
+	*pos = (loff_t)next_bucket << UDP_HASH_POS_BITS;
+	sk = udp_get_bucket(seq, pos);
+out:
+	++*pos;
+	return sk;
 }
 
 static void udp_seq_stop(struct seq_file *seq, void *v)
@@ -215,7 +263,7 @@ static void udp_seq_stop(struct seq_file *seq, void *v)
 	read_unlock(&udp_hash_lock);
 }
 
-static void udp_format_sock(struct sock *sp, char *tmpbuf, int i)
+static void udp_format_sock(struct sock *sp, char *tmpbuf, int bucket)
 {
 	struct inet_opt *inet = inet_sk(sp);
 	unsigned int dest = inet->daddr;
@@ -225,7 +273,7 @@ static void udp_format_sock(struct sock *sp, char *tmpbuf, int i)
 
 	sprintf(tmpbuf, "%4d: %08X:%04X %08X:%04X"
 		" %02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %p",
-		i, src, srcp, dest, destp, sp->state, 
+		bucket, src, srcp, dest, destp, sp->state, 
 		atomic_read(&sp->wmem_alloc), atomic_read(&sp->rmem_alloc),
 		0, 0L, 0, sock_i_uid(sp), 0, sock_i_ino(sp),
 		atomic_read(&sp->refcnt), sp);
@@ -233,19 +281,15 @@ static void udp_format_sock(struct sock *sp, char *tmpbuf, int i)
 
 static int udp_seq_show(struct seq_file *seq, void *v)
 {
-	char tmpbuf[129];
-	struct sock *sk;
-	unsigned long l = (unsigned long)v - 1;
-
-	if (!l)
+	if (v == (void *)1)
 		seq_printf(seq, "%-127s\n",
 			   "  sl  local_address rem_address   st tx_queue "
-			   "rx_queue tr tm->when retrnsmt   uid  timeout inode");
+			   "rx_queue tr tm->when retrnsmt   uid  timeout "
+			   "inode");
+	else {
+		char tmpbuf[129];
 
-	for (sk = udp_hash[l]; sk; sk = sk->next) {
-		if (sk->family != PF_INET)
-			continue;
-		udp_format_sock(sk, tmpbuf, l);
+		udp_format_sock(v, tmpbuf, (int)seq->private);
 		seq_printf(seq, "%-127s\n", tmpbuf);
 	}
 	return 0;
