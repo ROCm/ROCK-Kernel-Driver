@@ -787,6 +787,7 @@ acpi_ut_init_globals (
 
 	acpi_gbl_create_osi_method = TRUE;
 	acpi_gbl_all_methods_serialized = FALSE;
+	acpi_gbl_leave_wake_gpes_disabled = TRUE;
 
 	/* Memory allocation and cache lists */
 

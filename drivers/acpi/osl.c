@@ -1058,15 +1058,15 @@ __setup("acpi_serialize", acpi_serialize_setup);
  * Run-time events on the same GPE this flag is available
  * to tell Linux to keep the wake-time GPEs enabled at run-time.
  */
-static int __init
-acpi_leave_gpes_disabled_setup(char *str)
+int __init
+acpi_wake_gpes_always_on_setup(char *str)
 {
-	printk(KERN_INFO PREFIX "leave wake GPEs disabled\n");
+	printk(KERN_INFO PREFIX "wake GPEs not disabled\n");
 
-	acpi_gbl_leave_wake_gpes_disabled = TRUE;
+	acpi_gbl_leave_wake_gpes_disabled = FALSE;
 
 	return 1;
 }
 
-__setup("acpi_leave_gpes_disabled", acpi_leave_gpes_disabled_setup);
+__setup("acpi_wake_gpes_always_on", acpi_wake_gpes_always_on_setup);
 
