@@ -131,6 +131,7 @@ static void free_ebda_hpc (struct controller *controller)
 	controller->slots = NULL;
 	kfree (controller->buses);
 	controller->buses = NULL;
+	controller->ctrl_dev = NULL;
 	kfree (controller);
 }
 
@@ -798,6 +799,8 @@ static char *create_file_name (struct slot * slot_cur)
 	return NULL;
 }
 
+static struct pci_driver ibmphp_driver;
+
 /*
  * map info (ctlr-id, slot count, slot#.. bus count, bus#, ctlr type...) of
  * each hpc from physical address to a list of hot plug controllers based on
@@ -929,6 +932,7 @@ static int __init ebda_rsrc_controller (void)
 				hpc_ptr->u.pci_ctlr.dev_fun = readb (io_mem + addr + 1);
 				hpc_ptr->irq = readb (io_mem + addr + 2);
 				addr += 3;
+				debug ("ctrl bus = %x, ctlr devfun = %x, irq = %x\n", hpc_ptr->u.pci_ctlr.bus, hpc_ptr->u.pci_ctlr.dev_fun, hpc_ptr->irq);
 				break;
 
 			case 0:
@@ -952,12 +956,6 @@ static int __init ebda_rsrc_controller (void)
 			default:
 				iounmap (io_mem);
 				return -ENODEV;
-		}
-
-		/* following 3 line: Now our driver only supports I2c/ISA ctlrType */
-		if ((hpc_ptr->ctlr_type != 2) && (hpc_ptr->ctlr_type != 4) && (hpc_ptr->ctlr_type != 0)) {
-			err ("Please run this driver on IBM xSeries440 or xSeries 235\n ");
-			return -ENODEV;
 		}
 
 		//reorganize chassis' linked list
@@ -1213,11 +1211,16 @@ void ibmphp_free_ebda_hpc_queue (void)
 	struct controller *controller = NULL;
 	struct list_head *list;
 	struct list_head *next;
+	int pci_flag = 0;
 
 	list_for_each_safe (list, next, &ebda_hpc_head) {
 		controller = list_entry (list, struct controller, ebda_hpc_list);
 		if (controller->ctlr_type == 0)
 			release_region (controller->u.isa_ctlr.io_start, (controller->u.isa_ctlr.io_end - controller->u.isa_ctlr.io_start + 1));
+		else if ((controller->ctlr_type == 1) && (!pci_flag)) {
+			++pci_flag;
+			pci_unregister_driver (&ibmphp_driver);
+		}
 		free_ebda_hpc (controller);
 	}
 }
@@ -1234,3 +1237,59 @@ void ibmphp_free_ebda_pci_rsrc_queue (void)
 		resource = NULL;
 	}
 }
+
+static struct pci_device_id id_table[] __devinitdata = {
+	{
+		vendor:		PCI_VENDOR_ID_IBM,
+		device:		HPC_DEVICE_ID,
+		subvendor:	PCI_VENDOR_ID_IBM,
+		subdevice:	HPC_SUBSYSTEM_ID,
+		class:		((PCI_CLASS_SYSTEM_PCI_HOTPLUG << 8) | 0x00),
+	}, {}
+};		
+
+MODULE_DEVICE_TABLE(pci, id_table);
+
+static int ibmphp_probe (struct pci_dev *, const struct pci_device_id *);
+static struct pci_driver ibmphp_driver = {
+	name:		"ibmphp",
+	id_table:	id_table,
+	probe:		ibmphp_probe,
+};
+
+int ibmphp_register_pci (void)
+{
+	struct controller *ctrl;
+	struct list_head *tmp;
+	int rc = 0;
+
+	list_for_each (tmp, &ebda_hpc_head) {
+		ctrl = list_entry (tmp, struct controller, ebda_hpc_list);
+		if (ctrl->ctlr_type == 1) {
+			rc = pci_module_init (&ibmphp_driver);
+			break;
+		}
+	}
+	return rc;
+}
+static int ibmphp_probe (struct pci_dev * dev, const struct pci_device_id *ids)
+{
+	struct controller *ctrl;
+	struct list_head *tmp;
+
+	debug ("inside ibmphp_probe \n");
+	
+	list_for_each (tmp, &ebda_hpc_head) {
+		ctrl = list_entry (tmp, struct controller, ebda_hpc_list);
+		if (ctrl->ctlr_type == 1) {
+			if ((dev->devfn == ctrl->u.pci_ctlr.dev_fun) && (dev->bus->number == ctrl->u.pci_ctlr.bus)) {
+				ctrl->ctrl_dev = dev;
+				debug ("found device!!! \n");
+				debug ("dev->device = %x, dev->subsystem_device = %x\n", dev->device, dev->subsystem_device);
+				return 0;
+			}
+		}
+	}
+	return -ENODEV;
+}
+

@@ -379,12 +379,35 @@ static void isa_ctrl_write (struct controller *ctlr_ptr, u8 offset, u8 data)
 	outb (data, port_address);
 }
 
+static u8 pci_ctrl_read (struct controller *ctrl, u8 offset)
+{
+	u8 data = 0x00;
+	debug ("inside pci_ctrl_read\n");
+	if (ctrl->ctrl_dev)
+		pci_read_config_byte (ctrl->ctrl_dev, HPC_PCI_OFFSET + offset, &data);
+	return data;
+}
+
+static u8 pci_ctrl_write (struct controller *ctrl, u8 offset, u8 data)
+{
+	u8 rc = -ENODEV;
+	debug ("inside pci_ctrl_write\n");
+	if (ctrl->ctrl_dev) {
+		pci_write_config_byte (ctrl->ctrl_dev, HPC_PCI_OFFSET + offset, data);
+		rc = 0;
+	}
+	return rc;
+}
+
 static u8 ctrl_read (struct controller *ctlr, void *base, u8 offset)
 {
 	u8 rc;
 	switch (ctlr->ctlr_type) {
 	case 0:
 		rc = isa_ctrl_read (ctlr, offset);
+		break;
+	case 1:
+		rc = pci_ctrl_read (ctlr, offset);
 		break;
 	case 2:
 	case 4:
@@ -402,6 +425,9 @@ static u8 ctrl_write (struct controller *ctlr, void *base, u8 offset, u8 data)
 	switch (ctlr->ctlr_type) {
 	case 0:
 		isa_ctrl_write(ctlr, offset, data);
+		break;
+	case 1:
+		rc = pci_ctrl_write (ctlr, offset, data);
 		break;
 	case 2:
 	case 4:

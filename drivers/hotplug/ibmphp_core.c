@@ -1636,6 +1636,11 @@ static int __init ibmphp_init (void)
 
 	max_slots = get_max_slots ();
 	
+	if ((rc = ibmphp_register_pci ())) {
+		ibmphp_unload ();
+		return rc;
+	}
+
 	if (init_ops ()) {
 		ibmphp_unload ();
 		return -ENODEV;

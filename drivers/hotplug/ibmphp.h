@@ -737,6 +737,7 @@ struct slot {
 struct controller {
 	struct ebda_hpc_slot *slots;
 	struct ebda_hpc_bus *buses;
+	struct pci_dev *ctrl_dev; /* in case where controller is PCI */
 	u8 starting_slot_num;	/* starting and ending slot #'s this ctrl controls*/
 	u8 ending_slot_num;
 	u8 revision;
