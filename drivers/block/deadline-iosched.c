@@ -765,6 +765,7 @@ deadline_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 
 	drq = mempool_alloc(dd->drq_pool, gfp_mask);
 	if (drq) {
+		memset(drq, 0, sizeof(*drq));
 		RB_CLEAR(&drq->rb_node);
 		drq->request = rq;
 
