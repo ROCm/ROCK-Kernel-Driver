@@ -12,7 +12,6 @@
 #include <linux/fddidevice.h>
 #include <linux/trdevice.h>
 #include <linux/fcdevice.h>
-#include <net/ip.h>
 #include <linux/etherdevice.h>
 #ifdef CONFIG_HIPPI
 #include <linux/hippidevice.h>
@@ -46,28 +45,11 @@ EXPORT_SYMBOL(destroy_EII_client);
 #endif
 
 #ifdef CONFIG_INET
-
-/* Route manipulation */
-
-/* needed for ip_gre -cw */
-EXPORT_SYMBOL(ip_statistics);
 #if defined(CONFIG_INET_ESP) || defined(CONFIG_INET_ESP_MODULE) || defined(CONFIG_INET6_ESP) || defined(CONFIG_INET6_ESP_MODULE)
 EXPORT_SYMBOL_GPL(skb_cow_data);
 EXPORT_SYMBOL_GPL(pskb_put);
 EXPORT_SYMBOL_GPL(skb_to_sgvec);
 #endif
-
-#if defined (CONFIG_IPV6_MODULE) || defined (CONFIG_IP_SCTP_MODULE)
-/* inet functions common to v4 and v6 */
-
-/* UDP/TCP exported functions for TCPv6 */
-EXPORT_SYMBOL(net_statistics); 
-#endif
-
-/* Used by at least ipip.c.  */
-EXPORT_SYMBOL(ipv4_config);
-
-EXPORT_SYMBOL(ip_rcv);
 #endif  /* CONFIG_INET */
 
 #ifdef CONFIG_TR
