@@ -47,7 +47,7 @@ ENTRY(v4wb_flush_user_tlb_range)
 	mov	pc, lr
 
 /*
- *	v4_flush_kerm_tlb_range(start, end)
+ *	v4_flush_kern_tlb_range(start, end)
  *
  *	Invalidate a range of TLB entries in the specified kernel
  *	address range.
