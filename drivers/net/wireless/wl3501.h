@@ -187,6 +187,12 @@ enum wl3501_status {
 	WL3501_STATUS_ALREADY_BSS,
 };
 
+#define WL3501_MGMT_CAPABILITY_ESS		0x0001  /* see 802.11 p.58 */
+#define WL3501_MGMT_CAPABILITY_IBSS		0x0002  /*      - " -	   */
+#define WL3501_MGMT_CAPABILITY_CF_POLLABLE	0x0004  /*      - " -	   */
+#define WL3501_MGMT_CAPABILITY_CF_POLL_REQUEST	0x0008  /*      - " -	   */
+#define WL3501_MGMT_CAPABILITY_PRIVACY		0x0010  /*      - " -	   */
+
 #define WL3501_FREQ_DOMAIN_FCC    0x10	/* Channel 1 to 11 */
 #define WL3501_FREQ_DOMAIN_IC     0x20	/* Channel 1 to 11 */
 #define WL3501_FREQ_DOMAIN_ETSI   0x30	/* Channel 1 to 13 */

@@ -553,14 +553,18 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 	memcpy((char *)signal.ssid, (char *)this->essid, WL3501_ESSID_MAX_LEN);
 	memcpy((char *)this->keep_essid, (char *)this->essid,
 	       WL3501_ESSID_MAX_LEN);
-	signal.bss_type = this->net_type = IW_MODE_INFRA ?
-				WL3501_NET_TYPE_INFRA : WL3501_NET_TYPE_INFRA;
+	if (this->net_type == IW_MODE_INFRA) {
+		signal.bss_type = WL3501_NET_TYPE_INFRA;
+		signal.cap_info = WL3501_MGMT_CAPABILITY_ESS;
+	} else {
+		signal.bss_type = WL3501_NET_TYPE_ADHOC;
+		signal.cap_info = WL3501_MGMT_CAPABILITY_IBSS;
+	}
 	signal.beacon_period = 400;
 	signal.dtim_period = 1;
 	signal.phy_pset[0] = 3;
 	signal.phy_pset[1] = 1;
 	signal.phy_pset[2] = this->chan;
-	signal.cap_info = 0x02;
 	signal.bss_basic_rate_set[0] = 0x01;
 	signal.bss_basic_rate_set[1] = 0x02;
 	signal.bss_basic_rate_set[2] = 0x82;
@@ -608,9 +612,9 @@ static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 				this->bss_cnt++;
 			}
 		} else if ((this->net_type == IW_MODE_INFRA &&
-			    (signal.cap_info & 0x01)) ||
+			    (signal.cap_info & WL3501_MGMT_CAPABILITY_ESS)) ||
 			   (this->net_type == IW_MODE_ADHOC &&
-			    (signal.cap_info & 0x02)) ||
+			    (signal.cap_info & WL3501_MGMT_CAPABILITY_IBSS)) ||
 			   this->net_type == IW_MODE_AUTO) {
 			if (!this->essid[1])
 				matchflag = 1;
