@@ -14,12 +14,18 @@
 #include <asm/pgtable.h>
 #include <asm/dvma.h>
 
+#undef DVMA_DEBUG
+
 #ifdef CONFIG_SUN3X
 extern void dvma_unmap_iommu(unsigned long baddr, int len);
 #else
 static inline void dvma_unmap_iommu(unsigned long a, int b)
 {
 }
+#endif
+
+#ifdef CONFIG_SUN3
+extern void sun3_dvma_init(void);
 #endif
 
 unsigned long iommu_use[IOMMU_TOTAL_ENTRIES];
@@ -38,6 +44,60 @@ struct hole {
 static struct list_head hole_list;
 static struct list_head hole_cache;
 static struct hole initholes[64];
+
+#ifdef DVMA_DEBUG
+
+static unsigned long dvma_allocs = 0;
+static unsigned long dvma_frees = 0;
+static unsigned long long dvma_alloc_bytes = 0;
+static unsigned long long dvma_free_bytes = 0;
+
+static void print_use(void) 
+{
+	
+	int i;
+	int j = 0;
+
+	printk("dvma entry usage:\n");
+	
+	for(i = 0; i < IOMMU_TOTAL_ENTRIES; i++) {
+		if(!iommu_use[i])
+			continue;
+		
+		j++;
+
+		printk("dvma entry: %08lx len %08lx\n", 
+		       ( i << DVMA_PAGE_SHIFT) + DVMA_START,
+		       iommu_use[i]);
+	}
+
+	printk("%d entries in use total\n", j);
+
+	printk("allocation/free calls: %lu/%lu\n", dvma_allocs, dvma_frees);
+	printk("allocation/free bytes: %Lx/%Lx\n", dvma_alloc_bytes, 
+	       dvma_free_bytes);
+}
+
+static void print_holes(struct list_head *holes)
+{
+	
+	struct list_head *cur;
+	struct hole *hole;
+
+	printk("listing dvma holes\n");
+	list_for_each(cur, holes) {
+		hole = list_entry(cur, struct hole, list);
+		
+		if((hole->start == 0) && (hole->end == 0) && (hole->size == 0))
+			continue;
+		
+		printk("hole: start %08lx end %08lx size %08lx\n", hole->start, hole->end, hole->size);
+	}
+	
+	printk("end of hole listing...\n");
+	
+}
+#endif DVMA_DEBUG
 
 static inline int refill(void)
 {
@@ -93,7 +153,11 @@ static inline unsigned long get_baddr(int len, unsigned long align)
 	struct hole *hole;
 
 	if(list_empty(&hole_list)) {
-		printk("out of dvma holes!\n");
+#ifdef DVMA_DEBUG
+		printk("out of dvma holes! (printing hole cache)\n");
+		print_holes(&hole_cache);
+		print_use();
+#endif
 		BUG();
 	}
 
@@ -111,11 +175,19 @@ static inline unsigned long get_baddr(int len, unsigned long align)
 			hole->end -= newlen;
 			hole->size -= newlen;
 			dvma_entry_use(hole->end) = newlen;
+#ifdef DVMA_DEBUG
+			dvma_allocs++;
+			dvma_alloc_bytes += newlen;
+#endif
 			return hole->end;
 		} else if(hole->size == newlen) {
 			list_del(&(hole->list));
 			list_add(&(hole->list), &hole_cache);
 			dvma_entry_use(hole->start) = newlen;
+#ifdef DVMA_DEBUG
+			dvma_allocs++;
+			dvma_alloc_bytes += newlen;
+#endif
 			return hole->start;
 		}
 
@@ -139,6 +211,11 @@ static inline int free_baddr(unsigned long baddr)
 	dvma_entry_use(baddr) = 0;
 	baddr &= DVMA_PAGE_MASK;
 	dvma_unmap_iommu(baddr, len);
+
+#ifdef DVMA_DEBUG
+	dvma_frees++;
+	dvma_free_bytes += len;
+#endif
 
 	list_for_each(cur, &hole_list) {
 		hole = list_entry(cur, struct hole, list);
