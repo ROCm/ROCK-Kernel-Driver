@@ -31,6 +31,7 @@
 /* #include <linux/openpic.h> */
 #include <linux/spinlock.h>
 #include <linux/cache.h>
+#include <linux/err.h>
 
 #include <asm/ptrace.h>
 #include <asm/atomic.h>
