@@ -413,7 +413,9 @@ serial_pnp_probe(struct pnp_dev * dev, const struct pnp_device_id *dev_id)
 
 static void serial_pnp_remove(struct pnp_dev * dev)
 {
-	return;
+	int line = (int)pnp_get_drvdata(dev);
+	if (line)
+		unregister_serial(line - 1);
 }
 
 static struct pnp_driver serial_pnp_driver = {
@@ -430,7 +432,7 @@ static int __init serial8250_pnp_init(void)
 
 static void __exit serial8250_pnp_exit(void)
 {
-	/* FIXME */
+	pnp_unregister_driver(&serial_pnp_driver);
 }
 
 module_init(serial8250_pnp_init);
