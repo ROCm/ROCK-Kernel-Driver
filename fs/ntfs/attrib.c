@@ -22,6 +22,7 @@
 
 #include <linux/buffer_head.h>
 #include "ntfs.h"
+#include "dir.h"
 
 /* Temporary helper functions -- might become macros */
 
