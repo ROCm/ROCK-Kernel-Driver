@@ -235,6 +235,36 @@ static unsigned int real_irq_to_virt(unsigned int real_irq)
 	return ptr - virt_irq_to_real_map;
 }
 
+static int get_irq_server(unsigned int irq)
+{
+	cpumask_t cpumask = irq_affinity[irq];
+	cpumask_t allcpus = CPU_MASK_ALL;
+	cpumask_t tmp = CPU_MASK_NONE;
+	unsigned int server;
+
+#ifdef CONFIG_IRQ_ALL_CPUS
+	/* For the moment only implement delivery to all cpus or one cpu */
+	if (smp_threads_ready) {
+		if (cpus_equal(cpumask, allcpus)) {
+			server = default_distrib_server;
+		} else {
+			cpus_and(tmp, cpu_online_map, cpumask);
+
+			if (cpus_empty(tmp))
+				server = default_distrib_server;
+			else
+				server = get_hard_smp_processor_id(first_cpu(tmp));
+		}
+	} else {
+		server = default_server;
+	}
+#else
+	server = default_server;
+#endif
+	return server;
+
+}
+
 static void xics_enable_irq(unsigned int virq)
 {
 	unsigned int irq;
@@ -245,15 +275,7 @@ static void xics_enable_irq(unsigned int virq)
 	if (irq == XICS_IPI)
 		return;
 
-#ifdef CONFIG_IRQ_ALL_CPUS
-	if (smp_threads_ready)
-		server = default_distrib_server;
-	else
-		server = default_server;
-#else
-	server = default_server;
-#endif
-
+	server = get_irq_server(virq);
 	call_status = rtas_call(ibm_set_xive, 3, 1, NULL, irq, server,
 				DEFAULT_PRIORITY);
 	if (call_status != 0) {
@@ -274,6 +296,7 @@ static void xics_enable_irq(unsigned int virq)
 static void xics_disable_real_irq(unsigned int irq)
 {
 	long call_status;
+	unsigned int server;
 
 	if (irq == XICS_IPI)
 		return;
@@ -285,9 +308,9 @@ static void xics_disable_real_irq(unsigned int irq)
 		return;
 	}
 
+	server = get_irq_server(irq);
 	/* Have to set XIVE to 0xff to be able to remove a slot */
-	call_status = rtas_call(ibm_set_xive, 3, 1, NULL, irq, default_server,
-				0xff);
+	call_status = rtas_call(ibm_set_xive, 3, 1, NULL, irq, server, 0xff);
 	if (call_status != 0) {
 		printk(KERN_ERR "xics_disable_irq: irq=%x: ibm_set_xive(0xff)"
 		       " returned %lx\n", irq, call_status);
