@@ -109,6 +109,7 @@ static int t1pci_add_card(struct capicardparams *p, struct pci_dev *pdev)
 		goto err_unmap;
 	}
 
+	cinfo->capi_ctrl.owner         = THIS_MODULE;
 	cinfo->capi_ctrl.driver_name   = "t1pci";
 	cinfo->capi_ctrl.driverdata    = cinfo;
 	cinfo->capi_ctrl.register_appl = b1dma_register_appl;
@@ -119,7 +120,6 @@ static int t1pci_add_card(struct capicardparams *p, struct pci_dev *pdev)
 	cinfo->capi_ctrl.procinfo      = t1pci_procinfo;
 	cinfo->capi_ctrl.ctr_read_proc = b1dmactl_read_proc;
 	strcpy(cinfo->capi_ctrl.name, card->name);
-	SET_MODULE_OWNER(&cinfo->capi_ctrl);
 
 	retval = attach_capi_ctr(&cinfo->capi_ctrl);
 	if (retval) {

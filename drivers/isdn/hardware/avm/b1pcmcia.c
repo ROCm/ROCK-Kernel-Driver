@@ -95,6 +95,7 @@ static int b1pcmcia_add_card(unsigned int port, unsigned irq,
 	b1_reset(card->port);
 	b1_getrevision(card);
 
+	cinfo->capi_ctrl.owner         = THIS_MODULE;
 	cinfo->capi_ctrl.driver_name   = "b1pcmcia";
 	cinfo->capi_ctrl.driverdata    = cinfo;
 	cinfo->capi_ctrl.register_appl = b1_register_appl;
@@ -105,7 +106,6 @@ static int b1pcmcia_add_card(unsigned int port, unsigned irq,
 	cinfo->capi_ctrl.procinfo      = b1pcmcia_procinfo;
 	cinfo->capi_ctrl.ctr_read_proc = b1ctl_read_proc;
 	strcpy(cinfo->capi_ctrl.name, card->name);
-	SET_MODULE_OWNER(&cinfo->capi_ctrl);
 
 	retval = attach_capi_ctr(&cinfo->capi_ctrl);
 	if (retval) {
