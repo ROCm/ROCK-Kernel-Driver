@@ -525,31 +525,32 @@ err_out:
 static int __devinit tc35815_probe1(struct pci_dev *pdev, unsigned int base_addr, unsigned int irq)
 {
 	static unsigned version_printed = 0;
-	int i;
+	int i, ret;
 	struct tc35815_local *lp;
 	struct tc35815_regs *tr;
 	struct net_device *dev;
 
 	/* Allocate a new 'dev' if needed. */
-	dev = init_etherdev(NULL, sizeof(struct tc35815_local));
+	dev = alloc_etherdev(sizeof(struct tc35815_local));
 	if (dev == NULL)
 		return -ENOMEM;
 
 	/*
-	 * init_etherdev allocs and zeros dev->priv
+	 * alloc_etherdev allocs and zeros dev->priv
 	 */
 	lp = dev->priv;
 
 	if (tc35815_debug  &&  version_printed++ == 0)
 		printk(KERN_DEBUG "%s", version);
 
-	printk(KERN_INFO "%s: %s found at %#x, irq %d\n",
-	       dev->name, cardname, base_addr, irq);
-
 	/* Fill in the 'dev' fields. */
 	dev->irq = irq;
 	dev->base_addr = (unsigned long)ioremap(base_addr,
 						sizeof(struct tc35815_regs));
+	if (!dev->base_addr) {
+		ret = -ENOMEM;
+		goto err_out;
+	}
 	tr = (struct tc35815_regs*)dev->base_addr;
 
 	tc35815_chip_reset(dev);
@@ -566,9 +567,6 @@ static int __devinit tc35815_probe1(struct pci_dev *pdev, unsigned int base_addr
 		dev->dev_addr[i] = data & 0xff;
 		dev->dev_addr[i+1] = data >> 8;
 	}
-	for (i = 0; i < 6; i++)
-		printk(" %2.2x", dev->dev_addr[i]);
-	printk("\n");
 
 	/* Initialize the device structure. */
 	lp->pdev = pdev;
@@ -590,8 +588,6 @@ static int __devinit tc35815_probe1(struct pci_dev *pdev, unsigned int base_addr
 
 	/* do auto negotiation */
 	tc35815_phy_chip_init(dev);
-	printk(KERN_INFO "%s: linkspeed %dMbps, %s Duplex\n",
-	       dev->name, lp->linkspeed, lp->fullduplex ? "Full" : "Half");
 
 	dev->open		= tc35815_open;
 	dev->stop		= tc35815_close;
@@ -602,12 +598,25 @@ static int __devinit tc35815_probe1(struct pci_dev *pdev, unsigned int base_addr
 	dev->set_multicast_list = tc35815_set_multicast_list;
 	SET_MODULE_OWNER(dev);
 
-#if 0	/* XXX called in init_etherdev */
-	/* Fill in the fields of the device structure with ethernet values. */
-	ether_setup(dev);
-#endif
+	ret = register_netdev(dev);
+	if (ret)
+		goto err_out_iounmap;
+
+	printk(KERN_INFO "%s: %s found at %#x, irq %d, MAC",
+	       dev->name, cardname, base_addr, irq);
+	for (i = 0; i < 6; i++)
+		printk(" %2.2x", dev->dev_addr[i]);
+	printk("\n");
+	printk(KERN_INFO "%s: linkspeed %dMbps, %s Duplex\n",
+	       dev->name, lp->linkspeed, lp->fullduplex ? "Full" : "Half");
 
 	return 0;
+
+err_out_iounmap:
+	iounmap((void *) dev->base_addr);
+err_out:
+	free_netdev(dev);
+	return ret;
 }
 
 
