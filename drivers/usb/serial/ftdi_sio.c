@@ -1651,7 +1651,7 @@ static int ftdi_write (struct usb_serial_port *port,
 	dbg("%s port %d, %d bytes", __FUNCTION__, port->number, count);
 
 	if (count == 0) {
-		err("write request of 0 bytes");
+		dbg("write request of 0 bytes");
 		return 0;
 	}
 	
