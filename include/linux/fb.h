@@ -318,6 +318,7 @@ struct fb_cursor {
 	struct fbcurpos hot;	/* cursor hot spot */
 	struct fb_image	image;	/* Cursor image */
 /* all fields below are for fbcon use only */
+	int   flash;            /* cursor blink */
 	char  *data;             /* copy of bitmap */
 };
 
@@ -555,6 +556,82 @@ struct fb_ops {
 	int (*fb_mmap)(struct fb_info *info, struct file *file, struct vm_area_struct *vma);
 };
 
+#ifdef CONFIG_FB_TILEBLITTING
+
+#define FB_TILE_CURSOR_NONE        0
+#define FB_TILE_CURSOR_UNDERLINE   1
+#define FB_TILE_CURSOR_LOWER_THIRD 2
+#define FB_TILE_CURSOR_LOWER_HALF  3
+#define FB_TILE_CURSOR_TWO_THIRDS  4
+#define FB_TILE_CURSOR_BLOCK       5
+
+struct fb_tilemap {
+	__u32 width;                /* width of each tile in pixels */
+	__u32 height;               /* height of each tile in scanlines */
+	__u32 depth;                /* color depth of each tile */
+	__u32 length;               /* number of tiles in the map */
+	__u8  *data;                /* actual tile map: a bitmap array, packed
+				       to the nearest byte */
+};
+
+struct fb_tilerect {
+	__u32 sx;                   /* origin in the x-axis */
+	__u32 sy;                   /* origin in the y-axis */
+	__u32 width;                /* number of tiles in the x-axis */
+	__u32 height;               /* number of tiles in the y-axis */
+	__u32 index;                /* what tile to use: index to tile map */
+	__u32 fg;                   /* foreground color */
+	__u32 bg;                   /* background color */
+	__u32 rop;                  /* raster operation */
+};
+
+struct fb_tilearea {
+	__u32 sx;                   /* source origin in the x-axis */
+	__u32 sy;                   /* source origin in the y-axis */
+	__u32 dx;                   /* destination origin in the x-axis */
+	__u32 dy;                   /* destination origin in the y-axis */
+	__u32 width;                /* number of tiles in the x-axis */
+	__u32 height;               /* number of tiles in the y-axis */
+};
+
+struct fb_tileblit {
+	__u32 sx;                   /* origin in the x-axis */
+	__u32 sy;                   /* origin in the y-axis */
+	__u32 width;                /* number of tiles in the x-axis */
+	__u32 height;               /* number of tiles in the y-axis */
+	__u32 fg;                   /* foreground color */
+	__u32 bg;                   /* background color */
+	__u32 length;               /* number of tiles to draw */
+	__u32 *indices;             /* array of indices to tile map */
+};
+
+struct fb_tilecursor {
+	__u32 sx;                   /* cursor position in the x-axis */
+	__u32 sy;                   /* cursor position in the y-axis */
+	__u32 mode;                 /* 0 = erase, 1 = draw */
+	__u32 shape;                /* see FB_TILE_CURSOR_* */
+	__u32 fg;                   /* foreground color */
+	__u32 bg;                   /* background color */
+};
+
+struct fb_tile_ops {
+	/* set tile characteristics */
+	void (*fb_settile)(struct fb_info *info, struct fb_tilemap *map);
+
+	/* all dimensions from hereon are in terms of tiles */
+
+	/* move a rectangular region of tiles from one area to another*/
+	void (*fb_tilecopy)(struct fb_info *info, struct fb_tilearea *area);
+	/* fill a rectangular region with a tile */
+	void (*fb_tilefill)(struct fb_info *info, struct fb_tilerect *rect);
+	/* copy an array of tiles */
+	void (*fb_tileblit)(struct fb_info *info, struct fb_tileblit *blit);
+	/* cursor */
+	void (*fb_tilecursor)(struct fb_info *info,
+			      struct fb_tilecursor *cursor);
+};
+#endif /* CONFIG_FB_TILEBLITTING */
+
 /* FBINFO_* = fb_info.flags bit flags */
 #define FBINFO_MODULE		0x0001	/* Low-level driver is a module */
 #define FBINFO_HWACCEL_DISABLED	0x0002
@@ -586,6 +663,7 @@ struct fb_ops {
 						  from userspace */
 #define FBINFO_MISC_MODESWITCH         0x20000 /* mode switch */
 #define FBINFO_MISC_MODESWITCHLATE     0x40000 /* init hardware later */
+#define FBINFO_MISC_TILEBLITTING       0x80000 /* use tile blitting */
 
 struct fb_info {
 	int node;
@@ -602,6 +680,9 @@ struct fb_info {
 	struct list_head modelist;      /* mode list */
 	struct fb_ops *fbops;
 	struct device *device;
+#ifdef CONFIG_FB_TILEBLITTING
+	struct fb_tile_ops *tileops;    /* Tile Blitting */
+#endif
 	char __iomem *screen_base;	/* Virtual address */
 	unsigned long screen_size;	/* Amount of ioremapped VRAM or 0 */ 
 	int currcon;			/* Current VC. */
@@ -609,7 +690,7 @@ struct fb_info {
 #define FBINFO_STATE_RUNNING	0
 #define FBINFO_STATE_SUSPENDED	1
 	u32 state;			/* Hardware state i.e suspend */
-
+	void *fbcon_par;                /* fbcon use-only private area */
 	/* From here on everything is device dependent */
 	void *par;	
 };

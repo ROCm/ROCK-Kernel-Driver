@@ -368,6 +368,9 @@ int fb_prepare_logo(struct fb_info *info)
 
 	memset(&fb_logo, 0, sizeof(struct logo_data));
 
+	if (info->flags & FBINFO_MISC_TILEBLITTING)
+		return 0;
+
 	if (info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
 		depth = info->var.blue.length;
 		if (info->var.red.length < depth)
@@ -679,6 +682,7 @@ fb_cursor(struct fb_info *info, struct fb_cursor_user __user *sprite)
 	cursor.image.cmap.blue = info->cursor.image.cmap.blue;
 	cursor.image.cmap.transp = info->cursor.image.cmap.transp;
 	cursor.data = NULL;
+	cursor.flash = 0;
 
 	if (cursor.set & FB_CUR_SETCUR)
 		info->cursor.enable = 1;
