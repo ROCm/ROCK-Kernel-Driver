@@ -1,5 +1,5 @@
-/*------------------------------------------------------------------------------
- * Native PARISC/Linux Project (http://www.puffingroup.com/parisc)
+/*
+ * Linux/PARISC Project (http://www.parisc-linux.org/)
  *
  * HP-UX System Call Wrapper routines and System Call Return Path
  *
@@ -24,12 +24,11 @@
 #warning Must be changed for PA64
 #endif
 
-#include <asm/offset.h>
+#include <asm/offsets.h>
 
 	.level		1.1
 	.text
 
-#define __ASSEMBLY__
 #include <asm/assembly.h>
 #include <asm/signal.h>
 
@@ -81,6 +80,7 @@
 
 
 	.export hpux_fork_wrapper
+	.export hpux_child_return
 	.import sys_fork
 
 hpux_fork_wrapper:
@@ -91,12 +91,10 @@ hpux_fork_wrapper:
 	stw	%r2,-20(%r30)
 	ldo	64(%r30),%r30
 	stw	%r2,PT_GR19(%r1)	;! save for child
-	stw	%r30,PT_GR20(%r1)	;! save for child
-	ldil	L%child_return,%r3
-	ldo	R%child_return(%r3),%r3
-	stw	%r3,PT_GR21(%r1)	;! save for child
+	stw	%r30,PT_GR21(%r1)	;! save for child
 
-	ldw	TASK_PT_GR30(%r1),%r25
+	ldw     PT_GR30(%r1),%r25
+	mtctl   %r25,%cr29
 	copy	%r1,%r24
 	bl	sys_clone,%r2
 	ldi	SIGCHLD,%r26
@@ -130,7 +128,12 @@ fork_exit:
 
 	/* Set the return value for the child */
 
-child_return:
+hpux_child_return:
+#if CONFIG_SMP || CONFIG_PREEMPT
+	bl	schedule_tail, %r2
+	nop
+#endif
+
 	ldw TASK_PT_GR19-TASK_SZ_ALGN-128(%r30),%r2
 	b fork_return
 	copy %r0,%r28
@@ -242,3 +245,10 @@ hpux_syscall_exit:
 no_error:
 	b syscall_exit
 	nop
+
+	.export hpux_unimplemented_wrapper
+	.import hpux_unimplemented
+
+hpux_unimplemented_wrapper:
+	b hpux_unimplemented
+	stw %r22,-64(%r30)  /* overwrite arg8 with syscall number */

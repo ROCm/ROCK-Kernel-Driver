@@ -34,8 +34,7 @@ out:
 }
 
 struct hpux_dirent {
-	long	d_off_pad; /* we only have a 32-bit off_t */
-	long	d_off;
+	loff_t	d_off;
 	ino_t	d_ino;
 	short	d_reclen;
 	short	d_namlen;
@@ -52,7 +51,8 @@ struct getdents_callback {
 #define NAME_OFFSET(de) ((int) ((de)->d_name - (char *) (de)))
 #define ROUND_UP(x) (((x)+sizeof(long)-1) & ~(sizeof(long)-1))
 
-static int filldir(void * __buf, const char * name, int namlen, loff_t offset, ino_t ino)
+static int filldir(void * __buf, const char * name, int namlen, loff_t offset,
+		ino_t ino, unsigned d_type)
 {
 	struct hpux_dirent * dirent;
 	struct getdents_callback * buf = (struct getdents_callback *) __buf;
@@ -96,7 +96,7 @@ int hpux_getdents(unsigned int fd, struct hpux_dirent *dirent, unsigned int coun
 	buf.count = count;
 	buf.error = 0;
 
-	error = vfs_readdir(file, &buf, filldir);
+	error = vfs_readdir(file, filldir, &buf);
 	if (error < 0)
 		goto out_putf;
 	error = buf.error;
@@ -139,7 +139,7 @@ static int cp_hpux_stat(struct kstat *stat, struct hpux_stat64 *statbuf)
 	return copy_to_user(statbuf,&tmp,sizeof(tmp)) ? -EFAULT : 0;
 }
 
-long hpux_stat64(const char *path, struct hpux_stat64 *buf)
+long hpux_stat64(char *filename, struct hpux_stat64 *statbuf)
 {
 	struct kstat stat;
 	int error = vfs_stat(filename, &stat);
