@@ -259,7 +259,7 @@ apply_relocate_add(Elf64_Shdr *sechdrs, const char *strtab,
 			*(u64 *)location = value;
 			break;
 		case R_ALPHA_GPRELHIGH:
-			value = (value - gp + 0x8000) >> 16;
+			value = (long)(value - gp + 0x8000) >> 16;
 			if ((short) value != value)
 				goto reloc_overflow;
 			*(u16 *)location = value;
