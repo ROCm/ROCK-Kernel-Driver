@@ -124,7 +124,7 @@ static int __init via_generic_setup (struct pci_dev *pdev)
 	return 0;
 }
 
-
+#ifdef CONFIG_AGP3
 /*
  * The KT400 does magick to put the AGP bridge compliant with the same
  * standards version as the graphics card. If we haven't fallen into
@@ -137,6 +137,7 @@ static void __init via_kt400_enable(u32 mode)
 		/* Something weird happened, fall back to 2.0 */
 		agp_generic_agp_enable(mode);
 }
+#endif
 
 static int __init via_kt400_setup(struct pci_dev *pdev)
 {
@@ -173,9 +174,13 @@ static int __init via_kt400_setup(struct pci_dev *pdev)
 		agp_bridge.agp_enable = agp_generic_agp_enable;
 
 	} else {
-
+#ifdef CONFIG_AGP3
 		/* AGP 3.0 mode */
 		agp_bridge.agp_enable = via_kt400_enable;
+#else
+		printk ("AGP: VIA KT400 in AGP3.0 mode support not compiled in.\n");
+		return -ENODEV;
+#endif
 	}
 	return 0;
 }
