@@ -83,7 +83,7 @@ struct dvb_frontend_data {
 
 struct dvb_frontend_ioctl_data {
 	struct list_head list_head;
-	struct dvb_adapter_s *adapter;
+	struct dvb_adapter *adapter;
 	int (*before_ioctl) (struct dvb_frontend *frontend,
 			     unsigned int cmd, void *arg);
 	int (*after_ioctl)  (struct dvb_frontend *frontend,
@@ -336,9 +336,6 @@ int dvb_frontend_set_parameters (struct dvb_frontend_data *fe,
 	struct dvb_frontend *frontend = &fe->frontend;
 	int err;
 
-	dprintk ("%s: f == %i, drift == %i\n",
-		 __FUNCTION__, param->frequency, fe->lnb_drift);
-
 	dvb_bend_frequency (fe, 0);
 
 	if (first_trial) {
@@ -351,6 +348,9 @@ int dvb_frontend_set_parameters (struct dvb_frontend_data *fe,
 		memcpy (&fe->parameters, param,
 			sizeof (struct dvb_frontend_parameters));
 	}
+
+	dprintk ("%s: f == %i, drift == %i\n",
+		 __FUNCTION__, param->frequency, fe->lnb_drift);
 
 	param->frequency += fe->lnb_drift + fe->bending;
 	err = dvb_frontend_internal_ioctl (frontend, FE_SET_FRONTEND, param);
@@ -367,9 +367,8 @@ void dvb_frontend_init (struct dvb_frontend_data *fe)
 	struct dvb_frontend *frontend = &fe->frontend;
 	struct dvb_frontend_parameters *init_param;
 
-	printk ("%s: initialising frontend %i:%i (%s)...\n", __FUNCTION__,
-		frontend->i2c->adapter->num, frontend->i2c->id,
-		fe->info->name);
+	printk ("DVB: initialising frontend %i:%i (%s)...\n",
+		frontend->i2c->adapter->num, frontend->i2c->id, fe->info->name);
 
 	dvb_frontend_internal_ioctl (frontend, FE_INIT, NULL);
 
@@ -436,15 +435,20 @@ void dvb_frontend_recover (struct dvb_frontend_data *fe)
 	 */
 	{
 		int j = fe->lost_sync_count;
-		int stepsize = fe->info->frequency_stepsize;
-
-		if (j % 32 == 0)
-			fe->lnb_drift = 0;
+		int stepsize;
 		
-		if (j % 2)
-			fe->lnb_drift += stepsize * ((j+1)/2);
+		if (fe->info->type == FE_QPSK)
+			stepsize = fe->parameters.u.qpsk.symbol_rate / 16000;
 		else
+			stepsize = fe->info->frequency_stepsize * 2;
+
+		if (j % 32 == 0) {
+			fe->lnb_drift = 0;
+		} else {
 			fe->lnb_drift = -fe->lnb_drift;
+			if (j % 2)
+				fe->lnb_drift += stepsize;
+		}
 
 		dvb_frontend_set_parameters (fe, &fe->parameters, 0);
 	}
@@ -511,7 +515,8 @@ int dvb_frontend_thread (void *data)
 			fe->lost_sync_count = 0;
 		} else {
 			fe->lost_sync_count++;
-
+			if (fe->lost_sync_count < 10)  /* XXX FIXME CHECKME! */
+				continue;
 			dvb_frontend_recover (fe);
 			delay = HZ/5;
 			if (jiffies - fe->lost_sync_jiffies > TIMEOUT) {
@@ -627,7 +632,7 @@ unsigned int dvb_frontend_poll (struct file *file, struct poll_table_struct *wai
 static
 int dvb_frontend_open (struct inode *inode, struct file *file)
 {
-	dvb_device_t *dvbdev = file->private_data;
+	struct dvb_device *dvbdev = file->private_data;
 	struct dvb_frontend_data *fe = dvbdev->priv;
 	int ret;
 
@@ -648,7 +653,7 @@ int dvb_frontend_open (struct inode *inode, struct file *file)
 static
 int dvb_frontend_release (struct inode *inode, struct file *file)
 {
-	dvb_device_t *dvbdev = file->private_data;
+	struct dvb_device *dvbdev = file->private_data;
 	struct dvb_frontend_data *fe = dvbdev->priv;
 
 	dprintk ("%s\n", __FUNCTION__);
@@ -661,7 +666,7 @@ int dvb_frontend_release (struct inode *inode, struct file *file)
 
 
 int
-dvb_add_frontend_ioctls (struct dvb_adapter_s *adapter,
+dvb_add_frontend_ioctls (struct dvb_adapter *adapter,
                          int (*before_ioctl) (struct dvb_frontend *frontend,
                                               unsigned int cmd, void *arg),
                          int (*after_ioctl)  (struct dvb_frontend *frontend,
@@ -715,7 +720,7 @@ dvb_add_frontend_ioctls (struct dvb_adapter_s *adapter,
 
 
 void
-dvb_remove_frontend_ioctls (struct dvb_adapter_s *adapter,
+dvb_remove_frontend_ioctls (struct dvb_adapter *adapter,
 			    int (*before_ioctl) (struct dvb_frontend *frontend,
                                                  unsigned int cmd, void *arg),
                             int (*after_ioctl)  (struct dvb_frontend *frontend,
@@ -748,7 +753,7 @@ dvb_remove_frontend_ioctls (struct dvb_adapter_s *adapter,
 
 
 int
-dvb_add_frontend_notifier (struct dvb_adapter_s *adapter,
+dvb_add_frontend_notifier (struct dvb_adapter *adapter,
 			   void (*callback) (fe_status_t s, void *data),
 			   void *data)
 {
@@ -791,7 +796,7 @@ dvb_add_frontend_notifier (struct dvb_adapter_s *adapter,
 
 
 void
-dvb_remove_frontend_notifier (struct dvb_adapter_s *adapter,
+dvb_remove_frontend_notifier (struct dvb_adapter *adapter,
 			      void (*callback) (fe_status_t s, void *data))
 {
         struct list_head *entry;
@@ -827,11 +832,11 @@ dvb_remove_frontend_notifier (struct dvb_adapter_s *adapter,
 
 static
 struct file_operations dvb_frontend_fops = {
-        owner:          THIS_MODULE,
-        ioctl:          dvb_generic_ioctl,
-	poll:		dvb_frontend_poll,
-        open:           dvb_frontend_open,
-        release:        dvb_frontend_release
+	.owner		= THIS_MODULE,
+	.ioctl		= dvb_generic_ioctl,
+	.poll		= dvb_frontend_poll,
+	.open		= dvb_frontend_open,
+	.release	= dvb_frontend_release
 };
 
 
@@ -845,9 +850,11 @@ dvb_register_frontend (int (*ioctl) (struct dvb_frontend *frontend,
 {
 	struct list_head *entry;
 	struct dvb_frontend_data *fe;
-	dvb_device_t dvbdev_template = { users: 1, writers: 1,
-					 fops: &dvb_frontend_fops,
-					 kernel_ioctl: dvb_frontend_ioctl
+	static const struct dvb_device dvbdev_template = {
+		.users = 1,
+		.writers = 1,
+		.fops = &dvb_frontend_fops,
+		.kernel_ioctl = dvb_frontend_ioctl
 	};
 
 	dprintk ("%s\n", __FUNCTION__);
@@ -878,7 +885,9 @@ dvb_register_frontend (int (*ioctl) (struct dvb_frontend *frontend,
 	list_for_each (entry, &frontend_ioctl_list) {
 		struct dvb_frontend_ioctl_data *ioctl;
 
-		ioctl = list_entry (entry, struct dvb_frontend_ioctl_data, list_head);
+		ioctl = list_entry (entry,
+				    struct dvb_frontend_ioctl_data,
+				    list_head);
 
 		if (ioctl->adapter == i2c->adapter) {
 			fe->frontend.before_ioctl = ioctl->before_ioctl;
@@ -936,3 +945,4 @@ MODULE_PARM(dvb_frontend_debug,"i");
 MODULE_PARM(dvb_shutdown_timeout,"i");
 MODULE_PARM_DESC(dvb_frontend_debug, "enable verbose debug messages");
 MODULE_PARM_DESC(dvb_shutdown_timeout, "wait <shutdown_timeout> seconds after close() before suspending hardware");
+

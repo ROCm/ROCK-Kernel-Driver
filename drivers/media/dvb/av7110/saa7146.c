@@ -1399,7 +1399,7 @@ int i2c_reset(struct saa7146* saa)
 	/* if any error is still present, a fatal error has occured ... */
 	if ( SAA7146_I2C_BBR != (status = i2c_status_check(saa)) ) {
 		hprintk("saa7146: i2c_reset: fatal error, status:0x%08x\n",status);
-		return -1;
+		return -EIO;
 	}
 
 	return 0;

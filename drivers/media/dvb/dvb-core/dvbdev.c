@@ -37,6 +37,7 @@
 #include <asm/system.h>
 #include <linux/kmod.h>
 #include <linux/slab.h>
+#include <linux/videodev.h>
 
 #include "compat.h"
 #include "dvbdev.h"
@@ -69,17 +70,17 @@ static char *dnames[] = {
 
 
 static
-dvb_device_t* dvbdev_find_device (int minor)
+struct dvb_device* dvbdev_find_device (int minor)
 {
 	struct list_head *entry;
 
 	list_for_each (entry, &dvb_adapter_list) {
 		struct list_head *entry0;
-		dvb_adapter_t *adap;
-		adap = list_entry (entry, dvb_adapter_t, list_head);
+		struct dvb_adapter *adap;
+		adap = list_entry (entry, struct dvb_adapter, list_head);
 		list_for_each (entry0, &adap->device_list) {
-			dvb_device_t *dev;
-			dev = list_entry (entry0, dvb_device_t, list_head);
+			struct dvb_device *dev;
+			dev = list_entry (entry0, struct dvb_device, list_head);
 			if (nums2minor(adap->num, dev->type, dev->id) == minor)
 				return dev;
 		}
@@ -92,7 +93,7 @@ dvb_device_t* dvbdev_find_device (int minor)
 static
 int dvb_device_open(struct inode *inode, struct file *file)
 {
-	dvb_device_t *dvbdev;
+	struct dvb_device *dvbdev;
 	
 	dvbdev = dvbdev_find_device (minor(inode->i_rdev));
 
@@ -118,13 +119,8 @@ int dvb_device_open(struct inode *inode, struct file *file)
 
 static struct file_operations dvb_device_fops =
 {
-	owner:		THIS_MODULE,
-        read:		NULL,
-	write:		NULL,
-	ioctl:		NULL,
-	open:		dvb_device_open,
-	release:	NULL,
-	poll:		NULL,
+	.owner =	THIS_MODULE,
+	.open =		dvb_device_open,
 };
 #endif /* CONFIG_DVB_DEVFS_ONLY */
 
@@ -132,7 +128,7 @@ static struct file_operations dvb_device_fops =
 
 int dvb_generic_open(struct inode *inode, struct file *file)
 {
-        dvb_device_t *dvbdev = file->private_data;
+        struct dvb_device *dvbdev = file->private_data;
 
         if (!dvbdev)
                 return -ENODEV;
@@ -153,7 +149,7 @@ int dvb_generic_open(struct inode *inode, struct file *file)
 
 int dvb_generic_release(struct inode *inode, struct file *file)
 {
-        dvb_device_t *dvbdev = file->private_data;
+        struct dvb_device *dvbdev = file->private_data;
 
 	if (!dvbdev)
                 return -ENODEV;
@@ -166,73 +162,10 @@ int dvb_generic_release(struct inode *inode, struct file *file)
 }
 
 
-/*
- * helper function -- handles userspace copying for ioctl arguments
- */
-int
-generic_usercopy(struct inode *inode, struct file *file,
-		 unsigned int cmd, unsigned long arg,
-		 int (*func)(struct inode *inode, struct file *file,
-			     unsigned int cmd, void *arg))
-{
-	char	sbuf[128];
-	void    *mbuf = NULL;
-	void	*parg = NULL;
-	int	err  = -EINVAL;
-
-	/*  Copy arguments into temp kernel buffer  */
-	switch (_IOC_DIR(cmd)) {
-	case _IOC_NONE:
-		parg = (void *)arg;
-		break;
-	case _IOC_READ: /* some v4l ioctls are marked wrong ... */
-	case _IOC_WRITE:
-	case (_IOC_WRITE | _IOC_READ):
-		if (_IOC_SIZE(cmd) <= sizeof(sbuf)) {
-			parg = sbuf;
-		} else {
-			/* too big to allocate from stack */
-			mbuf = kmalloc(_IOC_SIZE(cmd),GFP_KERNEL);
-			if (NULL == mbuf)
-				return -ENOMEM;
-			parg = mbuf;
-		}
-		
-		err = -EFAULT;
-		if (copy_from_user(parg, (void *)arg, _IOC_SIZE(cmd)))
-			goto out;
-		break;
-	}
-
-	/* call driver */
-	if ((err = func(inode, file, cmd, parg)) == -ENOIOCTLCMD)
-		err = -EINVAL;
-
-	if (err < 0)
-		goto out;
-
-	/*  Copy results into user buffer  */
-	switch (_IOC_DIR(cmd))
-	{
-	case _IOC_READ:
-	case (_IOC_WRITE | _IOC_READ):
-		if (copy_to_user((void *)arg, parg, _IOC_SIZE(cmd)))
-			err = -EFAULT;
-		break;
-	}
-
-out:
-	if (mbuf)
-		kfree(mbuf);
-
-	return err;
-}
-
-
 int dvb_generic_ioctl(struct inode *inode, struct file *file,
 		      unsigned int cmd, unsigned long arg)
 {
-        dvb_device_t *dvbdev = file->private_data;
+        struct dvb_device *dvbdev = file->private_data;
 	
         if (!dvbdev)
 	        return -ENODEV;
@@ -240,20 +173,20 @@ int dvb_generic_ioctl(struct inode *inode, struct file *file,
 	if (!dvbdev->kernel_ioctl)
 		return -EINVAL;
 
-	return generic_usercopy (inode, file, cmd, arg, dvbdev->kernel_ioctl);
+	return video_usercopy (inode, file, cmd, arg, dvbdev->kernel_ioctl);
 }
 
 
 static
-int dvbdev_get_free_id (struct dvb_adapter_s *adap, int type)
+int dvbdev_get_free_id (struct dvb_adapter *adap, int type)
 {
 	u32 id = 0;
 
 	while (id < DVB_MAX_IDS) {
 		struct list_head *entry;
 		list_for_each (entry, &adap->device_list) {
-			dvb_device_t *dev;
-			dev = list_entry (entry, dvb_device_t, list_head);
+			struct dvb_device *dev;
+			dev = list_entry (entry, struct dvb_device, list_head);
 			if (dev->type == type && dev->id == id)
 				goto skip;
 		}
@@ -265,12 +198,12 @@ skip:
 }
 
 
-int dvb_register_device(dvb_adapter_t *adap, dvb_device_t **pdvbdev, 
-			dvb_device_t *template, void *priv, int type)
+int dvb_register_device(struct dvb_adapter *adap, struct dvb_device **pdvbdev, 
+			const struct dvb_device *template, void *priv, int type)
 {
 	u32 id;
 	char name [20];
-	dvb_device_t *dvbdev;
+	struct dvb_device *dvbdev;
 
 	if (down_interruptible (&dvbdev_register_lock))
 		return -ERESTARTSYS;
@@ -282,7 +215,7 @@ int dvb_register_device(dvb_adapter_t *adap, dvb_device_t **pdvbdev,
 		return -ENFILE;
 	}
 
-	*pdvbdev = dvbdev = kmalloc(sizeof(dvb_device_t), GFP_KERNEL);
+	*pdvbdev = dvbdev = kmalloc(sizeof(struct dvb_device), GFP_KERNEL);
 
 	if (!dvbdev) {
 		up(&dvbdev_register_lock);
@@ -291,7 +224,7 @@ int dvb_register_device(dvb_adapter_t *adap, dvb_device_t **pdvbdev,
 
 	up (&dvbdev_register_lock);
 	
-	memcpy(dvbdev, template, sizeof(dvb_device_t));
+	memcpy(dvbdev, template, sizeof(struct dvb_device));
 	dvbdev->type = type;
 	dvbdev->id = id;
 	dvbdev->adapter = adap;
@@ -307,15 +240,15 @@ int dvb_register_device(dvb_adapter_t *adap, dvb_device_t **pdvbdev,
 					      S_IFCHR | S_IRUSR | S_IWUSR,
 					      dvbdev->fops, dvbdev);
 
-	dprintk("%s: register adapter%d/%s @ minor: %i (0x%02x) - dvbdev: %p\n",
-		__FUNCTION__, adap->num, name, nums2minor(adap->num, type, id),
-		nums2minor(adap->num, type, id), dvbdev);
+	dprintk("DVB: register adapter%d/%s @ minor: %i (0x%02x)\n",
+		adap->num, name, nums2minor(adap->num, type, id),
+		nums2minor(adap->num, type, id));
 
 	return 0;
 }
 
 
-void dvb_unregister_device(dvb_device_t *dvbdev)
+void dvb_unregister_device(struct dvb_device *dvbdev)
 {
 	if (!dvbdev)
 		return;
@@ -334,8 +267,8 @@ int dvbdev_get_free_adapter_num (void)
 	while (1) {
 		struct list_head *entry;
 		list_for_each (entry, &dvb_adapter_list) {
-			dvb_adapter_t *adap;
-			adap = list_entry (entry, dvb_adapter_t, list_head);
+			struct dvb_adapter *adap;
+			adap = list_entry (entry, struct dvb_adapter, list_head);
 			if (adap->num == num)
 				goto skip;
 		}
@@ -348,10 +281,10 @@ skip:
 }
 
 
-int dvb_register_adapter(dvb_adapter_t **padap, char *name)
+int dvb_register_adapter(struct dvb_adapter **padap, char *name)
 {
 	char dirname[16];
-	dvb_adapter_t *adap;
+	struct dvb_adapter *adap;
 	int num;
 
 	if (down_interruptible (&dvbdev_register_lock))
@@ -362,17 +295,17 @@ int dvb_register_adapter(dvb_adapter_t **padap, char *name)
 		return -ENFILE;
 	}
 
-	if (!(*padap = adap = kmalloc(sizeof(dvb_adapter_t), GFP_KERNEL))) {
+	if (!(*padap = adap = kmalloc(sizeof(struct dvb_adapter), GFP_KERNEL))) {
 		up(&dvbdev_register_lock);
 		return -ENOMEM;
 	}
 
-	memset (adap, 0, sizeof(dvb_adapter_t));
+	memset (adap, 0, sizeof(struct dvb_adapter));
 	INIT_LIST_HEAD (&adap->device_list);
 
 	MOD_INC_USE_COUNT;
 
-	printk ("%s: registering new adapter (%s).\n", __FUNCTION__, name);
+	printk ("DVB: registering new adapter (%s).\n", name);
 	
 	sprintf(dirname, "dvb/adapter%d", num);
 	adap->devfs_handle = devfs_mk_dir(NULL, dirname, NULL);
@@ -386,7 +319,7 @@ int dvb_register_adapter(dvb_adapter_t **padap, char *name)
 }
 
 
-int dvb_unregister_adapter(dvb_adapter_t *adap)
+int dvb_unregister_adapter(struct dvb_adapter *adap)
 {
         devfs_unregister (adap->devfs_handle);
 	if (down_interruptible (&dvbdev_register_lock))

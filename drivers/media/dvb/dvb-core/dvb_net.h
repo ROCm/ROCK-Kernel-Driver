@@ -47,7 +47,7 @@ typedef struct dvb_net_priv_s {
 } dvb_net_priv_t;
 
 typedef struct dvb_net_s {
-	dvb_device_t *dvbdev;
+	struct dvb_device *dvbdev;
 
 	int card_num;
 	int dev_num;
@@ -58,6 +58,6 @@ typedef struct dvb_net_s {
 
 
 void dvb_net_release(dvb_net_t *);
-int  dvb_net_init(dvb_adapter_t *, dvb_net_t *, dmx_demux_t *);
+int  dvb_net_init(struct dvb_adapter *, dvb_net_t *, dmx_demux_t *);
 
 #endif

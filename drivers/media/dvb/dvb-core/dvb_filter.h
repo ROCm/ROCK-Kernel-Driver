@@ -6,18 +6,18 @@
 
 #include "demux.h"
 
-typedef int (pes2ts_cb_t) (void *, unsigned char *);
+typedef int (dvb_filter_pes2ts_cb_t) (void *, unsigned char *);
 
-typedef struct pes2ts_s {
+typedef struct dvb_filter_pes2ts_s {
 	unsigned char buf[188];
         unsigned char cc;
-        pes2ts_cb_t *cb;
+        dvb_filter_pes2ts_cb_t *cb;
 	void *priv;
-} pes2ts_t;
+} dvb_filter_pes2ts_t;
 
-void pes2ts_init(pes2ts_t *p2ts, unsigned short pid, 
-		 pes2ts_cb_t *cb, void *priv);
-int pes2ts(pes2ts_t *p2ts, unsigned char *pes, int len);
+void dvb_filter_pes2ts_init(dvb_filter_pes2ts_t *p2ts, unsigned short pid, 
+		 	    dvb_filter_pes2ts_cb_t *cb, void *priv);
+int dvb_filter_pes2ts(dvb_filter_pes2ts_t *p2ts, unsigned char *pes, int len);
 
 
 #define PROG_STREAM_MAP  0xBC
@@ -224,26 +224,11 @@ typedef struct audio_i{
 } AudioInfo;
 
 
-void reset_ipack(ipack *p);
-int instant_repack(u8 *buf, int count, ipack *p);
-void init_ipack(ipack *p, int size,
+void dvb_filter_ipack_reset(ipack *p);
+int dvb_filter_instant_repack(u8 *buf, int count, ipack *p);
+void dvb_filter_ipack_init(ipack *p, int size,
 		void (*func)(u8 *buf,  int size, void *priv));
-void free_ipack(ipack * p);
-void setup_ts2pes(ipack *pa, ipack *pv, u16 *pida, u16 *pidv, 
-		  void (*pes_write)(u8 *buf, int count, void *data),
-		  void *priv);
-void ts_to_pes(ipack *p, u8 *buf); 
-void send_ipack(ipack *p);
-void send_ipack_rest(ipack *p);
-int get_ainfo(uint8_t *mbuf, int count, AudioInfo *ai, int pr);
-int get_ac3info(uint8_t *mbuf, int count, AudioInfo *ai, int pr);
-int get_vinfo(uint8_t *mbuf, int count, VideoInfo *vi, int pr);
-uint8_t *skip_pes_header(uint8_t **bufp);
-void initialize_quant_matrix( uint32_t *matrix );
-void initialize_mpg_picture(mpg_picture *pic);
-void init_mpg_picture( mpg_picture *pic, int chan, int32_t field_type);
-void mpg_set_picture_parameter( int32_t field_type, mpg_picture *pic );
-int read_sequence_header(uint8_t *headr, VideoInfo *vi, int pr);
-int read_gop_header(uint8_t *headr, mpg_picture *pic, int pr);
-int read_picture_header(uint8_t *headr, mpg_picture *pic, int field, int pr);
+void dvb_filter_ipack_free(ipack * p);
+void dvb_filter_ipack_flush(ipack *p);
+
 #endif
