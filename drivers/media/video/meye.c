@@ -904,7 +904,7 @@ static int meye_do_ioctl(struct inode *inode, struct file *file,
 
 	case VIDIOCSPICT: {
 		struct video_picture *p = arg;
-		if (p->depth != 2)
+		if (p->depth != 16)
 			return -EINVAL;
 		if (p->palette != VIDEO_PALETTE_YUV422)
 			return -EINVAL;
@@ -1335,7 +1335,7 @@ static int __devinit meye_probe(struct pci_dev *pcidev,
 	init_MUTEX(&meye.lock);
 	init_waitqueue_head(&meye.proc_list);
 
-	meye.picture.depth = 2;
+	meye.picture.depth = 16;
 	meye.picture.palette = VIDEO_PALETTE_YUV422;
 	meye.picture.brightness = 32 << 10;
 	meye.picture.hue = 32 << 10;
