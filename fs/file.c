@@ -37,7 +37,7 @@ void free_fd_array(struct file **array, int num)
 	int size = num * sizeof(struct file *);
 
 	if (!array) {
-		printk (KERN_ERR __FUNCTION__ "array = 0 (num = %d)\n", num);
+		printk (KERN_ERR "free_fd_array: array = 0 (num = %d)\n", num);
 		return;
 	}
 
@@ -145,11 +145,6 @@ void free_fdset(fd_set *array, int num)
 {
 	int size = num / 8;
 
-	if (!array) {
-		printk (KERN_ERR __FUNCTION__ "array = 0 (num = %d)\n", num);
-		return;
-	}
-	
 	if (num <= __FD_SETSIZE) /* Don't free an embedded fdset */
 		return;
 	else if (size <= PAGE_SIZE)
