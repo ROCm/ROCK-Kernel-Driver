@@ -25,14 +25,6 @@
 #define	MEM_BASE	0x00000000	/* Memory base at address 0 */
 #define	VBR_BASE	MEM_BASE	/* Vector address */
 
-#if defined(CONFIG_RAM16MB)
-#define	MEM_SIZE	0x01000000	/* Memory size 16Mb */
-#elif defined(CONFIG_RAM8MB)
-#define	MEM_SIZE	0x00800000	/* Memory size 8Mb */
-#else
-#define	MEM_SIZE	0x00400000	/* Memory size 4Mb */
-#endif
-
 /*****************************************************************************/
 
 .global	_start
@@ -81,17 +73,31 @@ _start:
 	 * only, so the bus trap can't be changed. (RS)
 	 */
 	move.l	#VBR_BASE, %a7			/* Note VBR can't be read */
-	movec   %a7, %VBR
+	movec	%a7, %VBR
 	move.l	%a7, _ramvec			/* Set up vector addr */
 	move.l	%a7, _rambase			/* Set up base RAM addr */
 
-
+	/*
+	 *	Determine size of RAM, then set up initial stack.
+	 */
+#if defined(CONFIG_RAMAUTO)
+	move.l	MCF_MBAR+0x7c,%d0	/* get SDRAM address mask */
+	andi.l	#0xfffff000,%d0		/* mask out chip select options */
+	neg.l	%d0			/* negate bits */
+#else
+#if defined(CONFIG_RAM16MB)
+#define	MEM_SIZE	0x01000000	/* Memory size 16Mb */
+#elif defined(CONFIG_RAM8MB)
+#define	MEM_SIZE	0x00800000	/* Memory size 8Mb */
+#else
+#define	MEM_SIZE	0x00400000	/* Memory size 4Mb */
+#endif
 	/*
 	 *	Set memory size.
 	 */
-	move.l	#MEM_SIZE, %a0
+	move.l	#MEM_SIZE, %d0
+#endif
 
-	move.l	%a0, %d0			/* Mem end addr is in a0 */
 	move.l	%d0, %sp			/* Set up initial stack ptr */
 	move.l	%d0, _ramend			/* Set end ram addr */
 
