@@ -600,10 +600,8 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 			if (IS_IA32_PROCESS(&scr->pt)) {
 				scr->pt.r8 = scr->pt.r1;
 				scr->pt.cr_iip -= 2;
-				if (errno == ERESTART_RESTARTBLOCK) {
+				if (errno == ERESTART_RESTARTBLOCK)
 					scr->pt.r8 = 0;	/* x86 version of __NR_restart_syscall */
-					scr->pt.cr_iip -= 2;
-				}
 			} else {
 				/*
 				 * Note: the syscall number is in r15 which is saved in
