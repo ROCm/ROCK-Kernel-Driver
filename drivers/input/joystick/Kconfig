@@ -247,7 +247,7 @@ config JOYSTICK_AMIGA
 	  To compile this driver as a module, choose M here: the
 	  module will be called amijoy.
 
-config INPUT_JOYDUMP
+config JOYSTICK_JOYDUMP
 	tristate "Gameport data dumper"
 	depends on INPUT && INPUT_JOYSTICK
 	help

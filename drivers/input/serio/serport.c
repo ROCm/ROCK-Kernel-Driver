@@ -31,12 +31,9 @@ MODULE_ALIAS_LDISC(N_MOUSE);
 struct serport {
 	struct tty_struct *tty;
 	wait_queue_head_t wait;
-	struct serio serio;
+	struct serio *serio;
 	unsigned long flags;
-	char phys[32];
 };
-
-char serport_name[] = "Serial port";
 
 /*
  * Callback functions from the serio code.
@@ -44,15 +41,15 @@ char serport_name[] = "Serial port";
 
 static int serport_serio_write(struct serio *serio, unsigned char data)
 {
-	struct serport *serport = serio->driver;
+	struct serport *serport = serio->port_data;
 	return -(serport->tty->driver->write(serport->tty, 0, &data, 1) != 1);
 }
 
 static void serport_serio_close(struct serio *serio)
 {
-	struct serport *serport = serio->driver;
+	struct serport *serport = serio->port_data;
 
-	serport->serio.type = 0;
+	serport->serio->type = 0;
 	wake_up_interruptible(&serport->wait);
 }
 
@@ -64,26 +61,30 @@ static void serport_serio_close(struct serio *serio)
 static int serport_ldisc_open(struct tty_struct *tty)
 {
 	struct serport *serport;
+	struct serio *serio;
 	char name[64];
 
 	serport = kmalloc(sizeof(struct serport), GFP_KERNEL);
-	if (unlikely(!serport))
+	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
+	if (unlikely(!serport || !serio)) {
+		kfree(serport);
+		kfree(serio);
 		return -ENOMEM;
-	memset(serport, 0, sizeof(struct serport));
+	}
 
+	memset(serport, 0, sizeof(struct serport));
+	serport->serio = serio;
 	set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
 	serport->tty = tty;
 	tty->disc_data = serport;
 
-	snprintf(serport->phys, sizeof(serport->phys), "%s/serio0", tty_name(tty, name));
-
-	serport->serio.name = serport_name;
-	serport->serio.phys = serport->phys;
-
-	serport->serio.type = SERIO_RS232;
-	serport->serio.write = serport_serio_write;
-	serport->serio.close = serport_serio_close;
-	serport->serio.driver = serport;
+	memset(serio, 0, sizeof(struct serio));
+	strlcpy(serio->name, "Serial port", sizeof(serio->name));
+	snprintf(serio->phys, sizeof(serio->phys), "%s/serio0", tty_name(tty, name));
+	serio->type = SERIO_RS232;
+	serio->write = serport_serio_write;
+	serio->close = serport_serio_close;
+	serio->port_data = serport;
 
 	init_waitqueue_head(&serport->wait);
 
@@ -114,7 +115,7 @@ static void serport_ldisc_receive(struct tty_struct *tty, const unsigned char *c
 	struct serport *serport = (struct serport*) tty->disc_data;
 	int i;
 	for (i = 0; i < count; i++)
-		serio_interrupt(&serport->serio, cp[i], 0, NULL);
+		serio_interrupt(serport->serio, cp[i], 0, NULL);
 }
 
 /*
@@ -142,10 +143,10 @@ static ssize_t serport_ldisc_read(struct tty_struct * tty, struct file * file, u
 	if (test_and_set_bit(SERPORT_BUSY, &serport->flags))
 		return -EBUSY;
 
-	serio_register_port(&serport->serio);
+	serio_register_port(serport->serio);
 	printk(KERN_INFO "serio: Serial port %s\n", tty_name(tty, name));
-	wait_event_interruptible(serport->wait, !serport->serio.type);
-	serio_unregister_port(&serport->serio);
+	wait_event_interruptible(serport->wait, !serport->serio->type);
+	serio_unregister_port(serport->serio);
 
 	clear_bit(SERPORT_BUSY, &serport->flags);
 
@@ -161,7 +162,7 @@ static int serport_ldisc_ioctl(struct tty_struct * tty, struct file * file, unsi
 	struct serport *serport = (struct serport*) tty->disc_data;
 
 	if (cmd == SPIOCSTYPE)
-		return get_user(serport->serio.type, (unsigned long __user *) arg);
+		return get_user(serport->serio->type, (unsigned long __user *) arg);
 
 	return -EINVAL;
 }
@@ -170,7 +171,7 @@ static void serport_ldisc_write_wakeup(struct tty_struct * tty)
 {
 	struct serport *sp = (struct serport *) tty->disc_data;
 
-	serio_dev_write_wakeup(&sp->serio);
+	serio_drv_write_wakeup(sp->serio);
 }
 
 /*

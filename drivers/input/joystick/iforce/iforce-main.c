@@ -524,7 +524,7 @@ static int __init iforce_init(void)
 	usb_register(&iforce_usb_driver);
 #endif
 #ifdef CONFIG_JOYSTICK_IFORCE_232
-	serio_register_device(&iforce_serio_dev);
+	serio_register_driver(&iforce_serio_drv);
 #endif
 	return 0;
 }
@@ -535,7 +535,7 @@ static void __exit iforce_exit(void)
 	usb_deregister(&iforce_usb_driver);
 #endif
 #ifdef CONFIG_JOYSTICK_IFORCE_232
-	serio_unregister_device(&iforce_serio_dev);
+	serio_unregister_driver(&iforce_serio_drv);
 #endif
 }
 
