@@ -1005,7 +1005,7 @@ static void natsemi_reset(struct net_device *dev)
 		udelay(5);
 	}
 	if (i==NATSEMI_HW_TIMEOUT) {
-		printk(KERN_INFO "%s: reset did not complete in %d usec.\n",
+		printk(KERN_WARN "%s: reset did not complete in %d usec.\n",
 			dev->name, i*5);
 	} else if (netif_msg_hw(np)) {
 		printk(KERN_DEBUG "%s: reset completed in %d usec.\n",
@@ -1045,7 +1045,7 @@ static void natsemi_reload_eeprom(struct net_device *dev)
 			break;
 	}
 	if (i==NATSEMI_HW_TIMEOUT) {
-		printk(KERN_INFO "%s: EEPROM did not reload in %d usec.\n",
+		printk(KERN_WARN "%s: EEPROM did not reload in %d usec.\n",
 			dev->name, i*50);
 	} else if (netif_msg_hw(np)) {
 		printk(KERN_DEBUG "%s: EEPROM reloaded in %d usec.\n",
@@ -1066,7 +1066,7 @@ static void natsemi_stop_rxtx(struct net_device *dev)
 		udelay(5);
 	}
 	if (i==NATSEMI_HW_TIMEOUT) {
-		printk(KERN_INFO "%s: Tx/Rx process did not stop in %d usec.\n",
+		printk(KERN_WARN "%s: Tx/Rx process did not stop in %d usec.\n",
 			dev->name, i*5);
 	} else if (netif_msg_hw(np)) {
 		printk(KERN_DEBUG "%s: Tx/Rx process stopped in %d usec.\n",
@@ -1477,7 +1477,7 @@ static void refill_rx(struct net_device *dev)
 	}
 	if (np->cur_rx - np->dirty_rx == RX_RING_SIZE) {
 		if (netif_msg_rx_err(np))
-			printk(KERN_INFO "%s: going OOM.\n", dev->name);
+			printk(KERN_WARN "%s: going OOM.\n", dev->name);
 		np->oom = 1;
 	}
 }
