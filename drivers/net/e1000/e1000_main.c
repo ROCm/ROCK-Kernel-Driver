@@ -79,7 +79,7 @@ char e1000_driver_name[] = "e1000";
 
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
 
-char e1000_driver_version[] = "4.2.4-k1";
+char e1000_driver_version[] = "4.2.4-k2";
 
 char e1000_copyright[] = "Copyright (c) 1999-2002 Intel Corporation.";
 
@@ -368,13 +368,21 @@ e1000_probe(struct pci_dev *pdev,
 	static int cards_found = 0;
 	unsigned long mmio_start;
 	int mmio_len;
+	int pci_using_dac;
 	int i;
 
 	if((i = pci_enable_device(pdev)))
 		return i;
 
-	if((i = pci_set_dma_mask(pdev, E1000_DMA_MASK)))
-		return i;
+	if(!(i = pci_set_dma_mask(pdev, (u64) 0xffffffffffffffff))) {
+		pci_using_dac = 1;
+	} else {
+		if((i = pci_set_dma_mask(pdev, (u64) 0xffffffff))) {
+			E1000_ERR("No usable DMA configuration, aborting\n");
+			return i;
+		}
+		pci_using_dac = 0;
+	}
 
 	if((i = pci_request_regions(pdev, e1000_driver_name)))
 		return i;
@@ -422,12 +430,13 @@ e1000_probe(struct pci_dev *pdev,
 	e1000_sw_init(adapter);
 
 	if(adapter->shared.mac_type >= e1000_82543) {
-		netdev->features = NETIF_F_SG |
-		                   NETIF_F_IP_CSUM |
-		                   NETIF_F_HIGHDMA;
+		netdev->features = NETIF_F_SG | NETIF_F_HW_CSUM;
 	} else {
-		netdev->features = NETIF_F_SG | NETIF_F_HIGHDMA;
+		netdev->features = NETIF_F_SG;
 	}
+
+	if(pci_using_dac)
+		netdev->features |= NETIF_F_HIGHDMA;
 
 	/* make sure the EEPROM is good */
 
@@ -783,12 +792,6 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 
 	E1000_WRITE_REG(&adapter->shared, TCTL, tctl);
 
-#ifdef CONFIG_PPC
-	if(adapter->shared.mac_type >= e1000_82543) {
-		E1000_WRITE_REG(&adapter->shared, TXDCTL, 0x00020000);
-	}
-#endif
-
 	/* Setup Transmit Descriptor Settings for this adapter */
 	adapter->txd_cmd = E1000_TXD_CMD_IFCS;
 
@@ -926,12 +929,6 @@ e1000_configure_rx(struct e1000_adapter *adapter)
 		rxcsum |= E1000_RXCSUM_TUOFL;
 		E1000_WRITE_REG(&adapter->shared, RXCSUM, rxcsum);
 	}
-
-#ifdef CONFIG_PPC
-	if(adapter->shared.mac_type >= e1000_82543) {
-		E1000_WRITE_REG(&adapter->shared, RXDCTL, 0x00020000);
-	}
-#endif
 
 	/* Enable Receives */
 

@@ -117,9 +117,6 @@ struct e1000_adapter;
 
 #define BAR_0 0
 
-/* Advertise that we can DMA from any address location */
-#define E1000_DMA_MASK (~0x0UL)
-
 #if DBG
 #define E1000_DBG(args...) printk(KERN_DEBUG "e1000: " args)
 #else
