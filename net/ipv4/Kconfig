@@ -94,16 +94,6 @@ config IP_ROUTE_MULTIPATH
 	  equal "cost" and chooses one of them in a non-deterministic fashion
 	  if a matching packet arrives.
 
-config IP_ROUTE_TOS
-	bool "IP: use TOS value as routing key"
-	depends on IP_ADVANCED_ROUTER
-	help
-	  The header of every IP packet carries a TOS (Type Of Service) value
-	  with which the packet requests a certain treatment, e.g. low
-	  latency (for interactive traffic), high throughput, or high
-	  reliability.  If you say Y here, you will be able to specify
-	  different routes for packets with different TOS values.
-
 config IP_ROUTE_VERBOSE
 	bool "IP: verbose route monitoring"
 	depends on IP_ADVANCED_ROUTER

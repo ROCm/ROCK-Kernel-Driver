@@ -270,11 +270,9 @@ fn_hash_lookup(struct fib_table *tb, const struct flowi *flp, struct fib_result 
 				continue;
 
 			list_for_each_entry(fa, &f->fn_alias, fa_list) {
-#ifdef CONFIG_IP_ROUTE_TOS
 				if (fa->fa_tos &&
 				    fa->fa_tos != flp->fl4_tos)
 					continue;
-#endif
 				if (fa->fa_scope < flp->fl4_scope)
 					continue;
 
@@ -443,10 +441,8 @@ static struct fib_alias *fib_find_alias(struct fib_node *fn, u8 tos, u32 prio)
 
 		prev_fa = NULL;
 		list_for_each_entry(fa, head, fa_list) {
-#ifdef CONFIG_IP_ROUTE_TOS
 			if (fa->fa_tos != tos)
 				continue;
-#endif
 			prev_fa = fa;
 			if (prio <= fa->fa_info->fib_priority)
 				break;
@@ -471,9 +467,6 @@ fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 	u32 key;
 	int err;
 
-#ifndef CONFIG_IP_ROUTE_TOS
-	tos = 0;
-#endif
 	if (z > 32)
 		return -EINVAL;
 	fz = table->fn_zones[z];
@@ -620,9 +613,6 @@ fn_hash_delete(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 	u32 key;
 	u8 tos = r->rtm_tos;
 
-#ifndef CONFIG_IP_ROUTE_TOS
-	tos = 0;
-#endif
 	if (z > 32)
 		return -EINVAL;
 	if ((fz  = table->fn_zones[z]) == NULL)
