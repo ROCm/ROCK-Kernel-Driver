@@ -133,6 +133,7 @@ static inline int _snd_magic_bad(void *obj, unsigned long magic)
 #define mpu401_t_magic				0xa15a1701
 #define fm801_t_magic				0xa15a1801
 #define ac97_t_magic				0xa15a1901
+#define ac97_bus_t_magic			0xa15a1902
 #define ak4531_t_magic				0xa15a1a01
 #define snd_uart16550_t_magic			0xa15a1b01
 #define emu10k1_t_magic				0xa15a1c01

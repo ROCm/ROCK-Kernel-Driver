@@ -137,7 +137,7 @@ client_t *snd_seq_client_use_ptr(int clientid)
 		if (clientid < 64) {
 			int idx;
 			
-			if (! client_requested[clientid]) {
+			if (! client_requested[clientid] && current->fs->root) {
 				client_requested[clientid] = 1;
 				for (idx = 0; idx < 64; idx++) {
 					if (seq_client_load[idx] < 0)

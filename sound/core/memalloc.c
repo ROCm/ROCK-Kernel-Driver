@@ -39,7 +39,7 @@ MODULE_LICENSE("GPL");
 #ifndef SNDRV_CARDS
 #define SNDRV_CARDS	8
 #endif
-static int enable[8] = {[0 ... (SNDRV_CARDS-1)] = 1};
+static int enable[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 1};
 MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(enable, "Enable cards to allocate buffers.");
 
@@ -95,25 +95,25 @@ static void *snd_pci_hack_alloc_consistent(struct pci_dev *hwdev, size_t size,
 {
 	void *ret;
 	u64 dma_mask;
-	unsigned long rmask;
+	unsigned long mask;
 
 	if (hwdev == NULL)
 		return pci_alloc_consistent(hwdev, size, dma_handle);
-	dma_mask = hwdev->dma_mask;
-	rmask = ~((unsigned long)dma_mask);
-	hwdev->dma_mask = 0xffffffff; /* do without masking */
+	dma_mask = hwdev->consistent_dma_mask;
+	mask = (unsigned long)dma_mask;
+	hwdev->consistent_dma_mask = 0xffffffff; /* do without masking */
 	ret = pci_alloc_consistent(hwdev, size, dma_handle);
-	hwdev->dma_mask = dma_mask; /* restore */
+	hwdev->consistent_dma_mask = dma_mask; /* restore */
 	if (ret) {
 		/* obtained address is out of range? */
-		if (((unsigned long)*dma_handle + size - 1) & rmask) {
+		if (((unsigned long)*dma_handle + size - 1) & ~mask) {
 			/* reallocate with the proper mask */
 			pci_free_consistent(hwdev, size, ret, *dma_handle);
 			ret = pci_alloc_consistent(hwdev, size, dma_handle);
 		}
 	} else {
 		/* wish to success now with the proper mask... */
-		if (dma_mask != 0xffffffff)
+		if (mask != 0xffffffffUL)
 			ret = pci_alloc_consistent(hwdev, size, dma_handle);
 	}
 	return ret;
@@ -640,13 +640,13 @@ void *snd_malloc_pci_page(struct pci_dev *pci, dma_addr_t *addrp)
 {
 	void *ptr;
 	dma_addr_t addr;
-	unsigned long rmask;
+	unsigned long mask;
 
-	rmask = ~(unsigned long)(pci ? pci->dma_mask : 0x00ffffff);
+	mask = pci ? (unsigned long)pci->consistent_dma_mask : 0x00ffffffUL;
 	ptr = (void *)__get_free_page(GFP_KERNEL);
 	if (ptr) {
 		addr = virt_to_phys(ptr);
-		if (((unsigned long)addr + PAGE_SIZE - 1) & rmask) {
+		if (((unsigned long)addr + PAGE_SIZE - 1) & ~mask) {
 			/* try to reallocate with the GFP_DMA */
 			free_page((unsigned long)ptr);
 			/* use GFP_ATOMIC for the DMA zone to avoid stall */
@@ -783,6 +783,7 @@ void snd_free_sbus_pages(struct sbus_dev *sdev,
  * allocation of buffers for pre-defined devices
  */
 
+#ifdef CONFIG_PCI
 /* FIXME: for pci only - other bus? */
 struct prealloc_dev {
 	unsigned short vendor;
@@ -832,7 +833,7 @@ static void __init preallocate_cards(void)
 			if (! enable[card++])
 				continue;
 			
-			if (pci_set_dma_mask(pci, dev->dma_mask) < 0) {
+			if (pci_set_consistent_dma_mask(pci, dev->dma_mask) < 0) {
 				printk(KERN_ERR "snd-page-alloc: cannot set DMA mask %lx for pci %04x:%04x\n", dev->dma_mask, dev->vendor, dev->device);
 				continue;
 			}
@@ -854,6 +855,9 @@ static void __init preallocate_cards(void)
 		}
 	}
 }
+#else
+#define preallocate_cards()	/* NOP */
+#endif
 
 
 #ifdef CONFIG_PROC_FS

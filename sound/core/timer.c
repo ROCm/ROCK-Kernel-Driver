@@ -148,6 +148,8 @@ static snd_timer_t *snd_timer_find(snd_timer_id_t *tid)
 
 static void snd_timer_request(snd_timer_id_t *tid)
 {
+	if (! current->fs->root)
+		return;
 	switch (tid->dev_class) {
 	case SNDRV_TIMER_CLASS_GLOBAL:
 		if (tid->device < timer_limit)
@@ -304,14 +306,31 @@ int snd_timer_close(snd_timer_instance_t * timeri)
 
 	snd_assert(timeri != NULL, return -ENXIO);
 
-	snd_timer_stop(timeri); /* force to stop the timer */
+	/* force to stop the timer */
+	snd_timer_stop(timeri);
 
 	if (timeri->flags & SNDRV_TIMER_IFLG_SLAVE) {
+		/* wait, until the active callback is finished */
+		spin_lock_irq(&slave_active_lock);
+		while (timeri->flags & SNDRV_TIMER_IFLG_CALLBACK) {
+			spin_unlock_irq(&slave_active_lock);
+			udelay(10);
+			spin_lock_irq(&slave_active_lock);
+		}
+		spin_unlock_irq(&slave_active_lock);
 		down(&register_mutex);
 		list_del(&timeri->open_list);
 		up(&register_mutex);
 	} else {
 		timer = timeri->timer;
+		/* wait, until the active callback is finished */
+		spin_lock_irq(&timer->lock);
+		while (timeri->flags & SNDRV_TIMER_IFLG_CALLBACK) {
+			spin_unlock_irq(&timer->lock);
+			udelay(10);
+			spin_lock_irq(&timer->lock);
+		}
+		spin_unlock_irq(&timer->lock);
 		down(&register_mutex);
 		list_del(&timeri->open_list);
 		if (timer && list_empty(&timer->open_list_head) && timer->hw.close)
@@ -389,12 +408,15 @@ static int snd_timer_start1(snd_timer_t *timer, snd_timer_instance_t *timeri, un
 	list_del(&timeri->active_list);
 	list_add_tail(&timeri->active_list, &timer->active_list_head);
 	if (timer->running) {
+		if (timer->hw.flags & SNDRV_TIMER_HW_SLAVE)
+			goto __start_now;
 		timer->flags |= SNDRV_TIMER_FLG_RESCHED;
 		timeri->flags |= SNDRV_TIMER_IFLG_START;
 		return 1;	/* delayed start */
 	} else {
 		timer->sticks = sticks;
 		timer->hw.start(timer);
+	      __start_now:
 		timer->running++;
 		timeri->flags |= SNDRV_TIMER_IFLG_RUNNING;
 		return 0;
@@ -448,22 +470,21 @@ static int _snd_timer_stop(snd_timer_instance_t * timeri, int keep_flag, enum sn
 
 	snd_assert(timeri != NULL, return -ENXIO);
 
+	if (timeri->flags & SNDRV_TIMER_IFLG_SLAVE) {
+		if (!keep_flag) {
+			spin_lock_irqsave(&slave_active_lock, flags);
+			timeri->flags &= ~SNDRV_TIMER_IFLG_RUNNING;
+			spin_unlock_irqrestore(&slave_active_lock, flags);
+		}
+		goto __end;
+	}
 	timer = timeri->timer;
-	if (! timer)
+	if (!timer)
 		return -EINVAL;
 	spin_lock_irqsave(&timer->lock, flags);
 	list_del_init(&timeri->ack_list);
-#if 0   /* FIXME: this causes dead lock with the sequencer timer */
-	/* wait until the callback is finished */
-	while (timeri->flags & SNDRV_TIMER_IFLG_CALLBACK) {
-		spin_unlock_irqrestore(&timer->lock, flags);
-		udelay(10);
-		spin_lock_irqsave(&timer->lock, flags);
-	}
-#endif
 	list_del_init(&timeri->active_list);
 	if ((timeri->flags & SNDRV_TIMER_IFLG_RUNNING) &&
-	    !(timeri->flags & SNDRV_TIMER_IFLG_SLAVE) &&
 	    !(--timer->running)) {
 		timer->hw.stop(timer);
 		if (timer->flags & SNDRV_TIMER_FLG_RESCHED) {
@@ -478,6 +499,7 @@ static int _snd_timer_stop(snd_timer_instance_t * timeri, int keep_flag, enum sn
 	if (!keep_flag)
 		timeri->flags &= ~(SNDRV_TIMER_IFLG_RUNNING|SNDRV_TIMER_IFLG_START);
 	spin_unlock_irqrestore(&timer->lock, flags);
+      __end:
 	if (event != SNDRV_TIMER_EVENT_RESOLUTION)
 		snd_timer_notify1(timeri, event);
 	return 0;
@@ -1381,8 +1403,8 @@ static int snd_timer_user_gstatus(struct file *file, snd_timer_gstatus_t *_gstat
 		if (t->hw.precise_resolution) {
 			t->hw.precise_resolution(t, &gstatus.resolution_num, &gstatus.resolution_den);
 		} else {
-			gstatus.resolution_num = 1;
-			gstatus.resolution_den = gstatus.resolution;
+			gstatus.resolution_num = gstatus.resolution;
+			gstatus.resolution_den = 1000000000uL;
 		}
 	} else {
 		err = -ENODEV;
@@ -1684,20 +1706,20 @@ static ssize_t snd_timer_user_read(struct file *file, char *buffer, size_t count
 				break;
 			}
 		}
-		if (err < 0)
-			break;
 
 		spin_unlock_irq(&tu->qlock);
+		if (err < 0)
+			goto _error;
 
 		if (tu->tread) {
 			if (copy_to_user(buffer, &tu->tqueue[tu->qhead++], sizeof(snd_timer_tread_t))) {
 				err = -EFAULT;
-				break;
+				goto _error;
 			}
 		} else {
 			if (copy_to_user(buffer, &tu->queue[tu->qhead++], sizeof(snd_timer_read_t))) {
 				err = -EFAULT;
-				break;
+				goto _error;
 			}
 		}
 
@@ -1710,6 +1732,7 @@ static ssize_t snd_timer_user_read(struct file *file, char *buffer, size_t count
 		tu->qused--;
 	}
 	spin_unlock_irq(&tu->qlock);
+ _error:
 	return result > 0 ? result : err;
 }
 
@@ -1761,7 +1784,6 @@ static int __init alsa_timer_init(void)
 	snd_oss_info_register(SNDRV_OSS_INFO_DEV_TIMERS, SNDRV_CARDS - 1, "system timer");
 #endif
 	if ((entry = snd_info_create_module_entry(THIS_MODULE, "timers", NULL)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
 		entry->c.text.read_size = SNDRV_TIMER_DEVICES * 128;
 		entry->c.text.read = snd_timer_proc_read;
 		if (snd_info_register(entry) < 0) {
