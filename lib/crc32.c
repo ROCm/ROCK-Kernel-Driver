@@ -564,7 +564,7 @@ static void __exit cleanup_crc32(void)
 	crc32cleanup_be();
 }
 
-module_init(init_crc32);
+fs_initcall(init_crc32);
 module_exit(cleanup_crc32);
 
 EXPORT_SYMBOL(crc32_le);
