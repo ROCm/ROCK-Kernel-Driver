@@ -128,7 +128,7 @@ pcibios_fixup_resources(struct pci_dev *dev)
 		struct resource *res = dev->resource + i;
 		if (!res->flags)
 			continue;
-		if (!res->start || res->end == 0xffffffff) {
+		if (res->end == 0xffffffff) {
 			DBG("PCI:%s Resource %d [%08lx-%08lx] is unassigned\n",
 			    pci_name(dev), i, res->start, res->end);
 			res->end -= res->start;
@@ -347,6 +347,8 @@ pci_relocate_bridge_resource(struct pci_bus *bus, int i)
 		return -1;
 	}
 	res = bus->resource[i];
+	if (res == NULL)
+		return -1;
 	pr = NULL;
 	for (j = 0; j < 4; j++) {
 		struct resource *r = parent->resource[j];
@@ -659,11 +661,11 @@ make_one_node_map(struct device_node* node, u8 pci_bus)
 		return;
 	bus_range = (int *) get_property(node, "bus-range", &len);
 	if (bus_range == NULL || len < 2 * sizeof(int)) {
-		printk(KERN_WARNING "Can't get bus-range for %s\n",
-		       node->full_name);
-		return;
-	}
-	pci_to_OF_bus_map[pci_bus] = bus_range[0];
+		printk(KERN_WARNING "Can't get bus-range for %s, "
+		       "assuming it starts at 0\n", node->full_name);
+		pci_to_OF_bus_map[pci_bus] = 0;
+	} else
+		pci_to_OF_bus_map[pci_bus] = bus_range[0];
 
 	for (node=node->child; node != 0;node = node->sibling) {
 		struct pci_dev* dev;
@@ -1073,6 +1075,8 @@ do_update_p2p_io_resource(struct pci_bus *bus, int enable_vga)
 	u16 w;
 	struct resource res;
 
+	if (bus->resource[0] == NULL)
+		return;
  	res = *(bus->resource[0]);
 
 	DBG("Remapping Bus %d, bridge: %s\n", bus->number, bridge->slot_name);
@@ -1168,7 +1172,8 @@ do_fixup_p2p_level(struct pci_bus *bus)
 	int has_vga = 0;
 
 	for (parent_io=0; parent_io<4; parent_io++)
-		if (bus->resource[parent_io]->flags & IORESOURCE_IO)
+		if (bus->resource[parent_io]
+		    && bus->resource[parent_io]->flags & IORESOURCE_IO)
 			break;
 	if (parent_io >= 4)
 		return;
