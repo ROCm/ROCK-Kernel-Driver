@@ -39,16 +39,16 @@
  * An X.121 address, it is held as ASCII text, null terminated, up to 15
  * digits and a null terminator.
  */
-typedef struct {
-	char		x25_addr[16];
-} x25_address;
+struct x25_address {
+	char x25_addr[16];
+};
 
 /*
  *	Linux X.25 Address structure, used for bind, and connect mostly.
  */
 struct sockaddr_x25 {
-	sa_family_t	sx25_family;		/* Must be AF_X25 */
-	x25_address	sx25_addr;		/* X.121 Address */
+	sa_family_t	   sx25_family;		/* Must be AF_X25 */
+	struct x25_address sx25_addr;		/* X.121 Address */
 };
 
 /*
@@ -78,9 +78,9 @@ struct x25_subscrip_struct {
  *	Routing table control structure.
  */
 struct x25_route_struct {
-	x25_address	address;
-	unsigned int	sigdigits;
-	char		device[200];
+	struct x25_address address;
+	unsigned int	   sigdigits;
+	char		   device[200];
 };
 
 /*

@@ -103,9 +103,9 @@ enum {
 
 struct x25_route {
 	struct x25_route	*next;
-	x25_address		address;	/* Start of address range */
+	struct x25_address	address;	/* Start of address range */
 	unsigned int		sigdigits;	/* Number of sig digits */
-	struct net_device		*dev;		/* More than one for MLP */
+	struct net_device	*dev;		/* More than one for MLP */
 };
 
 struct x25_neigh {
@@ -120,7 +120,7 @@ struct x25_neigh {
 };
 
 typedef struct {
-	x25_address		source_addr, dest_addr;
+	struct x25_address	source_addr, dest_addr;
 	struct x25_neigh	*neighbour;
 	unsigned int		lci;
 	unsigned char		state, condition, qbitincl, intflag;
@@ -148,8 +148,10 @@ extern int  sysctl_x25_reset_request_timeout;
 extern int  sysctl_x25_clear_request_timeout;
 extern int  sysctl_x25_ack_holdback_timeout;
 
-extern int  x25_addr_ntoa(unsigned char *, x25_address *, x25_address *);
-extern int  x25_addr_aton(unsigned char *, x25_address *, x25_address *);
+extern int  x25_addr_ntoa(unsigned char *, struct x25_address *,
+			  struct x25_address *);
+extern int  x25_addr_aton(unsigned char *, struct x25_address *,
+			  struct x25_address *);
 extern unsigned int x25_new_lci(struct x25_neigh *);
 extern struct sock *x25_find_socket(unsigned int, struct x25_neigh *);
 extern void x25_destroy_socket(struct sock *);
@@ -194,7 +196,7 @@ extern void x25_kick(struct sock *);
 extern void x25_enquiry_response(struct sock *);
 
 /* x25_route.c */
-extern struct net_device *x25_get_route(x25_address *);
+extern struct net_device *x25_get_route(struct x25_address *);
 extern struct net_device *x25_dev_get(char *);
 extern void x25_route_device_down(struct net_device *);
 extern int  x25_route_ioctl(unsigned int, void *);

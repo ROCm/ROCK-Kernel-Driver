@@ -48,7 +48,8 @@ static struct x25_route *x25_route_list /* = NULL initially */;
 /*
  *	Add a new route.
  */
-static int x25_add_route(x25_address *address, unsigned int sigdigits, struct net_device *dev)
+static int x25_add_route(struct x25_address *address, unsigned int sigdigits,
+			 struct net_device *dev)
 {
 	struct x25_route *x25_route;
 	unsigned long flags;
@@ -103,7 +104,8 @@ static void x25_remove_route(struct x25_route *x25_route)
 	restore_flags(flags);
 }
 
-static int x25_del_route(x25_address *address, unsigned int sigdigits, struct net_device *dev)
+static int x25_del_route(struct x25_address *address, unsigned int sigdigits,
+			 struct net_device *dev)
 {
 	struct x25_route *x25_route;
 
@@ -158,7 +160,7 @@ struct net_device *x25_dev_get(char *devname)
 /*
  *	Find a device given an X.25 address.
  */
-struct net_device *x25_get_route(x25_address *addr)
+struct net_device *x25_get_route(struct x25_address *addr)
 {
 	struct x25_route *route, *use = NULL;
 
