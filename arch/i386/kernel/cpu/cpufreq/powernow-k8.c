@@ -39,12 +39,23 @@
 
 static struct powernow_k8_data *powernow_data[NR_CPUS];
 
- /* Return a frequency in MHz, given an input fid */
+/* Return a frequency in MHz, given an input fid */
 static u32 find_freq_from_fid(u32 fid)
 {
- 	return 800 + (fid * 100);
+	return 800 + (fid * 100);
 }
 
+/* Return a frequency in KHz, given an input fid */
+static u32 find_khz_freq_from_fid(u32 fid)
+{
+	return 1000 * find_freq_from_fid(fid);
+}
+
+/* Return a voltage in miliVolts, given an input vid */
+static u32 find_millivolts_from_vid(struct powernow_k8_data *data, u32 vid)
+{
+	return 1550-vid*25;
+}
 
 /* Return the vco fid for an input fid */
 static u32 convert_fid_to_vco_fid(u32 fid)
@@ -105,6 +116,22 @@ static void count_off_vst(struct powernow_k8_data *data)
 	udelay(data->vstable * VST_UNITS_20US);
 	return;
 }
+
+/* need to init the control msr to a safe value (for each cpu) */
+static void fidvid_msr_init(void)
+{
+	u32 lo, hi;
+	u8 fid, vid;
+
+	rdmsr(MSR_FIDVID_STATUS, lo, hi);
+	vid = hi & MSR_S_HI_CURRENT_VID;
+	fid = lo & MSR_S_LO_CURRENT_FID;
+	lo = fid | (vid << MSR_C_LO_VID_SHIFT);
+	hi = MSR_C_HI_STP_GNT_BENIGN;
+	dprintk(PFX "cpu%d, init lo %x, hi %x\n", smp_processor_id(), lo, hi);
+	wrmsr(MSR_FIDVID_CTL, lo, hi);
+}
+
 
 /* write the new fid value along with the other control fields to the msr */
 static int write_new_fid(struct powernow_k8_data *data, u32 fid)
