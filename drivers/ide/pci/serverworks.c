@@ -263,7 +263,7 @@ static int svwks_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	   Our code assumes we never _ever_ do this on an OSB4 */
 	   
 	if(dev->device == PCI_DEVICE_ID_SERVERWORKS_OSB4 &&
-		drive->media != ide_disk && speed >= XFER_UDMA_0)
+		drive->media == ide_disk && speed >= XFER_UDMA_0)
 			BUG();
 			
 	pci_read_config_byte(dev, drive_pci[drive->dn], &pio_timing);

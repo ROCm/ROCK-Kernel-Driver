@@ -77,7 +77,7 @@ obj-$(CONFIG_NWBUTTON) += nwbutton.o
 obj-$(CONFIG_NWFLASH) += nwflash.o
 obj-$(CONFIG_SCx200_GPIO) += scx200_gpio.o
 
-obj-$(CONFIG_WATCHDOGS)	+= watchdog/
+obj-$(CONFIG_WATCHDOG)	+= watchdog/
 obj-$(CONFIG_MWAVE) += mwave/
 obj-$(CONFIG_AGP) += agp/
 obj-$(CONFIG_DRM) += drm/
