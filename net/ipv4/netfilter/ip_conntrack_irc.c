@@ -289,9 +289,7 @@ static void fini(void)
 	}
 }
 
-#ifdef CONFIG_IP_NF_NAT_NEEDED
 EXPORT_SYMBOL(ip_irc_lock);
-#endif
 
 module_init(init);
 module_exit(fini);

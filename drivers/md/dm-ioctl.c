@@ -1084,9 +1084,10 @@ static struct file_operations _ctl_fops = {
 };
 
 static struct miscdevice _dm_misc = {
-	.minor = MISC_DYNAMIC_MINOR,
-	.name  = DM_NAME,
-	.fops  = &_ctl_fops
+	.minor		= MISC_DYNAMIC_MINOR,
+	.name		= DM_NAME,
+	.devfs_name	= "mapper/control",
+	.fops		= &_ctl_fops
 };
 
 /*
@@ -1107,18 +1108,12 @@ int __init dm_interface_init(void)
 		return r;
 	}
 
-	r = devfs_mk_symlink(DM_DIR "/control", "../misc/" DM_NAME);
-	if (r) {
-		DMERR("devfs_mk_symlink failed for control device");
-		goto failed;
-	}
 	DMINFO("%d.%d.%d%s initialised: %s", DM_VERSION_MAJOR,
 	       DM_VERSION_MINOR, DM_VERSION_PATCHLEVEL, DM_VERSION_EXTRA,
 	       DM_DRIVER_EMAIL);
 	return 0;
 
       failed:
-	devfs_remove(DM_DIR "/control");
 	if (misc_deregister(&_dm_misc) < 0)
 		DMERR("misc_deregister failed for control device");
 	dm_hash_exit();
@@ -1127,7 +1122,6 @@ int __init dm_interface_init(void)
 
 void dm_interface_exit(void)
 {
-	devfs_remove(DM_DIR "/control");
 	if (misc_deregister(&_dm_misc) < 0)
 		DMERR("misc_deregister failed for control device");
 	dm_hash_exit();

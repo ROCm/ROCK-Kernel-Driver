@@ -13,11 +13,18 @@ config BT_HCIUSB
 	  Say Y here to compile support for Bluetooth USB devices into the
 	  kernel or say M to compile it as module (hci_usb).
 
+config BT_USB_SCO
+	bool "SCO over HCI USB support"
+	depends on BT_HCIUSB
+	help
+	  This option enables the SCO support in the HCI USB driver. You need this
+	  to transmit voice data with your Bluetooth USB device. 
+	  Say Y here to compile support for SCO over HCI USB.
+
 config BT_USB_ZERO_PACKET
 	bool "USB zero packet support"
 	depends on BT_HCIUSB
 	help
-	  Support for USB zero packets. 
 	  This option is provided only as a work around for buggy Bluetooth USB 
 	  devices. Do _not_ enable it unless you know for sure that your device 
 	  requires zero packets.

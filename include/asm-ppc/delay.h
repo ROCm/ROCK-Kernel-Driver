@@ -31,7 +31,7 @@ extern void __delay(unsigned int loops);
  *  -- paulus
  */
 #define __MAX_UDELAY	(226050910/HZ)	/* maximum udelay argument */
-#define __MAX_NDELAY	(4294967295/HZ)	/* maximum ndelay argument */
+#define __MAX_NDELAY	(2147483647/HZ)	/* maximum ndelay argument */
 
 extern __inline__ void __udelay(unsigned int x)
 {

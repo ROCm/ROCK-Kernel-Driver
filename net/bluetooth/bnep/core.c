@@ -536,7 +536,7 @@ int bnep_add_connection(struct bnep_connadd_req *req, struct socket *sock)
 
 	memset(dev->broadcast, 0xff, ETH_ALEN);
 	
-	/* This is rx header therefor addresses are swaped.
+	/* This is rx header therefore addresses are swapped.
 	 * ie eh.h_dest is our local address. */
 	memcpy(s->eh.h_dest,   &src, ETH_ALEN);
 	memcpy(s->eh.h_source, &dst, ETH_ALEN);

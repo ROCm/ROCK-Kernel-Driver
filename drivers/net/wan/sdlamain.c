@@ -193,7 +193,7 @@ static int ioctl_dump	(sdla_t* card, sdla_dump_t* u_dump);
 static int ioctl_exec	(sdla_t* card, sdla_exec_t* u_exec, int);
 
 /* Miscellaneous functions */
-STATIC void sdla_isr	(int irq, void* dev_id, struct pt_regs *regs);
+STATIC irqreturn_t sdla_isr	(int irq, void* dev_id, struct pt_regs *regs);
 static void release_hw  (sdla_t *card);
 static void run_wanpipe_tq (unsigned long);
 
@@ -1034,9 +1034,10 @@ static int ioctl_exec (sdla_t* card, sdla_exec_t* u_exec, int cmd)
  * o acknowledge SDLA hardware interrupt.
  * o call protocol-specific interrupt service routine, if any.
  */
-STATIC void sdla_isr (int irq, void* dev_id, struct pt_regs *regs)
+STATIC irqreturn_t sdla_isr (int irq, void* dev_id, struct pt_regs *regs)
 {
 #define	card	((sdla_t*)dev_id)
+	int handled = 0;
 
 	if(card->hw.type == SDLA_S514) {	/* handle interrrupt on S514 */
                 u32 int_status;
@@ -1051,7 +1052,7 @@ STATIC void sdla_isr (int irq, void* dev_id, struct pt_regs *regs)
 			/* check if the interrupt is for this device */
  			if(!((unsigned char)int_status &
 				(IRQ_CPU_A | IRQ_CPU_B)))
-                	        return;
+                	        return IRQ_HANDLED;
 
 			/* if the IRQ is for both CPUs on the same adapter, */
 			/* then alter the interrupt status so as to handle */
@@ -1083,7 +1084,7 @@ STATIC void sdla_isr (int irq, void* dev_id, struct pt_regs *regs)
 			/* exit if the interrupt is for another CPU on the */
 			/* same IRQ */
 			if(!card_found_for_IRQ)
-				return;
+				return IRQ_HANDLED;
 
        	 		if (!card || 
 			   (card->wandev.state == WAN_UNCONFIGURED && !card->configured)){
@@ -1093,7 +1094,7 @@ STATIC void sdla_isr (int irq, void* dev_id, struct pt_regs *regs)
 					printk(KERN_INFO
 						"IRQ for unconfigured adapter\n");
 					S514_intack(&card->hw, int_status);
-					return;
+					return IRQ_HANDLED;
        			}
 
 	        	if (card->in_isr) {
@@ -1101,7 +1102,7 @@ STATIC void sdla_isr (int irq, void* dev_id, struct pt_regs *regs)
 					"%s: interrupt re-entrancy on IRQ %d\n",
                        			card->devname, card->wandev.irq);
 				S514_intack(&card->hw, int_status);
- 				return;
+ 				return IRQ_HANDLED;
        			}
 
 			spin_lock(&card->wandev.lock);
@@ -1121,20 +1122,20 @@ STATIC void sdla_isr (int irq, void* dev_id, struct pt_regs *regs)
 			/* handle a maximum of two interrupts (one for each */
 			/* CPU on the adapter) before returning */  
 			if((++ IRQ_count) == 2)
-				return;
+				return IRQ_HANDLED;
 		}
 	}
 
 	else {			/* handle interrupt on S508 adapter */
 
 		if (!card || ((card->wandev.state == WAN_UNCONFIGURED) && !card->configured))
-			return;
+			return IRQ_HANDLED;
 
 		if (card->in_isr) {
 			printk(KERN_INFO
 				"%s: interrupt re-entrancy on IRQ %d!\n",
 				card->devname, card->wandev.irq);
-			return;
+			return IRQ_HANDLED;
 		}
 
 		spin_lock(&card->wandev.lock);
@@ -1152,7 +1153,7 @@ STATIC void sdla_isr (int irq, void* dev_id, struct pt_regs *regs)
 		spin_unlock(&card->wandev.lock);
 
 	}
-                
+        return IRQ_HANDLED;
 #undef	card
 }
 

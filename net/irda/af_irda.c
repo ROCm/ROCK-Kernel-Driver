@@ -858,7 +858,7 @@ static int irda_accept(struct socket *sock, struct socket *newsock, int flags)
 	 */
 
 	/*
-	 * We can perform the accept only if there is incomming data
+	 * We can perform the accept only if there is incoming data
 	 * on the listening socket.
 	 * So, we will block the caller until we receive any data.
 	 * If the caller was waiting on select() or poll() before
@@ -1132,9 +1132,6 @@ static int irda_create(struct socket *sock, int protocol)
 	self->nslots = DISCOVERY_DEFAULT_SLOTS;
 	self->daddr = DEV_ADDR_ANY;	/* Until we get connected */
 	self->saddr = 0x0;		/* so IrLMP assign us any link */
-
-	MOD_INC_USE_COUNT;
-
 	return 0;
 }
 
@@ -1177,9 +1174,6 @@ void irda_destroy_socket(struct irda_sock *self)
 	}
 #endif /* CONFIG_IRDA_ULTRA */
 	kfree(self);
-	MOD_DEC_USE_COUNT;
-
-	return;
 }
 
 /*
@@ -1216,7 +1210,7 @@ static int irda_release(struct socket *sock)
 	/* Notes on socket locking and deallocation... - Jean II
 	 * In theory we should put pairs of sock_hold() / sock_put() to
 	 * prevent the socket to be destroyed whenever there is an
-	 * outstanding request or outstanding incomming packet or event.
+	 * outstanding request or outstanding incoming packet or event.
 	 *
 	 * 1) This may include IAS request, both in connect and getsockopt.
 	 * Unfortunately, the situation is a bit more messy than it looks,
@@ -2409,6 +2403,7 @@ bed:
 static struct net_proto_family irda_family_ops = {
 	.family = PF_IRDA,
 	.create = irda_create,
+	.owner	= THIS_MODULE,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(irda_stream_ops) = {

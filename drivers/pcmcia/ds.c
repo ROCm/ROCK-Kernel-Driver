@@ -130,11 +130,12 @@ extern struct proc_dir_entry *proc_pccard;
 
 /*====================================================================*/
 
-static void cs_error(client_handle_t handle, int func, int ret)
+void cs_error(client_handle_t handle, int func, int ret)
 {
-    error_info_t err = { func, ret };
-    pcmcia_report_error(handle, &err);
+	error_info_t err = { func, ret };
+	pcmcia_report_error(handle, &err);
 }
+EXPORT_SYMBOL(cs_error);
 
 /*======================================================================*/
 
@@ -957,9 +958,9 @@ static int __devinit pcmcia_bus_add_socket(struct device *dev, unsigned int sock
 }
 
 
-static int __devinit pcmcia_bus_add_socket_dev(struct device *dev)
+static int pcmcia_bus_add_socket_dev(struct class_device *class_dev)
 {
-	struct pcmcia_socket_class_data *cls_d = dev->class_data;
+	struct pcmcia_socket_class_data *cls_d = class_get_devdata(class_dev);
 	unsigned int i;
 	unsigned int ret = 0;
 
@@ -968,45 +969,42 @@ static int __devinit pcmcia_bus_add_socket_dev(struct device *dev)
 
 	down_write(&bus_socket_list_rwsem);
         for (i = 0; i < cls_d->nsock; i++)
-		ret += pcmcia_bus_add_socket(dev, i);
+		ret += pcmcia_bus_add_socket(class_dev->dev, i);
 	up_write(&bus_socket_list_rwsem);
 
 	return ret;
 }
 
-static int __devexit pcmcia_bus_remove_socket_dev(struct device *dev)
+static void pcmcia_bus_remove_socket_dev(struct class_device *class_dev)
 {
-	struct pcmcia_socket_class_data *cls_d = dev->class_data;
+	struct pcmcia_socket_class_data *cls_d = class_get_devdata(class_dev);
 	struct list_head *list_loop;
 	struct list_head *tmp_storage;
 
 	if (!cls_d)
-		return -ENODEV;
+		return;
 
 	flush_scheduled_work();
 
 	down_write(&bus_socket_list_rwsem);
 	list_for_each_safe(list_loop, tmp_storage, &bus_socket_list) {
 		struct pcmcia_bus_socket *bus_sock = container_of(list_loop, struct pcmcia_bus_socket, socket_list);
-		if (bus_sock->socket_dev == dev) {
+		if (bus_sock->socket_dev == class_dev->dev) {
 			pcmcia_deregister_client(bus_sock->handle);
 			list_del(&bus_sock->socket_list);
 			kfree(bus_sock);
 		}
 	}
 	up_write(&bus_socket_list_rwsem);
-	return 0;
+	return;
 }
 
 
 /* the pcmcia_bus_interface is used to handle pcmcia socket devices */
-static struct device_interface pcmcia_bus_interface = {
-	.name = "pcmcia-bus",
-	.devclass = &pcmcia_socket_class,
-	.add_device = &pcmcia_bus_add_socket_dev,
-	.remove_device = __devexit_p(&pcmcia_bus_remove_socket_dev),
-	.kset = { .subsys = &pcmcia_socket_class.subsys, },
-	.devnum = 0,
+static struct class_interface pcmcia_bus_interface = {
+	.class = &pcmcia_socket_class,
+	.add = &pcmcia_bus_add_socket_dev,
+	.remove = &pcmcia_bus_remove_socket_dev,
 };
 
 
@@ -1021,7 +1019,7 @@ static int __init init_pcmcia_bus(void)
 	int i;
 
 	bus_register(&pcmcia_bus_type);
-	interface_register(&pcmcia_bus_interface);
+	class_interface_register(&pcmcia_bus_interface);
 
 	/* Set up character device for user mode clients */
 	i = register_chrdev(0, "pcmcia", &ds_fops);
@@ -1044,7 +1042,7 @@ fs_initcall(init_pcmcia_bus); /* one level after subsys_initcall so that
 
 static void __exit exit_pcmcia_bus(void)
 {
-	interface_unregister(&pcmcia_bus_interface);
+	class_interface_unregister(&pcmcia_bus_interface);
 
 #ifdef CONFIG_PROC_FS
 	if (proc_pccard)

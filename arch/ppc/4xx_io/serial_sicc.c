@@ -431,11 +431,7 @@ static void siccuart_event(struct SICC_info *info, int event)
 }
 
 static void
-#ifdef SUPPORT_SYSRQ
 siccuart_rx_chars(struct SICC_info *info, struct pt_regs *regs)
-#else
-siccuart_rx_chars(struct SICC_info *info)
-#endif
 {
     struct tty_struct *tty = info->tty;
     unsigned int status, ch, rsr, flg, ignored = 0;
@@ -574,25 +570,19 @@ static void siccuart_tx_chars(struct SICC_info *info)
 }
 
 
-static void siccuart_int_rx(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t siccuart_int_rx(int irq, void *dev_id, struct pt_regs *regs)
 {
     struct SICC_info *info = dev_id;
-
-#ifdef SUPPORT_SYSRQ
-            siccuart_rx_chars(info, regs);
-#else
-            siccuart_rx_chars(info);
-#endif
-
-      //powerpcClearUicsrBits(0x00000400);
+    siccuart_rx_chars(info, regs);
+    return IRQ_HANDLED;
 }
 
 
-static void siccuart_int_tx(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t siccuart_int_tx(int irq, void *dev_id, struct pt_regs *regs)
 {
     struct SICC_info *info = dev_id;
     siccuart_tx_chars(info);
-
+    return IRQ_HANDLED;
 }
 
 static void siccuart_tasklet_action(unsigned long data)

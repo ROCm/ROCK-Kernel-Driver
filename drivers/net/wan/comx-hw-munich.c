@@ -1029,7 +1029,7 @@ static int MUNICH_send_packet(struct net_device *dev, struct sk_buff *skb)
  * Called by the Linux kernel.
  * BEWARE! The interrupts are enabled on the call!
  */
-static void MUNICH_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t MUNICH_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     struct sk_buff *skb;
     int length;
@@ -1386,7 +1386,7 @@ static void MUNICH_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	board->stat_pri_races_missed++;
     if (race_stat & STAT_PTI)
 	board->stat_pti_races_missed++;
-    return;
+    return IRQ_HANDLED;
 }
 
 /* 

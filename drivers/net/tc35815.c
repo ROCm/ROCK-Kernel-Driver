@@ -451,7 +451,7 @@ static int __init tc35815_probe1(struct pci_dev *pdev, unsigned int base_addr, u
 static int	tc35815_open(struct net_device *dev);
 static int	tc35815_send_packet(struct sk_buff *skb, struct net_device *dev);
 static void     tc35815_tx_timeout(struct net_device *dev);
-static void	tc35815_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t tc35815_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void	tc35815_rx(struct net_device *dev);
 static void	tc35815_txdone(struct net_device *dev);
 static int	tc35815_close(struct net_device *dev);
@@ -1036,16 +1036,17 @@ static void tc35815_fatal_error_interrupt(struct net_device *dev, int status)
  * The typical workload of the driver:
  *   Handle the network interface interrupts.
  */
-static void tc35815_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t tc35815_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct net_device *dev = dev_id;
 	struct tc35815_regs *tr;
 	struct tc35815_local *lp;
 	int status, boguscount = 0;
+	int handled = 0;
 
 	if (dev == NULL) {
 		printk(KERN_WARNING "%s: irq %d for unknown device.\n", cardname, irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	tr = (struct tc35815_regs*)dev->base_addr;
@@ -1055,6 +1056,7 @@ static void tc35815_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		status = tc_readl(&tr->Int_Src);
 		if (status == 0)
 			break;
+		handled = 1;
 		tc_writel(status, &tr->Int_Src);	/* write to clear */
 
 		/* Fatal errors... */
@@ -1097,7 +1099,7 @@ static void tc35815_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		}
 	} while (++boguscount < 20) ;
 
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 /* We have a good packet(s), get it/them out of the buffers. */

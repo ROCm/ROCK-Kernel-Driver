@@ -359,10 +359,8 @@ void x25_destroy_socket(struct sock *sk)
 		sk->timer.function = x25_destroy_timer;
 		sk->timer.data     = (unsigned long)sk;
 		add_timer(&sk->timer);
-	} else {
+	} else
 		sk_free(sk);
-		MOD_DEC_USE_COUNT;
-	}
 	release_sock(sk);
 	sock_put(sk);
 }
@@ -442,13 +440,11 @@ static int x25_listen(struct socket *sock, int backlog)
 
 static struct sock *x25_alloc_socket(void)
 {
-	struct sock *sk;
 	struct x25_opt *x25;
+	struct sock *sk = sk_alloc(AF_X25, GFP_ATOMIC, 1, NULL);
 
-	MOD_INC_USE_COUNT;
-
-	if ((sk = sk_alloc(AF_X25, GFP_ATOMIC, 1, NULL)) == NULL)
-		goto decmod;
+	if (!sk)
+		goto out;
 
 	x25 = x25_sk(sk) = kmalloc(sizeof(*x25), GFP_ATOMIC);
 	if (!x25)
@@ -469,8 +465,6 @@ out:
 frees:
 	sk_free(sk);
 	sk = NULL;
-decmod:
-	MOD_DEC_USE_COUNT;
 	goto out;
 }
 
@@ -1324,6 +1318,7 @@ static int x25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 struct net_proto_family x25_family_ops = {
 	.family =	AF_X25,
 	.create =	x25_create,
+	.owner	=	THIS_MODULE,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(x25_proto_ops) = {

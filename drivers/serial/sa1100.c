@@ -879,7 +879,6 @@ static int sa1100_serial_resume(struct device *dev, u32 level)
 static struct device_driver sa11x0_serial_driver = {
 	.name		= "sa11x0_serial",
 	.bus		= &system_bus_type,
-	.devclass	= &tty_devclass,
 	.suspend	= sa1100_serial_suspend,
 	.resume		= sa1100_serial_resume,
 };

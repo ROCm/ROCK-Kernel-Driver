@@ -1,6 +1,7 @@
 /*
     NetWinder Floating Point Emulator
     (c) Rebel.COM, 1998,1999
+    (c) Philip Blundell, 2001
 
     Direct questions, comments to Scott Bambrough <scottb@netwinder.org>
 
@@ -32,224 +33,92 @@ float32 float32_arctan(float32 rFm);
 float32 float32_log(float32 rFm);
 float32 float32_tan(float32 rFm);
 float32 float32_arccos(float32 rFm);
-float32 float32_pow(float32 rFn,float32 rFm);
-float32 float32_pol(float32 rFn,float32 rFm);
+float32 float32_pow(float32 rFn, float32 rFm);
+float32 float32_pol(float32 rFn, float32 rFm);
 
-unsigned int SingleCPDO(const unsigned int opcode)
+static float32 float32_rsf(float32 rFn, float32 rFm)
 {
-   FPA11 *fpa11 = GET_FPA11();
-   float32 rFm, rFn;
-   unsigned int Fd, Fm, Fn, nRc = 1;
-
-   Fm = getFm(opcode);
-   if (CONSTANT_FM(opcode))
-   {
-     rFm = getSingleConstant(Fm);
-   }
-   else
-   {  
-     switch (fpa11->fType[Fm])
-     {
-        case typeSingle:
-          rFm = fpa11->fpreg[Fm].fSingle;
-        break;
-        
-        default: return 0;
-     }
-   }
-
-   if (!MONADIC_INSTRUCTION(opcode))
-   {
-      Fn = getFn(opcode);
-      switch (fpa11->fType[Fn])
-      {
-        case typeSingle:
-          rFn = fpa11->fpreg[Fn].fSingle;
-        break;
-
-        default: return 0;
-      }
-   }
-
-   Fd = getFd(opcode);
-   switch (opcode & MASK_ARITHMETIC_OPCODE)
-   {
-      /* dyadic opcodes */
-      case ADF_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_add(rFn,rFm);
-      break;
-
-      case MUF_CODE:
-      case FML_CODE:
-        fpa11->fpreg[Fd].fSingle = float32_mul(rFn,rFm);
-      break;
-
-      case SUF_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_sub(rFn,rFm);
-      break;
-
-      case RSF_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_sub(rFm,rFn);
-      break;
-
-      case DVF_CODE:
-      case FDV_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_div(rFn,rFm);
-      break;
-
-      case RDF_CODE:
-      case FRD_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_div(rFm,rFn);
-      break;
-
-#if 0
-      case POW_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_pow(rFn,rFm);
-      break;
-
-      case RPW_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_pow(rFm,rFn);
-      break;
-#endif
-
-      case RMF_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_rem(rFn,rFm);
-      break;
-
-#if 0
-      case POL_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_pol(rFn,rFm);
-      break;
-#endif
-
-      /* monadic opcodes */
-      case MVF_CODE:
-         fpa11->fpreg[Fd].fSingle = rFm;
-      break;
-
-      case MNF_CODE:
-         rFm ^= 0x80000000;
-         fpa11->fpreg[Fd].fSingle = rFm;
-      break;
-
-      case ABS_CODE:
-         rFm &= 0x7fffffff;
-         fpa11->fpreg[Fd].fSingle = rFm;
-      break;
-
-      case RND_CODE:
-      case URD_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_round_to_int(rFm);
-      break;
-
-      case SQT_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_sqrt(rFm);
-      break;
-
-#if 0
-      case LOG_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_log(rFm);
-      break;
-
-      case LGN_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_ln(rFm);
-      break;
-
-      case EXP_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_exp(rFm);
-      break;
-
-      case SIN_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_sin(rFm);
-      break;
-
-      case COS_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_cos(rFm);
-      break;
-
-      case TAN_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_tan(rFm);
-      break;
-
-      case ASN_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_arcsin(rFm);
-      break;
-
-      case ACS_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_arccos(rFm);
-      break;
-
-      case ATN_CODE:
-         fpa11->fpreg[Fd].fSingle = float32_arctan(rFm);
-      break;
-#endif
-
-      case NRM_CODE:
-      break;
-      
-      default:
-      {
-        nRc = 0;
-      }
-   }
-
-   if (0 != nRc) fpa11->fType[Fd] = typeSingle;
-   return nRc;
+	return float32_sub(rFm, rFn);
 }
 
-#if 0
-float32 float32_exp(float32 Fm)
+static float32 float32_rdv(float32 rFn, float32 rFm)
 {
-//series
+	return float32_div(rFm, rFn);
 }
 
-float32 float32_ln(float32 Fm)
+static float32 (*const dyadic_single[16])(float32 rFn, float32 rFm) = {
+	[ADF_CODE >> 20] = float32_add,
+	[MUF_CODE >> 20] = float32_mul,
+	[SUF_CODE >> 20] = float32_sub,
+	[RSF_CODE >> 20] = float32_rsf,
+	[DVF_CODE >> 20] = float32_div,
+	[RDF_CODE >> 20] = float32_rdv,
+	[RMF_CODE >> 20] = float32_rem,
+
+	[FML_CODE >> 20] = float32_mul,
+	[FDV_CODE >> 20] = float32_div,
+	[FRD_CODE >> 20] = float32_rdv,
+};
+
+static float32 float32_mvf(float32 rFm)
 {
-//series
+	return rFm;
 }
 
-float32 float32_sin(float32 rFm)
+static float32 float32_mnf(float32 rFm)
 {
-//series
+	return rFm ^ 0x80000000;
 }
 
-float32 float32_cos(float32 rFm)
+static float32 float32_abs(float32 rFm)
 {
-//series
+	return rFm & 0x7fffffff;
 }
 
-float32 float32_arcsin(float32 rFm)
-{
-//series
-}
+static float32 (*const monadic_single[16])(float32 rFm) = {
+	[MVF_CODE >> 20] = float32_mvf,
+	[MNF_CODE >> 20] = float32_mnf,
+	[ABS_CODE >> 20] = float32_abs,
+	[RND_CODE >> 20] = float32_round_to_int,
+	[URD_CODE >> 20] = float32_round_to_int,
+	[SQT_CODE >> 20] = float32_sqrt,
+	[NRM_CODE >> 20] = float32_mvf,
+};
 
-float32 float32_arctan(float32 rFm)
+unsigned int SingleCPDO(const unsigned int opcode, FPREG * rFd)
 {
-  //series
-}
+	FPA11 *fpa11 = GET_FPA11();
+	float32 rFm;
+	unsigned int Fm, opc_mask_shift;
 
-float32 float32_arccos(float32 rFm)
-{
-   //return float32_sub(halfPi,float32_arcsin(rFm));
-}
+	Fm = getFm(opcode);
+	if (CONSTANT_FM(opcode)) {
+		rFm = getSingleConstant(Fm);
+	} else if (fpa11->fType[Fm] == typeSingle) {
+		rFm = fpa11->fpreg[Fm].fSingle;
+	} else {
+		return 0;
+	}
 
-float32 float32_log(float32 rFm)
-{
-  return float32_div(float32_ln(rFm),getSingleConstant(7));
-}
+	opc_mask_shift = (opcode & MASK_ARITHMETIC_OPCODE) >> 20;
+	if (!MONADIC_INSTRUCTION(opcode)) {
+		unsigned int Fn = getFn(opcode);
+		float32 rFn;
 
-float32 float32_tan(float32 rFm)
-{
-  return float32_div(float32_sin(rFm),float32_cos(rFm));
-}
+		if (fpa11->fType[Fn] == typeSingle &&
+		    dyadic_single[opc_mask_shift]) {
+			rFn = fpa11->fpreg[Fn].fSingle;
+			rFd->fSingle = dyadic_single[opc_mask_shift](rFn, rFm);
+		} else {
+			return 0;
+		}
+	} else {
+		if (monadic_single[opc_mask_shift]) {
+			rFd->fSingle = monadic_single[opc_mask_shift](rFm);
+		} else {
+			return 0;
+		}
+	}
 
-float32 float32_pow(float32 rFn,float32 rFm)
-{
-  return float32_exp(float32_mul(rFm,float32_ln(rFn))); 
+	return 1;
 }
-
-float32 float32_pol(float32 rFn,float32 rFm)
-{
-  return float32_arctan(float32_div(rFn,rFm)); 
-}
-#endif

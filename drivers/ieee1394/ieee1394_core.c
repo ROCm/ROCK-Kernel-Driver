@@ -60,6 +60,7 @@ static kmem_cache_t *hpsb_packet_cache;
 
 /* Some globals used */
 const char *hpsb_speedto_str[] = { "S100", "S200", "S400", "S800", "S1600", "S3200" };
+const u8 hpsb_speedto_maxrec[] = {   0x7,    0x8,    0x9,   0x10,    0x11,    0x12 };
 
 static void dump_packet(const char *text, quadlet_t *data, int size)
 {
@@ -285,7 +286,7 @@ static void build_speed_map(struct hpsb_host *host, int nodecount)
 
         for (i = 0; i < (nodecount * 64); i += 64) {
                 for (j = 0; j < nodecount; j++) {
-                        map[i+j] = SPEED_400;
+                        map[i+j] = SPEED_MAX;
                 }
         }
 
@@ -1239,6 +1240,7 @@ EXPORT_SYMBOL(hpsb_unref_host);
 
 /** ieee1394_core.c **/
 EXPORT_SYMBOL(hpsb_speedto_str);
+EXPORT_SYMBOL(hpsb_speedto_maxrec);
 EXPORT_SYMBOL(hpsb_set_packet_complete_task);
 EXPORT_SYMBOL(alloc_hpsb_packet);
 EXPORT_SYMBOL(free_hpsb_packet);
@@ -1278,6 +1280,7 @@ EXPORT_SYMBOL(hpsb_unregister_addrspace);
 EXPORT_SYMBOL(hpsb_listen_channel);
 EXPORT_SYMBOL(hpsb_unlisten_channel);
 EXPORT_SYMBOL(hpsb_get_hostinfo);
+EXPORT_SYMBOL(hpsb_get_host_bykey);
 EXPORT_SYMBOL(hpsb_create_hostinfo);
 EXPORT_SYMBOL(hpsb_destroy_hostinfo);
 EXPORT_SYMBOL(hpsb_set_hostinfo_key);

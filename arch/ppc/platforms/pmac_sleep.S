@@ -15,6 +15,7 @@
 #include <asm/page.h>
 #include <asm/ppc_asm.h>
 #include <asm/cputable.h>
+#include <asm/cache.h>
 #include <asm/thread_info.h>
 #include <asm/offsets.h>
 
@@ -157,33 +158,22 @@ _GLOBAL(low_sleep_handler)
 	addi r3,r3,sleep_storage@l
 	stw r5,0(r3)
 
-BEGIN_FTR_SECTION
-	DSSALL
+	/* Disable DPM during cache flush */
+	mfspr	r3, SPRN_HID0
+	rlwinm	r3,r3,0,12,10
 	sync
-END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
-
-/*
- * Flush the L1 data cache by reading the first 128kB of RAM
- * and then flushing the same area with the dcbf instruction.
- * The L2 cache has already been disabled.
- */
-	li	r4,0x1000	/* 128kB / 32B */
-	mtctr	r4
-	lis	r4,KERNELBASE@h
-1:
-	lwz	r0,0(r4)
-	addi	r4,r4,0x0020	/* Go to start of next cache line */
-	bdnz	1b
+	mtspr	SPRN_HID0,r3
 	sync
 	
-	li	r4,0x1000	/* 128kB / 32B */
-	mtctr	r4
-	lis	r4,KERNELBASE@h
-1:
-	dcbf	r0,r4
-	addi	r4,r4,0x0020	/* Go to start of next cache line */
-	bdnz	1b
+	/* Turn off data relocation. */
+	mfmsr	r3		/* Save MSR in r7 */
+	rlwinm	r3,r3,0,28,26	/* Turn off DR bit */
 	sync
+	mtmsr	r3
+	isync
+
+	/* Flush & disable L1 cache */
+	bl	__flush_disable_L1
 
 /*
  * Set the HID0 and MSR for sleep.
@@ -192,6 +182,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	rlwinm	r2,r2,0,10,7	/* clear doze, nap */
 	oris	r2,r2,HID0_SLEEP@h
 	sync
+	isync
 	mtspr	HID0,r2
 	sync
 
@@ -252,16 +243,11 @@ _GLOBAL(core99_wake_up)
  */
 	
 grackle_wake_up:
-	/* Enable and then Flash inval the instruction & data cache */
-	mfspr	r3,HID0
-	ori	r3,r3, HID0_ICE|HID0_ICFI|HID0_DCE|HID0_DCI
-	sync
-	isync
-	mtspr	HID0,r3
-	xori	r3,r3, HID0_ICFI|HID0_DCI
-	mtspr	HID0,r3
-	sync
-	
+	/* Invalidate & enable L1 cache, we don't care about
+	 * whatever the ROM may have tried to write to memory
+	 */
+	bl	__inval_enable_L1
+
 	/* Restore the kernel's segment registers before
 	 * we do any r1 memory access as we are not sure they
 	 * are in a sane state above the first 256Mb region
@@ -274,6 +260,8 @@ grackle_wake_up:
 	addi	r3,r3,0x111	/* increment VSID */
 	addis	r4,r4,0x1000	/* address of next segment */
 	bdnz	3b
+	sync
+	isync
 	
 	subi	r1,r1,SL_PC
 
@@ -325,6 +313,26 @@ grackle_wake_up:
 	lwz	r4,SL_IBAT3+4(r1)
 	mtibatl	3,r4
 
+BEGIN_FTR_SECTION
+	li	r4,0
+	mtspr	SPRN_DBAT4U,r4
+	mtspr	SPRN_DBAT4L,r4
+	mtspr	SPRN_DBAT5U,r4
+	mtspr	SPRN_DBAT5L,r4
+	mtspr	SPRN_DBAT6U,r4
+	mtspr	SPRN_DBAT6L,r4
+	mtspr	SPRN_DBAT7U,r4
+	mtspr	SPRN_DBAT7L,r4
+	mtspr	SPRN_IBAT4U,r4
+	mtspr	SPRN_IBAT4L,r4
+	mtspr	SPRN_IBAT5U,r4
+	mtspr	SPRN_IBAT5L,r4
+	mtspr	SPRN_IBAT6U,r4
+	mtspr	SPRN_IBAT6L,r4
+	mtspr	SPRN_IBAT7U,r4
+	mtspr	SPRN_IBAT7L,r4
+END_FTR_SECTION_IFSET(CPU_FTR_HAS_HIGH_BATS)
+
 	/* Flush all TLBs */
 	lis	r4,0x1000
 1:	addic.	r4,r4,-0x1000
@@ -368,8 +376,9 @@ turn_on_mmu:
 
 #endif /* defined(CONFIG_PMAC_PBOOK) || defined(CONFIG_CPU_FREQ) */
 
-
-	.data
-	.globl sleep_storage
+	.section .data
+	.balign	L1_CACHE_LINE_SIZE
 sleep_storage:
 	.long 0
+	.balign	L1_CACHE_LINE_SIZE, 0
+	.section .text

@@ -997,12 +997,12 @@ void irlap_apply_connection_parameters(struct irlap_cb *self, int now)
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == LAP_MAGIC, return;);
 
-	/* Set the negociated xbofs value */
+	/* Set the negotiated xbofs value */
 	self->next_bofs   = self->qos_tx.additional_bofs.value;
 	if (now)
 		self->bofs_count = self->next_bofs;
 
-	/* Set the negociated link speed (may need the new xbofs value) */
+	/* Set the negotiated link speed (may need the new xbofs value) */
 	irlap_change_speed(self, self->qos_tx.baud_rate.value, now);
 
 	self->window_size = self->qos_tx.window_size.value;

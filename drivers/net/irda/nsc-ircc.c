@@ -131,7 +131,6 @@ static int  nsc_ircc_hard_xmit_fir(struct sk_buff *skb, struct net_device *dev);
 static int  nsc_ircc_pio_write(int iobase, __u8 *buf, int len, int fifo_size);
 static void nsc_ircc_dma_xmit(struct nsc_ircc_cb *self, int iobase);
 static __u8 nsc_ircc_change_speed(struct nsc_ircc_cb *self, __u32 baud);
-static void nsc_ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static int  nsc_ircc_is_receiving(struct nsc_ircc_cb *self);
 static int  nsc_ircc_read_dongle_id (int iobase);
 static void nsc_ircc_init_dongle_interface (int iobase, int dongle_id);
@@ -1781,7 +1780,8 @@ static void nsc_ircc_fir_interrupt(struct nsc_ircc_cb *self, int iobase,
  *    An interrupt from the chip has arrived. Time to do some work
  *
  */
-static void nsc_ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t nsc_ircc_interrupt(int irq, void *dev_id,
+				struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct nsc_ircc_cb *self;
@@ -1790,7 +1790,7 @@ static void nsc_ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (!dev) {
 		WARNING("%s: irq %d for unknown device.\n", driver_name, irq);
-		return;
+		return IRQ_NONE;
 	}
 	self = (struct nsc_ircc_cb *) dev->priv;
 
@@ -1818,6 +1818,7 @@ static void nsc_ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	outb(bsr, iobase+BSR);       /* Restore bank register */
 
 	spin_unlock(&self->lock);
+	return IRQ_HANDLED;
 }
 
 /*

@@ -84,6 +84,9 @@
 #ifndef __HAVE_SG
 #define __HAVE_SG			0
 #endif
+#ifndef __HAVE_KERNEL_CTX_SWITCH
+#define __HAVE_KERNEL_CTX_SWITCH	0
+#endif
 #ifndef __HAVE_DRIVER_FOPS_READ
 #define __HAVE_DRIVER_FOPS_READ		0
 #endif
@@ -1013,6 +1016,12 @@ int DRM(lock)( struct inode *inode, struct file *filp,
 			DRIVER_DMA_QUIESCENT();
 		}
 #endif
+#if __HAVE_KERNEL_CTX_SWITCH
+		if ( dev->last_context != lock.context ) {
+			DRM(context_switch)(dev, dev->last_context,
+					    lock.context);
+		}
+#endif
         }
 
         DRM_DEBUG( "%d %s\n", lock.context, ret ? "interrupted" : "has lock" );
@@ -1039,6 +1048,25 @@ int DRM(unlock)( struct inode *inode, struct file *filp,
 
 	atomic_inc( &dev->counts[_DRM_STAT_UNLOCKS] );
 
+#if __HAVE_KERNEL_CTX_SWITCH
+	/* We no longer really hold it, but if we are the next
+	 * agent to request it then we should just be able to
+	 * take it immediately and not eat the ioctl.
+	 */
+	dev->lock.filp = 0;
+	{
+		__volatile__ unsigned int *plock = &dev->lock.hw_lock->lock;
+		unsigned int old, new, prev, ctx;
+
+		ctx = lock.context;
+		do {
+			old  = *plock;
+			new  = ctx;
+			prev = cmpxchg(plock, old, new);
+		} while (prev != old);
+	}
+	wake_up_interruptible(&dev->lock.lock_queue);
+#else
 	DRM(lock_transfer)( dev, &dev->lock.hw_lock->lock,
 			    DRM_KERNEL_CONTEXT );
 #if __HAVE_DMA_SCHEDULE
@@ -1053,6 +1081,7 @@ int DRM(unlock)( struct inode *inode, struct file *filp,
 			DRM_ERROR( "\n" );
 		}
 	}
+#endif /* !__HAVE_KERNEL_CTX_SWITCH */
 
 	unblock_all_signals();
 	return 0;

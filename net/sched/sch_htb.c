@@ -765,7 +765,7 @@ static void htb_rate_timer(unsigned long arg)
 #endif
 
 /**
- * htb_charge_class - charges ammount "bytes" to leaf and ancestors
+ * htb_charge_class - charges amount "bytes" to leaf and ancestors
  *
  * Routine assumes that packet "bytes" long was dequeued from leaf cl
  * borrowing from "level". It accounts bytes to ceil leaky bucket for

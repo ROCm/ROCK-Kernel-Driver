@@ -87,7 +87,11 @@
  */
 #define __HAVE_RELEASE		1
 #define DRIVER_RELEASE() do {						\
-	i830_reclaim_buffers( filp );				\
+	i830_reclaim_buffers( filp );					\
+} while (0)
+
+#define DRIVER_PRETAKEDOWN() do {					\
+	i830_dma_cleanup( dev );					\
 } while (0)
 
 /* DMA customization:
@@ -107,43 +111,15 @@
  * the card, but are subject to subtle interactions between bios,
  * hardware and the driver.
  */
+/* XXX: Add vblank support? */
 #define USE_IRQS 0
-
 
 #if USE_IRQS
 #define __HAVE_DMA_IRQ		1
 #define __HAVE_SHARED_IRQ	1
-
-#define DRIVER_PREINSTALL() do {			\
-	drm_i830_private_t *dev_priv =			\
-		(drm_i830_private_t *)dev->dev_private;	\
-							\
-   	I830_WRITE16( I830REG_HWSTAM, 0xffff );	\
-        I830_WRITE16( I830REG_INT_MASK_R, 0x0 );	\
-      	I830_WRITE16( I830REG_INT_ENABLE_R, 0x0 );	\
-} while (0)
-
-
-#define DRIVER_POSTINSTALL() do {				\
-	drm_i830_private_t *dev_priv =				\
-		(drm_i830_private_t *)dev->dev_private;		\
-   	I830_WRITE16( I830REG_INT_ENABLE_R, 0x2 );		\
-   	atomic_set(&dev_priv->irq_received, 0);			\
-   	atomic_set(&dev_priv->irq_emitted, 0);			\
-	init_waitqueue_head(&dev_priv->irq_queue);		\
-} while (0)
-
-
-/* This gets called too late to be useful: dev_priv has already been
- * freed.
- */
-#define DRIVER_UNINSTALL() do {					\
-} while (0)
-
 #else
 #define __HAVE_DMA_IRQ          0
 #endif
-
 
 
 /* Buffer customization:

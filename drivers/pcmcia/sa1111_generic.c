@@ -176,7 +176,6 @@ static struct sa1111_driver pcmcia_driver = {
 	.drv = {
 		.name		= "sa1111-pcmcia",
 		.bus		= &sa1111_bus_type,
-		.devclass	= &pcmcia_socket_class,
 		.probe		= pcmcia_probe,
 		.remove		= __devexit_p(pcmcia_remove),
 		.suspend 	= pcmcia_socket_dev_suspend,

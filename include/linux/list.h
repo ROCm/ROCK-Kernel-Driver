@@ -335,6 +335,16 @@ static inline void list_splice_init(struct list_head *list,
 		     prefetch(pos->member.next))
 
 
+/**
+ * list_for_each_continue_rcu	-	iterate over an rcu-protected list 
+ *			continuing from existing point.
+ * @pos:	the &struct list_head to use as a loop counter.
+ * @head:	the head for your list.
+ */
+#define list_for_each_continue_rcu(pos, head) \
+	for ((pos) = (pos)->next, prefetch((pos)->next); (pos) != (head); \
+        	(pos) = (pos)->next, ({ smp_read_barrier_depends(); 0;}), prefetch((pos)->next))
+
 /* 
  * Double linked lists with a single pointer list head. 
  * Mostly useful for hash tables where the two pointer list head is 
@@ -426,6 +436,10 @@ static __inline__ void hlist_add_before(struct hlist_node *n, struct hlist_node 
 #define hlist_for_each(pos, head) \
 	for (pos = (head)->first; pos; \
 	     pos = pos->next) 
+
+#define hlist_for_each_safe(pos, n, head) \
+	for (pos = (head)->first; n = pos ? pos->next : 0, pos; \
+	     pos = n)
 
 #else
 #warning "don't include kernel headers in userspace"

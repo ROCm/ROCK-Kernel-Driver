@@ -66,7 +66,6 @@ several floating point instructions.  */
 	.globl	nwfpe_enter
 nwfpe_enter:
 	mov	sl, sp
-
 	ldr	r5, [sp, #60]		@ get contents of PC
 	bic	r5, r5, #0xfc000003
 	ldr	r0, [r5, #-4]		@ get actual instruction into r0
@@ -96,7 +95,7 @@ next:
 
 	@ if condition code failed to match, next insn
 	beq	next			@ get the next instruction;
-	    
+
 	mov	r0, r6			@ prepare for EmulateAll()
 	adr	lr, 1b
 	orr	lr, lr, #3

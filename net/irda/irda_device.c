@@ -120,7 +120,7 @@ void __exit irda_device_cleanup(void)
 /*
  * Function irda_device_set_media_busy (self, status)
  *
- *    Called when we have detected that another station is transmiting
+ *    Called when we have detected that another station is transmitting
  *    in contention mode.
  */
 void irda_device_set_media_busy(struct net_device *dev, int status)
@@ -480,7 +480,7 @@ int irda_device_dongle_cleanup(dongle_t *dongle)
  */
 int irda_device_register_dongle(struct dongle_reg *new)
 {
-	/* Check if this dongle has been registred before */
+	/* Check if this dongle has been registered before */
 	if (hashbin_lock_find(dongles, new->type, NULL)) {
 		MESSAGE("%s: Dongle already registered\n", __FUNCTION__);
                 return 0;
@@ -495,7 +495,7 @@ int irda_device_register_dongle(struct dongle_reg *new)
 /*
  * Function irda_device_unregister_dongle (dongle)
  *
- *    Unregister dongle, and remove dongle from list of registred dongles
+ *    Unregister dongle, and remove dongle from list of registered dongles
  *
  */
 void irda_device_unregister_dongle(struct dongle_reg *dongle)

@@ -30,8 +30,8 @@ enum lw_bits {
 	LW_SE_USED
 };
 
-static unsigned long linkwatch_flags = 0;
-static unsigned long linkwatch_nextevent = 0;
+static unsigned long linkwatch_flags;
+static unsigned long linkwatch_nextevent;
 
 static void linkwatch_event(void *dummy);
 static DECLARE_WORK(linkwatch_work, linkwatch_event, NULL);

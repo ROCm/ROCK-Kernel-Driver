@@ -1,6 +1,3 @@
-comment "Micro Channel Architecture Bus support"
-	depends on MCA
-
 config MCA_LEGACY
 	bool "Legacy MCA API Support"
 	depends on MCA

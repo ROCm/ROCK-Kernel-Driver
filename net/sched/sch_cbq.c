@@ -44,7 +44,7 @@
 	         Management Models for Packet Networks",
 		 IEEE/ACM Transactions on Networking, Vol.3, No.4, 1995
 
-	         [2] Sally Floyd, "Notes on CBQ and Guaranted Service", 1995
+	         [2] Sally Floyd, "Notes on CBQ and Guaranteed Service", 1995
 
 	         [3] Sally Floyd, "Notes on Class-Based Queueing: Setting
 		 Parameters", 1996
@@ -106,7 +106,7 @@ struct cbq_class
 	u32			defmap;
 
 	/* Link-sharing scheduler parameters */
-	long			maxidle;	/* Class paramters: see below. */
+	long			maxidle;	/* Class parameters: see below. */
 	long			offtime;
 	long			minidle;
 	u32			avpkt;
@@ -998,7 +998,7 @@ cbq_dequeue(struct Qdisc *sch)
 	if (q->tx_class) {
 		psched_tdiff_t incr2;
 		/* Time integrator. We calculate EOS time
-		   by adding expected packet transmittion time.
+		   by adding expected packet transmission time.
 		   If real time is greater, we warp artificial clock,
 		   so that:
 

@@ -51,12 +51,6 @@
 struct ipaq_model_ops ipaq_model_ops;
 EXPORT_SYMBOL(ipaq_model_ops);
 
-static void msleep(unsigned int msec)
-{
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout((msec * HZ + 999) / 1000);
-}
-
 /*
  * low-level UART features
  */

@@ -95,7 +95,6 @@ static int  ali_ircc_net_close(struct net_device *dev);
 static int  ali_ircc_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int  ali_ircc_pmproc(struct pm_dev *dev, pm_request_t rqst, void *data);
 static void ali_ircc_change_speed(struct ali_ircc_cb *self, __u32 baud);
-static void ali_ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void ali_ircc_suspend(struct ali_ircc_cb *self);
 static void ali_ircc_wakeup(struct ali_ircc_cb *self);
 static struct net_device_stats *ali_ircc_net_get_stats(struct net_device *dev);
@@ -632,7 +631,8 @@ static int ali_ircc_read_dongle_id (int i, chipio_t *info)
  *    An interrupt from the chip has arrived. Time to do some work
  *
  */
-static void ali_ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t ali_ircc_interrupt(int irq, void *dev_id,
+					struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct ali_ircc_cb *self;
@@ -641,7 +641,7 @@ static void ali_ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		
  	if (!dev) {
 		WARNING("%s: irq %d for unknown device.\n", driver_name, irq);
-		return;
+		return IRQ_NONE;
 	}	
 	
 	self = (struct ali_ircc_cb *) dev->priv;
@@ -656,7 +656,8 @@ static void ali_ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		
 	spin_unlock(&self->lock);
 	
-	IRDA_DEBUG(2, "%s(), ----------------- End ------------------\n", __FUNCTION__);		
+	IRDA_DEBUG(2, "%s(), ----------------- End ------------------\n", __FUNCTION__);
+	return IRQ_HANDLED;
 }
 /*
  * Function ali_ircc_fir_interrupt(irq, struct ali_ircc_cb *self, regs)

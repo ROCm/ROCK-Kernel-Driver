@@ -321,6 +321,7 @@ int bt_sock_w4_connect(struct sock *sk, int flags)
 }
 
 struct net_proto_family bt_sock_family_ops = {
+	.owner  = THIS_MODULE,
 	.family	= PF_BLUETOOTH,
 	.create	= bt_sock_create,
 };

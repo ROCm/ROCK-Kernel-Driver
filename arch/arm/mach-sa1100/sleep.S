@@ -54,7 +54,7 @@ ENTRY(sa1100_cpu_suspend)
 	str	r0, [r1]
 
 	@ clean data cache and invalidate WB
-	bl	cpu_sa1100_cache_clean_invalidate_all
+	bl	v4wb_flush_kern_cache_all
 
 	@ disable clock switching
 	mcr	p15, 0, r1, c15, c2, 2

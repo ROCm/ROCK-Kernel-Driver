@@ -1408,6 +1408,8 @@ typedef struct pkt_task_s {
 	void			*special;
 } pkt_task_t;
 
+extern inline u32 ide_read_24(ide_drive_t *);
+
 extern inline void SELECT_DRIVE(ide_drive_t *);
 extern inline void SELECT_INTERRUPT(ide_drive_t *);
 extern inline void SELECT_MASK(ide_drive_t *, int);

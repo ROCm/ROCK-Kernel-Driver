@@ -52,8 +52,8 @@
 #endif
 
 /* Exported from arch/ppc/kernel/idle.c */
-extern int powersave_nap;
 extern int powersave_lowspeed;
+extern int powersave_nap;
 
 /*
  * We use a single global lock to protect accesses. Each driver has
@@ -1894,9 +1894,21 @@ static struct pmac_mb_def pmac_mb_defs[] __pmacdata = {
 		PMAC_TYPE_RACKMAC,		rackmac_features,
 		0,
 	},
+	{	"RackMac1,2",			"XServe rev. 2",
+		PMAC_TYPE_RACKMAC,		rackmac_features,
+		0,
+	},
 	{	"PowerMac3,6",			"PowerMac G4 Windtunnel",
 		PMAC_TYPE_WINDTUNNEL,		rackmac_features,
 		0,
+	},
+	{	"PowerBook5,1",			"PowerBook G4 17\"",
+		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
+		PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
+	},
+	{	"PowerBook6,1",			"PowerBook G4 12\"",
+		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
+		PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
 	},
 };
 
@@ -1994,8 +2006,8 @@ probe_motherboard(void)
 	    	pmac_mb.features = pangea_features;
 		break;
 	    case macio_intrepid:
-		pmac_mb.model_id = PMAC_TYPE_UNKNOWN_PANGEA;
-		pmac_mb.model_name = "Unknown Pangea-based";
+		pmac_mb.model_id = PMAC_TYPE_UNKNOWN_INTREPID;
+		pmac_mb.model_name = "Unknown Intrepid-based";
 	    	pmac_mb.features = intrepid_features;
 	    	break;
 	    default:

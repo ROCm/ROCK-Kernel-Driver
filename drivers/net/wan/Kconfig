@@ -255,8 +255,8 @@ config HDLC
 
  	  If you want to compile the driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read Documentation/modules.txt.  The module
-	  will be called hdlc.o.
+	  say M here and read <file:Documentation/modules.txt>.  The module
+	  will be called hdlc.
 
 	  If unsure, say N here.
 
@@ -363,7 +363,7 @@ config N2
 	  If you want to compile the driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called n2.o.
+	  will be called n2.
 
 	  If unsure, say N here.
 
@@ -378,7 +378,7 @@ config C101
 	  If you want to compile the driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called c101.o.
+	  will be called c101.
 
 	  If unsure, say N here.
 

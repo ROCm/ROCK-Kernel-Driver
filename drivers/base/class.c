@@ -1,5 +1,7 @@
 /*
  * class.c - basic device class management
+ * 
+ * Copyright (c) 2001-2003 Patrick Mochel <mochel@osdl.org>
  */
 
 #undef DEBUG
@@ -10,16 +12,14 @@
 #include <linux/string.h>
 #include "base.h"
 
-#define to_class_attr(_attr) container_of(_attr,struct devclass_attribute,attr)
-#define to_class(obj) container_of(obj,struct device_class,subsys.kset.kobj)
-
-DECLARE_MUTEX(devclass_sem);
+#define to_class_attr(_attr) container_of(_attr,struct class_attribute,attr)
+#define to_class(obj) container_of(obj,struct class,subsys.kset.kobj)
 
 static ssize_t
-devclass_attr_show(struct kobject * kobj, struct attribute * attr, char * buf)
+class_attr_show(struct kobject * kobj, struct attribute * attr, char * buf)
 {
-	struct devclass_attribute * class_attr = to_class_attr(attr);
-	struct device_class * dc = to_class(kobj);
+	struct class_attribute * class_attr = to_class_attr(attr);
+	struct class * dc = to_class(kobj);
 	ssize_t ret = 0;
 
 	if (class_attr->show)
@@ -28,11 +28,11 @@ devclass_attr_show(struct kobject * kobj, struct attribute * attr, char * buf)
 }
 
 static ssize_t
-devclass_attr_store(struct kobject * kobj, struct attribute * attr, 
-		    const char * buf, size_t count)
+class_attr_store(struct kobject * kobj, struct attribute * attr, 
+		 const char * buf, size_t count)
 {
-	struct devclass_attribute * class_attr = to_class_attr(attr);
-	struct device_class * dc = to_class(kobj);
+	struct class_attribute * class_attr = to_class_attr(attr);
+	struct class * dc = to_class(kobj);
 	ssize_t ret = 0;
 
 	if (class_attr->store)
@@ -41,49 +41,19 @@ devclass_attr_store(struct kobject * kobj, struct attribute * attr,
 }
 
 static struct sysfs_ops class_sysfs_ops = {
-	.show	= devclass_attr_show,
-	.store	= devclass_attr_store,
+	.show	= class_attr_show,
+	.store	= class_attr_store,
 };
 
-static struct kobj_type ktype_devclass = {
+static struct kobj_type ktype_class = {
 	.sysfs_ops	= &class_sysfs_ops,
 };
 
-/* Classes can't use the kobject hotplug logic, as
- * they do not add new kobjects to the system */
-static decl_subsys(class,&ktype_devclass,NULL);
+/* Hotplug events for classes go to the class_obj subsys */
+static decl_subsys(class,&ktype_class,NULL);
 
 
-static int devclass_dev_link(struct device_class * cls, struct device * dev)
-{
-	char	linkname[16];
-	snprintf(linkname,16,"%u",dev->class_num);
-	return sysfs_create_link(&cls->devices.kobj,&dev->kobj,linkname);
-}
-
-static void devclass_dev_unlink(struct device_class * cls, struct device * dev)
-{
-	char	linkname[16];
-	snprintf(linkname,16,"%u",dev->class_num);
-	sysfs_remove_link(&cls->devices.kobj,linkname);
-}
-
-static int devclass_drv_link(struct device_driver * drv)
-{
-	char	name[KOBJ_NAME_LEN * 3];
-	snprintf(name,KOBJ_NAME_LEN * 3,"%s:%s",drv->bus->name,drv->name);
-	return sysfs_create_link(&drv->devclass->drivers.kobj,&drv->kobj,name);
-}
-
-static void devclass_drv_unlink(struct device_driver * drv)
-{
-	char	name[KOBJ_NAME_LEN * 3];
-	snprintf(name,KOBJ_NAME_LEN * 3,"%s:%s",drv->bus->name,drv->name);
-	return sysfs_remove_link(&drv->devclass->drivers.kobj,name);
-}
-
-
-int devclass_create_file(struct device_class * cls, struct devclass_attribute * attr)
+int class_create_file(struct class * cls, struct class_attribute * attr)
 {
 	int error;
 	if (cls) {
@@ -93,190 +63,354 @@ int devclass_create_file(struct device_class * cls, struct devclass_attribute * 
 	return error;
 }
 
-void devclass_remove_file(struct device_class * cls, struct devclass_attribute * attr)
+void class_remove_file(struct class * cls, struct class_attribute * attr)
 {
 	if (cls)
 		sysfs_remove_file(&cls->subsys.kset.kobj,&attr->attr);
 }
 
-
-int devclass_add_driver(struct device_driver * drv)
+struct class * class_get(struct class * cls)
 {
-	struct device_class * cls = get_devclass(drv->devclass);
-	int error = 0;
-
-	if (cls) {
-		down_write(&cls->subsys.rwsem);
-		pr_debug("device class %s: adding driver %s:%s\n",
-			 cls->name,drv->bus->name,drv->name);
-		error = devclass_drv_link(drv);
-		
-		if (!error)
-			list_add_tail(&drv->class_list,&cls->drivers.list);
-		up_write(&cls->subsys.rwsem);
-	}
-	return error;
+	if (cls)
+		return container_of(subsys_get(&cls->subsys),struct class,subsys);
+	return NULL;
 }
 
-void devclass_remove_driver(struct device_driver * drv)
-{
-	struct device_class * cls = drv->devclass;
-	if (cls) {
-		down_write(&cls->subsys.rwsem);
-		pr_debug("device class %s: removing driver %s:%s\n",
-			 cls->name,drv->bus->name,drv->name);
-		list_del_init(&drv->class_list);
-		devclass_drv_unlink(drv);
-		up_write(&cls->subsys.rwsem);
-		put_devclass(cls);
-	}
-}
-
-
-static void enum_device(struct device_class * cls, struct device * dev)
-{
-	u32 val;
-	val = cls->devnum++;
-	dev->class_num = val;
-	devclass_dev_link(cls,dev);
-}
-
-static void unenum_device(struct device_class * cls, struct device * dev)
-{
-	devclass_dev_unlink(cls,dev);
-	dev->class_num = 0;
-}
-
-/**
- *	devclass_add_device - register device with device class
- *	@dev:   device to be registered 
- *
- *	This is called when a device is either registered with the 
- *	core, or after the a driver module is loaded and bound to
- *	the device. 
- *	The class is determined by looking at @dev's driver, so one
- *	way or another, it must be bound to something. Once the 
- *	class is determined, it's set to prevent against concurrent
- *	calls for the same device stomping on each other. 
- *
- *	/sbin/hotplug should be called once the device is added to 
- *	class and all the interfaces. 
- */
-int devclass_add_device(struct device * dev)
-{
-	struct device_class * cls;
-	int error = 0;
-
-	down(&devclass_sem);
-	if (dev->driver) {
-		cls = get_devclass(dev->driver->devclass);
-
-		if (!cls)
-			goto Done;
-
-		pr_debug("device class %s: adding device %s\n",
-			 cls->name,dev->name);
-		if (cls->add_device) 
-			error = cls->add_device(dev);
-		if (error) {
-			put_devclass(cls);
-			goto Done;
-		}
-
-		down_write(&cls->subsys.rwsem);
-		enum_device(cls,dev);
-		list_add_tail(&dev->class_list,&cls->devices.list);
-		/* notify userspace (call /sbin/hotplug) */
-		class_hotplug (dev, "add");
-
-		up_write(&cls->subsys.rwsem);
-
-		interface_add_dev(dev);
-	}
- Done:
-	up(&devclass_sem);
-	return error;
-}
-
-void devclass_remove_device(struct device * dev)
-{
-	struct device_class * cls;
-
-	down(&devclass_sem);
-	if (dev->driver) {
-		cls = dev->driver->devclass;
-		if (!cls) 
-			goto Done;
-
-		interface_remove_dev(dev);
-
-		down_write(&cls->subsys.rwsem);
-		pr_debug("device class %s: removing device %s\n",
-			 cls->name,dev->name);
-
-		unenum_device(cls,dev);
-
-		list_del(&dev->class_list);
-
-		/* notify userspace (call /sbin/hotplug) */
-		class_hotplug (dev, "remove");
-
-		up_write(&cls->subsys.rwsem);
-
-		if (cls->remove_device)
-			cls->remove_device(dev);
-		put_devclass(cls);
-	}
- Done:
-	up(&devclass_sem);
-}
-
-struct device_class * get_devclass(struct device_class * cls)
-{
-	return cls ? container_of(subsys_get(&cls->subsys),struct device_class,subsys) : NULL;
-}
-
-void put_devclass(struct device_class * cls)
+void class_put(struct class * cls)
 {
 	subsys_put(&cls->subsys);
 }
 
-
-int devclass_register(struct device_class * cls)
+int class_register(struct class * cls)
 {
 	pr_debug("device class '%s': registering\n",cls->name);
+
+	INIT_LIST_HEAD(&cls->children);
+	INIT_LIST_HEAD(&cls->interfaces);
+	
 	strncpy(cls->subsys.kset.kobj.name,cls->name,KOBJ_NAME_LEN);
 	subsys_set_kset(cls,class_subsys);
 	subsystem_register(&cls->subsys);
 
-	snprintf(cls->devices.kobj.name,KOBJ_NAME_LEN,"devices");
-	cls->devices.subsys = &cls->subsys;
-	kset_register(&cls->devices);
+	return 0;
+}
 
-	snprintf(cls->drivers.kobj.name,KOBJ_NAME_LEN,"drivers");
-	cls->drivers.subsys = &cls->subsys;
-	kset_register(&cls->drivers);
+void class_unregister(struct class * cls)
+{
+	pr_debug("device class '%s': unregistering\n",cls->name);
+	subsystem_unregister(&cls->subsys);
+}
+
+/* Class Device Stuff */
+
+int class_device_create_file(struct class_device * class_dev,
+			     struct class_device_attribute * attr)
+{
+	int error = -EINVAL;
+	if (class_dev)
+		error = sysfs_create_file(&class_dev->kobj, &attr->attr);
+	return error;
+}
+
+void class_device_remove_file(struct class_device * class_dev,
+			      struct class_device_attribute * attr)
+{
+	if (class_dev)
+		sysfs_remove_file(&class_dev->kobj, &attr->attr);
+}
+
+static int class_device_dev_link(struct class_device * class_dev)
+{
+	if (class_dev->dev)
+		return sysfs_create_link(&class_dev->kobj,
+					 &class_dev->dev->kobj, "device");
+	return 0;
+}
+
+static void class_device_dev_unlink(struct class_device * class_dev)
+{
+	if (class_dev->dev)
+		sysfs_remove_link(&class_dev->kobj, "device");
+}
+
+#define to_class_dev(obj) container_of(obj,struct class_device,kobj)
+#define to_class_dev_attr(_attr) container_of(_attr,struct class_device_attribute,attr)
+
+static ssize_t
+class_device_attr_show(struct kobject * kobj, struct attribute * attr,
+		       char * buf)
+{
+	struct class_device_attribute * class_dev_attr = to_class_dev_attr(attr);
+	struct class_device * cd = to_class_dev(kobj);
+	ssize_t ret = 0;
+
+	if (class_dev_attr->show)
+		ret = class_dev_attr->show(cd,buf);
+	return ret;
+}
+
+static ssize_t
+class_device_attr_store(struct kobject * kobj, struct attribute * attr, 
+			const char * buf, size_t count)
+{
+	struct class_device_attribute * class_dev_attr = to_class_dev_attr(attr);
+	struct class_device * cd = to_class_dev(kobj);
+	ssize_t ret = 0;
+
+	if (class_dev_attr->store)
+		ret = class_dev_attr->store(cd,buf,count);
+	return ret;
+}
+
+static struct sysfs_ops class_dev_sysfs_ops = {
+	.show	= class_device_attr_show,
+	.store	= class_device_attr_store,
+};
+
+static struct kobj_type ktype_class_device = {
+	.sysfs_ops	= &class_dev_sysfs_ops,
+};
+
+static int class_hotplug_filter(struct kset *kset, struct kobject *kobj)
+{
+	struct kobj_type *ktype = get_ktype(kobj);
+
+	if (ktype == &ktype_class_device) {
+		struct class_device *class_dev = to_class_dev(kobj);
+		if (class_dev->class)
+			return 1;
+	}
+	return 0;
+}
+
+static char *class_hotplug_name(struct kset *kset, struct kobject *kobj)
+{
+	struct class_device *class_dev = to_class_dev(kobj);
+
+	return class_dev->class->name;
+}
+
+static int class_hotplug(struct kset *kset, struct kobject *kobj, char **envp,
+			 int num_envp, char *buffer, int buffer_size)
+{
+	struct class_device *class_dev = to_class_dev(kobj);
+	int retval = 0;
+
+	pr_debug("%s - name = %s\n", __FUNCTION__, class_dev->class_id);
+	if (class_dev->class->hotplug) {
+		/* have the bus specific function add its stuff */
+		retval = class_dev->class->hotplug (class_dev, envp, num_envp,
+						    buffer, buffer_size);
+			if (retval) {
+			pr_debug ("%s - hotplug() returned %d\n",
+				  __FUNCTION__, retval);
+		}
+	}
+
+	return retval;
+}
+
+static struct kset_hotplug_ops class_hotplug_ops = {
+	.filter =	class_hotplug_filter,
+	.name =		class_hotplug_name,
+	.hotplug =	class_hotplug,
+};
+
+static decl_subsys(class_obj, &ktype_class_device, &class_hotplug_ops);
+
+void class_device_initialize(struct class_device *class_dev)
+{
+	kobject_init(&class_dev->kobj);
+	INIT_LIST_HEAD(&class_dev->node);
+}
+
+int class_device_add(struct class_device *class_dev)
+{
+	struct class * parent;
+	struct class_interface * class_intf;
+	struct list_head * entry;
+	int error;
+
+	class_dev = class_device_get(class_dev);
+	if (!class_dev || !strlen(class_dev->class_id))
+		return -EINVAL;
+
+	parent = class_get(class_dev->class);
+	if (class_dev->dev)
+		get_device(class_dev->dev);
+
+	pr_debug("CLASS: registering class device: ID = '%s'\n",
+		 class_dev->class_id);
+
+	/* first, register with generic layer. */
+	strncpy(class_dev->kobj.name, class_dev->class_id, KOBJ_NAME_LEN);
+	kobj_set_kset_s(class_dev, class_subsys);
+	kobj_set_kset_s(class_dev, class_obj_subsys);
+	if (parent)
+		class_dev->kobj.parent = &parent->subsys.kset.kobj;
+
+	if ((error = kobject_add(&class_dev->kobj)))
+		goto register_done;
+
+	/* now take care of our own registration */
+	if (parent) {
+		down_write(&parent->subsys.rwsem);
+		list_add_tail(&class_dev->node, &parent->children);
+		list_for_each(entry, &parent->interfaces) {
+			class_intf = container_of(entry, struct class_interface, node);
+			if (class_intf->add)
+				class_intf->add(class_dev);
+		}
+		up_write(&parent->subsys.rwsem);
+	}
+
+	class_device_dev_link(class_dev);
+
+ register_done:
+	if (error && parent)
+		class_put(parent);
+	class_device_put(class_dev);
+	return error;
+}
+
+int class_device_register(struct class_device *class_dev)
+{
+	class_device_initialize(class_dev);
+	return class_device_add(class_dev);
+}
+
+void class_device_del(struct class_device *class_dev)
+{
+	struct class * parent = class_dev->class;
+	struct class_interface * class_intf;
+	struct list_head * entry;
+
+	if (parent) {
+		down_write(&parent->subsys.rwsem);
+		list_del_init(&class_dev->node);
+		list_for_each(entry, &parent->interfaces) {
+			class_intf = container_of(entry, struct class_interface, node);
+			if (class_intf->remove)
+				class_intf->remove(class_dev);
+		}
+		up_write(&parent->subsys.rwsem);
+	}
+
+	if (class_dev->dev) {
+		class_device_dev_unlink(class_dev);
+		put_device(class_dev->dev);
+	}
+	
+	kobject_del(&class_dev->kobj);
+
+	if (parent)
+		class_put(parent);
+}
+
+void class_device_unregister(struct class_device *class_dev)
+{
+	pr_debug("CLASS: Unregistering class device. ID = '%s'\n",
+		 class_dev->class_id);
+	class_device_del(class_dev);
+	class_device_put(class_dev);
+}
+
+struct class_device * class_device_get(struct class_device *class_dev)
+{
+	if (class_dev)
+		return to_class_dev(kobject_get(&class_dev->kobj));
+	return NULL;
+}
+
+void class_device_put(struct class_device *class_dev)
+{
+	kobject_put(&class_dev->kobj);
+}
+
+
+int class_interface_register(struct class_interface *class_intf)
+{
+	struct class * parent;
+	struct class_device * class_dev;
+	struct list_head * entry;
+
+	if (!class_intf || !class_intf->class)
+		return -ENODEV;
+
+	parent = class_get(class_intf->class);
+	if (!parent)
+		return -EINVAL;
+
+	down_write(&parent->subsys.rwsem);
+	list_add_tail(&class_intf->node, &parent->interfaces);
+
+	if (class_intf->add) {
+		list_for_each(entry, &parent->children) {
+			class_dev = container_of(entry, struct class_device, node);
+			class_intf->add(class_dev);
+		}
+	}
+	up_write(&parent->subsys.rwsem);
 
 	return 0;
 }
 
-void devclass_unregister(struct device_class * cls)
+void class_interface_unregister(struct class_interface *class_intf)
 {
-	pr_debug("device class '%s': unregistering\n",cls->name);
-	kset_unregister(&cls->drivers);
-	kset_unregister(&cls->devices);
-	subsystem_unregister(&cls->subsys);
+	struct class * parent = class_intf->class;
+	struct list_head * entry;
+
+	if (!parent)
+		return;
+
+	down_write(&parent->subsys.rwsem);
+	list_del_init(&class_intf->node);
+
+	if (class_intf->remove) {
+		list_for_each(entry, &parent->children) {
+			struct class_device *class_dev = container_of(entry, struct class_device, node);
+			class_intf->remove(class_dev);
+		}
+	}
+	up_write(&parent->subsys.rwsem);
+
+	class_put(parent);
 }
+
+
 
 int __init classes_init(void)
 {
-	return subsystem_register(&class_subsys);
+	int retval;
+
+	retval = subsystem_register(&class_subsys);
+	if (retval)
+		return retval;
+
+	/* ick, this is ugly, the things we go through to keep from showing up
+	 * in sysfs... */
+	subsystem_init(&class_obj_subsys);
+	if (!class_obj_subsys.kset.subsys)
+			class_obj_subsys.kset.subsys = &class_obj_subsys;
+	return 0;
 }
 
-EXPORT_SYMBOL(devclass_create_file);
-EXPORT_SYMBOL(devclass_remove_file);
-EXPORT_SYMBOL(devclass_register);
-EXPORT_SYMBOL(devclass_unregister);
-EXPORT_SYMBOL(get_devclass);
-EXPORT_SYMBOL(put_devclass);
+EXPORT_SYMBOL(class_create_file);
+EXPORT_SYMBOL(class_remove_file);
+EXPORT_SYMBOL(class_register);
+EXPORT_SYMBOL(class_unregister);
+EXPORT_SYMBOL(class_get);
+EXPORT_SYMBOL(class_put);
 
+EXPORT_SYMBOL(class_device_register);
+EXPORT_SYMBOL(class_device_unregister);
+EXPORT_SYMBOL(class_device_initialize);
+EXPORT_SYMBOL(class_device_add);
+EXPORT_SYMBOL(class_device_del);
+EXPORT_SYMBOL(class_device_get);
+EXPORT_SYMBOL(class_device_put);
+EXPORT_SYMBOL(class_device_create_file);
+EXPORT_SYMBOL(class_device_remove_file);
+
+EXPORT_SYMBOL(class_interface_register);
+EXPORT_SYMBOL(class_interface_unregister);

@@ -380,7 +380,7 @@ static sctp_scope_t sctp_v4_scope(union sctp_addr *addr)
 
 /* Returns a valid dst cache entry for the given source and destination ip
  * addresses. If an association is passed, trys to get a dst entry with a
- * source adddress that matches an address in the bind address list.
+ * source address that matches an address in the bind address list.
  */
 struct dst_entry *sctp_v4_get_dst(struct sctp_association *asoc,
 				  union sctp_addr *daddr,

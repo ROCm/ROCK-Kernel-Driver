@@ -95,8 +95,9 @@ void mga_driver_irq_postinstall( drm_device_t *dev ) {
 void mga_driver_irq_uninstall( drm_device_t *dev ) {
   	drm_mga_private_t *dev_priv = 
 	   (drm_mga_private_t *)dev->dev_private;
-	if ( dev_priv ) {
-		/* Disable *all* interrupts */
-		MGA_WRITE( MGA_IEN, 0 );
-	}
+	if (!dev_priv)
+		return;
+
+	/* Disable *all* interrupts */
+	MGA_WRITE( MGA_IEN, 0 );
 }

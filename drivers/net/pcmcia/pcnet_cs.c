@@ -255,14 +255,6 @@ static void flush_stale_links(void)
     }
 }
 
-/*====================================================================*/
-
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-    error_info_t err = { func, ret };
-    CardServices(ReportError, handle, &err);
-}
-
 /*======================================================================
 
     We never need to do anything when a pcnet device is "initialized"

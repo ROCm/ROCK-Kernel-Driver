@@ -63,6 +63,12 @@
 #define __HAVE_COUNTER9		_DRM_STAT_SPECIAL
 #define __HAVE_COUNTER10	_DRM_STAT_MISSED
 
+/* Driver customization:
+ */
+#define DRIVER_PRETAKEDOWN() do {					\
+	gamma_do_cleanup_dma( dev );					\
+} while (0)
+
 /* DMA customization:
  */
 #define __HAVE_DMA			1

@@ -66,6 +66,8 @@ struct hpsb_host {
 
 	struct pci_dev *pdev;
 
+	int id;
+
 	struct device device;
 };
 

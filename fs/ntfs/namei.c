@@ -2,7 +2,7 @@
  * namei.c - NTFS kernel directory inode operations. Part of the Linux-NTFS
  * 	     project.
  *
- * Copyright (c) 2001,2002 Anton Altaparmakov.
+ * Copyright (c) 2001-2003 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -210,12 +210,12 @@ handle_name:
 			a = ctx->attr;
 			if (a->non_resident || a->flags)
 				goto eio_err_out;
-			val_len = le32_to_cpu(a->_ARA(value_length));
-			if (le16_to_cpu(a->_ARA(value_offset)) + val_len >
-					le32_to_cpu(a->length))
+			val_len = le32_to_cpu(a->data.resident.value_length);
+			if (le16_to_cpu(a->data.resident.value_offset) +
+					val_len > le32_to_cpu(a->length))
 				goto eio_err_out;
 			fn = (FILE_NAME_ATTR*)((u8*)ctx->attr + le16_to_cpu(
-					ctx->attr->_ARA(value_offset)));
+					ctx->attr->data.resident.value_offset));
 			if ((u32)(fn->file_name_length * sizeof(uchar_t) +
 					sizeof(FILE_NAME_ATTR)) > val_len)
 				goto eio_err_out;

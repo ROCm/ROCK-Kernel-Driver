@@ -298,7 +298,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 896 $ James Goodwin <jamesg@filanet.com>";
+	"$Rev: 912 $ James Goodwin <jamesg@filanet.com>";
 
 /*
  * Module load parameter definitions
@@ -311,15 +311,10 @@ static char version[] __devinitdata =
  * NOTE: On certain OHCI parts I have seen short packets on async transmit
  * (probably due to PCI latency/throughput issues with the part). You can
  * bump down the speed if you are running into problems.
- *
- * Valid values:
- * max_speed = 2 (default: max speed 400mb)
- * max_speed = 1 (max speed 200mb)
- * max_speed = 0 (max speed 100mb)
  */
-static int max_speed = SPEED_400;
+static int max_speed = SPEED_MAX;
 module_param(max_speed, int, 0644);
-MODULE_PARM_DESC(max_speed, "Force max speed (2 = 400mb default, 1 = 200mb, 0 = 100mb)");
+MODULE_PARM_DESC(max_speed, "Force max speed (3 = 800mb, 2 = 400mb default, 1 = 200mb, 0 = 100mb)");
 
 /*
  * Set serialize_io to 1 if you'd like only one scsi command sent
@@ -454,11 +449,8 @@ static void sbp2scsi_complete_command(struct scsi_id_instance_data *scsi_id,
 	
 static Scsi_Host_Template scsi_driver_template;
 
-static u8 sbp2_speedto_maxrec[] = { 0x7, 0x8, 0x9 };
-
-static struct hpsb_highlevel *sbp2_hl_handle = NULL;
-
-static struct hpsb_highlevel_ops sbp2_hl_ops = {
+static struct hpsb_highlevel sbp2_highlevel = {
+	.name =		SBP2_DEVICE_NAME,
 	.remove_host =	sbp2_remove_host,
 };
 
@@ -774,21 +766,22 @@ static struct sbp2_command_info *sbp2util_allocate_command_orb(
 /* Free our DMA's */
 static void sbp2util_free_command_dma(struct sbp2_command_info *command)
 {
-	struct sbp2scsi_host_info *hi;
+	struct hpsb_host *host;
 
-	hi = hpsb_get_hostinfo_bykey(sbp2_hl_handle, (unsigned long)command->Current_SCpnt->device->host);
-	if (!hi) {
-		printk(KERN_ERR "%s: hi == NULL\n", __FUNCTION__);
+	host = hpsb_get_host_bykey(&sbp2_highlevel,
+			(unsigned long)command->Current_SCpnt->device->host);
+	if (!host) {
+		printk(KERN_ERR "%s: host == NULL\n", __FUNCTION__);
 		return;
 	}
 
 	if (command->cmd_dma) {
 		if (command->dma_type == CMD_DMA_SINGLE) {
-			pci_unmap_single(hi->host->pdev, command->cmd_dma,
+			pci_unmap_single(host->pdev, command->cmd_dma,
 					 command->dma_size, command->dma_dir);
 			SBP2_DMA_FREE("single bulk");
 		} else if (command->dma_type == CMD_DMA_PAGE) {
-			pci_unmap_page(hi->host->pdev, command->cmd_dma,
+			pci_unmap_page(host->pdev, command->cmd_dma,
 				       command->dma_size, command->dma_dir);
 			SBP2_DMA_FREE("single page");
 		} /* XXX: Check for CMD_DMA_NONE bug */
@@ -797,7 +790,7 @@ static void sbp2util_free_command_dma(struct sbp2_command_info *command)
 	}
 
 	if (command->sge_buffer) {
-		pci_unmap_sg(hi->host->pdev, command->sge_buffer,
+		pci_unmap_sg(host->pdev, command->sge_buffer,
 			     command->dma_size, command->dma_dir);
 		SBP2_DMA_FREE("scatter list");
 		command->sge_buffer = NULL;
@@ -910,7 +903,7 @@ static struct sbp2scsi_host_info *sbp2_add_host(struct hpsb_host *host)
 
 	SBP2_DEBUG("sbp2_add_host");
 
-	hi = hpsb_get_hostinfo(sbp2_hl_handle, host);
+	hi = hpsb_get_hostinfo(&sbp2_highlevel, host);
 	if (hi)
 		return hi;
 
@@ -921,13 +914,13 @@ static struct sbp2scsi_host_info *sbp2_add_host(struct hpsb_host *host)
 		return NULL;
 	}
 
-	hi = hpsb_create_hostinfo(sbp2_hl_handle, host, sizeof(*hi));
+	hi = hpsb_create_hostinfo(&sbp2_highlevel, host, sizeof(*hi));
 	if (!hi) {
 		SBP2_ERR("failed to allocate hostinfo");
 		scsi_unregister(hi->scsi_host);
 	}
 
-	hpsb_set_hostinfo_key(sbp2_hl_handle, host, (unsigned long)scsi_host);
+	hpsb_set_hostinfo_key(&sbp2_highlevel, host, (unsigned long)scsi_host);
 
 	hi->scsi_host = scsi_host;
 	hi->host = host;
@@ -941,7 +934,7 @@ static struct sbp2scsi_host_info *sbp2_add_host(struct hpsb_host *host)
 	if (scsi_add_host(hi->scsi_host, NULL)) {
 		SBP2_ERR("failed to add scsi host");
 		scsi_unregister(hi->scsi_host);
-		hpsb_destroy_hostinfo(sbp2_hl_handle, host);
+		hpsb_destroy_hostinfo(&sbp2_highlevel, host);
 	}
 
 	return hi;
@@ -957,13 +950,12 @@ static void sbp2_remove_host(struct hpsb_host *host)
 
 	SBP2_DEBUG("sbp2_remove_host");
 
-	hi = hpsb_get_hostinfo(sbp2_hl_handle, host);
+	hi = hpsb_get_hostinfo(&sbp2_highlevel, host);
 
 	if (hi) {
 		scsi_remove_host(hi->scsi_host);
 		scsi_unregister(hi->scsi_host);
-	} else
-		SBP2_ERR("attempt to remove unknown host %p", host);
+	}
 }
 
 /*
@@ -1092,7 +1084,7 @@ alloc_fail_first:
 	scsi_id->ne = ne;
 	scsi_id->ud = ud;
 	scsi_id->speed_code = SPEED_100;
-	scsi_id->max_payload_size = sbp2_speedto_maxrec[SPEED_100];
+	scsi_id->max_payload_size = hpsb_speedto_maxrec[SPEED_100];
 	ud->device.driver_data = scsi_id;
 
 	atomic_set(&scsi_id->sbp2_login_complete, 0);
@@ -1854,7 +1846,7 @@ static int sbp2_max_speed_and_size(struct scsi_id_instance_data *scsi_id)
 
 	/* Payload size is the lesser of what our speed supports and what
 	 * our host supports.  */
-	scsi_id->max_payload_size = min(sbp2_speedto_maxrec[scsi_id->speed_code],
+	scsi_id->max_payload_size = min(hpsb_speedto_maxrec[scsi_id->speed_code],
 					(u8)(((be32_to_cpu(hi->host->csr.rom[2]) >> 12) & 0xf) - 1));
 
 	SBP2_ERR("Node[" NODE_BUS_FMT "]: Max speed [%s] - Max payload [%u]",
@@ -2565,7 +2557,7 @@ static int sbp2_handle_status_write(struct hpsb_host *host, int nodeid, int dest
 		return(RCODE_ADDRESS_ERROR);
 	}
 
-	hi = hpsb_get_hostinfo(sbp2_hl_handle, host);
+	hi = hpsb_get_hostinfo(&sbp2_highlevel, host);
 
 	if (!hi) {
 		SBP2_ERR("host info is NULL - this is bad!");
@@ -2712,7 +2704,7 @@ static int sbp2scsi_queuecommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	/*
 	 * Pull our host info and scsi id instance data from the scsi command
 	 */
-	hi = hpsb_get_hostinfo_bykey(sbp2_hl_handle, (unsigned long)SCpnt->device->host);
+	hi = hpsb_get_hostinfo_bykey(&sbp2_highlevel, (unsigned long)SCpnt->device->host);
 
 	if (!hi) {
 		SBP2_ERR("sbp2scsi_host_info is NULL - this is bad!");
@@ -2941,7 +2933,7 @@ static void sbp2scsi_complete_command(struct scsi_id_instance_data *scsi_id,
  */
 static int sbp2scsi_abort (Scsi_Cmnd *SCpnt) 
 {
-	struct sbp2scsi_host_info *hi = hpsb_get_hostinfo_bykey(sbp2_hl_handle,
+	struct sbp2scsi_host_info *hi = hpsb_get_hostinfo_bykey(&sbp2_highlevel,
 								(unsigned long)SCpnt->device->host);
 	struct scsi_id_instance_data *scsi_id = hi->scsi_id[SCpnt->device->id];
 	struct sbp2_command_info *command;
@@ -2992,7 +2984,7 @@ static int sbp2scsi_abort (Scsi_Cmnd *SCpnt)
  */
 static int sbp2scsi_reset (Scsi_Cmnd *SCpnt) 
 {
-	struct sbp2scsi_host_info *hi = hpsb_get_hostinfo_bykey(sbp2_hl_handle,
+	struct sbp2scsi_host_info *hi = hpsb_get_hostinfo_bykey(&sbp2_highlevel,
 								(unsigned long)SCpnt->device->host);
 	struct scsi_id_instance_data *scsi_id = hi->scsi_id[SCpnt->device->id];
 
@@ -3019,24 +3011,24 @@ static int sbp2scsi_proc_info(char *buffer, char **start, off_t offset,
 			      int length, int hostno, int inout)
 {
 	Scsi_Device *scd;
-	struct Scsi_Host *host;
-	struct sbp2scsi_host_info *hi;
+	struct Scsi_Host *scsi_host;
+	struct hpsb_host *host;
 	char *pos = buffer;
 
 	/* if someone is sending us data, just throw it away */
 	if (inout)
 		return length;
 
-	host = scsi_host_hn_get(hostno);
-	if (!host)  /* if we couldn't find it, we return an error */
+	scsi_host = scsi_host_hn_get(hostno);
+	if (!scsi_host)  /* if we couldn't find it, we return an error */
 		return -ESRCH;
 
-	hi = hpsb_get_hostinfo_bykey(sbp2_hl_handle, (unsigned long)host);
-	if (!hi) /* shouldn't happen, but... */
+	host = hpsb_get_host_bykey(&sbp2_highlevel, (unsigned long)scsi_host);
+	if (!host) /* shouldn't happen, but... */
 		return -ESRCH;
 
 	SPRINTF("Host scsi%d             : SBP-2 IEEE-1394 (%s)\n", hostno,
-		hi->host->driver->name);
+		host->driver->name);
 	SPRINTF("Driver version         : %s\n", version);
 
 	SPRINTF("\nModule options         :\n");
@@ -3045,10 +3037,10 @@ static int sbp2scsi_proc_info(char *buffer, char **start, off_t offset,
 	SPRINTF("  serialize_io         : %s\n", serialize_io ? "yes" : "no");
 	SPRINTF("  exclusive_login      : %s\n", exclusive_login ? "yes" : "no");
 
-	SPRINTF("\nAttached devices       : %s\n", !list_empty(&host->my_devices) ?
+	SPRINTF("\nAttached devices       : %s\n", !list_empty(&scsi_host->my_devices) ?
 		"" : "none");
 
-	list_for_each_entry (scd, &host->my_devices, siblings) {
+	list_for_each_entry (scd, &scsi_host->my_devices, siblings) {
 		int i;
 
 		SPRINTF("  [Channel: %02d, Id: %02d, Lun: %02d]  ", scd->channel,
@@ -3070,7 +3062,7 @@ static int sbp2scsi_proc_info(char *buffer, char **start, off_t offset,
 	SPRINTF("\n");
 
 	/* release the reference count on this host */
-	scsi_host_put(host);
+	scsi_host_put(scsi_host);
 	/* Calculate start of next buffer, and return value. */
 	*start = buffer + offset;
 
@@ -3112,49 +3104,33 @@ static int sbp2_module_init(void)
 {
 	SBP2_DEBUG("sbp2_module_init");
 
-	/* Module load debug option to force one command at a time
-	 * (serializing I/O) */
+	/* Module load debug option to force one command at a time (serializing I/O) */
 	if (serialize_io) {
 		SBP2_ERR("Driver forced to serialize I/O (serialize_io = 1)");
 		scsi_driver_template.can_queue = 1;
 		scsi_driver_template.cmd_per_lun = 1;
 	}
 
-	/* 
-	 * Set max sectors (module load option). Default is 255 sectors. 
-	 */
+	/* Set max sectors (module load option). Default is 255 sectors. */
 	scsi_driver_template.max_sectors = max_sectors;
 
 
-	/*
-	 * Register our high level driver with 1394 stack
-	 */
-	sbp2_hl_handle = hpsb_register_highlevel(SBP2_DEVICE_NAME,
-						 &sbp2_hl_ops);
-	if (!sbp2_hl_handle) {
-		SBP2_ERR("sbp2 failed to register with ieee1394 highlevel");
-		return(-ENOMEM);
-	}
+	/* Register our high level driver with 1394 stack */
+	hpsb_register_highlevel(&sbp2_highlevel);
 
-	/*
-	 * Register our sbp2 status address space...
-	 */
-	hpsb_register_addrspace(sbp2_hl_handle, &sbp2_ops,
-				SBP2_STATUS_FIFO_ADDRESS,
+	/* Register our sbp2 status address space... */
+	hpsb_register_addrspace(&sbp2_highlevel, &sbp2_ops, SBP2_STATUS_FIFO_ADDRESS,
 				SBP2_STATUS_FIFO_ADDRESS + 
-				SBP2_STATUS_FIFO_ENTRY_TO_OFFSET(
-					SBP2SCSI_MAX_SCSI_IDS+1));
+				SBP2_STATUS_FIFO_ENTRY_TO_OFFSET(SBP2SCSI_MAX_SCSI_IDS+1));
 
-	/*
-	 * Handle data movement if physical dma is not enabled/supported
-	 * on host controller
-	 */
+	/* Handle data movement if physical dma is not enabled/supported
+	 * on host controller */
 #ifdef CONFIG_IEEE1394_SBP2_PHYS_DMA
-	hpsb_register_addrspace(sbp2_hl_handle, &sbp2_physdma_ops,
-			0x0ULL, 0xfffffffcULL);
+	hpsb_register_addrspace(&sbp2_highlevel, &sbp2_physdma_ops, 0x0ULL, 0xfffffffcULL);
 #endif
 
 	hpsb_register_protocol(&sbp2_driver);
+
 	return 0;
 }
 
@@ -3163,8 +3139,8 @@ static void __exit sbp2_module_exit(void)
 	SBP2_DEBUG("sbp2_module_exit");
 
 	hpsb_unregister_protocol(&sbp2_driver);
-	if (sbp2_hl_handle)
-		hpsb_unregister_highlevel(sbp2_hl_handle);
+
+	hpsb_unregister_highlevel(&sbp2_highlevel);
 }
 
 module_init(sbp2_module_init);

@@ -247,7 +247,7 @@ static void tc574_reset(struct net_device *dev);
 static void media_check(unsigned long arg);
 static int el3_open(struct net_device *dev);
 static int el3_start_xmit(struct sk_buff *skb, struct net_device *dev);
-static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t el3_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void update_stats(struct net_device *dev);
 static struct net_device_stats *el3_get_stats(struct net_device *dev);
 static int el3_rx(struct net_device *dev, int worklimit);
@@ -271,16 +271,6 @@ static void flush_stale_links(void)
 		if (link->state & DEV_STALE_LINK)
 			tc574_detach(link);
 	}
-}
-
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-#if CS_RELEASE_CODE < 0x2911
-	CardServices(ReportError, dev_info, (void *)func, (void *)ret);
-#else
-	error_info_t err = { func, ret };
-	CardServices(ReportError, handle, &err);
-#endif
 }
 
 /*
@@ -947,15 +937,16 @@ static int el3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 }
 
 /* The EL3 interrupt handler. */
-static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct el3_private *lp = dev_id;
 	struct net_device *dev = &lp->dev;
 	ioaddr_t ioaddr, status;
 	int work_budget = max_interrupt_work;
+	int handled = 0;
 
 	if (!netif_device_present(dev))
-		return;
+		return IRQ_NONE;
 	ioaddr = dev->base_addr;
 
 	DEBUG(3, "%s: interrupt, status %4.4x.\n",
@@ -970,6 +961,8 @@ static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			DEBUG(1, "%s: Interrupt from dead card\n", dev->name);
 			break;
 		}
+
+		handled = 1;
 
 		if (status & RxComplete)
 			work_budget = el3_rx(dev, work_budget);
@@ -1029,7 +1022,7 @@ static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		  dev->name, inw(ioaddr + EL3_STATUS));
 		  
 	spin_unlock(&lp->window_lock);
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 /*
@@ -1336,37 +1329,26 @@ static int el3_close(struct net_device *dev)
 	return 0;
 }
 
-static int __init init_3c574_cs(void)
-{
-	servinfo_t serv;
+static struct pcmcia_driver tc574_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "3c574_cs",
+	},
+	.attach		= tc574_attach,
+	.detach		= tc574_detach,
+};
 
-	DEBUG(0, "%s\n", version);
-	CardServices(GetCardServicesInfo, &serv);
-	if (serv.Revision != CS_RELEASE_CODE) {
-		printk(KERN_NOTICE "3c574_cs: Card Services release "
-			   "does not match!\n");
-		return -1;
-	}
-	register_pccard_driver(&dev_info, &tc574_attach, &tc574_detach);
-	return 0;
+static int __init init_tc574(void)
+{
+	return pcmcia_register_driver(&tc574_driver);
 }
 
-static void __exit exit_3c574_cs(void)
+static void __exit exit_tc574(void)
 {
-	DEBUG(0, "3c574_cs: unloading\n");
-	unregister_pccard_driver(&dev_info);
+	pcmcia_unregister_driver(&tc574_driver);
 	while (dev_list != NULL)
 		tc574_detach(dev_list);
 }
 
-module_init(init_3c574_cs);
-module_exit(exit_3c574_cs);
-
-/*
- * Local variables:
- *  compile-command: "make 3c574_cs.o"
- *  c-indent-level: 4
- *  c-basic-offset: 4
- *  tab-width: 4
- * End:
- */
+module_init(init_tc574);
+module_exit(exit_tc574);

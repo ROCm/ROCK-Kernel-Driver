@@ -557,6 +557,7 @@ static void
 refill_inactive_zone(struct zone *zone, const int nr_pages_in,
 			struct page_state *ps, int priority)
 {
+	int pgmoved;
 	int pgdeactivate = 0;
 	int nr_pages = nr_pages_in;
 	LIST_HEAD(l_hold);	/* The pages which were snipped off */
@@ -570,6 +571,7 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
 	long swap_tendency;
 
 	lru_add_drain();
+	pgmoved = 0;
 	spin_lock_irq(&zone->lru_lock);
 	while (nr_pages && !list_empty(&zone->active_list)) {
 		page = list_entry(zone->active_list.prev, struct page, lru);
@@ -584,9 +586,11 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
 		} else {
 			page_cache_get(page);
 			list_add(&page->lru, &l_hold);
+			pgmoved++;
 		}
 		nr_pages--;
 	}
+	zone->nr_active -= pgmoved;
 	spin_unlock_irq(&zone->lru_lock);
 
 	/*
@@ -646,10 +650,10 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
 			continue;
 		}
 		list_add(&page->lru, &l_inactive);
-		pgdeactivate++;
 	}
 
 	pagevec_init(&pvec, 1);
+	pgmoved = 0;
 	spin_lock_irq(&zone->lru_lock);
 	while (!list_empty(&l_inactive)) {
 		page = list_entry(l_inactive.prev, struct page, lru);
@@ -659,19 +663,27 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
 		if (!TestClearPageActive(page))
 			BUG();
 		list_move(&page->lru, &zone->inactive_list);
+		pgmoved++;
 		if (!pagevec_add(&pvec, page)) {
+			zone->nr_inactive += pgmoved;
 			spin_unlock_irq(&zone->lru_lock);
+			pgdeactivate += pgmoved;
+			pgmoved = 0;
 			if (buffer_heads_over_limit)
 				pagevec_strip(&pvec);
 			__pagevec_release(&pvec);
 			spin_lock_irq(&zone->lru_lock);
 		}
 	}
+	zone->nr_inactive += pgmoved;
+	pgdeactivate += pgmoved;
 	if (buffer_heads_over_limit) {
 		spin_unlock_irq(&zone->lru_lock);
 		pagevec_strip(&pvec);
 		spin_lock_irq(&zone->lru_lock);
 	}
+
+	pgmoved = 0;
 	while (!list_empty(&l_active)) {
 		page = list_entry(l_active.prev, struct page, lru);
 		prefetchw_prev_lru_page(page, &l_active, flags);
@@ -679,14 +691,16 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
 			BUG();
 		BUG_ON(!PageActive(page));
 		list_move(&page->lru, &zone->active_list);
+		pgmoved++;
 		if (!pagevec_add(&pvec, page)) {
+			zone->nr_active += pgmoved;
+			pgmoved = 0;
 			spin_unlock_irq(&zone->lru_lock);
 			__pagevec_release(&pvec);
 			spin_lock_irq(&zone->lru_lock);
 		}
 	}
-	zone->nr_active -= pgdeactivate;
-	zone->nr_inactive += pgdeactivate;
+	zone->nr_active += pgmoved;
 	spin_unlock_irq(&zone->lru_lock);
 	pagevec_release(&pvec);
 

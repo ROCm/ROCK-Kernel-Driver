@@ -46,43 +46,126 @@
 #include "DAC960.h"
 
 
-/*
-  DAC960_ControllerCount is the number of DAC960 Controllers detected.
-*/
-
-static int
-  DAC960_ControllerCount =			0;
-
-/*
-  DAC960_Controllers is an array of pointers to the DAC960 Controller
-  structures.
-*/
-
-static DAC960_Controller_T
-  *DAC960_Controllers[DAC960_MaxControllers] =	{ NULL };
+static DAC960_Controller_T *DAC960_Controllers[DAC960_MaxControllers];
+static int DAC960_ControllerCount;
+static PROC_DirectoryEntry_T *DAC960_ProcDirectoryEntry;
 
 
-static int DAC960_revalidate(struct gendisk *);
-/*
-  DAC960_BlockDeviceOperations is the Block Device Operations structure for
-  DAC960 Logical Disk Devices.
-*/
+static long disk_size(DAC960_Controller_T *p, int drive_nr)
+{
+	if (p->FirmwareType == DAC960_V1_Controller) {
+		if (drive_nr >= p->LogicalDriveCount)
+			return 0;
+		return p->V1.LogicalDriveInformation[drive_nr].
+			LogicalDriveSize;
+	} else {
+		DAC960_V2_LogicalDeviceInfo_T *i =
+			p->V2.LogicalDeviceInformation[drive_nr];
+		if (i == NULL)
+			return 0;
+		return i->ConfigurableDeviceSize;
+	}
+}
+
+static int DAC960_open(struct inode *inode, struct file *file)
+{
+	struct gendisk *disk = inode->i_bdev->bd_disk;
+	DAC960_Controller_T *p = disk->queue->queuedata;
+	int drive_nr = (int)disk->private_data;
+
+	/* bad hack for the "user" ioctls */
+	if (!p->ControllerNumber && !drive_nr && (file->f_flags & O_NONBLOCK))
+		return 0;
+
+	if (p->FirmwareType == DAC960_V1_Controller) {
+		if (p->V1.LogicalDriveInformation[drive_nr].
+		    LogicalDriveState == DAC960_V1_LogicalDrive_Offline)
+			return -ENXIO;
+	} else {
+		DAC960_V2_LogicalDeviceInfo_T *i =
+			p->V2.LogicalDeviceInformation[drive_nr];
+		if (i->LogicalDeviceState == DAC960_V2_LogicalDevice_Offline)
+			return -ENXIO;
+	}
+
+	check_disk_change(inode->i_bdev);
+
+	if (!get_capacity(p->disks[drive_nr]))
+		return -ENXIO;
+	return 0;
+}
+
+static int DAC960_ioctl(struct inode *inode, struct file *file,
+			unsigned int cmd, unsigned long arg)
+{
+	struct gendisk *disk = inode->i_bdev->bd_disk;
+	DAC960_Controller_T *p = disk->queue->queuedata;
+	int drive_nr = (int)disk->private_data;
+	struct hd_geometry g, *loc = (struct hd_geometry *)arg;
+
+	if (file->f_flags & O_NONBLOCK)
+		return DAC960_UserIOCTL(inode, file, cmd, arg);
+
+	if (cmd != HDIO_GETGEO || !loc)
+		return -EINVAL;
+
+	if (p->FirmwareType == DAC960_V1_Controller) {
+		g.heads = p->V1.GeometryTranslationHeads;
+		g.sectors = p->V1.GeometryTranslationSectors;
+		g.cylinders = p->V1.LogicalDriveInformation[drive_nr].
+			LogicalDriveSize / (g.heads * g.sectors);
+	} else {
+		DAC960_V2_LogicalDeviceInfo_T *i =
+			p->V2.LogicalDeviceInformation[drive_nr];
+		switch (i->DriveGeometry) {
+		case DAC960_V2_Geometry_128_32:
+			g.heads = 128;
+			g.sectors = 32;
+			break;
+		case DAC960_V2_Geometry_255_63:
+			g.heads = 255;
+			g.sectors = 63;
+			break;
+		default:
+			DAC960_Error("Illegal Logical Device Geometry %d\n",
+					p, i->DriveGeometry);
+			return -EINVAL;
+		}
+
+		g.cylinders = i->ConfigurableDeviceSize / (g.heads * g.sectors);
+	}
+	
+	g.start = get_start_sect(inode->i_bdev);
+
+	return copy_to_user(loc, &g, sizeof g) ? -EFAULT : 0; 
+}
+
+static int DAC960_media_changed(struct gendisk *disk)
+{
+	DAC960_Controller_T *p = disk->queue->queuedata;
+	int drive_nr = (int)disk->private_data;
+
+	if (!p->LogicalDriveInitiallyAccessible[drive_nr])
+		return 1;
+	return 0;
+}
+
+static int DAC960_revalidate_disk(struct gendisk *disk)
+{
+	DAC960_Controller_T *p = disk->queue->queuedata;
+	int unit = (int)disk->private_data;
+
+	set_capacity(disk, disk_size(p, unit));
+	return 0;
+}
 
 static struct block_device_operations DAC960_BlockDeviceOperations = {
-	.owner		=THIS_MODULE,
-	.open		=DAC960_Open,
-	.release	=DAC960_Release,
-	.ioctl		=DAC960_IOCTL,
-	.revalidate_disk=DAC960_revalidate,
+	.owner			= THIS_MODULE,
+	.open			= DAC960_open,
+	.ioctl			= DAC960_ioctl,
+	.media_changed		= DAC960_media_changed,
+	.revalidate_disk	= DAC960_revalidate_disk,
 };
-
-
-/*
-  DAC960_ProcDirectoryEntry is the DAC960 /proc/rd directory entry.
-*/
-
-static PROC_DirectoryEntry_T
-  *DAC960_ProcDirectoryEntry;
 
 
 /*
@@ -2433,21 +2516,6 @@ static void DAC960_UnregisterBlockDevice(DAC960_Controller_T *Controller)
   blk_cleanup_queue(&Controller->RequestQueue);
 }
 
-static long disk_size(DAC960_Controller_T *Controller, int disk)
-{
-	if (Controller->FirmwareType == DAC960_V1_Controller) {
-		if (disk >= Controller->LogicalDriveCount)
-			return 0;
-		return Controller->V1.LogicalDriveInformation[disk].LogicalDriveSize;
-	} else {
-		DAC960_V2_LogicalDeviceInfo_T *LogicalDeviceInfo =
-			Controller->V2.LogicalDeviceInformation[disk];
-		if (LogicalDeviceInfo == NULL)
-			return 0;
-		return LogicalDeviceInfo->ConfigurableDeviceSize;
-	}
-}
-
 /*
   DAC960_ComputeGenericDiskInfo computes the values for the Generic Disk
   Information Partition Sector Counts and Block Sizes.
@@ -2458,14 +2526,6 @@ static void DAC960_ComputeGenericDiskInfo(DAC960_Controller_T *Controller)
 	int disk;
 	for (disk = 0; disk < DAC960_MaxLogicalDrives; disk++)
 		set_capacity(Controller->disks[disk], disk_size(Controller, disk));
-}
-
-static int DAC960_revalidate(struct gendisk *disk)
-{
-	DAC960_Controller_T *p = disk->queue->queuedata;
-	int unit = (int)disk->private_data;
-	set_capacity(disk, disk_size(p, unit));
-	return 0;
 }
 
 /*
@@ -5574,151 +5634,6 @@ static void DAC960_MonitoringTimerFunction(unsigned long TimerData)
       wake_up(&Controller->HealthStatusWaitQueue);
     }
 }
-
-
-/*
-  DAC960_Open is the Device Open Function for the DAC960 Driver.
-*/
-
-static int DAC960_Open(Inode_T *Inode, File_T *File)
-{
-  int ControllerNumber = DAC960_ControllerNumber(Inode->i_rdev);
-  int LogicalDriveNumber = DAC960_LogicalDriveNumber(Inode->i_rdev);
-  DAC960_Controller_T *Controller;
-  if (ControllerNumber == 0 && LogicalDriveNumber == 0 &&
-      (File->f_flags & O_NONBLOCK))
-    goto ModuleOnly;
-  if (ControllerNumber < 0 || ControllerNumber > DAC960_ControllerCount - 1)
-    return -ENXIO;
-  Controller = DAC960_Controllers[ControllerNumber];
-  if (Controller == NULL) return -ENXIO;
-  if (Controller->FirmwareType == DAC960_V1_Controller)
-    {
-      if (LogicalDriveNumber > Controller->LogicalDriveCount - 1)
-	return -ENXIO;
-      if (Controller->V1.LogicalDriveInformation
-			 [LogicalDriveNumber].LogicalDriveState
-	  == DAC960_V1_LogicalDrive_Offline)
-	return -ENXIO;
-    }
-  else
-    {
-      DAC960_V2_LogicalDeviceInfo_T *LogicalDeviceInfo =
-	Controller->V2.LogicalDeviceInformation[LogicalDriveNumber];
-      if (LogicalDeviceInfo == NULL ||
-	  LogicalDeviceInfo->LogicalDeviceState
-	  == DAC960_V2_LogicalDevice_Offline)
-	return -ENXIO;
-    }
-  if (!Controller->LogicalDriveInitiallyAccessible[LogicalDriveNumber])
-    {
-      long size;
-      Controller->LogicalDriveInitiallyAccessible[LogicalDriveNumber] = true;
-      size = disk_size(Controller, LogicalDriveNumber);
-      set_capacity(Controller->disks[LogicalDriveNumber], size);
-      Inode->i_bdev->bd_invalidated = 1;
-    }
-  if (!get_capacity(Controller->disks[LogicalDriveNumber]))
-    return -ENXIO;
-  /*
-    Increment Controller and Logical Drive Usage Counts.
-  */
-  Controller->ControllerUsageCount++;
-  Controller->LogicalDriveUsageCount[LogicalDriveNumber]++;
- ModuleOnly:
-  return 0;
-}
-
-
-/*
-  DAC960_Release is the Device Release Function for the DAC960 Driver.
-*/
-
-static int DAC960_Release(Inode_T *Inode, File_T *File)
-{
-  int ControllerNumber = DAC960_ControllerNumber(Inode->i_rdev);
-  int LogicalDriveNumber = DAC960_LogicalDriveNumber(Inode->i_rdev);
-  DAC960_Controller_T *Controller = DAC960_Controllers[ControllerNumber];
-  if (ControllerNumber == 0 && LogicalDriveNumber == 0 &&
-      File != NULL && (File->f_flags & O_NONBLOCK))
-    goto ModuleOnly;
-  /*
-    Decrement the Logical Drive and Controller Usage Counts.
-  */
-  Controller->LogicalDriveUsageCount[LogicalDriveNumber]--;
-  Controller->ControllerUsageCount--;
- ModuleOnly:
-  return 0;
-}
-
-
-/*
-  DAC960_IOCTL is the Device IOCTL Function for the DAC960 Driver.
-*/
-
-static int DAC960_IOCTL(Inode_T *Inode, File_T *File,
-			unsigned int Request, unsigned long Argument)
-{
-  int ControllerNumber = DAC960_ControllerNumber(Inode->i_rdev);
-  int LogicalDriveNumber = DAC960_LogicalDriveNumber(Inode->i_rdev);
-  DiskGeometry_T Geometry, *UserGeometry;
-  DAC960_Controller_T *Controller;
-
-  if (File != NULL && (File->f_flags & O_NONBLOCK))
-    return DAC960_UserIOCTL(Inode, File, Request, Argument);
-  if (ControllerNumber < 0 || ControllerNumber > DAC960_ControllerCount - 1)
-    return -ENXIO;
-  Controller = DAC960_Controllers[ControllerNumber];
-  if (Controller == NULL) return -ENXIO;
-  switch (Request)
-    {
-    case HDIO_GETGEO:
-      /* Get BIOS Disk Geometry. */
-      UserGeometry = (DiskGeometry_T *) Argument;
-      if (UserGeometry == NULL) return -EINVAL;
-      if (Controller->FirmwareType == DAC960_V1_Controller)
-	{
-	  if (LogicalDriveNumber > Controller->LogicalDriveCount - 1)
-	    return -ENXIO;
-	  Geometry.heads = Controller->V1.GeometryTranslationHeads;
-	  Geometry.sectors = Controller->V1.GeometryTranslationSectors;
-	  Geometry.cylinders =
-	    Controller->V1.LogicalDriveInformation[LogicalDriveNumber]
-						  .LogicalDriveSize
-	    / (Geometry.heads * Geometry.sectors);
-	}
-      else
-	{
-	  DAC960_V2_LogicalDeviceInfo_T *LogicalDeviceInfo =
-	    Controller->V2.LogicalDeviceInformation[LogicalDriveNumber];
-	  if (LogicalDeviceInfo == NULL)
-	    return -EINVAL;
-	  switch (LogicalDeviceInfo->DriveGeometry)
-	    {
-	    case DAC960_V2_Geometry_128_32:
-	      Geometry.heads = 128;
-	      Geometry.sectors = 32;
-	      break;
-	    case DAC960_V2_Geometry_255_63:
-	      Geometry.heads = 255;
-	      Geometry.sectors = 63;
-	      break;
-	    default:
-	      DAC960_Error("Illegal Logical Device Geometry %d\n",
-			   Controller, LogicalDeviceInfo->DriveGeometry);
-	      return -EINVAL;
-	    }
-	  Geometry.cylinders =
-	    LogicalDeviceInfo->ConfigurableDeviceSize
-	    / (Geometry.heads * Geometry.sectors);
-	}
-      Geometry.start = get_start_sect(Inode->i_bdev);
-      return (copy_to_user(UserGeometry, &Geometry,
-			   sizeof(DiskGeometry_T)) ? -EFAULT : 0);
-    }
-  return -EINVAL;
-}
-
 
 /*
   DAC960_UserIOCTL is the User IOCTL Function for the DAC960 Driver.

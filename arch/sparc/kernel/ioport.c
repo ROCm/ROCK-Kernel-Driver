@@ -62,13 +62,6 @@ static struct resource _sparc_dvma = {
 };
 
 /*
- * BTFIXUP would do as well but it seems overkill for the case.
- */
-static void (*_sparc_mapioaddr)(unsigned long pa, unsigned long va,
-    int bus, int ro);
-static void (*_sparc_unmapioaddr)(unsigned long va);
-
-/*
  * Our mini-allocator...
  * Boy this is gross! We need it because we must map I/O for
  * timers and interrupt controller before the kmalloc is available.
@@ -201,8 +194,6 @@ static void *
 _sparc_ioremap(struct resource *res, u32 bus, u32 pa, int sz)
 {
 	unsigned long offset = ((unsigned long) pa) & (~PAGE_MASK);
-	unsigned long va;
-	unsigned int psz;
 
 	if (allocate_resource(&sparc_iomap, res,
 	    (offset + sz + PAGE_SIZE-1) & PAGE_MASK,
@@ -213,27 +204,10 @@ _sparc_ioremap(struct resource *res, u32 bus, u32 pa, int sz)
 		prom_halt();
 	}
 
-	va = res->start;
 	pa &= PAGE_MASK;
-	for (psz = res->end - res->start + 1; psz != 0; psz -= PAGE_SIZE) {
-		(*_sparc_mapioaddr)(pa, va, bus, 0);
-		va += PAGE_SIZE;
-		pa += PAGE_SIZE;
-	}
+	sparc_mapiorange(bus, pa, res->start, res->end - res->start + 1);
 
-	/*
-	 * XXX Playing with implementation details here.
-	 * On sparc64 Ebus has resources with precise boundaries.
-	 * We share drivers with sparc64. Too clever drivers use
-	 * start of a resource instead of a base address.
-	 *
-	 * XXX-2 This may be not valid anymore, clean when
-	 * interface to sbus_ioremap() is resolved.
-	 */
-	res->start += offset;
-	res->end = res->start + sz - 1;		/* not strictly necessary.. */
-
-	return (void *) res->start;
+	return (void *) (res->start + offset);
 }
 
 /*
@@ -244,12 +218,8 @@ static void _sparc_free_io(struct resource *res)
 	unsigned long plen;
 
 	plen = res->end - res->start + 1;
-	plen = (plen + PAGE_SIZE-1) & PAGE_MASK;
-	while (plen != 0) {
-		plen -= PAGE_SIZE;
-		(*_sparc_unmapioaddr)(res->start + plen);
-	}
-
+	if ((plen & (PAGE_SIZE-1)) != 0) BUG();
+	sparc_unmapiorange(res->start, plen);
 	release_resource(res);
 }
 
@@ -283,40 +253,44 @@ void *sbus_alloc_consistent(struct sbus_dev *sdev, long len, u32 *dma_addrp)
 	}
 
 	order = get_order(len_total);
-	va = __get_free_pages(GFP_KERNEL, order);
-	if (va == 0) {
-		/*
-		 * printk here may be flooding... Consider removal XXX.
-		 */
-		printk("sbus_alloc_consistent: no %ld pages\n", len_total>>PAGE_SHIFT);
-		return NULL;
-	}
+	if ((va = __get_free_pages(GFP_KERNEL, order)) == 0)
+		goto err_nopages;
 
-	if ((res = kmalloc(sizeof(struct resource), GFP_KERNEL)) == NULL) {
-		free_pages(va, order);
-		printk("sbus_alloc_consistent: no core\n");
-		return NULL;
-	}
+	if ((res = kmalloc(sizeof(struct resource), GFP_KERNEL)) == NULL)
+		goto err_nomem;
 	memset((char*)res, 0, sizeof(struct resource));
 
 	if (allocate_resource(&_sparc_dvma, res, len_total,
 	    _sparc_dvma.start, _sparc_dvma.end, PAGE_SIZE, NULL, NULL) != 0) {
 		printk("sbus_alloc_consistent: cannot occupy 0x%lx", len_total);
-		free_pages(va, order);
-		kfree(res);
-		return NULL;
+		goto err_nova;
 	}
+	mmu_inval_dma_area(va, len_total);
+	// XXX The mmu_map_dma_area does this for us below, see comments.
+	// sparc_mapiorange(0, virt_to_phys(va), res->start, len_total);
+	/*
+	 * XXX That's where sdev would be used. Currently we load
+	 * all iommu tables with the same translations.
+	 */
+	if (mmu_map_dma_area(dma_addrp, va, res->start, len_total) != 0)
+		goto err_noiommu;
 
-	mmu_map_dma_area(va, res->start, len_total);
-
-	*dma_addrp = res->start;
 	return (void *)res->start;
+
+err_noiommu:
+	release_resource(res);
+err_nova:
+	free_pages(va, order);
+err_nomem:
+	kfree(res);
+err_nopages:
+	return NULL;
 }
 
 void sbus_free_consistent(struct sbus_dev *sdev, long n, void *p, u32 ba)
 {
 	struct resource *res;
-	unsigned long pgp;
+	struct page *pgv;
 
 	if ((res = _sparc_find_resource(&_sparc_dvma,
 	    (unsigned long)p)) == NULL) {
@@ -340,10 +314,10 @@ void sbus_free_consistent(struct sbus_dev *sdev, long n, void *p, u32 ba)
 	kfree(res);
 
 	/* mmu_inval_dma_area(va, n); */ /* it's consistent, isn't it */
-	pgp = (unsigned long) phys_to_virt(mmu_translate_dvma(ba));
+	pgv = mmu_translate_dvma(ba);
 	mmu_unmap_dma_area(ba, n);
 
-	free_pages(pgp, get_order(n));
+	__free_pages(pgv, get_order(n));
 }
 
 /*
@@ -353,39 +327,6 @@ void sbus_free_consistent(struct sbus_dev *sdev, long n, void *p, u32 ba)
  */
 dma_addr_t sbus_map_single(struct sbus_dev *sdev, void *va, size_t len, int direction)
 {
-#if 0 /* This is the version that abuses consistent space */
-	unsigned long len_total = (len + PAGE_SIZE-1) & PAGE_MASK;
-	struct resource *res;
-
-	/* XXX why are some lenghts signed, others unsigned? */
-	if (len <= 0) {
-		return 0;
-	}
-	/* XXX So what is maxphys for us and how do drivers know it? */
-	if (len > 256*1024) {			/* __get_free_pages() limit */
-		return 0;
-	}
-
-	if ((res = kmalloc(sizeof(struct resource), GFP_KERNEL)) == NULL) {
-		printk("sbus_map_single: no core\n");
-		return 0;
-	}
-	memset((char*)res, 0, sizeof(struct resource));
-	res->name = va; /* XXX */
-
-	if (allocate_resource(&_sparc_dvma, res, len_total,
-	    _sparc_dvma.start, _sparc_dvma.end, PAGE_SIZE) != 0) {
-		printk("sbus_map_single: cannot occupy 0x%lx", len);
-		kfree(res);
-		return 0;
-	}
-
-	mmu_map_dma_area(va, res->start, len_total);
-	mmu_flush_dma_area((unsigned long)va, len_total); /* in all contexts? */
-
-	return res->start;
-#endif
-#if 1 /* "trampoline" version */
 	/* XXX why are some lenghts signed, others unsigned? */
 	if (len <= 0) {
 		return 0;
@@ -395,36 +336,11 @@ dma_addr_t sbus_map_single(struct sbus_dev *sdev, void *va, size_t len, int dire
 		return 0;
 	}
 	return mmu_get_scsi_one(va, len, sdev->bus);
-#endif
 }
 
 void sbus_unmap_single(struct sbus_dev *sdev, dma_addr_t ba, size_t n, int direction)
 {
-#if 0 /* This is the version that abuses consistent space */
-	struct resource *res;
-	unsigned long va;
-
-	if ((res = _sparc_find_resource(&_sparc_dvma, ba)) == NULL) {
-		printk("sbus_unmap_single: cannot find %08x\n", (unsigned)ba);
-		return;
-	}
-
-	n = (n + PAGE_SIZE-1) & PAGE_MASK;
-	if ((res->end-res->start)+1 != n) {
-		printk("sbus_unmap_single: region 0x%lx asked 0x%lx\n",
-		    (long)((res->end-res->start)+1), n);
-		return;
-	}
-
-	va = (unsigned long) res->name;	/* XXX Ouch */
-	mmu_inval_dma_area(va, n);	/* in all contexts, mm's?... */
-	mmu_unmap_dma_area(ba, n);	/* iounit cache flush is here */
-	release_resource(res);
-	kfree(res);
-#endif
-#if 1 /* "trampoline" version */
 	mmu_release_scsi_one(ba, n, sdev->bus);
-#endif
 }
 
 int sbus_map_sg(struct sbus_dev *sdev, struct scatterlist *sg, int n, int direction)
@@ -456,7 +372,7 @@ void sbus_dma_sync_single(struct sbus_dev *sdev, dma_addr_t ba, size_t size, int
 	if (res == NULL)
 		panic("sbus_dma_sync_single: 0x%x\n", ba);
 
-	va = (unsigned long) phys_to_virt(mmu_translate_dvma(ba));
+	va = page_address(mmu_translate_dvma(ba)); /* XXX higmem */
 	/*
 	 * XXX This bogosity will be fixed with the iommu rewrite coming soon
 	 * to a kernel near you. - Anton
@@ -511,24 +427,12 @@ void *pci_alloc_consistent(struct pci_dev *pdev, size_t len, dma_addr_t *pba)
 		kfree(res);
 		return NULL;
 	}
-
 	mmu_inval_dma_area(va, len_total);
-
 #if 0
-/* P3 */ printk("pci_alloc_consistent: kva %lx uncva %lx phys %lx size %x\n",
+/* P3 */ printk("pci_alloc_consistent: kva %lx uncva %lx phys %lx size %lx\n",
   (long)va, (long)res->start, (long)virt_to_phys(va), len_total);
 #endif
-	{
-		unsigned long xva, xpa;
-		xva = res->start;
-		xpa = virt_to_phys(va);
-		while (len_total != 0) {
-			len_total -= PAGE_SIZE;
-			(*_sparc_mapioaddr)(xpa, xva, 0, 0);
-			xva += PAGE_SIZE;
-			xpa += PAGE_SIZE;
-		}
-	}
+	sparc_mapiorange(0, virt_to_phys(va), res->start, len_total);
 
 	*pba = virt_to_phys(va); /* equals virt_to_bus (R.I.P.) for us. */
 	return (void *) res->start;
@@ -567,12 +471,7 @@ void pci_free_consistent(struct pci_dev *pdev, size_t n, void *p, dma_addr_t ba)
 
 	pgp = (unsigned long) phys_to_virt(ba);	/* bus_to_virt actually */
 	mmu_inval_dma_area(pgp, n);
-	{
-		int x;
-		for (x = 0; x < n; x += PAGE_SIZE) {
-			(*_sparc_unmapioaddr)((unsigned long)p + n);
-		}
-	}
+	sparc_unmapiorange((unsigned long)p, n);
 
 	release_resource(res);
 	kfree(res);
@@ -749,37 +648,6 @@ _sparc_find_resource(struct resource *root, unsigned long hit)
 			return tmp;
 	}
 	return NULL;
-}
-
-/*
- * Necessary boot time initializations.
- */
-
-void ioport_init(void)
-{
-	extern void sun4c_mapioaddr(unsigned long, unsigned long, int, int);
-	extern void srmmu_mapioaddr(unsigned long, unsigned long, int, int);
-	extern void sun4c_unmapioaddr(unsigned long);
-	extern void srmmu_unmapioaddr(unsigned long);
-
-	switch(sparc_cpu_model) {
-	case sun4c:
-	case sun4:
-	case sun4e:
-		_sparc_mapioaddr = sun4c_mapioaddr;
-		_sparc_unmapioaddr = sun4c_unmapioaddr;
-		break;
-	case sun4m:
-	case sun4d:
-		_sparc_mapioaddr = srmmu_mapioaddr;
-		_sparc_unmapioaddr = srmmu_unmapioaddr;
-		break;
-	default:
-		printk("ioport_init: cpu type %d is unknown.\n",
-		    sparc_cpu_model);
-		prom_halt();
-	};
-
 }
 
 void register_proc_sparc_ioport(void)

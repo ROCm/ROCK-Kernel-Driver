@@ -46,6 +46,7 @@
 #include <asm/cputable.h>
 #include <asm/btext.h>
 #include <asm/div64.h>
+#include <asm/xmon.h>
 
 #ifdef  CONFIG_8xx
 #include <asm/commproc.h>
@@ -306,7 +307,6 @@ EXPORT_SYMBOL(tb_ticks_per_jiffy);
 EXPORT_SYMBOL(get_wchan);
 EXPORT_SYMBOL(console_drivers);
 #ifdef CONFIG_XMON
-extern void xmon_printf(char *fmt, ...);
 EXPORT_SYMBOL(xmon);
 EXPORT_SYMBOL(xmon_printf);
 #endif

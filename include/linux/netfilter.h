@@ -47,6 +47,7 @@ struct nf_hook_ops
 
 	/* User fills in from here down. */
 	nf_hookfn *hook;
+	struct module *owner;
 	int pf;
 	int hooknum;
 	/* Hooks are ordered in ascending priority. */

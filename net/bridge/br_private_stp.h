@@ -32,12 +32,18 @@ struct br_config_bpdu
 	int		forward_delay;
 };
 
+/* called under bridge lock */
+static inline int br_is_designated_port(const struct net_bridge_port *p)
+{
+	return !memcmp(&p->designated_bridge, &p->br->bridge_id, 8) &&
+		(p->designated_port == p->port_id);
+}
+
+
 /* br_stp.c */
 extern void br_become_root_bridge(struct net_bridge *br);
 extern void br_config_bpdu_generation(struct net_bridge *);
 extern void br_configuration_update(struct net_bridge *);
-extern int  br_is_designated_port(struct net_bridge_port *p);
-extern int  br_is_root_bridge(struct net_bridge *br);
 extern void br_port_state_selection(struct net_bridge *);
 extern void br_received_config_bpdu(struct net_bridge_port *p, struct br_config_bpdu *bpdu);
 extern void br_received_tcn_bpdu(struct net_bridge_port *p);

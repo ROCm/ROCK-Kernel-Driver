@@ -89,7 +89,7 @@ static void dump_packet(const struct ip6t_log_info *info,
 	printk("DST=%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x ", NIP6(ipv6h->daddr));
 
 	/* Max length: 44 "LEN=65535 TC=255 HOPLIMIT=255 FLOWLBL=FFFFF " */
-	printk("LEN=%u TC=%u HOPLIMIT=%u FLOWLBL=%u ",
+	printk("LEN=%Zu TC=%u HOPLIMIT=%u FLOWLBL=%u ",
 	       ntohs(ipv6h->payload_len) + sizeof(struct ipv6hdr),
 	       (ntohl(*(u_int32_t *)ipv6h) & 0x0ff00000) >> 20,
 	       ipv6h->hop_limit,

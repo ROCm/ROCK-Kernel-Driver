@@ -175,8 +175,6 @@ static void ir_tasklet_func(unsigned long data);
 static LIST_HEAD(dv1394_cards);
 static spinlock_t dv1394_cards_lock = SPIN_LOCK_UNLOCKED;
 
-static struct hpsb_highlevel *hl_handle; /* = NULL; */
-
 /* translate from a struct file* to the corresponding struct video_card* */
 
 static inline struct video_card* file_to_video_card(struct file *file)
@@ -2620,7 +2618,7 @@ static void dv1394_remove_host (struct hpsb_host *host)
 #endif	
 }
 
-static void dv1394_add_host (struct hpsb_host *host, struct hpsb_highlevel *hl)
+static void dv1394_add_host (struct hpsb_host *host)
 {
 	struct ti_ohci *ohci;
 	char buf[16];
@@ -2776,7 +2774,8 @@ out:
 	wake_up_interruptible(&video->waitq);
 }
 
-static struct hpsb_highlevel_ops hl_ops = {
+static struct hpsb_highlevel dv1394_highlevel = {
+	.name =		"dv1394",
 	.add_host =	dv1394_add_host,
 	.remove_host =	dv1394_remove_host,
 	.host_reset =   dv1394_host_reset,
@@ -2900,7 +2899,7 @@ static void __exit dv1394_exit_module(void)
 
 	hpsb_unregister_protocol(&dv1394_driver);
 
-	hpsb_unregister_highlevel (hl_handle);
+	hpsb_unregister_highlevel(&dv1394_highlevel);
 	ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_DV1394);
 #ifdef CONFIG_DEVFS_FS
 	devfs_remove("ieee1394/dv");
@@ -2937,18 +2936,7 @@ static int __init dv1394_init_module(void)
 	}
 #endif
 
-	hl_handle = hpsb_register_highlevel ("dv1394", &hl_ops);
-	if (hl_handle == NULL) {
-		printk(KERN_ERR "dv1394: hpsb_register_highlevel failed\n");
-		ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_DV1394);
-#ifdef CONFIG_DEVFS_FS
-		devfs_remove("ieee1394/dv");
-#endif
-#ifdef CONFIG_PROC_FS
-		dv1394_procfs_del("dv");
-#endif
-		return -ENOMEM;
-	}
+	hpsb_register_highlevel(&dv1394_highlevel);
 
 	hpsb_register_protocol(&dv1394_driver);
 

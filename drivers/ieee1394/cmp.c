@@ -75,7 +75,7 @@ enum {
 #define CSR_PCR_MAP      0x900
 #define CSR_PCR_MAP_END  0x9fc
 
-static struct hpsb_highlevel *cmp_highlevel;
+static struct hpsb_highlevel cmp_highlevel;
 
 struct cmp_pcr *
 cmp_register_opcr(struct hpsb_host *host, int opcr_number, int payload,
@@ -85,7 +85,7 @@ cmp_register_opcr(struct hpsb_host *host, int opcr_number, int payload,
 	struct cmp_host *ch;
 	struct plug *plug;
 
-	ch = hpsb_get_hostinfo(cmp_highlevel, host);
+	ch = hpsb_get_hostinfo(&cmp_highlevel, host);
 
 	if (opcr_number >= ch->u.ompr.nplugs ||
 	    ch->opcr[opcr_number].update != NULL)
@@ -108,7 +108,7 @@ void cmp_unregister_opcr(struct hpsb_host *host, struct cmp_pcr *opcr)
 	struct cmp_host *ch;
 	struct plug *plug;
 
-	ch = hpsb_get_hostinfo(cmp_highlevel, host);
+	ch = hpsb_get_hostinfo(&cmp_highlevel, host);
 	plug = (struct plug *)opcr;
 	if (plug - ch->opcr >= ch->u.ompr.nplugs) BUG();
 
@@ -128,9 +128,9 @@ static void reset_plugs(struct cmp_host *ch)
 	}
 }
 
-static void cmp_add_host(struct hpsb_host *host, struct hpsb_highlevel *hl)
+static void cmp_add_host(struct hpsb_host *host)
 {
-	struct cmp_host *ch = hpsb_create_hostinfo(hl, host, sizeof (*ch));
+	struct cmp_host *ch = hpsb_create_hostinfo(&cmp_highlevel, host, sizeof (*ch));
 
 	if (ch == NULL) {
 		HPSB_ERR("Failed to allocate cmp_host");
@@ -149,7 +149,7 @@ static void cmp_host_reset(struct hpsb_host *host)
 {
 	struct cmp_host *ch;
 
-	ch = hpsb_get_hostinfo(cmp_highlevel, host);
+	ch = hpsb_get_hostinfo(&cmp_highlevel, host);
 	if (ch == NULL) {
 		HPSB_ERR("cmp: Tried to reset unknown host");
 		return;
@@ -168,7 +168,7 @@ static int pcr_read(struct hpsb_host *host, int nodeid, quadlet_t *buf,
 	if (length != 4)
 		return RCODE_TYPE_ERROR;
 
-	ch = hpsb_get_hostinfo(cmp_highlevel, host);
+	ch = hpsb_get_hostinfo(&cmp_highlevel, host);
 	if (csraddr == 0x900) {
 		*buf = cpu_to_be32(ch->u.ompr_quadlet);
 		return RCODE_COMPLETE;   
@@ -201,7 +201,7 @@ static int pcr_lock(struct hpsb_host *host, int nodeid, quadlet_t *store,
 	int plug;
 	struct cmp_host *ch;
 
-	ch = hpsb_get_hostinfo(cmp_highlevel, host);
+	ch = hpsb_get_hostinfo(&cmp_highlevel, host);
 	
 	if (extcode != EXTCODE_COMPARE_SWAP) 
 		return RCODE_TYPE_ERROR;
@@ -258,7 +258,8 @@ static int pcr_lock(struct hpsb_host *host, int nodeid, quadlet_t *store,
 }
 
 
-static struct hpsb_highlevel_ops cmp_highlevel_ops = {
+static struct hpsb_highlevel cmp_highlevel = {
+	.name =		"cmp",
 	.add_host =	cmp_add_host,
         .host_reset =	cmp_host_reset,
 };
@@ -280,14 +281,9 @@ EXPORT_SYMBOL(cmp_unregister_opcr);
 
 static int __init cmp_init_module (void)
 {
-	cmp_highlevel = hpsb_register_highlevel ("cmp",
-						 &cmp_highlevel_ops);
-	if (cmp_highlevel == NULL) {
-		HPSB_ERR("cmp: unable to register highlevel ops");
-		return -EIO;
-	}
+	hpsb_register_highlevel (&cmp_highlevel);
 
-	hpsb_register_addrspace(cmp_highlevel, &pcr_ops,
+	hpsb_register_addrspace(&cmp_highlevel, &pcr_ops,
 				CSR_REGISTER_BASE + CSR_PCR_MAP,
 				CSR_REGISTER_BASE + CSR_PCR_MAP_END);
 
@@ -298,7 +294,7 @@ static int __init cmp_init_module (void)
 
 static void __exit cmp_exit_module (void)
 {
-        hpsb_unregister_highlevel(cmp_highlevel);
+        hpsb_unregister_highlevel(&cmp_highlevel);
 
 	HPSB_INFO("Unloaded CMP driver");
 }

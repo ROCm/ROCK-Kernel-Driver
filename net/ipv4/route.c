@@ -44,7 +44,7 @@
  *		Alan Cox	:	Multicast fixed (I hope)
  * 		Pavel Krauz	:	Limited broadcast fixed
  *		Mike McLagan	:	Routing by source
- *	Alexey Kuznetsov	:	End of old history. Splitted to fib.c and
+ *	Alexey Kuznetsov	:	End of old history. Split to fib.c and
  *					route.c and rewritten from scratch.
  *		Andi Kleen	:	Load-limit warning messages.
  *	Vitaly E. Lavrov	:	Transparent proxy revived after year coma.

@@ -18,13 +18,13 @@ prototypes:
 
 locking rules:
 	none have BKL
-		dcache_lock	may block
-d_revalidate:	no		yes
-d_hash		no		yes
-d_compare:	no		no 
-d_delete:	yes		no
-d_release:	no		yes
-d_iput:		no		yes
+		dcache_lock	rename_lock	->d_lock	may block
+d_revalidate:	no		no		no		yes
+d_hash		no		no		no		yes
+d_compare:	no		yes		no		no 
+d_delete:	yes		no		yes		no
+d_release:	no		no		no		yes
+d_iput:		no		no		no		yes
 
 --------------------------- inode_operations --------------------------- 
 prototypes:

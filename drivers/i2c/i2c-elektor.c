@@ -132,9 +132,10 @@ static void pcf_isa_waitforpin(void) {
 }
 
 
-static void pcf_isa_handler(int this_irq, void *dev_id, struct pt_regs *regs) {
+static irqreturn_t pcf_isa_handler(int this_irq, void *dev_id, struct pt_regs *regs) {
 	pcf_pending = 1;
 	wake_up_interruptible(&pcf_wait);
+	return IRQ_HANDLED;
 }
 
 
