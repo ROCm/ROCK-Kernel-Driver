@@ -19,5 +19,3 @@ obj-$(CONFIG_DRM_MGA)	+= mga.o
 obj-$(CONFIG_DRM_I810)	+= i810.o
 obj-$(CONFIG_DRM_I830)	+= i830.o
 obj-$(CONFIG_DRM_FFB)   += ffb.o
-
-include $(TOPDIR)/Rules.make

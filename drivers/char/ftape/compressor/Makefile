@@ -29,5 +29,3 @@ obj-$(CONFIG_ZFT_COMPRESSOR) += zft-compressor.o
 zft-compressor-objs := zftape-compress.o lzrw3.o
 
 CFLAGS_lzrw3.o	:= -O6 -funroll-all-loops
-
-include $(TOPDIR)/Rules.make

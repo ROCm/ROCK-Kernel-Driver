@@ -6,6 +6,3 @@ obj-y += s390mach.o sysinfo.o
 obj-y += cio/ block/ char/ misc/ net/
 
 drivers-y += drivers/s390/built-in.o
-
-include $(TOPDIR)/Rules.make
-

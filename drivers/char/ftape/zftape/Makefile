@@ -36,6 +36,3 @@ zftape-objs := zftape-rw.o zftape-ctl.o zftape-read.o \
 	       zftape-init.o zftape-buffers.o zftape_syms.o
 
 EXTRA_CFLAGS := -DZFT_OBSOLETE
-
-include $(TOPDIR)/Rules.make
-

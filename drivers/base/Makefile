@@ -12,5 +12,3 @@ obj-$(CONFIG_HOTPLUG)	+= hotplug.o
 
 export-objs	:= core.o power.o sys.o bus.o driver.o \
 			class.o intf.o platform.o firmware.o
-
-include $(TOPDIR)/Rules.make

@@ -15,5 +15,3 @@ export-objs += ccwgroup.o
 
 obj-$(CONFIG_QDIO) += qdio.o
 export-objs += qdio.o
-
-include $(TOPDIR)/Rules.make

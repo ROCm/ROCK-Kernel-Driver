@@ -45,6 +45,3 @@ endif
 ifeq ($(CONFIG_HOTPLUG_PCI_COMPAQ_NVRAM),y)
 	cpqphp-objs += cpqphp_nvram.o
 endif
-
-
-include $(TOPDIR)/Rules.make

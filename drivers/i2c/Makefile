@@ -21,6 +21,3 @@ obj-$(CONFIG_I2C_PROC)		+= i2c-proc.o
 
 # This is needed for automatic patch generation: sensors code starts here
 # This is needed for automatic patch generation: sensors code ends here
-
-include $(TOPDIR)/Rules.make
-

@@ -3,5 +3,3 @@
 #
 
 # placeholder for stuff to come...
-
-include $(TOPDIR)/Rules.make

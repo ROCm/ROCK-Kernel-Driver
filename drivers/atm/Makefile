@@ -51,8 +51,6 @@ ifeq ($(CONFIG_ATM_FORE200E_SBA),y)
   endif
 endif
 
-include $(TOPDIR)/Rules.make
-
 # FORE Systems 200E-series firmware magic
 $(obj)/fore200e_pca_fw.c: $(patsubst "%", %, $(CONFIG_ATM_FORE200E_PCA_FW)) \
 			  $(obj)/fore200e_mkfirm
