@@ -27,6 +27,14 @@
  */
 
 /*
+ * Create /proc/fs/jfs if procfs is enabled andeither
+ * CONFIG_JFS_DEBUG or CONFIG_JFS_STATISTICS is defined
+ */
+#if defined(CONFIG_PROC_FS) && (defined(CONFIG_JFS_DEBUG) || defined(CONFIG_JFS_STATISTICS))
+	#define PROC_FS_JFS
+#endif
+
+/*
  *	assert with traditional printf/panic
  */
 #ifdef CONFIG_KERNEL_ASSERTS
