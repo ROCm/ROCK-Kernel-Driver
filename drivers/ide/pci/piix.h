@@ -19,11 +19,6 @@ static void init_hwif_piix(ide_hwif_t *);
 		.bootable	= ON_BOARD,		\
 	}
 
-/*
- *	Table of the various PIIX capability blocks
- *
- */
- 
 static ide_pci_device_t piix_pci_info[] __devinitdata = {
 	/*  0 */ DECLARE_PIIX_DEV("PIIXa"),
 	/*  1 */ DECLARE_PIIX_DEV("PIIXb"),
