@@ -101,12 +101,15 @@ static void receive_chars(struct uart_sunsab_port *up,
 			  union sab82532_irq_status *stat,
 			  struct pt_regs *regs)
 {
-	struct tty_struct *tty = up->port.info->tty;
+	struct tty_struct *tty = NULL;
 	unsigned char buf[32];
 	int saw_console_brk = 0;
 	int free_fifo = 0;
 	int count = 0;
 	int i;
+
+	if (up->port.info != NULL)		/* Unopened serial console */
+		tty = up->port.info->tty;
 
 	/* Read number of BYTES (Character + Status) available. */
 	if (stat->sreg.isr0 & SAB82532_ISR0_RPF) {
@@ -141,6 +144,11 @@ static void receive_chars(struct uart_sunsab_port *up,
 
 	for (i = 0; i < count; i++) {
 		unsigned char ch = buf[i];
+
+		if (tty == NULL) {
+			uart_handle_sysrq_char(&up->port, ch, regs);
+			continue;
+		}
 
 		if (unlikely(tty->flip.count >= TTY_FLIPBUF_SIZE)) {
 			tty->flip.work.func((void *)tty);
@@ -217,7 +225,8 @@ static void receive_chars(struct uart_sunsab_port *up,
 		}
 	}
 
-	tty_flip_buffer_push(tty);
+	if (tty)
+		tty_flip_buffer_push(tty);
 
 	if (saw_console_brk)
 		sun_do_break();

@@ -32,28 +32,8 @@
 #ifndef __XFS_H__
 #define __XFS_H__
 
-#include <linux/types.h>
-#include <linux/config.h>
-#include <xfs_types.h>
-
-#include <xfs_arch.h>
-
-#include <support/kmem.h>
-#include <support/mrlock.h>
-#include <support/qsort.h>
-#include <support/spin.h>
-#include <support/sv.h>
-#include <support/ktrace.h>
-#include <support/mutex.h>
-#include <support/sema.h>
-#include <support/debug.h>
-#include <support/move.h>
-#include <support/uuid.h>
-#include <support/time.h>
-
 #include <linux/xfs_linux.h>
 
 #include <xfs_fs.h> 
-#include <xfs_buf.h>
 
 #endif	/* __XFS_H__ */

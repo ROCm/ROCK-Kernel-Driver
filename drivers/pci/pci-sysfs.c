@@ -160,6 +160,7 @@ static struct bin_attribute pci_config_attr = {
 	.attr =	{
 		.name = "config",
 		.mode = S_IRUGO | S_IWUSR,
+		.owner = THIS_MODULE,
 	},
 	.size = 256,
 	.read = pci_read_config,

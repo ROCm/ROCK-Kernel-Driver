@@ -295,7 +295,7 @@ static void sha256_final(void* ctx, u8 *out)
 	u8 bits[8];
 	unsigned int index, pad_len, t;
 	int i, j;
-	const u8 padding[64] = { 0x80, };
+	static const u8 padding[64] = { 0x80, };
 
 	/* Save number of bits */
 	t = sctx->count[0];

@@ -30,13 +30,12 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/slab.h>
 
 #include <xfs_types.h>
-#include "kmem.h"
-#include "spin.h"
+#include <kmem.h>
+#include <spin.h>
 #include "debug.h"
 #include "ktrace.h"
 
@@ -273,7 +272,6 @@ ktrace_first(ktrace_t   *ktp, ktrace_snap_t     *ktsp)
 	}
 	return ktep;
 }
-EXPORT_SYMBOL(ktrace_first);
 
 /*
  * ktrace_next()
@@ -308,7 +306,6 @@ ktrace_next(
 
 	return ktep;
 }
-EXPORT_SYMBOL(ktrace_next);
 
 /*
  * ktrace_skip()

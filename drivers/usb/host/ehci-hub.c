@@ -113,7 +113,7 @@ ehci_hub_descriptor (
 	u16		temp;
 
 	desc->bDescriptorType = 0x29;
-	desc->bPwrOn2PwrGood = 0;	/* FIXME: f(system power) */
+	desc->bPwrOn2PwrGood = 10;	/* FIXME: f(system power) */
 	desc->bHubContrCurrent = 0;
 
 	desc->bNbrPorts = ports;
