@@ -1508,12 +1508,9 @@ static int uhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, int mem_flags)
 		struct urb_priv *urbp = urb->hcpriv;
 
 		list_del_init(&urbp->urb_list);
-		spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
-		uhci_destroy_urb_priv (uhci, urb);
-
-		return ret;
-	}
-	ret = 0;
+		uhci_destroy_urb_priv(uhci, urb);
+	} else
+		ret = 0;
 
 out:
 	spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
@@ -1649,10 +1646,12 @@ static int uhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 	unsigned long flags;
-	struct urb_priv *urbp = urb->hcpriv;
+	struct urb_priv *urbp;
 
 	spin_lock_irqsave(&uhci->urb_list_lock, flags);
-
+	urbp = urb->hcpriv;
+	if (!urbp)			/* URB was never linked! */
+		goto done;
 	list_del_init(&urbp->urb_list);
 
 	uhci_unlink_generic(uhci, urb);
@@ -1665,6 +1664,7 @@ static int uhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb)
 	list_add_tail(&urbp->urb_list, &uhci->urb_remove_list);
 
 	spin_unlock(&uhci->urb_remove_list_lock);
+done:
 	spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
 	return 0;
 }
