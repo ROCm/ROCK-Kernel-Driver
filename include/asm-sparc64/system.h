@@ -78,9 +78,9 @@ enum sparc_cpu {
 
 #define nop() 		__asm__ __volatile__ ("nop")
 
-#define membar(type)	__asm__ __volatile__ ("membar " type : : : "memory");
+#define membar(type)	__asm__ __volatile__ ("membar " type : : : "memory")
 #define mb()		\
-	membar("#LoadLoad | #LoadStore | #StoreStore | #StoreLoad");
+	membar("#LoadLoad | #LoadStore | #StoreStore | #StoreLoad")
 #define rmb()		membar("#LoadLoad")
 #define wmb()		membar("#StoreStore")
 #define read_barrier_depends()		do { } while(0)
@@ -95,9 +95,9 @@ enum sparc_cpu {
 #define smp_wmb()	wmb()
 #define smp_read_barrier_depends()	read_barrier_depends()
 #else
-#define smp_mb()	__asm__ __volatile__("":::"memory");
-#define smp_rmb()	__asm__ __volatile__("":::"memory");
-#define smp_wmb()	__asm__ __volatile__("":::"memory");
+#define smp_mb()	__asm__ __volatile__("":::"memory")
+#define smp_rmb()	__asm__ __volatile__("":::"memory")
+#define smp_wmb()	__asm__ __volatile__("":::"memory")
 #define smp_read_barrier_depends()	do { } while(0)
 #endif
 
@@ -107,7 +107,7 @@ enum sparc_cpu {
 
 /* Performance counter register access. */
 #define read_pcr(__p)  __asm__ __volatile__("rd	%%pcr, %0" : "=r" (__p))
-#define write_pcr(__p) __asm__ __volatile__("wr	%0, 0x0, %%pcr" : : "r" (__p));
+#define write_pcr(__p) __asm__ __volatile__("wr	%0, 0x0, %%pcr" : : "r" (__p))
 #define read_pic(__p)  __asm__ __volatile__("rd %%pic, %0" : "=r" (__p))
 
 /* Blackbird errata workaround.  See commentary in
