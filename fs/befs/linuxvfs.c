@@ -789,6 +789,7 @@ befs_fill_super(struct super_block *sb, void *data, int silent)
 	struct buffer_head *bh;
 	befs_sb_info *befs_sb;
 	befs_super_block *disk_sb;
+	struct inode *root;
 
 	const unsigned long sb_block = 0;
 	const off_t x86_sb_off = 512;
@@ -863,9 +864,10 @@ befs_fill_super(struct super_block *sb, void *data, int silent)
 	/* Set real blocksize of fs */
 	sb_set_blocksize(sb, (ulong) befs_sb->block_size);
 	sb->s_op = (struct super_operations *) &befs_sops;
-	sb->s_root =
-	    d_alloc_root(iget(sb, iaddr2blockno(sb, &(befs_sb->root_dir))));
+	root = iget(sb, iaddr2blockno(sb, &(befs_sb->root_dir)));
+	sb->s_root = d_alloc_root(root);
 	if (!sb->s_root) {
+		iput(root);
 		befs_error(sb, "get root inode failed");
 		goto unaquire_priv_sbp;
 	}
