@@ -692,7 +692,7 @@ unsigned long get_wchan(struct task_struct *p);
 #define KSTK_EIP(tsk)  ((tsk)->thread.regs? (tsk)->thread.regs->nip: 0)
 #define KSTK_ESP(tsk)  ((tsk)->thread.regs? (tsk)->thread.regs->gpr[1]: 0)
 
-#define cpu_relax()     do { } while (0)
+#define cpu_relax()     barrier()
 
 /*
  * Prefetch macros.
