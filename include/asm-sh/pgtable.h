@@ -53,20 +53,20 @@ extern unsigned long empty_zero_page[1024];
 #define VMALLOC_START	(P3SEG+0x00100000)
 #define VMALLOC_END	P4SEG
 
-/*			0x001     WT-bit on SH-4, 0 on SH-3 */
+#define	_PAGE_WT	0x001  /* WT-bit on SH-4, 0 on SH-3 */
 #define _PAGE_HW_SHARED	0x002  /* SH-bit  : page is shared among processes */
 #define _PAGE_DIRTY	0x004  /* D-bit   : page changed */
 #define _PAGE_CACHABLE	0x008  /* C-bit   : cachable */
-/*			0x010     SZ0-bit : Size of page */
+#define _PAGE_SZ0	0x010  /* SZ0-bit : Size of page */
 #define _PAGE_RW	0x020  /* PR0-bit : write access allowed */
 #define _PAGE_USER	0x040  /* PR1-bit : user space access allowed */
-/*			0x080     SZ1-bit : Size of page (on SH-4) */
+#define _PAGE_SZ1	0x080  /* SZ1-bit : Size of page (on SH-4) */
 #define _PAGE_PRESENT	0x100  /* V-bit   : page is valid */
 #define _PAGE_PROTNONE	0x200  /* software: if not present  */
 #define _PAGE_ACCESSED 	0x400  /* software: page referenced */
 #define _PAGE_U0_SHARED 0x800  /* software: page is shared in user space */
 
-#define	_PAGE_FILE	0x080  /* software: pagecache or swap? */
+#define	_PAGE_FILE	_PAGE_WT  /* software: pagecache or swap? */
 
 /* software: moves to PTEA.TC (Timing Control) */
 #define _PAGE_PCC_AREA5	0x00000000	/* use BSC registers for area5 */
@@ -83,20 +83,29 @@ extern unsigned long empty_zero_page[1024];
 
 
 /* Mask which drop software flags
- * We also drop SZ1 bit since it is always 0 and used for _PAGE_FILE
+ * We also drop WT bit since it is used for _PAGE_FILE
  * bit in this implementation.
  */
+#define _PAGE_CLEAR_FLAGS	(_PAGE_WT | _PAGE_PROTNONE | _PAGE_ACCESSED | _PAGE_U0_SHARED)
+
 #if defined(CONFIG_CPU_SH3)
 /*
  * MMU on SH-3 has bug on SH-bit: We can't use it if MMUCR.IX=1.
  * Work around: Just drop SH-bit.
  */
-#define _PAGE_FLAGS_HARDWARE_MASK	0x1ffff17c
+#define _PAGE_FLAGS_HARDWARE_MASK	(0x1fffffff & ~(_PAGE_CLEAR_FLAGS | _PAGE_HW_SHARED))
 #else
-#define _PAGE_FLAGS_HARDWARE_MASK	0x1ffff17e
+#define _PAGE_FLAGS_HARDWARE_MASK	(0x1fffffff & ~(_PAGE_CLEAR_FLAGS))
 #endif
-/* Hardware flags: SZ=1 (4k-byte) */
-#define _PAGE_FLAGS_HARD		0x00000010
+
+/* Hardware flags: SZ0=1 (4k-byte) */
+#define _PAGE_FLAGS_HARD	_PAGE_SZ0
+
+#if defined(CONFIG_HUGETLB_PAGE_SIZE_64K)
+#define _PAGE_SZHUGE	(_PAGE_SZ1)
+#elif defined(CONFIG_HUGETLB_PAGE_SIZE_1MB)
+#define _PAGE_SZHUGE	(_PAGE_SZ0 | _PAGE_SZ1)
+#endif
 
 #define _PAGE_SHARED	_PAGE_U0_SHARED
 

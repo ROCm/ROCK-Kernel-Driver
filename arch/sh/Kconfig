@@ -244,6 +244,19 @@ config MMU
 	  turning this off will boot the kernel on these machines with the
 	  MMU implicitly switched off.
 
+choice
+	prompt "HugeTLB page size"
+	depends on HUGETLB_PAGE && CPU_SH4 && MMU
+	default HUGETLB_PAGE_SIZE_64K
+
+config HUGETLB_PAGE_SIZE_64K
+	bool "64K"
+
+config HUGETLB_PAGE_SIZE_1MB
+	bool "1MB"
+
+endchoice
+
 config CMDLINE_BOOL
 	bool "Default bootloader kernel arguments"
 
