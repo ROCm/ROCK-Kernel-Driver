@@ -186,7 +186,7 @@ static struct i2ob_request *i2ob_backlog_tail[MAX_I2O_CONTROLLERS];
 
 static struct i2ob_device i2ob_dev[MAX_I2OB<<4];
 static int i2ob_dev_count = 0;
-static struct gendisk i2o_disk[MAX_I2OB];
+static struct gendisk *i2o_disk[MAX_I2OB];
 
 /*
  * Mutex and spin lock for event handling synchronization
@@ -715,7 +715,7 @@ static int i2ob_evt(void *dummy)
 			 */
 			case I2O_EVT_IND_BSA_VOLUME_LOAD:
 			{
-				struct gendisk *p = &i2o_disk[unit>>4];
+				struct gendisk *p = i2o_disk[unit>>4];
 				i2ob_install_device(i2ob_dev[unit].i2odev->controller, 
 					i2ob_dev[unit].i2odev, unit);
 				add_disk(p);
@@ -730,7 +730,7 @@ static int i2ob_evt(void *dummy)
 			 */
 			case I2O_EVT_IND_BSA_VOLUME_UNLOAD:
 			{
-				struct gendisk *p = &i2o_disk[unit>>4];
+				struct gendisk *p = i2o_disk[unit>>4];
 				del_gendisk(p);
 				for(i = unit; i <= unit+15; i++)
 					blk_queue_max_sectors(i2ob_dev[i].req_queue, 0);
@@ -762,7 +762,7 @@ static int i2ob_evt(void *dummy)
 					i2ob_query_device(&i2ob_dev[unit], 0x0000, 4, &size, 8);
 
 				spin_lock_irqsave(I2O_LOCK(unit), flags);	
-				set_capacity(&i2o_disk[unit>>4], size>>9);
+				set_capacity(i2o_disk[unit>>4], size>>9);
 				spin_unlock_irqrestore(I2O_LOCK(unit), flags);	
 				break;
 			}
@@ -1040,7 +1040,7 @@ static int i2ob_ioctl(struct inode *inode, struct file *file,
 
 	if (cmd != HDIO_GETGEO)
 		return -EINVAL;
-	i2o_block_biosparam(get_capacity(&i2o_disk[u]),
+	i2o_block_biosparam(get_capacity(i2o_disk[u]),
 				&g.cylinders, &g.heads, &g.sectors);
 	g.start = get_start_sect(inode->i_bdev);
 	return copy_to_user((void *)arg, &g, sizeof(g)) ? -EFAULT : 0;
@@ -1216,7 +1216,7 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 	
 	i2ob_query_device(dev, 0x0000, 5, &flags, 4);
 	i2ob_query_device(dev, 0x0000, 6, &status, 4);
-	set_capacity(&i2o_disk[unit>>4], size>>9);
+	set_capacity(i2o_disk[unit>>4], size>>9);
 
 	/* Set limit based on inbound frame size */
 	limit = (d->controller->status_block->inbound_frame_size - 8)/2;
@@ -1253,7 +1253,7 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 	}
 
 
-	strcpy(d->dev_name, i2o_disk[unit>>4].disk_name);
+	strcpy(d->dev_name, i2o_disk[unit>>4]->disk_name);
 
 	printk(KERN_INFO "%s: Max segments %d, queue depth %d, byte limit %d.\n",
 		 d->dev_name, i2ob_dev[unit].max_segments, i2ob_dev[unit].depth, limit);
@@ -1460,7 +1460,7 @@ static void i2ob_scan(int bios)
 					printk(KERN_WARNING "Could not install I2O block device\n");
 				else
 				{
-					add_disk(&i2o_disk[scan_unit>>4]);
+					add_disk(i2o_disk[scan_unit>>4]);
 					scan_unit+=16;
 					i2ob_dev_count++;
 
@@ -1548,7 +1548,7 @@ void i2ob_new_device(struct i2o_controller *c, struct i2o_device *d)
 		printk(KERN_ERR "i2o_block: Could not install new device\n");
 	else	
 	{
-		add_disk(&i2o_disk[unit>>4]);
+		add_disk(i2o_disk[unit>>4]);
 		i2ob_dev_count++;
 		i2o_device_notify_on(d, &i2o_block_handler);
 	}
@@ -1599,7 +1599,7 @@ void i2ob_del_device(struct i2o_controller *c, struct i2o_device *d)
 	 * This will force errors when i2ob_get_queue() is called
 	 * by the kenrel.
 	 */
-	del_gendisk(&i2o_disk[unit>>4]);
+	del_gendisk(i2o_disk[unit>>4]);
 	i2ob_dev[unit].req_queue = NULL;
 	for(i = unit; i <= unit+15; i++)
 	{
@@ -1709,11 +1709,7 @@ static struct block_device_operations i2ob_fops =
  *  (Just smiley confuses emacs :-)
  */
 
-#ifdef MODULE
-#define i2o_block_init init_module
-#endif
-
-int i2o_block_init(void)
+static int __init i2o_block_init(void)
 {
 	int i;
 
@@ -1728,6 +1724,12 @@ int i2o_block_init(void)
 		printk(KERN_ERR "Unable to get major number %d for i2o_block\n",
 		       MAJOR_NR);
 		return -EIO;
+	}
+	for (i = 0; i < MAX_I2OB; i++) {
+		struct gendisk *disk = alloc_disk();
+		if (!disk)
+			goto Enomem;
+		i2o_disk[i] = disk;
 	}
 #ifdef MODULE
 	printk(KERN_INFO "i2o_block: registered device at major %d\n", MAJOR_NR);
@@ -1751,7 +1753,7 @@ int i2o_block_init(void)
 	}
 
 	for (i = 0; i < MAX_I2OB; i++) {
-		struct gendisk *disk = i2o_disk + i;
+		struct gendisk *disk = i2o_disk[i];
 		disk->major = MAJOR_NR;
 		disk->first_minor = i<<4;
 		disk->minor_shift = 4;
@@ -1808,15 +1810,14 @@ int i2o_block_init(void)
 	i2ob_probe();
 
 	return 0;
+Enomem:
+	while (i--)
+		put_disk(i2o_disk[i]);
+	unregister_blkdev(MAJOR_NR, "i2o_block");
+	return -ENOMEM;
 }
 
-#ifdef MODULE
-
-MODULE_AUTHOR("Red Hat Software");
-MODULE_DESCRIPTION("I2O Block Device OSM");
-MODULE_LICENSE("GPL");
-
-void cleanup_module(void)
+static void __exit i2o_block_exit(void)
 {
 	int i;
 	
@@ -1862,11 +1863,20 @@ void cleanup_module(void)
 	 */
 
 	i2o_remove_handler(&i2o_block_handler);
-		 
+
+	for (i = 0; i < MAX_I2OB; i++)
+		put_disk(i2o_disk[i]);
+ 
 	/*
 	 *	Return the block device
 	 */
 	if (unregister_blkdev(MAJOR_NR, "i2o_block") != 0)
 		printk("i2o_block: cleanup_module failed\n");
 }
-#endif
+
+MODULE_AUTHOR("Red Hat Software");
+MODULE_DESCRIPTION("I2O Block Device OSM");
+MODULE_LICENSE("GPL");
+
+module_init(i2o_block_init)
+module_exit(i2o_block_exit)
