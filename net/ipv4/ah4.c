@@ -1,5 +1,6 @@
 #include <linux/config.h>
 #include <linux/module.h>
+#include <net/inet_ecn.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
 #include <net/ah.h>
@@ -123,6 +124,8 @@ static int ah_output(struct sk_buff *skb)
 	top_iph->tos = iph->tos;
 	top_iph->ttl = iph->ttl;
 	if (x->props.mode) {
+		if (x->props.flags & XFRM_STATE_NOECN)
+			IP_ECN_clear(top_iph);
 		top_iph->frag_off = iph->frag_off&~htons(IP_MF|IP_OFFSET);
 		memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
 	} else {

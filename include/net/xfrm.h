@@ -108,6 +108,7 @@ struct xfrm_state
 		u8		mode;
 		u8		replay_window;
 		u8		aalgo, ealgo, calgo;
+		u8		flags;
 		u16		family;
 		xfrm_address_t	saddr;
 		int		header_len;

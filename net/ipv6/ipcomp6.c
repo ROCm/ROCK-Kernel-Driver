@@ -32,6 +32,7 @@
  */
 #include <linux/config.h>
 #include <linux/module.h>
+#include <net/inet_ecn.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
 #include <net/ipcomp.h>
@@ -201,6 +202,8 @@ static int ipcomp6_output(struct sk_buff *skb)
 	memcpy(top_iph, tmp_iph, hdr_len);
 	kfree(tmp_iph);
 
+	if (x->props.mode && (x->props.flags & XFRM_STATE_NOECN))
+		IP6_ECN_clear(top_iph);
 	top_iph->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
 	skb->nh.raw = skb->data; /* top_iph */
 	ip6_find_1stfragopt(skb, &prevhdr); 

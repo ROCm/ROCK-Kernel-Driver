@@ -1,6 +1,8 @@
 #ifndef _INET_ECN_H_
 #define _INET_ECN_H_
 
+#include <linux/ip.h>
+
 static inline int INET_ECN_is_ce(__u8 dsfield)
 {
 	return (dsfield&3) == 3;
@@ -44,11 +46,21 @@ static inline void IP_ECN_set_ce(struct iphdr *iph)
 	iph->tos |= 1;
 }
 
+static inline void IP_ECN_clear(struct iphdr *iph)
+{
+	iph->tos &= ~3;
+}
+
 struct ipv6hdr;
 
 static inline void IP6_ECN_set_ce(struct ipv6hdr *iph)
 {
 	*(u32*)iph |= htonl(1<<20);
+}
+
+static inline void IP6_ECN_clear(struct ipv6hdr *iph)
+{
+	*(u32*)iph &= ~htonl(3<<20);
 }
 
 #define ip6_get_dsfield(iph) ((ntohs(*(u16*)(iph)) >> 4) & 0xFF)

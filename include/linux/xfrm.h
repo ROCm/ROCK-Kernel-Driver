@@ -166,6 +166,8 @@ struct xfrm_usersa_info {
 	__u16				family;
 	__u8				mode; /* 0=transport,1=tunnel */
 	__u8				replay_window;
+	__u8				flags;
+#define XFRM_STATE_NOECN	1
 };
 
 struct xfrm_usersa_id {

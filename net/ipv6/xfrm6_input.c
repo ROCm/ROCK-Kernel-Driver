@@ -9,11 +9,20 @@
  *		IPv6 support
  */
 
+#include <net/inet_ecn.h>
 #include <net/ip.h>
 #include <net/ipv6.h>
 #include <net/xfrm.h>
 
 static kmem_cache_t *secpath_cachep;
+
+static inline void ipip6_ecn_decapsulate(struct ipv6hdr *iph,
+					 struct sk_buff *skb)
+{
+	if (INET_ECN_is_ce(ip6_get_dsfield(iph)) &&
+	    INET_ECN_is_not_ce(ip6_get_dsfield(skb->nh.ipv6h)))
+		IP6_ECN_set_ce(skb->nh.ipv6h);
+}
 
 int xfrm6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 {
@@ -71,6 +80,8 @@ int xfrm6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 			if (nexthdr != IPPROTO_IPV6)
 				goto drop;
 			skb->nh.raw = skb->data;
+			if (!(x->props.flags & XFRM_STATE_NOECN))
+				ipip6_ecn_decapsulate(iph, skb);
 			iph = skb->nh.ipv6h;
 			decaps = 1;
 			break;

@@ -1,5 +1,6 @@
 #include <linux/config.h>
 #include <linux/module.h>
+#include <net/inet_ecn.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
 #include <net/esp.h>
@@ -109,6 +110,8 @@ int esp_output(struct sk_buff *skb)
 		top_iph->ihl = 5;
 		top_iph->version = 4;
 		top_iph->tos = iph->tos;	/* DS disclosed */
+		if (x->props.flags & XFRM_STATE_NOECN)
+			IP_ECN_clear(top_iph);
 		top_iph->tot_len = htons(skb->len + alen);
 		top_iph->frag_off = iph->frag_off&htons(IP_DF);
 		if (!(top_iph->frag_off))

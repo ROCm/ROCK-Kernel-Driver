@@ -26,6 +26,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <net/inet_ecn.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
 #include <net/esp.h>
@@ -121,6 +122,8 @@ int esp6_output(struct sk_buff *skb)
 		top_iph->flow_lbl[0] = iph->flow_lbl[0];
 		top_iph->flow_lbl[1] = iph->flow_lbl[1];
 		top_iph->flow_lbl[2] = iph->flow_lbl[2];
+		if (x->props.flags & XFRM_STATE_NOECN)
+			IP6_ECN_clear(top_iph);
 		top_iph->nexthdr = IPPROTO_ESP;
 		top_iph->payload_len = htons(skb->len + alen - sizeof(struct ipv6hdr));
 		top_iph->hop_limit = iph->hop_limit;
