@@ -302,9 +302,7 @@ wlock_again:
 int _do_write_trylock (rwlock_t *rw, char *str)
 {
 	unsigned long caller, val;
-	int stuck = INIT_STUCK;
 	int cpu = smp_processor_id();
-	int shown = 0;
 
 	GET_CALLER(caller);
 
