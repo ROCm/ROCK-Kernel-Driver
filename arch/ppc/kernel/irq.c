@@ -46,6 +46,7 @@
 #include <linux/random.h>
 #include <linux/seq_file.h>
 #include <linux/cpumask.h>
+#include <linux/sysdev.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -56,6 +57,7 @@
 #include <asm/cache.h>
 #include <asm/prom.h>
 #include <asm/ptrace.h>
+#include <asm/xmon.h>
 
 #define NR_MASK_WORDS	((NR_IRQS + 31) / 32)
 
@@ -280,6 +282,11 @@ void disable_irq_nosync(unsigned int irq)
 	irq_desc_t *desc = irq_desc + irq;
 	unsigned long flags;
 
+	if (irq >= NR_IRQS) {
+		printk("Argh, disable_irq_nosync(%d) !\n", irq);
+		dump_stack();
+	}
+
 	spin_lock_irqsave(&desc->lock, flags);
 	if (!desc->depth++) {
 		if (!(desc->status & IRQ_PER_CPU))
@@ -322,6 +329,11 @@ void enable_irq(unsigned int irq)
 {
 	irq_desc_t *desc = irq_desc + irq;
 	unsigned long flags;
+
+	if (irq >= NR_IRQS) {
+		printk("Argh, enable_irq(%d) !\n", irq);
+		dump_stack();
+	}
 
 	spin_lock_irqsave(&desc->lock, flags);
 	switch (desc->depth) {
@@ -513,6 +525,8 @@ out:
 void do_IRQ(struct pt_regs *regs)
 {
 	int irq, first = 1;
+	static unsigned long deadcount = 0;
+
         irq_enter();
 
 	/*
@@ -526,7 +540,16 @@ void do_IRQ(struct pt_regs *regs)
 	while ((irq = ppc_md.get_irq(regs)) >= 0) {
 		ppc_irq_dispatch_handler(regs, irq);
 		first = 0;
+	        if (deadcount++ > 1000000) {
+#ifdef CONFIG_XMON
+			xmon_printf("Argh, stuck in IRQ loop, irq is %d\n", irq);
+			xmon(NULL);
+#else
+			printk("Argh, stuck in IRQ loop, irq is %d\n", irq);
+#endif
+		}
 	}
+	deadcount = 0;
 	if (irq != -2 && first)
 		/* That's not SMP safe ... but who cares ? */
 		ppc_spurious_interrupts++;

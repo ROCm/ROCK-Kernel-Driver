@@ -112,6 +112,10 @@
  */
 #define PMAC_TYPE_UNKNOWN_INTREPID	0x11f	/* Generic */
 
+/* MacRISC4 / G5 machines
+ */
+#define PMAC_TYPE_POWERMAC_G5		0x150	/* First tower */
+
 /*
  * Motherboard flags
  */
@@ -131,8 +135,8 @@
  */
 struct device_node;
 
-static inline int pmac_call_feature(int selector, struct device_node* node,
-					int param, int value)
+static inline long pmac_call_feature(int selector, struct device_node* node,
+					long param, long value)
 {
 	if (!ppc_md.feature_call)
 		return -ENODEV;
@@ -262,9 +266,15 @@ static inline int pmac_call_feature(int selector, struct device_node* node,
  */
 #define PMAC_FTR_WRITE_GPIO		PMAC_FTR_DEF(18)
 
+/* PMAC_FTR_ENABLE_MPIC
+ *
+ * Enable the MPIC cell
+ */
+#define PMAC_FTR_ENABLE_MPIC		PMAC_FTR_DEF(19)
+
 
 /* Don't use those directly, they are for the sake of pmac_setup.c */
-extern int pmac_do_feature_call(unsigned int selector, ...);
+extern long pmac_do_feature_call(unsigned int selector, ...);
 extern void pmac_feature_init(void);
 
 #define PMAC_FTR_DEF(x) ((_MACH_Pmac << 16) | (x))
@@ -289,6 +299,7 @@ enum {
 	macio_keylargo,
 	macio_pangea,
 	macio_intrepid,
+	macio_keylargo2,
 };
 
 struct macio_chip

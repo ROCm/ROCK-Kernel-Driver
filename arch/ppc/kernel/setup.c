@@ -35,6 +35,7 @@
 #include <asm/system.h>
 #include <asm/pmac_feature.h>
 #include <asm/sections.h>
+#include <asm/nvram.h>
 #include <asm/xmon.h>
 
 #if defined CONFIG_KGDB
@@ -116,6 +117,9 @@ struct screen_info screen_info = {
 
 void machine_restart(char *cmd)
 {
+#ifdef CONFIG_NVRAM
+	nvram_sync();
+#endif
 	ppc_md.restart(cmd);
 }
 
@@ -123,6 +127,9 @@ EXPORT_SYMBOL(machine_restart);
 
 void machine_power_off(void)
 {
+#ifdef CONFIG_NVRAM
+	nvram_sync();
+#endif
 	ppc_md.power_off();
 }
 
@@ -130,6 +137,9 @@ EXPORT_SYMBOL(machine_power_off);
 
 void machine_halt(void)
 {
+#ifdef CONFIG_NVRAM
+	nvram_sync();
+#endif
 	ppc_md.halt();
 }
 
@@ -369,6 +379,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	      unsigned long r6, unsigned long r7)
 {
 #ifdef CONFIG_BOOTX_TEXT
+	extern int force_printk_to_btext;
 	if (boot_text_mapped) {
 		btext_clearscreen();
 		btext_welcome();
@@ -452,62 +463,26 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 			}
 		}
 	}
-
-#ifdef CONFIG_SERIAL_CORE_CONSOLE
-	/* Hack -- add console=ttySn if necessary */
-	if(strstr(cmd_line, "console=") == NULL) {
-		extern char *of_stdout_device;
-		struct device_node *prom_stdout;
-
-		prom_stdout = find_path_device(of_stdout_device);
-		if (prom_stdout) {
-			unsigned char *name;
-			printk(KERN_INFO "of_stdout_device %s\n", of_stdout_device);
-			name = get_property(prom_stdout, "name", NULL);
-			if (name) { 
-				int i;
-#if 1
-				printk(KERN_INFO "name %s\n", name);
-#endif
-				i = -1;
-#ifdef CONFIG_SERIAL_8250_CONSOLE
-				if (strcmp(name, "serial") == 0) {
-					u32 *reg = (u32 *)get_property(prom_stdout, "reg", &i);
-					if (i > 8) {
-						switch (reg[1]) {
-							case 0x3f8: i = 0; break;
-							case 0x2f8: i = 1; break;
-							case 0x898: i = 2; break;
-							case 0x890: i = 3; break;
-						}
-					}
-				}
-#endif
-#ifdef CONFIG_SERIAL_PMACZILOG_CONSOLE
-				if (strcmp(name, "ch-a") == 0) 
-					i = 0;
-				if (strcmp(name, "ch-b") == 0) 
-					i = 1;
-#endif
-				if (i >= 0) {
-					char tmp_cmd_line[512];
-					snprintf(tmp_cmd_line, 512,
-							"AUTOCONSOLE console=ttyS%d %s",
-							i, cmd_line);
-					memcpy(cmd_line, tmp_cmd_line, 512);
-					printk("console= not found, add console=ttyS%d\n", i);
-				}
-			}
-		}
+#ifdef CONFIG_ADB_PMU
+	if (strstr(cmd_line, "fake_sleep")) {
+		extern int __fake_sleep;
+		__fake_sleep = 1;
 	}
-#endif
-
+#endif /* CONFIG_ADB_PMU */	
 #ifdef CONFIG_ADB
 	if (strstr(cmd_line, "adb_sync")) {
 		extern int __adb_probe_sync;
 		__adb_probe_sync = 1;
 	}
 #endif /* CONFIG_ADB */
+	if (strstr(cmd_line, "nol3") && cur_cpu_spec[0]->cpu_features & CPU_FTR_L3CR)
+		_set_L3CR(0);
+	if (strstr(cmd_line, "nonap"))
+		cur_cpu_spec[0]->cpu_features &= ~CPU_FTR_CAN_NAP;
+#ifdef CONFIG_BOOTX_TEXT
+	if (strstr(cmd_line, "printkbtext"))
+		force_printk_to_btext = 1;
+#endif
 
 	switch (_machine) {
 	case _MACH_Pmac:
@@ -609,24 +584,30 @@ int __init ppc_setup_l2cr(char *str)
 __setup("l2cr=", ppc_setup_l2cr);
 
 #ifdef CONFIG_NVRAM
-/* Generic nvram hooks we now look into ppc_md.nvram_read_val
- * on pmac too ;)
- * //XX Those 2 could be moved to headers
- */
-unsigned char
-nvram_read_byte(int addr)
+
+/* Generic nvram hooks used by drivers/char/gen_nvram.c */
+unsigned char nvram_read_byte(int addr)
 {
 	if (ppc_md.nvram_read_val)
 		return ppc_md.nvram_read_val(addr);
 	return 0xff;
 }
+EXPORT_SYMBOL(nvram_read_byte);
 
-void
-nvram_write_byte(unsigned char val, int addr)
+void nvram_write_byte(unsigned char val, int addr)
 {
 	if (ppc_md.nvram_write_val)
-		ppc_md.nvram_write_val(val, addr);
+		ppc_md.nvram_write_val(addr, val);
 }
+EXPORT_SYMBOL(nvram_write_byte);
+
+void nvram_sync(void)
+{
+	if (ppc_md.nvram_sync)
+		ppc_md.nvram_sync();
+}
+EXPORT_SYMBOL(nvram_sync);
+
 #endif /* CONFIG_NVRAM */
 
 static struct cpu cpu_devices[NR_CPUS];
@@ -659,8 +640,8 @@ void __init setup_arch(char **cmdline_p)
 	extern char *klimit;
 	extern void do_init_bootmem(void);
 
-	/* so udelay does something sensible, assume <= 1000 bogomips */
-	loops_per_jiffy = 500000000 / HZ;
+	/* so udelay does something sensible, assume <= 2000 bogomips */
+	loops_per_jiffy = 1000000000 / HZ;
 
 #ifdef CONFIG_PPC_MULTIPLATFORM
 	/* This could be called "early setup arch", it must be done

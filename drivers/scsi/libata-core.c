@@ -1927,12 +1927,17 @@ static void ata_pio_sector(struct ata_port *ap)
 		status);
 
 	/* do the actual data transfer */
-	/* FIXME: mmio-ize */
-	if (qc->flags & ATA_QCFLAG_WRITE)
-		outsl(ap->ioaddr.data_addr, buf, ATA_SECT_DWORDS);
-	else
-		insl(ap->ioaddr.data_addr, buf, ATA_SECT_DWORDS);
-
+	if (ap->flags & ATA_FLAG_MMIO) {
+		if (qc->flags & ATA_QCFLAG_WRITE)
+			__ide_mm_outsl(ap->ioaddr.data_addr, buf, ATA_SECT_DWORDS);
+		else
+			__ide_mm_insl(ap->ioaddr.data_addr, buf, ATA_SECT_DWORDS);
+	} else {
+		if (qc->flags & ATA_QCFLAG_WRITE)
+			outsl(ap->ioaddr.data_addr, buf, ATA_SECT_DWORDS);
+		else
+			insl(ap->ioaddr.data_addr, buf, ATA_SECT_DWORDS);
+	}
 	kunmap(sg[qc->cursg].page);
 }
 

@@ -151,20 +151,20 @@ static int offb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 		break;
 	}
 
-	if (regno < 16)
+	if (regno < 16) {
+		u32 *pal = info->pseudo_palette;
+		unsigned int i;
+
 		switch (info->var.bits_per_pixel) {
 		case 16:
-			((u16 *) (info->pseudo_palette))[regno] =
-			    (regno << 10) | (regno << 5) | regno;
+			pal[regno] = (regno << 10) | (regno << 5) | regno;
 			break;
 		case 32:
-			{
-				int i = (regno << 8) | regno;
-				((u32 *) (info->pseudo_palette))[regno] =
-				    (i << 16) | i;
-				break;
-			}
+			i = (regno << 8) | regno;
+			pal[regno] = (i << 16) | i;
+			break;
 		}
+	}
 	return 0;
 }
 

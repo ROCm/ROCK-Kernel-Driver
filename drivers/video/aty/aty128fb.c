@@ -52,22 +52,19 @@
 #include <linux/vmalloc.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
-#include <asm/uaccess.h>
 #include <linux/fb.h>
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/ioport.h>
+#include <linux/console.h>
+
+#include <asm/uaccess.h>
 #include <asm/io.h>
 
 #ifdef CONFIG_PPC_PMAC
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
 #include "../macmodes.h"
-#endif
-
-#ifdef CONFIG_ADB_PMU
-#include <linux/adb.h>
-#include <linux/pmu.h>
 #endif
 
 #ifdef CONFIG_PMAC_BACKLIGHT
@@ -146,6 +143,8 @@ enum {
 static int aty128_probe(struct pci_dev *pdev,
                                const struct pci_device_id *ent);
 static void aty128_remove(struct pci_dev *pdev);
+static int aty128_pci_suspend(struct pci_dev *pdev, u32 state);
+static int aty128_pci_resume(struct pci_dev *pdev);
 
 /* supported Rage128 chipsets */
 static struct pci_device_id aty128_pci_tbl[] = {
@@ -185,6 +184,8 @@ static struct pci_driver aty128fb_driver = {
 	.id_table	= aty128_pci_tbl,
 	.probe		= aty128_probe,
 	.remove		= __devexit_p(aty128_remove),
+	.suspend	= aty128_pci_suspend,
+	.resume		= aty128_pci_resume,
 };
 
 /* packed BIOS settings */
@@ -322,26 +323,20 @@ struct aty128fb_par {
 #endif
 	int blitter_may_be_busy;
 	int fifo_slots;                 /* free slots in FIFO (64 max) */
-#ifdef CONFIG_PMAC_PBOOK
-	unsigned char *save_framebuffer;
+
 	int	pm_reg;
 	int crt_on, lcd_on;
 	struct pci_dev *pdev;
 	struct fb_info *next;
-#endif
+	int	asleep;
+	int	lock_blank;
+
 	u8	red[32];		/* see aty128fb_setcolreg */
 	u8	green[64];
 	u8	blue[32];
 	u32	pseudo_palette[16];	/* used for TRUECOLOR */
 };
 
-#ifdef CONFIG_PMAC_PBOOK
-int aty128_sleep_notify(struct pmu_sleep_notifier *self, int when);
-static struct pmu_sleep_notifier aty128_sleep_notifier = {
-	aty128_sleep_notify, SLEEP_LEVEL_VIDEO,
-};
-static struct fb_info *aty128_fb = NULL;
-#endif
 
 #define round_div(n, d) ((n+(d/2))/d)
 
@@ -395,15 +390,9 @@ static struct fb_ops aty128fb_ops = {
 	.fb_blank	= aty128fb_blank,
 	.fb_ioctl	= aty128fb_ioctl,
 	.fb_sync	= aty128fb_sync,
-#if 0
-	.fb_fillrect	= aty128fb_fillrect,
-	.fb_copyarea	= aty128fb_copyarea,
-	.fb_imageblit	= aty128fb_imageblit,
-#else
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
-#endif
 	.fb_cursor	= soft_cursor,
 };
 
@@ -1039,7 +1028,7 @@ aty128_set_lcd_enable(struct aty128fb_par *par, int on)
 		aty_st_le32(LVDS_GEN_CNTL, reg);
 	}
 }
-#endif
+#endif /* CONFIG_PMAC_PBOOK */
 
 static void
 aty128_set_pll(struct aty128_pll *pll, const struct aty128fb_par *par)
@@ -1623,16 +1612,12 @@ aty128_init(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (par->chip_gen == rage_M3)
 		register_backlight_controller(&aty128_backlight_controller, par, "ati");
 #endif /* CONFIG_PMAC_BACKLIGHT */
-#ifdef CONFIG_PMAC_PBOOK
-	par->pm_reg = pci_find_capability(pdev, PCI_CAP_ID_PM);
-	if (aty128_fb == NULL) {
-		/* XXX can only put one chip to sleep */
-		aty128_fb = info;
-	} else
-		printk(KERN_WARNING "aty128fb: can only sleep one Rage 128\n");
-	par->pdev = pdev;
-#endif
 
+	par->pm_reg = pci_find_capability(pdev, PCI_CAP_ID_PM);
+	par->pdev = pdev;
+	par->asleep = 0;
+	par->lock_blank = 0;
+	
 	printk(KERN_INFO "fb%d: %s frame buffer device on %s\n",
 	       info->node, info->fix.id, video_card);
 
@@ -1780,10 +1765,6 @@ static void __devexit aty128_remove(struct pci_dev *pdev)
 			   pci_resource_len(pdev, 1));
 	release_mem_region(pci_resource_start(pdev, 2),
 			   pci_resource_len(pdev, 2));
-#ifdef CONFIG_PMAC_PBOOK
-	if (info == aty128_fb)
-		aty128_fb = NULL;
-#endif
 	kfree(info);
 }
 #endif /* CONFIG_PCI */
@@ -1944,6 +1925,9 @@ aty128fb_blank(int blank, struct fb_info *fb)
 	struct aty128fb_par *par = fb->par;
 	u8 state = 0;
 
+	if (par->lock_blank || par->asleep)
+		return 0;
+
 #ifdef CONFIG_PMAC_BACKLIGHT
 	if ((_machine == _MACH_Pmac) && blank)
 		set_backlight_enable(0);
@@ -2041,9 +2025,9 @@ aty128fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 #define ATY_MIRROR_CRT_ON	0x00000002
 
 /* out param: u32*	backlight value: 0 to 15 */
-#define FBIO_ATY128_GET_MIRROR	_IOR('@', 1, __u32*)
+#define FBIO_ATY128_GET_MIRROR	_IOR('@', 1, __u32)
 /* in param: u32*	backlight value: 0 to 15 */
-#define FBIO_ATY128_SET_MIRROR	_IOW('@', 2, __u32*)
+#define FBIO_ATY128_SET_MIRROR	_IOW('@', 2, __u32)
 
 static int aty128fb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 			  u_long arg, struct fb_info *info)
@@ -2212,7 +2196,6 @@ fbcon_aty128_bmove(struct display *p, int sy, int sx, int dy, int dx,
 }
 #endif /* 0 */
 
-#ifdef CONFIG_PMAC_PBOOK
 static void
 aty128_set_suspend(struct aty128fb_par *par, int suspend)
 {
@@ -2257,85 +2240,121 @@ aty128_set_suspend(struct aty128fb_par *par, int suspend)
 	}
 }
 
-/*
- * Save the contents of the frame buffer when we go to sleep,
- * and restore it when we wake up again.
- */
-int
-aty128_sleep_notify(struct pmu_sleep_notifier *self, int when)
+static int
+aty128_pci_suspend(struct pci_dev *pdev, u32 state)
 {
- 	int nb;
-	struct fb_info *info = aty128_fb;
-	struct aty128fb_par *par;
+	struct fb_info *info = pci_get_drvdata(pdev);
+	struct aty128fb_par *par = info->par;
 
-	if (info == NULL)
-		return PBOOK_SLEEP_OK;
-	par = info->par;
-	nb = info->var.yres * info->fix.line_length;
+	/* We don't do anything but D2, for now we return 0, but
+	 * we may want to change that. How do we know if the BIOS
+	 * can properly take care of D3 ? Also, with swsusp, we
+	 * know we'll be rebooted, ...
+	 */
+#ifdef CONFIG_PPC_PMAC
+	/* HACK ALERT ! Once I find a proper way to say to each driver
+	 * individually what will happen with it's PCI slot, I'll change
+	 * that. On laptops, the AGP slot is just unclocked, so D2 is
+	 * expected, while on desktops, the card is powered off
+	 */
+	if (state >= 3)
+		state = 2;
+#endif /* CONFIG_PPC_PMAC */
+	 
+	if (state != 2 || state == pdev->dev.power_state)
+		return 0;
 
-	switch (when) {
-	case PBOOK_SLEEP_REQUEST:
-		par->save_framebuffer = vmalloc(nb);
-		if (par->save_framebuffer == NULL)
-			return PBOOK_SLEEP_REFUSE;
-		break;
-	case PBOOK_SLEEP_REJECT:
-		if (par->save_framebuffer) {
-			vfree(par->save_framebuffer);
-			par->save_framebuffer = 0;
-		}
-		break;
-	case PBOOK_SLEEP_NOW:
-		wait_for_idle(par);
-		aty128_reset_engine(par);
-		wait_for_idle(par);
+	printk(KERN_DEBUG "aty128fb: suspending...\n");
+	
+	acquire_console_sem();
 
-		/* Backup fb content */	
-		if (par->save_framebuffer)
-			memcpy_fromio(par->save_framebuffer,
-			       info->screen_base, nb);
+	fb_set_suspend(info, 1);
 
-		/* Blank display and LCD */
-		aty128fb_blank(VESA_POWERDOWN, info);
-			
-		/* Sleep the chip */
+	/* Setup dummy fb raster ops */
+	info->fbops->fb_fillrect 	= fb_dummy_fillrect;
+	info->fbops->fb_copyarea 	= fb_dummy_copyarea;
+	info->fbops->fb_imageblit	= fb_dummy_imageblit;
+	info->fbops->fb_cursor   	= fb_dummy_cursor;
+
+	/* Make sure engine is reset */
+	wait_for_idle(par);
+	aty128_reset_engine(par);
+	wait_for_idle(par);
+
+	/* Blank display and LCD */
+	aty128fb_blank(VESA_POWERDOWN, info);
+
+	/* Sleep */
+	par->asleep = 1;
+	par->lock_blank = 1;
+
+	/* We need a way to make sure the fbdev layer will _not_ touch the
+	 * framebuffer before we put the chip to suspend state. On 2.4, I
+	 * used dummy fb ops, 2.5 need proper support for this at the
+	 * fbdev level
+	 */
+	if (state == 2)
 		aty128_set_suspend(par, 1);
 
-		break;
-	case PBOOK_WAKE:
-		/* Wake the chip */
-		aty128_set_suspend(par, 0);
-		
-		aty128_reset_engine(par);
-		wait_for_idle(par);
+	release_console_sem();
 
-		/* Restore fb content */			
-		if (par->save_framebuffer) {
-			memcpy_toio(info->screen_base,
-			       par->save_framebuffer, nb);
-			vfree(par->save_framebuffer);
-			par->save_framebuffer = 0;
-		}
-		aty128fb_blank(0, info);
-		break;
-	}
-	return PBOOK_SLEEP_OK;
+	pdev->dev.power_state = state;
+
+	return 0;
 }
-#endif /* CONFIG_PMAC_PBOOK */
+
+static int
+aty128_pci_resume(struct pci_dev *pdev)
+{
+	struct fb_info *info = pci_get_drvdata(pdev);
+	struct aty128fb_par *par = info->par;
+
+	if (pdev->dev.power_state == 0)
+		return 0;
+
+	acquire_console_sem();
+
+	/* Wakeup chip */
+	if (pdev->dev.power_state == 2)
+		aty128_set_suspend(par, 0);
+	par->asleep = 0;
+
+	/* Restore display & engine */
+	aty128_reset_engine(par);
+	wait_for_idle(par);
+	aty128fb_set_par(info);
+	fb_pan_display(info, &info->var);
+	fb_set_cmap(&info->cmap, 1, info);
+
+	/* Restore fb raster ops */
+	info->fbops->fb_fillrect	= cfb_fillrect;
+	info->fbops->fb_copyarea	= cfb_copyarea;
+	info->fbops->fb_imageblit = cfb_imageblit;
+	info->fbops->fb_cursor   	= soft_cursor;
+
+	/* Refresh */
+	fb_set_suspend(info, 0);
+
+	/* Unblank */
+	par->lock_blank = 0;
+	aty128fb_blank(0, info);
+
+	release_console_sem();
+
+	pdev->dev.power_state = 0;
+
+	printk(KERN_DEBUG "aty128fb: resumed !\n");
+
+	return 0;
+}
 
 int __init aty128fb_init(void)
 {
-#ifdef CONFIG_PMAC_PBOOK
-	pmu_register_sleep_notifier(&aty128_sleep_notifier);
-#endif
 	return pci_module_init(&aty128fb_driver);
 }
 
 static void __exit aty128fb_exit(void)
 {
-#ifdef CONFIG_PMAC_PBOOK
-	pmu_unregister_sleep_notifier(&aty128_sleep_notifier);
-#endif
 	pci_unregister_driver(&aty128fb_driver);
 }
 

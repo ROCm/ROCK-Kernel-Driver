@@ -30,6 +30,8 @@ typedef struct board_info {
 	unsigned int	 bi_busfreq;		/* PLB Bus speed, in Hz */
 	unsigned int	 bi_pci_busfreq;	/* PCI Bus speed, in Hz */
 	unsigned int	 bi_nvramsize;		/* Size of the NVRAM/RTC */
+	unsigned int	 bi_opb_busfreq;	/* OPB Bus speed, in Hz */
+	int		 bi_iic_fast[1];	/* Use fast i2c mode */
 } bd_t;
 
 /* Some 4xx parts use a different timebase frequency from the internal clock.

@@ -13,16 +13,6 @@
  *
  * This file is licenced under the GPL.
  */
- 
-#ifdef CONFIG_PMAC_PBOOK
-#include <asm/machdep.h>
-#include <asm/pmac_feature.h>
-#include <asm/pci-bridge.h>
-#include <asm/prom.h>
-#ifndef CONFIG_PM
-#	define CONFIG_PM
-#endif
-#endif
 
 #ifndef CONFIG_PCI
 #error "This file is PCI bus glue.  CONFIG_PCI must be defined."
@@ -46,6 +36,17 @@ ohci_pci_start (struct usb_hcd *hcd)
 	int		ret;
 
 	if (hcd->pdev) {
+#if 1
+		u16 status;
+
+		pci_read_config_word(hcd->pdev, PCI_STATUS, &status);
+		printk(KERN_ERR "OHCI PCI Status: 0x%04x\n", status);
+		if (status & 0xf900) {
+			printk(KERN_ERR "Initial error ! clearing ...\n");
+			pci_write_config_word(hcd->pdev, PCI_STATUS, status);
+		}
+#endif
+
 		ohci->hcca = pci_alloc_consistent (hcd->pdev,
 				sizeof *ohci->hcca, &ohci->hcca_dma);
 		if (!ohci->hcca)
@@ -142,12 +143,6 @@ static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 	mdelay (1);
 	if (!readl (&ohci->regs->intrstatus) & OHCI_INTR_SF)
 		mdelay (1);
-		
-#ifdef CONFIG_PMAC_PBOOK
-	if (_machine == _MACH_Pmac)
-		disable_irq (hcd->pdev->irq);
- 	/* else, 2.4 assumes shared irqs -- don't disable */
-#endif
 
 	/* Enable remote wakeup */
 	writel (readl (&ohci->regs->intrenable) | OHCI_INTR_RD,
@@ -182,16 +177,7 @@ static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 	pci_read_config_word (hcd->pdev, PCI_COMMAND, &cmd);
 	cmd &= ~PCI_COMMAND_MASTER;
 	pci_write_config_word (hcd->pdev, PCI_COMMAND, cmd);
-#ifdef CONFIG_PMAC_PBOOK
-	{
-	   	struct device_node	*of_node;
- 
-		/* Disable USB PAD & cell clock */
-		of_node = pci_device_to_OF_node (hcd->pdev);
-		if (of_node)
-			pmac_call_feature(PMAC_FTR_USB_ENABLE, of_node, 0, 0);
-	}
-#endif
+
 	return 0;
 }
 
@@ -202,16 +188,6 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 	int			temp;
 	int			retval = 0;
 
-#ifdef CONFIG_PMAC_PBOOK
-	{
-		struct device_node *of_node;
-
-		/* Re-enable USB PAD & cell clock */
-		of_node = pci_device_to_OF_node (hcd->pdev);
-		if (of_node)
-			pmac_call_feature (PMAC_FTR_USB_ENABLE, of_node, 0, 1);
-	}
-#endif
 	/* did we suspend, or were we powered off? */
 	ohci->hc_control = readl (&ohci->regs->control);
 	temp = ohci->hc_control & OHCI_CTRL_HCFS;
@@ -277,10 +253,6 @@ restart:
 		(void) readl (&ohci->regs->intrdisable);
 		spin_unlock_irq (&ohci->lock);
 
-#ifdef CONFIG_PMAC_PBOOK
-		if (_machine == _MACH_Pmac)
-			enable_irq (hcd->pdev->irq);
-#endif
 
 		/* Check for a pending done list */
 		if (ohci->hcca->done_head)

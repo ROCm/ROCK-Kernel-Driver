@@ -12,7 +12,6 @@ CONFIG_PPC32=y
 #
 CONFIG_EXPERIMENTAL=y
 CONFIG_CLEAN_COMPILE=y
-# CONFIG_STANDALONE is not set
 CONFIG_BROKEN_ON_SMP=y
 
 #
@@ -126,6 +125,7 @@ CONFIG_BOOT_LOAD=0x01000000
 #
 # Block devices
 #
+# CONFIG_BLK_DEV_FD is not set
 # CONFIG_BLK_CPQ_DA is not set
 # CONFIG_BLK_CPQ_CISS_DA is not set
 # CONFIG_BLK_DEV_DAC960 is not set
@@ -308,11 +308,6 @@ CONFIG_NETDEVICES=y
 # CONFIG_IRDA is not set
 
 #
-# Bluetooth support
-#
-# CONFIG_BT is not set
-
-#
 # ISDN subsystem
 #
 # CONFIG_ISDN_BOOL is not set
@@ -351,11 +346,7 @@ CONFIG_INPUT_MOUSEDEV_SCREEN_Y=768
 #
 # CONFIG_GAMEPORT is not set
 CONFIG_SOUND_GAMEPORT=y
-CONFIG_SERIO=y
-# CONFIG_SERIO_I8042 is not set
-# CONFIG_SERIO_SERPORT is not set
-# CONFIG_SERIO_CT82C710 is not set
-# CONFIG_SERIO_PCIPS2 is not set
+# CONFIG_SERIO is not set
 
 #
 # Input Device Drivers
@@ -383,7 +374,6 @@ CONFIG_HW_CONSOLE=y
 #
 CONFIG_SERIAL_8250=y
 CONFIG_SERIAL_8250_CONSOLE=y
-CONFIG_SERIAL_8250_NR_UARTS=4
 CONFIG_SERIAL_8250_EXTENDED=y
 CONFIG_SERIAL_8250_MANY_PORTS=y
 CONFIG_SERIAL_8250_SHARE_IRQ=y
@@ -405,11 +395,6 @@ CONFIG_UNIX98_PTY_COUNT=256
 # CONFIG_I2C is not set
 
 #
-# I2C Algorithms
-#
-
-#
-# I2C Hardware Bus support
 #
 
 #
@@ -492,7 +477,6 @@ CONFIG_PROC_KCORE=y
 CONFIG_DEVPTS_FS=y
 # CONFIG_DEVPTS_FS_XATTR is not set
 # CONFIG_TMPFS is not set
-# CONFIG_HUGETLB_PAGE is not set
 CONFIG_RAMFS=y
 
 #
@@ -546,6 +530,11 @@ CONFIG_MSDOS_PARTITION=y
 #
 # CONFIG_USB is not set
 # CONFIG_USB_GADGET is not set
+
+#
+# Bluetooth support
+#
+# CONFIG_BT is not set
 
 #
 # Library routines

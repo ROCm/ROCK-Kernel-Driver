@@ -80,6 +80,7 @@ struct atyfb_par {
 	u8 mem_refresh_rate;
 	u8 blitter_may_be_busy;
 	u32 accel_flags;
+	u32 pseudo_palette[17];
 #ifdef __sparc__
 	struct pci_mmap_map *mmap_map;
 	u8 mmaped;
@@ -89,6 +90,9 @@ struct atyfb_par {
 	struct fb_info *next;
 	unsigned char *save_framebuffer;
 	unsigned long save_pll[64];
+	int pm_reg;
+	int crt_on, lcd_on;
+	u32 save_lcd_gen_cntl;
 #endif
 };
     

@@ -337,6 +337,11 @@ riva_common_setup(struct riva_par *par)
 	case 0x01F0:
 	case 0x0250:
 	case 0x0280:
+	case 0x0300:
+	case 0x0310:
+	case 0x0320:
+	case 0x0330:
+	case 0x0340:
 		riva_is_second(par);
 		break;
 	default:

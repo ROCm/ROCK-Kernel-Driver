@@ -29,6 +29,8 @@ typedef struct board_info {
 	unsigned int	bi_intfreq;		/* Processor speed, in Hz */
 	unsigned int	bi_busfreq;		/* Bus speed, in Hz */
 	unsigned int	bi_tbfreq;		/* Software timebase freq */
+	unsigned int	bi_opb_busfreq;		/* OPB Bus speed, in Hz */
+	int		bi_iic_fast[2];		/* Use fast i2c mode */
 } bd_t;
 #endif /* !__ASSEMBLY__ */
 

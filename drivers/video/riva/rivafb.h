@@ -49,6 +49,7 @@ struct riva_par {
 	int forceCRTC;
 	Bool SecondCRTC;
 	int FlatPanel;
+	u32 pseudo_palette[17];
 #ifdef CONFIG_MTRR
 	struct { int vram; int vram_valid; } mtrr;
 #endif

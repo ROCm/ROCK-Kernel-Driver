@@ -15,6 +15,7 @@
 #include <asm/bootx.h>
 #include <asm/machdep.h>
 #include <asm/xmon.h>
+#include <asm/mmu_context.h>
 #ifdef CONFIG_PMAC_BACKLIGHT
 #include <asm/backlight.h>
 #endif
@@ -75,6 +76,7 @@ void print_address(unsigned);
 static int getsp(void);
 static void dump_hash_table(void);
 static void backtrace(struct pt_regs *);
+static void show_processes(void);
 static void excprint(struct pt_regs *);
 static void prregs(struct pt_regs *);
 static void memops(int);
@@ -154,6 +156,8 @@ Commands:\n\
   t	print backtrace\n\
   la	lookup address in system.map\n\
   ls	lookup symbol in system.map\n\
+  p	call procedure\n\
+  P	show processes\n\
   x	exit monitor\n\
 ";
 
@@ -241,6 +245,10 @@ xmon(struct pt_regs *excp)
 	}
 	debugger_fault_handler = 0;
 #endif	/* CONFIG_PMAC_BACKLIGHT */
+#if 1
+	termch = '\n';
+	backtrace(excp);
+#endif
 	cmd = cmds(excp);
 	if (cmd == 's') {
 		xmon_trace[smp_processor_id()] = SSTEP;
@@ -373,7 +381,7 @@ insert_bpts(void)
 		}
 		store_inst((void *) bp->address);
 	}
-#if !defined(CONFIG_8xx)
+#if !defined(CONFIG_8xx) && !defined(CONFIG_POWER4)
 	if (dabr.enabled)
 		set_dabr(dabr.address);
 	if (iabr.enabled)
@@ -388,7 +396,7 @@ remove_bpts(void)
 	struct bpt *bp;
 	unsigned instr;
 
-#if !defined(CONFIG_8xx)
+#if !defined(CONFIG_8xx) && !defined(CONFIG_POWER4)
 	set_dabr(0);
 	set_iabr(0);
 #endif
@@ -520,6 +528,9 @@ cmds(struct pt_regs *excp)
 			break;
 		case 'T':
 			printtime();
+			break;
+		case 'P':
+			show_processes();
 			break;
 		}
 	}
@@ -710,7 +721,7 @@ bpt_cmds(void)
 
 	cmd = inchar();
 	switch (cmd) {
-#if !defined(CONFIG_8xx)
+#if !defined(CONFIG_8xx) && !defined(CONFIG_POWER4)
 	case 'd':
 		mode = 7;
 		cmd = inchar();
@@ -1675,6 +1686,95 @@ void proccall(void)
 	}
 	debugger_fault_handler = 0;
 }
+
+static char
+state_to_char(int state)
+{
+	switch(state) {
+	case TASK_RUNNING:		return 'R';
+	case TASK_INTERRUPTIBLE:	return 'I';
+	case TASK_UNINTERRUPTIBLE:	return 'U';
+	case TASK_ZOMBIE:		return 'Z';
+	case TASK_STOPPED:		return 'S';
+	case TASK_DEAD:			return 'D';
+	}
+	return '?';
+}
+
+static void
+show_processes(void)
+{
+	struct task_struct *p, *g;
+	unsigned pid = -1UL;
+	char c = 0;
+
+	/* We can add some "actions" like 'Pw' to wakeup a process etc... */
+	if (termch != '\n' && termch != 0)
+		c = inchar();
+	if (isxdigit(c) && c != 'd')
+		termch = c;
+	scanhex(&pid);
+
+	if (setjmp(bus_error_jmp) == 0) {
+		debugger_fault_handler = handle_fault;
+		mb();
+		do_each_thread(g, p) {
+			unsigned long ksp;
+			struct pt_regs *regs;
+			if (pid != -1UL && pid != p->pid)
+				goto next;
+			ksp = p->thread.ksp;
+			regs = (struct pt_regs *)(ksp + STACK_FRAME_OVERHEAD);
+			printf("%8d %c %c F:%08x %16s KSP:%08x",
+			       p->pid, p == current ? '*' : ' ', state_to_char(p->state), p->flags, p->comm, ksp);
+			if (p->thread.regs)
+				printf(" USP:%08lx UPC:%08lx",
+					p->thread.regs->nip, p->thread.regs->link);
+			printf("\n");
+			if (c == 'd') {
+				/* Add more to detailed report infos...
+				 */
+				printf("comm          : %s\n", p->comm);
+				printf("lock_depth    : %d\n", p->lock_depth);
+				printf("prio          : %d\n", p->prio);
+				printf("static_prio   : %d\n", p->static_prio);
+				printf("mm            : %08x\n", p->mm);
+				if (p->thread.regs) {
+					printf("userland sp   : %08x\n", p->thread.regs->gpr[1]);
+					printf("userland pc   : %08x\n", p->thread.regs->nip);
+					printf("userland lr   : %08x\n", p->thread.regs->link);
+				}
+				if (p->mm) {
+					printf(" mm_users     : %d\n", p->mm->mm_users);
+					printf(" mm_count     : %d\n", p->mm->mm_count);
+					printf(" map_count    : %d\n", p->mm->map_count);
+					printf(" context      : %08x\n", p->mm->context);
+					printf(" VSID 0x0*    : %08x\n", CTX_TO_VSID(p->mm->context, 0x00000000));
+					printf(" VSID 0x1*    : %08x\n", CTX_TO_VSID(p->mm->context, 0x10000000));
+					printf(" VSID 0x2*    : %08x\n", CTX_TO_VSID(p->mm->context, 0x20000000));
+					printf(" VSID 0x3*    : %08x\n", CTX_TO_VSID(p->mm->context, 0x30000000));
+					printf(" VSID 0x4*    : %08x\n", CTX_TO_VSID(p->mm->context, 0x40000000));
+					printf(" VSID 0x5*    : %08x\n", CTX_TO_VSID(p->mm->context, 0x50000000));
+					printf(" VSID 0x6*    : %08x\n", CTX_TO_VSID(p->mm->context, 0x60000000));
+					printf(" VSID 0x7*    : %08x\n", CTX_TO_VSID(p->mm->context, 0x70000000));
+					printf(" VSID 0x8*    : %08x\n", CTX_TO_VSID(p->mm->context, 0x80000000));
+					printf(" VSID 0x9*    : %08x\n", CTX_TO_VSID(p->mm->context, 0x90000000));
+					printf(" VSID 0xa*    : %08x\n", CTX_TO_VSID(p->mm->context, 0xa0000000));
+					printf(" VSID 0xb*    : %08x\n", CTX_TO_VSID(p->mm->context, 0xb0000000));
+				}
+				printf("registers:\n");
+				prregs(regs);
+				backtrace(regs);
+			}
+		next:
+			;
+		} while_each_thread(g, p);
+	} else {
+		printf("*** %x exception occurred\n", fault_except);
+	}
+	debugger_fault_handler = 0;
+}
+
 
 /* Input scanning routines */
 int

@@ -86,11 +86,16 @@
 /* Special Purpose Registers (SPRNs)*/
 #define SPRN_CTR	0x009	/* Count Register */
 #define SPRN_DABR	0x3F5	/* Data Address Breakpoint Register */
+#if !defined(SPRN_DAC1) && !defined(SPRN_DAC2)
+#define SPRN_DAC1	0x3F6	/* Data Address Compare 1 */
+#define SPRN_DAC2	0x3F7	/* Data Address Compare 2 */
+#endif
 #define SPRN_DAR	0x013	/* Data Address Register */
 #define SPRN_TBRL	0x10C	/* Time Base Read Lower Register (user, R/O) */
 #define SPRN_TBRU	0x10D	/* Time Base Read Upper Register (user, R/O) */
 #define SPRN_TBWL	0x11C	/* Time Base Lower Register (super, R/W) */
 #define SPRN_TBWU	0x11D	/* Time Base Upper Register (super, R/W) */
+#define SPRN_HIOR	0x137	/* 970 Hypervisor interrupt offset */
 #define SPRN_DBAT0L	0x219	/* Data BAT 0 Lower Register */
 #define SPRN_DBAT0U	0x218	/* Data BAT 0 Upper Register */
 #define SPRN_DBAT1L	0x21B	/* Data BAT 1 Lower Register */
@@ -179,7 +184,10 @@
 #define HID1_PC3	(1<<13)		/* 7450 PLL_CFG[3] */
 #define HID1_SYNCBE	(1<<11)		/* 7450 ABE for sync, eieio */
 #define HID1_ABE	(1<<10)		/* 7450 Address Broadcast Enable */
+#define SPRN_HID2	0x3F8		/* Hardware Implementation Register 2 */
 #define SPRN_IABR	0x3F2	/* Instruction Address Breakpoint Register */
+#define SPRN_HID4	0x3F4		/* 970 HID4 */
+#define SPRN_HID5	0x3F6		/* 970 HID5 */
 #if !defined(SPRN_IAC1) && !defined(SPRN_IAC2)
 #define SPRN_IAC1	0x3F4		/* Instruction Address Compare 1 */
 #define SPRN_IAC2	0x3F5		/* Instruction Address Compare 2 */
@@ -290,6 +298,8 @@
 #define SPRN_SPRG7	0x117	/* Special Purpose Register General 7 */
 #define SPRN_SRR0	0x01A	/* Save/Restore Register 0 */
 #define SPRN_SRR1	0x01B	/* Save/Restore Register 1 */
+#define SPRN_SRR2	0x3DE	/* Save/Restore Register 2 */
+#define SPRN_SRR3	0x3DF	/* Save/Restore Register 3 */
 #define SPRN_THRM1	0x3FC		/* Thermal Management Register 1 */
 /* these bits were defined in inverted endian sense originally, ugh, confusing */
 #define THRM1_TIN	(1 << 31)

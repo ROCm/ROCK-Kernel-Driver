@@ -37,6 +37,32 @@
 #endif /* CONFIG_SMP */
 
 /*
+ * Sync CPUs with hash_page taking & releasing the hash
+ * table lock
+ */
+#ifdef CONFIG_SMP
+	.text
+_GLOBAL(hash_page_sync)
+	lis	r8,mmu_hash_lock@h
+	ori	r8,r8,mmu_hash_lock@l
+	lis	r0,0x0fff
+	b	10f
+11:	lwz	r6,0(r8)
+	cmpwi	0,r6,0
+	bne	11b
+10:	lwarx	r6,0,r8
+	cmpwi	0,r6,0
+	bne-	11b
+	stwcx.	r0,0,r8
+	bne-	10b
+	isync
+	eieio
+	li	r0,0
+	stw	r0,0(r8)
+	blr	
+#endif
+
+/*
  * Load a PTE into the hash table, if possible.
  * The address is in r4, and r3 contains an access flag:
  * _PAGE_RW (0x400) if a write.
@@ -417,21 +443,6 @@ _GLOBAL(hash_page_patch_C)
 	lwz	r6,next_slot@l(r4)
 	addi	r6,r6,PTE_SIZE
 	andi.	r6,r6,7*PTE_SIZE
-#ifdef CONFIG_POWER4
-	/*
-	 * Since we don't have BATs on POWER4, we rely on always having
-	 * PTEs in the hash table to map the hash table and the code
-	 * that manipulates it in virtual mode, namely flush_hash_page and
-	 * flush_hash_segments.  Otherwise we can get a DSI inside those
-	 * routines which leads to a deadlock on the hash_table_lock on
-	 * SMP machines.  We avoid this by never overwriting the first
-	 * PTE of each PTEG if it is already valid.
-	 *	-- paulus.
-	 */
-	bne	102f
-	li	r6,PTE_SIZE
-102:
-#endif /* CONFIG_POWER4 */
 	stw	r6,next_slot@l(r4)
 	add	r4,r3,r6
 

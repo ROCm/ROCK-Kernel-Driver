@@ -365,6 +365,7 @@
 #define DSTCACHE_CTLSTAT                       0x1714  
 #define DEFAULT_PITCH_OFFSET                   0x16E0  
 #define DEFAULT_SC_BOTTOM_RIGHT                0x16E8  
+#define DEFAULT_SC_TOP_LEFT                    0x16EC
 #define SRC_PITCH_OFFSET                       0x1428
 #define DST_PITCH_OFFSET                       0x142C
 #define DP_GUI_MASTER_CNTL                     0x146C  
@@ -379,16 +380,19 @@
 #define TMDS_CNTL                              0x0294
 #define TMDS_CRC			       0x02a0
 #define TMDS_TRANSMITTER_CNTL		       0x02a4
+#define MPP_TB_CONFIG            	       0x01c0
 
-#define RADEON_BASE_CODE		       0x0f0b
-#define RADEON_BIOS_0_SCRATCH		       0x0010
-#define RADEON_BIOS_1_SCRATCH		       0x0014
-#define RADEON_BIOS_2_SCRATCH		       0x0018
-#define RADEON_BIOS_3_SCRATCH		       0x001c
-#define RADEON_BIOS_4_SCRATCH		       0x0020
-#define RADEON_BIOS_5_SCRATCH		       0x0024
-#define RADEON_BIOS_6_SCRATCH		       0x0028
-#define RADEON_BIOS_7_SCRATCH		       0x002c
+//#define BASE_CODE			       0x0f0b
+#define BIOS_0_SCRATCH			       0x0010
+#define BIOS_1_SCRATCH			       0x0014
+#define BIOS_2_SCRATCH			       0x0018
+#define BIOS_3_SCRATCH			       0x001c
+#define BIOS_4_SCRATCH			       0x0020
+#define BIOS_5_SCRATCH			       0x0024
+#define BIOS_6_SCRATCH			       0x0028
+#define BIOS_7_SCRATCH			       0x002c
+
+#define HDP_SOFT_RESET                         (1 << 26)
 
 #define TV_DAC_CNTL                            0x088c
 #define GPIOPAD_MASK                           0x0198
@@ -410,7 +414,7 @@
 #define PPLL_DIV_3                                 0x0007
 #define VCLK_ECP_CNTL                              0x0008
 #define HTOTAL_CNTL                                0x0009
-#define M_SPLL_REF_FB_DIV                          0x000a
+#define X_MPLL_REF_FB_DIV                          0x000a
 #define AGP_PLL_CNTL                               0x000b
 #define SPLL_CNTL                                  0x000c
 #define SCLK_CNTL                                  0x000d
@@ -426,6 +430,7 @@
 #define P2PLL_CNTL                                 0x002a
 #define P2PLL_REF_DIV                              0x002b
 #define PIXCLKS_CNTL                               0x002d
+#define SCLK_MORE_CNTL				   0x0035
 
 /* MCLK_CNTL bit constants */
 #define FORCEON_MCLKA				   (1 << 16)
@@ -435,6 +440,13 @@
 #define FORCEON_MC            		   	   (1 << 20)
 #define FORCEON_AIC           		   	   (1 << 21)
 
+/* SCLK_CNTL bit constants */
+#define DYN_STOP_LAT_MASK			   0x00007ff8
+#define CP_MAX_DYN_STOP_LAT			   0x0008
+#define SCLK_FORCEON_MASK			   0xffff8000
+
+/* SCLK_MORE_CNTL bit constants */
+#define SCLK_MORE_FORCEON			   0x0700
 
 /* BUS_CNTL bit constants */
 #define BUS_DBL_RESYNC                             0x00000001
@@ -461,12 +473,26 @@
 #define BUS_READ_BURST                             0x40000000
 #define BUS_RDY_READ_DLY                           0x80000000
 
+/* PIXCLKS_CNTL */
+#define PIX2CLK_SRC_SEL_MASK                       0x03
+#define PIX2CLK_SRC_SEL_CPUCLK                     0x00
+#define PIX2CLK_SRC_SEL_PSCANCLK                   0x01
+#define PIX2CLK_SRC_SEL_BYTECLK                    0x02
+#define PIX2CLK_SRC_SEL_P2PLLCLK                   0x03
+#define PIX2CLK_ALWAYS_ONb                         (1<<6)
+#define PIX2CLK_DAC_ALWAYS_ONb                     (1<<7)
+#define PIXCLK_TV_SRC_SEL                          (1 << 8)
+#define PIXCLK_LVDS_ALWAYS_ONb                     (1 << 14)
+#define PIXCLK_TMDS_ALWAYS_ONb                     (1 << 15)
+
 
 /* CLOCK_CNTL_INDEX bit constants */
 #define PLL_WR_EN                                  0x00000080
 
 /* CONFIG_CNTL bit constants */
 #define CFG_VGA_RAM_EN                             0x00000100
+#define CFG_ATI_REV_ID_MASK			   (0xf << 16)
+#define CFG_ATI_REV_A11				   (0 << 16)
 
 /* CRTC_EXT_CNTL bit constants */
 #define VGA_ATI_LINEAR                             0x00000008
@@ -505,6 +531,22 @@
 /* CUR_OFFSET, CUR_HORZ_VERT_POSN, CUR_HORZ_VERT_OFF bit constants */
 #define CUR_LOCK                                   0x80000000
 
+/* GPIO bit constants */
+#define GPIO_A_0		(1 <<  0)
+#define GPIO_A_1		(1 <<  1)
+#define GPIO_Y_0		(1 <<  8)
+#define GPIO_Y_1		(1 <<  9)
+#define GPIO_EN_0		(1 << 16)
+#define GPIO_EN_1		(1 << 17)
+#define GPIO_MASK_0		(1 << 24)
+#define GPIO_MASK_1		(1 << 25)
+#define VGA_DDC_DATA_OUTPUT	GPIO_A_0
+#define VGA_DDC_CLK_OUTPUT	GPIO_A_1
+#define VGA_DDC_DATA_INPUT	GPIO_Y_0
+#define VGA_DDC_CLK_INPUT	GPIO_Y_1
+#define VGA_DDC_DATA_OUT_EN	GPIO_EN_0
+#define VGA_DDC_CLK_OUT_EN	GPIO_EN_1
+
 
 /* FP bit constants */
 #define FP_CRTC_H_TOTAL_MASK			   0x000003ff
@@ -540,6 +582,25 @@
 #define FP_CRT_SYNC_SEL				   (1 << 23)
 #define FP_USE_SHADOW_EN			   (1 << 24)
 #define FP_CRT_SYNC_ALT				   (1 << 26)
+
+/* FP2_GEN_CNTL bit constants */
+#define FP2_BLANK_EN             (1 <<  1)
+#define FP2_ON                   (1 <<  2)
+#define FP2_PANEL_FORMAT         (1 <<  3)
+#define FP2_SOURCE_SEL_MASK      (3 << 10)
+#define FP2_SOURCE_SEL_CRTC2     (1 << 10)
+#define FP2_SRC_SEL_MASK         (3 << 13)
+#define FP2_SRC_SEL_CRTC2        (1 << 13)
+#define FP2_FP_POL               (1 << 16)
+#define FP2_LP_POL               (1 << 17)
+#define FP2_SCK_POL              (1 << 18)
+#define FP2_LCD_CNTL_MASK        (7 << 19)
+#define FP2_PAD_FLOP_EN          (1 << 22)
+#define FP2_CRC_EN               (1 << 23)
+#define FP2_CRC_READ_EN          (1 << 24)
+#define FP2_DV0_EN               (1 << 25)
+#define FP2_DV0_RATE_SEL_SDR     (1 << 26)
+
 
 /* LVDS_GEN_CNTL bit constants */
 #define LVDS_ON					   (1 << 0)
@@ -597,15 +658,25 @@
 #define DAC_4BPP_PIX_ORDER                         0x00000200
 #define DAC_CRC_EN                                 0x00080000
 #define DAC_MASK_ALL				   (0xff << 24)
+#define DAC_PDWN                                   (1 << 15)
 #define DAC_EXPAND_MODE				   (1 << 14)
 #define DAC_VGA_ADR_EN				   (1 << 13)
-#define DAC_RANGE_CNTL				   (3 << 0)
-#define DAC_BLANKING				   (1 << 2)
-#define DAC_CMP_EN                                 (1 << 3)
+#define DAC_RANGE_CNTL				   (3 <<  0)
+#define DAC_RANGE_CNTL_MASK    			   0x03
+#define DAC_BLANKING				   (1 <<  2)
+#define DAC_CMP_EN                                 (1 <<  3)
+#define DAC_CMP_OUTPUT                             (1 <<  7)
 
 /* DAC_CNTL2 bit constants */   
 #define DAC2_CMP_EN                                (1 << 7)
 #define DAC2_PALETTE_ACCESS_CNTL                   (1 << 5)
+
+/* DAC_EXT_CNTL bit constants */
+#define DAC_FORCE_BLANK_OFF_EN                     (1 << 4)
+#define DAC_FORCE_DATA_EN                          (1 << 5)
+#define DAC_FORCE_DATA_SEL_MASK                    (3 << 6)
+#define DAC_FORCE_DATA_MASK                        0x0003ff00
+#define DAC_FORCE_DATA_SHIFT                       8
 
 /* GEN_RESET_CNTL bit constants */
 #define SOFT_RESET_GUI                             0x00000001
@@ -802,6 +873,11 @@
 #define MRDCKA1_RESET                              0x00020000
 
 /* VCLK_ECP_CNTL constants */
+#define VCLK_SRC_SEL_MASK                          0x03
+#define VCLK_SRC_SEL_CPUCLK                        0x00
+#define VCLK_SRC_SEL_PSCANCLK                      0x01
+#define VCLK_SRC_SEL_BYTECLK	                   0x02
+#define VCLK_SRC_SEL_PPLLCLK			   0x03
 #define PIXCLK_ALWAYS_ONb                          0x00000040
 #define PIXCLK_DAC_ALWAYS_ONb                      0x00000080
 
@@ -868,6 +944,7 @@
 #define DEFAULT_TILE_MASK		0xc0000000
 #define	PPLL_DIV_SEL_MASK		0x00000300
 #define	PPLL_RESET			0x00000001
+#define	PPLL_SLEEP			0x00000002
 #define PPLL_ATOMIC_UPDATE_EN		0x00010000
 #define PPLL_REF_DIV_MASK		0x000003ff
 #define	PPLL_FB3_DIV_MASK		0x000007ff
@@ -875,6 +952,8 @@
 #define PPLL_ATOMIC_UPDATE_R		0x00008000
 #define PPLL_ATOMIC_UPDATE_W		0x00008000
 #define	PPLL_VGA_ATOMIC_UPDATE_EN	0x00020000
+#define R300_PPLL_REF_DIV_ACC_MASK	(0x3ff << 18)
+#define R300_PPLL_REF_DIV_ACC_SHIFT	18
 
 #define GUI_ACTIVE			0x80000000
 

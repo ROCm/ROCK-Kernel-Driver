@@ -63,6 +63,7 @@
 #include <asm/macintosh.h>
 #else
 #include <asm/prom.h>
+#include <asm/of_device.h>
 #endif
 #include <asm/pgtable.h>
 
@@ -313,41 +314,13 @@ static void __init valkyrie_choose_mode(struct fb_info_valkyrie *p)
 	       default_vmode, default_cmode);
 }
 
-int __init valkyriefb_init(void)
+static int __devinit valkyriefb_fb_init(
+		struct device *dev,
+		unsigned long frame_buffer_phys,
+		unsigned long cmap_regs_phys, unsigned long flags)
 {
 	struct fb_info_valkyrie	*p;
-	unsigned long frame_buffer_phys, cmap_regs_phys, flags;
 	int err;
-
-#ifdef CONFIG_MAC
-	if (!MACH_IS_MAC)
-		return 0;
-	if (!(mac_bi_data.id == MAC_MODEL_Q630
-	      /* I'm not sure about this one */
-	    || mac_bi_data.id == MAC_MODEL_P588))
-		return 0;
-
-	/* Hardcoded addresses... welcome to 68k Macintosh country :-) */
-	frame_buffer_phys = 0xf9000000;
-	cmap_regs_phys = 0x50f24000;
-	flags = IOMAP_NOCACHE_SER; /* IOMAP_WRITETHROUGH?? */
-#else /* ppc (!CONFIG_MAC) */
-	struct device_node *dp;
-
-	dp = find_devices("valkyrie");
-	if (dp == 0)
-		return 0;
-
-	if (dp->n_addrs != 1) {
-		printk(KERN_ERR "expecting 1 address for valkyrie (got %d)\n",
-		       dp->n_addrs);
-		return 0;
-	}
-
-	frame_buffer_phys = dp->addrs[0].address;
-	cmap_regs_phys = dp->addrs[0].address+0x304000;
-	flags = _PAGE_WRITETHRU;
-#endif /* ppc (!CONFIG_MAC) */
 
 	p = kmalloc(sizeof(*p), GFP_ATOMIC);
 	if (p == 0)
@@ -359,6 +332,8 @@ int __init valkyriefb_init(void)
 		kfree(p);
 		return 0;
 	}
+	if (dev)
+		dev_set_drvdata(dev, p);
 	p->total_vram = 0x100000;
 	p->frame_buffer_phys = frame_buffer_phys;
 	p->frame_buffer = __ioremap(frame_buffer_phys, p->total_vram, flags);
@@ -388,6 +363,8 @@ int __init valkyriefb_init(void)
 	return 0;
 
  out_free:
+	if (dev)
+		dev_set_drvdata(dev, NULL);
 	if (p->frame_buffer)
 		iounmap(p->frame_buffer);
 	if (p->cmap_regs)
@@ -581,3 +558,90 @@ int __init valkyriefb_setup(char *options)
 }
 
 MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("framebuffer driver for Apple Platinum video");
+
+#ifdef CONFIG_MAC
+int __init valkyriefb_init(void)
+{
+	unsigned long frame_buffer_phys, cmap_regs_phys, flags;
+
+	if (!MACH_IS_MAC)
+		return 0;
+	if (!(mac_bi_data.id == MAC_MODEL_Q630
+	      /* I'm not sure about this one */
+	    || mac_bi_data.id == MAC_MODEL_P588))
+		return 0;
+
+	/* Hardcoded addresses... welcome to 68k Macintosh country :-) */
+	return valkyriefb_fb_init(NULL, 0xf9000000, 0x50f24000, IOMAP_NOCACHE_SER);
+}
+#else  /* CONFIG_MAC */
+
+static int __devinit valkyriefb_probe(struct of_device* odev, const struct of_match *match)
+{
+	if (odev->node->n_addrs != 1) {
+		printk(KERN_ERR "expecting 1 address for valkyrie (got %d)\n",
+		       odev->node->n_addrs);
+		return -ENXIO;
+	}
+
+	return valkyriefb_fb_init(&odev->dev, odev->node->addrs[0].address,
+		odev->node->addrs[0].address+0x304000, _PAGE_WRITETHRU);
+}
+
+static int __devexit valkyriefb_remove(struct of_device* odev)
+{
+	struct fb_info_valkyrie	*p = dev_get_drvdata(&odev->dev);
+
+	if (!p)
+		return 0;
+
+        unregister_framebuffer (&p->info);
+	
+	release_mem_region(p->frame_buffer_phys, 0x100000);
+	iounmap((void *)p->frame_buffer);
+	iounmap((void *)p->cmap_regs);
+	iounmap((void *)p->valkyrie_regs);
+
+	kfree(p);
+
+	return 0;
+}
+
+static struct of_match valkyriefb_match[] = 
+{
+	{
+	.name 		= "valkyrie",
+	.type		= OF_ANY_MATCH,
+	.compatible	= OF_ANY_MATCH,
+	},
+	{},
+};
+
+static struct of_platform_driver valkyrie_driver = 
+{
+	.name 		= "valkyriefb",
+	.match_table	= valkyriefb_match,
+	.probe		= valkyriefb_probe,
+	.remove		= valkyriefb_remove,
+};
+
+int __init valkyriefb_init(void)
+{
+	of_register_driver(&valkyrie_driver);
+
+	return 0;
+}
+
+void __exit valkyriefb_exit(void)
+{
+	of_unregister_driver(&valkyrie_driver);	
+}
+
+#ifdef MODULE
+module_init(valkyriefb_init);
+module_exit(valkyriefb_exit);
+#endif
+
+#endif /* (else) CONFIG_MAC */
+

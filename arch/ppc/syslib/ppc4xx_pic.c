@@ -40,7 +40,7 @@
 struct hw_interrupt_type *ppc4xx_pic;
 /*
  * We define 4xxIRQ_InitSenses table thusly:
- * bit 0x1: sense, 1 for edge and 0 for level.
+ * bit 0x1: sense, 0 for edge and 1 for level.
  * bit 0x2: polarity, 0 for negative, 1 for positive.
  */
 unsigned int ibm4xxPIC_NumInitSenses __initdata = 0;
@@ -225,10 +225,14 @@ ppc405_uic_disable_and_ack(unsigned int irq)
 		mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[word]);
 		mtdcr(DCRN_UIC_SR(UIC0), (1 << (31 - bit)));
 		break;
+#if NR_UICS > 1
 	case 1:
 		mtdcr(DCRN_UIC_ER(UIC1), ppc_cached_irq_mask[word]);
 		mtdcr(DCRN_UIC_SR(UIC1), (1 << (31 - bit)));
+		/* ACK cascaded interrupt in UIC0 */
+		mtdcr(DCRN_UIC_SR(UIC0), (1 << (31 - UIC0_UIC1NC)));
 		break;
+#endif
 	}
 }
 
@@ -260,9 +264,13 @@ ppc405_uic_end(unsigned int irq)
 		case 0:
 			mtdcr(DCRN_UIC_SR(UIC0), 1 << (31 - bit));
 			break;
+#if NR_UICS > 1
 		case 1:
 			mtdcr(DCRN_UIC_SR(UIC1), 1 << (31 - bit));
+			/* ACK cascaded interrupt in UIC0 */
+			mtdcr(DCRN_UIC_SR(UIC0), (1 << (31 - UIC0_UIC1NC)));
 			break;
+#endif
 		}
 	}
 
@@ -340,14 +348,6 @@ ppc405_pic_get_irq(struct pt_regs *regs)
 void __init
 ppc4xx_extpic_init(void)
 {
-	/* set polarity
-	 * 1 = default/pos/rising  , 0= neg/falling internal
-	 * 1 = neg/falling , 0= pos/rising external
-	 * Sense
-	 * 0 = default level internal
-	 * 0 = level, 1 = edge external
-	 */
-
 	unsigned int sense, irq;
 	int bit, word;
 	unsigned long ppc_cached_sense_mask[NR_MASK_WORDS];
@@ -362,15 +362,15 @@ ppc4xx_extpic_init(void)
 		bit = irq & 0x1f;
 		word = irq >> 5;
 
-		sense =
-		    (irq <
-		     ibm4xxPIC_NumInitSenses) ? ibm4xxPIC_InitSenses[irq] : 3;
+		sense = (irq < ibm4xxPIC_NumInitSenses) ?
+			ibm4xxPIC_InitSenses[irq] :
+			IRQ_SENSE_EDGE | IRQ_POLARITY_POSITIVE;
 #ifdef PPC4xx_PIC_DEBUG
 		printk("PPC4xx_picext %d word:%x bit:%x sense:%x", irq, word,
 		       bit, sense);
 #endif
 		ppc_cached_sense_mask[word] |=
-		    (sense & IRQ_SENSE_MASK) << (31 - bit);
+		    (~sense & IRQ_SENSE_MASK) << (31 - bit);
 		ppc_cached_pol_mask[word] |=
 		    ((sense & IRQ_POLARITY_MASK) >> 1) << (31 - bit);
 		switch (word) {

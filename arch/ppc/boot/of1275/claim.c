@@ -10,6 +10,7 @@
 
 #include "of1275.h"
 
+
 void *
 claim(unsigned int virt, unsigned int size, unsigned int align)
 {

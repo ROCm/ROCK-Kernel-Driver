@@ -566,17 +566,18 @@ static int get_std_timing(unsigned char *block, struct fb_videomode *mode)
 	}
 	refresh = (block[1] & 0x3f) + 60;
 
+	/* First find standard mode from the table of VESA modes */
 	for (i = 0; i < VESA_MODEDB_SIZE; i++) {
 		if (vesa_modes[i].xres == xres && 
 		    vesa_modes[i].yres == yres &&
 		    vesa_modes[i].refresh == refresh) {
 			*mode = vesa_modes[i];
-			break;
-		} else {
-			calc_mode_timings(xres, yres, refresh, mode);
-			break;
+			return 1;
 		}
 	}
+	/* If mode is not found in table, calculate it using GTF */
+	calc_mode_timings(xres, yres, refresh, mode);
+
 	return 1;
 }
 
@@ -1178,7 +1179,7 @@ int fb_get_mode(int flags, u32 val, struct fb_var_screeninfo *var, struct fb_inf
  * REQUIRES:
  * A valid info->monspecs.
  */
-int fb_validate_mode(struct fb_var_screeninfo *var, struct fb_info *info)
+int fb_validate_mode(const struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	u32 hfreq, vfreq, htotal, vtotal, pixclock;
 	u32 hfmin, hfmax, vfmin, vfmax, dclkmin, dclkmax;

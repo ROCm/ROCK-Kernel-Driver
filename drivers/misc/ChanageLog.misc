@@ -1,0 +1,5 @@
+Thu,  5 Sep 12:22:47 2002  Armin Kuster <akuster@mvista.com>
+	
+	* fixed compiler error in line 308.  missed indirection in parm 
+ 
+

@@ -32,3 +32,4 @@ obj-$(CONFIG_SERIAL_COLDFIRE) += mcfserial.o
 obj-$(CONFIG_V850E_UART) += v850e_uart.o
 obj-$(CONFIG_SERIAL98) += serial98.o
 obj-$(CONFIG_SERIAL_PMACZILOG) += pmac_zilog.o
+

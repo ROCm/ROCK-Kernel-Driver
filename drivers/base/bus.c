@@ -8,7 +8,7 @@
  *
  */
 
-#undef DEBUG
+#define DEBUG
 
 #include <linux/device.h>
 #include <linux/module.h>

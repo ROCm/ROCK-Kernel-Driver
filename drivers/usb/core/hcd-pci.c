@@ -32,6 +32,12 @@
 #include <linux/usb.h>
 #include "hcd.h"
 
+#ifdef CONFIG_PPC_PMAC
+#include <asm/machdep.h>
+#include <asm/pmac_feature.h>
+#include <asm/pci-bridge.h>
+#include <asm/prom.h>
+#endif /* CONFIG_PPC_PMAC */
 
 /* PCI-based HCs are normal, but custom bus glue should be ok */
 
@@ -295,8 +301,17 @@ int usb_hcd_pci_suspend (struct pci_dev *dev, u32 state)
 		if (retval)
 			dev_dbg (hcd->controller, "suspend fail, retval %d\n",
 					retval);
-		else
+		else {
+#ifdef CONFIG_PPC_PMAC
+			struct device_node	*of_node;
+ 
+			/* Disable USB PAD & cell clock for Keylargo built-in controller */
+			of_node = pci_device_to_OF_node (dev);
+			if (of_node)
+				pmac_call_feature(PMAC_FTR_USB_ENABLE, of_node, 0, 0);
+#endif /* CONFIG_PPC_PMAC */
 			hcd->state = USB_STATE_SUSPENDED;
+		}
 	}
 
  	pci_set_power_state (dev, state);
@@ -326,6 +341,17 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 	hcd->state = USB_STATE_RESUMING;
 
 	pci_set_power_state (dev, 0);
+#ifdef CONFIG_PPC_PMAC
+	{
+		struct device_node *of_node;
+
+		/* Re-enable USB PAD & cell clock for Keykargo built-in controller */
+		of_node = pci_device_to_OF_node (dev);
+		if (of_node)
+			pmac_call_feature (PMAC_FTR_USB_ENABLE, of_node, 0, 1);
+	}
+#endif /* CONFIG_PPC_PMAC */
+
 	pci_restore_state (dev, hcd->pci_state);
 
 	/* remote wakeup needs hub->suspend() cooperation */

@@ -20,6 +20,8 @@ obj-$(CONFIG_PARPORT)		+= parport/
 obj-y				+= base/ block/ misc/ net/ media/
 obj-$(CONFIG_NUBUS)		+= nubus/
 obj-$(CONFIG_ATM)		+= atm/
+# macintosh (on PPC at least) comes before ide & scsi for proper
+# interfaces ordering
 obj-$(CONFIG_PPC_PMAC)		+= macintosh/
 obj-$(CONFIG_IDE)		+= ide/
 obj-$(CONFIG_FC4)		+= fc4/

@@ -71,6 +71,11 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
 	int		ports, i, changed = 0, length = 1;
 
+	if (HCD_IS_SUSPENDED(hcd->state)) {
+		printk("ohci_hub_status_data() : sleeping\n");
+		return 0;
+	}
+
 	ports = roothub_a (ohci) & RH_A_NDP; 
 	if (ports > MAX_ROOT_PORTS) {
 		if (!HCD_IS_RUNNING(ohci->hcd.state))
@@ -160,6 +165,11 @@ static int ohci_hub_control (
 	int		ports = hcd_to_bus (hcd)->root_hub->maxchild;
 	u32		temp;
 	int		retval = 0;
+
+	if (HCD_IS_SUSPENDED(hcd->state)) {
+		printk("ohci_hub_control() : sleeping\n");
+		return -ENODEV;
+	}
 
 	switch (typeReq) {
 	case ClearHubFeature:

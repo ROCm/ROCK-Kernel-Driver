@@ -316,6 +316,11 @@ ohci_endpoint_disable (struct usb_hcd *hcd, struct hcd_dev *dev, int ep)
 	/* ASSERT:  any requests/urbs are being unlinked */
 	/* ASSERT:  nobody can be submitting urbs for this any more */
 
+	if (!HCD_IS_RUNNING (ohci->hcd.state)) {
+		ed->state = ED_IDLE;
+		finish_unlinks (ohci, 0, 0);
+	}
+
 	epnum <<= 1;
 	if (epnum != 0 && !(ep & USB_DIR_IN))
 		epnum |= 1;
@@ -571,9 +576,17 @@ static void ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 		disable (ohci);
 		ohci_err (ohci, "OHCI Unrecoverable Error, disabled\n");
 		// e.g. due to PCI Master/Target Abort
+#if 1
+		if (hcd->pdev) {
+			u16 status;
+
+			pci_read_config_word(hcd->pdev, PCI_STATUS, &status);
+			printk(KERN_ERR "OHCI PCI Status: 0x%04x\n", status);
+		}
+#endif
 
 		ohci_dump (ohci, 1);
-		hc_reset (ohci);
+       		hc_reset (ohci);
 	}
   
 	if (ints & OHCI_INTR_WDH) {

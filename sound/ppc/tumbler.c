@@ -956,6 +956,7 @@ static int __init tumbler_init(pmac_t *chip)
 	tumbler_reset_audio(chip);
 
 	/* activate headphone status interrupts */
+	/* XXX FIXME: disable that IRQ on suspend --BenH */
   	if (irq >= 0) {
 		unsigned char val;
 		if ((err = request_irq(irq, headphone_intr, 0,

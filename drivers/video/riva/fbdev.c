@@ -52,6 +52,11 @@
 #error This driver requires PCI support.
 #endif
 
+#include <linux/adb.h>
+#include <linux/pmu.h>
+#include <asm/prom.h>
+#include <asm/pci-bridge.h>
+
 /* version number of this driver */
 #define RIVAFB_VERSION "0.9.5b"
 
@@ -285,7 +290,6 @@ MODULE_DEVICE_TABLE(pci, rivafb_pci_tbl);
  * ------------------------------------------------------------------------- */
 
 /* command line data, set in rivafb_setup() */
-static u32 pseudo_palette[17];
 static int flatpanel __initdata = -1; /* Autodetect later */
 static int forceCRTC __initdata = -1;
 #ifdef CONFIG_MTRR
@@ -347,6 +351,94 @@ static const struct riva_regs reg_template = {
 	{0x03, 0x01, 0x0F, 0x00, 0x0E},				/* SEQ  */
 	0xEB							/* MISC */
 };
+
+/*
+ * Here is some specific support for the eMac machine
+ * 
+ * This machine is "special" because of it's ivad2 display
+ * controller and fixed horizontal timing requirements.
+ * 
+ * Right now, all I do is to set a fixed working 1024x768
+ * mode at boot (I also have a 1280x960 at hand, if you
+ * prefer...).
+ * 
+ * I expect to do things better in a future 2.5 version
+ * though.
+ * 
+ * I also turn off the screen during blanking using IVAD
+ * i2c accesses, that's the basis we can use to later
+ * implement full IVAD support (geometry setting,
+ * brightness, ...).
+ */
+#if defined(CONFIG_PPC_PMAC) && defined(CONFIG_ADB_PMU)
+
+static int ivad_iic_addr = -1;
+
+/* Default mode for eMac */
+static struct fb_var_screeninfo emac_default_var = {
+	xres:		1024,
+	yres:		768,
+	xres_virtual:	1024,
+	yres_virtual:	768,
+	xoffset:	0,
+	yoffset:	0,
+	bits_per_pixel:	8,
+	grayscale:	0,
+	red:		{0, 6, 0},
+	green:		{0, 6, 0},
+	blue:		{0, 6, 0},
+	transp:		{0, 0, 0},
+	nonstd:		0,
+	activate:	0,
+	height:		-1,
+	width:		-1,
+	accel_flags:	0,
+	pixclock:	10081,
+	left_margin:	208,
+	right_margin:	48,
+	upper_margin:	31,
+	lower_margin:	1,
+	hsync_len:	96,
+	vsync_len:	3,
+	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	vmode:		FB_VMODE_NONINTERLACED
+};
+
+static void
+init_ivad(void)
+{
+	if (machine_is_compatible("PowerMac4,4")) {
+		struct device_node* np = find_devices("ivad2");
+		unsigned int* prop;
+		
+		if (np == NULL)
+			return;
+		prop = (unsigned int*)get_property(np, "iic-address", NULL);
+		if (np == NULL) {
+			printk(KERN_INFO "IVAD2 has no iic-address property !\n");
+			return;
+		}
+		ivad_iic_addr = *prop;
+		printk(KERN_INFO "Found IVAD2, iic address is: 0x%02x\n", ivad_iic_addr);
+		rivafb_default_var = emac_default_var;
+	}
+}
+
+#define IVAD_CONTRAST_REG	0x00
+
+static void set_ivad_contrast(u8 contrast)
+{
+	int rc;
+
+	if (ivad_iic_addr < 0)
+		return;
+	rc = pmu_i2c_stdsub_write(PMU_I2C_BUS_POWER, ivad_iic_addr,
+				  IVAD_CONTRAST_REG, &contrast, 1);
+	if (rc < 0)
+		printk(KERN_ERR "IVAD2: Can't set contrast !\n");
+}
+
+#endif /* defined(CONFIG_PPC_PMAC) && defined(CONFIG_ADB_PMU) */
 
 /* ------------------------------------------------------------------------- *
  *
@@ -927,6 +1019,7 @@ static int rivafb_do_maximize(struct fb_info *info,
 /* acceleration routines */
 inline void wait_for_idle(struct riva_par *par)
 {
+	mb();
 	while (par->riva.Busy(&par->riva));
 }
 
@@ -1194,7 +1287,14 @@ static int rivafb_blank(int blank, struct fb_info *info)
 			vesa |= 0xc0;
 			break;
 		}
+#if defined(CONFIG_PPC_PMAC) && defined(CONFIG_ADB_PMU)
+		set_ivad_contrast(0);
+#endif
 	}
+#if defined(CONFIG_PPC_PMAC) && defined(CONFIG_ADB_PMU)
+	else
+		set_ivad_contrast(0xff);
+#endif
 	SEQout(par, 0x01, tmp);
 	CRTCout(par, 0x1a, vesa);
 	return 0;
@@ -1225,6 +1325,7 @@ static int rivafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 {
 	struct riva_par *par = (struct riva_par *)info->par;
 	RIVA_HW_INST *chip = &par->riva;
+	u32 *pal = info->pseudo_palette;
 	int i;
 
 	if (regno >= riva_get_cmap_len(&info->var))
@@ -1245,7 +1346,7 @@ static int rivafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 		if (info->var.green.length == 5) {
 			if (regno < 16) {
 				/* 0rrrrrgg gggbbbbb */
-				((u32 *)info->pseudo_palette)[regno] =
+				pal[regno] =
 					((red & 0xf800) >> 1) |
 					((green & 0xf800) >> 6) |
 					((blue & 0xf800) >> 11);
@@ -1258,7 +1359,7 @@ static int rivafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 			if (regno < 16) {
 				/* rrrrrggg gggbbbbb */
-				((u32 *)info->pseudo_palette)[regno] =
+				pal[regno] =
 					((red & 0xf800) >> 0) |
 					((green & 0xf800) >> 5) |
 					((blue & 0xf800) >> 11);
@@ -1277,7 +1378,7 @@ static int rivafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 		break;
 	case 32:
 		if (regno < 16) {
-			((u32 *)info->pseudo_palette)[regno] =
+			pal[regno] =
 				((red & 0xff00) << 8) |
 				((green & 0xff00)) | ((blue & 0xff00) >> 8);
 			
@@ -1585,7 +1686,7 @@ static int __devinit riva_set_fbinfo(struct fb_info *info)
 	info->var = rivafb_default_var;
 	info->fix = rivafb_fix;
 	info->fbops = &riva_fb_ops;
-	info->pseudo_palette = pseudo_palette;
+	info->pseudo_palette = par->pseudo_palette;
 
 #ifndef MODULE
 	if (mode_option)
@@ -1611,15 +1712,28 @@ static int riva_get_EDID_OF(struct riva_par *par, struct pci_dev *pd)
 {
 	struct device_node *dp;
 	unsigned char *pedid = NULL;
+	unsigned char *disptype = NULL;
+	static char *propnames[] = {
+		"DFP,EDID", "LCD,EDID", "EDID", "EDID1", "EDID,B", "EDID,A", NULL };
+	int i;  
 
 	dp = pci_device_to_OF_node(pd);
-	pedid = (unsigned char *)get_property(dp, "EDID,B", 0);
-
-	if (pedid) {
-		par->EDID = pedid;
-		return 1;
-	} else
-		return 0;
+	for (; dp != NULL; dp = dp->child) {
+		disptype = (unsigned char *)get_property(dp, "display-type", NULL);
+		if (disptype == NULL)
+			continue;
+		if (strncmp(disptype, "LCD", 3) != 0)
+			continue;
+		for (i = 0; propnames[i] != NULL; ++i) {
+			pedid = (unsigned char *)
+				get_property(dp, propnames[i], NULL);
+			if (pedid != NULL) {
+				par->EDID = pedid;
+				return 1;
+			}
+		}
+	}
+	return 0;
 }
 #endif /* CONFIG_PPC_OF */
 
@@ -1700,7 +1814,8 @@ static void riva_update_default_var(struct fb_info *info)
 static void riva_get_EDID(struct fb_info *info, struct pci_dev *pdev)
 {
 #ifdef CONFIG_PPC_OF
-	if (!riva_get_EDID_OF(info, pdev))
+	struct riva_par *par = (struct riva_par *) info->par;
+	if (!riva_get_EDID_OF(par, pdev))
 		printk("rivafb: could not retrieve EDID from OF\n");
 #else
 	/* XXX use other methods later */
@@ -1993,10 +2108,11 @@ static struct pci_driver rivafb_driver = {
 
 int __init rivafb_init(void)
 {
-	if (pci_register_driver(&rivafb_driver) > 0)
-		return 0;
-	pci_unregister_driver(&rivafb_driver);
-	return -ENODEV;
+	pci_register_driver(&rivafb_driver);
+#if defined(CONFIG_PPC_PMAC) && defined(CONFIG_ADB_PMU)
+       	init_ivad();
+#endif
+	return 0;
 }
 
 
