@@ -272,8 +272,6 @@ void __exit msr_exit(void)
 module_init(msr_init);
 module_exit(msr_exit)
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("H. Peter Anvin <hpa@zytor.com>");
 MODULE_DESCRIPTION("x86 generic MSR driver");
 MODULE_LICENSE("GPL");

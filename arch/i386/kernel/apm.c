@@ -2025,5 +2025,3 @@ MODULE_PARM_DESC(idle_threshold,
 MODULE_PARM(idle_period, "i");
 MODULE_PARM_DESC(idle_period,
 	"Period (in sec/100) over which to caculate the idle percentage");
-
-EXPORT_NO_SYMBOLS;
