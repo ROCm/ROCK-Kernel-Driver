@@ -503,6 +503,9 @@ static int count_and_copy_zone(struct zone *zone, struct pbe **pagedir_p)
 		if (!pbe)
 			continue;
 		pbe->orig_address = (long) page_address(page);
+		/* Copy page is dangerous: it likes to mess with
+		   preempt count on specific cpus. Wrong preempt count is then copied,
+		   oops. */
 		copy_page((void *)pbe->address, (void *)pbe->orig_address);
 		pbe++;
 	}
@@ -923,8 +926,9 @@ static int relocate_pagedir(void)
 	suspend_pagedir_t *new_pagedir, *old_pagedir = pagedir_nosave;
 	void **eaten_memory = NULL;
 	void **c = eaten_memory, *m, *f;
+	int ret = 0;
 
-	printk("Relocating pagedir");
+	printk("Relocating pagedir ");
 
 	if(!does_collide_order(old_pagedir, (unsigned long)old_pagedir, pagedir_order)) {
 		printk("not necessary\n");
@@ -941,22 +945,23 @@ static int relocate_pagedir(void)
 		c = eaten_memory;
 	}
 
-	if (!m)
-		return -ENOMEM;
-
-	pagedir_nosave = new_pagedir = m;
-	copy_pagedir(new_pagedir, old_pagedir);
+	if (!m) {
+		printk("out of memory\n");
+		ret = -ENOMEM;
+	} else {
+		pagedir_nosave = new_pagedir = m;
+		copy_pagedir(new_pagedir, old_pagedir);
+	}
 
 	c = eaten_memory;
-	while(c) {
+	while (c) {
 		printk(":");
-		f = *c;
+		f = c;
 		c = *c;
-		if (f)
-			free_pages((unsigned long)f, pagedir_order);
+		free_pages((unsigned long)f, pagedir_order);
 	}
 	printk("|\n");
-	return 0;
+	return ret;
 }
 
 /*
