@@ -87,15 +87,13 @@ int pcbit_init_dev(int board, int mem_base, int irq)
 
 	if (mem_base >= 0xA0000 && mem_base <= 0xFFFFF ) {
 		dev->ph_mem = mem_base;
-		if (check_mem_region(dev->ph_mem, 4096)) {
+		if (!request_mem_region(dev->ph_mem, 4096, "PCBIT mem")) {
 			printk(KERN_WARNING
 				"PCBIT: memory region %lx-%lx already in use\n",
 				dev->ph_mem, dev->ph_mem + 4096);
 			kfree(dev);
 			dev_pcbit[board] = NULL;
 			return -EACCES;
-		} else {
-			request_mem_region(dev->ph_mem, 4096, "PCBIT mem");
 		}
 		dev->sh_mem = (unsigned char*)ioremap(dev->ph_mem, 4096);
 	}

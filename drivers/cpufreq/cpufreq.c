@@ -449,6 +449,9 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 	if (!kobject_get(&data->kobj))
 		return -EFAULT;
 
+	if (cpufreq_driver->target)
+		__cpufreq_governor(data, CPUFREQ_GOV_STOP);
+
 	kobject_unregister(&data->kobj);
 
 	kobject_put(&data->kobj);
@@ -458,9 +461,6 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 	 * unloading.
 	 */
 	wait_for_completion(&data->kobj_unregister);
-
-	if (cpufreq_driver->target)
-		__cpufreq_governor(data, CPUFREQ_GOV_STOP);
 
 	if (cpufreq_driver->exit)
 		cpufreq_driver->exit(data);

@@ -247,10 +247,7 @@ static int budget_patch_detach (struct saa7146_dev* dev)
 
 static int __init budget_patch_init(void) 
 {
-        if (saa7146_register_extension(&budget_extension))
-                return -ENODEV;
-        
-        return 0;
+	return saa7146_register_extension(&budget_extension);
 }
 
 

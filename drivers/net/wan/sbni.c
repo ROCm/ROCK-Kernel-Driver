@@ -1300,12 +1300,9 @@ sbni_ioctl( struct net_device  *dev,  struct ifreq  *ifr,  int  cmd )
   
 	switch( cmd ) {
 	case  SIOCDEVGETINSTATS :
-		error = verify_area( VERIFY_WRITE, ifr->ifr_data,
-				     sizeof(struct sbni_in_stats) );
-		if( !error )
-			if (copy_to_user( ifr->ifr_data, &nl->in_stats,
-				      sizeof(struct sbni_in_stats) ))
-				return -EFAULT;
+		if (copy_to_user( ifr->ifr_data, &nl->in_stats,
+					sizeof(struct sbni_in_stats) ))
+			error = -EFAULT;
 		break;
 
 	case  SIOCDEVRESINSTATS :
@@ -1321,11 +1318,8 @@ sbni_ioctl( struct net_device  *dev,  struct ifreq  *ifr,  int  cmd )
 		flags.rxl	= nl->cur_rxl_index;
 		flags.fixed_rxl	= nl->delta_rxl == 0;
 
-		error = verify_area( VERIFY_WRITE, ifr->ifr_data,
-				     sizeof flags );
-		if( !error )
-			if (copy_to_user( ifr->ifr_data, &flags, sizeof flags ))
-				return -EFAULT;
+		if (copy_to_user( ifr->ifr_data, &flags, sizeof flags ))
+			error = -EFAULT;
 		break;
 
 	case  SIOCDEVSHWSTATE :
@@ -1352,10 +1346,6 @@ sbni_ioctl( struct net_device  *dev,  struct ifreq  *ifr,  int  cmd )
 	case  SIOCDEVENSLAVE :
 		if( current->euid != 0 )	/* root only */
 			return  -EPERM;
-
-		if( (error = verify_area( VERIFY_READ, ifr->ifr_data,
-					  sizeof slave_name )) != 0 )
-			return  error;
 
 		if (copy_from_user( slave_name, ifr->ifr_data, sizeof slave_name ))
 			return -EFAULT;

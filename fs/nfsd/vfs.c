@@ -781,7 +781,6 @@ nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 				dprintk("nfsd: write defer %d\n", current->pid);
 				set_current_state(TASK_UNINTERRUPTIBLE);
 				schedule_timeout((HZ+99)/100);
-				current->state = TASK_RUNNING;
 				dprintk("nfsd: write resume %d\n", current->pid);
 			}
 

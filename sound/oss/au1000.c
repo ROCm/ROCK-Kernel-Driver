@@ -50,7 +50,6 @@
  *                channels [stevel].
  *
  */
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/ioport.h>
@@ -2223,8 +2222,9 @@ static int __init au1000_setup(char *options)
 	if (!options || !*options)
 		return 0;
 
-	for(this_opt=strtok(options, ",");
-	    this_opt; this_opt=strtok(NULL, ",")) {
+	while (this_opt = strsep(&options, ",")) {
+		if (!*this_opt)
+			continue;
 		if (!strncmp(this_opt, "vra", 3)) {
 			vra = 1;
 		}

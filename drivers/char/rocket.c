@@ -85,11 +85,9 @@
 #include <linux/string.h>
 #include <linux/fcntl.h>
 #include <linux/ptrace.h>
-#include <linux/major.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
 #include <linux/wait.h>
-#include <linux/delay.h>
 #include <linux/pci.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
@@ -955,7 +953,7 @@ static int rp_open(struct tty_struct *tty, struct file *filp)
 	/*
 	 * Info->count is now 1; so it's safe to sleep now.
 	 */
-	info->session = current->session;
+	info->session = process_session(current);
 	info->pgrp = process_group(current);
 
 	if ((info->flags & ROCKET_INITIALIZED) == 0) {

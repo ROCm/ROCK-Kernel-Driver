@@ -35,7 +35,6 @@
 #include <linux/mm.h>
 #endif
 #include <linux/types.h>
-#include <linux/version.h>
 #include <linux/config.h>
 #include <linux/mtio.h>
 

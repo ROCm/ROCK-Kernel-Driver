@@ -35,6 +35,8 @@
 
 #if defined(CONFIG_PROC_FS) && !defined(XFS_STATS_OFF)
 
+#include <linux/percpu.h>
+
 /*
  * XFS global statistics
  */
@@ -126,11 +128,13 @@ struct xfsstats {
 	__uint64_t		xs_read_bytes;
 };
 
-extern struct xfsstats xfsstats;
+DECLARE_PER_CPU(struct xfsstats, xfsstats);
 
-# define XFS_STATS_INC(count)		( xfsstats.count++ )
-# define XFS_STATS_DEC(count)		( xfsstats.count-- )
-# define XFS_STATS_ADD(count, inc)	( xfsstats.count += (inc) )
+/* We don't disable preempt, not too worried about poking the
+ * wrong cpu's stat for now */
+#define XFS_STATS_INC(count)		(__get_cpu_var(xfsstats).count++)
+#define XFS_STATS_DEC(count)		(__get_cpu_var(xfsstats).count--)
+#define XFS_STATS_ADD(count, inc)	(__get_cpu_var(xfsstats).count += (inc))
 
 extern void xfs_init_procfs(void);
 extern void xfs_cleanup_procfs(void);

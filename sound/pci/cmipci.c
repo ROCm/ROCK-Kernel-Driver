@@ -2791,6 +2791,7 @@ static int __devinit snd_cmipci_mixer_new(cmipci_t *cm, int pcm_spdif_device)
  * proc interface
  */
 
+#ifdef CONFIG_PROC_FS
 static void snd_cmipci_proc_read(snd_info_entry_t *entry, 
 				 snd_info_buffer_t *buffer)
 {
@@ -2817,6 +2818,9 @@ static void __devinit snd_cmipci_proc_init(cmipci_t *cm)
 	if (! snd_card_proc_new(cm->card, "cmipci", &entry))
 		snd_info_set_text_ops(entry, cm, snd_cmipci_proc_read);
 }
+#else /* !CONFIG_PROC_FS */
+static inline void snd_cmipci_proc_init(cmipci_t *cm) {}
+#endif
 
 
 static struct pci_device_id snd_cmipci_ids[] = {

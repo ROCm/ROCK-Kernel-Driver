@@ -29,7 +29,6 @@
 
 #define VIDEOCODEC_VERSION "v0.2"
 
-#include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>

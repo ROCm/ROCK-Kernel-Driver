@@ -203,7 +203,7 @@ static inline void list_move_tail(struct list_head *list,
  * list_empty - tests whether a list is empty
  * @head: the list to test.
  */
-static inline int list_empty(struct list_head *head)
+static inline int list_empty(const struct list_head *head)
 {
 	return head->next == head;
 }
@@ -421,12 +421,12 @@ struct hlist_node {
 #define INIT_HLIST_HEAD(ptr) ((ptr)->first = NULL) 
 #define INIT_HLIST_NODE(ptr) ((ptr)->next = NULL, (ptr)->pprev = NULL)
 
-static __inline__ int hlist_unhashed(struct hlist_node *h) 
+static __inline__ int hlist_unhashed(const struct hlist_node *h) 
 { 
 	return !h->pprev;
 } 
 
-static __inline__ int hlist_empty(struct hlist_head *h) 
+static __inline__ int hlist_empty(const struct hlist_head *h) 
 { 
 	return !h->first;
 } 
@@ -449,7 +449,7 @@ static __inline__ void hlist_del(struct hlist_node *n)
 
 /**
  * hlist_del_rcu - deletes entry from hash list without re-initialization
- * @entry: the element to delete from the hash list.
+ * @n: the element to delete from the hash list.
  *
  * Note: list_unhashed() on entry does not return true after this, 
  * the entry is in an undefined state. It is useful for RCU based

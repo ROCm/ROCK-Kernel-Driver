@@ -200,7 +200,7 @@ vn_revalidate(
 	vn_trace_entry(vp, "vn_revalidate", (inst_t *)__return_address);
 	ASSERT(vp->v_fbhv != NULL);
 
-	va.va_mask = XFS_AT_STAT|XFS_AT_GENCOUNT;
+	va.va_mask = XFS_AT_STAT|XFS_AT_XFLAGS;
 	VOP_GETATTR(vp, &va, 0, NULL, error);
 	if (!error) {
 		inode = LINVFS_GET_IP(vp);

@@ -27,7 +27,6 @@ static ide_pci_host_proc_t cs5530_procs[] __initdata = {
 
 static unsigned int init_chipset_cs5530(struct pci_dev *, const char *);
 static void init_hwif_cs5530(ide_hwif_t *);
-static void init_dma_cs5530(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t cs5530_chipsets[] __devinitdata = {
 	{	/* 0 */
@@ -37,7 +36,6 @@ static ide_pci_device_t cs5530_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_cs5530,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_cs5530,
-		.init_dma	= init_dma_cs5530,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},

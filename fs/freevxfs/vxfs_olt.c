@@ -102,7 +102,7 @@ vxfs_read_olt(struct super_block *sbp, u_long bsize)
 	 */
 	if (infp->vsi_oltsize > 1) {
 		printk(KERN_NOTICE "vxfs: oltsize > 1 detected.\n");
-		printk(KERN_NOTICE "vxfs: please notify hch@caldera.de\n");
+		printk(KERN_NOTICE "vxfs: please notify hch@infradead.org\n");
 		goto fail;
 	}
 

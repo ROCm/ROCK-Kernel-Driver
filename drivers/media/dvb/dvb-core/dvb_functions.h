@@ -1,8 +1,6 @@
 #ifndef __DVB_FUNCTIONS_H__
 #define __DVB_FUNCTIONS_H__
 
-#include <linux/version.h>
-
 /**
  *  a sleeping delay function, waits i ms
  *

@@ -150,15 +150,15 @@ enum {
 };
 
 static match_table_t tokens = {
-	{Opt_bs, "bs=%d"},
+	{Opt_bs, "bs=%u"},
 	{Opt_mode, "mode=%o"},
 	{Opt_mufs, "mufs"},
 	{Opt_prefix, "prefix=%s"},
 	{Opt_protect, "protect"},
-	{Opt_reserved, "reserved=%d"},
-	{Opt_root, "root=%d"},
-	{Opt_setgid, "setgid=%d"},
-	{Opt_setuid, "setuid=%d"},
+	{Opt_reserved, "reserved=%u"},
+	{Opt_root, "root=%u"},
+	{Opt_setgid, "setgid=%u"},
+	{Opt_setuid, "setuid=%u"},
 	{Opt_verbose, "verbose"},
 	{Opt_volume, "volume=%s"},
 	{Opt_ignore, "grpquota"},

@@ -48,17 +48,23 @@ xfs_stats_clear_proc_handler(
 	void		*buffer,
 	size_t		*lenp)
 {
-	int		ret, *valp = ctl->data;
+	int		c, ret, *valp = ctl->data;
 	__uint32_t	vn_active;
 
 	ret = proc_doulongvec_minmax(ctl, write, filp, buffer, lenp);
 
 	if (!ret && write && *valp) {
 		printk("XFS Clearing xfsstats\n");
-		/* save vn_active, it's a universal truth! */
-		vn_active = xfsstats.vn_active;
-		memset(&xfsstats, 0, sizeof(xfsstats));
-		xfsstats.vn_active = vn_active;
+		for (c = 0; c < NR_CPUS; c++) {
+			if (!cpu_possible(c)) continue;
+			preempt_disable();
+			/* save vn_active, it's a universal truth! */
+			vn_active = per_cpu(xfsstats, c).vn_active;
+			memset(&per_cpu(xfsstats, c), 0,
+			       sizeof(struct xfsstats));
+			per_cpu(xfsstats, c).vn_active = vn_active;
+			preempt_enable();
+		}
 		xfs_stats_clear = 0;
 	}
 

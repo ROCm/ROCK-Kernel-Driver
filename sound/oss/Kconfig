@@ -17,10 +17,8 @@ config SOUND_BT878
 	  don't need this driver as most TV cards handle sound with a short
 	  cable from the TV card to your sound card's line-in.
 
-	  This driver is available as a module called btaudio ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the module will
+	  be called btaudio.
 
 config SOUND_CMPCI
 	tristate "C-Media PCI (CMI8338/8738)"

@@ -48,7 +48,6 @@
  */
 
 #include <linux/module.h>
-#include <linux/version.h>
 
 #define KERNEL
 #include <linux/types.h>

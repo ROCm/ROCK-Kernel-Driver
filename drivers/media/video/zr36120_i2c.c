@@ -22,7 +22,6 @@
 #include <linux/delay.h>
 #include <asm/io.h>
 
-#include <linux/version.h>
 #include <linux/video_decoder.h>
 #include <asm/uaccess.h>
 

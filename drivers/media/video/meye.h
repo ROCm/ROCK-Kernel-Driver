@@ -36,8 +36,6 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/pci.h>
-#include <linux/sonypi.h>
-#include <linux/meye.h>
 
 /****************************************************************************/
 /* Motion JPEG chip registers                                               */

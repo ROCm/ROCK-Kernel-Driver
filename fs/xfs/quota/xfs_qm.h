@@ -165,9 +165,9 @@ typedef struct xfs_dquot_acct {
  * Users are allowed to have a usage exceeding their softlimit for
  * a period this long.
  */
-#define XFS_QM_BTIMELIMIT	DQ_BTIMELIMIT
-#define XFS_QM_RTBTIMELIMIT	DQ_BTIMELIMIT
-#define XFS_QM_ITIMELIMIT	DQ_FTIMELIMIT
+#define XFS_QM_BTIMELIMIT	(7 * 24*60*60)          /* 1 week */
+#define XFS_QM_RTBTIMELIMIT	(7 * 24*60*60)          /* 1 week */
+#define XFS_QM_ITIMELIMIT	(7 * 24*60*60)          /* 1 week */
 
 #define XFS_QM_BWARNLIMIT	5
 #define XFS_QM_IWARNLIMIT	5

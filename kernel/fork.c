@@ -725,6 +725,12 @@ static inline int copy_signal(unsigned long clone_flags, struct task_struct * ts
 	sig->curr_target = NULL;
 	init_sigpending(&sig->shared_pending);
 
+	sig->tty = process_tty(current);
+	sig->pgrp = process_group(current);
+	sig->session = process_session(current);
+	sig->leader = 0;	/* session leadership doesn't inherit */
+	sig->tty_old_pgrp = 0;
+
 	return 0;
 }
 
@@ -771,7 +777,9 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	 * Thread groups must share signals as well, and detached threads
 	 * can only be started up within the thread group.
 	 */
-	if ((clone_flags & CLONE_THREAD) && !(clone_flags & CLONE_SIGHAND))
+	if ((clone_flags & CLONE_THREAD) &&
+		(clone_flags & (CLONE_SIGHAND|CLONE_DETACHED)) !=
+			(CLONE_SIGHAND|CLONE_DETACHED))
 		return ERR_PTR(-EINVAL);
 
 	/*
@@ -876,8 +884,6 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	init_timer(&p->real_timer);
 	p->real_timer.data = (unsigned long) p;
 
-	p->leader = 0;		/* session leadership doesn't inherit */
-	p->tty_old_pgrp = 0;
 	p->utime = p->stime = 0;
 	p->cutime = p->cstime = 0;
 	p->array = NULL;
@@ -1022,7 +1028,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	if (thread_group_leader(p)) {
 		attach_pid(p, PIDTYPE_TGID, p->tgid);
 		attach_pid(p, PIDTYPE_PGID, process_group(p));
-		attach_pid(p, PIDTYPE_SID, p->session);
+		attach_pid(p, PIDTYPE_SID, process_session(p));
 		if (p->pid)
 			__get_cpu_var(process_counts)++;
 	} else

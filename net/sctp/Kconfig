@@ -32,10 +32,8 @@ config IP_SCTP
 	  -- network-level fault tolerance through supporting of multi-
 	  homing at either or both ends of an association."
 
-	  This protocol support is also available as a module ( = code which
-	  can be inserted in and removed from the running kernel whenever you
-	  want). The module will be called sctp. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this protocol support as a module, choose M here: the
+	  module will be called sctp.
 
 	  If in doubt, say N.
 

@@ -460,7 +460,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 #ifdef CONFIG_EXT3_FS_XATTR
 		init_rwsem(&ei->xattr_sem);
 #endif
-		init_rwsem(&ei->truncate_sem);
+		init_MUTEX(&ei->truncate_sem);
 		inode_init_once(&ei->vfs_inode);
 	}
 }
@@ -544,9 +544,9 @@ static match_table_t tokens = {
 	{Opt_grpid, "bsdgroups"},
 	{Opt_nogrpid, "nogrpid"},
 	{Opt_nogrpid, "sysvgroups"},
-	{Opt_resgid, "resgid=%d"},
-	{Opt_resuid, "resuid=%d"},
-	{Opt_sb, "sb=%d"},
+	{Opt_resgid, "resgid=%u"},
+	{Opt_resuid, "resuid=%u"},
+	{Opt_sb, "sb=%u"},
 	{Opt_err_cont, "errors=continue"},
 	{Opt_err_panic, "errors=panic"},
 	{Opt_err_ro, "errors=remount-ro"},

@@ -25,7 +25,6 @@
 
 #include "ip2types.h"
 #include <asm/io.h>  /* For inb, etc */
-#include <linux/version.h>
 
 //------------------------------------
 // Defines for I/O instructions:

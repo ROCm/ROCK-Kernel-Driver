@@ -188,7 +188,6 @@ static void init_setup_pdc20270(struct pci_dev *, ide_pci_device_t *);
 static void init_setup_pdc20276(struct pci_dev *dev, ide_pci_device_t *d);
 static unsigned int init_chipset_pdcnew(struct pci_dev *, const char *);
 static void init_hwif_pdc202new(ide_hwif_t *);
-static void init_dma_pdc202new(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t pdcnew_chipsets[] __devinitdata = {
 	{	/* 0 */
@@ -199,7 +198,6 @@ static ide_pci_device_t pdcnew_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_pdcnew,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_pdc202new,
-		.init_dma	= init_dma_pdc202new,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
@@ -213,7 +211,6 @@ static ide_pci_device_t pdcnew_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_pdcnew,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_pdc202new,
-		.init_dma	= init_dma_pdc202new,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
@@ -227,7 +224,6 @@ static ide_pci_device_t pdcnew_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_pdcnew,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_pdc202new,
-		.init_dma	= init_dma_pdc202new,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 #ifdef CONFIG_PDC202XX_FORCE
@@ -245,7 +241,6 @@ static ide_pci_device_t pdcnew_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_pdcnew,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_pdc202new,
-		.init_dma	= init_dma_pdc202new,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
@@ -259,7 +254,6 @@ static ide_pci_device_t pdcnew_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_pdcnew,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_pdc202new,
-		.init_dma	= init_dma_pdc202new,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
@@ -273,7 +267,6 @@ static ide_pci_device_t pdcnew_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_pdcnew,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_pdc202new,
-		.init_dma	= init_dma_pdc202new,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 #ifdef CONFIG_PDC202XX_FORCE
@@ -291,7 +284,6 @@ static ide_pci_device_t pdcnew_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_pdcnew,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_pdc202new,
-		.init_dma	= init_dma_pdc202new,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},

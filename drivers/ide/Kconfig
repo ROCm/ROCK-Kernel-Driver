@@ -195,7 +195,7 @@ config BLK_DEV_IDECD
 
 	  Note that older versions of LILO (LInux LOader) cannot properly deal
 	  with IDE/ATAPI CD-ROMs, so install LILO 16 or higher, available from
-	  <ftp://brun.dyndns.org/pub/linux/lilo/>.
+	  <http://lilo.go.dyndns.org/>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called ide-cd.
@@ -673,7 +673,7 @@ config BLK_DEV_IT8172
 	  Say Y here to support the on-board IDE controller on the Integrated
 	  Technology Express, Inc. ITE8172 SBC.  Vendor page at
 	  <http://www.ite.com.tw/ia/brief_it8172bsp.htm>; picture of the
-	  board at <http://www.mvista.com/allies/semiconductor/ite.html>.
+	  board at <http://www.mvista.com/partners/semiconductor/ite.html>.
 
 config BLK_DEV_NS87415
 	tristate "NS87415 chipset support"
@@ -778,7 +778,7 @@ config BLK_DEV_SLC90E66
 	  available" as well.
 
 	  Please read the comments at the top of
-	  drivers/ide/pci/slc90e66.c.
+	  <file:drivers/ide/pci/slc90e66.c>.
 
 config BLK_DEV_TRM290
 	tristate "Tekram TRM290 chipset support"

@@ -12,7 +12,6 @@
 #define __ASM_I386_I387_H
 
 #include <linux/sched.h>
-#include <linux/spinlock.h>
 #include <asm/processor.h>
 #include <asm/sigcontext.h>
 #include <asm/user.h>

@@ -244,8 +244,7 @@ ccw_device_wake_up(struct ccw_device *cdev, unsigned long ip, struct irb *irb)
 }
 
 static inline int
-__ccw_device_retry_loop(struct ccw_device *cdev, struct ccw1 *ccw, long magic,
-			unsigned long flags)
+__ccw_device_retry_loop(struct ccw_device *cdev, struct ccw1 *ccw, long magic)
 {
 	int ret;
 	struct subchannel *sch;
@@ -255,7 +254,9 @@ __ccw_device_retry_loop(struct ccw_device *cdev, struct ccw1 *ccw, long magic,
 		ret = cio_start (sch, ccw, magic, 0);
 		if ((ret == -EBUSY) || (ret == -EACCES)) {
 			/* Try again later. */
+			spin_unlock_irq(&sch->lock);
 			schedule_timeout(1);
+			spin_lock_irq(&sch->lock);
 			continue;
 		}
 		if (ret != 0)
@@ -263,12 +264,12 @@ __ccw_device_retry_loop(struct ccw_device *cdev, struct ccw1 *ccw, long magic,
 			break;
 		/* Wait for end of request. */
 		cdev->private->intparm = magic;
-		spin_unlock_irqrestore(&sch->lock, flags);
+		spin_unlock_irq(&sch->lock);
 		wait_event(cdev->private->wait_q,
 			   (cdev->private->intparm == -EIO) ||
 			   (cdev->private->intparm == -EAGAIN) ||
 			   (cdev->private->intparm == 0));
-		spin_lock_irqsave(&sch->lock, flags);
+		spin_lock_irq(&sch->lock);
 		/* Check at least for channel end / device end */
 		if (cdev->private->intparm == -EIO) {
 			/* Non-retryable error. */
@@ -279,7 +280,9 @@ __ccw_device_retry_loop(struct ccw_device *cdev, struct ccw1 *ccw, long magic,
 			/* Success. */
 			break;
 		/* Try again later. */
+		spin_unlock_irq(&sch->lock);
 		schedule_timeout(1);
+		spin_lock_irq(&sch->lock);
 	} while (1);
 
 	return ret;
@@ -300,7 +303,6 @@ read_dev_chars (struct ccw_device *cdev, void **buffer, int length)
 {
 	void (*handler)(struct ccw_device *, unsigned long, struct irb *);
 	char dbf_txt[15];
-	unsigned long flags;
 	struct subchannel *sch;
 	int ret;
 	struct ccw1 *rdc_ccw;
@@ -327,7 +329,7 @@ read_dev_chars (struct ccw_device *cdev, void **buffer, int length)
 		return ret;
 	}
 
-	spin_lock_irqsave(&sch->lock, flags);
+	spin_lock_irq(&sch->lock);
 	/* Save interrupt handler. */
 	handler = cdev->handler;
 	/* Temporarily install own handler. */
@@ -338,11 +340,11 @@ read_dev_chars (struct ccw_device *cdev, void **buffer, int length)
 		ret = -EBUSY;
 	else
 		/* 0x00D9C4C3 == ebcdic "RDC" */
-		ret = __ccw_device_retry_loop(cdev, rdc_ccw, 0x00D9C4C3, flags);
+		ret = __ccw_device_retry_loop(cdev, rdc_ccw, 0x00D9C4C3);
 
 	/* Restore interrupt handler. */
 	cdev->handler = handler;
-	spin_unlock_irqrestore(&sch->lock, flags);
+	spin_unlock_irq(&sch->lock);
 
 	clear_normalized_cda (rdc_ccw);
 	kfree(rdc_ccw);
@@ -360,7 +362,6 @@ read_conf_data (struct ccw_device *cdev, void **buffer, int *length)
 	char dbf_txt[15];
 	struct subchannel *sch;
 	struct ciw *ciw;
-	unsigned long flags;
 	char *rcd_buf;
 	int ret;
 	struct ccw1 *rcd_ccw;
@@ -396,7 +397,7 @@ read_conf_data (struct ccw_device *cdev, void **buffer, int *length)
 	rcd_ccw->count = ciw->count;
 	rcd_ccw->flags = CCW_FLAG_SLI;
 
-	spin_lock_irqsave(&sch->lock, flags);
+	spin_lock_irq(&sch->lock);
 	/* Save interrupt handler. */
 	handler = cdev->handler;
 	/* Temporarily install own handler. */
@@ -407,11 +408,11 @@ read_conf_data (struct ccw_device *cdev, void **buffer, int *length)
 		ret = -EBUSY;
 	else
 		/* 0x00D9C3C4 == ebcdic "RCD" */
-		ret = __ccw_device_retry_loop(cdev, rcd_ccw, 0x00D9C3C4, flags);
+		ret = __ccw_device_retry_loop(cdev, rcd_ccw, 0x00D9C3C4);
 
 	/* Restore interrupt handler. */
 	cdev->handler = handler;
-	spin_unlock_irqrestore(&sch->lock, flags);
+	spin_unlock_irq(&sch->lock);
 
  	/*
  	 * on success we update the user input parms

@@ -10,7 +10,6 @@
 
 #define VIRTUAL_BUG_ON(x) 
 
-#include <asm/numnodes.h>
 #include <asm/smp.h>
 
 #define MAXNODE 8 

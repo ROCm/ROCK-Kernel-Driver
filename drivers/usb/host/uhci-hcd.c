@@ -2185,8 +2185,8 @@ static int uhci_reset(struct usb_hcd *hcd)
 	/* Maybe kick BIOS off this hardware.  Then reset, so we won't get
 	 * interrupts from any previous setup.
 	 */
-	pci_write_config_word(hcd->pdev, USBLEGSUP, USBLEGSUP_DEFAULT);
 	reset_hc(uhci);
+	pci_write_config_word(hcd->pdev, USBLEGSUP, USBLEGSUP_DEFAULT);
 	return 0;
 }
 

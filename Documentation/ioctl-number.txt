@@ -175,10 +175,6 @@ Code	Seq#	Include File		Comments
 					<mailto:buk@buks.ipn.de>
 0xA0	all	linux/sdp/sdp.h		Industrial Device Project
 					<mailto:kenji@bitgate.com>
-0xA2    00-0F   DVD decoder driver      in development:
-                                        <http://linuxtv.org/developer/dvdapi.html>
-0xA3	00-1F	Philips SAA7146 dirver	in development:
-					<mailto:Andreas.Beckmann@hamburg.sc.philips.com>
 0xA3	80-8F	Port ACL		in development:
 					<mailto:tlewis@mindspring.com>
 0xA3	90-9F	linux/dtlk.h

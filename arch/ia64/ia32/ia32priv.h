@@ -249,13 +249,6 @@ typedef struct siginfo32 {
 	} _sifields;
 } siginfo_t32;
 
-struct linux32_dirent {
-	u32	d_ino;
-	u32	d_off;
-	u16	d_reclen;
-	char	d_name[256];
-};
-
 struct old_linux32_dirent {
 	u32	d_ino;
 	u32	d_offset;

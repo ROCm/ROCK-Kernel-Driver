@@ -324,15 +324,6 @@ static void opl3sa3_set_treble(opl3sa2_state_t* devc, int left, int right)
 }
 
 
-static void opl3sa3_set_wide(opl3sa2_state_t* devc, int left, int right)
-{	
-	unsigned char wide;
-
-	wide = left ? ((unsigned char) (8 * left / 101)) : 0; 
-	wide |= (right ? ((unsigned char) (8 * right / 101)) : 0) << 4;
-
-	opl3sa2_write(devc->cfg_port, OPL3SA3_WIDE, wide);
-}
 
 
 static void opl3sa2_mixer_reset(opl3sa2_state_t* devc)
@@ -401,7 +392,7 @@ static inline int ret_vol_stereo(int left, int right)
 
 static int opl3sa2_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 {
-	int cmdf = cmd & 0xff;
+	int retval, value, cmdf = cmd & 0xff;
 
 	opl3sa2_state_t* devc = &opl3sa2_state[dev];
 	
@@ -422,23 +413,31 @@ static int opl3sa2_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 	if (((cmd >> 8) & 0xff) != 'M')
 		return -EINVAL;
 		
+	retval = 0;
 	if (_SIOC_DIR (cmd) & _SIOC_WRITE) {
 		switch (cmdf) {
 			case SOUND_MIXER_VOLUME:
-				arg_to_vol_stereo(*(unsigned int*)arg,
-						  &devc->volume_l, &devc->volume_r); 
+				retval = get_user(value, (unsigned int *) arg);
+				if (retval)
+					break;
+				arg_to_vol_stereo(value, &devc->volume_l, &devc->volume_r);
 				opl3sa2_set_volume(devc, devc->volume_l, devc->volume_r);
-				*(int*)arg = ret_vol_stereo(devc->volume_l, devc->volume_r);
-				return 0;
+				value = ret_vol_stereo(devc->volume_l, devc->volume_r);
+				retval = put_user(value, (int *) arg);
+				break;
 		  
 			case SOUND_MIXER_MIC:
-				arg_to_vol_mono(*(unsigned int*)arg, &devc->mic);
+				retval = get_user(value, (unsigned int *) arg);
+				if (retval)
+					break;
+				arg_to_vol_mono(value, &devc->mic);
 				opl3sa2_set_mic(devc, devc->mic);
-				*(int*)arg = ret_vol_mono(devc->mic);
-				return 0;
+				value = ret_vol_mono(devc->mic);
+				retval = put_user(value, (int *) arg);
+				break;
 
 			default:
-				return -EINVAL;
+				retval = -EINVAL;
 		}
 	}
 	else {
@@ -447,122 +446,72 @@ static int opl3sa2_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 		 */
 		switch (cmdf) {
 			case SOUND_MIXER_DEVMASK:
-				*(int*)arg = (SOUND_MASK_VOLUME | SOUND_MASK_MIC);
-				return 0;
+				retval = put_user(SOUND_MASK_VOLUME | SOUND_MASK_MIC, (int *) arg);
+				break;
 		  
 			case SOUND_MIXER_STEREODEVS:
-				*(int*)arg = SOUND_MASK_VOLUME;
-				return 0;
+				retval = put_user(SOUND_MASK_VOLUME, (int *) arg);
+				break;
 		  
 			case SOUND_MIXER_RECMASK:
 				/* No recording devices */
-				return (*(int*)arg = 0);
+				retval = put_user(0, (int *) arg);
+				break;
 
 			case SOUND_MIXER_CAPS:
-				*(int*)arg = SOUND_CAP_EXCL_INPUT;
-				return 0;
+				retval = put_user(SOUND_CAP_EXCL_INPUT, (int *) arg);
+				break;
 
 			case SOUND_MIXER_RECSRC:
 				/* No recording source */
-				return (*(int*)arg = 0);
+				retval = put_user(0, (int *) arg);
+				break;
 
 			case SOUND_MIXER_VOLUME:
-				*(int*)arg = ret_vol_stereo(devc->volume_l, devc->volume_r);
-				return 0;
+				value = ret_vol_stereo(devc->volume_l, devc->volume_r);
+				retval = put_user(value, (int *) arg);
+				break;
 			  
 			case SOUND_MIXER_MIC:
-				*(int*)arg = ret_vol_mono(devc->mic);
-				return 0;
+				value = ret_vol_mono(devc->mic);
+				put_user(value, (int *) arg);
+				break;
 
 			default:
-				return -EINVAL;
+				retval = -EINVAL;
 		}
 	}
+	return retval;
 }
 /* opl3sa2_mixer_ioctl end */
 
 
 static int opl3sa3_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 {
-	int cmdf = cmd & 0xff;
+	int value, retval, cmdf = cmd & 0xff;
 
 	opl3sa2_state_t* devc = &opl3sa2_state[dev];
 
 	switch (cmdf) {
-		case SOUND_MIXER_BASS:
-		case SOUND_MIXER_TREBLE:
-		case SOUND_MIXER_DIGITAL1:
-		case SOUND_MIXER_DEVMASK:
-		case SOUND_MIXER_STEREODEVS: 
-			break;
-
-		default:
-			return opl3sa2_mixer_ioctl(dev, cmd, arg);
-	}
-
-	if (((cmd >> 8) & 0xff) != 'M')
-		return -EINVAL;
+	case SOUND_MIXER_BASS:
+		value = ret_vol_stereo(devc->bass_l, devc->bass_r);
+		retval = put_user(value, (int *) arg);
+		break;
 		
-	if (_SIOC_DIR (cmd) & _SIOC_WRITE) {
-		switch (cmdf) {
-			case SOUND_MIXER_BASS:
-				arg_to_vol_stereo(*(unsigned int*)arg,
-						  &devc->bass_l, &devc->bass_r); 
-				opl3sa3_set_bass(devc, devc->bass_l, devc->bass_r);
-				*(int*)arg = ret_vol_stereo(devc->bass_l, devc->bass_r);
-				return 0;
-		  
-			case SOUND_MIXER_TREBLE:
-				arg_to_vol_stereo(*(unsigned int*)arg,
-						  &devc->treble_l, &devc->treble_r); 
-				opl3sa3_set_treble(devc, devc->treble_l, devc->treble_r);
-				*(int*)arg = ret_vol_stereo(devc->treble_l, devc->treble_r);
-				return 0;
+	case SOUND_MIXER_TREBLE:
+		value = ret_vol_stereo(devc->treble_l, devc->treble_r);
+		retval = put_user(value, (int *) arg);
+		break;
 
-			case SOUND_MIXER_DIGITAL1:
-				arg_to_vol_stereo(*(unsigned int*)arg,
-						  &devc->wide_l, &devc->wide_r); 
-				opl3sa3_set_wide(devc, devc->wide_l, devc->wide_r);
-				*(int*)arg = ret_vol_stereo(devc->wide_l, devc->wide_r);
-				return 0;
+	case SOUND_MIXER_DIGITAL1:
+		value = ret_vol_stereo(devc->wide_l, devc->wide_r);
+		retval = put_user(value, (int *) arg);
+		break;
 
-			default:
-				return -EINVAL;
-		}
+	default:
+		retval = -EINVAL;
 	}
-	else			
-	{
-		/*
-		 * Return parameters
-		 */
-		switch (cmdf) {
-			case SOUND_MIXER_DEVMASK:
-				*(int*)arg = (SOUND_MASK_VOLUME | SOUND_MASK_MIC |
-					      SOUND_MASK_BASS | SOUND_MASK_TREBLE |
-					      SOUND_MASK_DIGITAL1);
-				return 0;
-		  
-			case SOUND_MIXER_STEREODEVS:
-				*(int*)arg = (SOUND_MASK_VOLUME | SOUND_MASK_BASS |
-					      SOUND_MASK_TREBLE | SOUND_MASK_DIGITAL1);
-				return 0;
-		  
-			case SOUND_MIXER_BASS:
-				*(int*)arg = ret_vol_stereo(devc->bass_l, devc->bass_r);
-				return 0;
-			  
-			case SOUND_MIXER_TREBLE:
-				*(int*)arg = ret_vol_stereo(devc->treble_l, devc->treble_r);
-				return 0;
-
-			case SOUND_MIXER_DIGITAL1:
-				*(int*)arg = ret_vol_stereo(devc->wide_l, devc->wide_r);
-				return 0;
-
-			default:
-				return -EINVAL;
-		}
-	}
+	return retval;
 }
 /* opl3sa3_mixer_ioctl end */
 

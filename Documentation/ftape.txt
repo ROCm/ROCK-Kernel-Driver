@@ -246,8 +246,7 @@ C. Boot and load time configuration
 
    or by editing the file `/etc/modules.conf' in which case they take
    effect each time when the module is loaded with `modprobe' (please
-   refer to the modules documentation, i.e. `modules.txt' and the
-   respective manual pages). Thus, you should add a line
+   refer to the respective manual pages). Thus, you should add a line
 
    options ftape ft_tracing=4
 

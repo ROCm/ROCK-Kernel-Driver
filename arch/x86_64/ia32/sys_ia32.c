@@ -1422,8 +1422,9 @@ asmlinkage long sys32_olduname(struct oldold_utsname * name)
 	 __copy_to_user(&name->version,&system_utsname.version,__OLD_UTS_LEN);
 	 __put_user(0,name->version+__OLD_UTS_LEN);
 	 { 
-		 char *arch = current->personality == PER_LINUX32
-			 ? "i386" : "x86_64"; 
+		 char *arch = "x86_64";
+		 if (personality(current->personality) == PER_LINUX32)
+			 arch = "i686";
 		 
 		 __copy_to_user(&name->machine,arch,strlen(arch)+1);
 	 }
@@ -1443,7 +1444,7 @@ long sys32_uname(struct old_utsname * name)
 	down_read(&uts_sem);
 	err=copy_to_user(name, &system_utsname, sizeof (*name));
 	up_read(&uts_sem);
-	if (current->personality == PER_LINUX32) 
+	if (personality(current->personality) == PER_LINUX32) 
 		err |= copy_to_user(&name->machine, "i686", 5);
 	return err?-EFAULT:0;
 }
@@ -1952,6 +1953,9 @@ long
 sys32_timer_create(u32 clock, struct sigevent32 *se32, timer_t *timer_id)
 {
 	struct sigevent se;
+       mm_segment_t oldfs;
+       long err;
+
 	if (se32) { 
 		memset(&se, 0, sizeof(struct sigevent)); 
 		if (get_user(se.sigev_value.sival_int,  &se32->sigev_value) ||
@@ -1964,9 +1968,9 @@ sys32_timer_create(u32 clock, struct sigevent32 *se32, timer_t *timer_id)
 	if (!access_ok(VERIFY_WRITE,timer_id,sizeof(timer_t)))
 		return -EFAULT;
 
-	mm_segment_t oldfs = get_fs();
+       oldfs = get_fs();
 	set_fs(KERNEL_DS);
-	long err = sys_timer_create(clock, se32 ? &se : NULL, timer_id);
+       err = sys_timer_create(clock, se32 ? &se : NULL, timer_id);
 	set_fs(oldfs); 
 	
 	return err; 

@@ -87,39 +87,46 @@ static int ip_vs_ftp_get_addrport(char *data, char *data_limit,
 				  __u32 *addr, __u16 *port,
 				  char **start, char **end)
 {
-	unsigned char p1,p2,p3,p4,p5,p6;
+	unsigned char p[6];
+	int i = 0;
 
-	while (data < data_limit) {
-		if (strnicmp(data, pattern, plen) != 0) {
-			data++;
-			continue;
-		}
-		*start = data+plen;
-		p1 = simple_strtoul(data+plen, &data, 10);
-		if (*data != ',')
-			continue;
-		p2 = simple_strtoul(data+1, &data, 10);
-		if (*data != ',')
-			continue;
-		p3 = simple_strtoul(data+1, &data, 10);
-		if (*data != ',')
-			continue;
-		p4 = simple_strtoul(data+1, &data, 10);
-		if (*data != ',')
-			continue;
-		p5 = simple_strtoul(data+1, &data, 10);
-		if (*data != ',')
-			continue;
-		p6 = simple_strtoul(data+1, &data, 10);
-		if (*data != term)
-			continue;
-
-		*end = data;
-		*addr = (p4<<24) | (p3<<16) | (p2<<8) | p1;
-		*port = (p6<<8) | p5;
-		return 1;
+	if (data_limit - data < plen) {
+		/* check if there is partial match */
+		if (strnicmp(data, pattern, data_limit - data) == 0)
+			return -1;
+		else
+			return 0;
 	}
-	return 0;
+
+	if (strnicmp(data, pattern, plen) != 0) {
+		return 0;
+	}
+	*start = data + plen;
+
+	for (data = *start; *data != term; data++) {
+		if (data == data_limit)
+			return -1;
+	}
+	*end = data;
+
+	memset(p, 0, sizeof(p));
+	for (data = *start; data != *end; data++) {
+		if (*data >= '0' && *data <= '9') {
+			p[i] = p[i]*10 + *data - '0';
+		} else if (*data == ',' && i < 5) {
+			i++;
+		} else {
+			/* unexpected character */
+			return -1;
+		}
+	}
+
+	if (i != 5)
+		return -1;
+
+	*addr = (p[3]<<24) | (p[2]<<16) | (p[1]<<8) | p[0];
+	*port = (p[5]<<8) | p[4];
+	return 1;
 }
 
 
@@ -136,8 +143,8 @@ static int ip_vs_ftp_get_addrport(char *data, char *data_limit,
  *   "227 Entering Passive Mode (xxx,xxx,xxx,xxx,ppp,ppp)".
  * xxx,xxx,xxx,xxx is the server address, ppp,ppp is the server port number.
  */
-static int ip_vs_ftp_out(struct ip_vs_app *app,
-			 struct ip_vs_conn *cp, struct sk_buff *skb)
+static int ip_vs_ftp_out(struct ip_vs_app *app, struct ip_vs_conn *cp,
+			 struct sk_buff **pskb, int *diff)
 {
 	struct iphdr *iph;
 	struct tcphdr *th;
@@ -148,24 +155,30 @@ static int ip_vs_ftp_out(struct ip_vs_app *app,
 	struct ip_vs_conn *n_cp;
 	char buf[24];		/* xxx.xxx.xxx.xxx,ppp,ppp\000 */
 	unsigned buf_len;
-	int diff;
+	int ret;
+
+	*diff = 0;
 
 	/* Only useful for established sessions */
 	if (cp->state != IP_VS_TCP_S_ESTABLISHED)
+		return 1;
+
+	/* Linear packets are much easier to deal with. */
+	if (!ip_vs_make_skb_writable(pskb, (*pskb)->len))
 		return 0;
 
 	if (cp->app_data == &ip_vs_ftp_pasv) {
-		iph = skb->nh.iph;
+		iph = (*pskb)->nh.iph;
 		th = (struct tcphdr *)&(((char *)iph)[iph->ihl*4]);
 		data = (char *)th + (th->doff << 2);
-		data_limit = skb->tail;
+		data_limit = (*pskb)->tail;
 
 		if (ip_vs_ftp_get_addrport(data, data_limit,
 					   SERVER_STRING,
 					   sizeof(SERVER_STRING)-1, ')',
 					   &from, &port,
-					   &start, &end) == 0)
-			return 0;
+					   &start, &end) != 1)
+			return 1;
 
 		IP_VS_DBG(1-debug, "PASV response (%u.%u.%u.%u:%d) -> "
 			  "%u.%u.%u.%u:%d detected\n",
@@ -196,29 +209,29 @@ static int ip_vs_ftp_out(struct ip_vs_app *app,
 		from = n_cp->vaddr;
 		port = n_cp->vport;
 		sprintf(buf,"%d,%d,%d,%d,%d,%d", NIPQUAD(from),
-			port&255, port>>8&255);
+			port&255, (port>>8)&255);
 		buf_len = strlen(buf);
 
 		/*
 		 * Calculate required delta-offset to keep TCP happy
 		 */
-		diff = buf_len - (end-start);
+		*diff = buf_len - (end-start);
 
-		if (diff == 0) {
+		if (*diff == 0) {
 			/* simply replace it with new passive address */
 			memcpy(start, buf, buf_len);
+			ret = 1;
 		} else {
-			/* fixme: return value isn't checked here */
-			ip_vs_skb_replace(skb, GFP_ATOMIC, start,
+			ret = !ip_vs_skb_replace(*pskb, GFP_ATOMIC, start,
 					  end-start, buf, buf_len);
 		}
 
 		cp->app_data = NULL;
 		ip_vs_tcp_conn_listen(n_cp);
 		ip_vs_conn_put(n_cp);
-		return diff;
+		return ret;
 	}
-	return 0;
+	return 1;
 }
 
 
@@ -233,8 +246,8 @@ static int ip_vs_ftp_out(struct ip_vs_app *app,
  * port, so that the active ftp data connection from the server can reach
  * the client.
  */
-static int ip_vs_ftp_in(struct ip_vs_app *app,
-			struct ip_vs_conn *cp, struct sk_buff *skb)
+static int ip_vs_ftp_in(struct ip_vs_app *app, struct ip_vs_conn *cp,
+			struct sk_buff **pskb, int *diff)
 {
 	struct iphdr *iph;
 	struct tcphdr *th;
@@ -244,29 +257,37 @@ static int ip_vs_ftp_in(struct ip_vs_app *app,
 	__u16 port;
 	struct ip_vs_conn *n_cp;
 
+	/* no diff required for incoming packets */
+	*diff = 0;
+
 	/* Only useful for established sessions */
 	if (cp->state != IP_VS_TCP_S_ESTABLISHED)
+		return 1;
+
+	/* Linear packets are much easier to deal with. */
+	if (!ip_vs_make_skb_writable(pskb, (*pskb)->len))
 		return 0;
 
 	/*
 	 * Detecting whether it is passive
 	 */
-	iph = skb->nh.iph;
+	iph = (*pskb)->nh.iph;
 	th = (struct tcphdr *)&(((char *)iph)[iph->ihl*4]);
 
 	/* Since there may be OPTIONS in the TCP packet and the HLEN is
 	   the length of the header in 32-bit multiples, it is accurate
 	   to calculate data address by th+HLEN*4 */
 	data = data_start = (char *)th + (th->doff << 2);
-	data_limit = skb->tail;
+	data_limit = (*pskb)->tail;
 
-	while (data < data_limit) {
+	while (data <= data_limit - 6) {
 		if (strnicmp(data, "PASV\r\n", 6) == 0) {
+			/* Passive mode on */
 			IP_VS_DBG(1-debug, "got PASV at %d of %d\n",
 				  data - data_start,
 				  data_limit - data_start);
 			cp->app_data = &ip_vs_ftp_pasv;
-			return 0;
+			return 1;
 		}
 		data++;
 	}
@@ -278,28 +299,28 @@ static int ip_vs_ftp_in(struct ip_vs_app *app,
 	 * then create a new connection entry for the coming data
 	 * connection.
 	 */
-	data = data_start;
-	data_limit = skb->h.raw + skb->len - 18;
-
-	if (ip_vs_ftp_get_addrport(data, data_limit,
+	if (ip_vs_ftp_get_addrport(data_start, data_limit,
 				   CLIENT_STRING, sizeof(CLIENT_STRING)-1,
 				   '\r', &to, &port,
-				   &start, &end) == 0)
-		return 0;
+				   &start, &end) != 1)
+		return 1;
 
 	IP_VS_DBG(1-debug, "PORT %u.%u.%u.%u:%d detected\n",
 		  NIPQUAD(to), ntohs(port));
+
+	/* Passive mode off */
+	cp->app_data = NULL;
 
 	/*
 	 * Now update or create a connection entry for it
 	 */
 	IP_VS_DBG(1-debug, "protocol %s %u.%u.%u.%u:%d %u.%u.%u.%u:%d\n",
 		  ip_vs_proto_name(iph->protocol),
-		  NIPQUAD(to), ntohs(port), NIPQUAD(iph->daddr), 0);
+		  NIPQUAD(to), ntohs(port), NIPQUAD(cp->vaddr), 0);
 
 	n_cp = ip_vs_conn_in_get(iph->protocol,
 				 to, port,
-				 iph->daddr, htons(ntohs(cp->vport)-1));
+				 cp->vaddr, htons(ntohs(cp->vport)-1));
 	if (!n_cp) {
 		n_cp = ip_vs_conn_new(IPPROTO_TCP,
 				      to, port,
@@ -320,8 +341,7 @@ static int ip_vs_ftp_in(struct ip_vs_app *app,
 	ip_vs_tcp_conn_listen(n_cp);
 	ip_vs_conn_put(n_cp);
 
-	/* no diff required for incoming packets */
-	return 0;
+	return 1;
 }
 
 

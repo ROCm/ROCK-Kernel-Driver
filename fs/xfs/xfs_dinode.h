@@ -439,25 +439,21 @@ void xfs_dfork_next_set(xfs_dinode_t *dip, int w, int n);
 /*
  * File types (mode field)
  */
-#define	IFMT		0170000		/* type of file */
-#define	IFIFO		0010000		/* named pipe (fifo) */
-#define	IFCHR		0020000		/* character special */
-#define	IFDIR		0040000		/* directory */
-#define	IFBLK		0060000		/* block special */
-#define	IFREG		0100000		/* regular */
-#define	IFLNK		0120000		/* symbolic link */
-#define	IFSOCK		0140000		/* socket */
-#define	IFMNT		0160000		/* mount point */
+#define	IFMT		S_IFMT
+#define	IFSOCK		S_IFSOCK
+#define	IFLNK		S_IFLNK
+#define	IFREG		S_IFREG
+#define	IFBLK		S_IFBLK
+#define	IFDIR		S_IFDIR
+#define	IFCHR		S_IFCHR
+#define	IFIFO		S_IFIFO
 
-/*
- * File execution and access modes.
- */
-#define	ISUID		04000		/* set user id on execution */
-#define	ISGID		02000		/* set group id on execution */
-#define	ISVTX		01000		/* sticky directory */
-#define	IREAD		0400		/* read, write, execute permissions */
-#define	IWRITE		0200
-#define	IEXEC		0100
+#define	ISUID		S_ISUID
+#define	ISGID		S_ISGID
+#define	ISVTX		S_ISVTX
+#define	IREAD		S_IRUSR
+#define	IWRITE		S_IWUSR
+#define	IEXEC		S_IXUSR
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_DINODE)
 xfs_dinode_t *xfs_buf_to_dinode(struct xfs_buf *bp);

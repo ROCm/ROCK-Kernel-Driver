@@ -255,6 +255,9 @@ void clear_inode(struct inode *inode)
 EXPORT_SYMBOL(clear_inode);
 
 /*
+ * dispose_list - dispose of the contents of a local list
+ * @head: the head of the list to free
+ *
  * Dispose-list gets a local list with local inodes in it, so it doesn't
  * need to worry about list corruption and SMP locks.
  */
@@ -739,11 +742,11 @@ EXPORT_SYMBOL(igrab);
 /**
  * ifind - internal function, you want ilookup5() or iget5().
  * @sb:		super block of file system to search
- * @hashval:	hash value (usually inode number) to search for
+ * @head:       the head of the list to search
  * @test:	callback used for comparisons between inodes
  * @data:	opaque data pointer to pass to @test
  *
- * ifind() searches for the inode specified by @hashval and @data in the inode
+ * ifind() searches for the inode specified by @data in the inode
  * cache. This is a generalized version of ifind_fast() for file systems where
  * the inode number is not sufficient for unique identification of an inode.
  *
@@ -775,6 +778,7 @@ static inline struct inode *ifind(struct super_block *sb,
 /**
  * ifind_fast - internal function, you want ilookup() or iget().
  * @sb:		super block of file system to search
+ * @head:       head of the list to search
  * @ino:	inode number to search for
  *
  * ifind_fast() searches for the inode @ino in the inode cache. This is for

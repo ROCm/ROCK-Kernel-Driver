@@ -1,4 +1,3 @@
-#include <linux/version.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/string.h>

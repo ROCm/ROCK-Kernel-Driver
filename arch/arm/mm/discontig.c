@@ -15,7 +15,7 @@
 #include <linux/init.h>
 #include <linux/bootmem.h>
 
-#if NR_NODES != 4
+#if MAX_NUMNODES != 4
 #error Fix Me Please
 #endif
 
@@ -23,9 +23,9 @@
  * Our node_data structure for discontiguous memory.
  */
 
-static bootmem_data_t node_bootmem_data[NR_NODES];
+static bootmem_data_t node_bootmem_data[MAX_NUMNODES];
 
-pg_data_t discontig_node_data[NR_NODES] = {
+pg_data_t discontig_node_data[MAX_NUMNODES] = {
   { .bdata = &node_bootmem_data[0] },
   { .bdata = &node_bootmem_data[1] },
   { .bdata = &node_bootmem_data[2] },

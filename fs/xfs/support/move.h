@@ -48,11 +48,6 @@ typedef struct uio {
 } uio_t;
 
 /*
- * I/O direction.
- */
-typedef enum uio_rw { UIO_READ, UIO_WRITE } uio_rw_t;
-
-/*
  * Segment flag values.
  */
 typedef enum uio_seg {
@@ -60,7 +55,6 @@ typedef enum uio_seg {
 	UIO_SYSSPACE,           /* uio_iov describes system space */
 } uio_seg_t;
 
-
-extern int	uiomove (void *, size_t, uio_rw_t, uio_t *);
+extern int	uio_read (caddr_t, size_t, uio_t *);
 
 #endif  /* __XFS_SUPPORT_MOVE_H__ */

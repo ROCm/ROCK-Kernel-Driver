@@ -2612,7 +2612,7 @@ int __init espserial_init(void)
 static void __exit espserial_exit(void) 
 {
 	unsigned long flags;
-	int e1, e2;
+	int e1;
 	unsigned int region_start, region_end;
 	struct esp_struct *temp_async;
 	struct esp_pio_buffer *pio_buf;

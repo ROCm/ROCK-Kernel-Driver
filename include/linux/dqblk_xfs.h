@@ -105,15 +105,6 @@ typedef struct fs_disk_quota {
 #define FS_DQ_TIMER_MASK	(FS_DQ_BTIMER | FS_DQ_ITIMER | FS_DQ_RTBTIMER)
 
 /*
- * The following constants define the default amount of time given a user
- * before the soft limits are treated as hard limits (usually resulting
- * in an allocation failure).  These may be modified by the quotactl(2)
- * system call with the Q_XSETQLIM command.
- */
-#define	DQ_FTIMELIMIT	(7 * 24*60*60)		/* 1 week */
-#define	DQ_BTIMELIMIT	(7 * 24*60*60)		/* 1 week */
-
-/*
  * Various flags related to quotactl(2).  Only relevant to XFS filesystems.
  */
 #define XFS_QUOTA_UDQ_ACCT	(1<<0)  /* user quota accounting */

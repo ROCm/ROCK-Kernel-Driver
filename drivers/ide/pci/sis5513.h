@@ -27,7 +27,6 @@ static ide_pci_host_proc_t sis_procs[] __initdata = {
 
 static unsigned int init_chipset_sis5513(struct pci_dev *, const char *);
 static void init_hwif_sis5513(ide_hwif_t *);
-static void init_dma_sis5513(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t sis5513_chipsets[] __devinitdata = {
 	{	/* 0 */
@@ -37,7 +36,6 @@ static ide_pci_device_t sis5513_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_sis5513,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_sis5513,
-		.init_dma	= init_dma_sis5513,
 		.channels	= 2,
 		.autodma	= NOAUTODMA,
 		.enablebits	= {{0x4a,0x02,0x02}, {0x4a,0x04,0x04}},

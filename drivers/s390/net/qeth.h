@@ -14,7 +14,7 @@
 
 #define QETH_NAME " qeth"
 
-#define VERSION_QETH_H "$Revision: 1.56 $"
+#define VERSION_QETH_H "$Revision: 1.58 $"
 
 /******************** CONFIG STUFF ***********************/
 //#define QETH_DBF_LIKE_HELL
@@ -106,6 +106,12 @@
                 debug_text_event(qeth_dbf_##name,level,text); \
         } while (0)
 
+#define QETH_DBF_CARD(ex,name,level,text,card) \
+	do { \
+		QETH_DBF_TEXT(ex,name,level,text); \
+		QETH_DBF_TEXT(ex,name,level,card->gdev->dev.bus_id); \
+	} while (0)
+
 #define QETH_DBF_HEX0(ex,name,addr,len) QETH_DBF_HEX(ex,name,0,addr,len)
 #define QETH_DBF_HEX1(ex,name,addr,len) QETH_DBF_HEX(ex,name,1,addr,len)
 #define QETH_DBF_HEX2(ex,name,addr,len) QETH_DBF_HEX(ex,name,2,addr,len)
@@ -134,6 +140,21 @@
 #define QETH_DBF_TEXT4(ex,name,text) do {} while (0)
 #define QETH_DBF_TEXT5(ex,name,text) do {} while (0)
 #define QETH_DBF_TEXT6(ex,name,text) do {} while (0)
+#endif /* QETH_DBF_LIKE_HELL */
+
+#define QETH_DBF_CARD0(ex,name,text,card) QETH_DBF_CARD(ex,name,0,text,card)
+#define QETH_DBF_CARD1(ex,name,text,card) QETH_DBF_CARD(ex,name,1,text,card)
+#define QETH_DBF_CARD2(ex,name,text,card) QETH_DBF_CARD(ex,name,2,text,card)
+#ifdef QETH_DBF_LIKE_HELL
+#define QETH_DBF_CARD3(ex,name,text,card) QETH_DBF_CARD(ex,name,3,text,card)
+#define QETH_DBF_CARD4(ex,name,text,card) QETH_DBF_CARD(ex,name,4,text,card)
+#define QETH_DBF_CARD5(ex,name,text,card) QETH_DBF_CARD(ex,name,5,text,card)
+#define QETH_DBF_CARD6(ex,name,text,card) QETH_DBF_CARD(ex,name,6,text,card)
+#else /* QETH_DBF_LIKE_HELL */
+#define QETH_DBF_CARD3(ex,name,text,card) do {} while (0)
+#define QETH_DBF_CARD4(ex,name,text,card) do {} while (0)
+#define QETH_DBF_CARD5(ex,name,text,card) do {} while (0)
+#define QETH_DBF_CARD6(ex,name,text,card) do {} while (0)
 #endif /* QETH_DBF_LIKE_HELL */
 
 #define QETH_DBF_SETUP_NAME "qeth_setup"
@@ -662,6 +683,14 @@ struct sparebufs {
 #define PROBLEM_MACHINE_CHECK 11
 #define PROBLEM_TX_TIMEOUT 12
 
+#define CARD_RDEV(card) card->gdev->cdev[0]
+#define CARD_WDEV(card) card->gdev->cdev[1]
+#define CARD_DDEV(card) card->gdev->cdev[2]
+#define CARD_BUS_ID(card) card->gdev->dev.bus_id
+#define CARD_RDEV_ID(card) card->gdev->cdev[0]->dev.bus_id
+#define CARD_WDEV_ID(card) card->gdev->cdev[1]->dev.bus_id
+#define CARD_DDEV_ID(card) card->gdev->cdev[2]->dev.bus_id
+
 #define SENSE_COMMAND_REJECT_BYTE 0
 #define SENSE_COMMAND_REJECT_FLAG 0x80
 #define SENSE_RESETTING_EVENT_BYTE 1
@@ -926,9 +955,6 @@ struct qeth_card {	/* pointed to by dev->priv */
 
 	/* device and I/O data */
 	struct ccwgroup_device *gdev;
-	struct ccw_device *rdev;
-	struct ccw_device *wdev;
-	struct ccw_device *ddev;
 	unsigned short unit_addr2;
 	unsigned short cula;
 	unsigned short chpid;

@@ -99,82 +99,6 @@ static int uhci_show_td(struct uhci_td *td, char *buf, int len, int space)
 	return out - buf;
 }
 
-static int uhci_show_sc(int port, unsigned short status, char *buf, int len)
-{
-	char *out = buf;
-
-	/* Try to make sure there's enough memory */
-	if (len < 80)
-		return 0;
-
-	out += sprintf(out, "  stat%d     =     %04x   %s%s%s%s%s%s%s%s\n",
-		port,
-		status,
-		(status & USBPORTSC_SUSP) ? "PortSuspend " : "",
-		(status & USBPORTSC_PR) ?   "PortReset " : "",
-		(status & USBPORTSC_LSDA) ? "LowSpeed " : "",
-		(status & USBPORTSC_RD) ?   "ResumeDetect " : "",
-		(status & USBPORTSC_PEC) ?  "EnableChange " : "",
-		(status & USBPORTSC_PE) ?   "PortEnabled " : "",
-		(status & USBPORTSC_CSC) ?  "ConnectChange " : "",
-		(status & USBPORTSC_CCS) ?  "PortConnected " : "");
-
-	return out - buf;
-}
-
-static int uhci_show_status(struct uhci_hcd *uhci, char *buf, int len)
-{
-	char *out = buf;
-	unsigned int io_addr = uhci->io_addr;
-	unsigned short usbcmd, usbstat, usbint, usbfrnum;
-	unsigned int flbaseadd;
-	unsigned char sof;
-	unsigned short portsc1, portsc2;
-
-	/* Try to make sure there's enough memory */
-	if (len < 80 * 6)
-		return 0;
-
-	usbcmd    = inw(io_addr + 0);
-	usbstat   = inw(io_addr + 2);
-	usbint    = inw(io_addr + 4);
-	usbfrnum  = inw(io_addr + 6);
-	flbaseadd = inl(io_addr + 8);
-	sof       = inb(io_addr + 12);
-	portsc1   = inw(io_addr + 16);
-	portsc2   = inw(io_addr + 18);
-
-	out += sprintf(out, "  usbcmd    =     %04x   %s%s%s%s%s%s%s%s\n",
-		usbcmd,
-		(usbcmd & USBCMD_MAXP) ?    "Maxp64 " : "Maxp32 ",
-		(usbcmd & USBCMD_CF) ?      "CF " : "",
-		(usbcmd & USBCMD_SWDBG) ?   "SWDBG " : "",
-		(usbcmd & USBCMD_FGR) ?     "FGR " : "",
-		(usbcmd & USBCMD_EGSM) ?    "EGSM " : "",
-		(usbcmd & USBCMD_GRESET) ?  "GRESET " : "",
-		(usbcmd & USBCMD_HCRESET) ? "HCRESET " : "",
-		(usbcmd & USBCMD_RS) ?      "RS " : "");
-
-	out += sprintf(out, "  usbstat   =     %04x   %s%s%s%s%s%s\n",
-		usbstat,
-		(usbstat & USBSTS_HCH) ?    "HCHalted " : "",
-		(usbstat & USBSTS_HCPE) ?   "HostControllerProcessError " : "",
-		(usbstat & USBSTS_HSE) ?    "HostSystemError " : "",
-		(usbstat & USBSTS_RD) ?     "ResumeDetect " : "",
-		(usbstat & USBSTS_ERROR) ?  "USBError " : "",
-		(usbstat & USBSTS_USBINT) ? "USBINT " : "");
-
-	out += sprintf(out, "  usbint    =     %04x\n", usbint);
-	out += sprintf(out, "  usbfrnum  =   (%d)%03x\n", (usbfrnum >> 10) & 1,
-		0xfff & (4*(unsigned int)usbfrnum));
-	out += sprintf(out, "  flbaseadd = %08x\n", flbaseadd);
-	out += sprintf(out, "  sof       =       %02x\n", sof);
-	out += uhci_show_sc(1, portsc1, out, len - (out - buf));
-	out += uhci_show_sc(2, portsc2, out, len - (out - buf));
-
-	return out - buf;
-}
-
 static int uhci_show_qh(struct uhci_qh *qh, char *buf, int len, int space)
 {
 	char *out = buf;
@@ -274,6 +198,13 @@ out:
 	return out - buf;
 }
 
+#define show_frame_num()	\
+	if (!shown) {		\
+	  shown = 1;		\
+	  out += sprintf(out, "- Frame %d\n", i); \
+	}
+
+#ifdef CONFIG_PROC_FS
 static const char *qh_names[] = {
   "skel_int128_qh", "skel_int64_qh",
   "skel_int32_qh", "skel_int16_qh",
@@ -283,17 +214,87 @@ static const char *qh_names[] = {
   "skel_bulk_qh", "skel_term_qh"
 };
 
-#define show_frame_num()	\
-	if (!shown) {		\
-	  shown = 1;		\
-	  out += sprintf(out, "- Frame %d\n", i); \
-	}
-
 #define show_qh_name()		\
 	if (!shown) {		\
 	  shown = 1;		\
 	  out += sprintf(out, "- %s\n", qh_names[i]); \
 	}
+
+static int uhci_show_sc(int port, unsigned short status, char *buf, int len)
+{
+	char *out = buf;
+
+	/* Try to make sure there's enough memory */
+	if (len < 80)
+		return 0;
+
+	out += sprintf(out, "  stat%d     =     %04x   %s%s%s%s%s%s%s%s\n",
+		port,
+		status,
+		(status & USBPORTSC_SUSP) ? "PortSuspend " : "",
+		(status & USBPORTSC_PR) ?   "PortReset " : "",
+		(status & USBPORTSC_LSDA) ? "LowSpeed " : "",
+		(status & USBPORTSC_RD) ?   "ResumeDetect " : "",
+		(status & USBPORTSC_PEC) ?  "EnableChange " : "",
+		(status & USBPORTSC_PE) ?   "PortEnabled " : "",
+		(status & USBPORTSC_CSC) ?  "ConnectChange " : "",
+		(status & USBPORTSC_CCS) ?  "PortConnected " : "");
+
+	return out - buf;
+}
+
+static int uhci_show_status(struct uhci_hcd *uhci, char *buf, int len)
+{
+	char *out = buf;
+	unsigned int io_addr = uhci->io_addr;
+	unsigned short usbcmd, usbstat, usbint, usbfrnum;
+	unsigned int flbaseadd;
+	unsigned char sof;
+	unsigned short portsc1, portsc2;
+
+	/* Try to make sure there's enough memory */
+	if (len < 80 * 6)
+		return 0;
+
+	usbcmd    = inw(io_addr + 0);
+	usbstat   = inw(io_addr + 2);
+	usbint    = inw(io_addr + 4);
+	usbfrnum  = inw(io_addr + 6);
+	flbaseadd = inl(io_addr + 8);
+	sof       = inb(io_addr + 12);
+	portsc1   = inw(io_addr + 16);
+	portsc2   = inw(io_addr + 18);
+
+	out += sprintf(out, "  usbcmd    =     %04x   %s%s%s%s%s%s%s%s\n",
+		usbcmd,
+		(usbcmd & USBCMD_MAXP) ?    "Maxp64 " : "Maxp32 ",
+		(usbcmd & USBCMD_CF) ?      "CF " : "",
+		(usbcmd & USBCMD_SWDBG) ?   "SWDBG " : "",
+		(usbcmd & USBCMD_FGR) ?     "FGR " : "",
+		(usbcmd & USBCMD_EGSM) ?    "EGSM " : "",
+		(usbcmd & USBCMD_GRESET) ?  "GRESET " : "",
+		(usbcmd & USBCMD_HCRESET) ? "HCRESET " : "",
+		(usbcmd & USBCMD_RS) ?      "RS " : "");
+
+	out += sprintf(out, "  usbstat   =     %04x   %s%s%s%s%s%s\n",
+		usbstat,
+		(usbstat & USBSTS_HCH) ?    "HCHalted " : "",
+		(usbstat & USBSTS_HCPE) ?   "HostControllerProcessError " : "",
+		(usbstat & USBSTS_HSE) ?    "HostSystemError " : "",
+		(usbstat & USBSTS_RD) ?     "ResumeDetect " : "",
+		(usbstat & USBSTS_ERROR) ?  "USBError " : "",
+		(usbstat & USBSTS_USBINT) ? "USBINT " : "");
+
+	out += sprintf(out, "  usbint    =     %04x\n", usbint);
+	out += sprintf(out, "  usbfrnum  =   (%d)%03x\n", (usbfrnum >> 10) & 1,
+		0xfff & (4*(unsigned int)usbfrnum));
+	out += sprintf(out, "  flbaseadd = %08x\n", flbaseadd);
+	out += sprintf(out, "  sof       =       %02x\n", sof);
+	out += uhci_show_sc(1, portsc1, out, len - (out - buf));
+	out += uhci_show_sc(2, portsc2, out, len - (out - buf));
+
+	return out - buf;
+}
 
 static int uhci_show_urbp(struct uhci_hcd *uhci, struct urb_priv *urbp, char *buf, int len)
 {
@@ -512,7 +513,6 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 	return out - buf;
 }
 
-#ifdef CONFIG_PROC_FS
 #define MAX_OUTPUT	(64 * 1024)
 
 static struct proc_dir_entry *uhci_proc_root = NULL;

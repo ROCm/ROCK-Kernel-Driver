@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/ccwgroup.c
  *  bus driver for ccwgroup
- *   $Revision: 1.15 $
+ *   $Revision: 1.17 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *                       IBM Corporation
@@ -67,10 +67,7 @@ __ccwgroup_remove_symlinks(struct ccwgroup_device *gdev)
 	for (i = 0; i < gdev->count; i++) {
 		sprintf(str, "cdev%d", i);
 		sysfs_remove_link(&gdev->dev.kobj, str);
-		/* Hack: Make sure we act on still valid subdirs. */
-		if (atomic_read(&gdev->cdev[i]->dev.kobj.dentry->d_count))
-			sysfs_remove_link(&gdev->cdev[i]->dev.kobj,
-					  "group_device");
+		sysfs_remove_link(&gdev->cdev[i]->dev.kobj, "group_device");
 	}
 	
 }
@@ -187,7 +184,7 @@ ccwgroup_create(struct device *root,
 		.dev = {
 			.bus = &ccwgroup_bus_type,
 			.parent = root,
-			.release = &ccwgroup_release,
+			.release = ccwgroup_release,
 		},
 	};
 

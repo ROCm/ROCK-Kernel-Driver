@@ -3739,9 +3739,9 @@ xfsidbg_xdabuf(xfs_dabuf_t *dabuf)
 		kdb_printf(" %d:0x%p", i, dabuf->bps[i]);
 	kdb_printf("\n");
 #ifdef XFS_DABUF_DEBUG
-	kdb_printf(" ra 0x%x prev 0x%x next 0x%x dev %u:%u blkno 0x%x\n",
+	kdb_printf(" ra 0x%x prev 0x%x next 0x%x dev %s blkno 0x%x\n",
 		dabuf->ra, dabuf->prev, dabuf->next,
-		MAJOR(dabuf->dev), MINOR(dabuf->dev), dabuf->blkno);
+		XFS_BUFTARG_NAME(dabuf->dev), dabuf->blkno);
 #endif
 }
 
@@ -4269,9 +4269,8 @@ xfsidbg_xlog(xlog_t *log)
 			xfsidbg_get_cstate(log->l_covered_state));
 	kdb_printf("flags: ");
 	printflags(log->l_flags, t_flags,"log");
-	kdb_printf("  dev: %u:%u logBBstart: %lld logsize: %d logBBsize: %d\n",
-		MAJOR(log->l_dev), MINOR(log->l_dev),
-		(long long) log->l_logBBstart,
+	kdb_printf("  dev: %s logBBstart: %lld logsize: %d logBBsize: %d\n",
+		XFS_BUFTARG_NAME(log->l_targ), (long long) log->l_logBBstart,
 		log->l_logsize,log->l_logBBsize);
 	kdb_printf("curr_cycle: %d  prev_cycle: %d  curr_block: %d  prev_block: %d\n",
 	     log->l_curr_cycle, log->l_prev_cycle, log->l_curr_block,
@@ -4646,14 +4645,14 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		XFS_MTOVFS(mp), mp->m_tid, &mp->m_ail_lock, &mp->m_ail);
 	kdb_printf("ail_gen 0x%x &sb 0x%p\n",
 		mp->m_ail_gen, &mp->m_sb);
-	kdb_printf("sb_lock 0x%p sb_bp 0x%p dev %u:%u logdev %u:%u rtdev %u:%u\n",
+	kdb_printf("sb_lock 0x%p sb_bp 0x%p dev %s logdev %s rtdev %s\n",
 		&mp->m_sb_lock, mp->m_sb_bp,
-		mp->m_ddev_targp ? MAJOR(mp->m_ddev_targp->pbr_dev) : 0,
-		mp->m_ddev_targp ? MINOR(mp->m_ddev_targp->pbr_dev) : 0,
-		mp->m_logdev_targp ? MAJOR(mp->m_logdev_targp->pbr_dev) : 0,
-		mp->m_logdev_targp ? MINOR(mp->m_logdev_targp->pbr_dev) : 0,
-		mp->m_rtdev_targp ? MAJOR(mp->m_rtdev_targp->pbr_dev) : 0,
-		mp->m_rtdev_targp ? MINOR(mp->m_rtdev_targp->pbr_dev) : 0);
+		mp->m_ddev_targp ?
+			XFS_BUFTARG_NAME(mp->m_ddev_targp) : "none",
+		mp->m_logdev_targp ?
+			XFS_BUFTARG_NAME(mp->m_logdev_targp) : "none",
+		mp->m_rtdev_targp ?
+			XFS_BUFTARG_NAME(mp->m_rtdev_targp) : "none");
 	kdb_printf("bsize %d agfrotor %d agirotor %d ihash 0x%p ihsize %d\n",
 		mp->m_bsize, mp->m_agfrotor, mp->m_agirotor,
 		mp->m_ihash, mp->m_ihsize);
@@ -4824,9 +4823,8 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		ip->i_mnext,
 		ip->i_mprev,
 		XFS_ITOV_NULL(ip));
-	kdb_printf("dev %u:%u ino %s\n",
-		MAJOR(ip->i_mount->m_dev),
-		MINOR(ip->i_mount->m_dev),
+	kdb_printf("dev %s ino %s\n",
+		XFS_BUFTARG_NAME(ip->i_mount->m_ddev_targp),
 		xfs_fmtino(ip->i_ino, ip->i_mount));
 	kdb_printf("blkno 0x%llx len 0x%x boffset 0x%x\n",
 		(long long) ip->i_blkno,

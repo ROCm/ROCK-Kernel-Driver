@@ -28,8 +28,6 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include <linux/version.h>
-
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/delay.h>
@@ -51,7 +49,6 @@
 #include <linux/types.h>
 
 #include <linux/videodev.h>
-#include <linux/version.h>
 #include <asm/uaccess.h>
 
 MODULE_DESCRIPTION("Philips SAA7114H video decoder driver");

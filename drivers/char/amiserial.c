@@ -32,7 +32,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/version.h>
 
 #undef SERIAL_PARANOIA_CHECK
 #define SERIAL_DO_RESTART

@@ -9,7 +9,18 @@
  */
 #include <linux/linkage.h>
 #include <asm/assembler.h>
-#include <asm/hardware.h>
+
+		.macro	outword, rd
+#ifndef __ARMEB__
+		strh	\rd, [r0]
+		mov	\rd, \rd, lsr #16
+		strh	\rd, [r0]
+#else
+		mov	lr, \rd, lsr #16
+		strh	lr, [r0]
+		strh	\rd, [r0]
+#endif
+		.endm
 
 .outsw_bad_alignment:
 		adr	r0, .outsw_bad_align_msg
@@ -40,20 +51,10 @@ ENTRY(__raw_writesw)
 		bmi	.no_outsw_8
 
 .outsw_8_lp:	ldmia	r1!, {r3, r4, r5, ip}
-
-		strh	r3, [r0]
-		mov	r3, r3, lsr #16
-		strh	r3, [r0]
-		strh	r4, [r0]
-		mov	r4, r4, lsr #16
-		strh	r4, [r0]
-		strh	r5, [r0]
-		mov	r5, r5, lsr #16
-		strh	r5, [r0]
-		strh	ip, [r0]
-		mov	ip, ip, lsr #16
-		strh	ip, [r0]
-
+		outword	r3
+		outword	r4
+		outword	r5
+		outword	ip
 		subs	r2, r2, #8
 		bpl	.outsw_8_lp
 
@@ -64,20 +65,14 @@ ENTRY(__raw_writesw)
 		beq	.no_outsw_4
 
 		ldmia	r1!, {r3, ip}
-		strh	r3, [r0]
-		mov	r3, r3, lsr #16
-		strh	r3, [r0]
-		strh	ip, [r0]
-		mov	ip, ip, lsr #16
-		strh	ip, [r0]
+		outword	r3
+		outword	ip
 
 .no_outsw_4:	tst	r2, #2
 		beq	.no_outsw_2
 
 		ldr	r3, [r1], #4
-		strh	r3, [r0]
-		mov	r3, r3, lsr #16
-		strh	r3, [r0]
+		outword	r3
 
 .no_outsw_2:	tst	r2, #1
 		ldrneh	r3, [r1]

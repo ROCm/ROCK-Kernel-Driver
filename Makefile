@@ -37,7 +37,7 @@ ifdef V
   endif
 endif
 ifndef KBUILD_VERBOSE
-  KBUILD_VERBOSE = 0 
+  KBUILD_VERBOSE = 0
 endif
 
 # Call sparse as part of compilation of C files
@@ -79,16 +79,24 @@ ifdef O
   endif
 endif
 
+# That's our default target when none is given on the command line
+.PHONY: all
+all:
+  
 ifneq ($(KBUILD_OUTPUT),)
 # Invoke a second make in the output directory, passing relevant variables
-	KBUILD_OUTPUT := $(shell cd $(KBUILD_OUTPUT); /bin/pwd)
+# check that the output directory actually exists
+saved-output := $(KBUILD_OUTPUT)
+KBUILD_OUTPUT := $(shell cd $(KBUILD_OUTPUT) && /bin/pwd)
+$(if $(wildcard $(KBUILD_OUTPUT)),, \
+     $(error output directory "$(saved-output)" does not exist))
 
-.PHONY: $(MAKECMDGOALS) all
+.PHONY: $(MAKECMDGOALS)
 
-$(MAKECMDGOALS) all:
+$(filter-out all,$(MAKECMDGOALS)) all:
 	$(if $(KBUILD_VERBOSE:1=),@)$(MAKE) -C $(KBUILD_OUTPUT)		\
 	KBUILD_SRC=$(CURDIR)	KBUILD_VERBOSE=$(KBUILD_VERBOSE)	\
-	KBUILD_CHECK=$(KBUILD_CHECK) -f $(CURDIR)/Makefile $(MAKECMDGOALS)
+	KBUILD_CHECK=$(KBUILD_CHECK) -f $(CURDIR)/Makefile $@
 
 # Leave processing to above invocation of make
 skip-makefile := 1
@@ -155,13 +163,6 @@ HOSTCC  	= gcc
 HOSTCXX  	= g++
 HOSTCFLAGS	= -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
 HOSTCXXFLAGS	= -O2
-
-
-# 	That's our default target when none is given on the command line
-#	Note that 'modules' will be added as a prerequisite as well, 
-#	in the CONFIG_MODULES part below
-
-all:	vmlinux
 
 # 	Decide whether to build built-in, modular, or both.
 #	Normally, just do built-in.
@@ -365,6 +366,12 @@ else
 # ===========================================================================
 # Build targets only - this includes vmlinux, arch specific targets, clean
 # targets and others. In general all targets except *config targets.
+
+# That's our default target when none is given on the command line
+# Note that 'modules' will be added as a prerequisite as well, 
+# in the CONFIG_MODULES part below
+
+all:	vmlinux
 
 # Objects we will link into vmlinux / subdirs we need to visit
 init-y		:= init/
@@ -753,7 +760,7 @@ MRPROPER_FILES += \
 	.menuconfig.log \
 	include/asm \
 	.hdepend include/linux/modversions.h \
-	tags TAGS cscope.out kernel.spec \
+	tags TAGS cscope* kernel.spec \
 	.tmp*
 
 # Directories removed with 'make mrproper'
@@ -877,7 +884,7 @@ help:
 	@echo  '  mrproper	  - remove all generated files + config + various backup files'
 	@echo  ''
 	@echo  'Configuration targets:'
-	@$(MAKE) -f scripts/kconfig/Makefile help
+	@$(MAKE) -f $(srctree)/scripts/kconfig/Makefile help
 	@echo  ''
 	@echo  'Other generic targets:'
 	@echo  '  all		  - Build all targets marked with [*]'
@@ -890,7 +897,7 @@ help:
 	@echo  '  tags/TAGS	  - Generate tags file for editors'
 	@echo  ''
 	@echo  'Documentation targets:'
-	@$(MAKE) -f Documentation/DocBook/Makefile dochelp
+	@$(MAKE) -f $(srctree)/Documentation/DocBook/Makefile dochelp
 	@echo  ''
 	@echo  'Architecture specific targets ($(ARCH)):'
 	@$(if $(archhelp),$(archhelp),\

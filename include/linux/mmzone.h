@@ -10,13 +10,8 @@
 #include <linux/wait.h>
 #include <linux/cache.h>
 #include <linux/threads.h>
+#include <linux/numa.h>
 #include <asm/atomic.h>
-#ifdef CONFIG_DISCONTIGMEM
-#include <asm/numnodes.h>
-#endif
-#ifndef MAX_NUMNODES
-#define MAX_NUMNODES 1
-#endif
 
 /* Free memory management - zoned buddy allocator.  */
 #ifndef CONFIG_FORCE_MAX_ZONEORDER
@@ -303,19 +298,34 @@ extern void setup_per_zone_pages_min(void);
 #define numa_node_id()		(cpu_to_node(smp_processor_id()))
 
 #ifndef CONFIG_DISCONTIGMEM
+
 extern struct pglist_data contig_page_data;
 #define NODE_DATA(nid)		(&contig_page_data)
 #define NODE_MEM_MAP(nid)	mem_map
-#define MAX_NR_NODES		1
+#define MAX_NODES_SHIFT		0
+
 #else /* CONFIG_DISCONTIGMEM */
 
 #include <asm/mmzone.h>
 
-/* page->zone is currently 8 bits ... */
-#define MAX_NR_NODES		(255 / MAX_NR_ZONES)
+#if BITS_PER_LONG == 32
+/*
+ * with 32 bit flags field, page->zone is currently 8 bits.
+ * there are 3 zones (2 bits) and this leaves 8-2=6 bits for nodes.
+ */
+#define MAX_NODES_SHIFT		6
+#elif BITS_PER_LONG == 64
+/*
+ * with 64 bit flags field, there's plenty of room.
+ */
+#define MAX_NODES_SHIFT		10
+#endif
 
 #endif /* !CONFIG_DISCONTIGMEM */
 
+#if NODES_SHIFT > MAX_NODES_SHIFT
+#error NODES_SHIFT > MAX_NODES_SHIFT
+#endif
 
 extern DECLARE_BITMAP(node_online_map, MAX_NUMNODES);
 extern DECLARE_BITMAP(memblk_online_map, MAX_NR_MEMBLKS);
