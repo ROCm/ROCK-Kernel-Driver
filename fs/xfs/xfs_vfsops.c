@@ -393,7 +393,7 @@ xfs_mount(
 	xfs_mount_t		*mp;
 	struct block_device	*ddev, *logdev, *rtdev;
 	int			ronly = (vfsp->vfs_flag & VFS_RDONLY);
-	int			error = 0;
+	int			flags = 0, error;
 
 	ddev = vfsp->vfs_super->s_bdev;
 	logdev = rtdev = NULL;
@@ -430,17 +430,11 @@ xfs_mount(
 	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
 
 	mp->m_ddev_targp = xfs_alloc_buftarg(ddev);
-	if (rtdev != NULL) {
+	if (rtdev)
 		mp->m_rtdev_targp = xfs_alloc_buftarg(rtdev);
-		set_blocksize(rtdev, 512);
-	}
-	if (logdev != NULL && logdev != ddev) {
-		mp->m_logdev_targp = xfs_alloc_buftarg(logdev);
-		set_blocksize(logdev, 512);
-	} else {
-		mp->m_logdev_targp = mp->m_ddev_targp;
-	}
-	
+	mp->m_logdev_targp = (logdev && logdev != ddev) ?
+				xfs_alloc_buftarg(logdev) : mp->m_ddev_targp;
+
 	error = xfs_start_flags(args, mp, ronly);
 	if (error)
 		goto error;
@@ -455,16 +449,16 @@ xfs_mount(
 		goto error;
 	}
 
-	mp->m_ddev_targp->pbr_blocksize = mp->m_sb.sb_blocksize;
-	if (logdev != 0 && logdev != ddev) {
-		mp->m_logdev_targp->pbr_blocksize = mp->m_sb.sb_blocksize;
-	}
-	if (rtdev != 0) {
-		mp->m_rtdev_targp->pbr_blocksize = mp->m_sb.sb_blocksize;
-	}
+	xfs_size_buftarg(mp->m_ddev_targp, mp->m_sb.sb_blocksize,
+			 mp->m_sb.sb_sectsize);
+	if (logdev && logdev != ddev)
+		xfs_size_buftarg(mp->m_logdev_targp, mp->m_sb.sb_blocksize,
+				 mp->m_sb.sb_logsectsize);
+	if (rtdev)
+		xfs_size_buftarg(mp->m_logdev_targp, mp->m_sb.sb_blocksize,
+				 mp->m_sb.sb_blocksize);
 
-	mp->m_cxfstype = XFS_CXFS_NOT;
-	error = xfs_mountfs(vfsp, mp, ddev->bd_dev, 0);
+	error = xfs_mountfs(vfsp, mp, ddev->bd_dev, flags);
 	if (error)
 		goto error;
 	return 0;

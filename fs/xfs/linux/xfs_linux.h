@@ -153,7 +153,6 @@ typedef struct xfs_dirent {		/* data from readdir() */
 #define EFSCORRUPTED	990		/* Filesystem is corrupted */
 
 #define SYNCHRONIZE()	barrier()
-#define rootdev		ROOT_DEV
 #define __return_address __builtin_return_address(0)
 
 /* IRIX uses a dynamic sizing algorithm (ndquot = 200 + numprocs*2) */

@@ -63,10 +63,8 @@
 
 #include "page_buf_internal.h"
 
-#define SECTOR_SHIFT	9
-#define SECTOR_SIZE	(1<<SECTOR_SHIFT)
-#define SECTOR_MASK	(SECTOR_SIZE - 1)
-#define BN_ALIGN_MASK	((1 << (PAGE_CACHE_SHIFT - SECTOR_SHIFT)) - 1)
+#define BBSHIFT		9
+#define BN_ALIGN_MASK	((1 << (PAGE_CACHE_SHIFT - BBSHIFT)) - 1)
 
 #ifndef GFP_READAHEAD
 #define GFP_READAHEAD	0
@@ -245,19 +243,27 @@ typedef struct a_list {
 STATIC	a_list_t	*as_free_head;
 STATIC	int		as_list_len;
 
+
+/*
+ * Try to batch vunmaps because they are costly.
+ */
 STATIC void
 free_address(
 	void		*addr)
 {
 	a_list_t	*aentry;
 
-	spin_lock(&as_lock);
 	aentry = kmalloc(sizeof(a_list_t), GFP_ATOMIC);
-	aentry->next = as_free_head;
-	aentry->vm_addr = addr;
-	as_free_head = aentry;
-	as_list_len++;
-	spin_unlock(&as_lock);
+	if (aentry) {
+		spin_lock(&as_lock);
+		aentry->next = as_free_head;
+		aentry->vm_addr = addr;
+		as_free_head = aentry;
+		as_list_len++;
+		spin_unlock(&as_lock);
+	} else {
+		vunmap(addr);
+	}
 }
 
 STATIC void
@@ -265,7 +271,8 @@ purge_addresses(void)
 {
 	a_list_t	*aentry, *old;
 
-	if (as_free_head == NULL) return;
+	if (as_free_head == NULL)
+		return;
 
 	spin_lock(&as_lock);
 	aentry = as_free_head;
@@ -462,7 +469,8 @@ _pagebuf_lookup_pages(
 	struct page		*page;
 	int			gfp_mask, retry_count = 5, rval = 0;
 	int			all_mapped, good_pages, nbytes;
-	size_t			blocksize, size, offset;
+	unsigned int		blocksize, sectorshift;
+	size_t			size, offset;
 
 
 	/* For pagebufs where we want to map an address, do not use
@@ -508,7 +516,8 @@ _pagebuf_lookup_pages(
 		return rval;
 
 	rval = pi = 0;
-	blocksize = pb->pb_target->pbr_blocksize;
+	blocksize = pb->pb_target->pbr_bsize;
+	sectorshift = pb->pb_target->pbr_sshift;
 	size = pb->pb_count_desired;
 	offset = pb->pb_offset;
 
@@ -549,15 +558,15 @@ _pagebuf_lookup_pages(
 					pb->pb_locked = 1;
 				good_pages--;
 			} else if (!PagePrivate(page)) {
-				unsigned long i, range = (offset + nbytes) >> SECTOR_SHIFT;
+				unsigned long	i, range;
 
-				ASSERT(blocksize < PAGE_CACHE_SIZE);
-				ASSERT(!(pb->pb_flags & _PBF_PRIVATE_BH));
 				/*
 				 * In this case page->private holds a bitmap
-				 * of uptodate sectors (512) within the page
+				 * of uptodate sectors within the page
 				 */
-				for (i = offset >> SECTOR_SHIFT; i < range; i++)
+				ASSERT(blocksize < PAGE_CACHE_SIZE);
+				range = (offset + nbytes) >> sectorshift;
+				for (i = offset >> sectorshift; i < range; i++)
 					if (!test_bit(i, &page->private))
 						break;
 				if (i != range)
@@ -642,8 +651,14 @@ _pagebuf_find(				/* find buffer for block	*/
 	page_buf_t		*pb;
 	int			not_locked;
 
-	range_base = (ioff << SECTOR_SHIFT);
-	range_length = (isize << SECTOR_SHIFT);
+	range_base = (ioff << BBSHIFT);
+	range_length = (isize << BBSHIFT);
+
+	/* Ensure we never do IOs smaller than the sector size */
+	BUG_ON(range_length < (1 << target->pbr_sshift));
+
+	/* Ensure we never do IOs that are not sector aligned */
+	BUG_ON(range_base & (loff_t)target->pbr_smask);
 
 	hval = _bhash(target->pbr_bdev->bd_dev, range_base);
 	h = &pbhash[hval];
@@ -851,8 +866,20 @@ pagebuf_readahead(
 	size_t			isize,
 	page_buf_flags_t	flags)
 {
+	struct backing_dev_info *bdi;
+
+	bdi = target->pbr_mapping->backing_dev_info;
+	if (bdi_read_congested(bdi))
+		return;
+	if (bdi_write_congested(bdi))
+		return;
+
 	flags |= (PBF_TRYLOCK|PBF_READ|PBF_ASYNC|PBF_MAPPABLE|PBF_READ_AHEAD);
+
+	/* don't complain on allocation failure, it's fine with us */
+	current->flags |= PF_NOWARN;
 	pagebuf_get(target, ioff, isize, flags);
+	current->flags &= ~PF_NOWARN;
 }
 
 page_buf_t *
@@ -956,18 +983,12 @@ pagebuf_get_no_daddr(
 		} else {
 			kfree(rmem); /* free the mem from the previous try */
 			tlen <<= 1; /* double the size and try again */
-			/*
-			printk(
-			"pb_get_no_daddr NOT block 0x%p mask 0x%p len %d\n",
-				rmem, ((size_t)rmem & (size_t)~SECTOR_MASK),
-				len);
-			*/
 		}
 		if ((rmem = kmalloc(tlen, GFP_KERNEL)) == 0) {
 			pagebuf_free(pb);
 			return NULL;
 		}
-	} while ((size_t)rmem != ((size_t)rmem & (size_t)~SECTOR_MASK));
+	} while ((size_t)rmem != ((size_t)rmem & ~target->pbr_smask));
 
 	if ((rval = pagebuf_associate_memory(pb, rmem, len)) != 0) {
 		kfree(rmem);
@@ -1248,9 +1269,7 @@ pagebuf_iostart(			/* start I/O on a buffer	  */
 	pb->pb_flags &= ~(PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_DELWRI|PBF_READ_AHEAD);
 	pb->pb_flags |= flags & (PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_SYNC|PBF_READ_AHEAD);
 
-	if (pb->pb_bn == PAGE_BUF_DADDR_NULL) {
-		BUG();
-	}
+	BUG_ON(pb->pb_bn == PAGE_BUF_DADDR_NULL);
 
 	/* For writes call internal function which checks for
 	 * filesystem specific callout function and execute it.
@@ -1279,7 +1298,8 @@ bio_end_io_pagebuf(
 	int			error)
 {
 	page_buf_t		*pb = (page_buf_t *)bio->bi_private;
-	unsigned int		i, blocksize = pb->pb_target->pbr_blocksize;
+	unsigned int		i, blocksize = pb->pb_target->pbr_bsize;
+	unsigned int		sectorshift = pb->pb_target->pbr_sshift;
 	struct bio_vec		*bvec = bio->bi_io_vec;
 
 	if (bio->bi_size)
@@ -1299,10 +1319,8 @@ bio_end_io_pagebuf(
 			unsigned int	j, range;
 
 			ASSERT(blocksize < PAGE_CACHE_SIZE);
-			ASSERT(!(pb->pb_flags & _PBF_PRIVATE_BH));
-
-			range = (bvec->bv_offset + bvec->bv_len)>>SECTOR_SHIFT;
-			for (j = bvec->bv_offset>>SECTOR_SHIFT; j < range; j++)
+			range = (bvec->bv_offset + bvec->bv_len) >> sectorshift;
+			for (j = bvec->bv_offset >> sectorshift; j < range; j++)
 				set_bit(j, &page->private);
 			if (page->private == (unsigned long)(PAGE_CACHE_SIZE-1))
 				SetPageUptodate(page);
@@ -1353,7 +1371,7 @@ pagebuf_iorequest(			/* start real I/O		*/
 	int			offset = pb->pb_offset;
 	int			size = pb->pb_count_desired;
 	sector_t		sector = pb->pb_bn;
-	size_t			blocksize = pb->pb_target->pbr_blocksize;
+	unsigned int		blocksize = pb->pb_target->pbr_bsize;
 	int			locking;
 
 	locking = (pb->pb_flags & _PBF_LOCKABLE) == 0 && (pb->pb_locked == 0);
@@ -1382,7 +1400,7 @@ pagebuf_iorequest(			/* start real I/O		*/
 		bio = bio_alloc(GFP_NOIO, 1);
 
 		bio->bi_bdev = pb->pb_target->pbr_bdev;
-		bio->bi_sector = sector - (offset >> SECTOR_SHIFT);
+		bio->bi_sector = sector - (offset >> BBSHIFT);
 		bio->bi_end_io = bio_end_io_pagebuf;
 		bio->bi_private = pb;
 		bio->bi_vcnt++;
@@ -1427,7 +1445,7 @@ pagebuf_iorequest(			/* start real I/O		*/
 
 next_chunk:
 	atomic_inc(&PBP(pb)->pb_io_remaining);
-	nr_pages = BIO_MAX_SECTORS >> (PAGE_SHIFT - SECTOR_SHIFT);
+	nr_pages = BIO_MAX_SECTORS >> (PAGE_SHIFT - BBSHIFT);
 	if (nr_pages > total_nr_pages)
 		nr_pages = total_nr_pages;
 
@@ -1452,7 +1470,7 @@ next_chunk:
 
 		offset = 0;
 
-		sector += nbytes >> SECTOR_SHIFT;
+		sector += nbytes >> BBSHIFT;
 		size -= nbytes;
 		total_nr_pages--;
 	}
