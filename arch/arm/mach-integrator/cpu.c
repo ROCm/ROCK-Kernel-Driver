@@ -22,6 +22,7 @@
 
 #include <asm/hardware.h>
 #include <asm/io.h>
+#include <asm/mach-types.h>
 #include <asm/hardware/icst525.h>
 
 static struct cpufreq_driver integrator_driver;
@@ -98,7 +99,12 @@ static int integrator_set_target(struct cpufreq_policy *policy,
 
 	/* get current setting */
 	cm_osc = __raw_readl(CM_OSC);
-	vco.s = (cm_osc >> 8) & 7;
+
+	if (machine_is_integrator()) {
+		vco.s = (cm_osc >> 8) & 7;
+	} else if (machine_is_cintegrator()) {
+		vco.s = 1;
+	}
 	vco.v = cm_osc & 255;
 	vco.r = 22;
 	freqs.old = icst525_khz(&cclk_params, vco);
@@ -107,7 +113,7 @@ static int integrator_set_target(struct cpufreq_policy *policy,
 	 * larger freq in case of CPUFREQ_RELATION_L.
 	 */
 	if (relation == CPUFREQ_RELATION_L)
-		target_freq += 1999;
+		target_freq += 999;
 	if (target_freq > policy->max)
 		target_freq = policy->max;
 	vco = icst525_khz_to_vco(&cclk_params, target_freq);
@@ -123,8 +129,14 @@ static int integrator_set_target(struct cpufreq_policy *policy,
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
 	cm_osc = __raw_readl(CM_OSC);
-	cm_osc &= 0xfffff800;
-	cm_osc |= vco.v | vco.s << 8;
+
+	if (machine_is_integrator()) {
+		cm_osc &= 0xfffff800;
+		cm_osc |= vco.s << 8;
+	} else if (machine_is_cintegrator()) {
+		cm_osc &= 0xffffff00;
+	}
+	cm_osc |= vco.v;
 
 	__raw_writel(0xa05f, CM_LOCK);
 	__raw_writel(cm_osc, CM_OSC);
@@ -144,7 +156,7 @@ static int integrator_cpufreq_init(struct cpufreq_policy *policy)
 {
 	unsigned long cpus_allowed;
 	unsigned int cpu = policy->cpu;
-	u_int cm_osc, cm_stat, mem_freq_khz;
+	u_int cm_osc;
 	struct icst525_vco vco;
 
 	cpus_allowed = current->cpus_allowed;
@@ -153,18 +165,13 @@ static int integrator_cpufreq_init(struct cpufreq_policy *policy)
 	BUG_ON(cpu != smp_processor_id());
 
 	/* detect memory etc. */
-	cm_stat = __raw_readl(CM_STAT);
 	cm_osc = __raw_readl(CM_OSC);
-	vco.s = (cm_osc >> 20) & 7;
-	vco.v = (cm_osc >> 12) & 255;
-	vco.r = 22;
-	mem_freq_khz = icst525_khz(&lclk_params, vco) / 2;
 
-	printk(KERN_INFO "CPU%d: Module id: %d\n", cpu, cm_stat & 255);
-	printk(KERN_INFO "CPU%d: Memory clock = %d.%03d MHz\n",
-	       cpu, mem_freq_khz / 1000, mem_freq_khz % 1000);
-
-	vco.s = (cm_osc >> 8) & 7;
+	if (machine_is_integrator()) {
+		vco.s = (cm_osc >> 8) & 7;
+	} else if (machine_is_cintegrator()) {
+		vco.s = 1;
+	}
 	vco.v = cm_osc & 255;
 	vco.r = 22;
 

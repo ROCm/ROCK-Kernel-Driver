@@ -251,7 +251,7 @@ static struct platform_device cfi_flash_device = {
 	.resource	= &cfi_flash_resource,
 };
 
-static int __init ap_init(void)
+static void __init ap_init(void)
 {
 	unsigned long sc_dec;
 	int i;
@@ -279,11 +279,7 @@ static int __init ap_init(void)
 
 		lm_device_register(lmdev);
 	}
-
-	return 0;
 }
-
-arch_initcall(ap_init);
 
 MACHINE_START(INTEGRATOR, "ARM-Integrator")
 	MAINTAINER("ARM Ltd/Deep Blue Solutions Ltd")
@@ -291,4 +287,5 @@ MACHINE_START(INTEGRATOR, "ARM-Integrator")
 	BOOT_PARAMS(0x00000100)
 	MAPIO(ap_map_io)
 	INITIRQ(ap_init_irq)
+	INIT_MACHINE(ap_init)
 MACHINE_END

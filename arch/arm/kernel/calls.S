@@ -285,6 +285,9 @@ __syscall_start:
 		.long	sys_tgkill
 		.long	sys_utimes
 /* 270 */	.long	sys_fadvise64_64
+		.long	sys_pciconfig_iobase
+		.long	sys_pciconfig_read
+		.long	sys_pciconfig_write
 __syscall_end:
 
 		.rept	NR_syscalls - (__syscall_end - __syscall_start) / 4
