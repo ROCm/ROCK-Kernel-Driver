@@ -63,7 +63,7 @@
 
 /* local variables */
 static int debug;
-static char bridge[256];
+static char *bridge;
 static u8 bridge_busnr;
 static u8 bridge_slot;
 static struct pci_bus *bus;

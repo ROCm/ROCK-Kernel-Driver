@@ -1104,6 +1104,11 @@ repeat:
 			(buffer[9] << 16) | (buffer[10] << 8) | buffer[11];
 	}	
 
+	/* Some devices return the total number of sectors, not the
+	 * highest sector number.  Make the necessary adjustment. */
+	if (sdp->fix_capacity)
+		--sdkp->capacity;
+
 got_data:
 	if (sector_size == 0) {
 		sector_size = 512;

@@ -706,4 +706,7 @@ sys_call_table:
 	.long sys_mq_getsetattr
 	.long sys_waitid
 	.long sys_ni_syscall	/* for sys_vserver */
+	.long sys_add_key
+	.long sys_request_key	/* 280 */
+	.long sys_keyctl
 

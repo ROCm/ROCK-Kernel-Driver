@@ -258,25 +258,6 @@ io_port_init (void)
 	num_io_spaces = 1;
 }
 
-#ifdef CONFIG_SERIAL_8250_CONSOLE
-static void __init
-setup_serial_legacy (void)
-{
-	struct uart_port port;
-	unsigned int i, iobase[] = {0x3f8, 0x2f8};
-
-	printk(KERN_INFO "Registering legacy COM ports for serial console\n");
-	memset(&port, 0, sizeof(port));
-	port.iotype = SERIAL_IO_PORT;
-	port.uartclk = BASE_BAUD * 16;
-	for (i = 0; i < ARRAY_SIZE(iobase); i++) {
-		port.line = i;
-		port.iobase = iobase[i];
-		early_serial_setup(&port);
-	}
-}
-#endif
-
 /**
  * early_console_setup - setup debugging console
  *
@@ -287,14 +268,22 @@ setup_serial_legacy (void)
  * Returns non-zero if a console couldn't be setup.
  */
 static inline int __init
-early_console_setup (void)
+early_console_setup (char *cmdline)
 {
 #ifdef CONFIG_SERIAL_SGI_L1_CONSOLE
 	{
 		extern int sn_serial_console_early_setup(void);
-		if(!sn_serial_console_early_setup())
+		if (!sn_serial_console_early_setup())
 			return 0;
 	}
+#endif
+#ifdef CONFIG_EFI_PCDP
+	if (!efi_setup_pcdp_console(cmdline))
+		return 0;
+#endif
+#ifdef CONFIG_SERIAL_8250_CONSOLE
+	if (!early_serial_console_init(cmdline))
+		return 0;
 #endif
 
 	return -1;
@@ -319,7 +308,7 @@ setup_arch (char **cmdline_p)
 
 #ifdef CONFIG_SMP
 	/* If we register an early console, allow CPU 0 to printk */
-	if (!early_console_setup())
+	if (!early_console_setup(*cmdline_p))
 		cpu_set(smp_processor_id(), cpu_online_map);
 #endif
 
@@ -348,13 +337,6 @@ setup_arch (char **cmdline_p)
 
 #ifdef CONFIG_ACPI_BOOT
 	acpi_boot_init();
-#endif
-#ifdef CONFIG_EFI_PCDP
-	efi_setup_pcdp_console(*cmdline_p);
-#endif
-#ifdef CONFIG_SERIAL_8250_CONSOLE
-	if (!efi.hcdp)
-		setup_serial_legacy();
 #endif
 
 #ifdef CONFIG_VT

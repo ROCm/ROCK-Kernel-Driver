@@ -199,7 +199,7 @@ extern int skip_ioapic_setup;
  * If we use the IO-APIC for IRQ routing, disable automatic
  * assignment of PCI IRQ's.
  */
-#define io_apic_assign_pci_irqs (mp_irq_entries && !skip_ioapic_setup)
+#define io_apic_assign_pci_irqs (mp_irq_entries && !skip_ioapic_setup && io_apic_irqs)
 
 #ifdef CONFIG_ACPI_BOOT
 extern int io_apic_get_unique_id (int ioapic, int apic_id);
