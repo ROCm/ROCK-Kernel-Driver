@@ -125,18 +125,21 @@
 #include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
+#include <linux/blkdev.h>
+#include <linux/module.h>
+#include <linux/interrupt.h>
 #include <asm/dma.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/byteorder.h>
-#include <linux/blkdev.h>
-#include <linux/module.h>
-#include <linux/interrupt.h>
 
-#include "scsi.h"
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_dbg.h>
+#include <scsi/scsi_eh.h>
 #include <scsi/scsi_host.h>
-
+#include <scsi/scsi_tcq.h>
 #include <scsi/scsi_transport.h>
 #include <scsi/scsi_transport_spi.h>
 
@@ -164,15 +167,15 @@ MODULE_LICENSE("GPL");
 #include "53c700_d.h"
 
 
-STATIC int NCR_700_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-STATIC int NCR_700_abort(Scsi_Cmnd * SCpnt);
-STATIC int NCR_700_bus_reset(Scsi_Cmnd * SCpnt);
-STATIC int NCR_700_dev_reset(Scsi_Cmnd * SCpnt);
-STATIC int NCR_700_host_reset(Scsi_Cmnd * SCpnt);
+STATIC int NCR_700_queuecommand(struct scsi_cmnd *, void (*done)(struct scsi_cmnd *));
+STATIC int NCR_700_abort(struct scsi_cmnd * SCpnt);
+STATIC int NCR_700_bus_reset(struct scsi_cmnd * SCpnt);
+STATIC int NCR_700_dev_reset(struct scsi_cmnd * SCpnt);
+STATIC int NCR_700_host_reset(struct scsi_cmnd * SCpnt);
 STATIC void NCR_700_chip_setup(struct Scsi_Host *host);
 STATIC void NCR_700_chip_reset(struct Scsi_Host *host);
-STATIC int NCR_700_slave_configure(Scsi_Device *SDpnt);
-STATIC void NCR_700_slave_destroy(Scsi_Device *SDpnt);
+STATIC int NCR_700_slave_configure(struct scsi_device *SDpnt);
+STATIC void NCR_700_slave_destroy(struct scsi_device *SDpnt);
 
 STATIC struct device_attribute *NCR_700_dev_attrs[];
 
@@ -279,7 +282,7 @@ NCR_700_offset_period_to_sxfer(struct NCR_700_Host_Parameters *hostdata,
 }
 
 static inline __u8
-NCR_700_get_SXFER(Scsi_Device *SDp)
+NCR_700_get_SXFER(struct scsi_device *SDp)
 {
 	struct NCR_700_Host_Parameters *hostdata = 
 		(struct NCR_700_Host_Parameters *)SDp->host->hostdata[0];
@@ -289,7 +292,7 @@ NCR_700_get_SXFER(Scsi_Device *SDp)
 }
 
 struct Scsi_Host *
-NCR_700_detect(Scsi_Host_Template *tpnt,
+NCR_700_detect(struct scsi_host_template *tpnt,
 	       struct NCR_700_Host_Parameters *hostdata)
 {
 	dma_addr_t pScript, pSlots;
@@ -561,7 +564,7 @@ free_slot(struct NCR_700_command_slot *slot,
    the ITL and (if tagged) the ITLQ lists in _queuecommand */
 STATIC void
 save_for_reselection(struct NCR_700_Host_Parameters *hostdata,
-		     Scsi_Cmnd *SCp, __u32 dsp)
+		     struct scsi_cmnd *SCp, __u32 dsp)
 {
 	/* Its just possible that this gets executed twice */
 	if(SCp != NULL) {
@@ -575,27 +578,25 @@ save_for_reselection(struct NCR_700_Host_Parameters *hostdata,
 }
 
 STATIC inline void
-NCR_700_unmap(struct NCR_700_Host_Parameters *hostdata, Scsi_Cmnd *SCp,
+NCR_700_unmap(struct NCR_700_Host_Parameters *hostdata, struct scsi_cmnd *SCp,
 	      struct NCR_700_command_slot *slot)
 {
-	if(SCp->sc_data_direction != SCSI_DATA_NONE &&
-	   SCp->sc_data_direction != SCSI_DATA_UNKNOWN) {
-		enum dma_data_direction direction = SCp->sc_data_direction;
+	if(SCp->sc_data_direction != DMA_NONE &&
+	   SCp->sc_data_direction != DMA_BIDIRECTIONAL) {
 		if(SCp->use_sg) {
 			dma_unmap_sg(hostdata->dev, SCp->buffer,
-				     SCp->use_sg, direction);
+				     SCp->use_sg, SCp->sc_data_direction);
 		} else {
-			dma_unmap_single(hostdata->dev,
-					 slot->dma_handle,
+			dma_unmap_single(hostdata->dev, slot->dma_handle,
 					 SCp->request_bufflen,
-					 direction);
+					 SCp->sc_data_direction);
 		}
 	}
 }
 
 STATIC inline void
 NCR_700_scsi_done(struct NCR_700_Host_Parameters *hostdata,
-	       Scsi_Cmnd *SCp, int result)
+	       struct scsi_cmnd *SCp, int result)
 {
 	hostdata->state = NCR_700_HOST_FREE;
 	hostdata->cmd = NULL;
@@ -611,7 +612,7 @@ NCR_700_scsi_done(struct NCR_700_Host_Parameters *hostdata,
 #ifdef NCR_700_DEBUG
 			printk(" ORIGINAL CMD %p RETURNED %d, new return is %d sense is\n",
 			       SCp, SCp->cmnd[7], result);
-			print_sense("53c700", SCp);
+			scsi_print_sense("53c700", SCp);
 
 #endif
 			/* restore the old result if the request sense was
@@ -780,7 +781,7 @@ NCR_700_chip_reset(struct Scsi_Host *host)
 STATIC __u32
 process_extended_message(struct Scsi_Host *host, 
 			 struct NCR_700_Host_Parameters *hostdata,
-			 Scsi_Cmnd *SCp, __u32 dsp, __u32 dsps)
+			 struct scsi_cmnd *SCp, __u32 dsp, __u32 dsps)
 {
 	__u32 resume_offset = dsp, temp = dsp + 8;
 	__u8 pun = 0xff, lun = 0xff;
@@ -849,7 +850,7 @@ process_extended_message(struct Scsi_Host *host,
 		printk(KERN_INFO "scsi%d (%d:%d): Unexpected message %s: ",
 		       host->host_no, pun, lun,
 		       NCR_700_phase[(dsps & 0xf00) >> 8]);
-		print_msg(hostdata->msgin);
+		scsi_print_msg(hostdata->msgin);
 		printk("\n");
 		/* just reject it */
 		hostdata->msgout[0] = A_REJECT_MSG;
@@ -865,7 +866,7 @@ process_extended_message(struct Scsi_Host *host,
 
 STATIC __u32
 process_message(struct Scsi_Host *host,	struct NCR_700_Host_Parameters *hostdata,
-		Scsi_Cmnd *SCp, __u32 dsp, __u32 dsps)
+		struct scsi_cmnd *SCp, __u32 dsp, __u32 dsps)
 {
 	/* work out where to return to */
 	__u32 temp = dsp + 8, resume_offset = dsp;
@@ -879,7 +880,7 @@ process_message(struct Scsi_Host *host,	struct NCR_700_Host_Parameters *hostdata
 #ifdef NCR_700_DEBUG
 	printk("scsi%d (%d:%d): message %s: ", host->host_no, pun, lun,
 	       NCR_700_phase[(dsps & 0xf00) >> 8]);
-	print_msg(hostdata->msgin);
+	scsi_print_msg(hostdata->msgin);
 	printk("\n");
 #endif
 
@@ -927,7 +928,7 @@ process_message(struct Scsi_Host *host,	struct NCR_700_Host_Parameters *hostdata
 		       host->host_no, pun, lun,
 		       NCR_700_phase[(dsps & 0xf00) >> 8]);
 
-		print_msg(hostdata->msgin);
+		scsi_print_msg(hostdata->msgin);
 		printk("\n");
 		/* just reject it */
 		hostdata->msgout[0] = A_REJECT_MSG;
@@ -946,7 +947,7 @@ process_message(struct Scsi_Host *host,	struct NCR_700_Host_Parameters *hostdata
 }
 
 STATIC __u32
-process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
+process_script_interrupt(__u32 dsps, __u32 dsp, struct scsi_cmnd *SCp,
 			 struct Scsi_Host *host,
 			 struct NCR_700_Host_Parameters *hostdata)
 {
@@ -975,7 +976,7 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 				NCR_700_scsi_done(hostdata, SCp, hostdata->status[0]);
 			} else {
 #ifdef NCR_DEBUG
-				print_command(SCp->cmnd);
+				scsi_print_command(SCp);
 				printk("  cmd %p has status %d, requesting sense\n",
 				       SCp, hostdata->status[0]);
 #endif
@@ -1004,7 +1005,7 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 				SCp->cmnd[6] = NCR_700_INTERNAL_SENSE_MAGIC;
 				SCp->cmnd[7] = hostdata->status[0];
 				SCp->use_sg = 0;
-				SCp->sc_data_direction = SCSI_DATA_READ;
+				SCp->sc_data_direction = DMA_FROM_DEVICE;
 				dma_sync_single_for_device(hostdata->dev, slot->pCmd,
 							   SCp->cmd_len, DMA_TO_DEVICE);
 				SCp->request_bufflen = sizeof(SCp->sense_buffer);
@@ -1053,7 +1054,7 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 		       NCR_700_phase[i],
 		       sbcl_to_string(NCR_700_readb(host, SBCL_REG)));
 		printk(KERN_ERR "         len = %d, cmd =", SCp->cmd_len);
-		print_command(SCp->cmnd);
+		scsi_print_command(SCp);
 
 		NCR_700_internal_bus_reset(host);
 	} else if((dsps & 0xfffff000) == A_FATAL) {
@@ -1080,7 +1081,7 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 		__u8 lun;
 		struct NCR_700_command_slot *slot;
 		__u8 reselection_id = hostdata->reselection_id;
-		Scsi_Device *SDp;
+		struct scsi_device *SDp;
 
 		lun = hostdata->msgin[0] & 0x1f;
 
@@ -1095,7 +1096,7 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 			BUG();
 		}
 		if(hostdata->msgin[1] == A_SIMPLE_TAG_MSG) {
-			Scsi_Cmnd *SCp = scsi_find_tag(SDp, hostdata->msgin[2]);
+			struct scsi_cmnd *SCp = scsi_find_tag(SDp, hostdata->msgin[2]);
 			if(unlikely(SCp == NULL)) {
 				printk(KERN_ERR "scsi%d: (%d:%d) no saved request for tag %d\n", 
 				       host->host_no, reselection_id, lun, hostdata->msgin[2]);
@@ -1107,7 +1108,7 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 			       host->host_no, SDp->id, SDp->lun,
 			       hostdata->msgin[2], slot, slot->tag));
 		} else {
-			Scsi_Cmnd *SCp = scsi_find_tag(SDp, SCSI_NO_TAG);
+			struct scsi_cmnd *SCp = scsi_find_tag(SDp, SCSI_NO_TAG);
 			if(unlikely(SCp == NULL)) {
 				printk(KERN_ERR "scsi%d: (%d:%d) no saved request for untagged cmd\n", 
 				       host->host_no, reselection_id, lun);
@@ -1234,7 +1235,7 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 		       host->host_no, pun, lun, NCR_700_condition[i],
 		       NCR_700_phase[j], dsp - hostdata->pScript);
 		if(SCp != NULL) {
-			print_command(SCp->cmnd);
+			scsi_print_command(SCp);
 
 			if(SCp->use_sg) {
 				for(i = 0; i < SCp->use_sg + 1; i++) {
@@ -1270,7 +1271,7 @@ process_selection(struct Scsi_Host *host, __u32 dsp)
 	__u32 resume_offset = 0;
 	struct NCR_700_Host_Parameters *hostdata =
 		(struct NCR_700_Host_Parameters *)host->hostdata[0];
-	Scsi_Cmnd *SCp = hostdata->cmd;
+	struct scsi_cmnd *SCp = hostdata->cmd;
 	__u8 sbcl;
 
 	for(count = 0; count < 5; count++) {
@@ -1373,7 +1374,7 @@ NCR_700_flush_fifo(struct Scsi_Host *host) {
 /* The queue lock with interrupts disabled must be held on entry to
  * this function */
 STATIC int
-NCR_700_start_command(Scsi_Cmnd *SCp)
+NCR_700_start_command(struct scsi_cmnd *SCp)
 {
 	struct NCR_700_command_slot *slot =
 		(struct NCR_700_command_slot *)SCp->host_scribble;
@@ -1481,7 +1482,7 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 		__u32 dsps;
 		__u8 sstat0 = 0, dstat = 0;
 		__u32 dsp;
-		Scsi_Cmnd *SCp = hostdata->cmd;
+		struct scsi_cmnd *SCp = hostdata->cmd;
 		enum NCR_700_Host_State state;
 
 		handled = 1;
@@ -1514,7 +1515,7 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 		}
 
 		if(sstat0 & SCSI_RESET_DETECTED) {
-			Scsi_Device *SDp;
+			struct scsi_device *SDp;
 			int i;
 
 			hostdata->state = NCR_700_HOST_BUSY;
@@ -1530,7 +1531,7 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 			
 			/* clear all the slots and their pending commands */
 			for(i = 0; i < NCR_700_COMMAND_SLOTS_PER_HOST; i++) {
-				Scsi_Cmnd *SCp;
+				struct scsi_cmnd *SCp;
 				struct NCR_700_command_slot *slot =
 					&hostdata->slots[i];
 
@@ -1590,7 +1591,7 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 				printk("scsi%d: (%d:%d) Expected phase mismatch in slot->SG[%d], transferred 0x%x\n",
 				       host->host_no, pun, lun,
 				       SGcount, data_transfer);
-				print_command(SCp->cmnd);
+				scsi_print_command(SCp);
 				if(residual) {
 					printk("scsi%d: (%d:%d) Expected phase mismatch in slot->SG[%d], transferred 0x%x, residual %d\n",
 				       host->host_no, pun, lun,
@@ -1731,7 +1732,7 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 STATIC int
-NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
+NCR_700_queuecommand(struct scsi_cmnd *SCp, void (*done)(struct scsi_cmnd *))
 {
 	struct NCR_700_Host_Parameters *hostdata = 
 		(struct NCR_700_Host_Parameters *)SCp->device->host->hostdata[0];
@@ -1781,7 +1782,7 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 
 #ifdef NCR_700_DEBUG
 	printk("53c700: scsi%d, command ", SCp->device->host->host_no);
-	print_command(SCp->cmnd);
+	scsi_print_command(SCp);
 #endif
 	if(SCp->device->tagged_supported && !SCp->device->simple_tags
 	   && (hostdata->tag_negotiated &(1<<SCp->device->id)) == 0
@@ -1827,13 +1828,13 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 	/* sanity check: some of the commands generated by the mid-layer
 	 * have an eccentric idea of their sc_data_direction */
 	if(!SCp->use_sg && !SCp->request_bufflen 
-	   && SCp->sc_data_direction != SCSI_DATA_NONE) {
+	   && SCp->sc_data_direction != DMA_NONE) {
 #ifdef NCR_700_DEBUG
 		printk("53c700: Command");
-		print_command(SCp->cmnd);
+		scsi_print_command(SCp);
 		printk("Has wrong data direction %d\n", SCp->sc_data_direction);
 #endif
-		SCp->sc_data_direction = SCSI_DATA_NONE;
+		SCp->sc_data_direction = DMA_NONE;
 	}
 
 	switch (SCp->cmnd[0]) {
@@ -1844,20 +1845,20 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 	default:
 		/* OK, get it from the command */
 		switch(SCp->sc_data_direction) {
-		case SCSI_DATA_UNKNOWN:
+		case DMA_BIDIRECTIONAL:
 		default:
 			printk(KERN_ERR "53c700: Unknown command for data direction ");
-			print_command(SCp->cmnd);
+			scsi_print_command(SCp);
 			
 			move_ins = 0;
 			break;
-		case SCSI_DATA_NONE:
+		case DMA_NONE:
 			move_ins = 0;
 			break;
-		case SCSI_DATA_READ:
+		case DMA_FROM_DEVICE:
 			move_ins = SCRIPT_MOVE_DATA_IN;
 			break;
-		case SCSI_DATA_WRITE:
+		case DMA_TO_DEVICE:
 			move_ins = SCRIPT_MOVE_DATA_OUT;
 			break;
 		}
@@ -1914,13 +1915,13 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 }
 
 STATIC int
-NCR_700_abort(Scsi_Cmnd * SCp)
+NCR_700_abort(struct scsi_cmnd * SCp)
 {
 	struct NCR_700_command_slot *slot;
 
 	printk(KERN_INFO "scsi%d (%d:%d) New error handler wants to abort command\n\t",
 	       SCp->device->host->host_no, SCp->device->id, SCp->device->lun);
-	print_command(SCp->cmnd);
+	scsi_print_command(SCp);
 
 	slot = (struct NCR_700_command_slot *)SCp->host_scribble;
 
@@ -1946,7 +1947,7 @@ NCR_700_abort(Scsi_Cmnd * SCp)
 }
 
 STATIC int
-NCR_700_bus_reset(Scsi_Cmnd * SCp)
+NCR_700_bus_reset(struct scsi_cmnd * SCp)
 {
 	DECLARE_COMPLETION(complete);
 	struct NCR_700_Host_Parameters *hostdata = 
@@ -1954,7 +1955,7 @@ NCR_700_bus_reset(Scsi_Cmnd * SCp)
 
 	printk(KERN_INFO "scsi%d (%d:%d) New error handler wants BUS reset, cmd %p\n\t",
 	       SCp->device->host->host_no, SCp->device->id, SCp->device->lun, SCp);
-	print_command(SCp->cmnd);
+	scsi_print_command(SCp);
 	/* In theory, eh_complete should always be null because the
 	 * eh is single threaded, but just in case we're handling a
 	 * reset via sg or something */
@@ -1976,21 +1977,21 @@ NCR_700_bus_reset(Scsi_Cmnd * SCp)
 }
 
 STATIC int
-NCR_700_dev_reset(Scsi_Cmnd * SCp)
+NCR_700_dev_reset(struct scsi_cmnd * SCp)
 {
 	printk(KERN_INFO "scsi%d (%d:%d) New error handler wants device reset\n\t",
 	       SCp->device->host->host_no, SCp->device->id, SCp->device->lun);
-	print_command(SCp->cmnd);
+	scsi_print_command(SCp);
 	
 	return FAILED;
 }
 
 STATIC int
-NCR_700_host_reset(Scsi_Cmnd * SCp)
+NCR_700_host_reset(struct scsi_cmnd * SCp)
 {
 	printk(KERN_INFO "scsi%d (%d:%d) New error handler wants HOST reset\n\t",
 	       SCp->device->host->host_no, SCp->device->id, SCp->device->lun);
-	print_command(SCp->cmnd);
+	scsi_print_command(SCp);
 
 	NCR_700_internal_bus_reset(SCp->device->host);
 	NCR_700_chip_reset(SCp->device->host);
@@ -2043,7 +2044,7 @@ NCR_700_set_offset(struct scsi_device *SDp, int offset)
 
 
 STATIC int
-NCR_700_slave_configure(Scsi_Device *SDp)
+NCR_700_slave_configure(struct scsi_device *SDp)
 {
 	struct NCR_700_Host_Parameters *hostdata = 
 		(struct NCR_700_Host_Parameters *)SDp->host->hostdata[0];
@@ -2066,7 +2067,7 @@ NCR_700_slave_configure(Scsi_Device *SDp)
 }
 
 STATIC void
-NCR_700_slave_destroy(Scsi_Device *SDp)
+NCR_700_slave_destroy(struct scsi_device *SDp)
 {
 	/* to do here: deallocate memory */
 }

@@ -49,7 +49,6 @@
 #include <asm/parisc-device.h>
 #include <asm/delay.h>
 
-#include "scsi.h"
 #include <scsi/scsi_host.h>
 
 #include "lasi700.h"
@@ -65,7 +64,7 @@ static struct parisc_device_id lasi700_ids[] = {
 	{ 0 }
 };
 
-static Scsi_Host_Template lasi700_template = {
+static struct scsi_host_template lasi700_template = {
 	.name		= "LASI SCSI 53c700",
 	.proc_name	= "lasi700",
 	.this_id	= 7,

@@ -35,9 +35,8 @@
 #include <linux/mca.h>
 #include <linux/eisa.h>
 #include <linux/interrupt.h>
-
-#include "scsi.h"
 #include <scsi/scsi_host.h>
+
 #include "53c700.h"
 
 
@@ -86,7 +85,7 @@ param_setup(char *str)
 }
 __setup("sim710=", param_setup);
 
-static Scsi_Host_Template sim710_driver_template = {
+static struct scsi_host_template sim710_driver_template = {
 	.name			= "LSI (Symbios) 710 MCA/EISA",
 	.proc_name		= "sim710",
 	.this_id		= 7,
