@@ -145,6 +145,43 @@ static int sysfs_symlink(struct inode * dir, struct dentry *dentry, const char *
 	return error;
 }
 
+#define to_subsys(k) container_of(k,struct subsystem,kobj)
+#define to_sattr(a) container_of(a,struct subsys_attribute,attr)
+
+/**
+ * Subsystem file operations.
+ * These operations allow subsystems to have files that can be 
+ * read/written. 
+ */
+ssize_t subsys_attr_show(struct kobject * kobj, struct attribute * attr, 
+			 char * page, size_t count, loff_t off)
+{
+	struct subsystem * s = to_subsys(kobj);
+	struct subsys_attribute * sattr = to_sattr(attr);
+	ssize_t ret = 0;
+
+	if (sattr->show)
+		ret = sattr->show(s,page,count,off);
+	return ret;
+}
+
+ssize_t subsys_attr_store(struct kobject * kobj, struct attribute * attr,
+			  const char * page, size_t count, loff_t off)
+{
+	struct subsystem * s = to_subsys(kobj);
+	struct subsys_attribute * sattr = to_sattr(attr);
+	ssize_t ret = 0;
+
+	if (sattr->store)
+		ret = sattr->store(s,page,count,off);
+	return ret;
+}
+
+static struct sysfs_ops subsys_sysfs_ops = {
+	.show	= subsys_attr_show,
+	.store	= subsys_attr_store,
+};
+
 /**
  *	sysfs_read_file - read an attribute. 
  *	@file:	file pointer.
@@ -265,9 +302,14 @@ static int check_perm(struct inode * inode, struct file * file)
 
 	if (!kobj || !attr)
 		goto Einval;
-	
+
+	/* if the kobject has no subsystem, then it is a subsystem itself,
+	 * so give it the subsys_sysfs_ops.
+	 */
 	if (kobj->subsys)
 		ops = kobj->subsys->sysfs_ops;
+	else
+		ops = &subsys_sysfs_ops;
 
 	/* No sysfs operations, either from having no subsystem,
 	 * or the subsystem have no operations.
