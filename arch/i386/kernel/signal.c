@@ -504,12 +504,14 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 {
 	struct k_sigaction *ka = &current->sighand->action[sig-1];
 
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
+
 	/* Are we from a system call? */
 	if (regs->orig_eax >= 0) {
 		/* If so, check system call restarting.. */
 		switch (regs->eax) {
 		        case -ERESTART_RESTARTBLOCK:
-				current_thread_info()->restart_block.fn = do_no_restart_syscall;
 			case -ERESTARTNOHAND:
 				regs->eax = -EINTR;
 				break;
