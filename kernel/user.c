@@ -146,8 +146,11 @@ static int __init uid_cache_init(void)
 	for(n = 0; n < UIDHASH_SZ; ++n)
 		INIT_LIST_HEAD(uidhash_table + n);
 
-	/* Insert the root user immediately - init already runs with this */
+	/* Insert the root user immediately (init already runs as root) */
+	spin_lock(&uidhash_lock);
 	uid_hash_insert(&root_user, uidhashentry(0));
+	spin_unlock(&uidhash_lock);
+
 	return 0;
 }
 
