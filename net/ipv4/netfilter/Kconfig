@@ -642,6 +642,16 @@ config IP_NF_TARGET_CONNMARK
 	  Documentation/modules.txt.  The module will be called
 	  ipt_CONNMARK.o.  If unsure, say `N'.
 
+config IP_NF_TARGET_CLUSTERIP
+	tristate "CLUSTERIP target support (EXPERIMENTAL)"
+	depends on IP_NF_CONNTRACK_MARK && IP_NF_IPTABLES && EXPERIMENTAL
+	help
+	  The CLUSTERIP target allows you to build load-balancing clusters of
+	  network servers without having a dedicated load-balancing
+	  router/server/switch.
+	
+	  To compile it as a module, choose M here.  If unsure, say N.
+
 # raw + specific targets
 config IP_NF_RAW
 	tristate  'raw table support (required for NOTRACK/TRACE)'
