@@ -77,7 +77,7 @@ static void syntax_error( const char * msg )
  * Find index of a specyfic variable in the symbol table.
  * Create a new entry if it does not exist yet.
  */
-#define VARTABLE_SIZE 2048
+#define VARTABLE_SIZE 4096
 struct variable vartable[VARTABLE_SIZE];
 int max_varnum = 0;
 
