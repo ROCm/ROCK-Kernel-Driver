@@ -218,6 +218,7 @@ struct cifsFileInfo {
 	int closePend:1;	/* file is marked to close */
 	int emptyDir:1;
 	int invalidHandle:1;  /* file closed via session abend */
+	struct semaphore fh_sem; /* prevents reopen race after dead ses*/
 	char * search_resume_name;
 	unsigned int resume_name_length;
 	__u32 resume_key;
@@ -319,7 +320,7 @@ struct servers_not_supported { /* @z4a */
  *  ----------
  *  sesSem     operations on smb session
  *  tconSem    operations on tree connection
- *  i_sem      inode operations 
+ *  fh_sem      file handle reconnection operations 
  *
  ****************************************************************************/
 

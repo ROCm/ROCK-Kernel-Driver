@@ -230,9 +230,9 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 		return -EBADF;
 
 	xid = GetXid();
-	down(&inode->i_sem);
+	down(&pCifsFile->fh_sem);
 	if(pCifsFile->invalidHandle == FALSE) {
-		up(&inode->i_sem);
+		up(&pCifsFile->fh_sem);
 		FreeXid(xid);
 		return 0;
 	}
@@ -263,7 +263,7 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
            helps non-Unix server case */
 	buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
 	if(buf==0) {
-		up(&inode->i_sem);
+		up(&pCifsFile->fh_sem);
 		if (full_path)
 			kfree(full_path);
 		FreeXid(xid);
@@ -272,13 +272,13 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 	rc = CIFSSMBOpen(xid, pTcon, full_path, disposition, desiredAccess,
 				CREATE_NOT_DIR, &netfid, &oplock, buf, cifs_sb->local_nls);
 	if (rc) {
-		up(&inode->i_sem);
+		up(&pCifsFile->fh_sem);
 		cFYI(1, ("cifs_open returned 0x%x ", rc));
 		cFYI(1, ("oplock: %d ", oplock));
 	} else {
 		pCifsFile->netfid = netfid;
 		pCifsFile->invalidHandle = FALSE;
-		up(&inode->i_sem);
+		up(&pCifsFile->fh_sem);
 		pCifsInode = CIFS_I(file->f_dentry->d_inode);
 		if(pCifsInode) {
 			if (pTcon->ses->capabilities & CAP_UNIX)
