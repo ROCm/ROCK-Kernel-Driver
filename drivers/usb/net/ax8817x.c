@@ -1239,7 +1239,7 @@ static int ax8817x_bind(struct usb_interface *intf,
 
 	usb_fill_int_urb(ax_info->int_urb, usb, usb_rcvintpipe(usb, 1),
 			 ax_info->int_buf, 8, ax_int_callback, ax_info,
-			 100);
+			 usb->speed == USB_SPEED_HIGH? 8: 100);
 
 	ret = usb_submit_urb(ax_info->int_urb, GFP_ATOMIC);
 	if (ret < 0) {
