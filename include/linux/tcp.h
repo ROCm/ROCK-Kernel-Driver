@@ -255,6 +255,10 @@ struct tcp_opt {
 	__u8	retransmits;	/* Number of unrecovered RTO timeouts.	*/
 
 	__u8	reordering;	/* Packet reordering metric.		*/
+	__u8	frto_counter;	/* Number of new acks after RTO */
+	__u32	frto_highmark;	/* snd_nxt when RTO occurred */
+
+	__u8	unused_pad;
 	__u8	queue_shrunk;	/* Write queue has been shrunk recently.*/
 	__u8	defer_accept;	/* User waits for some data after accept() */
 
@@ -369,9 +373,6 @@ struct tcp_opt {
 	unsigned int		keepalive_time;	  /* time before keep alive takes place */
 	unsigned int		keepalive_intvl;  /* time interval between keep alive probes */
 	int			linger2;
-
-	int                     frto_counter; /* Number of new acks after RTO */
-	__u32                   frto_highmark; /* snd_nxt when RTO occurred */
 
 	unsigned long last_synq_overflow; 
 
