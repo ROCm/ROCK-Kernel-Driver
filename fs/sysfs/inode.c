@@ -42,7 +42,6 @@
 
 static struct super_operations sysfs_ops;
 static struct file_operations sysfs_file_operations;
-static struct inode_operations sysfs_dir_inode_operations;
 static struct address_space_operations sysfs_aops;
 
 static struct vfsmount *sysfs_mount;
@@ -51,45 +50,6 @@ static struct backing_dev_info sysfs_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
 };
-
-static int sysfs_readpage(struct file *file, struct page * page)
-{
-	if (!PageUptodate(page)) {
-		void *kaddr = kmap_atomic(page, KM_USER0);
-
-		memset(kaddr, 0, PAGE_CACHE_SIZE);
-		flush_dcache_page(page);
-		kunmap_atomic(kaddr, KM_USER0);
-		SetPageUptodate(page);
-	}
-	unlock_page(page);
-	return 0;
-}
-
-static int sysfs_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
-{
-	if (!PageUptodate(page)) {
-		void *kaddr = kmap_atomic(page, KM_USER0);
-
-		memset(kaddr, 0, PAGE_CACHE_SIZE);
-		flush_dcache_page(page);
-		kunmap_atomic(kaddr, KM_USER0);
-		SetPageUptodate(page);
-	}
-	return 0;
-}
-
-static int sysfs_commit_write(struct file *file, struct page *page, unsigned offset, unsigned to)
-{
-	struct inode *inode = page->mapping->host;
-	loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
-
-	set_page_dirty(page);
-	if (pos > inode->i_size)
-		inode->i_size = pos;
-	return 0;
-}
-
 
 static struct inode *sysfs_get_inode(struct super_block *sb, int mode, int dev)
 {
@@ -113,7 +73,7 @@ static struct inode *sysfs_get_inode(struct super_block *sb, int mode, int dev)
 			inode->i_fop = &sysfs_file_operations;
 			break;
 		case S_IFDIR:
-			inode->i_op = &sysfs_dir_inode_operations;
+			inode->i_op = &simple_dir_inode_operations;
 			inode->i_fop = &simple_dir_operations;
 
 			/* directory inodes start off with i_nlink == 2 (for "." entry) */
@@ -180,29 +140,6 @@ static int sysfs_symlink(struct inode * dir, struct dentry *dentry, const char *
 			iput(inode);
 	}
 	return error;
-}
-
-static inline int sysfs_positive(struct dentry *dentry)
-{
-	return (dentry->d_inode && !d_unhashed(dentry));
-}
-
-static int sysfs_empty(struct dentry *dentry)
-{
-	struct list_head *list;
-
-	spin_lock(&dcache_lock);
-
-	list_for_each(list, &dentry->d_subdirs) {
-		struct dentry *de = list_entry(list, struct dentry, d_child);
-		if (sysfs_positive(de)) {
-			spin_unlock(&dcache_lock);
-			return 0;
-		}
-	}
-
-	spin_unlock(&dcache_lock);
-	return 1;
 }
 
 static int sysfs_unlink(struct inode *dir, struct dentry *dentry)
@@ -329,32 +266,6 @@ sysfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	return retval;
 }
 
-static loff_t
-sysfs_file_lseek(struct file *file, loff_t offset, int orig)
-{
-	loff_t retval = -EINVAL;
-
-	down(&file->f_dentry->d_inode->i_sem);
-	switch(orig) {
-	case 0:
-		if (offset > 0) {
-			file->f_pos = offset;
-			retval = file->f_pos;
-		}
-		break;
-	case 1:
-		if ((offset + file->f_pos) > 0) {
-			file->f_pos += offset;
-			retval = file->f_pos;
-		}
-		break;
-	default:
-		break;
-	}
-	up(&file->f_dentry->d_inode->i_sem);
-	return retval;
-}
-
 static int sysfs_open_file(struct inode * inode, struct file * filp)
 {
 	struct driver_dir_entry * dir;
@@ -386,20 +297,16 @@ static int sysfs_release(struct inode * inode, struct file * filp)
 static struct file_operations sysfs_file_operations = {
 	.read		= sysfs_read_file,
 	.write		= sysfs_write_file,
-	.llseek		= sysfs_file_lseek,
+	.llseek		= generic_file_llseek,
 	.open		= sysfs_open_file,
 	.release	= sysfs_release,
 };
 
-static struct inode_operations sysfs_dir_inode_operations = {
-	.lookup		= simple_lookup,
-};
-
 static struct address_space_operations sysfs_aops = {
-	.readpage	= sysfs_readpage,
+	.readpage	= simple_readpage,
 	.writepage	= fail_writepage,
-	.prepare_write	= sysfs_prepare_write,
-	.commit_write	= sysfs_commit_write
+	.prepare_write	= simple_prepare_write,
+	.commit_write	= simple_commit_write
 };
 
 static struct super_operations sysfs_ops = {
@@ -622,7 +529,7 @@ void sysfs_remove_dir(struct driver_dir_entry * dir)
 	}
 
 	d_invalidate(dentry);
-	if (sysfs_empty(dentry)) {
+	if (simple_empty(dentry)) {
 		dentry->d_inode->i_nlink -= 2;
 		dentry->d_inode->i_flags |= S_DEAD;
 		parent->d_inode->i_nlink--;
