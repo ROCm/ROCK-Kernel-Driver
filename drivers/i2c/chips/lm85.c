@@ -383,7 +383,7 @@ struct lm85_data {
 	u8 syncpwm3;		/* Saved PWM3 for TACH 2,3,4 config */
 	u8 oppoint[3];		/* Register value */
 	u16 tmin_ctl;		/* Register value */
-	u32 therm_total;	/* Cummulative therm count */
+	unsigned long therm_total; /* Cummulative therm count */
 	u8 therm_limit;		/* Register value */
 	u16 alarms;		/* Register encoding, combined */
 	struct lm85_autofan autofan[3];
