@@ -380,8 +380,8 @@ tid_t txBegin(struct super_block *sb, int flag)
 
 	tblk = tid_to_tblock(t);
 
-	if ((tblk->next == 0) && (current != jfsCommitTask)) {
-		/* Save one tblk for jfsCommit thread */
+	if ((tblk->next == 0) && !(flag & COMMIT_FORCE)) {
+		/* Don't let a non-forced transaction take the last tblk */
 		jfs_info("txBegin: waiting for free tid");
 		INCREMENT(TxStat.txBegin_freetid);
 		TXN_SLEEP(&TxAnchor.freewait);
@@ -2991,8 +2991,7 @@ int jfs_sync(void *arg)
 				 * when it is committed
 				 */
 				TXN_UNLOCK();
-				tid = txBegin(ip->i_sb,
-					      COMMIT_INODE | COMMIT_FORCE);
+				tid = txBegin(ip->i_sb, COMMIT_INODE);
 				rc = txCommit(tid, 1, &ip, 0);
 				txEnd(tid);
 				up(&jfs_ip->commit_sem);
