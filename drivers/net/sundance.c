@@ -21,11 +21,15 @@
 	Version 1.01a (jgarzik):
 	- Replace some MII-related magic numbers with constants
 
+	Version 1.02 (D-Link):
+	- Add new board to PCI ID list
+	- Fix multicast bug
+
 */
 
 #define DRV_NAME	"sundance"
-#define DRV_VERSION	"1.01a"
-#define DRV_RELDATE	"11-Nov-2001"
+#define DRV_VERSION	"1.02"
+#define DRV_RELDATE	"17-Jan-2002"
 
 
 /* The user-configurable values.
@@ -223,8 +227,9 @@ static struct pci_device_id sundance_pci_tbl[] __devinitdata = {
 	{0x1186, 0x1002, 0x1186, 0x1002, 0, 0, 0},
 	{0x1186, 0x1002, 0x1186, 0x1003, 0, 0, 1},
 	{0x1186, 0x1002, 0x1186, 0x1012, 0, 0, 2},
-	{0x1186, 0x1002, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 3},
-	{0x13F0, 0x0201, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 4},
+	{0x1186, 0x1002, 0x1186, 0x1040, 0, 0, 3},
+	{0x1186, 0x1002, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 4},
+	{0x13F0, 0x0201, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 5},
 	{0,}
 };
 MODULE_DEVICE_TABLE(pci, sundance_pci_tbl);
@@ -246,6 +251,8 @@ static struct pci_id_info pci_id_tbl[] = {
 	 {0x10031186, 0xffffffff,},
 	 PCI_IOTYPE, 128, CanHaveMII},
 	{"D-Link DFE-580TX 4 port Server Adapter", {0x10121186, 0xffffffff,},
+	 PCI_IOTYPE, 128, CanHaveMII},
+	{"D-Link DFE-530TXS FAST Ethernet Adapter", {0x10021186, 0xffffffff,},
 	 PCI_IOTYPE, 128, CanHaveMII},
 	{"D-Link DL10050-based FAST Ethernet Adapter",
 	 {0x10021186, 0xffffffff,},
@@ -1287,11 +1294,16 @@ static void set_rx_mode(struct net_device *dev)
 		rx_mode = AcceptBroadcast | AcceptMulticast | AcceptMyPhys;
 	} else if (dev->mc_count) {
 		struct dev_mc_list *mclist;
-		memset(mc_filter, 0, sizeof(mc_filter));
+		int bit;
+		int index;
+		int crc;
+		memset (mc_filter, 0, sizeof (mc_filter));
 		for (i = 0, mclist = dev->mc_list; mclist && i < dev->mc_count;
-			 i++, mclist = mclist->next) {
-			set_bit(ether_crc_le(ETH_ALEN, mclist->dmi_addr) & 0x3f,
-					mc_filter);
+		     i++, mclist = mclist->next) {
+			crc = ether_crc_le (ETH_ALEN, mclist->dmi_addr);
+			for (index=0, bit=0; bit < 6; bit++, crc <<= 1)
+				if (crc & 0x80000000) index |= 1 << bit;
+			mc_filter[index/16] |= (1 << (index % 16));
 		}
 		rx_mode = AcceptBroadcast | AcceptMultiHash | AcceptMyPhys;
 	} else {
