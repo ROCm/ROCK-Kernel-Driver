@@ -428,18 +428,13 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 			 void *data, u16 size)
 {
 	int status;
-	struct usb_ctrlrequest *dr;
-
-	dr = kmalloc(sizeof(struct usb_ctrlrequest), GFP_NOIO);
-	if (!dr)
-		return -ENOMEM;
 
 	/* fill in the devrequest structure */
-	dr->bRequestType = requesttype;
-	dr->bRequest = request;
-	dr->wValue = cpu_to_le16(value);
-	dr->wIndex = cpu_to_le16(index);
-	dr->wLength = cpu_to_le16(size);
+	us->dr->bRequestType = requesttype;
+	us->dr->bRequest = request;
+	us->dr->wValue = cpu_to_le16(value);
+	us->dr->wIndex = cpu_to_le16(index);
+	us->dr->wLength = cpu_to_le16(size);
 
 	/* lock the URB */
 	down(&(us->current_urb_sem));
@@ -452,7 +447,7 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 
 	/* fill the URB */
 	FILL_CONTROL_URB(us->current_urb, us->pusb_dev, pipe, 
-			 (unsigned char*) dr, data, size, 
+			 (unsigned char*) us->dr, data, size, 
 			 usb_stor_blocking_completion, NULL);
 
 	/* submit the URB */
