@@ -478,6 +478,9 @@ extern void scsi_do_cmd(Scsi_Cmnd *, const void *cmnd,
 			int timeout, int retries);
 extern int scsi_dev_init(void);
 extern int scsi_mlqueue_insert(struct scsi_cmnd *, int);
+extern void scsi_detect_device(struct scsi_device *);
+extern int scsi_attach_device(struct scsi_device *);
+extern void scsi_detach_device(struct scsi_device *);
 
 /*
  * Newer request-based interfaces.

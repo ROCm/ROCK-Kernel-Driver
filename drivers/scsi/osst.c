@@ -163,7 +163,6 @@ struct Scsi_Device_Template osst_template =
        tag:		"osst",
        scsi_type:	TYPE_TAPE,
        detect:		osst_detect,
-       init:		osst_init,
        attach:		osst_attach,
        detach:		osst_detach
 };
@@ -5410,6 +5409,8 @@ static int osst_attach(Scsi_Device * SDp)
 
 	if (SDp->type != TYPE_TAPE || !osst_supports(SDp))
 		 return 1;
+
+	osst_init();
 
 	disk = alloc_disk(1);
 	if (!disk)

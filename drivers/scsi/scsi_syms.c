@@ -92,7 +92,6 @@ EXPORT_SYMBOL(scsi_reset_provider);
 EXPORT_SYMBOL(scsi_host_get_next);
 EXPORT_SYMBOL(scsi_host_hn_get);
 EXPORT_SYMBOL(scsi_host_put);
-EXPORT_SYMBOL(scsi_devicelist);
 EXPORT_SYMBOL(scsi_device_types);
 
 /*
