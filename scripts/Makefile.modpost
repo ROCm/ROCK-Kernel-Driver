@@ -37,10 +37,7 @@ targets += $(modules)
 quiet_cmd_cc_o_c = CC      $@
       cmd_cc_o_c = $(CC) $(CFLAGS) $(CFLAGS_MODULE) -c -o $@ $<
 
-#	We have a fake dependency on compile.h to make sure that we
-#	notice if the compiler version changes under us.
-
-$(modules:.ko=.mod.o): %.mod.o: %.mod.c include/linux/compile.h FORCE
+$(modules:.ko=.mod.o): %.mod.o: %.mod.c
 	$(call if_changed,cc_o_c)
 
 targets += $(modules:.ko=.mod.o)

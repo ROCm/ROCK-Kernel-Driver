@@ -460,7 +460,7 @@ include/config/MARKER: scripts/split-include include/linux/autoconf.h
 # 	if .config is newer than include/linux/autoconf.h, someone tinkered
 # 	with it and forgot to run make oldconfig
 
-include/linux/autoconf.h: .config scripts
+include/linux/autoconf.h: .config scripts/fixdep
 	$(Q)$(MAKE) $(build)=scripts/kconfig scripts/kconfig/conf
 	./scripts/kconfig/conf -s arch/$(ARCH)/Kconfig
 
@@ -477,7 +477,7 @@ include/linux/version.h: Makefile
 	  echo '"$(KERNELRELEASE)" exceeds $(uts_len) characters' >&2; \
 	  exit 1; \
 	fi;
-	@echo -n '  Generating $@'
+	@echo -n '  GEN     $@'
 	@(echo \#define UTS_RELEASE \"$(KERNELRELEASE)\"; \
 	  echo \#define LINUX_VERSION_CODE `expr $(VERSION) \\* 65536 + $(PATCHLEVEL) \\* 256 + $(SUBLEVEL)`; \
 	 echo '#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))'; \
@@ -501,11 +501,8 @@ all: modules
 
 #	Build modules
 
-include/linux/compile.h: FORCE
-	$(Q)$(MAKE) $(build)=init include/linux/compile.h
-
 .PHONY: modules
-modules: $(SUBDIRS) $(if $(KBUILD_BUILTIN),vmlinux) include/linux/compile.h
+modules: $(SUBDIRS) $(if $(KBUILD_BUILTIN),vmlinux)
 	@echo '  Building modules, stage 2.';
 	$(Q)$(MAKE) -rR -f scripts/Makefile.modpost
 
@@ -784,7 +781,6 @@ help:
 	@echo  ''
 	@echo  'Other generic targets:'
 	@echo  '  all		- Build all targets marked with [*]'
-	@echo  '  dep           - Create module version information'
 	@echo  '* vmlinux	- Build the bare kernel'
 	@echo  '* modules	- Build all modules'
 	@echo  '  dir/file.[ois]- Build specified target only'
@@ -804,7 +800,7 @@ help:
 
 # Documentation targets
 # ---------------------------------------------------------------------------
-sgmldocs psdocs pdfdocs htmldocs: scripts
+sgmldocs psdocs pdfdocs htmldocs: scripts/docproc FORCE
 	$(Q)$(MAKE) $(build)=Documentation/DocBook $@
 
 # Scripts to check various things for consistency
