@@ -374,10 +374,21 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
    and could overflow, it may be better (but slower)to use an 64bit division. */
 unsigned long long sched_clock(void)
 {
-	unsigned long a;
+	unsigned long a = 0;
 
+#if 0
+	/* Don't do a HPET read here. Using TSC always is much faster
+	   and HPET may not be mapped yet when the scheduler first runs.
+           Disadvantage is a small drift between CPUs in some configurations,
+	   but that should be tolerable. */
 	if (__vxtime.mode == VXTIME_HPET)
 		return (hpet_readl(HPET_COUNTER) * vxtime.quot) >> 32;
+#endif
+
+	/* Could do CPU core sync here. Opteron can execute rdtsc speculatively,
+	   which means it is not completely exact and may not be monotonous between
+	   CPUs. But the errors should be too small to matter for scheduling
+	   purposes. */
 
 	rdtscll(a);
 	return (a * vxtime.tsc_quot) >> 32;
