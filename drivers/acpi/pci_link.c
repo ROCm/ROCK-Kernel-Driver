@@ -308,30 +308,11 @@ acpi_pci_link_set (
 		struct acpi_resource	end;
 	}                       resource;
 	struct acpi_buffer	buffer = {sizeof(resource)+1, &resource};
-	int			i = 0;
-	int			valid = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_pci_link_set");
 
 	if (!link || !irq)
 		return_VALUE(-EINVAL);
-
-	/* We don't check irqs the first time around */
-	if (link->irq.setonboot) {
-		/* See if we're already at the target IRQ. */
-		if (irq == link->irq.active)
-			return_VALUE(0);
-
-		/* Make sure the target IRQ in the list of possible IRQs. */
-		for (i=0; i<link->irq.possible_count; i++) {
-			if (irq == link->irq.possible[i])
-				valid = 1;
-		}
-		if (!valid) {
-			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Target IRQ %d invalid\n", irq));
-			return_VALUE(-EINVAL);
-		}
-	}
 
 	memset(&resource, 0, sizeof(resource));
 
@@ -703,6 +684,9 @@ acpi_pci_link_add (
 	acpi_link.count++;
 
 end:
+	/* disable all links -- to be activated on use */
+	acpi_ut_evaluate_object(link->handle, "_DIS", 0, NULL);
+
 	if (result)
 		kfree(link);
 
