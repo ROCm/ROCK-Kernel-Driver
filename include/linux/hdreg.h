@@ -355,7 +355,7 @@ typedef struct hd_drive_hob_hdr {
 #define SETFEATURES_DIS_MSN	0x31	/* Disable Media Status Notification */
 #define SETFEATURES_DIS_RETRY	0x33	/* Disable Retry */
 #define SETFEATURES_EN_AAM	0x42	/* Enable Automatic Acoustic Management */
-#define SETFEATURES_RW_LONG	0x44	/* Set Lenght of VS bytes */
+#define SETFEATURES_RW_LONG	0x44	/* Set Length of VS bytes */
 #define SETFEATURES_SET_CACHE	0x54	/* Set Cache segments to SC Reg. Val */
 #define SETFEATURES_DIS_RLA	0x55	/* Disable read look-ahead feature */
 #define SETFEATURES_EN_RI	0x5D	/* Enable release interrupt */
