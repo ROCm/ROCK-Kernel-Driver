@@ -1384,7 +1384,7 @@ static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t mask)
 	unsigned long flags;
 	unsigned int dest;
 
-	dest = cpu_mask_to_apicid(mk_cpumask_const(mask));
+	dest = cpu_mask_to_apicid(mask);
 
 	/*
 	 * Only the first 8 bits are valid.
