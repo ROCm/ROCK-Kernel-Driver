@@ -82,8 +82,6 @@ unsigned long decr_overclock_proc0 = 1;
 unsigned long decr_overclock_set = 0;
 unsigned long decr_overclock_proc0_set = 0;
 
-int powersave_nap;
-
 unsigned char aux_device_present;
 
 #ifdef CONFIG_MAGIC_SYSRQ
