@@ -3158,8 +3158,7 @@ static int reset_camera(struct cam_data *cam)
 
 static void put_cam(struct cpia_camera_ops* ops)
 {
-	if (ops->owner)
-		__MOD_DEC_USE_COUNT(ops->owner);
+	module_put(ops->owner);
 }
 
 /* ------------------------- V4L interface --------------------- */

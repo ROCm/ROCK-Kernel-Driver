@@ -58,13 +58,7 @@ extern int copy_strings(int argc,char ** argv,struct linux_binprm *bprm);
 extern int copy_strings_kernel(int argc,char ** argv,struct linux_binprm *bprm);
 extern void compute_creds(struct linux_binprm *binprm);
 extern int do_coredump(long signr, int exit_code, struct pt_regs * regs);
-extern void set_binfmt(struct linux_binfmt *new);
-
-
-#if 0
-/* this went away now */
-#define change_ldt(a,b) setup_arg_pages(a,b)
-#endif
+extern int set_binfmt(struct linux_binfmt *new);
 
 #endif /* __KERNEL__ */
 #endif /* _LINUX_BINFMTS_H */

@@ -18,6 +18,4 @@ obj-$(CONFIG_ITE_I2C_ADAP)	+= i2c-adap-ite.o
 obj-$(CONFIG_SCx200_I2C)	+= scx200_i2c.o
 obj-$(CONFIG_SCx200_ACB)	+= scx200_acb.o
 obj-$(CONFIG_I2C_PROC)		+= i2c-proc.o
-
-# This is needed for automatic patch generation: sensors code starts here
-# This is needed for automatic patch generation: sensors code ends here
+obj-y				+= busses/ chips/

@@ -168,15 +168,13 @@ retry:
 		best = p->range;
 		*part = dev - p->dev;
 		if (p->lock && p->lock(dev, data) < 0) {
-			if (owner)
-				__MOD_DEC_USE_COUNT(owner);
+			module_put(owner);
 			continue;
 		}
 		read_unlock(&gendisk_lock);
 		disk = probe(dev, part, data);
 		/* Currently ->owner protects _only_ ->probe() itself. */
-		if (owner)
-			__MOD_DEC_USE_COUNT(owner);
+		module_put(owner);
 		if (disk)
 			return disk;
 		goto retry;

@@ -21,9 +21,9 @@
  * and then gcc will emit a warning for each usage of the function.
  */
 #if __GNUC__ >= 3
-#define deprecated	__attribute__((deprecated))
+#define __deprecated	__attribute__((deprecated))
 #else
-#define deprecated
+#define __deprecated
 #endif
 
 /* This macro obfuscates arithmetic on a variable address so that gcc

@@ -40,12 +40,11 @@ struct kernel_symbol
 	char name[MODULE_NAME_LEN];
 };
 
-#ifdef MODULE
+/* These are either module local, or the kernel's dummy ones. */
+extern int init_module(void);
+extern void cleanup_module(void);
 
-#ifdef KBUILD_MODNAME
-static const char __module_name[MODULE_NAME_LEN] __attribute__((section(".gnu.linkonce.modname"))) = \
-  __stringify(KBUILD_MODNAME);
-#endif
+#ifdef MODULE
 
 /* For replacement modutils, use an alias not a pointer. */
 #define MODULE_GENERIC_TABLE(gtype,name)			\
@@ -56,9 +55,6 @@ static const struct gtype##_id * __module_##gtype##_table	\
 extern const struct gtype##_id __mod_##gtype##_table		\
   __attribute__ ((unused, alias(__stringify(name))))
 
-/* This is magically filled in by the linker, but THIS_MODULE must be
-   a constant so it works in initializers. */
-extern struct module __this_module;
 #define THIS_MODULE (&__this_module)
 
 #else  /* !MODULE */
@@ -176,7 +172,7 @@ struct module
 
 	/* The command line arguments (may be mangled).  People like
 	   keeping pointers to this stuff */
-	char args[0];
+	char *args;
 };
 
 /* FIXME: It'd be nice to isolate modules during init, too, so they
@@ -289,6 +285,19 @@ static inline const char *module_address_lookup(unsigned long addr,
 }
 #endif /* CONFIG_MODULES */
 
+#if defined(MODULE) && defined(KBUILD_MODNAME)
+/* We make the linker do some of the work. */
+struct module __this_module
+__attribute__((section(".gnu.linkonce.this_module"))) = {
+	.name = __stringify(KBUILD_MODNAME),
+	.symbols = { .owner = &__this_module },
+	.init = init_module,
+#ifdef CONFIG_MODULE_UNLOAD
+	.exit = cleanup_module,
+#endif
+};
+#endif /* MODULE && KBUILD_MODNAME */
+
 /* For archs to search exception tables */
 extern struct list_head extables;
 extern spinlock_t modlist_lock;
@@ -296,9 +305,20 @@ extern spinlock_t modlist_lock;
 #define symbol_request(x) try_then_request_module(symbol_get(x), "symbol:" #x)
 
 /* BELOW HERE ALL THESE ARE OBSOLETE AND WILL VANISH */
-#define __MOD_INC_USE_COUNT(mod) \
-	do { __unsafe(mod); (void)try_module_get(mod); } while(0)
-#define __MOD_DEC_USE_COUNT(mod) module_put(mod)
+static inline void __deprecated __MOD_INC_USE_COUNT(struct module *module)
+{
+	__unsafe(module);
+	/*
+	 * Yes, we ignore the retval here, that's why it's deprecated.
+	 */
+	try_module_get(module);
+}
+
+static inline void __deprecated __MOD_DEC_USE_COUNT(struct module *module)
+{
+	module_put(module);
+}
+
 #define SET_MODULE_OWNER(dev) ((dev)->owner = THIS_MODULE)
 
 struct obsolete_modparm {
@@ -319,14 +339,21 @@ struct obsolete_modparm __parm_##var __attribute__((section("__obsparm"))) = \
 /* People do this inside their init routines, when the module isn't
    "live" yet.  They should no longer be doing that, but
    meanwhile... */
+static inline void __deprecated _MOD_INC_USE_COUNT(struct module *module)
+{
+	__unsafe(module);
+
 #if defined(CONFIG_MODULE_UNLOAD) && defined(MODULE)
-#define MOD_INC_USE_COUNT	\
-	do { __unsafe(THIS_MODULE); local_inc(&THIS_MODULE->ref[get_cpu()].count); put_cpu(); } while (0)
+	local_inc(&module->ref[get_cpu()].count);
+	put_cpu();
 #else
-#define MOD_INC_USE_COUNT \
-	do { __unsafe(THIS_MODULE); (void)try_module_get(THIS_MODULE); } while (0)
+	try_module_get(module);
 #endif
-#define MOD_DEC_USE_COUNT module_put(THIS_MODULE)
+}
+#define MOD_INC_USE_COUNT \
+	_MOD_INC_USE_COUNT(THIS_MODULE)
+#define MOD_DEC_USE_COUNT \
+	__MOD_DEC_USE_COUNT(THIS_MODULE)
 #define try_inc_mod_count(mod) try_module_get(mod)
 #define EXPORT_NO_SYMBOLS
 extern int module_dummy_usage;
@@ -341,13 +368,6 @@ extern int module_dummy_usage;
 (((m)->module_init						\
   && __mod_between((p),(n),(m)->module_init,(m)->init_size))	\
  || __mod_between((p),(n),(m)->module_core,(m)->core_size))
-
-/* Old-style "I'll just call it init_module and it'll be run at
-   insert".  Use module_init(myroutine) instead. */
-#ifdef MODULE
-#define init_module(voidarg) __initfn(void)
-#define cleanup_module(voidarg) __exitfn(void)
-#endif
 
 /*
  * The exception and symbol tables, and the lock

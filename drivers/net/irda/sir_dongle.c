@@ -121,8 +121,7 @@ int sirdev_get_dongle(struct sir_dev *dev, IRDA_DONGLE type)
 
 out_reject:
 	dev->dongle_drv = NULL;
-	if (drv->owner)
-		__MOD_DEC_USE_COUNT(drv->owner);
+	module_put(drv->owner);
 out_unlock:
 	up(&dongle_list_lock);
 	return err;
@@ -137,9 +136,7 @@ int sirdev_put_dongle(struct sir_dev *dev)
 			drv->close(dev);		/* close this dongle instance */
 
 		dev->dongle_drv = NULL;			/* unlink the dongle driver */
-
-		if (drv->owner)
-			__MOD_DEC_USE_COUNT(drv->owner);/* decrement driver's module refcount */
+		module_put(drv->owner);/* decrement driver's module refcount */
 	}
 
 	return 0;

@@ -14,6 +14,7 @@
 #include <linux/smp_lock.h>
 #include <linux/stddef.h>
 #include <linux/slab.h>
+#include <linux/thread_info.h>
 
 /* Set EXTENT bits starting at BASE in BITMAP to value TURN_ON. */
 static void set_bitmap(unsigned long *bitmap, short base, short extent, int new_value)
@@ -122,5 +123,7 @@ asmlinkage int sys_iopl(unsigned long unused)
 			return -EPERM;
 	}
 	regs->eflags = (regs->eflags & 0xffffcfff) | (level << 12);
+	/* Make sure we return the long way (not sysenter) */
+	set_thread_flag(TIF_SIGPENDING);
 	return 0;
 }
