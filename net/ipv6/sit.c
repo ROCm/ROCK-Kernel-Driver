@@ -487,6 +487,7 @@ static int ipip6_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 		}
 	}
 	if (rt->rt_type != RTN_UNICAST) {
+		ip_rt_put(rt);
 		tunnel->stat.tx_carrier_errors++;
 		goto tx_error_icmp;
 	}
@@ -814,18 +815,19 @@ int __init sit_init(void)
 					   ipip6_tunnel_setup);
 	if (!ipip6_fb_tunnel_dev) {
 		err = -ENOMEM;
-		goto fail;
+		goto err1;
 	}
 
 	ipip6_fb_tunnel_dev->init = ipip6_fb_tunnel_init;
 
 	if ((err =  register_netdev(ipip6_fb_tunnel_dev)))
-		goto fail;
+		goto err2;
 
  out:
 	return err;
- fail:
-	inet_del_protocol(&sit_protocol, IPPROTO_IPV6);
+ err2:
 	free_netdev(ipip6_fb_tunnel_dev);
+ err1:
+	inet_del_protocol(&sit_protocol, IPPROTO_IPV6);
 	goto out;
 }

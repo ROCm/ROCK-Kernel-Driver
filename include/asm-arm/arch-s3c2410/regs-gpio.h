@@ -14,7 +14,8 @@
  *    23-06-2003     BJD     Updated GSTATUS registers
  *    12-03-2004     BJD     Updated include protection
  *    20-07-2004     BJD     Added GPIO pin numbers, added Port A definitions
- */
+ *    04-10-2004     BJD     Fixed number of bugs, added EXT IRQ filter defs
+*/
 
 
 #ifndef __ASM_ARCH_REGS_GPIO_H
@@ -614,31 +615,31 @@
 #define S3C2410_GPG10_OUTP    (0x01 << 20)
 #define S3C2410_GPG10_EINT18  (0x02 << 20)
 
-#define S3C2410_GPG10         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 10)
+#define S3C2410_GPG11         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 11)
 #define S3C2410_GPG11_INP     (0x00 << 22)
 #define S3C2410_GPG11_OUTP    (0x01 << 22)
 #define S3C2410_GPG11_EINT19  (0x02 << 22)
 #define S3C2410_GPG11_TCLK1   (0x03 << 22)
 
-#define S3C2410_GPG10         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 10)
+#define S3C2410_GPG12         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 12)
 #define S3C2410_GPG12_INP     (0x00 << 24)
 #define S3C2410_GPG12_OUTP    (0x01 << 24)
 #define S3C2410_GPG12_EINT20  (0x02 << 24)
 #define S3C2410_GPG12_XMON    (0x03 << 24)
 
-#define S3C2410_GPG10         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 10)
+#define S3C2410_GPG13         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 13)
 #define S3C2410_GPG13_INP     (0x00 << 26)
 #define S3C2410_GPG13_OUTP    (0x01 << 26)
 #define S3C2410_GPG13_EINT21  (0x02 << 26)
 #define S3C2410_GPG13_nXPON   (0x03 << 26)
 
-#define S3C2410_GPG10         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 10)
+#define S3C2410_GPG14         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 14)
 #define S3C2410_GPG14_INP     (0x00 << 28)
 #define S3C2410_GPG14_OUTP    (0x01 << 28)
 #define S3C2410_GPG14_EINT22  (0x02 << 28)
 #define S3C2410_GPG14_YMON    (0x03 << 28)
 
-#define S3C2410_GPG10         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 10)
+#define S3C2410_GPG15         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 15)
 #define S3C2410_GPG15_INP     (0x00 << 30)
 #define S3C2410_GPG15_OUTP    (0x01 << 30)
 #define S3C2410_GPG15_EINT23  (0x02 << 30)
@@ -782,6 +783,11 @@
 #define S3C2410_EINFLT1	   S3C2410_GPIOREG(0x98)
 #define S3C2410_EINFLT2	   S3C2410_GPIOREG(0x9C)
 #define S3C2410_EINFLT3	   S3C2410_GPIOREG(0xA0)
+
+/* values for interrupt filtering */
+#define S3C2410_EINTFLT_PCLK		(0x00)
+#define S3C2410_EINTFLT_EXTCLK		(1<<7)
+#define S3C2410_EINTFLT_WIDTHMSK(x)	((x) & 0x3f)
 
 /* removed EINTxxxx defs from here, not meant for this */
 

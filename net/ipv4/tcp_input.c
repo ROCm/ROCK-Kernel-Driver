@@ -2369,7 +2369,7 @@ static int tcp_tso_acked(struct sock *sk, struct sk_buff *skb,
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct tcp_skb_cb *scb = TCP_SKB_CB(skb); 
-	__u32 mss = tcp_skb_psize(skb);
+	__u32 mss = tcp_skb_mss(skb);
 	__u32 snd_una = tp->snd_una;
 	__u32 orig_seq, seq;
 	__u32 packets_acked = 0;

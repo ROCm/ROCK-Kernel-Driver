@@ -312,7 +312,6 @@ static int inet_create(struct socket *sock, int protocol)
 	sk_set_owner(sk, THIS_MODULE);
 
 	sk->sk_destruct	   = inet_sock_destruct;
-	sk->sk_zapped	   = 0;
 	sk->sk_family	   = PF_INET;
 	sk->sk_protocol	   = protocol;
 	sk->sk_backlog_rcv = sk->sk_prot->backlog_rcv;

@@ -26,7 +26,8 @@
  *	30-Sep-2004  BJD  Fixed cfgpin() mask bug
  *	01-Oct-2004  BJD  Added getcfg() to get pin configuration
  *	01-Oct-2004  BJD  Fixed mask bug in pullup() call
- *	01-Oct-2004  BJD  Added getoirq() to turn pin into irqno
+ *	01-Oct-2004  BJD  Added getirq() to turn pin into irqno
+ *	04-Oct-2004  BJD  Added irq filter controls for GPIO
  */
 
 
@@ -154,4 +155,40 @@ int s3c2410_gpio_getirq(unsigned int pin)
 		return (pin - S3C2410_GPF4) + IRQ_EINT4;
 
 	return (pin - S3C2410_GPG0) + IRQ_EINT8;
+}
+
+int s3c2410_gpio_irqfilter(unsigned int pin, unsigned int on,
+			   unsigned int config)
+{
+	unsigned long reg = S3C2410_EINFLT0;
+	unsigned long flags;
+	unsigned long val;
+
+	if (pin < S3C2410_GPG8 || pin > S3C2410_GPG15)
+		return -1;
+
+	config &= 0xff;
+
+	pin -= S3C2410_GPG8_EINT16;
+	reg += pin & ~3;
+
+	local_irq_save(flags);
+
+	/* update filter width and clock source */
+
+	val = __raw_readl(reg);
+	val &= ~(0xff << ((pin & 3) * 8));
+	val |= config << ((pin & 3) * 8);
+	__raw_writel(val, reg);
+
+	/* update filter enable */
+
+	val = __raw_readl(S3C2410_EXTINT2);
+	val &= ~(1 << ((pin * 4) + 3));
+	val |= on << ((pin * 4) + 3);
+	__raw_writel(val, S3C2410_EXTINT2);
+
+	local_irq_restore(flags);
+
+	return 0;
 }

@@ -349,6 +349,12 @@ LC0:		.word	LC0			@ r1
 LC1:		.word	reloc_end - reloc_start
 		.size	LC0, . - LC0
 
+		.globl	params
+params:		ldr	r0, =params_phys
+		mov	pc, lr
+		.ltorg
+		.align
+
 /*
  * Turn on the cache.  We need to setup some page tables so that we
  * can have both the I and D caches on.
