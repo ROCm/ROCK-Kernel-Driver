@@ -1099,7 +1099,8 @@ cia_decode_parity_error(struct el_CIA_sysdata_mcheck *cia)
 	printk(KERN_CRIT "  Command: %s, Parity bit: %d\n", cmd, par);
 	printk(KERN_CRIT "  Address: %#010lx, Mask: %#lx\n", addr, mask);
 }
-#endif
+#endif /* CONFIG_VERBOSE_MCHECK */
+
 
 static int
 cia_decode_mchk(unsigned long la_ptr)
@@ -1114,6 +1115,9 @@ cia_decode_mchk(unsigned long la_ptr)
 		return 0;
 
 #ifdef CONFIG_VERBOSE_MCHECK
+	if (!alpha_verbose_mcheck)
+		return 1;
+
 	switch (ffs(cia->cia_err & 0xfff) - 1) {
 	case 0: /* CIA_ERR_COR_ERR */
 		cia_decode_ecc_error(cia, "Corrected ECC error");
@@ -1186,7 +1190,7 @@ cia_decode_mchk(unsigned long la_ptr)
 	if (cia->cia_err & CIA_ERR_LOST_IOA_TIMEOUT)
 		printk(KERN_CRIT "CIA lost machine check: "
 		       "I/O timeout\n");
-#endif
+#endif /* CONFIG_VERBOSE_MCHECK */
 
 	return 1;
 }

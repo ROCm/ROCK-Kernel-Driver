@@ -460,8 +460,8 @@ lca_machine_check(unsigned long vector, unsigned long la_ptr,
 	}
 
 	/* Dump the logout area to give all info.  */
-#if DEBUG_MCHECK > 1
-	{
+#ifdef CONFIG_VERBOSE_MCHECK
+	if (alpha_verbose_mcheck > 1) {
 		unsigned long * ptr = (unsigned long *) la_ptr;
 		long i;
 		for (i = 0; i < el.c->size / sizeof(long); i += 2) {
@@ -469,7 +469,7 @@ lca_machine_check(unsigned long vector, unsigned long la_ptr,
 			       i*sizeof(long), ptr[i], ptr[i+1]);
 		}
 	}
-#endif
+#endif /* CONFIG_VERBOSE_MCHECK */
 }
 
 /*

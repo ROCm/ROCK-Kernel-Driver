@@ -63,6 +63,12 @@ static struct notifier_block alpha_panic_block = {
 struct hwrpb_struct *hwrpb;
 unsigned long srm_hae;
 
+#ifdef CONFIG_VERBOSE_MCHECK
+/* 0=minimum, 1=verbose, 2=all */
+/* These can be overridden via the command line, ie "verbose_mcheck=2") */
+unsigned long alpha_verbose_mcheck = CONFIG_VERBOSE_MCHECK_ON;
+#endif
+
 /* Which processor we booted from.  */
 int boot_cpuid;
 
@@ -538,6 +544,12 @@ setup_arch(char **cmdline_p)
 				get_mem_size_limit(p+9) << PAGE_SHIFT;
 			continue;
 		}
+#ifdef CONFIG_VERBOSE_MCHECK
+		if (strncmp(p, "verbose_mcheck=", 15) == 0) {
+			alpha_verbose_mcheck = simple_strtol(p+15, NULL, 0);
+			continue;
+		}
+#endif
 	}
 
 	/* Replace the command line, now that we've killed it with strsep.  */
@@ -596,6 +608,38 @@ setup_arch(char **cmdline_p)
 	       type_name, (*var_name ? " variation " : ""),
 	       var_name, alpha_mv.vector_name,
 	       (alpha_using_srm ? "SRM" : "MILO"));
+
+	printk("Major Options: "
+#ifdef CONFIG_SMP
+	       "SMP "
+#endif
+#ifdef CONFIG_ALPHA_EV56
+	       "EV56 "
+#endif
+#ifdef CONFIG_ALPHA_EV67
+	       "EV67 "
+#endif
+#ifdef CONFIG_ALPHA_LEGACY_START_ADDRESS
+	       "LEGACY_START "
+#endif
+#ifdef CONFIG_VERBOSE_MCHECK
+	       "VERBOSE_MCHECK "
+#endif
+
+#ifdef CONFIG_DISCONTIGMEM
+	       "DISCONTIGMEM "
+#ifdef CONFIG_NUMA
+	       "NUMA "
+#endif
+#endif
+
+#ifdef CONFIG_DEBUG_SPINLOCK
+	       "DEBUG_SPINLOCK "
+#endif
+#ifdef CONFIG_MAGIC_SYSRQ
+	       "MAGIC_SYSRQ "
+#endif
+	       "\n");
 
 	printk("Command line: %s\n", command_line);
 
