@@ -103,6 +103,8 @@ struct nfs_open_context {
  */
 struct nfs_delegation;
 
+struct posix_acl;
+
 /*
  * nfs fs inode data in memory
  */
@@ -157,6 +159,11 @@ struct nfs_inode {
 	atomic_t		data_updates;
 
 	struct nfs_access_entry	cache_access;
+#ifdef CONFIG_NFS_ACL
+	unsigned long		acl_timestamp;
+	struct posix_acl	*acl_access;
+	struct posix_acl	*acl_default;
+#endif
 
 	/*
 	 * This is the cookie verifier used for NFSv3 readdir
@@ -288,6 +295,8 @@ static inline int nfs_verify_change_attribute(struct inode *inode, unsigned long
 extern void nfs_zap_caches(struct inode *);
 extern struct inode *nfs_fhget(struct super_block *, struct nfs_fh *,
 				struct nfs_fattr *);
+extern struct posix_acl *nfs_get_cached_acl(struct inode *, int);
+extern void nfs_cache_acls(struct inode *, struct posix_acl *, struct posix_acl *);
 extern int nfs_refresh_inode(struct inode *, struct nfs_fattr *);
 extern int nfs_getattr(struct vfsmount *, struct dentry *, struct kstat *);
 extern int nfs_permission(struct inode *, int, struct nameidata *);
@@ -298,6 +307,7 @@ extern int nfs_release(struct inode *, struct file *);
 extern int nfs_attribute_timeout(struct inode *inode);
 extern int nfs_revalidate_inode(struct nfs_server *server, struct inode *inode);
 extern int __nfs_revalidate_inode(struct nfs_server *, struct inode *);
+extern void nfs_invalidate_access_cache(struct inode *inode);
 extern int nfs_setattr(struct dentry *, struct iattr *);
 extern void nfs_begin_attr_update(struct inode *);
 extern void nfs_end_attr_update(struct inode *);
@@ -331,6 +341,22 @@ static inline struct rpc_cred *nfs_file_cred(struct file *file)
 	}
 	return NULL;
 }
+
+/*
+ * linux/fs/nfs/xattr.c
+ */
+#ifdef CONFIG_NFS_ACL
+extern ssize_t nfs_listxattr(struct dentry *, char *, size_t);
+extern ssize_t nfs_getxattr(struct dentry *, const char *, void *, size_t);
+extern int nfs_setxattr(struct dentry *, const char *,
+			const void *, size_t, int);
+extern int nfs_removexattr (struct dentry *, const char *name);
+#else
+# define nfs_listxattr NULL
+# define nfs_getxattr NULL
+# define nfs_setxattr NULL
+# define nfs_removexattr NULL
+#endif
 
 /*
  * linux/fs/nfs/direct.c

@@ -186,6 +186,27 @@ xdr_ressize_check(struct svc_rqst *rqstp, u32 *p)
 	return vec->iov_len <= PAGE_SIZE;
 }
 
+#if 0
+static inline struct page *
+svc_take_arg_page(struct svc_rqst *rqstp)
+{
+	if (rqstp->rq_arghi <= rqstp->rq_argused)
+		return NULL;
+	return rqstp->rq_argpages[rqstp->rq_argused++];
+}
+#endif
+
+static inline struct page *
+svc_take_res_page(struct svc_rqst *rqstp)
+{
+	if (rqstp->rq_arghi <= rqstp->rq_argused)
+		return NULL;
+	rqstp->rq_arghi--;
+	rqstp->rq_respages[rqstp->rq_resused] =
+		rqstp->rq_argpages[rqstp->rq_arghi];
+	return rqstp->rq_respages[rqstp->rq_resused++];
+}
+
 static inline int svc_take_page(struct svc_rqst *rqstp)
 {
 	if (rqstp->rq_arghi <= rqstp->rq_argused)

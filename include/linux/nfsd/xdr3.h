@@ -10,6 +10,7 @@
 #define _LINUX_NFSD_XDR3_H
 
 #include <linux/nfsd/xdr.h>
+#include <linux/posix_acl.h>
 
 struct nfsd3_sattrargs {
 	struct svc_fh		fh;
@@ -108,6 +109,18 @@ struct nfsd3_commitargs {
 	struct svc_fh		fh;
 	__u64			offset;
 	__u32			count;
+};
+
+struct nfsd3_getaclargs {
+	struct svc_fh		fh;
+	int			mask;
+};
+
+struct nfsd3_setaclargs {
+	struct svc_fh		fh;
+	int			mask;
+	struct posix_acl	*acl_access;
+	struct posix_acl	*acl_default;
 };
 
 struct nfsd3_attrstat {
@@ -209,6 +222,14 @@ struct nfsd3_commitres {
 	struct svc_fh		fh;
 };
 
+struct nfsd3_getaclres {
+	__u32			status;
+	struct svc_fh		fh;
+	int			mask;
+	struct posix_acl	*acl_access;
+	struct posix_acl	*acl_default;
+};
+
 /* dummy type for release */
 struct nfsd3_fhandle_pair {
 	__u32			dummy;
@@ -241,6 +262,7 @@ union nfsd3_xdrstore {
 	struct nfsd3_fsinfores		fsinfores;
 	struct nfsd3_pathconfres	pathconfres;
 	struct nfsd3_commitres		commitres;
+	struct nfsd3_getaclres		getaclres;
 };
 
 #define NFS3_SVC_XDRSIZE		sizeof(union nfsd3_xdrstore)
@@ -276,6 +298,10 @@ int nfs3svc_decode_readdirplusargs(struct svc_rqst *, u32 *,
 				struct nfsd3_readdirargs *);
 int nfs3svc_decode_commitargs(struct svc_rqst *, u32 *,
 				struct nfsd3_commitargs *);
+int nfs3svc_decode_getaclargs(struct svc_rqst *, u32 *,
+			      struct nfsd3_getaclargs *);
+int nfs3svc_decode_setaclargs(struct svc_rqst *, u32 *,
+			      struct nfsd3_setaclargs *);
 int nfs3svc_encode_voidres(struct svc_rqst *, u32 *, void *);
 int nfs3svc_encode_attrstat(struct svc_rqst *, u32 *,
 				struct nfsd3_attrstat *);
@@ -305,11 +331,17 @@ int nfs3svc_encode_pathconfres(struct svc_rqst *, u32 *,
 				struct nfsd3_pathconfres *);
 int nfs3svc_encode_commitres(struct svc_rqst *, u32 *,
 				struct nfsd3_commitres *);
+int nfs3svc_encode_getaclres(struct svc_rqst *, u32 *,
+			     struct nfsd3_getaclres *);
+int nfs3svc_encode_setaclres(struct svc_rqst *, u32 *,
+			     struct nfsd3_attrstat *);
 
 int nfs3svc_release_fhandle(struct svc_rqst *, u32 *,
 				struct nfsd3_attrstat *);
 int nfs3svc_release_fhandle2(struct svc_rqst *, u32 *,
 				struct nfsd3_fhandle_pair *);
+int nfs3svc_release_getacl(struct svc_rqst *rqstp, u32 *p,
+			   struct nfsd3_getaclres *resp);
 int nfs3svc_encode_entry(struct readdir_cd *, const char *name,
 				int namlen, loff_t offset, ino_t ino,
 				unsigned int);

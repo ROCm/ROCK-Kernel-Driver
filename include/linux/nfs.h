@@ -11,6 +11,7 @@
 #include <linux/string.h>
 
 #define NFS_PROGRAM	100003
+#define NFSACL_PROGRAM	100227
 #define NFS_PORT	2049
 #define NFS_MAXDATA	8192
 #define NFS_MAXPATHLEN	1024

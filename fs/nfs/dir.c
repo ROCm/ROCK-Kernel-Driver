@@ -31,6 +31,7 @@
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
 #include <linux/namei.h>
+#include <linux/posix_acl.h>
 
 #include "delegation.h"
 
@@ -74,6 +75,10 @@ struct inode_operations nfs_dir_inode_operations = {
 	.permission	= nfs_permission,
 	.getattr	= nfs_getattr,
 	.setattr	= nfs_setattr,
+	.listxattr	= nfs_listxattr,
+	.getxattr	= nfs_getxattr,
+	.setxattr	= nfs_setxattr,
+	.removexattr	= nfs_removexattr,
 };
 
 #ifdef CONFIG_NFS_V4
@@ -1022,6 +1027,38 @@ out_err:
 	return error;
 }
 
+static int nfs_set_default_acl(struct inode *dir, struct inode *inode,
+			       mode_t mode)
+{
+#ifdef CONFIG_NFS_ACL
+	struct posix_acl *dfacl, *acl;
+	int error = 0;
+
+	dfacl = NFS_PROTO(dir)->getacl(dir, ACL_TYPE_DEFAULT);
+	if (IS_ERR(dfacl)) {
+		error = PTR_ERR(dfacl);
+		return (error == -EOPNOTSUPP) ? 0 : error;
+	}
+	if (!dfacl)
+		return 0;
+	acl = posix_acl_clone(dfacl, GFP_KERNEL);
+	error = -ENOMEM;
+	if (!acl)
+		goto out;
+	error = posix_acl_create_masq(acl, &mode);
+	if (error < 0)
+		goto out;
+	error = NFS_PROTO(inode)->setacls(inode, acl, S_ISDIR(inode->i_mode) ?
+						      dfacl : NULL);
+out:
+	posix_acl_release(acl);
+	posix_acl_release(dfacl);
+	return error;
+#else
+	return 0;
+#endif
+}
+
 /*
  * Following a failed create operation, we drop the dentry rather
  * than retain a negative dentry. This avoids a problem in the event
@@ -1039,7 +1076,7 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode,
 	dfprintk(VFS, "NFS: create(%s/%ld, %s\n", dir->i_sb->s_id, 
 		dir->i_ino, dentry->d_name.name);
 
-	attr.ia_mode = mode;
+	attr.ia_mode = mode & ~current->fs->umask;
 	attr.ia_valid = ATTR_MODE;
 
 	if (nd && (nd->flags & LOOKUP_CREATE))
@@ -1059,7 +1096,7 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode,
 		d_instantiate(dentry, inode);
 		nfs_renew_times(dentry);
 		nfs_set_verifier(dentry, nfs_save_change_attribute(dir));
-		error = 0;
+		error = nfs_set_default_acl(dir, inode, mode);
 	} else {
 		error = PTR_ERR(inode);
 		d_drop(dentry);
@@ -1085,7 +1122,7 @@ nfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 	if (!new_valid_dev(rdev))
 		return -EINVAL;
 
-	attr.ia_mode = mode;
+	attr.ia_mode = mode & ~current->fs->umask;
 	attr.ia_valid = ATTR_MODE;
 
 	lock_kernel();
@@ -1097,6 +1134,8 @@ nfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 		error = nfs_instantiate(dentry, &fhandle, &fattr);
 	else
 		d_drop(dentry);
+	if (!error)
+		error = nfs_set_default_acl(dir, dentry->d_inode, mode);
 	unlock_kernel();
 	return error;
 }
@@ -1115,7 +1154,7 @@ static int nfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		dir->i_ino, dentry->d_name.name);
 
 	attr.ia_valid = ATTR_MODE;
-	attr.ia_mode = mode | S_IFDIR;
+	attr.ia_mode = (mode & ~current->fs->umask) | S_IFDIR;
 
 	lock_kernel();
 #if 0
@@ -1135,6 +1174,8 @@ static int nfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		error = nfs_instantiate(dentry, &fhandle, &fattr);
 	else
 		d_drop(dentry);
+	if (!error)
+		error = nfs_set_default_acl(dir, dentry->d_inode, mode);
 	unlock_kernel();
 	return error;
 }
@@ -1554,6 +1595,7 @@ out:
 
 int nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
+	struct nfs_server *server = NFS_SERVER(inode);
 	struct rpc_cred *cred;
 	int mode = inode->i_mode;
 	int res;
@@ -1590,7 +1632,7 @@ int nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
 
 	lock_kernel();
 
-	if (!NFS_PROTO(inode)->access)
+	if ((server->flags & NFS_MOUNT_NOACL) || !NFS_PROTO(inode)->access)
 		goto out_notsup;
 
 	cred = rpcauth_lookupcred(NFS_CLIENT(inode)->cl_auth, 0);

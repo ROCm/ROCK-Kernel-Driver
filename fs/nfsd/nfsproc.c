@@ -591,7 +591,6 @@ nfserrno (int errno)
 		{ nfserr_dropit, -EAGAIN },
 		{ nfserr_dropit, -ENOMEM },
 		{ nfserr_badname, -ESRCH },
-		{ nfserr_notsupp, -ENOTSUPP },
 		{ nfserr_notsupp, -EOPNOTSUPP },
 		{ -1, -EIO }
 	};
