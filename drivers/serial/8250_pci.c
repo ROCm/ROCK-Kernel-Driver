@@ -145,8 +145,10 @@ afavlab_setup(struct pci_dev *dev, struct pci_board *board,
 	bar = FL_GET_BASE(board->flags);
 	if (idx < 4)
 		bar += idx;
-	else
+	else {
+		bar = 4;
 		offset += (idx - 4) * board->uart_offset;
+	}
 
 	return setup_port(dev, req, bar, offset, board->reg_shift);
 }
@@ -1889,6 +1891,9 @@ static struct pci_device_id serial_pci_tbl[] = {
 	 * AFAVLAB serial card, from Harald Welte <laforge@gnumonks.org>
 	 */
 	{	PCI_VENDOR_ID_AFAVLAB, PCI_DEVICE_ID_AFAVLAB_P028,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_b0_bt_8_115200 },
+	{	PCI_VENDOR_ID_AFAVLAB, PCI_DEVICE_ID_AFAVLAB_P030,
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
 		pbn_b0_bt_8_115200 },
 
