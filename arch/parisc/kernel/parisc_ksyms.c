@@ -72,6 +72,16 @@ EXPORT_SYMBOL(lstrncpy_from_user);
 EXPORT_SYMBOL(lclear_user);
 EXPORT_SYMBOL(lstrnlen_user);
 
+/* Global fixups */
+extern void fixup_get_user_skip_1(void);
+extern void fixup_get_user_skip_2(void);
+extern void fixup_put_user_skip_1(void);
+extern void fixup_put_user_skip_2(void);
+EXPORT_SYMBOL(fixup_get_user_skip_1);
+EXPORT_SYMBOL(fixup_get_user_skip_2);
+EXPORT_SYMBOL(fixup_put_user_skip_1);
+EXPORT_SYMBOL(fixup_put_user_skip_2);
+
 #ifndef __LP64__
 /* Needed so insmod can set dp value */
 extern int $global$;
