@@ -70,20 +70,24 @@ SECTIONS
 #if defined(CONFIG_IA64_GENERIC)
   /* Machine Vector */
   . = ALIGN(16);
-  machvec_start = .;
   .machvec : AT(ADDR(.machvec) - PAGE_OFFSET)
-	{ *(.machvec) }
-  machvec_end = .;
+	{
+	  machvec_start = .;
+	  *(.machvec)
+	  machvec_end = .;
+	}
 #endif
 
   /* Unwind info & table: */
   . = ALIGN(8);
   .IA_64.unwind_info : AT(ADDR(.IA_64.unwind_info) - PAGE_OFFSET)
 	{ *(.IA_64.unwind_info*) }
-  ia64_unw_start = .;
   .IA_64.unwind : AT(ADDR(.IA_64.unwind) - PAGE_OFFSET)
-	{ *(.IA_64.unwind*) }
-  ia64_unw_end = .;
+	{
+	  ia64_unw_start = .;
+	  *(.IA_64.unwind*)
+	  ia64_unw_end = .;
+	}
 
   RODATA
 
@@ -100,32 +104,38 @@ SECTIONS
   .init.data : AT(ADDR(.init.data) - PAGE_OFFSET)
 	{ *(.init.data) }
 
-  __initramfs_start = .;
   .init.ramfs : AT(ADDR(.init.ramfs) - PAGE_OFFSET)
-	{ *(.init.ramfs) }
-  __initramfs_end = .;
+	{
+	  __initramfs_start = .;
+	  *(.init.ramfs)
+	  __initramfs_end = .;
+	}
 
    . = ALIGN(16);
-  __setup_start = .;
   .init.setup : AT(ADDR(.init.setup) - PAGE_OFFSET)
-        { *(.init.setup) }
-  __setup_end = .;
-  __start___param = .;
+        {
+	  __setup_start = .;
+	  *(.init.setup)
+	  __setup_end = .;
+	}
   __param : AT(ADDR(__param) - PAGE_OFFSET)
-        { *(__param) }
-  __stop___param = .;
-  __initcall_start = .;
+        {
+	  __start___param = .;
+	  *(__param)
+	  __stop___param = .;
+	}
   .initcall.init : AT(ADDR(.initcall.init) - PAGE_OFFSET)
 	{
-		*(.initcall1.init)
-		*(.initcall2.init)
-		*(.initcall3.init)
-		*(.initcall4.init)
-		*(.initcall5.init)
-		*(.initcall6.init)
-		*(.initcall7.init)
+	  __initcall_start = .;
+	  *(.initcall1.init)
+	  *(.initcall2.init)
+	  *(.initcall3.init)
+	  *(.initcall4.init)
+	  *(.initcall5.init)
+	  *(.initcall6.init)
+	  *(.initcall7.init)
+	  __initcall_end = .;
 	}
-  __initcall_end = .;
   . = ALIGN(PAGE_SIZE);
   __init_end = .;
 
