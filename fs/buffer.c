@@ -1186,6 +1186,7 @@ int block_flushpage(struct page *page, unsigned long offset)
 
 	return 1;
 }
+EXPORT_SYMBOL(block_flushpage);
 
 /*
  * We attach and possibly dirty the buffers atomically wrt
