@@ -1734,7 +1734,7 @@ jffs_read_inode(struct inode *inode)
 		   the device should be read from the flash memory and then
 		   added to the inode's i_rdev member.  */
 		u16 val;
-		jffs_read_data(f, (char *)val, 0, 2);
+		jffs_read_data(f, (char *)&val, 0, 2);
 		init_special_inode(inode, inode->i_mode,
 			old_decode_dev(val));
 	}
