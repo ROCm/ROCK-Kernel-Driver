@@ -215,7 +215,6 @@ struct hc_driver {
 
 extern void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb, struct pt_regs *regs);
 extern void usb_bus_init (struct usb_bus *bus);
-extern int usb_rh_status_dequeue (struct usb_hcd *hcd, struct urb *urb);
 
 #ifdef CONFIG_PCI
 struct pci_dev;

@@ -568,18 +568,34 @@ static int rh_urb_enqueue (struct usb_hcd *hcd, struct urb *urb)
 
 /*-------------------------------------------------------------------------*/
 
-int usb_rh_status_dequeue (struct usb_hcd *hcd, struct urb *urb)
+static int usb_rh_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 {
 	unsigned long	flags;
 
 	/* note:  always a synchronous unlink */
-	del_timer_sync (&hcd->rh_timer);
-	hcd->rh_timer.data = 0;
+	if ((unsigned long) urb == hcd->rh_timer.data) {
+		del_timer_sync (&hcd->rh_timer);
+		hcd->rh_timer.data = 0;
 
-	local_irq_save (flags);
-	urb->hcpriv = NULL;
-	usb_hcd_giveback_urb (hcd, urb, NULL);
-	local_irq_restore (flags);
+		local_irq_save (flags);
+		urb->hcpriv = NULL;
+		usb_hcd_giveback_urb (hcd, urb, NULL);
+		local_irq_restore (flags);
+
+	} else if (usb_pipeendpoint(urb->pipe) == 0) {
+		spin_lock_irq(&urb->lock);	/* from usb_kill_urb */
+		++urb->reject;
+		spin_unlock_irq(&urb->lock);
+
+		wait_event(usb_kill_urb_queue,
+				atomic_read(&urb->use_count) == 0);
+
+		spin_lock_irq(&urb->lock);
+		--urb->reject;
+		spin_unlock_irq(&urb->lock);
+	} else
+		return -EINVAL;
+
 	return 0;
 }
 
@@ -1171,8 +1187,8 @@ unlink1 (struct usb_hcd *hcd, struct urb *urb)
 {
 	int		value;
 
-	if (urb == (struct urb *) hcd->rh_timer.data)
-		value = usb_rh_status_dequeue (hcd, urb);
+	if (urb->dev == hcd->self.root_hub)
+		value = usb_rh_urb_dequeue (hcd, urb);
 	else {
 
 		/* The only reason an HCD might fail this call is if
@@ -1260,7 +1276,7 @@ static int hcd_unlink_urb (struct urb *urb, int status)
 	 * never get completion IRQs ... maybe even the ones we need to
 	 * finish unlinking the initial failed usb_set_address().
 	 */
-	if (!hcd->saw_irq && hcd->rh_timer.data != (unsigned long) urb) {
+	if (!hcd->saw_irq && hcd->self.root_hub != urb->dev) {
 		dev_warn (hcd->self.controller, "Unlink after no-IRQ?  "
 			"Different ACPI or APIC settings may help."
 			"\n");
