@@ -43,6 +43,7 @@
 #include <linux/smp.h>
 #include <linux/module.h>
 #include <linux/device.h>
+#include <linux/cpufreq.h>
 
 #include <asm/io.h>
 #include <asm/smp.h>
@@ -603,6 +604,52 @@ static int time_init_device(void)
 
 device_initcall(time_init_device);
 
+
+#ifdef CONFIG_CPU_FREQ
+
+static int
+time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
+		       void *data)
+{
+	struct cpufreq_freqs *freq = data;
+	unsigned int i;
+
+	if (!cpu_has_tsc)
+		return 0;
+
+	switch (val) {
+	case CPUFREQ_PRECHANGE:
+		if ((freq->old < freq->new) &&
+		((freq->cpu == CPUFREQ_ALL_CPUS) || (freq->cpu == 0)))  {
+			cpu_khz = cpufreq_scale(cpu_khz, freq->old, freq->new);
+		        fast_gettimeoffset_quotient = cpufreq_scale(fast_gettimeoffset_quotient, freq->new, freq->old);
+		}
+		for (i=0; i<NR_CPUS; i++)
+			if ((freq->cpu == CPUFREQ_ALL_CPUS) || (freq->cpu == i))
+				cpu_data[i].loops_per_jiffy = cpufreq_scale(loops_per_jiffy, freq->old, freq->new);
+		break;
+
+	case CPUFREQ_POSTCHANGE:
+		if ((freq->new < freq->old) &&
+		((freq->cpu == CPUFREQ_ALL_CPUS) || (freq->cpu == 0)))  {
+			cpu_khz = cpufreq_scale(cpu_khz, freq->old, freq->new);
+		        fast_gettimeoffset_quotient = cpufreq_scale(fast_gettimeoffset_quotient, freq->new, freq->old);
+		}
+		for (i=0; i<NR_CPUS; i++)
+			if ((freq->cpu == CPUFREQ_ALL_CPUS) || (freq->cpu == i))
+				cpu_data[i].loops_per_jiffy = cpufreq_scale(loops_per_jiffy, freq->old, freq->new);
+		break;
+	}
+
+	return 0;
+}
+
+static struct notifier_block time_cpufreq_notifier_block = {
+	notifier_call:	time_cpufreq_notifier
+};
+#endif
+
+
 void __init time_init(void)
 {
 #ifdef CONFIG_X86_TSC
@@ -665,6 +712,9 @@ void __init time_init(void)
 	                	"0" (eax), "1" (edx));
 				printk("Detected %lu.%03lu MHz processor.\n", cpu_khz / 1000, cpu_khz % 1000);
 			}
+#ifdef CONFIG_CPU_FREQ
+			cpufreq_register_notifier(&time_cpufreq_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
+#endif
 		}
 	}
 #endif /* CONFIG_X86_TSC */
