@@ -507,7 +507,7 @@ isdn_status_callback(isdn_ctrl * c)
 				case 1:
 					list_for_each(l, &isdn_net_devs) {
 						isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
-						if (p->local.isdn_slot == i) {
+						if (p->isdn_slot == i) {
 							strcpy(cmd.parm.setup.eazmsn, p->local.msn);
 							isdn_slot_command(i, ISDN_CMD_ACCEPTD, &cmd);
 							retval = 1;

@@ -309,24 +309,16 @@ struct isdn_netif_ops {
 
 /* Local interface-data */
 typedef struct isdn_net_local_s {
-  spinlock_t             lock;
   ulong                  magic;
-  struct timer_list      dial_timer;   /* dial events timer                */
-  int                    dial_event;   /* event in case of timer expiry    */
+  spinlock_t             lock;
   struct net_device_stats stats;       /* Ethernet Statistics              */
-  struct timer_list      hup_timer;    /* auto hangup timer                */
-  int                    isdn_slot;    /* Index to isdn device/channel     */
   int			 ppp_slot;     /* PPPD device slot number          */
-  int                    pre_device;   /* Preselected isdn-device          */
-  int                    pre_channel;  /* Preselected isdn-channel         */
-  int                    exclusive;    /* -1 if non excl./idx to excl chan */
   int                    flags;        /* Connection-flags                 */
   int                    dialretry;    /* Counter for Dialout-retries      */
   int                    dialmax;      /* Max. Number of Dial-retries      */
   int                    cbdelay;      /* Delay before Callback starts     */
   char                   msn[ISDN_MSNLEN]; /* MSNs/EAZs for this interface */
   u_char                 cbhup;        /* Flag: Reject Call before Callback*/
-  u_char                 dialstate;    /* State for dialing                */
   u_char                 p_encap;      /* Packet encapsulation             */
                                        /*   0 = Ethernet over ISDN         */
 				       /*   1 = RAW-IP                     */
@@ -404,8 +396,20 @@ typedef struct isdn_net_local_s {
 
 /* the interface itself */
 typedef struct isdn_net_dev_s {
-  isdn_net_local local;
-  isdn_net_local *queue;               /* circular list of all bundled
+  isdn_net_local         local;
+
+  int                    isdn_slot;    /* Index to isdn device/channel     */
+  int                    pre_device;   /* Preselected isdn-device          */
+  int                    pre_channel;  /* Preselected isdn-channel         */
+  int                    exclusive;    /* -1 if non excl./idx to excl chan */
+
+  struct timer_list      dial_timer;   /* dial events timer                */
+  int                    dial_event;   /* event in case of timer expiry    */
+  int                    dialstate;    /* State for dialing                */
+  struct timer_list      hup_timer;    /* auto hangup timer                */
+
+
+  isdn_net_local         *queue;       /* circular list of all bundled
 					  channels, which are currently
 					  online                           */
   spinlock_t queue_lock;               /* lock to protect queue            */

@@ -765,6 +765,7 @@ static ssize_t
 isdn_ppp_write(struct file *file, const char *buf, size_t count, loff_t *off)
 {
 	isdn_net_local *lp;
+	isdn_net_dev *idev;
 	struct ippp_struct *is;
 	int proto;
 	unsigned char protobuf[4];
@@ -789,6 +790,7 @@ isdn_ppp_write(struct file *file, const char *buf, size_t count, loff_t *off)
 	if (!lp)
 		printk(KERN_DEBUG "isdn_ppp_write: lp == NULL\n");
 	else {
+		idev = lp->netdev;
 		/*
 		 * Don't reset huptimer for
 		 * LCP packets. (Echo requests).
@@ -801,13 +803,12 @@ isdn_ppp_write(struct file *file, const char *buf, size_t count, loff_t *off)
 		if (proto != PPP_LCP)
 			lp->huptimer = 0;
 
-		if (lp->isdn_slot < 0) {
+		if (idev->isdn_slot < 0) {
 			retval = 0;
 			goto out;
 		}
-		if ((dev->drv[isdn_slot_driver(lp->isdn_slot)]->flags & DRV_FLAG_RUNNING) &&
-		    lp->dialstate == 0 &&
-		    isdn_net_bound(lp)) {
+		if ((dev->drv[isdn_slot_driver(idev->isdn_slot)]->flags & DRV_FLAG_RUNNING) &&
+		    isdn_net_online(idev)) {
 			unsigned short hl;
 			struct sk_buff *skb;
 			/*
@@ -815,7 +816,7 @@ isdn_ppp_write(struct file *file, const char *buf, size_t count, loff_t *off)
 			 * sk_buff. old call to dev_alloc_skb only reserved
 			 * 16 bytes, now we are looking what the driver want
 			 */
-			hl = isdn_slot_hdrlen(lp->isdn_slot);
+			hl = isdn_slot_hdrlen(idev->isdn_slot);
 			skb = alloc_skb(hl+count, GFP_ATOMIC);
 			if (!skb) {
 				printk(KERN_WARNING "isdn_ppp_write: out of memory!\n");
@@ -1188,6 +1189,7 @@ int
 isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 {
 	isdn_net_local *lp,*mlp;
+	isdn_net_dev *idev;
 	isdn_net_dev *nd;
 	unsigned int proto = PPP_IP;     /* 0x21 */
 	struct ippp_struct *ipt,*ipts;
@@ -1231,7 +1233,7 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 		return 1;
 	}
 	/* we have our lp locked from now on */
-
+	idev = lp->netdev;
 	slot = lp->ppp_slot;
 	if (slot < 0 || slot > ISDN_MAX_CHANNELS) {
 		printk(KERN_ERR "isdn_ppp_xmit: lp->ppp_slot(%d)\n",
@@ -1265,7 +1267,7 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 		 * sk_buff. old call to dev_alloc_skb only reserved
 		 * 16 bytes, now we are looking what the driver want.
 		 */
-		hl = isdn_slot_hdrlen(lp->isdn_slot) + IPPP_MAX_HEADER;;
+		hl = isdn_slot_hdrlen(idev->isdn_slot) + IPPP_MAX_HEADER;;
 		/* 
 		 * Note: hl might still be insufficient because the method
 		 * above does not account for a possibible MPPP slave channel
@@ -1972,20 +1974,22 @@ int
 isdn_ppp_dial_slave(char *name)
 {
 #ifdef CONFIG_ISDN_MPP
-	isdn_net_dev *ndev;
+	isdn_net_dev *idev;
 	isdn_net_local *lp;
 	struct net_device *sdev;
 
-	if (!(ndev = isdn_net_findif(name)))
+	idev = isdn_net_findif(name);
+	if (!idev)
 		return 1;
-	lp = &ndev->local;
-	if (!isdn_net_bound(lp))
+
+	lp = &idev->local;
+	if (!isdn_net_bound(idev))
 		return 5;
 
 	sdev = lp->slave;
 	while (sdev) {
 		isdn_net_local *mlp = (isdn_net_local *) sdev->priv;
-		if (!isdn_net_bound(mlp))
+		if (!isdn_net_bound(mlp->netdev))
 			break;
 		sdev = mlp->slave;
 	}
@@ -2003,14 +2007,15 @@ int
 isdn_ppp_hangup_slave(char *name)
 {
 #ifdef CONFIG_ISDN_MPP
-	isdn_net_dev *ndev;
+	isdn_net_dev *idev;
 	isdn_net_local *lp, *mlp = NULL;
 	struct net_device *sdev;
 
-	if (!(ndev = isdn_net_findif(name)))
+	idev = isdn_net_findif(name);
+	if (!idev)
 		return 1;
-	lp = &ndev->local;
-	if (!isdn_net_bound(lp))
+	lp = &idev->local;
+	if (!isdn_net_bound(idev))
 		return 5;
 
 	sdev = lp->slave;
@@ -2020,9 +2025,9 @@ isdn_ppp_hangup_slave(char *name)
 		if (mlp->slave) { /* find last connected link in chain */
 			isdn_net_local *nlp = (isdn_net_local *) mlp->slave->priv;
 
-			if (!isdn_net_bound(nlp))
+			if (!isdn_net_bound(nlp->netdev))
 				break;
-		} else if (isdn_net_bound(mlp))
+		} else if (isdn_net_bound(mlp->netdev))
 			break;
 		
 		sdev = mlp->slave;
@@ -2094,9 +2099,10 @@ static void isdn_ppp_ccp_xmit_reset(struct ippp_struct *is, int proto,
 	int hl;
 	int cnt = 0;
 	isdn_net_local *lp = is->lp;
+	isdn_net_dev *idev = lp->netdev;
 
 	/* Alloc large enough skb */
-	hl = isdn_slot_hdrlen(lp->isdn_slot);
+	hl = isdn_slot_hdrlen(idev->isdn_slot);
 	skb = alloc_skb(len + hl + 16,GFP_ATOMIC);
 	if(!skb) {
 		printk(KERN_WARNING

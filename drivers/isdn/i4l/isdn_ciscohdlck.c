@@ -26,13 +26,14 @@
 static struct sk_buff*
 isdn_net_ciscohdlck_alloc_skb(isdn_net_local *lp, int len)
 {
-	unsigned short hl = isdn_slot_hdrlen(lp->isdn_slot);
+	isdn_net_dev *idev = lp->netdev;
+	unsigned short hl = isdn_slot_hdrlen(idev->isdn_slot);
 	struct sk_buff *skb;
 
 	skb = alloc_skb(hl + len, GFP_ATOMIC);
 	if (!skb) {
 		printk("isdn out of mem at %s:%d!\n", __FILE__, __LINE__);
-		return 0;
+		return NULL;
 	}
 	skb_reserve(skb, hl);
 	return skb;

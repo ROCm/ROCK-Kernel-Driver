@@ -201,6 +201,11 @@ register_isdn_netif(int encap, struct isdn_netif_ops *ops)
 	return 0;
 }
 
+int isdn_net_online(isdn_net_dev *idev)
+{
+	return idev->dialstate == ST_ACTIVE;
+}
+
 /* Prototypes */
 
 static int isdn_net_force_dial_lp(isdn_net_local *);
@@ -255,6 +260,7 @@ isdn_net_open(struct net_device *dev)
 static void
 isdn_net_unbind_channel(isdn_net_local * lp)
 {
+	isdn_net_dev *idev = lp->netdev;
 	ulong flags;
 
 	save_flags(flags);
@@ -272,13 +278,13 @@ isdn_net_unbind_channel(isdn_net_local * lp)
 		 */
 		qdisc_reset(lp->netdev->dev.qdisc);
 	}
-	lp->dialstate = ST_NULL;
-	if (lp->isdn_slot >= 0) {
-		isdn_slot_set_rx_netdev(lp->isdn_slot, NULL);
-		isdn_slot_set_st_netdev(lp->isdn_slot, NULL);
-		isdn_slot_free(lp->isdn_slot, ISDN_USAGE_NET);
+	idev->dialstate = ST_NULL;
+	if (idev->isdn_slot >= 0) {
+		isdn_slot_set_rx_netdev(idev->isdn_slot, NULL);
+		isdn_slot_set_st_netdev(idev->isdn_slot, NULL);
+		isdn_slot_free(idev->isdn_slot, ISDN_USAGE_NET);
 	}
-	lp->isdn_slot = -1;
+	idev->isdn_slot = -1;
 
 	restore_flags(flags);
 }
@@ -289,15 +295,16 @@ isdn_net_unbind_channel(isdn_net_local * lp)
 static int
 isdn_net_bind_channel(isdn_net_local *lp, int idx)
 {
+	isdn_net_dev *idev = lp->netdev;
 	int retval = 0;
 	unsigned long flags;
 
 	save_flags(flags);
 	cli();
 
-	lp->isdn_slot = idx;
-	isdn_slot_set_rx_netdev(lp->isdn_slot, lp->netdev);
-	isdn_slot_set_st_netdev(lp->isdn_slot, lp->netdev);
+	idev->isdn_slot = idx;
+	isdn_slot_set_rx_netdev(idev->isdn_slot, lp->netdev);
+	isdn_slot_set_st_netdev(idev->isdn_slot, lp->netdev);
 
 	if (lp->ops->bind)
 		retval = lp->ops->bind(lp);
@@ -321,9 +328,10 @@ isdn_net_bind_channel(isdn_net_local *lp, int idx)
 
 static void isdn_net_hup_timer(unsigned long data)
 {
-	isdn_net_local *lp = (isdn_net_local *) data;
+	isdn_net_dev *idev = (isdn_net_dev *) data;
+	isdn_net_local *lp = &idev->local;
 
-	if (!isdn_net_bound(lp) || lp->dialstate != ST_ACTIVE) {
+	if (!isdn_net_online(idev)) {
 		isdn_BUG();
 		return;
 	}
@@ -365,7 +373,7 @@ static void isdn_net_hup_timer(unsigned long data)
 		return;
 	}
  mod_timer:
-	mod_timer(&lp->hup_timer, lp->hup_timer.expires + HZ);
+	mod_timer(&idev->hup_timer, idev->hup_timer.expires + HZ);
 }
 
 static void isdn_net_lp_disconnected(isdn_net_local *lp)
@@ -377,9 +385,9 @@ static void isdn_net_connected(isdn_net_local *lp)
 {
 	isdn_net_dev *idev = lp->netdev;
 
-	lp->dialstate = ST_ACTIVE;
-	lp->hup_timer.expires = jiffies + HZ;
-	add_timer(&lp->hup_timer);
+	idev->dialstate = ST_ACTIVE;
+	idev->hup_timer.expires = jiffies + HZ;
+	add_timer(&idev->hup_timer);
 
 	if (lp->p_encap != ISDN_NET_ENCAP_SYNCPPP) {
 		if (lp->master) { /* is lp a slave? */
@@ -432,9 +440,9 @@ isdn_net_stat_callback(int idx, isdn_ctrl *c)
 static void
 isdn_net_dial_timer(unsigned long data)
 {
-	isdn_net_local *lp = (isdn_net_local *) data;
+	isdn_net_dev *idev = (isdn_net_dev *) data;
 
-	isdn_net_handle_event(lp, lp->dial_event, NULL);
+	isdn_net_handle_event(&idev->local, idev->dial_event, NULL);
 }
 
 /* Initiate dialout. Set phone-number-pointer to first number
@@ -462,6 +470,7 @@ init_dialout(isdn_net_local *lp)
 static void
 do_dialout(isdn_net_local *lp)
 {
+	isdn_net_dev *idev = lp->netdev;
 	int i;
 	unsigned long flags;
 	struct isdn_net_phone *phone;
@@ -514,7 +523,7 @@ do_dialout(isdn_net_local *lp)
 	/*
 	 * Switch to next number or back to start if at end of list.
 	 */
-	isdn_slot_dial(lp->isdn_slot, &dial);
+	isdn_slot_dial(idev->isdn_slot, &dial);
 
 	lp->huptimer = 0;
 	lp->outgoing = 1;
@@ -524,14 +533,14 @@ do_dialout(isdn_net_local *lp)
 		lp->charge_state = ST_CHARGE_NULL;
 
 	if (lp->cbdelay && (lp->flags & ISDN_NET_CBOUT)) {
-		lp->dial_timer.expires = jiffies + lp->cbdelay;
-		lp->dial_event = EV_NET_TIMER_CB;
+		idev->dial_timer.expires = jiffies + lp->cbdelay;
+		idev->dial_event = EV_NET_TIMER_CB;
 	} else {
-		lp->dial_timer.expires = jiffies + 10 * HZ;
-		lp->dial_event = EV_NET_TIMER_OUT_DCONN;
+		idev->dial_timer.expires = jiffies + 10 * HZ;
+		idev->dial_event = EV_NET_TIMER_OUT_DCONN;
 	}
-	lp->dialstate = ST_OUT_WAIT_DCONN;
-	add_timer(&lp->dial_timer);
+	idev->dialstate = ST_OUT_WAIT_DCONN;
+	add_timer(&idev->dial_timer);
 }
 
 /* For EV_NET_DIAL, returns 1 if timer callback is needed 
@@ -546,27 +555,21 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 
 	dbg_net_dial("%s: dialstate=%d pr=%#x\n", lp->name, lp->dialstate,pr);
 
-	switch (lp->dialstate) {
+	switch (idev->dialstate) {
 	case ST_ACTIVE:
 		switch (pr) {
 		case ISDN_STAT_BSENT:
 			/* A packet has successfully been sent out */
-			if (isdn_net_bound(lp)) {
-				isdn_net_dec_frame_cnt(lp);
-				lp->stats.tx_packets++;
-				lp->stats.tx_bytes += c->parm.length;
-				return 1;
-			}
-			break;
+			isdn_net_dec_frame_cnt(lp);
+			lp->stats.tx_packets++;
+			lp->stats.tx_bytes += c->parm.length;
+			return 1;
 		case ISDN_STAT_DHUP:
-			if (!isdn_net_bound(lp))
-				break;
-
 			if (lp->ops->disconnected)
 				lp->ops->disconnected(lp);
 
 			isdn_net_lp_disconnected(lp);
-			isdn_slot_all_eaz(lp->isdn_slot);
+			isdn_slot_all_eaz(idev->isdn_slot);
 			printk(KERN_INFO "%s: remote hangup\n", idev->name);
 			printk(KERN_INFO "%s: Chargesum is %d\n", idev->name,
 			       lp->charge);
@@ -608,16 +611,16 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			return 1;
 		case ISDN_STAT_DCONN:
 			/* Got D-Channel-Connect, send B-Channel-request */
-			del_timer(&lp->dial_timer);
-			lp->dialstate = ST_OUT_WAIT_BCONN;
-			isdn_slot_command(lp->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
-			lp->dial_timer.expires = jiffies + 10 * HZ;
-			lp->dial_event = EV_NET_TIMER_OUT_BCONN;
-			add_timer(&lp->dial_timer);
+			del_timer(&idev->dial_timer);
+			idev->dialstate = ST_OUT_WAIT_BCONN;
+			isdn_slot_command(idev->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
+			idev->dial_timer.expires = jiffies + 10 * HZ;
+			idev->dial_event = EV_NET_TIMER_OUT_BCONN;
+			add_timer(&idev->dial_timer);
 			return 1;
 		case ISDN_STAT_DHUP:
-			del_timer(&lp->dial_timer);
-			isdn_slot_all_eaz(lp->isdn_slot);
+			del_timer(&idev->dial_timer);
+			isdn_slot_all_eaz(idev->isdn_slot);
 			printk(KERN_INFO "%s: remote hangup\n", idev->name);
 			isdn_net_unbind_channel(lp);
 			return 1;
@@ -630,13 +633,13 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			do_dialout(lp);
 			return 1;
 		case ISDN_STAT_BCONN:
-			del_timer(&lp->dial_timer);
-			isdn_slot_set_usage(lp->isdn_slot, isdn_slot_usage(lp->isdn_slot) | ISDN_USAGE_OUTGOING);
+			del_timer(&idev->dial_timer);
+			isdn_slot_set_usage(idev->isdn_slot, isdn_slot_usage(idev->isdn_slot) | ISDN_USAGE_OUTGOING);
 			isdn_net_connected(lp);
 			return 1;
 		case ISDN_STAT_DHUP:
-			del_timer(&lp->dial_timer);
-			isdn_slot_all_eaz(lp->isdn_slot);
+			del_timer(&idev->dial_timer);
+			isdn_slot_all_eaz(idev->isdn_slot);
 			printk(KERN_INFO "%s: remote hangup\n", idev->name);
 			isdn_net_unbind_channel(lp);
 			return 1;
@@ -648,16 +651,16 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			isdn_net_hangup(lp);
 			return 1;
 		case ISDN_STAT_DCONN:
-			del_timer(&lp->dial_timer);
-			lp->dialstate = ST_IN_WAIT_BCONN;
-			isdn_slot_command(lp->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
-			lp->dial_timer.expires = jiffies + 10 * HZ;
-			lp->dial_event = EV_NET_TIMER_IN_BCONN;
-			add_timer(&lp->dial_timer);
+			del_timer(&idev->dial_timer);
+			idev->dialstate = ST_IN_WAIT_BCONN;
+			isdn_slot_command(idev->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
+			idev->dial_timer.expires = jiffies + 10 * HZ;
+			idev->dial_event = EV_NET_TIMER_IN_BCONN;
+			add_timer(&idev->dial_timer);
 			return 1;
 		case ISDN_STAT_DHUP:
-			del_timer(&lp->dial_timer);
-			isdn_slot_all_eaz(lp->isdn_slot);
+			del_timer(&idev->dial_timer);
+			isdn_slot_all_eaz(idev->isdn_slot);
 			printk(KERN_INFO "%s: remote hangup\n", idev->name);
 			isdn_net_unbind_channel(lp);
 			return 1;
@@ -669,13 +672,13 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			isdn_net_hangup(lp);
 			break;
 		case ISDN_STAT_BCONN:
-			del_timer(&lp->dial_timer);
-			isdn_slot_set_rx_netdev(lp->isdn_slot, idev);
+			del_timer(&idev->dial_timer);
+			isdn_slot_set_rx_netdev(idev->isdn_slot, idev);
 			isdn_net_connected(lp);
 			return 1;
 		case ISDN_STAT_DHUP:
-			del_timer(&lp->dial_timer);
-			isdn_slot_all_eaz(lp->isdn_slot);
+			del_timer(&idev->dial_timer);
+			isdn_slot_all_eaz(idev->isdn_slot);
 			printk(KERN_INFO "%s: remote hangup\n", idev->name);
 			isdn_net_unbind_channel(lp);
 			return 1;
@@ -706,28 +709,30 @@ isdn_net_hangup(isdn_net_local *lp)
 	isdn_net_dev *idev = lp->netdev;
 	isdn_ctrl cmd;
 
-	del_timer_sync(&lp->hup_timer);
-	if (isdn_net_bound(lp)) {
-		if (lp->slave != NULL) {
-			isdn_net_local *slp = (isdn_net_local *)lp->slave->priv;
-			isdn_net_dev *sidev = slp->netdev;
-			if (isdn_net_bound(slp)) {
-				printk(KERN_INFO
-					"isdn_net: hang up slave %s before %s\n",
-					sidev->name, idev->name);
-				isdn_net_hangup(slp);
-			}
+	del_timer_sync(&idev->hup_timer);
+	if (!isdn_net_bound(idev))
+		return;
+
+	// FIXME ugly and recursive
+	if (lp->slave != NULL) {
+		isdn_net_local *slp = (isdn_net_local *)lp->slave->priv;
+		isdn_net_dev *sidev = slp->netdev;
+		if (isdn_net_bound(sidev)) {
+			printk(KERN_INFO
+			       "isdn_net: hang up slave %s before %s\n",
+			       sidev->name, idev->name);
+			isdn_net_hangup(slp);
 		}
-		printk(KERN_INFO "isdn_net: local hangup %s\n", idev->name);
-		if (lp->ops->disconnected)
-			lp->ops->disconnected(lp);
-
-		isdn_net_lp_disconnected(lp);
-
-		isdn_slot_command(lp->isdn_slot, ISDN_CMD_HANGUP, &cmd);
-		printk(KERN_INFO "%s: Chargesum is %d\n", idev->name, lp->charge);
-		isdn_slot_all_eaz(lp->isdn_slot);
 	}
+	printk(KERN_INFO "isdn_net: local hangup %s\n", idev->name);
+	if (lp->ops->disconnected)
+		lp->ops->disconnected(lp);
+	
+	isdn_net_lp_disconnected(lp);
+	
+	isdn_slot_command(idev->isdn_slot, ISDN_CMD_HANGUP, &cmd);
+	printk(KERN_INFO "%s: Chargesum is %d\n", idev->name, lp->charge);
+	isdn_slot_all_eaz(idev->isdn_slot);
 	isdn_net_unbind_channel(lp);
 }
 
@@ -894,11 +899,11 @@ void isdn_net_writebuf_skb(isdn_net_local *lp, struct sk_buff *skb)
 		goto error;
 	}
 
-	if (!isdn_net_bound(lp)) {
+	if (!isdn_net_online(idev)) {
 		isdn_BUG();
 		goto error;
 	}
-	ret = isdn_slot_write(lp->isdn_slot, skb);
+	ret = isdn_slot_write(idev->isdn_slot, skb);
 	if (ret != len) {
 		/* we should never get here */
 		printk(KERN_WARNING "%s: HL driver queue full\n", idev->name);
@@ -980,7 +985,7 @@ isdn_net_xmit(struct net_device *ndev, struct sk_buff *skb)
 				/* subsequent overload: if slavedelay exceeded, start dialing */
 				if (time_after(jiffies, lp->sqfull_stamp + lp->slavedelay)) {
 					slp = lp->slave->priv;
-					if (!isdn_net_bound(slp)) {
+					if (!isdn_net_bound(slp->netdev)) {
 						isdn_net_force_dial_lp((isdn_net_local *) lp->slave->priv);
 					}
 				}
@@ -1017,28 +1022,11 @@ isdn_net_adjust_hdr(struct sk_buff *skb, struct net_device *dev)
 void isdn_net_tx_timeout(struct net_device * ndev)
 {
 	isdn_net_local *lp = ndev->priv;
+	isdn_net_dev *idev = lp->netdev;
 
-	printk(KERN_WARNING "isdn_tx_timeout dev %s dialstate %d\n", ndev->name, lp->dialstate);
-	if (lp->dialstate == ST_ACTIVE){
-		lp->stats.tx_errors++;
-                /*
-		 * There is a certain probability that this currently
-		 * works at all because if we always wake up the interface,
-		 * then upper layer will try to send the next packet
-		 * immediately. And then, the old clean_up logic in the
-		 * driver will hopefully continue to work as it used to do.
-		 *
-		 * This is rather primitive right know, we better should
-		 * clean internal queues here, in particular for multilink and
-		 * ppp, and reset HL driver's channel, too.   --HE
-		 *
-		 * actually, this may not matter at all, because ISDN hardware
-		 * should not see transmitter hangs at all IMO
-		 * changed KERN_DEBUG to KERN_WARNING to find out if this is 
-		 * ever called   --KG
-		 */
-	}
-	ndev->trans_start = jiffies;
+	printk(KERN_WARNING "isdn_tx_timeout dev %s %d\n",
+	       ndev->name, idev->dialstate);
+
 	netif_wake_queue(ndev);
 }
 
@@ -1087,6 +1075,7 @@ static int
 isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
 	isdn_net_local *lp = ndev->priv;
+	isdn_net_dev *idev = lp->netdev;
 	int retval;
 
 	if (lp->p_encap == ISDN_NET_ENCAP_X25IFACE)
@@ -1096,13 +1085,13 @@ isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	isdn_net_adjust_hdr(skb, ndev);
 	isdn_dumppkt("S:", skb->data, skb->len, 40);
 	
-	if (!isdn_net_bound(lp))
+	if (!isdn_net_bound(idev))
 		return isdn_net_autodial(skb, ndev);
 
 	/* Device is bound to an ISDN channel */ 
 	ndev->trans_start = jiffies;
 
-	if (lp->dialstate != ST_ACTIVE) {
+	if (idev->dialstate != ST_ACTIVE) {
 		netif_stop_queue(ndev);
 		return 1;
 	}
@@ -1184,16 +1173,15 @@ isdn_net_receive(struct net_device *ndev, struct sk_buff *skb)
 int
 isdn_net_rcv_skb(int idx, struct sk_buff *skb)
 {
-	isdn_net_dev *p = isdn_slot_rx_netdev(idx);
+	isdn_net_dev *idev = isdn_slot_rx_netdev(idx);
 
-	if (p) {
-		isdn_net_local *lp = &p->local;
-		if (isdn_net_bound(lp) &&
-		    lp->dialstate == ST_ACTIVE) {
-			isdn_net_receive(&p->dev, skb);
-			return 1;
-		}
-	}
+	if (!idev)
+		return 0;
+
+	if (!isdn_net_online(idev))
+		return 0;
+
+	isdn_net_receive(&idev->dev, skb);
 	return 0;
 }
 
@@ -1235,7 +1223,7 @@ isdn_net_do_callback(isdn_net_local *lp)
 	
 	/* Grab a free ISDN-Channel */
 	slot = isdn_get_free_slot(ISDN_USAGE_NET, lp->l2_proto, lp->l3_proto,
-				  lp->pre_device, lp->pre_channel, lp->msn);
+				  idev->pre_device, idev->pre_channel, lp->msn);
 	if (slot < 0)
 		goto err;
 
@@ -1243,10 +1231,10 @@ isdn_net_do_callback(isdn_net_local *lp)
 		goto err;
 
 	/* Setup dialstate. */
-	lp->dial_timer.expires = jiffies + lp->cbdelay;
-	lp->dial_event = EV_NET_TIMER_CB;
-	add_timer(&lp->dial_timer);
-	lp->dialstate = ST_WAIT_BEFORE_CB;
+	idev->dial_timer.expires = jiffies + lp->cbdelay;
+	idev->dial_event = EV_NET_TIMER_CB;
+	add_timer(&idev->dial_timer);
+	idev->dialstate = ST_WAIT_BEFORE_CB;
 
 	/* Initiate dialing by returning 2 or 4 */
 	return (lp->flags & ISDN_NET_CBHUP) ? 2 : 4;
@@ -1347,7 +1335,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 			continue;
 		}
 
-		if (isdn_net_bound(lp))
+		if (isdn_net_bound(idev))
 			continue;
 		
 		if (!USG_NONE(isdn_slot_usage(idx)))
@@ -1357,7 +1345,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 			      lp->pre_device, lp->pre_channel);
 
 		if (isdn_slot_usage(idx) & ISDN_USAGE_EXCLUSIVE &&
-		    (lp->pre_channel != ch || lp->pre_device != di)) {
+		    (idev->pre_channel != ch || idev->pre_device != di)) {
 			dbg_net_icall("n_fi: excl check failed\n");
 			continue;
 		}
@@ -1405,7 +1393,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 			isdn_net_local *mlp = (isdn_net_local *) lp->master->priv;
 			printk(KERN_DEBUG "ICALLslv: %s\n", idev->name);
 			printk(KERN_DEBUG "master=%s\n", mlp->netdev->name);
-			if (isdn_net_bound(mlp)) {
+			if (isdn_net_bound(mlp->netdev)) {
 				printk(KERN_DEBUG "master online\n");
 				/* Master is online, find parent-slave (master if first slave) */
 				while (mlp->slave) {
@@ -1416,8 +1404,8 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 			} else
 				printk(KERN_DEBUG "master offline\n");
 			/* Found parent, if it's offline iterate next device */
-			printk(KERN_DEBUG "mlpf: %d\n", isdn_net_bound(mlp));
-			if (!isdn_net_bound(mlp)) {
+			printk(KERN_DEBUG "mlpf: %d\n", isdn_net_bound(mlp->netdev));
+			if (!isdn_net_bound(mlp->netdev)) {
 				continue;
 			}
 		} 
@@ -1441,14 +1429,14 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 		 * then wait for D-Channel-connect
 		 */
 		cmd.arg = lp->l2_proto << 8;
-		isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL2, &cmd);
+		isdn_slot_command(idev->isdn_slot, ISDN_CMD_SETL2, &cmd);
 		cmd.arg = lp->l3_proto << 8;
-		isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL3, &cmd);
+		isdn_slot_command(idev->isdn_slot, ISDN_CMD_SETL3, &cmd);
 		
-		lp->dial_timer.expires = jiffies + 15 * HZ;
-		lp->dial_event = EV_NET_TIMER_IN_DCONN;
-		add_timer(&lp->dial_timer);
-		lp->dialstate = ST_IN_WAIT_DCONN;
+		idev->dial_timer.expires = jiffies + 15 * HZ;
+		idev->dial_event = EV_NET_TIMER_IN_DCONN;
+		add_timer(&idev->dial_timer);
+		idev->dialstate = ST_IN_WAIT_DCONN;
 		
 		restore_flags(flags);
 		return 1;
@@ -1483,21 +1471,22 @@ isdn_net_findif(char *name)
 static int
 isdn_net_force_dial_lp(isdn_net_local *lp)
 {
+	isdn_net_dev *idev = lp->netdev;
 	int slot;
 	unsigned long flags;
 
-	if (isdn_net_bound(lp) || lp->dialstate != ST_NULL)
+	if (isdn_net_bound(idev))
 		return -EBUSY;
 
 	save_flags(flags);
 	cli();
 
-	if (lp->exclusive >= 0)
-		slot = lp->exclusive;
+	if (idev->exclusive >= 0)
+		slot = idev->exclusive;
 	else
 		slot = isdn_get_free_slot(ISDN_USAGE_NET, lp->l2_proto,
-					  lp->l3_proto, lp->pre_device, 
-					  lp->pre_channel, lp->msn);
+					  lp->l3_proto, idev->pre_device, 
+					  idev->pre_channel, lp->msn);
 	if (slot < 0)
 		goto err;
 
@@ -1606,10 +1595,10 @@ isdn_net_new(char *name, struct net_device *master)
 	netdev->local.tqueue.data = &netdev->local;
 	spin_lock_init(&netdev->local.xmit_lock);
 
-	netdev->local.isdn_slot = -1;
-	netdev->local.pre_device = -1;
-	netdev->local.pre_channel = -1;
-	netdev->local.exclusive = -1;
+	netdev->isdn_slot = -1;
+	netdev->pre_device = -1;
+	netdev->pre_channel = -1;
+	netdev->exclusive = -1;
 	netdev->local.ppp_slot = -1;
 	netdev->local.pppbind = -1;
 	netdev->local.p_encap = -1;
@@ -1629,12 +1618,12 @@ isdn_net_new(char *name, struct net_device *master)
 	netdev->local.dialstarted = 0;   /* Jiffies of last dial-start */
 	netdev->local.dialwait_timer = 0;  /* Jiffies of earliest next dial-start */
 
-	init_timer(&netdev->local.dial_timer);
-	netdev->local.dial_timer.data = (unsigned long) &netdev->local;
-	netdev->local.dial_timer.function = isdn_net_dial_timer;
-	init_timer(&netdev->local.hup_timer);
-	netdev->local.hup_timer.data = (unsigned long) &netdev->local;
-	netdev->local.hup_timer.function = isdn_net_hup_timer;
+	init_timer(&netdev->dial_timer);
+	netdev->dial_timer.data = (unsigned long) netdev;
+	netdev->dial_timer.function = isdn_net_dial_timer;
+	init_timer(&netdev->hup_timer);
+	netdev->hup_timer.data = (unsigned long) netdev;
+	netdev->hup_timer.function = isdn_net_hup_timer;
 	spin_lock_init(&netdev->local.lock);
 	INIT_LIST_HEAD(&netdev->local.phone[0]);
 	INIT_LIST_HEAD(&netdev->local.phone[1]);
@@ -1714,9 +1703,9 @@ isdn_net_set_encap(isdn_net_dev *p, int encap)
 }
 
 static int
-isdn_net_bind(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg)
+isdn_net_bind(isdn_net_dev *idev, isdn_net_ioctl_cfg *cfg)
 {
-	isdn_net_local *lp = &p->local;
+	isdn_net_local *lp = &idev->local;
 	int i, retval;
 	int drvidx = -1;
 	int chidx = -1;
@@ -1754,31 +1743,31 @@ isdn_net_bind(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg)
 			goto out;
 		}
 	}
-	if (cfg->exclusive == (lp->exclusive >= 0) &&
-	    drvidx == lp->pre_device && chidx == lp->pre_channel) {
+	if (cfg->exclusive == (idev->exclusive >= 0) &&
+	    drvidx == idev->pre_device && chidx == idev->pre_channel) {
 		/* no change */
 		retval = 0;
 		goto out;
 	}
-	if (lp->exclusive >= 0) {
-		isdn_unexclusive_channel(lp->pre_device, lp->pre_channel);
-		isdn_free_channel(lp->pre_device, lp->pre_channel, ISDN_USAGE_NET);
-		lp->exclusive = -1;
+	if (idev->exclusive >= 0) {
+		isdn_unexclusive_channel(idev->pre_device, idev->pre_channel);
+		isdn_free_channel(idev->pre_device, idev->pre_channel, ISDN_USAGE_NET);
+		idev->exclusive = -1;
 	}
 	if (cfg->exclusive) {
 		/* If binding is exclusive, try to grab the channel */
-		lp->exclusive = isdn_get_free_slot(ISDN_USAGE_NET, lp->l2_proto, 
-						   lp->l3_proto, drvidx, chidx, cfg->eaz);
-		if (lp->exclusive < 0) {
+		idev->exclusive = isdn_get_free_slot(ISDN_USAGE_NET, lp->l2_proto, 
+						     lp->l3_proto, drvidx, chidx, cfg->eaz);
+		if (idev->exclusive < 0) {
 			/* Grab failed, because desired channel is in use */
 			retval = -EBUSY;
 			goto out;
 		}
 		/* All went ok, so update isdninfo */
-		isdn_slot_set_usage(lp->exclusive, ISDN_USAGE_EXCLUSIVE);
+		isdn_slot_set_usage(idev->exclusive, ISDN_USAGE_EXCLUSIVE);
 	}
-	lp->pre_device = drvidx;
-	lp->pre_channel = chidx;
+	idev->pre_device = drvidx;
+	idev->pre_channel = chidx;
 	retval = 0;
  out:
 	return retval;
@@ -1895,17 +1884,17 @@ isdn_net_setcfg(isdn_net_ioctl_cfg *cfg)
 int
 isdn_net_getcfg(isdn_net_ioctl_cfg * cfg)
 {
-	isdn_net_dev *p = isdn_net_findif(cfg->name);
-	isdn_net_local *lp = &p->local;
+	isdn_net_dev *idev = isdn_net_findif(cfg->name);
+	isdn_net_local *lp = &idev->local;
 		
-	if (!p)
+	if (!idev)
 		return -ENODEV;
 
 	strcpy(cfg->eaz, lp->msn);
-	cfg->exclusive = lp->exclusive >= 0;
-	if (lp->pre_device >= 0) {
-		sprintf(cfg->drvid, "%s,%d", dev->drvid[lp->pre_device],
-			lp->pre_channel);
+	cfg->exclusive = idev->exclusive >= 0;
+	if (idev->pre_device >= 0) {
+		sprintf(cfg->drvid, "%s,%d", dev->drvid[idev->pre_device],
+			idev->pre_channel);
 	} else
 		cfg->drvid[0] = '\0';
 	cfg->onhtime = lp->onhtime;
@@ -2027,7 +2016,7 @@ isdn_net_getpeer(isdn_net_ioctl_phone *phone, isdn_net_ioctl_phone *peer)
          * in (partially) wrong number copied to user. This race
 	 * currently ignored.
 	 */
-	idx = p->local.isdn_slot;
+	idx = p->isdn_slot;
 	if (idx<0) return -ENOTCONN;
 	/* for pre-bound channels, we need this extra check */
 	if (strncmp(isdn_slot_num(idx),"???",3) == 0 ) return -ENOTCONN;
@@ -2093,22 +2082,23 @@ isdn_net_rmallphone(isdn_net_dev * p)
 int
 isdn_net_force_hangup(char *name)
 {
-	isdn_net_dev *p = isdn_net_findif(name);
+	isdn_net_dev *idev = isdn_net_findif(name);
 	struct net_device *q;
 
-	if (p) {
-		if (p->local.isdn_slot < 0)
-			return 1;
-		q = p->local.slave;
-		/* If this interface has slaves, do a hangup for them also. */
-		while (q) {
-			isdn_net_hangup(&p->local);
-			q = (((isdn_net_local *) q->priv)->slave);
-		}
-		isdn_net_hangup(&p->local);
-		return 0;
+	if (!idev)
+		return -ENODEV;
+
+	if (idev->isdn_slot < 0)
+		return -ENOTCONN;
+
+	q = idev->local.slave;
+	/* If this interface has slaves, do a hangup for them also. */
+	while (q) {
+		isdn_net_hangup((isdn_net_local *) q->priv);
+		q = (((isdn_net_local *) q->priv)->slave);
 	}
-	return -ENODEV;
+	isdn_net_hangup(&idev->local);
+	return 0;
 }
 
 /*
@@ -2130,8 +2120,8 @@ isdn_net_realrm(isdn_net_dev *p)
 	/* Free all phone-entries */
 	isdn_net_rmallphone(p);
 	/* If interface is bound exclusive, free channel-usage */
-	if (p->local.exclusive >= 0)
-		isdn_unexclusive_channel(p->local.pre_device, p->local.pre_channel);
+	if (p->exclusive >= 0)
+		isdn_unexclusive_channel(p->pre_device, p->pre_channel);
 	if (p->local.master) {
 		/* It's a slave-device, so update master's slave-pointer if necessary */
 		if (((isdn_net_local *) (p->local.master->priv))->slave == &p->dev)

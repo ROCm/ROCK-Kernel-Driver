@@ -55,6 +55,7 @@ extern int isdn_net_rcv_skb(int, struct sk_buff *);
 extern int isdn_net_dial_req(isdn_net_local *);
 extern void isdn_net_writebuf_skb(isdn_net_local *lp, struct sk_buff *skb);
 extern void isdn_net_write_super(isdn_net_local *lp, struct sk_buff *skb);
+extern int isdn_net_online(isdn_net_dev *idev);
 
 static inline void
 isdn_net_reset_huptimer(isdn_net_local *lp, isdn_net_local *olp)
@@ -159,9 +160,9 @@ static inline void isdn_net_device_wake_queue(isdn_net_local *lp)
 		netif_wake_queue(&lp->netdev->dev);
 }
 
-static inline int isdn_net_bound(isdn_net_local *lp)
+static inline int isdn_net_bound(isdn_net_dev *idev)
 {
-	return lp->isdn_slot >= 0;
+	return idev->isdn_slot >= 0;
 }
 
 static inline int
