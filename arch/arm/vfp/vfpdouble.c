@@ -427,12 +427,12 @@ static u32 vfp_double_fcmpe(int dd, int unused, int dm, u32 fpscr)
 
 static u32 vfp_double_fcmpz(int dd, int unused, int dm, u32 fpscr)
 {
-	return vfp_compare(dd, 0, -1, fpscr);
+	return vfp_compare(dd, 0, VFP_REG_ZERO, fpscr);
 }
 
 static u32 vfp_double_fcmpez(int dd, int unused, int dm, u32 fpscr)
 {
-	return vfp_compare(dd, 1, -1, fpscr);
+	return vfp_compare(dd, 1, VFP_REG_ZERO, fpscr);
 }
 
 static u32 vfp_double_fcvts(int sd, int unused, int dm, u32 fpscr)
