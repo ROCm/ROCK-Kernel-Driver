@@ -791,8 +791,7 @@ sn_pci_init (void)
 	struct list_head *ln;
 	struct pci_bus *pci_bus = NULL;
 	struct pci_dev *pci_dev = NULL;
-	extern int numnodes;
-	int cnode, ret;
+	int ret;
 #ifdef CONFIG_PROC_FS
 	extern void register_sn_procfs(void);
 #endif
