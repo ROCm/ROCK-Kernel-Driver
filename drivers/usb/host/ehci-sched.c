@@ -578,7 +578,7 @@ iso_stream_put(struct ehci_hcd *ehci, struct ehci_iso_stream *stream)
 			itd = list_entry (stream->free_itd_list.next,
 				struct ehci_itd, itd_list);
 			list_del (&itd->itd_list);
-			pci_pool_free (ehci->itd_pool, itd, itd->itd_dma);
+			dma_pool_free (ehci->itd_pool, itd, itd->itd_dma);
 		}
 
 		is_in = (stream->bEndpointAddress & USB_DIR_IN) ? 0x10 : 0;
@@ -760,7 +760,7 @@ itd_urb_transaction (
 			list_del (&itd->itd_list);
 			itd_dma = itd->itd_dma;
 		} else
-			itd = pci_pool_alloc (ehci->itd_pool, mem_flags,
+			itd = dma_pool_alloc (ehci->itd_pool, mem_flags,
 					&itd_dma);
 
 		if (unlikely (0 == itd)) {

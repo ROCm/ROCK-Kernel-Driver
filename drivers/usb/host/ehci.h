@@ -74,11 +74,11 @@ struct ehci_hcd {			/* one per controller */
 	struct ehci_regs	*regs;
 	u32			hcs_params;	/* cached register copy */
 
-	/* per-HC memory pools (could be per-PCI-bus, but ...) */
-	struct pci_pool		*qh_pool;	/* qh per active urb */
-	struct pci_pool		*qtd_pool;	/* one or more per qh */
-	struct pci_pool		*itd_pool;	/* itd per iso urb */
-	struct pci_pool		*sitd_pool;	/* sitd per split iso urb */
+	/* per-HC memory pools (could be per-bus, but ...) */
+	struct dma_pool		*qh_pool;	/* qh per active urb */
+	struct dma_pool		*qtd_pool;	/* one or more per qh */
+	struct dma_pool		*itd_pool;	/* itd per iso urb */
+	struct dma_pool		*sitd_pool;	/* sitd per split iso urb */
 
 	struct timer_list	watchdog;
 	struct notifier_block	reboot_notifier;

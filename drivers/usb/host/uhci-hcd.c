@@ -41,6 +41,8 @@
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
 #include <linux/proc_fs.h>
+#include <linux/dmapool.h>
+#include <linux/dma-mapping.h>
 #ifdef CONFIG_USB_DEBUG
 #define DEBUG
 #else
@@ -140,7 +142,7 @@ static struct uhci_td *uhci_alloc_td(struct uhci_hcd *uhci, struct usb_device *d
 	dma_addr_t dma_handle;
 	struct uhci_td *td;
 
-	td = pci_pool_alloc(uhci->td_pool, GFP_ATOMIC, &dma_handle);
+	td = dma_pool_alloc(uhci->td_pool, GFP_ATOMIC, &dma_handle);
 	if (!td)
 		return NULL;
 
@@ -292,7 +294,7 @@ static void uhci_free_td(struct uhci_hcd *uhci, struct uhci_td *td)
 	if (td->dev)
 		usb_put_dev(td->dev);
 
-	pci_pool_free(uhci->td_pool, td, td->dma_handle);
+	dma_pool_free(uhci->td_pool, td, td->dma_handle);
 }
 
 static struct uhci_qh *uhci_alloc_qh(struct uhci_hcd *uhci, struct usb_device *dev)
@@ -300,7 +302,7 @@ static struct uhci_qh *uhci_alloc_qh(struct uhci_hcd *uhci, struct usb_device *d
 	dma_addr_t dma_handle;
 	struct uhci_qh *qh;
 
-	qh = pci_pool_alloc(uhci->qh_pool, GFP_ATOMIC, &dma_handle);
+	qh = dma_pool_alloc(uhci->qh_pool, GFP_ATOMIC, &dma_handle);
 	if (!qh)
 		return NULL;
 
@@ -330,7 +332,7 @@ static void uhci_free_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
 	if (qh->dev)
 		usb_put_dev(qh->dev);
 
-	pci_pool_free(uhci->qh_pool, qh, qh->dma_handle);
+	dma_pool_free(uhci->qh_pool, qh, qh->dma_handle);
 }
 
 /*
@@ -2013,7 +2015,8 @@ static int suspend_allowed(struct uhci_hcd *uhci)
 	unsigned int io_addr = uhci->io_addr;
 	int i;
 
-	if (!uhci->hcd.pdev || uhci->hcd.pdev->vendor != PCI_VENDOR_ID_INTEL)
+	if (!uhci->hcd.self.controller || 
+		to_pci_dev(uhci->hcd.self.controller)->vendor != PCI_VENDOR_ID_INTEL)
 		return 1;
 
 	/* Some of Intel's USB controllers have a bug that causes false
@@ -2127,17 +2130,17 @@ static void release_uhci(struct uhci_hcd *uhci)
 	}
 
 	if (uhci->qh_pool) {
-		pci_pool_destroy(uhci->qh_pool);
+		dma_pool_destroy(uhci->qh_pool);
 		uhci->qh_pool = NULL;
 	}
 
 	if (uhci->td_pool) {
-		pci_pool_destroy(uhci->td_pool);
+		dma_pool_destroy(uhci->td_pool);
 		uhci->td_pool = NULL;
 	}
 
 	if (uhci->fl) {
-		pci_free_consistent(uhci->hcd.pdev, sizeof(*uhci->fl), uhci->fl, uhci->fl->dma_handle);
+		dma_free_coherent(uhci->hcd.self.controller, sizeof(*uhci->fl), uhci->fl, uhci->fl->dma_handle);
 		uhci->fl = NULL;
 	}
 
@@ -2162,7 +2165,7 @@ static int uhci_reset(struct usb_hcd *hcd)
 	 * interrupts from any previous setup.
 	 */
 	reset_hc(uhci);
-	pci_write_config_word(hcd->pdev, USBLEGSUP, USBLEGSUP_DEFAULT);
+	pci_write_config_word(to_pci_dev(hcd->self.controller), USBLEGSUP, USBLEGSUP_DEFAULT);
 	return 0;
 }
 
@@ -2194,7 +2197,7 @@ static int uhci_start(struct usb_hcd *hcd)
 	struct proc_dir_entry *ent;
 #endif
 
-	io_size = pci_resource_len(hcd->pdev, hcd->region);
+	io_size = pci_resource_len(to_pci_dev(hcd->self.controller), hcd->region);
 
 #ifdef CONFIG_PROC_FS
 	ent = create_proc_entry(hcd->self.bus_name, S_IFREG|S_IRUGO|S_IWUSR, uhci_proc_root);
@@ -2230,7 +2233,8 @@ static int uhci_start(struct usb_hcd *hcd)
 
 	spin_lock_init(&uhci->frame_list_lock);
 
-	uhci->fl = pci_alloc_consistent(hcd->pdev, sizeof(*uhci->fl), &dma_handle);
+	uhci->fl = dma_alloc_coherent(hcd->self.controller, 
+			sizeof(*uhci->fl), &dma_handle, 0);
 	if (!uhci->fl) {
 		err("unable to allocate consistent memory for frame list");
 		goto err_alloc_fl;
@@ -2240,17 +2244,17 @@ static int uhci_start(struct usb_hcd *hcd)
 
 	uhci->fl->dma_handle = dma_handle;
 
-	uhci->td_pool = pci_pool_create("uhci_td", hcd->pdev,
+	uhci->td_pool = dma_pool_create("uhci_td", hcd->self.controller,
 		sizeof(struct uhci_td), 16, 0);
 	if (!uhci->td_pool) {
-		err("unable to create td pci_pool");
+		err("unable to create td dma_pool");
 		goto err_create_td_pool;
 	}
 
-	uhci->qh_pool = pci_pool_create("uhci_qh", hcd->pdev,
+	uhci->qh_pool = dma_pool_create("uhci_qh", hcd->self.controller,
 		sizeof(struct uhci_qh), 16, 0);
 	if (!uhci->qh_pool) {
-		err("unable to create qh pci_pool");
+		err("unable to create qh dma_pool");
 		goto err_create_qh_pool;
 	}
 
@@ -2361,7 +2365,7 @@ static int uhci_start(struct usb_hcd *hcd)
 
 	udev->speed = USB_SPEED_FULL;
 
-	if (usb_register_root_hub(udev, &hcd->pdev->dev) != 0) {
+	if (usb_register_root_hub(udev, hcd->self.controller) != 0) {
 		err("unable to start root hub");
 		retval = -ENOMEM;
 		goto err_start_root_hub;
@@ -2392,15 +2396,16 @@ err_alloc_term_td:
 	hcd->self.root_hub = NULL;
 
 err_alloc_root_hub:
-	pci_pool_destroy(uhci->qh_pool);
+	dma_pool_destroy(uhci->qh_pool);
 	uhci->qh_pool = NULL;
 
 err_create_qh_pool:
-	pci_pool_destroy(uhci->td_pool);
+	dma_pool_destroy(uhci->td_pool);
 	uhci->td_pool = NULL;
 
 err_create_td_pool:
-	pci_free_consistent(hcd->pdev, sizeof(*uhci->fl), uhci->fl, uhci->fl->dma_handle);
+	dma_free_coherent(hcd->self.controller, 
+			sizeof(*uhci->fl), uhci->fl, uhci->fl->dma_handle);
 	uhci->fl = NULL;
 
 err_alloc_fl:
@@ -2456,7 +2461,7 @@ static int uhci_resume(struct usb_hcd *hcd)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 
-	pci_set_master(uhci->hcd.pdev);
+	pci_set_master(to_pci_dev(uhci->hcd.self.controller));
 
 	if (uhci->state == UHCI_SUSPENDED)
 		uhci->resume_detect = 1;

@@ -326,8 +326,8 @@ struct uhci_hcd {
 	/* Grabbed from PCI */
 	unsigned long io_addr;
 
-	struct pci_pool *qh_pool;
-	struct pci_pool *td_pool;
+	struct dma_pool *qh_pool;
+	struct dma_pool *td_pool;
 
 	struct usb_bus *bus;
 
