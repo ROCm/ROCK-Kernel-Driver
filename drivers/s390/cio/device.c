@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.128 $
+ *   $Revision: 1.129 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -525,8 +525,7 @@ get_disc_ccwdev_by_devno(unsigned int devno, struct ccw_device *sibling)
 		cdev = to_ccwdev(dev);
 		if ((cdev->private->state == DEV_STATE_DISCONNECTED) &&
 		    (cdev->private->devno == devno) &&
-		    (!strncmp(cdev->dev.bus_id, sibling->dev.bus_id,
-			      BUS_ID_SIZE))) {
+		    (cdev != sibling)) {
 			cdev->private->state = DEV_STATE_NOT_OPER;
 			break;
 		}
@@ -537,6 +536,24 @@ get_disc_ccwdev_by_devno(unsigned int devno, struct ccw_device *sibling)
 	put_bus(&ccw_bus_type);
 
 	return cdev;
+}
+
+static void
+ccw_device_add_changed(void *data)
+{
+
+	struct ccw_device *cdev;
+
+	cdev = (struct ccw_device *)data;
+	if (device_add(&cdev->dev)) {
+		put_device(&cdev->dev);
+		return;
+	}
+	set_bit(1, &cdev->private->registered);
+	if (device_add_files(&cdev->dev)) {
+		if (test_and_clear_bit(1, &cdev->private->registered))
+			device_unregister(&cdev->dev);
+	}
 }
 
 extern int css_get_ssd_info(struct subchannel *sch);
@@ -593,15 +610,9 @@ ccw_device_do_unreg_rereg(void *data)
 	if (need_rename)
 		snprintf (cdev->dev.bus_id, BUS_ID_SIZE, "0.0.%04x",
 			  sch->schib.pmcw.dev);
-	if (device_add(&cdev->dev)) {
-		put_device(&cdev->dev);
-		return;
-	}
-	set_bit(1, &cdev->private->registered);
-	if (device_add_files(&cdev->dev)) {
-		if (test_and_clear_bit(1, &cdev->private->registered))
-			device_unregister(&cdev->dev);
-	}
+	PREPARE_WORK(&cdev->private->kick_work,
+		     ccw_device_add_changed, (void *)cdev);
+	queue_work(ccw_device_work, &cdev->private->kick_work);
 }
 
 static void

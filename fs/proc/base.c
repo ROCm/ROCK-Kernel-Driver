@@ -780,11 +780,6 @@ static struct inode_operations proc_pid_link_inode_operations = {
 	.follow_link	= proc_pid_follow_link
 };
 
-static inline int pid_alive(struct task_struct *p)
-{
-	return p->pids[PIDTYPE_PID].nr != 0;
-}
-
 #define NUMBUF 10
 
 static int proc_readfd(struct file * filp, void * dirent, filldir_t filldir)

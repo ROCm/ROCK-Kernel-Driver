@@ -353,6 +353,15 @@ acpi_processor_idle (void)
 	 */
 	local_irq_disable();
 
+	/*
+	 * Check whether we truly need to go idle, or should
+	 * reschedule:
+	 */
+	if (unlikely(need_resched())) {
+		local_irq_enable();
+		return;
+	}
+
 	cx = &(pr->power.states[pr->power.state]);
 
 	/*

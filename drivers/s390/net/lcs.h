@@ -6,7 +6,7 @@
 #include <linux/workqueue.h>
 #include <asm/ccwdev.h>
 
-#define VERSION_LCS_H "$Revision: 1.18 $"
+#define VERSION_LCS_H "$Revision: 1.19 $"
 
 #define LCS_DBF_TEXT(level, name, text) \
 	do { \
@@ -309,6 +309,7 @@ struct lcs_card {
 	__u16 ip_assists_supported;
 	__u16 ip_assists_enabled;
 	__s8 lan_type;
+	__u32 pkt_seq;
 	__u16 sequence_no;
 	__s16 portno;
 	/* Some info copied from probeinfo */
