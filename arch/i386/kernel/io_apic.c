@@ -1117,7 +1117,7 @@ next:
 	if (current_vector == SYSCALL_VECTOR)
 		goto next;
 
-	if (current_vector > FIRST_SYSTEM_VECTOR) {
+	if (current_vector >= FIRST_SYSTEM_VECTOR) {
 		offset = (offset + 1) & 7;
 		current_vector = FIRST_DEVICE_VECTOR + offset;
 	}
