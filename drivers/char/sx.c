@@ -441,7 +441,7 @@ static struct miscdevice sx_fw_device = {
 /* This doesn't work. Who's paranoid around here? Not me! */
 
 static inline int sx_paranoia_check(struct sx_port const * port,
-				    kdev_t device, const char *routine)
+				    char *name, const char *routine)
 {
 
 	static const char *badmagic =
@@ -450,11 +450,11 @@ static inline int sx_paranoia_check(struct sx_port const * port,
 	  KERN_ERR "sx: Warning: null sx port for device %s in %s\n";
  
 	if (!port) {
-		printk(badinfo, cdevname(device), routine);
+		printk(badinfo, name, routine);
 		return 1;
 	}
 	if (port->magic != SX_MAGIC) {
-		printk(badmagic, cdevname(device), routine);
+		printk(badmagic, name, routine);
 		return 1;
 	}
 
@@ -1434,7 +1434,7 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 		return -EIO;
 	}
 
-	line = minor(tty->device);
+	line = tty->index;
 	sx_dprintk (SX_DEBUG_OPEN, "%d: opening line %d. tty=%p ctty=%p, np=%d)\n", 
 	            current->pid, line, tty, current->tty, sx_nports);
 
@@ -1500,7 +1500,7 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 	/* tty->low_latency = 1; */
 
 	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = port->gs.normal_termios;
 		else 
 			*tty->termios = port->gs.callout_termios;

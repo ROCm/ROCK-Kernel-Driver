@@ -170,14 +170,12 @@ static int irtty_open(struct tty_struct *tty)
 	tty->disc_data = self;
 
 	/* Give self a name */
-	sprintf(name, "%s%d", tty->driver.name,
-		minor(tty->device) - tty->driver.minor_start +
-		tty->driver.name_base);
+	strcpy(name, tty->name);
 
 	hashbin_insert(irtty, (irda_queue_t *) self, (int) self, NULL);
 
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
@@ -335,7 +333,7 @@ static void irtty_stop_receiver(struct irtty_cb *self, int stop)
 
 	/* This is unsafe, but currently under discussion - Jean II */
 	self->tty->termios->c_cflag = cflag;
-	self->tty->driver.set_termios(self->tty, &old_termios);
+	self->tty->driver->set_termios(self->tty, &old_termios);
 }
 
 /* 
@@ -388,7 +386,7 @@ static void __irtty_change_speed(struct irtty_cb *self, __u32 speed)
 
 	/* This is unsafe, but currently under discussion - Jean II */
 	self->tty->termios->c_cflag = cflag;
-	self->tty->driver.set_termios(self->tty, &old_termios);
+	self->tty->driver->set_termios(self->tty, &old_termios);
 
 	self->io.speed = speed;
 }
@@ -429,7 +427,7 @@ static int irtty_change_speed(struct irda_task *task)
 		 * Make sure all data is sent before changing the speed of the
 		 * serial port.
 		 */
-		if (self->tty->driver.chars_in_buffer(self->tty)) {
+		if (self->tty->driver->chars_in_buffer(self->tty)) {
 			/* Keep state, and try again later */
 			ret = MSECS_TO_JIFFIES(10);
 			break;
@@ -684,8 +682,8 @@ static int irtty_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 	dev->trans_start = jiffies;
 	self->stats.tx_bytes += self->tx_buff.len;
 
-	if (self->tty->driver.write)
-		actual = self->tty->driver.write(self->tty, 0, 
+	if (self->tty->driver->write)
+		actual = self->tty->driver->write(self->tty, 0, 
 						 self->tx_buff.data, 
 						 self->tx_buff.len);
 	/* Hide the part we just transmitted */
@@ -738,7 +736,7 @@ static void irtty_write_wakeup(struct tty_struct *tty)
 	/* Finished with frame?  */
 	if (self->tx_buff.len > 0)  {
 		/* Write data left in transmit buffer */
-		actual = tty->driver.write(tty, 0, self->tx_buff.data, 
+		actual = tty->driver->write(tty, 0, self->tx_buff.data, 
 					   self->tx_buff.len);
 
 		self->tx_buff.data += actual;
@@ -823,7 +821,7 @@ static int irtty_set_dtr_rts(struct net_device *dev, int dtr, int rts)
 	set_fs(get_ds());
 	
 	/* This is probably unsafe, but currently under discussion - Jean II */
-	if (tty->driver.ioctl(tty, NULL, TIOCMSET, (unsigned long) &arg)) { 
+	if (tty->driver->ioctl(tty, NULL, TIOCMSET, (unsigned long) &arg)) { 
 		IRDA_DEBUG(2, "%s(), error doing ioctl!\n", __FUNCTION__);
 	}
 	set_fs(fs);
@@ -923,8 +921,8 @@ static int irtty_raw_write(struct net_device *dev, __u8 *buf, int len)
 	ASSERT(self != NULL, return 0;);
 	ASSERT(self->magic == IRTTY_MAGIC, return 0;);
 
-	if (self->tty->driver.write)
-		actual = self->tty->driver.write(self->tty, 0, buf, len);
+	if (self->tty->driver->write)
+		actual = self->tty->driver->write(self->tty, 0, buf, len);
 
 	return actual;
 }
@@ -957,9 +955,7 @@ static int irtty_net_open(struct net_device *dev)
 	irtty_stop_receiver(self, FALSE);
 
 	/* Give self a hardware name */
-	sprintf(hwname, "%s%d", tty->driver.name,
-		minor(tty->device) - tty->driver.minor_start +
-		tty->driver.name_base);
+	sprintf(hwname, "%s", tty->name);
 
 	/* 
 	 * Open new IrLAP layer instance, now that everything should be

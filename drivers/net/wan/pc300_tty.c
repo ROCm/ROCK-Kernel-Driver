@@ -318,18 +318,18 @@ static int cpc_tty_open(struct tty_struct *tty, struct file *flip)
 		return -ENODEV;
 	} 
 
-	port = minor(tty->device) - tty->driver.minor_start; 
+	port = tty->index;
 
 	if ((port < 0) || (port >= CPC_TTY_NPORTS)){ 
-		CPC_TTY_DBG("pc300_tty: open invalid minor %i\n",MINOR(tty->device));
+		CPC_TTY_DBG("pc300_tty: open invalid port %d\n", port);
 		return -ENODEV;
 	} 
 
 	cpc_tty = &cpc_tty_area[port];
 	
 	if (cpc_tty->state == CPC_TTY_ST_IDLE){
-		CPC_TTY_DBG("%s: open - invalid interface, minor=%i\n",
-					cpc_tty->name, MINOR(tty->device));
+		CPC_TTY_DBG("%s: open - invalid interface, port=%d\n",
+					cpc_tty->name, tty->index);
 		return -ENODEV;
 	}
 

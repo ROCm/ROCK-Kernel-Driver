@@ -22,7 +22,7 @@ BTFIXUPDEF_CALL(char *, __irq_itoa, unsigned int)
 
 #define NR_IRQS    16
 
-#define irq_cannonicalize(irq)	(irq)
+#define irq_canonicalize(irq)	(irq)
 
 /* Dave Redman (djhr@tadpole.co.uk)
  * changed these to function pointers.. it saves cycles and will allow

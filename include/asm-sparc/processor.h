@@ -131,7 +131,7 @@ extern __inline__ void start_thread(struct pt_regs * regs, unsigned long pc,
 			     "std\t%%g0, [%0 + %3 + 0x30]\n\t"
 			     "st\t%1, [%0 + %3 + 0x38]\n\t"
 			     "st\t%%g0, [%0 + %3 + 0x3c]"
-			     : : "r" (regs), "r" (sp - REGWIN_SZ), "r" (zero),
+			     : : "r" (regs), "r" (sp - sizeof(struct reg_window)), "r" (zero),
 			     "i" ((const unsigned long)(&((struct pt_regs *)0)->u_regs[0])));
 }
 

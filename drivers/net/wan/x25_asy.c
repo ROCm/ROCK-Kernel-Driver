@@ -288,7 +288,7 @@ static void x25_asy_encaps(struct x25_asy *sl, unsigned char *icp, int len)
 	 *       14 Oct 1994  Dmitry Gorodchanin.
 	 */
 	sl->tty->flags |= (1 << TTY_DO_WRITE_WAKEUP);
-	actual = sl->tty->driver.write(sl->tty, 0, sl->xbuff, count);
+	actual = sl->tty->driver->write(sl->tty, 0, sl->xbuff, count);
 	sl->xleft = count - actual;
 	sl->xhead = sl->xbuff + actual;
 	/* VSV */
@@ -318,7 +318,7 @@ static void x25_asy_write_wakeup(struct tty_struct *tty)
 		return;
 	}
 
-	actual = tty->driver.write(tty, 0, sl->xhead, sl->xleft);
+	actual = tty->driver->write(tty, 0, sl->xhead, sl->xleft);
 	sl->xleft -= actual;
 	sl->xhead += actual;
 }
@@ -330,7 +330,7 @@ static void x25_asy_timeout(struct net_device *dev)
 	 *      14 Oct 1994 Dmitry Gorodchanin.
 	 */
 	printk(KERN_WARNING "%s: transmit timed out, %s?\n", dev->name,
-	       (sl->tty->driver.chars_in_buffer(sl->tty) || sl->xleft) ?
+	       (sl->tty->driver->chars_in_buffer(sl->tty) || sl->xleft) ?
 	       "bad line quality" : "driver error");
 	sl->xleft = 0;
 	sl->tty->flags &= ~(1 << TTY_DO_WRITE_WAKEUP);
@@ -620,8 +620,8 @@ static int x25_asy_open_tty(struct tty_struct *tty)
 
 	sl->tty = tty;
 	tty->disc_data = sl;
-	if (tty->driver.flush_buffer)  {
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)  {
+		tty->driver->flush_buffer(tty);
 	}
 	if (tty->ldisc.flush_buffer)  {
 		tty->ldisc.flush_buffer(tty);

@@ -1830,7 +1830,7 @@ static void __init serial8250_isa_init_ports(void)
 	for (i = 0, up = serial8250_ports; i < ARRAY_SIZE(old_serial_port);
 	     i++, up++) {
 		up->port.iobase   = old_serial_port[i].port;
-		up->port.irq      = irq_cannonicalize(old_serial_port[i].irq);
+		up->port.irq      = irq_canonicalize(old_serial_port[i].irq);
 		up->port.uartclk  = old_serial_port[i].baud_base * 16;
 		up->port.flags    = old_serial_port[i].flags |
 				    UPF_RESOURCES;
@@ -2003,9 +2003,9 @@ static struct uart_driver serial8250_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "serial",
 #ifdef CONFIG_DEVFS_FS
-	.dev_name		= "tts/%d",
+	.dev_name		= "tts/",
 #else
-	.dev_name		= "ttyS%d",
+	.dev_name		= "ttyS",
 #endif
 	.major			= TTY_MAJOR,
 	.minor			= 64,

@@ -10,8 +10,6 @@
  * $Revision: 1.94 $
  */
 
-#define LOCAL_END_REQUEST /* Don't generate end_request in blk.h */
-
 #include <linux/config.h>
 #include <linux/kmod.h>
 #include <linux/init.h>
@@ -1694,50 +1692,51 @@ dasd_flush_request_queue(struct dasd_device * device)
 static int
 dasd_open(struct inode *inp, struct file *filp)
 {
-	struct dasd_device *device;
+	struct gendisk *disk = inp->i_bdev->bd_disk;
+	struct dasd_device *device = disk->private_data;
 	int rc;
+
+	if (!try_module_get(device->discipline->owner))
+		return -EINVAL;
 	
 	if (dasd_probeonly) {
 		MESSAGE(KERN_INFO,
-			"No access to device (%d:%d) due to probeonly mode",
-			major(inp->i_rdev), minor(inp->i_rdev));
-		return -EPERM;
+			"No access to device %s due to probeonly mode",
+			disk->disk_name);
+		rc = -EPERM;
+		goto out;
 	}
 
-	device = inp->i_bdev->bd_disk->private_data;
+	rc = -ENODEV;
 	if (device->state < DASD_STATE_BASIC) {
 		DBF_DEV_EVENT(DBF_ERR, device, " %s",
 			      " Cannot open unrecognized device");
-		return -ENODEV;
+		rc = -ENODEV;
+		goto out;
 	}
-	rc = 0;
 
-	if (atomic_inc_return(&device->open_count) == 1) {
-		if (!try_module_get(device->discipline->owner)) {
-			/* Discipline is currently unloaded! */
-			atomic_dec(&device->open_count);
-			rc = -ENODEV;
-		}
-	}
+	atomic_inc(&device->open_count);
+	return 0;
+
+out:
+	module_put(device->discipline->owner);
 	return rc;
 }
 
 static int
 dasd_release(struct inode *inp, struct file *filp)
 {
-	struct dasd_device *device;
-
-	device = inp->i_bdev->bd_disk->private_data;
+	struct gendisk *disk = inp->i_bdev->bd_disk;
+	struct dasd_device *device = isk->private_data;
 
 	if (device->state < DASD_STATE_ACCEPT) {
 		DBF_DEV_EVENT(DBF_ERR, device, " %s",
 			      " Cannot release unrecognized device");
 		return -EINVAL;
 	}
-	if (atomic_dec_return(&device->open_count) == 0) {
-		invalidate_buffers(inp->i_rdev);
-		module_put(device->discipline->owner);
-	}
+
+	atomic_dec(&device->open_count);
+	module_put(device->discipline->owner);
 	return 0;
 }
 
@@ -2057,13 +2056,9 @@ dasd_init(void)
 
 	DBF_EVENT(DBF_EMERG, "%s", "debug area created");
 
-#ifdef CONFIG_DEVFS_FS
-	if (!devfs_mk_dir("dasd")) {
-		DBF_EVENT(DBF_ALERT, "%s", "no devfs");
-		rc = -ENOSYS;
+	rc = devfs_mk_dir("dasd");
+	if (rc)
 		goto failed;
-	}
-#endif
 	rc = dasd_devmap_init();
 	if (rc)
 		goto failed;

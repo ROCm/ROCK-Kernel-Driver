@@ -103,7 +103,7 @@ static void *usbvideo_rvmalloc(unsigned long size)
 	memset(mem, 0, size); /* Clear the ram out, no junk to the user */
 	adr = (unsigned long) mem;
 	while (size > 0) {
-		mem_map_reserve(vmalloc_to_page((void *)adr));
+		SetPageReserved(vmalloc_to_page((void *)adr));
 		adr += PAGE_SIZE;
 		size -= PAGE_SIZE;
 	}
@@ -120,7 +120,7 @@ static void usbvideo_rvfree(void *mem, unsigned long size)
 
 	adr = (unsigned long) mem;
 	while ((long) size > 0) {
-		mem_map_unreserve(vmalloc_to_page((void *)adr));
+		ClearPageReserved(vmalloc_to_page((void *)adr));
 		adr += PAGE_SIZE;
 		size -= PAGE_SIZE;
 	}

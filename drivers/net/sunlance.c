@@ -1417,7 +1417,7 @@ static int __init sparc_lance_init(struct net_device *dev,
 				       "'tpe-link-test?'\n", dev->name);
 				printk(KERN_NOTICE "%s: warning: mail any problems "
 				       "to ecd@skynet.be\n", dev->name);
-				set_auxio(AUXIO_LINK_TEST, 0);
+				auxio_set_lte(AUXIO_LTE_ON);
 			}
 no_link_test:
 			lp->auto_select = 1;

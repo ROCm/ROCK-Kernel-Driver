@@ -2216,7 +2216,7 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 	int lines;
 	int ret;
 
-	if (tty->driver.type != TTY_DRIVER_TYPE_CONSOLE)
+	if (tty->driver->type != TTY_DRIVER_TYPE_CONSOLE)
 		return -EINVAL;
 	if (current->tty != tty && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
@@ -2345,7 +2345,7 @@ static void con_stop(struct tty_struct *tty)
 	int console_num;
 	if (!tty)
 		return;
-	console_num = minor(tty->device) - (tty->driver.minor_start);
+	console_num = tty->index;
 	if (!vc_cons_allocated(console_num))
 		return;
 	set_vc_kbd_led(kbd_table + console_num, VC_SCROLLOCK);
@@ -2360,7 +2360,7 @@ static void con_start(struct tty_struct *tty)
 	int console_num;
 	if (!tty)
 		return;
-	console_num = minor(tty->device) - (tty->driver.minor_start);
+	console_num = tty->index;
 	if (!vc_cons_allocated(console_num))
 		return;
 	clr_vc_kbd_led(kbd_table + console_num, VC_SCROLLOCK);
@@ -2392,7 +2392,7 @@ static int con_open(struct tty_struct *tty, struct file * filp)
 	unsigned int	currcons;
 	int i;
 
-	currcons = minor(tty->device) - tty->driver.minor_start;
+	currcons = tty->index;
 
 	i = vc_allocate(currcons);
 	if (i)
@@ -2418,7 +2418,7 @@ static void con_close(struct tty_struct *tty, struct file * filp)
 	if (!tty)
 		return;
 	if (tty->count != 1) return;
-	vcs_make_devfs (minor(tty->device) - tty->driver.minor_start, 1);
+	vcs_make_devfs (tty->index, 1);
 	vt = (struct vt_struct*)tty->driver_data;
 	if (vt)
 		vc_cons[vt->vc_num].d->vc_tty = NULL;
@@ -2515,7 +2515,7 @@ int __init vty_init(void)
 	memset(&console_driver, 0, sizeof(struct tty_driver));
 	console_driver.magic = TTY_DRIVER_MAGIC;
 	console_driver.owner = THIS_MODULE;
-	console_driver.name = "vc/%d";
+	console_driver.name = "vc/";
 	console_driver.name_base = 1;
 	console_driver.major = TTY_MAJOR;
 	console_driver.minor_start = 1;
@@ -2664,8 +2664,7 @@ static void __init con_init_devfs (void)
 	int i;
 
 	for (i = 0; i < console_driver.num; i++)
-		tty_register_device (&console_driver,
-				    console_driver.minor_start + i);
+		tty_register_device (&console_driver, i);
 }
 
 /*

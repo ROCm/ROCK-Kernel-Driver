@@ -777,9 +777,6 @@ static int ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 		skb->dst->ops->update_pmtu(skb->dst, mtu);
 
 	if (skb->protocol == htons(ETH_P_IP)) {
-		if (skb->dst)
-			skb->dst->ops->update_pmtu(skb->dst, mtu);
-
 		df |= (old_iph->frag_off&htons(IP_DF));
 
 		if ((old_iph->frag_off&htons(IP_DF)) &&

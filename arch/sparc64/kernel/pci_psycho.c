@@ -854,7 +854,7 @@ static irqreturn_t psycho_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 /* PCI Errors.  They are signalled by the PCI bus module since they
- * are assosciated with a specific bus segment.
+ * are associated with a specific bus segment.
  */
 #define PSYCHO_PCI_AFSR_A	0x2010UL
 #define PSYCHO_PCI_AFSR_B	0x4010UL

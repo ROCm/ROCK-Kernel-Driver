@@ -84,7 +84,7 @@ sparc64_boot:
 	 nop
 
 cheetah_plus_boot:
-	/* Preserve OBP choosen DCU and DCR register settings.  */
+	/* Preserve OBP chosen DCU and DCR register settings.  */
 	ba,pt	%xcc, cheetah_generic_boot
 	 nop
 

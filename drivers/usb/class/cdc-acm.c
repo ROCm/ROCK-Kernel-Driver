@@ -313,7 +313,7 @@ static void acm_softint(void *private)
 
 static int acm_tty_open(struct tty_struct *tty, struct file *filp)
 {
-	struct acm *acm = acm_table[minor(tty->device)];
+	struct acm *acm = acm_table[tty->index];
 
 	if (!acm || !acm->dev) return -EINVAL;
 
@@ -727,7 +727,7 @@ static struct tty_driver acm_tty_driver = {
 	.magic =		TTY_DRIVER_MAGIC,
 	.owner =		THIS_MODULE,
 	.driver_name =		"acm",
-	.name =			"usb/acm/%d",
+	.name =			"usb/acm/",
 	.major =		ACM_TTY_MAJOR,
 	.minor_start =		0,
 	.num =			ACM_TTY_MINORS,

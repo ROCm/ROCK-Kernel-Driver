@@ -2164,8 +2164,7 @@ int end_that_request_chunk(struct request *req, int uptodate, int nr_bytes)
 void end_that_request_last(struct request *req)
 {
 	struct gendisk *disk = req->rq_disk;
-	if (req->waiting)
-		complete(req->waiting);
+	struct completion *waiting = req->waiting;
 
 	if (disk) {
 		unsigned long duration = jiffies - req->start_time;
@@ -2183,6 +2182,18 @@ void end_that_request_last(struct request *req)
 		disk_stat_dec(disk, in_flight);
 	}
 	__blk_put_request(req->q, req);
+	/* Do this LAST! The structure may be freed immediately afterwards */
+	if (waiting)
+		complete(waiting);
+}
+
+void end_request(struct request *req, int uptodate)
+{
+	if (!end_that_request_first(req, uptodate, req->hard_cur_sectors)) {
+		add_disk_randomness(req->rq_disk);
+		blkdev_dequeue_request(req);
+		end_that_request_last(req);
+	}
 }
 
 int __init blk_dev_init(void)
@@ -2227,6 +2238,7 @@ int __init blk_dev_init(void)
 EXPORT_SYMBOL(end_that_request_first);
 EXPORT_SYMBOL(end_that_request_chunk);
 EXPORT_SYMBOL(end_that_request_last);
+EXPORT_SYMBOL(end_request);
 EXPORT_SYMBOL(blk_init_queue);
 EXPORT_SYMBOL(blk_cleanup_queue);
 EXPORT_SYMBOL(blk_queue_make_request);

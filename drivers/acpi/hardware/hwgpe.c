@@ -424,7 +424,7 @@ acpi_hw_clear_gpe_block (
  *
  ******************************************************************************/
 
-acpi_status
+static acpi_status
 acpi_hw_disable_non_wakeup_gpe_block (
 	struct acpi_gpe_xrupt_info      *gpe_xrupt_info,
 	struct acpi_gpe_block_info      *gpe_block)
@@ -515,7 +515,7 @@ acpi_hw_disable_non_wakeup_gpes (
  *
  ******************************************************************************/
 
-acpi_status
+static acpi_status
 acpi_hw_enable_non_wakeup_gpe_block (
 	struct acpi_gpe_xrupt_info      *gpe_xrupt_info,
 	struct acpi_gpe_block_info      *gpe_block)

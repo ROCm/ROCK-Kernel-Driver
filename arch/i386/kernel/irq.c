@@ -32,6 +32,7 @@
 #include <linux/irq.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/kallsyms.h>
 
 #include <asm/atomic.h>
 #include <asm/io.h>
@@ -203,10 +204,12 @@ inline void synchronize_irq(unsigned int irq)
  * waste of time and is not what some drivers would
  * prefer.
  */
-int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction * action)
+int handle_IRQ_event(unsigned int irq,
+		struct pt_regs *regs, struct irqaction *action)
 {
 	int status = 1;	/* Force the "do bottom halves" bit */
 	int retval = 0;
+	struct irqaction *first_action = action;
 
 	if (!(action->flags & SA_INTERRUPT))
 		local_irq_enable();
@@ -221,13 +224,24 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
 	local_irq_disable();
 	if (retval != 1) {
 		static int count = 100;
-		while (count) {
+		if (count) {
 			count--;
-			printk(retval
-				? "irq event %d: bogus retval mask %x\n"
-				: "irq %d: nobody cared!\n",
-				irq, 
-				retval);
+			if (retval) {
+				printk("irq event %d: bogus retval mask %x\n",
+					irq, retval);
+			} else {
+				printk("irq %d: nobody cared!\n", irq);
+			}
+			dump_stack();
+			printk("handlers:\n");
+			action = first_action;
+			do {
+				printk("[<%p>]", action->handler);
+				print_symbol(" (%s)",
+					(unsigned long)action->handler);
+				printk("\n");
+				action = action->next;
+			} while (action);
 		}
 	}
 

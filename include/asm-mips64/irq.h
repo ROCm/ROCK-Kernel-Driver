@@ -34,12 +34,12 @@ extern int node_level_to_irq[MAX_COMPACT_NODES][PERNODE_LEVELS];
 			(node_level_to_irq[CPUID_TO_COMPACT_NODEID(c)][(l)])
 
 #ifdef CONFIG_I8259
-static inline int irq_cannonicalize(int irq)
+static inline int irq_canonicalize(int irq)
 {
 	return ((irq == 2) ? 9 : irq);
 }
 #else
-#define irq_cannonicalize(irq) (irq)	/* Sane hardware, sane code ... */
+#define irq_canonicalize(irq) (irq)	/* Sane hardware, sane code ... */
 #endif
 
 

@@ -9,7 +9,7 @@
 #define _SPARC_NS87303_H 1
 
 /*
- * Controll Register Index Values
+ * Control Register Index Values
  */
 #define FER	0x00
 #define FAR	0x01
@@ -58,7 +58,7 @@
 #define TUP_EPP_TIMO	0x02	/* Enable EPP timeout IRQ                    */
 
 /* Advanced SuperIO Config Register (ASC) bits */
-#define ASC_LPT_IRQ7	0x01	/* Allways use IRQ7 for LPT                  */
+#define ASC_LPT_IRQ7	0x01	/* Always use IRQ7 for LPT                  */
 #define ASC_DRV2_SEL	0x02	/* Logical Drive Exchange controlled by TDR  */
 
 #define FER_RESERVED	0x00

@@ -63,8 +63,8 @@ cpu3_startup:
 	and	%g4, 0xc, %g4
 	ld	[%g5 + %g4], %g6
 
-	sethi	%hi(THREAD_SIZE - REGWIN_SZ), %sp
-	or	%sp, %lo(THREAD_SIZE - REGWIN_SZ), %sp
+	sethi	%hi(THREAD_SIZE - STACKFRAME_SZ), %sp
+	or	%sp, %lo(THREAD_SIZE - STACKFRAME_SZ), %sp
 	add	%g6, %sp, %sp
 
 	/* Turn on traps (PSR_ET). */
@@ -142,8 +142,8 @@ C_LABEL(sun4d_cpu_startup):
 	srl	%g3, 1, %g4
 	ld	[%g5 + %g4], %g6
 
-	sethi	%hi(THREAD_SIZE - REGWIN_SZ), %sp
-	or	%sp, %lo(THREAD_SIZE - REGWIN_SZ), %sp
+	sethi	%hi(THREAD_SIZE - STACKFRAME_SZ), %sp
+	or	%sp, %lo(THREAD_SIZE - STACKFRAME_SZ), %sp
 	add	%g6, %sp, %sp
 
 	/* Turn on traps (PSR_ET). */

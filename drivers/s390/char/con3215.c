@@ -957,7 +957,7 @@ tty3215_open(struct tty_struct *tty, struct file * filp)
 	struct raw3215_info *raw;
 	int retval, line;
 
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = tty->index;
 	if ((line < 0) || (line >= NR_3215))
 		return -ENODEV;
 
@@ -1182,7 +1182,6 @@ tty3215_init(void)
 	tty3215_driver.owner = THIS_MODULE;
 	tty3215_driver.driver_name = "tty3215";
 	tty3215_driver.name = "ttyS";
-	tty3215_driver.name_base = 0;
 	tty3215_driver.major = TTY_MAJOR;
 	tty3215_driver.minor_start = 64;
 	tty3215_driver.num = NR_3215;

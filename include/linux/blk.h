@@ -25,6 +25,7 @@ extern void rand_initialize_disk(struct gendisk *disk);
 extern int end_that_request_first(struct request *, int, int);
 extern int end_that_request_chunk(struct request *, int, int);
 extern void end_that_request_last(struct request *);
+extern void end_request(struct request *req, int uptodate);
 struct request *elv_next_request(request_queue_t *q);
 
 static inline void blkdev_dequeue_request(struct request *req)
@@ -36,20 +37,5 @@ static inline void blkdev_dequeue_request(struct request *req)
 	if (req->q)
 		elv_remove_request(req->q, req);
 }
-
-/*
- * If we have our own end_request, we do not want to include this mess
- */
-#ifndef LOCAL_END_REQUEST
-static inline void end_request(struct request *req, int uptodate)
-{
-	if (end_that_request_first(req, uptodate, req->hard_cur_sectors))
-		return;
-
-	add_disk_randomness(req->rq_disk);
-	blkdev_dequeue_request(req);
-	end_that_request_last(req);
-}
-#endif /* !LOCAL_END_REQUEST */
 
 #endif /* _BLK_H */

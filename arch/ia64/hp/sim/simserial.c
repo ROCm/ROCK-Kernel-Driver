@@ -676,7 +676,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	 * the line discipline to only process XON/XOFF characters.
 	 */
 	shutdown(info);
-	if (tty->driver.flush_buffer) tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer) tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer) tty->ldisc.flush_buffer(tty);
 	info->event = 0;
 	info->tty = 0;
@@ -879,7 +879,7 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 	unsigned long		page;
 
 	MOD_INC_USE_COUNT;
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = tty->index;
 	if ((line < 0) || (line >= NR_PORTS)) {
 		MOD_DEC_USE_COUNT;
 		return -ENODEV;
@@ -893,8 +893,7 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 	info->tty = tty;
 
 #ifdef SIMSERIAL_DEBUG
-	printk("rs_open %s%d, count = %d\n", tty->driver.name, info->line,
-	       info->state->count);
+	printk("rs_open %s, count = %d\n", tty->name, info->state->count);
 #endif
 	info->tty->low_latency = (info->flags & ASYNC_LOW_LATENCY) ? 1 : 0;
 
@@ -937,7 +936,7 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 
 	if ((info->state->count == 1) &&
 	    (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = info->state->normal_termios;
 		else
 			*tty->termios = info->state->callout_termios;

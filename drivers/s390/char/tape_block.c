@@ -208,38 +208,65 @@ tapeblock_tasklet(unsigned long data)
 int
 tapeblock_setup_device(struct tape_device * device)
 {
-	request_queue_t *blk_queue;
+	struct tape_blk_data *d = &device->blk_data;
+	request_queue_t *q = &d->request_queue;
+	struct gendisk *disk = alloc_disk(1);
 	int rc;
 
-	/* Setup request queue and initialize gendisk for this device. */
-	tasklet_init(&device->blk_data.tasklet, tapeblock_tasklet,
-		     (unsigned long) device);
-	spin_lock_init(&device->blk_data.request_queue_lock);
-	blk_queue = &device->blk_data.request_queue;
-	rc = blk_init_queue(blk_queue, tapeblock_request_fn,
-			    &device->blk_data.request_queue_lock);
+	if (!disk)
+		return -ENOMEM;
 
-	elevator_exit(blk_queue);
-	rc = elevator_init(blk_queue, &elevator_noop);
-	if (rc) {
-		blk_cleanup_queue(blk_queue);
-		return rc;
-	}
+	tasklet_init(&d->tasklet, tapeblock_tasklet, (unsigned long)device);
+
+	spin_lock_init(&d->request_queue_lock);
+	rc = blk_init_queue(q, tapeblock_request_fn, &d->request_queue_lock);
+	if (rc)
+		goto put_disk;
+
+	elevator_exit(q);
+	rc = elevator_init(q, &elevator_noop);
+	if (rc)
+		goto cleanup_queue;
+
 	/* FIXME: We should be able to sense the sectore size */
-	blk_queue_hardsect_size(blk_queue, TAPEBLOCK_HSEC_SIZE);
-	blk_queue_max_sectors(blk_queue, TAPEBLOCK_MAX_SEC);
-	blk_queue_max_phys_segments(blk_queue, -1L);
-	blk_queue_max_hw_segments(blk_queue, -1L);
-	blk_queue_max_segment_size(blk_queue, -1L);
-	blk_queue_segment_boundary(blk_queue, -1L);
+	blk_queue_hardsect_size(q, TAPEBLOCK_HSEC_SIZE);
+	blk_queue_max_sectors(q, TAPEBLOCK_MAX_SEC);
+	blk_queue_max_phys_segments(q, -1L);
+	blk_queue_max_hw_segments(q, -1L);
+	blk_queue_max_segment_size(q, -1L);
+	blk_queue_segment_boundary(q, -1L);
+
+	disk->major = tapeblock_major;
+	disk->first_minor = i;
+	disk->fops = &tapeblock_fops;
+	disk->private_data = device;
+	disk->queue = q;
+	set_capacity(disk, size);
+
+	sprintf(disk->disk_name, "tBLK%d", i);
+	sprintf(disk->disk_name, "tBLK/%d", i);
+
+	add_disk(disk);
+	d->disk = disk;
 	return 0;
+
+ cleanup_queue:
+	blk_cleanup_queue(q);
+ put_disk:
+	put_disk(disk);
+	return rc;
 }
 
 void
 tapeblock_cleanup_device(struct tape_device *device)
 {
-	blk_cleanup_queue(&device->blk_data.request_queue);
-	tasklet_kill(&device->blk_data.tasklet);
+	struct tape_blk_data *d = &device->blk_data;
+
+	del_gendisk(d->disk);
+	put_disk(d->disk);
+	blk_cleanup_queue(&d->request_queue);
+
+	tasklet_kill(&d->tasklet);
 }
 
 /*
@@ -272,55 +299,47 @@ static int tapeblock_mediumdetect(struct tape_device *device)
 /*
  * Block frontend tape device open function.
  */
-int
-tapeblock_open(struct inode *inode, struct file *filp) {
-	struct tape_device *device;
-	int minor, rc;
+static int
+tapeblock_open(struct inode *inode, struct file *filp)
+{
+	struct gendisk *disk = inp->i_bdev->bd_disk;
+	struct tape_device *device = disk->private_data;
+	int rc;
 
-	MOD_INC_USE_COUNT;
-	if (major(filp->f_dentry->d_inode->i_rdev) != tapeblock_major)
-		return -ENODEV;
-	minor = minor(filp->f_dentry->d_inode->i_rdev);
-	device = tape_get_device(minor >> TAPE_MINORS_PER_DEV);
-	if (IS_ERR(device)) {
-		MOD_DEC_USE_COUNT;
-		return PTR_ERR(device);
-	}
-	DBF_EVENT(6, "TBLOCK:open:  %x\n", device->first_minor);
 	rc = tape_open(device);
-	if (rc == 0) {
-		rc = tape_assign(device);
-		if (rc == 0) {
-			device->blk_data.block_position = -1;
-			rc = tapeblock_mediumdetect(device);
-			if (rc == 0) {
-				filp->private_data = device;
-				return 0;
-			}
-			tape_unassign(device);
-		}
-		tape_release(device);
-	}
+	if (rc)
+		goto put_device;
+	rc = tape_assign(device);
+	if (rc)
+		goto release;
+	device->blk_data.block_position = -1;
+	rc = tapeblock_mediumdetect(device);
+	if (rc)
+		goto unassign;
+	return 0;
+
+ unassign:
+	tape_unassign(device);
+ release:
+	tape_release(device);
+ put_device:
 	tape_put_device(device);
-	MOD_DEC_USE_COUNT;
 	return rc;
 }
 
 /*
  * Block frontend tape device release function.
  */
-int
-tapeblock_release(struct inode *inode, struct file *filp) {
-	struct tape_device *device;
+static int
+tapeblock_release(struct inode *inode, struct file *filp)
+{
+	struct gendisk *disk = inp->i_bdev->bd_disk;
+	struct tape_device *device = disk->private_data;
 
-	/* Remove all buffers at device close. */
-	/* FIXME: can we do that a tape unload ? */
-	invalidate_buffers(inode->i_rdev);
-	device = (struct tape_device *) filp->private_data;
 	tape_release(device);
 	tape_unassign(device);
 	tape_put_device(device);
-	MOD_DEC_USE_COUNT;
+
 	return 0;
 }
 

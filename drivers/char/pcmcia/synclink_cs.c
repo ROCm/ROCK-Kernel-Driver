@@ -848,7 +848,7 @@ static int mgslpc_event(event_t event, int priority,
 }
 
 static inline int mgslpc_paranoia_check(MGSLPC_INFO *info,
-					kdev_t device, const char *routine)
+					char *name, const char *routine)
 {
 #ifdef MGSLPC_PARANOIA_CHECK
 	static const char *badmagic =
@@ -857,11 +857,11 @@ static inline int mgslpc_paranoia_check(MGSLPC_INFO *info,
 		"Warning: null mgslpc_info for (%s) in %s\n";
 
 	if (!info) {
-		printk(badinfo, cdevname(device), routine);
+		printk(badinfo, name, routine);
 		return 1;
 	}
 	if (info->magic != MGSLPC_MAGIC) {
-		printk(badmagic, cdevname(device), routine);
+		printk(badmagic, name, routine);
 		return 1;
 	}
 #endif
@@ -901,7 +901,7 @@ static void tx_pause(struct tty_struct *tty)
 	MGSLPC_INFO *info = (MGSLPC_INFO *)tty->driver_data;
 	unsigned long flags;
 	
-	if (mgslpc_paranoia_check(info, tty->device, "tx_pause"))
+	if (mgslpc_paranoia_check(info, tty->name, "tx_pause"))
 		return;
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("tx_pause(%s)\n",info->device_name);	
@@ -917,7 +917,7 @@ static void tx_release(struct tty_struct *tty)
 	MGSLPC_INFO *info = (MGSLPC_INFO *)tty->driver_data;
 	unsigned long flags;
 	
-	if (mgslpc_paranoia_check(info, tty->device, "tx_release"))
+	if (mgslpc_paranoia_check(info, tty->name, "tx_release"))
 		return;
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("tx_release(%s)\n",info->device_name);	
@@ -1703,7 +1703,7 @@ static void mgslpc_put_char(struct tty_struct *tty, unsigned char ch)
 			__FILE__,__LINE__,ch,info->device_name);
 	}
 
-	if (mgslpc_paranoia_check(info, tty->device, "mgslpc_put_char"))
+	if (mgslpc_paranoia_check(info, tty->name, "mgslpc_put_char"))
 		return;
 
 	if (!tty || !info->tx_buf)
@@ -1734,7 +1734,7 @@ static void mgslpc_flush_chars(struct tty_struct *tty)
 		printk( "%s(%d):mgslpc_flush_chars() entry on %s tx_count=%d\n",
 			__FILE__,__LINE__,info->device_name,info->tx_count);
 	
-	if (mgslpc_paranoia_check(info, tty->device, "mgslpc_flush_chars"))
+	if (mgslpc_paranoia_check(info, tty->name, "mgslpc_flush_chars"))
 		return;
 
 	if (info->tx_count <= 0 || tty->stopped ||
@@ -1773,7 +1773,7 @@ static int mgslpc_write(struct tty_struct * tty, int from_user,
 		printk( "%s(%d):mgslpc_write(%s) count=%d\n",
 			__FILE__,__LINE__,info->device_name,count);
 	
-	if (mgslpc_paranoia_check(info, tty->device, "mgslpc_write") ||
+	if (mgslpc_paranoia_check(info, tty->name, "mgslpc_write") ||
 	    !tty || !info->tx_buf)
 		goto cleanup;
 
@@ -1835,7 +1835,7 @@ static int mgslpc_write_room(struct tty_struct *tty)
 	MGSLPC_INFO *info = (MGSLPC_INFO *)tty->driver_data;
 	int ret;
 				
-	if (mgslpc_paranoia_check(info, tty->device, "mgslpc_write_room"))
+	if (mgslpc_paranoia_check(info, tty->name, "mgslpc_write_room"))
 		return 0;
 
 	if (info->params.mode == MGSL_MODE_HDLC) {
@@ -1867,7 +1867,7 @@ static int mgslpc_chars_in_buffer(struct tty_struct *tty)
 		printk("%s(%d):mgslpc_chars_in_buffer(%s)\n",
 			 __FILE__,__LINE__, info->device_name );
 			 
-	if (mgslpc_paranoia_check(info, tty->device, "mgslpc_chars_in_buffer"))
+	if (mgslpc_paranoia_check(info, tty->name, "mgslpc_chars_in_buffer"))
 		return 0;
 		
 	if (info->params.mode == MGSL_MODE_HDLC)
@@ -1893,7 +1893,7 @@ static void mgslpc_flush_buffer(struct tty_struct *tty)
 		printk("%s(%d):mgslpc_flush_buffer(%s) entry\n",
 			 __FILE__,__LINE__, info->device_name );
 	
-	if (mgslpc_paranoia_check(info, tty->device, "mgslpc_flush_buffer"))
+	if (mgslpc_paranoia_check(info, tty->name, "mgslpc_flush_buffer"))
 		return;
 		
 	spin_lock_irqsave(&info->lock,flags); 
@@ -1918,7 +1918,7 @@ static void mgslpc_send_xchar(struct tty_struct *tty, char ch)
 		printk("%s(%d):mgslpc_send_xchar(%s,%d)\n",
 			 __FILE__,__LINE__, info->device_name, ch );
 			 
-	if (mgslpc_paranoia_check(info, tty->device, "mgslpc_send_xchar"))
+	if (mgslpc_paranoia_check(info, tty->name, "mgslpc_send_xchar"))
 		return;
 
 	info->x_char = ch;
@@ -1941,7 +1941,7 @@ static void mgslpc_throttle(struct tty_struct * tty)
 		printk("%s(%d):mgslpc_throttle(%s) entry\n",
 			 __FILE__,__LINE__, info->device_name );
 
-	if (mgslpc_paranoia_check(info, tty->device, "mgslpc_throttle"))
+	if (mgslpc_paranoia_check(info, tty->name, "mgslpc_throttle"))
 		return;
 	
 	if (I_IXOFF(tty))
@@ -1966,7 +1966,7 @@ static void mgslpc_unthrottle(struct tty_struct * tty)
 		printk("%s(%d):mgslpc_unthrottle(%s) entry\n",
 			 __FILE__,__LINE__, info->device_name );
 
-	if (mgslpc_paranoia_check(info, tty->device, "mgslpc_unthrottle"))
+	if (mgslpc_paranoia_check(info, tty->name, "mgslpc_unthrottle"))
 		return;
 	
 	if (I_IXOFF(tty)) {
@@ -2393,7 +2393,7 @@ static void mgslpc_break(struct tty_struct *tty, int break_state)
 		printk("%s(%d):mgslpc_break(%s,%d)\n",
 			 __FILE__,__LINE__, info->device_name, break_state);
 			 
-	if (mgslpc_paranoia_check(info, tty->device, "mgslpc_break"))
+	if (mgslpc_paranoia_check(info, tty->name, "mgslpc_break"))
 		return;
 
 	spin_lock_irqsave(&info->lock,flags);
@@ -2424,7 +2424,7 @@ static int mgslpc_ioctl(struct tty_struct *tty, struct file * file,
 		printk("%s(%d):mgslpc_ioctl %s cmd=%08X\n", __FILE__,__LINE__,
 			info->device_name, cmd );
 	
-	if (mgslpc_paranoia_check(info, tty->device, "mgslpc_ioctl"))
+	if (mgslpc_paranoia_check(info, tty->name, "mgslpc_ioctl"))
 		return -ENODEV;
 
 	if ((cmd != TIOCGSERIAL) && (cmd != TIOCSSERIAL) &&
@@ -2516,7 +2516,7 @@ static void mgslpc_set_termios(struct tty_struct *tty, struct termios *old_termi
 	
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):mgslpc_set_termios %s\n", __FILE__,__LINE__,
-			tty->driver.name );
+			tty->driver->name );
 	
 	/* just return if nothing has changed */
 	if ((tty->termios->c_cflag == old_termios->c_cflag)
@@ -2560,7 +2560,7 @@ static void mgslpc_close(struct tty_struct *tty, struct file * filp)
 {
 	MGSLPC_INFO * info = (MGSLPC_INFO *)tty->driver_data;
 
-	if (!info || mgslpc_paranoia_check(info, tty->device, "mgslpc_close"))
+	if (!info || mgslpc_paranoia_check(info, tty->name, "mgslpc_close"))
 		return;
 	
 	if (debug_level >= DEBUG_LEVEL_INFO)
@@ -2615,8 +2615,8 @@ static void mgslpc_close(struct tty_struct *tty, struct file * filp)
  	if (info->flags & ASYNC_INITIALIZED)
  		mgslpc_wait_until_sent(tty, info->timeout);
 
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 		
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
@@ -2642,7 +2642,7 @@ static void mgslpc_close(struct tty_struct *tty, struct file * filp)
 cleanup:			
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):mgslpc_close(%s) exit, count=%d\n", __FILE__,__LINE__,
-			tty->driver.name, info->count);
+			tty->driver->name, info->count);
 }
 
 /* Wait until the transmitter is empty.
@@ -2659,7 +2659,7 @@ static void mgslpc_wait_until_sent(struct tty_struct *tty, int timeout)
 		printk("%s(%d):mgslpc_wait_until_sent(%s) entry\n",
 			 __FILE__,__LINE__, info->device_name );
       
-	if (mgslpc_paranoia_check(info, tty->device, "mgslpc_wait_until_sent"))
+	if (mgslpc_paranoia_check(info, tty->name, "mgslpc_wait_until_sent"))
 		return;
 
 	if (!(info->flags & ASYNC_INITIALIZED))
@@ -2721,7 +2721,7 @@ static void mgslpc_hangup(struct tty_struct *tty)
 		printk("%s(%d):mgslpc_hangup(%s)\n",
 			 __FILE__,__LINE__, info->device_name );
 			 
-	if (mgslpc_paranoia_check(info, tty->device, "mgslpc_hangup"))
+	if (mgslpc_paranoia_check(info, tty->name, "mgslpc_hangup"))
 		return;
 
 	mgslpc_flush_buffer(tty);
@@ -2747,9 +2747,9 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
 	
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):block_til_ready on %s\n",
-			 __FILE__,__LINE__, tty->driver.name );
+			 __FILE__,__LINE__, tty->driver->name );
 
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 		/* this is a callout device */
 		/* just verify that normal device is not in use */
 		if (info->flags & ASYNC_NORMAL_ACTIVE)
@@ -2795,7 +2795,7 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
 	
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):block_til_ready before block on %s count=%d\n",
-			 __FILE__,__LINE__, tty->driver.name, info->count );
+			 __FILE__,__LINE__, tty->driver->name, info->count );
 
 	spin_lock_irqsave(&info->lock, flags);
 	if (!tty_hung_up_p(filp)) {
@@ -2839,7 +2839,7 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
 		
 		if (debug_level >= DEBUG_LEVEL_INFO)
 			printk("%s(%d):block_til_ready blocking on %s count=%d\n",
-				 __FILE__,__LINE__, tty->driver.name, info->count );
+				 __FILE__,__LINE__, tty->driver->name, info->count );
 				 
 		schedule();
 	}
@@ -2853,7 +2853,7 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
 	
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):block_til_ready after blocking on %s count=%d\n",
-			 __FILE__,__LINE__, tty->driver.name, info->count );
+			 __FILE__,__LINE__, tty->driver->name, info->count );
 			 
 	if (!retval)
 		info->flags |= ASYNC_NORMAL_ACTIVE;
@@ -2868,7 +2868,7 @@ static int mgslpc_open(struct tty_struct *tty, struct file * filp)
 	unsigned long flags;
 
 	/* verify range of specified line number */	
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = tty->index;
 	if ((line < 0) || (line >= mgslpc_device_count)) {
 		printk("%s(%d):mgslpc_open with illegal line #%d.\n",
 			__FILE__,__LINE__,line);
@@ -2887,12 +2887,12 @@ static int mgslpc_open(struct tty_struct *tty, struct file * filp)
 	
 	tty->driver_data = info;
 	info->tty = tty;
-	if (mgslpc_paranoia_check(info, tty->device, "mgslpc_open"))
+	if (mgslpc_paranoia_check(info, tty->name, "mgslpc_open"))
 		return -ENODEV;
 		
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):mgslpc_open(%s), old ref count = %d\n",
-			 __FILE__,__LINE__,tty->driver.name, info->count);
+			 __FILE__,__LINE__,tty->driver->name, info->count);
 
 	/* If port is closing, signal caller to try again */
 	if (tty_hung_up_p(filp) || info->flags & ASYNC_CLOSING){
@@ -2931,7 +2931,7 @@ static int mgslpc_open(struct tty_struct *tty, struct file * filp)
 
 	if ((info->count == 1) &&
 	    info->flags & ASYNC_SPLIT_TERMIOS) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = info->normal_termios;
 		else 
 			*tty->termios = info->callout_termios;

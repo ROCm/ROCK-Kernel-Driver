@@ -651,9 +651,11 @@ L:	linux-net@vger.kernel.org
 S:	Maintained
 
 ETHERNET BRIDGE
+P:	Stephen Hemminger
+M:	shemminger@osdl.org
 L:	bridge@math.leidenuniv.nl
 W:	http://bridge.sourceforge.net/
-S:	Unmaintained
+S:	Maintained
 
 ETHERTEAM 16I DRIVER
 P:	Mika Kuoppala

@@ -1283,7 +1283,7 @@ static int capinc_tty_init(void)
 	memset(drv, 0, sizeof(struct tty_driver));
 	drv->magic = TTY_DRIVER_MAGIC;
 	drv->driver_name = "capi_nc";
-	drv->name = "capi/%d";
+	drv->name = "capi/";
 	drv->major = capi_ttymajor;
 	drv->minor_start = 0;
 	drv->num = CAPINC_NR_PORTS;

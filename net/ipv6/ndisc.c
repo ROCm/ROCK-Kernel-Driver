@@ -427,7 +427,7 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 
 	len = sizeof(struct icmp6hdr) + sizeof(struct in6_addr);
 
-	rt = ndisc_get_dummy_rt();
+	rt = ip6_dst_alloc();
 	if (!rt) 
 		return;
 
@@ -524,7 +524,7 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 		saddr = &addr_buf;
 	}
 
-	rt = ndisc_get_dummy_rt();
+	rt = ip6_dst_alloc();
 	if (!rt) 
 		return;
 
@@ -595,7 +595,7 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
         int len;
 	int err;
 
-	rt = ndisc_get_dummy_rt();
+	rt = ip6_dst_alloc();
 	if (!rt) 
 		return;
 

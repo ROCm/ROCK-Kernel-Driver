@@ -539,9 +539,7 @@ static int rtnetlink_event(struct notifier_block *this, unsigned long event, voi
 }
 
 struct notifier_block rtnetlink_dev_notifier = {
-	rtnetlink_event,
-	NULL,
-	0
+	.notifier_call	= rtnetlink_event,
 };
 
 

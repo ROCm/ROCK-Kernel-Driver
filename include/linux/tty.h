@@ -259,12 +259,14 @@ struct tty_flip_buffer {
  */
 struct tty_struct {
 	int	magic;
-	struct tty_driver driver;
+	struct tty_driver *driver;
+	int index;
 	struct tty_ldisc ldisc;
 	struct termios *termios, *termios_locked;
+	char name[64];
 	int pgrp;
 	int session;
-	kdev_t	device;
+	dev_t	device;
 	unsigned long flags;
 	int count;
 	struct winsize winsize;
@@ -378,8 +380,8 @@ extern void start_tty(struct tty_struct * tty);
 extern int tty_register_ldisc(int disc, struct tty_ldisc *new_ldisc);
 extern int tty_register_driver(struct tty_driver *driver);
 extern int tty_unregister_driver(struct tty_driver *driver);
-extern void tty_register_device(struct tty_driver *driver, unsigned minor);
-extern void tty_unregister_device(struct tty_driver *driver, unsigned minor);
+extern void tty_register_device(struct tty_driver *driver, unsigned index);
+extern void tty_unregister_device(struct tty_driver *driver, unsigned index);
 extern int tty_read_raw_data(struct tty_struct *tty, unsigned char *bufp,
 			     int buflen);
 extern void tty_write_message(struct tty_struct *tty, char *msg);

@@ -728,7 +728,7 @@ static unsigned long sysio_irq_offsets[] = {
 
 #define NUM_SYSIO_OFFSETS (sizeof(sysio_irq_offsets) / sizeof(sysio_irq_offsets[0]))
 
-/* Convert Interrupt Mapping register pointer to assosciated
+/* Convert Interrupt Mapping register pointer to associated
  * Interrupt Clear register pointer, SYSIO specific version.
  */
 #define SYSIO_ICLR_UNUSED0	0x3400UL
@@ -1098,7 +1098,7 @@ void __init sbus_iommu_init(int prom_node, struct sbus_bus *sbus)
 		prom_halt();
 	}
 
-	/* Align on E$ line boundry. */
+	/* Align on E$ line boundary. */
 	iommu = (struct sbus_iommu *)
 		(((unsigned long)iommu + (SMP_CACHE_BYTES - 1UL)) &
 		 ~(SMP_CACHE_BYTES - 1UL));

@@ -18,9 +18,9 @@ extern struct pglist_data node_data[];
  * Following are specific to this numa platform.
  */
 
-extern int numa_node_exists[];
 extern int numa_cpu_lookup_table[];
 extern int numa_memory_lookup_table[];
+extern unsigned long numa_cpumask_lookup_table[];
 
 #define MAX_MEMORY (1UL << 41)
 /* 256MB regions */

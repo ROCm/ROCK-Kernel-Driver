@@ -41,6 +41,7 @@
 #include <linux/random.h>
 #include <linux/time.h>
 #include <linux/device.h>
+#include <linux/devfs_fs_kernel.h>
 
 #ifndef CONFIG_INPUT_TSDEV_SCREEN_X
 #define CONFIG_INPUT_TSDEV_SCREEN_X	240

@@ -1708,41 +1708,39 @@ int devfs_mk_symlink(const char *from, const char *to)
  *	On failure %NULL is returned.
  */
 
-devfs_handle_t devfs_mk_dir(const char *fmt, ...)
+int devfs_mk_dir(const char *fmt, ...)
 {
 	struct devfs_entry *dir = NULL, *de = NULL, *old;
 	char buf[64];
 	va_list args;
-	int n;
+	int error, n;
 
 	va_start(args, fmt);
 	n = vsnprintf(buf, 64, fmt, args);
 	if (n >= 64 || !buf[0]) {
 		printk(KERN_WARNING "%s: invalid argument.", __FUNCTION__);
-		return NULL;
+		return -EINVAL;
 	}
 
 	de = _devfs_prepare_leaf(&dir, buf, MODE_DIR);
 	if (!de) {
 		PRINTK("(%s): could not prepare leaf\n", buf);
-		return NULL;
+		return -EINVAL;
 	}
 
-	de->info = NULL;
-	if (_devfs_append_entry(dir, de, &old)) {
+	error = _devfs_append_entry(dir, de, &old);
+	if (error) {
 		PRINTK("(%s): could not append to dir: %p \"%s\"\n",
 				buf, dir, dir->name);
 		devfs_put(old);
 		goto out_put;
 	}
 	
-	DPRINTK(DEBUG_REGISTER, "(%s): de: %p dir: %p \"%s\"\n",
-			buf, de, dir, dir->name);
 	devfsd_notify(de, DEVFSD_NOTIFY_REGISTERED);
 
  out_put:
 	devfs_put(dir);
-	return de;
+	return error;
 }
 
 

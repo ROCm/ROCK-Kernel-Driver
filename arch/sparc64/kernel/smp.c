@@ -1071,7 +1071,7 @@ void smp_percpu_timer_interrupt(struct pt_regs *regs)
 			prof_counter(cpu) = prof_multiplier(cpu);
 		}
 
-		/* Guarentee that the following sequences execute
+		/* Guarantee that the following sequences execute
 		 * uninterrupted.
 		 */
 		__asm__ __volatile__("rdpr	%%pstate, %0\n\t"
@@ -1096,7 +1096,7 @@ static void __init smp_setup_percpu_timer(void)
 
 	prof_counter(cpu) = prof_multiplier(cpu) = 1;
 
-	/* Guarentee that the following sequences execute
+	/* Guarantee that the following sequences execute
 	 * uninterrupted.
 	 */
 	__asm__ __volatile__("rdpr	%%pstate, %0\n\t"

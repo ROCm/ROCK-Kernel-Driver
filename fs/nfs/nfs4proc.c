@@ -572,10 +572,10 @@ nfs4_do_open(struct inode *dir, struct qstr *name, int flags,
 	u32                     f_bmres[2];
 	u32                     d_bmres[2];
 	struct nfs_fattr        d_attr = {
-		.valid          0,
+		.valid          = 0,
 	};
 	struct nfs_fattr        f_attr = {
-		.valid          0,
+		.valid          = 0,
 	};
 	struct nfs4_getattr     f_getattr = {
 		.gt_bmval       = nfs4_fattr_bitmap,

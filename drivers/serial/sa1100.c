@@ -852,7 +852,7 @@ console_initcall(sa1100_rs_console_init);
 static struct uart_driver sa1100_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "ttySA",
-	.dev_name		= "ttySA%d",
+	.dev_name		= "ttySA",
 	.major			= SERIAL_SA1100_MAJOR,
 	.minor			= MINOR_START,
 	.nr			= NR_PORTS,

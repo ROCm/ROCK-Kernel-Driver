@@ -88,7 +88,7 @@ trap_setup:
 	/* From kernel, allocate more kernel stack and
 	 * build a pt_regs trap frame.
 	 */
-	sub	%fp, (REGWIN_SZ + TRACEREG_SZ), %t_kstack
+	sub	%fp, (STACKFRAME_SZ + TRACEREG_SZ), %t_kstack
 	STORE_PT_ALL(t_kstack, t_psr, t_pc, t_npc, g2)
 
 	/* See if we are in the trap window. */
@@ -129,7 +129,7 @@ tsetup_patch2:
 	jmpl	%t_retpc + 0x8, %g0	! return to caller
 	 mov	%t_kstack, %sp		! and onto new kernel stack
 
-#define STACK_OFFSET (THREAD_SIZE - (TRACEREG_SZ + REGWIN_SZ))
+#define STACK_OFFSET (THREAD_SIZE - TRACEREG_SZ - STACKFRAME_SZ)
 
 trap_setup_from_user:
 	/* We can't use %curptr yet. */

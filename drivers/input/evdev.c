@@ -19,8 +19,9 @@
 #include <linux/input.h>
 #include <linux/smp_lock.h>
 #include <linux/device.h>
+#include <linux/devfs_fs_kernel.h>
 
-struct evdev{
+struct evdev {
 	int exist;
 	int open;
 	int minor;

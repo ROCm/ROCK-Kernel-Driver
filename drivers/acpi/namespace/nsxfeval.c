@@ -524,8 +524,8 @@ acpi_ns_get_device_callback (
  *
  * DESCRIPTION: Performs a modified depth-first walk of the namespace tree,
  *              starting (and ending) at the object specified by start_handle.
- *              The user_function is called whenever an object that matches
- *              the type parameter is found.  If the user function returns
+ *              The user_function is called whenever an object of type
+ *              Device is found.  If the user function returns
  *              a non-zero value, the search is terminated immediately and this
  *              value is returned to the caller.
  *

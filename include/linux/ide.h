@@ -1245,7 +1245,6 @@ extern int noautodma;
  * We need blk.h, but we replace its end_request by our own version.
  */
 #define IDE_DRIVER		/* Toggle some magic bits in blk.h */
-#define LOCAL_END_REQUEST	/* Don't generate end_request in blk.h */
 #include <linux/blk.h>
 
 extern int ide_end_request (ide_drive_t *drive, int uptodate, int nrsecs);

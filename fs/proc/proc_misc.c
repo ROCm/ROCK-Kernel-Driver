@@ -339,10 +339,10 @@ static int diskstats_open(struct inode *inode, struct file *file)
 	return seq_open(file, &diskstats_op);
 }
 static struct file_operations proc_diskstats_operations = {
-	open:		diskstats_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	seq_release,
+	.open		= diskstats_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 
 #ifdef CONFIG_MODULES

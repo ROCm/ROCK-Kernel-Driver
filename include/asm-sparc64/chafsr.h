@@ -61,7 +61,7 @@
 /* Uncorrectable system bus data ECC error for read of interrupt vector */
 #define CHAFSR_IVU		0x0000200000000000
 
-/* Unmappeed error from system bus */
+/* Unmapped error from system bus */
 #define CHAFSR_TO		0x0000100000000000
 
 /* Bus error response from system bus */
@@ -127,7 +127,7 @@
 
 /* The AFSR must be explicitly cleared by software, it is not cleared automatically
  * by a read.  Writes to bits <51:33> with bits set will clear the corresponding
- * bits in the AFSR.  Bits assosciated with disrupting traps must be cleared before
+ * bits in the AFSR.  Bits associated with disrupting traps must be cleared before
  * interrupts are re-enabled to prevent multiple traps for the same error.  I.e.
  * PSTATE.IE and AFSR bits control delivery of disrupting traps.
  *
