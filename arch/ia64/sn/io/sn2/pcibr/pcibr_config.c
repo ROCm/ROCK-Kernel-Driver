@@ -27,7 +27,6 @@
 #include <asm/sn/pci/pci_defs.h>
 #include <asm/sn/prio.h>
 #include <asm/sn/xtalk/xbow.h>
-#include <asm/sn/ioc3.h>
 #include <asm/sn/io.h>
 #include <asm/sn/sn_private.h>
 
