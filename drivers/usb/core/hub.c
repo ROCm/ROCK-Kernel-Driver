@@ -876,7 +876,6 @@ static int hub_port_status(struct usb_device *hdev, int port,
 #define HUB_LONG_RESET_TIME	200
 #define HUB_RESET_TIMEOUT	500
 
-/* return: -1 on error, 0 on success, 1 on disconnect.  */
 static int hub_port_wait_reset(struct usb_device *hdev, int port,
 				struct usb_device *udev, unsigned int delay)
 {
@@ -892,17 +891,16 @@ static int hub_port_wait_reset(struct usb_device *hdev, int port,
 
 		/* read and decode port status */
 		ret = hub_port_status(hdev, port, &portstatus, &portchange);
-		if (ret < 0) {
-			return -1;
-		}
+		if (ret < 0)
+			return ret;
 
 		/* Device went away? */
 		if (!(portstatus & USB_PORT_STAT_CONNECTION))
-			return 1;
+			return -ENOTCONN;
 
 		/* bomb out completely if something weird happened */
 		if ((portchange & USB_PORT_STAT_C_CONNECTION))
-			return -1;
+			return -EINVAL;
 
 		/* if we`ve finished resetting, then break out of the loop */
 		if (!(portstatus & USB_PORT_STAT_RESET) &&
@@ -925,10 +923,9 @@ static int hub_port_wait_reset(struct usb_device *hdev, int port,
 			port + 1, delay);
 	}
 
-	return -1;
+	return -EBUSY;
 }
 
-/* return: -1 on error, 0 on success, 1 on disconnect.  */
 static int hub_port_reset(struct usb_device *hdev, int port,
 				struct usb_device *udev, unsigned int delay)
 {
@@ -941,7 +938,7 @@ static int hub_port_reset(struct usb_device *hdev, int port,
 
 		/* return on disconnect or reset */
 		status = hub_port_wait_reset(hdev, port, udev, delay);
-		if (status != -1) {
+		if (status == -ENOTCONN || status == 0) {
 			clear_port_feature(hdev,
 				port + 1, USB_PORT_FEAT_C_RESET);
 			udev->state = status
@@ -960,7 +957,7 @@ static int hub_port_reset(struct usb_device *hdev, int port,
 		"Cannot enable port %i.  Maybe the USB cable is bad?\n",
 		port + 1);
 
-	return -1;
+	return status;
 }
 
 static int hub_port_disable(struct usb_device *hdev, int port)
@@ -993,7 +990,6 @@ static int hub_port_disable(struct usb_device *hdev, int port)
 #define HUB_DEBOUNCE_STEP	 25
 #define HUB_DEBOUNCE_STABLE	  4
 
-/* return: -1 on error, 0 on success, 1 on disconnect.  */
 static int hub_port_debounce(struct usb_device *hdev, int port)
 {
 	int ret;
@@ -1008,7 +1004,7 @@ static int hub_port_debounce(struct usb_device *hdev, int port)
 
 		ret = hub_port_status(hdev, port, &portstatus, &portchange);
 		if (ret < 0)
-			return -1;
+			return ret;
 
 		if ((portstatus & USB_PORT_STAT_CONNECTION) == connection) {
 			if (connection) {
@@ -1029,7 +1025,7 @@ static int hub_port_debounce(struct usb_device *hdev, int port)
 		"debounce: port %d: delay %dms stable %d status 0x%x\n",
 		port + 1, delay_time, stable_count, portstatus);
 
-	return ((portstatus&USB_PORT_STAT_CONNECTION)) ? 0 : 1;
+	return (portstatus & USB_PORT_STAT_CONNECTION) ? 0 : -ENOTCONN;
 }
 
 static int hub_set_address(struct usb_device *udev)
@@ -1062,7 +1058,7 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
 {
 	static DECLARE_MUTEX(usb_address0_sem);
 
-	int			i, j, retval = -ENODEV;
+	int			i, j, retval;
 	unsigned		delay = HUB_SHORT_RESET_TIME;
 	enum usb_device_speed	oldspeed = udev->speed;
 
@@ -1080,15 +1076,12 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
 	down(&usb_address0_sem);
 
 	/* Reset the device; full speed may morph to high speed */
-	switch (hub_port_reset(hdev, port, udev, delay)) {
-	case 0:			/* success, speed is known */
-		break;
-	case 1:			/* disconnect, give to companion */
-		retval = -EBUSY;
-		/* FALL THROUGH */
-	default:		/* error */
+	retval = hub_port_reset(hdev, port, udev, delay);
+	if (retval < 0)		/* error or disconnect */
 		goto fail;
-	}
+				/* success, speed is known */
+	retval = -ENODEV;
+
 	if (oldspeed != USB_SPEED_UNKNOWN && oldspeed != udev->speed) {
 		dev_dbg(&udev->dev, "device reset changed speed!\n");
 		goto fail;
@@ -1346,7 +1339,7 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 		/* reset, set address, get descriptor, add to hub's children */
 		down (&udev->serialize);
 		status = hub_port_init(hdev, udev, port);
-		if (status == -EBUSY)
+		if (status == -ENOTCONN)
 			break;
 		if (status < 0)
 			continue;
