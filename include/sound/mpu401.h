@@ -102,7 +102,7 @@ struct _snd_mpu401 {
 
  */
 
-void snd_mpu401_uart_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+irqreturn_t snd_mpu401_uart_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 int snd_mpu401_uart_new(snd_card_t * card,
 			int device,

@@ -25,6 +25,7 @@
 #include <linux/mman.h>
 #include <linux/tty.h>
 #include <linux/init.h>
+#include <linux/linux_logo.h>
 #include <linux/proc_fs.h>
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>
@@ -655,7 +656,7 @@ int fb_prepare_logo(struct fb_info *info)
 	}
 
 	/* Return if no suitable logo was found */
-	fb_logo.logo = find_logo(info->var.bits_per_pixel);
+	fb_logo.logo = fb_find_logo(info->var.bits_per_pixel);
 	
 	if (!fb_logo.logo || fb_logo.logo->height > info->var.yres) {
 		fb_logo.logo = NULL;

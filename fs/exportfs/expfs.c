@@ -91,7 +91,6 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 			if (dentry != result &&
 			    acceptable(context, dentry)) {
 				dput(result);
-				dentry->d_vfs_flags |= DCACHE_REFERENCED;
 				return dentry;
 			}
 			spin_lock(&dcache_lock);
@@ -271,7 +270,6 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 		if (dentry != result &&
 		    acceptable(context, dentry)) {
 			dput(result);
-			dentry->d_vfs_flags |= DCACHE_REFERENCED;
 			return dentry;
 		}
 		spin_lock(&dcache_lock);
@@ -434,7 +432,6 @@ static struct dentry *export_iget(struct super_block *sb, unsigned long ino, __u
 		iput(inode);
 		return ERR_PTR(-ENOMEM);
 	}
-	result->d_vfs_flags |= DCACHE_REFERENCED;
 	return result;
 }
 

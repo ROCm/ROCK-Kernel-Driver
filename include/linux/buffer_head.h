@@ -172,7 +172,7 @@ struct buffer_head * __getblk(struct block_device *, sector_t, int);
 void __brelse(struct buffer_head *);
 void __bforget(struct buffer_head *);
 struct buffer_head *__bread(struct block_device *, sector_t block, int size);
-struct buffer_head *alloc_buffer_head(void);
+struct buffer_head *alloc_buffer_head(int gfp_flags);
 void free_buffer_head(struct buffer_head * bh);
 void FASTCALL(unlock_buffer(struct buffer_head *bh));
 void ll_rw_block(int, int, struct buffer_head * bh[]);

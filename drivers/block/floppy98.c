@@ -2318,10 +2318,9 @@ static struct cont_t format_cont={
 	bad_flp_intr,
 	generic_done };
 
-static int do_format(kdev_t device, struct format_descr *tmp_format_req)
+static int do_format(int drive, struct format_descr *tmp_format_req)
 {
 	int ret;
-	int drive=DRIVE(device);
 
 	LOCK_FDC(drive,1);
 	set_floppy(drive);
@@ -2348,7 +2347,7 @@ static int do_format(kdev_t device, struct format_descr *tmp_format_req)
  * =============================
  */
 
-static inline void end_request(struct request *req, int uptodate)
+static void floppy_end_request(struct request *req, int uptodate)
 {
 	if (end_that_request_first(req, uptodate, current_count_sectors))
 		return;
@@ -2389,7 +2388,7 @@ static void request_done(int uptodate)
 
 		/* unlock chained buffers */
 		spin_lock_irqsave(q->queue_lock, flags);
-		end_request(req, 1);
+		floppy_end_request(req, 1);
 		spin_unlock_irqrestore(q->queue_lock, flags);
 	} else {
 		if (rq_data_dir(req) == WRITE) {
@@ -2403,7 +2402,7 @@ static void request_done(int uptodate)
 			DRWE->last_error_generation = DRS->generation;
 		}
 		spin_lock_irqsave(q->queue_lock, flags);
-		end_request(req, 0);
+		floppy_end_request(req, 0);
 		spin_unlock_irqrestore(q->queue_lock, flags);
 	}
 }
@@ -3635,7 +3634,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 		case FDFMTTRK:
 			if (UDRS->fd_ref != 1)
 				return -EBUSY;
-			return do_format(device, &inparam.f);
+			return do_format(drive, &inparam.f);
 		case FDFMTEND:
 		case FDFLUSH:
 			LOCK_FDC(drive,1);
@@ -4084,21 +4083,19 @@ static int *table_sup[] =
 
 static void __init register_devfs_entries (int drive)
 {
-    int base_minor, i;
+	int base_minor = (drive < 4) ? drive : (124 + drive);
 
-    base_minor = (drive < 4) ? drive : (124 + drive);
-    if (UDP->cmos < NUMBER(default_drive_params)) {
-	i = 0;
-	do {
-	    char name[16];
+	if (UDP->cmos < NUMBER(default_drive_params)) {
+		int i = 0;
+		do {
+			int minor = base_minor + (table_sup[UDP->cmos][i] << 2);
 
-	    sprintf(name, "floppy/%d%s", drive, table[table_sup[UDP->cmos][i]]);
-	    devfs_register(NULL, name, DEVFS_FL_DEFAULT, FLOPPY_MAJOR,
-			    base_minor + (table_sup[UDP->cmos][i] << 2),
-			    S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |S_IWGRP,
-			    &floppy_fops, NULL);
-	} while (table_sup[UDP->cmos][i++]);
-    }
+			devfs_mk_bdev(MKDEV(FLOPPY_MAJOR, minor), 
+					S_IFBLK|S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP,
+					"floppy/%d%s",
+					drive, table[table_sup[UDP->cmos][i]]);
+		} while (table_sup[UDP->cmos][i++]);
+	}
 }
 
 /*

@@ -608,7 +608,6 @@ struct dentry *fat_get_dentry(struct super_block *sb, void *inump)
 		return ERR_PTR(-ENOMEM);
 	}
 	result->d_op = sb->s_root->d_op;
-	result->d_vfs_flags |= DCACHE_REFERENCED;
 	return result;
 }
 

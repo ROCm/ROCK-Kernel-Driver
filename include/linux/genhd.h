@@ -64,7 +64,7 @@ struct hd_struct {
 	sector_t nr_sects;
 	struct kobject kobj;
 	unsigned reads, read_sectors, writes, write_sectors;
-	int policy;
+	int policy, partno;
 };
 
 #define GENHD_FL_REMOVABLE  1
@@ -89,7 +89,7 @@ struct gendisk {
 	int minor_shift;		/* number of times minor is shifted to
 					   get real minor */
 	char disk_name[16];		/* name of major driver */
-	struct hd_struct *part;		/* [indexed by minor] */
+	struct hd_struct **part;	/* [indexed by minor] */
 	struct block_device_operations *fops;
 	struct request_queue *queue;
 	void *private_data;

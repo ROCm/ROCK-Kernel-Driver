@@ -449,7 +449,6 @@ static int __init xpram_setup_blkdev(void)
 	offset = 0;
 	for (i = 0; i < xpram_devs; i++) {
 		struct gendisk *disk = xpram_disks[i];
-		char name[16];
 
 		xpram_devices[i].size = xpram_sizes[i] / 4;
 		xpram_devices[i].offset = offset;
@@ -460,13 +459,9 @@ static int __init xpram_setup_blkdev(void)
 		disk->private_data = &xpram_devices[i];
 		disk->queue = &xpram_queue;
 		sprintf(disk->disk_name, "slram%d", i);
+		sprintf(disk->disk_name, "slram/%d", i);
 		set_capacity(disk, xpram_sizes[i] << 1);
 		add_disk(disk);
-		sprintf(name, "slram/%d", i);
-		devfs_register(NULL, name, DEVFS_FL_DEFAULT,
-			       disk->major, disk->first_minor,
-			       S_IFBLK | S_IRUSR | S_IWUSR,
-			       disk->fops, NULL);
 	}
 
 	return 0;
@@ -485,7 +480,6 @@ static void __exit xpram_exit(void)
 	for (i = 0; i < xpram_devs; i++) {
 		del_gendisk(xpram_disks[i]);
 		put_disk(xpram_disks[i]);
-		devfs_remove("slram/%d", i);
 	}
 	unregister_blkdev(XPRAM_MAJOR, XPRAM_NAME);
 	devfs_remove("slram");

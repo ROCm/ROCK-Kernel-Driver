@@ -1436,17 +1436,18 @@ EXPORT_SYMBOL (usb_hcd_giveback_urb);
  * to handle interrupts.  The PCI glue layer does so automatically; only
  * bus glue for non-PCI system busses will need to use this.
  */
-void usb_hcd_irq (int irq, void *__hcd, struct pt_regs * r)
+irqreturn_t usb_hcd_irq (int irq, void *__hcd, struct pt_regs * r)
 {
 	struct usb_hcd		*hcd = __hcd;
 	int			start = hcd->state;
 
 	if (unlikely (hcd->state == USB_STATE_HALT))	/* irq sharing? */
-		return;
+		return IRQ_NONE;
 
 	hcd->driver->irq (hcd, r);
 	if (hcd->state != start && hcd->state == USB_STATE_HALT)
 		usb_hc_died (hcd);
+	return IRQ_HANDLED;
 }
 EXPORT_SYMBOL (usb_hcd_irq);
 

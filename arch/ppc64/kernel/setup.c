@@ -17,7 +17,7 @@
 #include <linux/init.h>
 #include <linux/reboot.h>
 #include <linux/delay.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/ide.h>
 #include <linux/seq_file.h>
 #include <linux/ioport.h>

@@ -441,8 +441,16 @@ repeat:
 unsigned long tick_usec = TICK_USEC; 		/* ACTHZ   period (usec) */
 unsigned long tick_nsec = TICK_NSEC(TICK_USEC);	/* USER_HZ period (nsec) */
 
-/* The current time */
+/* 
+ * The current time 
+ * wall_to_monotonic is what we need to add to xtime (or xtime corrected 
+ * for sub jiffie times) to get to monotonic time.  Monotonic is pegged at zero
+ * at zero at system boot time, so wall_to_monotonic will be negative,
+ * however, we will ALWAYS keep the tv_nsec part positive so we can use
+ * the usual normalization.
+ */
 struct timespec xtime __attribute__ ((aligned (16)));
+struct timespec wall_to_monotonic __attribute__ ((aligned (16)));
 
 /* Don't completely fail for HZ > 500.  */
 int tickadj = 500/HZ ? : 1;		/* microsecs */
@@ -508,6 +516,7 @@ static void second_overflow(void)
     case TIME_INS:
 	if (xtime.tv_sec % 86400 == 0) {
 	    xtime.tv_sec--;
+	    wall_to_monotonic.tv_sec++;
 	    time_state = TIME_OOP;
 	    clock_was_set();
 	    printk(KERN_NOTICE "Clock: inserting leap second 23:59:60 UTC\n");
@@ -517,6 +526,7 @@ static void second_overflow(void)
     case TIME_DEL:
 	if ((xtime.tv_sec + 1) % 86400 == 0) {
 	    xtime.tv_sec++;
+	    wall_to_monotonic.tv_sec--;
 	    time_state = TIME_WAIT;
 	    clock_was_set();
 	    printk(KERN_NOTICE "Clock: deleting leap second 23:59:59 UTC\n");

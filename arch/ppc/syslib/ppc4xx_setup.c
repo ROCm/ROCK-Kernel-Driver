@@ -22,7 +22,7 @@
 #include <linux/reboot.h>
 #include <linux/param.h>
 #include <linux/string.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/pci.h>
 #include <linux/rtc.h>
 #include <linux/console.h>

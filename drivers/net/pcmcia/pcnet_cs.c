@@ -117,7 +117,7 @@ static int pcnet_open(struct net_device *dev);
 static int pcnet_close(struct net_device *dev);
 static int ei_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int do_ioctl_light(struct net_device *dev, struct ifreq *rq, int cmd);
-static void ei_irq_wrapper(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t ei_irq_wrapper(int irq, void *dev_id, struct pt_regs *regs);
 static void ei_watchdog(u_long arg);
 static void pcnet_reset_8390(struct net_device *dev);
 static int set_config(struct net_device *dev, struct ifmap *map);
@@ -1121,11 +1121,13 @@ static int set_config(struct net_device *dev, struct ifmap *map)
 
 /*====================================================================*/
 
-static void ei_irq_wrapper(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t ei_irq_wrapper(int irq, void *dev_id, struct pt_regs *regs)
 {
     pcnet_dev_t *info = dev_id;
     info->stale = 0;
     ei_interrupt(irq, dev_id, regs);
+    /* FIXME! Was it really ours? */
+    return IRQ_HANDLED;
 }
 
 static void ei_watchdog(u_long arg)

@@ -1078,10 +1078,14 @@ void blk_stop_queue(request_queue_t *q)
  * blk_run_queue - run a single device queue
  * @q	The queue to run
  */
-void __blk_run_queue(request_queue_t *q)
+void blk_run_queue(struct request_queue *q)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(q->queue_lock, flags);
 	blk_remove_plug(q);
 	q->request_fn(q);
+	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 
 /**
@@ -1841,7 +1845,7 @@ static inline void blk_partition_remap(struct bio *bio)
 	if (bdev == bdev->bd_contains)
 		return;
 
-	p = &disk->part[bdev->bd_dev-MKDEV(disk->major,disk->first_minor)-1];
+	p = disk->part[bdev->bd_dev-MKDEV(disk->major,disk->first_minor)-1];
 	switch (bio->bi_rw) {
 	case READ:
 		p->read_sectors += bio_sectors(bio);
@@ -2267,5 +2271,5 @@ EXPORT_SYMBOL(blk_queue_invalidate_tags);
 EXPORT_SYMBOL(blk_start_queue);
 EXPORT_SYMBOL(blk_stop_queue);
 EXPORT_SYMBOL(__blk_stop_queue);
-EXPORT_SYMBOL(__blk_run_queue);
+EXPORT_SYMBOL(blk_run_queue);
 EXPORT_SYMBOL(blk_run_queues);

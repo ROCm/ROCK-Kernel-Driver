@@ -940,11 +940,9 @@ static int el3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		outw(SetTxThreshold + (1536>>2), ioaddr + EL3_CMD);
 	}
 
-	dev_kfree_skb (skb);
 	pop_tx_status(dev);
-
-	spin_unlock(&lp->window_lock);
-	
+	spin_unlock_irqrestore(&lp->window_lock, flags);
+	dev_kfree_skb(skb);
 	return 0;
 }
 

@@ -41,11 +41,14 @@ static int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg *arg)
 					return -EINVAL;
 			}
 			/* partition number in use? */
-			if (disk->part[part - 1].nr_sects != 0)
+			if (disk->part[part - 1])
 				return -EBUSY;
 			/* overlap? */
 			for (i = 0; i < disk->minors - 1; i++) {
-				struct hd_struct *s = &disk->part[i];
+				struct hd_struct *s = disk->part[i];
+
+				if (!s)
+					continue;
 				if (!(start+length <= s->start_sect ||
 				      start >= s->start_sect + s->nr_sects))
 					return -EBUSY;
@@ -54,7 +57,9 @@ static int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg *arg)
 			add_partition(disk, part, start, length);
 			return 0;
 		case BLKPG_DEL_PARTITION:
-			if (disk->part[part - 1].nr_sects == 0)
+			if (!disk->part[part-1])
+				return -ENXIO;
+			if (disk->part[part - 1]->nr_sects == 0)
 				return -ENXIO;
 			/* partition in use? Incomplete check for now. */
 			bdevp = bdget(MKDEV(disk->major, disk->first_minor) + part);

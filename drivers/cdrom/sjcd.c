@@ -70,7 +70,6 @@
 #include <linux/string.h>
 #include <linux/major.h>
 #include <linux/init.h>
-#include <linux/devfs_fs_kernel.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -1692,6 +1691,7 @@ static int __init sjcd_init(void)
 	sjcd_disk->first_minor = 0,
 	sjcd_disk->fops = &sjcd_fops,
 	sprintf(sjcd_disk->disk_name, "sjcd");
+	sprintf(sjcd_disk->devfs_name, "sjcd");
 
 	if (check_region(sjcd_base, 4)) {
 		printk
@@ -1778,8 +1778,6 @@ static int __init sjcd_init(void)
 	}
 
 	printk(KERN_INFO "SJCD: Status: port=0x%x.\n", sjcd_base);
-	devfs_register(NULL, "sjcd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
-		       S_IFBLK | S_IRUGO | S_IWUGO, &sjcd_fops, NULL);
 	sjcd_disk->queue = &sjcd_queue;
 	add_disk(sjcd_disk);
 
@@ -1798,7 +1796,6 @@ out1:
 
 static void __exit sjcd_exit(void)
 {
-	devfs_remove("sjcd");
 	del_gendisk(sjcd_disk);
 	put_disk(sjcd_disk);
 	release_region(sjcd_base, 4);

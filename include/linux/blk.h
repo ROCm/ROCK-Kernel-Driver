@@ -12,24 +12,6 @@ extern void set_disk_ro(struct gendisk *disk, int flag);
 extern void add_disk_randomness(struct gendisk *disk);
 extern void rand_initialize_disk(struct gendisk *disk);
 
-#ifdef CONFIG_BLK_DEV_RAM
-
-extern int rd_doload;          /* 1 = load ramdisk, 0 = don't load */
-extern int rd_prompt;          /* 1 = prompt for ramdisk, 0 = don't prompt */
-extern int rd_image_start;     /* starting block # of image */
-
-#ifdef CONFIG_BLK_DEV_INITRD
-
-#define INITRD_MINOR 250 /* shouldn't collide with /dev/ram* too soon ... */
-
-extern unsigned long initrd_start,initrd_end;
-extern int initrd_below_start_ok; /* 1 if it is not an error if initrd_start < memory_start */
-void initrd_init(void);
-
-#endif /* CONFIG_BLK_DEV_INITRD */
-
-#endif
-
 /*
  * end_request() and friends. Must be called with the request queue spinlock
  * acquired. All functions called within end_request() _must_be_ atomic.

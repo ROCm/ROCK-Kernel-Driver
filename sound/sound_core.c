@@ -54,7 +54,7 @@ struct sound_unit
 	int unit_minor;
 	struct file_operations *unit_fops;
 	struct sound_unit *next;
-	devfs_handle_t de;
+	char name[32];
 };
 
 #ifdef CONFIG_SOUND_MSNDCLAS
@@ -151,30 +151,29 @@ static spinlock_t sound_loader_lock = SPIN_LOCK_UNLOCKED;
 
 static int sound_insert_unit(struct sound_unit **list, struct file_operations *fops, int index, int low, int top, const char *name, umode_t mode)
 {
+	struct sound_unit *s = kmalloc(sizeof(*s), GFP_KERNEL);
 	int r;
-	struct sound_unit *s=(struct sound_unit *)kmalloc(sizeof(struct sound_unit), GFP_KERNEL);
-	char name_buf[32];
 
-	if(s==NULL)
+	if (!s)
 		return -ENOMEM;
 		
 	spin_lock(&sound_loader_lock);
-	r=__sound_insert_unit(s,list,fops,index,low,top);
+	r = __sound_insert_unit(s, list, fops, index, low, top);
 	spin_unlock(&sound_loader_lock);
 	
-	if(r<0)
-	{
-		kfree(s);
-		return r;
-	}
-	
-	if (r < SOUND_STEP)
-		sprintf (name_buf, "sound/%s", name);
+	if (r < 0)
+		goto fail;
+	else if (r < SOUND_STEP)
+		sprintf(s->name, "sound/%s", name);
 	else
-		sprintf (name_buf, "sound/%s%d", name, r / SOUND_STEP);
-	s->de = devfs_register (NULL, name_buf,
-				DEVFS_FL_NONE, SOUND_MAJOR, s->unit_minor,
-				S_IFCHR | mode, fops, NULL);
+		sprintf(s->name, "sound/%s%d", name, r / SOUND_STEP);
+
+	devfs_register(NULL, s->name, 0, SOUND_MAJOR, s->unit_minor,
+			S_IFCHR | mode, fops, NULL);
+	return r;
+
+ fail:
+	kfree(s);
 	return r;
 }
 
@@ -192,7 +191,7 @@ static void sound_remove_unit(struct sound_unit **list, int unit)
 	p = __sound_remove_unit(list, unit);
 	spin_unlock(&sound_loader_lock);
 	if (p) {
-		devfs_unregister (p->de);
+		devfs_remove(p->name);
 		kfree(p);
 	}
 }

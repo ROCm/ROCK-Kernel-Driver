@@ -14,7 +14,7 @@
 #include <linux/mm.h>
 #include <linux/hugetlb.h>
 #include <linux/slab.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/swap.h>
 #include <linux/pagemap.h>
 #include <linux/fs.h>

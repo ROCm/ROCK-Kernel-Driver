@@ -148,7 +148,7 @@ static int aio_setup_ring(struct kioctx *ctx)
 
 	dprintk("mmap address: 0x%08lx\n", info->mmap_base);
 	info->nr_pages = get_user_pages(current, ctx->mm,
-					info->mmap_base, info->mmap_size, 
+					info->mmap_base, nr_pages, 
 					1, 0, info->ring_pages, NULL);
 	up_write(&ctx->mm->mmap_sem);
 

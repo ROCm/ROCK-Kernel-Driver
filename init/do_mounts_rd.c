@@ -4,6 +4,7 @@
 #include <linux/minix_fs.h>
 #include <linux/ext2_fs.h>
 #include <linux/romfs_fs.h>
+#include <linux/initrd.h>
 
 #include "do_mounts.h"
 

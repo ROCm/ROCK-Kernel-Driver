@@ -74,7 +74,7 @@ static unsigned char i8042_unxlate_table[128] = {
 	 19, 25, 57, 81, 83, 92, 95, 98, 99,100,101,103,104,106,109,110
 };
 
-static void i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 /*
  * The i8042_wait_read() and i8042_wait_write functions wait for the i8042 to
@@ -332,7 +332,7 @@ static char i8042_mux_phys[4][32];
  * to the upper layers.
  */
 
-static void i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
 	unsigned char str, data;
@@ -415,6 +415,8 @@ static void i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		serio_interrupt(&i8042_kbd_port, data, dfl, regs);
 	}
 
+	/* FIXME - was it really ours? */
+	return IRQ_HANDLED;
 }
 
 /*

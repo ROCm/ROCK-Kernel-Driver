@@ -31,7 +31,7 @@
 #include <linux/interrupt.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/ioport.h>
 #include <linux/console.h>
 #include <linux/pci.h>

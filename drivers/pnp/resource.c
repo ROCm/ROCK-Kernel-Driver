@@ -420,8 +420,9 @@ struct pnp_dev * pnp_check_irq_conflicts(struct pnp_dev * dev, int idx, int mode
 	return NULL;
 }
 
-static void pnp_test_handler(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t pnp_test_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
+	return IRQ_NONE;
 }
 
 int pnp_check_irq(struct pnp_dev * dev, int idx)

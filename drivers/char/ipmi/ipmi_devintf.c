@@ -437,10 +437,7 @@ static struct file_operations ipmi_fops = {
 static int ipmi_major = 0;
 MODULE_PARM(ipmi_major, "i");
 
-static devfs_handle_t devfs_handle;
-
 #define MAX_DEVICES 10
-static devfs_handle_t handles[MAX_DEVICES];
 
 static void ipmi_new_smi(int if_num)
 {
@@ -451,10 +448,9 @@ static void ipmi_new_smi(int if_num)
 
 	snprintf(name, sizeof(name), "ipmidev/%d", if_num);
 
-	handles[if_num] = devfs_register(NULL, name, DEVFS_FL_NONE,
-					 ipmi_major, if_num,
-					 S_IFCHR | S_IRUSR | S_IWUSR,
-					 &ipmi_fops, NULL);
+	devfs_register(NULL, name, 0, ipmi_major, if_num,
+			S_IFCHR | S_IRUSR | S_IWUSR,
+			&ipmi_fops, NULL);
 }
 
 static void ipmi_smi_gone(int if_num)
@@ -462,7 +458,7 @@ static void ipmi_smi_gone(int if_num)
 	if (if_num > MAX_DEVICES)
 		return;
 
-	devfs_unregister(handles[if_num]);
+	devfs_remove("ipmidev/%d", if_num);
 }
 
 static struct ipmi_smi_watcher smi_watcher =
@@ -488,7 +484,7 @@ static __init int init_ipmi_devintf(void)
 		ipmi_major = rv;
 	}
 
-	devfs_handle = devfs_mk_dir(DEVICE_NAME);
+	devfs_mk_dir(DEVICE_NAME);
 
 	rv = ipmi_smi_watcher_register(&smi_watcher);
 	if (rv) {
@@ -507,7 +503,7 @@ module_init(init_ipmi_devintf);
 static __exit void cleanup_ipmi(void)
 {
 	ipmi_smi_watcher_unregister(&smi_watcher);
-	devfs_unregister(devfs_handle);
+	devfs_remove(DEVICE_NAME);
 	unregister_chrdev(ipmi_major, DEVICE_NAME);
 }
 module_exit(cleanup_ipmi);

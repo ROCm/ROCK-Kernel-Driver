@@ -23,7 +23,7 @@
 #include <linux/param.h>
 #include <linux/string.h>
 #include <linux/bootmem.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
 

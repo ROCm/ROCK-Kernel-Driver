@@ -40,7 +40,6 @@
 #include <linux/ioctl.h>
 #include <linux/sched.h>
 #include <linux/smp_lock.h>
-#include <linux/devfs_fs_kernel.h>
 
 // #define DEBUG
 
@@ -336,7 +335,6 @@ static DECLARE_MUTEX (scn_mutex); /* Initializes to unlocked */
 
 struct scn_usb_data {
 	struct usb_device *scn_dev;
-	devfs_handle_t devfs;	/* devfs device */
 	struct urb *scn_irq;
 	unsigned int ifnum;	/* Interface number of the USB device */
 	int scn_minor;		/* Scanner minor - used in disconnect() */

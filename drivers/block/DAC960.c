@@ -1069,6 +1069,7 @@ static boolean DAC960_V1_EnableMemoryMailboxInterface(DAC960_Controller_T
   
   if (pci_set_dma_mask(Controller->PCIDevice, DAC690_V1_PciDmaMask))
 	return DAC960_Failure(Controller, "DMA mask out of range");
+  Controller->BounceBufferLimit = DAC690_V1_PciDmaMask;
 
   if ((hw_type == DAC960_PD_Controller) || (hw_type == DAC960_P_Controller)) {
     CommandMailboxesSize =  0;
@@ -1271,6 +1272,7 @@ static boolean DAC960_V2_EnableMemoryMailboxInterface(DAC960_Controller_T
 
   if (pci_set_dma_mask(Controller->PCIDevice, DAC690_V2_PciDmaMask))
 	return DAC960_Failure(Controller, "DMA mask out of range");
+  Controller->BounceBufferLimit = DAC690_V2_PciDmaMask;
 
   /* This is a temporary dma mapping, used only in the scope of this function */
   CommandMailbox =
@@ -2386,6 +2388,7 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
   */
   RequestQueue = &Controller->RequestQueue;
   blk_init_queue(RequestQueue, DAC960_RequestFunction, &Controller->queue_lock);
+  blk_queue_bounce_limit(RequestQueue, Controller->BounceBufferLimit);
   RequestQueue->queuedata = Controller;
   blk_queue_max_hw_segments(RequestQueue,
 			    Controller->DriverScatterGatherLimit);

@@ -22,7 +22,8 @@
 #include <linux/writeback.h>
 #include <linux/suspend.h>
 #include <linux/blkdev.h>
-#include <linux/buffer_head.h>		/* for try_to_release_page() */
+#include <linux/buffer_head.h>	/* for try_to_release_page(),
+					buffer_heads_over_limit */
 #include <linux/mm_inline.h>
 #include <linux/pagevec.h>
 #include <linux/backing-dev.h>
@@ -134,11 +135,9 @@ void remove_shrinker(struct shrinker *shrinker)
  * If the vm encounted mapped pages on the LRU it increase the pressure on
  * slab to avoid swapping.
  *
- * FIXME: do not do for zone highmem
- *
  * We do weird things to avoid (scanned*seeks*entries) overflowing 32 bits.
  */
-static int shrink_slab(long scanned,  unsigned int gfp_mask)
+static int shrink_slab(long scanned, unsigned int gfp_mask)
 {
 	struct shrinker *shrinker;
 	long pages;
@@ -804,8 +803,7 @@ shrink_caches(struct zone *classzone, int priority, int *total_scanned,
  * excessive rotation of the inactive list, which is _supposed_ to be an LRU,
  * yes?
  */
-int
-try_to_free_pages(struct zone *classzone,
+int try_to_free_pages(struct zone *classzone,
 		unsigned int gfp_mask, unsigned int order)
 {
 	int priority;
@@ -835,9 +833,10 @@ try_to_free_pages(struct zone *classzone,
 
 		/* Take a nap, wait for some writeback to complete */
 		blk_congestion_wait(WRITE, HZ/10);
-		shrink_slab(total_scanned, gfp_mask);
+		if (classzone - classzone->zone_pgdat->node_zones < ZONE_HIGHMEM)
+			shrink_slab(total_scanned, gfp_mask);
 	}
-	if (gfp_mask & __GFP_FS)
+	if ((gfp_mask & __GFP_FS) && !(gfp_mask & __GFP_NORETRY))
 		out_of_memory();
 	return 0;
 }
@@ -895,7 +894,8 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 				max_scan = SWAP_CLUSTER_MAX;
 			to_free -= shrink_zone(zone, max_scan, GFP_KERNEL,
 					to_reclaim, &nr_mapped, ps, priority);
-			shrink_slab(max_scan + nr_mapped, GFP_KERNEL);
+			if (i < ZONE_HIGHMEM)
+				shrink_slab(max_scan + nr_mapped, GFP_KERNEL);
 			if (zone->all_unreclaimable)
 				continue;
 			if (zone->pages_scanned > zone->present_pages * 2)

@@ -262,9 +262,11 @@ static int clear_epp_timeout(struct parport *pb)
  * of these are in parport_pc.h.
  */
 
-static void parport_pc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t parport_pc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	parport_generic_irq(irq, (struct parport *) dev_id, regs);
+	/* FIXME! Was it really ours? */
+	return IRQ_HANDLED;
 }
 
 void parport_pc_write_data(struct parport *p, unsigned char d)

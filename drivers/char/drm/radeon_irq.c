@@ -54,7 +54,7 @@
  * tied to dma at all, this is just a hangover from dri prehistory.
  */
 
-void DRM(dma_service)( DRM_IRQ_ARGS )
+irqreturn_t DRM(dma_service)( DRM_IRQ_ARGS )
 {
 	drm_device_t *dev = (drm_device_t *) arg;
 	drm_radeon_private_t *dev_priv = 
@@ -67,7 +67,7 @@ void DRM(dma_service)( DRM_IRQ_ARGS )
 	stat = RADEON_READ(RADEON_GEN_INT_STATUS)
 	     & (RADEON_SW_INT_TEST | RADEON_CRTC_VBLANK_STAT);
 	if (!stat)
-		return;
+		return IRQ_NONE;
 
 	/* SW interrupt */
 	if (stat & RADEON_SW_INT_TEST) {
@@ -83,6 +83,7 @@ void DRM(dma_service)( DRM_IRQ_ARGS )
 
 	/* Acknowledge interrupts we handle */
 	RADEON_WRITE(RADEON_GEN_INT_STATUS, stat);
+	return IRQ_HANDLED;
 }
 
 static __inline__ void radeon_acknowledge_irqs(drm_radeon_private_t *dev_priv)

@@ -130,7 +130,6 @@ MFG:HEWLETT-PACKARD;MDL:DESKJET 970C;CMD:MLC,PCL,PML;CLASS:PRINTER;DESCRIPTION:H
 
 struct usblp {
 	struct usb_device 	*dev;			/* USB device */
-	devfs_handle_t		devfs;			/* devfs device */
 	struct semaphore	sem;			/* locks this struct, especially "dev" */
 	char			*writebuf;		/* write transfer_buffer */
 	char			*readbuf;		/* read transfer_buffer */
@@ -163,7 +162,6 @@ static void usblp_dump(struct usblp *usblp) {
 
 	dbg("usblp=0x%p", usblp);
 	dbg("dev=0x%p", usblp->dev);
-	dbg("devfs=0x%p", usblp->devfs);
 	dbg("buf=0x%p", usblp->buf);
 	dbg("readcount=%d", usblp->readcount);
 	dbg("ifnum=%d", usblp->ifnum);
@@ -382,7 +380,7 @@ out:
 
 static void usblp_cleanup (struct usblp *usblp)
 {
-	devfs_unregister (usblp->devfs);
+	devfs_remove ("usb/lp%d", usblp->minor);
 	usb_deregister_dev (1, usblp->minor);
 	info("usblp%d: removed", usblp->minor);
 
@@ -908,8 +906,7 @@ static int usblp_probe(struct usb_interface *intf,
 
 	/* If we have devfs, create with perms=660. */
 	sprintf(name, "usb/lp%d", usblp->minor);
-	usblp->devfs = devfs_register(NULL, name,
-				      DEVFS_FL_DEFAULT, USB_MAJOR,
+	devfs_register(NULL, name, 0, USB_MAJOR,
 				      usblp->minor,
 				      S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP |
 				      S_IWGRP, &usblp_fops, NULL);
