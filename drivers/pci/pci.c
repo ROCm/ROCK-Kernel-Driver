@@ -592,7 +592,7 @@ pci_set_master(struct pci_dev *dev)
  * function.  Originally copied from drivers/net/acenic.c.
  * Copyright 1998-2001 by Jes Sorensen, <jes@trained-monkey.org>.
  *
- * RETURNS: An appropriate -ERRNO error value on eror, or zero for success.
+ * RETURNS: An appropriate -ERRNO error value on error, or zero for success.
  */
 static int
 pci_generic_prep_mwi(struct pci_dev *dev)
@@ -634,7 +634,7 @@ pci_generic_prep_mwi(struct pci_dev *dev)
  * and then calls @pcibios_set_mwi to do the needed arch specific
  * operations or a generic mwi-prep function.
  *
- * RETURNS: An appriopriate -ERRNO error value on eror, or zero for success.
+ * RETURNS: An appropriate -ERRNO error value on error, or zero for success.
  */
 int
 pci_set_mwi(struct pci_dev *dev)
