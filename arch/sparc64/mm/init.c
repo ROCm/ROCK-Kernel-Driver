@@ -59,7 +59,7 @@ unsigned long pfn_base;
 static unsigned long bootmap_base;
 
 /* get_new_mmu_context() uses "cache + 1".  */
-spinlock_t ctx_alloc_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(ctx_alloc_lock);
 unsigned long tlb_context_cache = CTX_FIRST_VERSION - 1;
 #define CTX_BMAP_SLOTS (1UL << (CTX_VERSION_SHIFT - 6))
 unsigned long mmu_context_bmap[CTX_BMAP_SLOTS];

@@ -46,8 +46,8 @@
 #include <asm/sections.h>
 #include <asm/cpudata.h>
 
-spinlock_t mostek_lock = SPIN_LOCK_UNLOCKED;
-spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(mostek_lock);
+DEFINE_SPINLOCK(rtc_lock);
 unsigned long mstk48t02_regs = 0UL;
 #ifdef CONFIG_PCI
 unsigned long ds1287_regs = 0UL;
