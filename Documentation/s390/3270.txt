@@ -79,7 +79,6 @@ Here are the installation steps in detail:
 		(If you wish to disable 3215 console support, edit
 		.config; change CONFIG_TN3215's value to "n";
 		and rerun "make oldconfig".)
-		make dep
 		make image
 		make modules
 		make modules_install

@@ -254,19 +254,18 @@ Content
 
 	   a. cd /usr/src/linux
 	   b. make clean			     /* take a few minutes */
-	   c. make dep				     /* take a few minutes */
-	   d. make bzImage		   /* take probably 10-20 minutes */
-	   e. Backup original boot kernel.		  /* optional step */
-	   f. cp /usr/src/linux/arch/i386/boot/bzImage /boot/vmlinuz
-	   g. Please make sure the boot kernel (vmlinuz) is in the
+	   c. make bzImage		   /* take probably 10-20 minutes */
+	   d. Backup original boot kernel.		  /* optional step */
+	   e. cp /usr/src/linux/arch/i386/boot/bzImage /boot/vmlinuz
+	   f. Please make sure the boot kernel (vmlinuz) is in the
 	      correct position. If you use 'lilo' utility, you should
 	      check /etc/lilo.conf 'image' item specified the path
 	      which is the 'vmlinuz' path, or you will load wrong
 	      (or old) boot kernel image (vmlinuz).
-	   h. chmod 400 /vmlinuz
-	   i. lilo
-	   j. rdev -R /vmlinuz 1
-	   k. sync
+	   g. chmod 400 /vmlinuz
+	   h. lilo
+	   i. rdev -R /vmlinuz 1
+	   j. sync
 
 	  Note that if the result of "make zImage" is ERROR, then you have to
 	  go back to Linux configuration Setup. Type "make config" in directory

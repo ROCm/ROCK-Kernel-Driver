@@ -229,7 +229,7 @@ To install:
    second, third, or fourth controller installed, do not say "y" to the 
    secondary Matsushita CD-ROM questions.
 
-3. Then do a "make dep", then make the kernel image ("make zlilo" or similar).
+3. Then make the kernel image ("make zlilo" or similar).
 
 4. Make the device file(s). This step usually already has been done by the
    MAKEDEV script.
