@@ -58,27 +58,6 @@
 #define USB_ENDPOINT_XFER_INT		3
 
 /*
- * USB Packet IDs (PIDs)
- */
-#define USB_PID_UNDEF_0			0xf0
-#define USB_PID_OUT			0xe1
-#define USB_PID_ACK			0xd2
-#define USB_PID_DATA0			0xc3
-#define USB_PID_PING			0xb4	/* USB 2.0 */
-#define USB_PID_SOF			0xa5
-#define USB_PID_NYET			0x96	/* USB 2.0 */
-#define USB_PID_DATA2			0x87	/* USB 2.0 */
-#define USB_PID_SPLIT			0x78	/* USB 2.0 */
-#define USB_PID_IN			0x69
-#define USB_PID_NAK			0x5a
-#define USB_PID_DATA1			0x4b
-#define USB_PID_PREAMBLE		0x3c	/* Token mode */
-#define USB_PID_ERR			0x3c	/* USB 2.0: handshake mode */
-#define USB_PID_SETUP			0x2d
-#define USB_PID_STALL			0x1e
-#define USB_PID_MDATA			0x0f	/* USB 2.0 */
-
-/*
  * Standard requests
  */
 #define USB_REQ_GET_STATUS		0x00
@@ -318,8 +297,6 @@ int __usb_get_extra_descriptor(char *buffer, unsigned size,
 
 struct usb_operations;
 
-#define DEVNUM_ROUND_ROBIN	/***** OPTION *****/
-
 /*
  * Allocated per bus we have
  */
@@ -327,9 +304,7 @@ struct usb_bus {
 	int busnum;			/* Bus number (in order of reg) */
 	char *bus_name;			/* stable id (PCI slot_name etc) */
 
-#ifdef DEVNUM_ROUND_ROBIN
 	int devnum_next;		/* Next open device number in round-robin allocation */
-#endif /* DEVNUM_ROUND_ROBIN */
 
 	struct usb_devmap devmap;	/* device address allocation map */
 	struct usb_operations *op;	/* Operations (specific to the HC) */
@@ -353,10 +328,6 @@ struct usb_bus {
 	atomic_t refcnt;
 };
 
-// FIXME:  root_hub_string vanishes when "usb_hcd" conversion is done,
-// along with pre-hcd versions of the OHCI and UHCI drivers.
-extern int usb_root_hub_string(int id, int serial,
-		char *type, __u8 *data, int len);
 
 /* -------------------------------------------------------------------------- */
 
@@ -745,7 +716,7 @@ typedef void (*usb_complete_t)(struct urb *);
 /**
  * struct urb - USB Request Block
  * @urb_list: For use by current owner of the URB.
- * @pipe: Holds endpoint number, direction, type, and max packet size.
+ * @pipe: Holds endpoint number, direction, type, and more.
  *	Create these values with the eight macros available;
  *	usb_{snd,rcv}TYPEpipe(dev,endpoint), where the type is "ctrl"
  *	(control), "bulk", "int" (interrupt), or "iso" (isochronous).
@@ -774,7 +745,8 @@ typedef void (*usb_complete_t)(struct urb *);
  * @transfer_buffer_length: How big is transfer_buffer.  The transfer may
  *	be broken up into chunks according to the current maximum packet
  *	size for the endpoint, which is a function of the configuration
- *	and is encoded in the pipe.
+ *	and is encoded in the pipe.  When the length is zero, neither
+ *	transfer_buffer nor transfer_dma is used.
  * @actual_length: This is read in non-iso completion functions, and
  *	it tells how many bytes (out of transfer_buffer_length) were
  *	transferred.  It will normally be the same as requested, unless
@@ -787,7 +759,7 @@ typedef void (*usb_complete_t)(struct urb *);
  *	(Not used when URB_NO_DMA_MAP is set.)
  * @setup_dma: For control transfers with URB_NO_DMA_MAP set, the device
  * 	driver has provided this DMA address for the setup packet.  The
- * 	host controller driver should use instead of setup_buffer.
+ * 	host controller driver should use this instead of setup_buffer.
  * 	If there is a data phase, its buffer is identified by transfer_dma.
  * @start_frame: Returns the initial frame for interrupt or isochronous
  *	transfers.
@@ -817,8 +789,9 @@ typedef void (*usb_complete_t)(struct urb *);
  * taken from the general page pool.  That is provided by transfer_buffer
  * (control requests also use setup_packet), and host controller drivers
  * perform a dma mapping (and unmapping) for each buffer transferred.  Those
- * mapping operations can be expensive on some platforms (such using a dma
- * bounce buffer), although they're cheap on commodity x86 and ppc hardware.
+ * mapping operations can be expensive on some platforms (perhaps using a dma
+ * bounce buffer or talking to an IOMMU),
+ * although they're cheap on commodity x86 and ppc hardware.
  *
  * Alternatively, drivers may pass the URB_NO_DMA_MAP transfer flag, which
  * tells the host controller driver that no such mapping is needed since
@@ -884,7 +857,7 @@ typedef void (*usb_complete_t)(struct urb *);
  * things that a completion handler should do is check the status field.
  * The status field is provided for all URBs.  It is used to report
  * unlinked URBs, and status for all non-ISO transfers.  It should not
- * be examined outside of the completion handler.
+ * be examined before the URB is returned to the completion handler.
  *
  * The context field is normally used to link URBs back to the relevant
  * driver or request state.
@@ -1075,7 +1048,6 @@ extern int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe,
 	int timeout);
 
 /* wrappers around usb_control_msg() for the most common standard requests */
-extern int usb_clear_halt(struct usb_device *dev, int pipe);
 extern int usb_get_descriptor(struct usb_device *dev, unsigned char desctype,
 	unsigned char descindex, void *buf, int size);
 extern int usb_get_device_descriptor(struct usb_device *dev);
@@ -1085,6 +1057,9 @@ extern int usb_get_string(struct usb_device *dev,
 	unsigned short langid, unsigned char index, void *buf, int size);
 extern int usb_string(struct usb_device *dev, int index,
 	char *buf, size_t size);
+
+/* wrappers that also update important state inside usbcore */
+extern int usb_clear_halt(struct usb_device *dev, int pipe);
 extern int usb_set_configuration(struct usb_device *dev, int configuration);
 extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
 
@@ -1123,9 +1098,10 @@ extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
  *
  *  - max size:		bits 0-1	[Historical; now gone.]
  *  - direction:	bit 7		(0 = Host-to-Device [Out],
- *					 1 = Device-to-Host [In])
- *  - device:		bits 8-14
- *  - endpoint:		bits 15-18
+ *					 1 = Device-to-Host [In] ...
+ *					like endpoint bEndpointAddress)
+ *  - device:		bits 8-14       ... bit positions known to uhci-hcd
+ *  - endpoint:		bits 15-18      ... bit positions known to uhci-hcd
  *  - Data0/1:		bit 19		[Historical; now gone. ]
  *  - lowspeed:		bit 26		[Historical; now gone. ]
  *  - pipe type:	bits 30-31	(00 = isochronous, 01 = interrupt,
@@ -1146,10 +1122,9 @@ extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
 #define usb_maxpacket(dev, pipe, out)	(out \
 				? (dev)->epmaxpacketout[usb_pipeendpoint(pipe)] \
 				: (dev)->epmaxpacketin [usb_pipeendpoint(pipe)] )
-#define usb_packetid(pipe)	(((pipe) & USB_DIR_IN) ? USB_PID_IN : USB_PID_OUT)
 
-#define usb_pipeout(pipe)	((((pipe) >> 7) & 1) ^ 1)
-#define usb_pipein(pipe)	(((pipe) >> 7) & 1)
+#define usb_pipein(pipe)	((pipe) & USB_DIR_IN)
+#define usb_pipeout(pipe)	(!usb_pipein(pipe))
 #define usb_pipedevice(pipe)	(((pipe) >> 8) & 0x7f)
 #define usb_pipeendpoint(pipe)	(((pipe) >> 15) & 0xf)
 #define usb_pipetype(pipe)	(((pipe) >> 30) & 3)
@@ -1158,18 +1133,15 @@ extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
 #define usb_pipecontrol(pipe)	(usb_pipetype((pipe)) == PIPE_CONTROL)
 #define usb_pipebulk(pipe)	(usb_pipetype((pipe)) == PIPE_BULK)
 
-#define PIPE_DEVEP_MASK		0x0007ff00
-
-/* The D0/D1 toggle bits */
+/* The D0/D1 toggle bits ... USE WITH CAUTION (they're almost hcd-internal) */
 #define usb_gettoggle(dev, ep, out) (((dev)->toggle[out] >> (ep)) & 1)
 #define	usb_dotoggle(dev, ep, out)  ((dev)->toggle[out] ^= (1 << (ep)))
 #define usb_settoggle(dev, ep, out, bit) ((dev)->toggle[out] = ((dev)->toggle[out] & ~(1 << (ep))) | ((bit) << (ep)))
 
-/* Endpoint halt control/status */
-#define usb_endpoint_out(ep_dir)	((((ep_dir) >> 7) & 1) ^ 1)
-#define usb_endpoint_halt(dev, ep, out) ((dev)->halted[out] |= (1 << (ep)))
+/* Endpoint halt control/status ... likewise USE WITH CAUTION */
 #define usb_endpoint_running(dev, ep, out) ((dev)->halted[out] &= ~(1 << (ep)))
 #define usb_endpoint_halted(dev, ep, out) ((dev)->halted[out] & (1 << (ep)))
+
 
 static inline unsigned int __create_pipe(struct usb_device *dev, unsigned int endpoint)
 {
@@ -1210,47 +1182,6 @@ void usb_show_string(struct usb_device *dev, char *id, int index);
 #define info(format, arg...) printk(KERN_INFO __FILE__ ": " format "\n" , ## arg)
 #define warn(format, arg...) printk(KERN_WARNING __FILE__ ": " format "\n" , ## arg)
 
-
-/* -------------------------------------------------------------------------- */
-
-/*
- * driver list
- * exported only for usbfs (not visible outside usbcore)
- */
-
-extern struct list_head usb_driver_list;
-
-/*
- * USB device fs stuff
- */
-
-#ifdef CONFIG_USB_DEVICEFS
-
-/*
- * these are expected to be called from the USB core/hub thread
- * with the kernel lock held
- */
-extern void usbfs_add_bus(struct usb_bus *bus);
-extern void usbfs_remove_bus(struct usb_bus *bus);
-extern void usbfs_add_device(struct usb_device *dev);
-extern void usbfs_remove_device(struct usb_device *dev);
-extern void usbfs_update_special (void);
-
-extern int usbfs_init(void);
-extern void usbfs_cleanup(void);
-
-#else /* CONFIG_USB_DEVICEFS */
-
-static inline void usbfs_add_bus(struct usb_bus *bus) {}
-static inline void usbfs_remove_bus(struct usb_bus *bus) {}
-static inline void usbfs_add_device(struct usb_device *dev) {}
-static inline void usbfs_remove_device(struct usb_device *dev) {}
-static inline void usbfs_update_special (void) {}
-
-static inline int usbfs_init(void) { return 0; }
-static inline void usbfs_cleanup(void) { }
-
-#endif /* CONFIG_USB_DEVICEFS */
 
 #endif  /* __KERNEL__ */
 

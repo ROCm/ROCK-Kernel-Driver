@@ -21,6 +21,8 @@
  *
  *-------------------------------------------------------------------------*/
 
+/* FIXME:  reuse the root hub framework in usbcore, shrinking this code.  */
+
 #ifdef DEBUG
 #undef DEBUG
 #endif
@@ -229,6 +231,52 @@ static int rh_init_int_timer (struct urb * urb)
 
 /*-------------------------------------------------------------------------*/
 
+/* for returning string descriptors in UTF-16LE */
+static int ascii2utf (char *ascii, __u8 *utf, int utfmax)
+{
+	int retval;
+
+	for (retval = 0; *ascii && utfmax > 1; utfmax -= 2, retval += 2) {
+		*utf++ = *ascii++ & 0x7f;
+		*utf++ = 0;
+	}
+	return retval;
+}
+
+static int root_hub_string (int id, int serial, char *type, __u8 *data, int len)
+{
+	char buf [30];
+
+	// assert (len > (2 * (sizeof (buf) + 1)));
+	// assert (strlen (type) <= 8);
+
+	// language ids
+	if (id == 0) {
+		*data++ = 4; *data++ = 3;	/* 4 bytes data */
+		*data++ = 0; *data++ = 0;	/* some language id */
+		return 4;
+
+	// serial number
+	} else if (id == 1) {
+		sprintf (buf, "%x", serial);
+
+	// product description
+	} else if (id == 2) {
+		sprintf (buf, "USB %s Root Hub", type);
+
+	// id 3 == vendor description
+
+	// unsupported IDs --> "stall"
+	} else
+	    return 0;
+
+	data [0] = 2 + ascii2utf (buf, data + 2, len - 2);
+	data [1] = 3;
+	return data [0];
+}
+
+/*-------------------------------------------------------------------------*/
+
 /* helper macro */
 #define OK(x) 			len = (x); break
 
@@ -409,7 +457,7 @@ static int rh_submit_urb (struct urb * urb)
 			OK (len);
 
 		case (0x03):	/* string descriptors */
-			len = usb_root_hub_string (wValue & 0xff, (int) (long) 0,
+			len = root_hub_string (wValue & 0xff, (int) (long) 0,
 						   "SL811HS", data, wLength);
 			if (len > 0) {
 				data_buf = data;

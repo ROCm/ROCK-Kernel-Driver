@@ -1057,56 +1057,6 @@ int usb_get_current_frame_number(struct usb_device *dev)
 }
 
 /*-------------------------------------------------------------------*/
-
-
-/* for returning string descriptors in UTF-16LE */
-static int ascii2utf (char *ascii, __u8 *utf, int utfmax)
-{
-	int retval;
-
-	for (retval = 0; *ascii && utfmax > 1; utfmax -= 2, retval += 2) {
-		*utf++ = *ascii++ & 0x7f;
-		*utf++ = 0;
-	}
-	return retval;
-}
-
-/*
- * root_hub_string is used by each host controller's root hub code,
- * so that they're identified consistently throughout the system.
- */
-int usb_root_hub_string (int id, int serial, char *type, __u8 *data, int len)
-{
-	char buf [30];
-
-	// assert (len > (2 * (sizeof (buf) + 1)));
-	// assert (strlen (type) <= 8);
-
-	// language ids
-	if (id == 0) {
-		*data++ = 4; *data++ = 3;	/* 4 bytes data */
-		*data++ = 0; *data++ = 0;	/* some language id */
-		return 4;
-
-	// serial number
-	} else if (id == 1) {
-		sprintf (buf, "%x", serial);
-
-	// product description
-	} else if (id == 2) {
-		sprintf (buf, "USB %s Root Hub", type);
-
-	// id 3 == vendor description
-
-	// unsupported IDs --> "stall"
-	} else
-	    return 0;
-
-	data [0] = 2 + ascii2utf (buf, data + 2, len - 2);
-	data [1] = 3;
-	return data [0];
-}
-
 /*
  * __usb_get_extra_descriptor() finds a descriptor of specific type in the
  * extra field of the interface and endpoint descriptor structs.
@@ -1221,16 +1171,13 @@ void usb_connect(struct usb_device *dev)
 	 * won't have seen this, but not so for reinit ... 
 	 */
 	dev->descriptor.bMaxPacketSize0 = 8;  /* Start off at 8 bytes  */
-#ifndef DEVNUM_ROUND_ROBIN
-	devnum = find_next_zero_bit(dev->bus->devmap.devicemap, 128, 1);
-#else	/* round_robin alloc of devnums */
+
 	/* Try to allocate the next devnum beginning at bus->devnum_next. */
 	devnum = find_next_zero_bit(dev->bus->devmap.devicemap, 128, dev->bus->devnum_next);
 	if (devnum >= 128)
 		devnum = find_next_zero_bit(dev->bus->devmap.devicemap, 128, 1);
 
 	dev->bus->devnum_next = ( devnum >= 127 ? 1 : devnum + 1);
-#endif	/* round_robin alloc of devnums */
 
 	if (devnum < 128) {
 		set_bit(devnum, dev->bus->devmap.devicemap);
@@ -1649,7 +1596,6 @@ EXPORT_SYMBOL(usb_interface_claimed);
 EXPORT_SYMBOL(usb_driver_release_interface);
 EXPORT_SYMBOL(usb_match_id);
 
-EXPORT_SYMBOL(usb_root_hub_string);
 EXPORT_SYMBOL(usb_new_device);
 EXPORT_SYMBOL(usb_reset_device);
 EXPORT_SYMBOL(usb_connect);

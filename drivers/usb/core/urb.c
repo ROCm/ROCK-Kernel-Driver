@@ -88,15 +88,17 @@ struct urb * usb_get_urb(struct urb *urb)
 /*-------------------------------------------------------------------*/
 
 /**
- * usb_submit_urb - asynchronously issue a transfer request for an endpoint
+ * usb_submit_urb - issue an asynchronous transfer request for an endpoint
  * @urb: pointer to the urb describing the request
  * @mem_flags: the type of memory to allocate, see kmalloc() for a list
  *	of valid options for this.
  *
  * This submits a transfer request, and transfers control of the URB
  * describing that request to the USB subsystem.  Request completion will
- * indicated later, asynchronously, by calling the completion handler.
- * This call may be issued in interrupt context.
+ * be indicated later, asynchronously, by calling the completion handler.
+ * The three types of completion are success, error, and unlink
+ * (also called "request cancellation").
+ * URBs may be submitted in interrupt context.
  *
  * The caller must have correctly initialized the URB before submitting
  * it.  Functions such as usb_fill_bulk_urb() and usb_fill_control_urb() are
@@ -148,20 +150,19 @@ struct urb * usb_get_urb(struct urb *urb)
  *
  * Memory Flags:
  *
- * General rules for how to decide which mem_flags to use:
- * 
- * Basically the rules are the same as for kmalloc.  There are four
+ * The general rules for how to decide which mem_flags to use
+ * are the same as for kmalloc.  There are four
  * different possible values; GFP_KERNEL, GFP_NOFS, GFP_NOIO and
  * GFP_ATOMIC.
  *
  * GFP_NOFS is not ever used, as it has not been implemented yet.
  *
- * There are three situations you must use GFP_ATOMIC.
- *    a) you are inside a completion handler, an interrupt, bottom half,
- *       tasklet or timer.
- *    b) you are holding a spinlock or rwlock (does not apply to
- *       semaphores)
- *    c) current->state != TASK_RUNNING, this is the case only after
+ * GFP_ATOMIC is used when
+ *   (a) you are inside a completion handler, an interrupt, bottom half,
+ *       tasklet or timer, or
+ *   (b) you are holding a spinlock or rwlock (does not apply to
+ *       semaphores), or
+ *   (c) current->state != TASK_RUNNING, this is the case only after
  *       you've changed it.
  * 
  * GFP_NOIO is used in the block io path and error handling of storage
@@ -169,17 +170,17 @@ struct urb * usb_get_urb(struct urb *urb)
  *
  * All other situations use GFP_KERNEL.
  *
- * Specfic rules for how to decide which mem_flags to use:
- *
- *    - start_xmit, timeout, and receive methods of network drivers must
- *      use GFP_ATOMIC (spinlock)
- *    - queuecommand methods of scsi drivers must use GFP_ATOMIC (spinlock)
- *    - If you use a kernel thread with a network driver you must use
- *      GFP_NOIO, unless b) or c) apply
- *    - After you have done a down() you use GFP_KERNEL, unless b) or c)
- *      apply or your are in a storage driver's block io path
- *    - probe and disconnect use GFP_KERNEL unless b) or c) apply
- *    - Changing firmware on a running storage or net device uses
+ * Some more specific rules for mem_flags can be inferred, such as
+ *  (1) start_xmit, timeout, and receive methods of network drivers must
+ *      use GFP_ATOMIC (they are called with a spinlock held);
+ *  (2) queuecommand methods of scsi drivers must use GFP_ATOMIC (also
+ *      called with a spinlock held);
+ *  (3) If you use a kernel thread with a network driver you must use
+ *      GFP_NOIO, unless (b) or (c) apply;
+ *  (4) after you have done a down() you can use GFP_KERNEL, unless (b) or (c)
+ *      apply or your are in a storage driver's block io path;
+ *  (5) USB probe and disconnect can use GFP_KERNEL unless (b) or (c) apply; and
+ *  (6) changing firmware on a running storage or net device uses
  *      GFP_NOIO, unless b) or c) apply
  *
  */
