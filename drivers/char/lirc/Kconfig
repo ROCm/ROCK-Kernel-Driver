@@ -12,6 +12,7 @@
 
 config LIRC_SUPPORT
 	tristate "Linux InfraRed Controller"
+	depends on X86
 
 config LIRC_MAX_DEV
 	int
@@ -33,4 +34,3 @@ config LIRC_PARALLEL
 config LIRC_SERIAL
 	tristate "Serial Driver"
 	depends on LIRC_SUPPORT && SERIAL_8250
-
