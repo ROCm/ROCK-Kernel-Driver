@@ -2132,7 +2132,7 @@ S: D-37083 Goettingen
 S: Germany
 
 N: Thomas Molina
-E: tmolina@home.com
+E: tmolina@cox.net
 D: bug fixes, documentation, minor hackery
 
 N: David Mosberger-Tang
@@ -2536,6 +2536,7 @@ S: Germany
 
 N: Thiago Berlitz Rondon
 E: maluco@mileniumnet.com.br
+W: http://vivaldi.linuxms.com.br/~maluco
 D: Miscellaneous kernel hacker
 S: R. Anhanguera, 1487 - Ipiranga
 S: 79080-740 - Campo Grande - Mato Grosso do Sul
@@ -3288,9 +3289,10 @@ S: Bellevue, Washington 98007
 S: USA
 
 N: Richard Zidlicky
-E: rdzidlic@geocities.com,rdzidlic@cip.informatik.uni-erlangen.de
-W: http://www.geocities.com/SiliconValley/Bay/2602/
+E: rz@linux-m68k.org, rdzidlic@geocities.com
+W: http://www.geocities.com/rdzidlic
 D: Q40 port - see arch/m68k/q40/README
+D: various m68k hacks
 S: Germany
 
 N: Werner Zimmermann
