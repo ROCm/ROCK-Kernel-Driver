@@ -259,7 +259,6 @@ static void __devinit smp_xics_setup_cpu(int cpu)
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR)
 		vpa_init(cpu);
 
-#ifdef CONFIG_IRQ_ALL_CPUS
 	/*
 	 * Put the calling processor into the GIQ.  This is really only
 	 * necessary from a secondary thread as the OF start-cpu interface
@@ -267,7 +266,6 @@ static void __devinit smp_xics_setup_cpu(int cpu)
 	 */
 	rtas_set_indicator(GLOBAL_INTERRUPT_QUEUE,
 		(1UL << interrupt_server_size) - 1 - default_distrib_server, 1);
-#endif
 }
 
 static spinlock_t timebase_lock = SPIN_LOCK_UNLOCKED;

@@ -242,28 +242,24 @@ static unsigned int real_irq_to_virt(unsigned int real_irq)
 static int get_irq_server(unsigned int irq)
 {
 	unsigned int server;
-
-#ifdef CONFIG_IRQ_ALL_CPUS
 	/* For the moment only implement delivery to all cpus or one cpu */
-	if (smp_threads_ready) {
-		cpumask_t cpumask = irq_affinity[irq];
-		cpumask_t tmp = CPU_MASK_NONE;
-		if (cpus_equal(cpumask, CPU_MASK_ALL)) {
-			server = default_distrib_server;
-		} else {
-			cpus_and(tmp, cpu_online_map, cpumask);
+	cpumask_t cpumask = irq_affinity[irq];
+	cpumask_t tmp = CPU_MASK_NONE;
 
-			if (cpus_empty(tmp))
-				server = default_distrib_server;
-			else
-				server = get_hard_smp_processor_id(first_cpu(tmp));
-		}
+	if (!distribute_irqs)
+		return default_server;
+
+	if (cpus_equal(cpumask, CPU_MASK_ALL)) {
+		server = default_distrib_server;
 	} else {
-		server = default_server;
+		cpus_and(tmp, cpu_online_map, cpumask);
+
+		if (cpus_empty(tmp))
+			server = default_distrib_server;
+		else
+			server = get_hard_smp_processor_id(first_cpu(tmp));
 	}
-#else
-	server = default_server;
-#endif
+
 	return server;
 
 }

@@ -526,9 +526,6 @@ void __init smp_cpus_done(unsigned int max_cpus)
 	
 	smp_ops->setup_cpu(boot_cpuid);
 
-	/* XXX fix this, xics currently relies on it - Anton */
-	smp_threads_ready = 1;
-
 	set_cpus_allowed(current, old_mask);
 
 	/*
