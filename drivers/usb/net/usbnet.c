@@ -1298,7 +1298,7 @@ struct gl_header {
 	struct gl_packet	packets;
 };
 
-#ifdef	GENLINK_ACK
+#ifdef	GENELINK_ACK
 
 // FIXME:  this code is incomplete, not debugged; it doesn't
 // handle interrupts correctly.  interrupts should be generic
