@@ -213,7 +213,7 @@ static void x25_asy_bump(struct x25_asy *sl)
 	memcpy(skb_put(skb,count), sl->rbuff, count);
 	skb->mac.raw=skb->data;
 	skb->protocol=htons(ETH_P_X25);
-	if((err=lapb_data_received(sl,skb))!=LAPB_OK)
+	if((err=lapb_data_received(skb->dev, skb))!=LAPB_OK)
 	{
 		kfree_skb(skb);
 		printk(KERN_DEBUG "x25_asy: data received err - %d\n",err);
@@ -324,12 +324,12 @@ static int x25_asy_xmit(struct sk_buff *skb, struct net_device *dev)
 	{
 		case 0x00:break;
 		case 0x01: /* Connection request .. do nothing */
-			if((err=lapb_connect_request(sl))!=LAPB_OK)
+			if((err=lapb_connect_request(dev))!=LAPB_OK)
 				printk(KERN_ERR "x25_asy: lapb_connect_request error - %d\n", err);
 			kfree_skb(skb);
 			return 0;
 		case 0x02: /* Disconnect request .. do nothing - hang up ?? */
-			if((err=lapb_disconnect_request(sl))!=LAPB_OK)
+			if((err=lapb_disconnect_request(dev))!=LAPB_OK)
 				printk(KERN_ERR "x25_asy: lapb_disconnect_request error - %d\n", err);
 		default:
 			kfree_skb(skb);
@@ -347,7 +347,7 @@ static int x25_asy_xmit(struct sk_buff *skb, struct net_device *dev)
 	 *        14 Oct 1994  Dmitry Gorodchanin.
 	 */
 	
-	if((err=lapb_data_request(sl,skb))!=LAPB_OK)
+	if((err=lapb_data_request(dev,skb))!=LAPB_OK)
 	{
 		printk(KERN_ERR "lapbeth: lapb_data_request error - %d\n", err);
 		kfree_skb(skb);
@@ -366,7 +366,7 @@ static int x25_asy_xmit(struct sk_buff *skb, struct net_device *dev)
  *	at the net layer.
  */
   
-static int x25_asy_data_indication(void *token, struct sk_buff *skb)
+static int x25_asy_data_indication(struct net_device *dev, struct sk_buff *skb)
 {
 	skb->dev->last_rx = jiffies;
 	return netif_rx(skb);
@@ -378,9 +378,9 @@ static int x25_asy_data_indication(void *token, struct sk_buff *skb)
  *	perhaps lapb should allow us to bounce this ?
  */
  
-static void x25_asy_data_transmit(void *token, struct sk_buff *skb)
+static void x25_asy_data_transmit(struct net_device *dev, struct sk_buff *skb)
 {
-	struct x25_asy *sl=token;
+	struct x25_asy *sl=dev->priv;
 	
 	spin_lock(&sl->lock);
 	if (netif_queue_stopped(sl->dev) || sl->tty == NULL)
@@ -405,9 +405,9 @@ static void x25_asy_data_transmit(void *token, struct sk_buff *skb)
  *	LAPB connection establish/down information.
  */
  
-static void x25_asy_connected(void *token, int reason)
+static void x25_asy_connected(struct net_device *dev, int reason)
 {
-	struct x25_asy *sl = token;
+	struct x25_asy *sl = dev->priv;
 	struct sk_buff *skb;
 	unsigned char *ptr;
 
@@ -428,9 +428,9 @@ static void x25_asy_connected(void *token, int reason)
 	sl->dev->last_rx = jiffies;
 }
 
-static void x25_asy_disconnected(void *token, int reason)
+static void x25_asy_disconnected(struct net_device *dev, int reason)
 {
-	struct x25_asy *sl = token;
+	struct x25_asy *sl = dev->priv;
 	struct sk_buff *skb;
 	unsigned char *ptr;
 
@@ -500,7 +500,7 @@ static int x25_asy_open(struct net_device *dev)
 	/*
 	 *	Now attach LAPB
 	 */
-	if((err=lapb_register(sl, &x25_asy_callbacks))==LAPB_OK)
+	if((err=lapb_register(dev, &x25_asy_callbacks))==LAPB_OK)
 		return 0;
 
 	/* Cleanup */
@@ -525,7 +525,7 @@ static int x25_asy_close(struct net_device *dev)
 	netif_stop_queue(dev);
 	sl->rcount = 0;
 	sl->xleft  = 0;
-	if((err=lapb_unregister(sl))!=LAPB_OK)
+	if((err=lapb_unregister(dev))!=LAPB_OK)
 		printk(KERN_ERR "x25_asy_close: lapb_unregister error -%d\n",err);
 	spin_unlock(&sl->lock);
 	return 0;

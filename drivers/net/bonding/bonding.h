@@ -23,7 +23,7 @@
  * 2003/05/01 - Shmulik Hen <shmulik.hen at intel dot com>
  *	- Added support for Transmit load balancing mode.
  *
- * 2003/09/24 - Shmulik Hen <shmulik.hen at intel dot com>
+ * 2003/12/01 - Shmulik Hen <shmulik.hen at intel dot com>
  *	- Code cleanup and style changes
  */
 
@@ -36,10 +36,12 @@
 #include "bond_3ad.h"
 #include "bond_alb.h"
 
-#define DRV_VERSION	"2.5.0"
-#define DRV_RELDATE	"December 1, 2003"
+#define DRV_VERSION	"2.5.4"
+#define DRV_RELDATE	"December 30, 2003"
 #define DRV_NAME	"bonding"
 #define DRV_DESCRIPTION	"Ethernet Channel Bonding Driver"
+
+#define BOND_MAX_ARP_TARGETS	16
 
 #ifdef BONDING_DEBUG
 #define dprintk(fmt, args...) \
@@ -133,6 +135,18 @@
 		bond_for_each_slave_from(bond, pos, cnt, (bond)->first_slave)
 
 
+struct bond_params {
+	int mode;
+	int miimon;
+	int arp_interval;
+	int use_carrier;
+	int updelay;
+	int downdelay;
+	int lacp_fast;
+	char primary[IFNAMSIZ];
+	u32 arp_targets[BOND_MAX_ARP_TARGETS];
+};
+
 struct slave {
 	struct net_device *dev; /* first - usefull for panic debug */
 	struct slave *next;
@@ -181,6 +195,7 @@ struct bonding {
 	u16      flags;
 	struct   ad_bond_info ad_info;
 	struct   alb_bond_info alb_info;
+	struct   bond_params params;
 };
 
 /**

@@ -1952,7 +1952,7 @@ static int __init aty128_probe(struct pci_dev *pdev, const struct pci_device_id 
 	bios = aty128_map_ROM(par, pdev);
 #ifdef __i386__
 	if (bios == NULL)
-		bios = aty128_find_mem_vbios(par, pdev);
+		bios = aty128_find_mem_vbios(par);
 #endif
 	if (bios == NULL)
 		printk(KERN_INFO "aty128fb: BIOS not located, guessing timings.\n");

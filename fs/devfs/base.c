@@ -2840,7 +2840,7 @@ void __init mount_devfs_fs (void)
     int err;
 
     if ( !(boot_options & OPTION_MOUNT) ) return;
-    err = do_mount ("none", "/dev", "devfs", 0, "");
+    err = do_mount ("none", "/dev", "devfs", 0, NULL);
     if (err == 0) printk (KERN_INFO "Mounted devfs on /dev\n");
     else PRINTK ("(): unable to mount devfs, err: %d\n", err);
 }   /*  End Function mount_devfs_fs  */

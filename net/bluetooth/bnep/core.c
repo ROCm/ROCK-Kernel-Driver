@@ -501,7 +501,7 @@ static int bnep_session(void *arg)
 	__bnep_unlink_session(s);
 
 	up_write(&bnep_session_sem);
-	kfree(dev);
+	free_netdev(dev);
 	return 0;
 }
 
@@ -588,7 +588,7 @@ int bnep_add_connection(struct bnep_connadd_req *req, struct socket *sock)
 
 failed:
 	up_write(&bnep_session_sem);
-	kfree(dev);
+	free_netdev(dev);
 	return err;
 }
 

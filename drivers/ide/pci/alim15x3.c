@@ -516,7 +516,7 @@ static int ali15x3_config_drive_for_dma(ide_drive_t *drive)
 
 	if ((id != NULL) && ((id->capability & 1) != 0) && drive->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (hwif->ide_dma_bad_drive(drive))
+		if (__ide_dma_bad_drive(drive))
 			goto ata_pio;
 		if ((id->field_valid & 4) && (m5229_revision >= 0xC2)) {
 			if (id->dma_ultra & hwif->ultra_mask) {
@@ -533,7 +533,7 @@ try_dma_modes:
 				if (!config_chipset_for_dma(drive))
 					goto no_dma_set;
 			}
-		} else if (hwif->ide_dma_good_drive(drive) &&
+		} else if (__ide_dma_good_drive(drive) &&
 			   (id->eide_dma_time < 150)) {
 			/* Consult the list of known "good" drives */
 			if (!config_chipset_for_dma(drive))
