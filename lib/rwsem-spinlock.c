@@ -46,8 +46,9 @@ void init_rwsem(struct rw_semaphore *sem)
  *   - the 'waiting count' is non-zero
  * - the spinlock must be held by the caller
  * - woken process blocks are discarded from the list after having flags zeroised
+ * - writers are only woken if wakewrite is non-zero
  */
-static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem)
+static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem, int wakewrite)
 {
 	struct rwsem_waiter *waiter;
 	int woken;
@@ -56,7 +57,14 @@ static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem)
 
 	waiter = list_entry(sem->wait_list.next,struct rwsem_waiter,list);
 
-	/* try to grant a single write lock if there's a writer at the front of the queue
+	if (!wakewrite) {
+		if (waiter->flags & RWSEM_WAITING_FOR_WRITE)
+			goto out;
+		goto dont_wake_writers;
+	}
+
+	/* if we are allowed to wake writers try to grant a single write lock if there's a
+	 * writer at the front of the queue
 	 * - we leave the 'waiting count' incremented to signify potential contention
 	 */
 	if (waiter->flags & RWSEM_WAITING_FOR_WRITE) {
@@ -68,16 +76,19 @@ static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem)
 	}
 
 	/* grant an infinite number of read locks to the readers at the front of the queue */
+ dont_wake_writers:
 	woken = 0;
-	do {
+	while (waiter->flags&RWSEM_WAITING_FOR_READ) {
+		struct list_head *next = waiter->list.next;
+
 		list_del(&waiter->list);
 		waiter->flags = 0;
 		wake_up_process(waiter->task);
 		woken++;
 		if (list_empty(&sem->wait_list))
 			break;
-		waiter = list_entry(sem->wait_list.next,struct rwsem_waiter,list);
-	} while (waiter->flags&RWSEM_WAITING_FOR_READ);
+		waiter = list_entry(next,struct rwsem_waiter,list);
+	}
 
 	sem->activity += woken;
 
@@ -149,6 +160,28 @@ void __down_read(struct rw_semaphore *sem)
 }
 
 /*
+ * trylock for reading -- returns 1 if successful, 0 if contention
+ */
+int __down_read_trylock(struct rw_semaphore *sem)
+{
+	int ret = 0;
+	rwsemtrace(sem,"Entering __down_read_trylock");
+
+	spin_lock(&sem->wait_lock);
+
+	if (sem->activity>=0 && list_empty(&sem->wait_list)) {
+		/* granted */
+		sem->activity++;
+		ret = 1;
+	}
+
+	spin_unlock(&sem->wait_lock);
+
+	rwsemtrace(sem,"Leaving __down_read_trylock");
+	return ret;
+}
+
+/*
  * get a write lock on the semaphore
  * - note that we increment the waiting count anyway to indicate an exclusive lock
  */
@@ -195,6 +228,28 @@ void __down_write(struct rw_semaphore *sem)
 }
 
 /*
+ * trylock for writing -- returns 1 if successful, 0 if contention
+ */
+int __down_write_trylock(struct rw_semaphore *sem)
+{
+	int ret = 0;
+	rwsemtrace(sem,"Entering __down_write_trylock");
+
+	spin_lock(&sem->wait_lock);
+
+	if (sem->activity==0 && list_empty(&sem->wait_list)) {
+		/* granted */
+		sem->activity = -1;
+		ret = 1;
+	}
+
+	spin_unlock(&sem->wait_lock);
+
+	rwsemtrace(sem,"Leaving __down_write_trylock");
+	return ret;
+}
+
+/*
  * release a read lock on the semaphore
  */
 void __up_read(struct rw_semaphore *sem)
@@ -222,18 +277,40 @@ void __up_write(struct rw_semaphore *sem)
 
 	sem->activity = 0;
 	if (!list_empty(&sem->wait_list))
-		sem = __rwsem_do_wake(sem);
+		sem = __rwsem_do_wake(sem, 1);
 
 	spin_unlock(&sem->wait_lock);
 
 	rwsemtrace(sem,"Leaving __up_write");
 }
 
+/*
+ * downgrade a write lock into a read lock
+ * - just wake up any readers at the front of the queue
+ */
+void __downgrade_write(struct rw_semaphore *sem)
+{
+	rwsemtrace(sem,"Entering __rwsem_downgrade");
+
+	spin_lock(&sem->wait_lock);
+
+	sem->activity = 1;
+	if (!list_empty(&sem->wait_list))
+		sem = __rwsem_do_wake(sem,0);
+
+	spin_unlock(&sem->wait_lock);
+
+	rwsemtrace(sem,"Leaving __rwsem_downgrade");
+}
+
 EXPORT_SYMBOL(init_rwsem);
 EXPORT_SYMBOL(__down_read);
+EXPORT_SYMBOL(__down_read_trylock);
 EXPORT_SYMBOL(__down_write);
+EXPORT_SYMBOL(__down_write_trylock);
 EXPORT_SYMBOL(__up_read);
 EXPORT_SYMBOL(__up_write);
+EXPORT_SYMBOL(__downgrade_write);
 #if RWSEM_DEBUG
 EXPORT_SYMBOL(rwsemtrace);
 #endif
