@@ -1036,10 +1036,6 @@ void usb_disconnect(struct usb_device **pdev)
 	*pdev = NULL;
 	spin_unlock_irq(&device_state_lock);
 
-	kfree(udev->static_vendor);
-	kfree(udev->static_product);
-	kfree(udev->static_serial);
-
 	up(&udev->serialize);
 	if (!udev->parent)
 		up(&usb_bus_list_lock);
@@ -1080,7 +1076,8 @@ static int choose_configuration(struct usb_device *udev)
 	return c;
 }
 
-static void show_string(struct usb_device *udev, char *id, char **info, int index)
+#ifdef DEBUG
+static void show_string(struct usb_device *udev, char *id, int index)
 {
 	char *buf;
 
@@ -1089,9 +1086,14 @@ static void show_string(struct usb_device *udev, char *id, char **info, int inde
 	if (!(buf = kmalloc(256, GFP_KERNEL)))
 		return;
 	if (usb_string(udev, index, buf, 256) > 0)
-		dev_printk(KERN_INFO, &udev->dev, "%s: %s\n", id, *info = buf);
+		dev_printk(KERN_INFO, &udev->dev, "%s: %s\n", id, buf);
 	kfree(buf);
 }
+
+#else
+static inline void show_string(struct usb_device *udev, char *id, int index)
+{}
+#endif
 
 #ifdef	CONFIG_USB_OTG
 #include "otg_whitelist.h"
@@ -1138,15 +1140,12 @@ int usb_new_device(struct usb_device *udev)
 
 	if (udev->descriptor.iProduct)
 		show_string(udev, "Product",
-				&udev->static_product,
 				udev->descriptor.iProduct);
 	if (udev->descriptor.iManufacturer)
 		show_string(udev, "Manufacturer",
-				&udev->static_vendor,
 				udev->descriptor.iManufacturer);
 	if (udev->descriptor.iSerialNumber)
 		show_string(udev, "SerialNumber",
-				&udev->static_serial,
 				udev->descriptor.iSerialNumber);
 
 #ifdef	CONFIG_USB_OTG
