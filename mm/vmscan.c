@@ -309,6 +309,8 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 				goto keep_locked;
 			if (!mapping)
 				goto keep_locked;
+			if (mapping->a_ops->writepage == fail_writepage)
+				goto activate_locked;
 			if (!may_enter_fs)
 				goto keep_locked;
 			bdi = mapping->backing_dev_info;
