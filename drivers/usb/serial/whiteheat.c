@@ -240,7 +240,7 @@ static void command_port_read_callback (struct urb *urb)
 		      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
 		      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
 		      command_port_read_callback, port);
-	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 	if (result)
 		dbg(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
 }

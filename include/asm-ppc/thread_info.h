@@ -18,10 +18,11 @@
  * If you change this, change the TI_* offsets below to match.
  */
 struct thread_info {
-	struct task_struct *task;		/* main task structure */
-	struct exec_domain *exec_domain;	/* execution domain */
-	unsigned long	flags;			/* low level flags */
-	int		cpu;			/* cpu we're on */
+	struct task_struct	*task;		/* main task structure */
+	struct exec_domain	*exec_domain;	/* execution domain */
+	unsigned long		flags;		/* low level flags */
+	int			cpu;		/* cpu we're on */
+	int			preempt_count;	/* not used at present */
 };
 
 /*

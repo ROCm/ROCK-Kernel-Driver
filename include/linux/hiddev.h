@@ -119,6 +119,7 @@ struct hiddev_usage_ref {
 	__s32 value;
 };
 
+#define HID_FIELD_INDEX_NONE 0xffffffff
 
 /*
  * Protocol version.
@@ -143,6 +144,15 @@ struct hiddev_usage_ref {
 #define HIDIOCGUSAGE            _IOWR('H', 0x0B, struct hiddev_usage_ref)
 #define HIDIOCSUSAGE            _IOW('H', 0x0C, struct hiddev_usage_ref)
 #define HIDIOCGUCODE            _IOWR('H', 0x0D, struct hiddev_usage_ref)
+#define HIDIOCGFLAG             _IOR('H', 0x0E, int)
+#define HIDIOCSFLAG             _IOW('H', 0x0F, int)
+
+/* 
+ * Flags to be used in HIDIOCSFLAG
+ */
+#define HIDDEV_FLAG_UREF     0x1
+#define HIDDEV_FLAG_REPORT   0x2
+#define HIDDEV_FLAGS         0x3
 
 /* To traverse the input report descriptor info for a HID device, perform the 
  * following:
@@ -179,7 +189,7 @@ struct hiddev_usage_ref {
 #ifdef CONFIG_USB_HIDDEV
 int hiddev_connect(struct hid_device *);
 void hiddev_disconnect(struct hid_device *);
-void hiddev_hid_event(struct hid_device *, unsigned int usage, int value);
+void hiddev_hid_event(struct hid_device *, struct hiddev_usage_ref *ref);
 int __init hiddev_init(void);
 void __exit hiddev_exit(void);
 #else

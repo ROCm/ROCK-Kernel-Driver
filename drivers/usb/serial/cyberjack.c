@@ -262,7 +262,7 @@ static int cyberjack_write (struct usb_serial_port *port, int from_user, const u
 			      port);
 
 		/* send the data out the bulk port */
-		result = usb_submit_urb(port->write_urb, GFP_KERNEL);
+		result = usb_submit_urb(port->write_urb, GFP_ATOMIC);
 		if (result) {
 			err(__FUNCTION__ " - failed submitting write urb, error %d", result);
 			/* Throw away data. No better idea what to do with it. */
@@ -331,7 +331,7 @@ static void cyberjack_read_int_callback( struct urb *urb )
 
 		if( !old_rdtodo ) {
 			port->read_urb->dev = port->serial->dev;
-			result = usb_submit_urb(port->read_urb, GFP_KERNEL);
+			result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 			if( result )
 				err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
 			dbg(__FUNCTION__ " - usb_submit_urb(read urb)");
@@ -387,7 +387,7 @@ static void cyberjack_read_bulk_callback (struct urb *urb)
 	/* Continue to read if we have still urbs to do. */
 	if( priv->rdtodo /* || (urb->actual_length==port->bulk_in_endpointAddress)*/ ) {
 		port->read_urb->dev = port->serial->dev;
-		result = usb_submit_urb(port->read_urb, GFP_KERNEL);
+		result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 		if (result)
 			err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
 		dbg(__FUNCTION__ " - usb_submit_urb(read urb)");
@@ -440,7 +440,7 @@ static void cyberjack_write_bulk_callback (struct urb *urb)
 			      port);
 
 		/* send the data out the bulk port */
-		result = usb_submit_urb(port->write_urb, GFP_KERNEL);
+		result = usb_submit_urb(port->write_urb, GFP_ATOMIC);
 		if (result) {
 			err(__FUNCTION__ " - failed submitting write urb, error %d", result);
 			/* Throw away data. No better idea what to do with it. */

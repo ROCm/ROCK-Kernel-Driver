@@ -648,7 +648,6 @@ struct quota_mount_options
 #include <linux/ext3_fs_sb.h>
 #include <linux/hpfs_fs_sb.h>
 #include <linux/ntfs_fs_sb.h>
-#include <linux/iso_fs_sb.h>
 #include <linux/sysv_fs_sb.h>
 #include <linux/affs_fs_sb.h>
 #include <linux/ufs_fs_sb.h>
@@ -657,7 +656,6 @@ struct quota_mount_options
 #include <linux/adfs_fs_sb.h>
 #include <linux/reiserfs_fs_sb.h>
 #include <linux/bfs_fs_sb.h>
-#include <linux/udf_fs_sb.h>
 
 extern struct list_head super_blocks;
 extern spinlock_t sb_lock;
@@ -696,7 +694,6 @@ struct super_block {
 		struct ext3_sb_info	ext3_sb;
 		struct hpfs_sb_info	hpfs_sb;
 		struct ntfs_sb_info	ntfs_sb;
-		struct isofs_sb_info	isofs_sb;
 		struct sysv_sb_info	sysv_sb;
 		struct affs_sb_info	affs_sb;
 		struct ufs_sb_info	ufs_sb;
@@ -706,7 +703,6 @@ struct super_block {
 		struct adfs_sb_info	adfs_sb;
 		struct reiserfs_sb_info	reiserfs_sb;
 		struct bfs_sb_info	bfs_sb;
-		struct udf_sb_info	udf_sb;
 		void			*generic_sbp;
 	} u;
 	/*
