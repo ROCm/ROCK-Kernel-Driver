@@ -193,6 +193,9 @@ extern struct sctp_globals {
 	
 	/* Flag to indicate if addip is enabled. */
 	int addip_enable;
+
+	/* Flag to indicate if PR-SCTP is enabled. */
+	int prsctp_enable;
 } sctp_globals;
 
 #define sctp_rto_initial		(sctp_globals.rto_initial)
@@ -221,6 +224,7 @@ extern struct sctp_globals {
 #define sctp_local_addr_list		(sctp_globals.local_addr_list)
 #define sctp_local_addr_lock		(sctp_globals.local_addr_lock)
 #define sctp_addip_enable		(sctp_globals.addip_enable)
+#define sctp_prsctp_enable		(sctp_globals.prsctp_enable)
 
 /* SCTP Socket type: UDP or TCP style. */
 typedef enum {
@@ -316,6 +320,8 @@ struct sctp_cookie {
 
 	/* This holds the originating address of the INIT packet.  */
 	union sctp_addr peer_addr;
+
+	__u8 prsctp_capable;
 
 	/* This is a shim for my peer's INIT packet, followed by
 	 * a copy of the raw address list of the association.
@@ -413,6 +419,13 @@ static inline __u16 sctp_ssn_next(struct sctp_stream *stream, __u16 id)
 	return stream->ssn[id]++;
 }
 
+/* Skip over this ssn and all below. */
+static inline void sctp_ssn_skip(struct sctp_stream *stream, __u16 id, 
+				 __u16 ssn)
+{
+	stream->ssn[id] = ssn+1;
+}
+              
 /*
  * Pointers to address related SCTP functions.
  * (i.e. things that depend on the address family.)
@@ -514,8 +527,8 @@ struct sctp_datamsg {
 	/* Did the messenge fail to send? */
 	int send_error;
 	char send_failed;
-	/* Control whether fragments from this message can expire. */
-	char can_expire;
+	/* Control whether chunks from this message can be abandoned. */
+	char can_abandon;
 };
 
 struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *,
@@ -527,8 +540,8 @@ void sctp_datamsg_hold(struct sctp_datamsg *);
 void sctp_datamsg_free(struct sctp_datamsg *);
 void sctp_datamsg_track(struct sctp_chunk *);
 void sctp_datamsg_assign(struct sctp_datamsg *, struct sctp_chunk *);
-void sctp_datamsg_fail(struct sctp_chunk *, int error);
-int sctp_datamsg_expires(struct sctp_chunk *);
+void sctp_chunk_fail(struct sctp_chunk *, int error);
+int sctp_chunk_abandoned(struct sctp_chunk *);
 
 
 /* RFC2960 1.4 Key Terms
@@ -583,6 +596,7 @@ struct sctp_chunk {
 		struct sctp_cwrhdr *ecn_cwr_hdr;
 		struct sctp_errhdr *err_hdr;
 		struct sctp_addiphdr *addip_hdr;
+		struct sctp_fwdtsn_hdr *fwdtsn_hdr;
 	} subh;
 
 	__u8 *chunk_end;
@@ -667,6 +681,9 @@ struct sctp_packet {
 
 	/* This contains the payload chunks.  */
 	struct sk_buff_head chunks;
+
+	/* This is the overhead of the sctp and ip headers. */
+	size_t overhead;
 	/* This is the total size of all chunks INCLUDING padding.  */
 	size_t size;
 
@@ -675,16 +692,6 @@ struct sctp_packet {
 	 * layer lives in the transport structure.
 	 */
 	struct sctp_transport *transport;
-
-	/* Allow a callback for getting a high priority chunk
-	 * bundled early into the packet (This is used for ECNE).
-	 */
-	sctp_packet_phandler_t *get_prepend_chunk;
-
-	/* This packet should advertise ECN capability to the network
-	 * via the ECT bit.
-	 */
-	char ecn_capable;
 
 	/* This packet contains a COOKIE-ECHO chunk. */
 	char has_cookie_echo;
@@ -698,29 +705,21 @@ struct sctp_packet {
 	int malloced;
 };
 
-typedef int (sctp_outq_thandler_t)(struct sctp_outq *, void *);
-typedef int (sctp_outq_ehandler_t)(struct sctp_outq *);
-typedef struct sctp_packet *(sctp_outq_ohandler_init_t)
-	(struct sctp_packet *,
-	 struct sctp_transport *,
-	 __u16 sport,
-	 __u16 dport);
-typedef struct sctp_packet *(sctp_outq_ohandler_config_t)
-	(struct sctp_packet *,
-	 __u32 vtag,
-	 int ecn_capable,
-	 sctp_packet_phandler_t *get_prepend_chunk);
-typedef sctp_xmit_t (sctp_outq_ohandler_t)(struct sctp_packet *,
-					       struct sctp_chunk *);
-typedef int (sctp_outq_ohandler_force_t)(struct sctp_packet *);
-
-sctp_outq_ohandler_init_t    sctp_packet_init;
-sctp_outq_ohandler_config_t  sctp_packet_config;
-sctp_outq_ohandler_t	     sctp_packet_append_chunk;
-sctp_outq_ohandler_t	     sctp_packet_transmit_chunk;
-sctp_outq_ohandler_force_t   sctp_packet_transmit;
+struct sctp_packet *sctp_packet_init(struct sctp_packet *,
+				     struct sctp_transport *,
+				     __u16 sport, __u16 dport);
+struct sctp_packet *sctp_packet_config(struct sctp_packet *, __u32 vtag, int);
+sctp_xmit_t sctp_packet_transmit_chunk(struct sctp_packet *,
+                                       struct sctp_chunk *);
+sctp_xmit_t sctp_packet_append_chunk(struct sctp_packet *,
+                                     struct sctp_chunk *);
+int sctp_packet_transmit(struct sctp_packet *);
 void sctp_packet_free(struct sctp_packet *);
 
+static inline int sctp_packet_empty(struct sctp_packet *packet)
+{
+	return (packet->size == packet->overhead);
+}
 
 /* This represents a remote transport address.
  * For local transport addresses, we just use union sctp_addr.
@@ -905,7 +904,7 @@ struct sctp_transport {
 		/* A flag which indicates the occurrence of a changeover */
 		char changeover_active;
 
-		/* A glag which indicates whether the change of primary is
+		/* A flag which indicates whether the change of primary is
 		 * the first switch to this destination address during an
 		 * active switch.
 		 */
@@ -1008,15 +1007,10 @@ struct sctp_outq {
 	 */
 	struct list_head retransmit;
 
-	/* Call these functions to send chunks down to the next lower
-	 * layer.  This is always sctp_packet, but we separate the two
-	 * structures to make testing simpler.
+	/* Put chunks on this list to save them for FWD TSN processing as
+	 * they were abandoned.
 	 */
-	sctp_outq_ohandler_init_t	*init_output;
-	sctp_outq_ohandler_config_t	*config_output;
-	sctp_outq_ohandler_t	*append_output;
-	sctp_outq_ohandler_t	*build_output;
-	sctp_outq_ohandler_force_t	*force_output;
+	struct list_head abandoned;
 
 	/* How many unackd bytes do we have in-flight?	*/
 	__u32 outstanding_bytes;
@@ -1039,12 +1033,6 @@ int sctp_outq_tail(struct sctp_outq *, struct sctp_chunk *chunk);
 int sctp_outq_flush(struct sctp_outq *, int);
 int sctp_outq_sack(struct sctp_outq *, struct sctp_sackhdr *);
 int sctp_outq_is_empty(const struct sctp_outq *);
-int sctp_outq_set_output_handlers(struct sctp_outq *,
-				  sctp_outq_ohandler_init_t init,
-				  sctp_outq_ohandler_config_t config,
-				  sctp_outq_ohandler_t append,
-				  sctp_outq_ohandler_t build,
-				  sctp_outq_ohandler_force_t force);
 void sctp_outq_restart(struct sctp_outq *);
 
 void sctp_retransmit(struct sctp_outq *, struct sctp_transport *,
@@ -1387,16 +1375,25 @@ struct sctp_association {
 		struct sctp_tsnmap tsn_map;
 		__u8 _map[sctp_tsnmap_storage_size(SCTP_TSN_MAP_SIZE)];
 
-		/* Do we need to sack the peer? */
-		__u8	sack_needed;
+		/* Ack State   : This flag indicates if the next received
+		 *             : packet is to be responded to with a
+		 *             : SACK. This is initializedto 0.  When a packet
+		 *             : is received it is incremented. If this value
+		 *             : reaches 2 or more, a SACK is sent and the
+		 *             : value is reset to 0. Note: This is used only
+		 *             : when no DATA chunks are received out of
+		 *             : order.  When DATA chunks are out of order,
+		 *             : SACK's are not delayed (see Section 6).
+		 */
+		__u8    sack_needed;     /* Do we need to sack the peer? */
+
 		/* These are capabilities which our peer advertised.  */
 		__u8	ecn_capable;	 /* Can peer do ECN? */
 		__u8	ipv4_address;	 /* Peer understands IPv4 addresses? */
 		__u8	ipv6_address;	 /* Peer understands IPv6 addresses? */
 		__u8	hostname_address;/* Peer understands DNS addresses? */
-
-		/* Does peer support ADDIP? */
-		__u8    asconf_capable;
+		__u8    asconf_capable;  /* Does peer support ADDIP? */
+		__u8    prsctp_capable;  /* Can peer do PR-SCTP? */
 
 		/* This mask is used to disable sending the ASCONF chunk
 		 * with specified parameter to peer.
@@ -1489,6 +1486,9 @@ struct sctp_association {
 
 	__u32 ctsn_ack_point;
 
+	/* PR-SCTP Advanced.Peer.Ack.Point */
+	__u32 adv_peer_ack_point;
+
 	/* Highest TSN that is acknowledged by incoming SACKs. */
 	__u32 highest_sacked;
 
@@ -1529,19 +1529,7 @@ struct sctp_association {
 	/* The message size at which SCTP fragmentation will occur. */
 	__u32 frag_point;
 
-	/* Ack State   : This flag indicates if the next received
-	 *	       : packet is to be responded to with a
-	 *	       : SACK. This is initializedto 0.	 When a packet
-	 *	       : is received it is incremented. If this value
-	 *	       : reaches 2 or more, a SACK is sent and the
-	 *	       : value is reset to 0. Note: This is used only
-	 *	       : when no DATA chunks are received out of
-	 *	       : order.	 When DATA chunks are out of order,
-	 *	       : SACK's are not delayed (see Section 6).
-	 */
-	/* Do we need to send an ack?
-	 * When counters[SctpCounterAckState] is above 1 we do!
-	 */
+	/* Currently only one counter is used to count INIT errors. */
 	int counters[SCTP_NUMBER_COUNTERS];
 
 	/* Default send parameters. */

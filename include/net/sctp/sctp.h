@@ -437,11 +437,14 @@ static inline __s32 sctp_jitter(__u32 rto)
 static inline int sctp_frag_point(const struct sctp_opt *sp, int pmtu)
 {
 	int frag = pmtu;
-	frag -= SCTP_IP_OVERHEAD + sizeof(struct sctp_data_chunk);
-	frag -= sizeof(struct sctp_sack_chunk);
+
+	frag -= sp->pf->af->net_header_len;
+	frag -= sizeof(struct sctphdr) + sizeof(struct sctp_data_chunk);
 
 	if (sp->user_frag)
 		frag = min_t(int, frag, sp->user_frag);
+
+	frag = min_t(int, frag, SCTP_MAX_CHUNK_LEN);
 
 	return frag;
 }
@@ -471,6 +474,14 @@ for (err = (sctp_errhdr_t *)((void *)chunk_hdr + \
 		    WORD_ROUND(ntohs(err->length));\
      err = (sctp_errhdr_t *)((void *)err + \
 	    WORD_ROUND(ntohs(err->length))))
+
+#define sctp_walk_fwdtsn(pos, chunk)\
+_sctp_walk_fwdtsn((pos), (chunk), ntohs((chunk)->chunk_hdr->length) - sizeof(struct sctp_fwdtsn_chunk))
+
+#define _sctp_walk_fwdtsn(pos, chunk, end)\
+for (pos = chunk->subh.fwdtsn_hdr->skip;\
+     (void *)pos <= (void *)chunk->subh.fwdtsn_hdr->skip + end - sizeof(struct sctp_fwdtsn_skip);\
+     pos++)
 
 /* Round an int up to the next multiple of 4.  */
 #define WORD_ROUND(s) (((s)+3)&~3)
