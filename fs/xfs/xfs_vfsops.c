@@ -451,9 +451,13 @@ xfs_mount(
 
 	xfs_size_buftarg(mp->m_ddev_targp, mp->m_sb.sb_blocksize,
 			 mp->m_sb.sb_sectsize);
-	if (logdev && logdev != ddev)
-		xfs_size_buftarg(mp->m_logdev_targp, mp->m_sb.sb_blocksize,
-				 mp->m_sb.sb_logsectsize);
+	if (logdev && logdev != ddev) {
+		unsigned int	ss = BBSIZE;
+
+		if (XFS_SB_VERSION_HASSECTOR(&mp->m_sb))
+			ss = mp->m_sb.sb_logsectsize;
+		xfs_size_buftarg(mp->m_logdev_targp, mp->m_sb.sb_blocksize, ss);
+	}
 	if (rtdev)
 		xfs_size_buftarg(mp->m_logdev_targp, mp->m_sb.sb_blocksize,
 				 mp->m_sb.sb_blocksize);

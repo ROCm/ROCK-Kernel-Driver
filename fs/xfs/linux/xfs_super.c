@@ -619,7 +619,7 @@ linvfs_fill_super(
 
 	args = kmalloc(sizeof(struct xfs_mount_args), GFP_KERNEL);
 	if (!args)
-		return	-EINVAL;
+		return  -EINVAL;
 	memset(args, 0, sizeof(struct xfs_mount_args));
 	args->slcount = args->stimeout = args->ctimeout = -1;
 	strncpy(args->fsname, sb->s_id, MAXNAMELEN);
@@ -640,11 +640,12 @@ linvfs_fill_super(
 		vfsp->vfs_flag |= VFS_RDONLY;
 
 	vfsp->vfs_super = sb;
-	set_blocksize(sb->s_bdev, BBSIZE);
 	set_max_bytes(sb);
 	set_quota_ops(sb);
 	sb->s_op = &linvfs_sops;
 	sb->s_export_op = &linvfs_export_ops;
+
+	sb_min_blocksize(sb, BBSIZE);
 
 	LINVFS_SET_VFS(sb, vfsp);
 
@@ -767,8 +768,8 @@ STATIC void
 linvfs_put_super(
 	struct super_block	*sb)
 {
-	int			error;
 	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
+	int			error;
 
 	VFS_DOUNMOUNT(vfsp, 0, NULL, NULL, error);
 	if (error) {

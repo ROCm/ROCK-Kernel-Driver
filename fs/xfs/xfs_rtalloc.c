@@ -1925,7 +1925,8 @@ xfs_growfs_rt(
 	 * Read in the last block of the device, make sure it exists.
 	 */
 	error = xfs_read_buf(mp, mp->m_rtdev_targp,
-		XFS_FSB_TO_BB(mp, in->newblocks) - 1, 1, 0, &bp);
+			XFS_FSB_TO_BB(mp, in->newblocks - 1),
+			XFS_FSB_TO_BB(mp, 1), 0, &bp);
 	if (error)
 		return error;
 	ASSERT(bp);
@@ -2285,7 +2286,9 @@ xfs_rtmount_init(
 			(unsigned long long) mp->m_sb.sb_rblocks);
 		return XFS_ERROR(E2BIG);
 	}
-	error = xfs_read_buf(mp, mp->m_rtdev_targp, d - 1, 1, 0, &bp);
+	error = xfs_read_buf(mp, mp->m_rtdev_targp,
+				XFS_FSB_TO_BB(mp, d - 1),
+				XFS_FSB_TO_BB(mp, 1), 0, &bp);
 	if (error) {
 		cmn_err(CE_WARN,
 	"XFS: realtime mount -- xfs_read_buf failed, returned %d", error);

@@ -57,6 +57,7 @@ struct xfs_mount;
 #define XFS_SB_VERSION_DALIGNBIT	0x0100
 #define XFS_SB_VERSION_SHAREDBIT	0x0200
 #define XFS_SB_VERSION_LOGV2BIT		0x0400
+#define XFS_SB_VERSION_SECTORBIT	0x0800
 #define XFS_SB_VERSION_EXTFLGBIT	0x1000
 #define XFS_SB_VERSION_DIRV2BIT		0x2000
 #define XFS_SB_VERSION_OKSASHFBITS	\
@@ -69,7 +70,8 @@ struct xfs_mount;
 	 XFS_SB_VERSION_ALIGNBIT | \
 	 XFS_SB_VERSION_DALIGNBIT | \
 	 XFS_SB_VERSION_SHAREDBIT | \
-	 XFS_SB_VERSION_LOGV2BIT)
+	 XFS_SB_VERSION_LOGV2BIT | \
+	 XFS_SB_VERSION_SECTORBIT)
 #define XFS_SB_VERSION_OKSASHBITS	\
 	(XFS_SB_VERSION_NUMBITS | \
 	 XFS_SB_VERSION_REALFBITS | \
@@ -78,14 +80,15 @@ struct xfs_mount;
 	(XFS_SB_VERSION_NUMBITS | \
 	 XFS_SB_VERSION_OKREALFBITS | \
 	 XFS_SB_VERSION_OKSASHFBITS)
-#define XFS_SB_VERSION_MKFS(ia,dia,extflag,dirv2,na)	\
+#define XFS_SB_VERSION_MKFS(ia,dia,extflag,dirv2,na,sflag)	\
 	(((ia) || (dia) || (extflag) || (dirv2) || (na)) ? \
 		(XFS_SB_VERSION_4 | \
 		 ((ia) ? XFS_SB_VERSION_ALIGNBIT : 0) | \
 		 ((dia) ? XFS_SB_VERSION_DALIGNBIT : 0) | \
 		 ((extflag) ? XFS_SB_VERSION_EXTFLGBIT : 0) | \
 		 ((dirv2) ? XFS_SB_VERSION_DIRV2BIT : 0) | \
-		 ((na) ? XFS_SB_VERSION_LOGV2BIT : 0)) : \
+		 ((na) ? XFS_SB_VERSION_LOGV2BIT : 0) | \
+		 ((sflag) ? XFS_SB_VERSION_SECTORBIT : 0)) : \
 		XFS_SB_VERSION_1)
 
 typedef struct xfs_sb
@@ -441,6 +444,15 @@ int xfs_sb_version_subextflgbit(xfs_sb_t *sbp);
 		((sbp)->sb_versionnum & ~XFS_SB_VERSION_EXTFLGBIT))
 #endif
 
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_SB_VERSION_HASSECTOR)
+int xfs_sb_version_hassector(xfs_sb_t *sbp);
+#define XFS_SB_VERSION_HASSECTOR(sbp)   xfs_sb_version_hassector(sbp)
+#else
+#define XFS_SB_VERSION_HASSECTOR(sbp)   \
+	((XFS_SB_VERSION_NUM(sbp) == XFS_SB_VERSION_4) && \
+	((sbp)->sb_versionnum & XFS_SB_VERSION_SECTORBIT))
+#endif
+
 /*
  * end of superblock version macros
  */
@@ -486,7 +498,6 @@ xfs_sb_t *xfs_buf_to_sbp(struct xfs_buf *bp);
  * File system sector to basic block conversions.
  */
 #define XFS_FSS_TO_BB(mp,sec)	((sec) << (mp)->m_sectbb_log)
-#define XFS_LOGS_TO_BB(mp,sec)	((sec) << ((mp)->m_sb.sb_logsectlog - BBSHIFT))
 #define XFS_BB_TO_FSS(mp,bb)	\
 	(((bb) + (XFS_FSS_TO_BB(mp,1) - 1)) >> (mp)->m_sectbb_log)
 #define XFS_BB_TO_FSST(mp,bb)	((bb) >> (mp)->m_sectbb_log)
@@ -509,8 +520,7 @@ xfs_sb_t *xfs_buf_to_sbp(struct xfs_buf *bp);
 /*
  * File system block to byte conversions.
  */
-#define XFS_FSB_TO_B(mp,fsbno)	((xfs_fsize_t)(fsbno) << \
-				 (mp)->m_sb.sb_blocklog)
+#define XFS_FSB_TO_B(mp,fsbno)	((xfs_fsize_t)(fsbno) << (mp)->m_sb.sb_blocklog)
 #define XFS_B_TO_FSB(mp,b)	\
 	((((__uint64_t)(b)) + (mp)->m_blockmask) >> (mp)->m_sb.sb_blocklog)
 #define XFS_B_TO_FSBT(mp,b)	(((__uint64_t)(b)) >> (mp)->m_sb.sb_blocklog)

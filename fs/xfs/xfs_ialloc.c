@@ -1258,8 +1258,7 @@ xfs_ialloc_log_agi(
 	xfs_agi_t		*agi;	/* allocation group header */
 
 	agi = XFS_BUF_TO_AGI(bp);
-	ASSERT(INT_GET(agi->agi_magicnum, ARCH_CONVERT) ==
-		XFS_AGI_MAGIC);
+	ASSERT(INT_GET(agi->agi_magicnum, ARCH_CONVERT) == XFS_AGI_MAGIC);
 #endif
 	/*
 	 * Compute byte offsets for the first and last fields.
@@ -1284,26 +1283,26 @@ xfs_ialloc_read_agi(
 	xfs_agi_t	*agi;		/* allocation group header */
 	int		agi_ok;		/* agi is consistent */
 	xfs_buf_t	*bp;		/* allocation group hdr buf */
-    xfs_daddr_t		d;		/* disk block address */
-	int		error;
-#ifdef DEBUG
-	int		i;
-#endif
 	xfs_perag_t	*pag;		/* per allocation group data */
-
+	int		error;
 
 	ASSERT(agno != NULLAGNUMBER);
-	d = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
-	if ((error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, d, 1, 0, &bp)))
+	error = xfs_trans_read_buf(
+			mp, tp, mp->m_ddev_targp,
+			XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR(mp)),
+			XFS_FSS_TO_BB(mp, 1), 0, &bp);
+	if (error)
 		return error;
 	ASSERT(bp && !XFS_BUF_GETERROR(bp));
+
 	/*
 	 * Validate the magic number of the agi block.
 	 */
 	agi = XFS_BUF_TO_AGI(bp);
 	agi_ok =
 		INT_GET(agi->agi_magicnum, ARCH_CONVERT) == XFS_AGI_MAGIC &&
-		XFS_AGI_GOOD_VERSION(INT_GET(agi->agi_versionnum, ARCH_CONVERT));
+		XFS_AGI_GOOD_VERSION(
+			INT_GET(agi->agi_versionnum, ARCH_CONVERT));
 	if (XFS_TEST_ERROR(!agi_ok, mp, XFS_ERRTAG_IALLOC_READ_AGI,
 			XFS_RANDOM_IALLOC_READ_AGI)) {
 		xfs_trans_brelse(tp, bp);
@@ -1323,13 +1322,20 @@ xfs_ialloc_read_agi(
 		 * It's possible for these to be out of sync if
 		 * we are in the middle of a forced shutdown.
 		 */
-		ASSERT(pag->pagi_freecount == INT_GET(agi->agi_freecount, ARCH_CONVERT)
+		ASSERT(pag->pagi_freecount ==
+				INT_GET(agi->agi_freecount, ARCH_CONVERT)
 			|| XFS_FORCED_SHUTDOWN(mp));
 	}
+
 #ifdef DEBUG
-	for (i = 0; i < XFS_AGI_UNLINKED_BUCKETS; i++)
-		ASSERT(!INT_ISZERO(agi->agi_unlinked[i], ARCH_CONVERT));
+	{
+		int	i;
+
+		for (i = 0; i < XFS_AGI_UNLINKED_BUCKETS; i++)
+			ASSERT(!INT_ISZERO(agi->agi_unlinked[i], ARCH_CONVERT));
+	}
 #endif
+
 	XFS_BUF_SET_VTYPE_REF(bp, B_FS_AGI, XFS_AGI_REF);
 	*bpp = bp;
 	return 0;

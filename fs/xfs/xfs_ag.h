@@ -109,12 +109,12 @@ typedef struct xfs_agf
 #define XFS_AGF_ALL_BITS	((1 << XFS_AGF_NUM_BITS) - 1)
 
 /* disk block (xfs_daddr_t) in the AG */
-#define XFS_AGF_DADDR		((xfs_daddr_t)1)
+#define XFS_AGF_DADDR(mp)	((xfs_daddr_t)(1 << (mp)->m_sectbb_log))
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AGF_BLOCK)
 xfs_agblock_t xfs_agf_block(struct xfs_mount *mp);
 #define XFS_AGF_BLOCK(mp)	xfs_agf_block(mp)
 #else
-#define XFS_AGF_BLOCK(mp)	XFS_HDR_BLOCK(mp, XFS_AGF_DADDR)
+#define XFS_AGF_BLOCK(mp)	XFS_HDR_BLOCK(mp, XFS_AGF_DADDR(mp))
 #endif
 
 /*
@@ -164,29 +164,30 @@ typedef struct xfs_agi
 #define XFS_AGI_ALL_BITS	((1 << XFS_AGI_NUM_BITS) - 1)
 
 /* disk block (xfs_daddr_t) in the AG */
-#define XFS_AGI_DADDR		((xfs_daddr_t)2)
+#define XFS_AGI_DADDR(mp)	((xfs_daddr_t)(2 << (mp)->m_sectbb_log))
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AGI_BLOCK)
 xfs_agblock_t xfs_agi_block(struct xfs_mount *mp);
 #define XFS_AGI_BLOCK(mp)	xfs_agi_block(mp)
 #else
-#define XFS_AGI_BLOCK(mp)	XFS_HDR_BLOCK(mp, XFS_AGI_DADDR)
+#define XFS_AGI_BLOCK(mp)	XFS_HDR_BLOCK(mp, XFS_AGI_DADDR(mp))
 #endif
 
 /*
  * The third a.g. block contains the a.g. freelist, an array
  * of block pointers to blocks owned by the allocation btree code.
  */
-#define XFS_AGFL_DADDR		((xfs_daddr_t)3)
+#define XFS_AGFL_DADDR(mp)	((xfs_daddr_t)(3 << (mp)->m_sectbb_log))
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AGFL_BLOCK)
 xfs_agblock_t xfs_agfl_block(struct xfs_mount *mp);
 #define XFS_AGFL_BLOCK(mp)	xfs_agfl_block(mp)
 #else
-#define XFS_AGFL_BLOCK(mp)	XFS_HDR_BLOCK(mp, XFS_AGFL_DADDR)
+#define XFS_AGFL_BLOCK(mp)	XFS_HDR_BLOCK(mp, XFS_AGFL_DADDR(mp))
 #endif
-#define XFS_AGFL_SIZE		(BBSIZE / sizeof(xfs_agblock_t))
-typedef struct xfs_agfl
-{
-	xfs_agblock_t	agfl_bno[XFS_AGFL_SIZE];
+#define XFS_AGFL_SIZE(mp)	((mp)->m_sb.sb_sectsize / sizeof(xfs_agblock_t))
+
+/* -- nathans TODO ... use of BBSIZE here - should be sector size -- */
+typedef struct xfs_agfl {
+	xfs_agblock_t	agfl_bno[BBSIZE/sizeof(xfs_agblock_t)];
 } xfs_agfl_t;
 
 /*
@@ -244,15 +245,15 @@ xfs_extlen_t xfs_ag_min_blocks(int bl);
 xfs_extlen_t xfs_ag_best_blocks(int bl, xfs_drfsbno_t blks);
 #define XFS_AG_BEST_BLOCKS(bl,blks)	xfs_ag_best_blocks(bl,blks)
 #else
-/*--#define	XFS_AG_BEST_BLOCKS(bl)	((xfs_extlen_t)(XFS_AG_BEST_BYTES >> bl))*/
+/*--#define XFS_AG_BEST_BLOCKS(bl) ((xfs_extlen_t)(XFS_AG_BEST_BYTES >> bl))*/
 /*
  * Best is XFS_AG_BEST_BLOCKS at and below 64 Gigabyte filesystems, and
  * XFS_AG_MAX_BLOCKS above 64 Gigabytes.
  */
-#define XFS_AG_BEST_BLOCKS(bl,blks)	((xfs_extlen_t)((1LL << (36 - bl)) >= \
-							blks) ? \
-							((xfs_extlen_t)(XFS_AG_BEST_BYTES >> bl)) : \
-							XFS_AG_MAX_BLOCKS(bl))
+#define XFS_AG_BEST_BLOCKS(bl,blks)	\
+	((xfs_extlen_t)((1LL << (36 - bl)) >= blks) ? \
+		((xfs_extlen_t)(XFS_AG_BEST_BYTES >> bl)) : \
+		XFS_AG_MAX_BLOCKS(bl))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AG_MAX_BLOCKS)
 xfs_extlen_t xfs_ag_max_blocks(int bl);
@@ -320,7 +321,7 @@ xfs_agblock_t xfs_fsb_to_agbno(struct xfs_mount *mp, xfs_fsblock_t fsbno);
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AGB_TO_DADDR)
 xfs_daddr_t xfs_agb_to_daddr(struct xfs_mount *mp, xfs_agnumber_t agno,
-			 xfs_agblock_t agbno);
+				xfs_agblock_t agbno);
 #define XFS_AGB_TO_DADDR(mp,agno,agbno) xfs_agb_to_daddr(mp,agno,agbno)
 #else
 #define XFS_AGB_TO_DADDR(mp,agno,agbno) \
@@ -333,7 +334,8 @@ xfs_daddr_t xfs_agb_to_daddr(struct xfs_mount *mp, xfs_agnumber_t agno,
  */
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AG_DADDR)
-xfs_daddr_t xfs_ag_daddr(struct xfs_mount *mp, xfs_agnumber_t agno, xfs_daddr_t d);
+xfs_daddr_t xfs_ag_daddr(struct xfs_mount *mp, xfs_agnumber_t agno,
+				xfs_daddr_t d);
 #define XFS_AG_DADDR(mp,agno,d)		xfs_ag_daddr(mp,agno,d)
 #else
 #define XFS_AG_DADDR(mp,agno,d) (XFS_AGB_TO_DADDR(mp, agno, 0) + (d))
