@@ -191,6 +191,7 @@ static int palm_os_4_probe (struct usb_serial *serial, const struct usb_device_i
 static int debug;
 static __u16 vendor;
 static __u16 product;
+static int override_probe;
 
 static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_VISOR_ID),
@@ -804,6 +805,7 @@ static int palm_os_4_probe (struct usb_serial *serial, const struct usb_device_i
 
 static int visor_probe (struct usb_serial *serial, const struct usb_device_id *id)
 {
+	struct device *dev = &serial->dev->dev;
 	int retval = 0;
 	int (*startup) (struct usb_serial *serial, const struct usb_device_id *id);
 
@@ -816,7 +818,19 @@ static int visor_probe (struct usb_serial *serial, const struct usb_device_id *i
 	}
 
 	if (id->driver_info) {
-		startup = (void *)id->driver_info;
+		switch (override_probe) {
+		case 3:
+			dev_info( dev, "Using Palm OS V.3 probe\n" );
+			startup = palm_os_3_probe;
+			break;
+		case 4:
+			dev_info( dev, "Using Palm OS V.4 probe\n" );
+			startup = palm_os_4_probe;
+			break;
+		default:
+			startup = (void *)id->driver_info;
+			break;
+		}
 		retval = startup(serial, id);
 	}
 
@@ -1086,6 +1100,8 @@ MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
 
+module_param(override_probe, ushort, 0);
+MODULE_PARM_DESC(override_probe, "Override connection probe (Palm OS V.3 or V.4)");
 module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 
