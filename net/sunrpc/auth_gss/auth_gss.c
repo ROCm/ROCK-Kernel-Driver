@@ -720,6 +720,7 @@ gss_marshal(struct rpc_task *task, u32 *p, int ruid)
 		goto out_put_ctx;
 	}
 	p = xdr_encode_netobj(p, &bufout);
+	gss_put_ctx(ctx);
 	kfree(bufout.data);
 	return p;
 out_put_ctx:
@@ -758,13 +759,13 @@ gss_validate(struct rpc_task *task, u32 *p)
 	flav = ntohl(*p++);
 	if ((len = ntohl(*p++)) > RPC_MAX_AUTH_SIZE) {
                 printk("RPC: giant verf size: %ld\n", (unsigned long) len);
-                return NULL;
+                goto out_bad;
 	}
 	dprintk("RPC: gss_validate: verifier flavor %d, len %d\n", flav, len);
 
 	if (flav != RPC_AUTH_GSS) {
 		printk("RPC: bad verf flavor: %ld\n", (unsigned long)flav);
-		return NULL;
+		goto out_bad;
 	}
 	seq = htonl(task->tk_gss_seqno);
 	bufin.data = (u8 *) &seq;
@@ -773,10 +774,14 @@ gss_validate(struct rpc_task *task, u32 *p)
 	bufout.len = len;
 
 	if (gss_verify_mic(ctx->gc_gss_ctx, &bufin, &bufout, &qop_state) != 0)
-		return NULL;
+		goto out_bad;
 	task->tk_auth->au_rslack = XDR_QUADLEN(len) + 2;
 	dprintk("RPC: GSS gss_validate: gss_verify_mic succeeded.\n");
+	gss_put_ctx(ctx);
 	return p + XDR_QUADLEN(len);
+out_bad:
+	gss_put_ctx(ctx);
+	return NULL;
 }
 
 static struct rpc_authops authgss_ops = {
