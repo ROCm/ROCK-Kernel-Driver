@@ -317,13 +317,15 @@ uchar result;
 
 static void in2000_execute(struct Scsi_Host *instance);
 
-int in2000_queuecommand (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
+static int in2000_queuecommand (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 {
+struct Scsi_Host *instance;
 struct IN2000_hostdata *hostdata;
 Scsi_Cmnd *tmp;
 unsigned long flags;
 
-   hostdata = (struct IN2000_hostdata *)cmd->host->hostdata;
+   instance = cmd->host;
+   hostdata = (struct IN2000_hostdata *)instance->hostdata;
 
 DB(DB_QUEUE_COMMAND,printk("Q-%d-%02x-%ld(",cmd->target,cmd->cmnd[0],cmd->pid))
 
@@ -355,7 +357,7 @@ DB(DB_QUEUE_COMMAND,printk("Q-%d-%02x-%ld(",cmd->target,cmd->cmnd[0],cmd->pid))
    if (cmd->use_sg) {
       cmd->SCp.buffer = (struct scatterlist *)cmd->buffer;
       cmd->SCp.buffers_residual = cmd->use_sg - 1;
-      cmd->SCp.ptr = (char *)cmd->SCp.buffer->address;
+      cmd->SCp.ptr = (char *)page_address(cmd->SCp.buffer->page)+cmd->SCp.buffer->offset;
       cmd->SCp.this_residual = cmd->SCp.buffer->length;
       }
    else {
@@ -391,9 +393,7 @@ DB(DB_QUEUE_COMMAND,printk("Q-%d-%02x-%ld(",cmd->target,cmd->cmnd[0],cmd->pid))
  * queue and calling in2000_execute().
  */
 
-   save_flags(flags);
-   cli();
-
+   spin_lock_irqsave(instance->host_lock, flags);
    /*
     * Add the cmd to the end of 'input_Q'. Note that REQUEST_SENSE
     * commands are added to the head of the queue so that the desired
@@ -418,8 +418,7 @@ DB(DB_QUEUE_COMMAND,printk("Q-%d-%02x-%ld(",cmd->target,cmd->cmnd[0],cmd->pid))
    in2000_execute(cmd->host);
 
 DB(DB_QUEUE_COMMAND,printk(")Q-%ld ",cmd->pid))
-
-   restore_flags(flags);
+   spin_unlock_irqrestore(instance->host_lock, flags);
    return 0;
 }
 
@@ -762,7 +761,7 @@ int i;
       ++cmd->SCp.buffer;
       --cmd->SCp.buffers_residual;
       cmd->SCp.this_residual = cmd->SCp.buffer->length;
-      cmd->SCp.ptr = cmd->SCp.buffer->address;
+      cmd->SCp.ptr = page_address(cmd->SCp.buffer->page) + cmd->SCp.buffer->offset;
       }
 
 /* Set up hardware registers */
@@ -855,7 +854,7 @@ unsigned long flags;
 
 /* Get the spin_lock and disable further ints, for SMP */
 
-   CLISPIN_LOCK(instance, flags);
+   spin_lock_irqsave(instance->host_lock, flags);
 
 #ifdef PROC_STATISTICS
    hostdata->int_cnt++;
@@ -993,7 +992,7 @@ DB(DB_FIFO,printk("{W:%02x} ",read1_io(IO_FIFO_COUNT)))
       write1_io(0, IO_LED_OFF);
 
 /* release the SMP spin_lock and restore irq state */
-      CLISPIN_UNLOCK(instance, flags);
+      spin_unlock_irqrestore(instance->host_lock, flags);
       return;
       }
 
@@ -1011,7 +1010,7 @@ DB(DB_FIFO,printk("{W:%02x} ",read1_io(IO_FIFO_COUNT)))
       write1_io(0, IO_LED_OFF);
 
 /* release the SMP spin_lock and restore irq state */
-      CLISPIN_UNLOCK(instance, flags);
+      spin_unlock_irqrestore(instance->host_lock, flags);
       return;
       }
 
@@ -1433,7 +1432,7 @@ DB(DB_INTR,printk("%02x",hostdata->outgoing_msg[0]))
             hostdata->state = S_UNCONNECTED;
 
 /* release the SMP spin_lock and restore irq state */
-            CLISPIN_UNLOCK(instance, flags);
+            spin_unlock_irqrestore(instance->host_lock, flags);
             return;
             }
 DB(DB_INTR,printk("UNEXP_DISC-%ld",cmd->pid))
@@ -1609,7 +1608,7 @@ DB(DB_INTR,printk("-%ld",cmd->pid))
 DB(DB_INTR,printk("} "))
 
 /* release the SMP spin_lock and restore irq state */
-   CLISPIN_UNLOCK(instance, flags);
+   spin_unlock_irqrestore(instance->host_lock, flags);
 
 }
 
@@ -1619,11 +1618,14 @@ DB(DB_INTR,printk("} "))
 #define RESET_CARD_AND_BUS 1
 #define B_FLAG 0x80
 
+/*
+ *	Caller must hold instance lock!
+ */
+ 
 static int reset_hardware(struct Scsi_Host *instance, int type)
 {
 struct IN2000_hostdata *hostdata;
 int qt,x;
-unsigned long flags;
 
    hostdata = (struct IN2000_hostdata *)instance->hostdata;
 
@@ -1638,16 +1640,16 @@ unsigned long flags;
    write_3393(hostdata,WD_CONTROL, CTRL_IDI | CTRL_EDI | CTRL_POLLED);
    write_3393(hostdata,WD_SYNCHRONOUS_TRANSFER,
               calc_sync_xfer(hostdata->default_sx_per/4,DEFAULT_SX_OFF));
-   save_flags(flags);
-   cli();
+
    write1_io(0,IO_FIFO_WRITE);            /* clear fifo counter */
    write1_io(0,IO_FIFO_READ);             /* start fifo out in read mode */
    write_3393(hostdata,WD_COMMAND, WD_CMD_RESET);
+   /* FIXME: timeout ?? */
    while (!(READ_AUX_STAT() & ASR_INT))
-      ;                                   /* wait for RESET to complete */
+      cpu_relax();                           /* wait for RESET to complete */
 
    x = read_3393(hostdata,WD_SCSI_STATUS);   /* clear interrupt */
-   restore_flags(flags);
+
    write_3393(hostdata,WD_QUEUE_TAG,0xa5);   /* any random number */
    qt = read_3393(hostdata,WD_QUEUE_TAG);
    if (qt == 0xa5) {
@@ -1662,7 +1664,7 @@ unsigned long flags;
 
 
 
-int in2000_reset(Scsi_Cmnd *cmd, unsigned int reset_flags)
+static int in2000_bus_reset(Scsi_Cmnd *cmd)
 {
 unsigned long flags;
 struct Scsi_Host *instance;
@@ -1672,10 +1674,9 @@ int x;
    instance = cmd->host;
    hostdata = (struct IN2000_hostdata *)instance->hostdata;
 
-   printk("scsi%d: Reset. ", instance->host_no);
-   save_flags(flags);
-   cli();
+   printk(KERN_WARNING "scsi%d: Reset. ", instance->host_no);
 
+   spin_lock_irqsave(instance->host_lock, flags);
    /* do scsi-reset here */
 
    reset_hardware(instance, RESET_CARD_AND_BUS);
@@ -1694,13 +1695,22 @@ int x;
    hostdata->outgoing_len = 0;
 
    cmd->result = DID_RESET << 16;
-   restore_flags(flags);
-   return 0;
+   spin_unlock_irqrestore(instance->host_lock, flags);
+   return SUCCESS;
+}
+
+static int in2000_host_reset(Scsi_Cmnd *cmd)
+{
+	return FAILED;
+}
+
+static int in2000_device_reset(Scsi_Cmnd *cmd)
+{
+	return FAILED;
 }
 
 
-
-int in2000_abort (Scsi_Cmnd *cmd)
+static int in2000_abort (Scsi_Cmnd *cmd)
 {
 struct Scsi_Host *instance;
 struct IN2000_hostdata *hostdata;
@@ -1709,13 +1719,10 @@ unsigned long flags;
 uchar sr, asr;
 unsigned long timeout;
 
-   save_flags (flags);
-   cli();
-
    instance = cmd->host;
    hostdata = (struct IN2000_hostdata *)instance->hostdata;
 
-   printk ("scsi%d: Abort-", instance->host_no);
+   printk(KERN_DEBUG "scsi%d: Abort-", instance->host_no);
    printk("(asr=%02x,count=%ld,resid=%d,buf_resid=%d,have_data=%d,FC=%02x)- ",
             READ_AUX_STAT(),read_3393_count(hostdata),cmd->SCp.this_residual,cmd->SCp.buffers_residual,
             cmd->SCp.have_data_in,read1_io(IO_FIFO_COUNT));
@@ -1725,6 +1732,7 @@ unsigned long timeout;
  *     from the inout_Q.
  */
 
+   spin_lock_irqsave(instance->host_lock, flags);
    tmp = (Scsi_Cmnd *)hostdata->input_Q;
    prev = 0;
    while (tmp) {
@@ -1733,11 +1741,11 @@ unsigned long timeout;
             prev->host_scribble = cmd->host_scribble;
          cmd->host_scribble = NULL;
          cmd->result = DID_ABORT << 16;
-         printk("scsi%d: Abort - removing command %ld from input_Q. ",
+         printk(KERN_WARNING "scsi%d: Abort - removing command %ld from input_Q. ",
            instance->host_no, cmd->pid);
          cmd->scsi_done(cmd);
-         restore_flags(flags);
-         return SCSI_ABORT_SUCCESS;
+         spin_unlock_irqrestore(instance->host_lock, flags);
+         return SUCCESS;
          }
       prev = tmp;
       tmp = (Scsi_Cmnd *)tmp->host_scribble;
@@ -1756,7 +1764,7 @@ unsigned long timeout;
 
    if (hostdata->connected == cmd) {
 
-      printk("scsi%d: Aborting connected command %ld - ",
+      printk(KERN_WARNING "scsi%d: Aborting connected command %ld - ",
               instance->host_no, cmd->pid);
 
       printk("sending wd33c93 ABORT command - ");
@@ -1800,7 +1808,6 @@ unsigned long timeout;
 
       in2000_execute (instance);
 
-      restore_flags(flags);
       return SCSI_ABORT_SUCCESS;
       }
 
@@ -1813,9 +1820,9 @@ unsigned long timeout;
    for (tmp=(Scsi_Cmnd *)hostdata->disconnected_Q; tmp;
          tmp=(Scsi_Cmnd *)tmp->host_scribble)
       if (cmd == tmp) {
-         restore_flags(flags);
-         printk("Sending ABORT_SNOOZE. ");
-         return SCSI_ABORT_SNOOZE;
+	 spin_unlock_irqrestore(instance->host_lock, flags);
+	 printk(KERN_DEBUG "scsi%d: unable to abort disconnected command.\n", instance->host_no);
+         return FAILED;
          }
 
 /*
@@ -1830,10 +1837,10 @@ unsigned long timeout;
 
    in2000_execute (instance);
 
-   restore_flags(flags);
+   spin_unlock_irqrestore(instance->host_lock, flags);
    printk("scsi%d: warning : SCSI command probably completed successfully"
       "         before abortion. ", instance->host_no);
-   return SCSI_ABORT_NOT_RUNNING;
+   return SUCCESS;
 }
 
 
@@ -1845,7 +1852,7 @@ static char setup_buffer[SETUP_BUFFER_SIZE];
 static char setup_used[MAX_SETUP_ARGS];
 static int done_setup = 0;
 
-void __init in2000_setup (char *str, int *ints)
+static void __init in2000_setup (char *str, int *ints)
 {
 int i;
 char *p1,*p2;
@@ -1931,7 +1938,7 @@ static const int int_tab[] in2000__INITDATA = {
    };
 
 
-int __init in2000_detect(Scsi_Host_Template * tpnt)
+static int __init in2000_detect(Scsi_Host_Template * tpnt)
 {
 struct Scsi_Host *instance;
 struct IN2000_hostdata *hostdata;
@@ -2115,7 +2122,11 @@ char buf[32];
 #endif
 
 
+      /* FIXME: not strictly needed I think but the called code expects
+         to be locked */
+      spin_lock_irqsave(instance->host_lock, flags);
       x = reset_hardware(instance,(hostdata->args & A_NO_SCSI_RESET)?RESET_CARD:RESET_CARD_AND_BUS);
+      spin_unlock_irqrestore(instance->host_lock, flags);
 
       hostdata->microcode = read_3393(hostdata,WD_CDB_1);
       if (x & 0x01) {
@@ -2158,7 +2169,7 @@ char buf[32];
  *       supposed to do...
  */
 
-int in2000_biosparam(Disk *disk, struct block_device *dev, int *iinfo)
+static int in2000_biosparam(Disk *disk, struct block_device *dev, int *iinfo)
 {
 int size;
 
@@ -2190,7 +2201,7 @@ int size;
 }
 
 
-int in2000_proc_info(char *buf, char **start, off_t off, int len, int hn, int in)
+static int in2000_proc_info(char *buf, char **start, off_t off, int len, int hn, int in)
 {
 
 #ifdef PROC_INTERFACE
@@ -2260,8 +2271,7 @@ static int stop = 0;
       return len;
       }
 
-   save_flags(flags);
-   cli();
+   spin_lock_irqsave(instance->host_lock, flags);
    bp = buf;
    *bp = '\0';
    if (hd->proc & PR_VERSION) {
@@ -2340,7 +2350,7 @@ static int stop = 0;
       ;  /* insert your own custom function here */
       }
    strcat(bp,"\n");
-   restore_flags(flags);
+   spin_unlock_irqrestore(instance->host_lock, flags);
    *start = buf;
    if (stop) {
       stop = 0;
