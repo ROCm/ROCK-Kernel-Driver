@@ -1497,6 +1497,11 @@ static void idedisk_setup (ide_drive_t *drive)
 		return;
 
 	/*
+	 * default to stroke enabled
+	 */
+	drive->stroke = 1;
+
+	/*
 	 * CompactFlash cards and their brethern look just like hard drives
 	 * to us, but they are removable and don't have a doorlock mechanism.
 	 */

@@ -1206,7 +1206,7 @@ static void scsi_scan_target(struct Scsi_Host *shost, unsigned int channel,
 	 * not present. However, the assumption we can't use REPORT_LUNS
 	 * b/c of non-existing LUN 0 has no foundation in the standard.
 	 */
-	if (res == SCSI_SCAN_LUN_PRESENT || SCSI_SCAN_TARGET_PRESENT) {
+	if (res == SCSI_SCAN_LUN_PRESENT || res == SCSI_SCAN_TARGET_PRESENT) {
 		if (scsi_report_lun_scan(sdev, bflags, rescan) != 0)
 			/*
 			 * The REPORT LUN did not scan the target,

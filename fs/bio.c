@@ -608,18 +608,6 @@ static void __bio_unmap_user(struct bio *bio)
 	int i;
 
 	/*
-	 * find original bio if it was bounced
-	 */
-	if (bio->bi_private) {
-		/*
-		 * someone stole our bio, must not happen
-		 */
-		BUG_ON(!bio_flagged(bio, BIO_BOUNCED));
-	
-		bio = bio->bi_private;
-	}
-
-	/*
 	 * make sure we dirty pages we wrote to
 	 */
 	__bio_for_each_segment(bvec, bio, i, 0) {
