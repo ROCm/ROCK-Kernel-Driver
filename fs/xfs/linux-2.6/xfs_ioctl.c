@@ -102,7 +102,7 @@ xfs_find_handle(
 	struct inode		*inode;
 	struct vnode		*vp;
 
-	if (copy_from_user(&hreq, (xfs_fsop_handlereq_t *)arg, sizeof(hreq)))
+	if (copy_from_user(&hreq, arg, sizeof(hreq)))
 		return -XFS_ERROR(EFAULT);
 
 	memset((char *)&handle, 0, sizeof(handle));
@@ -185,7 +185,7 @@ xfs_find_handle(
 	}
 
 	/* now copy our handle into the user buffer & write out the size */
-	if (copy_to_user((xfs_handle_t *)hreq.ohandle, &handle, hsize) ||
+	if (copy_to_user(hreq.ohandle, &handle, hsize) ||
 	    copy_to_user(hreq.ohandlen, &hsize, sizeof(__s32))) {
 		iput(inode);
 		return -XFS_ERROR(EFAULT);
@@ -243,7 +243,7 @@ xfs_vget_fsop_handlereq(
 	 * Copy the handle down from the user and validate
 	 * that it looks to be in the correct format.
 	 */
-	if (copy_from_user(hreq, (struct xfs_fsop_handlereq *)arg, size))
+	if (copy_from_user(hreq, arg, size))
 		return XFS_ERROR(EFAULT);
 
 	hanp = hreq->ihandle;
@@ -667,7 +667,7 @@ xfs_ioctl(
 		/* The size dio will do in one go */
 		da.d_maxiosz = 64 * PAGE_CACHE_SIZE;
 
-		if (copy_to_user((struct dioattr *)arg, &da, sizeof(da)))
+		if (copy_to_user(arg, &da, sizeof(da)))
 			return -XFS_ERROR(EFAULT);
 		return 0;
 	}
@@ -694,7 +694,7 @@ xfs_ioctl(
 	case XFS_IOC_FSSETDM: {
 		struct fsdmidata	dmi;
 
-		if (copy_from_user(&dmi, (struct fsdmidata *)arg, sizeof(dmi)))
+		if (copy_from_user(&dmi, arg, sizeof(dmi)))
 			return -XFS_ERROR(EFAULT);
 
 		error = xfs_set_dmattrs(bdp, dmi.fsd_dmevmask, dmi.fsd_dmstate,
@@ -741,7 +741,7 @@ xfs_ioctl(
 		if (error)
 			return -error;
 
-		if (copy_to_user((char *)arg, &out, sizeof(out)))
+		if (copy_to_user(arg, &out, sizeof(out)))
 			return -XFS_ERROR(EFAULT);
 		return 0;
 	}
@@ -753,7 +753,7 @@ xfs_ioctl(
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 
-		if (copy_from_user(&inout, (char *)arg, sizeof(inout)))
+		if (copy_from_user(&inout, arg, sizeof(inout)))
 			return -XFS_ERROR(EFAULT);
 
 		/* input parameter is passed in resblks field of structure */
@@ -762,7 +762,7 @@ xfs_ioctl(
 		if (error)
 			return -error;
 
-		if (copy_to_user((char *)arg, &inout, sizeof(inout)))
+		if (copy_to_user(arg, &inout, sizeof(inout)))
 			return -XFS_ERROR(EFAULT);
 		return 0;
 	}
@@ -777,7 +777,7 @@ xfs_ioctl(
 		if (error)
 			return -error;
 
-		if (copy_to_user((char *)arg, &out, sizeof(out)))
+		if (copy_to_user(arg, &out, sizeof(out)))
 			return -XFS_ERROR(EFAULT);
 
 		return 0;
@@ -789,7 +789,7 @@ xfs_ioctl(
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 
-		if (copy_from_user(&in, (char *)arg, sizeof(in)))
+		if (copy_from_user(&in, arg, sizeof(in)))
 			return -XFS_ERROR(EFAULT);
 
 		error = xfs_growfs_data(mp, &in);
@@ -802,7 +802,7 @@ xfs_ioctl(
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 
-		if (copy_from_user(&in, (char *)arg, sizeof(in)))
+		if (copy_from_user(&in, arg, sizeof(in)))
 			return -XFS_ERROR(EFAULT);
 
 		error = xfs_growfs_log(mp, &in);
@@ -815,7 +815,7 @@ xfs_ioctl(
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 
-		if (copy_from_user(&in, (char *)arg, sizeof(in)))
+		if (copy_from_user(&in, arg, sizeof(in)))
 			return -XFS_ERROR(EFAULT);
 
 		error = xfs_growfs_rt(mp, &in);
@@ -841,7 +841,7 @@ xfs_ioctl(
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 
-		if (get_user(in, (__uint32_t *)arg))
+		if (get_user(in, (__uint32_t __user *)arg))
 			return -XFS_ERROR(EFAULT);
 
 		error = xfs_fs_goingdown(mp, in);
@@ -854,7 +854,7 @@ xfs_ioctl(
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 
-		if (copy_from_user(&in, (char *)arg, sizeof(in)))
+		if (copy_from_user(&in, arg, sizeof(in)))
 			return -XFS_ERROR(EFAULT);
 
 		error = xfs_errortag_add(in.errtag, mp);
@@ -895,7 +895,7 @@ xfs_ioc_space(
 	if (vp->v_type != VREG)
 		return -XFS_ERROR(EINVAL);
 
-	if (copy_from_user(&bf, (xfs_flock64_t *)arg, sizeof(bf)))
+	if (copy_from_user(&bf, arg, sizeof(bf)))
 		return -XFS_ERROR(EFAULT);
 
 	if (filp->f_flags & (O_NDELAY|O_NONBLOCK))
@@ -929,12 +929,10 @@ xfs_ioc_bulkstat(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return -XFS_ERROR(EIO);
 
-	if (copy_from_user(&bulkreq, (xfs_fsop_bulkreq_t *)arg,
-					sizeof(xfs_fsop_bulkreq_t)))
+	if (copy_from_user(&bulkreq, arg, sizeof(xfs_fsop_bulkreq_t)))
 		return -XFS_ERROR(EFAULT);
 
-	if (copy_from_user(&inlast, (__s64 *)bulkreq.lastip,
-						sizeof(__s64)))
+	if (copy_from_user(&inlast, bulkreq.lastip, sizeof(__s64)))
 		return -XFS_ERROR(EFAULT);
 
 	if ((count = bulkreq.icount) <= 0)
@@ -963,12 +961,11 @@ xfs_ioc_bulkstat(
 		return -error;
 
 	if (bulkreq.ocount != NULL) {
-		if (copy_to_user((xfs_ino_t *)bulkreq.lastip, &inlast,
+		if (copy_to_user(bulkreq.lastip, &inlast,
 						sizeof(xfs_ino_t)))
 			return -XFS_ERROR(EFAULT);
 
-		if (copy_to_user((__s32 *)bulkreq.ocount, &count,
-						sizeof(count)))
+		if (copy_to_user(bulkreq.ocount, &count, sizeof(count)))
 			return -XFS_ERROR(EFAULT);
 	}
 
@@ -987,7 +984,7 @@ xfs_ioc_fsgeometry_v1(
 	if (error)
 		return -error;
 
-	if (copy_to_user((xfs_fsop_geom_t *)arg, &fsgeo, sizeof(fsgeo)))
+	if (copy_to_user(arg, &fsgeo, sizeof(fsgeo)))
 		return -XFS_ERROR(EFAULT);
 	return 0;
 }
@@ -1004,7 +1001,7 @@ xfs_ioc_fsgeometry(
 	if (error)
 		return -error;
 
-	if (copy_to_user((xfs_fsop_geom_t *)arg, &fsgeo, sizeof(fsgeo)))
+	if (copy_to_user(arg, &fsgeo, sizeof(fsgeo)))
 		return -XFS_ERROR(EFAULT);
 	return 0;
 }
@@ -1093,13 +1090,13 @@ xfs_ioc_xattr(
 		fa.fsx_extsize	= va.va_extsize;
 		fa.fsx_nextents = va.va_nextents;
 
-		if (copy_to_user((struct fsxattr *)arg, &fa, sizeof(fa)))
+		if (copy_to_user(arg, &fa, sizeof(fa)))
 			return -XFS_ERROR(EFAULT);
 		return 0;
 	}
 
 	case XFS_IOC_FSSETXATTR: {
-		if (copy_from_user(&fa, (struct fsxattr *)arg, sizeof(fa)))
+		if (copy_from_user(&fa, arg, sizeof(fa)))
 			return -XFS_ERROR(EFAULT);
 
 		attr_flags = 0;
@@ -1126,20 +1123,20 @@ xfs_ioc_xattr(
 		fa.fsx_extsize	= va.va_extsize;
 		fa.fsx_nextents = va.va_anextents;
 
-		if (copy_to_user((struct fsxattr *)arg, &fa, sizeof(fa)))
+		if (copy_to_user(arg, &fa, sizeof(fa)))
 			return -XFS_ERROR(EFAULT);
 		return 0;
 	}
 
 	case XFS_IOC_GETXFLAGS: {
 		flags = xfs_di2lxflags(ip->i_d.di_flags);
-		if (copy_to_user((unsigned int *)arg, &flags, sizeof(flags)))
+		if (copy_to_user(arg, &flags, sizeof(flags)))
 			return -XFS_ERROR(EFAULT);
 		return 0;
 	}
 
 	case XFS_IOC_SETXFLAGS: {
-		if (copy_from_user(&flags, (unsigned int *)arg, sizeof(flags)))
+		if (copy_from_user(&flags, arg, sizeof(flags)))
 			return -XFS_ERROR(EFAULT);
 
 		if (flags & ~(LINUX_XFLAG_IMMUTABLE | LINUX_XFLAG_APPEND | \
@@ -1163,7 +1160,7 @@ xfs_ioc_xattr(
 
 	case XFS_IOC_GETVERSION: {
 		flags = LINVFS_GET_IP(vp)->i_generation;
-		if (copy_to_user((unsigned int *)arg, &flags, sizeof(flags)))
+		if (copy_to_user(arg, &flags, sizeof(flags)))
 			return -XFS_ERROR(EFAULT);
 		return 0;
 	}
@@ -1185,7 +1182,7 @@ xfs_ioc_getbmap(
 	int			iflags;
 	int			error;
 
-	if (copy_from_user(&bm, (struct getbmap *)arg, sizeof(bm)))
+	if (copy_from_user(&bm, arg, sizeof(bm)))
 		return -XFS_ERROR(EFAULT);
 
 	if (bm.bmv_count < 2)
@@ -1199,7 +1196,7 @@ xfs_ioc_getbmap(
 	if (error)
 		return -error;
 
-	if (copy_to_user((struct getbmap *)arg, &bm, sizeof(bm)))
+	if (copy_to_user(arg, &bm, sizeof(bm)))
 		return -XFS_ERROR(EFAULT);
 	return 0;
 }
@@ -1214,7 +1211,7 @@ xfs_ioc_getbmapx(
 	int			iflags;
 	int			error;
 
-	if (copy_from_user(&bmx, (struct getbmapx *)arg, sizeof(bmx)))
+	if (copy_from_user(&bmx, arg, sizeof(bmx)))
 		return -XFS_ERROR(EFAULT);
 
 	if (bmx.bmv_count < 2)
@@ -1239,7 +1236,7 @@ xfs_ioc_getbmapx(
 
 	GETBMAP_CONVERT(bm, bmx);
 
-	if (copy_to_user((struct getbmapx *)arg, &bmx, sizeof(bmx)))
+	if (copy_to_user(arg, &bmx, sizeof(bmx)))
 		return -XFS_ERROR(EFAULT);
 
 	return 0;
