@@ -294,16 +294,17 @@ good_area:
 	 * the fault.
 	 */
 	switch (handle_mm_fault(mm, vma, address, write)) {
-	case 1:
-		current->min_flt++;
-		break;
-	case 2:
+	case VM_FAULT_SIGBUS:
+		goto do_sigbus;
+	case VM_FAULT_OOM:
+		goto out_of_memory;
+	case VM_FAULT_MAJOR:
 		current->maj_flt++;
 		break;
-	case 0:
-		goto do_sigbus;
+	case VM_FAULT_MINOR:
 	default:
-		goto out_of_memory;
+		current->min_flt++;
+		break;
 	}
 	up_read(&mm->mmap_sem);
 	return;
@@ -535,8 +536,11 @@ good_area:
 		if(!(vma->vm_flags & (VM_READ | VM_EXEC)))
 			goto bad_area;
 	}
-	if (!handle_mm_fault(mm, vma, address, write))
+	switch (handle_mm_fault(mm, vma, address, write)) {
+	case VM_FAULT_SIGBUS:
+	case VM_FAULT_OOM:
 		goto do_sigbus;
+	}
 	up_read(&mm->mmap_sem);
 	return;
 bad_area:
