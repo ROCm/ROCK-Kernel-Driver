@@ -82,7 +82,7 @@ static inline struct dentry *debugfs_create_bool(const char *name, mode_t mode,
 						 struct dentry *parent,
 						 u8 *value)
 {
-	return EFF_PTR(-ENODEV);
+	return ERR_PTR(-ENODEV);
 }
 
 #endif
