@@ -318,18 +318,6 @@ void device_unregister(struct device * dev)
 	put_device(dev);
 }
 
-static int __init device_init(void)
-{
-	int error;
-
-	error = init_driverfs_fs();
-	if (error)
-		panic("DEV: could not initialize driverfs");
-	return 0;
-}
-
-core_initcall(device_init);
-
 EXPORT_SYMBOL(device_register);
 EXPORT_SYMBOL(device_unregister);
 EXPORT_SYMBOL(get_device);
