@@ -1768,6 +1768,7 @@ static struct pci_device_id agp_intel_pci_table[] = {
 	ID(PCI_DEVICE_ID_INTEL_82875_HB),
 	ID(PCI_DEVICE_ID_INTEL_7505_0),
 	ID(PCI_DEVICE_ID_INTEL_7205_0),
+	ID(PCI_DEVICE_ID_INTEL_82915G_HB),
 	{ }
 };
 
