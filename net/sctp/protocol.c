@@ -223,7 +223,8 @@ int sctp_copy_local_addr_list(struct sctp_protocol *proto,
 			    (((AF_INET6 == addr->a.sa.sa_family) &&
 			      (copy_flags & SCTP_ADDR6_ALLOWED) &&
 			      (copy_flags & SCTP_ADDR6_PEERSUPP)))) {
-				error = sctp_add_bind_addr(bp, &addr->a, gfp);
+				error = sctp_add_bind_addr(bp, &addr->a, 
+							   GFP_ATOMIC);
 				if (error)
 					goto end_copy;
 			}
