@@ -63,7 +63,7 @@ tools := arch/ia64/tools
 
 .PHONY: boot compressed include/asm-ia64/offsets.h
 
-all: vmlinux
+all: prepare vmlinux
 
 compressed: vmlinux.gz
 

@@ -25,7 +25,7 @@
 #include <asm/system.h>
 
 extern unsigned long wall_jiffies;
-extern unsigned long last_time_offset;
+extern unsigned long last_nsec_offset;
 
 u64 jiffies_64;
 
@@ -74,13 +74,13 @@ gettimeoffset (void)
 		     - (lost + 1)*cpu_data(time_keeper_id)->itm_delta);
 
 	now = ia64_get_itc();
-	if ((long) (now - last_tick) < 0) {
+	if (unlikely((long) (now - last_tick) < 0)) {
 		printk(KERN_ERR "CPU %d: now < last_tick (now=0x%lx,last_tick=0x%lx)!\n",
 		       smp_processor_id(), now, last_tick);
-		return last_time_offset;
+		return last_nsec_offset;
 	}
 	elapsed_cycles = now - last_tick;
-	return (elapsed_cycles*local_cpu_data->usec_per_cyc) >> IA64_USEC_PER_CYC_SHIFT;
+	return (elapsed_cycles*local_cpu_data->nsec_per_cyc) >> IA64_NSEC_PER_CYC_SHIFT;
 }
 
 void
@@ -115,30 +115,35 @@ do_settimeofday (struct timeval *tv)
 void
 do_gettimeofday (struct timeval *tv)
 {
-	unsigned long seq, usec, sec, old;
+	unsigned long seq, nsec, usec, sec, old;
 
-	do {
+	while (1) {
 		seq = read_seqbegin(&xtime_lock);
-		usec = gettimeoffset();
+
+		nsec = gettimeoffset();
 
 		/*
-		 * Ensure time never goes backwards, even when ITC on 
-		 * different CPUs are not perfectly synchronized.
+		 * Ensure time never goes backwards, even when ITC on different CPUs are
+		 * not perfectly synchronized.
 		 */
-		do {
-			old = last_time_offset;
-			if (usec <= old) {
-				usec = old;
-				break;
-			}
-		} while (cmpxchg(&last_time_offset, old, usec) != old);
+		old = last_nsec_offset;
+		if (unlikely(nsec <= old))
+			/* someone else has seen a newer time-offset; use that one instead */
+			nsec = old;
+		else if (unlikely(cmpxchg(&last_nsec_offset, old, nsec) != old))
+			/* someone else beat us to updating last_nsec_offset; try again */
+			continue;
 
 		sec = xtime.tv_sec;
-		usec += xtime.tv_nsec / 1000;
-	} while (read_seqend(&xtime_lock, seq));
+		nsec += xtime.tv_nsec;
 
+		if (likely(!read_seqretry(&xtime_lock, seq)))
+			break;
+	}
 
-	while (usec >= 1000000) {
+	usec = nsec / 1000;
+
+	while (unlikely(usec >= 1000000)) {
 		usec -= 1000000;
 		++sec;
 	}
@@ -278,7 +283,7 @@ ia64_init_itm (void)
 	local_cpu_data->proc_freq = (platform_base_freq*proc_ratio.num)/proc_ratio.den;
 	local_cpu_data->itc_freq = itc_freq;
 	local_cpu_data->cyc_per_usec = (itc_freq + 500000) / 1000000;
-	local_cpu_data->usec_per_cyc = ((1000000UL<<IA64_USEC_PER_CYC_SHIFT)
+	local_cpu_data->nsec_per_cyc = ((1000000000UL<<IA64_NSEC_PER_CYC_SHIFT)
 					+ itc_freq/2)/itc_freq;
 
 	/* Setup the CPU local timer tick */

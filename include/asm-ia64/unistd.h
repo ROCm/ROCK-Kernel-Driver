@@ -223,7 +223,7 @@
 #define __NR_sched_setaffinity		1231
 #define __NR_sched_getaffinity		1232
 #define __NR_set_tid_address		1233
-/* 1234 available for reuse */
+#define __NR_fadvise64			1234
 /* 1235 available for reuse */
 #define __NR_exit_group			1236
 #define __NR_lookup_dcookie		1237

@@ -1,7 +1,7 @@
 /*
  * Kernel support for the ptrace() and syscall tracing interfaces.
  *
- * Copyright (C) 1999-2002 Hewlett-Packard Co
+ * Copyright (C) 1999-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * Derived from the x86 and Alpha versions.  Most of the code in here
@@ -1235,19 +1235,12 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 		ret = 0;
 		goto out_tsk;
 
-	      case PTRACE_GETSIGINFO:
-		ret = -EIO;
-		if (!access_ok(VERIFY_WRITE, data, sizeof (siginfo_t)) || !child->thread.siginfo)
-			goto out_tsk;
-		ret = copy_siginfo_to_user((siginfo_t *) data, child->thread.siginfo);
+	      case PTRACE_OLD_GETSIGINFO:		/* for backwards-compatibility */
+		ret = ptrace_request(child, PTRACE_GETSIGINFO, addr, data);
 		goto out_tsk;
 
-	      case PTRACE_SETSIGINFO:
-		ret = -EIO;
-		if (!access_ok(VERIFY_READ, data, sizeof (siginfo_t))
-		    || child->thread.siginfo == 0)
-			goto out_tsk;
-		ret = copy_siginfo_from_user(child->thread.siginfo, (siginfo_t *) data);
+	      case PTRACE_OLD_SETSIGINFO:		/* for backwards-compatibility */
+		ret = ptrace_request(child, PTRACE_SETSIGINFO, addr, data);
 		goto out_tsk;
 
 	      case PTRACE_SYSCALL:	/* continue and stop at next (return from) syscall */

@@ -741,7 +741,7 @@ acpi_parse_spcr (unsigned long phys_addr, unsigned long size)
 
 
 int __init
-acpi_boot_init (char *cmdline)
+acpi_boot_init (void)
 {
 
 	/*

@@ -534,7 +534,7 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 		if (signr <= 0)
 			break;
 
-		ka = &current->sig->action[signr - 1];
+		ka = &current->sighand->action[signr - 1];
 
 		if (restart) {
 			switch (errno) {
