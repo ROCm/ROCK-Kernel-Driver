@@ -95,7 +95,8 @@ static inline void smp_send_reschedule_all(void) { }
 
 #endif /* !SMP */
 
-#define get_cpu()	({ preempt_disable(); smp_processor_id(); })
-#define put_cpu()	preempt_enable()
+#define get_cpu()		({ preempt_disable(); smp_processor_id(); })
+#define put_cpu()		preempt_enable()
+#define put_cpu_no_resched()	preempt_enable_no_resched()
 
 #endif /* __LINUX_SMP_H */

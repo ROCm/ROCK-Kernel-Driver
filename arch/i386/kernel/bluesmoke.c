@@ -74,7 +74,9 @@ static void (*vendor_thermal_interrupt)(struct pt_regs *regs) = unexpected_therm
 
 asmlinkage void smp_thermal_interrupt(struct pt_regs regs)
 {
+	irq_enter();
 	vendor_thermal_interrupt(&regs);
+	irq_exit();
 }
 
 /* P4/Xeon Thermal regulation detect and init */

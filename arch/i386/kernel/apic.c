@@ -1099,6 +1099,7 @@ asmlinkage void smp_spurious_interrupt(void)
 {
 	unsigned long v;
 
+	irq_enter();
 	/*
 	 * Check if this really is a spurious interrupt and ACK it
 	 * if it is a vectored one.  Just in case...
@@ -1111,6 +1112,7 @@ asmlinkage void smp_spurious_interrupt(void)
 	/* see sw-dev-man vol 3, chapter 7.4.13.5 */
 	printk(KERN_INFO "spurious APIC interrupt on CPU#%d, should never happen.\n",
 			smp_processor_id());
+	irq_exit();
 }
 
 /*
@@ -1121,6 +1123,7 @@ asmlinkage void smp_error_interrupt(void)
 {
 	unsigned long v, v1;
 
+	irq_enter();
 	/* First tickle the hardware, only then report what went on. -- REW */
 	v = apic_read(APIC_ESR);
 	apic_write(APIC_ESR, 0);
@@ -1140,6 +1143,7 @@ asmlinkage void smp_error_interrupt(void)
 	*/
 	printk (KERN_ERR "APIC error on CPU%d: %02lx(%02lx)\n",
 	        smp_processor_id(), v , v1);
+	irq_exit();
 }
 
 /*

@@ -387,7 +387,7 @@ asmlinkage void smp_invalidate_interrupt (void)
 	clear_bit(cpu, &flush_cpumask);
 
 out:
-	put_cpu();
+	put_cpu_no_resched();
 }
 
 static void flush_tlb_others (unsigned long cpumask, struct mm_struct *mm,
