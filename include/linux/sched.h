@@ -591,9 +591,6 @@ static inline int capable(int cap)
  */
 extern struct mm_struct * mm_alloc(void);
 
-extern struct mm_struct * start_lazy_tlb(void);
-extern void end_lazy_tlb(struct mm_struct *mm);
-
 /* mmdrop drops the mm and the page tables */
 extern inline void FASTCALL(__mmdrop(struct mm_struct *));
 static inline void mmdrop(struct mm_struct * mm)
