@@ -281,12 +281,12 @@ static void aio_cancel_all(struct kioctx *ctx)
 		struct kiocb *iocb = list_kiocb(pos);
 		list_del_init(&iocb->ki_list);
 		cancel = iocb->ki_cancel;
-		if (cancel)
+		if (cancel) {
 			iocb->ki_users++;
-		spin_unlock_irq(&ctx->ctx_lock);
-		if (cancel)
+			spin_unlock_irq(&ctx->ctx_lock);
 			cancel(iocb, &res);
-		spin_lock_irq(&ctx->ctx_lock);
+			spin_lock_irq(&ctx->ctx_lock);
+		}
 	}
 	spin_unlock_irq(&ctx->ctx_lock);
 }
@@ -843,13 +843,13 @@ static int read_events(struct kioctx *ctx,
 
 	/* End fast path */
 
+	init_timeout(&to);
 	if (timeout) {
 		struct timespec	ts;
 		ret = -EFAULT;
 		if (unlikely(copy_from_user(&ts, timeout, sizeof(ts))))
 			goto out;
 
-		init_timeout(&to);
 		set_timeout(start_jiffies, &to, &ts);
 	}
 
@@ -1195,6 +1195,9 @@ asmlinkage long sys_io_cancel(aio_context_t ctx_id, struct iocb *iocb,
 	if (NULL != cancel) {
 		struct io_event tmp;
 		printk("calling cancel\n");
+		memset(&tmp, 0, sizeof(tmp));
+		tmp.obj = (u64)(unsigned long)kiocb->ki_user_obj;
+		tmp.data = kiocb->ki_user_data;
 		ret = cancel(kiocb, &tmp);
 		if (!ret) {
 			/* Cancellation succeeded -- copy the result
