@@ -16,7 +16,9 @@ acpi_power_off (void)
 	printk("%s called\n",__FUNCTION__);
 	/* Some SMP machines only can poweroff in boot CPU */
 	set_cpus_allowed(current, cpumask_of_cpu(0));
+#ifdef CONFIG_ACPI_SLEEP
 	acpi_wakeup_gpe_poweroff_prepare();
+#endif
 	acpi_enter_sleep_state_prep(ACPI_STATE_S5);
 	ACPI_DISABLE_IRQS();
 	acpi_enter_sleep_state(ACPI_STATE_S5);
