@@ -225,7 +225,7 @@ extern void tconInfoFree(struct cifsTconInfo *);
 extern int cifs_demultiplex_thread(struct TCP_Server_Info *);
 extern int cifs_reconnect(struct TCP_Server_Info *server);
 
-extern int cifs_sign_smb(struct smb_hdr *, struct cifsSesInfo *);
+extern int cifs_sign_smb(struct smb_hdr *, struct cifsSesInfo *,__u32 *);
 extern int cifs_verify_signature(const struct smb_hdr *, const char * mac_key,
 	__u32 expected_sequence_number);
 

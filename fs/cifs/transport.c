@@ -200,7 +200,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
         if (in_buf->smb_buf_length > 12)
                 in_buf->Flags2 = cpu_to_le16(in_buf->Flags2);
 
-        rc = cifs_sign_smb(in_buf, ses);
+        rc = cifs_sign_smb(in_buf, ses, &midQ->sequence_number);
 
 	midQ->midState = MID_REQUEST_SUBMITTED;
 	rc = smb_send(ses->server->ssocket, in_buf, in_buf->smb_buf_length,
@@ -250,8 +250,8 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 			       receive_len +
 			       4 /* include 4 byte RFC1001 header */ );
 
-/* int cifs_verify_signature(out_buf, ses->mac_signing_key,
-        __u32 expected_sequence_number); */
+rc = cifs_verify_signature(out_buf, ses->mac_signing_key,midQ->sequence_number); /* BB fix BB */
+
 			dump_smb(out_buf, 92);
 			/* convert the length into a more usable form */
 			out_buf->smb_buf_length =
