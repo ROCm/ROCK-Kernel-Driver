@@ -42,6 +42,8 @@
  */
 
 #include <linux/fs.h>
+#include <linux/buffer_head.h>
+
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
 #include "jfs_dinode.h"
@@ -1175,7 +1177,7 @@ int diFree(struct inode *ip)
 	 * invalidate any page of the inode extent freed from buffer cache;
 	 */
 	freepxd = iagp->inoext[extno];
-	invalidate_pxd_metapages(JFS_SBI(ip->i_sb)->direct_inode, freepxd);
+	invalidate_pxd_metapages(ip->i_sb->s_bdev->bd_inode, freepxd);
 
 	/*
 	 *      update iag list(s) (careful update step 2)
@@ -2963,26 +2965,30 @@ printf("diExtendFS: iag:%d agstart:%Ld agno:%d\n", i, agstart, n);
  *
  * note: shadow page with regular inode (rel.2);
  */
-static void
-duplicateIXtree(struct super_block *sb, s64 blkno, int xlen, s64 * xaddr)
+static void duplicateIXtree(struct super_block *sb, s64 blkno,
+			    int xlen, s64 *xaddr)
 {
-	int rc;
-	tid_t tid;
-	struct inode *ip;
-	metapage_t *mpsuper;
 	struct jfs_superblock *j_sb;
+	struct buffer_head *bh;
+	struct inode *ip;
+	tid_t tid;
+	int rc;
 
 	/* if AIT2 ipmap2 is bad, do not try to update it */
 	if (JFS_SBI(sb)->mntflag & JFS_BAD_SAIT)	/* s_flag */
 		return;
 	ip = diReadSpecial(sb, FILESYSTEM_I, 1);
-	if (ip == 0) {
+	if (ip == NULL) {
 		JFS_SBI(sb)->mntflag |= JFS_BAD_SAIT;
-		if ((rc = readSuper(sb, &mpsuper)))
+		if ((rc = readSuper(sb, &bh)))
 			return;
-		j_sb = (struct jfs_superblock *) (mpsuper->data);
+		j_sb = (struct jfs_superblock *)bh->b_data;
 		j_sb->s_flag |= JFS_BAD_SAIT;
-		write_metapage(mpsuper);
+
+		mark_buffer_dirty(bh);
+		ll_rw_block(WRITE, 1, &bh);
+		wait_on_buffer(bh);
+		brelse(bh);
 		return;
 	}
 
