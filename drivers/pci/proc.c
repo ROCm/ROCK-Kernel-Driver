@@ -44,7 +44,7 @@ proc_bus_pci_lseek(struct file *file, loff_t off, int whence)
 }
 
 static ssize_t
-proc_bus_pci_read(struct file *file, char *buf, size_t nbytes, loff_t *ppos)
+proc_bus_pci_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 {
 	const struct inode *ino = file->f_dentry->d_inode;
 	const struct proc_dir_entry *dp = PDE(ino);
@@ -126,7 +126,7 @@ proc_bus_pci_read(struct file *file, char *buf, size_t nbytes, loff_t *ppos)
 }
 
 static ssize_t
-proc_bus_pci_write(struct file *file, const char *buf, size_t nbytes, loff_t *ppos)
+proc_bus_pci_write(struct file *file, const char __user *buf, size_t nbytes, loff_t *ppos)
 {
 	const struct inode *ino = file->f_dentry->d_inode;
 	const struct proc_dir_entry *dp = PDE(ino);
@@ -323,7 +323,7 @@ static void *pci_seq_next(struct seq_file *m, void *v, loff_t *pos)
 {
 	struct list_head *p = v;
 	(*pos)++;
-	return p->next != &pci_devices ? p->next : NULL;
+	return p->next != &pci_devices ? (void *)p->next : NULL;
 }
 static void pci_seq_stop(struct seq_file *m, void *v)
 {
