@@ -225,6 +225,7 @@ int add_to_page_cache(struct page *page, struct address_space *mapping,
 	}
 	return error;
 }
+EXPORT_SYMBOL(add_to_page_cache);
 
 int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
 				pgoff_t offset, int gfp_mask)
