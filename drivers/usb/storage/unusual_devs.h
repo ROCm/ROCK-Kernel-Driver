@@ -354,7 +354,8 @@ UNUSUAL_DEV(  0x054c, 0x002b, 0x0100, 0x0110,
 		0 ),
 #endif
 
-UNUSUAL_DEV(  0x054c, 0x002c, 0x0100, 0x0100, 
+/* Submitted by Olaf Hering, <olh@suse.de> SuSE Bugzilla #49049 */
+UNUSUAL_DEV(  0x054c, 0x002c, 0x0501, 0x0501,
 		"Sony",
 		"USB Floppy Drive",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
