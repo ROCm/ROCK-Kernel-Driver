@@ -470,16 +470,32 @@ static int xfrm_alloc_userspi(struct sk_buff *skb, struct nlmsghdr *nlh, void **
 	struct xfrm_state *x;
 	struct xfrm_userspi_info *p;
 	struct sk_buff *resp_skb;
+	xfrm_address_t *daddr;
+	int family;
 	int err;
 
 	p = NLMSG_DATA(nlh);
 	err = verify_userspi_info(p);
 	if (err)
 		goto out_noput;
-	x = xfrm_find_acq(p->info.mode, p->info.reqid, p->info.id.proto,
-			  &p->info.id.daddr,
-			  &p->info.saddr, 1,
-			  p->info.family);
+
+	family = p->info.family;
+	daddr = &p->info.id.daddr;
+
+	x = NULL;
+	if (p->info.seq) {
+		x = xfrm_find_acq_byseq(p->info.seq);
+		if (x && xfrm_addr_cmp(&x->id.daddr, daddr, family)) {
+			xfrm_state_put(x);
+			x = NULL;
+		}
+	}
+
+	if (!x)
+		x = xfrm_find_acq(p->info.mode, p->info.reqid,
+				  p->info.id.proto, daddr,
+				  &p->info.saddr, 1,
+				  family);
 	err = -ENOENT;
 	if (x == NULL)
 		goto out_noput;

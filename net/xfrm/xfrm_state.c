@@ -387,13 +387,17 @@ void xfrm_state_insert(struct xfrm_state *x)
 	spin_unlock_bh(&xfrm_state_lock);
 }
 
+static struct xfrm_state *__xfrm_find_acq_byseq(u32 seq);
+
 int xfrm_state_add(struct xfrm_state *x)
 {
 	struct xfrm_state_afinfo *afinfo;
 	struct xfrm_state *x1;
+	int family;
 	int err;
 
-	afinfo = xfrm_state_get_afinfo(x->props.family);
+	family = x->props.family;
+	afinfo = xfrm_state_get_afinfo(family);
 	if (unlikely(afinfo == NULL))
 		return -EAFNOSUPPORT;
 
@@ -407,9 +411,18 @@ int xfrm_state_add(struct xfrm_state *x)
 		goto out;
 	}
 
-	x1 = afinfo->find_acq(
-		x->props.mode, x->props.reqid, x->id.proto,
-		&x->id.daddr, &x->props.saddr, 0);
+	if (x->km.seq) {
+		x1 = __xfrm_find_acq_byseq(x->km.seq);
+		if (x1 && xfrm_addr_cmp(&x1->id.daddr, &x->id.daddr, family)) {
+			xfrm_state_put(x1);
+			x1 = NULL;
+		}
+	}
+
+	if (!x1)
+		x1 = afinfo->find_acq(
+			x->props.mode, x->props.reqid, x->id.proto,
+			&x->id.daddr, &x->props.saddr, 0);
 
 	__xfrm_state_insert(x);
 	err = 0;
@@ -570,12 +583,11 @@ xfrm_find_acq(u8 mode, u32 reqid, u8 proto,
 
 /* Silly enough, but I'm lazy to build resolution list */
 
-struct xfrm_state * xfrm_find_acq_byseq(u32 seq)
+static struct xfrm_state *__xfrm_find_acq_byseq(u32 seq)
 {
 	int i;
 	struct xfrm_state *x;
 
-	spin_lock_bh(&xfrm_state_lock);
 	for (i = 0; i < XFRM_DST_HSIZE; i++) {
 		list_for_each_entry(x, xfrm_state_bydst+i, bydst) {
 			if (x->km.seq == seq) {
@@ -585,8 +597,17 @@ struct xfrm_state * xfrm_find_acq_byseq(u32 seq)
 			}
 		}
 	}
-	spin_unlock_bh(&xfrm_state_lock);
 	return NULL;
+}
+
+struct xfrm_state *xfrm_find_acq_byseq(u32 seq)
+{
+	struct xfrm_state *x;
+
+	spin_lock_bh(&xfrm_state_lock);
+	x = __xfrm_find_acq_byseq(seq);
+	spin_unlock_bh(&xfrm_state_lock);
+	return x;
 }
  
 u32 xfrm_get_acqseq(void)
