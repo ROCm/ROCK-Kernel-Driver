@@ -41,7 +41,6 @@ struct systemcfg *systemcfg;
 	.xStab_data = {							    \
 		.real = (asrr),		/* Real pointer to segment table */ \
 		.virt = (asrv),		/* Virt pointer to segment table */ \
-		.next_round_robin = 1	/* Round robin index */		    \
 	},								    \
 	.lpQueuePtr = (lpq),		/* &xItLpQueue, */		    \
 	/* .xRtas = {							    \

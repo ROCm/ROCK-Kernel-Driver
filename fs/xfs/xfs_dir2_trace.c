@@ -49,11 +49,9 @@
 #include "xfs_da_btree.h"
 #include "xfs_dir2_trace.h"
 
-#ifdef DEBUG
-ktrace_t	*xfs_dir2_trace_buf;
-#endif /* DEBUG */
-
 #ifdef XFS_DIR2_TRACE
+ktrace_t	*xfs_dir2_trace_buf;
+
 /*
  * Enter something in the trace buffers.
  */

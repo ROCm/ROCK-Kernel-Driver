@@ -13,6 +13,7 @@
  *
  */
 #include <linux/config.h>
+#include <linux/compiler.h>
 
 /*
  * 32 bit bitops format:
@@ -109,6 +110,8 @@ extern const char _sb_findmap[];
 
 #endif /* __s390x__ */
 
+#define __BITOPS_BARRIER() __asm__ __volatile__ ( "" : : : "memory" )
+
 #ifdef CONFIG_SMP
 /*
  * SMP safe set_bit routine based on compare and swap (CS)
@@ -189,6 +192,7 @@ test_and_set_bit_cs(unsigned long nr, volatile unsigned long *ptr)
 	mask = 1UL << (nr & (__BITOPS_WORDSIZE - 1));
 	/* Do the atomic update. */
 	__BITOPS_LOOP(old, new, addr, mask, __BITOPS_OR);
+	__BITOPS_BARRIER();
 	return (old & mask) != 0;
 }
 
@@ -211,6 +215,7 @@ test_and_clear_bit_cs(unsigned long nr, volatile unsigned long *ptr)
 	mask = ~(1UL << (nr & (__BITOPS_WORDSIZE - 1)));
 	/* Do the atomic update. */
 	__BITOPS_LOOP(old, new, addr, mask, __BITOPS_AND);
+	__BITOPS_BARRIER();
 	return (old ^ new) != 0;
 }
 
@@ -233,6 +238,7 @@ test_and_change_bit_cs(unsigned long nr, volatile unsigned long *ptr)
 	mask = 1UL << (nr & (__BITOPS_WORDSIZE - 1));
 	/* Do the atomic update. */
 	__BITOPS_LOOP(old, new, addr, mask, __BITOPS_XOR);
+	__BITOPS_BARRIER();
 	return (old & mask) != 0;
 }
 #endif /* CONFIG_SMP */
@@ -435,7 +441,7 @@ test_and_set_bit_simple(unsigned long nr, volatile unsigned long *ptr)
         asm volatile("oc 0(1,%1),0(%2)"
 		     : "=m" (*(char *) addr)
 		     : "a" (addr), "a" (_oi_bitmap + (nr & 7)),
-		       "m" (*(char *) addr) : "cc" );
+		       "m" (*(char *) addr) : "cc", "memory" );
 	return (ch >> (nr & 7)) & 1;
 }
 #define __test_and_set_bit(X,Y)		test_and_set_bit_simple(X,Y)
@@ -454,7 +460,7 @@ test_and_clear_bit_simple(unsigned long nr, volatile unsigned long *ptr)
         asm volatile("nc 0(1,%1),0(%2)"
 		     : "=m" (*(char *) addr)
 		     : "a" (addr), "a" (_ni_bitmap + (nr & 7)),
-		       "m" (*(char *) addr) : "cc" );
+		       "m" (*(char *) addr) : "cc", "memory" );
 	return (ch >> (nr & 7)) & 1;
 }
 #define __test_and_clear_bit(X,Y)	test_and_clear_bit_simple(X,Y)
@@ -473,7 +479,7 @@ test_and_change_bit_simple(unsigned long nr, volatile unsigned long *ptr)
         asm volatile("xc 0(1,%1),0(%2)"
 		     : "=m" (*(char *) addr)
 		     : "a" (addr), "a" (_oi_bitmap + (nr & 7)),
-		       "m" (*(char *) addr) : "cc" );
+		       "m" (*(char *) addr) : "cc", "memory" );
 	return (ch >> (nr & 7)) & 1;
 }
 #define __test_and_change_bit(X,Y)	test_and_change_bit_simple(X,Y)
@@ -681,59 +687,6 @@ find_next_bit (unsigned long * addr, int size, int offset)
         return (offset + res);
 }
 
-/*
- * ffz = Find First Zero in word. Undefined if no zero exists,
- * so code should check against ~0UL first..
- */
-static inline unsigned long ffz(unsigned long word)
-{
-	unsigned long reg;
-        int result;
-
-        __asm__("   slr  %0,%0\n"
-                "   lhi  %2,0xff\n"
-                "   tml  %1,0xffff\n"
-                "   jno  0f\n"
-                "   ahi  %0,16\n"
-                "   srl  %1,16\n"
-                "0: tml  %1,0x00ff\n"
-                "   jno  1f\n"
-                "   ahi  %0,8\n"
-                "   srl  %1,8\n"
-                "1: nr   %1,%2\n"
-                "   ic   %1,0(%1,%3)\n"
-                "   alr  %0,%1"
-                : "=&d" (result), "+a" (word), "=&d" (reg)
-                : "a" (&_zb_findmap) : "cc" );
-        return result;
-}
-
-/*
- * __ffs = find first bit in word. Undefined if no bit exists,
- * so code should check against 0UL first..
- */
-static inline unsigned long __ffs (unsigned long word)
-{
-	unsigned long reg, result;
-
-        __asm__("   slr  %0,%0\n"
-                "   lhi  %2,0xff\n"
-                "   tml  %1,0xffff\n"
-                "   jnz  0f\n"
-                "   ahi  %0,16\n"
-                "   srl  %1,16\n"
-                "0: tml  %1,0x00ff\n"
-                "   jnz  1f\n"
-                "   ahi  %0,8\n"
-                "   srl  %1,8\n"
-                "1: nr   %1,%2\n"
-                "   ic   %1,0(%1,%3)\n"
-                "   alr  %0,%1"
-                : "=&d" (result), "+a" (word), "=&d" (reg)
-                : "a" (&_sb_findmap) : "cc" );
-        return result;
-}
-
 #else /* __s390x__ */
 
 /*
@@ -910,35 +863,31 @@ find_next_bit (unsigned long * addr, unsigned long size, unsigned long offset)
         return (offset + res);
 }
 
+#endif /* __s390x__ */
+
 /*
  * ffz = Find First Zero in word. Undefined if no zero exists,
  * so code should check against ~0UL first..
  */
 static inline unsigned long ffz(unsigned long word)
 {
-	unsigned long reg, result;
+        unsigned long bit = 0;
 
-        __asm__("   lhi  %2,-1\n"
-                "   slgr %0,%0\n"
-                "   clr  %1,%2\n"
-                "   jne  0f\n"
-                "   aghi %0,32\n"
-                "   srlg %1,%1,32\n"
-                "0: lghi %2,0xff\n"
-                "   tmll %1,0xffff\n"
-                "   jno  1f\n"
-                "   aghi %0,16\n"
-                "   srlg %1,%1,16\n"
-                "1: tmll %1,0x00ff\n"
-                "   jno  2f\n"
-                "   aghi %0,8\n"
-                "   srlg %1,%1,8\n"
-                "2: ngr  %1,%2\n"
-                "   ic   %1,0(%1,%3)\n"
-                "   algr %0,%1"
-                : "=&d" (result), "+a" (word), "=&d" (reg)
-                : "a" (&_zb_findmap) : "cc" );
-        return result;
+#ifdef __s390x__
+	if (likely((word & 0xffffffff) == 0xffffffff)) {
+		word >>= 32;
+		bit += 32;
+	}
+#endif
+	if (likely((word & 0xffff) == 0xffff)) {
+		word >>= 16;
+		bit += 16;
+	}
+	if (likely((word & 0xff) == 0xff)) {
+		word >>= 8;
+		bit += 8;
+	}
+	return bit + _zb_findmap[word & 0xff];
 }
 
 /*
@@ -947,31 +896,24 @@ static inline unsigned long ffz(unsigned long word)
  */
 static inline unsigned long __ffs (unsigned long word)
 {
-        unsigned long reg, result;
+	unsigned long bit = 0;
 
-        __asm__("   slgr %0,%0\n"
-                "   ltr  %1,%1\n"
-                "   jnz  0f\n"
-                "   aghi %0,32\n"
-                "   srlg %1,%1,32\n"
-                "0: lghi %2,0xff\n"
-                "   tmll %1,0xffff\n"
-                "   jnz  1f\n"
-                "   aghi %0,16\n"
-                "   srlg %1,%1,16\n"
-                "1: tmll %1,0x00ff\n"
-                "   jnz  2f\n"
-                "   aghi %0,8\n"
-                "   srlg %1,%1,8\n"
-                "2: ngr  %1,%2\n"
-                "   ic   %1,0(%1,%3)\n"
-                "   algr %0,%1"
-                : "=&d" (result), "+a" (word), "=&d" (reg)
-                : "a" (&_sb_findmap) : "cc" );
-        return result;
+#ifdef __s390x__
+	if (likely((word & 0xffffffff) == 0)) {
+		word >>= 32;
+		bit += 32;
+	}
+#endif
+	if (likely((word & 0xffff) == 0)) {
+		word >>= 16;
+		bit += 16;
+	}
+	if (likely((word & 0xff) == 0)) {
+		word >>= 8;
+		bit += 8;
+	}
+	return bit + _sb_findmap[word & 0xff];
 }
-
-#endif /* __s390x__ */
 
 /*
  * Every architecture must define this function. It's the fastest
@@ -989,68 +931,12 @@ static inline int sched_find_first_bit(unsigned long *b)
  * the libc and compiler builtin ffs routines, therefore
  * differs in spirit from the above ffz (man ffs).
  */
-extern inline int ffs (int x)
-{
-        int r = 1;
-
-        if (x == 0)
-		return 0;
-        __asm__("    tml  %1,0xffff\n"
-                "    jnz  0f\n"
-                "    srl  %1,16\n"
-                "    ahi  %0,16\n"
-                "0:  tml  %1,0x00ff\n"
-                "    jnz  1f\n"
-                "    srl  %1,8\n"
-                "    ahi  %0,8\n"
-                "1:  tml  %1,0x000f\n"
-                "    jnz  2f\n"
-                "    srl  %1,4\n"
-                "    ahi  %0,4\n"
-                "2:  tml  %1,0x0003\n"
-                "    jnz  3f\n"
-                "    srl  %1,2\n"
-                "    ahi  %0,2\n"
-                "3:  tml  %1,0x0001\n"
-                "    jnz  4f\n"
-                "    ahi  %0,1\n"
-                "4:"
-                : "=&d" (r), "+d" (x) : : "cc" );
-        return r;
-}
+#define ffs(x) generic_ffs(x)
 
 /*
  * fls: find last bit set.
  */
-static __inline__ int fls(int x)
-{
-	int r = 32;
-
-	if (x == 0)
-		return 0;
-	__asm__("    tmh  %1,0xffff\n"
-		"    jz   0f\n"
-		"    sll  %1,16\n"
-		"    ahi  %0,-16\n"
-		"0:  tmh  %1,0xff00\n"
-		"    jz   1f\n"
-		"    sll  %1,8\n"
-		"    ahi  %0,-8\n"
-		"1:  tmh  %1,0xf000\n"
-		"    jz   2f\n"
-		"    sll  %1,4\n"
-		"    ahi  %0,-4\n"
-		"2:  tmh  %1,0xc000\n"
-		"    jz   3f\n"
-		"    sll  %1,2\n"
-		"    ahi  %0,-2\n"
-		"3:  tmh  %1,0x8000\n"
-		"    jz   4f\n"
-		"    ahi  %0,-1\n"
-		"4:"
-		: "+d" (r), "+d" (x) : : "cc" );
-	return r;
-}
+#define fls(x) generic_fls(x)
 
 /*
  * hweightN: returns the hamming weight (i.e. the number
@@ -1273,11 +1159,16 @@ ext2_find_next_zero_bit(void *vaddr, unsigned long size, unsigned long offset)
 
 /* Bitmap functions for the minix filesystem.  */
 /* FIXME !!! */
-#define minix_test_and_set_bit(nr,addr) test_and_set_bit(nr,addr)
-#define minix_set_bit(nr,addr) set_bit(nr,addr)
-#define minix_test_and_clear_bit(nr,addr) test_and_clear_bit(nr,addr)
-#define minix_test_bit(nr,addr) test_bit(nr,addr)
-#define minix_find_first_zero_bit(addr,size) find_first_zero_bit(addr,size)
+#define minix_test_and_set_bit(nr,addr) \
+	test_and_set_bit(nr,(unsigned long *)addr)
+#define minix_set_bit(nr,addr) \
+	set_bit(nr,(unsigned long *)addr)
+#define minix_test_and_clear_bit(nr,addr) \
+	test_and_clear_bit(nr,(unsigned long *)addr)
+#define minix_test_bit(nr,addr) \
+	test_bit(nr,(unsigned long *)addr)
+#define minix_find_first_zero_bit(addr,size) \
+	find_first_zero_bit(addr,size)
 
 #endif /* __KERNEL__ */
 

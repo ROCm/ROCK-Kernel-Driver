@@ -61,7 +61,7 @@
 #include "xfs_error.h"
 #include "xfs_quota.h"
 
-#ifdef DEBUG
+#if defined(XFS_BMBT_TRACE)
 ktrace_t	*xfs_bmbt_trace_buf;
 #endif
 

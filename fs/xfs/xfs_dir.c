@@ -162,7 +162,7 @@ STATIC int xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     xfs_dir_put_t put);
 STATIC int xfs_dir_node_replace(xfs_da_args_t *args);
 
-#if defined(DEBUG)
+#if defined(XFS_DIR_TRACE)
 ktrace_t *xfs_dir_trace_buf;
 #endif
 

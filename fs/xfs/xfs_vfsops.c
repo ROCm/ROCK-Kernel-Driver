@@ -171,6 +171,25 @@ xfs_cleanup(void)
 	xfs_sysctl_unregister();
 	xfs_refcache_destroy();
 
+#ifdef XFS_DIR2_TRACE
+	ktrace_free(xfs_dir2_trace_buf);
+#endif
+#ifdef XFS_ATTR_TRACE
+	ktrace_free(xfs_attr_trace_buf);
+#endif
+#ifdef XFS_DIR_TRACE
+	ktrace_free(xfs_dir_trace_buf);
+#endif
+#ifdef XFS_BMBT_TRACE
+	ktrace_free(xfs_bmbt_trace_buf);
+#endif
+#ifdef XFS_BMAP_TRACE
+	ktrace_free(xfs_bmap_trace_buf);
+#endif
+#ifdef XFS_ALLOC_TRACE
+	ktrace_free(xfs_alloc_trace_buf);
+#endif
+
 	kmem_cache_destroy(xfs_bmap_free_item_zone);
 	kmem_cache_destroy(xfs_btree_cur_zone);
 	kmem_cache_destroy(xfs_inode_zone);

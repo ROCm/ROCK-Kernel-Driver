@@ -124,8 +124,8 @@ struct exception_table_entry
 		"1:\n"						\
 		__uaccess_fixup					\
 		: "=&d" (err)					\
-		: "a" (__to),"a" (__from),"K" (-EFAULT),"0" (0)	\
-		: "cc" );					\
+		: "a" (__to),"a" (__from),"K" (-EFAULT),"0" (0),\
+		  "m" (x) : "cc" );				\
 })
 
 #else /* __s390x__ */

@@ -60,6 +60,14 @@
 # define set_posix_acl_flag(sb)	do { } while (0)
 #endif
 
+#ifdef CONFIG_XFS_SECURITY
+# define XFS_SECURITY_STRING	"security attrs, "
+# define ENOSECURITY		0
+#else
+# define XFS_SECURITY_STRING
+# define ENOSECURITY		EOPNOTSUPP
+#endif
+
 #ifdef CONFIG_XFS_RT
 # define XFS_REALTIME_STRING	"realtime, "
 #else
@@ -89,6 +97,7 @@
 #endif
 
 #define XFS_BUILD_OPTIONS	XFS_ACL_STRING \
+				XFS_SECURITY_STRING \
 				XFS_REALTIME_STRING \
 				XFS_BIGFS_STRING \
 				XFS_TRACE_STRING \
