@@ -1043,11 +1043,15 @@ struct airo_info {
 	struct iw_statistics	wstats;		// wireless stats
 	unsigned long		scan_timestamp;	/* Time started to scan */
 	struct work_struct	event_task;
+#if WIRELESS_EXT > 15
+	struct iw_spy_data	spy_data;
+#else /* WIRELESS_EXT > 15 */
 #ifdef WIRELESS_SPY
 	int			spy_number;
 	u_char			spy_address[IW_MAX_SPY][ETH_ALEN];
 	struct iw_quality	spy_stat[IW_MAX_SPY];
 #endif /* WIRELESS_SPY */
+#endif /* WIRELESS_EXT > 15 */
 #endif /* WIRELESS_EXT */
 	/* MIC stuff */
 	mic_module		mod[2];
@@ -5286,7 +5290,7 @@ static inline char *airo_translate_scan(struct net_device *dev,
 	capabilities = le16_to_cpu(list->cap);
 	if(capabilities & (CAP_ESS | CAP_IBSS)) {
 		if(capabilities & CAP_ESS)
-			iwe.u.mode = IW_MODE_INFRA;
+			iwe.u.mode = IW_MODE_MASTER;
 		else
 			iwe.u.mode = IW_MODE_ADHOC;
 		current_ev = iwe_stream_add_event(current_ev, end_buf, &iwe, IW_EV_UINT_LEN);
