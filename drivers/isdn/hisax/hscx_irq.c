@@ -195,6 +195,12 @@ hscx_interrupt(struct IsdnCardState *cs, u_char val, u_char hscx)
 	}
 }
 
+static void
+reset_xmit(struct BCState *bcs)
+{
+	WriteHSCXCMDR(bcs->cs, bcs->hw.hscx.hscx, 0x01);
+}
+
 static inline void
 hscx_int_main(struct IsdnCardState *cs, u_char val)
 {
@@ -206,17 +212,11 @@ hscx_int_main(struct IsdnCardState *cs, u_char val)
 	if (val & 0x01) {
 		bcs = cs->bcs + 1;
 		exval = READHSCX(cs, 1, HSCX_EXIR);
-		if (exval & 0x40) {
-			if (cs->debug & L1_DEB_WARN)
-				debugl1(cs, "HSCX B EXIR %x", exval);
-			if (bcs->mode == L1_MODE_TRANS)
-				hscx_fill_fifo(bcs);
-			else {
-				xmit_restart_b(bcs);
-				WriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x01);
-			}
-		} else if (cs->debug & L1_DEB_HSCX)
+		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "HSCX B EXIR %x", exval);
+		if (exval & 0x40) {
+			xmit_xdu_b(bcs, reset_xmit);
+		}
 	}
 	if (val & 0xf8) {
 		if (cs->debug & L1_DEB_HSCX)
@@ -226,17 +226,11 @@ hscx_int_main(struct IsdnCardState *cs, u_char val)
 	if (val & 0x02) {
 		bcs = cs->bcs;
 		exval = READHSCX(cs, 0, HSCX_EXIR);
-		if (exval & 0x40) {
-			if (cs->debug & L1_DEB_WARN)
-				debugl1(cs, "HSCX A EXIR %x", exval);
-			if (bcs->mode == L1_MODE_TRANS)
-				hscx_fill_fifo(bcs);
-			else {
-				xmit_restart_b(bcs);
-				WriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x01);
-			}
-		} else if (cs->debug & L1_DEB_HSCX)
+		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "HSCX A EXIR %x", exval);
+		if (exval & 0x40) {
+			xmit_xdu_b(bcs, reset_xmit);
+		}
 	}
 	if (val & 0x04) {
 		exval = READHSCX(cs, 0, HSCX_ISTA);

@@ -159,3 +159,20 @@ xmit_xpr_b(struct BCState *bcs)
 	xmit_ready_b(bcs);
 }
 
+/* XDU - transmit data underrun */
+/* called with the card lock held */
+static inline void
+xmit_xdu_b(struct BCState *bcs, void (*reset_xmit)(struct BCState *bcs))
+{
+	struct IsdnCardState *cs = bcs->cs;
+
+	if (cs->debug & L1_DEB_WARN)
+		debugl1(cs, "HSCX %c EXIR XDU", 'A' + bcs->channel);
+
+	if (bcs->mode == L1_MODE_TRANS) {
+		cs->BC_Send_Data(bcs);
+	} else {
+		xmit_restart_b(bcs);
+		reset_xmit(bcs);
+	}
+}

@@ -375,6 +375,17 @@ hdlc_fill_fifo(struct BCState *bcs)
 	}
 }
 
+static void
+reset_xmit(struct BCState *bcs)
+{
+	bcs->hw.hdlc.ctrl.sr.xml = 0;
+	bcs->hw.hdlc.ctrl.sr.cmd |= HDLC_CMD_XRS;
+	write_ctrl(bcs, 1);
+	bcs->hw.hdlc.ctrl.sr.cmd &= ~HDLC_CMD_XRS;
+	write_ctrl(bcs, 1);
+	hdlc_fill_fifo(bcs);
+}
+
 static inline void
 HDLC_irq(struct BCState *bcs, u_int stat)
 {
@@ -423,17 +434,7 @@ HDLC_irq(struct BCState *bcs, u_int stat)
 		}
 	}
 	if (stat & HDLC_INT_XDU) {
-		/* Here we lost an TX interrupt, so
-		 * restart transmitting the whole frame. */
-		if (bcs->cs->debug & L1_DEB_WARN)
-			debugl1(bcs->cs, "ch%d XDU", bcs->channel);
-		xmit_restart_b(bcs);
-		bcs->hw.hdlc.ctrl.sr.xml = 0;
-		bcs->hw.hdlc.ctrl.sr.cmd |= HDLC_CMD_XRS;
-		write_ctrl(bcs, 1);
-		bcs->hw.hdlc.ctrl.sr.cmd &= ~HDLC_CMD_XRS;
-		write_ctrl(bcs, 1);
-		hdlc_fill_fifo(bcs);
+		xmit_xdu_b(bcs, reset_xmit);
 	} else if (stat & HDLC_INT_XPR) {
 		xmit_xpr_b(bcs);
 	}

@@ -181,8 +181,14 @@ jade_interrupt(struct IsdnCardState *cs, u_char val, u_char jade)
 		}
 	}
 	if (val & 0x10) {	/* XPR */
-		xmit_xpr(bcs);
+		xmit_xpr_b(bcs);
 	}
+}
+
+static void
+reset_xmit(struct BCState *bcs)
+{
+	WriteJADECMDR(bcs->cs, bcs->hw.hscx.hscx, jade_HDLC_XCMD, jadeXCMD_XRES);
 }
 
 static inline void
@@ -197,19 +203,7 @@ jade_int_main(struct IsdnCardState *cs, u_char val, int jade)
 		val &= ~jadeISR_RFO;
 	}
 	if (val & jadeISR_XDU) {
-		if (cs->debug & L1_DEB_WARN)
-			debugl1(cs, "JADE %c EXIR %x", 'A'+jade, val);
-		/* relevant in HDLC mode only */
-		/* don't reset XPR here */
-		if (bcs->mode == L1_MODE_TRANSPARENT)
-			jade_fill_fifo(bcs);
-		else {
-			/* Here we lost an TX interrupt, so
-			 * restart transmitting the whole frame.
-			 */
-			xmit_restart_b(bcs);
-			WriteJADECMDR(cs, bcs->hw.hscx.hscx, jade_HDLC_XCMD, jadeXCMD_XRES);
-		}
+		xmit_xdu_b(bcs, reset_xmit);
 	}
 	if (val & (jadeISR_RME|jadeISR_RPF|jadeISR_XPR)) {
 		if (cs->debug & L1_DEB_HSCX)

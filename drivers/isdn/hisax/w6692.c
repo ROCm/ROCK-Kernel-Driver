@@ -279,6 +279,13 @@ W6692B_fill_fifo(struct BCState *bcs)
 }
 
 static void
+reset_xmit(struct BCState *bcs)
+{
+	bcs->cs->BC_Write_Reg(bcs->cs, bcs->channel, W_B_CMDR,
+			      W_B_CMDR_XRST | W_B_CMDR_RACT);
+}
+
+static void
 W6692B_interrupt(struct IsdnCardState *cs, u_char bchan)
 {
 	u_char val;
@@ -340,20 +347,10 @@ W6692B_interrupt(struct IsdnCardState *cs, u_char bchan)
 		}
 	}
 	if (val & W_B_EXI_XFR) {	/* XFR */
-		xmit_xpr(bcs);
+		xmit_xpr_b(bcs);
 	}
 	if (val & W_B_EXI_XDUN) {	/* XDUN */
-		if (cs->debug & L1_DEB_WARN)
-			debugl1(cs, "W6692 B EXIR %x", val);
-		if (bcs->mode == L1_MODE_TRANSPARENT)
-			W6692B_fill_fifo(bcs);
-		else {
-			/* Here we lost an TX interrupt, so
-			 * restart transmitting the whole frame.
-			 */
-			xmit_restart_b(bcs);
-			cs->BC_Write_Reg(cs, bchan, W_B_CMDR, W_B_CMDR_XRST | W_B_CMDR_RACT);
-		}
+		xmit_xdu_b(bcs, reset_xmit);
 	}
 }
 

@@ -559,8 +559,14 @@ Memhscx_interrupt(struct IsdnCardState *cs, u_char val, u_char hscx)
 		}
 	}
 	if (val & 0x10) {
-		xmit_xpr(bcs);/* XPR */
+		xmit_xpr_b(bcs);/* XPR */
 	}
+}
+
+static void
+Memhscx_reset_xmit(struct BCState *bcs)
+{
+	MemWriteHSCXCMDR(bcs->cs, bcs->hw.hscx.hscx, 0x01);
 }
 
 static inline void
@@ -574,19 +580,10 @@ Memhscx_int_main(struct IsdnCardState *cs, u_char val)
 		bcs = cs->bcs + 1;
 		exval = MemReadHSCX(cs, 1, HSCX_EXIR);
 		if (exval & 0x40) {
-			if (cs->debug & L1_DEB_WARN)
+			if (cs->debug & L1_DEB_HSCX)
 				debugl1(cs, "HSCX B EXIR %x", exval);
-			if (bcs->mode == L1_MODE_TRANS)
-				Memhscx_fill_fifo(bcs);
-			else {
-				/* Here we lost an TX interrupt, so
-				 * restart transmitting the whole frame.
-				 */
-				xmit_restart_b(bcs);
-				MemWriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x01);
-			}
-		} else if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX B EXIR %x", exval);
+			xmit_xdu_b(bcs, Memhscx_reset_xmit);
+		}
 	}
 	if (val & 0xf8) {
 		if (cs->debug & L1_DEB_HSCX)
@@ -597,19 +594,10 @@ Memhscx_int_main(struct IsdnCardState *cs, u_char val)
 		bcs = cs->bcs;
 		exval = MemReadHSCX(cs, 0, HSCX_EXIR);
 		if (exval & 0x40) {
-			if (cs->debug & L1_DEB_WARN)
+			if (cs->debug & L1_DEB_HSCX)
 				debugl1(cs, "HSCX A EXIR %x", exval);
-			if (bcs->mode == L1_MODE_TRANS)
-				Memhscx_fill_fifo(bcs);
-			else {
-				/* Here we lost an TX interrupt, so
-				 * restart transmitting the whole frame.
-				 */
-				xmit_restart_b(bcs);
-				MemWriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x01);
-			}
-		} else if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX A EXIR %x", exval);
+			xmit_xdu_b(bcs, Memhscx_reset_xmit);
+		}
 	}
 	if (val & 0x04) {	// ICA
 		exval = MemReadHSCX(cs, 0, HSCX_ISTA);

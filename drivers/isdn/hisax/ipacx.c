@@ -637,6 +637,13 @@ ipacx_fill_fifo(struct BCState *bcs)
 //----------------------------------------------------------
 // B channel interrupt handler
 //----------------------------------------------------------
+
+static void
+reset_xmit(struct BCState *bcs)
+{
+	bcs->cs->BC_Write_Reg(bcs->cs, bcs->hw.hscx.hscx, IPACX_CMDRB, 0x01);  // XRES
+}
+
 static void
 bch_int(struct IsdnCardState *cs, u_char hscx)
 {
@@ -706,18 +713,11 @@ bch_int(struct IsdnCardState *cs, u_char hscx)
 	}
 
 	if (istab &0x10) {	// XPR
-		xmit_xpr(bcs);
+		xmit_xpr_b(bcs);
 	}
 
 	if (istab &0x04) {	// XDU
-		if (cs->debug &L1_DEB_WARN)
-			debugl1(cs, "bch_int() B-%d XDU error", hscx);
-		if (bcs->mode == L1_MODE_TRANS) {
-			ipacx_fill_fifo(bcs);
-		}  else {
-			xmit_restart_b(bcs);
-			cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x01);  // XRES
-		}
+		xmit_xdu_b(bcs, reset_xmit);
 	}
 }
 
