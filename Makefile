@@ -380,7 +380,7 @@ $(sort $(vmlinux-objs)): $(SUBDIRS) ;
 # 	Handle descending into subdirectories listed in $(SUBDIRS)
 
 .PHONY: $(SUBDIRS)
-$(SUBDIRS): .hdepend prepare
+$(SUBDIRS): prepare
 	$(Q)$(MAKE) $(build)=$@
 
 #	Things we need done before we descend to build or make
@@ -471,61 +471,11 @@ include/linux/version.h: Makefile
 	) > $@.tmp
 	@$(update-if-changed)
 
-# Generate module versions
 # ---------------------------------------------------------------------------
 
-# 	The targets are still named depend / dep for traditional
-#	reasons, but the only thing we do here is generating
-#	the module version checksums.
-
-.PHONY: depend dep $(patsubst %,_sfdep_%,$(SUBDIRS))
-
-depend dep: .hdepend
-
-#	.hdepend is our (misnomed) marker for whether we've
-#	generated module versions
-
-make-versions := $(strip $(if $(filter dep depend,$(MAKECMDGOALS)),1) \
-			 $(if $(wildcard .hdepend),,1))
-
-.hdepend: prepare FORCE
-ifneq ($(make-versions),)
-	@$(MAKE) include/linux/modversions.h
-	@touch $@
-endif
-
-ifdef CONFIG_MODVERSIONS
-
-# 	Update modversions.h, but only if it would change.
-
-.PHONY: __rm_tmp_export-objs
-__rm_tmp_export-objs: 
-	@rm -rf .tmp_export-objs
-
-include/linux/modversions.h: $(patsubst %,_modver_%,$(SUBDIRS))
-	@echo -n '  Generating $@'
-	@( echo "#ifndef _LINUX_MODVERSIONS_H";\
-	   echo "#define _LINUX_MODVERSIONS_H"; \
-	   echo "#include <linux/modsetver.h>"; \
-	   cd .tmp_export-objs >/dev/null; \
-	   for f in `find modules -name \*.ver -print | sort`; do \
-	     echo "#include <linux/$${f}>"; \
-	   done; \
-	   echo "#endif"; \
-	) > $@.tmp; \
-	$(update-if-changed)
-
-.PHONY: $(patsubst %, _modver_%, $(SUBDIRS))
-$(patsubst %, _modver_%, $(SUBDIRS)): __rm_tmp_export-objs
-	$(Q)$(MAKE) -f scripts/Makefile.modver obj=$(patsubst _modver_%,%,$@)
-
-else # !CONFIG_MODVERSIONS
-
-.PHONY: include/linux/modversions.h
-
-include/linux/modversions.h:
-
-endif # CONFIG_MODVERSIONS
+.PHONY: depend dep
+depend dep:
+	@echo'*** Warning: make $@ is unnecessary now.'
 
 # ---------------------------------------------------------------------------
 # Modules
@@ -533,10 +483,6 @@ endif # CONFIG_MODVERSIONS
 ifdef CONFIG_MODULES
 
 #	Build modules
-
-ifdef CONFIG_MODVERSIONS
-MODFLAGS += -include include/linux/modversions.h
-endif
 
 .PHONY: modules
 modules: $(SUBDIRS)
@@ -570,6 +516,7 @@ _modinst_post:
 .PHONY: $(patsubst %, _modinst_%, $(SUBDIRS))
 $(patsubst %, _modinst_%, $(SUBDIRS)) :
 	$(Q)$(MAKE) -rR -f scripts/Makefile.modinst obj=$(patsubst _modinst_%,%,$@)
+
 else # CONFIG_MODULES
 
 # Modules not configured
@@ -620,7 +567,7 @@ spec:
 
 rpm:	clean spec
 	find . $(RCS_FIND_IGNORE) \
-		\( -size 0 -o -name .depend -o -name .hdepend \) \
+		\( -size 0 -o -name .depend -o -name .hdepend\) \
 		-type f -print | xargs rm -f
 	set -e; \
 	cd $(TOPDIR)/.. ; \
