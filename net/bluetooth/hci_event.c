@@ -229,8 +229,11 @@ static void hci_cc_host_ctl(struct hci_dev *hdev, __u16 ocf, struct sk_buff *skb
 
 			BT_DBG("%s: voice setting 0x%04x", hdev->name, setting);
 
-			if (hdev->notify)
+			if (hdev->notify) {
+				tasklet_disable(&hdev->tx_task);
 				hdev->notify(hdev, HCI_NOTIFY_VOICE_SETTING);
+				tasklet_enable(&hdev->tx_task);
+			}
 		}
 		break;
 
@@ -247,8 +250,11 @@ static void hci_cc_host_ctl(struct hci_dev *hdev, __u16 ocf, struct sk_buff *skb
 
 			BT_DBG("%s: voice setting 0x%04x", hdev->name, setting);
 
-			if (hdev->notify)
+			if (hdev->notify) {
+				tasklet_disable(&hdev->tx_task);
 				hdev->notify(hdev, HCI_NOTIFY_VOICE_SETTING);
+				tasklet_enable(&hdev->tx_task);
+			}
 		}
 		hci_req_complete(hdev, status);
 		break;
