@@ -2719,6 +2719,7 @@ static void gdth_copy_internal_data(int hanum,Scsi_Cmnd *scp,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,13)
         sgcnt = pci_map_sg(ha->pdev,sl,scp->use_sg,PCI_DMA_FROMDEVICE);
         for (i=0,cpsum=0; i<sgcnt; ++i,++sl) {
+	    unsigned long flags;
             cpnow = (ushort)sg_dma_len(sl);
             TRACE(("copy_internal() now %d sum %d count %d %d\n",
                           cpnow,cpsum,cpcount,(ushort)scp->bufflen));
@@ -2730,8 +2731,11 @@ static void gdth_copy_internal_data(int hanum,Scsi_Cmnd *scp,
                        hanum);
                 return;
             }
-            address = (char *)(page_address(sl->page) + sl->offset);
+	    local_irq_save(flags);
+	    address = kmap_atomic(sl->page, KM_BIO_SRC_IRQ) + sl->offset;
             memcpy(address,buffer,cpnow);
+	    kunmap_atomic(address, KM_BIO_SRC_IRQ);
+	    local_irq_restore(flags);
             if (cpsum == cpcount)
                 break;
             buffer += cpnow;
@@ -3268,7 +3272,7 @@ static int gdth_fill_raw_cmd(int hanum,Scsi_Cmnd *scp,unchar b)
             }
 #endif
 
-        } else {
+        } else if(scp->request_bufflen) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,13)
             scp->SCp.Status = GDTH_MAP_SINGLE;
             scp->SCp.Message = PCI_DMA_BIDIRECTIONAL; 
