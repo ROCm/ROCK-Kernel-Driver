@@ -422,7 +422,6 @@ enum service {
 };
 
 int pcmcia_access_configuration_register(client_handle_t handle, conf_reg_t *reg);
-int pcmcia_bind_mtd(mtd_bind_t *req);
 int pcmcia_deregister_client(client_handle_t handle);
 int pcmcia_get_configuration_info(client_handle_t handle, config_info_t *config);
 int pcmcia_get_card_services_info(servinfo_t *info);

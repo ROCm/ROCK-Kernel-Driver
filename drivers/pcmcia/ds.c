@@ -176,6 +176,45 @@ static int pcmcia_bind_device(bind_req_t *req)
 } /* bind_device */
 
 
+/*======================================================================
+
+    Bind_mtd() associates a device driver with a particular memory
+    region.  It is normally called by Driver Services after it has
+    identified a memory device type.  An instance of the corresponding
+    driver will then be able to register to control this region.
+    
+======================================================================*/
+
+static int pcmcia_bind_mtd(mtd_bind_t *req)
+{
+	struct pcmcia_socket *s;
+	memory_handle_t region;
+
+	s = req->Socket;
+	if (!s)
+		return CS_BAD_SOCKET;
+    
+	if (req->Attributes & REGION_TYPE_AM)
+		region = s->a_region;
+	else
+		region = s->c_region;
+
+	while (region) {
+		if (region->info.CardOffset == req->CardOffset) 
+			break;
+		region = region->info.next;
+	}
+	if (!region || (region->mtd != NULL))
+		return CS_BAD_OFFSET;
+	strlcpy(region->dev_info, (char *)req->dev_info, DEV_NAME_LEN);
+
+	ds_dbg(1, "%s: bind_mtd: attr 0x%x, offset 0x%x, dev %s\n",
+	      cs_socket_name(s), req->Attributes, req->CardOffset,
+	      (char *)req->dev_info);
+	return CS_SUCCESS;
+} /* bind_mtd */
+
+
 /* end of code which was in cs.c before */
 
 /*======================================================================*/
