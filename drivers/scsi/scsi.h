@@ -63,56 +63,11 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 #define sense_error(sense)  ((sense) & 0xf)
 #define sense_valid(sense)  ((sense) & 0x80);
 
-#define NEEDS_RETRY     0x2001
-#define SUCCESS         0x2002
-#define FAILED          0x2003
-#define QUEUED          0x2004
-#define SOFT_ERROR      0x2005
-#define ADD_TO_MLQUEUE  0x2006
 
 #define IDENTIFY_BASE       0x80
 #define IDENTIFY(can_disconnect, lun)   (IDENTIFY_BASE |\
 		     ((can_disconnect) ?  0x40 : 0) |\
 		     ((lun) & 0x07))
-
-/* host byte codes */
-#define DID_OK          0x00	/* NO error                                */
-#define DID_NO_CONNECT  0x01	/* Couldn't connect before timeout period  */
-#define DID_BUS_BUSY    0x02	/* BUS stayed busy through time out period */
-#define DID_TIME_OUT    0x03	/* TIMED OUT for other reason              */
-#define DID_BAD_TARGET  0x04	/* BAD target.                             */
-#define DID_ABORT       0x05	/* Told to abort for some other reason     */
-#define DID_PARITY      0x06	/* Parity error                            */
-#define DID_ERROR       0x07	/* Internal error                          */
-#define DID_RESET       0x08	/* Reset by somebody.                      */
-#define DID_BAD_INTR    0x09	/* Got an interrupt we weren't expecting.  */
-#define DID_PASSTHROUGH 0x0a	/* Force command past mid-layer            */
-#define DID_SOFT_ERROR  0x0b	/* The low level driver just wish a retry  */
-#define DRIVER_OK       0x00	/* Driver status                           */
-
-/*
- *  These indicate the error that occurred, and what is available.
- */
-
-#define DRIVER_BUSY         0x01
-#define DRIVER_SOFT         0x02
-#define DRIVER_MEDIA        0x03
-#define DRIVER_ERROR        0x04
-
-#define DRIVER_INVALID      0x05
-#define DRIVER_TIMEOUT      0x06
-#define DRIVER_HARD         0x07
-#define DRIVER_SENSE	    0x08
-
-#define SUGGEST_RETRY       0x10
-#define SUGGEST_ABORT       0x20
-#define SUGGEST_REMAP       0x30
-#define SUGGEST_DIE         0x40
-#define SUGGEST_SENSE       0x80
-#define SUGGEST_IS_OK       0xff
-
-#define DRIVER_MASK         0x0f
-#define SUGGEST_MASK        0xf0
 
 /*
  *  SCSI command sets
@@ -145,13 +100,6 @@ extern void print_status(unsigned char status);
 extern int print_msg(const unsigned char *);
 extern const char *scsi_sense_key_string(unsigned char);
 extern const char *scsi_extd_sense_format(unsigned char, unsigned char);
-
-/*
- * Definitions and prototypes used for scsi mid-level queue.
- */
-#define SCSI_MLQUEUE_HOST_BUSY   0x1055
-#define SCSI_MLQUEUE_DEVICE_BUSY 0x1056
-#define SCSI_MLQUEUE_EH_RETRY    0x1057
 
 /*
  * Legacy dma direction interfaces.
