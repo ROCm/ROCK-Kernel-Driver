@@ -1696,7 +1696,7 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	},
 	{
 		.vendor = 0x11d4,
-		.vendor = 0x5375,
+		.device = 0x5375,
 		.name = "ADI AD1985 (discrete)",
 		.type = AC97_TUNE_HP_ONLY
 	},
