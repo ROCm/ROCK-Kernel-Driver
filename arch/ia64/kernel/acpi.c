@@ -47,9 +47,9 @@
 
 #define PREFIX			"ACPI: "
 
-asm (".weak iosapic_register_irq");
-asm (".weak iosapic_register_legacy_irq");
-asm (".weak iosapic_register_platform_irq");
+asm (".weak iosapic_register_intr");
+asm (".weak iosapic_override_isa_irq");
+asm (".weak iosapic_register_platform_intr");
 asm (".weak iosapic_init");
 asm (".weak iosapic_version");
 
@@ -173,10 +173,10 @@ acpi_dispose_crs (acpi_buffer *buf)
 
 #ifdef CONFIG_ACPI_BOOT
 
-#define ACPI_MAX_PLATFORM_IRQS	256
+#define ACPI_MAX_PLATFORM_INTERRUPTS	256
 
 /* Array to record platform interrupt vectors for generic interrupt routing. */
-int platform_irq_list[ACPI_MAX_PLATFORM_IRQS] = { [0 ... ACPI_MAX_PLATFORM_IRQS - 1] = -1 };
+int platform_intr_list[ACPI_MAX_PLATFORM_INTERRUPTS] = { [0 ... ACPI_MAX_PLATFORM_INTERRUPTS - 1] = -1 };
 
 enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_IOSAPIC;
 
@@ -189,9 +189,9 @@ acpi_request_vector (u32 int_type)
 {
 	int vector = -1;
 
-	if (int_type < ACPI_MAX_PLATFORM_IRQS) {
+	if (int_type < ACPI_MAX_PLATFORM_INTERRUPTS) {
 		/* correctable platform error interrupt */
-		vector = platform_irq_list[int_type];
+		vector = platform_intr_list[int_type];
 	} else
 		printk("acpi_request_vector(): invalid interrupt type\n");
 	return vector;
@@ -210,6 +210,7 @@ __acpi_map_table (unsigned long phys_addr, unsigned long size)
 static int			total_cpus __initdata;
 static int			available_cpus __initdata;
 struct acpi_table_madt *	acpi_madt __initdata;
+static u8			has_8259;
 
 
 static int __init
@@ -284,7 +285,7 @@ acpi_parse_lapic_nmi (acpi_table_entry_header *header)
 
 
 static int __init
-acpi_find_iosapic (int global_vector, u32 *irq_base, char **iosapic_address)
+acpi_find_iosapic (unsigned int gsi, u32 *gsi_base, char **iosapic_address)
 {
 	struct acpi_table_iosapic *iosapic;
 	int ver;
@@ -292,7 +293,7 @@ acpi_find_iosapic (int global_vector, u32 *irq_base, char **iosapic_address)
 	char *p;
 	char *end;
 
-	if (!irq_base || !iosapic_address)
+	if (!gsi_base || !iosapic_address)
 		return -ENODEV;
 
 	p = (char *) (acpi_madt + 1);
@@ -302,13 +303,13 @@ acpi_find_iosapic (int global_vector, u32 *irq_base, char **iosapic_address)
 		if (*p == ACPI_MADT_IOSAPIC) {
 			iosapic = (struct acpi_table_iosapic *) p;
 
-			*irq_base = iosapic->global_irq_base;
+			*gsi_base = iosapic->global_irq_base;
 			*iosapic_address = ioremap(iosapic->address, 0);
 
 			ver = iosapic_version(*iosapic_address);
 			max_pin = (ver >> 16) & 0xff;
 
-			if ((global_vector - *irq_base) <= max_pin)
+			if ((gsi - *gsi_base) <= max_pin)
 				return 0;	/* Found it! */
 		}
 		p += p[1];
@@ -347,7 +348,7 @@ acpi_parse_plat_int_src (acpi_table_entry_header *header)
 {
 	struct acpi_table_plat_int_src *plintsrc;
 	int vector;
-	u32 irq_base;
+	u32 gsi_base;
 	char *iosapic_address;
 
 	plintsrc = (struct acpi_table_plat_int_src *) header;
@@ -356,31 +357,31 @@ acpi_parse_plat_int_src (acpi_table_entry_header *header)
 
 	acpi_table_print_madt_entry(header);
 
-	if (!iosapic_register_platform_irq) {
-		printk(KERN_WARNING PREFIX "No ACPI platform IRQ support\n");
+	if (!iosapic_register_platform_intr) {
+		printk(KERN_WARNING PREFIX "No ACPI platform interrupt support\n");
 		return -ENODEV;
 	}
 
-	if (acpi_find_iosapic(plintsrc->global_irq, &irq_base, &iosapic_address)) {
+	if (acpi_find_iosapic(plintsrc->global_irq, &gsi_base, &iosapic_address)) {
 		printk(KERN_WARNING PREFIX "IOSAPIC not found\n");
 		return -ENODEV;
 	}
 
 	/*
-	 * Get vector assignment for this IRQ, set attributes, and program the
-	 * IOSAPIC routing table.
+	 * Get vector assignment for this interrupt, set attributes,
+	 * and program the IOSAPIC routing table.
 	 */
-	vector = iosapic_register_platform_irq(plintsrc->type,
-					       plintsrc->global_irq,
-					       plintsrc->iosapic_vector,
-					       plintsrc->eid,
-					       plintsrc->id,
-					       (plintsrc->flags.polarity == 1) ? 1 : 0,
-					       (plintsrc->flags.trigger == 1) ? 1 : 0,
-					       irq_base,
-					       iosapic_address);
+	vector = iosapic_register_platform_intr(plintsrc->type,
+						plintsrc->global_irq,
+						plintsrc->iosapic_vector,
+						plintsrc->eid,
+						plintsrc->id,
+						(plintsrc->flags.polarity == 1) ? 1 : 0,
+						(plintsrc->flags.trigger == 1) ? 1 : 0,
+						gsi_base,
+						iosapic_address);
 
-	platform_irq_list[plintsrc->type] = vector;
+	platform_intr_list[plintsrc->type] = vector;
 	return 0;
 }
 
@@ -397,12 +398,12 @@ acpi_parse_int_src_ovr (acpi_table_entry_header *header)
 	acpi_table_print_madt_entry(header);
 
 	/* Ignore if the platform doesn't support overrides */
-	if (!iosapic_register_legacy_irq)
+	if (!iosapic_override_isa_irq)
 		return 0;
 
-	iosapic_register_legacy_irq(p->bus_irq, p->global_irq,
-				    (p->flags.polarity == 1) ? 1 : 0,
-				    (p->flags.trigger == 1) ? 1 : 0);
+	iosapic_override_isa_irq(p->bus_irq, p->global_irq,
+				 (p->flags.polarity == 1) ? 1 : 0,
+				 (p->flags.trigger == 1) ? 1 : 0);
 	return 0;
 }
 
@@ -431,6 +432,9 @@ acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 
 	acpi_madt = (struct acpi_table_madt *) __va(phys_addr);
 
+	/* remember the value for reference after free_initmem() */
+	has_8259 = acpi_madt->flags.pcat_compat;
+
 	/* Get base address of IPI Message Block */
 
 	if (acpi_madt->lapic_address)
@@ -440,11 +444,14 @@ acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 	return 0;
 }
 
+
 static int __init
 acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 {
 	struct acpi_table_header *fadt_header;
 	fadt_descriptor_rev2 *fadt;
+	u32 sci_irq, gsi_base;
+	char *iosapic_address;
 
 	if (!phys_addr || !size)
 		return -EINVAL;
@@ -458,8 +465,19 @@ acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 	if (!(fadt->iapc_boot_arch & BAF_8042_KEYBOARD_CONTROLLER))
 		acpi_kbd_controller_present = 0;
 
+	if (!iosapic_register_intr)
+		return 0;	/* just ignore the rest */
+
+	sci_irq = fadt->sci_int;
+
+	if (has_8259 && sci_irq < 16)
+		return 0;	/* legacy, no setup required */
+
+	if (!acpi_find_iosapic(sci_irq, &gsi_base, &iosapic_address))
+		iosapic_register_intr(sci_irq, 0, 0, gsi_base, iosapic_address);
 	return 0;
 }
+
 
 unsigned long __init
 acpi_find_rsdp (void)
@@ -482,12 +500,12 @@ static int __init
 acpi_parse_spcr (unsigned long phys_addr, unsigned long size)
 {
 	acpi_ser_t *spcr;
-	unsigned long global_int;
+	unsigned int gsi;
 
 	if (!phys_addr || !size)
 		return -EINVAL;
 
-	if (!iosapic_register_irq)
+	if (!iosapic_register_intr)
 		return -ENODEV;
 
 	/*
@@ -500,6 +518,7 @@ acpi_parse_spcr (unsigned long phys_addr, unsigned long size)
 	 */
 
 	spcr = (acpi_ser_t *) __va(phys_addr);
+
 	setup_serial_acpi(spcr);
 
 	if (spcr->length < sizeof(acpi_ser_t))
@@ -509,22 +528,22 @@ acpi_parse_spcr (unsigned long phys_addr, unsigned long size)
 	if ((spcr->base_addr.space_id != ACPI_SERIAL_PCICONF_SPACE) &&
 	    (spcr->int_type == ACPI_SERIAL_INT_SAPIC))
 	{
-		u32 irq_base;
+		u32 gsi_base;
 		char *iosapic_address;
 		int vector;
 
 		/* We have a UART in memory space with an SAPIC interrupt */
 
-		global_int = ((spcr->global_int[3] << 24) |
-			      (spcr->global_int[2] << 16) |
-			      (spcr->global_int[1] << 8)  |
-			      (spcr->global_int[0])  );
+		gsi = (  (spcr->global_int[3] << 24) |
+			 (spcr->global_int[2] << 16) |
+			 (spcr->global_int[1] << 8)  |
+			 (spcr->global_int[0])  );
 
-		/* Which iosapic does this IRQ belong to? */
+		/* Which iosapic does this interrupt belong to? */
 
-		if (!acpi_find_iosapic(global_int, &irq_base, &iosapic_address))
-			vector = iosapic_register_irq(global_int, 1, 1,
-						      irq_base, iosapic_address);
+		if (!acpi_find_iosapic(gsi, &gsi_base, &iosapic_address))
+			vector = iosapic_register_intr(gsi, 1, 1,
+						       gsi_base, iosapic_address);
 	}
 	return 0;
 }
@@ -583,7 +602,12 @@ acpi_boot_init (char *cmdline)
 		printk(KERN_ERR PREFIX "Error parsing NMI SRC entry\n");
   skip_madt:
 
-	/* FADT says whether a legacy keyboard controller is present. */
+	/*
+	 * FADT says whether a legacy keyboard controller is present.
+	 * The FADT also contains an SCI_INT line, by which the system
+	 * gets interrupts such as power and sleep buttons.  If it's not
+	 * on a Legacy interrupt, it needs to be setup.
+	 */
 	if (acpi_table_parse(ACPI_FACP, acpi_parse_fadt) < 1)
 		printk(KERN_ERR PREFIX "Can't find FADT\n");
 
@@ -631,7 +655,7 @@ acpi_get_prt (struct pci_vector_struct **vectors, int *count)
 	*count = 0;
 
 	if (acpi_prt.count < 0) {
-		printk(KERN_ERR PREFIX "No PCI IRQ routing entries\n");
+		printk(KERN_ERR PREFIX "No PCI interrupt routing entries\n");
 		return -ENODEV;
 	}
 
@@ -667,6 +691,15 @@ acpi_get_interrupt_model (int *type)
 
 	*type = ACPI_IRQ_MODEL_IOSAPIC;
         return 0;
+}
+
+int
+acpi_irq_to_vector (u32 irq)
+{
+	if (has_8259 && irq < 16)
+		return isa_irq_to_vector(irq);
+
+	return gsi_to_vector(irq);
 }
 
 #endif /* CONFIG_ACPI_BOOT */

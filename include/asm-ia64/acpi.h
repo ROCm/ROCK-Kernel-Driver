@@ -100,7 +100,8 @@ const char *acpi_get_sysname (void);
 int acpi_boot_init (char *cdline);
 int acpi_request_vector (u32 int_type);
 int acpi_get_prt (struct pci_vector_struct **vectors, int *count);
-int acpi_get_interrupt_model(int *type);
+int acpi_get_interrupt_model (int *type);
+int acpi_irq_to_vector (u32 irq);
 
 #ifdef CONFIG_DISCONTIGMEM
 #define NODE_ARRAY_INDEX(x)	((x) / 8)	/* 8 bits/char */
