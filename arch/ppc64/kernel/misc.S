@@ -852,6 +852,8 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_utimes
 	.llong .sys_statfs64
 	.llong .sys_fstatfs64
+	.llong .sys_ni_syscall		/* 32bit only fadvise64 */
+	.llong .ppc_rtas		/* 255 */
 
 	.balign 8
 _GLOBAL(sys_call_table)
@@ -1109,3 +1111,5 @@ _GLOBAL(sys_call_table)
 	.llong .sys_utimes
 	.llong .sys_statfs64
 	.llong .sys_fstatfs64
+	.llong .sys_ni_syscall		/* 32bit only fadvise64 */
+	.llong .ppc_rtas		/* 255 */

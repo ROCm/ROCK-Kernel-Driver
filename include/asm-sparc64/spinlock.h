@@ -118,11 +118,13 @@ extern void __read_lock(rwlock_t *);
 extern void __read_unlock(rwlock_t *);
 extern void __write_lock(rwlock_t *);
 extern void __write_unlock(rwlock_t *);
+extern int __write_trylock(rwlock_t *);
 
 #define _raw_read_lock(p)	__read_lock(p)
 #define _raw_read_unlock(p)	__read_unlock(p)
 #define _raw_write_lock(p)	__write_lock(p)
 #define _raw_write_unlock(p)	__write_unlock(p)
+#define _raw_write_trylock(p)	__write_trylock(p)
 
 #else /* !(CONFIG_DEBUG_SPINLOCK) */
 

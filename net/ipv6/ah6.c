@@ -380,6 +380,9 @@ static int ah6_init_state(struct xfrm_state *x, void *args)
 	struct ah_data *ahp = NULL;
 	struct xfrm_algo_desc *aalg_desc;
 
+	if (!x->aalg)
+		goto error;
+
 	/* null auth can use a zero length key */
 	if (x->aalg->alg_key_len > 512)
 		goto error;

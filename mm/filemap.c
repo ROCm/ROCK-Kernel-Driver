@@ -82,6 +82,9 @@
  *    ->private_lock		(try_to_unmap_one)
  *    ->page_lock		(try_to_unmap_one)
  *    ->zone.lru_lock		(follow_page->mark_page_accessed)
+ *
+ *  ->task->proc_lock
+ *    ->dcache_lock		(proc_pid_lookup)
  */
 
 /*

@@ -147,10 +147,13 @@ repeat_locked:
 	 * lock to be released.
 	 */
 	if (transaction->t_state == T_LOCKED) {
+		DEFINE_WAIT(wait);
+
+		prepare_to_wait(&journal->j_wait_transaction_locked,
+					&wait, TASK_UNINTERRUPTIBLE);
 		spin_unlock(&journal->j_state_lock);
-		jbd_debug(3, "Handle %p stalling...\n", handle);
-		wait_event(journal->j_wait_transaction_locked,
-				transaction->t_state != T_LOCKED);
+		schedule();
+		finish_wait(&journal->j_wait_transaction_locked, &wait);
 		goto repeat;
 	}
 

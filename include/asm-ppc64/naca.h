@@ -37,7 +37,12 @@ struct naca_struct {
 	u32 dCacheL1LinesPerPage;	/* L1 d-cache lines / page   0x64 */
 	u32 iCacheL1LogLineSize;	/* L1 i-cache line size Log2 0x68 */
 	u32 iCacheL1LinesPerPage;	/* L1 i-cache lines / page   0x6c */
-	u64 resv0[2];                   /* Reserved           0x70 - 0x7F */
+	u64 smt_snooze_delay;           /* Delay (in usec) before    0x70 */
+                                        /* entering ST mode               */
+	u8  smt_state;                  /* 0 = SMT off               0x78 */
+	                                /* 1 = SMT on                     */
+	                                /* 2 = SMT dynamic                */
+	u8  resv0[7];                   /* Reserved           0x70 - 0x7F */
 };
 
 extern struct naca_struct *naca;

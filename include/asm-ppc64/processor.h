@@ -371,6 +371,7 @@
 #define	PV_ICESTAR	0x0036
 #define	PV_SSTAR	0x0037
 #define	PV_POWER4p	0x0038
+#define	PV_POWER5	0x003A
 #define	PV_630        	0x0040
 #define	PV_630p	        0x0041
 
@@ -378,6 +379,7 @@
 #define PLATFORM_PSERIES      0x0100
 #define PLATFORM_PSERIES_LPAR 0x0101
 #define PLATFORM_ISERIES_LPAR 0x0201
+#define PLATFORM_LPAR         0x0001
 	
 /*
  * List of interrupt controllers.

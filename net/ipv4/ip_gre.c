@@ -276,6 +276,8 @@ static struct ip_tunnel * ipgre_tunnel_locate(struct ip_tunnel_parm *parms, int 
 	  return NULL;
 
 	dev->init = ipgre_tunnel_init;
+	nt = dev->priv;
+	nt->parms = *parms;
 
 	if (register_netdevice(dev) < 0) {
 		kfree(dev);

@@ -74,6 +74,7 @@ extern int kdb_parse(const char *cmdstr, struct pt_regs *regs);
 #include <linux/sysrq.h>
 #include <linux/interrupt.h>
 
+#ifdef CONFIG_MAGIC_SYSRQ
 static void
 sysrq_handle_kdb(int key, struct pt_regs *pt_regs, struct kbd_struct *kbd, struct tty_struct *tty) 
 {
@@ -93,6 +94,7 @@ kdb_map_scc(void)
 	/* register sysrq 'x' */
 	__sysrq_put_key_op('x', &sysrq_kdb_op);
 }
+#endif
 
 
 /*
@@ -2089,7 +2091,9 @@ functionname(int argc, const char **argv, const char **envp, struct pt_regs *reg
 void __init
 kdba_init(void)
 {
+#ifdef CONFIG_MAGIC_SYSRQ
 	kdb_map_scc();		/* map sysrq key */
+#endif
 
 	debugger = kdb_debugger;
 	debugger_bpt = kdb_debugger_bpt;

@@ -132,13 +132,19 @@ pci_setup_cardbus(struct pci_bus *bus)
    PCI-to-PCI Bridge Architecture Specification rev. 1.1 (1998)
    requires that if there is no I/O ports or memory behind the
    bridge, corresponding range must be turned off by writing base
-   value greater than limit to the bridge's base/limit registers.  */
+   value greater than limit to the bridge's base/limit registers.
+
+   Note: care must be taken when updating I/O base/limit registers
+   of bridges which support 32-bit I/O. This update requires two
+   config space writes, so it's quite possible that an I/O window of
+   the bridge will have some undesirable address (e.g. 0) after the
+   first write. Ditto 64-bit prefetchable MMIO.  */
 static void __devinit
 pci_setup_bridge(struct pci_bus *bus)
 {
 	struct pci_dev *bridge = bus->self;
 	struct pci_bus_region region;
-	u32 l;
+	u32 l, io_upper16;
 
 	DBGC((KERN_INFO "PCI: Bus %d, bridge: %s\n",
 			bus->number, pci_name(bridge)));
@@ -151,20 +157,22 @@ pci_setup_bridge(struct pci_bus *bus)
 		l |= (region.start >> 8) & 0x00f0;
 		l |= region.end & 0xf000;
 		/* Set up upper 16 bits of I/O base/limit. */
-		pci_write_config_word(bridge, PCI_IO_BASE_UPPER16,
-				      region.start >> 16);
-		pci_write_config_word(bridge, PCI_IO_LIMIT_UPPER16,
-				      region.end >> 16);
+		io_upper16 = (region.end & 0xffff0000) | (region.start >> 16);
 		DBGC((KERN_INFO "  IO window: %04lx-%04lx\n",
 				region.start, region.end));
 	}
 	else {
 		/* Clear upper 16 bits of I/O base/limit. */
-		pci_write_config_dword(bridge, PCI_IO_BASE_UPPER16, 0);
+		io_upper16 = 0;
 		l = 0x00f0;
 		DBGC((KERN_INFO "  IO window: disabled.\n"));
 	}
+	/* Temporarily disable the I/O range before updating PCI_IO_BASE. */
+	pci_write_config_dword(bridge, PCI_IO_BASE_UPPER16, 0x0000ffff);
+	/* Update lower 16 bits of I/O base/limit. */
 	pci_write_config_dword(bridge, PCI_IO_BASE, l);
+	/* Update upper 16 bits of I/O base/limit. */
+	pci_write_config_dword(bridge, PCI_IO_BASE_UPPER16, io_upper16);
 
 	/* Set up the top and bottom of the PCI Memory segment
 	   for this bus. */
@@ -181,8 +189,9 @@ pci_setup_bridge(struct pci_bus *bus)
 	}
 	pci_write_config_dword(bridge, PCI_MEMORY_BASE, l);
 
-	/* Clear out the upper 32 bits of PREF base/limit. */
-	pci_write_config_dword(bridge, PCI_PREF_BASE_UPPER32, 0);
+	/* Clear out the upper 32 bits of PREF limit.
+	   If PCI_PREF_BASE_UPPER32 was non-zero, this temporarily
+	   disables PREF range, which is ok. */
 	pci_write_config_dword(bridge, PCI_PREF_LIMIT_UPPER32, 0);
 
 	/* Set up PREF base/limit. */
@@ -198,6 +207,9 @@ pci_setup_bridge(struct pci_bus *bus)
 		DBGC((KERN_INFO "  PREFETCH window: disabled.\n"));
 	}
 	pci_write_config_dword(bridge, PCI_PREF_MEMORY_BASE, l);
+
+	/* Clear out the upper 32 bits of PREF base. */
+	pci_write_config_dword(bridge, PCI_PREF_BASE_UPPER32, 0);
 
 	/* Check if we have VGA behind the bridge.
 	   Enable ISA in either case (FIXME!). */

@@ -1967,7 +1967,10 @@ static int tcp_ack_update_window(struct sock *sk, struct tcp_opt *tp,
 				 struct sk_buff *skb, u32 ack, u32 ack_seq)
 {
 	int flag = 0;
-	u32 nwin = ntohs(skb->h.th->window) << tp->snd_wscale;
+	u32 nwin = ntohs(skb->h.th->window);
+
+	if (likely(!skb->h.th->syn))
+		nwin <<= tp->snd_wscale;
 
 	if (tcp_may_update_window(tp, ack, ack_seq, nwin)) {
 		flag |= FLAG_WIN_UPDATE;

@@ -535,8 +535,8 @@ static void ip_vs_conn_expire(unsigned long data)
 
 void ip_vs_conn_expire_now(struct ip_vs_conn *cp)
 {
-	cp->timeout = 0;
-	mod_timer(&cp->timer, jiffies);
+	if (del_timer(&cp->timer))
+		mod_timer(&cp->timer, jiffies);
 	__ip_vs_conn_put(cp);
 }
 

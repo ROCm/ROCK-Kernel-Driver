@@ -475,7 +475,7 @@ config SCSI_SATA_VIA
 
 config SCSI_BUSLOGIC
 	tristate "BusLogic SCSI support"
-	depends on (PCI || ISA) && SCSI
+	depends on (PCI || ISA || MCA) && SCSI
 	---help---
 	  This is support for BusLogic MultiMaster and FlashPoint SCSI Host
 	  Adapters. Consult the SCSI-HOWTO, available from

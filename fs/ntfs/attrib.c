@@ -1215,7 +1215,7 @@ BOOL find_attr(const ATTR_TYPES type, const uchar_t *name, const u32 name_len,
  * load_attribute_list - load an attribute list into memory
  * @vol:		ntfs volume from which to read
  * @run_list:		run list of the attribute list
- * @al:			destination buffer
+ * @al_start:		destination buffer
  * @size:		size of the destination buffer in bytes
  * @initialized_size:	initialized size of the attribute list
  *
@@ -1227,10 +1227,11 @@ BOOL find_attr(const ATTR_TYPES type, const uchar_t *name, const u32 name_len,
  *
  * Return 0 on success or -errno on error.
  */
-int load_attribute_list(ntfs_volume *vol, run_list *run_list, u8 *al,
+int load_attribute_list(ntfs_volume *vol, run_list *run_list, u8 *al_start,
 		const s64 size, const s64 initialized_size)
 {
 	LCN lcn;
+	u8 *al = al_start;
 	u8 *al_end = al + initialized_size;
 	run_list_element *rl;
 	struct buffer_head *bh;
@@ -1284,32 +1285,28 @@ int load_attribute_list(ntfs_volume *vol, run_list *run_list, u8 *al,
 	}
 	if (initialized_size < size) {
 initialize:
-		memset(al + initialized_size, 0, size - initialized_size);
+		memset(al_start + initialized_size, 0, size - initialized_size);
 	}
 done:
 	up_read(&run_list->lock);
 	return err;
 do_final:
 	if (al < al_end) {
-		/* Partial block. */
+		/*
+		 * Partial block.
+		 *
+		 * Note: The attribute list can be smaller than its allocation
+		 * by multiple clusters.  This has been encountered by at least
+		 * two people running Windows XP, thus we cannot do any
+		 * truncation sanity checking here. (AIA)
+		 */
 		memcpy(al, bh->b_data, al_end - al);
 		brelse(bh);
-		/*
-		 * Skip sanity checking if initialized_size < size as it is
-		 * too much trouble.
-		 */
 		if (initialized_size < size)
 			goto initialize;
-		/* If the final lcn is partial all is fine. */
-		if (((s64)(block - (lcn << vol->cluster_size_bits >>
-				block_size_bits)) << block_size_bits >>
-				vol->cluster_size_bits) == rl->length - 1) {
-			if (!rl[1].length || (rl[1].lcn == LCN_RL_NOT_MAPPED
-					&& !rl[2].length))
-				goto done;
-		}
-	} else
-		brelse(bh);
+		goto done;
+	}
+	brelse(bh);
 	/* Real overflow! */
 	ntfs_error(sb, "Attribute list buffer overflow. Read attribute list "
 			"is truncated.");

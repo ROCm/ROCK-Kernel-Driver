@@ -245,8 +245,8 @@ static __u32 cpu_booted_map;
 static cpumask_t smp_commenced_mask = CPU_MASK_NONE;
 
 /* This is for the new dynamic CPU boot code */
-volatile cpumask_t cpu_callin_map = CPU_MASK_NONE;
-volatile cpumask_t cpu_callout_map = CPU_MASK_NONE;
+cpumask_t cpu_callin_map = CPU_MASK_NONE;
+cpumask_t cpu_callout_map = CPU_MASK_NONE;
 
 /* The per processor IRQ masks (these are usually kept in sync) */
 static __u16 vic_irq_mask[NR_CPUS] __cacheline_aligned;

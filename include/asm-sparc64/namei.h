@@ -8,8 +8,8 @@
 #ifndef __SPARC64_NAMEI_H
 #define __SPARC64_NAMEI_H
 
-#define SPARC_BSD_EMUL "usr/gnemul/sunos/"
-#define SPARC_SOL_EMUL "usr/gnemul/solaris/"
+#define SPARC_BSD_EMUL "/usr/gnemul/sunos/"
+#define SPARC_SOL_EMUL "/usr/gnemul/solaris/"
 
 static inline char * __emul_prefix(void)
 {

@@ -109,6 +109,8 @@ DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " Richard Proctor (rnp@netlink.co.nz
 
 #include "3c527.h"
 
+MODULE_LICENSE("GPL");
+
 /*
  * The name of the card. Is used for messages and in the requests for
  * io regions, irqs and dma channels

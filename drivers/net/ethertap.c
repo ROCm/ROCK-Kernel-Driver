@@ -302,11 +302,12 @@ static __inline__ int ethertap_rx_skb(struct sk_buff *skb, struct net_device *de
 
 static void ethertap_rx(struct sock *sk, int len)
 {
-	struct net_device *dev = tap_map[sk->sk_protocol];
+	unsigned unit = sk->sk_protocol - NETLINK_TAPBASE; 
+	struct net_device *dev;
 	struct sk_buff *skb;
 
-	if (dev==NULL) {
-		printk(KERN_CRIT "ethertap: bad unit!\n");
+	if (unit >= max_taps || (dev = tap_map[unit]) == NULL) { 
+		printk(KERN_CRIT "ethertap: bad unit %u!\n", unit);
 		skb_queue_purge(&sk->sk_receive_queue);
 		return;
 	}

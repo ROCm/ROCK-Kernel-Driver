@@ -28,8 +28,13 @@ endif
 
 LDFLAGS		:= -m elf64ppc
 LDFLAGS_vmlinux	:= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)
-CFLAGS		+= -msoft-float -pipe -Wno-uninitialized -mminimal-toc \
-		-mcpu=power4
+CFLAGS		+= -msoft-float -pipe -Wno-uninitialized -mminimal-toc
+
+ifeq ($(CONFIG_POWER4_ONLY),y)
+CFLAGS		+= -mcpu=power4
+else
+CFLAGS		+= -mtune=power4 -Wa,-mpower4
+endif
 
 have_zero_bss := $(shell if $(CC) -fno-zero-initialized-in-bss -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo y; else echo n; fi)
 

@@ -276,7 +276,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.progress = chrp_progress;
 
-        /* build up the firmware_features bitmask field
+        /* Build up the firmware_features bitmask field
          * using contents of device-tree/ibm,hypertas-functions.
          * Ultimately this functionality may be moved into prom.c prom_init().
          */
@@ -284,24 +284,27 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	cur_cpu_spec->firmware_features = 0;
 	hypertas = get_property(dn, "ibm,hypertas-functions", &len);
 	if (hypertas) {
-	    while (len > 0){
-		int i, hypertas_len;
-		/* check value against table of strings */
-		for(i=0; i < FIRMWARE_MAX_FEATURES ;i++) {
-		    if ((firmware_features_table[i].name) && (strcmp(firmware_features_table[i].name,hypertas))==0) {
-			/* we have a match */
-			cur_cpu_spec->firmware_features |= (1UL << firmware_features_table[i].val);
-			break;
-		    } 
+		while (len > 0){
+			int i, hypertas_len;
+			/* check value against table of strings */
+			for(i=0; i < FIRMWARE_MAX_FEATURES ;i++) {
+				if ((firmware_features_table[i].name) &&
+				    (strcmp(firmware_features_table[i].name,hypertas))==0) {
+					/* we have a match */
+					cur_cpu_spec->firmware_features |= 
+						(firmware_features_table[i].val);
+					break;
+				} 
+			}
+			hypertas_len = strlen(hypertas);
+			len -= hypertas_len +1;
+			hypertas+= hypertas_len +1;
 		}
-		hypertas_len = strlen(hypertas);
-		len -= hypertas_len +1;
-		hypertas+= hypertas_len +1;
-	    }
 	}
+
 	of_node_put(dn);
-	udbg_printf("firmware_features bitmask: 0x%x \n",
-		    cur_cpu_spec->firmware_features);
+	printk(KERN_INFO "firmware_features = 0x%lx\n", 
+	       cur_cpu_spec->firmware_features);
 }
 
 void

@@ -31,9 +31,6 @@
 #include "irq_vectors.h"
 
 
-int irq_vector[NR_IRQS] = { FIRST_EXTERNAL_VECTOR, 0 };
-
-
 static spinlock_t cobalt_lock = SPIN_LOCK_UNLOCKED;
 
 /*
@@ -42,7 +39,7 @@ static spinlock_t cobalt_lock = SPIN_LOCK_UNLOCKED;
  */
 static inline void co_apic_set(int entry, int irq)
 {
-	co_apic_write(CO_APIC_LO(entry), CO_APIC_LEVEL | irq_vector[irq]);
+	co_apic_write(CO_APIC_LO(entry), CO_APIC_LEVEL | (irq + FIRST_EXTERNAL_VECTOR));
 	co_apic_write(CO_APIC_HI(entry), 0);
 }
 
@@ -299,7 +296,6 @@ void init_VISWS_APIC_irqs(void)
 		else if (IS_CO_APIC(i)) {
 			irq_desc[i].handler = &cobalt_irq_type;
 		}
-		irq_vector[i] = i + FIRST_EXTERNAL_VECTOR;
 	}
 
 	setup_irq(CO_IRQ_8259, &master_action);

@@ -20,13 +20,13 @@
 #include <asm/iSeries/XmPciLpEvent.h>
 #include <asm/ppcdebug.h>
 
-long Pci_Interrupt_Count = 0;
-long Pci_Event_Count     = 0;
+static long Pci_Interrupt_Count;
+static long Pci_Event_Count;
 
 enum XmPciLpEvent_Subtype {
 	XmPciLpEvent_BusCreated	   = 0,		// PHB has been created
 	XmPciLpEvent_BusError	   = 1,		// PHB has failed
-	XmPciLpEvent_BusFailed	   = 2,		// Msg to Seconday, Primary failed bus
+	XmPciLpEvent_BusFailed	   = 2,		// Msg to Secondary, Primary failed bus
 	XmPciLpEvent_NodeFailed	   = 4,		// Multi-adapter bridge has failed
 	XmPciLpEvent_NodeRecovered = 5,		// Multi-adapter bridge has recovered
 	XmPciLpEvent_BusRecovered  = 12,	// PHB has been recovered
@@ -90,7 +90,7 @@ static void XmPciLpEvent_handler( struct HvLpEvent* eventParm, struct pt_regs* r
 			break;
 		}
 	}
-	else if (event) {
+	else if (eventParm) {
 		printk(KERN_ERR "XmPciLpEvent.c: Unrecognized PCI event type 0x%x\n",(int)eventParm->xType);
 	}
 	else {

@@ -677,7 +677,7 @@ static void dio_zero_block(struct dio *dio, int end)
 
 	this_chunk_bytes = this_chunk_blocks << dio->blkbits;
 
-	page = ZERO_PAGE(dio->cur_user_address);
+	page = ZERO_PAGE(dio->curr_user_address);
 	if (submit_page_section(dio, page, 0, this_chunk_bytes, 
 				dio->next_block_for_io))
 		return;

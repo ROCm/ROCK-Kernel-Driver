@@ -190,23 +190,34 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 
 void *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 {
+	unsigned long last_addr;
 	void *p = __ioremap(phys_addr, size, _PAGE_PCD);
 	if (!p) 
 		return p; 
 
-	if (phys_addr + size < virt_to_phys(high_memory)) { 
-		struct page *ppage = virt_to_page(__va(phys_addr));		
-		unsigned long npages = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	/* Guaranteed to be > phys_addr, as per __ioremap() */
+	last_addr = phys_addr + size - 1;
 
-		BUG_ON(phys_addr+size > (unsigned long)high_memory);
-		BUG_ON(phys_addr + size < phys_addr);
+	if (last_addr < virt_to_phys(high_memory)) { 
+		struct page *ppage = virt_to_page(__va(phys_addr));		
+		unsigned long npages;
+
+		phys_addr &= PAGE_MASK;
+
+		/* This might overflow and become zero.. */
+		last_addr = PAGE_ALIGN(last_addr);
+
+		/* .. but that's ok, because modulo-2**n arithmetic will make
+	 	* the page-aligned "last - first" come out right.
+	 	*/
+		npages = (last_addr - phys_addr) >> PAGE_SHIFT;
 
 		if (change_page_attr(ppage, npages, PAGE_KERNEL_NOCACHE) < 0) { 
 			iounmap(p); 
 			p = NULL;
 		}
 		global_flush_tlb();
-	} 
+	}
 
 	return p;					
 }

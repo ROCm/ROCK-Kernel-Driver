@@ -190,7 +190,7 @@ static inline void load_TLS(struct thread_struct *t, unsigned int cpu)
 /*
  * load one particular LDT into the current CPU
  */
-static inline void load_LDT_nolock (mm_context_t *pc, int cpu)
+extern inline void load_LDT_nolock (mm_context_t *pc, int cpu)
 {
 	int count = pc->size;
 

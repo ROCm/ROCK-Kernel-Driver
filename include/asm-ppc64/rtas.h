@@ -19,6 +19,9 @@
 #define RTAS_UNKNOWN_SERVICE (-1)
 #define RTAS_INSTANTIATE_MAX (1UL<<30) /* Don't instantiate rtas at/above this value */
 
+/* Buffer size for ppc_rtas system call. */
+#define RTAS_RMOBUF_MAX (64 * 1024)
+
 /*
  * In general to call RTAS use rtas_token("string") to lookup
  * an RTAS token for the given string (e.g. "event-scan").
@@ -57,11 +60,11 @@ struct rtas_t {
 };
 
 /* Event classes */
-#define INTERNAL_ERROR		0x80000000 /* set bit 0 */
-#define EPOW_WARNING		0x40000000 /* set bit 1 */
-#define POWERMGM_EVENTS		0x20000000 /* set bit 2 */
-#define HOTPLUG_EVENTS		0x10000000 /* set bit 3 */
-#define EVENT_SCAN_ALL_EVENTS	0xf0000000
+#define RTAS_INTERNAL_ERROR		0x80000000 /* set bit 0 */
+#define RTAS_EPOW_WARNING		0x40000000 /* set bit 1 */
+#define RTAS_POWERMGM_EVENTS		0x20000000 /* set bit 2 */
+#define RTAS_HOTPLUG_EVENTS		0x10000000 /* set bit 3 */
+#define RTAS_EVENT_SCAN_ALL_EVENTS	0xf0000000
 
 /* event-scan returns */
 #define SEVERITY_FATAL		0x5
@@ -165,6 +168,9 @@ extern void call_rtas_display_status(char);
 extern void rtas_restart(char *cmd);
 extern void rtas_power_off(void);
 extern void rtas_halt(void);
+extern int rtas_get_sensor(int sensor, int index, int *state);
+extern int rtas_get_power_level(int powerdomain, int *level);
+extern int rtas_set_indicator(int indicator, int index, int new_value);
 
 /* Given an RTAS status code of 9900..9905 compute the hinted delay */
 unsigned int rtas_extended_busy_delay_time(int status);
@@ -179,7 +185,14 @@ static inline int rtas_is_extended_busy(int status)
  * of holding the buffer for long.
  */
 #define RTAS_DATA_BUF_SIZE 1024
+
+#define RTAS_UNKNOWN_OP	-1099	/* Return Status - Unknown RTAS Token */
+#define RTAS_BUSY	-2	/* RTAS Return Status - Busy */
+
 extern spinlock_t rtas_data_buf_lock;
 extern char rtas_data_buf[RTAS_DATA_BUF_SIZE];
+
+/* RMO buffer reserved for user-space RTAS use */
+extern unsigned long rtas_rmo_buf;
 
 #endif /* _PPC64_RTAS_H */

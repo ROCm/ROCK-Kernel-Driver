@@ -514,7 +514,8 @@ struct sock *llc_lookup_listener(struct llc_sap *sap, struct llc_addr *laddr)
 
 		if (rc->sk_type == SOCK_STREAM && rc->sk_state == TCP_LISTEN &&
 		    llc->laddr.lsap == laddr->lsap &&
-		    llc_mac_match(llc->laddr.mac, laddr->mac)) {
+		    (llc_mac_match(llc->laddr.mac, laddr->mac) ||
+		     llc_mac_null(llc->laddr.mac))) {
 			sock_hold(rc);
 			goto found;
 		}

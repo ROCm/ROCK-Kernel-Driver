@@ -187,7 +187,6 @@ static int bt832_attach(struct i2c_adapter *adap, int addr,
         t->client.data = t;
         i2c_attach_client(&t->client);
 
-	MOD_INC_USE_COUNT;
 	if(! bt832_init(&t->client)) {
 		bt832_detach(&t->client);
 		return -1;
@@ -210,7 +209,6 @@ static int bt832_detach(struct i2c_client *client)
 	printk("bt832: detach.\n");
 	i2c_detach_client(client);
 	kfree(t);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

@@ -780,6 +780,11 @@ static char *rq_flags[] = {
 	"REQ_PM_SUSPEND",
 	"REQ_PM_RESUME",
 	"REQ_PM_SHUTDOWN",
+	"REQ_IDETAPE_PC1",
+	"REQ_IDETAPE_PC2",
+	"REQ_IDETAPE_READ",
+	"REQ_IDETAPE_WRITE",
+	"REQ_IDETAPE_READ_BUFFER",
 };
 
 void blk_dump_rq_flags(struct request *rq, char *msg)
@@ -814,6 +819,7 @@ void blk_recount_segments(request_queue_t *q, struct bio *bio)
 {
 	struct bio_vec *bv, *bvprv = NULL;
 	int i, nr_phys_segs, nr_hw_segs, seg_size, cluster;
+	int high, highprv = 1;
 
 	if (unlikely(!bio->bi_io_vec))
 		return;
@@ -821,7 +827,15 @@ void blk_recount_segments(request_queue_t *q, struct bio *bio)
 	cluster = q->queue_flags & (1 << QUEUE_FLAG_CLUSTER);
 	seg_size = nr_phys_segs = nr_hw_segs = 0;
 	bio_for_each_segment(bv, bio, i) {
-		if (bvprv && cluster) {
+		/*
+		 * the trick here is making sure that a high page is never
+		 * considered part of another segment, since that might
+		 * change with the bounce page.
+		 */
+		high = page_to_pfn(bv->bv_page) >= q->bounce_pfn;
+		if (high || highprv)
+			goto new_hw_segment;
+		if (cluster) {
 			if (seg_size + bv->bv_len > q->max_segment_size)
 				goto new_segment;
 			if (!BIOVEC_PHYS_MERGEABLE(bvprv, bv))
@@ -834,12 +848,14 @@ void blk_recount_segments(request_queue_t *q, struct bio *bio)
 			continue;
 		}
 new_segment:
-		if (!bvprv || !BIOVEC_VIRT_MERGEABLE(bvprv, bv))
+		if (!BIOVEC_VIRT_MERGEABLE(bvprv, bv))
+new_hw_segment:
 			nr_hw_segs++;
 
 		nr_phys_segs++;
 		bvprv = bv;
 		seg_size = bv->bv_len;
+		highprv = high;
 	}
 
 	bio->bi_phys_segments = nr_phys_segs;

@@ -398,6 +398,8 @@ static void udp_flush_pending_frames(struct sock *sk)
  */
 static int udp_push_pending_frames(struct sock *sk, struct udp_opt *up)
 {
+	struct inet_opt *inet = inet_sk(sk);
+	struct flowi *fl = &inet->cork.fl;
 	struct sk_buff *skb;
 	struct udphdr *uh;
 	int err = 0;
@@ -410,8 +412,8 @@ static int udp_push_pending_frames(struct sock *sk, struct udp_opt *up)
 	 * Create a UDP header
 	 */
 	uh = skb->h.uh;
-	uh->source = up->sport;
-	uh->dest = up->dport;
+	uh->source = fl->fl_ip_sport;
+	uh->dest = fl->fl_ip_dport;
 	uh->len = htons(up->len);
 	uh->check = 0;
 
@@ -426,12 +428,12 @@ static int udp_push_pending_frames(struct sock *sk, struct udp_opt *up)
 		 */
 		if (skb->ip_summed == CHECKSUM_HW) {
 			skb->csum = offsetof(struct udphdr, check);
-			uh->check = ~csum_tcpudp_magic(up->saddr, up->daddr,
+			uh->check = ~csum_tcpudp_magic(fl->fl4_src, fl->fl4_dst,
 					up->len, IPPROTO_UDP, 0);
 		} else {
 			skb->csum = csum_partial((char *)uh,
 					sizeof(struct udphdr), skb->csum);
-			uh->check = csum_tcpudp_magic(up->saddr, up->daddr,
+			uh->check = csum_tcpudp_magic(fl->fl4_src, fl->fl4_dst,
 					up->len, IPPROTO_UDP, skb->csum);
 			if (uh->check == 0)
 				uh->check = -1;
@@ -456,7 +458,7 @@ static int udp_push_pending_frames(struct sock *sk, struct udp_opt *up)
 		skb_queue_walk(&sk->sk_write_queue, skb) {
 			csum = csum_add(csum, skb->csum);
 		}
-		uh->check = csum_tcpudp_magic(up->saddr, up->daddr,
+		uh->check = csum_tcpudp_magic(fl->fl4_src, fl->fl4_dst,
 				up->len, IPPROTO_UDP, csum);
 		if (uh->check == 0)
 			uh->check = -1;
@@ -520,8 +522,13 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	 	 * The socket lock must be held while it's corked.
 		 */
 		lock_sock(sk);
-		if (likely(up->pending))
+		if (likely(up->pending)) {
+			if (unlikely(up->pending != AF_INET)) {
+				release_sock(sk);
+				return -EINVAL;
+			}
  			goto do_append_data;
+		}
 		release_sock(sk);
 	}
 	ulen += sizeof(struct udphdr);
@@ -636,11 +643,11 @@ back_from_confirm:
 	/*
 	 *	Now cork the socket to pend data.
 	 */
-	up->daddr = daddr;
-	up->dport = dport;
-	up->saddr = saddr;
-	up->sport = inet->sport;
-	up->pending = 1;
+	inet->cork.fl.fl4_dst = daddr;
+	inet->cork.fl.fl_ip_dport = dport;
+	inet->cork.fl.fl4_src = saddr;
+	inet->cork.fl.fl_ip_sport = inet->sport;
+	up->pending = AF_INET;
 
 do_append_data:
 	up->len += ulen;

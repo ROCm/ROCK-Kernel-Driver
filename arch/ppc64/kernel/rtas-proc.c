@@ -161,6 +161,8 @@ static ssize_t ppc_rtas_tone_volume_write(struct file * file, const char * buf,
 		size_t count, loff_t *ppos);
 static ssize_t ppc_rtas_tone_volume_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos);
+static ssize_t ppc_rtas_rmo_buf_read(struct file *file, char *buf,
+				    size_t count, loff_t *ppos);
 
 struct file_operations ppc_rtas_poweron_operations = {
 	.read =		ppc_rtas_poweron_read,
@@ -183,6 +185,10 @@ struct file_operations ppc_rtas_tone_freq_operations = {
 struct file_operations ppc_rtas_tone_volume_operations = {
 	.read =		ppc_rtas_tone_volume_read,
 	.write =	ppc_rtas_tone_volume_write
+};
+
+static struct file_operations ppc_rtas_rmo_buf_ops = {
+	.read =		ppc_rtas_rmo_buf_read,
 };
 
 int ppc_rtas_find_all_sensors (void);
@@ -233,6 +239,9 @@ void proc_rtas_init(void)
 
 	entry = create_proc_entry("volume", S_IWUSR|S_IRUGO, proc_rtas); 
 	if (entry) entry->proc_fops = &ppc_rtas_tone_volume_operations;
+
+	entry = create_proc_entry("rmo_buffer", S_IRUSR, proc_rtas);
+	if (entry) entry->proc_fops = &ppc_rtas_rmo_buf_ops;
 }
 
 /* ****************************************************************** */
@@ -849,5 +858,30 @@ static ssize_t ppc_rtas_tone_volume_read(struct file * file, char * buf,
 	if (n > count)
 		n = count;
 	*ppos += n;
+	return n;
+}
+
+#define RMO_READ_BUF_MAX 30
+
+/* RTAS Userspace access */
+static ssize_t ppc_rtas_rmo_buf_read(struct file *file, char __user *buf,
+				    size_t count, loff_t *ppos)
+{
+	char kbuf[RMO_READ_BUF_MAX];
+	int n;
+
+	n = sprintf(kbuf, "%016lx %x\n", rtas_rmo_buf, RTAS_RMOBUF_MAX);
+	if (n > count)
+		n = count;
+
+	if (ppos && *ppos != 0)
+		return 0;
+
+	if (copy_to_user(buf, kbuf, n))
+		return -EFAULT;
+
+	if (ppos)
+		*ppos = n;
+	
 	return n;
 }

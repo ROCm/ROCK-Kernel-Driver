@@ -188,7 +188,7 @@ nlmclnt_recovery(struct nlm_host *host, u32 newstate)
 		nlmclnt_prepare_reclaim(host, newstate);
 		nlm_get_host(host);
 		__module_get(THIS_MODULE);
-		if (kernel_thread(reclaimer, host, CLONE_KERNEL))
+		if (kernel_thread(reclaimer, host, CLONE_KERNEL) < 0)
 			module_put(THIS_MODULE);
 	}
 }

@@ -89,6 +89,7 @@
 #include <linux/random.h>
 #include <linux/jhash.h>
 #include <linux/rcupdate.h>
+#include <linux/times.h>
 #include <net/protocol.h>
 #include <net/ip.h>
 #include <net/route.h>
@@ -2305,11 +2306,11 @@ static int rt_fill_info(struct sk_buff *skb, u32 pid, u32 seq, int event,
 		RTA_PUT(skb, RTA_GATEWAY, 4, &rt->rt_gateway);
 	if (rtnetlink_put_metrics(skb, rt->u.dst.metrics) < 0)
 		goto rtattr_failure;
-	ci.rta_lastuse	= jiffies - rt->u.dst.lastuse;
+	ci.rta_lastuse	= jiffies_to_clock_t(jiffies - rt->u.dst.lastuse);
 	ci.rta_used	= rt->u.dst.__use;
 	ci.rta_clntref	= atomic_read(&rt->u.dst.__refcnt);
 	if (rt->u.dst.expires)
-		ci.rta_expires = rt->u.dst.expires - jiffies;
+		ci.rta_expires = jiffies_to_clock_t(rt->u.dst.expires - jiffies);
 	else
 		ci.rta_expires = 0;
 	ci.rta_error	= rt->u.dst.error;

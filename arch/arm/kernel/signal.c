@@ -187,6 +187,9 @@ asmlinkage int sys_sigreturn(struct pt_regs *regs)
 	struct sigframe *frame;
 	sigset_t set;
 
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
+
 	/*
 	 * Since we stacked the signal on a 64-bit boundary,
 	 * then 'sp' should be word aligned here.  If it's
@@ -231,6 +234,9 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
 {
 	struct rt_sigframe *frame;
 	sigset_t set;
+
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
 
 	/*
 	 * Since we stacked the signal on a 64-bit boundary,
@@ -462,8 +468,6 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	if (syscall) {
 		switch (regs->ARM_r0) {
 		case -ERESTART_RESTARTBLOCK:
-			current_thread_info()->restart_block.fn =
-				do_no_restart_syscall;
 		case -ERESTARTNOHAND:
 			regs->ARM_r0 = -EINTR;
 			break;
@@ -497,18 +501,21 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	 */
 	ret |= !valid_user_regs(regs);
 
+	/*
+	 * Block the signal if we were unsuccessful.
+	 */
+	if (ret != 0 || !(ka->sa.sa_flags & SA_NODEFER)) {
+		spin_lock_irq(&tsk->sighand->siglock);
+		sigorsets(&tsk->blocked, &tsk->blocked,
+			  &ka->sa.sa_mask);
+		sigaddset(&tsk->blocked, sig);
+		recalc_sigpending();
+		spin_unlock_irq(&tsk->sighand->siglock);
+	}
+
 	if (ret == 0) {
 		if (ka->sa.sa_flags & SA_ONESHOT)
 			ka->sa.sa_handler = SIG_DFL;
-
-		if (!(ka->sa.sa_flags & SA_NODEFER)) {
-			spin_lock_irq(&tsk->sighand->siglock);
-			sigorsets(&tsk->blocked, &tsk->blocked,
-				  &ka->sa.sa_mask);
-			sigaddset(&tsk->blocked, sig);
-			recalc_sigpending();
-			spin_unlock_irq(&tsk->sighand->siglock);
-		}
 		return;
 	}
 

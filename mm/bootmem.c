@@ -48,24 +48,8 @@ static unsigned long __init init_bootmem_core (pg_data_t *pgdat,
 	bootmem_data_t *bdata = pgdat->bdata;
 	unsigned long mapsize = ((end - start)+7)/8;
 
-
-	/*
-	 * sort pgdat_list so that the lowest one comes first,
-	 * which makes alloc_bootmem_low_pages work as desired.
-	 */
-	if (!pgdat_list || pgdat_list->node_start_pfn > pgdat->node_start_pfn) {
-		pgdat->pgdat_next = pgdat_list;
-		pgdat_list = pgdat;
-	} else {
-		pg_data_t *tmp = pgdat_list;
-		while (tmp->pgdat_next) {
-			if (tmp->pgdat_next->node_start_pfn > pgdat->node_start_pfn)
-				break;
-			tmp = tmp->pgdat_next;
-		}
-		pgdat->pgdat_next = tmp->pgdat_next;
-		tmp->pgdat_next = pgdat;
-	}
+	pgdat->pgdat_next = pgdat_list;
+	pgdat_list = pgdat;
 
 	mapsize = (mapsize + (sizeof(long) - 1UL)) & ~(sizeof(long) - 1UL);
 	bdata->node_bootmem_map = phys_to_virt(mapstart << PAGE_SHIFT);

@@ -234,9 +234,8 @@ W:	http://www.canb.auug.org.au/~sfr/
 S:	Supported
 
 APPLETALK NETWORK LAYER
-P:	Jay Schulist
-M:	jschlst@samba.org
-L:	linux-atalk@lists.netspace.org
+P:	Arnaldo Carvalho de Melo
+M:	acme@conectiva.com.br
 S:	Maintained
 
 ARM26 ARCHITECTURE
@@ -1356,7 +1355,7 @@ M:	James.Bottomley@HansenPartnership.com
 L:	linux-scsi@vger.kernel.org
 S:	Maintained
 
-NETFILTER/IPTABLES
+NETFILTER/IPTABLES/IPCHAINS
 P:	Rusty Russell
 P:	Marc Boucher
 P:	James Morris
@@ -1568,6 +1567,12 @@ P:	Thomas Bogendörfer
 M:	tsbogend@alpha.franken.de
 L:	linux-net@vger.kernel.org
 S:	Maintained
+
+POSIX CLOCKS and TIMERS
+P:	George Anzinger
+M:	george@mvista.com
+L:	linux-net@vger.kernel.org
+S:	Supported
 
 PNP SUPPORT
 P:	Adam Belay

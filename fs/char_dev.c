@@ -434,7 +434,7 @@ void cdev_init(struct cdev *cdev, struct file_operations *fops)
 
 static struct kobject *base_probe(dev_t dev, int *part, void *data)
 {
-	request_module("char-major-%d", MAJOR(dev));
+	request_module("char-major-%d-%d", MAJOR(dev), MINOR(dev));
 	return NULL;
 }
 

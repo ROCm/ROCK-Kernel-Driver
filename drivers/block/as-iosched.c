@@ -915,9 +915,10 @@ static void as_completed_request(request_queue_t *q, struct request *rq)
 	if (unlikely(arq->state != AS_RQ_DISPATCHED))
 		return;
 
-	if (ad->changed_batch && ad->nr_dispatched == 1) {
-		WARN_ON(ad->batch_data_dir == arq->is_sync);
+	if (!blk_fs_request(rq))
+		return;
 
+	if (ad->changed_batch && ad->nr_dispatched == 1) {
 		kblockd_schedule_work(&ad->antic_work);
 		ad->changed_batch = 0;
 
@@ -933,7 +934,6 @@ static void as_completed_request(request_queue_t *q, struct request *rq)
 	 * and writeback caches
 	 */
 	if (ad->new_batch && ad->batch_data_dir == arq->is_sync) {
-		WARN_ON(ad->batch_data_dir != REQ_SYNC);
 		update_write_batch(ad);
 		ad->current_batch_expires = jiffies +
 				ad->batch_expire[REQ_SYNC];

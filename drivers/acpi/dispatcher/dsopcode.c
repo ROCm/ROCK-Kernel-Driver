@@ -514,16 +514,14 @@ acpi_ds_init_buffer_field (
 		goto cleanup;
 	}
 
+
 	/* Entire field must fit within the current length of the buffer */
 
 	if ((bit_offset + bit_count) >
 		(8 * (u32) buffer_desc->buffer.length)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Field [%4.4s] size %d exceeds Buffer [%4.4s] size %d (bits)\n",
-			((struct acpi_namespace_node *) result_desc)->name.ascii,
-			 bit_offset + bit_count,
-			 buffer_desc->buffer.node->name.ascii,
-			 8 * (u32) buffer_desc->buffer.length));
+			"Field size %d exceeds Buffer size %d (bits)\n",
+			 bit_offset + bit_count, 8 * (u32) buffer_desc->buffer.length));
 		status = AE_AML_BUFFER_LIMIT;
 		goto cleanup;
 	}

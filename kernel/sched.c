@@ -492,6 +492,15 @@ static inline void resched_task(task_t *p)
 #endif
 }
 
+/**
+ * task_curr - is this task currently executing on a CPU?
+ * @p: the task in question.
+ */
+inline int task_curr(task_t *p)
+{
+	return cpu_curr(task_cpu(p)) == p;
+}
+
 #ifdef CONFIG_SMP
 
 /*
@@ -530,6 +539,27 @@ repeat:
 	task_rq_unlock(rq, &flags);
 	preempt_enable();
 }
+
+/***
+ * kick_process - kick a running thread to enter/exit the kernel
+ * @p: the to-be-kicked thread
+ *
+ * Cause a process which is running on another CPU to enter
+ * kernel-mode, without any delay. (to get signals handled.)
+ */
+void kick_process(task_t *p)
+{
+	int cpu;
+
+	preempt_disable();
+	cpu = task_cpu(p);
+	if ((cpu != smp_processor_id()) && task_curr(p))
+		smp_send_reschedule(cpu);
+	preempt_enable();
+}
+
+EXPORT_SYMBOL_GPL(kick_process);
+
 #endif
 
 /***
@@ -537,7 +567,6 @@ repeat:
  * @p: the to-be-woken-up thread
  * @state: the mask of task states that can be woken
  * @sync: do a synchronous wakeup?
- * @kick: kick the CPU if the task is already running?
  *
  * Put it on the run-queue if it's not already there. The "current"
  * thread is always on the run-queue (except when the actual
@@ -547,7 +576,7 @@ repeat:
  *
  * returns failure only if the task is already active.
  */
-static int try_to_wake_up(task_t * p, unsigned int state, int sync, int kick)
+static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 {
 	unsigned long flags;
 	int success = 0;
@@ -588,33 +617,22 @@ repeat_lock_task:
 			}
 			success = 1;
 		}
-#ifdef CONFIG_SMP
-	       	else
-			if (unlikely(kick) && task_running(rq, p) && (task_cpu(p) != smp_processor_id()))
-				smp_send_reschedule(task_cpu(p));
-#endif
 		p->state = TASK_RUNNING;
 	}
 	task_rq_unlock(rq, &flags);
 
 	return success;
 }
-
 int wake_up_process(task_t * p)
 {
-	return try_to_wake_up(p, TASK_STOPPED | TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0, 0);
+	return try_to_wake_up(p, TASK_STOPPED | TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0);
 }
 
 EXPORT_SYMBOL(wake_up_process);
 
-int wake_up_process_kick(task_t * p)
-{
-	return try_to_wake_up(p, TASK_STOPPED | TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0, 1);
-}
-
 int wake_up_state(task_t *p, unsigned int state)
 {
-	return try_to_wake_up(p, state, 0, 0);
+	return try_to_wake_up(p, state, 0);
 }
 
 /*
@@ -704,7 +722,7 @@ static inline void finish_task_switch(task_t *prev)
 {
 	runqueue_t *rq = this_rq();
 	struct mm_struct *mm = rq->prev_mm;
-	int drop_task_ref;
+	unsigned long prev_task_flags;
 
 	rq->prev_mm = NULL;
 
@@ -719,14 +737,11 @@ static inline void finish_task_switch(task_t *prev)
 	 * be dropped twice.
 	 * 		Manfred Spraul <manfred@colorfullife.com>
 	 */
-	drop_task_ref = 0;
-	if (unlikely(prev->state & (TASK_DEAD | TASK_ZOMBIE)))
-		drop_task_ref = 1;
-
+	prev_task_flags = prev->flags;
 	finish_arch_switch(rq, prev);
 	if (mm)
 		mmdrop(mm);
-	if (drop_task_ref)
+	if (unlikely(prev_task_flags & PF_DEAD))
 		put_task_struct(prev);
 }
 
@@ -1586,7 +1601,7 @@ EXPORT_SYMBOL(preempt_schedule);
 int default_wake_function(wait_queue_t *curr, unsigned mode, int sync)
 {
 	task_t *p = curr->task;
-	return try_to_wake_up(p, mode, sync, 0);
+	return try_to_wake_up(p, mode, sync);
 }
 
 EXPORT_SYMBOL(default_wake_function);
@@ -1905,15 +1920,6 @@ int task_nice(task_t *p)
 }
 
 EXPORT_SYMBOL(task_nice);
-
-/**
- * task_curr - is this task currently executing on a CPU?
- * @p: the task in question.
- */
-int task_curr(task_t *p)
-{
-	return cpu_curr(task_cpu(p)) == p;
-}
 
 /**
  * idle_cpu - is a given cpu idle currently?

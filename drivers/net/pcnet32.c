@@ -1378,6 +1378,10 @@ pcnet32_rx(struct net_device *dev)
 		if (!rx_in_place) {
 		    skb_reserve(skb,2); /* 16 byte align */
 		    skb_put(skb,pkt_len);	/* Make room */
+		    pci_dma_sync_single(lp->pci_dev,
+		                        lp->rx_dma_addr[entry],
+		                        PKT_BUF_SZ,
+		                        PCI_DMA_FROMDEVICE);
 		    eth_copy_and_sum(skb,
 				     (unsigned char *)(lp->rx_skbuff[entry]->tail),
 				     pkt_len,0);

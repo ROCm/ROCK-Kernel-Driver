@@ -2439,8 +2439,8 @@ hauppauge_tuner[] __devinitdata =
         { TUNER_TEMIC_4039FR5_NTSC, "Temic 4039FR5" },
         { TUNER_PHILIPS_FQ1216ME,   "Philips FQ1216 ME" },
         { TUNER_TEMIC_4066FY5_PAL_I, "Temic 4066FY5" },
-        { TUNER_ABSENT,        "Philips TD1536" },
-        { TUNER_ABSENT,        "Philips TD1536D" },
+        { TUNER_PHILIPS_NTSC,        "Philips TD1536" },
+        { TUNER_PHILIPS_NTSC,        "Philips TD1536D" },
 	{ TUNER_PHILIPS_NTSC,  "Philips FMR1236" }, /* mono radio */
         { TUNER_ABSENT,        "Philips FI1256MP" },
         { TUNER_ABSENT,        "Samsung TCPQ9091P" },

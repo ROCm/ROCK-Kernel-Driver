@@ -61,6 +61,7 @@
 #include <linux/cache.h>
 #include <linux/jhash.h>
 #include <linux/init.h>
+#include <linux/times.h>
 
 #include <net/icmp.h>
 #include <net/tcp.h>
@@ -178,12 +179,6 @@ void tcp_bind_hash(struct sock *sk, struct tcp_bind_bucket *tb,
 	tcp_sk(sk)->bind_hash = tb;
 }
 
-static inline const u32 tcp_v4_rcv_saddr(const struct sock *sk)
-{
-	return likely(sk->sk_state != TCP_TIME_WAIT) ?
-		inet_sk(sk)->rcv_saddr : tcptw_sk(sk)->tw_rcv_saddr;
-}
-
 static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
 {
 	const u32 sk_rcv_saddr = tcp_v4_rcv_saddr(sk);
@@ -193,7 +188,7 @@ static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
 
 	sk_for_each_bound(sk2, node, &tb->owners) {
 		if (sk != sk2 &&
-		    !ipv6_only_sock(sk2) &&
+		    !tcp_v6_ipv6only(sk2) &&
 		    (!sk->sk_bound_dev_if ||
 		     !sk2->sk_bound_dev_if ||
 		     sk->sk_bound_dev_if == sk2->sk_bound_dev_if)) {
@@ -2496,7 +2491,7 @@ static void get_openreq4(struct sock *sk, struct open_request *req,
 		TCP_SYN_RECV,
 		0, 0, /* could print option size, but that is af dependent. */
 		1,    /* timers active (only the expire timer) */
-		ttd,
+		jiffies_to_clock_t(ttd),
 		req->retrans,
 		uid,
 		0,  /* non standard timer */
@@ -2534,7 +2529,8 @@ static void get_tcp4_sock(struct sock *sp, char *tmpbuf, int i)
 			"%08X %5d %8d %lu %d %p %u %u %u %u %d",
 		i, src, srcp, dest, destp, sp->sk_state,
 		tp->write_seq - tp->snd_una, tp->rcv_nxt - tp->copied_seq,
-		timer_active, timer_expires - jiffies,
+		timer_active,
+		jiffies_to_clock_t(timer_expires - jiffies),
 		tp->retransmits,
 		sock_i_uid(sp),
 		tp->probes_out,
@@ -2562,7 +2558,7 @@ static void get_timewait4_sock(struct tcp_tw_bucket *tw, char *tmpbuf, int i)
 	sprintf(tmpbuf, "%4d: %08X:%04X %08X:%04X"
 		" %02X %08X:%08X %02X:%08X %08X %5d %8d %d %d %p",
 		i, src, srcp, dest, destp, tw->tw_substate, 0, 0,
-		3, ttd, 0, 0, 0, 0,
+		3, jiffies_to_clock_t(ttd), 0, 0, 0, 0,
 		atomic_read(&tw->tw_refcnt), tw);
 }
 

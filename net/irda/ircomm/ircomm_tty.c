@@ -663,9 +663,10 @@ static void ircomm_tty_do_softint(void *private_)
  *    accepted for writing. This routine is mandatory.
  */
 static int ircomm_tty_write(struct tty_struct *tty, int from_user,
-			    const unsigned char *buf, int count)
+			    const unsigned char *ubuf, int count)
 {
 	struct ircomm_tty_cb *self = (struct ircomm_tty_cb *) tty->driver_data;
+	unsigned char *kbuf;		/* Buffer in kernel space */
 	unsigned long flags;
 	struct sk_buff *skb;
 	int tailroom = 0;
@@ -702,6 +703,24 @@ static int ircomm_tty_write(struct tty_struct *tty, int from_user,
 #endif
 	}
 
+	if (count < 1)
+		return 0;
+
+	/* Additional copy to avoid copy_from_user() under spinlock.
+	 * We tradeoff this extra copy to allow to pack more the
+	 * IrCOMM frames. This is advantageous because the IrDA link
+	 * is the bottleneck. */
+	if (from_user) {
+		kbuf = kmalloc(count, GFP_KERNEL);
+		if (kbuf == NULL)
+			return -ENOMEM;
+		if (copy_from_user(kbuf, ubuf, count))
+			return -EFAULT;
+	} else
+		/* The buffer is already in kernel space */
+		kbuf = (unsigned char *) ubuf;
+
+	/* Protect our manipulation of self->tx_skb and related */
 	spin_lock_irqsave(&self->spinlock, flags);
 
 	/* Fetch current transmit buffer */
@@ -761,18 +780,18 @@ static int ircomm_tty_write(struct tty_struct *tty, int from_user,
 			 * change later on - Jean II */
 			self->tx_data_size = self->max_data_size;
 		}
-		
+
 		/* Copy data */
-		if (from_user)
-			copy_from_user(skb_put(skb,size), buf+len, size);
-		else
-			memcpy(skb_put(skb,size), buf+len, size);
-		
+		memcpy(skb_put(skb,size), kbuf + len, size);
+
 		count -= size;
 		len += size;
 	}
 
 	spin_unlock_irqrestore(&self->spinlock, flags);
+
+	if (from_user)
+		kfree(kbuf);
 
 	/*     
 	 * Schedule a new thread which will transmit the frame as soon
@@ -837,6 +856,7 @@ static void ircomm_tty_wait_until_sent(struct tty_struct *tty, int timeout)
 {
 	struct ircomm_tty_cb *self = (struct ircomm_tty_cb *) tty->driver_data;
 	unsigned long orig_jiffies, poll_time;
+	unsigned long flags;
 	
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
@@ -848,14 +868,18 @@ static void ircomm_tty_wait_until_sent(struct tty_struct *tty, int timeout)
 	/* Set poll time to 200 ms */
 	poll_time = IRDA_MIN(timeout, MSECS_TO_JIFFIES(200));
 
+	spin_lock_irqsave(&self->spinlock, flags);
 	while (self->tx_skb && self->tx_skb->len) {
+		spin_unlock_irqrestore(&self->spinlock, flags);
 		current->state = TASK_INTERRUPTIBLE;
 		schedule_timeout(poll_time);
+		spin_lock_irqsave(&self->spinlock, flags);
 		if (signal_pending(current))
 			break;
 		if (timeout && time_after(jiffies, orig_jiffies + timeout))
 			break;
 	}
+	spin_unlock_irqrestore(&self->spinlock, flags);
 	current->state = TASK_RUNNING;
 }
 

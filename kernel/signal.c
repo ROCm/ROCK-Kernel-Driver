@@ -539,7 +539,7 @@ inline void signal_wake_up(struct task_struct *t, int resume)
 {
 	unsigned int mask;
 
-	set_tsk_thread_flag(t,TIF_SIGPENDING);
+	set_tsk_thread_flag(t, TIF_SIGPENDING);
 
 	/*
 	 * If resume is set, we want to wake it up in the TASK_STOPPED case.
@@ -551,10 +551,8 @@ inline void signal_wake_up(struct task_struct *t, int resume)
 	mask = TASK_INTERRUPTIBLE;
 	if (resume)
 		mask |= TASK_STOPPED;
-	if (t->state & mask) {
-		wake_up_process_kick(t);
-		return;
-	}
+	if (!wake_up_state(t, mask))
+		kick_process(t);
 }
 
 /*

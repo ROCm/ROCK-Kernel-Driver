@@ -1206,14 +1206,16 @@ asmlinkage long sys_bind(int fd, struct sockaddr __user *umyaddr, int addrlen)
  *	ready for listening.
  */
 
+int sysctl_somaxconn = SOMAXCONN;
+
 asmlinkage long sys_listen(int fd, int backlog)
 {
 	struct socket *sock;
 	int err;
 	
 	if ((sock = sockfd_lookup(fd, &err)) != NULL) {
-		if ((unsigned) backlog > SOMAXCONN)
-			backlog = SOMAXCONN;
+		if ((unsigned) backlog > sysctl_somaxconn)
+			backlog = sysctl_somaxconn;
 
 		err = security_socket_listen(sock, backlog);
 		if (err) {

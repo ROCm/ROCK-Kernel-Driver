@@ -59,6 +59,9 @@ extern void iSeries_init_early( void );
 extern void pSeries_init_early( void );
 extern void pSeriesLP_init_early(void);
 extern void mm_init_ppc64( void ); 
+extern void pseries_secondary_smp_init(unsigned long); 
+extern int  idle_setup(void);
+extern void vpa_init(int cpu);
 
 unsigned long decr_overclock = 1;
 unsigned long decr_overclock_proc0 = 1;
@@ -138,12 +141,14 @@ void __init disable_early_printk(void)
 }
 
 /*
- * Do some initial setup of the system.  The paramters are those which 
+ * Do some initial setup of the system.  The parameters are those which 
  * were passed in from the bootloader.
  */
 void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 		  unsigned long r6, unsigned long r7)
 {
+        unsigned int ret, i;
+
 #ifdef CONFIG_XMON_DEFAULT
 	debugger = xmon;
 	debugger_bpt = xmon_bpt;
@@ -187,6 +192,21 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	if (systemcfg->platform & PLATFORM_PSERIES) {
 		early_console_initialized = 1;
 		register_console(&udbg_console);
+		finish_device_tree();
+		chrp_init(r3, r4, r5, r6, r7);
+
+		/* Start secondary threads on SMT systems */
+		for (i = 0; i < NR_CPUS; i++) {
+			if(cpu_available(i)  && !cpu_possible(i)) {
+				printk("%16.16x : starting thread\n", i);
+				rtas_call(rtas_token("start-cpu"), 3, 1, 
+					  (void *)&ret,
+					  get_hard_smp_processor_id(i), 
+					  *((unsigned long *)pseries_secondary_smp_init), i);
+				cpu_set(i, cpu_possible_map);
+				systemcfg->processorCount++;
+			}
+		}
 	}
 
 	printk("Starting Linux PPC64 %s\n", UTS_RELEASE);
@@ -205,12 +225,14 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	printk("htab_data.num_ptegs           = 0x%lx\n", htab_data.htab_num_ptegs);
 	printk("-----------------------------------------------------\n");
 
-	if (systemcfg->platform & PLATFORM_PSERIES) {
-		finish_device_tree();
-		chrp_init(r3, r4, r5, r6, r7);
+	mm_init_ppc64();
+
+	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
+		vpa_init(boot_cpuid);
 	}
 
-	mm_init_ppc64();
+	/* Select the correct idle loop for the platform. */
+	idle_setup();
 
 	switch (systemcfg->platform) {
 #ifdef CONFIG_PPC_ISERIES
@@ -278,35 +300,12 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	seq_printf(m, "processor\t: %lu\n", cpu_id);
 	seq_printf(m, "cpu\t\t: ");
 
-	switch (PVR_VER(pvr)) {
-	case PV_NORTHSTAR:
-		seq_printf(m, "RS64-II (northstar)\n");
-		break;
-	case PV_PULSAR:
-		seq_printf(m, "RS64-III (pulsar)\n");
-		break;
-	case PV_POWER4:
-		seq_printf(m, "POWER4 (gp)\n");
-		break;
-	case PV_ICESTAR:
-		seq_printf(m, "RS64-III (icestar)\n");
-		break;
-	case PV_SSTAR:
-		seq_printf(m, "RS64-IV (sstar)\n");
-		break;
-	case PV_POWER4p:
-		seq_printf(m, "POWER4+ (gq)\n");
-		break;
-	case PV_630:
-		seq_printf(m, "POWER3 (630)\n");
-		break;
-	case PV_630p:
-		seq_printf(m, "POWER3 (630+)\n");
-		break;
-	default:
-		seq_printf(m, "Unknown (%08x)\n", pvr);
-		break;
-	}
+	if (cur_cpu_spec->pvr_mask)
+		seq_printf(m, "%s", cur_cpu_spec->cpu_name);
+	else
+		seq_printf(m, "unknown (%08x)", pvr);
+
+	seq_printf(m, "\n");
 
 	/*
 	 * Assume here that all clock rates are the same in a
@@ -355,7 +354,8 @@ struct seq_operations cpuinfo_op = {
 };
 
 /*
- * Fetch the cmd_line from open firmware. */
+ * Fetch the cmd_line from open firmware. 
+ */
 void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 		  unsigned long r6, unsigned long r7)
 {

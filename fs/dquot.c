@@ -128,16 +128,17 @@ static struct quota_format_type *find_quota_format(int id)
 	if (!actqf || !try_module_get(actqf->qf_owner)) {
 		int qm;
 
+		spin_unlock(&dq_list_lock);
+		
 		for (qm = 0; module_names[qm].qm_fmt_id && module_names[qm].qm_fmt_id != id; qm++);
-		if (!module_names[qm].qm_fmt_id || request_module(module_names[qm].qm_mod_name)) {
-			actqf = NULL;
-			goto out;
-		}
+		if (!module_names[qm].qm_fmt_id || request_module(module_names[qm].qm_mod_name))
+			return NULL;
+
+		spin_lock(&dq_list_lock);
 		for (actqf = quota_formats; actqf && actqf->qf_fmt_id != id; actqf = actqf->qf_next);
 		if (actqf && !try_module_get(actqf->qf_owner))
 			actqf = NULL;
 	}
-out:
 	spin_unlock(&dq_list_lock);
 	return actqf;
 }

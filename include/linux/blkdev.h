@@ -193,6 +193,11 @@ enum rq_flag_bits {
 	__REQ_PM_SUSPEND,	/* suspend request */
 	__REQ_PM_RESUME,	/* resume request */
 	__REQ_PM_SHUTDOWN,	/* shutdown request */
+	__REQ_IDETAPE_PC1,	/* packet command (first stage) */
+	__REQ_IDETAPE_PC2,	/* packet command (second stage) */
+	__REQ_IDETAPE_READ,
+	__REQ_IDETAPE_WRITE,
+	__REQ_IDETAPE_READ_BUFFER,
 	__REQ_NR_BITS,		/* stops here */
 };
 
@@ -218,6 +223,11 @@ enum rq_flag_bits {
 #define REQ_PM_SUSPEND	(1 << __REQ_PM_SUSPEND)
 #define REQ_PM_RESUME	(1 << __REQ_PM_RESUME)
 #define REQ_PM_SHUTDOWN	(1 << __REQ_PM_SHUTDOWN)
+#define REQ_IDETAPE_PC1 (1 << __REQ_IDETAPE_PC1)
+#define REQ_IDETAPE_PC2 (1 << __REQ_IDETAPE_PC2)
+#define REQ_IDETAPE_READ	(1 << __REQ_IDETAPE_READ)
+#define REQ_IDETAPE_WRITE	(1 << __REQ_IDETAPE_WRITE)
+#define REQ_IDETAPE_READ_BUFFER	(1 << __REQ_IDETAPE_READ_BUFFER)
 
 /*
  * State information carried for REQ_PM_SUSPEND and REQ_PM_RESUME

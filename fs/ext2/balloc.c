@@ -402,6 +402,7 @@ int ext2_new_block(struct inode *inode, unsigned long goal,
 	 * Now search the rest of the groups.  We assume that 
 	 * i and desc correctly point to the last group visited.
 	 */
+retry:
 	for (bit = 0; !group_alloc &&
 			bit < sbi->s_groups_count; bit++) {
 		group_no++;
@@ -425,11 +426,12 @@ int ext2_new_block(struct inode *inode, unsigned long goal,
 	ret_block = grab_block(sb_bgl_lock(sbi, group_no), bitmap_bh->b_data,
 				group_size, 0);
 	if (ret_block < 0) {
-		ext2_error (sb, "ext2_new_block",
-			"Free blocks count corrupted for block group %d",
-				group_no);
+		/*
+		 * Someone else grabbed the last free block in this blockgroup
+		 * before us.  Retry the scan.
+		 */
 		group_alloc = 0;
-		goto io_error;
+		goto retry;
 	}
 
 got_block:

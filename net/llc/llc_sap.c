@@ -54,10 +54,8 @@ void llc_save_primitive(struct sk_buff* skb, u8 prim)
 	addr->sllc_test   = prim == LLC_TEST_PRIM;
 	addr->sllc_xid    = prim == LLC_XID_PRIM;
 	addr->sllc_ua     = prim == LLC_DATAUNIT_PRIM;
-	llc_pdu_decode_sa(skb, addr->sllc_smac);
-	llc_pdu_decode_da(skb, addr->sllc_dmac);
-	llc_pdu_decode_dsap(skb, &addr->sllc_dsap);
-	llc_pdu_decode_ssap(skb, &addr->sllc_ssap);
+	llc_pdu_decode_sa(skb, addr->sllc_mac);
+	llc_pdu_decode_ssap(skb, &addr->sllc_sap);
 }
 
 /**

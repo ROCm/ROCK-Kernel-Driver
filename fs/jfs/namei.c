@@ -772,15 +772,16 @@ int jfs_link(struct dentry *old_dentry,
 	jfs_info("jfs_link: %s %s", old_dentry->d_name.name,
 		 dentry->d_name.name);
 
+	if (ip->i_nlink == JFS_LINK_MAX)
+		return -EMLINK;
+
+	if (ip->i_nlink == 0)
+		return -ENOENT;
+
 	tid = txBegin(ip->i_sb, 0);
 
 	down(&JFS_IP(dir)->commit_sem);
 	down(&JFS_IP(ip)->commit_sem);
-
-	if (ip->i_nlink == JFS_LINK_MAX) {
-		rc = -EMLINK;
-		goto out;
-	}
 
 	/*
 	 * scan parent directory for entry/freespace

@@ -998,12 +998,12 @@ static void build_setup_frame_hash(u16 *setup_frm, struct net_device *dev)
 
 		set_bit_le(index, hash_table);
 
-		for (i = 0; i < 32; i++) {
-			*setup_frm++ = hash_table[i];
-			*setup_frm++ = hash_table[i];
-		}
-		setup_frm = &tp->setup_frame[13*6];
 	}
+	for (i = 0; i < 32; i++) {
+		*setup_frm++ = hash_table[i];
+		*setup_frm++ = hash_table[i];
+	}
+	setup_frm = &tp->setup_frame[13*6];
 
 	/* Fill the final entry with our physical address. */
 	eaddrs = (u16 *)dev->dev_addr;
@@ -1103,11 +1103,13 @@ static void set_rx_mode(struct net_device *dev)
 		}
 	} else {
 		unsigned long flags;
+		u32 tx_flags = 0x08000000 | 192;
 
 		/* Note that only the low-address shortword of setup_frame is valid!
 		   The values are doubled for big-endian architectures. */
 		if (dev->mc_count > 14) { /* Must use a multicast hash table. */
 			build_setup_frame_hash(tp->setup_frame, dev);
+			tx_flags = 0x08400000 | 192;
 		} else {
 			build_setup_frame_perfect(tp->setup_frame, dev);
 		}
@@ -1117,7 +1119,6 @@ static void set_rx_mode(struct net_device *dev)
 		if (tp->cur_tx - tp->dirty_tx > TX_RING_SIZE - 2) {
 			/* Same setup recently queued, we need not add it. */
 		} else {
-			u32 tx_flags = 0x08000000 | 192;
 			unsigned int entry;
 			int dummy = -1;
 

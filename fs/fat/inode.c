@@ -964,13 +964,17 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		error = first;
 		goto out_fail;
 	}
-	if (FAT_FIRST_ENT(sb, media) != first
-	    && (media != 0xf8 || FAT_FIRST_ENT(sb, 0xfe) != first)) {
-		if (!silent) {
+	if (FAT_FIRST_ENT(sb, media) == first) {
+		/* all is as it should be */
+	} else if (media == 0xf8 && FAT_FIRST_ENT(sb, 0xfe) == first) {
+		/* bad, reported on pc9800 */
+	} else if (first == 0) {
+		/* bad, reported with a SmartMedia card */
+	} else {
+		if (!silent)
 			printk(KERN_ERR "FAT: invalid first entry of FAT "
 			       "(0x%x != 0x%x)\n",
 			       FAT_FIRST_ENT(sb, media), first);
-		}
 		goto out_invalid;
 	}
 

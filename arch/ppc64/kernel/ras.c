@@ -113,7 +113,7 @@ ras_epow_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	status = rtas_call(rtas_token("check-exception"), 6, 1, NULL, 
 			   0x500, irq, 
-			   EPOW_WARNING | POWERMGM_EVENTS, 
+			   RTAS_EPOW_WARNING | RTAS_POWERMGM_EVENTS, 
 			   1,  /* Time Critical */
 			   __pa(&log_entry), size);
 
@@ -141,7 +141,7 @@ ras_error_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	status = rtas_call(rtas_token("check-exception"), 6, 1, NULL, 
 			   0x500, irq, 
-			   INTERNAL_ERROR, 
+			   RTAS_INTERNAL_ERROR, 
 			   1, /* Time Critical */
 			   __pa(&log_entry), size);
 

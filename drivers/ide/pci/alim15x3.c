@@ -634,23 +634,25 @@ static unsigned int __init init_chipset_ali15x3 (struct pci_dev *dev, const char
 	        return 0;
 	}
 
-	/*
-	 * set south-bridge's enable bit, m1533, 0x79
-	 */
+	if (m5229_revision < 0xC5 && isa_dev)
+	{	
+		/*
+		 * set south-bridge's enable bit, m1533, 0x79
+		 */
 
-	pci_read_config_byte(isa_dev, 0x79, &tmpbyte);
-	if (m5229_revision == 0xC2) {
-		/*
-		 * 1543C-B0 (m1533, 0x79, bit 2)
-		 */
-		pci_write_config_byte(isa_dev, 0x79, tmpbyte | 0x04);
-	} else if (m5229_revision >= 0xC3) {
-		/*
-		 * 1553/1535 (m1533, 0x79, bit 1)
-		 */
-		pci_write_config_byte(isa_dev, 0x79, tmpbyte | 0x02);
+		pci_read_config_byte(isa_dev, 0x79, &tmpbyte);
+		if (m5229_revision == 0xC2) {
+			/*
+			 * 1543C-B0 (m1533, 0x79, bit 2)
+			 */
+			pci_write_config_byte(isa_dev, 0x79, tmpbyte | 0x04);
+		} else if (m5229_revision >= 0xC3) {
+			/*
+			 * 1553/1535 (m1533, 0x79, bit 1)
+			 */
+			pci_write_config_byte(isa_dev, 0x79, tmpbyte | 0x02);
+		}
 	}
-
 	local_irq_restore(flags);
 	return 0;
 }

@@ -978,10 +978,6 @@ static const char *ias_value_types[] = {
 	"IAS_STRING"
 };
 
-struct irias_iter_state {
-	unsigned long flags;
-};
-
 static inline struct ias_object *irias_seq_idx(loff_t pos) 
 {
 	struct ias_object *obj;
@@ -997,9 +993,7 @@ static inline struct ias_object *irias_seq_idx(loff_t pos)
 
 static void *irias_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	struct irias_iter_state *iter = seq->private;
-
-	spin_lock_irqsave(&irias_objects->hb_spinlock, iter->flags);
+	spin_lock_irq(&irias_objects->hb_spinlock);
 
 	return *pos ? irias_seq_idx(*pos - 1) : SEQ_START_TOKEN;
 }
@@ -1015,9 +1009,7 @@ static void *irias_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 static void irias_seq_stop(struct seq_file *seq, void *v)
 {
-	struct irias_iter_state *iter = seq->private;
-
-	spin_unlock_irqrestore(&irias_objects->hb_spinlock, iter->flags);
+	spin_unlock_irq(&irias_objects->hb_spinlock);
 }
 
 static int irias_seq_show(struct seq_file *seq, void *v)
@@ -1088,26 +1080,9 @@ static struct seq_operations irias_seq_ops = {
 
 static int irias_seq_open(struct inode *inode, struct file *file)
 {
-	struct seq_file *seq;
-	int rc = -ENOMEM;
-	struct irias_iter_state *s;
-
 	ASSERT( irias_objects != NULL, return -EINVAL;);
-	s = kmalloc(sizeof(*s), GFP_KERNEL);
-	if (!s)
-		goto out;
 
-	rc = seq_open(file, &irias_seq_ops);
-	if (rc)
-		goto out_kfree;
-	seq	     = file->private_data;
-	seq->private = s;
-	memset(s, 0, sizeof(*s));
-out:
-	return rc;
-out_kfree:
-	kfree(s);
-	goto out;
+	return seq_open(file, &irias_seq_ops);
 }
 
 struct file_operations irias_seq_fops = {

@@ -57,7 +57,7 @@
 /* The size of the first scatter/gather segments (determines the maximum block
    size for SCSI adapters not supporting scatter/gather). The default is set
    to try to allocate the buffer as one chunk. */
-#define OSST_FIRST_ORDER  5
+#define OSST_FIRST_ORDER  (15-PAGE_SHIFT)
 
 
 /* The following lines define defaults for properties that can be set

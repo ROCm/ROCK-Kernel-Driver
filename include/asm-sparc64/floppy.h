@@ -62,8 +62,6 @@ struct sun_floppy_ops {
 	void		(*fd_set_dma_addr) (char *);
 	void		(*fd_set_dma_count) (int);
 	unsigned int	(*get_dma_residue) (void);
-	void		(*fd_enable_irq) (void);
-	void		(*fd_disable_irq) (void);
 	int		(*fd_request_irq) (void);
 	void		(*fd_free_irq) (void);
 	int		(*fd_eject) (int);
@@ -82,8 +80,6 @@ static struct sun_floppy_ops sun_fdops;
 #define fd_set_dma_addr(addr)     sun_fdops.fd_set_dma_addr(addr)
 #define fd_set_dma_count(count)   sun_fdops.fd_set_dma_count(count)
 #define get_dma_residue(x)        sun_fdops.get_dma_residue()
-#define fd_enable_irq()           sun_fdops.fd_enable_irq()
-#define fd_disable_irq()          sun_fdops.fd_disable_irq()
 #define fd_cacheflush(addr, size) /* nothing... */
 #define fd_request_irq()          sun_fdops.fd_request_irq()
 #define fd_free_irq()             sun_fdops.fd_free_irq()
@@ -230,14 +226,6 @@ static int sun_fd_request_irq(void)
 		return ((error == 0) ? 0 : -1);
 	}
 	return 0;
-}
-
-static void sun_fd_enable_irq(void)
-{
-}
-
-static void sun_fd_disable_irq(void)
-{
 }
 
 static void sun_fd_free_irq(void)
@@ -391,25 +379,14 @@ static unsigned int sun_pci_get_dma_residue(void)
 	return ebus_dma_residue(&sun_pci_fd_ebus_dma);
 }
 
-static void sun_pci_fd_enable_irq(void)
-{
-	ebus_dma_irq_enable(&sun_pci_fd_ebus_dma, 1);
-}
-
-static void sun_pci_fd_disable_irq(void)
-{
-	ebus_dma_irq_enable(&sun_pci_fd_ebus_dma, 0);
-}
-
 static int sun_pci_fd_request_irq(void)
 {
-	/* Done by enable/disable irq */
-	return 0;
+	return ebus_dma_irq_enable(&sun_pci_fd_ebus_dma, 1);
 }
 
 static void sun_pci_fd_free_irq(void)
 {
-	/* Done by enable/disable irq */
+	ebus_dma_irq_enable(&sun_pci_fd_ebus_dma, 0);
 }
 
 static int sun_pci_fd_eject(int drive)
@@ -587,8 +564,6 @@ isa_done:
 	sun_fdops.fd_set_dma_count = sun_fd_set_dma_count;
 	sun_fdops.get_dma_residue = sun_get_dma_residue;
 
-	sun_fdops.fd_enable_irq = sun_fd_enable_irq;
-	sun_fdops.fd_disable_irq = sun_fd_disable_irq;
 	sun_fdops.fd_request_irq = sun_fd_request_irq;
 	sun_fdops.fd_free_irq = sun_fd_free_irq;
 
@@ -694,8 +669,6 @@ static unsigned long __init sun_floppy_init(void)
 		sun_fdops.fd_set_dma_count = sun_pci_fd_set_dma_count;
 		sun_fdops.get_dma_residue = sun_pci_get_dma_residue;
 
-		sun_fdops.fd_enable_irq = sun_pci_fd_enable_irq;
-		sun_fdops.fd_disable_irq = sun_pci_fd_disable_irq;
 		sun_fdops.fd_request_irq = sun_pci_fd_request_irq;
 		sun_fdops.fd_free_irq = sun_pci_fd_free_irq;
 
@@ -810,8 +783,6 @@ static unsigned long __init sun_floppy_init(void)
 	sun_fdops.fd_set_dma_count = sun_fd_set_dma_count;
 	sun_fdops.get_dma_residue = sun_get_dma_residue;
 
-	sun_fdops.fd_enable_irq = sun_fd_enable_irq;
-	sun_fdops.fd_disable_irq = sun_fd_disable_irq;
 	sun_fdops.fd_request_irq = sun_fd_request_irq;
 	sun_fdops.fd_free_irq = sun_fd_free_irq;
 

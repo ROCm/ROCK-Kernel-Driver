@@ -72,6 +72,14 @@ config PPC64
 	bool
 	default y
 
+config POWER4_ONLY
+	bool "Optimize for POWER4"
+	default n
+	---help---
+	  Cause the compiler to optimize for POWER4 processors. The resulting
+	  binary will not work on POWER3 or RS64 processors when compiled with
+	  binutils 2.15 or later.
+
 config SMP
 	bool "Symmetric multi-processing support"
 	---help---
@@ -318,7 +326,7 @@ endmenu
 
 config VIOPATH
 	bool
-	depends on PPC_ISERIES
+	depends on VIOCONS || VIODASD || VIOCD || VIOTAPE || VETH
 	default y
 
 source "arch/ppc64/oprofile/Kconfig"

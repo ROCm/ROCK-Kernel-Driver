@@ -489,6 +489,18 @@ int dm_get_device(struct dm_target *ti, const char *path, sector_t start,
 		rs->max_sectors =
 			min_not_zero(rs->max_sectors, q->max_sectors);
 
+		/* FIXME: Device-Mapper on top of RAID-0 breaks because DM
+		 *        currently doesn't honor MD's merge_bvec_fn routine.
+		 *        In this case, we'll force DM to use PAGE_SIZE or
+		 *        smaller I/O, just to be safe. A better fix is in the
+		 *        works, but add this for the time being so it will at
+		 *        least operate correctly.
+		 */
+		if (q->merge_bvec_fn)
+			rs->max_sectors =
+				min_not_zero(rs->max_sectors,
+					     (unsigned short)(PAGE_SIZE >> 9));
+
 		rs->max_phys_segments =
 			min_not_zero(rs->max_phys_segments,
 				     q->max_phys_segments);

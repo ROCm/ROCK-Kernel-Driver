@@ -968,6 +968,10 @@ void irttp_status_indication(void *instance,
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == TTP_TSAP_MAGIC, return;);
 
+	/* Check if client has already closed the TSAP and gone away */
+	if (self->close_pend)
+		return;
+
 	/*
 	 *  Inform service user if he has requested it
 	 */
@@ -1603,7 +1607,7 @@ void irttp_do_data_indication(struct tsap_cb *self, struct sk_buff *skb)
 {
 	int err;
 
-	/* Check if client has already tried to close the TSAP */
+	/* Check if client has already closed the TSAP and gone away */
 	if (self->close_pend) {
 		dev_kfree_skb(skb);
 		return;
@@ -1770,7 +1774,6 @@ void irttp_run_rx_queue(struct tsap_cb *self)
 #ifdef CONFIG_PROC_FS
 struct irttp_iter_state {
 	int id;
-	unsigned long flags;
 };
 
 static void *irttp_seq_start(struct seq_file *seq, loff_t *pos)
@@ -1779,7 +1782,7 @@ static void *irttp_seq_start(struct seq_file *seq, loff_t *pos)
 	struct tsap_cb *self;
 
 	/* Protect our access to the tsap list */
-	spin_lock_irqsave(&irttp->tsaps->hb_spinlock, iter->flags);
+	spin_lock_irq(&irttp->tsaps->hb_spinlock);
 	iter->id = 0;
 
 	for (self = (struct tsap_cb *) hashbin_get_first(irttp->tsaps); 
@@ -1804,8 +1807,7 @@ static void *irttp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 static void irttp_seq_stop(struct seq_file *seq, void *v)
 {
-	struct irttp_iter_state *iter = seq->private;
-	spin_unlock_irqrestore(&irttp->tsaps->hb_spinlock, iter->flags);
+	spin_unlock_irq(&irttp->tsaps->hb_spinlock);
 }
 
 static int irttp_seq_show(struct seq_file *seq, void *v)

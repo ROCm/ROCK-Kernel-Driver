@@ -1707,6 +1707,9 @@ static int uart_line_info(char *buf, struct uart_driver *drv, int i)
 		strcat(stat_buf, "\n");
 	
 		ret += sprintf(buf + ret, stat_buf);
+	} else {
+		strcat(buf, "\n");
+		ret++;
 	}
 #undef STATBIT
 #undef INFOBIT

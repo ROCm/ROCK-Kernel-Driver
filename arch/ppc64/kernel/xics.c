@@ -202,7 +202,7 @@ static void pSeriesLP_qirr_info(int n_cpu , u8 value)
 {
 	unsigned long lpar_rc;
 
-	lpar_rc = plpar_ipi(n_cpu, value);
+	lpar_rc = plpar_ipi(get_hard_smp_processor_id(n_cpu), value);
 	if (lpar_rc != H_Success)
 		panic("bad return code qirr - rc = %lx\n", lpar_rc); 
 }
@@ -448,7 +448,7 @@ nextnode:
 	     np;
 	     np = of_find_node_by_type(np, "cpu")) {
 		ireg = (uint *)get_property(np, "reg", &ilen);
-		if (ireg && ireg[0] == smp_processor_id()) {
+		if (ireg && ireg[0] == hard_smp_processor_id()) {
 			ireg = (uint *)get_property(np, "ibm,ppc-interrupt-gserver#s", &ilen);
 			i = ilen / sizeof(int);
 			if (ireg && i > 0) {
@@ -485,8 +485,8 @@ nextnode:
 		for (i = 0; i < NR_CPUS; ++i) {
 			if (!cpu_possible(i))
 				continue;
-			xics_per_cpu[i] = __ioremap((ulong)inodes[i].addr, 
-						    (ulong)inodes[i].size,
+			xics_per_cpu[i] = __ioremap((ulong)inodes[get_hard_smp_processor_id(i)].addr, 
+						    (ulong)inodes[get_hard_smp_processor_id(i)].size,
 						    _PAGE_NO_CACHE);
 		}
 #else
@@ -569,7 +569,7 @@ void xics_set_affinity(unsigned int irq, cpumask_t cpumask)
 		cpus_and(tmp, cpu_online_map, cpumask);
 		if (cpus_empty(tmp))
 			goto out;
-		newmask = first_cpu(cpumask);
+		newmask = get_hard_smp_processor_id(first_cpu(cpumask));
 	}
 
 	status = rtas_call(ibm_set_xive, 3, 1, NULL,

@@ -44,6 +44,7 @@
 struct proc_ppc64_t proc_ppc64;
 
 void proc_ppc64_create_paca(int num);
+void proc_ppc64_create_smt(void);
 
 static loff_t  page_map_seek( struct file *file, loff_t off, int whence);
 static ssize_t page_map_read( struct file *file, char *buf, size_t nbytes, loff_t *ppos);
@@ -106,6 +107,8 @@ static int __init proc_ppc64_init(void)
 
 	/* Placeholder for rtas interfaces. */
 	proc_ppc64.rtas = proc_mkdir("rtas", proc_ppc64.root);
+
+	proc_ppc64_create_smt();
 
 	proc_ppc64_create_ofdt(proc_ppc64.root);
 
@@ -408,6 +411,88 @@ static void release_prop_list(const struct property *prop)
 		kfree(prop);
 	}
 
+}
+
+static int proc_ppc64_smt_snooze_read(char *page, char **start, off_t off,
+				      int count, int *eof, void *data)
+{
+	if (naca->smt_snooze_delay)
+		return sprintf(page, "%lu\n", naca->smt_snooze_delay);
+	else 
+		return sprintf(page, "disabled\n");
+}
+ 
+static int proc_ppc64_smt_snooze_write(struct file* file, const char *buffer,
+				       unsigned long count, void *data)
+{
+	unsigned long val;
+	char val_string[22];
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+
+	if (count > sizeof(val_string) - 1)
+		return -EINVAL;
+
+	if (copy_from_user(val_string, buffer, count))
+		return -EFAULT;
+
+	val_string[count] = '\0';
+
+	if (val_string[0] == '0' && (val_string[1] == '\n' || val_string[1] == '\0')) {
+		naca->smt_snooze_delay = 0;
+		return count;
+	}
+ 
+	val = simple_strtoul(val_string, NULL, 10);
+	if (val != 0) 
+		naca->smt_snooze_delay = val;
+	else
+		return -EINVAL;
+
+	return count;
+}
+ 
+static int proc_ppc64_smt_state_read(char *page, char **start, off_t off,
+				      int count, int *eof, void *data)
+{
+	switch(naca->smt_state) {
+	case SMT_OFF:
+		return sprintf(page, "off\n");
+		break;
+	case SMT_ON:
+		return sprintf(page, "on\n");
+		break;
+	case SMT_DYNAMIC:
+		return sprintf(page, "dynamic\n");
+		break;
+	default:
+		return sprintf(page, "unknown\n");
+		break;
+	}
+}
+ 
+void proc_ppc64_create_smt(void)
+{
+	struct proc_dir_entry *ent_snooze = 
+		create_proc_entry("smt-snooze-delay", S_IRUGO | S_IWUSR, 
+				  proc_ppc64.root);
+	struct proc_dir_entry *ent_enabled = 
+		create_proc_entry("smt-enabled", S_IRUGO | S_IWUSR, 
+				  proc_ppc64.root);
+	if (ent_snooze) {
+		ent_snooze->nlink = 1;
+		ent_snooze->data = NULL;
+		ent_snooze->read_proc = (void *)proc_ppc64_smt_snooze_read;
+		ent_snooze->write_proc = (void *)proc_ppc64_smt_snooze_write;
+	}
+
+	if (ent_enabled) {
+		ent_enabled->nlink = 1;
+		ent_enabled->data = NULL;
+		ent_enabled->read_proc = (void *)proc_ppc64_smt_state_read;
+		ent_enabled->write_proc = NULL;
+	}
 }
 
 fs_initcall(proc_ppc64_init);

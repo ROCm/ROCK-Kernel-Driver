@@ -9,6 +9,14 @@
 #define H_PTEG_Full	-6	/* PTEG is full */
 #define H_Not_Found	-7	/* PTE was not found" */
 #define H_Reserved_DABR	-8	/* DABR address is reserved by the hypervisor on this processor" */
+#define H_NoMem                 -9
+#define H_Authority            -10
+#define H_Permission           -11
+#define H_Dropped              -12
+#define H_SourceParm           -13
+#define H_DestParm             -14
+#define H_RemoteParm           -15
+#define H_Resource             -16
 
 /* Flags */
 #define H_LARGE_PAGE		(1UL<<(63-16))
@@ -58,6 +66,16 @@
 #define H_IPOLL			0x70
 #define H_XIRR			0x74
 #define H_PERFMON		0x7c
+#define H_MIGRATE_DMA		0x78
+#define H_REGISTER_VPA		0xDC
+#define H_CEDE		        0xE0
+#define H_CONFER		0xE4
+#define H_PROD		        0xE8
+#define H_GET_PPP		0xEC
+#define H_SET_PPP		0xF0
+#define H_SET_PURR		0xF4
+#define H_PIC		        0xF8
+#define H_POLL_PENDING	        0x1D8
 
 /* plpar_hcall() -- Generic call interface using above opcodes
  *
@@ -75,6 +93,8 @@ long plpar_hcall(unsigned long opcode,
 		 unsigned long *out1,
 		 unsigned long *out2,
 		 unsigned long *out3);
+
+#define HVSC			".long 0x44000022\n"
 
 /* Same as plpar_hcall but for those opcodes that return no values
  * other than status.  Slightly more efficient.
