@@ -795,10 +795,10 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
 	int ifnum = intf->altsetting->desc.bInterfaceNumber;
-	int i;
-	unsigned char mac [6];
+	struct udsl_instance_data *instance;
 	unsigned char mac_str [13];
-	struct udsl_instance_data *instance = NULL;
+	unsigned char mac [6];
+	int i, err;
 
 	PDEBUG ("Trying device with Vendor=0x%x, Product=0x%x, ifnum %d\n",
 		dev->descriptor.idVendor, dev->descriptor.idProduct, ifnum);
@@ -808,29 +808,34 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 	    (dev->descriptor.idProduct != SPEEDTOUCH_PRODUCTID) || (ifnum != 1))
 		return -ENODEV;
 
-	MOD_INC_USE_COUNT;
-
 	PDEBUG ("Device Accepted\n");
 
-	/* device init */
-	instance = kmalloc (sizeof (struct udsl_instance_data), GFP_KERNEL);
-	if (!instance) {
+	/* instance init */
+	if (!(instance = kmalloc (sizeof (struct udsl_instance_data), GFP_KERNEL))) {
 		PDEBUG ("No memory for Instance data!\n");
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto fail_instance;
 	}
 
-	/* initialize structure */
 	memset (instance, 0, sizeof (struct udsl_instance_data));
+
 	instance->usb_dev = dev;
+
+	skb_queue_head_init (&instance->recvqueue);
+
 	tasklet_init (&instance->recvqueue_tasklet, udsl_atm_processqueue, (unsigned long) instance);
 
-	instance->atm_dev = atm_dev_register (udsl_driver_name, &udsl_atm_devops, -1, 0);
+	/* atm init */
+	if (!(instance->atm_dev = atm_dev_register (udsl_driver_name, &udsl_atm_devops, -1, 0))) {
+		PDEBUG ("failed to register ATM device!\n");
+		err = -ENOMEM;
+		goto fail_atm;
+	}
+
 	instance->atm_dev->dev_data = instance;
 	instance->atm_dev->ci_range.vpi_bits = ATM_CI_MAX;
 	instance->atm_dev->ci_range.vci_bits = ATM_CI_MAX;
 	instance->atm_dev->signal = ATM_PHY_SIG_LOST;
-
-	skb_queue_head_init (&instance->recvqueue);
 
 	/* tmp init atm device, set to 128kbit */
 	instance->atm_dev->link_rate = 128 * 1000 / 424;
@@ -840,13 +845,18 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 	for (i = 0; i < 6; i++)
 		mac[i] = (hex2int (mac_str[i * 2]) * 16) + (hex2int (mac_str[i * 2 + 1]));
 
-	PDEBUG ("MAC is %02x:%02x:%02x:%02x:%02x:%02x\n", mac[0], mac[1], mac[2], mac[3], mac[4],
-		mac[5]);
+	PDEBUG ("MAC is %02x:%02x:%02x:%02x:%02x:%02x\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
 	memcpy (instance->atm_dev->esi, mac, 6);
 
 	usb_set_intfdata (intf, instance);
+
 	return 0;
+
+fail_atm:
+	kfree (instance);
+fail_instance:
+	return err;
 }
 
 static void udsl_usb_disconnect (struct usb_interface *intf)
@@ -865,8 +875,6 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 			udsl_atm_stopdevice (instance);
 
 		kfree (instance);
-
-		MOD_DEC_USE_COUNT;
 	}
 }
 
