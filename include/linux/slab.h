@@ -60,6 +60,7 @@ extern unsigned int kmem_cache_size(kmem_cache_t *);
 
 extern void *kmalloc(size_t, int);
 extern void kfree(const void *);
+extern unsigned int ksize(const void *);
 
 extern int FASTCALL(kmem_cache_reap(int));
 
