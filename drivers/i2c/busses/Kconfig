@@ -1,13 +1,12 @@
 #
 # Sensor device configuration
-# All depend on EXPERIMENTAL, I2C and I2C_PROC.
 #
 
 menu "I2C Hardware Sensors Mainboard support"
 
 config I2C_ALI15X3
 	tristate "  ALI 15x3"
-	depends on I2C && I2C_PROC && PCI && EXPERIMENTAL
+	depends on I2C && PCI && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for the
 	  Acer Labs Inc. (ALI) M1514 and M1543 motherboard I2C interfaces.
@@ -21,7 +20,7 @@ config I2C_ALI15X3
 
 config I2C_AMD756
 	tristate "  AMD 756/766"
-	depends on I2C && I2C_PROC
+	depends on I2C && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for the AMD
 	  756/766/768 mainboard I2C interfaces.
@@ -38,7 +37,7 @@ config I2C_AMD756
 
 config I2C_AMD8111
 	tristate "  AMD 8111"
-	depends on I2C && I2C_PROC
+	depends on I2C && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for the AMD
 	  8111 mainboard I2C interfaces.
@@ -55,7 +54,7 @@ config I2C_AMD8111
 
 config I2C_I801
 	tristate "  Intel 801"
-	depends on I2C && I2C_PROC && PCI && EXPERIMENTAL
+	depends on I2C && PCI && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for the Intel
 	  801 family of mainboard I2C interfaces.  Specifically, the following
@@ -78,7 +77,7 @@ config I2C_I801
 
 config I2C_ISA
 	tristate "  ISA Bus support"
-	depends on I2C && I2C_PROC && ISA && EXPERIMENTAL
+	depends on I2C && ISA && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for i2c
 	  interfaces that are on the ISA bus.
@@ -96,7 +95,7 @@ config I2C_ISA
 
 config I2C_PIIX4
 	tristate "  Intel PIIX4"
-	depends on I2C && I2C_PROC && PCI && EXPERIMENTAL
+	depends on I2C && PCI && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for the Intel
 	  PIIX4 family of mainboard I2C interfaces.  Specifically, the following

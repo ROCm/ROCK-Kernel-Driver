@@ -11,6 +11,7 @@
 #include <linux/notifier.h>
 #include <linux/smp.h>
 #include <linux/oprofile.h>
+#include <linux/device.h>
 #include <asm/nmi.h>
 #include <asm/msr.h>
 #include <asm/apic.h>
@@ -25,27 +26,59 @@ static unsigned long saved_lvtpc[NR_CPUS];
 static int nmi_start(void);
 static void nmi_stop(void);
 
-static struct pm_dev * oprofile_pmdev;
- 
-/* We're at risk of causing big trouble unless we
- * make sure to not cause any NMI interrupts when
- * suspended.
- */
-static int oprofile_pm_callback(struct pm_dev * dev,
-		pm_request_t rqst, void * data)
+/* 0 == registered but off, 1 == registered and on */
+static int nmi_enabled = 0;
+
+#ifdef CONFIG_PM
+
+static int nmi_suspend(struct device *dev, u32 state, u32 level)
 {
-	switch (rqst) {
-		case PM_SUSPEND:
-			nmi_stop();
-			break;
-		case PM_RESUME:
-			nmi_start();
-			break;
-	}
+	if (level != SUSPEND_POWER_DOWN)
+		return 0;
+	if (nmi_enabled == 1)
+		nmi_stop();
 	return 0;
 }
- 
- 
+
+
+static int nmi_resume(struct device *dev, u32 level)
+{
+	if (level != RESUME_POWER_ON)
+		return 0;
+	if (nmi_enabled == 1)
+		nmi_start();
+	return 0;
+}
+
+
+static struct device_driver nmi_driver = {
+	.name		= "oprofile",
+	.bus		= &system_bus_type,
+	.resume		= nmi_resume,
+	.suspend	= nmi_suspend,
+};
+
+
+static struct device device_nmi = {
+	.name	= "oprofile",
+	.bus_id = "oprofile",
+	.driver	= &nmi_driver,
+	.parent = &device_lapic.dev,
+};
+
+
+static int __init init_nmi_driverfs(void)
+{
+	driver_register(&nmi_driver);
+	return device_register(&device_nmi);
+}
+
+
+late_initcall(init_nmi_driverfs);
+
+#endif /* CONFIG_PM */
+
+
 static int nmi_callback(struct pt_regs * regs, int cpu)
 {
 	return model->check_ctrs(cpu, &cpu_msrs[cpu], regs);
@@ -86,7 +119,7 @@ static void nmi_cpu_setup(void * dummy)
 	saved_lvtpc[cpu] = apic_read(APIC_LVTPC);
 	apic_write(APIC_LVTPC, APIC_DM_NMI);
 }
- 
+
 
 static int nmi_setup(void)
 {
@@ -95,9 +128,10 @@ static int nmi_setup(void)
 	 * without actually triggering any NMIs as this will
 	 * break the core code horrifically.
 	 */
+	disable_lapic_nmi_watchdog();
 	on_each_cpu(nmi_cpu_setup, NULL, 0, 1);
 	set_nmi_callback(nmi_callback);
-	oprofile_pmdev = set_nmi_pm_callback(oprofile_pm_callback);
+	nmi_enabled = 1;
 	return 0;
 }
 
@@ -145,9 +179,10 @@ static void nmi_cpu_shutdown(void * dummy)
  
 static void nmi_shutdown(void)
 {
-	unset_nmi_pm_callback(oprofile_pmdev);
+	nmi_enabled = 0;
 	unset_nmi_callback();
 	on_each_cpu(nmi_cpu_shutdown, NULL, 0, 1);
+	enable_lapic_nmi_watchdog();
 }
 
  

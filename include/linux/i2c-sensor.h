@@ -1,5 +1,5 @@
 /*
-    i2c-proc.h - Part of the i2c package
+    i2c-sensor.h - Part of the i2c package
     was originally sensors.h - Part of lm_sensors, Linux kernel modules
                                for hardware monitoring
     Copyright (c) 1998, 1999  Frodo Looijaard <frodol@dds.nl>
@@ -19,8 +19,8 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-#ifndef _LINUX_I2C_PROC_H
-#define _LINUX_I2C_PROC_H
+#ifndef _LINUX_I2C_SENSOR_H
+#define _LINUX_I2C_SENSOR_H
 
 #include <linux/sysctl.h>
 
@@ -33,46 +33,6 @@ typedef void (*i2c_real_callback) (struct i2c_client * client,
 #define SENSORS_PROC_REAL_INFO 1
 #define SENSORS_PROC_REAL_READ 2
 #define SENSORS_PROC_REAL_WRITE 3
-
-/* These funcion reads or writes a 'real' value (encoded by the combination
-   of an integer and a magnitude, the last is the power of ten the value
-   should be divided with) to a /proc/sys directory. To use these functions,
-   you must (before registering the ctl_table) set the extra2 field to the
-   client, and the extra1 field to a function of the form:
-      void func(struct i2c_client *client, int operation, int ctl_name,
-                int *nrels_mag, long *results)
-   This last function can be called for three values of operation. If
-   operation equals SENSORS_PROC_REAL_INFO, the magnitude should be returned
-   in nrels_mag. If operation equals SENSORS_PROC_REAL_READ, values should
-   be read into results. nrels_mag should return the number of elements
-   read; the maximum number is put in it on entry. Finally, if operation
-   equals SENSORS_PROC_REAL_WRITE, the values in results should be
-   written to the chip. nrels_mag contains on entry the number of elements
-   found.
-   In all cases, client points to the client we wish to interact with,
-   and ctl_name is the SYSCTL id of the file we are accessing. */
-extern int i2c_sysctl_real(ctl_table * table, int *name, int nlen,
-			       void *oldval, size_t * oldlenp,
-			       void *newval, size_t newlen,
-			       void **context);
-extern int i2c_proc_real(ctl_table * ctl, int write, struct file *filp,
-			     void *buffer, size_t * lenp);
-
-
-
-/* These rather complex functions must be called when you want to add or
-   delete an entry in /proc/sys/dev/sensors/chips (not yet implemented). It
-   also creates a new directory within /proc/sys/dev/sensors/.
-   ctl_template should be a template of the newly created directory. It is
-   copied in memory. The extra2 field of each file is set to point to client.
-   If any driver wants subdirectories within the newly created directory,
-   these functions must be updated! */
-extern int i2c_register_entry(struct i2c_client *client,
-				  const char *prefix,
-				  ctl_table * ctl_template);
-
-extern void i2c_deregister_entry(int id);
-
 
 /* A structure containing detect information.
    Force variables overrule all other variables; they force a detection on
@@ -368,8 +328,7 @@ struct i2c_address_data {
   SENSORS_INSMOD
 
 typedef int i2c_found_addr_proc(struct i2c_adapter *adapter,
-				    int addr, unsigned short flags,
-				    int kind);
+				    int addr, int kind);
 
 /* Detect function. It iterates over all possible addresses itself. For
    SMBus addresses, it will only call found_proc if some client is connected
@@ -410,5 +369,5 @@ struct i2c_chips_data {
 	char name[SENSORS_PREFIX_MAX + 13];
 };
 
-#endif				/* def _LINUX_I2C_PROC_H */
+#endif				/* def _LINUX_I2C_SENSOR_H */
 

@@ -25,25 +25,4 @@ void set_nmi_callback(nmi_callback_t callback);
  */
 void unset_nmi_callback(void);
  
-#ifdef CONFIG_PM
- 
-/** Replace the PM callback routine for NMI. */
-struct pm_dev * set_nmi_pm_callback(pm_callback callback);
-
-/** Unset the PM callback routine back to the default. */
-void unset_nmi_pm_callback(struct pm_dev * dev);
-
-#else
-
-static inline struct pm_dev * set_nmi_pm_callback(pm_callback callback)
-{
-	return 0;
-} 
- 
-static inline void unset_nmi_pm_callback(struct pm_dev * dev)
-{
-}
-
-#endif /* CONFIG_PM */
- 
 #endif /* ASM_NMI_H */

@@ -10,6 +10,8 @@
  *					for testing these extensively.
  *	Maciej W. Rozycki	:	Various updates and fixes.
  *	Mikael Pettersson	:	Power Management for UP-APIC.
+ *	Pavel Machek and
+ *	Mikael Pettersson	:	PM converted to driver model.
  */
 
 #include <linux/config.h>
@@ -451,17 +453,14 @@ void __init setup_local_APIC (void)
 
 #ifdef CONFIG_PM
 
-#include <linux/slab.h>
-#include <linux/pm.h>
+#include <linux/device.h>
+#include <linux/module.h>
 
 static struct {
 	/* 'active' is true if the local APIC was enabled by us and
 	   not the BIOS; this signifies that we are also responsible
 	   for disabling it before entering apm/acpi suspend */
 	int active;
-	/* 'perfctr_pmdev' is here because the current (2.4.1) PM
-	   callback system doesn't handle hierarchical dependencies */
-	struct pm_dev *perfctr_pmdev;
 	/* r/w apic fields */
 	unsigned int apic_id;
 	unsigned int apic_taskpri;
@@ -478,13 +477,16 @@ static struct {
 	unsigned int apic_thmr;
 } apic_pm_state;
 
-static void apic_pm_suspend(void *data)
+static int lapic_suspend(struct device *dev, u32 state, u32 level)
 {
 	unsigned int l, h;
 	unsigned long flags;
 
-	if (apic_pm_state.perfctr_pmdev)
-		pm_send(apic_pm_state.perfctr_pmdev, PM_SUSPEND, data);
+	if (level != SUSPEND_POWER_DOWN)
+		return 0;
+	if (!apic_pm_state.active)
+		return 0;
+
 	apic_pm_state.apic_id = apic_read(APIC_ID);
 	apic_pm_state.apic_taskpri = apic_read(APIC_TASKPRI);
 	apic_pm_state.apic_ldr = apic_read(APIC_LDR);
@@ -505,12 +507,21 @@ static void apic_pm_suspend(void *data)
 	l &= ~MSR_IA32_APICBASE_ENABLE;
 	wrmsr(MSR_IA32_APICBASE, l, h);
 	local_irq_restore(flags);
+	return 0;
 }
 
-static void apic_pm_resume(void *data)
+static int lapic_resume(struct device *dev, u32 level)
 {
 	unsigned int l, h;
 	unsigned long flags;
+
+	if (level != RESUME_POWER_ON)
+		return 0;
+	if (!apic_pm_state.active)
+		return 0;
+
+	/* XXX: Pavel needs this for S3 resume, but can't explain why */
+	set_fixmap_nocache(FIX_APIC_BASE, APIC_DEFAULT_PHYS_BASE);
 
 	local_irq_save(flags);
 	rdmsr(MSR_IA32_APICBASE, l, h);
@@ -536,73 +547,45 @@ static void apic_pm_resume(void *data)
 	apic_write(APIC_ESR, 0);
 	apic_read(APIC_ESR);
 	local_irq_restore(flags);
-	if (apic_pm_state.perfctr_pmdev)
-		pm_send(apic_pm_state.perfctr_pmdev, PM_RESUME, data);
-}
-
-static int apic_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
-{
-	switch (rqst) {
-	case PM_SUSPEND:
-		apic_pm_suspend(data);
-		break;
-	case PM_RESUME:
-		apic_pm_resume(data);
-		break;
-	}
 	return 0;
 }
 
-/* perfctr driver should call this instead of pm_register() */
-struct pm_dev *apic_pm_register(pm_dev_t type,
-				unsigned long id,
-				pm_callback callback)
-{
-	struct pm_dev *dev;
+static struct device_driver lapic_driver = {
+	.name		= "lapic",
+	.bus		= &system_bus_type,
+	.resume		= lapic_resume,
+	.suspend	= lapic_suspend,
+};
 
-	if (!apic_pm_state.active)
-		return pm_register(type, id, callback);
-	if (apic_pm_state.perfctr_pmdev)
-		return NULL;	/* we're busy */
-	dev = kmalloc(sizeof(struct pm_dev), GFP_KERNEL);
-	if (dev) {
-		memset(dev, 0, sizeof(*dev));
-		dev->type = type;
-		dev->id = id;
-		dev->callback = callback;
-		apic_pm_state.perfctr_pmdev = dev;
-	}
-	return dev;
-}
+/* not static, needed by child devices */
+struct sys_device device_lapic = {
+	.name		= "lapic",
+	.id		= 0,
+	.dev		= {
+		.name	= "lapic",
+		.driver	= &lapic_driver,
+	},
+};
+EXPORT_SYMBOL(device_lapic);
 
-/* perfctr driver should call this instead of pm_unregister() */
-void apic_pm_unregister(struct pm_dev *dev)
+static void __init apic_pm_activate(void)
 {
-	if (!apic_pm_state.active) {
-		pm_unregister(dev);
-	} else if (dev == apic_pm_state.perfctr_pmdev) {
-		apic_pm_state.perfctr_pmdev = NULL;
-		kfree(dev);
-	}
-}
-
-static void __init apic_pm_init1(void)
-{
-	/* can't pm_register() at this early stage in the boot process
-	   (causes an immediate reboot), so just set the flag */
 	apic_pm_state.active = 1;
 }
 
-static void __init apic_pm_init2(void)
+static int __init init_lapic_devicefs(void)
 {
-	if (apic_pm_state.active)
-		pm_register(PM_SYS_DEV, 0, apic_pm_callback);
+	if (!cpu_has_apic)
+		return 0;
+	/* XXX: remove suspend/resume procs if !apic_pm_state.active? */
+	driver_register(&lapic_driver);
+	return sys_device_register(&device_lapic);
 }
+device_initcall(init_lapic_devicefs);
 
 #else	/* CONFIG_PM */
 
-static inline void apic_pm_init1(void) { }
-static inline void apic_pm_init2(void) { }
+static inline void apic_pm_activate(void) { }
 
 #endif	/* CONFIG_PM */
 
@@ -670,7 +653,7 @@ static int __init detect_init_APIC (void)
 
 	printk("Found and enabled local APIC!\n");
 
-	apic_pm_init1();
+	apic_pm_activate();
 
 	return 0;
 
@@ -1154,8 +1137,6 @@ int __init APIC_init_uniprocessor (void)
 	connect_bsp_APIC();
 
 	phys_cpu_present_map = 1 << boot_cpu_physical_apicid;
-
-	apic_pm_init2();
 
 	setup_local_APIC();
 

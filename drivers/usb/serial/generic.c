@@ -17,6 +17,7 @@
 #include <linux/tty_flip.h>
 #include <linux/module.h>
 #include <linux/usb.h>
+#include <asm/uaccess.h>
 
 #ifdef CONFIG_USB_SERIAL_DEBUG
 	static int debug = 1;
