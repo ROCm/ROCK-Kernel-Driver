@@ -32,7 +32,6 @@
 #include <linux/string.h>
 EXPORT_SYMBOL(memchr);
 EXPORT_SYMBOL(memcmp);
-EXPORT_SYMBOL(memcpy);
 EXPORT_SYMBOL(memmove);
 EXPORT_SYMBOL(memscan);
 EXPORT_SYMBOL(memset);
@@ -65,9 +64,6 @@ EXPORT_SYMBOL(__cmpxchg_u64);
 #endif
 
 #include <asm/uaccess.h>
-EXPORT_SYMBOL(lcopy_to_user);
-EXPORT_SYMBOL(lcopy_from_user);
-EXPORT_SYMBOL(lcopy_in_user);
 EXPORT_SYMBOL(lstrncpy_from_user);
 EXPORT_SYMBOL(lclear_user);
 EXPORT_SYMBOL(lstrnlen_user);
