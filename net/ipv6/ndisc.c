@@ -1418,7 +1418,7 @@ static int ndisc_netdev_event(struct notifier_block *this, unsigned long event, 
 	return NOTIFY_DONE;
 }
 
-struct notifier_block ndisc_netdev_notifier = {
+static struct notifier_block ndisc_netdev_notifier = {
 	.notifier_call = ndisc_netdev_event,
 };
 
