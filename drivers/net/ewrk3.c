@@ -1848,6 +1848,10 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	if (cmd == SIOCETHTOOL)
 		return ewrk3_ethtool_ioctl(dev, (void *)rq->ifr_data);
 
+	/* Other than ethtool, all we handle are private IOCTLs */
+	if (cmd != EWRK3IOCTL)
+		return -EOPNOTSUPP;
+
 	tmp = kmalloc(sizeof(union ewrk3_addr), GFP_KERNEL);
 	if(tmp==NULL)
 		return -ENOMEM;
@@ -1864,21 +1868,26 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		
 	case EWRK3_SET_HWADDR:	/* Set the hardware address */
 		if (capable(CAP_NET_ADMIN)) {
+			spin_lock_irqsave(&lp->hw_lock, flags);
 			csr = inb(EWRK3_CSR);
 			csr |= (CSR_TXD | CSR_RXD);
 			outb(csr, EWRK3_CSR);	/* Disable the TX and RX */
+			spin_unlock_irqrestore(&lp->hw_lock, flags);
 
 			if (copy_from_user(tmp->addr, ioc->data, ETH_ALEN)) {
 				status = -EFAULT;
 				break;
 			}
+			spin_lock_irqsave(&lp->hw_lock, flags);
 			for (i = 0; i < ETH_ALEN; i++) {
 				dev->dev_addr[i] = tmp->addr[i];
 				outb(tmp->addr[i], EWRK3_PAR0 + i);
 			}
 
+			csr = inb(EWRK3_CSR);
 			csr &= ~(CSR_TXD | CSR_RXD);	/* Enable the TX and RX */
 			outb(csr, EWRK3_CSR);
+			spin_unlock_irqrestore(&lp->hw_lock, flags);
 		} else {
 			status = -EPERM;
 		}
@@ -1886,10 +1895,12 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		break;
 	case EWRK3_SET_PROM:	/* Set Promiscuous Mode */
 		if (capable(CAP_NET_ADMIN)) {
+			spin_lock_irqsave(&lp->hw_lock, flags);
 			csr = inb(EWRK3_CSR);
 			csr |= CSR_PME;
 			csr &= ~CSR_MCE;
 			outb(csr, EWRK3_CSR);
+			spin_unlock_irqrestore(&lp->hw_lock, flags);
 		} else {
 			status = -EPERM;
 		}
@@ -1897,16 +1908,18 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		break;
 	case EWRK3_CLR_PROM:	/* Clear Promiscuous Mode */
 		if (capable(CAP_NET_ADMIN)) {
+			spin_lock_irqsave(&lp->hw_lock, flags);
 			csr = inb(EWRK3_CSR);
 			csr &= ~CSR_PME;
 			outb(csr, EWRK3_CSR);
+			spin_unlock_irqrestore(&lp->hw_lock, flags);
 		} else {
 			status = -EPERM;
 		}
 
 		break;
 	case EWRK3_GET_MCA:	/* Get the multicast address table */
-		spin_lock_irq(&lp->hw_lock);
+		spin_lock_irqsave(&lp->hw_lock, flags);
 		if (lp->shmem_length == IO_ONLY) {
 			outb(0, EWRK3_IOPR);
 			outw(PAGE0_HTE, EWRK3_PIR1);
@@ -1917,7 +1930,7 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			outb(0, EWRK3_MPR);
 			isa_memcpy_fromio(tmp->addr, lp->shmem_base + PAGE0_HTE, (HASH_TABLE_LEN >> 3));
 		}
-		spin_unlock_irq(&lp->hw_lock);
+		spin_unlock_irqrestore(&lp->hw_lock, flags);
 
 		ioc->len = (HASH_TABLE_LEN >> 3);
 		if (copy_to_user(ioc->data, tmp->addr, ioc->len))
@@ -1951,10 +1964,12 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		break;
 	case EWRK3_MCA_EN:	/* Enable multicast addressing */
 		if (capable(CAP_NET_ADMIN)) {
+			spin_lock_irqsave(&lp->hw_lock, flags);
 			csr = inb(EWRK3_CSR);
 			csr |= CSR_MCE;
 			csr &= ~CSR_PME;
 			outb(csr, EWRK3_CSR);
+			spin_unlock_irqrestore(&lp->hw_lock, flags);
 		} else {
 			status = -EPERM;
 		}
