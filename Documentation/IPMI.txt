@@ -496,3 +496,8 @@ start a 120 timer if it is running to make sure the reboot occurs.
 Note that if you use the NMI preaction for the watchdog, you MUST
 NOT use nmi watchdog mode 1.  If you use the NMI watchdog, you
 must use mode 2.
+
+Once you open the watchdog timer, you must write a 'V' character to the
+device to close it, or the timer will not stop.  This is a new semantic
+for the driver, but makes it consistent with the rest of the watchdog
+drivers in Linux.
