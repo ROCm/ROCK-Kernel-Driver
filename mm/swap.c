@@ -69,7 +69,8 @@ void lru_add_drain(void)
 }
 
 /*
- * This path almost never happens - pages are normally freed via pagevecs.
+ * This path almost never happens for VM activity - pages are normally
+ * freed via pagevecs.  But it gets used by networking.
  */
 void __page_cache_release(struct page *page)
 {
@@ -83,7 +84,7 @@ void __page_cache_release(struct page *page)
 		page = NULL;
 	spin_unlock_irqrestore(&zone->lru_lock, flags);
 	if (page)
-		__free_pages_ok(page, 0);
+		free_hot_page(page);
 }
 
 /*

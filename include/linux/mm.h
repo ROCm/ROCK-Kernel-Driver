@@ -211,7 +211,6 @@ struct page {
 #define set_page_count(p,v) 	atomic_set(&(p)->count, v)
 
 extern void FASTCALL(__page_cache_release(struct page *));
-void FASTCALL(__free_pages_ok(struct page *page, unsigned int order));
 
 static inline void put_page(struct page *page)
 {
