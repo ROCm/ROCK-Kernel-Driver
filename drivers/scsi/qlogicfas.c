@@ -667,7 +667,7 @@ struct Scsi_Host *__qlogicfas_detect(Scsi_Host_Template *host)
 	sprintf(qinfo,
 		"Qlogicfas Driver version 0.46, chip %02X at %03X, IRQ %d, TPdma:%d",
 		qltyp, qbase, qlirq, QL_TURBO_PDMA);
-	host->name = qinfo;
+	host->name = qlogicfas_name;
 
 	return hreg;
 
