@@ -996,11 +996,11 @@ static void __devexit saa9730_remove_one(struct pci_dev *pdev)
         struct net_device *dev = pci_get_drvdata(pdev);
 
         if (dev) {
-		
+                unregister_netdev(dev);
+
 		if (dev->priv)
 			kfree(dev->priv);
 
-                unregister_netdev(dev);
                 free_netdev(dev);
                 pci_release_regions(pdev);
                 pci_disable_device(pdev);
@@ -1015,17 +1015,10 @@ static int lan_saa9730_init(struct net_device *dev, int ioaddr, int irq)
 	unsigned char ethernet_addr[6];
 	int ret = 0;
 
-	dev = init_etherdev(dev, 0);
-
-	if (!dev) 
-		return -ENOMEM;
-	
 	dev->open = lan_saa9730_open_fail;
 
-	if (get_ethernet_addr(ethernet_addr)) {
-		ret = -ENODEV;
-		goto out;
-	}
+	if (get_ethernet_addr(ethernet_addr))
+		return -ENODEV;
 	
 	memcpy(dev->dev_addr, ethernet_addr, 6);
 	dev->base_addr = ioaddr;
@@ -1040,10 +1033,8 @@ static int lan_saa9730_init(struct net_device *dev, int ioaddr, int irq)
 						      GFP_DMA | GFP_KERNEL)
 					      + 7) & ~7);
 
-	if (!lp) {
-		ret = -ENOMEM;
-                goto out;
-        }
+	if (!lp)
+		return -ENOMEM;
 
 	dev->priv = lp;
 	memset(lp, 0, sizeof(*lp));
@@ -1057,6 +1048,7 @@ static int lan_saa9730_init(struct net_device *dev, int ioaddr, int irq)
 							 SAA9730_EVM_REGS_ADDR);
 
 	/* Allocate LAN RX/TX frame buffer space. */
+	/* FIXME: a leak */
 	if ((ret = lan_saa9730_allocate_buffers(lp)))
 		goto out;
 
@@ -1095,63 +1087,70 @@ static int lan_saa9730_init(struct net_device *dev, int ioaddr, int irq)
 	dev->watchdog_timeo = (HZ >> 1);
 	dev->dma = 0;
 	
+	ret = register_netdev(dev);
+	if (ret)
+		goto out;
 	return 0;
 
  out:
-	if (dev) {
-		if (dev->priv)
-			kfree(dev->priv);
-		unregister_netdevice(dev);
-		free_netdev(dev);
-	}
-		
+	if (dev->priv)
+		kfree(dev->priv);
+	free_netdev(dev);
 	return ret;
 }
 
 
 static int __devinit saa9730_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
-	struct net_device *dev = NULL;
+	struct net_device *dev;
 	unsigned int pci_ioaddr;
 	int err;
 
 	if (lan_saa9730_debug > 1)
 		printk("saa9730.c: PCI bios is present, checking for devices...\n");
 
+	err = -ENOMEM;
+	dev = alloc_etherdev(0);
+	if (!dev)
+		goto out;
+
+	SET_MODULE_OWNER(dev);
+
 	err = pci_enable_device(pdev);
         if (err) {
                 printk(KERN_ERR "Cannot enable PCI device, aborting.\n");
-                goto out;
+                goto out1;
         }
 
 	err = pci_request_regions(pdev, DRV_MODULE_NAME);
 	if (err) {
 		printk(KERN_ERR "Cannot obtain PCI resources, aborting.\n");
-		goto out_disable_pdev;
+		goto out2;
 	}
 
 	pci_irq_line = pdev->irq;
 	/* LAN base address in located at BAR 1. */
-	
+
 	pci_ioaddr = pci_resource_start(pdev, 1);
 	pci_set_master(pdev);
-	
+
 	printk("Found SAA9730 (PCI) at %#x, irq %d.\n",
 	       pci_ioaddr, pci_irq_line);
 
 	err = lan_saa9730_init(dev, pci_ioaddr, pci_irq_line);
 	if (err) {
 		printk("Lan init failed");
-		goto out_disable_pdev;
+		goto out2;
 	}
-	
+
 	pci_set_drvdata(pdev, dev);
 	return 0;
 	
- out_disable_pdev:
+out2:
 	pci_disable_device(pdev);
- out:
-	pci_set_drvdata(pdev, NULL);
+out1:
+	free_netdev(dev);
+out:
 	return err;
 }
 
