@@ -96,10 +96,11 @@ acpi_table_print (
 	else
 		name = header->signature;
 
-	printk(KERN_INFO PREFIX "%.4s (v%3.3d %6.6s %8.8s %5.5d.%5.5d) @ 0x%p\n",
+	printk(KERN_INFO PREFIX "%.4s (v%3.3d %6.6s %8.8s 0x%08x %.4s 0x%08x) @ 0x%p\n",
 		name, header->revision, header->oem_id,
-		header->oem_table_id, header->oem_revision >> 16,
-		header->oem_revision & 0xffff, (void *) phys_addr);
+		header->oem_table_id, header->oem_revision,
+		header->asl_compiler_id, header->asl_compiler_revision,
+		(void *) phys_addr);
 }
 
 
@@ -219,12 +220,16 @@ acpi_table_compute_checksum (
 	return (sum & 0xFF);
 }
 
+/*
+ * acpi_get_table_header_early()
+ * for acpi_blacklisted(), acpi_table_get_sdt()
+ */
 int __init
 acpi_get_table_header_early (
 	enum acpi_table_id	id,
 	struct acpi_table_header **header)
 {
-	int i;
+	unsigned int i;
 	enum acpi_table_id temp_id;
 
 	/* DSDT is different from the rest */
@@ -281,7 +286,7 @@ acpi_table_parse_madt_family (
 	acpi_table_entry_header	*entry = NULL;
 	unsigned long		count = 0;
 	unsigned long		madt_end = 0;
-	int			i = 0;
+	unsigned int			i = 0;
 
 	if (!handler)
 		return -EINVAL;
@@ -343,7 +348,7 @@ acpi_table_parse (
 	acpi_table_handler	handler)
 {
 	int			count = 0;
-	int			i = 0;
+	unsigned int		i = 0;
 
 	if (!handler)
 		return -EINVAL;
@@ -364,7 +369,7 @@ acpi_table_get_sdt (
 	struct acpi_table_rsdp	*rsdp)
 {
 	struct acpi_table_header *header = NULL;
-	int			i, id = 0;
+	unsigned int		i, id = 0;
 
 	if (!rsdp)
 		return -EINVAL;
@@ -550,7 +555,7 @@ acpi_table_init (void)
 		return -ENODEV;
 	}
 
-	printk(KERN_INFO PREFIX "RSDP (v%3.3d %6.6s                     ) @ 0x%p\n",
+	printk(KERN_INFO PREFIX "RSDP (v%3.3d %6.6s                                    ) @ 0x%p\n",
 		rsdp->revision, rsdp->oem_id, (void *) rsdp_phys);
 
 	if (rsdp->revision < 2)

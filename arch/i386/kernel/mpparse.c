@@ -620,7 +620,7 @@ void __init get_smp_config (void)
 
 	/*
 	 * ACPI may be used to obtain the entire SMP configuration or just to 
-	 * enumerate/configure processors (CONFIG_ACPI_HT_ONLY).  Note that 
+	 * enumerate/configure processors (CONFIG_ACPI_HT).  Note that 
 	 * ACPI supports both logical (e.g. Hyper-Threading) and physical 
 	 * processors, where MPS only supports physical.
 	 */
@@ -1011,8 +1011,9 @@ void __init mp_config_acpi_legacy_irqs (void)
 			panic("Max # of irq sources exceeded!\n");
 	}
 }
+#endif	/* CONFIG_X86_IO_APIC */
 
-#ifndef CONFIG_ACPI_HT_ONLY
+#ifdef	CONFIG_ACPI
 
 /* Ensure the ACPI SCI interrupt level is active low, edge-triggered */
 
@@ -1067,8 +1068,7 @@ void __init mp_config_ioapic_for_sci(int irq)
 
 	io_apic_set_pci_routing(ioapic, ioapic_pin, irq, 1, 1); // Active low, level triggered
 }
-
-#endif /*CONFIG_ACPI_HT_ONLY*/
+#endif	/* CONFIG_ACPI */
 
 #ifdef CONFIG_ACPI_PCI
 
@@ -1148,7 +1148,5 @@ void __init mp_parse_prt (void)
 }
 
 #endif /*CONFIG_ACPI_PCI*/
-
-#endif /*CONFIG_X86_IO_APIC*/
 
 #endif /*CONFIG_ACPI_BOOT*/

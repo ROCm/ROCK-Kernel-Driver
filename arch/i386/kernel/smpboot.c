@@ -954,7 +954,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 * If we couldn't find an SMP configuration at boot time,
 	 * get out of here now!
 	 */
-	if (!smp_found_config) {
+	if (!smp_found_config && !acpi_lapic) {
 		printk(KERN_NOTICE "SMP motherboard not detected.\n");
 		smpboot_clear_io_apic_irqs();
 		phys_cpu_present_map = 1;

@@ -85,13 +85,10 @@ running once the system is up.
 			See also Documentation/scsi/ncr53c7xx.txt.
 
 	acpi=		[HW,ACPI] Advanced Configuration and Power Interface 
-			Format: off
-			off -- disables both ACPI table parsing and interpreter init
-			See also Documentation/pm.txt.
-
-	acpismp=	[IA-32] Early setup parse and use ACPI SMP table.
-			Format: force
-			force -- force use of ACPI table parsing and interpreter init
+			Format: { force | off | ht }
+			force -- enables ACPI for systems with default off
+			off -- disabled ACPI for systems with default on
+			ht -- run only enough ACPI to enable Hyper Threading
 			See also Documentation/pm.txt.
  
 	ad1816=		[HW,OSS]
@@ -618,8 +615,6 @@ running once the system is up.
 	no-hlt		[BUGS=IA-32] Tells the kernel that the hlt
 			instruction doesn't work correctly and not to
 			use it.
-
-	noht		[SMP,IA-32] Disables P4 Xeon(tm) HyperThreading.
 
 	noirqdebug	[IA-32] Disables the code which attempts to detect and
 			disable unhandled interrupt sources.
