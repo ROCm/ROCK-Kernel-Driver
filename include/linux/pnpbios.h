@@ -143,20 +143,21 @@ static __inline struct pnpbios_driver *pnpbios_dev_driver(const struct pci_dev *
 extern int  pnpbios_dont_use_current_config;
 extern void *pnpbios_kmalloc(size_t size, int f);
 extern int pnpbios_init (void);
-extern void pnpbios_proc_init (void);
+extern int pnpbios_proc_init (void);
+extern void pnpbios_proc_exit (void);
 
 extern int pnp_bios_dev_node_info (struct pnp_dev_node_info *data);
 extern int pnp_bios_get_dev_node (u8 *nodenum, char config, struct pnp_bios_node *data);
 extern int pnp_bios_set_dev_node (u8 nodenum, char config, struct pnp_bios_node *data);
+extern int pnp_bios_get_stat_res (char *info);
+extern int pnp_bios_isapnp_config (struct pnp_isa_config_struc *data);
+extern int pnp_bios_escd_info (struct escd_info_struc *data);
+extern int pnp_bios_read_escd (char *data, u32 nvram_base);
 #if needed
 extern int pnp_bios_get_event (u16 *message);
 extern int pnp_bios_send_message (u16 message);
 extern int pnp_bios_set_stat_res (char *info);
-extern int pnp_bios_get_stat_res (char *info);
 extern int pnp_bios_apm_id_table (char *table, u16 *size);
-extern int pnp_bios_isapnp_config (struct pnp_isa_config_struc *data);
-extern int pnp_bios_escd_info (struct escd_info_struc *data);
-extern int pnp_bios_read_escd (char *data, u32 nvram_base);
 extern int pnp_bios_write_escd (char *data, u32 nvram_base);
 #endif
 
