@@ -618,8 +618,6 @@ do_kern_mount(const char *fstype, int flags, char *name, void *data)
 	sb = type->get_sb(type, flags, name, data);
 	if (IS_ERR(sb))
 		goto out_mnt;
-	if (type->fs_flags & FS_NOMOUNT)
-		sb->s_flags |= MS_NOUSER;
 	mnt->mnt_sb = sb;
 	mnt->mnt_root = dget(sb->s_root);
 	mnt->mnt_mountpoint = sb->s_root;

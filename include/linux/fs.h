@@ -89,11 +89,6 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 
 /* public flags for file_system_type */
 #define FS_REQUIRES_DEV 1 
-#define FS_NO_DCACHE	2 /* Only dcache the necessary things. */
-#define FS_NO_PRELIM	4 /* prevent preloading of dentries, even if
-			   * FS_NO_DCACHE is not set.
-			   */
-#define FS_NOMOUNT	16 /* Never mount from userland */
 #define FS_ODD_RENAME	32768	/* Temporary stuff; will go away as soon
 				  * as nfs_rename() will be cleaned up
 				  */
@@ -969,6 +964,8 @@ struct super_block *sget(struct file_system_type *type,
 			int (*test)(struct super_block *,void *),
 			int (*set)(struct super_block *,void *),
 			void *data);
+struct super_block *get_sb_pseudo(struct file_system_type *, char *,
+			struct super_operations *ops, unsigned long);
 
 /* Alas, no aliases. Too much hassle with bringing module.h everywhere */
 #define fops_get(fops) \
