@@ -98,7 +98,8 @@ put_log_buffer(hysdn_card * card, char *cp)
 {
 	struct log_data *ib;
 	struct procdata *pd = card->proclog;
-	int i, flags;
+	int i;
+	unsigned long flags;
 
 	if (!pd)
 		return;
@@ -300,7 +301,8 @@ hysdn_log_close(struct inode *ino, struct file *filep)
 	struct log_data *inf;
 	struct procdata *pd;
 	hysdn_card *card;
-	int flags, retval = 0;
+	int retval = 0;
+	unsigned long flags;
 
 
 	lock_kernel();
