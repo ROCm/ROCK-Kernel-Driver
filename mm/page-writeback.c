@@ -166,6 +166,7 @@ int pdflush_flush(unsigned long nr_pages)
  * to perform their I/O against a large file.
  */
 static int wb_writeback_jifs = 5 * HZ;
+static struct timer_list wb_timer;
 
 /*
  * Periodic writeback of "old" data.
@@ -206,16 +207,11 @@ static void wb_kupdate(unsigned long arg)
 		yield();
 	}
 	run_task_queue(&tq_disk);
+	mod_timer(&wb_timer, jiffies + wb_writeback_jifs);
 }
-
-/*
- * The writeback timer, for kupdate-style functionality
- */
-static struct timer_list wb_timer;
 
 static void wb_timer_fn(unsigned long unused)
 {
-	mod_timer(&wb_timer, jiffies + wb_writeback_jifs);
 	pdflush_operation(wb_kupdate, 0);
 }
 

@@ -12,6 +12,7 @@
 #include <linux/quotaops.h>
 #include <linux/slab.h>
 #include <linux/writeback.h>
+#include <linux/backing-dev.h>
 
 /*
  * New inode.c implementation.
@@ -83,6 +84,8 @@ static struct inode *alloc_inode(struct super_block *sb)
 		inode = (struct inode *) kmem_cache_alloc(inode_cachep, SLAB_KERNEL);
 
 	if (inode) {
+		struct address_space * const mapping = &inode->i_data;
+
 		inode->i_sb = sb;
 		inode->i_dev = sb->s_dev;
 		inode->i_blkbits = sb->s_blocksize_bits;
@@ -100,16 +103,17 @@ static struct inode *alloc_inode(struct super_block *sb)
 		inode->i_pipe = NULL;
 		inode->i_bdev = NULL;
 		inode->i_cdev = NULL;
-		inode->i_data.a_ops = &empty_aops;
-		inode->i_data.host = inode;
-		inode->i_data.gfp_mask = GFP_HIGHUSER;
-		inode->i_data.dirtied_when = 0;
-		inode->i_mapping = &inode->i_data;
-		inode->i_data.ra_pages = &default_ra_pages;
-		inode->i_data.assoc_mapping = NULL;
+
+		mapping->a_ops = &empty_aops;
+ 		mapping->host = inode;
+		mapping->gfp_mask = GFP_HIGHUSER;
+		mapping->dirtied_when = 0;
+		mapping->assoc_mapping = NULL;
+		mapping->backing_dev_info = &default_backing_dev_info;
 		if (sb->s_bdev)
-			inode->i_data.ra_pages = sb->s_bdev->bd_inode->i_mapping->ra_pages;
+			inode->i_data.backing_dev_info = sb->s_bdev->bd_inode->i_mapping->backing_dev_info;
 		memset(&inode->u, 0, sizeof(inode->u));
+		inode->i_mapping = mapping;
 	}
 	return inode;
 }

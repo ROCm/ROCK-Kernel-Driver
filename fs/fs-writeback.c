@@ -19,6 +19,7 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/writeback.h>
+#include <linux/backing-dev.h>
 
 /**
  *	__mark_inode_dirty -	internal function
@@ -507,4 +508,41 @@ int generic_osync_inode(struct inode *inode, int what)
 		wait_on_inode(inode);
 
 	return err;
+}
+
+/**
+ * writeback_acquire: attempt to get exclusive writeback access to a device
+ * @bdi: the device's backing_dev_info structure
+ *
+ * It is a waste of resources to have more than one pdflush thread blocked on
+ * a single request queue.  Exclusion at the request_queue level is obtained
+ * via a flag in the request_queue's backing_dev_info.state.
+ *
+ * Non-request_queue-backed address_spaces will share default_backing_dev_info,
+ * unless they implement their own.  Which is somewhat inefficient, as this
+ * may prevent concurrent writeback against multiple devices.
+ */
+int writeback_acquire(struct backing_dev_info *bdi)
+{
+	return !test_and_set_bit(BDI_pdflush, &bdi->state);
+}
+
+/**
+ * writeback_in_progress: determine whether there is writeback in progress
+ *                        against a backing device.
+ * @bdi: the device's backing_dev_info structure.
+ */
+int writeback_in_progress(struct backing_dev_info *bdi)
+{
+	return test_bit(BDI_pdflush, &bdi->state);
+}
+
+/**
+ * writeback_release: relinquish exclusive writeback access against a device.
+ * @bdi: the device's backing_dev_info structure
+ */
+void writeback_release(struct backing_dev_info *bdi)
+{
+	BUG_ON(!writeback_in_progress(bdi));
+	clear_bit(BDI_pdflush, &bdi->state);
 }

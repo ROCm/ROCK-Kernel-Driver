@@ -11,8 +11,12 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/blkdev.h>
+#include <linux/backing-dev.h>
 
-unsigned long default_ra_pages = (VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE;
+struct backing_dev_info default_backing_dev_info = {
+	ra_pages:	(VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE,
+	state:		0,
+};
 
 /*
  * Return max readahead size for this inode in number-of-pages.

@@ -103,6 +103,7 @@ static int __pdflush(struct pdflush_work *my_work)
 	preempt_disable();
 	spin_lock_irq(&pdflush_lock);
 	nr_pdflush_threads++;
+//	printk("pdflush %d [%d] starts\n", nr_pdflush_threads, current->pid);
 	for ( ; ; ) {
 		struct pdflush_work *pdf;
 
@@ -124,7 +125,7 @@ static int __pdflush(struct pdflush_work *my_work)
 		if (jiffies - last_empty_jifs > 1 * HZ) {
 			/* unlocked list_empty() test is OK here */
 			if (list_empty(&pdflush_list)) {
-				/* unlocked nr_pdflush_threads test is OK here */
+				/* unlocked test is OK here */
 				if (nr_pdflush_threads < MAX_PDFLUSH_THREADS)
 					start_one_pdflush_thread();
 			}
@@ -147,6 +148,7 @@ static int __pdflush(struct pdflush_work *my_work)
 		}
 	}
 	nr_pdflush_threads--;
+//	printk("pdflush %d [%d] ends\n", nr_pdflush_threads, current->pid);
 	spin_unlock_irq(&pdflush_lock);
 	preempt_enable();
 	return 0;

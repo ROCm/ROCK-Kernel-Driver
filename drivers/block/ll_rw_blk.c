@@ -27,6 +27,7 @@
 #include <linux/completion.h>
 #include <linux/compiler.h>
 #include <scsi/scsi.h>
+#include <linux/backing-dev.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -100,21 +101,21 @@ inline request_queue_t *blk_get_queue(kdev_t dev)
 }
 
 /**
- * blk_get_ra_pages - get the address of a queue's readahead tunable
+ * blk_get_backing_dev_info - get the address of a queue's backing_dev_info
  * @dev:	device
  *
  * Locates the passed device's request queue and returns the address of its
- * readahead setting.
+ * backing_dev_info
  *
  * Will return NULL if the request queue cannot be located.
  */
-unsigned long *blk_get_ra_pages(struct block_device *bdev)
+struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bdev)
 {
-	unsigned long *ret = NULL;
+	struct backing_dev_info *ret = NULL;
 	request_queue_t *q = blk_get_queue(to_kdev_t(bdev->bd_dev));
 
 	if (q)
-		ret = &q->ra_pages;
+		ret = &q->backing_dev_info;
 	return ret;
 }
 
@@ -153,7 +154,8 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	q->max_phys_segments = MAX_PHYS_SEGMENTS;
 	q->max_hw_segments = MAX_HW_SEGMENTS;
 	q->make_request_fn = mfn;
-	q->ra_pages = (VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE;
+	q->backing_dev_info.ra_pages = (VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE;
+	q->backing_dev_info.state = 0;
 	blk_queue_max_sectors(q, MAX_SECTORS);
 	blk_queue_hardsect_size(q, 512);
 

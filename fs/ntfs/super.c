@@ -26,6 +26,7 @@
 #include <linux/locks.h>
 #include <linux/spinlock.h>
 #include <linux/blkdev.h>	/* For bdev_hardsect_size(). */
+#include <linux/backing-dev.h>
 
 #include "ntfs.h"
 #include "sysctl.h"
@@ -1519,8 +1520,8 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	vol->mftbmp_mapping.assoc_mapping = NULL;
 	vol->mftbmp_mapping.dirtied_when = 0;
 	vol->mftbmp_mapping.gfp_mask = GFP_HIGHUSER;
-	vol->mftbmp_mapping.ra_pages =
-			sb->s_bdev->bd_inode->i_mapping->ra_pages;
+	vol->mftbmp_mapping.backing_dev_info =
+			sb->s_bdev->bd_inode->i_mapping->backing_dev_info;
 
 	/*
 	 * Default is group and other don't have any access to files or
