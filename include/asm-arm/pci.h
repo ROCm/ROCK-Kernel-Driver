@@ -20,6 +20,8 @@
 #endif
 
 
+#define pcibios_scan_all_fns(a, b)	0
+
 static inline void pcibios_set_master(struct pci_dev *dev)
 {
 	/* No special bus mastering setup handling */

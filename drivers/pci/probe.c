@@ -620,6 +620,9 @@ pci_scan_single_device(struct pci_bus *bus, int devfn)
 int __devinit pci_scan_slot(struct pci_bus *bus, int devfn)
 {
 	int func, nr = 0;
+	int scan_all_fns;
+
+	scan_all_fns = pcibios_scan_all_fns(bus, devfn);
 
 	for (func = 0; func < 8; func++, devfn++) {
 		struct pci_dev *dev;
@@ -640,7 +643,7 @@ int __devinit pci_scan_slot(struct pci_bus *bus, int devfn)
 				}
 			}
 		} else {
-			if (func == 0)
+			if (func == 0 && !scan_all_fns)
 				break;
 		}
 	}

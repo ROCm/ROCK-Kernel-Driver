@@ -22,4 +22,6 @@ pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
 	region->end = res->end;
 }
 
+#define pcibios_scan_all_fns(a, b)	0
+
 #endif
