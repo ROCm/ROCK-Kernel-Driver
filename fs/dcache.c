@@ -168,7 +168,7 @@ repeat:
  	if (d_unhashed(dentry))
 		goto kill_it;
   	if (list_empty(&dentry->d_lru)) {
-  		dentry->d_vfs_flags |= DCACHE_REFERENCED;
+  		dentry->d_flags |= DCACHE_REFERENCED;
   		list_add(&dentry->d_lru, &dentry_unused);
   		dentry_stat.nr_unused++;
   	}
@@ -401,8 +401,8 @@ static void prune_dcache(int count)
 			continue;
 		}
 		/* If the dentry was recently referenced, don't free it. */
-		if (dentry->d_vfs_flags & DCACHE_REFERENCED) {
-			dentry->d_vfs_flags &= ~DCACHE_REFERENCED;
+		if (dentry->d_flags & DCACHE_REFERENCED) {
+			dentry->d_flags &= ~DCACHE_REFERENCED;
  			list_add(&dentry->d_lru, &dentry_unused);
  			dentry_stat.nr_unused++;
  			spin_unlock(&dentry->d_lock);
@@ -707,9 +707,8 @@ struct dentry *d_alloc(struct dentry * parent, const struct qstr *name)
 	dname[name->len] = 0;
 
 	atomic_set(&dentry->d_count, 1);
-	dentry->d_vfs_flags = DCACHE_UNHASHED;
+	dentry->d_flags = DCACHE_UNHASHED;
 	dentry->d_lock = SPIN_LOCK_UNLOCKED;
-	dentry->d_flags = 0;
 	dentry->d_inode = NULL;
 	dentry->d_parent = NULL;
 	dentry->d_sb = NULL;
@@ -854,7 +853,7 @@ struct dentry * d_alloc_anon(struct inode *inode)
 			res->d_inode = inode;
 			res->d_bucket = d_hash(res, res->d_name.hash);
 			res->d_flags |= DCACHE_DISCONNECTED;
-			res->d_vfs_flags &= ~DCACHE_UNHASHED;
+			res->d_flags &= ~DCACHE_UNHASHED;
 			list_add(&res->d_alias, &inode->i_dentry);
 			hlist_add_head(&res->d_hash, &inode->i_sb->s_anon);
 			spin_unlock(&res->d_lock);
@@ -1117,9 +1116,10 @@ void d_delete(struct dentry * dentry)
 void d_rehash(struct dentry * entry)
 {
 	struct hlist_head *list = d_hash(entry->d_parent, entry->d_name.hash);
+
 	spin_lock(&dcache_lock);
 	spin_lock(&entry->d_lock);
- 	entry->d_vfs_flags &= ~DCACHE_UNHASHED;
+ 	entry->d_flags &= ~DCACHE_UNHASHED;
 	spin_unlock(&entry->d_lock);
 	entry->d_bucket = list;
  	hlist_add_head_rcu(&entry->d_hash, list);
@@ -1217,14 +1217,14 @@ void d_move(struct dentry * dentry, struct dentry * target)
 	}
 
 	/* Move the dentry to the target hash queue, if on different bucket */
-	if (dentry->d_vfs_flags & DCACHE_UNHASHED)
+	if (dentry->d_flags & DCACHE_UNHASHED)
 		goto already_unhashed;
 	if (dentry->d_bucket != target->d_bucket) {
 		hlist_del_rcu(&dentry->d_hash);
 already_unhashed:
 		dentry->d_bucket = target->d_bucket;
 		hlist_add_head_rcu(&dentry->d_hash, target->d_bucket);
-		dentry->d_vfs_flags &= ~DCACHE_UNHASHED;
+		dentry->d_flags &= ~DCACHE_UNHASHED;
 	}
 
 	/* Unhash the target: dput() will then get rid of it */

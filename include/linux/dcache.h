@@ -74,28 +74,28 @@ full_name_hash(const unsigned char *name, unsigned int len)
 }
 
 struct dcookie_struct;
- 
+
 struct dentry {
 	atomic_t d_count;
+	unsigned int d_flags;		/* protected by d_lock */
 	spinlock_t d_lock;		/* per dentry lock */
-	unsigned long d_vfs_flags;	/* moved here to be on same cacheline */
-	struct inode  * d_inode;	/* Where the name belongs to - NULL is negative */
+	struct inode *d_inode;		/* Where the name belongs to - NULL is
+					 * negative */
 	struct list_head d_lru;		/* LRU list */
 	struct list_head d_child;	/* child of parent list */
 	struct list_head d_subdirs;	/* our children */
 	struct list_head d_alias;	/* inode alias list */
 	unsigned long d_time;		/* used by d_revalidate */
-	struct dentry_operations  *d_op;
-	struct super_block * d_sb;	/* The root of the dentry tree */
-	unsigned int d_flags;
+	struct dentry_operations *d_op;
+	struct super_block *d_sb;	/* The root of the dentry tree */
 	int d_mounted;
-	void * d_fsdata;		/* fs-specific data */
+	void *d_fsdata;			/* fs-specific data */
  	struct rcu_head d_rcu;
-	struct dcookie_struct * d_cookie; /* cookie, if any */
-	struct dentry * d_parent;	/* parent directory */
+	struct dcookie_struct *d_cookie; /* cookie, if any */
+	struct dentry *d_parent;	/* parent directory */
 	struct qstr d_name;
 	struct hlist_node d_hash;	/* lookup hash list */	
-	struct hlist_head * d_bucket;	/* lookup hash bucket */
+	struct hlist_head *d_bucket;	/* lookup hash bucket */
 	unsigned char d_iname[0];	/* small names */
 };
 
@@ -168,8 +168,8 @@ extern spinlock_t dcache_lock;
 
 static inline void __d_drop(struct dentry *dentry)
 {
-	if (!(dentry->d_vfs_flags & DCACHE_UNHASHED)) {
-		dentry->d_vfs_flags |= DCACHE_UNHASHED;
+	if (!(dentry->d_flags & DCACHE_UNHASHED)) {
+		dentry->d_flags |= DCACHE_UNHASHED;
 		hlist_del_rcu(&dentry->d_hash);
 	}
 }
@@ -280,7 +280,7 @@ extern struct dentry * dget_locked(struct dentry *);
  
 static inline int d_unhashed(struct dentry *dentry)
 {
-	return (dentry->d_vfs_flags & DCACHE_UNHASHED);
+	return (dentry->d_flags & DCACHE_UNHASHED);
 }
 
 static inline struct dentry *dget_parent(struct dentry *dentry)
