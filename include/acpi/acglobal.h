@@ -106,6 +106,9 @@ ACPI_EXTERN struct acpi_common_facs             acpi_gbl_common_fACS;
 ACPI_EXTERN u8                                  acpi_gbl_integer_bit_width;
 ACPI_EXTERN u8                                  acpi_gbl_integer_byte_width;
 ACPI_EXTERN u8                                  acpi_gbl_integer_nybble_width;
+
+/* Keep local copies of these FADT-based registers */
+
 ACPI_EXTERN struct acpi_generic_address         acpi_gbl_xpm1a_enable;
 ACPI_EXTERN struct acpi_generic_address         acpi_gbl_xpm1b_enable;
 

@@ -140,7 +140,7 @@ acpi_ut_delete_internal_obj (
 
 		/* Walk the handler list for this device */
 
-		handler_desc = object->device.address_space;
+		handler_desc = object->device.handler;
 		while (handler_desc) {
 			next_desc = handler_desc->address_space.next;
 			acpi_ut_remove_reference (handler_desc);
@@ -193,7 +193,7 @@ acpi_ut_delete_internal_obj (
 			 * default handlers -- and therefore, we created the context object
 			 * locally, it was not created by an external caller.
 			 */
-			handler_desc = object->region.address_space;
+			handler_desc = object->region.handler;
 			if (handler_desc) {
 				if (handler_desc->address_space.hflags & ACPI_ADDR_HANDLER_DEFAULT_INSTALLED) {
 					obj_pointer = second_desc->extra.region_context;

@@ -182,6 +182,17 @@ acpi_ev_detach_region (
 	union acpi_operand_object      *region_obj,
 	u8                              acpi_ns_is_locked);
 
+acpi_status
+acpi_ev_execute_reg_method (
+	union acpi_operand_object      *region_obj,
+	u32                             function);
+
+acpi_status
+acpi_ev_reg_run (
+	acpi_handle                     obj_handle,
+	u32                             level,
+	void                            *context,
+	void                            **return_value);
 
 /*
  * Evregini - Region initialization and setup

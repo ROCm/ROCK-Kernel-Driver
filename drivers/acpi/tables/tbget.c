@@ -455,6 +455,7 @@ acpi_tb_get_table_ptr (
 	if (instance == 1) {
 		/* Get the first */
 
+		*table_ptr_loc = NULL;
 		if (acpi_gbl_table_lists[table_type].next) {
 			*table_ptr_loc = acpi_gbl_table_lists[table_type].next->pointer;
 		}

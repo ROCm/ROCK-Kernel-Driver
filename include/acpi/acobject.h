@@ -114,7 +114,7 @@
 #define ACPI_COMMON_NOTIFY_INFO \
 	union acpi_operand_object               *system_notify;     /* Handler for system notifies */\
 	union acpi_operand_object               *device_notify;     /* Handler for driver notifies */\
-	union acpi_operand_object               *address_space;     /* Handler for Address space */
+	union acpi_operand_object               *handler;           /* Handler for Address space */
 
 
 /******************************************************************************
@@ -214,7 +214,7 @@ struct acpi_object_region
 	ACPI_OBJECT_COMMON_HEADER
 
 	u8                                      space_id;
-	union acpi_operand_object               *address_space;     /* Handler for region access */
+	union acpi_operand_object               *handler;           /* Handler for region access */
 	struct acpi_namespace_node              *node;              /* containing object */
 	union acpi_operand_object               *next;
 	u32                                     length;

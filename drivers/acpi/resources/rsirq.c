@@ -132,26 +132,28 @@ acpi_rs_irq_resource (
 		temp8 = *buffer;
 
 		/*
-		 * Check for HE, LL or HL
+		 * Check for HE, LL interrupts
 		 */
-		if (temp8 & 0x01) {
+		switch (temp8 & 0x09) {
+		case 0x01: /* HE */
 			output_struct->data.irq.edge_level = ACPI_EDGE_SENSITIVE;
 			output_struct->data.irq.active_high_low = ACPI_ACTIVE_HIGH;
-		}
-		else {
-			if (temp8 & 0x8) {
-				output_struct->data.irq.edge_level = ACPI_LEVEL_SENSITIVE;
-				output_struct->data.irq.active_high_low = ACPI_ACTIVE_LOW;
-			}
-			else {
-				/*
-				 * Only _LL and _HE polarity/trigger interrupts
-				 * are allowed (ACPI spec v1.0b ection 6.4.2.1),
-				 * so an error will occur if we reach this point
-				 */
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid interrupt polarity/trigger in resource list\n"));
-				return_ACPI_STATUS (AE_BAD_DATA);
-			}
+			break;
+
+		case 0x08: /* LL */
+			output_struct->data.irq.edge_level = ACPI_LEVEL_SENSITIVE;
+			output_struct->data.irq.active_high_low = ACPI_ACTIVE_LOW;
+			break;
+
+		default:
+			/*
+			 * Only _LL and _HE polarity/trigger interrupts
+			 * are allowed (ACPI spec, section "IRQ Format")
+			 * so 0x00 and 0x09 are illegal.
+			 */
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+				"Invalid interrupt polarity/trigger in resource list, %X\n", temp8));
+			return_ACPI_STATUS (AE_BAD_DATA);
 		}
 
 		/*
@@ -419,7 +421,7 @@ acpi_rs_extended_irq_resource (
 		 * Point the String pointer to the end of this structure.
 		 */
 		output_struct->data.extended_irq.resource_source.string_ptr =
-				(char *)(output_struct + struct_size);
+				(char *)((char *) output_struct + struct_size);
 
 		temp_ptr = (u8 *) output_struct->data.extended_irq.resource_source.string_ptr;
 

@@ -631,7 +631,7 @@ acpi_ex_dump_object_descriptor (
 
 	case ACPI_TYPE_DEVICE:
 
-		acpi_ex_out_pointer ("address_space", obj_desc->device.address_space);
+		acpi_ex_out_pointer ("Handler",     obj_desc->device.handler);
 		acpi_ex_out_pointer ("system_notify", obj_desc->device.system_notify);
 		acpi_ex_out_pointer ("device_notify", obj_desc->device.device_notify);
 		break;
@@ -669,7 +669,7 @@ acpi_ex_dump_object_descriptor (
 		acpi_ex_out_integer ("Flags",        obj_desc->region.flags);
 		acpi_ex_out_address ("Address",      obj_desc->region.address);
 		acpi_ex_out_integer ("Length",       obj_desc->region.length);
-		acpi_ex_out_pointer ("address_space", obj_desc->region.address_space);
+		acpi_ex_out_pointer ("Handler",      obj_desc->region.handler);
 		acpi_ex_out_pointer ("Next",         obj_desc->region.next);
 		break;
 
@@ -690,7 +690,7 @@ acpi_ex_dump_object_descriptor (
 		acpi_ex_out_address ("Address",      (acpi_physical_address) obj_desc->processor.address);
 		acpi_ex_out_pointer ("system_notify", obj_desc->processor.system_notify);
 		acpi_ex_out_pointer ("device_notify", obj_desc->processor.device_notify);
-		acpi_ex_out_pointer ("address_space", obj_desc->processor.address_space);
+		acpi_ex_out_pointer ("Handler",      obj_desc->processor.handler);
 		break;
 
 
@@ -698,7 +698,7 @@ acpi_ex_dump_object_descriptor (
 
 		acpi_ex_out_pointer ("system_notify", obj_desc->thermal_zone.system_notify);
 		acpi_ex_out_pointer ("device_notify", obj_desc->thermal_zone.device_notify);
-		acpi_ex_out_pointer ("address_space", obj_desc->thermal_zone.address_space);
+		acpi_ex_out_pointer ("Handler",      obj_desc->thermal_zone.handler);
 		break;
 
 

@@ -167,7 +167,7 @@ acpi_ds_load1_begin_op (
 	object_type = walk_state->op_info->object_type;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-		"State=%p Op=%p [%s] ", walk_state, op, acpi_ut_get_type_name (object_type)));
+		"State=%p Op=%p [%s]\n", walk_state, op, acpi_ut_get_type_name (object_type)));
 
 	switch (walk_state->opcode) {
 	case AML_SCOPE_OP:
@@ -260,10 +260,12 @@ acpi_ds_load1_begin_op (
 		if ((walk_state->opcode != AML_SCOPE_OP) &&
 			(!(walk_state->parse_flags & ACPI_PARSE_DEFERRED_OP))) {
 			flags |= ACPI_NS_ERROR_IF_FOUND;
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DISPATCH, "Cannot already exist\n"));
+			ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "[%s] Cannot already exist\n",
+					acpi_ut_get_type_name (object_type)));
 		}
 		else {
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DISPATCH, "Both Find or Create allowed\n"));
+			ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "[%s] Both Find or Create allowed\n",
+					acpi_ut_get_type_name (object_type)));
 		}
 
 		/*

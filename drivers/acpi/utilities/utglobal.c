@@ -562,12 +562,12 @@ acpi_ut_get_node_name (
 
 	if (node->descriptor != ACPI_DESC_TYPE_NAMED)
 	{
-		return ("INVALID NODE");
+		return ("****");
 	}
 
 	if (!acpi_ut_valid_acpi_name (* (u32 *) node->name.ascii))
 	{
-		return ("INVALID NODE NAME");
+		return ("----");
 	}
 
 	return (node->name.ascii);
