@@ -1543,7 +1543,8 @@ static void scsi_eh_flush_done_q(struct list_head *done_q)
 		scmd = list_entry(lh, struct scsi_cmnd, eh_entry);
 		list_del_init(lh);
 		if (scsi_device_online(scmd->device) &&
-		    	(++scmd->retries < scmd->allowed)) {
+		    !blk_noretry_request(scmd->request) &&
+		    (++scmd->retries < scmd->allowed)) {
 			SCSI_LOG_ERROR_RECOVERY(3, printk("%s: flush"
 							  " retry cmd: %p\n",
 							  current->comm,
