@@ -320,6 +320,7 @@ struct nfsd4_compoundres {
 	u32				taglen;
 	char *				tag;
 	u32				opcnt;
+	u32 *				tagp; /* where to encode tag and  opcount */
 };
 
 #define NFS4_SVC_XDRSIZE		sizeof(struct nfsd4_compoundargs)
