@@ -79,7 +79,14 @@ static void handle_signal(struct pt_regs *regs, unsigned long signr,
 	else
 		err = setup_signal_stack_sc(sp, signr, ka, regs, oldset);
 
-	if (!err && !(ka->sa.sa_flags & SA_NODEFER)) {
+	if(err){
+		spin_lock_irq(&current->sighand->siglock);
+		current->blocked = *oldset;
+		recalc_sigpending();
+		spin_unlock_irq(&current->sighand->siglock);
+		force_sigsegv(signr, current);
+	}
+	else if(!(ka->sa.sa_flags & SA_NODEFER)){
 		spin_lock_irq(&current->sighand->siglock);
 		sigorsets(&current->blocked, &current->blocked, 
 			  &ka->sa.sa_mask);
@@ -87,9 +94,6 @@ static void handle_signal(struct pt_regs *regs, unsigned long signr,
 		recalc_sigpending();
 		spin_unlock_irq(&current->sighand->siglock);
 	}
-
-	if(err)
-		force_sigsegv(signr, current);
 }
 
 static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset)
