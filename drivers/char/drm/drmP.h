@@ -34,6 +34,8 @@
 #ifndef _DRM_P_H_
 #define _DRM_P_H_
 
+/* If you want the memory alloc debug functionality, change define below */
+/* #define DEBUG_MEMORY */
 
 #ifdef __KERNEL__
 #ifdef __alpha__
@@ -55,6 +57,7 @@
 #include <linux/jiffies.h>
 #include <linux/smp_lock.h>	/* For (un)lock_kernel */
 #include <linux/mm.h>
+#include <linux/cdev.h>
 #if defined(__alpha__) || defined(__powerpc__)
 #include <asm/pgtable.h> /* For pte_wrprotect */
 #endif
@@ -693,11 +696,30 @@ typedef struct drm_device {
 	drm_sigdata_t     sigdata; /**< For block_all_signals */
 	sigset_t          sigmask;
 
+	struct file_operations *fops;	/**< file operations */
+	struct proc_dir_entry  *dev_root; /**< proc directory entry */
+
 	struct            drm_driver_fn fn_tbl;
 	drm_local_map_t   *agp_buffer_map;
 	int               dev_priv_size;
 	u32               driver_features;
 } drm_device_t;
+
+typedef struct drm_minor {
+	enum {
+		DRM_MINOR_FREE = 0,
+		DRM_MINOR_PRIMARY,
+	} type;
+	drm_device_t *dev;
+	struct proc_dir_entry  *dev_root; /**< proc directory entry */
+} drm_minor_t;
+
+typedef struct drm_global {
+	unsigned int cards_limit;
+	drm_minor_t *minors;
+	struct class_simple *drm_class;
+	struct proc_dir_entry *proc_root;
+} drm_global_t;
 
 static __inline__ int drm_core_check_feature(struct drm_device *dev, int feature)
 {
@@ -765,11 +787,9 @@ extern ssize_t       DRM(read)(struct file *filp, char __user *buf, size_t count
 extern void	     DRM(mem_init)(void);
 extern int	     DRM(mem_info)(char *buf, char **start, off_t offset,
 				   int request, int *eof, void *data);
-extern void	     *DRM(alloc)(size_t size, int area);
 extern void	     *DRM(calloc)(size_t nmemb, size_t size, int area);
 extern void	     *DRM(realloc)(void *oldpt, size_t oldsize, size_t size,
 				   int area);
-extern void	     DRM(free)(void *pt, size_t size, int area);
 extern unsigned long DRM(alloc_pages)(int order, int area);
 extern void	     DRM(free_pages)(unsigned long address, int order,
 				     int area);
@@ -921,13 +941,12 @@ extern int            DRM(agp_bind_memory)(DRM_AGP_MEM *handle, off_t start);
 extern int            DRM(agp_unbind_memory)(DRM_AGP_MEM *handle);
 
 				/* Stub support (drm_stub.h) */
-int                   DRM(stub_register)(const char *name,
-					 struct file_operations *fops,
-					 drm_device_t *dev);
-int                   DRM(stub_unregister)(int minor);
+extern int 	      DRM(probe)(struct pci_dev *pdev, const struct pci_device_id *ent);
+extern int 	      DRM(put_minor)(drm_device_t *dev);
+extern drm_global_t   *DRM(global);
 
 				/* Proc support (drm_proc.h) */
-extern struct proc_dir_entry *DRM(proc_init)(drm_device_t *dev,
+extern int            DRM(proc_init)(drm_device_t *dev,
 					     int minor,
 					     struct proc_dir_entry *root,
 					     struct proc_dir_entry **dev_root);
@@ -984,6 +1003,24 @@ static __inline__ struct drm_map *drm_core_findmap(struct drm_device *dev, unsig
 static __inline__ void drm_core_dropmap(struct drm_map *map)
 {
 }
+
+#ifndef DEBUG_MEMORY
+/** Wrapper around kmalloc() */
+static __inline__ void *DRM(alloc)(size_t size, int area)
+{
+	return kmalloc(size, GFP_KERNEL);
+}
+
+/** Wrapper around kfree() */
+static __inline__ void DRM(free)(void *pt, size_t size, int area)
+{
+	kfree(pt);
+}
+#else
+extern void *DRM(alloc)(size_t size, int area);
+extern void DRM(free)(void *pt, size_t size, int area);
+#endif
+
 /*@}*/
 
 extern unsigned long DRM(core_get_map_ofs)(drm_map_t *map);
