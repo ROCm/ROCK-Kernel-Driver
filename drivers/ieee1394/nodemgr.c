@@ -460,21 +460,6 @@ static void nodemgr_remove_node_uds(struct node_entry *ne)
 }
 
 
-static void nodemgr_update_ud_names(struct host_info *hi, struct node_entry *ne)
-{
-	struct list_head *lh;
-
-	list_for_each(lh, &ne->device.children) {
-		struct unit_directory *ud;
-		ud = container_of(list_to_dev(lh), struct unit_directory, device);
-
-		snprintf(ud->device.name, DEVICE_NAME_SIZE,
-			 "IEEE-1394 unit directory " NODE_BUS_FMT "-%u",
-			 NODE_BUS_ARGS(hi->host, ne->nodeid), ud->id);
-	}
-}
-
-
 static void nodemgr_remove_ne(struct node_entry *ne)
 {
 	struct device *dev = &ne->device;
@@ -720,9 +705,6 @@ static struct node_entry *nodemgr_create_node(octlet_t guid, quadlet_t busoption
 	ne->device.parent = &host->device;
 	snprintf(ne->device.bus_id, BUS_ID_SIZE, "%016Lx",
 		 (unsigned long long)(ne->guid));
-	snprintf(ne->device.name, DEVICE_NAME_SIZE,
-		 "IEEE-1394 device " NODE_BUS_FMT,
-		 NODE_BUS_ARGS(host, ne->nodeid));
 
 	device_register(&ne->device);
 
@@ -731,8 +713,6 @@ static struct node_entry *nodemgr_create_node(octlet_t guid, quadlet_t busoption
 	nodemgr_create_ne_dev_files(ne);
 
 	nodemgr_process_config_rom (hi, ne, busoptions);
-
-	nodemgr_update_ud_names(hi, ne);
 
 	HPSB_DEBUG("%s added: ID:BUS[" NODE_BUS_FMT "]  GUID[%016Lx]",
 		   (host->node_id == nodeid) ? "Host" : "Node",
@@ -1312,18 +1292,11 @@ static void nodemgr_update_node(struct node_entry *ne, quadlet_t busoptions,
 				struct host_info *hi, nodeid_t nodeid,
 				unsigned int generation)
 {
-	int update_ud_names = 0;
-
 	if (ne->nodeid != nodeid) {
-		snprintf(ne->device.name, DEVICE_NAME_SIZE,
-			 "IEEE-1394 device " NODE_BUS_FMT,
-			 NODE_BUS_ARGS(hi->host, ne->nodeid));
 		HPSB_DEBUG("Node changed: " NODE_BUS_FMT " -> " NODE_BUS_FMT,
 			   NODE_BUS_ARGS(ne->host, ne->nodeid),
 			   NODE_BUS_ARGS(ne->host, nodeid));
 		ne->nodeid = nodeid;
-
-		update_ud_names++;
 	}
 
 	if (ne->busopt.generation != ((busoptions >> 4) & 0xf)) {
@@ -1333,12 +1306,7 @@ static void nodemgr_update_node(struct node_entry *ne, quadlet_t busoptions,
 
 		/* This will re-register our unitdir's */
 		nodemgr_process_config_rom (hi, ne, busoptions);
-
-		update_ud_names++;
 	}
-
-	if (update_ud_names)
-		nodemgr_update_ud_names(hi, ne);
 
 	/* Since that's done, we can declare this record current */
 	ne->generation = generation;
@@ -1772,8 +1740,6 @@ static void nodemgr_add_host(struct hpsb_host *host)
 	       sizeof(host->device));
 	host->device.parent = &host->pdev->dev;
 	snprintf(host->device.bus_id, BUS_ID_SIZE, "fw-host%d", host->id);
-	snprintf(host->device.name, DEVICE_NAME_SIZE, "IEEE-1394 Host %s-%d",
-		 host->driver->name, host->id);
 
 	sprintf(hi->daemon_name, "knodemgrd_%d", host->id);
 

@@ -144,9 +144,7 @@ static struct i2c_adapter bit_ops = {
 	.id 			= 0xAA, //FIXME: probably we should get an id in i2c-id.h
 	.client_register	= bit_reg,
 	.client_unregister	= bit_unreg,
-	.dev			= {
-		.name		= "PCILynx I2C",
-	},
+	.name			= "PCILynx I2C",
 };
 
 
