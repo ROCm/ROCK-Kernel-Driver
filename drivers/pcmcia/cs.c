@@ -2106,7 +2106,6 @@ EXPORT_SYMBOL(pcmcia_get_mem_page);
 EXPORT_SYMBOL(pcmcia_get_first_window);
 EXPORT_SYMBOL(pcmcia_get_next_window);
 EXPORT_SYMBOL(pcmcia_get_status);
-EXPORT_SYMBOL(pcmcia_get_tuple_data);
 EXPORT_SYMBOL(pcmcia_insert_card);
 EXPORT_SYMBOL(pcmcia_map_mem_page);
 EXPORT_SYMBOL(pcmcia_modify_configuration);

@@ -952,7 +952,7 @@ static int ds_ioctl(struct inode * inode, struct file * file,
     case DS_GET_TUPLE_DATA:
 	buf.tuple.TupleData = buf.tuple_parse.data;
 	buf.tuple.TupleDataMax = sizeof(buf.tuple_parse.data);
-	ret = pcmcia_get_tuple_data(s->handle, &buf.tuple);
+	ret = pccard_get_tuple_data(s->parent, &buf.tuple);
 	break;
     case DS_PARSE_TUPLE:
 	buf.tuple.TupleData = buf.tuple_parse.data;

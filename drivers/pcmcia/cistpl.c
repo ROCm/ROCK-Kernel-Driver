@@ -588,15 +588,12 @@ EXPORT_SYMBOL(pccard_get_next_tuple);
 
 #define _MIN(a, b)		(((a) < (b)) ? (a) : (b))
 
-int pcmcia_get_tuple_data(client_handle_t handle, tuple_t *tuple)
+int pccard_get_tuple_data(struct pcmcia_socket *s, tuple_t *tuple)
 {
-    struct pcmcia_socket *s;
     u_int len;
-    
-    if (CHECK_HANDLE(handle))
-	return CS_BAD_HANDLE;
 
-    s = SOCKET(handle);
+    if (!s)
+	return CS_BAD_HANDLE;
 
     if (tuple->TupleLink < tuple->TupleOffset)
 	return CS_NO_MORE_ITEMS;
@@ -609,6 +606,8 @@ int pcmcia_get_tuple_data(client_handle_t handle, tuple_t *tuple)
 		   _MIN(len, tuple->TupleDataMax), tuple->TupleData);
     return CS_SUCCESS;
 }
+EXPORT_SYMBOL(pccard_get_tuple_data);
+
 
 /*======================================================================
 
@@ -1520,3 +1519,14 @@ int pcmcia_get_next_tuple(client_handle_t handle, tuple_t *tuple)
 	return pccard_get_next_tuple(s, handle->Function, tuple);
 }
 EXPORT_SYMBOL(pcmcia_get_next_tuple);
+
+int pcmcia_get_tuple_data(client_handle_t handle, tuple_t *tuple)
+{
+	struct pcmcia_socket *s;
+	if (CHECK_HANDLE(handle))
+		return CS_BAD_HANDLE;
+	s = SOCKET(handle);
+	return pccard_get_tuple_data(s, tuple);
+}
+EXPORT_SYMBOL(pcmcia_get_tuple_data);
+
