@@ -58,14 +58,7 @@ struct dma_chan {
 };
 
 static struct dma_chan dma_chan_busy[MAX_DMA_CHANNELS] = {
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 1, "cascade" },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 }
+	[4] = { 1, "cascade" },
 };
 
 

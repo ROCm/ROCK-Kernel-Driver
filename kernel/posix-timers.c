@@ -210,7 +210,7 @@ static __init int init_posix_timers(void)
 	register_posix_clock(CLOCK_MONOTONIC, &clock_monotonic);
 
 	posix_timers_cache = kmem_cache_create("posix_timers_cache",
-					sizeof (struct k_itimer), 0, 0, 0, 0);
+					sizeof (struct k_itimer), 0, 0, NULL, NULL);
 	idr_init(&posix_timers_id);
 
 	return 0;
@@ -399,7 +399,7 @@ static struct k_itimer * alloc_posix_timer(void)
 	memset(tmr, 0, sizeof (struct k_itimer));
 	if (unlikely(!(tmr->sigq = sigqueue_alloc()))) {
 		kmem_cache_free(posix_timers_cache, tmr);
-		tmr = 0;
+		tmr = NULL;
 	}
 	return tmr;
 }
@@ -431,7 +431,7 @@ sys_timer_create(clockid_t which_clock,
 	int error = 0;
 	struct k_itimer *new_timer = NULL;
 	int new_timer_id;
-	struct task_struct *process = 0;
+	struct task_struct *process = NULL;
 	unsigned long flags;
 	sigevent_t event;
 	int it_id_set = IT_ID_NOT_SET;
@@ -521,7 +521,7 @@ sys_timer_create(clockid_t which_clock,
 				get_task_struct(process);
 			} else {
 				spin_unlock_irqrestore(&process->sighand->siglock, flags);
-				process = 0;
+				process = NULL;
 			}
 		}
 		read_unlock(&tasklist_lock);

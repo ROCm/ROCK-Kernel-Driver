@@ -1420,7 +1420,7 @@ struct bh_lru {
 	struct buffer_head *bhs[BH_LRU_SIZE];
 };
 
-static DEFINE_PER_CPU(struct bh_lru, bh_lrus) = {{0}};
+static DEFINE_PER_CPU(struct bh_lru, bh_lrus) = {{ NULL }};
 
 #ifdef CONFIG_SMP
 #define bh_lru_lock()	local_irq_disable()
@@ -2487,7 +2487,7 @@ int nobh_prepare_write(struct page *page, unsigned from, unsigned to,
 			}
 			bh->b_state = map_bh.b_state;
 			atomic_set(&bh->b_count, 0);
-			bh->b_this_page = 0;
+			bh->b_this_page = NULL;
 			bh->b_page = page;
 			bh->b_blocknr = map_bh.b_blocknr;
 			bh->b_size = blocksize;

@@ -669,7 +669,7 @@ out:
 static inline struct page *get_page_map(struct page *page)
 {
 	if (!pfn_valid(page_to_pfn(page)))
-		return 0;
+		return NULL;
 	return page;
 }
 
@@ -1805,7 +1805,7 @@ struct vm_area_struct *get_gate_vma(struct task_struct *tsk)
 #ifdef AT_SYSINFO_EHDR
 	return &gate_vma;
 #else
-	return 0;
+	return NULL;
 #endif
 }
 

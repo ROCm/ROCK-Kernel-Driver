@@ -1293,7 +1293,7 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	int i, prev;
 	int error;
 	static int least_priority;
-	union swap_header *swap_header = 0;
+	union swap_header *swap_header = NULL;
 	int swap_header_version;
 	int nr_good_pages = 0;
 	unsigned long maxpages = 1;
