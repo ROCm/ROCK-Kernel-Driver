@@ -1097,4 +1097,3 @@ void agp_frontend_cleanup(void)
 {
 	misc_deregister(&agp_miscdev);
 }
-

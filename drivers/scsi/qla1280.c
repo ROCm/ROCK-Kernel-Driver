@@ -331,10 +331,16 @@
  */
 #define  QL1280_LUN_SUPPORT	0
 #define  WATCHDOGTIMER		0
-#define  MEMORY_MAPPED_IO	1
+
 #define  DEBUG_QLA1280_INTR	0
 #define  DEBUG_PRINT_NVRAM	0
 #define  DEBUG_QLA1280		0
+
+#ifdef	CONFIG_SCSI_QLOGIC_1280_PIO
+#define	MEMORY_MAPPED_IO	0
+#else
+#define	MEMORY_MAPPED_IO	1
+#endif
 
 #define UNIQUE_FW_NAME
 #include "qla1280.h"

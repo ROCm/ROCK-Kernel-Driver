@@ -191,6 +191,8 @@ extern void get_full_page_state(struct page_state *ret);
 #define PageSlab(page)		test_bit(PG_slab, &(page)->flags)
 #define SetPageSlab(page)	set_bit(PG_slab, &(page)->flags)
 #define ClearPageSlab(page)	clear_bit(PG_slab, &(page)->flags)
+#define TestClearPageSlab(page)	test_and_clear_bit(PG_slab, &(page)->flags)
+#define TestSetPageSlab(page)	test_and_set_bit(PG_slab, &(page)->flags)
 
 #ifdef CONFIG_HIGHMEM
 #define PageHighMem(page)	test_bit(PG_highmem, &(page)->flags)

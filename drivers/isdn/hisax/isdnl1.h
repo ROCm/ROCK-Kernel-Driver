@@ -354,7 +354,7 @@ xmit_xdu_d(struct IsdnCardState *cs, void (*reset_xmit)(struct IsdnCardState *cs
 }
 
 static inline unsigned char *
-xmit_fill_fifo_b(struct BCState *bcs, int fifo_size, int *count, int *more)
+xmit_fill_fifo_b(struct BCState *bcs, u_int fifo_size, int *count, int *more)
 {
 	struct IsdnCardState *cs = bcs->cs;
 	unsigned char *p;
@@ -391,7 +391,7 @@ xmit_fill_fifo_b(struct BCState *bcs, int fifo_size, int *count, int *more)
 }
 
 static inline unsigned char *
-xmit_fill_fifo_d(struct IsdnCardState *cs, int fifo_size, int *count, int *more)
+xmit_fill_fifo_d(struct IsdnCardState *cs, u_int fifo_size, int *count, int *more)
 {
 	unsigned char *p;
 

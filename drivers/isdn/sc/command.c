@@ -419,14 +419,13 @@ int reset(int card)
 
 	adapter[card]->EngineUp = 0;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&adapter[card]->lock, flags);
 	init_timer(&adapter[card]->reset_timer);
 	adapter[card]->reset_timer.function = check_reset;
 	adapter[card]->reset_timer.data = card;
 	adapter[card]->reset_timer.expires = jiffies + CHECKRESET_TIME;
 	add_timer(&adapter[card]->reset_timer);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&adapter[card]->lock, flags);
 
 	outb(0x1,adapter[card]->ioport[SFT_RESET]); 
 

@@ -162,10 +162,10 @@ void elv_requeue_request(request_queue_t *q, struct request *rq)
 void __elv_add_request(request_queue_t *q, struct request *rq, int at_end,
 		       int plug)
 {
-	struct list_head *insert = &q->queue_head;
+	struct list_head *insert = NULL;
 
-	if (at_end)
-		insert = insert->prev;
+	if (!at_end)
+		insert = &q->queue_head;
 	if (plug)
 		blk_plug_device(q);
 

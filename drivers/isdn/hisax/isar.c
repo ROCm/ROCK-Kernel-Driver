@@ -677,7 +677,7 @@ isar_fill_fifo(struct BCState *bcs)
 	if (!(bcs->hw.isar.reg->bstat & 
 		(bcs->hw.isar.dpath == 1 ? BSTAT_RDM1 : BSTAT_RDM2)))
 		return;
-	if (bcs->tx_skb->len > bcs->hw.isar.mml) {
+	if (bcs->tx_skb->len > (u_int)bcs->hw.isar.mml) {
 		msb = 0;
 		count = bcs->hw.isar.mml;
 	} else {

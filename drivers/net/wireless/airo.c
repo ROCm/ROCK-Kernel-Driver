@@ -2665,11 +2665,13 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 				if (decapsulate(apriv,&micbuf,(etherHead*)buffer,len)) {
 badmic:
 					dev_kfree_skb_irq (skb);
+#else
+				if (0) {
+#endif
 badrx:
 					OUT4500( apriv, EVACK, EV_RX);
 					goto exitrx;
 				}
-#endif
 			}
 #if WIRELESS_EXT > 15
 #ifdef IW_WIRELESS_SPY		/* defined in iw_handler.h */
@@ -5662,9 +5664,10 @@ static int airo_get_power(struct net_device *dev,
 			  char *extra)
 {
 	struct airo_info *local = dev->priv;
+	int mode;
 
 	readConfigRid(local, 1);
-	int mode = local->config.powerSaveMode;
+	mode = local->config.powerSaveMode;
 	if ((vwrq->disabled = (mode == POWERSAVE_CAM)))
 		return 0;
 	if ((vwrq->flags & IW_POWER_TYPE) == IW_POWER_TIMEOUT) {

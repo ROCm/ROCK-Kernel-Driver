@@ -62,7 +62,6 @@ ocp_setup_dev(struct ocp_def *odef, unsigned int index)
 	    (unsigned long) dev->paddr, dev->irq, dev->pm);
 
 	/* now put in global tree */
-	strcpy(dev->dev.name, dev->name);
 	sprintf(dev->dev.bus_id, "%d", index);
 	dev->dev.parent = ocp_bus;
 	dev->dev.bus = &ocp_bus_type;
@@ -80,7 +79,7 @@ static struct device * __devinit ocp_alloc_primary_bus(void)
 		return NULL;
 	memset(b, 0, sizeof(struct device));
 	strcpy(b->bus_id, "ocp");
-	strcpy(b->name, "Host/OCP Bridge");
+
 	device_register(b);
 
 	return b;

@@ -452,4 +452,5 @@ EXPORT_SYMBOL(busmouse_add_buttons);
 EXPORT_SYMBOL(register_busmouse);
 EXPORT_SYMBOL(unregister_busmouse);
 
+MODULE_ALIAS_MISCDEV(BUSMOUSE_MINOR);
 MODULE_LICENSE("GPL");

@@ -23,7 +23,8 @@
 #include <asm/constants.h>
 #include <asm/procinfo.h>
 #include <asm/hardware.h>
-#include <asm/proc/pgtable.h>
+#include <asm/pgtable.h>
+#include <asm/ptrace.h>
 
 /*
  * the cache line size of the I and D cache

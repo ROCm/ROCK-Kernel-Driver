@@ -100,7 +100,6 @@ static char *IMM_MODE_STRING[] =
 	[IMM_NIBBLE]	 = "SPP",
 	[IMM_PS2]	 = "PS/2",
 	[IMM_EPP_8]	 = "EPP 8 bit",
-	[IMM_EPP_16]	 = "EPP 16 bit",
 #ifdef CONFIG_SCSI_IZIP_EPP16
 	[IMM_EPP_16]	 = "EPP 16 bit",
 #else

@@ -29,7 +29,7 @@ struct capilib_ncci {
 
 static inline void mq_init(struct capilib_ncci * np)
 {
-	int i;
+	u_int i;
 	np->msgidqueue = 0;
 	np->msgidlast = 0;
 	np->nmsg = 0;

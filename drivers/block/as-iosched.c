@@ -910,12 +910,7 @@ static void as_completed_request(request_queue_t *q, struct request *rq)
 	struct as_rq *arq = RQ_DATA(rq);
 	struct as_io_context *aic;
 
-	if (unlikely(!blk_fs_request(rq)))
-		return;
-
-	WARN_ON(blk_fs_request(rq) && arq->state == AS_RQ_NEW);
-
-	if (arq->state != AS_RQ_DISPATCHED)
+	if (unlikely(arq->state != AS_RQ_DISPATCHED))
 		return;
 
 	if (ad->changed_batch && ad->nr_dispatched == 1) {
@@ -1035,7 +1030,7 @@ static void as_remove_request(request_queue_t *q, struct request *rq)
 {
 	struct as_rq *arq = RQ_DATA(rq);
 
-	if (unlikely(!blk_fs_request(rq)))
+	if (unlikely(arq->state == AS_RQ_NEW))
 		return;
 
 	if (!arq) {
@@ -1341,9 +1336,9 @@ static void as_requeue_request(request_queue_t *q, struct request *rq)
 			atomic_inc(&arq->io_context->aic->nr_dispatched);
 	} else
 		WARN_ON(blk_fs_request(rq)
-				&& (!(rq->flags & REQ_HARDBARRIER)) );
+			&& (!(rq->flags & (REQ_HARDBARRIER|REQ_SOFTBARRIER))) );
 
-	list_add_tail(&rq->queuelist, ad->dispatch);
+	list_add(&rq->queuelist, ad->dispatch);
 
 	/* Stop anticipating - let this request get through */
 	as_antic_stop(ad);
@@ -1358,26 +1353,31 @@ as_insert_request(request_queue_t *q, struct request *rq,
 	struct as_data *ad = q->elevator.elevator_data;
 	struct as_rq *arq = RQ_DATA(rq);
 
-	if (unlikely(rq->flags & REQ_HARDBARRIER)) {
+	if (unlikely(rq->flags & (REQ_HARDBARRIER|REQ_SOFTBARRIER))) {
 		q->last_merge = NULL;
 
-		while (ad->next_arq[REQ_SYNC])
-			as_move_to_dispatch(ad, ad->next_arq[REQ_SYNC]);
+		if (insert_here != ad->dispatch) {
+			while (ad->next_arq[REQ_SYNC])
+				as_move_to_dispatch(ad, ad->next_arq[REQ_SYNC]);
 
-		while (ad->next_arq[REQ_ASYNC])
-			as_move_to_dispatch(ad, ad->next_arq[REQ_ASYNC]);
+			while (ad->next_arq[REQ_ASYNC])
+				as_move_to_dispatch(ad, ad->next_arq[REQ_ASYNC]);
+		}
+
+		if (!insert_here)
+			insert_here = ad->dispatch->prev;
 	}
 
 	if (unlikely(!blk_fs_request(rq))) {
 		if (!insert_here)
-			insert_here = ad->dispatch->prev;
+			insert_here = ad->dispatch;
+	}
 
+	if (insert_here) {
 		list_add(&rq->queuelist, insert_here);
 
 		/* Stop anticipating - let this request get through */
-		if (!list_empty(ad->dispatch)
-			&& (ad->antic_status == ANTIC_WAIT_REQ
-				|| ad->antic_status == ANTIC_WAIT_NEXT))
+		if (list_empty(ad->dispatch))
 			as_antic_stop(ad);
 
 		return;

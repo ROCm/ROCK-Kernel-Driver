@@ -73,6 +73,15 @@ static int __init enforcing_setup(char *str)
 __setup("enforcing=", enforcing_setup);
 #endif
 
+int selinux_enabled = 0;
+
+static int __init selinux_enabled_setup(char *str)
+{
+	selinux_enabled = simple_strtol(str, NULL, 0);
+	return 1;
+}
+__setup("selinux=", selinux_enabled_setup);
+
 /* Original (dummy) security module. */
 static struct security_operations *original_ops = NULL;
 
@@ -3346,6 +3355,11 @@ struct security_operations selinux_ops = {
 __init int selinux_init(void)
 {
 	struct task_security_struct *tsec;
+
+	if (!selinux_enabled) {
+		printk(KERN_INFO "SELinux:  Not enabled at boot.\n");
+		return 0;
+	}
 
 	printk(KERN_INFO "SELinux:  Initializing.\n");
 

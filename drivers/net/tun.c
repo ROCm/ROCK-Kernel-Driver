@@ -640,3 +640,4 @@ void tun_cleanup(void)
 module_init(tun_init);
 module_exit(tun_cleanup);
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_MISCDEV(TUN_MINOR);

@@ -258,13 +258,13 @@ typedef struct {
  * variables. Of course, we need to check skb_headroom prior to
  * any access.
  */
-typedef struct isdn_audio_skb {
+typedef struct _isdnaudio_header {
   unsigned short dle_count;
   unsigned char  lock;
-} isdn_audio_skb;
+} isdnaudio_header;
 
-#define ISDN_AUDIO_SKB_DLECOUNT(skb) (((isdn_audio_skb*)skb->head)->dle_count)
-#define ISDN_AUDIO_SKB_LOCK(skb) (((isdn_audio_skb*)skb->head)->lock)
+#define ISDN_AUDIO_SKB_DLECOUNT(skb) (((isdnaudio_header*)skb->head)->dle_count)
+#define ISDN_AUDIO_SKB_LOCK(skb) (((isdnaudio_header*)skb->head)->lock)
 #endif
 
 /* Private data of AT-command-interpreter */
@@ -291,6 +291,7 @@ typedef struct atemu {
 /* Private data (similar to async_struct in <linux/serial.h>) */
 typedef struct modem_info {
   int			magic;
+  struct module		*owner;
   int			flags;		 /* defined in tty.h               */
   int			x_char;		 /* xon/xoff character             */
   int			mcr;		 /* Modem control register         */

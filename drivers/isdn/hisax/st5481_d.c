@@ -294,8 +294,8 @@ static void usb_d_out(struct st5481_adapter *adapter, int buf_nr)
 {
 	struct st5481_d_out *d_out = &adapter->d_out;
 	struct urb *urb;
-	unsigned int num_packets, packet_offset;
-	int len, buf_size, bytes_sent;
+	unsigned int num_packets;
+	int len, buf_size, bytes_sent, packet_offset;
 	struct sk_buff *skb;
 	struct usb_iso_packet_descriptor *desc;
 
@@ -341,7 +341,7 @@ static void usb_d_out(struct st5481_adapter *adapter, int buf_nr)
 		desc = &urb->iso_frame_desc[num_packets];
 		desc->offset = packet_offset;
 		desc->length = SIZE_ISO_PACKETS_D_OUT;
-		if (len - packet_offset < desc->length)
+		if (len - packet_offset < (int)desc->length)
 			desc->length = len - packet_offset;
 		num_packets++;
 		packet_offset += desc->length;

@@ -97,11 +97,12 @@ static int __init sc_init(void)
 			 * No, I/O Base has been provided
 			 */
 			for (i = 0 ; i < MAX_IO_REGS - 1 ; i++) {
-				if(check_region(io[b] + i * 0x400, 1)) {
+				if(!request_region(io[b] + i * 0x400, 1, "sc test")) {
 					pr_debug("check_region for 0x%x failed\n", io[b] + i * 0x400);
 					io[b] = 0;
 					break;
-				}
+				} else
+					release_region(io[b] + i * 0x400, 1);
 			}
 
 			/*
@@ -136,11 +137,12 @@ static int __init sc_init(void)
 				last_base = i + IOBASE_OFFSET;
 				pr_debug("  checking 0x%x...", i);
 				for ( j = 0 ; j < MAX_IO_REGS - 1 ; j++) {
-					if(check_region(i + j * 0x400, 1)) {
+					if(!request_region(i + j * 0x400, 1, "sc test")) {
 						pr_debug("Failed\n");
 						found_io = 0;
 						break;
-					}
+					} else
+						release_region(i + j * 0x400, 1);
 				}	
 
 				if(found_io) {
@@ -177,9 +179,10 @@ static int __init sc_init(void)
 			 * Just look for a signature and ID the
 			 * board model
 			 */
-			if(!check_region(ram[b], SRAM_PAGESIZE)) {
-				pr_debug("check_region for RAM base 0x%x succeeded\n", ram[b]);
+			if(request_region(ram[b], SRAM_PAGESIZE, "sc test")) {
+				pr_debug("request_region for RAM base 0x%x succeeded\n", ram[b]);
 			 	model = identify_board(ram[b], io[b]);
+				release_region(ram[b], SRAM_PAGESIZE);
 			}
 		}
 		else {
@@ -189,9 +192,10 @@ static int __init sc_init(void)
 			 */
 			for (i = SRAM_MIN ; i < SRAM_MAX ; i += SRAM_PAGESIZE) {
 				pr_debug("Checking RAM address 0x%x...\n", i);
-				if(!check_region(i, SRAM_PAGESIZE)) {
+				if(request_region(i, SRAM_PAGESIZE, "sc test")) {
 					pr_debug("  check_region succeeded\n");
 					model = identify_board(i, io[b]);
+					release_region(i, SRAM_PAGESIZE);
 					if (model >= 0) {
 						pr_debug("  Identified a %s\n",
 							boardname[model]);
@@ -201,7 +205,7 @@ static int __init sc_init(void)
 					pr_debug("  Unidentifed or inaccessible\n");
 					continue;
 				}
-				pr_debug("  check_region failed\n");
+				pr_debug("  request failed\n");
 			}
 		}
 		/*
@@ -310,6 +314,7 @@ static int __init sc_init(void)
 			continue;
 		}
 		memset(adapter[cinst], 0, sizeof(board));
+		spin_lock_init(&adapter[cinst]->lock);
 
 		if(!register_isdn(interface)) {
 			/*

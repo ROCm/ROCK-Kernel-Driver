@@ -110,6 +110,7 @@ static void __down(struct semaphore * sem)
 
 void down(struct semaphore *sem)
 {
+	might_sleep();
 	/* This atomically does:
 	 * 	old_val = sem->count;
 	 *	new_val = sem->count - 1;
@@ -219,6 +220,7 @@ int down_interruptible(struct semaphore *sem)
 {
 	int ret = 0;
 	
+	might_sleep();
 	/* This atomically does:
 	 * 	old_val = sem->count;
 	 *	new_val = sem->count - 1;

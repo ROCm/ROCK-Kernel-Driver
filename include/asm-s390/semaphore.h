@@ -60,6 +60,7 @@ asmlinkage void __up(struct semaphore * sem);
 
 static inline void down(struct semaphore * sem)
 {
+	might_sleep();
 	if (atomic_dec_return(&sem->count) < 0)
 		__down(sem);
 }
@@ -68,6 +69,7 @@ static inline int down_interruptible(struct semaphore * sem)
 {
 	int ret = 0;
 
+	might_sleep();
 	if (atomic_dec_return(&sem->count) < 0)
 		ret = __down_interruptible(sem);
 	return ret;

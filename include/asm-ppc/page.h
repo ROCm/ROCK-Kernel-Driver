@@ -4,7 +4,12 @@
 /* PAGE_SHIFT determines the page size */
 #define PAGE_SHIFT	12
 #define PAGE_SIZE	(1UL << PAGE_SHIFT)
-#define PAGE_MASK	(~(PAGE_SIZE-1))
+
+/*
+ * Subtle: this is an int (not an unsigned long) and so it
+ * gets extended to 64 bits the way want (i.e. with 1s).  -- paulus
+ */
+#define PAGE_MASK	(~((1 << PAGE_SHIFT) - 1))
 
 #ifdef __KERNEL__
 #include <linux/config.h>
@@ -15,13 +20,27 @@
 
 #ifndef __ASSEMBLY__
 
-#define STRICT_MM_TYPECHECKS
+/*
+ * The basic type of a PTE - 64 bits for those CPUs with > 32 bit
+ * physical addressing.  For now this just the IBM PPC440.
+ */
+#ifdef CONFIG_PTE_64BIT
+typedef unsigned long long pte_basic_t;
+#define PTE_SHIFT	(PAGE_SHIFT - 3)	/* 512 ptes per page */
+#define PTE_FMT		"%16Lx"
+#else
+typedef unsigned long pte_basic_t;
+#define PTE_SHIFT	(PAGE_SHIFT - 2)	/* 1024 ptes per page */
+#define PTE_FMT		"%.8lx"
+#endif
+
+#undef STRICT_MM_TYPECHECKS
 
 #ifdef STRICT_MM_TYPECHECKS
 /*
  * These are used to make use of C type-checking..
  */
-typedef struct { unsigned long pte; } pte_t;
+typedef struct { pte_basic_t pte; } pte_t;
 typedef struct { unsigned long pmd; } pmd_t;
 typedef struct { unsigned long pgd; } pgd_t;
 typedef struct { unsigned long pgprot; } pgprot_t;
@@ -40,7 +59,7 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 /*
  * .. while these make it easier on the compiler
  */
-typedef unsigned long pte_t;
+typedef pte_basic_t pte_t;
 typedef unsigned long pmd_t;
 typedef unsigned long pgd_t;
 typedef unsigned long pgprot_t;
@@ -123,6 +142,7 @@ static inline void* ___va(unsigned long p)
 #define pfn_to_page(pfn)	(mem_map + ((pfn) - PPC_PGSTART))
 #define page_to_pfn(page)	((unsigned long)((page) - mem_map) + PPC_PGSTART)
 #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+#define page_to_virt(page)	__va(page_to_pfn(page) << PAGE_SHIFT)
 
 #define pfn_valid(pfn)		(((pfn) - PPC_PGSTART) < max_mapnr)
 #define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)

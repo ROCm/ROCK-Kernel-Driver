@@ -88,7 +88,7 @@ extern inline void down(struct semaphore * sem)
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
-
+	might_sleep();
 	__asm__ __volatile__(
 		"| atomic down operation\n\t"
 		"movel	%0, %%a1\n\t"
@@ -108,7 +108,7 @@ extern inline int down_interruptible(struct semaphore * sem)
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
-
+	might_sleep();
 	__asm__ __volatile__(
 		"| atomic down operation\n\t"
 		"movel	%1, %%a1\n\t"

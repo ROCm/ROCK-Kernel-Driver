@@ -12,6 +12,8 @@
 #include <linux/wait.h>
 #include <linux/mempool.h>
 #include <linux/bio.h>
+#include <linux/module.h>
+#include <linux/stringify.h>
 
 #include <asm/scatterlist.h>
 
@@ -671,6 +673,11 @@ void kblockd_flush(void);
 } \
 )
 #endif 
- 
+
+#define MODULE_ALIAS_BLOCKDEV(major,minor) \
+	MODULE_ALIAS("block-major-" __stringify(major) "-" __stringify(minor))
+#define MODULE_ALIAS_BLOCKDEV_MAJOR(major) \
+	MODULE_ALIAS("block-major-" __stringify(major) "-*")
+
 
 #endif

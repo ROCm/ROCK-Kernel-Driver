@@ -2102,3 +2102,4 @@ module_init(optcd_init);
 module_exit(optcd_exit);
 
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_BLOCKDEV_MAJOR(OPTICS_CDROM_MAJOR);

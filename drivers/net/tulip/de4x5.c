@@ -437,6 +437,9 @@
                            present. 
                            <france@handhelds.org>  
       0.547  08-Nov-01    Use library crc32 functions by <Matt_Domsch@dell.com>
+      0.548  30-Aug-03    Big 2.6 cleanup. Ported to PCI/EISA probing and
+                           generic DMA APIs. Fixed DE425 support on Alpha.
+			   <maz@wild-wind.fr.eu.org>
     =========================================================================
 */
 
@@ -450,6 +453,7 @@
 #include <linux/ioport.h>
 #include <linux/slab.h>
 #include <linux/pci.h>
+#include <linux/eisa.h>
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
@@ -461,6 +465,8 @@
 #include <linux/types.h>
 #include <linux/unistd.h>
 #include <linux/ctype.h>
+#include <linux/dma-mapping.h>
+#include <linux/moduleparam.h>
 
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -625,12 +631,12 @@ struct parameters {
 #define DE4X5_EISA_IO_PORTS   0x0c00    /* I/O port base address, slot 0 */
 #define DE4X5_EISA_TOTAL_SIZE 0x100     /* I/O address extent */
 
-#define MAX_EISA_SLOTS 16
-#define EISA_SLOT_INC 0x1000
 #define EISA_ALLOWED_IRQ_LIST  {5, 9, 10, 11}
 
 #define DE4X5_SIGNATURE {"DE425","DE434","DE435","DE450","DE500"}
 #define DE4X5_NAME_LENGTH 8
+
+static c_char *de4x5_signatures[] = DE4X5_SIGNATURE;
 
 /*
 ** Ethernet PROM defines for DC21040
@@ -644,7 +650,6 @@ struct parameters {
 #define PCI_MAX_BUS_NUM      8
 #define DE4X5_PCI_TOTAL_SIZE 0x80       /* I/O address extent */
 #define DE4X5_CLASS_CODE     0x00020000 /* Network controller, Ethernet */
-#define NO_MORE_PCI          -2         /* PCI bus search all done */
 
 /*
 ** Memory Alignment. Each descriptor is 4 longwords long. To force a
@@ -819,7 +824,6 @@ struct de4x5_private {
     struct timer_list timer;                /* Timer info for kernel        */
     int tmp;                                /* Temporary global per card    */
     struct {
-	void *priv;                         /* Original kmalloc'd mem addr  */
 	u_long lock;                        /* Lock the cache accesses      */
 	s32 csr0;                           /* Saved Bus Mode Register      */
 	s32 csr6;                           /* Saved Operating Mode Reg.    */
@@ -833,7 +837,7 @@ struct de4x5_private {
 	struct sk_buff *skb;                /* Save the (re-ordered) skb's  */
     } cache;
     struct de4x5_srom srom;                 /* A copy of the SROM           */
-    struct net_device *next_module;             /* Link to the next module      */
+    int cfrv;				    /* Card CFRV copy */
     int rx_ovf;                             /* Check for 'RX overflow' tag  */
     int useSROM;                            /* For non-DEC card use SROM    */
     int useMII;                             /* Infoblock using the MII      */
@@ -850,27 +854,11 @@ struct de4x5_private {
     u_char *rst;                            /* Pointer to Type 5 reset info */
     u_char  ibn;                            /* Infoblock number             */
     struct parameters params;               /* Command line/ #defined params */
-    struct pci_dev *pdev;		    /* Device cookie for DMA alloc  */
+    struct device *gendev;	            /* Generic device */
     dma_addr_t dma_rings;		    /* DMA handle for rings	    */
     int dma_size;			    /* Size of the DMA area	    */
     char *rx_bufs;			    /* rx bufs on alpha, sparc, ... */
 };
-
-/*
-** Kludge to get around the fact that the CSR addresses have different
-** offsets in the PCI and EISA boards. Also note that the ethernet address
-** PROM is accessed differently.
-*/
-static struct de4x5_bus_type {
-    int bus;
-    int bus_num;
-    int device;
-    int chipset;
-    struct de4x5_srom srom;
-    int autosense;
-    int useSROM;
-    struct pci_dev *pdev;
-} bus;
 
 /*
 ** To get around certain poxy cards that don't provide an SROM
@@ -919,7 +907,7 @@ static int     de4x5_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 /*
 ** Private functions
 */
-static int     de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev);
+static int     de4x5_hw_init(struct net_device *dev, u_long iobase, struct device *gendev);
 static int     de4x5_init(struct net_device *dev);
 static int     de4x5_sw_reset(struct net_device *dev);
 static int     de4x5_rx(struct net_device *dev);
@@ -962,11 +950,11 @@ static int     de4x5_reset_phy(struct net_device *dev);
 static void    reset_init_sia(struct net_device *dev, s32 sicr, s32 strr, s32 sigr);
 static int     test_ans(struct net_device *dev, s32 irqs, s32 irq_mask, s32 msec);
 static int     test_tp(struct net_device *dev, s32 msec);
-static int     EISA_signature(char *name, s32 eisa_id);
-static int     PCI_signature(char *name, struct de4x5_bus_type *lp);
-static void    DevicePresent(u_long iobase);
+static int     EISA_signature(char *name, struct device *device);
+static int     PCI_signature(char *name, struct de4x5_private *lp);
+static void    DevicePresent(struct net_device *dev, u_long iobase);
 static void    enet_addr_rst(u_long aprom_addr);
-static int     de4x5_bad_srom(struct de4x5_bus_type *lp);
+static int     de4x5_bad_srom(struct de4x5_private *lp);
 static short   srom_rd(u_long address, u_char offset);
 static void    srom_latch(u_int command, u_long address);
 static void    srom_command(u_int command, u_long address);
@@ -994,12 +982,7 @@ static void    SetMulticastFilter(struct net_device *dev);
 static int     get_hw_addr(struct net_device *dev);
 static void    srom_repair(struct net_device *dev, int card);
 static int     test_bad_enet(struct net_device *dev, int status);
-static int     an_exception(struct de4x5_bus_type *lp);
-#if !defined(__sparc_v9__) && !defined(__powerpc__) && !defined(__alpha__)
-static void    eisa_probe(struct net_device *dev, u_long iobase);
-#endif
-static void    pci_probe(struct net_device *dev, u_long iobase);
-static void    srom_search(struct pci_dev *pdev);
+static int     an_exception(struct de4x5_private *lp);
 static char    *build_setup_frame(struct net_device *dev, int mode);
 static void    disable_ast(struct net_device *dev);
 static void    enable_ast(struct net_device *dev, u32 time_out);
@@ -1008,7 +991,6 @@ static int     gep_rd(struct net_device *dev);
 static void    gep_wr(s32 data, struct net_device *dev);
 static void    timeout(struct net_device *dev, void (*fn)(u_long data), u_long data, u_long msec);
 static void    yawn(struct net_device *dev, int state);
-static void    link_modules(struct net_device *dev, struct net_device *tmp);
 static void    de4x5_parse_params(struct net_device *dev);
 static void    de4x5_dbg_open(struct net_device *dev);
 static void    de4x5_dbg_mii(struct net_device *dev, int k);
@@ -1028,39 +1010,24 @@ static int     type4_infoblock(struct net_device *dev, u_char count, u_char *p);
 static int     type5_infoblock(struct net_device *dev, u_char count, u_char *p);
 static int     compact_infoblock(struct net_device *dev, u_char count, u_char *p);
 
-#ifdef MODULE
-static struct net_device *unlink_modules(struct net_device *p);
-static struct net_device *insert_device(struct net_device *dev, u_long iobase,
-				     int (*init)(struct net_device *));
-static int count_adapters(void);
-static int loading_module = 1;
-MODULE_PARM(de4x5_debug, "i");
-MODULE_PARM(dec_only, "i");
-MODULE_PARM(args, "s");
+/*
+** Note now that module autoprobing is allowed under EISA and PCI. The
+** IRQ lines will not be auto-detected; instead I'll rely on the BIOSes
+** to "do the right thing".
+*/
+
+static int io=0x0;/* EDIT THIS LINE FOR YOUR CONFIGURATION IF NEEDED        */
+
+module_param(io, int, 0);
+module_param(de4x5_debug, int, 0);
+module_param(dec_only, int, 0);
+module_param(args, charp, 0);
+
+MODULE_PARM_DESC(io, "de4x5 I/O base address");
 MODULE_PARM_DESC(de4x5_debug, "de4x5 debug mask");
 MODULE_PARM_DESC(dec_only, "de4x5 probe only for Digital boards (0-1)");
 MODULE_PARM_DESC(args, "de4x5 full duplex and media type settings; see de4x5.c for details");
 MODULE_LICENSE("GPL");
-
-# else
-static int loading_module;
-#endif /* MODULE */
-
-static char name[DE4X5_NAME_LENGTH + 1];
-#if !defined(__sparc_v9__) && !defined(__powerpc__) && !defined(__alpha__)
-static u_char de4x5_irq[] = EISA_ALLOWED_IRQ_LIST;
-static int lastEISA;
-#  ifdef DE4X5_FORCE_EISA                 /* Force an EISA bus probe or not */
-static int forceEISA = 1;
-#  else
-static int forceEISA;
-#  endif
-#endif
-static int num_de4x5s;
-static int cfrv, useSROM;
-static int lastPCI = -1;
-static struct net_device *lastModule;
-static struct pci_dev *pdev;
 
 /*
 ** List the SROM infoleaf functions and chipsets
@@ -1115,37 +1082,22 @@ static int (*dc_infoblock[])(struct net_device *dev, u_char, u_char *) = {
 }
 
 
-/*
-** Autoprobing in modules is allowed here. See the top of the file for
-** more info.
-*/
-int __init 
-de4x5_probe(struct net_device *dev)
-{
-    u_long iobase = dev->base_addr;
-
-    pci_probe(dev, iobase);
-#if !defined(__sparc_v9__) && !defined(__powerpc__) && !defined(__alpha__)
-    if ((lastPCI == NO_MORE_PCI) && ((num_de4x5s == 0) || forceEISA)) {
-        eisa_probe(dev, iobase);
-    }
-#endif
-    
-    return (dev->priv ? 0 : -ENODEV);
-}
-
 static int __init 
-de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev)
+de4x5_hw_init(struct net_device *dev, u_long iobase, struct device *gendev)
 {
-    struct de4x5_bus_type *lp = &bus;
+    char name[DE4X5_NAME_LENGTH + 1];
+    struct de4x5_private *lp = dev->priv;
+    struct pci_dev *pdev = NULL;
     int i, status=0;
-    char *tmp;
-    
+
+    gendev->driver_data = dev;
+
     /* Ensure we're not sleeping */
     if (lp->bus == EISA) {
 	outb(WAKEUP, PCI_CFPM);
     } else {
-	pci_write_config_byte(lp->pdev, PCI_CFDA_PSM, WAKEUP);
+	pdev = to_pci_dev (gendev);
+	pci_write_config_byte(pdev, PCI_CFDA_PSM, WAKEUP);
     }
     mdelay(10);
 
@@ -1158,11 +1110,11 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev)
     /* 
     ** Now find out what kind of DC21040/DC21041/DC21140 board we have.
     */
-    useSROM = FALSE;
+    lp->useSROM = FALSE;
     if (lp->bus == PCI) {
 	PCI_signature(name, lp);
     } else {
-	EISA_signature(name, EISA_ID0);
+	EISA_signature(name, gendev);
     }
     
     if (*name == '\0') {                     /* Not found a board signature */
@@ -1170,13 +1122,7 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev)
     }
     
     dev->base_addr = iobase;
-    if (lp->bus == EISA) {
-	printk("%s: %s at 0x%04lx (EISA slot %ld)", 
-	       dev->name, name, iobase, ((iobase>>12)&0x0f));
-    } else {                                 /* PCI port address */
-	printk("%s: %s at 0x%04lx (PCI bus %d, device %d)", dev->name, name,
-	       iobase, lp->bus_num, lp->device);
-    }
+    printk ("%s: %s at 0x%04lx", gendev->bus_id, name, iobase);
     
     printk(", h/w address ");
     status = get_hw_addr(dev);
@@ -1189,38 +1135,12 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev)
 	printk("      which has an Ethernet PROM CRC error.\n");
 	return -ENXIO;
     } else {
-	struct de4x5_private *lp;
-	
-	/* 
-	** Reserve a section of kernel memory for the adapter
-	** private area and the TX/RX descriptor rings.
-	*/
-	dev->priv = (void *) kmalloc(sizeof(struct de4x5_private) + DE4X5_ALIGN, 
-				     GFP_KERNEL);
-	if (dev->priv == NULL) {
-	    return -ENOMEM;
-	}
-	
-	/*
-	** Align to a longword boundary
-	*/
-	tmp = dev->priv;
-	dev->priv = (void *)(((u_long)dev->priv + DE4X5_ALIGN) & ~DE4X5_ALIGN);
-	lp = (struct de4x5_private *)dev->priv;
-	memset(dev->priv, 0, sizeof(struct de4x5_private));
-	lp->bus = bus.bus;
-	lp->bus_num = bus.bus_num;
-	lp->device = bus.device;
-	lp->chipset = bus.chipset;
-	lp->cache.priv = tmp;
 	lp->cache.gepc = GEP_INIT;
 	lp->asBit = GEP_SLNK;
 	lp->asPolarity = GEP_SLNK;
 	lp->asBitValid = TRUE;
 	lp->timeout = -1;
-	lp->useSROM = useSROM;
-	lp->pdev = pdev;
-	memcpy((char *)&lp->srom,(char *)&bus.srom,sizeof(struct de4x5_srom));
+	lp->gendev = gendev;
 	lp->lock = (spinlock_t) SPIN_LOCK_UNLOCKED;
 	init_timer(&lp->timer);
 	de4x5_parse_params(dev);
@@ -1238,16 +1158,15 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev)
             }
         }
 	lp->fdx = lp->params.fdx;
-	sprintf(lp->adapter_name,"%s (%s)", name, dev->name);
+	sprintf(lp->adapter_name,"%s (%s)", name, gendev->bus_id);
 
 	lp->dma_size = (NUM_RX_DESC + NUM_TX_DESC) * sizeof(struct de4x5_desc);
 #if defined(__alpha__) || defined(__powerpc__) || defined(__sparc_v9__) || defined(DE4X5_DO_MEMCPY)
 	lp->dma_size += RX_BUFF_SZ * NUM_RX_DESC + DE4X5_ALIGN;
 #endif
-	lp->rx_ring = pci_alloc_consistent(pdev, lp->dma_size, &lp->dma_rings);
+	lp->rx_ring = dma_alloc_coherent(gendev, lp->dma_size,
+					 &lp->dma_rings, GFP_ATOMIC);
 	if (lp->rx_ring == NULL) {
-	    kfree(lp->cache.priv);
-	    lp->cache.priv = NULL;
 	    return -ENOMEM;
 	}
 
@@ -1288,11 +1207,7 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev)
 #endif
 
 	barrier();
-	    
-	request_region(iobase, (lp->bus == PCI ? DE4X5_PCI_TOTAL_SIZE :
-				DE4X5_EISA_TOTAL_SIZE), 
-		       lp->adapter_name);
-	    
+
 	lp->rxRingSize = NUM_RX_DESC;
 	lp->txRingSize = NUM_TX_DESC;
 	    
@@ -1313,7 +1228,7 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev)
 	create_packet(dev, lp->frame, sizeof(lp->frame));
 
 	/* Check if the RX overflow bug needs testing for */
-	i = cfrv & 0x000000fe;
+	i = lp->cfrv & 0x000000fe;
 	if ((lp->chipset == DC21140) && (i == 0x20)) {
 	    lp->rx_ovf = 1;
 	}
@@ -1350,7 +1265,7 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev)
     
     /* The DE4X5-specific entries in the device structure. */
     SET_MODULE_OWNER(dev);
-    SET_NETDEV_DEV(dev, &pdev->dev);
+    SET_NETDEV_DEV(dev, gendev);
     dev->open = &de4x5_open;
     dev->hard_start_xmit = &de4x5_queue_pkt;
     dev->stop = &de4x5_close;
@@ -1361,7 +1276,11 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev)
     dev->mem_start = 0;
     
     /* Fill in the generic fields of the device structure. */
-    ether_setup(dev);
+    if ((status = register_netdev (dev))) {
+	    dma_free_coherent (gendev, lp->dma_size,
+			       lp->rx_ring, lp->dma_rings);
+	    return status;
+    }
     
     /* Let the adapter sleep to save power */
     yawn(dev, SLEEP);
@@ -1766,9 +1685,9 @@ de4x5_rx(struct net_device *dev)
 static inline void
 de4x5_free_tx_buff(struct de4x5_private *lp, int entry)
 {
-    pci_unmap_single(lp->pdev, le32_to_cpu(lp->tx_ring[entry].buf),
+    dma_unmap_single(lp->gendev, le32_to_cpu(lp->tx_ring[entry].buf),
 		     le32_to_cpu(lp->tx_ring[entry].des1) & TD_TBS1,
-		     PCI_DMA_TODEVICE);
+		     DMA_TO_DEVICE);
     if ((u_long) lp->tx_skb[entry] > 1)
 	dev_kfree_skb_irq(lp->tx_skb[entry]);
     lp->tx_skb[entry] = NULL;
@@ -1987,7 +1906,7 @@ load_packet(struct net_device *dev, char *buf, u32 flags, struct sk_buff *skb)
 {
     struct de4x5_private *lp = (struct de4x5_private *)dev->priv;
     int entry = (lp->tx_new ? lp->tx_new-1 : lp->txRingSize-1);
-    dma_addr_t buf_dma = pci_map_single(lp->pdev, buf, flags & TD_TBS1, PCI_DMA_TODEVICE);
+    dma_addr_t buf_dma = dma_map_single(lp->gendev, buf, flags & TD_TBS1, DMA_TO_DEVICE);
 
     lp->tx_ring[lp->tx_new].buf = cpu_to_le32(buf_dma);
     lp->tx_ring[lp->tx_new].des1 &= cpu_to_le32(TD_TER);
@@ -2084,194 +2003,128 @@ SetMulticastFilter(struct net_device *dev)
     return;
 }
 
-#if !defined(__sparc_v9__) && !defined(__powerpc__) && !defined(__alpha__)
-/*
-** EISA bus I/O device probe. Probe from slot 1 since slot 0 is usually
-** the motherboard. Upto 15 EISA devices are supported.
-*/
-static void __init 
-eisa_probe(struct net_device *dev, u_long ioaddr)
+#ifdef CONFIG_EISA
+
+static u_char de4x5_irq[] = EISA_ALLOWED_IRQ_LIST;
+
+static int __init de4x5_eisa_probe (struct device *gendev)
 {
-    int i, maxSlots, status, device;
-    u_char irq;
-    u_short vendor;
-    u32 cfid;
-    u_long iobase;
-    struct de4x5_bus_type *lp = &bus;
-    char name[DE4X5_STRLEN];
+	struct eisa_device *edev;
+	u_long iobase;
+	u_char irq, regval;
+	u_short vendor;
+	u32 cfid;
+	int status, device;
+	struct net_device *dev;
+	struct de4x5_private *lp;
 
-    if (lastEISA == MAX_EISA_SLOTS) return;/* No more EISA devices to search */
+	edev = to_eisa_device (gendev);
+	iobase = edev->base_addr;
 
-    lp->bus = EISA;
-    
-    if (ioaddr == 0) {                     /* Autoprobing */
-	iobase = EISA_SLOT_INC;            /* Get the first slot address */
-	i = 1;
-	maxSlots = MAX_EISA_SLOTS;
-    } else {                               /* Probe a specific location */
-	iobase = ioaddr;
-	i = (ioaddr >> 12);
-	maxSlots = i + 1;
-    }
-    
-    for (status = -ENODEV; (i<maxSlots) && (dev!=NULL); i++, iobase+=EISA_SLOT_INC) {
-	if (check_region(iobase, DE4X5_EISA_TOTAL_SIZE)) continue;
-	if (!EISA_signature(name, EISA_ID)) continue;
+	if (!request_region (iobase, DE4X5_EISA_TOTAL_SIZE, "de4x5"))
+		return -EBUSY;
 
+	if (!request_region (iobase + DE4X5_EISA_IO_PORTS,
+			     DE4X5_EISA_TOTAL_SIZE, "de4x5")) {
+		status = -EBUSY;
+		goto release_reg_1;
+	}
+	
+	if (!(dev = alloc_etherdev (sizeof (struct de4x5_private)))) {
+		status = -ENOMEM;
+		goto release_reg_2;
+	}
+	lp = dev->priv;
+	
 	cfid = (u32) inl(PCI_CFID);
-	cfrv = (u_short) inl(PCI_CFRV);
+	lp->cfrv = (u_short) inl(PCI_CFRV);
 	device = (cfid >> 8) & 0x00ffff00;
 	vendor = (u_short) cfid;
 	    
 	/* Read the EISA Configuration Registers */
-	irq = inb(EISA_REG0);
-	irq = de4x5_irq[(irq >> 1) & 0x03];
+	regval = inb(EISA_REG0) & (ER0_INTL | ER0_INTT);
+#ifdef CONFIG_ALPHA
+	/* Looks like the Jensen firmware (rev 2.2) doesn't really
+	 * care about the EISA configuration, and thus doesn't
+	 * configure the PLX bridge properly. Oh well... Simply mimic
+	 * the EISA config file to sort it out. */
+	
+	/* EISA REG1: Assert DecChip 21040 HW Reset */
+	outb (ER1_IAM | 1, EISA_REG1);
+	mdelay (1);
 
+        /* EISA REG1: Deassert DecChip 21040 HW Reset */
+	outb (ER1_IAM, EISA_REG1);
+	mdelay (1);
+
+	/* EISA REG3: R/W Burst Transfer Enable */
+	outb (ER3_BWE | ER3_BRE, EISA_REG3);
+	
+	/* 32_bit slave/master, Preempt Time=23 bclks, Unlatched Interrupt */
+	outb (ER0_BSW | ER0_BMW | ER0_EPT | regval, EISA_REG0);
+#endif
+	irq = de4x5_irq[(regval >> 1) & 0x03];
+	
 	if (is_DC2114x) {
-	    device = ((cfrv & CFRV_RN) < DC2114x_BRK ? DC21142 : DC21143);
+	    device = ((lp->cfrv & CFRV_RN) < DC2114x_BRK ? DC21142 : DC21143);
 	}
 	lp->chipset = device;
+	lp->bus = EISA;
 
 	/* Write the PCI Configuration Registers */
 	outl(PCI_COMMAND_IO | PCI_COMMAND_MASTER, PCI_CFCS);
 	outl(0x00006000, PCI_CFLT);
 	outl(iobase, PCI_CBIO);
 	    
-	DevicePresent(EISA_APROM);
+	DevicePresent(dev, EISA_APROM);
 
 	dev->irq = irq;
-	if ((status = de4x5_hw_init(dev, iobase, NULL)) == 0) {
-	    num_de4x5s++;
-	    if (loading_module) link_modules(lastModule, dev);
-	    lastEISA = i;
-	    return;
+
+	if (!(status = de4x5_hw_init (dev, iobase, gendev))) {
+		return 0;
 	}
-    }
 
-    if (ioaddr == 0) lastEISA = i;
+	free_netdev (dev);
+ release_reg_2:
+	release_region (iobase + DE4X5_EISA_IO_PORTS, DE4X5_EISA_TOTAL_SIZE);
+ release_reg_1:
+	release_region (iobase, DE4X5_EISA_TOTAL_SIZE);
 
-    return;
+	return status;
 }
-#endif          /* !(__sparc_v9__) && !(__powerpc__) && !defined(__alpha__) */
 
-/*
-** PCI bus I/O device probe
-** NB: PCI I/O accesses and Bus Mastering are enabled by the PCI BIOS, not
-** the driver. Some PCI BIOS's, pre V2.1, need the slot + features to be
-** enabled by the user first in the set up utility. Hence we just check for
-** enabled features and silently ignore the card if they're not.
-**
-** STOP PRESS: Some BIOS's __require__ the driver to enable the bus mastering
-** bit. Here, check for I/O accesses and then set BM. If you put the card in
-** a non BM slot, you're on your own (and complain to the PC vendor that your
-** PC doesn't conform to the PCI standard)!
-**
-** This function is only compatible with the *latest* 2.1.x kernels. For 2.0.x
-** kernels use the V0.535[n] drivers.
-*/
-#define PCI_LAST_DEV  32
-
-static void __init 
-pci_probe(struct net_device *dev, u_long ioaddr)
+static int __devexit de4x5_eisa_remove (struct device *device)
 {
-    u_char pb, pbus, dev_num, dnum, timer;
-    u_short vendor, index, status;
-    u_int irq = 0, device, class = DE4X5_CLASS_CODE;
-    u_long iobase = 0;                     /* Clear upper 32 bits in Alphas */
-    struct de4x5_bus_type *lp = &bus;
+	struct net_device *dev;
+	u_long iobase;
 
-    if (lastPCI == NO_MORE_PCI) return;
+	dev = device->driver_data;
+	iobase = dev->base_addr;
+	
+	unregister_netdev (dev);
+	free_netdev (dev);
+	release_region (iobase + DE4X5_EISA_IO_PORTS, DE4X5_EISA_TOTAL_SIZE);
+	release_region (iobase, DE4X5_EISA_TOTAL_SIZE);
 
-    lp->bus = PCI;
-    lp->bus_num = 0;
-
-    if ((ioaddr < 0x1000) && loading_module) {
-	pbus = (u_short)(ioaddr >> 8);
-	dnum = (u_short)(ioaddr & 0xff);
-    } else {
-	pbus = 0;
-	dnum = 0;
-    }
-
-    for (index=lastPCI+1;(pdev = pci_find_class(class, pdev))!=NULL;index++) {
-	dev_num = PCI_SLOT(pdev->devfn);
-	pb = pdev->bus->number;
-	if ((pbus || dnum) && ((pbus != pb) || (dnum != dev_num))) continue;
-
-	vendor = pdev->vendor;
-	device = pdev->device << 8;
-	if (!(is_DC21040 || is_DC21041 || is_DC21140 || is_DC2114x)) continue;
-
-	/* Search for an SROM on this bus */
-	if (lp->bus_num != pb) {
-	    lp->bus_num = pb;
-	    srom_search(pdev);
-	}
-
-	/* Get the chip configuration revision register */
-	pci_read_config_dword(pdev, PCI_REVISION_ID, &cfrv);
-
-	/* Set the device number information */
-	lp->device = dev_num;
-	lp->bus_num = pb;
-	lp->pdev = pdev;
-	    
-	/* Set the chipset information */
-	if (is_DC2114x) {
-	    device = ((cfrv & CFRV_RN) < DC2114x_BRK ? DC21142 : DC21143);
-	}
-	lp->chipset = device;
-
-	/* Get the board I/O address (64 bits on sparc64) */
-	iobase = pci_resource_start(pdev, 0);
-
-	/* Fetch the IRQ to be used */
-	irq = pdev->irq;
-	if ((irq == 0) || (irq == 0xff) || ((int)irq == -1)) continue;
-	    
-	/* Check if I/O accesses and Bus Mastering are enabled */
-	pci_read_config_word(pdev, PCI_COMMAND, &status);
-#ifdef __powerpc__
-	if (!(status & PCI_COMMAND_IO)) {
-	    status |= PCI_COMMAND_IO;
-	    pci_write_config_word(pdev, PCI_COMMAND, status);
-	    pci_read_config_word(pdev, PCI_COMMAND, &status);
-	}
-#endif /* __powerpc__ */
-	if (!(status & PCI_COMMAND_IO)) continue;
-
-	if (!(status & PCI_COMMAND_MASTER)) {
-	    status |= PCI_COMMAND_MASTER;
-	    pci_write_config_word(pdev, PCI_COMMAND, status);
-	    pci_read_config_word(pdev, PCI_COMMAND, &status);
-	}
-	if (!(status & PCI_COMMAND_MASTER)) continue;
-
-	/* Check the latency timer for values >= 0x60 */
-	pci_read_config_byte(pdev, PCI_LATENCY_TIMER, &timer);
-	if (timer < 0x60) {
-	    pci_write_config_byte(pdev, PCI_LATENCY_TIMER, 0x60);
-	}
-
-	DevicePresent(DE4X5_APROM);
-	if (check_region(iobase, DE4X5_PCI_TOTAL_SIZE) == 0) {
-	    dev->irq = irq;
-	    if ((status = de4x5_hw_init(dev, iobase, pdev)) == 0) {
-		num_de4x5s++;
-		lastPCI = index;
-		if (loading_module) link_modules(lastModule, dev);
-		return;
-	    }
-	} else if (ioaddr != 0) {
-	    printk("%s: region already allocated at 0x%04lx.\n", dev->name,
-		   iobase);
-	}
-    }
-
-    lastPCI = NO_MORE_PCI;
-
-    return;
+	return 0;
 }
+
+static struct eisa_device_id de4x5_eisa_ids[] = {
+        { "DEC4250", 0 },	/* 0 is the board name index... */
+        { "" }
+};
+
+static struct eisa_driver de4x5_eisa_driver = {
+        .id_table = de4x5_eisa_ids,
+        .driver   = {
+                .name    = "de4x5",
+                .probe   = de4x5_eisa_probe,
+                .remove  = __devexit_p (de4x5_eisa_remove),
+        }
+};
+#endif
+
+#ifdef CONFIG_PCI
 
 /*
 ** This function searches the current bus (which is >0) for a DECchip with an
@@ -2280,21 +2133,21 @@ pci_probe(struct net_device *dev, u_long ioaddr)
 ** For single port cards this is a time waster...
 */
 static void __init 
-srom_search(struct pci_dev *dev)
+srom_search(struct net_device *dev, struct pci_dev *pdev)
 {
     u_char pb;
     u_short vendor, status;
     u_int irq = 0, device;
     u_long iobase = 0;                     /* Clear upper 32 bits in Alphas */
-    int i, j;
-    struct de4x5_bus_type *lp = &bus;
-    struct list_head *walk = &dev->bus_list;
+    int i, j, cfrv;
+    struct de4x5_private *lp = dev->priv;
+    struct list_head *walk = &pdev->bus_list;
 
-    for (walk = walk->next; walk != &dev->bus_list; walk = walk->next) {
+    for (walk = walk->next; walk != &pdev->bus_list; walk = walk->next) {
 	struct pci_dev *this_dev = pci_dev_b(walk);
 
 	/* Skip the pci_bus list entry */
-	if (list_entry(walk, struct pci_bus, devices) == dev->bus) continue;
+	if (list_entry(walk, struct pci_bus, devices) == pdev->bus) continue;
 
 	vendor = this_dev->vendor;
 	device = this_dev->device << 8;
@@ -2326,7 +2179,7 @@ srom_search(struct pci_dev *dev)
 	if (!(status & PCI_COMMAND_IO)) continue;
 
 	/* Search for a valid SROM attached to this DECchip */
-	DevicePresent(DE4X5_APROM);
+	DevicePresent(dev, DE4X5_APROM);
 	for (j=0, i=0; i<ETH_ALEN; i++) {
 	    j += (u_char) *((u_char *)&lp->srom + SROM_HWADD + i);
 	}
@@ -2344,25 +2197,170 @@ srom_search(struct pci_dev *dev)
     return;
 }
 
-static void __init 
-link_modules(struct net_device *dev, struct net_device *tmp)
+/*
+** PCI bus I/O device probe
+** NB: PCI I/O accesses and Bus Mastering are enabled by the PCI BIOS, not
+** the driver. Some PCI BIOS's, pre V2.1, need the slot + features to be
+** enabled by the user first in the set up utility. Hence we just check for
+** enabled features and silently ignore the card if they're not.
+**
+** STOP PRESS: Some BIOS's __require__ the driver to enable the bus mastering
+** bit. Here, check for I/O accesses and then set BM. If you put the card in
+** a non BM slot, you're on your own (and complain to the PC vendor that your
+** PC doesn't conform to the PCI standard)!
+**
+** This function is only compatible with the *latest* 2.1.x kernels. For 2.0.x
+** kernels use the V0.535[n] drivers.
+*/
+
+static int __init de4x5_pci_probe (struct pci_dev *pdev,
+				   const struct pci_device_id *ent)
 {
-    struct net_device *p=dev;
+	u_char pb, pbus = 0, dev_num, dnum = 0, timer;
+	u_short vendor, status;
+	u_int irq = 0, device;
+	u_long iobase = 0;	/* Clear upper 32 bits in Alphas */
+	int error;
+	struct net_device *dev;
+	struct de4x5_private *lp;
 
-    if (p) {
-	while (((struct de4x5_private *)(p->priv))->next_module) {
-	    p = ((struct de4x5_private *)(p->priv))->next_module;
+	dev_num = PCI_SLOT(pdev->devfn);
+	pb = pdev->bus->number;
+
+	if (io) { /* probe a single PCI device */
+		pbus = (u_short)(io >> 8);
+		dnum = (u_short)(io & 0xff);
+		if ((pbus != pb) || (dnum != dev_num))
+			return -ENODEV;
 	}
 
-	if (dev != tmp) {
-	    ((struct de4x5_private *)(p->priv))->next_module = tmp;
-	} else {
-	    ((struct de4x5_private *)(p->priv))->next_module = NULL;
-	}
-    }
+	vendor = pdev->vendor;
+	device = pdev->device << 8;
+	if (!(is_DC21040 || is_DC21041 || is_DC21140 || is_DC2114x))
+		return -ENODEV;
 
-    return;
+	/* Ok, the device seems to be for us. */
+	if (!(dev = alloc_etherdev (sizeof (struct de4x5_private))))
+		return -ENOMEM;
+
+	lp = dev->priv;
+	lp->bus = PCI;
+	lp->bus_num = 0;
+	
+	/* Search for an SROM on this bus */
+	if (lp->bus_num != pb) {
+	    lp->bus_num = pb;
+	    srom_search(dev, pdev);
+	}
+
+	/* Get the chip configuration revision register */
+	pci_read_config_dword(pdev, PCI_REVISION_ID, &lp->cfrv);
+
+	/* Set the device number information */
+	lp->device = dev_num;
+	lp->bus_num = pb;
+	
+	/* Set the chipset information */
+	if (is_DC2114x) {
+	    device = ((lp->cfrv & CFRV_RN) < DC2114x_BRK ? DC21142 : DC21143);
+	}
+	lp->chipset = device;
+
+	/* Get the board I/O address (64 bits on sparc64) */
+	iobase = pci_resource_start(pdev, 0);
+
+	/* Fetch the IRQ to be used */
+	irq = pdev->irq;
+	if ((irq == 0) || (irq == 0xff) || ((int)irq == -1)) {
+		error = -ENODEV;
+		goto free_dev;
+	}
+	    
+	/* Check if I/O accesses and Bus Mastering are enabled */
+	pci_read_config_word(pdev, PCI_COMMAND, &status);
+#ifdef __powerpc__
+	if (!(status & PCI_COMMAND_IO)) {
+	    status |= PCI_COMMAND_IO;
+	    pci_write_config_word(pdev, PCI_COMMAND, status);
+	    pci_read_config_word(pdev, PCI_COMMAND, &status);
+	}
+#endif /* __powerpc__ */
+	if (!(status & PCI_COMMAND_IO)) {
+		error = -ENODEV;
+		goto free_dev;
+	}
+
+	if (!(status & PCI_COMMAND_MASTER)) {
+	    status |= PCI_COMMAND_MASTER;
+	    pci_write_config_word(pdev, PCI_COMMAND, status);
+	    pci_read_config_word(pdev, PCI_COMMAND, &status);
+	}
+	if (!(status & PCI_COMMAND_MASTER)) {
+		error = -ENODEV;
+		goto free_dev;
+	}
+
+	/* Check the latency timer for values >= 0x60 */
+	pci_read_config_byte(pdev, PCI_LATENCY_TIMER, &timer);
+	if (timer < 0x60) {
+	    pci_write_config_byte(pdev, PCI_LATENCY_TIMER, 0x60);
+	}
+
+	DevicePresent(dev, DE4X5_APROM);
+
+	if (!request_region (iobase, DE4X5_PCI_TOTAL_SIZE, "de4x5")) {
+		error = -EBUSY;
+		goto free_dev;
+	}
+
+	dev->irq = irq;
+	
+	if ((error = de4x5_hw_init(dev, iobase, &pdev->dev))) {
+		goto release;
+	}
+
+	return 0;
+
+ release:
+	release_region (iobase, DE4X5_PCI_TOTAL_SIZE);
+ free_dev:
+	free_netdev (dev);
+	return error;
 }
+
+static void __devexit de4x5_pci_remove (struct pci_dev *pdev)
+{
+	struct net_device *dev;
+	u_long iobase;
+
+	dev = pdev->dev.driver_data;
+	iobase = dev->base_addr;
+
+	unregister_netdev (dev);
+	free_netdev (dev);
+	release_region (iobase, DE4X5_PCI_TOTAL_SIZE);
+}
+
+static struct pci_device_id de4x5_pci_tbl[] = {
+        { PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_TULIP,
+          PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+        { PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_TULIP_PLUS,
+          PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1 },
+        { PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_TULIP_FAST,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 2 },
+        { PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_21142,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 3 },
+        { },
+};
+
+static struct pci_driver de4x5_pci_driver = {
+        .name           = "de4x5",
+        .id_table       = de4x5_pci_tbl,
+        .probe          = de4x5_pci_probe,
+	.remove         = __devexit_p (de4x5_pci_remove),
+};
+
+#endif
 
 /*
 ** Auto configure the media here rather than setting the port at compile
@@ -3945,34 +3943,20 @@ create_packet(struct net_device *dev, char *frame, int len)
 ** Look for a particular board name in the EISA configuration space
 */
 static int
-EISA_signature(char *name, s32 eisa_id)
+EISA_signature(char *name, struct device *device)
 {
-    static c_char *signatures[] = DE4X5_SIGNATURE;
-    char ManCode[DE4X5_STRLEN];
-    union {
-	s32 ID;
-	char Id[4];
-    } Eisa;
-    int i, status = 0, siglen = sizeof(signatures)/sizeof(c_char *);
-    
+    int i, status = 0, siglen = sizeof(de4x5_signatures)/sizeof(c_char *);
+    struct eisa_device *edev;
+
     *name = '\0';
-    Eisa.ID = inl(eisa_id);
-    
-    ManCode[0]=(((Eisa.Id[0]>>2)&0x1f)+0x40);
-    ManCode[1]=(((Eisa.Id[1]&0xe0)>>5)+((Eisa.Id[0]&0x03)<<3)+0x40);
-    ManCode[2]=(((Eisa.Id[2]>>4)&0x0f)+0x30);
-    ManCode[3]=((Eisa.Id[2]&0x0f)+0x30);
-    ManCode[4]=(((Eisa.Id[3]>>4)&0x0f)+0x30);
-    ManCode[5]='\0';
-    
-    for (i=0;i<siglen;i++) {
-	if (strstr(ManCode, signatures[i]) != NULL) {
-	    strcpy(name,ManCode);
+    edev = to_eisa_device (device);
+    i = edev->id.driver_data;
+
+    if (i >= 0 && i < siglen) {
+	    strcpy (name, de4x5_signatures[i]);
 	    status = 1;
-	    break;
-	}
     }
-    
+
     return status;                         /* return the device name string */
 }
 
@@ -3980,9 +3964,8 @@ EISA_signature(char *name, s32 eisa_id)
 ** Look for a particular board name in the PCI configuration space
 */
 static int
-PCI_signature(char *name, struct de4x5_bus_type *lp)
+PCI_signature(char *name, struct de4x5_private *lp)
 {
-    static c_char *de4x5_signatures[] = DE4X5_SIGNATURE;
     int i, status = 0, siglen = sizeof(de4x5_signatures)/sizeof(c_char *);
     
     if (lp->chipset == DC21040) {
@@ -4008,10 +3991,10 @@ PCI_signature(char *name, struct de4x5_bus_type *lp)
 			     )))))));
 	}
 	if (lp->chipset != DC21041) {
-	    useSROM = TRUE;             /* card is not recognisably DEC */
+	    lp->useSROM = TRUE;             /* card is not recognisably DEC */
 	}
     } else if ((lp->chipset & ~0x00ff) == DC2114x) {
-	useSROM = TRUE;
+	lp->useSROM = TRUE;
     }
     
     return status;
@@ -4026,10 +4009,10 @@ PCI_signature(char *name, struct de4x5_bus_type *lp)
 ** be fixed up later).
 */
 static void
-DevicePresent(u_long aprom_addr)
+DevicePresent(struct net_device *dev, u_long aprom_addr)
 {
     int i, j=0;
-    struct de4x5_bus_type *lp = &bus;
+    struct de4x5_private *lp = (struct de4x5_private *) dev->priv;
     
     if (lp->chipset == DC21040) {
 	if (lp->bus == EISA) {
@@ -4110,7 +4093,7 @@ get_hw_addr(struct net_device *dev)
     u_long iobase = dev->base_addr;
     int broken, i, k, tmp, status = 0;
     u_short j,chksum;
-    struct de4x5_bus_type *lp = &bus;
+    struct de4x5_private *lp = dev->priv;
 
     broken = de4x5_bad_srom(lp);
 
@@ -4191,7 +4174,7 @@ get_hw_addr(struct net_device *dev)
 ** didn't seem to work here...?
 */
 static int
-de4x5_bad_srom(struct de4x5_bus_type *lp)
+de4x5_bad_srom(struct de4x5_private *lp)
 {
     int i, status = 0;
 
@@ -4225,14 +4208,14 @@ de4x5_strncmp(char *a, char *b, int n)
 static void
 srom_repair(struct net_device *dev, int card)
 {
-    struct de4x5_bus_type *lp = &bus;
+    struct de4x5_private *lp = dev->priv;
 
     switch(card) {
       case SMC:
-	memset((char *)&bus.srom, 0, sizeof(struct de4x5_srom));
+	memset((char *)&lp->srom, 0, sizeof(struct de4x5_srom));
 	memcpy(lp->srom.ieee_addr, (char *)dev->dev_addr, ETH_ALEN);
 	memcpy(lp->srom.info, (char *)&srom_repair_info[SMC-1], 100);
-	useSROM = TRUE;
+	lp->useSROM = TRUE;
 	break;
     }
 
@@ -4246,7 +4229,7 @@ srom_repair(struct net_device *dev, int card)
 static int
 test_bad_enet(struct net_device *dev, int status)
 {
-    struct de4x5_bus_type *lp = &bus;
+    struct de4x5_private *lp = dev->priv;
     int i, tmp;
 
     for (tmp=0,i=0; i<ETH_ALEN; i++) tmp += (u_char)dev->dev_addr[i];
@@ -4279,7 +4262,7 @@ test_bad_enet(struct net_device *dev, int status)
 ** List of board exceptions with correctly wired IRQs
 */
 static int
-an_exception(struct de4x5_bus_type *lp)
+an_exception(struct de4x5_private *lp)
 {
     if ((*(u_short *)lp->srom.sub_vendor_id == 0x00c0) && 
 	(*(u_short *)lp->srom.sub_system_id == 0x95e0)) {
@@ -5312,19 +5295,20 @@ yawn(struct net_device *dev, int state)
 	    break;
 	}
     } else {
+	struct pci_dev *pdev = to_pci_dev (lp->gendev);
 	switch(state) {
 	  case WAKEUP:
-	    pci_write_config_byte(lp->pdev, PCI_CFDA_PSM, WAKEUP);
+	    pci_write_config_byte(pdev, PCI_CFDA_PSM, WAKEUP);
 	    mdelay(10);
 	    break;
 
 	  case SNOOZE:
-	    pci_write_config_byte(lp->pdev, PCI_CFDA_PSM, SNOOZE);
+	    pci_write_config_byte(pdev, PCI_CFDA_PSM, SNOOZE);
 	    break;
 
 	  case SLEEP:
 	    outl(0, DE4X5_SICR);
-	    pci_write_config_byte(lp->pdev, PCI_CFDA_PSM, SLEEP);
+	    pci_write_config_byte(pdev, PCI_CFDA_PSM, SLEEP);
 	    break;
 	}
     }
@@ -5348,9 +5332,6 @@ de4x5_parse_params(struct net_device *dev)
 	t = *q;
 	*q = '\0';
 
-#if !defined(__sparc_v9__) && !defined(__powerpc__) && !defined(__alpha__)
-	if (strstr(p, "force_eisa") || strstr(p, "FORCE_EISA")) forceEISA = 1;
-#endif
 	if (strstr(p, "fdx") || strstr(p, "FDX")) lp->params.fdx = 1;
 
 	if (strstr(p, "autosense") || strstr(p, "AUTOSENSE")) {
@@ -5758,146 +5739,29 @@ de4x5_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
     return status;
 }
 
-#ifdef MODULE
-/*
-** Note now that module autoprobing is allowed under EISA and PCI. The
-** IRQ lines will not be auto-detected; instead I'll rely on the BIOSes
-** to "do the right thing".
-*/
-#define LP(a) ((struct de4x5_private *)(a))
-static struct net_device *mdev = NULL;
-static int io=0x0;/* EDIT THIS LINE FOR YOUR CONFIGURATION IF NEEDED        */
-MODULE_PARM(io, "i");
-MODULE_PARM_DESC(io, "de4x5 I/O base address");
-
-int
-init_module(void)
+static int __init de4x5_module_init (void)
 {
-    int i, num, status = -EIO;
-    struct net_device *p;
+	int err = 0;
 
-    num = count_adapters();
-
-    for (i=0; i<num; i++) {
-	if ((p = insert_device(NULL, io, de4x5_probe)) == NULL) 
-	    return -ENOMEM;
-
-	if (!mdev) mdev = p;
-
-	if (register_netdev(p) != 0) {
-	    struct de4x5_private *lp = (struct de4x5_private *)p->priv;
-	    if (lp) {
-		release_region(p->base_addr, (lp->bus == PCI ? 
-					      DE4X5_PCI_TOTAL_SIZE :
-					      DE4X5_EISA_TOTAL_SIZE));
-		if (lp->cache.priv) {       /* Private area allocated?   */
-		    kfree(lp->cache.priv);  /* Free the private area     */
-		}
-		if (lp->rx_ring) {
-		    pci_free_consistent(lp->pdev, lp->dma_size, lp->rx_ring,
-					lp->dma_rings);
-		}
-	    }
-	    kfree(p);
-	} else {
-	    status = 0;                 /* At least one adapter will work */
-	    lastModule = p;
-	}
-    }
-
-    return status;
-}
-
-void
-cleanup_module(void)
-{
-    while (mdev != NULL) {
-	mdev = unlink_modules(mdev);
-    }
-
-    return;
-}
-
-static struct net_device *
-unlink_modules(struct net_device *p)
-{
-    struct net_device *next = NULL;
-
-    if (p->priv) {                          /* Private areas allocated?  */
-	struct de4x5_private *lp = (struct de4x5_private *)p->priv;
-
-	next = lp->next_module;
-	if (lp->rx_ring) {
-		pci_free_consistent(lp->pdev, lp->dma_size, lp->rx_ring,
-				    lp->dma_rings);
-	}
-	release_region(p->base_addr, (lp->bus == PCI ? 
-				      DE4X5_PCI_TOTAL_SIZE :
-				      DE4X5_EISA_TOTAL_SIZE));
-	kfree(lp->cache.priv);              /* Free the private area     */
-    }
-    unregister_netdev(p);
-    free_netdev(p);                         /* Free the device structure */
-    
-    return next;
-}
-
-static int
-count_adapters(void)
-{
-    int i, j=0;
-    u_short vendor;
-    u_int class = DE4X5_CLASS_CODE;
-    u_int device;
-
-#if !defined(__sparc_v9__) && !defined(__powerpc__) && !defined(__alpha__)
-    char name[DE4X5_STRLEN];
-    u_long iobase = 0x1000;
-
-    for (i=1; i<MAX_EISA_SLOTS; i++, iobase+=EISA_SLOT_INC) {
-	if (EISA_signature(name, EISA_ID)) j++;
-    }
+#if CONFIG_PCI
+	err = pci_module_init (&de4x5_pci_driver);
+#endif
+#ifdef CONFIG_EISA
+	err |= eisa_driver_register (&de4x5_eisa_driver);
 #endif
 
-    for (i=0; (pdev=pci_find_class(class, pdev))!= NULL; i++) {
-	vendor = pdev->vendor;
-	device = pdev->device << 8;
-	if (is_DC21040 || is_DC21041 || is_DC21140 || is_DC2114x) j++;
-    }
-
-    return j;
+	return err;
 }
 
-/*
-** If at end of eth device list and can't use current entry, malloc
-** one up. If memory could not be allocated, print an error message.
-*/
-static struct net_device * __init 
-insert_device(struct net_device *dev, u_long iobase, int (*init)(struct net_device *))
+static void __exit de4x5_module_exit (void)
 {
-    struct net_device *new;
-
-    new = (struct net_device *)kmalloc(sizeof(struct net_device), GFP_KERNEL);
-    if (new == NULL) {
-	printk("de4x5.c: Device not initialised, insufficient memory\n");
-	return NULL;
-    } else {
-	memset((char *)new, 0, sizeof(struct net_device));
-	new->base_addr = iobase;       /* assign the io address */
-	new->init = init;              /* initialisation routine */
-    }
-
-    return new;
+#if CONFIG_PCI
+	pci_unregister_driver (&de4x5_pci_driver);
+#endif
+#ifdef CONFIG_EISA
+	eisa_driver_unregister (&de4x5_eisa_driver);
+#endif
 }
 
-#endif /* MODULE */
-
-
-/*
- * Local variables:
- *
- * Delete -DMODVERSIONS below if you didn't define this in your kernel
- *
- *  compile-command: "gcc -D__KERNEL__ -DMODULE -I/linux/include -Wall -Wstrict-prototypes -fomit-frame-pointer -fno-strength-reduce -malign-loops=2 -malign-jumps=2 -malign-functions=2 -O2 -m486 -DMODVERSIONS -include /linux/include/linux/modversions.h -c de4x5.c"
- * End:
- */
+module_init (de4x5_module_init);
+module_exit (de4x5_module_exit);

@@ -736,5 +736,6 @@ ipacx_setup(struct IsdnCardState *cs, struct dc_hw_ops *ipacx_dc_ops,
 	cs->bc_hw_ops = ipacx_bc_ops;
 	val = ipacx_read_reg(cs, IPACX_ID) & 0x3f;
 	printk(KERN_INFO "HiSax: IPACX Design Id: %#x\n", val);
+	return 0;
 }
 

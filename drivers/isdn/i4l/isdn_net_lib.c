@@ -758,7 +758,7 @@ static int
 isdn_net_getphone(isdn_net_ioctl_phone * phone, char *phones)
 {
 	isdn_net_dev *idev = isdn_net_findif(phone->name);
-	int count = 0;
+	u_int count = 0;
 	char *buf = (char *)__get_free_page(GFP_KERNEL);
 	struct isdn_net_phone *n;
 

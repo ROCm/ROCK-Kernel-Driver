@@ -94,6 +94,7 @@ typedef struct {
 	int StartOnReset;		/* Indicates startproc after reset */
 	int EngineUp;			/* Indicates CommEngine Up */
 	int trace_mode;			/* Indicate if tracing is on */
+	spinlock_t lock;		/* local lock */
 } board;
 
 #endif /* CARD_H */

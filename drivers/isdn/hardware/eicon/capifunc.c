@@ -22,8 +22,8 @@
 #define DBG_MINIMUM  (DL_LOG + DL_FTL + DL_ERR)
 #define DBG_DEFAULT  (DBG_MINIMUM + DL_XLOG + DL_REG)
 
-static DIVA_CAPI_ADAPTER *adapter = (DIVA_CAPI_ADAPTER *) NULL;
-static APPL *application = (APPL *) NULL;
+DIVA_CAPI_ADAPTER *adapter = (DIVA_CAPI_ADAPTER *) NULL;
+APPL *application = (APPL *) NULL;
 byte max_appl = MAX_APPL;
 static CAPI_MSG *mapped_msg = (CAPI_MSG *) NULL;
 
@@ -45,7 +45,7 @@ static dword notify_handle;
 static void DIRequest(ENTITY * e);
 static DESCRIPTOR MAdapter;
 static DESCRIPTOR DAdapter;
-static byte max_adapter = 0;
+byte max_adapter = 0;
 static byte ControllerMap[MAX_DESCRIPTORS + 1];
 
 
@@ -111,7 +111,7 @@ static void no_printf(unsigned char *x, ...)
 /*
  * Controller mapping
  */
-static byte MapController(byte Controller)
+byte MapController(byte Controller)
 {
 	byte i;
 	byte MappedController = 0;
@@ -750,8 +750,6 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 	void **xbuffer_ptr, **xbuffer_internal;
 	diva_os_spin_lock_magic_t old_irql;
 
-	DIVA_LOCK_MODULE;
-
 	if (diva_os_in_irq()) {
 		DBG_ERR(("CAPI_REGISTER - in irq context !"))
 		return;
@@ -777,6 +775,11 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 		return;	/* appl already registered */
 	}
 
+	if (!try_module_get(ctrl->owner)) {
+		printk(KERN_WARNING "%s: cannot reserve module\n", __FUNCTION__);
+		return;
+	}
+
 	/* alloc memory */
 
 	bnum = rp->level3cnt * rp->datablkcnt;
@@ -784,6 +787,7 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 
 	if (!(DataNCCI = diva_os_malloc(0, bnum * sizeof(word)))) {
 		DBG_ERR(("CAPI_REGISTER - memory allocation failed"))
+		module_put(ctrl->owner);
 		return;
 	}
 	memset(DataNCCI, 0, bnum * sizeof(word));
@@ -791,6 +795,7 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 	if (!(DataFlags = diva_os_malloc(0, bnum * sizeof(word)))) {
 		DBG_ERR(("CAPI_REGISTER - memory allocation failed"))
 		diva_os_free(0, DataNCCI);
+		module_put(ctrl->owner);
 		return;
 	}
 	memset(DataFlags, 0, bnum * sizeof(word));
@@ -799,6 +804,7 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 		DBG_ERR(("CAPI_REGISTER - memory allocation failed"))
 		diva_os_free(0, DataNCCI);
 		diva_os_free(0, DataFlags);
+		module_put(ctrl->owner);
 		return;
 	}
 	memset(ReceiveBuffer, 0, bnum * rp->datablklen);
@@ -808,6 +814,7 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 		diva_os_free(0, DataNCCI);
 		diva_os_free(0, DataFlags);
 		diva_os_free(0, ReceiveBuffer);
+		module_put(ctrl->owner);
 		return;
 	}
 	memset(xbuffer_used, 0, xnum);
@@ -818,6 +825,7 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 		diva_os_free(0, DataFlags);
 		diva_os_free(0, ReceiveBuffer);
 		diva_os_free(0, xbuffer_used);
+		module_put(ctrl->owner);
 		return;
 	}
 	memset(xbuffer_ptr, 0, xnum * sizeof(void *));
@@ -829,6 +837,7 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 		diva_os_free(0, ReceiveBuffer);
 		diva_os_free(0, xbuffer_used);
 		diva_os_free(0, xbuffer_ptr);
+		module_put(ctrl->owner);
 		return;
 	}
 	memset(xbuffer_internal, 0, xnum * sizeof(void *));
@@ -848,6 +857,7 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 			diva_os_free(0, xbuffer_used);
 			diva_os_free(0, xbuffer_ptr);
 			diva_os_free(0, xbuffer_internal);
+			module_put(ctrl->owner);
 			return;
 		}
 	}
@@ -935,7 +945,7 @@ static void diva_release_appl(struct capi_ctr *ctrl, __u16 appl)
 	}
 	diva_os_leave_spin_lock(&api_lock, &old_irql, "release_appl");
 
-	DIVA_UNLOCK_MODULE;
+	module_put(ctrl->owner);
 }
 
 /*
