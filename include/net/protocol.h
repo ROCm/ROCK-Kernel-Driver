@@ -44,15 +44,17 @@ struct inet_protocol
 #if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
 struct inet6_protocol 
 {
-	int	(*handler)(struct sk_buff **skbp);
+	int	(*handler)(struct sk_buff **skb, unsigned int *nhoffp);
 
 	void	(*err_handler)(struct sk_buff *skb,
 			       struct inet6_skb_parm *opt,
 			       int type, int code, int offset,
 			       __u32 info);
-	int	no_policy;
+	unsigned int	flags;	/* INET6_PROTO_xxx */
 };
 
+#define INET6_PROTO_NOPOLICY	0x1
+#define INET6_PROTO_FINAL	0x2
 #endif
 
 /* This is used to register socket interfaces for IP protocols.  */

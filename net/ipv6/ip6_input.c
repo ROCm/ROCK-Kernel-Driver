@@ -17,7 +17,8 @@
  */
 /* Changes
  *
- * 	Mitsuru KANDA @USAGI	: Remove ipv6_parse_exthdrs().
+ * 	Mitsuru KANDA @USAGI and
+ * 	YOSHIFUJI Hideaki @USAGI: Remove ipv6_parse_exthdrs().
  */
 
 #include <linux/errno.h>
@@ -128,22 +129,34 @@ out:
 
 static inline int ip6_input_finish(struct sk_buff *skb)
 {
-	struct ipv6hdr *hdr = skb->nh.ipv6h;
 	struct inet6_protocol *ipprot;
 	struct sock *raw_sk;
-	int nexthdr = hdr->nexthdr;
+	unsigned int nhoff;
+	int nexthdr;
 	u8 hash;
+	int cksum_sub = 0;
 
 	skb->h.raw = skb->nh.raw + sizeof(struct ipv6hdr);
 
-	if (!pskb_pull(skb, skb->h.raw - skb->data))
-		goto discard;
+	/*
+	 *	Parse extension headers
+	 */
 
-	if (skb->ip_summed == CHECKSUM_HW)
-		skb->csum = csum_sub(skb->csum,
-				     csum_partial(skb->nh.raw, skb->h.raw-skb->nh.raw, 0));
+	nexthdr = skb->nh.ipv6h->nexthdr;
+	nhoff = offsetof(struct ipv6hdr, nexthdr);
+
+	/* Skip  hop-by-hop options, they are already parsed. */
+	if (nexthdr == NEXTHDR_HOP) {
+		nhoff = sizeof(struct ipv6hdr);
+		nexthdr = skb->h.raw[0];
+		skb->h.raw += (skb->h.raw[1]+1)<<3;
+	}
 
 resubmit:
+	if (!pskb_pull(skb, skb->h.raw - skb->data))
+		goto discard;
+	nexthdr = skb->nh.raw[nhoff];
+
 	raw_sk = raw_v6_htable[nexthdr & (MAX_INET_PROTOS - 1)];
 	if (raw_sk)
 		ipv6_raw_deliver(skb, nexthdr);
@@ -152,23 +165,29 @@ resubmit:
 	if ((ipprot = inet6_protos[hash]) != NULL) {
 		int ret;
 		
-		if (!ipprot->no_policy &&
+		if (ipprot->flags & INET6_PROTO_FINAL) {
+			if (!cksum_sub && skb->ip_summed == CHECKSUM_HW) {
+				skb->csum = csum_sub(skb->csum,
+						     csum_partial(skb->nh.raw, skb->h.raw-skb->nh.raw, 0));
+				cksum_sub++;
+			}
+		}
+		if (!(ipprot->flags & INET6_PROTO_NOPOLICY) &&
 		    !xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb)) {
 			kfree_skb(skb);
 			return 0;
 		}
-		ret = ipprot->handler(&skb);
-		if (ret < 0) {
-			nexthdr = -ret;
+		
+		ret = ipprot->handler(&skb, &nhoff);
+		if (ret > 0)
 			goto resubmit;
-		}
-		IP6_INC_STATS_BH(Ip6InDelivers);
+		else if (ret == 0)
+			IP6_INC_STATS_BH(Ip6InDelivers);
 	} else {
 		if (!raw_sk) {
 			if (xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb)) {
 				IP6_INC_STATS_BH(Ip6InUnknownProtos);
-				icmpv6_param_prob(skb, ICMPV6_UNK_NEXTHDR,
-						  offsetof(struct ipv6hdr, nexthdr));
+				icmpv6_param_prob(skb, ICMPV6_UNK_NEXTHDR, nhoff);
 			}
 		} else {
 			IP6_INC_STATS_BH(Ip6InDelivers);

@@ -330,7 +330,7 @@ static struct xfrm_type ah6_type =
 static struct inet6_protocol ah6_protocol = {
 	.handler	=	xfrm6_rcv,
 	.err_handler	=	ah6_err,
-	.no_policy	=	1,
+	.flags		=	INET6_PROTO_NOPOLICY,
 };
 
 int __init ah6_init(void)
