@@ -587,7 +587,6 @@ int DMAbuf_getrdbuffer(int dev, char **buf, int *len, int dontblock)
 		spin_unlock_irqrestore(&dmap->lock,flags);
 		timeout = interruptible_sleep_on_timeout(&adev->in_sleeper,
 							 timeout);
-		spin_lock_irqsave(&dmap->lock,flags);
 		if (!timeout) {
 			/* FIXME: include device name */
 			err = -EIO;
@@ -595,6 +594,7 @@ int DMAbuf_getrdbuffer(int dev, char **buf, int *len, int dontblock)
 			dma_reset_input(dev);
 		} else
 			err = -EINTR;
+		spin_lock_irqsave(&dmap->lock,flags);
 	}
 	spin_unlock_irqrestore(&dmap->lock,flags);
 

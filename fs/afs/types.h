@@ -20,21 +20,6 @@ typedef unsigned			afs_volid_t;
 typedef unsigned			afs_vnodeid_t;
 typedef unsigned long long		afs_dataversion_t;
 
-typedef struct afs_async_op		afs_async_op_t;
-typedef struct afs_callback		afs_callback_t;
-typedef struct afs_cell			afs_cell_t;
-typedef struct afs_fid			afs_fid_t;
-typedef struct afs_file_status		afs_file_status_t;
-typedef struct afs_server		afs_server_t;
-typedef struct afs_timer		afs_timer_t;
-typedef struct afs_vlocation		afs_vlocation_t;
-typedef struct afs_vnode		afs_vnode_t;
-typedef struct afs_volsync		afs_volsync_t;
-typedef struct afs_volume		afs_volume_t;
-typedef struct afs_volume_info		afs_volume_info_t;
-
-typedef struct afsvl_dbentry		afsvl_dbentry_t;
-
 typedef enum {
 	AFSVL_RWVOL,			/* read/write volume */
 	AFSVL_ROVOL,			/* read-only volume */
@@ -51,6 +36,9 @@ typedef enum {
 } afs_file_type_t;
 
 #ifdef __KERNEL__
+
+struct afs_cell;
+struct afs_vnode;
 
 /*****************************************************************************/
 /*
@@ -76,8 +64,8 @@ typedef enum {
 
 struct afs_callback
 {
-	afs_server_t		*server;	/* server that made the promise */
-	afs_fid_t		fid;		/* file identifier */
+	struct afs_server	*server;	/* server that made the promise */
+	struct afs_fid		fid;		/* file identifier */
 	unsigned		version;	/* callback version */
 	unsigned		expiry;		/* time at which expires */
 	afs_callback_type_t	type;		/* type of callback */
@@ -120,7 +108,7 @@ struct afs_file_status
 	unsigned		caller_access;	/* access rights for authenticated caller */
 	unsigned		anon_access;	/* access rights for unauthenticated caller */
 	umode_t			mode;		/* UNIX mode */
-	afs_fid_t		parent;		/* parent file ID */
+	struct afs_fid		parent;		/* parent file ID */
 	time_t			mtime_client;	/* last time client changed data */
 	time_t			mtime_server;	/* last time server changed data */
 };

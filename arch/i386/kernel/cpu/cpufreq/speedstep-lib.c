@@ -104,6 +104,26 @@ static unsigned int pentium3_get_frequency (unsigned int processor)
 }
 
 
+static unsigned int pentiumM_get_frequency(void)
+{
+	u32     msr_lo, msr_tmp;
+
+	rdmsr(MSR_IA32_EBL_CR_POWERON, msr_lo, msr_tmp);
+	dprintk(KERN_DEBUG "speedstep-lib: PM - MSR_IA32_EBL_CR_POWERON: 0x%x 0x%x\n", msr_lo, msr_tmp);
+
+	/* see table B-2 of 24547212.pdf */
+	if (msr_lo & 0x00040000) {
+		printk(KERN_DEBUG "speedstep-lib: PM - invalid FSB: 0x%x 0x%x\n", msr_lo, msr_tmp);
+		return 0;
+	}
+
+	msr_tmp = (msr_lo >> 22) & 0x1f;
+	dprintk(KERN_DEBUG "speedstep-lib: bits 22-26 are 0x%x\n", msr_tmp);
+
+	return (msr_tmp * 100 * 10000);
+}
+
+
 static unsigned int pentium4_get_frequency(void)
 {
 	struct cpuinfo_x86 *c = &boot_cpu_data;
@@ -151,6 +171,9 @@ static unsigned int pentium4_get_frequency(void)
 unsigned int speedstep_get_processor_frequency(unsigned int processor)
 {
 	switch (processor) {
+	case SPEEDSTEP_PROCESSOR_PM:
+		return pentiumM_get_frequency();
+	case SPEEDSTEP_PROCESSOR_P4D:
 	case SPEEDSTEP_PROCESSOR_P4M:
 		return pentium4_get_frequency();
 	case SPEEDSTEP_PROCESSOR_PIII_T:

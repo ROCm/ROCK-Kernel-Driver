@@ -8,7 +8,7 @@
  *	modify it under the terms of the GNU General Public License
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
- *	
+ *
  *	Neither kernel concepts nor Nils Faerber admit liability nor provide
  *	warranty for any of this software. This material is provided
  *	"AS-IS" and at no charge.
@@ -112,7 +112,7 @@ static int tco_timer_start (void)
 	outb (val, TCO1_CNT + 1);
 	val = inb (TCO1_CNT + 1);
 	spin_unlock(&tco_lock);
-	
+
 	if (val & 0x08)
 		return -1;
 	return 0;
@@ -131,7 +131,7 @@ static int tco_timer_stop (void)
 	outb (val, TCO1_CNT + 1);
 	val = inb (TCO1_CNT + 1);
 	spin_unlock(&tco_lock);
-	
+
 	if ((val & 0x08) == 0)
 		return -1;
 	return 0;
@@ -148,7 +148,7 @@ static int tco_timer_settimer (unsigned char tmrval)
 	/* "Values of 0h-3h are ignored and should not be attempted" */
 	if (tmrval > 0x3f || tmrval < 0x04)
 		return -1;
-	
+
 	spin_lock(&tco_lock);
 	val = inb (TCO1_TMR);
 	val &= 0xc0;
@@ -156,7 +156,7 @@ static int tco_timer_settimer (unsigned char tmrval)
 	outb (val, TCO1_TMR);
 	val = inb (TCO1_TMR);
 	spin_unlock(&tco_lock);
-	
+
 	if ((val & 0x3f) != tmrval)
 		return -1;
 
@@ -197,7 +197,7 @@ static int i810tco_release (struct inode *inode, struct file *file)
 	/*
 	 *      Shut off the timer.
 	 */
-	if (tco_expect_close == 42 && !nowayout) {
+	if (tco_expect_close == 42) {
 		tco_timer_stop ();
 	} else {
 		tco_timer_reload ();
@@ -217,17 +217,21 @@ static ssize_t i810tco_write (struct file *file, const char *data,
 
 	/* See if we got the magic character 'V' and reload the timer */
 	if (len) {
-		size_t i;
+		if (!nowayout) {
+			size_t i;
 
-		tco_expect_close = 0;
+			/* note: just in case someone wrote the magic character
+			 * five months ago... */
+			tco_expect_close = 0;
 
-		/* scan to see whether or not we got the magic character */
-		for (i = 0; i != len; i++) {
-			u8 c;
-			if(get_user(c, data+i))
-				return -EFAULT;
-			if (c == 'V')
-				tco_expect_close = 42;
+			/* scan to see whether or not we got the magic character */
+			for (i = 0; i != len; i++) {
+				u8 c;
+				if(get_user(c, data+i))
+					return -EFAULT;
+				if (c == 'V')
+					tco_expect_close = 42;
+			}
 		}
 
 		/* someone wrote to us, we should reload the timer */
@@ -251,7 +255,7 @@ static int i810tco_ioctl (struct inode *inode, struct file *file,
 	};
 	switch (cmd) {
 		default:
-			return -ENOTTY;
+			return -ENOIOCTLCMD;
 		case WDIOC_GETSUPPORT:
 			if (copy_to_user
 			    ((struct watchdog_info *) arg, &ident, sizeof (ident)))

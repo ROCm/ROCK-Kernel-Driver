@@ -361,7 +361,6 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 	if (error) {
 		printk(KERN_INFO "error 2\n");
 		goto clean_device;
-		return error;
 	}
 
 	get_device(&sdev->sdev_gendev);
@@ -370,8 +369,10 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 		for (i = 0; sdev->host->hostt->sdev_attrs[i]; i++) {
 			error = attr_add(&sdev->sdev_gendev,
 					sdev->host->hostt->sdev_attrs[i]);
-			if (error)
+			if (error) {
 				scsi_remove_device(sdev);
+				goto out;
+			}
 		}
 	}
 	
@@ -380,11 +381,14 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 					scsi_sysfs_sdev_attrs[i])) {
 			error = device_create_file(&sdev->sdev_gendev,
 					scsi_sysfs_sdev_attrs[i]);
-			if (error)
+			if (error) {
 				scsi_remove_device(sdev);
+				goto out;
+			}
 		}
 	}
 
+ out:
 	return error;
 
 clean_device:
@@ -394,7 +398,6 @@ clean_device:
 	put_device(&sdev->sdev_gendev);
 
 	return error;
-
 }
 
 /**

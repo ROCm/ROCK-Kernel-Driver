@@ -43,7 +43,7 @@ static	int timeout = DEFAULT_TIMEOUT*60;	/* TO in seconds from user */
 static	int timeoutM = DEFAULT_TIMEOUT;		/* timeout in minutes */
 static	unsigned long timer_alive;
 static	int testmode;
-static int expect_close = 0;
+static	char expect_close;
 
 module_param(timeout, int, 0);
 MODULE_PARM_DESC(timeout,"Watchdog timeout in seconds (60..15300), default=60");
@@ -165,7 +165,7 @@ static int wdt977_release(struct inode *inode, struct file *file)
 	 *	Shut off the timer.
 	 * 	Lock it in if it's a module and we set nowayout
 	 */
-	if (!nowayout)
+	if (expect_close == 42)
 	{
 		/* unlock the SuperIO chip */
 		outb(0x87,0x370);
@@ -202,6 +202,7 @@ static int wdt977_release(struct inode *inode, struct file *file)
 	} else {
 		printk(KERN_CRIT "WDT device closed unexpectedly.  WDT will not stop!\n");
 	}
+	expect_close = 0;
 	return 0;
 }
 
@@ -235,7 +236,7 @@ static ssize_t wdt977_write(struct file *file, const char *buf, size_t count, lo
 				if (get_user(c, buf + i))
 					return -EFAULT;
 				if (c == 'V')
-					expect_close = 1;
+					expect_close = 42;
 			}
 		}
 
@@ -257,18 +258,18 @@ static ssize_t wdt977_write(struct file *file, const char *buf, size_t count, lo
 
 static struct watchdog_info ident = {
 	.options	= WDIOF_SETTIMEOUT,
-	.identity	= "Winbond 83977"
+	.identity	= "Winbond 83977",
 };
 
 static int wdt977_ioctl(struct inode *inode, struct file *file,
-         unsigned int cmd, unsigned long arg)
+	unsigned int cmd, unsigned long arg)
 {
 	int temp;
 
 	switch(cmd)
 	{
 	default:
-		return -ENOTTY;
+		return -ENOIOCTLCMD;
 
 	case WDIOC_GETSUPPORT:
 	    return copy_to_user((struct watchdog_info *)arg, &ident,
@@ -341,7 +342,7 @@ static struct miscdevice wdt977_miscdev=
 {
 	.minor		= WATCHDOG_MINOR,
 	.name		= "watchdog",
-	.fops		= &wdt977_fops
+	.fops		= &wdt977_fops,
 };
 
 static int __init nwwatchdog_init(void)

@@ -107,15 +107,7 @@ static int __init dmi_iterate(void (*decode)(struct dmi_header *))
 	u8 buf[15];
 	u32 fp=0xF0000;
 
-#ifdef CONFIG_SIMNOW
-	/*
- 	 *	Skip on x86/64 with simnow. Will eventually go away
- 	 *	If you see this ifdef in 2.6pre mail me !
- 	 */
-	return -1;
-#endif
- 	
-	while( fp < 0xFFFFF)
+	while (fp < 0xFFFFF)
 	{
 		isa_memcpy_fromio(buf, fp, 15);
 		if(memcmp(buf, "_DMI_", 5)==0 && dmi_checksum(buf))

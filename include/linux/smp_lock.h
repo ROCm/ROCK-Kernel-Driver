@@ -49,8 +49,7 @@ static inline void lock_kernel(void)
 
 static inline void unlock_kernel(void)
 {
-	if (unlikely(current->lock_depth < 0))
-		BUG();
+	BUG_ON(current->lock_depth < 0);
 	if (likely(--current->lock_depth < 0))
 		put_kernel_lock();
 }

@@ -77,6 +77,7 @@ static int sa1100dog_release(struct inode *inode, struct file *file)
 	}
 
 	clear_bit(1, &sa1100wdt_users);
+	expect_close = 0;
 
 	return 0;
 }

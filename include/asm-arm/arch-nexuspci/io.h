@@ -28,8 +28,7 @@ static inline unsigned long ___mem_pci(unsigned long a)
 
 static inline unsigned long ___mem_isa(unsigned long a)
 {
-	if (a >= 16*1048576)
-		BUG();
+	BUG_ON(a >= 16*1048576);
 	return PCIMEM_BASE + a;
 }
 #define __mem_pci(a)		___mem_pci((unsigned long)(a))

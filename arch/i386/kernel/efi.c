@@ -174,7 +174,7 @@ phys_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc)
 	return status;
 }
 
-int inline efi_set_rtc_mmss(unsigned long nowtime)
+inline int efi_set_rtc_mmss(unsigned long nowtime)
 {
 	int real_seconds, real_minutes;
 	efi_status_t 	status;
@@ -207,7 +207,7 @@ int inline efi_set_rtc_mmss(unsigned long nowtime)
  * services have been remapped, therefore, we'll need to call in physical
  * mode.  Note, this call isn't used later, so mark it __init.
  */
-unsigned long inline __init efi_get_time(void)
+inline unsigned long __init efi_get_time(void)
 {
 	efi_status_t status;
 	efi_time_t eft;

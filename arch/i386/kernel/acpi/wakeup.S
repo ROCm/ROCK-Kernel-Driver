@@ -193,21 +193,12 @@ wakeup_pmode_return:
 	# and restore the stack ... but you need gdt for this to work
 	movl	saved_context_esp, %esp
 
-	movw	$0x0e00 + 'W', 0xb8018
-	outl	%eax, $0x80
-	outl	%eax, $0x80
-	movw	$0x0e00 + 'O', 0xb8018
-
 	movl	%cs:saved_magic, %eax
 	cmpl	$0x12345678, %eax
 	jne	bogus_magic
 
 	# jump to place where we left off
 	movl	saved_eip,%eax
-	movw	$0x0e00 + 'x', 0xb8018
-	outl	%eax, $0x80
-	outl	%eax, $0x80
-	movw	$0x0e00 + '!', 0xb801a
 	jmp	*%eax
 
 bogus_magic:

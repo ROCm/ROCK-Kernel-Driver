@@ -400,6 +400,14 @@ int device_for_each_child(struct device * dev, void * data,
 	return error;
 }
 
+struct device *device_find(const char *name, struct bus_type *bus)
+{
+	struct kobject *k = kset_find_obj(&bus->devices, name);
+	if (k)
+		return to_dev(k);
+	return NULL;
+}
+
 int __init devices_init(void)
 {
 	return subsystem_register(&devices_subsys);
@@ -416,6 +424,7 @@ EXPORT_SYMBOL(device_unregister);
 EXPORT_SYMBOL(device_unregister_wait);
 EXPORT_SYMBOL(get_device);
 EXPORT_SYMBOL(put_device);
+EXPORT_SYMBOL(device_find);
 
 EXPORT_SYMBOL(device_create_file);
 EXPORT_SYMBOL(device_remove_file);

@@ -34,7 +34,7 @@
  * 971222       Changed open/close for temperature handling
  *              Michael Meskes <meskes@debian.org>.
  * 980112       Used minor numbers from include/linux/miscdevice.h
- * 990403       Clear reset status after reading control status register in 
+ * 990403       Clear reset status after reading control status register in
  *              pcwd_showprevstate(). [Marc Boucher <marc@mbsi.ca>]
  * 990605	Made changes to code to support Firmware 1.22a, added
  *		fairly useless proc entry.
@@ -86,10 +86,10 @@ static int pcwd_ioports[] = { 0x270, 0x350, 0x370, 0x000 };
 #define	WD_TIMEOUT		4	/* 2 seconds for a timeout */
 static int timeout_val = WD_TIMEOUT;
 static int timeout = 2;
-static int expect_close = 0;
+static char expect_close;
 
 module_param(timeout, int, 0);
-MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default=2)"); 
+MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default=2)");
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;
@@ -248,14 +248,14 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 	int cdat, rv;
 	static struct watchdog_info ident=
 	{
-		WDIOF_OVERHEAT|WDIOF_CARDRESET,
-		1,
-		"PCWD"
+		.options =		WDIOF_OVERHEAT|WDIOF_CARDRESET,
+		.firmware_version =	1,
+		.identity =		"PCWD",
 	};
 
 	switch(cmd) {
 	default:
-		return -ENOTTY;
+		return -ENOIOCTLCMD;
 
 	case WDIOC_GETSUPPORT:
 		if(copy_to_user((void*)arg, &ident, sizeof(ident)))
@@ -264,19 +264,19 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 
 	case WDIOC_GETSTATUS:
 		spin_lock(&io_lock);
-		if (revision == PCWD_REVISION_A) 
+		if (revision == PCWD_REVISION_A)
 			cdat = inb(current_readport);
 		else
 			cdat = inb(current_readport + 1 );
 		spin_unlock(&io_lock);
 		rv = WDIOF_MAGICCLOSE;
 
-		if (revision == PCWD_REVISION_A) 
+		if (revision == PCWD_REVISION_A)
 		{
 			if (cdat & WD_WDRST)
 				rv |= WDIOF_CARDRESET;
 
-			if (cdat & WD_T110) 
+			if (cdat & WD_T110)
 			{
 				rv |= WDIOF_OVERHEAT;
 
@@ -286,12 +286,12 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 				}
 			}
 		}
-		else 
+		else
 		{
 			if (cdat & 0x01)
 				rv |= WDIOF_CARDRESET;
 
-			if (cdat & 0x04) 
+			if (cdat & 0x04)
 			{
 				rv |= WDIOF_OVERHEAT;
 
@@ -309,7 +309,7 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 	case WDIOC_GETBOOTSTATUS:
 		rv = 0;
 
-		if (revision == PCWD_REVISION_A) 
+		if (revision == PCWD_REVISION_A)
 		{
 			if (initial_status & WD_WDRST)
 				rv |= WDIOF_CARDRESET;
@@ -333,7 +333,7 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 	case WDIOC_GETTEMP:
 
 		rv = 0;
-		if ((supports_temp) && (mode_debug == 0)) 
+		if ((supports_temp) && (mode_debug == 0))
 		{
 			spin_lock(&io_lock);
 			rv = inb(current_readport);
@@ -345,19 +345,19 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 		return 0;
 
 	case WDIOC_SETOPTIONS:
-		if (revision == PCWD_REVISION_C) 
+		if (revision == PCWD_REVISION_C)
 		{
 			if(copy_from_user(&rv, (int*) arg, sizeof(int)))
 				return -EFAULT;
 
-			if (rv & WDIOS_DISABLECARD) 
+			if (rv & WDIOS_DISABLECARD)
 			{
 				spin_lock(&io_lock);
 				outb_p(0xA5, current_readport + 3);
 				outb_p(0xA5, current_readport + 3);
 				cdat = inb_p(current_readport + 2);
 				spin_unlock(&io_lock);
-				if ((cdat & 0x10) == 0) 
+				if ((cdat & 0x10) == 0)
 				{
 					printk(KERN_INFO "pcwd: Could not disable card.\n");
 					return -EIO;
@@ -366,13 +366,13 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 				return 0;
 			}
 
-			if (rv & WDIOS_ENABLECARD) 
+			if (rv & WDIOS_ENABLECARD)
 			{
 				spin_lock(&io_lock);
 				outb_p(0x00, current_readport + 3);
 				cdat = inb_p(current_readport + 2);
 				spin_unlock(&io_lock);
-				if (cdat & 0x10) 
+				if (cdat & 0x10)
 				{
 					printk(KERN_INFO "pcwd: Could not enable card.\n");
 					return -EIO;
@@ -380,13 +380,13 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 				return 0;
 			}
 
-			if (rv & WDIOS_TEMPPANIC) 
+			if (rv & WDIOS_TEMPPANIC)
 			{
 				temp_panic = 1;
 			}
 		}
 		return -EINVAL;
-		
+
 	case WDIOC_KEEPALIVE:
 		pcwd_send_heartbeat();
 		return 0;
@@ -415,7 +415,7 @@ static ssize_t pcwd_write(struct file *file, const char *buf, size_t len,
 				if (get_user(c, buf + i))
 					return -EFAULT;
 				if (c == 'V')
-					expect_close = 1;
+					expect_close = 42;
 			}
 		}
 		pcwd_send_heartbeat();
@@ -456,14 +456,14 @@ static ssize_t pcwd_read(struct file *file, char *buf, size_t count,
 	/*  Can't seek (pread) on this device  */
 	if (ppos != &file->f_pos)
 		return -ESPIPE;
-	switch(iminor(file->f_dentry->d_inode)) 
+	switch(iminor(file->f_dentry->d_inode))
 	{
 		case TEMP_MINOR:
 			/*
 			 * Convert metric to Fahrenheit, since this was
 			 * the decided 'standard' for this return value.
 			 */
-			
+
 			c = inb(current_readport);
 			cp = (c * 9 / 5) + 32;
 			if(copy_to_user(buf, &cp, 1))
@@ -477,7 +477,7 @@ static ssize_t pcwd_read(struct file *file, char *buf, size_t count,
 static int pcwd_close(struct inode *ino, struct file *filep)
 {
 	if (iminor(ino)==WATCHDOG_MINOR) {
-		if (expect_close) {
+		if (expect_close == 42) {
 			/*  Disable the board  */
 			if (revision == PCWD_REVISION_C) {
 				spin_lock(&io_lock);
@@ -488,6 +488,7 @@ static int pcwd_close(struct inode *ino, struct file *filep)
 			atomic_inc( &open_allowed );
 		}
 	}
+	expect_close = 0;
 	return 0;
 }
 
@@ -500,7 +501,7 @@ static inline void get_support(void)
 static inline int get_revision(void)
 {
 	int r = PCWD_REVISION_C;
-	
+
 	spin_lock(&io_lock);
 	if ((inb(current_readport + 2) == 0xFF) ||
 	    (inb(current_readport + 3) == 0xFF))
@@ -576,29 +577,29 @@ static struct file_operations pcwd_fops = {
 };
 
 static struct miscdevice pcwd_miscdev = {
-	WATCHDOG_MINOR,
-	"watchdog",
-	&pcwd_fops
+	.minor =	WATCHDOG_MINOR,
+	.name =		"watchdog",
+	.fops =		&pcwd_fops,
 };
 
 static struct miscdevice temp_miscdev = {
-	TEMP_MINOR,
-	"temperature",
-	&pcwd_fops
+	.minor =	TEMP_MINOR,
+	.name =		"temperature",
+	.fops =		&pcwd_fops,
 };
- 
+
 static void __init pcwd_validate_timeout(void)
 {
 	timeout_val = timeout * 2;
 }
- 
+
 static int __init pcwatchdog_init(void)
 {
 	char *firmware;
 	int i, found = 0;
 	pcwd_validate_timeout();
 	spin_lock_init(&io_lock);
-	
+
 	revision = PCWD_REVISION_A;
 
 	printk(KERN_INFO "pcwd: v%s Ken Hollis (kenji@bitgate.com)\n", WD_VER);
@@ -660,11 +661,11 @@ static int __init pcwatchdog_init(void)
 
 	if (misc_register(&pcwd_miscdev))
 		return -ENODEV;
-	
+
 	if (supports_temp)
 		if (misc_register(&temp_miscdev)) {
 			misc_deregister(&pcwd_miscdev);
-			return -ENODEV;		
+			return -ENODEV;
 		}
 
 
@@ -673,10 +674,10 @@ static int __init pcwatchdog_init(void)
 			misc_deregister(&pcwd_miscdev);
 			if (supports_temp)
 				misc_deregister(&pcwd_miscdev);
-			return -EIO;		
+			return -EIO;
 		}
 	}
-	else 
+	else
 		if (!request_region(current_readport, 4, "PCWD Rev.C (Berkshire)")) {
 			misc_deregister(&pcwd_miscdev);
 			if (supports_temp)

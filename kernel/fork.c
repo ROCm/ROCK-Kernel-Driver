@@ -859,22 +859,6 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	if ((clone_flags & CLONE_SIGHAND) && !(clone_flags & CLONE_VM))
 		return ERR_PTR(-EINVAL);
 
-	/*
-	 * CLONE_DETACHED must match CLONE_THREAD: it's a historical
-	 * thing.
-	 */
-	if (!(clone_flags & CLONE_DETACHED) != !(clone_flags & CLONE_THREAD)) {
-		/* Warn about the old no longer supported case so that we see it */
-		if (clone_flags & CLONE_THREAD) {
-			static int count;
-			if (count < 5) {
-				count++;
-				printk(KERN_WARNING "%s trying to use CLONE_THREAD without CLONE_DETACH\n", current->comm);
-			}
-		}
-		return ERR_PTR(-EINVAL);
-	}
-
 	retval = security_task_create(clone_flags);
 	if (retval)
 		goto fork_out;

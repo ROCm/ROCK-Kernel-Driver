@@ -26,10 +26,10 @@ extern spinlock_t afs_server_peer_lock;
 struct afs_server
 {
 	atomic_t		usage;
-	afs_cell_t		*cell;		/* cell in which server resides */
+	struct afs_cell		*cell;		/* cell in which server resides */
 	struct list_head	link;		/* link in cell's server list */
 	struct rw_semaphore	sem;		/* access lock */
-	afs_timer_t		timeout;	/* graveyard timeout */
+	struct afs_timer	timeout;	/* graveyard timeout */
 	struct in_addr		addr;		/* server address */
 	struct rxrpc_peer	*peer;		/* peer record for this server */
 	struct rxrpc_connection	*vlserver;	/* connection to the volume location service */
@@ -50,20 +50,25 @@ struct afs_server
 	spinlock_t		cb_lock;	/* access lock */
 };
 
-extern int afs_server_lookup(afs_cell_t *cell, const struct in_addr *addr, afs_server_t **_server);
+extern int afs_server_lookup(struct afs_cell *cell,
+			     const struct in_addr *addr,
+			     struct afs_server **_server);
 
 #define afs_get_server(S) do { atomic_inc(&(S)->usage); } while(0)
 
-extern void afs_put_server(afs_server_t *server);
-extern void afs_server_do_timeout(afs_server_t *server);
+extern void afs_put_server(struct afs_server *server);
+extern void afs_server_do_timeout(struct afs_server *server);
 
-extern int afs_server_find_by_peer(const struct rxrpc_peer *peer, afs_server_t **_server);
+extern int afs_server_find_by_peer(const struct rxrpc_peer *peer,
+				   struct afs_server **_server);
 
-extern int afs_server_get_vlconn(afs_server_t *server, struct rxrpc_connection **_conn);
+extern int afs_server_get_vlconn(struct afs_server *server,
+				 struct rxrpc_connection **_conn);
 
-static inline afs_server_t *afs_server_get_from_peer(struct rxrpc_peer *peer)
+static inline
+struct afs_server *afs_server_get_from_peer(struct rxrpc_peer *peer)
 {
-	afs_server_t *server;
+	struct afs_server *server;
 
 	spin_lock(&afs_server_peer_lock);
 	server = peer->user;
@@ -88,10 +93,10 @@ struct afs_server_callslot
 	int			errno;		/* error number if nconn==-1 */
 };
 
-extern int afs_server_request_callslot(afs_server_t *server,
+extern int afs_server_request_callslot(struct afs_server *server,
 				       struct afs_server_callslot *callslot);
 
-extern void afs_server_release_callslot(afs_server_t *server,
+extern void afs_server_release_callslot(struct afs_server *server,
 					struct afs_server_callslot *callslot);
 
 #endif /* _LINUX_AFS_SERVER_H */

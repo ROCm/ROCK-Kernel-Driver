@@ -221,13 +221,24 @@ static inline int ext3_should_journal_data(struct inode *inode)
 
 static inline int ext3_should_order_data(struct inode *inode)
 {
-	return (test_opt(inode->i_sb, DATA_FLAGS) == EXT3_MOUNT_ORDERED_DATA);
+	if (!S_ISREG(inode->i_mode))
+		return 0;
+	if (EXT3_I(inode)->i_flags & EXT3_JOURNAL_DATA_FL)
+		return 0;
+	if (test_opt(inode->i_sb, DATA_FLAGS) == EXT3_MOUNT_ORDERED_DATA)
+		return 1;
+	return 0;
 }
 
 static inline int ext3_should_writeback_data(struct inode *inode)
 {
-	return !ext3_should_journal_data(inode) &&
-			!ext3_should_order_data(inode);
+	if (!S_ISREG(inode->i_mode))
+		return 0;
+	if (EXT3_I(inode)->i_flags & EXT3_JOURNAL_DATA_FL)
+		return 0;
+	if (test_opt(inode->i_sb, DATA_FLAGS) == EXT3_MOUNT_WRITEBACK_DATA)
+		return 1;
+	return 0;
 }
 
 #endif	/* _LINUX_EXT3_JBD_H */

@@ -160,10 +160,17 @@ struct zone {
 #define ZONE_NORMAL		1
 #define ZONE_HIGHMEM		2
 
-#define MAX_NR_ZONES		3	/* Sync this with MAX_NR_ZONES_SHIFT */
-#define MAX_NR_ZONES_SHIFT	2	/* ceil(log2(MAX_NR_ZONES)) */
+#define MAX_NR_ZONES		3	/* Sync this with ZONES_SHIFT */
+#define ZONES_SHIFT		2	/* ceil(log2(MAX_NR_ZONES)) */
 
 #define GFP_ZONEMASK	0x03
+
+/*
+ * The "priority" of VM scanning is how much of the queues we will scan in one
+ * go. A value of 12 for DEF_PRIORITY implies that we will scan 1/4096th of the
+ * queues ("queue_length >> 12") during an aging round.
+ */
+#define DEF_PRIORITY 12
 
 /*
  * One allocation request operates on a zonelist. A zonelist
@@ -303,7 +310,7 @@ int min_free_kbytes_sysctl_handler(struct ctl_table *, int, struct file *,
 extern struct pglist_data contig_page_data;
 #define NODE_DATA(nid)		(&contig_page_data)
 #define NODE_MEM_MAP(nid)	mem_map
-#define MAX_NODES_SHIFT		0
+#define MAX_NODES_SHIFT		1
 
 #else /* CONFIG_DISCONTIGMEM */
 
@@ -311,7 +318,7 @@ extern struct pglist_data contig_page_data;
 
 #if BITS_PER_LONG == 32
 /*
- * with 32 bit flags field, page->zone is currently 8 bits.
+ * with 32 bit page->flags field, we reserve 8 bits for node/zone info.
  * there are 3 zones (2 bits) and this leaves 8-2=6 bits for nodes.
  */
 #define MAX_NODES_SHIFT		6
@@ -326,6 +333,13 @@ extern struct pglist_data contig_page_data;
 
 #if NODES_SHIFT > MAX_NODES_SHIFT
 #error NODES_SHIFT > MAX_NODES_SHIFT
+#endif
+
+/* There are currently 3 zones: DMA, Normal & Highmem, thus we need 2 bits */
+#define MAX_ZONES_SHIFT		2
+
+#if ZONES_SHIFT > MAX_ZONES_SHIFT
+#error ZONES_SHIFT > MAX_ZONES_SHIFT
 #endif
 
 extern DECLARE_BITMAP(node_online_map, MAX_NUMNODES);

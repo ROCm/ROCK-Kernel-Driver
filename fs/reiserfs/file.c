@@ -8,6 +8,7 @@
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 #include <linux/pagemap.h>
+#include <linux/writeback.h>
 
 /*
 ** We pack the tails of files on file close, not at the time they are written.
@@ -1176,6 +1177,7 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
 	buf += write_bytes;
 	*ppos = pos += write_bytes;
 	count -= write_bytes;
+	balance_dirty_pages_ratelimited(inode->i_mapping);
     }
 
     if ((file->f_flags & O_SYNC) || IS_SYNC(inode))

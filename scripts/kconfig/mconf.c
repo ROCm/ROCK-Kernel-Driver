@@ -800,7 +800,6 @@ int main(int ac, char **av)
 		fprintf(stderr, "\n\n"
 			"Your kernel configuration changes were NOT saved."
 			"\n\n");
-		return 1;
 	}
 
 	return 0;

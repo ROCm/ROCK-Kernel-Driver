@@ -225,6 +225,7 @@ static int mousedev_fasync(int fd, struct file *file, int on)
 static void mousedev_free(struct mousedev *mousedev)
 {
 	devfs_remove("input/mouse%d", mousedev->minor);
+	class_simple_device_remove(MKDEV(INPUT_MAJOR, MOUSEDEV_MINOR_BASE + mousedev->minor));
 	mousedev_table[mousedev->minor] = NULL;
 	kfree(mousedev);
 }
@@ -486,6 +487,9 @@ static struct input_handle *mousedev_connect(struct input_handler *handler, stru
 
 	devfs_mk_cdev(MKDEV(INPUT_MAJOR, MOUSEDEV_MINOR_BASE + minor),
 			S_IFCHR|S_IRUGO|S_IWUSR, "input/mouse%d", minor);
+	class_simple_device_add(input_class, 
+				MKDEV(INPUT_MAJOR, MOUSEDEV_MINOR_BASE + minor),
+				dev->dev, "mouse%d", minor);
 
 	return &mousedev->handle;
 }
@@ -564,7 +568,8 @@ static int __init mousedev_init(void)
 
 	devfs_mk_cdev(MKDEV(INPUT_MAJOR, MOUSEDEV_MINOR_BASE + MOUSEDEV_MIX),
 			S_IFCHR|S_IRUGO|S_IWUSR, "input/mice");
-
+	class_simple_device_add(input_class, MKDEV(INPUT_MAJOR, MOUSEDEV_MINOR_BASE + MOUSEDEV_MIX),
+				NULL, "mice");
 
 #ifdef CONFIG_INPUT_MOUSEDEV_PSAUX
 	if (!(mousedev_mix.misc = !misc_register(&psaux_mouse)))
@@ -583,6 +588,7 @@ static void __exit mousedev_exit(void)
 		misc_deregister(&psaux_mouse);
 #endif
 	devfs_remove("input/mice");
+	class_simple_device_remove(MKDEV(INPUT_MAJOR, MOUSEDEV_MINOR_BASE + MOUSEDEV_MIX));
 	input_unregister_handler(&mousedev_handler);
 }
 

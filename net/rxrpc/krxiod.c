@@ -44,12 +44,6 @@ static int rxrpc_krxiod(void *arg)
 
 	daemonize("krxiod");
 
-	/* only certain signals are of interest */
-	spin_lock_irq(&current->sighand->siglock);
-	siginitsetinv(&current->blocked, 0);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
-
 	/* loop around waiting for work to do */
 	do {
 		/* wait for work or to be told to exit */
@@ -116,7 +110,7 @@ static int rxrpc_krxiod(void *arg)
 
 			if (!list_empty(&rxrpc_krxiod_callq)) {
 				call = list_entry(rxrpc_krxiod_callq.next,
-						   struct rxrpc_call,
+						  struct rxrpc_call,
 						  rcv_krxiodq_lk);
 				list_del_init(&call->rcv_krxiodq_lk);
 				atomic_dec(&rxrpc_krxiod_qcount);
@@ -125,7 +119,7 @@ static int rxrpc_krxiod(void *arg)
 				 * away */
 				if (atomic_read(&call->usage) > 0) {
 					_debug("@@@ KRXIOD"
-					       " Begin Attend Call %p",call);
+					       " Begin Attend Call %p", call);
 					rxrpc_get_call(call);
 				}
 				else {

@@ -527,7 +527,8 @@ unsigned long ext2_count_free_blocks (struct super_block * sb)
 	int i;
 #ifdef EXT2FS_DEBUG
 	unsigned long bitmap_count, x;
-	
+	struct ext2_super_block *es;
+
 	lock_super (sb);
 	es = EXT2_SB(sb)->s_es;
 	desc_count = 0;
@@ -550,7 +551,8 @@ unsigned long ext2_count_free_blocks (struct super_block * sb)
 		brelse(bitmap_bh);
 	}
 	printk("ext2_count_free_blocks: stored = %lu, computed = %lu, %lu\n",
-	       le32_to_cpu(es->s_free_blocks_count), desc_count, bitmap_count);
+		(long)le32_to_cpu(es->s_free_blocks_count),
+		desc_count, bitmap_count);
 	unlock_super (sb);
 	return bitmap_count;
 #else

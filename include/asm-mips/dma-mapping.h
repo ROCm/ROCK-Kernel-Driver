@@ -124,8 +124,7 @@ dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
 	for (i = 0; i < nhwentries; i++, sg++) {
 		unsigned long addr;
 
-		if (!sg->page)
-			BUG();
+		BUG_ON(!sg->page);
 
 		addr = (unsigned long) page_address(sg->page);
 		if (addr)
@@ -139,8 +138,7 @@ dma_sync_single(struct device *dev, dma_addr_t dma_handle, size_t size,
 {
 	unsigned long addr;
  
-	if (direction == DMA_NONE)
-		BUG();
+	BUG_ON(direction == DMA_NONE);
  
 	addr = baddr_to_bus(hwdev->bus, dma_handle) + PAGE_OFFSET;
 	dma_cache_wback_inv(addr, size);
@@ -153,8 +151,7 @@ dma_sync_single_range(struct device *dev, dma_addr_t dma_handle,
 {
 	unsigned long addr;
 
-	if (direction == DMA_NONE)
-		BUG();
+	BUG_ON(direction == DMA_NONE);
 
 	addr = baddr_to_bus(hwdev->bus, dma_handle) + PAGE_OFFSET;
 	dma_cache_wback_inv(addr, size);
@@ -168,8 +165,7 @@ dma_sync_sg(struct device *dev, struct scatterlist *sg, int nelems,
 	int i;
 #endif
  
-	if (direction == DMA_NONE)
-		BUG();
+	BUG_ON(direction == DMA_NONE);
  
 	/* Make sure that gcc doesn't leave the empty loop body.  */
 #ifdef CONFIG_NONCOHERENT_IO

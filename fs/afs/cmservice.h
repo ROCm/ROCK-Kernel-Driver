@@ -20,8 +20,10 @@ extern int afscm_start(void);
 extern void afscm_stop(void);
 
 /* cache manager server functions */
-extern int SRXAFSCM_InitCallBackState(afs_server_t *server);
-extern int SRXAFSCM_CallBack(afs_server_t *server, size_t count, afs_callback_t callbacks[]);
-extern int SRXAFSCM_Probe(afs_server_t *server);
+extern int SRXAFSCM_InitCallBackState(struct afs_server *server);
+extern int SRXAFSCM_CallBack(struct afs_server *server,
+			     size_t count,
+			     struct afs_callback callbacks[]);
+extern int SRXAFSCM_Probe(struct afs_server *server);
 
 #endif /* _LINUX_AFS_CMSERVICE_H */

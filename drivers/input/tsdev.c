@@ -129,6 +129,7 @@ static int tsdev_open(struct inode *inode, struct file *file)
 static void tsdev_free(struct tsdev *tsdev)
 {
 	devfs_remove("input/ts%d", tsdev->minor);
+	class_simple_device_remove(MKDEV(INPUT_MAJOR, TSDEV_MINOR_BASE + tsdev->minor));
 	tsdev_table[tsdev->minor] = NULL;
 	kfree(tsdev);
 }
@@ -343,6 +344,9 @@ static struct input_handle *tsdev_connect(struct input_handler *handler,
 	
 	devfs_mk_cdev(MKDEV(INPUT_MAJOR, TSDEV_MINOR_BASE + minor),
 			S_IFCHR|S_IRUGO|S_IWUSR, "input/ts%d", minor);
+	class_simple_device_add(input_class, 
+				MKDEV(INPUT_MAJOR, TSDEV_MINOR_BASE + minor),
+				dev->dev, "ts%d", minor);
 
 	return &tsdev->handle;
 }

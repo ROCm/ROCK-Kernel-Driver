@@ -136,20 +136,7 @@ static int proc_dma_show(struct seq_file *m, void *v)
 
 static int proc_dma_open(struct inode *inode, struct file *file)
 {
-	char *buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
-	struct seq_file *m;
-	int res;
-
-	if (!buf)
-		return -ENOMEM;
-	res = single_open(file, proc_dma_show, NULL);
-	if (!res) {
-		m = file->private_data;
-		m->buf = buf;
-		m->size = PAGE_SIZE;
-	} else
-		kfree(buf);
-	return res;
+	return single_open(file, proc_dma_show, NULL);
 }
 
 static struct file_operations proc_dma_operations = {
