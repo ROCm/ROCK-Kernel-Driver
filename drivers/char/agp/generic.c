@@ -96,7 +96,7 @@ agp_memory *agp_create_memory(int scratch_pages)
 
 void agp_free_memory(agp_memory * curr)
 {
-	int i;
+	size_t i;
 
 	if ((agp_bridge.type == NOT_SUPPORTED) || (curr == NULL))
 		return;
@@ -124,7 +124,7 @@ agp_memory *agp_allocate_memory(size_t page_count, u32 type)
 {
 	int scratch_pages;
 	agp_memory *new;
-	int i;
+	size_t i;
 
 	if (agp_bridge.type == NOT_SUPPORTED)
 		return NULL;
@@ -585,7 +585,9 @@ int agp_generic_free_gatt_table(void)
 
 int agp_generic_insert_memory(agp_memory * mem, off_t pg_start, int type)
 {
-	int i, j, num_entries;
+	int num_entries;
+	size_t i;
+	off_t j;
 	void *temp;
 
 	temp = agp_bridge.current_size;
@@ -648,7 +650,7 @@ int agp_generic_insert_memory(agp_memory * mem, off_t pg_start, int type)
 
 int agp_generic_remove_memory(agp_memory * mem, off_t pg_start, int type)
 {
-	int i;
+	size_t i;
 
 	if (type != 0 || mem->type != 0) {
 		/* The generic routines know nothing of memory types */
