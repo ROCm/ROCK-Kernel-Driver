@@ -173,12 +173,11 @@ static struct net_device_stats *get_stats(struct net_device *dev)
 
 		if (!cpu_possible(i)) 
 			continue;
-		lb_stats = &per_cpu(loopback_stats, get_cpu());
+		lb_stats = &per_cpu(loopback_stats, i);
 		stats->rx_bytes   += lb_stats->rx_bytes;
 		stats->tx_bytes   += lb_stats->tx_bytes;
 		stats->rx_packets += lb_stats->rx_packets;
 		stats->tx_packets += lb_stats->tx_packets;
-		put_cpu();
 	}
 				
 	return stats;
