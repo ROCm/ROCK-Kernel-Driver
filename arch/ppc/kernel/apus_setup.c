@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.apus_setup.c 1.20 09/08/01 15:47:42 paulus
+ * BK Id: SCCS/s.apus_setup.c 1.22 10/18/01 11:16:27 trini
  */
 /*
  *  linux/arch/ppc/kernel/apus_setup.c
@@ -1111,9 +1111,6 @@ void platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.kbd_unexpected_up = apus_kbd_unexpected_up;
 	ppc_md.kbd_leds          = apus_kbd_leds;
 	ppc_md.kbd_init_hw       = apus_kbd_init_hw;
-#ifdef CONFIG_MAGIC_SYSRQ
-	ppc_md.kbd_sysrq_xlate	 = NULL;
-#endif
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
         ppc_ide_md.ide_init_hwif = apus_ide_init_hwif_ports;

@@ -1357,14 +1357,19 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 	if (len > limit)
 		return -ENOMEM;
 
-	/* First, see if the given suggestion fits.  */
-	if (addr) {
-		struct vm_area_struct *vma;
+	/* First, see if the given suggestion fits.
 
-		addr = PAGE_ALIGN(addr);
-		vma = find_vma(current->mm, addr);
-		if (limit - len >= addr &&
-		    (!vma || addr + len <= vma->vm_start))
+	   The OSF/1 loader (/sbin/loader) relies on us returning an
+	   address larger than the requested if one exists, which is
+	   a terribly broken way to program.
+
+	   That said, I can see the use in being able to suggest not
+	   merely specific addresses, but regions of memory -- perhaps
+	   this feature should be incorporated into all ports?  */
+
+	if (addr) {
+		addr = arch_get_unmapped_area_1 (PAGE_ALIGN(addr), len, limit);
+		if (addr != -ENOMEM)
 			return addr;
 	}
 

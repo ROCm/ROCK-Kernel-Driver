@@ -144,7 +144,7 @@ clean:
 	rm -f core *~
 	rm -f $(BOOKS)
 	rm -f $(DVI) $(AUX) $(TEX) $(LOG) $(OUT)
-	rm -f $(JPG-parportbook) $(EPS-parportbook)
+	rm -f $(PNG-parportbook) $(EPS-parportbook)
 	rm -f $(C-procfs-example)
 
 mrproper: clean
@@ -172,7 +172,7 @@ mrproper: clean
 	  exit 1)
 	rm -rf $@
 	db2html $<
-	if [ ! -z "$(JPG-$@)" ]; then cp $(JPG-$@) $@; fi
+	if [ ! -z "$(PNG-$@)" ]; then cp $(PNG-$@) $@; fi
 
 #
 # we could have our own dependency generator

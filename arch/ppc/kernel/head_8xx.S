@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.head_8xx.S 1.21 08/28/01 16:27:27 trini
+ * BK Id: SCCS/s.head_8xx.S 1.23 09/16/01 19:32:54 trini
  */
 /*
  *  arch/ppc/kernel/except_8xx.S
@@ -352,16 +352,21 @@ InstructionTLBMiss:
 	mtspr	MD_TWC, r21	/* Load pte table base address */
 	mfspr	r21, MD_TWC	/* ....and get the pte address */
 	lwz	r20, 0(r21)	/* Get the pte */
-#if 0
+
 	ori	r20, r20, _PAGE_ACCESSED
 	stw	r20, 0(r21)
-#endif
 
-	/* Set four subpage valid bits (24, 25, 26, and 27).
-	 * Clear bit 28 (which should be in the PTE, but we do this anyway).
+	/* The Linux PTE won't go exactly into the MMU TLB.
+	 * Software indicator bits 21, 22 and 28 must be clear.
+	 * Software indicator bits 24, 25, 26, and 27 must be
+	 * set.  All other Linux PTE bits control the behavior
+	 * of the MMU.
 	 */
+	li	r21, 0x0600
+	andc	r20, r20, r21		/* Clear 21, 22 */
 	li	r21, 0x00f0
-	rlwimi	r20, r21, 0, 24, 28
+	rlwimi	r20, r21, 0, 24, 28	/* Set 24-27, clear 28 */
+
 #ifdef CONFIG_8xx_CPU6
 	li	r3, 0x2d80
 	stw	r3, 12(r0)
@@ -441,21 +446,21 @@ DataStoreTLBMiss:
 #endif
 	mtspr	MD_TWC, r21
 
-	/* Set PP0 to PP1 (== _PAGE_USER) & ~_PAGE_RW */
-	rlwimi	r20, r20, 32-1, 21, 21
-	rlwinm	r21, r20, 4, 21, 21
-	andc	r20, r20, r21
+	mfspr	r21, MD_TWC	/* get the pte address again */
+	ori	r20, r20, _PAGE_ACCESSED
+	stw	r20, 0(r21)
 
-	/* Set four subpage valid bits (24, 25, 26, and 27).
-	 * Clear bit 28 (which should be in the PTE, but we do this anyway).
+	/* The Linux PTE won't go exactly into the MMU TLB.
+	 * Software indicator bits 21, 22 and 28 must be clear.
+	 * Software indicator bits 24, 25, 26, and 27 must be
+	 * set.  All other Linux PTE bits control the behavior
+	 * of the MMU.
 	 */
-#if 0
-	ori	r20, r20, 0x00f0
-#else
+	li	r21, 0x0600
+	andc	r20, r20, r21		/* Clear 21, 22 */
 	li	r21, 0x00f0
-	rlwimi	r20, r21, 0, 24, 28
+	rlwimi	r20, r21, 0, 24, 28	/* Set 24-27, clear 28 */
 
-#endif
 #ifdef CONFIG_8xx_CPU6
 	li	r3, 0x3d80
 	stw	r3, 12(r0)
@@ -549,15 +554,21 @@ DataTLBError:
 
 	/* Update 'changed', among others.
 	*/
-	ori	r20, r20, _PAGE_DIRTY|_PAGE_ACCESSED
+	ori	r20, r20, _PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_HWWRITE
 	mfspr	r21, MD_TWC		/* Get pte address again */
 	stw	r20, 0(r21)		/* and update pte in table */
 
-	/* Set four subpage valid bits (24, 25, 26, and 27).
-	 * Clear bit 28 (which should be in the PTE, but we do this anyway).
+	/* The Linux PTE won't go exactly into the MMU TLB.
+	 * Software indicator bits 21, 22 and 28 must be clear.
+	 * Software indicator bits 24, 25, 26, and 27 must be
+	 * set.  All other Linux PTE bits control the behavior
+	 * of the MMU.
 	 */
+	li	r21, 0x0600
+	andc	r20, r20, r21		/* Clear 21, 22 */
 	li	r21, 0x00f0
-	rlwimi	r20, r21, 0, 24, 28
+	rlwimi	r20, r21, 0, 24, 28	/* Set 24-27, clear 28 */
+
 #ifdef CONFIG_8xx_CPU6
 	li	r3, 0x3d80
 	stw	r3, 12(r0)

@@ -177,7 +177,7 @@ int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 	pgd_t * src_pgd, * dst_pgd;
 	unsigned long address = vma->vm_start;
 	unsigned long end = vma->vm_end;
-	unsigned long cow = (vma->vm_flags & (VM_SHARED | VM_MAYWRITE)) == VM_MAYWRITE;
+	unsigned long cow = (vma->vm_flags & (VM_SHARED | VM_WRITE)) == VM_WRITE;
 
 	src_pgd = pgd_offset(src, address)-1;
 	dst_pgd = pgd_offset(dst, address)-1;
@@ -911,11 +911,15 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	if (!VALID_PAGE(old_page))
 		goto bad_wp_page;
 
-	if (can_share_swap_page(old_page)) {	
-		flush_cache_page(vma, address);
-		establish_pte(vma, address, page_table, pte_mkyoung(pte_mkdirty(pte_mkwrite(pte))));
-		spin_unlock(&mm->page_table_lock);
-		return 1;	/* Minor fault */
+	if (PageSwapCache(old_page) && !TryLockPage(old_page)) {
+		int reuse = can_share_swap_page(old_page);
+		unlock_page(old_page);
+		if (reuse) {
+			flush_cache_page(vma, address);
+			establish_pte(vma, address, page_table, pte_mkyoung(pte_mkdirty(pte_mkwrite(pte))));
+			spin_unlock(&mm->page_table_lock);
+			return 1;	/* Minor fault */
+		}
 	}
 
 	/*
@@ -928,7 +932,6 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	if (!new_page)
 		goto no_mem;
 	copy_cow_page(old_page,new_page,address);
-	page_cache_release(old_page);
 
 	/*
 	 * Re-check the pte - we dropped the lock
@@ -945,6 +948,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	}
 	spin_unlock(&mm->page_table_lock);
 	page_cache_release(new_page);
+	page_cache_release(old_page);
 	return 1;	/* Minor fault */
 
 bad_wp_page:
@@ -1066,10 +1070,6 @@ void swapin_readahead(swp_entry_t entry)
 	return;
 }
 
-/* Swap 80% full? Release the pages as they are paged in.. */
-#define vm_swap_full() \
-	(swapper_space.nrpages*5 > total_swap_pages*4)
-
 /*
  * We hold the mm semaphore and the page_table_lock on entry and
  * should release the pagetable lock on exit..
@@ -1104,8 +1104,7 @@ static int do_swap_page(struct mm_struct * mm,
 		ret = 2;
 	}
 
-	if (!Page_Uptodate(page))
-		wait_on_page(page);
+	lock_page(page);
 
 	/*
 	 * Back out if somebody else faulted in this pte while we
@@ -1113,24 +1112,23 @@ static int do_swap_page(struct mm_struct * mm,
 	 */
 	spin_lock(&mm->page_table_lock);
 	if (!pte_same(*page_table, orig_pte)) {
-		page_cache_release(page);
 		spin_unlock(&mm->page_table_lock);
+		unlock_page(page);
+		page_cache_release(page);
 		return 1;
 	}
 
 	/* The page isn't present yet, go ahead with the fault. */
 		
 	swap_free(entry);
-	if (vm_swap_full()) {
-		lock_page(page);
+	if (vm_swap_full())
 		remove_exclusive_swap_page(page);
-		UnlockPage(page);
-	}
 
 	mm->rss++;
 	pte = mk_pte(page, vma->vm_page_prot);
 	if (write_access && can_share_swap_page(page))
 		pte = pte_mkdirty(pte_mkwrite(pte));
+	unlock_page(page);
 
 	flush_page_to_ram(page);
 	flush_icache_page(vma, page);

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.open_pic.h 1.12 08/20/01 22:33:28 paulus
+ * BK Id: SCCS/s.open_pic.h 1.14 10/11/01 12:09:12 trini
  */
 /*
  *  arch/ppc/kernel/open_pic.h -- OpenPIC Interrupt Handling
@@ -46,7 +46,7 @@ extern void openpic_eoi(void);
 extern void openpic_request_IPIs(void);
 extern void do_openpic_setup_cpu(void);
 extern int openpic_get_irq(struct pt_regs *regs);
-extern void openpic_init_processor(u_int cpumask);
+extern void openpic_reset_processor_phys(u_int cpumask);
 extern void openpic_setup_ISU(int isu_num, unsigned long addr);
 extern void openpic_cause_IPI(u_int ipi, u_int cpumask);
 extern void smp_openpic_message_pass(int target, int msg, unsigned long data,

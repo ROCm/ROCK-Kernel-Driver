@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.head.S 1.29 08/19/01 22:43:23 paulus
+ * BK Id: SCCS/s.head.S 1.31 10/18/01 15:02:09 trini
  */
 /*
  *  PowerPC version 
@@ -32,6 +32,7 @@
 #include <asm/mmu.h>
 #include <asm/pgtable.h>
 #include <asm/cputable.h>
+#include <asm/cache.h>
 
 #ifdef CONFIG_APUS
 #include <asm/amigappc.h>
@@ -1083,7 +1084,7 @@ relocate_kernel:
 copy_and_flush:
 	addi	r5,r5,-4
 	addi	r6,r6,-4
-4:	li	r0,CACHE_LINE_SIZE/4
+4:	li	r0,L1_CACHE_LINE_SIZE/4
 	mtctr	r0
 3:	addi	r6,r6,4			/* copy a cache line */
 	lwzx	r0,r6,r4

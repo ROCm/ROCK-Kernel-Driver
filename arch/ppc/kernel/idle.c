@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.idle.c 1.14 08/15/01 22:43:06 paulus
+ * BK Id: SCCS/s.idle.c 1.16 10/16/01 15:58:42 trini
  */
 /*
  * Idle daemon for PowerPC.  Idle daemon will handle any action
@@ -58,14 +58,13 @@ int idled(void)
 	init_idle();
 	for (;;) {
 #ifdef CONFIG_SMP
-		int oldval;
 
 		if (!do_power_save) {
 			/*
 			 * Deal with another CPU just having chosen a thread to
 			 * run here:
 			 */
-			oldval = xchg(&current->need_resched, -1);
+			int oldval = xchg(&current->need_resched, -1);
 
 			if (!oldval) {
 				while(current->need_resched == -1)

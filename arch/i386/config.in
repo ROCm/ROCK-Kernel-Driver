@@ -149,6 +149,7 @@ if [ "$CONFIG_MWINCHIP3D" = "y" ]; then
    define_bool CONFIG_X86_USE_PPRO_CHECKSUM y
 fi
 tristate 'Toshiba Laptop support' CONFIG_TOSHIBA
+tristate 'Dell Inspiron 8000 support' CONFIG_I8K
 
 tristate '/dev/cpu/microcode - Intel IA32 CPU microcode support' CONFIG_MICROCODE
 tristate '/dev/cpu/*/msr - Model-specific register support' CONFIG_X86_MSR

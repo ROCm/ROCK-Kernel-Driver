@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.m8260_setup.c 1.26 09/22/01 11:33:22 trini
+ * BK Id: SCCS/s.m8260_setup.c 1.28 10/18/01 11:16:28 trini
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -49,19 +49,14 @@
 #include "ppc8260_pic.h"
 
 static int m8260_set_rtc_time(unsigned long time);
-unsigned long m8260_get_rtc_time(void);
-void m8260_calibrate_decr(void);
-
-extern unsigned long loops_per_jiffy;
+static unsigned long m8260_get_rtc_time(void);
+static void m8260_calibrate_decr(void);
 
 unsigned char __res[sizeof(bd_t)];
 
-extern char saved_command_line[256];
-
-extern unsigned long find_available_memory(void);
 extern void m8260_cpm_reset(void);
 
-void __init
+static void __init
 m8260_setup_arch(void)
 {
 	/* Reset the Communication Processor Module.
@@ -69,7 +64,7 @@ m8260_setup_arch(void)
 	m8260_cpm_reset();
 }
 
-void
+static void
 abort(void)
 {
 #ifdef CONFIG_XMON
@@ -82,7 +77,8 @@ abort(void)
 /* The decrementer counts at the system (internal) clock frequency
  * divided by four.
  */
-void __init m8260_calibrate_decr(void)
+static void __init
+m8260_calibrate_decr(void)
 {
 	bd_t	*binfo = (bd_t *)__res;
 	int freq, divisor;
@@ -98,14 +94,14 @@ void __init m8260_calibrate_decr(void)
  */
 static uint rtc_time;
 
-static int
+static static int
 m8260_set_rtc_time(unsigned long time)
 {
 	rtc_time = time;
 	return(0);
 }
 
-unsigned long
+static unsigned long
 m8260_get_rtc_time(void)
 {
 
@@ -114,7 +110,7 @@ m8260_get_rtc_time(void)
 	return((unsigned long)rtc_time);
 }
 
-void
+static void
 m8260_restart(char *cmd)
 {
 	extern void m8260_gorom(bd_t *bi, uint addr);
@@ -134,20 +130,21 @@ m8260_restart(char *cmd)
 	m8260_gorom((unsigned int)__pa(__res), startaddr);
 }
 
-void
+static void
 m8260_power_off(void)
 {
    m8260_restart(NULL);
 }
 
-void
+static void
 m8260_halt(void)
 {
    m8260_restart(NULL);
 }
 
 
-int m8260_setup_residual(char *buffer)
+static int
+m8260_setup_residual(char *buffer)
 {
         int     len = 0;
 	bd_t	*bp;
@@ -170,7 +167,7 @@ int m8260_setup_residual(char *buffer)
  * External interrupts can be either edge or level triggered, and
  * need to be initialized by the appropriate driver.
  */
-void __init
+static void __init
 m8260_init_IRQ(void)
 {
 	int i;
@@ -195,7 +192,8 @@ m8260_init_IRQ(void)
 /*
  * Same hack as 8xx
  */
-unsigned long __init m8260_find_end_of_memory(void)
+static unsigned long __init
+m8260_find_end_of_memory(void)
 {
 	bd_t	*binfo;
 	extern unsigned char __res[];
@@ -241,35 +239,33 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		strcpy(cmd_line, (char *)(r6+KERNELBASE));
 	}
 
-	ppc_md.setup_arch     = m8260_setup_arch;
-	ppc_md.setup_residual = m8260_setup_residual;
-	ppc_md.get_cpuinfo    = NULL;
-	ppc_md.irq_cannonicalize = NULL;
-	ppc_md.init_IRQ       = m8260_init_IRQ;
-	ppc_md.get_irq	      = m8260_get_irq;
-	ppc_md.init           = NULL;
+	ppc_md.setup_arch		= m8260_setup_arch;
+	ppc_md.setup_residual		= m8260_setup_residual;
+	ppc_md.get_cpuinfo		= NULL;
+	ppc_md.irq_cannonicalize	= NULL;
+	ppc_md.init_IRQ			= m8260_init_IRQ;
+	ppc_md.get_irq			= m8260_get_irq;
+	ppc_md.init			= NULL;
 
-	ppc_md.restart        = m8260_restart;
-	ppc_md.power_off      = m8260_power_off;
-	ppc_md.halt           = m8260_halt;
+	ppc_md.restart			= m8260_restart;
+	ppc_md.power_off		= m8260_power_off;
+	ppc_md.halt			= m8260_halt;
 
-	ppc_md.time_init      = NULL;
-	ppc_md.set_rtc_time   = m8260_set_rtc_time;
-	ppc_md.get_rtc_time   = m8260_get_rtc_time;
-	ppc_md.calibrate_decr = m8260_calibrate_decr;
+	ppc_md.time_init		= NULL;
+	ppc_md.set_rtc_time		= m8260_set_rtc_time;
+	ppc_md.get_rtc_time		= m8260_get_rtc_time;
+	ppc_md.calibrate_decr		= m8260_calibrate_decr;
 
-	ppc_md.find_end_of_memory = m8260_find_end_of_memory;
-	ppc_md.setup_io_mappings = m8260_map_io;
+	ppc_md.find_end_of_memory	= m8260_find_end_of_memory;
+	ppc_md.setup_io_mappings	= m8260_map_io;
 
-	ppc_md.kbd_setkeycode    = NULL;
-	ppc_md.kbd_getkeycode    = NULL;
-	ppc_md.kbd_translate     = NULL;
-	ppc_md.kbd_unexpected_up = NULL;
-	ppc_md.kbd_leds          = NULL;
-	ppc_md.kbd_init_hw       = NULL;
-#ifdef CONFIG_MAGIC_SYSRQ
-	ppc_md.kbd_sysrq_xlate	 = NULL;
-#endif
+	ppc_md.kbd_setkeycode		= NULL;
+	ppc_md.kbd_getkeycode		= NULL;
+	ppc_md.kbd_translate		= NULL;
+	ppc_md.kbd_unexpected_up	= NULL;
+	ppc_md.kbd_leds			= NULL;
+	ppc_md.kbd_init_hw		= NULL;
+	ppc_md.ppc_kbd_sysrq_xlate	= NULL;
 }
 
 /* Mainly for ksyms.

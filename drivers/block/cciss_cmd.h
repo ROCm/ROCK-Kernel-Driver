@@ -228,7 +228,7 @@ typedef struct _CommandList_struct {
   int			   cmd_type; 
   struct _CommandList_struct *prev;
   struct _CommandList_struct *next;
-  struct buffer_head *	   bh;
+  struct request *	   rq;
 } CommandList_struct;
 
 //Configuration Table Structure

@@ -50,6 +50,8 @@
 #include <asm/smp.h>
 #include <asm/machdep.h>
 
+extern int get_pteptr(struct mm_struct *mm, unsigned long addr, pte_t **ptep);
+
 void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle)
 {
 	int order, rsize;

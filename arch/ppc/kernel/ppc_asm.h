@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ppc_asm.h 1.16 08/15/01 22:43:06 paulus
+ * BK Id: SCCS/s.ppc_asm.h 1.18 10/18/01 15:02:09 trini
  */
 /*
  * arch/ppc/kernel/ppc_asm.h
@@ -156,22 +156,3 @@ END_FTR_SECTION_IFCLR(CPU_FTR_601)
 #define MTMSRD(r)	mtmsr	r
 #define CLR_TOP32(r)
 #endif /* CONFIG_PPC64BRIDGE */
-
-/*
- * Defines for cache-line size etc.
- */
-#if defined(CONFIG_4xx) || defined(CONFIG_8xx)
-#define CACHE_LINE_SIZE		16
-#define LG_CACHE_LINE_SIZE	4
-#define MAX_COPY_PREFETCH	1
-
-#elif !defined(CONFIG_PPC64BRIDGE)
-#define CACHE_LINE_SIZE		32
-#define LG_CACHE_LINE_SIZE	5
-#define MAX_COPY_PREFETCH	4
-
-#else
-#define CACHE_LINE_SIZE		128
-#define LG_CACHE_LINE_SIZE	7
-#define MAX_COPY_PREFETCH	1
-#endif /* CONFIG_4xx || CONFIG_8xx */

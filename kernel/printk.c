@@ -24,10 +24,18 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>			/* For in_interrupt() */
+#include <linux/config.h>
 
 #include <asm/uaccess.h>
 
+#ifdef CONFIG_MULTIQUAD
+#define LOG_BUF_LEN	(65536)
+#elif defined(CONFIG_SMP)
+#define LOG_BUF_LEN	(32768)
+#else	
 #define LOG_BUF_LEN	(16384)			/* This must be a power of two */
+#endif
+
 #define LOG_BUF_MASK	(LOG_BUF_LEN-1)
 
 /* printk's without a loglevel use this.. */

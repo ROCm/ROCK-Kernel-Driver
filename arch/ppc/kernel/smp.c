@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.smp.c 1.31 09/08/01 15:47:42 paulus
+ * BK Id: SCCS/s.smp.c 1.34 10/11/01 12:06:01 trini
  */
 /*
  * Smp support for ppc.
@@ -35,7 +35,6 @@
 #include <asm/prom.h>
 #include <asm/smp.h>
 #include <asm/residual.h>
-#include <asm/feature.h>
 #include <asm/time.h>
 
 #include "open_pic.h"
@@ -283,6 +282,7 @@ void __init smp_boot_cpus(void)
 	printk("Entering SMP Mode...\n");
 	smp_num_cpus = 1;
         smp_store_cpu_info(0);
+	cpu_online_map = 1UL;
 
 	/*
 	 * assume for now that the first cpu booted is

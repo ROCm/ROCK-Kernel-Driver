@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.traps.c 1.19 08/24/01 20:07:37 paulus
+ * BK Id: SCCS/s.traps.c 1.22 10/11/01 10:33:09 paulus
  */
 /*
  *  linux/arch/ppc/kernel/traps.c
@@ -108,6 +108,7 @@ MachineCheckException(struct pt_regs *regs)
 #ifdef CONFIG_ALL_PPC
 	unsigned long fixup;
 #endif /* CONFIG_ALL_PPC */
+	unsigned long msr = regs->msr;
 
 	if (user_mode(regs)) {
 		_exception(SIGSEGV, regs);	
@@ -132,31 +133,47 @@ MachineCheckException(struct pt_regs *regs)
 	 * Check if the NIP corresponds to the address of a sync
 	 * instruction for which there is an entry in the exception
 	 * table.
+	 * Note that the 601 only takes a machine check on TEA
+	 * (transfer error ack) signal assertion, and does not
+	 * set of the top 16 bits of SRR1.
+	 *  -- paulus.
 	 */
-	if (regs->msr & (0x80000 | 0x40000)
+	if (((msr & 0xffff0000) == 0 || (msr & (0x80000 | 0x40000)))
 	    && (fixup = search_exception_table(regs->nip)) != 0) {
 		/*
-		 * Check that it's a sync instruction.
+		 * Check that it's a sync instruction, or somewhere
+		 * in the twi; isync; nop sequence that inb/inw/inl uses.
 		 * As the address is in the exception table
 		 * we should be able to read the instr there.
+		 * For the debug message, we look at the preceding
+		 * load or store.
 		 */
-		if (*(unsigned int *)regs->nip == 0x7c0004ac) {
-			unsigned int lsi = ((unsigned int *)regs->nip)[-1];
-			int rb = (lsi >> 11) & 0x1f;
-			printk(KERN_DEBUG "%s bad port %lx at %lx\n",
-			       (lsi & 0x100)? "OUT to": "IN from",
-			       regs->gpr[rb] - _IO_BASE, regs->nip);
+		unsigned int *nip = (unsigned int *)regs->nip;
+		if (*nip == 0x60000000)		/* nop */
+			nip -= 2;
+		else if (*nip == 0x4c00012c)	/* isync */
+			--nip;
+		if (*nip == 0x7c0004ac || (*nip >> 26) == 3) {
+			/* sync or twi */
+			unsigned int rb;
+
+			--nip;
+			rb = (*nip >> 11) & 0x1f;
+			printk(KERN_DEBUG "%s bad port %lx at %p\n",
+			       (*nip & 0x100)? "OUT to": "IN from",
+			       regs->gpr[rb] - _IO_BASE, nip);
 			regs->nip = fixup;
 			return;
 		}
 	}
 #endif /* CONFIG_ALL_PPC */
 	printk("Machine check in kernel mode.\n");
-	printk("Caused by (from SRR1=%lx): ", regs->msr);
-	switch (regs->msr & 0xF0000) {
+	printk("Caused by (from SRR1=%lx): ", msr);
+	switch (msr & 0xF0000) {
 	case 0x80000:
 		printk("Machine check signal\n");
 		break;
+	case 0:		/* for 601 */
 	case 0x40000:
 		printk("Transfer error ack signal\n");
 		break;

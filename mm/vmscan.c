@@ -49,7 +49,7 @@ static inline int try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* 
 	swp_entry_t entry;
 
 	/* Don't look at this pte if it's been accessed recently. */
-	if (ptep_test_and_clear_young(page_table)) {
+	if ((vma->vm_flags & VM_LOCKED) || ptep_test_and_clear_young(page_table)) {
 		mark_page_accessed(page);
 		return 0;
 	}
@@ -220,8 +220,8 @@ static inline int swap_out_vma(struct mm_struct * mm, struct vm_area_struct * vm
 	pgd_t *pgdir;
 	unsigned long end;
 
-	/* Don't swap out areas which are locked down */
-	if (vma->vm_flags & (VM_LOCKED|VM_RESERVED))
+	/* Don't swap out areas which are reserved */
+	if (vma->vm_flags & VM_RESERVED)
 		return count;
 
 	pgdir = pgd_offset(mm, address);
@@ -331,7 +331,7 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 {
 	struct list_head * entry;
 	int max_scan = nr_inactive_pages / priority;
-	int max_mapped = nr_pages*10;
+	int max_mapped = nr_pages << (9 - priority);
 
 	spin_lock(&pagemap_lru_lock);
 	while (--max_scan >= 0 && (entry = inactive_list.prev) != &inactive_list) {
@@ -588,9 +588,7 @@ int try_to_free_pages(zone_t *classzone, unsigned int gfp_mask, unsigned int ord
 	 * Hmm.. Cache shrink failed - time to kill something?
 	 * Mhwahahhaha! This is the part I really like. Giggle.
 	 */
-	if (out_of_memory())
-		oom_kill();
-
+	out_of_memory();
 	return 0;
 }
 

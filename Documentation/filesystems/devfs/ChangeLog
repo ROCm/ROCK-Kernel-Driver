@@ -1771,3 +1771,10 @@ Changes for patch v195
 - Fixed buffer underrun in <try_modload>
 
 - Moved down_read() from <search_for_entry_in_dir> to <find_entry>
+===============================================================================
+Changes for patch v196
+
+- Fixed race in <devfsd_ioctl> when setting event mask
+  Thanks to Kari Hurtta <hurtta@leija.mh.fmi.fi>
+
+- Avoid deadlock in <devfs_follow_link> by using temporary buffer

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pgtable.h 1.12 06/28/01 15:50:17 paulus
+ * BK Id: SCCS/s.pgtable.h 1.15 09/22/01 11:26:52 trini
  */
 #ifdef __KERNEL__
 #ifndef _PPC_PGTABLE_H
@@ -223,7 +223,8 @@ extern unsigned long ioremap_bot, ioremap_base;
 #define _PAGE_RW	0x0040	/* software: user write access allowed */
 #define _PAGE_ACCESSED	0x0080	/* software: page referenced */
 
-#define _PAGE_DIRTY	0x0100	/* C: page changed (write protect) */
+#define _PAGE_HWWRITE	0x0100	/* h/w write enable: never set in Linux PTE */
+#define _PAGE_DIRTY	0x0200	/* software: page changed */
 #define _PAGE_USER	0x0800	/* One of the PP bits, the other is USER&~RW */
 
 #else /* CONFIG_6xx */
@@ -241,11 +242,34 @@ extern unsigned long ioremap_bot, ioremap_base;
 #define _PAGE_RW	0x400	/* software: user write access allowed */
 #endif
 
+/* The non-standard PowerPC MMUs, which includes the 4xx and 8xx (and
+ * mabe 603e) have TLB miss handlers that unconditionally set the
+ * _PAGE_ACCESSED flag as a performance optimization.  This causes
+ * problems for the page_none() macro, just like the HASHPTE flag does
+ * for the standard PowerPC MMUs.  Depending upon the MMU configuration,
+ * either HASHPTE or ACCESSED will have to be masked to give us a
+ * proper pte_none() condition.
+ */
 #ifndef _PAGE_HASHPTE
 #define _PAGE_HASHPTE	0
+#define _PTE_NONE_MASK _PAGE_ACCESSED
+#else
+#define _PTE_NONE_MASK _PAGE_HASHPTE
 #endif
 #ifndef _PAGE_SHARED
 #define _PAGE_SHARED	0
+#endif
+#ifndef _PAGE_HWWRITE
+#define _PAGE_HWWRITE	0
+#endif
+
+/* We can't use _PAGE_HWWRITE on any SMP due to the lack of ability
+ * to atomically manage _PAGE_HWWRITE and it's coordination flags,
+ * _PAGE_DIRTY or _PAGE_RW.  The SMP systems must manage HWWRITE
+ * or its logical equivalent in the MMU management software.
+ */
+#if CONFIG_SMP && _PAGE_HWWRITE
+#error "You can't configure SMP and HWWRITE"
 #endif
 
 #define _PAGE_CHG_MASK	(PAGE_MASK | _PAGE_ACCESSED | _PAGE_DIRTY)
@@ -308,7 +332,7 @@ extern unsigned long empty_zero_page[1024];
 
 #endif /* __ASSEMBLY__ */
 
-#define pte_none(pte)		((pte_val(pte) & ~_PAGE_HASHPTE) == 0)
+#define pte_none(pte)		((pte_val(pte) & ~_PTE_NONE_MASK) == 0)
 #define pte_present(pte)	(pte_val(pte) & _PAGE_PRESENT)
 #define pte_clear(ptep)		do { set_pte((ptep), __pte(0)); } while (0)
 
@@ -353,11 +377,11 @@ static inline void pte_cache(pte_t pte)         { pte_val(pte) &= ~_PAGE_NO_CACH
 static inline pte_t pte_rdprotect(pte_t pte) {
 	pte_val(pte) &= ~_PAGE_USER; return pte; }
 static inline pte_t pte_wrprotect(pte_t pte) {
-	pte_val(pte) &= ~_PAGE_RW; return pte; }
+	pte_val(pte) &= ~(_PAGE_RW | _PAGE_HWWRITE); return pte; }
 static inline pte_t pte_exprotect(pte_t pte) {
 	pte_val(pte) &= ~_PAGE_EXEC; return pte; }
 static inline pte_t pte_mkclean(pte_t pte) {
-	pte_val(pte) &= ~_PAGE_DIRTY; return pte; }
+	pte_val(pte) &= ~(_PAGE_DIRTY | _PAGE_HWWRITE); return pte; }
 static inline pte_t pte_mkold(pte_t pte) {
 	pte_val(pte) &= ~_PAGE_ACCESSED; return pte; }
 
@@ -433,7 +457,7 @@ static inline int ptep_test_and_clear_young(pte_t *ptep)
 
 static inline int ptep_test_and_clear_dirty(pte_t *ptep)
 {
-	return (pte_update(ptep, _PAGE_DIRTY, 0) & _PAGE_DIRTY) != 0;
+	return (pte_update(ptep, (_PAGE_DIRTY | _PAGE_HWWRITE), 0) & _PAGE_DIRTY) != 0;
 }
 
 static inline pte_t ptep_get_and_clear(pte_t *ptep)
@@ -443,7 +467,7 @@ static inline pte_t ptep_get_and_clear(pte_t *ptep)
 
 static inline void ptep_set_wrprotect(pte_t *ptep)
 {
-	pte_update(ptep, _PAGE_RW, 0);
+	pte_update(ptep, (_PAGE_RW | _PAGE_HWWRITE), 0);
 }
 
 static inline void ptep_mkdirty(pte_t *ptep)

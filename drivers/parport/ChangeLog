@@ -1,3 +1,11 @@
+2001-10-26  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (parport_irq_probe): When ECR programmable IRQ
+	support fails, generate interrupts using the FIFO even if we don't
+	want to use the FIFO for real data transfers.
+	(parport_pc_probe_port): Display the ECR address if we have an
+	ECR, not just if we will use the FIFO.
+
 2001-10-24  Dave Strauss  <D.Strauss@motorola.com>
 
 	* parport_pc.c (parport_pc_compat_write_block_pio,

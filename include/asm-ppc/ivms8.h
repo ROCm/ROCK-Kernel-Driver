@@ -1,77 +1,46 @@
 /*
- * BK Id: SCCS/s.ivms8.h 1.6 08/17/01 15:23:17 paulus
+ * BK Id: SCCS/s.ivms8.h 1.8 10/26/01 10:14:09 trini
  */
 /*
- * A collection of structures, addresses, and values associated with
- * Speech Design Integrated Voicemail Systems (IVMS8) boards.
+ * Speech Design Integrated Voicemail board specific definitions
+ * - IVMS8  (small,  8 channels)
+ * - IVML24 (large, 24 channels)
  *
- * Copyright (c) 2000 Wolfgang Denk (wd@denx.de)
+ * In 2.5 when we force a new bootloader, we can merge these two, and add
+ * in _MACH_'s for them. -- Tom
+ *
+ * Copyright (c) 2000, 2001 Wolfgang Denk (wd@denx.de)
  */
-#ifndef __MACH_IVMS8_DEFS
-#define __MACH_IVMS8_DEFS
 
-#ifndef __ASSEMBLY__
+#ifdef __KERNEL__
+#ifndef __ASM_IVMS8_H__
+#define __ASM_IVMS8_H__
 
-typedef	void (interrupt_handler_t)(void *);
+#include <linux/config.h>
 
-typedef struct serial_io {
-	int	(*getc)(void);
-	int	(*tstc)(void);
-	void	(*putc)(const char c);
-	void	(*printf)(const char *fmt, ...);
-} serial_io_t;
+#include <asm/ppcboot.h>
 
-typedef struct intr_util {
-	void	(*install_hdlr)(int, interrupt_handler_t *, void *);
-	void	(*free_hdlr)(int);
-} intr_util_t;
+#define IVMS_IMMR_BASE	0xFFF00000	/* phys. addr of IMMR */
+#define IVMS_IMAP_SIZE	(64 * 1024)	/* size of mapped area */
 
-
-/* A Board Information structure that is given to a program when
- * ppcboot starts it up.
- */
-typedef struct bd_info {
-	 unsigned long	bi_memstart;	/* start of  DRAM memory		*/
-	 unsigned long	bi_memsize;	/* size	 of  DRAM memory in bytes	*/
-	 unsigned long	bi_flashstart;	/* start of FLASH memory		*/
-	 unsigned long	bi_flashsize;	/* size	 of FLASH memory		*/
-	 unsigned long	bi_flashoffset; /* reserved area for startup monitor	*/
-	 unsigned long	bi_sramstart;	/* start of  SRAM memory		*/
-	 unsigned long	bi_sramsize;	/* size	 of  SRAM memory		*/
-	 unsigned long	bi_immr_base;	/* base of IMMR register		*/
-	 unsigned long	bi_bootflags;	/* boot / reboot flag (for LynxOS)	*/
-	 unsigned long	bi_ip_addr;	/* IP Address				*/
-	 unsigned char	bi_enetaddr[6]; /* Ethernet adress			*/
-	 unsigned char	bi_reserved[2]; /* -- just for alignment --		*/
-	 unsigned long	bi_intfreq;	/* Internal Freq, in MHz		*/
-	 unsigned long	bi_busfreq;	/* Bus Freq, in MHz			*/
-	 unsigned long	bi_baudrate;	/* Console Baudrate			*/
-	 serial_io_t	bi_serial_io;	/* Addr of monitor fnc for Console I/O	*/
-	 intr_util_t	bi_interrupt;	/* Addr of monitor fnc for Interrupts	*/
-} bd_t;
-
-#endif /* __ASSEMBLY__ */
-
-#define	IVMS_IMMR_BASE	0xFFF00000	/* phys. addr of IMMR			*/
-#define	IVMS_IMAP_SIZE	(64 * 1024)	/* size of mapped area			*/
-
-#define	IMAP_ADDR	IVMS_IMMR_BASE	/* physical base address of IMMR area	*/
-#define IMAP_SIZE	IVMS_IMAP_SIZE	/* mapped size of IMMR area		*/
+#define IMAP_ADDR	IVMS_IMMR_BASE	/* phys. base address of IMMR area */
+#define IMAP_SIZE	IVMS_IMAP_SIZE	/* mapped size of IMMR area */
 
 #define PCMCIA_MEM_ADDR	((uint)0xFE100000)
 #define PCMCIA_MEM_SIZE	((uint)(64 * 1024))
 
-#define	FEC_INTERRUPT	 9		/* = SIU_LEVEL4				*/
-#define IDE0_INTERRUPT	10		/* = IRQ5				*/
-#define	CPM_INTERRUPT	11		/* = SIU_LEVEL5 (was: SIU_LEVEL2)	*/
-#define PHY_INTERRUPT	12		/* = IRQ6				*/
+#define FEC_INTERRUPT	 9		/* = SIU_LEVEL4 */
+#define IDE0_INTERRUPT	10		/* = IRQ5 */
+#define CPM_INTERRUPT	11		/* = SIU_LEVEL5 (was: SIU_LEVEL2) */
+#define PHY_INTERRUPT	12		/* = IRQ6 */
 
-#define	MAX_HWIFS	1	/* overwrite default in include/asm-ppc/ide.h	*/
+/* override the default number of IDE hardware interfaces */
+#define MAX_HWIFS	1
 
 /*
  * Definitions for IDE0 Interface
  */
-#define IDE0_BASE_OFFSET		0x0000	/* Offset in PCMCIA memory	*/
+#define IDE0_BASE_OFFSET		0x0000	/* Offset in PCMCIA memory */
 #define IDE0_DATA_REG_OFFSET		0x0000
 #define IDE0_ERROR_REG_OFFSET		0x0081
 #define IDE0_NSECTOR_REG_OFFSET		0x0082
@@ -81,10 +50,10 @@ typedef struct bd_info {
 #define IDE0_SELECT_REG_OFFSET		0x0086
 #define IDE0_STATUS_REG_OFFSET		0x0087
 #define IDE0_CONTROL_REG_OFFSET		0x0106
-#define IDE0_IRQ_REG_OFFSET		0x000A	/* not used			*/
+#define IDE0_IRQ_REG_OFFSET		0x000A	/* not used */
 
-/* We don't use the 8259.
-*/
+/* We don't use the 8259. */
 #define NR_8259_INTS	0
 
-#endif	/* __MACH_IVMS8_DEFS */
+#endif /* __ASM_IVMS8_H__ */
+#endif /* __KERNEL__ */

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pci.c 1.28 08/08/01 16:35:43 paulus
+ * BK Id: SCCS/s.pci.c 1.31 11/01/01 12:24:55 trini
  */
 /*
  * Common pmac/prep/chrp pci routines. -- Cort
@@ -39,6 +39,8 @@
 unsigned long isa_io_base     = 0;
 unsigned long isa_mem_base    = 0;
 unsigned long pci_dram_offset = 0;
+
+void pcibios_make_OF_bus_map(void);
 
 static void pcibios_fixup_resources(struct pci_dev* dev);
 static void fixup_broken_pcnet32(struct pci_dev* dev);

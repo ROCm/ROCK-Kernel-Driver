@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ppc_ksyms.c 1.55 10/02/01 12:33:42 trini
+ * BK Id: SCCS/s.ppc_ksyms.c 1.57 10/16/01 15:58:42 trini
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -351,7 +351,7 @@ EXPORT_SYMBOL(next_mmu_context);
 EXPORT_SYMBOL(set_context);
 EXPORT_SYMBOL(handle_mm_fault); /* For MOL */
 EXPORT_SYMBOL_NOVERS(disarm_decr);
-#if !defined(CONFIG_8xx) && !defined(CONFIG_4xx)
+#ifdef CONFIG_PPC_STD_MMU
 EXPORT_SYMBOL(flush_hash_page); /* For MOL */
 extern long *intercept_table;
 EXPORT_SYMBOL(intercept_table);

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.mpc8xx.h 1.10 05/17/01 18:14:25 cort
+ * BK Id: SCCS/s.mpc8xx.h 1.15 11/01/01 12:48:53 trini
  */
 
 /* This is the single file included by all MPC8xx build options.
@@ -36,7 +36,7 @@
 #include <asm/rpxclassic.h>
 #endif
 
-#if (defined(CONFIG_TQM860) || defined(CONFIG_TQM8xxL))
+#if defined(CONFIG_TQM8xxL)
 #include <asm/tqm8xx.h>
 #endif
 
@@ -44,7 +44,7 @@
 #include <asm/spd8xx.h>
 #endif
 
-#if defined(CONFIG_IVMS8)
+#if defined(CONFIG_IVMS8) || defined(CONFIG_IVML24)
 #include <asm/ivms8.h>
 #endif
 

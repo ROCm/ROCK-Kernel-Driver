@@ -471,6 +471,8 @@ nfs_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs_readdirres *res)
 
 	for (nr = 0; *p++; nr++) {
 		entry = p - 1;
+		if (p + 2 > end)
+			goto short_pkt;
 		p++; /* fileid */
 		len = ntohl(*p++);
 		p += XDR_QUADLEN(len) + 1;	/* name plus cookie */
@@ -479,13 +481,13 @@ nfs_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs_readdirres *res)
 						len);
 			return -errno_NFSERR_IO;
 		}
-		if (p + 2 > end) {
-			printk(KERN_NOTICE
-				"NFS: short packet in readdir reply!\n");
-			entry[0] = entry[1] = 0;
-			break;
-		}
+		if (p + 2 > end)
+			goto short_pkt;
 	}
+	return nr;
+ short_pkt:
+	printk(KERN_NOTICE "NFS: short packet in readdir reply!\n");
+	entry[0] = entry[1] = 0;
 	return nr;
 }
 

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.misc.S 1.28 08/24/01 20:07:37 paulus
+ * BK Id: SCCS/s.misc.S 1.32 10/18/01 17:29:53 trini
  */
 /*
  * This file contains miscellaneous low-level functions.
@@ -385,21 +385,21 @@ _GLOBAL(flush_icache_range)
 	rlwinm	r5,r5,16,16,31
 	cmpi	0,r5,1
 	beqlr				/* for 601, do nothing */
-	li	r5,CACHE_LINE_SIZE-1
+	li	r5,L1_CACHE_LINE_SIZE-1
 	andc	r3,r3,r5
 	subf	r4,r3,r4
 	add	r4,r4,r5
-	srwi.	r4,r4,LG_CACHE_LINE_SIZE
+	srwi.	r4,r4,LG_L1_CACHE_LINE_SIZE
 	beqlr
 	mtctr	r4
 	mr	r6,r3
 1:	dcbst	0,r3
-	addi	r3,r3,CACHE_LINE_SIZE
+	addi	r3,r3,L1_CACHE_LINE_SIZE
 	bdnz	1b
 	sync				/* wait for dcbst's to get to ram */
 	mtctr	r4
 2:	icbi	0,r6
-	addi	r6,r6,CACHE_LINE_SIZE
+	addi	r6,r6,L1_CACHE_LINE_SIZE
 	bdnz	2b
 	sync				/* additional sync needed on g4 */
 	isync
@@ -412,37 +412,37 @@ _GLOBAL(flush_icache_range)
  * clean_dcache_range(unsigned long start, unsigned long stop)
  */
 _GLOBAL(clean_dcache_range)
-	li	r5,CACHE_LINE_SIZE-1
+	li	r5,L1_CACHE_LINE_SIZE-1
 	andc	r3,r3,r5
 	subf	r4,r3,r4
 	add	r4,r4,r5
-	srwi.	r4,r4,LG_CACHE_LINE_SIZE
+	srwi.	r4,r4,LG_L1_CACHE_LINE_SIZE
 	beqlr
 	mtctr	r4
 
 1:	dcbst	0,r3
-	addi	r3,r3,CACHE_LINE_SIZE
+	addi	r3,r3,L1_CACHE_LINE_SIZE
 	bdnz	1b
 	sync				/* wait for dcbst's to get to ram */
 	blr
 
 /*
- * Write any modified data cache blocks out to memory
- * and invalidate the corresponding instruction cache blocks.
+ * Write any modified data cache blocks out to memory and invalidate them.
+ * Does not invalidate the corresponding instruction cache blocks.
  *
  * flush_dcache_range(unsigned long start, unsigned long stop)
  */
 _GLOBAL(flush_dcache_range)
-	li	r5,CACHE_LINE_SIZE-1
+	li	r5,L1_CACHE_LINE_SIZE-1
 	andc	r3,r3,r5
 	subf	r4,r3,r4
 	add	r4,r4,r5
-	srwi.	r4,r4,LG_CACHE_LINE_SIZE
+	srwi.	r4,r4,LG_L1_CACHE_LINE_SIZE
 	beqlr
 	mtctr	r4
 
 1:	dcbf	0,r3
-	addi	r3,r3,CACHE_LINE_SIZE
+	addi	r3,r3,L1_CACHE_LINE_SIZE
 	bdnz	1b
 	sync				/* wait for dcbst's to get to ram */
 	blr
@@ -455,16 +455,16 @@ _GLOBAL(flush_dcache_range)
  * invalidate_dcache_range(unsigned long start, unsigned long stop)
  */
 _GLOBAL(invalidate_dcache_range)
-	li	r5,CACHE_LINE_SIZE-1
+	li	r5,L1_CACHE_LINE_SIZE-1
 	andc	r3,r3,r5
 	subf	r4,r3,r4
 	add	r4,r4,r5
-	srwi.	r4,r4,LG_CACHE_LINE_SIZE
+	srwi.	r4,r4,LG_L1_CACHE_LINE_SIZE
 	beqlr
 	mtctr	r4
 
 1:	dcbi	0,r3
-	addi	r3,r3,CACHE_LINE_SIZE
+	addi	r3,r3,L1_CACHE_LINE_SIZE
 	bdnz	1b
 	sync				/* wait for dcbi's to get to ram */
 	blr
@@ -481,18 +481,18 @@ _GLOBAL(__flush_page_to_ram)
 	mfspr	r5,PVR
 	rlwinm	r5,r5,16,16,31
 	cmpi	0,r5,1
-	beqlr				/* for 601, do nothing */
-	rlwinm	r3,r3,0,0,19		/* Get page base address */
-	li	r4,4096/CACHE_LINE_SIZE	/* Number of lines in a page */
+	beqlr					/* for 601, do nothing */
+	rlwinm	r3,r3,0,0,19			/* Get page base address */
+	li	r4,4096/L1_CACHE_LINE_SIZE	/* Number of lines in a page */
 	mtctr	r4
 	mr	r6,r3
-0:	dcbst	0,r3			/* Write line to ram */
-	addi	r3,r3,CACHE_LINE_SIZE
+0:	dcbst	0,r3				/* Write line to ram */
+	addi	r3,r3,L1_CACHE_LINE_SIZE
 	bdnz	0b
 	sync
 	mtctr	r4
 1:	icbi	0,r6
-	addi	r6,r6,CACHE_LINE_SIZE
+	addi	r6,r6,L1_CACHE_LINE_SIZE
 	bdnz	1b
 	sync
 	isync
@@ -510,11 +510,11 @@ _GLOBAL(__flush_icache_page)
 	mfspr	r5,PVR
 	rlwinm	r5,r5,16,16,31
 	cmpi	0,r5,1
-	beqlr				/* for 601, do nothing */
-	li	r4,4096/CACHE_LINE_SIZE	/* Number of lines in a page */
+	beqlr					/* for 601, do nothing */
+	li	r4,4096/L1_CACHE_LINE_SIZE	/* Number of lines in a page */
 	mtctr	r4
 1:	icbi	0,r3
-	addi	r3,r3,CACHE_LINE_SIZE
+	addi	r3,r3,L1_CACHE_LINE_SIZE
 	bdnz	1b
 	sync
 	isync
@@ -526,7 +526,7 @@ _GLOBAL(__flush_icache_page)
  * displaced).  This only works on cacheable memory.
  */
 _GLOBAL(clear_page)
-	li	r0,4096/CACHE_LINE_SIZE
+	li	r0,4096/L1_CACHE_LINE_SIZE
 	mtctr	r0
 #ifdef CONFIG_8xx
 	li	r4, 0
@@ -537,7 +537,7 @@ _GLOBAL(clear_page)
 #else
 1:	dcbz	0,r3
 #endif
-	addi	r3,r3,CACHE_LINE_SIZE
+	addi	r3,r3,L1_CACHE_LINE_SIZE
 	bdnz	1b
 	blr
 
@@ -563,20 +563,20 @@ _GLOBAL(copy_page)
 	li	r5,4
 
 #ifndef CONFIG_8xx
-#if MAX_COPY_PREFETCH > 1
-	li	r0,MAX_COPY_PREFETCH
+#if MAX_L1_COPY_PREFETCH > 1
+	li	r0,MAX_L1_COPY_PREFETCH
 	li	r11,4
 	mtctr	r0
 11:	dcbt	r11,r4
-	addi	r11,r11,CACHE_LINE_SIZE
+	addi	r11,r11,L1_CACHE_LINE_SIZE
 	bdnz	11b
-#else /* MAX_COPY_PREFETCH == 1 */
+#else /* MAX_L1_COPY_PREFETCH == 1 */
 	dcbt	r5,r4
-	li	r11,CACHE_LINE_SIZE+4
-#endif /* MAX_COPY_PREFETCH */
+	li	r11,L1_CACHE_LINE_SIZE+4
+#endif /* MAX_L1_COPY_PREFETCH */
 #endif /* CONFIG_8xx */
 
-	li	r0,4096/CACHE_LINE_SIZE
+	li	r0,4096/L1_CACHE_LINE_SIZE
 	mtctr	r0
 1:
 #ifndef CONFIG_8xx
@@ -584,12 +584,12 @@ _GLOBAL(copy_page)
 	dcbz	r5,r3
 #endif
 	COPY_16_BYTES
-#if CACHE_LINE_SIZE >= 32
+#if L1_CACHE_LINE_SIZE >= 32
 	COPY_16_BYTES
-#if CACHE_LINE_SIZE >= 64
+#if L1_CACHE_LINE_SIZE >= 64
 	COPY_16_BYTES
 	COPY_16_BYTES
-#if CACHE_LINE_SIZE >= 128
+#if L1_CACHE_LINE_SIZE >= 128
 	COPY_16_BYTES
 	COPY_16_BYTES
 	COPY_16_BYTES
@@ -1104,22 +1104,23 @@ _GLOBAL(sys_call_table)
 	.long sys_ni_syscall		/* streams2 */
 	.long sys_vfork
 	.long sys_getrlimit	/* 190 */
-	.long sys_ni_syscall		/* 191 */	/* Unused */
-	.long sys_mmap2			/* 192 */
-	.long sys_truncate64		/* 193 */
-	.long sys_ftruncate64		/* 194 */
-	.long sys_stat64		/* 195 */
-	.long sys_lstat64		/* 196 */
-	.long sys_fstat64		/* 197 */
-	.long sys_pciconfig_read	/* 198 */
-	.long sys_pciconfig_write 	/* 199 */
+	.long sys_readahead
+	.long sys_mmap2	
+	.long sys_truncate64
+	.long sys_ftruncate64
+	.long sys_stat64	/* 195 */
+	.long sys_lstat64
+	.long sys_fstat64
+	.long sys_pciconfig_read
+	.long sys_pciconfig_write 
 	.long sys_pciconfig_iobase 	/* 200 */
 	.long sys_ni_syscall		/* 201 - reserved - MacOnLinux - new */
-	.long sys_getdents64		/* 202 */
-	.long sys_pivot_root		/* 203 */
-	.long sys_fcntl64		/* 204 */
-	.long sys_madvise		/* 205 */
-	.long sys_mincore		/* 206 */
+	.long sys_getdents64
+	.long sys_pivot_root
+	.long sys_fcntl64
+	.long sys_madvise	/* 205 */
+	.long sys_mincore
+	.long sys_gettid
 	.rept NR_syscalls-(.-sys_call_table)/4
 		.long sys_ni_syscall
 	.endr

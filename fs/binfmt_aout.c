@@ -285,13 +285,15 @@ static int load_aout_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		return retval;
 
 	/* OK, This is the point of no return */
-#if !defined(__sparc__)
-	set_personality(PER_LINUX);
-#else
+#if defined(__alpha__)
+	SET_AOUT_PERSONALITY(bprm, ex);
+#elif defined(__sparc__)
 	set_personality(PER_SUNOS);
 #if !defined(__sparc_v9__)
 	memcpy(&current->thread.core_exec, &ex, sizeof(struct exec));
 #endif
+#else
+	set_personality(PER_LINUX);
 #endif
 
 	current->mm->end_code = ex.a_text +

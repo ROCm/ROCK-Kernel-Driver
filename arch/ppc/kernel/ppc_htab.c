@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ppc_htab.c 1.17 08/20/01 22:59:41 paulus
+ * BK Id: SCCS/s.ppc_htab.c 1.19 10/16/01 15:58:42 trini
  */
 /*
  * PowerPC hash table management proc entry.  Will show information
@@ -115,10 +115,13 @@ static ssize_t ppc_htab_read(struct file * file, char * buf,
 			     size_t count, loff_t *ppos)
 {
 	unsigned long mmcr0 = 0, pmc1 = 0, pmc2 = 0;
-	int n = 0, valid;
+	int n = 0;
+#ifdef CONFIG_PPC_STD_MMU
+	int valid;
 	unsigned int kptes = 0, uptes = 0, zombie_ptes = 0;
 	PTE *ptr;
 	struct task_struct *p;
+#endif /* CONFIG_PPC_STD_MMU */
 	char buffer[512];
 
 	if (count < 0)
@@ -206,9 +209,9 @@ static ssize_t ppc_htab_read(struct file * file, char * buf,
 		      "Evicts\t\t: %lu\n",
 		      htab_reloads, htab_preloads, htab_hash_searches,
 		      primary_pteg_full, htab_evicts);
+return_string:
 #endif /* CONFIG_PPC_STD_MMU */
 	
-return_string:
 	n += sprintf( buffer + n,
 		      "Non-error misses: %lu\n"
 		      "Error misses\t: %lu\n",

@@ -2119,10 +2119,9 @@ static int __devinit parport_irq_probe(struct parport *pb)
 
 	if (priv->ecr) {
 		pb->irq = programmable_irq_support(pb);
-	}
 
-	if (pb->modes & PARPORT_MODE_ECP) {
-		pb->irq = irq_probe_ECP(pb);
+		if (pb->irq == PARPORT_IRQ_NONE)
+			pb->irq = irq_probe_ECP(pb);
 	}
 
 	if ((pb->irq == PARPORT_IRQ_NONE) && priv->ecr &&
@@ -2255,7 +2254,7 @@ struct parport *parport_pc_probe_port (unsigned long int base,
 	p->private_data = priv;
 
 	printk(KERN_INFO "%s: PC-style at 0x%lx", p->name, p->base);
-	if (p->base_hi && (p->modes & PARPORT_MODE_ECP))
+	if (p->base_hi && priv->ecr)
 		printk(" (0x%lx)", p->base_hi);
 	p->irq = irq;
 	p->dma = dma;

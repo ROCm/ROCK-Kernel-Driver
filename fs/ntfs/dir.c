@@ -19,6 +19,7 @@
 #include "support.h"
 #include "util.h"
 #include <linux/smp_lock.h>
+#include <linux/bitops.h>
 
 static char I30[] = "$I30";
 

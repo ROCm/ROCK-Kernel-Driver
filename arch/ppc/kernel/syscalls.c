@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.syscalls.c 1.8 05/17/01 18:14:22 cort
+ * BK Id: SCCS/s.syscalls.c 1.11 10/16/01 15:58:42 trini
  */
 /*
  * linux/arch/ppc/kernel/sys_ppc.c
@@ -306,7 +306,7 @@ int sys_olduname(struct oldold_utsname * name)
  * Those are normally defined in arch/ppc/kernel/pci.c. But when CONFIG_PCI is
  * not defined, this file is not linked at all, so here are the "empty" versions
  */
-asmlinkage int sys_pciconfig_read() { return -ENOSYS; }
-asmlinkage int sys_pciconfig_write() { return -ENOSYS; }
-asmlinkage long sys_pciconfig_iobase() { return -ENOSYS; }
+int sys_pciconfig_read(void) { return -ENOSYS; }
+int sys_pciconfig_write(void) { return -ENOSYS; }
+long sys_pciconfig_iobase(void) { return -ENOSYS; }
 #endif

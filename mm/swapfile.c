@@ -260,6 +260,9 @@ static int exclusive_swap_page(struct page *page)
 int can_share_swap_page(struct page *page)
 {
 	int retval = 0;
+
+	if (!PageLocked(page))
+		BUG();
 	switch (page_count(page)) {
 	case 3:
 		if (!page->buffers)
@@ -268,10 +271,7 @@ int can_share_swap_page(struct page *page)
 	case 2:
 		if (!PageSwapCache(page))
 			break;
-		if (TryLockPage(page))
-			break;
 		retval = exclusive_swap_page(page);
-		UnlockPage(page);
 		break;
 	case 1:
 		if (PageReserved(page))
@@ -343,7 +343,11 @@ void free_swap_and_cache(swp_entry_t entry)
 	}
 	if (page) {
 		page_cache_get(page);
-		delete_from_swap_cache(page);
+		/* Only cache user (+us), or swap space full? Free it! */
+		if (page_count(page) == 2 || vm_swap_full()) {
+			delete_from_swap_cache(page);
+			SetPageDirty(page);
+		}
 		UnlockPage(page);
 		page_cache_release(page);
 	}

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.atomic.h 1.13 08/21/01 16:07:48 trini
+ * BK Id: SCCS/s.atomic.h 1.15 10/28/01 10:37:22 trini
  */
 /*
  * PowerPC atomic operations
@@ -7,9 +7,10 @@
 
 #ifndef _ASM_PPC_ATOMIC_H_ 
 #define _ASM_PPC_ATOMIC_H_
-#ifdef __KERNEL__
 
 typedef struct { volatile int counter; } atomic_t;
+
+#ifdef __KERNEL__
 
 #define ATOMIC_INIT(i)	{ (i) }
 

@@ -276,6 +276,7 @@ EXPORT_SYMBOL(filemap_sync);
 EXPORT_SYMBOL(filemap_fdatasync);
 EXPORT_SYMBOL(filemap_fdatawait);
 EXPORT_SYMBOL(lock_page);
+EXPORT_SYMBOL(unlock_page);
 
 /* device registration */
 EXPORT_SYMBOL(register_chrdev);

@@ -3,7 +3,7 @@
 
 #include <net/inet_ecn.h>
 
-#define TCP_HP_BITS (~(TCP_RESERVED_BITS|TCP_FLAG_PSH)|TCP_FLAG_ECE|TCP_FLAG_CWR)
+#define TCP_HP_BITS (~(TCP_RESERVED_BITS|TCP_FLAG_PSH))
 
 #define	TCP_ECN_OK		1
 #define TCP_ECN_QUEUE_CWR	2

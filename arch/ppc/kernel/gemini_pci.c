@@ -1,10 +1,10 @@
 /*
- * BK Id: SCCS/s.gemini_pci.c 1.5 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.gemini_pci.c 1.6 10/11/01 08:51:46 trini
  */
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/pci.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #include <asm/machdep.h>
 #include <asm/gemini.h>

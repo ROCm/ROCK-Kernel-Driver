@@ -93,7 +93,7 @@ typedef struct cmdlist {
 	int	ctlr;
 	struct cmdlist *prev;
 	struct cmdlist *next;
-	struct buffer_head *bh;
+	struct request *rq;
 	int type;
 } cmdlist_t;
 	

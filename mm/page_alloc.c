@@ -515,14 +515,14 @@ void show_free_areas_core(pg_data_t *pgdat)
 	pg_data_t *tmpdat = pgdat;
 
 	printk("Free pages:      %6dkB (%6dkB HighMem)\n",
-		nr_free_pages() << (PAGE_SHIFT-10),
-		nr_free_highpages() << (PAGE_SHIFT-10));
+		K(nr_free_pages()),
+		K(nr_free_highpages()));
 
 	while (tmpdat) {
 		zone_t *zone;
 		for (zone = tmpdat->node_zones;
 			       	zone < tmpdat->node_zones + MAX_NR_ZONES; zone++)
-			printk("Zone:%s freepages:%6lukB min:%6luKB low:%6lukB " 
+			printk("Zone:%s freepages:%6lukB min:%6lukB low:%6lukB " 
 				       "high:%6lukB\n", 
 					zone->name,
 					K(zone->free_pages),
@@ -532,10 +532,6 @@ void show_free_areas_core(pg_data_t *pgdat)
 			
 		tmpdat = tmpdat->node_next;
 	}
-
-	printk("Free pages:      %6dkB (%6dkB HighMem)\n",
-		K(nr_free_pages()),
-		K(nr_free_highpages()));
 
 	printk("( Active: %d, inactive: %d, free: %d )\n",
 	       nr_active_pages,
@@ -561,8 +557,7 @@ void show_free_areas_core(pg_data_t *pgdat)
 					nr++;
 				}
 				total += nr * (1 << order);
-				printk("%lu*%lukB ", nr,
-						(PAGE_SIZE>>10) << order);
+				printk("%lu*%lukB ", nr, K(1UL) << order);
 			}
 			spin_unlock_irqrestore(&zone->lock, flags);
 		}

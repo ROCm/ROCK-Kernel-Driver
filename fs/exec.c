@@ -771,7 +771,6 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 	    if (!bprm->loader && eh->fh.f_magic == 0x183 &&
 		(eh->fh.f_flags & 0x3000) == 0x3000)
 	    {
-		char * dynloader[] = { "/sbin/loader" };
 		struct file * file;
 		unsigned long loader;
 
@@ -781,10 +780,14 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 
 	        loader = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
 
-		file = open_exec(dynloader[0]);
+		file = open_exec("/sbin/loader");
 		retval = PTR_ERR(file);
 		if (IS_ERR(file))
 			return retval;
+
+		/* Remember if the application is TASO.  */
+		bprm->sh_bang = eh->ah.entry < 0x100000000;
+
 		bprm->file = file;
 		bprm->loader = loader;
 		retval = prepare_binprm(bprm);

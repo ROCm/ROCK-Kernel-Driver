@@ -16,7 +16,6 @@ comment 'Miscellaneous USB options'
       define_bool CONFIG_USB_BANDWIDTH n
    fi
    bool '  Long timeout for slow-responding devices (some MGE Ellipse UPSes)' CONFIG_USB_LONG_TIMEOUT
-   bool '  Large report fetching for "broken" devices (some APC UPSes)' CONFIG_USB_LARGE_CONFIG
 fi
 
 comment 'USB Controllers'

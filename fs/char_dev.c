@@ -104,8 +104,7 @@ struct char_device *cdget(dev_t dev)
 
 void cdput(struct char_device *cdev)
 {
-	if (atomic_dec_and_test(&cdev->count)) {
-		spin_lock(&cdev_lock);
+	if (atomic_dec_and_lock(&cdev->count, &cdev_lock)) {
 		list_del(&cdev->hash);
 		spin_unlock(&cdev_lock);
 		destroy_cdev(cdev);

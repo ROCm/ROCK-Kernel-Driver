@@ -594,6 +594,8 @@ nfs3_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs3_readdirres *res)
 	end = (u32 *) ((u8 *) p + iov[1].iov_len);
 	for (nr = 0; *p++; nr++) {
 		entry = p - 1;
+		if (p + 3 > end)
+			goto short_pkt;
 		p += 2;				/* inode # */
 		len = ntohl(*p++);		/* string length */
 		p += XDR_QUADLEN(len) + 2;	/* name + cookie */
@@ -605,10 +607,17 @@ nfs3_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs3_readdirres *res)
 
 		if (res->plus) {
 			/* post_op_attr */
-			if (*p++)
+			if (p > end)
+				goto short_pkt;
+			if (*p++) {
 				p += 21;
+				if (p > end)
+					goto short_pkt;
+			}
 			/* post_op_fh3 */
 			if (*p++) {
+				if (p > end)
+					goto short_pkt;
 				len = ntohl(*p++);
 				if (len > NFS3_FHSIZE) {
 					printk(KERN_WARNING "NFS: giant filehandle in "
@@ -619,15 +628,15 @@ nfs3_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs3_readdirres *res)
 			}
 		}
 
-		if (p + 2 > end) {
-			printk(KERN_NOTICE
-				"NFS: short packet in readdir reply!\n");
-			/* truncate listing */
-			entry[0] = entry[1] = 0;
-			break;
-		}
+		if (p + 2 > end)
+			goto short_pkt;
 	}
 
+	return nr;
+ short_pkt:
+	printk(KERN_NOTICE "NFS: short packet in readdir reply!\n");
+	/* truncate listing */
+	entry[0] = entry[1] = 0;
 	return nr;
 }
 

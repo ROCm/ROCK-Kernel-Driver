@@ -844,6 +844,14 @@ static int proc_submiturb(struct dev_state *ps, void *arg)
 		uurb.buffer_length = totlen;
 		break;
 
+	case USBDEVFS_URB_TYPE_INTERRUPT:
+		uurb.number_of_packets = 0;
+		if (uurb.buffer_length > 16384)
+			return -EINVAL;
+		if (!access_ok((uurb.endpoint & USB_DIR_IN) ? VERIFY_WRITE : VERIFY_READ, uurb.buffer, uurb.buffer_length))
+			return -EFAULT;   
+		break;
+
 	default:
 		return -EINVAL;
 	}

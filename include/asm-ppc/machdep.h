@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.machdep.h 1.21 08/29/01 10:07:29 paulus
+ * BK Id: SCCS/s.machdep.h 1.23 10/18/01 11:16:28 trini
  */
 #ifdef __KERNEL__
 #ifndef _PPC_MACHDEP_H
@@ -61,9 +61,7 @@ struct machdep_calls {
 	char		(*kbd_unexpected_up)(unsigned char keycode);
 	void		(*kbd_leds)(unsigned char leds);
 	void		(*kbd_init_hw)(void);
-#ifdef CONFIG_MAGIC_SYSRQ
 	unsigned char 	*ppc_kbd_sysrq_xlate;
-#endif
 
 	/*
 	 * optional PCI "hooks"

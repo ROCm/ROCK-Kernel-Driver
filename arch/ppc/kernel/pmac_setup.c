@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pmac_setup.c 1.39 09/08/01 15:47:42 paulus
+ * BK Id: SCCS/s.pmac_setup.c 1.41 10/18/01 11:16:28 trini
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -94,11 +94,9 @@ extern int mac_hid_kbd_translate(unsigned char scancode, unsigned char *keycode,
 				 char raw_mode);
 extern char mac_hid_kbd_unexpected_up(unsigned char keycode);
 extern void mac_hid_init_hw(void);
-#ifdef CONFIG_MAGIC_SYSRQ
-extern unsigned char mac_hid_kbd_sysrq_xlate[128];
-extern unsigned char pckbd_sysrq_xlate[128];
-extern unsigned char mackbd_sysrq_xlate[128];
-#endif /* CONFIG_MAGIC_SYSRQ */
+extern unsigned char mac_hid_kbd_sysrq_xlate[];
+extern unsigned char pckbd_sysrq_xlate[];
+extern unsigned char mackbd_sysrq_xlate[];
 extern int pckbd_setkeycode(unsigned int scancode, unsigned int keycode);
 extern int pckbd_getkeycode(unsigned int scancode);
 extern int pckbd_translate(unsigned char scancode, unsigned char *keycode,

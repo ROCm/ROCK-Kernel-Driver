@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.string.S 1.5 05/17/01 18:14:22 cort
+ * BK Id: SCCS/s.string.S 1.9 10/25/01 10:08:51 trini
  */
 /*
  * String handling functions for PowerPC.
@@ -14,21 +14,8 @@
 #include "../kernel/ppc_asm.tmpl"
 #include <linux/config.h>
 #include <asm/processor.h>
+#include <asm/cache.h>
 #include <asm/errno.h>
-
-#if defined(CONFIG_4xx) || defined(CONFIG_8xx)
-#define CACHE_LINE_SIZE		16
-#define LG_CACHE_LINE_SIZE	4
-#define MAX_COPY_PREFETCH	1
-#elif !defined(CONFIG_PPC64BRIDGE)
-#define CACHE_LINE_SIZE		32
-#define LG_CACHE_LINE_SIZE	5
-#define MAX_COPY_PREFETCH	4
-#else
-#define CACHE_LINE_SIZE		128
-#define LG_CACHE_LINE_SIZE	7
-#define MAX_COPY_PREFETCH	1
-#endif /* CONFIG_4xx || CONFIG_8xx */
 
 #define COPY_16_BYTES		\
 	lwz	r7,4(r4);	\
@@ -75,11 +62,13 @@
 	.long	8 ## n ## 5b,9 ## n ## 1b;	\
 	.long	8 ## n ## 6b,9 ## n ## 1b;	\
 	.long	8 ## n ## 7b,9 ## n ## 1b;	\
-.text
+	.text
 
-CACHELINE_BYTES = CACHE_LINE_SIZE
-LG_CACHELINE_BYTES = LG_CACHE_LINE_SIZE
-CACHELINE_MASK = (CACHE_LINE_SIZE-1)
+	.text
+
+CACHELINE_BYTES = L1_CACHE_LINE_SIZE
+LG_CACHELINE_BYTES = LG_L1_CACHE_LINE_SIZE
+CACHELINE_MASK = (L1_CACHE_LINE_SIZE-1)
 
 	.globl	strcpy
 strcpy:
@@ -278,12 +267,12 @@ cacheable_memcpy:
 	dcbz	r11,r6
 #endif
 	COPY_16_BYTES
-#if CACHE_LINE_SIZE >= 32
+#if L1_CACHE_LINE_SIZE >= 32
 	COPY_16_BYTES
-#if CACHE_LINE_SIZE >= 64
+#if L1_CACHE_LINE_SIZE >= 64
 	COPY_16_BYTES
 	COPY_16_BYTES
-#if CACHE_LINE_SIZE >= 128
+#if L1_CACHE_LINE_SIZE >= 128
 	COPY_16_BYTES
 	COPY_16_BYTES
 	COPY_16_BYTES
@@ -456,23 +445,23 @@ __copy_tofrom_user:
 
 #if !defined(CONFIG_8xx)
 	/* Here we decide how far ahead to prefetch the source */
-#if MAX_COPY_PREFETCH > 1
+#if MAX_L1_COPY_PREFETCH > 1
 	/* Heuristically, for large transfers we prefetch
-	   MAX_COPY_PREFETCH cachelines ahead.  For small transfers
+	   MAX_L1_COPY_PREFETCH cachelines ahead.  For small transfers
 	   we prefetch 1 cacheline ahead. */
-	cmpwi	r0,MAX_COPY_PREFETCH
+	cmpwi	r0,MAX_L1_COPY_PREFETCH
 	li	r7,1
 	li	r3,4
 	ble	111f
-	li	r7,MAX_COPY_PREFETCH
+	li	r7,MAX_L1_COPY_PREFETCH
 111:	mtctr	r7
 112:	dcbt	r3,r4
 	addi	r3,r3,CACHELINE_BYTES
 	bdnz	112b
-#else /* MAX_COPY_PREFETCH == 1 */
+#else /* MAX_L1_COPY_PREFETCH == 1 */
 	li	r3,CACHELINE_BYTES + 4
 	dcbt	r11,r4
-#endif /* MAX_COPY_PREFETCH */
+#endif /* MAX_L1_COPY_PREFETCH */
 #endif /* CONFIG_8xx */
 
 	mtctr	r0
@@ -492,12 +481,12 @@ __copy_tofrom_user:
 	.text
 /* the main body of the cacheline loop */
 	COPY_16_BYTES_WITHEX(0)
-#if CACHE_LINE_SIZE >= 32
+#if L1_CACHE_LINE_SIZE >= 32
 	COPY_16_BYTES_WITHEX(1)
-#if CACHE_LINE_SIZE >= 64
+#if L1_CACHE_LINE_SIZE >= 64
 	COPY_16_BYTES_WITHEX(2)
 	COPY_16_BYTES_WITHEX(3)
-#if CACHE_LINE_SIZE >= 128
+#if L1_CACHE_LINE_SIZE >= 128
 	COPY_16_BYTES_WITHEX(4)
 	COPY_16_BYTES_WITHEX(5)
 	COPY_16_BYTES_WITHEX(6)
@@ -546,12 +535,12 @@ __copy_tofrom_user:
  * 104f (if in read part) or 105f (if in write part), after updating r5
  */
 	COPY_16_BYTES_EXCODE(0)
-#if CACHE_LINE_SIZE >= 32
+#if L1_CACHE_LINE_SIZE >= 32
 	COPY_16_BYTES_EXCODE(1)
-#if CACHE_LINE_SIZE >= 64
+#if L1_CACHE_LINE_SIZE >= 64
 	COPY_16_BYTES_EXCODE(2)
 	COPY_16_BYTES_EXCODE(3)
-#if CACHE_LINE_SIZE >= 128
+#if L1_CACHE_LINE_SIZE >= 128
 	COPY_16_BYTES_EXCODE(4)
 	COPY_16_BYTES_EXCODE(5)
 	COPY_16_BYTES_EXCODE(6)

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.oak_setup.c 1.8 08/15/01 21:48:38 paulus
+ * BK Id: SCCS/s.oak_setup.c 1.10 10/18/01 11:16:28 trini
  */
 /*
  *
@@ -128,12 +128,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.kbd_unexpected_up 	= NULL;
 	ppc_md.kbd_leds          	= NULL;
 	ppc_md.kbd_init_hw       	= NULL;
-
-#if defined(CONFIG_MAGIC_SYSRQ)
 	ppc_md.ppc_kbd_sysrq_xlate	= NULL;
-#endif
-
-	return;
 }
 
 /*

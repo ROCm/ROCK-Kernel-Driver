@@ -53,6 +53,7 @@ extern unsigned long Hash_size, Hash_mask;
 
 #elif defined(CONFIG_4xx)
 #define flush_HPTE(X, va, pg)	_tlbie(va)
+extern void MMU_init_hw(void);
 
 #else
 /* anything except 4xx or 8xx */

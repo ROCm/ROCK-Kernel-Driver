@@ -1,11 +1,12 @@
 /*
- * BK Id: SCCS/s.io.h 1.11 08/28/01 15:48:26 paulus
+ * BK Id: SCCS/s.io.h 1.14 10/16/01 15:58:42 trini
  */
 #ifdef __KERNEL__
 #ifndef _PPC_IO_H
 #define _PPC_IO_H
 
 #include <linux/config.h>
+#include <linux/types.h>
 #include <asm/page.h>
 #include <asm/byteorder.h>
 
@@ -29,20 +30,18 @@
 #include <asm/mpc8xx.h>
 #elif defined(CONFIG_8260)
 #include <asm/mpc8260.h>
-#else /* 4xx/8xx/8260 */
-#ifdef CONFIG_APUS
+#elif defined(CONFIG_APUS)
 #define _IO_BASE 0
 #define _ISA_MEM_BASE 0
 #define PCI_DRAM_OFFSET 0
-#else /* CONFIG_APUS */
+#else /* Everyone else */
 extern unsigned long isa_io_base;
 extern unsigned long isa_mem_base;
 extern unsigned long pci_dram_offset;
 #define _IO_BASE	isa_io_base
 #define _ISA_MEM_BASE	isa_mem_base
 #define PCI_DRAM_OFFSET	pci_dram_offset
-#endif /* CONFIG_APUS */
-#endif
+#endif /* Platform-dependant I/O */
 
 #define readb(addr) in_8((volatile u8 *)(addr))
 #define writeb(b,addr) out_8((volatile u8 *)(addr), (b))
@@ -89,16 +88,20 @@ extern __inline__ unsigned int name(unsigned int port)	\
 {							\
 	unsigned int x;					\
 	__asm__ __volatile__(				\
-		op " %0,0,%1\n"				\
-		"1:	sync\n"				\
-		"2:\n"					\
+			op "	%0,0,%1\n"		\
+		"1:	twi	0,%0,0\n"		\
+		"2:	isync\n"			\
+		"3:	nop\n"				\
+		"4:\n"					\
 		".section .fixup,\"ax\"\n"		\
-		"3:	li	%0,-1\n"		\
-		"	b	2b\n"			\
+		"5:	li	%0,-1\n"		\
+		"	b	4b\n"			\
 		".previous\n"				\
 		".section __ex_table,\"a\"\n"		\
 		"	.align	2\n"			\
-		"	.long	1b,3b\n"		\
+		"	.long	1b,5b\n"		\
+		"	.long	2b,5b\n"		\
+		"	.long	3b,5b\n"		\
 		".previous"				\
 		: "=&r" (x)				\
 		: "r" (port + _IO_BASE));		\

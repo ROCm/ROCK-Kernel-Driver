@@ -11234,7 +11234,7 @@ CONFIG_USB_HID
   mice, joysticks, graphic tablets, or any other HID based devices
   to your computer via USB. You can't use this driver and the
   HIDBP (Boot Protocol) keyboard and mouse drivers at the same time.
-  More information is available: Documentation/usb/input.txt.
+  More information is available: Documentation/input/input.txt.
 
   If unsure, say Y.
 
@@ -15040,6 +15040,25 @@ CONFIG_TOSHIBA
   http://www.buzzard.org.uk/toshiba/
 
   Say Y if you intend to run this kernel on a Toshiba portable.
+  Say N otherwise.
+
+Dell Inspiron 8000 support
+CONFIG_I8K
+  This adds a driver to safely access the System Management Mode
+  of the CPU on the Dell Inspiron 8000. The System Management Mode
+  is used to read cpu temperature and cooling fan status and to
+  control the fans on the I8K portables.
+
+  This driver has been tested only on the Inspiron 8000 but it may
+  also work with other Dell laptops. You can force loading on other
+  models by passing the parameter `force=1' to the module. Use at
+  your own risk.
+
+  For information on utilities to make use of this driver see the
+  I8K Linux utilities web site at:
+  http://www.debian.org/~dz/i8k/
+
+  Say Y if you intend to run this kernel on a Dell Inspiron 8000.
   Say N otherwise.
 
 /dev/cpu/microcode - Intel IA32 CPU microcode support

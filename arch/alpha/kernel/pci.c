@@ -93,16 +93,18 @@ quirk_cypress(struct pci_dev *dev)
 
 	/* The Cypress bridge responds on the PCI bus in the address range
 	   0xffff0000-0xffffffff (conventional x86 BIOS ROM).  There is no
-	   way to turn this off, so if we use a large direct-map window, or
-	   a large SG window, we must avoid this region.  */
+	   way to turn this off.  The bridge also supports several extended
+	   BIOS ranges (disabled after power-up), and some consoles do turn
+	   them on.  So if we use a large direct-map window, or a large SG
+	   window, we must avoid entire 0xfff00000-0xffffffff region.  */
 	else if (dev->class >> 8 == PCI_CLASS_BRIDGE_ISA) {
-		if (__direct_map_base + __direct_map_size >= 0xffff0000)
-			__direct_map_size = 0xffff0000 - __direct_map_base;
+		if (__direct_map_base + __direct_map_size >= 0xfff00000)
+			__direct_map_size = 0xfff00000 - __direct_map_base;
 		else {
 			struct pci_controller *hose = dev->sysdata;
 			struct pci_iommu_arena *pci = hose->sg_pci;
-			if (pci && pci->dma_base + pci->size >= 0xffff0000)
-				pci->size = 0xffff0000 - pci->dma_base;
+			if (pci && pci->dma_base + pci->size >= 0xfff00000)
+				pci->size = 0xfff00000 - pci->dma_base;
 		}
 	}
 }

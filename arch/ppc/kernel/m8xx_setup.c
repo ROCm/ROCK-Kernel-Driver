@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.m8xx_setup.c 1.35 10/11/01 11:55:47 trini
+ * BK Id: SCCS/s.m8xx_setup.c 1.38 10/18/01 11:16:28 trini
  *
  *  linux/arch/ppc/kernel/setup.c
  *
@@ -59,8 +59,6 @@ extern int rd_doload;		/* 1 = load ramdisk, 0 = don't load */
 extern int rd_prompt;		/* 1 = prompt for ramdisk, 0 = don't prompt */
 extern int rd_image_start;	/* starting block # of image */
 #endif
-
-extern char saved_command_line[256];
 
 extern unsigned long find_available_memory(void);
 extern void m8xx_cpm_reset(uint);
@@ -373,35 +371,33 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		strcpy(cmd_line, (char *)(r6+KERNELBASE));
 	}
 
-	ppc_md.setup_arch     = m8xx_setup_arch;
-	ppc_md.setup_residual = m8xx_setup_residual;
-	ppc_md.get_cpuinfo    = NULL;
-	ppc_md.irq_cannonicalize = NULL;
-	ppc_md.init_IRQ       = m8xx_init_IRQ;
-	ppc_md.get_irq	      = m8xx_get_irq;
-	ppc_md.init           = NULL;
+	ppc_md.setup_arch		= m8xx_setup_arch;
+	ppc_md.setup_residual		= m8xx_setup_residual;
+	ppc_md.get_cpuinfo		= NULL;
+	ppc_md.irq_cannonicalize	= NULL;
+	ppc_md.init_IRQ			= m8xx_init_IRQ;
+	ppc_md.get_irq			= m8xx_get_irq;
+	ppc_md.init			= NULL;
 
-	ppc_md.restart        = m8xx_restart;
-	ppc_md.power_off      = m8xx_power_off;
-	ppc_md.halt           = m8xx_halt;
+	ppc_md.restart			= m8xx_restart;
+	ppc_md.power_off		= m8xx_power_off;
+	ppc_md.halt			= m8xx_halt;
 
-	ppc_md.time_init      = NULL;
-	ppc_md.set_rtc_time   = m8xx_set_rtc_time;
-	ppc_md.get_rtc_time   = m8xx_get_rtc_time;
-	ppc_md.calibrate_decr = m8xx_calibrate_decr;
+	ppc_md.time_init		= NULL;
+	ppc_md.set_rtc_time		= m8xx_set_rtc_time;
+	ppc_md.get_rtc_time		= m8xx_get_rtc_time;
+	ppc_md.calibrate_decr		= m8xx_calibrate_decr;
 
-	ppc_md.find_end_of_memory = m8xx_find_end_of_memory;
-	ppc_md.setup_io_mappings = m8xx_map_io;
+	ppc_md.find_end_of_memory	= m8xx_find_end_of_memory;
+	ppc_md.setup_io_mappings	= m8xx_map_io;
 
-	ppc_md.kbd_setkeycode    = NULL;
-	ppc_md.kbd_getkeycode    = NULL;
-	ppc_md.kbd_translate     = NULL;
-	ppc_md.kbd_unexpected_up = NULL;
-	ppc_md.kbd_leds          = NULL;
-	ppc_md.kbd_init_hw       = NULL;
-#ifdef CONFIG_MAGIC_SYSRQ
-	ppc_md.ppc_kbd_sysrq_xlate	 = NULL;
-#endif
+	ppc_md.kbd_setkeycode		= NULL;
+	ppc_md.kbd_getkeycode		= NULL;
+	ppc_md.kbd_translate		= NULL;
+	ppc_md.kbd_unexpected_up	= NULL;
+	ppc_md.kbd_leds			= NULL;
+	ppc_md.kbd_init_hw		= NULL;
+	ppc_md.ppc_kbd_sysrq_xlate	= NULL;
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 	m8xx_ide_init();

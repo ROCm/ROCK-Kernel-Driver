@@ -59,6 +59,8 @@ static inline int timer_pending (const struct timer_list * timer)
  *	2. Because if the timer wrap changes in future you wont have to
  *	   alter your driver code.
  *
+ * time_after(a,b) returns true if the time a is after time b.
+ *
  * Do this with "<0" and ">=0" to only test the sign of the result. A
  * good compiler would generate better code (and a really good compiler
  * wouldn't care). Gcc is currently neither.

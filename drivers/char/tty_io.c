@@ -2329,9 +2329,6 @@ void __init tty_init(void)
 #ifdef CONFIG_SERIAL_TX3912
 	tx3912_rs_init();
 #endif
-#ifdef CONFIG_COMPUTONE
-	ip2_init();
-#endif
 #ifdef CONFIG_ROCKETPORT
 	rp_init();
 #endif

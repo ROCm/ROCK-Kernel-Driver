@@ -79,6 +79,10 @@ struct swap_info_struct {
 };
 
 extern int nr_swap_pages;
+
+/* Swap 50% full? Release swapcache more aggressively.. */
+#define vm_swap_full() (nr_swap_pages*2 < total_swap_pages)
+
 extern unsigned int nr_free_pages(void);
 extern unsigned int nr_free_buffer_pages(void);
 extern int nr_active_pages;
@@ -129,8 +133,7 @@ extern struct page * lookup_swap_cache(swp_entry_t);
 extern struct page * read_swap_cache_async(swp_entry_t);
 
 /* linux/mm/oom_kill.c */
-extern int out_of_memory(void);
-extern void oom_kill(void);
+extern void out_of_memory(void);
 
 /* linux/mm/swapfile.c */
 extern int total_swap_pages;

@@ -13,8 +13,20 @@
 // ToDo:
 //
 // Fix the immediate DSS_NOW problem.
+// Work over the channel stats return logic in ip2_ipl_ioctl so they
+//	make sense for all 256 possible channels and so the user space
+//	utilities will compile and work properly.
 //
 // Done:
+//
+// 1.2.14	/\/\|=mhw=|\/\/
+// Added bounds checking to ip2_ipl_ioctl to avoid potential terroristic acts.
+// Changed the definition of ip2trace to be more consistant with kernel style
+//	Thanks to Andreas Dilger <adilger@turbolabs.com> for these updates
+//
+// 1.2.13	/\/\|=mhw=|\/\/
+// DEVFS: Renamed ttf/{n} to tts/F{n} and cuf/{n} to cua/F{n} to conform
+//	to agreed devfs serial device naming convention.
 //
 // 1.2.12	/\/\|=mhw=|\/\/
 // Cleaned up some remove queue cut and paste errors
@@ -215,13 +227,13 @@ int ip2_read_proc(char *, char **, off_t, int, int *, void * );
 
 /* String constants to identify ourselves */
 static char *pcName    = "Computone IntelliPort Plus multiport driver";
-static char *pcVersion = "1.2.11";
+static char *pcVersion = "1.2.14";
 
 /* String constants for port names */
 static char *pcDriver_name   = "ip2";
 #ifdef	CONFIG_DEVFS_FS
-static char *pcTty    		 = "ttf/%d";
-static char *pcCallout		 = "cuf/%d";
+static char *pcTty    		 = "tts/F%d";
+static char *pcCallout		 = "cua/F%d";
 #else
 static char *pcTty    		 = "ttyF";
 static char *pcCallout		 = "cuf";
@@ -289,7 +301,6 @@ static ssize_t ip2_ipl_write(struct file *, const char *, size_t, loff_t *);
 static int ip2_ipl_ioctl(struct inode *, struct file *, UINT, ULONG);
 static int ip2_ipl_open(struct inode *, struct file *);
 
-void ip2trace(unsigned short,unsigned char,unsigned char,unsigned long,...);
 static int DumpTraceBuffer(char *, int);
 static int DumpFifoBuffer( char *, int);
 
@@ -583,9 +594,7 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 	i2eBordStrPtr pB = NULL;
 	int rc = -1;
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace (ITRC_NO_PORT, ITRC_INIT, ITRC_ENTER, 0 );
-#endif
 
 	/* process command line arguments to modprobe or
 		insmod i.e. iop & irqp */
@@ -789,9 +798,7 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 		}
 	}
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace (ITRC_NO_PORT, ITRC_INIT, 2, 0 );
-#endif
 
 	/* Zero out the normal tty device structure. */
 	memset ( &ip2_tty_driver, 0, sizeof ip2_tty_driver );
@@ -850,9 +857,7 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 	ip2_callout_driver.major   = IP2_CALLOUT_MAJOR;
 	ip2_callout_driver.subtype = SERIAL_TYPE_CALLOUT;
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace (ITRC_NO_PORT, ITRC_INIT, 3, 0 );
-#endif
 
 	/* Register the tty devices. */
 	if ( ( err = tty_register_driver ( &ip2_tty_driver ) ) ) {
@@ -875,9 +880,7 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 		printk(KERN_ERR "IP2: failed to register read_procmem\n");
 	} else {
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace (ITRC_NO_PORT, ITRC_INIT, 4, 0 );
-#endif
 		/* Register the interrupt handler or poll handler, depending upon the
 		 * specified interrupt.
 		 */
@@ -967,9 +970,7 @@ retry:
 			}
 		}
 	}
-#ifdef IP2DEBUG_TRACE
 	ip2trace (ITRC_NO_PORT, ITRC_INIT, ITRC_RETURN, 0 );
-#endif
 
 	return 0;
 }
@@ -1368,9 +1369,7 @@ ip2_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	int i;
 	i2eBordStrPtr  pB;
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace (ITRC_NO_PORT, ITRC_INTR, 99, 1, irq );
-#endif
 
 	/* Service just the boards on the list using this irq */
 	for( i = 0; i < i2nBoards; ++i ) {
@@ -1404,9 +1403,7 @@ ip2_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	++irq_counter;
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace (ITRC_NO_PORT, ITRC_INTR, ITRC_RETURN, 0 );
-#endif
 }
 
 /******************************************************************************/
@@ -1422,9 +1419,8 @@ ip2_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 static void
 ip2_poll(unsigned long arg)
 {
-#ifdef IP2DEBUG_TRACE
 	ip2trace (ITRC_NO_PORT, ITRC_INTR, 100, 0 );
-#endif
+
 	TimerOn = 0; // it's the truth but not checked in service
 
 	// Just polled boards, IRQ = 0 will hit all non-interrupt boards.
@@ -1436,9 +1432,7 @@ ip2_poll(unsigned long arg)
 	add_timer( &PollTimer );
 	TimerOn = 1;
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace (ITRC_NO_PORT, ITRC_INTR, ITRC_RETURN, 0 );
-#endif
 }
 
 static inline void 
@@ -1446,9 +1440,8 @@ do_input( i2ChanStrPtr pCh )
 {
 	unsigned long flags;
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace(CHANN, ITRC_INPUT, 21, 0 );
-#endif
+
 	// Data input
 	if ( pCh->pTTY != NULL ) {
 		READ_LOCK_IRQSAVE(&pCh->Ibuf_spinlock,flags)
@@ -1458,9 +1451,8 @@ do_input( i2ChanStrPtr pCh )
 		} else
 			READ_UNLOCK_IRQRESTORE(&pCh->Ibuf_spinlock,flags)
 	} else {
-#ifdef IP2DEBUG_TRACE
 		ip2trace(CHANN, ITRC_INPUT, 22, 0 );
-#endif
+
 		i2InputFlush( pCh );
 	}
 }
@@ -1485,9 +1477,7 @@ do_status( i2ChanStrPtr pCh )
 
 	status =  i2GetStatus( pCh, (I2_BRK|I2_PAR|I2_FRA|I2_OVR) );
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace (CHANN, ITRC_STATUS, 21, 1, status );
-#endif
 
 	if (pCh->pTTY && (status & (I2_BRK|I2_PAR|I2_FRA|I2_OVR)) ) {
 		if ( (status & I2_BRK) ) {
@@ -1547,9 +1537,7 @@ skip_this:
 		}
 	}
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace (CHANN, ITRC_STATUS, 26, 0 );
-#endif
 }
 
 /******************************************************************************/
@@ -1604,9 +1592,7 @@ ip2_open( PTTY tty, struct file *pFile )
 	int do_clocal = 0;
 	i2ChanStrPtr  pCh = DevTable[MINOR(tty->device)];
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace (MINOR(tty->device), ITRC_OPEN, ITRC_ENTER, 0 );
-#endif
 
 	if ( pCh == NULL ) {
 		return -ENODEV;
@@ -1732,10 +1718,8 @@ ip2_open( PTTY tty, struct file *pFile )
 			(pCh->flags & ASYNC_CLOSING)?"True":"False");
 		printk(KERN_DEBUG "OpenBlock: waiting for CD or signal\n");
 #endif
-#ifdef IP2DEBUG_TRACE
 		ip2trace (CHANN, ITRC_OPEN, 3, 2, (pCh->flags & ASYNC_CALLOUT_ACTIVE),
-								(pCh->flags & ASYNC_CLOSING) );
-#endif
+				(pCh->flags & ASYNC_CLOSING) );
 		/* check for signal */
 		if (signal_pending(current)) {
 			rc = (( pCh->flags & ASYNC_HUP_NOTIFY ) ? -EAGAIN : -ERESTARTSYS);
@@ -1747,9 +1731,9 @@ ip2_open( PTTY tty, struct file *pFile )
 	remove_wait_queue(&pCh->open_wait, &wait);
 
 	--pCh->wopen; //why count?
-#ifdef IP2DEBUG_TRACE
+
 	ip2trace (CHANN, ITRC_OPEN, 4, 0 );
-#endif
+
 	if (rc != 0 ) {
 		return rc;
 	}
@@ -1786,9 +1770,8 @@ noblock:
 #endif
 	serviceOutgoingFifo( pCh->pMyBord );
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace (CHANN, ITRC_OPEN, ITRC_RETURN, 0 );
-#endif
+
 	return 0;
 }
 
@@ -1811,9 +1794,7 @@ ip2_close( PTTY tty, struct file *pFile )
 		return;
 	}
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace (CHANN, ITRC_CLOSE, ITRC_ENTER, 0 );
-#endif
 
 #ifdef IP2DEBUG_OPEN
 	printk(KERN_DEBUG "IP2:close ttyF%02X:\n",MINOR(tty->device));
@@ -1822,16 +1803,15 @@ ip2_close( PTTY tty, struct file *pFile )
 	if ( tty_hung_up_p ( pFile ) ) {
 		MOD_DEC_USE_COUNT;
 
-#ifdef IP2DEBUG_TRACE
 		ip2trace (CHANN, ITRC_CLOSE, 2, 1, 2 );
-#endif
+
 		return;
 	}
 	if ( tty->count > 1 ) { /* not the last close */
 		MOD_DEC_USE_COUNT;
-#ifdef IP2DEBUG_TRACE
+
 		ip2trace (CHANN, ITRC_CLOSE, 2, 1, 3 );
-#endif
+
 		return;
 	}
 	pCh->flags |= ASYNC_CLOSING;	// last close actually
@@ -1898,9 +1878,8 @@ ip2_close( PTTY tty, struct file *pFile )
 
 	MOD_DEC_USE_COUNT;
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace (CHANN, ITRC_CLOSE, ITRC_RETURN, 1, 1 );
-#endif
+
 	return;
 }
 
@@ -1922,9 +1901,7 @@ ip2_hangup ( PTTY tty )
 		return;
 	}
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace (CHANN, ITRC_HANGUP, ITRC_ENTER, 0 );
-#endif
 
 	ip2_flush_buffer(tty);
 
@@ -1947,9 +1924,7 @@ ip2_hangup ( PTTY tty )
 	pCh->pTTY = NULL;
 	wake_up_interruptible ( &pCh->open_wait );
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace (CHANN, ITRC_HANGUP, ITRC_RETURN, 0 );
-#endif
 }
 
 /******************************************************************************/
@@ -1977,9 +1952,7 @@ ip2_write( PTTY tty, int user, const unsigned char *pData, int count)
 	int bytesSent = 0;
 	unsigned long flags;
 
-#ifdef IP2DEBUG_TRACE
-   ip2trace (CHANN, ITRC_WRITE, ITRC_ENTER, 2, count, -1 );
-#endif
+	ip2trace (CHANN, ITRC_WRITE, ITRC_ENTER, 2, count, -1 );
 
 	/* Flush out any buffered data left over from ip2_putchar() calls. */
 	ip2_flush_chars( tty );
@@ -1989,9 +1962,8 @@ ip2_write( PTTY tty, int user, const unsigned char *pData, int count)
 	bytesSent = i2Output( pCh, pData, count, user );
 	WRITE_UNLOCK_IRQRESTORE(&pCh->Pbuf_spinlock,flags);
 
-#ifdef IP2DEBUG_TRACE
-   ip2trace (CHANN, ITRC_WRITE, ITRC_RETURN, 1, bytesSent );
-#endif
+	ip2trace (CHANN, ITRC_WRITE, ITRC_RETURN, 1, bytesSent );
+
 	return bytesSent > 0 ? bytesSent : 0;
 }
 
@@ -2011,9 +1983,7 @@ ip2_putchar( PTTY tty, unsigned char ch )
 	i2ChanStrPtr  pCh = tty->driver_data;
 	unsigned long flags;
 
-#ifdef IP2DEBUG_TRACE
 //	ip2trace (CHANN, ITRC_PUTC, ITRC_ENTER, 1, ch );
-#endif
 
 	WRITE_LOCK_IRQSAVE(&pCh->Pbuf_spinlock,flags);
 	pCh->Pbuf[pCh->Pbuf_stuff++] = ch;
@@ -2023,9 +1993,7 @@ ip2_putchar( PTTY tty, unsigned char ch )
 	} else
 		WRITE_UNLOCK_IRQRESTORE(&pCh->Pbuf_spinlock,flags);
 
-#ifdef IP2DEBUG_TRACE
 //	ip2trace (CHANN, ITRC_PUTC, ITRC_RETURN, 1, ch );
-#endif
 }
 
 /******************************************************************************/
@@ -2045,9 +2013,9 @@ ip2_flush_chars( PTTY tty )
 
 	WRITE_LOCK_IRQSAVE(&pCh->Pbuf_spinlock,flags);
 	if ( pCh->Pbuf_stuff ) {
-#ifdef IP2DEBUG_TRACE
-//	ip2trace (CHANN, ITRC_PUTC, 10, 1, strip );
-#endif
+
+//		ip2trace (CHANN, ITRC_PUTC, 10, 1, strip );
+
 		//
 		// We may need to restart i2Output if it does not fullfill this request
 		//
@@ -2079,9 +2047,7 @@ ip2_write_room ( PTTY tty )
 	bytesFree = i2OutputFree( pCh ) - pCh->Pbuf_stuff;
 	READ_UNLOCK_IRQRESTORE(&pCh->Pbuf_spinlock,flags);
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace (CHANN, ITRC_WRITE, 11, 1, bytesFree );
-#endif
 
 	return ((bytesFree > 0) ? bytesFree : 0);
 }
@@ -2101,9 +2067,9 @@ ip2_chars_in_buf ( PTTY tty )
 	i2ChanStrPtr  pCh = tty->driver_data;
 	int rc;
 	unsigned long flags;
-#ifdef IP2DEBUG_TRACE
+
 	ip2trace (CHANN, ITRC_WRITE, 12, 1, pCh->Obuf_char_count + pCh->Pbuf_stuff );
-#endif
+
 #ifdef IP2DEBUG_WRITE
 	printk (KERN_DEBUG "IP2: chars in buffer = %d (%d,%d)\n",
 				 pCh->Obuf_char_count + pCh->Pbuf_stuff,
@@ -2133,9 +2099,8 @@ ip2_flush_buffer( PTTY tty )
 	i2ChanStrPtr  pCh = tty->driver_data;
 	unsigned long flags;
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace (CHANN, ITRC_FLUSH, ITRC_ENTER, 0 );
-#endif
+
 #ifdef IP2DEBUG_WRITE
 	printk (KERN_DEBUG "IP2: flush buffer\n" );
 #endif
@@ -2144,9 +2109,9 @@ ip2_flush_buffer( PTTY tty )
 	WRITE_UNLOCK_IRQRESTORE(&pCh->Pbuf_spinlock,flags);
 	i2FlushOutput( pCh );
 	ip2_owake(tty);
-#ifdef IP2DEBUG_TRACE
+
 	ip2trace (CHANN, ITRC_FLUSH, ITRC_RETURN, 0 );
-#endif
+
 }
 
 /******************************************************************************/
@@ -2292,9 +2257,7 @@ ip2_ioctl ( PTTY tty, struct file *pFile, UINT cmd, ULONG arg )
 		return -ENODEV;
 	}
 
-#ifdef IP2DEBUG_TRACE
 	ip2trace (CHANN, ITRC_IOCTL, ITRC_ENTER, 2, cmd, arg );
-#endif
 
 #ifdef IP2DEBUG_IOCTL
 	printk(KERN_DEBUG "IP2: ioctl cmd (%x), arg (%lx)\n", cmd, arg );
@@ -2302,18 +2265,18 @@ ip2_ioctl ( PTTY tty, struct file *pFile, UINT cmd, ULONG arg )
 
 	switch(cmd) {
 	case TIOCGSERIAL:
-#ifdef IP2DEBUG_TRACE
+
 		ip2trace (CHANN, ITRC_IOCTL, 2, 1, rc );
-#endif
+
 		rc = get_serial_info(pCh, (struct serial_struct *) arg);
 		if (rc)
 			return rc;
 		break;
 
 	case TIOCSSERIAL:
-#ifdef IP2DEBUG_TRACE
+
 		ip2trace (CHANN, ITRC_IOCTL, 3, 1, rc );
-#endif
+
 		rc = set_serial_info(pCh, (struct serial_struct *) arg);
 		if (rc)
 			return rc;
@@ -2349,9 +2312,9 @@ ip2_ioctl ( PTTY tty, struct file *pFile, UINT cmd, ULONG arg )
 
 	case TCSBRK:   /* SVID version: non-zero arg --> no break */
 		rc = tty_check_change(tty);
-#ifdef IP2DEBUG_TRACE
+
 		ip2trace (CHANN, ITRC_IOCTL, 4, 1, rc );
-#endif
+
 		if (!rc) {
 			ip2_wait_until_sent(tty,0);
 			if (!arg) {
@@ -2363,9 +2326,9 @@ ip2_ioctl ( PTTY tty, struct file *pFile, UINT cmd, ULONG arg )
 
 	case TCSBRKP:  /* support for POSIX tcsendbreak() */
 		rc = tty_check_change(tty);
-#ifdef IP2DEBUG_TRACE
+
 		ip2trace (CHANN, ITRC_IOCTL, 5, 1, rc );
-#endif
+
 		if (!rc) {
 			ip2_wait_until_sent(tty,0);
 			i2QueueCommands(PTYPE_INLINE, pCh, 100, 1,
@@ -2375,18 +2338,18 @@ ip2_ioctl ( PTTY tty, struct file *pFile, UINT cmd, ULONG arg )
 		break;
 
 	case TIOCGSOFTCAR:
-#ifdef IP2DEBUG_TRACE
+
 		ip2trace (CHANN, ITRC_IOCTL, 6, 1, rc );
-#endif
+
 			PUT_USER(rc,C_CLOCAL(tty) ? 1 : 0, (unsigned long *) arg);
 		if (rc)	
 			return rc;
 	break;
 
 	case TIOCSSOFTCAR:
-#ifdef IP2DEBUG_TRACE
+
 		ip2trace (CHANN, ITRC_IOCTL, 7, 1, rc );
-#endif
+
 		GET_USER(rc,arg,(unsigned long *) arg);
 		if (rc) 
 			return rc;
@@ -2396,9 +2359,9 @@ ip2_ioctl ( PTTY tty, struct file *pFile, UINT cmd, ULONG arg )
 		break;
 
 	case TIOCMGET:
-#ifdef IP2DEBUG_TRACE
+
 		ip2trace (CHANN, ITRC_IOCTL, 8, 1, rc );
-#endif
+
 /*
 	FIXME - the following code is causing a NULL pointer dereference in
 	2.3.51 in an interrupt handler.  It's suppose to prompt the board
@@ -2441,9 +2404,8 @@ ip2_ioctl ( PTTY tty, struct file *pFile, UINT cmd, ULONG arg )
 	case TIOCMBIS:
 	case TIOCMBIC:
 	case TIOCMSET:
-#ifdef IP2DEBUG_TRACE
 		ip2trace (CHANN, ITRC_IOCTL, 9, 0 );
-#endif
+
 		rc = set_modem_info(pCh, cmd, (unsigned int *) arg);
 		break;
 
@@ -2464,13 +2426,12 @@ ip2_ioctl ( PTTY tty, struct file *pFile, UINT cmd, ULONG arg )
 
 		serviceOutgoingFifo( pCh->pMyBord );
 		for(;;) {
-#ifdef IP2DEBUG_TRACE
 			ip2trace (CHANN, ITRC_IOCTL, 10, 0 );
-#endif
+
 			schedule();
-#ifdef IP2DEBUG_TRACE
+
 			ip2trace (CHANN, ITRC_IOCTL, 11, 0 );
-#endif
+
 			/* see if a signal did it */
 			if (signal_pending(current)) {
 				rc = -ERESTARTSYS;
@@ -2514,9 +2475,8 @@ ip2_ioctl ( PTTY tty, struct file *pFile, UINT cmd, ULONG arg )
 	 * serial driver.
 	 */
 	case TIOCGICOUNT:
-#ifdef IP2DEBUG_TRACE
 		ip2trace (CHANN, ITRC_IOCTL, 11, 1, rc );
-#endif
+
 		save_flags(flags);cli();
 		cnow = pCh->icount;
 		restore_flags(flags);
@@ -2547,15 +2507,14 @@ ip2_ioctl ( PTTY tty, struct file *pFile, UINT cmd, ULONG arg )
 	case TIOCSERSETMULTI:
 
 	default:
-#ifdef IP2DEBUG_TRACE
 		ip2trace (CHANN, ITRC_IOCTL, 12, 0 );
-#endif
+
 		rc =  -ENOIOCTLCMD;
 		break;
 	}
-#ifdef IP2DEBUG_TRACE
+
 	ip2trace (CHANN, ITRC_IOCTL, ITRC_RETURN, 0 );
-#endif
+
 	return rc;
 }
 
@@ -2766,9 +2725,9 @@ ip2_set_line_discipline ( PTTY tty )
 #ifdef IP2DEBUG_IOCTL
 	printk (KERN_DEBUG "IP2: set line discipline\n" );
 #endif
-#ifdef IP2DEBUG_TRACE
+
 	ip2trace (((i2ChanStrPtr)tty->driver_data)->port_index, ITRC_IOCTL, 16, 0 );
-#endif
+
 }
 
 /******************************************************************************/
@@ -3224,12 +3183,16 @@ ip2_ipl_ioctl ( struct inode *pInode, struct file *pFile, UINT cmd, ULONG arg )
 			break;
 
 		default:
-			pCh = DevTable[cmd];
-			if ( pCh )
-			{
-				COPY_TO_USER(rc, (char*)arg, (char*)pCh, sizeof(i2ChanStr) );
+			if (cmd < IP2_MAX_PORTS) {
+				pCh = DevTable[cmd];
+				if ( pCh )
+				{
+					COPY_TO_USER(rc, (char*)arg, (char*)pCh, sizeof(i2ChanStr) );
+				} else {
+					rc = -ENODEV;
+				}
 			} else {
-				rc = cmd < 64 ? -ENODEV : -EINVAL;
+				rc = -EINVAL;
 			}
 		}
 		break;
@@ -3542,10 +3505,10 @@ int ip2_read_proc(char *page, char **start, off_t off,
 /*                                                                            */
 /*                                                                            */
 /******************************************************************************/
+#ifdef IP2DEBUG_TRACE
 void
 ip2trace (unsigned short pn, unsigned char cat, unsigned char label, unsigned long codes, ...)
 {
-#ifdef IP2DEBUG_TRACE
 	long flags;
 	unsigned long *pCode = &codes;
 	union ip2breadcrumb bc;
@@ -3585,8 +3548,8 @@ ip2trace (unsigned short pn, unsigned char cat, unsigned char label, unsigned lo
 
 		tracebuf[tracestuff++] = *++pCode;
 	}
-#endif
 }
+#endif
 
 
 MODULE_LICENSE("GPL");

@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.Makefile 1.32 08/24/01 20:07:37 paulus
+# BK Id: SCCS/s.Makefile 1.34 10/16/01 15:58:42 trini
 #
 #
 # Makefile for the linux kernel.
@@ -15,26 +15,21 @@ ifdef CONFIG_PPC64BRIDGE
 EXTRA_AFLAGS		:= -Wa,-mppc64bridge
 endif
 
-ifeq ($(CONFIG_4xx),y)
-  KHEAD := head_4xx.o
-else
-  ifeq ($(CONFIG_8xx),y)
-    KHEAD := head_8xx.o
-  else
-    KHEAD := head.o
-  endif
-endif
+# Start off with 'head.o', change as needed.
+HEAD-y				:= head.o
+HEAD-$(CONFIG_4xx)		:= head_4xx.o
+HEAD-$(CONFIG_8xx)		:= head_8xx.o
 
-all: $(KHEAD) kernel.o
+all: $(HEAD-y) kernel.o
 
 O_TARGET := kernel.o
 
 export-objs			:= ppc_ksyms.o prep_setup.o time.o
 
 obj-y				:= entry.o traps.o irq.o idle.o time.o misc.o \
-					process.o signal.o ptrace.o \
-					ppc_htab.o semaphore.o syscalls.o  \
-					align.o setup.o cputable.o
+					process.o signal.o ptrace.o align.o \
+					semaphore.o syscalls.o setup.o \
+					cputable.o ppc_htab.o
 obj-$(CONFIG_6xx)		+= l2cr.o
 obj-$(CONFIG_MODULES)		+= ppc_ksyms.o
 obj-$(CONFIG_POWER4)		+= xics.o
@@ -68,8 +63,8 @@ obj-$(CONFIG_ALL_PPC)		+= pmac_pic.o pmac_setup.o pmac_time.o prom.o \
 obj-$(CONFIG_NVRAM)		+= pmac_nvram.o
 obj-$(CONFIG_PMAC_BACKLIGHT)	+= pmac_backlight.o
 obj-$(CONFIG_PMAC_PBOOK)	+= sleep.o
-obj-$(CONFIG_PPC_RTAS)		+= error_log.o proc_rtas.o
 obj-$(CONFIG_PREP_RESIDUAL)	+= residual.o
+obj-$(CONFIG_PPC_RTAS)		+= error_log.o proc_rtas.o
 obj-$(CONFIG_GEMINI)		+= gemini_prom.o gemini_pci.o gemini_setup.o \
 					open_pic.o
 obj-$(CONFIG_8260)		+= m8260_setup.o ppc8260_pic.o

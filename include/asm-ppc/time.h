@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.time.h 1.15 08/16/01 07:49:31 paulus
+ * BK Id: SCCS/s.time.h 1.17 10/23/01 08:09:35 trini
  */
 /*
  * Common time prototypes and such for all ppc machines.
@@ -9,6 +9,9 @@
  */
 
 #ifdef __KERNEL__
+#ifndef __ASM_TIME_H__
+#define __ASM_TIME_H__
+
 #include <linux/config.h>
 #include <linux/mc146818rtc.h>
 #include <linux/threads.h>
@@ -136,4 +139,5 @@ extern __inline__ unsigned binary_tbl(void) {
 ({unsigned z; asm ("mulhwu %0,%1,%2" : "=r" (z) : "r" (x), "r" (y)); z;})
 
 unsigned mulhwu_scale_factor(unsigned, unsigned);
+#endif /* __ASM_TIME_H__ */
 #endif /* __KERNEL__ */

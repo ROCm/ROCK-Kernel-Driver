@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.commproc.c 1.13 09/14/01 18:01:16 trini
+ * BK Id: SCCS/s.commproc.c 1.15 10/16/01 16:21:52 trini
  */
 
 /*
@@ -38,6 +38,8 @@
 #include <asm/8xx_immap.h>
 #include <asm/commproc.h>
 
+extern int get_pteptr(struct mm_struct *mm, unsigned long addr, pte_t **ptep);
+
 static	uint	dp_alloc_base;	/* Starting offset in DP ram */
 static	uint	dp_alloc_top;	/* Max offset + 1 */
 static	uint	host_buffer;	/* One page of host buffer */
@@ -64,6 +66,18 @@ m8xx_cpm_reset(uint host_page_addr)
 	imp = (immap_t *)IMAP_ADDR;
 	commproc = (cpm8xx_t *)&imp->im_cpm;
 
+#ifdef CONFIG_UCODE_PATCH
+	/* Perform a reset.
+	*/
+	commproc->cp_cpcr = (CPM_CR_RST | CPM_CR_FLG);
+
+	/* Wait for it.
+	*/
+	while (commproc->cp_cpcr & CPM_CR_FLG);
+
+	cpm_load_patch(imp);
+#endif
+
 	/* Set SDMA Bus Request priority 5.
 	 * On 860T, this also enables FEC priority 6.  I am not sure
 	 * this is what we realy want for some applications, but the
@@ -81,9 +95,17 @@ m8xx_cpm_reset(uint host_page_addr)
 	*/
 	host_buffer = host_page_addr;	/* Host virtual page address */
 	host_end = host_page_addr + PAGE_SIZE;
-	pte = va_to_pte(host_page_addr);
-	pte_val(*pte) |= _PAGE_NO_CACHE;
-	flush_tlb_page(init_mm.mmap, host_buffer);
+
+	/* We need to get this page early, so I have to do it the
+	 * hard way.
+	 */
+	if (get_pteptr(&init_mm, host_page_addr, &pte)) {
+		pte_val(*pte) |= _PAGE_NO_CACHE;
+		flush_tlb_page(init_mm.mmap, host_buffer);
+	}
+	else {
+		panic("Huh?  No CPM host page?");
+	}
 
 	/* Tell everyone where the comm processor resides.
 	*/

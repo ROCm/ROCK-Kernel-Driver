@@ -110,7 +110,7 @@ enum {
 	TCP_FLAG_RST = __constant_htonl(0x00040000), 
 	TCP_FLAG_SYN = __constant_htonl(0x00020000), 
 	TCP_FLAG_FIN = __constant_htonl(0x00010000),
-	TCP_RESERVED_BITS = __constant_htonl(0x0FC00000),
+	TCP_RESERVED_BITS = __constant_htonl(0x0F000000),
 	TCP_DATA_OFFSET = __constant_htonl(0xF0000000)
 }; 
 

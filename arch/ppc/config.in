@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.config.in 1.40 08/24/01 20:31:47 paulus
+# BK Id: SCCS/s.config.in 1.43 10/16/01 15:18:50 trini
 #
 # For a description of the syntax of this configuration file,
 # see Documentation/kbuild/config-language.txt.
@@ -46,6 +46,8 @@ fi
 if [ "$CONFIG_6xx" = "y" -o "$CONFIG_POWER3" = "y" -o \
      "$CONFIG_POWER4" = "y" ]; then
   define_bool CONFIG_PPC_STD_MMU y
+else
+  define_bool CONFIG_PPC_STD_MMU n
 fi
 
 if [ "$CONFIG_8260" = "y" ]; then
@@ -66,6 +68,7 @@ if [ "$CONFIG_8xx" = "y" ]; then
 	"RPX-Lite	CONFIG_RPXLITE		\
 	 RPX-Classic	CONFIG_RPXCLASSIC	\
 	 BSE-IP		CONFIG_BSEIP		\
+	 FADS		CONFIG_FADS		\
  	 TQM823L	CONFIG_TQM823L		\
  	 TQM850L	CONFIG_TQM850L		\
  	 TQM855L	CONFIG_TQM855L		\
@@ -74,6 +77,7 @@ if [ "$CONFIG_8xx" = "y" ]; then
   	 TQM860		CONFIG_TQM860		\
  	 SPD823TS	CONFIG_SPD823TS		\
  	 IVMS8		CONFIG_IVMS8		\
+	 IVML24		CONFIG_IVML24		\
  	 SM850		CONFIG_SM850		\
 	 MBX		CONFIG_MBX		\
 	 WinCept	CONFIG_WINCEPT"		RPX-Lite
@@ -95,12 +99,7 @@ if [ "$CONFIG_6xx" = "y" -a "$CONFIG_8260" = "n" ]; then
 	 Synergy-Gemini        	CONFIG_GEMINI"		CHRP/PowerMac/PReP
 fi
 
-if [ "$CONFIG_PPC64BRIDGE" != "y" ]; then
-  bool 'Workarounds for PPC601 bugs' CONFIG_PPC601_SYNC_FIX
-fi
-
-if [ "$CONFIG_POWER3" = "n" -a "$CONFIG_POWER4" = "n" -a \
-	"$CONFIG_6xx" = "n" ]; then
+if [ "$CONFIG_PPC_STD_MMU" != "y" ]; then
   define_bool CONFIG_ALL_PPC n
 fi
 
@@ -183,6 +182,10 @@ if [ "$CONFIG_4xx" != "y" ]; then
   else
     bool 'Generic /dev/rtc emulation' CONFIG_GEN_RTC
   fi
+fi
+
+if [ "$CONFIG_ALL_PPC" = "y" -a "$CONFIG_POWER3" = "n" ] ; then
+  bool 'Workarounds for PPC601 bugs' CONFIG_PPC601_SYNC_FIX
 fi
 
 if [ "$CONFIG_ALL_PPC" = "y" ]; then

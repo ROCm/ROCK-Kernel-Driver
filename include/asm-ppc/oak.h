@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.oak.h 1.10 09/14/01 17:37:56 trini
+ * BK Id: SCCS/s.oak.h 1.12 10/11/01 13:05:07 trini
  */
 /*
  *
@@ -17,8 +17,6 @@
 #ifdef __KERNEL__
 #ifndef	__OAK_H__
 #define	__OAK_H__
-
-#include <asm/irq.h>
 
 #define _IO_BASE	0
 #define _ISA_MEM_BASE	0
@@ -38,10 +36,12 @@
 
 /* Interrupt assignments fixed by the hardware implementation */
 
-#define	PPC403SPU_RX_INT	AIC_INT4
-#define	PPC403SPU_TX_INT	AIC_INT5
-#define	OAKNET_INT		AIC_INT27
-#define	OAKSERIAL_INT		AIC_INT28
+/* This is annoying kbuild-2.4 problem. -- Tom */
+
+#define	PPC403SPU_RX_INT	4	/* AIC_INT4 */
+#define	PPC403SPU_TX_INT	5	/* AIC_INT5 */
+#define	OAKNET_INT		27	/* AIC_INT27 */
+#define	OAKSERIAL_INT		28	/* AIC_INT28 */
 
 #ifndef __ASSEMBLY__
 /*

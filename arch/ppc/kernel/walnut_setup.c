@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.walnut_setup.c 1.5 05/17/01 18:14:22 cort
+ * BK Id: SCCS/s.walnut_setup.c 1.8 10/18/01 11:16:28 trini
  */
 /*
  *
@@ -123,12 +123,7 @@ walnut_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.kbd_unexpected_up 	= NULL;
 	ppc_md.kbd_leds          	= NULL;
 	ppc_md.kbd_init_hw       	= NULL;
-
-#if defined(CONFIG_MAGIC_SYSRQ)
 	ppc_md.ppc_kbd_sysrq_xlate	= NULL;
-#endif
-
-	return;
 }
 
 /*

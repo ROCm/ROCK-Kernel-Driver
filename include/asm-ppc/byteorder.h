@@ -1,13 +1,13 @@
 /*
- * BK Id: SCCS/s.byteorder.h 1.5 05/17/01 18:14:24 cort
+ * BK Id: SCCS/s.byteorder.h 1.8 10/11/01 13:02:49 trini
  */
 #ifndef _PPC_BYTEORDER_H
 #define _PPC_BYTEORDER_H
 
 #include <asm/types.h>
 
-#ifdef __KERNEL__
 #ifdef __GNUC__
+#ifdef __KERNEL__
 
 extern __inline__ unsigned ld_le16(const volatile unsigned short *addr)
 {
@@ -72,12 +72,14 @@ static __inline__ __const__ __u32 ___arch__swab32(__u32 value)
 #define __arch__swab16s(addr) st_le16(addr,*addr)
 #define __arch__swab32s(addr) st_le32(addr,*addr)
 
-#ifndef __STRICT_ANSI__
-#define __BYTEORDER_HAS_U64__
+#endif /* __KERNEL__ */
+
+#if !defined(__STRICT_ANSI__) || defined(__KERNEL__)
+#  define __BYTEORDER_HAS_U64__
+#  define __SWAB_64_THRU_32__
 #endif
 
 #endif /* __GNUC__ */
-#endif /* __KERNEL__ */
 
 #include <linux/byteorder/big_endian.h>
 

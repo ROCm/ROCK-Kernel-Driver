@@ -555,6 +555,11 @@
 	       Fixed buffer underrun in <try_modload>.
 	       Moved down_read() from <search_for_entry_in_dir> to <find_entry>
   v0.119
+    20011029   Richard Gooch <rgooch@atnf.csiro.au>
+	       Fixed race in <devfsd_ioctl> when setting event mask.
+    20011103   Richard Gooch <rgooch@atnf.csiro.au>
+	       Avoid deadlock in <devfs_follow_link> by using temporary buffer.
+  v0.120
 */
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -587,7 +592,7 @@
 #include <asm/bitops.h>
 #include <asm/atomic.h>
 
-#define DEVFS_VERSION            "0.119 (20011009)"
+#define DEVFS_VERSION            "0.120 (20011103)"
 
 #define DEVFS_NAME "devfs"
 
@@ -3029,13 +3034,25 @@ static int devfs_follow_link (struct dentry *dentry, struct nameidata *nd)
 {
     int err;
     struct devfs_entry *de;
+    char *copy;
 
     de = get_devfs_entry_from_vfs_inode (dentry->d_inode, TRUE);
     if (!de) return -ENODEV;
     down_read (&symlink_rwsem);
-    err = de->registered ? vfs_follow_link (nd,
-					    de->u.symlink.linkname) : -ENODEV;
+    if (!de->registered)
+    {
+	up_read (&symlink_rwsem);
+	return -ENODEV;
+    }
+    copy = kmalloc (de->u.symlink.length + 1, GFP_KERNEL);
+    if (copy) memcpy (copy, de->u.symlink.linkname, de->u.symlink.length + 1);
     up_read (&symlink_rwsem);
+    if (copy)
+    {
+	err = vfs_follow_link (nd, copy);
+	kfree (copy);
+    }
+    else err = -ENOMEM;
     return err;
 }   /*  End Function devfs_follow_link  */
 
@@ -3212,7 +3229,6 @@ static int devfsd_ioctl (struct inode *inode, struct file *file,
 {
     int ival;
     struct fs_info *fs_info = inode->i_sb->u.generic_sbp;
-    static spinlock_t lock = SPIN_LOCK_UNLOCKED;
 
     switch (cmd)
     {
@@ -3226,7 +3242,14 @@ static int devfsd_ioctl (struct inode *inode, struct file *file,
 	    doesn't matter who gets in first, as long as only one gets it  */
 	if (fs_info->devfsd_task == NULL)
 	{
+	    static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+
 	    if ( !spin_trylock (&lock) ) return -EBUSY;
+	    if (fs_info->devfsd_task != NULL)
+	    {   /*  We lost the race...  */
+		spin_unlock (&lock);
+		return -EBUSY;
+	    }
 	    fs_info->devfsd_task = current;
 	    spin_unlock (&lock);
 	    fs_info->devfsd_file = file;

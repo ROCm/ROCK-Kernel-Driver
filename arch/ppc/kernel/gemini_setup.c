@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.gemini_setup.c 1.11 08/20/01 14:34:41 paulus
+ * BK Id: SCCS/s.gemini_setup.c 1.14 10/18/01 11:16:28 trini
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -150,6 +150,9 @@ extern char cmd_line[];
 void
 gemini_heartbeat(void)
 {
+	/* We only want to do this on 1 CPU */
+	if ( smp_processor_id() )
+		return;
 	static unsigned long led = GEMINI_LEDBASE+(4*8);
 	static char direction = 8;
 	*(char *)led = 0;
@@ -506,8 +509,8 @@ smp_gemini_probe(void)
 static void
 smp_gemini_kick_cpu(int nr)
 {
-	openpic_init_processor( 1<<nr );
-	openpic_init_processor( 0 );
+	openpic_reset_processor_phys(1 << nr);
+	openpic_reset_processor_phys(0);
 }
 
 static void
@@ -574,9 +577,7 @@ void __init platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.kbd_unexpected_up = NULL;
 	ppc_md.kbd_leds = NULL;
 	ppc_md.kbd_init_hw = NULL;
-#ifdef CONFIG_MAGIC_SYSRQ
 	ppc_md.ppc_kbd_sysrq_xlate = NULL;
-#endif
 	ppc_md.pcibios_fixup_bus = gemini_pcibios_fixup;
 
 #ifdef CONFIG_SMP

@@ -19,7 +19,13 @@
  * <dag@brattli.net>, and Jean Tourrilhes <jt@hpl.hp.com>
 
  * See Documentation/usb/usb-serial.txt for more information on using this driver
- * 
+ *
+ * 2001_Nov_01	greg kh
+ *	Added support for more IrDA USB devices.
+ *	Added support for zero packet.  Added buffer override paramater, so
+ *	users can transfer larger packets at once if they wish.  Both patches
+ *	came from Dag Brattli <dag@obexcode.com>.
+ *
  * 2001_Oct_07	greg kh
  *	initial version released.
  */
@@ -52,9 +58,13 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.1"
+#define DRIVER_VERSION "v0.2"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com>"
 #define DRIVER_DESC "USB IR Dongle driver"
+
+/* if overridden by the user, then use their value for the size of the read and
+ * write urbs */
+static int buffer_size = 0;
 
 static int  ir_startup (struct usb_serial *serial);
 static int  ir_open (struct usb_serial_port *port, struct file *filep);
@@ -66,7 +76,10 @@ static void ir_set_termios (struct usb_serial_port *port, struct termios *old_te
 
 
 static __devinitdata struct usb_device_id id_table [] = {
-	{ USB_DEVICE(0x09c4, 0x0011) },
+	{ USB_DEVICE(0x050f, 0x0180) },		/* KC Technology, KC-180 */
+	{ USB_DEVICE(0x08e9, 0x0100) },		/* XTNDAccess */
+	{ USB_DEVICE(0x09c4, 0x0011) },		/* ACTiSys ACT-IR2000U */
+	{ USB_INTERFACE_INFO (USB_CLASS_APP_SPEC, USB_CLASS_IRDA, 0) },
 	{ }					/* Terminating entry */
 };
 
@@ -180,6 +193,7 @@ static int ir_startup (struct usb_serial *serial)
 static int ir_open (struct usb_serial_port *port, struct file *filp)
 {
 	struct usb_serial *serial = port->serial;
+	char *buffer;
 	int result = 0;
 
 	if (port_paranoia_check (port, __FUNCTION__))
@@ -195,11 +209,28 @@ static int ir_open (struct usb_serial_port *port, struct file *filp)
 	if (!port->active) {
 		port->active = 1;
 
-		/* force low_latency on so that our tty_push actually forces the data through, 
-		   otherwise it is scheduled, and with high data rates (like with OHCI) data
-		   can get lost. */
-		port->tty->low_latency = 1;
-		
+		if (buffer_size) {
+			/* override the default buffer sizes */
+			buffer = kmalloc (buffer_size, GFP_KERNEL);
+			if (!buffer) {
+				err (__FUNCTION__ " - out of memory.");
+				return -ENOMEM;
+			}
+			kfree (port->read_urb->transfer_buffer);
+			port->read_urb->transfer_buffer = buffer;
+			port->read_urb->transfer_buffer_length = buffer_size;
+
+			buffer = kmalloc (buffer_size, GFP_KERNEL);
+			if (!buffer) {
+				err (__FUNCTION__ " - out of memory.");
+				return -ENOMEM;
+			}
+			kfree (port->write_urb->transfer_buffer);
+			port->write_urb->transfer_buffer = buffer;
+			port->write_urb->transfer_buffer_length = buffer_size;
+			port->bulk_out_size = buffer_size;
+		}
+
 		/* Start reading from the device */
 		FILL_BULK_URB(port->read_urb, serial->dev, 
 			      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
@@ -279,12 +310,14 @@ static int ir_write (struct usb_serial_port *port, int from_user, const unsigned
 		memcpy (&transfer_buffer[1], buf, count);
 	}
 
-	transfer_buffer[0] = 0x00;
+	/* use 12 XBOF's as default */
+	transfer_buffer[0] = 0x30;
 
 	usb_serial_debug_data (__FILE__, __FUNCTION__, count+1, transfer_buffer);
 
 	port->write_urb->transfer_buffer_length = count + 1;
 	port->write_urb->dev = port->serial->dev;
+	port->write_urb->transfer_flags |= USB_ZERO_PACKET;
 	result = usb_submit_urb (port->write_urb);
 	if (result)
 		err(__FUNCTION__ " - failed submitting write urb, error %d", result);
@@ -320,7 +353,6 @@ static void ir_read_bulk_callback (struct urb *urb)
 	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	struct tty_struct *tty;
 	unsigned char *data = urb->transfer_buffer;
-	int i;
 	int result;
 
 	if (port_paranoia_check (port, __FUNCTION__))
@@ -340,18 +372,11 @@ static void ir_read_bulk_callback (struct urb *urb)
 
 	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
 
+	/* Bypass flip-buffers, and feed the ldisc directly due to our 
+	 * potentally large buffer size.  Since we used to set low_latency,
+	 * this is exactly what the tty layer did anyway :) */
 	tty = port->tty;
-	if (urb->actual_length > 1) {
-		for (i = 1; i < urb->actual_length ; ++i) {
-			/* if we insert more than TTY_FLIPBUF_SIZE characters, we drop them. */
-			if(tty->flip.count >= TTY_FLIPBUF_SIZE) {
-				tty_flip_buffer_push(tty);
-			}
-			/* this doesn't actually push the data through unless tty->low_latency is set */
-			tty_insert_flip_char(tty, data[i], 0);
-		}
-		tty_flip_buffer_push(tty);
-	}
+	tty->ldisc.receive_buf(tty, data+1, NULL, urb->actual_length-1);
 
 	/* Continue trying to always read  */
 	FILL_BULK_URB(port->read_urb, serial->dev, 
@@ -449,4 +474,6 @@ MODULE_LICENSE("GPL");
 
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug enabled or not");
+MODULE_PARM(buffer_size, "i");
+MODULE_PARM_DESC(buffer_size, "Size of the transfer buffers");
 

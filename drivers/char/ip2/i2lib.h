@@ -341,6 +341,12 @@ static int  i2OutputFree(i2ChanStrPtr);
 static int  i2ServiceBoard(i2eBordStrPtr);
 static void i2DrainOutput(i2ChanStrPtr, int);
 
+#ifdef IP2DEBUG_TRACE
+void ip2trace(unsigned short,unsigned char,unsigned char,unsigned long,...);
+#else
+#define ip2trace(a,b,c,d...) do {} while (0)
+#endif
+
 // Argument to i2QueueCommands
 //
 #define C_IN_LINE 1

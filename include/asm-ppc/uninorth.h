@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.uninorth.h 1.11 08/19/01 22:23:04 paulus
+ * BK Id: SCCS/s.uninorth.h 1.13 10/23/01 08:09:35 trini
  */
 /*
  * uninorth.h: definitions for using the "UniNorth" host bridge chip
@@ -7,7 +7,8 @@
  *
  */
 #ifdef __KERNEL__
-
+#ifndef __ASM_UNINORTH_H__
+#define __ASM_UNINORTH_H__
 
 /*
  * Uni-N config space reg. definitions
@@ -131,4 +132,5 @@
 
 /* Uninorth 1.5 rev. has additional perf. monitor registers at 0xf00-0xf50 */
 
+#endif /* __ASM_UNINORTH_H__ */
 #endif /* __KERNEL__ */

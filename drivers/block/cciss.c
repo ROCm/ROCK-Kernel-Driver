@@ -1214,7 +1214,12 @@ static inline void complete_command( CommandList_struct *cmd, int timeout)
 				status=0;
 		}
 	}
-	complete_buffers(cmd->bh, status);
+	complete_buffers(cmd->rq->bh, status);
+
+#ifdef CCISS_DEBUG
+	printk("Done with %p\n", cmd->rq);
+#endif /* CCISS_DEBUG */ 
+	end_that_request_last(cmd->rq);
 }
 
 
@@ -1269,7 +1274,7 @@ static void do_cciss_request(request_queue_t *q)
 {
 	ctlr_info_t *h= q->queuedata; 
 	CommandList_struct *c;
-	int log_unit, start_blk, seg, sect;
+	int log_unit, start_blk, seg;
 	char *lastdataend;
 	struct buffer_head *bh;
 	struct list_head *queue_head = &q->queue_head;
@@ -1278,13 +1283,12 @@ static void do_cciss_request(request_queue_t *q)
 	struct my_sg tmp_sg[MAXSGENTRIES];
 	int i;
 
-    // Loop till the queue is empty if or it is plugged
-    while (1)
-    {
-	if (q->plugged || list_empty(queue_head)) {
-                start_io(h);
-                return;
-        }
+	if (q->plugged)
+		goto startio;
+
+queue_next:
+	if (list_empty(queue_head))
+		goto startio;
 
 	creq =	blkdev_entry_next_request(queue_head); 
 	if (creq->nr_segments > MAXSGENTRIES)
@@ -1296,17 +1300,18 @@ static void do_cciss_request(request_queue_t *q)
                                 h->ctlr, creq->rq_dev, creq);
                 blkdev_dequeue_request(creq);
                 complete_buffers(creq->bh, 0);
-                start_io(h);
-                return;
+		end_that_request_last(creq);
+		goto startio;
         }
 
 	if (( c = cmd_alloc(h, 1)) == NULL)
-	{
-		start_io(h);
-		return;
-	}
+		goto startio;
+
+	spin_unlock_irq(&io_request_lock);
+
 	c->cmd_type = CMD_RWREQ;      
-	bh = c->bh = creq->bh;
+	bh = creq->bh;
+	c->rq = creq;
 	
 	/* fill in the request */ 
 	log_unit = MINOR(creq->rq_dev) >> NWD_SHIFT; 
@@ -1330,10 +1335,8 @@ static void do_cciss_request(request_queue_t *q)
 #endif /* CCISS_DEBUG */
 	seg = 0; 
 	lastdataend = NULL;
-	sect = 0;
 	while(bh)
 	{
-		sect += bh->b_size/512;
 		if (bh->b_data == lastdataend)
 		{  // tack it on to the last segment 
 			tmp_sg[seg-1].len +=bh->b_size;
@@ -1367,7 +1370,7 @@ static void do_cciss_request(request_queue_t *q)
 		h->maxSG = seg; 
 
 #ifdef CCISS_DEBUG
-	printk(KERN_DEBUG "cciss: Submitting %d sectors in %d segments\n", sect, seg);
+	printk(KERN_DEBUG "cciss: Submitting %d sectors in %d segments\n", creq->nr_sectors, seg);
 #endif /* CCISS_DEBUG */
 
 	c->Header.SGList = c->Header.SGTotal = seg;
@@ -1377,28 +1380,26 @@ static void do_cciss_request(request_queue_t *q)
 	c->Request.CDB[4]= (start_blk >>  8) & 0xff;
 	c->Request.CDB[5]= start_blk & 0xff;
 	c->Request.CDB[6]= 0; // (sect >> 24) & 0xff; MSB
-	c->Request.CDB[7]= (sect >>  8) & 0xff; 
-	c->Request.CDB[8]= sect & 0xff; 
+	c->Request.CDB[7]= (creq->nr_sectors >>  8) & 0xff; 
+	c->Request.CDB[8]= creq->nr_sectors & 0xff; 
 	c->Request.CDB[9] = c->Request.CDB[11] = c->Request.CDB[12] = 0;
 
-			
+	spin_lock_irq(&io_request_lock);
+
 	blkdev_dequeue_request(creq);
 
-	
         /*
          * ehh, we can't really end the request here since it's not
          * even started yet. for now it shouldn't hurt though
          */
-#ifdef CCISS_DEBUG
-	printk("Done with %p\n", creq);
-#endif /* CCISS_DEBUG */ 
-	end_that_request_last(creq);
-
 	addQ(&(h->reqQ),c);
 	h->Qdepth++;
 	if(h->Qdepth > h->maxQsinceinit)
 		h->maxQsinceinit = h->Qdepth; 
-   }  // while loop
+
+	goto queue_next;
+startio:
+	start_io(h);
 }
 
 static void do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)

@@ -50,6 +50,7 @@ CONFIG_X86_GOOD_APIC=y
 CONFIG_X86_PGE=y
 CONFIG_X86_USE_PPRO_CHECKSUM=y
 # CONFIG_TOSHIBA is not set
+# CONFIG_I8K is not set
 # CONFIG_MICROCODE is not set
 # CONFIG_X86_MSR is not set
 # CONFIG_X86_CPUID is not set
@@ -707,7 +708,6 @@ CONFIG_USB=y
 # CONFIG_USB_DEVICEFS is not set
 # CONFIG_USB_BANDWIDTH is not set
 # CONFIG_USB_LONG_TIMEOUT is not set
-# CONFIG_USB_LARGE_CONFIG is not set
 
 #
 # USB Controllers
