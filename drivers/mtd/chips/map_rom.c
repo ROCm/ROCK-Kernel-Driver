@@ -4,7 +4,6 @@
  * $Id: map_rom.c,v 1.20 2003/05/28 12:51:49 dwmw2 Exp $
  */
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
