@@ -1775,13 +1775,13 @@ static void ata_sg_clean(struct ata_queued_cmd *qc)
 }
 
 /**
- *	ata_fill_sg -
- *	@qc:
+ *	ata_fill_sg - Fill PCI IDE PRD table
+ *	@qc: Metadata associated with taskfile to be transferred
  *
  *	LOCKING:
  *
  */
-void ata_fill_sg(struct ata_queued_cmd *qc)
+static void ata_fill_sg(struct ata_queued_cmd *qc)
 {
 	struct scatterlist *sg = qc->sg;
 	struct ata_port *ap = qc->ap;
@@ -1823,6 +1823,21 @@ void ata_fill_sg(struct ata_queued_cmd *qc)
 }
 
 /**
+ *	ata_qc_prep - Prepare taskfile for submission
+ *	@qc: Metadata associated with taskfile to be prepared
+ *
+ *	LOCKING:
+ *	spin_lock_irqsave(host_set lock)
+ */
+void ata_qc_prep(struct ata_queued_cmd *qc)
+{
+	if (!(qc->flags & ATA_QCFLAG_SG))
+		return;
+
+	ata_fill_sg(qc);
+}
+
+/**
  *	ata_sg_setup_one -
  *	@qc:
  *
@@ -1839,7 +1854,6 @@ static int ata_sg_setup_one(struct ata_queued_cmd *qc)
 	struct scsi_cmnd *cmd = qc->scsicmd;
 	int dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
 	struct scatterlist *sg = qc->sg;
-	unsigned int have_sg = (qc->flags & ATA_QCFLAG_SG);
 	dma_addr_t dma_address;
 
 	assert(sg == &qc->sgent);
@@ -1848,9 +1862,6 @@ static int ata_sg_setup_one(struct ata_queued_cmd *qc)
 	sg->page = virt_to_page(cmd->request_buffer);
 	sg->offset = (unsigned long) cmd->request_buffer & ~PAGE_MASK;
 	sg_dma_len(sg) = cmd->request_bufflen;
-
-	if (!have_sg)
-		return 0;
 
 	dma_address = pci_map_single(ap->host_set->pdev, cmd->request_buffer,
 				     cmd->request_bufflen, dir);
@@ -1881,22 +1892,19 @@ static int ata_sg_setup(struct ata_queued_cmd *qc)
 	struct ata_port *ap = qc->ap;
 	struct scsi_cmnd *cmd = qc->scsicmd;
 	struct scatterlist *sg;
-	int n_elem;
-	unsigned int have_sg = (qc->flags & ATA_QCFLAG_SG);
+	int n_elem, dir;
 
 	VPRINTK("ENTER, ata%u, use_sg %d\n", ap->id, cmd->use_sg);
 	assert(cmd->use_sg > 0);
 
 	sg = (struct scatterlist *)cmd->request_buffer;
-	if (have_sg) {
-		int dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
-		n_elem = pci_map_sg(ap->host_set->pdev, sg, cmd->use_sg, dir);
-		if (n_elem < 1)
-			return -1;
-		DPRINTK("%d sg elements mapped\n", n_elem);
-	} else {
-		n_elem = cmd->use_sg;
-	}
+	dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
+	n_elem = pci_map_sg(ap->host_set->pdev, sg, cmd->use_sg, dir);
+	if (n_elem < 1)
+		return -1;
+
+	DPRINTK("%d sg elements mapped\n", n_elem);
+
 	qc->n_elem = n_elem;
 
 	return 0;
@@ -2325,9 +2333,9 @@ int ata_qc_issue(struct ata_queued_cmd *qc)
 			if (ata_sg_setup_one(qc))
 				goto err_out;
 		}
-
-		ap->ops->fill_sg(qc);
 	}
+
+	ap->ops->qc_prep(qc);
 
 	qc->ap->active_tag = qc->tag;
 	qc->flags |= ATA_QCFLAG_ACTIVE;
@@ -3325,7 +3333,7 @@ EXPORT_SYMBOL_GPL(ata_exec_command_mmio);
 EXPORT_SYMBOL_GPL(ata_port_start);
 EXPORT_SYMBOL_GPL(ata_port_stop);
 EXPORT_SYMBOL_GPL(ata_interrupt);
-EXPORT_SYMBOL_GPL(ata_fill_sg);
+EXPORT_SYMBOL_GPL(ata_qc_prep);
 EXPORT_SYMBOL_GPL(ata_bmdma_setup_pio);
 EXPORT_SYMBOL_GPL(ata_bmdma_start_pio);
 EXPORT_SYMBOL_GPL(ata_bmdma_setup_mmio);

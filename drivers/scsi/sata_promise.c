@@ -81,7 +81,7 @@ static void pdc_eng_timeout(struct ata_port *ap);
 static int pdc_port_start(struct ata_port *ap);
 static void pdc_port_stop(struct ata_port *ap);
 static void pdc_phy_reset(struct ata_port *ap);
-static void pdc_fill_sg(struct ata_queued_cmd *qc);
+static void pdc_qc_prep(struct ata_queued_cmd *qc);
 static void pdc_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf);
 static void pdc_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf);
 static inline void pdc_dma_complete (struct ata_port *ap,
@@ -114,7 +114,7 @@ static struct ata_port_operations pdc_sata_ops = {
 	.phy_reset		= pdc_phy_reset,
 	.bmdma_setup            = pdc_dma_setup,
 	.bmdma_start            = pdc_dma_start,
-	.fill_sg		= pdc_fill_sg,
+	.qc_prep		= pdc_qc_prep,
 	.eng_timeout		= pdc_eng_timeout,
 	.irq_handler		= pdc_interrupt,
 	.scr_read		= pdc_sata_scr_read,
@@ -261,14 +261,14 @@ static void pdc_sata_scr_write (struct ata_port *ap, unsigned int sc_reg,
 	writel(val, (void *) ap->ioaddr.scr_addr + (sc_reg * 4));
 }
 
-static void pdc_fill_sg(struct ata_queued_cmd *qc)
+static void pdc_qc_prep(struct ata_queued_cmd *qc)
 {
 	struct pdc_port_priv *pp = qc->ap->private_data;
 	unsigned int i;
 
 	VPRINTK("ENTER\n");
 
-	ata_fill_sg(qc);
+	ata_qc_prep(qc);
 
 	i = pdc_pkt_header(&qc->tf, qc->ap->prd_dma,  qc->dev->devno, pp->pkt);
 

@@ -138,7 +138,7 @@ static struct ata_port_operations piix_pata_ops = {
 
 	.bmdma_setup		= ata_bmdma_setup_pio,
 	.bmdma_start		= ata_bmdma_start_pio,
-	.fill_sg		= ata_fill_sg,
+	.qc_prep		= ata_qc_prep,
 	.eng_timeout		= ata_eng_timeout,
 
 	.irq_handler		= ata_interrupt,
@@ -161,7 +161,7 @@ static struct ata_port_operations piix_sata_ops = {
 
 	.bmdma_setup		= ata_bmdma_setup_pio,
 	.bmdma_start		= ata_bmdma_start_pio,
-	.fill_sg		= ata_fill_sg,
+	.qc_prep		= ata_qc_prep,
 	.eng_timeout		= ata_eng_timeout,
 
 	.irq_handler		= ata_interrupt,
