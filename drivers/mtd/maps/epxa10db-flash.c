@@ -199,12 +199,12 @@ static int __init epxa_default_partitions(struct mtd_info *master, struct mtd_pa
 
 	printk("Using default partitions for %s\n",BOARD_NAME);
 	npartitions=1;
-	parts = kmalloc(npartitions*sizeof(*parts)+strlen(name), GFP_KERNEL);
-	memzero(parts,npartitions*sizeof(*parts)+strlen(name));
+	parts = kmalloc(npartitions*sizeof(*parts)+strlen(name)+1, GFP_KERNEL);
 	if (!parts) {
 		ret = -ENOMEM;
 		goto out;
 	}
+	memzero(parts,npartitions*sizeof(*parts)+strlen(name));
 	i=0;
 	names = (char *)&parts[npartitions];	
 	parts[i].name = names;
@@ -218,10 +218,11 @@ static int __init epxa_default_partitions(struct mtd_info *master, struct mtd_pa
 	parts[i].size = FLASH_SIZE-0x00180000;
 	parts[i].offset = 0x00180000;
 #endif
+	ret = npartitions;
 
  out:
 	*pparts = parts;
-	return npartitions;
+	return ret;
 }
 
 
