@@ -328,7 +328,8 @@ acpi_ev_save_method_info (
  *
  * PARAMETERS:  Callback from walk_namespace
  *
- * RETURN:      Status
+ * RETURN:      Status.  NOTE: We ignore errors so that the _PRW walk is
+ *              not aborted on a single _PRW failure.
  *
  * DESCRIPTION: Called from acpi_walk_namespace. Expects each object to be a
  *              Device.  Run the _PRW method.  If present, extract the GPE

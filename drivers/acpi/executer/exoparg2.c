@@ -573,9 +573,17 @@ acpi_ex_opcode_2A_0T_1R (
 	 * Execute the Opcode
 	 */
 	if (walk_state->op_info->flags & AML_LOGICAL) /* logical_op (Operand0, Operand1) */ {
+		/* Both operands must be of the same type */
+
+		if (ACPI_GET_OBJECT_TYPE (operand[0]) !=
+			ACPI_GET_OBJECT_TYPE (operand[1])) {
+			status = AE_AML_OPERAND_TYPE;
+			goto cleanup;
+		}
+
 		logical_result = acpi_ex_do_logical_op (walk_state->opcode,
-				 operand[0]->integer.value,
-				 operand[1]->integer.value);
+				 operand[0],
+				 operand[1]);
 		goto store_logical_result;
 	}
 

@@ -106,6 +106,10 @@ acpi_db_method_end (
  * dbcmds - debug commands and output routines
  */
 
+acpi_status
+acpi_db_disassemble_method (
+	char                            *name);
+
 void
 acpi_db_display_table_info (
 	char                            *table_arg);

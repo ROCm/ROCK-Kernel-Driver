@@ -246,8 +246,8 @@ acpi_ex_do_concatenate (
 u8
 acpi_ex_do_logical_op (
 	u16                             opcode,
-	acpi_integer                    operand0,
-	acpi_integer                    operand1);
+	union acpi_operand_object       *obj_desc,
+	union acpi_operand_object       *obj_desc2);
 
 acpi_integer
 acpi_ex_do_math_op (
