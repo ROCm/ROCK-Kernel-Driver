@@ -83,6 +83,8 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define WRITE 1
 #define READA 2		/* read-ahead  - don't block if no resources */
 #define SPECIAL 4	/* For non-blockdevice requests in request queue */
+#define READ_SYNC	(READ | (1 << BIO_RW_SYNC))
+#define WRITE_SYNC	(WRITE | (1 << BIO_RW_SYNC))
 
 #define SEL_IN		1
 #define SEL_OUT		2

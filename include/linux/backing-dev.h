@@ -28,9 +28,12 @@ struct backing_dev_info {
 	int memory_backed;	/* Cannot clean pages with writepage */
 	congested_fn *congested_fn; /* Function pointer if device is md/dm */
 	void *congested_data;	/* Pointer to aux data for congested func */
+	void (*unplug_io_fn)(struct backing_dev_info *);
+	void *unplug_io_data;
 };
 
 extern struct backing_dev_info default_backing_dev_info;
+void default_unplug_io_fn(struct backing_dev_info *bdi);
 
 int writeback_acquire(struct backing_dev_info *bdi);
 int writeback_in_progress(struct backing_dev_info *bdi);

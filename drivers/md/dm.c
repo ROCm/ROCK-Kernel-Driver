@@ -575,6 +575,17 @@ static int dm_request(request_queue_t *q, struct bio *bio)
 	return 0;
 }
 
+static void dm_unplug_all(request_queue_t *q)
+{
+	struct mapped_device *md = q->queuedata;
+	struct dm_table *map = dm_get_table(md);
+
+	if (map) {
+		dm_table_unplug_all(map);
+		dm_table_put(map);
+	}
+}
+
 static int dm_any_congested(void *congested_data, int bdi_bits)
 {
 	int r;
@@ -672,6 +683,7 @@ static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 	md->queue->backing_dev_info.congested_fn = dm_any_congested;
 	md->queue->backing_dev_info.congested_data = md;
 	blk_queue_make_request(md->queue, dm_request);
+	md->queue->unplug_fn = dm_unplug_all;
 
 	md->io_pool = mempool_create(MIN_IOS, mempool_alloc_slab,
 				     mempool_free_slab, _io_cache);
@@ -896,11 +908,17 @@ int dm_suspend(struct mapped_device *md)
 	add_wait_queue(&md->wait, &wait);
 	up_write(&md->lock);
 
+	/* unplug */
+	map = dm_get_table(md);
+	if (map) {
+		dm_table_unplug_all(map);
+		dm_table_put(map);
+	}
+
 	/*
 	 * Then we wait for the already mapped ios to
 	 * complete.
 	 */
-	blk_run_queues();
 	while (1) {
 		set_current_state(TASK_INTERRUPTIBLE);
 
@@ -945,9 +963,8 @@ int dm_resume(struct mapped_device *md)
 	def = bio_list_get(&md->deferred);
 	__flush_deferred_io(md, def);
 	up_write(&md->lock);
+	dm_table_unplug_all(map);
 	dm_table_put(map);
-
-	blk_run_queues();
 
 	return 0;
 }

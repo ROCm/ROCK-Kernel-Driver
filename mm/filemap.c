@@ -119,8 +119,10 @@ void remove_from_page_cache(struct page *page)
 
 static inline int sync_page(struct page *page)
 {
-	struct address_space *mapping = page->mapping;
+	struct address_space *mapping;
 
+	smp_mb();
+	mapping = page->mapping;
 	if (mapping && mapping->a_ops && mapping->a_ops->sync_page)
 		return mapping->a_ops->sync_page(page);
 	return 0;

@@ -249,6 +249,7 @@ static struct stripe_head *get_active_stripe(raid5_conf_t *conf, sector_t sector
 				break;
 			if (!sh) {
 				conf->inactive_blocked = 1;
+				md_unplug_mddev(conf->mddev);
 				wait_event_lock_irq(conf->wait_for_stripe,
 						    !list_empty(&conf->inactive_list) &&
 						    (atomic_read(&conf->active_stripes) < (NR_STRIPES *3/4)
@@ -1292,9 +1293,8 @@ static inline void raid5_activate_delayed(raid5_conf_t *conf)
 		}
 	}
 }
-static void raid5_unplug_device(void *data)
+static void raid5_unplug_device(request_queue_t *q)
 {
-	request_queue_t *q = data;
 	mddev_t *mddev = q->queuedata;
 	raid5_conf_t *conf = mddev_to_conf(mddev);
 	unsigned long flags;

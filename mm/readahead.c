@@ -15,11 +15,16 @@
 #include <linux/backing-dev.h>
 #include <linux/pagevec.h>
 
+void default_unplug_io_fn(struct backing_dev_info *bdi)
+{
+}
+EXPORT_SYMBOL(default_unplug_io_fn);
+
 struct backing_dev_info default_backing_dev_info = {
 	.ra_pages	= (VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE,
 	.state		= 0,
+	.unplug_io_fn	= default_unplug_io_fn,
 };
-
 EXPORT_SYMBOL_GPL(default_backing_dev_info);
 
 /*
@@ -32,7 +37,6 @@ file_ra_state_init(struct file_ra_state *ra, struct address_space *mapping)
 	ra->ra_pages = mapping->backing_dev_info->ra_pages;
 	ra->average = ra->ra_pages / 2;
 }
-
 EXPORT_SYMBOL(file_ra_state_init);
 
 /*

@@ -234,8 +234,6 @@ repeat_alloc:
 	if (!(gfp_mask & __GFP_WAIT))
 		return NULL;
 
-	blk_run_queues();
-
 	prepare_to_wait(&pool->wait, &wait, TASK_UNINTERRUPTIBLE);
 	mb();
 	if (!pool->curr_nr)

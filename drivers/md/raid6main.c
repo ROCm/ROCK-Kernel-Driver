@@ -1454,9 +1454,8 @@ static inline void raid6_activate_delayed(raid6_conf_t *conf)
 		}
 	}
 }
-static void raid6_unplug_device(void *data)
+static void raid6_unplug_device(request_queue_t *q)
 {
-	request_queue_t *q = data;
 	mddev_t *mddev = q->queuedata;
 	raid6_conf_t *conf = mddev_to_conf(mddev);
 	unsigned long flags;

@@ -147,8 +147,7 @@ static int blkmtd_readpage(struct blkmtd_dev *dev, struct page *page)
 		bio->bi_private = &event;
 		bio->bi_end_io = bi_read_complete;
 		if(bio_add_page(bio, page, PAGE_SIZE, 0) == PAGE_SIZE) {
-			submit_bio(READ, bio);
-			blk_run_queues();
+			submit_bio(READ_SYNC, bio);
 			wait_for_completion(&event);
 			err = test_bit(BIO_UPTODATE, &bio->bi_flags) ? 0 : -EIO;
 			bio_put(bio);
@@ -179,8 +178,7 @@ static int blkmtd_write_out(struct bio *bio)
 	init_completion(&event);
 	bio->bi_private = &event;
 	bio->bi_end_io = bi_write_complete;
-	submit_bio(WRITE, bio);
-	blk_run_queues();
+	submit_bio(WRITE_SYNC, bio);
 	wait_for_completion(&event);
 	DEBUG(3, "submit_bio completed, bi_vcnt = %d\n", bio->bi_vcnt);
 	err = test_bit(BIO_UPTODATE, &bio->bi_flags) ? 0 : -EIO;

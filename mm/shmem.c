@@ -169,6 +169,7 @@ static struct vm_operations_struct shmem_vm_ops;
 static struct backing_dev_info shmem_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
+	.unplug_io_fn = default_unplug_io_fn,
 };
 
 LIST_HEAD(shmem_inodes);

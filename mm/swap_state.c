@@ -19,6 +19,7 @@
 static struct backing_dev_info swap_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
+	.unplug_io_fn	= swap_unplug_io_fn,
 };
 
 extern struct address_space_operations swap_aops;

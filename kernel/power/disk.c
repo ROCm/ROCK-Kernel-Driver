@@ -84,7 +84,6 @@ static void free_some_memory(void)
 	while (shrink_all_memory(10000))
 		printk(".");
 	printk("|\n");
-	blk_run_queues();
 }
 
 

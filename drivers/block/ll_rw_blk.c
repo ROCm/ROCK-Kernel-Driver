@@ -42,12 +42,6 @@ static void blk_unplug_timeout(unsigned long data);
  */
 static kmem_cache_t *request_cachep;
 
-/*
- * plug management
- */
-static LIST_HEAD(blk_plug_list);
-static spinlock_t blk_plug_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-
 static wait_queue_head_t congestion_wqh[2] = {
 		__WAIT_QUEUE_HEAD_INITIALIZER(congestion_wqh[0]),
 		__WAIT_QUEUE_HEAD_INITIALIZER(congestion_wqh[1])
@@ -250,8 +244,6 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	 * by default assume old behaviour and bounce for any highmem page
 	 */
 	blk_queue_bounce_limit(q, BLK_BOUNCE_HIGH);
-
-	INIT_LIST_HEAD(&q->plug_list);
 
 	blk_queue_activity_fn(q, NULL, NULL);
 }
@@ -1104,13 +1096,11 @@ void blk_plug_device(request_queue_t *q)
 	 * don't plug a stopped queue, it must be paired with blk_start_queue()
 	 * which will restart the queueing
 	 */
-	if (!blk_queue_plugged(q)
-	    && !test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags)) {
-		spin_lock(&blk_plug_lock);
-		list_add_tail(&q->plug_list, &blk_plug_list);
+	if (test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
+		return;
+
+	if (!test_and_set_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags))
 		mod_timer(&q->unplug_timer, jiffies + q->unplug_delay);
-		spin_unlock(&blk_plug_lock);
-	}
 }
 
 EXPORT_SYMBOL(blk_plug_device);
@@ -1122,15 +1112,12 @@ EXPORT_SYMBOL(blk_plug_device);
 int blk_remove_plug(request_queue_t *q)
 {
 	WARN_ON(!irqs_disabled());
-	if (blk_queue_plugged(q)) {
-		spin_lock(&blk_plug_lock);
-		list_del_init(&q->plug_list);
-		del_timer(&q->unplug_timer);
-		spin_unlock(&blk_plug_lock);
-		return 1;
-	}
 
-	return 0;
+	if (!test_and_clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags))
+		return 0;
+
+	del_timer(&q->unplug_timer);
+	return 1;
 }
 
 EXPORT_SYMBOL(blk_remove_plug);
@@ -1161,24 +1148,32 @@ static inline void __generic_unplug_device(request_queue_t *q)
  *   Linux uses plugging to build bigger requests queues before letting
  *   the device have at them. If a queue is plugged, the I/O scheduler
  *   is still adding and merging requests on the queue. Once the queue
- *   gets unplugged (either by manually calling this function, or by
- *   calling blk_run_queues()), the request_fn defined for the
- *   queue is invoked and transfers started.
+ *   gets unplugged, the request_fn defined for the queue is invoked and
+ *   transfers started.
  **/
-void generic_unplug_device(void *data)
+void generic_unplug_device(request_queue_t *q)
 {
-	request_queue_t *q = data;
-
 	spin_lock_irq(q->queue_lock);
 	__generic_unplug_device(q);
 	spin_unlock_irq(q->queue_lock);
 }
-
 EXPORT_SYMBOL(generic_unplug_device);
+
+static void blk_backing_dev_unplug(struct backing_dev_info *bdi)
+{
+	request_queue_t *q = bdi->unplug_io_data;
+
+	/*
+	 * devices don't necessarily have an ->unplug_fn defined
+	 */
+	if (q->unplug_fn)
+		q->unplug_fn(q);
+}
 
 static void blk_unplug_work(void *data)
 {
 	request_queue_t *q = data;
+
 	q->unplug_fn(q);
 }
 
@@ -1254,42 +1249,6 @@ void blk_run_queue(struct request_queue *q)
 }
 
 EXPORT_SYMBOL(blk_run_queue);
-
-/**
- * blk_run_queues - fire all plugged queues
- *
- * Description:
- *   Start I/O on all plugged queues known to the block layer. Queues that
- *   are currently stopped are ignored. This is equivalent to the older
- *   tq_disk task queue run.
- **/
-#define blk_plug_entry(entry) list_entry((entry), request_queue_t, plug_list)
-void blk_run_queues(void)
-{
-	LIST_HEAD(local_plug_list);
-
-	spin_lock_irq(&blk_plug_lock);
-
-	/*
-	 * this will happen fairly often
-	 */
-	if (list_empty(&blk_plug_list))
-		goto out;
-
-	list_splice_init(&blk_plug_list, &local_plug_list);
-	
-	while (!list_empty(&local_plug_list)) {
-		request_queue_t *q = blk_plug_entry(local_plug_list.next);
-
-		spin_unlock_irq(&blk_plug_lock);
-		q->unplug_fn(q);
-		spin_lock_irq(&blk_plug_lock);
-	}
-out:
-	spin_unlock_irq(&blk_plug_lock);
-}
-
-EXPORT_SYMBOL(blk_run_queues);
 
 /**
  * blk_cleanup_queue: - release a &request_queue_t when it is no longer needed
@@ -1390,6 +1349,10 @@ request_queue_t *blk_alloc_queue(int gfp_mask)
 	memset(q, 0, sizeof(*q));
 	init_timer(&q->unplug_timer);
 	atomic_set(&q->refcnt, 1);
+
+	q->backing_dev_info.unplug_io_fn = blk_backing_dev_unplug;
+	q->backing_dev_info.unplug_io_data = q;
+
 	return q;
 }
 
@@ -2050,7 +2013,6 @@ long blk_congestion_wait(int rw, long timeout)
 	DEFINE_WAIT(wait);
 	wait_queue_head_t *wqh = &congestion_wqh[rw];
 
-	blk_run_queues();
 	prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
 	ret = io_schedule_timeout(timeout);
 	finish_wait(wqh, &wait);
@@ -2315,7 +2277,7 @@ out:
 	if (blk_queue_plugged(q)) {
 		int nr_queued = q->rq.count[READ] + q->rq.count[WRITE];
 
-		if (nr_queued == q->unplug_thresh)
+		if (nr_queued == q->unplug_thresh || bio_sync(bio))
 			__generic_unplug_device(q);
 	}
 	spin_unlock_irq(q->queue_lock);

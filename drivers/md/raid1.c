@@ -451,6 +451,7 @@ rb_out:
 
 static void device_barrier(conf_t *conf, sector_t sect)
 {
+	md_unplug_mddev(conf->mddev);
 	spin_lock_irq(&conf->resync_lock);
 	wait_event_lock_irq(conf->wait_idle, !waitqueue_active(&conf->wait_resume), conf->resync_lock);
 	
@@ -478,6 +479,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 	 * thread has put up a bar for new requests.
 	 * Continue immediately if no resync is active currently.
 	 */
+	md_unplug_mddev(conf->mddev);
 	spin_lock_irq(&conf->resync_lock);
 	wait_event_lock_irq(conf->wait_resume, !conf->barrier, conf->resync_lock);
 	conf->nr_pending++;
@@ -644,6 +646,7 @@ static void print_conf(conf_t *conf)
 
 static void close_sync(conf_t *conf)
 {
+	md_unplug_mddev(conf->mddev);
 	spin_lock_irq(&conf->resync_lock);
 	wait_event_lock_irq(conf->wait_resume, !conf->barrier, conf->resync_lock);
 	spin_unlock_irq(&conf->resync_lock);

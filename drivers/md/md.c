@@ -160,6 +160,30 @@ static int md_fail_request (request_queue_t *q, struct bio *bio)
 	return 0;
 }
 
+void md_unplug_mddev(mddev_t *mddev)
+{
+	struct list_head *tmp;
+	mdk_rdev_t *rdev;
+
+	/*
+	 * this list iteration is done without any locking in md?!
+	 */
+	ITERATE_RDEV(mddev, rdev, tmp) {
+		request_queue_t *r_queue = bdev_get_queue(rdev->bdev);
+
+		if (r_queue->unplug_fn)
+			r_queue->unplug_fn(r_queue);
+	}
+}
+EXPORT_SYMBOL(md_unplug_mddev);
+
+static void md_unplug_all(request_queue_t *q)
+{
+	mddev_t *mddev = q->queuedata;
+
+	md_unplug_mddev(mddev);
+}
+
 static inline mddev_t *mddev_get(mddev_t *mddev)
 {
 	atomic_inc(&mddev->active);
@@ -335,6 +359,8 @@ static int sync_page_io(struct block_device *bdev, sector_t sector, int size,
 	struct bio_vec vec;
 	struct completion event;
 
+	rw |= (1 << BIO_RW_SYNC);
+
 	bio_init(&bio);
 	bio.bi_io_vec = &vec;
 	vec.bv_page = page;
@@ -349,7 +375,6 @@ static int sync_page_io(struct block_device *bdev, sector_t sector, int size,
 	bio.bi_private = &event;
 	bio.bi_end_io = bi_complete;
 	submit_bio(rw, &bio);
-	blk_run_queues();
 	wait_for_completion(&event);
 
 	return test_bit(BIO_UPTODATE, &bio.bi_flags);
@@ -1644,6 +1669,7 @@ static int do_md_run(mddev_t * mddev)
 	 */
 	mddev->queue->queuedata = mddev;
 	mddev->queue->make_request_fn = mddev->pers->make_request;
+	mddev->queue->unplug_fn = md_unplug_all;
 
 	mddev->changed = 1;
 	return 0;
@@ -2718,7 +2744,7 @@ int md_thread(void * arg)
 		run = thread->run;
 		if (run) {
 			run(thread->mddev);
-			blk_run_queues();
+			md_unplug_mddev(thread->mddev);
 		}
 		if (signal_pending(current))
 			flush_signals(current);
@@ -3287,7 +3313,7 @@ static void md_do_sync(mddev_t *mddev)
 		    test_bit(MD_RECOVERY_ERR, &mddev->recovery))
 			break;
 
-		blk_run_queues();
+		md_unplug_mddev(mddev);
 
 	repeat:
 		if (jiffies >= mark[last_mark] + SYNC_MARK_STEP ) {

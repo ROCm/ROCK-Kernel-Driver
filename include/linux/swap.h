@@ -197,6 +197,8 @@ extern int shmem_unuse(swp_entry_t entry, struct page *page);
 #define	SWAP_AGAIN	1
 #define	SWAP_FAIL	2
 
+extern void swap_unplug_io_fn(struct backing_dev_info *);
+
 #ifdef CONFIG_SWAP
 /* linux/mm/page_io.c */
 extern int swap_readpage(struct file *, struct page *);
@@ -232,6 +234,7 @@ extern sector_t map_swap_page(struct swap_info_struct *, pgoff_t);
 extern struct swap_info_struct *get_swap_info_struct(unsigned);
 extern int can_share_swap_page(struct page *);
 extern int remove_exclusive_swap_page(struct page *);
+struct backing_dev_info;
 
 extern struct swap_list_t swap_list;
 extern spinlock_t swaplock;

@@ -23,6 +23,7 @@
 #include <linux/module.h>
 #include <linux/rmap-locking.h>
 #include <linux/security.h>
+#include <linux/backing-dev.h>
 
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
@@ -44,7 +45,63 @@ struct swap_list_t swap_list = {-1, -1};
 
 struct swap_info_struct swap_info[MAX_SWAPFILES];
 
+/*
+ * Array of backing blockdevs, for swap_unplug_fn.  We need this because the
+ * bdev->unplug_fn can sleep and we cannot hold swap_list_lock while calling
+ * the unplug_fn.  And swap_list_lock cannot be turned into a semaphore.
+ */
+static DECLARE_MUTEX(swap_bdevs_sem);
+static struct block_device *swap_bdevs[MAX_SWAPFILES];
+
 #define SWAPFILE_CLUSTER 256
+
+/*
+ * Caller holds swap_bdevs_sem
+ */
+static void install_swap_bdev(struct block_device *bdev)
+{
+	int i;
+
+	for (i = 0; i < MAX_SWAPFILES; i++) {
+		if (swap_bdevs[i] == NULL) {
+			swap_bdevs[i] = bdev;
+			return;
+		}
+	}
+	BUG();
+}
+
+static void remove_swap_bdev(struct block_device *bdev)
+{
+	int i;
+
+	for (i = 0; i < MAX_SWAPFILES; i++) {
+		if (swap_bdevs[i] == bdev) {
+			memcpy(&swap_bdevs[i], &swap_bdevs[i + 1],
+				(MAX_SWAPFILES - i - 1) * sizeof(*swap_bdevs));
+			swap_bdevs[MAX_SWAPFILES - 1] = NULL;
+			return;
+		}
+	}
+	BUG();
+}
+
+void swap_unplug_io_fn(struct backing_dev_info *unused_bdi)
+{
+	int i;
+
+	down(&swap_bdevs_sem);
+	for (i = 0; i < MAX_SWAPFILES; i++) {
+		struct block_device *bdev = swap_bdevs[i];
+		struct backing_dev_info *bdi;
+
+		if (bdev == NULL)
+			break;
+		bdi = bdev->bd_inode->i_mapping->backing_dev_info;
+		(*bdi->unplug_io_fn)(bdi);
+	}
+	up(&swap_bdevs_sem);
+}
 
 static inline int scan_swap_map(struct swap_info_struct *si)
 {
@@ -1088,6 +1145,7 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 		swap_list_unlock();
 		goto out_dput;
 	}
+	down(&swap_bdevs_sem);
 	swap_list_lock();
 	swap_device_lock(p);
 	swap_file = p->swap_file;
@@ -1099,6 +1157,8 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 	destroy_swap_extents(p);
 	swap_device_unlock(p);
 	swap_list_unlock();
+	remove_swap_bdev(p->bdev);
+	up(&swap_bdevs_sem);
 	vfree(swap_map);
 	if (S_ISBLK(mapping->host->i_mode)) {
 		struct block_device *bdev = I_BDEV(mapping->host);
@@ -1440,6 +1500,7 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	if (error)
 		goto bad_swap;
 
+	down(&swap_bdevs_sem);
 	swap_list_lock();
 	swap_device_lock(p);
 	p->flags = SWP_ACTIVE;
@@ -1465,6 +1526,8 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	}
 	swap_device_unlock(p);
 	swap_list_unlock();
+	install_swap_bdev(p->bdev);
+	up(&swap_bdevs_sem);
 	error = 0;
 	goto out;
 bad_swap:
@@ -1484,7 +1547,7 @@ bad_swap_2:
 	destroy_swap_extents(p);
 	if (swap_map)
 		vfree(swap_map);
-	if (swap_file && !IS_ERR(swap_file))
+	if (swap_file)
 		filp_close(swap_file, NULL);
 out:
 	if (page && !IS_ERR(page)) {
