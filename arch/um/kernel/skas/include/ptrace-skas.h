@@ -15,7 +15,9 @@
 #ifndef PTRACE_SYSEMU
 #define PTRACE_SYSEMU 31
 #endif
-extern int use_sysemu;
+
+void set_using_sysemu(int value);
+int get_using_sysemu(void);
 
 #include "skas_ptregs.h"
 

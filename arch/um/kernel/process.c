@@ -246,7 +246,7 @@ void __init check_ptrace(void)
 	printk("OK\n");
 
 	printk("Checking syscall emulation patch for ptrace...");
-	use_sysemu = 0;
+	set_using_sysemu(0);
 	pid = start_ptraced_child(&stack);
 	if(ptrace(PTRACE_SYSEMU, pid, 0, 0) >= 0) {
 		struct user_regs_struct regs;
@@ -269,7 +269,7 @@ void __init check_ptrace(void)
 
 		if (!force_sysemu_disabled) {
 			printk("found\n");
-			use_sysemu = 1;
+			set_using_sysemu(1);
 		} else {
 			printk("found but disabled\n");
 		}
