@@ -618,6 +618,7 @@ EXPORT_SYMBOL(pci_dma_supported);
 EXPORT_SYMBOL(no_iommu);
 EXPORT_SYMBOL(force_iommu); 
 EXPORT_SYMBOL(bad_dma_address);
+EXPORT_SYMBOL(iommu_merge);
 
 static __init unsigned long check_iommu_size(unsigned long aper, u64 aper_size)
 { 
