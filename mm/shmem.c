@@ -951,6 +951,7 @@ struct page *shmem_nopage(struct vm_area_struct *vma, unsigned long address, int
 	if (error)
 		return (error == -ENOMEM)? NOPAGE_OOM: NOPAGE_SIGBUS;
 
+	mark_page_accessed(page);
 	flush_page_to_ram(page);
 	return page;
 }
@@ -978,6 +979,8 @@ static int shmem_populate(struct vm_area_struct *vma,
 		if (err)
 			return err;
 		if (page) {
+			mark_page_accessed(page);
+			flush_page_to_ram(page);
 			err = install_page(mm, vma, addr, page, prot);
 			if (err) {
 				page_cache_release(page);
@@ -1192,6 +1195,8 @@ shmem_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 			break;
 		}
 
+		if (!PageReferenced(page))
+			SetPageReferenced(page);
 		set_page_dirty(page);
 		page_cache_release(page);
 
@@ -1264,13 +1269,20 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
 		}
 		nr -= offset;
 
-		/* If users can be writing to this page using arbitrary
-		 * virtual addresses, take care about potential aliasing
-		 * before reading the page on the kernel side.
-		 */
-		if (!list_empty(&mapping->i_mmap_shared) &&
-		    page != ZERO_PAGE(0))
-			flush_dcache_page(page);
+		if (page != ZERO_PAGE(0)) {
+			/*
+			 * If users can be writing to this page using arbitrary
+			 * virtual addresses, take care about potential aliasing
+			 * before reading the page on the kernel side.
+			 */
+			if (!list_empty(&mapping->i_mmap_shared))
+				flush_dcache_page(page);
+			/*
+			 * Mark the page accessed if we read the beginning.
+			 */
+			if (!offset)
+				mark_page_accessed(page);
+		}
 
 		/*
 		 * Ok, we have the page, and it's up-to-date, so
@@ -1523,6 +1535,7 @@ static int shmem_readlink(struct dentry *dentry, char *buffer, int buflen)
 		return res;
 	res = vfs_readlink(dentry, buffer, buflen, kmap(page));
 	kunmap(page);
+	mark_page_accessed(page);
 	page_cache_release(page);
 	return res;
 }
@@ -1535,6 +1548,7 @@ static int shmem_follow_link(struct dentry *dentry, struct nameidata *nd)
 		return res;
 	res = vfs_follow_link(nd, kmap(page));
 	kunmap(page);
+	mark_page_accessed(page);
 	page_cache_release(page);
 	return res;
 }
