@@ -578,6 +578,7 @@ static void add_p2p_bridge (acpi_handle *handle, int seg, int bus, int dev, int 
 		bridge->io_head = acpiphp_make_resource((u64)base, limit - base + 1);
 		if (!bridge->io_head) {
 			err("out of memory\n");
+			kfree(bridge);
 			return;
 		}
 		dbg("16bit I/O range: %04x-%04x\n",
@@ -592,6 +593,7 @@ static void add_p2p_bridge (acpi_handle *handle, int seg, int bus, int dev, int 
 		bridge->io_head = acpiphp_make_resource((u64)base, limit - base + 1);
 		if (!bridge->io_head) {
 			err("out of memory\n");
+			kfree(bridge);
 			return;
 		}
 		dbg("32bit I/O range: %08x-%08x\n",
@@ -613,6 +615,7 @@ static void add_p2p_bridge (acpi_handle *handle, int seg, int bus, int dev, int 
 	bridge->mem_head = acpiphp_make_resource((u64)base, limit - base + 1);
 	if (!bridge->mem_head) {
 		err("out of memory\n");
+		kfree(bridge);
 		return;
 	}
 	dbg("32bit Memory range: %08x-%08x\n",
@@ -632,6 +635,7 @@ static void add_p2p_bridge (acpi_handle *handle, int seg, int bus, int dev, int 
 		bridge->p_mem_head = acpiphp_make_resource((u64)base, limit - base + 1);
 		if (!bridge->p_mem_head) {
 			err("out of memory\n");
+			kfree(bridge);
 			return;
 		}
 		dbg("32bit Prefetchable memory range: %08x-%08x\n",
@@ -647,6 +651,7 @@ static void add_p2p_bridge (acpi_handle *handle, int seg, int bus, int dev, int 
 		bridge->p_mem_head = acpiphp_make_resource(base64, limit64 - base64 + 1);
 		if (!bridge->p_mem_head) {
 			err("out of memory\n");
+			kfree(bridge);
 			return;
 		}
 		dbg("64bit Prefetchable memory range: %08x%08x-%08x%08x\n",
