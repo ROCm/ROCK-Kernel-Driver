@@ -149,11 +149,6 @@ static int rsvp_classify(struct sk_buff *skb, struct tcf_proto *tp,
 	struct iphdr *nhptr = skb->nh.iph;
 #endif
 
-#if !defined( __i386__) && !defined(__mc68000__)
-	if ((unsigned long)nhptr & 3)
-		return -1;
-#endif
-
 restart:
 
 #if RSVP_DST_LEN == 4

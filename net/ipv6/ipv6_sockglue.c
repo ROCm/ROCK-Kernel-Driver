@@ -19,6 +19,10 @@
  *	o	Return -EINVAL for setsockopt of short lengths
  *	o	Truncate getsockopt returns
  *	o	Return an optlen of the truncated length if need be
+ *
+ *	Changes:
+ *	David L Stevens <dlstevens@us.ibm.com>:
+ *		- added multicast source filtering API for MLDv2
  */
 
 #include <linux/module.h>
@@ -375,6 +379,89 @@ done:
 			retv = ipv6_sock_ac_drop(sk, mreq.ipv6mr_ifindex, &mreq.ipv6mr_acaddr);
 		break;
 	}
+	case MCAST_JOIN_GROUP:
+	case MCAST_LEAVE_GROUP:
+	{
+		struct group_req greq;
+		struct sockaddr_in6 *psin6;
+
+		retv = -EFAULT;
+		if (copy_from_user(&greq, optval, sizeof(struct group_req)))
+			break;
+		if (greq.gr_group.ss_family != AF_INET6) {
+			retv = -EADDRNOTAVAIL;
+			break;
+		}
+		psin6 = (struct sockaddr_in6 *)&greq.gr_group;
+		if (optname == IPV6_ADD_MEMBERSHIP)
+			retv = ipv6_sock_mc_join(sk, greq.gr_interface,
+				&psin6->sin6_addr);
+		else
+			retv = ipv6_sock_mc_drop(sk, greq.gr_interface,
+				&psin6->sin6_addr);
+	}
+	case MCAST_JOIN_SOURCE_GROUP:
+	case MCAST_LEAVE_SOURCE_GROUP:
+	case MCAST_BLOCK_SOURCE:
+	case MCAST_UNBLOCK_SOURCE:
+	{
+		struct group_source_req greqs;
+		int omode, add;
+
+		if (optlen != sizeof(struct group_source_req))
+			goto e_inval;
+		if (copy_from_user(&greqs, optval, sizeof(greqs))) {
+			retv = -EFAULT;
+			break;
+		}
+		if (greqs.gsr_group.ss_family != AF_INET6) {
+			retv = -EADDRNOTAVAIL;
+			break;
+		}
+		if (optname == MCAST_BLOCK_SOURCE) {
+			omode = MCAST_EXCLUDE;
+			add = 1;
+		} else if (optname == MCAST_UNBLOCK_SOURCE) {
+			omode = MCAST_EXCLUDE;
+			add = 0;
+		} else if (optname == MCAST_JOIN_SOURCE_GROUP) {
+			struct sockaddr_in6 *psin6;
+
+			psin6 = (struct sockaddr_in6 *)&greqs.gsr_group;
+			retv = ipv6_sock_mc_join(sk, greqs.gsr_interface,
+				&psin6->sin6_addr);
+			if (retv)
+				break;
+			omode = MCAST_INCLUDE;
+			add = 1;
+		} else /*IP_DROP_SOURCE_MEMBERSHIP */ {
+			omode = MCAST_INCLUDE;
+			add = 0;
+		}
+		retv = ip6_mc_source(add, omode, sk, &greqs);
+		break;
+	}
+	case MCAST_MSFILTER:
+	{
+		struct group_filter *gsf;
+
+		if (optlen < GROUP_FILTER_SIZE(0))
+			goto e_inval;
+		gsf = (struct group_filter *)kmalloc(optlen,GFP_KERNEL);
+		if (gsf == 0) {
+			retv = -ENOBUFS;
+			break;
+		}
+		retv = -EFAULT;
+		if (copy_from_user(gsf, optval, optlen)) {
+			kfree(gsf);
+			break;
+		}
+		retv = ip6_mc_msfilter(sk, gsf);
+		kfree(gsf);
+
+		break;
+	}
 	case IPV6_ROUTER_ALERT:
 		retv = ip6_ra_control(sk, val, NULL);
 		break;
@@ -448,6 +535,21 @@ int ipv6_getsockopt(struct sock *sk, int level, int optname, char *optval,
 			return -ENOTCONN;
 		val = sk->family;
 		break;
+	case MCAST_MSFILTER:
+	{
+		struct group_filter gsf;
+		int err;
+
+		if (len < GROUP_FILTER_SIZE(0))
+			return -EINVAL;
+		if (copy_from_user(&gsf, optval, GROUP_FILTER_SIZE(0)))
+			return -EFAULT;
+		lock_sock(sk);
+		err = ip6_mc_msfget(sk, &gsf,
+			(struct group_filter *)optval, optlen);
+		release_sock(sk);
+		return err;
+	}
 
 	case IPV6_PKTOPTIONS:
 	{

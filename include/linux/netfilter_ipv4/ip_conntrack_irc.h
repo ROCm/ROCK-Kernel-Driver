@@ -37,11 +37,6 @@ struct ip_ct_irc_master {
 
 #define IRC_PORT	6667
 
-struct dccproto {
-	char* match;
-	int matchlen;
-};
-
 /* Protects irc part of conntracks */
 DECLARE_LOCK_EXTERN(ip_irc_lock);
 

@@ -227,6 +227,152 @@ asmlinkage long compat_sys_futex(u32 *uaddr, int op, int val,
 	return do_futex((unsigned long)uaddr, op, val, timeout);
 }
 
+asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit *rlim);
+
+asmlinkage long compat_sys_setrlimit(unsigned int resource, struct compat_rlimit *rlim)
+{
+	struct rlimit r;
+	int ret;
+	mm_segment_t old_fs = get_fs ();
+
+	if (resource >= RLIM_NLIMITS) 
+		return -EINVAL;	
+
+	if (!access_ok(VERIFY_READ, rlim, sizeof(*rlim)) ||
+	    __get_user(r.rlim_cur, &rlim->rlim_cur) ||
+	    __get_user(r.rlim_max, &rlim->rlim_max))
+		return -EFAULT;
+
+	if (r.rlim_cur == COMPAT_RLIM_INFINITY)
+		r.rlim_cur = RLIM_INFINITY;
+	if (r.rlim_max == COMPAT_RLIM_INFINITY)
+		r.rlim_max = RLIM_INFINITY;
+	set_fs(KERNEL_DS);
+	ret = sys_setrlimit(resource, &r);
+	set_fs(old_fs);
+	return ret;
+}
+
+#ifdef COMPAT_RLIM_OLD_INFINITY
+asmlinkage long sys_old_getrlimit(unsigned int resource, struct rlimit *rlim);
+
+asmlinkage long compat_sys_old_getrlimit(unsigned int resource, struct compat_rlimit *rlim)
+{
+	struct rlimit r;
+	int ret;
+	mm_segment_t old_fs = get_fs();
+
+	set_fs(KERNEL_DS);
+	ret = sys_old_getrlimit(resource, &r);
+	set_fs(old_fs);
+
+	if (!ret) {
+		if (r.rlim_cur > COMPAT_RLIM_OLD_INFINITY)
+			r.rlim_cur = COMPAT_RLIM_INFINITY;
+		if (r.rlim_max > COMPAT_RLIM_OLD_INFINITY)
+			r.rlim_max = COMPAT_RLIM_INFINITY;
+
+		if (!access_ok(VERIFY_WRITE, rlim, sizeof(*rlim)) ||
+		    __put_user(r.rlim_cur, &rlim->rlim_cur) ||
+		    __put_user(r.rlim_max, &rlim->rlim_max))
+			return -EFAULT;
+	}
+	return ret;
+}
+#endif
+
+asmlinkage long sys_getrlimit (unsigned int resource, struct rlimit *rlim);
+
+asmlinkage long compat_sys_getrlimit (unsigned int resource, struct compat_rlimit *rlim)
+{
+	struct rlimit r;
+	int ret;
+	mm_segment_t old_fs = get_fs();
+
+	set_fs(KERNEL_DS);
+	ret = sys_getrlimit(resource, &r);
+	set_fs(old_fs);
+	if (!ret) {
+		if (r.rlim_cur > COMPAT_RLIM_INFINITY)
+			r.rlim_cur = COMPAT_RLIM_INFINITY;
+		if (r.rlim_max > COMPAT_RLIM_INFINITY)
+			r.rlim_max = COMPAT_RLIM_INFINITY;
+
+		if (!access_ok(VERIFY_WRITE, rlim, sizeof(*rlim)) ||
+		    __put_user(r.rlim_cur, &rlim->rlim_cur) ||
+		    __put_user(r.rlim_max, &rlim->rlim_max))
+			return -EFAULT;
+	}
+	return ret;
+}
+
+static long put_compat_rusage (struct compat_rusage *ru, struct rusage *r)
+{
+	if (!access_ok(VERIFY_WRITE, ru, sizeof(*ru)) ||
+	    __put_user(r->ru_utime.tv_sec, &ru->ru_utime.tv_sec) ||
+	    __put_user(r->ru_utime.tv_usec, &ru->ru_utime.tv_usec) ||
+	    __put_user(r->ru_stime.tv_sec, &ru->ru_stime.tv_sec) ||
+	    __put_user(r->ru_stime.tv_usec, &ru->ru_stime.tv_usec) ||
+	    __put_user(r->ru_maxrss, &ru->ru_maxrss) ||
+	    __put_user(r->ru_ixrss, &ru->ru_ixrss) ||
+	    __put_user(r->ru_idrss, &ru->ru_idrss) ||
+	    __put_user(r->ru_isrss, &ru->ru_isrss) ||
+	    __put_user(r->ru_minflt, &ru->ru_minflt) ||
+	    __put_user(r->ru_majflt, &ru->ru_majflt) ||
+	    __put_user(r->ru_nswap, &ru->ru_nswap) ||
+	    __put_user(r->ru_inblock, &ru->ru_inblock) ||
+	    __put_user(r->ru_oublock, &ru->ru_oublock) ||
+	    __put_user(r->ru_msgsnd, &ru->ru_msgsnd) ||
+	    __put_user(r->ru_msgrcv, &ru->ru_msgrcv) ||
+	    __put_user(r->ru_nsignals, &ru->ru_nsignals) ||
+	    __put_user(r->ru_nvcsw, &ru->ru_nvcsw) ||
+	    __put_user(r->ru_nivcsw, &ru->ru_nivcsw))
+		return -EFAULT;
+	return 0;
+}
+
+asmlinkage long sys_getrusage(int who, struct rusage *ru);
+
+asmlinkage long compat_sys_getrusage(int who, struct compat_rusage *ru)
+{
+	struct rusage r;
+	int ret;
+	mm_segment_t old_fs = get_fs();
+		
+	set_fs(KERNEL_DS);
+	ret = sys_getrusage(who, &r);
+	set_fs(old_fs);
+
+	return ret || put_compat_rusage(ru, &r);
+}
+
+asmlinkage long
+compat_sys_wait4(compat_pid_t pid, compat_uint_t * stat_addr, int options,
+	struct compat_rusage *ru)
+{
+	if (!ru) {
+		return sys_wait4(pid, stat_addr, options, NULL);
+	} else {
+		struct rusage r;
+		int ret;
+		unsigned int status;
+		mm_segment_t old_fs = get_fs();
+
+		set_fs (KERNEL_DS);
+		ret = sys_wait4(pid, stat_addr ? &status : NULL, options, &r);
+		set_fs (old_fs);
+
+		if (!ret)
+		{
+			if (put_compat_rusage(ru, &r)) 
+				return -EFAULT;
+			if (stat_addr && put_user(status, stat_addr))
+				return -EFAULT;
+		}
+		return ret;
+	}
+}
+
 extern asmlinkage long sys_sched_setaffinity(pid_t pid, unsigned int len,
 					    unsigned long *user_mask_ptr);
 

@@ -35,15 +35,18 @@ MODULE_PARM_DESC(ports, "port numbers of tftp servers");
 #define DEBUGP(format, args...)
 #endif
 
-static int tftp_help(const struct iphdr *iph, size_t len,
-	struct ip_conntrack *ct,
-	enum ip_conntrack_info ctinfo)
+static int tftp_help(struct sk_buff *skb,
+		     struct ip_conntrack *ct,
+		     enum ip_conntrack_info ctinfo)
 {
-	struct udphdr *udph = (void *)iph + iph->ihl * 4;
-	struct tftphdr *tftph = (void *)udph + 8;
+	struct tftphdr tftph;
 	struct ip_conntrack_expect exp;
-	
-	switch (ntohs(tftph->opcode)) {
+
+	if (skb_copy_bits(skb, skb->nh.iph->ihl * 4 + sizeof(struct udphdr),
+			  &tftph, sizeof(tftph)) != 0)
+		return -1;
+
+	switch (ntohs(tftph.opcode)) {
 	/* RRQ and WRQ works the same way */
 	case TFTP_OPCODE_READ:
 	case TFTP_OPCODE_WRITE:

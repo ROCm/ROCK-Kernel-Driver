@@ -379,6 +379,7 @@ static int tun_set_iff(struct file *file, struct ifreq *ifr)
 		tun->owner = -1;
 		tun->dev.init = tun_net_init;
 		tun->dev.priv = tun;
+		tun->dev.owner = THIS_MODULE;
 
 		err = -EINVAL;
 
@@ -402,8 +403,6 @@ static int tun_set_iff(struct file *file, struct ifreq *ifr)
 		if ((err = register_netdevice(&tun->dev)))
 			goto failed;
 	
-		MOD_INC_USE_COUNT;
-
 		tun->name = tun->dev.name;
 	}
 
@@ -553,7 +552,6 @@ static int tun_chr_close(struct inode *inode, struct file *file)
 		dev_close(&tun->dev);
 		unregister_netdevice(&tun->dev);
 		kfree(tun);
-		MOD_DEC_USE_COUNT;
 	}
 
 	rtnl_unlock();

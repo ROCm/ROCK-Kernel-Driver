@@ -17,6 +17,7 @@
 #ifndef _LINUX_UDP_H
 #define _LINUX_UDP_H
 
+#include <linux/config.h>
 #include <asm/byteorder.h>
 #include <net/sock.h>
 #include <linux/ip.h>

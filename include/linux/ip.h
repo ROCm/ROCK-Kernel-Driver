@@ -79,6 +79,7 @@
 #define	IPOPT_TS_PRESPEC	3		/* specified modules only */
 
 #ifdef __KERNEL__
+#include <linux/config.h>
 #include <linux/types.h>
 #include <net/sock.h>
 #include <linux/igmp.h>

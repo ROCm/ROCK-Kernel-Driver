@@ -592,7 +592,7 @@ static struct sock *udp_v6_mcast_next(struct sock *sk,
 				if (!ipv6_addr_cmp(&np->rcv_saddr, loc_addr))
 					return s;
 			}
-			if(!inet6_mc_check(s, loc_addr))
+			if(!inet6_mc_check(s, loc_addr, rmt_addr))
 				continue;
 			return s;
 		}
@@ -640,7 +640,7 @@ free_skb:
 	read_unlock(&udp_hash_lock);
 }
 
-static int udpv6_rcv(struct sk_buff **pskb)
+static int udpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 {
 	struct sk_buff *skb = *pskb;
 	struct sock *sk;
@@ -954,7 +954,7 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 static struct inet6_protocol udpv6_protocol = {
 	.handler	=	udpv6_rcv,
 	.err_handler	=	udpv6_err,
-	.no_policy	=	1,
+	.flags		=	INET6_PROTO_NOPOLICY|INET6_PROTO_FINAL,
 };
 
 #define LINE_LEN 190

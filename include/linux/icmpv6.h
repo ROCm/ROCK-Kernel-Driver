@@ -86,6 +86,19 @@ struct icmp6hdr {
 #define ICMPV6_MGM_REPORT       	131
 #define ICMPV6_MGM_REDUCTION    	132
 
+/* definitions for MLDv2 */
+
+#define MLD2_MODE_IS_INCLUDE	1
+#define MLD2_MODE_IS_EXCLUDE	2
+#define MLD2_CHANGE_TO_INCLUDE	3
+#define MLD2_CHANGE_TO_EXCLUDE	4
+#define MLD2_ALLOW_NEW_SOURCES	5
+#define MLD2_BLOCK_OLD_SOURCES	6
+
+/* this must be an IANA-assigned value; 206 for testing only */
+#define ICMPV6_MLD2_REPORT		206
+#define MLD2_ALL_MCR_INIT { { { 0xff,0x02,0,0,0,0,0,0,0,0,0,0,0,0,0,0x16 } } }
+
 /*
  *	Codes for Destination Unreachable
  */

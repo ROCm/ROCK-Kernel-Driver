@@ -410,6 +410,15 @@ fallback:
 			goto found;
 	}
 
+	if (avefreei) {
+		/*
+		 * The free-inodes counter is approximate, and for really small
+		 * filesystems the above test can fail to find any blockgroups
+		 */
+		avefreei = 0;
+		goto fallback;
+	}
+
 	return -1;
 
 found:

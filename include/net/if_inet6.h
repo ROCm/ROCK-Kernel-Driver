@@ -52,27 +52,58 @@ struct inet6_ifaddr
 	int			dead;
 };
 
+struct ip6_sf_socklist
+{
+	unsigned int		sl_max;
+	unsigned int		sl_count;
+	struct in6_addr		sl_addr[0];
+};
+
+#define IP6_SFLSIZE(count)	(sizeof(struct ip6_sf_socklist) + \
+	(count) * sizeof(struct in6_addr))
+
+#define IP6_SFBLOCK	10	/* allocate this many at once */
+
 struct ipv6_mc_socklist
 {
 	struct in6_addr		addr;
 	int			ifindex;
 	struct ipv6_mc_socklist *next;
+	unsigned int		sfmode;		/* MCAST_{INCLUDE,EXCLUDE} */
+	struct ip6_sf_socklist	*sflist;
+};
+
+struct ip6_sf_list
+{
+	struct ip6_sf_list	*sf_next;
+	struct in6_addr		sf_addr;
+	unsigned long		sf_count[2];	/* include/exclude counts */
+	unsigned char		sf_gsresp;	/* include in g & s response? */
+	unsigned char		sf_oldin;	/* change state */
+	unsigned char		sf_crcount;	/* retrans. left to send */
 };
 
 #define MAF_TIMER_RUNNING	0x01
 #define MAF_LAST_REPORTER	0x02
 #define MAF_LOADED		0x04
+#define MAF_NOREPORT		0x08
+#define MAF_GSQUERY		0x10
 
 struct ifmcaddr6
 {
 	struct in6_addr		mca_addr;
 	struct inet6_dev	*idev;
 	struct ifmcaddr6	*next;
+	struct ip6_sf_list	*mca_sources;
+	struct ip6_sf_list	*mca_tomb;
+	unsigned int		mca_sfmode;
+	unsigned long		mca_sfcount[2];
 	struct timer_list	mca_timer;
 	unsigned		mca_flags;
 	int			mca_users;
 	atomic_t		mca_refcnt;
 	spinlock_t		mca_lock;
+	unsigned char		mca_crcount;
 };
 
 /* Anycast stuff */
@@ -126,7 +157,18 @@ struct inet6_dev
 	struct net_device		*dev;
 
 	struct inet6_ifaddr	*addr_list;
+
 	struct ifmcaddr6	*mc_list;
+	struct ifmcaddr6	*mc_tomb;
+	rwlock_t		mc_lock;
+	unsigned long		mc_v1_seen;
+	unsigned long		mc_maxdelay;
+	unsigned char		mc_qrv;
+	unsigned char		mc_gq_running;
+	unsigned char		mc_ifc_count;
+	struct timer_list	mc_gq_timer;	/* general query timer */
+	struct timer_list	mc_ifc_timer;	/* interface change timer */
+
 	struct ifacaddr6	*ac_list;
 	rwlock_t		lock;
 	atomic_t		refcnt;

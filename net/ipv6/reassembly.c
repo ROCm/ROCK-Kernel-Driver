@@ -520,13 +520,13 @@ err:
  *	the last and the first frames arrived and all the bits are here.
  */
 static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff **skb_in,
+			  unsigned int *nhoffp,
 			  struct net_device *dev)
 {
 	struct sk_buff *fp, *head = fq->fragments;
 	int    remove_fraghdr = 0;
 	int    payload_len;
-	int    nhoff;
-	u8     nexthdr = 0;
+	unsigned int nhoff;
 
 	fq_kill(fq);
 
@@ -536,8 +536,6 @@ static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff **skb_in,
 	/* Unfragmented part is taken from the first segment. */
 	payload_len = (head->data - head->nh.raw) - sizeof(struct ipv6hdr) + fq->len;
 	nhoff = head->h.raw - head->nh.raw;
-
-	nexthdr = ((struct frag_hdr*)head->h.raw)->nexthdr;
 
 	if (payload_len > 65535) {
 		payload_len -= 8;
@@ -613,12 +611,10 @@ static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff **skb_in,
 	if (head->ip_summed == CHECKSUM_HW)
 		head->csum = csum_partial(head->nh.raw, head->h.raw-head->nh.raw, head->csum);
 
-	if (!pskb_pull(head, head->h.raw - head->data))
-		goto out_fail;
-
 	IP6_INC_STATS_BH(Ip6ReasmOKs);
 	fq->fragments = NULL;
-	return nexthdr;
+	*nhoffp = nhoff;
+	return 1;
 
 out_oversize:
 	if (net_ratelimit())
@@ -629,18 +625,16 @@ out_oom:
 		printk(KERN_DEBUG "ip6_frag_reasm: no memory for reassembly\n");
 out_fail:
 	IP6_INC_STATS_BH(Ip6ReasmFails);
-	return 0;
+	return -1;
 }
 
-static int ipv6_frag_rcv(struct sk_buff **skbp)
+static int ipv6_frag_rcv(struct sk_buff **skbp, unsigned int *nhoffp)
 {
 	struct sk_buff *skb = *skbp; 
 	struct net_device *dev = skb->dev;
 	struct frag_hdr *fhdr;
 	struct frag_queue *fq;
 	struct ipv6hdr *hdr;
-	int nhoff = skb->h.raw - skb->nh.raw;
-	u8 nexthdr = 0;
 
 	hdr = skb->nh.ipv6h;
 
@@ -649,23 +643,23 @@ static int ipv6_frag_rcv(struct sk_buff **skbp)
 	/* Jumbo payload inhibits frag. header */
 	if (hdr->payload_len==0) {
 		icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, skb->h.raw-skb->nh.raw);
-		goto discard;
+		return -1;
 	}
 	if (!pskb_may_pull(skb, (skb->h.raw-skb->data)+sizeof(struct frag_hdr))) {
 		icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, skb->h.raw-skb->nh.raw);
-		goto discard;
+		return -1;
 	}
 
 	hdr = skb->nh.ipv6h;
 	fhdr = (struct frag_hdr *)skb->h.raw;
-	nexthdr = fhdr->nexthdr;
 
 	if (!(fhdr->frag_off & htons(0xFFF9))) {
 		/* It is not a fragmented frame */
 		skb->h.raw += sizeof(struct frag_hdr);
 		IP6_INC_STATS_BH(Ip6ReasmOKs);
 
-		return (u8*)fhdr - skb->nh.raw;
+		*nhoffp = (u8*)fhdr - skb->nh.raw;
+		return 1;
 	}
 
 	if (atomic_read(&ip6_frag_mem) > sysctl_ip6frag_high_thresh)
@@ -676,26 +670,26 @@ static int ipv6_frag_rcv(struct sk_buff **skbp)
 
 		spin_lock(&fq->lock);
 
-		ip6_frag_queue(fq, skb, fhdr, nhoff);
+		ip6_frag_queue(fq, skb, fhdr, *nhoffp);
 
 		if (fq->last_in == (FIRST_IN|LAST_IN) &&
 		    fq->meat == fq->len)
-			ret = ip6_frag_reasm(fq, skbp, dev);
+			ret = ip6_frag_reasm(fq, skbp, nhoffp, dev);
 
 		spin_unlock(&fq->lock);
 		fq_put(fq);
-		return -ret;
+		return ret;
 	}
 
-discard:
 	IP6_INC_STATS_BH(Ip6ReasmFails);
 	kfree_skb(skb);
-	return 0;
+	return -1;
 }
 
 static struct inet6_protocol frag_protocol =
 {
 	.handler	=	ipv6_frag_rcv,
+	.flags		=	INET6_PROTO_NOPOLICY,
 };
 
 void __init ipv6_frag_init(void)

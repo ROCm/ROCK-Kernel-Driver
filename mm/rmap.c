@@ -170,10 +170,10 @@ page_add_rmap(struct page *page, pte_t *ptep, struct pte_chain *pte_chain)
 	pte_addr_t pte_paddr = ptep_to_paddr(ptep);
 	struct pte_chain *cur_pte_chain;
 
-	pte_chain_lock(page);
-
 	if (!pfn_valid(page_to_pfn(page)) || PageReserved(page))
-		goto out;
+		return pte_chain;
+
+	pte_chain_lock(page);
 
 	if (page->pte.direct == 0) {
 		page->pte.direct = pte_paddr;
@@ -225,10 +225,10 @@ void page_remove_rmap(struct page *page, pte_t *ptep)
 	pte_addr_t pte_paddr = ptep_to_paddr(ptep);
 	struct pte_chain *pc;
 
-	pte_chain_lock(page);
-
 	if (!pfn_valid(page_to_pfn(page)) || PageReserved(page))
-		goto out_unlock;
+		return;
+
+	pte_chain_lock(page);
 
 	if (!page_mapped(page))
 		goto out_unlock;	/* remap_page_range() from a driver? */

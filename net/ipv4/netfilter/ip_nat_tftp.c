@@ -153,7 +153,7 @@ static void fini(void)
 
 static int __init init(void)
 {
-	int i, ret;
+	int i, ret = 0;
 	char *tmpname;
 
 	if (!ports[0])

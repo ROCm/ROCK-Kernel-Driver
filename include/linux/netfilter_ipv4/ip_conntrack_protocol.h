@@ -14,9 +14,11 @@ struct ip_conntrack_protocol
 	/* Protocol name */
 	const char *name;
 
-	/* Try to fill in the third arg; return true if possible. */
-	int (*pkt_to_tuple)(const void *datah, size_t datalen,
-			    struct ip_conntrack_tuple *tuple);
+	/* Try to fill in the third arg: dataoff is offset past IP
+           hdr.  Return true if possible. */
+	int (*pkt_to_tuple)(const struct sk_buff *skb,
+			   unsigned int dataoff,
+			   struct ip_conntrack_tuple *tuple);
 
 	/* Invert the per-proto part of the tuple: ie. turn xmit into reply.
 	 * Some packets can't be inverted: return 0 in that case.
@@ -34,20 +36,19 @@ struct ip_conntrack_protocol
 
 	/* Returns verdict for packet, or -1 for invalid. */
 	int (*packet)(struct ip_conntrack *conntrack,
-		      struct iphdr *iph, size_t len,
+		      const struct sk_buff *skb,
 		      enum ip_conntrack_info ctinfo);
 
 	/* Called when a new connection for this protocol found;
 	 * returns TRUE if it's OK.  If so, packet() called next. */
-	int (*new)(struct ip_conntrack *conntrack, struct iphdr *iph,
-		   size_t len);
+	int (*new)(struct ip_conntrack *conntrack, const struct sk_buff *skb);
 
 	/* Called when a conntrack entry is destroyed */
 	void (*destroy)(struct ip_conntrack *conntrack);
 
 	/* Has to decide if a expectation matches one packet or not */
 	int (*exp_matches_pkt)(struct ip_conntrack_expect *exp,
-			       struct sk_buff **pskb);
+			       const struct sk_buff *skb);
 
 	/* Module (if any) which this is connected to. */
 	struct module *me;
