@@ -655,7 +655,7 @@ void __init mem_init(void)
 
 	totalram_pages += free_all_bootmem();
 
-	for (addr = KERNELBASE; addr <= (unsigned long)__va(lmb_end_of_DRAM());
+	for (addr = KERNELBASE; addr < (unsigned long)__va(lmb_end_of_DRAM());
 	     addr += PAGE_SIZE) {
 		if (!PageReserved(virt_to_page(addr)))
 			continue;

@@ -78,19 +78,25 @@ struct paca_struct {
 	u64 exmc[8];		/* used for machine checks */
 	u64 exslb[8];		/* used for SLB/segment table misses
 				 * on the linear mapping */
-	u64 exdsi[8];		/* used for linear mapping hash table misses */
+	u64 slb_r3;		/* spot to save R3 on SLB miss */
+	mm_context_t context;
+	u16 slb_cache[SLB_CACHE_ENTRIES];
+	u16 slb_cache_ptr;
 
 	/*
 	 * then miscellaneous read-write fields
 	 */
 	struct task_struct *__current;	/* Pointer to current */
 	u64 kstack;			/* Saved Kernel stack addr */
-	u64 stab_next_rr;		/* stab/slb round-robin counter */
+	u64 stab_rr;			/* stab/slb round-robin counter */
 	u64 next_jiffy_update_tb;	/* TB value for next jiffy update */
 	u64 saved_r1;			/* r1 save for RTAS calls */
 	u64 saved_msr;			/* MSR saved here by enter_rtas */
 	u32 lpevent_count;		/* lpevents processed  */
 	u8 proc_enabled;		/* irq soft-enable flag */
+
+	/* not yet used */
+	u64 exdsi[8];		/* used for linear mapping hash table misses */
 
 	/*
 	 * iSeries structues which the hypervisor knows about - Not

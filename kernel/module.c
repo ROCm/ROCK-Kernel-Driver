@@ -51,9 +51,6 @@
 /* If this is set, the section belongs in the init part of the module */
 #define INIT_OFFSET_MASK (1UL << (BITS_PER_LONG-1))
 
-#define symbol_is(literal, string)				\
-	(strcmp(MODULE_SYMBOL_PREFIX literal, (string)) == 0)
-
 /* Protects module list */
 static spinlock_t modlist_lock = SPIN_LOCK_UNLOCKED;
 

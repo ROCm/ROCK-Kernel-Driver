@@ -8,7 +8,7 @@
  * published by the Free Software Foundation.
  *
  *  Structure passed to kernel to tell it about the
- *  hardware it's running on.  See linux/Documentation/arm/Setup
+ *  hardware it's running on.  See Documentation/arm/Setup
  *  for more info.
  */
 #ifndef __ASMARM_SETUP_H

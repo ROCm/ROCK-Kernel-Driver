@@ -8,7 +8,7 @@
  * of the GNU General Public License, incorporated herein by reference.
  *
  * For changes and modifications please read
- * ../../../Documentation/isdn/HiSax.cert
+ * Documentation/isdn/HiSax.cert
  *
  * based on the teles driver from Jan den Ouden
  *

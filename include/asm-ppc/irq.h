@@ -153,6 +153,79 @@ static __inline__ int irq_canonicalize(int irq)
 	return irq;
 }
 
+#elif defined(CONFIG_CPM2) && defined(CONFIG_85xx)
+/* Now include the board configuration specific associations.
+*/
+#include <asm/mpc85xx.h>
+
+/* The MPC8560 openpic has  32 internal interrupts and 12 external
+ * interrupts.
+ *
+ * We are "flattening" the interrupt vectors of the cascaded CPM
+ * so that we can uniquely identify any interrupt source with a
+ * single integer.
+ */
+#define NR_CPM_INTS	64
+#define NR_EPIC_INTS	44
+#ifndef NR_8259_INTS
+#define NR_8259_INTS 0
+#endif
+#define NUM_8259_INTERRUPTS NR_8259_INTS
+
+#ifndef CPM_IRQ_OFFSET
+#define CPM_IRQ_OFFSET	0
+#endif
+
+#define NR_IRQS	(NR_EPIC_INTS + NR_CPM_INTS + NR_8259_INTS)
+
+/* These values must be zero-based and map 1:1 with the EPIC configuration.
+ * They are used throughout the 8560 I/O subsystem to generate
+ * interrupt masks, flags, and other control patterns.  This is why the
+ * current kernel assumption of the 8259 as the base controller is such
+ * a pain in the butt.
+ */
+
+#define	SIU_INT_ERROR		((uint)0x00+CPM_IRQ_OFFSET)
+#define	SIU_INT_I2C		((uint)0x01+CPM_IRQ_OFFSET)
+#define	SIU_INT_SPI		((uint)0x02+CPM_IRQ_OFFSET)
+#define	SIU_INT_RISC		((uint)0x03+CPM_IRQ_OFFSET)
+#define	SIU_INT_SMC1		((uint)0x04+CPM_IRQ_OFFSET)
+#define	SIU_INT_SMC2		((uint)0x05+CPM_IRQ_OFFSET)
+#define	SIU_INT_TIMER1		((uint)0x0c+CPM_IRQ_OFFSET)
+#define	SIU_INT_TIMER2		((uint)0x0d+CPM_IRQ_OFFSET)
+#define	SIU_INT_TIMER3		((uint)0x0e+CPM_IRQ_OFFSET)
+#define	SIU_INT_TIMER4		((uint)0x0f+CPM_IRQ_OFFSET)
+#define	SIU_INT_FCC1		((uint)0x20+CPM_IRQ_OFFSET)
+#define	SIU_INT_FCC2		((uint)0x21+CPM_IRQ_OFFSET)
+#define	SIU_INT_FCC3		((uint)0x22+CPM_IRQ_OFFSET)
+#define	SIU_INT_MCC1		((uint)0x24+CPM_IRQ_OFFSET)
+#define	SIU_INT_MCC2		((uint)0x25+CPM_IRQ_OFFSET)
+#define	SIU_INT_SCC1		((uint)0x28+CPM_IRQ_OFFSET)
+#define	SIU_INT_SCC2		((uint)0x29+CPM_IRQ_OFFSET)
+#define	SIU_INT_SCC3		((uint)0x2a+CPM_IRQ_OFFSET)
+#define	SIU_INT_SCC4		((uint)0x2b+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC15		((uint)0x30+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC14		((uint)0x31+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC13		((uint)0x32+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC12		((uint)0x33+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC11		((uint)0x34+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC10		((uint)0x35+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC9		((uint)0x36+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC8		((uint)0x37+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC7		((uint)0x38+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC6		((uint)0x39+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC5		((uint)0x3a+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC4		((uint)0x3b+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC3		((uint)0x3c+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC2		((uint)0x3d+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC1		((uint)0x3e+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC0		((uint)0x3f+CPM_IRQ_OFFSET)
+
+static __inline__ int irq_canonicalize(int irq)
+{
+	return irq;
+}
+
 #else /* CONFIG_40x + CONFIG_8xx */
 /*
  * this is the # irq's for all ppc arch's (pmac/chrp/prep)

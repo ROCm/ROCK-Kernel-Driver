@@ -1322,7 +1322,7 @@ static unsigned int dv1394_poll(struct file *file, struct poll_table_struct *wai
 static int dv1394_fasync(int fd, struct file *file, int on)
 {
 	/* I just copied this code verbatim from Alan Cox's mouse driver example
-	   (linux/Documentation/DocBook/) */
+	   (Documentation/DocBook/) */
 
 	struct video_card *video = file_to_video_card(file);
 

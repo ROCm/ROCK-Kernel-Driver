@@ -72,7 +72,7 @@
 /*
  * There is a bunch of documentation about the card, jumpers, config
  * settings, restrictions, cables, device names and numbers in
- * ../../Documentation/specialix.txt 
+ * Documentation/specialix.txt
  */
 
 #include <linux/config.h>

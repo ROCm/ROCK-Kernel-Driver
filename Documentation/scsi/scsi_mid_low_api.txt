@@ -40,7 +40,7 @@ This version of the document roughly matches linux kernel version 2.6.0-test4.
 Documentation
 =============
 There is a SCSI documentation directory within the kernel source tree, 
-typically /usr/src/linux/Documentation/scsi . Most documents are in plain
+typically Documentation/scsi . Most documents are in plain
 (i.e. ASCII) text. This file is named scsi_mid_low_api.txt and can be 
 found in that directory. A more recent copy of this document may be found
 at http://www.torque.net/scsi/scsi_mid_low_api.txt.gz . 

@@ -18,7 +18,6 @@
 #define __MACH_MPC8540ADS_H__
 
 #include <linux/config.h>
-#include <linux/serial.h>
 #include <linux/initrd.h>
 #include <syslib/ppc85xx_setup.h>
 #include <platforms/85xx/mpc85xx_ads_common.h>

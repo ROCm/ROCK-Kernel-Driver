@@ -140,7 +140,8 @@ struct msi_desc {
 	struct {
 		__u8	type	: 5; 	/* {0: unused, 5h:MSI, 11h:MSI-X} */
 		__u8	maskbit	: 1; 	/* mask-pending bit supported ?   */
-		__u8	reserved: 2; 	/* reserved			  */
+		__u8	state	: 1; 	/* {0: free, 1: busy}		  */
+		__u8	reserved: 1; 	/* reserved			  */
 		__u8	entry_nr;    	/* specific enabled entry 	  */
 		__u8	default_vector; /* default pre-assigned vector    */
 		__u8	current_cpu; 	/* current destination cpu	  */

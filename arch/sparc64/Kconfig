@@ -139,7 +139,7 @@ config CPU_FREQ
 	  fly.  Currently there are only sparc64 drivers for UltraSPARC-III
 	  and UltraSPARC-IIe processors.
 
-	  For details, take a look at linux/Documentation/cpu-freq.
+	  For details, take a look at <file:Documentation/cpu-freq>.
 
 	  If in doubt, say N.
 
@@ -159,7 +159,7 @@ config US3_FREQ
 	help
 	  This adds the CPUFreq driver for UltraSPARC-III processors.
 
-	  For details, take a look at linux/Documentation/cpu-freq.
+	  For details, take a look at <file:Documentation/cpu-freq>.
 
 	  If in doubt, say N.
 
@@ -169,7 +169,7 @@ config US2E_FREQ
 	help
 	  This adds the CPUFreq driver for UltraSPARC-IIe processors.
 
-	  For details, take a look at linux/Documentation/cpu-freq.
+	  For details, take a look at <file:Documentation/cpu-freq>.
 
 	  If in doubt, say N.
 

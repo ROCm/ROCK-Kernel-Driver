@@ -21,6 +21,7 @@
 #include <linux/time.h>
 #include <linux/string.h>
 #include <linux/init.h>
+#include <linux/seq_file.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -137,66 +138,122 @@ struct rtas_sensors {
 
 /* ****************************************************************** */
 /* Declarations */
-static int ppc_rtas_sensor_read(char * buf, char ** start, off_t off,
-		int count, int *eof, void *data);
-static ssize_t ppc_rtas_clock_read(struct file * file, char * buf, 
-		size_t count, loff_t *ppos);
-static ssize_t ppc_rtas_clock_write(struct file * file, const char * buf, 
-		size_t count, loff_t *ppos);
-static ssize_t ppc_rtas_progress_read(struct file * file, char * buf,
-		size_t count, loff_t *ppos);
-static ssize_t ppc_rtas_progress_write(struct file * file, const char * buf,
-		size_t count, loff_t *ppos);
-static ssize_t ppc_rtas_poweron_read(struct file * file, char * buf,
-		size_t count, loff_t *ppos);
-static ssize_t ppc_rtas_poweron_write(struct file * file, const char * buf,
-		size_t count, loff_t *ppos);
+static int ppc_rtas_sensors_show(struct seq_file *m, void *v);
+static int ppc_rtas_clock_show(struct seq_file *m, void *v);
+static ssize_t ppc_rtas_clock_write(struct file *file,
+		const char __user *buf, size_t count, loff_t *ppos);
+static int ppc_rtas_progress_show(struct seq_file *m, void *v);
+static ssize_t ppc_rtas_progress_write(struct file *file,
+		const char __user *buf, size_t count, loff_t *ppos);
+static int ppc_rtas_poweron_show(struct seq_file *m, void *v);
+static ssize_t ppc_rtas_poweron_write(struct file *file,
+		const char __user *buf, size_t count, loff_t *ppos);
 
-static ssize_t ppc_rtas_tone_freq_write(struct file * file, const char * buf,
-		size_t count, loff_t *ppos);
-static ssize_t ppc_rtas_tone_freq_read(struct file * file, char * buf,
-		size_t count, loff_t *ppos);
-static ssize_t ppc_rtas_tone_volume_write(struct file * file, const char * buf,
-		size_t count, loff_t *ppos);
-static ssize_t ppc_rtas_tone_volume_read(struct file * file, char * buf,
-		size_t count, loff_t *ppos);
-static ssize_t ppc_rtas_rmo_buf_read(struct file *file, char *buf,
-				    size_t count, loff_t *ppos);
+static ssize_t ppc_rtas_tone_freq_write(struct file *file,
+		const char __user *buf, size_t count, loff_t *ppos);
+static int ppc_rtas_tone_freq_show(struct seq_file *m, void *v);
+static ssize_t ppc_rtas_tone_volume_write(struct file *file,
+		const char __user *buf, size_t count, loff_t *ppos);
+static int ppc_rtas_tone_volume_show(struct seq_file *m, void *v);
+static int ppc_rtas_rmo_buf_show(struct seq_file *m, void *v);
+
+static int sensors_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, ppc_rtas_sensors_show, NULL);
+}
+
+struct file_operations ppc_rtas_sensors_operations = {
+	.open		= sensors_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static int poweron_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, ppc_rtas_poweron_show, NULL);
+}
 
 struct file_operations ppc_rtas_poweron_operations = {
-	.read =		ppc_rtas_poweron_read,
-	.write =	ppc_rtas_poweron_write
+	.open		= poweron_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.write		= ppc_rtas_poweron_write,
+	.release	= single_release,
 };
+
+static int progress_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, ppc_rtas_progress_show, NULL);
+}
+
 struct file_operations ppc_rtas_progress_operations = {
-	.read =		ppc_rtas_progress_read,
-	.write =	ppc_rtas_progress_write
+	.open		= progress_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.write		= ppc_rtas_progress_write,
+	.release	= single_release,
 };
+
+static int clock_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, ppc_rtas_clock_show, NULL);
+}
 
 struct file_operations ppc_rtas_clock_operations = {
-	.read =		ppc_rtas_clock_read,
-	.write =	ppc_rtas_clock_write
+	.open		= clock_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.write		= ppc_rtas_clock_write,
+	.release	= single_release,
 };
+
+static int tone_freq_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, ppc_rtas_tone_freq_show, NULL);
+}
 
 struct file_operations ppc_rtas_tone_freq_operations = {
-	.read =		ppc_rtas_tone_freq_read,
-	.write =	ppc_rtas_tone_freq_write
+	.open		= tone_freq_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.write		= ppc_rtas_tone_freq_write,
+	.release	= single_release,
 };
+
+static int tone_volume_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, ppc_rtas_tone_volume_show, NULL);
+}
+
 struct file_operations ppc_rtas_tone_volume_operations = {
-	.read =		ppc_rtas_tone_volume_read,
-	.write =	ppc_rtas_tone_volume_write
+	.open		= tone_volume_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.write		= ppc_rtas_tone_volume_write,
+	.release	= single_release,
 };
 
-static struct file_operations ppc_rtas_rmo_buf_ops = {
-	.read =		ppc_rtas_rmo_buf_read,
+static int rmo_buf_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, ppc_rtas_rmo_buf_show, NULL);
+}
+
+struct file_operations ppc_rtas_rmo_buf_ops = {
+	.open		= rmo_buf_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
 };
 
-int ppc_rtas_find_all_sensors (void);
-int ppc_rtas_process_sensor(struct individual_sensor s, int state, 
-		int error, char * buf);
-char * ppc_rtas_process_error(int error);
-int get_location_code(struct individual_sensor s, char * buf);
-int check_location_string (char *c, char * buf);
-int check_location (char *c, int idx, char * buf);
+static int ppc_rtas_find_all_sensors(void);
+static void ppc_rtas_process_sensor(struct seq_file *m,
+	struct individual_sensor *s, int state, int error, char *loc);
+static char *ppc_rtas_process_error(int error);
+static void get_location_code(struct seq_file *m,
+	struct individual_sensor *s, char *loc);
+static void check_location_string(struct seq_file *m, char *c);
+static void check_location(struct seq_file *m, char *c);
 
 static int __init proc_rtas_init(void)
 {
@@ -221,8 +278,9 @@ static int __init proc_rtas_init(void)
 	if (entry)
 		entry->proc_fops = &ppc_rtas_poweron_operations;
 
-	create_proc_read_entry("ppc64/rtas/sensors", S_IRUGO, NULL,
-			       ppc_rtas_sensor_read, NULL);
+	entry = create_proc_entry("ppc64/rtas/sensors", S_IRUGO, NULL);
+	if (entry)
+		entry->proc_fops = &ppc_rtas_sensors_operations;
 
 	entry = create_proc_entry("ppc64/rtas/frequency", S_IWUSR|S_IRUGO,
 				  NULL);
@@ -242,28 +300,38 @@ static int __init proc_rtas_init(void)
 
 __initcall(proc_rtas_init);
 
+static int parse_number(const char __user *p, size_t count, unsigned long *val)
+{
+	char buf[40];
+	char *end;
+
+	if (count > 39)
+		return -EINVAL;
+
+	if (copy_from_user(buf, p, count))
+		return -EFAULT;
+
+	buf[count] = 0;
+
+	*val = simple_strtoul(buf, &end, 10);
+	if (*end && *end != '\n')
+		return -EINVAL;
+
+	return 0;
+}
+
 /* ****************************************************************** */
 /* POWER-ON-TIME                                                      */
 /* ****************************************************************** */
-static ssize_t ppc_rtas_poweron_write(struct file * file, const char * buf,
-		size_t count, loff_t *ppos)
+static ssize_t ppc_rtas_poweron_write(struct file *file,
+		const char __user *buf, size_t count, loff_t *ppos)
 {
-	char stkbuf[40];  /* its small, its on stack */
 	struct rtc_time tm;
 	unsigned long nowtime;
-	char *dest;
-	int error;
+	int error = parse_number(buf, count, &nowtime);
+	if (error)
+		return error;
 
-	if (39 < count) count = 39;
-	if (copy_from_user (stkbuf, buf, count)) {
-		return -EFAULT;
-	}
-	stkbuf[count] = 0;
-	nowtime = simple_strtoul(stkbuf, &dest, 10);
-	if (*dest != '\0' && *dest != '\n') {
-		printk("ppc_rtas_poweron_write: Invalid time\n");
-		return count;
-	}
 	power_on_time = nowtime; /* save the time */
 
 	to_tm(nowtime, &tm);
@@ -271,46 +339,32 @@ static ssize_t ppc_rtas_poweron_write(struct file * file, const char * buf,
 	error = rtas_call(rtas_token("set-time-for-power-on"), 7, 1, NULL, 
 			tm.tm_year, tm.tm_mon, tm.tm_mday, 
 			tm.tm_hour, tm.tm_min, tm.tm_sec, 0 /* nano */);
-	if (error != 0)
+	if (error)
 		printk(KERN_WARNING "error: setting poweron time returned: %s\n", 
 				ppc_rtas_process_error(error));
 	return count;
 }
 /* ****************************************************************** */
-static ssize_t ppc_rtas_poweron_read(struct file * file, char * buf,
-		size_t count, loff_t *ppos)
+static int ppc_rtas_poweron_show(struct seq_file *m, void *v)
 {
-	char stkbuf[40];  /* its small, its on stack */
-	int n, sn;
 	if (power_on_time == 0)
-		n = scnprintf(stkbuf,sizeof(stkbuf),"Power on time not set\n");
+		seq_printf(m, "Power on time not set\n");
 	else
-		n = scnprintf(stkbuf,sizeof(stkbuf),"%lu\n",power_on_time);
-
-	sn = strlen (stkbuf) +1;
-	if (*ppos >= sn)
-		return 0;
-	if (n > sn - *ppos)
-		n = sn - *ppos;
-	if (n > count)
-		n = count;
-	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
-		return -EFAULT;
-	}
-	*ppos += n;
-	return n;
+		seq_printf(m, "%lu\n",power_on_time);
+	return 0;
 }
 
 /* ****************************************************************** */
 /* PROGRESS                                                           */
 /* ****************************************************************** */
-static ssize_t ppc_rtas_progress_write(struct file * file, const char * buf,
-		size_t count, loff_t *ppos)
+static ssize_t ppc_rtas_progress_write(struct file *file,
+		const char __user *buf, size_t count, loff_t *ppos)
 {
 	unsigned long hex;
 
-	if (count >= MAX_LINELENGTH) count = MAX_LINELENGTH -1;
-	if (copy_from_user (progress_led, buf, count)) { /* save the string */
+	if (count >= MAX_LINELENGTH)
+		count = MAX_LINELENGTH -1;
+	if (copy_from_user(progress_led, buf, count)) { /* save the string */
 		return -EFAULT;
 	}
 	progress_led[count] = 0;
@@ -321,180 +375,106 @@ static ssize_t ppc_rtas_progress_write(struct file * file, const char * buf,
 	ppc_md.progress ((char *)progress_led, hex);
 	return count;
 
-	/* clear the line */ /* ppc_md.progress("                   ", 0xffff);*/
+	/* clear the line */
+	/* ppc_md.progress("                   ", 0xffff);*/
 }
 /* ****************************************************************** */
-static ssize_t ppc_rtas_progress_read(struct file * file, char * buf,
-		size_t count, loff_t *ppos)
+static int ppc_rtas_progress_show(struct seq_file *m, void *v)
 {
-	int sn, n = 0;
-	char *tmpbuf;
-
-	if (progress_led == NULL) return 0;
-
-	tmpbuf = kmalloc (MAX_LINELENGTH, GFP_KERNEL);
-	if (!tmpbuf) {
-		printk(KERN_ERR "error: kmalloc failed\n");
-		return -ENOMEM;
-	}
-	n = sprintf (tmpbuf, "%s\n", progress_led);
-
-	sn = strlen (tmpbuf) +1;
-	if (*ppos >= sn) {
-		kfree (tmpbuf);
-		return 0;
-	}
-	if (n > sn - *ppos)
-		n = sn - *ppos;
-	if (n > count)
-		n = count;
-	if (copy_to_user (buf, tmpbuf + (*ppos), n)) {
-		kfree (tmpbuf);
-		return -EFAULT;
-	}
-	kfree (tmpbuf);
-	*ppos += n;
-	return n;
+	if (progress_led)
+		seq_printf(m, "%s\n", progress_led);
+	return 0;
 }
 
 /* ****************************************************************** */
 /* CLOCK                                                              */
 /* ****************************************************************** */
-static ssize_t ppc_rtas_clock_write(struct file * file, const char * buf, 
-		size_t count, loff_t *ppos)
+static ssize_t ppc_rtas_clock_write(struct file *file,
+		const char __user *buf, size_t count, loff_t *ppos)
 {
-	char stkbuf[40];  /* its small, its on stack */
 	struct rtc_time tm;
 	unsigned long nowtime;
-	char *dest;
-	int error;
-
-	if (39 < count) count = 39;
-	if (copy_from_user (stkbuf, buf, count)) {
-		return -EFAULT;
-	}
-	stkbuf[count] = 0;
-	nowtime = simple_strtoul(stkbuf, &dest, 10);
-	if (*dest != '\0' && *dest != '\n') {
-		printk("ppc_rtas_clock_write: Invalid time\n");
-		return count;
-	}
+	int error = parse_number(buf, count, &nowtime);
+	if (error)
+		return error;
 
 	to_tm(nowtime, &tm);
 	error = rtas_call(rtas_token("set-time-of-day"), 7, 1, NULL, 
 			tm.tm_year, tm.tm_mon, tm.tm_mday, 
 			tm.tm_hour, tm.tm_min, tm.tm_sec, 0);
-	if (error != 0)
+	if (error)
 		printk(KERN_WARNING "error: setting the clock returned: %s\n", 
 				ppc_rtas_process_error(error));
 	return count;
 }
 /* ****************************************************************** */
-static ssize_t ppc_rtas_clock_read(struct file * file, char * buf, 
-		size_t count, loff_t *ppos)
+static int ppc_rtas_clock_show(struct seq_file *m, void *v)
 {
-	unsigned int year, mon, day, hour, min, sec;
 	int ret[8];
-	int n, sn, error;
-	char stkbuf[40];  /* its small, its on stack */
+	int error = rtas_call(rtas_token("get-time-of-day"), 0, 8, ret);
 
-	error = rtas_call(rtas_token("get-time-of-day"), 0, 8, ret);
-	
-	year = ret[0]; mon  = ret[1]; day  = ret[2];
-	hour = ret[3]; min  = ret[4]; sec  = ret[5];
-
-	if (error != 0){
+	if (error) {
 		printk(KERN_WARNING "error: reading the clock returned: %s\n", 
 				ppc_rtas_process_error(error));
-		n = scnprintf (stkbuf, sizeof(stkbuf), "0");
+		seq_printf(m, "0");
 	} else { 
-		n = scnprintf (stkbuf, sizeof(stkbuf), "%lu\n",
+		unsigned int year, mon, day, hour, min, sec;
+		year = ret[0]; mon  = ret[1]; day  = ret[2];
+		hour = ret[3]; min  = ret[4]; sec  = ret[5];
+		seq_printf(m, "%lu\n",
 				mktime(year, mon, day, hour, min, sec));
 	}
-
-	sn = strlen (stkbuf) +1;
-	if (*ppos >= sn)
-		return 0;
-	if (n > sn - *ppos)
-		n = sn - *ppos;
-	if (n > count)
-		n = count;
-	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
-		return -EFAULT;
-	}
-	*ppos += n;
-	return n;
+	return 0;
 }
 
 /* ****************************************************************** */
 /* SENSOR STUFF                                                       */
 /* ****************************************************************** */
-static int ppc_rtas_sensor_read(char * buf, char ** start, off_t off,
-		int count, int *eof, void *data)
+static int ppc_rtas_sensors_show(struct seq_file *m, void *v)
 {
-	int i,j,n;
+	int i,j;
 	int state, error;
-	char *buffer;
 	int get_sensor_state = rtas_token("get-sensor-state");
 
-	if (count < 0)
-		return -EINVAL;
-
-	/* May not be enough */
-	buffer = kmalloc(MAX_LINELENGTH*MAX_SENSORS, GFP_KERNEL);
-
-	if (!buffer)
-		return -ENOMEM;
-
-	memset(buffer, 0, MAX_LINELENGTH*MAX_SENSORS);
-
-	n  = sprintf ( buffer  , "RTAS (RunTime Abstraction Services) Sensor Information\n");
-	n += sprintf ( buffer+n, "Sensor\t\tValue\t\tCondition\tLocation\n");
-	n += sprintf ( buffer+n, "********************************************************\n");
+	seq_printf(m, "RTAS (RunTime Abstraction Services) Sensor Information\n");
+	seq_printf(m, "Sensor\t\tValue\t\tCondition\tLocation\n");
+	seq_printf(m, "********************************************************\n");
 
 	if (ppc_rtas_find_all_sensors() != 0) {
-		n += sprintf ( buffer+n, "\nNo sensors are available\n");
-		goto return_string;
+		seq_printf(m, "\nNo sensors are available\n");
+		return 0;
 	}
 
 	for (i=0; i<sensors.quant; i++) {
-		j = sensors.sensor[i].quant;
+		struct individual_sensor *p = &sensors.sensor[i];
+		char rstr[64];
+		char *loc;
+		int llen, offs;
+
+		sprintf (rstr, SENSOR_PREFIX"%04d", p->token);
+		loc = (char *) get_property(rtas_node, rstr, &llen);
+
 		/* A sensor may have multiple instances */
-		while (j >= 0) {
-
+		for (j = 0, offs = 0; j <= p->quant; j++) {
 			error =	rtas_call(get_sensor_state, 2, 2, &state, 
-				  	  sensors.sensor[i].token, 
-				  	  sensors.sensor[i].quant - j);
+				  	  p->token, j);
 
-			n += ppc_rtas_process_sensor(sensors.sensor[i], state, 
-					     	     error, buffer+n );
-			n += sprintf (buffer+n, "\n");
-			j--;
-		} /* while */
-	} /* for */
-
-return_string:
-	if (off >= strlen(buffer)) {
-		*eof = 1;
-		kfree(buffer);
-		return 0;
+			ppc_rtas_process_sensor(m, p, state, error, loc);
+			seq_putc(m, '\n');
+			if (loc) {
+				offs += strlen(loc) + 1;
+				loc += strlen(loc) + 1;
+				if (offs >= llen)
+					loc = NULL;
+			}
+		}
 	}
-	if (n > strlen(buffer) - off)
-		n = strlen(buffer) - off;
-	if (n > count)
-		n = count;
-	else
-		*eof = 1;
-
-	memcpy(buf, buffer + off, n);
-	*start = buf;
-	kfree(buffer);
-	return n;
+	return 0;
 }
 
 /* ****************************************************************** */
 
-int ppc_rtas_find_all_sensors (void)
+static int ppc_rtas_find_all_sensors(void)
 {
 	unsigned int *utmp;
 	int len, i;
@@ -518,7 +498,7 @@ int ppc_rtas_find_all_sensors (void)
 /*
  * Builds a string of what rtas returned
  */
-char * ppc_rtas_process_error(int error)
+static char *ppc_rtas_process_error(int error)
 {
 	switch (error) {
 		case SENSOR_CRITICAL_HIGH:
@@ -551,8 +531,8 @@ char * ppc_rtas_process_error(int error)
  * Builds a string out of what the sensor said
  */
 
-int ppc_rtas_process_sensor(struct individual_sensor s, int state, 
-		int error, char * buf) 
+static void ppc_rtas_process_sensor(struct seq_file *m,
+	struct individual_sensor *s, int state, int error, char *loc)
 {
 	/* Defined return vales */
 	const char * key_switch[]        = { "Off\t", "Normal\t", "Secure\t", 
@@ -578,174 +558,170 @@ int ppc_rtas_process_sensor(struct individual_sensor s, int state,
 	int num_states = 0;
 	int temperature = 0;
 	int unknown = 0;
-	int n = 0;
 
 	/* What kind of sensor do we have here? */
 	
-	switch (s.token) {
+	switch (s->token) {
 		case KEY_SWITCH:
-			n += sprintf(buf+n, "Key switch:\t");
+			seq_printf(m, "Key switch:\t");
 			num_states = sizeof(key_switch) / sizeof(char *);
 			if (state < num_states) {
-				n += sprintf(buf+n, "%s\t", key_switch[state]);
+				seq_printf(m, "%s\t", key_switch[state]);
 				have_strings = 1;
 			}
 			break;
 		case ENCLOSURE_SWITCH:
-			n += sprintf(buf+n, "Enclosure switch:\t");
+			seq_printf(m, "Enclosure switch:\t");
 			num_states = sizeof(enclosure_switch) / sizeof(char *);
 			if (state < num_states) {
-				n += sprintf(buf+n, "%s\t", 
+				seq_printf(m, "%s\t", 
 						enclosure_switch[state]);
 				have_strings = 1;
 			}
 			break;
 		case THERMAL_SENSOR:
-			n += sprintf(buf+n, "Temp. (°C/°F):\t");
+			seq_printf(m, "Temp. (°C/°F):\t");
 			temperature = 1;
 			break;
 		case LID_STATUS:
-			n += sprintf(buf+n, "Lid status:\t");
+			seq_printf(m, "Lid status:\t");
 			num_states = sizeof(lid_status) / sizeof(char *);
 			if (state < num_states) {
-				n += sprintf(buf+n, "%s\t", lid_status[state]);
+				seq_printf(m, "%s\t", lid_status[state]);
 				have_strings = 1;
 			}
 			break;
 		case POWER_SOURCE:
-			n += sprintf(buf+n, "Power source:\t");
+			seq_printf(m, "Power source:\t");
 			num_states = sizeof(power_source) / sizeof(char *);
 			if (state < num_states) {
-				n += sprintf(buf+n, "%s\t", 
+				seq_printf(m, "%s\t", 
 						power_source[state]);
 				have_strings = 1;
 			}
 			break;
 		case BATTERY_VOLTAGE:
-			n += sprintf(buf+n, "Battery voltage:\t");
+			seq_printf(m, "Battery voltage:\t");
 			break;
 		case BATTERY_REMAINING:
-			n += sprintf(buf+n, "Battery remaining:\t");
+			seq_printf(m, "Battery remaining:\t");
 			num_states = sizeof(battery_remaining) / sizeof(char *);
 			if (state < num_states)
 			{
-				n += sprintf(buf+n, "%s\t", 
+				seq_printf(m, "%s\t", 
 						battery_remaining[state]);
 				have_strings = 1;
 			}
 			break;
 		case BATTERY_PERCENTAGE:
-			n += sprintf(buf+n, "Battery percentage:\t");
+			seq_printf(m, "Battery percentage:\t");
 			break;
 		case EPOW_SENSOR:
-			n += sprintf(buf+n, "EPOW Sensor:\t");
+			seq_printf(m, "EPOW Sensor:\t");
 			num_states = sizeof(epow_sensor) / sizeof(char *);
 			if (state < num_states) {
-				n += sprintf(buf+n, "%s\t", epow_sensor[state]);
+				seq_printf(m, "%s\t", epow_sensor[state]);
 				have_strings = 1;
 			}
 			break;
 		case BATTERY_CYCLESTATE:
-			n += sprintf(buf+n, "Battery cyclestate:\t");
+			seq_printf(m, "Battery cyclestate:\t");
 			num_states = sizeof(battery_cyclestate) / 
 				     	sizeof(char *);
 			if (state < num_states) {
-				n += sprintf(buf+n, "%s\t", 
+				seq_printf(m, "%s\t", 
 						battery_cyclestate[state]);
 				have_strings = 1;
 			}
 			break;
 		case BATTERY_CHARGING:
-			n += sprintf(buf+n, "Battery Charging:\t");
+			seq_printf(m, "Battery Charging:\t");
 			num_states = sizeof(battery_charging) / sizeof(char *);
 			if (state < num_states) {
-				n += sprintf(buf+n, "%s\t", 
+				seq_printf(m, "%s\t", 
 						battery_charging[state]);
 				have_strings = 1;
 			}
 			break;
 		case IBM_SURVEILLANCE:
-			n += sprintf(buf+n, "Surveillance:\t");
+			seq_printf(m, "Surveillance:\t");
 			break;
 		case IBM_FANRPM:
-			n += sprintf(buf+n, "Fan (rpm):\t");
+			seq_printf(m, "Fan (rpm):\t");
 			break;
 		case IBM_VOLTAGE:
-			n += sprintf(buf+n, "Voltage (mv):\t");
+			seq_printf(m, "Voltage (mv):\t");
 			break;
 		case IBM_DRCONNECTOR:
-			n += sprintf(buf+n, "DR connector:\t");
+			seq_printf(m, "DR connector:\t");
 			num_states = sizeof(ibm_drconnector) / sizeof(char *);
 			if (state < num_states) {
-				n += sprintf(buf+n, "%s\t", 
+				seq_printf(m, "%s\t", 
 						ibm_drconnector[state]);
 				have_strings = 1;
 			}
 			break;
 		case IBM_POWERSUPPLY:
-			n += sprintf(buf+n, "Powersupply:\t");
+			seq_printf(m, "Powersupply:\t");
 			break;
 		case IBM_INTQUEUE:
-			n += sprintf(buf+n, "Interrupt queue:\t");
+			seq_printf(m, "Interrupt queue:\t");
 			num_states = sizeof(ibm_intqueue) / sizeof(char *);
 			if (state < num_states) {
-				n += sprintf(buf+n, "%s\t", 
+				seq_printf(m, "%s\t", 
 						ibm_intqueue[state]);
 				have_strings = 1;
 			}
 			break;
 		default:
-			n += sprintf(buf+n,  "Unknown sensor (type %d), ignoring it\n",
-					s.token);
+			seq_printf(m,  "Unknown sensor (type %d), ignoring it\n",
+					s->token);
 			unknown = 1;
 			have_strings = 1;
 			break;
 	}
 	if (have_strings == 0) {
 		if (temperature) {
-			n += sprintf(buf+n, "%4d /%4d\t", state, cel_to_fahr(state));
+			seq_printf(m, "%4d /%4d\t", state, cel_to_fahr(state));
 		} else
-			n += sprintf(buf+n, "%10d\t", state);
+			seq_printf(m, "%10d\t", state);
 	}
 	if (unknown == 0) {
-		n += sprintf ( buf+n, "%s\t", ppc_rtas_process_error(error));
-		n += get_location_code(s, buf+n);
+		seq_printf(m, "%s\t", ppc_rtas_process_error(error));
+		get_location_code(m, s, loc);
 	}
-	return n;
 }
 
 /* ****************************************************************** */
 
-int check_location (char *c, int idx, char * buf)
+static void check_location(struct seq_file *m, char *c)
 {
-	int n = 0;
-
-	switch (*(c+idx)) {
+	switch (c[0]) {
 		case LOC_PLANAR:
-			n += sprintf ( buf, "Planar #%c", *(c+idx+1));
+			seq_printf(m, "Planar #%c", c[1]);
 			break;
 		case LOC_CPU:
-			n += sprintf ( buf, "CPU #%c", *(c+idx+1));
+			seq_printf(m, "CPU #%c", c[1]);
 			break;
 		case LOC_FAN:
-			n += sprintf ( buf, "Fan #%c", *(c+idx+1));
+			seq_printf(m, "Fan #%c", c[1]);
 			break;
 		case LOC_RACKMOUNTED:
-			n += sprintf ( buf, "Rack #%c", *(c+idx+1));
+			seq_printf(m, "Rack #%c", c[1]);
 			break;
 		case LOC_VOLTAGE:
-			n += sprintf ( buf, "Voltage #%c", *(c+idx+1));
+			seq_printf(m, "Voltage #%c", c[1]);
 			break;
 		case LOC_LCD:
-			n += sprintf ( buf, "LCD #%c", *(c+idx+1));
+			seq_printf(m, "LCD #%c", c[1]);
 			break;
 		case '.':
-			n += sprintf ( buf, "- %c", *(c+idx+1));
+			seq_printf(m, "- %c", c[1]);
+			break;
 		default:
-			n += sprintf ( buf, "Unknown location");
+			seq_printf(m, "Unknown location");
 			break;
 	}
-	return n;
 }
 
 
@@ -755,199 +731,88 @@ int check_location (char *c, int idx, char * buf)
  * ${LETTER}${NUMBER}[[-/]${LETTER}${NUMBER} [ ... ] ]
  * the '.' may be an abbrevation
  */
-int check_location_string (char *c, char *buf)
+static void check_location_string(struct seq_file *m, char *c)
 {
-	int n=0,i=0;
-
-	while (c[i]) {
-		if (isalpha(c[i]) || c[i] == '.') {
-			 n += check_location(c, i, buf+n);
-		}
-		else if (c[i] == '/' || c[i] == '-')
-			n += sprintf(buf+n, " at ");
-		i++;
+	while (*c) {
+		if (isalpha(*c) || *c == '.')
+			check_location(m, c);
+		else if (*c == '/' || *c == '-')
+			seq_printf(m, " at ");
+		c++;
 	}
-	return n;
 }
 
 
 /* ****************************************************************** */
 
-int get_location_code(struct individual_sensor s, char * buffer)
+static void get_location_code(struct seq_file *m, struct individual_sensor *s, char *loc)
 {
-	char rstr[512], tmp[10], tmp2[10];
-	int n=0, i=0, llen, len;
-	/* char *buf = kmalloc(MAX_LINELENGTH, GFP_KERNEL); */
-	char *ret;
-
-	static int pos = 0; /* remember position where buffer was */
-
-	/* construct the sensor number like 0003 */
-	/* fill with zeros */
-	n = sprintf(tmp, "%d", s.token);
-	len = strlen(tmp);
-	while (strlen(tmp) < 4)
-		n += sprintf (tmp+n, "0");
-	
-	/* invert the string */
-	while (tmp[i]) {
-		if (i<len)
-			tmp2[4-len+i] = tmp[i];
-		else
-			tmp2[3-i] = tmp[i];
-		i++;
-	}
-	tmp2[4] = '\0';
-
-	sprintf (rstr, SENSOR_PREFIX"%s", tmp2);
-
-	ret = (char *) get_property(rtas_node, rstr, &llen);
-
-	n=0;
-	if (ret == NULL || ret[0] == '\0') {
-		n += sprintf ( buffer+n, "--- ");/* does not have a location */
+	if (!loc || !*loc) {
+		seq_printf(m, "---");/* does not have a location */
 	} else {
-		char t[50];
-		ret += pos;
-
-		n += check_location_string(ret, buffer + n);
-		n += sprintf ( buffer+n, " ");
-		/* see how many characters we have printed */
-		scnprintf(t, sizeof(t), "%s ", ret);
-
-		pos += strlen(t);
-		if (pos >= llen) pos=0;
+		check_location_string(m, loc);
 	}
-	return n;
+	seq_putc(m, ' ');
 }
 /* ****************************************************************** */
 /* INDICATORS - Tone Frequency                                        */
 /* ****************************************************************** */
-static ssize_t ppc_rtas_tone_freq_write(struct file * file, const char * buf,
-		size_t count, loff_t *ppos)
+static ssize_t ppc_rtas_tone_freq_write(struct file *file,
+		const char __user *buf, size_t count, loff_t *ppos)
 {
-	char stkbuf[40];  /* its small, its on stack */
 	unsigned long freq;
-	char *dest;
-	int error;
+	int error = parse_number(buf, count, &freq);
+	if (error)
+		return error;
 
-	if (39 < count) count = 39;
-	if (copy_from_user (stkbuf, buf, count)) {
-		return -EFAULT;
-	}
-	stkbuf[count] = 0;
-	freq = simple_strtoul(stkbuf, &dest, 10);
-	if (*dest != '\0' && *dest != '\n') {
-		printk("ppc_rtas_tone_freq_write: Invalid tone freqency\n");
-		return count;
-	}
-	if (freq < 0) freq = 0;
 	rtas_tone_frequency = freq; /* save it for later */
 	error = rtas_call(rtas_token("set-indicator"), 3, 1, NULL,
 			TONE_FREQUENCY, 0, freq);
-	if (error != 0)
+	if (error)
 		printk(KERN_WARNING "error: setting tone frequency returned: %s\n", 
 				ppc_rtas_process_error(error));
 	return count;
 }
 /* ****************************************************************** */
-static ssize_t ppc_rtas_tone_freq_read(struct file * file, char * buf,
-		size_t count, loff_t *ppos)
+static int ppc_rtas_tone_freq_show(struct seq_file *m, void *v)
 {
-	int n, sn;
-	char stkbuf[40];  /* its small, its on stack */
-
-	n = scnprintf(stkbuf, 40, "%lu\n", rtas_tone_frequency);
-
-	sn = strlen (stkbuf) +1;
-	if (*ppos >= sn)
-		return 0;
-	if (n > sn - *ppos)
-		n = sn - *ppos;
-	if (n > count)
-		n = count;
-	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
-		return -EFAULT;
-	}
-	*ppos += n;
-	return n;
+	seq_printf(m, "%lu\n", rtas_tone_frequency);
+	return 0;
 }
 /* ****************************************************************** */
 /* INDICATORS - Tone Volume                                           */
 /* ****************************************************************** */
-static ssize_t ppc_rtas_tone_volume_write(struct file * file, const char * buf,
-		size_t count, loff_t *ppos)
+static ssize_t ppc_rtas_tone_volume_write(struct file *file,
+		const char __user *buf, size_t count, loff_t *ppos)
 {
-	char stkbuf[40];  /* its small, its on stack */
 	unsigned long volume;
-	char *dest;
-	int error;
+	int error = parse_number(buf, count, &volume);
+	if (error)
+		return error;
 
-	if (39 < count) count = 39;
-	if (copy_from_user (stkbuf, buf, count)) {
-		return -EFAULT;
-	}
-	stkbuf[count] = 0;
-	volume = simple_strtoul(stkbuf, &dest, 10);
-	if (*dest != '\0' && *dest != '\n') {
-		printk("ppc_rtas_tone_volume_write: Invalid tone volume\n");
-		return count;
-	}
-	if (volume < 0) volume = 0;
-	if (volume > 100) volume = 100;
+	if (volume > 100)
+		volume = 100;
 	
         rtas_tone_volume = volume; /* save it for later */
 	error = rtas_call(rtas_token("set-indicator"), 3, 1, NULL,
 			TONE_VOLUME, 0, volume);
-	if (error != 0)
+	if (error)
 		printk(KERN_WARNING "error: setting tone volume returned: %s\n", 
 				ppc_rtas_process_error(error));
 	return count;
 }
 /* ****************************************************************** */
-static ssize_t ppc_rtas_tone_volume_read(struct file * file, char * buf,
-		size_t count, loff_t *ppos)
+static int ppc_rtas_tone_volume_show(struct seq_file *m, void *v)
 {
-	int n, sn;
-	char stkbuf[40];  /* its small, its on stack */
-
-	n = scnprintf(stkbuf, 40, "%lu\n", rtas_tone_volume);
-
-	sn = strlen (stkbuf) +1;
-	if (*ppos >= sn)
-		return 0;
-	if (n > sn - *ppos)
-		n = sn - *ppos;
-	if (n > count)
-		n = count;
-	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
-		return -EFAULT;
-	}
-	*ppos += n;
-	return n;
+	seq_printf(m, "%lu\n", rtas_tone_volume);
+	return 0;
 }
 
 #define RMO_READ_BUF_MAX 30
 
 /* RTAS Userspace access */
-static ssize_t ppc_rtas_rmo_buf_read(struct file *file, char __user *buf,
-				    size_t count, loff_t *ppos)
+static int ppc_rtas_rmo_buf_show(struct seq_file *m, void *v)
 {
-	char kbuf[RMO_READ_BUF_MAX];
-	int n;
-
-	n = sprintf(kbuf, "%016lx %x\n", rtas_rmo_buf, RTAS_RMOBUF_MAX);
-	if (n > count)
-		n = count;
-
-	if (ppos && *ppos != 0)
-		return 0;
-
-	if (copy_to_user(buf, kbuf, n))
-		return -EFAULT;
-
-	if (ppos)
-		*ppos = n;
-	
-	return n;
+	seq_printf(m, "%016lx %x\n", rtas_rmo_buf, RTAS_RMOBUF_MAX);
+	return 0;
 }

@@ -435,6 +435,7 @@ int __pmac check_media_bay(struct device_node *which_bay, int what)
 #endif /* CONFIG_BLK_DEV_IDE */
 	return -ENODEV;
 }
+EXPORT_SYMBOL(check_media_bay);
 
 int __pmac check_media_bay_by_base(unsigned long base, int what)
 {
