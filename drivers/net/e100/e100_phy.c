@@ -45,11 +45,12 @@ void e100_handle_zlock(struct e100_private *bdp);
  * Returns:
  *	NOTHING
  */
-void
+int
 e100_mdi_write(struct e100_private *bdp, u32 reg_addr, u32 phy_addr, u16 data)
 {
 	int e100_retry;
 	u32 temp_val;
+	unsigned int mdi_cntrl;
 
 	spin_lock_bh(&bdp->mdi_access_lock);
 	temp_val = (((u32) data) | (reg_addr << 16) |
@@ -62,13 +63,18 @@ e100_mdi_write(struct e100_private *bdp, u32 reg_addr, u32 phy_addr, u16 data)
 
 	/* poll for the mdi write to complete */
 	e100_retry = E100_CMD_WAIT;
-	while ((!(readl(&bdp->scb->scb_mdi_cntrl) & MDI_PHY_READY)) &&
-	       (e100_retry)) {
+	while ((!((mdi_cntrl = readl(&bdp->scb->scb_mdi_cntrl)) & MDI_PHY_READY)) && (e100_retry)) {
 
 		udelay(20);
 		e100_retry--;
 	}
 	spin_unlock_bh(&bdp->mdi_access_lock);
+	if (mdi_cntrl & MDI_PHY_READY) 
+		return 0;
+	else {
+		printk(KERN_ERR "e100: MDI write timeout\n");
+		return 1;
+	}
 }
 
 /* 
@@ -90,11 +96,12 @@ e100_mdi_write(struct e100_private *bdp, u32 reg_addr, u32 phy_addr, u16 data)
  * Returns:
  *	NOTHING
  */
-void
+int
 e100_mdi_read(struct e100_private *bdp, u32 reg_addr, u32 phy_addr, u16 *data)
 {
 	int e100_retry;
 	u32 temp_val;
+	unsigned int mdi_cntrl;
 
 	spin_lock_bh(&bdp->mdi_access_lock);
 	/* Issue the read command to the MDI control register. */
@@ -107,16 +114,22 @@ e100_mdi_read(struct e100_private *bdp, u32 reg_addr, u32 phy_addr, u16 *data)
 
 	/* poll for the mdi read to complete */
 	e100_retry = E100_CMD_WAIT;
-	while ((!(readl(&bdp->scb->scb_mdi_cntrl) & MDI_PHY_READY)) &&
-	       (e100_retry)) {
+	while ((!((mdi_cntrl = readl(&bdp->scb->scb_mdi_cntrl)) & MDI_PHY_READY)) && (e100_retry)) {
 
 		udelay(20);
 		e100_retry--;
 	}
 
-	// return the lower word
-	*data = (u16) readl(&bdp->scb->scb_mdi_cntrl);
 	spin_unlock_bh(&bdp->mdi_access_lock);
+	if (mdi_cntrl & MDI_PHY_READY) {
+		/* return the lower word */
+		*data = (u16) mdi_cntrl;
+		return 0;
+	}
+	else {
+		printk(KERN_ERR "e100: MDI read timeout\n");
+		return 1;
+	}
 }
 
 static unsigned char __devinit
@@ -480,10 +493,8 @@ e100_find_speed_duplex(struct e100_private *bdp)
 	/* First we should check to see if we have link */
 	/* If we don't have a link no reason to print a speed and duplex */
 	if (!e100_update_link_state(bdp)) {
-		return;
-	}
-
-	if (bdp->flags & DF_SPEED_FORCED) {
+		bdp->cur_line_speed = 0;
+		bdp->cur_dplx_mode = 0;
 		return;
 	}
 
@@ -617,10 +628,13 @@ e100_force_speed_duplex(struct e100_private *bdp)
 	u16 control;
 	unsigned long expires;
 
+	e100_phy_reset(bdp);
+
 	bdp->flags |= DF_SPEED_FORCED;
 
 	e100_mdi_read(bdp, MII_BMCR, bdp->phy_addr, &control);
 	control &= ~BMCR_ANENABLE;
+	control &= ~BMCR_LOOPBACK;
 
 	/* Check e100.c values */
 	switch (bdp->params.e100_speed_duplex) {
@@ -838,7 +852,7 @@ e100_phy_set_speed_duplex(struct e100_private *bdp, unsigned char force_restart)
 }
 
 void
-e100_phy_reset(struct e100_private *bdp)
+e100_phy_autoneg(struct e100_private *bdp)
 {
 	u16 ctrl_reg;
 
@@ -847,6 +861,23 @@ e100_phy_reset(struct e100_private *bdp)
 	e100_mdi_write(bdp, MII_BMCR, bdp->phy_addr, ctrl_reg);
 
 	udelay(100);
+}
+
+void
+e100_phy_set_loopback(struct e100_private *bdp)
+{
+	u16 ctrl_reg;
+	ctrl_reg = BMCR_LOOPBACK;
+	e100_mdi_write(bdp, MII_BMCR, bdp->phy_addr, ctrl_reg);
+		udelay(100);
+}
+	
+void
+e100_phy_reset(struct e100_private *bdp)
+{
+	u16 ctrl_reg;
+	ctrl_reg = BMCR_RESET;
+	e100_mdi_write(bdp, MII_BMCR, bdp->phy_addr, ctrl_reg);
 }
 
 unsigned char __devinit
@@ -915,7 +946,8 @@ e100_get_link_state(struct e100_private *bdp)
 /* 
  * Procedure: e100_update_link_state
  * 
- * Description: This routine updates the link status of the adapter
+ * Description: This routine updates the link status of the adapter,
+ * 		also considering netif_running
  *
  * Arguments:  bdp - Pointer to the e100_private structure for the board
  *		    
@@ -929,7 +961,8 @@ e100_update_link_state(struct e100_private *bdp)
 {
 	unsigned char link;
 
-	link = e100_get_link_state(bdp);
+	/* Logical AND PHY link & netif_running */
+	link = e100_get_link_state(bdp) && netif_running(bdp->device);
 
 	if (link) {
 		if (!netif_carrier_ok(bdp->device))

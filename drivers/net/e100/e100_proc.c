@@ -61,7 +61,7 @@ extern char e100_short_driver_name[];
 extern char e100_driver_version[];
 extern struct net_device_stats *e100_get_stats(struct net_device *dev);
 extern char *e100_get_brand_msg(struct e100_private *bdp);
-extern void e100_mdi_write(struct e100_private *, u32, u32, u16);
+extern int e100_mdi_write(struct e100_private *, u32, u32, u16);
 
 static void e100_proc_cleanup(void);
 static unsigned char e100_init_proc_dir(void);

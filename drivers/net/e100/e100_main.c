@@ -46,6 +46,21 @@
 
 /* Change Log
  *
+ * 2.1.12       8/2/02
+ *   o Feature: ethtool register dump
+ *   o Bug fix: Driver passes wrong name to /proc/interrupts
+ *   o Bug fix: Ethernet bridging not working 
+ *   o Bug fix: Promiscuous mode is not working
+ *   o Bug fix: Checked return value from copy_from_user (William Stinson,
+ *     wstinson@infonie.fr)
+ *   o Bug fix: ARP wake on LAN fails
+ *   o Bug fix: mii-diag does not update driver level's speed, duplex and
+ *     re-configure flow control
+ *   o Bug fix: Ethtool shows wrong speed/duplex when not connected
+ *   o Bug fix: Ethtool shows wrong speed/duplex when reconnected if forced 
+ *     speed/duplex
+ *   o Bug fix: PHY loopback diagnostic fails
+ *
  * 2.1.6        7/5/02
  *   o Added device ID support for Dell LOM.
  *   o Added device ID support for 82511QM mobile nics.
@@ -128,7 +143,7 @@ static void e100_non_tx_background(unsigned long);
 
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
-char e100_driver_version[]="2.1.6-k1";
+char e100_driver_version[]="2.1.15-k1";
 const char *e100_full_driver_name = "Intel(R) PRO/100 Network Driver";
 char e100_short_driver_name[] = "e100";
 static int e100nics = 0;
@@ -731,16 +746,6 @@ e100_remove1(struct pci_dev *pcid)
 		bdp->non_tx_command_state = E100_NON_TX_IDLE;
 	}
 
-	/* Set up wol options and enable PME if wol is enabled */
-	if (bdp->wolopts) {
-		e100_do_wol(pcid, bdp);
-		/* Enable PME for power state D3 */
-		pci_enable_wake(pcid, 3, 1);
-		/* Set power state to D1 in case driver is RELOADED */
-		/* If system powers down, device is switched from D1 to D3 */
-		pci_set_power_state(pcid, 1);
-	}
-
 	e100_clear_structs(dev);
 
 	--e100nics;
@@ -1011,7 +1016,9 @@ e100_close(struct net_device *dev)
 	bdp->intr_mask = SCB_INT_MASK;
 	e100_isolate_driver(bdp);
 
-	bdp->ip_lbytes = e100_get_ip_lbytes(dev);
+	netif_carrier_off(bdp->device);
+	bdp->cur_line_speed = 0;
+	bdp->cur_dplx_mode = 0;
 	free_irq(dev->irq, dev);
 	e100_clear_pools(bdp);
 
@@ -3345,9 +3352,15 @@ e100_ethtool_get_settings(struct net_device *dev, struct ifreq *ifr)
 	ecmd.transceiver = XCVR_INTERNAL;
 	ecmd.phy_address = bdp->phy_addr;
 
-	ecmd.speed = bdp->cur_line_speed;
-	ecmd.duplex =
-		(bdp->cur_dplx_mode == HALF_DUPLEX) ? DUPLEX_HALF : DUPLEX_FULL;
+	if (netif_carrier_ok(bdp->device)) {
+		ecmd.speed = bdp->cur_line_speed;
+		ecmd.duplex =
+			(bdp->cur_dplx_mode == HALF_DUPLEX) ? DUPLEX_HALF : DUPLEX_FULL;
+	}
+	else {
+		ecmd.speed = -1;
+		ecmd.duplex = -1;
+	}
 
 	ecmd.advertising = ADVERTISED_TP;
 
@@ -3469,7 +3482,8 @@ e100_ethtool_glink(struct net_device *dev, struct ifreq *ifr)
 	bdp = dev->priv;
 	info.cmd = ETHTOOL_GLINK;
 
-	info.data = e100_get_link_state(bdp);
+	/* Consider both PHY link and netif_running */
+	info.data = e100_update_link_state(bdp);
 
 	if (copy_to_user(ifr->ifr_data, &info, sizeof (info)))
 		return -EFAULT;
@@ -3882,7 +3896,6 @@ e100_ethtool_wol(struct net_device *dev, struct ifreq *ifr)
 		if (copy_to_user(ifr->ifr_data, &wolinfo, sizeof (wolinfo)))
 			res = -EFAULT;
 		break;
-
 	case ETHTOOL_SWOL:
 		/* If ALL requests are supported or request is DISABLE wol */
 		if (((wolinfo.wolopts & bdp->wolsupported) == wolinfo.wolopts)
@@ -3891,6 +3904,8 @@ e100_ethtool_wol(struct net_device *dev, struct ifreq *ifr)
 		} else {
 			res = -EOPNOTSUPP;
 		}
+		if (wolinfo.wolopts & WAKE_ARP)
+			bdp->ip_lbytes = e100_get_ip_lbytes(dev);
 		break;
 	default:
 		break;
@@ -3968,8 +3983,30 @@ e100_mii_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		if (netif_running(dev)) {
 			return -EBUSY;
 		}
-		e100_mdi_write(bdp, data_ptr->reg_num & 0x1f, bdp->phy_addr,
+		/* If reg = 0 && change speed/duplex */
+		if (data_ptr->reg_num == 0 && 
+			(data_ptr->val_in == (BMCR_ANENABLE | BMCR_ANRESTART) /* restart cmd */
+			|| data_ptr->val_in == (BMCR_RESET) /* reset cmd */ 
+			|| data_ptr->val_in & (BMCR_SPEED100 | BMCR_FULLDPLX) 
+			|| data_ptr->val_in == 0)) {
+				if (data_ptr->val_in == (BMCR_ANENABLE | BMCR_ANRESTART)
+					|| data_ptr->val_in == (BMCR_RESET))
+					bdp->params.e100_speed_duplex = E100_AUTONEG;
+				else if (data_ptr->val_in == (BMCR_SPEED100 | BMCR_FULLDPLX))
+					bdp->params.e100_speed_duplex = E100_SPEED_100_FULL;
+				else if (data_ptr->val_in == (BMCR_SPEED100))
+					bdp->params.e100_speed_duplex = E100_SPEED_100_HALF;
+				else if (data_ptr->val_in == (BMCR_FULLDPLX))
+					bdp->params.e100_speed_duplex = E100_SPEED_10_FULL;
+				else
+					bdp->params.e100_speed_duplex = E100_SPEED_10_HALF;
+				e100_set_speed_duplex(bdp);
+		}
+		else {
+			e100_mdi_write(bdp, data_ptr->reg_num, bdp->phy_addr,
 			       data_ptr->val_in);
+		}
+		
 		break;
 
 	default:
@@ -4140,8 +4177,6 @@ static int
 e100_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 {
         struct pci_dev *pdev = NULL;
-	struct net_device *netdev;
-	struct e100_private *bdp;
 	
         switch(event) {
         case SYS_DOWN:
@@ -4149,18 +4184,10 @@ e100_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
         case SYS_POWER_OFF:
                 pci_for_each_dev(pdev) {
                         if(pci_dev_driver(pdev) == &e100_driver) {
-				netdev = pci_get_drvdata(pdev);
 				/* If net_device struct is allocated? */
-                                if (netdev) {
-					bdp = netdev->priv;
-					if (bdp->wolopts) {
-						bdp->ip_lbytes = 
-							e100_get_ip_lbytes(netdev);
-						e100_do_wol(pdev, bdp);
-						pci_enable_wake(pdev, 3, 1);
-						pci_set_power_state(pdev, 3);
-					}
-				}
+                                if (pci_get_drvdata(pdev))
+					e100_suspend(pdev, 3);
+
 			}
 		}
         }
@@ -4178,7 +4205,6 @@ e100_suspend(struct pci_dev *pcid, u32 state)
 
 	/* If wol is enabled */
 	if (bdp->wolopts) {
-		bdp->ip_lbytes = e100_get_ip_lbytes(netdev);
 		e100_do_wol(pcid, bdp);
 		pci_enable_wake(pcid, 3, 1);	/* Enable PME for power state D3 */
 		pci_set_power_state(pcid, 3);	/* Set power state to D3.        */
@@ -4187,7 +4213,6 @@ e100_suspend(struct pci_dev *pcid, u32 state)
 		pci_disable_device(pcid);
 		pci_set_power_state(pcid, state);
 	}
-
 	return 0;
 }
 
@@ -4215,7 +4240,6 @@ e100_resume(struct pci_dev *pcid)
 
 	return 0;
 }
-
 #endif /* CONFIG_PM */
 
 static void

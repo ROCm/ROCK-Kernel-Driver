@@ -151,8 +151,10 @@ extern unsigned char e100_update_link_state(struct e100_private *bdp);
 extern unsigned char e100_phy_check(struct e100_private *bdp);
 extern void e100_phy_set_speed_duplex(struct e100_private *bdp,
 				      unsigned char force_restart);
+extern void e100_phy_autoneg(struct e100_private *bdp);
 extern void e100_phy_reset(struct e100_private *bdp);
-extern void e100_mdi_write(struct e100_private *, u32, u32, u16);
-extern void e100_mdi_read(struct e100_private *, u32, u32, u16 *);
+extern void e100_phy_set_loopback(struct e100_private *bdp);
+extern int e100_mdi_write(struct e100_private *, u32, u32, u16);
+extern int e100_mdi_read(struct e100_private *, u32, u32, u16 *);
 
 #endif

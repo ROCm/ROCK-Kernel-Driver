@@ -31,6 +31,9 @@
 extern u16 e100_eeprom_read(struct e100_private *, u16);
 extern int e100_wait_exec_cmplx(struct e100_private *, u32,u8);
 extern void e100_phy_reset(struct e100_private *bdp);
+extern void e100_phy_autoneg(struct e100_private *bdp);
+extern void e100_phy_set_loopback(struct e100_private *bdp);
+extern void e100_force_speed_duplex(struct e100_private *bdp);
 
 static u8 e100_diag_selftest(struct net_device *);
 static u8 e100_diag_eeprom(struct net_device *);
@@ -239,6 +242,7 @@ e100_diag_config_loopback(struct e100_private* bdp,
 		 *dynamic_tbd = e100_config_dynamic_tbd(bdp,*dynamic_tbd);
 
 	if (set_loopback) {
+		/* Configure loopback on MAC */
 		e100_config_loopback_mode(bdp,loopback_mode);
 	} else {
 		e100_config_loopback_mode(bdp,NO_LOOPBACK);
@@ -247,16 +251,20 @@ e100_diag_config_loopback(struct e100_private* bdp,
 	e100_config(bdp);
 
 	if (loopback_mode == PHY_LOOPBACK) {
-		unsigned long expires = jiffies + HZ * 5;
-
 		if (set_loopback)
-			e100_phy_reset(bdp);
-
-		/* wait up to 5 secs for PHY loopback ON/OFF to take effect */
-		while ((e100_get_link_state(bdp) != set_loopback) &&
-		       time_before(jiffies, expires)) {
-			yield();
+                        /* Set PHY loopback mode */
+                        e100_phy_set_loopback(bdp);
+                else {	/* Back to normal speed and duplex */
+                	if (bdp->params.e100_speed_duplex == E100_AUTONEG)
+				/* Reset PHY and do autoneg */
+                        	e100_phy_autoneg(bdp);
+			else    
+				/* Reset PHY and force speed and duplex */
+				e100_force_speed_duplex(bdp);
 		}
+                /* Wait for PHY state change */
+		set_current_state(TASK_UNINTERRUPTIBLE);
+                schedule_timeout(HZ);
 	} else { /* For MAC loopback wait 500 msec to take effect */
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(HZ / 2);
@@ -276,6 +284,7 @@ e100_diag_loopback_alloc(struct e100_private *bdp)
 	rfd_t *rfd;
 	tbd_t *tbd;
 
+	/* tcb, tbd and transmit buffer are allocated */
 	tcb = pci_alloc_consistent(bdp->pdev,
 				   (sizeof (tcb_t) + sizeof (tbd_t) +
 				    LB_PACKET_SIZE),
@@ -283,22 +292,26 @@ e100_diag_loopback_alloc(struct e100_private *bdp)
         if (tcb == NULL)
 		return false;
 
-	memset(tcb, 0x00, sizeof (tcb_t) + LB_PACKET_SIZE);
+	memset(tcb, 0x00, sizeof (tcb_t) + sizeof (tbd_t) + LB_PACKET_SIZE);
 	tcb->tcb_phys = dma_handle;
 	tcb->tcb_hdr.cb_status = 0;
 	tcb->tcb_hdr.cb_cmd =
 		cpu_to_le16(CB_EL_BIT | CB_TRANSMIT | CB_TX_SF_BIT);
-	tcb->tcb_hdr.cb_lnk_ptr = cpu_to_le32(tcb->tcb_phys);
-	tcb->tcb_tbd_ptr = cpu_to_le32(0xffffffff);
+	/* Next command is null */
+	tcb->tcb_hdr.cb_lnk_ptr = cpu_to_le32(0xffffffff);
 	tcb->tcb_cnt = 0;
 	tcb->tcb_thrshld = bdp->tx_thld;
 	tcb->tcb_tbd_num = 1;
+	/* Set up tcb tbd pointer */
 	tcb->tcb_tbd_ptr = cpu_to_le32(tcb->tcb_phys + sizeof (tcb_t));
 	tbd = (tbd_t *) ((u8 *) tcb + sizeof (tcb_t));
+	/* Set up tbd transmit buffer */
 	tbd->tbd_buf_addr =
 		cpu_to_le32(le32_to_cpu(tcb->tcb_tbd_ptr) + sizeof (tbd_t));
 	tbd->tbd_buf_cnt = __constant_cpu_to_le16(1024);
-	memset((void *) ((u8 *) tbd + sizeof (tbd_t)), 0xFF, 1024);
+	/* The value of first 512 bytes is FF */
+	memset((void *) ((u8 *) tbd + sizeof (tbd_t)), 0xFF, 512);
+	/* The value of second 512 bytes is BA */
 	memset((void *) ((u8 *) tbd + sizeof (tbd_t) + 512), 0xBA, 512);
 	wmb();
 	rfd = pci_alloc_consistent(bdp->pdev, sizeof (rfd_t), &dma_handle);
@@ -313,10 +326,9 @@ e100_diag_loopback_alloc(struct e100_private *bdp)
 	memset(rfd, 0x00, sizeof (rfd_t));
 
 	/* init all fields in rfd */
-	rfd->rfd_header.cb_status = 0;
 	rfd->rfd_header.cb_cmd = cpu_to_le16(RFD_EL_BIT);
-	rfd->rfd_act_cnt = 0;
 	rfd->rfd_sz = cpu_to_le16(ETH_FRAME_LEN + CHKSUM_SIZE);
+	/* dma_handle is physical address of rfd */
 	bdp->loopback.dma_handle = dma_handle;
 	bdp->loopback.tcb = tcb;
 	bdp->loopback.rfd = rfd;
@@ -354,12 +366,15 @@ e100_diag_loopback_cu_ru_exec(struct e100_private *bdp)
 static u8
 e100_diag_check_pkt(u8 *datap)
 {
-        if( (*datap)==0xFF) {
-                if(*(datap + 600) == 0xBA) {
-                        return true;
-                }
-        }
-        return false;
+	int i;
+	for (i = 0; i<512; i++) {
+		if( !((*datap)==0xFF && (*(datap + 512) == 0xBA)) ) {
+			printk (KERN_ERR "e100: check loopback packet failed at: %x\n", i);
+			return false;
+			}
+	}
+	printk (KERN_DEBUG "e100: Check received loopback packet OK\n");
+	return true;
 }
 
 /**
@@ -389,10 +404,14 @@ e100_diag_rcv_loopback_pkt(struct e100_private* bdp)
 		}
         }
 
-        if (rfd_status & RFD_STATUS_COMPLETE)
+        if (rfd_status & RFD_STATUS_COMPLETE) {
+		printk(KERN_DEBUG "e100: Loopback packet received\n");
                 return e100_diag_check_pkt(((u8 *)rfdp+bdp->rfd_size));
-	else
+	}
+	else {
+		printk(KERN_ERR "e100: Loopback packet not received\n");
 		return false;
+	}
 }
 
 /**
