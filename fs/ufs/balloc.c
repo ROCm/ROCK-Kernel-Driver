@@ -28,12 +28,12 @@
 #define UFSD(x)
 #endif
 
-unsigned ufs_add_fragments (struct inode *, unsigned, unsigned, unsigned, int *);
-unsigned ufs_alloc_fragments (struct inode *, unsigned, unsigned, unsigned, int *);
-unsigned ufs_alloccg_block (struct inode *, struct ufs_cg_private_info *, unsigned, int *);
-unsigned ufs_bitmap_search (struct super_block *, struct ufs_cg_private_info *, unsigned, unsigned);
+static unsigned ufs_add_fragments (struct inode *, unsigned, unsigned, unsigned, int *);
+static unsigned ufs_alloc_fragments (struct inode *, unsigned, unsigned, unsigned, int *);
+static unsigned ufs_alloccg_block (struct inode *, struct ufs_cg_private_info *, unsigned, int *);
+static unsigned ufs_bitmap_search (struct super_block *, struct ufs_cg_private_info *, unsigned, unsigned);
 static unsigned char ufs_fragtable_8fpb[], ufs_fragtable_other[];
-void ufs_clusteracct(struct super_block *, struct ufs_cg_private_info *, unsigned, int);
+static void ufs_clusteracct(struct super_block *, struct ufs_cg_private_info *, unsigned, int);
 
 /*
  * Free 'count' fragments from fragment number 'fragment'
@@ -393,8 +393,9 @@ unsigned ufs_new_fragments (struct inode * inode, u32 * p, unsigned fragment,
 	return 0;
 }		
 
-unsigned ufs_add_fragments (struct inode * inode, unsigned fragment,
-	unsigned oldcount, unsigned newcount, int * err)
+static unsigned
+ufs_add_fragments (struct inode * inode, unsigned fragment,
+		   unsigned oldcount, unsigned newcount, int * err)
 {
 	struct super_block * sb;
 	struct ufs_sb_private_info * uspi;
@@ -477,7 +478,7 @@ unsigned ufs_add_fragments (struct inode * inode, unsigned fragment,
 		if (fs32_to_cpu(sb, ucg->cg_frsum[k])) \
 			goto cg_found; 
 
-unsigned ufs_alloc_fragments (struct inode * inode, unsigned cgno,
+static unsigned ufs_alloc_fragments (struct inode * inode, unsigned cgno,
 	unsigned goal, unsigned count, int * err)
 {
 	struct super_block * sb;
@@ -595,7 +596,7 @@ succed:
 	return result;
 }
 
-unsigned ufs_alloccg_block (struct inode * inode,
+static unsigned ufs_alloccg_block (struct inode * inode,
 	struct ufs_cg_private_info * ucpi, unsigned goal, int * err)
 {
 	struct super_block * sb;
@@ -653,7 +654,7 @@ gotit:
 	return result;
 }
 
-unsigned ufs_bitmap_search (struct super_block * sb,
+static unsigned ufs_bitmap_search (struct super_block * sb,
 	struct ufs_cg_private_info * ucpi, unsigned goal, unsigned count)
 {
 	struct ufs_sb_private_info * uspi;
@@ -724,7 +725,7 @@ unsigned ufs_bitmap_search (struct super_block * sb,
 	return (unsigned)-1;
 }
 
-void ufs_clusteracct(struct super_block * sb, 
+static void ufs_clusteracct(struct super_block * sb,
 	struct ufs_cg_private_info * ucpi, unsigned blkno, int cnt)
 {
 	struct ufs_sb_private_info * uspi;
