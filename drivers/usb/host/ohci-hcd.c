@@ -167,7 +167,7 @@ static int ohci_urb_enqueue (
 			else if ((urb->transfer_flags & USB_ZERO_PACKET) != 0
 				&& (urb->transfer_buffer_length
 					% usb_maxpacket (urb->dev, pipe,
-						usb_pipeout (pipe))) != 0)
+						usb_pipeout (pipe))) == 0)
 				size++;
 			break;
 		case PIPE_ISOCHRONOUS: /* number of packets from URB */
