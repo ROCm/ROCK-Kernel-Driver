@@ -177,11 +177,11 @@ static _INLINE_ unsigned int serial_in(struct uart_8250_port *up, int offset)
 	offset <<= up->port.regshift;
 
 	switch (up->port.iotype) {
-	case SERIAL_IO_HUB6:
+	case UPIO_HUB6:
 		outb(up->port.hub6 - 1 + offset, up->port.iobase);
 		return inb(up->port.iobase + 1);
 
-	case SERIAL_IO_MEM:
+	case UPIO_MEM:
 		return readb(up->port.membase + offset);
 
 	default:
@@ -195,12 +195,12 @@ serial_out(struct uart_8250_port *up, int offset, int value)
 	offset <<= up->port.regshift;
 
 	switch (up->port.iotype) {
-	case SERIAL_IO_HUB6:
+	case UPIO_HUB6:
 		outb(up->port.hub6 - 1 + offset, up->port.iobase);
 		outb(value, up->port.iobase + 1);
 		break;
 
-	case SERIAL_IO_MEM:
+	case UPIO_MEM:
 		writeb(value, up->port.membase + offset);
 		break;
 
@@ -1613,7 +1613,7 @@ serial8250_request_std_resource(struct uart_8250_port *up, struct resource **res
 	int ret = 0;
 
 	switch (up->port.iotype) {
-	case SERIAL_IO_MEM:
+	case UPIO_MEM:
 		if (up->port.mapbase) {
 			*res = request_mem_region(up->port.mapbase, size, "serial");
 			if (!*res)
@@ -1621,8 +1621,8 @@ serial8250_request_std_resource(struct uart_8250_port *up, struct resource **res
 		}
 		break;
 
-	case SERIAL_IO_HUB6:
-	case SERIAL_IO_PORT:
+	case UPIO_HUB6:
+	case UPIO_PORT:
 		*res = request_region(up->port.iobase, size, "serial");
 		if (!*res)
 			ret = -EBUSY;
@@ -1639,7 +1639,7 @@ serial8250_request_rsa_resource(struct uart_8250_port *up, struct resource **res
 	int ret = 0;
 
 	switch (up->port.iotype) {
-	case SERIAL_IO_MEM:
+	case UPIO_MEM:
 		if (up->port.mapbase) {
 			start = up->port.mapbase;
 			start += UART_RSA_BASE << up->port.regshift;
@@ -1649,8 +1649,8 @@ serial8250_request_rsa_resource(struct uart_8250_port *up, struct resource **res
 		}
 		break;
 
-	case SERIAL_IO_HUB6:
-	case SERIAL_IO_PORT:
+	case UPIO_HUB6:
+	case UPIO_PORT:
 		start = up->port.iobase;
 		start += UART_RSA_BASE << up->port.regshift;
 		*res = request_region(start, size, "serial-rsa");
@@ -1675,7 +1675,7 @@ static void serial8250_release_port(struct uart_port *port)
 	size <<= up->port.regshift;
 
 	switch (up->port.iotype) {
-	case SERIAL_IO_MEM:
+	case UPIO_MEM:
 		if (up->port.mapbase) {
 			/*
 			 * Unmap the area.
@@ -1691,8 +1691,8 @@ static void serial8250_release_port(struct uart_port *port)
 		}
 		break;
 
-	case SERIAL_IO_HUB6:
-	case SERIAL_IO_PORT:
+	case UPIO_HUB6:
+	case UPIO_PORT:
 		start = up->port.iobase;
 
 		if (size)
