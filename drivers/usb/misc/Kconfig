@@ -94,7 +94,7 @@ config USB_LCD
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SPEEDTOUCH
-	tristate "Alcatel Speedtouch ADSL USB Modem"
+	tristate "Alcatel Speedtouch USB support"
 	depends on USB && ATM
 	help
 	  Say Y here if you have an Alcatel SpeedTouch USB or SpeedTouch 330
