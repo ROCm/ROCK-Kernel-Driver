@@ -1666,10 +1666,14 @@ static int get_tid_list(int index, unsigned int *tids, struct inode *dir)
 
 	index -= 2;
 	read_lock(&tasklist_lock);
-	do {
+	/*
+	 * The starting point task (leader_task) might be an already
+	 * unlinked task, which cannot be used to access the task-list
+	 * via next_thread().
+	 */
+	if (pid_alive(task)) do {
 		int tid = task->pid;
-		if (!pid_alive(task))
-			continue;
+
 		if (--index >= 0)
 			continue;
 		tids[nr_tids] = tid;

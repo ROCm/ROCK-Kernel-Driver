@@ -703,10 +703,6 @@ SiS190_remove_one(struct pci_dev *pdev)
 	iounmap(tp->mmio_addr);
 	pci_release_regions(pdev);
 
-	// poison memory before freeing 
-	memset(dev, 0xBC,
-	       sizeof (struct net_device) + sizeof (struct sis190_private));
-
 	free_netdev(dev);
 	pci_set_drvdata(pdev, NULL);
 }
