@@ -247,10 +247,11 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
 #define howmany(x, y)	(((x)+((y)-1))/(y))
 #define roundup(x, y)	((((x)+((y)-1))/(y))*(y))
 
-static inline void xfs_stack_trace(void)
-{
-	dump_stack();
-}
+#define xfs_stack_trace()	dump_stack()
+
+#define xfs_itruncate_data(ip, off)	\
+	(-vmtruncate(LINVFS_GET_IP(XFS_ITOV(ip)), (off)))
+
 
 /* Move the kernel do_div definition off to one side */
 
