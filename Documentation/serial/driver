@@ -138,8 +138,8 @@ hardware.
 	Stop receiving characters; the port is in the process of
 	being closed.
 
-	Locking: none.
-	Interrupts: caller dependent.
+	Locking: port->lock taken.
+	Interrupts: locally disabled.
 	This call must not sleep
 
   enable_ms(port)

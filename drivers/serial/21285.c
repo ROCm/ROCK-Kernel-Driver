@@ -85,14 +85,10 @@ serial21285_start_tx(struct uart_port *port, unsigned int tty_start)
 
 static void serial21285_stop_rx(struct uart_port *port)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&port->lock, flags);
 	if (rx_enabled(port)) {
 		disable_irq(IRQ_CONRX);
 		rx_enabled(port) = 0;
 	}
-	spin_unlock_irqrestore(&port->lock, flags);
 }
 
 static void serial21285_enable_ms(struct uart_port *port)

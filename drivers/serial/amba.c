@@ -138,14 +138,11 @@ static void ambauart_start_tx(struct uart_port *port, unsigned int tty_start)
 
 static void ambauart_stop_rx(struct uart_port *port)
 {
-	unsigned long flags;
 	unsigned int cr;
 
-	spin_lock_irqsave(&port->lock, flags);
 	cr = UART_GET_CR(port);
 	cr &= ~(AMBA_UARTCR_RIE | AMBA_UARTCR_RTIE);
 	UART_PUT_CR(port, cr);
-	spin_unlock_irqrestore(&port->lock, flags);
 }
 
 static void ambauart_enable_ms(struct uart_port *port)

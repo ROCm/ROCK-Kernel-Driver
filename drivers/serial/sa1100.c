@@ -190,13 +190,10 @@ static void sa1100_start_tx(struct uart_port *port, unsigned int tty_start)
 static void sa1100_stop_rx(struct uart_port *port)
 {
 	struct sa1100_port *sport = (struct sa1100_port *)port;
-	unsigned long flags;
 	u32 utcr3;
 
-	spin_lock_irqsave(&sport->port.lock, flags);
 	utcr3 = UART_GET_UTCR3(sport);
 	UART_PUT_UTCR3(sport, utcr3 & ~UTCR3_RIE);
-	spin_unlock_irqrestore(&sport->port.lock, flags);
 }
 
 /*

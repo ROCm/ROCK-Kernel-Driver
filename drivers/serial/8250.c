@@ -724,13 +724,10 @@ static void serial8250_start_tx(struct uart_port *port, unsigned int tty_start)
 static void serial8250_stop_rx(struct uart_port *port)
 {
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
-	unsigned long flags;
 
-	spin_lock_irqsave(&up->port.lock, flags);
 	up->ier &= ~UART_IER_RLSI;
 	up->port.read_status_mask &= ~UART_LSR_DR;
 	serial_out(up, UART_IER, up->ier);
-	spin_unlock_irqrestore(&up->port.lock, flags);
 }
 
 static void serial8250_enable_ms(struct uart_port *port)

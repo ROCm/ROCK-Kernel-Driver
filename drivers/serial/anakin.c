@@ -119,13 +119,9 @@ anakin_start_tx(struct uart_port *port, unsigned int tty_start)
 static void
 anakin_stop_rx(struct uart_port *port)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&port->lock, flags);
 	while (anakin_in(port, 0x10) & RXRELEASE) 
 	    anakin_in(port, 0x14);
 	anakin_out(port, 0x18, anakin_in(port, 0x18) | BLOCKRX);
-	spin_unlock_irqrestore(&port->lock, flags);
 }
 
 static void

@@ -1200,7 +1200,9 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 	 * disable the receive line status interrupts.
 	 */
 	if (info->flags & UIF_INITIALIZED) {
+		spin_lock_irqsave(&port->lock, flags);
 		port->ops->stop_rx(port);
+		spin_unlock_irqrestore(&port->lock, flags);
 		/*
 		 * Before we drop DTR, make sure the UART transmitter
 		 * has completely drained; this is especially
@@ -1948,8 +1950,8 @@ static int uart_pm_set_state(struct uart_state *state, int pm_state, int oldstat
 			spin_lock_irq(&port->lock);
 			ops->stop_tx(port, 0);
 			ops->set_mctrl(port, 0);
-			spin_unlock_irq(&port->lock);
 			ops->stop_rx(port);
+			spin_unlock_irq(&port->lock);
 			ops->shutdown(port);
 		}
 		if (ops->pm)
