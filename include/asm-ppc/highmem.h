@@ -54,8 +54,7 @@ extern void kunmap_high(struct page *page);
 
 static inline void *kmap(struct page *page)
 {
-	if (in_interrupt())
-		BUG();
+	might_sleep();
 	if (page < highmem_start_page)
 		return page_address(page);
 	return kmap_high(page);
