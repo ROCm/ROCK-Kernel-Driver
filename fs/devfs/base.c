@@ -2312,6 +2312,7 @@ EXPORT_SYMBOL(devfs_unregister);
 EXPORT_SYMBOL(devfs_mk_symlink);
 EXPORT_SYMBOL(devfs_mk_dir);
 EXPORT_SYMBOL(devfs_get_handle);
+EXPORT_SYMBOL(devfs_find_and_unregister);
 EXPORT_SYMBOL(devfs_get_flags);
 EXPORT_SYMBOL(devfs_set_flags);
 EXPORT_SYMBOL(devfs_get_maj_min);
