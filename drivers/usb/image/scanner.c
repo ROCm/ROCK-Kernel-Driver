@@ -1106,6 +1106,9 @@ probe_scanner(struct usb_interface *intf,
 	scn->scn_minor = intf->minor;
 	scn->isopen = 0;
 
+	snprintf(name, sizeof(name), scanner_class.name,
+		 intf->minor - scanner_class.minor_base);
+
 	info ("USB scanner device (0x%04x/0x%04x) now attached to %s",
 	      dev->descriptor.idVendor, dev->descriptor.idProduct, name);
 
