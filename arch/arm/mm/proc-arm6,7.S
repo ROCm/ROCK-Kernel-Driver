@@ -43,8 +43,6 @@ ENTRY(cpu_arm6_dcache_clean_page)
 ENTRY(cpu_arm7_dcache_clean_page)
 ENTRY(cpu_arm6_dcache_clean_entry)
 ENTRY(cpu_arm7_dcache_clean_entry)
-ENTRY(cpu_arm6_flush_ram_page)
-ENTRY(cpu_arm7_flush_ram_page)
 		mov	pc, lr
 
 /*
@@ -358,7 +356,6 @@ ENTRY(arm6_processor_functions)
 		/* cache */
 		.word	cpu_arm6_cache_clean_invalidate_all
 		.word	cpu_arm6_cache_clean_invalidate_range
-		.word	cpu_arm6_flush_ram_page
 
 		/* dcache */
 		.word	cpu_arm6_dcache_invalidate_range
@@ -393,7 +390,6 @@ ENTRY(arm7_processor_functions)
 		/* cache */
 		.word	cpu_arm7_cache_clean_invalidate_all
 		.word	cpu_arm7_cache_clean_invalidate_range
-		.word	cpu_arm7_flush_ram_page
 
 		/* dcache */
 		.word	cpu_arm7_dcache_invalidate_range

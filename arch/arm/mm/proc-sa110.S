@@ -262,26 +262,6 @@ ENTRY(cpu_sa1100_cache_clean_invalidate_range)
 	bhi	cpu_sa1100_cache_clean_invalidate_all_r2
 	b	1b
 
-/*
- * cpu_sa110_flush_ram_page(page)
- *
- * clean and invalidate all cache lines associated with this area of memory
- *
- * page: page to clean and invalidate
- */
-	.align	5
-ENTRY(cpu_sa110_flush_ram_page)
-ENTRY(cpu_sa1100_flush_ram_page)
-	mov	r1, #PAGESIZE
-1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
-	add	r0, r0, #DCACHELINESIZE
-	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
-	add	r0, r0, #DCACHELINESIZE
-	subs	r1, r1, #2 * DCACHELINESIZE
-	bne	1b
-	mcr	p15, 0, r1, c7, c10, 4		@ drain WB
-	mov	pc, lr
-
 /* ================================ D-CACHE =============================== */
 
 /*
@@ -550,7 +530,6 @@ ENTRY(sa110_processor_functions)
 	/* cache */
 	.word	cpu_sa110_cache_clean_invalidate_all
 	.word	cpu_sa110_cache_clean_invalidate_range
-	.word	cpu_sa110_flush_ram_page
 
 	/* dcache */
 	.word	cpu_sa110_dcache_invalidate_range
@@ -591,7 +570,6 @@ ENTRY(sa1100_processor_functions)
 	/* cache */
 	.word	cpu_sa1100_cache_clean_invalidate_all
 	.word	cpu_sa1100_cache_clean_invalidate_range
-	.word	cpu_sa1100_flush_ram_page
 
 	/* dcache */
 	.word	cpu_sa1100_dcache_invalidate_range

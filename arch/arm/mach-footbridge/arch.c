@@ -41,10 +41,12 @@ static void __init
 fixup_ebsa285(struct machine_desc *desc, struct param_struct *params,
 	      char **cmdline, struct meminfo *mi)
 {
+#if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)
 	ORIG_X		 = params->u1.s.video_x;
 	ORIG_Y		 = params->u1.s.video_y;
 	ORIG_VIDEO_COLS  = params->u1.s.video_num_cols;
 	ORIG_VIDEO_LINES = params->u1.s.video_num_rows;
+#endif
 }
 
 MACHINE_START(EBSA285, "EBSA285")

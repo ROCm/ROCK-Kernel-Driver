@@ -1,3 +1,10 @@
+/*
+ * We need constants.h for:
+ *  VMA_VM_MM
+ *  VMA_VM_FLAGS
+ *  VM_EXEC
+ */
+#include <asm/constants.h>
 #include <asm/thread_info.h>
 
 /*
@@ -12,6 +19,11 @@
  */
 	.macro	vma_vm_flags, rd, rn
 	ldr	\rd, [\rn, #VMA_VM_FLAGS]
+	.endm
+
+	.macro	tsk_mm, rd, rn
+	ldr	\rd, [\rn, #TI_TASK]
+	ldr	\rd, [\rd, #TSK_ACTIVE_MM]
 	.endm
 
 /*

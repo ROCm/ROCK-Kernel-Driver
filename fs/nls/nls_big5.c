@@ -11,12 +11,8 @@
 static struct nls_table *p_nls;
 
 static struct nls_table table = {
-	"big5",
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	THIS_MODULE,
+	charset:	"big5",
+	owner:		THIS_MODULE,
 };
 
 static int __init init_nls_big5(void)

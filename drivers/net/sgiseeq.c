@@ -720,3 +720,5 @@ int sgiseeq_probe(struct net_device *dev)
 			    (struct sgiseeq_regs *) (KSEG1ADDR(0x1fbd4000)),
 			    &hpc3c0->ethregs, SGI_ENET_IRQ);
 }
+
+MODULE_LICENSE("GPL");

@@ -183,7 +183,7 @@ static __u32 get_third_component (struct super_block * s,
     if (len == 2 && name[0] == '.' && name[1] == '.')
 	return DOT_DOT_OFFSET;
 
-    res = s->u.reiserfs_sb.s_hash_function (name, len);
+    res = REISERFS_SB(s)->s_hash_function (name, len);
 
     // take bits from 7-th to 30-th including both bounds
     res = GET_HASH_VALUE(res);

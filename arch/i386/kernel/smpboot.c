@@ -47,6 +47,7 @@
 #include <linux/mc146818rtc.h>
 #include <asm/mtrr.h>
 #include <asm/pgalloc.h>
+#include <asm/tlbflush.h>
 #include <asm/smpboot.h>
 
 /* Set if we find a B stepping CPU			*/

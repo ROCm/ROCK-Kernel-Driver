@@ -1,6 +1,5 @@
 /*
- *
- *   Copyright (c) International Business Machines  Corp., 2000
+ *   Copyright (c) International Business Machines Corp., 2000-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -15,8 +14,7 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program;  if not, write to the Free Software 
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- *
-*/
+ */
 
 /*
  *	jfs_logmgr.c: log manager
@@ -62,7 +60,6 @@
 
 #include <linux/fs.h>
 #include <linux/locks.h>
-#include <linux/slab.h>
 #include <linux/blkdev.h>
 #include <linux/interrupt.h>
 #include <linux/smp_lock.h>
@@ -160,7 +157,6 @@ do {						\
 /*
  * external references
  */
-extern void vPut(struct inode *ip);
 extern void txLazyUnlock(tblock_t * tblk);
 extern int jfs_thread_stopped(void);
 extern struct task_struct *jfsIOtask;
@@ -173,6 +169,7 @@ static int lmWriteRecord(log_t * log, tblock_t * tblk, lrd_t * lrd,
 			 tlock_t * tlck);
 
 static int lmNextPage(log_t * log);
+static int lmLogFileSystem(log_t * log, kdev_t fsdev, int activate);
 static int lmLogInit(log_t * log);
 static int lmLogShutdown(log_t * log);
 
@@ -186,9 +183,7 @@ static void lbmWrite(log_t * log, lbuf_t * bp, int flag, int cant_block);
 static void lbmDirectWrite(log_t * log, lbuf_t * bp, int flag);
 static int lbmIOWait(lbuf_t * bp, int flag);
 static bio_end_io_t lbmIODone;
-#ifdef _STILL_TO_PORT
-static void lbmDirectIODone(iobuf_t * ddbp);
-#endif				/* _STILL_TO_PORT */
+
 void lbmStartIO(lbuf_t * bp);
 void lmGCwrite(log_t * log, int cant_block);
 
@@ -1060,46 +1055,36 @@ int lmLogSync(log_t * log, int nosyncwait)
 int lmLogOpen(struct super_block *sb, log_t ** logptr)
 {
 	int rc;
-	kdev_t logdev;		/* dev_t of log device */
+	struct block_device *bdev;
 	log_t *log;
 
-	logdev = sb->s_dev;
+	if (!(log = kmalloc(sizeof(log_t), GFP_KERNEL)))
+		return ENOMEM;
+	memset(log, 0, sizeof(log_t));
 
-#ifdef _STILL_TO_PORT
-	/*
-	 * open the inode representing the log device (aka log inode)
-	 */
-	if (logdev != fsdev)
+	if (!(JFS_SBI(sb)->mntflag & JFS_INLINELOG))
 		goto externalLog;
-#endif				/* _STILL_TO_PORT */
 
 	/*
 	 *      in-line log in host file system
 	 *
 	 * file system to log have 1-to-1 relationship;
 	 */
-//    inlineLog:
 
-	*logptr = log = kmalloc(sizeof(log_t), GFP_KERNEL);
-	if (log == 0)
-		return ENOMEM;
-
-	memset(log, 0, sizeof(log_t));
 	log->sb = sb;		/* This should be a list */
 	log->flag = JFS_INLINELOG;
-	log->dev = logdev;
+	log->dev = sb->s_dev;
 	log->base = addressPXD(&JFS_SBI(sb)->logpxd);
 	log->size = lengthPXD(&JFS_SBI(sb)->logpxd) >>
 	    (L2LOGPSIZE - sb->s_blocksize_bits);
 	log->l2bsize = sb->s_blocksize_bits;
 	ASSERT(L2LOGPSIZE >= sb->s_blocksize_bits);
+
 	/*
 	 * initialize log.
 	 */
 	if ((rc = lmLogInit(log)))
 		goto errout10;
-
-#ifdef _STILL_TO_PORT
 	goto out;
 
 	/*
@@ -1108,103 +1093,47 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	 * file systems to log may have n-to-1 relationship;
 	 */
       externalLog:
-	/*
-	 * open log inode
-	 *
-	 * log inode is reserved inode of (dev_t = log device,
-	 * fileset number = 0, i_number = 0), which acquire
-	 * one i_count for each open by file system.
-	 *
-	 * hand craft dummy vfs to force iget() the special case of
-	 * an in-memory inode allocation without on-disk inode
-	 */
-	memset(&dummyvfs, 0, sizeof(struct vfs));
-	dummyvfs.filesetvfs.vfs_data = NULL;
-	dummyvfs.dummyvfs.dev = logdev;
-	dummyvfs.dummyvfs.ipmnt = NULL;
-	ICACHE_LOCK();
-	rc = iget((struct vfs *) &dummyvfs, 0, (inode_t **) & log, 0);
-	ICACHE_UNLOCK();
-	if (rc)
-		return rc;
-
-	log->flag = 0;
-	log->dev = logdev;
-	log->base = 0;
-	log->size = 0;
-
-	/*
-	 * serialize open/close between multiple file systems
-	 * bound with the log;
-	 */
-	ip = (inode_t *) log;
-	IWRITE_LOCK(ip);
-
-	/*
-	 * subsequent open: add file system to log active file system list
-	 */
-#ifdef	_JFS_OS2
-	if (log->strat2p)
-#endif				/* _JFS_OS2 */
-	{
-		if (rc = lmLogFileSystem(log, fsdev, 1))
-			goto errout10;
-
-		IWRITE_UNLOCK(ip);
-
-		*iplog = ip;
-		jFYI(1, ("lmLogOpen: exit(0)\n"));
-		return 0;
+	if (!(bdev = bdget(kdev_t_to_nr(JFS_SBI(sb)->logdev)))) {
+		rc = ENODEV;
+		goto errout10;
 	}
 
-	/* decouple log inode from dummy vfs */
-	vPut(ip);
+	if ((rc = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_FS))) {
+		rc = -rc;
+		goto errout10;
+	}
 
-	/*
-	 * first open:
-	 */
-#ifdef	_JFS_OS2
-	/*
-	 * establish access to the single/shared (already open) log device
-	 */
-	logdevfp = (void *) logStrat2;
-	log->strat2p = logStrat2;
-	log->strat3p = logStrat3;
-
-	log->l2pbsize = 9;	/* todo: when OS/2 have multiple external log */
-#endif				/* _JFS_OS2 */
-
+	log->sb = sb;		/* This should be a list */
+	log->dev = JFS_SBI(sb)->logdev;
+	log->bdev = bdev;
+	
 	/*
 	 * initialize log:
 	 */
-	if (rc = lmLogInit(log))
+	if ((rc = lmLogInit(log)))
 		goto errout20;
 
 	/*
 	 * add file system to log active file system list
 	 */
-	if (rc = lmLogFileSystem(log, fsdev, 1))
+	if ((rc = lmLogFileSystem(log, sb->s_dev, 1)))
 		goto errout30;
 
-	/*
-	 *      insert log device into log device list
-	 */
       out:
-#endif				/*  _STILL_TO_PORT */
 	jFYI(1, ("lmLogOpen: exit(0)\n"));
+	*logptr = log;
 	return 0;
 
 	/*
 	 *      unwind on error
 	 */
-#ifdef _STILL_TO_PORT
       errout30:		/* unwind lbmLogInit() */
 	lbmLogShutdown(log);
 
       errout20:		/* close external log device */
+	blkdev_put(bdev, BDEV_FS);
 
-#endif				/* _STILL_TO_PORT */
-      errout10:		/* free log inode */
+      errout10:		/* free log descriptor */
 	kfree(log);
 
 	jFYI(1, ("lmLogOpen: exit(%d)\n", rc));
@@ -1256,6 +1185,10 @@ static int lmLogInit(log_t * log)
 	/*
 	 * validate log superblock
 	 */
+
+
+	if (!(log->flag & JFS_INLINELOG))
+		log->l2bsize = 12;	/* XXX kludge alert XXX */
 	if ((rc = lbmRead(log, 1, &bpsuper)))
 		goto errout10;
 
@@ -1285,6 +1218,7 @@ static int lmLogInit(log_t * log)
 		      log, (unsigned long long) log->base, log->size));
 	} else {
 		log->size = le32_to_cpu(logsuper->size);
+		log->l2bsize = le32_to_cpu(logsuper->l2bsize);
 		jFYI(0,
 		     ("lmLogInit: external log:0x%p base:0x%Lx size:0x%x\n",
 		      log, (unsigned long long) log->base, log->size));
@@ -1379,6 +1313,7 @@ static int lmLogInit(log_t * log)
 	logsuper->state = cpu_to_le32(LOGMOUNT);
 	log->serial = le32_to_cpu(logsuper->serial) + 1;
 	logsuper->serial = cpu_to_le32(log->serial);
+	logsuper->device = cpu_to_le32(kdev_t_to_nr(log->dev));
 	lbmDirectWrite(log, bpsuper, lbmWRITE | lbmRELEASE | lbmSYNC);
 	if ((rc = lbmIOWait(bpsuper, lbmFREE)))
 		goto errout30;
@@ -1422,47 +1357,24 @@ int lmLogClose(struct super_block *sb, log_t * log)
 
 	jFYI(1, ("lmLogClose: log:0x%p\n", log));
 
+	if (!(log->flag & JFS_INLINELOG))
+		goto externalLog;
+	
 	/*
 	 *      in-line log in host file system
 	 */
-//      inlineLog:
-#ifdef _STILL_TO_PORT
-	if (log->flag & JFS_INLINELOG) {
-		rc = lmLogShutdown(log);
-
-		goto out1;
-	}
+	rc = lmLogShutdown(log);
+	goto out;
 
 	/*
 	 *      external log as separate logical volume
 	 */
       externalLog:
-
-	/* serialize open/close between multiple file systems
-	 * associated with the log
-	 */
-	IWRITE_LOCK(iplog);
-
-	/*
-	 * remove file system from log active file system list
-	 */
-	rc = lmLogFileSystem(log, fsdev, 0);
-
-	if (iplog->i_count > 1)
-		goto out2;
-
-	/*
-	 *      last close: shut down log
-	 */
-	rc = ((rc1 = lmLogShutdown(log)) && rc == 0) ? rc1 : rc;
-
-      out1:
-#else				/* _STILL_TO_PORT */
+	lmLogFileSystem(log, sb->s_dev, 0);
 	rc = lmLogShutdown(log);
-#endif				/* _STILL_TO_PORT */
+	blkdev_put(log->bdev, BDEV_FS);
 
-//      out2:
-
+      out:
 	jFYI(0, ("lmLogClose: exit(%d)\n", rc));
 	return rc;
 }
@@ -1564,7 +1476,6 @@ static int lmLogShutdown(log_t * log)
 }
 
 
-#ifdef _STILL_TO_PORT
 /*
  * NAME:	lmLogFileSystem()
  *
@@ -1572,7 +1483,7 @@ static int lmLogShutdown(log_t * log)
  *	file system into/from log active file system list.
  *
  * PARAMETE:	log	- pointer to logs inode.
- *		fsdev	- dev_t of filesystem.
+ *		fsdev	- kdev_t of filesystem.
  *		serial  - pointer to returned log serial number
  *		activate - insert/remove device from active list.
  *
@@ -1581,10 +1492,11 @@ static int lmLogShutdown(log_t * log)
  *			
  * serialization: IWRITE_LOCK(log inode) held on entry/exit
  */
-static int lmLogFileSystem(log_t * log, dev_t fsdev, int activate)
+static int lmLogFileSystem(log_t * log, kdev_t fsdev, int activate)
 {
 	int rc = 0;
-	int bit, word;
+	int i;
+	u32 dev_le = cpu_to_le32(kdev_t_to_nr(fsdev));
 	logsuper_t *logsuper;
 	lbuf_t *bpsuper;
 
@@ -1595,15 +1507,25 @@ static int lmLogFileSystem(log_t * log, dev_t fsdev, int activate)
 		return rc;
 
 	logsuper = (logsuper_t *) bpsuper->l_ldata;
-	bit = minor(fsdev);
-	word = bit / 32;
-	bit -= 32 * word;
-	if (activate)
-		logsuper->active[word] |=
-		    cpu_to_le32((LEFTMOSTONE >> bit));
-	else
-		logsuper->active[word] &=
-		    cpu_to_le32((~(LEFTMOSTONE >> bit)));
+	if (activate) {
+		for (i = 0; i < MAX_ACTIVE; i++)
+			if (logsuper->active[i] == 0) {
+				logsuper->active[i] = dev_le;
+				break;
+			}
+		if (i == MAX_ACTIVE) {
+			jERROR(1,("Too many file systems sharing journal!\n"));
+			lbmFree(bpsuper);
+			return EMFILE;	/* Is there a better rc? */
+		}
+	} else {
+		for (i = 0; i < MAX_ACTIVE; i++)
+			if (logsuper->active[i] == dev_le) {
+				logsuper->active[i] = 0;
+				break;
+			}
+		assert(i < MAX_ACTIVE);
+	}
 
 	/*
 	 * synchronous write log superblock:
@@ -1621,7 +1543,6 @@ static int lmLogFileSystem(log_t * log, dev_t fsdev, int activate)
 
 	return rc;
 }
-#endif				/* _STILL_TO_PORT */
 
 
 /*
@@ -1809,42 +1730,6 @@ static void lbmfree(lbuf_t * bp)
 	wake_up(&log->free_wait);
 	return;
 }
-
-
-#ifdef _THIS_IS_NOT_USED
-/*
- *	lbmRelease()
- *
- * remove the log buffer from log device write queue;
- */
-static void lbmRelease(log_t * log, uint flag)
-{
-	lbuf_t *bp, *tail;
-	unsigned long flags;
-
-	bp = log->bp;
-
-	LCACHE_LOCK(flags);
-
-	tail = log->wqueue;
-
-	/* single element queue */
-	if (bp == tail) {
-		log->wqueue = NULL;
-		bp->l_wqnext = NULL;
-	}
-	/* multi element queue */
-	else {
-		tail->l_wqnext = bp->l_wqnext;
-		bp->l_wqnext = NULL;
-	}
-
-	if (flag & lbmFREE)
-		lbmfree(bp);
-
-	LCACHE_UNLOCK(flags);
-}
-#endif				/* _THIS_IS_NOT_USED */
 
 
 /*
@@ -2272,63 +2157,6 @@ int jfsIOWait(void *arg)
 	return 0;
 }
 
-
-#ifdef _STILL_TO_PORT
-/*
- *	lbmDirectIODone()
- *
- * iodone() for lbmDirectWrite() to bypass write queue;
- * executed at INTIODONE level;
- */
-static void lbmDirectIODone(iobuf_t * iobp)
-{
-	lbuf_t *bp;
-	unsigned long flags;
-
-	/*
-	 * get back jfs buffer bound to the io buffer
-	 */
-	bp = (lbuf_t *) iobp->b_jfsbp;
-	jEVENT(0,
-	       ("lbmDirectIODone: bp:0x%p flag:0x%x\n", bp, bp->l_flag));
-
-	LCACHE_LOCK(flags);		/* disable+lock */
-
-	bp->l_flag |= lbmDONE;
-
-	if (iobp->b_flags & B_ERROR) {
-		bp->l_flag |= lbmERROR;
-#ifdef _JFS_OS2
-		SysLogError();
-#endif
-	}
-
-	/*
-	 *      pageout completion
-	 */
-	bp->l_flag &= ~lbmWRITE;
-
-	/*
-	 *      synchronous pageout:
-	 */
-	if (bp->l_flag & lbmSYNC) {
-		LCACHE_UNLOCK(flags);	/* unlock+enable */
-
-		/* wakeup I/O initiator */
-		LCACHE_WAKEUP(&bp->l_ioevent);
-	}
-	/*
-	 *      asynchronous pageout:
-	 */
-	else {
-		assert(bp->l_flag & lbmRELEASE);
-		assert(bp->l_flag & lbmFREE);
-		lbmfree(bp);
-
-		LCACHE_UNLOCK(flags);	/* unlock+enable */
-	}
-}
-#endif				/* _STILL_TO_PORT */
 
 #ifdef _STILL_TO_PORT
 /*

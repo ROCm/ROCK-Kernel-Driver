@@ -79,10 +79,13 @@ ENTRY(v3_flush_kern_tlb_page)
 	mcr	p15, 0, r0, c6, c0, 0		@ invalidate TLB entry
 	mov	pc, lr
 
-ENTRY(v3_tlb_fns)
-	.word	v3_flush_kern_tlb_all
-	.word	v3_flush_user_tlb_mm
-	.word	v3_flush_user_tlb_range
-	.word	v3_flush_user_tlb_page
-	.word	v3_flush_kern_tlb_page
+	.section ".text.init", #alloc, #execinstr
 
+	.type	v3_tlb_fns, #object
+ENTRY(v3_tlb_fns)
+	.long	v3_flush_kern_tlb_all
+	.long	v3_flush_user_tlb_mm
+	.long	v3_flush_user_tlb_range
+	.long	v3_flush_user_tlb_page
+	.long	v3_flush_kern_tlb_page
+	.size	v3_tlb_fns, . - v3_tlb_fns

@@ -445,7 +445,7 @@ static void			ahc_linux_free_device(struct ahc_softc*,
 						      struct ahc_linux_device*);
 static void ahc_linux_run_device_queue(struct ahc_softc*,
 				       struct ahc_linux_device*);
-static void ahc_linux_setup_tag_info(char *p, char *end);
+static void ahc_linux_setup_tag_info(char *p, char *end, char *s);
 static int ahc_linux_next_unit(void);
 static int ahc_linux_halt(struct notifier_block *nb, u_long event, void *buf);
 

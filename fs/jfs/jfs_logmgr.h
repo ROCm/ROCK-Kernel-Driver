@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines  Corp., 2000
+ *   Copyright (c) International Business Machines Corp., 2000-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -15,10 +15,8 @@
  *   along with this program;  if not, write to the Free Software 
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
-
 #ifndef	_H_JFS_LOGMGR
 #define _H_JFS_LOGMGR
-
 
 #include "jfs_filsys.h"
 #include "jfs_lock.h"
@@ -60,6 +58,8 @@
 #define	LOGMAGIC	0x87654321
 #define	LOGVERSION	1
 
+#define MAX_ACTIVE	512	/* Max active file systems sharing log */
+
 typedef struct {
 	u32 magic;		/* 4: log lv identifier */
 	s32 version;		/* 4: version number */
@@ -72,8 +72,8 @@ typedef struct {
 	u32 state;		/* 4: state - see below */
 
 	s32 end;		/* 4: addr of last log record set by logredo */
-	u32 active[8];		/* 32: active file systems bit vector */
-	s32 rsrvd[LOGPSIZE / 4 - 17];
+	u32 device;		/* 4: save device in case location changes */
+	u32 active[MAX_ACTIVE];	/* 2048: active file systems list */
 } logsuper_t;
 
 /* log flag: commit option (see jfs_filsys.h) */
@@ -200,7 +200,7 @@ typedef struct lrd {
 	s32 backchain;		/* 4: ptr to prev record of same transaction */
 	u16 type;		/* 2: record type */
 	s16 length;		/* 2: length of data in record (in byte) */
-	s32 aggregate;		/* 4: file system lv/aggregate */
+	u32 aggregate;		/* 4: file system lv/aggregate */
 	/* (16) */
 
 	/*
@@ -367,7 +367,7 @@ typedef struct jfs_log {
 				 *    the log between fs's
 				 */
 	kdev_t dev;		/* 4: log lv number */
-	struct file *devfp;	/* 4: log device file */
+	struct block_device *bdev; /* 4: log lv pointer */
 	s32 serial;		/* 4: log mount serial number */
 
 	s64 base;		/* @8: log extent address (inline log ) */

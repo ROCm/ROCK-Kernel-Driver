@@ -28,6 +28,7 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
+#include <asm/cacheflush.h>
 
 static int load_aout_binary(struct linux_binprm *, struct pt_regs * regs);
 static int load_aout_library(struct file*);
@@ -36,7 +37,11 @@ static int aout_core_dump(long signr, struct pt_regs * regs, struct file *file);
 extern void dump_thread(struct pt_regs *, struct user *);
 
 static struct linux_binfmt aout_format = {
-	NULL, THIS_MODULE, load_aout_binary, load_aout_library, aout_core_dump, PAGE_SIZE
+	module:		THIS_MODULE,
+	load_binary:	load_aout_binary,
+	load_shlib:	load_aout_library,
+	core_dump:	aout_core_dump,
+	min_coredump:	PAGE_SIZE
 };
 
 static void set_brk(unsigned long start, unsigned long end)

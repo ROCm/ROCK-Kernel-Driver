@@ -14,6 +14,7 @@
 #define _ASM_GENERIC__TLB_H
 
 #include <linux/config.h>
+#include <asm/tlbflush.h>
 
 #ifdef CONFIG_SMP
 /* aim for something that fits in the L1 cache */

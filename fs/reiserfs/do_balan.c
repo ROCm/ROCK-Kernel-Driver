@@ -1527,7 +1527,7 @@ static inline void do_balance_completed (struct tree_balance * tb)
     ** and then free them now
     */
 
-    tb->tb_sb->u.reiserfs_sb.s_do_balance ++;
+    REISERFS_SB(tb->tb_sb)->s_do_balance ++;
 
 
     /* release all nodes hold to perform the balancing */

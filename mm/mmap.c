@@ -17,6 +17,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
+#include <asm/tlbflush.h>
 
 /*
  * WARNING: the debugging will use recursive algorithms so never enable this

@@ -12,6 +12,10 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  *
+ * (04/03/2002) gkh
+ *	Added support for the Sony OS 4.1 devices.  Thanks to Hiroyuki ARAKI
+ *	<hiro@zob.ne.jp> for the information.
+ *
  * (03/27/2002) gkh
  *	Removed assumptions that port->tty was always valid (is not true
  *	for usb serial console devices.)
@@ -186,6 +190,7 @@ static __devinitdata struct usb_device_id combined_id_table [] = {
 	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_VISOR_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_0_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_S360_ID) },
+	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_1_ID) },
 	{ }					/* Terminating entry */
 };
 
@@ -205,6 +210,7 @@ static __devinitdata struct usb_device_id id_table [] = {
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_3_5_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_0_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_S360_ID) },
+	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_1_ID) },
 	{ }					/* Terminating entry */
 };
 
@@ -215,7 +221,7 @@ MODULE_DEVICE_TABLE (usb, id_table);
 /* All of the device info needed for the Handspring Visor, and Palm 4.0 devices */
 static struct usb_serial_device_type handspring_device = {
 	owner:			THIS_MODULE,
-	name:			"Handspring Visor / Palm 4.0 / Clié 4.0",
+	name:			"Handspring Visor / Palm 4.0 / Clié 4.x",
 	id_table:		combined_id_table,
 	num_interrupt_in:	0,
 	num_bulk_in:		2,
@@ -582,7 +588,8 @@ static int  visor_startup (struct usb_serial *serial)
 	}
 
 	if ((serial->dev->descriptor.idVendor == PALM_VENDOR_ID) ||
-	    (serial->dev->descriptor.idVendor == SONY_VENDOR_ID)) {
+	    ((serial->dev->descriptor.idVendor == SONY_VENDOR_ID) &&
+	     (serial->dev->descriptor.idProduct != SONY_CLIE_4_1_ID))) {
 		/* Palm OS 4.0 Hack */
 		response = usb_control_msg (serial->dev, usb_rcvctrlpipe(serial->dev, 0), 
 					    PALM_GET_SOME_UNKNOWN_INFORMATION,

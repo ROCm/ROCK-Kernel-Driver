@@ -218,7 +218,7 @@ fi
 comment 'Processor Type'
 
 # Firstly, figure out what processor architecture version we should be using.
-# This depends more on the machine type than anything else.
+# This defines the compiler instruction set which depends on the machine type.
 
 if [ "$CONFIG_ARCH_RPC"        = "y" -o "$CONFIG_ARCH_CLPS7500" = "y" ]; then
    define_bool CONFIG_CPU_32v3 y
@@ -235,10 +235,15 @@ if [ "$CONFIG_ARCH_EBSA110"    = "y" -o "$CONFIG_FOOTBRIDGE"    = "y" -o \
 else
    define_bool CONFIG_CPU_32v4 n
 fi
+if [ "$CONFIG_ARCH_IOP310" = "y" -o "$CONFIG_ARCH_ADIFCC" = "y" ]; then
+   define_bool CONFIG_CPU_32v5 y
+else
+   define_bool CONFIG_CPU_32v5 n
+fi
 
-# Select CPU types depending on the architecture selected.
-# We use this to select which CPUs are supported, and to select
-# the compiler tuning options.
+# Select CPU types depending on the architecture selected.  This selects
+# which CPUs we support in the kernel image, and the compiler instruction
+# optimiser behaviour.
 
 # ARM610
 if [ "$CONFIG_ARCH_RPC" = "y" ]; then
@@ -277,28 +282,12 @@ if [ "$CONFIG_ARCH_INTEGRATOR" = "y" ]; then
 else
    define_bool CONFIG_CPU_ARM920T n
 fi
-if [ "$CONFIG_CPU_ARM920T" = "y" ]; then
-   bool '  ARM920T CPU idle' CONFIG_CPU_ARM920_CPU_IDLE
-   bool '  ARM920T I-Cache on' CONFIG_CPU_ARM920_I_CACHE_ON
-   bool '  ARM920T D-Cache on' CONFIG_CPU_ARM920_D_CACHE_ON
-   if [ "$CONFIG_CPU_ARM920_D_CACHE_ON" = "y" ] ; then
-      bool '  Force write through caches on ARM920T' CONFIG_CPU_ARM920_WRITETHROUGH
-   fi
-fi
 
 # ARM922T
 if [ "$CONFIG_ARCH_CAMELOT" = "y" ]; then
          define_bool CONFIG_CPU_ARM922T y
 else
          define_bool CONFIG_CPU_ARM922T n
-fi
-if [ "$CONFIG_CPU_ARM922T" = "y" ]; then
-   bool '  ARM922T CPU idle' CONFIG_CPU_ARM922_CPU_IDLE
-   bool '  ARM922T I-Cache on' CONFIG_CPU_ARM922_I_CACHE_ON
-   bool '  ARM922T D-Cache on' CONFIG_CPU_ARM922_D_CACHE_ON
-   if [ "$CONFIG_CPU_ARM922_D_CACHE_ON" = "y" ] ; then
-      bool '  Force write through caches on ARM922T' CONFIG_CPU_ARM922_WRITETHROUGH
-   fi
 fi
 
 # ARM926T
@@ -307,35 +296,12 @@ if [ "$CONFIG_ARCH_INTEGRATOR" = "y" ]; then
 else
    define_bool CONFIG_CPU_ARM926T n
 fi
-if [ "$CONFIG_CPU_ARM926T" = "y" ]; then
-   bool '  ARM926T CPU idle' CONFIG_CPU_ARM926_CPU_IDLE
-   bool '  ARM926T I-Cache on' CONFIG_CPU_ARM926_I_CACHE_ON
-   bool '  ARM926T D-Cache on' CONFIG_CPU_ARM926_D_CACHE_ON
-   if [ "$CONFIG_CPU_ARM926_D_CACHE_ON" = "y" ] ; then
-      bool '  Force write through caches on ARM926T' CONFIG_CPU_ARM926_WRITETHROUGH
-   fi
-   if [ "$CONFIG_CPU_ARM926_I_CACHE_ON" = "y" -o \
-        "$CONFIG_CPU_ARM926_D_CACHE_ON" = "y" ]; then
-      bool '  Round robin I and D cache replacement algorithm' CONFIG_CPU_ARM926_ROUND_ROBIN
-   fi
-fi
 
 # ARM1020
 if [ "$CONFIG_ARCH_INTEGRATOR" = "y" ]; then
    bool 'Support ARM1020 processor' CONFIG_CPU_ARM1020
 else
     define_bool CONFIG_CPU_ARM1020 n
-fi
-if [ "$CONFIG_CPU_ARM1020" = "y" ]; then
-   bool '  ARM1020 I-Cache on' CONFIG_CPU_ARM1020_I_CACHE_ON
-   bool '  ARM10 D-Cache on' CONFIG_CPU_ARM1020_D_CACHE_ON
-   if [ "$CONFIG_CPU_ARM1020_D_CACHE_ON" = "y" ] ; then
-      bool '  Force write through caches on ARM1020' CONFIG_CPU_ARM1020_FORCE_WRITE_THROUGH
-   fi
-   if [ "$CONFIG_CPU_ARM1020_I_CACHE_ON" = "y" -o \
-        "$CONFIG_CPU_ARM1020_D_CACHE_ON" = "y" ]; then
-      bool '  Round robin I and D cache replacement algorithm' CONFIG_CPU_ARM1020_ROUND_ROBIN
-   fi
 fi
 
 # SA110
@@ -360,8 +326,9 @@ fi
 
 # XScale
 if [ "$CONFIG_ARCH_IOP310" = "y" -o "$CONFIG_ARCH_ADIFCC" = "y" ]; then
-   define_bool CONFIG_CPU_32v5 y
    define_bool CONFIG_CPU_XSCALE y
+else
+   define_bool CONFIG_CPU_XSCALE n
 fi
 
 #if [ "$CONFIG_CPU_XSCALE" = "y" ]; then
@@ -374,9 +341,34 @@ else
    define_bool CONFIG_XSCALE_PMU n
 fi
 
-if [ "$CONFIG_CPU_32" = "y" ]; then
+comment 'Processor Features'
+
+if [ "$CONFIG_CPU_ARM720T" = "y" -o "$CONFIG_CPU_ARM920T" = "y" -o \
+     "$CONFIG_CPU_ARM922T" = "y" -o "$CONFIG_CPU_ARM926T" = "y" -o \
+     "$CONFIG_CPU_ARM1020" = "y" -o "$CONFIG_CPU_XSCALE" = "y" ]; then
    dep_bool 'Support Thumb instructions (experimental)' CONFIG_ARM_THUMB $CONFIG_EXPERIMENTAL
 fi
+if [ "$CONFIG_CPU_ARM920T" = "y" -o "$CONFIG_CPU_ARM922T" = "y" -o \
+     "$CONFIG_CPU_ARM926T" = "y" -o "$CONFIG_CPU_ARM1020" = "y" ]; then
+   bool 'Disable I-Cache' CONFIG_CPU_ICACHE_DISABLE
+   bool 'Disable D-Cache' CONFIG_CPU_DCACHE_DISABLE
+   if [ "$CONFIG_CPU_DISABLE_DCACHE" = "n" ]; then
+      bool 'Force write through D-cache' CONFIG_CPU_DCACHE_WRITETHROUGH
+   fi
+fi
+if [ "$CONFIG_CPU_ARM926T" = "y" -o "$CONFIG_CPU_ARM1020" = "y" ]; then
+   if [ "$CONFIG_CPU_ICACHE_DISABLE" = "n" -o "$CONFIG_CPU_DCACHE_DISABLE" = "n" ]; then
+      bool 'Round robin I and D cache replacement algorithm' CONFIG_CPU_CACHE_ROUND_ROBIN
+   fi
+fi
+if [ "$CONFIG_CPU_ARM1020" = "y" ]; then
+   bool 'Disable branch prediction' CONFIG_CPU_BPREDICT_DISABLE
+fi
+
+endmenu
+
+mainmenu_option next_comment
+comment 'General setup'
 
 # Select various configuration options depending on the machine type
 if [ "$CONFIG_ARCH_EDB7211" = "y" -o \
@@ -385,11 +377,6 @@ if [ "$CONFIG_ARCH_EDB7211" = "y" -o \
 else
    define_bool CONFIG_DISCONTIGMEM n
 fi
-
-endmenu
-
-mainmenu_option next_comment
-comment 'General setup'
 
 # Now handle the bus types
 if [ "$CONFIG_ARCH_FTVPCI" = "y" -o \
@@ -693,7 +680,6 @@ dep_bool '  Verbose kernel error messages' CONFIG_DEBUG_ERRORS $CONFIG_DEBUG_KER
 dep_bool '  Kernel low-level debugging functions' CONFIG_DEBUG_LL $CONFIG_DEBUG_KERNEL
 dep_bool '    Kernel low-level debugging messages via footbridge serial port' CONFIG_DEBUG_DC21285_PORT $CONFIG_DEBUG_LL $CONFIG_FOOTBRIDGE
 dep_bool '    Kernel low-level debugging messages via UART2' CONFIG_DEBUG_CLPS711X_UART2 $CONFIG_DEBUG_LL $CONFIG_ARCH_CLPS711X
-dep_bool '    Kernel low-level debugging messages via SA1100 Ser3 (otherwise Ser1)' CONFIG_DEBUG_LL_SER3 $CONFIG_DEBUG_LL $CONFIG_ARCH_SA1100
 endmenu
 
 source lib/Config.in

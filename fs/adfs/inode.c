@@ -302,6 +302,8 @@ adfs_notify_change(struct dentry *dentry, struct iattr *attr)
 	struct super_block *sb = inode->i_sb;
 	unsigned int ia_valid = attr->ia_valid;
 	int error;
+	
+	lock_kernel();
 
 	error = inode_change_ok(inode, attr);
 
@@ -346,6 +348,7 @@ adfs_notify_change(struct dentry *dentry, struct iattr *attr)
 	if (ia_valid & (ATTR_SIZE | ATTR_MTIME | ATTR_MODE))
 		mark_inode_dirty(inode);
 out:
+	unlock_kernel();
 	return error;
 }
 

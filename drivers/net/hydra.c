@@ -121,7 +121,7 @@ int __init hydra_init(unsigned long board)
 	dev->dev_addr[j] = *((u8 *)(board + HYDRA_ADDRPROM + 2*j));
 
     /* We must set the 8390 for word mode. */
-    writeb(0x4b, ioaddr + NE_EN0_DCFG);
+    z_writeb(0x4b, ioaddr + NE_EN0_DCFG);
     start_page = NESM_START_PG;
     stop_page = NESM_STOP_PG;
 
@@ -196,10 +196,10 @@ static void hydra_get_8390_hdr(struct net_device *dev,
 			     ((ring_page - NESM_START_PG)<<8);
     ptrs = (short *)hdr;
 
-    *(ptrs++) = readw(hdr_start);
+    *(ptrs++) = z_readw(hdr_start);
     *((short *)hdr) = WORDSWAP(*((short *)hdr));
     hdr_start += 2;
-    *(ptrs++) = readw(hdr_start);
+    *(ptrs++) = z_readw(hdr_start);
     *((short *)hdr+1) = WORDSWAP(*((short *)hdr+1));
 }
 
@@ -216,11 +216,11 @@ static void hydra_block_input(struct net_device *dev, int count,
     if (xfer_start+count >  mem_base + (NESM_STOP_PG<<8)) {
 	int semi_count = (mem_base + (NESM_STOP_PG<<8)) - xfer_start;
 
-	memcpy_fromio(skb->data,xfer_start,semi_count);
+	z_memcpy_fromio(skb->data,xfer_start,semi_count);
 	count -= semi_count;
-	memcpy_fromio(skb->data+semi_count, mem_base, count);
+	z_memcpy_fromio(skb->data+semi_count, mem_base, count);
     } else
-	memcpy_fromio(skb->data, xfer_start,count);
+	z_memcpy_fromio(skb->data, xfer_start,count);
 
 }
 
@@ -233,7 +233,7 @@ static void hydra_block_output(struct net_device *dev, int count,
     if (count&1)
 	count++;
 
-    memcpy_toio(mem_base+((start_page - NESM_START_PG)<<8), buf, count);
+    z_memcpy_toio(mem_base+((start_page - NESM_START_PG)<<8), buf, count);
 }
 
 static void __exit hydra_cleanup(void)

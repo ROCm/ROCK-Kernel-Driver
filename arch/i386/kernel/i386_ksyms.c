@@ -28,6 +28,7 @@
 #include <asm/desc.h>
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
+#include <asm/tlbflush.h>
 
 extern void dump_thread(struct pt_regs *, struct user *);
 extern spinlock_t rtc_lock;

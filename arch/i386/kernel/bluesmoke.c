@@ -11,6 +11,7 @@
 #include <asm/msr.h>
 #include <asm/apic.h>
 #include <asm/pgtable.h>
+#include <asm/tlbflush.h>
 
 #ifdef CONFIG_X86_MCE
 

@@ -548,7 +548,7 @@ static inline void free_area(unsigned long addr, unsigned long end, char *s)
 	}
 
 	if (size && s)
-		printk("Freeing %s memory: %dK\n", s, size);
+		printk(KERN_INFO "Freeing %s memory: %dK\n", s, size);
 }
 
 /*

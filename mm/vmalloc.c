@@ -15,6 +15,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
+#include <asm/tlbflush.h>
 
 rwlock_t vmlist_lock = RW_LOCK_UNLOCKED;
 struct vm_struct * vmlist;

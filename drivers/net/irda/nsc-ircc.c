@@ -88,9 +88,13 @@ static int nsc_ircc_init_338(nsc_chip_t *chip, chipio_t *info);
 
 /* These are the known NSC chips */
 static nsc_chip_t chips[] = {
+/*  Name, {cfg registers}, chip id index reg, chip id expected value, revision mask */
 	{ "PC87108", { 0x150, 0x398, 0xea }, 0x05, 0x10, 0xf0, 
 	  nsc_ircc_probe_108, nsc_ircc_init_108 },
 	{ "PC87338", { 0x398, 0x15c, 0x2e }, 0x08, 0xb0, 0xf8, 
+	  nsc_ircc_probe_338, nsc_ircc_init_338 },
+	/* Contributed by Kevin Thayer - OmniBook 6100 */
+	{ "PC87338?", { 0x2e, 0x15c, 0x398 }, 0x08, 0x00, 0xf8, 
 	  nsc_ircc_probe_338, nsc_ircc_init_338 },
 	{ NULL }
 };
@@ -697,6 +701,9 @@ static int nsc_ircc_setup(chipio_t *info)
 	/* Read the Module ID */
 	switch_bank(iobase, BANK3);
 	version = inb(iobase+MID);
+
+	IRDA_DEBUG(2, __FUNCTION__  "() Driver %s Found chip version %02x\n",
+		   driver_name, version);
 
 	/* Should be 0x2? */
 	if (0x20 != (version & 0xf0)) {

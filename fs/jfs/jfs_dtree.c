@@ -1,6 +1,5 @@
 /*
- *
- *   Copyright (c) International Business Machines  Corp., 2000
+ *   Copyright (c) International Business Machines Corp., 2000-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -15,9 +14,7 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program;  if not, write to the Free Software 
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- *
- * 
-*/
+ */
 
 /*
  *	jfs_dtree.c: directory B+-tree manager
@@ -104,7 +101,6 @@
  */
 
 #include <linux/fs.h>
-#include <linux/slab.h>
 #include <linux/locks.h>
 #include "jfs_incore.h"
 #include "jfs_superblock.h"
@@ -3045,6 +3041,14 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 				t = (dtslot_t *) & p->slot[next];
 				name_ptr += outlen;
 				d_namleft -= len;
+				/* Sanity Check */
+				if (d_namleft == 0) {
+					jERROR(1,("JFS:Dtree error: "
+					  "ino = %ld, bn=%Ld, index = %d\n",
+						  ip->i_ino, bn, i));
+					updateSuper(ip->i_sb, FM_DIRTY);
+					goto skip_one;
+				}
 				len = min(d_namleft, DTSLOTDATALEN);
 				outlen = jfs_strfromUCS_le(name_ptr, t->name,
 							   len, codepage);
@@ -3056,6 +3060,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			if (filldir(dirent, d_name, d_namlen, filp->f_pos,
 				    le32_to_cpu(d->inumber), DT_UNKNOWN))
 				goto out;
+skip_one:
 			if (!do_index)
 				dtoffset->index++;
 		}
@@ -3352,9 +3357,8 @@ static int dtCompare(component_t * key,	/* search key */
 		     dtpage_t * p,	/* directory page */
 		     int si)
 {				/* entry slot index */
-	register int rc;
-	register wchar_t *kname, *name;
-	register int klen, namlen, len;
+	wchar_t *kname, *name;
+	int klen, namlen, len, rc;
 	idtentry_t *ih;
 	dtslot_t *t;
 
@@ -3429,9 +3433,8 @@ static int ciCompare(component_t * key,	/* search key */
 		     int si,	/* entry slot index */
 		     int flag)
 {
-	register int rc;
-	register wchar_t *kname, *name, x;
-	register int klen, namlen, len;
+	wchar_t *kname, *name, x;
+	int klen, namlen, len, rc;
 	ldtentry_t *lh;
 	idtentry_t *ih;
 	dtslot_t *t;
@@ -3535,8 +3538,8 @@ static int ciCompare(component_t * key,	/* search key */
 static void ciGetLeafPrefixKey(dtpage_t * lp, int li, dtpage_t * rp,
 			       int ri, component_t * key, int flag)
 {
-	register int klen, namlen;
-	register wchar_t *pl, *pr, *kname;
+	int klen, namlen;
+	wchar_t *pl, *pr, *kname;
 	wchar_t lname[JFS_NAME_MAX + 1];
 	component_t lkey = { 0, lname };
 	wchar_t rname[JFS_NAME_MAX + 1];

@@ -151,9 +151,11 @@ static void
 #ifdef DISCOVERY_EVENTS
 static void
 	irnet_discovery_indication(discovery_t *,
+				   DISCOVERY_MODE,
 				   void *);
 static void
 	irnet_expiry_indication(discovery_t *,
+				DISCOVERY_MODE,
 				void *);
 #endif
 /* -------------------------- PROC ENTRY -------------------------- */

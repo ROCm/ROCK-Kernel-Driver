@@ -169,7 +169,7 @@ int fs_may_remount_ro(struct super_block *sb)
 
 	/* Check that no files are currently opened for writing. */
 	file_list_lock();
-	for (p = sb->s_files.next; p != &sb->s_files; p = p->next) {
+	list_for_each(p, &sb->s_files) {
 		struct file *file = list_entry(p, struct file, f_list);
 		struct inode *inode = file->f_dentry->d_inode;
 

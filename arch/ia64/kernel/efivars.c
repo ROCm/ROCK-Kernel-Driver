@@ -29,6 +29,9 @@
  *
  * Changelog:
  *
+ *  25 Mar 2002 - Matt Domsch <Matt_Domsch@dell.com>
+ *   move uuid_unparse() to include/asm-ia64/efi.h:efi_guid_unparse()
+ *
  *  12 Feb 2002 - Matt Domsch <Matt_Domsch@dell.com>
  *   use list_for_each_safe when deleting vars.
  *   remove ifdef CONFIG_SMP around include <linux/smp.h>
@@ -70,7 +73,7 @@ MODULE_AUTHOR("Matt Domsch <Matt_Domsch@Dell.com>");
 MODULE_DESCRIPTION("/proc interface to EFI Variables");
 MODULE_LICENSE("GPL");
 
-#define EFIVARS_VERSION "0.04 2002-Feb-12"
+#define EFIVARS_VERSION "0.05 2002-Mar-26"
 
 static int
 efivar_read(char *page, char **start, off_t off,
@@ -141,20 +144,6 @@ proc_calc_metrics(char *page, char **start, off_t off,
 	return len;
 }
 
-
-static void
-uuid_unparse(efi_guid_t *guid, char *out)
-{
-	sprintf(out, "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-		guid->data1, guid->data2, guid->data3,
-		guid->data4[0], guid->data4[1], guid->data4[2], guid->data4[3],
-		guid->data4[4], guid->data4[5], guid->data4[6], guid->data4[7]);
-}
-
-
-
-
-
 /*
  * efivar_create_proc_entry()
  * Requires:
@@ -197,7 +186,7 @@ efivar_create_proc_entry(unsigned long variable_name_size,
 	   private variables from another's.         */
 
 	*(short_name + strlen(short_name)) = '-';
-	uuid_unparse(vendor_guid, short_name + strlen(short_name));
+	efi_guid_unparse(vendor_guid, short_name + strlen(short_name));
 
 
 	/* Create the entry in proc */

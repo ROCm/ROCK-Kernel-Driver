@@ -1460,7 +1460,7 @@ static void shmem_get_8390_hdr(struct net_device *dev,
 			       struct e8390_pkt_hdr *hdr,
 			       int ring_page)
 {
-    void *xfer_start = (void *)(dev->rmem_start + (ring_page << 8)
+    void *xfer_start = (void *)(ei_status.rmem_start + (ring_page << 8)
 				- (ei_status.rx_start_page << 8));
     
     copyin((void *)hdr, xfer_start, sizeof(struct e8390_pkt_hdr));
@@ -1473,17 +1473,17 @@ static void shmem_get_8390_hdr(struct net_device *dev,
 static void shmem_block_input(struct net_device *dev, int count,
 			      struct sk_buff *skb, int ring_offset)
 {
-    void *xfer_start = (void *)(dev->rmem_start + ring_offset
+    void *xfer_start = (void *)(ei_status.rmem_start + ring_offset
 				- (ei_status.rx_start_page << 8));
     char *buf = skb->data;
     
-    if (xfer_start + count > (void *)dev->rmem_end) {
+    if (xfer_start + count > (void *)ei_status.rmem_end) {
 	/* We must wrap the input move. */
-	int semi_count = (void*)dev->rmem_end - xfer_start;
+	int semi_count = (void*)ei_status.rmem_end - xfer_start;
 	copyin(buf, xfer_start, semi_count);
 	buf += semi_count;
 	ring_offset = ei_status.rx_start_page << 8;
-	xfer_start = (void *)dev->rmem_start;
+	xfer_start = (void *)ei_status.rmem_start;
 	count -= semi_count;
     }
     copyin(buf, xfer_start, count);
@@ -1548,8 +1548,8 @@ static int setup_shmem_window(dev_link_t *link, int start_pg,
     }
     
     dev->mem_start = (u_long)info->base + offset;
-    dev->rmem_start = dev->mem_start + (TX_PAGES<<8);
-    dev->mem_end = dev->rmem_end = (u_long)info->base + req.Size;
+    ei_status.rmem_start = dev->mem_start + (TX_PAGES<<8);
+    dev->mem_end = ei_status.rmem_end = (u_long)info->base + req.Size;
 
     ei_status.tx_start_page = start_pg;
     ei_status.rx_start_page = start_pg + TX_PAGES;

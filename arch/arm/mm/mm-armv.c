@@ -60,10 +60,6 @@ __setup("nowb", nowrite_setup);
 
 #define FIRST_KERNEL_PGD_NR	(FIRST_USER_PGD_NR + USER_PTRS_PER_PGD)
 
-#define clean_cache_area(start,size) \
-	cpu_cache_clean_invalidate_range((unsigned long)start, ((unsigned long)start) + size, 0);
-
-
 /*
  * need to get a 16k page for level 1
  */
@@ -114,10 +110,7 @@ pgd_t *get_pgd_slow(struct mm_struct *mm)
 	memcpy(new_pgd + FIRST_KERNEL_PGD_NR, init_pgd + FIRST_KERNEL_PGD_NR,
 		       (PTRS_PER_PGD - FIRST_KERNEL_PGD_NR) * sizeof(pgd_t));
 
-	/*
-	 * FIXME: this should not be necessary
-	 */
-	clean_cache_area(new_pgd, PTRS_PER_PGD * sizeof(pgd_t));
+	clean_dcache_area(new_pgd, PTRS_PER_PGD * sizeof(pgd_t));
 
 	return new_pgd;
 

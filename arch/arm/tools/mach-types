@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Sun Feb 24 17:43:42 2002
+# Last update: Sun Mar 24 11:48:10 2002
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -147,7 +147,7 @@ whitechapel		SA1100_WHITECHAPEL	WHITECHAPEL		135
 h3100			SA1100_H3100		H3100			136
 h3800			SA1100_H3800		H3800			137
 blue_v1			ARCH_BLUE_V1		BLUE_V1			138
-xscale_cerf		ARCH_XSCALE_CERF	XSCALE_CERF		139
+pxa_cerf		ARCH_PXA_CERF		PXA_CERF		139
 arm7tevb		ARCH_ARM7TEVB		ARM7TEVB		140
 d7400			ARCH_D7400		D7400			141
 piranha			ARCH_PIRANHA		PIRANHA			142
@@ -174,3 +174,8 @@ h7202			ARCH_H7202		H7202			162
 amico			ARCH_AMICO		AMICO			163
 iam			SA1100_IAM		IAM			164
 tt530			SA1100_TT530		TT530			165
+sam2400			ARCH_SAM2400		SAM2400			166
+jornada56x		ARCH_JORNADA56X		JORNADA56X		167
+active			SA1100_ACTIVE		ACTIVE			168
+iq80321			ARCH_IQ80321		IQ80321			169
+wid			SA1100_WID		WID			170

@@ -469,12 +469,15 @@ static void exit_notify(void)
 			write_lock_irq(&tasklist_lock);
 		}
 	}
+
 	/*
 	 * No need to unlock IRQs, we'll schedule() immediately
 	 * anyway. In the preemption case this also makes it
-	 * impossible for the task to get runnable again.
+	 * impossible for the task to get runnable again (thus
+	 * the "_raw_" unlock - to make sure we don't try to
+	 * preempt here).
 	 */
-	write_unlock(&tasklist_lock);
+	_raw_write_unlock(&tasklist_lock);
 }
 
 NORET_TYPE void do_exit(long code)

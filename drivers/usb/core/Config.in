@@ -1,0 +1,14 @@
+#
+# USB Core configuration
+#
+bool '  USB verbose debug messages' CONFIG_USB_DEBUG
+
+comment 'Miscellaneous USB options'
+bool '  USB device filesystem' CONFIG_USB_DEVICEFS
+if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+   bool '  Enforce USB bandwidth allocation (EXPERIMENTAL)' CONFIG_USB_BANDWIDTH
+else
+   define_bool CONFIG_USB_BANDWIDTH n
+fi
+bool '  Long timeout for slow-responding devices (some MGE Ellipse UPSes)' CONFIG_USB_LONG_TIMEOUT
+

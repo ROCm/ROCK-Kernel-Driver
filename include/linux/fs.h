@@ -651,7 +651,6 @@ struct quota_mount_options
 #include <linux/ufs_fs_sb.h>
 #include <linux/romfs_fs_sb.h>
 #include <linux/adfs_fs_sb.h>
-#include <linux/reiserfs_fs_sb.h>
 #include <linux/bfs_fs_sb.h>
 
 extern struct list_head super_blocks;
@@ -696,7 +695,6 @@ struct super_block {
 		struct ufs_sb_info	ufs_sb;
 		struct romfs_sb_info	romfs_sb;
 		struct adfs_sb_info	adfs_sb;
-		struct reiserfs_sb_info	reiserfs_sb;
 		struct bfs_sb_info	bfs_sb;
 		void			*generic_sbp;
 	} u;

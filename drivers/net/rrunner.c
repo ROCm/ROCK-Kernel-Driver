@@ -271,6 +271,7 @@ int __init rr_hippi_probe (struct net_device *dev)
 #if LINUX_VERSION_CODE > 0x20118
 MODULE_AUTHOR("Jes Sorensen <Jes.Sorensen@cern.ch>");
 MODULE_DESCRIPTION("Essential RoadRunner HIPPI driver");
+MODULE_LICENSE("GPL");
 #endif
 
 int init_module(void)

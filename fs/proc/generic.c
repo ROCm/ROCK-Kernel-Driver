@@ -404,7 +404,7 @@ static void proc_kill_inodes(struct proc_dir_entry *de)
 	 * Actually it's a partial revoke().
 	 */
 	file_list_lock();
-	for (p = sb->s_files.next; p != &sb->s_files; p = p->next) {
+	list_for_each(p, &sb->s_files) {
 		struct file * filp = list_entry(p, struct file, f_list);
 		struct dentry * dentry = filp->f_dentry;
 		struct inode * inode;

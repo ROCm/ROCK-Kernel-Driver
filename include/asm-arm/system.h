@@ -84,7 +84,6 @@ extern struct task_struct *__switch_to(struct thread_info *, struct thread_info 
 #define stf()			__stf()
 #define save_flags(x)		__save_flags(x)
 #define restore_flags(x)	__restore_flags(x)
-#define save_flags_cli(x)	__save_flags_cli(x)
 
 #endif /* CONFIG_SMP */
 

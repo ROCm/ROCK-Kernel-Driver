@@ -486,7 +486,7 @@ struct dentry *fat_fh_to_dentry(struct super_block *sb, __u32 *fh,
 	 * code.
 	 */
 	spin_lock(&dcache_lock);
-	for (lp = inode->i_dentry.next; lp != &inode->i_dentry ; lp=lp->next) {
+	list_for_each(lp, &inode->i_dentry) {
 		result = list_entry(lp,struct dentry, d_alias);
 		if (! (result->d_flags & DCACHE_NFSD_DISCONNECTED)) {
 			dget_locked(result);
@@ -1054,17 +1054,24 @@ int fat_notify_change(struct dentry * dentry, struct iattr * attr)
 {
 	struct super_block *sb = dentry->d_sb;
 	struct inode *inode = dentry->d_inode;
-	int error;
+	int error = 0;
+
+	lock_kernel();
 
 	/* FAT cannot truncate to a longer file */
 	if (attr->ia_valid & ATTR_SIZE) {
-		if (attr->ia_size > inode->i_size)
-			return -EPERM;
+		if (attr->ia_size > inode->i_size) {
+			error = -EPERM;
+			goto out;
+		}
 	}
 
 	error = inode_change_ok(inode, attr);
-	if (error)
-		return MSDOS_SB(sb)->options.quiet ? 0 : error;
+	if (error) {
+		if( MSDOS_SB(sb)->options.quiet )
+		    error = 0; 
+ 		goto out;
+	}
 
 	if (((attr->ia_valid & ATTR_UID) && 
 	     (attr->ia_uid != MSDOS_SB(sb)->options.fs_uid)) ||
@@ -1074,12 +1081,13 @@ int fat_notify_change(struct dentry * dentry, struct iattr * attr)
 	     (attr->ia_mode & ~MSDOS_VALID_MODE)))
 		error = -EPERM;
 
-	if (error)
-		return MSDOS_SB(sb)->options.quiet ? 0 : error;
-
-	error = inode_setattr(inode, attr);
-	if (error)
-		return error;
+	if (error) {
+		if( MSDOS_SB(sb)->options.quiet )  
+			error = 0;
+		goto out;
+	}
+	if( error = inode_setattr(inode, attr) )
+		goto out;
 
 	if (S_ISDIR(inode->i_mode))
 		inode->i_mode |= S_IXUGO;
@@ -1087,6 +1095,8 @@ int fat_notify_change(struct dentry * dentry, struct iattr * attr)
 	inode->i_mode = ((inode->i_mode & S_IFMT) | ((((inode->i_mode & S_IRWXU
 	    & ~MSDOS_SB(sb)->options.fs_umask) | S_IRUSR) >> 6)*S_IXUGO)) &
 	    ~MSDOS_SB(sb)->options.fs_umask;
-	return 0;
+out:
+	unlock_kernel();
+	return error;
 }
 MODULE_LICENSE("GPL");

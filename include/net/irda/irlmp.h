@@ -72,7 +72,7 @@ typedef enum {
 	S_END,
 } SERVICE;
 
-typedef void (*DISCOVERY_CALLBACK1) (discovery_t *, void *);
+typedef void (*DISCOVERY_CALLBACK1) (discovery_t *, DISCOVERY_MODE, void *);
 typedef void (*DISCOVERY_CALLBACK2) (hashbin_t *, void *);
 
 typedef struct {
@@ -214,7 +214,7 @@ void irlmp_disconnect_indication(struct lsap_cb *self, LM_REASON reason,
 				 struct sk_buff *userdata);
 int  irlmp_disconnect_request(struct lsap_cb *, struct sk_buff *userdata);
 
-void irlmp_discovery_confirm(hashbin_t *discovery_log);
+void irlmp_discovery_confirm(hashbin_t *discovery_log, DISCOVERY_MODE);
 void irlmp_discovery_request(int nslots);
 struct irda_device_info *irlmp_get_discoveries(int *pn, __u16 mask, int nslots);
 void irlmp_do_expiry(void);

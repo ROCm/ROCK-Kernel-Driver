@@ -12,6 +12,12 @@
  *  Note that we don't have to worry about the SA1111's DMA bugs in here,
  *  so we use the straight forward pci_map_* functions with a null pointer.
  *  IMHO we should really be using our own machine specific set.
+ *
+ *  This driver takes one kernel command line parameter, sa1100ir=, with
+ *  the following options:
+ *	max_rate:baudrate	- set the maximum baud rate
+ *	power_leve:level	- set the transmitter power level
+ *	tx_lpm:0|1		- set transmit low power mode
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -38,11 +44,6 @@
 
 #include <asm/arch/assabet.h>
 
-#ifndef CONFIG_SA1100_H3600
-#define clr_h3600_egpio(x)	do { } while (0)
-#define set_h3600_egpio(x)	do { } while (0)
-#endif
-
 #ifndef GPIO_IRDA_FIR
 #define GPIO_IRDA_FIR		(0)
 #endif
@@ -52,7 +53,8 @@
 #endif
 
 static int power_level = 3;
-static int tx_lpm = 0;
+static int tx_lpm;
+static int max_rate = 4000000;
 
 /*
  * Our netdevice.  There is only ever one of these.
@@ -72,8 +74,8 @@ struct sa1100_irda {
 	struct sk_buff		*rxskb;
 	dma_addr_t		txbuf_dma;
 	dma_addr_t		rxbuf_dma;
-	int			txdma;
-	int			rxdma;
+	dma_regs_t		*txdma;
+	dma_regs_t		*rxdma;
 
 	struct net_device_stats	stats;
 	struct irlap_cb		*irlap;
@@ -134,8 +136,8 @@ static void sa1100_irda_rx_dma_start(struct sa1100_irda *si)
 	/*
 	 * Enable the DMA, receiver and receive interrupt.
 	 */
-	sa1100_dma_flush_all(si->rxdma);
-	sa1100_dma_queue_buffer(si->rxdma, NULL, si->rxbuf_dma, HPSIR_MAX_RXLEN);
+	sa1100_clear_dma(si->rxdma);
+	sa1100_start_dma(si->rxdma, si->rxbuf_dma, HPSIR_MAX_RXLEN);
 	Ser2HSCR0 = si->hscr0 | HSCR0_HSSP | HSCR0_RXE;
 }
 
@@ -156,7 +158,7 @@ static int sa1100_irda_set_speed(struct sa1100_irda *si, int speed)
 		 * Stop the receive DMA.
 		 */
 		if (IS_FIR(si))
-			sa1100_dma_stop(si->rxdma);
+			sa1100_stop_dma(si->rxdma);
 
 		local_irq_save(flags);
 
@@ -174,8 +176,8 @@ static int sa1100_irda_set_speed(struct sa1100_irda *si, int speed)
 
 		if (machine_is_assabet())
 			ASSABET_BCR_clear(ASSABET_BCR_IRDA_FSEL);
-		if (machine_is_h3600())
-			clr_h3600_egpio(EGPIO_H3600_IR_FSEL);
+		if (machine_is_h3xxx())
+			clr_h3600_egpio(IPAQ_EGPIO_IR_FSEL);
 		if (machine_is_yopy())
 			PPSR &= ~GPIO_IRDA_FIR;
 
@@ -199,8 +201,8 @@ static int sa1100_irda_set_speed(struct sa1100_irda *si, int speed)
 
 		if (machine_is_assabet())
 			ASSABET_BCR_set(ASSABET_BCR_IRDA_FSEL);
-		if (machine_is_h3600())
-			set_h3600_egpio(EGPIO_H3600_IR_FSEL);
+		if (machine_is_h3xxx())
+			set_h3600_egpio(IPAQ_EGPIO_IR_FSEL);
 		if (machine_is_yopy())
 			PPSR |= GPIO_IRDA_FIR;
 
@@ -246,10 +248,7 @@ sa1100_irda_set_power_assabet(struct sa1100_irda *si, unsigned int state)
 static inline int
 sa1100_irda_set_power_h3600(struct sa1100_irda *si, unsigned int state)
 {
-	if (state)
-		set_h3600_egpio(EGPIO_H3600_IR_ON);
-	else
-		clr_h3600_egpio(EGPIO_H3600_IR_ON);
+	assign_h3600_egpio( IPAQ_EGPIO_IR_ON, state );
 	return 0;
 }
 
@@ -283,7 +282,7 @@ __sa1100_irda_set_power(struct sa1100_irda *si, unsigned int state)
 
 	if (machine_is_assabet())
 		ret = sa1100_irda_set_power_assabet(si, state);
-	if (machine_is_h3600())
+	if (machine_is_h3xxx())
 		ret = sa1100_irda_set_power_h3600(si, state);
 	if (machine_is_yopy())
 		ret = sa1100_irda_set_power_yopy(si, state);
@@ -350,8 +349,8 @@ static void sa1100_irda_shutdown(struct sa1100_irda *si)
 	/*
 	 * Stop all DMA activity.
 	 */
-	sa1100_dma_stop(si->rxdma);
-	sa1100_dma_stop(si->txdma);
+	sa1100_stop_dma(si->rxdma);
+	sa1100_stop_dma(si->txdma);
 
 	/* Disable the port. */
 	Ser2UTCR3 = 0;
@@ -552,8 +551,10 @@ static void sa1100_irda_fir_error(struct sa1100_irda *si, struct net_device *dev
 	/*
 	 * Get the current data position.
 	 */
-	sa1100_dma_get_current(si->rxdma, NULL, &dma_addr);
+	dma_addr = sa1100_get_dma_pos(si->rxdma);
 	len = dma_addr - si->rxbuf_dma;
+	if (len > HPSIR_MAX_RXLEN)
+		len = HPSIR_MAX_RXLEN;
 	pci_unmap_single(NULL, si->rxbuf_dma, len, PCI_DMA_FROMDEVICE);
 
 	do {
@@ -621,7 +622,7 @@ static void sa1100_irda_fir_irq(struct net_device *dev)
 	/*
 	 * Stop RX DMA
 	 */
-	sa1100_dma_stop(si->rxdma);
+	sa1100_stop_dma(si->rxdma);
 
 	/*
 	 * Framing error - we throw away the packet completely.
@@ -673,7 +674,7 @@ static void sa1100_irda_irq(int irq, void *dev_id, struct pt_regs *regs)
 /*
  * TX DMA completion handler.
  */
-static void sa1100_irda_txdma_irq(void *id, int len)
+static void sa1100_irda_txdma_irq(void *id)
 {
 	struct net_device *dev = id;
 	struct sa1100_irda *si = dev->priv;
@@ -715,9 +716,9 @@ static void sa1100_irda_txdma_irq(void *id, int len)
 	 * Account and free the packet.
 	 */
 	if (skb) {
-		pci_unmap_single(NULL, si->txbuf_dma, len, PCI_DMA_TODEVICE);
+		pci_unmap_single(NULL, si->txbuf_dma, skb->len, PCI_DMA_TODEVICE);
 		si->stats.tx_packets ++;
-		si->stats.tx_bytes += len;
+		si->stats.tx_bytes += skb->len;
 		dev_kfree_skb_irq(skb);
 	}
 
@@ -728,11 +729,6 @@ static void sa1100_irda_txdma_irq(void *id, int len)
 	netif_wake_queue(dev);
 }
 
-/*
- * Note that we will never build up a backlog of frames; the protocol is a
- * half duplex protocol which basically means we transmit a frame, we
- * receive a frame, we transmit the next frame etc.
- */
 static int sa1100_irda_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct sa1100_irda *si = dev->priv;
@@ -759,6 +755,8 @@ static int sa1100_irda_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	if (!IS_FIR(si)) {
+		netif_stop_queue(dev);
+
 		si->tx_buff.data = si->tx_buff.head;
 		si->tx_buff.len  = async_wrap_skb(skb, si->tx_buff.data,
 						  si->tx_buff.truesize);
@@ -787,8 +785,7 @@ static int sa1100_irda_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 		si->txbuf_dma = pci_map_single(NULL, skb->data,
 					 skb->len, PCI_DMA_TODEVICE);
 
-		sa1100_dma_queue_buffer(si->txdma, dev, si->txbuf_dma,
-					skb->len);
+		sa1100_start_dma(si->txdma, si->txbuf_dma, skb->len);
 
 		/*
 		 * If we have a mean turn-around time, impose the specified
@@ -869,11 +866,13 @@ static int sa1100_irda_start(struct net_device *dev)
 	if (err)
 		goto err_irq;
 
-	err = sa1100_request_dma(&si->rxdma, "IrDA receive", DMA_Ser2HSSPRd);
+	err = sa1100_request_dma(DMA_Ser2HSSPRd, "IrDA receive",
+				 NULL, NULL, &si->rxdma);
 	if (err)
 		goto err_rx_dma;
 
-	err = sa1100_request_dma(&si->txdma, "IrDA transmit", DMA_Ser2HSSPWr);
+	err = sa1100_request_dma(DMA_Ser2HSSPWr, "IrDA transmit",
+				 sa1100_irda_txdma_irq, dev, &si->txdma);
 	if (err)
 		goto err_tx_dma;
 
@@ -896,8 +895,6 @@ static int sa1100_irda_start(struct net_device *dev)
 	err = -ENOMEM;
 	if (!si->irlap)
 		goto err_irlap;
-
-	sa1100_dma_set_callback(si->txdma, sa1100_irda_txdma_irq);
 
 	/*
 	 * Now enable the interrupt and start the queue
@@ -1011,8 +1008,16 @@ static int sa1100_irda_net_init(struct net_device *dev)
 	 * We support original IRDA up to 115k2. (we don't currently
 	 * support 4Mbps).  Min Turn Time set to 1ms or greater.
 	 */
-	baudrate_mask = IR_9600|IR_19200|IR_38400|IR_57600|IR_115200;
-	baudrate_mask |= IR_4000000 << 8;
+	baudrate_mask = IR_9600;
+
+	switch (max_rate) {
+	case 4000000:		baudrate_mask |= IR_4000000 << 8;
+	case 115200:		baudrate_mask |= IR_115200;
+	case 57600:		baudrate_mask |= IR_57600;
+	case 38400:		baudrate_mask |= IR_38400;
+	case 19200:		baudrate_mask |= IR_19200;
+	}
+		
 	si->qos.baud_rate.bits &= baudrate_mask;
 	si->qos.min_turn_time.bits = 7;
 
@@ -1149,6 +1154,33 @@ static void __exit sa1100_irda_exit(void)
 	 */
 }
 
+static int __init sa1100ir_setup(char *line)
+{
+	char *opt;
+
+	if (!line)
+		return 0;
+
+	while ((opt = strsep(&line, ",")) != NULL) {
+		if (!strncmp(opt, "max_rate:", 9)) {
+			max_rate = simple_strtoul(opt + 9, NULL, 0);
+			continue;
+		}
+		if (!strncmp(opt, "power_level:", 12)) {
+			power_level = simple_strtoul(opt + 12, NULL, 0);
+			continue;
+		}
+		if (!strncmp(opt, "tx_lpm:", 7)) {
+			tx_lpm = simple_strtoul(opt + 7, NULL, 0);
+			continue;
+		}
+	}
+
+	return 1;
+}
+
+__setup("sa1100ir=", sa1100ir_setup);
+
 #ifdef MODULE
 module_init(sa1100_irda_init);
 module_exit(sa1100_irda_exit);
@@ -1161,4 +1193,6 @@ MODULE_PARM(power_level, "i");
 MODULE_PARM_DESC(power_level, "IrDA power level, 1 (low) to 3 (high)");
 MODULE_PARM(tx_lpm, "i");
 MODULE_PARM_DESC(tx_lpm, "Enable transmitter low power (1.6us) mode");
+MODULE_PARM(max_rate, "i");
+MODULE_PARM_DESC(max_rate, "Maximum baud rate (4000000, 115200, 57600, 38400, 19200, 9600)");
 EXPORT_NO_SYMBOLS;

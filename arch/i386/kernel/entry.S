@@ -238,12 +238,11 @@ ENTRY(resume_kernel)
 	movl SYMBOL_NAME(irq_stat)+local_bh_count CPU_IDX, %ecx
 	addl SYMBOL_NAME(irq_stat)+local_irq_count CPU_IDX, %ecx
 	jnz restore_all
-	incl TI_PRE_COUNT(%ebx)
+	movl $PREEMPT_ACTIVE,TI_PRE_COUNT(%ebx)
 	sti
-	movl TI_TASK(%ebx), %ecx		# ti->task
-	movl $0,(%ecx)			# current->state = TASK_RUNNING
 	call SYMBOL_NAME(schedule)
-	jmp ret_from_intr
+	movl $0,TI_PRE_COUNT(%ebx) 
+	jmp restore_all
 #endif
 
 	# system call handler stub

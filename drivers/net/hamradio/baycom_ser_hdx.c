@@ -649,6 +649,7 @@ MODULE_PARM_DESC(irq, "baycom irq number");
 
 MODULE_AUTHOR("Thomas M. Sailer, sailer@ife.ee.ethz.ch, hb9jnx@hb9w.che.eu");
 MODULE_DESCRIPTION("Baycom ser12 half duplex amateur radio modem driver");
+MODULE_LICENSE("GPL");
 
 /* --------------------------------------------------------------------- */
 

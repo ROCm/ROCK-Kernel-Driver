@@ -57,10 +57,26 @@ int sysctl_max_noreply_time = 12;
  * Nonzero values (usec) are used as lower limit to the per-connection
  * mtt value which was announced by the other end during negotiation.
  * Might be helpful if the peer device provides too short mtt.
- * Default is 10 which means using the unmodified value given by the peer
- * except if it's 0 (0 is likely a bug in the other stack).
+ * Default is 10us which means using the unmodified value given by the
+ * peer except if it's 0 (0 is likely a bug in the other stack).
  */
 unsigned sysctl_min_tx_turn_time = 10;
+/*
+ * Maximum data size to be used in transmission in payload of LAP frame.
+ * There is a bit of confusion in the IrDA spec :
+ * The LAP spec defines the payload of a LAP frame (I field) to be
+ * 2048 bytes max (IrLAP 1.1, chapt 6.6.5, p40).
+ * On the other hand, the PHY mention frames of 2048 bytes max (IrPHY
+ * 1.2, chapt 5.3.2.1, p41). But, this number includes the LAP header
+ * (2 bytes), and CRC (32 bits at 4 Mb/s). So, for the I field (LAP
+ * payload), that's only 2042 bytes. Oups !
+ * I've had trouble trouble transmitting 2048 bytes frames with USB
+ * dongles and nsc-ircc at 4 Mb/s, so adjust to 2042... I don't know
+ * if this bug applies only for 2048 bytes frames or all negociated
+ * frame sizes, but all hardware seem to support "2048 bytes" frames.
+ * You can use the sysctl to play with this value anyway.
+ * Jean II */
+unsigned sysctl_max_tx_data_size = 2042;
 
 static int irlap_param_baud_rate(void *instance, irda_param_t *param, int get);
 static int irlap_param_link_disconnect(void *instance, irda_param_t *parm, 
@@ -355,10 +371,10 @@ void irlap_adjust_qos_settings(struct qos_info *qos)
 	while ((qos->data_size.value > line_capacity) && (index > 0)) {
 		qos->data_size.value = data_sizes[index--];
 		IRDA_DEBUG(2, __FUNCTION__ 
-			   "(), redusing data size to %d\n",
+			   "(), reducing data size to %d\n",
 			   qos->data_size.value);
 	}
-#else /* Use method descibed in section 6.6.11 of IrLAP */
+#else /* Use method described in section 6.6.11 of IrLAP */
 	while (irlap_requested_line_capacity(qos) > line_capacity) {
 		ASSERT(index != 0, return;);
 
@@ -366,18 +382,24 @@ void irlap_adjust_qos_settings(struct qos_info *qos)
 		if (qos->window_size.value > 1) {
 			qos->window_size.value--;
 			IRDA_DEBUG(2, __FUNCTION__ 
-				   "(), redusing window size to %d\n",
+				   "(), reducing window size to %d\n",
 				   qos->window_size.value);
 		} else if (index > 1) {
 			qos->data_size.value = data_sizes[index--];
 			IRDA_DEBUG(2, __FUNCTION__ 
-				   "(), redusing data size to %d\n",
+				   "(), reducing data size to %d\n",
 				   qos->data_size.value);
 		} else {
 			WARNING(__FUNCTION__ "(), nothing more we can do!\n");
 		}
 	}
 #endif /* CONFIG_IRDA_DYNAMIC_WINDOW */
+	/*
+	 * Fix tx data size according to user limits - Jean II
+	 */
+	if (qos->data_size.value > sysctl_max_tx_data_size)
+		/* Allow non discrete adjustement to avoid loosing capacity */
+		qos->data_size.value = sysctl_max_tx_data_size;
 }
 
 /*
