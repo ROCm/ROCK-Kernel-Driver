@@ -380,9 +380,7 @@ sa1100_pcmcia_register_callback(unsigned int sock,
 
   if (handler == NULL) {
     skt->handler = NULL;
-    MOD_DEC_USE_COUNT;
   } else {
-    MOD_INC_USE_COUNT;
     skt->handler_info = info;
     skt->handler = handler;
   }
@@ -854,6 +852,7 @@ sa1100_pcmcia_proc_setup(unsigned int sock, struct proc_dir_entry *base)
 #endif  /* defined(CONFIG_PROC_FS) */
 
 static struct pccard_operations sa1100_pcmcia_operations = {
+  .owner		= THIS_MODULE,
   .init			= sa1100_pcmcia_sock_init,
   .suspend		= sa1100_pcmcia_suspend,
   .register_callback	= sa1100_pcmcia_register_callback,

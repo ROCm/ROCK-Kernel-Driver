@@ -423,8 +423,12 @@ int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
  * so the performance issues may eventually be a valid point.
  * More important, however, is the fact that this allows us much
  * more flexibility.
+ *
+ * The return value (in %eax) will be the "prev" task after
+ * the task-switch, and shows up in ret_from_fork in entry.S,
+ * for example.
  */
-void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
+struct task_struct * __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
 	struct thread_struct *prev = &prev_p->thread,
 				 *next = &next_p->thread;
@@ -495,6 +499,7 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 			 */
 			tss->bitmap = INVALID_IO_BITMAP_OFFSET;
 	}
+	return prev_p;
 }
 
 asmlinkage int sys_fork(struct pt_regs regs)

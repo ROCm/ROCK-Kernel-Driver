@@ -966,16 +966,6 @@ static int ohci_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 		dma_trm_reset(&ohci->at_resp_context);
 		break;
 
-	case MODIFY_USAGE:
-		if (arg) {
-			if (try_module_get(THIS_MODULE))
-				retval = 1;
-		} else {
-			module_put(THIS_MODULE);
-			retval = 1;
-		}
-                break;
-
 	case ISO_LISTEN_CHANNEL:
         {
 		u64 mask;
@@ -3202,6 +3192,7 @@ static quadlet_t ohci_hw_csr_reg(struct hpsb_host *host, int reg,
 }
 
 static struct hpsb_host_driver ohci1394_driver = {
+	.owner =		THIS_MODULE,
 	.name =			OHCI1394_DRIVER_NAME,
 	.get_rom =		ohci_get_rom,
 	.transmit_packet =	ohci_transmit,

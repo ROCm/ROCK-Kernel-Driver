@@ -11,6 +11,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/list.h>
 #include <linux/init.h>
@@ -69,8 +70,10 @@ int hpsb_ref_host(struct hpsb_host *host)
         spin_lock_irqsave(&hosts_lock, flags);
         list_for_each(lh, &hosts) {
                 if (host == list_entry(lh, struct hpsb_host, host_list)) {
-			if (host->driver->devctl(host, MODIFY_USAGE, 1)) {
-				host->driver->devctl(host, MODIFY_USAGE, 1);
+			if (try_module_get(host->driver->owner)) {
+				/* we're doing this twice and don't seem
+				   to undo it..  --hch */
+				(void)try_module_get(host->driver->owner);
 				host->refcount++;
 				retval = 1;
 			}
@@ -95,7 +98,7 @@ void hpsb_unref_host(struct hpsb_host *host)
 {
         unsigned long flags;
 
-        host->driver->devctl(host, MODIFY_USAGE, 0);
+	module_put(host->driver->owner);
 
         spin_lock_irqsave(&hosts_lock, flags);
         host->refcount--;

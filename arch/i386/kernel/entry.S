@@ -173,9 +173,10 @@ ENTRY(lcall27)
 
 
 ENTRY(ret_from_fork)
-	# NOTE: this function takes a parameter but it's unused on x86.
+	pushl %eax
 	call schedule_tail
 	GET_THREAD_INFO(%ebp)
+	popl %eax
 	jmp syscall_exit
 
 /*
