@@ -1080,7 +1080,9 @@ static char *vmstat_text[] = {
 	"pgfault",
 	"pgmajfault",
 	"pgscan",
+	"pgrefill",
 	"pgsteal",
+	"kswapd_steal",
 	"pageoutrun",
 	"allocstall",
 };

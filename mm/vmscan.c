@@ -313,6 +313,8 @@ keep:
 	if (pagevec_count(&freed_pvec))
 		__pagevec_release_nonlru(&freed_pvec);
 	mod_page_state(pgsteal, nr_pages_in - nr_pages);
+	if (current->flags & PF_KSWAPD)
+		mod_page_state(kswapd_steal, nr_pages_in - nr_pages);
 	mod_page_state(pgactivate, pgactivate);
 	return nr_pages;
 }
@@ -527,7 +529,7 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in)
 	spin_unlock_irq(&zone->lru_lock);
 	pagevec_release(&pvec);
 
-	mod_page_state(pgscan, nr_pages_in - nr_pages);
+	mod_page_state(pgrefill, nr_pages_in - nr_pages);
 	mod_page_state(pgdeactivate, pgdeactivate);
 }
 
@@ -757,7 +759,7 @@ int kswapd(void *p)
 	 * us from recursively trying to free more memory as we're
 	 * trying to free the first piece of memory in the first place).
 	 */
-	tsk->flags |= PF_MEMALLOC;
+	tsk->flags |= PF_MEMALLOC|PF_KSWAPD;
 
 	/*
 	 * Kswapd main loop.

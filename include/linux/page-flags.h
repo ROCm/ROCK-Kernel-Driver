@@ -98,7 +98,9 @@ extern struct page_state {
 	unsigned long pgfault;
 	unsigned long pgmajfault;
 	unsigned long pgscan;
+	unsigned long pgrefill;
 	unsigned long pgsteal;
+	unsigned long kswapd_steal;
 	unsigned long pageoutrun;
 	unsigned long allocstall;
 } ____cacheline_aligned_in_smp page_states[NR_CPUS];
