@@ -22,7 +22,7 @@
 #define DEBUG
 
 #include <linux/device.h>
-
+#include "power.h"
 
 LIST_HEAD(dpm_active);
 LIST_HEAD(dpm_suspended);
@@ -39,6 +39,46 @@ static struct attribute_group pm_attr_group = {
 	.attrs	= power_attrs,
 };
 
+
+/*
+ * PM Reference Counting.
+ */
+
+static inline void device_pm_hold(struct device * dev)
+{
+	atomic_inc(&dev->power.pm_users);
+}
+
+static inline void device_pm_release(struct device * dev)
+{
+	atomic_inc(&dev->power.pm_users);
+}
+
+
+/**
+ *	device_pm_set_parent - Specify power dependency.
+ *	@dev:		Device who needs power.
+ *	@parent:	Device that supplies power.
+ *
+ *	This function is used to manually describe a power-dependency
+ *	relationship. It may be used to specify a transversal relationship
+ *	(where the power supplier is not the physical (or electrical)
+ *	ancestor of a specific device.
+ *	The effect of this is that the supplier will not be powered down
+ *	before the power dependent.
+ */
+
+void device_pm_set_parent(struct device * dev, struct device * parent)
+{
+	struct device * old_parent = dev->power.pm_parent;
+	if (old_parent)
+		device_pm_release(old_parent);
+	dev->power.pm_parent = parent;
+	if (parent)
+		device_pm_hold(parent);
+}
+EXPORT_SYMBOL(device_pm_set_parent);
+
 int device_pm_add(struct device * dev)
 {
 	int error;
@@ -47,6 +87,7 @@ int device_pm_add(struct device * dev)
 		 dev->bus ? dev->bus->name : "No Bus", dev->kobj.name);
 	down(&dpm_sem);
 	list_add_tail(&dev->power.entry,&dpm_active);
+	device_pm_set_parent(dev,dev->parent);
 	error = sysfs_create_group(&dev->kobj,&pm_attr_group);
 	up(&dpm_sem);
 	return error;
@@ -61,3 +102,5 @@ void device_pm_remove(struct device * dev)
 	list_del(&dev->power.entry);
 	up(&dpm_sem);
 }
+
+

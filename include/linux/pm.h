@@ -25,6 +25,7 @@
 
 #include <linux/config.h>
 #include <linux/list.h>
+#include <asm/atomic.h>
 
 /*
  * Power management requests
@@ -188,14 +189,19 @@ static inline void pm_dev_idle(struct pm_dev *dev) {}
 extern void (*pm_idle)(void);
 extern void (*pm_power_off)(void);
 
+struct device;
 
 struct dev_pm_info {
 #ifdef	CONFIG_PM
 	u32			power_state;
 	u8			* saved_state;
+	atomic_t		pm_users;
+	struct device		* pm_parent;
 	struct list_head	entry;
 #endif
 };
+
+extern void device_pm_set_parent(struct device * dev, struct device * parent);
 
 extern int device_pm_suspend(u32 state);
 extern int device_pm_power_down(u32 state);
