@@ -2,15 +2,17 @@
 # always needed
 # ---------------------------------------------------------------------------
 
+all: fixdep split-include docproc __chmod
+
 # The following temporary rule will make sure that people's
 # trees get updated to the right permissions, since patch(1)
 # can't do it
-CHMOD_FILES := kernel-doc mkcompile_h makelst
+# ---------------------------------------------------------------------------
 
-all: fixdep split-include docproc $(CHMOD_FILES)
+.PHONY: __chmod
 
-$(CHMOD_FILES): FORCE
-	@chmod a+x $@
+__chmod: kernel-doc mkcompile_h makelst
+	@chmod a+x $^
 
 # xconfig
 # ---------------------------------------------------------------------------
