@@ -139,8 +139,8 @@ config CPU_FREQ
 	bool "CPU Frequency scaling"
 	help
 	  Clock scaling allows you to change the clock speed of CPUs on the
-	  fly.  Currently there is only a sparc64 driver for UltraSPARC-III
-	  processors.
+	  fly.  Currently there are only sparc64 drivers for UltraSPARC-III
+	  and UltraSPARC-IIe processors.
 
 	  For details, take a look at linux/Documentation/cpufreq. 
 
@@ -161,6 +161,16 @@ config US3_FREQ
 	depends on CPU_FREQ_TABLE
 	help
 	  This adds the CPUFreq driver for UltraSPARC-III processors.
+
+	  For details, take a look at linux/Documentation/cpufreq. 
+
+	  If in doubt, say N.
+
+config US2E_FREQ
+	tristate "UltraSPARC-IIe CPU Frequency driver"
+	depends on CPU_FREQ_TABLE
+	help
+	  This adds the CPUFreq driver for UltraSPARC-IIe processors.
 
 	  For details, take a look at linux/Documentation/cpufreq. 
 
