@@ -49,14 +49,20 @@
 #include <asm/hardirq.h>
 #include <asm/cputable.h>
 #include <asm/sections.h>
+#include <asm/tlbflush.h>
 
 #ifndef CONFIG_SMP
 struct task_struct *last_task_used_math = NULL;
 struct task_struct *last_task_used_altivec = NULL;
 #endif
 
-struct mm_struct ioremap_mm = { pgd             : ioremap_dir  
-                               ,page_table_lock : SPIN_LOCK_UNLOCKED };
+struct mm_struct ioremap_mm = {
+	.pgd		= ioremap_dir,
+	.mm_users	= ATOMIC_INIT(2),
+	.mm_count	= ATOMIC_INIT(1),
+	.cpu_vm_mask	= CPU_MASK_ALL,
+	.page_table_lock = SPIN_LOCK_UNLOCKED,
+};
 
 char *sysmap = NULL;
 unsigned long sysmap_size = 0;
@@ -145,6 +151,8 @@ struct task_struct *__switch_to(struct task_struct *prev,
 	if (new->thread.regs && last_task_used_altivec == new)
 		new->thread.regs->msr |= MSR_VEC;
 #endif /* CONFIG_ALTIVEC */
+
+	flush_tlb_pending();
 
 	new_thread = &new->thread;
 	old_thread = &current->thread;

@@ -32,9 +32,13 @@ static void make_slbe(unsigned long esid, unsigned long vsid, int large,
 void stab_initialize(unsigned long stab)
 {
 	unsigned long esid, vsid; 
+	int seg0_largepages = 0;
 
 	esid = GET_ESID(KERNELBASE);
 	vsid = get_kernel_vsid(esid << SID_SHIFT); 
+
+	if (cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE)
+		seg0_largepages = 1;
 
 	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB) {
 		/* Invalidate the entire SLB & all the ERATS */
@@ -44,7 +48,7 @@ void stab_initialize(unsigned long stab)
 		asm volatile("isync":::"memory");
 		asm volatile("slbmte  %0,%0"::"r" (0) : "memory");
 		asm volatile("isync; slbia; isync":::"memory");
-		make_slbe(esid, vsid, 0, 1);
+		make_slbe(esid, vsid, seg0_largepages, 1);
 		asm volatile("isync":::"memory");
 #endif
 	} else {
@@ -73,6 +77,8 @@ static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 	unsigned long entry, group, old_esid, castout_entry, i;
 	unsigned int global_entry;
 	STE *ste, *castout_ste;
+	unsigned long kernel_segment = (REGION_ID(esid << SID_SHIFT) != 
+					USER_REGION_ID);
 
 	/* Search the primary group first. */
 	global_entry = (esid & 0x1f) << 3;
@@ -85,6 +91,8 @@ static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 				ste->dw1.dw1.vsid = vsid;
 				ste->dw0.dw0.esid = esid;
 				ste->dw0.dw0.kp = 1;
+				if (!kernel_segment)
+					ste->dw0.dw0.ks = 1;
 				asm volatile("eieio":::"memory");
 				ste->dw0.dw0.v = 1;
 				return (global_entry | entry);
@@ -131,6 +139,8 @@ static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 	old_esid = castout_ste->dw0.dw0.esid;
 	castout_ste->dw0.dw0.esid = esid;
 	castout_ste->dw0.dw0.kp = 1;
+	if (!kernel_segment)
+		castout_ste->dw0.dw0.ks = 1;
 	asm volatile("eieio" : : : "memory");   /* Order update */
 	castout_ste->dw0.dw0.v  = 1;
 	asm volatile("slbie  %0" : : "r" (old_esid << SID_SHIFT)); 
@@ -340,6 +350,8 @@ static void make_slbe(unsigned long esid, unsigned long vsid, int large,
 		vsid_data.data.l = 1;
 	if (kernel_segment)
 		vsid_data.data.c = 1;
+	else
+		vsid_data.data.ks = 1;
 
 	esid_data.word0 = 0;
 	esid_data.data.esid = esid;

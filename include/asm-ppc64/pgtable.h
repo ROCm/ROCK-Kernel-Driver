@@ -12,6 +12,7 @@
 #include <asm/processor.h>		/* For TASK_SIZE */
 #include <asm/mmu.h>
 #include <asm/page.h>
+#include <asm/tlbflush.h>
 #endif /* __ASSEMBLY__ */
 
 /* PMD_SHIFT determines what a second-level page table entry can map */
@@ -288,49 +289,133 @@ static inline pte_t pte_mkyoung(pte_t pte) {
 	pte_val(pte) |= _PAGE_ACCESSED; return pte; }
 
 /* Atomic PTE updates */
-
-static inline unsigned long pte_update( pte_t *p, unsigned long clr,
-					unsigned long set )
+static inline unsigned long pte_update(pte_t *p, unsigned long clr)
 {
 	unsigned long old, tmp;
-	
+
 	__asm__ __volatile__(
 	"1:	ldarx	%0,0,%3		# pte_update\n\
-	andi.	%1,%0,%7\n\
+	andi.	%1,%0,%6\n\
 	bne-	1b \n\
 	andc	%1,%0,%4 \n\
-	or	%1,%1,%5 \n\
 	stdcx.	%1,0,%3 \n\
 	bne-	1b"
 	: "=&r" (old), "=&r" (tmp), "=m" (*p)
-	: "r" (p), "r" (clr), "r" (set), "m" (*p), "i" (_PAGE_BUSY)
+	: "r" (p), "r" (clr), "m" (*p), "i" (_PAGE_BUSY)
 	: "cc" );
 	return old;
 }
 
+/* PTE updating functions */
+extern void hpte_update(pte_t *ptep, unsigned long pte, int wrprot);
+
 static inline int ptep_test_and_clear_young(pte_t *ptep)
 {
-	return (pte_update(ptep, _PAGE_ACCESSED, 0) & _PAGE_ACCESSED) != 0;
+	unsigned long old;
+
+	old = pte_update(ptep, _PAGE_ACCESSED | _PAGE_HPTEFLAGS);
+	if (old & _PAGE_HASHPTE) {
+		hpte_update(ptep, old, 0);
+		flush_tlb_pending();	/* XXX generic code doesn't flush */
+	}
+	return (old & _PAGE_ACCESSED) != 0;
 }
 
+/*
+ * On RW/DIRTY bit transitions we can avoid flushing the hpte. For the
+ * moment we always flush but we need to fix hpte_update and test if the
+ * optimisation is worth it.
+ */
+#if 1
 static inline int ptep_test_and_clear_dirty(pte_t *ptep)
 {
-	return (pte_update(ptep, _PAGE_DIRTY, 0) & _PAGE_DIRTY) != 0;
-}
+	unsigned long old;
 
-static inline pte_t ptep_get_and_clear(pte_t *ptep)
-{
-	return __pte(pte_update(ptep, ~_PAGE_HPTEFLAGS, 0));
+	old = pte_update(ptep, _PAGE_DIRTY | _PAGE_HPTEFLAGS);
+	if (old & _PAGE_HASHPTE)
+		hpte_update(ptep, old, 0);
+	return (old & _PAGE_DIRTY) != 0;
 }
 
 static inline void ptep_set_wrprotect(pte_t *ptep)
 {
-	pte_update(ptep, _PAGE_RW, 0);
+	unsigned long old;
+
+	old = pte_update(ptep, _PAGE_RW | _PAGE_HPTEFLAGS);
+	if (old & _PAGE_HASHPTE)
+		hpte_update(ptep, old, 0);
 }
 
-static inline void ptep_mkdirty(pte_t *ptep)
+/*
+ * We currently remove entries from the hashtable regardless of whether
+ * the entry was young or dirty. The generic routines only flush if the
+ * entry was young or dirty which is not good enough.
+ *
+ * We should be more intelligent about this but for the moment we override
+ * these functions and force a tlb flush unconditionally
+ */
+#define __HAVE_ARCH_PTEP_CLEAR_YOUNG_FLUSH
+#define ptep_clear_flush_young(__vma, __address, __ptep)		\
+({									\
+	int __young = ptep_test_and_clear_young(__ptep);		\
+	flush_tlb_page(__vma, __address);				\
+	__young;							\
+})
+
+#define __HAVE_ARCH_PTEP_CLEAR_DIRTY_FLUSH
+#define ptep_clear_flush_dirty(__vma, __address, __ptep)		\
+({									\
+	int __dirty = ptep_test_and_clear_dirty(__ptep);		\
+	flush_tlb_page(__vma, __address);				\
+	__dirty;							\
+})
+
+#else
+static inline int ptep_test_and_clear_dirty(pte_t *ptep)
 {
-	pte_update(ptep, 0, _PAGE_DIRTY);
+	unsigned long old;
+
+	old = pte_update(ptep, _PAGE_DIRTY);
+	if ((~old & (_PAGE_HASHPTE | _PAGE_RW | _PAGE_DIRTY)) == 0)
+		hpte_update(ptep, old, 1);
+	return (old & _PAGE_DIRTY) != 0;
+}
+
+static inline void ptep_set_wrprotect(pte_t *ptep)
+{
+	unsigned long old;
+
+	old = pte_update(ptep, _PAGE_RW);
+	if ((~old & (_PAGE_HASHPTE | _PAGE_RW | _PAGE_DIRTY)) == 0)
+		hpte_update(ptep, old, 1);
+}
+#endif
+
+static inline pte_t ptep_get_and_clear(pte_t *ptep)
+{
+	unsigned long old = pte_update(ptep, ~0UL);
+
+	if (old & _PAGE_HASHPTE)
+		hpte_update(ptep, old, 0);
+	return __pte(old);
+}
+
+static inline void pte_clear(pte_t * ptep)
+{
+	unsigned long old = pte_update(ptep, ~0UL);
+
+	if (old & _PAGE_HASHPTE)
+		hpte_update(ptep, old, 0);
+}
+
+/*
+ * set_pte stores a linux PTE into the linux page table.
+ */
+static inline void set_pte(pte_t *ptep, pte_t pte)
+{
+	if (pte_present(*ptep))
+		pte_clear(ptep);
+	*ptep = __pte(pte_val(pte)) & ~_PAGE_HPTEFLAGS;
 }
 
 /*
@@ -339,21 +424,6 @@ static inline void ptep_mkdirty(pte_t *ptep)
 #define pgprot_noncached(prot)	(__pgprot(pgprot_val(prot) | _PAGE_NO_CACHE | _PAGE_GUARDED))
 
 #define pte_same(A,B)	(((pte_val(A) ^ pte_val(B)) & ~_PAGE_HPTEFLAGS) == 0)
-
-/*
- * set_pte stores a linux PTE into the linux page table.
- * On machines which use an MMU hash table we avoid changing the
- * _PAGE_HASHPTE bit.
- */
-static inline void set_pte(pte_t *ptep, pte_t pte)
-{
-	pte_update(ptep, ~_PAGE_HPTEFLAGS, pte_val(pte) & ~_PAGE_HPTEFLAGS);
-}
-
-static inline void pte_clear(pte_t * ptep)
-{
-	pte_update(ptep, ~_PAGE_HPTEFLAGS, 0);
-}
 
 extern unsigned long ioremap_bot, ioremap_base;
 

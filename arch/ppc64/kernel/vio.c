@@ -20,7 +20,7 @@
 #include <linux/kobject.h>
 #include <linux/mm.h>
 #include <asm/rtas.h>
-#include <asm/pci_dma.h>
+#include <asm/iommu.h>
 #include <asm/dma.h>
 #include <asm/ppcdebug.h>
 #include <asm/vio.h>
@@ -29,12 +29,7 @@
 
 #define DBGENTER() pr_debug("%s entered\n", __FUNCTION__)
 
-extern struct TceTable *build_tce_table(struct TceTable *tbl);
-
-extern dma_addr_t get_tces(struct TceTable *, unsigned order,
-			   void *page, unsigned numPages, int direction);
-extern void tce_free(struct TceTable *tbl, dma_addr_t dma_addr,
-		     unsigned order, unsigned num_pages);
+struct iommu_table *vio_build_iommu_table(struct vio_dev *dev);
 
 static int vio_num_address_cells;
 static struct vio_dev *vio_bus_device; /* fake "parent" device */
@@ -150,7 +145,7 @@ static int __init vio_bus_init(void)
 		return 1;
 	}
 	memset(vio_bus_device, 0, sizeof(struct vio_dev));
-	strcpy(vio_bus_device->dev.bus_id, "vdevice");
+	strcpy(vio_bus_device->dev.bus_id, "vio");
 
 	err = device_register(&vio_bus_device->dev);
 	if (err) {
@@ -199,6 +194,15 @@ static void __devinit vio_dev_release(struct device *dev)
 	kfree(viodev);
 }
 
+static ssize_t viodev_show_name(struct device *dev, char *buf)
+{
+	struct vio_dev *viodev = to_vio_dev(dev);
+	struct device_node *of_node = viodev->archdata;
+
+	return sprintf(buf, "%s\n", of_node->name);
+}
+DEVICE_ATTR(name, S_IRUSR | S_IRGRP | S_IROTH, viodev_show_name, NULL);
+
 /**
  * vio_register_device: - Register a new vio device.
  * @of_node:	The OF node for this device.
@@ -240,7 +244,7 @@ struct vio_dev * __devinit vio_register_device(struct device_node *of_node)
 
 	viodev->archdata = (void *)of_node_get(of_node);
 	viodev->unit_address = *unit_address;
-	viodev->tce_table = vio_build_tce_table(viodev);
+	viodev->iommu_table = vio_build_iommu_table(viodev);
 
 	viodev->irq = NO_IRQ;
 	irq_p = (unsigned int *)get_property(of_node, "interrupts", 0);
@@ -256,8 +260,7 @@ struct vio_dev * __devinit vio_register_device(struct device_node *of_node)
 	/* init generic 'struct device' fields: */
 	viodev->dev.parent = &vio_bus_device->dev;
 	viodev->dev.bus = &vio_bus_type;
-	snprintf(viodev->dev.bus_id, BUS_ID_SIZE, "%s@%lx",
-		of_node->name, viodev->unit_address);
+	snprintf(viodev->dev.bus_id, BUS_ID_SIZE, "%lx", viodev->unit_address);
 	viodev->dev.release = vio_dev_release;
 
 	/* register with generic device framework */
@@ -268,6 +271,7 @@ struct vio_dev * __devinit vio_register_device(struct device_node *of_node)
 		kfree(viodev);
 		return NULL;
 	}
+	device_create_file(&viodev->dev, &dev_attr_name);
 
 	return viodev;
 }
@@ -296,16 +300,16 @@ const void * vio_get_attribute(struct vio_dev *vdev, void* which, int* length)
 EXPORT_SYMBOL(vio_get_attribute);
 
 /**
- * vio_build_tce_table: - gets the dma information from OF and builds the TCE tree.
+ * vio_build_iommu_table: - gets the dma information from OF and builds the TCE tree.
  * @dev: the virtual device.
  *
  * Returns a pointer to the built tce tree, or NULL if it can't
  * find property.
 */
-struct TceTable * vio_build_tce_table(struct vio_dev *dev)
+struct iommu_table * vio_build_iommu_table(struct vio_dev *dev)
 {
 	unsigned int *dma_window;
-	struct TceTable *newTceTable;
+	struct iommu_table *newTceTable;
 	unsigned long offset;
 	unsigned long size;
 	int dma_window_property_size;
@@ -315,14 +319,14 @@ struct TceTable * vio_build_tce_table(struct vio_dev *dev)
 		return NULL;
 	}
 
-	newTceTable = (struct TceTable *) kmalloc(sizeof(struct TceTable), GFP_KERNEL);
+	newTceTable = (struct iommu_table *) kmalloc(sizeof(struct iommu_table), GFP_KERNEL);
 
 	/* RPA docs say that #address-cells is always 1 for virtual
 		devices, but some older boxes' OF returns 2.  This should
 		be removed by GA, unless there is legacy OFs that still
 		have 2 for #address-cells */
-	size = ((dma_window[1+vio_num_address_cells]
-		>> PAGE_SHIFT) << 3) >> PAGE_SHIFT;
+	size = ((dma_window[1+vio_num_address_cells] >> PAGE_SHIFT) << 3)
+		>> PAGE_SHIFT;
 
 	/* This is just an ugly kludge. Remove as soon as the OF for all
 	machines actually follow the spec and encodes the offset field
@@ -332,7 +336,7 @@ struct TceTable * vio_build_tce_table(struct vio_dev *dev)
 	} else if (dma_window_property_size == 20) {
 		size = ((dma_window[4] >> PAGE_SHIFT) << 3) >> PAGE_SHIFT;
 	} else {
-		printk(KERN_WARNING "vio_build_tce_table: Invalid size of ibm,my-dma-window=%i, using 0x80 for size\n", dma_window_property_size);
+		printk(KERN_WARNING "vio_build_iommu_table: Invalid size of ibm,my-dma-window=%i, using 0x80 for size\n", dma_window_property_size);
 		size = 0x80;
 	}
 
@@ -342,14 +346,15 @@ struct TceTable * vio_build_tce_table(struct vio_dev *dev)
 	offset = dma_window[1] >>  PAGE_SHIFT;
 
 	/* TCE table size - measured in units of pages of tce table */
-	newTceTable->size = size;
+	newTceTable->it_size		= size;
 	/* offset for VIO should always be 0 */
-	newTceTable->startOffset = offset;
-	newTceTable->busNumber   = 0;
-	newTceTable->index       = (unsigned long)dma_window[0];
-	newTceTable->tceType     = TCE_VB;
+	newTceTable->it_offset		= offset;
+	newTceTable->it_busno		= 0;
+	newTceTable->it_index		= (unsigned long)dma_window[0];
+	newTceTable->it_type		= TCE_VB;
+	newTceTable->it_entrysize	= sizeof(union tce_entry);
 
-	return build_tce_table(newTceTable);
+	return iommu_init_table(newTceTable);
 }
 
 int vio_enable_interrupts(struct vio_dev *dev)
@@ -376,29 +381,21 @@ EXPORT_SYMBOL(vio_disable_interrupts);
 dma_addr_t vio_map_single(struct vio_dev *dev, void *vaddr,
 			  size_t size, int direction )
 {
-	struct TceTable * tbl;
+	struct iommu_table *tbl;
 	dma_addr_t dma_handle = NO_TCE;
 	unsigned long uaddr;
-	unsigned order, nPages;
+	unsigned int npages;
 
-	if(direction == PCI_DMA_NONE) BUG();
+	BUG_ON(direction == PCI_DMA_NONE);
 
 	uaddr = (unsigned long)vaddr;
-	nPages = PAGE_ALIGN( uaddr + size ) - ( uaddr & PAGE_MASK );
-	order = get_order( nPages & PAGE_MASK );
-	nPages >>= PAGE_SHIFT;
+	npages = PAGE_ALIGN( uaddr + size ) - ( uaddr & PAGE_MASK );
+	npages >>= PAGE_SHIFT;
 
- 	/* Client asked for way to much space.  This is checked later anyway */
-	/* It is easier to debug here for the drivers than in the tce tables.*/
- 	if(order >= NUM_TCE_LEVELS) {
- 		printk("VIO_DMA: vio_map_single size to large: 0x%lx \n",size);
- 		return NO_TCE;
- 	}
+	tbl = dev->iommu_table;
 
-	tbl = dev->tce_table;
-
-	if(tbl) {
-		dma_handle = get_tces(tbl, order, vaddr, nPages, direction);
+	if (tbl) {
+		dma_handle = iommu_alloc(tbl, vaddr, npages, direction, NULL);
 		dma_handle |= (uaddr & ~PAGE_MASK);
 	}
 
@@ -409,107 +406,92 @@ EXPORT_SYMBOL(vio_map_single);
 void vio_unmap_single(struct vio_dev *dev, dma_addr_t dma_handle,
 		      size_t size, int direction)
 {
-	struct TceTable * tbl;
-	unsigned order, nPages;
+	struct iommu_table * tbl;
+	unsigned int npages;
 
-	if (direction == PCI_DMA_NONE) BUG();
+	BUG_ON(direction == PCI_DMA_NONE);
 
-	nPages = PAGE_ALIGN( dma_handle + size ) - ( dma_handle & PAGE_MASK );
-	order = get_order( nPages & PAGE_MASK );
-	nPages >>= PAGE_SHIFT;
+	npages = PAGE_ALIGN( dma_handle + size ) - ( dma_handle & PAGE_MASK );
+	npages >>= PAGE_SHIFT;
 
- 	/* Client asked for way to much space.  This is checked later anyway */
-	/* It is easier to debug here for the drivers than in the tce tables.*/
- 	if(order >= NUM_TCE_LEVELS) {
- 		printk("VIO_DMA: vio_unmap_single 0x%lx size to large: 0x%lx \n",(unsigned long)dma_handle,(unsigned long)size);
- 		return;
- 	}
-
-	tbl = dev->tce_table;
-	if(tbl) tce_free(tbl, dma_handle, order, nPages);
+	tbl = dev->iommu_table;
+	if(tbl)
+		iommu_free(tbl, dma_handle, npages);
 }
 EXPORT_SYMBOL(vio_unmap_single);
 
 int vio_map_sg(struct vio_dev *vdev, struct scatterlist *sglist, int nelems,
 	       int direction)
 {
-	int i;
+	struct iommu_table *tbl;
+	unsigned long handle;
 
-	for (i = 0; i < nelems; i++) {
+	BUG_ON(direction == PCI_DMA_NONE);
 
-		/* 2.4 scsi scatterlists use address field.
-		   Not sure about other subsystems. */
-		void *vaddr;
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0)
-		if (sglist->address)
-			vaddr = sglist->address;
-		else
-#endif
-			vaddr = page_address(sglist->page) + sglist->offset;
+	if (nelems == 0)
+		return 0;
 
-		sglist->dma_address = vio_map_single(vdev, vaddr,
-						     sglist->length,
-						     direction);
-		sglist->dma_length = sglist->length;
-		sglist++;
-	}
+	tbl = vdev->iommu_table;
+	if (!tbl)
+		return 0;
 
-	return nelems;
+	return iommu_alloc_sg(tbl, sglist, nelems, direction, &handle);
 }
 EXPORT_SYMBOL(vio_map_sg);
 
 void vio_unmap_sg(struct vio_dev *vdev, struct scatterlist *sglist, int nelems,
 		  int direction)
 {
-	while (nelems--) {
-		vio_unmap_single(vdev, sglist->dma_address,
-				 sglist->dma_length, direction);
-		sglist++;
-	}
+	struct iommu_table *tbl;
+
+	BUG_ON(direction == PCI_DMA_NONE);
+
+	tbl = vdev->iommu_table;
+	if (tbl)
+		iommu_free_sg(tbl, sglist, nelems, direction);
 }
+EXPORT_SYMBOL(vio_unmap_sg);
 
 void *vio_alloc_consistent(struct vio_dev *dev, size_t size,
 			   dma_addr_t *dma_handle)
 {
-	struct TceTable * tbl;
+	struct iommu_table * tbl;
 	void *ret = NULL;
-	unsigned order, nPages;
+	unsigned int npages, order;
 	dma_addr_t tce;
 
 	size = PAGE_ALIGN(size);
+	npages = size >> PAGE_SHIFT;
 	order = get_order(size);
-	nPages = 1 << order;
 
  	/* Client asked for way to much space.  This is checked later anyway */
 	/* It is easier to debug here for the drivers than in the tce tables.*/
- 	if(order >= NUM_TCE_LEVELS) {
- 		printk("VIO_DMA: vio_alloc_consistent size to large: 0x%lx \n",size);
+ 	if(order >= IOMAP_MAX_ORDER) {
+ 		printk("VIO_DMA: vio_alloc_consistent size to large: 0x%lx \n", size);
  		return (void *)NO_TCE;
  	}
 
-	tbl = dev->tce_table;
+	tbl = dev->iommu_table;
 
-	if ( tbl ) {
+	if (tbl) {
 		/* Alloc enough pages (and possibly more) */
-		ret = (void *)__get_free_pages( GFP_ATOMIC, order );
-		if ( ret ) {
+		ret = (void *)__get_free_pages(GFP_ATOMIC, order);
+		if (ret) {
 			/* Page allocation succeeded */
-			memset(ret, 0, nPages << PAGE_SHIFT);
+			memset(ret, 0, npages << PAGE_SHIFT);
 			/* Set up tces to cover the allocated range */
-			tce = get_tces( tbl, order, ret, nPages, PCI_DMA_BIDIRECTIONAL );
-			if ( tce == NO_TCE ) {
-				PPCDBG(PPCDBG_TCE, "vio_alloc_consistent: get_tces failed\n" );
-				free_pages( (unsigned long)ret, order );
+			tce = iommu_alloc(tbl, ret, npages, PCI_DMA_BIDIRECTIONAL, NULL);
+			if (tce == NO_TCE) {
+				PPCDBG(PPCDBG_TCE, "vio_alloc_consistent: iommu_alloc failed\n" );
+				free_pages((unsigned long)ret, order);
 				ret = NULL;
+			} else {
+				*dma_handle = tce;
 			}
-			else
-				{
-					*dma_handle = tce;
-				}
 		}
-		else PPCDBG(PPCDBG_TCE, "vio_alloc_consistent: __get_free_pages failed for order = %d\n", order);
+		else PPCDBG(PPCDBG_TCE, "vio_alloc_consistent: __get_free_pages failed for size = %d\n", size);
 	}
-	else PPCDBG(PPCDBG_TCE, "vio_alloc_consistent: get_tce_table failed for 0x%016lx\n", dev);
+	else PPCDBG(PPCDBG_TCE, "vio_alloc_consistent: get_iommu_table failed for 0x%016lx\n", dev);
 
 	PPCDBG(PPCDBG_TCE, "\tvio_alloc_consistent: dma_handle = 0x%16.16lx\n", *dma_handle);
 	PPCDBG(PPCDBG_TCE, "\tvio_alloc_consistent: return     = 0x%16.16lx\n", ret);
@@ -520,28 +502,20 @@ EXPORT_SYMBOL(vio_alloc_consistent);
 void vio_free_consistent(struct vio_dev *dev, size_t size,
 			 void *vaddr, dma_addr_t dma_handle)
 {
-	struct TceTable * tbl;
-	unsigned order, nPages;
+	struct iommu_table *tbl;
+	unsigned int npages;
 
 	PPCDBG(PPCDBG_TCE, "vio_free_consistent:\n");
 	PPCDBG(PPCDBG_TCE, "\tdev = 0x%16.16lx, size = 0x%16.16lx, dma_handle = 0x%16.16lx, vaddr = 0x%16.16lx\n", dev, size, dma_handle, vaddr);
 
 	size = PAGE_ALIGN(size);
-	order = get_order(size);
-	nPages = 1 << order;
+	npages = size >> PAGE_SHIFT;
 
- 	/* Client asked for way to much space.  This is checked later anyway */
-	/* It is easier to debug here for the drivers than in the tce tables.*/
- 	if(order >= NUM_TCE_LEVELS) {
- 		printk("PCI_DMA: pci_free_consistent size to large: 0x%lx \n",size);
- 		return;
- 	}
-
-	tbl = dev->tce_table;
+	tbl = dev->iommu_table;
 
 	if ( tbl ) {
-		tce_free(tbl, dma_handle, order, nPages);
-		free_pages( (unsigned long)vaddr, order );
+		iommu_free(tbl, dma_handle, npages);
+		free_pages((unsigned long)vaddr, get_order(size));
 	}
 }
 EXPORT_SYMBOL(vio_free_consistent);

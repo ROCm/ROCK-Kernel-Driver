@@ -24,6 +24,7 @@
 #define AGP_CNTL                               0x0174
 #define BM_STATUS                              0x0160
 #define CAP0_TRIG_CNTL			       0x0950
+#define CAP1_TRIG_CNTL		               0x09c0
 #define VIPH_CONTROL			       0x0C40
 #define VENDOR_ID                              0x0F00  
 #define DEVICE_ID                              0x0F02  

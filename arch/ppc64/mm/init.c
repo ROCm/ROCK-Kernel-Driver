@@ -60,10 +60,8 @@
 #include <asm/ppcdebug.h>
 #include <asm/sections.h>
 #include <asm/system.h>
+#include <asm/iommu.h>
 
-#ifdef CONFIG_PPC_ISERIES
-#include <asm/iSeries/iSeries_dma.h>
-#endif
 
 struct mmu_context_queue_t mmu_context_queue;
 int mem_init_done;
@@ -76,11 +74,6 @@ extern struct task_struct *current_set[NR_CPUS];
 extern pgd_t ioremap_dir[];
 pgd_t * ioremap_pgd = (pgd_t *)&ioremap_dir;
 
-static void * __ioremap_com(unsigned long addr, unsigned long pa, 
-			    unsigned long ea, unsigned long size, 
-			    unsigned long flags);
-static void map_io_page(unsigned long va, unsigned long pa, int flags);
-
 unsigned long klimit = (unsigned long)_end;
 
 HPTE *Hash=0;
@@ -91,58 +84,10 @@ unsigned long _ASR=0;
 /* max amount of RAM to use */
 unsigned long __max_memory;
 
-/* This is declared as we are using the more or less generic 
- * include/asm-ppc64/tlb.h file -- tgall
- */
-DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
-DEFINE_PER_CPU(struct pte_freelist_batch *, pte_freelist_cur);
-unsigned long pte_freelist_forced_free;
-
-#ifdef CONFIG_SMP
-static void pte_free_smp_sync(void *arg)
-{
-	/* Do nothing, just ensure we sync with all CPUs */
-}
-#endif
-
-/* This is only called when we are critically out of memory
- * (and fail to get a page in pte_free_tlb).
- */
-void pte_free_now(struct page *ptepage)
-{
-	pte_freelist_forced_free++;
-
-	smp_call_function(pte_free_smp_sync, NULL, 0, 1);
-
-	pte_free(ptepage);
-}
-
-static void pte_free_rcu_callback(void *arg)
-{
-	struct pte_freelist_batch *batch = arg;
-	unsigned int i;
-
-	for (i = 0; i < batch->index; i++)
-		pte_free(batch->pages[i]);
-	free_page((unsigned long)batch);
-}
-
-void pte_free_submit(struct pte_freelist_batch *batch)
-{
-	INIT_RCU_HEAD(&batch->rcu);
-	call_rcu(&batch->rcu, pte_free_rcu_callback, batch);
-}
-
-void pte_free_finish(void)
-{
-	/* This is safe as we are holding page_table_lock */
-	struct pte_freelist_batch **batchp = &__get_cpu_var(pte_freelist_cur);
-	
-	if (*batchp == NULL)
-		return;
-	pte_free_submit(*batchp);
-	*batchp = NULL;
-}
+/* info on what we think the IO hole is */
+unsigned long 	io_hole_start;
+unsigned long	io_hole_size;
+unsigned long	top_of_ram;
 
 void show_mem(void)
 {
@@ -173,17 +118,99 @@ void show_mem(void)
 	printk("%d pages swap cached\n",cached);
 }
 
+#ifdef CONFIG_PPC_ISERIES
+
+void *ioremap(unsigned long addr, unsigned long size)
+{
+	return (void *)addr;
+}
+
+extern void *__ioremap(unsigned long addr, unsigned long size,
+		       unsigned long flags)
+{
+	return (void *)addr;
+}
+
+void iounmap(void *addr)
+{
+	return;
+}
+
+#else
+
+/*
+ * map_io_page currently only called by __ioremap
+ * map_io_page adds an entry to the ioremap page table
+ * and adds an entry to the HPT, possibly bolting it
+ */
+static void map_io_page(unsigned long ea, unsigned long pa, int flags)
+{
+	pgd_t *pgdp;
+	pmd_t *pmdp;
+	pte_t *ptep;
+	unsigned long vsid;
+
+	if (mem_init_done) {
+		spin_lock(&ioremap_mm.page_table_lock);
+		pgdp = pgd_offset_i(ea);
+		pmdp = pmd_alloc(&ioremap_mm, pgdp, ea);
+		ptep = pte_alloc_kernel(&ioremap_mm, pmdp, ea);
+
+		pa = absolute_to_phys(pa);
+		set_pte(ptep, pfn_pte(pa >> PAGE_SHIFT, __pgprot(flags)));
+		spin_unlock(&ioremap_mm.page_table_lock);
+	} else {
+		unsigned long va, vpn, hash, hpteg;
+
+		/*
+		 * If the mm subsystem is not fully up, we cannot create a
+		 * linux page table entry for this mapping.  Simply bolt an
+		 * entry in the hardware page table.
+		 */
+		vsid = get_kernel_vsid(ea);
+		va = (vsid << 28) | (ea & 0xFFFFFFF);
+		vpn = va >> PAGE_SHIFT;
+
+		hash = hpt_hash(vpn, 0);
+
+		hpteg = ((hash & htab_data.htab_hash_mask)*HPTES_PER_GROUP);
+
+		/* Panic if a pte grpup is full */
+		if (ppc_md.hpte_insert(hpteg, va, pa >> PAGE_SHIFT, 0,
+				       _PAGE_NO_CACHE|_PAGE_GUARDED|PP_RWXX,
+				       1, 0) == -1) {
+			panic("map_io_page: could not insert mapping");
+		}
+	}
+}
+
+
+static void * __ioremap_com(unsigned long addr, unsigned long pa,
+			    unsigned long ea, unsigned long size,
+			    unsigned long flags)
+{
+	unsigned long i;
+
+	if ((flags & _PAGE_PRESENT) == 0)
+		flags |= pgprot_val(PAGE_KERNEL);
+	if (flags & (_PAGE_NO_CACHE | _PAGE_WRITETHRU))
+		flags |= _PAGE_GUARDED;
+
+	for (i = 0; i < size; i += PAGE_SIZE) {
+		map_io_page(ea+i, pa+i, flags);
+	}
+
+	return (void *) (ea + (addr & ~PAGE_MASK));
+}
+
+
 void *
 ioremap(unsigned long addr, unsigned long size)
 {
-#ifdef CONFIG_PPC_ISERIES
-	return (void*)addr;
-#else
 	void *ret = __ioremap(addr, size, _PAGE_NO_CACHE);
 	if(mem_init_done)
 		return eeh_ioremap(addr, ret);	/* may remap the addr */
 	return ret;
-#endif
 }
 
 void *
@@ -329,7 +356,7 @@ static void unmap_im_area_pmd(pgd_t *dir, unsigned long address,
  *
  * XXX	what about calls before mem_init_done (ie python_countermeasures())	
  */
-void pSeries_iounmap(void *addr)
+void iounmap(void *addr)
 {
 	unsigned long address, start, end, size;
 	struct mm_struct *mm;
@@ -355,27 +382,16 @@ void pSeries_iounmap(void *addr)
 	spin_lock(&mm->page_table_lock);
 
 	dir = pgd_offset_i(address);
-	flush_cache_all();
+	flush_cache_vunmap(address, end);
 	do {
 		unmap_im_area_pmd(dir, address, end - address);
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (address && (address < end));
-	__flush_tlb_range(mm, start, end);
+	flush_tlb_kernel_range(start, end);
 
 	spin_unlock(&mm->page_table_lock);
 	return;
-}
-
-void iounmap(void *addr) 
-{
-#ifdef CONFIG_PPC_ISERIES
-	/* iSeries I/O Remap is a noop              */
-	return;
-#else
-	/* DRENG / PPPBBB todo */
-	return pSeries_iounmap(addr);
-#endif
 }
 
 int iounmap_explicit(void *addr, unsigned long size)
@@ -402,216 +418,7 @@ int iounmap_explicit(void *addr, unsigned long size)
 	return 0;
 }
 
-static void * __ioremap_com(unsigned long addr, unsigned long pa, 
-			    unsigned long ea, unsigned long size, 
-			    unsigned long flags)
-{
-	unsigned long i;
-	
-	if ((flags & _PAGE_PRESENT) == 0)
-		flags |= pgprot_val(PAGE_KERNEL);
-	if (flags & (_PAGE_NO_CACHE | _PAGE_WRITETHRU))
-		flags |= _PAGE_GUARDED;
-
-	for (i = 0; i < size; i += PAGE_SIZE) {
-		map_io_page(ea+i, pa+i, flags);
-	}
-
-	return (void *) (ea + (addr & ~PAGE_MASK));
-}
-
-/*
- * map_io_page currently only called by __ioremap
- * map_io_page adds an entry to the ioremap page table
- * and adds an entry to the HPT, possibly bolting it
- */
-static void map_io_page(unsigned long ea, unsigned long pa, int flags)
-{
-	pgd_t *pgdp;
-	pmd_t *pmdp;
-	pte_t *ptep;
-	unsigned long vsid;
-	
-	if (mem_init_done) {
-		spin_lock(&ioremap_mm.page_table_lock);
-		pgdp = pgd_offset_i(ea);
-		pmdp = pmd_alloc(&ioremap_mm, pgdp, ea);
-		ptep = pte_alloc_kernel(&ioremap_mm, pmdp, ea);
-
-		pa = absolute_to_phys(pa);
-		set_pte(ptep, pfn_pte(pa >> PAGE_SHIFT, __pgprot(flags)));
-		spin_unlock(&ioremap_mm.page_table_lock);
-	} else {
-		unsigned long va, vpn, hash, hpteg;
-
-		/*
-		 * If the mm subsystem is not fully up, we cannot create a
-		 * linux page table entry for this mapping.  Simply bolt an
-		 * entry in the hardware page table. 
-		 */
-		vsid = get_kernel_vsid(ea);
-		va = (vsid << 28) | (ea & 0xFFFFFFF);
-		vpn = va >> PAGE_SHIFT;
-
-		hash = hpt_hash(vpn, 0);
-
-		hpteg = ((hash & htab_data.htab_hash_mask)*HPTES_PER_GROUP);
-
-		/* Panic if a pte grpup is full */
-		if (ppc_md.hpte_insert(hpteg, va, pa >> PAGE_SHIFT, 0,
-				       _PAGE_NO_CACHE|_PAGE_GUARDED|PP_RWXX,
-				       1, 0) == -1) {
-			panic("map_io_page: could not insert mapping");
-		}
-	}
-}
-
-void
-flush_tlb_mm(struct mm_struct *mm)
-{
-	struct vm_area_struct *mp;
-
-	spin_lock(&mm->page_table_lock);
-
-	for (mp = mm->mmap; mp != NULL; mp = mp->vm_next)
-		__flush_tlb_range(mm, mp->vm_start, mp->vm_end);
-
-	/* XXX are there races with checking cpu_vm_mask? - Anton */
-	cpus_clear(mm->cpu_vm_mask);
-
-	spin_unlock(&mm->page_table_lock);
-}
-
-/*
- * Callers should hold the mm->page_table_lock
- */
-void
-flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
-{
-	unsigned long context = 0;
-	pgd_t *pgd;
-	pmd_t *pmd;
-	pte_t *ptep;
-	pte_t pte;
-	int local = 0;
-	cpumask_t tmp;
-
-	switch( REGION_ID(vmaddr) ) {
-	case VMALLOC_REGION_ID:
-		pgd = pgd_offset_k( vmaddr );
-		break;
-	case IO_REGION_ID:
-		pgd = pgd_offset_i( vmaddr );
-		break;
-	case USER_REGION_ID:
-		pgd = pgd_offset( vma->vm_mm, vmaddr );
-		context = vma->vm_mm->context;
-
-		/* XXX are there races with checking cpu_vm_mask? - Anton */
-		tmp = cpumask_of_cpu(smp_processor_id());
-		if (cpus_equal(vma->vm_mm->cpu_vm_mask, tmp))
-			local = 1;
-
-		break;
-	default:
-		panic("flush_tlb_page: invalid region 0x%016lx", vmaddr);
-	
-	}
-
-	if (!pgd_none(*pgd)) {
-		pmd = pmd_offset(pgd, vmaddr);
-		if (pmd_present(*pmd)) {
-			ptep = pte_offset_kernel(pmd, vmaddr);
-			/* Check if HPTE might exist and flush it if so */
-			pte = __pte(pte_update(ptep, _PAGE_HPTEFLAGS, 0));
-			if ( pte_val(pte) & _PAGE_HASHPTE ) {
-				flush_hash_page(context, vmaddr, pte, local);
-			}
-		}
-		WARN_ON(pmd_hugepage(*pmd));
-	}
-}
-
-struct ppc64_tlb_batch ppc64_tlb_batch[NR_CPUS];
-
-void
-__flush_tlb_range(struct mm_struct *mm, unsigned long start, unsigned long end)
-{
-	pgd_t *pgd;
-	pmd_t *pmd;
-	pte_t *ptep;
-	pte_t pte;
-	unsigned long pgd_end, pmd_end;
-	unsigned long context = 0;
-	struct ppc64_tlb_batch *batch = &ppc64_tlb_batch[smp_processor_id()];
-	unsigned long i = 0;
-	int local = 0;
-	cpumask_t tmp;
-
-	switch(REGION_ID(start)) {
-	case VMALLOC_REGION_ID:
-		pgd = pgd_offset_k(start);
-		break;
-	case IO_REGION_ID:
-		pgd = pgd_offset_i(start);
-		break;
-	case USER_REGION_ID:
-		pgd = pgd_offset(mm, start);
-		context = mm->context;
-
-		/* XXX are there races with checking cpu_vm_mask? - Anton */
-		tmp = cpumask_of_cpu(smp_processor_id());
-		if (cpus_equal(mm->cpu_vm_mask, tmp))
-			local = 1;
-
-		break;
-	default:
-		panic("flush_tlb_range: invalid region for start (%016lx) and end (%016lx)\n", start, end);
-	}
-
-	do {
-		pgd_end = (start + PGDIR_SIZE) & PGDIR_MASK;
-		if (pgd_end > end)
-			pgd_end = end;
-		if (!pgd_none(*pgd)) {
-			pmd = pmd_offset(pgd, start);
-			do {
-				pmd_end = (start + PMD_SIZE) & PMD_MASK;
-				if (pmd_end > end)
-					pmd_end = end;
-				if (pmd_present(*pmd)) {
-					ptep = pte_offset_kernel(pmd, start);
-					do {
-						if (pte_val(*ptep) & _PAGE_HASHPTE) {
-							pte = __pte(pte_update(ptep, _PAGE_HPTEFLAGS, 0));
-							if (pte_val(pte) & _PAGE_HASHPTE) {								
-								batch->pte[i] = pte;
-								batch->addr[i] = start;
-								i++;
-								if (i == PPC64_TLB_BATCH_NR) {
-									flush_hash_range(context, i, local);
-									i = 0;
-								}
-							}
-						}
-						start += PAGE_SIZE;
-						++ptep;
-					} while (start < pmd_end);
-				} else {
-					WARN_ON(pmd_hugepage(*pmd));
-					start = pmd_end;
-				}
-				++pmd;
-			} while (start < pgd_end);
-		} else {
-			start = pgd_end;
-		}
-		++pgd;
-	} while (start < end);
-
-	if (i)
-		flush_hash_range(context, i, local);
-}
+#endif
 
 void free_initmem(void)
 {
@@ -647,8 +454,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
  */
 void __init mm_init_ppc64(void)
 {
-	struct paca_struct *lpaca;
-	unsigned long guard_page, index;
+	unsigned long i;
 
 	ppc64_boot_msg(0x100, "MM Init");
 
@@ -660,19 +466,62 @@ void __init mm_init_ppc64(void)
 	mmu_context_queue.head = 0;
 	mmu_context_queue.tail = NUM_USER_CONTEXT-1;
 	mmu_context_queue.size = NUM_USER_CONTEXT;
-	for(index=0; index < NUM_USER_CONTEXT ;index++) {
-		mmu_context_queue.elements[index] = index+FIRST_USER_CONTEXT;
-	}
+	for (i = 0; i < NUM_USER_CONTEXT; i++)
+		mmu_context_queue.elements[i] = i + FIRST_USER_CONTEXT;
 
-	/* Setup guard pages for the Paca's */
-	for (index = 0; index < NR_CPUS; index++) {
-		lpaca = &paca[index];
-		guard_page = ((unsigned long)lpaca) + 0x1000;
-		ppc_md.hpte_updateboltedpp(PP_RXRX, guard_page);
+	/* This is the story of the IO hole... please, keep seated,
+	 * unfortunately, we are out of oxygen masks at the moment.
+	 * So we need some rough way to tell where your big IO hole
+	 * is. On pmac, it's between 2G and 4G, on POWER3, it's around
+	 * that area as well, on POWER4 we don't have one, etc...
+	 * We need that to implement something approx. decent for
+	 * page_is_ram() so that /dev/mem doesn't map cacheable IO space
+	 * when XFree resquest some IO regions witout using O_SYNC, we
+	 * also need that as a "hint" when sizing the TCE table on POWER3
+	 * So far, the simplest way that seem work well enough for us it
+	 * to just assume that the first discontinuity in our physical
+	 * RAM layout is the IO hole. That may not be correct in the future
+	 * (and isn't on iSeries but then we don't care ;)
+	 */
+	top_of_ram = lmb_end_of_DRAM();
+
+#ifndef CONFIG_PPC_ISERIES
+	for (i = 1; i < lmb.memory.cnt; i++) {
+		unsigned long base, prevbase, prevsize;
+
+		prevbase = lmb.memory.region[i-1].physbase;
+		prevsize = lmb.memory.region[i-1].size;
+		base = lmb.memory.region[i].physbase;
+		if (base > (prevbase + prevsize)) {
+			io_hole_start = prevbase + prevsize;
+			io_hole_size = base  - (prevbase + prevsize);
+			break;
+		}
 	}
+#endif /* CONFIG_PPC_ISERIES */
+	if (io_hole_start)
+		printk("IO Hole assumed to be %lx -> %lx\n",
+		       io_hole_start, io_hole_start + io_hole_size - 1);
 
 	ppc64_boot_msg(0x100, "MM Init Done");
 }
+
+
+/*
+ * This is called by /dev/mem to know if a given address has to
+ * be mapped non-cacheable or not
+ */
+int page_is_ram(unsigned long physaddr)
+{
+#ifdef CONFIG_PPC_ISERIES
+	return 1;
+#endif
+	if (physaddr >= top_of_ram)
+		return 0;
+	return io_hole_start == 0 ||  physaddr < io_hole_start ||
+		physaddr >= (io_hole_start + io_hole_size);
+}
+
 
 /*
  * Initialize the bootmem system and give it all the memory we
@@ -698,7 +547,7 @@ void __init do_init_bootmem(void)
 
 	boot_mapsize = init_bootmem(start >> PAGE_SHIFT, total_pages);
 
-	/* add all physical memory to the bootmem map */
+	/* add all physical memory to the bootmem map. Also find the first */
 	for (i=0; i < lmb.memory.cnt; i++) {
 		unsigned long physbase, size;
 
@@ -721,17 +570,28 @@ void __init do_init_bootmem(void)
  */
 void __init paging_init(void)
 {
-	unsigned long zones_size[MAX_NR_ZONES], i;
+	unsigned long zones_size[MAX_NR_ZONES];
+	unsigned long zholes_size[MAX_NR_ZONES];
+	unsigned long total_ram = lmb_phys_mem_size();
 
+	printk(KERN_INFO "Top of RAM: 0x%lx, Total RAM: 0x%lx\n",
+	       top_of_ram, total_ram);
+	printk(KERN_INFO "Memory hole size: %ldMB\n",
+	       (top_of_ram - total_ram) >> 20);
 	/*
 	 * All pages are DMA-able so we put them all in the DMA zone.
 	 */
-	zones_size[ZONE_DMA] = lmb_end_of_DRAM() >> PAGE_SHIFT;
-	for (i = 1; i < MAX_NR_ZONES; i++)
-		zones_size[i] = 0;
-	free_area_init(zones_size);
+	memset(zones_size, 0, sizeof(zones_size));
+	memset(zholes_size, 0, sizeof(zholes_size));
+
+	zones_size[ZONE_DMA] = top_of_ram >> PAGE_SHIFT;
+	zholes_size[ZONE_DMA] = (top_of_ram - total_ram) >> PAGE_SHIFT;
+
+	free_area_init_node(0, &contig_page_data, NULL, zones_size,
+			    __pa(PAGE_OFFSET) >> PAGE_SHIFT, zholes_size);
+	mem_map = contig_page_data.node_mem_map;
 }
-#endif
+#endif /* CONFIG_DISCONTIGMEM */
 
 static struct kcore_list kcore_vmem;
 
@@ -827,7 +687,7 @@ void __init mem_init(void)
 	mem_init_done = 1;
 
 #ifdef CONFIG_PPC_ISERIES
-	create_virtual_bus_tce_table();
+	iommu_vio_init();
 #endif
 }
 

@@ -39,7 +39,7 @@
 #include "pci_hotplug.h"
 
 
-static int debug = 1;
+static int debug;
 static struct semaphore rpaphp_sem;
 static LIST_HEAD (rpaphp_slot_head);
 static int num_slots;
@@ -837,8 +837,6 @@ static int __init rpaphp_init(void)
 	int retval = 0;
 
 	info(DRIVER_DESC " version: " DRIVER_VERSION "\n");
-
-	rpaphp_debug = debug;
 
 	/* read all the PRA info from the system */
 	retval = init_rpa();
