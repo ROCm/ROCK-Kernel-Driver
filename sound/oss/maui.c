@@ -301,17 +301,21 @@ static int maui_load_patch(int dev, int format, const char __user *addr,
 
 static int __init probe_maui(struct address_info *hw_config)
 {
+	int this_dev;
 	int i;
 	int tmp1, tmp2, ret;
 
-	if (check_region(hw_config->io_base, 8))
+	if (check_region(hw_config->io_base, 2))
 		return 0;
+
+	if (!request_region(hw_config->io_base + 2, 6, "Maui"))
+		goto out;
 
 	maui_base = hw_config->io_base;
 	maui_osp = hw_config->osp;
 
 	if (request_irq(hw_config->irq, mauiintr, 0, "Maui", NULL) < 0)
-		return 0;
+		goto out2;
 
 	/*
 	 * Initialize the processor if necessary
@@ -322,36 +326,30 @@ static int __init probe_maui(struct address_info *hw_config)
 			!maui_write(0x9F) ||	/* Report firmware version */
 			!maui_short_wait(STAT_RX_AVAIL) ||
 			maui_read() == -1 || maui_read() == -1)
-			if (!maui_init(hw_config->irq)) {
-				free_irq(hw_config->irq, NULL);
-				return 0;
-			}
+			if (!maui_init(hw_config->irq))
+				goto out3;
 	}
 	if (!maui_write(0xCF))	/* Report hardware version */ {
 		printk(KERN_ERR "No WaveFront firmware detected (card uninitialized?)\n");
-		free_irq(hw_config->irq, NULL);
-		return 0;
+		goto out3;
 	}
 	if ((tmp1 = maui_read()) == -1 || (tmp2 = maui_read()) == -1) {
 		printk(KERN_ERR "No WaveFront firmware detected (card uninitialized?)\n");
-		free_irq(hw_config->irq, NULL);
-		return 0;
+		goto out3;
 	}
-	if (tmp1 == 0xff || tmp2 == 0xff) {
-		free_irq(hw_config->irq, NULL);
-		return 0;
-	}
+	if (tmp1 == 0xff || tmp2 == 0xff)
+		goto out3;
 	printk(KERN_DEBUG "WaveFront hardware version %d.%d\n", tmp1, tmp2);
 
 	if (!maui_write(0x9F))	/* Report firmware version */
-		return 0;
+		goto out3;
 	if ((tmp1 = maui_read()) == -1 || (tmp2 = maui_read()) == -1)
-		return 0;
+		goto out3;
 
 	printk(KERN_DEBUG "WaveFront firmware version %d.%d\n", tmp1, tmp2);
 
 	if (!maui_write(0x85))	/* Report free DRAM */
-		return 0;
+		goto out3;
 	tmp1 = 0;
 	for (i = 0; i < 4; i++) {
 		tmp1 |= maui_read() << (7 * i);
@@ -363,16 +361,8 @@ static int __init probe_maui(struct address_info *hw_config)
 			break;
 
 	ret = probe_mpu401(hw_config);
-
-	if (ret)
-		request_region(hw_config->io_base + 2, 6, "Maui");
-
-	return ret;
-}
-
-static void __init attach_maui(struct address_info *hw_config)
-{
-	int this_dev;
+	if (!ret)
+		goto out3;
 
 	conf_printf("Maui", hw_config);
 
@@ -399,6 +389,14 @@ static void __init attach_maui(struct address_info *hw_config)
 		} else
 			printk(KERN_ERR "Maui: Can't install patch loader\n");
 	}
+	return 1;
+
+out3:
+	free_irq(hw_config->irq, NULL);
+out2:
+	release_region(hw_config->io_base + 2, 6);
+out:
+	return 0;
 }
 
 static void __exit unload_maui(struct address_info *hw_config)
@@ -445,7 +443,6 @@ static int __init init_maui(void)
 	}
 	if (probe_maui(&cfg) == 0)
 		return -ENODEV;
-	attach_maui(&cfg);
 
 	return 0;
 }
