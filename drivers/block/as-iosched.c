@@ -1249,7 +1249,7 @@ fifo_expired:
 			ad->changed_batch = 0;
 		} else
 			ad->changed_batch = 2;
-		arq->request->flags |= REQ_HARDBARRIER;
+		arq->request->flags |= REQ_SOFTBARRIER;
 	}
 
 	/*

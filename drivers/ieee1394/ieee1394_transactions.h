@@ -7,7 +7,7 @@
 /*
  * Get and free transaction labels.
  */
-int hpsb_get_tlabel(struct hpsb_packet *packet, int wait);
+int hpsb_get_tlabel(struct hpsb_packet *packet);
 void hpsb_free_tlabel(struct hpsb_packet *packet);
 
 struct hpsb_packet *hpsb_make_readpacket(struct hpsb_host *host, nodeid_t node,
