@@ -250,7 +250,7 @@ pci_alloc_pci_controller(enum phb_types controller_type)
         else
 		memcpy(hose->what,model,7);
         hose->type = controller_type;
-        hose->global_number = global_phb_number;
+        hose->global_number = global_phb_number++;
         
         *hose_tail = hose;
         hose_tail = &hose->next;
