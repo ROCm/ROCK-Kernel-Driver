@@ -259,11 +259,6 @@ static inline void clear_in_cr4 (unsigned long mask)
 	outb((data), 0x23); \
 } while (0)
 
-/*
- * Bus types (default is ISA, but people can check others with these..)
- */
-extern int MCA_bus;
-
 static inline void __monitor(const void *eax, unsigned long ecx,
 		unsigned long edx)
 {

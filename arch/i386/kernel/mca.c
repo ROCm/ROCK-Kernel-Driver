@@ -56,6 +56,9 @@
 
 static unsigned char which_scsi = 0;
 
+int MCA_bus = 0;
+EXPORT_SYMBOL(MCA_bus);
+
 /*
  * Motherboard register spinlock. Untested on SMP at the moment, but
  * are there any MCA SMP boxes?

@@ -107,9 +107,6 @@ extern struct cpuinfo_parisc cpu_data[NR_CPUS];
 
 #define CPU_HVERSION ((boot_cpu_data.hversion >> 4) & 0x0FFF)
 
-#define MCA_bus 0
-#define MCA_bus__is_a_macro /* for versions in ksyms.c */
-
 typedef struct {
 	int seg;  
 } mm_segment_t;

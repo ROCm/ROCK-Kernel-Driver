@@ -157,12 +157,6 @@ static inline void clear_in_cr4 (unsigned long mask)
 		:"ax");
 }
 
-/*
- * Bus types
- */
-#define MCA_bus 0
-#define MCA_bus__is_a_macro
-
 
 /*
  * User space process size: 512GB - 1GB (default).

@@ -31,6 +31,7 @@
 #include <linux/init.h>
 #include <linux/console.h>
 #include <linux/sysrq.h>
+#include <linux/mca.h>
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/tty.h>
@@ -1861,13 +1862,11 @@ static void serial8250_config_port(struct uart_port *port, int flags)
 	int probeflags = PROBE_ANY;
 	int ret;
 
-#ifdef CONFIG_MCA
 	/*
 	 * Don't probe for MCA ports on non-MCA machines.
 	 */
 	if (up->port.flags & UPF_BOOT_ONLYMCA && !MCA_bus)
 		return;
-#endif
 
 	/*
 	 * Find the region that we can probe for.  This in turn

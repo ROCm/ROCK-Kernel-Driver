@@ -6,22 +6,14 @@
 #ifndef _LINUX_MCA_H
 #define _LINUX_MCA_H
 
-/* FIXME: This shouldn't happen, but we need everything that previously
- * included mca.h to compile.  Take it out later when the MCA #includes
- * are sorted out */
 #include <linux/device.h>
 
-/* get the platform specific defines */
 #ifdef CONFIG_MCA
 #include <asm/mca.h>
-#endif
 
-/* The detection of MCA bus is done in the real mode (using BIOS).
- * The information is exported to the protected code, where this
- * variable is set to one in case MCA bus was detected.
- */
-#ifndef MCA_bus__is_a_macro
-extern int  MCA_bus;
+extern int MCA_bus;
+#else
+#define MCA_bus 0
 #endif
 
 /* This sets up an information callback for /proc/mca/slot?.  The
