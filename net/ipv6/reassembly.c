@@ -372,7 +372,7 @@ static void ip6_frag_queue(struct frag_queue *fq, struct sk_buff *skb,
  				     csum_partial(skb->nh.raw, (u8*)(fhdr+1)-skb->nh.raw, 0));
 
 	/* Is this the final fragment? */
-	if (!(fhdr->frag_off & __constant_htons(0x0001))) {
+	if (!(fhdr->frag_off & htons(0x0001))) {
 		/* If we already have some bits beyond end
 		 * or have different end, the segment is corrupted.
 		 */
@@ -648,7 +648,7 @@ int ipv6_reassembly(struct sk_buff **skbp, int nhoff)
 	hdr = skb->nh.ipv6h;
 	fhdr = (struct frag_hdr *)skb->h.raw;
 
-	if (!(fhdr->frag_off & __constant_htons(0xFFF9))) {
+	if (!(fhdr->frag_off & htons(0xFFF9))) {
 		/* It is not a fragmented frame */
 		skb->h.raw += sizeof(struct frag_hdr);
 		IP6_INC_STATS_BH(Ip6ReasmOKs);

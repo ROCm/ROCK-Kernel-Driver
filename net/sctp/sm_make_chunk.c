@@ -223,7 +223,7 @@ nodata:
 
 sctp_chunk_t *sctp_make_init_ack(const sctp_association_t *asoc,
 				 const sctp_chunk_t *chunk,
-				 int priority)
+				 int priority, int unkparam_len)
 {
 	sctp_inithdr_t initack;
 	sctp_chunk_t *retval;
@@ -278,7 +278,10 @@ sctp_chunk_t *sctp_make_init_ack(const sctp_association_t *asoc,
 	if (!cookie)
 		goto nomem_cookie;
 
-	chunksize = sizeof(initack) + addrs_len + cookie_len;
+	/* Calculate the total size of allocation, include the reserved
+	 * space for reporting unknown parameters if it is specified.
+	 */
+	chunksize = sizeof(initack) + addrs_len + cookie_len + unkparam_len;
 
         /* Tell peer that we'll do ECN only if peer advertised such cap.  */
 	if (asoc->peer.ecn_capable)
@@ -883,28 +886,47 @@ nodata:
 	return retval;
 }
 
+/* Create an Operation Error chunk with the specified space reserved.
+ * This routine can be used for containing multiple causes in the chunk.
+ */
+sctp_chunk_t *sctp_make_op_error_space(const sctp_association_t *asoc,
+				       const sctp_chunk_t *chunk,
+				       size_t size)
+{
+	sctp_chunk_t *retval;
+
+	retval = sctp_make_chunk(asoc, SCTP_CID_ERROR, 0,
+				 sizeof(sctp_errhdr_t) + size);
+	if (!retval)
+		goto nodata;
+
+	/* RFC 2960 6.4 Multi-homed SCTP Endpoints
+	 *
+	 * An endpoint SHOULD transmit reply chunks (e.g., SACK,
+	 * HEARTBEAT ACK, etc.) to the same destination transport
+	 * address from which it received the DATA or control chunk
+	 * to which it is replying.
+	 *
+	 */
+	if (chunk)
+		retval->transport = chunk->transport;
+
+nodata:
+	return retval;
+}
+
 /* Create an Operation Error chunk.  */
 sctp_chunk_t *sctp_make_op_error(const sctp_association_t *asoc,
 				 const sctp_chunk_t *chunk,
 				 __u16 cause_code, const void *payload,
 				 size_t paylen)
 {
-	sctp_chunk_t *retval = sctp_make_chunk(asoc, SCTP_CID_ERROR, 0,
-					       sizeof(sctp_errhdr_t) + paylen);
+	sctp_chunk_t *retval = sctp_make_op_error_space(asoc, chunk, paylen);
 
 	if (!retval)
 		goto nodata;
-	sctp_init_cause(retval, cause_code, payload, paylen);
 
-        /* RFC 2960 6.4 Multi-homed SCTP Endpoints
-	 *
-	 * An endpoint SHOULD transmit reply chunks (e.g., SACK,
-	 * HEARTBEAT ACK, * etc.) to the same destination transport
-	 * address from which it * received the DATA or control chunk
-	 * to which it is replying.
-	 */
-	if (chunk)
-		retval->transport = chunk->transport;
+	sctp_init_cause(retval, cause_code, payload, paylen);
 
 nodata:
 	return retval;
@@ -1405,6 +1427,162 @@ malformed:
  * 3rd Level Abstractions
  ********************************************************************/
 
+/* Verify the INIT packet before we process it.  */
+int sctp_verify_init(const sctp_association_t *asoc,
+		     sctp_cid_t cid,
+		     sctp_init_chunk_t *peer_init,
+		     sctp_chunk_t *chunk,
+		     sctp_chunk_t **err_chk_p)
+{
+	sctpParam_t param;
+	uint8_t *end;
+
+	/* FIXME - Verify the fixed fields of the INIT chunk. Also, verify
+	 * the mandatory parameters somewhere here and generate either the
+	 * "Missing mandatory parameter" error or the "Invalid mandatory
+	 * parameter" error. */
+
+	/* Find unrecognized parameters. */
+
+	end = ((uint8_t *)peer_init + ntohs(peer_init->chunk_hdr.length));
+
+	for (param.v = peer_init->init_hdr.params;
+	     param.v < end;
+	     param.v += WORD_ROUND(ntohs(param.p->length))) {
+
+		if (!sctp_verify_param(asoc, param, cid, chunk, err_chk_p))
+			return 0;
+
+	} /* for (loop through all parameters) */
+	 
+	return 1;
+}
+
+
+/* Find unrecognized parameters in the chunk.
+ * Return values:
+ * 	0 - discard the chunk
+ * 	1 - continue with the chunk
+ */
+int sctp_verify_param(const sctp_association_t *asoc,
+		      sctpParam_t param,
+		      sctp_cid_t cid,
+		      sctp_chunk_t *chunk,
+		      sctp_chunk_t **err_chk_p)
+{
+	int retval = 1;
+
+	/* FIXME - This routine is not looking at each parameter per the
+	 * chunk type, i.e., unrecognized parameters should be further
+	 * identified based on the chunk id.
+	 */
+
+	switch (param.p->type) {
+	case SCTP_PARAM_IPV4_ADDRESS:
+	case SCTP_PARAM_IPV6_ADDRESS:
+	case SCTP_PARAM_COOKIE_PRESERVATIVE:
+	/* FIXME - If we don't support the host name parameter, we should
+	 * generate an error for this - Unresolvable address.
+	 */
+	case SCTP_PARAM_HOST_NAME_ADDRESS:
+	case SCTP_PARAM_SUPPORTED_ADDRESS_TYPES:
+	case SCTP_PARAM_STATE_COOKIE:
+	case SCTP_PARAM_HEARTBEAT_INFO:
+	case SCTP_PARAM_UNRECOGNIZED_PARAMETERS:
+	case SCTP_PARAM_ECN_CAPABLE:
+		break;
+	default:
+		SCTP_DEBUG_PRINTK("Unrecognized param: %d for chunk %d.\n",
+				ntohs(param.p->type), cid);
+		return sctp_process_unk_param(asoc, param, chunk, err_chk_p);
+
+		break;
+	}
+	return retval;
+}
+
+/* RFC 3.2.1 & the Implementers Guide 2.2.
+ *
+ * The Parameter Types are encoded such that the
+ * highest-order two bits specify the action that must be
+ * taken if the processing endpoint does not recognize the
+ * Parameter Type.
+ *
+ * 00 - Stop processing this SCTP chunk and discard it,
+ *	do not process any further chunks within it.
+ *
+ * 01 - Stop processing this SCTP chunk and discard it,
+ *	do not process any further chunks within it, and report
+ *	the unrecognized parameter in an 'Unrecognized
+ *	Parameter Type' (in either an ERROR or in the INIT ACK).
+ *
+ * 10 - Skip this parameter and continue processing.
+ *
+ * 11 - Skip this parameter and continue processing but
+ *	report the unrecognized parameter in an
+ *	'Unrecognized Parameter Type' (in either an ERROR or in
+ *	the INIT ACK).
+ *
+ * Return value:
+ * 	0 - discard the chunk
+ * 	1 - continue with the chunk
+ */
+int sctp_process_unk_param(const sctp_association_t *asoc,
+			   sctpParam_t param,
+			   sctp_chunk_t *chunk,
+			   sctp_chunk_t **err_chk_p)
+{
+	int retval = 1;
+
+	switch (param.p->type & SCTP_PARAM_ACTION_MASK) {
+	case SCTP_PARAM_ACTION_DISCARD:
+		retval =  0;
+		break;
+	case SCTP_PARAM_ACTION_DISCARD_ERR:
+		retval =  0;
+		/* Make an ERROR chunk, preparing enough room for
+		 * returning multiple unknown parameters.
+		 */
+		if (NULL == *err_chk_p)
+			*err_chk_p = sctp_make_op_error_space(asoc, chunk,
+					ntohs(chunk->chunk_hdr->length));
+
+		if (*err_chk_p)
+			sctp_init_cause(*err_chk_p, SCTP_ERROR_UNKNOWN_PARAM,
+					(const void *)param.p,
+					WORD_ROUND(ntohs(param.p->length)));
+
+		break;
+	case SCTP_PARAM_ACTION_SKIP:
+		break;
+	case SCTP_PARAM_ACTION_SKIP_ERR:
+		/* Make an ERROR chunk, preparing enough room for
+		 * returning multiple unknown parameters.
+		 */
+		if (NULL == *err_chk_p)
+			*err_chk_p = sctp_make_op_error_space(asoc, chunk,
+					ntohs(chunk->chunk_hdr->length));
+
+		if (*err_chk_p) {
+			sctp_init_cause(*err_chk_p, SCTP_ERROR_UNKNOWN_PARAM,
+					(const void *)param.p,
+					WORD_ROUND(ntohs(param.p->length)));
+		} else {
+			/* If there is no memory for generating the ERROR
+			 * report as specified, an ABORT will be triggered
+			 * to the peer and the association won't be established.
+			 */
+			retval = 0;
+		}
+
+		break;
+	default:
+		break;
+	}
+
+	return retval;
+}
+
 /* Unpack the parameters in an INIT packet.
  * FIXME:  There is no return status to allow callers to do
  * error handling.
@@ -1609,9 +1787,9 @@ int sctp_process_param(sctp_association_t *asoc, sctpParam_t param,
 		asoc->peer.cookie = param.cookie->body;
 		break;
 
-	case SCTP_PARAM_HEATBEAT_INFO:
+	case SCTP_PARAM_HEARTBEAT_INFO:
 		SCTP_DEBUG_PRINTK("unimplemented "
-				  "SCTP_PARAM_HEATBEAT_INFO\n");
+				  "SCTP_PARAM_HEARTBEAT_INFO\n");
 		break;
 
 	case SCTP_PARAM_UNRECOGNIZED_PARAMETERS:
@@ -1624,14 +1802,13 @@ int sctp_process_param(sctp_association_t *asoc, sctpParam_t param,
 		break;
 
 	default:
+		/* Any unrecognized parameters should have been caught
+		 * and handled by sctp_verify_param() which should be
+		 * called prior to this routine.  Simply log the error
+		 * here.
+		 */
 		SCTP_DEBUG_PRINTK("Ignoring param: %d for association %p.\n",
 				  ntohs(param.p->type), asoc);
-		/* FIXME:  The entire parameter processing really needs
-		 * redesigned.  For now, always return success as doing
-		 * otherwise craters the system.
-		 */
-		retval = 1;
-
 		break;
 	};
 

@@ -984,16 +984,16 @@ static void rtmsg_ifa(int event, struct in_ifaddr* ifa)
 }
 
 static struct rtnetlink_link inet_rtnetlink_table[RTM_MAX - RTM_BASE + 1] = {
-	 [4] = { doit:	 inet_rtm_newaddr,  },
-	 [5] = { doit:	 inet_rtm_deladdr,  },
-	 [6] = { dumpit: inet_dump_ifaddr,  },
-	 [8] = { doit:	 inet_rtm_newroute, },
-	 [9] = { doit:	 inet_rtm_delroute, },
-	[10] = { doit:	 inet_rtm_getroute, dumpit: inet_dump_fib, },
+	 [4] = { .doit	 = inet_rtm_newaddr,  },
+	 [5] = { .doit	 = inet_rtm_deladdr,  },
+	 [6] = { .dumpit = inet_dump_ifaddr,  },
+	 [8] = { .doit	 = inet_rtm_newroute, },
+	 [9] = { .doit	 = inet_rtm_delroute, },
+	[10] = { .doit	 = inet_rtm_getroute, .dumpit = inet_dump_fib, },
 #ifdef CONFIG_IP_MULTIPLE_TABLES
-	[16] = { doit:	 inet_rtm_newrule, },
-	[17] = { doit:	 inet_rtm_delrule, },
-	[18] = { dumpit: inet_dump_rules,  },
+	[16] = { .doit	 = inet_rtm_newrule, },
+	[17] = { .doit	 = inet_rtm_delrule, },
+	[18] = { .dumpit = inet_dump_rules,  },
 #endif
 };
 
