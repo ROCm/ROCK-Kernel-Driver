@@ -49,7 +49,7 @@ void ntfs_destroy_big_inode(struct inode *inode)
 	kmem_cache_free(ntfs_big_inode_cache, NTFS_I(inode));
 }
 
-ntfs_inode *ntfs_alloc_inode(void)
+ntfs_inode *ntfs_alloc_extent_inode(void)
 {
 	ntfs_inode *ni = (ntfs_inode *)kmem_cache_alloc(ntfs_inode_cache,
 			SLAB_NOFS);
@@ -59,7 +59,7 @@ ntfs_inode *ntfs_alloc_inode(void)
 	return ni;
 }
 
-void ntfs_destroy_inode(ntfs_inode *ni)
+void ntfs_destroy_extent_inode(ntfs_inode *ni)
 {
 	ntfs_debug("Entering.");
 	BUG_ON(atomic_read(&ni->mft_count) || !atomic_dec_and_test(&ni->count));
@@ -102,9 +102,9 @@ static void ntfs_init_big_inode(struct inode *vi)
 	return;
 }
 
-ntfs_inode *ntfs_new_inode(struct super_block *sb)
+ntfs_inode *ntfs_new_extent_inode(struct super_block *sb)
 {
-	ntfs_inode *ni = ntfs_alloc_inode();
+	ntfs_inode *ni = ntfs_alloc_extent_inode();
 
 	ntfs_debug("Entering.");
 	if (ni)
@@ -239,7 +239,8 @@ void ntfs_read_inode(struct inode *vi)
 
 	/*
 	 * Initialize the ntfs specific part of @vi special casing
-	 * FILE_MFT which we need to do at mount time.
+	 * FILE_MFT which we need to do at mount time. This also sets
+	 * ni->mft_no to vi->i_ino.
 	 */
 	if (vi->i_ino != FILE_MFT)
 		ntfs_init_big_inode(vi);
@@ -358,13 +359,14 @@ void ntfs_read_inode(struct inode *vi)
 		if (vi->i_ino == FILE_MFT)
 			goto skip_attr_list_load;
 		ntfs_debug("Attribute list found in inode 0x%lx.", vi->i_ino);
-		ni->state |= 1 << NI_AttrList;
+		NInoSetAttrList(ni);
 		if (ctx->attr->flags & ATTR_IS_ENCRYPTED ||
-				ctx->attr->flags & ATTR_COMPRESSION_MASK) {
+				ctx->attr->flags & ATTR_COMPRESSION_MASK ||
+				ctx->attr->flags & ATTR_IS_SPARSE) {
 			ntfs_error(vi->i_sb, "Attribute list attribute is "
-					"compressed/encrypted. Not allowed. "
-					"Corrupt inode. You should run "
-					"chkdsk.");
+					"compressed/encrypted/sparse. Not "
+					"allowed. Corrupt inode. You should "
+					"run chkdsk.");
 			goto put_unm_err_out;
 		}
 		/* Now allocate memory for the attribute list. */
@@ -377,7 +379,7 @@ void ntfs_read_inode(struct inode *vi)
 			goto ec_put_unm_err_out;
 		}
 		if (ctx->attr->non_resident) {
-			ni->state |= 1 << NI_AttrListNonResident;
+			NInoSetAttrListNonResident(ni);
 			if (ctx->attr->_ANR(lowest_vcn)) {
 				ntfs_error(vi->i_sb, "Attribute list has non "
 						"zero lowest_vcn. Inode is "
@@ -459,7 +461,7 @@ skip_attr_list_load:
 		 * encrypted.
 		 */
 		if (ctx->attr->flags & ATTR_COMPRESSION_MASK)
-			ni->state |= 1 << NI_Compressed;
+			NInoSetCompressed(ni);
 		if (ctx->attr->flags & ATTR_IS_ENCRYPTED) {
 			if (ctx->attr->flags & ATTR_COMPRESSION_MASK) {
 				ntfs_error(vi->i_sb, "Found encrypted and "
@@ -467,8 +469,10 @@ skip_attr_list_load:
 						"allowed.");
 				goto put_unm_err_out;
 			}
-			ni->state |= 1 << NI_Encrypted;
+			NInoSetEncrypted(ni);
 		}
+		if (ctx->attr->flags & ATTR_IS_SPARSE)
+			NInoSetSparse(ni);
 		ir = (INDEX_ROOT*)((char*)ctx->attr +
 				le16_to_cpu(ctx->attr->_ARA(value_offset)));
 		ir_end = (char*)ir + le32_to_cpu(ctx->attr->_ARA(value_length));
@@ -530,12 +534,19 @@ skip_attr_list_load:
 			ni->_IDM(index_vcn_size) = vol->sector_size;
 			ni->_IDM(index_vcn_size_bits) = vol->sector_size_bits;
 		}
+
+		/* Setup the index allocation attribute, even if not present. */
+		NInoSetMstProtected(ni);
+		ni->type = AT_INDEX_ALLOCATION;
+		ni->name = I30;
+		ni->name_len = 4;
+
 		if (!(ir->index.flags & LARGE_INDEX)) {
 			/* No index allocation. */
 			vi->i_size = ni->initialized_size = 0;
 			goto skip_large_dir_stuff;
 		} /* LARGE_INDEX: Index allocation present. Setup state. */
-		ni->state |= 1 << NI_NonResident;
+		NInoSetIndexAllocPresent(ni);
 		/* Find index allocation attribute. */
 		reinit_attr_search_ctx(ctx);
 		if (!lookup_attr(AT_INDEX_ALLOCATION, I30, 4, CASE_SENSITIVE,
@@ -553,6 +564,11 @@ skip_attr_list_load:
 		if (ctx->attr->flags & ATTR_IS_ENCRYPTED) {
 			ntfs_error(vi->i_sb, "$INDEX_ALLOCATION attribute "
 					"is encrypted.");
+			goto put_unm_err_out;
+		}
+		if (ctx->attr->flags & ATTR_IS_SPARSE) {
+			ntfs_error(vi->i_sb, "$INDEX_ALLOCATION attribute "
+					"is sparse.");
 			goto put_unm_err_out;
 		}
 		if (ctx->attr->flags & ATTR_COMPRESSION_MASK) {
@@ -581,13 +597,13 @@ skip_attr_list_load:
 			goto put_unm_err_out;
 		}
 		if (ctx->attr->flags & (ATTR_COMPRESSION_MASK |
-				ATTR_IS_ENCRYPTED)) {
+				ATTR_IS_ENCRYPTED | ATTR_IS_SPARSE)) {
 			ntfs_error(vi->i_sb, "$BITMAP attribute is compressed "
-					"and/or encrypted.");
+					"and/or encrypted and/or sparse.");
 			goto put_unm_err_out;
 		}
 		if (ctx->attr->non_resident) {
-			ni->state |= 1 << NI_BmpNonResident;
+			NInoSetBmpNonResident(ni);
 			if (ctx->attr->_ANR(lowest_vcn)) {
 				ntfs_error(vi->i_sb, "First extent of $BITMAP "
 						"attribute has non zero "
@@ -647,6 +663,12 @@ skip_large_dir_stuff:
 	} else {
 		/* It is a file: find first extent of unnamed data attribute. */
 		reinit_attr_search_ctx(ctx);
+
+		/* Setup the data attribute, even if not present. */
+		ni->type = AT_DATA;
+		ni->name = NULL;
+		ni->name_len = 0;
+
 		if (!lookup_attr(AT_DATA, NULL, 0, 0, 0, NULL, 0, ctx)) {
 			vi->i_size = ni->initialized_size =
 					ni->allocated_size = 0LL;
@@ -675,9 +697,9 @@ skip_large_dir_stuff:
 		}
 		/* Setup the state. */
 		if (ctx->attr->non_resident) {
-			ni->state |= 1 << NI_NonResident;
+			NInoSetNonResident(ni);
 			if (ctx->attr->flags & ATTR_COMPRESSION_MASK) {
-				ni->state |= 1 << NI_Compressed;
+				NInoSetCompressed(ni);
 				if (vol->cluster_size > 4096) {
 					ntfs_error(vi->i_sb, "Found "
 						"compressed data but "
@@ -707,8 +729,9 @@ skip_large_dir_stuff:
 					goto ec_put_unm_err_out;
 				}
 				ni->_ICF(compression_block_size) = 1U << (
-					       ctx->attr->_ANR(compression_unit)
-						+ vol->cluster_size_bits);
+						ctx->attr->_ANR(
+						compression_unit) +
+						vol->cluster_size_bits);
 				ni->_ICF(compression_block_size_bits) = ffs(
 					ni->_ICF(compression_block_size)) - 1;
 			}
@@ -718,8 +741,10 @@ skip_large_dir_stuff:
 							"and compressed data.");
 					goto put_unm_err_out;
 				}
-				ni->state |= 1 << NI_Encrypted;
+				NInoSetEncrypted(ni);
 			}
+			if (ctx->attr->flags & ATTR_IS_SPARSE)
+				NInoSetSparse(ni);
 			if (ctx->attr->_ANR(lowest_vcn)) {
 				ntfs_error(vi->i_sb, "First extent of $DATA "
 						"attribute has non zero "
@@ -861,6 +886,13 @@ void ntfs_read_inode_mount(struct inode *vi)
 		goto err_out;
 	}
 
+	/* Setup the data attribute. It is special as it is mst protected. */
+	NInoSetNonResident(ni);
+	NInoSetMstProtected(ni);
+	ni->type = AT_DATA;
+	ni->name = NULL;
+	ni->name_len = 0;
+
 	/*
 	 * This sets up our little cheat allowing us to reuse the async io
 	 * completion handler for directories.
@@ -930,13 +962,14 @@ void ntfs_read_inode_mount(struct inode *vi)
 		u8 *al_end;
 
 		ntfs_debug("Attribute list attribute found in $MFT.");
-		ni->state |= 1 << NI_AttrList;
+		NInoSetAttrList(ni);
 		if (ctx->attr->flags & ATTR_IS_ENCRYPTED ||
-				ctx->attr->flags & ATTR_COMPRESSION_MASK) {
+				ctx->attr->flags & ATTR_COMPRESSION_MASK ||
+				ctx->attr->flags & ATTR_IS_SPARSE) {
 			ntfs_error(sb, "Attribute list attribute is "
-					"compressed/encrypted. Not allowed. "
-					"$MFT is corrupt. You should run "
-					"chkdsk.");
+					"compressed/encrypted/sparse. Not "
+					"allowed. $MFT is corrupt. You should "
+					"run chkdsk.");
 			goto put_err_out;
 		}
 		/* Now allocate memory for the attribute list. */
@@ -948,7 +981,7 @@ void ntfs_read_inode_mount(struct inode *vi)
 			goto put_err_out;
 		}
 		if (ctx->attr->non_resident) {
-			ni->state |= 1 << NI_AttrListNonResident;
+			NInoSetAttrListNonResident(ni);
 			if (ctx->attr->_ANR(lowest_vcn)) {
 				ntfs_error(sb, "Attribute list has non zero "
 						"lowest_vcn. $MFT is corrupt. "
@@ -1071,11 +1104,13 @@ void ntfs_read_inode_mount(struct inode *vi)
 		}
 		/* $MFT must be uncompressed and unencrypted. */
 		if (attr->flags & ATTR_COMPRESSION_MASK ||
-				attr->flags & ATTR_IS_ENCRYPTED) {
-			ntfs_error(sb, "$MFT must be uncompressed and "
-					"unencrypted but a compressed/"
-					"encrypted extent was found. "
-					"$MFT is corrupt. Run chkdsk.");
+				attr->flags & ATTR_IS_ENCRYPTED ||
+				attr->flags & ATTR_IS_SPARSE) {
+			ntfs_error(sb, "$MFT must be uncompressed, "
+					"non-sparse, and unencrypted but a "
+					"compressed/sparse/encrypted extent "
+					"was found. $MFT is corrupt. Run "
+					"chkdsk.");
 			goto put_err_out;
 		}
 		/*
@@ -1296,29 +1331,42 @@ void __ntfs_clear_inode(ntfs_inode *ni)
 
 		// FIXME: Handle dirty case for each extent inode!
 		for (i = 0; i < ni->nr_extents; i++)
-			ntfs_destroy_inode(ni->_INE(extent_ntfs_inos)[i]);
+			ntfs_clear_extent_inode(ni->_INE(extent_ntfs_inos)[i]);
 		kfree(ni->_INE(extent_ntfs_inos));
 	}
 	/* Free all alocated memory. */
 	down_write(&ni->run_list.lock);
-	ntfs_free(ni->run_list.rl);
-	ni->run_list.rl = NULL;
+	if (ni->run_list.rl) {
+		ntfs_free(ni->run_list.rl);
+		ni->run_list.rl = NULL;
+	}
 	up_write(&ni->run_list.lock);
 
-	ntfs_free(ni->attr_list);
+	if (ni->attr_list) {
+		ntfs_free(ni->attr_list);
+		ni->attr_list = NULL;
+	}
 
 	down_write(&ni->attr_list_rl.lock);
-	ntfs_free(ni->attr_list_rl.rl);
-	ni->attr_list_rl.rl = NULL;
+	if (ni->attr_list_rl.rl) {
+		ntfs_free(ni->attr_list_rl.rl);
+		ni->attr_list_rl.rl = NULL;
+	}
 	up_write(&ni->attr_list_rl.lock);
+
+	if (ni->name_len && ni->name != I30) {
+		/* Catch bugs... */
+		BUG_ON(!ni->name);
+		kfree(ni->name);
+	}
 }
 
-void ntfs_clear_inode(ntfs_inode *ni)
+void ntfs_clear_extent_inode(ntfs_inode *ni)
 {
 	__ntfs_clear_inode(ni);
 
 	/* Bye, bye... */
-	ntfs_destroy_inode(ni);
+	ntfs_destroy_extent_inode(ni);
 }
 
 /**
@@ -1339,7 +1387,8 @@ void ntfs_clear_big_inode(struct inode *vi)
 
 	if (S_ISDIR(vi->i_mode)) {
 		down_write(&ni->_IDM(bmp_rl).lock);
-		ntfs_free(ni->_IDM(bmp_rl).rl);
+		if (ni->_IDM(bmp_rl).rl)
+			ntfs_free(ni->_IDM(bmp_rl).rl);
 		up_write(&ni->_IDM(bmp_rl).lock);
 	}
 	return;
