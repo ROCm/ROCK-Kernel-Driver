@@ -298,8 +298,6 @@ out:
 
 void initialize_paca_hardware_interrupt_stack(void)
 {
-	extern struct naca_struct *naca;
-
 	int i;
 	unsigned long stack;
 	unsigned long end_of_stack =0;
