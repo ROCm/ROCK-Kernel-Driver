@@ -194,7 +194,8 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 
 	/* Kludge to make it bug-to-bug compatible with i386. i386
 	   uses the normal dma_mask for alloc_consistent. */
-	dma_mask &= hwdev->dma_mask;
+	if (hwdev)
+		dma_mask &= hwdev->dma_mask;
 
  again:
 	memory = (void *)__get_free_pages(gfp, get_order(size));
