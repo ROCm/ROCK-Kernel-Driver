@@ -249,20 +249,6 @@ retry:
 struct vfsmount *alloc_vfsmnt(char *name);
 void free_vfsmnt(struct vfsmount *mnt);
 
-static inline struct super_block * find_super(kdev_t dev)
-{
-	struct list_head *p;
-
-	list_for_each(p, &super_blocks) {
-		struct super_block * s = sb_entry(p);
-		if (kdev_same(s->s_dev, dev)) {
-			s->s_count++;
-			return s;
-		}
-	}
-	return NULL;
-}
-
 void drop_super(struct super_block *sb)
 {
 	up_read(&sb->s_umount);
@@ -309,26 +295,50 @@ restart:
  *	Scans the superblock list and finds the superblock of the file system
  *	mounted on the device given. %NULL is returned if no match is found.
  */
- 
-struct super_block * get_super(kdev_t dev)
+
+struct super_block * get_super(struct block_device *bdev)
 {
-	struct super_block * s;
-
-	if (kdev_none(dev))
+	struct list_head *p;
+	if (!bdev)
 		return NULL;
-
-	while (1) {
-		spin_lock(&sb_lock);
-		s = find_super(dev);
-		spin_unlock(&sb_lock);
-		if (!s)
-			break;
-		down_read(&s->s_umount);
-		if (s->s_root)
-			break;
-		drop_super(s);
+rescan:
+	spin_lock(&sb_lock);
+	list_for_each(p, &super_blocks) {
+		struct super_block *s = sb_entry(p);
+		if (s->s_bdev == bdev) {
+			s->s_count++;
+			spin_unlock(&sb_lock);
+			down_read(&s->s_umount);
+			if (s->s_root)
+				return s;
+			drop_super(s);
+			goto rescan;
+		}
 	}
-	return s;
+	spin_unlock(&sb_lock);
+	return NULL;
+}
+ 
+struct super_block * user_get_super(dev_t dev)
+{
+	struct list_head *p;
+
+rescan:
+	spin_lock(&sb_lock);
+	list_for_each(p, &super_blocks) {
+		struct super_block *s = sb_entry(p);
+		if (kdev_t_to_nr(s->s_dev) ==  dev) {
+			s->s_count++;
+			spin_unlock(&sb_lock);
+			down_read(&s->s_umount);
+			if (s->s_root)
+				return s;
+			drop_super(s);
+			goto rescan;
+		}
+	}
+	spin_unlock(&sb_lock);
+	return NULL;
 }
 
 asmlinkage long sys_ustat(dev_t dev, struct ustat * ubuf)
@@ -338,7 +348,7 @@ asmlinkage long sys_ustat(dev_t dev, struct ustat * ubuf)
         struct statfs sbuf;
 	int err = -EINVAL;
 
-        s = get_super(to_kdev_t(dev));
+        s = user_get_super(dev);
         if (s == NULL)
                 goto out;
 	err = vfs_statfs(s, &sbuf);

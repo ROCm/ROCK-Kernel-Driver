@@ -131,6 +131,7 @@ EXPORT_SYMBOL(kmap_pte);
 EXPORT_SYMBOL(def_blk_fops);
 EXPORT_SYMBOL(update_atime);
 EXPORT_SYMBOL(get_fs_type);
+EXPORT_SYMBOL(user_get_super);
 EXPORT_SYMBOL(get_super);
 EXPORT_SYMBOL(drop_super);
 EXPORT_SYMBOL(getname);

@@ -1255,7 +1255,8 @@ extern int vfs_lstat(char *, struct kstat *);
 extern int vfs_fstat(unsigned int, struct kstat *);
 
 extern struct file_system_type *get_fs_type(const char *name);
-extern struct super_block *get_super(kdev_t);
+extern struct super_block *get_super(struct block_device *);
+extern struct super_block *user_get_super(dev_t);
 extern void drop_super(struct super_block *sb);
 
 extern int dcache_dir_open(struct inode *, struct file *);

@@ -29,12 +29,12 @@
  *
  */
 
-static struct super_block *procinfo_prologue( kdev_t dev )
+static struct super_block *procinfo_prologue(dev_t dev)
 {
 	struct super_block *result;
 
 	/* get super-block by device */
-	result = get_super( dev );
+	result = user_get_super(dev);
 	if( result != NULL ) {
 		if( !reiserfs_is_super( result ) ) {
 			printk( KERN_DEBUG "reiserfs: procfs-52: "
@@ -78,7 +78,7 @@ int reiserfs_version_in_proc( char *buffer, char **start, off_t offset,
 	struct super_block *sb;
 	char *format;
     
-	sb = procinfo_prologue( to_kdev_t((int)data) );
+	sb = procinfo_prologue((dev_t)data);
 	if( sb == NULL )
 		return -ENOENT;
 	if ( REISERFS_SB(sb)->s_properties & (1 << REISERFS_3_6) ) {
@@ -136,7 +136,7 @@ int reiserfs_super_in_proc( char *buffer, char **start, off_t offset,
 	struct reiserfs_sb_info *r;
 	int len = 0;
     
-	sb = procinfo_prologue( to_kdev_t((int)data) );
+	sb = procinfo_prologue((dev_t)data);
 	if( sb == NULL )
 		return -ENOENT;
 	r = REISERFS_SB(sb);
@@ -216,7 +216,7 @@ int reiserfs_per_level_in_proc( char *buffer, char **start, off_t offset,
 	int len = 0;
 	int level;
 	
-	sb = procinfo_prologue( to_kdev_t((int)data) );
+	sb = procinfo_prologue((dev_t)data);
 	if( sb == NULL )
 		return -ENOENT;
 	r = REISERFS_SB(sb);
@@ -295,7 +295,7 @@ int reiserfs_bitmap_in_proc( char *buffer, char **start, off_t offset,
 	struct reiserfs_sb_info *r;
 	int len = 0;
     
-	sb = procinfo_prologue( to_kdev_t((int)data) );
+	sb = procinfo_prologue((dev_t)data);
 	if( sb == NULL )
 		return -ENOENT;
 	r = REISERFS_SB(sb);
@@ -336,7 +336,7 @@ int reiserfs_on_disk_super_in_proc( char *buffer, char **start, off_t offset,
 	int hash_code;
 	int len = 0;
     
-	sb = procinfo_prologue( to_kdev_t((int)data) );
+	sb = procinfo_prologue((dev_t)data);
 	if( sb == NULL )
 		return -ENOENT;
 	sb_info = REISERFS_SB(sb);
@@ -393,7 +393,7 @@ int reiserfs_oidmap_in_proc( char *buffer, char **start, off_t offset,
 	int len = 0;
 	int exact;
     
-	sb = procinfo_prologue( to_kdev_t((int)data) );
+	sb = procinfo_prologue((dev_t)data);
 	if( sb == NULL )
 		return -ENOENT;
 	sb_info = REISERFS_SB(sb);
@@ -445,7 +445,7 @@ int reiserfs_journal_in_proc( char *buffer, char **start, off_t offset,
 	struct journal_params *jp;	
 	int len = 0;
     
-	sb = procinfo_prologue( to_kdev_t((int)data) );
+	sb = procinfo_prologue((dev_t)data);
 	if( sb == NULL )
 		return -ENOENT;
 	r = REISERFS_SB(sb);

@@ -332,7 +332,7 @@ int invalidate_device(kdev_t dev, int do_sync)
 		fsync_bdev(bdev);
 
 	res = 0;
-	sb = get_super(dev);
+	sb = get_super(bdev);
 	if (sb) {
 		/*
 		 * no need to lock the super, get_super holds the
