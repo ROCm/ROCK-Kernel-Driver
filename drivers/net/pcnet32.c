@@ -789,7 +789,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     dev->set_multicast_list = &pcnet32_set_multicast_list;
     dev->do_ioctl = &pcnet32_ioctl;
     dev->tx_timeout = pcnet32_tx_timeout;
-    dev->watchdog_timeo = (HZ >> 1);
+    dev->watchdog_timeo = (5*HZ);
 
     lp->next = pcnet32_dev;
     pcnet32_dev = dev;
