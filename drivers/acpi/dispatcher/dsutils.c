@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsutils - Dispatcher utilities
- *              $Revision: 96 $
+ *              $Revision: 97 $
  *
  ******************************************************************************/
 
@@ -273,6 +273,45 @@ acpi_ds_resolve_operands (
 	}
 
 	return_ACPI_STATUS (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ds_clear_operands
+ *
+ * PARAMETERS:  Walk_state          - Current walk state with operands on stack
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Clear all operands on the current walk state operand stack.
+ *
+ ******************************************************************************/
+
+void
+acpi_ds_clear_operands (
+	acpi_walk_state         *walk_state)
+{
+	u32                     i;
+
+
+	ACPI_FUNCTION_TRACE_PTR ("Acpi_ds_clear_operands", walk_state);
+
+
+	/*
+	 * Remove a reference on each operand on the stack
+	 */
+	for (i = 0; i < walk_state->num_operands; i++) {
+		/*
+		 * Remove a reference to all operands, including both
+		 * "Arguments" and "Targets".
+		 */
+		acpi_ut_remove_reference (walk_state->operands[i]);
+		walk_state->operands[i] = NULL;
+	}
+
+	walk_state->num_operands = 0;
+	return_VOID;
 }
 #endif
 
