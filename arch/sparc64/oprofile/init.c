@@ -9,6 +9,7 @@
 
 #include <linux/kernel.h>
 #include <linux/oprofile.h>
+#include <linux/errno.h>
 #include <linux/init.h>
  
 extern void timer_init(struct oprofile_operations ** ops);
