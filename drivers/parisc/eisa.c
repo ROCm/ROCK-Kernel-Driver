@@ -54,7 +54,7 @@
 #define SNAKES_EEPROM_BASE_ADDR 0xF0810400
 #define MIRAGE_EEPROM_BASE_ADDR 0xF00C0400
 
-static spinlock_t eisa_irq_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(eisa_irq_lock);
 
 /* We can only have one EISA adapter in the system because neither
  * implementation can be flexed.

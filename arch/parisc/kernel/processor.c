@@ -153,7 +153,7 @@ static int __init processor_probe(struct parisc_device *dev)
 	p->cpuid = cpuid;	/* save CPU id */
 	p->txn_addr = txn_addr;	/* save CPU IRQ address */
 #ifdef CONFIG_SMP
-	p->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&p->lock);
 
 	/*
 	** FIXME: review if any other initialization is clobbered
