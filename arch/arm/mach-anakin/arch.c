@@ -27,7 +27,7 @@ extern void anakin_map_io(void);
 extern void genarch_init_irq(void);
 
 static void __init
-fixup_anakin(struct machine_desc *desc, struct param_struct *unused,
+fixup_anakin(struct machine_desc *desc, struct tag *tag,
              char **cmdline, struct meminfo *mi)
 {
 	ROOT_DEV = mk_kdev(RAMDISK_MAJOR, 0);

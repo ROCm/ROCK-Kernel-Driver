@@ -337,17 +337,18 @@ void ide_set_handler(struct ata_device *drive, ata_handler_t handler,
 		      unsigned long timeout, ata_expiry_t expiry)
 {
 	unsigned long flags;
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
+	struct ata_channel *ch = drive->channel;
+	ide_hwgroup_t *hwgroup = ch->hwgroup;
 
 	spin_lock_irqsave(&ide_lock, flags);
 	if (hwgroup->handler != NULL) {
 		printk("%s: ide_set_handler: handler not null; old=%p, new=%p, from %p\n",
 			drive->name, hwgroup->handler, handler, __builtin_return_address(0));
 	}
-	hwgroup->handler	= handler;
-	hwgroup->expiry		= expiry;
-	hwgroup->timer.expires	= jiffies + timeout;
-	add_timer(&hwgroup->timer);
+	hwgroup->handler = handler;
+	ch->expiry = expiry;
+	ch->timer.expires = jiffies + timeout;
+	add_timer(&ch->timer);
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
 
@@ -592,15 +593,11 @@ static inline u32 read_24(struct ata_device *drive)
 
 /*
  * Clean up after success/failure of an explicit drive cmd
+ *
+ * Should be called under lock held.
  */
-void ide_end_drive_cmd(struct ata_device *drive, byte stat, byte err)
+void ide_end_drive_cmd(struct ata_device *drive, struct request *rq, u8 stat, u8 err)
 {
-	unsigned long flags;
-	struct request *rq;
-
-	spin_lock_irqsave(&ide_lock, flags);
-	rq = HWGROUP(drive)->rq;
-
 	if (rq->flags & REQ_DRIVE_CMD) {
 		u8 *args = rq->buffer;
 		rq->errors = !OK_STAT(stat, READY_STAT, BAD_STAT);
@@ -640,14 +637,12 @@ void ide_end_drive_cmd(struct ata_device *drive, byte stat, byte err)
 	blkdev_dequeue_request(rq);
 	HWGROUP(drive)->rq = NULL;
 	end_that_request_last(rq);
-
-	spin_unlock_irqrestore(&ide_lock, flags);
 }
 
 /*
  * Error reporting, in human readable form (luxurious, but a memory hog).
  */
-byte ide_dump_status(struct ata_device *drive, const char *msg, byte stat)
+u8 ide_dump_status(struct ata_device *drive, struct request * rq, const char *msg, u8 stat)
 {
 	unsigned long flags;
 	byte err = 0;
@@ -722,8 +717,8 @@ byte ide_dump_status(struct ata_device *drive, const char *msg, byte stat)
 						  IN_BYTE(IDE_SECTOR_REG));
 					}
 				}
-				if (HWGROUP(drive) && HWGROUP(drive)->rq)
-					printk(", sector=%ld", HWGROUP(drive)->rq->sector);
+				if (rq)
+					printk(", sector=%ld", rq->sector);
 			}
 		}
 #endif
@@ -786,18 +781,17 @@ static int do_recalibrate(struct ata_device *drive)
 /*
  * Take action based on the error returned by the drive.
  */
-ide_startstop_t ide_error(struct ata_device *drive, const char *msg, byte stat)
+ide_startstop_t ide_error(struct ata_device *drive, struct request *rq, const char *msg, byte stat)
 {
-	struct request *rq;
 	byte err;
 
-	err = ide_dump_status(drive, msg, stat);
-	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
+	err = ide_dump_status(drive, rq, msg, stat);
+	if (!drive || !rq)
 		return ide_stopped;
 	/* retry only "normal" I/O: */
 	if (!(rq->flags & REQ_CMD)) {
 		rq->errors = 1;
-		ide_end_drive_cmd(drive, stat, err);
+		ide_end_drive_cmd(drive, rq, stat, err);
 		return ide_stopped;
 	}
 
@@ -869,8 +863,8 @@ static ide_startstop_t drive_cmd_intr(struct ata_device *drive, struct request *
 	}
 
 	if (!OK_STAT(stat, READY_STAT, BAD_STAT))
-		return ide_error(drive, "drive_cmd", stat); /* calls ide_end_drive_cmd */
-	ide_end_drive_cmd (drive, stat, GET_ERR());
+		return ide_error(drive, rq, "drive_cmd", stat); /* calls ide_end_drive_cmd */
+	ide_end_drive_cmd(drive, rq, stat, GET_ERR());
 
 	return ide_stopped;
 }
@@ -886,8 +880,11 @@ static ide_startstop_t drive_cmd_intr(struct ata_device *drive, struct request *
  * setting a timer to wake up at half second intervals thereafter, until
  * timeout is achieved, before timing out.
  */
-int ide_wait_stat(ide_startstop_t *startstop, struct ata_device *drive, byte good, byte bad, unsigned long timeout) {
-	byte stat;
+int ide_wait_stat(ide_startstop_t *startstop,
+		struct ata_device *drive, struct request *rq,
+		byte good, byte bad, unsigned long timeout)
+{
+	u8 stat;
 	int i;
 	unsigned long flags;
 
@@ -903,9 +900,9 @@ int ide_wait_stat(ide_startstop_t *startstop, struct ata_device *drive, byte goo
 		ide__sti();		/* local CPU only */
 		timeout += jiffies;
 		while ((stat = GET_STAT()) & BUSY_STAT) {
-			if (0 < (signed long)(jiffies - timeout)) {
+			if (time_after(timeout, jiffies)) {
 				__restore_flags(flags);	/* local CPU only */
-				*startstop = ide_error(drive, "status timeout", stat);
+				*startstop = ide_error(drive, rq, "status timeout", stat);
 				return 1;
 			}
 		}
@@ -923,7 +920,8 @@ int ide_wait_stat(ide_startstop_t *startstop, struct ata_device *drive, byte goo
 		if (OK_STAT((stat = GET_STAT()), good, bad))
 			return 0;
 	}
-	*startstop = ide_error(drive, "status error", stat);
+	*startstop = ide_error(drive, rq, "status error", stat);
+
 	return 1;
 }
 
@@ -975,7 +973,7 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 		ide_startstop_t res;
 
 		SELECT_DRIVE(ch, drive);
-		if (ide_wait_stat(&res, drive, drive->ready_stat,
+		if (ide_wait_stat(&res, drive, rq, drive->ready_stat,
 					BUSY_STAT|DRQ_STAT, WAIT_READY)) {
 			printk(KERN_WARNING "%s: drive not ready for command\n", drive->name);
 
@@ -1066,20 +1064,21 @@ args_error:
 #ifdef DEBUG
 	printk("%s: DRIVE_CMD (null)\n", drive->name);
 #endif
-	ide_end_drive_cmd(drive, GET_STAT(), GET_ERR());
+	ide_end_drive_cmd(drive, rq, GET_STAT(), GET_ERR());
 
 	return ide_stopped;
 }
 
 ide_startstop_t restart_request(struct ata_device *drive)
 {
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
+	struct ata_channel *ch = drive->channel;
+	ide_hwgroup_t *hwgroup = ch->hwgroup;
 	unsigned long flags;
 	struct request *rq;
 
 	spin_lock_irqsave(&ide_lock, flags);
 	hwgroup->handler = NULL;
-	del_timer(&hwgroup->timer);
+	del_timer(&ch->timer);
 	rq = hwgroup->rq;
 	spin_unlock_irqrestore(&ide_lock, flags);
 
@@ -1195,11 +1194,11 @@ static struct ata_device *choose_urgent_device(struct ata_channel *channel)
 		if (time_after(jiffies, sleep - WAIT_MIN_SLEEP))
 			sleep = jiffies + WAIT_MIN_SLEEP;
 #if 1
-		if (timer_pending(&channel->hwgroup->timer))
+		if (timer_pending(&channel->timer))
 			printk(KERN_ERR "ide_set_handler: timer already active\n");
 #endif
 		set_bit(IDE_SLEEP, &channel->hwgroup->flags);
-		mod_timer(&channel->hwgroup->timer, sleep);
+		mod_timer(&channel->timer, sleep);
 		/* we purposely leave hwgroup busy while sleeping */
 	} else {
 		/* Ugly, but how can we sleep for the lock otherwise? perhaps
@@ -1341,8 +1340,8 @@ static void queue_commands(struct ata_device *drive, int masked_irq)
 static void ide_do_request(struct ata_channel *channel, int masked_irq)
 {
 	ide_hwgroup_t *hwgroup = channel->hwgroup;
-	ide_get_lock(&irq_lock, ata_irq_request, hwgroup);/* for atari only: POSSIBLY BROKEN HERE(?) */
 
+	ide_get_lock(&irq_lock, ata_irq_request, hwgroup);/* for atari only: POSSIBLY BROKEN HERE(?) */
 	__cli();	/* necessary paranoia: ensure IRQs are masked on local CPU */
 
 	while (!test_and_set_bit(IDE_BUSY, &hwgroup->flags)) {
@@ -1357,7 +1356,7 @@ static void ide_do_request(struct ata_channel *channel, int masked_irq)
 
 		ch = drive->channel;
 
-		if (hwgroup->XXX_drive->channel->sharing_irq && ch != hwgroup->XXX_drive->channel && ch->io_ports[IDE_CONTROL_OFFSET]) {
+		if (channel->sharing_irq && ch != channel && ch->io_ports[IDE_CONTROL_OFFSET]) {
 			/* set nIEN for previous channel */
 			/* FIXME: check this! It appears to act on the current channel! */
 
@@ -1369,7 +1368,7 @@ static void ide_do_request(struct ata_channel *channel, int masked_irq)
 
 		/* Remember the last drive we where acting on.
 		 */
-		hwgroup->XXX_drive = drive;
+		ch->drive = drive;
 
 		queue_commands(drive, masked_irq);
 	}
@@ -1423,7 +1422,8 @@ static void dma_timeout_retry(struct ata_device *drive, struct request *rq)
  */
 void ide_timer_expiry(unsigned long data)
 {
-	ide_hwgroup_t *hwgroup = (ide_hwgroup_t *) data;
+	struct ata_channel *ch = (struct ata_channel *) data;
+	ide_hwgroup_t *hwgroup = ch->hwgroup;
 	ata_handler_t *handler;
 	ata_expiry_t *expiry;
 	unsigned long flags;
@@ -1435,7 +1435,7 @@ void ide_timer_expiry(unsigned long data)
 	 */
 
 	spin_lock_irqsave(&ide_lock, flags);
-	del_timer(&hwgroup->timer);
+	del_timer(&ch->timer);
 
 	if ((handler = hwgroup->handler) == NULL) {
 
@@ -1449,23 +1449,22 @@ void ide_timer_expiry(unsigned long data)
 		if (test_and_clear_bit(IDE_SLEEP, &hwgroup->flags))
 			clear_bit(IDE_BUSY, &hwgroup->flags);
 	} else {
-		struct ata_device *drive = hwgroup->XXX_drive;
+		struct ata_device *drive = ch->drive;
 		if (!drive) {
 			printk("ide_timer_expiry: hwgroup->drive was NULL\n");
 			hwgroup->handler = NULL;
 		} else {
-			struct ata_channel *ch;
 			ide_startstop_t startstop;
 
 			/* paranoia */
 			if (!test_and_set_bit(IDE_BUSY, &hwgroup->flags))
 				printk("%s: ide_timer_expiry: hwgroup was not busy??\n", drive->name);
-			if ((expiry = hwgroup->expiry) != NULL) {
+			if ((expiry = ch->expiry) != NULL) {
 				/* continue */
 				if ((wait = expiry(drive, HWGROUP(drive)->rq)) != 0) {
 					/* reengage timer */
-					hwgroup->timer.expires  = jiffies + wait;
-					add_timer(&hwgroup->timer);
+					ch->timer.expires  = jiffies + wait;
+					add_timer(&ch->timer);
 					spin_unlock_irqrestore(&ide_lock, flags);
 					return;
 				}
@@ -1497,7 +1496,7 @@ void ide_timer_expiry(unsigned long data)
 					startstop = ide_stopped;
 					dma_timeout_retry(drive, ch->hwgroup->rq);
 				} else
-					startstop = ide_error(drive, "irq timeout", GET_STAT());
+					startstop = ide_error(drive, ch->hwgroup->rq, "irq timeout", GET_STAT());
 			}
 			set_recovery_timer(ch);
 			enable_irq(ch->irq);
@@ -1507,7 +1506,7 @@ void ide_timer_expiry(unsigned long data)
 		}
 	}
 
-	ide_do_request(hwgroup->XXX_drive->channel, 0);
+	ide_do_request(ch->drive->channel, 0);
 
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
@@ -1617,7 +1616,7 @@ void ata_irq_request(int irq, void *data, struct pt_regs *regs)
 		}
 		goto out_lock;
 	}
-	drive = hwgroup->XXX_drive;
+	drive = ch->drive;
 	if (!drive_is_ready(drive)) {
 		/*
 		 * This happens regularly when we share a PCI IRQ with another device.
@@ -1631,7 +1630,7 @@ void ata_irq_request(int irq, void *data, struct pt_regs *regs)
 	if (!test_and_set_bit(IDE_BUSY, &hwgroup->flags))
 		printk(KERN_ERR "%s: %s: hwgroup was not busy!?\n", drive->name, __FUNCTION__);
 	hwgroup->handler = NULL;
-	del_timer(&hwgroup->timer);
+	del_timer(&ch->timer);
 	spin_unlock(&ide_lock);
 
 	if (ch->unmask)
@@ -2002,7 +2001,7 @@ void ide_unregister(struct ata_channel *ch)
 	 */
 
 	hwgroup = ch->hwgroup;
-	d = hwgroup->XXX_drive;
+	d = ch->drive;
 	for (i = 0; i < MAX_DRIVES; ++i) {
 		struct ata_device *drive = &ch->drives[i];
 
@@ -2013,8 +2012,9 @@ void ide_unregister(struct ata_channel *ch)
 		if (!drive->present)
 			continue;
 
-		if (hwgroup->XXX_drive == drive)
-			hwgroup->XXX_drive = NULL;
+		/* FIXME: possibly unneccessary */
+		if (ch->drive == drive)
+			ch->drive = NULL;
 
 		if (drive->id != NULL) {
 			kfree(drive->id);
@@ -2024,7 +2024,7 @@ void ide_unregister(struct ata_channel *ch)
 		blk_cleanup_queue(&drive->queue);
 	}
 	if (d->present)
-		hwgroup->XXX_drive = d;
+		ch->drive = d;
 
 
 	/*
@@ -2220,84 +2220,6 @@ int ide_register(int arg1, int arg2, int irq)
 	return ide_register_hw(&hw, NULL);
 }
 
-void ide_add_setting(struct ata_device *drive, const char *name, int rw, int read_ioctl, int write_ioctl, int data_type, int min, int max, int mul_factor, int div_factor, void *data, ide_procset_t *set)
-{
-	ide_settings_t **p = &drive->settings;
-	ide_settings_t *setting = NULL;
-
-	while ((*p) && strcmp((*p)->name, name) < 0)
-		p = &((*p)->next);
-	if ((setting = kmalloc(sizeof(*setting), GFP_KERNEL)) == NULL)
-		goto abort;
-	memset(setting, 0, sizeof(*setting));
-	if ((setting->name = kmalloc(strlen(name) + 1, GFP_KERNEL)) == NULL)
-		goto abort;
-	strcpy(setting->name, name);		setting->rw = rw;
-	setting->read_ioctl = read_ioctl;	setting->write_ioctl = write_ioctl;
-	setting->data_type = data_type;		setting->min = min;
-	setting->max = max;			setting->mul_factor = mul_factor;
-	setting->div_factor = div_factor;	setting->data = data;
-	setting->set = set;			setting->next = *p;
-	if (drive->driver)
-		setting->auto_remove = 1;
-	*p = setting;
-	return;
-abort:
-	if (setting)
-		kfree(setting);
-}
-
-void ide_remove_setting(struct ata_device *drive, char *name)
-{
-	ide_settings_t **p = &drive->settings, *setting;
-
-	while ((*p) && strcmp((*p)->name, name))
-		p = &((*p)->next);
-	if ((setting = (*p)) == NULL)
-		return;
-	(*p) = setting->next;
-	kfree(setting->name);
-	kfree(setting);
-}
-
-static void auto_remove_settings(struct ata_device *drive)
-{
-	ide_settings_t *setting;
-repeat:
-	setting = drive->settings;
-	while (setting) {
-		if (setting->auto_remove) {
-			ide_remove_setting(drive, setting->name);
-			goto repeat;
-		}
-		setting = setting->next;
-	}
-}
-
-int ide_read_setting(struct ata_device *drive, ide_settings_t *setting)
-{
-	int val = -EINVAL;
-	unsigned long flags;
-
-	if ((setting->rw & SETTING_READ)) {
-		spin_lock_irqsave(&ide_lock, flags);
-		switch(setting->data_type) {
-			case TYPE_BYTE:
-				val = *((u8 *) setting->data);
-				break;
-			case TYPE_SHORT:
-				val = *((u16 *) setting->data);
-				break;
-			case TYPE_INT:
-			case TYPE_INTA:
-				val = *((u32 *) setting->data);
-				break;
-		}
-		spin_unlock_irqrestore(&ide_lock, flags);
-	}
-	return val;
-}
-
 int ide_spin_wait_hwgroup(struct ata_device *drive)
 {
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
@@ -2322,46 +2244,6 @@ int ide_spin_wait_hwgroup(struct ata_device *drive)
 	return 0;
 }
 
-/*
- * FIXME:  This should be changed to enqueue a special request
- * to the driver to change settings, and then wait on a semaphore for completion.
- * The current scheme of polling is kludgey, though safe enough.
- */
-int ide_write_setting(struct ata_device *drive, ide_settings_t *setting, int val)
-{
-	int i;
-	u32 *p;
-
-	if (!capable(CAP_SYS_ADMIN))
-		return -EACCES;
-	if (!(setting->rw & SETTING_WRITE))
-		return -EPERM;
-	if (val < setting->min || val > setting->max)
-		return -EINVAL;
-	if (setting->set)
-		return setting->set(drive, val);
-	if (ide_spin_wait_hwgroup(drive))
-		return -EBUSY;
-	switch (setting->data_type) {
-		case TYPE_BYTE:
-			*((u8 *) setting->data) = val;
-			break;
-		case TYPE_SHORT:
-			*((u16 *) setting->data) = val;
-			break;
-		case TYPE_INT:
-			*((u32 *) setting->data) = val;
-			break;
-		case TYPE_INTA:
-			p = (u32 *) setting->data;
-			for (i = 0; i < 1 << PARTN_BITS; i++, p++)
-				*p = val;
-			break;
-	}
-	spin_unlock_irq(&ide_lock);
-	return 0;
-}
-
 static int set_io_32bit(struct ata_device *drive, int arg)
 {
 	if (drive->channel->no_io_32bit)
@@ -2381,6 +2263,7 @@ static int set_using_dma(struct ata_device *drive, int arg)
 		return -EPERM;
 
 	udma_enable(drive, arg, 1);
+
 	return 0;
 }
 
@@ -2401,20 +2284,6 @@ static int set_pio_mode(struct ata_device *drive, int arg)
 	return 0;
 }
 
-void ide_add_generic_settings(struct ata_device *drive)
-{
-/*			drive	setting name		read/write access				read ioctl		write ioctl		data type	min	max				mul_factor	div_factor	data pointer			set function */
-	ide_add_setting(drive,	"io_32bit",		drive->channel->no_io_32bit ? SETTING_READ : SETTING_RW,	HDIO_GET_32BIT,		HDIO_SET_32BIT,		TYPE_BYTE,	0,	1 + (SUPPORT_VLB_SYNC << 1),	1,		1,		&drive->channel->io_32bit,		set_io_32bit);
-	ide_add_setting(drive,	"pio_mode",		SETTING_WRITE,					-1,			HDIO_SET_PIO_MODE,	TYPE_BYTE,	0,	255,				1,		1,		NULL,				set_pio_mode);
-	ide_add_setting(drive,	"slow",			SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	1,				1,		1,		&drive->channel->slow,			NULL);
-	ide_add_setting(drive,	"unmaskirq",		drive->channel->no_unmask ? SETTING_READ : SETTING_RW,	HDIO_GET_UNMASKINTR,	HDIO_SET_UNMASKINTR,	TYPE_BYTE,	0,	1,				1,		1,		&drive->channel->unmask,			NULL);
-	ide_add_setting(drive,	"using_dma",		SETTING_RW,					HDIO_GET_DMA,		HDIO_SET_DMA,		TYPE_BYTE,	0,	1,				1,		1,		&drive->using_dma,		set_using_dma);
-	ide_add_setting(drive,	"ide_scsi",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	1,				1,		1,		&drive->scsi,			NULL);
-	ide_add_setting(drive,	"init_speed",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	69,				1,		1,		&drive->init_speed,		NULL);
-	ide_add_setting(drive,	"current_speed",	SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	69,				1,		1,		&drive->current_speed,		NULL);
-	ide_add_setting(drive,	"number",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	3,				1,		1,		&drive->dn,			NULL);
-}
-
 /*
  * Delay for *at least* 50ms.  As we don't know how much time is left
  * until the next tick occurs, we wait an extra tick to be safe.
@@ -2433,44 +2302,125 @@ void ide_delay_50ms (void)
 #endif /* CONFIG_BLK_DEV_IDECS */
 }
 
+/*
+ * Handle ioctls.
+ *
+ * NOTE: Due to ridiculous coding habbits in the hdparm utility we have to
+ * always return unsigned long in case we are returning simple values.
+ */
 static int ide_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
-	int err = 0, major, minor;
+	unsigned int major, minor;
 	struct ata_device *drive;
 	struct request rq;
 	kdev_t dev;
-	ide_settings_t *setting;
 
 	dev = inode->i_rdev;
 	major = major(dev); minor = minor(dev);
 	if ((drive = get_info_ptr(inode->i_rdev)) == NULL)
 		return -ENODEV;
 
-	/* Find setting by ioctl */
 
-	setting = drive->settings;
+	/* Contrary to popular beleve we disallow even the reading of the ioctl
+	 * values for users which don't have permission too. We do this becouse
+	 * such information could be used by an attacker to deply a simple-user
+	 * attack, which triggers bugs present only on a particular
+	 * configuration.
+	 */
 
-	while (setting) {
-		if (setting->read_ioctl == cmd || setting->write_ioctl == cmd)
-			break;
-		setting = setting->next;
-	}
-
-	if (setting != NULL) {
-		if (cmd == setting->read_ioctl) {
-			err = ide_read_setting(drive, setting);
-			return err >= 0 ? put_user(err, (long *) arg) : err;
-		} else {
-			if ((minor(inode->i_rdev) & PARTN_MASK))
-				return -EINVAL;
-			return ide_write_setting(drive, setting, arg);
-		}
-	}
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
 
 	ide_init_drive_cmd(&rq);
 	switch (cmd) {
-		case HDIO_GETGEO:
-		{
+		case HDIO_GET_32BIT: {
+			unsigned long val = drive->channel->io_32bit;
+
+			if (put_user(val, (unsigned long *) arg))
+				return -EFAULT;
+			return 0;
+		}
+
+		case HDIO_SET_32BIT: {
+			int val;
+
+			if (arg < 0 || arg > 1 + (SUPPORT_VLB_SYNC << 1))
+				return -EINVAL;
+
+			if (ide_spin_wait_hwgroup(drive))
+				return -EBUSY;
+
+			val = set_io_32bit(drive, arg);
+			spin_unlock_irq(&ide_lock);
+
+			return val;
+		}
+
+		case HDIO_SET_PIO_MODE: {
+			int val;
+
+			if (arg < 0 || arg > 255)
+				return -EINVAL;
+
+			if (ide_spin_wait_hwgroup(drive))
+				return -EBUSY;
+
+			val = set_pio_mode(drive, arg);
+			spin_unlock_irq(&ide_lock);
+
+			return val;
+		}
+
+		case HDIO_GET_UNMASKINTR: {
+			unsigned long val = drive->channel->unmask;
+
+			if (put_user(val, (unsigned long *) arg))
+				return -EFAULT;
+			return 0;
+		}
+
+
+		case HDIO_SET_UNMASKINTR: {
+			if (arg < 0 || arg > 1)
+				return -EINVAL;
+
+			if (ide_spin_wait_hwgroup(drive))
+				return -EBUSY;
+
+			if (drive->channel->no_unmask)
+				return -EIO;
+
+			drive->channel->unmask = arg;
+			spin_unlock_irq(&ide_lock);
+
+			return 0;
+		}
+
+		case HDIO_GET_DMA: {
+			unsigned long val = drive->using_dma;
+
+			if (put_user(val, (unsigned long *) arg))
+				return -EFAULT;
+
+			return 0;
+		}
+
+		case HDIO_SET_DMA: {
+			int val;
+
+			if (arg < 0 || arg > 1)
+				return -EINVAL;
+
+			if (ide_spin_wait_hwgroup(drive))
+				return -EBUSY;
+
+			val = set_using_dma(drive, arg);
+			spin_unlock_irq(&ide_lock);
+
+			return val;
+		}
+
+		case HDIO_GETGEO: {
 			struct hd_geometry *loc = (struct hd_geometry *) arg;
 			unsigned short bios_cyl = drive->bios_cyl; /* truncate */
 
@@ -2484,11 +2434,12 @@ static int ide_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 			return 0;
 		}
 
-		case HDIO_GETGEO_BIG_RAW:
-		{
+		case HDIO_GETGEO_BIG_RAW: {
 			struct hd_big_geometry *loc = (struct hd_big_geometry *) arg;
+
 			if (!loc || (drive->type != ATA_DISK && drive->type != ATA_FLOPPY))
 				return -EINVAL;
+
 			if (put_user(drive->head, (u8 *) &loc->heads)) return -EFAULT;
 			if (put_user(drive->sect, (u8 *) &loc->sectors)) return -EFAULT;
 			if (put_user(drive->cyl, (unsigned int *) &loc->cylinders)) return -EFAULT;
@@ -2532,6 +2483,7 @@ static int ide_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 				return -EPERM;
 			}
 			return 0;
+
 		case BLKGETSIZE:
 		case BLKGETSIZE64:
 		case BLKROSET:
@@ -2566,6 +2518,9 @@ static int ide_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 				drive->channel->busproc(drive, (int)arg);
 			return 0;
 
+		/* Now check whatever this particular ioctl has a special
+		 * implementation.
+		 */
 		default:
 			if (ata_ops(drive) && ata_ops(drive)->ioctl)
 				return ata_ops(drive)->ioctl(drive, inode, file, cmd, arg);
@@ -2573,7 +2528,7 @@ static int ide_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 	}
 }
 
-static int ide_check_media_change (kdev_t i_rdev)
+static int ide_check_media_change(kdev_t i_rdev)
 {
 	struct ata_device *drive;
 	int res = 0; /* not changed */
@@ -3201,7 +3156,6 @@ int ide_unregister_subdriver(struct ata_device *drive)
 #if defined(CONFIG_BLK_DEV_ISAPNP) && defined(CONFIG_ISAPNP) && defined(MODULE)
 	pnpide_init(0);
 #endif
-	auto_remove_settings(drive);
 	drive->driver = NULL;
 	drive->present = 0;
 
@@ -3255,7 +3209,6 @@ devfs_handle_t ide_devfs_handle;
 EXPORT_SYMBOL(ide_lock);
 EXPORT_SYMBOL(drive_is_flashcard);
 EXPORT_SYMBOL(ide_timer_expiry);
-EXPORT_SYMBOL(ide_add_generic_settings);
 EXPORT_SYMBOL(do_ide_request);
 /*
  * Driver module
@@ -3278,8 +3231,6 @@ EXPORT_SYMBOL(ide_revalidate_disk);
 EXPORT_SYMBOL(ide_cmd);
 EXPORT_SYMBOL(ide_delay_50ms);
 EXPORT_SYMBOL(ide_stall_queue);
-EXPORT_SYMBOL(ide_add_setting);
-EXPORT_SYMBOL(ide_remove_setting);
 
 EXPORT_SYMBOL(ide_register_hw);
 EXPORT_SYMBOL(ide_register);

@@ -7,14 +7,15 @@
 #
 # Note 2! The CFLAGS definition is now in the main makefile...
 
+USE_STANDARD_AS_RULE := true
+
 OBJCOPY = $(CROSS_COMPILE)objcopy
 
 O_TARGET := 
 
-include $(TOPDIR)/Rules.make
+EXTRA_AFLAGS := -traditional
 
-.S.o:
-	$(CC) -D__ASSEMBLY__ $(AFLAGS) -traditional -c $< -o $*.o
+include $(TOPDIR)/Rules.make
 
 %.lnk: %.o
 	$(LD) -Ttext 0x0 -o $@ $<

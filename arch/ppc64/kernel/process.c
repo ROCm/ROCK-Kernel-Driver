@@ -256,19 +256,25 @@ void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp)
 int sys_clone(int p1, int p2, int p3, int p4, int p5, int p6,
 	      struct pt_regs *regs)
 {
-	return do_fork(p1, regs->gpr[1], regs, 0);
+	struct task_struct *p;
+	p = do_fork(p1 & ~CLONE_IDLETASK, regs->gpr[1], regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 int sys_fork(int p1, int p2, int p3, int p4, int p5, int p6,
 	     struct pt_regs *regs)
 {
-	return do_fork(SIGCHLD, regs->gpr[1], regs, 0);
+	struct task_struct *p;
+	p = do_fork(SIGCHLD, regs->gpr[1], regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 int sys_vfork(int p1, int p2, int p3, int p4, int p5, int p6,
 			 struct pt_regs *regs)
 {
-	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gpr[1], regs, 0);
+	struct task_struct *p;
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gpr[1], regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 int sys_execve(unsigned long a0, unsigned long a1, unsigned long a2,

@@ -276,16 +276,20 @@ asmlinkage int sys_fork(unsigned long r4, unsigned long r5,
 			unsigned long r6, unsigned long r7,
 			struct pt_regs regs)
 {
-	return do_fork(SIGCHLD, regs.regs[15], &regs, 0);
+	struct task_struct *p;
+	p = do_fork(SIGCHLD, regs.regs[15], &regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 asmlinkage int sys_clone(unsigned long clone_flags, unsigned long newsp,
 			 unsigned long r6, unsigned long r7,
 			 struct pt_regs regs)
 {
+	struct task_struct *p;
 	if (!newsp)
 		newsp = regs.regs[15];
-	return do_fork(clone_flags, newsp, &regs, 0);
+	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 /*
@@ -302,7 +306,9 @@ asmlinkage int sys_vfork(unsigned long r4, unsigned long r5,
 			 unsigned long r6, unsigned long r7,
 			 struct pt_regs regs)
 {
-	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.regs[15], &regs, 0);
+	struct task_struct *p;
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.regs[15], &regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 /*

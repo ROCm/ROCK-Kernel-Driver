@@ -11,11 +11,6 @@
 # unless it's something special (ie not a .c file).
 #
 
-.S.s:
-	$(CPP) $(CFLAGS) $< -o $*.s
-.S.o:
-	$(CC) $(CFLAGS) -c $< -o $*.o
-
 all: ivr.o
 
 O_TARGET := ivr.o

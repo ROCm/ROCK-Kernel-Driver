@@ -500,7 +500,7 @@ __kernel_thread:
 	ldo	CLONE_VM(%r0), %r26   /* Force CLONE_VM since only init_mm */
 	or	%r26, %r24, %r26      /* will have kernel mappings.	 */
 	copy	%r0, %r25
-	bl	do_fork, %r2
+	bl	do_fork_FIXME_NOW_RETURNS_TASK_STRUCT, %r2
 	copy	%r1, %r24
 
 	/* Parent Returns here */

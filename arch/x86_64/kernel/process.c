@@ -608,14 +608,18 @@ void set_personality_64bit(void)
 
 asmlinkage long sys_fork(struct pt_regs regs)
 {
-	return do_fork(SIGCHLD, regs.rsp, &regs, 0);
+	struct task_struct *p;
+	p = do_fork(SIGCHLD, regs.rsp, &regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, struct pt_regs regs)
 {
+	struct task_struct *p;
 	if (!newsp)
 		newsp = regs.rsp;
-	return do_fork(clone_flags, newsp, &regs, 0);
+	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 /*
@@ -630,7 +634,9 @@ asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, struct
  */
 asmlinkage long sys_vfork(struct pt_regs regs)
 {
-	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.rsp, &regs, 0);
+	struct task_struct *p;
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.rsp, &regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 /*

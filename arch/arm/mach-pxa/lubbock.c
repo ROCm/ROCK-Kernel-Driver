@@ -120,7 +120,7 @@ static int __init lubbock_init(void)
 __initcall(lubbock_init);
 
 static void __init
-fixup_lubbock(struct machine_desc *desc, struct param_struct *params,
+fixup_lubbock(struct machine_desc *desc, struct tag *tags,
 		char **cmdline, struct meminfo *mi)
 {
 	SET_BANK (0, 0xa0000000, 64*1024*1024);

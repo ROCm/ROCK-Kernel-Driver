@@ -158,7 +158,8 @@
  *
  *	We have the following to choose from:
  *	  v3		- ARMv3
- *	  v4		- ARMv4 without minicache
+ *	  v4wt		- ARMv4 with writethrough cache, without minicache
+ *	  v4wb		- ARMv4 with writeback cache, without minicache
  *	  v4_mc		- ARMv4 with minicache
  *	  v5te_mc	- ARMv5TE with minicache
  */
@@ -173,13 +174,21 @@
 # endif
 #endif
 
-#if defined(CONFIG_CPU_ARM720T) || defined(CONFIG_CPU_ARM920T) || \
-    defined(CONFIG_CPU_ARM922T) || defined(CONFIG_CPU_ARM926T) || \
-    defined(CONFIG_CPU_SA110)   || defined(CONFIG_CPU_ARM1020)
+#if defined(CONFIG_CPU_ARM720T)
 # ifdef _USER
 #  define MULTI_USER 1
 # else
-#  define _USER v4
+#  define _USER v4wt
+# endif
+#endif
+
+#if defined(CONFIG_CPU_ARM920T) || defined(CONFIG_CPU_ARM922T) || \
+    defined(CONFIG_CPU_ARM926T) || defined(CONFIG_CPU_SA110)   || \
+    defined(CONFIG_CPU_ARM1020)
+# ifdef _USER
+#  define MULTI_USER 1
+# else
+#  define _USER v4wb
 # endif
 #endif
 

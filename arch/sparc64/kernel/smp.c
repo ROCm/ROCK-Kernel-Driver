@@ -268,7 +268,7 @@ void __init smp_boot_cpus(void)
 			int no;
 
 			prom_printf("Starting CPU %d... ", i);
-			kernel_thread(NULL, NULL, CLONE_PID);
+			kernel_thread(NULL, NULL, CLONE_IDLETASK);
 			cpucount++;
 
 			p = prev_task(&init_task);

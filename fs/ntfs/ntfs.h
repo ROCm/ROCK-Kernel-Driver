@@ -26,14 +26,11 @@
 
 #include <linux/version.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,5)
-#	error The NTFS driver requires at least kernel 2.5.5.
-#endif
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/compiler.h>
 #include <linux/fs.h>
+#include <linux/buffer_head.h>
 #include <linux/nls.h>
 #include <linux/pagemap.h>
 #include <linux/smp.h>
@@ -48,10 +45,6 @@
 #include "layout.h"
 #include "attrib.h"
 #include "mft.h"
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-typedef long sector_t;
-#endif
 
 typedef enum {
 	NTFS_BLOCK_SIZE		= 512,
