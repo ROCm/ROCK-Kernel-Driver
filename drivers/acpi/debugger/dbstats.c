@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbstats - Generation and display of ACPI table statistics
- *              $Revision: 55 $
+ *              $Revision: 59 $
  *
  ******************************************************************************/
 
@@ -26,8 +26,6 @@
 
 #include <acpi.h>
 #include <acdebug.h>
-#include <amlcode.h>
-#include <acparser.h>
 #include <acnamesp.h>
 
 #ifdef ENABLE_DEBUGGER
@@ -38,7 +36,7 @@
 /*
  * Statistics subcommands
  */
-ARGUMENT_INFO               acpi_db_stat_types [] =
+static ARGUMENT_INFO        acpi_db_stat_types [] =
 { {"ALLOCATIONS"},
 	{"OBJECTS"},
 	{"MEMORY"},
@@ -49,13 +47,13 @@ ARGUMENT_INFO               acpi_db_stat_types [] =
 	{NULL}           /* Must be null terminated */
 };
 
-#define CMD_ALLOCATIONS     0
-#define CMD_OBJECTS         1
-#define CMD_MEMORY          2
-#define CMD_MISC            3
-#define CMD_TABLES          4
-#define CMD_SIZES           5
-#define CMD_STACK           6
+#define CMD_STAT_ALLOCATIONS     0
+#define CMD_STAT_OBJECTS         1
+#define CMD_STAT_MEMORY          2
+#define CMD_STAT_MISC            3
+#define CMD_STAT_TABLES          4
+#define CMD_STAT_SIZES           5
+#define CMD_STAT_STACK           6
 
 
 /*******************************************************************************
@@ -142,6 +140,9 @@ acpi_db_enumerate_object (
 		acpi_db_enumerate_object (obj_desc->thermal_zone.sys_handler);
 		acpi_db_enumerate_object (obj_desc->thermal_zone.drv_handler);
 		acpi_db_enumerate_object (obj_desc->thermal_zone.addr_handler);
+		break;
+
+	default:
 		break;
 	}
 }
@@ -232,7 +233,7 @@ acpi_db_classify_one_object (
  *
  ******************************************************************************/
 
-acpi_status
+void
 acpi_db_count_namespace_objects (
 	void)
 {
@@ -249,10 +250,8 @@ acpi_db_count_namespace_objects (
 		acpi_gbl_node_type_count [i] = 0;
 	}
 
-	acpi_ns_walk_namespace (ACPI_TYPE_ANY, ACPI_ROOT_OBJECT, ACPI_UINT32_MAX,
+	(void) acpi_ns_walk_namespace (ACPI_TYPE_ANY, ACPI_ROOT_OBJECT, ACPI_UINT32_MAX,
 			   FALSE, acpi_db_classify_one_object, NULL, NULL);
-
-	return (AE_OK);
 }
 
 #endif
@@ -305,14 +304,14 @@ acpi_db_display_statistics (
 	switch (type)
 	{
 #ifndef PARSER_ONLY
-	case CMD_ALLOCATIONS:
+	case CMD_STAT_ALLOCATIONS:
 #ifdef ACPI_DBG_TRACK_ALLOCATIONS
 		acpi_ut_dump_allocation_info ();
 #endif
 		break;
 #endif
 
-	case CMD_TABLES:
+	case CMD_STAT_TABLES:
 
 		acpi_os_printf ("ACPI Table Information:\n\n");
 		if (acpi_gbl_DSDT)
@@ -321,13 +320,13 @@ acpi_db_display_statistics (
 		}
 		break;
 
-	case CMD_OBJECTS:
+	case CMD_STAT_OBJECTS:
 
 #ifndef PARSER_ONLY
 
 		acpi_db_count_namespace_objects ();
 
-		acpi_os_printf ("\n_objects defined in the current namespace:\n\n");
+		acpi_os_printf ("\nObjects defined in the current namespace:\n\n");
 
 		acpi_os_printf ("%16.16s % 10.10s % 10.10s\n", "ACPI_TYPE", "NODES", "OBJECTS");
 
@@ -345,7 +344,7 @@ acpi_db_display_statistics (
 #endif
 		break;
 
-	case CMD_MEMORY:
+	case CMD_STAT_MEMORY:
 
 #ifdef ACPI_DBG_TRACK_ALLOCATIONS
 		acpi_os_printf ("\n----Object and Cache Statistics---------------------------------------------\n");
@@ -391,9 +390,9 @@ acpi_db_display_statistics (
 
 		break;
 
-	case CMD_MISC:
+	case CMD_STAT_MISC:
 
-		acpi_os_printf ("\n_miscellaneous Statistics:\n\n");
+		acpi_os_printf ("\nMiscellaneous Statistics:\n\n");
 		acpi_os_printf ("Calls to Acpi_ps_find:.. ........% 7ld\n", acpi_gbl_ps_find_count);
 		acpi_os_printf ("Calls to Acpi_ns_lookup:..........% 7ld\n", acpi_gbl_ns_lookup_count);
 
@@ -407,9 +406,9 @@ acpi_db_display_statistics (
 		break;
 
 
-	case CMD_SIZES:
+	case CMD_STAT_SIZES:
 
-		acpi_os_printf ("\n_internal object sizes:\n\n");
+		acpi_os_printf ("\nInternal object sizes:\n\n");
 
 		acpi_os_printf ("Common         %3d\n", sizeof (ACPI_OBJECT_COMMON));
 		acpi_os_printf ("Number         %3d\n", sizeof (ACPI_OBJECT_INTEGER));
@@ -436,23 +435,29 @@ acpi_db_display_statistics (
 
 		acpi_os_printf ("\n");
 
-		acpi_os_printf ("Parse_object   %3d\n", sizeof (acpi_parse_object));
-		acpi_os_printf ("Parse2_object  %3d\n", sizeof (acpi_parse2_object));
+		acpi_os_printf ("Parse_object   %3d\n", sizeof (ACPI_PARSE_OBJ_COMMON));
+		acpi_os_printf ("Parse_object_named %3d\n", sizeof (ACPI_PARSE_OBJ_NAMED));
+		acpi_os_printf ("Parse_object_asl %3d\n", sizeof (ACPI_PARSE_OBJ_ASL));
 		acpi_os_printf ("Operand_object %3d\n", sizeof (acpi_operand_object));
 		acpi_os_printf ("Namespace_node %3d\n", sizeof (acpi_namespace_node));
 
 		break;
 
 
-	case CMD_STACK:
+	case CMD_STAT_STACK:
+#if defined(ACPI_DEBUG)
 
-		size = acpi_gbl_entry_stack_pointer - acpi_gbl_lowest_stack_pointer;
+		size = (u32) (acpi_gbl_entry_stack_pointer - acpi_gbl_lowest_stack_pointer);
 
-		acpi_os_printf ("\n_subsystem Stack Usage:\n\n");
+		acpi_os_printf ("\nSubsystem Stack Usage:\n\n");
 		acpi_os_printf ("Entry Stack Pointer        %X\n", acpi_gbl_entry_stack_pointer);
 		acpi_os_printf ("Lowest Stack Pointer       %X\n", acpi_gbl_lowest_stack_pointer);
 		acpi_os_printf ("Stack Use                  %X (%d)\n", size, size);
 		acpi_os_printf ("Deepest Procedure Nesting  %d\n", acpi_gbl_deepest_nesting);
+#endif
+		break;
+
+	default:
 		break;
 	}
 

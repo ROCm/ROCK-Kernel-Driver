@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rscalc - Calculate stream and list lengths
- *              $Revision: 39 $
+ *              $Revision: 42 $
  *
  ******************************************************************************/
 
@@ -35,7 +35,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_calculate_byte_stream_length
+ * FUNCTION:    Acpi_rs_get_byte_stream_length
  *
  * PARAMETERS:  Linked_list         - Pointer to the resource linked list
  *              Size_needed         - u32 pointer of the size buffer needed
@@ -50,7 +50,7 @@
  ******************************************************************************/
 
 acpi_status
-acpi_rs_calculate_byte_stream_length (
+acpi_rs_get_byte_stream_length (
 	acpi_resource           *linked_list,
 	ACPI_SIZE               *size_needed)
 {
@@ -60,7 +60,7 @@ acpi_rs_calculate_byte_stream_length (
 	u8                      done = FALSE;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_calculate_byte_stream_length");
+	ACPI_FUNCTION_TRACE ("Rs_get_byte_stream_length");
 
 
 	while (!done) {
@@ -180,9 +180,9 @@ acpi_rs_calculate_byte_stream_length (
 			 */
 			segment_size = 16;
 
-			if (NULL != linked_list->data.address16.resource_source.string_ptr) {
-				segment_size += (1 +
-					linked_list->data.address16.resource_source.string_length);
+			if (linked_list->data.address16.resource_source.string_ptr) {
+				segment_size += linked_list->data.address16.resource_source.string_length;
+				segment_size++;
 			}
 			break;
 
@@ -196,9 +196,9 @@ acpi_rs_calculate_byte_stream_length (
 			 */
 			segment_size = 26;
 
-			if (NULL != linked_list->data.address32.resource_source.string_ptr) {
-				segment_size += (1 +
-					linked_list->data.address32.resource_source.string_length);
+			if (linked_list->data.address32.resource_source.string_ptr) {
+				segment_size += linked_list->data.address32.resource_source.string_length;
+				segment_size++;
 			}
 			break;
 
@@ -212,9 +212,9 @@ acpi_rs_calculate_byte_stream_length (
 			 */
 			segment_size = 46;
 
-			if (NULL != linked_list->data.address64.resource_source.string_ptr) {
-				segment_size += (1 +
-					linked_list->data.address64.resource_source.string_length);
+			if (linked_list->data.address64.resource_source.string_ptr) {
+				segment_size += linked_list->data.address64.resource_source.string_length;
+				segment_size++;
 			}
 			break;
 
@@ -229,11 +229,11 @@ acpi_rs_calculate_byte_stream_length (
 			 * Resource Source + 1 for the null.
 			 */
 			segment_size = 9 +
-				((linked_list->data.extended_irq.number_of_interrupts - 1) * 4);
+				(((ACPI_SIZE) linked_list->data.extended_irq.number_of_interrupts - 1) * 4);
 
-			if (NULL != ex_irq->resource_source.string_ptr) {
-				segment_size += (1 +
-					linked_list->data.extended_irq.resource_source.string_length);
+			if (ex_irq && ex_irq->resource_source.string_ptr) {
+				segment_size += linked_list->data.extended_irq.resource_source.string_length;
+				segment_size++;
 			}
 			break;
 
@@ -268,7 +268,7 @@ acpi_rs_calculate_byte_stream_length (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_calculate_list_length
+ * FUNCTION:    Acpi_rs_get_list_length
  *
  * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource byte stream
  *              Byte_stream_buffer_length - Size of Byte_stream_buffer
@@ -285,7 +285,7 @@ acpi_rs_calculate_byte_stream_length (
  ******************************************************************************/
 
 acpi_status
-acpi_rs_calculate_list_length (
+acpi_rs_get_list_length (
 	u8                      *byte_stream_buffer,
 	u32                     byte_stream_buffer_length,
 	ACPI_SIZE               *size_needed)
@@ -304,7 +304,7 @@ acpi_rs_calculate_list_length (
 	u8                      additional_bytes;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_calculate_list_length");
+	ACPI_FUNCTION_TRACE ("Rs_get_list_length");
 
 
 	while (bytes_parsed < byte_stream_buffer_length) {
@@ -705,7 +705,7 @@ acpi_rs_calculate_list_length (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_calculate_pci_routing_table_length
+ * FUNCTION:    Acpi_rs_get_pci_routing_table_length
  *
  * PARAMETERS:  Package_object          - Pointer to the package object
  *              Buffer_size_needed      - u32 pointer of the size buffer
@@ -721,12 +721,12 @@ acpi_rs_calculate_list_length (
  ******************************************************************************/
 
 acpi_status
-acpi_rs_calculate_pci_routing_table_length (
+acpi_rs_get_pci_routing_table_length (
 	acpi_operand_object     *package_object,
 	ACPI_SIZE               *buffer_size_needed)
 {
 	u32                     number_of_elements;
-	u32                     temp_size_needed = 0;
+	ACPI_SIZE               temp_size_needed = 0;
 	acpi_operand_object     **top_object_list;
 	u32                     index;
 	acpi_operand_object     *package_element;
@@ -735,7 +735,7 @@ acpi_rs_calculate_pci_routing_table_length (
 	u32                     table_index;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_calculate_pci_routing_table_length");
+	ACPI_FUNCTION_TRACE ("Rs_get_pci_routing_table_length");
 
 
 	number_of_elements = package_object->package.count;
@@ -788,7 +788,7 @@ acpi_rs_calculate_pci_routing_table_length (
 		/*
 		 * Was a String type found?
 		 */
-		if (TRUE == name_found) {
+		if (name_found) {
 			if (ACPI_TYPE_STRING == (*sub_object_list)->common.type) {
 				/*
 				 * The length String.Length field includes the

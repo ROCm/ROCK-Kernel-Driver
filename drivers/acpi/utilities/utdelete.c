@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utdelete - object deletion and reference count utilities
- *              $Revision: 88 $
+ *              $Revision: 90 $
  *
  ******************************************************************************/
 
@@ -27,8 +27,6 @@
 #include "acpi.h"
 #include "acinterp.h"
 #include "acnamesp.h"
-#include "actables.h"
-#include "acparser.h"
 
 #define _COMPONENT          ACPI_UTILITIES
 	 ACPI_MODULE_NAME    ("utdelete")
@@ -114,7 +112,7 @@ acpi_ut_delete_internal_obj (
 			object, object->mutex.semaphore));
 
 		acpi_ex_unlink_mutex (object);
-		acpi_os_delete_semaphore (object->mutex.semaphore);
+		(void) acpi_os_delete_semaphore (object->mutex.semaphore);
 		break;
 
 
@@ -123,7 +121,7 @@ acpi_ut_delete_internal_obj (
 		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "***** Event %p, Semaphore %p\n",
 			object, object->event.semaphore));
 
-		acpi_os_delete_semaphore (object->event.semaphore);
+		(void) acpi_os_delete_semaphore (object->event.semaphore);
 		object->event.semaphore = NULL;
 		break;
 
@@ -135,7 +133,7 @@ acpi_ut_delete_internal_obj (
 		/* Delete the method semaphore if it exists */
 
 		if (object->method.semaphore) {
-			acpi_os_delete_semaphore (object->method.semaphore);
+			(void) acpi_os_delete_semaphore (object->method.semaphore);
 			object->method.semaphore = NULL;
 		}
 		break;
@@ -205,14 +203,14 @@ acpi_ut_delete_internal_obj (
  *
  * PARAMETERS:  *Obj_list       - Pointer to the list to be deleted
  *
- * RETURN:      Status          - the status of the call
+ * RETURN:      None
  *
  * DESCRIPTION: This function deletes an internal object list, including both
  *              simple objects and package objects
  *
  ******************************************************************************/
 
-acpi_status
+void
 acpi_ut_delete_internal_object_list (
 	acpi_operand_object     **obj_list)
 {
@@ -231,7 +229,7 @@ acpi_ut_delete_internal_object_list (
 	/* Free the combined parameter pointer list and object array */
 
 	ACPI_MEM_FREE (obj_list);
-	return_ACPI_STATUS (AE_OK);
+	return_VOID;
 }
 
 
@@ -411,7 +409,7 @@ acpi_ut_update_object_reference (
 			status = acpi_ut_create_update_state_and_push (object->device.addr_handler,
 					   action, &state_list);
 			if (ACPI_FAILURE (status)) {
-				return_ACPI_STATUS (status);
+				goto error_exit;
 			}
 
 			acpi_ut_update_ref_count (object->device.sys_handler, action);
@@ -448,7 +446,7 @@ acpi_ut_update_object_reference (
 				status = acpi_ut_create_update_state_and_push (
 						 object->package.elements[i], action, &state_list);
 				if (ACPI_FAILURE (status)) {
-					return_ACPI_STATUS (status);
+					goto error_exit;
 				}
 			}
 			break;
@@ -458,9 +456,8 @@ acpi_ut_update_object_reference (
 
 			status = acpi_ut_create_update_state_and_push (
 					 object->buffer_field.buffer_obj, action, &state_list);
-
 			if (ACPI_FAILURE (status)) {
-				return_ACPI_STATUS (status);
+				goto error_exit;
 			}
 			break;
 
@@ -470,7 +467,7 @@ acpi_ut_update_object_reference (
 			status = acpi_ut_create_update_state_and_push (
 					 object->field.region_obj, action, &state_list);
 			if (ACPI_FAILURE (status)) {
-				return_ACPI_STATUS (status);
+				goto error_exit;
 			}
 		   break;
 
@@ -480,13 +477,13 @@ acpi_ut_update_object_reference (
 			status = acpi_ut_create_update_state_and_push (
 					 object->bank_field.bank_obj, action, &state_list);
 			if (ACPI_FAILURE (status)) {
-				return_ACPI_STATUS (status);
+				goto error_exit;
 			}
 
 			status = acpi_ut_create_update_state_and_push (
 					 object->bank_field.region_obj, action, &state_list);
 			if (ACPI_FAILURE (status)) {
-				return_ACPI_STATUS (status);
+				goto error_exit;
 			}
 			break;
 
@@ -496,19 +493,20 @@ acpi_ut_update_object_reference (
 			status = acpi_ut_create_update_state_and_push (
 					 object->index_field.index_obj, action, &state_list);
 			if (ACPI_FAILURE (status)) {
-				return_ACPI_STATUS (status);
+				goto error_exit;
 			}
 
 			status = acpi_ut_create_update_state_and_push (
 					 object->index_field.data_obj, action, &state_list);
 			if (ACPI_FAILURE (status)) {
-				return_ACPI_STATUS (status);
+				goto error_exit;
 			}
 			break;
 
 
 		case ACPI_TYPE_REGION:
 		case INTERNAL_TYPE_REFERENCE:
+		default:
 
 			/* No subobjects */
 			break;
@@ -527,6 +525,14 @@ acpi_ut_update_object_reference (
 	}
 
 	return_ACPI_STATUS (AE_OK);
+
+
+error_exit:
+
+	ACPI_REPORT_ERROR (("Could not update object reference count, %s\n",
+		acpi_format_exception (status)));
+
+	return_ACPI_STATUS (status);
 }
 
 
@@ -561,7 +567,7 @@ acpi_ut_add_reference (
 	/*
 	 * We have a valid ACPI internal object, now increment the reference count
 	 */
-	acpi_ut_update_object_reference (object, REF_INCREMENT);
+	(void) acpi_ut_update_object_reference (object, REF_INCREMENT);
 	return_VOID;
 }
 
@@ -610,7 +616,7 @@ acpi_ut_remove_reference (
 	 * if the reference count becomes 0.  (Must also decrement the ref count
 	 * of all subobjects!)
 	 */
-	acpi_ut_update_object_reference (object, REF_DECREMENT);
+	(void) acpi_ut_update_object_reference (object, REF_DECREMENT);
 	return_VOID;
 }
 

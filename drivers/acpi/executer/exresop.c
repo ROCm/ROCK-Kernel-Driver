@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresop - AML Interpreter operand/object resolution
- *              $Revision: 48 $
+ *              $Revision: 50 $
  *
  *****************************************************************************/
 
@@ -28,11 +28,8 @@
 #include "acpi.h"
 #include "amlcode.h"
 #include "acparser.h"
-#include "acdispat.h"
 #include "acinterp.h"
 #include "acnamesp.h"
-#include "actables.h"
-#include "acevents.h"
 
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -168,7 +165,7 @@ acpi_ex_resolve_operands (
 			break;
 
 
-		case ACPI_DESC_TYPE_INTERNAL:
+		case ACPI_DESC_TYPE_OPERAND:
 
 			/* ACPI internal object */
 
@@ -243,7 +240,7 @@ acpi_ex_resolve_operands (
 		switch (this_arg_type) {
 		case ARGI_REF_OR_STRING:        /* Can be a String or Reference */
 
-			if ((ACPI_GET_DESCRIPTOR_TYPE (obj_desc) == ACPI_DESC_TYPE_INTERNAL) &&
+			if ((ACPI_GET_DESCRIPTOR_TYPE (obj_desc) == ACPI_DESC_TYPE_OPERAND) &&
 				(ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_STRING)) {
 				/*
 				 * String found - the string references a named object and must be
@@ -253,6 +250,7 @@ acpi_ex_resolve_operands (
 			}
 
 			/* Else not a string - fall through to the normal Reference case below */
+			/*lint -fallthrough */
 
 		case ARGI_REFERENCE:            /* References: */
 		case ARGI_INTEGER_REF:
@@ -299,6 +297,10 @@ acpi_ex_resolve_operands (
 				((*stack_ptr)->reference.opcode == AML_INDEX_OP)) {
 				goto next_operand;
 			}
+			break;
+
+		default:
+			/* All cases covered above */
 			break;
 		}
 

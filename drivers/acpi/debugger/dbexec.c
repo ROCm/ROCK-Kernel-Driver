@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbexec - debugger control method execution
- *              $Revision: 39 $
+ *              $Revision: 41 $
  *
  ******************************************************************************/
 
@@ -25,15 +25,7 @@
 
 
 #include "acpi.h"
-#include "acparser.h"
-#include "acdispat.h"
-#include "amlcode.h"
-#include "acnamesp.h"
-#include "acparser.h"
-#include "acevents.h"
-#include "acinterp.h"
 #include "acdebug.h"
-#include "actables.h"
 
 #ifdef ENABLE_DEBUGGER
 
@@ -41,7 +33,7 @@
 	 ACPI_MODULE_NAME    ("dbexec")
 
 
-acpi_db_method_info         acpi_gbl_db_method_info;
+static acpi_db_method_info  acpi_gbl_db_method_info;
 
 
 /*******************************************************************************
@@ -127,7 +119,7 @@ acpi_db_execute_method (
 
 void
 acpi_db_execute_setup (
-	acpi_db_method_info         *info)
+	acpi_db_method_info     *info)
 {
 
 	/* Catenate the current scope to the supplied name */
@@ -172,7 +164,8 @@ acpi_db_execute_setup (
  ******************************************************************************/
 
 u32
-acpi_db_get_outstanding_allocations (void)
+acpi_db_get_outstanding_allocations (
+	void)
 {
 	u32                     outstanding = 0;
 
@@ -309,7 +302,10 @@ acpi_db_method_thread (
 
 	/* Signal our completion */
 
-	acpi_os_signal_semaphore (info->thread_gate, 1);
+	status = acpi_os_signal_semaphore (info->thread_gate, 1);
+	if (ACPI_FAILURE (status)) {
+		acpi_os_printf ("Could not signal debugger semaphore\n");
+	}
 }
 
 
@@ -373,7 +369,10 @@ acpi_db_create_execution_threads (
 	acpi_os_printf ("Creating %X threads to execute %X times each\n", num_threads, num_loops);
 
 	for (i = 0; i < (num_threads); i++) {
-		acpi_os_queue_for_execution (OSD_PRIORITY_MED, acpi_db_method_thread, &acpi_gbl_db_method_info);
+		status = acpi_os_queue_for_execution (OSD_PRIORITY_MED, acpi_db_method_thread, &acpi_gbl_db_method_info);
+		if (ACPI_FAILURE (status)) {
+			break;
+		}
 	}
 
 	/* Wait for all threads to complete */
@@ -386,7 +385,7 @@ acpi_db_create_execution_threads (
 
 	/* Cleanup and exit */
 
-	acpi_os_delete_semaphore (thread_gate);
+	(void) acpi_os_delete_semaphore (thread_gate);
 
 	acpi_db_set_output_destination (ACPI_DB_DUPLICATE_OUTPUT);
 	acpi_os_printf ("All threads (%X) have completed\n", num_threads);

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utdebug - Debug print routines
- *              $Revision: 97 $
+ *              $Revision: 103 $
  *
  *****************************************************************************/
 
@@ -30,12 +30,11 @@
 	 ACPI_MODULE_NAME    ("utdebug")
 
 
-u32             acpi_gbl_prev_thread_id = 0xFFFFFFFF;
-char            *acpi_gbl_fn_entry_str = "----Entry";
-char            *acpi_gbl_fn_exit_str = "----Exit-";
-
-
 #ifdef ACPI_DEBUG
+
+static u32   acpi_gbl_prev_thread_id = 0xFFFFFFFF;
+static char     *acpi_gbl_fn_entry_str = "----Entry";
+static char     *acpi_gbl_fn_exit_str = "----Exit-";
 
 
 /*****************************************************************************
@@ -132,7 +131,6 @@ acpi_ut_debug_print (
 		return;
 	}
 
-
 	/*
 	 * Thread tracking and context switch notification
 	 */
@@ -151,14 +149,13 @@ acpi_ut_debug_print (
 	 * Display the module name, current line number, thread ID (if requested),
 	 * current procedure nesting level, and the current procedure name
 	 */
-	acpi_os_printf ("%8s-%04d ", dbg_info->module_name, line_number);
+	acpi_os_printf ("%8s-%04ld ", dbg_info->module_name, line_number);
 
 	if (ACPI_LV_THREADS & acpi_dbg_level) {
-		acpi_os_printf ("[%04X] ", thread_id, acpi_gbl_nesting_level, dbg_info->proc_name);
+		acpi_os_printf ("[%04lX] ", thread_id, acpi_gbl_nesting_level, dbg_info->proc_name);
 	}
 
-	acpi_os_printf ("[%02d] %-22.22s: ", acpi_gbl_nesting_level, dbg_info->proc_name);
-
+	acpi_os_printf ("[%02ld] %-22.22s: ", acpi_gbl_nesting_level, dbg_info->proc_name);
 
 	va_start (args, format);
 	acpi_os_vprintf (format, args);
@@ -202,7 +199,6 @@ acpi_ut_debug_print_raw (
 	}
 
 	va_start (args, format);
-
 	acpi_os_vprintf (format, args);
 }
 
@@ -495,8 +491,8 @@ acpi_ut_dump_buffer (
 	u32                     display,
 	u32                     component_id)
 {
-	u32                     i = 0;
-	u32                     j;
+	NATIVE_UINT             i = 0;
+	NATIVE_UINT             j;
 	u32                     temp32;
 	u8                      buf_char;
 
@@ -512,7 +508,7 @@ acpi_ut_dump_buffer (
 		display = DB_BYTE_DISPLAY;
 	}
 
-	acpi_os_printf ("\n_offset Value\n");
+	acpi_os_printf ("\nOffset Value\n");
 
 	/*
 	 * Nasty little dump buffer routine!
@@ -521,7 +517,6 @@ acpi_ut_dump_buffer (
 		/* Print current offset */
 
 		acpi_os_printf ("%05X  ", i);
-
 
 		/* Print 16 hex chars */
 
@@ -576,12 +571,10 @@ acpi_ut_dump_buffer (
 			}
 		}
 
-
 		/*
 		 * Print the ASCII equivalent characters
 		 * But watch out for the bad unprintable ones...
 		 */
-
 		for (j = 0; j < 16; j++) {
 			if (i + j >= count) {
 				acpi_os_printf ("\n");

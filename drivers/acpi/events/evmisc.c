@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evmisc - Miscellaneous event manager support functions
- *              $Revision: 48 $
+ *              $Revision: 53 $
  *
  *****************************************************************************/
 
@@ -27,7 +27,6 @@
 #include "acevents.h"
 #include "acnamesp.h"
 #include "acinterp.h"
-#include "achware.h"
 
 #define _COMPONENT          ACPI_EVENTS
 	 ACPI_MODULE_NAME    ("evmisc")
@@ -178,7 +177,7 @@ acpi_ev_queue_notify_request (
 	}
 
 	/*
-	 * Get the notify object attached to the device Node
+	 * Get the notify object attached to the NS Node
 	 */
 	obj_desc = acpi_ns_get_attached_object (node);
 	if (obj_desc) {
@@ -186,25 +185,21 @@ acpi_ev_queue_notify_request (
 
 		switch (node->type) {
 		case ACPI_TYPE_DEVICE:
-
-			if (notify_value <= ACPI_MAX_SYS_NOTIFY) {
-				handler_obj = obj_desc->device.sys_handler;
-			}
-			else {
-				handler_obj = obj_desc->device.drv_handler;
-			}
-			break;
-
-
 		case ACPI_TYPE_THERMAL:
+		case ACPI_TYPE_PROCESSOR:
+		case ACPI_TYPE_POWER:
 
 			if (notify_value <= ACPI_MAX_SYS_NOTIFY) {
-				handler_obj = obj_desc->thermal_zone.sys_handler;
+				handler_obj = obj_desc->common_notify.sys_handler;
 			}
 			else {
-				handler_obj = obj_desc->thermal_zone.drv_handler;
+				handler_obj = obj_desc->common_notify.drv_handler;
 			}
 			break;
+
+		default:
+			/* All other types are not supported */
+			return (AE_TYPE);
 		}
 	}
 
@@ -323,14 +318,19 @@ static void ACPI_SYSTEM_XFACE
 acpi_ev_global_lock_thread (
 	void                    *context)
 {
+	acpi_status             status;
+
 
 	/* Signal threads that are waiting for the lock */
 
 	if (acpi_gbl_global_lock_thread_count) {
 		/* Send sufficient units to the semaphore */
 
-		acpi_os_signal_semaphore (acpi_gbl_global_lock_semaphore,
+		status = acpi_os_signal_semaphore (acpi_gbl_global_lock_semaphore,
 				 acpi_gbl_global_lock_thread_count);
+		if (ACPI_FAILURE (status)) {
+			ACPI_REPORT_ERROR (("Could not signal Global Lock semaphore\n"));
+		}
 	}
 }
 
@@ -352,6 +352,7 @@ acpi_ev_global_lock_handler (
 	void                    *context)
 {
 	u8                      acquired = FALSE;
+	acpi_status             status;
 
 
 	/*
@@ -367,8 +368,14 @@ acpi_ev_global_lock_handler (
 
 		/* Run the Global Lock thread which will signal all waiting threads */
 
-		acpi_os_queue_for_execution (OSD_PRIORITY_HIGH, acpi_ev_global_lock_thread,
-				  context);
+		status = acpi_os_queue_for_execution (OSD_PRIORITY_HIGH,
+				  acpi_ev_global_lock_thread, context);
+		if (ACPI_FAILURE (status)) {
+			ACPI_REPORT_ERROR (("Could not queue Global Lock thread, %s\n",
+				acpi_format_exception (status)));
+
+			return (ACPI_INTERRUPT_NOT_HANDLED);
+		}
 	}
 
 	return (ACPI_INTERRUPT_HANDLED);
@@ -487,10 +494,11 @@ acpi_ev_acquire_global_lock (
  *
  ******************************************************************************/
 
-void
+acpi_status
 acpi_ev_release_global_lock (void)
 {
 	u8                      pending = FALSE;
+	acpi_status             status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("Ev_release_global_lock");
@@ -498,7 +506,7 @@ acpi_ev_release_global_lock (void)
 
 	if (!acpi_gbl_global_lock_thread_count) {
 		ACPI_REPORT_WARNING(("Cannot release HW Global Lock, it has not been acquired\n"));
-		return_VOID;
+		return_ACPI_STATUS (AE_NOT_ACQUIRED);
 	}
 
 	/* One fewer thread has the global lock */
@@ -507,7 +515,7 @@ acpi_ev_release_global_lock (void)
 	if (acpi_gbl_global_lock_thread_count) {
 		/* There are still some threads holding the lock, cannot release */
 
-		return_VOID;
+		return_ACPI_STATUS (AE_OK);
 	}
 
 	/*
@@ -522,10 +530,10 @@ acpi_ev_release_global_lock (void)
 	 * register
 	 */
 	if (pending) {
-		acpi_hw_bit_register_write (ACPI_BITREG_GLOBAL_LOCK_RELEASE, 1, ACPI_MTX_LOCK);
+		status = acpi_set_register (ACPI_BITREG_GLOBAL_LOCK_RELEASE, 1, ACPI_MTX_LOCK);
 	}
 
-	return_VOID;
+	return_ACPI_STATUS (status);
 }
 
 

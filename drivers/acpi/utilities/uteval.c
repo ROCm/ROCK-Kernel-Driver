@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: uteval - Object evaluation
- *              $Revision: 38 $
+ *              $Revision: 39 $
  *
  *****************************************************************************/
 
@@ -69,11 +69,11 @@ acpi_ut_evaluate_numeric_object (
 	if (ACPI_FAILURE (status)) {
 		if (status == AE_NOT_FOUND) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%s on %4.4s was not found\n",
-				object_name, (char *) &device_node->name));
+				object_name, device_node->name.ascii));
 		}
 		else {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%s on %4.4s failed with status %s\n",
-				object_name, (char *) &device_node->name,
+				object_name, device_node->name.ascii,
 				acpi_format_exception (status)));
 		}
 
@@ -148,11 +148,11 @@ acpi_ut_execute_HID (
 	if (ACPI_FAILURE (status)) {
 		if (status == AE_NOT_FOUND) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "_HID on %4.4s was not found\n",
-				(char *) &device_node->name));
+				device_node->name.ascii));
 		}
 		else {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "_HID on %4.4s failed %s\n",
-				(char *) &device_node->name, acpi_format_exception (status)));
+				device_node->name.ascii, acpi_format_exception (status)));
 		}
 
 		return_ACPI_STATUS (status);
@@ -231,11 +231,11 @@ acpi_ut_execute_CID (
 	if (ACPI_FAILURE (status)) {
 		if (status == AE_NOT_FOUND) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "_CID on %4.4s was not found\n",
-				(char *)&device_node->name));
+				device_node->name.ascii));
 		}
 		else {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "_CID on %4.4s failed %s\n",
-				(char *)&device_node->name, acpi_format_exception (status)));
+				device_node->name.ascii, acpi_format_exception (status)));
 		}
 
 		return_ACPI_STATUS (status);
@@ -325,12 +325,12 @@ acpi_ut_execute_UID (
 	if (ACPI_FAILURE (status)) {
 		if (status == AE_NOT_FOUND) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "_UID on %4.4s was not found\n",
-				(char *) &device_node->name));
+				device_node->name.ascii));
 		}
 		else {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 				"_UID on %4.4s failed %s\n",
-				(char *) &device_node->name, acpi_format_exception (status)));
+				device_node->name.ascii, acpi_format_exception (status)));
 		}
 
 		return (status);
@@ -411,7 +411,7 @@ acpi_ut_execute_STA (
 	if (AE_NOT_FOUND == status) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
 			"_STA on %4.4s was not found, assuming present.\n",
-			(char *) &device_node->name));
+			device_node->name.ascii));
 
 		*flags = 0x0F;
 		status = AE_OK;
@@ -419,7 +419,7 @@ acpi_ut_execute_STA (
 
 	else if (ACPI_FAILURE (status)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "_STA on %4.4s failed %s\n",
-			(char *) &device_node->name,
+			device_node->name.ascii,
 			acpi_format_exception (status)));
 	}
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actables.h - ACPI table management
- *       $Revision: 36 $
+ *       $Revision: 41 $
  *
  *****************************************************************************/
 
@@ -63,6 +63,15 @@ acpi_tb_get_table_count (
  * tbget - Table "get" routines
  */
 
+void
+acpi_tb_table_override (
+	acpi_table_desc         *table_info);
+
+acpi_status
+acpi_tb_get_table_with_override (
+	ACPI_POINTER            *address,
+	acpi_table_desc         *table_info);
+
 acpi_status
 acpi_tb_get_table_ptr (
 	acpi_table_type         table_type,
@@ -90,7 +99,7 @@ acpi_status
 acpi_tb_get_table_pointer (
 	ACPI_POINTER            *address,
 	u32                     flags,
-	u32                     *size,
+	ACPI_SIZE               *size,
 	acpi_table_header       **table_ptr);
 
 /*
@@ -99,8 +108,7 @@ acpi_tb_get_table_pointer (
 
 acpi_status
 acpi_tb_get_all_tables (
-	u32                     number_of_tables,
-	acpi_table_header       *buffer_ptr);
+	u32                     number_of_tables);
 
 
 /*
@@ -109,7 +117,6 @@ acpi_tb_get_all_tables (
 
 acpi_status
 acpi_tb_install_table (
-	acpi_table_header       *table_ptr,
 	acpi_table_desc         *table_info);
 
 acpi_status
@@ -119,7 +126,6 @@ acpi_tb_match_signature (
 
 acpi_status
 acpi_tb_recognize_table (
-	acpi_table_header       *table_ptr,
 	acpi_table_desc         *table_info);
 
 acpi_status
@@ -186,7 +192,7 @@ acpi_tb_find_table (
 acpi_status
 acpi_tb_map_acpi_table (
 	ACPI_PHYSICAL_ADDRESS   physical_address,
-	u32                     *size,
+	ACPI_SIZE               *size,
 	acpi_table_header       **logical_address);
 
 acpi_status

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acglobal.h - Declarations for global variables
- *       $Revision: 121 $
+ *       $Revision: 125 $
  *
  *****************************************************************************/
 
@@ -80,6 +80,14 @@ ACPI_EXTERN FACS_DESCRIPTOR            *acpi_gbl_FACS;
 ACPI_EXTERN acpi_common_facs            acpi_gbl_common_fACS;
 
 /*
+ * Handle both ACPI 1.0 and ACPI 2.0 Integer widths
+ * If we are running a method that exists in a 32-bit ACPI table.
+ * Use only 32 bits of the Integer for conversion.
+ */
+ACPI_EXTERN u8                          acpi_gbl_integer_bit_width;
+ACPI_EXTERN u8                          acpi_gbl_integer_byte_width;
+
+/*
  * Since there may be multiple SSDTs and PSDTS, a single pointer is not
  * sufficient; Therefore, there isn't one!
  */
@@ -109,6 +117,7 @@ ACPI_EXTERN acpi_mutex_info             acpi_gbl_acpi_mutex_info [NUM_MTX];
 ACPI_EXTERN ACPI_MEMORY_LIST            acpi_gbl_memory_lists[ACPI_NUM_MEM_LISTS];
 ACPI_EXTERN ACPI_OBJECT_NOTIFY_HANDLER  acpi_gbl_drv_notify;
 ACPI_EXTERN ACPI_OBJECT_NOTIFY_HANDLER  acpi_gbl_sys_notify;
+ACPI_EXTERN ACPI_INIT_HANDLER           acpi_gbl_init_handler;
 ACPI_EXTERN acpi_walk_state            *acpi_gbl_breakpoint_walk;
 ACPI_EXTERN acpi_handle                 acpi_gbl_global_lock_semaphore;
 
@@ -131,6 +140,7 @@ extern u8                               acpi_gbl_shutdown;
 extern u32                              acpi_gbl_startup_flags;
 extern const u8                         acpi_gbl_decode_to8bit[8];
 extern const NATIVE_CHAR                *acpi_gbl_db_sleep_states[ACPI_NUM_SLEEP_STATES];
+extern const acpi_opcode_info           acpi_gbl_aml_op_info[AML_NUM_OPCODES];
 
 
 /*****************************************************************************
@@ -186,7 +196,7 @@ ACPI_EXTERN acpi_parse_object           *acpi_gbl_parsed_namespace_root;
  *
  ****************************************************************************/
 
-ACPI_EXTERN ACPI_BIT_REGISTER_INFO      acpi_gbl_bit_register_info[ACPI_NUM_BITREG];
+extern      ACPI_BIT_REGISTER_INFO      acpi_gbl_bit_register_info[ACPI_NUM_BITREG];
 ACPI_EXTERN u8                          acpi_gbl_sleep_type_a;
 ACPI_EXTERN u8                          acpi_gbl_sleep_type_b;
 
@@ -229,13 +239,11 @@ ACPI_EXTERN u8                          acpi_gbl_db_output_flags;
 
 #ifdef ENABLE_DEBUGGER
 
-ACPI_EXTERN u8                          acpi_gbl_method_executing;
-ACPI_EXTERN u8                          acpi_gbl_db_terminate_threads;
+extern      u8                          acpi_gbl_method_executing;
+extern      u8                          acpi_gbl_db_terminate_threads;
 
 ACPI_EXTERN int                         optind;
 ACPI_EXTERN NATIVE_CHAR                *optarg;
-ACPI_EXTERN u8                         *aml_start;
-ACPI_EXTERN u32                         aml_length;
 
 ACPI_EXTERN u8                          acpi_gbl_db_opt_tables;
 ACPI_EXTERN u8                          acpi_gbl_db_opt_disasm;

@@ -2,7 +2,7 @@
  *
  * Module Name: nsobject - Utilities for objects attached to namespace
  *                         table entries
- *              $Revision: 80 $
+ *              $Revision: 82 $
  *
  ******************************************************************************/
 
@@ -26,10 +26,7 @@
 
 
 #include "acpi.h"
-#include "amlcode.h"
 #include "acnamesp.h"
-#include "acinterp.h"
-#include "actables.h"
 
 
 #define _COMPONENT          ACPI_NAMESPACE
@@ -141,13 +138,7 @@ acpi_ns_attach_object (
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Installing %p into Node %p [%4.4s]\n",
-		obj_desc, node, (char *) &node->name));
-
-	/*
-	 * Must increment the new value's reference count
-	 * (if it is an internal object)
-	 */
-	acpi_ut_add_reference (obj_desc);
+		obj_desc, node, node->name.ascii));
 
 	/* Detach an existing attached object if present */
 
@@ -155,19 +146,26 @@ acpi_ns_attach_object (
 		acpi_ns_detach_object (node);
 	}
 
+	if (obj_desc) {
+		/*
+		 * Must increment the new value's reference count
+		 * (if it is an internal object)
+		 */
+		acpi_ut_add_reference (obj_desc);
 
-	/*
-	 * Handle objects with multiple descriptors - walk
-	 * to the end of the descriptor list
-	 */
-	last_obj_desc = obj_desc;
-	while (last_obj_desc->common.next_object) {
-		last_obj_desc = last_obj_desc->common.next_object;
+		/*
+		 * Handle objects with multiple descriptors - walk
+		 * to the end of the descriptor list
+		 */
+		last_obj_desc = obj_desc;
+		while (last_obj_desc->common.next_object) {
+			last_obj_desc = last_obj_desc->common.next_object;
+		}
+
+		/* Install the object at the front of the object list */
+
+		last_obj_desc->common.next_object = node->object;
 	}
-
-	/* Install the object at the front of the object list */
-
-	last_obj_desc->common.next_object = node->object;
 
 	node->type     = (u8) object_type;
 	node->object   = obj_desc;
@@ -209,7 +207,7 @@ acpi_ns_detach_object (
 	/* Clear the entry in all cases */
 
 	node->object = NULL;
-	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) == ACPI_DESC_TYPE_INTERNAL) {
+	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) == ACPI_DESC_TYPE_OPERAND) {
 		node->object = obj_desc->common.next_object;
 		if (node->object &&
 		   (node->object->common.type != INTERNAL_TYPE_DATA)) {
@@ -222,7 +220,7 @@ acpi_ns_detach_object (
 	node->type = ACPI_TYPE_ANY;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Node %p [%4.4s] Object %p\n",
-		node, (char *) &node->name, obj_desc));
+		node, node->name.ascii, obj_desc));
 
 	/* Remove one reference on the object (and all subobjects) */
 
@@ -255,8 +253,8 @@ acpi_ns_get_attached_object (
 	}
 
 	if (!node->object ||
-			((ACPI_GET_DESCRIPTOR_TYPE (node->object) != ACPI_DESC_TYPE_INTERNAL)  &&
-			 (ACPI_GET_DESCRIPTOR_TYPE (node->object) != ACPI_DESC_TYPE_NAMED))    ||
+			((ACPI_GET_DESCRIPTOR_TYPE (node->object) != ACPI_DESC_TYPE_OPERAND) &&
+			 (ACPI_GET_DESCRIPTOR_TYPE (node->object) != ACPI_DESC_TYPE_NAMED))  ||
 		(node->object->common.type == INTERNAL_TYPE_DATA)) {
 		return_PTR (NULL);
 	}

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exsystem - Interface to OS services
- *              $Revision: 71 $
+ *              $Revision: 73 $
  *
  *****************************************************************************/
 
@@ -27,8 +27,6 @@
 
 #include "acpi.h"
 #include "acinterp.h"
-#include "acnamesp.h"
-#include "achware.h"
 #include "acevents.h"
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -246,8 +244,8 @@ acpi_ex_system_release_mutex (
 	 * Support for the _GL_ Mutex object -- release the global lock
 	 */
 	if (obj_desc->mutex.semaphore == acpi_gbl_global_lock_semaphore) {
-		acpi_ev_release_global_lock ();
-		return_ACPI_STATUS (AE_OK);
+		status = acpi_ev_release_global_lock ();
+		return_ACPI_STATUS (status);
 	}
 
 	status = acpi_os_signal_semaphore (obj_desc->mutex.semaphore, 1);
@@ -350,7 +348,7 @@ acpi_ex_system_reset_event (
 	 */
 	status = acpi_os_create_semaphore (ACPI_NO_UNIT_LIMIT, 0, &temp_semaphore);
 	if (ACPI_SUCCESS (status)) {
-		acpi_os_delete_semaphore (obj_desc->event.semaphore);
+		(void) acpi_os_delete_semaphore (obj_desc->event.semaphore);
 		obj_desc->event.semaphore = temp_semaphore;
 	}
 

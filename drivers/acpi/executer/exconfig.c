@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconfig - Namespace reconfiguration (Load/Unload opcodes)
- *              $Revision: 60 $
+ *              $Revision: 65 $
  *
  *****************************************************************************/
 
@@ -25,13 +25,11 @@
 
 
 #include "acpi.h"
-#include "acparser.h"
 #include "acinterp.h"
 #include "amlcode.h"
 #include "acnamesp.h"
 #include "acevents.h"
 #include "actables.h"
-#include "acdispat.h"
 
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -77,11 +75,11 @@ acpi_ex_add_table (
 	/* Install the new table into the local data structures */
 
 	table_info.pointer     = table;
-	table_info.length      = table->length;
+	table_info.length      = (ACPI_SIZE) table->length;
 	table_info.allocation  = ACPI_MEM_ALLOCATED;
 	table_info.base_pointer = table;
 
-	status = acpi_tb_install_table (NULL, &table_info);
+	status = acpi_tb_install_table (&table_info);
 	if (ACPI_FAILURE (status)) {
 		goto cleanup;
 	}
@@ -92,7 +90,7 @@ acpi_ex_add_table (
 	if (ACPI_FAILURE (status)) {
 		/* Uninstall table on error */
 
-		acpi_tb_uninstall_table (table_info.installed_desc);
+		(void) acpi_tb_uninstall_table (table_info.installed_desc);
 		goto cleanup;
 	}
 
@@ -227,10 +225,10 @@ acpi_ex_load_table_op (
 	if (parameter_node) {
 		/* Store the parameter data into the optional parameter object */
 
-		status = acpi_ex_store (operand[5], (acpi_operand_object *) parameter_node,
+		status = acpi_ex_store (operand[5], ACPI_CAST_PTR (acpi_operand_object, parameter_node),
 				 walk_state);
 		if (ACPI_FAILURE (status)) {
-			acpi_ex_unload_table (ddb_handle);
+			(void) acpi_ex_unload_table (ddb_handle);
 		}
 	}
 
@@ -267,7 +265,6 @@ acpi_ex_load_op (
 	acpi_table_header       table_header;
 	u32                     i;
 
-
 	ACPI_FUNCTION_TRACE ("Ex_load_op");
 
 
@@ -285,7 +282,7 @@ acpi_ex_load_op (
 		for (i = 0; i < sizeof (acpi_table_header); i++) {
 			status = acpi_ev_address_space_dispatch (obj_desc, ACPI_READ,
 					   (ACPI_PHYSICAL_ADDRESS) i, 8,
-					   (acpi_integer *) ((u8 *) &table_header + i));
+					   ((u8 *) &table_header) + i);
 			if (ACPI_FAILURE (status)) {
 				return_ACPI_STATUS (status);
 			}
@@ -308,7 +305,7 @@ acpi_ex_load_op (
 		for (i = 0; i < table_header.length; i++) {
 			status = acpi_ev_address_space_dispatch (obj_desc, ACPI_READ,
 					   (ACPI_PHYSICAL_ADDRESS) i, 8,
-					   (acpi_integer *) (table_data_ptr + i));
+					   ((u8 *) table_data_ptr + i));
 			if (ACPI_FAILURE (status)) {
 				goto cleanup;
 			}
@@ -334,7 +331,7 @@ acpi_ex_load_op (
 			goto cleanup;
 		}
 
-		table_ptr = (acpi_table_header *) buffer_desc->buffer.pointer;
+		table_ptr = ACPI_CAST_PTR (acpi_table_header, buffer_desc->buffer.pointer);
 		break;
 
 
@@ -352,7 +349,7 @@ acpi_ex_load_op (
 				 acpi_gbl_acpi_table_data[ACPI_TABLE_SSDT].sig_length))) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Table has invalid signature [%4.4s], must be SSDT or PSDT\n",
-			(char *) &table_ptr->signature));
+			table_ptr->signature));
 		status = AE_BAD_SIGNATURE;
 		goto cleanup;
 	}
@@ -368,7 +365,7 @@ acpi_ex_load_op (
 
 	status = acpi_ex_store (ddb_handle, target, walk_state);
 	if (ACPI_FAILURE (status)) {
-		acpi_ex_unload_table (ddb_handle);
+		(void) acpi_ex_unload_table (ddb_handle);
 	}
 
 	return_ACPI_STATUS (status);
@@ -417,7 +414,7 @@ acpi_ex_unload_table (
 	 * validated here.
 	 */
 	if ((!ddb_handle) ||
-		(ACPI_GET_DESCRIPTOR_TYPE (ddb_handle) != ACPI_DESC_TYPE_INTERNAL) ||
+		(ACPI_GET_DESCRIPTOR_TYPE (ddb_handle) != ACPI_DESC_TYPE_OPERAND) ||
 		(((acpi_operand_object  *)ddb_handle)->common.type !=
 				INTERNAL_TYPE_REFERENCE)) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
@@ -431,14 +428,11 @@ acpi_ex_unload_table (
 	 * Delete the entire namespace under this table Node
 	 * (Offset contains the Table_id)
 	 */
-	status = acpi_ns_delete_namespace_by_owner (table_info->table_id);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
+	acpi_ns_delete_namespace_by_owner (table_info->table_id);
 
 	/* Delete the table itself */
 
-	acpi_tb_uninstall_table (table_info->installed_desc);
+	(void) acpi_tb_uninstall_table (table_info->installed_desc);
 
 	/* Delete the table descriptor (Ddb_handle) */
 

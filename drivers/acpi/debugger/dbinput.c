@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbinput - user front-end to the AML debugger
- *              $Revision: 81 $
+ *              $Revision: 86 $
  *
  ******************************************************************************/
 
@@ -25,10 +25,6 @@
 
 
 #include "acpi.h"
-#include "acparser.h"
-#include "actables.h"
-#include "acnamesp.h"
-#include "acinterp.h"
 #include "acdebug.h"
 
 
@@ -67,6 +63,7 @@ enum acpi_ex_debugger_commands
 	CMD_HISTORY_EXE,
 	CMD_HISTORY_LAST,
 	CMD_INFORMATION,
+	CMD_INTEGRITY,
 	CMD_INTO,
 	CMD_LEVEL,
 	CMD_LIST,
@@ -97,7 +94,7 @@ enum acpi_ex_debugger_commands
 #define CMD_FIRST_VALID     2
 
 
-const COMMAND_INFO          acpi_gbl_db_commands[] =
+static const COMMAND_INFO       acpi_gbl_db_commands[] =
 { {"<NOT FOUND>",  0},
 	{"<NULL>",       0},
 	{"ALLOCATIONS",  0},
@@ -120,6 +117,7 @@ const COMMAND_INFO          acpi_gbl_db_commands[] =
 	{"!",            1},
 	{"!!",           0},
 	{"INFORMATION",  0},
+	{"INTEGRITY",    0},
 	{"INTO",         0},
 	{"LEVEL",        0},
 	{"LIST",         0},
@@ -190,7 +188,7 @@ acpi_db_display_help (
 	switch (help_type[0])
 	{
 	case 'G':
-		acpi_os_printf ("\n_general-Purpose Commands\n\n");
+		acpi_os_printf ("\nGeneral-Purpose Commands\n\n");
 		acpi_os_printf ("Allocations                       Display list of current memory allocations\n");
 		acpi_os_printf ("Dump <Address>|<Namepath>\n");
 		acpi_os_printf ("   [Byte|Word|Dword|Qword]        Display ACPI objects or memory\n");
@@ -209,7 +207,7 @@ acpi_db_display_help (
 		return;
 
 	case 'N':
-		acpi_os_printf ("\n_namespace Access Commands\n\n");
+		acpi_os_printf ("\nNamespace Access Commands\n\n");
 		acpi_os_printf ("Debug <Namepath> [Arguments]      Single Step a control method\n");
 		acpi_os_printf ("Event <F|G> <Value>               Generate Acpi_event (Fixed/GPE)\n");
 		acpi_os_printf ("Execute <Namepath> [Arguments]    Execute control method\n");
@@ -227,7 +225,7 @@ acpi_db_display_help (
 		return;
 
 	case 'M':
-		acpi_os_printf ("\n_control Method Execution Commands\n\n");
+		acpi_os_printf ("\nControl Method Execution Commands\n\n");
 		acpi_os_printf ("Arguments (or Args)               Display method arguments\n");
 		acpi_os_printf ("Breakpoint <Aml_offset>           Set an AML execution breakpoint\n");
 		acpi_os_printf ("Call                              Run to next control method invocation\n");
@@ -244,14 +242,14 @@ acpi_db_display_help (
 		return;
 
 	case 'F':
-		acpi_os_printf ("\n_file I/O Commands\n\n");
+		acpi_os_printf ("\nFile I/O Commands\n\n");
 		acpi_os_printf ("Close                             Close debug output file\n");
 		acpi_os_printf ("Open <Output Filename>            Open a file for debug output\n");
 		acpi_os_printf ("Load <Input Filename>             Load ACPI table from a file\n");
 		return;
 
 	default:
-		acpi_os_printf ("Unrecognized Command Class: %x\n", help_type);
+		acpi_os_printf ("Unrecognized Command Class: %X\n", help_type);
 		return;
 	}
 }
@@ -526,7 +524,7 @@ acpi_db_command_dispatch (
 		break;
 
 	case CMD_FIND:
-		acpi_db_find_name_in_namespace (acpi_gbl_db_args[1]);
+		status = acpi_db_find_name_in_namespace (acpi_gbl_db_args[1]);
 		break;
 
 	case CMD_GO:
@@ -572,6 +570,10 @@ acpi_db_command_dispatch (
 
 	case CMD_INFORMATION:
 		acpi_db_display_method_info (op);
+		break;
+
+	case CMD_INTEGRITY:
+		acpi_db_check_integrity ();
 		break;
 
 	case CMD_INTO:
@@ -623,7 +625,7 @@ acpi_db_command_dispatch (
 		break;
 
 	case CMD_METHODS:
-		acpi_db_display_objects ("METHOD", acpi_gbl_db_args[1]);
+		status = acpi_db_display_objects ("METHOD", acpi_gbl_db_args[1]);
 		break;
 
 	case CMD_NAMESPACE:
@@ -636,7 +638,8 @@ acpi_db_command_dispatch (
 		break;
 
 	case CMD_OBJECT:
-		acpi_db_display_objects (ACPI_STRUPR (acpi_gbl_db_args[1]), acpi_gbl_db_args[2]);
+		ACPI_STRUPR (acpi_gbl_db_args[1]);
+		status = acpi_db_display_objects (acpi_gbl_db_args[1], acpi_gbl_db_args[2]);
 		break;
 
 	case CMD_OPEN:
@@ -668,11 +671,11 @@ acpi_db_command_dispatch (
 		break;
 
 	case CMD_STATS:
-		acpi_db_display_statistics (acpi_gbl_db_args[1]);
+		status = acpi_db_display_statistics (acpi_gbl_db_args[1]);
 		break;
 
 	case CMD_STOP:
-		return (AE_AML_ERROR);
+		return (AE_NOT_IMPLEMENTED);
 
 	case CMD_TABLES:
 		acpi_db_display_table_info (acpi_gbl_db_args[1]);
@@ -722,6 +725,7 @@ acpi_db_command_dispatch (
 		return (AE_CTRL_TERMINATE);
 
 	case CMD_NOT_FOUND:
+	default:
 		acpi_os_printf ("Unknown Command\n");
 		return (AE_CTRL_TRUE);
 	}
@@ -794,13 +798,11 @@ void
 acpi_db_single_thread (
 	void)
 {
-	acpi_status             status;
-
 
 	acpi_gbl_method_executing = FALSE;
 	acpi_gbl_step_to_next_call = FALSE;
 
-	status = acpi_db_command_dispatch (acpi_gbl_db_line_buf, NULL, NULL);
+	(void) acpi_db_command_dispatch (acpi_gbl_db_line_buf, NULL, NULL);
 }
 
 
@@ -847,8 +849,7 @@ acpi_db_user_commands (
 
 		/* Get the user input line */
 
-		acpi_os_get_line (acpi_gbl_db_line_buf);
-
+		(void) acpi_os_get_line (acpi_gbl_db_line_buf);
 
 		/* Check for single or multithreaded debug */
 
@@ -882,7 +883,7 @@ acpi_db_user_commands (
 	 * Only this thread (the original thread) should actually terminate the subsystem,
 	 * because all the semaphores are deleted during termination
 	 */
-	acpi_terminate ();
+	status = acpi_terminate ();
 	return (status);
 }
 

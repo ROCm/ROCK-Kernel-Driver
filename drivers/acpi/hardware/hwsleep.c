@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Name: hwsleep.c - ACPI Hardware Sleep/Wake Interface
- *              $Revision: 37 $
+ *              $Revision: 45 $
  *
  *****************************************************************************/
 
@@ -25,8 +25,6 @@
  */
 
 #include "acpi.h"
-#include "acnamesp.h"
-#include "achware.h"
 
 #define _COMPONENT          ACPI_HARDWARE
 	 ACPI_MODULE_NAME    ("hwsleep")
@@ -56,10 +54,12 @@ acpi_set_firmware_waking_vector (
 	/* Set the vector */
 
 	if (acpi_gbl_common_fACS.vector_width == 32) {
-		*(u32 *) acpi_gbl_common_fACS.firmware_waking_vector = (u32) physical_address;
+		*(ACPI_CAST_PTR (u32, acpi_gbl_common_fACS.firmware_waking_vector))
+				= (u32) physical_address;
 	}
 	else {
-		*acpi_gbl_common_fACS.firmware_waking_vector = physical_address;
+		*acpi_gbl_common_fACS.firmware_waking_vector
+				= physical_address;
 	}
 
 	return_ACPI_STATUS (AE_OK);
@@ -95,10 +95,12 @@ acpi_get_firmware_waking_vector (
 	/* Get the vector */
 
 	if (acpi_gbl_common_fACS.vector_width == 32) {
-		*physical_address = *(u32 *) acpi_gbl_common_fACS.firmware_waking_vector;
+		*physical_address = (ACPI_PHYSICAL_ADDRESS)
+			*(ACPI_CAST_PTR (u32, acpi_gbl_common_fACS.firmware_waking_vector));
 	}
 	else {
-		*physical_address = *acpi_gbl_common_fACS.firmware_waking_vector;
+		*physical_address =
+			*acpi_gbl_common_fACS.firmware_waking_vector;
 	}
 
 	return_ACPI_STATUS (AE_OK);
@@ -135,7 +137,7 @@ acpi_enter_sleep_state_prep (
 	/*
 	 * _PSW methods could be run here to enable wake-on keyboard, LAN, etc.
 	 */
-	status = acpi_hw_get_sleep_type_data (sleep_state,
+	status = acpi_get_sleep_type_data (sleep_state,
 			  &acpi_gbl_sleep_type_a, &acpi_gbl_sleep_type_b);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
@@ -182,10 +184,12 @@ acpi_status
 acpi_enter_sleep_state (
 	u8                      sleep_state)
 {
-	u16                     PM1Acontrol;
-	u16                     PM1Bcontrol;
+	u32                     PM1Acontrol;
+	u32                     PM1Bcontrol;
 	ACPI_BIT_REGISTER_INFO  *sleep_type_reg_info;
 	ACPI_BIT_REGISTER_INFO  *sleep_enable_reg_info;
+	u32                     in_value;
+	acpi_status             status;
 
 
 	ACPI_FUNCTION_TRACE ("Acpi_enter_sleep_state");
@@ -193,7 +197,7 @@ acpi_enter_sleep_state (
 
 	if ((acpi_gbl_sleep_type_a > ACPI_SLEEP_TYPE_MAX) ||
 		(acpi_gbl_sleep_type_b > ACPI_SLEEP_TYPE_MAX)) {
-		ACPI_REPORT_ERROR (("Sleep values out of range: A=%x B=%x\n",
+		ACPI_REPORT_ERROR (("Sleep values out of range: A=%X B=%X\n",
 			acpi_gbl_sleep_type_a, acpi_gbl_sleep_type_b));
 		return_ACPI_STATUS (AE_AML_OPERAND_VALUE);
 	}
@@ -204,16 +208,34 @@ acpi_enter_sleep_state (
 
 	/* Clear wake status */
 
-	acpi_hw_bit_register_write (ACPI_BITREG_WAKE_STATUS, 1, ACPI_MTX_LOCK);
-	acpi_hw_clear_acpi_status();
+	status = acpi_set_register (ACPI_BITREG_WAKE_STATUS, 1, ACPI_MTX_LOCK);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
-	/* TBD: Disable arbitration here? */
+	status = acpi_hw_clear_acpi_status();
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
-	acpi_hw_disable_non_wakeup_gpes();
+	/* Disable BM arbitration */
+
+	status = acpi_set_register (ACPI_BITREG_ARB_DISABLE, 1, ACPI_MTX_LOCK);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+
+	status = acpi_hw_disable_non_wakeup_gpes();
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
 	/* Get current value of PM1A control */
 
-	PM1Acontrol = (u16) acpi_hw_register_read (ACPI_MTX_LOCK, ACPI_REGISTER_PM1_CONTROL);
+	status = acpi_hw_register_read (ACPI_MTX_LOCK, ACPI_REGISTER_PM1_CONTROL, &PM1Acontrol);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 	ACPI_DEBUG_PRINT ((ACPI_DB_OK, "Entering S%d\n", sleep_state));
 
 	/* Clear SLP_EN and SLP_TYP fields */
@@ -228,8 +250,15 @@ acpi_enter_sleep_state (
 
 	/* Write #1: fill in SLP_TYP data */
 
-	acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1A_CONTROL, PM1Acontrol);
-	acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1B_CONTROL, PM1Bcontrol);
+	status = acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1A_CONTROL, PM1Acontrol);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+
+	status = acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1B_CONTROL, PM1Bcontrol);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
 	/* Insert SLP_ENABLE bit */
 
@@ -237,26 +266,48 @@ acpi_enter_sleep_state (
 	PM1Bcontrol |= sleep_enable_reg_info->access_bit_mask;
 
 	/* Write #2: SLP_TYP + SLP_EN */
-	ACPI_FLUSH_CPU_CACHE();
 
-	acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1A_CONTROL, PM1Acontrol);
-	acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1B_CONTROL, PM1Bcontrol);
+	ACPI_FLUSH_CPU_CACHE ();
+
+	status = acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1A_CONTROL, PM1Acontrol);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+
+	status = acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1B_CONTROL, PM1Bcontrol);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
 	/*
 	 * Wait a second, then try again. This is to get S4/5 to work on all machines.
 	 */
 	if (sleep_state > ACPI_STATE_S3) {
-		acpi_os_stall (1000000);
+		/*
+		 * We wait so long to allow chipsets that poll this reg very slowly to
+		 * still read the right value. Ideally, this entire block would go
+		 * away entirely.
+		 */
+		acpi_os_stall (10000000);
 
-		acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1_CONTROL,
-				sleep_enable_reg_info->access_bit_mask);
+		status = acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1_CONTROL,
+				 sleep_enable_reg_info->access_bit_mask);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
 	}
 
 	/* Wait until we enter sleep state */
 
-	while (!acpi_hw_bit_register_read (ACPI_BITREG_WAKE_STATUS, ACPI_MTX_LOCK)) {
+	do {
+		status = acpi_get_register (ACPI_BITREG_WAKE_STATUS, &in_value, ACPI_MTX_LOCK);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
+
 		/* Spin until we wake */
-	}
+
+	} while (!in_value);
 
 	return_ACPI_STATUS (AE_OK);
 }
@@ -311,7 +362,13 @@ acpi_leave_sleep_state (
 
 	/* _WAK returns stuff - do we want to look at it? */
 
-	acpi_hw_enable_non_wakeup_gpes();
+	status = acpi_hw_enable_non_wakeup_gpes();
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
-	return_ACPI_STATUS (AE_OK);
+	/* Disable BM arbitration */
+	status = acpi_set_register (ACPI_BITREG_ARB_DISABLE, 0, ACPI_MTX_LOCK);
+
+	return_ACPI_STATUS (status);
 }

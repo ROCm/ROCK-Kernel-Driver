@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rslist - Linked list utilities
- *              $Revision: 26 $
+ *              $Revision: 30 $
  *
  ******************************************************************************/
 
@@ -70,6 +70,11 @@ acpi_rs_get_resource_type (
 		 * Large Resource Type -- All bits are valid
 		 */
 		return (resource_start_byte);
+
+
+	default:
+		/* No other types of resource descriptor */
+		break;
 	}
 
 	return (0xFF);
@@ -99,7 +104,7 @@ acpi_rs_byte_stream_to_list (
 	u8                      *output_buffer)
 {
 	acpi_status             status;
-	u32                     bytes_parsed = 0;
+	ACPI_SIZE               bytes_parsed = 0;
 	u8                      resource_type = 0;
 	ACPI_SIZE               bytes_consumed = 0;
 	u8                      *buffer = output_buffer;
@@ -111,7 +116,7 @@ acpi_rs_byte_stream_to_list (
 
 
 	while (bytes_parsed < byte_stream_buffer_length &&
-			FALSE == end_tag_processed) {
+			!end_tag_processed) {
 		/*
 		 * The next byte in the stream is the resource type
 		 */
@@ -265,9 +270,9 @@ acpi_rs_byte_stream_to_list (
 
 		default:
 			/*
-			 * Invalid/Unknowns resource type
+			 * Invalid/Unknown resource type
 			 */
-			status = AE_AML_ERROR;
+			status = AE_AML_INVALID_RESOURCE_TYPE;
 			break;
 		}
 
@@ -288,7 +293,7 @@ acpi_rs_byte_stream_to_list (
 		/*
 		 * Set the Buffer to the next structure
 		 */
-		resource = (acpi_resource *)buffer;
+		resource = ACPI_CAST_PTR (acpi_resource, buffer);
 		resource->length = ACPI_ALIGN_RESOURCE_SIZE(resource->length);
 		buffer += ACPI_ALIGN_RESOURCE_SIZE(structure_size);
 
@@ -297,8 +302,8 @@ acpi_rs_byte_stream_to_list (
 	/*
 	 * Check the reason for exiting the while loop
 	 */
-	if (TRUE != end_tag_processed) {
-		return_ACPI_STATUS (AE_AML_ERROR);
+	if (!end_tag_processed) {
+		return_ACPI_STATUS (AE_AML_NO_RESOURCE_END_TAG);
 	}
 
 	return_ACPI_STATUS (AE_OK);
@@ -312,7 +317,7 @@ acpi_rs_byte_stream_to_list (
  * PARAMETERS:  Linked_list             - Pointer to the resource linked list
  *              Byte_steam_size_needed  - Calculated size of the byte stream
  *                                        needed from calling
- *                                        Acpi_rs_calculate_byte_stream_length()
+ *                                        Acpi_rs_get_byte_stream_length()
  *                                        The size of the Output_buffer is
  *                                        guaranteed to be >=
  *                                        Byte_stream_size_needed
@@ -329,7 +334,7 @@ acpi_rs_byte_stream_to_list (
 acpi_status
 acpi_rs_list_to_byte_stream (
 	acpi_resource           *linked_list,
-	u32                     byte_stream_size_needed,
+	ACPI_SIZE               byte_stream_size_needed,
 	u8                      *output_buffer)
 {
 	acpi_status             status;

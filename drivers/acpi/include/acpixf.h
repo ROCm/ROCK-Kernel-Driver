@@ -71,6 +71,10 @@ acpi_status
 acpi_purge_cached_objects (
 	void);
 
+acpi_status
+acpi_install_initialization_handler (
+	ACPI_INIT_HANDLER       handler,
+	u32                     function);
 
 /*
  * ACPI Memory manager
@@ -330,6 +334,18 @@ acpi_get_irq_routing_table (
  */
 
 acpi_status
+acpi_get_register (
+	u32                     register_id,
+	u32                     *return_value,
+	u32                     flags);
+
+acpi_status
+acpi_set_register (
+	u32                     register_id,
+	u32                     value,
+	u32                     flags);
+
+acpi_status
 acpi_set_firmware_waking_vector (
 	ACPI_PHYSICAL_ADDRESS   physical_address);
 
@@ -337,17 +353,23 @@ acpi_status
 acpi_get_firmware_waking_vector (
 	ACPI_PHYSICAL_ADDRESS   *physical_address);
 
+acpi_status
+acpi_get_sleep_type_data (
+	u8                      sleep_state,
+	u8                      *slp_typ_a,
+	u8                      *slp_typ_b);
 
 acpi_status
 acpi_enter_sleep_state_prep (
-	u8 sleep_state);
+	u8                      sleep_state);
 
 acpi_status
 acpi_enter_sleep_state (
-	u8 sleep_state);
+	u8                      sleep_state);
 
 acpi_status
 acpi_leave_sleep_state (
-	u8 sleep_state);
+	u8                      sleep_state);
+
 
 #endif /* __ACXFACE_H__ */

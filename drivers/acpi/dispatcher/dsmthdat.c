@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsmthdat - control method arguments and local variables
- *              $Revision: 59 $
+ *              $Revision: 61 $
  *
  ******************************************************************************/
 
@@ -25,9 +25,7 @@
 
 
 #include "acpi.h"
-#include "acparser.h"
 #include "acdispat.h"
-#include "acinterp.h"
 #include "amlcode.h"
 #include "acnamesp.h"
 
@@ -57,7 +55,7 @@
  *
  ******************************************************************************/
 
-acpi_status
+void
 acpi_ds_method_data_init (
 	acpi_walk_state         *walk_state)
 {
@@ -90,7 +88,7 @@ acpi_ds_method_data_init (
 		walk_state->local_variables[i].flags       = ANOBJ_END_OF_PEER_LIST | ANOBJ_METHOD_LOCAL;
 	}
 
-	return_ACPI_STATUS (AE_OK);
+	return_VOID;
 }
 
 
@@ -100,14 +98,14 @@ acpi_ds_method_data_init (
  *
  * PARAMETERS:  Walk_state          - Current walk state object
  *
- * RETURN:      Status
+ * RETURN:      None
  *
  * DESCRIPTION: Delete method locals and arguments.  Arguments are only
  *              deleted if this method was called from another method.
  *
  ******************************************************************************/
 
-acpi_status
+void
 acpi_ds_method_data_delete_all (
 	acpi_walk_state         *walk_state)
 {
@@ -127,7 +125,7 @@ acpi_ds_method_data_delete_all (
 			/* Detach object (if present) and remove a reference */
 
 			acpi_ns_detach_object (&walk_state->local_variables[index]);
-	   }
+		}
 	}
 
 	/* Detach the arguments */
@@ -143,7 +141,7 @@ acpi_ds_method_data_delete_all (
 		}
 	}
 
-	return_ACPI_STATUS (AE_OK);
+	return_VOID;
 }
 
 
@@ -435,6 +433,9 @@ acpi_ds_method_data_get_value (
 				index, node));
 
 			return_ACPI_STATUS (AE_AML_UNINITIALIZED_LOCAL);
+
+		default:
+			return_ACPI_STATUS (AE_AML_INTERNAL);
 		}
 	}
 
@@ -457,14 +458,14 @@ acpi_ds_method_data_get_value (
  *              Index               - Which local_var or argument to delete
  *              Walk_state          - Current walk state object
  *
- * RETURN:      Status
+ * RETURN:      None
  *
  * DESCRIPTION: Delete the entry at Opcode:Index on the method stack.  Inserts
  *              a null into the stack slot after the object is deleted.
  *
  ******************************************************************************/
 
-acpi_status
+void
 acpi_ds_method_data_delete_value (
 	u16                     opcode,
 	u32                     index,
@@ -482,7 +483,7 @@ acpi_ds_method_data_delete_value (
 
 	status = acpi_ds_method_data_get_node (opcode, index, walk_state, &node);
 	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
+		return_VOID;
 	}
 
 	/* Get the associated object */
@@ -497,7 +498,7 @@ acpi_ds_method_data_delete_value (
 	node->object = NULL;
 
 	if ((object) &&
-		(ACPI_GET_DESCRIPTOR_TYPE (object) == ACPI_DESC_TYPE_INTERNAL)) {
+		(ACPI_GET_DESCRIPTOR_TYPE (object) == ACPI_DESC_TYPE_OPERAND)) {
 		/*
 		 * There is a valid object.
 		 * Decrement the reference count by one to balance the
@@ -506,7 +507,7 @@ acpi_ds_method_data_delete_value (
 		acpi_ut_remove_reference (object);
 	}
 
-	return_ACPI_STATUS (AE_OK);
+	return_VOID;
 }
 
 

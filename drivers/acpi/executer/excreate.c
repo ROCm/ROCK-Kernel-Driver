@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: excreate - Named object creation
- *              $Revision: 89 $
+ *              $Revision: 91 $
  *
  *****************************************************************************/
 
@@ -25,12 +25,10 @@
 
 
 #include "acpi.h"
-#include "acparser.h"
 #include "acinterp.h"
 #include "amlcode.h"
 #include "acnamesp.h"
 #include "acevents.h"
-#include "acdispat.h"
 #include "actables.h"
 
 
@@ -234,7 +232,7 @@ acpi_ex_create_region (
 
 	/* Get the Node from the object stack  */
 
-	node = walk_state->op->node;
+	node = walk_state->op->common.node;
 
 	/*
 	 * If the region object is already attached to this node,
@@ -323,7 +321,7 @@ acpi_ex_create_table_region (
 
 	/* Get the Node from the object stack  */
 
-	node = walk_state->op->node;
+	node = walk_state->op->common.node;
 
 	/*
 	 * If the region object is already attached to this node,

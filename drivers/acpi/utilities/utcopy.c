@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utcopy - Internal to external object translation utilities
- *              $Revision: 95 $
+ *              $Revision: 98 $
  *
  *****************************************************************************/
 
@@ -25,7 +25,6 @@
 
 
 #include "acpi.h"
-#include "acinterp.h"
 #include "acnamesp.h"
 #include "amlcode.h"
 
@@ -92,10 +91,10 @@ acpi_ut_copy_isimple_to_esimple (
 
 		external_object->string.pointer = (NATIVE_CHAR *) data_space;
 		external_object->string.length = internal_object->string.length;
-		*buffer_space_used = ACPI_ROUND_UP_TO_NATIVE_WORD (internal_object->string.length + 1);
+		*buffer_space_used = ACPI_ROUND_UP_TO_NATIVE_WORD ((ACPI_SIZE) internal_object->string.length + 1);
 
 		ACPI_MEMCPY ((void *) data_space, (void *) internal_object->string.pointer,
-				 internal_object->string.length + 1);
+				 (ACPI_SIZE) internal_object->string.length + 1);
 		break;
 
 
@@ -153,12 +152,12 @@ acpi_ut_copy_isimple_to_esimple (
 			buffer.length = MAX_STRING_LENGTH;
 			buffer.pointer = data_space;
 
-			status = acpi_ns_handle_to_pathname ((acpi_handle *) internal_object->reference.node,
+			status = acpi_ns_handle_to_pathname ((acpi_handle) internal_object->reference.node,
 					 &buffer);
 
 			/* Converted (external) string length is returned from above */
 
-			external_object->string.length = buffer.length;
+			external_object->string.length = (u32) buffer.length;
 			*buffer_space_used = ACPI_ROUND_UP_TO_NATIVE_WORD (buffer.length);
 			break;
 
@@ -257,7 +256,7 @@ acpi_ut_copy_ielement_to_eelement (
 		 */
 		target_object->type             = ACPI_TYPE_PACKAGE;
 		target_object->package.count    = source_object->package.count;
-		target_object->package.elements = (acpi_object *) info->free_space;
+		target_object->package.elements = ACPI_CAST_PTR (acpi_object, info->free_space);
 
 		/*
 		 * Pass the new package object back to the package walk routine
@@ -269,7 +268,7 @@ acpi_ut_copy_ielement_to_eelement (
 		 * update the buffer length counter
 		 */
 		object_space = ACPI_ROUND_UP_TO_NATIVE_WORD (
-				   target_object->package.count * sizeof (acpi_object));
+				   (ACPI_SIZE) target_object->package.count * sizeof (acpi_object));
 		break;
 
 
@@ -319,7 +318,7 @@ acpi_ut_copy_ipackage_to_epackage (
 	/*
 	 * First package at head of the buffer
 	 */
-	external_object = (acpi_object *) buffer;
+	external_object = ACPI_CAST_PTR (acpi_object, buffer);
 
 	/*
 	 * Free space begins right after the first package
@@ -331,7 +330,7 @@ acpi_ut_copy_ipackage_to_epackage (
 
 	external_object->type              = internal_object->common.type;
 	external_object->package.count     = internal_object->package.count;
-	external_object->package.elements  = (acpi_object *) info.free_space;
+	external_object->package.elements  = ACPI_CAST_PTR (acpi_object, info.free_space);
 
 	/*
 	 * Build an array of ACPI_OBJECTS in the buffer
@@ -456,7 +455,7 @@ acpi_ut_copy_esimple_to_isimple (
 
 	case ACPI_TYPE_STRING:
 
-		internal_object->string.pointer = ACPI_MEM_CALLOCATE (external_object->string.length + 1);
+		internal_object->string.pointer = ACPI_MEM_CALLOCATE ((ACPI_SIZE) external_object->string.length + 1);
 		if (!internal_object->string.pointer) {
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
@@ -487,6 +486,10 @@ acpi_ut_copy_esimple_to_isimple (
 	case ACPI_TYPE_INTEGER:
 
 		internal_object->integer.value  = external_object->integer.value;
+		break;
+
+	default:
+		/* Other types can't get here */
 		break;
 	}
 
@@ -657,6 +660,7 @@ acpi_ut_copy_simple_object (
 		dest_desc->common.flags = source_desc->common.flags;
 
 		/* Fall through to common string/buffer case */
+		/*lint -fallthrough */
 
 	case ACPI_TYPE_STRING:
 
@@ -676,6 +680,10 @@ acpi_ut_copy_simple_object (
 			ACPI_MEMCPY (dest_desc->string.pointer, source_desc->string.pointer,
 					  source_desc->string.length);
 		}
+		break;
+
+	default:
+		/* Nothing to do for other simple objects */
 		break;
 	}
 
@@ -803,7 +811,7 @@ acpi_ut_copy_ipackage_to_ipackage (
 	/*
 	 * Create the object array and walk the source package tree
 	 */
-	dest_obj->package.elements = ACPI_MEM_CALLOCATE ((source_obj->package.count + 1) *
+	dest_obj->package.elements = ACPI_MEM_CALLOCATE (((ACPI_SIZE) source_obj->package.count + 1) *
 			 sizeof (void *));
 	if (!dest_obj->package.elements) {
 		ACPI_REPORT_ERROR (

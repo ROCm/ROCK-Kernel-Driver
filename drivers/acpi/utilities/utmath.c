@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmath - Integer math support routines
- *              $Revision: 10 $
+ *              $Revision: 11 $
  *
  ******************************************************************************/
 
@@ -193,7 +193,7 @@ acpi_ut_divide (
 		 */
 		partial1      = quotient.part.lo * divisor.part.hi;
 		partial2.full = (acpi_integer) quotient.part.lo * divisor.part.lo;
-		partial3.full = partial2.part.hi + partial1;
+		partial3.full = (acpi_integer) partial2.part.hi + partial1;
 
 		remainder.part.hi = partial3.part.lo;
 		remainder.part.lo = partial2.part.lo;
@@ -213,8 +213,8 @@ acpi_ut_divide (
 			}
 
 			remainder.full    = remainder.full - dividend.full;
-			remainder.part.hi = -((s32) remainder.part.hi);
-			remainder.part.lo = -((s32) remainder.part.lo);
+			remainder.part.hi = (u32) -((s32) remainder.part.hi);
+			remainder.part.lo = (u32) -((s32) remainder.part.lo);
 
 			if (remainder.part.lo) {
 				remainder.part.hi--;
