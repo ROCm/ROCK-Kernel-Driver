@@ -756,11 +756,14 @@ init_cifs(void)
 			if (!rc) {
 				rc = register_filesystem(&cifs_fs_type);
 				if (!rc) {                
-					kernel_thread(cifs_oplock_thread, NULL, 
+					rc = (int)kernel_thread(cifs_oplock_thread, NULL, 
 						CLONE_FS | CLONE_FILES | CLONE_VM);
-					return rc; /* Success */
-				} else
-					cifs_destroy_request_bufs();
+					if(rc > 0)
+						return 0;
+					else 
+						cERROR(1,("error %d create oplock thread",rc));
+				}
+				cifs_destroy_request_bufs();
 			}
 			cifs_destroy_mids();
 		}

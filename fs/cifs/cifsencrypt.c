@@ -153,7 +153,7 @@ int CalcNTLMv2_partial_mac_key(struct cifsSesInfo * ses, struct nls_table * nls_
 	wchar_t * unicode_buf;
 	unsigned int i,user_name_len,dom_name_len;
 
-	if(ses)
+	if(ses == NULL)
 		return -EINVAL;
 
 	E_md4hash(ses->password, temp_hash);
@@ -167,7 +167,13 @@ int CalcNTLMv2_partial_mac_key(struct cifsSesInfo * ses, struct nls_table * nls_
 		return -EINVAL;
   
 	ucase_buf = kmalloc((MAX_USERNAME_SIZE+1), GFP_KERNEL);
+	if(ucase_buf == NULL)
+		return -ENOMEM;
 	unicode_buf = kmalloc((MAX_USERNAME_SIZE+1)*4, GFP_KERNEL);
+	if(unicode_buf == NULL) {
+		kfree(ucase_buf);
+		return -ENOMEM;
+	}
    
 	for(i=0;i<user_name_len;i++)
 		ucase_buf[i] = nls_info->charset2upper[(int)ses->userName[i]];

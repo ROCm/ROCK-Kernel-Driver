@@ -297,10 +297,7 @@ cifs_readlink(struct dentry *direntry, char __user *pBuffer, int buflen)
 					if(referrals)
 						kfree(referrals);
 					kfree(tmp_path);
-					if(referrals) {
-						kfree(referrals);
-					}
-				}
+}
 				/* BB add code like else decode referrals then memcpy to
 				  tmpbuffer and free referrals string array BB */
 			}

@@ -201,6 +201,8 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 	/* if file info not passed in then get it from server */
 	if(pfindData == NULL) {
 		buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
+		if(buf == NULL)
+			return -ENOMEM;
 		pfindData = (FILE_ALL_INFO *)buf;
 	/* could do find first instead but this returns more info */
 		rc = CIFSSMBQPathInfo(xid, pTcon, search_path, pfindData,

@@ -1314,8 +1314,19 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			so no need to spinlock this init of tcpStatus */
 			srvTcp->tcpStatus = CifsNew;
 			init_MUTEX(&srvTcp->tcpSem);
-			kernel_thread((void *)(void *)cifs_demultiplex_thread, srvTcp,
+			rc = (int)kernel_thread((void *)(void *)cifs_demultiplex_thread, srvTcp,
 				      CLONE_FS | CLONE_FILES | CLONE_VM);
+			if(rc < 0) {
+				rc = -ENOMEM;
+				sock_release(csocket);
+				if(volume_info.UNC)
+					kfree(volume_info.UNC);
+				if(volume_info.password)
+					kfree(volume_info.password);
+				FreeXid(xid);
+				return rc;
+			} else
+				rc = 0;
 			memcpy(srvTcp->workstation_RFC1001_name, volume_info.source_rfc1001_name,16);
 		}
 	}
