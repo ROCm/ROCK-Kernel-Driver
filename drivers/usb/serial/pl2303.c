@@ -1,7 +1,7 @@
 /*
  * Prolific PL2303 USB to serial adaptor driver
  *
- * Copyright (C) 2001 Greg Kroah-Hartman (greg@kroah.com)
+ * Copyright (C) 2001-2002 Greg Kroah-Hartman (greg@kroah.com)
  *
  * Original driver for 2.2.x by anonymous
  *
@@ -11,6 +11,10 @@
  *	(at your option) any later version.
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
+ *
+ * 2002_Mar_26 gkh
+ *	allowed driver to work properly if there is no tty assigned to a port
+ *	(this happens for serial console devices.)
  *
  * 2001_Oct_06 gkh
  *	Added RTS and DTR line control.  Thanks to joe@bndlg.de for parts of it.
@@ -172,11 +176,6 @@ static int pl2303_write (struct usb_serial_port *port, int from_user,  const uns
 	int result;
 
 	dbg (__FUNCTION__ " - port %d, %d bytes", port->number, count);
-
-	if (!port->tty) {
-		err (__FUNCTION__ " - no tty???");
-		return 0;
-	}
 
 	if (port->write_urb->status == -EINPROGRESS) {
 		dbg (__FUNCTION__ " - already writing");
@@ -390,10 +389,12 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 2, 4);
 
 	/* Setup termios */
-	*(port->tty->termios) = tty_std_termios;
-	port->tty->termios->c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+	if (port->tty) {
+		*(port->tty->termios) = tty_std_termios;
+		port->tty->termios->c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 
-	pl2303_set_termios (port, &tmp_termios);
+		pl2303_set_termios (port, &tmp_termios);
+	}
 
 	//FIXME: need to assert RTS and DTR if CRTSCTS off
 
@@ -434,13 +435,15 @@ static void pl2303_close (struct usb_serial_port *port, struct file *filp)
 	dbg (__FUNCTION__ " - port %d", port->number);
 
 	if (serial->dev) {
-		c_cflag = port->tty->termios->c_cflag;
-		if (c_cflag & HUPCL) {
-			/* drop DTR and RTS */
-			priv = port->private;
-			priv->line_control = 0;
-			set_control_lines (port->serial->dev,
-					   priv->line_control);
+		if (port->tty) {
+			c_cflag = port->tty->termios->c_cflag;
+			if (c_cflag & HUPCL) {
+				/* drop DTR and RTS */
+				priv = port->private;
+				priv->line_control = 0;
+				set_control_lines (port->serial->dev,
+						   priv->line_control);
+			}
 		}
 
 		/* shutdown our urbs */
@@ -643,7 +646,7 @@ static void pl2303_read_bulk_callback (struct urb *urb)
 	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
 
 	tty = port->tty;
-	if (urb->actual_length) {
+	if (tty && urb->actual_length) {
 		for (i = 0; i < urb->actual_length; ++i) {
 			if (tty->flip.count >= TTY_FLIPBUF_SIZE) {
 				tty_flip_buffer_push(tty);

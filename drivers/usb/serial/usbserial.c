@@ -15,6 +15,12 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  *
+ * (03/27/2002) gkh
+ *	Got USB serial console code working properly and merged into the main
+ *	version of the tree.  Thanks to Randy Dunlap for the initial version
+ *	of this code, and for pushing me to finish it up.
+ *	The USB serial console works with any usb serial driver device.
+ *
  * (03/21/2002) gkh
  *	Moved all manipulation of port->open_count into the core.  Now the
  *	individual driver's open and close functions are called only when the
@@ -314,6 +320,14 @@
 #include <linux/smp_lock.h>
 #include <linux/usb.h>
 
+#ifdef MODULE
+#undef CONFIG_USB_SERIAL_CONSOLE
+#endif
+#ifdef CONFIG_USB_SERIAL_CONSOLE
+#include <linux/console.h>
+#include <linux/serial.h>
+#endif
+
 #ifdef CONFIG_USB_SERIAL_DEBUG
 	static int debug = 1;
 #else
@@ -402,6 +416,16 @@ static struct termios *		serial_termios_locked[SERIAL_TTY_MINORS];
 static struct usb_serial	*serial_table[SERIAL_TTY_MINORS];	/* initially all NULL */
 static LIST_HEAD(usb_serial_driver_list);
 
+#ifdef CONFIG_USB_SERIAL_CONSOLE
+struct usbcons_info {
+	int			magic;
+	int			break_flag;
+	struct usb_serial_port	*port;
+};
+
+static struct usbcons_info usbcons_info;
+static struct console usbcons;
+#endif /* CONFIG_USB_SERIAL_CONSOLE */
 
 static struct usb_serial *get_serial_by_minor (unsigned int minor)
 {
@@ -834,7 +858,8 @@ static int generic_open (struct usb_serial_port *port, struct file *filp)
 	/* force low_latency on so that our tty_push actually forces the data through, 
 	   otherwise it is scheduled, and with high data rates (like with OHCI) data
 	   can get lost. */
-	port->tty->low_latency = 1;
+	if (port->tty)
+		port->tty->low_latency = 1;
 
 	/* if we have a bulk interrupt, start reading from it */
 	if (serial->num_bulk_in) {
@@ -986,7 +1011,7 @@ static void generic_read_bulk_callback (struct urb *urb)
 	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
 
 	tty = port->tty;
-	if (urb->actual_length) {
+	if (tty && urb->actual_length) {
 		for (i = 0; i < urb->actual_length ; ++i) {
 			/* if we insert more than TTY_FLIPBUF_SIZE characters, we drop them. */
 			if(tty->flip.count >= TTY_FLIPBUF_SIZE) {
@@ -1311,6 +1336,26 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 		     type->name, serial->port[i].number, serial->port[i].number);
 	}
 
+#ifdef CONFIG_USB_SERIAL_CONSOLE
+	if (minor == 0) {
+		/* 
+		 * Call register_console() if this is the first device plugged
+		 * in.  If we call it earlier, then the callback to
+		 * console_setup() will fail, as there is not a device seen by
+		 * the USB subsystem yet.
+		 */
+		/*
+		 * Register console.
+		 * NOTES:
+		 * console_setup() is called (back) immediately (from register_console).
+		 * console_write() is called immediately from register_console iff
+		 * CON_PRINTBUFFER is set in flags.
+		 */
+		dbg ("registering the USB serial console.");
+		register_console(&usbcons);
+	}
+#endif
+
 	return serial; /* success */
 
 
@@ -1484,6 +1529,9 @@ static int __init usb_serial_init(void)
 
 static void __exit usb_serial_exit(void)
 {
+#ifdef CONFIG_USB_SERIAL_CONSOLE
+	unregister_console(&usbcons);
+#endif
 
 #ifdef CONFIG_USB_SERIAL_GENERIC
 	/* remove our generic driver */
@@ -1533,7 +1581,7 @@ void usb_serial_deregister(struct usb_serial_device_type *device)
 
 
 
-/* If the usb-serial core is build into the core, the usb-serial drivers
+/* If the usb-serial core is built into the core, the usb-serial drivers
    need these symbols to load properly as modules. */
 EXPORT_SYMBOL(usb_serial_register);
 EXPORT_SYMBOL(usb_serial_deregister);
@@ -1541,6 +1589,241 @@ EXPORT_SYMBOL(usb_serial_deregister);
 	EXPORT_SYMBOL(ezusb_writememory);
 	EXPORT_SYMBOL(ezusb_set_reset);
 #endif
+
+
+#ifdef CONFIG_USB_SERIAL_CONSOLE
+/*
+ * ------------------------------------------------------------
+ * USB Serial console driver
+ *
+ * Much of the code here is copied from drivers/char/serial.c
+ * and implements a phony serial console in the same way that
+ * serial.c does so that in case some software queries it,
+ * it will get the same results.
+ *
+ * Things that are different from the way the serial port code
+ * does things, is that we call the lower level usb-serial
+ * driver code to initialize the device, and we set the initial
+ * console speeds based on the command line arguments.
+ * ------------------------------------------------------------
+ */
+
+#if 0
+static kdev_t usb_console_device(struct console *co)
+{
+	return MKDEV(SERIAL_TTY_MAJOR, co->index);	/* TBD */
+}
+#endif
+
+/*
+ * The parsing of the command line works exactly like the
+ * serial.c code, except that the specifier is "ttyUSB" instead
+ * of "ttyS".
+ */
+static int __init usb_console_setup(struct console *co, char *options)
+{
+	struct usbcons_info *info = &usbcons_info;
+	int baud = 9600;
+	int bits = 8;
+	int parity = 'n';
+	int doflow = 0;
+	int cflag = CREAD | HUPCL | CLOCAL;
+	char *s;
+	struct usb_serial *serial;
+	struct usb_serial_port *port;
+	int retval = 0;
+	struct tty_struct *tty;
+	struct termios *termios;
+
+	dbg ("%s", __FUNCTION__);
+
+	if (options) {
+		baud = simple_strtoul(options, NULL, 10);
+		s = options;
+		while (*s >= '0' && *s <= '9')
+			s++;
+		if (*s)	parity = *s++;
+		if (*s)	bits   = *s++ - '0';
+		if (*s)	doflow = (*s++ == 'r');
+	}
+
+	/* build a cflag setting */
+	switch (baud) {
+		case 1200:
+			cflag |= B1200;
+			break;
+		case 2400:
+			cflag |= B2400;
+			break;
+		case 4800:
+			cflag |= B4800;
+			break;
+		case 19200:
+			cflag |= B19200;
+			break;
+		case 38400:
+			cflag |= B38400;
+			break;
+		case 57600:
+			cflag |= B57600;
+			break;
+		case 115200:
+			cflag |= B115200;
+			break;
+		case 9600:
+		default:
+			cflag |= B9600;
+			/*
+			 * Set this to a sane value to prevent a divide error
+			 */
+			baud  = 9600;
+			break;
+	}
+	switch (bits) {
+		case 7:
+			cflag |= CS7;
+			break;
+		default:
+		case 8:
+			cflag |= CS8;
+			break;
+	}
+	switch (parity) {
+		case 'o': case 'O':
+			cflag |= PARODD;
+			break;
+		case 'e': case 'E':
+			cflag |= PARENB;
+			break;
+	}
+	co->cflag = cflag;
+
+	/* grab the first serial port that happens to be connected */
+	serial = get_serial_by_minor (0);
+	if (serial_paranoia_check (serial, __FUNCTION__)) {
+		/* no device is connected yet, sorry :( */
+		err ("No USB device connected to ttyUSB0");
+		return -ENODEV;
+	}
+
+	port = &serial->port[0];
+	down (&port->sem);
+	port->tty = NULL;
+
+	info->port = port;
+	 
+	++port->open_count;
+	if (port->open_count == 1) {
+		/* only call the device specific open if this 
+		 * is the first time the port is opened */
+		if (serial->type->open)
+			retval = serial->type->open(port, NULL);
+		else
+			retval = generic_open(port, NULL);
+		if (retval)
+			port->open_count = 0;
+	}
+
+	up (&port->sem);
+
+	if (retval) {
+		err ("could not open USB console port");
+		return retval;
+	}
+
+	if (serial->type->set_termios) {
+		/* build up a fake tty structure so that the open call has something
+		 * to look at to get the cflag value */
+		tty = kmalloc (sizeof (*tty), GFP_KERNEL);
+		if (!tty) {
+			err ("no more memory");
+			return -ENOMEM;
+		}
+		termios = kmalloc (sizeof (*termios), GFP_KERNEL);
+		if (!termios) {
+			err ("no more memory");
+			kfree (tty);
+			return -ENOMEM;
+		}
+		memset (tty, 0x00, sizeof(*tty));
+		memset (termios, 0x00, sizeof(*termios));
+		termios->c_cflag = cflag;
+		tty->termios = termios;
+		port->tty = tty;
+
+		/* set up the initial termios settings */
+		serial->type->set_termios(port, NULL);
+		port->tty = NULL;
+		kfree (termios);
+		kfree (tty);
+	}
+
+	return retval;
+}
+
+static void usb_console_write(struct console *co, const char *buf, unsigned count)
+{
+	static struct usbcons_info *info = &usbcons_info;
+	struct usb_serial_port *port = info->port;
+	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
+	int retval = -ENODEV;
+
+	if (!serial || !port)
+		return;
+
+	if (count == 0)
+		return;
+
+	down (&port->sem);
+
+	dbg("%s - port %d, %d byte(s)", __FUNCTION__, port->number, count);
+
+	if (!port->open_count) {
+		dbg (__FUNCTION__ " - port not opened");
+		goto exit;
+	}
+
+	/* pass on to the driver specific version of this function if it is available */
+	if (serial->type->write)
+		retval = serial->type->write(port, 0, buf, count);
+	else
+		retval = generic_write(port, 0, buf, count);
+
+exit:
+	up (&port->sem);
+	dbg("%s - return value (if we had one): %d", __FUNCTION__, retval);
+}
+
+#if 0
+/*
+ * Receive character from the serial port
+ */
+static int usb_console_wait_key(struct console *co)
+{
+	static struct usbcons_info *info = &usbcons_info;
+	int c = 0;
+
+	dbg("%s", __FUNCTION__);
+
+	/* maybe use generic_read_bulk_callback ??? */
+
+	return c;
+}
+#endif
+
+static struct console usbcons = {
+	name:		"ttyUSB",			/* only [8] */
+	write:		usb_console_write,
+#if 0
+	device:		usb_console_device,		/* TBD */
+	wait_key:	usb_console_wait_key,		/* TBD */
+#endif
+	setup:		usb_console_setup,
+	flags:		CON_PRINTBUFFER,
+	index:		-1,
+};
+
+#endif /* CONFIG_USB_SERIAL_CONSOLE */
 
 
 /* Module information */

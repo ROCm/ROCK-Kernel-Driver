@@ -324,12 +324,31 @@ static void belkin_sa_set_termios (struct usb_serial_port *port, struct termios 
 {
 	struct usb_serial *serial = port->serial;
 	struct belkin_sa_private *priv = (struct belkin_sa_private *)port->private;
-	unsigned int iflag = port->tty->termios->c_iflag;
-	unsigned int cflag = port->tty->termios->c_cflag;
-	unsigned int old_iflag = old_termios->c_iflag;
-	unsigned int old_cflag = old_termios->c_cflag;
+	unsigned int iflag;
+	unsigned int cflag;
+	unsigned int old_iflag = 0;
+	unsigned int old_cflag = 0;
 	__u16 urb_value = 0; /* Will hold the new flags */
 	
+	if ((!port->tty) || (!port->tty->termios)) {
+		dbg ("%s - no tty or termios structure", __FUNCTION__);
+		return;
+	}
+
+	iflag = port->tty->termios->c_iflag;
+	cflag = port->tty->termios->c_cflag;
+
+	/* check that they really want us to change something */
+	if (old_termios) {
+		if ((cflag == old_termios->c_cflag) &&
+		    (RELEVANT_IFLAG(port->tty->termios->c_iflag) == RELEVANT_IFLAG(old_termios->c_iflag))) {
+			dbg("%s - nothing to change...", __FUNCTION__);
+			return;
+		}
+		old_iflag = old_termios->c_iflag;
+		old_cflag = old_termios->c_cflag;
+	}
+
 	/* Set the baud rate */
 	if( (cflag&CBAUD) != (old_cflag&CBAUD) ) {
 		/* reassert DTR and (maybe) RTS on transition from B0 */

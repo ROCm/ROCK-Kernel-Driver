@@ -12,6 +12,10 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  *
+ * (03/27/2002) gkh
+ *	Removed assumptions that port->tty was always valid (is not true
+ *	for usb serial console devices.)
+ *
  * (03/23/2002) gkh
  *	Added support for the Palm i705 device, thanks to Thomas Riemer
  *	<tom@netmech.com> for the information.
@@ -287,7 +291,8 @@ static int visor_open (struct usb_serial_port *port, struct file *filp)
 	 * through, otherwise it is scheduled, and with high data rates (like
 	 * with OHCI) data can get lost.
 	 */
-	port->tty->low_latency = 1;
+	if (port->tty)
+		port->tty->low_latency = 1;
 	
 	/* Start reading from the device */
 	usb_fill_bulk_urb (port->read_urb, serial->dev,
@@ -477,7 +482,7 @@ static void visor_read_bulk_callback (struct urb *urb)
 	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
 
 	tty = port->tty;
-	if (urb->actual_length) {
+	if (tty && urb->actual_length) {
 		for (i = 0; i < urb->actual_length ; ++i) {
 			/* if we insert more than TTY_FLIPBUF_SIZE characters, we drop them. */
 			if(tty->flip.count >= TTY_FLIPBUF_SIZE) {
@@ -487,8 +492,8 @@ static void visor_read_bulk_callback (struct urb *urb)
 			tty_insert_flip_char(tty, data[i], 0);
 		}
 		tty_flip_buffer_push(tty);
-		bytes_in += urb->actual_length;
 	}
+	bytes_in += urb->actual_length;
 
 	/* Continue trying to always read  */
 	usb_fill_bulk_urb (port->read_urb, serial->dev,
