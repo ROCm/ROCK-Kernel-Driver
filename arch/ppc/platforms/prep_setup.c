@@ -49,6 +49,7 @@
 #include <asm/cache.h>
 #include <asm/dma.h>
 #include <asm/machdep.h>
+#include <asm/mc146818rtc.h>
 #include <asm/mk48t59.h>
 #include <asm/prep_nvram.h>
 #include <asm/raven.h>
@@ -1023,8 +1024,10 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.time_init      = todc_time_init;
 	if (_prep_type == _PREP_IBM) {
-		TODC_INIT(TODC_TYPE_MC146818, PREP_NVRAM_AS0, PREP_NVRAM_AS1,
-				PREP_NVRAM_DATA, 8);
+		ppc_md.rtc_read_val = todc_mc146818_read_val;
+		ppc_md.rtc_write_val = todc_mc146818_write_val;
+		TODC_INIT(TODC_TYPE_MC146818, RTC_PORT(0), NULL, RTC_PORT(1),
+				8);
 	} else {
 		TODC_INIT(TODC_TYPE_MK48T59, PREP_NVRAM_AS0, PREP_NVRAM_AS1,
 				PREP_NVRAM_DATA, 8);

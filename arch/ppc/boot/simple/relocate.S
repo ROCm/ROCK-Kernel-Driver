@@ -9,7 +9,7 @@
  *	   trini@mvista.com
  * Derived from arch/ppc/boot/prep/head.S (Cort Dougan, many others).
  *
- * 2001-2002 (c) MontaVista, Software, Inc.  This file is licensed under
+ * 2001-2004 (c) MontaVista, Software, Inc.  This file is licensed under
  * the terms of the GNU General Public License version 2.  This program
  * is licensed "as is" without any warranty of any kind, whether express
  * or implied.
@@ -101,8 +101,8 @@ relocate:
 	GETSYM(r4, __relocate_start)
 	GETSYM(r5, do_relocate)
 
-	sub	r4,r5,r4	/* Get entry point for do_relocate in
-	add	r6,r6,r4       * relocated section */
+	sub	r4,r5,r4	/* Get entry point for do_relocate in */
+	add	r6,r6,r4	/* relocated section */
 
 	/* This will return to the relocated do_relocate */
 	mtlr	r6
@@ -182,6 +182,7 @@ start_ldr:
 	mr	r4,r7		/* Program length */
 	mr	r5,r6		/* Checksum */
 	mr	r6,r11		/* Residual data */
+	mr	r7,r25		/* Validated OFW interface */
 	bl	load_kernel
 
 	/*
@@ -195,8 +196,18 @@ start_ldr:
 	/*
 	 * Start at the begining.
 	 */
-	li	r9,0x0000
+	li	r9,0xc
 	mtlr	r9
+#ifdef CONFIG_PPC_MULTIPLATFORM
+	/* tell kernel we're prep, by putting 0xdeadc0de at KERNELLOAD,
+	 * and tell the kernel to start on the 4th instruction since we
+	 * overwrite the first 3 sometimes (which are 'nop').
+	 */
+	lis	r10,0xdeadc0de@h
+	ori	r10,r10,0xdeadc0de@l
+	li	r9,0
+	stw	r10,0(r9)
+#endif
 	blr
 
 	.comm	.stack,4096*2,4
