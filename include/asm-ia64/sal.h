@@ -36,14 +36,24 @@ extern spinlock_t sal_lock;
 #define __SAL_CALL(result,a0,a1,a2,a3,a4,a5,a6,a7)	\
 	result = (*ia64_sal)(a0,a1,a2,a3,a4,a5,a6,a7)
 
-# define SAL_CALL(result,args...) do {			\
-	unsigned long flags;				\
-	struct ia64_fpreg fr[6];                        \
-	ia64_save_scratch_fpregs(fr);                   \
-	spin_lock_irqsave(&sal_lock, flags);		\
-	__SAL_CALL(result,args);			\
-	spin_unlock_irqrestore(&sal_lock, flags);	\
-	ia64_load_scratch_fpregs(fr);                   \
+# define SAL_CALL(result,args...) do {				\
+	unsigned long __ia64_sc_flags;				\
+	struct ia64_fpreg __ia64_sc_fr[6];			\
+	ia64_save_scratch_fpregs(__ia64_sc_fr);			\
+	spin_lock_irqsave(&sal_lock, __ia64_sc_flags);		\
+	__SAL_CALL(result, args);				\
+	spin_unlock_irqrestore(&sal_lock, __ia64_sc_flags);	\
+	ia64_load_scratch_fpregs(__ia64_sc_fr);			\
+} while (0)
+
+# define SAL_CALL_NOLOCK(result,args...) do {		\
+	unsigned long __ia64_scn_flags;			\
+	struct ia64_fpreg __ia64_scn_fr[6];		\
+	ia64_save_scratch_fpregs(__ia64_scn_fr);	\
+	local_irq_save(__ia64_scn_flags);		\
+	__SAL_CALL(result, args);			\
+	local_irq_restore(__ia64_scn_flags);		\
+	ia64_load_scratch_fpregs(__ia64_scn_fr);	\
 } while (0)
 
 #define SAL_SET_VECTORS			0x01000000
@@ -686,13 +696,14 @@ ia64_sal_get_state_info_size (u64 sal_info_type)
 
 /*
  * Causes the processor to go into a spin loop within SAL where SAL awaits a wakeup from
- * the monarch processor.
+ * the monarch processor.  Must not lock, because it will not return on any cpu until the
+ * monarch processor sends a wake up.
  */
 static inline s64
 ia64_sal_mc_rendez (void)
 {
 	struct ia64_sal_retval isrv;
-	SAL_CALL(isrv, SAL_MC_RENDEZ, 0, 0, 0, 0, 0, 0, 0);
+	SAL_CALL_NOLOCK(isrv, SAL_MC_RENDEZ, 0, 0, 0, 0, 0, 0, 0);
 	return isrv.status;
 }
 
