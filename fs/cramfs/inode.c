@@ -218,7 +218,8 @@ static int cramfs_fill_super(struct super_block *sb, void *data, int silent)
 		/* check at 512 byte offset */
 		memcpy(&super, cramfs_read(sb, 512, sizeof(super)), sizeof(super));
 		if (super.magic != CRAMFS_MAGIC) {
-			printk(KERN_ERR "cramfs: wrong magic\n");
+			if (!silent)
+				printk(KERN_ERR "cramfs: wrong magic\n");
 			goto out;
 		}
 	}
