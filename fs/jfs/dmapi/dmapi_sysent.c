@@ -728,19 +728,19 @@ int __init dmapi_init(void)
 {
 	int ret;
 
-	dm_tokdata_cachep = kmem_cache_create("dm_tokdata",
+	dm_tokdata_cachep = kmem_cache_create("jfs_dm_tokdata",
 				sizeof(struct dm_tokdata), 0, 0, NULL, NULL);
 	if (dm_tokdata_cachep == NULL)
 		return -ENOMEM;
 
-	dm_fsreg_cachep = kmem_cache_create("dm_fsreg",
+	dm_fsreg_cachep = kmem_cache_create("jfs_dm_fsreg",
 				sizeof(struct dm_fsreg), 0, 0, NULL, NULL);
 	if (dm_fsreg_cachep == NULL) {
 		kmem_cache_destroy(dm_tokdata_cachep);
 		return -ENOMEM;
 	}
 
-	dm_session_cachep = kmem_cache_create("dm_session",
+	dm_session_cachep = kmem_cache_create("jfs_dm_session",
 				sizeof(struct dm_session), 0, 0, NULL, NULL);
 	if (dm_session_cachep == NULL) {
 		kmem_cache_destroy(dm_tokdata_cachep);
