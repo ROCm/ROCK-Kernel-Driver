@@ -60,6 +60,8 @@
 
 static int debug;
 
+#define PL2303_CLOSING_WAIT	(30*HZ)
+
 #define PL2303_BUF_SIZE		1024
 #define PL2303_TMP_BUF_SIZE	1024
 
@@ -158,6 +160,7 @@ static int pl2303_startup (struct usb_serial *serial);
 static void pl2303_shutdown (struct usb_serial *serial);
 static struct pl2303_buf *pl2303_buf_alloc(unsigned int size);
 static void pl2303_buf_free(struct pl2303_buf *pb);
+static void pl2303_buf_clear(struct pl2303_buf *pb);
 static unsigned int pl2303_buf_data_avail(struct pl2303_buf *pb);
 static unsigned int pl2303_buf_space_avail(struct pl2303_buf *pb);
 static unsigned int pl2303_buf_put(struct pl2303_buf *pb, const char *buf,
@@ -615,12 +618,51 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 
 static void pl2303_close (struct usb_serial_port *port, struct file *filp)
 {
-	struct pl2303_private *priv;
+	struct pl2303_private *priv = usb_get_serial_port_data(port);
 	unsigned long flags;
 	unsigned int c_cflag;
 	int result;
+	int bps;
+	long timeout;
+	wait_queue_t wait;						\
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
+
+	/* wait for data to drain from the buffer */
+	spin_lock_irqsave(&priv->lock, flags);
+	timeout = PL2303_CLOSING_WAIT;
+	init_waitqueue_entry(&wait, current);
+	add_wait_queue(&port->tty->write_wait, &wait);
+	for (;;) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		if (pl2303_buf_data_avail(priv->buf) == 0
+		|| timeout == 0 || signal_pending(current)
+		|| !usb_get_intfdata(port->serial->interface))	/* disconnect */
+			break;
+		spin_unlock_irqrestore(&priv->lock, flags);
+		timeout = schedule_timeout(timeout);
+		spin_lock_irqsave(&priv->lock, flags);
+	}
+	set_current_state(TASK_RUNNING);
+	remove_wait_queue(&port->tty->write_wait, &wait);
+	/* clear out any remaining data in the buffer */
+	pl2303_buf_clear(priv->buf);
+	spin_unlock_irqrestore(&priv->lock, flags);
+
+	/* wait for characters to drain from the device */
+	/* (this is long enough for the entire 256 byte */
+	/* pl2303 hardware buffer to drain with no flow */
+	/* control for data rates of 1200 bps or more, */
+	/* for lower rates we should really know how much */
+	/* data is in the buffer to compute a delay */
+	/* that is not unnecessarily long) */
+	bps = tty_get_baud_rate(port->tty);
+	if (bps > 1200)
+		timeout = max((HZ*2560)/bps,HZ/10);
+	else
+		timeout = 2*HZ;
+	set_current_state(TASK_INTERRUPTIBLE);
+	schedule_timeout(timeout);
 
 	/* shutdown our urbs */
 	dbg("%s - shutting down urbs", __FUNCTION__);
@@ -646,14 +688,12 @@ static void pl2303_close (struct usb_serial_port *port, struct file *filp)
 		c_cflag = port->tty->termios->c_cflag;
 		if (c_cflag & HUPCL) {
 			/* drop DTR and RTS */
-			priv = usb_get_serial_port_data(port);
 			spin_lock_irqsave(&priv->lock, flags);
 			priv->line_control = 0;
 			spin_unlock_irqrestore (&priv->lock, flags);
 			set_control_lines (port->serial->dev, 0);
 		}
 	}
-
 }
 
 static int pl2303_tiocmset (struct usb_serial_port *port, struct file *file,
@@ -1006,13 +1046,27 @@ static struct pl2303_buf *pl2303_buf_alloc(unsigned int size)
  * Free the buffer and all associated memory.
  */
 
-void pl2303_buf_free(struct pl2303_buf *pb)
+static void pl2303_buf_free(struct pl2303_buf *pb)
 {
 	if (pb != NULL) {
 		if (pb->buf_buf != NULL)
 			kfree(pb->buf_buf);
 		kfree(pb);
 	}
+}
+
+
+/*
+ * pl2303_buf_clear
+ *
+ * Clear out all data in the circular buffer.
+ */
+
+static void pl2303_buf_clear(struct pl2303_buf *pb)
+{
+	if (pb != NULL)
+		pb->buf_get = pb->buf_put;
+		/* equivalent to a get of all data available */
 }
 
 
