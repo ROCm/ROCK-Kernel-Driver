@@ -161,12 +161,11 @@ __xprt_lock_write(struct rpc_xprt *xprt, struct rpc_task *task)
 	smp_mb__after_clear_bit();
 out_sleep:
 	dprintk("RPC: %4d failed to lock socket %p\n", task->tk_pid, xprt);
-	task->tk_timeout = 0;
 	task->tk_status = -EAGAIN;
 	if (req && req->rq_ntrans)
-		rpc_sleep_on(&xprt->resend, task, NULL, NULL);
+		rpc_sleep_on(&xprt->resend, task, NULL, NULL, 0);
 	else
-		rpc_sleep_on(&xprt->sending, task, NULL, NULL);
+		rpc_sleep_on(&xprt->sending, task, NULL, NULL, 0);
 	return 0;
 }
 
@@ -522,15 +521,18 @@ xprt_connect(struct rpc_task *task)
 		/* Protect against TCP socket state changes */
 		lock_sock(inet);
 		if (inet->sk_state != TCP_ESTABLISHED) {
+			unsigned long	timeout;
+
 			dprintk("RPC: %4d  waiting for connection\n",
 					task->tk_pid);
-			task->tk_timeout = RPC_CONNECT_TIMEOUT;
+			timeout = RPC_CONNECT_TIMEOUT;
 			/* if the socket is already closing, delay briefly */
 			if ((1 << inet->sk_state) &
 			    ~(TCPF_SYN_SENT | TCPF_SYN_RECV))
-				task->tk_timeout = RPC_REESTABLISH_TIMEOUT;
-			rpc_sleep_on(&xprt->pending, task, xprt_connect_status,
-									NULL);
+				timeout = RPC_REESTABLISH_TIMEOUT;
+			rpc_sleep_on(&xprt->pending, task,
+					xprt_connect_status, NULL,
+					timeout);
 		}
 		release_sock(inet);
 		break;
@@ -1169,6 +1171,7 @@ xprt_transmit(struct rpc_task *task)
 	struct rpc_clnt *clnt = task->tk_client;
 	struct rpc_rqst	*req = task->tk_rqstp;
 	struct rpc_xprt	*xprt = req->rq_xprt;
+	unsigned long timeout;
 	int status, retry = 0;
 
 
@@ -1247,8 +1250,8 @@ xprt_transmit(struct rpc_task *task)
 			if (!xprt_connected(xprt))
 				task->tk_status = -ENOTCONN;
 			else if (test_bit(SOCK_NOSPACE, &xprt->sock->flags)) {
-				task->tk_timeout = req->rq_timeout.to_current;
-				rpc_sleep_on(&xprt->pending, task, NULL, NULL);
+				rpc_sleep_on(&xprt->pending, task, NULL, NULL,
+						req->rq_timeout.to_current);
 			}
 			spin_unlock_bh(&xprt->sock_lock);
 			return;
@@ -1257,8 +1260,8 @@ xprt_transmit(struct rpc_task *task)
 		rpc_delay(task, HZ>>4);
 		return;
 	case -ECONNREFUSED:
-		task->tk_timeout = RPC_REESTABLISH_TIMEOUT;
-		rpc_sleep_on(&xprt->sending, task, NULL, NULL);
+		rpc_sleep_on(&xprt->sending, task,
+				NULL, NULL, RPC_REESTABLISH_TIMEOUT);
 	case -ENOTCONN:
 		return;
 	default:
@@ -1273,19 +1276,23 @@ xprt_transmit(struct rpc_task *task)
 	spin_lock_bh(&xprt->sock_lock);
 	if (!xprt->nocong) {
 		int timer = task->tk_msg.rpc_proc->p_timer;
-		task->tk_timeout = rpc_calc_rto(clnt->cl_rtt, timer);
-		task->tk_timeout <<= rpc_ntimeo(clnt->cl_rtt, timer);
-		task->tk_timeout <<= clnt->cl_timeout.to_retries
+		timeout = rpc_calc_rto(clnt->cl_rtt, timer);
+		timeout <<= rpc_ntimeo(clnt->cl_rtt, timer);
+		timeout <<= clnt->cl_timeout.to_retries
 			- req->rq_timeout.to_retries;
-		if (task->tk_timeout > req->rq_timeout.to_maxval)
-			task->tk_timeout = req->rq_timeout.to_maxval;
+		if (timeout > req->rq_timeout.to_maxval)
+			timeout = req->rq_timeout.to_maxval;
+		else if (timeout == 0) {
+			printk(KERN_ERR "RPC task timeout == 0, please tell okir\n");
+			timeout = req->rq_timeout.to_maxval;
+		}
 	} else
-		task->tk_timeout = req->rq_timeout.to_current;
+		timeout = req->rq_timeout.to_current;
 	/* Don't race with disconnect */
 	if (!xprt_connected(xprt))
 		task->tk_status = -ENOTCONN;
 	else if (!req->rq_received)
-		rpc_sleep_on(&xprt->pending, task, NULL, xprt_timer);
+		rpc_sleep_on(&xprt->pending, task, NULL, xprt_timer, timeout);
 	__xprt_release_write(xprt, task);
 	spin_unlock_bh(&xprt->sock_lock);
 }
@@ -1326,8 +1333,7 @@ do_xprt_reserve(struct rpc_task *task)
 	}
 	dprintk("RPC:      waiting for request slot\n");
 	task->tk_status = -EAGAIN;
-	task->tk_timeout = 0;
-	rpc_sleep_on(&xprt->backlog, task, NULL, NULL);
+	rpc_sleep_on(&xprt->backlog, task, NULL, NULL, 0);
 }
 
 /*
