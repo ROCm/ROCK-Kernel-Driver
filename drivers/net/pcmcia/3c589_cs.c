@@ -711,12 +711,13 @@ static void pop_tx_status(struct net_device *dev)
 static int el3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
     ioaddr_t ioaddr = dev->base_addr;
+    struct el3_private *priv = netdev_priv(dev);
 
     DEBUG(3, "%s: el3_start_xmit(length = %ld) called, "
 	  "status %4.4x.\n", dev->name, (long)skb->len,
 	  inw(ioaddr + EL3_STATUS));
 
-    ((struct el3_private *)dev->priv)->stats.tx_bytes += skb->len;
+    priv->stats.tx_bytes += skb->len;
 
     /* Put out the doubleword header... */
     outw(skb->len, ioaddr + TX_FIFO);
