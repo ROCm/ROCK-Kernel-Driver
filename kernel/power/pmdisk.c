@@ -63,15 +63,6 @@ extern int pagedir_order;
 extern struct swsusp_info swsusp_info;
 
 
-#define PMDISK_SIG	"pmdisk-swap1"
-
-struct pmdisk_header {
-	char reserved[PAGE_SIZE - 20 - sizeof(swp_entry_t)];
-	swp_entry_t pmdisk_info;
-	char	orig_sig[10];
-	char	sig[10];
-} __attribute__((packed, aligned(PAGE_SIZE))) pmdisk_header;
-
 /*
  * XXX: We try to keep some more pages free so that I/O operations succeed
  * without paging. Might this be more?
@@ -89,34 +80,9 @@ struct pmdisk_header {
 #define SWAPFILE_SUSPEND   1	/* This is the suspending device */
 #define SWAPFILE_IGNORED   2	/* Those are other swap devices ignored for suspension */
 
-extern unsigned short swapfile_used[MAX_SWAPFILES];
-extern unsigned short root_swap;
 extern int swsusp_swap_check(void);
 extern void swsusp_swap_lock(void);
 
-
-static int mark_swapfiles(swp_entry_t prev)
-{
-	int error;
-
-	rw_swap_page_sync(READ, 
-			  swp_entry(root_swap, 0),
-			  virt_to_page((unsigned long)&pmdisk_header));
-	if (!memcmp("SWAP-SPACE",pmdisk_header.sig,10) ||
-	    !memcmp("SWAPSPACE2",pmdisk_header.sig,10)) {
-		memcpy(pmdisk_header.orig_sig,pmdisk_header.sig,10);
-		memcpy(pmdisk_header.sig,PMDISK_SIG,10);
-		pmdisk_header.pmdisk_info = prev;
-		error = rw_swap_page_sync(WRITE, 
-					  swp_entry(root_swap, 0),
-					  virt_to_page((unsigned long)
-						       &pmdisk_header));
-	} else {
-		pr_debug("pmdisk: Partition is not swap space.\n");
-		error = -ENODEV;
-	}
-	return error;
-}
 
 extern int swsusp_write_page(unsigned long addr, swp_entry_t * entry);
 extern int swsusp_data_write(void);
@@ -156,7 +122,7 @@ static int write_pagedir(void)
 }
 
 extern void swsusp_init_header(void);
-extern int swsusp_write_header(swp_entry_t*);
+extern int swsusp_close_swap(void);
 
 /**
  *	write_suspend_image - Write entire image and metadata.
@@ -166,7 +132,6 @@ extern int swsusp_write_header(swp_entry_t*);
 static int write_suspend_image(void)
 {
 	int error;
-	swp_entry_t prev = { 0 };
 
 	swsusp_init_header();
 	if ((error = swsusp_data_write()))
@@ -175,10 +140,8 @@ static int write_suspend_image(void)
 	if ((error = write_pagedir()))
 		goto FreePagedir;
 
-	if ((error = swsusp_write_header(&prev)))
+	if ((error = swsusp_close_swap()))
 		goto FreePagedir;
-
-	error = mark_swapfiles(prev);
  Done:
 	return error;
  FreePagedir:
@@ -227,30 +190,6 @@ extern int bio_write_page(pgoff_t page_off, void * page);
 extern dev_t __init name_to_dev_t(const char *line);
 
 
-static int __init check_sig(void)
-{
-	int error;
-
-	memset(&pmdisk_header,0,sizeof(pmdisk_header));
-	if ((error = bio_read_page(0,&pmdisk_header)))
-		return error;
-	if (!memcmp(PMDISK_SIG,pmdisk_header.sig,10)) {
-		memcpy(pmdisk_header.sig,pmdisk_header.orig_sig,10);
-
-		/*
-		 * Reset swap signature now.
-		 */
-		error = bio_write_page(0,&pmdisk_header);
-	} else { 
-		pr_debug(KERN_ERR "pmdisk: Invalid partition type.\n");
-		return -EINVAL;
-	}
-	if (!error)
-		pr_debug("pmdisk: Signature found, resuming\n");
-	return error;
-}
-
-
 static int __init read_pagedir(void)
 {
 	unsigned long addr;
@@ -282,13 +221,11 @@ static int __init read_pagedir(void)
 static int __init read_suspend_image(void)
 {
 	extern int swsusp_data_read(void);
-	extern int swsusp_check_header(swp_entry_t);
+	extern int swsusp_verify(void);
 
 	int error = 0;
 
-	if ((error = check_sig()))
-		return error;
-	if ((error = swsusp_check_header(pmdisk_header.pmdisk_info)))
+	if ((error = swsusp_verify()))
 		return error;
 	if ((error = read_pagedir()))
 		return error;

@@ -111,6 +111,15 @@ suspend_pagedir_t *pagedir_nosave __nosavedata = NULL;
 suspend_pagedir_t *pagedir_save;
 int pagedir_order __nosavedata = 0;
 
+#define SWSUSP_SIG	"S1SUSPEND"
+
+struct swsusp_header {
+	char reserved[PAGE_SIZE - 20 - sizeof(swp_entry_t)];
+	swp_entry_t swsusp_info;
+	char	orig_sig[10];
+	char	sig[10];
+} __attribute__((packed, aligned(PAGE_SIZE))) swsusp_header;
+
 struct swsusp_info swsusp_info;
 
 struct link {
@@ -161,48 +170,31 @@ static const char name_resume[] = "Resume Machine: ";
 #define SWAPFILE_SUSPEND   1	/* This is the suspending device */
 #define SWAPFILE_IGNORED   2	/* Those are other swap devices ignored for suspension */
 
-unsigned short swapfile_used[MAX_SWAPFILES];
-unsigned short root_swap;
-#define MARK_SWAP_SUSPEND 0
-#define MARK_SWAP_RESUME 2
+static unsigned short swapfile_used[MAX_SWAPFILES];
+static unsigned short root_swap;
 
-static void mark_swapfiles(swp_entry_t prev, int mode)
+static int mark_swapfiles(swp_entry_t prev)
 {
-	swp_entry_t entry;
-	union diskpage *cur;
-	struct page *page;
+	int error;
 
-	if (root_swap == 0xFFFF)  /* ignored */
-		return;
-
-	page = alloc_page(GFP_ATOMIC);
-	if (!page)
-		panic("Out of memory in mark_swapfiles");
-	cur = page_address(page);
-	/* XXX: this is dirty hack to get first page of swap file */
-	entry = swp_entry(root_swap, 0);
-	rw_swap_page_sync(READ, entry, page);
-
-	if (mode == MARK_SWAP_RESUME) {
-	  	if (!memcmp("S1",cur->swh.magic.magic,2))
-		  	memcpy(cur->swh.magic.magic,"SWAP-SPACE",10);
-		else if (!memcmp("S2",cur->swh.magic.magic,2))
-			memcpy(cur->swh.magic.magic,"SWAPSPACE2",10);
-		else printk("%sUnable to find suspended-data signature (%.10s - misspelled?\n", 
-		      	name_resume, cur->swh.magic.magic);
+	rw_swap_page_sync(READ, 
+			  swp_entry(root_swap, 0),
+			  virt_to_page((unsigned long)&swsusp_header));
+	if (!memcmp("SWAP-SPACE",swsusp_header.sig,10) ||
+	    !memcmp("SWAPSPACE2",swsusp_header.sig,10)) {
+		memcpy(swsusp_header.orig_sig,swsusp_header.sig,10);
+		memcpy(swsusp_header.sig,SWSUSP_SIG,10);
+		swsusp_header.swsusp_info = prev;
+		error = rw_swap_page_sync(WRITE, 
+					  swp_entry(root_swap, 0),
+					  virt_to_page((unsigned long)
+						       &swsusp_header));
 	} else {
-	  	if ((!memcmp("SWAP-SPACE",cur->swh.magic.magic,10)))
-		  	memcpy(cur->swh.magic.magic,"S1SUSP....",10);
-		else if ((!memcmp("SWAPSPACE2",cur->swh.magic.magic,10)))
-			memcpy(cur->swh.magic.magic,"S2SUSP....",10);
-		else panic("\nSwapspace is not swapspace (%.10s)\n", cur->swh.magic.magic);
-		cur->link.next = prev; /* prev is the first/last swap page of the resume area */
-		/* link.next lies *no more* in last 4/8 bytes of magic */
+		pr_debug("swsusp: Partition is not swap space.\n");
+		error = -ENODEV;
 	}
-	rw_swap_page_sync(WRITE, entry, page);
-	__free_page(page);
+	return error;
 }
-
 
 /*
  * Check whether the swap device is the specified resume
@@ -400,9 +392,23 @@ void swsusp_init_header(void)
  *	entrance. On exit, it contains the location of the header. 
  */
 
-int swsusp_write_header(swp_entry_t * entry)
+static int write_header(swp_entry_t * entry)
 {
 	return swsusp_write_page((unsigned long)&swsusp_info,entry);
+}
+
+
+int swsusp_close_swap(void)
+{
+	swp_entry_t entry;
+	int error;
+	error = write_header(&entry);
+
+	printk( "S" );
+	if (!error)
+		error = mark_swapfiles(entry);
+	printk( "|\n" );
+	return error;
 }
 
 /**
@@ -429,6 +435,7 @@ static int write_suspend_image(void)
 		return -ENOMEM;
 
 	swsusp_data_write();
+	swsusp_init_header();
 
 	printk( "Writing pagedir (%d pages): ", nr_pgdir_pages);
 	addr = (unsigned long)pagedir_nosave;
@@ -442,12 +449,8 @@ static int write_suspend_image(void)
 	BUG_ON (sizeof(union diskpage) != PAGE_SIZE);
 	BUG_ON (sizeof(struct link) != PAGE_SIZE);
 
-	swsusp_init_header();
 	swsusp_info.pagedir[0] = entry;
-	error = swsusp_write_header(&entry);
-	printk( "S" );
-	mark_swapfiles(entry, MARK_SWAP_SUSPEND);
-	printk( "|\n" );
+	swsusp_close_swap();
 
 	MDELAY(1000);
 	return 0;
@@ -906,9 +909,6 @@ static void suspend_finish(void)
 	restore_highmem();
 #endif
 	device_resume();
-	PRINTK( "Fixing swap signatures... " );
-	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
-	PRINTK( "ok\n" );
 
 #ifdef SUSPEND_CONSOLE
 	acquire_console_sem();
@@ -1217,12 +1217,12 @@ static const char * __init sanity_check(void)
 }
 
 
-int __init swsusp_check_header(swp_entry_t loc)
+static int __init check_header(void)
 {
 	const char * reason = NULL;
 	int error;
 
-	if ((error = bio_read_page(swp_offset(loc), &swsusp_info)))
+	if ((error = bio_read_page(swp_offset(swsusp_header.swsusp_info), &swsusp_info)))
 		return error;
 
  	/* Is this same machine? */
@@ -1234,6 +1234,38 @@ int __init swsusp_check_header(swp_entry_t loc)
 	return error;
 }
 
+static int __init check_sig(void)
+{
+	int error;
+
+	memset(&swsusp_header,0,sizeof(swsusp_header));
+	if ((error = bio_read_page(0,&swsusp_header)))
+		return error;
+	if (!memcmp(SWSUSP_SIG,swsusp_header.sig,10)) {
+		memcpy(swsusp_header.sig,swsusp_header.orig_sig,10);
+
+		/*
+		 * Reset swap signature now.
+		 */
+		error = bio_write_page(0,&swsusp_header);
+	} else { 
+		pr_debug(KERN_ERR "swsusp: Invalid partition type.\n");
+		return -EINVAL;
+	}
+	if (!error)
+		pr_debug("swsusp: Signature found, resuming\n");
+	return error;
+}
+
+
+int __init swsusp_verify(void)
+{
+	int error;
+
+	if (!(error = check_sig()))
+		error = check_header();
+	return error;
+}
 
 
 /**
@@ -1273,6 +1305,9 @@ static int __init __read_suspend_image(int noresume)
 	int i, nr_pgdir_pages;
 	int error;
 
+	if ((error = swsusp_verify()))
+		return error;
+	
 	cur = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
 	if (!cur)
 		return -ENOMEM;
@@ -1282,40 +1317,8 @@ static int __init __read_suspend_image(int noresume)
 		next.val = swp_offset(next); \
         }
 
-	if (bio_read_page(0, cur)) return -EIO;
-
-	if ((!memcmp("SWAP-SPACE",cur->swh.magic.magic,10)) ||
-	    (!memcmp("SWAPSPACE2",cur->swh.magic.magic,10))) {
-		printk(KERN_ERR "%sThis is normal swap space\n", name_resume );
-		return -EINVAL;
-	}
-
-	PREPARENEXT; /* We have to read next position before we overwrite it */
-
-	if (!memcmp("S1",cur->swh.magic.magic,2))
-		memcpy(cur->swh.magic.magic,"SWAP-SPACE",10);
-	else if (!memcmp("S2",cur->swh.magic.magic,2))
-		memcpy(cur->swh.magic.magic,"SWAPSPACE2",10);
-	else {
-		if (noresume)
-			return -EINVAL;
-		panic("%sUnable to find suspended-data signature (%.10s - misspelled?\n", 
-			name_resume, cur->swh.magic.magic);
-	}
-	if (noresume) {
-		/* We don't do a sanity check here: we want to restore the swap
-		   whatever version of kernel made the suspend image;
-		   We need to write swap, but swap is *not* enabled so
-		   we must write the device directly */
-		printk("%s: Fixing swap signatures %s...\n", name_resume, resume_file);
-		bio_write_page(0, cur);
-	}
-
-	printk( "%sSignature found, resuming\n", name_resume );
-	MDELAY(1000);
-
-	if ((error = swsusp_check_header(next)))
-		return error;
+	if (noresume)
+		return 0;
 
 	next = swsusp_info.pagedir[0];
 	next.val = swp_offset(next);
