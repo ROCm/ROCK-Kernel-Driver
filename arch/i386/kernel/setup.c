@@ -980,6 +980,9 @@ void __init setup_arch(char **cmdline_p)
 	if (smp_found_config)
 		get_smp_config();
 #endif
+#ifdef CONFIG_X86_SUMMIT
+	setup_summit();
+#endif
 
 	register_memory(max_low_pfn);
 

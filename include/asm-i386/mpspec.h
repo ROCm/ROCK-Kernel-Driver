@@ -222,6 +222,10 @@ extern unsigned long mp_lapic_addr;
 extern int pic_mode;
 extern int using_apic_timer;
 
+#ifdef CONFIG_X86_SUMMIT
+extern void setup_summit (void);
+#endif
+
 #ifdef CONFIG_ACPI_BOOT
 extern void mp_register_lapic (u8 id, u8 enabled);
 extern void mp_register_lapic_address (u64 address);
