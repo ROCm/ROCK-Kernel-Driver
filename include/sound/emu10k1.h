@@ -31,6 +31,7 @@
 #include <sound/ac97_codec.h>
 #include <sound/util_mem.h>
 #include <sound/pcm-indirect.h>
+#include <sound/timer.h>
 #include <linux/interrupt.h>
 #include <asm/io.h>
 
@@ -1000,6 +1001,8 @@ struct _snd_emu10k1 {
 	snd_pcm_substream_t *pcm_capture_mic_substream;
 	snd_pcm_substream_t *pcm_capture_efx_substream;
 
+	snd_timer_t *timer;
+
 	emu10k1_midi_t midi;
 	emu10k1_midi_t midi2; /* for audigy */
 
@@ -1019,6 +1022,7 @@ int snd_emu10k1_pcm_mic(emu10k1_t * emu, int device, snd_pcm_t ** rpcm);
 int snd_emu10k1_pcm_efx(emu10k1_t * emu, int device, snd_pcm_t ** rpcm);
 int snd_emu10k1_fx8010_pcm(emu10k1_t * emu, int device, snd_pcm_t ** rpcm);
 int snd_emu10k1_mixer(emu10k1_t * emu);
+int snd_emu10k1_timer(emu10k1_t * emu, int device);
 int snd_emu10k1_fx8010_new(emu10k1_t *emu, int device, snd_hwdep_t ** rhwdep);
 
 irqreturn_t snd_emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs);
