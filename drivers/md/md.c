@@ -2356,10 +2356,10 @@ static int set_disk_faulty(mddev_t *mddev, dev_t dev)
 
 	rdev = find_rdev(mddev, dev);
 	if (!rdev)
-		return 0;
+		return -ENODEV;
 
 	md_error(mddev, rdev);
-	return 1;
+	return 0;
 }
 
 static int md_ioctl(struct inode *inode, struct file *file,
