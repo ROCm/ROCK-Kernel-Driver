@@ -67,6 +67,9 @@
  *
  * HISTORY:
  *
+ * 2003-12-29 Rewritten high speed iso transfer support (by Michal Sojka,
+ *	<sojkam@centrum.cz>, updates by DB).
+ *
  * 2002-11-29	Correct handling for hw async_next register.
  * 2002-08-06	Handling for bulk and interrupt transfers is mostly shared;
  *	only scheduling is different, no arbitrary limitations.
@@ -90,14 +93,16 @@
  * 2001-June	Works with usb-storage and NEC EHCI on 2.4
  */
 
-#define DRIVER_VERSION "2003-Jun-13"
+#define DRIVER_VERSION "2003-Dec-29"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
 static const char	hcd_name [] = "ehci_hcd";
 
 
-// #define EHCI_VERBOSE_DEBUG
+#undef EHCI_VERBOSE_DEBUG
+#undef EHCI_URB_TRACE
+
 // #define have_split_iso
 
 #ifdef DEBUG
@@ -324,8 +329,8 @@ static int ehci_hc_reset (struct usb_hcd *hcd)
 	spin_lock_init (&ehci->lock);
 
 	ehci->caps = (struct ehci_caps *) hcd->regs;
-	ehci->regs = (struct ehci_regs *) (hcd->regs +
-				readb (&ehci->caps->length));
+	ehci->regs = (struct ehci_regs *) (hcd->regs + 
+				HC_LENGTH (readl (&ehci->caps->hc_capbase)));
 	dbg_hcs_params (ehci, "reset");
 	dbg_hcc_params (ehci, "reset");
 
@@ -489,7 +494,7 @@ done2:
 
         /* PCI Serial Bus Release Number is at 0x60 offset */
 	pci_read_config_byte (hcd->pdev, 0x60, &tempbyte);
-	temp = readw (&ehci->caps->hci_version);
+	temp = HC_VERSION(readl (&ehci->caps->hc_capbase));
 	ehci_info (ehci,
 		"USB %x.%x enabled, EHCI %x.%02x, driver %s\n",
 		((tempbyte & 0xf0)>>4), (tempbyte & 0x0f),
@@ -899,10 +904,19 @@ rescan:
 	if (!qh)
 		goto done;
 
+	/* endpoints can be iso streams.  for now, we don't
+	 * accelerate iso completions ... so spin a while.
+	 */
+	if (qh->hw_info1 == 0) {
+		ehci_vdbg (ehci, "iso delay\n");
+		goto idle_timeout;
+	}
+
 	if (!HCD_IS_RUNNING (ehci->hcd.state))
 		qh->qh_state = QH_STATE_IDLE;
 	switch (qh->qh_state) {
 	case QH_STATE_UNLINK:		/* wait for hw to finish? */
+idle_timeout:
 		spin_unlock_irqrestore (&ehci->lock, flags);
 		set_current_state (TASK_UNINTERRUPTIBLE);
 		schedule_timeout (1);

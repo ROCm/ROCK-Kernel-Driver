@@ -1089,6 +1089,9 @@ static int usb_stor_reset_common(struct us_data *us,
 		return FAILED;
 	}
 
+	/* permit the clear-halt transfers to take place */
+	clear_bit(US_FLIDX_ABORTING, &us->flags);
+
 	US_DEBUGP("Soft reset: clearing bulk-in endpoint halt\n");
 	result = usb_stor_clear_halt(us, us->recv_bulk_pipe);
 

@@ -45,13 +45,6 @@
  *
  */
 
-/* Patch submitted by Martin Berentsen <berentsen at sent5 dot uni-duisburg dot de> */
-#define US_FL_START_STOP  0x00000004   /* ignore START_STOP commands     */
-UNUSUAL_DEV(  0x0686, 0x4014, 0x0001, 0x0001, 
-		"Minolta",
-		"Dimage S414",
-		US_SC_SCSI, US_PR_BULK, NULL, US_FL_START_STOP), 
-
 UNUSUAL_DEV(  0x03ee, 0x0000, 0x0000, 0x0245, 
 		"Mitsumi",
 		"CD-R/RW Drive",
@@ -296,7 +289,7 @@ UNUSUAL_DEV(  0x054c, 0x0069, 0x0000, 0x9999,
 UNUSUAL_DEV(  0x054c, 0x006d, 0x0000, 0x9999,
 		"Sony",
 		"PEG Mass Storage",
-		US_SC_8070, US_PR_CBI, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 		
 UNUSUAL_DEV(  0x057b, 0x0000, 0x0000, 0x0299, 
@@ -377,7 +370,7 @@ UNUSUAL_DEV(  0x05e3, 0x0700, 0x0000, 0xffff,
 UNUSUAL_DEV(  0x05e3, 0x0701, 0x0000, 0xffff, 
 		"", 
 		"USB TO IDE",
-		US_SC_SCSI, US_PR_BULK, NULL,
+		US_SC_SCSI, US_PR_DEVICE, NULL,
 		US_FL_MODE_XLATE ), 
 
 /* Reported by Peter Marks <peter.marks@turner.com>
@@ -643,7 +636,7 @@ UNUSUAL_DEV( 0x08ca, 0x2011, 0x0001, 0x0001,
 UNUSUAL_DEV( 0x090c, 0x1132, 0x0000, 0xffff,
 		"Feiya",
 		"5-in-1 Card Reader",
-		US_SC_SCSI, US_PR_BULK, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_CAPACITY ),
 
 UNUSUAL_DEV(  0x097a, 0x0001, 0x0000, 0x0001,
@@ -670,6 +663,13 @@ UNUSUAL_DEV( 0x0a17, 0x0004, 0x1000, 0x1000,
                 "Optio 2/3/400",
                 US_SC_DEVICE, US_PR_DEVICE, NULL,
                 US_FL_FIX_INQUIRY ),
+
+/* This entry from <matthias@ma-c.de> in the Debian mailing list */
+UNUSUAL_DEV( 0x0a17, 0x0006, 0x0000, 0xffff,
+		"Pentax",
+		"Optio 330GS",
+		US_SC_8070, US_PR_CB, NULL,
+		US_FL_MODE_XLATE | US_FL_FIX_INQUIRY ),
 
 /* Submitted by Per Winkvist <per.winkvist@uk.com> */
 UNUSUAL_DEV( 0x0a17, 0x006, 0x1000, 0x9009,
