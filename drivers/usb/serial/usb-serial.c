@@ -466,7 +466,7 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 
 	/* set up our port structure making the tty driver remember our port object, and us it */
 	portNumber = tty->index - serial->minor;
-	port = &serial->port[portNumber];
+	port = serial->port[portNumber];
 	tty->driver_data = port;
 
 	port->tty = tty;
@@ -863,13 +863,13 @@ static void destroy_serial (struct kobject *kobj)
 	struct usb_serial_port *port;
 	int i;
 
-	dbg ("%s", __FUNCTION__);
+	dbg ("%s - %s", __FUNCTION__, kobj->name);
 
 	serial = to_usb_serial(kobj);
 
 	/* fail all future close/read/write/ioctl/etc calls */
 	for (i = 0; i < serial->num_ports; ++i) {
-		port = &serial->port[i];
+		port = serial->port[i];
 		if (port->tty != NULL) {
 			port->tty->driver_data = NULL;
 			while (port->open_count > 0) {
@@ -881,41 +881,41 @@ static void destroy_serial (struct kobject *kobj)
 
 	serial_shutdown (serial);
 
-	for (i = 0; i < serial->num_ports; ++i)
-		device_unregister(&serial->port[i].dev);
-
-	for (i = 0; i < serial->num_ports; ++i)
-		serial->port[i].open_count = 0;
-
-	for (i = 0; i < serial->num_bulk_in; ++i) {
-		port = &serial->port[i];
-		if (port->read_urb) {
-			usb_unlink_urb (port->read_urb);
-			usb_free_urb (port->read_urb);
-		}
-		if (port->bulk_in_buffer)
-			kfree (port->bulk_in_buffer);
-	}
-	for (i = 0; i < serial->num_bulk_out; ++i) {
-		port = &serial->port[i];
-		if (port->write_urb) {
-			usb_unlink_urb (port->write_urb);
-			usb_free_urb (port->write_urb);
-		}
-		if (port->bulk_out_buffer)
-			kfree (port->bulk_out_buffer);
-	}
-	for (i = 0; i < serial->num_interrupt_in; ++i) {
-		port = &serial->port[i];
-		if (port->interrupt_in_urb) {
-			usb_unlink_urb (port->interrupt_in_urb);
-			usb_free_urb (port->interrupt_in_urb);
-		}
-		if (port->interrupt_in_buffer)
-			kfree (port->interrupt_in_buffer);
-	}
 	/* return the minor range that this device had */
-	return_serial (serial);
+	return_serial(serial);
+
+	for (i = 0; i < serial->num_ports; ++i)
+		serial->port[i]->open_count = 0;
+
+	/* the ports are cleaned up and released in port_release() */
+	for (i = 0; i < serial->num_ports; ++i)
+		device_unregister(&serial->port[i]->dev);
+
+	/* If this is a "fake" port, we have to clean it up here, as it will
+	 * not get cleaned up in port_release() as it was never registered with
+	 * the driver core */
+	if (serial->num_ports < serial->num_port_pointers) {
+		for (i = serial->num_ports; i < serial->num_port_pointers; ++i) {
+			port = serial->port[i];
+			if (!port)
+				continue;
+			if (port->read_urb) {
+				usb_unlink_urb(port->read_urb);
+				usb_free_urb(port->read_urb);
+			}
+			if (port->write_urb) {
+				usb_unlink_urb(port->write_urb);
+				usb_free_urb(port->write_urb);
+			}
+			if (port->interrupt_in_urb) {
+				usb_unlink_urb(port->interrupt_in_urb);
+				usb_free_urb(port->interrupt_in_urb);
+			}
+			kfree(port->bulk_in_buffer);
+			kfree(port->bulk_out_buffer);
+			kfree(port->interrupt_in_buffer);
+		}
+	}
 
 	usb_put_dev(serial->dev);
 
@@ -926,6 +926,29 @@ static void destroy_serial (struct kobject *kobj)
 static struct kobj_type usb_serial_kobj_type = {
 	.release = destroy_serial,
 };
+
+static void port_release(struct device *dev)
+{
+	struct usb_serial_port *port = to_usb_serial_port(dev);
+
+	dbg ("%s - %s", __FUNCTION__, dev->bus_id);
+	if (port->read_urb) {
+		usb_unlink_urb(port->read_urb);
+		usb_free_urb(port->read_urb);
+	}
+	if (port->write_urb) {
+		usb_unlink_urb(port->write_urb);
+		usb_free_urb(port->write_urb);
+	}
+	if (port->interrupt_in_urb) {
+		usb_unlink_urb(port->interrupt_in_urb);
+		usb_free_urb(port->interrupt_in_urb);
+	}
+	kfree(port->bulk_in_buffer);
+	kfree(port->bulk_out_buffer);
+	kfree(port->interrupt_in_buffer);
+	kfree(port);
+}
 
 static struct usb_serial * create_serial (struct usb_device *dev, 
 					  struct usb_interface *interface,
@@ -1124,10 +1147,29 @@ int usb_serial_probe(struct usb_interface *interface,
 	serial->num_bulk_out = num_bulk_out;
 	serial->num_interrupt_in = num_interrupt_in;
 
+	/* create our ports, we need as many as the max endpoints */
+	/* we don't use num_ports here cauz some devices have more endpoint pairs than ports */
+	max_endpoints = max(num_bulk_in, num_bulk_out);
+	max_endpoints = max(max_endpoints, num_interrupt_in);
+	max_endpoints = max(max_endpoints, (int)serial->num_ports);
+	serial->num_port_pointers = max_endpoints;
+	dbg("%s - setting up %d port structures for this device", __FUNCTION__, max_endpoints);
+	for (i = 0; i < max_endpoints; ++i) {
+		port = kmalloc(sizeof(struct usb_serial_port), GFP_KERNEL);
+		if (!port)
+			goto probe_error;
+		memset(port, 0x00, sizeof(struct usb_serial_port));
+		port->number = i + serial->minor;
+		port->serial = serial;
+		port->magic = USB_SERIAL_PORT_MAGIC;
+		INIT_WORK(&port->work, usb_serial_port_softint, port);
+		serial->port[i] = port;
+	}
+
 	/* set up the endpoint information */
 	for (i = 0; i < num_bulk_in; ++i) {
 		endpoint = bulk_in_endpoint[i];
-		port = &serial->port[i];
+		port = serial->port[i];
 		port->read_urb = usb_alloc_urb (0, GFP_KERNEL);
 		if (!port->read_urb) {
 			dev_err(&interface->dev, "No free urbs available\n");
@@ -1152,7 +1194,7 @@ int usb_serial_probe(struct usb_interface *interface,
 
 	for (i = 0; i < num_bulk_out; ++i) {
 		endpoint = bulk_out_endpoint[i];
-		port = &serial->port[i];
+		port = serial->port[i];
 		port->write_urb = usb_alloc_urb(0, GFP_KERNEL);
 		if (!port->write_urb) {
 			dev_err(&interface->dev, "No free urbs available\n");
@@ -1178,7 +1220,7 @@ int usb_serial_probe(struct usb_interface *interface,
 
 	for (i = 0; i < num_interrupt_in; ++i) {
 		endpoint = interrupt_in_endpoint[i];
-		port = &serial->port[i];
+		port = serial->port[i];
 		port->interrupt_in_urb = usb_alloc_urb(0, GFP_KERNEL);
 		if (!port->interrupt_in_urb) {
 			dev_err(&interface->dev, "No free urbs available\n");
@@ -1197,20 +1239,6 @@ int usb_serial_probe(struct usb_interface *interface,
 				  port->interrupt_in_buffer, buffer_size, 
 				  serial->type->read_int_callback, port, 
 				  endpoint->bInterval);
-	}
-
-	/* initialize some parts of the port structures */
-	/* we don't use num_ports here cauz some devices have more endpoint pairs than ports */
-	max_endpoints = max(num_bulk_in, num_bulk_out);
-	max_endpoints = max(max_endpoints, num_interrupt_in);
-	max_endpoints = max(max_endpoints, (int)serial->num_ports);
-	dbg("%s - setting up %d port structures for this device", __FUNCTION__, max_endpoints);
-	for (i = 0; i < max_endpoints; ++i) {
-		port = &serial->port[i];
-		port->number = i + serial->minor;
-		port->serial = serial;
-		port->magic = USB_SERIAL_PORT_MAGIC;
-		INIT_WORK(&port->work, usb_serial_port_softint, port);
 	}
 
 	/* if this device type has an attach function, call it */
@@ -1232,10 +1260,11 @@ int usb_serial_probe(struct usb_interface *interface,
 
 	/* register all of the individual ports with the driver core */
 	for (i = 0; i < num_ports; ++i) {
-		port = &serial->port[i];
+		port = serial->port[i];
 		port->dev.parent = &serial->dev->dev;
 		port->dev.driver = NULL;
 		port->dev.bus = &usb_serial_bus_type;
+		port->dev.release = &port_release;
 
 		snprintf (&port->dev.bus_id[0], sizeof(port->dev.bus_id), "ttyUSB%d", port->number);
 		dbg ("%s - registering %s", __FUNCTION__, port->dev.bus_id);
@@ -1249,34 +1278,38 @@ exit:
 	usb_set_intfdata (interface, serial);
 	return 0;
 
-
 probe_error:
 	for (i = 0; i < num_bulk_in; ++i) {
-		port = &serial->port[i];
+		port = serial->port[i];
+		if (!port)
+			continue;
 		if (port->read_urb)
 			usb_free_urb (port->read_urb);
-		if (port->bulk_in_buffer)
-			kfree (port->bulk_in_buffer);
+		kfree(port->bulk_in_buffer);
 	}
 	for (i = 0; i < num_bulk_out; ++i) {
-		port = &serial->port[i];
+		port = serial->port[i];
+		if (!port)
+			continue;
 		if (port->write_urb)
 			usb_free_urb (port->write_urb);
-		if (port->bulk_out_buffer)
-			kfree (port->bulk_out_buffer);
+		kfree(port->bulk_out_buffer);
 	}
 	for (i = 0; i < num_interrupt_in; ++i) {
-		port = &serial->port[i];
+		port = serial->port[i];
+		if (!port)
+			continue;
 		if (port->interrupt_in_urb)
 			usb_free_urb (port->interrupt_in_urb);
-		if (port->interrupt_in_buffer)
-			kfree (port->interrupt_in_buffer);
+		kfree(port->interrupt_in_buffer);
 	}
 
 	/* return the minor range that this device had */
 	return_serial (serial);
 
 	/* free up any memory that we allocated */
+	for (i = 0; i < serial->num_port_pointers; ++i)
+		kfree(serial->port[i]);
 	kfree (serial);
 	return -EIO;
 }
