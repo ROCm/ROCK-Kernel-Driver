@@ -516,6 +516,8 @@ sa1111_configure_smc(struct sa1111 *sachip, int sdram, unsigned int drac,
 	 */
 	if (sachip->dev->dma_mask)
 		*sachip->dev->dma_mask &= sa1111_dma_mask[drac >> 2];
+
+	sachip->dev->coherent_dma_mask &= sa1111_dma_mask[drac >> 2];
 }
 
 #endif
@@ -558,6 +560,7 @@ sa1111_init_one_child(struct sa1111 *sachip, struct resource *parent,
 	dev->dev.parent  = sachip->dev;
 	dev->dev.bus     = &sa1111_bus_type;
 	dev->dev.release = sa1111_dev_release;
+	dev->dev.coherent_dma_mask = sachip->dev->coherent_dma_mask;
 	dev->res.start   = sachip->phys + info->offset;
 	dev->res.end     = dev->res.start + 511;
 	dev->res.name    = dev->dev.bus_id;

@@ -15,6 +15,7 @@
 struct amba_device {
 	struct device		dev;
 	struct resource		res;
+	u64			dma_mask;
 	unsigned int		periphid;
 	unsigned int		irq[AMBA_NR_IRQS];
 };
