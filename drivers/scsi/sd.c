@@ -1314,6 +1314,7 @@ static int sd_attach(Scsi_Device * sdp)
 	p = kmalloc(sizeof(*p), GFP_KERNEL);
 	if (!p)
 		return 1;
+	memset(p, 0, sizeof(*p));
 	gd = &p->disk;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_attach: scsi device: <%d,%d,%d,%d>\n", 
