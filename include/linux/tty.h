@@ -306,26 +306,27 @@ struct tty_struct {
  * tty->write.  Thus, you must use the inline functions set_bit() and
  * clear_bit() to make things atomic.
  */
-#define TTY_THROTTLED 0
-#define TTY_IO_ERROR 1
-#define TTY_OTHER_CLOSED 2
-#define TTY_EXCLUSIVE 3
-#define TTY_DEBUG 4
-#define TTY_DO_WRITE_WAKEUP 5
-#define TTY_PUSH 6
-#define TTY_CLOSING 7
-#define TTY_DONT_FLIP 8
-#define TTY_HW_COOK_OUT 14
-#define TTY_HW_COOK_IN 15
-#define TTY_PTY_LOCK 16
-#define TTY_NO_WRITE_SPLIT 17
+#define TTY_THROTTLED 		0	/* Call unthrottle() at threshold min */
+#define TTY_IO_ERROR 		1	/* Canse an I/O error (may be no ldisc too) */
+#define TTY_OTHER_CLOSED 	2	/* Other side (if any) has closed */
+#define TTY_EXCLUSIVE 		3	/* Exclusive open mode */
+#define TTY_DEBUG 		4	/* Debugging */
+#define TTY_DO_WRITE_WAKEUP 	5	/* Call write_wakeup after queuing new */
+#define TTY_PUSH 		6	/* n_tty private */
+#define TTY_CLOSING 		7	/* ->close() in progress */
+#define TTY_DONT_FLIP 		8	/* Defer buffer flip */
+#define TTY_LDISC 		9	/* Line discipline attached */
+#define TTY_HW_COOK_OUT 	14	/* Hardware can do output cooking */
+#define TTY_HW_COOK_IN 		15	/* Hardware can do input cooking */
+#define TTY_PTY_LOCK 		16	/* pty private */
+#define TTY_NO_WRITE_SPLIT 	17	/* Preserve write boundaries to driver */
+#define TTY_HUPPED 		18	/* Post driver->hangup() */
 
 #define TTY_WRITE_FLUSH(tty) tty_write_flush((tty))
 
 extern void tty_write_flush(struct tty_struct *);
 
 extern struct termios tty_std_termios;
-extern struct tty_ldisc ldiscs[];
 extern int fg_console, last_console, want_console;
 
 extern int kmsg_redirect;
@@ -361,6 +362,16 @@ extern void disassociate_ctty(int priv);
 extern void tty_flip_buffer_push(struct tty_struct *tty);
 extern int tty_get_baud_rate(struct tty_struct *tty);
 extern int tty_termios_baud_rate(struct termios *termios);
+
+extern struct tty_ldisc *tty_ldisc_ref(struct tty_struct *);
+extern void tty_ldisc_deref(struct tty_ldisc *);
+extern struct tty_ldisc *tty_ldisc_ref_wait(struct tty_struct *);
+
+extern struct tty_ldisc *tty_ldisc_get(int);
+extern void tty_ldisc_put(int);
+
+extern void tty_wakeup(struct tty_struct *tty);
+extern void tty_ldisc_flush(struct tty_struct *tty);
 
 struct semaphore;
 extern struct semaphore tty_sem;

@@ -307,10 +307,7 @@ ctc_tty_tint(ctc_tty_info * info)
 
 		info->flags &= ~CTC_ASYNC_TX_LINESTAT;
 		if (tty) {
-			if (wake && (tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-			    tty->ldisc.write_wakeup)
-				(tty->ldisc.write_wakeup)(tty);
-			wake_up_interruptible(&tty->write_wait);
+			tty_wakeup(tty);
 		}
 	}
 	return (skb_queue_empty(&info->tx_queue) ? 0 : 1);
@@ -589,9 +586,7 @@ ctc_tty_flush_buffer(struct tty_struct *tty)
 	info->lsr |= UART_LSR_TEMT;
 	spin_unlock_irqrestore(&ctc_tty_lock, flags);
 	wake_up_interruptible(&tty->write_wait);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup) (tty);
+	tty_wakeup(tty);
 ex:
 	DBF_TEXT_(trace, 2, "ex: %s ", __FUNCTION__);
 	return;
@@ -1066,8 +1061,7 @@ ctc_tty_close(struct tty_struct *tty, struct file *filp)
 		skb_queue_purge(&info->tx_queue);
 		info->lsr |= UART_LSR_TEMT;
 	}
-	if (tty->ldisc.flush_buffer)
-		tty->ldisc.flush_buffer(tty);
+	tty_ldisc_flush(tty);
 	info->tty = 0;
 	tty->closing = 0;
 	if (info->blocked_open) {

@@ -15,9 +15,6 @@
 #include <linux/seq_file.h>
 #include <asm/bitops.h>
 
-extern struct tty_ldisc ldiscs[];
-
-
 static int tty_ldiscs_read_proc(char *page, char **start, off_t off,
 				int count, int *eof, void *data);
 
@@ -159,12 +156,15 @@ static int tty_ldiscs_read_proc(char *page, char **start, off_t off,
 	int	i;
 	int	len = 0;
 	off_t	begin = 0;
-
+	struct tty_ldisc *ld;
+	
 	for (i=0; i < NR_LDISCS; i++) {
-		if (!(ldiscs[i].flags & LDISC_FLAG_DEFINED))
+		ld = tty_ldisc_get(i);
+		if (ld == NULL)
 			continue;
 		len += sprintf(page+len, "%-10s %2d\n",
-			       ldiscs[i].name ? ldiscs[i].name : "???", i);
+			       ld->name ? ld->name : "???", i);
+		tty_ldisc_put(i);
 		if (len+begin > off+count)
 			break;
 		if (len+begin < off) {
