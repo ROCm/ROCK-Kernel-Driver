@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/copypage-armv5te.S
+ *  linux/arch/arm/lib/copypage-xscale.S
  *
  *  Copyright (C) 2001 Russell King
  *
@@ -19,7 +19,7 @@
 	.text
 	.align	5
 /*
- * ARMv5TE optimised copy_user_page
+ * XScale optimised copy_user_page
  *  r0 = destination
  *  r1 = source
  *  r2 = virtual user address of ultimate destination page
@@ -32,7 +32,7 @@
  * page.  We rely on the mini-cache being smaller than one page, so we'll
  * cycle through the complete cache anyway.
  */
-ENTRY(v5te_mc_copy_user_page)
+ENTRY(xscale_mc_copy_user_page)
 	stmfd	sp!, {r4, r5, lr}
 	mov	r5, r0
 	mov	r0, r1
@@ -58,11 +58,11 @@ ENTRY(v5te_mc_copy_user_page)
 
 	.align	5
 /*
- * ARMv5TE optimised clear_user_page
+ * XScale optimised clear_user_page
  *  r0 = destination
  *  r1 = virtual user address of ultimate destination page
  */
-ENTRY(v5te_mc_clear_user_page)
+ENTRY(xscale_mc_clear_user_page)
 	str	lr, [sp, #-4]!
 	mov	r1, #PAGE_SZ/32
 	mov	r2, #0
@@ -80,6 +80,6 @@ ENTRY(v5te_mc_clear_user_page)
 
 	.section ".text.init", #alloc, #execinstr
 
-ENTRY(v5te_mc_user_fns)
-	.long	v5te_mc_clear_user_page
-	.long	v5te_mc_copy_user_page
+ENTRY(xscale_mc_user_fns)
+	.long	xscale_mc_clear_user_page
+	.long	xscale_mc_copy_user_page

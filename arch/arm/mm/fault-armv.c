@@ -47,6 +47,10 @@ static struct fsr_info {
 	int	sig;
 	const char *name;
 } fsr_info[] = {
+	/*
+	 * The following are the standard ARMv3 and ARMv4 aborts.  ARMv5
+	 * defines these to be "precise" aborts.
+	 */
 	{ do_bad,		SIGSEGV, "vector exception"		   },
 	{ do_bad,		SIGILL,	 "alignment exception"		   },
 	{ do_bad,		SIGKILL, "terminal exception"		   },
@@ -62,14 +66,35 @@ static struct fsr_info {
 	{ do_bad,		SIGBUS,	 "external abort on translation"   },
 	{ do_sect_fault,	SIGSEGV, "section permission fault"	   },
 	{ do_bad,		SIGBUS,	 "external abort on translation"   },
-	{ do_page_fault,	SIGSEGV, "page permission fault"	   }
+	{ do_page_fault,	SIGSEGV, "page permission fault"	   },
+	/*
+	 * The following are "imprecise" aborts, which are signalled by bit
+	 * 10 of the FSR, and may not be recoverable.  These are only
+	 * supported if the CPU abort handler supports bit 10.
+	 */
+	{ do_bad,		SIGBUS,  "unknown 16"			   },
+	{ do_bad,		SIGBUS,  "unknown 17"			   },
+	{ do_bad,		SIGBUS,  "unknown 18"			   },
+	{ do_bad,		SIGBUS,  "unknown 19"			   },
+	{ do_bad,		SIGBUS,  "lock abort"			   }, /* xscale */
+	{ do_bad,		SIGBUS,  "unknown 21"			   },
+	{ do_bad,		SIGBUS,  "imprecise external abort"	   }, /* xscale */
+	{ do_bad,		SIGBUS,  "unknown 23"			   },
+	{ do_bad,		SIGBUS,  "dcache parity error"		   }, /* xscale */
+	{ do_bad,		SIGBUS,  "unknown 25"			   },
+	{ do_bad,		SIGBUS,  "unknown 26"			   },
+	{ do_bad,		SIGBUS,  "unknown 27"			   },
+	{ do_bad,		SIGBUS,  "unknown 28"			   },
+	{ do_bad,		SIGBUS,  "unknown 29"			   },
+	{ do_bad,		SIGBUS,  "unknown 30"			   },
+	{ do_bad,		SIGBUS,  "unknown 31"			   }
 };
 
 void __init
 hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *),
 		int sig, const char *name)
 {
-	if (nr >= 0 && nr < 16) {
+	if (nr >= 0 && nr < ARRAY_SIZE(fsr_info)) {
 		fsr_info[nr].fn   = fn;
 		fsr_info[nr].sig  = sig;
 		fsr_info[nr].name = name;
@@ -82,7 +107,7 @@ hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *)
 asmlinkage void
 do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
-	const struct fsr_info *inf = fsr_info + (fsr & 15);
+	const struct fsr_info *inf = fsr_info + (fsr & 15) + ((fsr & (1 << 10)) >> 6);
 
 	if (!inf->fn(addr, fsr, regs))
 		return;
