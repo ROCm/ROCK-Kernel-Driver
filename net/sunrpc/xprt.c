@@ -1543,7 +1543,7 @@ xprt_create_proto(int proto, struct sockaddr_in *sap, struct rpc_timeout *to)
  out_bad:
 	dprintk("RPC:      xprt_create_proto failed\n");
 	if (xprt)
-		rpc_free(xprt);
+		kfree(xprt);
 	return NULL;
 }
 
@@ -1582,7 +1582,7 @@ xprt_destroy(struct rpc_xprt *xprt)
 	dprintk("RPC:      destroying transport %p\n", xprt);
 	xprt_shutdown(xprt);
 	xprt_close(xprt);
-	rpc_free(xprt);
+	kfree(xprt);
 
 	return 0;
 }
