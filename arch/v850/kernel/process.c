@@ -188,7 +188,7 @@ int sys_execve (char *name, char **argv, char **envp, struct pt_regs *regs)
    are in entry.S).  */
 int fork_common (int flags, unsigned long new_sp, struct pt_regs *regs)
 {
-	struct task_struct *p = do_fork (flags, new_sp, regs, 0, 0);
+	struct task_struct *p = do_fork (flags, new_sp, regs, 0, 0, 0);
 	return IS_ERR (p) ? PTR_ERR (p) : p->pid;
 }
 
