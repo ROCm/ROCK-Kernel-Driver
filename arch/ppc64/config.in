@@ -148,6 +148,7 @@ comment 'Console drivers'
 source drivers/video/Config.in
 endmenu
 
+source drivers/input/Config.in
 
 if [ "$CONFIG_PPC_ISERIES" = "y" ]; then
 mainmenu_option next_comment
