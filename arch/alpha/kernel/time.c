@@ -149,7 +149,9 @@ common_init_rtc(void)
 
 	/* Reset periodic interrupt frequency.  */
 	x = CMOS_READ(RTC_FREQ_SELECT) & 0x3f;
-	if (x != 0x26 && x != 0x19 && x != 0x06) {
+        /* Test includes known working values on various platforms
+           where 0x26 is wrong; we refuse to change those. */
+	if (x != 0x26 && x != 0x25 && x != 0x19 && x != 0x06) {
 		printk("Setting RTC_FREQ to 1024 Hz (%x)\n", x);
 		CMOS_WRITE(0x26, RTC_FREQ_SELECT);
 	}
