@@ -45,7 +45,7 @@ MODULE_PARM_DESC(tsbufs,"number of ts buffers, range 2-32");
 #define TS_NR_PACKETS 312
 
 #define dprintk(fmt, arg...)	if (ts_debug) \
-	printk(KERN_DEBUG "%s/ts: " fmt, dev->name, ## arg)
+	printk(KERN_DEBUG "%s/ts: " fmt, dev->name , ## arg)
 
 /* ------------------------------------------------------------------ */
 
@@ -173,7 +173,7 @@ static void ts_reset_encoder(struct saa7134_dev* dev)
 	saa_writeb(SAA7134_SPECIAL_MODE, 0x00);
 	mdelay(10);
    	saa_writeb(SAA7134_SPECIAL_MODE, 0x01);
-   	current->state = TASK_INTERRUPTIBLE;
+   	set_current_state(TASK_INTERRUPTIBLE);
 	schedule_timeout(HZ/10);
 }
 
@@ -196,7 +196,7 @@ static int ts_open(struct inode *inode, struct file *file)
 	
 	list_for_each(list,&saa7134_devlist) {
 		h = list_entry(list, struct saa7134_dev, devlist);
-		if (h->ts_dev->minor == minor)
+		if (h->ts_dev && h->ts_dev->minor == minor)
 			dev = h;
 	}
 	if (NULL == dev)

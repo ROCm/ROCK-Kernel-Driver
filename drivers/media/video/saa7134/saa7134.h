@@ -29,14 +29,11 @@
 
 #include <asm/io.h>
 
-#ifdef CONFIG_VIDEO_IR
-#include "ir-common.h"
-#endif
-
 #include <media/video-buf.h>
 #include <media/tuner.h>
 #include <media/audiochip.h>
 #include <media/id.h>
+#include <media/ir-common.h>
 
 #ifndef TRUE
 # define TRUE (1==1)
@@ -116,6 +113,7 @@ struct saa7134_format {
 	unsigned int   wswap:1;
 	unsigned int   yuv:1;
 	unsigned int   planar:1;
+	unsigned int   uvswap:1;
 };
 
 /* ----------------------------------------------------------- */
@@ -143,6 +141,16 @@ struct saa7134_format {
 #define SAA7134_BOARD_BMK_MPEX_NOTUNER 18
 #define SAA7134_BOARD_VIDEOMATE_TV     19
 #define SAA7134_BOARD_CRONOS_PLUS      20
+#define SAA7134_BOARD_10MOONSTVMASTER  21
+#define SAA7134_BOARD_MD2819           22
+#define SAA7134_BOARD_BMK_MPEX_TUNER   23
+#define SAA7134_BOARD_TVSTATION_DVR    24
+#define SAA7134_BOARD_ASUSTEK_TVFM7133	25
+#define SAA7134_BOARD_PINNACLE_PCTV_STEREO 26
+#define SAA7134_BOARD_MANLI_MTV002     27
+#define SAA7134_BOARD_MANLI_MTV001     28
+#define SAA7134_BOARD_TG3000TV         29
+#define SAA7134_BOARD_ECS_TVP3XP       30
 
 #define SAA7134_INPUT_MAX 8
 
@@ -242,11 +250,15 @@ struct saa7134_fh {
 	struct saa7134_dev         *dev;
 	unsigned int               radio;
 	enum v4l2_buf_type         type;
+	unsigned int               resources;
+#ifdef VIDIOC_G_PRIORITY 
+	enum v4l2_priority	   prio;
+#endif
 
+	/* video overlay */
 	struct v4l2_window         win;
 	struct v4l2_clip           clips[8];
 	unsigned int               nclips;
-	unsigned int               resources;
 
 	/* video capture */
 	struct saa7134_format      *fmt;
@@ -298,7 +310,6 @@ struct saa7134_oss {
 	unsigned int               read_count;
 };
 
-#ifdef CONFIG_VIDEO_IR
 /* IR input */
 struct saa7134_ir {
 	struct input_dev           dev;
@@ -307,14 +318,17 @@ struct saa7134_ir {
 	char                       phys[32];
 	u32                        mask_keycode;
 	u32                        mask_keydown;
+	u32                        mask_keyup;
 };
-#endif
 
 /* global device status */
 struct saa7134_dev {
 	struct list_head           devlist;
         struct semaphore           lock;
        	spinlock_t                 slock;
+#ifdef VIDIOC_G_PRIORITY 
+	struct v4l2_prio_state     prio;
+#endif
 
 	/* various device info */
 	unsigned int               resources;
@@ -327,9 +341,7 @@ struct saa7134_dev {
 
 	/* infrared remote */
 	int                        has_remote;
-#ifdef CONFIG_VIDEO_IR
 	struct saa7134_ir          *remote;
-#endif
 
 	/* pci i/o */
 	char                       name[32];
@@ -358,6 +370,7 @@ struct saa7134_dev {
 	struct saa7134_dmaqueue    video_q;
 	struct saa7134_dmaqueue    ts_q;
 	struct saa7134_dmaqueue    vbi_q;
+	unsigned int               video_fieldcount;
 	unsigned int               vbi_fieldcount;
 
 	/* various v4l controls */
@@ -403,9 +416,7 @@ struct saa7134_dev {
 #define saa_setb(reg,bit)          saa_andorb((reg),(bit),(bit))
 #define saa_clearb(reg,bit)        saa_andorb((reg),(bit),0)
 
-//#define saa_wait(d) { if (need_resched()) schedule(); else udelay(d);}
 #define saa_wait(d) { udelay(d); }
-//#define saa_wait(d) { schedule_timeout(HZ*d/1000 ?:1); }
 
 /* ----------------------------------------------------------- */
 /* saa7134-core.c                                              */

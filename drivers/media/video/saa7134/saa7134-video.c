@@ -40,7 +40,7 @@ MODULE_PARM(gbuffers,"i");
 MODULE_PARM_DESC(gbuffers,"number of capture buffers, range 2-32");
 
 #define dprintk(fmt, arg...)	if (video_debug) \
-	printk(KERN_DEBUG "%s/video: " fmt, dev->name, ## arg)
+	printk(KERN_DEBUG "%s/video: " fmt, dev->name , ## arg)
 
 /* ------------------------------------------------------------------ */
 /* data structs for video                                             */
@@ -83,6 +83,12 @@ static struct saa7134_format formats[] = {
 		.depth    = 24,
 		.pm       = 0x11,
 	},{
+		.name     = "24 bpp RGB, be",
+		.fourcc   = V4L2_PIX_FMT_RGB24,
+		.depth    = 24,
+		.pm       = 0x11,
+		.bswap    = 1,
+	},{
 		.name     = "32 bpp RGB, le",
 		.fourcc   = V4L2_PIX_FMT_BGR32,
 		.depth    = 32,
@@ -123,6 +129,16 @@ static struct saa7134_format formats[] = {
 		.pm       = 0x0a,
 		.yuv      = 1,
 		.planar   = 1,
+		.hshift   = 1,
+		.vshift   = 1,
+	},{
+		.name     = "4:2:0 planar, Y-Cb-Cr",
+		.fourcc   = V4L2_PIX_FMT_YVU420,
+		.depth    = 12,
+		.pm       = 0x0a,
+		.yuv      = 1,
+		.planar   = 1,
+		.uvswap   = 1,
 		.hshift   = 1,
 		.vshift   = 1,
 	}
@@ -788,7 +804,7 @@ static int buffer_activate(struct saa7134_dev *dev,
 			   struct saa7134_buf *next)
 {
 	unsigned long base,control,bpl;
-	unsigned long bpl_uv,lines_uv,base2,base3; /* planar */
+	unsigned long bpl_uv,lines_uv,base2,base3,tmp; /* planar */
 
 	dprintk("buffer_activate buf=%p\n",buf);
 	buf->vb.state = STATE_ACTIVE;
@@ -834,6 +850,8 @@ static int buffer_activate(struct saa7134_dev *dev,
 		lines_uv = buf->vb.height >> buf->fmt->vshift;
 		base2    = base + bpl * buf->vb.height;
 		base3    = base2 + bpl_uv * lines_uv;
+		if (buf->fmt->uvswap)
+			tmp = base2, base2 = base3, base3 = tmp;
 		dprintk("uv: bpl=%ld lines=%ld base2/3=%ld/%ld\n",
 			bpl_uv,lines_uv,base2,base3);
 		if (V4L2_FIELD_HAS_BOTH(buf->vb.field)) {
@@ -1160,6 +1178,9 @@ static int video_open(struct inode *inode, struct file *file)
 	fh->fmt      = format_by_fourcc(V4L2_PIX_FMT_BGR24);
 	fh->width    = 768;
 	fh->height   = 576;
+#ifdef VIDIOC_G_PRIORITY
+	v4l2_prio_open(&dev->prio,&fh->prio);
+#endif
 
 	videobuf_queue_init(&fh->cap, &video_qops,
 			    dev->pci, &dev->slock,
@@ -1268,7 +1289,7 @@ static int video_release(struct inode *inode, struct file *file)
 
 	/* stop video capture */
 	if (res_check(fh, RESOURCE_VIDEO)) {
-		videobuf_queue_cancel(file,&fh->cap);
+		videobuf_streamoff(file,&fh->cap);
 		res_free(dev,fh,RESOURCE_VIDEO);
 	}
 	if (fh->cap.read_buf) {
@@ -1287,7 +1308,10 @@ static int video_release(struct inode *inode, struct file *file)
 
 	saa7134_pgtable_free(dev->pci,&fh->pt_cap);
 	saa7134_pgtable_free(dev->pci,&fh->pt_vbi);
-	
+
+#ifdef VIDIOC_G_PRIORITY
+	v4l2_prio_close(&dev->prio,&fh->prio);
+#endif
 	file->private_data = NULL;
 	kfree(fh);
 	return 0;
@@ -1568,6 +1592,20 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 
 	if (video_debug > 1)
 		saa7134_print_ioctl(dev->name,cmd);
+
+#ifdef VIDIOC_G_PRIORITY
+	switch (cmd) {
+	case VIDIOC_S_CTRL:
+	case VIDIOC_S_STD:
+	case VIDIOC_S_INPUT:
+	case VIDIOC_S_TUNER:
+	case VIDIOC_S_FREQUENCY:
+		err = v4l2_prio_check(&dev->prio,&fh->prio);
+		if (0 != err)
+			return err;
+	}
+#endif
+
 	switch (cmd) {
 	case VIDIOC_QUERYCAP:
 	{
@@ -1697,6 +1735,7 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 		down(&dev->lock);
 		dev->ctl_freq = f->frequency;
 		saa7134_i2c_call_clients(dev,VIDIOCSFREQ,&dev->ctl_freq);
+		saa7134_tvaudio_do_scan(dev);
 		up(&dev->lock);
 		return 0;
 	}
@@ -1726,6 +1765,22 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
                 memset(parm,0,sizeof(*parm));
                 return 0;
         }
+
+#ifdef VIDIOC_G_PRIORITY
+        case VIDIOC_G_PRIORITY:
+        {
+                enum v4l2_priority *p = arg;
+
+                *p = v4l2_prio_max(&dev->prio);
+                return 0;
+        }
+        case VIDIOC_S_PRIORITY:
+        {
+                enum v4l2_priority *prio = arg;
+
+                return v4l2_prio_change(&dev->prio, &fh->prio, *prio);
+        }
+#endif
 
 	/* --- preview ioctls ---------------------------------------- */
 	case VIDIOC_ENUM_FMT:
@@ -2148,8 +2203,8 @@ void saa7134_irq_video_done(struct saa7134_dev *dev, unsigned long status)
 	
 	spin_lock(&dev->slock);
 	if (dev->video_q.curr) {
+		dev->video_fieldcount++;
 		field = dev->video_q.curr->vb.field;
-		
 		if (V4L2_FIELD_HAS_BOTH(field)) {
 			/* make sure we have seen both fields */
 			if ((status & 0x10) == 0x00) {
@@ -2165,6 +2220,7 @@ void saa7134_irq_video_done(struct saa7134_dev *dev, unsigned long status)
 			if ((status & 0x10) != 0x00)
 				goto done;
 		}
+		dev->video_q.curr->vb.field_count = dev->video_fieldcount;
 		saa7134_buffer_finish(dev,&dev->video_q,STATE_DONE);
 	}
 	saa7134_buffer_next(dev,&dev->video_q);
