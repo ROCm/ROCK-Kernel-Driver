@@ -1,7 +1,7 @@
 #ifndef _CIO_QDIO_H
 #define _CIO_QDIO_H
 
-#define VERSION_CIO_QDIO_H "$Revision: 1.23 $"
+#define VERSION_CIO_QDIO_H "$Revision: 1.24 $"
 
 //#define QDIO_DBF_LIKE_HELL
 
@@ -517,6 +517,8 @@ struct qdio_perf_stats {
 
 struct qdio_q {
 	volatile struct slsb slsb;
+
+	char unused[QDIO_MAX_BUFFERS_PER_Q];
 
 	__u32 * volatile dev_st_chg_ind;
 

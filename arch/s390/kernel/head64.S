@@ -623,10 +623,6 @@ startup:basr  %r13,0                     # get base
         bne    1f-.LPG1(%r13)
         oi     7(%r12),4                # set P/390 flag
 1:
-	chi    %r0,0x2084		# new stidp format?
-	bne    2f-.LPG1(%r13)
-	oi     7(%r12),64		# set new stidp flag
-2:	
 
 #
 # find out if we have the MVPG instruction

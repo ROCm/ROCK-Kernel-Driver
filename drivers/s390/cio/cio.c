@@ -688,15 +688,15 @@ cio_console_irq(void)
 		if (stsch(console_irq, &console_subchannel.schib) != 0 ||
 		    !console_subchannel.schib.pmcw.dnv)
 			return -1;
-		console_device = console_subchannel.schib.pmcw.dev;
-	} else if (console_device != -1) {
+		console_devno = console_subchannel.schib.pmcw.dev;
+	} else if (console_devno != -1) {
 		/* At least the console device number is known. */
 		for (irq = 0; irq < __MAX_SUBCHANNELS; irq++) {
 			if (stsch(irq, &console_subchannel.schib) != 0)
 				break;
 			if (console_subchannel.schib.pmcw.dnv &&
 			    console_subchannel.schib.pmcw.dev ==
-			    console_device) {
+			    console_devno) {
 				console_irq = irq;
 				break;
 			}
