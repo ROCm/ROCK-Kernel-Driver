@@ -6,7 +6,7 @@ O_TARGET	:= vmlinux-obj.o
 
 # Object files in subdirectories
 
-mod-subdirs				:= i4l avmb1 eicon
+mod-subdirs				:= i4l hisax avmb1 eicon
 subdir-$(CONFIG_ISDN)			+= i4l
 subdir-$(CONFIG_ISDN_DIVERSION)		+= divert
 subdir-$(CONFIG_ISDN_DRV_HISAX)		+= hisax
