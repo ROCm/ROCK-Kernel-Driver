@@ -61,6 +61,9 @@ static inline int __node_to_first_cpu(int node)
 /* Returns the number of the first MemBlk on Node 'node' */
 #define __node_to_memblk(node) (node)
 
+/* Cross-node load balancing interval. */
+#define NODE_BALANCE_RATE 100
+
 #else /* !CONFIG_NUMA */
 /*
  * Other i386 platforms should define their own version of the 

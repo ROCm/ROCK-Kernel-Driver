@@ -80,9 +80,9 @@ static inline int convert_fxsr_from_user(struct i387_fxsave_struct *fxsave,
 	int err; 
 	__u32 v;
 
-	err = __get_user(fxsave->cwd, (u16 *)&buf->cw); 
-	err |= __get_user(fxsave->swd, (u16 *)&buf->sw);
-	err |= __get_user(fxsave->twd, (u16 *)&buf->tag);
+	err = __get_user(fxsave->cwd, &buf->cw); 
+	err |= __get_user(fxsave->swd, &buf->sw);
+	err |= __get_user(fxsave->twd, &buf->tag);
 	fxsave->twd = twd_i387_to_fxsr(fxsave->twd);
 	err |= __get_user(fxsave->rip, &buf->ipoff); 
 	err |= __get_user(fxsave->rdp, &buf->dataoff); 

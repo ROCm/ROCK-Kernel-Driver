@@ -69,21 +69,7 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 
 #ifndef __ASSEMBLY__
 
-#include <linux/stringify.h>
-
-/*
- * Tell the user there is some problem.  The exception handler decodes this frame.
- */ 
-struct bug_frame { 
-       unsigned char ud2[2];          
-	char *filename;    /* should use 32bit offset instead, but the assembler doesn't like it */ 
-	unsigned short line; 
-} __attribute__((packed)); 
-#define BUG() \
-	asm volatile("ud2 ; .quad %c1 ; .short %c0" :: \
-		     "i"(__LINE__), "i" (__stringify(KBUILD_BASENAME)))
-#define PAGE_BUG(page) BUG()
-void out_of_line_bug(void);
+#include <asm/bug.h>
 
 /* Pure 2^n version of get_order */
 extern __inline__ int get_order(unsigned long size)

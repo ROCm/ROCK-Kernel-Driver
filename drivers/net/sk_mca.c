@@ -1274,11 +1274,6 @@ void cleanup_module(void)
 	skmca_priv *priv;
 	int z;
 
-	if (MOD_IN_USE) {
-		printk("cannot unload, module in use\n");
-		return;
-	}
-
 	for (z = 0; z < DEVMAX; z++) {
 		dev = moddevs + z;
 		if (dev->priv != NULL) {

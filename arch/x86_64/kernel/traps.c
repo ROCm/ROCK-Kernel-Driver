@@ -450,16 +450,20 @@ asmlinkage void do_int3(struct pt_regs * regs, long error_code)
 	do_trap(3, SIGTRAP, "int3", regs, error_code, NULL);
 }
 
+extern void dump_pagetable(unsigned long);
+
 asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 {
 #ifdef CONFIG_CHECKING
        { 
                unsigned long gs; 
-               struct x8664_pda *pda = cpu_pda + stack_smp_processor_id(); 
+               struct x8664_pda *pda = cpu_pda + hard_smp_processor_id(); 
                rdmsrl(MSR_GS_BASE, gs); 
                if (gs != (unsigned long)pda) { 
                        wrmsrl(MSR_GS_BASE, pda); 
+		       oops_in_progress++;
                        printk("general protection handler: wrong gs %lx expected %p\n", gs, pda);
+		       oops_in_progress--;
                }
        }
 #endif

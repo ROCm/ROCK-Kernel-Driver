@@ -1558,7 +1558,6 @@ static void __exit el3_cleanup_module(void)
 {
 	struct net_device *next_dev;
 
-	/* No need to check MOD_IN_USE, as sys_delete_module() checks. */
 	while (el3_root_dev) {
 		struct el3_private *lp = (struct el3_private *)el3_root_dev->priv;
 

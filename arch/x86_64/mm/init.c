@@ -161,7 +161,6 @@ static  struct temp_map {
 } temp_mappings[] __initdata = { 
 	{ &temp_boot_pmds[0], (void *)(40UL * 1024 * 1024) },
 	{ &temp_boot_pmds[1], (void *)(42UL * 1024 * 1024) }, 
-	{ &temp_boot_pmds[2], (void *)(44UL * 1024 * 1024) }, 
 	{}
 }; 
 
@@ -315,8 +314,6 @@ void __init mem_init(void)
 {
 	int codesize, reservedpages, datasize, initsize;
 	int tmp;
-
-	printk("mem_init\n");
 
 	if (!mem_map)
 		BUG();

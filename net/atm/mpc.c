@@ -1424,10 +1424,6 @@ void cleanup_module(void)
 	struct atm_mpoa_qos *qos, *nextqos;
 	struct lec_priv *priv;
 
-	if (MOD_IN_USE) {
-		printk("mpc.c: module in use\n");
-		return;
-	}
 #ifdef CONFIG_PROC_FS
 	mpc_proc_clean();
 #endif

@@ -39,7 +39,7 @@ int dont_enable_local_apic __initdata = 0;
 
 int prof_multiplier[NR_CPUS] = { 1, };
 int prof_old_multiplier[NR_CPUS] = { 1, };
-int prof_counter[NR_CPUS] = { 1, };
+DEFINE_PER_CPU(int, prof_counter) =  1;
 
 int get_maxlvt(void)
 {
@@ -901,7 +901,7 @@ inline void smp_local_timer_interrupt(struct pt_regs *regs)
 
 	x86_do_profile(regs);
 
-	if (--prof_counter[cpu] <= 0) {
+	if (--per_cpu(prof_counter, cpu) <= 0) {
 		/*
 		 * The multiplier may have changed since the last time we got
 		 * to this point as a result of the user writing to
@@ -910,10 +910,11 @@ inline void smp_local_timer_interrupt(struct pt_regs *regs)
 		 *
 		 * Interrupts are already masked off at this point.
 		 */
-		prof_counter[cpu] = prof_multiplier[cpu];
-		if (prof_counter[cpu] != prof_old_multiplier[cpu]) {
-			__setup_APIC_LVTT(calibration_result/prof_counter[cpu]);
-			prof_old_multiplier[cpu] = prof_counter[cpu];
+		per_cpu(prof_counter, cpu) = prof_multiplier[cpu];
+		if (per_cpu(prof_counter, cpu) != prof_old_multiplier[cpu]) {
+			__setup_APIC_LVTT(calibration_result/
+					per_cpu(prof_counter, cpu));
+			prof_old_multiplier[cpu] = per_cpu(prof_counter, cpu);
 		}
 
 #ifdef CONFIG_SMP

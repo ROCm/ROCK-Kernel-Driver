@@ -532,8 +532,10 @@ error_swapgs:
 	xorl %ebx,%ebx	
 	swapgs
 error_sti:	
+	bt $9,EFLAGS(%rsp)
+	jnc 1f
 	sti
-	movq %rdi,RDI(%rsp) 	
+1:	movq %rdi,RDI(%rsp) 	
 	movq %rsp,%rdi
 	movq ORIG_RAX(%rsp),%rsi	/* get error code */ 
 	movq $-1,ORIG_RAX(%rsp)
