@@ -325,11 +325,6 @@ static inline unsigned int num_online_memblks(void)
 #define num_online_memblks()		1
 
 #endif /* CONFIG_DISCONTIGMEM || CONFIG_NUMA */
-
-
-#define MAP_ALIGN(x)	((((x) % sizeof(struct page)) == 0) ? (x) : ((x) + \
-		sizeof(struct page) - ((x) % sizeof(struct page))))
-
 #endif /* !__ASSEMBLY__ */
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MMZONE_H */
