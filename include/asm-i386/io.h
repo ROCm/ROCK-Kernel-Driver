@@ -184,7 +184,7 @@ static inline void memcpy_fromio(void *dst, volatile void __iomem *src, int coun
 {
 	__memcpy(dst, (void __force *) src, count);
 }
-static inline void memcpy_toio(volatile void __iomem *dst, void *src, int count)
+static inline void memcpy_toio(volatile void __iomem *dst, const void *src, int count)
 {
 	__memcpy((void __force *) dst, src, count);
 }
