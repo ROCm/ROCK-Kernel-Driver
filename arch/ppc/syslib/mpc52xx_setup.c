@@ -100,6 +100,14 @@ mpc52xx_map_io(void)
 #error "mpc52xx PSC for console not selected"
 #endif
 
+static void
+mpc52xx_psc_putc(struct mpc52xx_psc * psc, unsigned char c)
+{
+	while (!(in_be16(&psc->mpc52xx_psc_status) &
+	         MPC52xx_PSC_SR_TXRDY));
+	out_8(&psc->mpc52xx_psc_buffer_8, c);
+}
+
 void
 mpc52xx_progress(char *s, unsigned short hex)
 {
@@ -107,15 +115,13 @@ mpc52xx_progress(char *s, unsigned short hex)
 	char c;
 
 	while ((c = *s++) != 0) {
-		if (c == '\n') {
-			while (!(in_be16(&psc->mpc52xx_psc_status) &
-			         MPC52xx_PSC_SR_TXRDY)) ;
-			out_8(&psc->mpc52xx_psc_buffer_8, '\r');
-		}
-		while (!(in_be16(&psc->mpc52xx_psc_status) &
-		         MPC52xx_PSC_SR_TXRDY)) ;
-		out_8(&psc->mpc52xx_psc_buffer_8, c);
+		if (c == '\n')
+			mpc52xx_psc_putc(psc, '\r');
+		mpc52xx_psc_putc(psc, c);
 	}
+
+	mpc52xx_psc_putc(psc, '\r');
+	mpc52xx_psc_putc(psc, '\n');
 }
 
 #endif  /* CONFIG_SERIAL_TEXT_DEBUG */
