@@ -1243,8 +1243,7 @@ shmem_file_write(struct file *file, const char __user *buf, size_t count, loff_t
 
 		flush_dcache_page(page);
 		set_page_dirty(page);
-		if (!PageReferenced(page))
-			SetPageReferenced(page);
+		mark_page_accessed(page);
 		page_cache_release(page);
 
 		if (left) {
