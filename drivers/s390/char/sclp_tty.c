@@ -112,46 +112,46 @@ sclp_tty_ioctl(struct tty_struct *tty, struct file * file,
 	switch (cmd) {
 	case TIOCSCLPSHTAB:
 		/* set width of horizontal tab	*/
-		if (get_user(sclp_ioctls.htab, (unsigned short *) arg))
+		if (get_user(sclp_ioctls.htab, (unsigned short __user *) arg))
 			rc = -EFAULT;
 		else
 			check = 1;
 		break;
 	case TIOCSCLPGHTAB:
 		/* get width of horizontal tab	*/
-		if (put_user(sclp_ioctls.htab, (unsigned short *) arg))
+		if (put_user(sclp_ioctls.htab, (unsigned short __user *) arg))
 			rc = -EFAULT;
 		break;
 	case TIOCSCLPSECHO:
 		/* enable/disable echo of input */
-		if (get_user(sclp_ioctls.echo, (unsigned char *) arg))
+		if (get_user(sclp_ioctls.echo, (unsigned char __user *) arg))
 			rc = -EFAULT;
 		break;
 	case TIOCSCLPGECHO:
 		/* Is echo of input enabled ?  */
-		if (put_user(sclp_ioctls.echo, (unsigned char *) arg))
+		if (put_user(sclp_ioctls.echo, (unsigned char __user *) arg))
 			rc = -EFAULT;
 		break;
 	case TIOCSCLPSCOLS:
 		/* set number of columns for output  */
-		if (get_user(sclp_ioctls.columns, (unsigned short *) arg))
+		if (get_user(sclp_ioctls.columns, (unsigned short __user *) arg))
 			rc = -EFAULT;
 		else
 			check = 1;
 		break;
 	case TIOCSCLPGCOLS:
 		/* get number of columns for output  */
-		if (put_user(sclp_ioctls.columns, (unsigned short *) arg))
+		if (put_user(sclp_ioctls.columns, (unsigned short __user *) arg))
 			rc = -EFAULT;
 		break;
 	case TIOCSCLPSNL:
 		/* enable/disable writing without final new line character  */
-		if (get_user(sclp_ioctls.final_nl, (signed char *) arg))
+		if (get_user(sclp_ioctls.final_nl, (signed char __user *) arg))
 			rc = -EFAULT;
 		break;
 	case TIOCSCLPGNL:
 		/* Is writing without final new line character enabled ?  */
-		if (put_user(sclp_ioctls.final_nl, (signed char *) arg))
+		if (put_user(sclp_ioctls.final_nl, (signed char __user *) arg))
 			rc = -EFAULT;
 		break;
 	case TIOCSCLPSOBUF:
@@ -160,7 +160,7 @@ sclp_tty_ioctl(struct tty_struct *tty, struct file * file,
 		 * up to next 4kB boundary and stored as number of SCCBs
 		 * (4kB Buffers) limitation: 256 x 4kB
 		 */
-		if (get_user(obuf, (unsigned int *) arg) == 0) {
+		if (get_user(obuf, (unsigned int __user *) arg) == 0) {
 			if (obuf & 0xFFF)
 				sclp_ioctls.max_sccb = (obuf >> 12) + 1;
 			else
@@ -171,22 +171,22 @@ sclp_tty_ioctl(struct tty_struct *tty, struct file * file,
 	case TIOCSCLPGOBUF:
 		/* get the maximum buffers size for output  */
 		obuf = sclp_ioctls.max_sccb << 12;
-		if (put_user(obuf, (unsigned int *) arg))
+		if (put_user(obuf, (unsigned int __user *) arg))
 			rc = -EFAULT;
 		break;
 	case TIOCSCLPGKBUF:
 		/* get the number of buffers got from kernel at startup */
-		if (put_user(sclp_ioctls.kmem_sccb, (unsigned short *) arg))
+		if (put_user(sclp_ioctls.kmem_sccb, (unsigned short __user *) arg))
 			rc = -EFAULT;
 		break;
 	case TIOCSCLPSCASE:
 		/* enable/disable conversion from upper to lower case */
-		if (get_user(sclp_ioctls.tolower, (unsigned char *) arg))
+		if (get_user(sclp_ioctls.tolower, (unsigned char __user *) arg))
 			rc = -EFAULT;
 		break;
 	case TIOCSCLPGCASE:
 		/* Is conversion from upper to lower case of input enabled? */
-		if (put_user(sclp_ioctls.tolower, (unsigned char *) arg))
+		if (put_user(sclp_ioctls.tolower, (unsigned char __user *) arg))
 			rc = -EFAULT;
 		break;
 	case TIOCSCLPSDELIM:
@@ -194,7 +194,7 @@ sclp_tty_ioctl(struct tty_struct *tty, struct file * file,
 		 * set special character used for separating upper and
 		 * lower case, 0x00 disables this feature
 		 */
-		if (get_user(sclp_ioctls.delim, (unsigned char *) arg))
+		if (get_user(sclp_ioctls.delim, (unsigned char __user *) arg))
 			rc = -EFAULT;
 		break;
 	case TIOCSCLPGDELIM:
@@ -202,7 +202,7 @@ sclp_tty_ioctl(struct tty_struct *tty, struct file * file,
 		 * get special character used for separating upper and
 		 * lower case, 0x00 disables this feature
 		 */
-		if (put_user(sclp_ioctls.delim, (unsigned char *) arg))
+		if (put_user(sclp_ioctls.delim, (unsigned char __user *) arg))
 			rc = -EFAULT;
 		break;
 	case TIOCSCLPSINIT:
@@ -415,7 +415,8 @@ sclp_tty_write(struct tty_struct *tty, int from_user,
 	while (count > 0) {
 		length = count < SCLP_TTY_BUF_SIZE ?
 			count : SCLP_TTY_BUF_SIZE;
-		length -= copy_from_user(sclp_tty_chars, buf, length);
+		length -= copy_from_user(sclp_tty_chars,
+				(const unsigned char __user *)buf, length);
 		if (length == 0) {
 			if (!ret)
 				ret = -EFAULT;

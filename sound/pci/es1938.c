@@ -822,7 +822,7 @@ static snd_pcm_uframes_t snd_es1938_playback_pointer(snd_pcm_substream_t *substr
 static int snd_es1938_capture_copy(snd_pcm_substream_t *substream,
 				   int channel,
 				   snd_pcm_uframes_t pos,
-				   void *dst,
+				   void __user *dst,
 				   snd_pcm_uframes_t count)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -836,7 +836,7 @@ static int snd_es1938_capture_copy(snd_pcm_substream_t *substream,
 	} else {
 		if (copy_to_user(dst, runtime->dma_area + pos + 1, count - 1))
 			return -EFAULT;
-		if (put_user(runtime->dma_area[0], ((unsigned char *)dst) + count - 1))
+		if (put_user(runtime->dma_area[0], ((unsigned char __user *)dst) + count - 1))
 			return -EFAULT;
 	}
 	return 0;

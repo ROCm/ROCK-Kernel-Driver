@@ -283,7 +283,7 @@ static void handle_BUG(struct pt_regs *regs)
 		file = "<bad filename>";
 
 	printk("------------[ cut here ]------------\n");
-	printk("kernel BUG at %s:%d!\n", file, line);
+	printk(KERN_ALERT "kernel BUG at %s:%d!\n", file, line);
 
 no_bug:
 	return;
@@ -304,7 +304,7 @@ void die(const char * str, struct pt_regs * regs, long err)
 	spin_lock_irq(&die_lock);
 	bust_spinlocks(1);
 	handle_BUG(regs);
-	printk("%s: %04lx [#%d]\n", str, err & 0xffff, ++die_counter);
+	printk(KERN_ALERT "%s: %04lx [#%d]\n", str, err & 0xffff, ++die_counter);
 #ifdef CONFIG_PREEMPT
 	printk("PREEMPT ");
 	nl = 1;

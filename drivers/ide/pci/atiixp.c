@@ -458,8 +458,6 @@ static void __devinit init_hwif_atiixp(ide_hwif_t *hwif)
 
 static ide_pci_device_t atiixp_pci_info[] __devinitdata = {
 	{	/* 0 */
-		.vendor		= PCI_VENDOR_ID_ATI,
-		.device		= PCI_DEVICE_ID_ATI_IXP_IDE,
 		.name		= "ATIIXP",
 		.init_chipset	= init_chipset_atiixp,
 		.init_hwif	= init_hwif_atiixp,
@@ -481,11 +479,7 @@ static ide_pci_device_t atiixp_pci_info[] __devinitdata = {
 
 static int __devinit atiixp_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &atiixp_pci_info[id->driver_data];
-
-	if (dev->device != d->device)
-		BUG();
-	ide_setup_pci_device(dev, d);
+	ide_setup_pci_device(dev, &atiixp_pci_info[id->driver_data]);
 	return 0;
 }
 

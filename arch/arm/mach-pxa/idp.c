@@ -27,6 +27,8 @@
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 
+#include <asm/arch/idp.h>
+
 #include "generic.h"
 
 #ifndef PXA_IDP_REV02

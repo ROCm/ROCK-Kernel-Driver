@@ -39,6 +39,7 @@ SECTIONS
 
   __bss_start = .;		/* BSS */
   .bss : {
+	*(.bss.page_aligned)	
 	*(.bss)
 	}
   __bss_end = .;
@@ -75,8 +76,8 @@ SECTIONS
   . = ALIGN(8192);		/* init_task */
   .data.init_task : { *(.data.init_task) }
 
-  . = ALIGN(4096); 
-  .data.boot_pgt : { *(.data.boot_pgt) }
+  . = ALIGN(4096);
+  .data.page_aligned : { *(.data.page_aligned) }
 
   . = ALIGN(4096);		/* Init code and data */
   __init_begin = .;

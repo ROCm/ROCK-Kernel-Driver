@@ -100,6 +100,7 @@ find_dmabounce_dev(struct device *dev)
 		if (d->dev == dev)
 			return d;
 	}
+	return NULL;
 }
 
 

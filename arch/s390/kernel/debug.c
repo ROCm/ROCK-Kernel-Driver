@@ -62,9 +62,9 @@ extern void tod_to_timeval(uint64_t todval, struct timeval *xtime);
 /* internal function prototyes */
 
 static int debug_init(void);
-static ssize_t debug_output(struct file *file, char *user_buf,
+static ssize_t debug_output(struct file *file, char __user *user_buf,
 			    size_t user_len, loff_t * offset);
-static ssize_t debug_input(struct file *file, const char *user_buf,
+static ssize_t debug_input(struct file *file, const char __user *user_buf,
 			   size_t user_len, loff_t * offset);
 static int debug_open(struct inode *inode, struct file *file);
 static int debug_close(struct inode *inode, struct file *file);
@@ -74,10 +74,10 @@ static void debug_info_put(debug_info_t *);
 static int debug_prolog_level_fn(debug_info_t * id,
 				 struct debug_view *view, char *out_buf);
 static int debug_input_level_fn(debug_info_t * id, struct debug_view *view,
-				struct file *file, const char *user_buf,
+				struct file *file, const char __user *user_buf,
 				size_t user_buf_size, loff_t * offset);
 static int debug_input_flush_fn(debug_info_t * id, struct debug_view *view,
-                                struct file *file, const char *user_buf,
+                                struct file *file, const char __user *user_buf,
                                 size_t user_buf_size, loff_t * offset);
 static int debug_hex_ascii_format_fn(debug_info_t * id, struct debug_view *view,
                                 char *out_buf, const char *in_buf);
@@ -416,10 +416,10 @@ out:
  * - copies formated debug entries to the user buffer
  */
 
-static ssize_t debug_output(struct file *file,	/* file descriptor */
-			    char *user_buf,	/* user buffer */
-			    size_t  len,	/* length of buffer */
-			    loff_t *offset	/* offset in the file */ )
+static ssize_t debug_output(struct file *file,		/* file descriptor */
+			    char __user *user_buf,	/* user buffer */
+			    size_t  len,		/* length of buffer */
+			    loff_t *offset)	      /* offset in the file */
 {
 	size_t count = 0;
 	size_t entry_offset, size = 0;
@@ -462,7 +462,7 @@ out:
  */
 
 static ssize_t debug_input(struct file *file,
-			   const char *user_buf, size_t length,
+			   const char __user *user_buf, size_t length,
 			   loff_t *offset)
 {
 	int rc = 0;
@@ -942,7 +942,7 @@ static int debug_prolog_level_fn(debug_info_t * id,
  */
 
 static int debug_input_level_fn(debug_info_t * id, struct debug_view *view,
-				struct file *file, const char *user_buf,
+				struct file *file, const char __user *user_buf,
 				size_t in_buf_size, loff_t * offset)
 {
 	char input_buf[1];
@@ -1004,9 +1004,9 @@ void debug_flush(debug_info_t* id, int area)
 /*
  * view function: flushes debug areas 
  */
- 
+
 static int debug_input_flush_fn(debug_info_t * id, struct debug_view *view,
-                                struct file *file, const char *user_buf,
+                                struct file *file, const char __user *user_buf,
                                 size_t in_buf_size, loff_t * offset)
 {
         char input_buf[1];

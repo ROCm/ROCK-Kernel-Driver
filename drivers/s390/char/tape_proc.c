@@ -16,6 +16,8 @@
 #include <linux/vmalloc.h>
 #include <linux/seq_file.h>
 
+#define TAPE_DBF_AREA	tape_core_dbf
+
 #include "tape.h"
 
 #define PRINTK_HEADER "TAPE_PROC: "

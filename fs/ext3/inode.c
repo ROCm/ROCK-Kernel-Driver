@@ -205,8 +205,6 @@ void ext3_delete_inode (struct inode * inode)
 		 * need to make sure that the in-core orphan linked list
 		 * is properly cleaned up. */
 		ext3_orphan_del(NULL, inode);
-
-		ext3_std_error(inode->i_sb, PTR_ERR(handle));
 		goto no_delete;
 	}
 

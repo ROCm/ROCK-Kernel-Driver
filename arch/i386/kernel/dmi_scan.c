@@ -546,15 +546,21 @@ static __init int ignore_timer_override(struct dmi_blacklist *d)
 
 #ifdef	CONFIG_ACPI_PCI
 static __init int disable_acpi_irq(struct dmi_blacklist *d) 
-{ 
-	printk(KERN_NOTICE "%s detected: force use of acpi=noirq\n", d->ident); 	
-	acpi_noirq_set();
+{
+	if (!acpi_force) {
+		printk(KERN_NOTICE "%s detected: force use of acpi=noirq\n",
+		       d->ident); 	
+		acpi_noirq_set();
+	}
 	return 0;
 }
 static __init int disable_acpi_pci(struct dmi_blacklist *d) 
-{ 
-	printk(KERN_NOTICE "%s detected: force use of pci=noacpi\n", d->ident); 	
-	acpi_disable_pci();
+{
+	if (!acpi_force) {
+		printk(KERN_NOTICE "%s detected: force use of pci=noacpi\n",
+		       d->ident); 	
+		acpi_disable_pci();
+	}
 	return 0;
 }  
 #endif
@@ -783,6 +789,7 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 	{ exploding_pnp_bios, "ASUS P4P800", {	/* PnPBIOS GPF on boot */
 			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer Inc."),
 			MATCH(DMI_BOARD_NAME, "P4P800"),
+			NO_MATCH, NO_MATCH
 			} },
 
 	/* Machines which have problems handling enabled local APICs */

@@ -384,7 +384,7 @@ out:
  *	an IP socket.
  */
 
-int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int optlen)
+int ip_setsockopt(struct sock *sk, int level, int optname, char __user *optval, int optlen)
 {
 	struct inet_opt *inet = inet_sk(sk);
 	int val=0,err;
@@ -401,12 +401,12 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 				optname == IP_MULTICAST_TTL || 
 				optname == IP_MULTICAST_LOOP) { 
 		if (optlen >= sizeof(int)) {
-			if (get_user(val, (int *) optval))
+			if (get_user(val, (int __user *) optval))
 				return -EFAULT;
 		} else if (optlen >= sizeof(char)) {
 			unsigned char ucval;
 
-			if (get_user(ucval, (unsigned char *) optval))
+			if (get_user(ucval, (unsigned char __user *) optval))
 				return -EFAULT;
 			val = (int) ucval;
 		}
@@ -875,7 +875,7 @@ e_inval:
  *	_received_ ones. The set sets the _sent_ ones.
  */
 
-int ip_getsockopt(struct sock *sk, int level, int optname, char *optval, int *optlen)
+int ip_getsockopt(struct sock *sk, int level, int optname, char __user *optval, int __user *optlen)
 {
 	struct inet_opt *inet = inet_sk(sk);
 	int val;
@@ -984,7 +984,7 @@ int ip_getsockopt(struct sock *sk, int level, int optname, char *optval, int *op
 
   			if(put_user(len, optlen))
   				return -EFAULT;
-			if(copy_to_user((void *)optval, &addr, len))
+			if(copy_to_user(optval, &addr, len))
 				return -EFAULT;
 			return 0;
 		}
@@ -1002,7 +1002,7 @@ int ip_getsockopt(struct sock *sk, int level, int optname, char *optval, int *op
 				return -EFAULT;
 			}
 			err = ip_mc_msfget(sk, &msf,
-				(struct ip_msfilter *)optval, optlen);
+				(struct ip_msfilter __user *)optval, optlen);
 			release_sock(sk);
 			return err;
 		}
@@ -1020,7 +1020,7 @@ int ip_getsockopt(struct sock *sk, int level, int optname, char *optval, int *op
 				return -EFAULT;
 			}
 			err = ip_mc_gsfget(sk, &gsf,
-				(struct group_filter *)optval, optlen);
+				(struct group_filter __user *)optval, optlen);
 			release_sock(sk);
 			return err;
 		}

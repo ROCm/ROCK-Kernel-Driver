@@ -307,7 +307,7 @@ static inline void out_le32(volatile unsigned *addr, int val)
 
 static inline void out_be32(volatile unsigned *addr, int val)
 {
-	__asm__ __volatile__("stw%U0%X0 %1,%0; eieio"
+	__asm__ __volatile__("stw%U0%X0 %1,%0; sync"
 			     : "=m" (*addr) : "r" (val));
 }
 
@@ -356,9 +356,9 @@ static inline void out_le64(volatile unsigned long *addr, unsigned long val)
 			     : "=&r" (tmp) , "=&r" (val) : "1" (val) , "b" (addr) , "m" (*addr));
 }
 
-static inline void out_be64(volatile unsigned long *addr, int val)
+static inline void out_be64(volatile unsigned long *addr, unsigned long val)
 {
-	__asm__ __volatile__("std %1,0(%0); sync" : "=m" (*addr) : "r" (val));
+	__asm__ __volatile__("std%U0%X0 %1,%0; sync" : "=m" (*addr) : "r" (val));
 }
 
 #ifndef CONFIG_PPC_ISERIES 

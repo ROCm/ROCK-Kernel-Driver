@@ -43,7 +43,7 @@ extern struct movsl_mask {
 } ____cacheline_aligned_in_smp movsl_mask;
 #endif
 
-#define __addr_ok(addr) ((unsigned long)(addr) < (current_thread_info()->addr_limit.seg))
+#define __addr_ok(addr) ((unsigned long __force)(addr) < (current_thread_info()->addr_limit.seg))
 
 /*
  * Test whether a block of memory is a valid user space address.
@@ -56,6 +56,7 @@ extern struct movsl_mask {
  */
 #define __range_ok(addr,size) ({ \
 	unsigned long flag,sum; \
+	__chk_user_ptr(addr); \
 	asm("addl %3,%1 ; sbbl %0,%0; cmpl %1,%4; sbbl $0,%0" \
 		:"=&r" (flag), "=r" (sum) \
 		:"1" (addr),"g" ((int)(size)),"g" (current_thread_info()->addr_limit.seg)); \
@@ -170,6 +171,7 @@ extern void __get_user_4(void);
  */
 #define get_user(x,ptr)							\
 ({	int __ret_gu,__val_gu;						\
+	__chk_user_ptr(ptr);						\
 	switch(sizeof (*(ptr))) {					\
 	case 1:  __get_user_x(1,__ret_gu,__val_gu,ptr); break;		\
 	case 2:  __get_user_x(2,__ret_gu,__val_gu,ptr); break;		\
@@ -288,6 +290,7 @@ extern void __put_user_bad(void);
 #define __put_user_size(x,ptr,size,retval,errret)			\
 do {									\
 	retval = 0;							\
+	__chk_user_ptr(ptr);						\
 	switch (size) {							\
 	case 1: __put_user_asm(x,ptr,retval,"b","b","iq",errret);break;	\
 	case 2: __put_user_asm(x,ptr,retval,"w","w","ir",errret);break; \
@@ -346,6 +349,7 @@ extern long __get_user_bad(void);
 #define __get_user_size(x,ptr,size,retval,errret)			\
 do {									\
 	retval = 0;							\
+	__chk_user_ptr(ptr);						\
 	switch (size) {							\
 	case 1: __get_user_asm(x,ptr,retval,"b","b","=q",errret);break;	\
 	case 2: __get_user_asm(x,ptr,retval,"w","w","=r",errret);break;	\
@@ -403,13 +407,13 @@ __copy_to_user(void __user *to, const void *from, unsigned long n)
 
 		switch (n) {
 		case 1:
-			__put_user_size(*(u8 *)from, (u8 *)to, 1, ret, 1);
+			__put_user_size(*(u8 *)from, (u8 __user *)to, 1, ret, 1);
 			return ret;
 		case 2:
-			__put_user_size(*(u16 *)from, (u16 *)to, 2, ret, 2);
+			__put_user_size(*(u16 *)from, (u16 __user *)to, 2, ret, 2);
 			return ret;
 		case 4:
-			__put_user_size(*(u32 *)from, (u32 *)to, 4, ret, 4);
+			__put_user_size(*(u32 *)from, (u32 __user *)to, 4, ret, 4);
 			return ret;
 		}
 	}

@@ -558,7 +558,7 @@ extern int		dev_restart(struct net_device *dev);
 extern int		netpoll_trap(void);
 #endif
 
-typedef int gifconf_func_t(struct net_device * dev, char * bufptr, int len);
+typedef int gifconf_func_t(struct net_device * dev, char __user * bufptr, int len);
 extern int		register_gifconf(unsigned int family, gifconf_func_t * gifconf);
 static inline int unregister_gifconf(unsigned int family)
 {
@@ -676,7 +676,7 @@ static inline void dev_kfree_skb_any(struct sk_buff *skb)
 extern int		netif_rx(struct sk_buff *skb);
 #define HAVE_NETIF_RECEIVE_SKB 1
 extern int		netif_receive_skb(struct sk_buff *skb);
-extern int		dev_ioctl(unsigned int cmd, void *);
+extern int		dev_ioctl(unsigned int cmd, void __user *);
 extern int		dev_ethtool(struct ifreq *);
 extern unsigned		dev_get_flags(const struct net_device *);
 extern int		dev_change_flags(struct net_device *, unsigned);
@@ -943,7 +943,7 @@ extern int		weight_p;
 extern unsigned long	netdev_fc_xoff;
 extern atomic_t netdev_dropping;
 extern int		netdev_set_master(struct net_device *dev, struct net_device *master);
-extern struct sk_buff * skb_checksum_help(struct sk_buff *skb);
+extern int skb_checksum_help(struct sk_buff **pskb, int inward);
 #ifdef CONFIG_NET_FASTROUTE
 extern int		netdev_fastroute;
 extern int		netdev_fastroute_obstacles;

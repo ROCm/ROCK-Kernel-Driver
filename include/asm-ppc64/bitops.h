@@ -154,6 +154,20 @@ static __inline__ int test_and_change_bit(unsigned long nr, volatile unsigned lo
 	return (old & mask) != 0;
 }
 
+static __inline__ void set_bits(unsigned long mask, unsigned long *addr)
+{
+	unsigned long old;
+
+	__asm__ __volatile__(
+"1:	ldarx	%0,0,%3		# set_bit\n\
+	or	%0,%0,%2\n\
+	stdcx.	%0,0,%3\n\
+	bne-	1b"
+	: "=&r" (old), "=m" (*addr)
+	: "r" (mask), "r" (addr), "m" (*addr)
+	: "cc");
+}
+
 /*
  * non-atomic versions
  */

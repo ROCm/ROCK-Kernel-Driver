@@ -279,7 +279,13 @@ parse_mount_opts_wfstab () {
 	fi
 }
 
-KLEVEL="$(uname -r | cut -c1-3)"
+KLEVEL=$(
+           uname -r |
+             (
+	       IFS="." read a b c
+	       echo $a.$b
+	     )
+	 )
 case "$KLEVEL" in
 	"2.4"|"2.6")
 		true
@@ -496,7 +502,7 @@ status=`awk '/^state: / { print $2 }' /proc/acpi/ac_adapter/AC/state`
 
 case $status in
         "on-line")
-                echo "Setting HD spindown to 2 hours"
+                echo "Setting HD spindown for AC mode."
                 /sbin/laptop_mode stop
                 /sbin/hdparm -S $ACAD_HD /dev/hda > /dev/null 2>&1
                 /sbin/hdparm -B 255 /dev/hda > /dev/null 2>&1
@@ -504,7 +510,7 @@ case $status in
                 exit 0
         ;;
         "off-line")
-                echo "Setting HD spindown to 20 seconds"
+                echo "Setting HD spindown for battery mode."
                 /sbin/laptop_mode start
                 /sbin/hdparm -S $BATT_HD /dev/hda > /dev/null 2>&1
                 /sbin/hdparm -B 1 /dev/hda > /dev/null 2>&1

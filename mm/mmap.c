@@ -293,10 +293,8 @@ __vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 	struct vm_area_struct *prev, struct rb_node **rb_link,
 	struct rb_node *rb_parent)
 {
-	vma_prio_tree_init(vma);
 	__vma_link_list(mm, vma, prev, rb_parent);
 	__vma_link_rb(mm, vma, rb_link, rb_parent);
-	__vma_link_file(vma);
 	__anon_vma_link(vma);
 }
 
@@ -312,7 +310,10 @@ static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (mapping)
 		spin_lock(&mapping->i_mmap_lock);
 	anon_vma_lock(vma);
+
 	__vma_link(mm, vma, prev, rb_link, rb_parent);
+	__vma_link_file(vma);
+
 	anon_vma_unlock(vma);
 	if (mapping)
 		spin_unlock(&mapping->i_mmap_lock);
@@ -323,9 +324,9 @@ static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 }
 
 /*
- * Insert vm structure into process list sorted by address and into the
- * inode's i_mmap tree. The caller should hold mm->mmap_sem and
- * ->f_mappping->i_mmap_lock if vm_file is non-NULL.
+ * Helper for vma_adjust in the split_vma insert case:
+ * insert vm structure into list and rbtree and anon_vma,
+ * but it has already been inserted into prio_tree earlier.
  */
 static void
 __insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
@@ -337,9 +338,7 @@ __insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
 	if (__vma && __vma->vm_start < vma->vm_end)
 		BUG();
 	__vma_link(mm, vma, prev, rb_link, rb_parent);
-	mark_mm_hugetlb(mm, vma);
 	mm->map_count++;
-	validate_mm(mm);
 }
 
 static inline void
@@ -373,20 +372,27 @@ void vma_adjust(struct vm_area_struct *vma, unsigned long start,
 
 	if (next && !insert) {
 		if (end >= next->vm_end) {
+			/*
+			 * vma expands, overlapping all the next, and
+			 * perhaps the one after too (mprotect case 6).
+			 */
 again:			remove_next = 1 + (end > next->vm_end);
 			end = next->vm_end;
 			anon_vma = next->anon_vma;
-		} else if (end < vma->vm_end || end > next->vm_start) {
+		} else if (end > next->vm_start) {
+			/*
+			 * vma expands, overlapping part of the next:
+			 * mprotect case 5 shifting the boundary up.
+			 */
+			adjust_next = (end - next->vm_start) >> PAGE_SHIFT;
+			anon_vma = next->anon_vma;
+		} else if (end < vma->vm_end) {
 			/*
 			 * vma shrinks, and !insert tells it's not
-			 * split_vma inserting another: so it must
-			 * be mprotect shifting the boundary down.
-			 *   Or:
-			 * vma expands, overlapping part of the next:
-			 * must be mprotect shifting the boundary up.
+			 * split_vma inserting another: so it must be
+			 * mprotect case 4 shifting the boundary down.
 			 */
-			BUG_ON(vma->vm_end != next->vm_start);
-			adjust_next = end - next->vm_start;
+			adjust_next = - ((vma->vm_end - end) >> PAGE_SHIFT);
 			anon_vma = next->anon_vma;
 		}
 	}
@@ -396,6 +402,15 @@ again:			remove_next = 1 + (end > next->vm_end);
 		if (!(vma->vm_flags & VM_NONLINEAR))
 			root = &mapping->i_mmap;
 		spin_lock(&mapping->i_mmap_lock);
+		if (insert) {
+			/*
+			 * Put into prio_tree now, so instantiated pages
+			 * are visible to arm/parisc __flush_dcache_page
+			 * throughout; but we cannot insert into address
+			 * space until vma start or end is updated.
+			 */
+			__vma_link_file(insert);
+		}
 	}
 
 	/*
@@ -418,8 +433,8 @@ again:			remove_next = 1 + (end > next->vm_end);
 	vma->vm_end = end;
 	vma->vm_pgoff = pgoff;
 	if (adjust_next) {
-		next->vm_start += adjust_next;
-		next->vm_pgoff += adjust_next >> PAGE_SHIFT;
+		next->vm_start += adjust_next << PAGE_SHIFT;
+		next->vm_pgoff += adjust_next;
 	}
 
 	if (root) {
@@ -951,7 +966,7 @@ out:
 	}
 	if (flags & MAP_POPULATE) {
 		up_write(&mm->mmap_sem);
-		sys_remap_file_pages(addr, len, prot,
+		sys_remap_file_pages(addr, len, 0,
 					pgoff, flags & MAP_NONBLOCK);
 		down_write(&mm->mmap_sem);
 	}
@@ -1456,6 +1471,7 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 
 	/* most fields are the same, copy all, and then fixup */
 	*new = *vma;
+	vma_prio_tree_init(new);
 
 	if (new_below)
 		new->vm_end = addr;
@@ -1768,6 +1784,7 @@ struct vm_area_struct *copy_vma(struct vm_area_struct **vmap,
 		new_vma = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
 		if (new_vma) {
 			*new_vma = *vma;
+			vma_prio_tree_init(new_vma);
 			pol = mpol_copy(vma_policy(vma));
 			if (IS_ERR(pol)) {
 				kmem_cache_free(vm_area_cachep, new_vma);

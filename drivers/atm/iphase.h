@@ -141,7 +141,7 @@ typedef struct {
         int len;
         u32 maddr;
         int status;
-        void *buf;
+        void __user *buf;
 } IA_CMDBUF, *PIA_CMDBUF;
 
 /* cmds */

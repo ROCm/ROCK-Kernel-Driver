@@ -59,7 +59,10 @@ struct kiocb {
 	struct list_head	ki_list;	/* the aio core uses this
 						 * for cancellation */
 
-	void __user		*ki_user_obj;	/* pointer to userland's iocb */
+	union {
+		void __user		*user;
+		struct task_struct	*tsk;
+	} ki_obj;
 	__u64			ki_user_data;	/* user's data for completion */
 	loff_t			ki_pos;
 
@@ -76,7 +79,7 @@ struct kiocb {
 		(x)->ki_filp = (filp);			\
 		(x)->ki_ctx = &tsk->active_mm->default_kioctx;	\
 		(x)->ki_cancel = NULL;			\
-		(x)->ki_user_obj = tsk;			\
+		(x)->ki_obj.tsk = tsk;			\
 	} while (0)
 
 #define AIO_RING_MAGIC			0xa10a10a1
@@ -149,11 +152,11 @@ struct mm_struct;
 extern void FASTCALL(exit_aio(struct mm_struct *mm));
 extern struct kioctx *lookup_ioctx(unsigned long ctx_id);
 extern int FASTCALL(io_submit_one(struct kioctx *ctx,
-			struct iocb *user_iocb, struct iocb *iocb));
+			struct iocb __user *user_iocb, struct iocb *iocb));
 
 /* semi private, but used by the 32bit emulations: */
 struct kioctx *lookup_ioctx(unsigned long ctx_id);
-int FASTCALL(io_submit_one(struct kioctx *ctx, struct iocb *user_iocb,
+int FASTCALL(io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 				  struct iocb *iocb));
 
 #define get_ioctx(kioctx)	do { if (unlikely(atomic_read(&(kioctx)->users) <= 0)) BUG(); atomic_inc(&(kioctx)->users); } while (0)

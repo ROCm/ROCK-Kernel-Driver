@@ -1190,7 +1190,7 @@ static struct net_device_stats *ns83820_get_stats(struct net_device *ndev)
 	return &dev->stats;
 }
 
-static int ns83820_ethtool_ioctl (struct ns83820 *dev, void *useraddr)
+static int ns83820_ethtool_ioctl (struct ns83820 *dev, void __user *useraddr)
 {
 	u32 ethcmd;
 
@@ -1236,7 +1236,7 @@ static int ns83820_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
 
 	switch(cmd) {
 	case SIOCETHTOOL:
-		return ns83820_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		return ns83820_ethtool_ioctl(dev, rq->ifr_data);
 
 	default:
 		return -EOPNOTSUPP;

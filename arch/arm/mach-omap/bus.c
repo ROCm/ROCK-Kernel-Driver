@@ -266,7 +266,7 @@ static void __exit omap_bus_exit(void)
 	}
 }
 
-module_init(omap_bus_init);
+postcore_initcall(omap_bus_init);
 module_exit(omap_bus_exit);
 
 MODULE_DESCRIPTION("Virtual bus for OMAP");

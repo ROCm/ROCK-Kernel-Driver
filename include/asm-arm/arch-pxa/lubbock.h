@@ -35,3 +35,6 @@
 #define LUB_IRQ_SET_CLR		__LUB_REG(LUBBOCK_FPGA_PHYS + 0x0d0)
 #define LUB_GP			__LUB_REG(LUBBOCK_FPGA_PHYS + 0x100)
 
+#ifndef __ASSEMBLY__
+extern void lubbock_set_misc_wr(unsigned int mask, unsigned int set);
+#endif

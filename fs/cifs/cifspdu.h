@@ -862,6 +862,10 @@ typedef struct smb_com_create_directory_rsp {
 	__u16 ByteCount;	/* bct = 0 */
 } CREATE_DIRECTORY_RSP;
 
+/***************************************************/
+/* NT Transact structure defintions follow         */
+/* Currently only ioctl and notify are implemented */
+/***************************************************/
 typedef struct smb_com_transaction_ioctl_req {
 	struct smb_hdr hdr;	/* wct = 23 */
 	__u8 MaxSetupCount;
@@ -904,29 +908,45 @@ typedef struct smb_com_transaction_ioctl_rsp {
 } TRANSACT_IOCTL_RSP;
 
 typedef struct smb_com_transaction_change_notify_req {
-        struct smb_hdr hdr;     /* wct = 23 */
-        __u8 MaxSetupCount;
-        __u16 Reserved;
-        __u32 TotalParameterCount;
-        __u32 TotalDataCount;
-        __u32 MaxParameterCount;
-        __u32 MaxDataCount;
-        __u32 ParameterCount;
-        __u32 ParameterOffset;
-        __u32 DataCount;
-        __u32 DataOffset;
-        __u8 SetupCount; /* four setup words follow subcommand */
-        /* SNIA spec incorrectly included spurious pad here */
-        __u16 SubCommand;/* 4 = Change Notify */
+	struct smb_hdr hdr;     /* wct = 23 */
+	__u8 MaxSetupCount;
+	__u16 Reserved;
+	__u32 TotalParameterCount;
+	__u32 TotalDataCount;
+	__u32 MaxParameterCount;
+	__u32 MaxDataCount;
+	__u32 ParameterCount;
+	__u32 ParameterOffset;
+	__u32 DataCount;
+	__u32 DataOffset;
+	__u8 SetupCount; /* four setup words follow subcommand */
+	/* SNIA spec incorrectly included spurious pad here */
+	__u16 SubCommand;/* 4 = Change Notify */
 	__u32 CompletionFilter;  /* operation to monitor */
 	__u16 Fid;
 	__u8 WatchTree;  /* 1 = Monitor subdirectories */
+	__u8 Reserved2;
 	__u16 ByteCount;
-	__u8 Pad[3];
-	__u8 Data[1];
+/* __u8 Pad[3];*/
+/*	__u8 Data[1];*/
 } TRANSACT_CHANGE_NOTIFY_REQ;
 
-/* Completion Filter flags */
+typedef struct smb_com_transaction_change_notify_rsp {
+	struct smb_hdr hdr;	/* wct = 18 */
+	__u8 Reserved[3];
+	__u32 TotalParameterCount;
+	__u32 TotalDataCount;
+	__u32 ParameterCount;
+	__u32 ParameterOffset;
+	__u32 ParameterDisplacement;
+	__u32 DataCount;
+	__u32 DataOffset;
+	__u32 DataDisplacement;
+	__u8 SetupCount;   /* 0 */
+	__u16 ByteCount;
+	/* __u8 Pad[3]; */
+} TRANSACT_CHANGE_NOTIFY_RSP;
+/* Completion Filter flags for Notify */
 #define FILE_NOTIFY_CHANGE_FILE_NAME    0x00000001
 #define FILE_NOTIFY_CHANGE_DIR_NAME     0x00000002
 #define FILE_NOTIFY_CHANGE_NAME         0x00000003
@@ -1026,9 +1046,12 @@ typedef union smb_com_transaction2 {
 
 /* PathInfo/FileInfo infolevels */
 #define SMB_INFO_STANDARD                   1
+#define SMB_INFO_QUERY_EAS_FROM_LIST        3
+#define SMB_INFO_QUERY_ALL_EAS              4
 #define SMB_INFO_IS_NAME_VALID              6
 #define SMB_QUERY_FILE_BASIC_INFO       0x101
 #define SMB_QUERY_FILE_STANDARD_INFO    0x102
+#define SMB_QUERY_FILE_EA_INFO          0x103
 #define SMB_QUERY_FILE_NAME_INFO        0x104
 #define SMB_QUERY_FILE_ALLOCATION_INFO  0x105
 #define SMB_QUERY_FILE_END_OF_FILEINFO  0x106
@@ -1667,16 +1690,17 @@ struct gealist {
 };
 
 struct fea {
-	unsigned char fEA;
-	unsigned char cbName;
-	unsigned short cbValue;
+	unsigned char EA_flags;
+	__u8 name_len;
+	__u16 value_len;
 	char szName[1];
+	/* optionally followed by value */
 };
 /* flags for _FEA.fEA */
 #define FEA_NEEDEA         0x80	/* need EA bit */
 
 struct fealist {
-	unsigned long cbList;
+	__u32 list_len;
 	struct fea list[1];
 };
 
@@ -1686,6 +1710,83 @@ struct data_blob {
 	size_t length;
 	void (*free) (struct data_blob * data_blob);
 };
+
+#ifdef CONFIG_CIFS_POSIX
+/* 
+	For better POSIX semantics from Linux client, (even better
+	than the existing CIFS Unix Extensions) we need updated PDUs for:
+	
+	1) PosixCreateX - to set and return the mode, inode#, device info and
+	perhaps add a CreateDevice - to create Pipes and other special .inodes
+	Also note POSIX open flags
+	2) Close - to return the last write time to do cache across close more safely
+	3) PosixQFSInfo - to return statfs info
+	4) FindFirst return unique inode number - what about resume key, two forms short (matches readdir) and full (enough info to cache inodes)
+	5) Mkdir - set mode
+	
+	And under consideration: 
+	6) FindClose2 (return nanosecond timestamp ??)
+	7) Use nanosecond timestamps throughout all time fields if 
+	   corresponding attribute flag is set
+	8) sendfile - handle based copy
+	9) Direct i/o
+	10) "POSIX ACL" support
+	11) Misc fcntls?
+	
+	what about fixing 64 bit alignment
+	
+	There are also various legacy SMB/CIFS requests used as is
+	
+	From existing Lanman and NTLM dialects:
+	--------------------------------------
+	NEGOTIATE
+	SESSION_SETUP_ANDX (BB which?)
+	TREE_CONNECT_ANDX (BB which wct?)
+	TREE_DISCONNECT (BB add volume timestamp on response)
+	LOGOFF_ANDX
+	DELETE (note delete open file behavior)
+	DELETE_DIRECTORY
+	READ_AND_X
+	WRITE_AND_X
+	LOCKING_AND_X (note posix lock semantics)
+	RENAME (note rename across dirs and open file rename posix behaviors)
+	NT_RENAME (for hardlinks) Is this good enough for all features?
+	FIND_CLOSE2
+	TRANSACTION2 (18 cases)
+		SMB_SET_FILE_END_OF_FILE_INFO2 SMB_SET_PATH_END_OF_FILE_INFO2
+		(BB verify that never need to set allocation size)
+		SMB_SET_FILE_BASIC_INFO2 (setting times - BB can it be done via Unix ext?)
+	
+	COPY (note support for copy across directories) - FUTURE, OPTIONAL
+	setting/getting OS/2 EAs - FUTURE (BB can this handle
+	        setting Linux xattrs perfectly)         - OPTIONAL
+    dnotify                                         - FUTURE, OPTIONAL
+    quota                                           - FUTURE, OPTIONAL
+			
+	Note that various requests implemented for NT interop such as 
+		NT_TRANSACT (IOCTL) QueryReparseInfo
+	are unneeded to servers compliant with the CIFS POSIX extensions
+	
+	From CIFS Unix Extensions:
+	-------------------------
+	T2 SET_PATH_INFO (SMB_SET_FILE_UNIX_LINK) for symlinks
+	T2 SET_PATH_INFO (SMB_SET_FILE_BASIC_INFO2)
+	T2 QUERY_PATH_INFO (SMB_QUERY_FILE_UNIX_LINK)
+	T2 QUERY_PATH_INFO (SMB_QUERY_FILE_UNIX_BASIC) - BB check for missing inode fields
+					Actually need QUERY_FILE_UNIX_INFO since has inode num
+					BB what about a) blksize/blkbits/blocks
+								  b) i_version
+								  c) i_rdev
+								  d) notify mask?
+								  e) generation
+								  f) size_seqcount
+	T2 FIND_FIRST/FIND_NEXT FIND_FILE_UNIX
+	TRANS2_GET_DFS_REFERRAL				  - OPTIONAL but recommended
+	T2_QFS_INFO QueryDevice/AttributeInfo - OPTIONAL
+	
+	
+ */
+#endif 
 
 #pragma pack()			/* resume default structure packing */
 

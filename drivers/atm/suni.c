@@ -95,7 +95,7 @@ static void suni_hz(unsigned long from_timer)
 #undef ADD_LIMITED
 
 
-static int fetch_stats(struct atm_dev *dev,struct sonet_stats *arg,int zero)
+static int fetch_stats(struct atm_dev *dev,struct sonet_stats __user *arg,int zero)
 {
 	struct sonet_stats tmp;
 	int error = 0;
@@ -115,11 +115,11 @@ static int fetch_stats(struct atm_dev *dev,struct sonet_stats *arg,int zero)
   }
 
 
-static int change_diag(struct atm_dev *dev,void *arg,int set)
+static int change_diag(struct atm_dev *dev,void __user *arg,int set)
 {
 	int todo;
 
-	if (get_user(todo,(int *) arg)) return -EFAULT;
+	if (get_user(todo,(int __user *)arg)) return -EFAULT;
 	HANDLE_FLAG(SONET_INS_SBIP,TSOP_DIAG,SUNI_TSOP_DIAG_DBIP8);
 	HANDLE_FLAG(SONET_INS_LBIP,TLOP_DIAG,SUNI_TLOP_DIAG_DBIP);
 	HANDLE_FLAG(SONET_INS_PBIP,TPOP_CD,SUNI_TPOP_DIAG_DB3);
@@ -128,14 +128,14 @@ static int change_diag(struct atm_dev *dev,void *arg,int set)
 	HANDLE_FLAG(SONET_INS_PAIS,TPOP_CD,SUNI_TPOP_DIAG_PAIS);
 	HANDLE_FLAG(SONET_INS_LOS,TSOP_DIAG,SUNI_TSOP_DIAG_DLOS);
 	HANDLE_FLAG(SONET_INS_HCS,TACP_CS,SUNI_TACP_CS_DHCS);
-	return put_user(todo,(int *) arg) ? -EFAULT : 0;
+	return put_user(todo,(int __user *)arg) ? -EFAULT : 0;
 }
 
 
 #undef HANDLE_FLAG
 
 
-static int get_diag(struct atm_dev *dev,void *arg)
+static int get_diag(struct atm_dev *dev,void __user *arg)
 {
 	int set;
 
@@ -148,7 +148,7 @@ static int get_diag(struct atm_dev *dev,void *arg)
 	if (GET(TPOP_CD) & SUNI_TPOP_DIAG_PAIS) set |= SONET_INS_PAIS;
 	if (GET(TSOP_DIAG) & SUNI_TSOP_DIAG_DLOS) set |= SONET_INS_LOS;
 	if (GET(TACP_CS) & SUNI_TACP_CS_DHCS) set |= SONET_INS_HCS;
-	return put_user(set,(int *) arg) ? -EFAULT : 0;
+	return put_user(set,(int __user *)arg) ? -EFAULT : 0;
 }
 
 
@@ -175,13 +175,12 @@ static int set_loopback(struct atm_dev *dev,int mode)
 }
 
 
-static int suni_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
+static int suni_ioctl(struct atm_dev *dev,unsigned int cmd,void __user *arg)
 {
 	switch (cmd) {
 		case SONET_GETSTATZ:
 		case SONET_GETSTAT:
-			return fetch_stats(dev,(struct sonet_stats *) arg,
-			    cmd == SONET_GETSTATZ);
+			return fetch_stats(dev, arg, cmd == SONET_GETSTATZ);
 		case SONET_SETDIAG:
 			return change_diag(dev,arg,1);
 		case SONET_CLRDIAG:
@@ -192,18 +191,18 @@ static int suni_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 			if (arg != SONET_FRAME_SONET) return -EINVAL;
 			return 0;
 		case SONET_GETFRAMING:
-			return put_user(SONET_FRAME_SONET,(int *) arg) ?
+			return put_user(SONET_FRAME_SONET,(int __user *)arg) ?
 			    -EFAULT : 0;
 		case SONET_GETFRSENSE:
 			return -EINVAL;
 		case ATM_SETLOOP:
 			return set_loopback(dev,(int) (long) arg);
 		case ATM_GETLOOP:
-			return put_user(PRIV(dev)->loop_mode,(int *) arg) ?
+			return put_user(PRIV(dev)->loop_mode,(int __user *)arg) ?
 			    -EFAULT : 0;
 		case ATM_QUERYLOOP:
 			return put_user(ATM_LM_LOC_PHY | ATM_LM_RMT_PHY,
-			    (int *) arg) ? -EFAULT : 0;
+			    (int __user *) arg) ? -EFAULT : 0;
 		default:
 			return -ENOIOCTLCMD;
 	}

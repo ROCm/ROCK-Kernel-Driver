@@ -180,7 +180,8 @@ static int cisco_rx(struct sk_buff *skb)
 
 		case CISCO_KEEPALIVE_REQ:
 			hdlc->state.cisco.rxseq = ntohl(cisco_data->par1);
-			if (ntohl(cisco_data->par2)==hdlc->state.cisco.txseq) {
+			if (hdlc->state.cisco.request_sent &&
+			    ntohl(cisco_data->par2)==hdlc->state.cisco.txseq) {
 				hdlc->state.cisco.last_poll = jiffies;
 				if (!hdlc->state.cisco.up) {
 					u32 sec, min, hrs, days;
@@ -192,8 +193,9 @@ static int cisco_rx(struct sk_buff *skb)
 					       "uptime %ud%uh%um%us)\n",
 					       dev->name, days, hrs,
 					       min, sec);
+					netif_carrier_on(dev);
+					hdlc->state.cisco.up = 1;
 				}
-				hdlc->state.cisco.up = 1;
 			}
 
 			dev_kfree_skb_any(skb);
@@ -219,17 +221,18 @@ static void cisco_timer(unsigned long arg)
 	struct net_device *dev = (struct net_device *)arg;
 	hdlc_device *hdlc = dev_to_hdlc(dev);
 
-	if (hdlc->state.cisco.up && jiffies - hdlc->state.cisco.last_poll >=
-	    hdlc->state.cisco.settings.timeout * HZ) {
+	if (hdlc->state.cisco.up &&
+	    time_after(jiffies, hdlc->state.cisco.last_poll +
+		       hdlc->state.cisco.settings.timeout * HZ)) {
 		hdlc->state.cisco.up = 0;
 		printk(KERN_INFO "%s: Link down\n", dev->name);
-		if (netif_carrier_ok(dev))
-			netif_carrier_off(dev);
+		netif_carrier_off(dev);
 	}
 
 	cisco_keepalive_send(dev, CISCO_KEEPALIVE_REQ,
 			     ++hdlc->state.cisco.txseq,
 			     hdlc->state.cisco.rxseq);
+	hdlc->state.cisco.request_sent = 1;
 	hdlc->state.cisco.timer.expires = jiffies +
 		hdlc->state.cisco.settings.interval * HZ;
 	hdlc->state.cisco.timer.function = cisco_timer;
@@ -242,8 +245,8 @@ static void cisco_timer(unsigned long arg)
 static void cisco_start(struct net_device *dev)
 {
 	hdlc_device *hdlc = dev_to_hdlc(dev);
-	hdlc->state.cisco.last_poll = 0;
 	hdlc->state.cisco.up = 0;
+	hdlc->state.cisco.request_sent = 0;
 	hdlc->state.cisco.txseq = hdlc->state.cisco.rxseq = 0;
 
 	init_timer(&hdlc->state.cisco.timer);
@@ -257,9 +260,12 @@ static void cisco_start(struct net_device *dev)
 
 static void cisco_stop(struct net_device *dev)
 {
-	del_timer_sync(&dev_to_hdlc(dev)->state.cisco.timer);
+	hdlc_device *hdlc = dev_to_hdlc(dev);
+	del_timer_sync(&hdlc->state.cisco.timer);
 	if (netif_carrier_ok(dev))
 		netif_carrier_off(dev);
+	hdlc->state.cisco.up = 0;
+	hdlc->state.cisco.request_sent = 0;
 }
 
 

@@ -2738,12 +2738,12 @@ static int ia_change_qos(struct atm_vcc *vcc, struct atm_qos *qos, int flags)
 	return 0;  
 }  
   
-static int ia_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg)  
+static int ia_ioctl(struct atm_dev *dev, unsigned int cmd, void __user *arg)  
 {  
    IA_CMDBUF ia_cmds;
    IADEV *iadev;
    int i, board;
-   u16 *tmps;
+   u16 __user *tmps;
    IF_EVENT(printk(">ia_ioctl\n");)  
    if (cmd != IA_CMD) {
       if (!dev->phy->ioctl) return -EINVAL;
@@ -2766,7 +2766,7 @@ static int ia_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg)
              break;
           case MEMDUMP_SEGREG:
 	     if (!capable(CAP_NET_ADMIN)) return -EPERM;
-             tmps = (u16 *)ia_cmds.buf;
+             tmps = (u16 __user *)ia_cmds.buf;
              for(i=0; i<0x80; i+=2, tmps++)
                 if(put_user((u16)(readl(iadev->seg_reg+i) & 0xffff), tmps)) return -EFAULT;
              ia_cmds.status = 0;
@@ -2774,7 +2774,7 @@ static int ia_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg)
              break;
           case MEMDUMP_REASSREG:
 	     if (!capable(CAP_NET_ADMIN)) return -EPERM;
-             tmps = (u16 *)ia_cmds.buf;
+             tmps = (u16 __user *)ia_cmds.buf;
              for(i=0; i<0x80; i+=2, tmps++)
                 if(put_user((u16)(readl(iadev->reass_reg+i) & 0xffff), tmps)) return -EFAULT;
              ia_cmds.status = 0;
@@ -2874,14 +2874,14 @@ static int ia_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg)
 }  
   
 static int ia_getsockopt(struct atm_vcc *vcc, int level, int optname,   
-	void *optval, int optlen)  
+	void __user *optval, int optlen)  
 {  
 	IF_EVENT(printk(">ia_getsockopt\n");)  
 	return -EINVAL;  
 }  
   
 static int ia_setsockopt(struct atm_vcc *vcc, int level, int optname,   
-	void *optval, int optlen)  
+	void __user *optval, int optlen)  
 {  
 	IF_EVENT(printk(">ia_setsockopt\n");)  
 	return -EINVAL;  

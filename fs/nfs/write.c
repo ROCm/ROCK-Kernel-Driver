@@ -185,23 +185,17 @@ static int nfs_writepage_sync(struct file *file, struct inode *inode,
 	if (!wdata)
 		return -ENOMEM;
 
-	*wdata = (struct nfs_write_data) {
-		.flags		= how,
-		.cred		= NULL,
-		.inode		= inode,
-		.args		= {
-			.fh		= NFS_FH(inode),
-			.lockowner	= current->files,
-			.pages		= &page,
-			.stable		= NFS_FILE_SYNC,
-			.pgbase		= offset,
-			.count		= wsize,
-		},
-		.res		= {
-			.fattr		= &wdata->fattr,
-			.verf		= &wdata->verf,
-		},
-	};
+	memset(wdata, 0, sizeof(*wdata));
+	wdata->flags = how;
+	wdata->inode = inode;
+	wdata->args.fh = NFS_FH(inode);
+	wdata->args.lockowner = current->files;
+	wdata->args.pages = &page;
+	wdata->args.stable = NFS_FILE_SYNC;
+	wdata->args.pgbase = offset;
+	wdata->args.count = wsize;
+	wdata->res.fattr = &wdata->fattr;
+	wdata->res.verf = &wdata->verf;
 
 	dprintk("NFS:      nfs_writepage_sync(%s/%Ld %d@%Ld)\n",
 		inode->i_sb->s_id,
@@ -320,7 +314,7 @@ do_it:
 		if (err >= 0) {
 			err = 0;
 			if (wbc->for_reclaim)
-				err = WRITEPAGE_ACTIVATE;
+				nfs_flush_inode(inode, 0, 0, FLUSH_STABLE);
 		}
 	} else {
 		err = nfs_writepage_sync(NULL, inode, page, 0,
@@ -333,8 +327,7 @@ do_it:
 	}
 	unlock_kernel();
 out:
-	if (err != WRITEPAGE_ACTIVATE)
-		unlock_page(page);
+	unlock_page(page);
 	if (inode_referenced)
 		iput(inode);
 	return err; 

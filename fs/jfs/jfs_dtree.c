@@ -1,5 +1,5 @@
 /*
- *   Copyright (C) International Business Machines Corp., 2000-2003
+ *   Copyright (C) International Business Machines Corp., 2000-2004
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -378,6 +378,8 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		 * It's time to move the inline table to an external
 		 * page and begin to build the xtree
 		 */
+		if (dbAlloc(ip, 0, sbi->nbperpage, &xaddr))
+			goto clean_up;	/* No space */
 
 		/*
 		 * Save the table, we're going to overwrite it with the
@@ -394,8 +396,8 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		/*
 		 * Allocate the first block & add it to the xtree
 		 */
-		xaddr = 0;
 		if (xtInsert(tid, ip, 0, 0, sbi->nbperpage, &xaddr, 0)) {
+			/* This really shouldn't fail */
 			jfs_warn("add_index: xtInsert failed!");
 			memcpy(&jfs_ip->i_dirtable, temp_table,
 			       sizeof (temp_table));
@@ -764,11 +766,12 @@ int dtSearch(struct inode *ip, struct component_name * key, ino_t * data,
 		 */
 	      getChild:
 		/* update max. number of pages to split */
-		if (btstack->nsplit >= 8) {
+		if (BT_STACK_FULL(btstack)) {
 			/* Something's corrupted, mark filesytem dirty so
 			 * chkdsk will fix it.
 			 */
 			jfs_error(sb, "stack overrun in dtSearch!");
+			BT_STACK_DUMP(btstack);
 			rc = -EIO;
 			goto out;
 		}
@@ -975,8 +978,10 @@ static int dtSplitUp(tid_t tid,
 		n -= DTROOTMAXSLOT - sp->header.freecnt; /* header + entries */
 		if (n <= split->nslot)
 			xlen++;
-		if ((rc = dbAlloc(ip, 0, (s64) xlen, &xaddr)))
+		if ((rc = dbAlloc(ip, 0, (s64) xlen, &xaddr))) {
+			DT_PUTPAGE(smp);
 			goto freeKeyName;
+		}
 
 		pxdlist.maxnpxd = 1;
 		pxdlist.npxd = 0;
@@ -3342,6 +3347,12 @@ static int dtReadFirst(struct inode *ip, struct btstack * btstack)
 		/*
 		 * descend down to leftmost child page
 		 */
+		if (BT_STACK_FULL(btstack)) {
+			DT_PUTPAGE(mp);
+			jfs_error(ip->i_sb, "dtReadFirst: btstack overrun");
+			BT_STACK_DUMP(btstack);
+			return -EIO;
+		}
 		/* push (bn, index) of the parent page/entry */
 		BT_PUSH(btstack, bn, 0);
 

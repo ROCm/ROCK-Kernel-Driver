@@ -179,7 +179,7 @@ asmlinkage unsigned long sparc_brk(unsigned long brk)
  * sys_pipe() is the normal C calling standard for creating
  * a pipe. It's not the way unix traditionally does this, though.
  */
-asmlinkage int sparc_pipe(struct pt_regs *regs)
+asmlinkage long sparc_pipe(struct pt_regs *regs)
 {
 	int fd[2];
 	int error;
@@ -199,22 +199,22 @@ out:
  * This is really horribly ugly.
  */
 
-asmlinkage int sys_ipc (unsigned call, int first, int second, unsigned long third, void *ptr, long fifth)
+asmlinkage long sys_ipc(unsigned int call, int first, int second, unsigned long third, void __user *ptr, long fifth)
 {
 	int err;
 
 	/* No need for backward compatibility. We can start fresh... */
-
-	if (call <= SEMCTL)
+	if (call <= SEMCTL) {
 		switch (call) {
 		case SEMOP:
-			err = sys_semtimedop (first, (struct sembuf *)ptr, second, NULL);
+			err = sys_semtimedop(first, ptr, second, NULL);
 			goto out;
 		case SEMTIMEDOP:
-			err = sys_semtimedop (first, (struct sembuf *)ptr, second, (const struct timespec *) fifth);
+			err = sys_semtimedop(first, ptr, second,
+				(const struct timespec __user *) fifth);
 			goto out;
 		case SEMGET:
-			err = sys_semget (first, second, (int)third);
+			err = sys_semget(first, second, (int)third);
 			goto out;
 		case SEMCTL: {
 			union semun fourth;
@@ -222,79 +222,87 @@ asmlinkage int sys_ipc (unsigned call, int first, int second, unsigned long thir
 			if (!ptr)
 				goto out;
 			err = -EFAULT;
-			if(get_user(fourth.__pad, (void **)ptr))
+			if (get_user(fourth.__pad,
+				     (void __user * __user *) ptr))
 				goto out;
-			err = sys_semctl (first, second | IPC_64, (int)third, fourth);
+			err = sys_semctl(first, second | IPC_64,
+					 (int)third, fourth);
 			goto out;
-			}
+		}
 		default:
 			err = -ENOSYS;
 			goto out;
-		}
-	if (call <= MSGCTL) 
+		};
+	}
+	if (call <= MSGCTL) {
 		switch (call) {
 		case MSGSND:
-			err = sys_msgsnd (first, (struct msgbuf *) ptr, 
-					  second, (int)third);
+			err = sys_msgsnd(first, ptr, second, (int)third);
 			goto out;
 		case MSGRCV:
-			err = sys_msgrcv (first, (struct msgbuf *) ptr, second, fifth, (int)third);
+			err = sys_msgrcv(first, ptr, second, fifth,
+					 (int)third);
 			goto out;
 		case MSGGET:
-			err = sys_msgget ((key_t) first, second);
+			err = sys_msgget((key_t) first, second);
 			goto out;
 		case MSGCTL:
-			err = sys_msgctl (first, second | IPC_64, (struct msqid_ds *) ptr);
+			err = sys_msgctl(first, second | IPC_64, ptr);
 			goto out;
 		default:
 			err = -ENOSYS;
 			goto out;
-		}
-	if (call <= SHMCTL) 
+		};
+	}
+	if (call <= SHMCTL) {
 		switch (call) {
 		case SHMAT: {
 			ulong raddr;
-			err = do_shmat (first, (char *) ptr, second, &raddr);
+			err = do_shmat(first, ptr, second, &raddr);
 			if (!err) {
-				if (put_user(raddr, (ulong __user *) third))
+				if (put_user(raddr,
+					     (ulong __user *) third))
 					err = -EFAULT;
 			}
 			goto out;
 		}
 		case SHMDT:
-			err = sys_shmdt ((char *)ptr);
+			err = sys_shmdt(ptr);
 			goto out;
 		case SHMGET:
-			err = sys_shmget (first, second, (int)third);
+			err = sys_shmget(first, second, (int)third);
 			goto out;
 		case SHMCTL:
-			err = sys_shmctl (first, second | IPC_64, (struct shmid_ds *) ptr);
+			err = sys_shmctl(first, second | IPC_64, ptr);
 			goto out;
 		default:
 			err = -ENOSYS;
 			goto out;
-		}
-	else
+		};
+	} else {
 		err = -ENOSYS;
+	}
 out:
 	return err;
 }
 
-asmlinkage int sparc64_newuname(struct new_utsname __user *name)
+asmlinkage long sparc64_newuname(struct new_utsname __user *name)
 {
 	int ret = sys_newuname(name);
 	
 	if (current->personality == PER_LINUX32 && !ret) {
-		ret = copy_to_user(name->machine, "sparc\0\0", 8) ? -EFAULT : 0;
+		ret = (copy_to_user(name->machine, "sparc\0\0", 8)
+		       ? -EFAULT : 0);
 	}
 	return ret;
 }
 
-asmlinkage int sparc64_personality(unsigned long personality)
+asmlinkage long sparc64_personality(unsigned long personality)
 {
 	int ret;
 
-	if (current->personality == PER_LINUX32 && personality == PER_LINUX)
+	if (current->personality == PER_LINUX32 &&
+	    personality == PER_LINUX)
 		personality = PER_LINUX32;
 	ret = sys_personality(personality);
 	if (ret == PER_LINUX32)
@@ -408,8 +416,7 @@ out:
 }
 
 /* we come to here via sys_nis_syscall so it can setup the regs argument */
-asmlinkage unsigned long
-c_sys_nis_syscall (struct pt_regs *regs)
+asmlinkage unsigned long c_sys_nis_syscall(struct pt_regs *regs)
 {
 	static int count;
 	
@@ -427,8 +434,7 @@ c_sys_nis_syscall (struct pt_regs *regs)
 
 /* #define DEBUG_SPARC_BREAKPOINT */
 
-asmlinkage void
-sparc_breakpoint (struct pt_regs *regs)
+asmlinkage void sparc_breakpoint(struct pt_regs *regs)
 {
 	siginfo_t info;
 
@@ -452,7 +458,7 @@ sparc_breakpoint (struct pt_regs *regs)
 
 extern void check_pending(int signum);
 
-asmlinkage int sys_getdomainname(char __user *name, int len)
+asmlinkage long sys_getdomainname(char __user *name, int len)
 {
         int nlen;
 	int err = -EFAULT;
@@ -473,7 +479,7 @@ done:
 	return err;
 }
 
-asmlinkage int solaris_syscall(struct pt_regs *regs)
+asmlinkage long solaris_syscall(struct pt_regs *regs)
 {
 	static int count;
 
@@ -493,7 +499,7 @@ asmlinkage int solaris_syscall(struct pt_regs *regs)
 }
 
 #ifndef CONFIG_SUNOS_EMUL
-asmlinkage int sunos_syscall(struct pt_regs *regs)
+asmlinkage long sunos_syscall(struct pt_regs *regs)
 {
 	static int count;
 
@@ -511,11 +517,11 @@ asmlinkage int sunos_syscall(struct pt_regs *regs)
 }
 #endif
 
-asmlinkage int sys_utrap_install(utrap_entry_t type,
-				 utrap_handler_t new_p,
-				 utrap_handler_t new_d,
-				 utrap_handler_t __user *old_p,
-				 utrap_handler_t __user *old_d)
+asmlinkage long sys_utrap_install(utrap_entry_t type,
+				  utrap_handler_t new_p,
+				  utrap_handler_t new_d,
+				  utrap_handler_t __user *old_p,
+				  utrap_handler_t __user *old_d)
 {
 	if (type < UT_INSTRUCTION_EXCEPTION || type > UT_TRAP_INSTRUCTION_31)
 		return -EINVAL;
@@ -582,12 +588,11 @@ long sparc_memory_ordering(unsigned long model, struct pt_regs *regs)
 	return 0;
 }
 
-asmlinkage long
-sys_rt_sigaction(int sig,
-		const struct sigaction __user *act,
-		struct sigaction __user *oact,
-		void __user *restorer,
-		size_t sigsetsize)
+asmlinkage long sys_rt_sigaction(int sig,
+				 const struct sigaction __user *act,
+				 struct sigaction __user *oact,
+				 void __user *restorer,
+				 size_t sigsetsize)
 {
 	struct k_sigaction new_ka, old_ka;
 	int ret;
@@ -615,8 +620,7 @@ sys_rt_sigaction(int sig,
 /* Invoked by rtrap code to update performance counters in
  * user space.
  */
-asmlinkage void
-update_perfctrs(void)
+asmlinkage void update_perfctrs(void)
 {
 	unsigned long pic, tmp;
 
@@ -628,16 +632,15 @@ update_perfctrs(void)
 	reset_pic();
 }
 
-asmlinkage int
-sys_perfctr(int opcode, unsigned long arg0, unsigned long arg1, unsigned long arg2)
+asmlinkage long sys_perfctr(int opcode, unsigned long arg0, unsigned long arg1, unsigned long arg2)
 {
 	int err = 0;
 
 	switch(opcode) {
 	case PERFCTR_ON:
 		current_thread_info()->pcr_reg = arg2;
-		current_thread_info()->user_cntd0 = (u64 *) arg0;
-		current_thread_info()->user_cntd1 = (u64 *) arg1;
+		current_thread_info()->user_cntd0 = (u64 __user *) arg0;
+		current_thread_info()->user_cntd1 = (u64 __user *) arg1;
 		current_thread_info()->kernel_cntd0 =
 			current_thread_info()->kernel_cntd1 = 0;
 		write_pcr(arg2);
@@ -684,7 +687,8 @@ sys_perfctr(int opcode, unsigned long arg0, unsigned long arg1, unsigned long ar
 		break;
 
 	case PERFCTR_SETPCR: {
-		u64 *user_pcr = (u64 *)arg0;
+		u64 __user *user_pcr = (u64 __user *)arg0;
+
 		if (!test_thread_flag(TIF_PERFCTR)) {
 			err = -EINVAL;
 			break;
@@ -698,7 +702,8 @@ sys_perfctr(int opcode, unsigned long arg0, unsigned long arg1, unsigned long ar
 	}
 
 	case PERFCTR_GETPCR: {
-		u64 *user_pcr = (u64 *)arg0;
+		u64 __user *user_pcr = (u64 __user *)arg0;
+
 		if (!test_thread_flag(TIF_PERFCTR)) {
 			err = -EINVAL;
 			break;

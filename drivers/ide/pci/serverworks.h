@@ -31,8 +31,6 @@ static void init_dma_svwks(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t serverworks_chipsets[] __devinitdata = {
 	{	/* 0 */
-		.vendor		= PCI_VENDOR_ID_SERVERWORKS,
-		.device		= PCI_DEVICE_ID_SERVERWORKS_OSB4IDE,
 		.name		= "SvrWks OSB4",
 		.init_setup	= init_setup_svwks,
 		.init_chipset	= init_chipset_svwks,
@@ -41,8 +39,6 @@ static ide_pci_device_t serverworks_chipsets[] __devinitdata = {
 		.autodma	= AUTODMA,
 		.bootable	= ON_BOARD,
 	},{	/* 1 */
-		.vendor		= PCI_VENDOR_ID_SERVERWORKS,
-		.device		= PCI_DEVICE_ID_SERVERWORKS_CSB5IDE,
 		.name		= "SvrWks CSB5",
 		.init_setup	= init_setup_svwks,
 		.init_chipset	= init_chipset_svwks,
@@ -52,8 +48,6 @@ static ide_pci_device_t serverworks_chipsets[] __devinitdata = {
 		.autodma	= AUTODMA,
 		.bootable	= ON_BOARD,
 	},{	/* 2 */
-		.vendor		= PCI_VENDOR_ID_SERVERWORKS,
-		.device		= PCI_DEVICE_ID_SERVERWORKS_CSB6IDE,
 		.name		= "SvrWks CSB6",
 		.init_setup	= init_setup_csb6,
 		.init_chipset	= init_chipset_svwks,
@@ -63,8 +57,6 @@ static ide_pci_device_t serverworks_chipsets[] __devinitdata = {
 		.autodma	= AUTODMA,
 		.bootable	= ON_BOARD,
 	},{	/* 3 */
-		.vendor		= PCI_VENDOR_ID_SERVERWORKS,
-		.device		= PCI_DEVICE_ID_SERVERWORKS_CSB6IDE2,
 		.name		= "SvrWks CSB6",
 		.init_setup	= init_setup_csb6,
 		.init_chipset	= init_chipset_svwks,

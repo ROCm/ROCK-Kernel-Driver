@@ -17,11 +17,12 @@ KERNELLOAD	:= 0xc000000000000000
 
 HAS_BIARCH      := $(shell if $(CC) -m64 -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo y; else echo n; fi;)
 ifeq ($(HAS_BIARCH),y)
-AS              := $(AS) -64
+AS              := $(AS) -a64
 LD              := $(LD) -m elf64ppc
 CC		:= $(CC) -m64
-CHECK		:= $(CHECK) -m64
 endif
+
+CHECK		:= $(CHECK) -m64 -D__powerpc__=1
 
 LDFLAGS		:= -m elf64ppc
 LDFLAGS_vmlinux	:= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)

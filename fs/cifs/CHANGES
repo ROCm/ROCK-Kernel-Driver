@@ -1,3 +1,30 @@
+Version 1.18
+------------
+Do not rename hardlinked files (since that should be a noop). Flush
+cached write behind data when reopening a file after session abend,
+except when already in write. Grab per socket sem during reconnect 
+to avoid oops in sendmsg if overlapping with reconnect.
+
+
+Version 1.17
+------------
+Update number of blocks in file so du command is happier (in Linux a fake
+blocksize of 512 is required for calculating number of blocks in inode).
+Fix prepare write of partial pages to read in data from server if possible.
+Fix race on tcpStatus field between unmount and reconnection code, causing
+cifsd process sometimes to hang around forever. Improve out of memory
+checks in cifs_filldir
+
+Version 1.16
+------------
+Fix incorrect file size in file handle based setattr on big endian hardware.
+Fix oops in build_path_from_dentry when out of memory.  Add checks for invalid
+and closing file structs in writepage/partialpagewrite.  Add statistics
+for each mounted share (new menuconfig option). Fix endianness problem in
+volume information displayed in /proc/fs/cifs/DebugData (only affects
+affects big endian architectures). Prevent renames while constructing
+path names for open, mkdir and rmdir.
+
 Version 1.15
 ------------
 Change to mempools for alloc smb request buffers and multiplex structs

@@ -433,7 +433,7 @@ do_next_tag:
 	goto do_next_tag;
 
 return_overflow:
-	ntfs_error(NULL, "Failed. Returning -EOVERFLOW.\n");
+	ntfs_error(NULL, "Failed. Returning -EOVERFLOW.");
 	goto return_error;
 }
 
@@ -507,7 +507,7 @@ int ntfs_read_compressed_block(struct page *page)
 	 */
 	unsigned int nr_pages = (end_vcn - start_vcn) <<
 			vol->cluster_size_bits >> PAGE_CACHE_SHIFT;
-	unsigned int xpage, max_page, max_ofs, cur_page, cur_ofs, i;
+	unsigned int xpage, max_page, cur_page, cur_ofs, i;
 	unsigned int cb_clusters, cb_max_ofs;
 	int block, max_block, cb_max_page, bhs_size, nr_bhs, err = 0;
 	struct page **pages;
@@ -550,11 +550,8 @@ int ntfs_read_compressed_block(struct page *page)
 	 */
 	max_page = ((VFS_I(ni)->i_size + PAGE_CACHE_SIZE - 1) >>
 			PAGE_CACHE_SHIFT) - offset;
-	max_ofs = (VFS_I(ni)->i_size + PAGE_CACHE_SIZE - 1) & ~PAGE_CACHE_MASK;
-	if (nr_pages < max_page) {
+	if (nr_pages < max_page)
 		max_page = nr_pages;
-		max_ofs = 0;
-	}
 	for (i = 0; i < max_page; i++, offset++) {
 		if (i != xpage)
 			pages[i] = grab_cache_page_nowait(mapping, offset);
@@ -722,14 +719,8 @@ lock_retry_remap:
 	cb_max_page >>= PAGE_CACHE_SHIFT;
 
 	/* Catch end of file inside a compression block. */
-	if (cb_max_page >= max_page) {
-		if (cb_max_page > max_page) {
-			cb_max_page = max_page;
-			cb_max_ofs = max_ofs;
-		} else if (cb_max_ofs > max_ofs) {
-			cb_max_ofs = max_ofs;
-		}
-	}
+	if (cb_max_page > max_page)
+		cb_max_page = max_page;
 
 	if (vcn == start_vcn - cb_clusters) {
 		/* Sparse cb, zero out page range overlapping the cb. */
@@ -860,7 +851,7 @@ lock_retry_remap:
 		if (err) {
 			ntfs_error(vol->sb, "ntfs_decompress() failed in inode "
 					"0x%lx with error code %i. Skipping "
-					"this compression block.\n",
+					"this compression block.",
 					ni->mft_no, -err);
 			/* Release the unfinished pages. */
 			for (; prev_cur_page < cur_page; prev_cur_page++) {
@@ -897,7 +888,8 @@ lock_retry_remap:
 		if (page) {
 			ntfs_error(vol->sb, "Still have pages left! "
 					"Terminating them with extreme "
-					"prejudice.");
+					"prejudice.  Inode 0x%lx, page index "
+					"0x%lx.", ni->mft_no, page->index);
 			if (cur_page == xpage && !xpage_done)
 				SetPageError(page);
 			flush_dcache_page(page);

@@ -181,9 +181,6 @@ EXPORT_SYMBOL(pci_bus_to_phys);
 #endif /* CONFIG_PCI */
 
 #ifdef CONFIG_NOT_COHERENT_CACHE
-EXPORT_SYMBOL(consistent_alloc);
-EXPORT_SYMBOL(consistent_free);
-EXPORT_SYMBOL(consistent_sync);
 EXPORT_SYMBOL(flush_dcache_all);
 #endif
 
@@ -203,15 +200,6 @@ EXPORT_SYMBOL(last_task_used_altivec);
 EXPORT_SYMBOL(giveup_altivec);
 #endif /* CONFIG_ALTIVEC */
 #ifdef CONFIG_SMP
-#ifdef CONFIG_DEBUG_SPINLOCK
-EXPORT_SYMBOL(_raw_spin_lock);
-EXPORT_SYMBOL(_raw_spin_unlock);
-EXPORT_SYMBOL(_raw_spin_trylock);
-EXPORT_SYMBOL(_raw_read_lock);
-EXPORT_SYMBOL(_raw_read_unlock);
-EXPORT_SYMBOL(_raw_write_lock);
-EXPORT_SYMBOL(_raw_write_unlock);
-#endif
 EXPORT_SYMBOL(smp_call_function);
 EXPORT_SYMBOL(smp_hw_index);
 EXPORT_SYMBOL(synchronize_irq);

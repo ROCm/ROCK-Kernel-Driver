@@ -248,26 +248,13 @@ static int serverworks_fetch_size(void)
  */
 static void serverworks_tlbflush(struct agp_memory *temp)
 {
-	unsigned long end;
+	OUTREG8(serverworks_private.registers, SVWRKS_POSTFLUSH, 1);
+	while(INREG8(serverworks_private.registers, SVWRKS_POSTFLUSH) == 1)
+		cpu_relax();
 
-	OUTREG8(serverworks_private.registers, SVWRKS_POSTFLUSH, 0x01);
-	end = jiffies + 3*HZ;
-	while(INREG8(serverworks_private.registers, 
-		     SVWRKS_POSTFLUSH) == 0x01) {
-		if((signed)(end - jiffies) <= 0) {
-			printk(KERN_ERR PFX "Posted write buffer flush took more"
-			       "then 3 seconds\n");
-		}
-	}
-	OUTREG32(serverworks_private.registers, SVWRKS_DIRFLUSH, 0x00000001);
-	end = jiffies + 3*HZ;
-	while(INREG32(serverworks_private.registers, 
-		     SVWRKS_DIRFLUSH) == 0x00000001) {
-		if((signed)(end - jiffies) <= 0) {
-			printk(KERN_ERR PFX "TLB flush took more"
-			       "then 3 seconds\n");
-		}
-	}
+	OUTREG32(serverworks_private.registers, SVWRKS_DIRFLUSH, 1);
+	while(INREG32(serverworks_private.registers, SVWRKS_DIRFLUSH) == 1)
+		cpu_relax();
 }
 
 static int serverworks_configure(void)

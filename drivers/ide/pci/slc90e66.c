@@ -21,7 +21,7 @@
 
 #include <asm/io.h>
 
-#include "slc90e66.h"
+#define DISPLAY_SLC90E66_TIMINGS
 
 #if defined(DISPLAY_SLC90E66_TIMINGS) && defined(CONFIG_PROC_FS)
 #include <linux/stat.h>
@@ -364,12 +364,19 @@ static void __init init_hwif_slc90e66 (ide_hwif_t *hwif)
 #endif /* !CONFIG_BLK_DEV_IDEDMA */
 }
 
+static ide_pci_device_t slc90e66_chipset __devinitdata = {
+	.name		= "SLC90E66",
+	.init_chipset	= init_chipset_slc90e66,
+	.init_hwif	= init_hwif_slc90e66,
+	.channels	= 2,
+	.autodma	= AUTODMA,
+	.enablebits	= {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+	.bootable	= ON_BOARD,
+};
+
 static int __devinit slc90e66_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &slc90e66_chipsets[id->driver_data];
-	if (dev->device != d->device)
-		BUG();
-	ide_setup_pci_device(dev, d);
+	ide_setup_pci_device(dev, &slc90e66_chipset);
 	return 0;
 }
 

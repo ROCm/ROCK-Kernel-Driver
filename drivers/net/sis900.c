@@ -260,9 +260,13 @@ static int __devinit sis630e_get_mac_addr(struct pci_dev * pci_dev, struct net_d
 	u8 reg;
 	int i;
 
-	if ((isa_bridge = pci_find_device(0x1039, 0x0008, isa_bridge)) == NULL) {
-		printk("%s: Can not find ISA bridge\n", net_dev->name);
-		return 0;
+	isa_bridge = pci_find_device(PCI_VENDOR_ID_SI, 0x0008, isa_bridge);
+	if (!isa_bridge) {
+		isa_bridge = pci_find_device(PCI_VENDOR_ID_SI, 0x0018, isa_bridge);
+		if (!isa_bridge) {
+			printk("%s: Can not find ISA bridge\n", net_dev->name);
+			return 0;
+		}
 	}
 	pci_read_config_byte(isa_bridge, 0x48, &reg);
 	pci_write_config_byte(isa_bridge, 0x48, reg | 0x40);
@@ -1889,7 +1893,7 @@ static struct ethtool_ops sis900_ethtool_ops = {
 static int mii_ioctl(struct net_device *net_dev, struct ifreq *rq, int cmd)
 {
 	struct sis900_private *sis_priv = net_dev->priv;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
+	struct mii_ioctl_data *data = if_mii(rq);
 
 	switch(cmd) {
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
@@ -2195,6 +2199,7 @@ static int sis900_suspend(struct pci_dev *pci_dev, u32 state)
 		return 0;
 
 	netif_stop_queue(net_dev);
+	netif_device_detach(net_dev);
 
 	/* Stop the chip's Tx and Rx Status Machine */
 	outl(RxDIS | TxDIS | inl(ioaddr + cr), ioaddr + cr);

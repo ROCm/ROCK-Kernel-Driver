@@ -474,23 +474,23 @@ int inet6_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	switch(cmd) 
 	{
 	case SIOCGSTAMP:
-		return sock_get_timestamp(sk, (struct timeval *)arg);
+		return sock_get_timestamp(sk, (struct timeval __user *)arg);
 
 	case SIOCADDRT:
 	case SIOCDELRT:
 	  
-		return(ipv6_route_ioctl(cmd,(void *)arg));
+		return(ipv6_route_ioctl(cmd,(void __user *)arg));
 
 	case SIOCSIFADDR:
-		return addrconf_add_ifaddr((void *) arg);
+		return addrconf_add_ifaddr((void __user *) arg);
 	case SIOCDIFADDR:
-		return addrconf_del_ifaddr((void *) arg);
+		return addrconf_del_ifaddr((void __user *) arg);
 	case SIOCSIFDSTADDR:
-		return addrconf_set_dstaddr((void *) arg);
+		return addrconf_set_dstaddr((void __user *) arg);
 	default:
 		if (!sk->sk_prot->ioctl ||
 		    (err = sk->sk_prot->ioctl(sk, cmd, arg)) == -ENOIOCTLCMD)
-			return(dev_ioctl(cmd,(void *) arg));		
+			return(dev_ioctl(cmd,(void __user *) arg));		
 		return err;
 	}
 	/*NOTREACHED*/
@@ -572,7 +572,7 @@ inet6_register_protosw(struct inet_protosw *p)
 
 	spin_lock_bh(&inetsw6_lock);
 
-	if (p->type > SOCK_MAX)
+	if (p->type >= SOCK_MAX)
 		goto out_illegal;
 
 	/* If we are trying to override a permanent protocol, bail. */
@@ -667,14 +667,14 @@ snmp6_mib_free(void *ptr[2])
 
 static int __init init_ipv6_mibs(void)
 {
-	if (snmp6_mib_init((void **)ipv6_statistics, sizeof (struct ipv6_mib),
-			   __alignof__(struct ipv6_mib)) < 0)
+	if (snmp6_mib_init((void **)ipv6_statistics, sizeof (struct ipstats_mib),
+			   __alignof__(struct ipstats_mib)) < 0)
 		goto err_ip_mib;
 	if (snmp6_mib_init((void **)icmpv6_statistics, sizeof (struct icmpv6_mib),
-			   __alignof__(struct ipv6_mib)) < 0)
+			   __alignof__(struct icmpv6_mib)) < 0)
 		goto err_icmp_mib;
 	if (snmp6_mib_init((void **)udp_stats_in6, sizeof (struct udp_mib),
-			   __alignof__(struct ipv6_mib)) < 0)
+			   __alignof__(struct udp_mib)) < 0)
 		goto err_udp_mib;
 	return 0;
 

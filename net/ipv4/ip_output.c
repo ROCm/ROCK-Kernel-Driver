@@ -223,8 +223,9 @@ int ip_finish_output(struct sk_buff *skb)
 		       ip_finish_output2);
 }
 
-int ip_mc_output(struct sk_buff *skb)
+int ip_mc_output(struct sk_buff **pskb)
 {
+	struct sk_buff *skb = *pskb;
 	struct sock *sk = skb->sk;
 	struct rtable *rt = (struct rtable*)skb->dst;
 	struct net_device *dev = rt->u.dst.dev;
@@ -232,7 +233,7 @@ int ip_mc_output(struct sk_buff *skb)
 	/*
 	 *	If the indicated interface is up and running, send the packet.
 	 */
-	IP_INC_STATS(IpOutRequests);
+	IP_INC_STATS(OutRequests);
 
 	skb->dev = dev;
 	skb->protocol = htons(ETH_P_IP);
@@ -283,9 +284,11 @@ int ip_mc_output(struct sk_buff *skb)
 		return ip_finish_output(skb);
 }
 
-int ip_output(struct sk_buff *skb)
+int ip_output(struct sk_buff **pskb)
 {
-	IP_INC_STATS(IpOutRequests);
+	struct sk_buff *skb = *pskb;
+
+	IP_INC_STATS(OutRequests);
 
 	if ((skb->len > dst_pmtu(skb->dst) || skb_shinfo(skb)->frag_list) &&
 	    !skb_shinfo(skb)->tso_size)
@@ -390,7 +393,7 @@ packet_routed:
 		       dst_output);
 
 no_route:
-	IP_INC_STATS(IpOutNoRoutes);
+	IP_INC_STATS(OutNoRoutes);
 	kfree_skb(skb);
 	return -EHOSTUNREACH;
 }
@@ -547,7 +550,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 		}
 
 		if (err == 0) {
-			IP_INC_STATS(IpFragOKs);
+			IP_INC_STATS(FragOKs);
 			return 0;
 		}
 
@@ -556,7 +559,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 			kfree_skb(frag);
 			frag = skb;
 		}
-		IP_INC_STATS(IpFragFails);
+		IP_INC_STATS(FragFails);
 		return err;
 	}
 
@@ -662,7 +665,7 @@ slow_path:
 		 *	Put this fragment into the sending queue.
 		 */
 
-		IP_INC_STATS(IpFragCreates);
+		IP_INC_STATS(FragCreates);
 
 		iph->tot_len = htons(len + hlen);
 
@@ -673,12 +676,12 @@ slow_path:
 			goto fail;
 	}
 	kfree_skb(skb);
-	IP_INC_STATS(IpFragOKs);
+	IP_INC_STATS(FragOKs);
 	return err;
 
 fail:
 	kfree_skb(skb); 
-	IP_INC_STATS(IpFragFails);
+	IP_INC_STATS(FragFails);
 	return err;
 }
 
@@ -975,7 +978,7 @@ alloc_new_skb:
 
 error:
 	inet->cork.length -= length;
-	IP_INC_STATS(IpOutDiscards);
+	IP_INC_STATS(OutDiscards);
 	return err; 
 }
 
@@ -1088,7 +1091,7 @@ ssize_t	ip_append_page(struct sock *sk, struct page *page,
 
 error:
 	inet->cork.length -= size;
-	IP_INC_STATS(IpOutDiscards);
+	IP_INC_STATS(OutDiscards);
 	return err;
 }
 
@@ -1198,7 +1201,7 @@ out:
 	return err;
 
 error:
-	IP_INC_STATS(IpOutDiscards);
+	IP_INC_STATS(OutDiscards);
 	goto out;
 }
 

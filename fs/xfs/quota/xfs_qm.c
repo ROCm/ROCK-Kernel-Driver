@@ -1734,7 +1734,6 @@ xfs_qm_get_rtblks(
 STATIC int
 xfs_qm_dqusage_adjust(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
-	xfs_trans_t	*tp,		/* transaction pointer - NULL */
 	xfs_ino_t	ino,		/* inode number to get data for */
 	void		*buffer,	/* not used */
 	int		ubsize,		/* not used */
@@ -1766,7 +1765,7 @@ xfs_qm_dqusage_adjust(
 	 * the case in all other instances. It's OK that we do this because
 	 * quotacheck is done only at mount time.
 	 */
-	if ((error = xfs_iget(mp, tp, ino, XFS_ILOCK_EXCL, &ip, bno))) {
+	if ((error = xfs_iget(mp, NULL, ino, XFS_ILOCK_EXCL, &ip, bno))) {
 		*res = BULKSTAT_RV_NOTHING;
 		return (error);
 	}
@@ -1903,7 +1902,7 @@ xfs_qm_quotacheck(
 		 * Iterate thru all the inodes in the file system,
 		 * adjusting the corresponding dquot counters in core.
 		 */
-		if ((error = xfs_bulkstat(mp, NULL, &lastino, &count,
+		if ((error = xfs_bulkstat(mp, &lastino, &count,
 				     xfs_qm_dqusage_adjust, NULL,
 				     structsz, NULL,
 				     BULKSTAT_FG_IGET|BULKSTAT_FG_VFSLOCKED,

@@ -58,9 +58,10 @@ rpc_unregister_sysctl(void)
 
 static int
 proc_dodebug(ctl_table *table, int write, struct file *file,
-				void *buffer, size_t *lenp)
+				void __user *buffer, size_t *lenp)
 {
-	char		tmpbuf[20], *p, c;
+	char		tmpbuf[20], c, *s;
+	char __user *p;
 	unsigned int	value;
 	size_t		left, len;
 
@@ -74,7 +75,7 @@ proc_dodebug(ctl_table *table, int write, struct file *file,
 	if (write) {
 		if (!access_ok(VERIFY_READ, buffer, left))
 			return -EFAULT;
-		p = (char *) buffer;
+		p = buffer;
 		while (left && __get_user(c, p) >= 0 && isspace(c))
 			left--, p++;
 		if (!left)
@@ -86,12 +87,12 @@ proc_dodebug(ctl_table *table, int write, struct file *file,
 			return -EFAULT;
 		tmpbuf[left] = '\0';
 
-		for (p = tmpbuf, value = 0; '0' <= *p && *p <= '9'; p++, left--)
-			value = 10 * value + (*p - '0');
-		if (*p && !isspace(*p))
+		for (s = tmpbuf, value = 0; '0' <= *s && *s <= '9'; s++, left--)
+			value = 10 * value + (*s - '0');
+		if (*s && !isspace(*s))
 			return -EINVAL;
-		while (left && isspace(*p))
-			left--, p++;
+		while (left && isspace(*s))
+			left--, s++;
 		*(unsigned int *) table->data = value;
 		/* Display the RPC tasks on writing to rpc_debug */
 		if (table->ctl_name == CTL_RPCDEBUG) {
@@ -106,7 +107,7 @@ proc_dodebug(ctl_table *table, int write, struct file *file,
 		if (__copy_to_user(buffer, tmpbuf, len))
 			return -EFAULT;
 		if ((left -= len) > 0) {
-			if (put_user('\n', (char *)buffer + len))
+			if (put_user('\n', (char __user *)buffer + len))
 				return -EFAULT;
 			left--;
 		}

@@ -10,9 +10,6 @@
 
 /* PMD_SHIFT determines the size of the area a second-level page table can map */
 #define SUN4C_PMD_SHIFT       22
-#define SUN4C_PMD_SIZE        (1UL << SUN4C_PMD_SHIFT)
-#define SUN4C_PMD_MASK        (~(SUN4C_PMD_SIZE-1))
-#define SUN4C_PMD_ALIGN(addr) (((addr)+SUN4C_PMD_SIZE-1)&SUN4C_PMD_MASK)
 
 /* PGDIR_SHIFT determines what a third-level page table entry can map */
 #define SUN4C_PGDIR_SHIFT       22

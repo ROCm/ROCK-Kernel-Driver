@@ -1185,7 +1185,7 @@ static void snd_cs4281_proc_read(snd_info_entry_t *entry,
 }
 
 static long snd_cs4281_BA0_read(snd_info_entry_t *entry, void *file_private_data,
-				struct file *file, char *buf, long count)
+				struct file *file, char __user *buf, long count)
 {
 	long size;
 	cs4281_t *chip = snd_magic_cast(cs4281_t, entry->private_data, return -ENXIO);
@@ -1202,7 +1202,7 @@ static long snd_cs4281_BA0_read(snd_info_entry_t *entry, void *file_private_data
 }
 
 static long snd_cs4281_BA1_read(snd_info_entry_t *entry, void *file_private_data,
-				struct file *file, char *buf, long count)
+				struct file *file, char __user *buf, long count)
 {
 	long size;
 	cs4281_t *chip = snd_magic_cast(cs4281_t, entry->private_data, return -ENXIO);

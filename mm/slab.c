@@ -477,10 +477,12 @@ struct cache_sizes malloc_sizes[] = {
 EXPORT_SYMBOL(malloc_sizes);
 
 /* Must match cache_sizes above. Out of line to keep cache footprint low. */
-static struct cache_names {
+struct cache_names {
 	char *name;
 	char *name_dma;
-} cache_names[] = {
+};
+
+static struct cache_names __initdata cache_names[] = {
 #define CACHE(x) { .name = "size-" #x, .name_dma = "size-" #x "(DMA)" },
 #include <linux/kmalloc_sizes.h>
 	{ 0, }
@@ -754,11 +756,9 @@ void __init kmem_cache_init(void)
 		 * eliminates "false sharing".
 		 * Note for systems short on memory removing the alignment will
 		 * allow tighter packing of the smaller caches. */
-		sizes->cs_cachep = kmem_cache_create(
-			names->name, sizes->cs_size,
-			ARCH_KMALLOC_MINALIGN, 0, NULL, NULL);
-		if (!sizes->cs_cachep)
-			BUG();
+		sizes->cs_cachep = kmem_cache_create(names->name,
+			sizes->cs_size, ARCH_KMALLOC_MINALIGN,
+			SLAB_PANIC, NULL, NULL);
 
 		/* Inc off-slab bufctl limit until the ceiling is hit. */
 		if (!(OFF_SLAB(sizes->cs_cachep))) {
@@ -766,11 +766,9 @@ void __init kmem_cache_init(void)
 			offslab_limit /= sizeof(kmem_bufctl_t);
 		}
 
-		sizes->cs_dmacachep = kmem_cache_create(
-			names->name_dma, sizes->cs_size,
-			ARCH_KMALLOC_MINALIGN, SLAB_CACHE_DMA, NULL, NULL);
-		if (!sizes->cs_dmacachep)
-			BUG();
+		sizes->cs_dmacachep = kmem_cache_create(names->name_dma,
+			sizes->cs_size, ARCH_KMALLOC_MINALIGN,
+			(SLAB_CACHE_DMA | SLAB_PANIC), NULL, NULL);
 
 		sizes++;
 		names++;

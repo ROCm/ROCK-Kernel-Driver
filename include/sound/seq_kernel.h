@@ -158,7 +158,7 @@ extern int snd_seq_create_kernel_client(snd_card_t *card, int client_index, snd_
 extern int snd_seq_delete_kernel_client(int client);
 extern int snd_seq_kernel_client_enqueue(int client, snd_seq_event_t *ev, int atomic, int hop);
 extern int snd_seq_kernel_client_dispatch(int client, snd_seq_event_t *ev, int atomic, int hop);
-extern int snd_seq_kernel_client_ctl(int client, unsigned int cmd, void __user *arg);
+extern int snd_seq_kernel_client_ctl(int client, unsigned int cmd, void *arg);
 
 #define SNDRV_SEQ_EXT_MASK	0xc0000000
 #define SNDRV_SEQ_EXT_USRPTR	0x80000000

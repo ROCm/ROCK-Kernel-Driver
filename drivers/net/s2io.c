@@ -99,45 +99,45 @@ static char s2io_gstrings[][ETH_GSTRING_LEN] = {
 };
 
 static char ethtool_stats_keys[][ETH_GSTRING_LEN] = {
-	{"tmac_frms"},
-	{"tmac_data_octets"},
-	{"tmac_drop_frms"},
-	{"tmac_mcst_frms"},
-	{"tmac_bcst_frms"},
-	{"tmac_pause_ctrl_frms"},
-	{"tmac_any_err_frms"},
-	{"tmac_vld_ip_octets"},
-	{"tmac_vld_ip"},
-	{"tmac_drop_ip"},
-	{"tmac_icmp"},
-	{"tmac_rst_tcp"},
-	{"tmac_tcp"},
-	{"tmac_udp"},
-	{"rmac_vld_frms"},
-	{"rmac_data_octets"},
-	{"rmac_fcs_err_frms"},
-	{"rmac_drop_frms"},
-	{"rmac_vld_mcst_frms"},
-	{"rmac_vld_bcst_frms"},
-	{"rmac_in_rng_len_err_frms"},
-	{"rmac_long_frms"},
-	{"rmac_pause_ctrl_frms"},
-	{"rmac_discarded_frms"},
-	{"rmac_usized_frms"},
-	{"rmac_osized_frms"},
-	{"rmac_frag_frms"},
-	{"rmac_jabber_frms"},
-	{"rmac_ip"},
-	{"rmac_ip_octets"},
-	{"rmac_hdr_err_ip"},
-	{"rmac_drop_ip"},
-	{"rmac_icmp"},
-	{"rmac_tcp"},
-	{"rmac_udp"},
-	{"rmac_err_drp_udp"},
-	{"rmac_pause_cnt"},
-	{"rmac_accepted_ip"},
-	{"rmac_err_tcp"},
+	"tmac_frms",
+	"tmac_data_octets",
+	"tmac_drop_frms",
+	"tmac_mcst_frms",
+	"tmac_bcst_frms",
+	"tmac_pause_ctrl_frms",
+	"tmac_any_err_frms",
+	"tmac_vld_ip_octets",
+	"tmac_vld_ip",
+	"tmac_drop_ip",
+	"tmac_icmp",
+	"tmac_rst_tcp",
+	"tmac_tcp",
+	"tmac_udp",
+	"rmac_vld_frms",
+	"rmac_data_octets",
+	"rmac_fcs_err_frms",
+	"rmac_drop_frms",
+	"rmac_vld_mcst_frms",
+	"rmac_vld_bcst_frms",
+	"rmac_in_rng_len_err_frms",
+	"rmac_long_frms",
+	"rmac_pause_ctrl_frms",
+	"rmac_discarded_frms",
+	"rmac_usized_frms",
+	"rmac_osized_frms",
+	"rmac_frag_frms",
+	"rmac_jabber_frms",
+	"rmac_ip",
+	"rmac_ip_octets",
+	"rmac_hdr_err_ip",
+	"rmac_drop_ip",
+	"rmac_icmp",
+	"rmac_tcp",
+	"rmac_udp",
+	"rmac_err_drp_udp",
+	"rmac_pause_cnt",
+	"rmac_accepted_ip",
+	"rmac_err_tcp",
 };
 
 #define S2IO_STAT_LEN sizeof(ethtool_stats_keys)/ ETH_GSTRING_LEN
@@ -238,7 +238,7 @@ static struct pci_driver s2io_driver = {
       name:"S2IO",
       id_table:s2io_tbl,
       probe:s2io_init_nic,
-      remove:s2io_rem_nic,
+      remove:__devexit_p(s2io_rem_nic),
 };
 
 /*  
@@ -4355,7 +4355,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 *  and free up all resource held up by the device. This could be in response 
 *  to a Hot plug event or when the driver is to be removed from memory.
 */
-static void __exit s2io_rem_nic(struct pci_dev *pdev)
+static void __devexit s2io_rem_nic(struct pci_dev *pdev)
 {
 	struct net_device *dev =
 	    (struct net_device *) pci_get_drvdata(pdev);

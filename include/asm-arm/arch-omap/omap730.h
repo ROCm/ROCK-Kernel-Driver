@@ -105,8 +105,8 @@
  * OMAP730 PCC_UPLD configuration registers
  * ----------------------------------------------------------------------------
  */
-#define OMAP730_PCC_UPLD_CTRL_REG_BASE	(0xfffe0900)
-#define OMAP730_PCC_UPLD_CTRL_REG	(OMAP730_PCC_UPLD_CTRL_REG_BASE + 0x00)
+#define OMAP730_PCC_UPLD_CTRL_BASE	(0xfffe0900)
+#define OMAP730_PCC_UPLD_CTRL		(OMAP730_PCC_UPLD_CTRL_BASE + 0x00)
 
 #endif /*  __ASM_ARCH_OMAP730_H */
 

@@ -661,8 +661,7 @@ interrupt_base:
 	NORMAL_EXCEPTION_PROLOG
 	mr      r4,r12                  /* Pass SRR0 as arg2 */
 	li      r5,0                    /* Pass zero as arg3 */
-	addi    r3,r1,STACK_FRAME_OVERHEAD
-	EXC_XFER_EE_LITE(0x0400, do_page_fault)
+	EXC_XFER_EE_LITE(0x0400, handle_page_fault)
 
 	/* External Input Interrupt */
 	EXCEPTION(0x0500, ExternalInput, do_IRQ, EXC_XFER_LITE)
@@ -914,9 +913,7 @@ data_access:
 	mfspr	r5,SPRN_ESR		/* Grab the ESR, save it, pass arg3 */
 	stw	r5,_ESR(r11)
 	mfspr	r4,SPRN_DEAR		/* Grab the DEAR, save it, pass arg2 */
-	stw	r4,_DEAR(r11)
-	addi	r3,r1,STACK_FRAME_OVERHEAD
-	EXC_XFER_EE_LITE(0x0300, do_page_fault)
+	EXC_XFER_EE_LITE(0x0300, handle_page_fault)
 
 /*
 

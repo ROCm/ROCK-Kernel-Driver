@@ -509,7 +509,7 @@ probe_interrupts:
 		fill_ebus_child(node, &regs[0],
 				child, child_regs_nonstandard(dev));
 
-		while ((node = prom_getsibling(node))) {
+		while ((node = prom_getsibling(node)) != 0) {
 			child->next = ebus_alloc(sizeof(struct linux_ebus_child));
 
 			child = child->next;
@@ -611,7 +611,7 @@ void __init ebus_init(void)
 		dev->bus = ebus;
 		fill_ebus_device(nd, dev);
 
-		while ((nd = prom_getsibling(nd))) {
+		while ((nd = prom_getsibling(nd)) != 0) {
 			dev->next = ebus_alloc(sizeof(struct linux_ebus_device));
 
 			dev = dev->next;

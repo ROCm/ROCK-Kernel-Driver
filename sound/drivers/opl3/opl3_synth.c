@@ -94,6 +94,7 @@ int snd_opl3_ioctl(snd_hwdep_t * hw, struct file *file,
 		   unsigned int cmd, unsigned long arg)
 {
 	opl3_t *opl3 = snd_magic_cast(opl3_t, hw->private_data, return -ENXIO);
+	void __user *argp = (void __user *)arg;
 
 	snd_assert(opl3 != NULL, return -EINVAL);
 
@@ -105,7 +106,7 @@ int snd_opl3_ioctl(snd_hwdep_t * hw, struct file *file,
 
 			info.fm_mode = opl3->fm_mode;
 			info.rhythm = opl3->rhythm;
-			if (copy_to_user((snd_dm_fm_info_t *) arg, &info, sizeof(snd_dm_fm_info_t)))
+			if (copy_to_user(argp, &info, sizeof(snd_dm_fm_info_t)))
 				return -EFAULT;
 			return 0;
 		}
@@ -123,7 +124,7 @@ int snd_opl3_ioctl(snd_hwdep_t * hw, struct file *file,
 #endif
 		{
 			snd_dm_fm_note_t note;
-			if (copy_from_user(&note, (snd_dm_fm_note_t *) arg, sizeof(snd_dm_fm_note_t)))
+			if (copy_from_user(&note, argp, sizeof(snd_dm_fm_note_t)))
 				return -EFAULT;
 			return snd_opl3_play_note(opl3, &note);
 		}
@@ -134,7 +135,7 @@ int snd_opl3_ioctl(snd_hwdep_t * hw, struct file *file,
 #endif
 		{
 			snd_dm_fm_voice_t voice;
-			if (copy_from_user(&voice, (snd_dm_fm_voice_t *) arg, sizeof(snd_dm_fm_voice_t)))
+			if (copy_from_user(&voice, argp, sizeof(snd_dm_fm_voice_t)))
 				return -EFAULT;
 			return snd_opl3_set_voice(opl3, &voice);
 		}
@@ -145,7 +146,7 @@ int snd_opl3_ioctl(snd_hwdep_t * hw, struct file *file,
 #endif
 		{
 			snd_dm_fm_params_t params;
-			if (copy_from_user(&params, (snd_dm_fm_params_t *) arg, sizeof(snd_dm_fm_params_t)))
+			if (copy_from_user(&params, argp, sizeof(snd_dm_fm_params_t)))
 				return -EFAULT;
 			return snd_opl3_set_params(opl3, &params);
 		}

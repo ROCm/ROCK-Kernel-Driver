@@ -1359,7 +1359,7 @@ determine_cpu_caches (unsigned int cpu_type)
 		L1I = L1D = CSHAPE(8*1024, 5, 1);
 		L3 = -1;
 
-		car = *(vuip) phys_to_virt (0x120000078);
+		car = *(vuip) phys_to_virt (0x120000078UL);
 		size = 64*1024 * (1 << ((car >> 5) & 7));
 		/* No typo -- 8 byte cacheline size.  Whodathunk.  */
 		L2 = (car & 1 ? CSHAPE (size, 3, 1) : -1);
@@ -1374,7 +1374,7 @@ determine_cpu_caches (unsigned int cpu_type)
 		L1I = L1D = CSHAPE(8*1024, 5, 1);
 
 		/* Check the line size of the Scache.  */
-		sc_ctl = *(vulp) phys_to_virt (0xfffff000a8);
+		sc_ctl = *(vulp) phys_to_virt (0xfffff000a8UL);
 		width = sc_ctl & 0x1000 ? 6 : 5;
 		L2 = CSHAPE (96*1024, width, 3);
 
@@ -1406,7 +1406,7 @@ determine_cpu_caches (unsigned int cpu_type)
 		}
 		L3 = -1;
 
-		cbox_config = *(vulp) phys_to_virt (0xfffff00008);
+		cbox_config = *(vulp) phys_to_virt (0xfffff00008UL);
 		size = 512*1024 * (1 << ((cbox_config >> 12) & 3));
 
 #if 0

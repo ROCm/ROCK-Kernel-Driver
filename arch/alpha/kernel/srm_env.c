@@ -132,7 +132,7 @@ srm_env_read(char *page, char **start, off_t off, int count, int *eof,
 
 
 static int
-srm_env_write(struct file *file, const char *buffer, unsigned long count,
+srm_env_write(struct file *file, const char __user *buffer, unsigned long count,
 		void *data)
 {
 	int res;

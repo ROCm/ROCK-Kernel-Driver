@@ -1529,12 +1529,11 @@ static struct ethtool_ops ioc3_ethtool_ops = {
 
 static int ioc3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
 	struct ioc3_private *ip = netdev_priv(dev);
 	int rc;
 
 	spin_lock_irq(&ip->ioc3_lock);
-	rc = generic_mii_ioctl(&ip->mii, data, cmd, NULL);
+	rc = generic_mii_ioctl(&ip->mii, if_mii(rq), cmd, NULL);
 	spin_unlock_irq(&ip->ioc3_lock);
 
 	return rc;

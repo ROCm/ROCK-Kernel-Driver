@@ -439,6 +439,7 @@ static inline _syscall3(int, execve, __const__ char *, file, char **, argv,
 #define __ARCH_WANT_SYS_OLDUMOUNT
 #define __ARCH_WANT_SYS_SIGPENDING
 #define __ARCH_WANT_SYS_SIGPROCMASK
+#define __ARCH_WANT_SYS_RT_SIGACTION
 
 unsigned long sys_mmap(unsigned long addr, size_t len, unsigned long prot,
 		       unsigned long flags, unsigned long fd, off_t offset);
@@ -455,7 +456,7 @@ int sys_fork(unsigned long p1, unsigned long p2, unsigned long p3,
 int sys_vfork(unsigned long p1, unsigned long p2, unsigned long p3,
 		unsigned long p4, unsigned long p5, unsigned long p6,
 		struct pt_regs *regs);
-int sys_pipe(int *fildes);
+int sys_pipe(int __user *fildes);
 int sys_ptrace(long request, long pid, long addr, long data);
 struct sigaction;
 long sys_rt_sigaction(int sig, const struct sigaction __user *act,

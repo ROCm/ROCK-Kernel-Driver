@@ -207,7 +207,7 @@ extern struct net_device *rose_dev_get(rose_address *);
 extern struct rose_route *rose_route_free_lci(unsigned int, struct rose_neigh *);
 extern struct net_device *rose_ax25_dev_get(char *);
 extern struct rose_neigh *rose_get_neigh(rose_address *, unsigned char *, unsigned char *);
-extern int  rose_rt_ioctl(unsigned int, void *);
+extern int  rose_rt_ioctl(unsigned int, void __user *);
 extern void rose_link_failed(ax25_cb *, int);
 extern int  rose_route_frame(struct sk_buff *, ax25_cb *);
 extern void rose_rt_free(void);

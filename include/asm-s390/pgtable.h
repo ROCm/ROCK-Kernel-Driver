@@ -580,11 +580,15 @@ static inline void ptep_mkdirty(pte_t *ptep)
 
 static inline void
 ptep_establish(struct vm_area_struct *vma, 
-	       unsigned long address, pte_t *ptep, pte_t entry)
+	       unsigned long address, pte_t *ptep,
+	       pte_t entry)
 {
 	ptep_clear_flush(vma, address, ptep);
 	set_pte(ptep, entry);
 }
+
+#define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
+	ptep_establish(__vma, __address, __ptep, __entry)
 
 /*
  * Test and clear dirty bit in storage key.
@@ -783,6 +787,7 @@ extern inline pte_t mk_swap_pte(unsigned long type, unsigned long offset)
 #define pgtable_cache_init()	do { } while (0)
 
 #define __HAVE_ARCH_PTEP_ESTABLISH
+#define __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
 #define __HAVE_ARCH_PTEP_CLEAR_YOUNG_FLUSH
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY

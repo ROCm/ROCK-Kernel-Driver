@@ -256,7 +256,7 @@ out:
 /*
  * We use a normal struct rtentry for route handling
  */
-int ipxrtr_ioctl(unsigned int cmd, void *arg)
+int ipxrtr_ioctl(unsigned int cmd, void __user *arg)
 {
 	struct rtentry rt;	/* Use these to behave like 'other' stacks */
 	struct sockaddr_ipx *sg, *st;

@@ -565,7 +565,7 @@ static int mpc_send_packet(struct sk_buff *skb, struct net_device *dev)
 	return retval;
 }
 
-int atm_mpoa_vcc_attach(struct atm_vcc *vcc, long arg)
+int atm_mpoa_vcc_attach(struct atm_vcc *vcc, void __user *arg)
 {
 	int bytes_left;
 	struct mpoa_client *mpc;
@@ -574,7 +574,7 @@ int atm_mpoa_vcc_attach(struct atm_vcc *vcc, long arg)
 	uint32_t  ipaddr;
 	unsigned char *ip;
 
-	bytes_left = copy_from_user(&ioc_data, (void *)arg, sizeof(struct atmmpc_ioc));
+	bytes_left = copy_from_user(&ioc_data, arg, sizeof(struct atmmpc_ioc));
 	if (bytes_left != 0) {
 		printk("mpoa: mpc_vcc_attach: Short read (missed %d bytes) from userland\n", bytes_left);
 		return -EFAULT;
@@ -1366,7 +1366,7 @@ static void clean_up(struct k_message *msg, struct mpoa_client *mpc, int action)
 	return;
 }
 
-static void mpc_timer_refresh()
+static void mpc_timer_refresh(void)
 {
 	mpc_timer.expires = jiffies + (MPC_P2 * HZ);
 	mpc_timer.data = mpc_timer.expires;
@@ -1418,7 +1418,7 @@ static int atm_mpoa_ioctl(struct socket *sock, unsigned int cmd, unsigned long a
 				sock->state = SS_CONNECTED;
 			break;
 		case ATMMPC_DATA:
-			err = atm_mpoa_vcc_attach(vcc, arg);
+			err = atm_mpoa_vcc_attach(vcc, (void __user *)arg);
 			break;
 		default:
 			break;

@@ -332,8 +332,8 @@ void start_thread(struct pt_regs *regs, unsigned long fdptr, unsigned long sp)
          * entry is the TOC value we need to use.
          */
 	set_fs(USER_DS);
-	__get_user(entry, (unsigned long *)fdptr);
-	__get_user(toc, (unsigned long *)fdptr+1);
+	__get_user(entry, (unsigned long __user *)fdptr);
+	__get_user(toc, (unsigned long __user *)fdptr+1);
 
 	/* Check whether the e_entry function descriptor entries
 	 * need to be relocated before we can use them.
@@ -386,7 +386,7 @@ int get_fpexc_mode(struct task_struct *tsk, unsigned long adr)
 	unsigned int val;
 
 	val = __unpack_fe01(tsk->thread.fpexc_mode);
-	return put_user(val, (unsigned int *) adr);
+	return put_user(val, (unsigned int __user *) adr);
 }
 
 int sys_clone(unsigned long clone_flags, unsigned long p2, unsigned long p3,
@@ -410,7 +410,7 @@ int sys_clone(unsigned long clone_flags, unsigned long p2, unsigned long p3,
 	}
 
 	return do_fork(clone_flags & ~CLONE_IDLETASK, p2, regs, 0,
-		    (int *)parent_tidptr, (int *)child_tidptr);
+		    (int __user *)parent_tidptr, (int __user *)child_tidptr);
 }
 
 int sys_fork(unsigned long p1, unsigned long p2, unsigned long p3,
@@ -435,7 +435,7 @@ int sys_execve(unsigned long a0, unsigned long a1, unsigned long a2,
 	int error;
 	char * filename;
 	
-	filename = getname((char *) a0);
+	filename = getname((char __user *) a0);
 	error = PTR_ERR(filename);
 	if (IS_ERR(filename))
 		goto out;
@@ -445,7 +445,8 @@ int sys_execve(unsigned long a0, unsigned long a1, unsigned long a2,
 	if (regs->msr & MSR_VEC)
 		giveup_altivec(current);
 #endif /* CONFIG_ALTIVEC */
-	error = do_execve(filename, (char **) a1, (char **) a2, regs);
+	error = do_execve(filename, (char __user * __user *) a1,
+				    (char __user * __user *) a2, regs);
   
 	if (error == 0)
 		current->ptrace &= ~PT_DTRACE;
@@ -457,16 +458,28 @@ out:
 
 static int kstack_depth_to_print = 64;
 
-static inline int validate_sp(unsigned long sp, struct task_struct *p)
+static int validate_sp(unsigned long sp, struct task_struct *p,
+		       unsigned long nbytes)
 {
 	unsigned long stack_page = (unsigned long)p->thread_info;
 
-	if (sp < stack_page + sizeof(struct thread_struct))
-		return 0;
-	if (sp >= stack_page + THREAD_SIZE)
-		return 0;
+	if (sp >= stack_page + sizeof(struct thread_struct)
+	    && sp <= stack_page + THREAD_SIZE - nbytes)
+		return 1;
 
-	return 1;
+#ifdef CONFIG_IRQSTACKS
+	stack_page = (unsigned long) hardirq_ctx[task_cpu(p)];
+	if (sp >= stack_page + sizeof(struct thread_struct)
+	    && sp <= stack_page + THREAD_SIZE - nbytes)
+		return 1;
+
+	stack_page = (unsigned long) softirq_ctx[task_cpu(p)];
+	if (sp >= stack_page + sizeof(struct thread_struct)
+	    && sp <= stack_page + THREAD_SIZE - nbytes)
+		return 1;
+#endif
+
+	return 0;
 }
 
 unsigned long get_wchan(struct task_struct *p)
@@ -478,12 +491,12 @@ unsigned long get_wchan(struct task_struct *p)
 		return 0;
 
 	sp = p->thread.ksp;
-	if (!validate_sp(sp, p))
+	if (!validate_sp(sp, p, 112))
 		return 0;
 
 	do {
 		sp = *(unsigned long *)sp;
-		if (!validate_sp(sp, p))
+		if (!validate_sp(sp, p, 112))
 			return 0;
 		if (count > 0) {
 			ip = *(unsigned long *)(sp + 16);
@@ -496,9 +509,10 @@ unsigned long get_wchan(struct task_struct *p)
 
 void show_stack(struct task_struct *p, unsigned long *_sp)
 {
-	unsigned long ip;
+	unsigned long ip, newsp, lr;
 	int count = 0;
 	unsigned long sp = (unsigned long)_sp;
+	int firstframe = 1;
 
 	if (sp == 0) {
 		if (p) {
@@ -509,17 +523,40 @@ void show_stack(struct task_struct *p, unsigned long *_sp)
 		}
 	}
 
-	if (!validate_sp(sp, p))
-		return;
-
+	lr = 0;
 	printk("Call Trace:\n");
 	do {
-		sp = *(unsigned long *)sp;
-		if (!validate_sp(sp, p))
+		if (!validate_sp(sp, p, 112))
 			return;
-		ip = *(unsigned long *)(sp + 16);
-		printk("[%016lx] ", ip);
-		print_symbol("%s\n", ip);
+
+		_sp = (unsigned long *) sp;
+		newsp = _sp[0];
+		ip = _sp[2];
+		if (!firstframe || ip != lr) {
+			printk("[%016lx] [%016lx] ", sp, ip);
+			print_symbol("%s", ip);
+			if (firstframe)
+				printk(" (unreliable)");
+			printk("\n");
+		}
+		firstframe = 0;
+
+		/*
+		 * See if this is an exception frame.
+		 * We look for the "regshere" marker in the current frame.
+		 */
+		if (validate_sp(sp, p, sizeof(struct pt_regs) + 400)
+		    && _sp[12] == 0x7265677368657265ul) {
+			struct pt_regs *regs = (struct pt_regs *)
+				(sp + STACK_FRAME_OVERHEAD);
+			printk("--- Exception: %lx", regs->trap);
+			print_symbol(" at %s\n", regs->nip);
+			lr = regs->link;
+			print_symbol("    LR = %s\n", lr);
+			firstframe = 1;
+		}
+
+		sp = newsp;
 	} while (count++ < kstack_depth_to_print);
 }
 

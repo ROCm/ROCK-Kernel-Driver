@@ -31,7 +31,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "cs5530.h"
+#define DISPLAY_CS5530_TIMINGS
 
 #if defined(DISPLAY_CS5530_TIMINGS) && defined(CONFIG_PROC_FS)
 #include <linux/stat.h>
@@ -404,12 +404,19 @@ static void __init init_hwif_cs5530 (ide_hwif_t *hwif)
 	hwif->drives[1].autodma = hwif->autodma;
 }
 
+static ide_pci_device_t cs5530_chipset __devinitdata = {
+	.name		= "CS5530",
+	.init_chipset	= init_chipset_cs5530,
+	.init_hwif	= init_hwif_cs5530,
+	.channels	= 2,
+	.autodma	= AUTODMA,
+	.bootable	= ON_BOARD,
+	.flags		= IDEPCI_FLAG_FORCE_MASTER,
+};
+
 static int __devinit cs5530_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &cs5530_chipsets[id->driver_data];
-	if (dev->device != d->device)
-		BUG();
-	ide_setup_pci_device(dev, d);
+	ide_setup_pci_device(dev, &cs5530_chipset);
 	return 0;
 }
 

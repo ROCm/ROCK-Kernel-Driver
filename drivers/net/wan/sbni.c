@@ -1342,7 +1342,7 @@ sbni_ioctl( struct net_device  *dev,  struct ifreq  *ifr,  int  cmd )
 			return  -EPERM;
 
 		spin_lock( &nl->lock );
-		flags = *(struct sbni_flags*) &ifr->ifr_data;
+		flags = *(struct sbni_flags*) &ifr->ifr_ifru;
 		if( flags.fixed_rxl )
 			nl->delta_rxl = 0,
 			nl->cur_rxl_index = flags.rxl;

@@ -82,9 +82,9 @@ void reset_coda_cache_inv_stats( void );
  * data structure for /proc/sys/... files 
  */
 int do_reset_coda_vfs_stats( ctl_table * table, int write, struct file * filp,
-			     void * buffer, size_t * lenp );
+			     void __user * buffer, size_t * lenp );
 int do_reset_coda_cache_inv_stats( ctl_table * table, int write, 
-				   struct file * filp, void * buffer, 
+				   struct file * filp, void __user * buffer, 
 				   size_t * lenp );
 
 /* these functions are called to form the content of /proc/fs/coda/... files */

@@ -94,10 +94,12 @@ extern void __ret_efault(void);
  */
 #define put_user(x,ptr) ({ \
 unsigned long __pu_addr = (unsigned long)(ptr); \
+__chk_user_ptr(ptr); \
 __put_user_check((__typeof__(*(ptr)))(x),__pu_addr,sizeof(*(ptr))); })
 
 #define get_user(x,ptr) ({ \
 unsigned long __gu_addr = (unsigned long)(ptr); \
+__chk_user_ptr(ptr); \
 __get_user_check((x),__gu_addr,sizeof(*(ptr)),__typeof__(*(ptr))); })
 
 /*
@@ -292,32 +294,32 @@ __asm__ __volatile__(							\
 
 extern int __get_user_bad(void);
 
-extern unsigned long __copy_user(void *to, const void *from, unsigned long size);
+extern unsigned long __copy_user(void __user *to, const void __user *from, unsigned long size);
 
 static inline unsigned long copy_to_user(void __user *to, const void *from, unsigned long n)
 {
 	if (n && __access_ok((unsigned long) to, n))
-		return __copy_user((void *) to, from, n);
+		return __copy_user(to, (void __user *) from, n);
 	else
 		return n;
 }
 
 static inline unsigned long __copy_to_user(void __user *to, const void *from, unsigned long n)
 {
-	return __copy_user((void *)to, from, n);
+	return __copy_user(to, (void __user *) from, n);
 }
 
 static inline unsigned long copy_from_user(void *to, const void __user *from, unsigned long n)
 {
 	if (n && __access_ok((unsigned long) from, n))
-		return __copy_user(to, (void *) from, n);
+		return __copy_user((void __user *) to, from, n);
 	else
 		return n;
 }
 
 static inline unsigned long __copy_from_user(void *to, const void __user *from, unsigned long n)
 {
-	return __copy_user(to, (void *)from, n);
+	return __copy_user((void __user *) to, from, n);
 }
 
 static inline unsigned long __clear_user(void __user *addr, unsigned long size)

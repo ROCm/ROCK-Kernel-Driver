@@ -527,7 +527,7 @@ done:
 }
 
 int ip6_mc_msfget(struct sock *sk, struct group_filter *gsf,
-	struct group_filter *optval, int *optlen)
+	struct group_filter __user *optval, int __user *optlen)
 {
 	int err, i, count, copycount;
 	struct in6_addr *group;
@@ -569,7 +569,7 @@ int ip6_mc_msfget(struct sock *sk, struct group_filter *gsf,
 	copycount = count < gsf->gf_numsrc ? count : gsf->gf_numsrc;
 	gsf->gf_numsrc = count;
 	if (put_user(GROUP_FILTER_SIZE(copycount), optlen) ||
-	    copy_to_user((void *)optval, gsf, GROUP_FILTER_SIZE(0))) {
+	    copy_to_user(optval, gsf, GROUP_FILTER_SIZE(0))) {
 		return -EFAULT;
 	}
 	for (i=0; i<copycount; i++) {
@@ -580,7 +580,7 @@ int ip6_mc_msfget(struct sock *sk, struct group_filter *gsf,
 		memset(&ss, 0, sizeof(ss));
 		psin6->sin6_family = AF_INET6;
 		psin6->sin6_addr = psl->sl_addr[i];
-	    	if (copy_to_user((void *)&optval->gf_slist[i], &ss, sizeof(ss)))
+	    	if (copy_to_user(&optval->gf_slist[i], &ss, sizeof(ss)))
 			return -EFAULT;
 	}
 	return 0;
@@ -1317,7 +1317,7 @@ static void mld_sendpack(struct sk_buff *skb)
 	struct inet6_dev *idev = in6_dev_get(skb->dev);
 	int err;
 
-	IP6_INC_STATS(Ip6OutRequests);
+	IP6_INC_STATS(OutRequests);
 	payload_len = skb->tail - (unsigned char *)skb->nh.ipv6h -
 		sizeof(struct ipv6hdr);
 	mldlen = skb->tail - skb->h.raw;
@@ -1329,9 +1329,9 @@ static void mld_sendpack(struct sk_buff *skb)
 		dev_queue_xmit);
 	if (!err) {
 		ICMP6_INC_STATS(idev,Icmp6OutMsgs);
-		IP6_INC_STATS(Ip6OutMcastPkts);
+		IP6_INC_STATS(OutMcastPkts);
 	} else
-		IP6_INC_STATS(Ip6OutDiscards);
+		IP6_INC_STATS(OutDiscards);
 
 	if (likely(idev != NULL))
 		in6_dev_put(idev);
@@ -1613,7 +1613,7 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 		     IPV6_TLV_ROUTERALERT, 2, 0, 0,
 		     IPV6_TLV_PADN, 0 };
 
-	IP6_INC_STATS(Ip6OutRequests);
+	IP6_INC_STATS(OutRequests);
 	snd_addr = addr;
 	if (type == ICMPV6_MGM_REDUCTION) {
 		snd_addr = &all_routers;
@@ -1627,7 +1627,7 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 	skb = sock_alloc_send_skb(sk, LL_RESERVED_SPACE(dev) + full_len, 1, &err);
 
 	if (skb == NULL) {
-		IP6_INC_STATS(Ip6OutDiscards);
+		IP6_INC_STATS(OutDiscards);
 		return;
 	}
 
@@ -1672,16 +1672,16 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 		else
 			ICMP6_INC_STATS(idev, Icmp6OutGroupMembResponses);
 		ICMP6_INC_STATS(idev, Icmp6OutMsgs);
-		IP6_INC_STATS(Ip6OutMcastPkts);
+		IP6_INC_STATS(OutMcastPkts);
 	} else
-		IP6_INC_STATS(Ip6OutDiscards);
+		IP6_INC_STATS(OutDiscards);
 
 	if (likely(idev != NULL))
 		in6_dev_put(idev);
 	return;
 
 out:
-	IP6_INC_STATS(Ip6OutDiscards);
+	IP6_INC_STATS(OutDiscards);
 	kfree_skb(skb);
 }
 

@@ -237,9 +237,9 @@ struct cdrom_read
 struct cdrom_read_audio
 {
 	union cdrom_addr addr; /* frame address */
-	__u8 addr_format;    /* CDROM_LBA or CDROM_MSF */
+	__u8 addr_format;      /* CDROM_LBA or CDROM_MSF */
 	int nframes;           /* number of 2352-byte-frames to read at once */
-	__u8 *buf;           /* frame buffer (size: nframes*2352 bytes) */
+	__u8 __user *buf;      /* frame buffer (size: nframes*2352 bytes) */
 };
 
 /* This struct is used with the CDROMMULTISESSION ioctl */
@@ -280,16 +280,15 @@ struct cdrom_blk
 struct cdrom_generic_command
 {
 	unsigned char 		cmd[CDROM_PACKET_SIZE];
-	unsigned char 		*buffer;
+	unsigned char		__user *buffer;
 	unsigned int 		buflen;
 	int			stat;
-	struct request_sense	*sense;
+	struct request_sense	__user *sense;
 	unsigned char		data_direction;
 	int			quiet;
 	int			timeout;
-	void			*reserved[1];
+	void			__user *reserved[1];	/* unused, actually */
 };
-
 
 /*
  * A CD-ROM physical sector size is 2048, 2052, 2056, 2324, 2332, 2336, 
@@ -907,6 +906,19 @@ struct mode_page_header {
 #include <linux/fs.h>		/* not really needed, later.. */
 #include <linux/device.h>
 
+struct packet_command
+{
+	unsigned char 		cmd[CDROM_PACKET_SIZE];
+	unsigned char 		*buffer;
+	unsigned int 		buflen;
+	int			stat;
+	struct request_sense	*sense;
+	unsigned char		data_direction;
+	int			quiet;
+	int			timeout;
+	void			*reserved[1];
+};
+
 /*
  * _OLD will use PIO transfer on atapi devices, _BPC_* will use DMA
  */
@@ -965,7 +977,7 @@ struct cdrom_device_ops {
 	int n_minors;           /* number of active minor devices */
 	/* handle uniform packets for scsi type devices (scsi,atapi) */
 	int (*generic_packet) (struct cdrom_device_info *,
-			       struct cdrom_generic_command *);
+			       struct packet_command *);
 };
 
 /* the general block_device operations structure: */
@@ -990,11 +1002,11 @@ typedef struct {
 extern int cdrom_get_last_written(struct cdrom_device_info *cdi, long *last_written);
 extern int cdrom_number_of_slots(struct cdrom_device_info *cdi);
 extern int cdrom_mode_select(struct cdrom_device_info *cdi,
-			     struct cdrom_generic_command *cgc);
+			     struct packet_command *cgc);
 extern int cdrom_mode_sense(struct cdrom_device_info *cdi,
-			    struct cdrom_generic_command *cgc,
+			    struct packet_command *cgc,
 			    int page_code, int page_control);
-extern void init_cdrom_command(struct cdrom_generic_command *cgc,
+extern void init_cdrom_command(struct packet_command *cgc,
 			       void *buffer, int len, int type);
 
 /* The SCSI spec says there could be 256 slots. */

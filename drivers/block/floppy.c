@@ -3079,19 +3079,19 @@ static int user_reset_fdc(int drive, int arg, int interruptible)
  * Misc Ioctl's and support
  * ========================
  */
-static inline int fd_copyout(void *param, const void *address,
+static inline int fd_copyout(void __user *param, const void *address,
 			     unsigned long size)
 {
 	return copy_to_user(param, address, size) ? -EFAULT : 0;
 }
 
-static inline int fd_copyin(void *param, void *address, unsigned long size)
+static inline int fd_copyin(void __user *param, void *address, unsigned long size)
 {
 	return copy_from_user(address, param, size) ? -EFAULT : 0;
 }
 
-#define _COPYOUT(x) (copy_to_user((void *)param, &(x), sizeof(x)) ? -EFAULT : 0)
-#define _COPYIN(x) (copy_from_user(&(x), (void *)param, sizeof(x)) ? -EFAULT : 0)
+#define _COPYOUT(x) (copy_to_user((void __user *)param, &(x), sizeof(x)) ? -EFAULT : 0)
+#define _COPYIN(x) (copy_from_user(&(x), (void __user *)param, sizeof(x)) ? -EFAULT : 0)
 
 #define COPYOUT(x) ECALL(_COPYOUT(x))
 #define COPYIN(x) ECALL(_COPYIN(x))
@@ -3166,7 +3166,7 @@ static struct cont_t raw_cmd_cont = {
 	.done		= raw_cmd_done
 };
 
-static inline int raw_cmd_copyout(int cmd, char *param,
+static inline int raw_cmd_copyout(int cmd, char __user *param,
 				  struct floppy_raw_cmd *ptr)
 {
 	int ret;
@@ -3204,7 +3204,7 @@ static void raw_cmd_free(struct floppy_raw_cmd **ptr)
 	}
 }
 
-static inline int raw_cmd_copyin(int cmd, char *param,
+static inline int raw_cmd_copyin(int cmd, char __user *param,
 				 struct floppy_raw_cmd **rcmd)
 {
 	struct floppy_raw_cmd *ptr;
@@ -3258,7 +3258,7 @@ static inline int raw_cmd_copyin(int cmd, char *param,
 	}
 }
 
-static int raw_cmd_ioctl(int cmd, void *param)
+static int raw_cmd_ioctl(int cmd, void __user *param)
 {
 	int drive, ret, ret2;
 	struct floppy_raw_cmd *my_raw_cmd;
@@ -3508,7 +3508,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 	/* copyin */
 	CLEARSTRUCT(&inparam);
 	if (_IOC_DIR(cmd) & _IOC_WRITE)
-	    ECALL(fd_copyin((void *)param, &inparam, size))
+	    ECALL(fd_copyin((void __user *)param, &inparam, size))
 
 		switch (cmd) {
 		case FDEJECT:
@@ -3604,7 +3604,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 				return -EINVAL;
 			LOCK_FDC(drive, 1);
 			set_floppy(drive);
-			CALL(i = raw_cmd_ioctl(cmd, (void *)param));
+			CALL(i = raw_cmd_ioctl(cmd, (void __user *)param));
 			process_fd_request();
 			return i;
 
@@ -3619,7 +3619,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 		}
 
 	if (_IOC_DIR(cmd) & _IOC_READ)
-		return fd_copyout((void *)param, outparam, size);
+		return fd_copyout((void __user *)param, outparam, size);
 	else
 		return 0;
 #undef OUT
@@ -4238,7 +4238,7 @@ int __init floppy_init(void)
 		}
 
 		disks[dr]->major = FLOPPY_MAJOR;
-		disks[dr]->first_minor = TOMINOR(i);
+		disks[dr]->first_minor = TOMINOR(dr);
 		disks[dr]->fops = &floppy_fops;
 		sprintf(disks[dr]->disk_name, "fd%d", dr);
 

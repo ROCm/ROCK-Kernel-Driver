@@ -148,7 +148,7 @@ struct lec_vcc_priv {
 #define LEC_VCC_PRIV(vcc)	((struct lec_vcc_priv *)((vcc)->user_back))
 
 int lecd_attach(struct atm_vcc *vcc, int arg);
-int lec_vcc_attach(struct atm_vcc *vcc, void *arg);
+int lec_vcc_attach(struct atm_vcc *vcc, void __user *arg);
 int lec_mcast_attach(struct atm_vcc *vcc, int arg);
 struct net_device *get_dev_lec(int itf);
 int make_lec(struct atm_vcc *vcc);

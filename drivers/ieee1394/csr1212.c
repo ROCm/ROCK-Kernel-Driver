@@ -206,7 +206,9 @@ struct csr1212_csr *csr1212_create_csr(struct csr1212_bus_ops *ops,
 void csr1212_init_local_csr(struct csr1212_csr *csr,
 			    const u_int32_t *bus_info_data, int max_rom)
 {
-	csr->max_rom = max_rom;
+	static const int mr_map[] = { 4, 64, 1024, 0 };
+
+	csr->max_rom = mr_map[max_rom];
 	memcpy(csr->bus_info_data, bus_info_data, csr->bus_info_len);
 }
 
@@ -1059,6 +1061,10 @@ void csr1212_fill_cache(struct csr1212_csr_rom_cache *cache)
 		}
 
 		nkv = kv->next;
+		if (kv->prev)
+			kv->prev->next = NULL;
+		if (kv->next)
+			kv->next->prev = NULL;
 		kv->prev = NULL;
 		kv->next = NULL;
 	}
@@ -1132,7 +1138,7 @@ int csr1212_generate_csr_image(struct csr1212_csr *csr)
 			/* Make sure the Extended ROM leaf is a multiple of
 			 * max_rom in size. */
 			leaf_size = (cache->len + (csr->max_rom - 1)) &
-				(csr->max_rom - 1);
+				~(csr->max_rom - 1);
 
 			/* Zero out the unused ROM region */
 			memset(cache->data + bytes_to_quads(cache->len), 0x00,

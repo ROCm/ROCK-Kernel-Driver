@@ -461,8 +461,9 @@ static int sonypi_misc_open(struct inode * inode, struct file * file) {
 	return 0;
 }
 
-static ssize_t sonypi_misc_read(struct file * file, char * buf, 
-		                size_t count, loff_t *pos) {
+static ssize_t sonypi_misc_read(struct file * file, char __user * buf,
+			size_t count, loff_t *pos)
+{
 	DECLARE_WAITQUEUE(wait, current);
 	ssize_t i = count;
 	unsigned char c;
@@ -504,6 +505,7 @@ static unsigned int sonypi_misc_poll(struct file *file, poll_table * wait) {
 static int sonypi_misc_ioctl(struct inode *ip, struct file *fp, 
 			     unsigned int cmd, unsigned long arg) {
 	int ret = 0;
+	void __user *argp = (void __user *)arg;
 	u8 val8;
 	u16 val16;
 
@@ -514,11 +516,11 @@ static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
 			ret = -EIO;
 			break;
 		}
-		if (copy_to_user((u8 *)arg, &val8, sizeof(val8)))
+		if (copy_to_user(argp, &val8, sizeof(val8)))
 			ret = -EFAULT;
 		break;
 	case SONYPI_IOCSBRT:
-		if (copy_from_user(&val8, (u8 *)arg, sizeof(val8))) {
+		if (copy_from_user(&val8, argp, sizeof(val8))) {
 			ret = -EFAULT;
 			break;
 		}
@@ -530,7 +532,7 @@ static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
 			ret = -EIO;
 			break;
 		}
-		if (copy_to_user((u16 *)arg, &val16, sizeof(val16)))
+		if (copy_to_user(argp, &val16, sizeof(val16)))
 			ret = -EFAULT;
 		break;
 	case SONYPI_IOCGBAT1REM:
@@ -538,7 +540,7 @@ static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
 			ret = -EIO;
 			break;
 		}
-		if (copy_to_user((u16 *)arg, &val16, sizeof(val16)))
+		if (copy_to_user(argp, &val16, sizeof(val16)))
 			ret = -EFAULT;
 		break;
 	case SONYPI_IOCGBAT2CAP:
@@ -546,7 +548,7 @@ static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
 			ret = -EIO;
 			break;
 		}
-		if (copy_to_user((u16 *)arg, &val16, sizeof(val16)))
+		if (copy_to_user(argp, &val16, sizeof(val16)))
 			ret = -EFAULT;
 		break;
 	case SONYPI_IOCGBAT2REM:
@@ -554,7 +556,7 @@ static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
 			ret = -EIO;
 			break;
 		}
-		if (copy_to_user((u16 *)arg, &val16, sizeof(val16)))
+		if (copy_to_user(argp, &val16, sizeof(val16)))
 			ret = -EFAULT;
 		break;
 	case SONYPI_IOCGBATFLAGS:
@@ -563,16 +565,16 @@ static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
 			break;
 		}
 		val8 &= 0x07;
-		if (copy_to_user((u8 *)arg, &val8, sizeof(val8)))
+		if (copy_to_user(argp, &val8, sizeof(val8)))
 			ret = -EFAULT;
 		break;
 	case SONYPI_IOCGBLUE:
 		val8 = sonypi_device.bluetooth_power;
-		if (copy_to_user((u8 *)arg, &val8, sizeof(val8)))
+		if (copy_to_user(argp, &val8, sizeof(val8)))
 			ret = -EFAULT;
 		break;
 	case SONYPI_IOCSBLUE:
-		if (copy_from_user(&val8, (u8 *)arg, sizeof(val8))) {
+		if (copy_from_user(&val8, argp, sizeof(val8))) {
 			ret = -EFAULT;
 			break;
 		}

@@ -101,7 +101,7 @@ static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 {
 	unsigned long mmcr0 = 0, pmc1 = 0, pmc2 = 0;
 	int n = 0;
-#ifdef CONFIG_PPC_STD_MMU
+#if defined(CONFIG_PPC_STD_MMU) && !defined(CONFIG_PPC64BRIDGE)
 	unsigned int kptes = 0, uptes = 0;
 	PTE *ptr;
 #endif /* CONFIG_PPC_STD_MMU */
@@ -135,6 +135,7 @@ static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 		goto return_string;
 	}
 
+#ifndef CONFIG_PPC64BRIDGE
 	for (ptr = Hash; ptr < Hash_end; ptr++) {
 		unsigned int mctx, vsid;
 
@@ -148,6 +149,7 @@ static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 		else
 			uptes++;
 	}
+#endif
 
 	n += sprintf( buffer + n,
 		      "PTE Hash Table Information\n"
@@ -155,16 +157,20 @@ static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 		      "Buckets\t\t: %lu\n"
  		      "Address\t\t: %08lx\n"
 		      "Entries\t\t: %lu\n"
+#ifndef CONFIG_PPC64BRIDGE
 		      "User ptes\t: %u\n"
 		      "Kernel ptes\t: %u\n"
-		      "Percent full\t: %lu%%\n",
-                      (unsigned long)(Hash_size>>10),
+		      "Percent full\t: %lu%%\n"
+#endif
+                      , (unsigned long)(Hash_size>>10),
 		      (Hash_size/(sizeof(PTE)*8)),
 		      (unsigned long)Hash,
-		      Hash_size/sizeof(PTE),
-                      uptes,
+		      Hash_size/sizeof(PTE)
+#ifndef CONFIG_PPC64BRIDGE
+                      , uptes,
 		      kptes,
 		      ((kptes+uptes)*100) / (Hash_size/sizeof(PTE))
+#endif
 		);
 
 	n += sprintf( buffer + n,

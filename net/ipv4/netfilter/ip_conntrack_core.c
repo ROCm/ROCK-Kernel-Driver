@@ -324,8 +324,9 @@ destroy_conntrack(struct nf_conntrack *nfct)
 		ip_conntrack_destroyed(ct);
 
 	WRITE_LOCK(&ip_conntrack_lock);
-	/* Delete us from our own list to prevent corruption later */
-	list_del(&ct->sibling_list);
+	/* Make sure don't leave any orphaned expectations lying around */
+	if (ct->expecting)
+		remove_expectations(ct, 1);
 
 	/* Delete our master expectation */
 	if (ct->master) {
@@ -920,7 +921,7 @@ static void expectation_timed_out(unsigned long ul_expect)
 }
 
 struct ip_conntrack_expect *
-ip_conntrack_expect_alloc()
+ip_conntrack_expect_alloc(void)
 {
 	struct ip_conntrack_expect *new;
 	
@@ -1127,10 +1128,8 @@ int ip_conntrack_alter_reply(struct ip_conntrack *conntrack,
 	DUMP_TUPLE(newreply);
 
 	conntrack->tuplehash[IP_CT_DIR_REPLY].tuple = *newreply;
-	if (!conntrack->master)
-		conntrack->helper = LIST_FIND(&helpers, helper_cmp,
-					      struct ip_conntrack_helper *,
-					      newreply);
+	if (!conntrack->master && list_empty(&conntrack->sibling_list))
+		conntrack->helper = ip_ct_find_helper(newreply);
 	WRITE_UNLOCK(&ip_conntrack_lock);
 
 	return 1;
@@ -1300,7 +1299,7 @@ ip_ct_selective_cleanup(int (*kill)(const struct ip_conntrack *i, void *data),
 /* Reversing the socket's dst/src point of view gives us the reply
    mapping. */
 static int
-getorigdst(struct sock *sk, int optval, void *user, int *len)
+getorigdst(struct sock *sk, int optval, void __user *user, int *len)
 {
 	struct inet_opt *inet = inet_sk(sk);
 	struct ip_conntrack_tuple_hash *h;

@@ -458,13 +458,6 @@ static void __init prom_initialize_naca(void)
 		PROM_BUG();
 	}
 
-	/* 
-	 * Hardcode to GP size.  I am not sure where to get this info
-	 * in general, as there does not appear to be a slb-size OF
-	 * entry.  At least in Condor and earlier.  DRENG 
-	 */
-	_naca->slb_size = 64;
-
 	/* Add an eye catcher and the systemcfg layout version number */
 	strcpy(_systemcfg->eye_catcher, RELOC("SYSTEMCFG:PPC64"));
 	_systemcfg->version.major = SYSTEMCFG_MAJOR;
@@ -654,8 +647,6 @@ static void __init prom_initialize_lmb(void)
 #endif /* DEBUG_PROM */
 }
 
-static char hypertas_funcs[1024];
-
 static void __init
 prom_instantiate_rtas(void)
 {
@@ -665,6 +656,7 @@ prom_instantiate_rtas(void)
 	struct systemcfg *_systemcfg = RELOC(systemcfg);
 	ihandle prom_rtas;
         u32 getprop_rval;
+	char hypertas_funcs[4];
 
 #ifdef DEBUG_PROM
 	prom_print(RELOC("prom_instantiate_rtas: start...\n"));
@@ -1556,7 +1548,7 @@ static void __init *__make_room(unsigned long *mem_start, unsigned long *mem_end
 		if (*mem_end != RELOC(initrd_start))
 			prom_panic(RELOC("No memory for copy_device_tree"));
 
-		prom_print("Huge device_tree: moving initrd\n");
+		prom_print(RELOC("Huge device_tree: moving initrd\n"));
 		/* Move by 4M. */
 		initrd_len = RELOC(initrd_end) - RELOC(initrd_start);
 		*mem_end = RELOC(initrd_start) + 4 * 1024 * 1024;
@@ -1590,6 +1582,7 @@ inspect_node(phandle node, struct device_node *dad,
 	char *prev_name, *namep;
 	unsigned char *valp;
 	unsigned long offset = reloc_offset();
+	phandle ibm_phandle;
 
 	np = make_room(mem_start, mem_end, struct device_node);
 	memset(np, 0, sizeof(*np));
@@ -1652,23 +1645,24 @@ inspect_node(phandle node, struct device_node *dad,
 		prev_propp = &pp->next;
 	}
 
-	/* Add a "linux_phandle" value */
-        if (np->node) {
-		u32 ibm_phandle = 0;
-		int len;
+	/* Add a "linux,phandle" property. */
+	namep = make_room(mem_start, mem_end, char[16]);
+	strcpy(namep, RELOC("linux,phandle"));
+	pp = make_room(mem_start, mem_end, struct property);
+	pp->name = PTRUNRELOC(namep);
+	pp->length = sizeof(phandle);
+	valp = make_room(mem_start, mem_end, phandle);
+	pp->value = PTRUNRELOC(valp);
+	*(phandle *)valp = node;
+	*prev_propp = PTRUNRELOC(pp);
+	pp->next = NULL;
 
-                /* First see if "ibm,phandle" exists and use its value */
-                len = (int)
-                        call_prom(RELOC("getprop"), 4, 1, node, RELOC("ibm,phandle"),
-                                  &ibm_phandle, sizeof(ibm_phandle));
-                if (len < 0) {
-                        np->linux_phandle = np->node;
-                } else {
-                        np->linux_phandle = ibm_phandle;
-		}
-	}
-
-	*prev_propp = 0;
+	/* Set np->linux_phandle to the value of the ibm,phandle property
+	   if it exists, otherwise to the phandle for this node. */
+	np->linux_phandle = node;
+	if ((int)call_prom(RELOC("getprop"), 4, 1, node, RELOC("ibm,phandle"),
+			   &ibm_phandle, sizeof(ibm_phandle)) > 0)
+		np->linux_phandle = ibm_phandle;
 
 	/* get the node's full name */
 	namep = (char *)*mem_start;
@@ -2189,11 +2183,13 @@ map_interrupt(unsigned int **irq, struct device_node **ictrler,
 		ints = imap - nintrc;
 		reg = ints - naddrc;
 	}
+	if (p == NULL) {
 #ifdef DEBUG_IRQ
-	if (p == NULL)
 		printk("hmmm, int tree for %s doesn't have ctrler\n",
 		       np->full_name);
 #endif
+		return 0;
+	}
 	*irq = ints;
 	*ictrler = p;
 	return nintrc;
@@ -2204,7 +2200,7 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start,
 		       int measure_only)
 {
 	unsigned int *ints;
-	int intlen, intrcells;
+	int intlen, intrcells, intrcount;
 	int i, j, n;
 	unsigned int *irq, virq;
 	struct device_node *ic;
@@ -2214,34 +2210,40 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start,
 		return mem_start;
 	intrcells = prom_n_intr_cells(np);
 	intlen /= intrcells * sizeof(unsigned int);
-	np->n_intrs = intlen;
 	np->intrs = (struct interrupt_info *) mem_start;
 	mem_start += intlen * sizeof(struct interrupt_info);
 
 	if (measure_only)
 		return mem_start;
 
-	for (i = 0; i < intlen; ++i) {
-		np->intrs[i].line = 0;
-		np->intrs[i].sense = 1;
+	intrcount = 0;
+	for (i = 0; i < intlen; ++i, ints += intrcells) {
 		n = map_interrupt(&irq, &ic, np, ints, intrcells);
 		if (n <= 0)
 			continue;
-		virq = virt_irq_create_mapping(irq[0]);
-		if (virq == NO_IRQ) {
-			printk(KERN_CRIT "Could not allocate interrupt "
-			       "number for %s\n", np->full_name);
-		} else
-			np->intrs[i].line = irq_offset_up(virq);
+
+		/* don't map IRQ numbers under a cascaded 8259 controller */
+		if (ic && device_is_compatible(ic, "chrp,iic")) {
+			np->intrs[intrcount].line = irq[0];
+		} else {
+			virq = virt_irq_create_mapping(irq[0]);
+			if (virq == NO_IRQ) {
+				printk(KERN_CRIT "Could not allocate interrupt"
+				       " number for %s\n", np->full_name);
+				continue;
+			}
+			np->intrs[intrcount].line = irq_offset_up(virq);
+		}
 
 		/* We offset irq numbers for the u3 MPIC by 128 in PowerMac */
 		if (systemcfg->platform == PLATFORM_POWERMAC && ic && ic->parent) {
 			char *name = get_property(ic->parent, "name", NULL);
 			if (name && !strcmp(name, "u3"))
-				np->intrs[i].line += 128;
+				np->intrs[intrcount].line += 128;
 		}
+		np->intrs[intrcount].sense = 1;
 		if (n > 1)
-			np->intrs[i].sense = irq[1];
+			np->intrs[intrcount].sense = irq[1];
 		if (n > 2) {
 			printk("hmmm, got %d intr cells for %s:", n,
 			       np->full_name);
@@ -2249,8 +2251,9 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start,
 				printk(" %d", irq[j]);
 			printk("\n");
 		}
-		ints += intrcells;
+		++intrcount;
 	}
+	np->n_intrs = intrcount;
 
 	return mem_start;
 }

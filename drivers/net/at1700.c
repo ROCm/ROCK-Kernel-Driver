@@ -242,7 +242,7 @@ static void cleanup_card(struct net_device *dev)
 {
 #ifdef CONFIG_MCA	
 	struct net_local *lp = netdev_priv(dev);
-	if (lp->mca_slot)
+	if (lp->mca_slot >= 0)
 		mca_mark_as_unused(lp->mca_slot);
 #endif	
 	free_irq(dev->irq, NULL);
@@ -444,11 +444,11 @@ found:
 					break;
 			}
 			if (i == 8) {
-				goto err_out;
+				goto err_mca;
 			}
 		} else {
 			if (fmv18x_probe_list[inb(ioaddr + IOCONFIG) & 0x07] != ioaddr)
-				goto err_out;
+				goto err_mca;
 			irq = fmv_irqmap[(inb(ioaddr + IOCONFIG)>>6) & 0x03];
 		}
 	}
@@ -546,11 +546,16 @@ found:
 	if (ret) {
 		printk ("  AT1700 at %#3x is unusable due to a conflict on"
 				"IRQ %d.\n", ioaddr, irq);
-		goto err_out;
+		goto err_mca;
 	}
 
 	return 0;
 
+err_mca:
+#ifdef CONFIG_MCA
+	if (slot >= 0)
+		mca_mark_as_unused(slot);
+#endif
 err_out:
 #ifndef CONFIG_X86_PC9800
 	release_region(ioaddr, AT1700_IO_EXTENT);

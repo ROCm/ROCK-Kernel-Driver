@@ -1217,7 +1217,10 @@ static int
 plip_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct net_local *nl = netdev_priv(dev);
-	struct plipconf *pc = (struct plipconf *) &rq->ifr_data;
+	struct plipconf *pc = (struct plipconf *) &rq->ifr_ifru;
+
+	if (cmd != SIOCDEVPLIP)
+		return -EOPNOTSUPP;
 
 	switch(pc->pcmd) {
 	case PLIP_GET_TIMEOUT:

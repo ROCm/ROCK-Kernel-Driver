@@ -15,7 +15,7 @@
  * See arch/s390/kernel/sys_s390.c for ugly details..
  */
 struct ipc_kludge {
-	struct msgbuf *msgp;
+	struct msgbuf __user *msgp;
 	long msgtyp;
 };
 

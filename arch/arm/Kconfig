@@ -84,9 +84,6 @@ config ARCH_CLPS711X
 config ARCH_CO285
 	bool "Co-EBSA285"
 
-config ARCH_PXA
-	bool "PXA2xx-based"
-
 config ARCH_EBSA110
 	bool "EBSA-110"
 	help
@@ -126,6 +123,9 @@ config ARCH_L7200
 	  If you have any questions or comments about the Linux kernel port
 	  to this board, send e-mail to sjhill@cotw.com.
 
+config ARCH_PXA
+	bool "PXA2xx-based"
+
 config ARCH_RPC
 	bool "RiscPC"
 	help
@@ -135,9 +135,6 @@ config ARCH_RPC
 config ARCH_SA1100
 	bool "SA1100-based"
 
-config ARCH_SHARK
-	bool "Shark"
-
 config ARCH_S3C2410
 	bool "Samsung S3C2410"
 	help
@@ -145,8 +142,8 @@ config ARCH_S3C2410
 	  BAST (http://www.simtec.co.uk/products/EB110ITX/), the IPAQ 1940 or
 	  the Samsung SMDK2410 development board (and derviatives).
 
-config ARCH_OMAP
-	bool "TI OMAP"
+config ARCH_SHARK
+	bool "Shark"
 
 config ARCH_LH7A40X
 	bool "Sharp LH7A40X"
@@ -155,6 +152,9 @@ config ARCH_LH7A40X
 	  System on a Chip processors.  These CPUs include an ARM922T
 	  core with a wide array of integrated devices for
 	  hand-held and low-power applications.
+
+config ARCH_OMAP
+	bool "TI OMAP"
 
 config ARCH_VERSATILE_PB
 	bool "Versatile PB"
@@ -581,7 +581,7 @@ config LEDS_CPU
 config ALIGNMENT_TRAP
 	bool
 	depends on CPU_32
-	default y
+	default y if !ARCH_EBSA110
 	help
 	  ARM processors can not fetch/store information which is not
 	  naturally aligned on the bus, i.e., a 4 byte fetch must start at an

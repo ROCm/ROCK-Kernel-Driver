@@ -160,39 +160,43 @@ EXPORT_SYMBOL(machine_restart);
 
 static void show_regwindow32(struct pt_regs *regs)
 {
-	struct reg_window32 *rw;
+	struct reg_window32 __user *rw;
 	struct reg_window32 r_w;
 	mm_segment_t old_fs;
 	
 	__asm__ __volatile__ ("flushw");
-	rw = (struct reg_window32 *)((long)(unsigned)regs->u_regs[14]);
+	rw = (struct reg_window32 __user *)((long)(unsigned)regs->u_regs[14]);
 	old_fs = get_fs();
 	set_fs (USER_DS);
 	if (copy_from_user (&r_w, rw, sizeof(r_w))) {
 		set_fs (old_fs);
 		return;
 	}
-	rw = &r_w;
+
 	set_fs (old_fs);			
 	printk("l0: %08x l1: %08x l2: %08x l3: %08x "
 	       "l4: %08x l5: %08x l6: %08x l7: %08x\n",
-	       rw->locals[0], rw->locals[1], rw->locals[2], rw->locals[3],
-	       rw->locals[4], rw->locals[5], rw->locals[6], rw->locals[7]);
+	       r_w.locals[0], r_w.locals[1], r_w.locals[2], r_w.locals[3],
+	       r_w.locals[4], r_w.locals[5], r_w.locals[6], r_w.locals[7]);
 	printk("i0: %08x i1: %08x i2: %08x i3: %08x "
 	       "i4: %08x i5: %08x i6: %08x i7: %08x\n",
-	       rw->ins[0], rw->ins[1], rw->ins[2], rw->ins[3],
-	       rw->ins[4], rw->ins[5], rw->ins[6], rw->ins[7]);
+	       r_w.ins[0], r_w.ins[1], r_w.ins[2], r_w.ins[3],
+	       r_w.ins[4], r_w.ins[5], r_w.ins[6], r_w.ins[7]);
 }
 
 static void show_regwindow(struct pt_regs *regs)
 {
-	struct reg_window *rw;
+	struct reg_window __user *rw;
+	struct reg_window *rwk;
 	struct reg_window r_w;
 	mm_segment_t old_fs;
 
 	if ((regs->tstate & TSTATE_PRIV) || !(test_thread_flag(TIF_32BIT))) {
 		__asm__ __volatile__ ("flushw");
-		rw = (struct reg_window *)(regs->u_regs[14] + STACK_BIAS);
+		rw = (struct reg_window __user *)
+			(regs->u_regs[14] + STACK_BIAS);
+		rwk = (struct reg_window *)
+			(regs->u_regs[14] + STACK_BIAS);
 		if (!(regs->tstate & TSTATE_PRIV)) {
 			old_fs = get_fs();
 			set_fs (USER_DS);
@@ -200,7 +204,7 @@ static void show_regwindow(struct pt_regs *regs)
 				set_fs (old_fs);
 				return;
 			}
-			rw = &r_w;
+			rwk = &r_w;
 			set_fs (old_fs);			
 		}
 	} else {
@@ -208,15 +212,15 @@ static void show_regwindow(struct pt_regs *regs)
 		return;
 	}
 	printk("l0: %016lx l1: %016lx l2: %016lx l3: %016lx\n",
-	       rw->locals[0], rw->locals[1], rw->locals[2], rw->locals[3]);
+	       rwk->locals[0], rwk->locals[1], rwk->locals[2], rwk->locals[3]);
 	printk("l4: %016lx l5: %016lx l6: %016lx l7: %016lx\n",
-	       rw->locals[4], rw->locals[5], rw->locals[6], rw->locals[7]);
+	       rwk->locals[4], rwk->locals[5], rwk->locals[6], rwk->locals[7]);
 	printk("i0: %016lx i1: %016lx i2: %016lx i3: %016lx\n",
-	       rw->ins[0], rw->ins[1], rw->ins[2], rw->ins[3]);
+	       rwk->ins[0], rwk->ins[1], rwk->ins[2], rwk->ins[3]);
 	printk("i4: %016lx i5: %016lx i6: %016lx i7: %016lx\n",
-	       rw->ins[4], rw->ins[5], rw->ins[6], rw->ins[7]);
+	       rwk->ins[4], rwk->ins[5], rwk->ins[6], rwk->ins[7]);
 	if (regs->tstate & TSTATE_PRIV)
-		print_symbol("I7: <%s>\n", rw->ins[7]);
+		print_symbol("I7: <%s>\n", rwk->ins[7]);
 }
 
 void show_stackframe(struct sparc_stackf *sf)
@@ -471,10 +475,10 @@ static unsigned long clone_stackframe(unsigned long csp, unsigned long psp)
 	if (!(test_thread_flag(TIF_32BIT))) {
 		csp += STACK_BIAS;
 		psp += STACK_BIAS;
-		__get_user(fp, &(((struct reg_window *)psp)->ins[6]));
+		__get_user(fp, &(((struct reg_window __user *)psp)->ins[6]));
 		fp += STACK_BIAS;
 	} else
-		__get_user(fp, &(((struct reg_window32 *)psp)->ins[6]));
+		__get_user(fp, &(((struct reg_window32 __user *)psp)->ins[6]));
 
 	/* Now 8-byte align the stack as this is mandatory in the
 	 * Sparc ABI due to how register windows work.  This hides
@@ -487,11 +491,12 @@ static unsigned long clone_stackframe(unsigned long csp, unsigned long psp)
 	if (copy_in_user((void __user *) rval, (void __user *) psp, distance))
 		rval = 0;
 	else if (test_thread_flag(TIF_32BIT)) {
-		if (put_user(((u32)csp), &(((struct reg_window32 *)rval)->ins[6])))
+		if (put_user(((u32)csp),
+			     &(((struct reg_window32 __user *)rval)->ins[6])))
 			rval = 0;
 	} else {
 		if (put_user(((u64)csp - STACK_BIAS),
-			     &(((struct reg_window *)rval)->ins[6])))
+			     &(((struct reg_window __user *)rval)->ins[6])))
 			rval = 0;
 		else
 			rval = rval - STACK_BIAS;
@@ -533,7 +538,7 @@ void synchronize_user_stack(void)
 			unsigned long sp = (t->rwbuf_stkptrs[window] + bias);
 			struct reg_window *rwin = &t->reg_window[window];
 
-			if (!copy_to_user((char *)sp, rwin, winsize)) {
+			if (!copy_to_user((char __user *)sp, rwin, winsize)) {
 				shift_window_buffer(window, get_thread_wsaved() - 1, t);
 				set_thread_wsaved(get_thread_wsaved() - 1);
 			}
@@ -562,7 +567,7 @@ void fault_in_user_windows(void)
 			unsigned long sp = (t->rwbuf_stkptrs[window] + bias);
 			struct reg_window *rwin = &t->reg_window[window];
 
-			if (copy_to_user((char *)sp, rwin, winsize))
+			if (copy_to_user((char __user *)sp, rwin, winsize))
 				goto barf;
 		} while (window--);
 	}
@@ -574,26 +579,26 @@ barf:
 	do_exit(SIGILL);
 }
 
-asmlinkage int sparc_do_fork(unsigned long clone_flags,
-			     unsigned long stack_start,
-			     struct pt_regs *regs,
-			     unsigned long stack_size)
+asmlinkage long sparc_do_fork(unsigned long clone_flags,
+			      unsigned long stack_start,
+			      struct pt_regs *regs,
+			      unsigned long stack_size)
 {
-	unsigned long parent_tid_ptr, child_tid_ptr;
+	int __user *parent_tid_ptr, *child_tid_ptr;
 
 	clone_flags &= ~CLONE_IDLETASK;
 
-	parent_tid_ptr = regs->u_regs[UREG_I2];
-	child_tid_ptr = regs->u_regs[UREG_I4];
 	if (test_thread_flag(TIF_32BIT)) {
-		parent_tid_ptr &= 0xffffffff;
-		child_tid_ptr &= 0xffffffff;
+		parent_tid_ptr = compat_ptr(regs->u_regs[UREG_I2]);
+		child_tid_ptr = compat_ptr(regs->u_regs[UREG_I4]);
+	} else {
+		parent_tid_ptr = (int __user *) regs->u_regs[UREG_I2];
+		child_tid_ptr = (int __user *) regs->u_regs[UREG_I4];
 	}
 
 	return do_fork(clone_flags, stack_start,
 		       regs, stack_size,
-		       (int *) parent_tid_ptr,
-		       (int *) child_tid_ptr);
+		       parent_tid_ptr, child_tid_ptr);
 }
 
 /* Copy a Sparc thread.  The fork() return value conventions
@@ -694,24 +699,24 @@ pid_t kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	 * So we stash 'fn' and 'arg' into global registers which
 	 * will not be modified by the parent.
 	 */
-	__asm__ __volatile("mov %4, %%g2\n\t"	   /* Save FN into global */
-			   "mov %5, %%g3\n\t"	   /* Save ARG into global */
-			   "mov %1, %%g1\n\t"	   /* Clone syscall nr. */
-			   "mov %2, %%o0\n\t"	   /* Clone flags. */
-			   "mov 0, %%o1\n\t"	   /* usp arg == 0 */
-			   "t 0x6d\n\t"		   /* Linux/Sparc clone(). */
-			   "brz,a,pn %%o1, 1f\n\t" /* Parent, just return. */
-			   " mov %%o0, %0\n\t"
-			   "jmpl %%g2, %%o7\n\t"   /* Call the function. */
-			   " mov %%g3, %%o0\n\t"   /* Set arg in delay. */
-			   "mov %3, %%g1\n\t"
-			   "t 0x6d\n\t"		   /* Linux/Sparc exit(). */
-			   /* Notreached by child. */
-			   "1:" :
-			   "=r" (retval) :
-			   "i" (__NR_clone), "r" (flags | CLONE_VM | CLONE_UNTRACED),
-			   "i" (__NR_exit),  "r" (fn), "r" (arg) :
-			   "g1", "g2", "g3", "o0", "o1", "memory", "cc");
+	__asm__ __volatile__("mov %4, %%g2\n\t"	   /* Save FN into global */
+			     "mov %5, %%g3\n\t"	   /* Save ARG into global */
+			     "mov %1, %%g1\n\t"	   /* Clone syscall nr. */
+			     "mov %2, %%o0\n\t"	   /* Clone flags. */
+			     "mov 0, %%o1\n\t"	   /* usp arg == 0 */
+			     "t 0x6d\n\t"	   /* Linux/Sparc clone(). */
+			     "brz,a,pn %%o1, 1f\n\t" /* Parent, just return. */
+			     " mov %%o0, %0\n\t"
+			     "jmpl %%g2, %%o7\n\t"   /* Call the function. */
+			     " mov %%g3, %%o0\n\t"   /* Set arg in delay. */
+			     "mov %3, %%g1\n\t"
+			     "t 0x6d\n\t"	   /* Linux/Sparc exit(). */
+			     /* Notreached by child. */
+			     "1:" :
+			     "=r" (retval) :
+			     "i" (__NR_clone), "r" (flags | CLONE_VM | CLONE_UNTRACED),
+			     "i" (__NR_exit),  "r" (fn), "r" (arg) :
+			     "g1", "g2", "g3", "o0", "o1", "memory", "cc");
 	return retval;
 }
 
@@ -806,12 +811,15 @@ asmlinkage int sparc_execve(struct pt_regs *regs)
 	if (regs->u_regs[UREG_G1] == 0)
 		base = 1;
 
-	filename = getname((char *)regs->u_regs[base + UREG_I0]);
+	filename = getname((char __user *)regs->u_regs[base + UREG_I0]);
 	error = PTR_ERR(filename);
 	if (IS_ERR(filename))
 		goto out;
-	error = do_execve(filename, (char **) regs->u_regs[base + UREG_I1],
-			  (char **) regs->u_regs[base + UREG_I2], regs);
+	error = do_execve(filename,
+			  (char __user * __user *)
+			  regs->u_regs[base + UREG_I1],
+			  (char __user * __user *)
+			  regs->u_regs[base + UREG_I2], regs);
 	putname(filename);
 	if (!error) {
 		fprs_write(0);

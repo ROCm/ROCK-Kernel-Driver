@@ -103,22 +103,16 @@ nfs_readpage_sync(struct file *file, struct inode *inode, struct page *page)
 	if (!rdata)
 		return -ENOMEM;
 
-	*rdata = (struct nfs_read_data) {
-		.flags		= (IS_SWAPFILE(inode)? NFS_RPC_SWAPFLAGS : 0),
-		.cred		= NULL,
-		.inode		= inode,
-		.pages		= LIST_HEAD_INIT(rdata->pages),
-		.args		= {
-			.fh		= NFS_FH(inode),
-			.lockowner	= current->files,
-			.pages		= &page,
-			.pgbase		= 0UL,
-			.count		= rsize,
-		},
-		.res		= {
-			.fattr		= &rdata->fattr,
-		}
-	};
+	memset(rdata, 0, sizeof(*rdata));
+	rdata->flags = (IS_SWAPFILE(inode)? NFS_RPC_SWAPFLAGS : 0);
+	rdata->inode = inode;
+	INIT_LIST_HEAD(&rdata->pages);
+	rdata->args.fh = NFS_FH(inode);
+	rdata->args.lockowner = current->files;
+	rdata->args.pages = &page;
+	rdata->args.pgbase = 0UL;
+	rdata->args.count = rsize;
+	rdata->res.fattr = &rdata->fattr;
 
 	dprintk("NFS: nfs_readpage_sync(%p)\n", page);
 

@@ -77,7 +77,7 @@ end:
 	return_VALUE(size);
 }
 
-static ssize_t acpi_system_read_dsdt (struct file*, char*, size_t, loff_t*);
+static ssize_t acpi_system_read_dsdt (struct file*, char __user *, size_t, loff_t*);
 
 static struct file_operations acpi_system_dsdt_ops = {
 	.read =			acpi_system_read_dsdt,
@@ -86,7 +86,7 @@ static struct file_operations acpi_system_dsdt_ops = {
 static ssize_t
 acpi_system_read_dsdt (
 	struct file		*file,
-	char			*buffer,
+	char			__user *buffer,
 	size_t			count,
 	loff_t			*ppos)
 {
@@ -120,7 +120,7 @@ acpi_system_read_dsdt (
 }
 
 
-static ssize_t acpi_system_read_fadt (struct file*, char*, size_t, loff_t*);
+static ssize_t acpi_system_read_fadt (struct file*, char __user *, size_t, loff_t*);
 
 static struct file_operations acpi_system_fadt_ops = {
 	.read =			acpi_system_read_fadt,
@@ -129,7 +129,7 @@ static struct file_operations acpi_system_fadt_ops = {
 static ssize_t
 acpi_system_read_fadt (
 	struct file		*file,
-	char			*buffer,
+	char			__user *buffer,
 	size_t			count,
 	loff_t			*ppos)
 {

@@ -85,9 +85,10 @@ struct appldata_parameter_list {
  */
 static const char appldata_proc_name[APPLDATA_PROC_NAME_LENGTH] = "appldata";
 static int appldata_timer_handler(ctl_table *ctl, int write, struct file *filp,
-		   		  void *buffer, size_t *lenp);
+				  void __user *buffer, size_t *lenp);
 static int appldata_interval_handler(ctl_table *ctl, int write,
-					 struct file *filp, void *buffer,
+					 struct file *filp,
+					 void __user *buffer,
 					 size_t *lenp);
 
 static struct ctl_table_header *appldata_sysctl_header;
@@ -192,7 +193,8 @@ static void appldata_tasklet_function(unsigned long data)
  * wrapper function for mod_virt_timer(), because smp_call_function_on()
  * accepts only one parameter.
  */
-static void appldata_mod_vtimer_wrap(struct appldata_mod_vtimer_args *args) {
+static void appldata_mod_vtimer_wrap(void *p) {
+	struct appldata_mod_vtimer_args *args = p;
 	mod_virt_timer(args->timer, args->expires);
 }
 
@@ -252,7 +254,7 @@ static int appldata_diag(char record_nr, u16 function, unsigned long buffer,
  */
 static int
 appldata_timer_handler(ctl_table *ctl, int write, struct file *filp,
-			   void *buffer, size_t *lenp)
+			   void __user *buffer, size_t *lenp)
 {
 	int len, i;
 	char buf[2];
@@ -309,7 +311,7 @@ out:
  */
 static int
 appldata_interval_handler(ctl_table *ctl, int write, struct file *filp,
-			   void *buffer, size_t *lenp)
+			   void __user *buffer, size_t *lenp)
 {
 	int len, i, interval;
 	char buf[16];
@@ -347,7 +349,7 @@ appldata_interval_handler(ctl_table *ctl, int write, struct file *filp,
 			appldata_mod_vtimer_args.expires =
 					per_cpu_interval;
 			smp_call_function_on(
-				(void *) appldata_mod_vtimer_wrap,
+				appldata_mod_vtimer_wrap,
 				&appldata_mod_vtimer_args,
 				0, 1, i);
 		}
@@ -370,7 +372,7 @@ out:
  */
 static int
 appldata_generic_handler(ctl_table *ctl, int write, struct file *filp,
-			   void *buffer, size_t *lenp)
+			   void __user *buffer, size_t *lenp)
 {
 	struct appldata_ops *ops = NULL, *tmp_ops;
 	int rc, len, found;

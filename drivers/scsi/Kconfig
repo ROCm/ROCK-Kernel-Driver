@@ -352,7 +352,7 @@ source "drivers/scsi/aic7xxx/Kconfig.aic79xx"
 # All the I2O code and drivers do not seem to be 64bit safe.
 config SCSI_DPT_I2O
 	tristate "Adaptec I2O RAID support "
-	depends on !64BIT && SCSI
+	depends on !64BIT && SCSI && PCI
 	help
 	  This driver supports all of Adaptec's I2O based RAID controllers as 
 	  well as the DPT SmartRaid V cards.  This is an Adaptec maintained
@@ -494,9 +494,15 @@ config SCSI_OMIT_FLASHPOINT
 	  substantial, so users of MultiMaster Host Adapters may wish to omit
 	  it.
 
+#
+# This is marked broken because it uses over 4kB of stack in
+# just two routines:
+#     2076  CpqTsProcessIMQEntry
+#     2052  PeekIMQEntry
+#
 config SCSI_CPQFCTS
 	tristate "Compaq Fibre Channel 64-bit/66Mhz HBA support"
-	depends on PCI && SCSI
+	depends on PCI && SCSI && BROKEN
 	help
 	  Say Y here to compile in support for the Compaq StorageWorks Fibre
 	  Channel 64-bit/66Mhz Host Bus Adapter.

@@ -368,7 +368,7 @@ void rose_destroy_socket(struct sock *sk)
  */
 
 static int rose_setsockopt(struct socket *sock, int level, int optname,
-	char *optval, int optlen)
+	char __user *optval, int optlen)
 {
 	struct sock *sk = sock->sk;
 	rose_cb *rose = rose_sk(sk);
@@ -380,7 +380,7 @@ static int rose_setsockopt(struct socket *sock, int level, int optname,
 	if (optlen < sizeof(int))
 		return -EINVAL;
 
-	if (get_user(opt, (int *)optval))
+	if (get_user(opt, (int __user *)optval))
 		return -EFAULT;
 
 	switch (optname) {
@@ -428,7 +428,7 @@ static int rose_setsockopt(struct socket *sock, int level, int optname,
 }
 
 static int rose_getsockopt(struct socket *sock, int level, int optname,
-	char *optval, int *optlen)
+	char __user *optval, int __user *optlen)
 {
 	struct sock *sk = sock->sk;
 	rose_cb *rose = rose_sk(sk);
@@ -1021,7 +1021,7 @@ static int rose_sendmsg(struct kiocb *iocb, struct socket *sock,
 	unsigned char *asmptr;
 	int n, size, qbit = 0;
 
-	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_EOR))
+	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_EOR|MSG_CMSG_COMPAT))
 		return -EINVAL;
 
 	if (sk->sk_zapped)
@@ -1249,6 +1249,7 @@ static int rose_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	struct sock *sk = sock->sk;
 	rose_cb *rose = rose_sk(sk);
+	void __user *argp = (void __user *)arg;
 
 	switch (cmd) {
 	case TIOCOUTQ: {
@@ -1256,7 +1257,7 @@ static int rose_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		amount = sk->sk_sndbuf - atomic_read(&sk->sk_wmem_alloc);
 		if (amount < 0)
 			amount = 0;
-		return put_user(amount, (unsigned int *)arg);
+		return put_user(amount, (unsigned int __user *)argp);
 	}
 
 	case TIOCINQ: {
@@ -1265,12 +1266,12 @@ static int rose_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		/* These two are safe on a single CPU system as only user tasks fiddle here */
 		if ((skb = skb_peek(&sk->sk_receive_queue)) != NULL)
 			amount = skb->len;
-		return put_user(amount, (unsigned int *)arg);
+		return put_user(amount, (unsigned int __user *)argp);
 	}
 
 	case SIOCGSTAMP:
 		if (sk != NULL) 
-			return sock_get_timestamp(sk, (struct timeval *)arg);
+			return sock_get_timestamp(sk, (struct timeval __user *)argp);
 		return -EINVAL;
 
 	case SIOCGIFADDR:
@@ -1290,18 +1291,18 @@ static int rose_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	case SIOCRSCLRRT:
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		return rose_rt_ioctl(cmd, (void *)arg);
+		return rose_rt_ioctl(cmd, argp);
 
 	case SIOCRSGCAUSE: {
 		struct rose_cause_struct rose_cause;
 		rose_cause.cause      = rose->cause;
 		rose_cause.diagnostic = rose->diagnostic;
-		return copy_to_user((void *)arg, &rose_cause, sizeof(struct rose_cause_struct)) ? -EFAULT : 0;
+		return copy_to_user(argp, &rose_cause, sizeof(struct rose_cause_struct)) ? -EFAULT : 0;
 	}
 
 	case SIOCRSSCAUSE: {
 		struct rose_cause_struct rose_cause;
-		if (copy_from_user(&rose_cause, (void *)arg, sizeof(struct rose_cause_struct)))
+		if (copy_from_user(&rose_cause, argp, sizeof(struct rose_cause_struct)))
 			return -EFAULT;
 		rose->cause      = rose_cause.cause;
 		rose->diagnostic = rose_cause.diagnostic;
@@ -1312,14 +1313,14 @@ static int rose_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		if (!capable(CAP_NET_ADMIN)) return -EPERM;
 		if (ax25cmp(&rose_callsign, &null_ax25_address) != 0)
 			ax25_listen_release(&rose_callsign, NULL);
-		if (copy_from_user(&rose_callsign, (void *)arg, sizeof(ax25_address)))
+		if (copy_from_user(&rose_callsign, argp, sizeof(ax25_address)))
 			return -EFAULT;
 		if (ax25cmp(&rose_callsign, &null_ax25_address) != 0)
 			ax25_listen_register(&rose_callsign, NULL);
 		return 0;
 
 	case SIOCRSGL2CALL:
-		return copy_to_user((void *)arg, &rose_callsign, sizeof(ax25_address)) ? -EFAULT : 0;
+		return copy_to_user(argp, &rose_callsign, sizeof(ax25_address)) ? -EFAULT : 0;
 
 	case SIOCRSACCEPT:
 		if (rose->state == ROSE_STATE_5) {
@@ -1335,7 +1336,7 @@ static int rose_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		return 0;
 
 	default:
-		return dev_ioctl(cmd, (void *)arg);
+		return dev_ioctl(cmd, argp);
 	}
 
 	return 0;

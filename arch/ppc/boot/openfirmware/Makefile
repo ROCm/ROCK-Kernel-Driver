@@ -22,9 +22,10 @@ of1275	:= $(boot)/of1275
 images	:= $(boot)/images
 
 OBJCOPY_ARGS	:= -O aixcoff-rs6000 -R .stab -R .stabstr -R .comment
-COFF_LD_ARGS	:= -T $(boot)/ld.script -e _start -Ttext 0x00500000 -Bstatic
-CHRP_LD_ARGS	:= -T $(boot)/ld.script -e _start -Ttext 0x00800000
-NEWWORLD_LD_ARGS:= -T $(boot)/ld.script -e _start -Ttext 0x01000000
+COFF_LD_ARGS	:= -T $(srctree)/$(boot)/ld.script -e _start -Ttext 0x00500000 \
+			-Bstatic
+CHRP_LD_ARGS	:= -T $(srctree)/$(boot)/ld.script -e _start -Ttext 0x00800000
+NEWWORLD_LD_ARGS:= -T $(srctree)/$(boot)/ld.script -e _start -Ttext 0x01000000
 
 COMMONOBJS	:= start.o misc.o common.o
 COFFOBJS	:= coffcrt0.o $(COMMONOBJS) coffmain.o
@@ -92,11 +93,11 @@ quiet_cmd_gencoffb = COFF    $@
       cmd_gencoffb = $(LD) -o $@ $(COFF_LD_ARGS) $(COFFOBJS) $< $(LIBS) && \
                      $(OBJCOPY) $@ $@ -R .comment $(del-ramdisk-sec)
 targets += coffboot
-$(obj)/coffboot: $(obj)/image.o $(COFFOBJS) $(LIBS) $(boot)/ld.script FORCE
+$(obj)/coffboot: $(obj)/image.o $(COFFOBJS) $(LIBS) $(srctree)/$(boot)/ld.script FORCE
 	$(call if_changed,gencoffb)
 targets += coffboot.initrd
 $(obj)/coffboot.initrd: $(obj)/image.initrd.o $(COFFOBJS) $(LIBS) \
-			$(boot)/ld.script FORCE
+			$(srctree)/$(boot)/ld.script FORCE
 	$(call if_changed,gencoffb)
 
 
@@ -118,20 +119,22 @@ quiet_cmd_gen-elf-pmac = ELF     $@
 					 -R .comment $(del-ramdisk-sec)
 
 $(images)/vmlinux.elf-pmac: $(obj)/image.o $(NEWWORLDOBJS) $(LIBS) \
-			$(obj)/note $(boot)/ld.script
+			$(obj)/note $(srctree)/$(boot)/ld.script
 	$(call cmd,gen-elf-pmac)
 $(images)/vmlinux.initrd.elf-pmac: $(obj)/image.initrd.o $(NEWWORLDOBJS) \
-				   $(LIBS) $(obj)/note $(boot)/ld.script
+				   $(LIBS) $(obj)/note \
+				   $(srctree)/$(boot)/ld.script
 	$(call cmd,gen-elf-pmac)
 
 quiet_cmd_gen-chrp = CHRP    $@
       cmd_gen-chrp = $(LD) $(CHRP_LD_ARGS) -o $@ $(CHRPOBJS) $< $(LIBS) && \
 			$(OBJCOPY) $@ $@ -R .comment $(del-ramdisk-sec)
 
-$(images)/zImage.chrp: $(obj)/image.o $(CHRPOBJS) $(LIBS) $(boot)/ld.script
+$(images)/zImage.chrp: $(obj)/image.o $(CHRPOBJS) $(LIBS) \
+				   $(srctree)/$(boot)/ld.script
 	$(call cmd,gen-chrp)
 $(images)/zImage.initrd.chrp: $(obj)/image.initrd.o $(CHRPOBJS) $(LIBS) \
-			$(boot)/ld.script
+				   $(srctree)/$(boot)/ld.script
 	$(call cmd,gen-chrp)
 
 quiet_cmd_addnote = ADDNOTE $@

@@ -10,6 +10,7 @@
  * Author: RidgeRun, Inc. Greg Lonnon <glonnon@ridgerun.com>
  *
  * Reorganized for Linux-2.6 by Tony Lindgren <tony@atomide.com>
+ *                          and Dirk Behme <dirk.behme@de.bosch.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -40,50 +41,7 @@
 #ifndef __ASSEMBLER__
 #include <asm/types.h>
 #endif
-#include <asm/mach-types.h>
-
-/*
- * ----------------------------------------------------------------------------
- * I/O mapping
- * ----------------------------------------------------------------------------
- */
-#define IO_PHYS			0xFFFB0000
-#define IO_OFFSET		0x01000000	/* Virtual IO = 0xfefb0000 */
-#define IO_VIRT			(IO_PHYS - IO_OFFSET)
-#define IO_SIZE			0x40000
-#define IO_ADDRESS(x)		((x) - IO_OFFSET)
-
-#define PCIO_BASE		0
-
-#define io_p2v(x)               ((x) - IO_OFFSET)
-#define io_v2p(x)               ((x) + IO_OFFSET)
-
-#ifndef __ASSEMBLER__
-
-/* 16 bit uses LDRH/STRH, base +/- offset_8 */
-typedef struct { volatile u16 offset[256]; } __regbase16;
-#define __REGV16(vaddr)		((__regbase16 *)((vaddr)&~0xff)) \
-					->offset[((vaddr)&0xff)>>1]
-#define __REG16(paddr)          __REGV16(io_p2v(paddr))
-
-/* 8/32 bit uses LDR/STR, base +/- offset_12 */
-typedef struct { volatile u8 offset[4096]; } __regbase8;
-#define __REGV8(vaddr)		((__regbase8  *)((paddr)&~4095)) \
-					->offset[((paddr)&4095)>>0]
-#define __REG8(paddr)		__REGV8(io_p2v(paddr))
-
-typedef struct { volatile u32 offset[4096]; } __regbase32;
-#define __REGV32(vaddr)		((__regbase32 *)((vaddr)&~4095)) \
-					->offset[((vaddr)&4095)>>2]
-#define __REG32(paddr)		__REGV32(io_p2v(paddr))
-
-#else
-
-#define __REG8(paddr)		io_p2v(paddr)
-#define __REG16(paddr)		io_p2v(paddr)
-#define __REG32(paddr)		io_p2v(paddr)
-
-#endif
+#include <asm/arch/io.h>
 
 /*
  * ---------------------------------------------------------------------------
@@ -98,14 +56,14 @@ typedef struct { volatile u32 offset[4096]; } __regbase32;
  * Clocks
  * ----------------------------------------------------------------------------
  */
-#define CLKGEN_RESET_BASE	(0xfffece00)
-#define ARM_CKCTL		(CLKGEN_RESET_BASE + 0x0)
-#define ARM_IDLECT1		(CLKGEN_RESET_BASE + 0x4)
-#define ARM_IDLECT2		(CLKGEN_RESET_BASE + 0x8)
-#define ARM_EWUPCT		(CLKGEN_RESET_BASE + 0xC)
-#define ARM_RSTCT1		(CLKGEN_RESET_BASE + 0x10)
-#define ARM_RSTCT2		(CLKGEN_RESET_BASE + 0x14)
-#define ARM_SYSST		(CLKGEN_RESET_BASE + 0x18)
+#define CLKGEN_REG_BASE		(0xfffece00)
+#define ARM_CKCTL		(CLKGEN_REG_BASE + 0x0)
+#define ARM_IDLECT1		(CLKGEN_REG_BASE + 0x4)
+#define ARM_IDLECT2		(CLKGEN_REG_BASE + 0x8)
+#define ARM_EWUPCT		(CLKGEN_REG_BASE + 0xC)
+#define ARM_RSTCT1		(CLKGEN_REG_BASE + 0x10)
+#define ARM_RSTCT2		(CLKGEN_REG_BASE + 0x14)
+#define ARM_SYSST		(CLKGEN_REG_BASE + 0x18)
 
 #define CK_RATEF		1
 #define CK_IDLEF		2
@@ -114,19 +72,27 @@ typedef struct { volatile u32 offset[4096]; } __regbase32;
 #define SETARM_IDLE_SHIFT
 
 /* DPLL control registers */
-#define DPLL_CTL_REG		(0xfffecf00)
-#define CK_DPLL1		(0xfffecf00)
+#define DPLL_CTL		(0xfffecf00)
 
-/* ULPD */
+/* DSP clock control */
+#define DSP_CONFIG_REG_BASE     (0xe1008000)
+#define DSP_IDLECT1		(DSP_CONFIG_REG_BASE + 0x4)
+#define DSP_IDLECT2		(DSP_CONFIG_REG_BASE + 0x8)
+
+/*
+ * ---------------------------------------------------------------------------
+ * UPLD
+ * ---------------------------------------------------------------------------
+ */
 #define ULPD_REG_BASE		(0xfffe0800)
-#define ULPD_IT_STATUS_REG	(ULPD_REG_BASE + 0x14)
-#define ULPD_CLOCK_CTRL_REG	(ULPD_REG_BASE + 0x30)
-#define ULPD_SOFT_REQ_REG	(ULPD_REG_BASE + 0x34)
-#define ULPD_DPLL_CTRL_REG	(ULPD_REG_BASE + 0x3c)
-#define ULPD_STATUS_REQ_REG	(ULPD_REG_BASE + 0x40)
-#define ULPD_APLL_CTRL_REG	(ULPD_REG_BASE + 0x4c)
-#define ULPD_POWER_CTRL_REG	(ULPD_REG_BASE + 0x50)
-#define ULPD_CAM_CLK_CTRL_REG	(ULPD_REG_BASE + 0x7c)
+#define ULPD_IT_STATUS		(ULPD_REG_BASE + 0x14)
+#define ULPD_CLOCK_CTRL		(ULPD_REG_BASE + 0x30)
+#define ULPD_SOFT_REQ		(ULPD_REG_BASE + 0x34)
+#define ULPD_DPLL_CTRL		(ULPD_REG_BASE + 0x3c)
+#define ULPD_STATUS_REQ		(ULPD_REG_BASE + 0x40)
+#define ULPD_APLL_CTRL		(ULPD_REG_BASE + 0x4c)
+#define ULPD_POWER_CTRL		(ULPD_REG_BASE + 0x50)
+#define ULPD_CAM_CLK_CTRL	(ULPD_REG_BASE + 0x7c)
 
 /*
  * ---------------------------------------------------------------------------
@@ -147,18 +113,24 @@ typedef struct { volatile u32 offset[4096]; } __regbase32;
 #define TIMER32k_ARL		(1<<3)
 
 /* MPU Timer base addresses */
-#define OMAP_MPUTIMER_BASE	0xfffec500
-#define OMAP_MPUTIMER_OFF	0x00000100
-
-#define OMAP_TIMER1_BASE	0xfffec500
-#define OMAP_TIMER2_BASE	0xfffec600
-#define OMAP_TIMER3_BASE	0xfffec700
-#define OMAP_WATCHDOG_BASE	0xfffec800
+#define OMAP_TIMER1_BASE	(0xfffec500)
+#define OMAP_TIMER2_BASE	(0xfffec600)
+#define OMAP_TIMER3_BASE	(0xfffec700)
+#define OMAP_MPUTIMER_BASE	OMAP_TIMER1_BASE
+#define OMAP_MPUTIMER_OFFSET	0x100
 
 /* MPU Timer Registers */
-#define CNTL_TIMER		0
-#define LOAD_TIM		4
-#define READ_TIM		8
+#define OMAP_TIMER1_CNTL	(OMAP_TIMER_BASE1 + 0x0)
+#define OMAP_TIMER1_LOAD_TIM	(OMAP_TIMER_BASE1 + 0x4)
+#define OMAP_TIMER1_READ_TIM	(OMAP_TIMER_BASE1 + 0x8)
+
+#define OMAP_TIMER2_CNTL	(OMAP_TIMER_BASE2 + 0x0)
+#define OMAP_TIMER2_LOAD_TIM	(OMAP_TIMER_BASE2 + 0x4)
+#define OMAP_TIMER2_READ_TIM	(OMAP_TIMER_BASE2 + 0x8)
+
+#define OMAP_TIMER3_CNTL	(OMAP_TIMER_BASE3 + 0x0)
+#define OMAP_TIMER3_LOAD_TIM	(OMAP_TIMER_BASE3 + 0x4)
+#define OMAP_TIMER3_READ_TIM	(OMAP_TIMER_BASE3 + 0x8)
 
 /* CNTL_TIMER register bits */
 #define MPUTIM_FREE		(1<<6)
@@ -168,6 +140,13 @@ typedef struct { volatile u32 offset[4096]; } __regbase32;
 #define MPUTIM_AR		(1<<1)
 #define MPUTIM_ST		(1<<0)
 
+/* Watchdog */
+#define OMAP_WATCHDOG_BASE	(0xfffec800)
+#define OMAP_WDT_TIMER		(OMAP_WATCHDOG_BASE + 0x0)
+#define OMAP_WDT_LOAD_TIM	(OMAP_WATCHDOG_BASE + 0x4)
+#define OMAP_WDT_READ_TIM	(OMAP_WATCHDOG_BASE + 0x4)
+#define OMAP_WDT_TIMER_MODE	(OMAP_WATCHDOG_BASE + 0x8)
+
 /*
  * ---------------------------------------------------------------------------
  * Interrupts
@@ -175,22 +154,30 @@ typedef struct { volatile u32 offset[4096]; } __regbase32;
  */
 #define OMAP_IH1_BASE		0xfffecb00
 #define OMAP_IH2_BASE		0xfffe0000
-#define OMAP_ITR		0x0
-#define OMAP_MASK		0x4
 
-#define IRQ_ITR			0x00
-#define IRQ_MIR			0x04
-#define IRQ_SIR_IRQ		0x10
-#define IRQ_SIR_FIQ		0x14
-#define IRQ_CONTROL_REG		0x18
-#define IRQ_ISR			0x9c
-#define IRQ_ILR0		0x1c
+#define OMAP_IH1_ITR		(OMAP_IH1_BASE + 0x00)
+#define OMAP_IH1_MIR		(OMAP_IH1_BASE + 0x04)
+#define OMAP_IH1_SIR_IRQ	(OMAP_IH1_BASE + 0x10)
+#define OMAP_IH1_SIR_FIQ	(OMAP_IH1_BASE + 0x14)
+#define OMAP_IH1_CONTROL	(OMAP_IH1_BASE + 0x18)
+#define OMAP_IH1_ILR0		(OMAP_IH1_BASE + 0x1c)
+#define OMAP_IH1_ISR		(OMAP_IH1_BASE + 0x9c)
 
-/* OMAP-1610 specific interrupt handler registers */
-#define OMAP_IH2_SECT1		(OMAP_IH2_BASE)
-#define OMAP_IH2_SECT2		(OMAP_IH2_BASE + 0x100)
-#define OMAP_IH2_SECT3		(OMAP_IH2_BASE + 0x200)
-#define OMAP_IH2_SECT4		(OMAP_IH2_BASE + 0x300)
+#define OMAP_IH2_ITR		(OMAP_IH2_BASE + 0x00)
+#define OMAP_IH2_MIR		(OMAP_IH2_BASE + 0x04)
+#define OMAP_IH2_SIR_IRQ	(OMAP_IH2_BASE + 0x10)
+#define OMAP_IH2_SIR_FIQ	(OMAP_IH2_BASE + 0x14)
+#define OMAP_IH2_CONTROL	(OMAP_IH2_BASE + 0x18)
+#define OMAP_IH2_ILR0		(OMAP_IH2_BASE + 0x1c)
+#define OMAP_IH2_ISR		(OMAP_IH2_BASE + 0x9c)
+
+#define IRQ_ITR_REG_OFFSET	0x00
+#define IRQ_MIR_REG_OFFSET	0x04
+#define IRQ_SIR_IRQ_REG_OFFSET	0x10
+#define IRQ_SIR_FIQ_REG_OFFSET	0x14
+#define IRQ_CONTROL_REG_OFFSET	0x18
+#define IRQ_ISR_REG_OFFSET	0x9c
+#define IRQ_ILR0_REG_OFFSET	0x1c
 
 /*
  * ---------------------------------------------------------------------------
@@ -199,9 +186,9 @@ typedef struct { volatile u32 offset[4096]; } __regbase32;
  */
 #define TCMIF_BASE		0xfffecc00
 #define IMIF_PRIO		(TCMIF_BASE + 0x00)
-#define EMIFS_PRIO_REG		(TCMIF_BASE + 0x04)
-#define EMIFF_PRIO_REG		(TCMIF_BASE + 0x08)
-#define EMIFS_CONFIG_REG	(TCMIF_BASE + 0x0c)
+#define EMIFS_PRIO		(TCMIF_BASE + 0x04)
+#define EMIFF_PRIO		(TCMIF_BASE + 0x08)
+#define EMIFS_CONFIG		(TCMIF_BASE + 0x0c)
 #define EMIFS_CS0_CONFIG	(TCMIF_BASE + 0x10)
 #define EMIFS_CS1_CONFIG	(TCMIF_BASE + 0x14)
 #define EMIFS_CS2_CONFIG	(TCMIF_BASE + 0x18)
@@ -214,7 +201,6 @@ typedef struct { volatile u32 offset[4096]; } __regbase32;
 #define TC_ENDIANISM		(TCMIF_BASE + 0x34)
 #define EMIFF_SDRAM_CONFIG_2	(TCMIF_BASE + 0x3c)
 #define EMIF_CFG_DYNAMIC_WS	(TCMIF_BASE + 0x40)
-
 /*
  * ----------------------------------------------------------------------------
  * System control registers
@@ -266,25 +252,24 @@ typedef struct { volatile u32 offset[4096]; } __regbase32;
  * ---------------------------------------------------------------------------
  */
 #define TIPB_PUBLIC_CNTL_BASE		0xfffed300
-#define MPU_PUBLIC_TIPB_CNTL_REG	(TIPB_PUBLIC_CNTL_BASE + 0x8)
+#define MPU_PUBLIC_TIPB_CNTL		(TIPB_PUBLIC_CNTL_BASE + 0x8)
 #define TIPB_PRIVATE_CNTL_BASE		0xfffeca00
-#define MPU_PRIVATE_TIPB_CNTL_REG	(TIPB_PRIVATE_CNTL_BASE + 0x8)
+#define MPU_PRIVATE_TIPB_CNTL		(TIPB_PRIVATE_CNTL_BASE + 0x8)
 
 /*
  * ----------------------------------------------------------------------------
- * DSP control registers
+ * MPUI interface
  * ----------------------------------------------------------------------------
  */
-/*  MPUI Interface Registers */
-#define MPUI_CTRL_REG		(0xfffec900)
-#define MPUI_DEBUG_ADDR		(0xfffec904)
-#define MPUI_DEBUG_DATA		(0xfffec908)
-#define MPUI_DEBUG_FLAG		(0xfffec90c)
-#define MPUI_STATUS_REG		(0xfffec910)
-#define MPUI_DSP_STATUS_REG	(0xfffec914)
-#define MPUI_DSP_BOOT_CONFIG	(0xfffec918)
-#define MPUI_DSP_API_CONFIG	(0xfffec91c)
-
+#define MPUI_BASE			(0xfffec900)
+#define MPUI_CTRL			(MPUI_BASE + 0x0)
+#define MPUI_DEBUG_ADDR			(MPUI_BASE + 0x4)
+#define MPUI_DEBUG_DATA			(MPUI_BASE + 0x8)
+#define MPUI_DEBUG_FLAG			(MPUI_BASE + 0xc)
+#define MPUI_STATUS_REG			(MPUI_BASE + 0x10)
+#define MPUI_DSP_STATUS			(MPUI_BASE + 0x14)
+#define MPUI_DSP_BOOT_CONFIG		(MPUI_BASE + 0x18)
+#define MPUI_DSP_API_CONFIG		(MPUI_BASE + 0x1c)
 
 #ifndef __ASSEMBLER__
 
@@ -293,34 +278,38 @@ typedef struct { volatile u32 offset[4096]; } __regbase32;
  * Processor differentiation
  * ---------------------------------------------------------------------------
  */
-#define OMAP_ID_REG		__REG32(0xfffed404)
+#define OMAP_ID_BASE		(0xfffed400)
+#define OMAP_ID_REG		__REG32(OMAP_ID_BASE +  0x04)
+
+#define ID_SHIFT		12
+#define ID_MASK			0x7fff
 
 /* See also uncompress.h */
-#define OMAP_ID_730		0xB55F
-#define OMAP_ID_1510		0xB470
-#define OMAP_ID_1610		0xB576
-#define OMAP_ID_1710		0xB5F7
-#define OMAP_ID_5912		0xB58C
+#define OMAP_ID_730		0x355F
+#define OMAP_ID_1510		0x3470
+#define OMAP_ID_1610		0x3576
+#define OMAP_ID_1710		0x35F7
+#define OMAP_ID_5912		0x358C
 
 #ifdef CONFIG_ARCH_OMAP730
 #include "omap730.h"
-#define cpu_is_omap730()	(((OMAP_ID_REG >> 12) & 0xffff) == OMAP_ID_730)
+#define cpu_is_omap730()	(((OMAP_ID_REG >> ID_SHIFT) & ID_MASK) == OMAP_ID_730)
 #else
 #define cpu_is_omap730()	0
 #endif
 
 #ifdef CONFIG_ARCH_OMAP1510
 #include "omap1510.h"
-#define cpu_is_omap1510()	(((OMAP_ID_REG >> 12) & 0xffff) == OMAP_ID_1510)
+#define cpu_is_omap1510()	(((OMAP_ID_REG >> ID_SHIFT) & ID_MASK) == OMAP_ID_1510)
 #else
 #define cpu_is_omap1510()	0
 #endif
 
 #ifdef CONFIG_ARCH_OMAP1610
 #include "omap1610.h"
-#define cpu_is_omap1710()       (((OMAP_ID_REG >> 12) & 0xffff) == OMAP_ID_1710)
+#define cpu_is_omap1710()       (((OMAP_ID_REG >> ID_SHIFT) & ID_MASK) == OMAP_ID_1710)
 /* Detect 1710 as 1610 for now */
-#define cpu_is_omap1610()	(((OMAP_ID_REG >> 12) & 0xffff) == OMAP_ID_1610 \
+#define cpu_is_omap1610()	(((OMAP_ID_REG >> ID_SHIFT) & ID_MASK) == OMAP_ID_1610 \
 				|| cpu_is_omap1710())
 #else
 #define cpu_is_omap1610()	0
@@ -329,7 +318,7 @@ typedef struct { volatile u32 offset[4096]; } __regbase32;
 
 #ifdef CONFIG_ARCH_OMAP5912
 #include "omap5912.h"
-#define cpu_is_omap5912()	(((OMAP_ID_REG >> 12) & 0xffff) == OMAP_ID_5912)
+#define cpu_is_omap5912()	(((OMAP_ID_REG >> ID_SHIFT) & ID_MASK) == OMAP_ID_5912)
 #else
 #define cpu_is_omap5912()	0
 #endif

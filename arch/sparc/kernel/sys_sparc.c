@@ -136,7 +136,8 @@ asmlinkage int sys_ipc (uint call, int first, int second, int third, void __user
 			if (!ptr)
 				goto out;
 			err = -EFAULT;
-			if(get_user(fourth.__pad, (void __user **)ptr))
+			if (get_user(fourth.__pad,
+				     (void __user * __user *)ptr))
 				goto out;
 			err = sys_semctl (first, second, third, fourth);
 			goto out;
@@ -165,7 +166,9 @@ asmlinkage int sys_ipc (uint call, int first, int second, int third, void __user
 				goto out;
 				}
 			case 1: default:
-				err = sys_msgrcv (first, (struct msgbuf *) ptr, second, fifth, third);
+				err = sys_msgrcv (first,
+						  (struct msgbuf __user *) ptr,
+						  second, fifth, third);
 				goto out;
 			}
 		case MSGGET:
@@ -194,7 +197,8 @@ asmlinkage int sys_ipc (uint call, int first, int second, int third, void __user
 				goto out;
 				}
 			case 1:	/* iBCS2 emulator entry point */
-				err = do_shmat (first, (char __user *) ptr, second, (ulong __user *) third);
+				err = do_shmat (first, (char __user *) ptr,
+						second, (ulong *) third);
 				goto out;
 			}
 		case SHMDT: 

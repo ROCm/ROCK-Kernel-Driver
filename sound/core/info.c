@@ -174,7 +174,7 @@ out:
 	return ret;
 }
 
-static ssize_t snd_info_entry_read(struct file *file, char *buffer,
+static ssize_t snd_info_entry_read(struct file *file, char __user *buffer,
 				   size_t count, loff_t * offset)
 {
 	snd_info_private_data_t *data;
@@ -208,7 +208,7 @@ static ssize_t snd_info_entry_read(struct file *file, char *buffer,
 	return size;
 }
 
-static ssize_t snd_info_entry_write(struct file *file, const char *buffer,
+static ssize_t snd_info_entry_write(struct file *file, const char __user *buffer,
 				    size_t count, loff_t * offset)
 {
 	snd_info_private_data_t *data;

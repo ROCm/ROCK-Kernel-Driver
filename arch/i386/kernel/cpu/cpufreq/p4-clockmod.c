@@ -27,7 +27,7 @@
 #include <linux/smp.h>
 #include <linux/cpufreq.h>
 #include <linux/slab.h>
-#include <linux/sched.h>
+#include <linux/cpumask.h>
 
 #include <asm/processor.h> 
 #include <asm/msr.h>
@@ -35,7 +35,7 @@
 
 #include "speedstep-lib.h"
 
-#define PFX	"cpufreq: "
+#define PFX	"p4-clockmod: "
 
 /*
  * Duty Cycle (3bits), note DC_DISABLE is not specified in
@@ -133,34 +133,28 @@ static int cpufreq_p4_target(struct cpufreq_policy *policy,
 #endif
 
 	/* notifiers */
-	for_each_cpu(i) {
-		if (cpu_isset(i, affected_cpu_map)) {
-			freqs.cpu = i;
-			cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-		}
+	for_each_cpu_mask(i, affected_cpu_map) {
+		freqs.cpu = i;
+		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 	}
 
 	/* run on each logical CPU, see section 13.15.3 of IA32 Intel Architecture Software
 	 * Developer's Manual, Volume 3 
 	 */
-	for_each_cpu(i) {
-		if (cpu_isset(i, affected_cpu_map)) {
-			cpumask_t this_cpu = cpumask_of_cpu(i);
+	for_each_cpu_mask(i, affected_cpu_map) {
+		cpumask_t this_cpu = cpumask_of_cpu(i);
 
-			set_cpus_allowed(current, this_cpu);
-			BUG_ON(smp_processor_id() != i);
+		set_cpus_allowed(current, this_cpu);
+		BUG_ON(smp_processor_id() != i);
 
-			cpufreq_p4_setdc(i, p4clockmod_table[newstate].index);
-		}
+		cpufreq_p4_setdc(i, p4clockmod_table[newstate].index);
 	}
 	set_cpus_allowed(current, cpus_allowed);
 
 	/* notifiers */
-	for_each_cpu(i) {
-		if (cpu_isset(i, affected_cpu_map)) {
-			freqs.cpu = i;
-			cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-		}
+	for_each_cpu_mask(i, affected_cpu_map) {
+		freqs.cpu = i;
+		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 	}
 
 	return 0;

@@ -11,11 +11,12 @@
  *  it under the terms of the GNU General Public License version 2 as
  *  published by the Free Software Foundation.
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/device.h>
 #include <linux/major.h>
-#include <linux/fs.h>
+#include <linux/fb.h>
 #include <linux/interrupt.h>
 
 #include <asm/setup.h>
@@ -28,11 +29,23 @@
 #include <asm/mach/map.h>
 #include <asm/mach/irq.h>
 
+#include <asm/arch/lubbock.h>
 #include <asm/arch/udc.h>
+#include <asm/arch/pxafb.h>
 #include <asm/hardware/sa1111.h>
 
 #include "generic.h"
 
+
+void lubbock_set_misc_wr(unsigned int mask, unsigned int set)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	LUB_MISC_WR = (LUB_MISC_WR & ~mask) | (set & mask);
+	local_irq_restore(flags);
+}
+EXPORT_SYMBOL(lubbock_set_misc_wr);
 
 static unsigned long lubbock_irq_enabled;
 
@@ -148,9 +161,29 @@ static struct platform_device *devices[] __initdata = {
 	&smc91x_device,
 };
 
+static struct pxafb_mach_info sharp_lm8v31 __initdata = {
+	.pixclock	= 270000,
+	.xres		= 640,
+	.yres		= 480,
+	.bpp		= 16,
+	.hsync_len	= 1,
+	.left_margin	= 3,
+	.right_margin	= 3,
+	.vsync_len	= 1,
+	.upper_margin	= 0,
+	.lower_margin	= 0,
+	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.cmap_greyscale	= 0,
+	.cmap_inverse	= 0,
+	.cmap_static	= 0,
+	.lccr0		= LCCR0_SDS,
+	.lccr3		= LCCR3_PCP | LCCR3_Acb(255),
+};
+
 static void __init lubbock_init(void)
 {
 	pxa_set_udc_info(&udc_info);
+	set_pxa_fb_info(&sharp_lm8v31);
 	(void) platform_add_devices(devices, ARRAY_SIZE(devices));
 }
 

@@ -20,13 +20,12 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/serial_reg.h>
-#include <asm/mach-types.h>
 #include <asm/hardware.h>
 #include <asm/arch/serial.h>
 
 #define UART_OMAP_MDR1		0x08	/* mode definition register */
 #define check_port(base, shift) ((base[UART_OMAP_MDR1 << shift] & 7) == 0)
-#define omap_get_id() ((*(volatile unsigned int *)(0xfffed404)) >> 12) & 0xffff
+#define omap_get_id() ((*(volatile unsigned int *)(0xfffed404)) >> 12) & ID_MASK
 
 static void
 puts(const char *s)

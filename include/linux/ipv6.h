@@ -192,6 +192,8 @@ struct inet6_skb_parm
 	__u16			dst1;
 };
 
+#define IP6CB(skb)	((struct inet6_skb_parm*)((skb)->cb))
+
 struct ipv6_pinfo {
 	struct in6_addr 	saddr;
 	struct in6_addr 	rcv_saddr;

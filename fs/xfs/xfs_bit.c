@@ -238,32 +238,33 @@ xfs_count_bits(uint *map, uint size, uint start_bit)
 int
 xfs_contig_bits(uint *map, uint	size, uint start_bit)
 {
-#if BITS_PER_LONG == 32
-	return find_next_zero_bit((unsigned long *)map,
-			size * sizeof(uint) * 8, start_bit) - start_bit;
-#else
-	/*
-	 * The first argument to find_next_zero_bit needs to be aligned,
-	 * but this is coming from the xfs_buf_log_format_t on-disk
-	 * struct, which can't be padded or otherwise modified w/o breaking
-	 * on-disk compatibility... so create a temporary, aligned
-	 * variable, copy over the bitmap, and send that to find_next_zero_bit
-	 * This only happens in recovery, so it's ugly but not too bad.
-	 */
-	void * addr;
-	int bit;
-	size_t bitmap_size = size * sizeof(uint);
+	uint * p = ((unsigned int *) map) + (start_bit >> BIT_TO_WORD_SHIFT);
+	uint result = 0;
+	uint tmp;
 
-	addr = (void *)kmem_alloc(bitmap_size, KM_SLEEP);
-	memcpy(addr, map, size * sizeof(uint));
+	size <<= BIT_TO_WORD_SHIFT;
 
-	bit = find_next_zero_bit((unsigned long *)addr,
-			size * sizeof(uint) * 8, start_bit) - start_bit;
-
-	kmem_free(addr, bitmap_size);
-
-	return bit;
-#endif
+	ASSERT(start_bit < size);
+	size -= start_bit & ~(NBWORD - 1);
+	start_bit &= (NBWORD - 1);
+	if (start_bit) {
+		tmp = *p++;
+		/* set to one first offset bits prior to start */
+		tmp |= (~0U >> (NBWORD-start_bit));
+		if (tmp != ~0U)
+			goto found;
+		result += NBWORD;
+		size -= NBWORD;
+	}
+	while (size) {
+		if ((tmp = *p++) != ~0U)
+			goto found;
+		result += NBWORD;
+		size -= NBWORD;
+	}
+	return result - start_bit;
+found:
+	return result + ffz(tmp) - start_bit;
 }
 
 /*
@@ -288,25 +289,20 @@ int xfs_next_bit(uint *map, uint size, uint start_bit)
 	start_bit &= (NBWORD - 1);
 	if (start_bit) {
 		tmp = *p++;
-		/* set to zero first offset bits */
+		/* set to zero first offset bits prior to start */
 		tmp &= (~0U << start_bit);
-		if (size < NBWORD)
-			goto found_first;
 		if (tmp != 0U)
-			goto found_middle;
-		size -= NBWORD;
+			goto found;
 		result += NBWORD;
+		size -= NBWORD;
 	}
-	while (size >= NBWORD) {
+	while (size) {
 		if ((tmp = *p++) != 0U)
-			goto found_middle;
+			goto found;
 		result += NBWORD;
 		size -= NBWORD;
 	}
-	if (!size)
-		return -1;
-	tmp = *p;
-found_first:
-found_middle:
+	return -1;
+found:
 	return result + ffs(tmp) - 1;
 }

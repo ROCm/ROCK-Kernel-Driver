@@ -64,7 +64,7 @@ static IR_KEYTAB_TYPE ir_codes_avermedia[IR_KEYTAB_SIZE] = {
 	[ 13 ] = KEY_STOP,        // freeze 
 	[ 29 ] = KEY_RECORD,      // capture 
 	[  3 ] = KEY_PLAY,        // unmarked
-	[ 24 ] = KEY_RED,         // unmarked
+	[ 23 ] = KEY_RED,         // unmarked
 	[  7 ] = KEY_GREEN,       // unmarked
 
 #if 0

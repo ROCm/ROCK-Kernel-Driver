@@ -103,7 +103,7 @@ static __inline__ void _raw_spin_lock_flags(spinlock_t *lock,
 	unsigned long tmp2;
 
 	__asm__ __volatile__(
-	"b		2f		# spin_lock\n\
+	"b		3f		# spin_lock\n\
 1:	mfmsr		%1\n\
 	mtmsrd		%3,1\n\
 2:"	HMT_LOW

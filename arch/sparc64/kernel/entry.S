@@ -1697,12 +1697,12 @@ linux_sparc_syscall32:
 	 add		%sp, PTREGS_OFF, %o0
 	srl		%i0, 0, %o0
 #endif
-	mov		%i4, %o4				! IEU1
+	srl		%i4, 0, %o4				! IEU1
 	lduw		[%l7 + %l4], %l7			! Load
 	srl		%i1, 0, %o1				! IEU0	Group
 	ldx		[%curptr + TI_FLAGS], %l0		! Load
 
-	mov		%i5, %o5				! IEU1
+	srl		%i5, 0, %o5				! IEU1
 	srl		%i2, 0, %o2				! IEU0	Group
 	andcc		%l0, _TIF_SYSCALL_TRACE, %g0		! IEU0	Group
 	bne,pn		%icc, linux_syscall_trace32		! CTI

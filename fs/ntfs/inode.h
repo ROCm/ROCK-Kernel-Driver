@@ -281,6 +281,15 @@ extern void ntfs_truncate(struct inode *vi);
 
 extern int ntfs_setattr(struct dentry *dentry, struct iattr *attr);
 
+extern void ntfs_write_inode(struct inode *vi, int sync);
+
+static inline void ntfs_commit_inode(struct inode *vi)
+{
+	if (!is_bad_inode(vi))
+		ntfs_write_inode(vi, 1);
+	return;
+}
+
 #endif /* NTFS_RW */
 
 #endif /* _LINUX_NTFS_INODE_H */

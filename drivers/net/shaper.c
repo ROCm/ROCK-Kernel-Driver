@@ -579,7 +579,7 @@ static int shaper_attach(struct net_device *shdev, struct shaper *sh, struct net
 
 static int shaper_ioctl(struct net_device *dev,  struct ifreq *ifr, int cmd)
 {
-	struct shaperconf *ss= (struct shaperconf *)&ifr->ifr_data;
+	struct shaperconf *ss= (struct shaperconf *)&ifr->ifr_ifru;
 	struct shaper *sh=dev->priv;
 	
 	if(ss->ss_cmd == SHAPER_SET_DEV || ss->ss_cmd == SHAPER_SET_SPEED)

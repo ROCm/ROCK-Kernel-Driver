@@ -1298,7 +1298,6 @@ xfs_qm_internalqcheck_dqadjust(
 STATIC int
 xfs_qm_internalqcheck_adjust(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
-	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	ino,		/* inode number to get data for */
 	void		*buffer,	/* not used */
 	int		ubsize,		/* not used */
@@ -1327,7 +1326,7 @@ xfs_qm_internalqcheck_adjust(
 	ipreleased = B_FALSE;
  again:
 	lock_flags = XFS_ILOCK_SHARED;
-	if ((error = xfs_iget(mp, tp, ino, lock_flags, &ip, bno))) {
+	if ((error = xfs_iget(mp, NULL, ino, lock_flags, &ip, bno))) {
 		*res = BULKSTAT_RV_NOTHING;
 		return (error);
 	}
@@ -1405,7 +1404,7 @@ xfs_qm_internalqcheck(
 		 * Iterate thru all the inodes in the file system,
 		 * adjusting the corresponding dquot counters
 		 */
-		if ((error = xfs_bulkstat(mp, NULL, &lastino, &count,
+		if ((error = xfs_bulkstat(mp, &lastino, &count,
 				 xfs_qm_internalqcheck_adjust, NULL,
 				 0, NULL, BULKSTAT_FG_IGET, &done))) {
 			break;

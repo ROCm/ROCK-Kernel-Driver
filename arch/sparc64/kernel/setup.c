@@ -293,7 +293,7 @@ int prom_callback(long *args)
 		unsigned long tte;
 
 		tte = args[3];
-		prom_printf("%lx ", (tte & 0x07FC000000000000) >> 50);
+		prom_printf("%lx ", (tte & 0x07FC000000000000UL) >> 50);
 
 		args[2] = 2;
 		args[args[1] + 3] = 0;

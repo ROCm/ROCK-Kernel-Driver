@@ -253,6 +253,8 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		/* acpi=ht just means: do ACPI MADT parsing 
 		   at bootup, but don't enable the full ACPI interpreter */
 		if (!memcmp(from, "acpi=ht", 7)) { 
+			/* if (!acpi_force) */
+				disable_acpi();
 			acpi_ht = 1; 
 		}
                 else if (!memcmp(from, "pci=noacpi", 10)) 
@@ -535,8 +537,7 @@ void __init setup_arch(char **cmdline_p)
         * the bootmem allocator) but before get_smp_config (to allow parsing
         * of MADT).
         */
-	if (!acpi_disabled)
-		acpi_boot_init();
+	acpi_boot_init();
 #endif
 #ifdef CONFIG_X86_LOCAL_APIC
 	/*
@@ -909,7 +910,7 @@ void __init early_identify_cpu(struct cpuinfo_x86 *c)
 			c->x86_model += ((tfms >> 16) & 0xF) << 4;
 		} 
 		if (c->x86_capability[0] & (1<<19)) 
-       		c->x86_clflush_size = ((misc >> 8) & 0xff) * 8;
+			c->x86_clflush_size = ((misc >> 8) & 0xff) * 8;
 	} else {
 		/* Have CPUID level 0 only - unheard of */
 		c->x86 = 4;
@@ -967,7 +968,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 			display_cacheinfo(c);
 			break;
 	}
-	
+
 	select_idle_routine(c);
 	detect_ht(c); 
 		

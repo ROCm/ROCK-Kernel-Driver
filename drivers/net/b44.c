@@ -1633,7 +1633,7 @@ static struct ethtool_ops b44_ethtool_ops = {
 
 static int b44_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	struct mii_ioctl_data __user *data = (struct mii_ioctl_data __user *)&ifr->ifr_data;
+	struct mii_ioctl_data *data = if_mii(ifr);
 	struct b44 *bp = netdev_priv(dev);
 	int err;
 
@@ -1882,10 +1882,10 @@ static int b44_resume(struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct b44 *bp = dev->priv;
 
+	pci_restore_state(pdev, bp->pci_cfg_state);
+
 	if (!netif_running(dev))
 		return 0;
-
-	pci_restore_state(pdev, bp->pci_cfg_state);
 
 	spin_lock_irq(&bp->lock);
 

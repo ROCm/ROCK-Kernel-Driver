@@ -75,7 +75,6 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h> 
-#include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/smp.h>
 #include <linux/cpufreq.h>
@@ -125,7 +124,7 @@ static int stock_freq;
 
 /* PCI bus clock - defaults to 30.000 if cpu_khz is not available */
 static int pci_busclk = 0;
-MODULE_PARM(pci_busclk, "i");
+module_param (pci_busclk, int, 0444);
 
 /* maximum duration for which the cpu may be suspended
  * (32us * MAX_DURATION). If no parameter is given, this defaults
@@ -134,7 +133,7 @@ MODULE_PARM(pci_busclk, "i");
  * is suspended -- processing power is just 0.39% of what it used to be,
  * though. 781.25 kHz(!) for a 200 MHz processor -- wow. */
 static int max_duration = 255;
-MODULE_PARM(max_duration, "i");
+module_param (max_duration, int, 0444);
 
 /* For the default policy, we want at least some processing power
  * - let's say 5%. (min = maxfreq / POLICY_MIN_DIV)

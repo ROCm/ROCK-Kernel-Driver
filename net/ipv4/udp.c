@@ -294,7 +294,7 @@ static inline struct sock *udp_v4_mcast_next(struct sock *sk,
 		    ipv6_only_sock(s)					||
 		    (s->sk_bound_dev_if && s->sk_bound_dev_if != dif))
 			continue;
-		if (!ip_mc_sf_allow(sk, loc_addr, rmt_addr, dif))
+		if (!ip_mc_sf_allow(s, loc_addr, rmt_addr, dif))
 			continue;
 		goto found;
   	}
@@ -725,7 +725,7 @@ int udp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 		case SIOCOUTQ:
 		{
 			int amount = atomic_read(&sk->sk_wmem_alloc);
-			return put_user(amount, (int *)arg);
+			return put_user(amount, (int __user *)arg);
 		}
 
 		case SIOCINQ:
@@ -745,7 +745,7 @@ int udp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 				amount = skb->len - sizeof(struct udphdr);
 			}
 			spin_unlock_irq(&sk->sk_receive_queue.lock);
-			return put_user(amount, (int *)arg);
+			return put_user(amount, (int __user *)arg);
 		}
 
 		default:
@@ -1269,7 +1269,7 @@ static int udp_destroy_sock(struct sock *sk)
  *	Socket option code for UDP
  */
 static int udp_setsockopt(struct sock *sk, int level, int optname, 
-			  char *optval, int optlen)
+			  char __user *optval, int optlen)
 {
 	struct udp_opt *up = udp_sk(sk);
 	int val;
@@ -1281,7 +1281,7 @@ static int udp_setsockopt(struct sock *sk, int level, int optname,
 	if(optlen<sizeof(int))
 		return -EINVAL;
 
-	if (get_user(val, (int *)optval))
+	if (get_user(val, (int __user *)optval))
 		return -EFAULT;
 
 	switch(optname) {
@@ -1309,7 +1309,7 @@ static int udp_setsockopt(struct sock *sk, int level, int optname,
 }
 
 static int udp_getsockopt(struct sock *sk, int level, int optname, 
-			  char *optval, int *optlen)
+			  char __user *optval, int __user *optlen)
 {
 	struct udp_opt *up = udp_sk(sk);
 	int val, len;

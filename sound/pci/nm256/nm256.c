@@ -275,11 +275,15 @@ struct snd_nm256 {
 #ifndef PCI_DEVICE_ID_NEOMAGIC_NM256ZX_AUDIO
 #define PCI_DEVICE_ID_NEOMAGIC_NM256ZX_AUDIO 0x8006
 #endif
+#ifndef PCI_DEVICE_ID_NEOMAGIC_NM256XL_PLUS_AUDIO
+#define PCI_DEVICE_ID_NEOMAGIC_NM256XL_PLUS_AUDIO 0x8016
+#endif
 
 
 static struct pci_device_id snd_nm256_ids[] = {
 	{PCI_VENDOR_ID_NEOMAGIC, PCI_DEVICE_ID_NEOMAGIC_NM256AV_AUDIO, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{PCI_VENDOR_ID_NEOMAGIC, PCI_DEVICE_ID_NEOMAGIC_NM256ZX_AUDIO, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{PCI_VENDOR_ID_NEOMAGIC, PCI_DEVICE_ID_NEOMAGIC_NM256XL_PLUS_AUDIO, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0,},
 };
 
@@ -680,7 +684,7 @@ static int
 snd_nm256_playback_copy(snd_pcm_substream_t *substream,
 			int channel, /* not used (interleaved data) */
 			snd_pcm_uframes_t pos,
-			void *src,
+			void __user *src,
 			snd_pcm_uframes_t count)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -1590,6 +1594,9 @@ static int __devinit snd_nm256_probe(struct pci_dev *pci,
 		break;
 	case PCI_DEVICE_ID_NEOMAGIC_NM256ZX_AUDIO:
 		strcpy(card->driver, "NM256ZX");
+		break;
+	case PCI_DEVICE_ID_NEOMAGIC_NM256XL_PLUS_AUDIO:
+		strcpy(card->driver, "NM256XL+");
 		break;
 	default:
 		snd_printk("invalid device id 0x%x\n", pci->device);

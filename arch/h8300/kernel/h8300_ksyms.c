@@ -40,6 +40,8 @@ EXPORT_SYMBOL(strncmp);
 EXPORT_SYMBOL(ip_fast_csum);
 
 EXPORT_SYMBOL(kernel_thread);
+EXPORT_SYMBOL(enable_irq);
+EXPORT_SYMBOL(disable_irq);
 
 /* Networking helper routines. */
 EXPORT_SYMBOL(csum_partial_copy);

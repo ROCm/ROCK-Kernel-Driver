@@ -269,7 +269,7 @@ struct udsl_instance_data {
 static void udsl_atm_dev_close (struct atm_dev *dev);
 static int udsl_atm_open (struct atm_vcc *vcc);
 static void udsl_atm_close (struct atm_vcc *vcc);
-static int udsl_atm_ioctl (struct atm_dev *dev, unsigned int cmd, void *arg);
+static int udsl_atm_ioctl (struct atm_dev *dev, unsigned int cmd, void __user *arg);
 static int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb);
 static int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t *pos, char *page);
 
@@ -991,11 +991,11 @@ static void udsl_atm_close (struct atm_vcc *vcc)
 	dbg ("udsl_atm_close successful");
 }
 
-static int udsl_atm_ioctl (struct atm_dev *dev, unsigned int cmd, void *arg)
+static int udsl_atm_ioctl (struct atm_dev *dev, unsigned int cmd, void __user *arg)
 {
 	switch (cmd) {
 	case ATM_QUERYLOOP:
-		return put_user (ATM_LM_NONE, (int *) arg) ? -EFAULT : 0;
+		return put_user (ATM_LM_NONE, (int __user *)arg) ? -EFAULT : 0;
 	default:
 		return -ENOIOCTLCMD;
 	}

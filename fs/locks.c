@@ -1720,6 +1720,9 @@ void locks_remove_flock(struct file *filp)
 				lease_modify(before, F_UNLCK);
 				continue;
 			}
+			/* FL_POSIX locks of this process have already been
+			 * removed in filp_close->locks_remove_posix.
+			 */
 			BUG();
  		}
 		before = &fl->fl_next;
@@ -1813,7 +1816,7 @@ static void lock_get_status(char* out, struct file_lock *fl, int id, char *pfx)
 			       : (fl->fl_type & F_WRLCK) ? "WRITE" : "READ ");
 	}
 	if (inode) {
-#if WE_CAN_BREAK_LSLK_NOW
+#ifdef WE_CAN_BREAK_LSLK_NOW
 		out += sprintf(out, "%d %s:%ld ", fl->fl_pid,
 				inode->i_sb->s_id, inode->i_ino);
 #else
@@ -1979,18 +1982,49 @@ int lock_may_write(struct inode *inode, loff_t start, unsigned long len)
 
 EXPORT_SYMBOL(lock_may_write);
 
+static inline void __steal_locks(struct file *file, fl_owner_t from)
+{
+	struct inode *inode = file->f_dentry->d_inode;
+	struct file_lock *fl = inode->i_flock;
+
+	while (fl) {
+		if (fl->fl_file == file && fl->fl_owner == from)
+			fl->fl_owner = current->files;
+		fl = fl->fl_next;
+	}
+}
+
+/* When getting ready for executing a binary, we make sure that current
+ * has a files_struct on its own. Before dropping the old files_struct,
+ * we take over ownership of all locks for all file descriptors we own.
+ * Note that we may accidentally steal a lock for a file that a sibling
+ * has created since the unshare_files() call.
+ */
 void steal_locks(fl_owner_t from)
 {
-	struct list_head *tmp;
+	struct files_struct *files = current->files;
+	int i, j;
 
-	if (from == current->files)
+	if (from == files)
 		return;
 
 	lock_kernel();
-	list_for_each(tmp, &file_lock_list) {
-		struct file_lock *fl = list_entry(tmp, struct file_lock, fl_link);
-		if (fl->fl_owner == from)
-			fl->fl_owner = current->files;
+	j = 0;
+	for (;;) {
+		unsigned long set;
+		i = j * __NFDBITS;
+		if (i >= files->max_fdset || i >= files->max_fds)
+			break;
+		set = files->open_fds->fds_bits[j++];
+		while (set) {
+			if (set & 1) {
+				struct file *file = files->fd[i];
+				if (file)
+					__steal_locks(file, from);
+			}
+			i++;
+			set >>= 1;
+		}
 	}
 	unlock_kernel();
 }

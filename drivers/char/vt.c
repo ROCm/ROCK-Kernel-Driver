@@ -152,7 +152,7 @@ static void gotoxy(int currcons, int new_x, int new_y);
 static void save_cur(int currcons);
 static void reset_terminal(int currcons, int do_clear);
 static void con_flush_chars(struct tty_struct *tty);
-static void set_vesa_blanking(unsigned long arg);
+static void set_vesa_blanking(char __user *p);
 static void set_cursor(int currcons);
 static void hide_cursor(int currcons);
 static void console_callback(void *ignored);
@@ -2274,6 +2274,7 @@ struct console vt_console_driver = {
 int tioclinux(struct tty_struct *tty, unsigned long arg)
 {
 	char type, data;
+	char __user *p = (char __user *)arg;
 	int lines;
 	int ret;
 
@@ -2281,14 +2282,14 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 		return -EINVAL;
 	if (current->signal->tty != tty && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
-	if (get_user(type, (char *)arg))
+	if (get_user(type, p))
 		return -EFAULT;
 	ret = 0;
 	switch (type)
 	{
 		case TIOCL_SETSEL:
 			acquire_console_sem();
-			ret = set_selection((struct tiocl_selection *)((char *)arg+1), tty, 1);
+			ret = set_selection((struct tiocl_selection __user *)(p+1), tty);
 			release_console_sem();
 			break;
 		case TIOCL_PASTESEL:
@@ -2298,7 +2299,7 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 			unblank_screen();
 			break;
 		case TIOCL_SELLOADLUT:
-			ret = sel_loadlut(arg);
+			ret = sel_loadlut(p);
 			break;
 		case TIOCL_GETSHIFTSTATE:
 			
@@ -2309,20 +2310,20 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 	 * related to the kernel should not use this.
 	 */
 	 		data = shift_state;
-			ret = __put_user(data, (char *) arg);
+			ret = __put_user(data, p);
 			break;
 		case TIOCL_GETMOUSEREPORTING:
 			data = mouse_reporting();
-			ret = __put_user(data, (char *) arg);
+			ret = __put_user(data, p);
 			break;
 		case TIOCL_SETVESABLANK:
-			set_vesa_blanking(arg);
+			set_vesa_blanking(p);
 			break;
 		case TIOCL_SETKMSGREDIRECT:
 			if (!capable(CAP_SYS_ADMIN)) {
 				ret = -EPERM;
 			} else {
-				if (get_user(data, (char *)arg+1))
+				if (get_user(data, p+1))
 					ret = -EFAULT;
 				else
 					kmsg_redirect = data;
@@ -2332,7 +2333,7 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 			ret = fg_console;
 			break;
 		case TIOCL_SCROLLCONSOLE:
-			if (get_user(lines, (s32 *)((char *)arg+4))) {
+			if (get_user(lines, (s32 __user *)(p+4))) {
 				ret = -EFAULT;
 			} else {
 				scrollfront(lines);
@@ -2757,11 +2758,10 @@ void give_up_console(const struct consw *csw)
  *	Screen blanking
  */
 
-static void set_vesa_blanking(unsigned long arg)
+static void set_vesa_blanking(char __user *p)
 {
-    char *argp = (char *)arg + 1;
     unsigned int mode;
-    get_user(mode, argp);
+    get_user(mode, p + 1);
     vesa_blank_mode = (mode < 4) ? mode : 0;
 }
 
@@ -2937,7 +2937,7 @@ void set_palette(int currcons)
 		sw->con_set_palette(vc_cons[currcons].d, color_table);
 }
 
-static int set_get_cmap(unsigned char *arg, int set)
+static int set_get_cmap(unsigned char __user *arg, int set)
 {
     int i, j, k;
 
@@ -2972,7 +2972,7 @@ static int set_get_cmap(unsigned char *arg, int set)
  * map, 3 bytes per colour, 16 colours, range from 0 to 255.
  */
 
-int con_set_cmap(unsigned char *arg)
+int con_set_cmap(unsigned char __user *arg)
 {
 	int rc;
 
@@ -2983,7 +2983,7 @@ int con_set_cmap(unsigned char *arg)
 	return rc;
 }
 
-int con_get_cmap(unsigned char *arg)
+int con_get_cmap(unsigned char __user *arg)
 {
 	int rc;
 
@@ -3037,7 +3037,8 @@ int con_font_op(int currcons, struct console_font_op *op)
 			goto quit;
 		if (!op->height) {		/* Need to guess font height [compat] */
 			int h, i;
-			u8 *charmap = op->data, tmp;
+			u8 __user *charmap = op->data;
+			u8 tmp;
 			
 			/* If from KDFONTOP ioctl, don't allow things which can be done in userland,
 			   so that we can get rid of this soon */

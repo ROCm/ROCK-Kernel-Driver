@@ -92,6 +92,7 @@ extern int attr_generic_list(struct vnode *, void *, size_t, int, ssize_t *);
 #define ATTR_REPLACE	0x0020	/* pure set: fail if attr does not exist */
 #define ATTR_SYSTEM	0x0100	/* use attrs in system (pseudo) namespace */
 
+#define ATTR_KERNACCESS	0x0400	/* [kernel] iaccess, inode held io-locked */
 #define ATTR_KERNOTIME	0x1000	/* [kernel] don't update inode timestamps */
 #define ATTR_KERNOVAL	0x2000	/* [kernel] get attr size only, not value */
 #define ATTR_KERNAMELS	0x4000	/* [kernel] list attr names (simple list) */
@@ -186,6 +187,7 @@ int xfs_attr_inactive(struct xfs_inode *dp);
 int xfs_attr_node_get(struct xfs_da_args *);
 int xfs_attr_leaf_get(struct xfs_da_args *);
 int xfs_attr_shortform_getvalue(struct xfs_da_args *);
-int xfs_attr_fetch(struct xfs_inode *, char *, char *, int);
+int xfs_attr_fetch(struct xfs_inode *, char *, int,
+			char *, int *, int, struct cred *);
 
 #endif	/* __XFS_ATTR_H__ */

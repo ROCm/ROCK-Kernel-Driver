@@ -232,7 +232,7 @@ static int sctp_sysctl_jiffies_ms(ctl_table *table, int __user *name, int nlen,
 				return -EINVAL;
 		}
 		if (put_user((*(int *)(table->data) * 1000) / HZ,
-			(int *)oldval) ||
+			(int __user *)oldval) ||
 		    (oldlenp && put_user(sizeof (int), oldlenp)))
 			return -EFAULT;
 	}
@@ -242,7 +242,7 @@ static int sctp_sysctl_jiffies_ms(ctl_table *table, int __user *name, int nlen,
 		if (newlen != sizeof (int))
 			return -EINVAL;
 
-		if (get_user(new, (int *)newval))
+		if (get_user(new, (int __user *)newval))
 			return -EFAULT;
 
 		*(int *)(table->data) = (new * HZ) / 1000;

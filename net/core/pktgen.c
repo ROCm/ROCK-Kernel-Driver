@@ -870,7 +870,7 @@ static int proc_read(char *buf , char **start, off_t offset,
 	return p - buf;
 }
 
-static int count_trail_chars(const char *user_buffer, unsigned int maxlen)
+static int count_trail_chars(const char __user *user_buffer, unsigned int maxlen)
 {
 	int i;
 
@@ -895,7 +895,7 @@ done:
 	return i;
 }
 
-static unsigned long num_arg(const char *user_buffer, unsigned long maxlen,
+static unsigned long num_arg(const char __user *user_buffer, unsigned long maxlen,
 			     unsigned long *num)
 {
 	int i = 0;
@@ -916,7 +916,7 @@ static unsigned long num_arg(const char *user_buffer, unsigned long maxlen,
 	return i;
 }
 
-static int strn_len(const char *user_buffer, unsigned int maxlen)
+static int strn_len(const char __user *user_buffer, unsigned int maxlen)
 {
 	int i = 0;
 
@@ -940,7 +940,7 @@ done_str:
 	return i;
 }
 
-static int proc_write(struct file *file, const char *user_buffer,
+static int proc_write(struct file *file, const char __user *user_buffer,
 			 unsigned long count, void *data)
 {
 	int i = 0, max, len;

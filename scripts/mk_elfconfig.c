@@ -55,7 +55,7 @@ main(int argc, char **argv)
 	else
 		abort();
 
-	if (strcmp(argv[1], "v850") == 0)
+	if ((strcmp(argv[1], "v850") == 0) || (strcmp(argv[1], "h8300") == 0))
 		printf("#define MODULE_SYMBOL_PREFIX \"_\"\n");
 	else 
 		printf("#define MODULE_SYMBOL_PREFIX \"\"\n");

@@ -65,9 +65,10 @@
 
 #define access_ok(type,addr,size) __access_ok(addr,size)
 
-extern inline int verify_area(int type, const void * addr, unsigned long size)
+extern inline int verify_area(int type, const void __user *addr,
+						unsigned long size)
 {
-        return access_ok(type,addr,size)?0:-EFAULT;
+	return access_ok(type, addr, size) ? 0 : -EFAULT;
 }
 
 /*
@@ -147,6 +148,7 @@ struct exception_table_entry
 })
 #endif
 
+#ifndef __CHECKER__
 #define __put_user(x, ptr) \
 ({								\
 	__typeof__(*(ptr)) __x = (x);				\
@@ -164,6 +166,14 @@ struct exception_table_entry
 	 }							\
 	__pu_err;						\
 })
+#else
+#define __put_user(x, ptr)			\
+({						\
+	void __user *p;				\
+	p = (ptr);				\
+	0;					\
+})
+#endif
 
 #define put_user(x, ptr)					\
 ({								\
@@ -202,6 +212,7 @@ extern int __put_user_bad(void);
 })
 #endif
 
+#ifndef __CHECKER__
 #define __get_user(x, ptr)					\
 ({								\
 	__typeof__(*(ptr)) __x;					\
@@ -221,6 +232,15 @@ extern int __put_user_bad(void);
 	(x) = __x;						\
 	__gu_err;						\
 })
+#else
+#define __get_user(x, ptr)			\
+({						\
+	void __user *p;				\
+	p = (ptr);				\
+	0;					\
+})
+#endif
+
 
 #define get_user(x, ptr)					\
 ({								\
@@ -230,7 +250,7 @@ extern int __put_user_bad(void);
 
 extern int __get_user_bad(void);
 
-extern long __copy_to_user_asm(const void *from, long n, void *to);
+extern long __copy_to_user_asm(const void *from, long n, void __user *to);
 
 /**
  * __copy_to_user: - Copy a block of data into user space, with less checking.
@@ -274,7 +294,7 @@ copy_to_user(void __user *to, const void *from, unsigned long n)
 	return n;
 }
 
-extern long __copy_from_user_asm(void *to, long n, const void *from);
+extern long __copy_from_user_asm(void *to, long n, const void __user *from);
 
 /**
  * __copy_from_user: - Copy a block of data from user space, with less checking.
@@ -326,12 +346,13 @@ copy_from_user(void *to, const void __user *from, unsigned long n)
 	return n;
 }
 
-extern long __copy_in_user_asm(const void *from, long n, void *to);
+extern unsigned long __copy_in_user_asm(const void __user *from, long n,
+							void __user *to);
 
 static inline unsigned long
 __copy_in_user(void __user *to, const void __user *from, unsigned long n)
 {
-	__copy_in_user_asm(from, n, to);
+	return __copy_in_user_asm(from, n, to);
 }
 
 static inline unsigned long
@@ -346,26 +367,27 @@ copy_in_user(void __user *to, const void __user *from, unsigned long n)
 /*
  * Copy a null terminated string from userspace.
  */
-extern long __strncpy_from_user_asm(char *dst, const char *src, long count);
+extern long __strncpy_from_user_asm(long count, char *dst,
+					const char __user *src);
 
 static inline long
-strncpy_from_user(char *dst, const char *src, long count)
+strncpy_from_user(char *dst, const char __user *src, long count)
 {
         long res = -EFAULT;
         might_sleep();
         if (access_ok(VERIFY_READ, src, 1))
-                res = __strncpy_from_user_asm(dst, src, count);
+                res = __strncpy_from_user_asm(count, dst, src);
         return res;
 }
 
 
-extern long __strnlen_user_asm(const char *src, long count);
+extern long __strnlen_user_asm(long count, const char __user *src);
 
 static inline unsigned long
-strnlen_user(const char * src, unsigned long n)
+strnlen_user(const char __user * src, unsigned long n)
 {
 	might_sleep();
-	return __strnlen_user_asm(src, n);
+	return __strnlen_user_asm(n, src);
 }
 
 /**
@@ -388,16 +410,16 @@ strnlen_user(const char * src, unsigned long n)
  * Zero Userspace
  */
 
-extern long __clear_user_asm(void *to, long n);
+extern long __clear_user_asm(void __user *to, long n);
 
 static inline unsigned long
-__clear_user(void *to, unsigned long n)
+__clear_user(void __user *to, unsigned long n)
 {
 	return __clear_user_asm(to, n);
 }
 
 static inline unsigned long
-clear_user(void *to, unsigned long n)
+clear_user(void __user *to, unsigned long n)
 {
 	might_sleep();
 	if (access_ok(VERIFY_WRITE, to, n))

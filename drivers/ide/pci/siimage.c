@@ -21,7 +21,6 @@
  *	if neccessary
  */
 
-#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/module.h>
 #include <linux/pci.h>
@@ -32,16 +31,8 @@
 
 #include <asm/io.h>
 
-#include "siimage.h"
-
-#if defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/proc_fs.h>
-
-static u8 siimage_proc = 0;
-#define SIIMAGE_MAX_DEVS		16
-static struct pci_dev *siimage_devs[SIIMAGE_MAX_DEVS];
-static int n_siimage_devs;
-#endif /* defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS) */
+#undef SIIMAGE_VIRTUAL_DMAPIO
+#undef SIIMAGE_LARGE_DMA
 
 /**
  *	pdev_is_sata		-	check if device is SATA
@@ -120,67 +111,6 @@ static inline unsigned long siimage_seldev(ide_drive_t *drive, int r)
 	base |= drive->select.b.unit << drive->select.b.unit;
 	return base;
 }
-
-#if defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS)
-/**
- *	print_siimage_get_info	-	print minimal proc information
- *	@buf: buffer to write into (kernel space)
- *	@dev: PCI device we are describing
- *	@index: Controller number
- *
- *	Print the basic information for the state of the CMD680/SI3112
- *	channel. We don't actually dump a lot of information out for
- *	this controller although we could expand it if we needed.
- */
- 
-static char *print_siimage_get_info (char *buf, struct pci_dev *dev, int index)
-{
-	char *p		= buf;
-	u8 mmio		= (pci_get_drvdata(dev) != NULL) ? 1 : 0;
-	unsigned long bmdma = pci_resource_start(dev, 4);
-	
-	if(mmio)
-		bmdma = pci_resource_start(dev, 5);
-
-	p += sprintf(p, "\nController: %d\n", index);
-	p += sprintf(p, "SiI%x Chipset.\n", dev->device);
-	if (mmio)
-		p += sprintf(p, "MMIO Base 0x%lx\n", bmdma);
-	p += sprintf(p, "%s-DMA Base 0x%lx\n", (mmio)?"MMIO":"BM", bmdma);
-	p += sprintf(p, "%s-DMA Base 0x%lx\n", (mmio)?"MMIO":"BM", bmdma+8);
-	return (char *)p;
-}
-
-/**
- *	siimage_get_info	-	proc callback
- *	@buffer: kernel buffer to complete
- *	@addr: written with base of data to return
- *	offset: seek offset
- *	count: bytes to fill in 
- *
- *	Called when the user reads data from the virtual file for this
- *	controller from /proc
- */
- 
-static int siimage_get_info (char *buffer, char **addr, off_t offset, int count)
-{
-	char *p = buffer;
-	int len;
-	u16 i;
-
-	p += sprintf(p, "\n");
-	for (i = 0; i < n_siimage_devs; i++) {
-		struct pci_dev *dev	= siimage_devs[i];
-		p = print_siimage_get_info(p, dev, i);
-	}
-	/* p - buffer must be less than 4k! */
-	len = (p - buffer) - offset;
-	*addr = buffer + offset;
-	
-	return len > count ? count : len;
-}
-
-#endif	/* defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS) */
 
 /**
  *	siimage_ratemask	-	Compute available modes
@@ -779,15 +709,6 @@ static void proc_reports_siimage (struct pci_dev *dev, u8 clocking, const char *
 			case 0x00: printk("== 100\n"); break;
 		}
 	}
-
-#if defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS)
-	siimage_devs[n_siimage_devs++] = dev;
-
-	if (!siimage_proc) {
-		siimage_proc = 1;
-		ide_pci_create_host_proc("siimage", siimage_get_info);
-	}
-#endif /* DISPLAY_SIIMAGE_TIMINGS && CONFIG_PROC_FS */
 }
 
 /**
@@ -892,7 +813,7 @@ static unsigned int setup_mmio_siimage (struct pci_dev *dev, const char *name)
  *	to 133MHz clocking if the system isn't already set up to do it.
  */
 
-static unsigned int __init init_chipset_siimage (struct pci_dev *dev, const char *name)
+static unsigned int __devinit init_chipset_siimage(struct pci_dev *dev, const char *name)
 {
 	u32 class_rev	= 0;
 	u8 tmpbyte	= 0;
@@ -957,8 +878,8 @@ static unsigned int __init init_chipset_siimage (struct pci_dev *dev, const char
  *	The hardware supports buffered taskfiles and also some rather nice
  *	extended PRD tables. Unfortunately right now we don't.
  */
- 
-static void __init init_mmio_iops_siimage (ide_hwif_t *hwif)
+
+static void __devinit init_mmio_iops_siimage(ide_hwif_t *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
 	void *addr		= pci_get_drvdata(dev);
@@ -1076,8 +997,8 @@ static int is_dev_seagate_sata(ide_drive_t *drive)
  *	look in we get for setting up the hwif so that we
  *	can get the iops right before using them.
  */
- 
-static void __init init_iops_siimage (ide_hwif_t *hwif)
+
+static void __devinit init_iops_siimage(ide_hwif_t *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
 	u32 class_rev		= 0;
@@ -1103,8 +1024,8 @@ static void __init init_iops_siimage (ide_hwif_t *hwif)
  *	Check for the presence of an ATA66 capable cable on the
  *	interface.
  */
- 
-static unsigned int __init ata66_siimage (ide_hwif_t *hwif)
+
+static unsigned int __devinit ata66_siimage(ide_hwif_t *hwif)
 {
 	unsigned long addr = siimage_selreg(hwif, 0);
 	if (pci_get_drvdata(hwif->pci_dev) == NULL) {
@@ -1124,8 +1045,8 @@ static unsigned int __init ata66_siimage (ide_hwif_t *hwif)
  *	requires several custom handlers so we override the default
  *	ide DMA handlers appropriately
  */
- 
-static void __init init_hwif_siimage (ide_hwif_t *hwif)
+
+static void __devinit init_hwif_siimage(ide_hwif_t *hwif)
 {
 	hwif->autodma = 0;
 	
@@ -1172,6 +1093,23 @@ static void __init init_hwif_siimage (ide_hwif_t *hwif)
 	hwif->drives[1].autodma = hwif->autodma;
 }
 
+#define DECLARE_SII_DEV(name_str)			\
+	{						\
+		.name		= name_str,		\
+		.init_chipset	= init_chipset_siimage,	\
+		.init_iops	= init_iops_siimage,	\
+		.init_hwif	= init_hwif_siimage,	\
+		.channels	= 2,			\
+		.autodma	= AUTODMA,		\
+		.bootable	= ON_BOARD,		\
+	}
+
+static ide_pci_device_t siimage_chipsets[] __devinitdata = {
+	/* 0 */ DECLARE_SII_DEV("SiI680"),
+	/* 1 */ DECLARE_SII_DEV("SiI3112 Serial ATA"),
+	/* 2 */ DECLARE_SII_DEV("Adaptec AAR-1210SA")
+};
+
 /**
  *	siimage_init_one	-	pci layer discovery entry
  *	@dev: PCI device
@@ -1183,10 +1121,7 @@ static void __init init_hwif_siimage (ide_hwif_t *hwif)
  
 static int __devinit siimage_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &siimage_chipsets[id->driver_data];
-	if (dev->device != d->device)
-		BUG();
-	ide_setup_pci_device(dev, d);
+	ide_setup_pci_device(dev, &siimage_chipsets[id->driver_data]);
 	return 0;
 }
 

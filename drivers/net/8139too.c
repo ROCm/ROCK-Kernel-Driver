@@ -171,7 +171,11 @@ static int debug = -1;
  * Receive ring size 
  * Warning: 64K ring has hardware issues and may lock up.
  */
+#if defined(CONFIG_SH_DREAMCAST)
+#define RX_BUF_IDX	1	/* 16K ring */
+#else
 #define RX_BUF_IDX	2	/* 32K ring */
+#endif
 #define RX_BUF_LEN	(8192 << RX_BUF_IDX)
 #define RX_BUF_PAD	16
 #define RX_BUF_WRAP_PAD 2048 /* spare padding to handle lack of packet wrap */
@@ -2454,14 +2458,13 @@ static struct ethtool_ops rtl8139_ethtool_ops = {
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct rtl8139_private *np = dev->priv;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
 	int rc;
 
 	if (!netif_running(dev))
 		return -EINVAL;
 
 	spin_lock_irq(&np->lock);
-	rc = generic_mii_ioctl(&np->mii, data, cmd, NULL);
+	rc = generic_mii_ioctl(&np->mii, if_mii(rq), cmd, NULL);
 	spin_unlock_irq(&np->lock);
 
 	return rc;

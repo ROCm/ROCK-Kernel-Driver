@@ -161,10 +161,10 @@ static int min_priority[1];
 static int max_priority[] = { 127 }; /* From DECnet spec */
 
 static int dn_forwarding_proc(ctl_table *, int, struct file *,
-			void *, size_t *);
-static int dn_forwarding_sysctl(ctl_table *table, int *name, int nlen,
-			void *oldval, size_t *oldlenp,
-			void *newval, size_t newlen,
+			void __user *, size_t *);
+static int dn_forwarding_sysctl(ctl_table *table, int __user *name, int nlen,
+			void __user *oldval, size_t __user *oldlenp,
+			void __user *newval, size_t newlen,
 			void **context);
 
 static struct dn_dev_sysctl_table {
@@ -362,7 +362,7 @@ static void dn_dev_check_default(struct net_device *dev)
 
 static int dn_forwarding_proc(ctl_table *table, int write, 
 				struct file *filep,
-				void *buffer, size_t *lenp)
+				void __user *buffer, size_t *lenp)
 {
 #ifdef CONFIG_DECNET_ROUTER
 	struct net_device *dev = table->extra1;
@@ -404,9 +404,9 @@ static int dn_forwarding_proc(ctl_table *table, int write,
 #endif
 }
 
-static int dn_forwarding_sysctl(ctl_table *table, int *name, int nlen,
-			void *oldval, size_t *oldlenp,
-			void *newval, size_t newlen,
+static int dn_forwarding_sysctl(ctl_table *table, int __user *name, int nlen,
+			void __user *oldval, size_t __user *oldlenp,
+			void __user *newval, size_t newlen,
 			void **context)
 {
 #ifdef CONFIG_DECNET_ROUTER
@@ -423,7 +423,7 @@ static int dn_forwarding_sysctl(ctl_table *table, int *name, int nlen,
 		if (newlen != sizeof(int))
 			return -EINVAL;
 
-		if (get_user(value, (int *)newval))
+		if (get_user(value, (int __user *)newval))
 			return -EFAULT;
 		if (value < 0)
 			return -EINVAL;
@@ -553,7 +553,7 @@ static int dn_dev_set_ifa(struct net_device *dev, struct dn_ifaddr *ifa)
 }
 
 
-int dn_dev_ioctl(unsigned int cmd, void *arg)
+int dn_dev_ioctl(unsigned int cmd, void __user *arg)
 {
 	char buffer[DN_IFREQ_SIZE];
 	struct ifreq *ifr = (struct ifreq *)buffer;
@@ -1294,35 +1294,43 @@ int unregister_dnaddr_notifier(struct notifier_block *nb)
  * it as a compile time option. Probably you should use the
  * rtnetlink interface instead.
  */
-int dnet_gifconf(struct net_device *dev, char *buf, int len)
+int dnet_gifconf(struct net_device *dev, char __user *buf, int len)
 {
 	struct dn_dev *dn_db = (struct dn_dev *)dev->dn_ptr;
 	struct dn_ifaddr *ifa;
-	struct ifreq *ifr = (struct ifreq *)buf;
+	char buffer[DN_IFREQ_SIZE];
+	struct ifreq *ifr = (struct ifreq *)buffer;
+	struct sockaddr_dn *addr = (struct sockaddr_dn *)&ifr->ifr_addr;
 	int done = 0;
 
 	if ((dn_db == NULL) || ((ifa = dn_db->ifa_list) == NULL))
 		return 0;
 
 	for(; ifa; ifa = ifa->ifa_next) {
-		if (!ifr) {
+		if (!buf) {
 			done += sizeof(DN_IFREQ_SIZE);
 			continue;
 		}
 		if (len < DN_IFREQ_SIZE)
 			return done;
-		memset(ifr, 0, DN_IFREQ_SIZE);
+		memset(buffer, 0, DN_IFREQ_SIZE);
 
 		if (ifa->ifa_label)
 			strcpy(ifr->ifr_name, ifa->ifa_label);
 		else
 			strcpy(ifr->ifr_name, dev->name);
 
-		(*(struct sockaddr_dn *) &ifr->ifr_addr).sdn_family = AF_DECnet;
-		(*(struct sockaddr_dn *) &ifr->ifr_addr).sdn_add.a_len = 2;
-		(*(dn_address *)(*(struct sockaddr_dn *) &ifr->ifr_addr).sdn_add.a_addr) = ifa->ifa_local;
+		addr->sdn_family = AF_DECnet;
+		addr->sdn_add.a_len = 2;
+		memcpy(addr->sdn_add.a_addr, &ifa->ifa_local,
+			sizeof(dn_address));
 
-		ifr = (struct ifreq *)((char *)ifr + DN_IFREQ_SIZE);
+		if (copy_to_user(buf, buffer, DN_IFREQ_SIZE)) {
+			done = -EFAULT;
+			break;
+		}
+
+		buf  += DN_IFREQ_SIZE;
 		len  -= DN_IFREQ_SIZE;
 		done += DN_IFREQ_SIZE;
 	}

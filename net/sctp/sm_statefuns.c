@@ -171,7 +171,7 @@ nomem:
  *    Verification Tag field to Tag_A, and also provide its own
  *    Verification Tag (Tag_Z) in the Initiate Tag field.
  *
- * Verification Tag: No checking.
+ * Verification Tag: Must be 0. 
  *
  * Inputs
  * (endpoint, asoc, chunk)
@@ -217,6 +217,12 @@ sctp_disposition_t sctp_sf_do_5_1B_init(const struct sctp_endpoint *ep,
 	if (!sctp_sstate(sk, LISTENING) ||
 	    (sctp_style(sk, TCP) &&
 	     (sk->sk_ack_backlog >= sk->sk_max_ack_backlog)))
+		return sctp_sf_tabort_8_4_8(ep, asoc, type, arg, commands);
+
+	/* 3.1 A packet containing an INIT chunk MUST have a zero Verification
+	 * Tag. 
+	 */
+	if (chunk->sctp_hdr->vtag != 0)
 		return sctp_sf_tabort_8_4_8(ep, asoc, type, arg, commands);
 
 	/* Verify the INIT chunk before processing it. */
@@ -376,6 +382,9 @@ sctp_disposition_t sctp_sf_do_5_1C_ack(const struct sctp_endpoint *ep,
 	 */
 	if (!chunk->singleton)
 		return SCTP_DISPOSITION_VIOLATION;
+
+	if (!sctp_vtag_verify(chunk, asoc))
+		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 
 	/* Grab the INIT header.  */
 	chunk->subh.init_hdr = (sctp_inithdr_t *) chunk->skb->data;
@@ -659,7 +668,11 @@ sctp_disposition_t sctp_sf_do_5_1E_ca(const struct sctp_endpoint *ep,
 				      const sctp_subtype_t type, void *arg,
 				      sctp_cmd_seq_t *commands)
 {
+	struct sctp_chunk *chunk = arg;
 	struct sctp_ulpevent *ev;
+
+	if (!sctp_vtag_verify(chunk, asoc))
+		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 
 	/* RFC 2960 5.1 Normal Establishment of an Association
 	 *
@@ -807,13 +820,7 @@ sctp_disposition_t sctp_sf_beat_8_3(const struct sctp_endpoint *ep,
 	struct sctp_chunk *reply;
 	size_t paylen = 0;
 
-	/* 8.5 When receiving an SCTP packet, the endpoint MUST ensure
-	 * that the value in the Verification Tag field of the
-	 * received SCTP packet matches its own Tag. If the received
-	 * Verification Tag value does not match the receiver's own
-	 * tag value, the receiver shall silently discard the packet...
-	 */
-	if (ntohl(chunk->sctp_hdr->vtag) != asoc->c.my_vtag)
+	if (!sctp_vtag_verify(chunk, asoc))
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 
 	/* 8.3 The receiver of the HEARTBEAT should immediately
@@ -876,11 +883,7 @@ sctp_disposition_t sctp_sf_backbeat_8_3(const struct sctp_endpoint *ep,
 	sctp_sender_hb_info_t *hbinfo;
 	unsigned long max_interval;
 
-	/* 8.5 When receiving an SCTP packet, the endpoint MUST ensure
-	 * that the value in the Verification Tag field of the
-	 * received SCTP packet matches its own Tag. ...
-	 */
-	if (ntohl(chunk->sctp_hdr->vtag) != asoc->c.my_vtag)
+	if (!sctp_vtag_verify(chunk, asoc))
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 
 	hbinfo = (sctp_sender_hb_info_t *) chunk->skb->data;
@@ -1129,6 +1132,12 @@ static sctp_disposition_t sctp_sf_do_unexpected_init(
 	 */
 	if (!chunk->singleton)
 		return SCTP_DISPOSITION_VIOLATION;
+
+	/* 3.1 A packet containing an INIT chunk MUST have a zero Verification
+	 * Tag. 
+	 */
+	if (chunk->sctp_hdr->vtag != 0)
+		return sctp_sf_tabort_8_4_8(ep, asoc, type, arg, commands);
 
 	/* Grab the INIT header.  */
 	chunk->subh.init_hdr = (sctp_inithdr_t *) chunk->skb->data;
@@ -1386,6 +1395,8 @@ static sctp_disposition_t sctp_sf_do_dupcook_a(const struct sctp_endpoint *ep,
 	sctp_init_chunk_t *peer_init;
 	struct sctp_ulpevent *ev;
 	struct sctp_chunk *repl;
+	struct sctp_chunk *err;
+	sctp_disposition_t disposition;
 
 	/* new_asoc is a brand-new association, so these are not yet
 	 * side effects--it is safe to run them here.
@@ -1402,6 +1413,29 @@ static sctp_disposition_t sctp_sf_do_dupcook_a(const struct sctp_endpoint *ep,
 	 * since you'd have to get inside the cookie.
 	 */
 	if (!sctp_sf_check_restart_addrs(new_asoc, asoc, chunk, commands)) {
+		return SCTP_DISPOSITION_CONSUME;
+	}
+
+	/* If the endpoint is in the SHUTDOWN-ACK-SENT state and recognizes
+	 * the peer has restarted (Action A), it MUST NOT setup a new
+	 * association but instead resend the SHUTDOWN ACK and send an ERROR
+	 * chunk with a "Cookie Received while Shutting Down" error cause to
+	 * its peer.
+	*/
+	if (sctp_state(asoc, SHUTDOWN_ACK_SENT)) {
+		disposition = sctp_sf_do_9_2_reshutack(ep, asoc,
+				SCTP_ST_CHUNK(chunk->chunk_hdr->type),
+				chunk, commands);
+		if (SCTP_DISPOSITION_NOMEM == disposition)
+			goto nomem;
+
+		err = sctp_make_op_error(asoc, chunk,
+					 SCTP_ERROR_COOKIE_IN_SHUTDOWN,
+					 NULL, 0);
+		if (err)
+			sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,
+					SCTP_CHUNK(err));
+
 		return SCTP_DISPOSITION_CONSUME;
 	}
 
@@ -1883,6 +1917,9 @@ sctp_disposition_t sctp_sf_do_5_2_6_stale(const struct sctp_endpoint *ep,
 
 	sctp_addto_chunk(reply, sizeof(bht), &bht);
 
+	/* Clear peer's init_tag cached in assoc as we are sending a new INIT */
+	sctp_add_cmd_sf(commands, SCTP_CMD_CLEAR_INIT_TAG, SCTP_NULL());
+
 	/* Cast away the const modifier, as we want to just
 	 * rerun it through as a sideffect.
 	 */
@@ -2071,13 +2108,7 @@ sctp_disposition_t sctp_sf_do_9_2_shutdown(const struct sctp_endpoint *ep,
 	skb_pull(chunk->skb, sizeof(sctp_shutdownhdr_t));
 	chunk->subh.shutdown_hdr = sdh;
 
-	/* 8.5 When receiving an SCTP packet, the endpoint MUST ensure
-	 * that the value in the Verification Tag field of the
-	 * received SCTP packet matches its own Tag. If the received
-	 * Verification Tag value does not match the receiver's own
-	 * tag value, the receiver shall silently discard the packet...
-	 */
-	if (ntohl(chunk->sctp_hdr->vtag) != asoc->c.my_vtag)
+	if (!sctp_vtag_verify(chunk, asoc))
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 
 	/* Upon the reception of the SHUTDOWN, the peer endpoint shall
@@ -2190,13 +2221,7 @@ sctp_disposition_t sctp_sf_do_ecn_cwr(const struct sctp_endpoint *ep,
 	sctp_cwrhdr_t *cwr;
 	struct sctp_chunk *chunk = arg;
 
-	/* 8.5 When receiving an SCTP packet, the endpoint MUST ensure
-	 * that the value in the Verification Tag field of the
-	 * received SCTP packet matches its own Tag. If the received
-	 * Verification Tag value does not match the receiver's own
-	 * tag value, the receiver shall silently discard the packet...
-	 */
-	if (ntohl(chunk->sctp_hdr->vtag) != asoc->c.my_vtag)
+	if (!sctp_vtag_verify(chunk, asoc))
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 
 	cwr = (sctp_cwrhdr_t *) chunk->skb->data;
@@ -2246,13 +2271,7 @@ sctp_disposition_t sctp_sf_do_ecne(const struct sctp_endpoint *ep,
 	sctp_ecnehdr_t *ecne;
 	struct sctp_chunk *chunk = arg;
 
-	/* 8.5 When receiving an SCTP packet, the endpoint MUST ensure
-	 * that the value in the Verification Tag field of the
-	 * received SCTP packet matches its own Tag. If the received
-	 * Verification Tag value does not match the receiver's own
-	 * tag value, the receiver shall silently discard the packet...
-	 */
-	if (ntohl(chunk->sctp_hdr->vtag) != asoc->c.my_vtag)
+	if (!sctp_vtag_verify(chunk, asoc))
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 
 	ecne = (sctp_ecnehdr_t *) chunk->skb->data;
@@ -2309,13 +2328,7 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const struct sctp_endpoint *ep,
 	int tmp;
 	__u32 tsn;
 
-	/* RFC 2960 8.5 Verification Tag
-	 *
-	 * When receiving an SCTP packet, the endpoint MUST ensure
-	 * that the value in the Verification Tag field of the
-	 * received SCTP packet matches its own Tag.
-	 */
-	if (ntohl(chunk->sctp_hdr->vtag) != asoc->c.my_vtag) {
+	if (!sctp_vtag_verify(chunk, asoc)) {
 		sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_BAD_TAG,
 				SCTP_NULL());
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
@@ -2569,13 +2582,7 @@ sctp_disposition_t sctp_sf_eat_data_fast_4_4(const struct sctp_endpoint *ep,
 	int tmp;
 	__u32 tsn;
 
-	/* RFC 2960 8.5 Verification Tag
-	 *
-	 * When receiving an SCTP packet, the endpoint MUST ensure
-	 * that the value in the Verification Tag field of the
-	 * received SCTP packet matches its own Tag.
-	 */
-	if (ntohl(chunk->sctp_hdr->vtag) != asoc->c.my_vtag) {
+	if (!sctp_vtag_verify(chunk, asoc)) {
 		sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_BAD_TAG,
 				SCTP_NULL());
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
@@ -2745,11 +2752,7 @@ sctp_disposition_t sctp_sf_eat_sack_6_2(const struct sctp_endpoint *ep,
 	sctp_sackhdr_t *sackh;
 	__u32 ctsn;
 
-	/* 8.5 When receiving an SCTP packet, the endpoint MUST ensure
-	 * that the value in the Verification Tag field of the
-	 * received SCTP packet matches its own Tag. ...
-	 */
-	if (ntohl(chunk->sctp_hdr->vtag) != asoc->c.my_vtag)
+	if (!sctp_vtag_verify(chunk, asoc))
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 
 	/* Pull the SACK chunk from the data buffer */
@@ -2894,6 +2897,9 @@ sctp_disposition_t sctp_sf_do_9_2_final(const struct sctp_endpoint *ep,
 	struct sctp_chunk *chunk = arg;
 	struct sctp_chunk *reply;
 	struct sctp_ulpevent *ev;
+
+	if (!sctp_vtag_verify(chunk, asoc))
+		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 
 	/* 10.2 H) SHUTDOWN COMPLETE notification
 	 *
@@ -3229,13 +3235,7 @@ sctp_disposition_t sctp_sf_eat_fwd_tsn(const struct sctp_endpoint *ep,
 	__u16 len;
 	__u32 tsn;
 
-	/* RFC 2960 8.5 Verification Tag
-	 *
-	 * When receiving an SCTP packet, the endpoint MUST ensure
-	 * that the value in the Verification Tag field of the
-	 * received SCTP packet matches its own Tag.
-	 */
-	if (ntohl(chunk->sctp_hdr->vtag) != asoc->c.my_vtag) {
+	if (!sctp_vtag_verify(chunk, asoc)) {
 		sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_BAD_TAG,
 				SCTP_NULL());
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
@@ -3293,13 +3293,7 @@ sctp_disposition_t sctp_sf_eat_fwd_tsn_fast(
 	__u16 len;
 	__u32 tsn;
 
-	/* RFC 2960 8.5 Verification Tag
-	 *
-	 * When receiving an SCTP packet, the endpoint MUST ensure
-	 * that the value in the Verification Tag field of the
-	 * received SCTP packet matches its own Tag.
-	 */
-	if (ntohl(chunk->sctp_hdr->vtag) != asoc->c.my_vtag) {
+	if (!sctp_vtag_verify(chunk, asoc)) {
 		sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_BAD_TAG,
 				SCTP_NULL());
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
@@ -3376,13 +3370,7 @@ sctp_disposition_t sctp_sf_unk_chunk(const struct sctp_endpoint *ep,
 
 	SCTP_DEBUG_PRINTK("Processing the unknown chunk id %d.\n", type.chunk);
 
-	/* 8.5 When receiving an SCTP packet, the endpoint MUST ensure
-	 * that the value in the Verification Tag field of the
-	 * received SCTP packet matches its own Tag.  If the received
-	 * Verification Tag value does not match the receiver's own
-	 * tag value, the receiver shall silently discard the packet.
-	 */
-	if (ntohl(unk_chunk->sctp_hdr->vtag) != asoc->c.my_vtag)
+	if (!sctp_vtag_verify(unk_chunk, asoc))
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 
 	switch (type.chunk & SCTP_CID_ACTION_MASK) {

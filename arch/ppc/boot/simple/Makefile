@@ -41,7 +41,7 @@ end-y := elf
 # if present on 'classic' PPC.
 cacheflag-y	:= -DCLEAR_CACHES=""
 # This file will flush / disable the L2, and L3 if present.
-clear_L2_L3	:= $(srctree)/$(boot)/simple/clear.S
+clear_L2_L3	:= $(boot)/simple/clear.S
 
 #
 # See arch/ppc/kconfig and arch/ppc/platforms/Kconfig

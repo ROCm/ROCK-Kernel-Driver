@@ -35,7 +35,7 @@ extern int			ip6_route_me_harder(struct sk_buff *skb);
 extern void			ip6_route_init(void);
 extern void			ip6_route_cleanup(void);
 
-extern int			ipv6_route_ioctl(unsigned int cmd, void *arg);
+extern int			ipv6_route_ioctl(unsigned int cmd, void __user *arg);
 
 extern int			ip6_route_add(struct in6_rtmsg *rtmsg,
 					      struct nlmsghdr *,
@@ -65,7 +65,7 @@ extern struct rt6_info		*rt6_lookup(struct in6_addr *daddr,
 extern struct dst_entry *ndisc_dst_alloc(struct net_device *dev,
 					 struct neighbour *neigh,
 					 struct in6_addr *addr,
-					 int (*output)(struct sk_buff *));
+					 int (*output)(struct sk_buff **));
 extern int ndisc_dst_gc(int *more);
 extern void fib6_force_start_gc(void);
 

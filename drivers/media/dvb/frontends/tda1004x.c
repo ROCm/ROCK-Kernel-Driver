@@ -190,6 +190,7 @@ static int tda10045h_fwinfo_count = sizeof(tda10045h_fwinfo) / sizeof(struct fwi
 static struct fwinfo tda10046h_fwinfo[] = { {.file_size = 286720,.fw_offset = 0x3c4f9,.fw_size = 24479} };
 static int tda10046h_fwinfo_count = sizeof(tda10046h_fwinfo) / sizeof(struct fwinfo);
 
+static int errno;
 
 
 static int tda1004x_write_byte(struct dvb_i2c_bus *i2c, struct tda1004x_state *tda_state, int reg, int data)

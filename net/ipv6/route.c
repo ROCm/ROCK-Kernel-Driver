@@ -83,9 +83,12 @@ static int ip6_rt_min_advmss = IPV6_MIN_MTU - 20 - 40;
 static struct rt6_info * ip6_rt_copy(struct rt6_info *ort);
 static struct dst_entry	*ip6_dst_check(struct dst_entry *dst, u32 cookie);
 static struct dst_entry *ip6_negative_advice(struct dst_entry *);
+static void		ip6_dst_destroy(struct dst_entry *);
+static void		ip6_dst_ifdown(struct dst_entry *, int how);
 static int		 ip6_dst_gc(void);
 
 static int		ip6_pkt_discard(struct sk_buff *skb);
+static int		ip6_pkt_discard_out(struct sk_buff **pskb);
 static void		ip6_link_failure(struct sk_buff *skb);
 static void		ip6_rt_update_pmtu(struct dst_entry *dst, u32 mtu);
 
@@ -95,6 +98,8 @@ static struct dst_ops ip6_dst_ops = {
 	.gc			=	ip6_dst_gc,
 	.gc_thresh		=	1024,
 	.check			=	ip6_dst_check,
+	.destroy		=	ip6_dst_destroy,
+	.ifdown			=	ip6_dst_ifdown,
 	.negative_advice	=	ip6_negative_advice,
 	.link_failure		=	ip6_link_failure,
 	.update_pmtu		=	ip6_rt_update_pmtu,
@@ -111,7 +116,7 @@ struct rt6_info ip6_null_entry = {
 			.error		= -ENETUNREACH,
 			.metrics	= { [RTAX_HOPLIMIT - 1] = 255, },
 			.input		= ip6_pkt_discard,
-			.output		= ip6_pkt_discard,
+			.output		= ip6_pkt_discard_out,
 			.ops		= &ip6_dst_ops,
 			.path		= (struct dst_entry*)&ip6_null_entry,
 		}
@@ -134,7 +139,23 @@ rwlock_t rt6_lock = RW_LOCK_UNLOCKED;
 /* allocate dst with ip6_dst_ops */
 static __inline__ struct rt6_info *ip6_dst_alloc(void)
 {
-	return dst_alloc(&ip6_dst_ops);
+	return (struct rt6_info *)dst_alloc(&ip6_dst_ops);
+}
+
+static void ip6_dst_destroy(struct dst_entry *dst)
+{
+	struct rt6_info *rt = (struct rt6_info *)dst;
+	struct inet6_dev *idev = rt->rt6i_idev;
+
+	if (idev != NULL) {
+		rt->rt6i_idev = NULL;
+		in6_dev_put(idev);
+	}	
+}
+
+static void ip6_dst_ifdown(struct dst_entry *dst, int how)
+{
+	ip6_dst_destroy(dst);
 }
 
 /*
@@ -554,37 +575,43 @@ static void ip6_rt_update_pmtu(struct dst_entry *dst, u32 mtu)
 
 	if (mtu < dst_pmtu(dst) && rt6->rt6i_dst.plen == 128) {
 		rt6->rt6i_flags |= RTF_MODIFIED;
+		if (mtu < IPV6_MIN_MTU)
+			mtu = IPV6_MIN_MTU;
 		dst->metrics[RTAX_MTU-1] = mtu;
 	}
 }
 
 /* Protected by rt6_lock.  */
 static struct dst_entry *ndisc_dst_gc_list;
+static int ipv6_get_mtu(struct net_device *dev);
+static inline unsigned int ipv6_advmss(unsigned int mtu);
 
 struct dst_entry *ndisc_dst_alloc(struct net_device *dev, 
 				  struct neighbour *neigh,
 				  struct in6_addr *addr,
-				  int (*output)(struct sk_buff *))
+				  int (*output)(struct sk_buff **))
 {
 	struct rt6_info *rt = ip6_dst_alloc();
 
 	if (unlikely(rt == NULL))
 		goto out;
 
-	if (dev)
-		dev_hold(dev);
+	dev_hold(dev);
 	if (neigh)
 		neigh_hold(neigh);
 	else
 		neigh = ndisc_get_neigh(dev, addr);
 
 	rt->rt6i_dev	  = dev;
+	rt->rt6i_idev     = in6_dev_get(dev);
 	rt->rt6i_nexthop  = neigh;
 	rt->rt6i_expires  = 0;
 	rt->rt6i_flags    = RTF_LOCAL;
 	rt->rt6i_metric   = 0;
 	atomic_set(&rt->u.dst.__refcnt, 1);
 	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = 255;
+	rt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(rt->rt6i_dev);
+	rt->u.dst.metrics[RTAX_ADVMSS-1] = ipv6_advmss(dst_pmtu(&rt->u.dst));
 	rt->u.dst.output  = output;
 
 	write_lock_bh(&rt6_lock);
@@ -712,6 +739,12 @@ int ip6_route_add(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
 	if (rtmsg->rtmsg_src_len)
 		return -EINVAL;
 #endif
+	if (rtmsg->rtmsg_ifindex) {
+		dev = dev_get_by_index(rtmsg->rtmsg_ifindex);
+		if (!dev)
+			return -ENODEV;
+	}
+
 	if (rtmsg->rtmsg_metric == 0)
 		rtmsg->rtmsg_metric = IP6_RT_PRIO_USER;
 
@@ -737,13 +770,6 @@ int ip6_route_add(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
 
 	rt->u.dst.output = ip6_output;
 
-	if (rtmsg->rtmsg_ifindex) {
-		dev = dev_get_by_index(rtmsg->rtmsg_ifindex);
-		err = -ENODEV;
-		if (dev == NULL)
-			goto out;
-	}
-
 	ipv6_addr_prefix(&rt->rt6i_dst.addr, 
 			 &rtmsg->rtmsg_dst, rtmsg->rtmsg_dst_len);
 	rt->rt6i_dst.plen = rtmsg->rtmsg_dst_len;
@@ -767,7 +793,7 @@ int ip6_route_add(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
 			dev_put(dev);
 		dev = &loopback_dev;
 		dev_hold(dev);
-		rt->u.dst.output = ip6_pkt_discard;
+		rt->u.dst.output = ip6_pkt_discard_out;
 		rt->u.dst.input = ip6_pkt_discard;
 		rt->u.dst.error = -ENETUNREACH;
 		rt->rt6i_flags = RTF_REJECT|RTF_NONEXTHOP;
@@ -870,6 +896,7 @@ install_route:
 	if (!rt->u.dst.metrics[RTAX_ADVMSS-1])
 		rt->u.dst.metrics[RTAX_ADVMSS-1] = ipv6_advmss(dst_pmtu(&rt->u.dst));
 	rt->u.dst.dev = dev;
+	rt->rt6i_idev = in6_dev_get(dev);
 	return rt6_ins(rt, nlh, _rtattr);
 
 out:
@@ -1136,6 +1163,9 @@ static struct rt6_info * ip6_rt_copy(struct rt6_info *ort)
 		rt->u.dst.dev = ort->u.dst.dev;
 		if (rt->u.dst.dev)
 			dev_hold(rt->u.dst.dev);
+		rt->rt6i_idev = ort->rt6i_idev;
+		if (rt->rt6i_idev)
+			in6_dev_hold(rt->rt6i_idev);
 		rt->u.dst.lastuse = jiffies;
 		rt->rt6i_expires = 0;
 
@@ -1217,7 +1247,7 @@ restart:
 	read_unlock_bh(&rt6_lock);
 }
 
-int ipv6_route_ioctl(unsigned int cmd, void *arg)
+int ipv6_route_ioctl(unsigned int cmd, void __user *arg)
 {
 	struct in6_rtmsg rtmsg;
 	int err;
@@ -1257,10 +1287,15 @@ int ipv6_route_ioctl(unsigned int cmd, void *arg)
 
 int ip6_pkt_discard(struct sk_buff *skb)
 {
-	IP6_INC_STATS(Ip6OutNoRoutes);
+	IP6_INC_STATS(OutNoRoutes);
 	icmpv6_send(skb, ICMPV6_DEST_UNREACH, ICMPV6_NOROUTE, 0, skb->dev);
 	kfree_skb(skb);
 	return 0;
+}
+
+int ip6_pkt_discard_out(struct sk_buff **pskb)
+{
+	return ip6_pkt_discard(*pskb);
 }
 
 /*
@@ -1280,6 +1315,7 @@ int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev, int anycast)
 	rt->u.dst.input = ip6_input;
 	rt->u.dst.output = ip6_output;
 	rt->rt6i_dev = &loopback_dev;
+	rt->rt6i_idev = in6_dev_get(&loopback_dev);
 	rt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(rt->rt6i_dev);
 	rt->u.dst.metrics[RTAX_ADVMSS-1] = ipv6_advmss(dst_pmtu(&rt->u.dst));
 	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = ipv6_get_hoplimit(rt->rt6i_dev);
@@ -1884,7 +1920,7 @@ static int flush_delay;
 
 static
 int ipv6_sysctl_rtcache_flush(ctl_table *ctl, int write, struct file * filp,
-			      void *buffer, size_t *lenp)
+			      void __user *buffer, size_t *lenp)
 {
 	if (write) {
 		proc_dointvec(ctl, write, filp, buffer, lenp);

@@ -72,7 +72,7 @@ static unsigned char cobra_read_packet(struct gameport *gameport, unsigned int *
 		r[i] = buf[i] = 0;
 		t[i] = COBRA_MAX_STROBE;
 	}
-	
+
 	local_irq_save(flags);
 
 	u = gameport_read(gameport);
@@ -140,14 +140,14 @@ static void cobra_timer(unsigned long private)
 
 		}
 
-	mod_timer(&cobra->timer, jiffies + COBRA_REFRESH_TIME);	
+	mod_timer(&cobra->timer, jiffies + COBRA_REFRESH_TIME);
 }
 
 static int cobra_open(struct input_dev *dev)
 {
 	struct cobra *cobra = dev->private;
 	if (!cobra->used++)
-		mod_timer(&cobra->timer, jiffies + COBRA_REFRESH_TIME);	
+		mod_timer(&cobra->timer, jiffies + COBRA_REFRESH_TIME);
 	return 0;
 }
 
@@ -180,7 +180,7 @@ static void cobra_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 	cobra->exists = cobra_read_packet(gameport, data);
 
-	for (i = 0; i < 2; i++) 
+	for (i = 0; i < 2; i++)
 		if ((cobra->exists >> i) & data[i] & 1) {
 			printk(KERN_WARNING "cobra.c: Device %d on %s has the Ext bit set. ID is: %d"
 				" Contact vojtech@ucw.cz\n", i, gameport->phys, (data[i] >> 2) & 7);
@@ -205,7 +205,7 @@ static void cobra_connect(struct gameport *gameport, struct gameport_dev *dev)
 			cobra->dev[i].id.vendor = GAMEPORT_ID_VENDOR_CREATIVE;
 			cobra->dev[i].id.product = 0x0008;
 			cobra->dev[i].id.version = 0x0100;
-		
+
 			cobra->dev[i].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 			cobra->dev[i].absbit[0] = BIT(ABS_X) | BIT(ABS_Y);
 

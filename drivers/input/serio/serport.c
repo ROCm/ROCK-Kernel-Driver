@@ -48,11 +48,6 @@ static int serport_serio_write(struct serio *serio, unsigned char data)
 	return -(serport->tty->driver->write(serport->tty, 0, &data, 1) != 1);
 }
 
-static int serport_serio_open(struct serio *serio)
-{
-        return 0;
-}
-
 static void serport_serio_close(struct serio *serio)
 {
 	struct serport *serport = serio->driver;
@@ -87,7 +82,6 @@ static int serport_ldisc_open(struct tty_struct *tty)
 
 	serport->serio.type = SERIO_RS232;
 	serport->serio.write = serport_serio_write;
-	serport->serio.open = serport_serio_open;
 	serport->serio.close = serport_serio_close;
 	serport->serio.driver = serport;
 
@@ -135,12 +129,12 @@ static int serport_ldisc_room(struct tty_struct *tty)
 }
 
 /*
- * serport_ldisc_read() just waits indefinitely if everything goes well. 
+ * serport_ldisc_read() just waits indefinitely if everything goes well.
  * However, when the serio driver closes the serio port, it finishes,
  * returning 0 characters.
  */
 
-static ssize_t serport_ldisc_read(struct tty_struct * tty, struct file * file, unsigned char * buf, size_t nr)
+static ssize_t serport_ldisc_read(struct tty_struct * tty, struct file * file, unsigned char __user * buf, size_t nr)
 {
 	struct serport *serport = (struct serport*) tty->disc_data;
 	char name[64];
@@ -165,9 +159,9 @@ static ssize_t serport_ldisc_read(struct tty_struct * tty, struct file * file, u
 static int serport_ldisc_ioctl(struct tty_struct * tty, struct file * file, unsigned int cmd, unsigned long arg)
 {
 	struct serport *serport = (struct serport*) tty->disc_data;
-	
+
 	if (cmd == SPIOCSTYPE)
-		return get_user(serport->serio.type, (unsigned long *) arg);
+		return get_user(serport->serio.type, (unsigned long __user *) arg);
 
 	return -EINVAL;
 }

@@ -418,8 +418,10 @@ static int wanxl_open(struct net_device *dev)
 
 	timeout = jiffies + HZ;
 	do
-		if (get_status(port)->open)
+		if (get_status(port)->open) {
+			netif_start_queue(dev);
 			return 0;
+		}
 	while (time_after(timeout, jiffies));
 
 	printk(KERN_ERR "%s: unable to open port\n", dev->name);
@@ -449,6 +451,8 @@ static int wanxl_close(struct net_device *dev)
 
 	if (get_status(port)->open)
 		printk(KERN_ERR "%s: unable to close port\n", dev->name);
+
+	netif_stop_queue(dev);
 
 	for (i = 0; i < TX_BUFFERS; i++) {
 		desc_t *desc = &get_status(port)->tx_descs[i];

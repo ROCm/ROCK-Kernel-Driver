@@ -38,7 +38,7 @@
 
 #include <asm/io.h>
 
-#include "alim15x3.h"
+#define DISPLAY_ALI_TIMINGS
 
 /*
  *	ALi devices are not plug in. Otherwise these static values would
@@ -853,6 +853,16 @@ static void __init init_dma_ali15x3 (ide_hwif_t *hwif, unsigned long dmabase)
 	ide_setup_dma(hwif, dmabase, 8);
 }
 
+static ide_pci_device_t ali15x3_chipset __devinitdata = {
+	.name		= "ALI15X3",
+	.init_chipset	= init_chipset_ali15x3,
+	.init_hwif	= init_hwif_ali15x3,
+	.init_dma	= init_dma_ali15x3,
+	.channels	= 2,
+	.autodma	= AUTODMA,
+	.bootable	= ON_BOARD,
+};
+
 /**
  *	alim15x3_init_one	-	set up an ALi15x3 IDE controller
  *	@dev: PCI device to set up
@@ -863,8 +873,8 @@ static void __init init_dma_ali15x3 (ide_hwif_t *hwif, unsigned long dmabase)
  
 static int __devinit alim15x3_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &ali15x3_chipsets[id->driver_data];
-	
+	ide_pci_device_t *d = &ali15x3_chipset;
+
 	if(pci_find_device(PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RS100, NULL))
 		printk(KERN_ERR "Warning: ATI Radeon IGP Northbridge is not yet fully tested.\n");
 

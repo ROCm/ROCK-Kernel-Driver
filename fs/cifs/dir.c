@@ -38,7 +38,7 @@ renew_parental_timestamps(struct dentry *direntry)
 	do {
 		direntry->d_time = jiffies;
 		direntry = direntry->d_parent;
-	} while (!IS_ROOT(direntry));	/* BB for DFS case should stop at the root of share which could be lower than root of this mount due to implicit dfs connections */
+	} while (!IS_ROOT(direntry));	
 }
 
 /* Note: caller must free return buffer */
@@ -49,14 +49,26 @@ build_path_from_dentry(struct dentry *direntry)
 	int namelen = 0;
 	char *full_path;
 
+	if(direntry == NULL)
+		return NULL;  /* not much we can do if dentry is freed and
+		we need to reopen the file after it was closed implicitly
+		when the server crashed */
+
+cifs_bp_rename_retry:
 	for (temp = direntry; !IS_ROOT(temp);) {
 		namelen += (1 + temp->d_name.len);
 		temp = temp->d_parent;
+		if(temp == NULL) {
+			cERROR(1,("corrupt dentry"));
+			return NULL;
+		}
 	}
-	namelen += 1;		/* allow for trailing null */
-	full_path = kmalloc(namelen, GFP_KERNEL);
-	namelen--;
+
+	full_path = kmalloc(namelen+1, GFP_KERNEL);
+	if(full_path == NULL)
+		return full_path;
 	full_path[namelen] = 0;	/* trailing null */
+
 	for (temp = direntry; !IS_ROOT(temp);) {
 		namelen -= 1 + temp->d_name.len;
 		if (namelen < 0) {
@@ -68,11 +80,23 @@ build_path_from_dentry(struct dentry *direntry)
 			cFYI(0, (" name: %s ", full_path + namelen));
 		}
 		temp = temp->d_parent;
+		if(temp == NULL) {
+			cERROR(1,("corrupt dentry"));
+			kfree(full_path);
+			return NULL;
+		}
 	}
-	if (namelen != 0)
+	if (namelen != 0) {
 		cERROR(1,
 		       ("We did not end path lookup where we expected namelen is %d",
 			namelen));
+		/* presumably this is only possible if we were racing with a rename 
+		of one of the parent directories  (we can not lock the dentries
+		above us to prevent this, but retrying should be harmless) */
+		kfree(full_path);
+		namelen = 0;
+		goto cifs_bp_rename_retry;
+	}
 
 	return full_path;
 }
@@ -135,22 +159,28 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 	struct cifsFileInfo * pCifsFile = NULL;
 	struct cifsInodeInfo * pCifsInode;
 	int disposition = FILE_OVERWRITE_IF;
+	int write_only = FALSE;
 
 	xid = GetXid();
 
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 
+	down(&direntry->d_sb->s_vfs_rename_sem);
 	full_path = build_path_from_dentry(direntry);
+	up(&direntry->d_sb->s_vfs_rename_sem);
+	if(full_path == NULL) {
+		FreeXid(xid);
+		return -ENOMEM;
+	}
 
-	if(nd) { 
-		cFYI(1,("In create for inode %p dentry->inode %p nd flags = 0x%x for %s",inode, direntry->d_inode, nd->flags,full_path));
-
+	if(nd) {
 		if ((nd->intent.open.flags & O_ACCMODE) == O_RDONLY)
 			desiredAccess = GENERIC_READ;
-		else if ((nd->intent.open.flags & O_ACCMODE) == O_WRONLY)
+		else if ((nd->intent.open.flags & O_ACCMODE) == O_WRONLY) {
 			desiredAccess = GENERIC_WRITE;
-		else if ((nd->intent.open.flags & O_ACCMODE) == O_RDWR) {
+			write_only = TRUE;
+		} else if ((nd->intent.open.flags & O_ACCMODE) == O_RDWR) {
 			/* GENERIC_ALL is too much permission to request */
 			/* can cause unnecessary access denied on create */
 			/* desiredAccess = GENERIC_ALL; */
@@ -173,6 +203,12 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 		oplock = REQ_OPLOCK;
 
 	buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
+	if(buf == NULL) {
+		kfree(full_path);
+		FreeXid(xid);
+		return -ENOMEM;
+	}
+
 	rc = CIFSSMBOpen(xid, pTcon, full_path, disposition,
 			 desiredAccess, CREATE_NOT_DIR,
 			 &fileHandle, &oplock, buf, cifs_sb->local_nls);
@@ -228,16 +264,25 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 				pCifsFile->invalidHandle = FALSE;
 				pCifsFile->closePend     = FALSE;
 				init_MUTEX(&pCifsFile->fh_sem);
-				/* pCifsFile->pfile = file; */ /* put in at open time */
+				/* put the following in at open now */
+				/* pCifsFile->pfile = file; */ 
 				write_lock(&GlobalSMBSeslock);
 				list_add(&pCifsFile->tlist,&pTcon->openFileList);
 				pCifsInode = CIFS_I(newinode);
 				if(pCifsInode) {
-					list_add(&pCifsFile->flist,&pCifsInode->openFileList);
+				/* if readable file instance put first in list*/
+					if (write_only == TRUE) {
+                                        	list_add_tail(&pCifsFile->flist,
+							&pCifsInode->openFileList);
+					} else {
+						list_add(&pCifsFile->flist,
+							&pCifsInode->openFileList);
+					}
 					if((oplock & 0xF) == OPLOCK_EXCLUSIVE) {
 						pCifsInode->clientCanCacheAll = TRUE;
 						pCifsInode->clientCanCacheRead = TRUE;
-						cFYI(1,("Exclusive Oplock granted on inode %p",newinode));
+						cFYI(1,("Exclusive Oplock granted on inode %p",
+							newinode));
 					} else if((oplock & 0xF) == OPLOCK_READ)
 						pCifsInode->clientCanCacheRead = TRUE;
 				}
@@ -272,9 +317,13 @@ int cifs_mknod(struct inode *inode, struct dentry *direntry, int mode, dev_t dev
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 
+	down(&direntry->d_sb->s_vfs_rename_sem);
 	full_path = build_path_from_dentry(direntry);
-
-	if (pTcon->ses->capabilities & CAP_UNIX) {
+	up(&direntry->d_sb->s_vfs_rename_sem);
+	if(full_path == NULL)
+		rc = -ENOMEM;
+	
+	if (full_path && (pTcon->ses->capabilities & CAP_UNIX)) {
 		rc = CIFSSMBUnixSetPerms(xid, pTcon,
 			full_path, mode, current->euid, current->egid,
 			device_number, cifs_sb->local_nls);
@@ -298,7 +347,8 @@ int cifs_mknod(struct inode *inode, struct dentry *direntry, int mode, dev_t dev
 struct dentry *
 cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry, struct nameidata *nd)
 {
-	int rc, xid;
+	int xid;
+	int rc = 0; /* to get around spurious gcc warning, set to zero here */
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	struct inode *newInode = NULL;
@@ -320,7 +370,15 @@ cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry, struct name
 	cifs_sb = CIFS_SB(parent_dir_inode->i_sb);
 	pTcon = cifs_sb->tcon;
 
+	/* can not grab the rename sem here since it would
+	deadlock in the cases (beginning of sys_rename itself)
+	in which we already have the sb rename sem */
 	full_path = build_path_from_dentry(direntry);
+	if(full_path == NULL) {
+		FreeXid(xid);
+		return ERR_PTR(-ENOMEM);
+	}
+
 	if (direntry->d_inode != NULL) {
 		cFYI(1, (" non-NULL inode in lookup"));
 	} else {
@@ -347,10 +405,10 @@ cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry, struct name
 		rc = 0;
 		d_add(direntry, NULL);
 	} else {
-		cERROR(1,
-		       ("Error 0x%x or (%d decimal) on cifs_get_inode_info in lookup",
-			rc, rc));
-		/* BB special case check for Access Denied - watch security exposure of returning dir info implicitly via different rc if file exists or not but no access BB */
+		cERROR(1,("Error 0x%x or on cifs_get_inode_info in lookup",rc));
+		/* BB special case check for Access Denied - watch security 
+		exposure of returning dir info implicitly via different rc 
+		if file exists or not but no access BB */
 	}
 
 	if (full_path)

@@ -11,6 +11,7 @@
 
 #include <linux/types.h>
 #include <linux/sched.h>
+#include <linux/module.h>
 #include <linux/sunrpc/types.h>
 #include <linux/sunrpc/xdr.h>
 #include <linux/sunrpc/svcsock.h>
@@ -27,6 +28,7 @@
 extern struct auth_ops svcauth_null;
 extern struct auth_ops svcauth_unix;
 
+static spinlock_t authtab_lock = SPIN_LOCK_UNLOCKED;
 static struct auth_ops	*authtab[RPC_AUTH_MAXFLAVOR] = {
 	[0] = &svcauth_null,
 	[1] = &svcauth_unix,
@@ -43,10 +45,15 @@ svc_authenticate(struct svc_rqst *rqstp, u32 *authp)
 	flavor = ntohl(svc_getu32(&rqstp->rq_arg.head[0]));
 
 	dprintk("svc: svc_authenticate (%d)\n", flavor);
-	if (flavor >= RPC_AUTH_MAXFLAVOR || !(aops = authtab[flavor])) {
+
+	spin_lock(&authtab_lock);
+	if (flavor >= RPC_AUTH_MAXFLAVOR || !(aops = authtab[flavor])
+			|| !try_module_get(aops->owner)) {
+		spin_unlock(&authtab_lock);
 		*authp = rpc_autherr_badcred;
 		return SVC_DENIED;
 	}
+	spin_unlock(&authtab_lock);
 
 	rqstp->rq_authop = aops;
 	return aops->accept(rqstp, authp);
@@ -63,28 +70,35 @@ int svc_authorise(struct svc_rqst *rqstp)
 
 	rqstp->rq_authop = NULL;
 	
-	if (aops) 
+	if (aops) {
 		rv = aops->release(rqstp);
-
-	/* FIXME should I count and release authops */
+		module_put(aops->owner);
+	}
 	return rv;
 }
 
 int
 svc_auth_register(rpc_authflavor_t flavor, struct auth_ops *aops)
 {
-	if (flavor >= RPC_AUTH_MAXFLAVOR || authtab[flavor])
-		return -EINVAL;
-	authtab[flavor] = aops;
-	return 0;
+	int rv = -EINVAL;
+	spin_lock(&authtab_lock);
+	if (flavor < RPC_AUTH_MAXFLAVOR && authtab[flavor] == NULL) {
+		authtab[flavor] = aops;
+		rv = 0;
+	}
+	spin_unlock(&authtab_lock);
+	return rv;
 }
 
 void
 svc_auth_unregister(rpc_authflavor_t flavor)
 {
+	spin_lock(&authtab_lock);
 	if (flavor < RPC_AUTH_MAXFLAVOR)
 		authtab[flavor] = NULL;
+	spin_unlock(&authtab_lock);
 }
+EXPORT_SYMBOL(svc_auth_unregister);
 
 /**************************************************
  * cache for domain name to auth_domain

@@ -337,15 +337,14 @@ static __inline__ int find_first_bit(const unsigned long * addr, unsigned size)
 		"repe; scasl\n\t"
 		"jz 1f\n\t"
 		"leaq -4(%%rdi),%%rdi\n\t"
-		"bsfq (%%rdi),%%rax\n"
-		"1:\tsubl %%ebx,%%edi\n\t"
+		"bsfl (%%rdi),%%eax\n"
+		"1:\tsubq %%rbx,%%rdi\n\t"
 		"shll $3,%%edi\n\t"
 		"addl %%edi,%%eax"
 		:"=a" (res), "=&c" (d0), "=&D" (d1)
-		:"1" ((size + 31) >> 5), "2" (addr), "b" (addr));
+		:"1" ((size + 31) >> 5), "2" (addr), "b" (addr) : "memory");
 	return res;
 }
-
 
 /**
  * find_next_bit - find the first set bit in a memory region

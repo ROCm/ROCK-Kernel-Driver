@@ -201,6 +201,8 @@ void __init early_cpu_detect(void)
 {
 	struct cpuinfo_x86 *c = &boot_cpu_data;
 
+	c->x86_cache_alignment = 32;
+
 	if (!have_cpuid_p())
 		return;
 
@@ -213,8 +215,6 @@ void __init early_cpu_detect(void)
 	get_cpu_vendor(c, 1);
 
 	c->x86 = 4;
-	c->x86_cache_alignment = 32;
-
 	if (c->cpuid_level >= 0x00000001) {
 		u32 junk, tfms, cap0, misc;
 		cpuid(0x00000001, &tfms, &misc, &junk, &cap0);

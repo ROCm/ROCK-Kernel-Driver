@@ -633,8 +633,8 @@ out:
 outmisc:
 #ifdef CONFIG_WDT_501
 	misc_deregister(&temp_miscdev);
-#endif /* CONFIG_WDT_501 */
 outrbt:
+#endif /* CONFIG_WDT_501 */
 	unregister_reboot_notifier(&wdt_notifier);
 outirq:
 	free_irq(irq, NULL);

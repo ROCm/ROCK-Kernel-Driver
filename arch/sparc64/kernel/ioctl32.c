@@ -60,11 +60,11 @@ static int fbiogetputcmap(unsigned int fd, unsigned int cmd, unsigned long arg)
 	u32 r, g, b;
 	mm_segment_t old_fs = get_fs();
 	
-	ret = get_user(f.index, &(((struct fbcmap32 *)arg)->index));
-	ret |= __get_user(f.count, &(((struct fbcmap32 *)arg)->count));
-	ret |= __get_user(r, &(((struct fbcmap32 *)arg)->red));
-	ret |= __get_user(g, &(((struct fbcmap32 *)arg)->green));
-	ret |= __get_user(b, &(((struct fbcmap32 *)arg)->blue));
+	ret = get_user(f.index, &(((struct fbcmap32 __user *)arg)->index));
+	ret |= __get_user(f.count, &(((struct fbcmap32 __user *)arg)->count));
+	ret |= __get_user(r, &(((struct fbcmap32 __user *)arg)->red));
+	ret |= __get_user(g, &(((struct fbcmap32 __user *)arg)->green));
+	ret |= __get_user(b, &(((struct fbcmap32 __user *)arg)->blue));
 	if (ret)
 		return -EFAULT;
 	if ((f.index < 0) || (f.index > 255)) return -EINVAL;
@@ -113,16 +113,21 @@ static int fbiogscursor(unsigned int fd, unsigned int cmd, unsigned long arg)
 	u32 m, i;
 	mm_segment_t old_fs = get_fs();
 	
-	ret = copy_from_user (&f, (struct fbcursor32 *)arg, 2 * sizeof (short) + 2 * sizeof(struct fbcurpos));
-	ret |= __get_user(f.size.x, &(((struct fbcursor32 *)arg)->size.x));
-	ret |= __get_user(f.size.y, &(((struct fbcursor32 *)arg)->size.y));
-	ret |= __get_user(f.cmap.index, &(((struct fbcursor32 *)arg)->cmap.index));
-	ret |= __get_user(f.cmap.count, &(((struct fbcursor32 *)arg)->cmap.count));
-	ret |= __get_user(r, &(((struct fbcursor32 *)arg)->cmap.red));
-	ret |= __get_user(g, &(((struct fbcursor32 *)arg)->cmap.green));
-	ret |= __get_user(b, &(((struct fbcursor32 *)arg)->cmap.blue));
-	ret |= __get_user(m, &(((struct fbcursor32 *)arg)->mask));
-	ret |= __get_user(i, &(((struct fbcursor32 *)arg)->image));
+	ret = copy_from_user (&f, (struct fbcursor32 __user *) arg,
+			      2 * sizeof (short) + 2 * sizeof(struct fbcurpos));
+	ret |= __get_user(f.size.x,
+			  &(((struct fbcursor32 __user *)arg)->size.x));
+	ret |= __get_user(f.size.y,
+			  &(((struct fbcursor32 __user *)arg)->size.y));
+	ret |= __get_user(f.cmap.index,
+			  &(((struct fbcursor32 __user *)arg)->cmap.index));
+	ret |= __get_user(f.cmap.count,
+			  &(((struct fbcursor32 __user *)arg)->cmap.count));
+	ret |= __get_user(r, &(((struct fbcursor32 __user *)arg)->cmap.red));
+	ret |= __get_user(g, &(((struct fbcursor32 __user *)arg)->cmap.green));
+	ret |= __get_user(b, &(((struct fbcursor32 __user *)arg)->cmap.blue));
+	ret |= __get_user(m, &(((struct fbcursor32 __user *)arg)->mask));
+	ret |= __get_user(i, &(((struct fbcursor32 __user *)arg)->image));
 	if (ret)
 		return -EFAULT;
 	if (f.set & FB_CUR_SETCMAP) {
@@ -167,7 +172,7 @@ typedef struct drm32_version {
 
 static int drm32_version(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-	drm32_version_t *uversion = (drm32_version_t *)arg;
+	drm32_version_t __user *uversion = (drm32_version_t __user *)arg;
 	char __user *name_ptr, *date_ptr, *desc_ptr;
 	u32 tmp1, tmp2, tmp3;
 	drm_version_t kversion;
@@ -245,7 +250,7 @@ typedef struct drm32_unique {
 
 static int drm32_getsetunique(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-	drm32_unique_t *uarg = (drm32_unique_t *)arg;
+	drm32_unique_t __user *uarg = (drm32_unique_t __user *)arg;
 	drm_unique_t karg;
 	mm_segment_t old_fs;
 	char __user *uptr;
@@ -309,7 +314,7 @@ typedef struct drm32_map {
 
 static int drm32_addmap(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-	drm32_map_t *uarg = (drm32_map_t *) arg;
+	drm32_map_t __user *uarg = (drm32_map_t __user *) arg;
 	drm_map_t karg;
 	mm_segment_t old_fs;
 	u32 tmp;
@@ -324,7 +329,7 @@ static int drm32_addmap(unsigned int fd, unsigned int cmd, unsigned long arg)
 	if (ret)
 		return -EFAULT;
 
-	karg.handle = A(tmp);
+	karg.handle = (void *) (unsigned long) tmp;
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
@@ -354,7 +359,7 @@ typedef struct drm32_buf_info {
 
 static int drm32_info_bufs(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-	drm32_buf_info_t *uarg = (drm32_buf_info_t *)arg;
+	drm32_buf_info_t __user *uarg = (drm32_buf_info_t __user *)arg;
 	drm_buf_desc_t __user *ulist;
 	drm_buf_info_t karg;
 	mm_segment_t old_fs;
@@ -400,7 +405,7 @@ typedef struct drm32_buf_free {
 
 static int drm32_free_bufs(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-	drm32_buf_free_t *uarg = (drm32_buf_free_t *)arg;
+	drm32_buf_free_t __user *uarg = (drm32_buf_free_t __user *)arg;
 	drm_buf_free_t karg;
 	mm_segment_t old_fs;
 	int __user *ulist;
@@ -448,7 +453,7 @@ typedef struct drm32_buf_map {
 
 static int drm32_map_bufs(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-	drm32_buf_map_t *uarg = (drm32_buf_map_t *)arg;
+	drm32_buf_map_t __user *uarg = (drm32_buf_map_t __user *)arg;
 	drm32_buf_pub_t __user *ulist;
 	drm_buf_map_t karg;
 	mm_segment_t old_fs;
@@ -460,7 +465,7 @@ static int drm32_map_bufs(unsigned int fd, unsigned int cmd, unsigned long arg)
 	    get_user(tmp2, &uarg->list))
 		return -EFAULT;
 
-	karg.virtual = A(tmp1);
+	karg.virtual = (void *) (unsigned long) tmp1;
 	ulist = A(tmp2);
 
 	orig_count = karg.count;
@@ -477,7 +482,7 @@ static int drm32_map_bufs(unsigned int fd, unsigned int cmd, unsigned long arg)
 		    get_user(tmp1, &ulist[i].address))
 			goto out;
 
-		karg.list[i].address = A(tmp1);
+		karg.list[i].address = (void *) (unsigned long) tmp1;
 	}
 
 	old_fs = get_fs();
@@ -527,7 +532,7 @@ typedef struct drm32_dma {
  */
 static int drm32_dma(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-	drm32_dma_t *uarg = (drm32_dma_t *) arg;
+	drm32_dma_t __user *uarg = (drm32_dma_t __user *) arg;
 	int __user *u_si, *u_ss, *u_ri, *u_rs;
 	drm_dma_t karg;
 	mm_segment_t old_fs;
@@ -637,7 +642,7 @@ typedef struct drm32_ctx_res {
 
 static int drm32_res_ctx(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-	drm32_ctx_res_t *uarg = (drm32_ctx_res_t *) arg;
+	drm32_ctx_res_t __user *uarg = (drm32_ctx_res_t __user *) arg;
 	drm_ctx_t __user *ulist;
 	drm_ctx_res_t karg;
 	mm_segment_t old_fs;

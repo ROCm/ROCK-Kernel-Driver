@@ -221,13 +221,9 @@ static void __xfrm_state_delete(struct xfrm_state *x)
 		if (atomic_read(&x->refcnt) > 2)
 			xfrm_flush_bundles();
 
-		/* All xfrm_state objects are created by one of two possible
-		 * paths:
-		 *
-		 * 2) xfrm_state_lookup --> xfrm_state_insert
-		 *
-		 * The xfrm_state_lookup or xfrm_state_alloc call gives a
-		 * reference, and that is what we are dropping here.
+		/* All xfrm_state objects are created by xfrm_state_alloc.
+		 * The xfrm_state_alloc call gives a reference, and that
+		 * is what we are dropping here.
 		 */
 		atomic_dec(&x->refcnt);
 	}
@@ -235,7 +231,6 @@ static void __xfrm_state_delete(struct xfrm_state *x)
 
 void xfrm_state_delete(struct xfrm_state *x)
 {
-	xfrm_state_delete_tunnel(x);
 	spin_lock_bh(&x->lock);
 	__xfrm_state_delete(x);
 	spin_unlock_bh(&x->lock);
@@ -331,14 +326,8 @@ xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr,
 		}
 	}
 
-	if (best) {
-		xfrm_state_hold(best);
-		spin_unlock_bh(&xfrm_state_lock);
-		return best;
-	}
-
-	x = NULL;
-	if (!error && !acquire_in_progress &&
+	x = best;
+	if (!x && !error && !acquire_in_progress &&
 	    ((x = xfrm_state_alloc()) != NULL)) {
 		/* Initialize temporary selector matching only
 		 * to current session. */
@@ -355,7 +344,8 @@ xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr,
 			}
 			x->lft.hard_add_expires_seconds = XFRM_ACQ_EXPIRES;
 			xfrm_state_hold(x);
-			mod_timer(&x->timer, XFRM_ACQ_EXPIRES*HZ);
+			x->timer.expires = jiffies + XFRM_ACQ_EXPIRES*HZ;
+			add_timer(&x->timer);
 		} else {
 			x->km.state = XFRM_STATE_DEAD;
 			xfrm_state_put(x);
@@ -363,10 +353,12 @@ xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr,
 			error = 1;
 		}
 	}
-	spin_unlock_bh(&xfrm_state_lock);
-	if (!x)
+	if (x)
+		xfrm_state_hold(x);
+	else
 		*err = acquire_in_progress ? -EAGAIN :
 			(error ? -ESRCH : -ENOMEM);
+	spin_unlock_bh(&xfrm_state_lock);
 	return x;
 }
 
@@ -802,7 +794,7 @@ void km_policy_expired(struct xfrm_policy *pol, int dir, int hard)
 		wake_up(&km_waitq);
 }
 
-int xfrm_user_policy(struct sock *sk, int optname, u8 *optval, int optlen)
+int xfrm_user_policy(struct sock *sk, int optname, u8 __user *optval, int optlen)
 {
 	int err;
 	u8 *data;

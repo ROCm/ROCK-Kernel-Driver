@@ -1546,7 +1546,6 @@ static struct ethtool_ops cp_ethtool_ops = {
 static int cp_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct cp_private *cp = netdev_priv(dev);
-	struct mii_ioctl_data *mii = (struct mii_ioctl_data *) &rq->ifr_data;
 	int rc;
 	unsigned long flags;
 
@@ -1554,7 +1553,7 @@ static int cp_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 		return -EINVAL;
 
 	spin_lock_irqsave(&cp->lock, flags);
-	rc = generic_mii_ioctl(&cp->mii_if, mii, cmd, NULL);
+	rc = generic_mii_ioctl(&cp->mii_if, if_mii(rq), cmd, NULL);
 	spin_unlock_irqrestore(&cp->lock, flags);
 	return rc;
 }

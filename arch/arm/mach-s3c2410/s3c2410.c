@@ -31,7 +31,6 @@
 #include <asm/hardware.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/mach-types.h>
 
 #include <asm/arch/regs-clock.h>
 #include <asm/arch/regs-serial.h>

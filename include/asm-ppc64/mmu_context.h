@@ -172,11 +172,17 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
  * After we have set current->mm to a new value, this activates
  * the context for the new mm so we see the new mappings.
  */
-#define activate_mm(active_mm, mm) \
-	switch_mm(active_mm, mm, current);
+static inline void activate_mm(struct mm_struct *prev, struct mm_struct *next)
+{
+	unsigned long flags;
 
-#define VSID_RANDOMIZER 42470972311
-#define VSID_MASK	0xfffffffff
+	local_irq_save(flags);
+	switch_mm(prev, next, current);
+	local_irq_restore(flags);
+}
+
+#define VSID_RANDOMIZER 42470972311UL
+#define VSID_MASK	0xfffffffffUL
 
 
 /* This is only valid for kernel (including vmalloc, imalloc and bolted) EA's
@@ -189,15 +195,15 @@ get_kernel_vsid( unsigned long ea )
 	ordinal = (((ea >> 28) & 0x1fff) * LAST_USER_CONTEXT) | (ea >> 60);
 	vsid = (ordinal * VSID_RANDOMIZER) & VSID_MASK;
 
-	ifppcdebug(PPCDBG_HTABSTRESS) {
-		/* For debug, this path creates a very poor vsid distribuition.
-		 * A user program can access virtual addresses in the form
-		 * 0x0yyyyxxxx000 where yyyy = xxxx to cause multiple mappings
-		 * to hash to the same page table group.
-		 */ 
-		ordinal = ((ea >> 28) & 0x1fff) | (ea >> 44);
-		vsid = ordinal & VSID_MASK;
-	}
+#ifdef HTABSTRESS
+	/* For debug, this path creates a very poor vsid distribuition.
+	 * A user program can access virtual addresses in the form
+	 * 0x0yyyyxxxx000 where yyyy = xxxx to cause multiple mappings
+	 * to hash to the same page table group.
+	 */
+	ordinal = ((ea >> 28) & 0x1fff) | (ea >> 44);
+	vsid = ordinal & VSID_MASK;
+#endif /* HTABSTRESS */
 
 	return vsid;
 } 
@@ -212,11 +218,11 @@ get_vsid( unsigned long context, unsigned long ea )
 	ordinal = (((ea >> 28) & 0x1fff) * LAST_USER_CONTEXT) | context;
 	vsid = (ordinal * VSID_RANDOMIZER) & VSID_MASK;
 
-	ifppcdebug(PPCDBG_HTABSTRESS) {
-		/* See comment above. */
-		ordinal = ((ea >> 28) & 0x1fff) | (context << 16);
-		vsid = ordinal & VSID_MASK;
-	}
+#ifdef HTABSTRESS
+	/* See comment above. */
+	ordinal = ((ea >> 28) & 0x1fff) | (context << 16);
+	vsid = ordinal & VSID_MASK;
+#endif /* HTABSTRESS */
 
 	return vsid;
 }

@@ -100,7 +100,7 @@
 #endif
 
 static spinlock_t iosapic_lock = SPIN_LOCK_UNLOCKED;
-cpumask_t	__cacheline_aligned pending_irq_cpumask[NR_IRQS];
+extern cpumask_t	__cacheline_aligned pending_irq_cpumask[NR_IRQS];
 
 /* These tables map IA-64 vectors to the IOSAPIC pin that generates this vector. */
 

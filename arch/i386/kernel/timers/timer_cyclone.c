@@ -17,6 +17,7 @@
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/fixmap.h>
+#include "io_ports.h"
 
 extern spinlock_t i8253_lock;
 
@@ -62,6 +63,17 @@ static void mark_offset_cyclone(void)
 
 	count = inb_p(0x40);    /* read the latched count */
 	count |= inb(0x40) << 8;
+
+	/*
+	 * VIA686a test code... reset the latch if count > max + 1
+	 * from timer_pit.c - cjb
+	 */
+	if (count > LATCH) {
+		outb_p(0x34, PIT_MODE);
+		outb_p(LATCH & 0xff, PIT_CH0);
+		outb(LATCH >> 8, PIT_CH0);
+		count = LATCH - 1;
+	}
 	spin_unlock(&i8253_lock);
 
 	/* lost tick compensation */

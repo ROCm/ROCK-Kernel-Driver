@@ -575,6 +575,7 @@ static int __init smp_scan_config (unsigned long base, unsigned long length)
 	extern void __bad_mpf_size(void); 
 	unsigned int *bp = phys_to_virt(base);
 	struct intel_mp_floating *mpf;
+	static int printed __initdata; 
 
 	Dprintk("Scan SMP from %p for %ld bytes.\n", bp,length);
 	if (sizeof(*mpf) != 16)
@@ -598,7 +599,10 @@ static int __init smp_scan_config (unsigned long base, unsigned long length)
 		bp += 4;
 		length -= 16;
 	}
-	printk(KERN_INFO "No mptable found.\n");
+	if (!printed) {		
+		printk(KERN_INFO "No mptable found.\n");
+		printed = 1;
+	}
 	return 0;
 }
 
@@ -712,7 +716,7 @@ struct mp_ioapic_routing {
 } mp_ioapic_routing[MAX_IO_APICS];
 
 
-static int __init mp_find_ioapic (
+static int mp_find_ioapic (
 	int			gsi)
 {
 	int			i = 0;

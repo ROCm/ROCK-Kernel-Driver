@@ -236,7 +236,7 @@ static unsigned int default_set_bits(int dev, unsigned int bits)
 	mm_segment_t fs = get_fs();
 
 	set_fs(get_ds());
-	audio_devs[dev]->d->ioctl(dev, SNDCTL_DSP_SETFMT, (caddr_t)&bits);
+	audio_devs[dev]->d->ioctl(dev, SNDCTL_DSP_SETFMT, (void __user *)&bits);
 	set_fs(fs);
 	return bits;
 }
@@ -246,7 +246,7 @@ static int default_set_speed(int dev, int speed)
 	mm_segment_t fs = get_fs();
 
 	set_fs(get_ds());
-	audio_devs[dev]->d->ioctl(dev, SNDCTL_DSP_SPEED, (caddr_t)&speed);
+	audio_devs[dev]->d->ioctl(dev, SNDCTL_DSP_SPEED, (void __user *)&speed);
 	set_fs(fs);
 	return speed;
 }
@@ -257,7 +257,7 @@ static short default_set_channels(int dev, short channels)
 	mm_segment_t fs = get_fs();
 
 	set_fs(get_ds());
-	audio_devs[dev]->d->ioctl(dev, SNDCTL_DSP_CHANNELS, (caddr_t)&c);
+	audio_devs[dev]->d->ioctl(dev, SNDCTL_DSP_CHANNELS, (void __user *)&c);
 	set_fs(fs);
 	return c;
 }

@@ -41,6 +41,7 @@ extern cpumask_t cpu_present_map;
 #define cpu_possible(cpu)		({ BUG_ON((cpu) != 0); 1; })
 #define cpu_present(cpu)		({ BUG_ON((cpu) != 0); 1; })
 
+#define for_each_cpu_mask(cpu, mask) for (cpu = 0; cpu < 1; cpu++)
 #define for_each_cpu(cpu) for (cpu = 0; cpu < 1; cpu++)
 #define for_each_online_cpu(cpu) for (cpu = 0; cpu < 1; cpu++)
 #define for_each_present_cpu(cpu) for (cpu = 0; cpu < 1; cpu++)

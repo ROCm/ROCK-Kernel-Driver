@@ -48,7 +48,7 @@ extern inline void _raw_spin_lock(spinlock_t *lp)
 {
 #ifndef __s390x__
 	unsigned int reg1, reg2;
-        __asm__ __volatile("    bras  %0,1f\n"
+        __asm__ __volatile__("    bras  %0,1f\n"
                            "0:  diag  0,0,68\n"
                            "1:  slr   %1,%1\n"
                            "    cs    %1,%0,0(%3)\n"
@@ -58,7 +58,7 @@ extern inline void _raw_spin_lock(spinlock_t *lp)
 			   : "cc", "memory" );
 #else /* __s390x__ */
 	unsigned long reg1, reg2;
-        __asm__ __volatile("    bras  %1,1f\n"
+        __asm__ __volatile__("    bras  %1,1f\n"
                            "0:  " __DIAG44_INSN " 0,%4\n"
                            "1:  slr   %0,%0\n"
                            "    cs    %0,%1,0(%3)\n"
@@ -74,7 +74,7 @@ extern inline int _raw_spin_trylock(spinlock_t *lp)
 	unsigned long reg;
 	unsigned int result;
 
-	__asm__ __volatile("    basr  %1,0\n"
+	__asm__ __volatile__("    basr  %1,0\n"
 			   "0:  cs    %0,%1,0(%3)"
 			   : "=d" (result), "=&d" (reg), "=m" (lp->lock)
 			   : "a" (&lp->lock), "m" (lp->lock), "0" (0)
@@ -86,7 +86,7 @@ extern inline void _raw_spin_unlock(spinlock_t *lp)
 {
 	unsigned int old;
 
-	__asm__ __volatile("cs %0,%3,0(%4)"
+	__asm__ __volatile__("cs %0,%3,0(%4)"
 			   : "=d" (old), "=m" (lp->lock)
 			   : "0" (lp->lock), "d" (0), "a" (lp)
 			   : "cc", "memory" );

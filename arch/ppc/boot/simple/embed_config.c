@@ -10,6 +10,7 @@
 #include <linux/types.h>
 #include <linux/config.h>
 #include <linux/string.h>
+#include <asm/reg.h>
 #ifdef CONFIG_8xx
 #include <asm/mpc8xx.h>
 #endif
@@ -402,14 +403,18 @@ embed_config(bd_t **bdp)
 
 #ifdef CONFIG_8260
 /* Compute 8260 clock values if the rom doesn't provide them.
- * We can't compute the internal core frequency (I don't know how to
- * do that).
  */
+static unsigned char bus2core_8260[] = {
+/*      0   1   2   3   4   5   6   7   8   9   a   b   c   d   e   f */
+	3,  2,  2,  2,  4,  4,  5,  9,  6, 11,  8, 10,  3, 12,  7,  2,
+	6,  5, 13,  2, 14,  4, 15,  2,  3, 11,  8, 10, 16, 12,  7,  2,
+};
+
 static void
 clk_8260(bd_t *bd)
 {
 	uint	scmr, vco_out, clkin;
-	uint	plldf, pllmf, busdf, brgdf, cpmdf;
+	uint	plldf, pllmf, corecnf;
 	volatile immap_t	*ip;
 
 	ip = (immap_t *)IMAP_ADDR;
@@ -423,8 +428,7 @@ clk_8260(bd_t *bd)
 	*/
 	plldf = (scmr >> 12) & 1;
 	pllmf = scmr & 0xfff;
-	cpmdf = (scmr >> 16) & 0x0f;
-	busdf = (scmr >> 20) & 0x0f;
+	corecnf = (scmr >> 24) &0x1f;
 
 	/* This is arithmetic from the 8260 manual.
 	*/
@@ -433,6 +437,7 @@ clk_8260(bd_t *bd)
 	bd->bi_vco = vco_out;		/* Save for later */
 
 	bd->bi_cpmfreq = vco_out / 2;	/* CPM Freq, in MHz */
+	bd->bi_intfreq = bd->bi_busfreq * bus2core_8260[corecnf] / 2;
 
 	/* Set Baud rate divisor.  The power up default is divide by 16,
 	 * but we set it again here in case it was changed.
@@ -440,7 +445,78 @@ clk_8260(bd_t *bd)
 	ip->im_clkrst.car_sccr = 1;	/* DIV 16 BRG */
 	bd->bi_brgfreq = vco_out / 16;
 }
+
+static unsigned char bus2core_8280[] = {
+/*      0   1   2   3   4   5   6   7   8   9   a   b   c   d   e   f */
+	3,  2,  2,  2,  4,  4,  5,  9,  6, 11,  8, 10,  3, 12,  7,  2,
+	6,  5, 13,  2, 14,  2, 15,  2,  3,  2,  2,  2, 16,  2,  2,  2,
+};
+
+static void
+clk_8280(bd_t *bd)
+{
+	uint	scmr, main_clk, clkin;
+	uint	pllmf, corecnf;
+	volatile immap_t	*ip;
+
+	ip = (immap_t *)IMAP_ADDR;
+	scmr = ip->im_clkrst.car_scmr;
+
+	/* The clkin is always bus frequency.
+	*/
+	clkin = bd->bi_busfreq;
+
+	/* Collect the bits from the scmr.
+	*/
+	pllmf = scmr & 0xf;
+	corecnf = (scmr >> 24) & 0x1f;
+
+	/* This is arithmetic from the 8280 manual.
+	*/
+	main_clk = clkin * (pllmf + 1);
+
+	bd->bi_cpmfreq = main_clk / 2;	/* CPM Freq, in MHz */
+	bd->bi_intfreq = bd->bi_busfreq * bus2core_8280[corecnf] / 2;
+
+	/* Set Baud rate divisor.  The power up default is divide by 16,
+	 * but we set it again here in case it was changed.
+	 */
+	ip->im_clkrst.car_sccr = (ip->im_clkrst.car_sccr & 0x3) | 0x1;
+	bd->bi_brgfreq = main_clk / 16;
+}
 #endif
+
+#ifdef CONFIG_SBC82xx
+void
+embed_config(bd_t **bdp)
+{
+	u_char	*cp;
+	int	i;
+	bd_t	*bd;
+	unsigned long pvr;
+
+	bd = *bdp;
+
+	bd = &bdinfo;
+	*bdp = bd;
+	bd->bi_baudrate = 9600;
+	bd->bi_memsize = 256 * 1024 * 1024;	/* just a guess */
+
+	cp = (void*)SBC82xx_MACADDR_NVRAM_SCC1;
+	memcpy(bd->bi_enetaddr, cp, 6);
+
+	/* can busfreq be calculated? */
+	pvr = mfspr(PVR);
+	if ((pvr & 0xffff0000) == 0x80820000) {
+		bd->bi_busfreq = 100000000;
+		clk_8280(bd);
+	} else {
+		bd->bi_busfreq = 66000000;
+		clk_8260(bd);
+	}
+
+}
+#endif /* SBC82xx */
 
 #if defined(CONFIG_EST8260) || defined(CONFIG_TQM8260)
 void

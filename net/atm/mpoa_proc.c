@@ -30,10 +30,10 @@
 extern struct mpoa_client *mpcs;
 extern struct proc_dir_entry *atm_proc_root;  /* from proc.c. */
 
-static ssize_t proc_mpc_read(struct file *file, char *buff,
+static ssize_t proc_mpc_read(struct file *file, char __user *buff,
 			     size_t count, loff_t *pos);
 
-static ssize_t proc_mpc_write(struct file *file, const char *buff,
+static ssize_t proc_mpc_write(struct file *file, const char __user *buff,
                               size_t nbytes, loff_t *ppos);
 
 static int parse_qos(const char *buff, int len);
@@ -99,7 +99,7 @@ static const char *egress_state_string(int state){
 /*
  * READING function - called when the /proc/atm/mpoa file is read from.
  */
-static ssize_t proc_mpc_read(struct file *file, char *buff,
+static ssize_t proc_mpc_read(struct file *file, char __user *buff,
 			     size_t count, loff_t *pos){
         unsigned long page = 0;
 	unsigned char *temp;
@@ -165,12 +165,12 @@ static ssize_t proc_mpc_read(struct file *file, char *buff,
         return length;
 }
 
-static ssize_t proc_mpc_write(struct file *file, const char *buff,
+static ssize_t proc_mpc_write(struct file *file, const char __user *buff,
                               size_t nbytes, loff_t *ppos)
 {
         int incoming, error, retval;
         char *page, c;
-        const char *tmp;
+        const char __user *tmp;
 
         if (nbytes == 0) return 0;
         if (nbytes >= PAGE_SIZE) nbytes = PAGE_SIZE-1;

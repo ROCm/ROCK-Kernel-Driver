@@ -118,7 +118,6 @@ static inline void set_tssldt_descriptor(void *ptr, unsigned long tss, unsigned 
 	d.base1 = PTR_MIDDLE(tss) & 0xFF; 
 	d.type = type;
 	d.p = 1; 
-	d.g = 1;
 	d.limit1 = (size >> 16) & 0xF;
 	d.base2 = (PTR_MIDDLE(tss) >> 8) & 0xFF; 
 	d.base3 = PTR_HIGH(tss); 
@@ -135,7 +134,7 @@ static inline void set_tss_desc(unsigned cpu, void *addr)
 static inline void set_ldt_desc(unsigned cpu, void *addr, int size)
 { 
 	set_tssldt_descriptor(&cpu_gdt_table[cpu][GDT_ENTRY_LDT], (unsigned long)addr, 
-			      DESC_LDT, size); 
+			      DESC_LDT, size * 8);
 }
 
 static inline void set_seg_base(unsigned cpu, int entry, void *base)

@@ -106,6 +106,7 @@ extern void _do_read_lock(rwlock_t *rw, char *str);
 extern void _do_read_unlock(rwlock_t *rw, char *str);
 extern void _do_write_lock(rwlock_t *rw, char *str);
 extern void _do_write_unlock(rwlock_t *rw);
+extern int _do_write_trylock(rwlock_t *rw, char *str);
 #endif
 
 extern unsigned long phys_base;
@@ -133,6 +134,8 @@ EXPORT_SYMBOL(__read_unlock);
 EXPORT_SYMBOL(__write_lock);
 EXPORT_SYMBOL(__write_unlock);
 EXPORT_SYMBOL(__write_trylock);
+/* Out of line spin-locking implementation. */
+EXPORT_SYMBOL(_raw_spin_lock_flags);
 #endif
 
 /* Hard IRQ locking */
@@ -156,6 +159,7 @@ EXPORT_SYMBOL(_do_read_lock);
 EXPORT_SYMBOL(_do_read_unlock);
 EXPORT_SYMBOL(_do_write_lock);
 EXPORT_SYMBOL(_do_write_unlock);
+EXPORT_SYMBOL(_do_write_trylock);
 #endif
 
 EXPORT_SYMBOL(smp_call_function);
@@ -184,6 +188,11 @@ EXPORT_SYMBOL(___test_and_clear_bit);
 EXPORT_SYMBOL(___test_and_change_bit);
 EXPORT_SYMBOL(___test_and_set_le_bit);
 EXPORT_SYMBOL(___test_and_clear_le_bit);
+
+/* Bit searching */
+EXPORT_SYMBOL(find_next_bit);
+EXPORT_SYMBOL(find_next_zero_bit);
+EXPORT_SYMBOL(find_next_zero_le_bit);
 
 EXPORT_SYMBOL(ivector_table);
 EXPORT_SYMBOL(enable_irq);

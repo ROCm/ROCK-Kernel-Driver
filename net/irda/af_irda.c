@@ -1269,7 +1269,7 @@ static int irda_sendmsg(struct kiocb *iocb, struct socket *sock,
 	IRDA_DEBUG(4, "%s(), len=%d\n", __FUNCTION__, len);
 
 	/* Note : socket.c set MSG_EOR on SEQPACKET sockets */
-	if (msg->msg_flags & ~(MSG_DONTWAIT | MSG_EOR))
+	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_EOR|MSG_CMSG_COMPAT))
 		return -EINVAL;
 
 	if (sk->sk_shutdown & SEND_SHUTDOWN) {
@@ -1521,7 +1521,7 @@ static int irda_sendmsg_dgram(struct kiocb *iocb, struct socket *sock,
 
 	IRDA_DEBUG(4, "%s(), len=%d\n", __FUNCTION__, len);
 
-	if (msg->msg_flags & ~MSG_DONTWAIT)
+	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_CMSG_COMPAT))
 		return -EINVAL;
 
 	if (sk->sk_shutdown & SEND_SHUTDOWN) {
@@ -1593,7 +1593,7 @@ static int irda_sendmsg_ultra(struct kiocb *iocb, struct socket *sock,
 
 	IRDA_DEBUG(4, "%s(), len=%d\n", __FUNCTION__, len);
 
-	if (msg->msg_flags & ~MSG_DONTWAIT)
+	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_CMSG_COMPAT))
 		return -EINVAL;
 
 	if (sk->sk_shutdown & SEND_SHUTDOWN) {
@@ -1779,7 +1779,7 @@ static int irda_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		amount = sk->sk_sndbuf - atomic_read(&sk->sk_wmem_alloc);
 		if (amount < 0)
 			amount = 0;
-		if (put_user(amount, (unsigned int *)arg))
+		if (put_user(amount, (unsigned int __user *)arg))
 			return -EFAULT;
 		return 0;
 	}
@@ -1790,14 +1790,14 @@ static int irda_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		/* These two are safe on a single CPU system as only user tasks fiddle here */
 		if ((skb = skb_peek(&sk->sk_receive_queue)) != NULL)
 			amount = skb->len;
-		if (put_user(amount, (unsigned int *)arg))
+		if (put_user(amount, (unsigned int __user *)arg))
 			return -EFAULT;
 		return 0;
 	}
 
 	case SIOCGSTAMP:
 		if (sk != NULL)
-			return sock_get_timestamp(sk, (struct timeval *)arg);
+			return sock_get_timestamp(sk, (struct timeval __user *)arg);
 		return -EINVAL;
 
 	case SIOCGIFADDR:
@@ -1813,7 +1813,7 @@ static int irda_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		return -EINVAL;
 	default:
 		IRDA_DEBUG(1, "%s(), doing device ioctl!\n", __FUNCTION__);
-		return dev_ioctl(cmd, (void *) arg);
+		return dev_ioctl(cmd, (void __user *) arg);
 	}
 
 	/*NOTREACHED*/
@@ -1827,7 +1827,7 @@ static int irda_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
  *
  */
 static int irda_setsockopt(struct socket *sock, int level, int optname,
-			   char *optval, int optlen)
+			   char __user *optval, int optlen)
 {
 	struct sock *sk = sock->sk;
 	struct irda_sock *self = irda_sk(sk);
@@ -1860,7 +1860,7 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 			return -ENOMEM;
 
 		/* Copy query to the driver. */
-		if (copy_from_user(ias_opt, (char *)optval, optlen)) {
+		if (copy_from_user(ias_opt, optval, optlen)) {
 			kfree(ias_opt);
 			return -EFAULT;
 		}
@@ -1962,7 +1962,7 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 			return -ENOMEM;
 
 		/* Copy query to the driver. */
-		if (copy_from_user(ias_opt, (char *)optval, optlen)) {
+		if (copy_from_user(ias_opt, optval, optlen)) {
 			kfree(ias_opt);
 			return -EFAULT;
 		}
@@ -2012,7 +2012,7 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 		if (optlen < sizeof(int))
 			return -EINVAL;
 
-		if (get_user(opt, (int *)optval))
+		if (get_user(opt, (int __user *)optval))
 			return -EFAULT;
 
 		/* Only possible for a seqpacket service (TTP with SAR) */
@@ -2031,7 +2031,7 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 			return -EINVAL;
 
 		/* The input is really a (__u8 hints[2]), easier as an int */
-		if (get_user(opt, (int *)optval))
+		if (get_user(opt, (int __user *)optval))
 			return -EFAULT;
 
 		/* Unregister any old registration */
@@ -2050,7 +2050,7 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 			return -EINVAL;
 
 		/* The input is really a (__u8 hints[2]), easier as an int */
-		if (get_user(opt, (int *)optval))
+		if (get_user(opt, (int __user *)optval))
 			return -EFAULT;
 
 		/* Set the new hint mask */
@@ -2121,7 +2121,7 @@ static int irda_extract_ias_value(struct irda_ias_set *ias_opt,
  * Function irda_getsockopt (sock, level, optname, optval, optlen)
  */
 static int irda_getsockopt(struct socket *sock, int level, int optname,
-			   char *optval, int *optlen)
+			   char __user *optval, int __user *optlen)
 {
 	struct sock *sk = sock->sk;
 	struct irda_sock *self = irda_sk(sk);
@@ -2211,7 +2211,7 @@ bed:
 			return -ENOMEM;
 
 		/* Copy query to the driver. */
-		if (copy_from_user((char *) ias_opt, (char *)optval, len)) {
+		if (copy_from_user(ias_opt, optval, len)) {
 			kfree(ias_opt);
 			return -EFAULT;
 		}
@@ -2245,7 +2245,7 @@ bed:
 		}
 
 		/* Copy reply to the user */
-		if (copy_to_user((char *)optval, (char *) ias_opt,
+		if (copy_to_user(optval, ias_opt,
 				 sizeof(struct irda_ias_set))) {
 			kfree(ias_opt);
 			return -EFAULT;
@@ -2267,7 +2267,7 @@ bed:
 			return -ENOMEM;
 
 		/* Copy query to the driver. */
-		if (copy_from_user((char *) ias_opt, (char *)optval, len)) {
+		if (copy_from_user(ias_opt, optval, len)) {
 			kfree(ias_opt);
 			return -EFAULT;
 		}
@@ -2351,7 +2351,7 @@ bed:
 		}
 
 		/* Copy reply to the user */
-		if (copy_to_user((char *)optval, (char *) ias_opt,
+		if (copy_to_user(optval, ias_opt,
 				 sizeof(struct irda_ias_set))) {
 			kfree(ias_opt);
 			return -EFAULT;
@@ -2378,7 +2378,7 @@ bed:
 		if (len != sizeof(int))
 			return -EINVAL;
 		/* Get timeout in ms (max time we block the caller) */
-		if (get_user(val, (int *)optval))
+		if (get_user(val, (int __user *)optval))
 			return -EFAULT;
 
 		/* Tell IrLMP we want to be notified */
@@ -2438,7 +2438,7 @@ bed:
 		 * If the user want more details, he should query
 		 * the whole discovery log and pick one device...
 		 */
-		if (put_user(daddr, (int *)optval))
+		if (put_user(daddr, (int __user *)optval))
 			return -EFAULT;
 
 		break;

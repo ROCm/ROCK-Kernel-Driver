@@ -55,7 +55,7 @@ static int snd_pcm_control_ioctl(snd_card_t * card,
 		{
 			int device;
 
-			if (get_user(device, (int *)arg))
+			if (get_user(device, (int __user *)arg))
 				return -EFAULT;
 			device = device < 0 ? 0 : device + 1;
 			while (device < SNDRV_PCM_DEVICES) {
@@ -65,18 +65,19 @@ static int snd_pcm_control_ioctl(snd_card_t * card,
 			}
 			if (device == SNDRV_PCM_DEVICES)
 				device = -1;
-			if (put_user(device, (int *)arg))
+			if (put_user(device, (int __user *)arg))
 				return -EFAULT;
 			return 0;
 		}
 	case SNDRV_CTL_IOCTL_PCM_INFO:
 		{
-			snd_pcm_info_t *info = (snd_pcm_info_t *)arg;
+			snd_pcm_info_t __user *info;
 			unsigned int device, subdevice;
 			snd_pcm_stream_t stream;
 			snd_pcm_t *pcm;
 			snd_pcm_str_t *pstr;
 			snd_pcm_substream_t *substream;
+			info = (snd_pcm_info_t __user *)arg;
 			if (get_user(device, &info->device))
 				return -EFAULT;
 			if (device >= SNDRV_PCM_DEVICES)
@@ -106,7 +107,7 @@ static int snd_pcm_control_ioctl(snd_card_t * card,
 		{
 			int val;
 			
-			if (get_user(val, (int *)arg))
+			if (get_user(val, (int __user *)arg))
 				return -EFAULT;
 			control->prefer_pcm_subdevice = val;
 			return 0;

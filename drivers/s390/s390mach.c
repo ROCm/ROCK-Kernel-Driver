@@ -12,6 +12,7 @@
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
+#include <linux/workqueue.h>
 
 #include <asm/lowcore.h>
 
@@ -21,13 +22,14 @@
 // #define DBG(args,...) do {} while (0);
 
 static struct semaphore m_sem;
-static struct semaphore s_sem;
 
 extern int css_process_crw(int);
 extern int chsc_process_crw(void);
 extern int chp_process_crw(int, int);
 extern void css_reiterate_subchannels(void);
-extern void css_trigger_slow_path(void);
+
+extern struct workqueue_struct *slow_path_wq;
+extern struct work_struct slow_path_work;
 
 static void
 s390_handle_damage(char *msg)
@@ -37,21 +39,6 @@ s390_handle_damage(char *msg)
 	smp_send_stop();
 #endif
 	disabled_wait((unsigned long) __builtin_return_address(0));
-}
-
-static int
-s390_mchk_slow_path(void *param)
-{
-	struct semaphore *sem;
-
-	sem = (struct semaphore *)param;
-	/* Set a nice name. */
-	daemonize("kslowcrw");
-repeat:
-	down_interruptible(sem);
-	css_trigger_slow_path();
-	goto repeat;
-	return 0;
 }
 
 /*
@@ -130,7 +117,7 @@ repeat:
 		}
 	}
 	if (slow)
-		up(&s_sem);
+		queue_work(slow_path_wq, &slow_path_work);
 	goto repeat;
 	return 0;
 }
@@ -202,7 +189,6 @@ static int
 machine_check_init(void)
 {
 	init_MUTEX_LOCKED(&m_sem);
-	init_MUTEX_LOCKED( &s_sem );
 	ctl_clear_bit(14, 25);	/* disable damage MCH */
 	ctl_set_bit(14, 26);	/* enable degradation MCH */
 	ctl_set_bit(14, 27);	/* enable system recovery MCH */
@@ -226,7 +212,6 @@ static int __init
 machine_check_crw_init (void)
 {
 	kernel_thread(s390_collect_crw_info, &m_sem, CLONE_FS|CLONE_FILES);
-	kernel_thread(s390_mchk_slow_path, &s_sem, CLONE_FS|CLONE_FILES);
 	ctl_set_bit(14, 28);	/* enable channel report MCH */
 	return 0;
 }

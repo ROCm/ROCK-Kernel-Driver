@@ -567,7 +567,7 @@ nfsd_sync_dir(struct dentry *dp)
 static spinlock_t ra_lock = SPIN_LOCK_UNLOCKED;
 
 static inline struct raparms *
-nfsd_get_raparms(dev_t dev, ino_t ino)
+nfsd_get_raparms(dev_t dev, ino_t ino, struct address_space *mapping)
 {
 	struct raparms	*ra, **rap, **frap = NULL;
 	int depth = 0;
@@ -589,7 +589,7 @@ nfsd_get_raparms(dev_t dev, ino_t ino)
 	ra = *frap;
 	ra->p_dev = dev;
 	ra->p_ino = ino;
-	memset(&ra->p_ra, 0, sizeof(ra->p_ra));
+	file_ra_state_init(&ra->p_ra, mapping);
 found:
 	if (rap != &raparm_cache) {
 		*rap = ra->p_next;
@@ -661,7 +661,8 @@ nfsd_read(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 #endif
 
 	/* Get readahead parameters */
-	ra = nfsd_get_raparms(inode->i_sb->s_dev, inode->i_ino);
+	ra = nfsd_get_raparms(inode->i_sb->s_dev, inode->i_ino,
+			      inode->i_mapping->host->i_mapping);
 	if (ra)
 		file.f_ra = ra->p_ra;
 
@@ -677,9 +678,12 @@ nfsd_read(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	}
 
 	/* Write back readahead params */
-	if (ra)
+	if (ra) {
+		spin_lock(&ra_lock);
 		ra->p_ra = file.f_ra;
-
+		ra->p_count--;
+		spin_unlock(&ra_lock);
+	}
 	if (err >= 0) {
 		nfsdstats.io_read += err;
 		*count = err;
@@ -899,7 +903,7 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 			goto out;
 	} else {
 		/* called from nfsd_proc_create */
-		dchild = resfhp->fh_dentry;
+		dchild = dget(resfhp->fh_dentry);
 		if (!fhp->fh_locked) {
 			/* not actually possible */
 			printk(KERN_ERR
@@ -1228,8 +1232,8 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		err = nfserrno(err);
 	fh_unlock(fhp);
 
-	/* Compose the fh so the dentry will be freed ... */
 	cerr = fh_compose(resfhp, fhp->fh_export, dnew, fhp);
+	dput(dnew);
 	if (err==0) err = cerr;
 out:
 	return err;

@@ -2668,9 +2668,7 @@ static int usbnet_ioctl (struct net_device *net, struct ifreq *rq, int cmd)
 	struct usbnet *dev = (struct usbnet *)net->priv;
 
 	if (dev->mii.mdio_read != NULL && dev->mii.mdio_write != NULL)
-		return generic_mii_ioctl(&dev->mii,
-				(struct mii_ioctl_data *) &rq->ifr_data,
-				cmd, NULL);
+		return generic_mii_ioctl(&dev->mii, if_mii(rq), cmd, NULL);
 	}
 #endif
 	return -EOPNOTSUPP;

@@ -1,5 +1,6 @@
+if ARCH_INTEGRATOR
+
 menu "Integrator Options"
-	depends on ARCH_INTEGRATOR
 
 config ARCH_INTEGRATOR_AP
 	bool "Support Integrator/AP and Integrator/PP2 platforms"
@@ -28,3 +29,5 @@ config INTEGRATOR_IMPD1
 	  module will be called impd1.
 
 endmenu
+
+endif

@@ -122,6 +122,7 @@ int sbusfb_ioctl_helper(unsigned long cmd, unsigned long arg,
 		cmap.red = &red;
 		cmap.green = &green;
 		cmap.blue = &blue;
+		cmap.transp = NULL;
 		for (i = 0; i < count; i++) {
 			int err;
 

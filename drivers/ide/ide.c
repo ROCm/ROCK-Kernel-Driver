@@ -188,7 +188,6 @@ int noautodma = 1;
 #endif
 
 EXPORT_SYMBOL(noautodma);
-EXPORT_SYMBOL(ide_bus_type);
 
 /*
  * This is declared extern in ide.h, for access by other IDE modules:
@@ -554,8 +553,6 @@ control_region_busy:
 	return -EBUSY;
 }
 
-EXPORT_SYMBOL(ide_hwif_request_regions);
-
 /**
  *	ide_hwif_release_regions - free IDE resources
  *
@@ -583,8 +580,6 @@ void ide_hwif_release_regions(ide_hwif_t *hwif)
 		if (hwif->io_ports[i])
 			release_region(hwif->io_ports[i], 1);
 }
-
-EXPORT_SYMBOL(ide_hwif_release_regions);
 
 /* restore hwif to a sane state */
 static void ide_hwif_restore(ide_hwif_t *hwif, ide_hwif_t *tmp_hwif)
@@ -936,8 +931,6 @@ void ide_setup_ports (	hw_regs_t *hw,
  */
 }
 
-EXPORT_SYMBOL(ide_setup_ports);
-
 /*
  * Register an IDE interface, specifying exactly the registers etc
  * Set init=1 iff calling before probes have taken place.
@@ -998,7 +991,6 @@ EXPORT_SYMBOL(ide_register_hw);
  */
 
 DECLARE_MUTEX(ide_setting_sem);
-EXPORT_SYMBOL(ide_setting_sem);
 
 /**
  *	ide_add_setting	-	add an ide setting option
@@ -1090,26 +1082,6 @@ static void __ide_remove_setting (ide_drive_t *drive, char *name)
 	kfree(setting->name);
 	kfree(setting);
 }
-
-/**
- *	ide_remove_setting	-	remove an ide setting option
- *	@drive: drive to use
- *	@name: setting name
- *
- *	Removes the setting named from the device if it is present.
- *	The function takes the settings_lock to protect against 
- *	parallel changes. This function must not be called from IRQ
- *	context.
- */
- 
-void ide_remove_setting (ide_drive_t *drive, char *name)
-{
-	down(&ide_setting_sem);
-	__ide_remove_setting(drive, name);
-	up(&ide_setting_sem);
-}
-
-EXPORT_SYMBOL(ide_remove_setting);
 
 /**
  *	ide_find_setting_by_ioctl	-	find a drive specific ioctl
@@ -1292,8 +1264,6 @@ int ide_write_setting (ide_drive_t *drive, ide_settings_t *setting, int val)
 	return 0;
 }
 
-EXPORT_SYMBOL(ide_write_setting);
-
 static int set_io_32bit(ide_drive_t *drive, int arg)
 {
 	drive->io_32bit = arg;
@@ -1387,26 +1357,6 @@ void ide_add_generic_settings (ide_drive_t *drive)
 		ide_add_setting(drive,	"ide-scsi",		SETTING_RW,					-1,		HDIO_SET_IDE_SCSI,		TYPE_BYTE,	0,	1,				1,		1,		&drive->scsi,			ide_atapi_to_scsi);
 }
 
-/*
- * Delay for *at least* 50ms.  As we don't know how much time is left
- * until the next tick occurs, we wait an extra tick to be safe.
- * This is used only during the probing/polling for drives at boot time.
- *
- * However, its usefullness may be needed in other places, thus we export it now.
- * The future may change this to a millisecond setable delay.
- */
-void ide_delay_50ms (void)
-{
-#ifndef CONFIG_BLK_DEV_IDECS
-	mdelay(50);
-#else
-	__set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(1+HZ/20);
-#endif /* CONFIG_BLK_DEV_IDECS */
-}
-
-EXPORT_SYMBOL(ide_delay_50ms);
-
 int system_bus_clock (void)
 {
 	return((int) ((!system_bus_speed) ? ide_system_bus_speed() : system_bus_speed ));
@@ -1441,8 +1391,6 @@ abort:
 	return 1;
 }
 
-EXPORT_SYMBOL(ide_replace_subdriver);
-
 int ata_attach(ide_drive_t *drive)
 {
 	struct list_head *p;
@@ -1466,8 +1414,6 @@ int ata_attach(ide_drive_t *drive)
 		panic("ide: default attach failed");
 	return 1;
 }
-
-EXPORT_SYMBOL(ata_attach);
 
 static int generic_ide_suspend(struct device *dev, u32 state)
 {
@@ -1513,13 +1459,14 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 	ide_drive_t *drive = bdev->bd_disk->private_data;
 	ide_settings_t *setting;
 	int err = 0;
+	void __user *p = (void __user *)arg;
 
 	down(&ide_setting_sem);
 	if ((setting = ide_find_setting_by_ioctl(drive, cmd)) != NULL) {
 		if (cmd == setting->read_ioctl) {
 			err = ide_read_setting(drive, setting);
 			up(&ide_setting_sem);
-			return err >= 0 ? put_user(err, (long *) arg) : err;
+			return err >= 0 ? put_user(err, (long __user *)arg) : err;
 		} else {
 			if (bdev != bdev->bd_contains)
 				err = -EINVAL;
@@ -1534,14 +1481,14 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 	switch (cmd) {
 		case HDIO_GETGEO:
 		{
-			struct hd_geometry *loc = (struct hd_geometry *) arg;
-			u16 bios_cyl = drive->bios_cyl; /* truncate */
-			if (!loc || (drive->media != ide_disk && drive->media != ide_floppy)) return -EINVAL;
-			if (put_user(drive->bios_head, (u8 *) &loc->heads)) return -EFAULT;
-			if (put_user(drive->bios_sect, (u8 *) &loc->sectors)) return -EFAULT;
-			if (put_user(bios_cyl, (u16 *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)get_start_sect(bdev),
-				(unsigned long *) &loc->start)) return -EFAULT;
+			struct hd_geometry geom;
+			if (!p || (drive->media != ide_disk && drive->media != ide_floppy)) return -EINVAL;
+			geom.heads = drive->bios_head;
+			geom.sectors = drive->bios_sect;
+			geom.cylinders = (u16)drive->bios_cyl; /* truncate */
+			geom.start = get_start_sect(bdev);
+			if (copy_to_user(p, &geom, sizeof(struct hd_geometry)))
+				return -EFAULT;
 			return 0;
 		}
 
@@ -1551,7 +1498,7 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 				return -EINVAL;
 			if (drive->id_read == 0)
 				return -ENOMSG;
-			if (copy_to_user((char *)arg, (char *)drive->id, (cmd == HDIO_GET_IDENTITY) ? sizeof(*drive->id) : 142))
+			if (copy_to_user(p, drive->id, (cmd == HDIO_GET_IDENTITY) ? sizeof(*drive->id) : 142))
 				return -EFAULT;
 			return 0;
 
@@ -1561,7 +1508,7 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 					drive->nice0		<< 	IDE_NICE_0		|
 					drive->nice1		<<	IDE_NICE_1		|
 					drive->nice2		<<	IDE_NICE_2,
-					(long *) arg);
+					(long __user *) arg);
 
 #ifdef CONFIG_IDE_TASK_IOCTL
 		case HDIO_DRIVE_TASKFILE:
@@ -1590,7 +1537,7 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 			hw_regs_t hw;
 			int args[3];
 			if (!capable(CAP_SYS_RAWIO)) return -EACCES;
-			if (copy_from_user(args, (void *)arg, 3 * sizeof(int)))
+			if (copy_from_user(args, p, 3 * sizeof(int)))
 				return -EFAULT;
 			memset(&hw, 0, sizeof(hw));
 			ide_init_hwif_ports(&hw, (unsigned long) args[0],
@@ -1658,12 +1605,12 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 
 		case CDROMEJECT:
 		case CDROMCLOSETRAY:
-			return scsi_cmd_ioctl(bdev->bd_disk, cmd, arg);
+			return scsi_cmd_ioctl(bdev->bd_disk, cmd, p);
 
 		case HDIO_GET_BUSSTATE:
 			if (!capable(CAP_SYS_ADMIN))
 				return -EACCES;
-			if (put_user(HWIF(drive)->bus_state, (long *)arg))
+			if (put_user(HWIF(drive)->bus_state, (long __user *)arg))
 				return -EFAULT;
 			return 0;
 
@@ -1825,7 +1772,7 @@ int __init ide_setup (char *s)
 	if (s[0] == 'h' && s[1] == 'd' && s[2] >= 'a' && s[2] <= max_drive) {
 		const char *hd_words[] = {
 			"none", "noprobe", "nowerr", "cdrom", "serialize",
-			"autotune", "noautotune", "minus8", "swapdata", "bswap",
+			"autotune", "noautotune", "stroke", "swapdata", "bswap",
 			"minus11", "remap", "remap63", "scsi", NULL };
 		unit = s[2] - 'a';
 		hw   = unit / MAX_DRIVES;
@@ -1858,6 +1805,9 @@ int __init ide_setup (char *s)
 				goto done;
 			case -7: /* "noautotune" */
 				drive->autotune = IDE_TUNE_NOAUTO;
+				goto done;
+			case -8: /* stroke */
+				drive->stroke = 1;
 				goto done;
 			case -9: /* "swapdata" */
 			case -10: /* "bswap" */
@@ -2053,6 +2003,7 @@ done:
 	return 1;
 }
 
+extern void pnpide_init(void);
 extern void h8300_ide_init(void);
 
 /*
@@ -2119,12 +2070,9 @@ static void __init probe_for_hwifs (void)
 		buddha_init();
 	}
 #endif /* CONFIG_BLK_DEV_BUDDHA */
-#if defined(CONFIG_BLK_DEV_IDEPNP) && defined(CONFIG_PNP)
-	{
-		extern void pnpide_init(int enable);
-		pnpide_init(1);
-	}
-#endif /* CONFIG_BLK_DEV_IDEPNP */
+#ifdef CONFIG_BLK_DEV_IDEPNP
+	pnpide_init();
+#endif
 #ifdef CONFIG_H8300
 	h8300_ide_init();
 #endif
@@ -2262,9 +2210,6 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 		up(&ide_setting_sem);
 		return 1;
 	}
-#if defined(CONFIG_BLK_DEV_IDEPNP) && defined(CONFIG_PNP) && defined(MODULE)
-	pnpide_init(0);
-#endif /* CONFIG_BLK_DEV_IDEPNP */
 #ifdef CONFIG_PROC_FS
 	ide_remove_proc_entries(drive->proc, DRIVER(drive)->proc);
 	ide_remove_proc_entries(drive->proc, generic_subdriver_entries);

@@ -1172,7 +1172,7 @@ struct security_operations {
 	int (*shm_associate) (struct shmid_kernel * shp, int shmflg);
 	int (*shm_shmctl) (struct shmid_kernel * shp, int cmd);
 	int (*shm_shmat) (struct shmid_kernel * shp, 
-			  char *shmaddr, int shmflg);
+			  char __user *shmaddr, int shmflg);
 
 	int (*sem_alloc_security) (struct sem_array * sma);
 	void (*sem_free_security) (struct sem_array * sma);

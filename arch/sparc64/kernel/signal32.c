@@ -345,8 +345,10 @@ asmlinkage void do_sigreturn32(struct pt_regs *regs)
 	current_thread_info()->restart_block.fn = do_no_restart_syscall;
 
 	synchronize_user_stack();
-	if (test_thread_flag(TIF_NEWSIGNALS))
-		return do_new_sigreturn32(regs);
+	if (test_thread_flag(TIF_NEWSIGNALS)) {
+		do_new_sigreturn32(regs);
+		return;
+	}
 
 	scptr = (struct sigcontext32 __user *)
 		(regs->u_regs[UREG_I0] & 0x00000000ffffffffUL);
@@ -469,7 +471,7 @@ asmlinkage void do_rt_sigreturn32(struct pt_regs *regs)
 	   call it and ignore errors.  */
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	do_sigaltstack(&st, NULL, (unsigned long)sf);
+	do_sigaltstack((stack_t __user *) &st, NULL, (unsigned long)sf);
 	set_fs(old_fs);
 	
 	switch (_NSIG_WORDS) {
@@ -1039,7 +1041,7 @@ asmlinkage int svr4_setcontext(svr4_ucontext_t __user *c, struct pt_regs *regs)
 	   call it and ignore errors.  */
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	do_sigaltstack(&st, NULL, regs->u_regs[UREG_I6]);
+	do_sigaltstack((stack_t __user *) &st, NULL, regs->u_regs[UREG_I6]);
 	set_fs(old_fs);
 	
 	sigdelsetmask(&set, ~_BLOCKABLE);
@@ -1347,7 +1349,7 @@ out:
 	return ret;
 }
 
-asmlinkage int do_sys32_sigaltstack(u32 ussa, u32 uossa, unsigned long sp)
+asmlinkage long do_sys32_sigaltstack(u32 ussa, u32 uossa, unsigned long sp)
 {
 	stack_t uss, uoss;
 	u32 u_ss_sp = 0;
@@ -1361,7 +1363,8 @@ asmlinkage int do_sys32_sigaltstack(u32 ussa, u32 uossa, unsigned long sp)
 	uss.ss_sp = (void *) (long) u_ss_sp;
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	ret = do_sigaltstack(ussa ? &uss : NULL, uossa ? &uoss : NULL, sp);
+	ret = do_sigaltstack(ussa ? (stack_t __user *) &uss : NULL,
+			     uossa ? (stack_t __user *) &uoss : NULL, sp);
 	set_fs(old_fs);
 	if (!ret && uossa && (put_user((long)uoss.ss_sp, &((stack_t32 __user *)(long)uossa)->ss_sp) ||
 		    __put_user(uoss.ss_flags, &((stack_t32 __user *)(long)uossa)->ss_flags) ||

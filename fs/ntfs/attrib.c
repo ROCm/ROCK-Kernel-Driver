@@ -624,7 +624,7 @@ run_list_element *ntfs_merge_run_lists(run_list_element *drl,
 
 			if (drl[ds].vcn == marker_vcn) {
 				ntfs_debug("Old marker = 0x%llx, replacing "
-						"with LCN_ENOENT.\n",
+						"with LCN_ENOENT.",
 						(unsigned long long)
 						drl[ds].lcn);
 				drl[ds].lcn = (LCN)LCN_ENOENT;
@@ -1565,7 +1565,7 @@ do_next_attr:
 		goto do_next_attr_loop;
 	}
 	ntfs_error(base_ni->vol->sb, "Inode contains corrupt attribute list "
-			"attribute.\n");
+			"attribute.");
 	if (ni != base_ni) {
 		unmap_extent_mft_record(ni);
 		ctx->ntfs_ino = base_ni;

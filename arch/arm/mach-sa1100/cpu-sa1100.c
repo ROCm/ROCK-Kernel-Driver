@@ -230,8 +230,9 @@ static int __init sa1100_cpu_init(struct cpufreq_policy *policy)
 }
 
 static struct cpufreq_driver sa1100_driver = {
-	.flags		= (CPUFREQ_PANIC_OUTOFSYNC | 
-			   CPUFREQ_PANIC_RESUME_OUTOFSYNC),
+	.flags		= CPUFREQ_STICKY |
+			  CPUFREQ_PANIC_OUTOFSYNC | 
+			  CPUFREQ_PANIC_RESUME_OUTOFSYNC,
 	.verify		= sa11x0_verify_speed,
 	.target		= sa1100_target,
 	.get		= sa11x0_getspeed,

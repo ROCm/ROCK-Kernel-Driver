@@ -113,7 +113,7 @@ static spinlock_t microcode_update_lock = SPIN_LOCK_UNLOCKED;
 /* no concurrent ->write()s are allowed on /dev/cpu/microcode */
 static DECLARE_MUTEX(microcode_sem);
 
-static void *user_buffer;		/* user area microcode data buffer */
+static void __user *user_buffer;	/* user area microcode data buffer */
 static unsigned int user_buffer_size;	/* it's size */
 
 typedef enum mc_error_code {
@@ -425,7 +425,7 @@ out:
 	return error;
 }
 
-static ssize_t microcode_write (struct file *file, const char *buf, size_t len, loff_t *ppos)
+static ssize_t microcode_write (struct file *file, const char __user *buf, size_t len, loff_t *ppos)
 {
 	ssize_t ret;
 
@@ -441,7 +441,7 @@ static ssize_t microcode_write (struct file *file, const char *buf, size_t len, 
 
 	down(&microcode_sem);
 
-	user_buffer = (void *) buf;
+	user_buffer = (void __user *) buf;
 	user_buffer_size = (int) len;
 
 	ret = do_microcode_update();

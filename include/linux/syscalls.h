@@ -160,12 +160,13 @@ asmlinkage long sys_kexec_load(void *entry, unsigned long nr_segments,
 
 asmlinkage long sys_exit(int error_code);
 asmlinkage void sys_exit_group(int error_code);
-asmlinkage long sys_wait4(pid_t pid, unsigned int *stat_addr,
+asmlinkage long sys_wait4(pid_t pid, unsigned int __user *stat_addr,
 				int options, struct rusage __user *ru);
 asmlinkage long sys_waitpid(pid_t pid, unsigned int __user *stat_addr, int options);
 asmlinkage long sys_set_tid_address(int __user *tidptr);
 asmlinkage long sys_futex(u32 __user *uaddr, int op, int val,
-			struct timespec __user *utime, u32 __user *uaddr2);
+			struct timespec __user *utime, u32 __user *uaddr2,
+			int val3);
 
 asmlinkage long sys_init_module(void __user *umod, unsigned long len,
 				const char __user *uargs);
@@ -256,7 +257,7 @@ asmlinkage long sys_mprotect(unsigned long start, size_t len,
 asmlinkage unsigned long sys_mremap(unsigned long addr,
 				unsigned long old_len, unsigned long new_len,
 				unsigned long flags, unsigned long new_addr);
-long sys_remap_file_pages(unsigned long start, unsigned long size,
+asmlinkage long sys_remap_file_pages(unsigned long start, unsigned long size,
 			unsigned long prot, unsigned long pgoff,
 			unsigned long flags);
 asmlinkage long sys_msync(unsigned long start, size_t len, int flags);

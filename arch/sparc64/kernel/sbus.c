@@ -810,17 +810,17 @@ unsigned int sbus_build_irq(void *buscookie, unsigned int ino)
 /* Error interrupt handling. */
 #define SYSIO_UE_AFSR	0x0030UL
 #define SYSIO_UE_AFAR	0x0038UL
-#define  SYSIO_UEAFSR_PPIO	0x8000000000000000 /* Primary PIO is cause         */
-#define  SYSIO_UEAFSR_PDRD	0x4000000000000000 /* Primary DVMA read is cause   */
-#define  SYSIO_UEAFSR_PDWR	0x2000000000000000 /* Primary DVMA write is cause  */
-#define  SYSIO_UEAFSR_SPIO	0x1000000000000000 /* Secondary PIO is cause       */
-#define  SYSIO_UEAFSR_SDRD	0x0800000000000000 /* Secondary DVMA read is cause */
-#define  SYSIO_UEAFSR_SDWR	0x0400000000000000 /* Secondary DVMA write is cause*/
-#define  SYSIO_UEAFSR_RESV1	0x03ff000000000000 /* Reserved                     */
-#define  SYSIO_UEAFSR_DOFF	0x0000e00000000000 /* Doubleword Offset            */
-#define  SYSIO_UEAFSR_SIZE	0x00001c0000000000 /* Bad transfer size is 2**SIZE */
-#define  SYSIO_UEAFSR_MID	0x000003e000000000 /* UPA MID causing the fault    */
-#define  SYSIO_UEAFSR_RESV2	0x0000001fffffffff /* Reserved                     */
+#define  SYSIO_UEAFSR_PPIO  0x8000000000000000UL /* Primary PIO cause         */
+#define  SYSIO_UEAFSR_PDRD  0x4000000000000000UL /* Primary DVMA read cause   */
+#define  SYSIO_UEAFSR_PDWR  0x2000000000000000UL /* Primary DVMA write cause  */
+#define  SYSIO_UEAFSR_SPIO  0x1000000000000000UL /* Secondary PIO is cause    */
+#define  SYSIO_UEAFSR_SDRD  0x0800000000000000UL /* Secondary DVMA read cause */
+#define  SYSIO_UEAFSR_SDWR  0x0400000000000000UL /* Secondary DVMA write cause*/
+#define  SYSIO_UEAFSR_RESV1 0x03ff000000000000UL /* Reserved                  */
+#define  SYSIO_UEAFSR_DOFF  0x0000e00000000000UL /* Doubleword Offset         */
+#define  SYSIO_UEAFSR_SIZE  0x00001c0000000000UL /* Bad transfer size 2^SIZE  */
+#define  SYSIO_UEAFSR_MID   0x000003e000000000UL /* UPA MID causing the fault */
+#define  SYSIO_UEAFSR_RESV2 0x0000001fffffffffUL /* Reserved                  */
 static irqreturn_t sysio_ue_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct sbus_bus *sbus = dev_id;
@@ -881,18 +881,18 @@ static irqreturn_t sysio_ue_handler(int irq, void *dev_id, struct pt_regs *regs)
 
 #define SYSIO_CE_AFSR	0x0040UL
 #define SYSIO_CE_AFAR	0x0048UL
-#define  SYSIO_CEAFSR_PPIO	0x8000000000000000 /* Primary PIO is cause         */
-#define  SYSIO_CEAFSR_PDRD	0x4000000000000000 /* Primary DVMA read is cause   */
-#define  SYSIO_CEAFSR_PDWR	0x2000000000000000 /* Primary DVMA write is cause  */
-#define  SYSIO_CEAFSR_SPIO	0x1000000000000000 /* Secondary PIO is cause       */
-#define  SYSIO_CEAFSR_SDRD	0x0800000000000000 /* Secondary DVMA read is cause */
-#define  SYSIO_CEAFSR_SDWR	0x0400000000000000 /* Secondary DVMA write is cause*/
-#define  SYSIO_CEAFSR_RESV1	0x0300000000000000 /* Reserved                     */
-#define  SYSIO_CEAFSR_ESYND	0x00ff000000000000 /* Syndrome Bits                */
-#define  SYSIO_CEAFSR_DOFF	0x0000e00000000000 /* Double Offset                */
-#define  SYSIO_CEAFSR_SIZE	0x00001c0000000000 /* Bad transfer size is 2**SIZE */
-#define  SYSIO_CEAFSR_MID	0x000003e000000000 /* UPA MID causing the fault    */
-#define  SYSIO_CEAFSR_RESV2	0x0000001fffffffff /* Reserved                     */
+#define  SYSIO_CEAFSR_PPIO  0x8000000000000000UL /* Primary PIO cause         */
+#define  SYSIO_CEAFSR_PDRD  0x4000000000000000UL /* Primary DVMA read cause   */
+#define  SYSIO_CEAFSR_PDWR  0x2000000000000000UL /* Primary DVMA write cause  */
+#define  SYSIO_CEAFSR_SPIO  0x1000000000000000UL /* Secondary PIO cause       */
+#define  SYSIO_CEAFSR_SDRD  0x0800000000000000UL /* Secondary DVMA read cause */
+#define  SYSIO_CEAFSR_SDWR  0x0400000000000000UL /* Secondary DVMA write cause*/
+#define  SYSIO_CEAFSR_RESV1 0x0300000000000000UL /* Reserved                  */
+#define  SYSIO_CEAFSR_ESYND 0x00ff000000000000UL /* Syndrome Bits             */
+#define  SYSIO_CEAFSR_DOFF  0x0000e00000000000UL /* Double Offset             */
+#define  SYSIO_CEAFSR_SIZE  0x00001c0000000000UL /* Bad transfer size 2^SIZE  */
+#define  SYSIO_CEAFSR_MID   0x000003e000000000UL /* UPA MID causing the fault */
+#define  SYSIO_CEAFSR_RESV2 0x0000001fffffffffUL /* Reserved                  */
 static irqreturn_t sysio_ce_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct sbus_bus *sbus = dev_id;
@@ -958,18 +958,18 @@ static irqreturn_t sysio_ce_handler(int irq, void *dev_id, struct pt_regs *regs)
 
 #define SYSIO_SBUS_AFSR		0x2010UL
 #define SYSIO_SBUS_AFAR		0x2018UL
-#define  SYSIO_SBAFSR_PLE	0x8000000000000000 /* Primary Late PIO Error       */
-#define  SYSIO_SBAFSR_PTO	0x4000000000000000 /* Primary SBUS Timeout         */
-#define  SYSIO_SBAFSR_PBERR	0x2000000000000000 /* Primary SBUS Error ACK       */
-#define  SYSIO_SBAFSR_SLE	0x1000000000000000 /* Secondary Late PIO Error     */
-#define  SYSIO_SBAFSR_STO	0x0800000000000000 /* Secondary SBUS Timeout       */
-#define  SYSIO_SBAFSR_SBERR	0x0400000000000000 /* Secondary SBUS Error ACK     */
-#define  SYSIO_SBAFSR_RESV1	0x03ff000000000000 /* Reserved                     */
-#define  SYSIO_SBAFSR_RD	0x0000800000000000 /* Primary was late PIO read    */
-#define  SYSIO_SBAFSR_RESV2	0x0000600000000000 /* Reserved                     */
-#define  SYSIO_SBAFSR_SIZE	0x00001c0000000000 /* Size of transfer             */
-#define  SYSIO_SBAFSR_MID	0x000003e000000000 /* MID causing the error        */
-#define  SYSIO_SBAFSR_RESV3	0x0000001fffffffff /* Reserved                     */
+#define  SYSIO_SBAFSR_PLE   0x8000000000000000UL /* Primary Late PIO Error    */
+#define  SYSIO_SBAFSR_PTO   0x4000000000000000UL /* Primary SBUS Timeout      */
+#define  SYSIO_SBAFSR_PBERR 0x2000000000000000UL /* Primary SBUS Error ACK    */
+#define  SYSIO_SBAFSR_SLE   0x1000000000000000UL /* Secondary Late PIO Error  */
+#define  SYSIO_SBAFSR_STO   0x0800000000000000UL /* Secondary SBUS Timeout    */
+#define  SYSIO_SBAFSR_SBERR 0x0400000000000000UL /* Secondary SBUS Error ACK  */
+#define  SYSIO_SBAFSR_RESV1 0x03ff000000000000UL /* Reserved                  */
+#define  SYSIO_SBAFSR_RD    0x0000800000000000UL /* Primary was late PIO read */
+#define  SYSIO_SBAFSR_RESV2 0x0000600000000000UL /* Reserved                  */
+#define  SYSIO_SBAFSR_SIZE  0x00001c0000000000UL /* Size of transfer          */
+#define  SYSIO_SBAFSR_MID   0x000003e000000000UL /* MID causing the error     */
+#define  SYSIO_SBAFSR_RESV3 0x0000001fffffffffUL /* Reserved                  */
 static irqreturn_t sysio_sbus_error_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct sbus_bus *sbus = dev_id;
@@ -1030,9 +1030,9 @@ static irqreturn_t sysio_sbus_error_handler(int irq, void *dev_id, struct pt_reg
 }
 
 #define ECC_CONTROL	0x0020UL
-#define  SYSIO_ECNTRL_ECCEN	0x8000000000000000 /* Enable ECC Checking          */
-#define  SYSIO_ECNTRL_UEEN	0x4000000000000000 /* Enable UE Interrupts         */
-#define  SYSIO_ECNTRL_CEEN	0x2000000000000000 /* Enable CE Interrupts         */
+#define  SYSIO_ECNTRL_ECCEN	0x8000000000000000UL /* Enable ECC Checking   */
+#define  SYSIO_ECNTRL_UEEN	0x4000000000000000UL /* Enable UE Interrupts  */
+#define  SYSIO_ECNTRL_CEEN	0x2000000000000000UL /* Enable CE Interrupts  */
 
 #define SYSIO_UE_INO		0x34
 #define SYSIO_CE_INO		0x35

@@ -211,7 +211,8 @@ static int is_errata93(struct pt_regs *regs, unsigned long address)
 int unhandled_signal(struct task_struct *tsk, int sig)
 {
 	/* Warn for strace, but not for gdb */
-	if ((tsk->ptrace & (PT_PTRACED|PT_TRACESYSGOOD)) == PT_PTRACED)
+	if (!test_ti_thread_flag(tsk->thread_info, TIF_SYSCALL_TRACE) &&
+	    (tsk->ptrace & PT_PTRACED))
 		return 0;
 	return (tsk->sighand->action[sig-1].sa.sa_handler == SIG_IGN) ||
 		(tsk->sighand->action[sig-1].sa.sa_handler == SIG_DFL);
@@ -374,7 +375,7 @@ bad_area_nosemaphore:
 		    (address >> 32))
 			return;
 
-		if (exception_trace && !unhandled_signal(tsk, SIGSEGV)) { 
+		if (exception_trace && unhandled_signal(tsk, SIGSEGV)) {
 		printk(KERN_INFO 
 		       "%s[%d]: segfault at %016lx rip %016lx rsp %016lx error %lx\n",
 					tsk->comm, tsk->pid, address, regs->rip,
@@ -423,8 +424,9 @@ no_context:
 		printk(KERN_ALERT "Unable to handle kernel NULL pointer dereference");
 	else
 		printk(KERN_ALERT "Unable to handle kernel paging request");
-	printk(" at %016lx RIP: \n",address);	
+	printk(" at %016lx RIP: \n" KERN_ALERT,address);
 	printk_address(regs->rip);
+	printk("\n");
 	dump_pagetable(address);
 	__die("Oops", regs, error_code);
 	/* Executive summary in case the body of the oops scrolled away */

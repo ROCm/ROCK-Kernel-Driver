@@ -670,7 +670,7 @@ static int autofs4_dir_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 
 /* Get/set timeout ioctl() operation */
 static inline int autofs4_get_set_timeout(struct autofs_sb_info *sbi,
-					 unsigned long *p)
+					 unsigned long __user *p)
 {
 	int rv;
 	unsigned long ntimeout;
@@ -688,13 +688,13 @@ static inline int autofs4_get_set_timeout(struct autofs_sb_info *sbi,
 }
 
 /* Return protocol version */
-static inline int autofs4_get_protover(struct autofs_sb_info *sbi, int *p)
+static inline int autofs4_get_protover(struct autofs_sb_info *sbi, int __user *p)
 {
 	return put_user(sbi->version, p);
 }
 
 /* Return protocol sub version */
-static inline int autofs4_get_protosubver(struct autofs_sb_info *sbi, int *p)
+static inline int autofs4_get_protosubver(struct autofs_sb_info *sbi, int __user *p)
 {
 	return put_user(sbi->sub_version, p);
 }
@@ -703,7 +703,7 @@ static inline int autofs4_get_protosubver(struct autofs_sb_info *sbi, int *p)
  * Tells the daemon whether we need to reghost or not. Also, clears
  * the reghost_needed flag.
  */
-static inline int autofs4_ask_reghost(struct autofs_sb_info *sbi, int *p)
+static inline int autofs4_ask_reghost(struct autofs_sb_info *sbi, int __user *p)
 {
 	int status;
 
@@ -720,7 +720,7 @@ static inline int autofs4_ask_reghost(struct autofs_sb_info *sbi, int *p)
 /*
  * Enable / Disable reghosting ioctl() operation
  */
-static inline int autofs4_toggle_reghost(struct autofs_sb_info *sbi, int *p)
+static inline int autofs4_toggle_reghost(struct autofs_sb_info *sbi, int __user *p)
 {
 	int status;
 	int val;
@@ -740,7 +740,7 @@ static inline int autofs4_toggle_reghost(struct autofs_sb_info *sbi, int *p)
 /*
 * Tells the daemon whether it can umount the autofs mount.
 */
-static inline int autofs4_ask_umount(struct vfsmount *mnt, int *p)
+static inline int autofs4_ask_umount(struct vfsmount *mnt, int __user *p)
 {
 	int status = 0;
 
@@ -774,6 +774,7 @@ static int autofs4_root_ioctl(struct inode *inode, struct file *filp,
 			     unsigned int cmd, unsigned long arg)
 {
 	struct autofs_sb_info *sbi = autofs4_sbi(inode->i_sb);
+	void __user *p = (void __user *)arg;
 
 	DPRINTK("cmd = 0x%08x, arg = 0x%08lx, sbi = %p, pgrp = %u",
 		cmd,arg,sbi,process_group(current));
@@ -794,28 +795,26 @@ static int autofs4_root_ioctl(struct inode *inode, struct file *filp,
 		autofs4_catatonic_mode(sbi);
 		return 0;
 	case AUTOFS_IOC_PROTOVER: /* Get protocol version */
-		return autofs4_get_protover(sbi, (int *)arg);
+		return autofs4_get_protover(sbi, p);
 	case AUTOFS_IOC_PROTOSUBVER: /* Get protocol sub version */
-		return autofs4_get_protosubver(sbi, (int *)arg);
+		return autofs4_get_protosubver(sbi, p);
 	case AUTOFS_IOC_SETTIMEOUT:
-		return autofs4_get_set_timeout(sbi,(unsigned long *)arg);
+		return autofs4_get_set_timeout(sbi, p);
 
 	case AUTOFS_IOC_TOGGLEREGHOST:
-		return autofs4_toggle_reghost(sbi, (int *) arg);
+		return autofs4_toggle_reghost(sbi, p);
 	case AUTOFS_IOC_ASKREGHOST:
-		return autofs4_ask_reghost(sbi, (int *) arg);
+		return autofs4_ask_reghost(sbi, p);
 
 	case AUTOFS_IOC_ASKUMOUNT:
-		return autofs4_ask_umount(filp->f_vfsmnt, (int *) arg);
+		return autofs4_ask_umount(filp->f_vfsmnt, p);
 
 	/* return a single thing to expire */
 	case AUTOFS_IOC_EXPIRE:
-		return autofs4_expire_run(inode->i_sb,filp->f_vfsmnt,sbi,
-					  (struct autofs_packet_expire *)arg);
+		return autofs4_expire_run(inode->i_sb,filp->f_vfsmnt,sbi, p);
 	/* same as above, but can send multiple expires through pipe */
 	case AUTOFS_IOC_EXPIRE_MULTI:
-		return autofs4_expire_multi(inode->i_sb,filp->f_vfsmnt,sbi,
-					    (int *)arg);
+		return autofs4_expire_multi(inode->i_sb,filp->f_vfsmnt,sbi, p);
 
 	default:
 		return -ENOSYS;

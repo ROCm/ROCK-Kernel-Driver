@@ -1103,7 +1103,7 @@ static int bond_check_dev_link(struct bonding *bond, struct net_device *slave_de
 
 		/* Yes, the mii is overlaid on the ifreq.ifr_ifru */
 		strncpy(ifr.ifr_name, slave_dev->name, IFNAMSIZ);
-		mii = (struct mii_ioctl_data *)&ifr.ifr_data;
+		mii = if_mii(&ifr);
 		if (IOCTL(slave_dev, &ifr, SIOCGMIIPHY) == 0) {
 			mii->reg_num = MII_BMSR;
 			if (IOCTL(slave_dev, &ifr, SIOCGMIIREG) == 0) {
@@ -2357,10 +2357,10 @@ static int bond_ioctl_change_active(struct net_device *bond_dev, struct net_devi
 static int bond_ethtool_ioctl(struct net_device *bond_dev, struct ifreq *ifr)
 {
 	struct ethtool_drvinfo info;
-	void *addr = ifr->ifr_data;
+	void __user *addr = ifr->ifr_data;
 	uint32_t cmd;
 
-	if (get_user(cmd, (uint32_t *)addr)) {
+	if (get_user(cmd, (uint32_t __user *)addr)) {
 		return -EFAULT;
 	}
 
@@ -3667,8 +3667,10 @@ static struct net_device_stats *bond_get_stats(struct net_device *bond_dev)
 static int bond_do_ioctl(struct net_device *bond_dev, struct ifreq *ifr, int cmd)
 {
 	struct net_device *slave_dev = NULL;
-	struct ifbond *u_binfo = NULL, k_binfo;
-	struct ifslave *u_sinfo = NULL, k_sinfo;
+	struct ifbond k_binfo;
+	struct ifbond __user *u_binfo = NULL;
+	struct ifslave k_sinfo;
+	struct ifslave __user *u_sinfo = NULL;
 	struct mii_ioctl_data *mii = NULL;
 	int prev_abi_ver = orig_app_abi_ver;
 	int res = 0;
@@ -3680,7 +3682,7 @@ static int bond_do_ioctl(struct net_device *bond_dev, struct ifreq *ifr, int cmd
 	case SIOCETHTOOL:
 		return bond_ethtool_ioctl(bond_dev, ifr);
 	case SIOCGMIIPHY:
-		mii = (struct mii_ioctl_data *)&ifr->ifr_data;
+		mii = if_mii(ifr);
 		if (!mii) {
 			return -EINVAL;
 		}
@@ -3691,7 +3693,7 @@ static int bond_do_ioctl(struct net_device *bond_dev, struct ifreq *ifr, int cmd
 		 * We do this again just in case we were called by SIOCGMIIREG
 		 * instead of SIOCGMIIPHY.
 		 */
-		mii = (struct mii_ioctl_data *)&ifr->ifr_data;
+		mii = if_mii(ifr);
 		if (!mii) {
 			return -EINVAL;
 		}
@@ -3711,7 +3713,7 @@ static int bond_do_ioctl(struct net_device *bond_dev, struct ifreq *ifr, int cmd
 		return 0;
 	case BOND_INFO_QUERY_OLD:
 	case SIOCBONDINFOQUERY:
-		u_binfo = (struct ifbond *)ifr->ifr_data;
+		u_binfo = (struct ifbond __user *)ifr->ifr_data;
 
 		if (copy_from_user(&k_binfo, u_binfo, sizeof(ifbond))) {
 			return -EFAULT;
@@ -3727,7 +3729,7 @@ static int bond_do_ioctl(struct net_device *bond_dev, struct ifreq *ifr, int cmd
 		return res;
 	case BOND_SLAVE_INFO_QUERY_OLD:
 	case SIOCBONDSLAVEINFOQUERY:
-		u_sinfo = (struct ifslave *)ifr->ifr_data;
+		u_sinfo = (struct ifslave __user *)ifr->ifr_data;
 
 		if (copy_from_user(&k_sinfo, u_sinfo, sizeof(ifslave))) {
 			return -EFAULT;

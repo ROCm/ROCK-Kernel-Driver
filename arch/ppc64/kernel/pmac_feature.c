@@ -343,6 +343,10 @@ static struct pmac_mb_def pmac_mb_defs[] __pmacdata = {
 		PMAC_TYPE_POWERMAC_G5,		g5_features,
 		0,
 	},
+	{       "RackMac3,1",                   "XServe G5",
+		PMAC_TYPE_POWERMAC_G5,          g5_features,
+		0,
+	},
 };
 
 /*

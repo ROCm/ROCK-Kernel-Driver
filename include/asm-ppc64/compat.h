@@ -117,12 +117,12 @@ typedef u32		compat_sigset_word;
  */
 typedef	u32		compat_uptr_t;
 
-static inline void *compat_ptr(compat_uptr_t uptr)
+static inline void __user *compat_ptr(compat_uptr_t uptr)
 {
-	return (void *)(unsigned long)uptr;
+	return (void __user *)(unsigned long)uptr;
 }
 
-static inline void *compat_alloc_user_space(long len)
+static inline void __user *compat_alloc_user_space(long len)
 {
 	struct pt_regs *regs = current->thread.regs;
 	unsigned long usp = regs->gpr[1];
@@ -134,7 +134,7 @@ static inline void *compat_alloc_user_space(long len)
 	if (!(test_thread_flag(TIF_32BIT)))
 		usp -= 288;
 
-	return (void *) (usp - len);
+	return (void __user *) (usp - len);
 }
 
 /*

@@ -28,7 +28,7 @@
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <linux/libata.h>
 
 #define DRV_NAME	"ata_piix"
@@ -424,16 +424,15 @@ static void piix_set_udmamode (struct ata_port *ap, struct ata_device *adev,
 	int w_flag		= 0x10 << drive_dn;
 	int u_speed		= 0;
 	int			sitre;
-	u16			reg4042, reg44, reg48, reg4a, reg54;
-	u8			reg55;
+	u16			reg4042, reg4a;
+	u8			reg48, reg54, reg55;
 
 	pci_read_config_word(dev, maslave, &reg4042);
 	DPRINTK("reg4042 = 0x%04x\n", reg4042);
 	sitre = (reg4042 & 0x4000) ? 1 : 0;
-	pci_read_config_word(dev, 0x44, &reg44);
-	pci_read_config_word(dev, 0x48, &reg48);
+	pci_read_config_byte(dev, 0x48, &reg48);
 	pci_read_config_word(dev, 0x4a, &reg4a);
-	pci_read_config_word(dev, 0x54, &reg54);
+	pci_read_config_byte(dev, 0x54, &reg54);
 	pci_read_config_byte(dev, 0x55, &reg55);
 
 	switch(speed) {
@@ -450,23 +449,19 @@ static void piix_set_udmamode (struct ata_port *ap, struct ata_device *adev,
 	}
 
 	if (!(reg48 & u_flag))
-		pci_write_config_word(dev, 0x48, reg48|u_flag);
+		pci_write_config_byte(dev, 0x48, reg48 | u_flag);
 	if (speed == XFER_UDMA_5) {
 		pci_write_config_byte(dev, 0x55, (u8) reg55|w_flag);
 	} else {
 		pci_write_config_byte(dev, 0x55, (u8) reg55 & ~w_flag);
 	}
-	if (!(reg4a & u_speed)) {
-		pci_write_config_word(dev, 0x4a, reg4a & ~a_speed);
-		pci_write_config_word(dev, 0x4a, reg4a|u_speed);
-	}
+	if ((reg4a & a_speed) != u_speed)
+		pci_write_config_word(dev, 0x4a, (reg4a & ~a_speed) | u_speed);
 	if (speed > XFER_UDMA_2) {
-		if (!(reg54 & v_flag)) {
-			pci_write_config_word(dev, 0x54, reg54|v_flag);
-		}
-	} else {
-		pci_write_config_word(dev, 0x54, reg54 & ~v_flag);
-	}
+		if (!(reg54 & v_flag))
+			pci_write_config_byte(dev, 0x54, reg54 | v_flag);
+	} else
+		pci_write_config_byte(dev, 0x54, reg54 & ~v_flag);
 }
 
 /* move to PCI layer, integrate w/ MSI stuff */

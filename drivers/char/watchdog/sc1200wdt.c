@@ -38,6 +38,7 @@
 #include <linux/reboot.h>
 #include <linux/init.h>
 #include <linux/pnp.h>
+#include <linux/fs.h>
 #include <linux/pci.h>
 
 #include <asm/semaphore.h>

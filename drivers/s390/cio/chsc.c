@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/chsc.c
  *   S/390 common I/O routines -- channel subsystem call
- *   $Revision: 1.110 $
+ *   $Revision: 1.112 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -24,7 +24,6 @@
 #include "ioasm.h"
 #include "chsc.h"
 
-#define CHPID_LONGS (256 / (8 * sizeof(long))) /* 256 chpids */
 static struct channel_path *chps[NR_CHPIDS];
 
 static void *sei_page;
@@ -62,11 +61,11 @@ chpid_is_actually_online(int chp)
 	int state;
 
 	state = get_chp_status(chp);
-	if (state < 0)
-		new_channel_path(chp);
-	else
+	if (state < 0) {
+		need_rescan = 1;
+		queue_work(slow_path_wq, &slow_path_work);
+	} else
 		WARN_ON(!state);
-	/* FIXME: should notify other subchannels here */
 }
 
 /* FIXME: this is _always_ called for every subchannel. shouldn't we
@@ -285,8 +284,10 @@ out_unlock:
 out_unreg:
 	spin_unlock(&sch->lock);
 	sch->lpm = 0;
-	/* We can't block here. */
-	device_call_nopath_notify(sch);
+	if (css_enqueue_subchannel_slow(sch->irq)) {
+		css_clear_subchannel_slow_list();
+		need_rescan = 1;
+	}
 	return 0;
 }
 
@@ -303,6 +304,9 @@ s390_set_chpid_offline( __u8 chpid)
 
 	bus_for_each_dev(&css_bus_type, NULL, &chpid,
 			 s390_subchannel_remove_chpid);
+
+	if (need_rescan || css_slow_subchannels_exist())
+		queue_work(slow_path_wq, &slow_path_work);
 }
 
 static int
@@ -737,10 +741,12 @@ __s390_subchannel_vary_chpid(struct subchannel *sch, __u8 chpid, int on)
 			 * can successfully terminate, even using the
 			 * just varied off path. Then kill it.
 			 */
-			if (!__check_for_io_and_kill(sch, chp) && !sch->lpm)
-				/* Get over with it now. */
-				device_call_nopath_notify(sch);
-			else if (sch->driver && sch->driver->verify)
+			if (!__check_for_io_and_kill(sch, chp) && !sch->lpm) {
+				if (css_enqueue_subchannel_slow(sch->irq)) {
+					css_clear_subchannel_slow_list();
+					need_rescan = 1;
+				}
+			} else if (sch->driver && sch->driver->verify)
 				sch->driver->verify(&sch->dev);
 		}
 		break;
@@ -772,11 +778,6 @@ s390_subchannel_vary_chpid_on(struct device *dev, void *data)
 	__s390_subchannel_vary_chpid(sch, *chpid, 1);
 	return 0;
 }
-
-extern void css_trigger_slow_path(void);
-typedef void (*workfunc)(void *);
-static DECLARE_WORK(varyonoff_work, (workfunc)css_trigger_slow_path,
-		    NULL);
 
 /*
  * Function: s390_vary_chpid
@@ -813,7 +814,7 @@ s390_vary_chpid( __u8 chpid, int on)
 			 s390_subchannel_vary_chpid_on :
 			 s390_subchannel_vary_chpid_off);
 	if (!on)
-		return 0;
+		goto out;
 	/* Scan for new devices on varied on path. */
 	for (irq = 0; irq < __MAX_SUBCHANNELS; irq++) {
 		struct schib schib;
@@ -835,8 +836,9 @@ s390_vary_chpid( __u8 chpid, int on)
 			need_rescan = 1;
 		}
 	}
+out:
 	if (need_rescan || css_slow_subchannels_exist())
-		schedule_work(&varyonoff_work);
+		queue_work(slow_path_wq, &slow_path_work);
 	return 0;
 }
 

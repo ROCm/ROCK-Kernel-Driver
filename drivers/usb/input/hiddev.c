@@ -232,7 +232,7 @@ static int hiddev_fasync(int fd, struct file *file, int on)
 static struct usb_class_driver hiddev_class;
 static void hiddev_cleanup(struct hiddev *hiddev)
 {
-	hiddev_table[hiddev->hid->minor] = NULL;
+	hiddev_table[hiddev->hid->minor - HIDDEV_MINOR_BASE] = NULL;
 	usb_deregister_dev(hiddev->hid->intf, &hiddev_class);
 	kfree(hiddev);
 }
@@ -612,7 +612,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		uref = &uref_multi->uref;
 		if (cmd == HIDIOCGUSAGES || cmd == HIDIOCSUSAGES) {
 			if (copy_from_user(uref_multi, (void *) arg, 
-					   sizeof(uref_multi)))
+					   sizeof(*uref_multi)))
 				goto fault;
 		} else {
 			if (copy_from_user(uref, (void *) arg, sizeof(*uref)))

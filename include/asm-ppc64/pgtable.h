@@ -47,7 +47,7 @@
 /*
  * Define the address range of the vmalloc VM area.
  */
-#define VMALLOC_START (0xD000000000000000)
+#define VMALLOC_START (0xD000000000000000ul)
 #define VMALLOC_END   (VMALLOC_START + VALID_EA_BITS)
 
 /*
@@ -56,8 +56,8 @@
  */
 #define IMALLOC_START     (ioremap_bot)
 #define IMALLOC_VMADDR(x) ((unsigned long)(x))
-#define PHBS_IO_BASE  	  (0xE000000000000000)	/* Reserve 2 gigs for PHBs */
-#define IMALLOC_BASE      (0xE000000080000000)  
+#define PHBS_IO_BASE  	  (0xE000000000000000ul)	/* Reserve 2 gigs for PHBs */
+#define IMALLOC_BASE      (0xE000000080000000ul)  
 #define IMALLOC_END       (IMALLOC_BASE + VALID_EA_BITS)
 
 /*
@@ -306,7 +306,10 @@ static inline unsigned long pte_update(pte_t *p, unsigned long clr)
 	return old;
 }
 
-/* PTE updating functions */
+/* PTE updating functions, this function puts the PTE in the
+ * batch, doesn't actually triggers the hash flush immediately,
+ * you need to call flush_tlb_pending() to do that.
+ */
 extern void hpte_update(pte_t *ptep, unsigned long pte, int wrprot);
 
 static inline int ptep_test_and_clear_young(pte_t *ptep)
@@ -318,7 +321,7 @@ static inline int ptep_test_and_clear_young(pte_t *ptep)
 	old = pte_update(ptep, _PAGE_ACCESSED);
 	if (old & _PAGE_HASHPTE) {
 		hpte_update(ptep, old, 0);
-		flush_tlb_pending();	/* XXX generic code doesn't flush */
+		flush_tlb_pending();
 	}
 	return (old & _PAGE_ACCESSED) != 0;
 }
@@ -396,10 +399,39 @@ static inline void pte_clear(pte_t * ptep)
  */
 static inline void set_pte(pte_t *ptep, pte_t pte)
 {
-	if (pte_present(*ptep))
+	if (pte_present(*ptep)) {
 		pte_clear(ptep);
+		flush_tlb_pending();
+	}
 	*ptep = __pte(pte_val(pte)) & ~_PAGE_HPTEFLAGS;
 }
+
+/* Set the dirty and/or accessed bits atomically in a linux PTE, this
+ * function doesn't need to flush the hash entry
+ */
+#define __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
+static inline void __ptep_set_access_flags(pte_t *ptep, pte_t entry, int dirty)
+{
+	unsigned long bits = pte_val(entry) &
+		(_PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_RW);
+	unsigned long old, tmp;
+
+	__asm__ __volatile__(
+	"1:	ldarx	%0,0,%4\n\
+		andi.	%1,%0,%6\n\
+		bne-	1b \n\
+		or	%0,%3,%0\n\
+		stdcx.	%0,0,%4\n\
+		bne-	1b"
+	:"=&r" (old), "=&r" (tmp), "=m" (*ptep)
+	:"r" (bits), "r" (ptep), "m" (ptep), "i" (_PAGE_BUSY)
+	:"cc");
+}
+#define  ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
+	do {								   \
+		__ptep_set_access_flags(__ptep, __entry, __dirty);	   \
+		flush_tlb_page_nohash(__vma, __address);	       	   \
+	} while(0)
 
 /*
  * Macro to mark a page protection value as "uncacheable".

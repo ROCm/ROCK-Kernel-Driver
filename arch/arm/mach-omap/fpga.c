@@ -46,11 +46,11 @@ static void fpga_mask_irq(unsigned int irq)
 	irq -= IH_FPGA_BASE;
 
 	if (irq < 8)
-		__raw_writeb((__raw_readb(OMAP1510P1_FPGA_IMR_LO)
-			      & ~(1 << irq)), OMAP1510P1_FPGA_IMR_LO);
+		__raw_writeb((__raw_readb(OMAP1510_FPGA_IMR_LO)
+			      & ~(1 << irq)), OMAP1510_FPGA_IMR_LO);
 	else if (irq < 16)
-		__raw_writeb((__raw_readb(OMAP1510P1_FPGA_IMR_HI)
-			      & ~(1 << (irq - 8))), OMAP1510P1_FPGA_IMR_HI);
+		__raw_writeb((__raw_readb(OMAP1510_FPGA_IMR_HI)
+			      & ~(1 << (irq - 8))), OMAP1510_FPGA_IMR_HI);
 	else
 		__raw_writeb((__raw_readb(INNOVATOR_FPGA_IMR2)
 			      & ~(1 << (irq - 16))), INNOVATOR_FPGA_IMR2);
@@ -60,10 +60,10 @@ static void fpga_mask_irq(unsigned int irq)
 static inline u32 get_fpga_unmasked_irqs(void)
 {
 	return
-		((__raw_readb(OMAP1510P1_FPGA_ISR_LO) &
-		  __raw_readb(OMAP1510P1_FPGA_IMR_LO))) |
-		((__raw_readb(OMAP1510P1_FPGA_ISR_HI) &
-		  __raw_readb(OMAP1510P1_FPGA_IMR_HI)) << 8) |
+		((__raw_readb(OMAP1510_FPGA_ISR_LO) &
+		  __raw_readb(OMAP1510_FPGA_IMR_LO))) |
+		((__raw_readb(OMAP1510_FPGA_ISR_HI) &
+		  __raw_readb(OMAP1510_FPGA_IMR_HI)) << 8) |
 		((__raw_readb(INNOVATOR_FPGA_ISR2) &
 		  __raw_readb(INNOVATOR_FPGA_IMR2)) << 16);
 }
@@ -79,11 +79,11 @@ static void fpga_unmask_irq(unsigned int irq)
 	irq -= IH_FPGA_BASE;
 
 	if (irq < 8)
-		__raw_writeb((__raw_readb(OMAP1510P1_FPGA_IMR_LO) | (1 << irq)),
-		     OMAP1510P1_FPGA_IMR_LO);
+		__raw_writeb((__raw_readb(OMAP1510_FPGA_IMR_LO) | (1 << irq)),
+		     OMAP1510_FPGA_IMR_LO);
 	else if (irq < 16)
-		__raw_writeb((__raw_readb(OMAP1510P1_FPGA_IMR_HI)
-			      | (1 << (irq - 8))), OMAP1510P1_FPGA_IMR_HI);
+		__raw_writeb((__raw_readb(OMAP1510_FPGA_IMR_HI)
+			      | (1 << (irq - 8))), OMAP1510_FPGA_IMR_HI);
 	else
 		__raw_writeb((__raw_readb(INNOVATOR_FPGA_IMR2)
 			      | (1 << (irq - 16))), INNOVATOR_FPGA_IMR2);
@@ -166,8 +166,8 @@ void fpga_init_irq(void)
 {
 	int i;
 
-	__raw_writeb(0, OMAP1510P1_FPGA_IMR_LO);
-	__raw_writeb(0, OMAP1510P1_FPGA_IMR_HI);
+	__raw_writeb(0, OMAP1510_FPGA_IMR_LO);
+	__raw_writeb(0, OMAP1510_FPGA_IMR_HI);
 	__raw_writeb(0, INNOVATOR_FPGA_IMR2);
 
 	for (i = IH_FPGA_BASE; i < (IH_FPGA_BASE + NR_FPGA_IRQS); i++) {

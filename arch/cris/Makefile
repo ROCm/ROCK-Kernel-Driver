@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.15 2003/07/04 12:47:53 tobiasa Exp $
+# $Id: Makefile,v 1.20 2004/05/14 14:35:58 orjanf Exp $
 # cris/Makefile
 #
 # This file is included by the global makefile so that you can add your own
@@ -34,7 +34,7 @@ AFLAGS += -mlinux
 
 CFLAGS := $(CFLAGS) -mlinux -march=$(arch-y) -pipe
 
-ifdef CONFIG_ETRAX_KGDB
+ifdef CONFIG_FRAME_POINTER
 CFLAGS := $(subst -fomit-frame-pointer,,$(CFLAGS)) -g
 CFLAGS += -fno-omit-frame-pointer
 endif
@@ -90,10 +90,14 @@ prepare: arch/$(ARCH)/.links include/asm-$(ARCH)/.arch \
 
 # Create some links to make all tools happy
 arch/$(ARCH)/.links:
+	@rm -rf arch/$(ARCH)/drivers
 	@ln -sfn $(SARCH)/drivers arch/$(ARCH)/drivers
+	@rm -rf arch/$(ARCH)/boot
 	@ln -sfn $(SARCH)/boot arch/$(ARCH)/boot
+	@rm -rf arch/$(ARCH)/lib
 	@ln -sfn $(SARCH)/lib arch/$(ARCH)/lib
-	@ln -sfn $(SARCH)/vmlinux.lds.S arch/$(ARCH)/kernel/vmlinux.lds.S
+	@ln -sfn $(SARCH) arch/$(ARCH)/arch
+	@ln -sfn ../$(SARCH)/vmlinux.lds.S arch/$(ARCH)/kernel/vmlinux.lds.S
 	@touch $@
 
 # Create link to sub arch includes

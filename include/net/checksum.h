@@ -95,7 +95,7 @@ static __inline__ unsigned short int csum_ipv6_magic(struct in6_addr *saddr,
 
 #ifndef _HAVE_ARCH_COPY_AND_CSUM_FROM_USER
 static inline
-unsigned int csum_and_copy_from_user (const char *src, char *dst,
+unsigned int csum_and_copy_from_user (const char __user *src, char *dst,
 				      int len, int sum, int *err_ptr)
 {
 	if (verify_area(VERIFY_READ, src, len) == 0)
@@ -110,7 +110,7 @@ unsigned int csum_and_copy_from_user (const char *src, char *dst,
 
 #ifndef HAVE_CSUM_COPY_USER
 static __inline__ unsigned int csum_and_copy_to_user
-(const char *src, char *dst, int len, unsigned int sum, int *err_ptr)
+(const char *src, char __user *dst, int len, unsigned int sum, int *err_ptr)
 {
 	sum = csum_partial(src, len, sum);
 

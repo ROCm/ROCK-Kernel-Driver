@@ -714,40 +714,6 @@ xfs_trans_bhold(xfs_trans_t	*tp,
 }
 
 /*
- * This function is used to indicate that the buffer should not be
- * unlocked until the transaction is committed to disk.  Since we
- * are going to keep the lock held, make the transaction synchronous
- * so that the lock is not held too long.
- *
- * It uses the log item descriptor flag XFS_LID_SYNC_UNLOCK to
- * delay the buf items's unlock call until the transaction is
- * committed to disk or aborted.
- */
-void
-xfs_trans_bhold_until_committed(xfs_trans_t	*tp,
-				xfs_buf_t	*bp)
-{
-	xfs_log_item_desc_t	*lidp;
-	xfs_buf_log_item_t	*bip;
-
-	ASSERT(XFS_BUF_ISBUSY(bp));
-	ASSERT(XFS_BUF_FSPRIVATE2(bp, xfs_trans_t *) == tp);
-	ASSERT(XFS_BUF_FSPRIVATE(bp, void *) != NULL);
-
-	bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *);
-	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
-	ASSERT(!(bip->bli_format.blf_flags & XFS_BLI_CANCEL));
-	ASSERT(atomic_read(&bip->bli_refcount) > 0);
-	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)bip);
-	ASSERT(lidp != NULL);
-
-	lidp->lid_flags |= XFS_LID_SYNC_UNLOCK;
-	xfs_buf_item_trace("BHOLD UNTIL COMMIT", bip);
-
-	xfs_trans_set_sync(tp);
-}
-
-/*
  * This is called to mark bytes first through last inclusive of the given
  * buffer as needing to be logged when the transaction is committed.
  * The buffer must already be associated with the given transaction.
@@ -799,7 +765,6 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
 	if (bip->bli_flags & XFS_BLI_STALE) {
 		xfs_buf_item_trace("BLOG UNSTALE", bip);
 		bip->bli_flags &= ~XFS_BLI_STALE;
-		/* note this will have to change for page_buf interface... unstale isn't really an option RMC */
 		ASSERT(XFS_BUF_ISSTALE(bp));
 		XFS_BUF_UNSTALE(bp);
 		bip->bli_format.blf_flags &= ~XFS_BLI_CANCEL;

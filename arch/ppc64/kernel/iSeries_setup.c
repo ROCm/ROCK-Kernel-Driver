@@ -563,11 +563,6 @@ static void __init build_iSeries_Memory_Map(void)
 	lmb_add(0, systemcfg->physicalMemorySize);
 	lmb_analyze();	/* ?? */
 	lmb_reserve(0, __pa(klimit));
-
-	/* 
-	 * Hardcode to GP size.  I am not sure where to get this info. DRENG
-	 */
-	naca->slb_size = 64;
 }
 
 /*
@@ -858,3 +853,12 @@ static void iSeries_setup_dprofile(void)
 		}
 	}
 }
+
+int __init iSeries_src_init(void)
+{
+        /* clear the progress line */
+        ppc_md.progress(" ", 0xffff);
+        return 0;
+}
+
+late_initcall(iSeries_src_init);

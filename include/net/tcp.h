@@ -610,6 +610,8 @@ extern int sysctl_tcp_nometrics_save;
 extern int sysctl_tcp_bic;
 extern int sysctl_tcp_bic_fast_convergence;
 extern int sysctl_tcp_bic_low_window;
+extern int sysctl_tcp_default_win_scale;
+extern int sysctl_tcp_moderate_rcvbuf;
 
 extern atomic_t tcp_memory_allocated;
 extern atomic_t tcp_sockets_allocated;
@@ -720,14 +722,14 @@ struct tcp_func {
 	int			(*setsockopt)		(struct sock *sk, 
 							 int level, 
 							 int optname, 
-							 char *optval, 
+							 char __user *optval, 
 							 int optlen);
 
 	int			(*getsockopt)		(struct sock *sk, 
 							 int level, 
 							 int optname, 
-							 char *optval, 
-							 int *optlen);
+							 char __user *optval, 
+							 int __user *optlen);
 
 
 	void			(*addr2sockaddr)	(struct sock *sk,
@@ -800,6 +802,8 @@ extern int			tcp_rcv_established(struct sock *sk,
 						    struct tcphdr *th, 
 						    unsigned len);
 
+extern void			tcp_rcv_space_adjust(struct sock *sk);
+
 enum tcp_ack_state_t
 {
 	TCP_ACK_SCHED = 1,
@@ -869,10 +873,11 @@ extern unsigned int		tcp_poll(struct file * file, struct socket *sock, struct po
 extern void			tcp_write_space(struct sock *sk); 
 
 extern int			tcp_getsockopt(struct sock *sk, int level, 
-					       int optname, char *optval, 
-					       int *optlen);
+					       int optname,
+					       char __user *optval, 
+					       int __user *optlen);
 extern int			tcp_setsockopt(struct sock *sk, int level, 
-					       int optname, char *optval, 
+					       int optname, char __user *optval, 
 					       int optlen);
 extern void			tcp_set_keepalive(struct sock *sk, int val);
 extern int			tcp_recvmsg(struct kiocb *iocb, struct sock *sk,
@@ -965,6 +970,9 @@ extern int tcp_sync_mss(struct sock *sk, u32 pmtu);
 
 extern const char timer_bug_msg[];
 
+/* tcp_diag.c */
+extern void tcp_get_info(struct sock *, struct tcp_info *);
+
 /* Read 'sendfile()'-style from a TCP socket */
 typedef int (*sk_read_actor_t)(read_descriptor_t *, struct sk_buff *,
 				unsigned int, size_t);
@@ -981,9 +989,7 @@ static inline void tcp_clear_xmit_timer(struct sock *sk, int what)
 		tp->pending = 0;
 
 #ifdef TCP_CLEAR_TIMERS
-		if (timer_pending(&tp->retransmit_timer) &&
-		    del_timer(&tp->retransmit_timer))
-			__sock_put(sk);
+		sk_stop_timer(sk, &tp->retransmit_timer);
 #endif
 		break;
 	case TCP_TIME_DACK:
@@ -991,9 +997,7 @@ static inline void tcp_clear_xmit_timer(struct sock *sk, int what)
 		tp->ack.pending = 0;
 
 #ifdef TCP_CLEAR_TIMERS
-		if (timer_pending(&tp->delack_timer) &&
-		    del_timer(&tp->delack_timer))
-			__sock_put(sk);
+		sk_stop_timer(sk, &tp->delack_timer);
 #endif
 		break;
 	default:
@@ -1022,15 +1026,13 @@ static inline void tcp_reset_xmit_timer(struct sock *sk, int what, unsigned long
 	case TCP_TIME_PROBE0:
 		tp->pending = what;
 		tp->timeout = jiffies+when;
-		if (!mod_timer(&tp->retransmit_timer, tp->timeout))
-			sock_hold(sk);
+		sk_reset_timer(sk, &tp->retransmit_timer, tp->timeout);
 		break;
 
 	case TCP_TIME_DACK:
 		tp->ack.pending |= TCP_ACK_TIMER;
 		tp->ack.timeout = jiffies+when;
-		if (!mod_timer(&tp->delack_timer, tp->ack.timeout))
-			sock_hold(sk);
+		sk_reset_timer(sk, &tp->delack_timer, tp->ack.timeout);
 		break;
 
 	default:
@@ -1751,6 +1753,9 @@ static inline void tcp_select_initial_window(int __space, __u32 mss,
 		if (*rcv_wscale && sysctl_tcp_app_win && space>=mss &&
 		    space - max((space>>sysctl_tcp_app_win), mss>>*rcv_wscale) < 65536/2)
 			(*rcv_wscale)--;
+
+		*rcv_wscale = max((__u8)sysctl_tcp_default_win_scale,
+				  *rcv_wscale);
 	}
 
 	/* Set initial window to value enough for senders,
@@ -1789,28 +1794,13 @@ static inline int tcp_full_space( struct sock *sk)
 	return tcp_win_from_space(sk->sk_rcvbuf); 
 }
 
-static inline void tcp_acceptq_removed(struct sock *sk)
-{
-	sk->sk_ack_backlog--;
-}
-
-static inline void tcp_acceptq_added(struct sock *sk)
-{
-	sk->sk_ack_backlog++;
-}
-
-static inline int tcp_acceptq_is_full(struct sock *sk)
-{
-	return sk->sk_ack_backlog > sk->sk_max_ack_backlog;
-}
-
 static inline void tcp_acceptq_queue(struct sock *sk, struct open_request *req,
 					 struct sock *child)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 
 	req->sk = child;
-	tcp_acceptq_added(sk);
+	sk_acceptq_added(sk);
 
 	if (!tp->accept_queue_tail) {
 		tp->accept_queue = req;

@@ -13,9 +13,6 @@
 #ifndef __ASM_ARCH_HARDWARE_H
 #define __ASM_ARCH_HARDWARE_H
 
-#include <asm/mach-types.h>
-
-
 /*
  * We requires absolute addresses.
  */
@@ -43,7 +40,7 @@
  * kernel only maps the minimum needed range of this mapping.
  */
 #define io_p2v(x) (0xf2000000 + ((x) & 0x01ffffff) + (((x) & 0x1c000000) >> 1))
-#define io_v2p(x) (0x40000000 + ((x) & 0x01ffffff) + (((x) & 0x0e000000) << 1))
+#define io_v2p(x) (0x3c000000 + ((x) & 0x01ffffff) + (((x) & 0x0e000000) << 1))
 
 #ifndef __ASSEMBLY__
 
@@ -86,19 +83,11 @@ typedef struct { volatile u32 offset[4096]; } __regbase;
 extern void pxa_gpio_mode( int gpio_mode );
 
 /*
- * return current lclk frequency in units of 10kHz
+ * return current memory and LCD clock frequency in units of 10kHz
  */
-extern unsigned int get_lclk_frequency_10khz(void);
+extern unsigned int get_memclk_frequency_10khz(void);
+extern unsigned int get_lcdclk_frequency_10khz(void);
 
 #endif
-
-
-/*
- * Implementation specifics
- */
-
-#include "lubbock.h"
-#include "mainstone.h"
-#include "idp.h"
 
 #endif  /* _ASM_ARCH_HARDWARE_H */

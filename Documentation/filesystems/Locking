@@ -203,20 +203,34 @@ currently-in-progress I/O.
 
 If the filesystem is not called for "sync" and it determines that it
 would need to block against in-progress I/O to be able to start new I/O
-against the page the filesystem shoud redirty the page (usually with
-__set_page_dirty_nobuffers()), then unlock the page and return zero. 
+against the page the filesystem should redirty the page with
+redirty_page_for_writepage(), then unlock the page and return zero.
 This may also be done to avoid internal deadlocks, but rarely.
 
 If the filesytem is called for sync then it must wait on any
 in-progress I/O and then start new I/O.
 
 The filesystem should unlock the page synchronously, before returning
-to the caller.  If the page has write I/O underway against it,
-writepage() should run SetPageWriteback() against the page prior to
-unlocking it.  The write I/O completion handler should run
-end_page_writeback() against the page.
+to the caller.
 
-That is: after 2.5.12, pages which are under writeout are *not* locked.
+Unless the filesystem is going to redirty_page_for_writepage(), unlock the page
+and return zero, writepage *must* run set_page_writeback() against the page,
+followed by unlocking it.  Once set_page_writeback() has been run against the
+page, write I/O can be submitted and the write I/O completion handler must run
+end_page_writeback() once the I/O is complete.  If no I/O is submitted, the
+filesystem must run end_page_writeback() against the page before returning from
+writepage.
+
+That is: after 2.5.12, pages which are under writeout are *not* locked.  Note,
+if the filesystem needs the page to be locked during writeout, that is ok, too,
+the page is allowed to be unlocked at any point in time between the calls to
+set_page_writeback() and end_page_writeback().
+
+Note, failure to run either redirty_page_for_writepage() or the combination of
+set_page_writeback()/end_page_writeback() on a page submitted to writepage
+will leave the page itself marked clean but it will be tagged as dirty in the
+radix tree.  This incoherency can lead to all sorts of hard-to-debug problems
+in the filesystem like having dirty inodes at umount and losing written data.
 
 	->sync_page() locking rules are not well-defined - usually it is called
 with lock on page, but that is not guaranteed. Considering the currently

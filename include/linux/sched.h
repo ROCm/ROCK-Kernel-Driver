@@ -293,7 +293,7 @@ struct signal_struct {
  * in the range MAX_RT_PRIO..MAX_PRIO-1. Priority values
  * are inverted: lower p->prio value means higher priority.
  *
- * The MAX_RT_USER_PRIO value allows the actual maximum
+ * The MAX_USER_RT_PRIO value allows the actual maximum
  * RT priority to be separate from the value exported to
  * user-space.  This allows kernel threads to set their
  * priority to a value higher than any user task. Note:
@@ -738,7 +738,7 @@ extern void FASTCALL(wake_up_forked_process(struct task_struct * tsk));
  static inline void kick_process(struct task_struct *tsk) { }
  static inline void wake_up_forked_thread(struct task_struct * tsk)
  {
-	return wake_up_forked_process(tsk);
+	wake_up_forked_process(tsk);
  }
 #endif
 extern void FASTCALL(sched_fork(task_t * p));

@@ -144,7 +144,7 @@ static inline void mca_do_proc_init(void)
 {
 }
 
-static inline void mca_set_adapter_procfn(int slot, MCA_ProcFn *fn, void* dev)
+static inline void mca_set_adapter_procfn(int slot, MCA_ProcFn fn, void* dev)
 {
 }
 #endif

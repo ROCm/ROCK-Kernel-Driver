@@ -108,8 +108,21 @@ static void make_page_uptodate(struct page *page)
 		struct buffer_head *head = bh;
 
 		do {
-			if (!buffer_uptodate(bh))
+			if (!buffer_uptodate(bh)) {
 				memset(bh->b_data, 0, bh->b_size);
+				/*
+				 * akpm: I'm totally undecided about this.  The
+				 * buffer has just been magically brought "up to
+				 * date", but nobody should want to be reading
+				 * it anyway, because it hasn't been used for
+				 * anything yet.  It is still in a "not read
+				 * from disk yet" state.
+				 *
+				 * But non-uptodate buffers against an uptodate
+				 * page are against the rules.  So do it anyway.
+				 */
+				 set_buffer_uptodate(bh);
+			}
 		} while ((bh = bh->b_this_page) != head);
 	} else {
 		memset(page_address(page), 0, PAGE_CACHE_SIZE);

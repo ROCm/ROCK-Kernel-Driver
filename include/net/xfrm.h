@@ -216,7 +216,7 @@ struct xfrm_type
 	void			(*destructor)(struct xfrm_state *);
 	int			(*input)(struct xfrm_state *, struct xfrm_decap_state *, struct sk_buff *skb);
 	int			(*post_input)(struct xfrm_state *, struct xfrm_decap_state *, struct sk_buff *skb);
-	int			(*output)(struct sk_buff *skb);
+	int			(*output)(struct sk_buff **pskb);
 	/* Estimate maximal size of result of transformation of a dgram */
 	u32			(*get_max_size)(struct xfrm_state *, int size);
 };
@@ -821,10 +821,10 @@ extern int xfrm6_rcv(struct sk_buff **pskb, unsigned int *nhoffp);
 
 #ifdef CONFIG_XFRM
 extern int xfrm4_rcv_encap(struct sk_buff *skb, __u16 encap_type);
-extern int xfrm_user_policy(struct sock *sk, int optname, u8 *optval, int optlen);
+extern int xfrm_user_policy(struct sock *sk, int optname, u8 __user *optval, int optlen);
 extern int xfrm_dst_lookup(struct xfrm_dst **dst, struct flowi *fl, unsigned short family);
 #else
-static inline int xfrm_user_policy(struct sock *sk, int optname, u8 *optval, int optlen)
+static inline int xfrm_user_policy(struct sock *sk, int optname, u8 __user *optval, int optlen)
 {
  	return -ENOPROTOOPT;
 } 

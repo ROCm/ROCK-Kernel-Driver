@@ -48,20 +48,60 @@
 #define OMAP1610_DSPREG_SIZE	SZ_128K
 #define OMAP1610_DSPREG_START	0xE1000000
 
-#define OMAP_IH2_0_BASE          0xfffe0000
-#define OMAP_IH2_1_BASE          0xfffe0100
-#define OMAP_IH2_2_BASE          0xfffe0200
-#define OMAP_IH2_3_BASE          0xfffe0300
+/*
+ * ---------------------------------------------------------------------------
+ * Interrupts
+ * ---------------------------------------------------------------------------
+ */
+#define OMAP_IH2_0_BASE		(0xfffe0000)
+#define OMAP_IH2_1_BASE		(0xfffe0100)
+#define OMAP_IH2_2_BASE		(0xfffe0200)
+#define OMAP_IH2_3_BASE		(0xfffe0300)
+
+#define OMAP_IH2_0_ITR		(OMAP_IH2_0_BASE + 0x00)
+#define OMAP_IH2_0_MIR		(OMAP_IH2_0_BASE + 0x04)
+#define OMAP_IH2_0_SIR_IRQ	(OMAP_IH2_0_BASE + 0x10)
+#define OMAP_IH2_0_SIR_FIQ	(OMAP_IH2_0_BASE + 0x14)
+#define OMAP_IH2_0_CONTROL	(OMAP_IH2_0_BASE + 0x18)
+#define OMAP_IH2_0_ILR0		(OMAP_IH2_0_BASE + 0x1c)
+#define OMAP_IH2_0_ISR		(OMAP_IH2_0_BASE + 0x9c)
+
+#define OMAP_IH2_1_ITR		(OMAP_IH2_1_BASE + 0x00)
+#define OMAP_IH2_1_MIR		(OMAP_IH2_1_BASE + 0x04)
+#define OMAP_IH2_1_SIR_IRQ	(OMAP_IH2_1_BASE + 0x10)
+#define OMAP_IH2_1_SIR_FIQ	(OMAP_IH2_1_BASE + 0x14)
+#define OMAP_IH2_1_CONTROL	(OMAP_IH2_1_BASE + 0x18)
+#define OMAP_IH2_1_ILR1		(OMAP_IH2_1_BASE + 0x1c)
+#define OMAP_IH2_1_ISR		(OMAP_IH2_1_BASE + 0x9c)
+
+#define OMAP_IH2_2_ITR		(OMAP_IH2_2_BASE + 0x00)
+#define OMAP_IH2_2_MIR		(OMAP_IH2_2_BASE + 0x04)
+#define OMAP_IH2_2_SIR_IRQ	(OMAP_IH2_2_BASE + 0x10)
+#define OMAP_IH2_2_SIR_FIQ	(OMAP_IH2_2_BASE + 0x14)
+#define OMAP_IH2_2_CONTROL	(OMAP_IH2_2_BASE + 0x18)
+#define OMAP_IH2_2_ILR2		(OMAP_IH2_2_BASE + 0x1c)
+#define OMAP_IH2_2_ISR		(OMAP_IH2_2_BASE + 0x9c)
+
+#define OMAP_IH2_3_ITR		(OMAP_IH2_3_BASE + 0x00)
+#define OMAP_IH2_3_MIR		(OMAP_IH2_3_BASE + 0x04)
+#define OMAP_IH2_3_SIR_IRQ	(OMAP_IH2_3_BASE + 0x10)
+#define OMAP_IH2_3_SIR_FIQ	(OMAP_IH2_3_BASE + 0x14)
+#define OMAP_IH2_3_CONTROL	(OMAP_IH2_3_BASE + 0x18)
+#define OMAP_IH2_3_ILR3		(OMAP_IH2_3_BASE + 0x1c)
+#define OMAP_IH2_3_ISR		(OMAP_IH2_3_BASE + 0x9c)
 
 /*
  * ----------------------------------------------------------------------------
- * System control registers
+ * Clocks
  * ----------------------------------------------------------------------------
  */
+#define OMAP1610_ARM_IDLECT3	(CLKGEN_REG_BASE + 0x24)
 
-#define OMAP1610_RESET_CONTROL		0xfffe1140
-#define OMAP1610_ARM_IDLECT3		(CLKGEN_RESET_BASE + 0x24)
-#define OMAP1610_CONF_VOLTAGE_CTRL_0	0xfffe1060
+/*
+ * ----------------------------------------------------------------------------
+ * Pin configuration registers
+ * ----------------------------------------------------------------------------
+ */
 #define OMAP1610_CONF_VOLTAGE_VDDSHV6	(1 << 8)
 #define OMAP1610_CONF_VOLTAGE_VDDSHV7	(1 << 9)
 #define OMAP1610_CONF_VOLTAGE_VDDSHV8	(1 << 10)
@@ -73,14 +113,8 @@
  * TIPB bus interface
  * ---------------------------------------------------------------------------
  */
-
-#define OMAP1610_TIPB_SWITCH		0xfffbc800
-#define OMAP1610_TIPB_BRIDGE_INT	0xfffeca00	/* Private TIPB_CNTL */
-#define OMAP1610_PRIVATE_MPU_TIPB_CNTL	0xfffeca08
-#define OMAP1610_TIPB_BRIDGE_EXT	0xfffed300	/* Public (Shared) TIPB_CNTL */
-#define OMAP1610_PUBLIC_MPU_TIPB_CNTL	0xfffed308
-#define OMAP1610_TIPB_SWITCH_CFG	OMAP_TIPB_SWITCH
-#define OMAP1610_MMCSD2_SSW_MPU_CONF	(TIPB_SWITCH_CFG + 0x160)
+#define TIPB_SWITCH_BASE		 (0xfffbc800)
+#define OMAP1610_MMCSD2_SSW_MPU_CONF	(TIPB_SWITCH_BASE + 0x160)
 
 #endif /*  __ASM_ARCH_OMAP1610_H */
 

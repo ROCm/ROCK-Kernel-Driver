@@ -78,7 +78,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 1205 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1219 $ Ben Collins <bcollins@debian.org>";
 
 /*
  * Module load parameter definitions
@@ -876,9 +876,9 @@ alloc_fail:
 			SBP2_DMA_FREE("login FIFO DMA");
 		}
 
-		kfree(scsi_id);
-
 		list_del(&scsi_id->scsi_list);
+
+		kfree(scsi_id);
 
 		SBP2_ERR ("Could not allocate memory for scsi_id");
 

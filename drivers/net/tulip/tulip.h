@@ -64,6 +64,8 @@ enum tbl_flag {
 	COMET_MAC_ADDR		= 0x0800,
 	HAS_PCI_MWI		= 0x1000,
 	HAS_PHY_IRQ		= 0x2000,
+	HAS_SWAPPED_SEEPROM	= 0x4000,
+	NEEDS_FAKE_MEDIA_TABLE	= 0x8000,
 };
 
 
@@ -407,7 +409,7 @@ void pnic2_lnk_change(struct net_device *dev, int csr5);
 
 /* eeprom.c */
 void tulip_parse_eeprom(struct net_device *dev);
-int tulip_read_eeprom(long ioaddr, int location, int addr_len);
+int tulip_read_eeprom(struct net_device *dev, int location, int addr_len);
 
 /* interrupt.c */
 extern unsigned int tulip_max_interrupt_work;

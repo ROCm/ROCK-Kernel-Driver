@@ -853,7 +853,7 @@ int IO_APIC_get_PCI_irq_vector(int bus, int slot, int pin)
  * we need to reprogram the ioredtbls to cater for the cpus which have come online
  * so mask in all cases should simply be TARGET_CPUS
  */
-void __init setup_ioapic_dest(cpumask_t mask)
+void __init setup_ioapic_dest(void)
 {
 	int pin, ioapic, irq, irq_entry;
 
@@ -866,7 +866,7 @@ void __init setup_ioapic_dest(cpumask_t mask)
 			if (irq_entry == -1)
 				continue;
 			irq = pin_2_irq(irq_entry, ioapic, pin);
-			set_ioapic_affinity_irq(irq, mask);
+			set_ioapic_affinity_irq(irq, TARGET_CPUS);
 		}
 
 	}

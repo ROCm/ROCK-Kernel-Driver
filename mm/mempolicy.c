@@ -61,6 +61,7 @@
 
 #include <linux/mempolicy.h>
 #include <linux/mm.h>
+#include <linux/highmem.h>
 #include <linux/hugetlb.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -126,7 +127,7 @@ static int mpol_check_policy(int mode, unsigned long *nodes)
 }
 
 /* Copy a node mask from user space. */
-static int get_nodes(unsigned long *nodes, unsigned long *nmask,
+static int get_nodes(unsigned long *nodes, unsigned long __user *nmask,
 		     unsigned long maxnode, int mode)
 {
 	unsigned long k;
@@ -334,7 +335,7 @@ static int mbind_range(struct vm_area_struct *vma, unsigned long start,
 /* Change policy for a memory range */
 asmlinkage long sys_mbind(unsigned long start, unsigned long len,
 			  unsigned long mode,
-			  unsigned long *nmask, unsigned long maxnode,
+			  unsigned long __user *nmask, unsigned long maxnode,
 			  unsigned flags)
 {
 	struct vm_area_struct *vma;
@@ -379,7 +380,7 @@ asmlinkage long sys_mbind(unsigned long start, unsigned long len,
 }
 
 /* Set the process memory policy */
-asmlinkage long sys_set_mempolicy(int mode, unsigned long *nmask,
+asmlinkage long sys_set_mempolicy(int mode, unsigned long __user *nmask,
 				   unsigned long maxnode)
 {
 	int err;
@@ -443,25 +444,25 @@ static int lookup_node(struct mm_struct *mm, unsigned long addr)
 }
 
 /* Copy a kernel node mask to user space */
-static int copy_nodes_to_user(unsigned long *user_mask, unsigned long maxnode,
-			      unsigned long *nodes)
+static int copy_nodes_to_user(unsigned long __user *mask, unsigned long maxnode,
+			      void *nodes, unsigned nbytes)
 {
 	unsigned long copy = ALIGN(maxnode-1, 64) / 8;
 
-	if (copy > sizeof(nodes)) {
+	if (copy > nbytes) {
 		if (copy > PAGE_SIZE)
 			return -EINVAL;
-		if (clear_user((char*)user_mask + sizeof(nodes),
-				copy - sizeof(nodes)))
+		if (clear_user((char __user *)mask + nbytes, copy - nbytes))
 			return -EFAULT;
-		copy = sizeof(nodes);
+		copy = nbytes;
 	}
-	return copy_to_user(user_mask, nodes, copy) ? -EFAULT : 0;
+	return copy_to_user(mask, nodes, copy) ? -EFAULT : 0;
 }
 
 /* Retrieve NUMA policy */
-asmlinkage long sys_get_mempolicy(int *policy,
-				  unsigned long *nmask, unsigned long maxnode,
+asmlinkage long sys_get_mempolicy(int __user *policy,
+				  unsigned long __user *nmask,
+				  unsigned long maxnode,
 				  unsigned long addr, unsigned long flags)
 {
 	int err, pval;
@@ -514,7 +515,7 @@ asmlinkage long sys_get_mempolicy(int *policy,
 	if (nmask) {
 		DECLARE_BITMAP(nodes, MAX_NUMNODES);
 		get_zonemask(pol, nodes);
-		err = copy_nodes_to_user(nmask, maxnode, nodes);
+		err = copy_nodes_to_user(nmask, maxnode, nodes, sizeof(nodes));
 	}
 
  out:
@@ -525,12 +526,12 @@ asmlinkage long sys_get_mempolicy(int *policy,
 
 #ifdef CONFIG_COMPAT
 /* The other functions are compatible */
-asmlinkage long compat_get_mempolicy(int *policy,
-				  unsigned  *nmask, unsigned  maxnode,
+asmlinkage long compat_get_mempolicy(int __user *policy,
+				  unsigned __user *nmask, unsigned  maxnode,
 				  unsigned addr, unsigned  flags)
 {
 	long err;
-	unsigned long *nm = NULL;
+	unsigned long __user *nm = NULL;
 	if (nmask)
 		nm = compat_alloc_user_space(ALIGN(maxnode-1, 64) / 8);
 	err = sys_get_mempolicy(policy, nm, maxnode, addr, flags);
@@ -757,7 +758,7 @@ int __mpol_equal(struct mempolicy *a, struct mempolicy *b)
 }
 
 /* Slow path of a mpol destructor. */
-extern void __mpol_free(struct mempolicy *p)
+void __mpol_free(struct mempolicy *p)
 {
 	if (!atomic_dec_and_test(&p->refcnt))
 		return;

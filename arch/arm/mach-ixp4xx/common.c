@@ -30,7 +30,6 @@
 #include <asm/hardware.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
-#include <asm/mach-types.h>
 #include <asm/pgtable.h>
 #include <asm/page.h>
 #include <asm/irq.h>

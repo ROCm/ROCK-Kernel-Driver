@@ -542,6 +542,15 @@ config EST8260
 	  <http://www.windriver.com/>, but the EST8260 cannot be found on it
 	  and has probably been discontinued or rebadged.
 
+config SBC82xx
+	bool "SBC82xx"
+	---help---
+	  SBC PowerQUICC II, single-board computer with MPC82xx CPU
+	  Manufacturer: Wind River Systems, Inc.
+	  Date of Release: May 2003
+	  End of Life: -
+	  URL: <http://www.windriver.com/>
+
 config SBS8260
 	bool "SBS8260"
 
@@ -575,7 +584,7 @@ config EMBEDDEDBOOT
 config 8260
 	bool "MPC8260 CPM Support" if WILLOW
 	depends on 6xx
-	default y if TQM8260 || RPXSUPER || EST8260 || SBS8260
+	default y if TQM8260 || RPXSUPER || EST8260 || SBS8260 || SBC82xx
 	help
 	  The MPC8260 CPM (Communications Processor Module) is a typical
 	  embedded CPU made by Motorola.  Selecting this option means that
@@ -1069,6 +1078,30 @@ config TASK_SIZE_BOOL
 config TASK_SIZE
 	hex "Size of user task space" if TASK_SIZE_BOOL
 	default "0x80000000"
+
+config CONSISTENT_START_BOOL
+	bool "Set custom consistent memory pool address"
+	depends on ADVANCED_OPTIONS && NOT_COHERENT_CACHE
+	help
+	  This option allows you to set the base virtual address
+	  of the the consistent memory pool.  This pool of virtual
+	  memory is used to make consistent memory allocations.
+
+config CONSISTENT_START
+	hex "Base virtual address of consistent memory pool" if CONSISTENT_START_BOOL
+	default "0xff100000" if NOT_COHERENT_CACHE
+
+config CONSISTENT_SIZE_BOOL
+	bool "Set custom consistent memory pool size"
+	depends on ADVANCED_OPTIONS && NOT_COHERENT_CACHE
+	help
+	  This option allows you to set the size of the the
+	  consistent memory pool.  This pool of virtual memory
+	  is used to make consistent memory allocations.
+
+config CONSISTENT_SIZE
+	hex "Size of consistent memory pool" if CONSISTENT_SIZE_BOOL
+	default "0x00200000" if NOT_COHERENT_CACHE
 
 config BOOT_LOAD_BOOL
 	bool "Set the boot link/load address"

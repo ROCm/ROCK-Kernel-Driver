@@ -173,6 +173,8 @@
 #define CUR_CLR1                               0x0270  
 #define FP_HORZ_VERT_ACTIVE                    0x0278  
 #define CRTC_MORE_CNTL                         0x027C  
+#define CRTC_H_CUTOFF_ACTIVE_EN                (1<<4)
+#define CRTC_V_CUTOFF_ACTIVE_EN                (1<<5)
 #define DAC_EXT_CNTL                           0x0280  
 #define FP_GEN_CNTL                            0x0284  
 #define FP_HORZ_STRETCH                        0x028C  
@@ -185,6 +187,7 @@
 //#define DDA_ON_OFF			       0x02e4
 #define DVI_I2C_CNTL_1			       0x02e4
 #define GRPH_BUFFER_CNTL                       0x02F0
+#define GRPH2_BUFFER_CNTL                      0x03F0
 #define VGA_BUFFER_CNTL                        0x02F4
 #define OV0_Y_X_START                          0x0400
 #define OV0_Y_X_END                            0x0404  
@@ -1944,7 +1947,7 @@
 #define ixREG_COLLAR_WRITE                         0x0013
 #define ixREG_COLLAR_READ                          0x0014
 
-
+#define NB_TOM                                     0x15C
 
 
 #endif	/* _RADEON_H */

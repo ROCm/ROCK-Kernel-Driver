@@ -196,7 +196,7 @@ extern void x25_transmit_restart_confirmation(struct x25_neigh *);
 extern void x25_transmit_diagnostic(struct x25_neigh *, unsigned char);
 extern void x25_transmit_clear_request(struct x25_neigh *, unsigned int, unsigned char);
 extern void x25_transmit_link(struct sk_buff *, struct x25_neigh *);
-extern int  x25_subscr_ioctl(unsigned int, void *);
+extern int  x25_subscr_ioctl(unsigned int, void __user *);
 extern struct x25_neigh *x25_get_neigh(struct net_device *);
 extern void x25_link_free(void);
 
@@ -221,7 +221,7 @@ extern void x25_enquiry_response(struct sock *);
 extern struct x25_route *x25_get_route(struct x25_address *addr);
 extern struct net_device *x25_dev_get(char *);
 extern void x25_route_device_down(struct net_device *dev);
-extern int  x25_route_ioctl(unsigned int, void *);
+extern int  x25_route_ioctl(unsigned int, void __user *);
 extern void x25_route_free(void);
 
 static __inline__ void x25_route_hold(struct x25_route *rt)

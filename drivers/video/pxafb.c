@@ -153,7 +153,7 @@ pxafb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 		 * 12 or 16-bit True Colour.  We encode the RGB value
 		 * according to the RGB bitfield information.
 		 */
-		if (regno <= 16) {
+		if (regno < 16) {
 			u32 *pal = fbi->fb.pseudo_palette;
 
 			val  = chan_to_field(red, &fbi->fb.var.red);
@@ -432,7 +432,7 @@ static inline unsigned int get_pcd(unsigned int pixclock)
          * (DPC) bit? or perhaps set it based on the various clock
          * speeds */
 
-	pcd = (unsigned long long)get_lclk_frequency_10khz() * (unsigned long long)pixclock;
+	pcd = (unsigned long long)get_lcdclk_frequency_10khz() * pixclock;
 	pcd /= 100000000 * 2;
 	/* no need for this, since we should subtract 1 anyway. they cancel */
 	/* pcd += 1; */ /* make up for integer math truncations */
@@ -448,7 +448,7 @@ static int pxafb_activate_var(struct fb_var_screeninfo *var, struct pxafb_info *
 {
 	struct pxafb_lcd_reg new_regs;
 	u_long flags;
-	u_int pcd = get_pcd(var->pixclock);
+	u_int lines_per_panel, pcd = get_pcd(var->pixclock);
 
 	DPRINTK("Configuring PXA LCD\n");
 
@@ -509,8 +509,16 @@ static int pxafb_activate_var(struct fb_var_screeninfo *var, struct pxafb_info *
 		LCCR1_BegLnDel(var->left_margin) +
 		LCCR1_EndLnDel(var->right_margin);
 
+	/*
+	 * If we have a dual scan LCD, we need to halve
+	 * the YRES parameter.
+	 */
+	lines_per_panel = var->yres;
+	if (fbi->lccr0 & LCCR0_SDS)
+		lines_per_panel /= 2;
+
 	new_regs.lccr2 =
-		LCCR2_DisHght(var->yres) +
+		LCCR2_DisHght(lines_per_panel) +
 		LCCR2_VrtSnchWdth(var->vsync_len) +
 		LCCR2_BegFrmDel(var->upper_margin) +
 		LCCR2_EndFrmDel(var->lower_margin);
@@ -540,9 +548,7 @@ static int pxafb_activate_var(struct fb_var_screeninfo *var, struct pxafb_info *
 	fbi->dmadesc_fbhigh_dma = fbi->palette_dma - 2*16;
 	fbi->dmadesc_palette_dma = fbi->palette_dma - 1*16;
 
-	#define BYTES_PER_PANEL ((fbi->lccr0 & LCCR0_SDS) == LCCR0_Dual ? \
-                                (var->xres * var->yres * var->bits_per_pixel / 8 / 2) : \
-                                (var->xres * var->yres * var->bits_per_pixel / 8))
+#define BYTES_PER_PANEL (lines_per_panel * fbi->fb.fix.line_length)
 
 	/* populate descriptors */
 	fbi->dmadesc_fblow_cpu->fdadr = fbi->dmadesc_fblow_dma;
@@ -733,8 +739,7 @@ static void pxafb_disable_controller(struct pxafb_info *fbi)
 
 	LCSR = 0xffffffff;	/* Clear LCD Status Register */
 	LCCR0 &= ~LCCR0_LDM;	/* Enable LCD Disable Done Interrupt */
-	//TODO?enable_irq(IRQ_LCD);  /* Enable LCD IRQ */
-	LCCR0 &= ~LCCR0_ENB;	/* Disable LCD Controller */
+	LCCR0 |= LCCR0_DIS;	/* Disable LCD Controller */
 
 	schedule_timeout(20 * HZ / 1000);
 	remove_wait_queue(&fbi->ctrlr_wait, &wait);
@@ -1137,25 +1142,25 @@ static int __init pxafb_parse_options(struct device *dev, char *options)
 				}
                 } else if (!strncmp(this_opt, "pixclock:", 9)) {
                         inf->pixclock = simple_strtoul(this_opt+9, NULL, 0);
-			dev_info(dev, "override pixclock: %uld\n", inf->pixclock);
+			dev_info(dev, "override pixclock: %u\n", inf->pixclock);
                 } else if (!strncmp(this_opt, "left:", 5)) {
                         inf->left_margin = simple_strtoul(this_opt+5, NULL, 0);
-			dev_info(dev, "override left: %d\n", inf->left_margin);
+			dev_info(dev, "override left: %u\n", inf->left_margin);
                 } else if (!strncmp(this_opt, "right:", 6)) {
                         inf->right_margin = simple_strtoul(this_opt+6, NULL, 0);
-			dev_info(dev, "override right: %d\n", inf->right_margin);
+			dev_info(dev, "override right: %u\n", inf->right_margin);
                 } else if (!strncmp(this_opt, "upper:", 6)) {
                         inf->upper_margin = simple_strtoul(this_opt+6, NULL, 0);
-			dev_info(dev, "override upper: %d\n", inf->upper_margin);
+			dev_info(dev, "override upper: %u\n", inf->upper_margin);
                 } else if (!strncmp(this_opt, "lower:", 6)) {
                         inf->lower_margin = simple_strtoul(this_opt+6, NULL, 0);
-			dev_info(dev, "override lower: %d\n", inf->lower_margin);
+			dev_info(dev, "override lower: %u\n", inf->lower_margin);
                 } else if (!strncmp(this_opt, "hsynclen:", 9)) {
                         inf->hsync_len = simple_strtoul(this_opt+9, NULL, 0);
-			dev_info(dev, "override hsynclen: %d\n", inf->hsync_len);
+			dev_info(dev, "override hsynclen: %u\n", inf->hsync_len);
                 } else if (!strncmp(this_opt, "vsynclen:", 9)) {
                         inf->vsync_len = simple_strtoul(this_opt+9, NULL, 0);
-			dev_info(dev, "override vsynclen: %d\n", inf->vsync_len);
+			dev_info(dev, "override vsynclen: %u\n", inf->vsync_len);
                 } else if (!strncmp(this_opt, "hsync:", 6)) {
                         if ( simple_strtoul(this_opt+6, NULL, 0) == 0 ) {
 				dev_info(dev, "override hsync: Active Low\n");

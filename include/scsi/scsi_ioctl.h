@@ -40,10 +40,10 @@ typedef struct scsi_fctargaddress {
 	unsigned char host_wwn[8]; // include NULL term.
 } Scsi_FCTargAddress;
 
-extern int scsi_ioctl(struct scsi_device *, int, void *);
+extern int scsi_ioctl(struct scsi_device *, int, void __user *);
 extern int kernel_scsi_ioctl(struct scsi_device *, int , void *);
 extern int scsi_ioctl_send_command(struct scsi_device *,
-				   struct scsi_ioctl_command *);
+				   struct scsi_ioctl_command __user *);
 
 #endif /* __KERNEL__ */
 #endif /* _SCSI_IOCTL_H */

@@ -56,8 +56,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"3.4"
-#define DRV_MODULE_RELDATE	"May 14, 2004"
+#define DRV_MODULE_VERSION	"3.6"
+#define DRV_MODULE_RELDATE	"June 12, 2004"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -128,7 +128,8 @@
 /* minimum number of free TX descriptors required to wake up TX process */
 #define TG3_TX_WAKEUP_THRESH		(TG3_TX_RING_SIZE / 4)
 
-#define TG3_NUM_STATS		25	/* number of ETHTOOL_GSTATS u64's */
+/* number of ETHTOOL_GSTATS u64's */
+#define TG3_NUM_STATS		(sizeof(struct tg3_ethtool_stats)/sizeof(u64))
 
 static char version[] __devinitdata =
 	DRV_MODULE_NAME ".c:v" DRV_MODULE_VERSION " (" DRV_MODULE_RELDATE ")\n";
@@ -176,6 +177,8 @@ static struct pci_device_id tg3_pci_tbl[] = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5788,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5789,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5901,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5901_2,
@@ -193,6 +196,10 @@ static struct pci_device_id tg3_pci_tbl[] = {
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5751,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5750M,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5751M,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5751F,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_SYSKONNECT, PCI_DEVICE_ID_SYSKONNECT_9DXX,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
@@ -216,10 +223,13 @@ MODULE_DEVICE_TABLE(pci, tg3_pci_tbl);
 struct {
 	char string[ETH_GSTRING_LEN];
 } ethtool_stats_keys[TG3_NUM_STATS] = {
+	{ "rx_octets" },
 	{ "rx_fragments" },
 	{ "rx_ucast_packets" },
+	{ "rx_mcast_packets" },
 	{ "rx_bcast_packets" },
 	{ "rx_fcs_errors" },
+	{ "rx_align_errors" },
 	{ "rx_xon_pause_rcvd" },
 	{ "rx_xoff_pause_rcvd" },
 	{ "rx_mac_ctrl_rcvd" },
@@ -229,6 +239,19 @@ struct {
 	{ "rx_undersize_packets" },
 	{ "rx_in_length_errors" },
 	{ "rx_out_length_errors" },
+	{ "rx_64_or_less_octet_packets" },
+	{ "rx_65_to_127_octet_packets" },
+	{ "rx_128_to_255_octet_packets" },
+	{ "rx_256_to_511_octet_packets" },
+	{ "rx_512_to_1023_octet_packets" },
+	{ "rx_1024_to_1522_octet_packets" },
+	{ "rx_1523_to_2047_octet_packets" },
+	{ "rx_2048_to_4095_octet_packets" },
+	{ "rx_4096_to_8191_octet_packets" },
+	{ "rx_8192_to_9022_octet_packets" },
+
+	{ "tx_octets" },
+	{ "tx_collisions" },
 
 	{ "tx_xon_sent" },
 	{ "tx_xoff_sent" },
@@ -239,9 +262,43 @@ struct {
 	{ "tx_deferred" },
 	{ "tx_excessive_collisions" },
 	{ "tx_late_collisions" },
+	{ "tx_collide_2times" },
+	{ "tx_collide_3times" },
+	{ "tx_collide_4times" },
+	{ "tx_collide_5times" },
+	{ "tx_collide_6times" },
+	{ "tx_collide_7times" },
+	{ "tx_collide_8times" },
+	{ "tx_collide_9times" },
+	{ "tx_collide_10times" },
+	{ "tx_collide_11times" },
+	{ "tx_collide_12times" },
+	{ "tx_collide_13times" },
+	{ "tx_collide_14times" },
+	{ "tx_collide_15times" },
 	{ "tx_ucast_packets" },
 	{ "tx_mcast_packets" },
-	{ "tx_bcast_packets" }
+	{ "tx_bcast_packets" },
+	{ "tx_carrier_sense_errors" },
+	{ "tx_discards" },
+	{ "tx_errors" },
+
+	{ "dma_writeq_full" },
+	{ "dma_write_prioq_full" },
+	{ "rxbds_empty" },
+	{ "rx_discards" },
+	{ "rx_errors" },
+	{ "rx_threshold_hit" },
+
+	{ "dma_readq_full" },
+	{ "dma_read_prioq_full" },
+	{ "tx_comp_queue_full" },
+
+	{ "ring_set_send_prod_index" },
+	{ "ring_status_update" },
+	{ "nic_irqs" },
+	{ "nic_avoided_irqs" },
+	{ "nic_tx_threshold_hit" }
 };
 
 static void tg3_write_indirect_reg32(struct tg3 *tp, u32 off, u32 val)
@@ -1053,6 +1110,8 @@ static void tg3_link_report(struct tg3 *tp)
 static void tg3_setup_flow_control(struct tg3 *tp, u32 local_adv, u32 remote_adv)
 {
 	u32 new_tg3_flags = 0;
+	u32 old_rx_mode = tp->rx_mode;
+	u32 old_tx_mode = tp->tx_mode;
 
 	if (local_adv & ADVERTISE_PAUSE_CAP) {
 		if (local_adv & ADVERTISE_PAUSE_ASYM) {
@@ -1083,10 +1142,18 @@ static void tg3_setup_flow_control(struct tg3 *tp, u32 local_adv, u32 remote_adv
 	else
 		tp->rx_mode &= ~RX_MODE_FLOW_CTRL_ENABLE;
 
+	if (old_rx_mode != tp->rx_mode) {
+		tw32_f(MAC_RX_MODE, tp->rx_mode);
+	}
+	
 	if (new_tg3_flags & TG3_FLAG_TX_PAUSE)
 		tp->tx_mode |= TX_MODE_FLOW_CTRL_ENABLE;
 	else
 		tp->tx_mode &= ~TX_MODE_FLOW_CTRL_ENABLE;
+
+	if (old_tx_mode != tp->tx_mode) {
+		tw32_f(MAC_TX_MODE, tp->tx_mode);
+	}
 }
 
 static void tg3_aux_stat_to_speed_duplex(struct tg3 *tp, u32 val, u16 *speed, u8 *duplex)
@@ -2472,7 +2539,7 @@ next_pkt_nopost:
 
 static int tg3_poll(struct net_device *netdev, int *budget)
 {
-	struct tg3 *tp = netdev->priv;
+	struct tg3 *tp = netdev_priv(netdev);
 	struct tg3_hw_status *sblk = tp->hw_status;
 	unsigned long flags;
 	int done;
@@ -2554,7 +2621,7 @@ static inline unsigned int tg3_has_work(struct net_device *dev, struct tg3 *tp)
 static irqreturn_t tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 	struct tg3_hw_status *sblk = tp->hw_status;
 	unsigned long flags;
 	unsigned int handled = 1;
@@ -2634,7 +2701,7 @@ static void tg3_reset_task(void *_data)
 
 static void tg3_tx_timeout(struct net_device *dev)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 
 	printk(KERN_ERR PFX "%s: transmit timed out, resetting\n",
 	       dev->name);
@@ -2750,7 +2817,7 @@ static inline int tg3_4g_overflow_test(dma_addr_t mapping, int len)
 
 static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 	dma_addr_t mapping;
 	unsigned int i;
 	u32 len, entry, base_flags, mss;
@@ -2954,7 +3021,7 @@ out_unlock:
 
 static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 	dma_addr_t mapping;
 	u32 len, entry, base_flags, mss;
 	unsigned long flags;
@@ -3124,7 +3191,7 @@ static inline void tg3_set_mtu(struct net_device *dev, struct tg3 *tp,
 
 static int tg3_change_mtu(struct net_device *dev, int new_mtu)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 
 	if (new_mtu < TG3_MIN_MTU || new_mtu > TG3_MAX_MTU(tp))
 		return -EINVAL;
@@ -4741,7 +4808,7 @@ static void __tg3_set_mac_addr(struct tg3 *tp)
 
 static int tg3_set_mac_addr(struct net_device *dev, void *p)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 	struct sockaddr *addr = p;
 
 	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
@@ -5533,7 +5600,7 @@ static void tg3_timer(unsigned long __opaque)
 
 static int tg3_open(struct net_device *dev)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 	int err;
 
 	spin_lock_irq(&tp->lock);
@@ -5836,7 +5903,7 @@ static struct tg3_ethtool_stats *tg3_get_estats(struct tg3 *);
 
 static int tg3_close(struct net_device *dev)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 
 	netif_stop_queue(dev);
 
@@ -5921,10 +5988,13 @@ static struct tg3_ethtool_stats *tg3_get_estats(struct tg3 *tp)
 	if (!hw_stats)
 		return old_estats;
 
+	ESTAT_ADD(rx_octets);
 	ESTAT_ADD(rx_fragments);
 	ESTAT_ADD(rx_ucast_packets);
+	ESTAT_ADD(rx_mcast_packets);
 	ESTAT_ADD(rx_bcast_packets);
 	ESTAT_ADD(rx_fcs_errors);
+	ESTAT_ADD(rx_align_errors);
 	ESTAT_ADD(rx_xon_pause_rcvd);
 	ESTAT_ADD(rx_xoff_pause_rcvd);
 	ESTAT_ADD(rx_mac_ctrl_rcvd);
@@ -5934,7 +6004,19 @@ static struct tg3_ethtool_stats *tg3_get_estats(struct tg3 *tp)
 	ESTAT_ADD(rx_undersize_packets);
 	ESTAT_ADD(rx_in_length_errors);
 	ESTAT_ADD(rx_out_length_errors);
+	ESTAT_ADD(rx_64_or_less_octet_packets);
+	ESTAT_ADD(rx_65_to_127_octet_packets);
+	ESTAT_ADD(rx_128_to_255_octet_packets);
+	ESTAT_ADD(rx_256_to_511_octet_packets);
+	ESTAT_ADD(rx_512_to_1023_octet_packets);
+	ESTAT_ADD(rx_1024_to_1522_octet_packets);
+	ESTAT_ADD(rx_1523_to_2047_octet_packets);
+	ESTAT_ADD(rx_2048_to_4095_octet_packets);
+	ESTAT_ADD(rx_4096_to_8191_octet_packets);
+	ESTAT_ADD(rx_8192_to_9022_octet_packets);
 
+	ESTAT_ADD(tx_octets);
+	ESTAT_ADD(tx_collisions);
 	ESTAT_ADD(tx_xon_sent);
 	ESTAT_ADD(tx_xoff_sent);
 	ESTAT_ADD(tx_flow_control);
@@ -5944,16 +6026,50 @@ static struct tg3_ethtool_stats *tg3_get_estats(struct tg3 *tp)
 	ESTAT_ADD(tx_deferred);
 	ESTAT_ADD(tx_excessive_collisions);
 	ESTAT_ADD(tx_late_collisions);
+	ESTAT_ADD(tx_collide_2times);
+	ESTAT_ADD(tx_collide_3times);
+	ESTAT_ADD(tx_collide_4times);
+	ESTAT_ADD(tx_collide_5times);
+	ESTAT_ADD(tx_collide_6times);
+	ESTAT_ADD(tx_collide_7times);
+	ESTAT_ADD(tx_collide_8times);
+	ESTAT_ADD(tx_collide_9times);
+	ESTAT_ADD(tx_collide_10times);
+	ESTAT_ADD(tx_collide_11times);
+	ESTAT_ADD(tx_collide_12times);
+	ESTAT_ADD(tx_collide_13times);
+	ESTAT_ADD(tx_collide_14times);
+	ESTAT_ADD(tx_collide_15times);
 	ESTAT_ADD(tx_ucast_packets);
 	ESTAT_ADD(tx_mcast_packets);
 	ESTAT_ADD(tx_bcast_packets);
+	ESTAT_ADD(tx_carrier_sense_errors);
+	ESTAT_ADD(tx_discards);
+	ESTAT_ADD(tx_errors);
+
+	ESTAT_ADD(dma_writeq_full);
+	ESTAT_ADD(dma_write_prioq_full);
+	ESTAT_ADD(rxbds_empty);
+	ESTAT_ADD(rx_discards);
+	ESTAT_ADD(rx_errors);
+	ESTAT_ADD(rx_threshold_hit);
+
+	ESTAT_ADD(dma_readq_full);
+	ESTAT_ADD(dma_read_prioq_full);
+	ESTAT_ADD(tx_comp_queue_full);
+
+	ESTAT_ADD(ring_set_send_prod_index);
+	ESTAT_ADD(ring_status_update);
+	ESTAT_ADD(nic_irqs);
+	ESTAT_ADD(nic_avoided_irqs);
+	ESTAT_ADD(nic_tx_threshold_hit);
 
 	return estats;
 }
 
 static struct net_device_stats *tg3_get_stats(struct net_device *dev)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 	struct net_device_stats *stats = &tp->net_stats;
 	struct net_device_stats *old_stats = &tp->net_stats_prev;
 	struct tg3_hw_stats *hw_stats = tp->hw_stats;
@@ -5977,7 +6093,8 @@ static struct net_device_stats *tg3_get_stats(struct net_device *dev)
 		get_stat64(&hw_stats->tx_octets);
 
 	stats->rx_errors = old_stats->rx_errors +
-		get_stat64(&hw_stats->rx_errors);
+		get_stat64(&hw_stats->rx_errors) +
+		get_stat64(&hw_stats->rx_discards);
 	stats->tx_errors = old_stats->tx_errors +
 		get_stat64(&hw_stats->tx_errors) +
 		get_stat64(&hw_stats->tx_mac_errors) +
@@ -6044,7 +6161,7 @@ static void tg3_set_multi(struct tg3 *tp, unsigned int accept_all)
 
 static void __tg3_set_rx_mode(struct net_device *dev)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 	u32 rx_mode;
 
 	rx_mode = tp->rx_mode & ~(RX_MODE_PROMISC |
@@ -6108,7 +6225,7 @@ static void __tg3_set_rx_mode(struct net_device *dev)
 
 static void tg3_set_rx_mode(struct net_device *dev)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 
 	spin_lock_irq(&tp->lock);
 	__tg3_set_rx_mode(dev);
@@ -6126,7 +6243,7 @@ static void tg3_get_regs(struct net_device *dev,
 		struct ethtool_regs *regs, void *_p)
 {
 	u32 *p = _p;
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 	u8 *orig_p = _p;
 	int i;
 
@@ -6257,7 +6374,7 @@ static int tg3_get_eeprom(struct net_device *dev, struct ethtool_eeprom *eeprom,
 
 static int tg3_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
-  	struct tg3 *tp = dev->priv;
+  	struct tg3 *tp = netdev_priv(dev);
   
 	if (!(tp->tg3_flags & TG3_FLAG_INIT_COMPLETE) ||
 					tp->link_config.phy_is_low_power)
@@ -6292,7 +6409,7 @@ static int tg3_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
   
 static int tg3_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
   
 	if (!(tp->tg3_flags & TG3_FLAG_INIT_COMPLETE) ||
 	    tp->link_config.phy_is_low_power)
@@ -6331,7 +6448,7 @@ static int tg3_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
   
 static void tg3_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
   
 	strcpy(info->driver, DRV_MODULE_NAME);
 	strcpy(info->version, DRV_MODULE_VERSION);
@@ -6340,7 +6457,7 @@ static void tg3_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info
   
 static void tg3_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
   
 	wol->supported = WAKE_MAGIC;
 	wol->wolopts = 0;
@@ -6351,7 +6468,7 @@ static void tg3_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
   
 static int tg3_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
   
 	if (wol->wolopts & ~WAKE_MAGIC)
 		return -EINVAL;
@@ -6372,20 +6489,20 @@ static int tg3_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
   
 static u32 tg3_get_msglevel(struct net_device *dev)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 	return tp->msg_enable;
 }
   
 static void tg3_set_msglevel(struct net_device *dev, u32 value)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 	tp->msg_enable = value;
 }
   
 #if TG3_TSO_SUPPORT != 0
 static int tg3_set_tso(struct net_device *dev, u32 value)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 
 	if (!(tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE)) {
 		if (value)
@@ -6398,7 +6515,7 @@ static int tg3_set_tso(struct net_device *dev, u32 value)
   
 static int tg3_nway_reset(struct net_device *dev)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 	u32 bmcr;
 	int r;
   
@@ -6417,7 +6534,7 @@ static int tg3_nway_reset(struct net_device *dev)
   
 static void tg3_get_ringparam(struct net_device *dev, struct ethtool_ringparam *ering)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
   
 	ering->rx_max_pending = TG3_RX_RING_SIZE - 1;
 	ering->rx_mini_max_pending = 0;
@@ -6431,7 +6548,7 @@ static void tg3_get_ringparam(struct net_device *dev, struct ethtool_ringparam *
   
 static int tg3_set_ringparam(struct net_device *dev, struct ethtool_ringparam *ering)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
   
 	if ((ering->rx_pending > TG3_RX_RING_SIZE - 1) ||
 	    (ering->rx_jumbo_pending > TG3_RX_JUMBO_RING_SIZE - 1) ||
@@ -6462,7 +6579,7 @@ static int tg3_set_ringparam(struct net_device *dev, struct ethtool_ringparam *e
   
 static void tg3_get_pauseparam(struct net_device *dev, struct ethtool_pauseparam *epause)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
   
 	epause->autoneg = (tp->tg3_flags & TG3_FLAG_PAUSE_AUTONEG) != 0;
 	epause->rx_pause = (tp->tg3_flags & TG3_FLAG_PAUSE_RX) != 0;
@@ -6471,7 +6588,7 @@ static void tg3_get_pauseparam(struct net_device *dev, struct ethtool_pauseparam
   
 static int tg3_set_pauseparam(struct net_device *dev, struct ethtool_pauseparam *epause)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
   
 	tg3_netif_stop(tp);
 	spin_lock_irq(&tp->lock);
@@ -6499,13 +6616,13 @@ static int tg3_set_pauseparam(struct net_device *dev, struct ethtool_pauseparam 
   
 static u32 tg3_get_rx_csum(struct net_device *dev)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 	return (tp->tg3_flags & TG3_FLAG_RX_CHECKSUMS) != 0;
 }
   
 static int tg3_set_rx_csum(struct net_device *dev, u32 data)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
   
 	if (tp->tg3_flags & TG3_FLAG_BROKEN_CHECKSUMS) {
 		if (data != 0)
@@ -6525,7 +6642,7 @@ static int tg3_set_rx_csum(struct net_device *dev, u32 data)
   
 static int tg3_set_tx_csum(struct net_device *dev, u32 data)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
   
 	if (tp->tg3_flags & TG3_FLAG_BROKEN_CHECKSUMS) {
 		if (data != 0)
@@ -6562,13 +6679,13 @@ static void tg3_get_ethtool_stats (struct net_device *dev,
 				   struct ethtool_stats *estats, u64 *tmp_stats)
 {
 	struct tg3 *tp = dev->priv;
-	memcpy(tmp_stats, &tp->estats, sizeof(tp->estats));
+	memcpy(tmp_stats, tg3_get_estats(tp), sizeof(tp->estats));
 }
 
 static int tg3_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&ifr->ifr_data;
-	struct tg3 *tp = dev->priv;
+	struct mii_ioctl_data *data = if_mii(ifr);
+	struct tg3 *tp = netdev_priv(dev);
 	int err;
 
 	switch(cmd) {
@@ -6608,7 +6725,7 @@ static int tg3_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 #if TG3_VLAN_TAG_USED
 static void tg3_vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 
 	spin_lock_irq(&tp->lock);
 	spin_lock(&tp->tx_lock);
@@ -6624,7 +6741,7 @@ static void tg3_vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
 
 static void tg3_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 
 	spin_lock_irq(&tp->lock);
 	spin_lock(&tp->tx_lock);
@@ -7425,6 +7542,14 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	udelay(50);
 	tg3_nvram_init(tp);
 
+	/* Always use host TXDs, it performs better in particular
+	 * with multi-frag packets.  The tests below are kept here
+	 * as documentation should we change this decision again
+	 * in the future.
+	 */
+	tp->tg3_flags |= TG3_FLAG_HOST_TXDS;
+
+#if 0
 	/* Determine if TX descriptors will reside in
 	 * main memory or in the chip SRAM.
 	 */
@@ -7432,6 +7557,7 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 ||
 	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
 		tp->tg3_flags |= TG3_FLAG_HOST_TXDS;
+#endif
 
 	grc_misc_cfg = tr32(GRC_MISC_CFG);
 	grc_misc_cfg &= GRC_MISC_CFG_BOARD_ID_MASK;
@@ -7454,7 +7580,9 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	     tp->pdev->vendor == PCI_VENDOR_ID_BROADCOM &&
 	     (tp->pdev->device == PCI_DEVICE_ID_TIGON3_5901 ||
 	      tp->pdev->device == PCI_DEVICE_ID_TIGON3_5901_2 ||
-	      tp->pdev->device == PCI_DEVICE_ID_TIGON3_5705F)))
+	      tp->pdev->device == PCI_DEVICE_ID_TIGON3_5705F)) ||
+	    (tp->pdev->vendor == PCI_VENDOR_ID_BROADCOM &&
+	     tp->pdev->device == PCI_DEVICE_ID_TIGON3_5751F))
 		tp->tg3_flags |= TG3_FLAG_10_100_ONLY;
 
 	err = tg3_phy_probe(tp);
@@ -8047,7 +8175,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	dev->vlan_rx_kill_vid = tg3_vlan_rx_kill_vid;
 #endif
 
-	tp = dev->priv;
+	tp = netdev_priv(dev);
 	tp->pdev = pdev;
 	tp->dev = dev;
 	tp->pm_cap = pm_cap;
@@ -8268,8 +8396,10 @@ static void __devexit tg3_remove_one(struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 
 	if (dev) {
+		struct tg3 *tp = netdev_priv(dev);
+
 		unregister_netdev(dev);
-		iounmap((void *) ((struct tg3 *)(dev->priv))->regs);
+		iounmap((void *)tp->regs);
 		free_netdev(dev);
 		pci_release_regions(pdev);
 		pci_disable_device(pdev);
@@ -8280,7 +8410,7 @@ static void __devexit tg3_remove_one(struct pci_dev *pdev)
 static int tg3_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 	int err;
 
 	if (!netif_running(dev))
@@ -8327,11 +8457,13 @@ static int tg3_suspend(struct pci_dev *pdev, u32 state)
 static int tg3_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = netdev_priv(dev);
 	int err;
 
 	if (!netif_running(dev))
 		return 0;
+
+	pci_restore_state(tp->pdev, tp->pci_cfg_state);
 
 	err = tg3_set_power_state(tp, 0);
 	if (err)

@@ -134,7 +134,7 @@ static char *version = "$Id: he.c,v 1.18 2003/05/06 22:57:15 chas Exp $";
 static int he_open(struct atm_vcc *vcc);
 static void he_close(struct atm_vcc *vcc);
 static int he_send(struct atm_vcc *vcc, struct sk_buff *skb);
-static int he_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg);
+static int he_ioctl(struct atm_dev *dev, unsigned int cmd, void __user *arg);
 static irqreturn_t he_irq_handler(int irq, void *dev_id, struct pt_regs *regs);
 static void he_tasklet(unsigned long data);
 static int he_proc_read(struct atm_dev *dev,loff_t *pos,char *page);
@@ -2809,7 +2809,7 @@ he_send(struct atm_vcc *vcc, struct sk_buff *skb)
 }
 
 static int
-he_ioctl(struct atm_dev *atm_dev, unsigned int cmd, void *arg)
+he_ioctl(struct atm_dev *atm_dev, unsigned int cmd, void __user *arg)
 {
 	unsigned long flags;
 	struct he_dev *he_dev = HE_DEV(atm_dev);
@@ -2821,8 +2821,8 @@ he_ioctl(struct atm_dev *atm_dev, unsigned int cmd, void *arg)
 			if (!capable(CAP_NET_ADMIN))
 				return -EPERM;
 
-			if (copy_from_user(&reg, (struct he_ioctl_reg *) arg,
-						sizeof(struct he_ioctl_reg)))
+			if (copy_from_user(&reg, arg,
+					   sizeof(struct he_ioctl_reg)))
 				return -EFAULT;
 			
 			spin_lock_irqsave(&he_dev->global_lock, flags);
@@ -2848,7 +2848,7 @@ he_ioctl(struct atm_dev *atm_dev, unsigned int cmd, void *arg)
 			}
 			spin_unlock_irqrestore(&he_dev->global_lock, flags);
 			if (err == 0)
-				if (copy_to_user((struct he_ioctl_reg *) arg, &reg,
+				if (copy_to_user(arg, &reg,
 							sizeof(struct he_ioctl_reg)))
 					return -EFAULT;
 			break;

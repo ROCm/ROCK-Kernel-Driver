@@ -267,13 +267,15 @@ static inline void disable_surveillance(void)
 		 * real possibility of deadlock.
 		 */
 		args.token = rtas_token("set-indicator");
+		if (args.token == RTAS_UNKNOWN_SERVICE)
+			return;
 		args.nargs = 3;
 		args.nret = 1;
 		args.rets = &args.args[3];
 		args.args[0] = SURVEILLANCE_TOKEN;
 		args.args[1] = 0;
 		args.args[2] = 0;
-		enter_rtas((void *) __pa(&args));
+		enter_rtas(__pa(&args));
 	}
 #endif
 }
@@ -343,7 +345,7 @@ int xmon_core(struct pt_regs *regs, int fromipi)
 	if (cpu_isset(cpu, cpus_in_xmon)) {
 		get_output_lock();
 		excprint(regs);
-		printf("cpu 0x%s: Exception %lx %s in xmon, "
+		printf("cpu 0x%x: Exception %lx %s in xmon, "
 		       "returning to main loop\n",
 		       cpu, regs->trap, getvecname(TRAP(regs)));
 		longjmp(xmon_fault_jmp[cpu], 1);
@@ -1399,9 +1401,8 @@ static void xmon_show_stack(unsigned long sp, unsigned long lr,
 
 		/* Look for "regshere" marker to see if this is
 		   an exception frame. */
-		if (newsp - sp == sizeof(struct pt_regs) + 400
-		    && mread(sp + 0x60, &marker, sizeof(unsigned long))
-		    && marker == 0x7265677368657265) {
+		if (mread(sp + 0x60, &marker, sizeof(unsigned long))
+		    && marker == 0x7265677368657265ul) {
 			if (mread(sp + 0x70, &regs, sizeof(regs))
 			    != sizeof(regs)) {
 				printf("Couldn't read registers at %lx\n",
@@ -1417,12 +1418,6 @@ static void xmon_show_stack(unsigned long sp, unsigned long lr,
 
 		if (newsp == 0)
 			break;
-		if (newsp < sp) {
-			printf("Stack chain goes %s: %.16lx\n",
-			       (newsp < KERNELBASE? "into userspace":
-				"backwards"), newsp);
-			break;
-		}
 
 		sp = newsp;
 	} while (count++ < xmon_depth_to_print);
@@ -2517,7 +2512,7 @@ static void dump_slb(void)
 
 	printf("SLB contents of cpu %x\n", smp_processor_id());
 
-	for (i = 0; i < naca->slb_size; i++) {
+	for (i = 0; i < SLB_NUM_ENTRIES; i++) {
 		asm volatile("slbmfee  %0,%1" : "=r" (tmp) : "r" (i));
 		printf("%02d %016lx ", i, tmp);
 

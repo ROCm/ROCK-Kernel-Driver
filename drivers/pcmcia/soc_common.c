@@ -31,6 +31,7 @@
 ======================================================================*/
 
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -39,6 +40,7 @@
 #include <linux/mm.h>
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
+#include <linux/cpufreq.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
@@ -67,6 +69,29 @@ void soc_pcmcia_debug(struct soc_pcmcia_socket *skt, const char *func,
 #endif
 
 #define to_soc_pcmcia_socket(x)	container_of(x, struct soc_pcmcia_socket, socket)
+
+static unsigned short
+calc_speed(unsigned short *spds, int num, unsigned short dflt)
+{
+	unsigned short speed = 0;
+	int i;
+
+	for (i = 0; i < num; i++)
+		if (speed < spds[i])
+			speed = spds[i];
+	if (speed == 0)
+		speed = dflt;
+
+	return speed;
+}
+
+void soc_common_pcmcia_get_timing(struct soc_pcmcia_socket *skt, struct soc_pcmcia_timing *timing)
+{
+	timing->io = calc_speed(skt->spd_io, MAX_IO_WIN, SOC_PCMCIA_IO_ACCESS);
+	timing->mem = calc_speed(skt->spd_mem, MAX_WIN, SOC_PCMCIA_3V_MEM_ACCESS);
+	timing->attr = calc_speed(skt->spd_attr, MAX_WIN, SOC_PCMCIA_3V_MEM_ACCESS);
+}
+EXPORT_SYMBOL(soc_common_pcmcia_get_timing);
 
 static unsigned int soc_common_pcmcia_skt_state(struct soc_pcmcia_socket *skt)
 {
@@ -591,6 +616,49 @@ struct skt_dev_info {
 #define SKT_DEV_INFO_SIZE(n) \
 	(sizeof(struct skt_dev_info) + (n)*sizeof(struct soc_pcmcia_socket))
 
+#ifdef CONFIG_CPU_FREQ
+static int
+soc_pcmcia_notifier(struct notifier_block *nb, unsigned long val, void *data)
+{
+	struct soc_pcmcia_socket *skt;
+	struct cpufreq_freqs *freqs = data;
+	int ret = 0;
+
+	down(&soc_pcmcia_sockets_lock);
+	list_for_each_entry(skt, &soc_pcmcia_sockets, node)
+		if ( skt->ops->frequency_change )
+			ret += skt->ops->frequency_change(skt, val, freqs);
+	up(&soc_pcmcia_sockets_lock);
+
+	return ret;
+}
+
+static struct notifier_block soc_pcmcia_notifier_block = {
+	.notifier_call	= soc_pcmcia_notifier
+};
+
+static int soc_pcmcia_cpufreq_register(void)
+{
+	int ret;
+
+	ret = cpufreq_register_notifier(&soc_pcmcia_notifier_block,
+					CPUFREQ_TRANSITION_NOTIFIER);
+	if (ret < 0)
+		printk(KERN_ERR "Unable to register CPU frequency change "
+				"notifier for PCMCIA (%d)\n", ret);
+	return ret;
+}
+
+static void soc_pcmcia_cpufreq_unregister(void)
+{
+	cpufreq_unregister_notifier(&soc_pcmcia_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
+}
+
+#else
+#define soc_pcmcia_cpufreq_register()
+#define soc_pcmcia_cpufreq_unregister()
+#endif
+
 int soc_common_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, int first, int nr)
 {
 	struct skt_dev_info *sinfo;
@@ -668,6 +736,9 @@ int soc_common_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops
 			ret = -ENOMEM;
 			goto out_err_5;
 		}
+
+		if ( list_empty(&soc_pcmcia_sockets) )
+			soc_pcmcia_cpufreq_register();
 
 		list_add(&skt->node, &soc_pcmcia_sockets);
 
@@ -766,6 +837,9 @@ int soc_common_drv_pcmcia_remove(struct device *dev)
 		release_resource(&skt->res_io);
 		release_resource(&skt->res_skt);
 	}
+	if ( list_empty(&soc_pcmcia_sockets) )
+		soc_pcmcia_cpufreq_unregister();
+
 	up(&soc_pcmcia_sockets_lock);
 
 	kfree(sinfo);

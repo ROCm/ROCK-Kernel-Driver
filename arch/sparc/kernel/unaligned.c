@@ -109,14 +109,14 @@ static inline unsigned long fetch_reg(unsigned int reg, struct pt_regs *regs)
 
 static inline unsigned long safe_fetch_reg(unsigned int reg, struct pt_regs *regs)
 {
-	struct reg_window *win;
+	struct reg_window __user *win;
 	unsigned long ret;
 
-	if(reg < 16)
+	if (reg < 16)
 		return (!reg ? 0 : regs->u_regs[reg]);
 
 	/* Ho hum, the slightly complicated case. */
-	win = (struct reg_window *) regs->u_regs[UREG_FP];
+	win = (struct reg_window __user *) regs->u_regs[UREG_FP];
 
 	if ((unsigned long)win & 3)
 		return -1;
@@ -137,8 +137,8 @@ static inline unsigned long *fetch_reg_addr(unsigned int reg, struct pt_regs *re
 	return &win->locals[reg - 16];
 }
 
-static inline unsigned long compute_effective_address(struct pt_regs *regs,
-						      unsigned int insn)
+static unsigned long compute_effective_address(struct pt_regs *regs,
+					       unsigned int insn)
 {
 	unsigned int rs1 = (insn >> 14) & 0x1f;
 	unsigned int rs2 = insn & 0x1f;
@@ -153,8 +153,8 @@ static inline unsigned long compute_effective_address(struct pt_regs *regs,
 	}
 }
 
-static inline unsigned long safe_compute_effective_address(struct pt_regs *regs,
-							   unsigned int insn)
+unsigned long safe_compute_effective_address(struct pt_regs *regs,
+					     unsigned int insn)
 {
 	unsigned int rs1 = (insn >> 14) & 0x1f;
 	unsigned int rs2 = insn & 0x1f;
@@ -431,29 +431,32 @@ static inline int ok_for_user(struct pt_regs *regs, unsigned int insn,
 	int retval, check = (dir == load) ? VERIFY_READ : VERIFY_WRITE;
 	int size = ((insn >> 19) & 3) == 3 ? 8 : 4;
 
-	if((regs->pc | regs->npc) & 3)
+	if ((regs->pc | regs->npc) & 3)
 		return 0;
 
 	/* Must verify_area() in all the necessary places. */
-#define WINREG_ADDR(regnum) ((void *)(((unsigned long *)regs->u_regs[UREG_FP])+(regnum)))
+#define WINREG_ADDR(regnum) \
+	((void __user *)(((unsigned long *)regs->u_regs[UREG_FP])+(regnum)))
+
 	retval = 0;
 	reg = (insn >> 25) & 0x1f;
-	if(reg >= 16) {
+	if (reg >= 16) {
 		retval = verify_area(check, WINREG_ADDR(reg - 16), size);
-		if(retval)
+		if (retval)
 			return retval;
 	}
 	reg = (insn >> 14) & 0x1f;
-	if(reg >= 16) {
+	if (reg >= 16) {
 		retval = verify_area(check, WINREG_ADDR(reg - 16), size);
-		if(retval)
+		if (retval)
 			return retval;
 	}
-	if(!(insn & 0x2000)) {
+	if (!(insn & 0x2000)) {
 		reg = (insn & 0x1f);
-		if(reg >= 16) {
-			retval = verify_area(check, WINREG_ADDR(reg - 16), size);
-			if(retval)
+		if (reg >= 16) {
+			retval = verify_area(check, WINREG_ADDR(reg - 16),
+					     size);
+			if (retval)
 				return retval;
 		}
 	}
