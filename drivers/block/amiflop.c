@@ -322,7 +322,7 @@ static void fd_deselect (int drive)
 
 	get_fdc(drive);
 	save_flags (flags);
-	sti();
+	cli();
 
 	selected = -1;
 
