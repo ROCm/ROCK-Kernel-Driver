@@ -7,7 +7,7 @@
  *
  * Interface to generic NAND code for M-Systems DiskOnChip devices
  *
- * $Id: diskonchip.c,v 1.23 2004/07/13 00:14:35 dbrown Exp $
+ * $Id: diskonchip.c,v 1.25 2004/07/16 13:54:27 dbrown Exp $
  */
 
 #include <linux/kernel.h>
@@ -382,7 +382,7 @@ static void doc2001_readbuf(struct mtd_info *mtd,
 	ReadDOC(docptr, ReadPipeInit);
 
 	for (i=0; i < len-1; i++)
-		buf[i] = ReadDOC(docptr, Mil_CDSN_IO);
+		buf[i] = ReadDOC(docptr, Mil_CDSN_IO + (i & 0xff));
 
 	/* Terminate read pipeline */
 	buf[i] = ReadDOC(docptr, LastDataRead);
@@ -654,7 +654,7 @@ static int __init find_media_headers(struct mtd_info *mtd, u_char *buf,
 	int offs, end = (MAX_MEDIAHEADER_SCAN << this->phys_erase_shift);
 	int ret, retlen;
 
-	end = min(end, mtd->size); // paranoia
+	end = min(end, (int)mtd->size); // paranoia
 	for (offs = 0; offs < end; offs += mtd->erasesize) {
 		ret = mtd->read(mtd, offs, mtd->oobblock, &retlen, buf);
 		if (retlen != mtd->oobblock) continue;
@@ -714,7 +714,7 @@ static inline int __init nftl_partscan(struct mtd_info *mtd,
 //#endif
 
 	blocks = mtd->size >> this->phys_erase_shift;
-	maxblocks = min(32768, mtd->erasesize - psize);
+	maxblocks = min(32768, (int)mtd->erasesize - psize);
 
 	if (mh->UnitSizeFactor == 0x00) {
 		/* Auto-determine UnitSizeFactor.  The constraints are:
@@ -741,7 +741,7 @@ static inline int __init nftl_partscan(struct mtd_info *mtd,
 		mtd->erasesize <<= (0xff - mh->UnitSizeFactor);
 		printk(KERN_INFO "Setting virtual erase size to %d\n", mtd->erasesize);
 		blocks = mtd->size >> this->bbt_erase_shift;
-		maxblocks = min(32768, mtd->erasesize - psize);
+		maxblocks = min(32768, (int)mtd->erasesize - psize);
 	}
 
 	if (blocks > maxblocks) {
@@ -933,17 +933,6 @@ static int __init inftl_scan_bbt(struct mtd_info *mtd)
 		return -EIO;
 	}
 
-	if (mtd->size == (8<<20)) {
-#if 0
-/* This doesn't seem to work for me.  I get ECC errors on every page. */
-		/* The Millennium 8MiB is actually an NFTL device! */
-		mtd->name = "DiskOnChip Millennium 8MiB (NFTL)";
-		return nftl_scan_bbt(mtd);
-#endif
-		printk(KERN_ERR "DiskOnChip Millennium 8MiB is not supported.\n");
-		return -EIO;
-	}
-
 	this->bbt_td->options = NAND_BBT_LASTBLOCK | NAND_BBT_8BIT |
 				NAND_BBT_VERSION;
 	if (inftl_bbt_write)
@@ -1011,7 +1000,6 @@ static inline int __init doc2001_init(struct mtd_info *mtd)
 	this->write_buf = doc2001_writebuf;
 	this->read_buf = doc2001_readbuf;
 	this->verify_buf = doc2001_verifybuf;
-	this->scan_bbt = inftl_scan_bbt;
 
 	ReadDOC(doc->virtadr, ChipID);
 	ReadDOC(doc->virtadr, ChipID);
@@ -1023,11 +1011,13 @@ static inline int __init doc2001_init(struct mtd_info *mtd)
 		   can have multiple chips. */
 		doc2000_count_chips(mtd);
 		mtd->name = "DiskOnChip 2000 (INFTL Model)";
+		this->scan_bbt = inftl_scan_bbt;
 		return (4 * doc->chips_per_floor);
 	} else {
 		/* Bog-standard Millennium */
 		doc->chips_per_floor = 1;
 		mtd->name = "DiskOnChip Millennium";
+		this->scan_bbt = nftl_scan_bbt;
 		return 1;
 	}
 }
@@ -1096,14 +1086,16 @@ static inline int __init doc_probe(unsigned long physadr)
 	}
 
 	for (mtd = doclist; mtd; mtd = doc->nextdoc) {
+		unsigned char oldval;
+		unsigned char newval;
 		nand = mtd->priv;
 		doc = (void *)nand->priv;
 		/* Use the alias resolution register to determine if this is
 		   in fact the same DOC aliased to a new address.  If writes
 		   to one chip's alias resolution register change the value on
 		   the other chip, they're the same chip. */
-		unsigned char oldval = ReadDOC(doc->virtadr, AliasResolution);
-		unsigned char newval = ReadDOC(virtadr, AliasResolution);
+		oldval = ReadDOC(doc->virtadr, AliasResolution);
+		newval = ReadDOC(virtadr, AliasResolution);
 		if (oldval != newval)
 			continue;
 		WriteDOC(~newval, virtadr, AliasResolution);

@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: super.c,v 1.96 2004/07/13 08:57:30 dwmw2 Exp $
+ * $Id: super.c,v 1.97 2004/07/16 15:17:57 dwmw2 Exp $
  *
  */
 
@@ -308,13 +308,6 @@ static int __init init_jffs2_fs(void)
 		printk(KERN_ERR "JFFS2 error: Failed to initialise inode cache\n");
 		return -ENOMEM;
 	}
-#ifdef CONFIG_JFFS2_PROC
-	ret = jffs2_proc_init();
-	if (ret) {
-		printk(KERN_ERR "JFFS2 error: Failed to initialise proc interface\n");
-		goto out;
-	}
-#endif
 	ret = jffs2_compressors_init();
 	if (ret) {
 		printk(KERN_ERR "JFFS2 error: Failed to initialise compressors\n");
@@ -336,9 +329,6 @@ static int __init init_jffs2_fs(void)
 	jffs2_destroy_slab_caches();
  out_compressors:
 	jffs2_compressors_exit();
-#ifdef CONFIG_JFFS2_PROC
-        jffs2_proc_exit();
-#endif
  out:
 	return ret;
 }
@@ -348,9 +338,6 @@ static void __exit exit_jffs2_fs(void)
 	unregister_filesystem(&jffs2_fs_type);
 	jffs2_destroy_slab_caches();
 	jffs2_compressors_exit();
-#ifdef CONFIG_JFFS2_PROC
-        jffs2_proc_exit();
-#endif
 	kmem_cache_destroy(jffs2_inode_cachep);
 }
 

@@ -1216,15 +1216,6 @@ config JFFS2_CMODE_SIZE
 
 endchoice
 
-config JFFS2_PROC
-	bool "JFFS2 proc interface support" if JFFS2_COMPRESSION_OPTIONS
-	depends on JFFS2_FS && PROC_FS
-	default n
-        help
-          You can read some statistics and set the compression mode and
-          compressor priorities with this interface.
-
-
 config CRAMFS
 	tristate "Compressed ROM file system support"
 	select ZLIB_INFLATE

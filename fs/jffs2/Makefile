@@ -1,7 +1,7 @@
 #
 # Makefile for the Linux Journalling Flash File System v2 (JFFS2)
 #
-# $Id: Makefile.common,v 1.5 2004/07/15 16:06:41 dwmw2 Exp $
+# $Id: Makefile.common,v 1.6 2004/07/16 15:17:57 dwmw2 Exp $
 #
 
 obj-$(CONFIG_JFFS2_FS) += jffs2.o
@@ -15,4 +15,3 @@ jffs2-$(CONFIG_JFFS2_FS_NAND)	+= wbuf.o
 jffs2-$(CONFIG_JFFS2_RUBIN)	+= compr_rubin.o
 jffs2-$(CONFIG_JFFS2_RTIME)	+= compr_rtime.o
 jffs2-$(CONFIG_JFFS2_ZLIB)	+= compr_zlib.o
-jffs2-$(CONFIG_JFFS2_PROC)	+= proc.o

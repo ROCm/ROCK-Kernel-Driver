@@ -7,7 +7,7 @@
  * For licensing information, see the file 'LICENCE' in the 
  * jffs2 directory.
  *
- * $Id: compr.h,v 1.5 2004/06/23 16:34:39 havasi Exp $
+ * $Id: compr.h,v 1.6 2004/07/16 15:17:57 dwmw2 Exp $
  *
  */
 
@@ -114,9 +114,5 @@ void jffs2_lzari_exit(void);
 int jffs2_lzo_init(void);
 void jffs2_lzo_exit(void);
 #endif
-
-/* Prototypes from proc.c */
-int jffs2_proc_init(void);
-int jffs2_proc_exit(void);
 
 #endif /* __JFFS2_COMPR_H__ */
