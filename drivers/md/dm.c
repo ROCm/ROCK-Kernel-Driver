@@ -238,10 +238,11 @@ static inline void dec_pending(struct dm_io *io, int error)
 	static spinlock_t _uptodate_lock = SPIN_LOCK_UNLOCKED;
 	unsigned long flags;
 
-	spin_lock_irqsave(&_uptodate_lock, flags);
-	if (error)
+	if (error) {
+		spin_lock_irqsave(&_uptodate_lock, flags);
 		io->error = error;
-	spin_unlock_irqrestore(&_uptodate_lock, flags);
+		spin_unlock_irqrestore(&_uptodate_lock, flags);
+	}
 
 	if (atomic_dec_and_test(&io->io_count)) {
 		if (atomic_dec_and_test(&io->md->pending))
