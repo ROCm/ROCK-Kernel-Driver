@@ -34,6 +34,8 @@
 
 #ifdef __KERNEL__
 
+#include <linux/types.h>
+
 /*
  * POSIX Extensions
  */
@@ -54,6 +56,9 @@ typedef unsigned int		__uint32_t;
 typedef signed long long int	__int64_t;
 typedef unsigned long long int	__uint64_t;
 
+typedef enum { B_FALSE, B_TRUE } boolean_t;
+
+
 typedef __int64_t		prid_t;		/* project ID */
 typedef __uint32_t		inst_t;		/* an instruction */
 
@@ -63,17 +68,11 @@ typedef __s64			xfs_daddr_t;	/* <disk address> type */
 typedef char *			xfs_caddr_t;	/* <core address> type */
 typedef __u32			xfs_dev_t;
 
-typedef struct xfs_dirent {		/* data from readdir() */
-	xfs_ino_t	d_ino;		/* inode number of entry */
-	xfs_off_t	d_off;		/* offset of disk directory entry */
-	unsigned short	d_reclen;	/* length of this record */
-	char		d_name[1];	/* name of file */
-} xfs_dirent_t;
+typedef struct timespec		timespec_t;
 
-#define DIRENTBASESIZE		(((xfs_dirent_t *)0)->d_name - (char *)0)
-#define DIRENTSIZE(namelen)	\
-	((DIRENTBASESIZE + (namelen) + \
-		sizeof(xfs_off_t)) & ~(sizeof(xfs_off_t) - 1))
+typedef struct {
+	unsigned char	__u_bits[16];
+} uuid_t;
 
 /* __psint_t is the same size as a pointer */
 #if (BITS_PER_LONG == 32)

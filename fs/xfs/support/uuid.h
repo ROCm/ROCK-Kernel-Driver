@@ -32,18 +32,9 @@
 #ifndef __XFS_SUPPORT_UUID_H__
 #define __XFS_SUPPORT_UUID_H__
 
-typedef enum {
-	B_FALSE,
-	B_TRUE
-} boolean_t;
-
-typedef struct {
-	unsigned char	__u_bits[16];
-} uuid_t;
-
 void uuid_create_nil(uuid_t *uuid);
-boolean_t uuid_is_nil(uuid_t *uuid);
-boolean_t uuid_equal(uuid_t *uuid1, uuid_t *uuid2);
+int uuid_is_nil(uuid_t *uuid);
+int uuid_equal(uuid_t *uuid1, uuid_t *uuid2);
 void uuid_getnodeuniq(uuid_t *uuid, int fsid [2]);
 __uint64_t uuid_hash64(uuid_t *uuid);
 
