@@ -8,7 +8,7 @@
 bool 'Direct Rendering Manager (XFree86 4.1.0 and higher DRI support)' CONFIG_DRM
 if [ "$CONFIG_DRM" != "n" ]; then
     tristate '  3dfx Banshee/Voodoo3+' CONFIG_DRM_TDFX
-    tristate '  3dlabs GMX 2000' CONFIG_DRM_GAMMA
+#    tristate '  3dlabs GMX 2000' CONFIG_DRM_GAMMA
     tristate '  ATI Rage 128' CONFIG_DRM_R128
     dep_tristate '  ATI Radeon' CONFIG_DRM_RADEON $CONFIG_AGP
     dep_tristate '  Intel I810' CONFIG_DRM_I810 $CONFIG_AGP
