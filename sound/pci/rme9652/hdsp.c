@@ -5144,6 +5144,7 @@ static int __devinit snd_hdsp_probe(struct pci_dev *pci,
 	card->private_free = snd_hdsp_card_free;
 	hdsp->dev = dev;
 	hdsp->pci = pci;
+	snd_card_set_dev(card, &pci->dev);
 
 	if ((err = snd_hdsp_create(card, hdsp, precise_ptr[dev])) < 0) {
 		snd_card_free(card);

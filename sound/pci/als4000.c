@@ -684,6 +684,7 @@ static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 
 	chip->pci = pci;
 	chip->alt_port = gcr;
+	snd_card_set_dev(card, &pci->dev);
 
 	snd_als4000_configure(chip);
 	

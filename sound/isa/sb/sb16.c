@@ -393,6 +393,7 @@ static int __init snd_sb16_probe(int dev,
 			snd_card_free(card);
 			return err;
 		}
+		snd_card_set_dev(card, &pcard->card->dev);
 	}
 #endif
 

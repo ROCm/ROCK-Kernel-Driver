@@ -228,6 +228,7 @@ static int __init snd_card_als100_probe(int dev,
 		snd_card_free(card);
 		return error;
 	}
+	snd_card_set_dev(card, &pcard->card->dev);
 
 	if ((error = snd_sbdsp_create(card, port[dev],
 				      irq[dev],

@@ -1864,6 +1864,8 @@ static int __devinit snd_vt1724_create(snd_card_t * card,
  		return err;
 	}
 
+	snd_card_set_dev(card, &pci->dev);
+
 	*r_ice1712 = ice;
 	return 0;
 }

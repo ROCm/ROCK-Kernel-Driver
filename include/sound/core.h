@@ -308,6 +308,10 @@ int snd_component_add(snd_card_t *card, const char *component);
 int snd_card_file_add(snd_card_t *card, struct file *file);
 int snd_card_file_remove(snd_card_t *card, struct file *file);
 
+#ifndef snd_card_set_dev
+#define snd_card_set_dev(card,devptr) ((card)->dev = (devptr))
+#endif
+
 /* device.c */
 
 int snd_device_new(snd_card_t *card, snd_device_type_t type,

@@ -1409,6 +1409,7 @@ static int __devinit sscape_pnp_detect(struct pnp_card_link *pcard,
 			ret = create_sscape(this, &card);
 			if (ret < 0)
 				return ret;
+			snd_card_set_dev(card, &pcard->card->dev);
 			pnp_set_card_drvdata(pcard, card);
 			++sscape_cards;
 			++idx;

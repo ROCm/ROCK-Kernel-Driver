@@ -2313,6 +2313,8 @@ int __devinit snd_ymfpci_create(snd_card_t * card,
 		return err;
 	}
 
+	snd_card_set_dev(card, &pci->dev);
+
 	*rchip = chip;
 	return 0;
 }

@@ -3629,6 +3629,7 @@ int __devinit snd_trident_create(snd_card_t * card,
 		snd_trident_free(trident);
 		return err;
 	}
+	snd_card_set_dev(card, &pci->dev);
 	*rtrident = trident;
 	return 0;
 }

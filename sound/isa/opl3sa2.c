@@ -759,8 +759,11 @@ static int __devinit snd_opl3sa2_probe(int dev,
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0)
 		goto __error;
 #ifdef CONFIG_PNP
-	if (isapnp[dev] && (err = snd_opl3sa2_pnp(dev, chip, pcard, pid)) < 0)
-		goto __error;
+	if (isapnp[dev]) {
+		if ((err = snd_opl3sa2_pnp(dev, chip, pcard, pid)) < 0)
+			goto __error;
+		snd_card_set_dev(card, &pcard->card->dev);
+	}
 #endif
 	chip->ymode = opl3sa3_ymode[dev] & 0x03 ; /* initialise this card from supplied (or default) parameter*/ 
 	chip->card = card;

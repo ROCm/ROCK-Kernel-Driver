@@ -1437,6 +1437,8 @@ static int __devinit snd_azf3328_create(snd_card_t * card,
 
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 
+	snd_card_set_dev(card, &pci->dev);
+
 	*rchip = chip;
 	return 0;
 }

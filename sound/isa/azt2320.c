@@ -255,6 +255,7 @@ static int __devinit snd_card_azt2320_probe(int dev,
 		snd_card_free(card);
 		return error;
 	}
+	snd_card_set_dev(card, &pcard->card->dev);
 
 	if ((error = snd_card_azt2320_enable_wss(port[dev]))) {
 		snd_card_free(card);

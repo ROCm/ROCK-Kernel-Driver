@@ -2461,6 +2461,8 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
                 return err;
         }
         
+	snd_card_set_dev(card, &pci->dev);
+
         * rchip = korg1212;
 	return 0;
 

@@ -449,12 +449,15 @@ snd_wavefront_probe (int dev, struct pnp_card_link *pcard,
 	card->private_free = snd_wavefront_free;
 
 #ifdef CONFIG_PNP
-	if (isapnp[dev] && snd_wavefront_pnp (dev, acard, pcard, pid) < 0) {
-		if (cs4232_pcm_port[dev] == SNDRV_AUTO_PORT) {
-			snd_printk ("isapnp detection failed\n");
-			snd_card_free (card);
-			return -ENODEV;
+	if (isapnp[dev]) {
+		if (snd_wavefront_pnp (dev, acard, pcard, pid) < 0) {
+			if (cs4232_pcm_port[dev] == SNDRV_AUTO_PORT) {
+				snd_printk ("isapnp detection failed\n");
+				snd_card_free (card);
+				return -ENODEV;
+			}
 		}
+		snd_card_set_dev(card, &pcard->card->dev);
 	}
 #endif /* CONFIG_PNP */
 

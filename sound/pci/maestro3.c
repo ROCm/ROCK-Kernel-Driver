@@ -2665,6 +2665,8 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 	snd_m3_enable_ints(chip);
 	snd_m3_assp_continue(chip);
 
+	snd_card_set_dev(card, &pci->dev);
+
 	*chip_ret = chip;
 
 	return 0; 

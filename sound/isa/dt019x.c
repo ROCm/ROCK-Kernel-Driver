@@ -210,6 +210,7 @@ static int __devinit snd_card_dt019x_probe(int dev, struct pnp_card_link *pcard,
 		return -ENOMEM;
 	acard = (struct snd_card_dt019x *)card->private_data;
 
+	snd_card_set_dev(card, &pcard->card->dev);
 	if ((error = snd_card_dt019x_pnp(dev, acard, pcard, pid))) {
 		snd_card_free(card);
 		return error;

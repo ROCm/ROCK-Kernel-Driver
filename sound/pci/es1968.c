@@ -2646,6 +2646,8 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 		return err;
 	}
 
+	snd_card_set_dev(card, &pci->dev);
+
 	*chip_ret = chip;
 
 	return 0;

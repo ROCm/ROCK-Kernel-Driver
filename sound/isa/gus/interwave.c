@@ -701,9 +701,12 @@ static int __devinit snd_interwave_probe(int dev, struct pnp_card_link *pcard,
 	iwcard->irq = -1;
 	card->private_free = snd_interwave_free;
 #ifdef CONFIG_PNP
-	if (isapnp[dev] && snd_interwave_pnp(dev, iwcard, pcard, pid)) {
-		snd_card_free(card);
-		return -ENODEV;
+	if (isapnp[dev]) {
+		if (snd_interwave_pnp(dev, iwcard, pcard, pid)) {
+			snd_card_free(card);
+			return -ENODEV;
+		}
+		snd_card_set_dev(card, &pcard->card->dev);
 	}
 #endif
 	xirq = irq[dev];

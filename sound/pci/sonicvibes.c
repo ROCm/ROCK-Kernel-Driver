@@ -1384,6 +1384,8 @@ static int __devinit snd_sonicvibes_create(snd_card_t * card,
 		return err;
 	}
 
+	snd_card_set_dev(card, &pci->dev);
+
 	*rsonic = sonic;
 	return 0;
 }

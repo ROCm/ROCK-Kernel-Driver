@@ -1951,6 +1951,8 @@ static int __devinit snd_via82xx_create(snd_card_t * card,
 	 * We call pci_set_master here because it does not hurt. */
 	pci_set_master(pci);
 
+	snd_card_set_dev(card, &pci->dev);
+
 	*r_via = chip;
 	return 0;
 }

@@ -2778,6 +2778,8 @@ static int snd_usb_audio_create(snd_card_t *card, struct usb_device *dev,
 
 	snd_usb_audio_create_proc(chip);
 
+	snd_card_set_dev(card, &dev->dev);
+
 	*rchip = chip;
 	return 0;
 }

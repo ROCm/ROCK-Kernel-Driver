@@ -1948,6 +1948,7 @@ snd_rme32_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 	rme32 = (rme32_t *) card->private_data;
 	rme32->card = card;
 	rme32->pci = pci;
+	snd_card_set_dev(card, &pci->dev);
 	if ((err = snd_rme32_create(rme32)) < 0) {
 		snd_card_free(card);
 		return err;

@@ -1973,6 +1973,7 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 		}
 		if (hw <= OPTi9XX_HW_82C930)
 			chip->mc_base -= 0x80;
+		snd_card_set_dev(card, &pcard->card->dev);
 	} else {
 #endif	/* CONFIG_PNP */
 		if ((error = snd_card_opti9xx_detect(card, chip)) < 0) {

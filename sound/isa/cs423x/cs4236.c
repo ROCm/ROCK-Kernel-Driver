@@ -431,10 +431,13 @@ static int __devinit snd_card_cs423x_probe(int dev, struct pnp_card_link *pcard,
 	acard = (struct snd_card_cs4236 *)card->private_data;
 	card->private_free = snd_card_cs4236_free;
 #ifdef CONFIG_PNP
-	if (isapnp[dev] && (err = snd_card_cs4236_pnp(dev, acard, pcard, pid))<0) {
-		printk(KERN_ERR "isapnp detection failed and probing for " IDENT " is not supported\n");
-		snd_card_free(card);
-		return -ENXIO;
+	if (isapnp[dev]) {
+		if ((err = snd_card_cs4236_pnp(dev, acard, pcard, pid))<0) {
+			printk(KERN_ERR "isapnp detection failed and probing for " IDENT " is not supported\n");
+			snd_card_free(card);
+			return -ENXIO;
+		}
+		snd_card_set_dev(card, &pcard->card->dev);
 	}
 #endif
 	if (sb_port[dev] > 0 && sb_port[dev] != SNDRV_AUTO_PORT)

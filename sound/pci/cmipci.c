@@ -3173,6 +3173,8 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 		snd_cmipci_clear_bit(cm, CM_REG_FUNCTRL1, CM_JYSTK_EN);
 	}
 #endif
+	snd_card_set_dev(card, &pci->dev);
+
 	*rcmipci = cm;
 	return 0;
 

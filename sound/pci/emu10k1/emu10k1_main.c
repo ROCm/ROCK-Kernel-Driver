@@ -714,6 +714,7 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 
 	snd_emu10k1_proc_init(emu);
 
+	snd_card_set_dev(card, &pci->dev);
 	*remu = emu;
 	return 0;
 }
