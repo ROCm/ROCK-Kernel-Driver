@@ -132,6 +132,12 @@ static int nfs_stat_to_errno(int);
 #define NFS4_dec_read_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz + 2)
+#define NFS4_enc_readlink_sz	(compound_encode_hdr_maxsz + \
+				encode_putfh_maxsz + \
+				op_encode_hdr_maxsz)
+#define NFS4_dec_readlink_sz	(compound_decode_hdr_maxsz + \
+				decode_putfh_maxsz + \
+				op_decode_hdr_maxsz)
 #define NFS4_enc_write_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				op_encode_hdr_maxsz + 8)
@@ -963,8 +969,7 @@ encode_readdir(struct xdr_stream *xdr, struct nfs4_readdir *readdir, struct rpc_
 	return 0;
 }
 
-static int
-encode_readlink(struct xdr_stream *xdr, struct nfs4_readlink *readlink, struct rpc_rqst *req)
+static int encode_readlink(struct xdr_stream *xdr, const struct nfs4_readlink *readlink, struct rpc_rqst *req)
 {
 	struct rpc_auth *auth = req->rq_task->tk_auth;
 	int replen;
@@ -978,7 +983,7 @@ encode_readlink(struct xdr_stream *xdr, struct nfs4_readlink *readlink, struct r
 	 *      + OP_READLINK + status  = 7
 	 */
 	replen = (RPC_REPHDRSIZE + auth->au_rslack + 7) << 2;
-	xdr_inline_pages(&req->rq_rcv_buf, replen, readlink->rl_pages, 0, readlink->rl_count);
+	xdr_inline_pages(&req->rq_rcv_buf, replen, readlink->pages, 0, readlink->count);
 	
 	return 0;
 }
@@ -1143,9 +1148,6 @@ encode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 			break;
 		case OP_READDIR:
 			status = encode_readdir(xdr, &cp->ops[i].u.readdir, req);
-			break;
-		case OP_READLINK:
-			status = encode_readlink(xdr, &cp->ops[i].u.readlink, req);
 			break;
 		default:
 			BUG();
@@ -1537,6 +1539,27 @@ nfs4_xdr_enc_locku(struct rpc_rqst *req, uint32_t *p, struct nfs_lockargs *args)
 	if(status)
 		goto out;
 	status = encode_locku(&xdr, args);
+out:
+	return status;
+}
+
+/*
+ * Encode a READLINK request
+ */
+static int nfs4_xdr_enc_readlink(struct rpc_rqst *req, uint32_t *p, const struct nfs4_readlink *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 2,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	status = encode_putfh(&xdr, args->fh);
+	if(status)
+		goto out;
+	status = encode_readlink(&xdr, args, req);
 out:
 	return status;
 }
@@ -3018,8 +3041,7 @@ err_unmap:
 	return -errno_NFSERR_IO;
 }
 
-static int
-decode_readlink(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs4_readlink *readlink)
+static int decode_readlink(struct xdr_stream *xdr, struct rpc_rqst *req)
 {
 	struct xdr_buf *rcvbuf = &req->rq_rcv_buf;
 	struct iovec *iov = rcvbuf->head;
@@ -3219,9 +3241,6 @@ decode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 			break;
 		case OP_READDIR:
 			status = decode_readdir(xdr, req, &op->u.readdir);
-			break;
-		case OP_READLINK:
-			status = decode_readlink(xdr, req, &op->u.readlink);
 			break;
 		default:
 			BUG();
@@ -3652,6 +3671,27 @@ out:
 }
 
 /*
+ * Decode READLINK response
+ */
+static int nfs4_xdr_dec_readlink(struct rpc_rqst *rqstp, uint32_t *p, void *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_putfh(&xdr);
+	if (status)
+		goto out;
+	status = decode_readlink(&xdr, rqstp);
+out:
+	return status;
+}
+
+/*
  * Decode Read response
  */
 static int
@@ -3982,6 +4022,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(CREATE,		enc_create,	dec_create),
   PROC(PATHCONF,	enc_pathconf,	dec_pathconf),
   PROC(STATFS,		enc_statfs,	dec_statfs),
+  PROC(READLINK,	enc_readlink,	dec_readlink),
 };
 
 struct rpc_version		nfs_version4 = {

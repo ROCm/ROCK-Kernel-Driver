@@ -188,18 +188,6 @@ nfs4_setup_readdir(struct nfs4_compound *cp, u64 cookie, u32 *verifier,
 }
 
 static void
-nfs4_setup_readlink(struct nfs4_compound *cp, int count, struct page **pages)
-{
-	struct nfs4_readlink *readlink = GET_OP(cp, readlink);
-
-	readlink->rl_count = count;
-	readlink->rl_pages = pages;
-
-	OPNUM(cp) = OP_READLINK;
-	cp->req_nops++;
-}
-
-static void
 renew_lease(struct nfs_server *server, unsigned long timestamp)
 {
 	struct nfs4_client *clp = server->nfs4_state;
@@ -885,16 +873,20 @@ static int nfs4_proc_access(struct inode *inode, struct rpc_cred *cred, int mode
  * Both of these changes to the XDR layer would in fact be quite
  * minor, but I decided to leave them for a subsequent patch.
  */
-static int
-nfs4_proc_readlink(struct inode *inode, struct page *page)
+static int nfs4_proc_readlink(struct inode *inode, struct page *page)
 {
-	struct nfs4_compound	compound;
-	struct nfs4_op		ops[2];
+	struct nfs4_readlink args = {
+		.fh       = NFS_FH(inode),
+		.count    = PAGE_CACHE_SIZE,
+		.pages    = &page,
+	};
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_READLINK],
+		.rpc_argp = &args,
+		.rpc_resp = NULL,
+	};
 
-	nfs4_setup_compound(&compound, ops, NFS_SERVER(inode), "readlink");
-	nfs4_setup_putfh(&compound, NFS_FH(inode));
-	nfs4_setup_readlink(&compound, PAGE_CACHE_SIZE, &page);
-	return nfs4_map_errors(nfs4_call_compound(&compound, NULL, 0));
+	return nfs4_map_errors(rpc_call_sync(NFS_CLIENT(inode), &msg, 0));
 }
 
 static int

@@ -609,8 +609,9 @@ struct nfs4_readdir {
 };
 
 struct nfs4_readlink {
-	u32				rl_count;   /* zero-copy data */
-	struct page **			rl_pages;   /* zero-copy data */
+	const struct nfs_fh *		fh;
+	u32				count;   /* zero-copy data */
+	struct page **			pages;   /* zero-copy data */
 };
 
 struct nfs4_remove_arg {
