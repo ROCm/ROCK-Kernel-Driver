@@ -26,7 +26,7 @@ extern spinlock_t kernel_flag;
  */
 #define release_kernel_lock(task)		\
 do {						\
-	if (unlikely(task->lock_depth >= 0)) {	\
+	if (unlikely(task->lock_depth >= 0))	\
 		spin_unlock(&kernel_flag);	\
 } while (0)
 
