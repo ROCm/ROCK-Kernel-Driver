@@ -279,7 +279,7 @@ static atomic_t ip_vs_nullsvc_counter = ATOMIC_INIT(0);
 static __inline__ unsigned
 ip_vs_svc_hashkey(unsigned proto, __u32 addr, __u16 port)
 {
-	register unsigned porth = ntohs(port);
+	unsigned porth = ntohs(port);
 
 	return (proto^ntohl(addr)^(porth>>IP_VS_SVC_TAB_BITS)^porth)
 		& IP_VS_SVC_TAB_MASK;
@@ -482,7 +482,7 @@ __ip_vs_unbind_svc(struct ip_vs_dest *dest)
  */
 static __inline__ unsigned ip_vs_rs_hashkey(__u32 addr, __u16 port)
 {
-	register unsigned porth = ntohs(port);
+	unsigned porth = ntohs(port);
 
 	return (ntohl(addr)^(porth>>IP_VS_RTAB_BITS)^porth)
 		& IP_VS_RTAB_MASK;
