@@ -839,9 +839,9 @@ e1000_setup_desc_rings(struct e1000_adapter *adapter)
 				       PCI_DMA_TODEVICE);
 		tx_desc->buffer_addr = cpu_to_le64(txdr->buffer_info[i].dma);
 		tx_desc->lower.data = cpu_to_le32(skb->len);
-		tx_desc->lower.data |= E1000_TXD_CMD_EOP;
-		tx_desc->lower.data |= E1000_TXD_CMD_IFCS;
-		tx_desc->lower.data |= E1000_TXD_CMD_RPS;
+		tx_desc->lower.data |= cpu_to_le32(E1000_TXD_CMD_EOP |
+						   E1000_TXD_CMD_IFCS |
+						   E1000_TXD_CMD_RPS);
 		tx_desc->upper.data = 0;
 	}
 
