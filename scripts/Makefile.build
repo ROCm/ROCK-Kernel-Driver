@@ -83,8 +83,13 @@ __build: $(if $(KBUILD_BUILTIN),$(builtin-target) $(lib-target) $(extra-y)) \
 
 # Linus' kernel sanity checking tool
 ifneq ($(KBUILD_CHECKSRC),0)
-quiet_cmd_checksrc = CHECK   $<
-      cmd_checksrc = $(CHECK) $(c_flags) $< ;
+  ifeq ($(KBUILD_CHECKSRC),2)
+    quiet_cmd_force_checksrc = CHECK   $<
+          cmd_force_checksrc = $(CHECK) $(c_flags) $< ;
+  else
+      quiet_cmd_checksrc     = CHECK   $<
+            cmd_checksrc     = $(CHECK) $(c_flags) $< ;
+  endif
 endif
 
 
@@ -182,11 +187,13 @@ endef
 # Built-in and composite module parts
 
 %.o: %.c FORCE
+	$(call cmd,force_checksrc)
 	$(call if_changed_rule,cc_o_c)
 
 # Single-part modules are special since we need to mark them in $(MODVERDIR)
 
 $(single-used-m): %.o: %.c FORCE
+	$(call cmd,force_checksrc)
 	$(call if_changed_rule,cc_o_c)
 	@{ echo $(@:.o=.ko); echo $@; } > $(MODVERDIR)/$(@F:.o=.mod)
 

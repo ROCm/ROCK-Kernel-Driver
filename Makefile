@@ -958,7 +958,8 @@ help:
 
 	@echo  '  make V=0|1 [targets] 0 => quiet build (default), 1 => verbose build'
 	@echo  '  make O=dir [targets] Locate all output files in "dir", including .config'
-	@echo  '  make C=1   [targets] Check all c source with checker tool'
+	@echo  '  make C=1   [targets] Check all c source with $$CHECK (sparse)'
+	@echo  '  make C=2   [targets] Force check of all c source with $$CHECK (sparse)'
 	@echo  ''
 	@echo  'Execute "make" or "make all" to build all targets marked with [*] '
 	@echo  'For further info see the ./README file'
