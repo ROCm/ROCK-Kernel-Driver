@@ -22,8 +22,8 @@
  *************************************************************************/
 
 #define DRV_NAME	"pcnet32"
-#define DRV_VERSION	"1.30b"
-#define DRV_RELDATE	"05.24.2004"
+#define DRV_VERSION	"1.30c"
+#define DRV_RELDATE	"05.25.2004"
 #define PFX		DRV_NAME ": "
 
 static const char *version =
@@ -244,6 +244,7 @@ static int full_duplex[MAX_UNITS];
  * v1.30a  22 May 2004 Don Fry limit frames received during interrupt.
  * v1.30b  24 May 2004 Don Fry fix bogus tx carrier errors with 79c973,
  *	   assisted by Bruce Penrod <bmpenrod@endruntechnologies.com>.
+ * v1.30c  25 May 2004 Don Fry added netif_wake_queue after pcnet32_restart.
  */
 
 
@@ -1859,6 +1860,7 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	    /* stop the chip to clear the error condition, then restart */
 	    lp->a.write_csr (ioaddr, 0, 0x0004);
 	    pcnet32_restart(dev, 0x0002);
+	    netif_wake_queue(dev);
 	}
     }
 
@@ -2130,8 +2132,9 @@ static void pcnet32_set_multicast_list(struct net_device *dev)
     }
 
     lp->a.write_csr (ioaddr, 0, 0x0004); /* Temporarily stop the lance. */
-
     pcnet32_restart(dev, 0x0042); /*  Resume normal operation */
+    netif_wake_queue(dev);
+
     spin_unlock_irqrestore(&lp->lock, flags);
 }
 
