@@ -73,8 +73,6 @@ nwfpe_enter:
         mov r4, lr			@ save the failure-return addresses
 	mov sl, sp
 
-	bl FPA11_CheckInit		@ check to see if we are initialised
-
         ldr r5, [sp, #60]	 	@ get contents of PC;
 	sub r8, r5, #4
 .Lx2:	ldrt r0, [r8]			@ get actual instruction into r0
