@@ -22,15 +22,13 @@
 
 #include <asm/uaccess.h>
 
-struct vfsmount *do_kern_mount(const char *type, int flags, char *name, void *data);
-int do_remount_sb(struct super_block *sb, int flags, void * data);
-int __init init_rootfs(void);
+extern struct vfsmount *do_kern_mount(const char *type, int flags, char *name, void *data);
+extern int do_remount_sb(struct super_block *sb, int flags, void * data);
+extern int __init init_rootfs(void);
 
 static struct list_head *mount_hashtable;
 static int hash_mask, hash_bits;
 static kmem_cache_t *mnt_cache; 
-
-extern void init_rootfs(void);
 
 static inline unsigned long hash(struct vfsmount *mnt, struct dentry *dentry)
 {

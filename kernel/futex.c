@@ -388,7 +388,6 @@ static struct file_system_type futex_fs_type = {
 	name:		"futexfs",
 	get_sb:		futexfs_get_sb,
 	kill_sb:	kill_anon_super,
-	fs_flags:	FS_NOMOUNT,
 };
 
 static int __init init(void)

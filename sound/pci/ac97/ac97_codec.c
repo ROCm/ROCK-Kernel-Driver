@@ -265,7 +265,7 @@ void snd_ac97_write_cache(ac97_t *ac97, unsigned short reg, unsigned short value
 	spin_lock(&ac97->reg_lock);
 	ac97->write(ac97, reg, ac97->regs[reg] = value);
 	spin_unlock(&ac97->reg_lock);
-	set_bit(reg, &ac97->reg_accessed);
+	set_bit(reg, ac97->reg_accessed);
 }
 
 #ifndef CONFIG_SND_DEBUG
@@ -2204,7 +2204,7 @@ void snd_ac97_resume(ac97_t *ac97)
 		 * some chip (e.g. nm256) may hang up when unsupported registers
 		 * are accessed..!
 		 */
-		if (test_bit(i, &ac97->reg_accessed))
+		if (test_bit(i, ac97->reg_accessed))
 			snd_ac97_write(ac97, i, ac97->regs[i]);
 	}
 }
