@@ -528,7 +528,7 @@ static int ubd_new_disk(int major, u64 size, int unit,
 	disk->fops = &ubd_blops;
 	set_capacity(disk, size / 512);
 	if(major == MAJOR_NR){
-		sprintf(disk->disk_name, "ubd%d", unit);
+		sprintf(disk->disk_name, "ubd%c", 'a' + unit);
 		sprintf(disk->devfs_name, "ubd/disc%d", unit);
 		sprintf(from, "ubd/%d", unit);
 		sprintf(to, "disc%d/disc", unit);
