@@ -956,7 +956,10 @@ struct e100_private {
 #define E100_SPEED_100_FULL 4
 
 /********* function prototypes *************/
+extern int e100_open(struct net_device *);
+extern int e100_close(struct net_device *);
 extern void e100_isolate_driver(struct e100_private *bdp);
+extern unsigned char e100_hw_init(struct e100_private *);
 extern void e100_sw_reset(struct e100_private *bdp, u32 reset_cmd);
 extern u8 e100_start_cu(struct e100_private *bdp, tcb_t *tcb);
 extern void e100_free_non_tx_cmd(struct e100_private *bdp,

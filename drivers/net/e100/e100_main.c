@@ -183,8 +183,6 @@ struct notifier_block e100_notifier_reboot = {
 static u8 e100_D101M_checksum(struct e100_private *, struct sk_buff *);
 static u8 e100_D102_check_checksum(rfd_t *);
 static int e100_ioctl(struct net_device *, struct ifreq *, int);
-static int e100_open(struct net_device *);
-static int e100_close(struct net_device *);
 static int e100_change_mtu(struct net_device *, int);
 static int e100_xmit_frame(struct sk_buff *, struct net_device *);
 static unsigned char e100_init(struct e100_private *);
@@ -974,7 +972,7 @@ e100_set_bool_option(struct e100_private *bdp, int val, u32 mask,
 	}
 }
 
-static int
+int
 e100_open(struct net_device *dev)
 {
 	struct e100_private *bdp;
@@ -1033,7 +1031,7 @@ exit:
 	return rc;
 }
 
-static int
+int
 e100_close(struct net_device *dev)
 {
 	struct e100_private *bdp = dev->priv;
@@ -3213,6 +3211,144 @@ e100_do_ethtool_ioctl(struct net_device *dev, struct ifreq *ifr)
 	case ETHTOOL_PHYS_ID:
 		rc = e100_ethtool_led_blink(dev,ifr);
 		break;
+#ifdef	ETHTOOL_GRINGPARAM
+	case ETHTOOL_GRINGPARAM: {
+		struct ethtool_ringparam ering;
+		struct e100_private *bdp = dev->priv;
+		memset((void *) &ering, 0, sizeof(ering));
+		ering.rx_max_pending = E100_MAX_RFD;
+		ering.tx_max_pending = E100_MAX_TCB;
+		ering.rx_pending = bdp->params.RxDescriptors;
+		ering.tx_pending = bdp->params.TxDescriptors;
+		rc = copy_to_user(ifr->ifr_data, &ering, sizeof(ering))
+			? -EFAULT : 0;
+		return rc;
+	}
+#endif
+#ifdef	ETHTOOL_SRINGPARAM
+	case ETHTOOL_SRINGPARAM: {
+		struct ethtool_ringparam ering;
+		struct e100_private *bdp = dev->priv;
+		if (copy_from_user(&ering, ifr->ifr_data, sizeof(ering)))
+			return -EFAULT;
+		if (ering.rx_pending > E100_MAX_RFD 
+		    || ering.rx_pending < E100_MIN_RFD)
+			return -EINVAL;
+		if (ering.tx_pending > E100_MAX_TCB 
+		    || ering.tx_pending < E100_MIN_TCB)
+			return -EINVAL;
+		if (netif_running(dev)) {
+			spin_lock_bh(&dev->xmit_lock);
+			e100_close(dev);
+			spin_unlock_bh(&dev->xmit_lock);
+			/* Use new values to open interface */
+			bdp->params.RxDescriptors = ering.rx_pending;
+			bdp->params.TxDescriptors = ering.tx_pending;
+			e100_hw_init(bdp);
+			e100_open(dev);
+		}
+		else {
+			bdp->params.RxDescriptors = ering.rx_pending;
+			bdp->params.TxDescriptors = ering.tx_pending;
+		}
+		return 0;
+	}
+#endif
+#ifdef	ETHTOOL_GPAUSEPARAM
+	case ETHTOOL_GPAUSEPARAM: {
+		struct ethtool_pauseparam epause;
+		struct e100_private *bdp = dev->priv;
+		memset((void *) &epause, 0, sizeof(epause));
+		if ((bdp->flags & IS_BACHELOR)
+		    && (bdp->params.b_params & PRM_FC)) {
+			epause.autoneg = 1;
+			if (bdp->flags && DF_LINK_FC_CAP) {
+				epause.rx_pause = 1;
+				epause.tx_pause = 1;
+			}
+			if (bdp->flags && DF_LINK_FC_TX_ONLY)
+				epause.tx_pause = 1;
+		}
+		rc = copy_to_user(ifr->ifr_data, &epause, sizeof(epause))
+			? -EFAULT : 0;
+		return rc;
+	}
+#endif
+#ifdef	ETHTOOL_SPAUSEPARAM
+	case ETHTOOL_SPAUSEPARAM: {
+		struct ethtool_pauseparam epause;
+		struct e100_private *bdp = dev->priv;
+		if (!(bdp->flags & IS_BACHELOR))
+			return -EINVAL;
+		if (copy_from_user(&epause, ifr->ifr_data, sizeof(epause)))
+			return -EFAULT;
+		if (epause.autoneg == 1)
+			bdp->params.b_params |= PRM_FC;
+		else
+			bdp->params.b_params &= ~PRM_FC;
+		if (netif_running(dev)) {
+			spin_lock_bh(&dev->xmit_lock);
+			e100_close(dev);
+			spin_unlock_bh(&dev->xmit_lock);
+			e100_hw_init(bdp);
+			e100_open(dev);
+		}
+		return 0;
+	}
+#endif
+#ifdef	ETHTOOL_GRXCSUM
+	case ETHTOOL_GRXCSUM:
+	case ETHTOOL_GTXCSUM:
+	case ETHTOOL_GSG:
+	{	struct ethtool_value eval;
+		struct e100_private *bdp = dev->priv;
+		memset((void *) &eval, 0, sizeof(eval));
+		if ((ecmd.cmd == ETHTOOL_GRXCSUM) 
+		    && (bdp->params.b_params & PRM_XSUMRX))
+			eval.data = 1;
+		else
+			eval.data = 0;
+		rc = copy_to_user(ifr->ifr_data, &eval, sizeof(eval))
+			? -EFAULT : 0;
+		return rc;
+	}
+#endif
+#ifdef	ETHTOOL_SRXCSUM
+	case ETHTOOL_SRXCSUM:
+	case ETHTOOL_STXCSUM:
+	case ETHTOOL_SSG:
+	{	struct ethtool_value eval;
+		struct e100_private *bdp = dev->priv;
+		if (copy_from_user(&eval, ifr->ifr_data, sizeof(eval)))
+			return -EFAULT;
+		if (ecmd.cmd == ETHTOOL_SRXCSUM) {
+			if (eval.data == 1) { 
+				if (bdp->rev_id >= D101MA_REV_ID)
+					bdp->params.b_params |= PRM_XSUMRX;
+				else
+					return -EINVAL;
+			} else {
+				if (bdp->rev_id >= D101MA_REV_ID)
+					bdp->params.b_params &= ~PRM_XSUMRX;
+				else
+					return 0;
+			}
+		} else {
+			if (eval.data == 1)
+				return -EINVAL;
+			else
+				return 0;
+		}
+		if (netif_running(dev)) {
+			spin_lock_bh(&dev->xmit_lock);
+			e100_close(dev);
+			spin_unlock_bh(&dev->xmit_lock);
+			e100_hw_init(bdp);
+			e100_open(dev);
+		}
+		return 0;
+	}
+#endif
 	default:
 		break;
 	}			//switch
