@@ -2547,13 +2547,31 @@ asmlinkage long
 sys32_sysinfo (struct sysinfo32 *info)
 {
 	extern asmlinkage long sys_sysinfo (struct sysinfo *);
-	mm_segment_t old_fs = get_fs();
 	struct sysinfo s;
 	long ret, err;
+	int bitcount = 0;
+	mm_segment_t old_fs = get_fs();
 
 	set_fs(KERNEL_DS);
 	ret = sys_sysinfo(&s);
 	set_fs(old_fs);
+	/* Check to see if any memory value is too large for 32-bit and
+	 * scale down if needed.
+	 */
+	if ((s.totalram >> 32) || (s.totalswap >> 32)) {
+		while (s.mem_unit < PAGE_SIZE) {
+			s.mem_unit <<= 1;
+			bitcount++;
+		}
+		s.totalram >>= bitcount;
+		s.freeram >>= bitcount;
+		s.sharedram >>= bitcount;
+		s.bufferram >>= bitcount;
+		s.totalswap >>= bitcount;
+		s.freeswap >>= bitcount;
+		s.totalhigh >>= bitcount;
+		s.freehigh >>= bitcount;
+	}
 
 	if (!access_ok(VERIFY_WRITE, info, sizeof(*info)))
 		return -EFAULT;
