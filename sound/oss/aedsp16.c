@@ -489,7 +489,7 @@ static struct orVals orDMA[] __initdata = {
 	{0x00, 0x00}
 };
 
-static struct aedsp16_info ae_config __initdata = {
+static struct aedsp16_info ae_config = {
 	DEF_AEDSP16_IOB,
 	DEF_AEDSP16_IRQ,
 	DEF_AEDSP16_MRQ,
@@ -1155,7 +1155,7 @@ static int __init init_aedsp16_sb(void)
 	return TRUE;
 }
 
-static void __init uninit_aedsp16_sb(void)
+static void uninit_aedsp16_sb(void)
 {
 	DBG(("uninit_aedsp16_sb: "));
 
@@ -1196,7 +1196,7 @@ static int __init init_aedsp16_mss(void)
 	return TRUE;
 }
 
-static void __init uninit_aedsp16_mss(void)
+static void uninit_aedsp16_mss(void)
 {
 	DBG(("uninit_aedsp16_mss: "));
 
@@ -1237,7 +1237,7 @@ static int __init init_aedsp16_mpu(void)
 	return TRUE;
 }
 
-static void __init uninit_aedsp16_mpu(void)
+static void uninit_aedsp16_mpu(void)
 {
 	DBG(("uninit_aedsp16_mpu: "));
 
@@ -1294,7 +1294,7 @@ static int __init init_aedsp16(void)
 	return initialized;
 }
 
-static void __init uninit_aedsp16(void)
+static void __exit uninit_aedsp16(void)
 {
 	if (ae_config.mss_base != -1)
 		uninit_aedsp16_mss();
