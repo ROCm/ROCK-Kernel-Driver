@@ -155,8 +155,7 @@ ctl_table core_table[] = {
 		.data		= &net_msg_burst,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_jiffies,
-		.strategy	= &sysctl_jiffies,
+		.proc_handler	= &proc_dointvec,
 	},
 	{
 		.ctl_name	= NET_CORE_OPTMEM_MAX,
