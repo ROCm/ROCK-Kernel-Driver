@@ -19,7 +19,7 @@
  *
  *  rs_set_termios fixed to look also for changes of the input
  *      flags INPCK, BRKINT, PARMRK, IGNPAR and IGNBRK.
- *                                            Bernd Anhäupl 05/17/96.
+ *                                            Bernd Anhï¿½pl 05/17/96.
  *
  * --- End of notices from serial.c ---
  *
@@ -140,7 +140,7 @@ static struct esp_struct *ports;
 
 static void change_speed(struct esp_struct *info);
 static void rs_wait_until_sent(struct tty_struct *, int);
-	
+
 /*
  * The ESP card has a clock rate of 14.7456 MHz (that is, 2**ESPC_SCALE
  * times the normal 1.8432 Mhz clock of most serial boards).
@@ -149,10 +149,6 @@ static void rs_wait_until_sent(struct tty_struct *, int);
 
 /* Standard COM flags (except for COM4, because of the 8514 problem) */
 #define STD_COM_FLAGS (ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST)
-
-#ifndef MIN
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#endif
 
 /*
  * tmp_buf is used as a temporary buffer by serial_write.  We need to
