@@ -260,7 +260,6 @@ static char ixj_c_revision[] = "$Revision: 4.7 $";
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
-#include <linux/tqueue.h>
 #include <linux/proc_fs.h>
 #include <linux/poll.h>
 #include <linux/timer.h>
