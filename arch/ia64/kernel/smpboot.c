@@ -69,7 +69,7 @@ static volatile unsigned long go[SLAVE + 1];
 
 #define DEBUG_ITC_SYNC	0
 
-extern void __init calibrate_delay (void);
+extern void __devinit calibrate_delay (void);
 extern void start_ap (void);
 extern unsigned long ia64_iobase;
 
@@ -262,12 +262,12 @@ ia64_sync_itc (unsigned int master)
 /*
  * Ideally sets up per-cpu profiling hooks.  Doesn't do much now...
  */
-static inline void __init
+static inline void __devinit
 smp_setup_percpu_timer (void)
 {
 }
 
-static void __init
+static void __devinit
 smp_callin (void)
 {
 	int cpuid, phys_id;
@@ -333,7 +333,7 @@ smp_callin (void)
 /*
  * Activate a secondary processor.  head.S calls this.
  */
-int __init
+int __devinit
 start_secondary (void *unused)
 {
 	extern int cpu_idle (void);
@@ -346,7 +346,7 @@ start_secondary (void *unused)
 	return cpu_idle();
 }
 
-static struct task_struct * __init
+static struct task_struct * __devinit
 fork_by_hand (void)
 {
 	/*
@@ -356,7 +356,7 @@ fork_by_hand (void)
 	return copy_process(CLONE_VM|CLONE_IDLETASK, 0, 0, 0, NULL, NULL);
 }
 
-static int __init
+static int __devinit
 do_boot_cpu (int sapicid, int cpu)
 {
 	struct task_struct *idle;

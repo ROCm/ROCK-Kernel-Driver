@@ -36,7 +36,7 @@ extern struct smp_boot_data {
 	int cpu_phys_id[NR_CPUS];
 } smp_boot_data __initdata;
 
-extern char no_int_routing __initdata;
+extern char no_int_routing __devinitdata;
 
 extern cpumask_t phys_cpu_present_map;
 extern cpumask_t cpu_online_map;
@@ -113,6 +113,7 @@ hard_smp_processor_id (void)
 /* Upping and downing of CPUs */
 extern int __cpu_disable (void);
 extern void __cpu_die (unsigned int cpu);
+extern void cpu_die (void) __attribute__ ((noreturn));
 extern int __cpu_up (unsigned int cpu);
 extern void __init smp_build_cpu_map(void);
 

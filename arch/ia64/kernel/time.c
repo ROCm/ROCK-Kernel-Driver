@@ -326,7 +326,7 @@ ia64_cpu_local_tick (void)
 	ia64_set_itm(local_cpu_data->itm_next);
 }
 
-void __init
+void __devinit
 ia64_init_itm (void)
 {
 	unsigned long platform_base_freq, itc_freq;
