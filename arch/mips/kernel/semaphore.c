@@ -6,6 +6,7 @@
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/sched.h>
 
 #ifdef CONFIG_CPU_HAS_LLDSCD
@@ -104,7 +105,7 @@ static inline int waking_non_zero(struct semaphore *sem)
  * Either form may be used in conjunction with "up()".
  */
 
-void __down_failed(struct semaphore * sem)
+void __sched __down_failed(struct semaphore * sem)
 {
 	struct task_struct *tsk = current;
 	wait_queue_t wait;
@@ -227,7 +228,7 @@ static inline int waking_non_zero_interruptible(struct semaphore *sem,
 
 #endif /* !CONFIG_CPU_HAS_LLDSCD */
 
-int __down_failed_interruptible(struct semaphore * sem)
+int __sched __down_failed_interruptible(struct semaphore * sem)
 {
 	struct task_struct *tsk = current;
 	wait_queue_t wait;

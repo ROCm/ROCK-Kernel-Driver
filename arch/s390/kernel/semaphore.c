@@ -11,6 +11,7 @@
  */
 #include <linux/sched.h>
 #include <linux/errno.h>
+#include <linux/init.h>
 
 #include <asm/semaphore.h>
 
@@ -60,7 +61,7 @@ void __up(struct semaphore *sem)
  *   count > 0: decrement count, wake up queue and exit.
  *   count <= 0: set count to -1, go to sleep.
  */
-void __down(struct semaphore * sem)
+void __sched __down(struct semaphore * sem)
 {
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
@@ -82,7 +83,7 @@ void __down(struct semaphore * sem)
  *   count > 0: wake up queue and exit.
  *   count <= 0: set count to 0, wake up queue and exit.
  */
-int __down_interruptible(struct semaphore * sem)
+int __sched __down_interruptible(struct semaphore * sem)
 {
 	int retval = 0;
 	struct task_struct *tsk = current;

@@ -170,6 +170,8 @@ extern void update_one_process(struct task_struct *p, unsigned long user,
 			       unsigned long system, int cpu);
 extern void scheduler_tick(int user_tick, int system);
 extern unsigned long cache_decay_ticks;
+extern const unsigned long scheduling_functions_start_here;
+extern const unsigned long scheduling_functions_end_here;
 
 
 #define	MAX_SCHEDULE_TIMEOUT	LONG_MAX

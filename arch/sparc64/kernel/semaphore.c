@@ -8,6 +8,7 @@
 
 #include <linux/sched.h>
 #include <linux/errno.h>
+#include <linux/init.h>
 
 /*
  * Atomically update sem->count.
@@ -90,7 +91,7 @@ void up(struct semaphore *sem)
 	: "g5", "g7", "memory", "cc");
 }
 
-static void __down(struct semaphore * sem)
+static void __sched __down(struct semaphore * sem)
 {
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
@@ -108,7 +109,7 @@ static void __down(struct semaphore * sem)
 	wake_up(&sem->wait);
 }
 
-void down(struct semaphore *sem)
+void __sched down(struct semaphore *sem)
 {
 	might_sleep();
 	/* This atomically does:
@@ -192,7 +193,7 @@ int down_trylock(struct semaphore *sem)
 	return ret;
 }
 
-static int __down_interruptible(struct semaphore * sem)
+static int __sched __down_interruptible(struct semaphore * sem)
 {
 	int retval = 0;
 	struct task_struct *tsk = current;
@@ -216,7 +217,7 @@ static int __down_interruptible(struct semaphore * sem)
 	return retval;
 }
 
-int down_interruptible(struct semaphore *sem)
+int __sched down_interruptible(struct semaphore *sem)
 {
 	int ret = 0;
 	

@@ -632,8 +632,6 @@ out:
 /*
  * These bracket the sleeping functions..
  */
-extern void scheduling_functions_start_here(void);
-extern void scheduling_functions_end_here(void);
 #define first_sched	((unsigned long) scheduling_functions_start_here)
 #define last_sched	((unsigned long) scheduling_functions_end_here)
 #define top_esp                (THREAD_SIZE - sizeof(unsigned long))

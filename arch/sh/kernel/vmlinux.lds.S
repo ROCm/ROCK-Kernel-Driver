@@ -22,6 +22,7 @@ SECTIONS
 	} = 0
   .text : {
 	*(.text)
+	SCHED_TEXT
 	*(.fixup)
 	*(.gnu.warning)
 	} = 0x0009

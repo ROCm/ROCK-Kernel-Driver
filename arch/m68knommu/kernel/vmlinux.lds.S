@@ -191,6 +191,7 @@ SECTIONS {
 	.text : {
 		_stext = . ;
         	*(.text)
+		SCHED_TEXT
         	*(.text.lock)
 
 		. = ALIGN(16);          /* Exception table              */
