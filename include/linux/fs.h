@@ -1221,8 +1221,13 @@ extern void __iget(struct inode * inode);
 extern void clear_inode(struct inode *);
 extern struct inode *new_inode(struct super_block *);
 extern void remove_suid(struct dentry *);
-extern void insert_inode_hash(struct inode *);
+
+extern void __insert_inode_hash(struct inode *, unsigned long hashval);
 extern void remove_inode_hash(struct inode *);
+static inline void insert_inode_hash(struct inode *inode) {
+	__insert_inode_hash(inode, inode->i_ino);
+}
+
 extern struct file * get_empty_filp(void);
 extern void file_move(struct file *f, struct list_head *list);
 extern void ll_rw_block(int, int, struct buffer_head * bh[]);

@@ -537,7 +537,7 @@ EXPORT_SYMBOL(clear_inode);
 EXPORT_SYMBOL(init_special_inode);
 EXPORT_SYMBOL(__get_hash_table);
 EXPORT_SYMBOL(new_inode);
-EXPORT_SYMBOL(insert_inode_hash);
+EXPORT_SYMBOL(__insert_inode_hash);
 EXPORT_SYMBOL(remove_inode_hash);
 EXPORT_SYMBOL(buffer_insert_list);
 EXPORT_SYMBOL(make_bad_inode);

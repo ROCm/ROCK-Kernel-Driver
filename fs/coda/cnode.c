@@ -74,16 +74,17 @@ struct inode * coda_iget(struct super_block * sb, ViceFid * fid,
 	struct inode *inode;
 	struct coda_inode_info *cii;
 	struct coda_sb_info *sbi = coda_sbp(sb);
-	ino_t ino = coda_f2i(fid);
+	unsigned long hash = coda_f2i(fid);
 
-	inode = iget5_locked(sb, ino, coda_test_inode, coda_set_inode, fid);
+	inode = iget5_locked(sb, hash, coda_test_inode, coda_set_inode, fid);
 
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
 
 	if (inode->i_state & I_NEW) {
 		cii = ITOC(inode);
-		inode->i_ino = ino;
+		/* we still need to set i_ino for things like stat(2) */
+		inode->i_ino = hash;
 		list_add(&cii->c_cilist, &sbi->sbi_cihead);
 		unlock_new_inode(inode);
 	}
@@ -124,6 +125,7 @@ void coda_replace_fid(struct inode *inode, struct ViceFid *oldfid,
 		      struct ViceFid *newfid)
 {
 	struct coda_inode_info *cii;
+	unsigned long hash = coda_f2i(newfid);
 	
 	cii = ITOC(inode);
 
@@ -134,23 +136,22 @@ void coda_replace_fid(struct inode *inode, struct ViceFid *oldfid,
 	/* XXX we probably need to hold some lock here! */
 	remove_inode_hash(inode);
 	cii->c_fid = *newfid;
-	inode->i_ino = coda_f2i(newfid);
-	insert_inode_hash(inode);
+	inode->i_ino = hash;
+	__insert_inode_hash(inode, hash);
 }
 
 /* convert a fid to an inode. */
 struct inode *coda_fid_to_inode(ViceFid *fid, struct super_block *sb) 
 {
-	ino_t nr;
 	struct inode *inode;
+	unsigned long hash = coda_f2i(fid);
 
 	if ( !sb ) {
 		printk("coda_fid_to_inode: no sb!\n");
 		return NULL;
 	}
 
-	nr = coda_f2i(fid);
-	inode = iget5_locked(sb, nr, coda_test_inode, coda_fail_inode, fid);
+	inode = iget5_locked(sb, hash, coda_test_inode, coda_fail_inode, fid);
 	if ( !inode )
 		return NULL;
 

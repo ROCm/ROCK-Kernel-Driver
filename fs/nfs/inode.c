@@ -641,7 +641,7 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		fattr:	fattr
 	};
 	struct inode *inode = NULL;
-	unsigned long ino;
+	unsigned long hash;
 
 	if ((fattr->valid & NFS_ATTR_FATTR) == 0)
 		goto out_no_inode;
@@ -651,9 +651,9 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		goto out_no_inode;
 	}
 
-	ino = nfs_fattr_to_ino_t(fattr);
+	hash = nfs_fattr_to_ino_t(fattr);
 
-	if (!(inode = iget5_locked(sb, ino, nfs_find_actor, nfs_init_locked, &desc)))
+	if (!(inode = iget5_locked(sb, hash, nfs_find_actor, nfs_init_locked, &desc)))
 		goto out_no_inode;
 
 	if (inode->i_state & I_NEW) {
@@ -661,7 +661,9 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		loff_t		new_isize;
 		time_t		new_atime;
 
-		inode->i_ino = ino;
+		/* We set i_ino for the few things that still rely on it,
+		 * such as stat(2) */
+		inode->i_ino = hash;
 
 		/* We can't support UPDATE_ATIME(), since the server will reset it */
 		inode->i_flags |= S_NOATIME;
