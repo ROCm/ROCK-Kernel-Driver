@@ -19,6 +19,8 @@
 #include "linux/inetdevice.h"
 #include "linux/ctype.h"
 #include "linux/bootmem.h"
+#include "linux/ethtool.h"
+#include "asm/uaccess.h"
 #include "user_util.h"
 #include "kern_util.h"
 #include "net_kern.h"
@@ -127,6 +129,13 @@ static int uml_net_open(struct net_device *dev)
 	spin_lock(&opened_lock);
 	list_add(&lp->list, &opened);
 	spin_unlock(&opened_lock);
+
+	/* clear buffer - it can happen that the host side of the interface
+	 * is full when we get here.  In this case, new data is never queued,
+	 * SIGIOs never arrive, and the net never works.
+	 */
+	while((err = uml_net_rx(dev)) > 0) ;
+
  out:
 	spin_unlock(&lp->lock);
 	return(err);
@@ -240,7 +249,30 @@ static int uml_net_change_mtu(struct net_device *dev, int new_mtu)
 
 static int uml_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	return(-EINVAL);
+	static const struct ethtool_drvinfo info = {
+		.cmd     = ETHTOOL_GDRVINFO,
+		.driver  = "uml virtual ethernet",
+		.version = "42",
+	};
+	void *useraddr;
+	u32 ethcmd;
+
+	switch (cmd) {
+	case SIOCETHTOOL:
+		useraddr = ifr->ifr_data;
+		if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
+			return -EFAULT;
+		switch (ethcmd) {
+		case ETHTOOL_GDRVINFO:
+			if (copy_to_user(useraddr, &info, sizeof(info)))
+				return -EFAULT;
+			return 0;
+		default:
+			return -EOPNOTSUPP;
+		}
+	default:
+		return -EINVAL;
+	}
 }
 
 void uml_net_user_timer_expire(unsigned long _conn)
