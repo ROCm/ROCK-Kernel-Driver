@@ -637,6 +637,7 @@ END(daccess_bit)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2c00 Entry 11 (size 64 bundles) Break instruction (33)
 ENTRY(break_fault)
+	.global ia64_enter_syscall
 	/*
 	 * The streamlined system call entry/exit paths only save/restore the initial part
 	 * of pt_regs.  This implies that the callers of system-calls must adhere to the
@@ -675,8 +676,22 @@ ENTRY(break_fault)
 	adds r1=-IA64_TASK_THREAD_ON_USTACK_OFFSET,r16	// set r1 for MINSTATE_START_SAVE_MIN_VIRT
 	;;
 	invala
-	cmp.eq pKStk,pUStk=r0,r17		// are we in kernel mode already?
+
+	/* adjust return address so we skip over the break instruction: */
+
+	extr.u r8=r29,41,2			// extract ei field from cr.ipsr
 	;;
+	cmp.eq p6,p7=2,r8			// isr.ei==2?
+	;;
+(p6)	mov r8=0				// clear ei to 0
+(p6)	adds r28=16,r28				// switch cr.iip to next bundle cr.ipsr.ei wrapped
+(p7)	adds r8=1,r8				// increment ei to next slot
+	;;
+	cmp.eq pKStk,pUStk=r0,r17		// are we in kernel mode already?
+	dep r29=r8,r29,41,2			// insert new ei into cr.ipsr
+	;;
+
+ia64_enter_syscall:
 	// switch from user to kernel RBS:
 	MINSTATE_START_SAVE_MIN_VIRT
 	br.call.sptk.many b7=setup_syscall_via_break
@@ -692,33 +707,14 @@ ENTRY(break_fault)
 	mov rp=r2				// set the real return addr
 	;;
 (p7)	add r20=(__NR_ni_syscall-1024)*8,r16	// force __NR_ni_syscall
-	add r16=PT(CR_IPSR)+16,sp		// get pointer to cr_ipsr
 	add r2=TI_FLAGS+IA64_TASK_SIZE,r13
 	;;
 	ld8 r20=[r20]				// load address of syscall entry point
-	ld8 r18=[r16]				// fetch cr_ipsr
-
-	// arrange things so we skip over break instruction when returning:
-	adds r17=PT(CR_IIP)+16,sp		// get pointer to cr_iip
-	;;
 	ld4 r2=[r2]				// r2 = current_thread_info()->flags
-	ld8 r19=[r17]				// fetch cr_iip
+	;;
+	tbit.z p8,p0=r2,TIF_SYSCALL_TRACE
 	mov b6=r20
 	;;
-	extr.u r20=r18,41,2			// extract ei field
-	adds r19=16,r19				// compute address of next bundle
-	;;
-	cmp.eq p6,p7=2,r20			// isr.ei==2?
-	;;
-(p6)	mov r20=0				// clear ei to 0
-(p7)	adds r20=1,r20				// increment ei to next slot
-	;;
-(p6)	st8 [r17]=r19				// store new cr.iip if cr.ipsr.ei wrapped around
-	dep r18=r20,r18,41,2			// insert new ei into cr.ipsr
-	tbit.z p8,p0=r2,TIF_SYSCALL_TRACE
-	;;
-	st8 [r16]=r18				// store new value for cr.ipsr
-
 (p8)	br.call.sptk.many b6=b6			// ignore this return addr
 	br.cond.sptk ia64_trace_syscall
 	// NOT REACHED
@@ -780,7 +776,7 @@ ENTRY(setup_syscall_via_break)
 	add r16=PT(CR_IPSR),r1			// initialize first base pointer
 	add r17=PT(R11),r1			// initialize second base pointer
 	;;
-	alloc r19=ar.pfs,8,0,0,0		// ensur in0-in7 are writable
+	alloc r19=ar.pfs,8,0,0,0		// ensure in0-in7 are writable
 	st8 [r16]=r29,PT(CR_IFS)-PT(CR_IPSR)	// save cr.ipsr
 	tnat.nz p8,p0=in0
 

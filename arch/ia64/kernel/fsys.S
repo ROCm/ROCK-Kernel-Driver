@@ -15,6 +15,9 @@
 #include <asm/percpu.h>
 #include <asm/thread_info.h>
 #include <asm/sal.h>
+#include <asm/system.h>
+
+#include "entry.h"
 
 /*
  * See Documentation/ia64/fsys.txt for details on fsyscalls.
@@ -37,6 +40,58 @@
  *   b6		= return address (as passed into the fsyscall handler)
  *   ar.pfs	= previous frame-state (as passed into the fsyscall handler)
  */
+
+#if 1
+ENTRY(fsys_fallback_syscall)
+	/*
+	 * This is called for system calls which are entered via epc, but don't
+	 * have a light-weight handler.  We need to bubble down into the kernel,
+	 * and that requires setting up a minimal pt_regs structure, and initializing
+	 * the CPU state more or less as if an interruption had occurred.  To make
+	 * syscall-restarts work, we setup pt_regs such that cr_iip points to the
+	 * second instruction in syscall_via_break.  Decrementing the IP hence will
+	 * restart the syscall via break and not decrementing IP will return us
+	 * to the caller, as usual.
+	 */
+#	define PSR_PRESERVED_BITS	(IA64_PSR_UP | IA64_PSR_MFL | IA64_PSR_MFH | IA64_PSR_PK \
+					 | IA64_PSR_DT | IA64_PSR_RT)
+	/*
+	 * Reading psr.l gives us only bits 0-31, psr.it, and psr.mc.  The rest we have
+	 * to synthesize.
+	 */
+#	define PSR_ONE_BITS		((3 << IA64_PSR_CPL0_BIT) | (0x1 << IA64_PSR_RI_BIT) \
+					 | IA64_PSR_BN)
+	mov r29=psr
+	movl r9=PSR_PRESERVED_BITS
+
+	mov r20=r1
+	movl r8=PSR_ONE_BITS
+	;;
+	mov r1=IA64_KR(CURRENT)		// r16 = current (physical); 12 cycle read lat.
+	and r9=r9,r29
+	or r29=r8,r29
+	;;
+	mov psr.l=r9			// slam the door
+	mov r21=ar.fpsr
+	mov r26=ar.pfs
+
+	mov r25=ar.unat
+	mov r27=ar.rsc
+	mov r19=b6
+	;;
+
+	srlz.i				// ensure new psr.l has been established
+	movl r28=GATE_ADDR	// cr.iip XXX fix me!! Should be: GATE_ADDR(syscall_via_break)
+
+	invala
+	mov r31=pr
+	adds r16=IA64_TASK_THREAD_ON_USTACK_OFFSET,r1
+	;;
+	st1 [r16]=r0				// clear current->thread.on_ustack flag
+	cmp.ne pKStk,pUStk=r0,r0		// set pKStk <- 0, pUStk <- 1
+	br.cond.sptk.many ia64_enter_syscall
+END(fsys_fallback_syscall)
+#endif
 
 ENTRY(fsys_ni_syscall)
 	mov r8=ENOSYS
@@ -334,7 +389,7 @@ fsyscall_table:
 	data8 fsys_fallback_syscall	// chmod
 	data8 fsys_fallback_syscall	// chown
 	data8 fsys_fallback_syscall	// lseek		// 1040
-	data8 fsys_getpid
+	data8 fsys_getpid		// getpid
 	data8 fsys_getppid		// getppid
 	data8 fsys_fallback_syscall	// mount
 	data8 fsys_fallback_syscall	// umount

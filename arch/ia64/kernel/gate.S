@@ -21,6 +21,21 @@
 
 #include <asm/errno.h>
 
+GLOBAL_ENTRY(syscall_via_break)
+	.prologue
+	.altrp b6
+	.body
+	/*
+	 * Note: for (fast) syscall restart to work, the break instruction must be
+	 *	 the first one in the bundle addressed by syscall_via_break.
+	 */
+{ .mib
+	break 0x100000
+	nop.i 0
+	br.ret.sptk.many b6
+}
+END(syscall_via_break)
+
 /*
  * On entry:
  *	r11 = saved ar.pfs
@@ -70,21 +85,7 @@ GLOBAL_ENTRY(syscall_via_epc)
 	br.ret.sptk.many b6
 END(syscall_via_epc)
 
-GLOBAL_ENTRY(syscall_via_break)
-	.prologue
-	.altrp b6
-	.body
-	/*
-	 * Note: for (fast) syscall restart to work, the break instruction must be
-	 *	 the first one in the bundle addressed by syscall_via_break.
-	 */
-{ .mib
-	break 0x100000
-	nop.i 0
-	br.ret.sptk.many b6
-}
-END(syscall_via_break)
-
+#if 0
 GLOBAL_ENTRY(fsys_fallback_syscall)
 	/*
 	 * It would be better/fsyser to do the SAVE_MIN magic directly here, but for now
@@ -100,6 +101,7 @@ GLOBAL_ENTRY(fsys_fallback_syscall)
 	mov b7=r2
 	br.ret.sptk.many b7
 END(fsys_fallback_syscall)
+#endif
 
 #endif /* CONFIG_FSYS */
 
