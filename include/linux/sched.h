@@ -275,6 +275,9 @@ struct signal_struct {
 
 	/* thread group stop support, overloads group_exit_code too */
 	int			group_stop_count;
+
+	/* POSIX.1b Interval Timers */
+	struct list_head	posix_timers;
 };
 
 /*
@@ -436,7 +439,6 @@ struct task_struct {
 	unsigned long it_real_value, it_prof_value, it_virt_value;
 	unsigned long it_real_incr, it_prof_incr, it_virt_incr;
 	struct timer_list real_timer;
-	struct list_head posix_timers; /* POSIX.1b Interval Timers */
 	unsigned long utime, stime, cutime, cstime;
 	unsigned long nvcsw, nivcsw, cnvcsw, cnivcsw; /* context switch counts */
 	u64 start_time;
@@ -937,7 +939,7 @@ extern void exit_signal(struct task_struct *);
 extern void __exit_signal(struct task_struct *);
 extern void exit_sighand(struct task_struct *);
 extern void __exit_sighand(struct task_struct *);
-extern void exit_itimers(struct task_struct *);
+extern void exit_itimers(struct signal_struct *);
 
 extern NORET_TYPE void do_group_exit(int);
 
