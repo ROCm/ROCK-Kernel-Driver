@@ -89,7 +89,7 @@ struct stv680_frame {
 
 /* this is almost the video structure uvd_t, with extra parameters for stv */
 struct usb_stv {
-	struct video_device vdev;
+	struct video_device *vdev;
 
 	struct usb_device *udev;
 

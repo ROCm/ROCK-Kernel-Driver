@@ -1000,7 +1000,7 @@ static int stv680_newframe (struct usb_stv *stv680, int framenr)
 static int stv_open (struct inode *inode, struct file *file)
 {
 	struct video_device *dev = video_devdata(file);
-	struct usb_stv *stv680 = (struct usb_stv *) dev;
+	struct usb_stv *stv680 = video_get_drvdata(dev);
 	int err = 0;
 
 	/* we are called with the BKL held */
@@ -1024,7 +1024,7 @@ static int stv_open (struct inode *inode, struct file *file)
 static int stv_close (struct inode *inode, struct file *file)
 {
 	struct video_device *dev = file->private_data;
-	struct usb_stv *stv680 = (struct usb_stv *) dev;
+	struct usb_stv *stv680 = video_get_drvdata(dev);
 	int i;
 
 	for (i = 0; i < STV680_NUMFRAMES; i++)
@@ -1051,7 +1051,7 @@ static int stv680_do_ioctl (struct inode *inode, struct file *file,
 			    unsigned int cmd, void *arg)
 {
 	struct video_device *vdev = file->private_data;
-	struct usb_stv *stv680 = (struct usb_stv *) vdev;
+	struct usb_stv *stv680 = video_get_drvdata(vdev);
 
 	if (!stv680->udev)
 		return -EIO;
@@ -1227,7 +1227,7 @@ static int stv680_ioctl(struct inode *inode, struct file *file,
 static int stv680_mmap (struct file *file, struct vm_area_struct *vma)
 {
 	struct video_device *dev = file->private_data;
-	struct usb_stv *stv680 = (struct usb_stv *) dev;
+	struct usb_stv *stv680 = video_get_drvdata(dev);
 	unsigned long start = vma->vm_start;
 	unsigned long size  = vma->vm_end-vma->vm_start;
 	unsigned long page, pos;
@@ -1268,7 +1268,7 @@ static int stv680_read (struct file *file, char *buf,
 	struct video_device *dev = file->private_data;
 	unsigned long int realcount = count;
 	int ret = 0;
-	struct usb_stv *stv680 = (struct usb_stv *) dev;
+	struct usb_stv *stv680 = video_get_drvdata(dev);
 	unsigned long int i;
 
 	if (STV680_NUMFRAMES != 2) {
@@ -1325,14 +1325,17 @@ static struct video_device stv680_template = {
 	.type =		VID_TYPE_CAPTURE,
 	.hardware =	VID_HARDWARE_SE401,
 	.fops =         &stv680_fops,
+	.release =	video_device_release,
+	.minor = 	-1,
 };
 
 static int stv680_probe (struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
 	struct usb_host_interface *interface;
-	struct usb_stv *stv680;
+	struct usb_stv *stv680 = NULL;
 	char *camera_name = NULL;
+	int retval = 0;
 
 	/* We don't handle multi-config cameras */
 	if (dev->descriptor.bNumConfigurations != 1) {
@@ -1348,12 +1351,14 @@ static int stv680_probe (struct usb_interface *intf, const struct usb_device_id 
 	} else {
 		PDEBUG (0, "STV(e): Vendor/Product ID do not match STV0680 values.");
 		PDEBUG (0, "STV(e): Check that the STV0680 camera is connected to the computer.");
-		return -ENODEV;
+		retval = -ENODEV;
+		goto error;
 	}
 	/* We found one */
 	if ((stv680 = kmalloc (sizeof (*stv680), GFP_KERNEL)) == NULL) {
 		PDEBUG (0, "STV(e): couldn't kmalloc stv680 struct.");
-		return -ENOMEM;
+		retval = -ENOMEM;
+		goto error;
 	}
 
 	memset (stv680, 0, sizeof (*stv680));
@@ -1361,21 +1366,33 @@ static int stv680_probe (struct usb_interface *intf, const struct usb_device_id 
 	stv680->udev = dev;
 	stv680->camera_name = camera_name;
 
-	memcpy (&stv680->vdev, &stv680_template, sizeof (stv680_template));
-	memcpy (stv680->vdev.name, stv680->camera_name, strlen (stv680->camera_name));
+	stv680->vdev = video_device_alloc();
+	if (!stv680->vdev) {
+		retval = -ENOMEM;
+		goto error;
+	}
+	memcpy(stv680->vdev, &stv680_template, sizeof(stv680_template));
+	stv680->vdev->dev = &intf->dev;
+	video_set_drvdata(stv680->vdev, stv680);
+
+	memcpy (stv680->vdev->name, stv680->camera_name, strlen (stv680->camera_name));
 	init_waitqueue_head (&stv680->wq);
 	init_MUTEX (&stv680->lock);
 	wmb ();
 
-	if (video_register_device (&stv680->vdev, VFL_TYPE_GRABBER, video_nr) == -1) {
-		kfree (stv680);
+	if (video_register_device (stv680->vdev, VFL_TYPE_GRABBER, video_nr) == -1) {
 		PDEBUG (0, "STV(e): video_register_device failed");
-		return -EIO;
+		retval = -EIO;
+		goto error;
 	}
-	PDEBUG (0, "STV(i): registered new video device: video%d", stv680->vdev.minor);
+	PDEBUG (0, "STV(i): registered new video device: video%d", stv680->vdev->minor);
 
 	usb_set_intfdata (intf, stv680);
 	return 0;
+
+error:
+	kfree(stv680);
+	return retval;
 }
 
 static inline void usb_stv680_remove_disconnected (struct usb_stv *stv680)
@@ -1414,7 +1431,10 @@ static void stv680_disconnect (struct usb_interface *intf)
 
 	if (stv680) {
 		/* We don't want people trying to open up the device */
-		video_unregister_device (&stv680->vdev);
+		if (stv680->vdev) {
+			video_unregister_device(stv680->vdev);
+			stv680->vdev = NULL;
+		}
 		if (!stv680->user) {
 			usb_stv680_remove_disconnected (stv680);
 		} else {
