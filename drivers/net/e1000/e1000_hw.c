@@ -658,14 +658,17 @@ e1000_setup_copper_link(struct e1000_hw *hw)
         return -E1000_ERR_PHY;
     }
     phy_data |= M88E1000_EPSCR_TX_CLK_25;
-    /* Configure Master and Slave downshift values */
-    phy_data &= ~(M88E1000_EPSCR_MASTER_DOWNSHIFT_MASK |
-                  M88E1000_EPSCR_SLAVE_DOWNSHIFT_MASK);
-    phy_data |= (M88E1000_EPSCR_MASTER_DOWNSHIFT_1X |
-                 M88E1000_EPSCR_SLAVE_DOWNSHIFT_1X);
-    if(e1000_write_phy_reg(hw, M88E1000_EXT_PHY_SPEC_CTRL, phy_data) < 0) {
-        DEBUGOUT("PHY Write Error\n");
-        return -E1000_ERR_PHY;
+
+    if (hw->phy_revision < M88E1011_I_REV_4) {
+        /* Configure Master and Slave downshift values */
+        phy_data &= ~(M88E1000_EPSCR_MASTER_DOWNSHIFT_MASK |
+                      M88E1000_EPSCR_SLAVE_DOWNSHIFT_MASK);
+        phy_data |= (M88E1000_EPSCR_MASTER_DOWNSHIFT_1X |
+                     M88E1000_EPSCR_SLAVE_DOWNSHIFT_1X);
+        if(e1000_write_phy_reg(hw, M88E1000_EXT_PHY_SPEC_CTRL, phy_data) < 0) {
+            DEBUGOUT("PHY Write Error\n");
+            return -E1000_ERR_PHY;
+        }
     }
 
     /* SW Reset the PHY so all changes take effect */
@@ -2103,7 +2106,8 @@ e1000_detect_gig_phy(struct e1000_hw *hw)
         return -E1000_ERR_PHY;
     }
     hw->phy_id |= (uint32_t) (phy_id_low & PHY_REVISION_MASK);
-    
+    hw->phy_revision = (uint32_t) phy_id_low & ~PHY_REVISION_MASK;
+
     switch(hw->mac_type) {
     case e1000_82543:
         if(hw->phy_id == M88E1000_E_PHY_ID) match = TRUE;

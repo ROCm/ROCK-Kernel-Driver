@@ -854,6 +854,7 @@ struct e1000_hw {
     e1000_bus_type bus_type;
     uint32_t io_base;
     uint32_t phy_id;
+    uint32_t phy_revision;
     uint32_t phy_addr;
     uint32_t original_fc;
     uint32_t txcw;
@@ -1758,6 +1759,7 @@ struct e1000_hw {
 #define M88E1011_I_PHY_ID  0x01410C20
 #define M88E1000_12_PHY_ID M88E1000_E_PHY_ID
 #define M88E1000_14_PHY_ID M88E1000_E_PHY_ID
+#define M88E1011_I_REV_4   0x04
 
 /* Miscellaneous PHY bit definitions. */
 #define PHY_PREAMBLE        0xFFFFFFFF
