@@ -34,11 +34,10 @@ extern void before_mem_skas(unsigned long unused);
 extern unsigned long set_task_sizes_skas(int arg, unsigned long *host_size_out,
 					 unsigned long *task_size_out);
 extern int start_uml_skas(void);
-extern struct page *arch_validate_skas(struct page *page, int mask, int order);
 extern int external_pid_skas(struct task_struct *task);
 extern int thread_pid_skas(struct task_struct *task);
 
-#define kmem_end_skas (host_task_size)
+#define kmem_end_skas (host_task_size - 1024 * 1024)
 
 #endif
 

@@ -37,7 +37,7 @@ int timer_irq_inited = 0;
  */
 int __attribute__ ((__section__ (".unprotected"))) missed_ticks[NR_CPUS];
 
-void timer_irq(struct uml_pt_regs *regs)
+void timer_irq(union uml_pt_regs *regs)
 {
 	int cpu = current->thread_info->cpu, ticks = missed_ticks[cpu];
 
@@ -50,7 +50,9 @@ void boot_timer_handler(int sig)
 {
 	struct pt_regs regs;
 
-	regs.regs.is_user = 0;
+	CHOOSE_MODE((void) 
+		    (UPT_SC(&regs.regs) = (struct sigcontext *) (&sig + 1)),
+		    (void) (regs.regs.skas.is_user = 0));
 	do_timer(&regs);
 }
 
@@ -118,7 +120,7 @@ void __const_udelay(um_udelay_t usecs)
 	for(i=0;i<n;i++) ;
 }
 
-void timer_handler(int sig, struct uml_pt_regs *regs)
+void timer_handler(int sig, union uml_pt_regs *regs)
 {
 #ifdef CONFIG_SMP
 	update_process_times(user_context(UPT_SP(regs)));
@@ -129,14 +131,16 @@ void timer_handler(int sig, struct uml_pt_regs *regs)
 
 static spinlock_t timer_spinlock = SPIN_LOCK_UNLOCKED;
 
-void time_lock(void)
+unsigned long time_lock(void)
 {
-	spin_lock(&timer_spinlock);
+	unsigned long flags;
+	spin_lock_irqsave(&timer_spinlock, flags);
+	return(flags);
 }
 
-void time_unlock(void)
+void time_unlock(unsigned long flags)
 {
-	spin_unlock(&timer_spinlock);
+	spin_unlock_irqrestore(&timer_spinlock, flags);
 }
 
 int __init timer_init(void)

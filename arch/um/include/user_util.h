@@ -24,7 +24,7 @@ struct cpu_task {
 extern struct cpu_task cpu_tasks[];
 
 struct signal_info {
-	void (*handler)(int, struct uml_pt_regs *);
+	void (*handler)(int, union uml_pt_regs *);
 	int is_irq;
 };
 
@@ -86,7 +86,7 @@ extern void check_sigio(void);
 extern int run_kernel_thread(int (*fn)(void *), void *arg, void **jmp_ptr);
 extern void write_sigio_workaround(void);
 extern void arch_check_bugs(void);
-extern int arch_handle_signal(int sig, struct uml_pt_regs *regs);
+extern int arch_handle_signal(int sig, union uml_pt_regs *regs);
 extern int arch_fixup(unsigned long address, void *sc_ptr);
 extern void forward_pending_sigio(int target);
 extern int can_do_skas(void);

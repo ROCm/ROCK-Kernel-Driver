@@ -201,14 +201,14 @@ static int tuntap_set_mtu(int mtu, void *data)
 }
 
 struct net_user_info tuntap_user_info = {
-	init:		tuntap_user_init,
-	open:		tuntap_open,
-	close:	 	tuntap_close,
-	remove:	 	NULL,
-	set_mtu:	tuntap_set_mtu,
-	add_address:	tuntap_add_addr,
-	delete_address: tuntap_del_addr,
-	max_packet:	MAX_PACKET
+	.init		= tuntap_user_init,
+	.open		= tuntap_open,
+	.close	 	= tuntap_close,
+	.remove	 	= NULL,
+	.set_mtu	= tuntap_set_mtu,
+	.add_address	= tuntap_add_addr,
+	.delete_address = tuntap_del_addr,
+	.max_packet	= MAX_PACKET
 };
 
 /*

@@ -9,7 +9,7 @@
 #ifndef __ASSEMBLY__
 
 #include "linux/config.h"
-#include "skas_ptrace.h"
+
 #include "asm/current.h"
 
 #define pt_regs pt_regs_subarch
@@ -23,9 +23,10 @@
 #undef instruction_pointer
 
 #include "sysdep/ptrace.h"
+#include "skas_ptrace.h"
 
 struct pt_regs {
-	struct uml_pt_regs regs;
+	union uml_pt_regs regs;
 };
 
 #define EMPTY_REGS { regs : EMPTY_UML_PT_REGS }

@@ -26,7 +26,7 @@ void remap_data(void *segment_start, void *segment_end, int w)
 		(unsigned long) segment_start;
 	data = create_mem_file(size);
 	if((addr = mmap(NULL, size, PROT_WRITE | PROT_READ, 
-			MAP_SHARED, data, 0)) < 0){
+			MAP_SHARED, data, 0)) == MAP_FAILED){
 		perror("mapping new data segment");
 		exit(1);
 	}

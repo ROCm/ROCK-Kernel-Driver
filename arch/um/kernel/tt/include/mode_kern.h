@@ -34,7 +34,6 @@ extern void before_mem_tt(unsigned long brk_start);
 extern unsigned long set_task_sizes_tt(int arg, unsigned long *host_size_out, 
 				       unsigned long *task_size_out);
 extern int start_uml_tt(void);
-extern struct page *arch_validate_tt(struct page *page, int mask, int order);
 extern int external_pid_tt(struct task_struct *task);
 extern int thread_pid_tt(struct task_struct *task);
 
