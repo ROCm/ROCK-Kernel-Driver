@@ -50,6 +50,7 @@
 #include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
+#include <linux/suspend.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
@@ -897,8 +898,7 @@ static int usb_stor_scan_thread(void * __us)
 	 * so get rid of all our resources.
 	 */
 	lock_kernel();
-	daemonize("usb-stor");
-	current->flags |= PF_NOFREEZE;
+	daemonize("usb-stor-scan");
 	unlock_kernel();
 
 	printk(KERN_DEBUG
@@ -908,9 +908,14 @@ static int usb_stor_scan_thread(void * __us)
 	if (delay_use > 0) {
 		printk(KERN_DEBUG "usb-storage: waiting for device "
 				"to settle before scanning\n");
+retry:
 		wait_event_interruptible_timeout(us->scsi_scan_wait,
 				test_bit(US_FLIDX_DISCONNECTING, &us->flags),
 				delay_use * HZ);
+		if (current->flags & PF_FREEZE) {
+			refrigerator(PF_FREEZE);
+			goto retry;
+		}
 	}
 
 	/* If the device is still connected, perform the scanning */
