@@ -300,6 +300,11 @@ struct ub_dev {
 
 /*
  */
+static int ub_bd_rq_fn_1(struct ub_dev *sc, struct request *rq);
+static int ub_cmd_build_block(struct ub_dev *sc, struct ub_scsi_cmd *cmd,
+    struct request *rq);
+static int ub_cmd_build_packet(struct ub_dev *sc, struct ub_scsi_cmd *cmd,
+    struct request *rq);
 static void ub_rw_cmd_done(struct ub_dev *sc, struct ub_scsi_cmd *cmd);
 static void ub_end_rq(struct request *rq, int uptodate);
 static int ub_submit_scsi(struct ub_dev *sc, struct ub_scsi_cmd *cmd);
@@ -591,26 +596,23 @@ static struct ub_scsi_cmd *ub_cmdq_pop(struct ub_dev *sc)
  * The request function is our main entry point
  */
 
-static inline int ub_bd_rq_fn_1(request_queue_t *q)
+static void ub_bd_rq_fn(request_queue_t *q)
 {
-#if 0
-	int writing = 0, pci_dir, i, n_elem;
-	u32 tmp;
-	unsigned int msg_size;
-#endif
 	struct ub_dev *sc = q->queuedata;
 	struct request *rq;
-#if 0 /* We use rq->buffer for now */
-	struct scatterlist *sg;
-	int n_elem;
-#endif
-	struct ub_scsi_cmd *cmd;
-	int ub_dir;
-	unsigned int block, nblks;
-	int rc;
 
-	if ((rq = elv_next_request(q)) == NULL)
-		return 1;
+	while ((rq = elv_next_request(q)) != NULL) {
+		if (ub_bd_rq_fn_1(sc, rq) != 0) {
+			blk_stop_queue(q);
+			break;
+		}
+	}
+}
+
+static int ub_bd_rq_fn_1(struct ub_dev *sc, struct request *rq)
+{
+	struct ub_scsi_cmd *cmd;
+	int rc;
 
 	if (atomic_read(&sc->poison) || sc->changed) {
 		blkdev_dequeue_request(rq);
@@ -618,12 +620,48 @@ static inline int ub_bd_rq_fn_1(request_queue_t *q)
 		return 0;
 	}
 
-	if ((cmd = ub_get_cmd(sc)) == NULL) {
-		blk_stop_queue(q);
-		return 1;
-	}
+	if ((cmd = ub_get_cmd(sc)) == NULL)
+		return -1;
+	memset(cmd, 0, sizeof(struct ub_scsi_cmd));
 
 	blkdev_dequeue_request(rq);
+
+	if (blk_pc_request(rq)) {
+		rc = ub_cmd_build_packet(sc, cmd, rq);
+	} else {
+		rc = ub_cmd_build_block(sc, cmd, rq);
+	}
+	if (rc != 0) {
+		ub_put_cmd(sc, cmd);
+		ub_end_rq(rq, 0);
+		blk_start_queue(sc->disk->queue);
+		return 0;
+	}
+
+	cmd->state = UB_CMDST_INIT;
+	cmd->done = ub_rw_cmd_done;
+	cmd->back = rq;
+
+	cmd->tag = sc->tagcnt++;
+	if ((rc = ub_submit_scsi(sc, cmd)) != 0) {
+		ub_put_cmd(sc, cmd);
+		ub_end_rq(rq, 0);
+		blk_start_queue(sc->disk->queue);
+		return 0;
+	}
+
+	return 0;
+}
+
+static int ub_cmd_build_block(struct ub_dev *sc, struct ub_scsi_cmd *cmd,
+    struct request *rq)
+{
+	int ub_dir;
+#if 0 /* We use rq->buffer for now */
+	struct scatterlist *sg;
+	int n_elem;
+#endif
+	unsigned int block, nblks;
 
 	if (rq_data_dir(rq) == WRITE)
 		ub_dir = UB_DIR_WRITE;
@@ -652,6 +690,7 @@ static inline int ub_bd_rq_fn_1(request_queue_t *q)
 		return 0;
 	}
 #endif
+
 	/*
 	 * XXX Unfortunately, this check does not work. It is quite possible
 	 * to get bogus non-null rq->buffer if you allow sg by mistake.
@@ -663,13 +702,12 @@ static inline int ub_bd_rq_fn_1(request_queue_t *q)
 		 */
 		static int do_print = 1;
 		if (do_print) {
-			printk(KERN_WARNING "%s: unmapped request\n", sc->name);
+			printk(KERN_WARNING "%s: unmapped block request"
+			    " flags 0x%lx sectors %lu\n",
+			    sc->name, rq->flags, rq->nr_sectors);
 			do_print = 0;
 		}
-		ub_put_cmd(sc, cmd);
-		ub_end_rq(rq, 0);
-		blk_start_queue(q);
-		return 0;
+		return -1;
 	}
 
 	/*
@@ -681,7 +719,6 @@ static inline int ub_bd_rq_fn_1(request_queue_t *q)
 	block = rq->sector >> sc->capacity.bshift;
 	nblks = rq->nr_sectors >> sc->capacity.bshift;
 
-	memset(cmd, 0, sizeof(struct ub_scsi_cmd));
 	cmd->cdb[0] = (ub_dir == UB_DIR_READ)? READ_10: WRITE_10;
 	/* 10-byte uses 4 bytes of LBA: 2147483648KB, 2097152MB, 2048GB */
 	cmd->cdb[2] = block >> 24;
@@ -691,27 +728,44 @@ static inline int ub_bd_rq_fn_1(request_queue_t *q)
 	cmd->cdb[7] = nblks >> 8;
 	cmd->cdb[8] = nblks;
 	cmd->cdb_len = 10;
+
 	cmd->dir = ub_dir;
-	cmd->state = UB_CMDST_INIT;
 	cmd->data = rq->buffer;
 	cmd->len = rq->nr_sectors * 512;
-	cmd->done = ub_rw_cmd_done;
-	cmd->back = rq;
-
-	cmd->tag = sc->tagcnt++;
-	if ((rc = ub_submit_scsi(sc, cmd)) != 0) {
-		ub_put_cmd(sc, cmd);
-		ub_end_rq(rq, 0);
-		blk_start_queue(q);
-		return 0;
-	}
 
 	return 0;
 }
 
-static void ub_bd_rq_fn(request_queue_t *q)
+static int ub_cmd_build_packet(struct ub_dev *sc, struct ub_scsi_cmd *cmd,
+    struct request *rq)
 {
-	do { } while (ub_bd_rq_fn_1(q) == 0);
+
+	if (rq->data_len != 0 && rq->data == NULL) {
+		static int do_print = 1;
+		if (do_print) {
+			printk(KERN_WARNING "%s: unmapped packet request"
+			    " flags 0x%lx length %d\n",
+			    sc->name, rq->flags, rq->data_len);
+			do_print = 0;
+		}
+		return -1;
+	}
+
+	memcpy(&cmd->cdb, rq->cmd, rq->cmd_len);
+	cmd->cdb_len = rq->cmd_len;
+
+	if (rq->data_len == 0) {
+		cmd->dir = UB_DIR_NONE;
+	} else {
+		if (rq_data_dir(rq) == WRITE)
+			cmd->dir = UB_DIR_WRITE;
+		else
+			cmd->dir = UB_DIR_READ;
+	}
+	cmd->data = rq->data;
+	cmd->len = rq->data_len;
+
+	return 0;
 }
 
 static void ub_rw_cmd_done(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
@@ -720,6 +774,12 @@ static void ub_rw_cmd_done(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 	struct gendisk *disk = sc->disk;
 	request_queue_t *q = disk->queue;
 	int uptodate;
+
+	if (blk_pc_request(rq)) {
+		/* UB_SENSE_SIZE is smaller than SCSI_SENSE_BUFFERSIZE */
+		memcpy(rq->sense, sc->top_sense, UB_SENSE_SIZE);
+		rq->sense_len = UB_SENSE_SIZE;
+	}
 
 	if (cmd->error == 0)
 		uptodate = 1;
@@ -778,6 +838,17 @@ static int ub_scsi_cmd_start(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 	int rc;
 
 	bcb = &sc->work_bcb;
+
+	/*
+	 * ``If the allocation length is eighteen or greater, and a device
+	 * server returns less than eithteen bytes of data, the application
+	 * client should assume that the bytes not transferred would have been
+	 * zeroes had the device server returned those bytes.''
+	 *
+	 * We zero sense for all commands so that when a packet request
+	 * fails it does not return a stale sense.
+	 */
+	memset(&sc->top_sense, 0, UB_SENSE_SIZE);
 
 	/* set up the command wrapper */
 	bcb->Signature = cpu_to_le32(US_BULK_CB_SIGN);
@@ -1222,14 +1293,6 @@ static void ub_state_sense(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 		goto error;
 	}
 
-	/*
-	 * ``If the allocation length is eighteen or greater, and a device
-	 * server returns less than eithteen bytes of data, the application
-	 * client should assume that the bytes not transferred would have been
-	 * zeroes had the device server returned those bytes.''
-	 */
-	memset(&sc->top_sense, 0, UB_SENSE_SIZE);
-
 	scmd = &sc->top_rqs_cmd;
 	scmd->cdb[0] = REQUEST_SENSE;
 	scmd->cdb[4] = UB_SENSE_SIZE;
@@ -1495,30 +1558,10 @@ static int ub_bd_release(struct inode *inode, struct file *filp)
 static int ub_bd_ioctl(struct inode *inode, struct file *filp,
     unsigned int cmd, unsigned long arg)
 {
-// void __user *usermem = (void *) arg;
-// struct carm_port *port = ino->i_bdev->bd_disk->private_data;
-// struct hd_geometry geom;
+	struct gendisk *disk = inode->i_bdev->bd_disk;
+	void __user *usermem = (void __user *) arg;
 
-#if 0
-	switch (cmd) {
-	case HDIO_GETGEO:
-		if (usermem == NULL)		// XXX Bizzare. Why?
-			return -EINVAL;
-
-		geom.heads = (u8) port->dev_geom_head;
-		geom.sectors = (u8) port->dev_geom_sect;
-		geom.cylinders = port->dev_geom_cyl;
-		geom.start = get_start_sect(ino->i_bdev);
-
-		if (copy_to_user(usermem, &geom, sizeof(geom)))
-			return -EFAULT;
-		return 0;
-
-	default: ;
-	}
-#endif
-
-	return -ENOTTY;
+	return scsi_cmd_ioctl(filp, disk, cmd, usermem);
 }
 
 /*

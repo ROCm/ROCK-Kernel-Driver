@@ -98,7 +98,8 @@ static inline void clear_pmd_range(struct mmu_gather *tlb, pmd_t *pmd, unsigned 
 		pmd_clear(pmd);
 		return;
 	}
-	if (!(start & ~PMD_MASK) && !(end & ~PMD_MASK)) {
+	if (!((start | end) & ~PMD_MASK)) {
+		/* Only clear full, aligned ranges */
 		page = pmd_page(*pmd);
 		pmd_clear(pmd);
 		dec_page_state(nr_page_table_pages);
@@ -131,7 +132,8 @@ static inline void clear_pud_range(struct mmu_gather *tlb, pud_t *pud, unsigned 
 		addr = next;
 	} while (addr && (addr < end));
 
-	if (!(start & ~PUD_MASK) && !(end & ~PUD_MASK)) {
+	if (!((start | end) & ~PUD_MASK)) {
+		/* Only clear full, aligned ranges */
 		pud_clear(pud);
 		pmd_free_tlb(tlb, __pmd);
 	}
@@ -162,7 +164,8 @@ static inline void clear_pgd_range(struct mmu_gather *tlb, pgd_t *pgd, unsigned 
 		addr = next;
 	} while (addr && (addr < end));
 
-	if (!(start & ~PGDIR_MASK) && !(end & ~PGDIR_MASK)) {
+	if (!((start | end) & ~PGDIR_MASK)) {
+		/* Only clear full, aligned ranges */
 		pgd_clear(pgd);
 		pud_free_tlb(tlb, __pud);
 	}
@@ -358,7 +361,7 @@ static int copy_pmd_range(struct mm_struct *dst_mm,  struct mm_struct *src_mm,
 
 	for (; addr < end; addr = next, src_pmd++, dst_pmd++) {
 		next = (addr + PMD_SIZE) & PMD_MASK;
-		if (next > end)
+		if (next > end || next <= addr)
 			next = end;
 		if (pmd_none(*src_pmd))
 			continue;
@@ -390,7 +393,7 @@ static int copy_pud_range(struct mm_struct *dst_mm,  struct mm_struct *src_mm,
 
 	for (; addr < end; addr = next, src_pud++, dst_pud++) {
 		next = (addr + PUD_SIZE) & PUD_MASK;
-		if (next > end)
+		if (next > end || next <= addr)
 			next = end;
 		if (pud_none(*src_pud))
 			continue;
@@ -1041,7 +1044,8 @@ static inline int zeromap_pud_range(struct mm_struct *mm, pud_t * pud,
 		error = -ENOMEM;
 		if (!pmd)
 			break;
-		error = zeromap_pmd_range(mm, pmd, address, end - address, prot);
+		error = zeromap_pmd_range(mm, pmd, base + address,
+					  end - address, prot);
 		if (error)
 			break;
 		address = (address + PUD_SIZE) & PUD_MASK;
