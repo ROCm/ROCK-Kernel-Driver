@@ -196,6 +196,7 @@ void videobuf_queue_init(struct videobuf_queue *q,
 int  videobuf_queue_is_busy(struct videobuf_queue *q);
 void videobuf_queue_cancel(struct file *file, struct videobuf_queue *q);
 
+enum v4l2_field videobuf_next_field(struct videobuf_queue *q);
 void videobuf_status(struct v4l2_buffer *b, struct videobuf_buffer *vb,
 		     enum v4l2_buf_type type);
 int videobuf_reqbufs(struct file *file, struct videobuf_queue *q,
