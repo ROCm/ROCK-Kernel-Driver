@@ -2011,6 +2011,8 @@ static int do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs *
 	int retval;
 	int i;
 
+	sched_balance_exec();
+
 	file = open_exec(filename);
 
 	retval = PTR_ERR(file);
