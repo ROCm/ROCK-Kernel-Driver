@@ -462,9 +462,8 @@ int fastcall mremap_move_anon_rmap(struct page *page, unsigned long address)
  * Subfunctions of try_to_unmap: try_to_unmap_one called
  * repeatedly from either try_to_unmap_anon or try_to_unmap_file.
  */
-static int try_to_unmap_one(struct page *page,
-	struct mm_struct *mm, unsigned long address,
-	unsigned int *mapcount, struct vm_area_struct *vma)
+static int try_to_unmap_one(struct page *page, struct mm_struct *mm,
+		unsigned long address, struct vm_area_struct *vma)
 {
 	pgd_t *pgd;
 	pmd_t *pmd;
@@ -493,8 +492,6 @@ static int try_to_unmap_one(struct page *page,
 
 	if (page_to_pfn(page) != pte_pfn(*pte))
 		goto out_unmap;
-
-	(*mapcount)--;
 
 	if (!vma) {
 		vma = find_vma(mm, address);
@@ -654,7 +651,6 @@ out_unlock:
 
 static inline int try_to_unmap_anon(struct page *page)
 {
-	unsigned int mapcount = page->mapcount;
 	struct anonmm *anonmm = (struct anonmm *) page->mapping;
 	struct anonmm *anonhd = anonmm->head;
 	struct list_head *seek_head;
@@ -665,9 +661,8 @@ static inline int try_to_unmap_anon(struct page *page)
 	 * First try the indicated mm, it's the most likely.
 	 */
 	if (anonmm->mm && anonmm->mm->rss) {
-		ret = try_to_unmap_one(page,
-			anonmm->mm, page->index, &mapcount, NULL);
-		if (ret == SWAP_FAIL || !mapcount)
+		ret = try_to_unmap_one(page, anonmm->mm, page->index, NULL);
+		if (ret == SWAP_FAIL || !page->mapcount)
 			goto out;
 	}
 
@@ -681,9 +676,8 @@ static inline int try_to_unmap_anon(struct page *page)
 	list_for_each_entry(anonmm, seek_head, list) {
 		if (!anonmm->mm || !anonmm->mm->rss)
 			continue;
-		ret = try_to_unmap_one(page,
-			anonmm->mm, page->index, &mapcount, NULL);
-		if (ret == SWAP_FAIL || !mapcount)
+		ret = try_to_unmap_one(page, anonmm->mm, page->index, NULL);
+		if (ret == SWAP_FAIL || !page->mapcount)
 			goto out;
 	}
 out:
@@ -705,7 +699,6 @@ out:
  */
 static inline int try_to_unmap_file(struct page *page)
 {
-	unsigned int mapcount = page->mapcount;
 	struct address_space *mapping = page->mapping;
 	pgoff_t pgoff = page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT);
 	struct vm_area_struct *vma = NULL;
@@ -715,6 +708,7 @@ static inline int try_to_unmap_file(struct page *page)
 	unsigned long cursor;
 	unsigned long max_nl_cursor = 0;
 	unsigned long max_nl_size = 0;
+	unsigned int mapcount;
 
 	if (!spin_trylock(&mapping->i_mmap_lock))
 		return ret;
@@ -723,9 +717,8 @@ static inline int try_to_unmap_file(struct page *page)
 					&iter, pgoff, pgoff)) != NULL) {
 		if (vma->vm_mm->rss) {
 			address = vma_address(vma, pgoff);
-			ret = try_to_unmap_one(page,
-				vma->vm_mm, address, &mapcount, vma);
-			if (ret == SWAP_FAIL || !mapcount)
+			ret = try_to_unmap_one(page, vma->vm_mm, address, vma);
+			if (ret == SWAP_FAIL || !page->mapcount)
 				goto out;
 		}
 	}
@@ -755,6 +748,7 @@ static inline int try_to_unmap_file(struct page *page)
 	 * The mapcount of the page we came in with is irrelevant,
 	 * but even so use it as a guide to how hard we should try?
 	 */
+	mapcount = page->mapcount;
 	page_map_unlock(page);
 	cond_resched_lock(&mapping->i_mmap_lock);
 
