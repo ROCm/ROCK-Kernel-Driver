@@ -111,8 +111,6 @@ static struct board_type products[] = {
 
 static ctlr_info_t *hba[MAX_CTLR];
 
-static struct proc_dir_entry *proc_cciss;
-
 static void do_cciss_request(request_queue_t *q);
 static int cciss_open(struct inode *inode, struct file *filep);
 static int cciss_release(struct inode *inode, struct file *filep);
@@ -137,8 +135,6 @@ static int cciss_proc_get_info(char *buffer, char **start, off_t offset,
 		int length, int *eof, void *data);
 static void cciss_procinit(int i);
 #else
-static int cciss_proc_get_info(char *buffer, char **start, off_t offset, 
-		int length, int *eof, void *data) { return 0;}
 static void cciss_procinit(int i) {}
 #endif /* CONFIG_PROC_FS */
 
@@ -156,6 +152,9 @@ static struct block_device_operations cciss_fops  = {
  * Report information about this controller.
  */
 #ifdef CONFIG_PROC_FS
+
+static struct proc_dir_entry *proc_cciss;
+
 static int cciss_proc_get_info(char *buffer, char **start, off_t offset, 
 		int length, int *eof, void *data)
 {
