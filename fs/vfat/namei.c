@@ -117,8 +117,6 @@ static int parse_options(char *options,	struct fat_mount_options *opts)
 	savep = NULL;
 	ret = 1;
 	while ((this_char = strsep(&options,",")) != NULL) {
-		if (!*this_char)
-			continue;
 		if ((value = strchr(this_char,'=')) != NULL) {
 			save = *value;
 			savep = value;
@@ -154,8 +152,8 @@ static int parse_options(char *options,	struct fat_mount_options *opts)
 			else
 				ret = 0;
 		}
-		if (this_char != options)
-			*(this_char-1) = ',';
+		if (options)
+			*(options-1) = ',';
 		if (value) {
 			*savep = save;
 		}
