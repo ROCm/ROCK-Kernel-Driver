@@ -57,6 +57,7 @@ struct tvec_t_base_s {
 	spinlock_t lock;
 	unsigned long timer_jiffies;
 	struct timer_list *running_timer;
+	struct list_head *run_timer_list_running;
 	tvec_root_t tv1;
 	tvec_t tv2;
 	tvec_t tv3;
@@ -101,13 +102,22 @@ static inline void check_timer(struct timer_list *timer)
 		check_timer_failed(timer);
 }
 
+/*
+ * If a timer handler re-adds the timer with expires == jiffies, the timer
+ * running code can lock up.  So here we detect that situation and park the
+ * timer onto base->run_timer_list_running.  It will be added to the main timer
+ * structures later, by __run_timers().
+ */
+
 static void internal_add_timer(tvec_base_t *base, struct timer_list *timer)
 {
 	unsigned long expires = timer->expires;
 	unsigned long idx = expires - base->timer_jiffies;
 	struct list_head *vec;
 
-	if (idx < TVR_SIZE) {
+	if (base->run_timer_list_running) {
+		vec = base->run_timer_list_running;
+	} else if (idx < TVR_SIZE) {
 		int i = expires & TVR_MASK;
 		vec = base->tv1.vec + i;
 	} else if (idx < 1 << (TVR_BITS + TVN_BITS)) {
@@ -391,8 +401,11 @@ static int cascade(tvec_base_t *base, tvec_t *tv)
  */
 static inline void __run_timers(tvec_base_t *base)
 {
+	struct timer_list *timer;
+
 	spin_lock_irq(&base->lock);
 	while (time_after_eq(jiffies, base->timer_jiffies)) {
+		LIST_HEAD(deferred_timers);
 		struct list_head *head;
 
 		/*
@@ -403,12 +416,12 @@ static inline void __run_timers(tvec_base_t *base)
 				(cascade(base, &base->tv3) == 1) &&
 					cascade(base, &base->tv4) == 1)
 			cascade(base, &base->tv5);
+		base->run_timer_list_running = &deferred_timers;
 repeat:
 		head = base->tv1.vec + base->tv1.index;
 		if (!list_empty(head)) {
 			void (*fn)(unsigned long);
 			unsigned long data;
-			struct timer_list *timer;
 
 			timer = list_entry(head->next,struct timer_list,entry);
  			fn = timer->function;
@@ -422,8 +435,15 @@ repeat:
 			spin_lock_irq(&base->lock);
 			goto repeat;
 		}
+		base->run_timer_list_running = NULL;
 		++base->timer_jiffies; 
 		base->tv1.index = (base->tv1.index + 1) & TVR_MASK;
+		while (!list_empty(&deferred_timers)) {
+			timer = list_entry(deferred_timers.prev,
+						struct timer_list, entry);
+			list_del(&timer->entry);
+			internal_add_timer(base, timer);
+		}
 	}
 	set_running_timer(base, NULL);
 	spin_unlock_irq(&base->lock);
