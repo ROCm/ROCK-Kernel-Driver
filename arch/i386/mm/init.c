@@ -105,7 +105,6 @@ extern char __init_begin, __init_end;
 static inline void set_pte_phys (unsigned long vaddr,
 			unsigned long phys, pgprot_t flags)
 {
-	pgprot_t prot;
 	pgd_t *pgd;
 	pmd_t *pmd;
 	pte_t *pte;
@@ -121,10 +120,8 @@ static inline void set_pte_phys (unsigned long vaddr,
 		return;
 	}
 	pte = pte_offset_kernel(pmd, vaddr);
-	if (pte_val(*pte))
-		pte_ERROR(*pte);
-	pgprot_val(prot) = pgprot_val(PAGE_KERNEL) | pgprot_val(flags);
-	set_pte(pte, mk_pte_phys(phys, prot));
+	/* <phys,flags> stored as-is, to permit clearing entries */
+	set_pte(pte, mk_pte_phys(phys, flags));
 
 	/*
 	 * It's enough to flush this one mapping.
