@@ -14,8 +14,8 @@
 
 extern unsigned long isa_io_base;
 
-extern struct pci_controller* pci_alloc_pci_controller(enum phb_types controller_type);
-extern struct pci_controller* pci_alloc_phb_dynamic(enum phb_types controller_type);
+extern struct pci_controller* pci_alloc_pci_controller(void);
+extern struct pci_controller* pci_alloc_phb_dynamic(void);
 extern void pci_setup_phb_io(struct pci_controller *hose, int primary);
 
 extern struct pci_controller* pci_find_hose_for_OF_device(struct device_node* node);
@@ -50,7 +50,8 @@ void pci_addr_cache_remove_device(struct pci_dev *dev);
 void init_pci_config_tokens (void);
 unsigned long get_phb_buid (struct device_node *);
 
-extern int pci_probe_only;
+extern unsigned long pci_probe_only;
+extern unsigned long pci_assign_all_buses;
 extern int pci_read_irq_line(struct pci_dev *pci_dev);
 
 #endif /* __PPC_KERNEL_PCI_H__ */

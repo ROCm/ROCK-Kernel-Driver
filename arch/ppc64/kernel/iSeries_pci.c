@@ -256,7 +256,7 @@ unsigned long __init find_and_init_phbs(void)
 		int ret = HvCallXm_testBus(bus);
 		if (ret == 0) {
 			printk("bus %d appears to exist\n", bus);
-			phb = pci_alloc_pci_controller(phb_type_hypervisor);
+			phb = pci_alloc_pci_controller();
 			if (phb == NULL)
 				return -1;
 			phb->pci_mem_offset = phb->local_number = bus;

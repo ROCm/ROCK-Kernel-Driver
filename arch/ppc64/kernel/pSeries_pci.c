@@ -149,6 +149,16 @@ struct pci_ops rtas_pci_ops = {
 	rtas_pci_write_config
 };
 
+static int is_python(struct device_node *dev)
+{
+	char *model = (char *)get_property(dev, "model", NULL);
+
+	if (model && strstr(model, "Python"))
+		return 1;
+
+	return 0;
+}
+
 static void python_countermeasures(unsigned long addr)
 {
 	void __iomem *chip_regs;
@@ -218,33 +228,6 @@ unsigned long __devinit get_phb_buid (struct device_node *phb)
 	return buid;
 }
 
-static enum phb_types get_phb_type(struct device_node *dev)
-{
-	enum phb_types type;
-	char *model;
-
-	model = (char *)get_property(dev, "model", NULL);
-
-	if (!model) {
-		printk(KERN_ERR "%s: phb has no model property\n",
-				__FUNCTION__);
-		model = "<empty>";
-	}
-
-	if (strstr(model, "Python")) {
-		type = phb_type_python;
-	} else if (strstr(model, "Speedwagon")) {
-		type = phb_type_speedwagon;
-	} else if (strstr(model, "Winnipeg")) {
-		type = phb_type_winnipeg;
-	} else {
-		printk(KERN_ERR "%s: unknown PHB %s\n", __FUNCTION__, model);
-		type = phb_type_unknown;
-	}
-
-	return type;
-}
-
 static int get_phb_reg_prop(struct device_node *dev,
 			    unsigned int addr_size_words,
 			    struct reg_property64 *reg)
@@ -288,21 +271,18 @@ static struct pci_controller *alloc_phb(struct device_node *dev,
 {
 	struct pci_controller *phb;
 	struct reg_property64 reg_struct;
-	enum phb_types phb_type;
 	struct property *of_prop;
 	int rc;
-
-	phb_type = get_phb_type(dev);
 
 	rc = get_phb_reg_prop(dev, addr_size_words, &reg_struct);
 	if (rc)
 		return NULL;
 
-	phb = pci_alloc_pci_controller(phb_type);
+	phb = pci_alloc_pci_controller();
 	if (phb == NULL)
 		return NULL;
 
-	if (phb_type == phb_type_python)
+	if (is_python(dev))
 		python_countermeasures(reg_struct.address);
 
 	rc = phb_set_bus_ranges(dev, phb);
@@ -336,20 +316,17 @@ static struct pci_controller * __devinit alloc_phb_dynamic(struct device_node *d
 {
 	struct pci_controller *phb;
 	struct reg_property64 reg_struct;
-	enum phb_types phb_type;
 	int rc;
-
-	phb_type = get_phb_type(dev);
 
 	rc = get_phb_reg_prop(dev, addr_size_words, &reg_struct);
 	if (rc)
 		return NULL;
 
-	phb = pci_alloc_phb_dynamic(phb_type);
+	phb = pci_alloc_phb_dynamic();
 	if (phb == NULL)
 		return NULL;
 
-	if (phb_type == phb_type_python)
+	if (is_python(dev))
 		python_countermeasures(reg_struct.address);
 
 	rc = phb_set_bus_ranges(dev, phb);

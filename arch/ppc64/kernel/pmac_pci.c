@@ -614,7 +614,7 @@ static int __init add_bridge(struct device_node *dev)
        			       dev->full_name);
        	}
 
-       	hose = pci_alloc_pci_controller(phb_type_apple);
+       	hose = pci_alloc_pci_controller();
        	if (!hose)
        		return -ENOMEM;
        	hose->arch_data = dev;

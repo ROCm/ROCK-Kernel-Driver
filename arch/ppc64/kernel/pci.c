@@ -181,43 +181,10 @@ void pcibios_align_resource(void *data, struct resource *res,
 	res->start = start;
 }
 
-static void phb_set_model(struct pci_controller *hose, 
-			  enum phb_types controller_type)
-{
-	char *model;
-
-	switch(controller_type) {
-#ifdef CONFIG_PPC_ISERIES
-	case phb_type_hypervisor:
-		model = "PHB HV";
-		break;
-#endif
-	case phb_type_python:
-		model = "PHB PY";
-		break;
-	case phb_type_speedwagon:
-		model = "PHB SW";
-		break;
-	case phb_type_winnipeg:
-		model = "PHB WP";
-		break;
-	case phb_type_apple:
-		model = "PHB APPLE";
-		break;
-	default:
-		model = "PHB UK";
-		break;
-	}
-
-        if(strlen(model) < 8)
-		strcpy(hose->what,model);
-        else
-		memcpy(hose->what,model,7);
-}
 /*
  * Allocate pci_controller(phb) initialized common variables.
  */
-struct pci_controller * __init pci_alloc_pci_controller(enum phb_types controller_type)
+struct pci_controller * __init pci_alloc_pci_controller()
 {
 	struct pci_controller *hose;
 
@@ -233,10 +200,7 @@ struct pci_controller * __init pci_alloc_pci_controller(enum phb_types controlle
 	}
 	memset(hose, 0, sizeof(struct pci_controller));
 
-	phb_set_model(hose, controller_type);
-
 	hose->is_dynamic = 0;
-	hose->type = controller_type;
 	hose->global_number = global_phb_number++;
 
 	list_add_tail(&hose->list_node, &hose_list);
@@ -247,7 +211,7 @@ struct pci_controller * __init pci_alloc_pci_controller(enum phb_types controlle
 /*
  * Dymnamically allocate pci_controller(phb), initialize common variables.
  */
-struct pci_controller * pci_alloc_phb_dynamic(enum phb_types controller_type)
+struct pci_controller * pci_alloc_phb_dynamic()
 {
 	struct pci_controller *hose;
 
@@ -259,10 +223,7 @@ struct pci_controller * pci_alloc_phb_dynamic(enum phb_types controller_type)
 	}
 	memset(hose, 0, sizeof(struct pci_controller));
 
-	phb_set_model(hose, controller_type);
-
 	hose->is_dynamic = 1;
-	hose->type = controller_type;
 	hose->global_number = global_phb_number++;
 
 	list_add_tail(&hose->list_node, &hose_list);
