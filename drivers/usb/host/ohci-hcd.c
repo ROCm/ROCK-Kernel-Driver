@@ -165,6 +165,7 @@ MODULE_PARM_DESC (no_handshake, "true (not default) disables BIOS handshake");
  */
 static int ohci_urb_enqueue (
 	struct usb_hcd	*hcd,
+	struct usb_host_endpoint *ep,
 	struct urb	*urb,
 	int		mem_flags
 ) {
@@ -181,7 +182,7 @@ static int ohci_urb_enqueue (
 #endif
 	
 	/* every endpoint has a ed, locate and maybe (re)initialize it */
-	if (! (ed = ed_get (ohci, urb->dev, pipe, urb->interval)))
+	if (! (ed = ed_get (ohci, ep, urb->dev, pipe, urb->interval)))
 		return -ENOMEM;
 
 	/* for the private part of the URB we need the number of TDs (size) */
@@ -338,26 +339,21 @@ static int ohci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
  */
 
 static void
-ohci_endpoint_disable (struct usb_hcd *hcd, struct hcd_dev *dev, int ep)
+ohci_endpoint_disable (struct usb_hcd *hcd, struct usb_host_endpoint *ep)
 {
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
-	int			epnum = ep & USB_ENDPOINT_NUMBER_MASK;
 	unsigned long		flags;
-	struct ed		*ed;
+	struct ed		*ed = ep->hcpriv;
 	unsigned		limit = 1000;
 
 	/* ASSERT:  any requests/urbs are being unlinked */
 	/* ASSERT:  nobody can be submitting urbs for this any more */
 
-	epnum <<= 1;
-	if (epnum != 0 && !(ep & USB_DIR_IN))
-		epnum |= 1;
+	if (!ed)
+		return;
 
 rescan:
 	spin_lock_irqsave (&ohci->lock, flags);
-	ed = dev->ep [epnum];
-	if (!ed)
-		goto done;
 
 	if (!HCD_IS_RUNNING (ohci->hcd.state)) {
 sanitize:
@@ -387,14 +383,13 @@ sanitize:
 		/* caller was supposed to have unlinked any requests;
 		 * that's not our job.  can't recover; must leak ed.
 		 */
-		ohci_err (ohci, "leak ed %p (#%d) state %d%s\n",
-			ed, epnum, ed->state,
+		ohci_err (ohci, "leak ed %p (#%02x) state %d%s\n",
+			ed, ep->desc.bEndpointAddress, ed->state,
 			list_empty (&ed->td_list) ? "" : " (has tds)");
 		td_free (ohci, ed->dummy);
 		break;
 	}
-	dev->ep [epnum] = NULL;
-done:
+	ep->hcpriv = NULL;
 	spin_unlock_irqrestore (&ohci->lock, flags);
 	return;
 }

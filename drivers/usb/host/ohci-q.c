@@ -386,37 +386,30 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 /*-------------------------------------------------------------------------*/
 
 /* get and maybe (re)init an endpoint. init _should_ be done only as part
- * of usb_set_configuration() or usb_set_interface() ... but the USB stack
- * isn't very stateful, so we re-init whenever the HC isn't looking.
+ * of enumeration, usb_set_configuration() or usb_set_interface().
  */
 static struct ed *ed_get (
 	struct ohci_hcd		*ohci,
+	struct usb_host_endpoint *ep,
 	struct usb_device	*udev,
 	unsigned int		pipe,
 	int			interval
 ) {
-	int			is_out = !usb_pipein (pipe);
-	int			type = usb_pipetype (pipe);
-	struct hcd_dev		*dev = (struct hcd_dev *) udev->hcpriv;
 	struct ed		*ed; 
-	unsigned		ep;
 	unsigned long		flags;
-
-	ep = usb_pipeendpoint (pipe) << 1;
-	if (type != PIPE_CONTROL && is_out)
-		ep |= 1;
 
 	spin_lock_irqsave (&ohci->lock, flags);
 
-	if (!(ed = dev->ep [ep])) {
+	if (!(ed = ep->hcpriv)) {
 		struct td	*td;
+		int		is_out;
+		u32		info;
 
 		ed = ed_alloc (ohci, GFP_ATOMIC);
 		if (!ed) {
 			/* out of memory */
 			goto done;
 		}
-		dev->ep [ep] = ed;
 
   		/* dummy td; end of td list for ed */
 		td = td_alloc (ohci, GFP_ATOMIC);
@@ -430,38 +423,39 @@ static struct ed *ed_get (
 		ed->hwTailP = cpu_to_hc32 (ohci, td->td_dma);
 		ed->hwHeadP = ed->hwTailP;	/* ED_C, ED_H zeroed */
 		ed->state = ED_IDLE;
-		ed->type = type;
-	}
 
-	/* NOTE: only ep0 currently needs this "re"init logic, during
-	 * enumeration (after set_address).
-	 */
-  	if (ed->state == ED_IDLE) {
-		u32	info;
+		is_out = !(ep->desc.bEndpointAddress & USB_DIR_IN);
 
+		/* FIXME usbcore changes dev->devnum before SET_ADDRESS
+		 * suceeds ... otherwise we wouldn't need "pipe".
+		 */
 		info = usb_pipedevice (pipe);
-		info |= (ep >> 1) << 7;
-		info |= usb_maxpacket (udev, pipe, is_out) << 16;
+		ed->type = usb_pipetype(pipe);
+
+		info |= (ep->desc.bEndpointAddress & ~USB_DIR_IN) << 7;
+		info |= ep->desc.wMaxPacketSize << 16;
 		if (udev->speed == USB_SPEED_LOW)
 			info |= ED_LOWSPEED;
 		/* only control transfers store pids in tds */
-		if (type != PIPE_CONTROL) {
+		if (ed->type != PIPE_CONTROL) {
 			info |= is_out ? ED_OUT : ED_IN;
-			if (type != PIPE_BULK) {
+			if (ed->type != PIPE_BULK) {
 				/* periodic transfers... */
-				if (type == PIPE_ISOCHRONOUS)
+				if (ed->type == PIPE_ISOCHRONOUS)
 					info |= ED_ISO;
 				else if (interval > 32)	/* iso can be bigger */
 					interval = 32;
 				ed->interval = interval;
 				ed->load = usb_calc_bus_time (
 					udev->speed, !is_out,
-					type == PIPE_ISOCHRONOUS,
-					usb_maxpacket (udev, pipe, is_out))
+					ed->type == PIPE_ISOCHRONOUS,
+					ep->desc.wMaxPacketSize)
 						/ 1000;
 			}
 		}
 		ed->hwINFO = cpu_to_hc32(ohci, info);
+
+		ep->hcpriv = ed;
 	}
 
 done:
