@@ -4130,16 +4130,16 @@ ssize_t32 sys32_pread64(unsigned int fd, char *ubuf, __kernel_size_t32 count,
 }
 
 ssize_t32 sys32_pwrite64(unsigned int fd, char *ubuf, __kernel_size_t32 count,
-			 u32 reg6 ,u32 poshi, u32 poslo)
+			 u32 reg6, u32 poshi, u32 poslo)
 {
 	return sys_pwrite64(fd, ubuf, count, ((loff_t)AA(poshi) << 32) | AA(poslo));
 }
 
 extern ssize_t sys_readahead(int fd, loff_t offset, size_t count);
 
-ssize_t32 sys32_readahead(int fd, u32 offhi, u32 offlo, s32 count)
+ssize_t32 sys32_readahead(int fd, u32 r4, u32 offhi, u32 offlo, u32 count)
 {
-        return sys_readahead(fd, ((loff_t)AA(offhi) << 32) | AA(offlo), count);
+        return sys_readahead(fd, ((loff_t)offhi << 32) | offlo, AA(count));
 }
 
 extern asmlinkage long sys_truncate(const char * path, unsigned long length);
