@@ -179,19 +179,6 @@ static int ext3_journal_test_restart(handle_t *handle, struct inode *inode)
 }
 
 /*
- * Called at each iput()
- *
- * The inode may be "bad" if ext3_read_inode() saw an error from
- * ext3_get_inode(), so we need to check that to avoid freeing random disk
- * blocks.
- */
-void ext3_put_inode(struct inode *inode)
-{
-	if (!is_bad_inode(inode))
-		ext3_discard_prealloc(inode);
-}
-
-/*
  * Called at the last iput() if i_nlink is zero.
  */
 void ext3_delete_inode (struct inode * inode)
@@ -244,62 +231,12 @@ no_delete:
 	clear_inode(inode);	/* We must guarantee clearing of inode... */
 }
 
-void ext3_discard_prealloc (struct inode * inode)
-{
-#ifdef EXT3_PREALLOCATE
-	struct ext3_inode_info *ei = EXT3_I(inode);
-	/* Writer: ->i_prealloc* */
-	if (ei->i_prealloc_count) {
-		unsigned short total = ei->i_prealloc_count;
-		unsigned long block = ei->i_prealloc_block;
-		ei->i_prealloc_count = 0;
-		ei->i_prealloc_block = 0;
-		/* Writer: end */
-		ext3_free_blocks (inode, block, total);
-	}
-#endif
-}
-
 static int ext3_alloc_block (handle_t *handle,
 			struct inode * inode, unsigned long goal, int *err)
 {
 	unsigned long result;
 
-#ifdef EXT3_PREALLOCATE
-#ifdef EXT3FS_DEBUG
-	static unsigned long alloc_hits, alloc_attempts;
-#endif
-	struct ext3_inode_info *ei = EXT3_I(inode);
-	/* Writer: ->i_prealloc* */
-	if (ei->i_prealloc_count &&
-	    (goal == ei->i_prealloc_block ||
-	     goal + 1 == ei->i_prealloc_block))
-	{
-		result = ei->i_prealloc_block++;
-		ei->i_prealloc_count--;
-		/* Writer: end */
-		ext3_debug ("preallocation hit (%lu/%lu).\n",
-			    ++alloc_hits, ++alloc_attempts);
-	} else {
-		ext3_discard_prealloc (inode);
-		ext3_debug ("preallocation miss (%lu/%lu).\n",
-			    alloc_hits, ++alloc_attempts);
-		if (S_ISREG(inode->i_mode))
-			result = ext3_new_block (inode, goal, 
-				 &ei->i_prealloc_count,
-				 &ei->i_prealloc_block, err);
-		else
-			result = ext3_new_block(inode, goal, NULL, NULL, err);
-		/*
-		 * AKPM: this is somewhat sticky.  I'm not surprised it was
-		 * disabled in 2.2's ext3.  Need to integrate b_committed_data
-		 * guarding with preallocation, if indeed preallocation is
-		 * effective.
-		 */
-	}
-#else
-	result = ext3_new_block(handle, inode, goal, NULL, NULL, err);
-#endif
+	result = ext3_new_block(handle, inode, goal, err);
 	return result;
 }
 
@@ -983,38 +920,6 @@ struct buffer_head *ext3_bread(handle_t *handle, struct inode * inode,
 	bh = ext3_getblk (handle, inode, block, create, err);
 	if (!bh)
 		return bh;
-#ifdef EXT3_PREALLOCATE
-	/*
-	 * If the inode has grown, and this is a directory, then use a few
-	 * more of the preallocated blocks to keep directory fragmentation
-	 * down.  The preallocated blocks are guaranteed to be contiguous.
-	 */
-	if (create &&
-	    S_ISDIR(inode->i_mode) &&
-	    inode->i_blocks > prev_blocks &&
-	    EXT3_HAS_COMPAT_FEATURE(inode->i_sb,
-				    EXT3_FEATURE_COMPAT_DIR_PREALLOC)) {
-		int i;
-		struct buffer_head *tmp_bh;
-
-		for (i = 1;
-		     EXT3_I(inode)->i_prealloc_count &&
-		     i < EXT3_SB(inode->i_sb)->s_es->s_prealloc_dir_blocks;
-		     i++) {
-			/*
-			 * ext3_getblk will zero out the contents of the
-			 * directory for us
-			 */
-			tmp_bh = ext3_getblk(handle, inode,
-						block+i, create, err);
-			if (!tmp_bh) {
-				brelse (bh);
-				return 0;
-			}
-			brelse (tmp_bh);
-		}
-	}
-#endif
 	if (buffer_uptodate(bh))
 		return bh;
 	ll_rw_block (READ, 1, &bh);
@@ -2170,7 +2075,7 @@ void ext3_truncate(struct inode * inode)
 	if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
 		return;
 
-	ext3_discard_prealloc(inode);
+	ext3_discard_reservation(inode);
 
 	/*
 	 * We have to lock the EOF page here, because lock_page() nests
@@ -2326,8 +2231,10 @@ static unsigned long ext3_get_inode_block(struct super_block *sb,
 	struct buffer_head *bh;
 	struct ext3_group_desc * gdp;
 
+
 	if ((ino != EXT3_ROOT_INO &&
 		ino != EXT3_JOURNAL_INO &&
+		ino != EXT3_RESIZE_INO &&
 		ino < EXT3_FIRST_INO(sb)) ||
 		ino > le32_to_cpu(
 			EXT3_SB(sb)->s_es->s_inodes_count)) {
@@ -2341,6 +2248,7 @@ static unsigned long ext3_get_inode_block(struct super_block *sb,
 			    "group >= groups count");
 		return 0;
 	}
+	smp_rmb();
 	group_desc = block_group >> EXT3_DESC_PER_BLOCK_BITS(sb);
 	desc = block_group & (EXT3_DESC_PER_BLOCK(sb) - 1);
 	bh = EXT3_SB(sb)->s_group_desc[group_desc];
@@ -2504,6 +2412,8 @@ void ext3_read_inode(struct inode * inode)
 	ei->i_acl = EXT3_ACL_NOT_CACHED;
 	ei->i_default_acl = EXT3_ACL_NOT_CACHED;
 #endif
+	ei->i_rsv_window.rsv_end = EXT3_RESERVE_WINDOW_NOT_ALLOCATED;
+
 	if (ext3_get_inode_loc(inode, &iloc, 0))
 		goto bad_inode;
 	bh = iloc.bh;
@@ -2563,11 +2473,11 @@ void ext3_read_inode(struct inode * inode)
 	}
 	ei->i_disksize = inode->i_size;
 	inode->i_generation = le32_to_cpu(raw_inode->i_generation);
-#ifdef EXT3_PREALLOCATE
-	ei->i_prealloc_count = 0;
-#endif
 	ei->i_block_group = iloc.block_group;
-
+	ei->i_rsv_window.rsv_start = 0;
+	ei->i_rsv_window.rsv_end= 0;
+	atomic_set(&ei->i_rsv_window.rsv_goal_size, EXT3_DEFAULT_RESERVE_BLOCKS);
+	seqlock_init(&ei->i_rsv_window.rsv_seqlock);
 	/*
 	 * NOTE! The in-memory inode i_data array is in little-endian order
 	 * even on big-endian machines: we do NOT byteswap the block numbers!

@@ -38,6 +38,7 @@
 #include <linux/kernelcapi.h>
 #include <linux/init.h>
 #include <linux/device.h>
+#include <linux/moduleparam.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/isdn/capiutil.h>
 #include <linux/isdn/capicmd.h>
@@ -67,10 +68,10 @@ int capi_ttymajor = 191;
 int capi_ttyminors = CAPINC_NR_PORTS;
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 
-MODULE_PARM(capi_major, "i");
+module_param_named(major, capi_major, uint, 0);
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
-MODULE_PARM(capi_ttymajor, "i");
-MODULE_PARM(capi_ttyminors, "i");
+module_param_named(ttymajor, capi_ttymajor, uint, 0);
+module_param_named(ttyminors, capi_ttyminors, uint, 0);
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 
 /* -------- defines ------------------------------------------------- */

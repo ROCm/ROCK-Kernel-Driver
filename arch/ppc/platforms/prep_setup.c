@@ -961,6 +961,9 @@ prep_irq_canonicalize(u_int irq)
 static int __init
 prep_request_cascade(void)
 {
+	if (_machine != _MACH_prep)
+		return 0;
+
 	if (OpenPIC_Addr != NULL)
 		/* We have a cascade on OpenPIC IRQ 0, Linux IRQ 16 */
 		openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",

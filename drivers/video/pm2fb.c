@@ -97,8 +97,8 @@ struct pm2fb_par
 {
 	pm2type_t	type;		/* Board type */
 	u32		fb_size;	/* framebuffer memory size */
-	unsigned char*	v_fb;		/* virtual address of frame buffer */
-	unsigned char*	v_regs;		/* virtual address of p_regs */
+	unsigned char	__iomem *v_fb;  /* virtual address of frame buffer */
+	unsigned char	__iomem *v_regs;/* virtual address of p_regs */
 	u32 	   	memclock;	/* memclock */
 	u32		video;		/* video flags before blanking */
 };
@@ -149,12 +149,12 @@ static struct fb_var_screeninfo pm2fb_var __initdata = {
  * Utility functions
  */
 
-inline static u32 RD32(unsigned char* base, s32 off)
+inline static u32 RD32(unsigned char __iomem *base, s32 off)
 {
 	return fb_readl(base + off);
 }
 
-inline static void WR32(unsigned char* base, s32 off, u32 v)
+inline static void WR32(unsigned char __iomem *base, s32 off, u32 v)
 {
 	fb_writel(v, base + off);
 }
@@ -1154,10 +1154,10 @@ static int __devinit pm2fb_probe(struct pci_dev *pdev,
  err_exit_all:
 	fb_dealloc_cmap(&info->cmap);	
  err_exit_both:    
-	iounmap((void*) pm2fb_fix.smem_start);
+	iounmap(info->screen_base);
 	release_mem_region(pm2fb_fix.smem_start, pm2fb_fix.smem_len);
  err_exit_mmio:
-	iounmap((void*) pm2fb_fix.mmio_start);
+	iounmap(default_par->v_regs);
 	release_mem_region(pm2fb_fix.mmio_start, pm2fb_fix.mmio_len);
  err_exit_neither:
 	framebuffer_release(info);
@@ -1175,12 +1175,13 @@ static void __devexit pm2fb_remove(struct pci_dev *pdev)
 {
 	struct fb_info* info = pci_get_drvdata(pdev);
 	struct fb_fix_screeninfo* fix = &info->fix;
-    
+	struct pm2fb_par *par = info->par;
+
 	unregister_framebuffer(info);
     
-	iounmap((void*) fix->smem_start);
+	iounmap(info->screen_base);
 	release_mem_region(fix->smem_start, fix->smem_len);
-	iounmap((void*) fix->mmio_start);
+	iounmap(par->v_regs);
 	release_mem_region(fix->mmio_start, fix->mmio_len);
 
 	pci_set_drvdata(pdev, NULL);

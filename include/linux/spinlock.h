@@ -27,7 +27,7 @@
         extra                                   \
         ".ifndef " LOCK_SECTION_NAME "\n\t"     \
         LOCK_SECTION_NAME ":\n\t"               \
-        ".endif\n\t"
+        ".endif\n"
 
 #define LOCK_SECTION_END                        \
         ".previous\n\t"

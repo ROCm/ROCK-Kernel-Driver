@@ -13,6 +13,7 @@ unsigned char cached_8259[2] = { 0xff, 0xff };
 static spinlock_t i8259_lock = SPIN_LOCK_UNLOCKED;
 
 int i8259_pic_irq_offset;
+static int i8259_present;
 
 /*
  * Acknowledge the IRQ using either the PCI host bridge's interrupt
@@ -154,6 +155,9 @@ static struct resource pic_edgectrl_iores = {
 static int __init
 i8259_hook_cascade(void)
 {
+	if (!i8259_present)
+		return 0;
+
 	/* reserve our resources */
 	request_irq( i8259_pic_irq_offset + 2, no_action, SA_INTERRUPT,
 				"82c59 secondary cascade", NULL );
@@ -201,4 +205,6 @@ i8259_init(long intack_addr)
 
 	if (intack_addr != 0)
 		pci_intack = ioremap(intack_addr, 1);
+
+	i8259_present = 1;
 }

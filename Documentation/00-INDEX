@@ -178,8 +178,6 @@ mips/
 	- directory with info about Linux on MIPS architecture.
 mkdev.cciss
 	- script to make /dev entries for SMART controllers (see cciss.txt).
-mkdev.ida
-	- script to make /dev entries for Intelligent Disk Array Controllers.
 mono.txt
 	- how to execute Mono-based .NET binaries with the help of BINFMT_MISC.
 moxa-smartio

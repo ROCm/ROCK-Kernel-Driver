@@ -94,6 +94,7 @@ static int smp_iSeries_numProcs(void)
                 if (paca[i].lppaca.xDynProcStatus < 2) {
 			cpu_set(i, cpu_possible_map);
 			cpu_set(i, cpu_present_map);
+			cpu_set(i, cpu_sibling_map[i]);
                         ++np;
                 }
         }
