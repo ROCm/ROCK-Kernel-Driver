@@ -396,11 +396,14 @@ static int snd_ac97_ad18xx_update_pcm_bits(ac97_t *ac97, int codec, unsigned sho
 		ac97->spec.ad18xx.pcmreg[codec] = new;
 		spin_unlock(&ac97->reg_lock);
 		/* select single codec */
-		ac97->bus->write(ac97, AC97_AD_SERIAL_CFG, ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
+		ac97->bus->write(ac97, AC97_AD_SERIAL_CFG,
+				 (ac97->regs[AC97_AD_SERIAL_CFG] & ~0x7000) |
+				 ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
 		/* update PCM bits */
 		ac97->bus->write(ac97, AC97_PCM, new);
 		/* select all codecs */
-		ac97->bus->write(ac97, AC97_AD_SERIAL_CFG, 0x7000);
+		ac97->bus->write(ac97, AC97_AD_SERIAL_CFG,
+				 ac97->regs[AC97_AD_SERIAL_CFG] | 0x7000);
 	} else
 		spin_unlock(&ac97->reg_lock);
 	up(&ac97->spec.ad18xx.mutex);
@@ -2032,11 +2035,12 @@ __reset_ready:
 			if (! ac97->spec.ad18xx.id[codec])
 				continue;
 			/* select single codec */
-			ac97->bus->write(ac97, AC97_AD_SERIAL_CFG, ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
+			snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000,
+					     ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
 			ac97->bus->write(ac97, AC97_AD_CODEC_CFG, ac97->spec.ad18xx.codec_cfg[codec]);
 		}
 		/* select all codecs */
-		ac97->bus->write(ac97, AC97_AD_SERIAL_CFG, 0x7000);
+		snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000, 0x7000);
 	}
 
 	/* restore ac97 status */
@@ -2055,12 +2059,13 @@ __reset_ready:
 						if (! ac97->spec.ad18xx.id[codec])
 							continue;
 						/* select single codec */
-						ac97->bus->write(ac97, AC97_AD_SERIAL_CFG, ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
+						snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000,
+								     ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
 						/* update PCM bits */
 						ac97->bus->write(ac97, AC97_PCM, ac97->spec.ad18xx.pcmreg[codec]);
 					}
 					/* select all codecs */
-					ac97->bus->write(ac97, AC97_AD_SERIAL_CFG, 0x7000);
+					snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000, 0x7000);
 					continue;
 				} else if (i == AC97_AD_TEST ||
 					   i == AC97_AD_CODEC_CFG ||
