@@ -2,7 +2,7 @@
  *                  QLOGIC LINUX SOFTWARE
  *
  * QLogic ISP2x00 device driver for Linux 2.6.x
- * Copyright (C) 2003 QLogic Corporation
+ * Copyright (C) 2003-2004 QLogic Corporation
  * (www.qlogic.com)
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -1598,8 +1598,8 @@ qla2x00_get_port_name(scsi_qla_host_t *ha, uint16_t loop_id, uint8_t *name,
  *	BIT_1 = mailbox error.
  */
 uint8_t
-qla2x00_get_link_status(scsi_qla_host_t *ha, uint8_t loop_id, void *ret_buf,
-    uint16_t *status)
+qla2x00_get_link_status(scsi_qla_host_t *ha, uint8_t loop_id,
+    link_stat_t *ret_buf, uint16_t *status)
 {
 	int rval;
 	mbx_cmd_t mc;
@@ -1646,16 +1646,20 @@ qla2x00_get_link_status(scsi_qla_host_t *ha, uint8_t loop_id, void *ret_buf,
 			status[0] = mcp->mb[0];
 			rval = BIT_1;
 		} else {
-			/* copy over data */
-			memcpy(ret_buf, stat_buf,sizeof(link_stat_t));
-			DEBUG(printk("qla2x00_get_link_status(%ld): stat dump: "
-			    "fail_cnt=%d loss_sync=%d loss_sig=%d seq_err=%d "
-			    "inval_xmt_word=%d inval_crc=%d.\n",
-			    ha->host_no,
-			    stat_buf->link_fail_cnt, stat_buf->loss_sync_cnt,
-			    stat_buf->loss_sig_cnt, stat_buf->prim_seq_err_cnt,
-			    stat_buf->inval_xmit_word_cnt,
-			    stat_buf->inval_crc_cnt);)
+			/* copy over data -- firmware data is LE. */
+			ret_buf->link_fail_cnt =
+			    le32_to_cpu(stat_buf->link_fail_cnt);
+			ret_buf->loss_sync_cnt =
+			    le32_to_cpu(stat_buf->loss_sync_cnt);
+			ret_buf->loss_sig_cnt =
+			    le32_to_cpu(stat_buf->loss_sig_cnt);
+			ret_buf->prim_seq_err_cnt =
+			    le32_to_cpu(stat_buf->prim_seq_err_cnt);
+			ret_buf->inval_xmit_word_cnt =
+			    le32_to_cpu(stat_buf->inval_xmit_word_cnt);
+			ret_buf->inval_crc_cnt =
+			    le32_to_cpu(stat_buf->inval_crc_cnt);
+
 			DEBUG11(printk("qla2x00_get_link_status(%ld): stat "
 			    "dump: fail_cnt=%d loss_sync=%d loss_sig=%d "
 			    "seq_err=%d inval_xmt_word=%d inval_crc=%d.\n",
@@ -1672,8 +1676,8 @@ qla2x00_get_link_status(scsi_qla_host_t *ha, uint8_t loop_id, void *ret_buf,
 		rval = BIT_1;
 	}
 
-	pci_free_consistent(ha->pdev, sizeof(link_stat_t),
-	    stat_buf, phys_address);
+	pci_free_consistent(ha->pdev, sizeof(link_stat_t), stat_buf,
+	    phys_address);
 
 	return rval;
 }

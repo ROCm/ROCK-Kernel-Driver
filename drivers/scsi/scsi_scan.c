@@ -205,7 +205,6 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	sdev->id = id;
 	sdev->lun = lun;
 	sdev->channel = channel;
-	sdev->online = TRUE;
 	sdev->sdev_state = SDEV_CREATED;
 	INIT_LIST_HEAD(&sdev->siblings);
 	INIT_LIST_HEAD(&sdev->same_target_siblings);
@@ -552,7 +551,7 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 	if (((inq_result[0] >> 5) & 7) == 1) {
 		SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: peripheral"
 				" qualifier of 1, device offlined\n"));
-		sdev->online = FALSE;
+		scsi_device_set_state(sdev, SDEV_OFFLINE);
 	}
 
 	sdev->removable = (0x80 & inq_result[1]) >> 7;
@@ -646,6 +645,9 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 	/* set the device running here so that slave configure
 	 * may do I/O */
 	scsi_device_set_state(sdev, SDEV_RUNNING);
+
+	if (*bflags & BLIST_MS_192_BYTES_FOR_3F)
+		sdev->use_192_bytes_for_3f = 1;
 
 	if(sdev->host->hostt->slave_configure)
 		sdev->host->hostt->slave_configure(sdev);

@@ -2,7 +2,7 @@
 *                  QLOGIC LINUX SOFTWARE
 *
 * QLogic ISP2x00 device driver for Linux 2.6.x
-* Copyright (C) 2003 QLogic Corporation
+* Copyright (C) 2003-2004 QLogic Corporation
 * (www.qlogic.com)
 *
 * This program is free software; you can redistribute it and/or modify it
@@ -209,7 +209,7 @@
 #define MAX_OUTSTANDING_COMMANDS	1024
 
 /* ISP request and response entry counts (37-65535) */
-#define REQUEST_ENTRY_CNT		1024	/* Number of request entries. */
+#define REQUEST_ENTRY_CNT		2048	/* Number of request entries. */
 #define RESPONSE_ENTRY_CNT_2100		64	/* Number of response entries.*/
 #define RESPONSE_ENTRY_CNT_2300		512	/* Number of response entries.*/
 
@@ -265,6 +265,14 @@ typedef struct srb {
 	/* Raw completion info for use by failover ? */
 	uint8_t	fo_retry_cnt;		/* Retry count this request */
 	uint8_t	err_id;			/* error id */
+#define SRB_ERR_PORT	1		/* Request failed -- "port down" */
+#define SRB_ERR_LOOP	2		/* Request failed -- "loop down" */
+#define SRB_ERR_DEVICE	3		/* Request failed -- "device error" */
+#define SRB_ERR_OTHER	4
+
+	/* Segment/entries counts */
+	uint16_t	req_cnt;	/* !0 indicates counts determined */
+	uint16_t	tot_dsds;
 
 	/* SRB magic number */
 	uint16_t magic;
@@ -1518,7 +1526,7 @@ typedef struct {
 /*
  * Inquiry command structure.
  */
-#define INQ_DATA_SIZE	8
+#define INQ_DATA_SIZE	36
 
 /*
  * Inquiry mailbox IOCB packet definition.
@@ -1572,7 +1580,7 @@ typedef struct {
 typedef struct os_tgt {
 	struct os_lun *olun[MAX_LUNS]; /* LUN context pointer. */
 	struct fc_port *fcport;
-	uint32_t flags;
+	unsigned long flags;
 	uint8_t port_down_retry_count;
     	uint32_t down_timer;
 	struct scsi_qla_host *ha;
@@ -1586,10 +1594,9 @@ typedef struct os_tgt {
 /*
  * SCSI Target Queue flags
  */
-#define TQF_QUEUE_SUSPENDED	BIT_0		/* Queue suspended. */
-#define TQF_BOOT_DEVICE		BIT_1		/* Boot device. */
-#define TQF_ONLINE		BIT_2		/* Device online to OS. */
-#define TQF_TGT_RST_NEEDED	BIT_3
+#define TQF_ONLINE		0		/* Device online to OS. */
+#define TQF_SUSPENDED		1
+#define TQF_RETRY_CMDS		2
 
 /*
  * SCSI LUN Queue structure
@@ -1715,6 +1722,12 @@ typedef struct fc_port {
 #define FCF_RLC_SUPPORT		BIT_14
 #define FCF_CONFIG		BIT_15	/* Needed? */
 #define FCF_RESCAN_NEEDED	BIT_16
+#define FCF_XP_DEVICE		BIT_17
+#define FCF_MSA_DEVICE		BIT_18
+#define FCF_EVA_DEVICE		BIT_19
+#define FCF_MSA_PORT_ACTIVE	BIT_20
+#define FCF_FAILBACK_DISABLE	BIT_21
+#define FCF_FAILOVER_DISABLE	BIT_22
 
 /* No loop ID flag. */
 #define FC_NO_LOOP_ID		0x1000
@@ -1730,9 +1743,13 @@ typedef struct fc_lun {
 	uint16_t lun;
 	atomic_t state;
 	uint8_t device_type;
+
 	uint8_t max_path_retries;
+	uint32_t flags;
 } fc_lun_t;
 
+#define	FLF_VISIBLE_LUN		BIT_0
+#define	FLF_ACTIVE_LUN		BIT_1
 
 /*
  * FC-CT interface
@@ -2071,6 +2088,7 @@ typedef struct scsi_qla_host {
 #define ISP_ABORT_RETRY         20      /* ISP aborted. */
 #define FCPORT_RESCAN_NEEDED	21      /* IO descriptor processing needed */
 #define IODESC_PROCESS_NEEDED	22      /* IO descriptor processing needed */
+#define IOCTL_ERROR_RECOVERY	23      
 
 	uint32_t	device_flags;
 #define DFLG_LOCAL_DEVICES		BIT_0
@@ -2287,6 +2305,7 @@ typedef struct scsi_qla_host {
 	uint32_t failback_delay;
 	unsigned long   cfg_flags;
 #define	CFG_ACTIVE	0	/* CFG during a failover, event update, or ioctl */
+#define	CFG_FAILOVER	1	/* CFG during path change */
 
 	uint32_t	binding_type;
 #define BIND_BY_PORT_NAME	0
@@ -2319,7 +2338,6 @@ typedef struct scsi_qla_host {
 #define BINZERO		"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 	char		*model_desc;
 
-/* following are new and needed for IOCTL support */
 	uint8_t     node_name[WWN_SIZE];
 	uint8_t     nvram_version; 
 	uint8_t     optrom_major; 

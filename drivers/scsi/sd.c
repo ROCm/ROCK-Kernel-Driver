@@ -245,7 +245,7 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 	SCSI_LOG_HLQUEUE(1, printk("sd_init_command: disk=%s, block=%llu, "
 			    "count=%d\n", disk->disk_name, (unsigned long long)block, this_count));
 
-	if (!sdp || !sdp->online ||
+	if (!sdp || !scsi_device_online(sdp) ||
  	    block + SCpnt->request->nr_sectors > get_capacity(disk)) {
 		SCSI_LOG_HLQUEUE(2, printk("Finishing %ld sectors\n", 
 				 SCpnt->request->nr_sectors));
@@ -452,7 +452,7 @@ static int sd_open(struct inode *inode, struct file *filp)
 	 * open actually succeeded.
 	 */
 	retval = -ENXIO;
-	if (!sdev->online)
+	if (!scsi_device_online(sdev))
 		goto error_out;
 
 	if (!sdkp->openers++ && sdev->removable) {
@@ -619,7 +619,7 @@ static int sd_media_changed(struct gendisk *disk)
 	 * can deal with it then.  It is only because of unrecoverable errors
 	 * that we would ever take a device offline in the first place.
 	 */
-	if (!sdp->online)
+	if (!scsi_device_online(sdp))
 		goto not_present;
 
 	/*
@@ -1122,26 +1122,32 @@ sd_read_write_protect_flag(struct scsi_disk *sdkp, char *diskname,
 		return;
 	}
 
-	/*
-	 * First attempt: ask for all pages (0x3F), but only 4 bytes.
-	 * We have to start carefully: some devices hang if we ask
-	 * for more than is available.
-	 */
-	res = sd_do_mode_sense(SRpnt, 0, 0x3F, buffer, 4, &data);
+	if (sdkp->device->use_192_bytes_for_3f) {
+		res = sd_do_mode_sense(SRpnt, 0, 0x3F, buffer, 192, &data);
+	} else {
+		/*
+		 * First attempt: ask for all pages (0x3F), but only 4 bytes.
+		 * We have to start carefully: some devices hang if we ask
+		 * for more than is available.
+		 */
+		res = sd_do_mode_sense(SRpnt, 0, 0x3F, buffer, 4, &data);
 
-	/*
-	 * Second attempt: ask for page 0
-	 * When only page 0 is implemented, a request for page 3F may return
-	 * Sense Key 5: Illegal Request, Sense Code 24: Invalid field in CDB.
-	 */
-	if (!scsi_status_is_good(res))
-		res = sd_do_mode_sense(SRpnt, 0, 0, buffer, 4, &data);
+		/*
+		 * Second attempt: ask for page 0 When only page 0 is
+		 * implemented, a request for page 3F may return Sense Key
+		 * 5: Illegal Request, Sense Code 24: Invalid field in
+		 * CDB.
+		 */
+		if (!scsi_status_is_good(res))
+			res = sd_do_mode_sense(SRpnt, 0, 0, buffer, 4, &data);
 
-	/*
-	 * Third attempt: ask 255 bytes, as we did earlier.
-	 */
-	if (!scsi_status_is_good(res))
-		res = sd_do_mode_sense(SRpnt, 0, 0x3F, buffer, 255, &data);
+		/*
+		 * Third attempt: ask 255 bytes, as we did earlier.
+		 */
+		if (!scsi_status_is_good(res))
+			res = sd_do_mode_sense(SRpnt, 0, 0x3F, buffer, 255,
+					       &data);
+	}
 
 	if (!scsi_status_is_good(res)) {
 		printk(KERN_WARNING
@@ -1254,7 +1260,7 @@ static int sd_revalidate_disk(struct gendisk *disk)
 	 * If the device is offline, don't try and read capacity or any
 	 * of the other niceties.
 	 */
-	if (!sdp->online)
+	if (!scsi_device_online(sdp))
 		goto out;
 
 	sreq = scsi_allocate_request(sdp, GFP_KERNEL);
@@ -1474,7 +1480,7 @@ static void sd_shutdown(struct device *dev)
 	if (!sdkp)
                return;         /* this can happen */
 
-	if (!sdp->online || !sdkp->WCE)
+	if (!scsi_device_online(sdp) || !sdkp->WCE)
 		return;
 
 	printk(KERN_NOTICE "Synchronizing SCSI cache for disk %s: ",
