@@ -85,6 +85,9 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		/* get new inode */
 		if (*pinode == NULL) {
 			*pinode = new_inode(sb);
+			if(*pinode == NULL)
+				return -ENOMEM;
+			insert_inode_hash(*pinode);
 		}
 		inode = *pinode;
 
@@ -244,6 +247,9 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 		/* get new inode */
 		if (*pinode == NULL) {
 			*pinode = new_inode(sb);
+			if(*pinode == NULL)
+				return -ENOMEM;
+			insert_inode_hash(*pinode);
 		}
 
 		inode = *pinode;
