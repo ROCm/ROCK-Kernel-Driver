@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -73,10 +73,10 @@
 
 acpi_status
 acpi_ex_opcode_1A_0T_0R (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_operand_object     **operand = &walk_state->operands[0];
-	acpi_status             status = AE_OK;
+	union acpi_operand_object       **operand = &walk_state->operands[0];
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE_STR ("ex_opcode_1A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
@@ -148,10 +148,10 @@ acpi_ex_opcode_1A_0T_0R (
 
 acpi_status
 acpi_ex_opcode_1A_1T_0R (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status = AE_OK;
-	acpi_operand_object     **operand = &walk_state->operands[0];
+	acpi_status                     status = AE_OK;
+	union acpi_operand_object       **operand = &walk_state->operands[0];
 
 
 	ACPI_FUNCTION_TRACE_STR ("ex_opcode_1A_1T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
@@ -195,16 +195,16 @@ cleanup:
 
 acpi_status
 acpi_ex_opcode_1A_1T_1R (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status = AE_OK;
-	acpi_operand_object     **operand = &walk_state->operands[0];
-	acpi_operand_object     *return_desc = NULL;
-	acpi_operand_object     *return_desc2 = NULL;
-	u32                     temp32;
-	u32                     i;
-	u32                     j;
-	acpi_integer            digit;
+	acpi_status                     status = AE_OK;
+	union acpi_operand_object       **operand = &walk_state->operands[0];
+	union acpi_operand_object       *return_desc = NULL;
+	union acpi_operand_object       *return_desc2 = NULL;
+	u32                             temp32;
+	u32                             i;
+	u32                             j;
+	acpi_integer                    digit;
 
 
 	ACPI_FUNCTION_TRACE_STR ("ex_opcode_1A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
@@ -338,7 +338,7 @@ acpi_ex_opcode_1A_1T_1R (
 			 * different than the return value stored in the result descriptor
 			 * (There are really two return values)
 			 */
-			if ((acpi_namespace_node *) operand[0] == acpi_gbl_root_node) {
+			if ((struct acpi_namespace_node *) operand[0] == acpi_gbl_root_node) {
 				/*
 				 * This means that the object does not exist in the namespace,
 				 * return FALSE
@@ -486,14 +486,14 @@ cleanup:
 
 acpi_status
 acpi_ex_opcode_1A_0T_1R (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_operand_object     **operand = &walk_state->operands[0];
-	acpi_operand_object     *temp_desc;
-	acpi_operand_object     *return_desc = NULL;
-	acpi_status             status = AE_OK;
-	u32                     type;
-	acpi_integer            value;
+	union acpi_operand_object       **operand = &walk_state->operands[0];
+	union acpi_operand_object       *temp_desc;
+	union acpi_operand_object       *return_desc = NULL;
+	acpi_status                     status = AE_OK;
+	u32                             type;
+	acpi_integer                    value;
 
 
 	ACPI_FUNCTION_TRACE_STR ("ex_opcode_1A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
@@ -695,13 +695,13 @@ acpi_ex_opcode_1A_0T_1R (
 				 */
 				status = acpi_ns_get_node_by_path (operand[0]->string.pointer,
 						  walk_state->scope_info->scope.node, ACPI_NS_SEARCH_PARENT,
-						  ACPI_CAST_INDIRECT_PTR (acpi_namespace_node, &return_desc));
+						  ACPI_CAST_INDIRECT_PTR (struct acpi_namespace_node, &return_desc));
 				if (ACPI_FAILURE (status)) {
 					goto cleanup;
 				}
 
 				status = acpi_ex_resolve_node_to_value (
-						  ACPI_CAST_INDIRECT_PTR (acpi_namespace_node, &return_desc), walk_state);
+						  ACPI_CAST_INDIRECT_PTR (struct acpi_namespace_node, &return_desc), walk_state);
 				goto cleanup;
 
 
@@ -720,7 +720,7 @@ acpi_ex_opcode_1A_0T_1R (
 			 * Get the actual object from the Node (This is the dereference).
 			 * -- This case may only happen when a local_x or arg_x is dereferenced above.
 			 */
-			return_desc = acpi_ns_get_attached_object ((acpi_namespace_node *) operand[0]);
+			return_desc = acpi_ns_get_attached_object ((struct acpi_namespace_node *) operand[0]);
 		}
 		else {
 			/*
@@ -802,7 +802,7 @@ acpi_ex_opcode_1A_0T_1R (
 
 				if (ACPI_GET_DESCRIPTOR_TYPE (return_desc) == ACPI_DESC_TYPE_NAMED) {
 
-					return_desc = acpi_ns_get_attached_object ((acpi_namespace_node *) return_desc);
+					return_desc = acpi_ns_get_attached_object ((struct acpi_namespace_node *) return_desc);
 				}
 
 				/* Add another reference to the object! */

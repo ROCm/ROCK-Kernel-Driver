@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -57,9 +57,9 @@
 
 void
 acpi_ds_method_data_init (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	u32                     i;
+	u32                             i;
 
 
 	ACPI_FUNCTION_TRACE ("ds_method_data_init");
@@ -107,9 +107,9 @@ acpi_ds_method_data_init (
 
 void
 acpi_ds_method_data_delete_all (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	u32                     index;
+	u32                             index;
 
 
 	ACPI_FUNCTION_TRACE ("ds_method_data_delete_all");
@@ -163,12 +163,12 @@ acpi_ds_method_data_delete_all (
 
 acpi_status
 acpi_ds_method_data_init_args (
-	acpi_operand_object     **params,
-	u32                     max_param_count,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       **params,
+	u32                             max_param_count,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status;
-	u32                     index = 0;
+	acpi_status                     status;
+	u32                             index = 0;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_method_data_init_args", params);
@@ -215,10 +215,10 @@ acpi_ds_method_data_init_args (
 
 acpi_status
 acpi_ds_method_data_get_node (
-	u16                     opcode,
-	u32                     index,
-	acpi_walk_state         *walk_state,
-	acpi_namespace_node     **node)
+	u16                             opcode,
+	u32                             index,
+	struct acpi_walk_state          *walk_state,
+	struct acpi_namespace_node      **node)
 {
 	ACPI_FUNCTION_TRACE ("ds_method_data_get_node");
 
@@ -280,14 +280,14 @@ acpi_ds_method_data_get_node (
 
 acpi_status
 acpi_ds_method_data_set_value (
-	u16                     opcode,
-	u32                     index,
-	acpi_operand_object     *object,
-	acpi_walk_state         *walk_state)
+	u16                             opcode,
+	u32                             index,
+	union acpi_operand_object       *object,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status;
-	acpi_namespace_node     *node;
-	acpi_operand_object     *new_desc = object;
+	acpi_status                     status;
+	struct acpi_namespace_node      *node;
+	union acpi_operand_object       *new_desc = object;
 
 
 	ACPI_FUNCTION_TRACE ("ds_method_data_set_value");
@@ -347,13 +347,13 @@ acpi_ds_method_data_set_value (
 
 acpi_object_type
 acpi_ds_method_data_get_type (
-	u16                     opcode,
-	u32                     index,
-	acpi_walk_state         *walk_state)
+	u16                             opcode,
+	u32                             index,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status;
-	acpi_namespace_node     *node;
-	acpi_operand_object     *object;
+	acpi_status                     status;
+	struct acpi_namespace_node      *node;
+	union acpi_operand_object       *object;
 
 
 	ACPI_FUNCTION_TRACE ("ds_method_data_get_type");
@@ -401,14 +401,14 @@ acpi_ds_method_data_get_type (
 
 acpi_status
 acpi_ds_method_data_get_value (
-	u16                     opcode,
-	u32                     index,
-	acpi_walk_state         *walk_state,
-	acpi_operand_object     **dest_desc)
+	u16                             opcode,
+	u32                             index,
+	struct acpi_walk_state          *walk_state,
+	union acpi_operand_object       **dest_desc)
 {
-	acpi_status             status;
-	acpi_namespace_node     *node;
-	acpi_operand_object     *object;
+	acpi_status                     status;
+	struct acpi_namespace_node      *node;
+	union acpi_operand_object       *object;
 
 
 	ACPI_FUNCTION_TRACE ("ds_method_data_get_value");
@@ -490,13 +490,13 @@ acpi_ds_method_data_get_value (
 
 void
 acpi_ds_method_data_delete_value (
-	u16                     opcode,
-	u32                     index,
-	acpi_walk_state         *walk_state)
+	u16                             opcode,
+	u32                             index,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status;
-	acpi_namespace_node     *node;
-	acpi_operand_object     *object;
+	acpi_status                     status;
+	struct acpi_namespace_node      *node;
+	union acpi_operand_object       *object;
 
 
 	ACPI_FUNCTION_TRACE ("ds_method_data_delete_value");
@@ -553,14 +553,14 @@ acpi_ds_method_data_delete_value (
 
 acpi_status
 acpi_ds_store_object_to_local (
-	u16                     opcode,
-	u32                     index,
-	acpi_operand_object     *obj_desc,
-	acpi_walk_state         *walk_state)
+	u16                             opcode,
+	u32                             index,
+	union acpi_operand_object       *obj_desc,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status;
-	acpi_namespace_node     *node;
-	acpi_operand_object     *current_obj_desc;
+	acpi_status                     status;
+	struct acpi_namespace_node      *node;
+	union acpi_operand_object       *current_obj_desc;
 
 
 	ACPI_FUNCTION_TRACE ("ds_store_object_to_local");

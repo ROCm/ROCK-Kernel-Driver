@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -45,7 +45,7 @@
 acpi_status
 acpi_enable (void)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_enable");
@@ -92,7 +92,7 @@ acpi_enable (void)
 acpi_status
 acpi_disable (void)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_disable");
@@ -138,12 +138,12 @@ acpi_disable (void)
 
 acpi_status
 acpi_enable_event (
-	u32                     event,
-	u32                     type,
-	u32                     flags)
+	u32                             event,
+	u32                             type,
+	u32                             flags)
 {
-	acpi_status             status = AE_OK;
-	u32                     value;
+	acpi_status                     status = AE_OK;
+	u32                             value;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_enable_event");
@@ -232,12 +232,12 @@ acpi_enable_event (
 
 acpi_status
 acpi_disable_event (
-	u32                     event,
-	u32                     type,
-	u32                     flags)
+	u32                             event,
+	u32                             type,
+	u32                             flags)
 {
-	acpi_status             status = AE_OK;
-	u32                     value;
+	acpi_status                     status = AE_OK;
+	u32                             value;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_disable_event");
@@ -323,10 +323,10 @@ acpi_disable_event (
 
 acpi_status
 acpi_clear_event (
-	u32                     event,
-	u32                     type)
+	u32                             event,
+	u32                             type)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_clear_event");
@@ -391,11 +391,11 @@ acpi_clear_event (
 
 acpi_status
 acpi_get_event_status (
-	u32                     event,
-	u32                     type,
-	acpi_event_status       *event_status)
+	u32                             event,
+	u32                             type,
+	acpi_event_status               *event_status)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_get_event_status");

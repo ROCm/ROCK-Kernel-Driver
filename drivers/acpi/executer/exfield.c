@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -49,15 +49,15 @@
 
 acpi_status
 acpi_ex_read_data_from_field (
-	acpi_walk_state         *walk_state,
-	acpi_operand_object     *obj_desc,
-	acpi_operand_object     **ret_buffer_desc)
+	struct acpi_walk_state          *walk_state,
+	union acpi_operand_object       *obj_desc,
+	union acpi_operand_object       **ret_buffer_desc)
 {
-	acpi_status             status;
-	acpi_operand_object     *buffer_desc;
-	acpi_size               length;
-	void                    *buffer;
-	u8                      locked;
+	acpi_status                     status;
+	union acpi_operand_object       *buffer_desc;
+	acpi_size                       length;
+	void                            *buffer;
+	u8                              locked;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ex_read_data_from_field", obj_desc);
@@ -186,17 +186,17 @@ exit:
 
 acpi_status
 acpi_ex_write_data_to_field (
-	acpi_operand_object     *source_desc,
-	acpi_operand_object     *obj_desc,
-	acpi_operand_object     **result_desc)
+	union acpi_operand_object       *source_desc,
+	union acpi_operand_object       *obj_desc,
+	union acpi_operand_object       **result_desc)
 {
-	acpi_status             status;
-	u32                     length;
-	u32                     required_length;
-	void                    *buffer;
-	void                    *new_buffer;
-	u8                      locked;
-	acpi_operand_object     *buffer_desc;
+	acpi_status                     status;
+	u32                             length;
+	u32                             required_length;
+	void                            *buffer;
+	void                            *new_buffer;
+	u8                              locked;
+	union acpi_operand_object       *buffer_desc;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ex_write_data_to_field", obj_desc);

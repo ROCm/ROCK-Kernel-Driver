@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -49,10 +49,10 @@
 
 acpi_status
 acpi_ns_load_table (
-	acpi_table_desc         *table_desc,
-	acpi_namespace_node     *node)
+	struct acpi_table_desc          *table_desc,
+	struct acpi_namespace_node      *node)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ns_load_table");
@@ -137,11 +137,11 @@ acpi_ns_load_table (
 
 acpi_status
 acpi_ns_load_table_by_type (
-	acpi_table_type         table_type)
+	acpi_table_type                 table_type)
 {
-	u32                     i;
-	acpi_status             status;
-	acpi_table_desc         *table_desc;
+	u32                             i;
+	acpi_status                     status;
+	struct acpi_table_desc          *table_desc;
 
 
 	ACPI_FUNCTION_TRACE ("ns_load_table_by_type");
@@ -266,7 +266,7 @@ acpi_status
 acpi_ns_load_namespace (
 	void)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_load_name_space");
@@ -319,14 +319,14 @@ acpi_ns_load_namespace (
 
 acpi_status
 acpi_ns_delete_subtree (
-	acpi_handle             start_handle)
+	acpi_handle                     start_handle)
 {
-	acpi_status             status;
-	acpi_handle             child_handle;
-	acpi_handle             parent_handle;
-	acpi_handle             next_child_handle;
-	acpi_handle             dummy;
-	u32                     level;
+	acpi_status                     status;
+	acpi_handle                     child_handle;
+	acpi_handle                     parent_handle;
+	acpi_handle                     next_child_handle;
+	acpi_handle                     dummy;
+	u32                             level;
 
 
 	ACPI_FUNCTION_TRACE ("ns_delete_subtree");
@@ -407,9 +407,9 @@ acpi_ns_delete_subtree (
 
 acpi_status
 acpi_ns_unload_namespace (
-	acpi_handle             handle)
+	acpi_handle                     handle)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ns_unload_name_space");

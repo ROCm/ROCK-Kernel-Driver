@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -50,11 +50,11 @@
 
 acpi_status
 acpi_install_fixed_event_handler (
-	u32                     event,
-	acpi_event_handler      handler,
-	void                    *context)
+	u32                             event,
+	acpi_event_handler              handler,
+	void                            *context)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_install_fixed_event_handler");
@@ -119,10 +119,10 @@ cleanup:
 
 acpi_status
 acpi_remove_fixed_event_handler (
-	u32                     event,
-	acpi_event_handler      handler)
+	u32                             event,
+	acpi_event_handler              handler)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_remove_fixed_event_handler");
@@ -180,15 +180,15 @@ acpi_remove_fixed_event_handler (
 
 acpi_status
 acpi_install_notify_handler (
-	acpi_handle             device,
-	u32                     handler_type,
-	acpi_notify_handler     handler,
-	void                    *context)
+	acpi_handle                     device,
+	u32                             handler_type,
+	acpi_notify_handler             handler,
+	void                            *context)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_operand_object     *notify_obj;
-	acpi_namespace_node     *node;
-	acpi_status             status;
+	union acpi_operand_object       *obj_desc;
+	union acpi_operand_object       *notify_obj;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_install_notify_handler");
@@ -335,14 +335,14 @@ unlock_and_exit:
 
 acpi_status
 acpi_remove_notify_handler (
-	acpi_handle             device,
-	u32                     handler_type,
-	acpi_notify_handler     handler)
+	acpi_handle                     device,
+	u32                             handler_type,
+	acpi_notify_handler             handler)
 {
-	acpi_operand_object     *notify_obj;
-	acpi_operand_object     *obj_desc;
-	acpi_namespace_node     *node;
-	acpi_status             status;
+	union acpi_operand_object       *notify_obj;
+	union acpi_operand_object       *obj_desc;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_remove_notify_handler");
@@ -467,13 +467,13 @@ unlock_and_exit:
 
 acpi_status
 acpi_install_gpe_handler (
-	u32                     gpe_number,
-	u32                     type,
-	acpi_gpe_handler        handler,
-	void                    *context)
+	u32                             gpe_number,
+	u32                             type,
+	acpi_gpe_handler                handler,
+	void                            *context)
 {
-	acpi_status             status;
-	u32                     gpe_number_index;
+	acpi_status                     status;
+	u32                             gpe_number_index;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_install_gpe_handler");
@@ -541,11 +541,11 @@ cleanup:
 
 acpi_status
 acpi_remove_gpe_handler (
-	u32                     gpe_number,
-	acpi_gpe_handler        handler)
+	u32                             gpe_number,
+	acpi_gpe_handler                handler)
 {
-	acpi_status             status;
-	u32                     gpe_number_index;
+	acpi_status                     status;
+	u32                             gpe_number_index;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_remove_gpe_handler");
@@ -611,10 +611,10 @@ cleanup:
 
 acpi_status
 acpi_acquire_global_lock (
-	u16                     timeout,
-	u32                     *handle)
+	u16                             timeout,
+	u32                             *handle)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	if (!handle) {
@@ -652,9 +652,9 @@ acpi_acquire_global_lock (
 
 acpi_status
 acpi_release_global_lock (
-	u32                     handle)
+	u32                             handle)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	if (handle != acpi_gbl_global_lock_handle) {

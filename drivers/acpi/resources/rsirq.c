@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -53,18 +53,18 @@
 
 acpi_status
 acpi_rs_irq_resource (
-	u8                      *byte_stream_buffer,
-	acpi_size               *bytes_consumed,
-	u8                      **output_buffer,
-	acpi_size               *structure_size)
+	u8                              *byte_stream_buffer,
+	acpi_size                       *bytes_consumed,
+	u8                              **output_buffer,
+	acpi_size                       *structure_size)
 {
-	u8                      *buffer = byte_stream_buffer;
-	acpi_resource           *output_struct = (void *) *output_buffer;
-	u16                     temp16 = 0;
-	u8                      temp8 = 0;
-	u8                      index;
-	u8                      i;
-	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_irq);
+	u8                              *buffer = byte_stream_buffer;
+	struct acpi_resource            *output_struct = (void *) *output_buffer;
+	u16                             temp16 = 0;
+	u8                              temp8 = 0;
+	u8                              index;
+	u8                              i;
+	acpi_size                       struct_size = ACPI_SIZEOF_RESOURCE (struct acpi_resource_irq);
 
 
 	ACPI_FUNCTION_TRACE ("rs_irq_resource");
@@ -181,15 +181,15 @@ acpi_rs_irq_resource (
 
 acpi_status
 acpi_rs_irq_stream (
-	acpi_resource           *linked_list,
-	u8                      **output_buffer,
-	acpi_size               *bytes_consumed)
+	struct acpi_resource            *linked_list,
+	u8                              **output_buffer,
+	acpi_size                       *bytes_consumed)
 {
-	u8                      *buffer = *output_buffer;
-	u16                     temp16 = 0;
-	u8                      temp8 = 0;
-	u8                      index;
-	u8                      IRqinfo_byte_needed;
+	u8                              *buffer = *output_buffer;
+	u16                             temp16 = 0;
+	u8                              temp8 = 0;
+	u8                              index;
+	u8                              IRqinfo_byte_needed;
 
 
 	ACPI_FUNCTION_TRACE ("rs_irq_stream");
@@ -277,18 +277,18 @@ acpi_rs_irq_stream (
 
 acpi_status
 acpi_rs_extended_irq_resource (
-	u8                      *byte_stream_buffer,
-	acpi_size               *bytes_consumed,
-	u8                      **output_buffer,
-	acpi_size               *structure_size)
+	u8                              *byte_stream_buffer,
+	acpi_size                       *bytes_consumed,
+	u8                              **output_buffer,
+	acpi_size                       *structure_size)
 {
-	u8                      *buffer = byte_stream_buffer;
-	acpi_resource           *output_struct = (void *) *output_buffer;
-	u16                     temp16 = 0;
-	u8                      temp8 = 0;
-	u8                      *temp_ptr;
-	u8                      index;
-	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_ext_irq);
+	u8                              *buffer = byte_stream_buffer;
+	struct acpi_resource            *output_struct = (void *) *output_buffer;
+	u16                             temp16 = 0;
+	u8                              temp8 = 0;
+	u8                              *temp_ptr;
+	u8                              index;
+	acpi_size                       struct_size = ACPI_SIZEOF_RESOURCE (struct acpi_resource_ext_irq);
 
 
 	ACPI_FUNCTION_TRACE ("rs_extended_irq_resource");
@@ -451,15 +451,15 @@ acpi_rs_extended_irq_resource (
 
 acpi_status
 acpi_rs_extended_irq_stream (
-	acpi_resource           *linked_list,
-	u8                      **output_buffer,
-	acpi_size               *bytes_consumed)
+	struct acpi_resource            *linked_list,
+	u8                              **output_buffer,
+	acpi_size                       *bytes_consumed)
 {
-	u8                      *buffer = *output_buffer;
-	u16                     *length_field;
-	u8                      temp8 = 0;
-	u8                      index;
-	char                    *temp_pointer = NULL;
+	u8                              *buffer = *output_buffer;
+	u16                             *length_field;
+	u8                              temp8 = 0;
+	u8                              index;
+	char                            *temp_pointer = NULL;
 
 
 	ACPI_FUNCTION_TRACE ("rs_extended_irq_stream");

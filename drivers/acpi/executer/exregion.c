@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -52,20 +52,20 @@
 
 acpi_status
 acpi_ex_system_memory_space_handler (
-	u32                     function,
-	acpi_physical_address   address,
-	u32                     bit_width,
-	acpi_integer            *value,
-	void                    *handler_context,
-	void                    *region_context)
+	u32                             function,
+	acpi_physical_address           address,
+	u32                             bit_width,
+	acpi_integer                    *value,
+	void                            *handler_context,
+	void                            *region_context)
 {
-	acpi_status             status = AE_OK;
-	void                    *logical_addr_ptr = NULL;
-	acpi_mem_space_context  *mem_info = region_context;
-	u32                     length;
-	acpi_size               window_size;
+	acpi_status                     status = AE_OK;
+	void                            *logical_addr_ptr = NULL;
+	struct acpi_mem_space_context   *mem_info = region_context;
+	u32                             length;
+	acpi_size                       window_size;
 #ifndef _HW_ALIGNMENT_SUPPORT
-	u32                     remainder;
+	u32                             remainder;
 #endif
 
 	ACPI_FUNCTION_TRACE ("ex_system_memory_space_handler");
@@ -256,14 +256,14 @@ acpi_ex_system_memory_space_handler (
 
 acpi_status
 acpi_ex_system_io_space_handler (
-	u32                     function,
-	acpi_physical_address   address,
-	u32                     bit_width,
-	acpi_integer            *value,
-	void                    *handler_context,
-	void                    *region_context)
+	u32                             function,
+	acpi_physical_address           address,
+	u32                             bit_width,
+	acpi_integer                    *value,
+	void                            *handler_context,
+	void                            *region_context)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("ex_system_io_space_handler");
@@ -316,16 +316,16 @@ acpi_ex_system_io_space_handler (
 
 acpi_status
 acpi_ex_pci_config_space_handler (
-	u32                     function,
-	acpi_physical_address   address,
-	u32                     bit_width,
-	acpi_integer            *value,
-	void                    *handler_context,
-	void                    *region_context)
+	u32                             function,
+	acpi_physical_address           address,
+	u32                             bit_width,
+	acpi_integer                    *value,
+	void                            *handler_context,
+	void                            *region_context)
 {
-	acpi_status             status = AE_OK;
-	acpi_pci_id             *pci_id;
-	u16                     pci_register;
+	acpi_status                     status = AE_OK;
+	struct acpi_pci_id              *pci_id;
+	u16                             pci_register;
 
 
 	ACPI_FUNCTION_TRACE ("ex_pci_config_space_handler");
@@ -343,7 +343,7 @@ acpi_ex_pci_config_space_handler (
 	 *  Value - input value for write, output address for read
 	 *
 	 */
-	pci_id      = (acpi_pci_id *) region_context;
+	pci_id      = (struct acpi_pci_id *) region_context;
 	pci_register = (u16) (u32) address;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
@@ -393,14 +393,14 @@ acpi_ex_pci_config_space_handler (
 
 acpi_status
 acpi_ex_cmos_space_handler (
-	u32                     function,
-	acpi_physical_address   address,
-	u32                     bit_width,
-	acpi_integer            *value,
-	void                    *handler_context,
-	void                    *region_context)
+	u32                             function,
+	acpi_physical_address           address,
+	u32                             bit_width,
+	acpi_integer                    *value,
+	void                            *handler_context,
+	void                            *region_context)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("ex_cmos_space_handler");
@@ -430,14 +430,14 @@ acpi_ex_cmos_space_handler (
 
 acpi_status
 acpi_ex_pci_bar_space_handler (
-	u32                     function,
-	acpi_physical_address   address,
-	u32                     bit_width,
-	acpi_integer            *value,
-	void                    *handler_context,
-	void                    *region_context)
+	u32                             function,
+	acpi_physical_address           address,
+	u32                             bit_width,
+	acpi_integer                    *value,
+	void                            *handler_context,
+	void                            *region_context)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("ex_pci_bar_space_handler");
@@ -467,17 +467,17 @@ acpi_ex_pci_bar_space_handler (
 
 acpi_status
 acpi_ex_data_table_space_handler (
-	u32                     function,
-	acpi_physical_address   address,
-	u32                     bit_width,
-	acpi_integer            *value,
-	void                    *handler_context,
-	void                    *region_context)
+	u32                             function,
+	acpi_physical_address           address,
+	u32                             bit_width,
+	acpi_integer                    *value,
+	void                            *handler_context,
+	void                            *region_context)
 {
-	acpi_status             status = AE_OK;
-	u32                     byte_width = ACPI_DIV_8 (bit_width);
-	u32                     i;
-	char                    *logical_addr_ptr;
+	acpi_status                     status = AE_OK;
+	u32                             byte_width = ACPI_DIV_8 (bit_width);
+	u32                             i;
+	char                            *logical_addr_ptr;
 
 
 	ACPI_FUNCTION_TRACE ("ex_data_table_space_handler");

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -47,10 +47,10 @@
 
 u32
 acpi_ps_get_next_package_length (
-	acpi_parse_state        *parser_state)
+	struct acpi_parse_state         *parser_state)
 {
-	u32                     encoded_length;
-	u32                     length = 0;
+	u32                             encoded_length;
+	u32                             length = 0;
 
 
 	ACPI_FUNCTION_TRACE ("ps_get_next_package_length");
@@ -118,10 +118,10 @@ acpi_ps_get_next_package_length (
 
 u8 *
 acpi_ps_get_next_package_end (
-	acpi_parse_state        *parser_state)
+	struct acpi_parse_state         *parser_state)
 {
-	u8                      *start = parser_state->aml;
-	acpi_native_uint        length;
+	u8                              *start = parser_state->aml;
+	acpi_native_uint                length;
 
 
 	ACPI_FUNCTION_TRACE ("ps_get_next_package_end");
@@ -152,10 +152,10 @@ acpi_ps_get_next_package_end (
 
 char *
 acpi_ps_get_next_namestring (
-	acpi_parse_state        *parser_state)
+	struct acpi_parse_state         *parser_state)
 {
-	u8                      *start = parser_state->aml;
-	u8                      *end = parser_state->aml;
+	u8                              *start = parser_state->aml;
+	u8                              *end = parser_state->aml;
 
 
 	ACPI_FUNCTION_TRACE ("ps_get_next_namestring");
@@ -232,17 +232,17 @@ acpi_ps_get_next_namestring (
 
 acpi_status
 acpi_ps_get_next_namepath (
-	acpi_walk_state         *walk_state,
-	acpi_parse_state        *parser_state,
-	acpi_parse_object       *arg,
-	u8                      method_call)
+	struct acpi_walk_state          *walk_state,
+	struct acpi_parse_state         *parser_state,
+	union acpi_parse_object         *arg,
+	u8                              method_call)
 {
-	char                    *path;
-	acpi_parse_object       *name_op;
-	acpi_status             status = AE_OK;
-	acpi_operand_object     *method_desc;
-	acpi_namespace_node     *node;
-	acpi_generic_state      scope_info;
+	char                            *path;
+	union acpi_parse_object         *name_op;
+	acpi_status                     status = AE_OK;
+	union acpi_operand_object       *method_desc;
+	struct acpi_namespace_node      *node;
+	union acpi_generic_state        scope_info;
 
 
 	ACPI_FUNCTION_TRACE ("ps_get_next_namepath");
@@ -370,9 +370,9 @@ acpi_ps_get_next_namepath (
 
 void
 acpi_ps_get_next_simple_arg (
-	acpi_parse_state        *parser_state,
-	u32                     arg_type,
-	acpi_parse_object       *arg)
+	struct acpi_parse_state         *parser_state,
+	u32                             arg_type,
+	union acpi_parse_object         *arg)
 {
 
 	ACPI_FUNCTION_TRACE_U32 ("ps_get_next_simple_arg", arg_type);
@@ -462,15 +462,15 @@ acpi_ps_get_next_simple_arg (
  *
  ******************************************************************************/
 
-acpi_parse_object *
+union acpi_parse_object *
 acpi_ps_get_next_field (
-	acpi_parse_state        *parser_state)
+	struct acpi_parse_state         *parser_state)
 {
-	u32                     aml_offset = ACPI_PTR_DIFF (parser_state->aml,
+	u32                             aml_offset = ACPI_PTR_DIFF (parser_state->aml,
 			 parser_state->aml_start);
-	acpi_parse_object       *field;
-	u16                     opcode;
-	u32                     name;
+	union acpi_parse_object         *field;
+	u16                             opcode;
+	u32                             name;
 
 
 	ACPI_FUNCTION_TRACE ("ps_get_next_field");
@@ -572,16 +572,16 @@ acpi_ps_get_next_field (
 
 acpi_status
 acpi_ps_get_next_arg (
-	acpi_walk_state         *walk_state,
-	acpi_parse_state        *parser_state,
-	u32                     arg_type,
-	acpi_parse_object       **return_arg)
+	struct acpi_walk_state          *walk_state,
+	struct acpi_parse_state         *parser_state,
+	u32                             arg_type,
+	union acpi_parse_object         **return_arg)
 {
-	acpi_parse_object       *arg = NULL;
-	acpi_parse_object       *prev = NULL;
-	acpi_parse_object       *field;
-	u32                     subop;
-	acpi_status             status = AE_OK;
+	union acpi_parse_object         *arg = NULL;
+	union acpi_parse_object         *prev = NULL;
+	union acpi_parse_object         *field;
+	u32                             subop;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ps_get_next_arg", parser_state);

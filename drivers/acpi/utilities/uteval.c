@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -53,14 +53,14 @@
 
 acpi_status
 acpi_ut_evaluate_object (
-	acpi_namespace_node     *prefix_node,
-	char                    *path,
-	u32                     expected_return_btypes,
-	acpi_operand_object     **return_desc)
+	struct acpi_namespace_node      *prefix_node,
+	char                            *path,
+	u32                             expected_return_btypes,
+	union acpi_operand_object       **return_desc)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_status             status;
-	u32                     return_btype;
+	union acpi_operand_object       *obj_desc;
+	acpi_status                     status;
+	u32                             return_btype;
 
 
 	ACPI_FUNCTION_TRACE ("ut_evaluate_object");
@@ -161,12 +161,12 @@ acpi_ut_evaluate_object (
 
 acpi_status
 acpi_ut_evaluate_numeric_object (
-	char                    *object_name,
-	acpi_namespace_node     *device_node,
-	acpi_integer            *address)
+	char                            *object_name,
+	struct acpi_namespace_node      *device_node,
+	acpi_integer                    *address)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_status             status;
+	union acpi_operand_object       *obj_desc;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ut_evaluate_numeric_object");
@@ -207,11 +207,11 @@ acpi_ut_evaluate_numeric_object (
 
 acpi_status
 acpi_ut_execute_HID (
-	acpi_namespace_node     *device_node,
-	acpi_device_id          *hid)
+	struct acpi_namespace_node      *device_node,
+	struct acpi_device_id           *hid)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_status             status;
+	union acpi_operand_object       *obj_desc;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ut_execute_HID");
@@ -259,11 +259,11 @@ acpi_ut_execute_HID (
 
 acpi_status
 acpi_ut_execute_CID (
-	acpi_namespace_node     *device_node,
-	acpi_device_id          *cid)
+	struct acpi_namespace_node      *device_node,
+	struct acpi_device_id           *cid)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_status             status;
+	union acpi_operand_object       *obj_desc;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ut_execute_CID");
@@ -333,11 +333,11 @@ acpi_ut_execute_CID (
 
 acpi_status
 acpi_ut_execute_UID (
-	acpi_namespace_node     *device_node,
-	acpi_device_id          *uid)
+	struct acpi_namespace_node      *device_node,
+	struct acpi_device_id           *uid)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_status             status;
+	union acpi_operand_object       *obj_desc;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ut_execute_UID");
@@ -385,11 +385,11 @@ acpi_ut_execute_UID (
 
 acpi_status
 acpi_ut_execute_STA (
-	acpi_namespace_node     *device_node,
-	u32                     *flags)
+	struct acpi_namespace_node      *device_node,
+	u32                             *flags)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_status             status;
+	union acpi_operand_object       *obj_desc;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ut_execute_STA");

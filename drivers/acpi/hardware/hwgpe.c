@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -44,7 +44,7 @@
 
 u8
 acpi_hw_get_gpe_bit_mask (
-	u32                     gpe_number)
+	u32                             gpe_number)
 {
 	return (acpi_gbl_gpe_number_info [acpi_ev_get_gpe_number_index (gpe_number)].bit_mask);
 }
@@ -64,12 +64,12 @@ acpi_hw_get_gpe_bit_mask (
 
 acpi_status
 acpi_hw_enable_gpe (
-	u32                     gpe_number)
+	u32                             gpe_number)
 {
-	u32                     in_byte;
-	u32                     register_index;
-	u8                      bit_mask;
-	acpi_status             status;
+	u32                             in_byte;
+	u32                             register_index;
+	u8                              bit_mask;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -115,10 +115,10 @@ acpi_hw_enable_gpe (
 
 void
 acpi_hw_enable_gpe_for_wakeup (
-	u32                     gpe_number)
+	u32                             gpe_number)
 {
-	u32                     register_index;
-	u8                      bit_mask;
+	u32                             register_index;
+	u8                              bit_mask;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -153,12 +153,12 @@ acpi_hw_enable_gpe_for_wakeup (
 
 acpi_status
 acpi_hw_disable_gpe (
-	u32                     gpe_number)
+	u32                             gpe_number)
 {
-	u32                     in_byte;
-	u32                     register_index;
-	u8                      bit_mask;
-	acpi_status             status;
+	u32                             in_byte;
+	u32                             register_index;
+	u8                              bit_mask;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -208,10 +208,10 @@ acpi_hw_disable_gpe (
 
 void
 acpi_hw_disable_gpe_for_wakeup (
-	u32                     gpe_number)
+	u32                             gpe_number)
 {
-	u32                     register_index;
-	u8                      bit_mask;
+	u32                             register_index;
+	u8                              bit_mask;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -246,11 +246,11 @@ acpi_hw_disable_gpe_for_wakeup (
 
 acpi_status
 acpi_hw_clear_gpe (
-	u32                     gpe_number)
+	u32                             gpe_number)
 {
-	u32                     register_index;
-	u8                      bit_mask;
-	acpi_status             status;
+	u32                             register_index;
+	u8                              bit_mask;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -289,14 +289,14 @@ acpi_hw_clear_gpe (
 
 acpi_status
 acpi_hw_get_gpe_status (
-	u32                     gpe_number,
-	acpi_event_status       *event_status)
+	u32                             gpe_number,
+	acpi_event_status               *event_status)
 {
-	u32                     in_byte = 0;
-	u32                     register_index = 0;
-	u8                      bit_mask = 0;
-	acpi_gpe_register_info  *gpe_register_info;
-	acpi_status             status;
+	u32                             in_byte = 0;
+	u32                             register_index = 0;
+	u8                              bit_mask = 0;
+	struct acpi_gpe_register_info   *gpe_register_info;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -368,10 +368,10 @@ acpi_status
 acpi_hw_disable_non_wakeup_gpes (
 	void)
 {
-	u32                     i;
-	acpi_gpe_register_info  *gpe_register_info;
-	u32                     in_value;
-	acpi_status             status;
+	u32                             i;
+	struct acpi_gpe_register_info   *gpe_register_info;
+	u32                             in_value;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -421,9 +421,9 @@ acpi_status
 acpi_hw_enable_non_wakeup_gpes (
 	void)
 {
-	u32                     i;
-	acpi_gpe_register_info  *gpe_register_info;
-	acpi_status             status;
+	u32                             i;
+	struct acpi_gpe_register_info   *gpe_register_info;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_ENTRY ();
