@@ -274,9 +274,9 @@ int ps2pp_init(struct psmouse *psmouse, int set_properties)
 {
 	struct ps2dev *ps2dev = &psmouse->ps2dev;
 	unsigned char param[4];
-	unsigned char protocol = PSMOUSE_PS2;
 	unsigned char model, buttons;
 	struct ps2pp_info *model_info;
+	int use_ps2pp = 0;
 
 	param[0] = 0;
 	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
@@ -286,10 +286,13 @@ int ps2pp_init(struct psmouse *psmouse, int set_properties)
 	param[1] = 0;
 	ps2_command(ps2dev, param, PSMOUSE_CMD_GETINFO);
 
-	if (param[1] != 0) {
-		model = ((param[0] >> 4) & 0x07) | ((param[0] << 3) & 0x78);
-		buttons = param[1];
-		model_info = get_model_info(model);
+	if (!param[1])
+		return 0;
+
+	model = ((param[0] >> 4) & 0x07) | ((param[0] << 3) & 0x78);
+	buttons = param[1];
+
+	if ((model_info = get_model_info(model)) != NULL) {
 
 /*
  * Do Logitech PS2++ / PS2T++ magic init.
@@ -309,10 +312,10 @@ int ps2pp_init(struct psmouse *psmouse, int set_properties)
 			param[0] = 0;
 			if (!ps2_command(ps2dev, param, 0x13d1) &&
 			    param[0] == 0x06 && param[1] == 0x00 && param[2] == 0x14) {
-				protocol = PSMOUSE_PS2TPP;
+				use_ps2pp = 1;
 			}
 
-		} else if (model_info != NULL) {
+		} else {
 
 			param[0] = param[1] = param[2] = 0;
 			ps2pp_cmd(psmouse, param, 0x39); /* Magic knock */
@@ -322,30 +325,31 @@ int ps2pp_init(struct psmouse *psmouse, int set_properties)
 			    (param[1] & 0xf3) == 0xc2 &&
 			    (param[2] & 0x03) == ((param[1] >> 2) & 3)) {
 				ps2pp_set_smartscroll(psmouse, psmouse->smartscroll);
-				protocol = PSMOUSE_PS2PP;
+				use_ps2pp = 1;
 			}
-		}
-
-		if (set_properties) {
-			psmouse->vendor = "Logitech";
-			psmouse->model = model;
-			if (protocol == PSMOUSE_PS2PP) {
-				psmouse->set_resolution = ps2pp_set_resolution;
-				psmouse->disconnect = ps2pp_disconnect;
-
-				device_create_file(&psmouse->ps2dev.serio->dev, &psmouse_attr_smartscroll);
-			}
-
-			if (buttons < 3)
-				clear_bit(BTN_MIDDLE, psmouse->dev.keybit);
-			if (buttons < 2)
-				clear_bit(BTN_RIGHT, psmouse->dev.keybit);
-
-			if (model_info)
-				ps2pp_set_model_properties(psmouse, model_info);
 		}
 	}
 
-	return protocol;
+	if (set_properties) {
+		psmouse->vendor = "Logitech";
+		psmouse->model = model;
+
+		if (use_ps2pp && model_info->kind != PS2PP_KIND_TP3) {
+			psmouse->set_resolution = ps2pp_set_resolution;
+			psmouse->disconnect = ps2pp_disconnect;
+
+			device_create_file(&psmouse->ps2dev.serio->dev, &psmouse_attr_smartscroll);
+		}
+
+		if (buttons < 3)
+			clear_bit(BTN_MIDDLE, psmouse->dev.keybit);
+		if (buttons < 2)
+			clear_bit(BTN_RIGHT, psmouse->dev.keybit);
+
+		if (model_info)
+			ps2pp_set_model_properties(psmouse, model_info);
+	}
+
+	return use_ps2pp;
 }
 

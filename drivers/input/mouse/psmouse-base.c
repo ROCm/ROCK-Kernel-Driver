@@ -62,7 +62,7 @@ __obsolete_setup("psmouse_smartscroll=");
 __obsolete_setup("psmouse_resetafter=");
 __obsolete_setup("psmouse_rate=");
 
-static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "ThinkPS/2", "GenPS/2", "ImPS/2", "ImExPS/2", "SynPS/2", "AlpsPS/2" };
+static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "ThinkPS/2", "GenPS/2", "ImPS/2", "ImExPS/2", "SynPS/2", "AlpsPS/2" };
 
 /*
  * psmouse_process_byte() analyzes the PS/2 data stream and reports
@@ -87,7 +87,7 @@ static psmouse_ret_t psmouse_process_byte(struct psmouse *psmouse, struct pt_reg
  * The PS2++ protocol is a little bit complex
  */
 
-	if (psmouse->type == PSMOUSE_PS2PP || psmouse->type == PSMOUSE_PS2TPP)
+	if (psmouse->type == PSMOUSE_PS2PP)
 		ps2pp_process_packet(psmouse);
 
 /*
@@ -442,11 +442,8 @@ static int psmouse_extensions(struct psmouse *psmouse,
 		return PSMOUSE_GENPS;
 	}
 
-	if (max_proto > PSMOUSE_IMEX) {
-		int type = ps2pp_init(psmouse, set_properties);
-		if (type > PSMOUSE_PS2)
-			return type;
-	}
+	if (max_proto > PSMOUSE_IMEX && ps2pp_init(psmouse, set_properties))
+		return PSMOUSE_PS2PP;
 
 /*
  * Reset to defaults in case the device got confused by extended
