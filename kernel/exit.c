@@ -131,9 +131,14 @@ int session_of_pgrp(int pgrp)
 	for_each_task_pid(pgrp, PIDTYPE_PGID, p, l, pid)
 		if (p->session > 0) {
 			sid = p->session;
-			break;
+			goto out;
 		}
+	p = find_task_by_pid(pgrp);
+	if (p)
+		sid = p->session;
+out:
 	read_unlock(&tasklist_lock);
+	
 	return sid;
 }
 
@@ -621,7 +626,7 @@ NORET_TYPE void do_exit(long code)
 	tsk->flags |= PF_EXITING;
 	del_timer_sync(&tsk->real_timer);
 
-	if (unlikely(preempt_count()))
+	if (unlikely(in_atomic()))
 		printk(KERN_INFO "note: %s[%d] exited with preempt_count %d\n",
 				current->comm, current->pid,
 				preempt_count());

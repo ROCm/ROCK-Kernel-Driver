@@ -165,7 +165,7 @@
 #define pte_unmap(pte)
 #endif
 
-#if LINUX_VERSION_CODE < 0x020413 /* KERNEL_VERSION(2,4,19) */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,19)
 static inline struct page * vmalloc_to_page(void * vmalloc_addr)
 {
 	unsigned long addr = (unsigned long) vmalloc_addr;
@@ -190,7 +190,7 @@ static inline struct page * vmalloc_to_page(void * vmalloc_addr)
 }
 #endif
 
-#if LINUX_VERSION_CODE < 0x020500
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 #define DRM_RPR_ARG(vma)
 #else
 #define DRM_RPR_ARG(vma) vma,
@@ -597,7 +597,7 @@ typedef struct drm_device {
 #endif
 	struct pci_dev *pdev;
 #ifdef __alpha__
-#if LINUX_VERSION_CODE < 0x020403
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,3)
 	struct pci_controler *hose;
 #else
 	struct pci_controller *hose;

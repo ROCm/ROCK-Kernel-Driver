@@ -142,6 +142,9 @@
 #define RADEON_CMD_PACKET3     5 /* emit hw packet */
 #define RADEON_CMD_PACKET3_CLIP 6 /* emit hw packet wrapped in cliprects */
 #define RADEON_CMD_SCALARS2     7 /* r200 stopgap */
+#define RADEON_CMD_WAIT         8 /* emit hw wait commands -- note:
+				   *  doesn't make the cpu wait, just
+				   *  the graphics hardware */
 
 
 typedef union {
@@ -161,7 +164,13 @@ typedef union {
 	struct { 
 		unsigned char cmd_type, buf_idx, pad0, pad1; 
 	} dma;
+	struct { 
+		unsigned char cmd_type, flags, pad0, pad1; 
+	} wait;
 } drm_radeon_cmd_header_t;
+
+#define RADEON_WAIT_2D  0x1
+#define RADEON_WAIT_3D  0x2
 
 
 #define RADEON_FRONT			0x1
@@ -364,6 +373,11 @@ typedef struct {
 #define DRM_IOCTL_RADEON_CMDBUF     DRM_IOW( 0x50, drm_radeon_cmd_buffer_t)
 #define DRM_IOCTL_RADEON_GETPARAM   DRM_IOWR(0x51, drm_radeon_getparam_t)
 #define DRM_IOCTL_RADEON_FLIP	    DRM_IO(  0x52)
+#define DRM_IOCTL_RADEON_ALLOC      DRM_IOWR( 0x53, drm_radeon_mem_alloc_t)
+#define DRM_IOCTL_RADEON_FREE       DRM_IOW( 0x54, drm_radeon_mem_free_t)
+#define DRM_IOCTL_RADEON_INIT_HEAP  DRM_IOW( 0x55, drm_radeon_mem_init_heap_t)
+#define DRM_IOCTL_RADEON_IRQ_EMIT   DRM_IOWR( 0x56, drm_radeon_irq_emit_t)
+#define DRM_IOCTL_RADEON_IRQ_WAIT   DRM_IOW( 0x57, drm_radeon_irq_wait_t)
 
 typedef struct drm_radeon_init {
 	enum {
@@ -499,14 +513,51 @@ typedef struct drm_radeon_indirect {
 /* 1.3: An ioctl to get parameters that aren't available to the 3d
  * client any other way.  
  */
-#define RADEON_PARAM_AGP_BUFFER_OFFSET 0x1
-#define RADEON_PARAM_LAST_FRAME 0x2
-#define RADEON_PARAM_LAST_DISPATCH 0x3
-#define RADEON_PARAM_LAST_CLEAR 0x4
+#define RADEON_PARAM_AGP_BUFFER_OFFSET     1 /* card offset of 1st agp buffer */
+#define RADEON_PARAM_LAST_FRAME            2
+#define RADEON_PARAM_LAST_DISPATCH         3
+#define RADEON_PARAM_LAST_CLEAR            4
+#define RADEON_PARAM_IRQ_ACTIVE            5
+#define RADEON_PARAM_AGP_BASE              6 /* card offset of agp base */
 
 typedef struct drm_radeon_getparam {
 	int param;
 	int *value;
 } drm_radeon_getparam_t;
+
+/* 1.6: Set up a memory manager for regions of shared memory:
+ */
+#define RADEON_MEM_REGION_AGP 1
+#define RADEON_MEM_REGION_FB  2
+
+typedef struct drm_radeon_mem_alloc {
+	int region;
+	int alignment;
+	int size;
+	int *region_offset;	/* offset from start of fb or agp */
+} drm_radeon_mem_alloc_t;
+
+typedef struct drm_radeon_mem_free {
+	int region;
+	int region_offset;
+} drm_radeon_mem_free_t;
+
+typedef struct drm_radeon_mem_init_heap {
+	int region;
+	int size;
+	int start;	
+} drm_radeon_mem_init_heap_t;
+
+
+/* 1.6: Userspace can request & wait on irq's:
+ */
+typedef struct drm_radeon_irq_emit {
+	int *irq_seq;
+} drm_radeon_irq_emit_t;
+
+typedef struct drm_radeon_irq_wait {
+	int irq_seq;
+} drm_radeon_irq_wait_t;
+
 
 #endif

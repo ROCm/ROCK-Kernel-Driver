@@ -91,9 +91,9 @@ CFLAGS := $(CFLAGS) -Wa,-mev6
 
 HEAD := arch/alpha/kernel/head.o
 
-core-y			:= arch/alpha/kernel/ arch/alpha/mm/
-core-$(CONFIG_MATHEMU)  += arch/alpha/math-emu/built-in.o
-libs-y 			:= arch/alpha/lib
+core-y			+= arch/alpha/kernel/ arch/alpha/mm/
+core-$(CONFIG_MATHEMU)  += arch/alpha/math-emu/
+libs-y			+= arch/alpha/lib/
 
 MAKEBOOT = $(MAKE) -C arch/alpha/boot
 

@@ -29,6 +29,7 @@
  *    Jeff Hartmann <jhartmann@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *    Abraham vd Merwe <abraham@2d3d.co.za>
+ *    Keith Whitwell <keith@tungstengraphics.com>
  */
 
 #include <linux/config.h>

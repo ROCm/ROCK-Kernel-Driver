@@ -45,11 +45,11 @@
 
 #define DRIVER_NAME		"i830"
 #define DRIVER_DESC		"Intel 830M"
-#define DRIVER_DATE		"20011004"
+#define DRIVER_DATE		"20020828"
 
 #define DRIVER_MAJOR		1
 #define DRIVER_MINOR		2
-#define DRIVER_PATCHLEVEL	0
+#define DRIVER_PATCHLEVEL	1
 
 #define DRIVER_IOCTLS							    \
 	[DRM_IOCTL_NR(DRM_IOCTL_I830_INIT)]   = { i830_dma_init,    1, 1 }, \
@@ -87,50 +87,10 @@
 	i830_dma_quiescent( dev );					\
 } while (0)
 
-#define __HAVE_DMA_IRQ		1
-#define __HAVE_DMA_IRQ_BH	1
-#define __HAVE_SHARED_IRQ       1
-#define DRIVER_PREINSTALL() do {					\
-	drm_i830_private_t *dev_priv =					\
-		(drm_i830_private_t *)dev->dev_private;			\
-	u16 tmp;							\
-   	tmp = I830_READ16( I830REG_HWSTAM );				\
-   	tmp = tmp & 0x6000;						\
-   	I830_WRITE16( I830REG_HWSTAM, tmp );				\
-									\
-      	tmp = I830_READ16( I830REG_INT_MASK_R );			\
-   	tmp = tmp & 0x6000;		/* Unmask interrupts */		\
-   	I830_WRITE16( I830REG_INT_MASK_R, tmp );			\
-   	tmp = I830_READ16( I830REG_INT_ENABLE_R );			\
-   	tmp = tmp & 0x6000;		/* Disable all interrupts */	\
-      	I830_WRITE16( I830REG_INT_ENABLE_R, tmp );			\
-} while (0)
-
-#define DRIVER_POSTINSTALL() do {					\
-	drm_i830_private_t *dev_priv =					\
-		(drm_i830_private_t *)dev->dev_private;	\
-	u16 tmp;							\
-   	tmp = I830_READ16( I830REG_INT_ENABLE_R );			\
-   	tmp = tmp & 0x6000;						\
-   	tmp = tmp | 0x0003;	/* Enable bp & user interrupts */	\
-   	I830_WRITE16( I830REG_INT_ENABLE_R, tmp );			\
-} while (0)
-
-#define DRIVER_UNINSTALL() do {						\
-	drm_i830_private_t *dev_priv =					\
-		(drm_i830_private_t *)dev->dev_private;			\
-	u16 tmp;							\
-	if ( dev_priv ) {						\
-		tmp = I830_READ16( I830REG_INT_IDENTITY_R );		\
-		tmp = tmp & ~(0x6000);	/* Clear all interrupts */	\
-		if ( tmp != 0 )						\
-			I830_WRITE16( I830REG_INT_IDENTITY_R, tmp );	\
-									\
-		tmp = I830_READ16( I830REG_INT_ENABLE_R );		\
-		tmp = tmp & 0x6000;	/* Disable all interrupts */	\
-		I830_WRITE16( I830REG_INT_ENABLE_R, tmp );		\
-	}								\
-} while (0)
+/* Don't need an irq any more.  The template code will make sure that
+ * a noop stub is generated for compatibility.
+ */
+#define __HAVE_DMA_IRQ		0
 
 /* Buffer customization:
  */

@@ -380,18 +380,21 @@ static ssize_t mousedev_read(struct file * file, char * buffer, size_t count, lo
 	if (!list->ready && !list->buffer) {
 
 		add_wait_queue(&list->mousedev->wait, &wait);
-		set_current_state(TASK_INTERRUPTIBLE);
 
-		while (!list->ready) {
+		for (;;) {
+			set_current_state(TASK_INTERRUPTIBLE);
 
-			if (file->f_flags & O_NONBLOCK) {
-				retval = -EAGAIN;
+			retval = 0;
+			if (list->ready || list->buffer)
 				break;
-			}
-			if (signal_pending(current)) {
-				retval = -ERESTARTSYS;
+
+			retval = -EAGAIN;
+			if (file->f_flags & O_NONBLOCK)
 				break;
-			}
+
+			retval = -ERESTARTSYS;
+			if (signal_pending(current))
+				break;
 
 			schedule();
 		}
