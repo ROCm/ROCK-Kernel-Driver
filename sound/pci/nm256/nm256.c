@@ -1042,7 +1042,7 @@ snd_nm256_interrupt(int irq, void *dev_id, struct pt_regs *dummy)
 static irqreturn_t
 snd_nm256_interrupt_zx(int irq, void *dev_id, struct pt_regs *dummy)
 {
-	nm256_t *chip = snd_magic_cast(nm256_t, dev_id, return);
+	nm256_t *chip = snd_magic_cast(nm256_t, dev_id, return IRQ_NONE);
 	u32 status;
 	u8 cbyte;
 

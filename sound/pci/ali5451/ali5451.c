@@ -1033,10 +1033,10 @@ static void snd_ali_interrupt(ali_t * codec)
 
 
 static irqreturn_t snd_ali_card_interrupt(int irq,
-					  void *dev_id,
-					  struct pt_regs *regs)
+				   void *dev_id,
+				   struct pt_regs *regs)
 {
-	ali_t *codec = snd_magic_cast(ali_t, dev_id, return IRQ_NONE);
+	ali_t 	*codec = snd_magic_cast(ali_t, dev_id, return IRQ_NONE);
 
 	if (codec == NULL)
 		return IRQ_NONE;
@@ -1211,6 +1211,7 @@ static int snd_ali_trigger(snd_pcm_substream_t *substream,
 				    
 {
 	ali_t *codec = snd_pcm_substream_chip(substream);
+	struct list_head *pos;
 	snd_pcm_substream_t *s;
 	unsigned int what, whati, capture_flag;
 	snd_ali_voice_t *pvoice = NULL, *evoice = NULL;
@@ -1229,8 +1230,8 @@ static int snd_ali_trigger(snd_pcm_substream_t *substream,
 	}
 
 	what = whati = capture_flag = 0;
-	s = substream;
-	do {
+	snd_pcm_group_for_each(pos, substream) {
+		s = snd_pcm_group_substream_entry(pos);
 		if ((ali_t *) _snd_pcm_chip(s->pcm) == codec) {
 			pvoice = (snd_ali_voice_t *) s->runtime->private_data;
 			evoice = pvoice->extra;
@@ -1254,8 +1255,7 @@ static int snd_ali_trigger(snd_pcm_substream_t *substream,
 			if (pvoice->mode)
 				capture_flag = 1;
 		}
-		s = s->link_next;
-	} while (s != substream);
+	}
 	spin_lock(&codec->reg_lock);
 	if (! do_start) {
 		outl(what, ALI_REG(codec, ALI_STOP));

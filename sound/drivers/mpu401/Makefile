@@ -31,6 +31,7 @@ obj-$(CONFIG_SND_ES1938) += snd-mpu401-uart.o
 obj-$(CONFIG_SND_ES1968) += snd-mpu401-uart.o
 obj-$(CONFIG_SND_FM801) += snd-mpu401-uart.o
 obj-$(CONFIG_SND_ICE1712) += snd-mpu401-uart.o
+obj-$(CONFIG_SND_ICE1724) += snd-mpu401-uart.o
 obj-$(CONFIG_SND_INTEL8X0) += snd-mpu401-uart.o
 obj-$(CONFIG_SND_SONICVIBES) += snd-mpu401-uart.o
 obj-$(CONFIG_SND_VIA82XX) += snd-mpu401-uart.o

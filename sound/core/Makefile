@@ -78,6 +78,7 @@ obj-$(CONFIG_SND_ES1938) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-hwd
 obj-$(CONFIG_SND_ES1968) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-rawmidi.o
 obj-$(CONFIG_SND_FM801) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_ICE1712) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-rawmidi.o
+obj-$(CONFIG_SND_ICE1724) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-rawmidi.o
 obj-$(CONFIG_SND_INTEL8X0) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-rawmidi.o
 obj-$(CONFIG_SND_MAESTRO3) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o
 obj-$(CONFIG_SND_RME32) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o

@@ -79,16 +79,15 @@ MODULE_DEVICE_TABLE(pnp_card, snd_es968_pnpids);
 #define	DRIVER_NAME	"snd-card-es968"
 
 static irqreturn_t snd_card_es968_interrupt(int irq, void *dev_id,
-				     struct pt_regs *regs)
+					    struct pt_regs *regs)
 {
 	sb_t *chip = snd_magic_cast(sb_t, dev_id, return IRQ_NONE);
 
 	if (chip->open & SB_OPEN_PCM) {
-		snd_sb8dsp_interrupt(chip);
+		return snd_sb8dsp_interrupt(chip);
 	} else {
-		snd_sb8dsp_midi_interrupt(chip);
+		return snd_sb8dsp_midi_interrupt(chip);
 	}
-	return IRQ_HANDLED;
 }
 
 static int __devinit snd_card_es968_pnp(int dev, struct snd_card_es968 *acard,

@@ -295,13 +295,13 @@ int snd_sbmixer_new(sb_t *chip);
 /* sb8_init.c */
 int snd_sb8dsp_pcm(sb_t *chip, int device, snd_pcm_t ** rpcm);
 /* sb8.c */
-void snd_sb8dsp_interrupt(sb_t *chip);
+irqreturn_t snd_sb8dsp_interrupt(sb_t *chip);
 int snd_sb8_playback_open(snd_pcm_substream_t *substream);
 int snd_sb8_capture_open(snd_pcm_substream_t *substream);
 int snd_sb8_playback_close(snd_pcm_substream_t *substream);
 int snd_sb8_capture_close(snd_pcm_substream_t *substream);
 /* midi8.c */
-void snd_sb8dsp_midi_interrupt(sb_t *chip);
+irqreturn_t snd_sb8dsp_midi_interrupt(sb_t *chip);
 int snd_sb8dsp_midi(sb_t *chip, int device, snd_rawmidi_t ** rrawmidi);
 
 /* sb16_init.c */

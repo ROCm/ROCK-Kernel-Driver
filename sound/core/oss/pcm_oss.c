@@ -1477,10 +1477,10 @@ static int snd_pcm_oss_release_file(snd_pcm_oss_file_t *pcm_oss_file)
 			continue;
 		runtime = substream->runtime;
 		
-		spin_lock_irq(&runtime->lock);
+		snd_pcm_stream_lock_irq(substream);
 		if (snd_pcm_running(substream))
 			snd_pcm_stop(substream, SNDRV_PCM_STATE_SETUP);
-		spin_unlock_irq(&runtime->lock);
+		snd_pcm_stream_unlock_irq(substream);
 		if (substream->open_flag) {
 			if (substream->ops->hw_free != NULL)
 				substream->ops->hw_free(substream);
@@ -1918,21 +1918,21 @@ static unsigned int snd_pcm_oss_poll(struct file *file, poll_table * wait)
 	if (psubstream != NULL) {
 		snd_pcm_runtime_t *runtime = psubstream->runtime;
 		poll_wait(file, &runtime->sleep, wait);
-		spin_lock_irq(&runtime->lock);
+		snd_pcm_stream_lock_irq(psubstream);
 		if (runtime->status->state != SNDRV_PCM_STATE_DRAINING &&
 		    (runtime->status->state != SNDRV_PCM_STATE_RUNNING ||
 		     snd_pcm_oss_playback_ready(psubstream)))
 			mask |= POLLOUT | POLLWRNORM;
-		spin_unlock_irq(&runtime->lock);
+		snd_pcm_stream_unlock_irq(psubstream);
 	}
 	if (csubstream != NULL) {
 		snd_pcm_runtime_t *runtime = csubstream->runtime;
 		poll_wait(file, &runtime->sleep, wait);
-		spin_lock_irq(&runtime->lock);
+		snd_pcm_stream_lock_irq(csubstream);
 		if (runtime->status->state != SNDRV_PCM_STATE_RUNNING ||
 		    snd_pcm_oss_capture_ready(csubstream))
 			mask |= POLLIN | POLLRDNORM;
-		spin_unlock_irq(&runtime->lock);
+		snd_pcm_stream_unlock_irq(csubstream);
 	}
 
 	return mask;

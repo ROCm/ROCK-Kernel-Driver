@@ -598,8 +598,7 @@ static int snd_sonicvibes_trigger(sonicvibes_t * sonic, int what, int cmd)
 
 static irqreturn_t snd_sonicvibes_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	sonicvibes_t *sonic = snd_magic_cast(sonicvibes_t, dev_id,
-						return IRQ_NONE);
+	sonicvibes_t *sonic = snd_magic_cast(sonicvibes_t, dev_id, return IRQ_NONE);
 	unsigned char status;
 
 	status = inb(SV_REG(sonic, STATUS));
@@ -655,7 +654,6 @@ static irqreturn_t snd_sonicvibes_interrupt(int irq, void *dev_id, struct pt_reg
 		snd_ctl_notify(sonic->card, SNDRV_CTL_EVENT_MASK_VALUE, &sonic->master_mute->id);
 		snd_ctl_notify(sonic->card, SNDRV_CTL_EVENT_MASK_VALUE, &sonic->master_volume->id);
 	}
-
 	return IRQ_HANDLED;
 }
 

@@ -88,6 +88,12 @@ static int PRO_RATE_RESET = 1;
 static unsigned int PRO_RATE_DEFAULT = 44100;
 
 /*
+ *  AK4xxx stuff
+ */
+
+#include "ak4xxx.c"
+
+/*
  *  Basic I/O
  */
  
@@ -284,14 +290,15 @@ static int snd_vt1724_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
 	unsigned int what;
 	unsigned int old;
+	struct list_head *pos;
 	snd_pcm_substream_t *s;
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		what = 0;
-		s = substream;
-		do {
+		snd_pcm_group_for_each(pos, substream) {
+			s = snd_pcm_group_substream_entry(pos);
 			if (s == ice->playback_pro_substream)
 				what |= VT1724_PDMA0_PAUSE;
 			else if (s == ice->capture_pro_substream)
@@ -300,8 +307,7 @@ static int snd_vt1724_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 				what |= VT1724_PDMA4_PAUSE;
 			else if (s == ice->capture_con_substream)
 				what |= VT1724_RDMA1_PAUSE;
-			s = s->link_next;
-		} while (s != substream);
+		}
 		spin_lock(&ice->reg_lock);
 		old = inl(ICEMT1724(ice, DMA_PAUSE));
 		if (cmd == SNDRV_PCM_TRIGGER_PAUSE_PUSH)
@@ -316,7 +322,8 @@ static int snd_vt1724_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 	case SNDRV_PCM_TRIGGER_STOP:
 		what = 0;
 		s = substream;
-		do {
+		snd_pcm_group_for_each(pos, substream) {
+			s = snd_pcm_group_substream_entry(pos);
 			if (s == ice->playback_pro_substream) {
 				what |= VT1724_PDMA0_START;
 				snd_pcm_trigger_done(s, substream);
@@ -330,8 +337,7 @@ static int snd_vt1724_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 				what |= VT1724_RDMA1_START;
 				snd_pcm_trigger_done(s, substream);
 			}
-			s = s->link_next;
-		} while (s != substream);
+		}
 		spin_lock(&ice->reg_lock);
 		old = inl(ICEMT1724(ice, DMA_CONTROL));
 		if (cmd == SNDRV_PCM_TRIGGER_START)
@@ -1297,7 +1303,7 @@ static int snd_vt1724_pro_internal_clock_put(snd_kcontrol_t * kcontrol, snd_ctl_
 	return change;
 }
 
-static snd_kcontrol_new_t snd_vt1724_pro_internal_clock = __devinitdata {
+static snd_kcontrol_new_t snd_vt1724_pro_internal_clock __devinitdata = {
 	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	.name = "Multi Track Internal Clock",
 	.info = snd_vt1724_pro_internal_clock_info,
@@ -1452,7 +1458,7 @@ static int put_route_val(ice1712_t *ice, unsigned int val, int shift)
 static int snd_vt1724_pro_route_analog_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
-	int idx = kcontrol->id.index;
+	int idx = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id);
 	ucontrol->value.enumerated.item[0] = get_route_val(ice, analog_route_shift(idx));
 	return 0;
 }
@@ -1460,7 +1466,7 @@ static int snd_vt1724_pro_route_analog_get(snd_kcontrol_t * kcontrol, snd_ctl_el
 static int snd_vt1724_pro_route_analog_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
-	int idx = kcontrol->id.index;
+	int idx = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id);
 	return put_route_val(ice, ucontrol->value.enumerated.item[0],
 			     analog_route_shift(idx));
 }
@@ -1468,7 +1474,7 @@ static int snd_vt1724_pro_route_analog_put(snd_kcontrol_t * kcontrol, snd_ctl_el
 static int snd_vt1724_pro_route_spdif_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
-	int idx = kcontrol->id.index;
+	int idx = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id);
 	ucontrol->value.enumerated.item[0] = get_route_val(ice, digital_route_shift(idx));
 	return 0;
 }
@@ -1476,7 +1482,7 @@ static int snd_vt1724_pro_route_spdif_get(snd_kcontrol_t * kcontrol, snd_ctl_ele
 static int snd_vt1724_pro_route_spdif_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
-	int idx = kcontrol->id.index;
+	int idx = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id);
 	return put_route_val(ice, ucontrol->value.enumerated.item[0],
 			     digital_route_shift(idx));
 }
@@ -1495,6 +1501,7 @@ static snd_kcontrol_new_t snd_vt1724_mixer_pro_spdif_route __devinitdata = {
 	.info = snd_vt1724_pro_route_info,
 	.get = snd_vt1724_pro_route_spdif_get,
 	.put = snd_vt1724_pro_route_spdif_put,
+	.count = 2,
 };
 
 
@@ -1605,20 +1612,13 @@ static int __devinit snd_vt1724_chip_init(ice1712_t *ice)
 static int __devinit snd_vt1724_spdif_build_controls(ice1712_t *ice)
 {
 	int err;
-	unsigned int idx;
 	snd_kcontrol_t *kctl;
 
 	snd_assert(ice->pcm != NULL, return -EIO);
 
-	for (idx = 0; idx < 2; idx++) {
-		kctl = snd_ctl_new1(&snd_vt1724_mixer_pro_spdif_route, ice);
-		if (kctl == NULL)
-			return -ENOMEM;
-		kctl->id.index = idx;
-		err = snd_ctl_add(ice->card, kctl);
-		if (err < 0)
-			return err;
-	}
+	err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_vt1724_mixer_pro_spdif_route, ice));
+	if (err < 0)
+		return err;
 
 	err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_vt1724_spdif_switch, ice));
 	if (err < 0)
@@ -1649,8 +1649,6 @@ static int __devinit snd_vt1724_spdif_build_controls(ice1712_t *ice)
 
 static int __devinit snd_vt1724_build_controls(ice1712_t *ice)
 {
-	unsigned int idx;
-	snd_kcontrol_t *kctl;
 	int err;
 
 	err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_vt1724_eeprom, ice));
@@ -1667,12 +1665,10 @@ static int __devinit snd_vt1724_build_controls(ice1712_t *ice)
 	if (err < 0)
 		return err;
 
-	for (idx = 0; idx < ice->num_total_dacs; idx++) {
-		kctl = snd_ctl_new1(&snd_vt1724_mixer_pro_analog_route, ice);
-		if (kctl == NULL)
-			return -ENOMEM;
-		kctl->id.index = idx;
-		err = snd_ctl_add(ice->card, kctl);
+	if (ice->num_total_dacs > 0) {
+		snd_kcontrol_new_t tmp = snd_vt1724_mixer_pro_analog_route;
+		tmp.count = ice->num_total_dacs;
+		err = snd_ctl_add(ice->card, snd_ctl_new1(&tmp, ice));
 		if (err < 0)
 			return err;
 	}
@@ -1705,8 +1701,7 @@ static int snd_vt1724_free(ice1712_t *ice)
 		release_resource(ice->res_profi_port);
 		kfree_nocheck(ice->res_profi_port);
 	}
-	if (ice->akm)
-		kfree(ice->akm);
+	snd_ice1712_akm4xxx_free(ice);
 	snd_magic_kfree(ice);
 	return 0;
 }
