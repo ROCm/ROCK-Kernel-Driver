@@ -59,7 +59,7 @@ static char fat_default_iocharset[] = CONFIG_FAT_DEFAULT_IOCHARSET;
 #define FAT_HASH_SIZE	(1UL << FAT_HASH_BITS)
 #define FAT_HASH_MASK	(FAT_HASH_SIZE-1)
 static struct list_head fat_inode_hashtable[FAT_HASH_SIZE];
-spinlock_t fat_inode_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t fat_inode_lock = SPIN_LOCK_UNLOCKED;
 
 void fat_hash_init(void)
 {
@@ -579,12 +579,11 @@ static int fat_read_root(struct inode *inode)
  * of i_logstart is used to store the directory entry offset.
  */
 
-struct dentry *fat_decode_fh(struct super_block *sb, __u32 *fh,
-			     int len, int fhtype, 
-			     int (*acceptable)(void *context, struct dentry *de),
-			     void *context)
+static struct dentry *
+fat_decode_fh(struct super_block *sb, __u32 *fh, int len, int fhtype, 
+	      int (*acceptable)(void *context, struct dentry *de),
+	      void *context)
 {
-
 	if (fhtype != 3)
 		return ERR_PTR(-ESTALE);
 	if (len < 5)
@@ -593,7 +592,7 @@ struct dentry *fat_decode_fh(struct super_block *sb, __u32 *fh,
 	return sb->s_export_op->find_exported_dentry(sb, fh, NULL, acceptable, context);
 }
 
-struct dentry *fat_get_dentry(struct super_block *sb, void *inump)
+static struct dentry *fat_get_dentry(struct super_block *sb, void *inump)
 {
 	struct inode *inode = NULL;
 	struct dentry *result;
@@ -653,7 +652,8 @@ struct dentry *fat_get_dentry(struct super_block *sb, void *inump)
 	return result;
 }
 
-int fat_encode_fh(struct dentry *de, __u32 *fh, int *lenp, int connectable)
+static int
+fat_encode_fh(struct dentry *de, __u32 *fh, int *lenp, int connectable)
 {
 	int len = *lenp;
 	struct inode *inode =  de->d_inode;
@@ -676,7 +676,7 @@ int fat_encode_fh(struct dentry *de, __u32 *fh, int *lenp, int connectable)
 	return 3;
 }
 
-struct dentry *fat_get_parent(struct dentry *child)
+static struct dentry *fat_get_parent(struct dentry *child)
 {
 	struct buffer_head *bh=NULL;
 	struct msdos_dir_entry *de = NULL;
