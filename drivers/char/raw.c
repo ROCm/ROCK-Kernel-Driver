@@ -74,6 +74,7 @@ static int raw_open(struct inode *inode, struct file *filp)
 			goto out;
 		}
 		filp->f_flags |= O_DIRECT;
+		filp->f_mapping = bdev->bd_inode->i_mapping;
 		if (++raw_devices[minor].inuse == 1)
 			filp->f_dentry->d_inode->i_mapping =
 				bdev->bd_inode->i_mapping;

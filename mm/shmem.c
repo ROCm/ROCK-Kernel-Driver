@@ -1978,6 +1978,7 @@ struct file *shmem_file_setup(char *name, loff_t size, unsigned long flags)
 	inode->i_nlink = 0;	/* It is unlinked */
 	file->f_vfsmnt = mntget(shm_mnt);
 	file->f_dentry = dentry;
+	file->f_mapping = inode->i_mapping;
 	file->f_op = &shmem_file_operations;
 	file->f_mode = FMODE_WRITE | FMODE_READ;
 	return(file);

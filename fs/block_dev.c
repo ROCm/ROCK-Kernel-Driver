@@ -538,6 +538,7 @@ static int do_open(struct block_device *bdev, struct file *file)
 	int ret = -ENXIO;
 	int part;
 
+	file->f_mapping = bdev->bd_inode->i_mapping;
 	lock_kernel();
 	disk = get_gendisk(bdev->bd_dev, &part);
 	if (!disk) {

@@ -89,6 +89,7 @@ coda_file_mmap(struct file *coda_file, struct vm_area_struct *vma)
 
 	coda_inode = coda_file->f_dentry->d_inode;
 	host_inode = host_file->f_dentry->d_inode;
+	coda_file->f_mapping = host_file->f_mapping;
 	if (coda_inode->i_mapping == &coda_inode->i_data)
 		coda_inode->i_mapping = host_inode->i_mapping;
 

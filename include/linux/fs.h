@@ -526,6 +526,7 @@ struct file {
 	/* Used by fs/eventpoll.c to link all the hooks to this file */
 	struct list_head	f_ep_links;
 	spinlock_t		f_ep_lock;
+	struct address_space	*f_mapping;
 };
 extern spinlock_t files_lock;
 #define file_list_lock() spin_lock(&files_lock);

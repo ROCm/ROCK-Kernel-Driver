@@ -776,7 +776,8 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags)
 			goto cleanup_file;
 	}
 
-	file_ra_state_init(&f->f_ra, inode->i_mapping);
+	f->f_mapping = inode->i_mapping;
+	file_ra_state_init(&f->f_ra, f->f_mapping);
 	f->f_dentry = dentry;
 	f->f_vfsmnt = mnt;
 	f->f_pos = 0;

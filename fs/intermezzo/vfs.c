@@ -2083,7 +2083,9 @@ static struct file *presto_filp_dopen(struct dentry *dentry, int flags)
                 }
         }
 
+	/* XXX: where the fuck is ->f_vfsmnt? */
         f->f_dentry = dentry;
+        f->f_mapping = dentry->d_inode->i_mapping;
         f->f_pos = 0;
         //f->f_reada = 0;
         f->f_op = NULL;
