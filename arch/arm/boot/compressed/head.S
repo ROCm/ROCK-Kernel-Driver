@@ -355,6 +355,12 @@ proc_types:
 		b	__armv4_cache_off
 		mov	pc, lr
 
+		.word	0x41129200		@ ARM920T
+		.word	0xff00fff0
+		b	__cache_on
+		b	__armv4_cache_off
+		b	__armv4_cache_flush
+
 		.word	0x4401a100		@ sa110 / sa1100
 		.word	0xffffffe0
 		b	__cache_on
