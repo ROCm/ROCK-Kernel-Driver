@@ -107,7 +107,7 @@ static int fjn_config(struct net_device *dev, struct ifmap *map);
 static int fjn_open(struct net_device *dev);
 static int fjn_close(struct net_device *dev);
 static int fjn_start_xmit(struct sk_buff *skb, struct net_device *dev);
-static void fjn_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t fjn_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void fjn_rx(struct net_device *dev);
 static void fjn_reset(struct net_device *dev);
 static struct net_device_stats *fjn_get_stats(struct net_device *dev);
@@ -845,7 +845,7 @@ module_exit(exit_fmvj18x_cs);
 
 /*====================================================================*/
 
-static void fjn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t fjn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     local_info_t *lp = dev_id;
     struct net_device *dev = &lp->dev;
@@ -855,7 +855,7 @@ static void fjn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     if (lp == NULL) {
         printk(KERN_NOTICE "fjn_interrupt(): irq %d for "
 	       "unknown device.\n", irq);
-        return;
+        return IRQ_NONE;
     }
     ioaddr = dev->base_addr;
 
@@ -899,6 +899,7 @@ static void fjn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
     outb(D_TX_INTR, ioaddr + TX_INTR);
     outb(D_RX_INTR, ioaddr + RX_INTR);
+    return IRQ_HANDLED;
 
 } /* fjn_interrupt */
 

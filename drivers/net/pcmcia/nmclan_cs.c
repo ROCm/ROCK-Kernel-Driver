@@ -431,7 +431,7 @@ static int mace_open(struct net_device *dev);
 static int mace_close(struct net_device *dev);
 static int mace_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static void mace_tx_timeout(struct net_device *dev);
-static void mace_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t mace_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static struct net_device_stats *mace_get_stats(struct net_device *dev);
 static int mace_rx(struct net_device *dev, unsigned char RxCnt);
 static void restore_multicast_list(struct net_device *dev);
@@ -1143,7 +1143,7 @@ static int mace_start_xmit(struct sk_buff *skb, struct net_device *dev)
 mace_interrupt
 	The interrupt handler.
 ---------------------------------------------------------------------------- */
-static void mace_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t mace_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
   mace_private *lp = (mace_private *)dev_id;
   struct net_device *dev = &lp->dev;
@@ -1154,7 +1154,7 @@ static void mace_interrupt(int irq, void *dev_id, struct pt_regs *regs)
   if (dev == NULL) {
     DEBUG(2, "mace_interrupt(): irq 0x%X for unknown device.\n",
 	  irq);
-    return;
+    return IRQ_NONE;
   }
 
   if (lp->tx_irq_disabled) {
@@ -1169,12 +1169,12 @@ static void mace_interrupt(int irq, void *dev_id, struct pt_regs *regs)
       inb(ioaddr + AM2150_MACE_BASE + MACE_IMR)
     );
     /* WARNING: MACE_IR has been read! */
-    return;
+    return IRQ_NONE;
   }
 
   if (!netif_device_present(dev)) {
     DEBUG(2, "%s: interrupt from dead card\n", dev->name);
-    goto exception;
+    return IRQ_NONE;
   }
 
   do {
@@ -1279,8 +1279,7 @@ static void mace_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
   } while ((status & ~MACE_IMR_DEFAULT) && (--IntrCnt));
 
-exception:
-  return;
+  return IRQ_HANDLED;
 } /* mace_interrupt */
 
 /* ----------------------------------------------------------------------------
