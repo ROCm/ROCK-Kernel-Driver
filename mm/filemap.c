@@ -1094,7 +1094,9 @@ retry_find:
 				pgoff = 0;
 			do_page_cache_readahead(mapping, file, pgoff, ra_pages);
 		}
-		goto retry_find;
+		page = find_get_page(mapping, pgoff);
+		if (!page)
+			goto no_cached_page;
 	}
 
 	if (!did_readaround)
