@@ -5,12 +5,15 @@
  *		 2002 Open Source Development Lab
  */
 
+#define DEBUG 0
+
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/stat.h>
+#include <linux/limits.h>
 
 extern struct driver_file_entry * device_default_files[];
 
@@ -66,6 +69,84 @@ void device_remove_dir(struct device * dev)
 {
 	if (dev)
 		driverfs_remove_dir(&dev->dir);
+}
+
+
+static int get_devpath_length(struct device * dev)
+{
+	int length = 1;
+	struct device * parent = dev;
+
+	/* walk up the ancestors until we hit the root.
+	 * Add 1 to strlen for leading '/' of each level.
+	 */
+	do {
+		length += strlen(parent->bus_id) + 1;
+		parent = parent->parent;
+	} while (parent);
+	return length;
+}
+
+static void fill_devpath(struct device * dev, char * path, int length)
+{
+	struct device * parent;
+	--length;
+	for (parent = dev; parent; parent = parent->parent) {
+		int cur = strlen(parent->bus_id);
+
+		/* back up enough to print this bus id with '/' */
+		length -= cur;
+		strncpy(path + length,parent->bus_id,cur);
+		*(path + --length) = '/';
+	}
+
+	pr_debug("%s: path = '%s'\n",__FUNCTION__,path);
+}
+
+static int create_symlink(struct driver_dir_entry * parent, char * name, char * path)
+{
+	struct driver_file_entry * entry;
+
+	entry = kmalloc(sizeof(struct driver_file_entry),GFP_KERNEL);
+	if (!entry)
+		return -ENOMEM;
+	entry->name = name;
+	entry->mode = S_IRUGO;
+	return driverfs_create_symlink(parent,entry,path);
+}
+
+int device_bus_link(struct device * dev)
+{
+	char * path;
+	int length;
+	int error = 0;
+
+	if (!dev->bus)
+		return 0;
+
+	length = get_devpath_length(dev);
+
+	/* now add the path from the bus directory
+	 * It should be '../..' (one to get to the 'bus' directory,
+	 * and one to get to the root of the fs.
+	 */
+	length += strlen("../..");
+
+	if (length > PATH_MAX)
+		return -ENAMETOOLONG;
+
+	if (!(path = kmalloc(length,GFP_KERNEL)))
+		return -ENOMEM;
+	memset(path,0,length);
+
+	/* our relative position */
+	strcpy(path,"../..");
+
+	fill_devpath(dev,path,length);
+	error = create_symlink(&dev->bus->device_dir,dev->bus_id,path);
+
+	kfree(path);
+	return error;
 }
 
 int device_create_dir(struct driver_dir_entry * dir, struct driver_dir_entry * parent)

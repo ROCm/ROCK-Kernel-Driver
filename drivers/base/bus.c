@@ -7,6 +7,8 @@
  * 
  */
 
+#define DEBUG 0
+
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/errno.h>
@@ -32,10 +34,12 @@ static struct driver_dir_entry bus_dir = {
 int bus_add_device(struct device * dev)
 {
 	if (dev->bus) {
+		pr_debug("registering %s with bus '%s'\n",dev->bus_id,dev->bus->name);
 		get_bus(dev->bus);
 		write_lock(&dev->bus->lock);
 		list_add_tail(&dev->bus_list,&dev->bus->devices);
 		write_unlock(&dev->bus->lock);
+		device_bus_link(dev);
 	}
 	return 0;
 }
@@ -50,6 +54,7 @@ int bus_add_device(struct device * dev)
 void bus_remove_device(struct device * dev)
 {
 	if (dev->bus) {
+		driverfs_remove_file(&dev->bus->device_dir,dev->bus_id);
 		write_lock(&dev->bus->lock);
 		list_del_init(&dev->bus_list);
 		write_unlock(&dev->bus->lock);
@@ -112,7 +117,7 @@ static int __init bus_init(void)
 	return driverfs_create_dir(&bus_dir,NULL);
 }
 
-subsys_initcall(bus_init);
+core_initcall(bus_init);
 
 EXPORT_SYMBOL(bus_add_device);
 EXPORT_SYMBOL(bus_remove_device);
