@@ -47,14 +47,14 @@ static hfs_rwret_t cap_info_write(struct file *, const char *,
 /*================ Global variables ================*/
 
 struct file_operations hfs_cap_info_operations = {
-	llseek:		cap_info_llseek,
-	read:		cap_info_read,
-	write:		cap_info_write,
-	fsync:		file_fsync,
+	.llseek		= cap_info_llseek,
+	.read		= cap_info_read,
+	.write		= cap_info_write,
+	.fsync		= file_fsync,
 };
 
 struct inode_operations hfs_cap_info_inode_operations = {
-	setattr:	hfs_notify_change_cap,
+	.setattr	= hfs_notify_change_cap,
 };
 
 /*================ File-local functions ================*/

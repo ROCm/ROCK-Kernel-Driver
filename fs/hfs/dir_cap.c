@@ -59,30 +59,30 @@ const struct hfs_name hfs_cap_reserved2[] = {
 #define DOT_ROOTINFO	(&hfs_cap_reserved2[0])
 
 struct file_operations hfs_cap_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	cap_readdir,
-	fsync:		file_fsync,
+	.read		= generic_read_dir,
+	.readdir	= cap_readdir,
+	.fsync		= file_fsync,
 };
 
 struct inode_operations hfs_cap_ndir_inode_operations = {
-	create:		hfs_create,
-	lookup:		cap_lookup,
-	unlink:		hfs_unlink,
-	mkdir:		hfs_mkdir,
-	rmdir:		hfs_rmdir,
-	rename:		hfs_rename,
-	setattr:	hfs_notify_change,
+	.create		= hfs_create,
+	.lookup		= cap_lookup,
+	.unlink		= hfs_unlink,
+	.mkdir		= hfs_mkdir,
+	.rmdir		= hfs_rmdir,
+	.rename		= hfs_rename,
+	.setattr	= hfs_notify_change,
 };
 
 struct inode_operations hfs_cap_fdir_inode_operations = {
-	lookup:		cap_lookup,
-	setattr:	hfs_notify_change,
+	.lookup		= cap_lookup,
+	.setattr	= hfs_notify_change,
 };
 
 struct inode_operations hfs_cap_rdir_inode_operations = {
-	create:		hfs_create,
-	lookup:		cap_lookup,
-	setattr:	hfs_notify_change,
+	.create		= hfs_create,
+	.lookup		= cap_lookup,
+	.setattr	= hfs_notify_change,
 };
 
 /*================ File-local functions ================*/

@@ -34,16 +34,16 @@ static void hfs_file_truncate(struct inode *);
 /*================ Global variables ================*/
 
 struct file_operations hfs_file_operations = {
-	llseek:		generic_file_llseek,
-	read:		hfs_file_read,
-	write:		hfs_file_write,
-	mmap:		generic_file_mmap,
-	fsync:		file_fsync,
+	.llseek		= generic_file_llseek,
+	.read		= hfs_file_read,
+	.write		= hfs_file_write,
+	.mmap		= generic_file_mmap,
+	.fsync		= file_fsync,
 };
 
 struct inode_operations hfs_file_inode_operations = {
-	truncate:	hfs_file_truncate,
-	setattr:	hfs_notify_change,
+	.truncate	= hfs_file_truncate,
+	.setattr	= hfs_notify_change,
 };
 
 /*================ Variable-like macros ================*/

@@ -247,12 +247,12 @@ static int hfs_bmap(struct address_space *mapping, long block)
 	return generic_block_bmap(mapping,block,hfs_get_block);
 }
 struct address_space_operations hfs_aops = {
-	readpage: hfs_readpage,
-	writepage: hfs_writepage,
-	sync_page: block_sync_page,
-	prepare_write: hfs_prepare_write,
-	commit_write: generic_commit_write,
-	bmap: hfs_bmap
+	.readpage = hfs_readpage,
+	.writepage = hfs_writepage,
+	.sync_page = block_sync_page,
+	.prepare_write = hfs_prepare_write,
+	.commit_write = generic_commit_write,
+	.bmap = hfs_bmap
 };
 
 /*

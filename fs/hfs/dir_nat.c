@@ -64,27 +64,27 @@ const struct hfs_name hfs_nat_reserved2[] = {
 #define ROOTINFO        (&hfs_nat_reserved2[0])
 
 struct file_operations hfs_nat_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	nat_readdir,
-	fsync:		file_fsync,
+	.read		= generic_read_dir,
+	.readdir	= nat_readdir,
+	.fsync		= file_fsync,
 };
 
 struct inode_operations hfs_nat_ndir_inode_operations = {
-	create:		hfs_create,
-	lookup:		nat_lookup,
-	unlink:		hfs_unlink,
-	mkdir:		hfs_mkdir,
-	rmdir:		nat_rmdir,
-	rename:		hfs_rename,
-	setattr:	hfs_notify_change,
+	.create		= hfs_create,
+	.lookup		= nat_lookup,
+	.unlink		= hfs_unlink,
+	.mkdir		= hfs_mkdir,
+	.rmdir		= nat_rmdir,
+	.rename		= hfs_rename,
+	.setattr	= hfs_notify_change,
 };
 
 struct inode_operations hfs_nat_hdir_inode_operations = {
-	create:		hfs_create,
-	lookup:		nat_lookup,
-	unlink:		nat_hdr_unlink,
-	rename:		nat_hdr_rename,
-	setattr:	hfs_notify_change,
+	.create		= hfs_create,
+	.lookup		= nat_lookup,
+	.unlink		= nat_hdr_unlink,
+	.rename		= nat_hdr_rename,
+	.setattr	= hfs_notify_change,
 };
 
 /*================ File-local functions ================*/

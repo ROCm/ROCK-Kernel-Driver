@@ -25,10 +25,10 @@ static int hfs_compare_dentry(struct dentry *, struct qstr *, struct qstr *);
 static void hfs_dentry_iput(struct dentry *, struct inode *);
 struct dentry_operations hfs_dentry_operations =
 {
-	d_revalidate:	hfs_revalidate_dentry,	
-	d_hash:		hfs_hash_dentry,
-	d_compare:	hfs_compare_dentry,
-	d_iput:		hfs_dentry_iput,
+	.d_revalidate	= hfs_revalidate_dentry,	
+	.d_hash		= hfs_hash_dentry,
+	.d_compare	= hfs_compare_dentry,
+	.d_iput		= hfs_dentry_iput,
 };
 
 /*
