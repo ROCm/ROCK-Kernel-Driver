@@ -287,8 +287,9 @@ NCR_700_get_SXFER(struct scsi_device *SDp)
 	struct NCR_700_Host_Parameters *hostdata = 
 		(struct NCR_700_Host_Parameters *)SDp->host->hostdata[0];
 
-	return NCR_700_offset_period_to_sxfer(hostdata, spi_offset(SDp),
-					      spi_period(SDp));
+	return NCR_700_offset_period_to_sxfer(hostdata,
+					      spi_offset(SDp->sdev_target),
+					      spi_period(SDp->sdev_target));
 }
 
 struct Scsi_Host *
@@ -803,7 +804,7 @@ process_extended_message(struct Scsi_Host *host,
 			}
 			
 			if(NCR_700_is_flag_set(SCp->device, NCR_700_DEV_PRINT_SYNC_NEGOTIATION)) {
-				if(spi_offset(SCp->device) != 0)
+				if(spi_offset(SCp->device->sdev_target) != 0)
 					printk(KERN_INFO "scsi%d: (%d:%d) Synchronous at offset %d, period %dns\n",
 					       host->host_no, pun, lun,
 					       offset, period*4);
@@ -813,8 +814,8 @@ process_extended_message(struct Scsi_Host *host,
 				NCR_700_clear_flag(SCp->device, NCR_700_DEV_PRINT_SYNC_NEGOTIATION);
 			}
 				
-			spi_offset(SCp->device) = offset;
-			spi_period(SCp->device) = period;
+			spi_offset(SCp->device->sdev_target) = offset;
+			spi_period(SCp->device->sdev_target) = period;
 			
 
 			NCR_700_set_flag(SCp->device, NCR_700_DEV_NEGOTIATED_SYNC);
@@ -894,7 +895,8 @@ process_message(struct Scsi_Host *host,	struct NCR_700_Host_Parameters *hostdata
 	case A_REJECT_MSG:
 		if(SCp != NULL && NCR_700_is_flag_set(SCp->device, NCR_700_DEV_BEGIN_SYNC_NEGOTIATION)) {
 			/* Rejected our sync negotiation attempt */
-			spi_period(SCp->device) = spi_offset(SCp->device) = 0;
+			spi_period(SCp->device->sdev_target) =
+				spi_offset(SCp->device->sdev_target) = 0;
 			NCR_700_set_flag(SCp->device, NCR_700_DEV_NEGOTIATED_SYNC);
 			NCR_700_clear_flag(SCp->device, NCR_700_DEV_BEGIN_SYNC_NEGOTIATION);
 		} else if(SCp != NULL && NCR_700_is_flag_set(SCp->device, NCR_700_DEV_BEGIN_TAG_QUEUEING)) {
@@ -1420,8 +1422,8 @@ NCR_700_start_command(struct scsi_cmnd *SCp)
 	   NCR_700_is_flag_clear(SCp->device, NCR_700_DEV_NEGOTIATED_SYNC)) {
 		memcpy(&hostdata->msgout[count], NCR_700_SDTR_msg,
 		       sizeof(NCR_700_SDTR_msg));
-		hostdata->msgout[count+3] = spi_period(SCp->device);
-		hostdata->msgout[count+4] = spi_offset(SCp->device);
+		hostdata->msgout[count+3] = spi_period(SCp->device->sdev_target);
+		hostdata->msgout[count+4] = spi_offset(SCp->device->sdev_target);
 		count += sizeof(NCR_700_SDTR_msg);
 		NCR_700_set_flag(SCp->device, NCR_700_DEV_BEGIN_SYNC_NEGOTIATION);
 	}
@@ -1999,10 +2001,11 @@ NCR_700_host_reset(struct scsi_cmnd * SCp)
 }
 
 STATIC void
-NCR_700_set_period(struct scsi_device *SDp, int period)
+NCR_700_set_period(struct scsi_target *STp, int period)
 {
+	struct Scsi_Host *SHp = dev_to_shost(STp->dev.parent);
 	struct NCR_700_Host_Parameters *hostdata = 
-		(struct NCR_700_Host_Parameters *)SDp->host->hostdata[0];
+		(struct NCR_700_Host_Parameters *)SHp->hostdata[0];
 	
 	if(!hostdata->fast)
 		return;
@@ -2010,17 +2013,18 @@ NCR_700_set_period(struct scsi_device *SDp, int period)
 	if(period < hostdata->min_period)
 		period = hostdata->min_period;
 
-	spi_period(SDp) = period;
-	NCR_700_clear_flag(SDp, NCR_700_DEV_NEGOTIATED_SYNC);
-	NCR_700_clear_flag(SDp, NCR_700_DEV_BEGIN_SYNC_NEGOTIATION);
-	NCR_700_set_flag(SDp, NCR_700_DEV_PRINT_SYNC_NEGOTIATION);
+	spi_period(STp) = period;
+	spi_flags(STp) &= ~(NCR_700_DEV_NEGOTIATED_SYNC |
+			    NCR_700_DEV_BEGIN_SYNC_NEGOTIATION);
+	spi_flags(STp) |= NCR_700_DEV_PRINT_SYNC_NEGOTIATION;
 }
 
 STATIC void
-NCR_700_set_offset(struct scsi_device *SDp, int offset)
+NCR_700_set_offset(struct scsi_target *STp, int offset)
 {
+	struct Scsi_Host *SHp = dev_to_shost(STp->dev.parent);
 	struct NCR_700_Host_Parameters *hostdata = 
-		(struct NCR_700_Host_Parameters *)SDp->host->hostdata[0];
+		(struct NCR_700_Host_Parameters *)SHp->hostdata[0];
 	int max_offset = hostdata->chip710
 		? NCR_710_MAX_OFFSET : NCR_700_MAX_OFFSET;
 	
@@ -2031,14 +2035,14 @@ NCR_700_set_offset(struct scsi_device *SDp, int offset)
 		offset = max_offset;
 
 	/* if we're currently async, make sure the period is reasonable */
-	if(spi_offset(SDp) == 0 && (spi_period(SDp) < hostdata->min_period ||
-				    spi_period(SDp) > 0xff))
-		spi_period(SDp) = hostdata->min_period;
+	if(spi_offset(STp) == 0 && (spi_period(STp) < hostdata->min_period ||
+				    spi_period(STp) > 0xff))
+		spi_period(STp) = hostdata->min_period;
 
-	spi_offset(SDp) = offset;
-	NCR_700_clear_flag(SDp, NCR_700_DEV_NEGOTIATED_SYNC);
-	NCR_700_clear_flag(SDp, NCR_700_DEV_BEGIN_SYNC_NEGOTIATION);
-	NCR_700_set_flag(SDp, NCR_700_DEV_PRINT_SYNC_NEGOTIATION);
+	spi_offset(STp) = offset;
+	spi_flags(STp) &= ~(NCR_700_DEV_NEGOTIATED_SYNC |
+			    NCR_700_DEV_BEGIN_SYNC_NEGOTIATION);
+	spi_flags(STp) |= NCR_700_DEV_PRINT_SYNC_NEGOTIATION;
 }
 
 
@@ -2058,10 +2062,11 @@ NCR_700_slave_configure(struct scsi_device *SDp)
 	}
 	if(hostdata->fast) {
 		/* Find the correct offset and period via domain validation */
-		spi_dv_device(SDp);
+		if (!spi_initial_dv(SDp->sdev_target))
+			spi_dv_device(SDp);
 	} else {
-		spi_offset(SDp) = 0;
-		spi_period(SDp) = 0;
+		spi_offset(SDp->sdev_target) = 0;
+		spi_period(SDp->sdev_target) = 0;
 	}
 	return 0;
 }

@@ -35,45 +35,49 @@ struct spi_transport_attrs {
 	unsigned int rd_strm:1;	/* Read streaming enabled */
 	unsigned int rti:1;	/* Retain Training Information */
 	unsigned int pcomp_en:1;/* Precompensation enabled */
+	unsigned int initial_dv:1; /* DV done to this target yet  */
+	unsigned long flags;	/* flags field for drivers to use */
 	/* Private Fields */
 	unsigned int dv_pending:1; /* Internal flag */
 	struct semaphore dv_sem; /* semaphore to serialise dv */
 };
 
 /* accessor functions */
-#define spi_period(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->period)
-#define spi_offset(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->offset)
-#define spi_width(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->width)
-#define spi_iu(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->iu)
-#define spi_dt(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->dt)
-#define spi_qas(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->qas)
-#define spi_wr_flow(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->wr_flow)
-#define spi_rd_strm(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->rd_strm)
-#define spi_rti(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->rti)
-#define spi_pcomp_en(x)	(((struct spi_transport_attrs *)&(x)->sdev_data)->pcomp_en)
+#define spi_period(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->period)
+#define spi_offset(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->offset)
+#define spi_width(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->width)
+#define spi_iu(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->iu)
+#define spi_dt(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->dt)
+#define spi_qas(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->qas)
+#define spi_wr_flow(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->wr_flow)
+#define spi_rd_strm(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->rd_strm)
+#define spi_rti(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->rti)
+#define spi_pcomp_en(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->pcomp_en)
+#define spi_initial_dv(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->initial_dv)
+#define spi_flags(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->flags)
 
 /* The functions by which the transport class and the driver communicate */
 struct spi_function_template {
-	void	(*get_period)(struct scsi_device *);
-	void	(*set_period)(struct scsi_device *, int);
-	void	(*get_offset)(struct scsi_device *);
-	void	(*set_offset)(struct scsi_device *, int);
-	void	(*get_width)(struct scsi_device *);
-	void	(*set_width)(struct scsi_device *, int);
-	void	(*get_iu)(struct scsi_device *);
-	void	(*set_iu)(struct scsi_device *, int);
-	void	(*get_dt)(struct scsi_device *);
-	void	(*set_dt)(struct scsi_device *, int);
-	void	(*get_qas)(struct scsi_device *);
-	void	(*set_qas)(struct scsi_device *, int);
-	void	(*get_wr_flow)(struct scsi_device *);
-	void	(*set_wr_flow)(struct scsi_device *, int);
-	void	(*get_rd_strm)(struct scsi_device *);
-	void	(*set_rd_strm)(struct scsi_device *, int);
-	void	(*get_rti)(struct scsi_device *);
-	void	(*set_rti)(struct scsi_device *, int);
-	void	(*get_pcomp_en)(struct scsi_device *);
-	void	(*set_pcomp_en)(struct scsi_device *, int);
+	void	(*get_period)(struct scsi_target *);
+	void	(*set_period)(struct scsi_target *, int);
+	void	(*get_offset)(struct scsi_target *);
+	void	(*set_offset)(struct scsi_target *, int);
+	void	(*get_width)(struct scsi_target *);
+	void	(*set_width)(struct scsi_target *, int);
+	void	(*get_iu)(struct scsi_target *);
+	void	(*set_iu)(struct scsi_target *, int);
+	void	(*get_dt)(struct scsi_target *);
+	void	(*set_dt)(struct scsi_target *, int);
+	void	(*get_qas)(struct scsi_target *);
+	void	(*set_qas)(struct scsi_target *, int);
+	void	(*get_wr_flow)(struct scsi_target *);
+	void	(*set_wr_flow)(struct scsi_target *, int);
+	void	(*get_rd_strm)(struct scsi_target *);
+	void	(*set_rd_strm)(struct scsi_target *, int);
+	void	(*get_rti)(struct scsi_target *);
+	void	(*set_rti)(struct scsi_target *, int);
+	void	(*get_pcomp_en)(struct scsi_target *);
+	void	(*set_pcomp_en)(struct scsi_target *, int);
 	/* The driver sets these to tell the transport class it
 	 * wants the attributes displayed in sysfs.  If the show_ flag
 	 * is not set, the attribute will be private to the transport

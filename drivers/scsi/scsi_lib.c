@@ -1739,3 +1739,30 @@ scsi_device_resume(struct scsi_device *sdev)
 }
 EXPORT_SYMBOL(scsi_device_resume);
 
+static int
+device_quiesce_fn(struct device *dev, void *data)
+{
+	scsi_device_quiesce(to_scsi_device(dev));
+	return 0;
+}
+
+void
+scsi_target_quiesce(struct scsi_target *starget)
+{
+	device_for_each_child(&starget->dev, NULL, device_quiesce_fn);
+}
+EXPORT_SYMBOL(scsi_target_quiesce);
+
+static int
+device_resume_fn(struct device *dev, void *data)
+{
+	scsi_device_resume(to_scsi_device(dev));
+	return 0;
+}
+
+void
+scsi_target_resume(struct scsi_target *starget)
+{
+	device_for_each_child(&starget->dev, NULL, device_resume_fn);
+}
+EXPORT_SYMBOL(scsi_target_resume);
