@@ -65,17 +65,4 @@ extern unsigned char mca_read_pos(int slot, int reg);
 /* write a byte to the specified POS register. */
 extern void mca_write_pos(int slot, int reg, unsigned char byte);
 
-#ifdef CONFIG_PROC_FS
-extern void mca_do_proc_init(void);
-extern void mca_set_adapter_procfn(int slot, MCA_ProcFn, void* dev);
-#else
-static inline void mca_do_proc_init(void)
-{
-}
-
-static inline void mca_set_adapter_procfn(int slot, MCA_ProcFn *fn, void* dev)
-{
-}
-#endif
-
 #endif

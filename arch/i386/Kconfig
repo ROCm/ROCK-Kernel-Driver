@@ -1079,6 +1079,8 @@ config MCA
 	  <file:Documentation/mca.txt> (and especially the web page given
 	  there) before attempting to build an MCA bus kernel.
 
+source "drivers/mca/Kconfig"
+
 config HOTPLUG
 	bool "Support for hot-pluggable devices"
 	---help---

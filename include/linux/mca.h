@@ -64,7 +64,7 @@ struct mca_device {
 	short			pos_register;
 	
 	enum MCA_AdapterStatus	status;
-#ifdef CONFIG_PROC_FS
+#ifdef CONFIG_MCA_PROC_FS
 	/* name of the proc/mca file */
 	char			procname[8];
 	/* /proc info callback */
@@ -128,8 +128,21 @@ extern void mca_unregister_driver(struct mca_driver *drv);
 /* WARNING: only called by the boot time device setup */
 extern int mca_register_device(int bus, struct mca_device *mca_dev);
 
-/* for now, include the legacy API */
+#ifdef CONFIG_MCA_LEGACY
 #include <linux/mca-legacy.h>
+#endif
 
+#ifdef CONFIG_MCA_PROC_FS
+extern void mca_do_proc_init(void);
+extern void mca_set_adapter_procfn(int slot, MCA_ProcFn, void* dev);
+#else
+static inline void mca_do_proc_init(void)
+{
+}
+
+static inline void mca_set_adapter_procfn(int slot, MCA_ProcFn *fn, void* dev)
+{
+}
+#endif
 
 #endif /* _LINUX_MCA_H */

@@ -408,16 +408,11 @@ subsys_initcall(mca_init);
 
 /*--------------------------------------------------------------------*/
 
-static void mca_handle_nmi_slot(int slot, int check_flag)
+static void mca_handle_nmi_device(struct mca_device *mca_dev, int check_flag)
 {
-	struct mca_device *mca_dev = mca_find_device_by_slot(slot);
+	int slot = mca_dev->slot;
 
-	if(!mca_dev) {
-		printk(KERN_CRIT "NMI: caused by unknown slot %d\n", slot);
-	} else if(slot < MCA_MAX_SLOT_NR) {
-		printk(KERN_CRIT "NMI: caused by MCA adapter in slot %d (%s)\n", slot+1,
-			mca_dev->dev.name);
-	} else if(slot == MCA_INTEGSCSI) {
+	if(slot == MCA_INTEGSCSI) {
 		printk(KERN_CRIT "NMI: caused by MCA integrated SCSI adapter (%s)\n",
 			mca_dev->dev.name);
 	} else if(slot == MCA_INTEGVIDEO) {
@@ -433,8 +428,8 @@ static void mca_handle_nmi_slot(int slot, int check_flag)
 	if(check_flag) {
 		unsigned char pos6, pos7;
 
-		pos6 = mca_read_pos(slot, 6);
-		pos7 = mca_read_pos(slot, 7);
+		pos6 = mca_device_read_pos(mca_dev, 6);
+		pos7 = mca_device_read_pos(mca_dev, 7);
 
 		printk(KERN_CRIT "NMI: POS 6 = 0x%x, POS 7 = 0x%x\n", pos6, pos7);
 	}
@@ -443,28 +438,30 @@ static void mca_handle_nmi_slot(int slot, int check_flag)
 
 /*--------------------------------------------------------------------*/
 
-void mca_handle_nmi(void)
+static int mca_handle_nmi_callback(struct device *dev, void *data)
 {
-
-	int i;
+	struct mca_device *mca_dev = to_mca_device(dev);
 	unsigned char pos5;
 
-	/* First try - scan the various adapters and see if a specific
-	 * adapter was responsible for the error.
-	 */
+	pos5 = mca_device_read_pos(mca_dev, 5);
 
-	for(i = 0; i < MCA_NUMADAPTERS; i++) 
-	{
+	if(!(pos5 & 0x80)) {
 		/* Bit 7 of POS 5 is reset when this adapter has a hardware
 		 * error. Bit 7 it reset if there's error information
 		 * available in POS 6 and 7.
 		 */
-		pos5 = mca_read_pos(i, 5);
-
-		if(!(pos5 & 0x80)) {
-			mca_handle_nmi_slot(i, !(pos5 & 0x40));
-			return;
-		}
+		mca_handle_nmi_device(mca_dev, !(pos5 & 0x40));
+		return 1;
 	}
+	return 0;
+}
+
+void mca_handle_nmi(void)
+{
+	/* First try - scan the various adapters and see if a specific
+	 * adapter was responsible for the error.
+	 */
+	bus_for_each_dev(&mca_bus_type, NULL, mca_handle_nmi_callback);
+
 	mca_nmi_hook();
 } /* mca_handle_nmi */
