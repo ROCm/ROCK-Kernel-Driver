@@ -445,6 +445,7 @@ err_out:
 
 /**
  * ntfs_write_block - write a @page to the backing store
+ * @wbc:	writeback control structure
  * @page:	page cache page to write out
  *
  * This function is for writing pages belonging to non-resident, non-mst
@@ -773,8 +774,54 @@ lock_retry_remap:
 }
 
 /**
+ * ntfs_write_mst_block - write a @page to the backing store
+ * @wbc:	writeback control structure
+ * @page:	page cache page to write out
+ *
+ * This function is for writing pages belonging to non-resident, mst protected
+ * attributes to their backing store.  The only supported attribute is the
+ * index allocation attribute.  Both directory inodes and index inodes are
+ * supported.
+ *
+ * The page must remain locked for the duration of the write because we apply
+ * the mst fixups, write, and then undo the fixups, so if we were to unlock the
+ * page before undoing the fixups, any other user of the page will see the
+ * page contents as corrupt.
+ *
+ * Return 0 on success and -errno on error.
+ *
+ * Based on ntfs_write_block(), ntfs_mft_writepage(), and
+ * write_mft_record_nolock().
+ */
+static int ntfs_write_mst_block(struct writeback_control *wbc,
+		struct page *page)
+{
+	struct inode *vi;
+	ntfs_inode *ni;
+	ntfs_volume *vol;
+
+	vi = page->mapping->host;
+	ni = NTFS_I(vi);
+	vol = ni->vol;
+	ntfs_debug("Entering for inode 0x%lx, attribute type 0x%x, page index "
+			"0x%lx.", vi->i_ino, ni->type, page->index);
+	BUG_ON(!NInoNonResident(ni));
+	BUG_ON(!NInoMstProtected(ni));
+	BUG_ON(!(S_ISDIR(vi->i_mode) ||
+			(NInoAttr(ni) && ni->type == AT_INDEX_ALLOCATION)));
+	BUG_ON(PageWriteback(page));
+	set_page_writeback(page);
+	unlock_page(page);
+	end_page_writeback(page);
+	ntfs_warning(vi->i_sb, "Writing to index allocation attribute is not "
+			"supported yet.  Discarding written data.");
+	return 0;
+}
+
+/**
  * ntfs_writepage - write a @page to the backing store
  * @page:	page cache page to write out
+ * @wbc:	writeback control structure
  *
  * For non-resident attributes, ntfs_writepage() writes the @page by calling
  * the ntfs version of the generic block_write_full_page() function,
@@ -859,13 +906,8 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 			kunmap_atomic(kaddr, KM_USER0);
 		}
 		/* Handle mst protected attributes. */
-		if (NInoMstProtected(ni)) {
-			unlock_page(page);
-			ntfs_warning(vi->i_sb, "Writing to index allocation "
-					"attribute is not supported yet.  "
-					"Discarding written data.");
-			return 0;
-		}
+		if (NInoMstProtected(ni))
+			return ntfs_write_mst_block(wbc, page);
 		/* Normal data stream. */
 		return ntfs_write_block(wbc, page);
 	}
