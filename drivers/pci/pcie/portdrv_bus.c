@@ -14,8 +14,6 @@
 
 #include <linux/pcieport_if.h>
 
-static int generic_probe (struct device *dev) {	return 0;}
-static int generic_remove (struct device *dev) { return 0;}
 static int pcie_port_bus_match(struct device *dev, struct device_driver *drv);
 static int pcie_port_bus_suspend(struct device *dev, u32 state);
 static int pcie_port_bus_resume(struct device *dev);
@@ -27,23 +25,14 @@ struct bus_type pcie_port_bus_type = {
 	.resume		= pcie_port_bus_resume, 
 };
 
-struct device_driver pcieport_generic_driver = {
-	.name =	"pcieport",
-	.bus = &pcie_port_bus_type,
-	.probe = generic_probe,
-	.remove = generic_remove,
-};
-
 static int pcie_port_bus_match(struct device *dev, struct device_driver *drv)
 {
 	struct pcie_device *pciedev;
 	struct pcie_port_service_driver *driver;
 
-	if (	drv->bus != &pcie_port_bus_type || 
-		dev->bus != &pcie_port_bus_type	||
-		drv == &pcieport_generic_driver) {
+	if (drv->bus != &pcie_port_bus_type || dev->bus != &pcie_port_bus_type)
 		return 0;
-	}
+	
 	pciedev = to_pcie_device(dev);
 	driver = to_service_driver(drv);
 	if (   (driver->id_table->vendor != PCI_ANY_ID && 

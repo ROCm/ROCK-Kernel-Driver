@@ -1,7 +1,7 @@
 /*
  * Garmin GPS driver
  *
- * Copyright (C) 2004 Hermann Kneissel hkneissel@t-online.de
+ * Copyright (C) 2004 Hermann Kneissel herkne@users.sourceforge.net
  *
  * The latest version of the driver can be found at
  * http://sourceforge.net/projects/garmin-gps/

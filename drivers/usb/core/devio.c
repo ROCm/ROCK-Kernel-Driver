@@ -123,13 +123,26 @@ static ssize_t usbdev_read(struct file *file, char __user *buf, size_t nbytes, l
 	}
 
 	if (pos < sizeof(struct usb_device_descriptor)) {
+		struct usb_device_descriptor *desc = kmalloc(sizeof(*desc), GFP_KERNEL);
+		if (!desc) {
+			ret = -ENOMEM;
+			goto err;
+		}
+		memcpy(desc, &dev->descriptor, sizeof(dev->descriptor));
+		le16_to_cpus(&desc->bcdUSB);
+		le16_to_cpus(&desc->idVendor);
+		le16_to_cpus(&desc->idProduct);
+		le16_to_cpus(&desc->bcdDevice);
+
 		len = sizeof(struct usb_device_descriptor) - pos;
 		if (len > nbytes)
 			len = nbytes;
-		if (copy_to_user(buf, ((char *)&dev->descriptor) + pos, len)) {
+		if (copy_to_user(buf, ((char *)desc) + pos, len)) {
+			kfree(desc);
 			ret = -EFAULT;
 			goto err;
 		}
+		kfree(desc);
 
 		*ppos += len;
 		buf += len;

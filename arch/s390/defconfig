@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.11-rc1
-# Fri Jan 14 14:56:51 2005
+# Linux kernel version: 2.6.11-rc2
+# Mon Jan 31 16:27:12 2005
 #
 CONFIG_MMU=y
 CONFIG_RWSEM_XCHGADD_ALGORITHM=y
@@ -156,6 +156,7 @@ CONFIG_CCW=y
 #
 # Block devices
 #
+# CONFIG_BLK_DEV_COW_COMMON is not set
 CONFIG_BLK_DEV_LOOP=m
 # CONFIG_BLK_DEV_CRYPTOLOOP is not set
 CONFIG_BLK_DEV_NBD=m
@@ -579,5 +580,5 @@ CONFIG_CRYPTO=y
 # Library routines
 #
 # CONFIG_CRC_CCITT is not set
-# CONFIG_CRC32 is not set
+CONFIG_CRC32=m
 # CONFIG_LIBCRC32C is not set

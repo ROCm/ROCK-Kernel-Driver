@@ -40,7 +40,6 @@
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
 extern void ia64_tlb_init (void);
-extern void efi_get_pal_addr (void);
 
 unsigned long MAX_DMA_ADDRESS = PAGE_OFFSET + 0x100000000UL;
 
@@ -290,27 +289,6 @@ setup_gate (void)
 	put_kernel_page(page, GATE_ADDR + PERCPU_PAGE_SIZE, PAGE_GATE);
 #endif
 	ia64_patch_gate();
-}
-
-void
-set_mca_pointer(struct cpuinfo_ia64 *cpuinfo, void *cpu_data)
-{
-	void *my_cpu_data = ia64_imva(cpu_data);
-
-        /*
-         * The MCA info structure was allocated earlier and a physical address pointer
-         * saved in __per_cpu_mca[cpu].  Move that pointer into the cpuinfo structure.
-         */
-
-        cpuinfo->ia64_pa_mca_data = (__u64 *)__per_cpu_mca[smp_processor_id()];
-
-        cpuinfo->percpu_paddr = pte_val(mk_pte_phys(__pa(my_cpu_data), PAGE_KERNEL));
-        ia64_set_kr(IA64_KR_PA_CPU_INFO, __pa(cpuinfo));
-
-        /*
-         * Set pal_base and pal_paddr in cpuinfo structure.
-         */
-        efi_get_pal_addr();
 }
 
 void __devinit

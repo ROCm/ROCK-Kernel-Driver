@@ -14,7 +14,7 @@
  */
 #define IA64_KR_IO_BASE		0	/* ar.k0: legacy I/O base address */
 #define IA64_KR_TSSD		1	/* ar.k1: IVE uses this as the TSSD */
-#define IA64_KR_PA_CPU_INFO	3	/* ar.k3: phys addr of this cpu's cpu_info struct */
+#define IA64_KR_PER_CPU_DATA	3	/* ar.k3: physical per-CPU base */
 #define IA64_KR_CURRENT_STACK	4	/* ar.k4: what's mapped in IA64_TR_CURRENT_STACK */
 #define IA64_KR_FPU_OWNER	5	/* ar.k5: fpu-owner (UP only, at the moment) */
 #define IA64_KR_CURRENT		6	/* ar.k6: "current" task pointer */

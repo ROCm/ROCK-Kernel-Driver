@@ -512,6 +512,8 @@ ppc4xx_get_channel_config(unsigned int dmanr, ppc_dma_ch_t * p_dma_ch)
 		return DMA_STATUS_BAD_CHANNEL;
 	}
 
+	memcpy(p_dma_ch, &dma_channels[dmanr], sizeof (ppc_dma_ch_t));
+
 #if DCRN_POL > 0
 	polarity = mfdcr(DCRN_POL);
 #else
@@ -604,6 +606,84 @@ ppc4xx_get_peripheral_width(unsigned int dmanr)
 	return (GET_DMA_PW(control));
 }
 
+/*
+ * Clears the channel status bits
+ */
+int
+ppc4xx_clr_dma_status(unsigned int dmanr)
+{
+	if (dmanr >= MAX_PPC4xx_DMA_CHANNELS) {
+		printk(KERN_ERR "ppc4xx_clr_dma_status: bad channel: %d\n", dmanr);
+		return DMA_STATUS_BAD_CHANNEL;
+	}
+	mtdcr(DCRN_DMASR, ((u32)DMA_CH0_ERR | (u32)DMA_CS0 | (u32)DMA_TS0) >> dmanr);
+	return DMA_STATUS_GOOD;
+}
+
+/*
+ * Enables the burst on the channel (BTEN bit in the control/count register)
+ * Note:
+ * For scatter/gather dma, this function MUST be called before the
+ * ppc4xx_alloc_dma_handle() func as the chan count register is copied into the
+ * sgl list and used as each sgl element is added.
+ */
+int
+ppc4xx_enable_burst(unsigned int dmanr)
+{
+	unsigned int ctc;
+	if (dmanr >= MAX_PPC4xx_DMA_CHANNELS) {
+		printk(KERN_ERR "ppc4xx_enable_burst: bad channel: %d\n", dmanr);
+		return DMA_STATUS_BAD_CHANNEL;
+	}
+        ctc = mfdcr(DCRN_DMACT0 + (dmanr * 0x8)) | DMA_CTC_BTEN;
+	mtdcr(DCRN_DMACT0 + (dmanr * 0x8), ctc);
+	return DMA_STATUS_GOOD;
+}
+/*
+ * Disables the burst on the channel (BTEN bit in the control/count register)
+ * Note:
+ * For scatter/gather dma, this function MUST be called before the
+ * ppc4xx_alloc_dma_handle() func as the chan count register is copied into the
+ * sgl list and used as each sgl element is added.
+ */
+int
+ppc4xx_disable_burst(unsigned int dmanr)
+{
+	unsigned int ctc;
+	if (dmanr >= MAX_PPC4xx_DMA_CHANNELS) {
+		printk(KERN_ERR "ppc4xx_disable_burst: bad channel: %d\n", dmanr);
+		return DMA_STATUS_BAD_CHANNEL;
+	}
+	ctc = mfdcr(DCRN_DMACT0 + (dmanr * 0x8)) &~ DMA_CTC_BTEN;
+	mtdcr(DCRN_DMACT0 + (dmanr * 0x8), ctc);
+	return DMA_STATUS_GOOD;
+}
+/*
+ * Sets the burst size (number of peripheral widths) for the channel
+ * (BSIZ bits in the control/count register))
+ * must be one of:
+ *    DMA_CTC_BSIZ_2
+ *    DMA_CTC_BSIZ_4
+ *    DMA_CTC_BSIZ_8
+ *    DMA_CTC_BSIZ_16
+ * Note:
+ * For scatter/gather dma, this function MUST be called before the
+ * ppc4xx_alloc_dma_handle() func as the chan count register is copied into the
+ * sgl list and used as each sgl element is added.
+ */
+int
+ppc4xx_set_burst_size(unsigned int dmanr, unsigned int bsize)
+{
+	unsigned int ctc;
+	if (dmanr >= MAX_PPC4xx_DMA_CHANNELS) {
+		printk(KERN_ERR "ppc4xx_set_burst_size: bad channel: %d\n", dmanr);
+		return DMA_STATUS_BAD_CHANNEL;
+	}
+	ctc = mfdcr(DCRN_DMACT0 + (dmanr * 0x8)) &~ DMA_CTC_BSIZ_MSK;
+	ctc |= (bsize & DMA_CTC_BSIZ_MSK);
+	mtdcr(DCRN_DMACT0 + (dmanr * 0x8), ctc);
+	return DMA_STATUS_GOOD;
+}
 
 EXPORT_SYMBOL(ppc4xx_init_dma_channel);
 EXPORT_SYMBOL(ppc4xx_get_channel_config);
@@ -622,3 +702,7 @@ EXPORT_SYMBOL(ppc4xx_get_dma_residue);
 EXPORT_SYMBOL(ppc4xx_enable_dma_interrupt);
 EXPORT_SYMBOL(ppc4xx_disable_dma_interrupt);
 EXPORT_SYMBOL(ppc4xx_get_dma_status);
+EXPORT_SYMBOL(ppc4xx_clr_dma_status);
+EXPORT_SYMBOL(ppc4xx_enable_burst);
+EXPORT_SYMBOL(ppc4xx_disable_burst);
+EXPORT_SYMBOL(ppc4xx_set_burst_size);

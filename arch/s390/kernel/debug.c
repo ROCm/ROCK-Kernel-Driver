@@ -931,7 +931,7 @@ int debug_register_view(debug_info_t * id, struct debug_view *view)
 	int rc = 0;
 	int i;
 	unsigned long flags;
-	mode_t mode = S_IFREG;
+	mode_t mode = S_IFREG | S_IRUSR | S_IWUSR;
 	struct proc_dir_entry *pde;
 
 	if (!id)

@@ -47,8 +47,6 @@
 
 #include "ip22zilog.h"
 
-int ip22serial_current_minor = 64;
-
 void ip22_do_break(void);
 
 /*
@@ -59,10 +57,10 @@ void ip22_do_break(void);
 #define ZSDELAY_LONG()		udelay(20)
 #define ZS_WSYNC(channel)	do { } while (0)
 
-#define NUM_IP22ZILOG	1
-#define NUM_CHANNELS	(NUM_IP22ZILOG * 2)
+#define NUM_IP22ZILOG		1
+#define NUM_CHANNELS		(NUM_IP22ZILOG * 2)
 
-#define ZS_CLOCK		4915200 /* Zilog input clock rate. */
+#define ZS_CLOCK		3672000	/* Zilog input clock rate. */
 #define ZS_CLOCK_DIVISOR	16      /* Divisor this driver uses. */
 
 /*
@@ -86,7 +84,7 @@ struct uart_ip22zilog_port {
 #define IP22ZILOG_FLAG_TX_STOPPED	0x00000080
 #define IP22ZILOG_FLAG_TX_ACTIVE	0x00000100
 
-	unsigned int cflag;
+	unsigned int			cflag;
 
 	/* L1-A keyboard break state.  */
 	int				kbd_id;
@@ -642,36 +640,28 @@ static void ip22zilog_start_tx(struct uart_port *port, unsigned int tty_start)
 	}
 }
 
-/* The port lock is not held.  */
+/* The port lock is held and interrupts are disabled.  */
 static void ip22zilog_stop_rx(struct uart_port *port)
 {
 	struct uart_ip22zilog_port *up = UART_ZILOG(port);
 	struct zilog_channel *channel;
-	unsigned long flags;
 
 	if (ZS_IS_CONS(up))
 		return;
-
-	spin_lock_irqsave(&port->lock, flags);
 
 	channel = ZILOG_CHANNEL_FROM_PORT(port);
 
 	/* Disable all RX interrupts.  */
 	up->curregs[R1] &= ~RxINT_MASK;
 	ip22zilog_maybe_update_regs(up, channel);
-
-	spin_unlock_irqrestore(&port->lock, flags);
 }
 
-/* The port lock is not held.  */
+/* The port lock is held.  */
 static void ip22zilog_enable_ms(struct uart_port *port)
 {
 	struct uart_ip22zilog_port *up = (struct uart_ip22zilog_port *) port;
 	struct zilog_channel *channel = ZILOG_CHANNEL_FROM_PORT(port);
 	unsigned char new_reg;
-	unsigned long flags;
-
-	spin_lock_irqsave(&port->lock, flags);
 
 	new_reg = up->curregs[R15] | (DCDIE | SYNCIE | CTSIE);
 	if (new_reg != up->curregs[R15]) {
@@ -680,8 +670,6 @@ static void ip22zilog_enable_ms(struct uart_port *port)
 		/* NOTE: Not subject to 'transmitter active' rule.  */ 
 		write_zsreg(channel, R15, up->curregs[R15]);
 	}
-
-	spin_unlock_irqrestore(&port->lock, flags);
 }
 
 /* The port lock is not held.  */
@@ -807,7 +795,7 @@ ip22zilog_convert_to_zs(struct uart_ip22zilog_port *up, unsigned int cflag,
 	up->curregs[R4] |= X16CLK;
 	up->curregs[R12] = brg & 0xff;
 	up->curregs[R13] = (brg >> 8) & 0xff;
-	up->curregs[R14] = BRSRC | BRENAB;
+	up->curregs[R14] = BRENAB;
 
 	/* Character size, stop bits, and parity. */
 	up->curregs[3] &= ~RxN_MASK;
@@ -950,13 +938,6 @@ static struct zilog_layout **ip22zilog_chip_regs;
 static struct uart_ip22zilog_port *ip22zilog_irq_chain;
 static int zilog_irq = -1;
 
-static struct uart_driver ip22zilog_reg = {
-	.owner		=	THIS_MODULE,
-	.driver_name	=	"ttyS",
-	.devfs_name	=	"tty/",
-	.major		=	TTY_MAJOR,
-};
-
 static void * __init alloc_one_table(unsigned long size)
 {
 	void *ret;
@@ -990,7 +971,7 @@ static struct zilog_layout * __init get_zs(int chip)
 	}
 
 	/* Not probe-able, hard code it. */
-	base = (unsigned long) &sgioc->serport;
+	base = (unsigned long) &sgioc->uart;
 
 	zilog_irq = SGI_SERIAL_IRQ;
 	request_mem_region(base, 8, "IP22-Zilog");
@@ -1047,9 +1028,6 @@ ip22serial_console_termios(struct console *con, char *options)
 	int parity = 'n';
 	int flow = 'n';
 
-	if (!serial_console)
-		return;
-
 	if (options)
 		uart_parse_options(options, &baud, &parity, &bits, &flow);
 
@@ -1077,8 +1055,7 @@ static int __init ip22zilog_console_setup(struct console *con, char *options)
 	unsigned long flags;
 	int baud, brg;
 
-	printk("Console: ttyS%d (IP22-Zilog)\n",
-	       (ip22zilog_reg.minor - 64) + con->index);
+	printk("Console: ttyS%d (IP22-Zilog)\n", con->index);
 
 	/* Get firmware console settings.  */
 	ip22serial_console_termios(con, options);
@@ -1112,6 +1089,8 @@ static int __init ip22zilog_console_setup(struct console *con, char *options)
 	return 0;
 }
 
+static struct uart_driver ip22zilog_reg;
+
 static struct console ip22zilog_console = {
 	.name	=	"ttyS",
 	.write	=	ip22zilog_console_write,
@@ -1121,32 +1100,20 @@ static struct console ip22zilog_console = {
 	.index	=	-1,
 	.data	=	&ip22zilog_reg,
 };
-#define IP22ZILOG_CONSOLE	(&ip22zilog_console)
+#endif /* CONFIG_SERIAL_IP22_ZILOG_CONSOLE */
 
-static int __init ip22zilog_console_init(void)
-{
-	int i;
-
-	if (con_is_present())
-		return 0;
-
-	for (i = 0; i < NUM_CHANNELS; i++) {
-		int this_minor = ip22zilog_reg.minor + i;
-
-		if ((this_minor - 64) == (serial_console - 1))
-			break;
-	}
-	if (i == NUM_CHANNELS)
-		return 0;
-
-	ip22zilog_console.index = i;
-	register_console(&ip22zilog_console);
-	return 0;
-}
-#else /* CONFIG_SERIAL_IP22_ZILOG_CONSOLE */
-#define IP22ZILOG_CONSOLE		(NULL)
-#define ip22zilog_console_init()	do { } while (0)
+static struct uart_driver ip22zilog_reg = {
+	.owner		= THIS_MODULE,
+	.driver_name	= "serial",
+	.devfs_name	= "tts/",
+	.dev_name	= "ttyS",
+	.major		= TTY_MAJOR,
+	.minor		= 64,
+	.nr		= NUM_CHANNELS,
+#ifdef CONFIG_SERIAL_IP22_ZILOG_CONSOLE
+	.cons		= &ip22zilog_console,
 #endif
+};
 
 static void __init ip22zilog_prepare(void)
 {
@@ -1160,17 +1127,24 @@ static void __init ip22zilog_prepare(void)
 	for (channel = 0; channel < NUM_CHANNELS; channel++)
 		spin_lock_init(&ip22zilog_port_table[channel].port.lock);
 
-	ip22zilog_irq_chain = up = &ip22zilog_port_table[0];
-	for (channel = 0; channel < NUM_CHANNELS - 1; channel++)
-		up[channel].next = &up[channel + 1];
+	ip22zilog_irq_chain = &ip22zilog_port_table[NUM_CHANNELS - 1];
+        up = &ip22zilog_port_table[0];
+	for (channel = NUM_CHANNELS - 1 ; channel > 0; channel--)
+		up[channel].next = &up[channel - 1];
 	up[channel].next = NULL;
 
 	for (chip = 0; chip < NUM_IP22ZILOG; chip++) {
 		if (!ip22zilog_chip_regs[chip]) {
 			ip22zilog_chip_regs[chip] = rp = get_zs(chip);
 
-			up[(chip * 2) + 0].port.membase = (char *) &rp->channelA;
-			up[(chip * 2) + 1].port.membase = (char *) &rp->channelB;
+			up[(chip * 2) + 0].port.membase = (char *) &rp->channelB;
+			up[(chip * 2) + 1].port.membase = (char *) &rp->channelA;
+
+			/* In theory mapbase is the physical address ...  */
+			up[(chip * 2) + 0].port.mapbase =
+				(unsigned long) ioremap((unsigned long) &rp->channelB, 8);
+			up[(chip * 2) + 1].port.mapbase =
+				(unsigned long) ioremap((unsigned long) &rp->channelA, 8);
 		}
 
 		/* Channel A */
@@ -1182,7 +1156,7 @@ static void __init ip22zilog_prepare(void)
 		up[(chip * 2) + 0].port.type = PORT_IP22ZILOG;
 		up[(chip * 2) + 0].port.flags = 0;
 		up[(chip * 2) + 0].port.line = (chip * 2) + 0;
-		up[(chip * 2) + 0].flags |= IP22ZILOG_FLAG_IS_CHANNEL_A;
+		up[(chip * 2) + 0].flags = 0;
 
 		/* Channel B */
 		up[(chip * 2) + 1].port.iotype = UPIO_MEM;
@@ -1191,9 +1165,9 @@ static void __init ip22zilog_prepare(void)
 		up[(chip * 2) + 1].port.fifosize = 1;
 		up[(chip * 2) + 1].port.ops = &ip22zilog_pops;
 		up[(chip * 2) + 1].port.type = PORT_IP22ZILOG;
-		up[(chip * 2) + 1].port.flags = 0;
+		up[(chip * 2) + 1].port.flags |= IP22ZILOG_FLAG_IS_CHANNEL_A;
 		up[(chip * 2) + 1].port.line = (chip * 2) + 1;
-		up[(chip * 2) + 1].flags |= 0;
+		up[(chip * 2) + 1].flags = 0;
 	}
 }
 
@@ -1228,8 +1202,10 @@ static void __init ip22zilog_init_hw(void)
 		brg = BPS_TO_BRG(baud, ZS_CLOCK / ZS_CLOCK_DIVISOR);
 		up->curregs[R12] = (brg & 0xff);
 		up->curregs[R13] = (brg >> 8) & 0xff;
-		up->curregs[R14] = BRSRC | BRENAB;
+		up->curregs[R14] = BRENAB;
 		__load_zsregs(channel, up->curregs);
+	        /* set master interrupt enable */
+	        write_zsreg(channel, R9, up->curregs[R9]);
 
 		spin_unlock_irqrestore(&up->port.lock, flags);
 	}
@@ -1250,15 +1226,6 @@ static int __init ip22zilog_ports_init(void)
 
 	ip22zilog_init_hw();
 
-	/* We can only init this once we have probed the Zilogs
-	 * in the system.
-	 */
-	ip22zilog_reg.nr = NUM_CHANNELS;
-	ip22zilog_reg.cons = IP22ZILOG_CONSOLE;
-
-	ip22zilog_reg.minor = ip22serial_current_minor;
-	ip22serial_current_minor += NUM_CHANNELS;
-
 	ret = uart_register_driver(&ip22zilog_reg);
 	if (ret == 0) {
 		int i;
@@ -1276,11 +1243,8 @@ static int __init ip22zilog_ports_init(void)
 static int __init ip22zilog_init(void)
 {
 	/* IP22 Zilog setup is hard coded, no probing to do.  */
-
 	ip22zilog_alloc_tables();
-
 	ip22zilog_ports_init();
-	ip22zilog_console_init();
 
 	return 0;
 }

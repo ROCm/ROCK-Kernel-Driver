@@ -1838,9 +1838,11 @@ static int reiserfs_dquot_initialize(struct inode *inode, int type)
     int ret;
 
     /* We may create quota structure so we need to reserve enough blocks */
+    reiserfs_write_lock(inode->i_sb);
     journal_begin(&th, inode->i_sb, 2*REISERFS_QUOTA_INIT_BLOCKS);
     ret = dquot_initialize(inode, type);
     journal_end(&th, inode->i_sb, 2*REISERFS_QUOTA_INIT_BLOCKS);
+    reiserfs_write_unlock(inode->i_sb);
     return ret;
 }
 
@@ -1850,9 +1852,11 @@ static int reiserfs_dquot_drop(struct inode *inode)
     int ret;
 
     /* We may delete quota structure so we need to reserve enough blocks */
+    reiserfs_write_lock(inode->i_sb);
     journal_begin(&th, inode->i_sb, 2*REISERFS_QUOTA_INIT_BLOCKS);
     ret = dquot_drop(inode);
     journal_end(&th, inode->i_sb, 2*REISERFS_QUOTA_INIT_BLOCKS);
+    reiserfs_write_unlock(inode->i_sb);
     return ret;
 }
 
@@ -1861,9 +1865,11 @@ static int reiserfs_write_dquot(struct dquot *dquot)
     struct reiserfs_transaction_handle th;
     int ret;
 
+    reiserfs_write_lock(dquot->dq_sb);
     journal_begin(&th, dquot->dq_sb, REISERFS_QUOTA_TRANS_BLOCKS);
     ret = dquot_commit(dquot);
     journal_end(&th, dquot->dq_sb, REISERFS_QUOTA_TRANS_BLOCKS);
+    reiserfs_write_unlock(dquot->dq_sb);
     return ret;
 }
 
@@ -1872,9 +1878,11 @@ static int reiserfs_acquire_dquot(struct dquot *dquot)
     struct reiserfs_transaction_handle th;
     int ret;
 
+    reiserfs_write_lock(dquot->dq_sb);
     journal_begin(&th, dquot->dq_sb, REISERFS_QUOTA_INIT_BLOCKS);
     ret = dquot_acquire(dquot);
     journal_end(&th, dquot->dq_sb, REISERFS_QUOTA_INIT_BLOCKS);
+    reiserfs_write_unlock(dquot->dq_sb);
     return ret;
 }
 
@@ -1883,9 +1891,11 @@ static int reiserfs_release_dquot(struct dquot *dquot)
     struct reiserfs_transaction_handle th;
     int ret;
 
+    reiserfs_write_lock(dquot->dq_sb);
     journal_begin(&th, dquot->dq_sb, REISERFS_QUOTA_INIT_BLOCKS);
     ret = dquot_release(dquot);
     journal_end(&th, dquot->dq_sb, REISERFS_QUOTA_INIT_BLOCKS);
+    reiserfs_write_unlock(dquot->dq_sb);
     return ret;
 }
 
@@ -1907,9 +1917,11 @@ static int reiserfs_write_info(struct super_block *sb, int type)
     int ret;
 
     /* Data block + inode block */
+    reiserfs_write_lock(sb);
     journal_begin(&th, sb, 2);
     ret = dquot_commit_info(sb, type);
     journal_end(&th, sb, 2);
+    reiserfs_write_unlock(sb);
     return ret;
 }
 
@@ -1996,7 +2008,9 @@ static ssize_t reiserfs_quota_read(struct super_block *sb, int type, char *data,
 	tocopy = sb->s_blocksize - offset < toread ? sb->s_blocksize - offset : toread;
 	tmp_bh.b_state = 0;
 	/* Quota files are without tails so we can safely use this function */
+	reiserfs_write_lock(sb);
 	err = reiserfs_get_block(inode, blk, &tmp_bh, 0);
+	reiserfs_write_unlock(sb);
 	if (err)
 	    return err;
 	if (!buffer_mapped(&tmp_bh))    /* A hole? */
@@ -2044,8 +2058,11 @@ static ssize_t reiserfs_quota_write(struct super_block *sb, int type,
 	    err = -EIO;
 	    goto out;
 	}
+	lock_buffer(bh);
 	memcpy(bh->b_data+offset, data, tocopy);
+	flush_dcache_page(bh->b_page);
 	set_buffer_uptodate(bh);
+	unlock_buffer(bh);
 	reiserfs_prepare_for_journal(sb, bh, 1);
 	journal_mark_dirty(current->journal_info, sb, bh);
 	if (!journal_quota)

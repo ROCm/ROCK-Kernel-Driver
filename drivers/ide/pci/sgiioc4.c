@@ -669,7 +669,8 @@ sgiioc4_ide_setup_pci_device(struct pci_dev *dev, ide_pci_device_t * d)
 		printk(KERN_INFO "%s: %s Bus-Master DMA disabled\n",
 		       hwif->name, d->name);
 
-	probe_hwif_init(hwif);
+	if (probe_hwif_init(hwif))
+		return -EIO;
 
 	/* Create /proc/ide entries */
 	create_proc_ide_interfaces(); 

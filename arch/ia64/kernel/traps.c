@@ -372,11 +372,10 @@ struct illegal_op_return {
 };
 
 struct illegal_op_return
-ia64_illegal_op_fault (unsigned long ec, unsigned long arg1, unsigned long arg2,
-		       unsigned long arg3, unsigned long arg4, unsigned long arg5,
-		       unsigned long arg6, unsigned long arg7, unsigned long stack)
+ia64_illegal_op_fault (unsigned long ec, long arg1, long arg2, long arg3,
+		       long arg4, long arg5, long arg6, long arg7,
+		       struct pt_regs regs)
 {
-	struct pt_regs *regs = (struct pt_regs *) &stack;
 	struct illegal_op_return rv;
 	struct siginfo si;
 	char buf[128];
@@ -385,19 +384,19 @@ ia64_illegal_op_fault (unsigned long ec, unsigned long arg1, unsigned long arg2,
 	{
 		extern struct illegal_op_return ia64_emulate_brl (struct pt_regs *, unsigned long);
 
-		rv = ia64_emulate_brl(regs, ec);
+		rv = ia64_emulate_brl(&regs, ec);
 		if (rv.fkt != (unsigned long) -1)
 			return rv;
 	}
 #endif
 
 	sprintf(buf, "IA-64 Illegal operation fault");
-	die_if_kernel(buf, regs, 0);
+	die_if_kernel(buf, &regs, 0);
 
 	memset(&si, 0, sizeof(si));
 	si.si_signo = SIGILL;
 	si.si_code = ILL_ILLOPC;
-	si.si_addr = (void __user *) (regs->cr_iip + ia64_psr(regs)->ri);
+	si.si_addr = (void __user *) (regs.cr_iip + ia64_psr(&regs)->ri);
 	force_sig_info(SIGILL, &si, current);
 	rv.fkt = 0;
 	return rv;
@@ -405,11 +404,10 @@ ia64_illegal_op_fault (unsigned long ec, unsigned long arg1, unsigned long arg2,
 
 void
 ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
-	    unsigned long iim, unsigned long itir, unsigned long arg5,
-	    unsigned long arg6, unsigned long arg7, unsigned long stack)
+	    unsigned long iim, unsigned long itir, long arg5, long arg6,
+	    long arg7, struct pt_regs regs)
 {
-	struct pt_regs *regs = (struct pt_regs *) &stack;
-	unsigned long code, error = isr;
+	unsigned long code, error = isr, iip;
 	struct siginfo siginfo;
 	char buf[128];
 	int result, sig;
@@ -429,9 +427,11 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		 * This fault was due to lfetch.fault, set "ed" bit in the psr to cancel
 		 * the lfetch.
 		 */
-		ia64_psr(regs)->ed = 1;
+		ia64_psr(&regs)->ed = 1;
 		return;
 	}
+
+	iip = regs.cr_iip + ia64_psr(&regs)->ri;
 
 	switch (vector) {
 	      case 24: /* General Exception */
@@ -442,8 +442,8 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		if (code == 8) {
 # ifdef CONFIG_IA64_PRINT_HAZARDS
 			printk("%s[%d]: possible hazard @ ip=%016lx (pr = %016lx)\n",
-			       current->comm, current->pid, regs->cr_iip + ia64_psr(regs)->ri,
-			       regs->pr);
+			       current->comm, current->pid,
+			       regs.cr_iip + ia64_psr(&regs)->ri, regs.pr);
 # endif
 			return;
 		}
@@ -451,14 +451,14 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 
 	      case 25: /* Disabled FP-Register */
 		if (isr & 2) {
-			disabled_fph_fault(regs);
+			disabled_fph_fault(&regs);
 			return;
 		}
 		sprintf(buf, "Disabled FPL fault---not supposed to happen!");
 		break;
 
 	      case 26: /* NaT Consumption */
-		if (user_mode(regs)) {
+		if (user_mode(&regs)) {
 			void __user *addr;
 
 			if (((isr >> 4) & 0xf) == 2) {
@@ -470,7 +470,8 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 				/* register NaT consumption */
 				sig = SIGILL;
 				code = ILL_ILLOPN;
-				addr = (void __user *) (regs->cr_iip + ia64_psr(regs)->ri);
+				addr = (void __user *) (regs.cr_iip
+							+ ia64_psr(&regs)->ri);
 			}
 			siginfo.si_signo = sig;
 			siginfo.si_code = code;
@@ -481,17 +482,17 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 			siginfo.si_isr = isr;
 			force_sig_info(sig, &siginfo, current);
 			return;
-		} else if (ia64_done_with_exception(regs))
+		} else if (ia64_done_with_exception(&regs))
 			return;
 		sprintf(buf, "NaT consumption");
 		break;
 
 	      case 31: /* Unsupported Data Reference */
-		if (user_mode(regs)) {
+		if (user_mode(&regs)) {
 			siginfo.si_signo = SIGILL;
 			siginfo.si_code = ILL_ILLOPN;
 			siginfo.si_errno = 0;
-			siginfo.si_addr = (void __user *) (regs->cr_iip + ia64_psr(regs)->ri);
+			siginfo.si_addr = (void __user *) iip;
 			siginfo.si_imm = vector;
 			siginfo.si_flags = __ISR_VALID;
 			siginfo.si_isr = isr;
@@ -504,7 +505,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 	      case 29: /* Debug */
 	      case 35: /* Taken Branch Trap */
 	      case 36: /* Single Step Trap */
-		if (fsys_mode(current, regs)) {
+		if (fsys_mode(current, &regs)) {
 			extern char __kernel_syscall_via_break[];
 			/*
 			 * Got a trap in fsys-mode: Taken Branch Trap and Single Step trap
@@ -512,13 +513,13 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 			 */
 			if (unlikely(vector == 29)) {
 				die("Got debug trap in fsys-mode---not supposed to happen!",
-				    regs, 0);
+				    &regs, 0);
 				return;
 			}
 			/* re-do the system call via break 0x100000: */
-			regs->cr_iip = (unsigned long) __kernel_syscall_via_break;
-			ia64_psr(regs)->ri = 0;
-			ia64_psr(regs)->cpl = 3;
+			regs.cr_iip = (unsigned long) __kernel_syscall_via_break;
+			ia64_psr(&regs)->ri = 0;
+			ia64_psr(&regs)->cpl = 3;
 			return;
 		}
 		switch (vector) {
@@ -529,8 +530,8 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 			 * Erratum 10 (IFA may contain incorrect address) now has
 			 * "NoFix" status.  There are no plans for fixing this.
 			 */
-			if (ia64_psr(regs)->is == 0)
-			  ifa = regs->cr_iip;
+			if (ia64_psr(&regs)->is == 0)
+			  ifa = regs.cr_iip;
 #endif
 			break;
 		      case 35: siginfo.si_code = TRAP_BRANCH; ifa = 0; break;
@@ -551,12 +552,12 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 
 	      case 32: /* fp fault */
 	      case 33: /* fp trap */
-		result = handle_fpu_swa((vector == 32) ? 1 : 0, regs, isr);
+		result = handle_fpu_swa((vector == 32) ? 1 : 0, &regs, isr);
 		if ((result < 0) || (current->thread.flags & IA64_THREAD_FPEMU_SIGFPE)) {
 			siginfo.si_signo = SIGFPE;
 			siginfo.si_errno = 0;
 			siginfo.si_code = FPE_FLTINV;
-			siginfo.si_addr = (void __user *) (regs->cr_iip + ia64_psr(regs)->ri);
+			siginfo.si_addr = (void __user *) iip;
 			siginfo.si_flags = __ISR_VALID;
 			siginfo.si_isr = isr;
 			siginfo.si_imm = 0;
@@ -572,19 +573,18 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 			 * interesting work (e.g., signal delivery is done in the kernel
 			 * exit path).
 			 */
-			ia64_psr(regs)->lp = 0;
+			ia64_psr(&regs)->lp = 0;
 			return;
 		} else {
 			/* Unimplemented Instr. Address Trap */
-			if (user_mode(regs)) {
+			if (user_mode(&regs)) {
 				siginfo.si_signo = SIGILL;
 				siginfo.si_code = ILL_BADIADDR;
 				siginfo.si_errno = 0;
 				siginfo.si_flags = 0;
 				siginfo.si_isr = 0;
 				siginfo.si_imm = 0;
-				siginfo.si_addr = (void __user *)
-					(regs->cr_iip + ia64_psr(regs)->ri);
+				siginfo.si_addr = (void __user *) iip;
 				force_sig_info(SIGILL, &siginfo, current);
 				return;
 			}
@@ -594,23 +594,23 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 
 	      case 45:
 #ifdef CONFIG_IA32_SUPPORT
-		if (ia32_exception(regs, isr) == 0)
+		if (ia32_exception(&regs, isr) == 0)
 			return;
 #endif
 		printk(KERN_ERR "Unexpected IA-32 exception (Trap 45)\n");
 		printk(KERN_ERR "  iip - 0x%lx, ifa - 0x%lx, isr - 0x%lx\n",
-		       regs->cr_iip, ifa, isr);
+		       iip, ifa, isr);
 		force_sig(SIGSEGV, current);
 		break;
 
 	      case 46:
 #ifdef CONFIG_IA32_SUPPORT
-		if (ia32_intercept(regs, isr) == 0)
+		if (ia32_intercept(&regs, isr) == 0)
 			return;
 #endif
 		printk(KERN_ERR "Unexpected IA-32 intercept trap (Trap 46)\n");
 		printk(KERN_ERR "  iip - 0x%lx, ifa - 0x%lx, isr - 0x%lx, iim - 0x%lx\n",
-		       regs->cr_iip, ifa, isr, iim);
+		       iip, ifa, isr, iim);
 		force_sig(SIGSEGV, current);
 		return;
 
@@ -622,6 +622,6 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		sprintf(buf, "Fault %lu", vector);
 		break;
 	}
-	die_if_kernel(buf, regs, error);
+	die_if_kernel(buf, &regs, error);
 	force_sig(SIGILL, current);
 }

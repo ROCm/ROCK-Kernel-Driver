@@ -28,8 +28,8 @@ enum sgi_mach {
 	ip26,	/* TFP UP, Indigo2 */
 	ip27,	/* R10k MP, R12k MP, Origin */
 	ip28,	/* R10k UP, Indigo2 */
-	ip30,
-	ip32,
+	ip30,	/* Octane */
+	ip32,	/* O2 */
 };
 
 extern enum sgi_mach sgimach;

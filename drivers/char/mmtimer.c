@@ -36,9 +36,7 @@
 #include <asm/sn/intr.h>
 #include <asm/sn/shub_mmr.h>
 #include <asm/sn/nodepda.h>
-
-/* This is ugly and jbarnes has promised me to fix this later */
-#include "../../arch/ia64/sn/include/shubio.h"
+#include <asm/sn/shubio.h>
 
 MODULE_AUTHOR("Jesse Barnes <jbarnes@sgi.com>");
 MODULE_DESCRIPTION("SGI Altix RTC Timer");

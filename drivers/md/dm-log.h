@@ -39,7 +39,7 @@ struct dirty_log_type {
 	 * Retrieves the smallest size of region that the log can
 	 * deal with.
 	 */
-	sector_t (*get_region_size)(struct dirty_log *log);
+	uint32_t (*get_region_size)(struct dirty_log *log);
 
         /*
 	 * A predicate to say whether a region is clean or not.

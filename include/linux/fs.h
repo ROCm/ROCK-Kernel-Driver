@@ -16,7 +16,6 @@
 #include <linux/dcache.h>
 #include <linux/stat.h>
 #include <linux/cache.h>
-#include <linux/prio_tree.h>
 #include <linux/kobject.h>
 #include <linux/sched.h>
 #include <asm/atomic.h>
@@ -220,6 +219,7 @@ extern int dir_notify_enable;
 
 #include <linux/list.h>
 #include <linux/radix-tree.h>
+#include <linux/prio_tree.h>
 #include <linux/audit.h>
 #include <linux/init.h>
 #include <asm/semaphore.h>

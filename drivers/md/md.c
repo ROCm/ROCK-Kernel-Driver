@@ -336,8 +336,6 @@ static int sync_page_io(struct block_device *bdev, sector_t sector, int size,
 	struct completion event;
 	int ret;
 
-	bio_get(bio);
-
 	rw |= (1 << BIO_RW_SYNC);
 
 	bio->bi_bdev = bdev;

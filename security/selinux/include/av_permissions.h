@@ -143,6 +143,10 @@
 #define CHR_FILE__QUOTAON                         0x00008000UL
 #define CHR_FILE__MOUNTON                         0x00010000UL
 
+#define CHR_FILE__EXECUTE_NO_TRANS                0x00020000UL
+#define CHR_FILE__ENTRYPOINT                      0x00040000UL
+#define CHR_FILE__EXECMOD                         0x00080000UL
+
 #define BLK_FILE__IOCTL                           0x00000001UL
 #define BLK_FILE__READ                            0x00000002UL
 #define BLK_FILE__WRITE                           0x00000004UL

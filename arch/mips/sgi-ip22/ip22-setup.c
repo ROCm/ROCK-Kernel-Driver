@@ -120,9 +120,8 @@ static int __init ip22_setup(void)
 	}
 #endif
 
-#ifdef CONFIG_VT
-#ifdef CONFIG_SGI_NEWPORT_CONSOLE
-	if (ctype && *ctype == 'g'){
+#if defined(CONFIG_VT) && defined(CONFIG_SGI_NEWPORT_CONSOLE)
+	{
 		ULONG *gfxinfo;
 		ULONG * (*__vec)(void) = (void *) (long)
 			*((_PULONG *)(long)((PROMBLOCK)->pvector + 0x20));
@@ -137,7 +136,6 @@ static int __init ip22_setup(void)
 			conswitchp = &newport_con;
 		}
 	}
-#endif
 #endif
 
 	return 0;

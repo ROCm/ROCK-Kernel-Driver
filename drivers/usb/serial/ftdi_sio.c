@@ -1140,7 +1140,7 @@ static int set_serial_info(struct usb_serial_port * port, struct serial_struct _
 		goto check_and_exit;
 	}
 
-	if ((new_serial.baud_base != priv->baud_base) ||
+	if ((new_serial.baud_base != priv->baud_base) &&
 	    (new_serial.baud_base < 9600))
 		return -EINVAL;
 

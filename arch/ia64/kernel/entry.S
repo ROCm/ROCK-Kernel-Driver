@@ -558,7 +558,7 @@ GLOBAL_ENTRY(ia64_trace_syscall)
 .mem.offset 0,0; st8.spill [r2]=r8		// store return value in slot for r8
 .mem.offset 8,0; st8.spill [r3]=r10		// clear error indication in slot for r10
 	br.call.sptk.many rp=syscall_trace_leave // give parent a chance to catch return value
-.ret3:	br.cond.sptk ia64_leave_syscall
+.ret3:	br.cond.sptk .work_pending_syscall_end
 
 strace_error:
 	ld8 r3=[r2]				// load pt_regs.r8
@@ -621,10 +621,7 @@ GLOBAL_ENTRY(ia64_ret_from_syscall)
 	PT_REGS_UNWIND_INFO(0)
 	cmp.ge p6,p7=r8,r0			// syscall executed successfully?
 	adds r2=PT(R8)+16,sp			// r2 = &pt_regs.r8
-	adds r3=PT(R10)+16,sp			// r3 = &pt_regs.r10
-	;;
-.mem.offset 0,0; (p6) st8.spill [r2]=r8	// store return value in slot for r8 and set unat bit
-.mem.offset 8,0; (p6) st8.spill [r3]=r0	// clear error indication in slot for r10 and set unat bit
+	mov r10=r0				// clear error indication in r10
 (p7)	br.cond.spnt handle_syscall_error	// handle potential syscall failure
 END(ia64_ret_from_syscall)
 	// fall through
@@ -709,27 +706,23 @@ ENTRY(ia64_leave_syscall)
 	ld8 r19=[r2],PT(B6)-PT(LOADRS)		// load ar.rsc value for "loadrs"
 	mov b7=r0		// clear b7
 	;;
-	ld8 r23=[r3],PT(R9)-PT(AR_BSPSTORE)	// load ar.bspstore (may be garbage)
-	ld8 r18=[r2],PT(R8)-PT(B6)		// load b6
+	ld8 r23=[r3],PT(R11)-PT(AR_BSPSTORE)	// load ar.bspstore (may be garbage)
+	ld8 r18=[r2],PT(R9)-PT(B6)		// load b6
 (p6)	and r15=TIF_WORK_MASK,r31		// any work other than TIF_SYSCALL_TRACE?
 	;;
 	mov r16=ar.bsp				// M2  get existing backing store pointer
 (p6)	cmp4.ne.unc p6,p0=r15, r0		// any special work pending?
-(p6)	br.cond.spnt .work_pending
+(p6)	br.cond.spnt .work_pending_syscall
 	;;
 	// start restoring the state saved on the kernel stack (struct pt_regs):
-	ld8.fill r8=[r2],16
-	ld8.fill r9=[r3],16
+	ld8 r9=[r2],PT(CR_IPSR)-PT(R9)
+	ld8 r11=[r3],PT(CR_IIP)-PT(R11)
 	mov f6=f0		// clear f6
 	;;
 	invala			// M0|1 invalidate ALAT
 	rsm psr.i | psr.ic	// M2 initiate turning off of interrupt and interruption collection
 	mov f9=f0		// clear f9
 
-	ld8.fill r10=[r2],16
-	ld8.fill r11=[r3],16
-	mov f7=f0		// clear f7
-	;;
 	ld8 r29=[r2],16		// load cr.ipsr
 	ld8 r28=[r3],16			// load cr.iip
 	mov f8=f0		// clear f8
@@ -760,7 +753,7 @@ ENTRY(ia64_leave_syscall)
 	;;
 	srlz.d			// M0  ensure interruption collection is off
 	ld8.fill r13=[r3],16
-	nop.i 0
+	mov f7=f0		// clear f7
 	;;
 	ld8.fill r12=[r2]	// restore r12 (sp)
 	ld8.fill r15=[r3]	// restore r15
@@ -770,8 +763,8 @@ ENTRY(ia64_leave_syscall)
 (pUStk) st1 [r14]=r17
 	mov b6=r18		// I0  restore b6
 	;;
-	shr.u r18=r19,16	// I0|1 get byte size of existing "dirty" partition
 	mov r14=r0		// clear r14
+	shr.u r18=r19,16	// I0|1 get byte size of existing "dirty" partition
 (pKStk) br.cond.dpnt.many skip_rbs_switch
 
 	mov.m ar.ccv=r0		// clear ar.ccv
@@ -987,7 +980,7 @@ dont_preserve_current_frame:
 	shladd in0=loc1,3,r17
 	mov in1=0
 	;;
-	.align 32
+	TEXT_ALIGN(32)
 rse_clear_invalid:
 #ifdef CONFIG_ITANIUM
 	// cycle 0
@@ -1083,6 +1076,12 @@ skip_rbs_switch:
 	 * On exit:
 	 *	p6 = TRUE if work-pending-check needs to be redone
 	 */
+.work_pending_syscall:
+	add r2=-8,r2
+	add r3=-8,r3
+	;;
+	st8 [r2]=r8
+	st8 [r3]=r10
 .work_pending:
 	tbit.nz p6,p0=r31,TIF_SIGDELAYED		// signal delayed from  MCA/INIT/NMI/PMI context?
 (p6)	br.cond.sptk.few .sigdelayed
@@ -1104,13 +1103,13 @@ skip_rbs_switch:
 	;;
 (pKStk)	st4 [r20]=r0		// preempt_count() <- 0
 #endif
-(pLvSys)br.cond.sptk.many .work_processed_syscall	// re-check
+(pLvSys)br.cond.sptk.few  .work_pending_syscall_end
 	br.cond.sptk.many .work_processed_kernel	// re-check
 
 .notify:
 (pUStk)	br.call.spnt.many rp=notify_resume_user
 .ret10:	cmp.ne p6,p0=r0,r0				// p6 <- 0
-(pLvSys)br.cond.sptk.many .work_processed_syscall	// don't re-check
+(pLvSys)br.cond.sptk.few  .work_pending_syscall_end
 	br.cond.sptk.many .work_processed_kernel	// don't re-check
 
 // There is a delayed signal that was detected in MCA/INIT/NMI/PMI context where
@@ -1121,8 +1120,16 @@ skip_rbs_switch:
 .sigdelayed:
 	br.call.sptk.many rp=do_sigdelayed
 	cmp.eq p6,p0=r0,r0				// p6 <- 1, always re-check
-(pLvSys)br.cond.sptk.many .work_processed_syscall	// re-check
+(pLvSys)br.cond.sptk.few  .work_pending_syscall_end
 	br.cond.sptk.many .work_processed_kernel	// re-check
+
+.work_pending_syscall_end:
+	adds r2=PT(R8)+16,r12
+	adds r3=PT(R10)+16,r12
+	;;
+	ld8 r8=[r2]
+	ld8 r10=[r3]
+	br.cond.sptk.many .work_processed_syscall	// re-check
 
 END(ia64_leave_kernel)
 
@@ -1135,17 +1142,11 @@ ENTRY(handle_syscall_error)
 	 */
 	PT_REGS_UNWIND_INFO(0)
 	ld8 r3=[r2]		// load pt_regs.r8
-	sub r9=0,r8		// negate return value to get errno
 	;;
-	mov r10=-1		// return -1 in pt_regs.r10 to indicate error
 	cmp.eq p6,p7=r3,r0	// is pt_regs.r8==0?
-	adds r3=16,r2		// r3=&pt_regs.r10
 	;;
-(p6)	mov r9=r8
-(p6)	mov r10=0
-	;;
-.mem.offset 0,0; st8.spill [r2]=r9	// store errno in pt_regs.r8 and set unat bit
-.mem.offset 8,0; st8.spill [r3]=r10	// store error indication in pt_regs.r10 and set unat bit
+(p7)	mov r10=-1
+(p7)	sub r8=0,r8		// negate return value to get errno
 	br.cond.sptk ia64_leave_syscall
 END(handle_syscall_error)
 

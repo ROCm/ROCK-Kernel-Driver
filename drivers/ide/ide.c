@@ -333,7 +333,7 @@ static void __init init_ide_data (void)
  *	Returns a guessed speed in MHz.
  */
 
-int ide_system_bus_speed (void)
+static int ide_system_bus_speed(void)
 {
 	static struct pci_device_id pci_default[] = {
 		{ PCI_DEVICE(PCI_ANY_ID, PCI_ANY_ID) },
@@ -414,7 +414,7 @@ struct seq_operations ide_drivers_op = {
 #ifdef CONFIG_PROC_FS
 struct proc_dir_entry *proc_ide_root;
 
-ide_proc_entry_t generic_subdriver_entries[] = {
+static ide_proc_entry_t generic_subdriver_entries[] = {
 	{ "capacity",	S_IFREG|S_IRUGO,	proc_ide_read_capacity,	NULL },
 	{ NULL, 0, NULL, NULL }
 };
@@ -1685,7 +1685,7 @@ static int __initdata is_chipset_set[MAX_HWIFS];
  *
  * Remember to update Documentation/ide.txt if you change something here.
  */
-int __init ide_setup (char *s)
+static int __init ide_setup(char *s)
 {
 	int i, vals[3];
 	ide_hwif_t *hwif;
@@ -2271,7 +2271,7 @@ struct bus_type ide_bus_type = {
 /*
  * This is gets invoked once during initialization, to set *everything* up
  */
-int __init ide_init (void)
+static int __init ide_init(void)
 {
 	printk(KERN_INFO "Uniform Multi-Platform E-IDE driver " REVISION "\n");
 	devfs_mk_dir("ide");
@@ -2318,7 +2318,7 @@ int __init ide_init (void)
 }
 
 #ifdef MODULE
-char *options = NULL;
+static char *options = NULL;
 module_param(options, charp, 0);
 MODULE_LICENSE("GPL");
 
