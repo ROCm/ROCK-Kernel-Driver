@@ -360,6 +360,7 @@ typedef struct {
         int frags;
         int lvi;
         int lvi_frag;
+	int civ;
 	int ack;
 	int ack_reload;
 	unsigned int ack_bit;
@@ -710,6 +711,7 @@ static void snd_intel8x0_setup_periods(intel8x0_t *chip, ichdev_t *ichdev)
 		ichdev->frags = ichdev->size / ichdev->fragsize;
 	}
 	iputbyte(chip, port + ICH_REG_OFF_LVI, ichdev->lvi = ICH_REG_LVI_MASK);
+	ichdev->civ = 0;
 	iputbyte(chip, port + ICH_REG_OFF_CIV, 0);
 	ichdev->lvi_frag = ICH_REG_LVI_MASK % ichdev->frags;
 	ichdev->position = 0;
@@ -728,19 +730,39 @@ static void snd_intel8x0_setup_periods(intel8x0_t *chip, ichdev_t *ichdev)
 static inline void snd_intel8x0_update(intel8x0_t *chip, ichdev_t *ichdev)
 {
 	unsigned long port = ichdev->reg_offset;
+	int civ, i, step;
 	int ack = 0;
 
-	ichdev->position += ichdev->fragsize1;
+	civ = igetbyte(chip, port + ICH_REG_OFF_CIV);
+	if (civ == ichdev->civ) {
+		// snd_printd("civ same %d\n", civ);
+		step = 1;
+		ichdev->civ++;
+		ichdev->civ &= ICH_REG_LVI_MASK;
+	} else {
+		step = civ - ichdev->civ;
+		if (step < 0)
+			step += ICH_REG_LVI_MASK + 1;
+		// if (step != 1)
+		//	snd_printd("step = %d, %d -> %d\n", step, ichdev->civ, civ);
+		ichdev->civ = civ;
+	}
+
+	ichdev->position += step * ichdev->fragsize1;
 	ichdev->position %= ichdev->size;
-	ichdev->lvi++;
+	ichdev->lvi += step;
 	ichdev->lvi &= ICH_REG_LVI_MASK;
 	iputbyte(chip, port + ICH_REG_OFF_LVI, ichdev->lvi);
-	ichdev->lvi_frag++;
-	ichdev->lvi_frag %= ichdev->frags;
-	ichdev->bdbar[ichdev->lvi * 2] = cpu_to_le32(ichdev->physbuf + ichdev->lvi_frag * ichdev->fragsize1);
+	for (i = 0; i < step; i++) {
+		ichdev->lvi_frag++;
+		ichdev->lvi_frag %= ichdev->frags;
+		ichdev->bdbar[ichdev->lvi * 2] = cpu_to_le32(ichdev->physbuf + ichdev->lvi_frag * ichdev->fragsize1);
 	// printk("new: bdbar[%i] = 0x%x [0x%x], prefetch = %i, all = 0x%x, 0x%x\n", ichdev->lvi * 2, ichdev->bdbar[ichdev->lvi * 2], ichdev->bdbar[ichdev->lvi * 2 + 1], inb(ICH_REG_OFF_PIV + port), inl(port + 4), inb(port + ICH_REG_OFF_CR));
-	if ((ack = (--ichdev->ack == 0)) != 0)
-		ichdev->ack = ichdev->ack_reload;
+		if (--ichdev->ack == 0) {
+			ichdev->ack = ichdev->ack_reload;
+			ack = 1;
+		}
+	}
 	if (ack && ichdev->substream) {
 		spin_unlock(&chip->reg_lock);
 		snd_pcm_period_elapsed(ichdev->substream);
