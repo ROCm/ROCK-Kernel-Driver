@@ -110,7 +110,7 @@ extern void scsi_exit_procfs(void);
 # define scsi_proc_host_add(shost)	do { } while (0)
 # define scsi_proc_host_rm(shost)	do { } while (0)
 # define scsi_init_procfs()		(0)
-# define scsi_exit_procfs		do { } while (0)
+# define scsi_exit_procfs()		do { } while (0)
 #endif /* CONFIG_PROC_FS */
 
 /* scsi_scan.c */

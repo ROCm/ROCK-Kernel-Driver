@@ -1129,7 +1129,9 @@ void __exit pppoe_exit(void)
 	dev_remove_pack(&pppoes_ptype);
 	dev_remove_pack(&pppoed_ptype);
 	unregister_netdevice_notifier(&pppoe_notifier);
+#ifdef CONFIG_PROC_FS
 	remove_proc_entry("pppoe", proc_net);
+#endif
 }
 
 module_init(pppoe_init);
