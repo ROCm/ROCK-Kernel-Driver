@@ -30,6 +30,7 @@
 #include <linux/console.h>
 #include <linux/root_dev.h>
 #include <linux/interrupt.h>
+#include <linux/cpu.h>
 
 #include <asm/segment.h>
 #include <asm/system.h>
@@ -677,3 +678,21 @@ void sun_do_break(void)
 
 int serial_console;
 int stop_a_enabled = 1;
+
+static struct cpu *sparc64_cpus;
+
+static int __init topology_init(void)
+{
+	int i;
+
+	sparc64_cpus = kmalloc(NR_CPUS * sizeof(struct cpu), GFP_KERNEL);
+	if (!sparc64_cpus)
+		return -ENOMEM;
+	for (i = 0; i < NR_CPUS; i++) {
+		if (cpu_possible(i))
+			register_cpu(&sparc64_cpus[i], i, NULL);
+	}
+	return 0;
+}
+
+subsys_initcall(topology_init);
