@@ -105,7 +105,7 @@ static struct mtd_partition tqm8xxl_fs_partitions[] = {
 	  .name = "jffs",
 	  .offset = 0x00200000,
 	  .size = 0x00200000,
-	  .//size = MTDPART_SIZ_FULL,
+	  //.size = MTDPART_SIZ_FULL,
 	}
 };
 #endif
