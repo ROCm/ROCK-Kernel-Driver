@@ -238,6 +238,16 @@ acpi_button_remove_fs (
 
 	button = acpi_driver_data(device);
 	if (acpi_device_dir(device)) {
+		if (button->type == ACPI_BUTTON_TYPE_LID)
+			remove_proc_entry(ACPI_BUTTON_FILE_STATE,
+					     acpi_device_dir(device));
+		remove_proc_entry(ACPI_BUTTON_FILE_INFO,
+				     acpi_device_dir(device));
+
+		remove_proc_entry(acpi_device_bid(device),
+				     acpi_device_dir(device)->parent);
+
+
 		switch (button->type) {
 			case ACPI_BUTTON_TYPE_POWER:
 			case ACPI_BUTTON_TYPE_POWERF:
