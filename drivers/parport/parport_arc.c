@@ -129,7 +129,6 @@ static int parport_arc_init(void)
 
 	printk(KERN_INFO "%s: Archimedes on-board port, using irq %d\n",
 	       p->irq);
-	parport_proc_register(p);
 
 	/* Tell the high-level drivers about the port. */
 	parport_announce_port (p);

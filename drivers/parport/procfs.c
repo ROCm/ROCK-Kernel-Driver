@@ -530,8 +530,6 @@ static void __exit parport_default_proc_unregister (void)
 }
 #endif
 
-EXPORT_SYMBOL(parport_proc_register);
-EXPORT_SYMBOL(parport_proc_unregister);
 EXPORT_SYMBOL(parport_device_proc_register);
 EXPORT_SYMBOL(parport_device_proc_unregister);
 

@@ -360,7 +360,6 @@ static int __init parport_mfc3_init(void)
 		this_port[pias++] = p;
 		printk(KERN_INFO "%s: Multiface III port using irq\n", p->name);
 		/* XXX: set operating mode */
-		parport_proc_register(p);
 
 		p->private_data = (void *)piabase;
 		parport_announce_port (p);
@@ -386,7 +385,6 @@ static void __exit parport_mfc3_exit(void)
 		if (!this_port[i])
 			continue;
 		parport_remove_port(this_port[i]);
-		parport_proc_unregister(this_port[i]);
 		if (!this_port[i]->irq != PARPORT_IRQ_NONE) {
 			if (--use_cnt == 0) 
 				free_irq(IRQ_AMIGA_PORTS, &pp_mfc3_ops);

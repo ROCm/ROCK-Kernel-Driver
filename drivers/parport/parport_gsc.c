@@ -412,7 +412,6 @@ struct parport *__devinit parport_gsc_probe_port (unsigned long base,
 	}
 #undef printmode
 	printk("]\n");
-	parport_proc_register(p);
 
 	if (p->irq != PARPORT_IRQ_NONE) {
 		if (request_irq (p->irq, parport_gsc_interrupt,
@@ -488,7 +487,6 @@ static void __devexit parport_remove_chip(struct parisc_device *dev)
 			free_dma(p->dma);
 		if (p->irq != PARPORT_IRQ_NONE)
 			free_irq(p->irq, p);
-		parport_proc_unregister(p);
 		if (priv->dma_buf)
 			pci_free_consistent(priv->dev, PAGE_SIZE,
 					    priv->dma_buf,

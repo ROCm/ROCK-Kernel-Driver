@@ -262,8 +262,6 @@ static int __init parport_amiga_init(void)
 	this_port = p;
 	printk(KERN_INFO "%s: Amiga built-in port using irq\n", p->name);
 	/* XXX: set operating mode */
-	parport_proc_register(p);
-
 	parport_announce_port(p);
 
 	return 0;
@@ -281,7 +279,6 @@ static void __exit parport_amiga_exit(void)
 	parport_remove_port(this_port);
 	if (this_port->irq != PARPORT_IRQ_NONE)
 		free_irq(IRQ_AMIGA_CIAA_FLG, this_port);
-	parport_proc_unregister(this_port);
 	parport_put_port(this_port);
 	release_mem_region(CIAA_PHYSADDR-1+0x100, 0x100);
 }

@@ -343,7 +343,6 @@ static int __init init_one_port(struct sbus_dev *sdev)
 	sbus_writeb(value_tcr, &regs->p_tcr);
 
 	printk(KERN_INFO "%s: sunbpp at 0x%lx\n", p->name, p->base);
-	parport_proc_register(p);
 	parport_announce_port (p);
 
 	return 1;
@@ -374,7 +373,6 @@ static void __exit parport_sunbpp_exit(void)
 		if (1/*p->modes & PARPORT_MODE_PCSPP*/) { 
 			struct parport_operations *ops = p->ops;
 			parport_remove_port(p);
-			parport_proc_unregister(p);
 
 			if (p->irq != PARPORT_IRQ_NONE) {
 				parport_sunbpp_disable_irq(p);

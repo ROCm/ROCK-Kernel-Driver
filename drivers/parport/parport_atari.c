@@ -216,8 +216,6 @@ static int __init parport_atari_init(void)
 
 		this_port = p;
 		printk(KERN_INFO "%s: Atari built-in port using irq\n", p->name);
-		parport_proc_register(p);
-
 		parport_announce_port (p);
 
 		return 0;
@@ -230,7 +228,6 @@ static void __exit parport_atari_exit(void)
 	parport_remove_port(this_port);
 	if (this_port->irq != PARPORT_IRQ_NONE)
 		free_irq(IRQ_MFP_BUSY, this_port);
-	parport_proc_unregister(this_port);
 	parport_put_port(this_port);
 }
 

@@ -2236,7 +2236,6 @@ struct parport *parport_pc_probe_port (unsigned long int base,
 	printk("]\n");
 	if (probedirq != PARPORT_IRQ_NONE) 
 		printk(KERN_INFO "%s: irq %d detected\n", p->name, probedirq);
-	parport_proc_register(p);
 
 	/* If No ECP release the ports grabbed above. */
 	if (ECR_res && (p->modes & PARPORT_MODE_ECP) == 0) {
@@ -2326,7 +2325,6 @@ void parport_pc_unregister_port (struct parport *p)
 #endif /* CONFIG_PARPORT_PC_FIFO */
 	struct parport_operations *ops = p->ops;
 	parport_remove_port(p);
-	parport_proc_unregister(p);
 	if (p->dma != PARPORT_DMA_NONE)
 		free_dma(p->dma);
 	if (p->irq != PARPORT_IRQ_NONE)

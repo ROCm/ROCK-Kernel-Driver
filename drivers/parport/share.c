@@ -420,6 +420,7 @@ void parport_announce_port (struct parport *port)
 	parport_daisy_init(port);
 #endif
 
+	parport_proc_register(port);
 	down(&registration_lock);
 	/* We are locked against anyone else performing alterations, but
 	 * because of parport_enumerate people can still _read_ the list
@@ -527,6 +528,8 @@ void parport_remove_port(struct parport *port)
 	}
 
 	up(&registration_lock);
+
+	parport_proc_unregister(port);
 
 	/* Yes, parport_enumerate _is_ unsafe.  Don't use it. */
 	for (i = 1; i < 3; i++) {
