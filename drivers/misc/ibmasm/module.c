@@ -126,6 +126,13 @@ static int __init ibmasm_init_one(struct pci_dev *pdev, const struct pci_device_
 
 	ibmasm_register_uart(sp);
 
+	dev_printk(KERN_DEBUG, &pdev->dev, "WARNING: This software may not be supported or function\n");
+	dev_printk(KERN_DEBUG, &pdev->dev, "correctly on your IBM server. Please consult the IBM\n");
+	dev_printk(KERN_DEBUG, &pdev->dev, "ServerProven website\n");
+	dev_printk(KERN_DEBUG, &pdev->dev, "http://www.pc.ibm.com/ww/eserver/xseries/serverproven\n");
+	dev_printk(KERN_DEBUG, &pdev->dev, "for information on the specific driver level and support\n");
+	dev_printk(KERN_DEBUG, &pdev->dev, "statement for your IBM server.\n");
+
 	return 0;
 
 error_send_message:
