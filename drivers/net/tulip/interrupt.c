@@ -211,7 +211,7 @@ int tulip_poll(struct net_device *dev, int *budget)
                                        if (tp->rx_buffers[entry].mapping !=
                                            le32_to_cpu(tp->rx_ring[entry].buffer1)) {
                                                printk(KERN_ERR "%s: Internal fault: The skbuff addresses "
-                                                      "do not match in tulip_rx: %08x vs. %llx %p / %p.\n",
+                                                      "do not match in tulip_rx: %08x vs. %08llx %p / %p.\n",
                                                       dev->name,
                                                       le32_to_cpu(tp->rx_ring[entry].buffer1),
                                                       (unsigned long long)tp->rx_buffers[entry].mapping,
