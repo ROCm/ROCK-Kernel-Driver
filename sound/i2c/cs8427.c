@@ -258,6 +258,8 @@ int snd_cs8427_create(snd_i2c_bus_t *bus,
 	snd_i2c_unlock(bus);
 
 	/* turn on run bit and rock'n'roll */
+	if (reset_timeout < 1)
+		reset_timeout = 1;
 	chip->reset_timeout = reset_timeout;
 	snd_cs8427_reset(device);
 
@@ -312,7 +314,7 @@ void snd_cs8427_reset(snd_i2c_device_t *cs8427)
 		if (!(data & CS8427_UNLOCK))
 			break;
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/100);
+		schedule_timeout(1);
 	}
 	snd_i2c_lock(cs8427->bus);
 	chip->regmap[CS8427_REG_CLOCKSOURCE] &= ~CS8427_RXDMASK;

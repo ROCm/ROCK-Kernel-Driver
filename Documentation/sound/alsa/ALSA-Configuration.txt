@@ -612,7 +612,7 @@ Module parameters
 
     omni	- Omni I/O support for MidiMan M-Audio Delta44/66
     cs8427_timeout - reset timeout for the CS8427 chip (S/PDIF transciever)
-                     in msec resolution, default value is 50 (0.5 sec)
+                     in msec resolution, default value is 500 (0.5 sec)
 
     Module supports up to 8 cards and autoprobe. Note: The consumer part
     is not used with all Envy24 based cards (for example in the MidiMan Delta
