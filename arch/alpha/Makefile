@@ -95,6 +95,8 @@ core-y			+= arch/alpha/kernel/ arch/alpha/mm/
 core-$(CONFIG_MATHEMU)  += arch/alpha/math-emu/
 libs-y			+= arch/alpha/lib/
 
+export libs-y
+
 MAKEBOOT = $(MAKE) -C arch/alpha/boot
 
 rawboot:

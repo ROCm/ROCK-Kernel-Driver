@@ -40,6 +40,6 @@ $(obj)/names.o: $(obj)/devlist.h $(obj)/classlist.h
 # And that's how to generate them
 
 $(obj)/devlist.h: $(src)/pci.ids $(obj)/gen-devlist
-	$(obj)/gen-devlist < $<
+	( cd $(obj); ./gen-devlist ) < $<
 
 $(obj)/classlist.h: $(obj)/devlist.h

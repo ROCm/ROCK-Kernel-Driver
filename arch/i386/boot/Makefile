@@ -44,7 +44,7 @@ bzImage: IMAGE_OFFSET := 0x100000
 bzImage: EXTRA_AFLAGS := -traditional $(SVGA_MODE) $(RAMDISK) -D__BIG_KERNEL__
 bzImage: BUILDFLAGS   := -b
 
-quiet_cmd_image = BUILD  $(RELDIR)/$@
+quiet_cmd_image = BUILD   $(echo_target)
 cmd_image = tools/build $(BUILDFLAGS) bootsect setup vmlinux.bin \
 			$(ROOT_DEV) > $@
 
