@@ -266,6 +266,10 @@ A partial list of the supported mount options follows:
 		If you do not trust the servers in your network (your mount
 		targets) it is recommended that you specify this option for
 		greater security.
+  exec		Permit execution of binaries on the mount.
+  noexec	Do not permit execution of binaries on the mount.
+  dev		Recognize block devices on the remote mount.
+  nodev		Do not recognize devices on the remote mount.
   suid          Allow remote files on this mountpoint with suid enabled to 
 		be executed (default for mounts when executed as root,
 		nosuid is default for user mounts).

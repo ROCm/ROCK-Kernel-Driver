@@ -1376,23 +1376,22 @@ fill_in_inode(struct inode *tmp_inode,
 	cFYI(0,
 	     ("CIFS FFIRST: Attributes came in as 0x%x",
 	      attr));
-	if (attr & ATTR_REPARSE) {
-		*pobject_type = DT_LNK;
-		/* BB can this and S_IFREG or S_IFDIR be set as in Windows? */
-		tmp_inode->i_mode |= S_IFLNK;
-	} else if (attr & ATTR_DIRECTORY) {
+	if (attr & ATTR_DIRECTORY) {
 		*pobject_type = DT_DIR;
 		/* override default perms since we do not lock dirs */
 		if(atomic_read(&cifsInfo->inUse) == 0) {
 			tmp_inode->i_mode = cifs_sb->mnt_dir_mode;
 		}
 		tmp_inode->i_mode |= S_IFDIR;
+/* we no longer mark these because we could not follow them */
+/*        } else if (attr & ATTR_REPARSE) {
+                *pobject_type = DT_LNK;
+                tmp_inode->i_mode |= S_IFLNK;*/
 	} else {
 		*pobject_type = DT_REG;
 		tmp_inode->i_mode |= S_IFREG;
 		if(attr & ATTR_READONLY)
 			tmp_inode->i_mode &= ~(S_IWUGO);
-
 	}/* could add code here - to validate if device or weird share type? */
 
 	/* can not fill in nlink here as in qpathinfo version and Unx search */
