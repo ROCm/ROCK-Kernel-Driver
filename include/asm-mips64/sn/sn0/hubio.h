@@ -68,7 +68,7 @@
 /*
  * The following definitions use the names defined in the IO interface
  * document for ease of reference.  When possible, software should 
- * generally use the the longer but clearer names defined above.
+ * generally use the longer but clearer names defined above.
  */
 
 #define IIO_BASE	0x400000

@@ -139,7 +139,7 @@ struct task_struct;
 struct vm_area_struct;
 struct sysinfo;
 struct address_space;
-struct zone_t;
+struct zone;
 
 /* linux/mm/rmap.c */
 extern int FASTCALL(page_referenced(struct page *));
@@ -163,7 +163,7 @@ extern void swap_setup(void);
 
 /* linux/mm/vmscan.c */
 extern wait_queue_head_t kswapd_wait;
-extern int FASTCALL(try_to_free_pages(zone_t *, unsigned int, unsigned int));
+extern int try_to_free_pages(struct zone *, unsigned int, unsigned int);
 
 /* linux/mm/page_io.c */
 int swap_readpage(struct file *file, struct page *page);
@@ -209,54 +209,7 @@ extern struct swap_list_t swap_list;
 asmlinkage long sys_swapoff(const char *);
 asmlinkage long sys_swapon(const char *, int);
 
-extern spinlock_t _pagemap_lru_lock;
-
 extern void FASTCALL(mark_page_accessed(struct page *));
-
-/*
- * List add/del helper macros. These must be called
- * with the pagemap_lru_lock held!
- */
-#define DEBUG_LRU_PAGE(page)			\
-do {						\
-	if (!PageLRU(page))			\
-		BUG();				\
-	if (PageActive(page))			\
-		BUG();				\
-} while (0)
-
-#define __add_page_to_active_list(page)		\
-do {						\
-	list_add(&(page)->lru, &active_list);	\
-	inc_page_state(nr_active);		\
-} while (0)
-
-#define add_page_to_active_list(page)		\
-do {						\
-	DEBUG_LRU_PAGE(page);			\
-	SetPageActive(page);			\
-	__add_page_to_active_list(page);	\
-} while (0)
-
-#define add_page_to_inactive_list(page)		\
-do {						\
-	DEBUG_LRU_PAGE(page);			\
-	list_add(&(page)->lru, &inactive_list);	\
-	inc_page_state(nr_inactive);		\
-} while (0)
-
-#define del_page_from_active_list(page)		\
-do {						\
-	list_del(&(page)->lru);			\
-	ClearPageActive(page);			\
-	dec_page_state(nr_active);		\
-} while (0)
-
-#define del_page_from_inactive_list(page)	\
-do {						\
-	list_del(&(page)->lru);			\
-	dec_page_state(nr_inactive);		\
-} while (0)
 
 extern spinlock_t swaplock;
 

@@ -1,27 +1,13 @@
 /*
- * $Id: psmouse.c,v 1.18 2002/03/13 10:03:43 vojtech Exp $
+ * PS/2 mouse driver
  *
- *  Copyright (c) 1999-2001 Vojtech Pavlik
+ * Copyright (c) 1999-2002 Vojtech Pavlik
  */
 
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
- * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published by
+ * the Free Software Foundation.
  */
 
 #include <linux/delay.h>
@@ -33,7 +19,7 @@
 #include <linux/init.h>
 #include <linux/tqueue.h>
 
-MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("PS/2 mouse driver");
 MODULE_LICENSE("GPL");
 
@@ -43,6 +29,7 @@ MODULE_LICENSE("GPL");
 #define PSMOUSE_CMD_SETSTREAM	0x00ea
 #define PSMOUSE_CMD_POLL	0x03eb	
 #define PSMOUSE_CMD_GETID	0x01f2
+#define PSMOUSE_CMD_GETID2	0x0100
 #define PSMOUSE_CMD_SETRATE	0x10f3
 #define PSMOUSE_CMD_ENABLE	0x00f4
 #define PSMOUSE_CMD_RESET_DIS	0x00f6
@@ -313,7 +300,7 @@ static int psmouse_extensions(struct psmouse *psmouse)
 	param[0] = 0;
 	psmouse->vendor = "Generic";
 	psmouse->name = "Mouse";
-	psmouse->model = 2;
+	psmouse->model = 0;
 
 /*
  * Try Genius NetMouse magic init.
@@ -327,13 +314,13 @@ static int psmouse_extensions(struct psmouse *psmouse)
 	psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO);
 
 	if (param[0] == 0x00 && param[1] == 0x33 && param[2] == 0x55) {
-		psmouse->vendor = "Genius";
-		psmouse->name = "Mouse";
 
 		set_bit(BTN_EXTRA, psmouse->dev.keybit);
 		set_bit(BTN_SIDE, psmouse->dev.keybit);
 		set_bit(REL_WHEEL, psmouse->dev.relbit);
 
+		psmouse->vendor = "Genius";
+		psmouse->name = "Wheel Mouse";
 		return PSMOUSE_GENPS;
 	}
 
@@ -356,7 +343,6 @@ static int psmouse_extensions(struct psmouse *psmouse)
 		static int logitech_ps2pp[] = { 12, 13, 40, 41, 42, 43, 50, 51, 52, 53, 73, 75,
 							76, 80, 81, 83, 88, 96, 97, -1 };
 		psmouse->vendor = "Logitech";
-		psmouse->name = "Mouse";
 		psmouse->model = ((param[0] >> 4) & 0x07) | ((param[0] << 3) & 0x78);
 
 		if (param[1] < 3)
@@ -367,46 +353,53 @@ static int psmouse_extensions(struct psmouse *psmouse)
 		psmouse->type = PSMOUSE_PS2;
 
 		for (i = 0; logitech_ps2pp[i] != -1; i++)
-			if (logitech_ps2pp[i] == psmouse->model) psmouse->type = PSMOUSE_PS2PP;
+			if (logitech_ps2pp[i] == psmouse->model)
+				psmouse->type = PSMOUSE_PS2PP;
 
-		if (psmouse->type != PSMOUSE_PS2PP) return PSMOUSE_PS2;
+		if (psmouse->type == PSMOUSE_PS2PP) {
 
-		for (i = 0; logitech_4btn[i] != -1; i++)
-			if (logitech_4btn[i] == psmouse->model) set_bit(BTN_SIDE, psmouse->dev.keybit);
+			for (i = 0; logitech_4btn[i] != -1; i++)
+				if (logitech_4btn[i] == psmouse->model)
+					set_bit(BTN_SIDE, psmouse->dev.keybit);
 
-		for (i = 0; logitech_wheel[i] != -1; i++)
-			if (logitech_wheel[i] == psmouse->model) set_bit(REL_WHEEL, psmouse->dev.relbit);
+			for (i = 0; logitech_wheel[i] != -1; i++)
+				if (logitech_wheel[i] == psmouse->model) {
+					set_bit(REL_WHEEL, psmouse->dev.relbit);
+					psmouse->name = "Wheel Mouse";
+				}
 
 /*
  * Do Logitech PS2++ / PS2T++ magic init.
  */
 
-		if (psmouse->model == 97) { /* TouchPad 3 */
+			if (psmouse->model == 97) { /* TouchPad 3 */
 
-			set_bit(REL_WHEEL, psmouse->dev.relbit);
-			set_bit(REL_HWHEEL, psmouse->dev.relbit);
+				set_bit(REL_WHEEL, psmouse->dev.relbit);
+				set_bit(REL_HWHEEL, psmouse->dev.relbit);
 
-			param[0] = 0x11; param[1] = 0x04; param[2] = 0x68; /* Unprotect RAM */
-			psmouse_command(psmouse, param, 0x30d1);
-			param[0] = 0x11; param[1] = 0x05; param[2] = 0x0b; /* Enable features */
-			psmouse_command(psmouse, param, 0x30d1);
-			param[0] = 0x11; param[1] = 0x09; param[2] = 0xc3; /* Enable PS2++ */
-			psmouse_command(psmouse, param, 0x30d1);
+				param[0] = 0x11; param[1] = 0x04; param[2] = 0x68; /* Unprotect RAM */
+				psmouse_command(psmouse, param, 0x30d1);
+				param[0] = 0x11; param[1] = 0x05; param[2] = 0x0b; /* Enable features */
+				psmouse_command(psmouse, param, 0x30d1);
+				param[0] = 0x11; param[1] = 0x09; param[2] = 0xc3; /* Enable PS2++ */
+				psmouse_command(psmouse, param, 0x30d1);
 
-			param[0] = 0;
-			if (!psmouse_command(psmouse, param, 0x13d1) &&
-				param[0] == 0x06 && param[1] == 0x00 && param[2] == 0x14)
-				return PSMOUSE_PS2TPP;
+				param[0] = 0;
+				if (!psmouse_command(psmouse, param, 0x13d1) &&
+					param[0] == 0x06 && param[1] == 0x00 && param[2] == 0x14)
+					return PSMOUSE_PS2TPP;
 
-		} else {
-			psmouse_ps2pp_cmd(psmouse, param, 0x39); /* Magic knock */
-			psmouse_ps2pp_cmd(psmouse, param, 0xDB);
+			} else {
+				param[0] = param[1] = param[2] = 0;
 
-			if ((param[0] & 0x78) == 0x48 && (param[1] & 0xf3) == 0xc2 &&
-				(param[2] & 3) == ((param[1] >> 2) & 3))
-					return PSMOUSE_PS2PP;
+				psmouse_ps2pp_cmd(psmouse, param, 0x39); /* Magic knock */
+				psmouse_ps2pp_cmd(psmouse, param, 0xDB);
+
+				if ((param[0] & 0x78) == 0x48 && (param[1] & 0xf3) == 0xc2 &&
+					(param[2] & 3) == ((param[1] >> 2) & 3))
+						return PSMOUSE_PS2PP;
+			}
 		}
-
 	}
 
 /*
@@ -426,7 +419,7 @@ static int psmouse_extensions(struct psmouse *psmouse)
 		set_bit(REL_WHEEL, psmouse->dev.relbit);
 
 /*
- * Try IntelliMouse Explorer magic init.
+ * Try IntelliMouse/Explorer magic init.
  */
 
 		param[0] = 200;
@@ -439,28 +432,21 @@ static int psmouse_extensions(struct psmouse *psmouse)
 
 		if (param[0] == 4) {
 
-			psmouse->vendor = "Microsoft";
-			psmouse->name = "IntelliMouse Explorer";
-
 			set_bit(BTN_SIDE, psmouse->dev.keybit);
 			set_bit(BTN_EXTRA, psmouse->dev.keybit);
 
+			psmouse->name = "Explorer Mouse";
 			return PSMOUSE_IMEX;
 		}
 
-		psmouse->vendor = "Microsoft";
-		psmouse->name = "IntelliMouse";
-
+		psmouse->name = "Wheel Mouse";
 		return PSMOUSE_IMPS;
 	}
 
 /*
- * Okay, all failed, we have a standard mouse here. The number of the buttons is
- * still a question, though.
+ * Okay, all failed, we have a standard mouse here. The number of the buttons
+ * is still a question, though. We assume 3.
  */
-
-	psmouse->vendor = "Generic";
-	psmouse->name = "Mouse";
 
 	return PSMOUSE_PS2;
 }
@@ -474,14 +460,7 @@ static int psmouse_probe(struct psmouse *psmouse)
 	unsigned char param[2];
 
 /*
- * First we reset and disable the mouse.
- */
-
-	if (psmouse_command(psmouse, NULL, PSMOUSE_CMD_RESET_DIS))
-		return -1;
-
-/*
- * Next, we check if it's a mouse. It should send 0x00 or 0x03
+ * First, we check if it's a mouse. It should send 0x00 or 0x03
  * in case of an IntelliMouse in 4-byte mode or 0x04 for IM Explorer.
  */
 
@@ -490,7 +469,19 @@ static int psmouse_probe(struct psmouse *psmouse)
 	if (psmouse_command(psmouse, param, PSMOUSE_CMD_GETID))
 		return -1;
 
+	if (param[0] == 0xab || param[0] == 0xac) {
+		psmouse_command(psmouse, param, PSMOUSE_CMD_GETID2);
+		return -1;
+	}
+
 	if (param[0] != 0x00 && param[0] != 0x03 && param[0] != 0x04)
+		return -1;
+
+/*
+ * Then we reset and disable the mouse so that it doesn't generate events.
+ */
+
+	if (psmouse_command(psmouse, NULL, PSMOUSE_CMD_RESET_DIS))
 		return -1;
 
 /*
@@ -602,9 +593,9 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 	psmouse->dev.name = psmouse->devname;
 	psmouse->dev.phys = psmouse->phys;
 	psmouse->dev.id.bustype = BUS_I8042;
-	psmouse->dev.id.vendor = psmouse->type;
-	psmouse->dev.id.product = psmouse->model;
-	psmouse->dev.id.version = 0x0100;
+	psmouse->dev.id.vendor = 0x0002;
+	psmouse->dev.id.product = psmouse->type;
+	psmouse->dev.id.version = psmouse->model;
 
 	input_register_device(&psmouse->dev);
 	

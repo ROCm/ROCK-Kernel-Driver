@@ -58,6 +58,9 @@ EXPORT_SYMBOL(boot_cpu_data);
 EXPORT_SYMBOL(EISA_bus);
 #endif
 EXPORT_SYMBOL(MCA_bus);
+#ifdef CONFIG_MULTIQUAD
+EXPORT_SYMBOL(xquad_portio);
+#endif
 EXPORT_SYMBOL(__verify_write);
 EXPORT_SYMBOL(dump_thread);
 EXPORT_SYMBOL(dump_fpu);
@@ -169,7 +172,3 @@ extern int is_sony_vaio_laptop;
 EXPORT_SYMBOL(is_sony_vaio_laptop);
 
 EXPORT_SYMBOL(__PAGE_KERNEL);
-
-#ifdef CONFIG_MULTIQUAD
-EXPORT_SYMBOL(xquad_portio);
-#endif

@@ -8,6 +8,8 @@
 #include <linux/spinlock.h>
 #include <linux/list.h>
 #include <linux/wait.h>
+#include <linux/cache.h>
+#include <asm/atomic.h>
 
 /*
  * Free memory management - zoned buddy allocator.
@@ -27,6 +29,21 @@ typedef struct free_area_struct {
 struct pglist_data;
 
 /*
+ * zone->lock and zone->lru_lock are two of the hottest locks in the kernel.
+ * So add a wild amount of padding here to ensure that they fall into separate
+ * cachelines.  There are very few zone structures in the machine, so space
+ * consumption is not a concern here.
+ */
+#if defined(CONFIG_SMP)
+struct zone_padding {
+	int x;
+} ____cacheline_maxaligned_in_smp;
+#define ZONE_PADDING(name)	struct zone_padding name;
+#else
+#define ZONE_PADDING(name)
+#endif
+
+/*
  * On machines where it is needed (eg PCs) we divide physical memory
  * into multiple physical zones. On a PC we have 3 zones:
  *
@@ -34,7 +51,8 @@ struct pglist_data;
  * ZONE_NORMAL	16-896 MB	direct mapped by the kernel
  * ZONE_HIGHMEM	 > 896 MB	only page cache and user processes
  */
-typedef struct zone_struct {
+
+struct zone {
 	/*
 	 * Commonly accessed fields:
 	 */
@@ -42,6 +60,17 @@ typedef struct zone_struct {
 	unsigned long		free_pages;
 	unsigned long		pages_min, pages_low, pages_high;
 	int			need_balance;
+
+	ZONE_PADDING(_pad1_)
+
+	spinlock_t		lru_lock;	
+	struct list_head	active_list;
+	struct list_head	inactive_list;
+	atomic_t		refill_counter;
+	unsigned long		nr_active;
+	unsigned long		nr_inactive;
+
+	ZONE_PADDING(_pad2_)
 
 	/*
 	 * free areas of different sizes
@@ -89,7 +118,7 @@ typedef struct zone_struct {
 	 */
 	char			*name;
 	unsigned long		size;
-} zone_t;
+} ____cacheline_maxaligned_in_smp;
 
 #define ZONE_DMA		0
 #define ZONE_NORMAL		1
@@ -107,16 +136,16 @@ typedef struct zone_struct {
  * so despite the zonelist table being relatively big, the cache
  * footprint of this construct is very small.
  */
-typedef struct zonelist_struct {
-	zone_t * zones [MAX_NR_ZONES+1]; // NULL delimited
-} zonelist_t;
+struct zonelist {
+	struct zone *zones[MAX_NR_ZONES+1]; // NULL delimited
+};
 
 #define GFP_ZONEMASK	0x0f
 
 /*
  * The pg_data_t structure is used in machines with CONFIG_DISCONTIGMEM
  * (mostly NUMA machines?) to denote a higher-level memory zone than the
- * zone_struct denotes.
+ * zone denotes.
  *
  * On NUMA machines, each NUMA node would have a pg_data_t to describe
  * it's memory layout.
@@ -126,8 +155,8 @@ typedef struct zonelist_struct {
  */
 struct bootmem_data;
 typedef struct pglist_data {
-	zone_t node_zones[MAX_NR_ZONES];
-	zonelist_t node_zonelists[GFP_ZONEMASK+1];
+	struct zone node_zones[MAX_NR_ZONES];
+	struct zonelist node_zonelists[GFP_ZONEMASK+1];
 	int nr_zones;
 	struct page *node_mem_map;
 	unsigned long *valid_addr_bitmap;
@@ -142,7 +171,8 @@ typedef struct pglist_data {
 extern int numnodes;
 extern pg_data_t *pgdat_list;
 
-static inline int memclass(zone_t *pgzone, zone_t *classzone)
+static inline int
+memclass(struct zone *pgzone, struct zone *classzone)
 {
 	if (pgzone->zone_pgdat != classzone->zone_pgdat)
 		return 0;
@@ -156,10 +186,10 @@ static inline int memclass(zone_t *pgzone, zone_t *classzone)
  * prototypes for the discontig memory code.
  */
 struct page;
-extern void show_free_areas_core(pg_data_t *pgdat);
-extern void free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
+void free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
   unsigned long *zones_size, unsigned long paddr, unsigned long *zholes_size,
   struct page *pmap);
+void get_zone_counts(unsigned long *active, unsigned long *inactive);
 
 extern pg_data_t contig_page_data;
 
@@ -181,7 +211,7 @@ extern pg_data_t contig_page_data;
  * next_zone - helper magic for for_each_zone()
  * Thanks to William Lee Irwin III for this piece of ingenuity.
  */
-static inline zone_t * next_zone(zone_t * zone)
+static inline struct zone *next_zone(struct zone *zone)
 {
 	pg_data_t *pgdat = zone->zone_pgdat;
 
@@ -198,7 +228,7 @@ static inline zone_t * next_zone(zone_t * zone)
 
 /**
  * for_each_zone - helper macro to iterate over all memory zones
- * @zone - pointer to zone_t variable
+ * @zone - pointer to struct zone variable
  *
  * The user only needs to declare the zone variable, for_each_zone
  * fills it in. This basically means for_each_zone() is an
@@ -206,7 +236,7 @@ static inline zone_t * next_zone(zone_t * zone)
  *
  * for (pgdat = pgdat_list; pgdat; pgdat = pgdat->node_next)
  * 	for (i = 0; i < MAX_NR_ZONES; ++i) {
- * 		zone_t * z = pgdat->node_zones + i;
+ * 		struct zone * z = pgdat->node_zones + i;
  * 		...
  * 	}
  * }

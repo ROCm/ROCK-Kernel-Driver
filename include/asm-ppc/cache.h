@@ -29,6 +29,7 @@
 #define	L1_CACHE_BYTES L1_CACHE_LINE_SIZE
 #define L1_CACHE_SHIFT LG_L1_CACHE_LINE_SIZE
 #define	SMP_CACHE_BYTES L1_CACHE_BYTES
+#define L1_CACHE_SHIFT_MAX 7	/* largest L1 which this arch supports */
 
 #define	L1_CACHE_ALIGN(x)       (((x)+(L1_CACHE_BYTES-1))&~(L1_CACHE_BYTES-1))
 #define	L1_CACHE_PAGES		8

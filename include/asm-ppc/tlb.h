@@ -34,7 +34,7 @@ extern void tlb_flush(struct free_pte_ctx *tlb);
 extern void flush_hash_entry(struct mm_struct *mm, pte_t *ptep,
 			     unsigned long address);
 
-static inline void tlb_remove_tlb_entry(mmu_gather_t *tlb, pte_t *ptep,
+static inline void __tlb_remove_tlb_entry(mmu_gather_t *tlb, pte_t *ptep,
 					unsigned long address)
 {
 	if (pte_val(*ptep) & _PAGE_HASHPTE)
@@ -50,7 +50,7 @@ struct flush_tlb_arch { };
 #define tlb_finish_arch(tlb)		do { } while (0)
 #define tlb_start_vma(tlb, vma)		do { } while (0)
 #define tlb_end_vma(tlb, vma)		do { } while (0)
-#define tlb_remove_tlb_entry(tlb, pte, address) do { } while (0)
+#define __tlb_remove_tlb_entry(tlb, pte, address) do { } while (0)
 #define tlb_flush(tlb)			flush_tlb_mm((tlb)->mm)
 
 /* Get the generic bits... */

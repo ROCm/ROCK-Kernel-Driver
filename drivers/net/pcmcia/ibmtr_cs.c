@@ -53,6 +53,8 @@
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/module.h>
+#include <linux/ethtool.h>
+#include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/system.h>
 
@@ -164,6 +166,37 @@ static void cs_error(client_handle_t handle, int func, int ret)
     CardServices(ReportError, handle, &err);
 }
 
+static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+{
+	u32 ethcmd;
+		
+	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
+		return -EFAULT;
+	
+	switch (ethcmd) {
+	case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
+		strncpy(info.driver, "ibmtr_cs", sizeof(info.driver)-1);
+		if (copy_to_user(useraddr, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
+	}
+	}
+	
+	return -EOPNOTSUPP;
+}
+
+static int private_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+{
+
+       switch(cmd) {
+       case SIOCETHTOOL:
+	       return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+	default:
+	    return -EOPNOTSUPP;
+	}
+}
+
 /*======================================================================
 
     ibmtr_attach() creates an "instance" of the driver, allocating
@@ -216,6 +249,7 @@ static dev_link_t *ibmtr_attach(void)
     link->irq.Instance = info->dev = dev;
     
     dev->init = &ibmtr_probe;
+    dev->do_ioctl = &private_ioctl;
 
     /* Register with Card Services */
     link->next = dev_list;

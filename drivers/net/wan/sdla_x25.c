@@ -4721,7 +4721,7 @@ static int execute_delayed_cmd (sdla_t* card, netdevice_t *dev, mbox_cmd_t *usr_
 /*===============================================================
  * api_incoming_call 
  *
- *	Pass an incoming call request up the the listening
+ *	Pass an incoming call request up the listening
  *      sock.  If the API sock is not listening reject the
  *      call.
  *

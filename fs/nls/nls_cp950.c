@@ -9460,12 +9460,12 @@ static int char2uni(const unsigned char *rawstring, int boundlen,
 }
 
 static struct nls_table table = {
-	charset:	"cp950",
-	uni2char:	uni2char,
-	char2uni:	char2uni,
-	charset2lower:	charset2lower,
-	charset2upper:	charset2upper,
-	owner:		THIS_MODULE,
+	.charset	= "cp950",
+	.uni2char	= uni2char,
+	.char2uni	= char2uni,
+	.charset2lower	= charset2lower,
+	.charset2upper	= charset2upper,
+	.owner		= THIS_MODULE,
 };
 
 static int __init init_nls_cp950(void)

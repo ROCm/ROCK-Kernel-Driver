@@ -1,73 +1,28 @@
 /*******************************************************************************
 
-This software program is available to you under a choice of one of two 
-licenses. You may choose to be licensed under either the GNU General Public 
-License 2.0, June 1991, available at http://www.fsf.org/copyleft/gpl.html, 
-or the Intel BSD + Patent License, the text of which follows:
-
-Recipient has requested a license and Intel Corporation ("Intel") is willing
-to grant a license for the software entitled Linux Base Driver for the 
-Intel(R) PRO/100 Family of Adapters (e100) (the "Software") being provided 
-by Intel Corporation. The following definitions apply to this license:
-
-"Licensed Patents" means patent claims licensable by Intel Corporation which 
-are necessarily infringed by the use of sale of the Software alone or when 
-combined with the operating system referred to below.
-
-"Recipient" means the party to whom Intel delivers this Software.
-
-"Licensee" means Recipient and those third parties that receive a license to 
-any operating system available under the GNU General Public License 2.0 or 
-later.
-
-Copyright (c) 1999 - 2002 Intel Corporation.
-All rights reserved.
-
-The license is provided to Recipient and Recipient's Licensees under the 
-following terms.
-
-Redistribution and use in source and binary forms of the Software, with or 
-without modification, are permitted provided that the following conditions 
-are met:
-
-Redistributions of source code of the Software may retain the above 
-copyright notice, this list of conditions and the following disclaimer.
-
-Redistributions in binary form of the Software may reproduce the above 
-copyright notice, this list of conditions and the following disclaimer in 
-the documentation and/or materials provided with the distribution.
-
-Neither the name of Intel Corporation nor the names of its contributors 
-shall be used to endorse or promote products derived from this Software 
-without specific prior written permission.
-
-Intel hereby grants Recipient and Licensees a non-exclusive, worldwide, 
-royalty-free patent license under Licensed Patents to make, use, sell, offer 
-to sell, import and otherwise transfer the Software, if any, in source code 
-and object code form. This license shall include changes to the Software 
-that are error corrections or other minor changes to the Software that do 
-not add functionality or features when the Software is incorporated in any 
-version of an operating system that has been distributed under the GNU 
-General Public License 2.0 or later. This patent license shall apply to the 
-combination of the Software and any operating system licensed under the GNU 
-General Public License 2.0 or later if, at the time Intel provides the 
-Software to Recipient, such addition of the Software to the then publicly 
-available versions of such operating systems available under the GNU General 
-Public License 2.0 or later (whether in gold, beta or alpha form) causes 
-such combination to be covered by the Licensed Patents. The patent license 
-shall not apply to any other combinations which include the Software. NO 
-hardware per se is licensed hereunder.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
-IMPLIED WARRANTIES OF MECHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
-ARE DISCLAIMED. IN NO EVENT SHALL INTEL OR IT CONTRIBUTORS BE LIABLE FOR ANY 
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES 
-(INCLUDING, BUT NOT LIMITED, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
-ANY LOSS OF USE; DATA, OR PROFITS; OR BUSINESS INTERUPTION) HOWEVER CAUSED 
-AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY OR 
-TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE 
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  
+  Copyright(c) 1999 - 2002 Intel Corporation. All rights reserved.
+  
+  This program is free software; you can redistribute it and/or modify it 
+  under the terms of the GNU General Public License as published by the Free 
+  Software Foundation; either version 2 of the License, or (at your option) 
+  any later version.
+  
+  This program is distributed in the hope that it will be useful, but WITHOUT 
+  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
+  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for 
+  more details.
+  
+  You should have received a copy of the GNU General Public License along with
+  this program; if not, write to the Free Software Foundation, Inc., 59 
+  Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+  
+  The full GNU General Public License is included in this distribution in the
+  file called LICENSE.
+  
+  Contact Information:
+  Linux NICS <linux.nics@intel.com>
+  Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 *******************************************************************************/
 
 #include "e100.h"
@@ -76,6 +31,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 extern u16 e100_eeprom_read(struct e100_private *, u16);
 extern int e100_wait_exec_cmplx(struct e100_private *, u32,u8);
 extern void e100_phy_reset(struct e100_private *bdp);
+extern void e100_phy_autoneg(struct e100_private *bdp);
+extern void e100_phy_set_loopback(struct e100_private *bdp);
+extern void e100_force_speed_duplex(struct e100_private *bdp);
 
 static u8 e100_diag_selftest(struct net_device *);
 static u8 e100_diag_eeprom(struct net_device *);
@@ -284,6 +242,7 @@ e100_diag_config_loopback(struct e100_private* bdp,
 		 *dynamic_tbd = e100_config_dynamic_tbd(bdp,*dynamic_tbd);
 
 	if (set_loopback) {
+		/* Configure loopback on MAC */
 		e100_config_loopback_mode(bdp,loopback_mode);
 	} else {
 		e100_config_loopback_mode(bdp,NO_LOOPBACK);
@@ -292,16 +251,20 @@ e100_diag_config_loopback(struct e100_private* bdp,
 	e100_config(bdp);
 
 	if (loopback_mode == PHY_LOOPBACK) {
-		unsigned long expires = jiffies + HZ * 5;
-
 		if (set_loopback)
-			e100_phy_reset(bdp);
-
-		/* wait up to 5 secs for PHY loopback ON/OFF to take effect */
-		while ((e100_get_link_state(bdp) != set_loopback) &&
-		       time_before(jiffies, expires)) {
-			yield();
+                        /* Set PHY loopback mode */
+                        e100_phy_set_loopback(bdp);
+                else {	/* Back to normal speed and duplex */
+                	if (bdp->params.e100_speed_duplex == E100_AUTONEG)
+				/* Reset PHY and do autoneg */
+                        	e100_phy_autoneg(bdp);
+			else    
+				/* Reset PHY and force speed and duplex */
+				e100_force_speed_duplex(bdp);
 		}
+                /* Wait for PHY state change */
+		set_current_state(TASK_UNINTERRUPTIBLE);
+                schedule_timeout(HZ);
 	} else { /* For MAC loopback wait 500 msec to take effect */
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(HZ / 2);
@@ -321,6 +284,7 @@ e100_diag_loopback_alloc(struct e100_private *bdp)
 	rfd_t *rfd;
 	tbd_t *tbd;
 
+	/* tcb, tbd and transmit buffer are allocated */
 	tcb = pci_alloc_consistent(bdp->pdev,
 				   (sizeof (tcb_t) + sizeof (tbd_t) +
 				    LB_PACKET_SIZE),
@@ -328,22 +292,26 @@ e100_diag_loopback_alloc(struct e100_private *bdp)
         if (tcb == NULL)
 		return false;
 
-	memset(tcb, 0x00, sizeof (tcb_t) + LB_PACKET_SIZE);
+	memset(tcb, 0x00, sizeof (tcb_t) + sizeof (tbd_t) + LB_PACKET_SIZE);
 	tcb->tcb_phys = dma_handle;
 	tcb->tcb_hdr.cb_status = 0;
 	tcb->tcb_hdr.cb_cmd =
 		cpu_to_le16(CB_EL_BIT | CB_TRANSMIT | CB_TX_SF_BIT);
-	tcb->tcb_hdr.cb_lnk_ptr = cpu_to_le32(tcb->tcb_phys);
-	tcb->tcb_tbd_ptr = cpu_to_le32(0xffffffff);
+	/* Next command is null */
+	tcb->tcb_hdr.cb_lnk_ptr = cpu_to_le32(0xffffffff);
 	tcb->tcb_cnt = 0;
 	tcb->tcb_thrshld = bdp->tx_thld;
 	tcb->tcb_tbd_num = 1;
+	/* Set up tcb tbd pointer */
 	tcb->tcb_tbd_ptr = cpu_to_le32(tcb->tcb_phys + sizeof (tcb_t));
 	tbd = (tbd_t *) ((u8 *) tcb + sizeof (tcb_t));
+	/* Set up tbd transmit buffer */
 	tbd->tbd_buf_addr =
 		cpu_to_le32(le32_to_cpu(tcb->tcb_tbd_ptr) + sizeof (tbd_t));
 	tbd->tbd_buf_cnt = __constant_cpu_to_le16(1024);
-	memset((void *) ((u8 *) tbd + sizeof (tbd_t)), 0xFF, 1024);
+	/* The value of first 512 bytes is FF */
+	memset((void *) ((u8 *) tbd + sizeof (tbd_t)), 0xFF, 512);
+	/* The value of second 512 bytes is BA */
 	memset((void *) ((u8 *) tbd + sizeof (tbd_t) + 512), 0xBA, 512);
 	wmb();
 	rfd = pci_alloc_consistent(bdp->pdev, sizeof (rfd_t), &dma_handle);
@@ -358,10 +326,9 @@ e100_diag_loopback_alloc(struct e100_private *bdp)
 	memset(rfd, 0x00, sizeof (rfd_t));
 
 	/* init all fields in rfd */
-	rfd->rfd_header.cb_status = 0;
 	rfd->rfd_header.cb_cmd = cpu_to_le16(RFD_EL_BIT);
-	rfd->rfd_act_cnt = 0;
 	rfd->rfd_sz = cpu_to_le16(ETH_FRAME_LEN + CHKSUM_SIZE);
+	/* dma_handle is physical address of rfd */
 	bdp->loopback.dma_handle = dma_handle;
 	bdp->loopback.tcb = tcb;
 	bdp->loopback.rfd = rfd;
@@ -399,12 +366,15 @@ e100_diag_loopback_cu_ru_exec(struct e100_private *bdp)
 static u8
 e100_diag_check_pkt(u8 *datap)
 {
-        if( (*datap)==0xFF) {
-                if(*(datap + 600) == 0xBA) {
-                        return true;
-                }
-        }
-        return false;
+	int i;
+	for (i = 0; i<512; i++) {
+		if( !((*datap)==0xFF && (*(datap + 512) == 0xBA)) ) {
+			printk (KERN_ERR "e100: check loopback packet failed at: %x\n", i);
+			return false;
+			}
+	}
+	printk (KERN_DEBUG "e100: Check received loopback packet OK\n");
+	return true;
 }
 
 /**
@@ -434,10 +404,14 @@ e100_diag_rcv_loopback_pkt(struct e100_private* bdp)
 		}
         }
 
-        if (rfd_status & RFD_STATUS_COMPLETE)
+        if (rfd_status & RFD_STATUS_COMPLETE) {
+		printk(KERN_DEBUG "e100: Loopback packet received\n");
                 return e100_diag_check_pkt(((u8 *)rfdp+bdp->rfd_size));
-	else
+	}
+	else {
+		printk(KERN_ERR "e100: Loopback packet not received\n");
 		return false;
+	}
 }
 
 /**

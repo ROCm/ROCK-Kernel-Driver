@@ -680,7 +680,7 @@ static void set_multicast_list(struct net_device *master)
 }
 
 /*
- * This function counts the the number of attached 
+ * This function counts the number of attached 
  * slaves for use by bond_xmit_xor.
  */
 static void update_slave_cnt(bonding_t *bond)

@@ -519,19 +519,19 @@ xor_p5_mmx_5(unsigned long bytes, unsigned long *p1, unsigned long *p2,
 }
 
 static struct xor_block_template xor_block_pII_mmx = {
-	name: "pII_mmx",
-	do_2: xor_pII_mmx_2,
-	do_3: xor_pII_mmx_3,
-	do_4: xor_pII_mmx_4,
-	do_5: xor_pII_mmx_5,
+	.name = "pII_mmx",
+	.do_2 = xor_pII_mmx_2,
+	.do_3 = xor_pII_mmx_3,
+	.do_4 = xor_pII_mmx_4,
+	.do_5 = xor_pII_mmx_5,
 };
 
 static struct xor_block_template xor_block_p5_mmx = {
-	name: "p5_mmx",
-	do_2: xor_p5_mmx_2,
-	do_3: xor_p5_mmx_3,
-	do_4: xor_p5_mmx_4,
-	do_5: xor_p5_mmx_5,
+	.name = "p5_mmx",
+	.do_2 = xor_p5_mmx_2,
+	.do_3 = xor_p5_mmx_3,
+	.do_4 = xor_p5_mmx_4,
+	.do_5 = xor_p5_mmx_5,
 };
 
 #undef FPU_SAVE
@@ -848,11 +848,11 @@ xor_sse_5(unsigned long bytes, unsigned long *p1, unsigned long *p2,
 }
 
 static struct xor_block_template xor_block_pIII_sse = {
-        name: "pIII_sse",
-        do_2: xor_sse_2,
-        do_3: xor_sse_3,
-        do_4: xor_sse_4,
-        do_5: xor_sse_5,
+        .name = "pIII_sse",
+        .do_2 =  xor_sse_2,
+        .do_3 =  xor_sse_3,
+        .do_4 =  xor_sse_4,
+        .do_5 = xor_sse_5,
 };
 
 /* Also try the generic routines.  */

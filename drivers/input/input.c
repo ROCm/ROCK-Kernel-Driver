@@ -1,29 +1,13 @@
 /*
- * $Id: input.c,v 1.48 2001/12/26 21:08:33 jsimmons Exp $
+ * The input core
  *
- *  Copyright (c) 1999-2001 Vojtech Pavlik
- *
- *  The input core
+ * Copyright (c) 1999-2002 Vojtech Pavlik
  */
 
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
- * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published by
+ * the Free Software Foundation.
  */
 
 #include <linux/init.h>
@@ -39,7 +23,7 @@
 #include <linux/poll.h>
 #include <linux/device.h>
 
-MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("Input core");
 MODULE_LICENSE("GPL");
 
@@ -337,7 +321,7 @@ static void input_call_hotplug(char *verb, struct input_dev *dev)
 	int i = 0, j, value;
 
 	if (!hotplug_path[0]) {
-		printk(KERN_ERR "input.c: calling hotplug a hotplug agent defined\n");
+		printk(KERN_ERR "input.c: calling hotplug without a hotplug agent defined\n");
 		return;
 	}
 	if (in_interrupt()) {
@@ -395,16 +379,20 @@ static void input_call_hotplug(char *verb, struct input_dev *dev)
 
 	envp[i++] = 0;
 
+#ifdef INPUT_DEBUG
 	printk(KERN_DEBUG "input.c: calling %s %s [%s %s %s %s %s]\n",
 		argv[0], argv[1], envp[0], envp[1], envp[2], envp[3], envp[4]);
+#endif
 
 	value = call_usermodehelper(argv [0], argv, envp);
 
 	kfree(buf);
 	kfree(envp);
 
+#ifdef INPUT_DEBUG
 	if (value != 0)
-		printk(KERN_WARNING "input.c: hotplug returned %d\n", value);
+		printk(KERN_DEBUG "input.c: hotplug returned %d\n", value);
+#endif
 }
 
 #endif
@@ -415,15 +403,7 @@ void input_register_device(struct input_dev *dev)
 	struct input_handle *handle;
 	struct input_device_id *id;
 
-/*
- * Add the EV_SYN capability.
- */
-
 	set_bit(EV_SYN, dev->evbit);
-
-/*
- * Initialize repeat timer to default values.
- */
 
 	init_timer(&dev->timer);
 	dev->timer.data = (long) dev;
@@ -431,15 +411,9 @@ void input_register_device(struct input_dev *dev)
 	dev->rep[REP_DELAY] = HZ/4;
 	dev->rep[REP_PERIOD] = HZ/33;
 
-/*
- * Add the device.
- */
 	INIT_LIST_HEAD(&dev->h_list);
 	list_add_tail(&dev->node,&input_dev_list);
 
-/*
- * Notify handlers.
- */
 	list_for_each(node,&input_handler_list) {
 		struct input_handler *handler = to_handler(node);
 		if ((id = input_match_device(handler->id_table, dev)))
@@ -447,17 +421,9 @@ void input_register_device(struct input_dev *dev)
 				input_link_handle(handle);
 	}
 
-/*
- * Notify the hotplug agent.
- */
-
 #ifdef CONFIG_HOTPLUG
 	input_call_hotplug("add", dev);
 #endif
-
-/*
- * Notify /proc.
- */
 
 #ifdef CONFIG_PROC_FS
 	input_devices_state++;
@@ -471,21 +437,10 @@ void input_unregister_device(struct input_dev *dev)
 
 	if (!dev) return;
 
-/*
- * Turn off power management for the device.
- */
 	if (dev->pm_dev)
 		pm_unregister(dev->pm_dev);
 
-/*
- * Kill any pending repeat timers.
- */
-
 	del_timer_sync(&dev->timer);
-
-/*
- * Notify handlers.
- */
 
 	list_for_each_safe(node,next,&dev->h_list) {
 		struct input_handle * handle = to_handle(node);
@@ -494,22 +449,11 @@ void input_unregister_device(struct input_dev *dev)
 		handle->handler->disconnect(handle);
 	}
 
-/*
- * Notify the hotplug agent.
- */
-
 #ifdef CONFIG_HOTPLUG
 	input_call_hotplug("remove", dev);
 #endif
 
-/*
- * Remove the device.
- */
 	list_del_init(&dev->node);
-
-/*
- * Notify /proc.
- */
 
 #ifdef CONFIG_PROC_FS
 	input_devices_state++;
@@ -526,32 +470,18 @@ void input_register_handler(struct input_handler *handler)
 	if (!handler) return;
 
 	INIT_LIST_HEAD(&handler->h_list);
-/*
- * Add minors if needed.
- */
 
 	if (handler->fops != NULL)
 		input_table[handler->minor >> 5] = handler;
 
-/*
- * Add the handler.
- */
 	list_add_tail(&handler->node,&input_handler_list);
 	
-/*
- * Notify it about all existing devices.
- */
-
 	list_for_each(node,&input_dev_list) {
 		struct input_dev *dev = to_dev(node);
 		if ((id = input_match_device(handler->id_table, dev)))
 			if ((handle = handler->connect(handler, dev, id)))
 				input_link_handle(handle);
 	}
-
-/*
- * Notify /proc.
- */
 
 #ifdef CONFIG_PROC_FS
 	input_devices_state++;
@@ -563,10 +493,6 @@ void input_unregister_handler(struct input_handler *handler)
 {
 	struct list_head * node, * next;
 
-
-/*
- * Tell the handler to disconnect from all devices it keeps open.
- */
 	list_for_each_safe(node,next,&handler->h_list) {
 		struct input_handle * handle = to_handle_h(node);
 		list_del_init(&handle->h_node);
@@ -574,20 +500,10 @@ void input_unregister_handler(struct input_handler *handler)
 		handler->disconnect(handle);
 	}
 
-/*
- * Remove it.
- */
 	list_del_init(&handler->node);
 
-/*
- * Remove minors.
- */
 	if (handler->fops != NULL)
 		input_table[handler->minor >> 5] = NULL;
-
-/*
- * Notify /proc.
- */
 
 #ifdef CONFIG_PROC_FS
 	input_devices_state++;
@@ -643,10 +559,6 @@ void input_unregister_minor(devfs_handle_t handle)
 {
 	devfs_unregister(handle);
 }
-
-/*
- * ProcFS interface for the input drivers.
- */
 
 #ifdef CONFIG_PROC_FS
 
