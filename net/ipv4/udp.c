@@ -1483,6 +1483,7 @@ out_kfree:
 }
 
 static struct file_operations udp_seq_fops = {
+	.owner		= THIS_MODULE,
 	.open           = udp_seq_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,

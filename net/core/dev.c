@@ -1912,6 +1912,7 @@ static int dev_seq_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations dev_seq_fops = {
+	.owner	 = THIS_MODULE,
 	.open    = dev_seq_open,
 	.read    = seq_read,
 	.llseek  = seq_lseek,
@@ -1931,6 +1932,7 @@ static int softnet_seq_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations softnet_seq_fops = {
+	.owner	 = THIS_MODULE,
 	.open    = softnet_seq_open,
 	.read    = seq_read,
 	.llseek  = seq_lseek,

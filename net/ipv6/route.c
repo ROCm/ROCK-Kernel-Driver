@@ -1797,6 +1797,7 @@ static int rt6_stats_seq_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations rt6_stats_seq_fops = {
+	.owner	 = THIS_MODULE,
 	.open	 = rt6_stats_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,

@@ -693,6 +693,7 @@ out_kfree:
 }
 
 static struct file_operations dn_neigh_seq_fops = {
+	.owner		= THIS_MODULE,
 	.open		= dn_neigh_seq_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
