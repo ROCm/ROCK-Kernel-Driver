@@ -1,6 +1,8 @@
 #ifndef __LINUX_COMPILER_H
 #define __LINUX_COMPILER_H
 
+#ifndef __ASSEMBLY__
+
 #ifdef __CHECKER__
 # define __user		__attribute__((noderef, address_space(1)))
 # define __kernel	/* default address space */
@@ -22,7 +24,6 @@ extern void __chk_io_ptr(void __iomem *);
 
 #ifdef __KERNEL__
 
-#ifndef __ASSEMBLY__
 #if __GNUC__ > 3
 # include <linux/compiler-gcc+.h>	/* catch-all for GCC 4, 5, etc. */
 #elif __GNUC__ == 3
@@ -31,7 +32,6 @@ extern void __chk_io_ptr(void __iomem *);
 # include <linux/compiler-gcc2.h>
 #else
 # error Sorry, your compiler is too old/not recognized.
-#endif
 #endif
 
 /* Intel compiler defines __GNUC__. So we will overwrite implementations
@@ -61,6 +61,8 @@ extern void __chk_io_ptr(void __iomem *);
      __ptr = (unsigned long) (ptr);				\
     (typeof(ptr)) (__ptr + (off)); })
 #endif
+
+#endif /* __ASSEMBLY__ */
 
 #endif /* __KERNEL__ */
 
