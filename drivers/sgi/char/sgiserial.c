@@ -97,7 +97,7 @@ static unsigned char zscons_regs[16] = {
 
 DECLARE_TASK_QUEUE(tq_serial);
 
-struct tty_driver serial_driver;
+static struct tty_driver *serial_driver;
 struct console *sgisercon;
 
 /* serial subtype definitions */
@@ -1794,7 +1794,22 @@ rs_cons_check(struct sgi_serial *ss, int channel)
 	}
 }
 
-volatile int test_done;
+static struct tty_operations serial_ops = {
+	.open = rs_open,
+	.close = rs_close,
+	.write = rs_write,
+	.flush_chars = rs_flush_chars,
+	.write_room = rs_write_room,
+	.chars_in_buffer = rs_chars_in_buffer,
+	.flush_buffer = rs_flush_buffer,
+	.ioctl = rs_ioctl,
+	.throttle = rs_throttle,
+	.unthrottle = rs_unthrottle,
+	.set_termios = rs_set_termios,
+	.stop = rs_stop,
+	.start = rs_start,
+	.hangup = rs_hangup,
+};
 
 /* rs_init inits the driver */
 int rs_init(void)
@@ -1802,6 +1817,9 @@ int rs_init(void)
 	int chip, channel, i, flags;
 	struct sgi_serial *info;
 
+	serial_driver = tty_alloc_serial(NUM_CHANNELS);
+	if (!serial_driver)
+		return -ENOMEM;
 
 	/* Setup base handler, and timer table. */
 	init_bh(SERIAL_BH, do_serial_bh);
@@ -1810,38 +1828,22 @@ int rs_init(void)
 
 	/* Initialize the tty_driver structure */
 	/* SGI: Not all of this is exactly right for us. */
-	
-	memset(&serial_driver, 0, sizeof(struct tty_driver));
-	serial_driver.magic = TTY_DRIVER_MAGIC;
-	serial_driver.owner = THIS_MODULE;
-	serial_driver.name = "ttyS";
-	serial_driver.major = TTY_MAJOR;
-	serial_driver.minor_start = 64;
-	serial_driver.num = NUM_CHANNELS;
-	serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	serial_driver.subtype = SERIAL_TYPE_NORMAL;
-	serial_driver.init_termios = tty_std_termios;
 
-	serial_driver.init_termios.c_cflag =
+	serial_driver->owner = THIS_MODULE;
+	serial_driver->name = "ttyS";
+	serial_driver->major = TTY_MAJOR;
+	serial_driver->minor_start = 64;
+	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	serial_driver->subtype = SERIAL_TYPE_NORMAL;
+	serial_driver->init_termios = tty_std_termios;
+
+	serial_driver->init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	serial_driver.flags = TTY_DRIVER_REAL_RAW;
+	serial_driver->flags = TTY_DRIVER_REAL_RAW;
 
-	serial_driver.open = rs_open;
-	serial_driver.close = rs_close;
-	serial_driver.write = rs_write;
-	serial_driver.flush_chars = rs_flush_chars;
-	serial_driver.write_room = rs_write_room;
-	serial_driver.chars_in_buffer = rs_chars_in_buffer;
-	serial_driver.flush_buffer = rs_flush_buffer;
-	serial_driver.ioctl = rs_ioctl;
-	serial_driver.throttle = rs_throttle;
-	serial_driver.unthrottle = rs_unthrottle;
-	serial_driver.set_termios = rs_set_termios;
-	serial_driver.stop = rs_stop;
-	serial_driver.start = rs_start;
-	serial_driver.hangup = rs_hangup;
+	tty_set_operations(serial_driver, &serial_ops);
 
-	if (tty_register_driver(&serial_driver))
+	if (tty_register_driver(serial_driver))
 		panic("Couldn't register serial driver\n");
 
 	save_flags(flags); cli();
@@ -2042,7 +2044,7 @@ static void zs_console_write(struct console *co, const char *str,
 static struct tty_driver *zs_console_device(struct console *con, int *index)
 {
 	*index = con->index;
-	return &serial_driver;
+	return serial_driver;
 }
 
 
