@@ -1004,7 +1004,7 @@ static inline void break_cow(struct vm_area_struct * vma, struct page * new_page
 	flush_cache_page(vma, address);
 	entry = maybe_mkwrite(pte_mkdirty(mk_pte(new_page, vma->vm_page_prot)),
 			      vma);
-	ptep_establish(vma, address, page_table, entry, 1);
+	ptep_establish(vma, address, page_table, entry);
 	update_mmu_cache(vma, address, entry);
 }
 
@@ -1056,7 +1056,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 			flush_cache_page(vma, address);
 			entry = maybe_mkwrite(pte_mkyoung(pte_mkdirty(pte)),
 					      vma);
-			ptep_establish(vma, address, page_table, entry, 1);
+			ptep_set_access_flags(vma, address, page_table, entry, 1);
 			update_mmu_cache(vma, address, entry);
 			pte_unmap(page_table);
 			spin_unlock(&mm->page_table_lock);
@@ -1646,7 +1646,7 @@ static inline int handle_pte_fault(struct mm_struct *mm,
 		entry = pte_mkdirty(entry);
 	}
 	entry = pte_mkyoung(entry);
-	ptep_establish(vma, address, pte, entry, write_access);
+	ptep_set_access_flags(vma, address, pte, entry, write_access);
 	update_mmu_cache(vma, address, entry);
 	pte_unmap(pte);
 	spin_unlock(&mm->page_table_lock);

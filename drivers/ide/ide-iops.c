@@ -767,7 +767,7 @@ int ide_driveid_update (ide_drive_t *drive)
 	SELECT_MASK(drive, 1);
 	if (IDE_CONTROL_REG)
 		hwif->OUTB(drive->ctl,IDE_CONTROL_REG);
-	ide_delay_50ms();
+	msleep(50);
 	hwif->OUTB(WIN_IDENTIFY, IDE_COMMAND_REG);
 	timeout = jiffies + WAIT_WORSTCASE;
 	do {
@@ -775,9 +775,9 @@ int ide_driveid_update (ide_drive_t *drive)
 			SELECT_MASK(drive, 0);
 			return 0;	/* drive timed-out */
 		}
-		ide_delay_50ms();	/* give drive a breather */
+		msleep(50);	/* give drive a breather */
 	} while (hwif->INB(IDE_ALTSTATUS_REG) & BUSY_STAT);
-	ide_delay_50ms();	/* wait for IRQ and DRQ_STAT */
+	msleep(50);	/* wait for IRQ and DRQ_STAT */
 	if (!OK_STAT(hwif->INB(IDE_STATUS_REG),DRQ_STAT,BAD_R_STAT)) {
 		SELECT_MASK(drive, 0);
 		printk("%s: CHECK for good STATUS\n", drive->name);
@@ -827,7 +827,7 @@ int ide_config_drive_speed (ide_drive_t *drive, u8 speed)
 	u8 stat;
 
 //	while (HWGROUP(drive)->busy)
-//		ide_delay_50ms();
+//		msleep(50);
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->ide_dma_check)	 /* check if host supports DMA */
