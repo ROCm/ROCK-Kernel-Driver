@@ -191,54 +191,89 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
 	}
 }
 
-/*
- * PIO data transfer IRQ handler.
- */
-static irqreturn_t mmci_pio_irq(int irq, void *dev_id, struct pt_regs *regs)
+static int mmci_pio_read(struct mmci_host *host, struct request *req, u32 status)
 {
-	struct mmci_host *host = dev_id;
 	void *base = host->base;
-	u32 status;
 	int ret = 0;
 
 	do {
-		status = readl(base + MMCISTATUS);
+		unsigned int count;
 
-		if (!(status & (MCI_RXDATAAVLBL|MCI_RXFIFOHALFFULL|
-				MCI_TXFIFOHALFEMPTY)))
+		/*
+		 * Check for data available.
+		 */
+		if (!(status & MCI_RXDATAAVLBL))
 			break;
 
-		DBG(host, "irq1 %08x\n", status);
-
-		if (status & (MCI_RXDATAAVLBL|MCI_RXFIFOHALFFULL)) {
-			unsigned int count = host->size - (readl(base + MMCIFIFOCNT) << 2);
-			if (count < 0)
-				count = 0;
-			if (count && host->buffer) {
-				readsl(base + MMCIFIFO, host->buffer, count >> 2);
-				host->buffer += count;
-				host->size -= count;
-			}
+		count = host->size - (readl(base + MMCIFIFOCNT) << 2);
+		if (count < 0)
+			count = 0;
+		if (count && host->buffer) {
+			ret = 1;
+			readsl(base + MMCIFIFO, host->buffer, count >> 2);
+			host->buffer += count;
+			host->size -= count;
 		}
+
+		status = readl(base + MMCISTATUS);
+	} while (status & MCI_RXDATAAVLBL);
+
+	return ret;
+}
+
+static int mmci_pio_write(struct mmci_host *host, struct request *req, u32 status)
+{
+	void *base = host->base;
+	int ret = 0;
+
+	do {
+		unsigned int count, maxcnt;
 
 		/*
 		 * We only need to test the half-empty flag here - if
 		 * the FIFO is completely empty, then by definition
 		 * it is more than half empty.
 		 */
-		if (status & MCI_TXFIFOHALFEMPTY) {
-			unsigned int maxcnt = status & MCI_TXFIFOEMPTY ?
-					      MCI_FIFOSIZE : MCI_FIFOHALFSIZE;
-			unsigned int count = min(host->size, maxcnt);
+		if (!(status & MCI_TXFIFOHALFEMPTY))
+			break;
 
-			writesl(base + MMCIFIFO, host->buffer, count >> 2);
+		maxcnt = status & MCI_TXFIFOEMPTY ?
+			 MCI_FIFOSIZE : MCI_FIFOHALFSIZE;
+		count = min(host->size, maxcnt);
 
-			host->buffer += count;
-			host->size -= count;
-		}
+		writesl(base + MMCIFIFO, host->buffer, count >> 2);
+
+		host->buffer += count;
+		host->size -= count;
 
 		ret = 1;
-	} while (status);
+
+		status = readl(base + MMCISTATUS);
+	} while (status & MCI_TXFIFOHALFEMPTY);
+
+	return ret;
+}
+
+/*
+ * PIO data transfer IRQ handler.
+ */
+static irqreturn_t mmci_pio_irq(int irq, void *dev_id, struct pt_regs *regs)
+{
+	struct mmci_host *host = dev_id;
+	struct request *req;
+	void *base = host->base;
+	u32 status;
+	int ret = 0;
+
+	status = readl(base + MMCISTATUS);
+
+	DBG(host, "irq1 %08x\n", status);
+
+	req = host->data->req;
+	if (status & MCI_RXACTIVE)
+		ret = mmci_pio_read(host, req, status);
+	else if (status & MCI_TXACTIVE)
+		ret = mmci_pio_write(host, req, status);
 
 	/*
 	 * If we run out of data, disable the data IRQs; this
