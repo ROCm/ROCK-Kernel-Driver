@@ -519,30 +519,27 @@ static struct pci_resource *do_bridge_resource_split(struct pci_resource **head,
 		kfree(prevnode);
 	}
 
-	if (node->length < alignment) {
-		kfree(node);
-		return NULL;
-	}
+	if (node->length < alignment)
+		goto error;
 
 	if (node->base & (alignment - 1)) {
 		/* Short circuit if adjusted size is too small */
 		temp_dword = (node->base | (alignment-1)) + 1;
-		if ((node->length - (temp_dword - node->base)) < alignment) {
-			kfree(node);
-			return NULL;
-		}
+		if ((node->length - (temp_dword - node->base)) < alignment)
+			goto error;
 
 		node->length -= (temp_dword - node->base);
 		node->base = temp_dword;
 	}
 
-	if (node->length & (alignment - 1)) {
+	if (node->length & (alignment - 1))
 		/* There's stuff in use after this node */
-		kfree(node);
-		return NULL;
-	}
+		goto error;
 
 	return node;
+error:
+	kfree(node);
+	return NULL;
 }
 
 
@@ -1082,26 +1079,23 @@ static int bridge_slot_remove(struct pci_func *bridge)
 
 	next = cpqhp_slot_list[bridge->bus];
 
-	if (next == NULL) {
+	if (next == NULL)
 		return 1;
-	}
 
 	if (next == bridge) {
 		cpqhp_slot_list[bridge->bus] = bridge->next;
-		kfree(bridge);
-		return 0;
+		goto out;
 	}
 
-	while ((next->next != bridge) && (next->next != NULL)) {
+	while ((next->next != bridge) && (next->next != NULL))
 		next = next->next;
-	}
 
-	if (next->next == bridge) {
-		next->next = bridge->next;
-		kfree(bridge);
-		return 0;
-	} else
+	if (next->next != bridge)
 		return 2;
+	next->next = bridge->next;
+out:
+	kfree(bridge);
+	return 0;
 }
 
 
@@ -2720,15 +2714,8 @@ static int configure_new_function(struct controller *ctrl, struct pci_func *func
 			}	/* End of IF (device in slot?) */
 		}		/* End of FOR loop */
 
-		if (rc) {
-			cpqhp_destroy_resource_list(&temp_resources);
-
-			return_resource(&(resources->bus_head), hold_bus_node);
-			return_resource(&(resources->io_head), hold_IO_node);
-			return_resource(&(resources->mem_head), hold_mem_node);
-			return_resource(&(resources->p_mem_head), hold_p_mem_node);
-			return rc;
-		}
+		if (rc)
+			goto free_and_out;
 		/* save the interrupt routing information */
 		if (resources->irqs) {
 			resources->irqs->interrupt[0] = irqs.interrupt[0];
@@ -2742,15 +2729,8 @@ static int configure_new_function(struct controller *ctrl, struct pci_func *func
 				if (irqs.valid_INT & (0x01 << cloop)) {
 					rc = cpqhp_set_irq(func->bus, func->device,
 							   0x0A + cloop, irqs.interrupt[cloop]);
-					if (rc) {
-						cpqhp_destroy_resource_list (&temp_resources);
-
-						return_resource(&(resources-> bus_head), hold_bus_node);
-						return_resource(&(resources-> io_head), hold_IO_node);
-						return_resource(&(resources-> mem_head), hold_mem_node);
-						return_resource(&(resources-> p_mem_head), hold_p_mem_node);
-						return rc;
-					}
+					if (rc)
+						goto free_and_out;
 				}
 			}	/* end of for loop */
 		}
@@ -3131,4 +3111,12 @@ static int configure_new_function(struct controller *ctrl, struct pci_func *func
 	func->configured = 1;
 
 	return 0;
+free_and_out:
+	cpqhp_destroy_resource_list (&temp_resources);
+
+	return_resource(&(resources-> bus_head), hold_bus_node);
+	return_resource(&(resources-> io_head), hold_IO_node);
+	return_resource(&(resources-> mem_head), hold_mem_node);
+	return_resource(&(resources-> p_mem_head), hold_p_mem_node);
+	return rc;
 }
