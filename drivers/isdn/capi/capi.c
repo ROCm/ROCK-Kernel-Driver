@@ -591,9 +591,10 @@ static void capi_signal(u16 applid, void *param)
 		u16 info = CAPIMSG_U16(skb->data, 12); // Info field
 		if (info == 0)
 			capincci_alloc(cdev, CAPIMSG_NCCI(skb->data));
-			
 	}
-
+	if (CAPIMSG_COMMAND(skb->data) == CAPI_CONNECT_B3_IND) {
+		capincci_alloc(cdev, CAPIMSG_NCCI(skb->data));
+	}
 	if (CAPIMSG_COMMAND(skb->data) != CAPI_DATA_B3) {
 		skb_queue_tail(&cdev->recvqueue, skb);
 		wake_up_interruptible(&cdev->recvwait);
