@@ -51,7 +51,7 @@
 #define AC97_REC_GAIN_MIC	0x1e	/* Record Gain MIC (optional) */
 #define AC97_GENERAL_PURPOSE	0x20	/* General Purpose (optional) */
 #define AC97_3D_CONTROL		0x22	/* 3D Control (optional) */
-#define AC97_RESERVED		0x24	/* Reserved */
+#define AC97_INT_PAGING		0x24	/* Audio Interrupt & Paging (AC'97 2.3) */
 #define AC97_POWERDOWN		0x26	/* Powerdown control / status */
 /* range 0x28-0x3a - AUDIO AC'97 2.0 extensions */
 #define AC97_EXTENDED_ID	0x28	/* Extended Audio ID */
@@ -82,6 +82,13 @@
 /* range 0x5a-0x7b - Vendor Specific */
 #define AC97_VENDOR_ID1		0x7c	/* Vendor ID1 */
 #define AC97_VENDOR_ID2		0x7e	/* Vendor ID2 / revision */
+/* range 0x60-0x6f (page 1) - extended codec registers */
+#define AC97_CODEC_CLASS_REV	0x60	/* Codec Class/Revision */
+#define AC97_PCI_SVID		0x62	/* PCI Subsystem Vendor ID */
+#define AC97_PCI_SID		0x64	/* PCI Subsystem ID */
+#define AC97_FUNC_SELECT	0x66	/* Function Select */
+#define AC97_FUNC_INFO		0x68	/* Function Information */
+#define AC97_SENSE_INFO		0x6a	/* Sense Details */
 
 /* slot allocation */
 #define AC97_SLOT_TAG		0
@@ -139,6 +146,7 @@
 #define AC97_EI_AMAP		0x0200	/* indicates optional slot/DAC mapping based on codec ID */
 #define AC97_EI_REV_MASK	0x0c00	/* AC'97 revision mask */
 #define AC97_EI_REV_22		0x0400	/* AC'97 revision 2.2 */
+#define AC97_EI_REV_23		0x0800	/* AC'97 revision 2.3 */
 #define AC97_EI_REV_SHIFT	10
 #define AC97_EI_ADDR_MASK	0xc000	/* physical codec ID (address) */
 #define AC97_EI_ADDR_SHIFT	14
@@ -179,6 +187,16 @@
 #define AC97_SC_SPSR_32K	0x3000	/* Use 32kHz Sample rate */
 #define AC97_SC_DRS		0x4000	/* Double Rate S/PDIF */
 #define AC97_SC_V		0x8000	/* Validity status */
+
+/* Interrupt and Paging bit defines (AC'97 2.3) */
+#define AC97_PAGE_MASK		0x000f	/* Page Selector */
+#define AC97_PAGE_VENDOR	0	/* Vendor-specific registers */
+#define AC97_PAGE_1		1	/* Extended Codec Registers page 1 */
+#define AC97_INT_ENABLE		0x0800	/* Interrupt Enable */
+#define AC97_INT_SENSE		0x1000	/* Sense Cycle */
+#define AC97_INT_CAUSE_SENSE	0x2000	/* Sense Cycle Completed (RO) */
+#define AC97_INT_CAUSE_GPIO	0x4000	/* GPIO bits changed (RO) */
+#define AC97_INT_STATUS		0x8000	/* Interrupt Status */
 
 /* extended modem ID bit defines */
 #define AC97_MEI_LINE1		0x0001	/* Line1 present */
