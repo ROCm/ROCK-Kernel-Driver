@@ -1489,7 +1489,7 @@ out:
 	return error;
 }
 
-static int nfs_access_get_cached(struct inode *inode, struct rpc_cred *cred, struct nfs_access_entry *res)
+int nfs_access_get_cached(struct inode *inode, struct rpc_cred *cred, struct nfs_access_entry *res)
 {
 	struct nfs_access_entry *cache = &NFS_I(inode)->cache_access;
 
@@ -1501,7 +1501,7 @@ static int nfs_access_get_cached(struct inode *inode, struct rpc_cred *cred, str
 	return 0;
 }
 
-static void nfs_access_add_cache(struct inode *inode, struct nfs_access_entry *set)
+void nfs_access_add_cache(struct inode *inode, struct nfs_access_entry *set)
 {
 	struct nfs_access_entry *cache = &NFS_I(inode)->cache_access;
 

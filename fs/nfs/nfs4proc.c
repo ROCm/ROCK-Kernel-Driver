@@ -56,6 +56,7 @@
 
 static int nfs4_do_fsinfo(struct nfs_server *, struct nfs_fh *, struct nfs_fsinfo *);
 static int nfs4_async_handle_error(struct rpc_task *, struct nfs_server *);
+static int _nfs4_proc_access(struct inode *inode, struct nfs_access_entry *entry);
 extern u32 *nfs4_decode_dirent(u32 *p, struct nfs_entry *entry, int plus);
 extern struct rpc_procinfo nfs4_procedures[];
 
@@ -354,6 +355,125 @@ static int _nfs4_proc_open_confirm(struct rpc_clnt *clnt, const struct nfs_fh *f
 	return status;
 }
 
+static int _nfs4_do_access(struct inode *inode, struct rpc_cred *cred, int mask)
+{
+	struct nfs_access_entry cache;
+	int status;
+
+	status = nfs_access_get_cached(inode, cred, &cache);
+	if (status == 0)
+		goto out;
+
+	/* Be clever: ask server to check for all possible rights */
+	cache.mask = MAY_EXEC | MAY_WRITE | MAY_READ;
+	cache.cred = cred;
+	cache.jiffies = jiffies;
+	status = _nfs4_proc_access(inode, &cache);
+	if (status != 0)
+		return status;
+	nfs_access_add_cache(inode, &cache);
+out:
+	if ((cache.mask & mask) == mask)
+		return 0;
+	return -EACCES;
+}
+
+/*
+ * Returns an nfs4_state + an extra reference to the inode
+ */
+int _nfs4_open_delegated(struct inode *inode, int flags, struct rpc_cred *cred, struct nfs4_state **res)
+{
+	struct nfs_delegation *delegation;
+	struct nfs_server *server = NFS_SERVER(inode);
+	struct nfs4_client *clp = server->nfs4_state;
+	struct nfs_inode *nfsi = NFS_I(inode);
+	struct nfs4_state_owner *sp = NULL;
+	struct nfs4_state *state = NULL;
+	int open_flags = flags & (FMODE_READ|FMODE_WRITE);
+	int mask = 0;
+	int err;
+
+	/* Protect against reboot recovery - NOTE ORDER! */
+	down_read(&clp->cl_sem);
+	/* Protect against delegation recall */
+	down_read(&nfsi->rwsem);
+	delegation = NFS_I(inode)->delegation;
+	err = -ENOENT;
+	if (delegation == NULL || (delegation->type & open_flags) != open_flags)
+		goto out_err;
+	err = -ENOMEM;
+	if (!(sp = nfs4_get_state_owner(server, cred))) {
+		dprintk("%s: nfs4_get_state_owner failed!\n", __FUNCTION__);
+		goto out_err;
+	}
+	down(&sp->so_sema);
+	state = nfs4_get_open_state(inode, sp);
+	if (state == NULL)
+		goto out_err;
+
+	err = -ENOENT;
+	if ((state->state & open_flags) == open_flags) {
+		spin_lock(&inode->i_lock);
+		if (open_flags & FMODE_READ)
+			state->nreaders++;
+		if (open_flags & FMODE_WRITE)
+			state->nwriters++;
+		spin_unlock(&inode->i_lock);
+		goto out_ok;
+	} else if (state->state != 0)
+		goto out_err;
+
+	lock_kernel();
+	err = _nfs4_do_access(inode, cred, mask);
+	unlock_kernel();
+	if (err != 0)
+		goto out_err;
+	spin_lock(&inode->i_lock);
+	memcpy(state->stateid.data, delegation->stateid.data,
+			sizeof(state->stateid.data));
+	state->state |= open_flags;
+	if (open_flags & FMODE_READ)
+		state->nreaders++;
+	if (open_flags & FMODE_WRITE)
+		state->nwriters++;
+	set_bit(NFS_DELEGATED_STATE, &state->flags);
+	spin_unlock(&inode->i_lock);
+out_ok:
+	up(&sp->so_sema);
+	nfs4_put_state_owner(sp);
+	up_read(&nfsi->rwsem);
+	up_read(&clp->cl_sem);
+	igrab(inode);
+	*res = state;
+	return 0; 
+out_err:
+	if (sp != NULL) {
+		if (state != NULL)
+			nfs4_put_open_state(state);
+		up(&sp->so_sema);
+		nfs4_put_state_owner(sp);
+	}
+	up_read(&nfsi->rwsem);
+	up_read(&clp->cl_sem);
+	return err;
+}
+
+static struct nfs4_state *nfs4_open_delegated(struct inode *inode, int flags, struct rpc_cred *cred)
+{
+	struct nfs4_exception exception = { };
+	struct nfs4_state *res;
+	int err;
+
+	do {
+		err = _nfs4_open_delegated(inode, flags, cred, &res);
+		if (err == 0)
+			break;
+		res = ERR_PTR(nfs4_handle_exception(NFS_SERVER(inode),
+					err, &exception));
+	} while (exception.retry);
+	return res;
+}
+
 /*
  * Returns an nfs4_state + an referenced inode
  */
@@ -563,6 +683,8 @@ static int _nfs4_do_close(struct inode *inode, struct nfs4_state *state)
 		.rpc_resp	= &res,
 	};
 
+	if (test_bit(NFS_DELEGATED_STATE, &state->flags))
+		return 0;
 	memcpy(&arg.stateid, &state->stateid, sizeof(arg.stateid));
 	/* Serialization for the sequence id */
 	arg.seqid = sp->so_seqid,
@@ -614,6 +736,8 @@ static int _nfs4_do_downgrade(struct inode *inode, struct nfs4_state *state, mod
 		.rpc_resp	= &res,
 	};
 
+	if (test_bit(NFS_DELEGATED_STATE, &state->flags))
+		return 0;
 	memcpy(&arg.stateid, &state->stateid, sizeof(arg.stateid));
 	status = rpc_call_sync(NFS_SERVER(inode)->client, &msg, 0);
 	nfs4_increment_seqid(status, sp);
@@ -676,7 +800,9 @@ nfs4_open_revalidate(struct inode *dir, struct dentry *dentry, int openflags)
 	struct inode *inode;
 
 	cred = rpcauth_lookupcred(NFS_SERVER(dir)->client->cl_auth, 0);
-	state = nfs4_do_open(dir, &dentry->d_name, openflags, NULL, cred);
+	state = nfs4_open_delegated(dentry->d_inode, openflags, cred);
+	if (IS_ERR(state))
+		state = nfs4_do_open(dir, &dentry->d_name, openflags, NULL, cred);
 	put_rpccred(cred);
 	if (state == ERR_PTR(-ENOENT) && dentry->d_inode == 0)
 		return 1;
@@ -895,9 +1021,13 @@ nfs4_proc_setattr(struct dentry *dentry, struct nfs_fattr *fattr,
 	if (size_change) {
 		struct rpc_cred *cred = rpcauth_lookupcred(NFS_SERVER(inode)->client->cl_auth, 0);
 		state = nfs4_find_state(inode, cred, FMODE_WRITE);
-		if (!state) {
-			state = nfs4_do_open(dentry->d_parent->d_inode, 
-				&dentry->d_name, FMODE_WRITE, NULL, cred);
+		if (state == NULL) {
+			state = nfs4_open_delegated(dentry->d_inode,
+					FMODE_WRITE, cred);
+			if (IS_ERR(state))
+				state = nfs4_do_open(dentry->d_parent->d_inode,
+						&dentry->d_name, FMODE_WRITE,
+						NULL, cred);
 			need_iput = 1;
 		}
 		put_rpccred(cred);
