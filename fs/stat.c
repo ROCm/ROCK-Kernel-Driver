@@ -5,6 +5,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/errno.h>
 #include <linux/file.h>
@@ -33,6 +34,8 @@ void generic_fillattr(struct inode *inode, struct kstat *stat)
 	stat->blksize = inode->i_blksize;
 }
 
+EXPORT_SYMBOL(generic_fillattr);
+
 int vfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 {
 	struct inode *inode = dentry->d_inode;
@@ -56,6 +59,8 @@ int vfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 	return 0;
 }
 
+EXPORT_SYMBOL(vfs_getattr);
+
 int vfs_stat(char __user *name, struct kstat *stat)
 {
 	struct nameidata nd;
@@ -68,6 +73,8 @@ int vfs_stat(char __user *name, struct kstat *stat)
 	}
 	return error;
 }
+
+EXPORT_SYMBOL(vfs_stat);
 
 int vfs_lstat(char __user *name, struct kstat *stat)
 {
@@ -82,6 +89,8 @@ int vfs_lstat(char __user *name, struct kstat *stat)
 	return error;
 }
 
+EXPORT_SYMBOL(vfs_lstat);
+
 int vfs_fstat(unsigned int fd, struct kstat *stat)
 {
 	struct file *f = fget(fd);
@@ -93,6 +102,8 @@ int vfs_fstat(unsigned int fd, struct kstat *stat)
 	}
 	return error;
 }
+
+EXPORT_SYMBOL(vfs_fstat);
 
 #if !defined(__alpha__) && !defined(__sparc__) && !defined(__ia64__) \
   && !defined(CONFIG_ARCH_S390) && !defined(__hppa__) && !defined(__x86_64__) \
@@ -355,6 +366,8 @@ void inode_add_bytes(struct inode *inode, loff_t bytes)
 	spin_unlock(&inode->i_lock);
 }
 
+EXPORT_SYMBOL(inode_add_bytes);
+
 void inode_sub_bytes(struct inode *inode, loff_t bytes)
 {
 	spin_lock(&inode->i_lock);
@@ -368,6 +381,8 @@ void inode_sub_bytes(struct inode *inode, loff_t bytes)
 	spin_unlock(&inode->i_lock);
 }
 
+EXPORT_SYMBOL(inode_sub_bytes);
+
 loff_t inode_get_bytes(struct inode *inode)
 {
 	loff_t ret;
@@ -378,8 +393,12 @@ loff_t inode_get_bytes(struct inode *inode)
 	return ret;
 }
 
+EXPORT_SYMBOL(inode_get_bytes);
+
 void inode_set_bytes(struct inode *inode, loff_t bytes)
 {
 	inode->i_blocks = bytes >> 9;
 	inode->i_bytes = bytes & 511;
 }
+
+EXPORT_SYMBOL(inode_set_bytes);

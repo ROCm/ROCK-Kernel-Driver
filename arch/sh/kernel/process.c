@@ -11,6 +11,7 @@
  * This file handles the architecture-dependent parts of process handling..
  */
 
+#include <linux/module.h>
 #include <linux/unistd.h>
 #include <linux/mm.h>
 #include <linux/elfcore.h>
@@ -33,10 +34,14 @@ void disable_hlt(void)
 	hlt_counter++;
 }
 
+EXPORT_SYMBOL(disable_hlt);
+
 void enable_hlt(void)
 {
 	hlt_counter--;
 }
+
+EXPORT_SYMBOL(enable_hlt);
 
 void default_idle(void)
 {
@@ -71,15 +76,21 @@ void machine_restart(char * __unused)
 		     "mov.l @%1, %0" : : "r" (0x10000000), "r" (0x80000001));
 }
 
+EXPORT_SYMBOL(machine_restart);
+
 void machine_halt(void)
 {
 	while (1)
 		asm volatile("sleep" : : : "memory");
 }
 
+EXPORT_SYMBOL(machine_halt);
+
 void machine_power_off(void)
 {
 }
+
+EXPORT_SYMBOL(machine_power_off);
 
 void show_regs(struct pt_regs * regs)
 {

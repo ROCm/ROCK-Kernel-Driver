@@ -1,6 +1,8 @@
 #ifndef _ROOT_DEV_H_
 #define _ROOT_DEV_H_
 
+#include <linux/major.h>
+
 enum {
 	Root_NFS = MKDEV(UNNAMED_MAJOR, 255),
 	Root_RAM0 = MKDEV(RAMDISK_MAJOR, 0),

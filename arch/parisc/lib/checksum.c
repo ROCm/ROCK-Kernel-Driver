@@ -96,6 +96,8 @@ unsigned int csum_partial(const unsigned char *buff, int len, unsigned int sum)
 	return result;
 }
 
+EXPORT_SYMBOL(csum_partial);
+
 /*
  * copy while checksumming, otherwise like csum_partial
  */

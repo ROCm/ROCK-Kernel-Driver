@@ -13,6 +13,7 @@
  * Copyright 1999 D. Jeff Dionne <jeff@rt-control.com>
  */
 
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -155,6 +156,8 @@ int request_irq(unsigned int irq,
 	return 0;
 }
 
+EXPORT_SYMBOL(request_irq);
+
 void free_irq(unsigned int irq, void *dev_id)
 {
 	if (irq >= NR_IRQS) {
@@ -171,6 +174,8 @@ void free_irq(unsigned int irq, void *dev_id)
 	}
 }
 
+EXPORT_SYMBOL(free_irq);
+
 /*
  * Do we need these probe functions on the m68k?
  */
@@ -179,10 +184,14 @@ unsigned long probe_irq_on (void)
 	return 0;
 }
 
+EXPORT_SYMBOL(probe_irq_on);
+
 int probe_irq_off (unsigned long irqs)
 {
 	return 0;
 }
+
+EXPORT_SYMBOL(probe_irq_off);
 
 void enable_irq(unsigned int irq)
 {

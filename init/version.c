@@ -7,6 +7,7 @@
  */
 
 #include <linux/compile.h>
+#include <linux/module.h>
 #include <linux/uts.h>
 #include <linux/utsname.h>
 #include <linux/version.h>
@@ -24,6 +25,8 @@ struct new_utsname system_utsname = {
 	.machine	= UTS_MACHINE,
 	.domainname	= UTS_DOMAINNAME,
 };
+
+EXPORT_SYMBOL(system_utsname);
 
 const char *linux_banner = 
 	"Linux version " UTS_RELEASE " (" LINUX_COMPILE_BY "@"

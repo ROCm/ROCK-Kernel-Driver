@@ -4,6 +4,7 @@
  */
 
 #include "linux/config.h"
+#include "linux/module.h"
 #include "linux/types.h"
 #include "linux/mm.h"
 #include "linux/fs.h"
@@ -128,6 +129,9 @@ void set_kmem_end(unsigned long new)
 /* Changed during early boot */
 pte_t *kmap_pte;
 pgprot_t kmap_prot;
+
+EXPORT_SYMBOL(kmap_prot);
+EXPORT_SYMBOL(kmap_pte);
 
 #define kmap_get_fixmap_pte(vaddr)					\
 	pte_offset_kernel(pmd_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr))

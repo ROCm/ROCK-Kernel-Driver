@@ -211,3 +211,5 @@ EXPORT_SYMBOL(eddnr);
 #if defined(CONFIG_X86_SPEEDSTEP_SMI) || defined(CONFIG_X86_SPEEDSTEP_SMI_MODULE)
 EXPORT_SYMBOL(ist_info);
 #endif
+
+EXPORT_SYMBOL(csum_partial);

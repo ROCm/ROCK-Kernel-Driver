@@ -3,7 +3,7 @@
  * linux/fs/nfsd/vfs.c
  *
  * File operations used by nfsd. Some of these have been ripped from
- * other parts of the kernel because they weren't in ksyms.c, others
+ * other parts of the kernel because they weren't exported, others
  * are partial duplicates with added or changed functionality.
  *
  * Note that several functions dget() the dentry upon which they want

@@ -55,6 +55,11 @@
 int overflowuid = DEFAULT_OVERFLOWUID;
 int overflowgid = DEFAULT_OVERFLOWGID;
 
+#ifdef CONFIG_UID16
+EXPORT_SYMBOL(overflowuid);
+EXPORT_SYMBOL(overflowgid);
+#endif
+
 /*
  * the same as above, but for filesystems which can only store a 16-bit
  * UID and GID. as such, this is needed on all architectures
@@ -62,6 +67,9 @@ int overflowgid = DEFAULT_OVERFLOWGID;
 
 int fs_overflowuid = DEFAULT_FS_OVERFLOWUID;
 int fs_overflowgid = DEFAULT_FS_OVERFLOWUID;
+
+EXPORT_SYMBOL(fs_overflowuid);
+EXPORT_SYMBOL(fs_overflowgid);
 
 /*
  * this indicates whether you can reboot with ctrl-alt-del: the default is yes
@@ -106,6 +114,8 @@ int notifier_chain_register(struct notifier_block **list, struct notifier_block 
 	return 0;
 }
 
+EXPORT_SYMBOL(notifier_chain_register);
+
 /**
  *	notifier_chain_unregister - Remove notifier from a notifier chain
  *	@nl: Pointer to root list pointer
@@ -132,6 +142,8 @@ int notifier_chain_unregister(struct notifier_block **nl, struct notifier_block 
 	write_unlock(&notifier_lock);
 	return -ENOENT;
 }
+
+EXPORT_SYMBOL(notifier_chain_unregister);
 
 /**
  *	notifier_call_chain - Call functions in a notifier chain
@@ -166,6 +178,8 @@ int notifier_call_chain(struct notifier_block **n, unsigned long val, void *v)
 	return ret;
 }
 
+EXPORT_SYMBOL(notifier_call_chain);
+
 /**
  *	register_reboot_notifier - Register function to be called at reboot time
  *	@nb: Info about notifier function to be called
@@ -182,6 +196,8 @@ int register_reboot_notifier(struct notifier_block * nb)
 	return notifier_chain_register(&reboot_notifier_list, nb);
 }
 
+EXPORT_SYMBOL(register_reboot_notifier);
+
 /**
  *	unregister_reboot_notifier - Unregister previously registered reboot notifier
  *	@nb: Hook to be unregistered
@@ -196,6 +212,8 @@ int unregister_reboot_notifier(struct notifier_block * nb)
 {
 	return notifier_chain_unregister(&reboot_notifier_list, nb);
 }
+
+EXPORT_SYMBOL(unregister_reboot_notifier);
 
 asmlinkage long sys_ni_syscall(void)
 {
@@ -1144,6 +1162,8 @@ int in_group_p(gid_t grp)
 	return retval;
 }
 
+EXPORT_SYMBOL(in_group_p);
+
 int in_egroup_p(gid_t grp)
 {
 	int retval = 1;
@@ -1152,7 +1172,11 @@ int in_egroup_p(gid_t grp)
 	return retval;
 }
 
+EXPORT_SYMBOL(in_egroup_p);
+
 DECLARE_RWSEM(uts_sem);
+
+EXPORT_SYMBOL(uts_sem);
 
 asmlinkage long sys_newuname(struct new_utsname __user * name)
 {
@@ -1433,11 +1457,3 @@ asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 	}
 	return error;
 }
-
-EXPORT_SYMBOL(notifier_chain_register);
-EXPORT_SYMBOL(notifier_chain_unregister);
-EXPORT_SYMBOL(notifier_call_chain);
-EXPORT_SYMBOL(register_reboot_notifier);
-EXPORT_SYMBOL(unregister_reboot_notifier);
-EXPORT_SYMBOL(in_group_p);
-EXPORT_SYMBOL(in_egroup_p);

@@ -24,6 +24,7 @@
 
 #include <linux/config.h>
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -89,6 +90,8 @@ void machine_restart(char * __unused)
 	__asm__("jmp @@0"); 
 }
 
+EXPORT_SYMBOL(machine_restart);
+
 void machine_halt(void)
 {
 	local_irq_disable();
@@ -96,12 +99,16 @@ void machine_halt(void)
 	for (;;);
 }
 
+EXPORT_SYMBOL(machine_halt);
+
 void machine_power_off(void)
 {
 	local_irq_disable();
 	__asm__("sleep");
 	for (;;);
 }
+
+EXPORT_SYMBOL(machine_power_off);
 
 void show_regs(struct pt_regs * regs)
 {

@@ -35,6 +35,8 @@
 
 u64 jiffies_64 = INITIAL_JIFFIES;
 
+EXPORT_SYMBOL(jiffies_64);
+
 extern int using_apic_timer;
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
@@ -119,6 +121,8 @@ void do_gettimeofday(struct timeval *tv)
 	tv->tv_usec = usec % 1000000;
 }
 
+EXPORT_SYMBOL(do_gettimeofday);
+
 /*
  * settimeofday() first undoes the correction that gettimeofday would do
  * on the time, and then saves it. This is ugly, but has been like this for
@@ -153,6 +157,8 @@ int do_settimeofday(struct timespec *tv)
 	clock_was_set();
 	return 0;
 }
+
+EXPORT_SYMBOL(do_settimeofday);
 
 /*
  * In order to set the CMOS clock precisely, set_rtc_mmss has to be called 500

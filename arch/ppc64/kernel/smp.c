@@ -17,6 +17,7 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
@@ -54,6 +55,8 @@ unsigned long cache_decay_ticks;
 
 /* initialised so it doesn't end up in bss */
 cpumask_t cpu_online_map = CPU_MASK_NONE;
+
+EXPORT_SYMBOL(cpu_online_map);
 
 static struct smp_ops_t *smp_ops;
 

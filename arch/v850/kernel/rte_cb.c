@@ -15,6 +15,7 @@
 #include <linux/init.h>
 #include <linux/irq.h>
 #include <linux/fs.h>
+#include <linux/module.h>
 
 #include <asm/machdep.h>
 #include <asm/v850e_uart.h>
@@ -66,6 +67,8 @@ void machine_restart (char *__unused)
 	asm ("jmp r0"); /* Jump to the reset vector.  */
 }
 
+EXPORT_SYMBOL(machine_restart);
+
 /* This says `HALt.' in LEDese.  */
 static unsigned char halt_leds_msg[] = { 0x76, 0x77, 0x38, 0xF8 };
 
@@ -86,10 +89,14 @@ void machine_halt (void)
 		asm ("halt; nop; nop; nop; nop; nop");
 }
 
+EXPORT_SYMBOL(machine_halt);
+
 void machine_power_off (void)
 {
 	machine_halt ();
 }
+
+EXPORT_SYMBOL(machine_power_off);
 
 
 /* Animated LED display for timer tick.  */

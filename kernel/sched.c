@@ -2760,6 +2760,8 @@ __init int migration_init(void)
  * Don't use in new code.
  */
 spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
+
+EXPORT_SYMBOL(kernel_flag);
 #endif
 
 static void kstat_init_cpu(int cpu)

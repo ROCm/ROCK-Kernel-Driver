@@ -250,7 +250,6 @@ EXPORT_SYMBOL(io_remap_page_range);
 EXPORT_SYMBOL(_sigpause_common);
 EXPORT_SYMBOL(verify_compat_iovec);
 
-/* Should really be in linux/kernel/ksyms.c */
 EXPORT_SYMBOL(dump_thread);
 EXPORT_SYMBOL(dump_fpu);
 EXPORT_SYMBOL(pte_alloc_one_kernel);

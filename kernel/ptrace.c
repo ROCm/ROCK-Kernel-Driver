@@ -7,6 +7,7 @@
  * to continually duplicate across every architecture.
  */
 
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/mm.h>
@@ -340,3 +341,5 @@ void ptrace_notify(int exit_code)
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 }
+
+EXPORT_SYMBOL(ptrace_notify);

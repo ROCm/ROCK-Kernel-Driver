@@ -24,6 +24,7 @@
  *	(Even though the technical memorandum forbids it)
  */
 
+#include <linux/module.h>
 #include <linux/timex.h>
 #include <linux/errno.h>
 #include <linux/smp_lock.h>
@@ -34,6 +35,8 @@
  * programs who obtain this value by using gettimeofday.
  */
 struct timezone sys_tz;
+
+EXPORT_SYMBOL(sys_tz);
 
 #if !defined(__alpha__) && !defined(__ia64__)
 
@@ -413,6 +416,8 @@ struct timespec current_kernel_time(void)
 	return now; 
 }
 
+EXPORT_SYMBOL(current_kernel_time);
+
 #if (BITS_PER_LONG < 64)
 u64 get_jiffies_64(void)
 {
@@ -425,4 +430,8 @@ u64 get_jiffies_64(void)
 	} while (read_seqretry(&xtime_lock, seq));
 	return ret;
 }
+
+EXPORT_SYMBOL(get_jiffies_64);
 #endif
+
+EXPORT_SYMBOL(jiffies);

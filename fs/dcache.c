@@ -35,6 +35,8 @@
 spinlock_t dcache_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 seqlock_t rename_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
 
+EXPORT_SYMBOL(dcache_lock);
+
 static kmem_cache_t *dentry_cache; 
 
 /*

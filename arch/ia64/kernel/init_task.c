@@ -8,6 +8,7 @@
 
 #include <linux/init.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/init_task.h>
 
@@ -19,6 +20,8 @@ static struct files_struct init_files = INIT_FILES;
 static struct signal_struct init_signals = INIT_SIGNALS(init_signals);
 static struct sighand_struct init_sighand = INIT_SIGHAND(init_sighand);
 struct mm_struct init_mm = INIT_MM(init_mm);
+
+EXPORT_SYMBOL(init_mm);
 
 /*
  * Initial task structure.
@@ -38,3 +41,5 @@ union {
 	.task =		INIT_TASK(init_task_mem.s.task),
 	.thread_info =	INIT_THREAD_INFO(init_task_mem.s.task)
 }};
+
+EXPORT_SYMBOL(init_task);

@@ -8,6 +8,7 @@
  */
 
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/highmem.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
@@ -324,6 +325,8 @@ void vfree(void *addr)
 	__vunmap(addr, 1);
 }
 
+EXPORT_SYMBOL(vfree);
+
 /**
  *	vunmap  -  release virtual mapping obtained by vmap()
  *
@@ -339,6 +342,8 @@ void vunmap(void *addr)
 	BUG_ON(in_interrupt());
 	__vunmap(addr, 0);
 }
+
+EXPORT_SYMBOL(vunmap);
 
 /**
  *	vmap  -  map an array of pages into virtually contiguous space
@@ -369,6 +374,8 @@ void *vmap(struct page **pages, unsigned int count,
 
 	return area->addr;
 }
+
+EXPORT_SYMBOL(vmap);
 
 /**
  *	__vmalloc  -  allocate virtually contiguous memory
@@ -425,6 +432,8 @@ fail:
 	return NULL;
 }
 
+EXPORT_SYMBOL(__vmalloc);
+
 /**
  *	vmalloc  -  allocate virtually contiguous memory
  *
@@ -441,6 +450,8 @@ void *vmalloc(unsigned long size)
        return __vmalloc(size, GFP_KERNEL | __GFP_HIGHMEM, PAGE_KERNEL);
 }
 
+EXPORT_SYMBOL(vmalloc);
+
 /**
  *	vmalloc_32  -  allocate virtually contiguous memory (32bit addressable)
  *
@@ -453,6 +464,8 @@ void *vmalloc_32(unsigned long size)
 {
 	return __vmalloc(size, GFP_KERNEL, PAGE_KERNEL);
 }
+
+EXPORT_SYMBOL(vmalloc_32);
 
 long vread(char *buf, char *addr, unsigned long count)
 {
