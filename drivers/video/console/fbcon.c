@@ -2266,6 +2266,39 @@ static int fbcon_set_origin(struct vc_data *vc)
 	return 0;
 }
 
+static void fbcon_suspended(struct fb_info *info)
+{
+	/* Clear cursor, restore saved data */
+	info->cursor.enable = 0;
+	info->fbops->fb_cursor(info, &info->cursor);
+}
+
+static void fbcon_resumed(struct fb_info *info)
+{
+	struct vc_data *vc;
+
+	if (info->currcon < 0)
+		return;
+	vc = vc_cons[info->currcon].d;
+
+	update_screen(vc->vc_num);
+}
+static int fbcon_event_notify(struct notifier_block *self, 
+			      unsigned long action, void *data)
+{
+	struct fb_info *info = (struct fb_info *) data;
+
+	switch(action) {
+	case FB_EVENT_SUSPEND:
+		fbcon_suspended(info);
+		break;
+	case FB_EVENT_RESUME:
+		fbcon_resumed(info);
+		break;
+	}
+	return 0;
+}
+
 /*
  *  The console `switch' structure for the frame buffer based console
  */
@@ -2292,16 +2325,35 @@ const struct consw fb_con = {
 	.con_resize             = fbcon_resize,
 };
 
+static struct notifier_block fbcon_event_notifer = {
+	.notifier_call	= fbcon_event_notify,
+};
+
+static int fbcon_event_notifier_registered;
+
 int __init fb_console_init(void)
 {
 	if (!num_registered_fb)
 		return -ENODEV;
 	take_over_console(&fb_con, first_fb_vc, last_fb_vc, fbcon_is_default);
+	acquire_console_sem();
+	if (!fbcon_event_notifier_registered) {
+		fb_register_client(&fbcon_event_notifer);
+		fbcon_event_notifier_registered = 1;
+	} 
+	release_console_sem();
+
 	return 0;
 }
 
 void __exit fb_console_exit(void)
 {
+	acquire_console_sem();
+	if (fbcon_event_notifier_registered) {
+		fb_unregister_client(&fbcon_event_notifer);
+		fbcon_event_notifier_registered = 0;
+	}
+	release_console_sem();
 	give_up_console(&fb_con);
 }	
 
