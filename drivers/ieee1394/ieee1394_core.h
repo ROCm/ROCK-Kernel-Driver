@@ -68,7 +68,10 @@ struct hpsb_packet {
         /* Very core internal, don't care. */
         struct semaphore state_change;
 
-	struct list_head complete_tq;
+	/* Function (and possible data to pass to it) to call when this
+	 * packet is completed.  */
+	void (*complete_routine)(void *);
+	void *complete_data;
 
         /* Store jiffies for implementing bus timeouts. */
         unsigned long sendtime;
@@ -76,8 +79,9 @@ struct hpsb_packet {
         quadlet_t embedded_header[5];
 };
 
-/* add a new task for when a packet completes */
-void hpsb_add_packet_complete_task(struct hpsb_packet *packet, struct hpsb_queue_struct *tq);
+/* Set a task for when a packet completes */
+void hpsb_set_packet_complete_task(struct hpsb_packet *packet,
+		void (*routine)(void *), void *data);
 
 static inline struct hpsb_packet *driver_packet(struct list_head *l)
 {
@@ -135,6 +139,12 @@ void hpsb_selfid_received(struct hpsb_host *host, quadlet_t sid);
  * and whether host is root now.
  */
 void hpsb_selfid_complete(struct hpsb_host *host, int phyid, int isroot);
+
+/* 
+ * Check bus reset results to find cycle master
+ */
+void hpsb_check_cycle_master(struct hpsb_host *host);
+
 
 /*
  * Notify core of sending a packet.  Ackcode is the ack code returned for async
