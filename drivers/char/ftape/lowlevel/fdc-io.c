@@ -31,6 +31,7 @@
 #include <linux/sched.h>
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
+#include <linux/kernel.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/dma.h>
@@ -786,8 +787,8 @@ int fdc_seek(int track)
 		}
 	}
 #ifdef TESTING
-	time = ftape_timediff(time, ftape_timestamp()) / ABS(track - ftape_current_cylinder);
-	if ((time < 900 || time > 3100) && ABS(track - ftape_current_cylinder) > 5) {
+	time = ftape_timediff(time, ftape_timestamp()) / abs(track - ftape_current_cylinder);
+	if ((time < 900 || time > 3100) && abs(track - ftape_current_cylinder) > 5) {
 		TRACE(ft_t_warn, "Wrong FDC STEP interval: %d usecs (%d)",
                          time, track - ftape_current_cylinder);
 	}

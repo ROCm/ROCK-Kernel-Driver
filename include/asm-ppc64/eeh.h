@@ -24,6 +24,7 @@
 #include <linux/init.h>
 
 struct pci_dev;
+struct device_node;
 
 /* I/O addresses are converted to EEH "tokens" such that a driver will cause
  * a bad page fault if the address is used directly (i.e. these addresses are

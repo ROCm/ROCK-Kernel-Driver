@@ -33,8 +33,8 @@ struct pt_regs;
 extern void smp_message_recv(int, struct pt_regs *);
 
 
-#define smp_processor_id() (get_paca()->xPacaIndex)
-#define hard_smp_processor_id() (get_paca()->xHwProcNum)
+#define smp_processor_id() (get_paca()->paca_index)
+#define hard_smp_processor_id() (get_paca()->hw_cpu_id)
 
 /*
  * Retrieve the state of a CPU:
@@ -75,9 +75,9 @@ extern void __cpu_die(unsigned int cpu);
 extern void cpu_die(void) __attribute__((noreturn));
 #endif /* !(CONFIG_SMP) */
 
-#define get_hard_smp_processor_id(CPU) (paca[(CPU)].xHwProcNum)
+#define get_hard_smp_processor_id(CPU) (paca[(CPU)].hw_cpu_id)
 #define set_hard_smp_processor_id(CPU, VAL) \
-	do { (paca[(CPU)].xHwProcNum = VAL); } while (0)
+	do { (paca[(CPU)].hw_proc_num = (VAL)); } while (0)
 
 #endif /* __ASSEMBLY__ */
 

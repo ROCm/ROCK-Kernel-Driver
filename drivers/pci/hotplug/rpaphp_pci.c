@@ -24,6 +24,7 @@
  */
 #include <linux/pci.h>
 #include <asm/pci-bridge.h>
+#include <asm/rtas.h>
 #include "../pci.h"		/* for pci_add_new_bus */
 
 #include "rpaphp.h"

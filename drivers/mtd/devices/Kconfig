@@ -40,7 +40,7 @@ config MTD_PMC551_DEBUG
 
 config MTD_MS02NV
 	tristate "DEC MS02-NV NVRAM module support"
-	depends on CONFIG_DECSTATION
+	depends on CONFIG_MACH_DECSTATION
 	help
 	  Support for NVRAM module on DECstation.
 

@@ -31,7 +31,7 @@
 #define _MEYE_PRIV_H_
 
 #define MEYE_DRIVER_MAJORVERSION	1
-#define MEYE_DRIVER_MINORVERSION	9
+#define MEYE_DRIVER_MINORVERSION	10
 
 #include <linux/config.h>
 #include <linux/types.h>

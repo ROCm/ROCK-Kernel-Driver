@@ -114,10 +114,10 @@ static irqreturn_t gt64240_p0int_irq(int irq, void *dev, struct pt_regs *regs)
 	int handled;
 
 	/* get the low interrupt cause register */
-	irq_src = GT_READ(LOW_INTERRUPT_CAUSE_REGISTER);
+	irq_src = MV_READ(LOW_INTERRUPT_CAUSE_REGISTER);
 
 	/* get the mask register for this pin */
-	irq_src_mask = GT_READ(PCI_0INTERRUPT_CAUSE_MASK_REGISTER_LOW);
+	irq_src_mask = MV_READ(PCI_0INTERRUPT_CAUSE_MASK_REGISTER_LOW);
 
 	/* mask off only the interrupts we're interested in */
 	irq_src = irq_src & irq_src_mask;
@@ -130,7 +130,7 @@ static irqreturn_t gt64240_p0int_irq(int irq, void *dev, struct pt_regs *regs)
 		irq_src &= ~0x00000100;
 
 		/* Clear any pending cause bits */
-		GT_WRITE(TIMER_COUNTER_0_3_INTERRUPT_CAUSE, 0x0);
+		MV_WRITE(TIMER_COUNTER_0_3_INTERRUPT_CAUSE, 0x0);
 
 		/* handle the timer call */
 		do_timer(regs);
@@ -160,10 +160,10 @@ void gt64240_time_init(void)
 	static struct irqaction timer;
 
 	/* Stop the timer -- we'll use timer #0 */
-	GT_WRITE(TIMER_COUNTER_0_3_CONTROL, 0x0);
+	MV_WRITE(TIMER_COUNTER_0_3_CONTROL, 0x0);
 
 	/* Load timer value for 100 Hz */
-	GT_WRITE(TIMER_COUNTER0, bus_clock / 100);
+	MV_WRITE(TIMER_COUNTER0, bus_clock / 100);
 
 	/*
 	 * Create the IRQ structure entry for the timer.  Since we're too early
@@ -181,16 +181,16 @@ void gt64240_time_init(void)
 	enable_irq(6);
 
 	/* Clear any pending cause bits */
-	GT_WRITE(TIMER_COUNTER_0_3_INTERRUPT_CAUSE, 0x0);
+	MV_WRITE(TIMER_COUNTER_0_3_INTERRUPT_CAUSE, 0x0);
 
 	/* Enable the interrupt for timer 0 */
-	GT_WRITE(TIMER_COUNTER_0_3_INTERRUPT_MASK, 0x1);
+	MV_WRITE(TIMER_COUNTER_0_3_INTERRUPT_MASK, 0x1);
 
 	/* Enable the timer interrupt for GT-64240 pin P0_INT# */
-	GT_WRITE (PCI_0INTERRUPT_CAUSE_MASK_REGISTER_LOW, 0x100);
+	MV_WRITE (PCI_0INTERRUPT_CAUSE_MASK_REGISTER_LOW, 0x100);
 
 	/* Configure and start the timer */
-	GT_WRITE(TIMER_COUNTER_0_3_CONTROL, 0x3);
+	MV_WRITE(TIMER_COUNTER_0_3_CONTROL, 0x3);
 }
 
 void gt64240_irq_init(void)

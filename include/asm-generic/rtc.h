@@ -46,7 +46,7 @@ static inline unsigned int get_rtc_time(struct rtc_time *time)
 {
 	unsigned long uip_watchdog = jiffies;
 	unsigned char ctrl;
-#ifdef CONFIG_DECSTATION
+#ifdef CONFIG_MACH_DECSTATION
 	unsigned int real_year;
 #endif
 
@@ -79,7 +79,7 @@ static inline unsigned int get_rtc_time(struct rtc_time *time)
 	time->tm_mday = CMOS_READ(RTC_DAY_OF_MONTH);
 	time->tm_mon = CMOS_READ(RTC_MONTH);
 	time->tm_year = CMOS_READ(RTC_YEAR);
-#ifdef CONFIG_DECSTATION
+#ifdef CONFIG_MACH_DECSTATION
 	real_year = CMOS_READ(RTC_DEC_YEAR);
 #endif
 	ctrl = CMOS_READ(RTC_CONTROL);
@@ -95,7 +95,7 @@ static inline unsigned int get_rtc_time(struct rtc_time *time)
 		BCD_TO_BIN(time->tm_year);
 	}
 
-#ifdef CONFIG_DECSTATION
+#ifdef CONFIG_MACH_DECSTATION
 	time->tm_year += real_year - 72;
 #endif
 
@@ -117,7 +117,7 @@ static inline int set_rtc_time(struct rtc_time *time)
 	unsigned char mon, day, hrs, min, sec;
 	unsigned char save_control, save_freq_select;
 	unsigned int yrs;
-#ifdef CONFIG_DECSTATION
+#ifdef CONFIG_MACH_DECSTATION
 	unsigned int real_yrs, leap_yr;
 #endif
 
@@ -132,7 +132,7 @@ static inline int set_rtc_time(struct rtc_time *time)
 		return -EINVAL;
 
 	spin_lock_irq(&rtc_lock);
-#ifdef CONFIG_DECSTATION
+#ifdef CONFIG_MACH_DECSTATION
 	real_yrs = yrs;
 	leap_yr = ((!((yrs + 1900) % 4) && ((yrs + 1900) % 100)) ||
 			!((yrs + 1900) % 400));
@@ -174,7 +174,7 @@ static inline int set_rtc_time(struct rtc_time *time)
 	save_freq_select = CMOS_READ(RTC_FREQ_SELECT);
 	CMOS_WRITE((save_freq_select|RTC_DIV_RESET2), RTC_FREQ_SELECT);
 
-#ifdef CONFIG_DECSTATION
+#ifdef CONFIG_MACH_DECSTATION
 	CMOS_WRITE(real_yrs, RTC_DEC_YEAR);
 #endif
 	CMOS_WRITE(yrs, RTC_YEAR);

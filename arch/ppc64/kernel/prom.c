@@ -919,7 +919,7 @@ static void __init prom_hold_cpus(unsigned long mem)
         unsigned long secondary_hold
 		= virt_to_abs(*PTRRELOC((unsigned long *)__secondary_hold));
         struct systemcfg *_systemcfg = RELOC(systemcfg);
-	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
+	struct paca_struct *lpaca = PTRRELOC(&paca[0]);
 	struct prom_t *_prom = PTRRELOC(&prom);
 #ifdef CONFIG_SMP
 	struct naca_struct *_naca = RELOC(naca);
@@ -937,7 +937,7 @@ static void __init prom_hold_cpus(unsigned long mem)
 				continue;
 			reg = -1;
 			prom_getprop(node, "reg", &reg, sizeof(reg));
-			_xPaca[cpuid].xHwProcNum = reg;
+			lpaca[cpuid].hw_cpu_id = reg;
 
 #ifdef CONFIG_SMP
 			cpu_set(cpuid, RELOC(cpu_available_map));
@@ -997,7 +997,7 @@ static void __init prom_hold_cpus(unsigned long mem)
 
 		prom_debug("\ncpuid        = 0x%x\n", cpuid);
 		prom_debug("cpu hw idx   = 0x%x\n", reg);
-		_xPaca[cpuid].xHwProcNum = reg;
+		lpaca[cpuid].hw_cpu_id = reg;
 
 		/* Init the acknowledge var which will be reset by
 		 * the secondary cpu when it awakens from its OF
@@ -1066,7 +1066,7 @@ next:
 			cpuid++;
 			if (cpuid >= NR_CPUS)
 				continue;
-			_xPaca[cpuid].xHwProcNum = interrupt_server[i];
+			lpaca[cpuid].hw_cpu_id = interrupt_server[i];
 			prom_printf("%x : preparing thread ... ",
 				    interrupt_server[i]);
 			if (_naca->smt_state) {
@@ -1664,7 +1664,7 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	unsigned long phys;
 	u32 getprop_rval;
 	struct systemcfg *_systemcfg;
-	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
+	struct paca_struct *lpaca = PTRRELOC(&paca[0]);
 	struct prom_t *_prom = PTRRELOC(&prom);
 
 	/* First zero the BSS -- use memset, some arches don't have
@@ -1735,7 +1735,7 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	cpu_pkg = call_prom("instance-to-package", 1, 1, prom_cpu);
 	prom_getprop(cpu_pkg, "reg", &getprop_rval, sizeof(getprop_rval));
 	_prom->cpu = getprop_rval;
-	_xPaca[0].xHwProcNum = _prom->cpu;
+	lpaca[0].hw_cpu_id = _prom->cpu;
 
 	RELOC(boot_cpuid) = 0;
 

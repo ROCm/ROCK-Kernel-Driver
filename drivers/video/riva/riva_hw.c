@@ -46,6 +46,7 @@
 
 /* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/nv/riva_hw.c,v 1.33 2002/08/05 20:47:06 mvojkovi Exp $ */
 
+#include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/pci_ids.h>
 #include "riva_hw.h"
@@ -147,7 +148,7 @@ static int ShowHideCursor
 #define GFIFO_SIZE_128	256
 #define MFIFO_SIZE	120
 #define VFIFO_SIZE	256
-#define	ABS(a)	(a>0?a:-a)
+
 typedef struct {
   int gdrain_rate;
   int vdrain_rate;
@@ -376,44 +377,44 @@ static int nv3_iterate(nv3_fifo_info *res_info, nv3_sim_state * state, nv3_arb_i
         }
         ns = 1000000*ainfo->gburst_size/(state->memory_width/8)/state->mclk_khz;
         tmp = ns * ainfo->gdrain_rate/1000000;
-        if (ABS(ainfo->gburst_size) + ((ABS(ainfo->wcglwm) + 16 ) & ~0x7) - tmp > max_gfsize)
+        if (abs(ainfo->gburst_size) + ((abs(ainfo->wcglwm) + 16 ) & ~0x7) - tmp > max_gfsize)
         {
             ainfo->converged = 0;
             return (1);
         }
         ns = 1000000*ainfo->vburst_size/(state->memory_width/8)/state->mclk_khz;
         tmp = ns * ainfo->vdrain_rate/1000000;
-        if (ABS(ainfo->vburst_size) + (ABS(ainfo->wcvlwm + 32) & ~0xf)  - tmp> VFIFO_SIZE)
+        if (abs(ainfo->vburst_size) + (abs(ainfo->wcvlwm + 32) & ~0xf)  - tmp> VFIFO_SIZE)
         {
             ainfo->converged = 0;
             return (1);
         }
-        if (ABS(ainfo->gocc) > max_gfsize)
+        if (abs(ainfo->gocc) > max_gfsize)
         {
             ainfo->converged = 0;
             return (1);
         }
-        if (ABS(ainfo->vocc) > VFIFO_SIZE)
+        if (abs(ainfo->vocc) > VFIFO_SIZE)
         {
             ainfo->converged = 0;
             return (1);
         }
-        if (ABS(ainfo->mocc) > MFIFO_SIZE)
+        if (abs(ainfo->mocc) > MFIFO_SIZE)
         {
             ainfo->converged = 0;
             return (1);
         }
-        if (ABS(vfsize) > VFIFO_SIZE)
+        if (abs(vfsize) > VFIFO_SIZE)
         {
             ainfo->converged = 0;
             return (1);
         }
-        if (ABS(gfsize) > max_gfsize)
+        if (abs(gfsize) > max_gfsize)
         {
             ainfo->converged = 0;
             return (1);
         }
-        if (ABS(mfsize) > MFIFO_SIZE)
+        if (abs(mfsize) > MFIFO_SIZE)
         {
             ainfo->converged = 0;
             return (1);
@@ -493,8 +494,8 @@ static char nv3_arb(nv3_fifo_info * res_info, nv3_sim_state * state,  nv3_arb_in
     }
     if (ainfo->converged)
     {
-        res_info->graphics_lwm = (int)ABS(ainfo->wcglwm) + 16;
-        res_info->video_lwm = (int)ABS(ainfo->wcvlwm) + 32;
+        res_info->graphics_lwm = (int)abs(ainfo->wcglwm) + 16;
+        res_info->video_lwm = (int)abs(ainfo->wcvlwm) + 32;
         res_info->graphics_burst_size = ainfo->gburst_size;
         res_info->video_burst_size = ainfo->vburst_size;
         res_info->graphics_hi_priority = (ainfo->priority == GRAPHICS);

@@ -27,12 +27,14 @@ static struct resource mv_pci_mem0_resource = {
 	.flags	= IORESOURCE_MEM
 };
 
-extern struct pci_ops mv64340_bus0_pci_ops;
-
-static struct pci_controller mv_bus0_controller = {
-	.pci_ops	= &mv64340_bus0_pci_ops,
-	.mem_resource	= &mv_pci_mem0_resource,
-	.io_resource	= &mv_pci_io_mem0_resource,
+static struct mv_pci_controller mv_bus0_controller = {
+	.pcic = {
+		.pci_ops	= &mv_pci_ops,
+		.mem_resource	= &mv_pci_mem0_resource,
+		.io_resource	= &mv_pci_io_mem0_resource,
+	},
+	.config_addr	= MV64340_PCI_0_CONFIG_ADDR,
+	.config_vreg	= MV64340_PCI_0_CONFIG_DATA_VIRTUAL_REG,
 };
 
 static uint32_t mv_io_base, mv_io_size;
@@ -47,16 +49,16 @@ static void mv64340_pci0_init(void)
 	mem0_base = MV_READ(MV64340_PCI_0_MEMORY0_BASE_ADDR) << 16;
 	mem0_size = (MV_READ(MV64340_PCI_0_MEMORY0_SIZE) + 1) << 16;
 
-	mv_pci_io_mem0_resource.start	= 0;
-	mv_pci_io_mem0_resource.end	= io_size - 1;
-	mv_pci_mem0_resource.start	= mem0_base;
-	mv_pci_mem0_resource.end	= mem0_base + mem0_size - 1;
-	mv_bus0_controller.mem_offset	= mem0_base;
-	mv_bus0_controller.io_offset	= 0;
+	mv_pci_io_mem0_resource.start		= 0;
+	mv_pci_io_mem0_resource.end		= io_size - 1;
+	mv_pci_mem0_resource.start		= mem0_base;
+	mv_pci_mem0_resource.end		= mem0_base + mem0_size - 1;
+	mv_bus0_controller.pcic.mem_offset	= mem0_base;
+	mv_bus0_controller.pcic.io_offset	= 0;
 
 	ioport_resource.end		= io_size - 1;
 
-	register_pci_controller(&mv_bus0_controller);
+	register_pci_controller(&mv_bus0_controller.pcic);
 
 	mv_io_base = io_base;
 	mv_io_size = io_size;
@@ -72,12 +74,14 @@ static struct resource mv_pci_mem1_resource = {
 	.flags	= IORESOURCE_MEM
 };
 
-extern struct pci_ops mv64340_bus1_pci_ops;
-
-static struct pci_controller mv_bus1_controller = {
-	.pci_ops	= &mv64340_bus1_pci_ops,
-	.mem_resource	= &mv_pci_mem1_resource,
-	.io_resource	= &mv_pci_io_mem1_resource,
+static struct mv_pci_controller mv_bus1_controller = {
+	.pcic = {
+		.pci_ops	= &mv_pci_ops,
+		.mem_resource	= &mv_pci_mem1_resource,
+		.io_resource	= &mv_pci_io_mem1_resource,
+	},
+	.config_addr	= MV64340_PCI_1_CONFIG_ADDR,
+	.config_vreg	= MV64340_PCI_1_CONFIG_DATA_VIRTUAL_REG,
 };
 
 static __init void mv64340_pci1_init(void)
@@ -95,16 +99,16 @@ static __init void mv64340_pci1_init(void)
 	 * the first.  A gap is no problem but would waste address space for
 	 * remapping the port space.
 	 */
-	mv_pci_io_mem1_resource.start	= mv_io_size;
-	mv_pci_io_mem1_resource.end	= mv_io_size + io_size - 1;
-	mv_pci_mem1_resource.start	= mem0_base;
-	mv_pci_mem1_resource.end	= mem0_base + mem0_size - 1;
-	mv_bus1_controller.mem_offset	= mem0_base;
-	mv_bus1_controller.io_offset	= 0;
+	mv_pci_io_mem1_resource.start		= mv_io_size;
+	mv_pci_io_mem1_resource.end		= mv_io_size + io_size - 1;
+	mv_pci_mem1_resource.start		= mem0_base;
+	mv_pci_mem1_resource.end		= mem0_base + mem0_size - 1;
+	mv_bus1_controller.pcic.mem_offset	= mem0_base;
+	mv_bus1_controller.pcic.io_offset	= 0;
 
 	ioport_resource.end		= io_base + io_size -mv_io_base - 1;
 
-	register_pci_controller(&mv_bus1_controller);
+	register_pci_controller(&mv_bus1_controller.pcic);
 
 	mv_io_size = io_base + io_size - mv_io_base;
 }

@@ -238,8 +238,8 @@ exception_marker:
 
 #define EXCEPTION_PROLOG_ISERIES_2					\
 	mfmsr	r10;							\
-	ld	r11,LPPACA+LPPACASRR0(r13);				\
-	ld	r12,LPPACA+LPPACASRR1(r13);				\
+	ld	r11,PACALPPACA+LPPACASRR0(r13);				\
+	ld	r12,PACALPPACA+LPPACASRR1(r13);				\
 	ori	r10,r10,MSR_RI;						\
 	mtmsrd	r10,1
 
@@ -327,10 +327,10 @@ label##_Iseries_prof_ret:						\
 	EXCEPTION_PROLOG_ISERIES_2;					\
 	b	label##_common;						\
 label##_Iseries_profile:						\
-	ld	r12,LPPACA+LPPACASRR1(r13);				\
+	ld	r12,PACALPPACA+LPPACASRR1(r13);				\
 	andi.	r12,r12,MSR_PR;		/* Test if in kernel */		\
 	bne	label##_Iseries_prof_ret;				\
-	ld	r11,LPPACA+LPPACASRR0(r13);				\
+	ld	r11,PACALPPACA+LPPACASRR0(r13);				\
 	ld	r12,PACAPROFSTEXT(r13);	/* _stext */			\
 	subf	r11,r12,r11;		/* offset into kernel */	\
 	lwz	r12,PACAPROFSHIFT(r13);					\
@@ -690,8 +690,8 @@ Decrementer_Iseries_masked:
 	.globl HardwareInterrupt_Iseries_masked
 HardwareInterrupt_Iseries_masked:
 	mtcrf	0x80,r9		/* Restore regs */
-	ld	r11,LPPACA+LPPACASRR0(r13)
-	ld	r12,LPPACA+LPPACASRR1(r13)
+	ld	r11,PACALPPACA+LPPACASRR0(r13)
+	ld	r12,PACALPPACA+LPPACASRR1(r13)
 	mtspr	SRR0,r11
 	mtspr	SRR1,r12
 	ld	r9,PACA_EXGEN+EX_R9(r13)
@@ -776,7 +776,8 @@ MachineCheck_common:
  * save the registers there, and call kernel_bad_stack(), which panics.
  */
 bad_stack:
-	addi	r1,r13,8192-64-INT_FRAME_SIZE
+	ld	r1,PACAEMERGSP(r13)
+	subi	r1,r1,64+INT_FRAME_SIZE
 	std	r9,_CCR(r1)
 	std	r10,GPR1(r1)
 	std	r11,_NIP(r1)
@@ -1319,9 +1320,7 @@ _GLOBAL(pseries_secondary_smp_init)
 	sync
 
 	/* Create a temp kernel stack for use before relocation is on.	*/
-	mr	r1,r13
-	addi	r1,r1,PACAGUARD
-	addi	r1,r1,0x1000
+	ld	r1,PACAEMERGSP(r13)
 	subi	r1,r1,STACK_FRAME_OVERHEAD
 
 	cmpwi	0,r23,0
@@ -1787,9 +1786,7 @@ _GLOBAL(pmac_secondary_start)
 	mtspr	SPRG3,r13		 /* Save vaddr of paca in SPRG3	*/
 
 	/* Create a temp kernel stack for use before relocation is on.	*/
-	mr	r1,r13
-	addi	r1,r1,PACAGUARD
-	addi	r1,r1,0x1000
+	ld	r1,PACAEMERGSP(r13)
 	subi	r1,r1,STACK_FRAME_OVERHEAD
 
 	b	.__secondary_start
@@ -1813,12 +1810,7 @@ _GLOBAL(__secondary_start)
 
 	HMT_MEDIUM			/* Set thread priority to MEDIUM */
 
-	/* set up the TOC (virtual address) */
-	LOADADDR(r2,__toc_start)
-	addi	r2,r2,0x4000
-	addi	r2,r2,0x4000
-
-	std	r2,PACATOC(r13)
+	ld	r2,PACATOC(r13)
 	li	r6,0
 	stb	r6,PACAPROCENABLED(r13)
 
@@ -2060,11 +2052,6 @@ _STATIC(start_here_common)
 	li	r0,0
 	stdu	r0,-STACK_FRAME_OVERHEAD(r1)
 
-	/* set up the TOC */
-	LOADADDR(r2,__toc_start)
-	addi	r2,r2,0x4000
-	addi	r2,r2,0x4000
-
 	/* Apply the CPUs-specific fixups (nop out sections not relevant
 	 * to this CPU
 	 */
@@ -2093,7 +2080,8 @@ _STATIC(start_here_common)
 	LOADADDR(r4,init_task)
 	std	r4,PACACURRENT(r13)
 
-	std	r2,PACATOC(r13)
+	/* Load the TOC */
+	ld	r2,PACATOC(r13)
 	std	r1,PACAKSAVE(r13)
 
 	/* Restore the parms passed in from the bootloader. */

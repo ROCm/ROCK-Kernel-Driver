@@ -16,7 +16,7 @@ static inline cpumask_t target_cpus(void)
 #if defined CONFIG_ES7000_CLUSTERED_APIC
 	return CPU_MASK_ALL;
 #else
-	return cpumask_of_cpu(bios_cpu_apicid[smp_processor_id()]);
+	return cpumask_of_cpu(smp_processor_id());
 #endif
 }
 #define TARGET_CPUS	(target_cpus())

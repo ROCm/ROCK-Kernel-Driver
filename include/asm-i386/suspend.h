@@ -36,9 +36,6 @@ struct saved_context {
                        : /* no output */ \
                        :"r" ((thread)->debugreg[register]))
 
-extern void save_processor_state(void);
-extern void restore_processor_state(void);
-
 #ifdef CONFIG_ACPI_SLEEP
 extern unsigned long saved_eip;
 extern unsigned long saved_esp;

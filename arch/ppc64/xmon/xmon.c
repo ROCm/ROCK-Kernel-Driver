@@ -30,6 +30,7 @@
 #include <asm/paca.h>
 #include <asm/ppcdebug.h>
 #include <asm/cputable.h>
+#include <asm/rtas.h>
 
 #include "nonstdio.h"
 #include "privinst.h"
@@ -1611,7 +1612,7 @@ super_regs()
 		ptrPaca = get_paca();
     
 		printf("  Local Processor Control Area (LpPaca): \n");
-		ptrLpPaca = ptrPaca->xLpPacaPtr;
+		ptrLpPaca = ptrPaca->lppaca_ptr;
 		printf("    Saved Srr0=%.16lx  Saved Srr1=%.16lx \n",
 		       ptrLpPaca->xSavedSrr0, ptrLpPaca->xSavedSrr1);
 		printf("    Saved Gpr3=%.16lx  Saved Gpr4=%.16lx \n",
@@ -1619,7 +1620,7 @@ super_regs()
 		printf("    Saved Gpr5=%.16lx \n", ptrLpPaca->xSavedGpr5);
     
 		printf("  Local Processor Register Save Area (LpRegSave): \n");
-		ptrLpRegSave = ptrPaca->xLpRegSavePtr;
+		ptrLpRegSave = ptrPaca->reg_save_ptr;
 		printf("    Saved Sprg0=%.16lx  Saved Sprg1=%.16lx \n",
 		       ptrLpRegSave->xSPRG0, ptrLpRegSave->xSPRG0);
 		printf("    Saved Sprg2=%.16lx  Saved Sprg3=%.16lx \n",
@@ -2521,7 +2522,7 @@ static void dump_slb(void)
 static void dump_stab(void)
 {
 	int i;
-	unsigned long *tmp = (unsigned long *)get_paca()->xStab_data.virt;
+	unsigned long *tmp = (unsigned long *)get_paca()->stab_addr;
 
 	printf("Segment table contents of cpu %x\n", smp_processor_id());
 

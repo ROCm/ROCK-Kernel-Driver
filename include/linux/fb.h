@@ -532,6 +532,7 @@ struct fb_ops {
 
 #define FBINFO_MISC_MODECHANGEUSER     0x10000 /* mode change request
 						  from userspace */
+#define FBINFO_MISC_MODESWITCH         0x20000 /* mode switch */
 
 struct fb_info {
 	int node;

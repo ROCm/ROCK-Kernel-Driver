@@ -49,7 +49,7 @@
  * Machine setup..
  */
 unsigned int console_mode = 0;
-unsigned int console_device = -1;
+unsigned int console_devno = -1;
 unsigned int console_irq = -1;
 unsigned long memory_size = 0;
 unsigned long machine_flags = 0;
@@ -160,7 +160,7 @@ static int __init condev_setup(char *str)
 
 	vdev = simple_strtoul(str, &str, 0);
 	if (vdev >= 0 && vdev < 65536) {
-		console_device = vdev;
+		console_devno = vdev;
 		console_irq = -1;
 	}
 	return 1;
@@ -194,7 +194,7 @@ static void __init conmode_default(void)
 
         if (MACHINE_IS_VM) {
 		cpcmd("QUERY CONSOLE", query_buffer, 1024);
-		console_device = simple_strtoul(query_buffer + 5, NULL, 16);
+		console_devno = simple_strtoul(query_buffer + 5, NULL, 16);
 		ptr = strstr(query_buffer, "SUBCHANNEL =");
 		console_irq = simple_strtoul(ptr + 13, NULL, 16);
 		cpcmd("QUERY TERM", query_buffer, 1024);
@@ -648,4 +648,14 @@ int show_interrupts(struct seq_file *p, void *v)
         }
 	
         return 0;
+}
+
+/*
+ * For compatibilty only. S/390 specific setup of interrupts et al. is done
+ * much later in init_channel_subsystem().
+ */
+void __init
+init_IRQ(void)
+{
+	/* nothing... */
 }

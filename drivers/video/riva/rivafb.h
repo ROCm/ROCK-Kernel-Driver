@@ -60,6 +60,7 @@ struct riva_par {
 	Bool SecondCRTC;
 	int FlatPanel;
 	struct pci_dev *pdev;
+	int bus;
 #ifdef CONFIG_MTRR
 	struct { int vram; int vram_valid; } mtrr;
 #endif

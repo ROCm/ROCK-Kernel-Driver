@@ -1,5 +1,5 @@
 /*
- * $Id: netiucv.c,v 1.54 2004/05/28 08:04:14 braunu Exp $
+ * $Id: netiucv.c,v 1.57 2004/06/30 09:26:40 braunu Exp $
  *
  * IUCV network driver
  *
@@ -30,7 +30,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV network driver $Revision: 1.54 $
+ * RELEASE-TAG: IUCV network driver $Revision: 1.57 $
  *
  */
 
@@ -98,15 +98,12 @@ struct iucv_connection {
 	spinlock_t                collect_lock;
 	int                       collect_len;
 	int                       max_buffsize;
-	int                       flags;
 	fsm_timer                 timer;
 	fsm_instance              *fsm;
 	struct net_device         *netdev;
 	struct connection_profile prof;
 	char                      userid[9];
 };
-
-#define CONN_FLAGS_BUFSIZE_CHANGED 1
 
 /**
  * Linked list of all connection structs.
@@ -131,7 +128,6 @@ struct netiucv_priv {
 	fsm_instance            *fsm;
         struct iucv_connection  *conn;
 	struct device           *dev;
-	fsm_timer               timer;
 };
 
 /**
@@ -232,7 +228,6 @@ enum dev_events {
 	DEV_EVENT_STOP,
 	DEV_EVENT_CONUP,
 	DEV_EVENT_CONDOWN,
-	DEV_EVENT_TIMER,
 	/**
 	 * MUST be always the last element!!
 	 */
@@ -244,7 +239,6 @@ static const char *dev_event_names[] = {
 	"Stop",
 	"Connection up",
 	"Connection down",
-	"Timer",
 };
 
 /**
@@ -701,7 +695,7 @@ conn_action_connreject(fsm_instance *fi, int event, void *arg)
 	iucv_sever(eib->ippathid, udata);
 	if (eib->ippathid != conn->pathid) {
 		printk(KERN_INFO
-			"%s: IR pathid %d does not match original pathid %d\n",
+			"%s: IR Connection Pending; pathid %d does not match original pathid %d\n",
 			netdev->name, eib->ippathid, conn->pathid);
 		iucv_sever(conn->pathid, udata);
 	}
@@ -722,7 +716,7 @@ conn_action_connack(fsm_instance *fi, int event, void *arg)
 	fsm_newstate(fi, CONN_STATE_IDLE);
 	if (eib->ippathid != conn->pathid) {
 		printk(KERN_INFO
-			"%s: IR pathid %d does not match original pathid %d\n",
+			"%s: IR Connection Complete; pathid %d does not match original pathid %d\n",
 			netdev->name, eib->ippathid, conn->pathid);
 		conn->pathid = eib->ippathid;
 	}
@@ -1372,7 +1366,6 @@ buffer_write (struct device *dev, const char *buf, size_t count)
 	priv->conn->max_buffsize = bs1;
 	if (!(ndev->flags & IFF_RUNNING))
 		ndev->mtu = bs1 - NETIUCV_HDRLEN - NETIUCV_HDRLEN;
-	priv->conn->flags |= CONN_FLAGS_BUFSIZE_CHANGED;
 
 	return count;
 
@@ -1756,8 +1749,6 @@ netiucv_free_netdevice(struct net_device *dev)
 
 	privptr = (struct netiucv_priv *)dev->priv;
 	if (privptr) {
-		if (privptr->fsm)
-			fsm_deltimer(&privptr->timer);
 		if (privptr->conn)
 			netiucv_remove_connection(privptr->conn);
 		if (privptr->fsm)
@@ -1819,7 +1810,6 @@ netiucv_init_netdevice(char *username)
 		free_netdev(dev);
 		return NULL;
 	}
-	fsm_settimer(privptr->fsm, &privptr->timer);
 	fsm_newstate(privptr->fsm, DEV_STATE_STOPPED);
 
 	return dev;
@@ -1949,7 +1939,7 @@ static struct device_driver netiucv_driver = {
 static void
 netiucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.54 $";
+	char vbuf[] = "$Revision: 1.57 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {

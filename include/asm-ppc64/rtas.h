@@ -51,18 +51,17 @@ struct rtas_args {
 	u32 nargs;
 	u32 nret; 
 	rtas_arg_t args[16];
-#if 0
-	spinlock_t lock;
-#endif
 	rtas_arg_t *rets;     /* Pointer to return values in args[]. */
 };  
+
+extern struct rtas_args rtas_stop_self_args;
 
 struct rtas_t {
 	unsigned long entry;		/* physical address pointer */
 	unsigned long base;		/* physical address pointer */
 	unsigned long size;
 	spinlock_t lock;
-
+	struct rtas_args args;
 	struct device_node *dev;	/* virtual address pointer */
 };
 

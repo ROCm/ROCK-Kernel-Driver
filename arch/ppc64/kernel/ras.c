@@ -124,7 +124,7 @@ ras_epow_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct rtas_error_log log_entry;
 	unsigned int size = sizeof(log_entry);
-	long status = 0xdeadbeef;
+	int status = 0xdeadbeef;
 
 	spin_lock(&log_lock);
 
@@ -138,10 +138,10 @@ ras_epow_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	spin_unlock(&log_lock);
 
-	udbg_printf("EPOW <0x%lx 0x%lx>\n", 
+	udbg_printf("EPOW <0x%lx 0x%x>\n",
 		    *((unsigned long *)&log_entry), status); 
 	printk(KERN_WARNING 
-		"EPOW <0x%lx 0x%lx>\n",*((unsigned long *)&log_entry), status);
+		"EPOW <0x%lx 0x%x>\n",*((unsigned long *)&log_entry), status);
 
 	/* format and print the extended information */
 	log_error((char *)&log_entry, ERR_TYPE_RTAS_LOG, 0);
@@ -162,7 +162,7 @@ ras_error_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct rtas_error_log log_entry;
 	unsigned int size = sizeof(log_entry);
-	long status = 0xdeadbeef;
+	int status = 0xdeadbeef;
 	int fatal;
 
 	spin_lock(&log_lock);
@@ -186,10 +186,10 @@ ras_error_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	log_error((char *)&log_entry, ERR_TYPE_RTAS_LOG, fatal); 
 
 	if (fatal) {
-		udbg_printf("HW Error <0x%lx 0x%lx>\n",
+		udbg_printf("HW Error <0x%lx 0x%x>\n",
 			    *((unsigned long *)&log_entry), status);
 		printk(KERN_EMERG 
-		       "Error: Fatal hardware error <0x%lx 0x%lx>\n",
+		       "Error: Fatal hardware error <0x%lx 0x%x>\n",
 		       *((unsigned long *)&log_entry), status);
 
 #ifndef DEBUG
@@ -200,10 +200,10 @@ ras_error_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		ppc_md.power_off();
 #endif
 	} else {
-		udbg_printf("Recoverable HW Error <0x%lx 0x%lx>\n",
+		udbg_printf("Recoverable HW Error <0x%lx 0x%x>\n",
 			    *((unsigned long *)&log_entry), status); 
 		printk(KERN_WARNING 
-		       "Warning: Recoverable hardware error <0x%lx 0x%lx>\n",
+		       "Warning: Recoverable hardware error <0x%lx 0x%x>\n",
 		       *((unsigned long *)&log_entry), status);
 	}
 	return IRQ_HANDLED;

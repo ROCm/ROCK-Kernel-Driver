@@ -159,7 +159,7 @@ static inline struct pm_dev *pm_register(pm_dev_t type,
 					 unsigned long id,
 					 pm_callback callback)
 {
-	return 0;
+	return NULL;
 }
 
 static inline void pm_unregister(struct pm_dev *dev) {}

@@ -67,7 +67,7 @@
 #include <asm/mv64340.h>
 #include "ocelot_c_fpga.h"
 
-unsigned long mv64340_base;
+unsigned long marvell_base;
 extern unsigned long mv64340_sram_base;
 unsigned long cpu_clock;
 
@@ -117,7 +117,7 @@ void PMON_v2_setup(void)
 	/* m-sys and internal SRAM */
 	add_wired_entry(ENTRYLO(0xfe000000), ENTRYLO(0xff000000), 0xfffffffffe000000, PM_16M);
 
-	mv64340_base = 0xfffffffff4000000;
+	marvell_base = 0xfffffffff4000000;
 	mv64340_sram_base = 0xfffffffffe000000;
 #else
 	/* marvell and extra space */
@@ -127,7 +127,7 @@ void PMON_v2_setup(void)
 	/* m-sys and internal SRAM */
 	add_wired_entry(ENTRYLO(0xfe000000), ENTRYLO(0xff000000), 0xfe000000, PM_16M);
 
-	mv64340_base = 0xf4000000;
+	marvell_base = 0xf4000000;
 	mv64340_sram_base = 0xfe000000;
 #endif
 }

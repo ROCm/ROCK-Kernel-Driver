@@ -27,6 +27,7 @@
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
 #include <linux/pci.h>
+#include <asm/rtas.h>
 #include "rpaphp.h"
 
 static ssize_t removable_read_file (struct hotplug_slot *php_slot, char *buf)

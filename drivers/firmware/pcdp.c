@@ -13,6 +13,7 @@
 #include <linux/tty.h>
 #include <linux/serial.h>
 #include <linux/serial_core.h>
+#include <asm/io.h>
 #include <asm/serial.h>
 #include "pcdp.h"
 

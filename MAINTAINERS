@@ -1110,7 +1110,7 @@ S:	Maintained
 
 IOC3 DRIVER
 P:	Ralf Baechle
-M:	ralf@oss.sgi.com
+M:	ralf@linux-mips.org
 L:	linux-mips@linux-mips.org
 S:	Maintained
 
@@ -1352,6 +1352,13 @@ P:	Zach Brown
 M:	zab@zabbo.net
 S:	Odd Fixes
 
+MARVELL MV64340 ETHERNET DRIVER
+P:	Manish Lachwani
+M:	Manish_Lachwani@pmc-sierra.com
+L:	linux-mips@linux-mips.org
+L:	netdev@oss.sgi.com
+S:	Supported
+
 MATROX FRAMEBUFFER DRIVER
 P:	Petr Vandrovec
 M:	vandrove@vc.cvut.cz
@@ -1372,7 +1379,7 @@ S:	Maintained
 
 MIPS
 P:	Ralf Baechle
-M:	ralf@gnu.org
+M:	ralf@linux-mips.org
 W:	http://oss.sgi.com/mips/mips-howto.html
 L:	linux-mips@linux-mips.org
 S:	Maintained

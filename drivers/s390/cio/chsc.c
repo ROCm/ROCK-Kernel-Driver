@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/chsc.c
  *   S/390 common I/O routines -- channel subsystem call
- *   $Revision: 1.112 $
+ *   $Revision: 1.114 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -942,3 +942,59 @@ chsc_alloc_sei_area(void)
 }
 
 subsys_initcall(chsc_alloc_sei_area);
+
+struct css_general_char css_general_characteristics;
+struct css_chsc_char css_chsc_characteristics;
+
+int __init
+chsc_determine_css_characteristics(void)
+{
+	int result;
+	struct {
+		struct chsc_header request;
+		u32 reserved1;
+		u32 reserved2;
+		u32 reserved3;
+		struct chsc_header response;
+		u32 reserved4;
+		u32 general_char[510];
+		u32 chsc_char[518];
+	} *scsc_area;
+
+	scsc_area = (void *)get_zeroed_page(GFP_KERNEL | GFP_DMA);
+	if (!scsc_area) {
+	        printk(KERN_WARNING"cio: Was not able to determine available" \
+		       "CHSCs due to no memory.\n");
+		return -ENOMEM;
+	}
+
+	scsc_area->request = (struct chsc_header) {
+		.length = 0x0010,
+		.code   = 0x0010,
+	};
+
+	result = chsc(scsc_area);
+	if (result) {
+		printk(KERN_WARNING"cio: Was not able to determine " \
+		       "available CHSCs, cc=%i.\n", result);
+		result = -EIO;
+		goto exit;
+	}
+
+	if (scsc_area->response.code != 1) {
+		printk(KERN_WARNING"cio: Was not able to determine " \
+		       "available CHSCs.\n");
+		result = -EIO;
+		goto exit;
+	}
+	memcpy(&css_general_characteristics, scsc_area->general_char,
+	       sizeof(css_general_characteristics));
+	memcpy(&css_chsc_characteristics, scsc_area->chsc_char,
+	       sizeof(css_chsc_characteristics));
+exit:
+	free_page ((unsigned long) scsc_area);
+	return result;
+}
+
+EXPORT_SYMBOL_GPL(css_general_characteristics);
+EXPORT_SYMBOL_GPL(css_chsc_characteristics);

@@ -7757,6 +7757,7 @@ int __init ixj_probe_isapnp(int *cnt)
 			}
 
 			j = ixj_alloc();
+			j->DSPbase = pnp_port_start(dev,0);
 			request_region(j->DSPbase, 16, "ixj DSP");
 
 			if (func != 0x110)

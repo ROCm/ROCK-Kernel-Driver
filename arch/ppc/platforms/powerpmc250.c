@@ -197,7 +197,7 @@ powerpmc250_init_IRQ(void)
 
 	OpenPIC_InitSenses = powerpmc250_openpic_initsenses;
 	OpenPIC_NumInitSenses = sizeof(powerpmc250_openpic_initsenses);
-	openpic_init(1, 0, 0, -1);
+	mpc10x_set_openpic();
 }
 
 /*

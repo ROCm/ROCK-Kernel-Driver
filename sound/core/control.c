@@ -1116,7 +1116,7 @@ static ssize_t snd_ctl_read(struct file *file, char __user *buffer, size_t count
 			wait_queue_t wait;
 			if ((file->f_flags & O_NONBLOCK) != 0 || result > 0) {
 				err = -EAGAIN;
-				goto __end;
+				goto out;
 			}
 			init_waitqueue_entry(&wait, current);
 			add_wait_queue(&ctl->change_sleep, &wait);
@@ -1144,8 +1144,9 @@ static ssize_t snd_ctl_read(struct file *file, char __user *buffer, size_t count
 		count -= sizeof(snd_ctl_event_t);
 		result += sizeof(snd_ctl_event_t);
 	}
-      __end:
+__end:
 	spin_unlock_irq(&ctl->read_lock);
+out:
       	return result > 0 ? result : err;
 }
 

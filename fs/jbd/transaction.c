@@ -320,7 +320,7 @@ int journal_extend(handle_t *handle, int nblocks)
 
 	result = -EIO;
 	if (is_handle_aborted(handle))
-		goto error_out;
+		goto out;
 
 	result = 1;
 
@@ -357,6 +357,7 @@ unlock:
 	spin_unlock(&transaction->t_handle_lock);
 error_out:
 	spin_unlock(&journal->j_state_lock);
+out:
 	return result;
 }
 

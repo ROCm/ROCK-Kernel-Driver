@@ -68,7 +68,7 @@ static int proc_lpevents_show(struct seq_file *m, void *v)
 	seq_printf(m, "\n  events processed by processor:\n");
 
 	for_each_online_cpu(i)
-		seq_printf(m, "    CPU%02d  %10u\n", i, paca[i].lpEvent_count);
+		seq_printf(m, "    CPU%02d  %10u\n", i, paca[i].lpevent_count);
 
 	return 0;
 }

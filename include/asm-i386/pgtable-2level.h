@@ -1,22 +1,6 @@
 #ifndef _I386_PGTABLE_2LEVEL_H
 #define _I386_PGTABLE_2LEVEL_H
 
-/*
- * traditional i386 two-level paging structure:
- */
-
-#define PGDIR_SHIFT	22
-#define PTRS_PER_PGD	1024
-
-/*
- * the i386 is two-level, so we don't really have any
- * PMD directory physically.
- */
-#define PMD_SHIFT	22
-#define PTRS_PER_PMD	1
-
-#define PTRS_PER_PTE	1024
-
 #define pte_ERROR(e) \
 	printk("%s:%d: bad pte %08lx.\n", __FILE__, __LINE__, (e).pte_low)
 #define pmd_ERROR(e) \
@@ -62,6 +46,22 @@ static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 #define pte_pfn(x)		((unsigned long)(((x).pte_low >> PAGE_SHIFT)))
 #define pfn_pte(pfn, prot)	__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
 #define pfn_pmd(pfn, prot)	__pmd(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
+
+/*
+ * All present user pages are user-executable:
+ */
+static inline int pte_exec(pte_t pte)
+{
+	return pte_user(pte);
+}
+
+/*
+ * All present pages are kernel-executable:
+ */
+static inline int pte_exec_kernel(pte_t pte)
+{
+	return 1;
+}
 
 /*
  * Bits 0, 6 and 7 are taken, split up the 29 bits of offset

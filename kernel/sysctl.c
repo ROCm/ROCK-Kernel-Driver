@@ -2162,7 +2162,7 @@ int proc_doulongvec_ms_jiffies_minmax(ctl_table *table, int write,
 struct ctl_table_header * register_sysctl_table(ctl_table * table, 
 						int insert_at_head)
 {
-	return 0;
+	return NULL;
 }
 
 void unregister_sysctl_table(struct ctl_table_header * table)
