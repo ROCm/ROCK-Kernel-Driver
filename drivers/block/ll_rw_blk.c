@@ -1660,7 +1660,7 @@ void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 	}
 	if (new_io) {
 		disk_round_stats(rq->rq_disk);
-		disk_stat_inc(rq->rq_disk, in_flight);
+		rq->rq_disk->in_flight++;
 	}
 }
 
@@ -1704,10 +1704,10 @@ void disk_round_stats(struct gendisk *disk)
 	unsigned long now = jiffies;
 
 	disk_stat_add(disk, time_in_queue, 
-			disk_stat_read(disk, in_flight) * (now - disk->stamp));
+			disk->in_flight * (now - disk->stamp));
 	disk->stamp = now;
 
-	if (disk_stat_read(disk, in_flight))
+	if (disk->in_flight)
 		disk_stat_add(disk, io_ticks, (now - disk->stamp_idle));
 	disk->stamp_idle = now;
 }
@@ -1819,7 +1819,7 @@ static int attempt_merge(request_queue_t *q, struct request *req,
 
 	if (req->rq_disk) {
 		disk_round_stats(req->rq_disk);
-		disk_stat_dec(req->rq_disk, in_flight);
+		req->rq_disk->in_flight--;
 	}
 
 	__blk_put_request(q, next);
@@ -2480,7 +2480,7 @@ void end_that_request_last(struct request *req)
 			break;
 		}
 		disk_round_stats(disk);
-		disk_stat_dec(disk, in_flight);
+		disk->in_flight--;
 	}
 	__blk_put_request(req->q, req);
 	/* Do this LAST! The structure may be freed immediately afterwards */
