@@ -1,0 +1,21 @@
+CONFIG_DVB_AV7110
+  Support for SAA7146 and AV7110 based DVB cards as produced 
+  by Fujitsu-Siemens, Technotrend, Hauppauge and others.
+
+  Simple cards like so called Budget- or Nova-PCI cards are 
+  supported as well as fullfeatured cards with onboard MPEG2 
+  decoder.
+
+  Say Y if you own such a card and want to use it.
+
+
+CONFIG_DVB_AV7110_OSD
+  The AV7110 firmware provides some code to generate an OnScreenDisplay
+  on the video output. This is kind of nonstandard and not guaranteed to
+  be maintained.
+
+  Anyway, some popular DVB software like VDR uses this OSD to render
+  its menus, so say Y if you want to use this software.
+
+  All other people say N.
+
