@@ -119,8 +119,9 @@
 		  initialized
 		* enable only the WoL and PHY interrupts in wol mode
 
-	version 1.0.17: (Tim Hockin)
-		* Only do cable_magic on 83815 and early 83816
+	version 1.0.17:
+		* only do cable_magic on 83815 and early 83816 (Tim Hockin)
+		* create a function for rx refill (Manfred Spraul)
 
 	TODO:
 	* big endian support with CFG:BEM instead of cpu_to_le32
@@ -161,7 +162,7 @@
 
 #define DRV_NAME	"natsemi"
 #define DRV_VERSION	"1.07+LK1.0.17"
-#define DRV_RELDATE	"Sep 23, 2002"
+#define DRV_RELDATE	"Sep 27, 2002"
 
 /* Updated to recommendations in pci-skeleton v2.03. */
 
@@ -677,6 +678,7 @@ static void check_link(struct net_device *dev);
 static void netdev_timer(unsigned long data);
 static void tx_timeout(struct net_device *dev);
 static int alloc_ring(struct net_device *dev);
+static void refill_rx(struct net_device *dev);
 static void init_ring(struct net_device *dev);
 static void drain_ring(struct net_device *dev);
 static void free_ring(struct net_device *dev);
@@ -1415,15 +1417,51 @@ static int alloc_ring(struct net_device *dev)
 	return 0;
 }
 
+static void refill_rx(struct net_device *dev)
+{
+	struct netdev_private *np = dev->priv;
+
+	/* Refill the Rx ring buffers. */
+	for (; np->cur_rx - np->dirty_rx > 0; np->dirty_rx++) {
+		struct sk_buff *skb;
+		int entry = np->dirty_rx % RX_RING_SIZE;
+		if (np->rx_skbuff[entry] == NULL) {
+			skb = dev_alloc_skb(np->rx_buf_sz);
+			np->rx_skbuff[entry] = skb;
+			if (skb == NULL)
+				break; /* Better luck next round. */
+			skb->dev = dev; /* Mark as being used by this device. */
+			np->rx_dma[entry] = pci_map_single(np->pci_dev,
+				skb->data, skb->len, PCI_DMA_FROMDEVICE);
+			np->rx_ring[entry].addr = cpu_to_le32(np->rx_dma[entry]);
+		}
+		np->rx_ring[entry].cmd_status = cpu_to_le32(np->rx_buf_sz);
+	}
+	if (np->cur_rx - np->dirty_rx == RX_RING_SIZE) {
+		if (netif_msg_rx_err(np))
+			printk(KERN_INFO "%s: OOM.\n", dev->name);
+	}
+}
+
 /* Initialize the Rx and Tx rings, along with various 'dev' bits. */
 static void init_ring(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
 	int i;
 
-	np->cur_rx = np->cur_tx = 0;
-	np->dirty_rx = np->dirty_tx = 0;
+	/* 1) TX ring */
+	np->dirty_tx = np->cur_tx = 0;
+	for (i = 0; i < TX_RING_SIZE; i++) {
+		np->tx_skbuff[i] = NULL;
+		np->tx_ring[i].next_desc = cpu_to_le32(np->ring_dma
+			+sizeof(struct netdev_desc)
+			*((i+1)%TX_RING_SIZE+RX_RING_SIZE));
+		np->tx_ring[i].cmd_status = 0;
+	}
 
+	/* 2) RX ring */
+	np->dirty_rx = 0;
+	np->cur_rx = RX_RING_SIZE;
 	np->rx_buf_sz = (dev->mtu <= 1500 ? PKT_BUF_SZ : dev->mtu + 32);
 	np->rx_head_desc = &np->rx_ring[0];
 
@@ -1438,28 +1476,7 @@ static void init_ring(struct net_device *dev)
 		np->rx_ring[i].cmd_status = cpu_to_le32(DescOwn);
 		np->rx_skbuff[i] = NULL;
 	}
-
-	/* Fill in the Rx buffers.  Handle allocation failure gracefully. */
-	for (i = 0; i < RX_RING_SIZE; i++) {
-		struct sk_buff *skb = dev_alloc_skb(np->rx_buf_sz);
-		np->rx_skbuff[i] = skb;
-		if (skb == NULL)
-			break;
-		skb->dev = dev;			/* Mark as being used by this device. */
-		np->rx_dma[i] = pci_map_single(np->pci_dev,
-						skb->data, skb->len, PCI_DMA_FROMDEVICE);
-		np->rx_ring[i].addr = cpu_to_le32(np->rx_dma[i]);
-		np->rx_ring[i].cmd_status = cpu_to_le32(np->rx_buf_sz);
-	}
-	np->dirty_rx = (unsigned int)(i - RX_RING_SIZE);
-
-	for (i = 0; i < TX_RING_SIZE; i++) {
-		np->tx_skbuff[i] = NULL;
-		np->tx_ring[i].next_desc = cpu_to_le32(np->ring_dma
-					+sizeof(struct netdev_desc)
-					 *((i+1)%TX_RING_SIZE+RX_RING_SIZE));
-		np->tx_ring[i].cmd_status = 0;
-	}
+	refill_rx(dev);
 	dump_ring(dev);
 }
 
@@ -1719,26 +1736,9 @@ static void netdev_rx(struct net_device *dev)
 		np->rx_head_desc = &np->rx_ring[entry];
 		desc_status = le32_to_cpu(np->rx_head_desc->cmd_status);
 	}
-
-	/* Refill the Rx ring buffers. */
-	for (; np->cur_rx - np->dirty_rx > 0; np->dirty_rx++) {
-		struct sk_buff *skb;
-		entry = np->dirty_rx % RX_RING_SIZE;
-		if (np->rx_skbuff[entry] == NULL) {
-			skb = dev_alloc_skb(np->rx_buf_sz);
-			np->rx_skbuff[entry] = skb;
-			if (skb == NULL)
-				break;				/* Better luck next round. */
-			skb->dev = dev;			/* Mark as being used by this device. */
-			np->rx_dma[entry] = pci_map_single(np->pci_dev,
-							skb->data, skb->len, PCI_DMA_FROMDEVICE);
-			np->rx_ring[entry].addr = cpu_to_le32(np->rx_dma[entry]);
-		}
-		np->rx_ring[entry].cmd_status =
-			cpu_to_le32(np->rx_buf_sz);
-	}
-
-	/* Restart Rx engine if stopped. */
+	refill_rx(dev);
+ 
+ 	/* Restart Rx engine if stopped. */
 	writel(RxOn, dev->base_addr + ChipCmd);
 }
 
