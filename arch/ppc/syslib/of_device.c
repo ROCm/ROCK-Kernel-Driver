@@ -227,8 +227,6 @@ of_platform_device_create(struct device_node *np, const char *bus_id)
 	dev->dev.parent = NULL;
 	dev->dev.bus = &of_platform_bus_type;
 
-	/* XXX Make something better here ? */
-	snprintf(dev->dev.name, DEVICE_NAME_SIZE, "Platform device %s", np->name);
 	reg = (u32 *)get_property(np, "reg", NULL);
 	strlcpy(dev->dev.bus_id, bus_id, BUS_ID_SIZE);
 

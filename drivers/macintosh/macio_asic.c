@@ -141,9 +141,6 @@ macio_add_one_device(struct macio_chip *chip, struct device *parent,
 	dev->ofdev.dev.parent = parent;
 	dev->ofdev.dev.bus = &macio_bus_type;
 
-	/* XXX Make something better here ? */
-	snprintf(dev->ofdev.dev.name, DEVICE_NAME_SIZE, "MacIO device %s", np->name);
-
 	/* MacIO itself has a different reg, we use it's PCI base */
 	if (np == chip->of_node) {
 		sprintf(dev->ofdev.dev.bus_id, "%1d.%08lx:%.8s", chip->lbus.index,
