@@ -1074,9 +1074,12 @@ int nfs_commit_file(struct inode *inode, struct file *file, unsigned long idx_st
 
 	spin_lock(&nfs_wreq_lock);
 	res = nfs_scan_commit(inode, &head, file, idx_start, npages);
-	spin_unlock(&nfs_wreq_lock);
-	if (res)
+	if (res) {
+		res += nfs_scan_commit(inode, &head, NULL, 0, 0);
+		spin_unlock(&nfs_wreq_lock);
 		error = nfs_commit_list(&head, how);
+	} else
+		spin_unlock(&nfs_wreq_lock);
 	if (error < 0)
 		return error;
 	return res;
