@@ -21,7 +21,7 @@ static spinlock_t hugetlb_lock = SPIN_LOCK_UNLOCKED;
 
 static void enqueue_huge_page(struct page *page)
 {
-	int nid = page_zone(page)->zone_pgdat->node_id;
+	int nid = page_to_nid(page);
 	list_add(&page->lru, &hugepage_freelists[nid]);
 	free_huge_pages++;
 	free_huge_pages_node[nid]++;
