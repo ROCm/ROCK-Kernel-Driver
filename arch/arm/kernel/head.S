@@ -18,6 +18,14 @@
 #include <asm/procinfo.h>
 #include <asm/ptrace.h>
 #include <asm/constants.h>
+#include <asm/system.h>
+
+#define PROCINFO_MMUFLAGS	8
+#define PROCINFO_INITFUNC	12
+
+#define MACHINFO_PHYSRAM	4
+#define MACHINFO_PHYSIO		8
+#define MACHINFO_PGOFFIO	12
 
 #ifndef CONFIG_XIP_KERNEL
 /*
@@ -86,17 +94,16 @@
  * circumstances, zImage) is for.
  */
 	__INIT
-	.type	stext, #function
+	.type	stext, %function
 ENTRY(stext)
-	mov	r12, r0
-	mov	r0, #PSR_F_BIT | PSR_I_BIT | MODE_SVC	@ make sure svc mode
-	msr	cpsr_c, r0			@ and all irqs disabled
-	bl	__lookup_processor_type
-	teq	r10, #0				@ invalid processor?
+	msr	cpsr_c, #PSR_F_BIT | PSR_I_BIT | MODE_SVC @ ensure svc mode
+						@ and irqs disabled
+	bl	__lookup_processor_type		@ r5=procinfo r9=cpuid
+	movs	r10, r5				@ invalid processor (r5=0)?
 	moveq	r0, #'p'			@ yes, error 'p'
 	beq	__error
-	bl	__lookup_architecture_type
-	teq	r7, #0				@ invalid architecture?
+	bl	__lookup_machine_type		@ r5=machinfo
+	movs	r8, r5				@ invalid machine (r5=0)?
 	moveq	r0, #'a'			@ yes, error 'a'
 	beq	__error
 	bl	__create_page_tables
@@ -104,75 +111,92 @@ ENTRY(stext)
 	/*
 	 * The following calls CPU specific code in a position independent
 	 * manner.  See arch/arm/mm/proc-*.S for details.  r10 = base of
-	 * xxx_proc_info structure selected by __lookup_architecture_type
+	 * xxx_proc_info structure selected by __lookup_machine_type
 	 * above.  On return, the CPU will be ready for the MMU to be
 	 * turned on, and r0 will hold the CPU control register value.
 	 */
-	adr	lr, __turn_mmu_on		@ return (PIC) address
-	add	pc, r10, #12
+	ldr	r13, __switch_data		@ address to jump to after
+						@ mmu has been enabled
+	adr	lr, __enable_mmu		@ return (PIC) address
+	add	pc, r10, #PROCINFO_INITFUNC
 
 	.type	__switch_data, %object
 __switch_data:
 	.long	__mmap_switched
-	.long	__data_loc			@ r2
-	.long	__data_start			@ r3
-	.long	__bss_start			@ r4
-	.long	_end				@ r5
-	.long	processor_id			@ r6
-	.long	__machine_arch_type		@ r7
-	.long	cr_alignment			@ r8
+	.long	__data_loc			@ r4
+	.long	__data_start			@ r5
+	.long	__bss_start			@ r6
+	.long	_end				@ r7
+	.long	processor_id			@ r4
+	.long	__machine_arch_type		@ r5
+	.long	cr_alignment			@ r6
 	.long	init_thread_union+8192		@ sp
+
+/*
+ * The following fragment of code is executed with the MMU on, and uses
+ * absolute addresses; this is not position independent.
+ *
+ *  r0  = cp#15 control register
+ *  r1  = machine ID
+ *  r9  = processor ID
+ */
+	.type	__mmap_switched, %function
+__mmap_switched:
+	adr	r3, __switch_data + 4
+
+	ldmia	r3!, {r4, r5, r6, r7}
+	cmp	r4, r5				@ Copy data segment if needed
+1:	cmpne	r5, r6
+	ldrne	fp, [r4], #4
+	strne	fp, [r5], #4
+	bne	1b
+
+	mov	fp, #0				@ Clear BSS (and zero fp)
+1:	cmp	r6, r7
+	strcc	fp, [r6],#4
+	bcc	1b
+
+	ldmia	r3, {r4, r5, r6, sp}
+	str	r9, [r4]			@ Save processor ID
+	str	r1, [r5]			@ Save machine type
+	bic	r4, r0, #CR_A			@ Clear 'A' bit
+	stmia	r6, {r0, r4}			@ Save control register values
+	b	start_kernel
+
+
+
+/*
+ * Setup common bits before finally enabling the MMU.
+ */
+	.type	__enable_mmu, %function
+__enable_mmu:
+#ifdef CONFIG_ALIGNMENT_TRAP
+	orr	r0, r0, #CR_A
+#else
+	bic	r0, r0, #CR_A
+#endif
+	b	__turn_mmu_on
 
 /*
  * Enable the MMU.  This completely changes the structure of the visible
  * memory space.  You will not be able to trace execution through this.
  * If you have an enquiry about this, *please* check the linux-arm-kernel
  * mailing list archives BEFORE sending another post to the list.
+ *
+ *  r0  = cp#15 control register
+ *  r13 = *virtual* address to jump to upon completion
+ *
+ * other registers depend on the function called upon completion
  */
 	.align	5
 	.type	__turn_mmu_on, %function
 __turn_mmu_on:
-	ldr	lr, __switch_data
-#ifdef CONFIG_ALIGNMENT_TRAP
-	orr	r0, r0, #2			@ ...........A.
-#endif
+	mov	r0, r0
 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
 	mrc	p15, 0, r3, c0, c0, 0		@ read id reg
 	mov	r3, r3
 	mov	r3, r3
-	mov	pc, lr
-
-/*
- * The following fragment of code is executed with the MMU on, and uses
- * absolute addresses; this is not position independent.
- *
- *  r0  = processor control register
- *  r1  = machine ID
- *  r9  = processor ID
- *  r12 = value of r0 when kernel was called (currently always zero)
- */
-	.align	5
-__mmap_switched:
-	adr	r2, __switch_data + 4
-	ldmia	r2, {r2, r3, r4, r5, r6, r7, r8, sp}
-
-	cmp	r2, r3				@ Copy data segment if needed
-1:	cmpne	r3, r4
-	ldrne	fp, [r2], #4
-	strne	fp, [r3], #4
-	bne	1b
-
-	mov	fp, #0				@ Clear BSS (and zero fp)
-1:	cmp	r4, r5
-	strcc	fp, [r4],#4
-	bcc	1b
-
-	str	r9, [r6]			@ Save processor ID
-	str	r1, [r7]			@ Save machine type
-	bic	r2, r0, #2			@ Clear 'A' bit
-	stmia	r8, {r0, r2}			@ Save control register values
-	b	start_kernel
-
+	mov	pc, r13
 
 
 
@@ -181,12 +205,17 @@ __mmap_switched:
  * amount which are required to get the kernel running, which
  * generally means mapping in the kernel code.
  *
- * r5 = physical address of start of RAM
- * r6 = physical IO address
- * r7 = byte offset into page tables for IO
- * r8 = page table flags
+ * r8  = machinfo
+ * r9  = cpuid
+ * r10 = procinfo
+ *
+ * Returns:
+ *  r0, r3, r5, r6, r7 corrupted
+ *  r4 = physical page table address
  */
+	.type	__create_page_tables, %function
 __create_page_tables:
+	ldr	r5, [r8, #MACHINFO_PHYSRAM]	@ physram
 	pgtbl	r4, r5				@ page table address
 
 	/*
@@ -194,13 +223,15 @@ __create_page_tables:
 	 */
 	mov	r0, r4
 	mov	r3, #0
-	add	r2, r0, #0x4000
+	add	r6, r0, #0x4000
 1:	str	r3, [r0], #4
 	str	r3, [r0], #4
 	str	r3, [r0], #4
 	str	r3, [r0], #4
-	teq	r0, r2
+	teq	r0, r6
 	bne	1b
+
+	ldr	r7, [r10, #PROCINFO_MMUFLAGS]	@ mmuflags
 
 	/*
 	 * Create identity mapping for first MB of kernel to
@@ -208,9 +239,9 @@ __create_page_tables:
 	 * will be removed by paging_init().  We use our current program
 	 * counter to determine corresponding section base address.
 	 */
-	mov	r2, pc, lsr #20			@ start of kernel section
-	add	r3, r8, r2, lsl #20		@ flags + kernel base
-	str	r3, [r4, r2, lsl #2]		@ identity mapping
+	mov	r6, pc, lsr #20			@ start of kernel section
+	orr	r3, r7, r6, lsl #20		@ flags + kernel base
+	str	r3, [r4, r6, lsl #2]		@ identity mapping
 
 	/*
 	 * Now setup the pagetables for our kernel direct
@@ -231,8 +262,8 @@ __create_page_tables:
 	 * Then map first 1MB of ram in case it contains our boot params.
 	 */
 	add	r0, r4, #VIRT_OFFSET >> 18
-	add	r2, r5, r8
-	str	r2, [r0]
+	orr	r6, r5, r7
+	str	r6, [r0]
 
 #ifdef CONFIG_XIP_KERNEL
 	/*
@@ -242,15 +273,15 @@ __create_page_tables:
 	sub	r3, r4, r5
 	mov	r3, r3, lsr #20
 	add	r0, r0, r3, lsl #2
-	add	r2, r2, r3, lsl #20
-	str	r2, [r0], #4
-	add	r2, r2, #(1 << 20)
-	str	r2, [r0], #4
-	add	r2, r2, #(1 << 20)
-	str	r2, [r0]
+	add	r6, r6, r3, lsl #20
+	str	r6, [r0], #4
+	add	r6, r6, #(1 << 20)
+	str	r6, [r0], #4
+	add	r6, r6, #(1 << 20)
+	str	r6, [r0]
 #endif
 
-	bic	r8, r8, #0x0c			@ turn off cacheable
+	bic	r7, r7, #0x0c			@ turn off cacheable
 						@ and bufferable bits
 #ifdef CONFIG_DEBUG_LL
 	/*
@@ -258,15 +289,17 @@ __create_page_tables:
 	 * This allows debug messages to be output
 	 * via a serial console before paging_init.
 	 */
-	add	r0, r4, r7
-	rsb	r3, r7, #0x4000			@ PTRS_PER_PGD*sizeof(long)
-	cmp	r3, #0x0800
-	addge	r2, r0, #0x0800
-	addlt	r2, r0, r3
-	orr	r3, r6, r8
+	ldr	r3, [r8, #MACHINFO_PGOFFIO]
+	add	r0, r4, r3
+	rsb	r3, r3, #0x4000			@ PTRS_PER_PGD*sizeof(long)
+	cmp	r3, #0x0800			@ limit to 512MB
+	movhi	r3, #0x0800
+	add	r6, r0, r3
+	ldr	r3, [r8, #MACHINFO_PHYSIO]
+	orr	r3, r3, r7
 1:	str	r3, [r0], #4
 	add	r3, r3, #1 << 20
-	teq	r0, r2
+	teq	r0, r6
 	bne	1b
 #if defined(CONFIG_ARCH_NETWINDER) || defined(CONFIG_ARCH_CATS)
 	/*
@@ -278,7 +311,7 @@ __create_page_tables:
 	bne	1f
 	add	r0, r4, #0x3fc0			@ ff000000
 	mov	r3, #0x7c000000
-	orr	r3, r3, r8
+	orr	r3, r3, r7
 	str	r3, [r0], #4
 	add	r3, r3, #1 << 20
 	str	r3, [r0], #4
@@ -293,7 +326,7 @@ __create_page_tables:
 	 */
 	add	r0, r4, #0x80			@ 02000000
 	mov	r3, #0x02000000
-	orr	r3, r3, r8
+	orr	r3, r3, r7
 	str	r3, [r0]
 	add	r0, r4, #0x3600			@ d8000000
 	str	r3, [r0]
@@ -315,6 +348,7 @@ __create_page_tables:
  *
  * Generally, only serious errors cause this.
  */
+	.type	__error, %function
 __error:
 #ifdef CONFIG_DEBUG_LL
 	mov	r8, r0				@ preserve r0
@@ -340,6 +374,7 @@ __error:
 	b	1b
 
 #ifdef CONFIG_DEBUG_LL
+	.type	err_str, %object
 err_str:
 	.asciz	"\nError: "
 	.align
@@ -353,35 +388,35 @@ err_str:
  * calculate the offset.
  *
  * Returns:
- *	r5, r6, r7 corrupted
- *	r8  = page table flags
- *	r9  = processor ID
- *	r10 = pointer to processor structure
+ *	r3, r6 corrupted
+ *	r5 = proc_info pointer in physical address space
+ *	r9 = cpuid
  */
+	.type	__lookup_processor_type, %function
 __lookup_processor_type:
-	adr	r5, 2f
-	ldmia	r5, {r7, r9, r10}
-	sub	r5, r5, r10			@ convert addresses
-	add	r7, r7, r5			@ to our address space
-	add	r10, r9, r5
+	adr	r3, 3f
+	ldmda	r3, {r5, r6, r9}
+	sub	r3, r3, r9			@ get offset between virt&phys
+	add	r5, r5, r3			@ convert virt addresses to
+	add	r6, r6, r3			@ physical address space
 	mrc	p15, 0, r9, c0, c0		@ get processor id
-1:	ldmia	r10, {r5, r6, r8}		@ value, mask, mmuflags
-	and	r6, r6, r9			@ mask wanted bits
-	teq	r5, r6
-	moveq	pc, lr
-	add	r10, r10, #PROC_INFO_SZ		@ sizeof(proc_info_list)
-	cmp	r10, r7
+1:	ldmia	r5, {r3, r10}			@ value, mask
+	and	r10, r10, r9			@ mask wanted bits
+	teq	r3, r10
+	beq	2f
+	add	r5, r5, #PROC_INFO_SZ		@ sizeof(proc_info_list)
+	cmp	r5, r6
 	blt	1b
-	mov	r10, #0				@ unknown processor
-	mov	pc, lr
+	mov	r5, #0				@ unknown processor
+2:	mov	pc, lr
 
 /*
  * Look in include/asm-arm/procinfo.h and arch/arm/kernel/arch.[ch] for
  * more information about the __proc_info and __arch_info structures.
  */
-2:	.long	__proc_info_end
 	.long	__proc_info_begin
-	.long	2b
+	.long	__proc_info_end
+3:	.long	.
 	.long	__arch_info_begin
 	.long	__arch_info_end
 
@@ -393,24 +428,21 @@ __lookup_processor_type:
  *
  *  r1 = machine architecture number
  * Returns:
- *  r2, r3, r4 corrupted
- *  r5 = physical start address of RAM
- *  r6 = physical address of IO
- *  r7 = byte offset into page tables for IO
+ *  r3, r4, r6 corrupted
+ *  r5 = mach_info pointer in physical address space
  */
-__lookup_architecture_type:
-	adr	r4, 2b
-	ldmia	r4, {r2, r3, r5, r6, r7}	@ throw away r2, r3
-	sub	r5, r4, r5			@ convert addresses
-	add	r4, r6, r5			@ to our address space
-	add	r7, r7, r5
-1:	ldr	r5, [r4]			@ get machine type
-	teq	r5, r1				@ matches loader number?
+	.type	__lookup_machine_type, %function
+__lookup_machine_type:
+	adr	r3, 3b
+	ldmia	r3, {r4, r5, r6}
+	sub	r3, r3, r4			@ get offset between virt&phys
+	add	r5, r5, r3			@ convert virt addresses to
+	add	r6, r6, r3			@ physical address space
+1:	ldr	r3, [r5]			@ get machine type
+	teq	r3, r1				@ matches loader number?
 	beq	2f				@ found
-	add	r4, r4, #SIZEOF_MACHINE_DESC	@ next machine_desc
-	cmp	r4, r7
+	add	r5, r5, #SIZEOF_MACHINE_DESC	@ next machine_desc
+	cmp	r5, r6
 	blt	1b
-	mov	r7, #0				@ unknown architecture
-	mov	pc, lr
-2:	ldmib	r4, {r5, r6, r7}		@ found, get results
-	mov	pc, lr
+	mov	r5, #0				@ unknown machine
+2:	mov	pc, lr
