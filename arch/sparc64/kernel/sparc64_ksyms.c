@@ -139,6 +139,11 @@ EXPORT_SYMBOL(__global_sti);
 EXPORT_SYMBOL(__global_save_flags);
 EXPORT_SYMBOL(__global_restore_flags);
 
+#if defined(CONFIG_MCOUNT)
+extern void mcount(void);
+EXPORT_SYMBOL(mcount);
+#endif
+
 /* Per-CPU information table */
 EXPORT_SYMBOL(cpu_data);
 
