@@ -73,17 +73,17 @@ static int bnep_sock_release(struct socket *sock)
 
 static int bnep_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
-	struct bnep_conlist_req cl;
-	struct bnep_conadd_req  ca;
-	struct bnep_condel_req  cd;
-	struct bnep_coninfo ci;
+	struct bnep_connlist_req cl;
+	struct bnep_connadd_req  ca;
+	struct bnep_conndel_req  cd;
+	struct bnep_conninfo ci;
 	struct socket *nsock;
 	int err;
 
 	BT_DBG("cmd %x arg %lx", cmd, arg);
 
 	switch (cmd) {
-	case BNEPCONADD:
+	case BNEPCONNADD:
 		if (!capable(CAP_NET_ADMIN))
 			return -EACCES;
 
@@ -106,7 +106,7 @@ static int bnep_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long 
 
 		return err;
 	
-	case BNEPCONDEL:
+	case BNEPCONNDEL:
 		if (!capable(CAP_NET_ADMIN))
 			return -EACCES;
 
@@ -115,24 +115,24 @@ static int bnep_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long 
 	
 		return bnep_del_connection(&cd);
 
-	case BNEPGETCONLIST:
+	case BNEPGETCONNLIST:
 		if (copy_from_user(&cl, (void *) arg, sizeof(cl)))
 			return -EFAULT;
 
 		if (cl.cnum <= 0)
 			return -EINVAL;
 	
-		err = bnep_get_conlist(&cl);
+		err = bnep_get_connlist(&cl);
 		if (!err && copy_to_user((void *) arg, &cl, sizeof(cl)))
 			return -EFAULT;
 
 		return err;
 
-	case BNEPGETCONINFO:
+	case BNEPGETCONNINFO:
 		if (copy_from_user(&ci, (void *) arg, sizeof(ci)))
 			return -EFAULT;
 
-		err = bnep_get_coninfo(&ci);
+		err = bnep_get_conninfo(&ci);
 		if (!err && copy_to_user((void *) arg, &ci, sizeof(ci)))
 			return -EFAULT;
 
@@ -192,13 +192,13 @@ static struct net_proto_family bnep_sock_family_ops = {
 	.create = bnep_sock_create
 };
 
-int bnep_sock_init(void)
+int __init bnep_sock_init(void)
 {
 	bt_sock_register(BTPROTO_BNEP, &bnep_sock_family_ops);
 	return 0;
 }
 
-int bnep_sock_cleanup(void)
+int __exit bnep_sock_cleanup(void)
 {
 	if (bt_sock_unregister(BTPROTO_BNEP))
 		BT_ERR("Can't unregister BNEP socket");
