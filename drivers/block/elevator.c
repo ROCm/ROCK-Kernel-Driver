@@ -169,6 +169,13 @@ void elv_requeue_request(request_queue_t *q, struct request *rq)
 void __elv_add_request(request_queue_t *q, struct request *rq, int where,
 		       int plug)
 {
+	/*
+	 * barriers implicitly indicate back insertion
+	 */
+	if (rq->flags & (REQ_SOFTBARRIER | REQ_HARDBARRIER) &&
+	    where == ELEVATOR_INSERT_SORT)
+		where = ELEVATOR_INSERT_BACK;
+
 	if (plug)
 		blk_plug_device(q);
 

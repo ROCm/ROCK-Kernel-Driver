@@ -1216,13 +1216,12 @@ static void as_move_to_dispatch(struct as_data *ad, struct as_rq *arq)
 	}
 
 	as_remove_queued_request(ad->q, rq);
+	WARN_ON(arq->state != AS_RQ_QUEUED);
+
 	list_add(&rq->queuelist, insert);
+	arq->state = AS_RQ_DISPATCHED;
 	if (arq->io_context && arq->io_context->aic)
 		atomic_inc(&arq->io_context->aic->nr_dispatched);
-
-	WARN_ON(arq->state != AS_RQ_QUEUED);
-	arq->state = AS_RQ_DISPATCHED;
-
 	ad->nr_dispatched++;
 }
 
@@ -1492,6 +1491,21 @@ static void as_requeue_request(request_queue_t *q, struct request *rq)
 	as_antic_stop(ad);
 }
 
+/*
+ * Account a request that is inserted directly onto the dispatch queue.
+ * arq->io_context->aic->nr_dispatched should not need to be incremented
+ * because only new requests should come through here: requeues go through
+ * our explicit requeue handler.
+ */
+static void as_account_queued_request(struct as_data *ad, struct request *rq)
+{
+	if (blk_fs_request(rq)) {
+		struct as_rq *arq = RQ_DATA(rq);
+		arq->state = AS_RQ_DISPATCHED;
+		ad->nr_dispatched++;
+	}
+}
+
 static void
 as_insert_request(request_queue_t *q, struct request *rq, int where)
 {
@@ -1522,10 +1536,12 @@ as_insert_request(request_queue_t *q, struct request *rq, int where)
 				as_move_to_dispatch(ad, ad->next_arq[REQ_ASYNC]);
 
 			list_add_tail(&rq->queuelist, ad->dispatch);
+			as_account_queued_request(ad, rq);
 			as_antic_stop(ad);
 			break;
 		case ELEVATOR_INSERT_FRONT:
 			list_add(&rq->queuelist, ad->dispatch);
+			as_account_queued_request(ad, rq);
 			as_antic_stop(ad);
 			break;
 		case ELEVATOR_INSERT_SORT:
