@@ -1191,9 +1191,9 @@ smt_setup(void)
 				sizeof(option));
 			if (option[0] != 0) {
 				found = 1;
-				if (!strcmp(option, "off"))	
+				if (!strcmp(option, RELOC("off")))
 					my_smt_enabled = SMT_OFF;
-				else if (!strcmp(option, "on"))	
+				else if (!strcmp(option, RELOC("on")))
 					my_smt_enabled = SMT_ON;
 				else
 					my_smt_enabled = SMT_DYNAMIC;
