@@ -86,7 +86,6 @@ static ctl_table ipv6_net_table[] = {
 	{
 		.ctl_name	= NET_IPV6,
 		.procname	= "ipv6",
-		.maxlen		= 0,
 		.mode		= 0555,
 		.child		= ipv6_table
 	},
@@ -97,7 +96,6 @@ static ctl_table ipv6_root_table[] = {
 	{
 		.ctl_name	= CTL_NET,
 		.procname	= "net",
-		.maxlen		= 0,
 		.mode		= 0555,
 		.child		= ipv6_net_table
 	},

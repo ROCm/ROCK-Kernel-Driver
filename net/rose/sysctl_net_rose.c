@@ -142,7 +142,6 @@ static ctl_table rose_dir_table[] = {
 	{
 		.ctl_name	= NET_ROSE,
 		.procname	= "rose",
-		.maxlen		= 0,
 		.mode		= 0555,
 		.child		= rose_table
 	},
@@ -153,7 +152,6 @@ static ctl_table rose_root_table[] = {
 	{
 		.ctl_name	= CTL_NET,
 		.procname	= "net",
-		.maxlen		= 0,
 		.mode		= 0555,
 		.child		= rose_dir_table
 	},
