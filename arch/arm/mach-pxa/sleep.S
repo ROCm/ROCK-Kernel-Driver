@@ -48,7 +48,7 @@ ENTRY(pxa_cpu_suspend)
 	str	r0, [r1]
 
 	@ clean data cache
-	bl	cpu_xscale_cache_clean_invalidate_all
+	bl	xscale_flush_kern_cache_all
 
 	@ Put the processor to sleep
 	@ (also workaround for sighting 28071)
@@ -101,7 +101,7 @@ ENTRY(pxa_cpu_suspend)
 	.data
 	.align 5
 ENTRY(pxa_cpu_resume)
-	mov	r0, #I_BIT | F_BIT | MODE_SVC	@ set SVC, irqs off
+	mov	r0, #PSR_I_BIT | PSR_F_BIT | MODE_SVC	@ set SVC, irqs off
 	msr	cpsr_c, r0
 
 	ldr	r0, sleep_save_sp		@ stack phys addr
