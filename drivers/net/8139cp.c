@@ -67,6 +67,8 @@
 #include <linux/mii.h>
 #include <linux/if_vlan.h>
 #include <linux/crc32.h>
+#include <linux/in.h>
+#include <linux/ip.h>
 #include <linux/tcp.h>
 #include <linux/udp.h>
 #include <asm/io.h>
