@@ -15,7 +15,7 @@ static u8 sc1200_proc;
 
 static int sc1200_get_info(char *, char **, off_t, int);
 
-static ide_pci_host_proc_t sc1200_procs[] __initdata = {
+static ide_pci_host_proc_t sc1200_procs[] = {
 	{
 		.name		= "sc1200",
 		.set		= 1,

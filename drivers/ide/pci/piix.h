@@ -17,7 +17,7 @@ static u8 piix_proc;
 
 static int piix_get_info(char *, char **, off_t, int);
 
-static ide_pci_host_proc_t piix_procs[] __devinitdata = {
+static ide_pci_host_proc_t piix_procs[] = {
 	{
 		.name		= "piix",
 		.set		= 1,
