@@ -164,10 +164,10 @@ static int cmtp_sock_create(struct socket *sock, int protocol)
 	if (sock->type != SOCK_RAW)
 		return -ESOCKTNOSUPPORT;
 
-	sock->ops = &cmtp_sock_ops;
-
 	if (!(sk = bt_sock_alloc(sock, PF_BLUETOOTH, 0, GFP_KERNEL)))
 		return -ENOMEM;
+
+	sk_set_owner(sk, THIS_MODULE);
 
 	sock->ops = &cmtp_sock_ops;
 
@@ -180,8 +180,9 @@ static int cmtp_sock_create(struct socket *sock, int protocol)
 }
 
 static struct net_proto_family cmtp_sock_family_ops = {
-	.family =	PF_BLUETOOTH,
-	.create =	cmtp_sock_create
+	.family	= PF_BLUETOOTH,
+	.owner	= THIS_MODULE,
+	.create	= cmtp_sock_create
 };
 
 int cmtp_init_sockets(void)
