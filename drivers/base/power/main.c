@@ -31,15 +31,6 @@ LIST_HEAD(dpm_off_irq);
 
 DECLARE_MUTEX(dpm_sem);
 
-static struct attribute power_attrs[] = {
-	{ .name = NULL },
-};
-static struct attribute_group pm_attr_group = {
-	.name	= "pm",
-	.attrs	= power_attrs,
-};
-
-
 /*
  * PM Reference Counting.
  */
@@ -88,7 +79,8 @@ int device_pm_add(struct device * dev)
 	down(&dpm_sem);
 	list_add_tail(&dev->power.entry,&dpm_active);
 	device_pm_set_parent(dev,dev->parent);
-	error = sysfs_create_group(&dev->kobj,&pm_attr_group);
+	if ((error = dpm_sysfs_add(dev)))
+		list_del(&dev->power.entry);
 	up(&dpm_sem);
 	return error;
 }
@@ -98,7 +90,7 @@ void device_pm_remove(struct device * dev)
 	pr_debug("PM: Removing info for %s:%s\n",
 		 dev->bus ? dev->bus->name : "No Bus", dev->kobj.name);
 	down(&dpm_sem);
-	sysfs_remove_group(&dev->kobj,&pm_attr_group);
+	dpm_sysfs_remove(dev);
 	list_del(&dev->power.entry);
 	up(&dpm_sem);
 }
