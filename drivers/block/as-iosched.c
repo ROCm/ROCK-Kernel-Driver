@@ -1319,12 +1319,30 @@ static void as_add_request(struct as_data *ad, struct as_rq *arq)
 }
 
 /*
- * FIXME: HACK for AS requeue problems
+ * requeue the request. The request has not been completed, nor is it a
+ * new request, so don't touch accounting.
  */
 static void as_requeue_request(request_queue_t *q, struct request *rq)
 {
-	elv_completed_request(q, rq);
-	__elv_add_request(q, rq, 0, 0);
+	struct as_data *ad = q->elevator.elevator_data;
+	struct as_rq *arq = RQ_DATA(rq);
+
+	if (arq) {
+		if (arq->io_context && arq->io_context->aic) {
+			arq->state = AS_RQ_DISPATCHED;
+			atomic_inc(&arq->io_context->aic->nr_dispatched);
+		}
+	} else
+		WARN_ON(!(rq->flags & REQ_HARDBARRIER) && blk_fs_request(rq));
+
+	list_add_tail(&rq->queuelist, ad->dispatch);
+
+	/* Stop anticipating - let this request get through */
+	if (ad->antic_status == ANTIC_WAIT_REQ
+			|| ad->antic_status == ANTIC_WAIT_NEXT)
+		as_antic_stop(ad);
+
+	return;
 }
 
 static void
