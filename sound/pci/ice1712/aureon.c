@@ -799,7 +799,7 @@ static int __devinit aureon_init(ice1712_t *ice)
 	static unsigned short cs_inits[] = {
 		0x0441, /* RUN */
 		0x0100, /* no mute */
-		0x0200, /* */
+		0x0201, /* S/PDIF source on RXP1 */
 		0x0600, /* slave, 24bit */
 		(unsigned short)-1
 	};
@@ -827,7 +827,7 @@ static int __devinit aureon_init(ice1712_t *ice)
 	else
 		cscs = AUREON_CS8415_CS;
 
-	snd_ice1712_gpio_set_dir(ice, 0xbfffff); /* fix this for the time being */
+	snd_ice1712_gpio_set_dir(ice, 0x5fffff); /* fix this for the time being */
 
 	/* reset the wm codec as the SPI mode */
 	snd_ice1712_save_gpio_status(ice);
@@ -877,7 +877,7 @@ static unsigned char aureon51_eeprom[] __devinitdata = {
 	0xc3,	/* SPDIF: out-en, out-int, spdif-in */
 	0xff,	/* GPIO_DIR */
 	0xff,	/* GPIO_DIR1 */
-	0xbf,	/* GPIO_DIR2 */
+	0x5f,	/* GPIO_DIR2 */
 	0xff,	/* GPIO_MASK */
 	0xff,	/* GPIO_MASK1 */
 	0xff,	/* GPIO_MASK2 */
@@ -893,7 +893,7 @@ static unsigned char aureon71_eeprom[] __devinitdata = {
 	0xc3,	/* SPDIF: out-en, out-int, spdif-in */
 	0xff,	/* GPIO_DIR */
 	0xff,	/* GPIO_DIR1 */
-	0xbf,	/* GPIO_DIR2 */
+	0x5f,	/* GPIO_DIR2 */
 	0x00,	/* GPIO_MASK */
 	0x00,	/* GPIO_MASK1 */
 	0x00,	/* GPIO_MASK2 */
@@ -909,7 +909,7 @@ static unsigned char prodigy71_eeprom[] __devinitdata = {
 	0xc3,	/* SPDIF: out-en, out-int, spdif-in */
 	0xff,	/* GPIO_DIR */
 	0xff,	/* GPIO_DIR1 */
-	0xbf,	/* GPIO_DIR2 */
+	0x5f,	/* GPIO_DIR2 */
 	0x00,	/* GPIO_MASK */
 	0x00,	/* GPIO_MASK1 */
 	0x00,	/* GPIO_MASK2 */
