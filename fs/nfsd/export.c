@@ -73,18 +73,17 @@ svc_export *
 exp_get(svc_client *clp, kdev_t dev, ino_t ino)
 {
 	struct list_head *head, *p;
-	svc_export *exp = NULL;
-
+	
 	if (!clp)
 		return NULL;
 
 	head = &clp->cl_export[EXPORT_HASH(dev)];
 	list_for_each(p, head) {
-		exp = list_entry(p, svc_export, ex_hash);
+		svc_export *exp = list_entry(p, svc_export, ex_hash);
 		if (exp->ex_ino == ino && kdev_same(exp->ex_dev, dev))
-			break;
+			return exp;
 	}
-	return exp;
+	return NULL;
 }
 
 svc_export *
@@ -92,18 +91,17 @@ exp_get_by_name(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry)
 {
 	struct list_head *head, *p;
 	int hash = EXPORT_HASH(mnt->mnt_sb->s_dev);
-	svc_export *exp = NULL;
 
 	if (!clp)
 		return NULL;
 
 	head = &clp->cl_export[hash];
 	list_for_each(p, head) {
-		exp = list_entry(p, svc_export, ex_hash);
+		svc_export *exp = list_entry(p, svc_export, ex_hash);
 		if (exp->ex_dentry == dentry && exp->ex_mnt == mnt)
 			break;
 	}
-	return exp;
+	return NULL;
 }
 
 /*
@@ -114,14 +112,13 @@ exp_parent(svc_client *clp, struct super_block *sb, struct dentry *dentry)
 {
 	struct list_head *head = &clp->cl_export[EXPORT_HASH(sb->s_dev)];
 	struct list_head *p;
-	svc_export *exp = NULL;
 
 	list_for_each(p, head) {
-		exp = list_entry(p, svc_export, ex_hash);
+		svc_export *exp = list_entry(p, svc_export, ex_hash);
 		if (is_subdir(dentry, exp->ex_dentry))
-			break;
+			return exp;
 	}
-	return exp;
+	return NULL;
 }
 
 /*
@@ -134,16 +131,15 @@ exp_child(svc_client *clp, struct super_block *sb, struct dentry *dentry)
 {
 	struct list_head *head = &clp->cl_export[EXPORT_HASH(sb->s_dev)];
 	struct list_head *p;
-	svc_export *exp = NULL;
 	struct dentry *ndentry;
 
 	list_for_each(p, head) {
-		exp = list_entry(p, svc_export, ex_hash);
+		svc_export *exp = list_entry(p, svc_export, ex_hash);
 		ndentry = exp->ex_dentry;
 		if (ndentry && is_subdir(ndentry->d_parent, dentry))
-			break;
+			return exp;
 	}
-	return exp;
+	return NULL;
 }
 
 /* Update parent pointers of all exports */
@@ -552,9 +548,10 @@ static void *e_next(struct seq_file *m, void *p, loff_t *pos)
 
 	if (p == (void *)1)
 		clp = clients;
-	else if (exp->ex_list.next == &exp->ex_client->cl_list)
+	else if (exp->ex_list.next == &exp->ex_client->cl_list) {
 		clp = exp->ex_client->cl_next;
-	else {
+		*pos += 1LL<<32;
+	} else {
 		++*pos;
 		return list_entry(exp->ex_list.next, svc_export, ex_list);
 	}
