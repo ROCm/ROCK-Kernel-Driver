@@ -56,7 +56,7 @@
 #define access_ok(type,addr,size) \
 	__access_ok(((unsigned long)(addr)),(size),get_fs())
 
-static inline int verify_area(int type, const void *addr, unsigned long size)
+static inline int verify_area(int type, const void __user *addr, unsigned long size)
 {
 	return access_ok(type,addr,size) ? 0 : -EFAULT;
 }
@@ -214,7 +214,7 @@ do {									\
 
 /* more complex routines */
 
-extern unsigned long __copy_tofrom_user(void *to, const void *from,
+extern unsigned long __copy_tofrom_user(void __user *to, const void __user *from,
 					unsigned long size);
 
 static inline unsigned long
@@ -239,7 +239,7 @@ __copy_from_user(void *to, const void __user *from, unsigned long n)
 			return ret;
 		}
 	}
-	return __copy_tofrom_user(to, from, n);
+	return __copy_tofrom_user((void __user *) to, from, n);
 }
 
 static inline unsigned long
@@ -251,27 +251,27 @@ __copy_to_user(void __user *to, const void *from, unsigned long n)
 
 		switch (n) {
 		case 1:
-			__put_user_size(*(u8 *)from, (u8 *)to, 1, ret, 1);
+			__put_user_size(*(u8 *)from, (u8 __user *)to, 1, ret, 1);
 			return ret;
 		case 2:
-			__put_user_size(*(u16 *)from, (u16 *)to, 2, ret, 2);
+			__put_user_size(*(u16 *)from, (u16 __user *)to, 2, ret, 2);
 			return ret;
 		case 4:
-			__put_user_size(*(u32 *)from, (u32 *)to, 4, ret, 4);
+			__put_user_size(*(u32 *)from, (u32 __user *)to, 4, ret, 4);
 			return ret;
 		case 8:
-			__put_user_size(*(u64 *)from, (u64 *)to, 8, ret, 8);
+			__put_user_size(*(u64 *)from, (u64 __user *)to, 8, ret, 8);
 			return ret;
 		}
 	}
-	return __copy_tofrom_user(to, from, n);
+	return __copy_tofrom_user(to, (const void __user *) from, n);
 }
 
 #define __copy_in_user(to, from, size) \
 	__copy_tofrom_user((to), (from), (size))
 
 static inline unsigned long
-copy_from_user(void *to, const void *from, unsigned long n)
+copy_from_user(void *to, const void __user *from, unsigned long n)
 {
 	if (likely(access_ok(VERIFY_READ, from, n)))
 		n = __copy_from_user(to, from, n);
@@ -281,7 +281,7 @@ copy_from_user(void *to, const void *from, unsigned long n)
 }
 
 static inline unsigned long
-copy_to_user(void *to, const void *from, unsigned long n)
+copy_to_user(void __user *to, const void *from, unsigned long n)
 {
 	if (likely(access_ok(VERIFY_WRITE, to, n)))
 		n = __copy_to_user(to, from, n);
@@ -289,7 +289,7 @@ copy_to_user(void *to, const void *from, unsigned long n)
 }
 
 static inline unsigned long
-copy_in_user(void *to, const void *from, unsigned long n)
+copy_in_user(void __user *to, const void __user *from, unsigned long n)
 {
 	might_sleep();
 	if (likely(access_ok(VERIFY_READ, from, n) &&
@@ -298,10 +298,10 @@ copy_in_user(void *to, const void *from, unsigned long n)
 	return n;
 }
 
-extern unsigned long __clear_user(void *addr, unsigned long size);
+extern unsigned long __clear_user(void __user *addr, unsigned long size);
 
 static inline unsigned long
-clear_user(void *addr, unsigned long size)
+clear_user(void __user *addr, unsigned long size)
 {
 	might_sleep();
 	if (likely(access_ok(VERIFY_WRITE, addr, size)))
@@ -309,10 +309,10 @@ clear_user(void *addr, unsigned long size)
 	return size;
 }
 
-extern int __strncpy_from_user(char *dst, const char *src, long count);
+extern int __strncpy_from_user(char *dst, const char __user *src, long count);
 
 static inline long
-strncpy_from_user(char *dst, const char *src, long count)
+strncpy_from_user(char *dst, const char __user *src, long count)
 {
 	might_sleep();
 	if (likely(access_ok(VERIFY_READ, src, 1)))
@@ -325,14 +325,14 @@ strncpy_from_user(char *dst, const char *src, long count)
  *
  * Return 0 for error
  */
-extern int __strnlen_user(const char *str, long len);
+extern int __strnlen_user(const char __user *str, long len);
 
 /*
  * Returns the length of the string at str (including the null byte),
  * or 0 if we hit a page we can't access,
  * or something > len if we didn't find a null byte.
  */
-static inline int strnlen_user(const char *str, long len)
+static inline int strnlen_user(const char __user *str, long len)
 {
 	might_sleep();
 	if (likely(access_ok(VERIFY_READ, str, 1)))
