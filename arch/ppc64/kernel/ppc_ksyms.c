@@ -87,7 +87,6 @@ EXPORT_SYMBOL(disable_irq_nosync);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(kernel_flag);
 EXPORT_SYMBOL(synchronize_irq);
-EXPORT_SYMBOL(smp_num_cpus);
 #endif /* CONFIG_SMP */
 
 EXPORT_SYMBOL(register_ioctl32_conversion);

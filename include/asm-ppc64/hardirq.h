@@ -15,7 +15,7 @@
 #include <linux/config.h>
 #include <linux/brlock.h>
 #include <linux/spinlock.h>
-
+#include <asm/smp.h>
 
 typedef struct {
 	unsigned long __softirq_pending;
@@ -67,8 +67,8 @@ static __inline__ int irqs_running(void)
 {
 	int i;
 
-	for (i = 0; i < smp_num_cpus; i++)
-		if (local_irq_count(cpu_logical_map(i)))
+	for (i = 0; i < NR_CPUS; i++)
+		if (local_irq_count(i))
 			return 1;
 	return 0;
 }

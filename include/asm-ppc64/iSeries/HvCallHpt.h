@@ -106,21 +106,21 @@ static inline u64		HvCallHpt_invalidateSetSwBitsGet(u32 hpteIndex, u8 bitson, u8
 	return compressedStatus;
 }
 //=============================================================================
-static inline u64		HvCallHpt_findValid( struct HPTE *hpte, u64 vpn )
+static inline u64		HvCallHpt_findValid( HPTE *hpte, u64 vpn )
 {
 	u64 retIndex = HvCall3Ret16( HvCallHptFindValid, hpte, vpn, 0, 0 );
 	// getPaca()->adjustHmtForNoOfSpinLocksHeld();
 	return retIndex;
 }
 //=============================================================================
-static inline u64		HvCallHpt_findNextValid( struct HPTE *hpte, u32 hpteIndex, u8 bitson, u8 bitsoff )
+static inline u64		HvCallHpt_findNextValid( HPTE *hpte, u32 hpteIndex, u8 bitson, u8 bitsoff )
 {
 	u64 retIndex = HvCall3Ret16( HvCallHptFindNextValid, hpte, hpteIndex, bitson, bitsoff );
 	// getPaca()->adjustHmtForNoOfSpinLocksHeld();
 	return retIndex;
 }
 //=============================================================================
-static inline void		HvCallHpt_get( struct HPTE *hpte, u32 hpteIndex )
+static inline void		HvCallHpt_get( HPTE *hpte, u32 hpteIndex )
 {
 	HvCall2Ret16( HvCallHptGet, hpte, hpteIndex, 0 );
 	// getPaca()->adjustHmtForNoOfSpinLocksHeld();
@@ -128,7 +128,7 @@ static inline void		HvCallHpt_get( struct HPTE *hpte, u32 hpteIndex )
 //============================================================================
 static inline void		HvCallHpt_addValidate( u32 hpteIndex,
 						       u32 hBit,
-						       struct HPTE *hpte )
+						       HPTE *hpte )
 						
 {
 	HvCall4( HvCallHptAddValidate, hpteIndex,

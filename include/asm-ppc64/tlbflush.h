@@ -35,12 +35,4 @@ extern void flush_hash_page(unsigned long context, unsigned long ea, pte_t pte,
 			    int local);
 void flush_hash_range(unsigned long context, unsigned long number, int local);
 
-/* TLB flush batching */
-#define MAX_BATCH_FLUSH 128
-struct tlb_batch_data {
-	pte_t pte;
-	unsigned long addr;
-};
-extern struct tlb_batch_data tlb_batch_array[NR_CPUS][MAX_BATCH_FLUSH];
-
 #endif /* _PPC64_TLBFLUSH_H */

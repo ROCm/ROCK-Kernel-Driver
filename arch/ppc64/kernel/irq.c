@@ -81,7 +81,7 @@ unsigned long lpEvent_count = 0;
  * this needs to be removed.
  * -- Cort
  */
-#define IRQ_KMALLOC_ENTRIES 8
+#define IRQ_KMALLOC_ENTRIES 16
 static int cache_bitmask = 0;
 static struct irqaction malloc_cache[IRQ_KMALLOC_ENTRIES];
 extern int mem_init_done;
@@ -346,8 +346,10 @@ int show_interrupts(struct seq_file *p, void *v)
 	struct irqaction * action;
 
 	seq_printf(p, "           ");
-	for (j=0; j<smp_num_cpus; j++)
-		seq_printf(p, "CPU%d       ",j);
+	for (j=0; j<NR_CPUS; j++) {
+		if (cpu_online(j))
+			seq_printf(p, "CPU%d       ",j);
+	}
 	seq_putc(p, '\n');
 
 	for (i = 0 ; i < NR_IRQS ; i++) {
@@ -356,9 +358,10 @@ int show_interrupts(struct seq_file *p, void *v)
 			continue;
 		seq_printf(p, "%3d: ", i);		
 #ifdef CONFIG_SMP
-		for (j = 0; j < smp_num_cpus; j++)
-			seq_printf(p, "%10u ",
-				kstat.irqs[cpu_logical_map(j)][i]);
+		for (j = 0; j < NR_CPUS; j++) {
+			if (cpu_online(j))
+				seq_printf(p, "%10u ", kstat.irqs[j][i]);
+		}
 #else		
 		seq_printf(p, "%10u ", kstat_irqs(i));
 #endif /* CONFIG_SMP */
@@ -425,14 +428,14 @@ static unsigned long move(unsigned long curr_cpu, unsigned long allowed_mask,
 inside:
 		if (direction == 1) {
 			cpu++;
-			if (cpu >= smp_num_cpus)
+			if (cpu >= NR_CPUS)
 				cpu = 0;
 		} else {
 			cpu--;
 			if (cpu == -1)
-				cpu = smp_num_cpus-1;
+				cpu = NR_CPUS-1;
 		}
-	} while (!IRQ_ALLOWED(cpu,allowed_mask) ||
+	} while (!cpu_online(cpu) || !IRQ_ALLOWED(cpu,allowed_mask) ||
 			(search_idle && !IDLE_ENOUGH(cpu,now)));
 
 	return cpu;
@@ -474,7 +477,9 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	int cpu = smp_processor_id();
 	irq_desc_t *desc = irq_desc + irq;
 
-	balance_irq(irq);
+	/* XXX This causes bad performance and lockups on XICS - Anton */
+	if (naca->interrupt_controller == IC_OPEN_PIC)
+		balance_irq(irq);
 
 	kstat.irqs[cpu][irq]++;
 	spin_lock(&desc->lock);
@@ -651,12 +656,16 @@ static void show(char * str)
 
 	printk("\n%s, CPU %d:\n", str, cpu);
 	printk("irq:  %d [ ", irqs_running());
-	for (i = 0; i < smp_num_cpus; i++)
-		printk("%u ", __brlock_array[i][BR_GLOBALIRQ_LOCK]);
+	for (i = 0; i < NR_CPUS; i++) {
+		if (cpu_online(i))
+			printk("%u ", __brlock_array[i][BR_GLOBALIRQ_LOCK]);
+	}
 	printk("]\nbh:   %d [ ",
 		(spin_is_locked(&global_bh_lock) ? 1 : 0));
-	for (i = 0; i < smp_num_cpus; i++)
-		printk("%u ", local_bh_count(i));
+	for (i = 0; i < NR_CPUS; i++) {
+		if (cpu_online(i))
+			printk("%u ", local_bh_count(i));
+	}
 	printk("]\n");
 }
 

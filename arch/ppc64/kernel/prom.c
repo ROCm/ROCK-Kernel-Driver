@@ -48,7 +48,6 @@
 #define call_yaboot(FUNC,...) do { ; } while (0)
 #endif
 
-#include <asm/init.h>
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <asm/prom.h>
@@ -446,8 +445,11 @@ prom_initialize_naca(unsigned long mem)
 	}
 
 	/* We gotta have at least 1 cpu... */
-        if ( (_naca->processorCount = num_cpus) < 1 )
+        if (num_cpus < 1)
                 PROM_BUG();
+
+	if (num_cpus > 1)
+		RELOC(ppc64_is_smp) = 1;
 
 	_naca->physicalMemorySize = lmb_phys_mem_size();
 
@@ -478,10 +480,6 @@ prom_initialize_naca(unsigned long mem)
 	_naca->slb_size = 64;
 
 #ifdef DEBUG_PROM
-        prom_print(RELOC("naca->processorCount       = 0x"));
-        prom_print_hex(_naca->processorCount);
-        prom_print_nl();
-
         prom_print(RELOC("naca->physicalMemorySize   = 0x"));
         prom_print_hex(_naca->physicalMemorySize);
         prom_print_nl();
@@ -1045,19 +1043,14 @@ prom_hold_cpus(unsigned long mem)
 	phandle node;
 	unsigned long offset = reloc_offset();
 	char type[64], *path;
-	int cpuid = 0;
 	extern void __secondary_hold(void);
         extern unsigned long __secondary_hold_spinloop;
         extern unsigned long __secondary_hold_acknowledge;
         unsigned long *spinloop     = __v2a(&__secondary_hold_spinloop);
         unsigned long *acknowledge  = __v2a(&__secondary_hold_acknowledge);
         unsigned long secondary_hold = (unsigned long)__v2a(*PTRRELOC((unsigned long *)__secondary_hold));
-        struct naca_struct *_naca = RELOC(naca);
 	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
 	struct prom_t *_prom = PTRRELOC(&prom);
-
-	/* Initially, we must have one active CPU. */
-	_naca->processorCount = 1;
 
 #ifdef DEBUG_PROM
 	prom_print(RELOC("prom_hold_cpus: start...\n"));
@@ -1118,19 +1111,12 @@ prom_hold_cpus(unsigned long mem)
 				     node, path, 255) < 0)
 			continue;
 
-		cpuid++;
-
 #ifdef DEBUG_PROM
-		prom_print_nl();
-		prom_print(RELOC("cpuid        = 0x"));
-		prom_print_hex(cpuid);
 		prom_print_nl();
 		prom_print(RELOC("cpu hw idx   = 0x"));
 		prom_print_hex(reg);
 		prom_print_nl();
 #endif
-		_xPaca[cpuid].xHwProcNum = reg;
-
 		prom_print(RELOC("starting cpu "));
 		prom_print(path);
 
@@ -1156,11 +1142,9 @@ prom_hold_cpus(unsigned long mem)
 		prom_print(RELOC("    3) secondary_hold = 0x"));
 		prom_print_hex(secondary_hold);
 		prom_print_nl();
-		prom_print(RELOC("    3) cpuid = 0x"));
-		prom_print_hex(cpuid);
 		prom_print_nl();
 #endif
-		call_prom(RELOC("start-cpu"), 3, 0, node, secondary_hold, cpuid);
+		call_prom(RELOC("start-cpu"), 3, 0, node, secondary_hold, reg);
 		prom_print(RELOC("..."));
 		for ( i = 0 ; (i < 100000000) && 
 			      (*acknowledge == ((unsigned long)-1)); i++ ) ;
@@ -1172,10 +1156,10 @@ prom_hold_cpus(unsigned long mem)
 			prom_print_nl();
 		}
 #endif
-		if (*acknowledge == cpuid) {
+		if (*acknowledge == reg) {
 			prom_print(RELOC("ok\n"));
 			/* Set the number of active processors. */
-			_naca->processorCount++;
+			_xPaca[reg].active = 1;
 		} else {
 			prom_print(RELOC("failed: "));
 			prom_print_hex(*acknowledge);
@@ -1189,10 +1173,11 @@ prom_hold_cpus(unsigned long mem)
 	    __is_processor(PV_SSTAR)) {
 		prom_print(RELOC("    starting secondary threads\n"));
 
-		for (i=0; i < _naca->processorCount ;i++) {
-			unsigned long threadid = _naca->processorCount*2-1-i;
-			
-			if (i == 0) {
+		for (i = 0; i < NR_CPUS; i += 2) {
+			if (!_xPaca[i].active)
+				continue;
+
+			if (i == boot_cpuid) {
 				unsigned long pir = _get_PIR();
 				if (__is_processor(PV_PULSAR)) {
 					RELOC(hmt_thread_data)[i].pir = 
@@ -1202,21 +1187,9 @@ prom_hold_cpus(unsigned long mem)
 						pir & 0x3ff;
 				}
 			}
-			
-			RELOC(hmt_thread_data)[i].threadid = threadid;
-#ifdef DEBUG_PROM
-			prom_print(RELOC("        cpuid 0x"));
-			prom_print_hex(i);
-			prom_print(RELOC(" maps to threadid 0x"));
-			prom_print_hex(threadid);
-			prom_print_nl();
-			prom_print(RELOC(" pir 0x"));
-			prom_print_hex(RELOC(hmt_thread_data)[i].pir);
-			prom_print_nl();
-#endif
-			_xPaca[threadid].xHwProcNum = _xPaca[i].xHwProcNum+1;
+			_xPaca[i+1].active = 1;
+			RELOC(hmt_thread_data)[i].threadid = i+1;
 		}
-		_naca->processorCount *= 2;
 	} else {
 		prom_print(RELOC("Processor is not HMT capable\n"));
 	}
@@ -1373,7 +1346,9 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 		cpu_pkg, RELOC("reg"),
 		&getprop_rval, sizeof(getprop_rval));
 	_prom->cpu = (int)(unsigned long)getprop_rval;
-	_xPaca[0].xHwProcNum = _prom->cpu;
+	_xPaca[_prom->cpu].active = 1;
+	RELOC(cpu_online_map) = 1 << _prom->cpu;
+	RELOC(boot_cpuid) = _prom->cpu;
 
 #ifdef DEBUG_PROM
   	prom_print(RELOC("Booting CPU hw index = 0x"));
@@ -1409,7 +1384,7 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
          * following, regardless of whether we have an SMP
          * kernel or not.
          */
-        if ( _naca->processorCount > 1 )
+        if (RELOC(ppc64_is_smp))
 	        prom_hold_cpus(mem);
 
 	mem = check_display(mem);
@@ -2110,7 +2085,7 @@ find_type_devices(const char *type)
 /*
  * Returns all nodes linked together
  */
-struct device_node * __openfirmware
+struct device_node *
 find_all_nodes(void)
 {
 	struct device_node *head, **prevp, *np;
@@ -2235,7 +2210,7 @@ get_property(struct device_node *np, const char *name, int *lenp)
 /*
  * Add a property to a node
  */
-void __openfirmware
+void
 prom_add_property(struct device_node* np, struct property* prop)
 {
 	struct property **next = &np->properties;
@@ -2247,7 +2222,7 @@ prom_add_property(struct device_node* np, struct property* prop)
 }
 
 #if 0
-void __openfirmware
+void
 print_properties(struct device_node *np)
 {
 	struct property *pp;
