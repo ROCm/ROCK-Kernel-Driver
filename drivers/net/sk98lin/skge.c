@@ -443,6 +443,11 @@ static int __init skge_probe (void)
 		if (pci_enable_device(pdev))
 			continue;
 
+		/* Configure DMA attributes. */
+		if (pci_set_dma_mask(pdev, (u64) 0xffffffffffffffff) &&
+		    pci_set_dma_mask(pdev, (u64) 0xffffffff))
+				continue;
+
 		if ((dev = init_etherdev(dev, sizeof(DEV_NET))) == 0) {
 			printk(KERN_ERR "Unable to allocate etherdev "
 			       "structure!\n");
@@ -1770,10 +1775,12 @@ int		BytesSend;
 #endif
 
 	/* set up descriptor and CONTROL dword */
-	PhysAddr = (SK_U64) pci_map_single(&pAC->PciDev,
-					   pMessage->data,
-					   pMessage->len,
-					   PCI_DMA_TODEVICE);
+	PhysAddr = (SK_U64) pci_map_page(&pAC->PciDev,
+					 virt_to_page(pMessage->data),
+					 ((unsigned long) pMessage->data &
+					  ~PAGE_MASK),
+					 pMessage->len,
+					 PCI_DMA_TODEVICE);
 	pTxd->VDataLow = (SK_U32)  (PhysAddr & 0xffffffff);
 	pTxd->VDataHigh = (SK_U32) (PhysAddr >> 32);
 	pTxd->pMBuf = pMessage;
@@ -1865,9 +1872,9 @@ SK_U64	PhysAddr;	/* address of DMA mapping */
 		/* release the DMA mapping */
 		PhysAddr = ((SK_U64) pTxd->VDataHigh) << (SK_U64) 32;
 		PhysAddr |= (SK_U64) pTxd->VDataLow;
-		pci_unmap_single(&pAC->PciDev, PhysAddr,
-				 pTxd->pMBuf->len,
-				 PCI_DMA_TODEVICE);
+		pci_unmap_page(&pAC->PciDev, PhysAddr,
+			       pTxd->pMBuf->len,
+			       PCI_DMA_TODEVICE);
 
 		/* free message */
 		DEV_KFREE_SKB_ANY(pTxd->pMBuf);
@@ -1946,10 +1953,12 @@ SK_U64		PhysAddr;	/* physical address of a rx buffer */
 	pRxPort->pRxdRingTail = pRxd->pNextRxd;
 	pRxPort->RxdRingFree--;
 	Length = pAC->RxBufSize;
-	PhysAddr = (SK_U64) pci_map_single(&pAC->PciDev,
-					   pMsgBlock->data,
-					   pAC->RxBufSize - 2,
-					   PCI_DMA_FROMDEVICE);
+	PhysAddr = (SK_U64) pci_map_page(&pAC->PciDev,
+					 virt_to_page(pMsgBlock->data),
+					 ((unsigned long) pMsgBlock->data &
+					  ~PAGE_MASK),
+					 pAC->RxBufSize - 2,
+					 PCI_DMA_FROMDEVICE);
 	pRxd->VDataLow = (SK_U32) (PhysAddr & 0xffffffff);
 	pRxd->VDataHigh = (SK_U32) (PhysAddr >> 32);
 	pRxd->pMBuf = pMsgBlock;
@@ -2093,9 +2102,9 @@ rx_start:
 			PhysAddr = ((SK_U64) pRxd->VDataHigh) << (SK_U64)32;
 			PhysAddr |= (SK_U64) pRxd->VDataLow;
 			pci_dma_sync_single(&pAC->PciDev,
-						(dma_addr_t) PhysAddr,
-						FrameLength,
-						PCI_DMA_FROMDEVICE);
+					    (dma_addr_t) PhysAddr,
+					    FrameLength,
+					    PCI_DMA_FROMDEVICE);
 			ReQueueRxBuffer(pAC, pRxPort, pMsg,
 				pRxd->VDataHigh, pRxd->VDataLow);
 
@@ -2117,9 +2126,9 @@ rx_start:
 			skb_reserve(pNewMsg, 2);
 			skb_put(pNewMsg, FrameLength);
 			pci_dma_sync_single(&pAC->PciDev,
-						(dma_addr_t) PhysAddr,
-						FrameLength,
-						PCI_DMA_FROMDEVICE);
+					    (dma_addr_t) PhysAddr,
+					    FrameLength,
+					    PCI_DMA_FROMDEVICE);
 			eth_copy_and_sum(pNewMsg, pMsg->data,
 				FrameLength, 0);
 			ReQueueRxBuffer(pAC, pRxPort, pMsg,
@@ -2137,10 +2146,10 @@ rx_start:
 			PhysAddr |= (SK_U64) pRxd->VDataLow;
 
 			/* release the DMA mapping */
-			pci_unmap_single(&pAC->PciDev,
-					 PhysAddr,
-					 pAC->RxBufSize - 2,
-					 PCI_DMA_FROMDEVICE);
+			pci_unmap_page(&pAC->PciDev,
+				       PhysAddr,
+				       pAC->RxBufSize - 2,
+				       PCI_DMA_FROMDEVICE);
 
 			/* set length in message */
 			skb_put(pMsg, FrameLength);
@@ -2262,10 +2271,10 @@ rx_failed:
 	/* release the DMA mapping */
 	PhysAddr = ((SK_U64) pRxd->VDataHigh) << (SK_U64)32;
 	PhysAddr |= (SK_U64) pRxd->VDataLow;
-	pci_unmap_single(&pAC->PciDev,
-			 PhysAddr,
-			 pAC->RxBufSize - 2,
-			 PCI_DMA_FROMDEVICE);
+	pci_unmap_page(&pAC->PciDev,
+		       PhysAddr,
+		       pAC->RxBufSize - 2,
+		       PCI_DMA_FROMDEVICE);
 	DEV_KFREE_SKB_IRQ(pRxd->pMBuf);
 	pRxd->pMBuf = NULL;
 	pRxPort->RxdRingFree++;
@@ -2342,10 +2351,10 @@ unsigned long	Flags;
 		if (pRxd->pMBuf != NULL) {
 			PhysAddr = ((SK_U64) pRxd->VDataHigh) << (SK_U64)32;
 			PhysAddr |= (SK_U64) pRxd->VDataLow;
-			pci_unmap_single(&pAC->PciDev,
-					 PhysAddr,
-					 pAC->RxBufSize - 2,
-					 PCI_DMA_FROMDEVICE);
+			pci_unmap_page(&pAC->PciDev,
+				       PhysAddr,
+				       pAC->RxBufSize - 2,
+				       PCI_DMA_FROMDEVICE);
 			DEV_KFREE_SKB(pRxd->pMBuf);
 			pRxd->pMBuf = NULL;
 		}

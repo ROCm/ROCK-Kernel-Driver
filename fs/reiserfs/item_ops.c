@@ -48,13 +48,15 @@ static void sd_print_item (struct item_head * ih, char * item)
     if (stat_data_v1 (ih)) {
       	struct stat_data_v1 * sd = (struct stat_data_v1 *)item;
 
-	printk ("\t0%-6o | %6u | %2u | %d | %s\n", sd->sd_mode, sd->sd_size,
-		sd->sd_nlink, sd->sd_first_direct_byte, print_time (sd->sd_mtime));
+	printk ("\t0%-6o | %6u | %2u | %d | %s\n", sd_v1_mode(sd),
+                sd_v1_size(sd), sd_v1_nlink(sd), sd_v1_first_direct_byte(sd),
+                print_time( sd_v1_mtime(sd) ) );
     } else {
 	struct stat_data * sd = (struct stat_data *)item;
 
-	printk ("\t0%-6o | %6Lu | %2u | %d | %s\n", sd->sd_mode, (unsigned long long)(sd->sd_size),
-		sd->sd_nlink, sd->u.sd_rdev, print_time (sd->sd_mtime));
+	printk ("\t0%-6o | %6Lu | %2u | %d | %s\n", sd_v2_mode(sd),
+            (unsigned long long)sd_v2_size(sd), sd_v2_nlink(sd),
+            sd_v2_rdev(sd), print_time(sd_v2_mtime(sd)));
     }
 }
 
@@ -130,7 +132,7 @@ struct item_operations stat_data_ops = {
 //
 static int direct_bytes_number (struct item_head * ih, int block_size)
 {
-  return le16_to_cpu (ih->ih_item_len);
+  return ih_item_len(ih);
 }
 
 
@@ -156,7 +158,7 @@ static void direct_print_item (struct item_head * ih, char * item)
 
 //    return;
     printk ("\"");
-    while (j < ih->ih_item_len)
+    while (j < ih_item_len(ih))
 	printk ("%c", item[j++]);
     printk ("\"\n");
 }
@@ -234,7 +236,7 @@ struct item_operations direct_ops = {
 
 static int indirect_bytes_number (struct item_head * ih, int block_size)
 {
-  return le16_to_cpu (ih->ih_item_len) / UNFM_P_SIZE * block_size; //- get_ih_free_space (ih);
+  return ih_item_len(ih) / UNFM_P_SIZE * block_size; //- get_ih_free_space (ih);
 }
 
 
@@ -299,14 +301,14 @@ static void indirect_print_item (struct item_head * ih, char * item)
 
     unp = (__u32 *)item;
 
-    if (ih->ih_item_len % UNFM_P_SIZE)
+    if (ih_item_len(ih) % UNFM_P_SIZE)
 	printk ("indirect_print_item: invalid item len");  
 
     printk ("%d pointers\n[ ", (int)I_UNFM_NUM (ih));
     for (j = 0; j < I_UNFM_NUM (ih); j ++) {
-	if (sequence_finished (prev, &num, unp[j])) {
+	if (sequence_finished (prev, &num, get_block_num(unp, j))) {
 	    print_sequence (prev, num);
-	    start_new_sequence (&prev, &num, unp[j]);
+	    start_new_sequence (&prev, &num, get_block_num(unp, j));
 	}
     }
     print_sequence (prev, num);
@@ -424,8 +426,8 @@ static void direntry_print_item (struct item_head * ih, char * item)
     deh = (struct reiserfs_de_head *)item;
 
     for (i = 0; i < I_ENTRY_COUNT (ih); i ++, deh ++) {
-	namelen = (i ? ((deh - 1)->deh_location) : ih->ih_item_len) - deh->deh_location;
-	name = item + deh->deh_location;
+	namelen = (i ? (deh_location(deh - 1)) : ih_item_len(ih)) - deh_location(deh);
+	name = item + deh_location(deh);
 	if (name[namelen-1] == 0)
 	  namelen = strlen (name);
 	namebuf[0] = '"';
@@ -441,7 +443,7 @@ static void direntry_print_item (struct item_head * ih, char * item)
 
 	printk ("%d:  %-15s%-15d%-15d%-15Ld%-15Ld(%s)\n", 
 		i, namebuf,
-		deh->deh_dir_id, deh->deh_objectid,
+		deh_dir_id(deh), deh_objectid(deh),
 		GET_HASH_VALUE (deh_offset (deh)), GET_GENERATION_NUMBER ((deh_offset (deh))),
 		(de_hidden (deh)) ? "HIDDEN" : "VISIBLE");
     }
@@ -466,9 +468,9 @@ static void direntry_check_item (struct item_head * ih, char * item)
 
 struct direntry_uarea {
     int flags;
-    short entry_count;
-    short entry_sizes[1];
-};
+    __u16 entry_count;
+    __u16 entry_sizes[1];
+} __attribute__ ((__packed__)) ;
 
 
 /*
@@ -531,8 +533,9 @@ static int direntry_create_vi (struct virtual_node * vn,
     
     for (i = 0; i < dir_u->entry_count; i ++) {
 	j = old_entry_num (is_affected, i, vn->vn_pos_in_item, vn->vn_mode);
-	dir_u->entry_sizes[i] = (j ? le16_to_cpu (deh[j - 1].deh_location) : le16_to_cpu (vi->vi_ih->ih_item_len)) -
-	    le16_to_cpu (deh[j].deh_location) + DEH_SIZE;
+        dir_u->entry_sizes[i] = (j ? deh_location( &(deh[j - 1]) ) :
+                                ih_item_len (vi->vi_ih)) -
+                                deh_location( &(deh[j])) + DEH_SIZE;
     }
 
     size += (dir_u->entry_count * sizeof (short));

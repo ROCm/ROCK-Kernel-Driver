@@ -28,6 +28,12 @@ extern inline void pcibios_penalize_isa_irq(int irq)
 /* Dynamic DMA mapping stuff.
  */
 
+/* The PCI address space does not equal the physical memory
+ * address space.  The networking and block device layers use
+ * this boolean for bounce buffer decisions.
+ */
+#define PCI_DMA_BUS_IS_PHYS	(0)
+
 #include <asm/scatterlist.h>
 
 struct pci_dev;
@@ -64,6 +70,11 @@ extern dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, 
  */
 extern void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr, size_t size, int direction);
 
+/* No highmem on sparc64, plus we have an IOMMU, so mapping pages is easy. */
+#define pci_map_page(dev, page, off, size, dir) \
+	pci_map_single(dev, (page_address(page) + (off)), size, dir)
+#define pci_unmap_page(dev,addr,sz,dir) pci_unmap_single(dev,addr,sz,dir)
+
 /* Map a set of buffers described by scatterlist in streaming
  * mode for DMA.  This is the scather-gather version of the
  * above pci_map_single interface.  Here the scatter gather list
@@ -79,13 +90,15 @@ extern void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr, size_t 
  * Device ownership issues as mentioned above for pci_map_single are
  * the same here.
  */
-extern int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int direction);
+extern int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
+		      int nents, int direction);
 
 /* Unmap a set of streaming mode DMA translations.
  * Again, cpu read rules concerning calls here are the same as for
  * pci_unmap_single() above.
  */
-extern void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nhwents, int direction);
+extern void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
+			 int nhwents, int direction);
 
 /* Make physical memory consistent for a single
  * streaming mode DMA translation after a transfer.
@@ -96,7 +109,8 @@ extern void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nhwe
  * next point you give the PCI dma address back to the card, the
  * device again owns the buffer.
  */
-extern void pci_dma_sync_single(struct pci_dev *hwdev, dma_addr_t dma_handle, size_t size, int direction);
+extern void pci_dma_sync_single(struct pci_dev *hwdev, dma_addr_t dma_handle,
+				size_t size, int direction);
 
 /* Make physical memory consistent for a set of streaming
  * mode DMA translations after a transfer.
@@ -111,7 +125,51 @@ extern void pci_dma_sync_sg(struct pci_dev *hwdev, struct scatterlist *sg, int n
  * only drive the low 24-bits during PCI bus mastering, then
  * you would pass 0x00ffffff as the mask to this function.
  */
-extern int pci_dma_supported(struct pci_dev *hwdev, dma_addr_t mask);
+extern int pci_dma_supported(struct pci_dev *hwdev, u64 mask);
+
+/* PCI IOMMU mapping bypass support. */
+
+/* PCI 64-bit addressing works for all slots on all controller
+ * types on sparc64.  However, it requires that the device
+ * can drive enough of the 64 bits.
+ */
+#define PCI64_REQUIRED_MASK	(~(dma64_addr_t)0)
+#define PCI64_ADDR_BASE		0xfffc000000000000
+
+/* Usage of the pci_dac_foo interfaces is only valid if this
+ * test passes.
+ */
+#define pci_dac_dma_supported(pci_dev, mask) \
+	((((mask) & PCI64_REQUIRED_MASK) == PCI64_REQUIRED_MASK) ? 1 : 0)
+
+static __inline__ dma64_addr_t
+pci_dac_page_to_dma(struct pci_dev *pdev, struct page *page, unsigned long offset, int direction)
+{
+	return (PCI64_ADDR_BASE +
+		__pa(page_address(page)) + offset);
+}
+
+static __inline__ struct page *
+pci_dac_dma_to_page(struct pci_dev *pdev, dma64_addr_t dma_addr)
+{
+	unsigned long paddr = (dma_addr & PAGE_MASK) - PCI64_ADDR_BASE;
+
+	return virt_to_page(__va(paddr));
+}
+
+static __inline__ unsigned long
+pci_dac_dma_to_offset(struct pci_dev *pdev, dma64_addr_t dma_addr)
+{
+	return (dma_addr & ~PAGE_MASK);
+}
+
+static __inline__ void
+pci_dac_dma_sync_single(struct pci_dev *pdev, dma64_addr_t dma_addr, size_t len, int direction)
+{
+	/* DAC cycle addressing does not make use of the
+	 * PCI controller's streaming cache, so nothing to do.
+	 */
+}
 
 /* Return the index of the PCI controller for device PDEV. */
 

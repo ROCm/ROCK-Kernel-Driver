@@ -39,6 +39,7 @@ struct alpha_machine_vector
 	unsigned long iack_sc;
 	unsigned long min_io_address;
 	unsigned long min_mem_address;
+	unsigned long pci_dac_offset;
 
 	void (*mv_pci_tbi)(struct pci_controller *hose,
 			   dma_addr_t start, dma_addr_t end);

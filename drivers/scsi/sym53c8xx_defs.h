@@ -184,32 +184,11 @@
 #endif
 
 /*
- * Should we enable DAC cycles on Sparc64 platform?
- * Until further investigation we do not enable it
- * at the moment.
- * We may want to enable it for __ia64__ (untested)
- */
-#if defined(__ia64__)
-#    if !defined(SCSI_NCR_USE_64BIT_DAC)
-#        define SCSI_NCR_USE_64BIT_DAC
-#    endif
-#else
-#    undef SCSI_NCR_USE_64BIT_DAC
-#endif
-
-/*
  * Immediate arbitration
  */
 #if defined(CONFIG_SCSI_NCR53C8XX_IARB)
 #define SCSI_NCR_IARB_SUPPORT
 #endif
-
-/*
- * Should we enable DAC cycles on sparc64 platforms?
- * Until further investigation we do not enable it
- * anywhere at the moment.
- */
-#undef SCSI_NCR_USE_64BIT_DAC
 
 /*
  * Sync transfer frequency at startup.
@@ -746,6 +725,7 @@ typedef struct {
 #define FE_66MHZ 	(1<<23)   /* 66MHz PCI Support */
 #define FE_DAC	 	(1<<24)   /* Support DAC cycles (64 bit addressing) */
 #define FE_ISTAT1 	(1<<25)   /* Have ISTAT1, MBOX0, MBOX1 registers */
+#define FE_DAC_IN_USE	(1<<26)	  /* Platform does DAC cycles */
 
 #define FE_CACHE_SET	(FE_ERL|FE_CLSE|FE_WRIE|FE_ERMP)
 #define FE_SCSI_SET	(FE_WIDE|FE_ULTRA|FE_ULTRA2|FE_DBLR|FE_QUAD|F_CLK80)

@@ -129,7 +129,9 @@ sx164_init_arch(void)
 	struct percpu_struct *cpu = (struct percpu_struct*)
 		((char*)hwrpb + hwrpb->processor_offset);
 
-	if (alpha_using_srm && (cpu->pal_revision & 0xffff) == 0x117) {
+	if (amask(AMASK_MAX) != 0
+	    && alpha_using_srm
+	    && (cpu->pal_revision & 0xffff) == 0x117) {
 		__asm__ __volatile__(
 		"lda	$16,8($31)\n"
 		"call_pal 9\n"		/* Allow PALRES insns in kernel mode */
@@ -160,6 +162,7 @@ struct alpha_machine_vector sx164_mv __initmv = {
 	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
 	min_io_address:		DEFAULT_IO_BASE,
 	min_mem_address:	DEFAULT_MEM_BASE,
+	pci_dac_offset:		PYXIS_DAC_OFFSET,
 
 	nr_irqs:		48,
 	device_interrupt:	pyxis_device_interrupt,

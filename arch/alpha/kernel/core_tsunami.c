@@ -279,16 +279,6 @@ tsunami_probe_write(volatile unsigned long *vaddr)
 #define FN __FUNCTION__
 
 static void __init
-tsunami_monster_window_enable(tsunami_pchip * pchip)
-{
-	volatile unsigned long * csr = &pchip->pctl.csr;
-
-	*csr |= pctl_m_mwin;
-	mb();
-	*csr;
-}
-
-static void __init
 tsunami_init_one_pchip(tsunami_pchip *pchip, int index)
 {
 	struct pci_controller *hose;
@@ -358,47 +348,34 @@ tsunami_init_one_pchip(tsunami_pchip *pchip, int index)
 	 * Note: Window 3 is scatter-gather only
 	 * 
 	 * Window 0 is scatter-gather 8MB at 8MB (for isa)
-	 * Window 1 is direct access 1GB at 1GB
-	 * Window 2 is direct access 1GB at 2GB
-	 * Window 3 is scatter-gather 128MB at 3GB
-	 * ??? We ought to scale window 3 memory.
-	 *
-	 * We must actually use 2 windows to direct-map the 2GB space,
-	 * because of an idiot-syncrasy of the CYPRESS chip.  It may
-	 * respond to a PCI bus address in the last 1MB of the 4GB
-	 * address range.
+	 * Window 1 is scatter-gather (up to) 1GB at 1GB
+	 * Window 2 is direct access 2GB at 2GB
 	 */
 	hose->sg_isa = iommu_arena_new(hose, 0x00800000, 0x00800000, 0);
-	{
-		unsigned long size = 0x08000000;
-		if (max_low_pfn > (0x80000000 >> PAGE_SHIFT))
-			size = 0x40000000;
-		hose->sg_pci = iommu_arena_new(hose, 0xc0000000, size, 0);
-	}
-	
-	__direct_map_base = 0x40000000;
+	hose->sg_pci = iommu_arena_new(hose, 0x40000000,
+				       size_for_memory(0x40000000), 0);
+
+	__direct_map_base = 0x80000000;
 	__direct_map_size = 0x80000000;
 
 	pchip->wsba[0].csr = hose->sg_isa->dma_base | 3;
 	pchip->wsm[0].csr  = (hose->sg_isa->size - 1) & 0xfff00000;
 	pchip->tba[0].csr  = virt_to_phys(hose->sg_isa->ptes);
 
-	pchip->wsba[1].csr = 0x40000000 | 1;
-	pchip->wsm[1].csr  = (0x40000000 - 1) & 0xfff00000;
-	pchip->tba[1].csr  = 0;
+	pchip->wsba[1].csr = hose->sg_pci->dma_base | 3;
+	pchip->wsm[1].csr  = (hose->sg_pci->size - 1) & 0xfff00000;
+	pchip->tba[1].csr  = virt_to_phys(hose->sg_pci->ptes);
 
 	pchip->wsba[2].csr = 0x80000000 | 1;
-	pchip->wsm[2].csr  = (0x40000000 - 1) & 0xfff00000;
-	pchip->tba[2].csr  = 0x40000000;
+	pchip->wsm[2].csr  = (0x80000000 - 1) & 0xfff00000;
+	pchip->tba[2].csr  = 0x80000000;
 
-	pchip->wsba[3].csr = hose->sg_pci->dma_base | 3;
-	pchip->wsm[3].csr  = (hose->sg_pci->size - 1) & 0xfff00000;
-	pchip->tba[3].csr  = virt_to_phys(hose->sg_pci->ptes);
-
-	tsunami_pci_tbi(hose, 0, -1);
+	pchip->wsba[3].csr = 0;
 
 	/* Enable the Monster Window to make DAC pci64 possible. */
-	tsunami_monster_window_enable(pchip);
+	pchip->pctl.csr |= pctl_m_mwin;
+
+	tsunami_pci_tbi(hose, 0, -1);
 }
 
 void __init

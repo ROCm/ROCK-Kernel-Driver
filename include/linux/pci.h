@@ -353,7 +353,7 @@ struct pci_dev {
 
 	struct pci_driver *driver;	/* which driver has allocated this device */
 	void		*driver_data;	/* data private to the driver */
-	dma_addr_t	dma_mask;	/* Mask of the bits of bus address this
+	u64		dma_mask;	/* Mask of the bits of bus address this
 					   device implements.  Normally this is
 					   0xffffffff.  You only need to change
 					   this if your device has broken DMA
@@ -559,7 +559,8 @@ int pci_write_config_dword(struct pci_dev *dev, int where, u32 val);
 int pci_enable_device(struct pci_dev *dev);
 void pci_disable_device(struct pci_dev *dev);
 void pci_set_master(struct pci_dev *dev);
-int pci_set_dma_mask(struct pci_dev *dev, dma_addr_t mask);
+int pci_set_dma_mask(struct pci_dev *dev, u64 mask);
+int pci_dac_set_dma_mask(struct pci_dev *dev, u64 mask);
 int pci_assign_resource(struct pci_dev *dev, int i);
 
 /* Power management related routines */
@@ -641,7 +642,8 @@ static inline void pci_set_master(struct pci_dev *dev) { }
 static inline int pci_enable_device(struct pci_dev *dev) { return -EIO; }
 static inline void pci_disable_device(struct pci_dev *dev) { }
 static inline int pci_module_init(struct pci_driver *drv) { return -ENODEV; }
-static inline int pci_set_dma_mask(struct pci_dev *dev, dma_addr_t mask) { return -EIO; }
+static inline int pci_set_dma_mask(struct pci_dev *dev, u64 mask) { return -EIO; }
+static inline int pci_dac_set_dma_mask(struct pci_dev *dev, u64 mask) { return -EIO; }
 static inline int pci_assign_resource(struct pci_dev *dev, int i) { return -EBUSY;}
 static inline int pci_register_driver(struct pci_driver *drv) { return 0;}
 static inline void pci_unregister_driver(struct pci_driver *drv) { }

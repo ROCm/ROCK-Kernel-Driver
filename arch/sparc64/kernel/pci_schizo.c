@@ -1,4 +1,4 @@
-/* $Id: pci_schizo.c,v 1.21 2001/08/24 19:36:58 kanoj Exp $
+/* $Id: pci_schizo.c,v 1.22 2001/10/11 00:44:38 davem Exp $
  * pci_schizo.c: SCHIZO specific PCI controller support.
  *
  * Copyright (C) 2001 David S. Miller (davem@redhat.com)
@@ -34,7 +34,8 @@
 	__asm__ __volatile__("stxa %0, [%1] %2" \
 			     : /* no outputs */ \
 			     : "r" (__val), "r" (__reg), \
-			       "i" (ASI_PHYS_BYPASS_EC_E))
+			       "i" (ASI_PHYS_BYPASS_EC_E) \
+			     : "memory")
 
 /* This is a convention that at least Excalibur and Merlin
  * follow.  I suppose the SCHIZO used in Starcat and friends

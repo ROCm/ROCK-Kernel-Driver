@@ -127,10 +127,16 @@ EXPORT_SYMBOL(__direct_map_size);
 EXPORT_SYMBOL(pci_alloc_consistent);
 EXPORT_SYMBOL(pci_free_consistent);
 EXPORT_SYMBOL(pci_map_single);
+EXPORT_SYMBOL(pci_map_page);
 EXPORT_SYMBOL(pci_unmap_single);
+EXPORT_SYMBOL(pci_unmap_page);
 EXPORT_SYMBOL(pci_map_sg);
 EXPORT_SYMBOL(pci_unmap_sg);
 EXPORT_SYMBOL(pci_dma_supported);
+EXPORT_SYMBOL(pci_dac_dma_supported);
+EXPORT_SYMBOL(pci_dac_page_to_dma);
+EXPORT_SYMBOL(pci_dac_dma_to_page);
+EXPORT_SYMBOL(pci_dac_dma_to_offset);
 #endif
 
 EXPORT_SYMBOL(dump_thread);

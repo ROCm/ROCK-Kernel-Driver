@@ -17,17 +17,18 @@
 
 #define DEBUG_ALLOC 0
 #if DEBUG_ALLOC > 0
-# define DBGA(args...)		printk(KERN_DEBUG ##args)
+# define DBGA(args...)		printk(KERN_DEBUG args)
 #else
 # define DBGA(args...)
 #endif
 #if DEBUG_ALLOC > 1
-# define DBGA2(args...)		printk(KERN_DEBUG ##args)
+# define DBGA2(args...)		printk(KERN_DEBUG args)
 #else
 # define DBGA2(args...)
 #endif
 
 #define DEBUG_NODIRECT 0
+#define DEBUG_FORCEDAC 0
 
 
 static inline unsigned long
@@ -43,6 +44,18 @@ calc_npages(long bytes)
 }
 
 
+/* Return the minimum of MAX or the first power of two larger
+   than main memory.  */
+
+unsigned long
+size_for_memory(unsigned long max)
+{
+	unsigned long mem = max_low_pfn << PAGE_SHIFT;
+	if (mem < max)
+		max = 1UL << ceil_log2(mem);
+	return max;
+}
+
 struct pci_iommu_arena *
 iommu_arena_new(struct pci_controller *hose, dma_addr_t base,
 		unsigned long window_size, unsigned long align)
@@ -163,8 +176,9 @@ iommu_arena_free(struct pci_iommu_arena *arena, long ofs, long n)
    Once the device is given the dma address, the device owns this memory
    until either pci_unmap_single or pci_dma_sync_single is performed.  */
 
-dma_addr_t
-pci_map_single(struct pci_dev *pdev, void *cpu_addr, long size, int direction)
+static dma_addr_t
+pci_map_single_1(struct pci_dev *pdev, void *cpu_addr, size_t size,
+		 int dac_allowed)
 {
 	struct pci_controller *hose = pdev ? pdev->sysdata : pci_isa_hose;
 	dma_addr_t max_dma = pdev ? pdev->dma_mask : 0x00ffffff;
@@ -173,10 +187,7 @@ pci_map_single(struct pci_dev *pdev, void *cpu_addr, long size, int direction)
 	unsigned long paddr;
 	dma_addr_t ret;
 
-	if (direction == PCI_DMA_NONE)
-		BUG();
-
-	paddr = virt_to_phys(cpu_addr);
+	paddr = __pa(cpu_addr);
 
 #if !DEBUG_NODIRECT
 	/* First check to see if we can use the direct map window.  */
@@ -184,12 +195,22 @@ pci_map_single(struct pci_dev *pdev, void *cpu_addr, long size, int direction)
 	    && paddr + size <= __direct_map_size) {
 		ret = paddr + __direct_map_base;
 
-		DBGA2("pci_map_single: [%p,%lx] -> direct %x from %p\n",
+		DBGA2("pci_map_single: [%p,%lx] -> direct %lx from %p\n",
 		      cpu_addr, size, ret, __builtin_return_address(0));
 
 		return ret;
 	}
 #endif
+
+	/* Next, use DAC if selected earlier.  */
+	if (dac_allowed) {
+		ret = paddr + alpha_mv.pci_dac_offset;
+
+		DBGA2("pci_map_single: [%p,%lx] -> DAC %lx from %p\n",
+		      cpu_addr, size, ret, __builtin_return_address(0));
+
+		return ret;
+	}
 
 	/* If the machine doesn't define a pci_tbi routine, we have to
 	   assume it doesn't support sg mapping.  */
@@ -217,12 +238,30 @@ pci_map_single(struct pci_dev *pdev, void *cpu_addr, long size, int direction)
 	ret = arena->dma_base + dma_ofs * PAGE_SIZE;
 	ret += (unsigned long)cpu_addr & ~PAGE_MASK;
 
-	DBGA("pci_map_single: [%p,%lx] np %ld -> sg %x from %p\n",
-	     cpu_addr, size, npages, ret, __builtin_return_address(0));
+	DBGA2("pci_map_single: [%p,%lx] np %ld -> sg %lx from %p\n",
+	      cpu_addr, size, npages, ret, __builtin_return_address(0));
 
 	return ret;
 }
 
+dma_addr_t
+pci_map_single(struct pci_dev *pdev, void *cpu_addr, size_t size, int dir)
+{
+	if (dir == PCI_DMA_NONE)
+		BUG();
+	return pci_map_single_1(pdev, cpu_addr, size,
+			        (pdev->dma_mask >> 32) != 0);
+}
+
+dma_addr_t
+pci_map_page(struct pci_dev *pdev, struct page *page, unsigned long offset,
+	     size_t size, int dir)
+{
+	if (dir == PCI_DMA_NONE)
+		BUG();
+	return pci_map_single_1(pdev, (char *)page_address(page) + offset,
+			        size, (pdev->dma_mask >> 32) != 0);
+}
 
 /* Unmap a single streaming mode DMA translation.  The DMA_ADDR and
    SIZE must match what was provided for in a previous pci_map_single
@@ -231,7 +270,7 @@ pci_map_single(struct pci_dev *pdev, void *cpu_addr, long size, int direction)
    wrote there.  */
 
 void
-pci_unmap_single(struct pci_dev *pdev, dma_addr_t dma_addr, long size,
+pci_unmap_single(struct pci_dev *pdev, dma_addr_t dma_addr, size_t size,
 		 int direction)
 {
 	unsigned long flags;
@@ -242,17 +281,21 @@ pci_unmap_single(struct pci_dev *pdev, dma_addr_t dma_addr, long size,
 	if (direction == PCI_DMA_NONE)
 		BUG();
 
-#if !DEBUG_NODIRECT
 	if (dma_addr >= __direct_map_base
 	    && dma_addr < __direct_map_base + __direct_map_size) {
 		/* Nothing to do.  */
 
-		DBGA2("pci_unmap_single: direct [%x,%lx] from %p\n",
+		DBGA2("pci_unmap_single: direct [%lx,%lx] from %p\n",
 		      dma_addr, size, __builtin_return_address(0));
 
 		return;
 	}
-#endif
+
+	if (dma_addr > 0xffffffff) {
+		DBGA2("pci64_unmap_single: DAC [%lx,%lx] from %p\n",
+		      dma_addr, size, __builtin_return_address(0));
+		return;
+	}
 
 	arena = hose->sg_pci;
 	if (!arena || dma_addr < arena->dma_base)
@@ -260,7 +303,7 @@ pci_unmap_single(struct pci_dev *pdev, dma_addr_t dma_addr, long size,
 
 	dma_ofs = (dma_addr - arena->dma_base) >> PAGE_SHIFT;
 	if (dma_ofs * PAGE_SIZE >= arena->size) {
-		printk(KERN_ERR "Bogus pci_unmap_single: dma_addr %x "
+		printk(KERN_ERR "Bogus pci_unmap_single: dma_addr %lx "
 		       " base %x size %x\n", dma_addr, arena->dma_base,
 		       arena->size);
 		return;
@@ -273,21 +316,24 @@ pci_unmap_single(struct pci_dev *pdev, dma_addr_t dma_addr, long size,
 
 	iommu_arena_free(arena, dma_ofs, npages);
 
-
-        /*
-	   If we're freeing ptes above the `next_entry' pointer (they
+        /* If we're freeing ptes above the `next_entry' pointer (they
            may have snuck back into the TLB since the last wrap flush),
-           we need to flush the TLB before reallocating the latter.
-	*/
+           we need to flush the TLB before reallocating the latter.  */
 	if (dma_ofs >= arena->next_entry)
 		alpha_mv.mv_pci_tbi(hose, dma_addr, dma_addr + size - 1);
 
 	spin_unlock_irqrestore(&arena->lock, flags);
 
-	DBGA("pci_unmap_single: sg [%x,%lx] np %ld from %p\n",
-	     dma_addr, size, npages, __builtin_return_address(0));
+	DBGA2("pci_unmap_single: sg [%lx,%lx] np %ld from %p\n",
+	      dma_addr, size, npages, __builtin_return_address(0));
 }
 
+void
+pci_unmap_page(struct pci_dev *pdev, dma_addr_t dma_addr,
+	       size_t size, int direction)
+{
+	pci_unmap_single(pdev, dma_addr, size, direction);
+}
 
 /* Allocate and map kernel buffer using consistent mode DMA for PCI
    device.  Returns non-NULL cpu-view pointer to the buffer if
@@ -295,7 +341,7 @@ pci_unmap_single(struct pci_dev *pdev, dma_addr_t dma_addr, long size,
    else DMA_ADDRP is undefined.  */
 
 void *
-pci_alloc_consistent(struct pci_dev *pdev, long size, dma_addr_t *dma_addrp)
+pci_alloc_consistent(struct pci_dev *pdev, size_t size, dma_addr_t *dma_addrp)
 {
 	void *cpu_addr;
 	long order = get_order(size);
@@ -311,8 +357,7 @@ pci_alloc_consistent(struct pci_dev *pdev, long size, dma_addr_t *dma_addrp)
 	}
 	memset(cpu_addr, 0, size);
 
-	*dma_addrp = pci_map_single(pdev, cpu_addr, size,
-				    PCI_DMA_BIDIRECTIONAL);
+	*dma_addrp = pci_map_single_1(pdev, cpu_addr, size, 0);
 	if (*dma_addrp == 0) {
 		free_pages((unsigned long)cpu_addr, order);
 		return NULL;
@@ -324,7 +369,6 @@ pci_alloc_consistent(struct pci_dev *pdev, long size, dma_addr_t *dma_addrp)
 	return cpu_addr;
 }
 
-
 /* Free and unmap a consistent DMA buffer.  CPU_ADDR and DMA_ADDR must
    be values that were returned from pci_alloc_consistent.  SIZE must
    be the same as what as passed into pci_alloc_consistent.
@@ -332,7 +376,7 @@ pci_alloc_consistent(struct pci_dev *pdev, long size, dma_addr_t *dma_addrp)
    DMA_ADDR past this call are illegal.  */
 
 void
-pci_free_consistent(struct pci_dev *pdev, long size, void *cpu_addr,
+pci_free_consistent(struct pci_dev *pdev, size_t size, void *cpu_addr,
 		    dma_addr_t dma_addr)
 {
 	pci_unmap_single(pdev, dma_addr, size, PCI_DMA_BIDIRECTIONAL);
@@ -352,27 +396,35 @@ pci_free_consistent(struct pci_dev *pdev, long size, void *cpu_addr,
    Write dma_length of each leader with the combined lengths of
    the mergable followers.  */
 
+#define SG_ENT_VIRT_ADDRESS(SG)				\
+	((SG)->address					\
+	 ? (SG)->address				\
+	 : page_address((SG)->page) + (SG)->offset)
+
+#define SG_ENT_PHYS_ADDRESS(SG)	\
+        __pa(SG_ENT_VIRT_ADDRESS(SG))
+
 static void
 sg_classify(struct scatterlist *sg, struct scatterlist *end, int virt_ok)
 {
-	unsigned long next_vaddr;
+	unsigned long next_paddr;
 	struct scatterlist *leader;
 	long leader_flag, leader_length;
 
 	leader = sg;
 	leader_flag = 0;
 	leader_length = leader->length;
-	next_vaddr = (unsigned long)leader->address + leader_length;
+	next_paddr = SG_ENT_PHYS_ADDRESS(leader) + leader_length;
 
 	for (++sg; sg < end; ++sg) {
 		unsigned long addr, len;
-		addr = (unsigned long) sg->address;
+		addr = SG_ENT_PHYS_ADDRESS(sg);
 		len = sg->length;
 
-		if (next_vaddr == addr) {
+		if (next_paddr == addr) {
 			sg->dma_address = -1;
 			leader_length += len;
-		} else if (((next_vaddr | addr) & ~PAGE_MASK) == 0 && virt_ok) {
+		} else if (((next_paddr | addr) & ~PAGE_MASK) == 0 && virt_ok) {
 			sg->dma_address = -2;
 			leader_flag = 1;
 			leader_length += len;
@@ -384,7 +436,7 @@ sg_classify(struct scatterlist *sg, struct scatterlist *end, int virt_ok)
 			leader_length = len;
 		}
 
-		next_vaddr = addr + len;
+		next_paddr = addr + len;
 	}
 
 	leader->dma_address = leader_flag;
@@ -397,9 +449,9 @@ sg_classify(struct scatterlist *sg, struct scatterlist *end, int virt_ok)
 static inline int
 sg_fill(struct scatterlist *leader, struct scatterlist *end,
 	struct scatterlist *out, struct pci_iommu_arena *arena,
-	dma_addr_t max_dma)
+	dma_addr_t max_dma, int dac_allowed)
 {
-	unsigned long paddr = virt_to_phys(leader->address);
+	unsigned long paddr = SG_ENT_PHYS_ADDRESS(leader);
 	long size = leader->dma_length;
 	struct scatterlist *sg;
 	unsigned long *ptes;
@@ -414,12 +466,23 @@ sg_fill(struct scatterlist *leader, struct scatterlist *end,
 		out->dma_address = paddr + __direct_map_base;
 		out->dma_length = size;
 
-		DBGA("    sg_fill: [%p,%lx] -> direct %x\n",
-		     leader->address, size, out->dma_address);
+		DBGA("    sg_fill: [%p,%lx] -> direct %lx\n",
+		     __va(paddr), size, out->dma_address);
 
 		return 0;
 	}
 #endif
+
+	/* If physically contiguous and DAC is available, use it.  */
+	if (leader->dma_address == 0 && dac_allowed) {
+		out->dma_address = paddr + alpha_mv.pci_dac_offset;
+		out->dma_length = size;
+
+		DBGA("    sg_fill: [%p,%lx] -> DAC %lx\n",
+		     __va(paddr), size, out->dma_address);
+
+		return 0;
+	}
 
 	/* Otherwise, we'll use the iommu to make the pages virtually
 	   contiguous.  */
@@ -433,17 +496,16 @@ sg_fill(struct scatterlist *leader, struct scatterlist *end,
 			return -1;
 
 		/* Otherwise, break up the remaining virtually contiguous
-		   hunks into individual direct maps.  */
+		   hunks into individual direct maps and retry.  */
 		sg_classify(leader, end, 0);
-		/* Retry.  */
-		return sg_fill(leader, end, out, arena, max_dma);
+		return sg_fill(leader, end, out, arena, max_dma, dac_allowed);
 	}
 
 	out->dma_address = arena->dma_base + dma_ofs*PAGE_SIZE + paddr;
 	out->dma_length = size;
 
-	DBGA("    sg_fill: [%p,%lx] -> sg %x np %ld\n",
-	     leader->address, size, out->dma_address, npages);
+	DBGA("    sg_fill: [%p,%lx] -> sg %lx np %ld\n",
+	     __va(paddr), size, out->dma_address, npages);
 
 	/* All virtually contiguous.  We need to find the length of each
 	   physically contiguous subsegment to fill in the ptes.  */
@@ -455,7 +517,7 @@ sg_fill(struct scatterlist *leader, struct scatterlist *end,
 #endif
 
 		size = sg->length;
-		paddr = virt_to_phys(sg->address);
+		paddr = SG_ENT_PHYS_ADDRESS(sg);
 
 		while (sg+1 < end && (int) sg[1].dma_address == -1) {
 			size += sg[1].length;
@@ -470,11 +532,11 @@ sg_fill(struct scatterlist *leader, struct scatterlist *end,
 
 #if DEBUG_ALLOC > 0
 		DBGA("    (%ld) [%p,%x] np %ld\n",
-		     last_sg - leader, last_sg->address,
+		     last_sg - leader, SG_ENT_VIRT_ADDRESS(last_sg),
 		     last_sg->length, npages);
 		while (++last_sg <= sg) {
 			DBGA("        (%ld) [%p,%x] cont\n",
-			     last_sg - leader, last_sg->address,
+			     last_sg - leader, SG_ENT_VIRT_ADDRESS(last_sg),
 			     last_sg->length);
 		}
 #endif
@@ -491,15 +553,19 @@ pci_map_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
 	struct pci_controller *hose;
 	struct pci_iommu_arena *arena;
 	dma_addr_t max_dma;
+	int dac_allowed;
 
 	if (direction == PCI_DMA_NONE)
 		BUG();
+
+	dac_allowed = ((pdev->dma_mask >> 32) != 0);
 
 	/* Fast path single entry scatterlists.  */
 	if (nents == 1) {
 		sg->dma_length = sg->length;
 		sg->dma_address
-		  = pci_map_single(pdev, sg->address, sg->length, direction);
+		  = pci_map_single_1(pdev, SG_ENT_VIRT_ADDRESS(sg),
+				     sg->length, dac_allowed);
 		return sg->dma_address != 0;
 	}
 
@@ -527,7 +593,7 @@ pci_map_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
 	for (out = sg; sg < end; ++sg) {
 		if ((int) sg->dma_address < 0)
 			continue;
-		if (sg_fill(sg, end, out, arena, max_dma) < 0)
+		if (sg_fill(sg, end, out, arena, max_dma, dac_allowed) < 0)
 			goto error;
 		out++;
 	}
@@ -542,7 +608,7 @@ pci_map_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
 
 	return out - start;
 
-error:
+ error:
 	printk(KERN_WARNING "pci_map_sg failed: "
 	       "could not allocate dma page tables\n");
 
@@ -552,7 +618,6 @@ error:
 		pci_unmap_sg(pdev, start, out - start, direction);
 	return 0;
 }
-
 
 /* Unmap a set of streaming mode DMA translations.  Again, cpu read
    rules concerning calls here are the same as for pci_unmap_single()
@@ -586,7 +651,8 @@ pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
 	spin_lock_irqsave(&arena->lock, flags);
 
 	for (end = sg + nents; sg < end; ++sg) {
-		unsigned long addr, size;
+		dma64_addr_t addr;
+		size_t size;
 		long npages, ofs;
 		dma_addr_t tend;
 
@@ -595,7 +661,13 @@ pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
 		if (!size)
 			break;
 
-#if !DEBUG_NODIRECT
+		if (addr > 0xffffffff) {
+			/* It's a DAC address -- nothing to do.  */
+			DBGA("    (%ld) DAC [%lx,%lx]\n",
+			      sg - end + nents, addr, size);
+			continue;
+		}
+
 		if (addr >= __direct_map_base
 		    && addr < __direct_map_base + __direct_map_size) {
 			/* Nothing to do.  */
@@ -603,7 +675,6 @@ pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
 			      sg - end + nents, addr, size);
 			continue;
 		}
-#endif
 
 		DBGA("    (%ld) sg [%lx,%lx]\n",
 		     sg - end + nents, addr, size);
@@ -617,29 +688,27 @@ pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
 		if (fend < tend) fend = tend;
 	}
 
-        /*
-	   If we're freeing ptes above the `next_entry' pointer (they
+        /* If we're freeing ptes above the `next_entry' pointer (they
            may have snuck back into the TLB since the last wrap flush),
-           we need to flush the TLB before reallocating the latter.
-	*/
+           we need to flush the TLB before reallocating the latter.  */
 	if ((fend - arena->dma_base) >> PAGE_SHIFT >= arena->next_entry)
 		alpha_mv.mv_pci_tbi(hose, fbeg, fend);
 
 	spin_unlock_irqrestore(&arena->lock, flags);
 
-	DBGA("pci_unmap_sg: %d entries\n", nents - (end - sg));
+	DBGA("pci_unmap_sg: %ld entries\n", nents - (end - sg));
 }
+
 
 /* Return whether the given PCI device DMA address mask can be
    supported properly.  */
 
 int
-pci_dma_supported(struct pci_dev *pdev, dma_addr_t mask)
+pci_dma_supported(struct pci_dev *pdev, u64 mask)
 {
 	struct pci_controller *hose;
 	struct pci_iommu_arena *arena;
 
-#if !DEBUG_NODIRECT
 	/* If there exists a direct map, and the mask fits either
 	   MAX_DMA_ADDRESS defined such that GFP_DMA does something
 	   useful, or the total system memory as shifted by the
@@ -648,7 +717,6 @@ pci_dma_supported(struct pci_dev *pdev, dma_addr_t mask)
 	    && (__direct_map_base + MAX_DMA_ADDRESS-IDENT_ADDR-1 <= mask
 		|| __direct_map_base + (max_low_pfn<<PAGE_SHIFT)-1 <= mask))
 		return 1;
-#endif
 
 	/* Check that we have a scatter-gather arena that fits.  */
 	hose = pdev ? pdev->sysdata : pci_isa_hose;
@@ -758,4 +826,50 @@ iommu_unbind(struct pci_iommu_arena *arena, long pg_start, long pg_count)
 		p[i] = IOMMU_RESERVED_PTE;
 
 	return 0;
+}
+
+/* True if the machine supports DAC addressing, and DEV can
+   make use of it given MASK.  */
+
+int
+pci_dac_dma_supported(struct pci_dev *dev, u64 mask)
+{
+	dma64_addr_t dac_offset = alpha_mv.pci_dac_offset;
+	int ok = 1;
+
+	/* If this is not set, the machine doesn't support DAC at all.  */
+	if (dac_offset == 0)
+		ok = 0;
+
+	/* The device has to be able to address our DAC bit.  */
+	if ((dac_offset & dev->dma_mask) != dac_offset)
+		ok = 0;
+
+	/* If both conditions above are met, we are fine. */
+	DBGA("pci_dac_dma_supported %s from %p\n",
+	     ok ? "yes" : "no", __builtin_return_address(0));
+
+	return ok;
+}
+
+dma64_addr_t
+pci_dac_page_to_dma(struct pci_dev *pdev, struct page *page,
+		    unsigned long offset, int direction)
+{
+	return (alpha_mv.pci_dac_offset
+		+ __pa(page_address(page)) 
+		+ (dma64_addr_t) offset);
+}
+
+struct page *
+pci_dac_dma_to_page(struct pci_dev *pdev, dma64_addr_t dma_addr)
+{
+	unsigned long paddr = (dma_addr & PAGE_MASK) - alpha_mv.pci_dac_offset;
+	return virt_to_page(__va(paddr));
+}
+
+unsigned long
+pci_dac_dma_to_offset(struct pci_dev *pdev, dma64_addr_t dma_addr)
+{
+	return (dma_addr & ~PAGE_MASK);
 }

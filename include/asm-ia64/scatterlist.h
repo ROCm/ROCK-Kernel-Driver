@@ -8,11 +8,6 @@
 
 struct scatterlist {
 	char *address;		/* location data is to be transferred to */
-	/*
-	 * Location of actual buffer if ADDRESS points to a DMA
-	 * indirection buffer, NULL otherwise:
-	 */
-	char *alt_address;
 	char *orig_address;	/* Save away the original buffer address (used by pci-dma.c) */
 	unsigned int length;	/* buffer length */
 };

@@ -13,6 +13,16 @@ lbalance.o ibalance.o stree.o hashes.o buffer2.o tail_conversion.o journal.o res
 
 obj-m   := $(O_TARGET)
 
+# gcc -O2 (the kernel default)  is overaggressive on ppc when many inline
+# functions are used.  This causes the compiler to advance the stack
+# pointer out of the available stack space, corrupting kernel space,
+# and causing a panic. Since this behavior only affects ppc, this ifeq
+# will work around it. If any other architecture displays this behavior,
+# add it here.
+ifeq ($(shell uname -m),ppc) 
+EXTRA_CFLAGS := -O1
+endif
+
 include $(TOPDIR)/Rules.make
 
 TAGS:

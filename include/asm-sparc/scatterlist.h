@@ -1,4 +1,4 @@
-/* $Id: scatterlist.h,v 1.5 2000/01/29 16:27:07 jj Exp $ */
+/* $Id: scatterlist.h,v 1.6 2001/10/09 02:24:35 davem Exp $ */
 #ifndef _SPARC_SCATTERLIST_H
 #define _SPARC_SCATTERLIST_H
 
@@ -6,8 +6,6 @@
 
 struct scatterlist {
     char *  address;    /* Location data is to be transferred to */
-    char * alt_address; /* Location of actual if address is a 
-			 * dma indirect buffer.  NULL otherwise */
     unsigned int length;
 
     __u32 dvma_address; /* A place to hang host-specific addresses at. */

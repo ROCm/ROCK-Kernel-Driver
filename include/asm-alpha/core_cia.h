@@ -263,6 +263,9 @@
 #define PYXIS_IIC_CTRL			(IDENT_ADDR + 0x87A00002C0UL)
 #define PYXIS_RESET			(IDENT_ADDR + 0x8780000900UL)
 
+/* Offset between ram physical addresses and pci64 DAC bus addresses.  */
+#define PYXIS_DAC_OFFSET		(1UL << 40)
+
 /*
  * Data structure for handling CIA machine checks.
  */

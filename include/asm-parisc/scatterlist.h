@@ -3,8 +3,6 @@
 
 struct scatterlist {
 	char *  address;    /* Location data is to be transferred to */
-	char * alt_address; /* Location of actual if address is a 
-			     * dma indirect buffer.  NULL otherwise */
 	unsigned int length;
 
 	/* an IOVA can be 64-bits on some PA-Risc platforms. */

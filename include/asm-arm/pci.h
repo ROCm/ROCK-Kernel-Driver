@@ -160,7 +160,7 @@ pci_dma_sync_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int d
  * only drive the low 24-bits during PCI bus mastering, then
  * you would pass 0x00ffffff as the mask to this function.
  */
-static inline int pci_dma_supported(struct pci_dev *hwdev, dma_addr_t mask)
+static inline int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
 {
 	return 1;
 }

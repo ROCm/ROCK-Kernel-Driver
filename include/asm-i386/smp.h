@@ -109,7 +109,7 @@ static __inline int hard_smp_processor_id(void)
 	return GET_APIC_ID(*(unsigned long *)(APIC_BASE+APIC_ID));
 }
 
-extern __inline int logical_smp_processor_id(void)
+static __inline int logical_smp_processor_id(void)
 {
 	/* we don't want to mark this access volatile - bad code generation */
 	return GET_APIC_LOGICAL_ID(*(unsigned long *)(APIC_BASE+APIC_LDR));

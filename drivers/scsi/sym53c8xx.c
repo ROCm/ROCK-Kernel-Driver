@@ -987,8 +987,8 @@ static m_addr_t ___dma_getp(m_pool_s *mp)
 	if (vbp) {
 		dma_addr_t daddr;
 		vp = (m_addr_t) pci_alloc_consistent(mp->bush,
-						PAGE_SIZE<<MEMO_PAGE_ORDER,
-						&daddr);
+						     PAGE_SIZE<<MEMO_PAGE_ORDER,
+						     &daddr);
 		if (vp) {
 			int hc = VTOB_HASH_CODE(vp);
 			vbp->vaddr = vp;
@@ -1138,26 +1138,26 @@ static m_addr_t __vtobus(m_bush_t bush, void *m)
 /* Linux version with pci bus iommu kernel interface */
 
 /* To keep track of the dma mapping (sg/single) that has been set */
-#define __data_mapped	SCp.phase
-#define __data_mapping	SCp.have_data_in
+#define __data_mapped(cmd)	(cmd)->SCp.phase
+#define __data_mapping(cmd)	(cmd)->SCp.dma_handle
 
 static void __unmap_scsi_data(pcidev_t pdev, Scsi_Cmnd *cmd)
 {
 	int dma_dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
 
-	switch(cmd->__data_mapped) {
+	switch(__data_mapped(cmd)) {
 	case 2:
 		pci_unmap_sg(pdev, cmd->buffer, cmd->use_sg, dma_dir);
 		break;
 	case 1:
-		pci_unmap_single(pdev, cmd->__data_mapping,
-				 cmd->request_bufflen, dma_dir);
+		pci_unmap_page(pdev, __data_mapping(cmd),
+			       cmd->request_bufflen, dma_dir);
 		break;
 	}
-	cmd->__data_mapped = 0;
+	__data_mapped(cmd) = 0;
 }
 
-static u_long __map_scsi_single_data(pcidev_t pdev, Scsi_Cmnd *cmd)
+static dma_addr_t __map_scsi_single_data(pcidev_t pdev, Scsi_Cmnd *cmd)
 {
 	dma_addr_t mapping;
 	int dma_dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
@@ -1165,10 +1165,13 @@ static u_long __map_scsi_single_data(pcidev_t pdev, Scsi_Cmnd *cmd)
 	if (cmd->request_bufflen == 0)
 		return 0;
 
-	mapping = pci_map_single(pdev, cmd->request_buffer,
-				 cmd->request_bufflen, dma_dir);
-	cmd->__data_mapped = 1;
-	cmd->__data_mapping = mapping;
+	mapping = pci_map_page(pdev,
+			       virt_to_page(cmd->request_buffer),
+			       ((unsigned long)cmd->request_buffer &
+				~PAGE_MASK),
+			       cmd->request_bufflen, dma_dir);
+	__data_mapped(cmd) = 1;
+	__data_mapping(cmd) = mapping;
 
 	return mapping;
 }
@@ -1182,8 +1185,8 @@ static int __map_scsi_sg_data(pcidev_t pdev, Scsi_Cmnd *cmd)
 		return 0;
 
 	use_sg = pci_map_sg(pdev, cmd->buffer, cmd->use_sg, dma_dir);
-	cmd->__data_mapped = 2;
-	cmd->__data_mapping = use_sg;
+	__data_mapped(cmd) = 2;
+	__data_mapping(cmd) = use_sg;
 
 	return use_sg;
 }
@@ -1192,12 +1195,12 @@ static void __sync_scsi_data(pcidev_t pdev, Scsi_Cmnd *cmd)
 {
 	int dma_dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
 
-	switch(cmd->__data_mapped) {
+	switch(__data_mapped(cmd)) {
 	case 2:
 		pci_dma_sync_sg(pdev, cmd->buffer, cmd->use_sg, dma_dir);
 		break;
 	case 1:
-		pci_dma_sync_single(pdev, cmd->__data_mapping,
+		pci_dma_sync_single(pdev, __data_mapping(cmd),
 				    cmd->request_bufflen, dma_dir);
 		break;
 	}
@@ -5029,12 +5032,12 @@ static int __init ncr_prepare_setting(ncb_p np, ncr_nvram *nvram)
 	/*
 	**	64 bit (53C895A or 53C896) ?
 	*/
-	if (np->features & FE_DAC)
-#ifdef SCSI_NCR_USE_64BIT_DAC
-		np->rv_ccntl1	|= (XTIMOD | EXTIBMV);
-#else
-		np->rv_ccntl1	|= (DDAC);
-#endif
+	if (np->features & FE_DAC) {
+		if (np->features & FE_DAC_IN_USE)
+			np->rv_ccntl1	|= (XTIMOD | EXTIBMV);
+		else
+			np->rv_ccntl1	|= (DDAC);
+	}
 
 	/*
 	**	Phase mismatch handled by SCRIPTS (53C895A, 53C896 or C1010) ?
@@ -12068,15 +12071,9 @@ fail:
 **	code will get more complex later).
 */
 
-#ifdef SCSI_NCR_USE_64BIT_DAC
 #define SCATTER_ONE(data, badd, len)					\
 	(data)->addr = cpu_to_scr(badd);				\
 	(data)->size = cpu_to_scr((((badd) >> 8) & 0xff000000) + len);
-#else
-#define SCATTER_ONE(data, badd, len)		\
-	(data)->addr = cpu_to_scr(badd);	\
-	(data)->size = cpu_to_scr(len);
-#endif
 
 #define CROSS_16MB(p, n) (((((u_long) p) + n - 1) ^ ((u_long) p)) & ~0xffffff)
 
@@ -12088,7 +12085,7 @@ static	int ncr_scatter_no_sglist(ncb_p np, ccb_p cp, Scsi_Cmnd *cmd)
 	cp->data_len = cmd->request_bufflen;
 
 	if (cmd->request_bufflen) {
-		u_long baddr = map_scsi_single_data(np, cmd);
+		dma_addr_t baddr = map_scsi_single_data(np, cmd);
 
 		SCATTER_ONE(data, baddr, cmd->request_bufflen);
 		if (CROSS_16MB(baddr, cmd->request_bufflen)) {
@@ -12139,7 +12136,7 @@ static int ncr_scatter_896R1(ncb_p np, ccb_p cp, Scsi_Cmnd *cmd)
 		data = &cp->phys.data[MAX_SCATTER - use_sg];
 
 		for (segn = 0; segn < use_sg; segn++) {
-			u_long baddr = scsi_sg_dma_address(&scatter[segn]);
+			dma_addr_t baddr = scsi_sg_dma_address(&scatter[segn]);
 			unsigned int len = scsi_sg_dma_len(&scatter[segn]);
 
 			SCATTER_ONE(&data[segn],
@@ -12178,7 +12175,7 @@ static int ncr_scatter(ncb_p np, ccb_p cp, Scsi_Cmnd *cmd)
 		data = &cp->phys.data[MAX_SCATTER - use_sg];
 
 		for (segment = 0; segment < use_sg; segment++) {
-			u_long baddr = scsi_sg_dma_address(&scatter[segment]);
+			dma_addr_t baddr = scsi_sg_dma_address(&scatter[segment]);
 			unsigned int len = scsi_sg_dma_len(&scatter[segment]);
 
 			SCATTER_ONE(&data[segment],
@@ -13098,14 +13095,6 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, ncr_device *device)
 		(int) (PciDeviceFn(pdev) & 0xf8) >> 3,
 		(int) (PciDeviceFn(pdev) & 7));
 
-#ifdef SCSI_NCR_DYNAMIC_DMA_MAPPING
-	if (pci_set_dma_mask(pdev, (dma_addr_t) (0xffffffffUL))) {
-		printk(KERN_WARNING NAME53C8XX
-		       "32 BIT PCI BUS DMA ADDRESSING NOT SUPPORTED\n");
-		return -1;
-	}
-#endif
-
 	/*
 	**    Read info from the PCI config space.
 	**    pci_read_config_xxx() functions are assumed to be used for 
@@ -13172,6 +13161,28 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, ncr_device *device)
 		chip->revision_id = revision;
 		break;
 	}
+
+#ifdef SCSI_NCR_DYNAMIC_DMA_MAPPING
+	/* Configure DMA attributes.  For DAC capable boards, we can encode
+	** 32+8 bits for SCSI DMA data addresses with the extra bits used
+	** in the size field.  We use normal 32-bit PCI addresses for
+	** descriptors.
+	*/
+	if (chip->features & FE_DAC) {
+		if (pci_set_dma_mask(pdev, (u64) 0xffffffffff))
+			chip->features &= ~FE_DAC_IN_USE;
+		else
+			chip->features |= FE_DAC_IN_USE;
+	}
+
+	if (!(chip->features & FE_DAC_IN_USE)) {
+		if (pci_set_dma_mask(pdev, (u64) 0xffffffff)) {
+			printk(KERN_WARNING NAME53C8XX
+			       "32 BIT PCI BUS DMA ADDRESSING NOT SUPPORTED\n");
+			return -1;
+		}
+	}
+#endif
 
 	/*
 	**	Ignore Symbios chips controlled by SISL RAID controller.
@@ -13609,8 +13620,8 @@ printk("sym53c8xx_queue_command\n");
      cmd->SCp.ptr       = NULL;
      cmd->SCp.buffer    = NULL;
 #ifdef SCSI_NCR_DYNAMIC_DMA_MAPPING
-     cmd->__data_mapped = 0;
-     cmd->__data_mapping = 0;
+     __data_mapped(cmd) = 0;
+     __data_mapping(cmd) = 0;
 #endif
 
      NCR_LOCK_NCB(np, flags);

@@ -1,4 +1,4 @@
-/* $Id: iommu_common.h,v 1.3 2001/08/24 19:36:58 kanoj Exp $
+/* $Id: iommu_common.h,v 1.4 2001/10/09 02:24:33 davem Exp $
  * iommu_common.h: UltraSparc SBUS/PCI common iommu declarations.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -34,10 +34,7 @@
 #undef VERIFY_SG
 
 #ifdef VERIFY_SG
-int verify_lengths(struct scatterlist *sg, int nents, int npages);
-int verify_one_map(struct scatterlist *dma_sg, struct scatterlist **__sg, int nents, iopte_t **__iopte);
-int verify_maps(struct scatterlist *sg, int nents, iopte_t *iopte);
-void verify_sglist(struct scatterlist *sg, int nents, iopte_t *iopte, int npages);
+extern void verify_sglist(struct scatterlist *sg, int nents, iopte_t *iopte, int npages);
 #endif
 
 /* Two addresses are "virtually contiguous" if and only if:
@@ -47,4 +44,4 @@ void verify_sglist(struct scatterlist *sg, int nents, iopte_t *iopte, int npages
 #define VCONTIG(__X, __Y)	(((__X) == (__Y)) || \
 				 (((__X) | (__Y)) << (64UL - PAGE_SHIFT)) == 0UL)
 
-unsigned long prepare_sg(struct scatterlist *sg, int nents);
+extern unsigned long prepare_sg(struct scatterlist *sg, int nents);

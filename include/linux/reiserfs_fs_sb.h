@@ -65,6 +65,57 @@ struct reiserfs_super_block
 } __attribute__ ((__packed__));
 
 #define SB_SIZE (sizeof(struct reiserfs_super_block))
+/* struct reiserfs_super_block accessors/mutators
+ * since this is a disk structure, it will always be in 
+ * little endian format. */
+#define sb_block_count(sbp)           (le32_to_cpu((sbp)->s_block_count))
+#define set_sb_block_count(sbp,v)     ((sbp)->s_block_count = cpu_to_le32(v))
+#define sb_free_blocks(sbp)           (le32_to_cpu((sbp)->s_free_blocks))
+#define set_sb_free_blocks(sbp,v)     ((sbp)->s_free_blocks = cpu_to_le32(v))
+#define sb_root_block(sbp)            (le32_to_cpu((sbp)->s_root_block))
+#define set_sb_root_block(sbp,v)      ((sbp)->s_root_block = cpu_to_le32(v))
+#define sb_journal_block(sbp)         (le32_to_cpu((sbp)->s_journal_block))
+#define set_sb_journal_block(sbp,v)   ((sbp)->s_journal_block = cpu_to_le32(v))
+#define sb_journal_dev(sbp)           (le32_to_cpu((sbp)->s_journal_dev))
+#define set_sb_journal_dev(sbp,v)     ((sbp)->s_journal_dev = cpu_to_le32(v))
+#define sb_orig_journal_size(sbp)   (le32_to_cpu((sbp)->s_orig_journal_size))
+#define set_sb_orig_journal_size(sbp,v) \
+                            ((sbp)->s_orig_journal_size = cpu_to_le32(v))
+#define sb_journal_trans_max(sbp)     (le32_to_cpu((sbp)->s_journal_trans_max))
+#define set_journal_trans_max(sbp,v) \
+                            ((sbp)->s_journal_trans_max = cpu_to_le32(v))
+#define sb_journal_block_count(sbp)  (le32_to_cpu((sbp)->journal_block_count))
+#define sb_set_journal_block_count(sbp,v) \
+                            ((sbp)->s_journal_block_count = cpu_to_le32(v))
+#define sb_journal_max_batch(sbp)     (le32_to_cpu((sbp)->s_journal_max_batch))
+#define set_sb_journal_max_batch(sbp,v) \
+                            ((sbp)->s_journal_max_batch = cpu_to_le32(v))
+#define sb_jourmal_max_commit_age(sbp) \
+                            (le32_to_cpu((sbp)->s_journal_max_commit_age))
+#define set_sb_journal_max_commit_age(sbp,v) \
+                            ((sbp)->s_journal_max_commit_age = cpu_to_le32(v))
+#define sb_jourmal_max_trans_age(sbp) \
+                            (le32_to_cpu((sbp)->s_journal_max_trans_age))
+#define set_sb_journal_max_trans_age(sbp,v) \
+                            ((sbp)->s_journal_max_trans_age = cpu_to_le32(v))
+#define sb_blocksize(sbp)             (le16_to_cpu((sbp)->s_blocksize))
+#define set_sb_blocksize(sbp,v)       ((sbp)->s_blocksize = cpu_to_le16(v))
+#define sb_oid_maxsize(sbp)           (le16_to_cpu((sbp)->s_oid_maxsize))
+#define set_sb_oid_maxsize(sbp,v)     ((sbp)->s_oid_maxsize = cpu_to_le16(v))
+#define sb_oid_cursize(sbp)           (le16_to_cpu((sbp)->s_oid_cursize))
+#define set_sb_oid_cursize(sbp,v)     ((sbp)->s_oid_cursize = cpu_to_le16(v))
+#define sb_state(sbp)                 (le16_to_cpu((sbp)->s_state))
+#define set_sb_state(sbp,v)           ((sbp)->s_state = cpu_to_le16(v))
+#define sb_hash_function_code(sbp) \
+                            (le32_to_cpu((sbp)->s_hash_function_code))
+#define set_sb_hash_function_code(sbp,v) \
+                            ((sbp)->s_hash_function_code = cpu_to_le32(v))
+#define sb_tree_height(sbp)           (le16_to_cpu((sbp)->s_tree_height))
+#define set_sb_tree_height(sbp,v)     ((sbp)->s_tree_height = cpu_to_le16(v))
+#define sb_bmap_nr(sbp)               (le16_to_cpu((sbp)->s_bmap_nr))
+#define set_sb_bmap_nr(sbp,v)         ((sbp)->s_bmap_nr = cpu_to_le16(v))
+#define sb_version(sbp)               (le16_to_cpu((sbp)->s_version))
+#define set_sb_version(sbp,v)         ((sbp)->s_version = cpu_to_le16(v))
 
 /* this is the super from 3.5.X, where X >= 10 */
 struct reiserfs_super_block_v1
@@ -180,7 +231,6 @@ struct reiserfs_transaction_handle {
   unsigned long t_trans_id ;    /* sanity check, equals the current trans id */
   struct super_block *t_super ; /* super for this FS when journal_begin was 
                                    called. saves calls to reiserfs_get_super */
-
 } ;
 
 /*
@@ -262,7 +312,7 @@ struct reiserfs_journal {
 #define JOURNAL_DESC_MAGIC "ReIsErLB" /* ick.  magic string to find desc blocks in the journal */
 
 
-typedef __u32 (*hashf_t) (const char *, int);
+typedef __u32 (*hashf_t) (const signed char *, int);
 
 /* reiserfs union of in-core super block data */
 struct reiserfs_sb_info
@@ -377,25 +427,22 @@ int reiserfs_resize(struct super_block *, unsigned long) ;
 
 
 // on-disk super block fields converted to cpu form
-#define SB_DISK_SUPER_BLOCK(s) ((s)->u.reiserfs_sb.s_rs)
-#define SB_BLOCK_COUNT(s) le32_to_cpu ((SB_DISK_SUPER_BLOCK(s)->s_block_count))
-#define SB_FREE_BLOCKS(s) le32_to_cpu ((SB_DISK_SUPER_BLOCK(s)->s_free_blocks))
-#define SB_REISERFS_MAGIC(s) (SB_DISK_SUPER_BLOCK(s)->s_magic)
-#define SB_ROOT_BLOCK(s) le32_to_cpu ((SB_DISK_SUPER_BLOCK(s)->s_root_block))
-#define SB_TREE_HEIGHT(s) le16_to_cpu ((SB_DISK_SUPER_BLOCK(s)->s_tree_height))
-#define SB_REISERFS_STATE(s) le16_to_cpu ((SB_DISK_SUPER_BLOCK(s)->s_state))
-#define SB_VERSION(s) le16_to_cpu ((SB_DISK_SUPER_BLOCK(s)->s_version))
-#define SB_BMAP_NR(s) le16_to_cpu ((SB_DISK_SUPER_BLOCK(s)->s_bmap_nr))
+#define SB_DISK_SUPER_BLOCK(s)        ((s)->u.reiserfs_sb.s_rs)
+#define SB_BLOCK_COUNT(s)             sb_block_count (SB_DISK_SUPER_BLOCK(s))
+#define SB_FREE_BLOCKS(s)             sb_free_blocks (SB_DISK_SUPER_BLOCK(s))
+#define SB_REISERFS_MAGIC(s)          (SB_DISK_SUPER_BLOCK(s)->s_magic)
+#define SB_ROOT_BLOCK(s)              sb_root_block (SB_DISK_SUPER_BLOCK(s))
+#define SB_TREE_HEIGHT(s)             sb_tree_height (SB_DISK_SUPER_BLOCK(s))
+#define SB_REISERFS_STATE(s)          sb_state (SB_DISK_SUPER_BLOCK(s))
+#define SB_VERSION(s)                 sb_version (SB_DISK_SUPER_BLOCK(s))
+#define SB_BMAP_NR(s)                 sb_bmap_nr(SB_DISK_SUPER_BLOCK(s))
 
-#define PUT_SB_BLOCK_COUNT(s, val)    do { SB_DISK_SUPER_BLOCK(s)->s_block_count = cpu_to_le32(val); } while (0)
-#define PUT_SB_FREE_BLOCKS(s, val)    do { SB_DISK_SUPER_BLOCK(s)->s_free_blocks = cpu_to_le32(val); } while (0)
-#define PUT_SB_ROOT_BLOCK(s, val)     do { SB_DISK_SUPER_BLOCK(s)->s_root_block = cpu_to_le32(val); } while (0)
-#define PUT_SB_TREE_HEIGHT(s, val)    do { SB_DISK_SUPER_BLOCK(s)->s_tree_height = cpu_to_le16(val); } while (0)
-#define PUT_SB_REISERFS_STATE(s, val) do { SB_DISK_SUPER_BLOCK(s)->s_state = cpu_to_le16(val); } while (0) 
-#define PUT_SB_VERSION(s, val)        do { SB_DISK_SUPER_BLOCK(s)->s_version = cpu_to_le16(val); } while (0)
-#define PUT_SB_BMAP_NR(s, val)           do { SB_DISK_SUPER_BLOCK(s)->s_bmap_nr = cpu_to_le16 (val); } while (0)
+#define PUT_SB_BLOCK_COUNT(s, val)    do { set_sb_block_count( SB_DISK_SUPER_BLOCK(s), val); } while (0)
+#define PUT_SB_FREE_BLOCKS(s, val)    do { set_sb_free_blocks( SB_DISK_SUPER_BLOCK(s), val); } while (0)
+#define PUT_SB_ROOT_BLOCK(s, val)     do { set_sb_root_block( SB_DISK_SUPER_BLOCK(s), val); } while (0)
+#define PUT_SB_TREE_HEIGHT(s, val)    do { set_sb_tree_height( SB_DISK_SUPER_BLOCK(s), val); } while (0)
+#define PUT_SB_REISERFS_STATE(s, val) do { set_sb_state( SB_DISK_SUPER_BLOCK(s), val); } while (0) 
+#define PUT_SB_VERSION(s, val)        do { set_sb_version( SB_DISK_SUPER_BLOCK(s), val); } while (0)
+#define PUT_SB_BMAP_NR(s, val)        do { set_sb_bmap_nr( SB_DISK_SUPER_BLOCK(s), val); } while (0)
 
 #endif	/* _LINUX_REISER_FS_SB */
-
-
-

@@ -3229,7 +3229,6 @@ static ST_buffer *
 			tb->sg[0].address =
 			    (unsigned char *) __get_free_pages(priority, order);
 			if (tb->sg[0].address != NULL) {
-				tb->sg[0].alt_address = NULL;
 				tb->sg[0].length = b_size;
 				break;
 			}
@@ -3265,7 +3264,6 @@ static ST_buffer *
 					tb = NULL;
 					break;
 				}
-				tb->sg[segs].alt_address = NULL;
 				tb->sg[segs].length = b_size;
 				got += b_size;
 				segs++;
@@ -3339,7 +3337,6 @@ static int enlarge_buffer(ST_buffer * STbuffer, int new_size, int need_dma)
 			normalize_buffer(STbuffer);
 			return FALSE;
 		}
-		STbuffer->sg[segs].alt_address = NULL;
 		STbuffer->sg[segs].length = b_size;
 		STbuffer->sg_segs += 1;
 		got += b_size;

@@ -37,9 +37,14 @@
 #include <linux/locks.h>
 #include <linux/mm.h>
 #include <linux/smp_lock.h>
+#include <linux/module.h>
 
 #include "udf_i.h"
 #include "udf_sb.h"
+
+MODULE_AUTHOR("Ben Fennema");
+MODULE_DESCRIPTION("Universal Disk Format Filesystem");
+MODULE_LICENSE("GPL");
 
 #define EXTENT_MERGE_SIZE 5
 
@@ -621,8 +626,17 @@ static void udf_split_extents(struct inode *inode, int *c, int offset, int newbl
 
 		if (offset)
 		{
-			laarr[curr].extLength = type |
-				(offset << inode->i_sb->s_blocksize_bits);
+			if ((type >> 30) == EXTENT_NOT_RECORDED_ALLOCATED)
+			{
+				udf_free_blocks(inode->i_sb, inode, laarr[curr].extLocation, 0, offset);
+				laarr[curr].extLength = (EXTENT_NOT_RECORDED_NOT_ALLOCATED << 30) |
+					(offset << inode->i_sb->s_blocksize_bits);
+				laarr[curr].extLocation.logicalBlockNum = 0;
+				laarr[curr].extLocation.partitionReferenceNum = 0;
+			}
+			else
+				laarr[curr].extLength = type |
+					(offset << inode->i_sb->s_blocksize_bits);
 			curr ++;
 			(*c) ++;
 			(*endnum) ++;

@@ -1123,13 +1123,12 @@ void __brelse(struct buffer_head * buf)
 }
 
 /*
- * bforget() is like brelse(), except it puts the buffer on the
- * free list if it can.. We can NOT free the buffer if:
- *  - there are other users of it
- *  - it is locked and thus can have active IO
+ * bforget() is like brelse(), except it might discard any
+ * potentially dirty data.
  */
 void __bforget(struct buffer_head * buf)
 {
+	/* mark_buffer_clean(bh); */
 	__brelse(buf);
 }
 

@@ -308,14 +308,18 @@ union TPAchipAGPERR {
  * devices can use their familiar numbers and have them map to bus 0.
  */
 
-#define TITAN_IO_BIAS          TITAN_IO(0)
-#define TITAN_MEM_BIAS         TITAN_MEM(0)
+#define TITAN_IO_BIAS		TITAN_IO(0)
+#define TITAN_MEM_BIAS		TITAN_MEM(0)
 
 /* The IO address space is larger than 0xffff */
 #define TITAN_IO_SPACE		(TITAN_CONF(0) - TITAN_IO(0))
 
 /* TIG Space */
 #define TITAN_TIG_SPACE		(TITAN_BASE + 0x100000000UL)
+
+/* Offset between ram physical addresses and pci64 DAC bus addresses.  */
+/* ??? Just a guess.  Ought to confirm it hasn't been moved.  */
+#define TITAN_DAC_OFFSET	(1UL << 40)
 
 /*
  * Data structure for handling TITAN machine checks:

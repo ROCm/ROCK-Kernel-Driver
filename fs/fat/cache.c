@@ -15,8 +15,6 @@
 #include <linux/stat.h>
 #include <linux/fat_cvf.h>
 
-#include "msbuffer.h"
-
 #if 0
 #  define PRINTK(x) printk x
 #else

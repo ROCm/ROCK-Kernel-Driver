@@ -2059,6 +2059,10 @@ static int wavelan_ioctl(struct net_device *dev,	/* device on which the ioctl is
 			range.max_qual.qual = MMR_SGNL_QUAL;
 			range.max_qual.level = MMR_SIGNAL_LVL;
 			range.max_qual.noise = MMR_SILENCE_LVL;
+			range.avg_qual.qual = MMR_SGNL_QUAL; /* Always max */
+			/* Need to get better values for those two */
+			range.avg_qual.level = 30;
+			range.avg_qual.noise = 8;
 
 			range.num_bitrates = 1;
 			range.bitrate[0] = 2000000;	/* 2 Mb/s */

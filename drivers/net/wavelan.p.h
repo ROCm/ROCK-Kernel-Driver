@@ -447,13 +447,13 @@ static const char	*version	= "wavelan.c : v23 (SMP + wireless extensions) 05/10/
 
 /* ------------------------ PRIVATE IOCTL ------------------------ */
 
-#define SIOCSIPQTHR	SIOCDEVPRIVATE		/* Set quality threshold */
-#define SIOCGIPQTHR	SIOCDEVPRIVATE + 1	/* Get quality threshold */
-#define SIOCSIPLTHR	SIOCDEVPRIVATE + 2	/* Set level threshold */
-#define SIOCGIPLTHR	SIOCDEVPRIVATE + 3	/* Get level threshold */
+#define SIOCSIPQTHR	SIOCIWFIRSTPRIV		/* Set quality threshold */
+#define SIOCGIPQTHR	SIOCIWFIRSTPRIV + 1	/* Get quality threshold */
+#define SIOCSIPLTHR	SIOCIWFIRSTPRIV + 2	/* Set level threshold */
+#define SIOCGIPLTHR	SIOCIWFIRSTPRIV + 3	/* Get level threshold */
 
-#define SIOCSIPHISTO	SIOCDEVPRIVATE + 6	/* Set histogram ranges */
-#define SIOCGIPHISTO	SIOCDEVPRIVATE + 7	/* Get histogram values */
+#define SIOCSIPHISTO	SIOCIWFIRSTPRIV + 6	/* Set histogram ranges */
+#define SIOCGIPHISTO	SIOCIWFIRSTPRIV + 7	/* Get histogram values */
 
 /****************************** TYPES ******************************/
 

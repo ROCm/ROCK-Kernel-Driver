@@ -378,6 +378,7 @@ struct alpha_machine_vector privateer_mv __initmv = {
 	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
 	min_io_address:		DEFAULT_IO_BASE,
 	min_mem_address:	DEFAULT_MEM_BASE,
+	pci_dac_offset:		TITAN_DAC_OFFSET,
 
 	nr_irqs:		80,	/* 64 + 16 */
 	device_interrupt:	privateer_device_interrupt,

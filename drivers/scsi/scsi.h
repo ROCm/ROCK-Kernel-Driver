@@ -633,6 +633,8 @@ typedef struct scsi_pointer {
 	struct scatterlist *buffer;	/* which buffer */
 	int buffers_residual;	/* how many buffers left */
 
+        dma_addr_t dma_handle;
+
 	volatile int Status;
 	volatile int Message;
 	volatile int have_data_in;
@@ -745,7 +747,8 @@ struct scsi_cmnd {
 	unsigned request_bufflen;	/* Actual request size */
 
 	struct timer_list eh_timeout;	/* Used to time out the command. */
-	void *request_buffer;	/* Actual requested buffer */
+	void *request_buffer;		/* Actual requested buffer */
+        void **bounce_buffers;		/* Array of bounce buffers when using scatter-gather */
 
 	/* These elements define the operation we ultimately want to perform */
 	unsigned char data_cmnd[MAX_COMMAND_SIZE];

@@ -254,6 +254,7 @@ struct alpha_machine_vector rawhide_mv __initmv = {
 	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
 	min_io_address:		DEFAULT_IO_BASE,
 	min_mem_address:	MCPCIA_DEFAULT_MEM_BASE,
+	pci_dac_offset:		MCPCIA_DAC_OFFSET,
 
 	nr_irqs:		128,
 	device_interrupt:	rawhide_srm_device_interrupt,

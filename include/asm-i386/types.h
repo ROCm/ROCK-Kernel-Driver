@@ -27,6 +27,8 @@ typedef unsigned long long __u64;
  */
 #ifdef __KERNEL__
 
+#include <linux/config.h>
+
 typedef signed char s8;
 typedef unsigned char u8;
 
@@ -41,9 +43,14 @@ typedef unsigned long long u64;
 
 #define BITS_PER_LONG 32
 
-/* Dma addresses are 32-bits wide.  */
+/* DMA addresses come in generic and 64-bit flavours.  */
 
+#ifdef CONFIG_HIGHMEM
+typedef u64 dma_addr_t;
+#else
 typedef u32 dma_addr_t;
+#endif
+typedef u64 dma64_addr_t;
 
 #endif /* __KERNEL__ */
 

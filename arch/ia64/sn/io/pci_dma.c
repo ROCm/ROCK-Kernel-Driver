@@ -182,7 +182,7 @@ sn1_pci_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_add
 }
 
 /*
- * On sn1 we use the alt_address entry of the scatterlist to store
+ * On sn1 we use the orig_address entry of the scatterlist to store
  * the physical address corresponding to the given virtual address
  */
 int

@@ -124,7 +124,7 @@ static void create_virtual_node (struct tree_balance * tb, int h)
 	/* get item number in source node */
 	j = old_item_num (new_num, vn->vn_affected_item_num, vn->vn_mode);
     
-	vi->vi_item_len += ih[j].ih_item_len + IH_SIZE;
+	vi->vi_item_len += ih_item_len(ih + j) + IH_SIZE;
 	vi->vi_ih = ih + j;
 	vi->vi_item = B_I_PITEM (Sh, ih + j);
 	vi->vi_uarea = vn->vn_free_ptr;
@@ -658,9 +658,8 @@ static int are_leaves_removable (struct tree_balance * tb, int lfree, int rfree)
 	    
 	    /* we might check that left neighbor exists and is of the
 	       same directory */
-	    RFALSE( le_key_k_offset 
-		    (ih_version (ih), &(ih->ih_key)) == DOT_OFFSET,
-		    "vs-8130: first directory item can not be removed until directory is not empty");
+	    RFALSE(le_ih_k_offset (ih) == DOT_OFFSET,
+		"vs-8130: first directory item can not be removed until directory is not empty");
       }
     
   }
@@ -857,7 +856,7 @@ static int get_lfree (struct tree_balance * tb, int h)
 	f = l;
     }
 
-    return (MAX_CHILD_SIZE(f) - le16_to_cpu (B_N_CHILD(f,order)->dc_size));
+    return (MAX_CHILD_SIZE(f) - dc_size(B_N_CHILD(f,order)));
 }
 
 
@@ -879,7 +878,7 @@ static int get_rfree (struct tree_balance * tb, int h)
       f = r;
   }
 
-  return (MAX_CHILD_SIZE(f) - B_N_CHILD(f,order)->dc_size);
+  return (MAX_CHILD_SIZE(f) - dc_size( B_N_CHILD(f,order)));
 
 }
 
@@ -959,7 +958,7 @@ static int  get_far_parent (struct tree_balance *   p_s_tb,
     struct path * p_s_path = p_s_tb->tb_path;
     struct cpu_key	s_lr_father_key;
     int                   n_counter,
-	n_position = MAX_INT,
+	n_position = INT_MAX,
 	n_first_last_position = 0,
 	n_path_offset = PATH_H_PATH_OFFSET(p_s_path, n_h);
 
@@ -1134,17 +1133,8 @@ static int  get_parents (struct tree_balance * p_s_tb, int n_h)
     decrement_bcount(p_s_tb->CFR[n_h]);
     p_s_tb->CFR[n_h] = p_s_curcf; /* New initialization of CFR[n_path_offset]. */
 
-#ifdef CONFIG_REISERFS_CHECK
-#if 0
-    if (n_h == 0 && p_s_tb->CFR[n_h] && COMP_KEYS (B_PRIGHT_DELIM_KEY (PATH_H_PBUFFER(p_s_path, n_h)), 
-						   B_N_PDELIM_KEY (p_s_tb->CFR[n_h], p_s_tb->rkey[n_h]))) {
-	reiserfs_panic (p_s_tb->tb_sb, "PAP-8200: get_parents: rdkey in S0 %k, rdkey in CFR0 %k do not match",
-			B_PRIGHT_DELIM_KEY (PATH_H_PBUFFER(p_s_path, n_h)), B_N_PDELIM_KEY (p_s_tb->CFR[n_h], p_s_tb->rkey[n_h]));
-    }
-#endif
-#endif
-    RFALSE( (p_s_curf && !B_IS_IN_TREE (p_s_curf)) || 
-	    (p_s_curcf && !B_IS_IN_TREE (p_s_curcf)),
+    RFALSE( (p_s_curf && !B_IS_IN_TREE (p_s_curf)) ||
+            (p_s_curcf && !B_IS_IN_TREE (p_s_curcf)),
 	    "PAP-8205: FR (%b) or CFR (%b) is invalid", p_s_curf, p_s_curcf);
 
     return CARRY_ON;
@@ -1590,7 +1580,7 @@ static int dc_check_balance_internal (struct tree_balance * tb, int h)
 	      int order_L;
 	      
 	      order_L = ((n=PATH_H_B_ITEM_ORDER(tb->tb_path, h))==0) ? B_NR_ITEMS(tb->FL[h]) : n - 1;
-	      n = B_N_CHILD(tb->FL[h],order_L)->dc_size / (DC_SIZE + KEY_SIZE);
+	      n = dc_size(B_N_CHILD(tb->FL[h],order_L)) / (DC_SIZE + KEY_SIZE);
 	      set_parameters (tb, h, -n-1, 0, 0, NULL, -1, -1);
 	      return CARRY_ON;
 	    }
@@ -1602,7 +1592,7 @@ static int dc_check_balance_internal (struct tree_balance * tb, int h)
 	      int order_R;
 	    
 	      order_R = ((n=PATH_H_B_ITEM_ORDER(tb->tb_path, h))==B_NR_ITEMS(Fh)) ? 0 : n + 1;
-	      n = B_N_CHILD(tb->FR[h],order_R)->dc_size / (DC_SIZE + KEY_SIZE);
+	      n = dc_size(B_N_CHILD(tb->FR[h],order_R)) / (DC_SIZE + KEY_SIZE);
 	      set_parameters (tb, h, 0, -n-1, 0, NULL, -1, -1);
 	      return CARRY_ON;   
 	    }
@@ -1633,7 +1623,7 @@ static int dc_check_balance_internal (struct tree_balance * tb, int h)
 	int order_L;
 	      
 	order_L = ((n=PATH_H_B_ITEM_ORDER(tb->tb_path, h))==0) ? B_NR_ITEMS(tb->FL[h]) : n - 1;
-	n = B_N_CHILD(tb->FL[h],order_L)->dc_size / (DC_SIZE + KEY_SIZE);
+	n = dc_size(B_N_CHILD(tb->FL[h],order_L)) / (DC_SIZE + KEY_SIZE);
 	set_parameters (tb, h, -n-1, 0, 0, NULL, -1, -1);
 	return CARRY_ON;
       }
@@ -1645,7 +1635,7 @@ static int dc_check_balance_internal (struct tree_balance * tb, int h)
       int order_R;
 	    
       order_R = ((n=PATH_H_B_ITEM_ORDER(tb->tb_path, h))==B_NR_ITEMS(Fh)) ? 0 : (n + 1);
-      n = B_N_CHILD(tb->FR[h],order_R)->dc_size / (DC_SIZE + KEY_SIZE);
+      n = dc_size(B_N_CHILD(tb->FR[h],order_R)) / (DC_SIZE + KEY_SIZE);
       set_parameters (tb, h, 0, -n-1, 0, NULL, -1, -1);
       return CARRY_ON;   
     }
@@ -1934,14 +1924,14 @@ static int  get_neighbors(
 	    return REPEAT_SEARCH;
 	}
 	
-	RFALSE( ! B_IS_IN_TREE(p_s_tb->FL[n_h]) || 
-		n_child_position > B_NR_ITEMS(p_s_tb->FL[n_h]) ||
-		B_N_CHILD_NUM(p_s_tb->FL[n_h], n_child_position) != 
-		p_s_bh->b_blocknr, "PAP-8275: invalid parent");
+	RFALSE( ! B_IS_IN_TREE(p_s_tb->FL[n_h]) ||
+                n_child_position > B_NR_ITEMS(p_s_tb->FL[n_h]) ||
+	        B_N_CHILD_NUM(p_s_tb->FL[n_h], n_child_position) !=
+                p_s_bh->b_blocknr, "PAP-8275: invalid parent");
 	RFALSE( ! B_IS_IN_TREE(p_s_bh), "PAP-8280: invalid child");
-	RFALSE( ! n_h && 
-		B_FREE_SPACE (p_s_bh) != MAX_CHILD_SIZE (p_s_bh) - B_N_CHILD (p_s_tb->FL[0],n_child_position)->dc_size,
-		"PAP-8290: invalid child size of left neighbor");
+	RFALSE( ! n_h &&
+                B_FREE_SPACE (p_s_bh) != MAX_CHILD_SIZE (p_s_bh) - dc_size(B_N_CHILD (p_s_tb->FL[0],n_child_position)),
+                "PAP-8290: invalid child size of left neighbor");
 
 	decrement_bcount(p_s_tb->L[n_h]);
 	p_s_tb->L[n_h] = p_s_bh;
@@ -1967,10 +1957,10 @@ static int  get_neighbors(
 	decrement_bcount(p_s_tb->R[n_h]);
 	p_s_tb->R[n_h] = p_s_bh;
 
-	RFALSE( ! n_h && B_FREE_SPACE (p_s_bh) != MAX_CHILD_SIZE (p_s_bh) - B_N_CHILD (p_s_tb->FR[0],n_child_position)->dc_size,
-		"PAP-8300: invalid child size of right neighbor (%d != %d - %d)",
-		B_FREE_SPACE (p_s_bh), MAX_CHILD_SIZE (p_s_bh), 
-		B_N_CHILD (p_s_tb->FR[0],n_child_position)->dc_size);
+	RFALSE( ! n_h && B_FREE_SPACE (p_s_bh) != MAX_CHILD_SIZE (p_s_bh) - dc_size(B_N_CHILD (p_s_tb->FR[0],n_child_position)),
+                "PAP-8300: invalid child size of right neighbor (%d != %d - %d)",
+                B_FREE_SPACE (p_s_bh), MAX_CHILD_SIZE (p_s_bh),
+                dc_size(B_N_CHILD (p_s_tb->FR[0],n_child_position)));
 	
     }
     return CARRY_ON;
@@ -2027,7 +2017,7 @@ static int get_virtual_node_size (struct super_block * sb, struct buffer_head * 
     size += sizeof (struct virtual_item);
     if (is_direntry_le_ih (ih))
       /* each entry and new one occupeis 2 byte in the virtual node */
-      size += (le16_to_cpu (ih->u.ih_entry_count) + 1) * sizeof (__u16);
+      size += (ih_entry_count(ih) + 1) * sizeof( __u16 );
   }
   
   /* 1 bit for each bitmap block to note whether bitmap block was
@@ -2544,8 +2534,9 @@ void unfix_nodes (struct tree_balance * tb)
 	    brelse (tb->used[i]);
 	}
     }
+
     if (tb->vn_buf) 
-	reiserfs_kfree (tb->vn_buf, tb->vn_buf_size, tb->tb_sb);
+    reiserfs_kfree (tb->vn_buf, tb->vn_buf_size, tb->tb_sb);
 
 } 
 

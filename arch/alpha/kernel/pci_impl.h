@@ -163,6 +163,8 @@ extern const char *const pci_io_names[];
 extern const char *const pci_mem_names[];
 extern const char pci_hae0_name[];
 
+extern unsigned long size_for_memory(unsigned long max);
+
 extern int iommu_reserve(struct pci_iommu_arena *, long, long);
 extern int iommu_release(struct pci_iommu_arena *, long, long);
 extern int iommu_bind(struct pci_iommu_arena *, long, long, unsigned long *);

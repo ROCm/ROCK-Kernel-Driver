@@ -10,12 +10,9 @@
  *  VFAT extensions by Gordon Chaffee <chaffee@plateau.cs.berkeley.edu>
  *  Merged with msdos fs by Henrik Storner <storner@osiris.ping.dk>
  *  Rewritten for constant inumbers. Plugged buffer overrun in readdir(). AV
- *  Short name translation 1999 by Wolfram Pienkoss <wp@bszh.de>
+ *  Short name translation 1999, 2001 by Wolfram Pienkoss <wp@bszh.de>
  */
 
-#define ASC_LINUX_VERSION(V, P, S)	(((V) * 65536) + ((P) * 256) + (S))
-
-#include <linux/version.h>
 #include <linux/fs.h>
 #include <linux/msdos_fs.h>
 #include <linux/nls.h>
@@ -29,8 +26,6 @@
 #include <linux/ctype.h>
 
 #include <asm/uaccess.h>
-
-#include "msbuffer.h"
 
 #define PRINTK(X)
 
@@ -163,6 +158,27 @@ fat_strnicmp(struct nls_table *t, const unsigned char *s1,
 	return 0;
 }
 
+static inline int
+fat_shortname2uni(struct nls_table *nls, char *buf, int buf_size,
+		  wchar_t *uni_buf, unsigned short opt, int lower)
+{
+	int len = 0;
+
+	if (opt & VFAT_SFN_DISPLAY_LOWER)
+		len =  fat_short2lower_uni(nls, buf, buf_size, uni_buf);
+	else if (opt & VFAT_SFN_DISPLAY_WIN95)
+		len = fat_short2uni(nls, buf, buf_size, uni_buf);
+	else if (opt & VFAT_SFN_DISPLAY_WINNT) {
+		if (lower)
+			len = fat_short2lower_uni(nls, buf, buf_size, uni_buf);
+		else 
+			len = fat_short2uni(nls, buf, buf_size, uni_buf);
+	} else
+		len = fat_short2uni(nls, buf, buf_size, uni_buf);
+
+	return len;
+}
+
 /*
  * Return values: negative -> error, 0 -> not found, positive -> found,
  * value is the total amount of slots, including the shortname entry.
@@ -176,11 +192,12 @@ int fat_search_long(struct inode *inode, const char *name, int name_len,
 	struct nls_table *nls_io = MSDOS_SB(sb)->nls_io;
 	struct nls_table *nls_disk = MSDOS_SB(sb)->nls_disk;
 	wchar_t bufuname[14];
-	unsigned char xlate_len, long_slots, *unicode = NULL;
+	unsigned char xlate_len, long_slots;
+	wchar_t *unicode = NULL;
 	char work[8], bufname[260];	/* 256 + 4 */
 	int uni_xlate = MSDOS_SB(sb)->options.unicode_xlate;
 	int utf8 = MSDOS_SB(sb)->options.utf8;
-	int nocase = MSDOS_SB(sb)->options.nocase;
+	unsigned short opt_shortname = MSDOS_SB(sb)->options.shortname;
 	int ino, chl, i, j, last_u, res = 0;
 	loff_t cpos = 0;
 
@@ -197,7 +214,6 @@ parse_record:
 			continue;
 		if (de->attr == ATTR_EXT) {
 			struct msdos_dir_slot *ds;
-			int offset;
 			unsigned char id;
 			unsigned char slot;
 			unsigned char slots;
@@ -205,7 +221,7 @@ parse_record:
 			unsigned char alias_checksum;
 
 			if (!unicode) {
-				unicode = (unsigned char *)
+				unicode = (wchar_t *)
 					__get_free_page(GFP_KERNEL);
 				if (!unicode) {
 					fat_brelse(sb, bh);
@@ -214,7 +230,6 @@ parse_record:
 			}
 parse_long:
 			slots = 0;
-			offset = 0;
 			ds = (struct msdos_dir_slot *) de;
 			id = ds->id;
 			if (!(id & 0x40))
@@ -227,16 +242,16 @@ parse_long:
 
 			slot = slots;
 			while (1) {
+				int offset;
+
 				slot--;
-				offset = slot * 26;
-				memcpy(&unicode[offset], ds->name0_4, 10);
-				memcpy(&unicode[offset+10], ds->name5_10, 12);
-				memcpy(&unicode[offset+22], ds->name11_12, 4);
-				offset += 26;
+				offset = slot * 13;
+				fat16_towchar(unicode + offset, ds->name0_4, 5);
+				fat16_towchar(unicode + offset + 5, ds->name5_10, 6);
+				fat16_towchar(unicode + offset + 11, ds->name11_12, 2);
 
 				if (ds->id & 0x40) {
-					unicode[offset] = 0;
-					unicode[offset+1] = 0;
+					unicode[offset + 13] = 0;
 				}
 				if (fat_get_entry(inode,&cpos,&bh,&de,&ino)<0)
 					goto EODir;
@@ -271,10 +286,9 @@ parse_long:
 		}
 		for (i = 0, j = 0, last_u = 0; i < 8;) {
 			if (!work[i]) break;
-			if (nocase)
-				chl = fat_short2uni(nls_disk, &work[i], 8 - i, &bufuname[j++]);
-			else
-				chl = fat_short2lower_uni(nls_disk, &work[i], 8 - i, &bufuname[j++]);
+			chl = fat_shortname2uni(nls_disk, &work[i], 8 - i,
+						&bufuname[j++], opt_shortname,
+						de->lcase & CASE_LOWER_BASE);
 			if (chl <= 1) {
 				if (work[i] != ' ')
 					last_u = j;
@@ -287,10 +301,9 @@ parse_long:
 		fat_short2uni(nls_disk, ".", 1, &bufuname[j++]);
 		for (i = 0; i < 3;) {
 			if (!de->ext[i]) break;
-			if (nocase)
-				chl = fat_short2uni(nls_disk, &de->ext[i], 3 - i, &bufuname[j++]);
-			else
-				chl = fat_short2lower_uni(nls_disk, &de->ext[i], 3 - i, &bufuname[j++]);
+			chl = fat_shortname2uni(nls_disk, &de->ext[i], 3 - i,
+						&bufuname[j++], opt_shortname,
+						de->lcase & CASE_LOWER_EXT);
 			if (chl <= 1) {
 				if (de->ext[i] != ' ')
 					last_u = j;
@@ -314,8 +327,8 @@ parse_long:
 
 		if (long_slots) {
 			xlate_len = utf8
-				?utf8_wcstombs(bufname, (wchar_t *) unicode, sizeof(bufname))
-				:uni16_to_x8(bufname, (wchar_t *) unicode, uni_xlate, nls_io);
+				?utf8_wcstombs(bufname, unicode, sizeof(bufname))
+				:uni16_to_x8(bufname, unicode, uni_xlate, nls_io);
 			if (xlate_len != name_len)
 				continue;
 			if ((!anycase && !memcmp(name, bufname, xlate_len)) ||
@@ -346,13 +359,15 @@ static int fat_readdirx(struct inode *inode, struct file *filp, void *dirent,
 	struct nls_table *nls_io = MSDOS_SB(sb)->nls_io;
 	struct nls_table *nls_disk = MSDOS_SB(sb)->nls_disk;
 	wchar_t bufuname[14];
-	unsigned char long_slots, *unicode = NULL;
+	unsigned char long_slots;
+	wchar_t *unicode = NULL;
 	char c, work[8], bufname[56], *ptname = bufname;
 	unsigned long lpos, dummy, *furrfu = &lpos;
 	int uni_xlate = MSDOS_SB(sb)->options.unicode_xlate;
 	int isvfat = MSDOS_SB(sb)->options.isvfat;
 	int utf8 = MSDOS_SB(sb)->options.utf8;
 	int nocase = MSDOS_SB(sb)->options.nocase;
+	unsigned short opt_shortname = MSDOS_SB(sb)->options.shortname;
 	int ino, inum, chi, chl, i, i2, j, last, last_u, dotoffset = 0;
 	loff_t cpos;
 
@@ -394,7 +409,6 @@ GetNew:
 
 	if (isvfat && de->attr == ATTR_EXT) {
 		struct msdos_dir_slot *ds;
-		int offset;
 		unsigned char id;
 		unsigned char slot;
 		unsigned char slots;
@@ -402,7 +416,7 @@ GetNew:
 		unsigned char alias_checksum;
 
 		if (!unicode) {
-			unicode = (unsigned char *)
+			unicode = (wchar_t *)
 				__get_free_page(GFP_KERNEL);
 			if (!unicode) {
 				filp->f_pos = cpos;
@@ -412,7 +426,6 @@ GetNew:
 		}
 ParseLong:
 		slots = 0;
-		offset = 0;
 		ds = (struct msdos_dir_slot *) de;
 		id = ds->id;
 		if (!(id & 0x40))
@@ -425,16 +438,16 @@ ParseLong:
 
 		slot = slots;
 		while (1) {
+			int offset;
+
 			slot--;
-			offset = slot * 26;
-			memcpy(&unicode[offset], ds->name0_4, 10);
-			memcpy(&unicode[offset+10], ds->name5_10, 12);
-			memcpy(&unicode[offset+22], ds->name11_12, 4);
-			offset += 26;
+			offset = slot * 13;
+			fat16_towchar(unicode + offset, ds->name0_4, 5);
+			fat16_towchar(unicode + offset + 5, ds->name5_10, 6);
+			fat16_towchar(unicode + offset + 11, ds->name11_12, 2);
 
 			if (ds->id & 0x40) {
-				unicode[offset] = 0;
-				unicode[offset+1] = 0;
+				unicode[offset + 13] = 0;
 			}
 			if (fat_get_entry(inode,&cpos,&bh,&de,&ino) == -1)
 				goto EODir;
@@ -474,10 +487,9 @@ ParseLong:
 	}
 	for (i = 0, j = 0, last = 0, last_u = 0; i < 8;) {
 		if (!(c = work[i])) break;
-		if (nocase)
-			chl = fat_short2uni(nls_disk, &work[i], 8 - i, &bufuname[j++]);
-		else
-			chl = fat_short2lower_uni(nls_disk, &work[i], 8 - i, &bufuname[j++]);
+		chl = fat_shortname2uni(nls_disk, &work[i], 8 - i,
+					&bufuname[j++], opt_shortname,
+					de->lcase & CASE_LOWER_BASE);
 		if (chl <= 1) {
 			ptname[i++] = (!nocase && c>='A' && c<='Z') ? c+32 : c;
 			if (c != ' ') {
@@ -498,10 +510,9 @@ ParseLong:
 	ptname[i++] = '.';
 	for (i2 = 0; i2 < 3;) {
 		if (!(c = de->ext[i2])) break;
-		if (nocase)
-			chl = fat_short2uni(nls_disk, &de->ext[i2], 3 - i2, &bufuname[j++]);
-		else
-			chl = fat_short2lower_uni(nls_disk, &de->ext[i2], 3 - i2, &bufuname[j++]);
+		chl = fat_shortname2uni(nls_disk, &de->ext[i2], 3 - i2,
+					&bufuname[j++], opt_shortname,
+					de->lcase & CASE_LOWER_EXT);
 		if (chl <= 1) {
 			i2++;
 			ptname[i++] = (!nocase && c>='A' && c<='Z') ? c+32 : c;
@@ -553,8 +564,8 @@ ParseLong:
 	} else {
 		char longname[275];
 		int long_len = utf8
-			? utf8_wcstombs(longname, (wchar_t *) unicode, sizeof(longname))
-			: uni16_to_x8(longname, (wchar_t *) unicode, uni_xlate,
+			? utf8_wcstombs(longname, unicode, sizeof(longname))
+			: uni16_to_x8(longname, unicode, uni_xlate,
 				      nls_io);
 		if (both) {
 			memcpy(&longname[long_len+1], bufname, i);

@@ -264,6 +264,7 @@ static int sr_scatter_pad(Scsi_Cmnd *SCpnt, int s_size)
 	struct scatterlist *sg, *old_sg = NULL;
 	int i, fsize, bsize, sg_ent, sg_count;
 	char *front, *back;
+	void **bbpnt, **old_bbpnt = NULL;
 
 	back = front = NULL;
 	sg_ent = SCpnt->use_sg;
@@ -291,16 +292,24 @@ static int sr_scatter_pad(Scsi_Cmnd *SCpnt, int s_size)
 	 * extend or allocate new scatter-gather table
 	 */
 	sg_count = SCpnt->use_sg;
-	if (sg_count)
+	if (sg_count) {
 		old_sg = (struct scatterlist *) SCpnt->request_buffer;
-	else {
+		old_bbpnt = SCpnt->bounce_buffers;
+	} else {
 		sg_count = 1;
 		sg_ent++;
 	}
 
-	i = ((sg_ent * sizeof(struct scatterlist)) + 511) & ~511;
+	/* Get space for scatterlist and bounce buffer array. */
+	i  = sg_ent * sizeof(struct scatterlist);
+	i += sg_ent * sizeof(void *);
+	i  = (i + 511) & ~511;
+
 	if ((sg = scsi_malloc(i)) == NULL)
 		goto no_mem;
+
+	bbpnt = (void **)
+		((char *)sg + (sg_ent * sizeof(struct scatterlist)));
 
 	/*
 	 * no more failing memory allocs possible, we can safely assign
@@ -312,13 +321,15 @@ static int sr_scatter_pad(Scsi_Cmnd *SCpnt, int s_size)
 
 	i = 0;
 	if (fsize) {
-		sg[0].address = sg[0].alt_address = front;
+		sg[0].address = bbpnt[0] = front;
 		sg[0].length = fsize;
 		i++;
 	}
 	if (old_sg) {
 		memcpy(sg + i, old_sg, SCpnt->use_sg * sizeof(struct scatterlist));
-		scsi_free(old_sg, ((SCpnt->use_sg * sizeof(struct scatterlist)) + 511) & ~511);
+		memcpy(bbpnt + i, old_bbpnt, SCpnt->use_sg * sizeof(void *));
+		scsi_free(old_sg, (((SCpnt->use_sg * sizeof(struct scatterlist)) +
+				    (SCpnt->use_sg * sizeof(void *))) + 511) & ~511);
 	} else {
 		sg[i].address = SCpnt->request_buffer;
 		sg[i].length = SCpnt->request_bufflen;
@@ -326,11 +337,12 @@ static int sr_scatter_pad(Scsi_Cmnd *SCpnt, int s_size)
 
 	SCpnt->request_bufflen += (fsize + bsize);
 	SCpnt->request_buffer = sg;
+	SCpnt->bounce_buffers = bbpnt;
 	SCpnt->use_sg += i;
 
 	if (bsize) {
 		sg[SCpnt->use_sg].address = back;
-		sg[SCpnt->use_sg].alt_address = back;
+		bbpnt[SCpnt->use_sg] = back;
 		sg[SCpnt->use_sg].length = bsize;
 		SCpnt->use_sg++;
 	}

@@ -5,8 +5,6 @@
  * These symbols are used by dmsdos.
  */
 
-#define ASC_LINUX_VERSION(V, P, S)	(((V) * 65536) + ((P) * 256) + (S))
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/init.h>
 

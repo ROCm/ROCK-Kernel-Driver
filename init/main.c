@@ -777,8 +777,12 @@ static void prepare_namespace(void)
 		int i, pid;
 
 		pid = kernel_thread(do_linuxrc, "/linuxrc", SIGCHLD);
-		if (pid>0)
-			while (pid != wait(&i));
+		if (pid > 0) {
+			while (pid != wait(&i)) {
+				current->policy |= SCHED_YIELD;
+				schedule();
+			}
+		}
 		if (MAJOR(real_root_dev) != RAMDISK_MAJOR
 		     || MINOR(real_root_dev) != 0) {
 			error = change_root(real_root_dev,"/initrd");

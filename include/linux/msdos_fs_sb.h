@@ -12,6 +12,7 @@ struct fat_mount_options {
 	unsigned short fs_umask;
 	unsigned short codepage;  /* Codepage for shortname conversions */
 	char *iocharset;          /* Charset used for filename input/display */
+	unsigned short shortname; /* flags for shortname display/create rule */
 	unsigned char name_check; /* r = relaxed, n = normal, s = strict */
 	unsigned char conversion; /* b = binary, t = text, a = auto */
 	unsigned quiet:1,         /* set = fake successful chmods and chowns */
@@ -28,11 +29,6 @@ struct fat_mount_options {
 		 nocase:1;	  /* Does this need case conversion? 0=need case conversion*/
 };
 
-struct vfat_unicode {
-	unsigned char uni1;
-	unsigned char uni2;
-};
-
 struct msdos_sb_info {
 	unsigned short cluster_size; /* sectors/cluster */
 	unsigned short cluster_bits; /* sectors/cluster */
@@ -45,7 +41,6 @@ struct msdos_sb_info {
 	unsigned long clusters;      /* number of clusters */
 	unsigned long root_cluster;  /* first cluster of the root directory */
 	unsigned long fsinfo_sector; /* FAT32 fsinfo offset from start of disk */
-	wait_queue_head_t fat_wait;
 	struct semaphore fat_lock;
 	int prev_free;               /* previously returned free cluster number */
 	int free_clusters;           /* -1 if undefined */

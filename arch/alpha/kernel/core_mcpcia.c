@@ -406,12 +406,12 @@ mcpcia_startup_hose(struct pci_controller *hose)
 	 * Set up the PCI->physical memory translation windows.
 	 *
 	 * Window 0 is scatter-gather 8MB at 8MB (for isa)
-	 * Window 1 is scatter-gather 128MB at 1GB
+	 * Window 1 is scatter-gather (up to) 1GB at 1GB (for pci)
 	 * Window 2 is direct access 2GB at 2GB
-	 * ??? We ought to scale window 1 with memory.
 	 */
 	hose->sg_isa = iommu_arena_new(hose, 0x00800000, 0x00800000, 0);
-	hose->sg_pci = iommu_arena_new(hose, 0x40000000, 0x08000000, 0);
+	hose->sg_pci = iommu_arena_new(hose, 0x40000000,
+				       size_for_memory(0x40000000), 0);
 
 	__direct_map_base = 0x80000000;
 	__direct_map_size = 0x80000000;

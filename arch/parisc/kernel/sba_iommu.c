@@ -779,7 +779,7 @@ sba_mark_invalid(struct ioc *ioc, dma_addr_t iova, size_t byte_cnt)
 }
 
 static int
-sba_dma_supported( struct pci_dev *dev, dma_addr_t mask)
+sba_dma_supported( struct pci_dev *dev, u64 mask)
 {
 	if (dev == NULL) {
 		printk(MODULE_NAME ": EISA/ISA/et al not supported\n");

@@ -2,6 +2,8 @@
  *  linux/fs/fat/misc.c
  *
  *  Written 1992,1993 by Werner Almesberger
+ *  22/11/2000 - Fixed fat_date_unix2dos for dates earlier than 01/01/1980
+ *		 and date_dos2unix for date==0 by Igor Zhbanov(bsg@uniyar.ac.ru)
  */
 
 #include <linux/fs.h>
@@ -11,8 +13,6 @@
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/stat.h>
-
-#include "msbuffer.h"
 
 #if 0
 #  define PRINTK(x)	printk x
@@ -75,29 +75,10 @@ int fat_is_binary(char conversion,char *extension)
 	}
 }
 
-
-/* File creation lock. This is system-wide to avoid deadlocks in rename. */
-/* (rename might deadlock before detecting cross-FS moves.) */
-
-static DECLARE_MUTEX(creation_lock);
-
-void fat_lock_creation(void)
-{
-	down(&creation_lock);
-}
-
-
-void fat_unlock_creation(void)
-{
-	up(&creation_lock);
-}
-
-
 void lock_fat(struct super_block *sb)
 {
 	down(&(MSDOS_SB(sb)->fat_lock));
 }
-
 
 void unlock_fat(struct super_block *sb)
 {
@@ -132,89 +113,22 @@ void fat_clusters_flush(struct super_block *sb)
 }
 
 /*
- * fat_add_cluster tries to allocate a new cluster and adds it to the file
- * represented by inode. The cluster is zero-initialized.
+ * fat_add_cluster tries to allocate a new cluster and adds it to the
+ * file represented by inode.
  */
-
-/* not a directory */
-
 int fat_add_cluster(struct inode *inode)
 {
 	struct super_block *sb = inode->i_sb;
-	int count,nr,limit,last,curr,file_cluster;
+	int count, nr, limit, last, curr, file_cluster;
+	int cluster_size = MSDOS_SB(sb)->cluster_size;
 	int res = -ENOSPC;
-
-	if (!MSDOS_SB(sb)->free_clusters) return res;
+	
 	lock_fat(sb);
-	limit = MSDOS_SB(sb)->clusters;
-	nr = limit; /* to keep GCC happy */
-	for (count = 0; count < limit; count++) {
-		nr = ((count+MSDOS_SB(sb)->prev_free) % limit)+2;
-		if (fat_access(sb,nr,-1) == 0) break;
-	}
-	MSDOS_SB(sb)->prev_free = (count+MSDOS_SB(sb)->prev_free+1) % limit;
-	if (count >= limit) {
-		MSDOS_SB(sb)->free_clusters = 0;
+	
+	if (MSDOS_SB(sb)->free_clusters == 0) {
 		unlock_fat(sb);
 		return res;
 	}
-	fat_access(sb,nr,EOF_FAT(sb));
-	if (MSDOS_SB(sb)->free_clusters != -1)
-		MSDOS_SB(sb)->free_clusters--;
-	if (MSDOS_SB(sb)->fat_bits == 32)
-		fat_clusters_flush(sb);
-	unlock_fat(sb);
-
-	/* We must locate the last cluster of the file to add this
-	   new one (nr) to the end of the link list (the FAT).
-	   
-	   Here file_cluster will be the number of the last cluster of the
-	   file (before we add nr).
-	   
-	   last is the corresponding cluster number on the disk. We will
-	   use last to plug the nr cluster. We will use file_cluster to
-	   update the cache.
-	*/
-	last = file_cluster = 0;
-	if ((curr = MSDOS_I(inode)->i_start) != 0) {
-		fat_cache_lookup(inode,INT_MAX,&last,&curr);
-		file_cluster = last;
-		while (curr && curr != -1){
-			file_cluster++;
-			if (!(curr = fat_access(sb, last = curr,-1))) {
-				fat_fs_panic(sb,"File without EOF");
-				return res;
-			}
-		}
-	}
-	if (last) {
-		fat_access(sb, last, nr);
-		fat_cache_add(inode, file_cluster, nr);
-	} else {
-		MSDOS_I(inode)->i_start = nr;
-		MSDOS_I(inode)->i_logstart = nr;
-		mark_inode_dirty(inode);
-	}
-	inode->i_blocks += (1 << MSDOS_SB(sb)->cluster_bits) / 512;
-	return 0;
-}
-
-struct buffer_head *fat_extend_dir(struct inode *inode)
-{
-	struct super_block *sb = inode->i_sb;
-	int count,nr,limit,last,curr,sector,last_sector,file_cluster;
-	struct buffer_head *bh, *res=NULL;
-	int cluster_size = MSDOS_SB(sb)->cluster_size;
-
-	if (MSDOS_SB(sb)->fat_bits != 32) {
-		if (inode->i_ino == MSDOS_ROOT_INO)
-			return res;
-	}
-	if (!MSDOS_SB(sb)->free_clusters)
-		return res;
-
-	lock_fat(sb);
-
 	limit = MSDOS_SB(sb)->clusters;
 	nr = limit; /* to keep GCC happy */
 	for (count = 0; count < limit; count++) {
@@ -222,29 +136,21 @@ struct buffer_head *fat_extend_dir(struct inode *inode)
 		if (fat_access(sb, nr, -1) == 0)
 			break;
 	}
-	PRINTK (("cnt = %d --", count));
-#ifdef DEBUG
-	printk("free cluster: %d\n", nr);
-#endif
 	if (count >= limit) {
 		MSDOS_SB(sb)->free_clusters = 0;
 		unlock_fat(sb);
 		return res;
 	}
-
+	
 	MSDOS_SB(sb)->prev_free = (count + MSDOS_SB(sb)->prev_free + 1) % limit;
 	fat_access(sb, nr, EOF_FAT(sb));
 	if (MSDOS_SB(sb)->free_clusters != -1)
 		MSDOS_SB(sb)->free_clusters--;
 	if (MSDOS_SB(sb)->fat_bits == 32)
 		fat_clusters_flush(sb);
-
+	
 	unlock_fat(sb);
-
-#ifdef DEBUG
-	printk("set to %x\n", fat_access(sb, nr, -1));
-#endif
-
+	
 	/* We must locate the last cluster of the file to add this
 	   new one (nr) to the end of the link list (the FAT).
 	   
@@ -260,29 +166,49 @@ struct buffer_head *fat_extend_dir(struct inode *inode)
 		fat_cache_lookup(inode, INT_MAX, &last, &curr);
 		file_cluster = last;
 		while (curr && curr != -1){
-			PRINTK (("."));
 			file_cluster++;
-			if (!(curr = fat_access(sb, last = curr, -1))) {
-				fat_fs_panic(sb,"File without EOF");
+			if (!(curr = fat_access(sb, last = curr,-1))) {
+				fat_fs_panic(sb, "File without EOF");
 				return res;
 			}
 		}
-		PRINTK ((" --  "));
 	}
-#ifdef DEBUG
-	printk("last = %d\n", last);
-#endif
-	if (last)
+	if (last) {
 		fat_access(sb, last, nr);
-	else {
+		fat_cache_add(inode, file_cluster, nr);
+	} else {
 		MSDOS_I(inode)->i_start = nr;
 		MSDOS_I(inode)->i_logstart = nr;
 		mark_inode_dirty(inode);
 	}
-#ifdef DEBUG
-	if (last)
-		printk("next set to %d\n",fat_access(sb, last, -1));
-#endif
+	if (file_cluster
+	    != inode->i_blocks / cluster_size / (sb->s_blocksize / 512)) {
+		printk ("file_cluster badly computed!!! %d <> %ld\n",
+			file_cluster,
+			inode->i_blocks / cluster_size / (sb->s_blocksize / 512));
+		fat_cache_inval_inode(inode);
+	}
+	inode->i_blocks += (1 << MSDOS_SB(sb)->cluster_bits) / 512;
+
+	return nr;
+}
+
+struct buffer_head *fat_extend_dir(struct inode *inode)
+{
+	struct super_block *sb = inode->i_sb;
+	int nr, sector, last_sector;
+	struct buffer_head *bh, *res = NULL;
+	int cluster_size = MSDOS_SB(sb)->cluster_size;
+
+	if (MSDOS_SB(sb)->fat_bits != 32) {
+		if (inode->i_ino == MSDOS_ROOT_INO)
+			return res;
+	}
+
+	nr = fat_add_cluster(inode);
+	if (nr < 0)
+		return res;
+	
 	sector = MSDOS_SB(sb)->data_start + (nr - 2) * cluster_size;
 	last_sector = sector + cluster_size;
 	if (MSDOS_SB(sb)->cvf_format && MSDOS_SB(sb)->cvf_format->zero_out_cluster)
@@ -305,23 +231,15 @@ struct buffer_head *fat_extend_dir(struct inode *inode)
 			}
 		}
 	}
-	if (file_cluster
-	    != inode->i_blocks / cluster_size / (sb->s_blocksize / 512)) {
-		printk ("file_cluster badly computed!!! %d <> %ld\n",
-			file_cluster,
-			inode->i_blocks / cluster_size / (sb->s_blocksize / 512));
-	}else{
-		fat_cache_add(inode, file_cluster, nr);
-	}
-	inode->i_blocks += (1 << MSDOS_SB(sb)->cluster_bits) / 512;
 	if (inode->i_size & (sb->s_blocksize - 1)) {
 		fat_fs_panic(sb, "Odd directory size");
-		inode->i_size = (inode->i_size + sb->s_blocksize) &
-			~(sb->s_blocksize - 1);
+		inode->i_size = (inode->i_size + sb->s_blocksize)
+			& ~(sb->s_blocksize - 1);
 	}
 	inode->i_size += 1 << MSDOS_SB(sb)->cluster_bits;
 	MSDOS_I(inode)->mmu_private += 1 << MSDOS_SB(sb)->cluster_bits;
 	mark_inode_dirty(inode);
+
 	return res;
 }
 
@@ -340,7 +258,9 @@ int date_dos2unix(unsigned short time,unsigned short date)
 {
 	int month,year,secs;
 
-	month = ((date >> 5) & 15)-1;
+	/* first subtract and mask after that... Otherwise, if
+	   date == 0, bad things happen */
+	month = ((date >> 5) - 1) & 15;
 	year = date >> 9;
 	secs = (time & 31)*2+60*((time >> 5) & 63)+(time >> 11)*3600+86400*
 	    ((date & 31)-1+day_n[month]+(year/4)+year*365-((year & 3) == 0 &&
@@ -359,7 +279,10 @@ void fat_date_unix2dos(int unix_date,unsigned short *time,
 	int day,year,nl_day,month;
 
 	unix_date -= sys_tz.tz_minuteswest*60;
-	if (sys_tz.tz_dsttime) unix_date += 3600;
+
+	/* Jan 1 GMT 00:00:00 1980. But what about another time zone? */
+	if (unix_date < 315532800)
+		unix_date = 315532800;
 
 	*time = (unix_date % 60)/2+(((unix_date/60) % 60) << 5)+
 	    (((unix_date/3600) % 24) << 11);
@@ -592,61 +515,9 @@ static int raw_scan(struct super_block *sb, int start, const char *name,
 }
 
 /*
- * fat_parent_ino returns the inode number of the parent directory of dir.
- * File creation has to be deferred while fat_parent_ino is running to
- * prevent renames.
- *
- * AV. Bad, bad, bad... We need a mapping that would give us inode by
- * first cluster. Sheeeeit... OK, we can do it on fat_fill_inode() and
- * update on fat_add_cluster(). When will we remove it? fat_clear_inode()
- * and fat_truncate() to zero?
- */
-
-int fat_parent_ino(struct inode *dir,int locked)
-{
-	static int zero = 0;
-	int error,curr,prev,nr;
-
-	PRINTK(("fat_parent_ino: Debug 0\n"));
-	if (!S_ISDIR(dir->i_mode)) panic("Non-directory fed to m_p_i");
-	if (dir->i_ino == MSDOS_ROOT_INO) return dir->i_ino;
-	if (!locked) fat_lock_creation(); /* prevent renames */
-	if ((curr = raw_scan(dir->i_sb,MSDOS_I(dir)->i_start,MSDOS_DOTDOT,
-	    &zero,NULL,NULL,NULL)) < 0) {
-		if (!locked) fat_unlock_creation();
-		return curr;
-	}
-	PRINTK(("fat_parent_ino: Debug 1 curr=%d\n", curr));
-	if (!curr) nr = MSDOS_ROOT_INO;
-	else {
-		PRINTK(("fat_parent_ino: Debug 2\n"));
-		if ((prev = raw_scan(dir->i_sb,curr,MSDOS_DOTDOT,&zero,NULL,
-		    NULL,NULL)) < 0) {
-			PRINTK(("fat_parent_ino: Debug 3 prev=%d\n", prev));
-			if (!locked) fat_unlock_creation();
-			return prev;
-		}
-		PRINTK(("fat_parent_ino: Debug 4 prev=%d\n", prev));
-		if (prev == 0 && MSDOS_SB(dir->i_sb)->fat_bits == 32) {
-			prev = MSDOS_SB(dir->i_sb)->root_cluster;
-		}
-		if ((error = raw_scan(dir->i_sb,prev,NULL,&curr,&nr,NULL,
-		    NULL)) < 0) {
-			PRINTK(("fat_parent_ino: Debug 5 error=%d\n", error));
-			if (!locked) fat_unlock_creation();
-			return error;
-		}
-		PRINTK(("fat_parent_ino: Debug 6 nr=%d\n", nr));
-	}
-	if (!locked) fat_unlock_creation();
-	return nr;
-}
-
-/*
  * fat_subdirs counts the number of sub-directories of dir. It can be run
  * on directories being created.
  */
-
 int fat_subdirs(struct inode *dir)
 {
 	int count;

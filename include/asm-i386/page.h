@@ -15,7 +15,7 @@
 
 #include <asm/mmx.h>
 
-#define clear_page(page)	mmx_clear_page(page)
+#define clear_page(page)	mmx_clear_page((void *)(page))
 #define copy_page(to,from)	mmx_copy_page(to,from)
 
 #else

@@ -1,4 +1,4 @@
-/* $Id: pci_psycho.c,v 1.28 2001/08/24 19:36:58 kanoj Exp $
+/* $Id: pci_psycho.c,v 1.29 2001/10/11 00:44:38 davem Exp $
  * pci_psycho.c: PSYCHO/U2P specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -36,7 +36,8 @@
 	__asm__ __volatile__("stxa %0, [%1] %2" \
 			     : /* no outputs */ \
 			     : "r" (__val), "r" (__reg), \
-			       "i" (ASI_PHYS_BYPASS_EC_E))
+			       "i" (ASI_PHYS_BYPASS_EC_E) \
+			     : "memory")
 
 /* Misc. PSYCHO PCI controller register offsets and definitions. */
 #define PSYCHO_CONTROL		0x0010UL

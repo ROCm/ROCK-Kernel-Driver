@@ -1,4 +1,4 @@
-/* $Id: sungem.c,v 1.20 2001/09/19 00:04:32 davem Exp $
+/* $Id: sungem.c,v 1.22 2001/10/09 02:24:33 davem Exp $
  * sungem.c: Sun GEM ethernet driver.
  *
  * Copyright (C) 2000, 2001 David S. Miller (davem@redhat.com)
@@ -418,7 +418,8 @@ static __inline__ void gem_tx(struct net_device *dev, struct gem *gp, u32 gem_st
 	while (entry != limit) {
 		struct sk_buff *skb;
 		struct gem_txd *txd;
-		u32 dma_addr, dma_len;
+		dma_addr_t dma_addr;
+		u32 dma_len;
 		int frag;
 
 		skb = gp->tx_skbs[entry];
@@ -444,10 +445,10 @@ static __inline__ void gem_tx(struct net_device *dev, struct gem *gp, u32 gem_st
 		for (frag = 0; frag <= skb_shinfo(skb)->nr_frags; frag++) {
 			txd = &gp->init_block->txd[entry];
 
-			dma_addr = (u32) le64_to_cpu(txd->buffer);
+			dma_addr = le64_to_cpu(txd->buffer);
 			dma_len = le64_to_cpu(txd->control_word) & TXDCTRL_BUFSZ;
 
-			pci_unmap_single(gp->pdev, dma_addr, dma_len, PCI_DMA_TODEVICE);
+			pci_unmap_page(gp->pdev, dma_addr, dma_len, PCI_DMA_TODEVICE);
 			entry = NEXT_TX(entry);
 		}
 
@@ -498,7 +499,7 @@ static void gem_rx(struct gem *gp)
 		struct gem_rxd *rxd = &gp->init_block->rxd[entry];
 		struct sk_buff *skb;
 		u64 status = cpu_to_le64(rxd->status_word);
-		u32 dma_addr;
+		dma_addr_t dma_addr;
 		int len;
 
 		if ((status & RXDCTRL_OWN) != 0)
@@ -520,7 +521,7 @@ static void gem_rx(struct gem *gp)
 			goto next;
 		}
 
-		dma_addr = (u32) cpu_to_le64(rxd->buffer);
+		dma_addr = cpu_to_le64(rxd->buffer);
 		if (len > RX_COPY_THRESHOLD) {
 			struct sk_buff *new_skb;
 
@@ -529,15 +530,18 @@ static void gem_rx(struct gem *gp)
 				drops++;
 				goto drop_it;
 			}
-			pci_unmap_single(gp->pdev, dma_addr,
-					 RX_BUF_ALLOC_SIZE(gp), PCI_DMA_FROMDEVICE);
+			pci_unmap_page(gp->pdev, dma_addr,
+				       RX_BUF_ALLOC_SIZE(gp),
+				       PCI_DMA_FROMDEVICE);
 			gp->rx_skbs[entry] = new_skb;
 			new_skb->dev = gp->dev;
 			skb_put(new_skb, (ETH_FRAME_LEN + RX_OFFSET));
-			rxd->buffer = cpu_to_le64(pci_map_single(gp->pdev,
-								 new_skb->data,
-								 RX_BUF_ALLOC_SIZE(gp),
-								 PCI_DMA_FROMDEVICE));
+			rxd->buffer = cpu_to_le64(pci_map_page(gp->pdev,
+							       virt_to_page(new_skb->data),
+							       ((unsigned long) new_skb->data &
+								~PAGE_MASK),
+							       RX_BUF_ALLOC_SIZE(gp),
+							       PCI_DMA_FROMDEVICE));
 			skb_reserve(new_skb, RX_OFFSET);
 
 			/* Trim the original skb for the netif. */
@@ -661,37 +665,45 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	if (skb_shinfo(skb)->nr_frags == 0) {
 		struct gem_txd *txd = &gp->init_block->txd[entry];
-		u32 mapping, len;
+		dma_addr_t mapping;
+		u32 len;
 
 		len = skb->len;
-		mapping = pci_map_single(gp->pdev, skb->data, len, PCI_DMA_TODEVICE);
+		mapping = pci_map_page(gp->pdev,
+				       virt_to_page(skb->data),
+				       ((unsigned long) skb->data &
+					~PAGE_MASK),
+				       len, PCI_DMA_TODEVICE);
 		ctrl |= TXDCTRL_SOF | TXDCTRL_EOF | len;
 		txd->buffer = cpu_to_le64(mapping);
 		txd->control_word = cpu_to_le64(ctrl);
 		entry = NEXT_TX(entry);
 	} else {
 		struct gem_txd *txd;
-		u32 first_len, first_mapping;
+		u32 first_len;
+		dma_addr_t first_mapping;
 		int frag, first_entry = entry;
 
 		/* We must give this initial chunk to the device last.
 		 * Otherwise we could race with the device.
 		 */
 		first_len = skb->len - skb->data_len;
-		first_mapping = pci_map_single(gp->pdev, skb->data,
-					       first_len, PCI_DMA_TODEVICE);
+		first_mapping = pci_map_page(gp->pdev, virt_to_page(skb->data),
+					     ((unsigned long) skb->data & ~PAGE_MASK),
+					     first_len, PCI_DMA_TODEVICE);
 		entry = NEXT_TX(entry);
 
 		for (frag = 0; frag < skb_shinfo(skb)->nr_frags; frag++) {
 			skb_frag_t *this_frag = &skb_shinfo(skb)->frags[frag];
-			u32 len, mapping;
+			u32 len;
+			dma_addr_t mapping;
 			u64 this_ctrl;
 
 			len = this_frag->size;
-			mapping = pci_map_single(gp->pdev,
-						 ((void *) page_address(this_frag->page) +
-						  this_frag->page_offset),
-						 len, PCI_DMA_TODEVICE);
+			mapping = pci_map_page(gp->pdev,
+					       this_frag->page,
+					       this_frag->page_offset,
+					       len, PCI_DMA_TODEVICE);
 			this_ctrl = ctrl;
 			if (frag == skb_shinfo(skb)->nr_frags - 1)
 				this_ctrl |= TXDCTRL_EOF;
@@ -948,19 +960,18 @@ static void gem_clean_rings(struct gem *gp)
 	struct gem_init_block *gb = gp->init_block;
 	struct sk_buff *skb;
 	int i;
-	u32 dma_addr;
+	dma_addr_t dma_addr;
 
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		struct gem_rxd *rxd;
 
 		rxd = &gb->rxd[i];
 		if (gp->rx_skbs[i] != NULL) {
-
 			skb = gp->rx_skbs[i];
-			dma_addr = (u32) le64_to_cpu(rxd->buffer);
-			pci_unmap_single(gp->pdev, dma_addr,
-					 RX_BUF_ALLOC_SIZE(gp),
-					 PCI_DMA_FROMDEVICE);
+			dma_addr = le64_to_cpu(rxd->buffer);
+			pci_unmap_page(gp->pdev, dma_addr,
+				       RX_BUF_ALLOC_SIZE(gp),
+				       PCI_DMA_FROMDEVICE);
 			dev_kfree_skb_any(skb);
 			gp->rx_skbs[i] = NULL;
 		}
@@ -978,10 +989,10 @@ static void gem_clean_rings(struct gem *gp)
 
 			for (frag = 0; frag <= skb_shinfo(skb)->nr_frags; frag++) {
 				txd = &gb->txd[i];
-				dma_addr = (u32) le64_to_cpu(txd->buffer);
-				pci_unmap_single(gp->pdev, dma_addr,
-						 le64_to_cpu(txd->control_word) &
-						 TXDCTRL_BUFSZ, PCI_DMA_TODEVICE);
+				dma_addr = le64_to_cpu(txd->buffer);
+				pci_unmap_page(gp->pdev, dma_addr,
+					       le64_to_cpu(txd->control_word) &
+					       TXDCTRL_BUFSZ, PCI_DMA_TODEVICE);
 
 				if (frag != skb_shinfo(skb)->nr_frags)
 					i++;
@@ -996,7 +1007,7 @@ static void gem_init_rings(struct gem *gp, int from_irq)
 	struct gem_init_block *gb = gp->init_block;
 	struct net_device *dev = gp->dev;
 	int i, gfp_flags = GFP_KERNEL;
-	u32 dma_addr;
+	dma_addr_t dma_addr;
 
 	if (from_irq)
 		gfp_flags = GFP_ATOMIC;
@@ -1019,9 +1030,12 @@ static void gem_init_rings(struct gem *gp, int from_irq)
 		gp->rx_skbs[i] = skb;
 		skb->dev = dev;
 		skb_put(skb, (ETH_FRAME_LEN + RX_OFFSET));
-		dma_addr = pci_map_single(gp->pdev, skb->data,
-					  RX_BUF_ALLOC_SIZE(gp),
-					  PCI_DMA_FROMDEVICE);
+		dma_addr = pci_map_page(gp->pdev,
+					virt_to_page(skb->data),
+					((unsigned long) skb->data &
+					 ~PAGE_MASK),
+					RX_BUF_ALLOC_SIZE(gp),
+					PCI_DMA_FROMDEVICE);
 		rxd->buffer = cpu_to_le64(dma_addr);
 		rxd->status_word = cpu_to_le64(RXDCTRL_FRESH(gp));
 		skb_reserve(skb, RX_OFFSET);
@@ -1137,13 +1151,15 @@ static void gem_init_phy(struct gem *gp)
 
 static void gem_init_dma(struct gem *gp)
 {
+	u64 desc_dma = (u64) gp->gblock_dvma;
 	u32 val;
 
 	val = (TXDMA_CFG_BASE | (0x7ff << 10) | TXDMA_CFG_PMODE);
 	writel(val, gp->regs + TXDMA_CFG);
 
-	writel(0, gp->regs + TXDMA_DBHI);
-	writel(gp->gblock_dvma, gp->regs + TXDMA_DBLOW);
+	writel(desc_dma >> 32, gp->regs + TXDMA_DBHI);
+	writel(desc_dma & 0xffffffff, gp->regs + TXDMA_DBLOW);
+	desc_dma += (TX_RING_SIZE * sizeof(struct gem_txd));
 
 	writel(0, gp->regs + TXDMA_KICK);
 
@@ -1151,10 +1167,8 @@ static void gem_init_dma(struct gem *gp)
 	       ((14 / 2) << 13) | RXDMA_CFG_FTHRESH_512);
 	writel(val, gp->regs + RXDMA_CFG);
 
-	writel(0, gp->regs + RXDMA_DBHI);
-	writel((gp->gblock_dvma +
-		(TX_RING_SIZE * sizeof(struct gem_txd))),
-	       gp->regs + RXDMA_DBLOW);
+	writel(desc_dma >> 32, gp->regs + RXDMA_DBHI);
+	writel(desc_dma & 0xffffffff, gp->regs + RXDMA_DBLOW);
 
 	writel(RX_RING_SIZE - 4, gp->regs + RXDMA_KICK);
 
@@ -1562,8 +1576,10 @@ static int __devinit gem_check_invariants(struct gem *gp)
 	}
 
 	{
-		u32 cfg = readl(gp->regs + GREG_BIFCFG);
+		u32 cfg;
 
+		/* XXX Why do I do this? -DaveM XXX */
+		cfg = readl(gp->regs + GREG_BIFCFG);
 		cfg |= GREG_BIFCFG_B64DIS;
 		writel(cfg, gp->regs + GREG_BIFCFG);
 
@@ -1621,7 +1637,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	unsigned long gemreg_base, gemreg_len;
 	struct net_device *dev;
 	struct gem *gp;
-	int i, err;
+	int i, err, pci_using_dac;
 
 	if (gem_version_printed++ == 0)
 		printk(KERN_INFO "%s", version);
@@ -1633,6 +1649,29 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 		return err;
 	}
 	pci_set_master(pdev);
+
+	/* Configure DMA attributes. */
+
+	/* All of the GEM documentation states that 64-bit DMA addressing
+	 * is fully supported and should work just fine.  However the
+	 * front end for RIO based GEMs is different and only supports
+	 * 32-bit addressing.
+	 *
+	 * For now we assume the various PPC GEMs are 32-bit only as well.
+	 */
+	if (pdev->vendor == PCI_VENDOR_ID_SUN &&
+	    pdev->device == PCI_DEVICE_ID_SUN_GEM &&
+	    !pci_set_dma_mask(pdev, (u64) 0xffffffffffffffff)) {
+		pci_using_dac = 1;
+	} else {
+		err = pci_set_dma_mask(pdev, (u64) 0xffffffff);
+		if (err) {
+			printk(KERN_ERR PFX "No usable DMA configuration, "
+			       "aborting.\n");
+			return err;
+		}
+		pci_using_dac = 0;
+	}
 
 	gemreg_base = pci_resource_start(pdev, 0);
 	gemreg_len = pci_resource_len(pdev, 0);
@@ -1717,6 +1756,8 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 
 	/* GEM can do it all... */
 	dev->features |= NETIF_F_SG | NETIF_F_HW_CSUM;
+	if (pci_using_dac)
+		dev->features |= NETIF_F_HIGHDMA;
 
 	return 0;
 

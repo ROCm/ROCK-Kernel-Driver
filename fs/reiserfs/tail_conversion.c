@@ -61,7 +61,7 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
     if ( is_statdata_le_ih (p_le_ih) )  {
 	/* Insert new indirect item. */
 	set_ih_free_space (&ind_ih, 0); /* delete at nearest future */
-	ind_ih.ih_item_len = cpu_to_le16 (UNFM_P_SIZE);
+        put_ih_item_len( &ind_ih, UNFM_P_SIZE );
 	PATH_LAST_POSITION (path)++;
 	n_retval = reiserfs_insert_item (th, path, &end_key, &ind_ih, 
 					 (char *)&unfm_ptr);
@@ -93,10 +93,10 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
 			    "direct item (%k) not found", &end_key);
 	p_le_ih = PATH_PITEM_HEAD (path);
 	RFALSE( !is_direct_le_ih (p_le_ih),
-		"vs-14055: direct item expected(%k), found %h", 
-		&end_key, p_le_ih);
-	tail_size = (le_ih_k_offset (p_le_ih) & (n_blk_size - 1))
-	    + ih_item_len(p_le_ih) - 1;
+	        "vs-14055: direct item expected(%k), found %h",
+                &end_key, p_le_ih);
+        tail_size = (le_ih_k_offset (p_le_ih) & (n_blk_size - 1))
+            + ih_item_len(p_le_ih) - 1;
 
 	/* we only send the unbh pointer if the buffer is not up to date.
 	** this avoids overwriting good data from writepage() with old data
@@ -214,7 +214,7 @@ int indirect2direct (struct reiserfs_transaction_handle *th,
     else
 	round_tail_len = tail_len;
 
-    pos = le_ih_k_offset (&s_ih) - 1 + (le16_to_cpu (s_ih.ih_item_len) / UNFM_P_SIZE - 1) * p_s_sb->s_blocksize;
+    pos = le_ih_k_offset (&s_ih) - 1 + (ih_item_len(&s_ih) / UNFM_P_SIZE - 1) * p_s_sb->s_blocksize;
     pos1 = pos;
 
     // we are protected by i_sem. The tail can not disapper, not
@@ -231,7 +231,7 @@ int indirect2direct (struct reiserfs_transaction_handle *th,
 	copy_item_head(&s_ih, PATH_PITEM_HEAD(p_s_path));
 #ifdef CONFIG_REISERFS_CHECK
 	pos = le_ih_k_offset (&s_ih) - 1 + 
-	    (le16_to_cpu (s_ih.ih_item_len) / UNFM_P_SIZE - 1) * p_s_sb->s_blocksize;
+	    (ih_item_len(&s_ih) / UNFM_P_SIZE - 1) * p_s_sb->s_blocksize;
 	if (pos != pos1)
 	    reiserfs_panic (p_s_sb, "vs-5530: indirect2direct: "
 			    "tail position changed while we were reading it");

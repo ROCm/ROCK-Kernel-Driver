@@ -574,6 +574,7 @@ struct alpha_machine_vector dp264_mv __initmv = {
 	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
 	min_io_address:		DEFAULT_IO_BASE,
 	min_mem_address:	DEFAULT_MEM_BASE,
+	pci_dac_offset:		TSUNAMI_DAC_OFFSET,
 
 	nr_irqs:		64,
 	device_interrupt:	dp264_device_interrupt,
@@ -598,6 +599,7 @@ struct alpha_machine_vector monet_mv __initmv = {
 	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
 	min_io_address:		DEFAULT_IO_BASE,
 	min_mem_address:	DEFAULT_MEM_BASE,
+	pci_dac_offset:		TSUNAMI_DAC_OFFSET,
 
 	nr_irqs:		64,
 	device_interrupt:	dp264_device_interrupt,
@@ -621,6 +623,7 @@ struct alpha_machine_vector webbrick_mv __initmv = {
 	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
 	min_io_address:		DEFAULT_IO_BASE,
 	min_mem_address:	DEFAULT_MEM_BASE,
+	pci_dac_offset:		TSUNAMI_DAC_OFFSET,
 
 	nr_irqs:		64,
 	device_interrupt:	dp264_device_interrupt,
@@ -644,6 +647,7 @@ struct alpha_machine_vector clipper_mv __initmv = {
 	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
 	min_io_address:		DEFAULT_IO_BASE,
 	min_mem_address:	DEFAULT_MEM_BASE,
+	pci_dac_offset:		TSUNAMI_DAC_OFFSET,
 
 	nr_irqs:		64,
 	device_interrupt:	dp264_device_interrupt,
@@ -672,6 +676,7 @@ struct alpha_machine_vector shark_mv __initmv = {
 	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
 	min_io_address:		DEFAULT_IO_BASE,
 	min_mem_address:	DEFAULT_MEM_BASE,
+	pci_dac_offset:		TSUNAMI_DAC_OFFSET,
 
 	nr_irqs:		64,
 	device_interrupt:	dp264_device_interrupt,

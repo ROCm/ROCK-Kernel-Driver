@@ -1804,7 +1804,7 @@ static int sprintf_wireless_stats(char *buffer, struct net_device *dev)
 
 	if (stats != (struct iw_statistics *) NULL) {
 		size = sprintf(buffer,
-			       "%6s: %04x  %3d%c  %3d%c  %3d%c  %6d %6d %6d\n",
+			       "%6s: %04x  %3d%c  %3d%c  %3d%c  %6d %6d %6d %6d %6d   %6d\n",
 			       dev->name,
 			       stats->status,
 			       stats->qual.qual,
@@ -1815,7 +1815,10 @@ static int sprintf_wireless_stats(char *buffer, struct net_device *dev)
 			       stats->qual.updated & 4 ? '.' : ' ',
 			       stats->discard.nwid,
 			       stats->discard.code,
-			       stats->discard.misc);
+			       stats->discard.fragment,
+			       stats->discard.retries,
+			       stats->discard.misc,
+			       stats->miss.beacon);
 		stats->qual.updated = 0;
 	}
 	else
@@ -1839,8 +1842,8 @@ static int dev_get_wireless_info(char * buffer, char **start, off_t offset,
 	struct net_device *	dev;
 
 	size = sprintf(buffer,
-		       "Inter-| sta-|   Quality        |   Discarded packets\n"
-		       " face | tus | link level noise |  nwid  crypt   misc\n"
+		       "Inter-| sta-|   Quality        |   Discarded packets               | Missed\n"
+		       " face | tus | link level noise |  nwid  crypt   frag  retry   misc | beacon\n"
 			);
 	
 	pos += size;
@@ -1871,6 +1874,33 @@ static int dev_get_wireless_info(char * buffer, char **start, off_t offset,
 	return len;
 }
 #endif	/* CONFIG_PROC_FS */
+
+/*
+ *	Allow programatic access to /proc/net/wireless even if /proc
+ *	doesn't exist... Also more efficient...
+ */
+static inline int dev_iwstats(struct net_device *dev, struct ifreq *ifr)
+{
+	/* Get stats from the driver */
+	struct iw_statistics *stats = (dev->get_wireless_stats ?
+				       dev->get_wireless_stats(dev) :
+				       (struct iw_statistics *) NULL);
+
+	if (stats != (struct iw_statistics *) NULL) {
+		struct iwreq *	wrq = (struct iwreq *)ifr;
+
+		/* Copy statistics to the user buffer */
+		if(copy_to_user(wrq->u.data.pointer, stats,
+				sizeof(struct iw_statistics)))
+			return -EFAULT;
+
+		/* Check if we need to clear the update flag */
+		if(wrq->u.data.flags != 0)
+			stats->qual.updated = 0;
+		return(0);
+	} else
+		return -EOPNOTSUPP;
+}
 #endif	/* WIRELESS_EXT */
 
 /**
@@ -2169,6 +2199,11 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 			dev->name[IFNAMSIZ-1] = 0;
 			notifier_call_chain(&netdev_chain, NETDEV_CHANGENAME, dev);
 			return 0;
+
+#ifdef WIRELESS_EXT
+		case SIOCGIWSTATS:
+			return dev_iwstats(dev, ifr);
+#endif	/* WIRELESS_EXT */
 
 		/*
 		 *	Unknown or private ioctl

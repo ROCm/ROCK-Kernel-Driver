@@ -269,8 +269,15 @@ static dev_link_t *dev_list;
    because they generally can't be allocated dynamically.
 */
 
-#define SIOCGIPSNAP	SIOCDEVPRIVATE		/* Site Survey Snapshot */
-/*#define SIOCGIPQTHR	SIOCDEVPRIVATE + 1*/
+/* Wireless Extension Backward compatibility - Jean II
+ * If the new wireless device private ioctl range is not defined,
+ * default to standard device private ioctl range */
+#ifndef SIOCIWFIRSTPRIV
+#define SIOCIWFIRSTPRIV	SIOCDEVPRIVATE
+#endif /* SIOCIWFIRSTPRIV */
+
+#define SIOCGIPSNAP	SIOCIWFIRSTPRIV		/* Site Survey Snapshot */
+/*#define SIOCGIPQTHR	SIOCIWFIRSTPRIV + 1*/
 
 #define MAX_ESA 10
 

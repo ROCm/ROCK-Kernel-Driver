@@ -80,10 +80,9 @@ __u32 reiserfs_get_unused_objectid (struct reiserfs_transaction_handle *th)
        first two odd sequences into one sequence.  If so, then the net
        result is to eliminate a pair of objectids from oids.  We do this
        by shifting the entire map to the left. */
-    if (le16_to_cpu (rs->s_oid_cursize) > 2 && map[1] == map[2]) {
-	memmove (map + 1, map + 3, (le16_to_cpu (rs->s_oid_cursize) - 3) * sizeof(__u32));
-	//rs->s_oid_cursize -= 2;
-	rs->s_oid_cursize = cpu_to_le16 (le16_to_cpu (rs->s_oid_cursize) - 2);
+    if (sb_oid_cursize(rs) > 2 && map[1] == map[2]) {
+	memmove (map + 1, map + 3, (sb_oid_cursize(rs) - 3) * sizeof(__u32));
+        set_sb_oid_cursize( rs, sb_oid_cursize(rs) - 2 );
     }
 
     journal_mark_dirty(th, s, SB_BUFFER_WITH_SB (s));
@@ -114,7 +113,7 @@ void reiserfs_release_objectid (struct reiserfs_transaction_handle *th,
        what we use, though it is possible that binary search would be
        more efficient after performing lots of deletions (which is
        when oids is large.)  We only check even i's. */
-    while (i < le16_to_cpu (rs->s_oid_cursize)) {
+    while (i < sb_oid_cursize(rs)) {
 	if (objectid_to_release == le32_to_cpu (map[i])) {
 	    /* This incrementation unallocates the objectid. */
 	    //map[i]++;
@@ -124,14 +123,14 @@ void reiserfs_release_objectid (struct reiserfs_transaction_handle *th,
 	    if (map[i] == map[i+1]) {
 		/* shrink objectid map */
 		memmove (map + i, map + i + 2, 
-			 (le16_to_cpu (rs->s_oid_cursize) - i - 2) * sizeof (__u32));
+			 (sb_oid_cursize(rs) - i - 2) * sizeof (__u32));
 		//disk_sb->s_oid_cursize -= 2;
-		rs->s_oid_cursize = cpu_to_le16 (le16_to_cpu (rs->s_oid_cursize) - 2);
+                set_sb_oid_cursize( rs, sb_oid_cursize(rs) - 2 );
 
-		RFALSE( le16_to_cpu (rs->s_oid_cursize) < 2 || 
-			le16_to_cpu (rs->s_oid_cursize) > le16_to_cpu (rs->s_oid_maxsize),
-			"vs-15005: objectid map corrupted cur_size == %d (max == %d)",
-			le16_to_cpu (rs->s_oid_cursize), le16_to_cpu (rs->s_oid_maxsize));
+		RFALSE( sb_oid_cursize(rs) < 2 || 
+		        sb_oid_cursize(rs) > sb_oid_maxsize(rs),
+		        "vs-15005: objectid map corrupted cur_size == %d (max == %d)",
+                        sb_oid_cursize(rs), sb_oid_maxsize(rs));
 	    }
 	    return;
 	}
@@ -145,16 +144,17 @@ void reiserfs_release_objectid (struct reiserfs_transaction_handle *th,
 		return;
 	    }
 
+            /* JDM comparing two little-endian values for equality -- safe */
 	    if (rs->s_oid_cursize == rs->s_oid_maxsize)
 		/* objectid map must be expanded, but there is no space */
 		return;
 
 	    /* expand the objectid map*/
 	    memmove (map + i + 3, map + i + 1, 
-		     (le16_to_cpu (rs->s_oid_cursize) - i - 1) * sizeof(__u32));
+		     (sb_oid_cursize(rs) - i - 1) * sizeof(__u32));
 	    map[i + 1] = cpu_to_le32 (objectid_to_release);
 	    map[i + 2] = cpu_to_le32 (objectid_to_release + 1);
-	    rs->s_oid_cursize = cpu_to_le16 (le16_to_cpu (rs->s_oid_cursize) + 2);
+            set_sb_oid_cursize( rs, sb_oid_cursize(rs) + 2 );
 	    return;
 	}
 	i += 2;

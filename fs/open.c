@@ -104,7 +104,12 @@ static inline long do_sys_truncate(const char * path, loff_t length)
 		goto out;
 	inode = nd.dentry->d_inode;
 
-	error = -EACCES;
+	/* For directories it's -EISDIR, for other non-regulars - -EINVAL */
+	error = -EISDIR;
+	if (S_ISDIR(inode->i_mode))
+		goto dput_and_out;
+
+	error = -EINVAL;
 	if (!S_ISREG(inode->i_mode))
 		goto dput_and_out;
 
@@ -146,10 +151,11 @@ out:
 
 asmlinkage long sys_truncate(const char * path, unsigned long length)
 {
-	return do_sys_truncate(path, length);
+	/* on 32-bit boxen it will cut the range 2^31--2^32-1 off */
+	return do_sys_truncate(path, (long)length);
 }
 
-static inline long do_sys_ftruncate(unsigned int fd, loff_t length)
+static inline long do_sys_ftruncate(unsigned int fd, loff_t length, int small)
 {
 	struct inode * inode;
 	struct dentry *dentry;
@@ -163,13 +169,24 @@ static inline long do_sys_ftruncate(unsigned int fd, loff_t length)
 	file = fget(fd);
 	if (!file)
 		goto out;
+
+	/* explicitly opened as large or we are on 64-bit box */
+	if (file->f_flags & O_LARGEFILE)
+		small = 0;
+
 	dentry = file->f_dentry;
 	inode = dentry->d_inode;
-	error = -EACCES;
+	error = -EINVAL;
 	if (!S_ISREG(inode->i_mode) || !(file->f_mode & FMODE_WRITE))
 		goto out_putf;
+
+	error = -EINVAL;
+	/* Cannot ftruncate over 2^31 bytes without large file support */
+	if (small && length > MAX_NON_LFS)
+		goto out_putf;
+
 	error = -EPERM;
-	if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
+	if (IS_APPEND(inode))
 		goto out_putf;
 
 	error = locks_verify_truncate(inode, file, length);
@@ -183,7 +200,7 @@ out:
 
 asmlinkage long sys_ftruncate(unsigned int fd, unsigned long length)
 {
-	return do_sys_ftruncate(fd, length);
+	return do_sys_ftruncate(fd, length, 1);
 }
 
 /* LFS versions of truncate are only needed on 32 bit machines */
@@ -195,7 +212,7 @@ asmlinkage long sys_truncate64(const char * path, loff_t length)
 
 asmlinkage long sys_ftruncate64(unsigned int fd, loff_t length)
 {
-	return do_sys_ftruncate(fd, length);
+	return do_sys_ftruncate(fd, length, 0);
 }
 #endif
 
@@ -507,7 +524,7 @@ static int chown_common(struct dentry * dentry, uid_t user, gid_t group)
 
 	error = -ENOENT;
 	if (!(inode = dentry->d_inode)) {
-		printk("chown_common: NULL inode\n");
+		printk(KERN_ERR "chown_common: NULL inode\n");
 		goto out;
 	}
 	error = -EROFS;
@@ -744,7 +761,7 @@ repeat:
 #if 1
 	/* Sanity check */
 	if (files->fd[fd] != NULL) {
-		printk("get_unused_fd: slot %d not NULL!\n", fd);
+		printk(KERN_WARNING "get_unused_fd: slot %d not NULL!\n", fd);
 		files->fd[fd] = NULL;
 	}
 #endif
@@ -807,7 +824,7 @@ int filp_close(struct file *filp, fl_owner_t id)
 	int retval;
 
 	if (!file_count(filp)) {
-		printk("VFS: Close: file count is 0\n");
+		printk(KERN_ERR "VFS: Close: file count is 0\n");
 		return 0;
 	}
 	retval = 0;

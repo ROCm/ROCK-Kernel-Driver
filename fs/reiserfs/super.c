@@ -79,9 +79,6 @@ void reiserfs_unlockfs(struct super_block *s) {
 // at the ext2 code and comparing. It's subfunctions contain no code
 // used as a template unless they are so labeled.
 //
-/* there should be no suspected recipients already. True and cautious
-   bitmaps should not differ. We only have to free preserve list and
-   write both bitmaps */
 void reiserfs_put_super (struct super_block * s)
 {
   int i;
@@ -91,7 +88,7 @@ void reiserfs_put_super (struct super_block * s)
   if (!(s->s_flags & MS_RDONLY)) {
     journal_begin(&th, s, 10) ;
     reiserfs_prepare_for_journal(s, SB_BUFFER_WITH_SB(s), 1) ;
-    s->u.reiserfs_sb.s_rs->s_state = le16_to_cpu (s->u.reiserfs_sb.s_mount_state);
+    set_sb_state( SB_DISK_SUPER_BLOCK(s), s->u.reiserfs_sb.s_mount_state );
     journal_mark_dirty(&th, s, SB_BUFFER_WITH_SB (s));
   }
 
@@ -250,26 +247,26 @@ int reiserfs_remount (struct super_block * s, int * flags, char * data)
   
   if (*flags & MS_RDONLY) {
     /* try to remount file system with read-only permissions */
-    if (le16_to_cpu (rs->s_state) == REISERFS_VALID_FS || s->u.reiserfs_sb.s_mount_state != REISERFS_VALID_FS) {
+    if (sb_state(rs) == REISERFS_VALID_FS || s->u.reiserfs_sb.s_mount_state != REISERFS_VALID_FS) {
       return 0;
     }
 
     journal_begin(&th, s, 10) ;
     /* Mounting a rw partition read-only. */
     reiserfs_prepare_for_journal(s, SB_BUFFER_WITH_SB(s), 1) ;
-    rs->s_state = cpu_to_le16 (s->u.reiserfs_sb.s_mount_state);
+    set_sb_state( rs, s->u.reiserfs_sb.s_mount_state );
     journal_mark_dirty(&th, s, SB_BUFFER_WITH_SB (s));
     s->s_dirt = 0;
   } else {
-    s->u.reiserfs_sb.s_mount_state = le16_to_cpu(rs->s_state) ;
+    s->u.reiserfs_sb.s_mount_state = sb_state(rs) ;
     s->s_flags &= ~MS_RDONLY ; /* now it is safe to call journal_begin */
     journal_begin(&th, s, 10) ;
 
     /* Mount a partition which is read-only, read-write */
     reiserfs_prepare_for_journal(s, SB_BUFFER_WITH_SB(s), 1) ;
-    s->u.reiserfs_sb.s_mount_state = le16_to_cpu (rs->s_state);
+    s->u.reiserfs_sb.s_mount_state = sb_state(rs);
     s->s_flags &= ~MS_RDONLY;
-    rs->s_state = cpu_to_le16 (REISERFS_ERROR_FS);
+    set_sb_state( rs, REISERFS_ERROR_FS );
     /* mark_buffer_dirty (SB_BUFFER_WITH_SB (s), 1); */
     journal_mark_dirty(&th, s, SB_BUFFER_WITH_SB (s));
     s->s_dirt = 0;
@@ -287,10 +284,10 @@ static int read_bitmaps (struct super_block * s)
     int i, bmp, dl ;
     struct reiserfs_super_block * rs = SB_DISK_SUPER_BLOCK(s);
 
-    SB_AP_BITMAP (s) = reiserfs_kmalloc (sizeof (struct buffer_head *) * le16_to_cpu (rs->s_bmap_nr), GFP_NOFS, s);
+    SB_AP_BITMAP (s) = reiserfs_kmalloc (sizeof (struct buffer_head *) * sb_bmap_nr(rs), GFP_NOFS, s);
     if (SB_AP_BITMAP (s) == 0)
 	return 1;
-    memset (SB_AP_BITMAP (s), 0, sizeof (struct buffer_head *) * le16_to_cpu (rs->s_bmap_nr));
+    memset (SB_AP_BITMAP (s), 0, sizeof (struct buffer_head *) * sb_bmap_nr(rs));
 
     /* reiserfs leaves the first 64k unused so that any partition
        labeling scheme currently used will have enough space. Then we
@@ -299,7 +296,7 @@ static int read_bitmaps (struct super_block * s)
     SB_AP_BITMAP (s)[0] = reiserfs_bread (s->s_dev, bmp, s->s_blocksize);
     if(!SB_AP_BITMAP(s)[0])
 	return 1;
-    for (i = 1, bmp = dl = rs->s_blocksize * 8; i < le16_to_cpu (rs->s_bmap_nr); i ++) {
+    for (i = 1, bmp = dl = s->s_blocksize * 8; i < sb_bmap_nr(rs); i ++) {
 	SB_AP_BITMAP (s)[i] = reiserfs_bread (s->s_dev, bmp, s->s_blocksize);
 	if (!SB_AP_BITMAP (s)[i])
 	    return 1;
@@ -316,13 +313,13 @@ static int read_old_bitmaps (struct super_block * s)
   int bmp1 = (REISERFS_OLD_DISK_OFFSET_IN_BYTES / s->s_blocksize) + 1;  /* first of bitmap blocks */
 
   /* read true bitmap */
-  SB_AP_BITMAP (s) = reiserfs_kmalloc (sizeof (struct buffer_head *) * le16_to_cpu (rs->s_bmap_nr), GFP_NOFS, s);
+  SB_AP_BITMAP (s) = reiserfs_kmalloc (sizeof (struct buffer_head *) * sb_bmap_nr(rs), GFP_NOFS, s);
   if (SB_AP_BITMAP (s) == 0)
     return 1;
 
-  memset (SB_AP_BITMAP (s), 0, sizeof (struct buffer_head *) * le16_to_cpu (rs->s_bmap_nr));
+  memset (SB_AP_BITMAP (s), 0, sizeof (struct buffer_head *) * sb_bmap_nr(rs));
 
-  for (i = 0; i < le16_to_cpu (rs->s_bmap_nr); i ++) {
+  for (i = 0; i < sb_bmap_nr(rs); i ++) {
     SB_AP_BITMAP (s)[i] = reiserfs_bread (s->s_dev, bmp1 + i, s->s_blocksize);
     if (!SB_AP_BITMAP (s)[i])
       return 1;
@@ -349,35 +346,33 @@ void check_bitmap (struct super_block * s)
 		      free, SB_FREE_BLOCKS (s));
 }
 
-
-
 static int read_super_block (struct super_block * s, int size, int offset)
 {
     struct buffer_head * bh;
     struct reiserfs_super_block * rs;
-
+ 
 
     bh = bread (s->s_dev, offset / size, size);
     if (!bh) {
-	printk ("read_super_block: "
-		"bread failed (dev %s, block %d, size %d)\n", 
-		kdevname (s->s_dev), offset / size, size);
-	return 1;
+      printk ("read_super_block: "
+              "bread failed (dev %s, block %d, size %d)\n",
+              kdevname (s->s_dev), offset / size, size);
+      return 1;
     }
-
+ 
     rs = (struct reiserfs_super_block *)bh->b_data;
     if (!is_reiserfs_magic_string (rs)) {
-	printk ("read_super_block: "
-		"can't find a reiserfs filesystem on (dev %s, block %lu, size %d)\n",
-		kdevname(s->s_dev), bh->b_blocknr, size);
-	brelse (bh);
-	return 1;
+      printk ("read_super_block: "
+              "can't find a reiserfs filesystem on (dev %s, block %lu, size %d)\n",
+              kdevname(s->s_dev), bh->b_blocknr, size);
+      brelse (bh);
+      return 1;
     }
-
+ 
     //
     // ok, reiserfs signature (old or new) found in at the given offset
-    //
-    s->s_blocksize = le16_to_cpu (rs->s_blocksize);
+    //    
+    s->s_blocksize = sb_blocksize(rs);
     s->s_blocksize_bits = 0;
     while ((1 << s->s_blocksize_bits) != s->s_blocksize)
 	s->s_blocksize_bits ++;
@@ -387,21 +382,22 @@ static int read_super_block (struct super_block * s, int size, int offset)
     if (s->s_blocksize != size)
 	set_blocksize (s->s_dev, s->s_blocksize);
 
-    bh = bread (s->s_dev, offset / s->s_blocksize, s->s_blocksize);
+    bh = reiserfs_bread (s->s_dev, offset / s->s_blocksize, s->s_blocksize);
     if (!bh) {
-	printk ("read_super_block: "
-		"bread failed (dev %s, block %d, size %d)\n", 
-		kdevname (s->s_dev), offset / size, size);
+	printk("read_super_block: "
+                "bread failed (dev %s, block %d, size %d)\n",
+                kdevname (s->s_dev), offset / size, size);
 	return 1;
     }
     
     rs = (struct reiserfs_super_block *)bh->b_data;
     if (!is_reiserfs_magic_string (rs) ||
-	le16_to_cpu (rs->s_blocksize) != s->s_blocksize) {
+	sb_blocksize(rs) != s->s_blocksize) {
 	printk ("read_super_block: "
 		"can't find a reiserfs filesystem on (dev %s, block %lu, size %d)\n",
 		kdevname(s->s_dev), bh->b_blocknr, size);
 	brelse (bh);
+	printk ("read_super_block: can't find a reiserfs filesystem on dev %s.\n", kdevname(s->s_dev));
 	return 1;
     }
     /* must check to be sure we haven't pulled an old format super out
@@ -409,8 +405,8 @@ static int read_super_block (struct super_block * s, int size, int offset)
     ** will work.  If block we've just read in is inside the
     ** journal for that super, it can't be valid.  
     */
-    if (bh->b_blocknr >= le32_to_cpu(rs->s_journal_block) && 
-	bh->b_blocknr < (le32_to_cpu(rs->s_journal_block) + JOURNAL_BLOCK_COUNT)) {
+    if (bh->b_blocknr >= sb_journal_block(rs) && 
+	bh->b_blocknr < (sb_journal_block(rs) + JOURNAL_BLOCK_COUNT)) {
 	brelse(bh) ;
 	printk("super-459: read_super_block: "
 	       "super found at block %lu is within its own log. "
@@ -483,7 +479,7 @@ __u32 find_hash_out (struct super_block * s)
 	if (retval == NAME_NOT_FOUND)
 	    de.de_entry_num --;
 	set_de_name_and_namelen (&de);
-	if (le32_to_cpu (de.de_deh[de.de_entry_num].deh_offset) == DOT_DOT_OFFSET) {
+	if (deh_offset( &(de.de_deh[de.de_entry_num]) ) == DOT_DOT_OFFSET) {
 	    /* allow override in this case */
 	    if (reiserfs_rupasov_hash(s)) {
 		hash = YURA_HASH ;
@@ -499,7 +495,7 @@ __u32 find_hash_out (struct super_block * s)
 	    hash = UNSET_HASH ;
 	    break;
 	}
-	if (GET_HASH_VALUE(le32_to_cpu(de.de_deh[de.de_entry_num].deh_offset))==
+	if (GET_HASH_VALUE( deh_offset(&(de.de_deh[de.de_entry_num])) ) ==
 	    GET_HASH_VALUE (yura_hash (de.de_name, de.de_namelen)))
 	    hash = YURA_HASH;
 	else
@@ -516,7 +512,7 @@ static int what_hash (struct super_block * s)
 {
     __u32 code;
 
-    code = le32_to_cpu (s->u.reiserfs_sb.s_rs->s_hash_function_code);
+    code = sb_hash_function_code(SB_DISK_SUPER_BLOCK(s));
 
     /* reiserfs_hash_detect() == true if any of the hash mount options
     ** were used.  We must check them to make sure the user isn't
@@ -558,8 +554,8 @@ static int what_hash (struct super_block * s)
     */
     if (code != UNSET_HASH && 
 	!(s->s_flags & MS_RDONLY) && 
-        code != le32_to_cpu (s->u.reiserfs_sb.s_rs->s_hash_function_code)) {
-        s->u.reiserfs_sb.s_rs->s_hash_function_code = cpu_to_le32(code) ;
+        code != sb_hash_function_code(SB_DISK_SUPER_BLOCK(s))) {
+        set_sb_hash_function_code(SB_DISK_SUPER_BLOCK(s), code);
     }
     return code;
 }
@@ -646,7 +642,7 @@ struct super_block * reiserfs_read_super (struct super_block * s, void * data, i
 	    old_format = 1;
     }
 
-    s->u.reiserfs_sb.s_mount_state = le16_to_cpu (SB_DISK_SUPER_BLOCK (s)->s_state); /* journal victim */
+    s->u.reiserfs_sb.s_mount_state = SB_REISERFS_STATE(s);
     s->u.reiserfs_sb.s_mount_state = REISERFS_VALID_FS ;
 
     if (old_format ? read_old_bitmaps(s) : read_bitmaps(s)) { 
@@ -702,10 +698,10 @@ struct super_block * reiserfs_read_super (struct super_block * s, void * data, i
 
     if (!(s->s_flags & MS_RDONLY)) {
 	struct reiserfs_super_block * rs = SB_DISK_SUPER_BLOCK (s);
-	int old_magic;
+        int old_magic;
 
-	old_magic = strncmp (rs->s_magic,  REISER2FS_SUPER_MAGIC_STRING, 
-			     strlen ( REISER2FS_SUPER_MAGIC_STRING));
+      old_magic = strncmp (rs->s_magic,  REISER2FS_SUPER_MAGIC_STRING,
+                           strlen ( REISER2FS_SUPER_MAGIC_STRING));
 	if( old_magic && le16_to_cpu(rs->s_version) != 0 ) {
 	  dput(s->s_root) ;
 	  s->s_root = NULL ;
@@ -716,7 +712,7 @@ struct super_block * reiserfs_read_super (struct super_block * s, void * data, i
 	journal_begin(&th, s, 1) ;
 	reiserfs_prepare_for_journal(s, SB_BUFFER_WITH_SB(s), 1) ;
 
-	rs->s_state = cpu_to_le16 (REISERFS_ERROR_FS);
+        set_sb_state( rs, REISERFS_ERROR_FS );
 
         if ( old_magic ) {
 	    // filesystem created under 3.5.x found
@@ -736,7 +732,7 @@ struct super_block * reiserfs_read_super (struct super_block * s, void * data, i
 	}
 
 	// mark hash in super block: it could be unset. overwrite should be ok
-	rs->s_hash_function_code = cpu_to_le32 (function2code (s->u.reiserfs_sb.s_hash_function));
+        set_sb_hash_function_code( rs, function2code(s->u.reiserfs_sb.s_hash_function ) );
 
 	journal_mark_dirty(&th, s, SB_BUFFER_WITH_SB (s));
 	journal_end(&th, s, 1) ;
@@ -785,13 +781,13 @@ int reiserfs_statfs (struct super_block * s, struct statfs * buf)
   struct reiserfs_super_block * rs = SB_DISK_SUPER_BLOCK (s);
   
 				/* changed to accomodate gcc folks.*/
-  buf->f_type =  REISERFS_SUPER_MAGIC;
-  buf->f_bsize = le32_to_cpu (s->s_blocksize);
-  buf->f_blocks = le32_to_cpu (rs->s_block_count) - le16_to_cpu (rs->s_bmap_nr) - 1;
-  buf->f_bfree = le32_to_cpu (rs->s_free_blocks);
-  buf->f_bavail = buf->f_bfree;
-  buf->f_files = -1;
-  buf->f_ffree = -1;
+  buf->f_type    =  REISERFS_SUPER_MAGIC;
+  buf->f_bsize   = s->s_blocksize;
+  buf->f_blocks  = sb_block_count(rs) - sb_bmap_nr(rs) - 1;
+  buf->f_bfree   = sb_free_blocks(rs);
+  buf->f_bavail  = buf->f_bfree;
+  buf->f_files   = -1;
+  buf->f_ffree   = -1;
   buf->f_namelen = (REISERFS_MAX_NAME_LEN (s->s_blocksize));
   return 0;
 }
@@ -806,6 +802,9 @@ static int __init init_reiserfs_fs (void)
         return register_filesystem(&reiserfs_fs_type);
 }
 
+MODULE_DESCRIPTION("ReiserFS journaled filesystem");
+MODULE_AUTHOR("Hans Reiser <reiser@namesys.com>");
+MODULE_LICENSE("GPL");
 EXPORT_NO_SYMBOLS;
 
 //

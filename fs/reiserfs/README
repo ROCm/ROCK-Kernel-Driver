@@ -145,6 +145,10 @@ Yuri Shevchuk and Nikita Danilov are doing squid cache optimization.
 
 Vitaly Fertman is doing fsck.
 
+Jeff Mahoney, of SuSE, contributed a few cleanup fixes, most notably
+the endian safe patches which allow ReiserFS to run on any platform
+supported by the Linux kernel.
+
 SuSE, IntegratedLinux.com, Ecila, MP3.com, bigstorage.com, and the
 Alpha PC Company made it possible for me to not have a day job
 anymore, and to dramatically increase our staffing.  Ecila funded

@@ -81,7 +81,7 @@ inline void set_de_name_and_namelen (struct reiserfs_dir_entry * de)
 
     de->de_entrylen = entry_length (de->de_bh, de->de_ih, de->de_entry_num);
     de->de_namelen = de->de_entrylen - (de_with_sd (deh) ? SD_SIZE : 0);
-    de->de_name = B_I_PITEM (de->de_bh, de->de_ih) + le16_to_cpu (deh->deh_location);
+    de->de_name = B_I_PITEM (de->de_bh, de->de_ih) + deh_location(deh);
     if (de->de_name[de->de_namelen - 1] == 0)
 	de->de_namelen = strlen (de->de_name);
 }
@@ -92,8 +92,8 @@ static inline void set_de_object_key (struct reiserfs_dir_entry * de)
 {
     if (de->de_entry_num >= ih_entry_count (de->de_ih))
 	BUG ();
-    de->de_dir_id = le32_to_cpu (de->de_deh[de->de_entry_num].deh_dir_id);
-    de->de_objectid = le32_to_cpu (de->de_deh[de->de_entry_num].deh_objectid);
+    de->de_dir_id = deh_dir_id( &(de->de_deh[de->de_entry_num]));
+    de->de_objectid = deh_objectid( &(de->de_deh[de->de_entry_num]));
 }
 
 
@@ -159,7 +159,7 @@ int search_by_entry_key (struct super_block * sb, struct cpu_key * key,
 	COMP_SHORT_KEYS (&(de->de_ih->ih_key), key)) {
 	print_block (de->de_bh, 0, -1, -1);
 	reiserfs_panic (sb, "vs-7005: search_by_entry_key: found item %h is not directory item or "
-			"does not belong to the same directory as key %k", de->de_ih, key);
+                        "does not belong to the same directory as key %K", de->de_ih, key);
     }
 #endif /* CONFIG_REISERFS_CHECK */
 
@@ -322,12 +322,7 @@ static int reiserfs_find_entry (struct inode * dir, const char * name, int namel
 	retval = search_by_entry_key (dir->i_sb, &key_to_search, path_to_entry, de);
 	if (retval == IO_ERROR)
 	    // FIXME: still has to be dealt with
-
-				/* I want you to conform to our error
-                                   printing standard.  How many times
-                                   do I have to ask? -Hans */
-
-	    BUG ();
+	    reiserfs_panic (dir->i_sb, "zam-7001: io error in " __FUNCTION__ "\n");
 
 	/* compare names for all entries having given hash value */
 	retval = linear_search_in_dir_item (&key_to_search, de, name, namelen);
@@ -434,12 +429,12 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
 
     /* fill buffer : directory entry head, name[, dir objectid | , stat data | ,stat data, dir objectid ] */
     deh = (struct reiserfs_de_head *)buffer;
-    deh->deh_location = 0;
-    deh->deh_offset = cpu_to_le32 (cpu_key_k_offset (&entry_key));
-    deh->deh_state = 0;
+    deh->deh_location = 0; /* JDM Endian safe if 0 */
+    put_deh_offset( deh, cpu_key_k_offset( &entry_key ) );
+    deh->deh_state = 0; /* JDM Endian safe if 0 */
     /* put key (ino analog) to de */
-    deh->deh_dir_id = INODE_PKEY (inode)->k_dir_id;
-    deh->deh_objectid = INODE_PKEY (inode)->k_objectid;
+    deh->deh_dir_id = INODE_PKEY (inode)->k_dir_id; /* safe: k_dir_id is le */
+    deh->deh_objectid = INODE_PKEY (inode)->k_objectid; /* safe: k_objectid is le */
 
     /* copy name */
     memcpy ((char *)(deh + 1), name, namelen);
@@ -454,36 +449,37 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
     memset (bit_string, 0, sizeof (bit_string));
     de.de_gen_number_bit_string = (char *)bit_string;
     retval = reiserfs_find_entry (dir, name, namelen, &path, &de);
-    if (retval != NAME_NOT_FOUND) {
+    if( retval != NAME_NOT_FOUND ) {
 	if (buffer != small_buf)
 	    reiserfs_kfree (buffer, buflen, dir->i_sb);
 	pathrelse (&path);
-	
-	if (retval != NAME_FOUND) {
+
+        if (retval != NAME_FOUND) {
 	    reiserfs_warning ("zam-7002:" __FUNCTION__ ": \"reiserfs_find_entry\" has returned"
-			      " unexpected value (%d)\n", retval);
-	}
-	
+                              " unexpected value (%d)\n", retval);
+       }
+
 	return -EEXIST;
     }
 
     gen_number = find_first_zero_bit (bit_string, MAX_GENERATION_NUMBER + 1);
     if (gen_number > MAX_GENERATION_NUMBER) {
-	/* there is no free generation number */
-	reiserfs_warning ("reiserfs_add_entry: Congratulations! we have got hash function screwed up\n");
-	if (buffer != small_buf)
-	    reiserfs_kfree (buffer, buflen, dir->i_sb);
-	pathrelse (&path);
-	return -EBUSY;
+      /* there is no free generation number */
+      reiserfs_warning ("reiserfs_add_entry: Congratulations! we have got hash function screwed up\n");
+      if (buffer != small_buf)
+          reiserfs_kfree (buffer, buflen, dir->i_sb);
+      pathrelse (&path);
+      return -EBUSY;
     }
     /* adjust offset of directory enrty */
-    deh->deh_offset = cpu_to_le32 (SET_GENERATION_NUMBER (deh_offset (deh), gen_number));
-    set_cpu_key_k_offset (&entry_key, le32_to_cpu (deh->deh_offset));
-
+    put_deh_offset(deh, SET_GENERATION_NUMBER(deh_offset(deh), gen_number));
+    set_cpu_key_k_offset (&entry_key, deh_offset(deh));
+ 
     if (gen_number != 0) {	/* we need to re-search for the insertion point */
-	if (search_by_entry_key (dir->i_sb, &entry_key, &path, &de) != NAME_NOT_FOUND) {
-	    reiserfs_warning ("vs-7032: reiserfs_add_entry: "
-			      "entry with this key (%k) already exists\n", &entry_key);
+      if (search_by_entry_key (dir->i_sb, &entry_key, &path, &de) != NAME_NOT_FOUND) {
+            reiserfs_warning ("vs-7032: reiserfs_add_entry: "
+                            "entry with this key (%k) already exists\n", &entry_key);
+
 	    if (buffer != small_buf)
 		reiserfs_kfree (buffer, buflen, dir->i_sb);
 	    pathrelse (&path);
@@ -558,6 +554,8 @@ int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode)
 	iput (inode);
 	return retval;
     }
+    reiserfs_update_inode_transaction(inode) ;
+    reiserfs_update_inode_transaction(dir) ;
 
     d_instantiate(dentry, inode);
     pop_journal_writer(windex) ;
@@ -599,6 +597,9 @@ int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, int rde
 
     //FIXME: needed for block and char devices only
     reiserfs_update_sd (&th, inode);
+
+    reiserfs_update_inode_transaction(inode) ;
+    reiserfs_update_inode_transaction(dir) ;
 
     retval = reiserfs_add_entry (&th, dir, dentry->d_name.name, dentry->d_name.len, 
 				 inode, 1/*visible*/);
@@ -655,6 +656,8 @@ int reiserfs_mkdir (struct inode * dir, struct dentry *dentry, int mode)
 	journal_end(&th, dir->i_sb, jbegin_count) ;
 	return retval;
     }
+    reiserfs_update_inode_transaction(inode) ;
+    reiserfs_update_inode_transaction(dir) ;
 
     inode->i_op = &reiserfs_dir_inode_operations;
     inode->i_fop = &reiserfs_dir_operations;
@@ -722,6 +725,9 @@ int reiserfs_rmdir (struct inode * dir, struct dentry *dentry)
 	goto end_rmdir;
     }
     inode = dentry->d_inode;
+
+    reiserfs_update_inode_transaction(inode) ;
+    reiserfs_update_inode_transaction(dir) ;
 
     if (de.de_objectid != inode->i_ino) {
 	// FIXME: compare key of an object and a key found in the
@@ -795,6 +801,9 @@ int reiserfs_unlink (struct inode * dir, struct dentry *dentry)
 	goto end_unlink;
     }
     inode = dentry->d_inode;
+
+    reiserfs_update_inode_transaction(inode) ;
+    reiserfs_update_inode_transaction(dir) ;
 
     if (de.de_objectid != inode->i_ino) {
 	// FIXME: compare key of an object and a key found in the
@@ -885,6 +894,9 @@ int reiserfs_symlink (struct inode * dir, struct dentry * dentry, const char * s
 	return retval;
     }
 
+    reiserfs_update_inode_transaction(inode) ;
+    reiserfs_update_inode_transaction(dir) ;
+
     inode->i_op = &page_symlink_inode_operations;
     inode->i_mapping->a_ops = &reiserfs_address_space_operations;
 
@@ -940,6 +952,10 @@ int reiserfs_link (struct dentry * old_dentry, struct inode * dir, struct dentry
     /* create new entry */
     retval = reiserfs_add_entry (&th, dir, dentry->d_name.name, dentry->d_name.len,
 				 inode, 1/*visible*/);
+
+    reiserfs_update_inode_transaction(inode) ;
+    reiserfs_update_inode_transaction(dir) ;
+
     if (retval) {
 	pop_journal_writer(windex) ;
 	journal_end(&th, dir->i_sb, jbegin_count) ;
@@ -994,6 +1010,7 @@ static int entry_points_to_object (const char * name, int len, struct reiserfs_d
 /* sets key of objectid the entry has to point to */
 static void set_ino_in_dir_entry (struct reiserfs_dir_entry * de, struct key * key)
 {
+    /* JDM These operations are endian safe - both are le */
     de->de_deh[de->de_entry_num].deh_dir_id = key->k_dir_id;
     de->de_deh[de->de_entry_num].deh_objectid = key->k_objectid;
 }
@@ -1085,6 +1102,16 @@ int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 	return retval;
     }
 
+    reiserfs_update_inode_transaction(old_dir) ;
+    reiserfs_update_inode_transaction(new_dir) ;
+
+    /* this makes it so an fsync on an open fd for the old name will
+    ** commit the rename operation
+    */
+    reiserfs_update_inode_transaction(old_inode) ;
+
+    if (new_inode) 
+	reiserfs_update_inode_transaction(new_inode) ;
 
     while (1) {
 	// look for old name using corresponding entry key (found by reiserfs_find_entry)

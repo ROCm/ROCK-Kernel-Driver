@@ -1572,7 +1572,8 @@ void cleanup_module()
 	cli();
 
 	if ((tty_unregister_driver(&pc_driver)) ||  
-	    (tty_unregister_driver(&pc_callout)))
+	    (tty_unregister_driver(&pc_callout)) ||
+	    (tty_unregister_driver(&pc_info)))
 	{
 		printk(KERN_WARNING "<Error> - DIGI : cleanup_module failed to un-register tty driver\n");
 		restore_flags(flags);

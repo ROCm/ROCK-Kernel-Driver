@@ -140,7 +140,8 @@ static void internal_insert_childs (struct buffer_info * cur_bi,
     if (count <= 0)
 	return;
 
-    nr = le16_to_cpu ((blkh = B_BLK_HEAD(cur))->blk_nr_item);
+    blkh = B_BLK_HEAD(cur);
+    nr = blkh_nr_item(blkh);
 
     RFALSE( count > 2,
 	    "too many children (%d) are to be inserted", count);
@@ -155,9 +156,8 @@ static void internal_insert_childs (struct buffer_info * cur_bi,
 
     /* copy to_be_insert disk children */
     for (i = 0; i < count; i ++) {
-	new_dc[i].dc_size =
-	    cpu_to_le16 (MAX_CHILD_SIZE(bh[i]) - B_FREE_SPACE (bh[i]));
-	new_dc[i].dc_block_number = cpu_to_le32 (bh[i]->b_blocknr);
+	put_dc_size( &(new_dc[i]), MAX_CHILD_SIZE(bh[i]) - B_FREE_SPACE(bh[i]));
+	put_dc_block_number( &(new_dc[i]), bh[i]->b_blocknr );
     }
     memcpy (dc, new_dc, DC_SIZE * count);
 
@@ -173,8 +173,9 @@ static void internal_insert_childs (struct buffer_info * cur_bi,
 	memcpy (ih + 1, inserted + 1, KEY_SIZE);
 
     /* sizes, item number */
-    blkh->blk_nr_item = cpu_to_le16 (le16_to_cpu (blkh->blk_nr_item) + count);
-    blkh->blk_free_space = cpu_to_le16 (le16_to_cpu (blkh->blk_free_space) - count * (DC_SIZE + KEY_SIZE));
+    set_blkh_nr_item( blkh, blkh_nr_item(blkh) + count );
+    set_blkh_free_space( blkh,
+                        blkh_free_space(blkh) - count * (DC_SIZE + KEY_SIZE ) );
 
     do_balance_mark_internal_dirty (cur_bi->tb, cur,0);
 
@@ -183,7 +184,8 @@ static void internal_insert_childs (struct buffer_info * cur_bi,
     /*&&&&&&&&&&&&&&&&&&&&&&&&*/
 
     if (cur_bi->bi_parent) {
-	B_N_CHILD (cur_bi->bi_parent,cur_bi->bi_position)->dc_size += count * (DC_SIZE + KEY_SIZE);
+	struct disk_child *t_dc = B_N_CHILD (cur_bi->bi_parent,cur_bi->bi_position);
+	put_dc_size( t_dc, dc_size(t_dc) + (count * (DC_SIZE + KEY_SIZE)));
 	do_balance_mark_internal_dirty(cur_bi->tb, cur_bi->bi_parent, 0);
 
 	/*&&&&&&&&&&&&&&&&&&&&&&&&*/
@@ -210,17 +212,18 @@ static void	internal_delete_pointers_items (
   struct disk_child * dc;
 
   RFALSE( cur == NULL, "buffer is 0");
-  RFALSE( del_num < 0, 
-	  "negative number of items (%d) can not be deleted", del_num);
+  RFALSE( del_num < 0,
+          "negative number of items (%d) can not be deleted", del_num);
   RFALSE( first_p < 0 || first_p + del_num > B_NR_ITEMS (cur) + 1 || first_i < 0,
-	  "first pointer order (%d) < 0 or "
-	  "no so many pointers (%d), only (%d) or "
-	  "first key order %d < 0", first_p, 
-	  first_p + del_num, B_NR_ITEMS (cur) + 1, first_i);
+          "first pointer order (%d) < 0 or "
+          "no so many pointers (%d), only (%d) or "
+          "first key order %d < 0", first_p, 
+          first_p + del_num, B_NR_ITEMS (cur) + 1, first_i);
   if ( del_num == 0 )
     return;
 
-  nr = le16_to_cpu ((blkh = B_BLK_HEAD(cur))->blk_nr_item);
+  blkh = B_BLK_HEAD(cur);
+  nr = blkh_nr_item(blkh);
 
   if ( first_p == 0 && del_num == nr + 1 ) {
     RFALSE( first_i != 0, "1st deleted key must have order 0, not %d", first_i);
@@ -229,9 +232,9 @@ static void	internal_delete_pointers_items (
   }
 
   RFALSE( first_i + del_num > B_NR_ITEMS (cur),
-	  "first_i = %d del_num = %d "
-	  "no so many keys (%d) in the node (%b)(%z)", 
-	  first_i, del_num, first_i + del_num, cur, cur);
+          "first_i = %d del_num = %d "
+          "no so many keys (%d) in the node (%b)(%z)",
+          first_i, del_num, first_i + del_num, cur, cur);
 
 
   /* deleting */
@@ -243,8 +246,9 @@ static void	internal_delete_pointers_items (
 
 
   /* sizes, item number */
-  blkh->blk_nr_item = cpu_to_le16 (le16_to_cpu (blkh->blk_nr_item) - del_num);
-  blkh->blk_free_space = cpu_to_le16 (le16_to_cpu (blkh->blk_free_space) + del_num * (KEY_SIZE +  DC_SIZE));
+  set_blkh_nr_item( blkh, blkh_nr_item(blkh) - del_num );
+  set_blkh_free_space( blkh,
+                    blkh_free_space(blkh) + (del_num * (KEY_SIZE + DC_SIZE) ) );
 
   do_balance_mark_internal_dirty (cur_bi->tb, cur, 0);
   /*&&&&&&&&&&&&&&&&&&&&&&&*/
@@ -252,7 +256,10 @@ static void	internal_delete_pointers_items (
   /*&&&&&&&&&&&&&&&&&&&&&&&*/
  
   if (cur_bi->bi_parent) {
-    B_N_CHILD (cur_bi->bi_parent, cur_bi->bi_position)->dc_size -= del_num * (KEY_SIZE +  DC_SIZE);
+    struct disk_child *t_dc;
+    t_dc = B_N_CHILD (cur_bi->bi_parent, cur_bi->bi_position);
+    put_dc_size( t_dc, dc_size(t_dc) - (del_num * (KEY_SIZE + DC_SIZE) ) );
+
     do_balance_mark_internal_dirty (cur_bi->tb, cur_bi->bi_parent,0);
     /*&&&&&&&&&&&&&&&&&&&&&&&&*/
     check_internal (cur_bi->bi_parent);
@@ -312,7 +319,8 @@ static void internal_copy_pointers_items (
     return;
 
 	/* coping */
-  nr_dest = le16_to_cpu ((blkh = B_BLK_HEAD(dest))->blk_nr_item);
+  blkh = B_BLK_HEAD(dest);
+  nr_dest = blkh_nr_item(blkh);
 
   /*dest_order = (last_first == LAST_TO_FIRST) ? 0 : nr_dest;*/
   /*src_order = (last_first == LAST_TO_FIRST) ? (nr_src - cpy_num + 1) : 0;*/
@@ -338,8 +346,9 @@ static void internal_copy_pointers_items (
   memcpy (key, B_N_PDELIM_KEY (src, src_order), KEY_SIZE * (cpy_num - 1));
 
   /* sizes, item number */
-  blkh->blk_nr_item = cpu_to_le16 (le16_to_cpu (blkh->blk_nr_item) + (cpy_num - 1));
-  blkh->blk_free_space = cpu_to_le16 (le16_to_cpu (blkh->blk_free_space) - (KEY_SIZE * (cpy_num - 1) + DC_SIZE * cpy_num));
+  set_blkh_nr_item( blkh, blkh_nr_item(blkh) + (cpy_num - 1 ) );
+  set_blkh_free_space( blkh,
+      blkh_free_space(blkh) - (KEY_SIZE * (cpy_num - 1) + DC_SIZE * cpy_num ) );
 
   do_balance_mark_internal_dirty (dest_bi->tb, dest, 0);
 
@@ -348,8 +357,9 @@ static void internal_copy_pointers_items (
   /*&&&&&&&&&&&&&&&&&&&&&&&&*/
 
   if (dest_bi->bi_parent) {
-    B_N_CHILD(dest_bi->bi_parent,dest_bi->bi_position)->dc_size +=
-      KEY_SIZE * (cpy_num - 1) + DC_SIZE * cpy_num;
+    struct disk_child *t_dc;
+    t_dc = B_N_CHILD(dest_bi->bi_parent,dest_bi->bi_position);
+    put_dc_size( t_dc, dc_size(t_dc) + (KEY_SIZE * (cpy_num - 1) + DC_SIZE * cpy_num) );
 
     do_balance_mark_internal_dirty (dest_bi->tb, dest_bi->bi_parent,0);
     /*&&&&&&&&&&&&&&&&&&&&&&&&*/
@@ -413,7 +423,8 @@ static void internal_insert_key (struct buffer_info * dest_bi,
     RFALSE( B_FREE_SPACE (dest) < KEY_SIZE,
 	    "no enough free space (%d) in dest buffer", B_FREE_SPACE (dest));
 
-    nr = le16_to_cpu ((blkh=B_BLK_HEAD(dest))->blk_nr_item);
+    blkh = B_BLK_HEAD(dest);
+    nr = blkh_nr_item(blkh);
 
     /* prepare space for inserting key */
     key = B_N_PDELIM_KEY (dest, dest_position_before);
@@ -423,13 +434,17 @@ static void internal_insert_key (struct buffer_info * dest_bi,
     memcpy (key, B_N_PDELIM_KEY(src, src_position), KEY_SIZE);
 
     /* Change dirt, free space, item number fields. */
-    blkh->blk_nr_item = cpu_to_le16 (le16_to_cpu (blkh->blk_nr_item) + 1);
-    blkh->blk_free_space = cpu_to_le16 (le16_to_cpu (blkh->blk_free_space) - KEY_SIZE);
+
+    set_blkh_nr_item( blkh, blkh_nr_item(blkh) + 1 );
+    set_blkh_free_space( blkh, blkh_free_space(blkh) - KEY_SIZE );
 
     do_balance_mark_internal_dirty (dest_bi->tb, dest, 0);
 
     if (dest_bi->bi_parent) {
-	B_N_CHILD(dest_bi->bi_parent,dest_bi->bi_position)->dc_size += KEY_SIZE;
+	struct disk_child *t_dc;
+	t_dc = B_N_CHILD(dest_bi->bi_parent,dest_bi->bi_position);
+	put_dc_size( t_dc, dc_size(t_dc) + KEY_SIZE );
+
 	do_balance_mark_internal_dirty (dest_bi->tb, dest_bi->bi_parent,0);
     }
 }
@@ -607,9 +622,9 @@ static void balance_internal_when_delete (struct tree_balance * tb,
 	    else
 		new_root = tb->L[h-1];
 	    /* switch super block's tree root block number to the new value */
-	    tb->tb_sb->u.reiserfs_sb.s_rs->s_root_block = cpu_to_le32 (new_root->b_blocknr);
+            PUT_SB_ROOT_BLOCK( tb->tb_sb, new_root->b_blocknr );
 	    //tb->tb_sb->u.reiserfs_sb.s_rs->s_tree_height --;
-	    tb->tb_sb->u.reiserfs_sb.s_rs->s_tree_height = cpu_to_le16 (SB_TREE_HEIGHT (tb->tb_sb) - 1);
+            PUT_SB_TREE_HEIGHT( tb->tb_sb, SB_TREE_HEIGHT(tb->tb_sb) - 1 );
 
 	    do_balance_mark_sb_dirty (tb, tb->tb_sb->u.reiserfs_sb.s_sbh, 1);
 	    /*&&&&&&&&&&&&&&&&&&&&&&*/
@@ -818,8 +833,8 @@ int balance_internal (struct tree_balance * tb,			/* tree_balance structure 		*/
 
 	    /* replace the first node-ptr in S[h] by node-ptr to insert_ptr[k] */
 	    dc = B_N_CHILD(tbSh, 0);
-	    dc->dc_size = cpu_to_le16 (MAX_CHILD_SIZE(insert_ptr[k]) - B_FREE_SPACE (insert_ptr[k]));
-	    dc->dc_block_number = cpu_to_le32 (insert_ptr[k]->b_blocknr);
+	    put_dc_size( dc, MAX_CHILD_SIZE(insert_ptr[k]) - B_FREE_SPACE (insert_ptr[k]));
+	    put_dc_block_number( dc, insert_ptr[k]->b_blocknr );
 
 	    do_balance_mark_internal_dirty (tb, tbSh, 0);
 
@@ -874,10 +889,9 @@ int balance_internal (struct tree_balance * tb,			/* tree_balance structure 		*/
 
 		/* replace the first node-ptr in R[h] by node-ptr insert_ptr[insert_num-k-1]*/
 		dc = B_N_CHILD(tb->R[h], 0);
-		dc->dc_size =
-		    cpu_to_le16 (MAX_CHILD_SIZE(insert_ptr[insert_num-k-1]) -
-				 B_FREE_SPACE (insert_ptr[insert_num-k-1]));
-		dc->dc_block_number = cpu_to_le32 (insert_ptr[insert_num-k-1]->b_blocknr);
+		put_dc_size( dc, MAX_CHILD_SIZE(insert_ptr[insert_num-k-1]) -
+    				    B_FREE_SPACE (insert_ptr[insert_num-k-1]));
+		put_dc_block_number( dc, insert_ptr[insert_num-k-1]->b_blocknr );
 
 		do_balance_mark_internal_dirty (tb, tb->R[h],0);
 
@@ -902,22 +916,24 @@ int balance_internal (struct tree_balance * tb,			/* tree_balance structure 		*/
 	/* create new root */
 	struct disk_child  * dc;
 	struct buffer_head * tbSh_1 = PATH_H_PBUFFER (tb->tb_path, h - 1);
+        struct block_head *  blkh;
 
 
 	if ( tb->blknum[h] != 1 )
 	    reiserfs_panic(0, "balance_internal", "One new node required for creating the new root");
 	/* S[h] = empty buffer from the list FEB. */
 	tbSh = get_FEB (tb);
-	B_BLK_HEAD(tbSh)->blk_level = cpu_to_le16 (h + 1);
+        blkh = B_BLK_HEAD(tbSh);
+        set_blkh_level( blkh, h + 1 );
 
 	/* Put the unique node-pointer to S[h] that points to S[h-1]. */
 
 	dc = B_N_CHILD(tbSh, 0);
-	dc->dc_block_number = cpu_to_le32 (tbSh_1->b_blocknr);
-	dc->dc_size = cpu_to_le16 (MAX_CHILD_SIZE (tbSh_1) - B_FREE_SPACE (tbSh_1));
+	put_dc_block_number( dc, tbSh_1->b_blocknr );
+	put_dc_size( dc, (MAX_CHILD_SIZE (tbSh_1) - B_FREE_SPACE (tbSh_1)));
 
 	tb->insert_size[h] -= DC_SIZE;
-	B_BLK_HEAD(tbSh)->blk_free_space = cpu_to_le16 (B_FREE_SPACE (tbSh) - DC_SIZE);
+        set_blkh_free_space( blkh, blkh_free_space(blkh) - DC_SIZE );
 
 	do_balance_mark_internal_dirty (tb, tbSh, 0);
 
@@ -929,8 +945,8 @@ int balance_internal (struct tree_balance * tb,			/* tree_balance structure 		*/
 	PATH_OFFSET_PBUFFER(tb->tb_path, ILLEGAL_PATH_ELEMENT_OFFSET) = tbSh;
 
 	/* Change root in structure super block. */
-	tb->tb_sb->u.reiserfs_sb.s_rs->s_root_block = cpu_to_le32 (tbSh->b_blocknr);
-	tb->tb_sb->u.reiserfs_sb.s_rs->s_tree_height = cpu_to_le16 (SB_TREE_HEIGHT (tb->tb_sb) + 1);
+        PUT_SB_ROOT_BLOCK( tb->tb_sb, tbSh->b_blocknr );
+        PUT_SB_TREE_HEIGHT( tb->tb_sb, SB_TREE_HEIGHT(tb->tb_sb) + 1 );
 	do_balance_mark_sb_dirty (tb, tb->tb_sb->u.reiserfs_sb.s_sbh, 1);
 	tb->tb_sb->s_dirt = 1;
     }
@@ -943,7 +959,7 @@ int balance_internal (struct tree_balance * tb,			/* tree_balance structure 		*/
 	/* S_new = free buffer from list FEB */
 	S_new = get_FEB(tb);
 
-	B_BLK_HEAD(S_new)->blk_level = cpu_to_le16 (h + 1);
+        set_blkh_level( B_BLK_HEAD(S_new), h + 1 );
 
 	dest_bi.tb = tb;
 	dest_bi.bi_bh = S_new;
@@ -998,9 +1014,9 @@ int balance_internal (struct tree_balance * tb,			/* tree_balance structure 		*/
 	    /* replace first node-ptr in S_new by node-ptr to insert_ptr[insert_num-k-1] */
 
 	    dc = B_N_CHILD(S_new,0);
-	    dc->dc_size = cpu_to_le16 (MAX_CHILD_SIZE(insert_ptr[insert_num-k-1]) -
-				       B_FREE_SPACE(insert_ptr[insert_num-k-1]));
-	    dc->dc_block_number =	cpu_to_le32 (insert_ptr[insert_num-k-1]->b_blocknr);
+	    put_dc_size( dc, (MAX_CHILD_SIZE(insert_ptr[insert_num-k-1]) -
+				B_FREE_SPACE(insert_ptr[insert_num-k-1])) );
+	    put_dc_block_number( dc, insert_ptr[insert_num-k-1]->b_blocknr );
 
 	    do_balance_mark_internal_dirty (tb, S_new,0);
 			

@@ -2186,7 +2186,7 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, ncr_device *device)
 		(int) (PciDeviceFn(pdev) & 7));
 
 #ifdef SCSI_NCR_DYNAMIC_DMA_MAPPING
-	if (!pci_dma_supported(pdev, (dma_addr_t) (0xffffffffUL))) {
+	if (!pci_dma_supported(pdev, 0xffffffff)) {
 		printk(KERN_WARNING NAME53C8XX
 		       "32 BIT PCI BUS DMA ADDRESSING NOT SUPPORTED\n");
 		return -1;

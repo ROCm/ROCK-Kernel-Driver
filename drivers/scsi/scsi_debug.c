@@ -154,10 +154,7 @@ static void scsi_dump(Scsi_Cmnd * SCpnt, int flag)
 	if (SCpnt->use_sg) {
 		sgpnt = (struct scatterlist *) SCpnt->buffer;
 		for (i = 0; i < SCpnt->use_sg; i++) {
-			lpnt = (int *) sgpnt[i].alt_address;
-			printk(":%p %p %d\n", sgpnt[i].alt_address, sgpnt[i].address, sgpnt[i].length);
-			if (lpnt)
-				printk(" (Alt %x) ", lpnt[15]);
+			printk(":%p %d\n", sgpnt[i].address, sgpnt[i].length);
 		};
 	} else {
 		printk("nosg: %p %p %d\n", SCpnt->request.buffer, SCpnt->buffer,
@@ -175,12 +172,6 @@ static void scsi_dump(Scsi_Cmnd * SCpnt, int flag)
 	printk("\n");
 	if (flag == 0)
 		return;
-	lpnt = (unsigned int *) sgpnt[0].alt_address;
-	for (i = 0; i < sizeof(Scsi_Cmnd) / 4 + 1; i++) {
-		if ((i & 7) == 0)
-			printk("\n");
-		printk("%x ", *lpnt++);
-	};
 #if 0
 	printk("\n");
 	lpnt = (unsigned int *) sgpnt[0].address;

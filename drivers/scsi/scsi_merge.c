@@ -120,9 +120,11 @@ static void dma_exhausted(Scsi_Cmnd * SCpnt, int i)
 {
 	int jj;
 	struct scatterlist *sgpnt;
+	void **bbpnt;
 	int consumed = 0;
 
 	sgpnt = (struct scatterlist *) SCpnt->request_buffer;
+	bbpnt = SCpnt->bounce_buffers;
 
 	/*
 	 * Now print out a bunch of stats.  First, start with the request
@@ -136,15 +138,13 @@ static void dma_exhausted(Scsi_Cmnd * SCpnt, int i)
 	 */
 	for(jj=0; jj < SCpnt->use_sg; jj++)
 	{
-		printk("[%d]\tlen:%d\taddr:%p\talt:%p\n",
+		printk("[%d]\tlen:%d\taddr:%p\tbounce:%p\n",
 		       jj,
 		       sgpnt[jj].length,
 		       sgpnt[jj].address,
-		       sgpnt[jj].alt_address);		       
-		if( sgpnt[jj].alt_address != NULL )
-		{
-			consumed = (sgpnt[jj].length >> 9);
-		}
+		       (bbpnt ? bbpnt[jj] : NULL));
+		if (bbpnt && bbpnt[jj])
+			consumed += sgpnt[jj].length;
 	}
 	printk("Total %d sectors consumed\n", consumed);
 	panic("DMA pool exhausted");
@@ -807,6 +807,7 @@ __inline static int __init_io(Scsi_Cmnd * SCpnt,
 	int		     sectors;
 	struct scatterlist * sgpnt;
 	int		     this_count;
+	void		   ** bbpnt;
 
 	/*
 	 * FIXME(eric) - don't inline this - it doesn't depend on the
@@ -861,10 +862,19 @@ __inline static int __init_io(Scsi_Cmnd * SCpnt,
 
 	/* 
 	 * Allocate the actual scatter-gather table itself.
-	 * scsi_malloc can only allocate in chunks of 512 bytes 
 	 */
-	SCpnt->sglist_len = (SCpnt->use_sg
-			     * sizeof(struct scatterlist) + 511) & ~511;
+	SCpnt->sglist_len = (SCpnt->use_sg * sizeof(struct scatterlist));
+
+	/* If we could potentially require ISA bounce buffers, allocate
+	 * space for this array here.
+	 */
+	if (dma_host)
+		SCpnt->sglist_len += (SCpnt->use_sg * sizeof(void *));
+
+	/* scsi_malloc can only allocate in chunks of 512 bytes so
+	 * round it up.
+	 */
+	SCpnt->sglist_len = (SCpnt->sglist_len + 511) & ~511;
 
 	sgpnt = (struct scatterlist *) scsi_malloc(SCpnt->sglist_len);
 
@@ -888,6 +898,14 @@ __inline static int __init_io(Scsi_Cmnd * SCpnt,
 	SCpnt->request_buffer = (char *) sgpnt;
 	SCpnt->request_bufflen = 0;
 	bhprev = NULL;
+
+	if (dma_host)
+		bbpnt = (void **) ((char *)sgpnt +
+			 (SCpnt->use_sg * sizeof(struct scatterlist)));
+	else
+		bbpnt = NULL;
+
+	SCpnt->bounce_buffers = bbpnt;
 
 	for (count = 0, bh = SCpnt->request.bh;
 	     bh; bh = bh->b_reqnext) {
@@ -956,7 +974,7 @@ __inline static int __init_io(Scsi_Cmnd * SCpnt,
 			if( scsi_dma_free_sectors - sectors <= 10  ) {
 				/*
 				 * If this would nearly drain the DMA
-				 * pool, mpty, then let's stop here.
+				 * pool empty, then let's stop here.
 				 * Don't make this request any larger.
 				 * This is kind of a safety valve that
 				 * we use - we could get screwed later
@@ -970,7 +988,7 @@ __inline static int __init_io(Scsi_Cmnd * SCpnt,
 				break;
 			}
 
-			sgpnt[i].alt_address = sgpnt[i].address;
+			bbpnt[i] = sgpnt[i].address;
 			sgpnt[i].address =
 			    (char *) scsi_malloc(sgpnt[i].length);
 			/*
@@ -987,7 +1005,7 @@ __inline static int __init_io(Scsi_Cmnd * SCpnt,
 				break;
 			}
 			if (SCpnt->request.cmd == WRITE) {
-				memcpy(sgpnt[i].address, sgpnt[i].alt_address,
+				memcpy(sgpnt[i].address, bbpnt[i],
 				       sgpnt[i].length);
 			}
 		}

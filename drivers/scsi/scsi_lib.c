@@ -496,13 +496,16 @@ static void scsi_release_buffers(Scsi_Cmnd * SCpnt)
 	 */
 	if (SCpnt->use_sg) {
 		struct scatterlist *sgpnt;
+		void **bbpnt;
 		int i;
 
 		sgpnt = (struct scatterlist *) SCpnt->request_buffer;
+		bbpnt = SCpnt->bounce_buffers;
 
-		for (i = 0; i < SCpnt->use_sg; i++) {
-			if (sgpnt[i].alt_address) {
-				scsi_free(sgpnt[i].address, sgpnt[i].length);
+		if (bbpnt) {
+			for (i = 0; i < SCpnt->use_sg; i++) {
+				if (bbpnt[i])
+					scsi_free(sgpnt[i].address, sgpnt[i].length);
 			}
 		}
 		scsi_free(SCpnt->request_buffer, SCpnt->sglist_len);
@@ -568,18 +571,22 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 	 */
 	if (SCpnt->use_sg) {
 		struct scatterlist *sgpnt;
+		void **bbpnt;
 		int i;
 
 		sgpnt = (struct scatterlist *) SCpnt->buffer;
+		bbpnt = SCpnt->bounce_buffers;
 
-		for (i = 0; i < SCpnt->use_sg; i++) {
-			if (sgpnt[i].alt_address) {
-				if (SCpnt->request.cmd == READ) {
-					memcpy(sgpnt[i].alt_address, 
-					       sgpnt[i].address,
-					       sgpnt[i].length);
+		if (bbpnt) {
+			for (i = 0; i < SCpnt->use_sg; i++) {
+				if (bbpnt[i]) {
+					if (SCpnt->request.cmd == READ) {
+						memcpy(bbpnt[i],
+						       sgpnt[i].address,
+						       sgpnt[i].length);
+					}
+					scsi_free(sgpnt[i].address, sgpnt[i].length);
 				}
-				scsi_free(sgpnt[i].address, sgpnt[i].length);
 			}
 		}
 		scsi_free(SCpnt->buffer, SCpnt->sglist_len);

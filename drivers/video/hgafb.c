@@ -203,7 +203,7 @@ static void hga_clear_screen(void)
 		fillchar = 0x00;
 	spin_unlock_irqrestore(&hga_reg_lock, flags);
 	if (fillchar != 0xbf)
-		memset((char *)hga_vram_base, fillchar, hga_vram_len);
+		isa_memset_io(hga_vram_base, fillchar, hga_vram_len);
 }
 
 
@@ -275,11 +275,12 @@ static void hga_gfx_mode(void)
 static void hga_show_logo(void)
 {
 	int x, y;
-	char *dest = (char *)hga_vram_base;
+	unsigned long dest = hga_vram_base;
 	char *logo = linux_logo_bw;
 	for (y = 134; y < 134 + 80 ; y++) /* this needs some cleanup */
 		for (x = 0; x < 10 ; x++)
-			*(dest + (y%4)*8192 + (y>>2)*90 + x + 40) = ~*(logo++);
+			isa_writeb(~*(logo++),
+				   (dest + (y%4)*8192 + (y>>2)*90 + x + 40));
 }
 #endif /* MODULE */	
 

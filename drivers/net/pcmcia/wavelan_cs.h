@@ -465,13 +465,20 @@ static const char *version = "wavelan_cs.c : v21 (wireless extensions) 18/10/99\
 
 /* ------------------------ PRIVATE IOCTL ------------------------ */
 
-#define SIOCSIPQTHR	SIOCDEVPRIVATE		/* Set quality threshold */
-#define SIOCGIPQTHR	SIOCDEVPRIVATE + 1	/* Get quality threshold */
-#define SIOCSIPROAM     SIOCDEVPRIVATE + 2      /* Set roaming state */
-#define SIOCGIPROAM     SIOCDEVPRIVATE + 3      /* Get roaming state */
+/* Wireless Extension Backward compatibility - Jean II
+ * If the new wireless device private ioctl range is not defined,
+ * default to standard device private ioctl range */
+#ifndef SIOCIWFIRSTPRIV
+#define SIOCIWFIRSTPRIV	SIOCDEVPRIVATE
+#endif /* SIOCIWFIRSTPRIV */
 
-#define SIOCSIPHISTO	SIOCDEVPRIVATE + 6	/* Set histogram ranges */
-#define SIOCGIPHISTO	SIOCDEVPRIVATE + 7	/* Get histogram values */
+#define SIOCSIPQTHR	SIOCIWFIRSTPRIV		/* Set quality threshold */
+#define SIOCGIPQTHR	SIOCIWFIRSTPRIV + 1	/* Get quality threshold */
+#define SIOCSIPROAM     SIOCIWFIRSTPRIV + 2	/* Set roaming state */
+#define SIOCGIPROAM     SIOCIWFIRSTPRIV + 3	/* Get roaming state */
+
+#define SIOCSIPHISTO	SIOCIWFIRSTPRIV + 6	/* Set histogram ranges */
+#define SIOCGIPHISTO	SIOCIWFIRSTPRIV + 7	/* Get histogram values */
 
 /*************************** WaveLAN Roaming  **************************/
 #ifdef WAVELAN_ROAMING		/* Conditional compile, see above in options */

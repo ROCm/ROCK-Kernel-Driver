@@ -746,7 +746,7 @@ reiserfs_panic(s, "journal-539: flush_commit_list: BAD count(%d) > orig_commit_l
   }
   atomic_set(&(jl->j_commit_flushing), 0) ;
   wake_up(&(jl->j_commit_wait)) ;
-  
+
   s->s_dirt = 1 ;
   return 0 ;
 }
@@ -1936,7 +1936,7 @@ int journal_init(struct super_block *p_s_sb) {
                                          where it belongs */
 
   INIT_LIST_HEAD (&SB_JOURNAL(p_s_sb)->j_prealloc_list);
-  
+
   if (reiserfs_dont_log (p_s_sb))
     return 0;
 
@@ -2319,6 +2319,11 @@ static int can_dirty(struct reiserfs_journal_cnode *cn) {
 ** will wait until the current transaction is done/commited before returning 
 */
 int journal_end_sync(struct reiserfs_transaction_handle *th, struct super_block *p_s_sb, unsigned long nblocks) {
+
+  if (SB_JOURNAL(p_s_sb)->j_len == 0) {
+    reiserfs_prepare_for_journal(p_s_sb, SB_BUFFER_WITH_SB(p_s_sb), 1) ;
+    journal_mark_dirty(th, p_s_sb, SB_BUFFER_WITH_SB(p_s_sb)) ;
+  }
   return do_journal_end(th, p_s_sb, nblocks, COMMIT_NOW | WAIT) ;
 }
 
@@ -2416,8 +2421,8 @@ int flush_old_commits(struct super_block *p_s_sb, int immediate) {
     journal_mark_dirty(&th, p_s_sb, SB_BUFFER_WITH_SB(p_s_sb)) ;
     do_journal_end(&th, p_s_sb,1, COMMIT_NOW | WAIT) ;
   }
-  reiserfs_journal_kupdate(p_s_sb) ;
-  return 0 ;
+   reiserfs_journal_kupdate(p_s_sb) ;
+   return 0 ;
 }
 
 /*
@@ -2603,6 +2608,41 @@ int journal_mark_freed(struct reiserfs_transaction_handle *th, struct super_bloc
   return 0 ;
 }
 
+void reiserfs_update_inode_transaction(struct inode *inode) {
+  
+  inode->u.reiserfs_i.i_trans_index = SB_JOURNAL_LIST_INDEX(inode->i_sb);
+
+  inode->u.reiserfs_i.i_trans_id = SB_JOURNAL(inode->i_sb)->j_trans_id ;
+}
+
+static int reiserfs_inode_in_this_transaction(struct inode *inode) {
+  if (inode->u.reiserfs_i.i_trans_id == SB_JOURNAL(inode->i_sb)->j_trans_id || 
+      inode->u.reiserfs_i.i_trans_id == 0) {
+    return 1; 
+  } 
+  return 0 ;
+}
+
+void reiserfs_commit_for_inode(struct inode *inode) {
+  struct reiserfs_journal_list *jl ;
+  struct reiserfs_transaction_handle th ;
+  struct super_block *sb = inode->i_sb ;
+
+  jl = SB_JOURNAL_LIST(sb) + inode->u.reiserfs_i.i_trans_index ;
+
+  /* is it from the current transaction, or from an unknown transaction? */
+  if (reiserfs_inode_in_this_transaction(inode)) {
+    journal_join(&th, sb, 1) ;
+    reiserfs_update_inode_transaction(inode) ;
+    journal_end_sync(&th, sb, 1) ;
+  } else if (jl->j_trans_id == inode->u.reiserfs_i.i_trans_id) {
+    flush_commit_list(sb, jl, 1) ;
+  }
+  /* if the transaction id does not match, this list is long since flushed
+  ** and we don't have to do anything here
+  */
+}
+
 void reiserfs_restore_prepared_buffer(struct super_block *p_s_sb, 
                                       struct buffer_head *bh) {
   if (reiserfs_dont_log (p_s_sb))
@@ -2645,7 +2685,7 @@ void reiserfs_prepare_for_journal(struct super_block *p_s_sb,
   }
 }
 
-/*
+/* 
 ** long and ugly.  If flush, will not return until all commit
 ** blocks and all real buffers in the trans are on disk.
 ** If no_async, won't return until all commit blocks are on disk.

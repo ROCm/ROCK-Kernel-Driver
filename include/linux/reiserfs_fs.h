@@ -12,11 +12,12 @@
 #ifndef _LINUX_REISER_FS_H
 #define _LINUX_REISER_FS_H
 
-
 #include <linux/types.h>
 #ifdef __KERNEL__
 #include <linux/slab.h>
 #include <linux/tqueue.h>
+#include <asm/unaligned.h>
+#include <linux/bitops.h>
 #include <asm/hardirq.h>
 #endif
 
@@ -293,11 +294,57 @@ struct offset_v1 {
 } __attribute__ ((__packed__));
 
 struct offset_v2 {
-    __u64 k_offset:60;
-    __u64 k_type: 4;
+#ifdef __LITTLE_ENDIAN
+	    /* little endian version */
+	    __u64 k_offset:60;
+	    __u64 k_type: 4;
+#else
+	    /* big endian version */
+	    __u64 k_type: 4;
+	    __u64 k_offset:60;
+#endif
 } __attribute__ ((__packed__));
 
+#ifndef __LITTLE_ENDIAN
+typedef union {
+    struct offset_v2 offset_v2;
+    __u64 linear;
+} __attribute__ ((__packed__)) offset_v2_esafe_overlay;
 
+static inline __u16 offset_v2_k_type( struct offset_v2 *v2 )
+{
+    offset_v2_esafe_overlay tmp = *(offset_v2_esafe_overlay *)v2;
+    tmp.linear = le64_to_cpu( tmp.linear );
+    return tmp.offset_v2.k_type;
+}
+ 
+static inline void set_offset_v2_k_type( struct offset_v2 *v2, int type )
+{
+    offset_v2_esafe_overlay *tmp = (offset_v2_esafe_overlay *)v2;
+    tmp->linear = le64_to_cpu(tmp->linear);
+    tmp->offset_v2.k_type = type;
+    tmp->linear = le64_to_cpu(tmp->linear);
+}
+ 
+static inline loff_t offset_v2_k_offset( struct offset_v2 *v2 )
+{
+    offset_v2_esafe_overlay tmp = *(offset_v2_esafe_overlay *)v2;
+    tmp.linear = le64_to_cpu( tmp.linear );
+    return tmp.offset_v2.k_offset;
+}
+
+static inline void set_offset_v2_k_offset( struct offset_v2 *v2, loff_t offset ){
+    offset_v2_esafe_overlay *tmp = (offset_v2_esafe_overlay *)v2;
+    tmp->linear = le64_to_cpu(tmp->linear);
+    tmp->offset_v2.k_offset = offset;
+    tmp->linear = le64_to_cpu(tmp->linear);
+}
+#else
+# define offset_v2_k_type(v2)           ((v2)->k_type)
+# define set_offset_v2_k_type(v2,val)   (offset_v2_k_type(v2) = (val))
+# define offset_v2_k_offset(v2)         ((v2)->k_offset)
+# define set_offset_v2_k_offset(v2,val) (offset_v2_k_offset(v2) = (val))
+#endif
 
 /* Key of an item determines its location in the S+tree, and
    is composed of 4 components */
@@ -387,8 +434,8 @@ struct item_head
     __u16 ih_entry_count; /* Iff this is a directory item, this field equals the number of directory
 				      entries in the directory item. */
   } __attribute__ ((__packed__)) u;
-  __u16 ih_item_len;           /* total size of the item body                  */
-  __u16 ih_item_location;      /* an offset to the item body within the block  */
+  __u16 ih_item_len;           /* total size of the item body */
+  __u16 ih_item_location;      /* an offset to the item body within the block */
 				/* I thought we were going to use this
                                    for having lots of item types? Why
                                    don't you use this for item type
@@ -423,11 +470,19 @@ struct item_head
 
 
 // FIXME: now would that work for other than i386 archs
-#define unreachable_item(ih) (ih->ih_version & (1 << 15))
+#define unreachable_item(ih) (ih_version(ih) & (1 << 15))
 
 #define get_ih_free_space(ih) (ih_version (ih) == ITEM_VERSION_2 ? 0 : ih_free_space (ih))
 #define set_ih_free_space(ih,val) put_ih_free_space((ih), ((ih_version(ih) == ITEM_VERSION_2) ? 0 : (val)))
 
+/* these operate on indirect items, where you've got an array of ints
+** at a possibly unaligned location.  These are a noop on ia32
+** 
+** p is the array of __u32, i is the index into the array, v is the value
+** to store there.
+*/
+#define get_block_num(p, i) le32_to_cpu(get_unaligned((p) + (i)))
+#define put_block_num(p, i, v) put_unaligned(cpu_to_le32(v), (p) + (i))
 
 //
 // there are 5 item types currently
@@ -490,8 +545,9 @@ static inline __u32 type2uniqueness (int type)
 //
 static inline loff_t le_key_k_offset (int version, struct key * key)
 {
-    return (version == ITEM_VERSION_1) ? key->u.k_offset_v1.k_offset :
-	le64_to_cpu (key->u.k_offset_v2.k_offset);
+    return (version == ITEM_VERSION_1) ?
+        le32_to_cpu( key->u.k_offset_v1.k_offset ) :
+	offset_v2_k_offset( &(key->u.k_offset_v2) );
 }
 static inline loff_t le_ih_k_offset (struct item_head * ih)
 {
@@ -501,8 +557,9 @@ static inline loff_t le_ih_k_offset (struct item_head * ih)
 
 static inline loff_t le_key_k_type (int version, struct key * key)
 {
-    return (version == ITEM_VERSION_1) ? uniqueness2type (key->u.k_offset_v1.k_uniqueness) :
-	le16_to_cpu (key->u.k_offset_v2.k_type);
+    return (version == ITEM_VERSION_1) ?
+        uniqueness2type( le32_to_cpu( key->u.k_offset_v1.k_uniqueness)) :
+	offset_v2_k_type( &(key->u.k_offset_v2) );
 }
 static inline loff_t le_ih_k_type (struct item_head * ih)
 {
@@ -512,8 +569,9 @@ static inline loff_t le_ih_k_type (struct item_head * ih)
 
 static inline void set_le_key_k_offset (int version, struct key * key, loff_t offset)
 {
-    (version == ITEM_VERSION_1) ? (key->u.k_offset_v1.k_offset = offset) :
-	(key->u.k_offset_v2.k_offset = cpu_to_le64 (offset));
+    (version == ITEM_VERSION_1) ?
+        (key->u.k_offset_v1.k_offset = cpu_to_le32 (offset)) : /* jdm check */
+	(set_offset_v2_k_offset( &(key->u.k_offset_v2), offset ));
 }
 static inline void set_le_ih_k_offset (struct item_head * ih, loff_t offset)
 {
@@ -524,8 +582,9 @@ static inline void set_le_ih_k_offset (struct item_head * ih, loff_t offset)
 
 static inline void set_le_key_k_type (int version, struct key * key, int type)
 {
-    (version == ITEM_VERSION_1) ? (key->u.k_offset_v1.k_uniqueness = type2uniqueness (type)) :
-	(key->u.k_offset_v2.k_type = cpu_to_le16 (type));
+    (version == ITEM_VERSION_1) ?
+        (key->u.k_offset_v1.k_uniqueness = cpu_to_le32(type2uniqueness(type))):
+	(set_offset_v2_k_type( &(key->u.k_offset_v2), type ));
 }
 static inline void set_le_ih_k_type (struct item_head * ih, int type)
 {
@@ -553,26 +612,30 @@ static inline void set_le_ih_k_type (struct item_head * ih, int type)
 //
 static inline loff_t cpu_key_k_offset (struct cpu_key * key)
 {
-    return (key->version == ITEM_VERSION_1) ? key->on_disk_key.u.k_offset_v1.k_offset :
+    return (key->version == ITEM_VERSION_1) ?
+        key->on_disk_key.u.k_offset_v1.k_offset :
 	key->on_disk_key.u.k_offset_v2.k_offset;
 }
 
 static inline loff_t cpu_key_k_type (struct cpu_key * key)
 {
-    return (key->version == ITEM_VERSION_1) ? uniqueness2type (key->on_disk_key.u.k_offset_v1.k_uniqueness) :
+    return (key->version == ITEM_VERSION_1) ?
+        uniqueness2type (key->on_disk_key.u.k_offset_v1.k_uniqueness) :
 	key->on_disk_key.u.k_offset_v2.k_type;
 }
 
 static inline void set_cpu_key_k_offset (struct cpu_key * key, loff_t offset)
 {
-    (key->version == ITEM_VERSION_1) ? (key->on_disk_key.u.k_offset_v1.k_offset = offset) :
+    (key->version == ITEM_VERSION_1) ?
+        (key->on_disk_key.u.k_offset_v1.k_offset = offset) :
 	(key->on_disk_key.u.k_offset_v2.k_offset = offset);
 }
 
 
 static inline void set_cpu_key_k_type (struct cpu_key * key, int type)
 {
-    (key->version == ITEM_VERSION_1) ? (key->on_disk_key.u.k_offset_v1.k_uniqueness = type2uniqueness (type)) :
+    (key->version == ITEM_VERSION_1) ?
+        (key->on_disk_key.u.k_offset_v1.k_uniqueness = type2uniqueness (type)):
 	(key->on_disk_key.u.k_offset_v2.k_type = type);
 }
 
@@ -638,7 +701,17 @@ struct block_head {
   struct key  blk_right_delim_key; /* kept only for compatibility */
 };
 
-#define BLKH_SIZE (sizeof(struct block_head))
+#define BLKH_SIZE                     (sizeof(struct block_head))
+#define blkh_level(p_blkh)            (le16_to_cpu((p_blkh)->blk_level))
+#define blkh_nr_item(p_blkh)          (le16_to_cpu((p_blkh)->blk_nr_item))
+#define blkh_free_space(p_blkh)       (le16_to_cpu((p_blkh)->blk_free_space))
+#define blkh_reserved(p_blkh)         (le16_to_cpu((p_blkh)->blk_reserved))
+#define set_blkh_level(p_blkh,val)    ((p_blkh)->blk_level = cpu_to_le16(val))
+#define set_blkh_nr_item(p_blkh,val)  ((p_blkh)->blk_nr_item = cpu_to_le16(val))
+#define set_blkh_free_space(p_blkh,val) ((p_blkh)->blk_free_space = cpu_to_le16(val))
+#define set_blkh_reserved(p_blkh,val) ((p_blkh)->blk_reserved = cpu_to_le16(val))
+#define blkh_right_delim_key(p_blkh)  ((p_blkh)->blk_right_delim_key)
+#define set_blkh_right_delim_key(p_blkh,val)  ((p_blkh)->blk_right_delim_key = val)
 
 /*
  * values for blk_level field of the struct block_head
@@ -652,25 +725,26 @@ struct block_head {
 #define DISK_LEAF_NODE_LEVEL  1 /* Leaf node level.*/
 
 /* Given the buffer head of a formatted node, resolve to the block head of that node. */
-#define B_BLK_HEAD(p_s_bh)  ((struct block_head *)((p_s_bh)->b_data))
+#define B_BLK_HEAD(p_s_bh)            ((struct block_head *)((p_s_bh)->b_data))
 /* Number of items that are in buffer. */
-#define B_NR_ITEMS(p_s_bh)	  	(le16_to_cpu ( B_BLK_HEAD(p_s_bh)->blk_nr_item ))
-#define B_LEVEL(bh)			(le16_to_cpu ( B_BLK_HEAD(bh)->blk_level ))
-#define B_FREE_SPACE(bh)		(le16_to_cpu ( B_BLK_HEAD(bh)->blk_free_space ))
+#define B_NR_ITEMS(p_s_bh)            (blkh_nr_item(B_BLK_HEAD(p_s_bh)))
+#define B_LEVEL(p_s_bh)               (blkh_level(B_BLK_HEAD(p_s_bh)))
+#define B_FREE_SPACE(p_s_bh)          (blkh_free_space(B_BLK_HEAD(p_s_bh)))
 
-#define PUT_B_NR_ITEMS(p_s_bh)	  	do { B_BLK_HEAD(p_s_bh)->blk_nr_item = cpu_to_le16(val); } while (0)
-#define PUT_B_LEVEL(bh, val)		do { B_BLK_HEAD(bh)->blk_level = cpu_to_le16(val); } while (0)
-#define PUT_B_FREE_SPACE(bh)		do { B_BLK_HEAD(bh)->blk_free_space = cpu_to_le16(val); } while (0)
+#define PUT_B_NR_ITEMS(p_s_bh,val)    do { set_blkh_nr_item(B_BLK_HEAD(p_s_bh),val); } while (0)
+#define PUT_B_LEVEL(p_s_bh,val)       do { set_blkh_level(B_BLK_HEAD(p_s_bh),val); } while (0)
+#define PUT_B_FREE_SPACE(p_s_bh,val)  do { set_blkh_free_space(B_BLK_HEAD(p_s_bh),val); } while (0)
 
-/* Get right delimiting key. */
-#define B_PRIGHT_DELIM_KEY(p_s_bh)	( &(B_BLK_HEAD(p_s_bh)->blk_right_delim_key) )
+
+/* Get right delimiting key. -- little endian */
+#define B_PRIGHT_DELIM_KEY(p_s_bh)   (&(blk_right_delim_key(B_BLK_HEAD(p_s_bh))
 
 /* Does the buffer contain a disk leaf. */
-#define B_IS_ITEMS_LEVEL(p_s_bh)   	( B_BLK_HEAD(p_s_bh)->blk_level == DISK_LEAF_NODE_LEVEL )
+#define B_IS_ITEMS_LEVEL(p_s_bh)     (B_LEVEL(p_s_bh) == DISK_LEAF_NODE_LEVEL)
 
 /* Does the buffer contain a disk internal node */
-#define B_IS_KEYS_LEVEL(p_s_bh) 	( B_BLK_HEAD(p_s_bh)->blk_level > DISK_LEAF_NODE_LEVEL &&\
-					  B_BLK_HEAD(p_s_bh)->blk_level <= MAX_HEIGHT )
+#define B_IS_KEYS_LEVEL(p_s_bh)      (B_LEVEL(p_s_bh) > DISK_LEAF_NODE_LEVEL \
+                                            && B_LEVEL(p_s_bh) <= MAX_HEIGHT)
 
 
 
@@ -709,8 +783,32 @@ struct stat_data_v1
 				   policy.  Someday.  -Hans */
 } __attribute__ ((__packed__));
 
-#define SD_V1_SIZE (sizeof(struct stat_data_v1))
-
+#define SD_V1_SIZE              (sizeof(struct stat_data_v1))
+#define stat_data_v1(ih)        (ih_version (ih) == ITEM_VERSION_1)
+#define sd_v1_mode(sdp)         (le16_to_cpu((sdp)->sd_mode))
+#define set_sd_v1_mode(sdp,v)   ((sdp)->sd_mode = cpu_to_le16(v))
+#define sd_v1_nlink(sdp)        (le16_to_cpu((sdp)->sd_nlink))
+#define set_sd_v1_nlink(sdp,v)  ((sdp)->sd_nlink = cpu_to_le16(v))
+#define sd_v1_uid(sdp)          (le16_to_cpu((sdp)->sd_uid))
+#define set_sd_v1_uid(sdp,v)    ((sdp)->sd_uid = cpu_to_le16(v))
+#define sd_v1_gid(sdp)          (le16_to_cpu((sdp)->sd_gid))
+#define set_sd_v1_gid(sdp,v)    ((sdp)->sd_gid = cpu_to_le16(v))
+#define sd_v1_size(sdp)         (le32_to_cpu((sdp)->sd_size))
+#define set_sd_v1_size(sdp,v)   ((sdp)->sd_size = cpu_to_le32(v))
+#define sd_v1_atime(sdp)        (le32_to_cpu((sdp)->sd_atime))
+#define set_sd_v1_atime(sdp,v)  ((sdp)->sd_atime = cpu_to_le32(v))
+#define sd_v1_mtime(sdp)        (le32_to_cpu((sdp)->sd_mtime))
+#define set_sd_v1_mtime(sdp,v)  ((sdp)->sd_mtime = cpu_to_le32(v))
+#define sd_v1_ctime(sdp)        (le32_to_cpu((sdp)->sd_ctime))
+#define set_sd_v1_ctime(sdp,v)  ((sdp)->sd_ctime = cpu_to_le32(v))
+#define sd_v1_rdev(sdp)         (le32_to_cpu((sdp)->u.sd_rdev))
+#define set_sd_v1_rdev(sdp,v)   ((sdp)->u.sd_rdev = cpu_to_le32(v))
+#define sd_v1_blocks(sdp)       (le32_to_cpu((sdp)->u.sd_blocks))
+#define set_sd_v1_blocks(sdp,v) ((sdp)->u.sd_blocks = cpu_to_le32(v))
+#define sd_v1_first_direct_byte(sdp) \
+                                (le32_to_cpu((sdp)->sd_first_direct_byte))
+#define set_sd_v1_first_direct_byte(sdp,v) \
+                                ((sdp)->sd_first_direct_byte = cpu_to_le32(v))
 
 /* Stat Data on disk (reiserfs version of UFS disk inode minus the
    address blocks) */
@@ -743,8 +841,32 @@ struct stat_data {
 // this is 40 bytes long
 //
 #define SD_SIZE (sizeof(struct stat_data))
-
-#define stat_data_v1(ih) (ih_version (ih) == ITEM_VERSION_1)
+#define SD_V2_SIZE              SD_SIZE
+#define stat_data_v2(ih)        (ih_version (ih) == ITEM_VERSION_2)
+#define sd_v2_mode(sdp)         (le16_to_cpu((sdp)->sd_mode))
+#define set_sd_v2_mode(sdp,v)   ((sdp)->sd_mode = cpu_to_le16(v))
+/* sd_reserved */
+/* set_sd_reserved */
+#define sd_v2_nlink(sdp)        (le32_to_cpu((sdp)->sd_nlink))
+#define set_sd_v2_nlink(sdp,v)  ((sdp)->sd_nlink = cpu_to_le32(v))
+#define sd_v2_size(sdp)         (le64_to_cpu((sdp)->sd_size))
+#define set_sd_v2_size(sdp,v)   ((sdp)->sd_size = cpu_to_le64(v))
+#define sd_v2_uid(sdp)          (le32_to_cpu((sdp)->sd_uid))
+#define set_sd_v2_uid(sdp,v)    ((sdp)->sd_uid = cpu_to_le32(v))
+#define sd_v2_gid(sdp)          (le32_to_cpu((sdp)->sd_gid))
+#define set_sd_v2_gid(sdp,v)    ((sdp)->sd_gid = cpu_to_le32(v))
+#define sd_v2_atime(sdp)        (le32_to_cpu((sdp)->sd_atime))
+#define set_sd_v2_atime(sdp,v)  ((sdp)->sd_atime = cpu_to_le32(v))
+#define sd_v2_mtime(sdp)        (le32_to_cpu((sdp)->sd_mtime))
+#define set_sd_v2_mtime(sdp,v)  ((sdp)->sd_mtime = cpu_to_le32(v))
+#define sd_v2_ctime(sdp)        (le32_to_cpu((sdp)->sd_ctime))
+#define set_sd_v2_ctime(sdp,v)  ((sdp)->sd_ctime = cpu_to_le32(v))
+#define sd_v2_blocks(sdp)       (le32_to_cpu((sdp)->sd_blocks))
+#define set_sd_v2_blocks(sdp,v) ((sdp)->sd_blocks = cpu_to_le32(v))
+#define sd_v2_rdev(sdp)         (le32_to_cpu((sdp)->u.sd_rdev))
+#define set_sd_v2_rdev(sdp,v)   ((sdp)->u.sd_rdev = cpu_to_le32(v))
+#define sd_v2_generation(sdp)   (le32_to_cpu((sdp)->u.sd_generation))
+#define set_sd_v2_generation(sdp,v) ((sdp)->u.sd_generation = cpu_to_le32(v))
 
 
 /***************************************************************************/
@@ -793,7 +915,18 @@ struct reiserfs_de_head
   __u16 deh_state;		/* whether 1) entry contains stat data (for future), and 2) whether
 					   entry is hidden (unlinked) */
 } __attribute__ ((__packed__));
-#define DEH_SIZE sizeof(struct reiserfs_de_head)
+#define DEH_SIZE                  sizeof(struct reiserfs_de_head)
+#define deh_offset(p_deh)         (le32_to_cpu((p_deh)->deh_offset))
+#define deh_dir_id(p_deh)         (le32_to_cpu((p_deh)->deh_dir_id))
+#define deh_objectid(p_deh)       (le32_to_cpu((p_deh)->deh_objectid))
+#define deh_location(p_deh)       (le16_to_cpu((p_deh)->deh_location))
+#define deh_state(p_deh)          (le16_to_cpu((p_deh)->deh_state))
+
+#define put_deh_offset(p_deh,v)   ((p_deh)->deh_offset = cpu_to_le32((v)))
+#define put_deh_dir_id(p_deh,v)   ((p_deh)->deh_dir_id = cpu_to_le32((v)))
+#define put_deh_objectid(p_deh,v) ((p_deh)->deh_objectid = cpu_to_le32((v)))
+#define put_deh_location(p_deh,v) ((p_deh)->deh_location = cpu_to_le16((v)))
+#define put_deh_state(p_deh,v)    ((p_deh)->deh_state = cpu_to_le16((v)))
 
 /* empty directory contains two entries "." and ".." and their headers */
 #define EMPTY_DIR_SIZE \
@@ -805,33 +938,30 @@ struct reiserfs_de_head
 #define DEH_Statdata 0			/* not used now */
 #define DEH_Visible 2
 
-/* bitops which deals with unaligned addrs; 
-   needed for alpha port. --zam */
-#ifdef __alpha__
-#   define ADDR_UNALIGNED_BITS  (5)
+/* 64 bit systems (and the S/390) need to be aligned explicitly -jdm */
+#if BITS_PER_LONG == 64 || defined(__s390__) || defined(__hppa__)
+#   define ADDR_UNALIGNED_BITS  (3)
 #endif
 
+/* These are only used to manipulate deh_state.
+ * Because of this, we'll use the ext2_ bit routines,
+ * since they are little endian */
 #ifdef ADDR_UNALIGNED_BITS
 
 #   define aligned_address(addr)           ((void *)((long)(addr) & ~((1UL << ADDR_UNALIGNED_BITS) - 1)))
 #   define unaligned_offset(addr)          (((int)((long)(addr) & ((1 << ADDR_UNALIGNED_BITS) - 1))) << 3)
 
-#   define set_bit_unaligned(nr, addr)     set_bit((nr) + unaligned_offset(addr), aligned_address(addr))
-#   define clear_bit_unaligned(nr, addr)   clear_bit((nr) + unaligned_offset(addr), aligned_address(addr))
-#   define test_bit_unaligned(nr, addr)    test_bit((nr) + unaligned_offset(addr), aligned_address(addr))
+#   define set_bit_unaligned(nr, addr)     ext2_set_bit((nr) + unaligned_offset(addr), aligned_address(addr))
+#   define clear_bit_unaligned(nr, addr)   ext2_clear_bit((nr) + unaligned_offset(addr), aligned_address(addr))
+#   define test_bit_unaligned(nr, addr)    ext2_test_bit((nr) + unaligned_offset(addr), aligned_address(addr))
 
 #else
 
-#   define set_bit_unaligned(nr, addr)     set_bit(nr, addr)
-#   define clear_bit_unaligned(nr, addr)   clear_bit(nr, addr)
-#   define test_bit_unaligned(nr, addr)    test_bit(nr, addr)
+#   define set_bit_unaligned(nr, addr)     ext2_set_bit(nr, addr)
+#   define clear_bit_unaligned(nr, addr)   ext2_clear_bit(nr, addr)
+#   define test_bit_unaligned(nr, addr)    ext2_test_bit(nr, addr)
 
 #endif
-
-#define deh_dir_id(deh) (__le32_to_cpu ((deh)->deh_dir_id))
-#define deh_objectid(deh) (__le32_to_cpu ((deh)->deh_objectid))
-#define deh_offset(deh) (__le32_to_cpu ((deh)->deh_offset))
-
 
 #define mark_de_with_sd(deh)        set_bit_unaligned (DEH_Statdata, &((deh)->deh_state))
 #define mark_de_without_sd(deh)     clear_bit_unaligned (DEH_Statdata, &((deh)->deh_state))
@@ -844,7 +974,9 @@ struct reiserfs_de_head
 
 /* compose directory item containing "." and ".." entries (entries are
    not aligned to 4 byte boundary) */
-static inline void make_empty_dir_item_v1 (char * body, __u32 dirid, __u32 objid,
+/* the last four params are LE */
+static inline void make_empty_dir_item_v1 (char * body,
+                                           __u32 dirid, __u32 objid,
 					   __u32 par_dirid, __u32 par_objid)
 {
     struct reiserfs_de_head * deh;
@@ -853,29 +985,32 @@ static inline void make_empty_dir_item_v1 (char * body, __u32 dirid, __u32 objid
     deh = (struct reiserfs_de_head *)body;
     
     /* direntry header of "." */
-    deh[0].deh_offset = cpu_to_le32 (DOT_OFFSET);
-    deh[0].deh_dir_id = cpu_to_le32 (dirid);
-    deh[0].deh_objectid = cpu_to_le32 (objid);
-    deh[0].deh_location = cpu_to_le16 (EMPTY_DIR_SIZE_V1 - strlen ("."));
-    deh[0].deh_state = 0;
+    put_deh_offset( &(deh[0]), DOT_OFFSET );
+    /* these two are from make_le_item_head, and are are LE */
+    deh[0].deh_dir_id = dirid;
+    deh[0].deh_objectid = objid;
+    deh[0].deh_state = 0; /* Endian safe if 0 */
+    put_deh_location( &(deh[0]), EMPTY_DIR_SIZE_V1 - strlen( "." ));
     mark_de_visible(&(deh[0]));
   
     /* direntry header of ".." */
-    deh[1].deh_offset = cpu_to_le32 (DOT_DOT_OFFSET);
+    put_deh_offset( &(deh[1]), DOT_DOT_OFFSET);
     /* key of ".." for the root directory */
-    deh[1].deh_dir_id = cpu_to_le32 (par_dirid);
-    deh[1].deh_objectid = cpu_to_le32 (par_objid);
-    deh[1].deh_location = cpu_to_le16 (le16_to_cpu (deh[0].deh_location) - strlen (".."));
-    deh[1].deh_state = 0;
+    /* these two are from the inode, and are are LE */
+    deh[1].deh_dir_id = par_dirid;
+    deh[1].deh_objectid = par_objid;
+    deh[1].deh_state = 0; /* Endian safe if 0 */
+    put_deh_location( &(deh[1]), deh_location( &(deh[0]) ) - strlen( ".." ) );
     mark_de_visible(&(deh[1]));
 
     /* copy ".." and "." */
-    memcpy (body + deh[0].deh_location, ".", 1);
-    memcpy (body + deh[1].deh_location, "..", 2);
+    memcpy (body + deh_location( &(deh[0]) ), ".", 1);
+    memcpy (body + deh_location( &(deh[1]) ), "..", 2);
 }
 
 /* compose directory item containing "." and ".." entries */
-static inline void make_empty_dir_item (char * body, __u32 dirid, __u32 objid,
+static inline void make_empty_dir_item (char * body,
+                                        __u32 dirid, __u32 objid,
 					__u32 par_dirid, __u32 par_objid)
 {
     struct reiserfs_de_head * deh;
@@ -884,31 +1019,33 @@ static inline void make_empty_dir_item (char * body, __u32 dirid, __u32 objid,
     deh = (struct reiserfs_de_head *)body;
     
     /* direntry header of "." */
-    deh[0].deh_offset = cpu_to_le32 (DOT_OFFSET);
-    deh[0].deh_dir_id = cpu_to_le32 (dirid);
-    deh[0].deh_objectid = cpu_to_le32 (objid);
-    deh[0].deh_location = cpu_to_le16 (EMPTY_DIR_SIZE - ROUND_UP (strlen (".")));
-    deh[0].deh_state = 0;
+    put_deh_offset( &(deh[0]), DOT_OFFSET );
+    /* these two are from make_le_item_head, and are are LE */
+    deh[0].deh_dir_id = dirid;
+    deh[0].deh_objectid = objid;
+    deh[0].deh_state = 0; /* Endian safe if 0 */
+    put_deh_location( &(deh[0]), EMPTY_DIR_SIZE - ROUND_UP( strlen( "." ) ) );
     mark_de_visible(&(deh[0]));
   
     /* direntry header of ".." */
-    deh[1].deh_offset = cpu_to_le32 (DOT_DOT_OFFSET);
+    put_deh_offset( &(deh[1]), DOT_DOT_OFFSET );
     /* key of ".." for the root directory */
-    deh[1].deh_dir_id = cpu_to_le32 (par_dirid);
-    deh[1].deh_objectid = cpu_to_le32 (par_objid);
-    deh[1].deh_location = cpu_to_le16 (le16_to_cpu (deh[0].deh_location) - ROUND_UP (strlen ("..")));
-    deh[1].deh_state = 0;
+    /* these two are from the inode, and are are LE */
+    deh[1].deh_dir_id = par_dirid;
+    deh[1].deh_objectid = par_objid;
+    deh[1].deh_state = 0; /* Endian safe if 0 */
+    put_deh_location( &(deh[1]), deh_location( &(deh[0])) - ROUND_UP( strlen( ".." ) ) );
     mark_de_visible(&(deh[1]));
 
     /* copy ".." and "." */
-    memcpy (body + deh[0].deh_location, ".", 1);
-    memcpy (body + deh[1].deh_location, "..", 2);
+    memcpy (body + deh_location( &(deh[0]) ), ".", 1);
+    memcpy (body + deh_location( &(deh[1]) ), "..", 2);
 }
 
 
 /* array of the entry headers */
  /* get item body */
-#define B_I_PITEM(bh,ih) ( (bh)->b_data + (ih)->ih_item_location )
+#define B_I_PITEM(bh,ih) ( (bh)->b_data + ih_location(ih) )
 #define B_I_DEH(bh,ih) ((struct reiserfs_de_head *)(B_I_PITEM(bh,ih)))
 
 /* length of the directory entry in directory item. This define
@@ -919,7 +1056,7 @@ static inline void make_empty_dir_item (char * body, __u32 dirid, __u32 objid,
    See picture above.*/
 /*
 #define I_DEH_N_ENTRY_LENGTH(ih,deh,i) \
-((i) ? (((deh)-1)->deh_location - (deh)->deh_location) : ((ih)->ih_item_len) - (deh)->deh_location)
+((i) ? (deh_location((deh)-1) - deh_location((deh))) : (ih_item_len((ih)) - deh_location((deh))))
 */
 static inline int entry_length (struct buffer_head * bh, struct item_head * ih,
 				int pos_in_item)
@@ -928,18 +1065,19 @@ static inline int entry_length (struct buffer_head * bh, struct item_head * ih,
 
     deh = B_I_DEH (bh, ih) + pos_in_item;
     if (pos_in_item)
-	return (le16_to_cpu ((deh - 1)->deh_location) - le16_to_cpu (deh->deh_location));
-    return (le16_to_cpu (ih->ih_item_len) - le16_to_cpu (deh->deh_location));
+	return deh_location(deh-1) - deh_location(deh);
+
+    return ih_item_len(ih) - deh_location(deh);
 }
 
 
 
 /* number of entries in the directory item, depends on ENTRY_COUNT being at the start of directory dynamic data. */
-#define I_ENTRY_COUNT(ih) ((ih)->u.ih_entry_count)
+#define I_ENTRY_COUNT(ih) (ih_entry_count((ih)))
 
 
 /* name by bh, ih and entry_num */
-#define B_I_E_NAME(bh,ih,entry_num) ((char *)(bh->b_data + ih->ih_item_location + (B_I_DEH(bh,ih)+(entry_num))->deh_location))
+#define B_I_E_NAME(bh,ih,entry_num) ((char *)(bh->b_data + ih_location(ih) + deh_location(B_I_DEH(bh,ih)+(entry_num))))
 
 // two entries per block (at least)
 //#define REISERFS_MAX_NAME_LEN(block_size) 
@@ -976,7 +1114,7 @@ struct reiserfs_dir_entry
 /* these defines are useful when a particular member of a reiserfs_dir_entry is needed */
 
 /* pointer to file name, stored in entry */
-#define B_I_DEH_ENTRY_FILE_NAME(bh,ih,deh) (B_I_PITEM (bh, ih) + (deh)->deh_location)
+#define B_I_DEH_ENTRY_FILE_NAME(bh,ih,deh) (B_I_PITEM (bh, ih) + deh_location(deh))
 
 /* length of name */
 #define I_DEH_N_ENTRY_FILE_NAME_LENGTH(ih,deh,entry_num) \
@@ -1014,14 +1152,18 @@ struct disk_child {
 };
 
 #define DC_SIZE (sizeof(struct disk_child))
+#define dc_block_number(dc_p)	(le32_to_cpu((dc_p)->dc_block_number))
+#define dc_size(dc_p)		(le16_to_cpu((dc_p)->dc_size))
+#define put_dc_block_number(dc_p, val)   do { (dc_p)->dc_block_number = cpu_to_le32(val); } while(0)
+#define put_dc_size(dc_p, val)   do { (dc_p)->dc_size = cpu_to_le16(val); } while(0)
 
 /* Get disk child by buffer header and position in the tree node. */
 #define B_N_CHILD(p_s_bh,n_pos)  ((struct disk_child *)\
 ((p_s_bh)->b_data+BLKH_SIZE+B_NR_ITEMS(p_s_bh)*KEY_SIZE+DC_SIZE*(n_pos)))
 
 /* Get disk child number by buffer header and position in the tree node. */
-#define B_N_CHILD_NUM(p_s_bh,n_pos) (le32_to_cpu (B_N_CHILD(p_s_bh,n_pos)->dc_block_number))
-#define PUT_B_N_CHILD_NUM(p_s_bh,n_pos, val) do { B_N_CHILD(p_s_bh,n_pos)->dc_block_number = cpu_to_le32(val); } while (0)
+#define B_N_CHILD_NUM(p_s_bh,n_pos) (dc_block_number(B_N_CHILD(p_s_bh,n_pos)))
+#define PUT_B_N_CHILD_NUM(p_s_bh,n_pos, val) (put_dc_block_number(B_N_CHILD(p_s_bh,n_pos), val ))
 
  /* maximal value of field child_size in structure disk_child */ 
  /* child size is the combined size of all items and their headers */
@@ -1459,10 +1601,10 @@ extern struct item_operations * item_ops [4];
 
 
 /* number of blocks pointed to by the indirect item */
-#define I_UNFM_NUM(p_s_ih)	( (p_s_ih)->ih_item_len / UNFM_P_SIZE )
+#define I_UNFM_NUM(p_s_ih)	( ih_item_len(p_s_ih) / UNFM_P_SIZE )
 
 /* the used space within the unformatted node corresponding to pos within the item pointed to by ih */
-#define I_POS_UNFM_SIZE(ih,pos,size) (((pos) == I_UNFM_NUM(ih) - 1 ) ? (size) - (ih)->u.ih_free_space : (size))
+#define I_POS_UNFM_SIZE(ih,pos,size) (((pos) == I_UNFM_NUM(ih) - 1 ) ? (size) - ih_free_space(ih) : (size))
 
 /* number of bytes contained by the direct item or the unformatted nodes the indirect item points to */
 
@@ -1477,16 +1619,16 @@ extern struct item_operations * item_ops [4];
 #define B_N_PKEY(bh,item_num) ( &(B_N_PITEM_HEAD(bh,item_num)->ih_key) )
 
 /* get item body */
-#define B_N_PITEM(bh,item_num) ( (bh)->b_data + B_N_PITEM_HEAD((bh),(item_num))->ih_item_location)
+#define B_N_PITEM(bh,item_num) ( (bh)->b_data + ih_location(B_N_PITEM_HEAD((bh),(item_num))))
 
 /* get the stat data by the buffer header and the item order */
 #define B_N_STAT_DATA(bh,nr) \
-( (struct stat_data *)((bh)->b_data+B_N_PITEM_HEAD((bh),(nr))->ih_item_location ) )
+( (struct stat_data *)((bh)->b_data + ih_location(B_N_PITEM_HEAD((bh),(nr))) ) )
 
-                 /* following defines use reiserfs buffer header and item header */
+    /* following defines use reiserfs buffer header and item header */
 
 /* get stat-data */
-#define B_I_STAT_DATA(bh, ih) ( (struct stat_data * )((bh)->b_data + (ih)->ih_item_location) )
+#define B_I_STAT_DATA(bh, ih) ( (struct stat_data * )((bh)->b_data + ih_location(ih)) )
 
 // this is 3976 for size==4096
 #define MAX_DIRECT_ITEM_LEN(size) ((size) - BLKH_SIZE - 2*IH_SIZE - SD_SIZE - UNFM_P_SIZE)
@@ -1494,7 +1636,7 @@ extern struct item_operations * item_ops [4];
 /* indirect items consist of entries which contain blocknrs, pos
    indicates which entry, and B_I_POS_UNFM_POINTER resolves to the
    blocknr contained by the entry pos points to */
-#define B_I_POS_UNFM_POINTER(bh,ih,pos) (*(((unp_t *)B_I_PITEM(bh,ih)) + (pos)))
+#define B_I_POS_UNFM_POINTER(bh,ih,pos) le32_to_cpu(*(((unp_t *)B_I_PITEM(bh,ih)) + (pos)))
 #define PUT_B_I_POS_UNFM_POINTER(bh,ih,pos, val) do {*(((unp_t *)B_I_PITEM(bh,ih)) + (pos)) = cpu_to_le32(val); } while (0)
 
 /* Reiserfs buffer cache statistics. */
@@ -1596,6 +1738,8 @@ extern wait_queue_head_t reiserfs_commit_thread_wait ;
 */
 #define JOURNAL_BUFFER(j,n) ((j)->j_ap_blocks[((j)->j_start + (n)) % JOURNAL_BLOCK_COUNT])
 
+void reiserfs_commit_for_inode(struct inode *) ;
+void reiserfs_update_inode_transaction(struct inode *) ;
 void reiserfs_wait_on_write_block(struct super_block *s) ;
 void reiserfs_block_writes(struct reiserfs_transaction_handle *th) ;
 void reiserfs_allow_writes(struct super_block *s) ;
@@ -1692,7 +1836,7 @@ static inline int le_key_version (struct key * key)
 {
     int type;
     
-    type = le16_to_cpu (key->u.k_offset_v2.k_type);
+    type = offset_v2_k_type( &(key->u.k_offset_v2));
     if (type != TYPE_DIRECT && type != TYPE_INDIRECT && type != TYPE_DIRENTRY)
 	return ITEM_VERSION_1;
 
@@ -1943,9 +2087,9 @@ void reiserfs_discard_all_prealloc (struct reiserfs_transaction_handle *th);
 #endif
 
 /* hashes.c */
-__u32 keyed_hash (const char *msg, int len);
-__u32 yura_hash (const char *msg, int len);
-__u32 r5_hash (const char *msg, int len);
+__u32 keyed_hash (const signed char *msg, int len);
+__u32 yura_hash (const signed char *msg, int len);
+__u32 r5_hash (const signed char *msg, int len);
 
 /* version.c */
 char *reiserfs_get_version_string(void) ;

@@ -1,4 +1,4 @@
-/* $Id: sbus.c,v 1.16 2001/08/24 19:36:58 kanoj Exp $
+/* $Id: sbus.c,v 1.17 2001/10/09 02:24:33 davem Exp $
  * sbus.c: UltraSparc SBUS controller support.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -376,18 +376,24 @@ void sbus_unmap_single(struct sbus_dev *sdev, dma_addr_t dma_addr, size_t size, 
 	spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
-static inline void fill_sg(iopte_t *iopte, struct scatterlist *sg, int nused, unsigned long iopte_bits)
+#define SG_ENT_PHYS_ADDRESS(SG)	\
+	((SG)->address ? \
+	 __pa((SG)->address) : \
+	 (__pa(page_address((SG)->page)) + (SG)->offset))
+
+static inline void fill_sg(iopte_t *iopte, struct scatterlist *sg, int nused, int nelems, unsigned long iopte_bits)
 {
 	struct scatterlist *dma_sg = sg;
+	struct scatterlist *sg_end = sg + nelems;
 	int i;
 
 	for (i = 0; i < nused; i++) {
 		unsigned long pteval = ~0UL;
 		u32 dma_npages;
 
-		dma_npages = ((dma_sg->dvma_address & (IO_PAGE_SIZE - 1UL)) +
-			      dma_sg->dvma_length +
-			      ((u32)(IO_PAGE_SIZE - 1UL))) >> IO_PAGE_SHIFT;
+		dma_npages = ((dma_sg->dma_address & (IO_PAGE_SIZE - 1UL)) +
+			      dma_sg->dma_length +
+			      ((IO_PAGE_SIZE - 1UL))) >> IO_PAGE_SHIFT;
 		do {
 			unsigned long offset;
 			signed int len;
@@ -400,7 +406,7 @@ static inline void fill_sg(iopte_t *iopte, struct scatterlist *sg, int nused, un
 			for (;;) {
 				unsigned long tmp;
 
-				tmp = (unsigned long) __pa(sg->address);
+				tmp = (unsigned long) SG_ENT_PHYS_ADDRESS(sg);
 				len = sg->length;
 				if (((tmp ^ pteval) >> IO_PAGE_SHIFT) != 0UL) {
 					pteval = tmp & IO_PAGE_MASK;
@@ -432,10 +438,11 @@ static inline void fill_sg(iopte_t *iopte, struct scatterlist *sg, int nused, un
 			 * adjusting pteval along the way.  Stop when we
 			 * detect a page crossing event.
 			 */
-			while ((pteval << (64 - IO_PAGE_SHIFT)) != 0UL &&
-			       pteval == __pa(sg->address) &&
+			while (sg < sg_end &&
+			       (pteval << (64 - IO_PAGE_SHIFT)) != 0UL &&
+			       (pteval == SG_ENT_PHYS_ADDRESS(sg)) &&
 			       ((pteval ^
-				 (__pa(sg->address) + sg->length - 1UL)) >> IO_PAGE_SHIFT) == 0UL) {
+				 (SG_ENT_PHYS_ADDRESS(sg) + sg->length - 1UL)) >> IO_PAGE_SHIFT) == 0UL) {
 				pteval += sg->length;
 				sg++;
 			}
@@ -461,8 +468,13 @@ int sbus_map_sg(struct sbus_dev *sdev, struct scatterlist *sg, int nents, int di
 
 	/* Fast path single entry scatterlists. */
 	if (nents == 1) {
-		sg->dvma_address = sbus_map_single(sdev, sg->address, sg->length, dir);
-		sg->dvma_length = sg->length;
+		sg->dma_address =
+			sbus_map_single(sdev,
+					(sg->address ?
+					 sg->address :
+					 (page_address(sg->page) + sg->offset)),
+					sg->length, dir);
+		sg->dma_length = sg->length;
 		return 1;
 	}
 
@@ -478,8 +490,8 @@ int sbus_map_sg(struct sbus_dev *sdev, struct scatterlist *sg, int nents, int di
 	sgtmp = sg;
 	used = nents;
 
-	while (used && sgtmp->dvma_length) {
-		sgtmp->dvma_address += dma_base;
+	while (used && sgtmp->dma_length) {
+		sgtmp->dma_address += dma_base;
 		sgtmp++;
 		used--;
 	}
@@ -489,7 +501,7 @@ int sbus_map_sg(struct sbus_dev *sdev, struct scatterlist *sg, int nents, int di
 	if (dir != SBUS_DMA_TODEVICE)
 		iopte_bits |= IOPTE_WRITE;
 
-	fill_sg(iopte, sg, used, iopte_bits);
+	fill_sg(iopte, sg, used, nents, iopte_bits);
 #ifdef VERIFY_SG
 	verify_sglist(sg, nents, iopte, npages);
 #endif
@@ -512,17 +524,17 @@ void sbus_unmap_sg(struct sbus_dev *sdev, struct scatterlist *sg, int nents, int
 
 	/* Fast path single entry scatterlists. */
 	if (nents == 1) {
-		sbus_unmap_single(sdev, sg->dvma_address, sg->dvma_length, direction);
+		sbus_unmap_single(sdev, sg->dma_address, sg->dma_length, direction);
 		return;
 	}
 
-	dvma_base = sg[0].dvma_address & IO_PAGE_MASK;
+	dvma_base = sg[0].dma_address & IO_PAGE_MASK;
 	for (i = 0; i < nents; i++) {
-		if (sg[i].dvma_length == 0)
+		if (sg[i].dma_length == 0)
 			break;
 	}
 	i--;
-	size = IO_PAGE_ALIGN(sg[i].dvma_address + sg[i].dvma_length) - dvma_base;
+	size = IO_PAGE_ALIGN(sg[i].dma_address + sg[i].dma_length) - dvma_base;
 
 	iommu = sdev->bus->iommu;
 	spin_lock_irqsave(&iommu->lock, flags);
@@ -550,13 +562,13 @@ void sbus_dma_sync_sg(struct sbus_dev *sdev, struct scatterlist *sg, int nents, 
 	u32 base;
 	int i;
 
-	base = sg[0].dvma_address & IO_PAGE_MASK;
+	base = sg[0].dma_address & IO_PAGE_MASK;
 	for (i = 0; i < nents; i++) {
-		if (sg[i].dvma_length == 0)
+		if (sg[i].dma_length == 0)
 			break;
 	}
 	i--;
-	size = IO_PAGE_ALIGN(sg[i].dvma_address + sg[i].dvma_length) - base;
+	size = IO_PAGE_ALIGN(sg[i].dma_address + sg[i].dma_length) - base;
 
 	spin_lock_irqsave(&iommu->lock, flags);
 	strbuf_flush(iommu, base, size >> IO_PAGE_SHIFT);

@@ -52,7 +52,7 @@ pcibios_penalize_isa_irq (int irq)
  * you would pass 0x00ffffff as the mask to this function.
  */
 static inline int
-pci_dma_supported (struct pci_dev *hwdev, dma_addr_t mask)
+pci_dma_supported (struct pci_dev *hwdev, u64 mask)
 {
 	return 1;
 }

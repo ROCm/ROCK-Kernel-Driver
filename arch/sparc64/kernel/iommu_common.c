@@ -1,4 +1,4 @@
-/* $Id: iommu_common.c,v 1.5 2001/08/24 17:57:51 kanoj Exp $
+/* $Id: iommu_common.c,v 1.6 2001/10/09 02:24:33 davem Exp $
  * iommu_common.c: UltraSparc SBUS/PCI common iommu code.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -12,7 +12,7 @@
  */
 
 #ifdef VERIFY_SG
-int verify_lengths(struct scatterlist *sg, int nents, int npages)
+static int verify_lengths(struct scatterlist *sg, int nents, int npages)
 {
 	int sg_len, dma_len;
 	int i, pgcount;
@@ -22,8 +22,8 @@ int verify_lengths(struct scatterlist *sg, int nents, int npages)
 		sg_len += sg[i].length;
 
 	dma_len = 0;
-	for (i = 0; i < nents && sg[i].dvma_length; i++)
-		dma_len += sg[i].dvma_length;
+	for (i = 0; i < nents && sg[i].dma_length; i++)
+		dma_len += sg[i].dma_length;
 
 	if (sg_len != dma_len) {
 		printk("verify_lengths: Error, different, sg[%d] dma[%d]\n",
@@ -32,13 +32,13 @@ int verify_lengths(struct scatterlist *sg, int nents, int npages)
 	}
 
 	pgcount = 0;
-	for (i = 0; i < nents && sg[i].dvma_length; i++) {
+	for (i = 0; i < nents && sg[i].dma_length; i++) {
 		unsigned long start, end;
 
-		start = sg[i].dvma_address;
+		start = sg[i].dma_address;
 		start = start & IO_PAGE_MASK;
 
-		end = sg[i].dvma_address + sg[i].dvma_length;
+		end = sg[i].dma_address + sg[i].dma_length;
 		end = (end + (IO_PAGE_SIZE - 1)) & IO_PAGE_MASK;
 
 		pgcount += ((end - start) >> IO_PAGE_SHIFT);
@@ -55,15 +55,16 @@ int verify_lengths(struct scatterlist *sg, int nents, int npages)
 	return 0;
 }
 
-int verify_one_map(struct scatterlist *dma_sg, struct scatterlist **__sg, int nents, iopte_t **__iopte)
+static int verify_one_map(struct scatterlist *dma_sg, struct scatterlist **__sg, int nents, iopte_t **__iopte)
 {
 	struct scatterlist *sg = *__sg;
 	iopte_t *iopte = *__iopte;
-	u32 dlen = dma_sg->dvma_length;
-	u32 daddr = dma_sg->dvma_address;
+	u32 dlen = dma_sg->dma_length;
+	u32 daddr;
 	unsigned int sglen;
 	unsigned long sgaddr;
 
+	daddr = dma_sg->dma_address;
 	sglen = sg->length;
 	sgaddr = (unsigned long) sg->address;
 	while (dlen > 0) {
@@ -136,7 +137,7 @@ out:
 	return nents;
 }
 
-int verify_maps(struct scatterlist *sg, int nents, iopte_t *iopte)
+static int verify_maps(struct scatterlist *sg, int nents, iopte_t *iopte)
 {
 	struct scatterlist *dma_sg = sg;
 	struct scatterlist *orig_dma_sg = dma_sg;
@@ -147,7 +148,7 @@ int verify_maps(struct scatterlist *sg, int nents, iopte_t *iopte)
 		if (nents <= 0)
 			break;
 		dma_sg++;
-		if (dma_sg->dvma_length == 0)
+		if (dma_sg->dma_length == 0)
 			break;
 	}
 
@@ -174,14 +175,15 @@ void verify_sglist(struct scatterlist *sg, int nents, iopte_t *iopte, int npages
 	    verify_maps(sg, nents, iopte) < 0) {
 		int i;
 
-		printk("verify_sglist: Crap, messed up mappings, dumping, iodma at %08x.\n",
-		       (u32) (sg->dvma_address & IO_PAGE_MASK));
+		printk("verify_sglist: Crap, messed up mappings, dumping, iodma at ");
+		printk("%016lx.\n", sg->dma_address & IO_PAGE_MASK);
+
 		for (i = 0; i < nents; i++) {
 			printk("sg(%d): address(%p) length(%x) "
-			       "dma_address[%08x] dma_length[%08x]\n",
+			       "dma_address[%016lx] dma_length[%016lx]\n",
 			       i,
 			       sg[i].address, sg[i].length,
-			       sg[i].dvma_address, sg[i].dvma_length);
+			       sg[i].dma_address, sg[i].dma_length);
 		}
 	}
 
@@ -204,8 +206,8 @@ unsigned long prepare_sg(struct scatterlist *sg, int nents)
 		sg++;
 		addr = (unsigned long) sg->address;
 		if (! VCONTIG(prev, addr)) {
-			dma_sg->dvma_address = dent_addr;
-			dma_sg->dvma_length = dent_len;
+			dma_sg->dma_address = dent_addr;
+			dma_sg->dma_length = dent_len;
 			dma_sg++;
 
 			dent_addr = ((dent_addr +
@@ -218,8 +220,8 @@ unsigned long prepare_sg(struct scatterlist *sg, int nents)
 		dent_len += sg->length;
 		prev = addr + sg->length;
 	}
-	dma_sg->dvma_address = dent_addr;
-	dma_sg->dvma_length = dent_len;
+	dma_sg->dma_address = dent_addr;
+	dma_sg->dma_length = dent_len;
 
 	return ((unsigned long) dent_addr +
 		(unsigned long) dent_len +

@@ -116,7 +116,7 @@ void reiserfs_free_block (struct reiserfs_transaction_handle *th, unsigned long 
 
   reiserfs_prepare_for_journal(s, sbh, 1) ;
   /* update super block */
-  rs->s_free_blocks = cpu_to_le32 (le32_to_cpu (rs->s_free_blocks) + 1);
+  set_sb_free_blocks( rs, sb_free_blocks(rs) + 1 );
 
   journal_mark_dirty (th, s, sbh);
   s->s_dirt = 1;
@@ -304,8 +304,7 @@ static int do_reiserfs_new_blocknrs (struct reiserfs_transaction_handle *th,
 
   /* We continue the while loop if another process snatches our found
    * free block from us after we find it but before we successfully
-   * mark it as in use, or if we need to use sync to free up some
-   * blocks on the preserve list.  */
+   * mark it as in use */
 
   while (amount_needed--) {
     /* skip over any blocknrs already gotten last time. */
@@ -405,26 +404,26 @@ free_and_return:
 
   reiserfs_prepare_for_journal(s, SB_BUFFER_WITH_SB(s), 1) ;
   /* update free block count in super block */
-  s->u.reiserfs_sb.s_rs->s_free_blocks = cpu_to_le32 (SB_FREE_BLOCKS (s) - init_amount_needed);
+  PUT_SB_FREE_BLOCKS( s, SB_FREE_BLOCKS(s) - init_amount_needed );
   journal_mark_dirty (th, s, SB_BUFFER_WITH_SB (s));
   s->s_dirt = 1;
 
   return CARRY_ON;
 }
 
-// this is called only by get_empty_nodes with for_preserve_list==0
+// this is called only by get_empty_nodes
 int reiserfs_new_blocknrs (struct reiserfs_transaction_handle *th, unsigned long * free_blocknrs,
 			    unsigned long search_start, int amount_needed) {
-  return do_reiserfs_new_blocknrs(th, free_blocknrs, search_start, amount_needed, 0/*for_preserve_list-priority*/, 0/*for_formatted*/, 0/*for_prealloc */) ;
+  return do_reiserfs_new_blocknrs(th, free_blocknrs, search_start, amount_needed, 0/*priority*/, 0/*for_formatted*/, 0/*for_prealloc */) ;
 }
 
 
-// called by get_new_buffer and by reiserfs_get_block with amount_needed == 1 and for_preserve_list == 0
+// called by get_new_buffer and by reiserfs_get_block with amount_needed == 1
 int reiserfs_new_unf_blocknrs(struct reiserfs_transaction_handle *th, unsigned long * free_blocknrs,
 			      unsigned long search_start) {
   return do_reiserfs_new_blocknrs(th, free_blocknrs, search_start, 
                                   1/*amount_needed*/,
-				  0/*for_preserve_list-priority*/, 
+				  0/*priority*/, 
 				  1/*for formatted*/,
 				  0/*for prealloc */) ;
 }
@@ -666,10 +665,10 @@ void reiserfs_discard_prealloc (struct reiserfs_transaction_handle *th,
   if (inode->u.reiserfs_i.i_prealloc_count < 0)
      reiserfs_warning("zam-4001:" __FUNCTION__ ": inode has negative prealloc blocks count.\n");
 #endif  
-  if (inode->u.reiserfs_i.i_prealloc_count > 0) {
+    if (inode->u.reiserfs_i.i_prealloc_count > 0) {
     __discard_prealloc(th, inode);
   }
-}
+      }
 
 void reiserfs_discard_all_prealloc (struct reiserfs_transaction_handle *th)
 {
@@ -684,6 +683,6 @@ void reiserfs_discard_all_prealloc (struct reiserfs_transaction_handle *th)
     }
 #endif    
     __discard_prealloc(th, inode);
-  }
+    }
 }
 #endif

@@ -2269,6 +2269,12 @@ wavelan_ioctl(struct net_device *	dev,	/* Device on wich the ioctl apply */
 	  range.max_qual.qual = MMR_SGNL_QUAL;
 	  range.max_qual.level = MMR_SIGNAL_LVL;
 	  range.max_qual.noise = MMR_SILENCE_LVL;
+#if WIRELESS_EXT > 11
+	  range.avg_qual.qual = MMR_SGNL_QUAL; /* Always max */
+	  /* Need to get better values for those two */
+	  range.avg_qual.level = 30;
+	  range.avg_qual.noise = 8;
+#endif /* WIRELESS_EXT > 11 */
 
 #if WIRELESS_EXT > 7
 	  range.num_bitrates = 1;

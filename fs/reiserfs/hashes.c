@@ -48,7 +48,7 @@
 	} while(0)
 
 
-u32 keyed_hash(const char *msg, int len)
+u32 keyed_hash(const signed char *msg, int len)
 {
 	u32 k[] = { 0x9464a485, 0x542e1a94, 0x3e846bff, 0xb75bcfc3}; 
 
@@ -174,7 +174,7 @@ u32 keyed_hash(const char *msg, int len)
 /* What follows in this file is copyright 2000 by Hans Reiser, and the
  * licensing of what follows is governed by reiserfs/README */
 
-u32 yura_hash (const char *msg, int len)
+u32 yura_hash (const signed char *msg, int len)
 {
     int j, pow;
     u32 a, c;
@@ -209,7 +209,7 @@ u32 yura_hash (const char *msg, int len)
     return a;
 }
 
-u32 r5_hash (const char *msg, int len)
+u32 r5_hash (const signed char *msg, int len)
 {
   u32 a=0;
   while(*msg) { 

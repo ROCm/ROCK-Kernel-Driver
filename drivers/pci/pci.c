@@ -834,17 +834,27 @@ pci_set_master(struct pci_dev *dev)
 }
 
 int
-pci_set_dma_mask(struct pci_dev *dev, dma_addr_t mask)
+pci_set_dma_mask(struct pci_dev *dev, u64 mask)
 {
-    if(! pci_dma_supported(dev, mask))
-        return -EIO;
+	if (!pci_dma_supported(dev, mask))
+		return -EIO;
 
-    dev->dma_mask = mask;
+	dev->dma_mask = mask;
 
-    return 0;
+	return 0;
 }
     
+int
+pci_dac_set_dma_mask(struct pci_dev *dev, u64 mask)
+{
+	if (!pci_dac_dma_supported(dev, mask))
+		return -EIO;
 
+	dev->dma_mask = mask;
+
+	return 0;
+}
+    
 /*
  * Translate the low bits of the PCI base
  * to the resource type
@@ -1678,7 +1688,8 @@ pool_alloc_page (struct pci_pool *pool, int mem_flags)
 	if (!page)
 		return 0;
 	page->vaddr = pci_alloc_consistent (pool->dev,
-				pool->allocation, &page->dma);
+					    pool->allocation,
+					    &page->dma);
 	if (page->vaddr) {
 		memset (page->bitmap, 0xff, mapsize);	// bit set == free
 		if (pool->flags & SLAB_POISON)
@@ -1864,14 +1875,14 @@ pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t dma)
 	if ((page = pool_find_page (pool, dma)) == 0) {
 		printk (KERN_ERR "pci_pool_free %s/%s, %p/%x (bad dma)\n",
 			pool->dev ? pool->dev->slot_name : NULL,
-			pool->name, vaddr, dma);
+			pool->name, vaddr, (int) (dma & 0xffffffff));
 		return;
 	}
 #ifdef	CONFIG_PCIPOOL_DEBUG
 	if (((dma - page->dma) + (void *)page->vaddr) != vaddr) {
 		printk (KERN_ERR "pci_pool_free %s/%s, %p (bad vaddr)/%x\n",
 			pool->dev ? pool->dev->slot_name : NULL,
-			pool->name, vaddr, dma);
+			pool->name, vaddr, (int) (dma & 0xffffffff));
 		return;
 	}
 #endif
@@ -1956,6 +1967,7 @@ EXPORT_SYMBOL(pci_find_slot);
 EXPORT_SYMBOL(pci_find_subsys);
 EXPORT_SYMBOL(pci_set_master);
 EXPORT_SYMBOL(pci_set_dma_mask);
+EXPORT_SYMBOL(pci_dac_set_dma_mask);
 EXPORT_SYMBOL(pci_assign_resource);
 EXPORT_SYMBOL(pci_register_driver);
 EXPORT_SYMBOL(pci_unregister_driver);

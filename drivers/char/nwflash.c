@@ -59,6 +59,7 @@ static int gbWriteEnable;
 static int gbWriteBase64Enable;
 static volatile unsigned char *FLASH_BASE;
 static int gbFlashSize = KFLASH_SIZE;
+static DECLARE_MUTEX(nwflash_sem);
 
 extern spinlock_t gpio_lock;
 
@@ -132,7 +133,6 @@ static int flash_ioctl(struct inode *inodep, struct file *filep, unsigned int cm
 
 static ssize_t flash_read(struct file *file, char *buf, size_t size, loff_t * ppos)
 {
-	struct inode *inode = file->f_dentry->d_inode;
 	unsigned long p = *ppos;
 	unsigned int count = size;
 	int ret = 0;
@@ -151,7 +151,7 @@ static ssize_t flash_read(struct file *file, char *buf, size_t size, loff_t * pp
 		/*
 		 * We now lock against reads and writes. --rmk
 		 */
-		if (down_interruptible(&inode->i_sem))
+		if (down_interruptible(&nwflash_sem))
 			return -ERESTARTSYS;
 
 		ret = copy_to_user(buf, (void *)(FLASH_BASE + p), count);
@@ -159,14 +159,13 @@ static ssize_t flash_read(struct file *file, char *buf, size_t size, loff_t * pp
 			ret = count;
 			*ppos += count;
 		}
-		up(&inode->i_sem);
+		up(&nwflash_sem);
 	}
 	return ret;
 }
 
 static ssize_t flash_write(struct file *file, const char *buf, size_t size, loff_t * ppos)
 {
-	struct inode *inode = file->f_dentry->d_inode;
 	unsigned long p = *ppos;
 	unsigned int count = size;
 	int written;
@@ -198,7 +197,7 @@ static ssize_t flash_write(struct file *file, const char *buf, size_t size, loff
 	/*
 	 * We now lock against reads and writes. --rmk
 	 */
-	if (down_interruptible(&inode->i_sem))
+	if (down_interruptible(&nwflash_sem))
 		return -ERESTARTSYS;
 
 	written = 0;
@@ -286,7 +285,7 @@ static ssize_t flash_write(struct file *file, const char *buf, size_t size, loff
 	 */
 	leds_event(led_release);
 
-	up(&inode->i_sem);
+	up(&nwflash_sem);
 
 	return written;
 }

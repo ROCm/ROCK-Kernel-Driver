@@ -275,7 +275,7 @@ union TPchipPERRMASK {
 /* The IO address space is larger than 0xffff */
 #define TSUNAMI_IO_SPACE	(TSUNAMI_CONF(0) - TSUNAMI_IO(0))
 
-/* Offset between ram physical addresses and pci64 DAC bus addresses */
+/* Offset between ram physical addresses and pci64 DAC bus addresses.  */
 #define TSUNAMI_DAC_OFFSET	(1UL << 40)
 
 /*

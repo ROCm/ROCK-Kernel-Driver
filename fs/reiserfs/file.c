@@ -42,6 +42,7 @@ static int reiserfs_file_release (struct inode * inode, struct file * filp)
     lock_kernel() ;
     down (&inode->i_sem); 
     journal_begin(&th, inode->i_sb, JOURNAL_PER_BALANCE_CNT * 3) ;
+    reiserfs_update_inode_transaction(inode) ;
 
 #ifdef REISERFS_PREALLOCATE
     reiserfs_discard_prealloc (&th, inode);
@@ -75,10 +76,7 @@ static int reiserfs_sync_file(
 			      int datasync
 			      ) {
   struct inode * p_s_inode = p_s_dentry->d_inode;
-  struct reiserfs_transaction_handle th ;
   int n_err;
-  int windex ;
-  int jbegin_count = 1 ;
 
   lock_kernel() ;
 
@@ -87,14 +85,7 @@ static int reiserfs_sync_file(
 
   n_err = fsync_inode_buffers(p_s_inode) ;
   n_err |= fsync_inode_data_buffers(p_s_inode);
-  /* commit the current transaction to flush any metadata
-  ** changes.  sys_fsync takes care of flushing the dirty pages for us
-  */
-  journal_begin(&th, p_s_inode->i_sb, jbegin_count) ;
-  windex = push_journal_writer("sync_file") ;
-  reiserfs_update_sd(&th, p_s_inode);
-  pop_journal_writer(windex) ;
-  journal_end_sync(&th, p_s_inode->i_sb,jbegin_count) ;
+  reiserfs_commit_for_inode(p_s_inode) ;
   unlock_kernel() ;
   return ( n_err < 0 ) ? -EIO : 0;
 }

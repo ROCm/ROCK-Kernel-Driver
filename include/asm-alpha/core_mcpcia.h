@@ -181,6 +181,8 @@
 #define MCPCIA_IO_BIAS		MCPCIA_IO(4)
 #define MCPCIA_MEM_BIAS		MCPCIA_DENSE(4)
 
+/* Offset between ram physical addresses and pci64 DAC bus addresses.  */
+#define MCPCIA_DAC_OFFSET	(1UL << 40)
 
 /*
  * Data structure for handling MCPCIA machine checks:

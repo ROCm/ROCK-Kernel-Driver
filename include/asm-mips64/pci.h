@@ -220,7 +220,7 @@ static inline void pci_dma_sync_sg(struct pci_dev *hwdev,
 }
 #endif /* CONFIG_MAPPED_PCI_IO  */
 
-static inline int pci_dma_supported(struct pci_dev *hwdev, dma_addr_t mask)
+static inline int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
 {
 	/*
 	 * we fall back to GFP_DMA when the mask isn't all 1s,

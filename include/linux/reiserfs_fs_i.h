@@ -40,6 +40,12 @@ struct reiserfs_inode_info {
                                    is a comment you should make.... -Hans */
   //nopack-attribute
   int nopack;
+  
+  /* we use these for fsync or O_SYNC to decide which transaction needs
+  ** to be committed in order for this inode to be properly flushed
+  */
+  unsigned long i_trans_id ;
+  unsigned long i_trans_index ;
 };
 
 

@@ -233,6 +233,7 @@ struct alpha_machine_vector eiger_mv __initmv = {
 	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
 	min_io_address:		DEFAULT_IO_BASE,
 	min_mem_address:	DEFAULT_MEM_BASE,
+	pci_dac_offset:		TSUNAMI_DAC_OFFSET,
 
 	nr_irqs:		128,
 	device_interrupt:	eiger_device_interrupt,
