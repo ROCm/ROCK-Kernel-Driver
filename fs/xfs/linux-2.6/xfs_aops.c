@@ -288,7 +288,7 @@ xfs_probe_unwritten_page(
 		*fsbs = 0;
 		bh = head = page_buffers(page);
 		do {
-			if (!buffer_unwritten(bh))
+			if (!buffer_unwritten(bh) || !buffer_uptodate(bh))
 				break;
 			if (!xfs_offset_to_map(page, iomapp, p_offset))
 				break;
@@ -769,6 +769,8 @@ xfs_page_state_convert(
 		 * extent state conversion transaction on completion.
 		 */
 		if (buffer_unwritten(bh)) {
+			if (!startio)
+				continue;
 			if (!iomp) {
 				err = xfs_map_blocks(inode, offset, len, &iomap,
 						BMAPI_READ|BMAPI_IGNSTATE);
@@ -778,7 +780,7 @@ xfs_page_state_convert(
 				iomp = xfs_offset_to_map(page, &iomap,
 								p_offset);
 			}
-			if (iomp && startio) {
+			if (iomp) {
 				if (!bh->b_end_io) {
 					err = xfs_map_unwritten(inode, page,
 							head, bh, p_offset,
@@ -787,7 +789,10 @@ xfs_page_state_convert(
 					if (err) {
 						goto error;
 					}
+				} else {
+					set_bit(BH_Lock, &bh->b_state);
 				}
+				BUG_ON(!buffer_locked(bh));
 				bh_arr[cnt++] = bh;
 				page_dirty = 0;
 			}
