@@ -235,8 +235,11 @@ asmlinkage long sys_acct(const char *name)
 	}
 
 	error = security_acct(file);
-	if (error)
+	if (error) {
+		if (file)
+			filp_close(file, NULL);
 		return error;
+	}
 
 	spin_lock(&acct_globals.lock);
 	acct_file_reopen(file);
