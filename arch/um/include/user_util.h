@@ -8,6 +8,8 @@
 
 #include "sysdep/ptrace.h"
 
+#define CATCH_EINTR(expr) while (((expr) < 0) && (errno == EINTR))
+
 extern int mode_tt;
 
 extern int grantpt(int __fd);
@@ -89,11 +91,8 @@ extern void forward_pending_sigio(int target);
 extern int can_do_skas(void);
 extern void arch_init_thread(void);
 extern int setjmp_wrapper(void (*proc)(void *, void *), ...);
+extern int raw(int fd);
 
-extern int __raw(int fd, int complain, int now);
-#define raw(fd, complain) __raw((fd), (complain), 1)
-
-#define CATCH_EINTR(expr) while ( ((expr) < 0) && errno == EINTR)
 #endif
 
 /*

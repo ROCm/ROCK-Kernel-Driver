@@ -118,35 +118,26 @@ int wait_for_stop(int pid, int sig, int cont_type, void *relay)
 	}
 }
 
-int __raw(int fd, int complain, int now)
+int raw(int fd)
 {
 	struct termios tt;
 	int err;
-	int when;
 
 	CATCH_EINTR(err = tcgetattr(fd, &tt));
-
 	if (err < 0) {
-		if (complain)
 			printk("tcgetattr failed, errno = %d\n", errno);
 		return(-errno);
 	}
 
 	cfmakeraw(&tt);
 
-	if (now)
-		when = TCSANOW;
-	else
-		when = TCSADRAIN;
-
-	CATCH_EINTR(err = tcsetattr(fd, when, &tt));
-
+ 	CATCH_EINTR(err = tcsetattr(fd, TCSADRAIN, &tt));
 	if (err < 0) {
-		if (complain)
 			printk("tcsetattr failed, errno = %d\n", errno);
 		return(-errno);
 	}
-	/*XXX: tcsetattr could have applied only some changes
+
+	/* XXX tcsetattr could have applied only some changes
 	 * (and cfmakeraw() is a set of changes) */
 	return(0);
 }

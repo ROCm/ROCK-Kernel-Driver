@@ -38,7 +38,7 @@ int pts_open(int input, int output, int primary, void *d, char **dev_out)
 {
 	struct pty_chan *data = d;
 	char *dev;
-	int fd;
+	int fd, err;
 
 	fd = get_pty();
 	if(fd < 0){
@@ -46,8 +46,13 @@ int pts_open(int input, int output, int primary, void *d, char **dev_out)
 		return(-errno);
 	}
 	if(data->raw){
-		tcgetattr(fd, &data->tt);
-		raw(fd, 0);
+		CATCH_EINTR(err = tcgetattr(fd, &data->tt));
+		if(err)
+			return(err);
+
+		err = raw(fd);
+		if(err)
+			return(err);
 	}
 
 	dev = ptsname(fd);
@@ -89,13 +94,19 @@ int getmaster(char *line)
 int pty_open(int input, int output, int primary, void *d, char **dev_out)
 {
 	struct pty_chan *data = d;
-	int fd;
+	int fd, err;
 	char dev[sizeof("/dev/ptyxx\0")] = "/dev/ptyxx";
 
 	fd = getmaster(dev);
-	if(fd < 0) return(-errno);
+	if(fd < 0)
+		return(-errno);
+
+	if(data->raw){
+		err = raw(fd);
+		if(err)
+			return(err);
+	}
 	
-	if(data->raw) raw(fd, 0);
 	if(data->announce) (*data->announce)(dev, data->dev);
 
 	sprintf(data->dev_name, "%s", dev);
