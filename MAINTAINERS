@@ -1210,6 +1210,12 @@ M:	zwane@commfireservices.com
 L:	linux-sound@vger.kernel.org
 S:	Maintained
 
+OPROFILE
+P:	John Levon
+M:	levon@movementarian.org
+L:	oprofile-list@lists.sf.net
+S:	Maintained
+
 ORINOCO DRIVER
 P:	David Gibson
 M:	hermes@gibson.dropbear.id.au
