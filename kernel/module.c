@@ -78,6 +78,7 @@ EXPORT_SYMBOL(init_module);
 /* Find a symbol, return value and the symbol group */
 static unsigned long __find_symbol(const char *name,
 				   struct kernel_symbol_group **group,
+				   unsigned int *symidx,
 				   int gplok)
 {
 	struct kernel_symbol_group *ks;
@@ -90,6 +91,8 @@ static unsigned long __find_symbol(const char *name,
 		for (i = 0; i < ks->num_syms; i++) {
 			if (strcmp(ks->syms[i].name, name) == 0) {
 				*group = ks;
+				if (symidx)
+					*symidx = i;
 				return ks->syms[i].value;
 			}
 		}
@@ -520,7 +523,7 @@ void __symbol_put(const char *symbol)
 	unsigned long flags;
 
 	spin_lock_irqsave(&modlist_lock, flags);
-	if (!__find_symbol(symbol, &ksg, 1))
+	if (!__find_symbol(symbol, &ksg, NULL, 1))
 		BUG();
 	module_put(ksg->owner);
 	spin_unlock_irqrestore(&modlist_lock, flags);
@@ -732,9 +735,10 @@ static unsigned long resolve_symbol(Elf_Shdr *sechdrs,
 {
 	struct kernel_symbol_group *ksg;
 	unsigned long ret;
+	unsigned int symidx;
 
 	spin_lock_irq(&modlist_lock);
-	ret = __find_symbol(name, &ksg, mod->license_gplok);
+	ret = __find_symbol(name, &ksg, &symidx, mod->license_gplok);
 	if (ret) {
 		/* This can fail due to OOM, or module unloading */
 		if (!use_module(mod, ksg->owner))
@@ -772,7 +776,7 @@ void *__symbol_get(const char *symbol)
 	unsigned long value, flags;
 
 	spin_lock_irqsave(&modlist_lock, flags);
-	value = __find_symbol(symbol, &ksg, 1);
+	value = __find_symbol(symbol, &ksg, NULL, 1);
 	if (value && !strong_try_module_get(ksg->owner))
 		value = 0;
 	spin_unlock_irqrestore(&modlist_lock, flags);
