@@ -366,7 +366,6 @@ int __init g364fb_init(void)
     disp.cmap.start = 0;
     disp.cmap.len = 0;
     disp.cmap.red = disp.cmap.green = disp.cmap.blue = disp.cmap.transp = NULL;
-    disp.screen_base = (char *)G364_MEM_BASE; /* virtual kernel address */
     disp.visual = fb_fix.visual;
     disp.type = fb_fix.type;
     disp.type_aux = fb_fix.type_aux;
@@ -380,6 +379,7 @@ int __init g364fb_init(void)
     strcpy(fb_info.modename, fb_fix.id);
     fb_info.node = NODEV;
     fb_info.fbops = &g364fb_ops;
+    fb_info.screen_base = (char *)G364_MEM_BASE; /* virtual kernel address */
     fb_info.disp = &disp;
     fb_info.currcon = -1;	
     fb_info.fontname[0] = '\0';

@@ -760,7 +760,7 @@ static int matroxfb_set_var(struct fb_var_screeninfo *var, int con,
 	}
 	display->var = *var;
 	/* cmap */
-	display->screen_base = vaddr_va(ACCESS_FBINFO(video.vbase)) + ydstorg;
+	ACCESS_FBINFO(fbcon.screen_base) = vaddr_va(ACCESS_FBINFO(video.vbase)) + ydstorg;
 	display->visual = visual;
 	display->ypanstep = 1;
 	display->ywrapstep = 0;

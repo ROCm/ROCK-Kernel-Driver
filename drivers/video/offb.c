@@ -562,7 +562,6 @@ static void __init offb_init_fb(const char *name, const char *full_name,
     disp->cmap.green = NULL;
     disp->cmap.blue = NULL;
     disp->cmap.transp = NULL;
-    disp->screen_base = ioremap(address, fix->smem_len);
     disp->visual = fix->visual;
     disp->type = fix->type;
     disp->type_aux = fix->type_aux;
@@ -617,6 +616,7 @@ static void __init offb_init_fb(const char *name, const char *full_name,
     strncat(info->info.modename, full_name, sizeof(info->info.modename));
     info->info.node = NODEV;
     info->info.fbops = &offb_ops;
+    info->info.screen_base = ioremap(address, fix->smem_len);
     info->info.disp = disp;
     info->info.currcon = -1;	
     info->info.fontname[0] = '\0';

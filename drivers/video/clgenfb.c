@@ -2181,13 +2181,13 @@ static void clgen_set_disp (const void *par, struct display *disp,
 	accel_text = _par->var.accel_flags & FB_ACCELF_TEXT;
 
 	printk ("Cirrus Logic video mode: ");
-	disp->screen_base = (char *) fb_info->fbmem;
+	info->info.screen_base = (char *) fb_info->fbmem;
 	switch (_par->var.bits_per_pixel) {
 #ifdef FBCON_HAS_MFB
 	case 1:
 		printk ("monochrome\n");
 		if (fb_info->btype == BT_GD5480)
-			disp->screen_base = (char *) fb_info->fbmem;
+			info->info.screen_base = (char *) fb_info->fbmem;
 		disp->dispsw = &fbcon_mfb;
 		break;
 #endif
@@ -2195,7 +2195,7 @@ static void clgen_set_disp (const void *par, struct display *disp,
 	case 8:
 		printk ("8 bit color depth\n");
 		if (fb_info->btype == BT_GD5480)
-			disp->screen_base = (char *) fb_info->fbmem;
+			info->info.screen_base = (char *) fb_info->fbmem;
 		if (accel_text)
 			disp->dispsw = &fbcon_clgen_8;
 		else
@@ -2210,7 +2210,7 @@ static void clgen_set_disp (const void *par, struct display *disp,
 		else
 			disp->dispsw = &fbcon_cfb16;
 		if (fb_info->btype == BT_GD5480)
-			disp->screen_base = (char *) fb_info->fbmem + 1 * MB_;
+			info->info.screen_base = (char *) fb_info->fbmem + 1 * MB_;
 		disp->dispsw_data = fb_info->fbcon_cmap.cfb16;
 		break;
 #endif
@@ -2219,7 +2219,7 @@ static void clgen_set_disp (const void *par, struct display *disp,
 		printk ("24 bit color depth\n");
 		disp->dispsw = &fbcon_cfb24;
 		if (fb_info->btype == BT_GD5480)
-			disp->screen_base = (char *) fb_info->fbmem + 2 * MB_;
+			info->info.screen_base = (char *) fb_info->fbmem + 2 * MB_;
 		disp->dispsw_data = fb_info->fbcon_cmap.cfb24;
 		break;
 #endif
@@ -2231,7 +2231,7 @@ static void clgen_set_disp (const void *par, struct display *disp,
 		else
 			disp->dispsw = &fbcon_cfb32;
 		if (fb_info->btype == BT_GD5480)
-			disp->screen_base = (char *) fb_info->fbmem + 2 * MB_;
+			info->info.screen_base = (char *) fb_info->fbmem + 2 * MB_;
 		disp->dispsw_data = fb_info->fbcon_cmap.cfb32;
 		break;
 #endif

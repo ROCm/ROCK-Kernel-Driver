@@ -1783,7 +1783,6 @@ static int tdfxfb_set_var(struct fb_var_screeninfo *var,
 	 struct fb_fix_screeninfo fix;
 	 
 	 tdfxfb_encode_fix(&fix, &par, info);
-	 display->screen_base    = info->bufbase_virt;
 	 display->visual         = fix.visual;
 	 display->type           = fix.type;
 	 display->type_aux       = fix.type_aux;
@@ -2015,7 +2014,7 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 		}
 	}
 
-	fb_info.disp.screen_base = fb_info.bufbase_virt;
+	fb_info.fb_info.screen_base = fb_info.bufbase_virt;
 	fb_info.disp.var         = var;
       
 	if (tdfxfb_set_var(&var, -1, &fb_info.fb_info)) {

@@ -1163,7 +1163,6 @@ static void retz3fb_set_disp(int con, struct fb_info *info)
 	if (con == -1)
 		con = 0;
 
-	display->screen_base = zinfo->fbmem;
 	display->visual = fix.visual;
 	display->type = fix.type;
 	display->type_aux = fix.type_aux;
@@ -1448,6 +1447,7 @@ int __init retz3fb_init(void)
 		fb_info->changevar = NULL;
 		fb_info->node = NODEV;
 		fb_info->fbops = &retz3fb_ops;
+		fb_info->screen_base = zinfo->fbmem;
 		fb_info->disp = &zinfo->disp;
 		fb_info->currcon = -1;
 		fb_info->switch_con = &z3fb_switch;

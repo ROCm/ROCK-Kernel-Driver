@@ -294,7 +294,6 @@ static void hitfb_set_disp(const void *fb_par, struct display *disp,
 {
     const struct hitfb_par *par = fb_par;
 
-    disp->screen_base = (void *)fb_info.hit_videobase;
     disp->scrollmode = SCROLL_YREDRAW;
 
     switch(((struct hitfb_par *)par)->bpp) {
@@ -356,6 +355,7 @@ int __init hitfb_init(void)
     fb_info.gen.parsize = sizeof(struct hitfb_par);
     fb_info.gen.fbhw = &hitfb_switch;
     fb_info.gen.fbhw->detect();
+    fb_info.screen_base = (void *)fb_info.hit_videobase;
     
     fbgen_get_var(&fb_info.disp.var, -1, &fb_info.gen.info);
     fb_info.disp.var.activate = FB_ACTIVATE_NOW;

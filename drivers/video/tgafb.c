@@ -829,7 +829,6 @@ static int tgafb_blank(int blank, struct fb_info_gen *info)
 static void tgafb_set_disp(const void *fb_par, struct display *disp,
 	struct fb_info_gen *info)
 {
-    disp->screen_base = (char *)fb_info.tga_fb_base;
     switch (fb_info.tga_type) {
 #ifdef FBCON_HAS_CFB8
 	case TGA_TYPE_8PLANE:
@@ -940,6 +939,7 @@ int __init tgafb_init(void)
     fb_info.gen.info.node = NODEV;
     fb_info.gen.info.flags = FBINFO_FLAG_DEFAULT;
     fb_info.gen.info.fbops = &tgafb_ops;
+    fb_info.gen.info.screen_base = (char *)fb_info.tga_fb_base;
     fb_info.gen.info.disp = &disp;
     fb_info.gen.info.currcon = -1;	
     fb_info.gen.info.changevar = NULL;

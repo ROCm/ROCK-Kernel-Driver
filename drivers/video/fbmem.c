@@ -382,7 +382,7 @@ fb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 	if (count) {
 	    char *base_addr;
 
-	    base_addr = info->disp->screen_base;
+	    base_addr = info->screen_base;
 	    count -= copy_to_user(buf, base_addr+p, count);
 	    if (!count)
 		return -EFAULT;
@@ -418,7 +418,7 @@ fb_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	if (count) {
 	    char *base_addr;
 
-	    base_addr = info->disp->screen_base;
+	    base_addr = info->screen_base;
 	    count -= copy_from_user(base_addr+p, buf, count);
 	    *ppos += count;
 	    err = -EFAULT;

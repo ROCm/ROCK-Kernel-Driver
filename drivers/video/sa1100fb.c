@@ -1137,7 +1137,6 @@ sa1100fb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 		break;
 	}
 
-	display->screen_base	= fbi->screen_cpu;
 	display->next_line	= display->line_length;
 	display->type		= fbi->fb.fix.type;
 	display->type_aux	= fbi->fb.fix.type_aux;
@@ -1987,7 +1986,7 @@ static int __init sa1100fb_map_video_memory(struct sa1100fb_info *fbi)
 					&fbi->map_dma);
 
 	if (fbi->map_cpu) {
-		fbi->screen_cpu = fbi->map_cpu + PAGE_SIZE;
+		fbi->fb.screen_base = fbi->map_cpu + PAGE_SIZE;
 		fbi->screen_dma = fbi->map_dma + PAGE_SIZE;
 		fbi->fb.fix.smem_start = fbi->screen_dma;
 	}

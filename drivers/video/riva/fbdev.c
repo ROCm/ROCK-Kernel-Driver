@@ -662,7 +662,6 @@ static void riva_set_dispsw(struct rivafb_info *rinfo, struct display *disp)
 
 	disp->dispsw_data = NULL;
 
-	disp->screen_base = rinfo->fb_base;
 	disp->type = FB_TYPE_PACKED_PIXELS;
 	disp->type_aux = 0;
 	disp->ypanstep = 1;
@@ -1817,7 +1816,7 @@ static int __devinit riva_set_fbinfo(struct rivafb_info *rinfo)
 	info->node = NODEV;
 	info->flags = FBINFO_FLAG_DEFAULT;
 	info->fbops = &riva_fb_ops;
-
+	info->screen_base = rinfo->fb_base;
 	/* FIXME: set monspecs to what??? */
 
 	info->display_fg = NULL;

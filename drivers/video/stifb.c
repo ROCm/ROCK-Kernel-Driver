@@ -112,8 +112,6 @@ static void
 sti_set_disp(const void *par, struct display *disp,
 	     struct fb_info_gen *info)
 {
-	disp->screen_base =
-		(void *) PTR_STI(fb_info.sti->glob_cfg)->region_ptrs[1];
 	disp->dispsw = &fbcon_sti;
 }
 
@@ -160,7 +158,8 @@ stifb_init(void)
 	strcpy(fb_info.gen.info.modename, "STI Generic");
 	fb_info.gen.fbhw = &sti_switch;
 	fb_info.gen.fbhw->detect();
-
+	fb_info.gen.info.screen_base = 
+		(void *) PTR_STI(fb_info.sti->glob_cfg)->region_ptrs[1];
 	/* This should give a reasonable default video mode */
 	fbgen_get_var(&disp.var, -1, &fb_info.gen.info);
 	fbgen_do_set_var(&disp.var, 1, &fb_info.gen);

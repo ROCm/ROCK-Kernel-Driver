@@ -288,7 +288,6 @@ static void pmagbafb_set_disp(int con, struct pmag_ba_my_fb_info *info)
 
 	pmagbafb_get_fix(&fix, con, (struct fb_info *) info);
 
-	display->screen_base = (char *) fix.smem_start;
 	display->visual = fix.visual;
 	display->type = fix.type;
 	display->type_aux = fix.type_aux;
@@ -351,6 +350,7 @@ int __init pmagbafb_init_one(int slot)
 	ip->info.changevar = NULL;
 	ip->info.node = NODEV;
 	ip->info.fbops = &pmagbafb_ops;
+	ip->info.screen_base = ip->pmagba_fb_start;
 	ip->info.disp = &disp;
 	ip->info.currcon = -1;
 	ip->info.switch_con = &pmagbafb_switch;
@@ -360,7 +360,7 @@ int __init pmagbafb_init_one(int slot)
 	pmagba_do_fb_set_var(&pmagbafb_defined, 1);
 	pmagbafb_get_var(&disp.var, -1, (struct fb_info *) ip);
 	pmagbafb_set_disp(-1, ip);
-
+	
 	if (register_framebuffer((struct fb_info *) ip) < 0)
 		return 1;
 

@@ -272,8 +272,6 @@ static void dn_fb_set_disp(int con, struct fb_info *info) {
   if(con==-1) 
     con=0;
 
-   display->screen_base = (u_char *)fix.smem_start;
-printk("screenbase: %lx\n",fix.smem_start);
    display->visual = fix.visual;
    display->type = fix.type;
    display->type_aux = fix.type_aux;
@@ -305,6 +303,8 @@ printk("dn_fb_init\n");
 	fb_info.updatevar=&dnfbcon_updatevar;
 	fb_info.node = NODEV;
 	fb_info.fbops = &dn_fb_ops;
+   	fb_info.screen_base = (u_char *)fix.smem_start;
+	printk("screenbase: %lx\n",fix.smem_start);
 	fb_info.currcon = -1;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;	
 
@@ -366,7 +366,7 @@ void dn_bitblt(struct display *p,int x_src,int y_src, int x_dest, int y_dest,
 
 	incr=(y_dest<=y_src) ? 1 : -1 ;
 
-	src=(ushort *)(p->screen_base+ y_src*p->next_line+(x_src >> 4));
+	src=(ushort *)(p->fb_info.screen_base+ y_src*p->next_line+(x_src >> 4));
 	dest=y_dest*(p->next_line >> 1)+(x_dest >> 4);
 	
 	if(incr>0) {
@@ -444,20 +444,20 @@ static void bmove_apollofb(struct display *p, int sy, int sx, int dy, int dx,
     u_int rows;
 
     if (sx == 0 && dx == 0 && width == p->next_line) {
-	src = p->screen_base+sy*fontheight*width;
-	dest = p->screen_base+dy*fontheight*width;
+	src = p->fb_info.screen_base+sy*fontheight*width;
+	dest = p->fb_info.screen_base+dy*fontheight*width;
 	mymemmove(dest, src, height*fontheight*width);
     } else if (dy <= sy) {
-	src = p->screen_base+sy*fontheight*p->next_line+sx;
-	dest = p->screen_base+dy*fontheight*p->next_line+dx;
+	src = p->fb_info.screen_base+sy*fontheight*p->next_line+sx;
+	dest = p->fb_info.screen_base+dy*fontheight*p->next_line+dx;
 	for (rows = height*fontheight; rows--;) {
 	    mymemmove(dest, src, width);
 	    src += p->next_line;
 	    dest += p->next_line;
 	}
     } else {
-	src = p->screen_base+((sy+height)*fontheight-1)*p->next_line+sx;
-	dest = p->screen_base+((dy+height)*fontheight-1)*p->next_line+dx;
+	src = p->fb_info.screen_base+((sy+height)*fontheight-1)*p->next_line+sx;
+	dest = p->fb_info.screen_base+((dy+height)*fontheight-1)*p->next_line+dx;
 	for (rows = height*fontheight; rows--;) {
 	    mymemmove(dest, src, width);
 	    src -= p->next_line;

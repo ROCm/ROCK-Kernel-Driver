@@ -570,7 +570,6 @@ static void __init init_chips(struct fb_info_chips *p)
 	p->disp.cmap.green = NULL;
 	p->disp.cmap.blue = NULL;
 	p->disp.cmap.transp = NULL;
-	p->disp.screen_base = p->frame_buffer;
 	p->disp.visual = p->fix.visual;
 	p->disp.type = p->fix.type;
 	p->disp.type_aux = p->fix.type_aux;
@@ -582,6 +581,7 @@ static void __init init_chips(struct fb_info_chips *p)
 	strcpy(p->info.modename, p->fix.id);
 	p->info.node = NODEV;
 	p->info.fbops = &chipsfb_ops;
+	p->info.screen_base = p->frame_buffer;
 	p->info.disp = &p->disp;
 	p->info.currcon = -1;
 	p->info.fontname[0] = 0;

@@ -1036,7 +1036,7 @@ acornfb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 		break;
 	}
 
-	display->screen_base	= (char *)current_par.screen_base;
+	info->screen_base	= (char *)current_par.screen_base;
 	display->type		= FB_TYPE_PACKED_PIXELS;
 	display->type_aux	= 0;
 	display->ypanstep	= 1;

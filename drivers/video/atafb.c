@@ -2456,7 +2456,7 @@ atafb_set_disp(int con, struct fb_info *info)
 	atafb_get_var(&var, con, info);
 	if (con == -1)
 		con=0;
-	display->screen_base = (void *)fix.smem_start;
+	info->screen_base = (void *)fix.smem_start;
 	display->visual = fix.visual;
 	display->type = fix.type;
 	display->type_aux = fix.type_aux;

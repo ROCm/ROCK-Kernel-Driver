@@ -1336,7 +1336,6 @@ static int amifb_set_var(struct fb_var_screeninfo *var, int con,
 			struct fb_fix_screeninfo fix;
 
 			ami_encode_fix(&fix, &par);
-			display->screen_base = (char *)videomemory;
 			display->visual = fix.visual;
 			display->type = fix.type;
 			display->type_aux = fix.type_aux;
@@ -1770,6 +1769,7 @@ default_chipset:
 		videomemory = ZTWO_VADDR(videomemory_phys);
 	}
 
+	fb_info.screen_base = (char *)videomemory;
 	memset(dummysprite, 0, DUMMYSPRITEMEMSIZE);
 
 	/*

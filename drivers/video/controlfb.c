@@ -1256,7 +1256,7 @@ static void control_par_to_display(struct fb_par_control *par,
 	disp->ywrapstep = fix->ywrapstep;
 
 	control_par_to_var(par, &disp->var);
-	disp->screen_base = (char *) p->frame_buffer + CTRLFB_OFF;
+	p->info.screen_base = (char *) p->frame_buffer + CTRLFB_OFF;
 	disp->visual = fix->visual;
 	disp->line_length = fix->line_length;
 	control_set_dispsw(disp, par->cmode, p);
@@ -1272,7 +1272,7 @@ static void control_cfb16_revc(struct display *p, int xx, int yy)
     u8 *dest;
     int bytes = p->next_line, rows;
 
-    dest = p->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p)*2;
+    dest = p->info.screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p)*2;
     for (rows = fontheight(p); rows--; dest += bytes) {
        switch (fontwidth(p)) {
        case 16:
@@ -1295,7 +1295,7 @@ static void control_cfb32_revc(struct display *p, int xx, int yy)
     u8 *dest;
     int bytes = p->next_line, rows;
 
-    dest = p->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p) * 4;
+    dest = p->info.screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p) * 4;
     for (rows = fontheight(p); rows--; dest += bytes) {
        switch (fontwidth(p)) {
        case 16:

@@ -235,7 +235,6 @@ static int vfb_set_var(struct fb_var_screeninfo *var, int con,
 	    struct fb_fix_screeninfo fix;
 
 	    vfb_encode_fix(&fix, var);
-	    display->screen_base = (char *)videomemory;
 	    display->visual = fix.visual;
 	    display->type = fix.type;
 	    display->type_aux = fix.type_aux;
@@ -404,6 +403,7 @@ int __init vfb_init(void)
     fb_info.changevar = NULL;
     fb_info.node = NODEV;
     fb_info.fbops = &vfb_ops;
+    fb_info.screen_base = (char *)videomemory;
     fb_info.disp = &disp;
     fb_info.currcon = -1;	
     fb_info.switch_con = &vfbcon_switch;

@@ -825,7 +825,7 @@ static int sstfb_set_var(struct fb_var_screeninfo *var,
 	if ((old_xres != var->xres) || (old_yres != var->yres)
 	    || (old_bpp != var->bits_per_pixel)) {
 		/* 2-3  lignes redondantes avec get_fix */
-		display->screen_base = (char *) sst_info->video.vbase;
+		info->screen_base = (char *) sst_info->video.vbase;
 		display->visual = FB_VISUAL_TRUECOLOR;
 		display->type = FB_TYPE_PACKED_PIXELS;
 		display->type_aux = 0;

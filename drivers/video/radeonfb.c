@@ -1309,7 +1309,8 @@ static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
         info->node = NODEV;
         info->flags = FBINFO_FLAG_DEFAULT;
         info->fbops = &radeon_fb_ops;
-        info->display_fg = NULL;
+        info->screen_base = (char*)rinfo->fb_base;
+  	info->display_fg = NULL;
 	info->currcon = -1;
         strncpy (info->fontname, fontname, sizeof (info->fontname));
         info->fontname[sizeof (info->fontname) - 1] = 0;
@@ -1383,7 +1384,6 @@ static void radeon_set_dispsw (struct radeonfb_info *rinfo, struct display *disp
                 
         disp->dispsw_data = NULL;
         
-        disp->screen_base = (char*)rinfo->fb_base;
         disp->type = FB_TYPE_PACKED_PIXELS;
         disp->type_aux = 0;
         disp->ypanstep = 1;

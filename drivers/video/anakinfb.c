@@ -173,6 +173,7 @@ static struct fb_ops anakinfb_ops = {
 	fb_get_cmap:	anakinfb_get_cmap,
 	fb_set_cmap:	anakinfb_set_cmap,
 	fb_setcolreg:	anakinfb_setcolreg,
+	fb_blank:	anakinfb_blank,
 };
 
 int __init
@@ -189,11 +190,10 @@ anakinfb_init(void)
 	fb_info.changevar = NULL;
 	fb_info.switch_con = &anakinfb_switch_con;
 	fb_info.updatevar = &anakinfb_updatevar;
-	fb_info.blank = &anakinfb_blank;
+	fb_info.screen_base = ioremap(VGA_START, VGA_SIZE);
 
 	memset(&display, 0, sizeof(struct display));
 	anakinfb_get_var(&display.var, 0, &fb_info);
-	display.screen_base = ioremap(VGA_START, VGA_SIZE);
 	display.visual = FB_VISUAL_TRUECOLOR;
 	display.type = FB_TYPE_PACKED_PIXELS;
 	display.type_aux = 0;

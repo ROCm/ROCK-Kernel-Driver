@@ -52,7 +52,6 @@ struct sgivwfb_par {
 u_long                sgivwfb_mem_phys;
 u_long                sgivwfb_mem_size;
 
-static volatile char  *fbmem;
 static asregs         *regs;
 static struct fb_info fb_info;
 static struct { u_char red, green, blue, pad; } palette[256];
@@ -754,7 +753,6 @@ static int sgivwfb_set_var(struct fb_var_screeninfo *var, int con,
 	     var->xres_virtual, var->yres_virtual);
       activate_par(&par_current);
       sgivwfb_encode_fix(&fix, var);
-      display->screen_base = (char *)fbmem;
       display->visual = fix.visual;
       display->type = fix.type;
       display->type_aux = fix.type_aux;
@@ -897,9 +895,9 @@ int __init sgivwfb_init(void)
   fb_info.updatevar = &sgivwfbcon_updatevar;
   fb_info.flags = FBINFO_FLAG_DEFAULT;
 
-  fbmem = ioremap_nocache((unsigned long)sgivwfb_mem_phys, sgivwfb_mem_size);
-  if (!fbmem) {
-    printk(KERN_ERR "sgivwfb: couldn't ioremap fbmem\n");
+  fb_info.screen_base = ioremap_nocache((unsigned long)sgivwfb_mem_phys, sgivwfb_mem_size);
+  if (!fb_info.screen_base) {
+    printk(KERN_ERR "sgivwfb: couldn't ioremap screen_base\n");
     goto fail_ioremap_fbmem;
   }
 
@@ -917,7 +915,7 @@ int __init sgivwfb_init(void)
   return 0;
 
  fail_register_framebuffer:
-  iounmap((char*)fbmem);
+  iounmap((char*)fb_info.screen_base);
  fail_ioremap_fbmem:
   iounmap(regs);
  fail_ioremap_regs:
@@ -958,7 +956,7 @@ void cleanup_module(void)
   unregister_framebuffer(&fb_info);
   dbe_TurnOffDma();
   iounmap(regs);
-  iounmap(fbmem);
+  iounmap(&fb_info.screen_base);
 }
 
 #endif /* MODULE */

@@ -876,7 +876,6 @@ static void cyberfb_set_disp(int con, struct fb_info *info)
 	cyberfb_get_fix(&fix, con, info);
 	if (con == -1)
 		con = 0;
-	display->screen_base = (unsigned char *)CyberMem;
 	display->visual = fix.visual;
 	display->type = fix.type;
 	display->type_aux = fix.type_aux;
@@ -1087,6 +1086,7 @@ int __init cyberfb_init(void)
 	    fb_info.changevar = NULL;
 	    fb_info.node = NODEV;
 	    fb_info.fbops = &cyberfb_ops;
+	    fb_info.screen_base = (unsigned char *)CyberMem;
 	    fb_info.disp = &disp;
 	    fb_info.currcon = -1;
 	    fb_info.switch_con = &Cyberfb_switch;

@@ -460,7 +460,6 @@ static void igafb_set_disp(int con, struct fb_info_iga *info)
         igafb_get_fix(&fix, con, &info->fb_info);
 
         memset(display, 0, sizeof(struct display));
-        display->screen_base = info->frame_buffer;
         display->visual = fix.visual;
         display->type = fix.type;
         display->type_aux = fix.type_aux;
@@ -561,6 +560,7 @@ static int __init iga_init(struct fb_info_iga *info)
 	info->fb_info.node = NODEV;
 	info->fb_info.fbops = &igafb_ops;
 	info->fb_info.disp = &info->disp;
+        info->fb_info.screen_base = info->frame_buffer;
 	info->fb_info.currcon = -1;
 	strcpy(info->fb_info.fontname, fontname);
 	info->fb_info.changevar = NULL;

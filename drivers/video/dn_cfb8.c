@@ -266,8 +266,6 @@ static void dn_fb_set_disp(int con, struct fb_info *info) {
   if(con==-1) 
     con=0;
 
-   disp[con].screen_base = (u_char *)fix.smem_start;
-printk("screenbase: %p\n",fix.smem_start);
    disp[con].visual = fix.visual;
    disp[con].type = fix.type;
    disp[con].type_aux = fix.type_aux;
@@ -283,7 +281,7 @@ unsigned long dn_fb_init(unsigned long mem_start) {
 
 	int err;
        
-printk("dn_fb_init\n");
+	printk("dn_fb_init\n");
 
 	fb_info.changevar=NULL;
 	strcpy(&fb_info.modename[0],dn_fb_name);
@@ -294,6 +292,7 @@ printk("dn_fb_init\n");
 	fb_info.node = NODEV;
 	fb_info.currcon = -1;
 	fb_info.fbops = &dn_fb_ops;
+	printk("screenbase: %p\n",fix.smem_start);
 	
 printk("dn_fb_init: register\n");
 	err=register_framebuffer(&fb_info);
@@ -317,9 +316,8 @@ printk("dn_fb_init: register\n");
         dn_fb_get_var(&disp[0].var,0, &fb_info);
 
 	dn_fb_set_disp(-1, &fb_info);
-
+   	fb_info.screen_base = (u_char *)fix.smem_start;
 	return mem_start;
-
 }	
 
 	
@@ -357,7 +355,7 @@ void dn_bitblt(struct display *p,int x_src,int y_src, int x_dest, int y_dest,
 
 	incr=(y_dest<=y_src) ? 1 : -1 ;
 
-	src=(ushort *)(p->screen_base+ y_src*p->next_line+(x_src >> 4));
+	src=(ushort *)(p->fb_info.screen_base+ y_src*p->next_line+(x_src >> 4));
 	dest=y_dest*(p->next_line >> 1)+(x_dest >> 4);
 	
 	if(incr>0) {
@@ -430,20 +428,20 @@ static void bmove_apollofb(struct display *p, int sy, int sx, int dy, int dx,
     u_int rows;
 
     if (sx == 0 && dx == 0 && width == p->next_line) {
-	src = p->screen_base+sy*p->fontheight*width;
-	dest = p->screen_base+dy*p->fontheight*width;
+	src = p->fb_info.screen_base+sy*p->fontheight*width;
+	dest = p->fb_info.screen_base+dy*p->fontheight*width;
 	mymemmove(dest, src, height*p->fontheight*width);
     } else if (dy <= sy) {
-	src = p->screen_base+sy*p->fontheight*p->next_line+sx;
-	dest = p->screen_base+dy*p->fontheight*p->next_line+dx;
+	src = p->fb_info.screen_base+sy*p->fontheight*p->next_line+sx;
+	dest = p->fb_info.screen_base+dy*p->fontheight*p->next_line+dx;
 	for (rows = height*p->fontheight; rows--;) {
 	    mymemmove(dest, src, width);
 	    src += p->next_line;
 	    dest += p->next_line;
 	}
     } else {
-	src = p->screen_base+((sy+height)*p->fontheight-1)*p->next_line+sx;
-	dest = p->screen_base+((dy+height)*p->fontheight-1)*p->next_line+dx;
+	src = p->fb_info.screen_base+((sy+height)*p->fontheight-1)*p->next_line+sx;
+	dest = p->fb_info.screen_base+((dy+height)*p->fontheight-1)*p->next_line+dx;
 	for (rows = height*p->fontheight; rows--;) {
 	    mymemmove(dest, src, width);
 	    src -= p->next_line;
@@ -459,7 +457,7 @@ static void clear_apollofb(struct vc_data *conp, struct display *p, int sy, int 
     u_char *dest;
     u_int rows;
 
-    dest = p->screen_base+sy*p->fontheight*p->next_line+sx;
+    dest = p->fb_info.screen_base+sy*p->fontheight*p->next_line+sx;
 
     if (sx == 0 && width == p->next_line)
 	if (attr_reverse(p,conp))
@@ -483,7 +481,7 @@ static void putc_apollofb(struct vc_data *conp, struct display *p, int c, int yy
 
     c &= 0xff;
 
-    dest = p->screen_base+yy*p->fontheight*p->next_line+xx;
+    dest = p->fb_info.screen_base+yy*p->fontheight*p->next_line+xx;
     cdat = p->fontdata+c*p->fontheight;
     bold = attr_bold(p,conp);
     revs = attr_reverse(p,conp);
@@ -508,7 +506,7 @@ static void putcs_apollofb(struct vc_data *conp, struct display *p, const char *
     u_int rows, bold, revs, underl;
     u_char c, d;
 
-    dest0 = p->screen_base+yy*p->fontheight*p->next_line+xx;
+    dest0 = p->fb_info.screen_base+yy*p->fontheight*p->next_line+xx;
     bold = attr_bold(p,conp);
     revs = attr_reverse(p,conp);
     underl = attr_underline(p,conp);
@@ -535,7 +533,7 @@ static void rev_char_apollofb(struct display *p, int xx, int yy)
     u_char *dest;
     u_int rows;
 
-    dest = p->screen_base+yy*p->fontheight*p->next_line+xx;
+    dest = p->fb_info.screen_base+yy*p->fontheight*p->next_line+xx;
     for (rows = p->fontheight; rows--; dest += p->next_line)
 	*dest = ~*dest;
 }

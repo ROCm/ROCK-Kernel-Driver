@@ -112,7 +112,7 @@ static int bw2_unblank (struct fb_info_sbusfb *fb)
 static void bw2_margins (struct fb_info_sbusfb *fb, struct display *p,
 			 int x_margin, int y_margin)
 {
-	p->screen_base += (y_margin - fb->y_margin) *
+	fb->info.screen_base += (y_margin - fb->y_margin) *
 		p->line_length + ((x_margin - fb->x_margin) >> 3);
 }
 
@@ -237,11 +237,11 @@ char __init *bwtwofb_init(struct fb_info_sbusfb *fb)
 	
 	disp->scrollmode = SCROLL_YREDRAW;
 	disp->inverse = 1;
-	if (!disp->screen_base) {
-		disp->screen_base = (char *)
+	if (!fb->info.screen_base) {
+		fb->info.screen_base = (char *)
 			sbus_ioremap(resp, 0, type->fb_size, "bw2 ram");
 	}
-	disp->screen_base += fix->line_length * fb->y_margin + (fb->x_margin >> 3);
+	fb->info.screen_base += fix->line_length * fb->y_margin + (fb->x_margin >> 3);
 	fb->dispsw = fbcon_mfb;
 	fix->visual = FB_VISUAL_MONO01;
 

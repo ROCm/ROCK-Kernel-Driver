@@ -22,7 +22,6 @@
 #define FBIOSETSCROLLMODE   0x4611
 
 #define Q40_PHYS_SCREEN_ADDR 0xFE800000
-static unsigned long q40_screen_addr;
 
 static u16 fbcon_cmap_cfb16[16];
 
@@ -67,7 +66,7 @@ static int q40fb_get_fix(struct fb_fix_screeninfo *fix, int con,
 	memset(fix, 0, sizeof(struct fb_fix_screeninfo));
 
 	strcpy(fix->id,"Q40");
-	fix->smem_start=q40_screen_addr;
+	fix->smem_start = info->screen_base;
 	fix->smem_len=1024*1024;
 	fix->type=FB_TYPE_PACKED_PIXELS;
 	fix->type_aux=0;
@@ -261,7 +260,6 @@ static void q40fb_set_disp(int con, struct fb_info *info)
 
   if (con<0) con=0;
 
-   display->screen_base = fix.smem_start;
    display->visual = fix.visual;
    display->type = fix.type;
    display->type_aux = fix.type_aux;
@@ -287,10 +285,10 @@ int __init q40fb_init(void)
         if ( !MACH_IS_Q40)
 	  return -ENXIO;
 #if 0
-        q40_screen_addr = kernel_map(Q40_PHYS_SCREEN_ADDR, 1024*1024,
+        fb_info.screen_base = kernel_map(Q40_PHYS_SCREEN_ADDR, 1024*1024,
 					   KERNELMAP_NO_COPYBACK, NULL);
 #else
-	q40_screen_addr = Q40_PHYS_SCREEN_ADDR; /* mapped in q40/config.c */
+	fb_info.screen_base = Q40_PHYS_SCREEN_ADDR; /* mapped in q40/config.c */
 #endif
 
 	fb_info.changevar=NULL;

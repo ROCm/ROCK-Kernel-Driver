@@ -250,7 +250,6 @@ static void macfb_set_disp(int con)
 	macfb_get_fix(&fix, con, &fb_info);
 
 	memset(display, 0, sizeof(struct display));
-	display->screen_base = video_vbase;
 	display->visual = fix.visual;
 	display->type = fix.type;
 	display->type_aux = fix.type_aux;
@@ -1215,13 +1214,14 @@ void __init macfb_init(void)
 			break;
 		}
 	
-	fb_info.changevar  = NULL;
-	fb_info.node       = NODEV;
-	fb_info.fbops      = &macfb_ops;
-	fb_info.disp       = &disp;
-	fb_info.switch_con = &macfb_switch;
-	fb_info.updatevar  = &macfb_update_var;
-	fb_info.flags      = FBINFO_FLAG_DEFAULT;
+	fb_info.changevar   = NULL;
+	fb_info.node        = NODEV;
+	fb_info.fbops       = &macfb_ops;
+	fb_info.screen_base = video_vbase;
+	fb_info.disp        = &disp;
+	fb_info.switch_con  = &macfb_switch;
+	fb_info.updatevar   = &macfb_update_var;
+	fb_info.flags       = FBINFO_FLAG_DEFAULT;
 	macfb_set_disp(-1);
 	do_install_cmap(0, &fb_info);
 	

@@ -382,7 +382,6 @@ static int pvr2fb_set_var(struct fb_var_screeninfo *var, int con,
 			struct fb_fix_screeninfo fix;
 
 			pvr2_encode_fix(&fix, &par);
-			display->screen_base = (char *)fix.smem_start;
 			display->scrollmode = SCROLL_YREDRAW;
 			display->visual = fix.visual;
 			display->type = fix.type;
@@ -1037,6 +1036,7 @@ int __init pvr2fb_init(void)
 	fb_info.changevar = NULL;
 	fb_info.node = NODEV;
 	fb_info.fbops = &pvr2fb_ops;
+	fb_info.screen_base = (char *) videomemory;
 	fb_info.disp = &disp;
 	fb_info.currcon = -1;
 	fb_info.switch_con = &pvr2fbcon_switch;

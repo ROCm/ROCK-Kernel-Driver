@@ -942,14 +942,14 @@ static void virgefb_set_disp(int con, struct fb_info *info)
 	if (con == -1)
 		con = 0;
 	if (cv3d_on_zorro2) {
-		display->screen_base = (char*) CyberMem;
+		info->screen_base = (char*) CyberMem;
 	} else {
 	        switch (display->var.bits_per_pixel) {
 			case 8:
-				display->screen_base = (char*) (CyberMem + CYBMEM_OFFSET_8);
+				info->screen_base = (char*) (CyberMem + CYBMEM_OFFSET_8);
 				break;
 			case 16:
-				display->screen_base = (char*) (CyberMem + CYBMEM_OFFSET_16);
+				info->screen_base = (char*) (CyberMem + CYBMEM_OFFSET_16);
 				break;
 		}
 	}

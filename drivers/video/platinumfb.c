@@ -259,7 +259,7 @@ static int platinum_set_var(struct fb_var_screeninfo *var, int con,
 	    struct fb_fix_screeninfo fix;
 
 	    platinum_encode_fix(&fix, &par, info);
-	    display->screen_base = (char *) info->frame_buffer + init->fb_offset + 0x20;
+	    info->fb_info.screen_base = (char *) info->frame_buffer + init->fb_offset + 0x20;
 	    display->visual = fix.visual;
 	    display->type = fix.type;
 	    display->type_aux = fix.type_aux;

@@ -138,7 +138,7 @@ static void sun3fb_clear_margin(struct display *p, int s)
 		rects [15] = fb->var.yres_virtual;
 		(*fb->fill)(fb, p, s, 4, rects);
 	} else {
-		unsigned char *fb_base = p->screen_base, *q;
+		unsigned char *fb_base = fb->info.screen_base, *q;
 		int skip_bytes = fb->y_margin * fb->var.xres_virtual;
 		int scr_size = fb->var.xres_virtual * fb->var.yres_virtual;
 		int h, he, incr, size;
@@ -600,7 +600,7 @@ sizechange:
 		p = bwtwofb_init(fb); break;
 #endif
 	}
-	fix->smem_start = fb->disp.screen_base;
+	fix->smem_start = fb->info.screen_base;
 	
 	if (!p) {
 		kfree(fb);

@@ -174,7 +174,6 @@ static void vga16fb_set_disp(int con, struct vga16fb_info *info)
 	
 	vga16fb_get_fix(&fix, con, &info->fb_info);
 
-	display->screen_base = info->video_vbase;
 	display->visual = fix.visual;
 	display->type = fix.type;
 	display->type_aux = fix.type_aux;
@@ -928,6 +927,7 @@ int __init vga16fb_init(void)
 	vga16fb.fb_info.changevar = NULL;
 	vga16fb.fb_info.node = NODEV;
 	vga16fb.fb_info.fbops = &vga16fb_ops;
+	vga16fb.fb_info.screen_base = vga16fb.video_vbase;
 	vga16fb.fb_info.disp=&disp;
 	vga16fb.fb_info.currcon = -1;
 	vga16fb.fb_info.switch_con=&vga16fb_switch;

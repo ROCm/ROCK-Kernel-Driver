@@ -672,7 +672,7 @@ static void cg6_reset (struct fb_info_sbusfb *fb)
 
 static void cg6_margins (struct fb_info_sbusfb *fb, struct display *p, int x_margin, int y_margin)
 {
-	p->screen_base += (y_margin - fb->y_margin) *
+	fb->info.screen_base += (y_margin - fb->y_margin) *
 		p->line_length + (x_margin - fb->x_margin);
 }
 
@@ -723,12 +723,12 @@ char __init *cgsixfb_init(struct fb_info_sbusfb *fb)
 	var->accel_flags = FB_ACCELF_TEXT;
 	
 	disp->scrollmode = SCROLL_YREDRAW;
-	if (!disp->screen_base) {
-		disp->screen_base = (char *)
+	if (!fb->info.screen_base) {
+		fb->info.screen_base = (char *)
 			sbus_ioremap(&sdev->resource[0], CG6_RAM_OFFSET,
 				     type->fb_size, "cgsix ram");
 	}
-	disp->screen_base += fix->line_length * fb->y_margin + fb->x_margin;
+	fb->info.screen_base += fix->line_length * fb->y_margin + fb->x_margin;
 	fb->s.cg6.fbc = (struct cg6_fbc *)
 		sbus_ioremap(&sdev->resource[0], CG6_FBC_OFFSET,
 			     4096, "cgsix fbc");

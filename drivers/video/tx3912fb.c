@@ -225,7 +225,6 @@ static int tx3912fb_set_var(struct fb_var_screeninfo *var, int con,
 		    oldvyres != var->yres_virtual ||
 		    oldbpp != var->bits_per_pixel) {
 
-			display->screen_base = (u_char *) tx3912fb_vaddr;
 
 			switch (var->bits_per_pixel) {
 			case 1:
@@ -398,6 +397,7 @@ int __init tx3912fb_init(void)
 	fb_info.changevar = NULL;
 	fb_info.node = NODEV;
 	fb_info.fbops = &tx3912fb_ops;
+	fb_info.screen_base = (u_char *) tx3912fb_vaddr;
 	fb_info.disp = &global_disp;
 	fb_info.currcon = -1;
 	fb_info.switch_con = &tx3912fbcon_switch;

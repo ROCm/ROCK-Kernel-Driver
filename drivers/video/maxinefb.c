@@ -290,7 +290,6 @@ static void maxinefb_set_disp(int con)
 
 	maxinefb_get_fix(&fix, con, 0);
 
-	display->screen_base = fix.smem_start;
 	display->visual = fix.visual;
 	display->type = fix.type;
 	display->type_aux = fix.type_aux;
@@ -359,6 +358,7 @@ int __init maxinefb_init(void)
 	fb_info.changevar = NULL;
 	fb_info.node = NODEV;
 	fb_info.fbops = &maxinefb_ops;
+	fb_info.screen_base = (char *) fb_start;
 	fb_info.disp = &disp;
 	fb_info.currcon = -1;
 	fb_info.switch_con = &maxinefb_switch;

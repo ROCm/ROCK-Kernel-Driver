@@ -253,7 +253,6 @@ static void xxx_set_disp(const void *par, struct display *disp,
      *  If you don't have any appropriate operations, you must fill in a
      *  pointer to dummy operations, and there will be no text output.
      */
-    disp->screen_base = virtual_frame_buffer_address;
 #ifdef FBCON_HAS_CFB8
     if (is_cfb8) {
 	disp->dispsw = fbcon_cfb8;
@@ -307,6 +306,7 @@ int __init xxxfb_init(void)
     fb_info.gen.info.changevar = NULL;
     fb_info.gen.info.node = NODEV;
     fb_info.gen.info.fbops = &xxxfb_ops;
+    fb_info.gen.info.screen_base = virtual_frame_buffer_address;
     fb_info.gen.info.disp = &disp;
     fb_info.gen.info.currcon = -1;
     fb_info.gen.info.switch_con = &xxxfb_switch;

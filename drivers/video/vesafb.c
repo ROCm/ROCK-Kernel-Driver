@@ -182,7 +182,6 @@ static void vesafb_set_disp(int con)
 	vesafb_get_fix(&fix, con, 0);
 
 	memset(display, 0, sizeof(struct display));
-	display->screen_base = video_vbase;
 	display->visual = fix.visual;
 	display->type = fix.type;
 	display->type_aux = fix.type_aux;
@@ -642,6 +641,7 @@ int __init vesafb_init(void)
 	fb_info.changevar = NULL;
 	fb_info.node = NODEV;
 	fb_info.fbops = &vesafb_ops;
+	fb_info.screen_base = video_vbase;
 	fb_info.disp=&disp;
 	fb_info.currcon = -1;
 	fb_info.switch_con=&vesafb_switch;

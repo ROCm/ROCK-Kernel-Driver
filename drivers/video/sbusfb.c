@@ -265,7 +265,7 @@ static void sbusfb_clear_margin(struct display *p, int s)
 		rects [15] = fb->var.yres_virtual;
 		(*fb->fill)(fb, p, s, 4, rects);
 	} else {
-		unsigned char *fb_base = p->screen_base, *q;
+		unsigned char *fb_base = fb->info.screen_base, *q;
 		int skip_bytes = fb->y_margin * fb->var.xres_virtual;
 		int scr_size = fb->var.xres_virtual * fb->var.yres_virtual;
 		int h, he, incr, size;
@@ -977,7 +977,7 @@ static void __init sbusfb_init_fb(int node, int parent, int fbtype,
 	fb->emulations[0] = fbtype;
 	
 #ifndef __sparc_v9__
-	disp->screen_base = (unsigned char *)prom_getintdefault(node, "address", 0);
+	fb->info.screen_base = (unsigned char *)prom_getintdefault(node, "address", 0);
 #endif
 	
 	type->fb_height = h = prom_getintdefault(node, "height", 900);

@@ -1413,7 +1413,6 @@ set_disp (struct display *disp, struct fb_info_imstt *p)
 
 	disp->visual = disp->var.bits_per_pixel == 8 ? FB_VISUAL_PSEUDOCOLOR
 					 	     : FB_VISUAL_DIRECTCOLOR;
-	disp->screen_base = (__u8 *)p->frame_buffer;
 	disp->visual = p->fix.visual;
 	disp->type = p->fix.type;
 	disp->type_aux = p->fix.type_aux;
@@ -1871,6 +1870,7 @@ init_imstt(struct fb_info_imstt *p)
 	p->info.node = NODEV;
 	p->info.fbops = &imsttfb_ops;
 	p->info.disp = &p->disp;
+	p->info.screen_base = (__u8 *)p->frame_buffer;
 	p->info.currcon = -1;
 	p->info.changevar = 0;
 	p->info.switch_con = &imsttfbcon_switch;

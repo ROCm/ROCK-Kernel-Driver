@@ -530,7 +530,6 @@ static void __init s3triofb_of_init(struct device_node *dp)
     disp.cmap.start = 0;
     disp.cmap.len = 0;
     disp.cmap.red = disp.cmap.green = disp.cmap.blue = disp.cmap.transp = NULL;
-    disp.screen_base = s3trio_base;
     disp.visual = fb_fix.visual;
     disp.type = fb_fix.type;
     disp.type_aux = fb_fix.type_aux;
@@ -554,6 +553,7 @@ static void __init s3triofb_of_init(struct device_node *dp)
     fb_info.node = NODEV;
     fb_info.currcon = -1;
     fb_info.fbops = &s3trio_ops;
+    fb_info.screen_base = s3trio_base;	
 #if 0
     fb_info.fbvar_num = 1;
     fb_info.fbvar = &fb_var;

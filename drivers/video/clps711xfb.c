@@ -186,7 +186,6 @@ clps7111fb_set_var(struct fb_var_screeninfo *var, int con,
 
 	info->fix.line_length = display->next_line;
 
-	display->screen_base	= info->screen_base;
 	display->line_length	= info->fix.line_length;
 	display->visual		= info->fix.visual;
 	display->type		= info->fix.type;

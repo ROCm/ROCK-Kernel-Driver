@@ -751,7 +751,6 @@ static void valkyrie_par_to_display(struct fb_par_valkyrie *par,
   struct display *disp, struct fb_fix_screeninfo *fix, struct fb_info_valkyrie *p)
 {
 	disp->var = p->var;
-	disp->screen_base = (char *) p->frame_buffer + 0x1000;
 	disp->visual = fix->visual;
 	disp->line_length = fix->line_length;
 
@@ -782,6 +781,7 @@ static void __init valkyrie_init_info(struct fb_info *info, struct fb_info_valky
 	strcpy(info->modename, p->fix.id);
 	info->node = NODEV;
 	info->fbops = &valkyriefb_ops;
+	info->screen_base = (char *) p->frame_buffer + 0x1000;
 	info->disp = &p->disp;
 	info->currcon = -1;
 	strcpy(info->fontname, fontname);

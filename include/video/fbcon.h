@@ -55,8 +55,6 @@ struct display {
     struct fb_var_screeninfo var;   /* variable infos. yoffset and vmode */
                                     /* are updated by fbcon.c */
     struct fb_cmap cmap;            /* colormap */
-    char *screen_base;              /* pointer to top of virtual screen */    
-                                    /* (virtual address) */
     int visual;
     int type;                       /* see FB_TYPE_* */
     int type_aux;                   /* Interleave for interleaved Planes */

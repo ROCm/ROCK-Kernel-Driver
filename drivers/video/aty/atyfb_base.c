@@ -1115,7 +1115,7 @@ static int atyfb_set_var(struct fb_var_screeninfo *var, int con,
 	    struct fb_fix_screeninfo fix;
 
 	    encode_fix(&fix, &par, info);
-	    display->screen_base = (char *)info->frame_buffer;
+	    fb->screen_base = (char *)info->frame_buffer;
 	    display->visual = fix.visual;
 	    display->type = fix.type;
 	    display->type_aux = fix.type_aux;

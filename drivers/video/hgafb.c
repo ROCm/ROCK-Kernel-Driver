@@ -721,7 +721,6 @@ int __init hgafb_init(void)
 	hga_fix.smem_len = hga_vram_len;
 
 	disp.var = hga_default_var;
-	disp.screen_base = (char*)hga_fix.smem_start;
 	disp.visual = hga_fix.visual;
 	disp.type = hga_fix.type;
 	disp.type_aux = hga_fix.type_aux;

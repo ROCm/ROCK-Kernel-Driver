@@ -432,7 +432,6 @@ static void e1355_set_disp(const void *unused, struct display *disp,
 {
 	struct display_switch *d;
 
-	disp->screen_base = (void *)E1355_FB_BASE;
 	disp->dispsw = &e1355_dispsw;
 	
 	switch(disp->var.bits_per_pixel) {
@@ -503,6 +502,7 @@ int __init e1355fb_init(void)
 	fb_info.gen.info.changevar = NULL;
 	fb_info.gen.info.node = NODEV;
 	fb_info.gen.info.fbops = &e1355fb_ops;
+	fb_info.gen.info.screen_base = (void *)E1355_FB_BASE;
 	fb_info.gen.currcon = -1;
 	fb_info.gen.info.disp = &disp;
 	fb_info.gen.parsize = sizeof(struct e1355_par);

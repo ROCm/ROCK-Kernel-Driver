@@ -1811,7 +1811,7 @@ static void pm2fb_set_disp(const void* par, struct display* disp,
 
 	save_flags(flags);
 	cli();
-	disp->screen_base = i->regions.v_fb;
+	i->gen.info.screen_base = i->regions.v_fb;
 	switch (depth=((struct pm2fb_par* )par)->depth) {
 #ifdef FBCON_HAS_CFB8
 		case 8:

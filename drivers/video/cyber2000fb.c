@@ -956,7 +956,6 @@ cyber2000fb_set_var(struct fb_var_screeninfo *var, int con,
 
 	cfb->fb.fix.line_length	= display->next_line;
 
-	display->screen_base	= cfb->fb.screen_base;
 	display->line_length	= cfb->fb.fix.line_length;
 	display->visual		= cfb->fb.fix.visual;
 	display->type		= cfb->fb.fix.type;
