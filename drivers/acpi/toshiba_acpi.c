@@ -52,7 +52,7 @@
 extern struct proc_dir_entry* bm_proc_root;
 #define acpi_root_dir bm_proc_root
 #else
-#include "acpi_drivers.h"
+#include <acpi/acpi_drivers.h>
 #endif
 
 MODULE_AUTHOR("John Belmonte");

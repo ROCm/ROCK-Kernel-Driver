@@ -39,8 +39,8 @@
 #include <linux/sched.h>
 #include <linux/kmod.h>
 #include <linux/seq_file.h>
-#include "acpi_bus.h"
-#include "acpi_drivers.h"
+#include <acpi/acpi_bus.h>
+#include <acpi/acpi_drivers.h>
 
 #define ACPI_THERMAL_COMPONENT		0x04000000
 #define ACPI_THERMAL_CLASS		"thermal_zone"

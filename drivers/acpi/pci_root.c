@@ -32,8 +32,8 @@
 #include <linux/pm.h>
 #include <linux/pci.h>
 #include <linux/acpi.h>
-#include "acpi_bus.h"
-#include "acpi_drivers.h"
+#include <acpi/acpi_bus.h>
+#include <acpi/acpi_drivers.h>
 
 
 #define _COMPONENT		ACPI_PCI_COMPONENT

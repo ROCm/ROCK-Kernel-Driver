@@ -37,7 +37,7 @@
 #include <linux/workqueue.h>
 #include <acpi/acpi.h>
 #include <asm/io.h>
-#include "acpi_bus.h"
+#include <acpi/acpi_bus.h>
 
 #ifdef CONFIG_ACPI_EFI
 #include <linux/efi.h>

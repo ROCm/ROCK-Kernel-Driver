@@ -21,8 +21,8 @@
 #include <asm/uaccess.h>
 #include <asm/acpi.h>
 
-#include "acpi_bus.h"
-#include "acpi_drivers.h"
+#include <acpi/acpi_bus.h>
+#include <acpi/acpi_drivers.h>
 
 #ifdef CONFIG_X86
 #include <linux/mc146818rtc.h>
