@@ -214,7 +214,7 @@ static int sem_revalidate(int semid, struct sem_array* sma, int nsems, short flg
 		return -EIDRM;
 	}
 
-	if (ipcperms(&sma->sem_perm, flg)) {
+	if (flg && ipcperms(&sma->sem_perm, flg)) {
 		sem_unlock(smanew);
 		return -EACCES;
 	}
@@ -412,7 +412,7 @@ static void freeary (struct sem_array *sma, int id)
 	int size;
 
 	/* Invalidate the existing undo structures for this semaphore set.
-	 * (They will be freed without any further action in sem_exit()
+	 * (They will be freed without any further action in exit_sem()
 	 * or during the next semop.)
 	 */
 	for (un = sma->undo; un; un = un->id_next)
@@ -887,106 +887,87 @@ static inline int get_undo_list(struct sem_undo_list **undo_listp)
 	return 0;
 }
 
-static struct sem_undo* freeundos(struct sem_undo* un)
+static struct sem_undo *lookup_undo(struct sem_undo_list *ulp, int semid)
 {
-	struct sem_undo* u;
-	struct sem_undo** up;
+	struct sem_undo **last, *un;
 
-	for(up = &current->sysvsem.undo_list->proc_list;(u=*up);up=&u->proc_next) {
-		if(un==u) {
-			un=u->proc_next;
-			*up=un;
-			kfree(u);
-			return un;
-		}
-	}
-	printk ("freeundos undo list error id=%d\n", un->semid);
-	return un->proc_next;
-}
-
-static inline struct sem_undo *find_undo(int semid)
-{
-	struct sem_undo *un;
-
-	un = NULL;
-	if (current->sysvsem.undo_list != NULL) {
-		un = current->sysvsem.undo_list->proc_list;
-	}
+	last = &ulp->proc_list;
+	un = *last;
 	while(un != NULL) {
 		if(un->semid==semid)
 			break;
-		if(un->semid==-1)
-			un=freeundos(un);
-		 else
-			un=un->proc_next;
+		if(un->semid==-1) {
+			*last=un->proc_next;
+			kfree(un);
+		} else {
+			last=&un->proc_next;
+		}
+		un=*last;
 	}
 	return un;
 }
 
-/* returns without sem_lock and semundo list locks on error! */
-static int alloc_undo(struct sem_array *sma, struct sem_undo** unp, int semid, int alter)
+static struct sem_undo *find_undo(int semid)
 {
-	int size, nsems, error;
-	struct sem_undo *un, *new_un;
-	struct sem_undo_list *undo_list;
-	unsigned long	saved_add_count;
+	struct sem_array *sma;
+	struct sem_undo_list *ulp;
+	struct sem_undo *un, *new;
+	int nsems;
+	int error;
 
-
-	nsems = sma->sem_nsems;
-	saved_add_count = 0;
-	if (current->sysvsem.undo_list != NULL)
-		saved_add_count = current->sysvsem.undo_list->add_count;
-	sem_unlock(sma);
-	unlock_semundo();
-
-	error = get_undo_list(&undo_list);
+	error = get_undo_list(&ulp);
 	if (error)
-		return error;
+		return ERR_PTR(error);
 
-	size = sizeof(struct sem_undo) + sizeof(short)*nsems;
-	un = (struct sem_undo *) kmalloc(size, GFP_KERNEL);
-	if (!un)
-		return -ENOMEM;
-
-	memset(un, 0, size);
 	lock_semundo();
-	error = sem_revalidate(semid, sma, nsems, alter ? S_IWUGO : S_IRUGO);
-	if(error) {
+	un = lookup_undo(ulp, semid);
+	unlock_semundo();
+	if (likely(un!=NULL))
+		goto out;
+
+	/* no undo structure around - allocate one. */
+	sma = sem_lock(semid);
+	un = ERR_PTR(-EINVAL);
+	if(sma==NULL)
+		goto out;
+	un = ERR_PTR(-EIDRM);
+	if (sem_checkid(sma,semid))
+		goto out_unlock;
+	nsems = sma->sem_nsems;
+	sem_unlock(sma);
+
+	new = (struct sem_undo *) kmalloc(sizeof(struct sem_undo) + sizeof(short)*nsems, GFP_KERNEL);
+	if (!new)
+		return ERR_PTR(-ENOMEM);
+	memset(new, 0, sizeof(struct sem_undo) + sizeof(short)*nsems);
+	new->semadj = (short *) &new[1];
+	new->semid = semid;
+
+	lock_semundo();
+	un = lookup_undo(ulp, semid);
+	if (un) {
 		unlock_semundo();
-		kfree(un);
-		return error;
+		kfree(new);
+		goto out;
 	}
-
-
-	/* alloc_undo has just
-	 * released all locks and reacquired them. 
-	 * But, another thread may have
-	 * added the semundo we were looking for
-	 * during that time.
-	 * So, we check for it again.
-	 * only initialize and add the new one
-	 * if we don't discover one.
-	 */
-	new_un = NULL;
-	if (current->sysvsem.undo_list->add_count != saved_add_count)
-		new_un = find_undo(semid);
-
-	if (new_un != NULL) {
-		if (sma->undo != new_un)
-			BUG();
-		kfree(un);
-		un = new_un;
-	} else {
-		current->sysvsem.undo_list->add_count++;
-		un->semadj = (short *) &un[1];
-		un->semid = semid;
-		un->proc_next = undo_list->proc_list;
-		undo_list->proc_list = un;
-		un->id_next = sma->undo;
-		sma->undo = un;
+	error = sem_revalidate(semid, sma, nsems, 0);
+	if (error) {
+		sem_unlock(sma);
+		unlock_semundo();
+		kfree(new);
+		un = ERR_PTR(error);
+		goto out;
 	}
-	*unp = un;
-	return 0;
+	new->proc_next = ulp->proc_list;
+	ulp->proc_list = new;
+	new->id_next = sma->undo;
+	sma->undo = new;
+	sem_unlock(sma);
+	un = new;
+out_unlock:
+	unlock_semundo();
+out:
+	return un;
 }
 
 asmlinkage long sys_semop (int semid, struct sembuf *tsops, unsigned nsops)
@@ -1002,7 +983,7 @@ asmlinkage long sys_semtimedop(int semid, struct sembuf *tsops,
 	struct sembuf fast_sops[SEMOPM_FAST];
 	struct sembuf* sops = fast_sops, *sop;
 	struct sem_undo *un;
-	int undos = 0, decrease = 0, alter = 0;
+	int undos = 0, decrease = 0, alter = 0, max;
 	struct sem_queue queue;
 	unsigned long jiffies_left = 0;
 
@@ -1032,18 +1013,10 @@ asmlinkage long sys_semtimedop(int semid, struct sembuf *tsops,
 		}
 		jiffies_left = timespec_to_jiffies(&_timeout);
 	}
-	lock_semundo();
-	sma = sem_lock(semid);
-	error=-EINVAL;
-	if(sma==NULL)
-		goto out_semundo_free;
-	error = -EIDRM;
-	if (sem_checkid(sma,semid))
-		goto out_unlock_semundo_free;
-	error = -EFBIG;
+	max = 0;
 	for (sop = sops; sop < sops + nsops; sop++) {
-		if (sop->sem_num >= sma->sem_nsems)
-			goto out_unlock_semundo_free;
+		if (sop->sem_num >= max)
+			max = sop->sem_num;
 		if (sop->sem_flg & SEM_UNDO)
 			undos++;
 		if (sop->sem_op < 0)
@@ -1053,29 +1026,41 @@ asmlinkage long sys_semtimedop(int semid, struct sembuf *tsops,
 	}
 	alter |= decrease;
 
-	error = -EACCES;
-	if (ipcperms(&sma->sem_perm, alter ? S_IWUGO : S_IRUGO))
-		goto out_unlock_semundo_free;
-
-	error = security_sem_semop(sma, sops, nsops, alter);
-	if (error)
-		goto out_unlock_semundo_free;
-
-	error = -EACCES;		
+retry_undos:
 	if (undos) {
-		/* Make sure we have an undo structure
-		 * for this process and this semaphore set.
-		 */
-		
 		un = find_undo(semid);
-		if (!un) {
-			error = alloc_undo(sma,&un,semid,alter);
-			if (error)
-				goto out_free;
-
+		if (IS_ERR(un)) {
+			error = PTR_ERR(un);
+			goto out_free;
 		}
 	} else
 		un = NULL;
+
+	sma = sem_lock(semid);
+	error=-EINVAL;
+	if(sma==NULL)
+		goto out_free;
+	error = -EIDRM;
+	if (sem_checkid(sma,semid))
+		goto out_unlock_free;
+	/*
+	 * semid identifies are not unique - find_undo may have
+	 * allocated an undo structure, it was invalidated by an RMID
+	 * and now a new array with received the same id. Check and retry.
+	 */
+	if (un && un->semid == -1)
+		goto retry_undos;
+	error = -EFBIG;
+	if (max >= sma->sem_nsems)
+		goto out_unlock_free;
+
+	error = -EACCES;
+	if (ipcperms(&sma->sem_perm, alter ? S_IWUGO : S_IRUGO))
+		goto out_unlock_free;
+
+	error = security_sem_semop(sma, sops, nsops, alter);
+	if (error)
+		goto out_unlock_free;
 
 	error = try_atomic_semop (sma, sops, nsops, un, current->pid, 0);
 	if (error <= 0)
@@ -1096,28 +1081,24 @@ asmlinkage long sys_semtimedop(int semid, struct sembuf *tsops,
 		append_to_queue(sma ,&queue);
 	else
 		prepend_to_queue(sma ,&queue);
-	current->sysvsem.sleep_list = &queue;
 
 	for (;;) {
 		queue.status = -EINTR;
 		queue.sleeper = current;
 		current->state = TASK_INTERRUPTIBLE;
 		sem_unlock(sma);
-		unlock_semundo();
 
 		if (timeout)
 			jiffies_left = schedule_timeout(jiffies_left);
 		else
 			schedule();
 
-		lock_semundo();
 		sma = sem_lock(semid);
 		if(sma==NULL) {
 			if(queue.prev != NULL)
 				BUG();
-			current->sysvsem.sleep_list = NULL;
 			error = -EIDRM;
-			goto out_semundo_free;
+			goto out_free;
 		}
 		/*
 		 * If queue.status == 1 we where woken up and
@@ -1139,19 +1120,15 @@ asmlinkage long sys_semtimedop(int semid, struct sembuf *tsops,
 			if (queue.prev) /* got Interrupt */
 				break;
 			/* Everything done by update_queue */
-			current->sysvsem.sleep_list = NULL;
-			goto out_unlock_semundo_free;
+			goto out_unlock_free;
 		}
 	}
-	current->sysvsem.sleep_list = NULL;
 	remove_from_queue(sma,&queue);
 update:
 	if (alter)
 		update_queue (sma);
-out_unlock_semundo_free:
+out_unlock_free:
 	sem_unlock(sma);
-out_semundo_free:
-	unlock_semundo();
 out_free:
 	if(sops != fast_sops)
 		kfree(sops);
@@ -1185,21 +1162,6 @@ int copy_semundo(unsigned long clone_flags, struct task_struct *tsk)
 	return 0;
 }
 
-static inline void __exit_semundo(struct task_struct *tsk)
-{
-	struct sem_undo_list *undo_list;
-
-	undo_list = tsk->sysvsem.undo_list;
-	if (!atomic_dec_and_test(&undo_list->refcnt))
-		kfree(undo_list);
-}
-
-void exit_semundo(struct task_struct *tsk)
-{
-	if (tsk->sysvsem.undo_list != NULL)
-		__exit_semundo(tsk);
-}
-
 /*
  * add semadj values to semaphores, free undo structures.
  * undo structures are not freed when semaphore arrays are destroyed
@@ -1212,44 +1174,29 @@ void exit_semundo(struct task_struct *tsk)
  * The current implementation does not do so. The POSIX standard
  * and SVID should be consulted to determine what behavior is mandated.
  */
-void sem_exit (void)
+void exit_sem(struct task_struct *tsk)
 {
-	struct sem_queue *q;
-	struct sem_undo *u, *un = NULL, **up, **unp;
-	struct sem_array *sma;
 	struct sem_undo_list *undo_list;
-	int nsems, i;
+	struct sem_undo *u, **up;
 
-	lock_kernel();
-
-	/* If the current process was sleeping for a semaphore,
-	 * remove it from the queue.
-	 */
-	if ((q = current->sysvsem.sleep_list)) {
-		int semid = q->id;
-		sma = sem_lock(semid);
-		current->sysvsem.sleep_list = NULL;
-
-		if (q->prev) {
-			if(sma==NULL)
-				BUG();
-			remove_from_queue(q->sma,q);
-		}
-		if(sma!=NULL)
-			sem_unlock(sma);
-	}
-
-	undo_list = current->sysvsem.undo_list;
-	if ((undo_list == NULL) || (atomic_read(&undo_list->refcnt) != 1)) {
-		unlock_kernel();
+	undo_list = tsk->sysvsem.undo_list;
+	if (!undo_list)
 		return;
-	}
+
+	if (!atomic_dec_and_test(&undo_list->refcnt))
+		return;
 
 	/* There's no need to hold the semundo list lock, as current
          * is the last task exiting for this undo list.
 	 */
 	for (up = &undo_list->proc_list; (u = *up); *up = u->proc_next, kfree(u)) {
-		int semid = u->semid;
+		struct sem_array *sma;
+		int nsems, i;
+		struct sem_undo *un, **unp;
+		int semid;
+	       
+		semid = u->semid;
+
 		if(semid == -1)
 			continue;
 		sma = sem_lock(semid);
@@ -1259,15 +1206,14 @@ void sem_exit (void)
 		if (u->semid == -1)
 			goto next_entry;
 
-		if (sem_checkid(sma,u->semid))
-			goto next_entry;
+		BUG_ON(sem_checkid(sma,u->semid));
 
 		/* remove u from the sma->undo list */
 		for (unp = &sma->undo; (un = *unp); unp = &un->id_next) {
 			if (u == un)
 				goto found;
 		}
-		printk ("sem_exit undo list error id=%d\n", u->semid);
+		printk ("exit_sem undo list error id=%d\n", u->semid);
 		goto next_entry;
 found:
 		*unp = un->id_next;
@@ -1275,10 +1221,12 @@ found:
 		nsems = sma->sem_nsems;
 		for (i = 0; i < nsems; i++) {
 			struct sem * sem = &sma->sem_base[i];
-			sem->semval += u->semadj[i];
-			if (sem->semval < 0)
-				sem->semval = 0; /* shouldn't happen */
-			sem->sempid = current->pid;
+			if (u->semadj[i]) {
+				sem->semval += u->semadj[i];
+				if (sem->semval < 0)
+					sem->semval = 0; /* shouldn't happen */
+				sem->sempid = current->pid;
+			}
 		}
 		sma->sem_otime = get_seconds();
 		/* maybe some queued-up processes were waiting for this */
@@ -1286,9 +1234,7 @@ found:
 next_entry:
 		sem_unlock(sma);
 	}
-	__exit_semundo(current);
-
-	unlock_kernel();
+	kfree(undo_list);
 }
 
 #ifdef CONFIG_PROC_FS

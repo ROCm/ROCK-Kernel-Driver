@@ -39,7 +39,7 @@
 #include <asm/tlbflush.h>
 
 extern int copy_semundo(unsigned long clone_flags, struct task_struct *tsk);
-extern void exit_semundo(struct task_struct *tsk);
+extern void exit_sem(struct task_struct *tsk);
 
 /* The idle threads do not count..
  * Protected by write_lock_irq(&tasklist_lock)
@@ -1032,7 +1032,7 @@ bad_fork_cleanup_fs:
 bad_fork_cleanup_files:
 	exit_files(p); /* blocking */
 bad_fork_cleanup_semundo:
-	exit_semundo(p);
+	exit_sem(p);
 bad_fork_cleanup_security:
 	security_task_free(p);
 bad_fork_cleanup:
