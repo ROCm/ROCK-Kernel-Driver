@@ -318,12 +318,16 @@ ohci_dump_ed (struct ohci_hcd *ohci, char *label, struct ed *ed, int verbose)
 	}
 }
 
+#define DRIVERFS_DEBUG_FILES 		/* only on 2.5 versions */
+
 #else
 static inline void ohci_dump (struct ohci_hcd *controller, int verbose) {}
 
 #endif /* DEBUG */
 
 /*-------------------------------------------------------------------------*/
+
+#ifdef DRIVERFS_DEBUG_FILES
 
 static ssize_t
 show_list (struct ohci_hcd *ohci, char *buf, size_t count, struct ed *ed)
@@ -521,6 +525,13 @@ static inline void remove_debug_files (struct ohci_hcd *bus)
 	device_remove_file (bus->hcd.controller, &dev_attr_async);
 	device_remove_file (bus->hcd.controller, &dev_attr_periodic);
 }
+
+#else /* empty stubs for creating those files */
+
+static inline void create_debug_files (struct ohci_hcd *bus) { }
+static inline void remove_debug_files (struct ohci_hcd *bus) { }
+
+#endif /* DRIVERFS_DEBUG_FILES */
 
 /*-------------------------------------------------------------------------*/
 
