@@ -34,12 +34,21 @@
 #include <linux/highmem.h>
 #include <linux/time.h>
 #include <linux/pagemap.h>
+#include <linux/slab.h>
+#include <linux/poll.h>
+#include <linux/file.h>
+#include <linux/dcache.h>
 #include <asm/uaccess.h>
 
 /* Simple "sleep if unchanged" interface. */
 
 /* FIXME: This may be way too small. --RR */
 #define FUTEX_HASHBITS 6
+
+extern void send_sigio(struct fown_struct *fown, int fd, int band);
+
+/* Everyone needs a dentry and inode */
+static struct dentry *futex_dentry;
 
 /* We use this instead of a normal wait_queue_t, so we can wake only
    the relevent ones (hashed queues may be shared) */
@@ -49,6 +58,9 @@ struct futex_q {
 	/* Page struct and offset within it. */
 	struct page *page;
 	unsigned int offset;
+	/* For fd, sigio sent using these. */
+	int fd;
+	struct file *filp;
 };
 
 /* The key for the hash is the address + index + offset within page */
@@ -65,9 +77,12 @@ static inline struct list_head *hash_futex(struct page *page,
 	return &futex_queues[hash_long(h, FUTEX_HASHBITS)];
 }
 
+/* Waiter either waiting in FUTEX_WAIT or poll(), or expecting signal */
 static inline void tell_waiter(struct futex_q *q)
 {
 	wake_up_all(&q->waiters);
+	if (q->filp)
+		send_sigio(&q->filp->f_owner, q->fd, POLL_IN);
 }
 
 static inline void unpin_page(struct page *page)
@@ -103,14 +118,16 @@ static int futex_wake(struct list_head *head,
 
 /* Add at end to avoid starvation */
 static inline void queue_me(struct list_head *head,
-			    wait_queue_t *wait,
 			    struct futex_q *q,
 			    struct page *page,
-			    unsigned int offset)
+			    unsigned int offset,
+			    int fd,
+			    struct file *filp)
 {
-	add_wait_queue(&q->waiters, wait);
 	q->page = page;
 	q->offset = offset;
+	q->fd = fd;
+	q->filp = filp;
 
 	spin_lock(&futex_lock);
 	list_add_tail(&q->list, head);
@@ -164,7 +181,9 @@ static int futex_wait(struct list_head *head,
 	int ret = 0;
 
 	set_current_state(TASK_INTERRUPTIBLE);
-	queue_me(head, &wait, &q, page, offset);
+	init_waitqueue_head(&q.waiters);
+	add_wait_queue(&q.waiters, &wait);
+	queue_me(head, &q, page, offset, -1, NULL);
 
 	/* Page is pinned, but may no longer be in this address space. */
 	if (get_user(curval, uaddr) != 0) {
@@ -191,6 +210,92 @@ static int futex_wait(struct list_head *head,
 	if (!unqueue_me(&q))
 		return 0;
 	return ret;
+}
+
+static int futex_close(struct inode *inode, struct file *filp)
+{
+	struct futex_q *q = filp->private_data;
+
+	spin_lock(&futex_lock);
+	if (!list_empty(&q->list)) {
+		list_del(&q->list);
+		/* Noone can be polling on us now. */
+		BUG_ON(waitqueue_active(&q->waiters));
+	}
+	spin_unlock(&futex_lock);
+	unpin_page(q->page);
+	kfree(filp->private_data);
+	return 0;
+}
+
+/* This is one-shot: once it's gone off you need a new fd */
+static unsigned int futex_poll(struct file *filp,
+			       struct poll_table_struct *wait)
+{
+	struct futex_q *q = filp->private_data;
+	int ret = 0;
+
+	poll_wait(filp, &q->waiters, wait);
+	spin_lock(&futex_lock);
+	if (list_empty(&q->list))
+		ret = POLLIN | POLLRDNORM;
+	spin_unlock(&futex_lock);
+
+	return ret;
+}
+
+static struct file_operations futex_fops = {
+	release:	futex_close,
+	poll:		futex_poll,
+};
+
+/* Signal allows caller to avoid the race which would occur if they
+   set the sigio stuff up afterwards. */
+static int futex_fd(struct list_head *head,
+		    struct page *page,
+		    int offset,
+		    int signal)
+{
+	int fd;
+	struct futex_q *q;
+	struct file *filp;
+
+	if (signal < 0 || signal > _NSIG)
+		return -EINVAL;
+
+	fd = get_unused_fd();
+	if (fd < 0)
+		return fd;
+	filp = get_empty_filp();
+	if (!filp) {
+		put_unused_fd(fd);
+		return -ENFILE;
+	}
+	filp->f_op = &futex_fops;
+	filp->f_dentry = dget(futex_dentry);
+
+	if (signal) {
+		filp->f_owner.pid = current->pid;
+		filp->f_owner.uid = current->uid;
+		filp->f_owner.euid = current->euid;
+		filp->f_owner.signum = signal;
+	}
+
+	q = kmalloc(sizeof(*q), GFP_KERNEL);
+	if (!q) {
+		put_unused_fd(fd);
+		put_filp(filp);
+		return -ENOMEM;
+	}
+
+	/* Initialize queue structure, and add to hash table. */
+	filp->private_data = q;
+	init_waitqueue_head(&q->waiters);
+	queue_me(head, q, page, offset, fd, filp);
+
+	/* Now we map fd to filp, so userspace can access it */
+	fd_install(fd, filp);
+	return fd;
 }
 
 asmlinkage int sys_futex(void *uaddr, int op, int val, struct timespec *utime)
@@ -228,6 +333,13 @@ asmlinkage int sys_futex(void *uaddr, int op, int val, struct timespec *utime)
 	case FUTEX_WAKE:
 		ret = futex_wake(head, page, pos_in_page, val);
 		break;
+	case FUTEX_FD:
+		/* non-zero val means F_SETOWN(getpid()) & F_SETSIG(val) */
+		ret = futex_fd(head, page, pos_in_page, val);
+		if (ret >= 0)
+			/* Leave page pinned (attached to fd). */
+			return ret;
+		break;
 	default:
 		ret = -EINVAL;
 	}
@@ -236,9 +348,55 @@ asmlinkage int sys_futex(void *uaddr, int op, int val, struct timespec *utime)
 	return ret;
 }
 
+/* FIXME: Oh yeah, makes sense to write a filesystem... */
+static struct super_operations futexfs_ops = { statfs: simple_statfs };
+
+/* Don't check error returns: we're dead if they happen */
+static int futexfs_fill_super(struct super_block *sb, void *data, int silent)
+{
+	struct inode *root;
+
+	sb->s_blocksize = 1024;
+	sb->s_blocksize_bits = 10;
+	sb->s_magic = 0xBAD1DEA;
+	sb->s_op = &futexfs_ops;
+
+	root = new_inode(sb);
+	root->i_mode = S_IFDIR | S_IRUSR | S_IWUSR;
+	root->i_uid = root->i_gid = 0;
+	root->i_atime = root->i_mtime = root->i_ctime = CURRENT_TIME;
+
+	sb->s_root = d_alloc(NULL, &(const struct qstr) { "futex", 5, 0 });
+	sb->s_root->d_sb = sb;
+	sb->s_root->d_parent = sb->s_root;
+	d_instantiate(sb->s_root, root);
+
+	/* We never let this drop to zero. */
+	futex_dentry = dget(sb->s_root);
+
+	return 0;
+}
+
+static struct super_block *
+futexfs_get_sb(struct file_system_type *fs_type,
+	       int flags, char *dev_name, void *data)
+{
+	return get_sb_nodev(fs_type, flags, data, futexfs_fill_super);
+}
+
+static struct file_system_type futex_fs_type = {
+	name:		"futexfs",
+	get_sb:		futexfs_get_sb,
+	kill_sb:	kill_anon_super,
+	fs_flags:	FS_NOMOUNT,
+};
+
 static int __init init(void)
 {
 	unsigned int i;
+
+	register_filesystem(&futex_fs_type);
+	kern_mount(&futex_fs_type);
 
 	for (i = 0; i < ARRAY_SIZE(futex_queues); i++)
 		INIT_LIST_HEAD(&futex_queues[i]);
