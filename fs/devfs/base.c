@@ -2228,16 +2228,14 @@ const char *devfs_get_name (devfs_handle_t de, unsigned int *namelen)
 
 
 /**
- *	devfs_only - returns if "devfs=only" is a boot option
+ *	devfs_only - returns true if "devfs=only" is a boot option
  *
  *	If "devfs=only" this function will return 1, otherwise 0 is returned.
  */
 int devfs_only (void)
 {
-    if (boot_options & OPTION_ONLY)
-	    return 1;
-    return 0;
-}
+    return (boot_options & OPTION_ONLY) ? 1 : 0;
+}   /*  End Function devfs_only  */
 
 
 /**
@@ -2312,6 +2310,7 @@ EXPORT_SYMBOL(devfs_unregister);
 EXPORT_SYMBOL(devfs_mk_symlink);
 EXPORT_SYMBOL(devfs_mk_dir);
 EXPORT_SYMBOL(devfs_get_handle);
+EXPORT_SYMBOL(devfs_find_and_unregister);
 EXPORT_SYMBOL(devfs_get_flags);
 EXPORT_SYMBOL(devfs_set_flags);
 EXPORT_SYMBOL(devfs_get_maj_min);
@@ -2327,6 +2326,7 @@ EXPORT_SYMBOL(devfs_get_next_sibling);
 EXPORT_SYMBOL(devfs_auto_unregister);
 EXPORT_SYMBOL(devfs_get_unregister_slave);
 EXPORT_SYMBOL(devfs_get_name);
+EXPORT_SYMBOL(devfs_only);
 
 
 /**
