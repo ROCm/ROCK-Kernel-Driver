@@ -2011,16 +2011,20 @@ void reiserfs_kfree (const void * vp, size_t size, struct super_block * s)
 
 static int get_virtual_node_size (struct super_block * sb, struct buffer_head * bh)
 {
-  //  int size = sizeof (struct virtual_item); /* for new item in case of insert */
-  //  int i, nr_items;
-  //  struct item_head * ih;
+    int max_num_of_items;
+    int max_num_of_entries;
+    unsigned long blocksize = sb->s_blocksize;
 
-  // this is enough for _ALL_ currently possible cases. In 4 k block
-  // one may put < 170 empty items. Each virtual item eats 12
-  // byte. The biggest direntry item may have < 256 entries. Each
-  // entry would eat 2 byte of virtual node space
-  return sb->s_blocksize;
+#define MIN_NAME_LEN 1
 
+    max_num_of_items = (blocksize - BLKH_SIZE) / (IH_SIZE + MIN_ITEM_LEN);
+    max_num_of_entries = (blocksize - BLKH_SIZE - IH_SIZE) / 
+                         (DEH_SIZE + MIN_NAME_LEN);
+
+    return sizeof(struct virtual_node) + 
+           max(max_num_of_items * sizeof (struct virtual_item),
+	       sizeof (struct virtual_item) + sizeof(struct direntry_uarea) + 
+               (max_num_of_entries - 1) * sizeof (__u16));
 }
 
 

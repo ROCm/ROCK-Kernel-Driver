@@ -466,13 +466,6 @@ static void direntry_check_item (struct item_head * ih, char * item)
 
 #define DIRENTRY_VI_FIRST_DIRENTRY_ITEM 1
 
-struct direntry_uarea {
-    int flags;
-    __u16 entry_count;
-    __u16 entry_sizes[1];
-} __attribute__ ((__packed__)) ;
-
-
 /*
  * function returns old entry number in directory item in real node
  * using new entry number in virtual item in virtual node */
