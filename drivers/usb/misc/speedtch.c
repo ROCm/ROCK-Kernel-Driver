@@ -883,8 +883,10 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 		return -EINVAL;
 
 	/* only support AAL5 */
-	if ((vcc->qos.aal != ATM_AAL5) || (vcc->qos.rxtp.max_sdu < 0) || (vcc->qos.rxtp.max_sdu > ATM_MAX_AAL5_PDU))
+	if ((vcc->qos.aal != ATM_AAL5) || (vcc->qos.rxtp.max_sdu < 0) || (vcc->qos.rxtp.max_sdu > ATM_MAX_AAL5_PDU)) {
+		dbg ("udsl_atm_open: unsupported ATM type %d!", vcc->qos.aal);
 		return -EINVAL;
+	}
 
 	if (!instance->firmware_loaded) {
 		dbg ("udsl_atm_open: firmware not loaded!");
@@ -894,11 +896,13 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 	down (&instance->serialize); /* vs self, udsl_atm_close */
 
 	if (udsl_find_vcc (instance, vpi, vci)) {
+		dbg ("udsl_atm_open: %hd/%d already in use!", vpi, vci);
 		up (&instance->serialize);
 		return -EADDRINUSE;
 	}
 
 	if (!(new = kmalloc (sizeof (struct udsl_vcc_data), GFP_KERNEL))) {
+		dbg ("udsl_atm_open: no memory for vcc_data!");
 		up (&instance->serialize);
 		return -ENOMEM;
 	}
@@ -1216,7 +1220,7 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 
 	for (i = 0; i < num_rcv_urbs; i++)
 		if ((result = usb_unlink_urb (instance->receivers [i].urb)) < 0)
-			dbg ("udsl_usb_disconnect: usb_unlink_urb on receive urb %d returned %d", i, result);
+			dbg ("udsl_usb_disconnect: usb_unlink_urb on receive urb %d returned %d!", i, result);
 
 	/* wait for completion handlers to finish */
 	do {
@@ -1252,7 +1256,7 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 
 	for (i = 0; i < num_snd_urbs; i++)
 		if ((result = usb_unlink_urb (instance->senders [i].urb)) < 0)
-			dbg ("udsl_usb_disconnect: usb_unlink_urb on send urb %d returned %d", i, result);
+			dbg ("udsl_usb_disconnect: usb_unlink_urb on send urb %d returned %d!", i, result);
 
 	/* wait for completion handlers to finish */
 	do {
