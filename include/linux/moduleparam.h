@@ -14,10 +14,8 @@
 #endif
 
 /* Type information for a module parameter. */
-#ifndef MODULE_PARM_TYPE
 #define MODULE_PARM_TYPE(name, _type) \
 	__MODULE_INFO(parmtype, name##type, #name ":" _type)
-#endif
 
 struct kernel_param;
 
