@@ -846,6 +846,13 @@ static int snd_ensoniq_playback1_prepare(snd_pcm_substream_t * substream)
 		mode |= 0x01;
 	spin_lock_irq(&ensoniq->reg_lock);
 	ensoniq->ctrl &= ~ES_DAC1_EN;
+#ifdef CHIP1371
+	/* 48k doesn't need SRC (it breaks AC3-passthru) */
+	if (runtime->rate == 48000)
+		ensoniq->ctrl |= ES_1373_BYPASS_P1;
+	else
+		ensoniq->ctrl &= ~ES_1373_BYPASS_P1;
+#endif
 	outl(ensoniq->ctrl, ES_REG(ensoniq, CONTROL));
 	outl(ES_MEM_PAGEO(ES_PAGE_DAC), ES_REG(ensoniq, MEM_PAGE));
 	outl(runtime->dma_addr, ES_REG(ensoniq, DAC1_FRAME));
