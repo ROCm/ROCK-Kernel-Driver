@@ -2087,6 +2087,15 @@ static int attempt_merge(request_queue_t *q, struct request *req,
 	if (!q->merge_requests_fn(q, req, next))
 		return 0;
 
+	/*
+	 * At this point we have either done a back merge
+	 * or front merge. We need the smaller start_time of
+	 * the merged requests to be the current request
+	 * for accounting purposes.
+	 */
+	if (time_after(req->start_time, next->start_time))
+		req->start_time = next->start_time;
+
 	req->biotail->bi_next = next->bio;
 	req->biotail = next->biotail;
 
