@@ -442,7 +442,7 @@ int __log_space_left(journal_t *journal)
 /*
  * Called under j_state_lock.
  */
-static tid_t __log_start_commit(journal_t *journal, transaction_t *transaction)
+tid_t __log_start_commit(journal_t *journal, transaction_t *transaction)
 {
 	tid_t target = journal->j_commit_request;
 

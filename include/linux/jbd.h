@@ -991,6 +991,7 @@ extern void	journal_switch_revoke_table(journal_t *journal);
 
 int __log_space_left(journal_t *); /* Called with journal locked */
 extern tid_t	log_start_commit (journal_t *, transaction_t *);
+extern tid_t	__log_start_commit(journal_t *, transaction_t *);
 extern int	log_wait_commit (journal_t *, tid_t);
 extern int	log_do_checkpoint (journal_t *, int);
 

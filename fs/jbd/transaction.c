@@ -171,12 +171,12 @@ repeat:
 		 */
 		DEFINE_WAIT(wait);
 
-		spin_unlock(&transaction->t_handle_lock);
-		spin_unlock(&journal->j_state_lock);
 		jbd_debug(2, "Handle %p starting new commit...\n", handle);
+		spin_unlock(&transaction->t_handle_lock);
 		prepare_to_wait(&journal->j_wait_transaction_locked, &wait,
 				TASK_UNINTERRUPTIBLE);
-		log_start_commit(journal, transaction);
+		__log_start_commit(journal, transaction);
+		spin_unlock(&journal->j_state_lock);
 		schedule();
 		finish_wait(&journal->j_wait_transaction_locked, &wait);
 		goto repeat;
