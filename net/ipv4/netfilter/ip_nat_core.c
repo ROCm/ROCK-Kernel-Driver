@@ -894,7 +894,7 @@ icmp_reply_translation(struct sk_buff *skb,
 	/* Note: May not be from a NAT'd host, but probably safest to
 	   do translation always as if it came from the host itself
 	   (even though a "host unreachable" coming from the host
-	   itself is a bit wierd).
+	   itself is a bit weird).
 
 	   More explanation: some people use NAT for anonymizing.
 	   Also, CERT recommends dropping all packets from private IP

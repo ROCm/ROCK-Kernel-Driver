@@ -285,7 +285,7 @@ static inline void cpu_probe(void)
 			mips_cpu.isa_level = MIPS_CPU_ISA_IV;
 			mips_cpu.options = MIPS_CPU_TLB | MIPS_CPU_4KEX |
 				           MIPS_CPU_FPU | MIPS_CPU_32FPR;
-			mips_cpu.tlbsize = 384;      /* has wierd TLB: 3-way x 128 */
+			mips_cpu.tlbsize = 384;      /* has weird TLB: 3-way x 128 */
 			break;
 		case PRID_IMP_R10000:
 			mips_cpu.cputype = CPU_R10000;

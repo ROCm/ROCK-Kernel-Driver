@@ -1381,7 +1381,7 @@ int esp_abort(Scsi_Cmnd *SCptr)
 	don = esp->dma_ports_p(esp);
 	if(don) {
 		esp->dma_ints_off(esp);
-		synchronize_irq();
+		synchronize_irq(esp->irq);
 	}
 	if(esp->issue_SC) {
 		Scsi_Cmnd **prev, *this;

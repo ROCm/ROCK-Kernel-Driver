@@ -442,17 +442,17 @@ static snd_pcm_hardware_t snd_pmac_playback =
 			 SNDRV_PCM_INFO_MMAP |
 			 SNDRV_PCM_INFO_MMAP_VALID |
 			 SNDRV_PCM_INFO_RESUME),
-	formats:	SNDRV_PCM_FMTBIT_S16_BE | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:		SNDRV_PCM_RATE_8000_44100,
-	rate_min:	7350,
-	rate_max:	44100,
-	channels_min:	2,
-	channels_max:	2,
-	buffer_bytes_max:	32768,
-	period_bytes_min:	256,
-	period_bytes_max:	16384,
-	periods_min:		1,
-	periods_max:		PMAC_MAX_FRAGS,
+	.formats	= SNDRV_PCM_FMTBIT_S16_BE | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates		= SNDRV_PCM_RATE_8000_44100,
+	.rate_min	= 7350,
+	.rate_max	= 44100,
+	.channels_min	= 2,
+	.channels_max	= 2,
+	.buffer_bytes_max	= 32768,
+	.period_bytes_min	= 256,
+	.period_bytes_max	= 16384,
+	.periods_min		= 1,
+	.periods_max		= PMAC_MAX_FRAGS,
 };
 
 static snd_pcm_hardware_t snd_pmac_capture =
@@ -461,17 +461,17 @@ static snd_pcm_hardware_t snd_pmac_capture =
 			 SNDRV_PCM_INFO_MMAP |
 			 SNDRV_PCM_INFO_MMAP_VALID |
 			 SNDRV_PCM_INFO_RESUME),
-	formats:	SNDRV_PCM_FMTBIT_S16_BE | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:		SNDRV_PCM_RATE_8000_44100,
-	rate_min:	7350,
-	rate_max:	44100,
-	channels_min:	2,
-	channels_max:	2,
-	buffer_bytes_max:	32768,
-	period_bytes_min:	256,
-	period_bytes_max:	16384,
-	periods_min:		1,
-	periods_max:		PMAC_MAX_FRAGS,
+	.formats	= SNDRV_PCM_FMTBIT_S16_BE | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates		= SNDRV_PCM_RATE_8000_44100,
+	.rate_min	= 7350,
+	.rate_max	= 44100,
+	.channels_min	= 2,
+	.channels_max	= 2,
+	.buffer_bytes_max	= 32768,
+	.period_bytes_min	= 256,
+	.period_bytes_max	= 16384,
+	.periods_min		= 1,
+	.periods_max		= PMAC_MAX_FRAGS,
 };
 
 
@@ -628,25 +628,25 @@ static int snd_pmac_capture_close(snd_pcm_substream_t *subs)
  */
 
 static snd_pcm_ops_t snd_pmac_playback_ops = {
-	open:		snd_pmac_playback_open,
-	close:		snd_pmac_playback_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_pmac_pcm_hw_params,
-	hw_free:	snd_pmac_pcm_hw_free,
-	prepare:	snd_pmac_playback_prepare,
-	trigger:	snd_pmac_playback_trigger,
-	pointer:	snd_pmac_playback_pointer,
+	.open		= snd_pmac_playback_open,
+	.close		= snd_pmac_playback_close,
+	.ioctl		= snd_pcm_lib_ioctl,
+	.hw_params	= snd_pmac_pcm_hw_params,
+	.hw_free	= snd_pmac_pcm_hw_free,
+	.prepare	= snd_pmac_playback_prepare,
+	.trigger	= snd_pmac_playback_trigger,
+	.pointer	= snd_pmac_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_pmac_capture_ops = {
-	open:		snd_pmac_capture_open,
-	close:		snd_pmac_capture_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_pmac_pcm_hw_params,
-	hw_free:	snd_pmac_pcm_hw_free,
-	prepare:	snd_pmac_capture_prepare,
-	trigger:	snd_pmac_capture_trigger,
-	pointer:	snd_pmac_capture_pointer,
+	.open		= snd_pmac_capture_open,
+	.close		= snd_pmac_capture_close,
+	.ioctl		= snd_pcm_lib_ioctl,
+	.hw_params	= snd_pmac_pcm_hw_params,
+	.hw_free	= snd_pmac_pcm_hw_free,
+	.prepare	= snd_pmac_capture_prepare,
+	.trigger	= snd_pmac_capture_trigger,
+	.pointer	= snd_pmac_capture_pointer,
 };
 
 static void pmac_pcm_free(snd_pcm_t *pcm)
@@ -871,12 +871,12 @@ static int snd_pmac_put_beep(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *uco
 }
 
 static snd_kcontrol_new_t snd_pmac_beep_mixer = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Beep Playback Volume",
-	index: 0,
-	info: snd_pmac_info_beep,
-	get: snd_pmac_get_beep,
-	put: snd_pmac_put_beep,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Beep Playback Volume",
+	.index = 0,
+	.info = snd_pmac_info_beep,
+	.get = snd_pmac_get_beep,
+	.put = snd_pmac_put_beep,
 };
 
 static void snd_pmac_beep_free(snd_kcontrol_t *control)
@@ -1271,17 +1271,17 @@ static int pmac_hp_detect_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *uc
 }
 
 static snd_kcontrol_new_t auto_mute_controls[] __initdata = {
-	{ iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	  name: "Auto Mute Switch",
-	  info: snd_pmac_boolean_mono_info,
-	  get: pmac_auto_mute_get,
-	  put: pmac_auto_mute_put,
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "Auto Mute Switch",
+	  .info = snd_pmac_boolean_mono_info,
+	  .get = pmac_auto_mute_get,
+	  .put = pmac_auto_mute_put,
 	},
-	{ iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	  name: "Headphone Detection",
-	  access: SNDRV_CTL_ELEM_ACCESS_READ,
-	  info: snd_pmac_boolean_mono_info,
-	  get: pmac_hp_detect_get,
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "Headphone Detection",
+	  .access = SNDRV_CTL_ELEM_ACCESS_READ,
+	  .info = snd_pmac_boolean_mono_info,
+	  .get = pmac_hp_detect_get,
 	},
 };
 
@@ -1306,7 +1306,7 @@ int __init snd_pmac_new(snd_card_t *card, pmac_t **chip_return)
 	struct device_node *np;
 	int i, err;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_pmac_dev_free,
+		.dev_free	= snd_pmac_dev_free,
 	};
 
 	snd_runtime_check(chip_return, return -EINVAL);

@@ -165,10 +165,10 @@ static int snd_pmac_awacs_put_volume(snd_kcontrol_t *kcontrol, snd_ctl_elem_valu
 
 
 #define AWACS_VOLUME(xname, xreg, xshift) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: 0, \
-  info: snd_pmac_awacs_info_volume, \
-  get: snd_pmac_awacs_get_volume, \
-  put: snd_pmac_awacs_put_volume, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: 0, \
+  .info = snd_pmac_awacs_info_volume, \
+  .get = snd_pmac_awacs_get_volume, \
+  .put = snd_pmac_awacs_put_volume, \
   private_value: (xreg) | ((xshift) << 8) }
 
 /*
@@ -214,10 +214,10 @@ static int snd_pmac_awacs_put_switch(snd_kcontrol_t *kcontrol, snd_ctl_elem_valu
 }
 
 #define AWACS_SWITCH(xname, xreg, xshift, xinvert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: 0, \
-  info: snd_pmac_boolean_mono_info, \
-  get: snd_pmac_awacs_get_switch, \
-  put: snd_pmac_awacs_put_switch, \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: 0, \
+  .info = snd_pmac_boolean_mono_info, \
+  .get = snd_pmac_awacs_get_switch, \
+  .put = snd_pmac_awacs_put_switch, \
   private_value: (xreg) | ((xshift) << 8) | ((xinvert) << 16) }
 
 
@@ -422,58 +422,58 @@ static int snd_pmac_awacs_put_master_amp(snd_kcontrol_t *kcontrol, snd_ctl_elem_
 #define AMP_CH_HD	1
 
 static snd_kcontrol_new_t snd_pmac_awacs_amp_vol[] __initdata = {
-	{ iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	  name: "PC Speaker Playback Volume",
-	  info: snd_pmac_awacs_info_volume_amp,
-	  get: snd_pmac_awacs_get_volume_amp,
-	  put: snd_pmac_awacs_put_volume_amp,
-	  private_value: AMP_CH_SPK,
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "PC Speaker Playback Volume",
+	  .info = snd_pmac_awacs_info_volume_amp,
+	  .get = snd_pmac_awacs_get_volume_amp,
+	  .put = snd_pmac_awacs_put_volume_amp,
+	  .private_value = AMP_CH_SPK,
 	},
-	{ iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	  name: "Headphone Playback Volume",
-	  info: snd_pmac_awacs_info_volume_amp,
-	  get: snd_pmac_awacs_get_volume_amp,
-	  put: snd_pmac_awacs_put_volume_amp,
-	  private_value: AMP_CH_HD,
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "Headphone Playback Volume",
+	  .info = snd_pmac_awacs_info_volume_amp,
+	  .get = snd_pmac_awacs_get_volume_amp,
+	  .put = snd_pmac_awacs_put_volume_amp,
+	  .private_value = AMP_CH_HD,
 	},
-	{ iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	  name: "Tone Control - Bass",
-	  info: snd_pmac_awacs_info_tone_amp,
-	  get: snd_pmac_awacs_get_tone_amp,
-	  put: snd_pmac_awacs_put_tone_amp,
-	  private_value: 0,
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "Tone Control - Bass",
+	  .info = snd_pmac_awacs_info_tone_amp,
+	  .get = snd_pmac_awacs_get_tone_amp,
+	  .put = snd_pmac_awacs_put_tone_amp,
+	  .private_value = 0,
 	},
-	{ iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	  name: "Tone Control - Treble",
-	  info: snd_pmac_awacs_info_tone_amp,
-	  get: snd_pmac_awacs_get_tone_amp,
-	  put: snd_pmac_awacs_put_tone_amp,
-	  private_value: 1,
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "Tone Control - Treble",
+	  .info = snd_pmac_awacs_info_tone_amp,
+	  .get = snd_pmac_awacs_get_tone_amp,
+	  .put = snd_pmac_awacs_put_tone_amp,
+	  .private_value = 1,
 	},
-	{ iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	  name: "Amp Master Playback Volume",
-	  info: snd_pmac_awacs_info_master_amp,
-	  get: snd_pmac_awacs_get_master_amp,
-	  put: snd_pmac_awacs_put_master_amp,
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "Amp Master Playback Volume",
+	  .info = snd_pmac_awacs_info_master_amp,
+	  .get = snd_pmac_awacs_get_master_amp,
+	  .put = snd_pmac_awacs_put_master_amp,
 	},
 };
 
 static snd_kcontrol_new_t snd_pmac_awacs_amp_hp_sw __initdata = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Headphone Playback Switch",
-	info: snd_pmac_boolean_stereo_info,
-	get: snd_pmac_awacs_get_switch_amp,
-	put: snd_pmac_awacs_put_switch_amp,
-	private_value: AMP_CH_HD,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Headphone Playback Switch",
+	.info = snd_pmac_boolean_stereo_info,
+	.get = snd_pmac_awacs_get_switch_amp,
+	.put = snd_pmac_awacs_put_switch_amp,
+	.private_value = AMP_CH_HD,
 };
 
 static snd_kcontrol_new_t snd_pmac_awacs_amp_spk_sw __initdata = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "PC Speaker Playback Switch",
-	info: snd_pmac_boolean_stereo_info,
-	get: snd_pmac_awacs_get_switch_amp,
-	put: snd_pmac_awacs_put_switch_amp,
-	private_value: AMP_CH_SPK,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "PC Speaker Playback Switch",
+	.info = snd_pmac_boolean_stereo_info,
+	.get = snd_pmac_awacs_get_switch_amp,
+	.put = snd_pmac_awacs_put_switch_amp,
+	.private_value = AMP_CH_SPK,
 };
 
 #endif /* PMAC_AMP_AVAIL */
@@ -556,11 +556,11 @@ static snd_kcontrol_new_t snd_pmac_awacs_mic_boost[] __initdata = {
 };
 
 static snd_kcontrol_new_t snd_pmac_screamer_mic_boost[] __initdata = {
-	{ iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	  name: "Mic Boost",
-	  info: snd_pmac_screamer_mic_boost_info,
-	  get: snd_pmac_screamer_mic_boost_get,
-	  put: snd_pmac_screamer_mic_boost_put,
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "Mic Boost",
+	  .info = snd_pmac_screamer_mic_boost_info,
+	  .get = snd_pmac_screamer_mic_boost_get,
+	  .put = snd_pmac_screamer_mic_boost_put,
 	},
 };
 

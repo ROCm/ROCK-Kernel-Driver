@@ -150,10 +150,10 @@ static int proc_dma_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations proc_dma_operations = {
-	open:		proc_dma_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	single_release,
+	.open		= proc_dma_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
 };
 
 static int __init proc_dma_init(void)

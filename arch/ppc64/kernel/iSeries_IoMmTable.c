@@ -130,7 +130,7 @@ static void iSeries_IoMmTable_AllocateEntry(struct pci_dev* PciDev, int BarNumbe
 /*   The HvCallPci_getBarParms is used to get the size of the BAR  */
 /*   space.  It calls iSeries_IoMmTable_AllocateEntry to allocate  */
 /*   each entry.                                                   */
-/* - Loops through The Bar resourses(0 - 5) including the the ROM  */
+/* - Loops through The Bar resources(0 - 5) including the ROM      */
 /*   is resource(6).                                               */
 /*******************************************************************/
 void iSeries_allocateDeviceBars(struct pci_dev* PciDev)
