@@ -158,7 +158,7 @@ extern void atyfb_imageblit(struct fb_info *info, struct fb_image *image);
 static int atyfb_mmap(struct fb_info *info, struct file *file,
 		      struct vm_area_struct *vma);
 #endif
-static int atyfb_rasterimg(struct fb_info *info, int start);
+static int atyfb_sync(struct fb_info *info);
 
     /*
      *  Internal routines
@@ -1126,7 +1126,7 @@ static int atyfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 	return 0;
 }
 
-static int atyfb_rasterimg(struct fb_info *info, int start)
+static int atyfb_sync(struct fb_info *info)
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 

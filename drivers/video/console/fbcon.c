@@ -929,73 +929,69 @@ static void fbcon_putcs(struct vc_data *conp, const unsigned short *s, int count
 	    vbl_cursor_cnt = CURSOR_DRAW_DELAY;
 }
 
-
 static void fbcon_cursor(struct vc_data *conp, int mode)
 {
-    int unit = conp->vc_num;
-    struct display *p = &fb_display[unit];
-    int y = conp->vc_y;
-    
-    if (mode & CM_SOFTBACK) {
-    	mode &= ~CM_SOFTBACK;
-    	if (softback_lines) {
-    	    if (y + softback_lines >= conp->vc_rows)
-    		mode = CM_ERASE;
-    	    else
-    	        y += softback_lines;
-    	}
-    } else if (softback_lines)
-        fbcon_set_origin(conp);
-
-    /* do we have a hardware cursor ? */
-    if (p->dispsw->cursor) {
+	int unit = conp->vc_num;
+	struct display *p = &fb_display[unit];
+	int y = conp->vc_y;
+	
+	if (mode & CM_SOFTBACK) {
+		mode &= ~CM_SOFTBACK;
+		if (softback_lines) {
+			if (y + softback_lines >= conp->vc_rows)
+				mode = CM_ERASE;
+			else
+				y += softback_lines;
+		}
+	} else if (softback_lines)
+		fbcon_set_origin(conp);
+	
+	/* Avoid flickering if there's no real change. */
+	if (p->cursor_x == conp->vc_x && p->cursor_y == y &&
+	    (mode == CM_ERASE) == !cursor_on)
+		return;
+	
+	cursor_on = 0;
+	if (cursor_drawn) 
+		p->dispsw->cursor(p, 0, p->cursor_x, real_y(p, p->cursor_y));
+	
 	p->cursor_x = conp->vc_x;
 	p->cursor_y = y;
-	p->dispsw->cursor(p, mode, p->cursor_x, real_y(p, p->cursor_y));
-	return;
-    }
+	p->cursor_pos = conp->vc_pos;
 
-    /* Avoid flickering if there's no real change. */
-    if (p->cursor_x == conp->vc_x && p->cursor_y == y &&
-	(mode == CM_ERASE) == !cursor_on)
-	return;
-
-    cursor_on = 0;
-    if (cursor_drawn)
-        p->dispsw->revc(p, p->cursor_x, real_y(p, p->cursor_y));
-
-    p->cursor_x = conp->vc_x;
-    p->cursor_y = y;
-
-    switch (mode) {
+	switch (mode) {
         case CM_ERASE:
-            cursor_drawn = 0;
-            break;
+		cursor_drawn = 0;
+		break;
         case CM_MOVE:
         case CM_DRAW:
-            if (cursor_drawn)
-	        p->dispsw->revc(p, p->cursor_x, real_y(p, p->cursor_y));
-            vbl_cursor_cnt = CURSOR_DRAW_DELAY;
-            cursor_on = 1;
-            break;
+		if (cursor_drawn)
+			p->dispsw->cursor(p, FB_CUR_SETCUR, p->cursor_x, real_y(p, p->cursor_y));
+		vbl_cursor_cnt = CURSOR_DRAW_DELAY;
+		cursor_on = 1;
+		break;
         }
+	
 }
-
 
 static void fbcon_vbl_handler(int irq, void *dummy, struct pt_regs *fp)
 {
-    struct display *p;
-
-    if (!cursor_on)
-	return;
-
-    if (vbl_cursor_cnt && --vbl_cursor_cnt == 0) {
-	p = &fb_display[fg_console];
-	if (p->dispsw->revc)
-		p->dispsw->revc(p, p->cursor_x, real_y(p, p->cursor_y));
-	cursor_drawn ^= 1;
-	vbl_cursor_cnt = cursor_blink_rate;
-    }
+	struct display *p;
+	
+	if (!cursor_on)
+		return;
+	
+	if (vbl_cursor_cnt && --vbl_cursor_cnt == 0) {
+		int flag;
+	    
+		p = &fb_display[fg_console];
+		flag = 0;
+		if (!cursor_drawn) 
+			flag = FB_CUR_SETCUR;
+		p->dispsw->cursor(p, flag, p->cursor_x, real_y(p, p->cursor_y));
+		cursor_drawn ^= 1;
+		vbl_cursor_cnt = cursor_blink_rate;
+	}
 }
 
 static int scrollback_phys_max = 0;

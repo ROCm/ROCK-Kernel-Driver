@@ -284,6 +284,12 @@ static int xxxfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 }
 
 /**
+ *	xxxfb_cursor -
+ *
+ *	Returns negative errno on error, or zero on success.
+ */
+
+/**
  *      xxxfb_pan_display - NOT a required function. Pans the display.
  *      @var: frame buffer variable screen structure
  *      @info: frame buffer structure that represents a single frame buffer

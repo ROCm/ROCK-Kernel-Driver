@@ -36,7 +36,7 @@ struct display_switch {
     void (*putcs)(struct vc_data *conp, struct display *p, const unsigned short *s,
 		  int count, int yy, int xx);     
     void (*revc)(struct display *p, int xx, int yy);
-    void (*cursor)(struct display *p, int mode, int xx, int yy);
+    void (*cursor)(struct display *p, int flags, int xx, int yy);
     int  (*set_font)(struct display *p, int width, int height);
     void (*clear_margins)(struct vc_data *conp, struct display *p,
 			  int bottom_only);
@@ -69,6 +69,7 @@ struct display {
     int vrows;                      /* number of virtual rows */
     unsigned short cursor_x;        /* current cursor position */
     unsigned short cursor_y;
+    unsigned long cursor_pos;
     int fgcol;                      /* text colors */
     int bgcol;
     u_long next_line;               /* offset to one line below */

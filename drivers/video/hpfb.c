@@ -105,6 +105,7 @@ static struct fb_ops hpfb_ops = {
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= hpfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
+	.fb_cursor	= cfb_cursor,
 };
 
 #define TOPCAT_FBOMSB	0x5d

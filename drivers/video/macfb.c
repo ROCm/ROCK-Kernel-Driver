@@ -589,6 +589,7 @@ static struct fb_ops macfb_ops = {
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
+	.fb_cursor	= cfb_cursor,
 };
 
 void __init macfb_setup(char *options, int *ints)

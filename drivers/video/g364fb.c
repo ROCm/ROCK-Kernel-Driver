@@ -111,6 +111,7 @@ static int g364fb_pan_display(struct fb_var_screeninfo *var,
 static int g364fb_setcolreg(u_int regno, u_int red, u_int green,
 			    u_int blue, u_int transp,
 			    struct fb_info *info);
+static int g364fb_cursor(struct fb_info *info, struct fb_cursor *cursor);
 static int g364fb_blank(int blank, struct fb_info *info);
 
 static struct fb_ops g364fb_ops = {
@@ -121,11 +122,13 @@ static struct fb_ops g364fb_ops = {
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
+	.fb_cursor	= g364fb_cursor,
 };
 
-void fbcon_g364fb_cursor(struct display *p, int mode, int x, int y)
+int g364fb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
-	switch (mode) {
+	
+	switch (cursor->enable) {
 	case CM_ERASE:
 		*(unsigned int *) CTLA_REG |= CURS_TOGGLE;
 		break;
@@ -135,9 +138,10 @@ void fbcon_g364fb_cursor(struct display *p, int mode, int x, int y)
 		*(unsigned int *) CTLA_REG &= ~CURS_TOGGLE;
 		*(unsigned int *) CURS_POS_REG =
 		    ((x * fontwidth(p)) << 12) | ((y * fontheight(p)) -
-						  p->var.yoffset);
+						  info->var.yoffset);
 		break;
 	}
+	return 0;
 }
 
 /*

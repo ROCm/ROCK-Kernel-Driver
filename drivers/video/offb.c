@@ -86,6 +86,7 @@ static struct fb_ops offb_ops = {
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
+	.fb_cursor	= cfb_cursor,
 };
 
     /*

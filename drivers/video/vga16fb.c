@@ -1054,6 +1054,7 @@ static struct fb_ops vga16fb_ops = {
 	.fb_pan_display = vga16fb_pan_display,
 	.fb_blank 	= vga16fb_blank,
 	.fb_imageblit	= vga16fb_imageblit,
+	.fb_cursor	= cfb_cursor,
 };
 
 int vga16fb_setup(char *options)

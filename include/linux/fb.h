@@ -222,6 +222,11 @@ struct fb_cmap {
 	__u16 *transp;			/* transparency, can be NULL */
 };
 
+struct fb_index {
+	__u32 len;                      /* number of entries */
+	__u32 *entry;                   /* "pseudopalette" color index entries */
+};
+
 struct fb_con2fbmap {
 	__u32 console;
 	__u32 framebuffer;
@@ -268,7 +273,9 @@ struct fb_vblank {
 #define FB_CUR_SETHOT   0x04
 #define FB_CUR_SETCMAP  0x08
 #define FB_CUR_SETSHAPE 0x10
-#define FB_CUR_SETALL   0x1F
+#define FB_CUR_SETDEST	0x20
+#define FB_CUR_SETSIZE	0x40
+#define FB_CUR_SETALL   0xFF
 
 struct fbcurpos {
 	__u16 x, y;
@@ -277,12 +284,16 @@ struct fbcurpos {
 struct fbcursor {
 	__u16 set;		/* what to set */
 	__u16 enable;		/* cursor on/off */
+	__u8 rop;		/* bitop operation */
+	__u8 depth;		/* color depth of image */		
 	struct fbcurpos pos;	/* cursor position */
 	struct fbcurpos hot;	/* cursor hot spot */
-	struct fb_cmap cmap;	/* color map info */
 	struct fbcurpos size;	/* cursor bit map size */
+	struct fb_cmap cmap;	/* color map info */
+	struct fb_index *index;		
 	char *image;		/* cursor image bits */
 	char *mask;		/* cursor mask bits */
+	char *dest;		/* destination */
 };
 
 /* Internal HW accel */
@@ -314,7 +325,7 @@ struct fb_image {
 	__u32 height;
 	__u32 fg_color;	/* Only used when a mono bitmap */
 	__u32 bg_color;
-	__u8  depth;	/* Dpeth of the image */
+	__u8  depth;	/* Depth of the image */
 	char  *data;	/* Pointer to image data */
 };
 
@@ -351,8 +362,6 @@ struct fb_ops {
     int (*fb_check_var)(struct fb_var_screeninfo *var, struct fb_info *info);
     /* set the video mode according to par */
     int (*fb_set_par)(struct fb_info *info);
-    /* cursor control */
-    int (*fb_cursor)(struct fb_info *info, struct fbcursor *cursor);		
     /* set color register */
     int (*fb_setcolreg)(unsigned regno, unsigned red, unsigned green,
                         unsigned blue, unsigned transp, struct fb_info *info);
@@ -366,6 +375,8 @@ struct fb_ops {
     void (*fb_copyarea)(struct fb_info *info, struct fb_copyarea *region); 
     /* Draws a image to the display */
     void (*fb_imageblit)(struct fb_info *info, struct fb_image *image);
+    /* Draws cursor */
+    int (*fb_cursor)(struct fb_info *info, struct fbcursor *cursor);
     /* perform polling on fb device */
     int (*fb_poll)(struct fb_info *info, poll_table *wait);
     /* wait for blit idle, optional */
@@ -451,6 +462,7 @@ struct fb_info {
 extern int fb_set_var(struct fb_var_screeninfo *var, struct fb_info *info); 
 extern int fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info); 
 extern int fb_blank(int blank, struct fb_info *info);
+extern int cfb_cursor(struct fb_info *info, struct fbcursor *cursor);
 extern void cfb_fillrect(struct fb_info *info, struct fb_fillrect *rect); 
 extern void cfb_copyarea(struct fb_info *info, struct fb_copyarea *area); 
 extern void cfb_imageblit(struct fb_info *info, struct fb_image *image);

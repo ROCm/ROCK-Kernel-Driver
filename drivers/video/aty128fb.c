@@ -234,7 +234,6 @@ static struct fb_fix_screeninfo aty128fb_fix __initdata = {
 	.accel		= FB_ACCEL_ATI_RAGE128,
 };
 
-static const char *aty128fb_name = "ATY Rage128";
 static char fontname[40] __initdata = { 0 };
 
 static int  noaccel __initdata = 0;
@@ -360,7 +359,7 @@ static int aty128fb_pan_display(struct fb_var_screeninfo *var, int con,
 static int aty128fb_blank(int blank, struct fb_info *fb);
 static int aty128fb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 			  u_long arg, int con, struct fb_info *info);
-static int aty128fb_rasterimg(struct fb_info *info, int start);
+static int aty128fb_sync(struct fb_info *info);
 
     /*
      *  Interface to the low level console driver
@@ -397,22 +396,21 @@ static struct fb_ops aty128fb_ops = {
 	.fb_set_var	= gen_set_var,
 	.fb_check_var	= aty128fb_check_var,
 	.fb_set_par	= aty128fb_set_par,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= aty128fb_setcolreg,
 	.fb_pan_display = aty128fb_pan_display,
 	.fb_blank	= aty128fb_blank,
 	.fb_ioctl	= aty128fb_ioctl,
+	.fb_sync	= aty128fb_sync,
 #if 0
 	.fb_fillrect	= aty128fb_fillrect,
 	.fb_copyarea	= aty128fb_copyarea,
 	.fb_imageblit	= aty128fb_imageblit,
-	.fb_rasterimg	= aty128fb_rasterimg,
 #else
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
 #endif
+	.fb_cursor	= cfb_cursor,
 };
 
 #ifdef CONFIG_PMAC_BACKLIGHT
@@ -1398,16 +1396,14 @@ aty128_st_pal(u_int regno, u_int red, u_int green, u_int blue,
 }
 
 static int
-aty128fb_rasterimg(struct fb_info *info, int start)
+aty128fb_sync(struct fb_info *info)
 {
 	struct aty128fb_par *par = info->par;
 
 	if (par->blitter_may_be_busy)
 		wait_for_idle(par);
-
 	return 0;
 }
-
 
 int __init
 aty128fb_setup(char *options)
@@ -1507,13 +1503,8 @@ aty128_init(struct fb_info *info, const char *name)
 		printk("%dk %s\n", par->vram_size / 1024, par->mem->name);
 
 	/* fill in info */
-	strcpy(info->modename, aty128fb_name);
 	info->node  = NODEV;
 	info->fbops = &aty128fb_ops;
-	strcpy(info->fontname, fontname);
-	info->changevar  = NULL;
-	info->switch_con = gen_switch;
-	info->updatevar  = gen_update_var;
 	info->flags = FBINFO_FLAG_DEFAULT;
 
 #ifdef CONFIG_PMAC_PBOOK
@@ -1591,10 +1582,8 @@ aty128_init(struct fb_info *info, const char *name)
 
 	info->var = var;
 	fb_alloc_cmap(&info->cmap, 256, 0);
-	gen_set_disp(-1, info);
 
 	var.activate = FB_ACTIVATE_NOW;
-	gen_set_var(&var, -1, info);
 
 	aty128_init_engine(par);
 
@@ -1616,7 +1605,7 @@ aty128_init(struct fb_info *info, const char *name)
 #endif
 
 	printk(KERN_INFO "fb%d: %s frame buffer device on %s\n",
-	       GET_FB_IDX(info->node), aty128fb_name, name);
+	       GET_FB_IDX(info->node), info->fix.id, name);
 
 	return 1;	/* success! */
 }
@@ -1693,7 +1682,6 @@ aty128_pci_register(struct pci_dev *pdev,
 	info->par = par;
 	info->disp = &lump->disp;
 	info->fix = aty128fb_fix;
-	info->currcon = -1;
 	info->pseudo_palette = lump->pseudo_palette;
 
 	par->pdev = pdev;

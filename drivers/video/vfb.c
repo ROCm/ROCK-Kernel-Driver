@@ -93,14 +93,15 @@ static int vfb_mmap(struct fb_info *info, struct file *file,
 		    struct vm_area_struct *vma);
 
 static struct fb_ops vfb_ops = {
-	.fb_check_var	vfb_check_var,
-	.fb_set_par	vfb_set_par,
-	.fb_setcolreg	vfb_setcolreg,
-	.fb_pan_display	vfb_pan_display,
-	.fb_fillrect	cfb_fillrect,
-	.fb_copyarea	cfb_copyarea,
-	.fb_imageblit	cfb_imageblit,
-	.fb_mmap	vfb_mmap,
+	.fb_check_var	= vfb_check_var,
+	.fb_set_par	= vfb_set_par,
+	.fb_setcolreg	= vfb_setcolreg,
+	.fb_pan_display	= vfb_pan_display,
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= cfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,
+	.fb_cursor	= cfb_cursor,
+	.fb_mmap	= vfb_mmap,
 };
 
     /*

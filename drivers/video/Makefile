@@ -11,6 +11,7 @@ export-objs    	:= fbmem.o fbcmap.o fbgen.o fbmon.o modedb.o cyber2000fb.o
 
 obj-$(CONFIG_AGP)		  += agp/
 obj-$(CONFIG_DRM)		  += drm/
+obj-$(CONFIG_VT)		  += console/
 
 # Add fbmon.o back into obj-$(CONFIG_FB) in 2.5.x
 obj-$(CONFIG_FB)                  += fbmem.o fbcmap.o modedb.o fbgen.o

@@ -70,6 +70,7 @@ static struct fb_ops q40fb_ops = {
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
+	.fb_cursor	= cfb_cursor,
 };
 
 static int q40fb_setcolreg(unsigned regno, unsigned red, unsigned green,

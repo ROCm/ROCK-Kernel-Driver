@@ -1393,6 +1393,7 @@ static struct fb_ops neofb_ops = {
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
+	.fb_cursor	= cfb_cursor,
 };
 
 /* --------------------------------------------------------------------- */
