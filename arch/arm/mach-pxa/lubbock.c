@@ -88,9 +88,36 @@ static void __init lubbock_init_irq(void)
 	set_irq_type(IRQ_GPIO(0), IRQT_FALLING);
 }
 
+static struct resource sa1111_resources[] = {
+	[0] = {
+		.start	= 0x10000000,
+		.end	= 0x10001fff,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start	= LUBBOCK_SA1111_IRQ,
+		.end	= LUBBOCK_SA1111_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device sa1111_device = {
+	.name		= "sa1111",
+	.id		= 0,
+	.dev		= {
+		.name	= "Intel Corporation SA1111",
+	},
+	.num_resources	= ARRAY_SIZE(sa1111_resources),
+	.resource	= sa1111_resources,
+};
+
+static struct platform_device *devices[] __initdata = {
+	&sa1111_device,
+};
+
 static int __init lubbock_init(void)
 {
-	return sa1111_init(0x10000000, LUBBOCK_SA1111_IRQ);
+	return platform_add_devices(devices, ARRAY_SIZE(devices));
 }
 
 subsys_initcall(lubbock_init);
