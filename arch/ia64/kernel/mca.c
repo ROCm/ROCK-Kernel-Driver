@@ -247,7 +247,9 @@ ia64_mca_log_sal_error_record(int sal_info_type)
 	u8 *buffer;
 	u64 size;
 	int irq_safe = sal_info_type != SAL_INFO_TYPE_MCA && sal_info_type != SAL_INFO_TYPE_INIT;
+#ifdef IA64_MCA_DEBUG_INFO
 	static const char * const rec_name[] = { "MCA", "INIT", "CMC", "CPE" };
+#endif
 
 	size = ia64_log_get(sal_info_type, &buffer, irq_safe);
 	if (!size)
