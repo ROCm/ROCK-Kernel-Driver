@@ -75,13 +75,6 @@ static int pc_debug = PCMCIA_DEBUG;
 
 #define FIND_FIRST_BIT(n)	((n) - ((n) & ((n)-1)))
 
-#define pci_readb		pci_read_config_byte
-#define pci_writeb		pci_write_config_byte
-#define pci_readw		pci_read_config_word
-#define pci_writew		pci_write_config_word
-#define pci_readl		pci_read_config_dword
-#define pci_writel		pci_write_config_dword
-
 /* Offsets in the Expansion ROM Image Header */
 #define ROM_SIGNATURE		0x0000	/* 2 bytes */
 #define ROM_DATA_PTR		0x0018	/* 2 bytes */
@@ -192,7 +185,7 @@ int read_cb_mem(socket_info_t * s, int space, u_int addr, u_int len, void *ptr)
 		if (addr + len > 0x100)
 			goto fail;
 		for (; len; addr++, ptr++, len--)
-			pci_readb(dev, addr, (u_char *) ptr);
+			pci_read_config_byte(dev, addr, ptr);
 		return 0;
 	}
 
@@ -243,17 +236,18 @@ int cb_alloc(socket_info_t * s)
 	tmp.sysdata = bus->sysdata;
 	tmp.devfn = 0;
 
-	pci_readw(&tmp, PCI_VENDOR_ID, &vend);
-	pci_readw(&tmp, PCI_DEVICE_ID, &dev);
+	pci_read_config_word(&tmp, PCI_VENDOR_ID, &vend);
+	pci_read_config_word(&tmp, PCI_DEVICE_ID, &dev);
 	printk(KERN_INFO "cs: cb_alloc(bus %d): vendor 0x%04x, "
 	       "device 0x%04x\n", bus->number, vend, dev);
 
-	pci_readb(&tmp, PCI_HEADER_TYPE, &hdr);
+	pci_read_config_byte(&tmp, PCI_HEADER_TYPE, &hdr);
 	fn = 1;
 	if (hdr & 0x80) {
 		do {
 			tmp.devfn = fn;
-			if (pci_readw(&tmp, PCI_VENDOR_ID, &v) || !v || v == 0xffff)
+			if (pci_read_config_word(&tmp, PCI_VENDOR_ID, &v) ||
+			    !v || v == 0xffff)
 				break;
 			fn++;
 		} while (fn < 8);
@@ -278,7 +272,7 @@ int cb_alloc(socket_info_t * s)
 
 		dev->devfn = i;
 		dev->vendor = vend;
-		pci_readw(dev, PCI_DEVICE_ID, &dev->device);
+		pci_read_config_word(dev, PCI_DEVICE_ID, &dev->device);
 		dev->hdr_type = hdr & 0x7f;
 		dev->dma_mask = 0xffffffff;
 		dev->dev.dma_mask = &dev->dma_mask;
@@ -295,7 +289,7 @@ int cb_alloc(socket_info_t * s)
 		}
 
 		/* Does this function have an interrupt at all? */
-		pci_readb(dev, PCI_INTERRUPT_PIN, &irq_pin);
+		pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &irq_pin);
 		if (irq_pin)
 			dev->irq = irq;
 		
@@ -305,7 +299,7 @@ int cb_alloc(socket_info_t * s)
 			continue;
 
 		if (irq_pin)
-			pci_writeb(dev, PCI_INTERRUPT_LINE, irq);
+			pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
 		
 		device_register(&dev->dev);
 		pci_insert_device(dev, bus);
@@ -360,15 +354,17 @@ void cb_enable(socket_info_t * s)
 	/* Set up PCI interrupt and command registers */
 	for (i = 0; i < s->functions; i++) {
 		dev = &s->cb_config[i].dev;
-		pci_writeb(dev, PCI_COMMAND, PCI_COMMAND_MASTER |
-			   PCI_COMMAND_IO | PCI_COMMAND_MEMORY);
-		pci_writeb(dev, PCI_CACHE_LINE_SIZE, L1_CACHE_BYTES / 4);
+		pci_write_config_byte(dev, PCI_COMMAND, PCI_COMMAND_MASTER |
+				      PCI_COMMAND_IO | PCI_COMMAND_MEMORY);
+		pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE,
+				      L1_CACHE_BYTES / 4);
 	}
 
 	if (s->irq.AssignedIRQ) {
 		for (i = 0; i < s->functions; i++) {
 			dev = &s->cb_config[i].dev;
-			pci_writeb(dev, PCI_INTERRUPT_LINE, s->irq.AssignedIRQ);
+			pci_write_config_byte(dev, PCI_INTERRUPT_LINE,
+					      s->irq.AssignedIRQ);
 		}
 		s->socket.io_irq = s->irq.AssignedIRQ;
 		s->ss_entry->set_socket(s->sock, &s->socket);
