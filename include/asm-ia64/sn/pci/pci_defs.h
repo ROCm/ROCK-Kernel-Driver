@@ -321,8 +321,6 @@ extern void pci_write(void * address, int data, int type);
 
 #ifndef __ASSEMBLY__
 
-#ifdef LITTLE_ENDIAN
-
 /*
  * PCI config space definition
  */
@@ -425,111 +423,5 @@ typedef volatile struct cap_pcix_type0_s {
 	cap_pcix_stat_reg_t	pcix_type0_status;
 } cap_pcix_type0_t;
 
-#else
-
-/*
- * PCI config space definition
- */
-typedef volatile struct pci_cfg_s {
-	uint16_t	dev_id;
-	uint16_t	vendor_id;
-	uint16_t	status;
-	uint16_t	cmd;
-	uchar_t		class;
-	uchar_t		sub_class;
-	uchar_t		prog_if;
-	uchar_t		rev;
-	uchar_t		bist;
-	uchar_t		hdr_type;
-	uchar_t		lt;
-	uchar_t		line_size;
-	uint32_t	bar[6];
-	uint32_t	cardbus;
-	uint16_t	subsys_dev_id;
-	uint16_t	subsys_vendor_id;
-	uint32_t	exp_rom;
-	uint32_t	res[2];
-	uchar_t		max_lat;
-	uchar_t		min_gnt;
-	uchar_t		int_pin;
-	uchar_t		int_line;
-} pci_cfg_t;
-
-/*
- * PCI Type 1 config space definition for PCI to PCI Bridges (PPBs)
- */
-typedef volatile struct pci_cfg1_s {
-	uint16_t	dev_id;
-	uint16_t	vendor_id;
-	uint16_t	status;
-	uint16_t	cmd;
-	uchar_t		class;
-	uchar_t		sub_class;
-	uchar_t		prog_if;
-	uchar_t		rev;
-	uchar_t		bist;
-	uchar_t		hdr_type;
-	uchar_t		lt;
-	uchar_t		line_size;
-	uint32_t	bar[2];
-	uchar_t		slt;
-	uchar_t		sub_bus_num;
-	uchar_t		snd_bus_num;
-	uchar_t		pri_bus_num;
-	uint16_t	snd_status;
-	uchar_t		io_limit;
-	uchar_t		io_base;
-	uint16_t	mem_limit;
-	uint16_t	mem_base;
-	uint16_t	pmem_limit;
-	uint16_t	pmem_base;
-	uint32_t	pmem_limit_upper;
-	uint32_t	pmem_base_upper;
-	uint16_t	io_limit_upper;
-	uint16_t	io_base_upper;
-	uint32_t	res;
-	uint32_t	exp_rom;
-	uint16_t	ppb_control;
-	uchar_t		int_pin;
-	uchar_t		int_line;
-} pci_cfg1_t;
-
-
-
-/*
- * PCI-X Capability
- */
-typedef volatile struct cap_pcix_cmd_reg_s {
-	uint16_t	reserved1:              9,
-			max_split:		3,
-			max_mem_read_cnt:	2,
-			enable_relaxed_order:	1,
-			data_parity_enable:	1;
-} cap_pcix_cmd_reg_t;
-
-typedef volatile struct cap_pcix_stat_reg_s {
-	uint32_t	reserved1:		2,
-			split_complt_err:	1,
-			max_cum_read:		3,
-			max_out_split:		3,
-			max_mem_read_cnt:	2,
-			device_complex:		1,
-			unexpect_split_complt:	1,
-			split_complt_discard:	1,
-			mhz133_capable:		1,
-			bit64_device:		1,
-			bus_num:		8,
-			dev_num:		5,
-			func_num:		3;
-} cap_pcix_stat_reg_t;
-
-typedef volatile struct cap_pcix_type0_s {
-	cap_pcix_cmd_reg_t	pcix_type0_command;
-	uchar_t			pcix_cap_nxt;
-	uchar_t			pcix_cap_id;
-	cap_pcix_stat_reg_t	pcix_type0_status;
-} cap_pcix_type0_t;
-
-#endif
 #endif	/* __ASSEMBLY__ */
 #endif /* _ASM_SN_PCI_PCI_DEFS_H */

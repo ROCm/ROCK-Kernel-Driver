@@ -18,7 +18,6 @@
 #include <asm/sn/cdl.h>
 #endif /* __ASSEMBLY__ */
 
-#ifdef LITTLE_ENDIAN
 #define WIDGET_ID			0x00
 #define WIDGET_STATUS			0x08
 #define WIDGET_ERR_UPPER_ADDR		0x10
@@ -30,19 +29,6 @@
 #define WIDGET_ERR_CMD_WORD		0x40
 #define WIDGET_LLP_CFG			0x48
 #define WIDGET_TFLUSH			0x50
-#else	/* !LITTLE_ENDIAN */
-#define WIDGET_ID                       0x04
-#define WIDGET_STATUS                   0x0c
-#define WIDGET_ERR_UPPER_ADDR           0x14
-#define WIDGET_ERR_LOWER_ADDR           0x1c
-#define WIDGET_CONTROL                  0x24
-#define WIDGET_REQ_TIMEOUT              0x2c
-#define WIDGET_INTDEST_UPPER_ADDR       0x34
-#define WIDGET_INTDEST_LOWER_ADDR       0x3c
-#define WIDGET_ERR_CMD_WORD             0x44
-#define WIDGET_LLP_CFG                  0x4c
-#define WIDGET_TFLUSH                   0x54
-#endif
 
 /* WIDGET_ID */
 #define WIDGET_REV_NUM			0xf0000000
@@ -120,7 +106,6 @@ typedef uint32_t      widgetreg_t;
 
 /* widget configuration registers */
 typedef volatile struct widget_cfg {
-#ifdef LITTLE_ENDIAN
 /*
  * we access these through synergy unswizzled space, so the address
  * gets twiddled (i.e. references to 0x4 actually go to 0x0 and vv.)
@@ -148,33 +133,8 @@ typedef volatile struct widget_cfg {
     widgetreg_t		    w_pad_9;	/* 0x48 */
     widgetreg_t		    w_tflush;	/* 0x54 */
     widgetreg_t		    w_pad_10;	/* 0x50 */
-#else
-    widgetreg_t		    w_pad_0;	/* 0x00 */
-    widgetreg_t		    w_id;	/* 0x04 */
-    widgetreg_t		    w_pad_1;	/* 0x08 */
-    widgetreg_t		    w_status;	/* 0x0c */
-    widgetreg_t		    w_pad_2;	/* 0x10 */
-    widgetreg_t		    w_err_upper_addr;	/* 0x14 */
-    widgetreg_t		    w_pad_3;	/* 0x18 */
-    widgetreg_t		    w_err_lower_addr;	/* 0x1c */
-    widgetreg_t		    w_pad_4;	/* 0x20 */
-    widgetreg_t		    w_control;	/* 0x24 */
-    widgetreg_t		    w_pad_5;	/* 0x28 */
-    widgetreg_t		    w_req_timeout;	/* 0x2c */
-    widgetreg_t		    w_pad_6;	/* 0x30 */
-    widgetreg_t		    w_intdest_upper_addr;	/* 0x34 */
-    widgetreg_t		    w_pad_7;	/* 0x38 */
-    widgetreg_t		    w_intdest_lower_addr;	/* 0x3c */
-    widgetreg_t		    w_pad_8;	/* 0x40 */
-    widgetreg_t		    w_err_cmd_word;	/* 0x44 */
-    widgetreg_t		    w_pad_9;	/* 0x48 */
-    widgetreg_t		    w_llp_cfg;	/* 0x4c */
-    widgetreg_t		    w_pad_10;	/* 0x50 */
-    widgetreg_t		    w_tflush;	/* 0x54 */
-#endif /* LITTLE_ENDIAN */
 } widget_cfg_t;
 
-#ifdef LITTLE_ENDIAN
 typedef struct {
     unsigned                other:8;
     unsigned                bo:1;
@@ -188,33 +148,11 @@ typedef struct {
     unsigned                sidn:4;
     unsigned                didn:4;
 } w_err_cmd_word_f;
-#else
-typedef struct {
-    unsigned                didn:4;
-    unsigned                sidn:4;
-    unsigned                pactyp:4;
-    unsigned                tnum:5;
-    unsigned                ct:1;
-    unsigned                ds:2;
-    unsigned                gbr:1;
-    unsigned                vbpm:1;
-    unsigned                error:1;
-    unsigned                bo:1;
-    unsigned                other:8;
-} w_err_cmd_word_f;
-#endif
 
-#ifdef LITTLE_ENDIAN
 typedef union {
     w_err_cmd_word_f        f;
     widgetreg_t             r;
 } w_err_cmd_word_u;
-#else
-typedef union {
-    widgetreg_t             r;
-    w_err_cmd_word_f        f;
-} w_err_cmd_word_u;
-#endif
 
 /* IO widget initialization function */
 typedef struct xwidget_info_s *xwidget_info_t;
@@ -222,19 +160,11 @@ typedef struct xwidget_info_s *xwidget_info_t;
 /*
  * Crosstalk Widget Hardware Identification, as defined in the Crosstalk spec.
  */
-#ifdef LITTLE_ENDIAN
 typedef struct xwidget_hwid_s {
     xwidget_mfg_num_t       mfg_num;
     xwidget_rev_num_t       rev_num;
     xwidget_part_num_t      part_num;
 }                      *xwidget_hwid_t;
-#else
-typedef struct xwidget_hwid_s {
-    xwidget_part_num_t      part_num;
-    xwidget_rev_num_t       rev_num;
-    xwidget_mfg_num_t       mfg_num;
-}                      *xwidget_hwid_t;
-#endif
 
 
 /*
