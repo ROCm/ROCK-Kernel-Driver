@@ -105,7 +105,8 @@
 #include <linux/seq_file.h>
 #endif
 
-#define IP_MAX_MEMBERSHIPS 20
+#define IP_MAX_MEMBERSHIPS	20
+#define IP_MAX_MSF		10
 
 #ifdef CONFIG_IP_MULTICAST
 /* Parameter names and values are taken from igmp-v2-06 draft */
@@ -1325,6 +1326,7 @@ static struct in_device * ip_mc_find_dev(struct ip_mreqn *imr)
  *	Join a socket to a group
  */
 int sysctl_igmp_max_memberships = IP_MAX_MEMBERSHIPS;
+int sysctl_igmp_max_msf = IP_MAX_MSF;
 
 
 static int ip_mc_del1_src(struct ip_mc_list *pmc, int sfmode,
@@ -1790,6 +1792,10 @@ int ip_mc_source(int add, int omode, struct sock *sk, struct
 	}
 	/* else, add a new source to the filter */
 
+	if (psl && psl->sl_count >= sysctl_igmp_max_msf) {
+		err = -ENOBUFS;
+		goto done;
+	}
 	if (!psl || psl->sl_count == psl->sl_max) {
 		struct ip_sf_socklist *newpsl;
 		int count = IP_SFBLOCK;

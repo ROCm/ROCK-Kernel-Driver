@@ -56,11 +56,6 @@ static int		exp_verify_string(char *cp, int max);
 #define	EXPKEY_HASHMASK		(EXPKEY_HASHMAX -1)
 static struct cache_head *expkey_table[EXPKEY_HASHMAX];
 
-static inline int key_len(int type)
-{
-	return type == 0 ? 8 : type == 1 ? 4 : 12;
-}
-
 static inline int svc_expkey_hash(struct svc_expkey *item)
 {
 	int hash = item->ek_fsidtype;
@@ -547,8 +542,8 @@ exp_get_key(svc_client *clp, dev_t dev, ino_t ino)
 		mk_fsid_v0(fsidv, dev, ino);
 		return exp_find_key(clp, 0, fsidv, NULL);
 	}
-	mk_fsid_v2(fsidv, dev, ino);
-	return exp_find_key(clp, 2, fsidv, NULL);
+	mk_fsid_v3(fsidv, dev, ino);
+	return exp_find_key(clp, 3, fsidv, NULL);
 }
 
 /*
@@ -684,8 +679,8 @@ static int exp_hash(struct auth_domain *clp, struct svc_export *exp)
 		mk_fsid_v0(fsid, dev, inode->i_ino);
 		return exp_set_key(clp, 0, fsid, exp);
 	}
-	mk_fsid_v2(fsid, dev, inode->i_ino);
-	return exp_set_key(clp, 2, fsid, exp);
+	mk_fsid_v3(fsid, dev, inode->i_ino);
+	return exp_set_key(clp, 3, fsid, exp);
 }
 
 static void exp_unhash(struct svc_export *exp)
