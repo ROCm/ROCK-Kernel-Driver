@@ -210,7 +210,6 @@ typedef struct _snd_gf1_mem {
 	snd_gf1_bank_info_t banks_16[4];
 	snd_gf1_mem_block_t *first;
 	snd_gf1_mem_block_t *last;
-	snd_info_entry_t *info_entry;
 	struct semaphore memory_mutex;
 } snd_gf1_mem_t;
 
@@ -332,8 +331,6 @@ struct _snd_gf1 {
 	unsigned int rom_banks;		/* GUS's ROM banks */
 
 	snd_gf1_mem_t mem_alloc;
-	snd_info_entry_t *ram_entries[4];
-	snd_info_entry_t *rom_entries[4];
 
 	/* registers */
 	unsigned short reg_page;
@@ -452,9 +449,6 @@ struct _snd_gus_card {
 	int timer_dev;			/* timer device */
 
 	struct _snd_gf1 gf1;	/* gf1 specific variables */
-#ifdef CONFIG_SND_DEBUG
-	snd_info_entry_t *irq_entry;
-#endif
 	snd_pcm_t *pcm;
 	snd_pcm_substream_t *pcm_cap_substream;
 	unsigned int c_dma_size;
@@ -601,7 +595,6 @@ int snd_gf1_mem_done(snd_gus_card_t * gus);
 /* gus_mem_proc.c */
 
 int snd_gf1_mem_proc_init(snd_gus_card_t * gus);
-int snd_gf1_mem_proc_done(snd_gus_card_t * gus);
 
 /* gus_dma.c */
 
@@ -676,7 +669,6 @@ int snd_gus_initialize(snd_gus_card_t * gus);
 void snd_gus_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 #ifdef CONFIG_SND_DEBUG
 void snd_gus_irq_profile_init(snd_gus_card_t *gus);
-void snd_gus_irq_profile_done(snd_gus_card_t *gus);
 #endif
 
 /* gus_uart.c */

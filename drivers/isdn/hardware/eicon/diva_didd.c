@@ -120,7 +120,7 @@ static int DIVA_INIT_FUNCTION create_proc(void)
 	return (0);
 }
 
-static void DIVA_EXIT_FUNCTION remove_proc(void)
+static void remove_proc(void)
 {
 	remove_proc_entry(DRIVERLNAME, proc_net_isdn_eicon);
 	remove_proc_entry(main_proc_dir, proc_net_isdn);

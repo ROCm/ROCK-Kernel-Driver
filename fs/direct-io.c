@@ -892,15 +892,14 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 	
 		ret = do_direct_IO(dio);
 
-		if (ret) {
-			dio_cleanup(dio);
-			break;
-		}
-
 		dio->result += iov[seg].iov_len -
 			((dio->final_block_in_request - dio->block_in_file) <<
 					blkbits);
 
+		if (ret) {
+			dio_cleanup(dio);
+			break;
+		}
 	} /* end iovec loop */
 
 	/*

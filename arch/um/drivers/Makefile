@@ -20,8 +20,6 @@ ubd-objs := ubd_kern.o ubd_user.o
 port-objs := port_kern.o port_user.o
 harddog-objs := harddog_kern.o harddog_user.o
 
-export-objs := mconsole_kern.o
-
 obj-y = 
 obj-$(CONFIG_SSL) += ssl.o 
 obj-$(CONFIG_UML_NET_SLIP) += slip.o

@@ -2,8 +2,6 @@
 # Makefile for the Linux kernel pci hotplug controller drivers.
 #
 
-export-objs	:= pci_hotplug_core.o pci_hotplug_util.o cpci_hotplug_core.o
-
 obj-$(CONFIG_HOTPLUG_PCI)		+= pci_hotplug.o
 obj-$(CONFIG_HOTPLUG_PCI_COMPAQ)	+= cpqphp.o
 obj-$(CONFIG_HOTPLUG_PCI_IBM)		+= ibmphp.o

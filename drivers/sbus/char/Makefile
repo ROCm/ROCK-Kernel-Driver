@@ -7,8 +7,6 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-export-objs := bbc_i2c.o
-
 vfc-objs := vfc_dev.o vfc_i2c.o
 bbc-objs := bbc_i2c.o bbc_envctrl.o
 

@@ -2,8 +2,6 @@
 # Makefile for native language support
 #
 
-export-objs := nls_base.o
-
 obj-$(CONFIG_NLS)		+= nls_base.o
 
 obj-$(CONFIG_NLS_CODEPAGE_437)	+= nls_cp437.o

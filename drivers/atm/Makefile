@@ -4,7 +4,6 @@
 
 EXTRA_CFLAGS := -g
 
-export-objs	:= uPD98402.o suni.o idt77105.o
 fore_200e-objs	:= fore200e.o
 host-progs	:= fore200e_mkfirm
 

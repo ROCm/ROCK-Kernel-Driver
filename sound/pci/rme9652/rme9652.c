@@ -263,7 +263,6 @@ typedef struct snd_rme9652 {
 	snd_card_t *card;
 	snd_pcm_t *pcm;
 	struct pci_dev *pci;
-	snd_info_entry_t *proc_entry;
 	snd_kcontrol_t *spdif_ctl;
 
 } rme9652_t;
@@ -1803,27 +1802,8 @@ static void __devinit snd_rme9652_proc_init(rme9652_t *rme9652)
 {
 	snd_info_entry_t *entry;
 
-	if ((entry = snd_info_create_card_entry(rme9652->card, "rme9652", rme9652->card->proc_root)) !=
-	    NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = rme9652;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_rme9652_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	rme9652->proc_entry = entry;
-}
-
-static void snd_rme9652_proc_done(rme9652_t *rme9652)
-{
-	if (rme9652->proc_entry) {
-		snd_info_unregister(rme9652->proc_entry);
-		rme9652->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(rme9652->card, "rme9652", &entry))
+		snd_info_set_text_ops(entry, rme9652, snd_rme9652_proc_read);
 }
 
 static void snd_rme9652_free_buffers(rme9652_t *rme9652)
@@ -1855,7 +1835,6 @@ static int snd_rme9652_free(rme9652_t *rme9652)
 {
 	if (rme9652->irq >= 0)
 		rme9652_stop(rme9652);
-	snd_rme9652_proc_done(rme9652);
 	snd_rme9652_free_buffers(rme9652);
 
 	if (rme9652->iobase)

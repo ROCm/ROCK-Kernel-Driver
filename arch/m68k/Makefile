@@ -54,9 +54,9 @@ CFLAGS := $(subst -fomit-frame-pointer,,$(CFLAGS)) -g
 endif
 
 ifndef CONFIG_SUN3
-HEAD := arch/m68k/kernel/head.o
+head-y := arch/m68k/kernel/head.o
 else
-HEAD := arch/m68k/kernel/sun3-head.o
+head-y := arch/m68k/kernel/sun3-head.o
 endif 
 
 core-y				+= arch/m68k/kernel/	arch/m68k/mm/
@@ -113,5 +113,3 @@ endif
 archclean:
 	rm -f vmlinux.gz vmlinux.bz2
 	rm -f arch/m68k/kernel/m68k_defs.h arch/m68k/kernel/m68k_defs.d
-
-archmrproper:

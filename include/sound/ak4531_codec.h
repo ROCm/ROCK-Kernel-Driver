@@ -68,7 +68,6 @@ typedef struct _snd_ak4531 ak4531_t;
 
 struct _snd_ak4531 {
 	void (*write) (ak4531_t *ak4531, unsigned short reg, unsigned short val);
-	snd_info_entry_t *proc_entry;
 	void *private_data;
 	void (*private_free) (ak4531_t *ak4531);
 	/* --- */

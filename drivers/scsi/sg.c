@@ -19,7 +19,7 @@
  */
 #include <linux/config.h>
 #ifdef CONFIG_PROC_FS
-static char *sg_version_str = "Version: 3.5.27 (20020812)";
+static char *sg_version_str = "Version: 3.5.27 (20030130)";
 #endif
 static int sg_version_num = 30527;	/* 2 digits for each component */
 /*
@@ -1455,9 +1455,9 @@ find_empty_slot:
 	sdp->sg_tablesize = scsidp->host ? scsidp->host->sg_tablesize : 0;
 
 	memset(&sdp->sg_driverfs_dev, 0, sizeof (struct device));
-	sprintf(sdp->sg_driverfs_dev.bus_id, "%s:gen",
+	snprintf(sdp->sg_driverfs_dev.bus_id, BUS_ID_SIZE, "%s:gen",
 		scsidp->sdev_driverfs_dev.bus_id);
-	sprintf(sdp->sg_driverfs_dev.name, "%sgeneric",
+	snprintf(sdp->sg_driverfs_dev.name, DEVICE_NAME_SIZE, "%sgeneric",
 		scsidp->sdev_driverfs_dev.name);
 	sdp->sg_driverfs_dev.parent = &scsidp->sdev_driverfs_dev;
 	sdp->sg_driverfs_dev.bus = scsidp->sdev_driverfs_dev.bus;

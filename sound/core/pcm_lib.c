@@ -214,10 +214,14 @@ int snd_pcm_update_hw_ptr(snd_pcm_substream_t *substream)
 	return 0;
 }
 
-/*
- *  Operations
+/**
+ * snd_pcm_set_ops - set the PCM operators
+ * @pcm: the pcm instance
+ * @direction: stream direction, SNDRV_PCM_STREAM_XXX
+ * @ops: the operator table
+ *
+ * Sets the given PCM operators to the pcm instance.
  */
-
 void snd_pcm_set_ops(snd_pcm_t *pcm, int direction, snd_pcm_ops_t *ops)
 {
 	snd_pcm_str_t *stream = &pcm->streams[direction];
@@ -227,10 +231,13 @@ void snd_pcm_set_ops(snd_pcm_t *pcm, int direction, snd_pcm_ops_t *ops)
 		substream->ops = ops;
 }
 
-/*
- *  Sync
+
+/**
+ * snd_pcm_sync - set the PCM sync id
+ * @substream: the pcm substream
+ *
+ * Sets the PCM sync identifier for the card.
  */
- 
 void snd_pcm_set_sync(snd_pcm_substream_t * substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -354,7 +361,17 @@ int snd_interval_refine_max(snd_interval_t *i, unsigned int max, int openmax)
 	return changed;
 }
 
-/* r <- v */
+/**
+ * snd_interval_refine - refine the interval value of configurator
+ * @i: the interval value to refine
+ * @v: the interval value to refer to
+ *
+ * Refines the interval value with the reference value.
+ * The interval is changed to the range satisfying both intervals.
+ * The interval status (min, max, integer, etc.) are evaluated.
+ *
+ * Returns non-zero if the value is changed, zero if not changed.
+ */
 int snd_interval_refine(snd_interval_t *i, const snd_interval_t *v)
 {
 	int changed = 0;
@@ -445,6 +462,13 @@ void snd_interval_mul(const snd_interval_t *a, const snd_interval_t *b, snd_inte
 	c->integer = (a->integer && b->integer);
 }
 
+/**
+ * snd_interval_div - refine the interval value with division
+ *
+ * c = a / b
+ *
+ * Returns non-zero if the value is changed, zero if not changed.
+ */
 void snd_interval_div(const snd_interval_t *a, const snd_interval_t *b, snd_interval_t *c)
 {
 	unsigned int r;
@@ -469,7 +493,13 @@ void snd_interval_div(const snd_interval_t *a, const snd_interval_t *b, snd_inte
 	c->integer = 0;
 }
 
-/* a * b / k */
+/**
+ * snd_interval_muldivk - refine the interval value
+ *
+ * c = a * b / k
+ *
+ * Returns non-zero if the value is changed, zero if not changed.
+ */
 void snd_interval_muldivk(const snd_interval_t *a, const snd_interval_t *b,
 		      unsigned int k, snd_interval_t *c)
 {
@@ -490,7 +520,13 @@ void snd_interval_muldivk(const snd_interval_t *a, const snd_interval_t *b,
 	c->integer = 0;
 }
 
-/* a * k / b */
+/**
+ * snd_interval_mulkdiv - refine the interval value
+ *
+ * c = a * k / b
+ *
+ * Returns non-zero if the value is changed, zero if not changed.
+ */
 void snd_interval_mulkdiv(const snd_interval_t *a, unsigned int k,
 		      const snd_interval_t *b, snd_interval_t *c)
 {
@@ -520,6 +556,11 @@ void snd_interval_mulkdiv(const snd_interval_t *a, unsigned int k,
 /* ---- */
 
 
+/**
+ * snd_interval_ratnum - refine the interval value
+ *
+ * Returns non-zero if the value is changed, zero if not changed.
+ */
 int snd_interval_ratnum(snd_interval_t *i,
 		    unsigned int rats_count, ratnum_t *rats,
 		    unsigned int *nump, unsigned int *denp)
@@ -612,6 +653,11 @@ int snd_interval_ratnum(snd_interval_t *i,
 	return err;
 }
 
+/**
+ * snd_interval_ratden - refine the interval value
+ *
+ * Returns non-zero if the value is changed, zero if not changed.
+ */
 int snd_interval_ratden(snd_interval_t *i,
 		    unsigned int rats_count, ratden_t *rats,
 		    unsigned int *nump, unsigned int *denp)
@@ -698,6 +744,19 @@ int snd_interval_ratden(snd_interval_t *i,
 	return err;
 }
 
+/**
+ * snd_interval_list - refine the interval value from the list
+ * @i: the interval value to refine
+ * @count: the number of elements in the list
+ * @list: the value list
+ * @mask: the bit-mask to evaluate
+ *
+ * Refines the interval value from the list.
+ * When mask is non-zero, only the elements corresponding to bit 1 are
+ * evaluated.
+ *
+ * Returns non-zero if the value is changed, zero if not changed.
+ */
 int snd_interval_list(snd_interval_t *i, unsigned int count, unsigned int *list, unsigned int mask)
 {
         unsigned int k;
@@ -762,6 +821,17 @@ int snd_interval_step(snd_interval_t *i, unsigned int min, unsigned int step)
 
 /* Info constraints helpers */
 
+/**
+ * snd_pcm_hw_rule_add - add the hw-constraint rule
+ * @runtime: the pcm runtime instance
+ * @cond: condition bits
+ * @var: the variable to evaluate
+ * @func: the evaluation function
+ * @private: the private data pointer passed to function
+ * @dep: the dependent variables
+ *
+ * Returns zero if successful, or a negative error code on failure.
+ */
 int snd_pcm_hw_rule_add(snd_pcm_runtime_t *runtime, unsigned int cond,
 			int var,
 			snd_pcm_hw_rule_func_t func, void *private,
@@ -808,6 +878,9 @@ int snd_pcm_hw_rule_add(snd_pcm_runtime_t *runtime, unsigned int cond,
 	return 0;
 }				    
 
+/**
+ * snd_pcm_hw_constraint_mask
+ */
 int snd_pcm_hw_constraint_mask(snd_pcm_runtime_t *runtime, snd_pcm_hw_param_t var,
 			       u_int32_t mask)
 {
@@ -820,6 +893,9 @@ int snd_pcm_hw_constraint_mask(snd_pcm_runtime_t *runtime, snd_pcm_hw_param_t va
 	return 0;
 }
 
+/**
+ * snd_pcm_hw_constraint_mask64
+ */
 int snd_pcm_hw_constraint_mask64(snd_pcm_runtime_t *runtime, snd_pcm_hw_param_t var,
 				 u_int64_t mask)
 {
@@ -833,12 +909,18 @@ int snd_pcm_hw_constraint_mask64(snd_pcm_runtime_t *runtime, snd_pcm_hw_param_t 
 	return 0;
 }
 
+/**
+ * snd_pcm_hw_constraint_integer
+ */
 int snd_pcm_hw_constraint_integer(snd_pcm_runtime_t *runtime, snd_pcm_hw_param_t var)
 {
 	snd_pcm_hw_constraints_t *constrs = &runtime->hw_constraints;
 	return snd_interval_setinteger(constrs_interval(constrs, var));
 }
 
+/**
+ * snd_pcm_hw_constraint_minmax
+ */
 int snd_pcm_hw_constraint_minmax(snd_pcm_runtime_t *runtime, snd_pcm_hw_param_t var,
 				 unsigned int min, unsigned int max)
 {
@@ -859,6 +941,9 @@ static int snd_pcm_hw_rule_list(snd_pcm_hw_params_t *params,
 }		
 
 
+/**
+ * snd_pcm_hw_constraint_list
+ */
 int snd_pcm_hw_constraint_list(snd_pcm_runtime_t *runtime,
 			       unsigned int cond,
 			       snd_pcm_hw_param_t var,
@@ -884,6 +969,9 @@ static int snd_pcm_hw_rule_ratnums(snd_pcm_hw_params_t *params,
 	return err;
 }
 
+/**
+ * snd_pcm_hw_constraint_ratnums
+ */
 int snd_pcm_hw_constraint_ratnums(snd_pcm_runtime_t *runtime, 
 				  unsigned int cond,
 				  snd_pcm_hw_param_t var,
@@ -908,6 +996,9 @@ static int snd_pcm_hw_rule_ratdens(snd_pcm_hw_params_t *params,
 	return err;
 }
 
+/**
+ * snd_pcm_hw_constraint_ratdens
+ */
 int snd_pcm_hw_constraint_ratdens(snd_pcm_runtime_t *runtime, 
 				  unsigned int cond,
 				  snd_pcm_hw_param_t var,
@@ -930,6 +1021,9 @@ static int snd_pcm_hw_rule_msbits(snd_pcm_hw_params_t *params,
 	return 0;
 }
 
+/**
+ * snd_pcm_hw_constraint_msbits
+ */
 int snd_pcm_hw_constraint_msbits(snd_pcm_runtime_t *runtime, 
 				 unsigned int cond,
 				 unsigned int width,
@@ -949,6 +1043,9 @@ static int snd_pcm_hw_rule_step(snd_pcm_hw_params_t *params,
 	return snd_interval_step(hw_param_interval(params, rule->var), 0, step);
 }
 
+/**
+ * snd_pcm_hw_constraint_step
+ */
 int snd_pcm_hw_constraint_step(snd_pcm_runtime_t *runtime,
 			       unsigned int cond,
 			       snd_pcm_hw_param_t var,
@@ -971,6 +1068,9 @@ static int snd_pcm_hw_rule_pow2(snd_pcm_hw_params_t *params, snd_pcm_hw_rule_t *
 				 sizeof(pow2_sizes)/sizeof(int), pow2_sizes, 0);
 }		
 
+/**
+ * snd_pcm_hw_constraint_pow2
+ */
 int snd_pcm_hw_constraint_pow2(snd_pcm_runtime_t *runtime,
 			       unsigned int cond,
 			       snd_pcm_hw_param_t var)
@@ -1004,6 +1104,9 @@ void _snd_pcm_hw_param_any(snd_pcm_hw_params_t *params, snd_pcm_hw_param_t var)
 	snd_BUG();
 }
 
+/**
+ * snd_pcm_hw_param_any
+ */
 int snd_pcm_hw_param_any(snd_pcm_t *pcm, snd_pcm_hw_params_t *params,
 			 snd_pcm_hw_param_t var)
 {
@@ -1022,16 +1125,23 @@ void _snd_pcm_hw_params_any(snd_pcm_hw_params_t *params)
 	params->info = ~0U;
 }
 
-/* Fill PARAMS with full configuration space boundaries */
+/**
+ * snd_pcm_hw_params_any
+ *
+ * Fill PARAMS with full configuration space boundaries
+ */
 int snd_pcm_hw_params_any(snd_pcm_t *pcm, snd_pcm_hw_params_t *params)
 {
 	_snd_pcm_hw_params_any(params);
 	return snd_pcm_hw_refine(pcm, params);
 }
 
-/* Return the value for field PAR if it's fixed in configuration space 
-   defined by PARAMS. Return -EINVAL otherwise
-*/
+/**
+ * snd_pcm_hw_param_value
+ *
+ * Return the value for field PAR if it's fixed in configuration space 
+ *  defined by PARAMS. Return -EINVAL otherwise
+ */
 int snd_pcm_hw_param_value(const snd_pcm_hw_params_t *params,
 			   snd_pcm_hw_param_t var, int *dir)
 {
@@ -1055,7 +1165,11 @@ int snd_pcm_hw_param_value(const snd_pcm_hw_params_t *params,
 	return -EINVAL;
 }
 
-/* Return the minimum value for field PAR. */
+/**
+ * snd_pcm_hw_param_value_min
+ *
+ * Return the minimum value for field PAR.
+ */
 unsigned int snd_pcm_hw_param_value_min(const snd_pcm_hw_params_t *params,
 					snd_pcm_hw_param_t var, int *dir)
 {
@@ -1074,7 +1188,11 @@ unsigned int snd_pcm_hw_param_value_min(const snd_pcm_hw_params_t *params,
 	return -EINVAL;
 }
 
-/* Return the maximum value for field PAR. */
+/**
+ * snd_pcm_hw_param_value_max
+ *
+ * Return the maximum value for field PAR.
+ */
 unsigned int snd_pcm_hw_param_value_max(const snd_pcm_hw_params_t *params,
 					snd_pcm_hw_param_t var, int *dir)
 {
@@ -1122,10 +1240,13 @@ int _snd_pcm_hw_param_setinteger(snd_pcm_hw_params_t *params,
 	return changed;
 }
 	
-/* Inside configuration space defined by PARAMS remove from PAR all 
-   non integer values. Reduce configuration space accordingly.
-   Return -EINVAL if the configuration space is empty
-*/
+/**
+ * snd_pcm_hw_param_setinteger
+ *
+ * Inside configuration space defined by PARAMS remove from PAR all 
+ * non integer values. Reduce configuration space accordingly.
+ * Return -EINVAL if the configuration space is empty
+ */
 int snd_pcm_hw_param_setinteger(snd_pcm_t *pcm, 
 				snd_pcm_hw_params_t *params,
 				snd_pcm_hw_param_t var)
@@ -1161,10 +1282,13 @@ int _snd_pcm_hw_param_first(snd_pcm_hw_params_t *params,
 }
 
 
-/* Inside configuration space defined by PARAMS remove from PAR all 
-   values > minimum. Reduce configuration space accordingly.
-   Return the minimum.
-*/
+/**
+ * snd_pcm_hw_param_first
+ *
+ * Inside configuration space defined by PARAMS remove from PAR all 
+ * values > minimum. Reduce configuration space accordingly.
+ * Return the minimum.
+ */
 int snd_pcm_hw_param_first(snd_pcm_t *pcm, 
 			   snd_pcm_hw_params_t *params, 
 			   snd_pcm_hw_param_t var, int *dir)
@@ -1199,10 +1323,13 @@ int _snd_pcm_hw_param_last(snd_pcm_hw_params_t *params,
 }
 
 
-/* Inside configuration space defined by PARAMS remove from PAR all 
-   values < maximum. Reduce configuration space accordingly.
-   Return the maximum.
-*/
+/**
+ * snd_pcm_hw_param_last
+ *
+ * Inside configuration space defined by PARAMS remove from PAR all 
+ * values < maximum. Reduce configuration space accordingly.
+ * Return the maximum.
+ */
 int snd_pcm_hw_param_last(snd_pcm_t *pcm, 
 			  snd_pcm_hw_params_t *params,
 			  snd_pcm_hw_param_t var, int *dir)
@@ -1247,10 +1374,13 @@ int _snd_pcm_hw_param_min(snd_pcm_hw_params_t *params,
 	return changed;
 }
 
-/* Inside configuration space defined by PARAMS remove from PAR all 
-   values < VAL. Reduce configuration space accordingly.
-   Return new minimum or -EINVAL if the configuration space is empty
-*/
+/**
+ * snd_pcm_hw_param_min
+ *
+ * Inside configuration space defined by PARAMS remove from PAR all 
+ * values < VAL. Reduce configuration space accordingly.
+ * Return new minimum or -EINVAL if the configuration space is empty
+ */
 int snd_pcm_hw_param_min(snd_pcm_t *pcm, snd_pcm_hw_params_t *params,
 			 snd_pcm_hw_param_t var, unsigned int val, int *dir)
 {
@@ -1297,10 +1427,13 @@ int _snd_pcm_hw_param_max(snd_pcm_hw_params_t *params,
 	return changed;
 }
 
-/* Inside configuration space defined by PARAMS remove from PAR all 
-   values >= VAL + 1. Reduce configuration space accordingly.
-   Return new maximum or -EINVAL if the configuration space is empty
-*/
+/**
+ * snd_pcm_hw_param_max
+ *
+ * Inside configuration space defined by PARAMS remove from PAR all 
+ *  values >= VAL + 1. Reduce configuration space accordingly.
+ *  Return new maximum or -EINVAL if the configuration space is empty
+ */
 int snd_pcm_hw_param_max(snd_pcm_t *pcm, snd_pcm_hw_params_t *params,
 			  snd_pcm_hw_param_t var, unsigned int val, int *dir)
 {
@@ -1364,10 +1497,13 @@ int _snd_pcm_hw_param_set(snd_pcm_hw_params_t *params,
 	return changed;
 }
 
-/* Inside configuration space defined by PARAMS remove from PAR all 
-   values != VAL. Reduce configuration space accordingly.
-   Return VAL or -EINVAL if the configuration space is empty
-*/
+/**
+ * snd_pcm_hw_param_set
+ *
+ * Inside configuration space defined by PARAMS remove from PAR all 
+ * values != VAL. Reduce configuration space accordingly.
+ *  Return VAL or -EINVAL if the configuration space is empty
+ */
 int snd_pcm_hw_param_set(snd_pcm_t *pcm, snd_pcm_hw_params_t *params,
 			 snd_pcm_hw_param_t var, unsigned int val, int dir)
 {
@@ -1395,13 +1531,16 @@ int _snd_pcm_hw_param_mask(snd_pcm_hw_params_t *params,
 	return changed;
 }
 
-/* Inside configuration space defined by PARAMS remove from PAR all values
-   not contained in MASK. Reduce configuration space accordingly.
-   This function can be called only for SNDRV_PCM_HW_PARAM_ACCESS,
-   SNDRV_PCM_HW_PARAM_FORMAT, SNDRV_PCM_HW_PARAM_SUBFORMAT.
-   Return 0 on success or -EINVAL
-   if the configuration space is empty
-*/
+/**
+ * snd_pcm_hw_param_mask
+ *
+ * Inside configuration space defined by PARAMS remove from PAR all values
+ * not contained in MASK. Reduce configuration space accordingly.
+ * This function can be called only for SNDRV_PCM_HW_PARAM_ACCESS,
+ * SNDRV_PCM_HW_PARAM_FORMAT, SNDRV_PCM_HW_PARAM_SUBFORMAT.
+ * Return 0 on success or -EINVAL
+ * if the configuration space is empty
+ */
 int snd_pcm_hw_param_mask(snd_pcm_t *pcm, snd_pcm_hw_params_t *params,
 			  snd_pcm_hw_param_t var, const snd_mask_t *val)
 {
@@ -1464,12 +1603,15 @@ static int boundary_nearer(int min, int mindir,
 	return boundary_lt(dmin, dmindir, dmax, dmaxdir);
 }
 
-/* Inside configuration space defined by PARAMS set PAR to the available value
-   nearest to VAL. Reduce configuration space accordingly.
-   This function cannot be called for SNDRV_PCM_HW_PARAM_ACCESS,
-   SNDRV_PCM_HW_PARAM_FORMAT, SNDRV_PCM_HW_PARAM_SUBFORMAT.
-   Return the value found.
- */
+/**
+ * snd_pcm_hw_param_near
+ *
+ * Inside configuration space defined by PARAMS set PAR to the available value
+ * nearest to VAL. Reduce configuration space accordingly.
+ * This function cannot be called for SNDRV_PCM_HW_PARAM_ACCESS,
+ * SNDRV_PCM_HW_PARAM_FORMAT, SNDRV_PCM_HW_PARAM_SUBFORMAT.
+ * Return the value found.
+  */
 int snd_pcm_hw_param_near(snd_pcm_t *pcm, snd_pcm_hw_params_t *params,
 			  snd_pcm_hw_param_t var, unsigned int best, int *dir)
 {
@@ -1537,17 +1679,14 @@ int snd_pcm_hw_param_near(snd_pcm_t *pcm, snd_pcm_hw_params_t *params,
 	return v;
 }
 
-/* Choose one configuration from configuration space defined by PARAMS
-   The configuration choosen is that obtained fixing in this order:
-   first access
-   first format
-   first subformat
-   min channels
-   min rate
-   min period time
-   max buffer size
-   min tick time
-*/
+/**
+ * snd_pcm_hw_param_choose
+ *
+ * Choose one configuration from configuration space defined by PARAMS
+ * The configuration choosen is that obtained fixing in this order:
+ * first access, first format, first subformat, min channels,
+ * min rate, min period time, max buffer size, min tick time
+ */
 int snd_pcm_hw_params_choose(snd_pcm_t *pcm, snd_pcm_hw_params_t *params)
 {
 	int err;
@@ -1630,6 +1769,17 @@ static int snd_pcm_lib_ioctl_channel_info(snd_pcm_substream_t *substream,
 	return 0;
 }
 
+/**
+ * snd_pcm_lib_ioctl - a generic PCM ioctl callback
+ * @substream: the pcm substream instance
+ * @cmd: ioctl command
+ * @arg: ioctl argument
+ *
+ * Processes the generic ioctl commands for PCM.
+ * Can be passed as the ioctl callback for PCM ops.
+ *
+ * Returns zero if successful, or a negative error code on failure.
+ */
 int snd_pcm_lib_ioctl(snd_pcm_substream_t *substream,
 		      unsigned int cmd, void *arg)
 {
@@ -1648,30 +1798,70 @@ int snd_pcm_lib_ioctl(snd_pcm_substream_t *substream,
  *  Conditions
  */
 
+/**
+ * snd_pcm_playback_ready - check whether the playback buffer is available
+ * @substream: the pcm substream instance
+ *
+ * Checks whether enough free space is available on the playback buffer.
+ *
+ * Returns non-zero if available, or zero if not.
+ */
 int snd_pcm_playback_ready(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	return snd_pcm_playback_avail(runtime) >= runtime->control->avail_min;
 }
 
+/**
+ * snd_pcm_capture_ready - check whether the capture buffer is available
+ * @substream: the pcm substream instance
+ *
+ * Checks whether enough capture data is available on the capture buffer.
+ *
+ * Returns non-zero if available, or zero if not.
+ */
 int snd_pcm_capture_ready(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	return snd_pcm_capture_avail(runtime) >= runtime->control->avail_min;
 }
 
+/**
+ * snd_pcm_playback_data - check whether any data exists on the playback buffer
+ * @substream: the pcm substream instance
+ *
+ * Checks whether any data exists on the playback buffer.
+ *
+ * Returns non-zero if exists, or zero if not.
+ */
 int snd_pcm_playback_data(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	return snd_pcm_playback_avail(runtime) < runtime->buffer_size;
 }
 
+/**
+ * snd_pcm_playback_empty - check whether the playback buffer is empty
+ * @substream: the pcm substream instance
+ *
+ * Checks whether the playback buffer is empty.
+ *
+ * Returns non-zero if empty, or zero if not.
+ */
 int snd_pcm_playback_empty(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	return snd_pcm_playback_avail(runtime) >= runtime->buffer_size;
 }
 
+/**
+ * snd_pcm_capture_empty - check whether the capture buffer is empty
+ * @substream: the pcm substream instance
+ *
+ * Checks whether the capture buffer is empty.
+ *
+ * Returns non-zero if empty, or zero if not.
+ */
 int snd_pcm_capture_empty(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -1766,6 +1956,17 @@ void snd_pcm_tick_elapsed(snd_pcm_substream_t *substream)
 	spin_unlock_irq(&runtime->lock);
 }
 
+/**
+ * snd_pcm_period_elapsed - update the pcm status for the next period
+ * @substream: the pcm substream instance
+ *
+ * This function is called from the interrupt handler when the
+ * PCM has processed the period size.  It will update the current
+ * pointer, set up the tick, wake up sleepers, etc.
+ *
+ * Even if more than one periods have elapsed since the last call, you
+ * have to call this only once.
+ */
 void snd_pcm_period_elapsed(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime;
@@ -2377,6 +2578,7 @@ EXPORT_SYMBOL(snd_pcm_hw_param_mask);
 EXPORT_SYMBOL(snd_pcm_hw_param_first);
 EXPORT_SYMBOL(snd_pcm_hw_param_last);
 EXPORT_SYMBOL(snd_pcm_hw_param_near);
+EXPORT_SYMBOL(snd_pcm_hw_param_set);
 EXPORT_SYMBOL(snd_pcm_hw_refine);
 EXPORT_SYMBOL(snd_pcm_hw_constraints_init);
 EXPORT_SYMBOL(snd_pcm_hw_constraints_complete);

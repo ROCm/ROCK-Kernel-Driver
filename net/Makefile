@@ -5,8 +5,6 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-export-objs :=	netsyms.o
-
 obj-y	:= socket.o core/
 
 # LLC has to be linked before the files in net/802/

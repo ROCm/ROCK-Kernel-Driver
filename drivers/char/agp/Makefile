@@ -3,8 +3,6 @@
 # space ioctl interface to use agp memory.  It also adds a kernel interface
 # that other drivers could use to manipulate agp memory.
 
-export-objs := backend.o
-
 agpgart-y := backend.o frontend.o generic.o
 agpgart-$(CONFIG_AGP3) += generic-3.0.o
 agpgart-objs := $(agpgart-y)

@@ -728,14 +728,14 @@ struct scsi_request {
 struct scsi_cmnd {
 	int     sc_magic;
 
-	struct Scsi_Host *host;
+	struct scsi_device *device;
 	unsigned short state;
 	unsigned short owner;
-	Scsi_Device *device;
 	Scsi_Request *sc_request;
 	struct scsi_cmnd *next;
 	struct scsi_cmnd *reset_chain;
-	struct list_head list_entry; /* Used to place us on the cmd lists */
+
+	struct list_head list;  /* scsi_cmnd participates in queue lists */
 
 	int eh_state;		/* Used for state tracking in error handlr */
 	int eh_eflags;		/* Used by error handlr */
@@ -771,9 +771,14 @@ struct scsi_cmnd {
 	struct scsi_cmnd *bh_next;	/* To enumerate the commands waiting 
 					   to be processed. */
 
-	unsigned int target;
-	unsigned int lun;
-	unsigned int channel;
+/* OBSOLETE, please do not use -- obosolete stuff. */
+/* Use cmd->device->{id, channel, lun} instead */
+/* 	unsigned int target; */
+/* 	unsigned int lun; */
+/* 	unsigned int channel; */
+/* OBSOLETE, use cmd->device->host instead */	
+/* 	struct Scsi_Host   *host; */
+
 	unsigned char cmd_len;
 	unsigned char old_cmd_len;
 	unsigned char sc_data_direction;
@@ -989,5 +994,46 @@ extern void scsi_device_unregister(struct scsi_device *);
 
 extern int scsi_sysfs_register(void);
 extern void scsi_sysfs_unregister(void);
+
+/* -------------------------------------------------- */
+/* data decl: */
+
+/* All the SCSI Core specific global data, etc,
+   should go in here.
+*/
+
+struct scsi_core_data {
+	kmem_cache_t   *scsi_cmd_cache;
+	kmem_cache_t   *scsi_cmd_dma_cache;
+};
+
+extern struct scsi_core_data *scsi_core;
+
+/* -------------------------------------------------- */
+/* fn decl: */
+
+int scsi_create_cmdcache(struct scsi_core_data *scsi_core);
+int scsi_destroy_cmdcache(struct scsi_core_data *scsi_core);
+
+struct scsi_cmnd * scsi_get_command(struct Scsi_Host *host, int alloc_flags);
+void scsi_put_command(struct scsi_cmnd *cmd);
+void scsi_setup_command(struct scsi_device *dev, struct scsi_cmnd *cmd);
+
+/* -------------------------------------------------- */
+/* inline funcs: */
+
+/* scsi_getset_command: allocate, set and return a command struct,
+   when the device is known.
+*/
+static inline struct scsi_cmnd *scsi_getset_command(struct scsi_device *dev,
+						    int flags)
+{
+	struct scsi_cmnd *cmd;
+
+	if (!dev) return NULL;
+	if (!dev->host) return NULL;
+	scsi_setup_command(dev, (cmd = scsi_get_command(dev->host, flags)));
+	return cmd;
+}				
 
 #endif

@@ -239,111 +239,43 @@ int __devinit snd_emu10k1_proc_init(emu10k1_t * emu)
 {
 	snd_info_entry_t *entry;
 	
-	if ((entry = snd_info_create_card_entry(emu->card, "emu10k1", emu->card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = emu;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 4096;
-		entry->c.text.read = snd_emu10k1_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	emu->proc_entry = entry;
-	entry = NULL;
-	if ((entry = snd_info_create_card_entry(emu->card, "fx8010_gpr", emu->card->proc_root)) != NULL) {
+	if (! snd_card_proc_new(emu->card, "emu10k1", &entry))
+		snd_info_set_text_ops(entry, emu, snd_emu10k1_proc_read);
+
+	if (! snd_card_proc_new(emu->card, "fx8010_gpr", &entry)) {
 		entry->content = SNDRV_INFO_CONTENT_DATA;
 		entry->private_data = emu;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
+		entry->mode = S_IFREG | S_IRUGO /*| S_IWUSR*/;
 		entry->size = TOTAL_SIZE_GPR;
 		entry->c.ops = &snd_emu10k1_proc_ops_fx8010;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
 	}
-	emu->proc_entry_fx8010_gpr = entry;
-	entry = NULL;
-	if (!emu->audigy && (entry = snd_info_create_card_entry(emu->card, "fx8010_tram_data", emu->card->proc_root)) != NULL) {
+	if (!emu->audigy && ! snd_card_proc_new(emu->card, "fx8010_tram_data", &entry)) {
 		entry->content = SNDRV_INFO_CONTENT_DATA;
 		entry->private_data = emu;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
+		entry->mode = S_IFREG | S_IRUGO /*| S_IWUSR*/;
 		entry->size = TOTAL_SIZE_TANKMEM_DATA;
 		entry->c.ops = &snd_emu10k1_proc_ops_fx8010;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
 	}
-	emu->proc_entry_fx8010_tram_data = entry;
-	entry = NULL;
-	if (!emu->audigy && (entry = snd_info_create_card_entry(emu->card, "fx8010_tram_addr", emu->card->proc_root)) != NULL) {
+	if (!emu->audigy && ! snd_card_proc_new(emu->card, "fx8010_tram_addr", &entry)) {
 		entry->content = SNDRV_INFO_CONTENT_DATA;
 		entry->private_data = emu;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
+		entry->mode = S_IFREG | S_IRUGO /*| S_IWUSR*/;
 		entry->size = TOTAL_SIZE_TANKMEM_ADDR;
 		entry->c.ops = &snd_emu10k1_proc_ops_fx8010;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
 	}
-	emu->proc_entry_fx8010_tram_addr = entry;
-	entry = NULL;
-	if ((entry = snd_info_create_card_entry(emu->card, "fx8010_code", emu->card->proc_root)) != NULL) {
+	if (! snd_card_proc_new(emu->card, "fx8010_code", &entry)) {
 		entry->content = SNDRV_INFO_CONTENT_DATA;
 		entry->private_data = emu;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
+		entry->mode = S_IFREG | S_IRUGO /*| S_IWUSR*/;
 		entry->size = TOTAL_SIZE_CODE;
 		entry->c.ops = &snd_emu10k1_proc_ops_fx8010;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
 	}
-	emu->proc_entry_fx8010_code = entry;
-	entry = NULL;
-	if ((entry = snd_info_create_card_entry(emu->card, "fx8010_acode", emu->card->proc_root)) != NULL) {
+	if (! snd_card_proc_new(emu->card, "fx8010_acode", &entry)) {
 		entry->content = SNDRV_INFO_CONTENT_TEXT;
 		entry->private_data = emu;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
+		entry->mode = S_IFREG | S_IRUGO /*| S_IWUSR*/;
 		entry->c.text.read_size = 64*1024;
 		entry->c.text.read = snd_emu10k1_proc_acode_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	emu->proc_entry_fx8010_iblocks = entry;
-	return 0;
-}
-
-int snd_emu10k1_proc_done(emu10k1_t * emu)
-{
-	if (emu->proc_entry) {
-		snd_info_unregister(emu->proc_entry);
-		emu->proc_entry = NULL;
-	}
-	if (emu->proc_entry_fx8010_gpr) {
-		snd_info_unregister(emu->proc_entry_fx8010_gpr);
-		emu->proc_entry_fx8010_gpr = NULL;
-	}
-	if (emu->proc_entry_fx8010_tram_data) {
-		snd_info_unregister(emu->proc_entry_fx8010_tram_data);
-		emu->proc_entry_fx8010_tram_data = NULL;
-	}
-	if (emu->proc_entry_fx8010_tram_addr) {
-		snd_info_unregister(emu->proc_entry_fx8010_tram_addr);
-		emu->proc_entry_fx8010_tram_addr = NULL;
-	}
-	if (emu->proc_entry_fx8010_code) {
-		snd_info_unregister(emu->proc_entry_fx8010_code);
-		emu->proc_entry_fx8010_code = NULL;
-	}
-	if (emu->proc_entry_fx8010_iblocks) {
-		snd_info_unregister(emu->proc_entry_fx8010_iblocks);
-		emu->proc_entry_fx8010_iblocks = NULL;
 	}
 	return 0;
 }

@@ -334,7 +334,8 @@ static struct ecard_driver cumanascsi1_driver = {
 	.remove		= __devexit_p(cumanascsi1_remove),
 	.id_table	= cumanascsi1_cids,
 	.drv = {
-		.name	= "cumanascsi1",
+		.devclass	= &shost_devclass,
+		.name		= "cumanascsi1",
 	},
 };
 

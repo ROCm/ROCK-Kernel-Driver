@@ -17,8 +17,6 @@ HEAD-$(CONFIG_6xx)		+= idle_6xx.o
 
 EXTRA_TARGETS	:= $(HEAD-y)
 
-export-objs			:= ppc_ksyms.o time.o
-
 obj-y				:= entry.o traps.o irq.o idle.o time.o misc.o \
 					process.o signal.o ptrace.o align.o \
 					semaphore.o syscalls.o setup.o \

@@ -39,7 +39,7 @@
  *
  * $FreeBSD$
  */
-VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic79xx.reg#59 $"
+VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic79xx.reg#60 $"
 
 /*
  * This file is processed by the aic7xxx_asm utility for use in assembling
@@ -173,6 +173,23 @@ register SEQINTCODE {
 		STATUS_OVERRUN,
 		CFG4OVERRUN,
 		ENTERING_NONPACK,
+		TASKMGMT_FUNC_COMPLETE,		/*
+						 * Task management function
+						 * request completed with
+						 * an expected busfree.
+						 */
+		TASKMGMT_CMD_CMPLT_OKAY,	/*
+						 * A command with a non-zero
+						 * task management function
+						 * has completed via the normal
+						 * command completion method
+						 * for commands with a zero
+						 * task management function.
+						 * This happens when an attempt
+						 * to abort a command loses
+						 * the race for the command to
+						 * complete normally.
+						 */
 		TRACEPOINT0,
 		TRACEPOINT1,
 		TRACEPOINT2,

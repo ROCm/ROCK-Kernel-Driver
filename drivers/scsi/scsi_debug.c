@@ -217,7 +217,7 @@ int scsi_debug_queuecommand(struct scsi_cmnd * SCpnt, done_funct_t done)
 	int block, upper_blk, num;
 	unsigned char *buff;
 	int errsts = 0;
-	int target = SCpnt->target;
+	int target = SCpnt->device->id;
 	int bufflen = SCpnt->request_bufflen;
 	unsigned long capac;
 	struct sdebug_dev_info * devip = NULL;
@@ -247,7 +247,7 @@ int scsi_debug_queuecommand(struct scsi_cmnd * SCpnt, done_funct_t done)
 		return schedule_resp(SCpnt, NULL, done, 0, 0);
         }
 
-	if (SCpnt->lun >= scsi_debug_max_luns)
+	if (SCpnt->device->lun >= scsi_debug_max_luns)
 		return schedule_resp(SCpnt, NULL, done, 
 				     DID_NO_CONNECT << 16, 0);
 	devip = devInfoReg(SCpnt);
@@ -868,19 +868,19 @@ static struct sdebug_dev_info * devInfoReg(struct scsi_cmnd *scmd)
 		return devip;
 	for (k = 0; k < scsi_debug_num_devs; ++k) {
 		devip = &devInfop[k];
-		if ((devip->channel == scmd->channel) &&
-		    (devip->target == scmd->target) &&
-		    (devip->lun == scmd->lun) &&
-		    (devip->host == scmd->host))
+		if ((devip->channel == scmd->device->channel) &&
+		    (devip->target == scmd->device->id) &&
+		    (devip->lun == scmd->device->lun) &&
+		    (devip->host == scmd->device->host))
 			return devip;
 	}
 	for (k = 0; k < scsi_debug_num_devs; ++k) {
 		devip = &devInfop[k];
 		if (!devip->used) {
-			devip->channel = scmd->channel;
-			devip->target = scmd->target;
-			devip->lun = scmd->lun;
-			devip->host = scmd->host;
+			devip->channel = scmd->device->channel;
+			devip->target = scmd->device->id;
+			devip->lun = scmd->device->lun;
+			devip->host = scmd->device->host;
 			devip->reset = 1;
 			devip->used = 1;
 			memset(devip->sense_buff, 0, SDEBUG_SENSE_LEN);
@@ -962,7 +962,7 @@ static int scsi_debug_bus_reset(struct scsi_cmnd * SCpnt)
 	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
 		printk(KERN_INFO "scsi_debug: bus_reset\n");
 	++num_bus_resets;
-	if (SCpnt && ((sdp = SCpnt->device)) && ((hp = SCpnt->host))) {
+	if (SCpnt && ((sdp = SCpnt->device)) && ((hp = SCpnt->device->host))) {
 		for (k = 0; k < scsi_debug_num_devs; ++k) {
 			if (hp == devInfop[k].host)
 				devInfop[k].reset = 1;

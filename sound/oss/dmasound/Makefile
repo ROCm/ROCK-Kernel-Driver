@@ -2,8 +2,6 @@
 # Makefile for the DMA sound driver
 #
 
-export-objs := dmasound_core.o
-
 obj-$(CONFIG_DMASOUND_ATARI)  += dmasound_core.o dmasound_atari.o
 obj-$(CONFIG_DMASOUND_AWACS)  += dmasound_core.o dmasound_awacs.o
 obj-$(CONFIG_DMASOUND_PAULA)  += dmasound_core.o dmasound_paula.o

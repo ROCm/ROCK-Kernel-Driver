@@ -9,6 +9,9 @@
  */
 
 #include <linux/config.h>
+#ifdef CONFIG_SPARC32_COMPAT
+#include <linux/compat.h>	/* for compat_old_sigset_t */
+#endif
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/signal.h>
@@ -247,7 +250,7 @@ asmlinkage void _sigpause_common(old_sigset_t set, struct pt_regs *regs)
 
 #ifdef CONFIG_SPARC32_COMPAT
 	if (test_thread_flag(TIF_32BIT)) {
-		extern asmlinkage void _sigpause32_common(old_sigset_t32,
+		extern asmlinkage void _sigpause32_common(compat_old_sigset_t,
 							  struct pt_regs *);
 		_sigpause32_common(set, regs);
 		return;

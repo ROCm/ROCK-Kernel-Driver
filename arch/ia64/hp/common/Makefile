@@ -5,6 +5,4 @@
 # Copyright (C) Alex Williamson (alex_williamson@hp.com)
 #
 
-export-objs := sba_iommu.o
-
 obj-y := sba_iommu.o

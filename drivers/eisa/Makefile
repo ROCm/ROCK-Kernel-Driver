@@ -2,8 +2,6 @@
 
 obj-$(CONFIG_EISA)	+= eisa-bus.o
 
-export-objs	:= eisa-bus.o
-
 clean-files:= devlist.h
 
 # Ugly hack to get DEVICE_NAME_SIZE value...

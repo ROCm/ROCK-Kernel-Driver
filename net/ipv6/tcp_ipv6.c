@@ -934,11 +934,11 @@ static void tcp_v6_or_free(struct open_request *req)
 }
 
 static struct or_calltable or_ipv6 = {
-	AF_INET6,
-	tcp_v6_send_synack,
-	tcp_v6_or_send_ack,
-	tcp_v6_or_free,
-	tcp_v6_send_reset
+	.family		=	AF_INET6,
+	.rtx_syn_ack	=	tcp_v6_send_synack,
+	.send_ack	=	tcp_v6_or_send_ack,
+	.destructor	=	tcp_v6_or_free,
+	.send_reset	=	tcp_v6_send_reset
 };
 
 static int ipv6_opt_accepted(struct sock *sk, struct sk_buff *skb)
@@ -1746,7 +1746,7 @@ static int tcp_v6_rebuild_header(struct sock *sk)
 	return 0;
 }
 
-static int tcp_v6_xmit(struct sk_buff *skb)
+static int tcp_v6_xmit(struct sk_buff *skb, int ipfragok)
 {
 	struct sock *sk = skb->sk;
 	struct inet_opt *inet = inet_sk(sk);
@@ -1812,18 +1812,18 @@ static int tcp_v6_remember_stamp(struct sock *sk)
 }
 
 static struct tcp_func ipv6_specific = {
-	tcp_v6_xmit,
-	tcp_v6_send_check,
-	tcp_v6_rebuild_header,
-	tcp_v6_conn_request,
-	tcp_v6_syn_recv_sock,
-	tcp_v6_remember_stamp,
-	sizeof(struct ipv6hdr),
+	.queue_xmit	=	tcp_v6_xmit,
+	.send_check	=	tcp_v6_send_check,
+	.rebuild_header	=	tcp_v6_rebuild_header,
+	.conn_request	=	tcp_v6_conn_request,
+	.syn_recv_sock	=	tcp_v6_syn_recv_sock,
+	.remember_stamp	=	tcp_v6_remember_stamp,
+	.net_header_len	=	sizeof(struct ipv6hdr),
 
-	ipv6_setsockopt,
-	ipv6_getsockopt,
-	v6_addr2sockaddr,
-	sizeof(struct sockaddr_in6)
+	.setsockopt	=	ipv6_setsockopt,
+	.getsockopt	=	ipv6_getsockopt,
+	.addr2sockaddr	=	v6_addr2sockaddr,
+	.sockaddr_len	=	sizeof(struct sockaddr_in6)
 };
 
 /*
@@ -1831,18 +1831,18 @@ static struct tcp_func ipv6_specific = {
  */
 
 static struct tcp_func ipv6_mapped = {
-	ip_queue_xmit,
-	tcp_v4_send_check,
-	tcp_v4_rebuild_header,
-	tcp_v6_conn_request,
-	tcp_v6_syn_recv_sock,
-	tcp_v4_remember_stamp,
-	sizeof(struct iphdr),
+	.queue_xmit	=	ip_queue_xmit,
+	.send_check	=	tcp_v4_send_check,
+	.rebuild_header	=	tcp_v4_rebuild_header,
+	.conn_request	=	tcp_v6_conn_request,
+	.syn_recv_sock	=	tcp_v6_syn_recv_sock,
+	.remember_stamp	=	tcp_v4_remember_stamp,
+	.net_header_len	=	sizeof(struct iphdr),
 
-	ipv6_setsockopt,
-	ipv6_getsockopt,
-	v6_addr2sockaddr,
-	sizeof(struct sockaddr_in6)
+	.setsockopt	=	ipv6_setsockopt,
+	.getsockopt	=	ipv6_getsockopt,
+	.addr2sockaddr	=	v6_addr2sockaddr,
+	.sockaddr_len	=	sizeof(struct sockaddr_in6)
 };
 
 
@@ -2157,23 +2157,23 @@ out_no_bh:
 }
 
 struct proto tcpv6_prot = {
-	.name =		"TCPv6",
-	.close =	tcp_close,
-	.connect =	tcp_v6_connect,
-	.disconnect =	tcp_disconnect,
-	.accept =	tcp_accept,
-	.ioctl =	tcp_ioctl,
-	.init =		tcp_v6_init_sock,
-	.destroy =	tcp_v6_destroy_sock,
-	.shutdown =	tcp_shutdown,
-	.setsockopt =	tcp_setsockopt,
-	.getsockopt =	tcp_getsockopt,
-	.sendmsg =	tcp_sendmsg,
-	.recvmsg =	tcp_recvmsg,
-	.backlog_rcv =	tcp_v6_do_rcv,
-	.hash =		tcp_v6_hash,
-	.unhash =	tcp_unhash,
-	.get_port =	tcp_v6_get_port,
+	.name		=	"TCPv6",
+	.close		=	tcp_close,
+	.connect	=	tcp_v6_connect,
+	.disconnect	=	tcp_disconnect,
+	.accept		=	tcp_accept,
+	.ioctl		=	tcp_ioctl,
+	.init		=	tcp_v6_init_sock,
+	.destroy	=	tcp_v6_destroy_sock,
+	.shutdown	=	tcp_shutdown,
+	.setsockopt	=	tcp_setsockopt,
+	.getsockopt	=	tcp_getsockopt,
+	.sendmsg	=	tcp_sendmsg,
+	.recvmsg	=	tcp_recvmsg,
+	.backlog_rcv	=	tcp_v6_do_rcv,
+	.hash		=	tcp_v6_hash,
+	.unhash		=	tcp_unhash,
+	.get_port	=	tcp_v6_get_port,
 };
 
 static struct inet6_protocol tcpv6_protocol = {
@@ -2184,13 +2184,13 @@ static struct inet6_protocol tcpv6_protocol = {
 extern struct proto_ops inet6_stream_ops;
 
 static struct inet_protosw tcpv6_protosw = {
-	.type =      SOCK_STREAM,
-	.protocol =  IPPROTO_TCP,
-	.prot =      &tcpv6_prot,
-	.ops =       &inet6_stream_ops,
-	.capability =-1,
-	.no_check =  0,
-	.flags =     INET_PROTOSW_PERMANENT,
+	.type		=	SOCK_STREAM,
+	.protocol	=	IPPROTO_TCP,
+	.prot		=	&tcpv6_prot,
+	.ops		=	&inet6_stream_ops,
+	.capability	=	-1,
+	.no_check	=	0,
+	.flags		=	INET_PROTOSW_PERMANENT,
 };
 
 void __init tcpv6_init(void)

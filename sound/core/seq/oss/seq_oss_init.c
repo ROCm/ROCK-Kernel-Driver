@@ -275,9 +275,6 @@ snd_seq_oss_open(struct file *file, int level)
 
 	client_table[dp->index] = dp;
 	num_clients++;
-#ifdef LINUX_2_2
-	MOD_INC_USE_COUNT;
-#endif
 
 	debug_printk(("open done\n"));
 
@@ -434,9 +431,6 @@ snd_seq_oss_release(seq_oss_devinfo_t *dp)
 	if (dp->queue >= 0)
 		delete_seq_queue(dp);
 
-#ifdef LINUX_2_2
-	MOD_DEC_USE_COUNT;
-#endif
 	debug_printk(("release done\n"));
 }
 

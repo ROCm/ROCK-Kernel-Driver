@@ -1,9 +1,5 @@
 # Makefile for the CAPI subsystem.
 
-# Objects that export symbols.
-
-export-objs	:= kcapi.o capiutil.o capilib.o capifs.o
-
 # Ordering constraints: kernelcapi.o first
 
 # Each configuration option enables a list of files.

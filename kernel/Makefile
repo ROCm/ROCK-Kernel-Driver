@@ -2,10 +2,6 @@
 # Makefile for the linux kernel.
 #
 
-export-objs = signal.o sys.o kmod.o workqueue.o ksyms.o pm.o exec_domain.o \
-		printk.o suspend.o dma.o module.o cpufreq.o \
-		profile.o rcupdate.o intermodule.o params.o
-
 obj-y     = sched.o fork.o exec_domain.o panic.o printk.o profile.o \
 	    exit.o itimer.o time.o softirq.o resource.o \
 	    sysctl.o capability.o ptrace.o timer.o user.o \

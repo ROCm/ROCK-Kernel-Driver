@@ -2,7 +2,6 @@
 # Makefile for the Linux/MIPS-specific parts of the memory manager.
 #
 
-export-objs			+= ioremap.o umap.o
 obj-y				+= extable.o init.o ioremap.o fault.o loadmmu.o
 
 obj-$(CONFIG_CPU_R3000)		+= r2300.o

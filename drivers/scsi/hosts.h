@@ -375,6 +375,9 @@ struct Scsi_Host
     struct list_head      sh_list;
     struct list_head	  my_devices;
 
+    spinlock_t            free_list_lock;
+    struct list_head      free_list;   /* backup store of cmd structs */
+
     spinlock_t		  default_lock;
     spinlock_t		  *host_lock;
 
@@ -605,8 +608,8 @@ static inline Scsi_Device *scsi_find_device(struct Scsi_Host *shost,
 	list_for_each_entry (sdev, &shost->my_devices, siblings)
                 if (sdev->channel == channel && sdev->id == pun
                    && sdev->lun ==lun)
-                        break;
-        return sdev;
+                        return sdev;
+        return NULL;
 }
 
 /*

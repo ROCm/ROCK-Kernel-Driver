@@ -39,6 +39,16 @@ extern int e1000_up(struct e1000_adapter *adapter);
 extern void e1000_down(struct e1000_adapter *adapter);
 extern void e1000_reset(struct e1000_adapter *adapter);
 
+static char e1000_gstrings_stats[][ETH_GSTRING_LEN] = {
+	"rx_packets", "tx_packets", "rx_bytes", "tx_bytes", "rx_errors",
+	"tx_errors", "rx_dropped", "tx_dropped", "multicast", "collisions",
+	"rx_length_errors", "rx_over_errors", "rx_crc_errors",
+	"rx_frame_errors", "rx_fifo_errors", "rx_missed_errors",
+	"tx_aborted_errors", "tx_carrier_errors", "tx_fifo_errors",
+	"tx_heartbeat_errors", "tx_window_errors",
+};
+#define E1000_STATS_LEN	sizeof(e1000_gstrings_stats) / ETH_GSTRING_LEN
+
 static void
 e1000_ethtool_gset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 {
@@ -173,6 +183,7 @@ e1000_ethtool_gdrvinfo(struct e1000_adapter *adapter,
 	strncpy(drvinfo->version, e1000_driver_version, 32);
 	strncpy(drvinfo->fw_version, "N/A", 32);
 	strncpy(drvinfo->bus_info, adapter->pdev->slot_name, 32);
+	drvinfo->n_stats = E1000_STATS_LEN;
 #define E1000_REGS_LEN 32
 	drvinfo->regdump_len  = E1000_REGS_LEN * sizeof(uint32_t);
 	drvinfo->eedump_len  = e1000_eeprom_size(&adapter->hw);
@@ -209,18 +220,24 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
                       struct ethtool_eeprom *eeprom, uint16_t *eeprom_buff)
 {
 	struct e1000_hw *hw = &adapter->hw;
-	int i, max_len, first_word, last_word;
+	int max_len, first_word, last_word;
+	int ret_val = 0;
+	int i;
 
-	if(eeprom->len == 0)
-		return -EINVAL;
+	if(eeprom->len == 0) {
+		ret_val = -EINVAL;
+		goto geeprom_error;
+	}
 
 	eeprom->magic = hw->vendor_id | (hw->device_id << 16);
 
 	max_len = e1000_eeprom_size(hw);
 
-	if(eeprom->offset > eeprom->offset + eeprom->len)
-		return -EINVAL;
-	
+	if(eeprom->offset > eeprom->offset + eeprom->len) {
+		ret_val = -EINVAL;
+		goto geeprom_error;
+	}
+
 	if((eeprom->offset + eeprom->len) > max_len)
 		eeprom->len = (max_len - eeprom->offset);
 
@@ -230,7 +247,8 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
 	for(i = 0; i <= (last_word - first_word); i++)
 		e1000_read_eeprom(hw, first_word + i, &eeprom_buff[i]);
 
-	return 0;
+geeprom_error:
+	return ret_val;
 }
 
 static int
@@ -238,9 +256,10 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
                       struct ethtool_eeprom *eeprom, void *user_data)
 {
 	struct e1000_hw *hw = &adapter->hw;
-	uint16_t eeprom_buff[256];
-	int i, max_len, first_word, last_word;
+	uint16_t *eeprom_buff;
+	int max_len, first_word, last_word;
 	void *ptr;
+	int i;
 
 	if(eeprom->len == 0)
 		return -EOPNOTSUPP;
@@ -255,6 +274,10 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
 
 	first_word = eeprom->offset >> 1;
 	last_word = (eeprom->offset + eeprom->len - 1) >> 1;
+	eeprom_buff = kmalloc(max_len, GFP_KERNEL);
+	if(eeprom_buff == NULL)
+		return -ENOMEM;
+
 	ptr = (void *)eeprom_buff;
 
 	if(eeprom->offset & 1) {
@@ -269,8 +292,10 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
 		e1000_read_eeprom(hw, last_word,
 		                  &eeprom_buff[last_word - first_word]);
 	}
-	if(copy_from_user(ptr, user_data, eeprom->len))
+	if(copy_from_user(ptr, user_data, eeprom->len)) {
+		kfree(eeprom_buff);
 		return -EFAULT;
+	}
 
 	for(i = 0; i <= (last_word - first_word); i++)
 		e1000_write_eeprom(hw, first_word + i, eeprom_buff[i]);
@@ -278,6 +303,8 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
 	/* Update the checksum over the first part of the EEPROM if needed */
 	if(first_word <= EEPROM_CHECKSUM_REG)
 		e1000_update_eeprom_checksum(hw);
+
+	kfree(eeprom_buff);
 
 	return 0;
 }
@@ -438,6 +465,28 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 			return -EFAULT;
 		return 0;
 	}
+	case ETHTOOL_GSTRINGS: {
+		struct ethtool_gstrings gstrings = { ETHTOOL_GSTRINGS };
+		char *strings = NULL;
+
+		if(copy_from_user(&gstrings, addr, sizeof(gstrings)))
+			return -EFAULT;
+		switch(gstrings.string_set) {
+		case ETH_SS_STATS:
+			gstrings.len = E1000_STATS_LEN;
+			strings = *e1000_gstrings_stats;
+			break;
+		default:
+			return -EOPNOTSUPP;
+		}
+		if(copy_to_user(addr, &gstrings, sizeof(gstrings)))
+			return -EFAULT;
+		addr += offsetof(struct ethtool_gstrings, data);
+		if(copy_to_user(addr, strings,
+		   gstrings.len * ETH_GSTRING_LEN))
+			return -EFAULT;
+		return 0;
+	}
 	case ETHTOOL_GREGS: {
 		struct ethtool_regs regs = {ETHTOOL_GREGS};
 		uint32_t regs_buff[E1000_REGS_LEN];
@@ -493,26 +542,40 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 	}
 	case ETHTOOL_GEEPROM: {
 		struct ethtool_eeprom eeprom = {ETHTOOL_GEEPROM};
-		uint16_t eeprom_buff[256];
+		uint16_t *eeprom_buff;
 		void *ptr;
-		int err;
+		int max_len, err = 0;
 
-		if(copy_from_user(&eeprom, addr, sizeof(eeprom)))
-			return -EFAULT;
+		max_len = e1000_eeprom_size(&adapter->hw);
 
-		if((err = e1000_ethtool_geeprom(adapter, 
-			&eeprom, eeprom_buff)))
-			return err;
+		eeprom_buff = kmalloc(max_len, GFP_KERNEL);
 
-		if(copy_to_user(addr, &eeprom, sizeof(eeprom)))
-			return -EFAULT;
+		if(eeprom_buff == NULL)
+			return -ENOMEM;
+
+		if(copy_from_user(&eeprom, addr, sizeof(eeprom))) {
+			err = -EFAULT;
+			goto err_geeprom_ioctl;
+		}
+
+		if((err = e1000_ethtool_geeprom(adapter, &eeprom,
+						eeprom_buff)))
+			goto err_geeprom_ioctl;
+
+		if(copy_to_user(addr, &eeprom, sizeof(eeprom))) {
+			err = -EFAULT;
+			goto err_geeprom_ioctl;
+		}
 
 		addr += offsetof(struct ethtool_eeprom, data);
 		ptr = ((void *)eeprom_buff) + (eeprom.offset & 1);
 
 		if(copy_to_user(addr, ptr, eeprom.len))
-			return -EFAULT;
-		return 0;
+			err = -EFAULT;
+
+err_geeprom_ioctl:
+		kfree(eeprom_buff);
+		return err;
 	}
 	case ETHTOOL_SEEPROM: {
 		struct ethtool_eeprom eeprom;
@@ -525,6 +588,20 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 
 		addr += offsetof(struct ethtool_eeprom, data);
 		return e1000_ethtool_seeprom(adapter, &eeprom, addr);
+	}
+	case ETHTOOL_GSTATS: {
+		struct {
+			struct ethtool_stats cmd;
+			uint64_t data[E1000_STATS_LEN];
+		} stats = { {ETHTOOL_GSTATS, E1000_STATS_LEN} };
+		int i;
+
+		for(i = 0; i < E1000_STATS_LEN; i++)
+			stats.data[i] =
+				((unsigned long *)&adapter->net_stats)[i];
+		if(copy_to_user(addr, &stats, sizeof(stats)))
+			return -EFAULT;
+		return 0;
 	}
 	default:
 		return -EOPNOTSUPP;

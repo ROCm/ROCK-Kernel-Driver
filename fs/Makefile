@@ -5,9 +5,6 @@
 # Rewritten to use lists instead of if-statements.
 # 
 
-export-objs :=	open.o dcache.o buffer.o bio.o inode.o dquot.o mpage.o aio.o \
-                fcntl.o read_write.o dcookies.o mbcache.o posix_acl.o xattr_acl.o
-
 obj-y :=	open.o read_write.o file_table.o buffer.o \
 		bio.o super.o block_dev.o char_dev.o stat.o exec.o pipe.o \
 		namei.o fcntl.o ioctl.o readdir.o select.o fifo.o locks.o \

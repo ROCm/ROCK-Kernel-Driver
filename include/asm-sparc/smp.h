@@ -48,7 +48,6 @@ extern unsigned long cpu_offset[NR_CPUS];
  *	Private routines/data
  */
  
-extern int smp_found_cpus;
 extern unsigned char boot_cpu_id;
 extern unsigned long cpu_present_map;
 #define cpu_online_map cpu_present_map

@@ -9,7 +9,5 @@ obj-m			:=
 obj-n			:=
 obj-			:=
 
-export-objs		:= 
-
 obj-$(CONFIG_PCI)	+= pci.o
 obj-$(CONFIG_LEDS)	+= leds.o

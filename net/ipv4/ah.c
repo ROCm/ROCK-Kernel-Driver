@@ -280,6 +280,8 @@ int ah_input(struct xfrm_state *x, struct sk_buff *skb)
 	    pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
 		goto out;
 
+	skb->ip_summed = CHECKSUM_NONE;
+
 	ah = (struct ip_auth_hdr*)skb->data;
 	iph = skb->nh.iph;
 

@@ -2,105 +2,82 @@
 # Module versions
 # ===========================================================================
 
-src := $(obj)
-
-MODVERDIR := include/linux/modules
-
-.PHONY: modver
-modver:
-
-include .config
-
-include $(obj)/Makefile
+.PHONY: __modversions
+__modversions:
 
 include scripts/Makefile.lib
 
-# ===========================================================================
+#
 
-ifeq ($(strip $(export-objs)),)
+modules := $(patsubst ./%,%,$(shell cd $(MODVERDIR); find . -name \*.ko))
 
-# If we don't export any symbols in this dir, just descend
-# ---------------------------------------------------------------------------
-
-modver: $(subdir-ym)
+__modversions: $(modules)
 	@:
 
-else
+# The final module link
 
-# This sets version suffixes on exported symbols
-# ---------------------------------------------------------------------------
+quiet_cmd_ld_ko_o = LD [M]  $@
+      cmd_ld_ko_o = $(LD) $(LDFLAGS) $(LDFLAGS_MODULE) -o $@ 		\
+			  $(filter-out FORCE,$^)
 
-#
-# Added the SMP separator to stop module accidents between uniprocessor
-# and SMP Intel boxes - AC - from bits by Michael Chastain
-#
+init/vermagic.o: ;
 
-ifdef CONFIG_SMP
-	genksyms_smp_prefix := -p smp_
-else
-	genksyms_smp_prefix := 
-endif
+$(modules): %.ko :%.o %.ver.o init/vermagic.o FORCE
+	$(call if_changed,ld_ko_o)
 
-#	Don't include modversions.h, we're just about to generate it here.
+targets += $(modules)
 
-CFLAGS_MODULE := $(filter-out -include include/linux/modversions.h,$(CFLAGS_MODULE))
+# Compile version info for unresolved symbols
 
-$(addprefix $(MODVERDIR)/,$(real-objs-y:.o=.ver)): modkern_cflags := $(CFLAGS_KERNEL)
-$(addprefix $(MODVERDIR)/,$(real-objs-m:.o=.ver)): modkern_cflags := $(CFLAGS_MODULE)
-$(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver)): export_flags   := -D__GENKSYMS__
-# Default for not multi-part modules
-modname = $(*F)
+quiet_cmd_cc_o_c = CC      $@
+      cmd_cc_o_c = $(CC) $(CFLAGS) -c -o $@ $<
 
-$(addprefix $(MODVERDIR)/,$(multi-objs:.o=.ver)) : modname = $(modname-multi)
+$(modules:.ko=.ver.o): %.ver.o: %.ver.c FORCE
+	$(call if_changed,cc_o_c)
 
-# Our objects only depend on modversions.h, not on the individual .ver
-# files (fix-dep filters them), so touch modversions.h if any of the .ver
-# files changes
+targets += $(modules:.ko=.ver.o)
 
-quiet_cmd_cc_ver_c = MKVER   include/linux/modules/$*.ver
-cmd_cc_ver_c = $(CPP) $(c_flags) $< | $(GENKSYMS) $(genksyms_smp_prefix) \
-		 -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp
+# Generate C source with version info for unresolved symbols
 
-# Okay, let's explain what's happening in rule_make_cc_ver_c:
-# o echo the command
-# o execute the command
-# o If the $(CPP) fails, we won't notice because it's output is piped
-#   to $(GENKSYMS) which does not fail. We recognize this case by
-#   looking if the generated $(depfile) exists, though.
-# o If the .ver file changed, touch modversions.h, which is our marker
-#   of any changed .ver files.
-# o Move command line and deps into their normal .*.cmd place.  
-
-define rule_cc_ver_c
-	$(if $($(quiet)cmd_cc_ver_c),echo '  $($(quiet)cmd_cc_ver_c)';) \
-	$(cmd_cc_ver_c); \
-	if [ ! -r $(depfile) ]; then exit 1; fi; \
-	scripts/fixdep $(depfile) $@ '$(cmd_cc_ver_c)' > $(@D)/.$(@F).tmp; \
-	rm -f $(depfile); \
-	if [ ! -r $@ ] || cmp -s $@ $@.tmp; then \
-	  touch include/linux/modversions.h; \
-	fi; \
-	mv -f $@.tmp $@
-	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd
+define rule_mkver_o_c
+	echo '  MKVER   $@';						\
+	( echo "#include <linux/module.h>";				\
+	  echo "";							\
+	  echo "static const struct modversion_info ____versions[]";	\
+	  echo "__attribute__((section(\"__versions\"))) = {"; 	\
+	  for sym in `nm -u $<`; do					\
+		grep "\"$$sym\"" .tmp_all-versions			\
+		|| echo "*** Warning: $(<:.o=.ko): \"$$sym\" unresolved!" >&2;\
+	  done;								\
+	  echo "};";							\
+	) > $@
 endef
 
-targets := $(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver))
+$(modules:.ko=.ver.c): %.ver.c: %.o .tmp_all-versions FORCE
+	$(call if_changed_rule,mkver_o_c)
 
-$(MODVERDIR)/%.ver: %.c FORCE
-	@$(call if_changed_rule,cc_ver_c)
+targets += $(modules:.ko=.ver.c))
 
-modver: $(targets) $(subdir-ym)
-	@mkdir -p $(dir $(addprefix .tmp_export-objs/modules/,$(export-objs:.o=.ver)))
-	@touch $(addprefix .tmp_export-objs/modules/,$(export-objs:.o=.ver))
+# Extract all checksums for all exported symbols
 
-endif # export-objs 
+export-objs := $(shell for m in vmlinux $(modules:.ko=.o); do objdump -h $$m | grep -q __ksymtab && echo $$m; done)
 
-# Descending
-# ---------------------------------------------------------------------------
+cmd_gen-all-versions = mksyms $(export-objs)
+define rule_gen-all-versions
+	echo '  MKSYMS  $@';						\
+	for mod in $(export-objs); do					\
+		modname=`basename $$mod`;				\
+		nm $$mod 						\
+		| grep ' __crc_'					\
+		| sed "s/\([^ ]*\) A __crc_\(.*\)/{ 0x\1, \"\2\" }, \/* $$modname *\//g;s/.* w __crc_\(.*\)/{ 0x0       , \"\1\" }, \/* $$modname *\//g"; \
+	done > $@;							\
+	echo 'cmd_$@ := $(cmd_$(1))' > $(@D)/.$(@F).cmd
+endef
 
-.PHONY: $(subdir-ym)
-$(subdir-ym):
-	$(Q)$(MAKE) -f scripts/Makefile.modver obj=$@
+.tmp_all-versions: $(export-objs) FORCE
+	$(call if_changed_rule,gen-all-versions)
+
+targets += .tmp_all-versions
 
 # Add FORCE to the prequisites of a target to force it to be always rebuilt.
 # ---------------------------------------------------------------------------

@@ -2,7 +2,6 @@
 # Makefile for the kernel software RAID and LVM drivers.
 #
 
-export-objs	:= md.o xor.o dm-table.o dm-target.o
 dm-mod-objs	:= dm.o dm-table.o dm-target.o dm-linear.o dm-stripe.o \
 		   dm-ioctl.o
 

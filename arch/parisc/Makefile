@@ -56,7 +56,6 @@ head-y			:= arch/parisc/kernel/head.o
 head-$(CONFIG_PARISC64)	:= arch/parisc/kernel/head64.o
 
 CFLAGS	+= $(cflags-y)
-HEAD	:= $(head-y)
 
 core-y	+= $(addprefix arch/parisc/, kernel/pdc_cons.o kernel/process.o   \
 		mm/ kernel/ hpux/ math-emu/ kernel/init_task.o )
@@ -95,9 +94,6 @@ include/asm-parisc/offsets.h: arch/parisc/kernel/asm-offsets.s
 	@echo -n '  Generating $@'
 	@$(generate-asm-offsets.h) < $< > $@.tmp
 	@$(update-if-changed)
-
-archclean:
-archmrproper:
 
 CLEAN_FILES	+= palo.conf lifimage include/asm-parisc/offsets.h \
 		include/asm-parisc/offsets.h.tmp

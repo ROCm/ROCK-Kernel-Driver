@@ -512,6 +512,37 @@ static void h3xxx_set_vpp(struct map_info *map, int vpp)
 #define h3xxx_set_vpp NULL
 #endif
 
+#ifdef CONFIG_SA1100_HACKKIT
+static struct mtd_partition hackkit_partitions[] = {
+	{
+		.name		= "BLOB",
+		.size		= 0x00040000,
+		.offset		= 0x00000000,
+		.mask_flags	= MTD_WRITEABLE,  /* force read-only */
+	}, {
+		.name		= "config",
+		.size		= 0x00040000,
+		.offset		= MTDPART_OFS_APPEND,
+	}, {
+		.name		= "kernel",
+		.size		= 0x00100000,
+		.offset		= MTDPART_OFS_APPEND,
+	}, {
+		.name		= "initrd",
+		.size		= 0x00180000,
+		.offset		= MTDPART_OFS_APPEND,
+	}, {
+		.name		= "rootfs",
+		.size		= 0x700000,
+		.offset		= MTDPART_OFS_APPEND,
+	}, {
+		.name		= "data",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= MTDPART_OFS_APPEND,
+	}
+};
+#endif
+
 #ifdef CONFIG_SA1100_HUW_WEBPANEL
 static struct mtd_partition huw_webpanel_partitions[] = {
 	{
@@ -847,6 +878,12 @@ static int __init sa1100_static_partitions(struct mtd_partition **parts)
 	if (machine_is_h3xxx()) {
 		*parts       = h3xxx_partitions;
 		nb_parts     = ARRAY_SIZE(h3xxx_partitions);
+	}
+#endif
+#ifdef CONFIG_SA1100_HACKKIT
+	if (machine_is_hackkit()) {
+		*parts = hackkit_partitions;
+		nb_parts = ARRAY_SIZE(hackkit_partitions);
 	}
 #endif
 #ifdef CONFIG_SA1100_HUW_WEBPANEL

@@ -1,10 +1,10 @@
 00-INDEX
     	- this file: info on the kernel build process
-bug-list.txt
-	- known bugs in kbuild programs
 commands.txt
 	- overview of kbuild commands
 kconfig-language.txt
 	- specification of Config Language, the language in Kconfig files
+random.txt
+	- description of generic config targets
 makefiles.txt
 	- developer information for linux kernel makefiles

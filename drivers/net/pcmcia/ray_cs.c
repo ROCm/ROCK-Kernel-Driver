@@ -378,6 +378,7 @@ static dev_link_t *ray_attach(void)
     memset(dev, 0, sizeof(struct net_device));
     memset(local, 0, sizeof(ray_dev_t));
 
+    init_timer(&link->release);
     link->release.function = &ray_release;
     link->release.data = (u_long)link;
 

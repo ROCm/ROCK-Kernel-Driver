@@ -5,8 +5,6 @@
 
 EXTRA_TARGETS	:= head.o
 
-export-objs := ksyms.o
-
 obj-y   := process.o signal.o entry.o traps.o irq.o \
            ptrace.o setup.o time.o sys_cris.o shadows.o \
 	   debugport.o semaphore.o
