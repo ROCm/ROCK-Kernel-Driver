@@ -34,9 +34,10 @@
 #include <asm/arch/regs-irq.h>
 #include <asm/mach/time.h>
 
+#include "clock.h"
+
 static unsigned long timer_startval;
 static unsigned long timer_ticks_usec;
-
 
 /* with an 12MHz clock, we get 12 ticks per-usec
  */
@@ -139,7 +140,7 @@ void __init s3c2410_init_time (void)
 	 */
 
 	if (machine_is_h1940() || machine_is_smdk2410() ) {
-		timer_ticks_usec = s3c2410_pclk / (1000*1000);
+		timer_ticks_usec = s3c24xx_pclk / (1000*1000);
 		timer_ticks_usec /= 6;
 
 		tcfg1 &= ~S3C2410_TCFG1_MUX4_MASK;
@@ -148,7 +149,7 @@ void __init s3c2410_init_time (void)
 		tcfg0 &= ~S3C2410_TCFG_PRESCALER1_MASK;
 		tcfg0 |= ((6 - 1) / 2) << S3C2410_TCFG_PRESCALER1_SHIFT;
 
-		tcnt = (s3c2410_pclk / 6) / HZ;
+		tcnt = (s3c24xx_pclk / 6) / HZ;
 	}
 
 
