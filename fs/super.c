@@ -101,6 +101,21 @@ static inline void destroy_super(struct super_block *s)
 
 /* Superblock refcounting  */
 
+/*
+ * Drop a superblock's refcount.  Returns non-zero if the superblock was
+ * destroyed.  The caller must hold sb_lock.
+ */
+int __put_super(struct super_block *sb)
+{
+	int ret = 0;
+
+	if (!--sb->s_count) {
+		destroy_super(sb);
+		ret = 1;
+	}
+	return ret;
+}
+
 /**
  *	put_super	-	drop a temporary reference to superblock
  *	@s: superblock in question
@@ -108,13 +123,13 @@ static inline void destroy_super(struct super_block *s)
  *	Drops a temporary reference, frees superblock if there's no
  *	references left.
  */
-static inline void put_super(struct super_block *s)
+static void put_super(struct super_block *sb)
 {
 	spin_lock(&sb_lock);
-	if (!--s->s_count)
-		destroy_super(s);
+	__put_super(sb);
 	spin_unlock(&sb_lock);
 }
+
 
 /**
  *	deactivate_super	-	drop an active reference to superblock

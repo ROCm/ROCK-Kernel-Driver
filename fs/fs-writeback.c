@@ -397,12 +397,16 @@ writeback_inodes(struct writeback_control *wbc)
 
 	spin_lock(&inode_lock);
 	spin_lock(&sb_lock);
+restart:
 	sb = sb_entry(super_blocks.prev);
 	for (; sb != sb_entry(&super_blocks); sb = sb_entry(sb->s_list.prev)) {
 		if (!list_empty(&sb->s_dirty) || !list_empty(&sb->s_io)) {
+			sb->s_count++;
 			spin_unlock(&sb_lock);
 			sync_sb_inodes(sb, wbc);
 			spin_lock(&sb_lock);
+			if (__put_super(sb))
+				goto restart;
 		}
 		if (wbc->nr_to_write <= 0)
 			break;
