@@ -307,6 +307,9 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh, struct pt_regs *regs)
 		} else {
 			stopped = 1;
 
+			if (unlikely (!HCD_IS_RUNNING (ehci->hcd.state)))
+				urb->status = -ESHUTDOWN;
+
 			/* ignore active urbs unless some previous qtd
 			 * for the urb faulted (including short read) or
 			 * its urb was canceled.  we may patch qh or qtds.
