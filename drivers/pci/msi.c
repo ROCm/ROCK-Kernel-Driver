@@ -275,7 +275,6 @@ static void msi_data_init(struct msg_data *msi_data,
 static void msi_address_init(struct msg_address *msi_address)
 {
 	unsigned int	dest_id;
-	unsigned long val; 
 
 	memset(msi_address, 0, sizeof(struct msg_address));
 	msi_address->hi_address = (u32)0;
@@ -283,13 +282,7 @@ static void msi_address_init(struct msg_address *msi_address)
 	msi_address->lo_address.u.dest_mode = MSI_DEST_MODE;
 	msi_address->lo_address.u.redirection_hint = MSI_REDIRECTION_HINT_MODE;
 	msi_address->lo_address.u.dest_id = dest_id;
-	/* FIXME: broken for >64 CPUs */
-#ifdef __i386__
-	val = MSI_TARGET_CPU;
-#else
-	val = *cpus_addr(MSI_TARGET_CPU);
-#endif
-	msi_address->lo_address.value |= (val << MSI_TARGET_CPU_SHIFT);
+	msi_address->lo_address.value |= (MSI_TARGET_CPU << MSI_TARGET_CPU_SHIFT);
 }
 
 static int msi_free_vector(struct pci_dev* dev, int vector, int reassign);
