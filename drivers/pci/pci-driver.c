@@ -65,7 +65,9 @@ pci_device_probe_static(struct pci_driver *drv,
 {		   
 	int error = -ENODEV;
 	const struct pci_device_id *id;
-	
+
+	if (!drv->id_table)
+		return error;
 	id = pci_match_device(drv->id_table, pci_dev);
 	if (id)
 		error = drv->probe(pci_dev, id);
