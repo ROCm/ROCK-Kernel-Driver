@@ -1,6 +1,4 @@
 /*
- *  
- *
  *  PowerPC version 
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
  *
@@ -62,8 +60,6 @@
 
 #include <asm/ppcdebug.h>
 
-#define	PGTOKB(pages)	(((pages) * PAGE_SIZE) >> 10)
-
 #ifdef CONFIG_PPC_ISERIES
 #include <asm/iSeries/iSeries_dma.h>
 #endif
@@ -78,12 +74,9 @@ extern pgd_t swapper_pg_dir[];
 extern char __init_begin, __init_end;
 extern char __chrp_begin, __chrp_end;
 extern char __openfirmware_begin, __openfirmware_end;
-extern struct _of_tce_table of_tce_table[];
 extern char _start[], _end[];
 extern char _stext[], etext[];
 extern struct task_struct *current_set[NR_CPUS];
-
-void mm_init_ppc64(void);
 
 extern pgd_t ioremap_dir[];
 pgd_t * ioremap_pgd = (pgd_t *)&ioremap_dir;
@@ -179,7 +172,7 @@ __ioremap(unsigned long addr, unsigned long size, unsigned long flags)
 	else {
 		ea = ioremap_bot;
 		ioremap_bot += size;
-        }
+	}
 
 	if ((flags & _PAGE_PRESENT) == 0)
 		flags |= pgprot_val(PAGE_KERNEL);
@@ -196,9 +189,9 @@ __ioremap(unsigned long addr, unsigned long size, unsigned long flags)
 void iounmap(void *addr) 
 {
 #ifdef CONFIG_PPC_ISERIES
-     /* iSeries I/O Remap is a noop              */
+	/* iSeries I/O Remap is a noop              */
 	return;
-#else 
+#else
 	/* DRENG / PPPBBB todo */
 	return;
 #endif
@@ -229,7 +222,7 @@ static void map_io_page(unsigned long ea, unsigned long pa, int flags)
 		/* If the mm subsystem is not fully up, we cannot create a
 		 * linux page table entry for this mapping.  Simply bolt an
 		 * entry in the hardware page table. 
- 		 */
+		 */
 		vsid = get_kernel_vsid(ea);
 		ppc_md.make_pte(htab_data.htab,
 			(vsid << 28) | (ea & 0xFFFFFFF), // va (NOT the ea)
@@ -435,12 +428,12 @@ void __init mm_init_ppc64(void)
 	 * The range of contexts [FIRST_USER_CONTEXT, NUM_USER_CONTEXT)
 	 * are stored on a stack/queue for easy allocation and deallocation.
 	 */
-        mmu_context_queue.lock = SPIN_LOCK_UNLOCKED;
-        mmu_context_queue.head = 0;
-        mmu_context_queue.tail = NUM_USER_CONTEXT-1;
-        mmu_context_queue.size = NUM_USER_CONTEXT;
+	mmu_context_queue.lock = SPIN_LOCK_UNLOCKED;
+	mmu_context_queue.head = 0;
+	mmu_context_queue.tail = NUM_USER_CONTEXT-1;
+	mmu_context_queue.size = NUM_USER_CONTEXT;
 	for(index=0; index < NUM_USER_CONTEXT ;index++) {
-                mmu_context_queue.elements[index] = index+FIRST_USER_CONTEXT;
+		mmu_context_queue.elements[index] = index+FIRST_USER_CONTEXT;
 	}
 
 	/* Setup guard pages for the Paca's */
@@ -463,7 +456,6 @@ void __init do_init_bootmem(void)
 	unsigned long start, bootmap_pages;
 	unsigned long total_pages = lmb_end_of_DRAM() >> PAGE_SHIFT;
 
-	PPCDBG(PPCDBG_MMINIT, "do_init_bootmem: start\n");
 	/*
 	 * Find an area to use for the bootmem bitmap.  Calculate the size of
 	 * bitmap required as (Total Memory) / PAGE_SIZE / BITS_PER_BYTE.
@@ -472,21 +464,16 @@ void __init do_init_bootmem(void)
 	bootmap_pages = bootmem_bootmap_pages(total_pages);
 
 	start = (unsigned long)__a2p(lmb_alloc(bootmap_pages<<PAGE_SHIFT, PAGE_SIZE));
-	if( start == 0 ) {
+	if (start == 0) {
 		udbg_printf("do_init_bootmem: failed to allocate a bitmap.\n");
 		udbg_printf("\tbootmap_pages = 0x%lx.\n", bootmap_pages);
 		PPCDBG_ENTER_DEBUGGER(); 
 	}
 
-	PPCDBG(PPCDBG_MMINIT, "\tstart               = 0x%lx\n", start);
-	PPCDBG(PPCDBG_MMINIT, "\tbootmap_pages       = 0x%lx\n", bootmap_pages);
-	PPCDBG(PPCDBG_MMINIT, "\tphysicalMemorySize  = 0x%lx\n", naca->physicalMemorySize);
-
 	boot_mapsize = init_bootmem(start >> PAGE_SHIFT, total_pages);
-	PPCDBG(PPCDBG_MMINIT, "\tboot_mapsize        = 0x%lx\n", boot_mapsize);
 
 	/* add all physical memory to the bootmem map */
-	for (i=0; i < lmb.memory.cnt ;i++) {
+	for (i=0; i < lmb.memory.cnt; i++) {
 		unsigned long physbase, size;
 		unsigned long type = lmb.memory.region[i].type;
 
@@ -497,19 +484,14 @@ void __init do_init_bootmem(void)
 		size = lmb.memory.region[i].size;
 		free_bootmem(physbase, size);
 	}
+
 	/* reserve the sections we're already using */
-	for (i=0; i < lmb.reserved.cnt ;i++) {
+	for (i=0; i < lmb.reserved.cnt; i++) {
 		unsigned long physbase = lmb.reserved.region[i].physbase;
 		unsigned long size = lmb.reserved.region[i].size;
-#if 0 /* PPPBBB */
-		if ( (physbase == 0) && (size < (16<<20)) ) {
-			size = 16 << 20;
-		}
-#endif
+
 		reserve_bootmem(physbase, size);
 	}
-
-	PPCDBG(PPCDBG_MMINIT, "do_init_bootmem: end\n");
 }
 
 /*
@@ -522,7 +504,7 @@ void __init paging_init(void)
 	/*
 	 * All pages are DMA-able so we put them all in the DMA zone.
 	 */
-	zones_size[0] = lmb_end_of_DRAM() >> PAGE_SHIFT;
+	zones_size[ZONE_DMA] = lmb_end_of_DRAM() >> PAGE_SHIFT;
 	for (i = 1; i < MAX_NR_ZONES; i++)
 		zones_size[i] = 0;
 	free_area_init(zones_size);
@@ -554,14 +536,6 @@ void __init mem_init(void)
 
 	totalram_pages += free_all_bootmem();
 
-	ifppcdebug(PPCDBG_MMINIT) {
-		udbg_printf("mem_init: totalram_pages = 0x%lx\n", totalram_pages);
-		udbg_printf("mem_init: va_rtas_base   = 0x%lx\n", va_rtas_base); 
-		udbg_printf("mem_init: va_rtas_end    = 0x%lx\n", PAGE_ALIGN(va_rtas_base+rtas.size)); 
-		udbg_printf("mem_init: pinned start   = 0x%lx\n", __va(0)); 
-		udbg_printf("mem_init: pinned end     = 0x%lx\n", PAGE_ALIGN(klimit)); 
-	}
-
 	if ( sysmap_size )
 		for (addr = (unsigned long)sysmap;
 		     addr < PAGE_ALIGN((unsigned long)sysmap+sysmap_size) ;
@@ -582,7 +556,7 @@ void __init mem_init(void)
 			datapages++;
 	}
 
-        printk("Memory: %luk available (%dk kernel code, %dk data, %dk init) [%08lx,%08lx]\n",
+	printk("Memory: %luk available (%dk kernel code, %dk data, %dk init) [%08lx,%08lx]\n",
 	       (unsigned long)nr_free_pages()<< (PAGE_SHIFT-10),
 	       codepages<< (PAGE_SHIFT-10), datapages<< (PAGE_SHIFT-10),
 	       initpages<< (PAGE_SHIFT-10),
