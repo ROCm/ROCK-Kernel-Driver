@@ -15,7 +15,7 @@ CHAN_OBJS := chan_kern.o chan_user.o line.o
 # So, what this does is figure out by hand (crudely) what file -lpcap really 
 # is and just use it.
 
-PCAP = $(shell for f in echo {/lib,/usr/lib}/libpcap.{a,so}; do \
+PCAP = $(shell for f in echo {/lib,/usr/lib}/libpcap.a; do \
        [ -f $$f ] && echo $$f ; done | head -1)
 
 slip-objs := slip_kern.o slip_user.o

@@ -50,13 +50,17 @@ static void pipe_interrupt(int irq, void *data, struct pt_regs *regs)
 	struct connection *conn = data;
 	int fd;
 
-	list_del(&conn->list);
-
  	fd = os_rcv_fd(conn->socket[0], &conn->helper_pid);
 	if(fd < 0){
+		if(fd == -EAGAIN)
+			return;
+
 		printk("os_rcv_fd returned %d\n", -fd);
 		os_close_file(conn->fd);
 	}
+
+	list_del(&conn->list);
+
 	conn->fd = fd;
 	list_add(&conn->list, &conn->port->connections);
 

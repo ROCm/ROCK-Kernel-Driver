@@ -423,7 +423,6 @@ devfs_handle_t ubd_fake_dir_handle;
 
 static int ubd_add(int n)
 {
- 	devfs_handle_t real, fake;
 	char name[sizeof("nnnnnn\0")];
 	struct ubd *dev = &ubd_dev[n];
 	struct gendisk *disk, *fake_disk = NULL;
@@ -465,24 +464,18 @@ static int ubd_add(int n)
 	}
  
 	sprintf(name, "%d", n);
-	real = devfs_register(ubd_dir_handle, name, DEVFS_FL_REMOVABLE, 
-			      MAJOR_NR, n << UBD_SHIFT,
-			      S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |S_IWGRP,
-			      &ubd_blops, NULL);
- 	if(real == NULL) 
- 		goto out;
- 	ubd_dev[n].real = real;
+	dev->real = devfs_register(ubd_dir_handle, name, DEVFS_FL_REMOVABLE, 
+				   MAJOR_NR, n << UBD_SHIFT, S_IFBLK | 
+				   S_IRUSR | S_IWUSR | S_IRGRP |S_IWGRP,
+				   &ubd_blops, NULL);
 
 	if (fake_major) {
-		fake = devfs_register(ubd_fake_dir_handle, name, 
-				      DEVFS_FL_REMOVABLE, fake_major,
-				      n << UBD_SHIFT, 
-				      S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |
-				      S_IWGRP, &ubd_blops, NULL);
- 		if(fake == NULL)
-			goto out_unregister;
-
- 		ubd_dev[n].fake = fake;
+		dev->fake = devfs_register(ubd_fake_dir_handle, name, 
+					   DEVFS_FL_REMOVABLE, fake_major,
+					   n << UBD_SHIFT, 
+					   S_IFBLK | S_IRUSR | S_IWUSR | 
+					   S_IRGRP | S_IWGRP, &ubd_blops,
+					   NULL);
 		add_disk(fake_disk);
 	}
  
@@ -490,9 +483,6 @@ static int ubd_add(int n)
 	make_ide_entries(disk->disk_name);
 	return(0);
 
- out_unregister:
-	devfs_unregister(real);
-	ubd_dev[n].real = NULL;
  out:
 	return(-1);
 }
@@ -700,11 +690,12 @@ static int ubd_open(struct inode *inode, struct file *filp)
 {
 	int n = DEVICE_NR(inode->i_rdev);
 	struct ubd *dev = &ubd_dev[n];
-	int err = 0;
+	int err = -EISDIR;
 
 	if(dev->is_dir == 1)
 		goto out;
 
+	err = 0;
 	if(dev->count == 0){
 		dev->openflags = dev->boot_openflags;
 

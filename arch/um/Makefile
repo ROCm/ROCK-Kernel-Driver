@@ -1,7 +1,7 @@
 ARCH_DIR = arch/um
 OS := $(shell uname -s)
 
-EXTRAVERSION := $(EXTRAVERSION)-1um
+EXTRAVERSION := $(EXTRAVERSION)-3um
 include/linux/version.h: arch/$(ARCH)/Makefile
 
 # Recalculate MODLIB to reflect the EXTRAVERSION changes (via KERNELRELEASE)

@@ -39,12 +39,15 @@ EXPORT_SYMBOL(page_mem_map);
 EXPORT_SYMBOL(get_signals);
 EXPORT_SYMBOL(page_to_phys);
 EXPORT_SYMBOL(phys_to_page);
+EXPORT_SYMBOL(high_physmem);
 
 EXPORT_SYMBOL(os_open_file);
 EXPORT_SYMBOL(os_read_file);
 EXPORT_SYMBOL(os_write_file);
 EXPORT_SYMBOL(os_seek_file);
 EXPORT_SYMBOL(os_pipe);
+EXPORT_SYMBOL(os_file_type);
+EXPORT_SYMBOL(os_close_file);
 EXPORT_SYMBOL(helper_wait);
 EXPORT_SYMBOL(os_shutdown_socket);
 EXPORT_SYMBOL(os_connect_socket);
@@ -70,5 +73,7 @@ EXPORT_SYMBOL_NOVERS(__write_lock_failed);
 
 extern void FASTCALL( __read_lock_failed(rwlock_t *rw));
 EXPORT_SYMBOL_NOVERS(__read_lock_failed);
+
+EXPORT_SYMBOL(smp_num_cpus);
 
 #endif

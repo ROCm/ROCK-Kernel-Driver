@@ -8,6 +8,7 @@
 #include "asm/semaphore.h"
 #include "asm/irq.h"
 #include "irq_user.h"
+#include "kern_util.h"
 #include "os.h"
 #include "xterm.h"
 
@@ -23,6 +24,9 @@ static void xterm_interrupt(int irq, void *data, struct pt_regs *regs)
 	struct xterm_wait *xterm = data;
 
 	xterm->new_fd = os_rcv_fd(xterm->fd, &xterm->pid);
+	if(xterm->new_fd == -EAGAIN)
+		return;
+
 	up(&xterm->sem);
 }
 
@@ -51,6 +55,8 @@ int xterm_fd(int socket, int *pid_out)
 		return(err);
 	}
 	down(&data->sem);
+
+	free_irq(XTERM_IRQ, data);
 
 	ret = data->new_fd;
 	*pid_out = data->pid;
