@@ -660,10 +660,10 @@ acpi_get_prt (struct pci_vector_struct **vectors, int *count)
 
 	list_for_each(node, &acpi_prts.entries) {
 		entry = (struct acpi_prt_entry *)node;
-		vector[i].bus    = (u16) entry->id.bus;
-		vector[i].pci_id = (u32) entry->id.dev << 16 | 0xffff;
-		vector[i].pin    = (u8)  entry->id.pin;
-		vector[i].irq    = (u8)  entry->source.index;
+		vector[i].bus    = entry->id.bus;
+		vector[i].pci_id = ((u32) entry->id.dev) << 16 | 0xffff;
+		vector[i].pin    = entry->id.pin;
+		vector[i].irq    = entry->source.index;
 		i++;
 	}
 	*count = acpi_prts.count;

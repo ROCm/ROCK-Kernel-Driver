@@ -30,7 +30,7 @@ struct pci_vector_struct {
 	__u16 bus;	/* PCI Bus number */
 	__u32 pci_id;	/* ACPI split 16 bits device, 16 bits function (see section 6.1.1) */
 	__u8 pin;	/* PCI PIN (0 = A, 1 = B, 2 = C, 3 = D) */
-	__u8 irq;	/* IRQ assigned */
+	__u32 irq;	/* IRQ assigned */
 };
 
 extern struct ia64_boot_param {
