@@ -35,6 +35,7 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/smp.h>
+#include <linux/cpu.h>
 
 #include <asm/mtrr.h>
 
@@ -546,6 +547,58 @@ static void init_other_cpus(void)
 	}
 }
 
+
+struct mtrr_value {
+	mtrr_type	ltype;
+	unsigned long	lbase;
+	unsigned int	lsize;
+};
+
+static struct mtrr_value * mtrr_state;
+
+static int mtrr_save(struct sys_device * sysdev, u32 state)
+{
+	int i;
+	int size = num_var_ranges * sizeof(struct mtrr_value);
+
+	mtrr_state = kmalloc(size,GFP_KERNEL);
+	if (mtrr_state)
+		memset(mtrr_state,0,size);
+	else
+		return -ENOMEM;
+
+	for (i = 0; i < num_var_ranges; i++) {
+		mtrr_if->get(i,
+			     &mtrr_state[i].lbase,
+			     &mtrr_state[i].lsize,
+			     &mtrr_state[i].ltype);
+	}
+	return 0;
+}
+
+static int mtrr_restore(struct sys_device * sysdev)
+{
+	int i;
+
+	for (i = 0; i < num_var_ranges; i++) {
+		if (mtrr_state[i].lsize) 
+			set_mtrr(i,
+				 mtrr_state[i].lbase,
+				 mtrr_state[i].lsize,
+				 mtrr_state[i].ltype);
+	}
+	kfree(mtrr_state);
+	return 0;
+}
+
+
+
+static struct sysdev_driver mtrr_sysdev_driver = {
+	.save		= mtrr_save,
+	.restore	= mtrr_restore,
+};
+
+
 /**
  * mtrr_init - initialie mtrrs on the boot CPU
  *
@@ -630,8 +683,11 @@ static int __init mtrr_init(void)
 		set_num_var_ranges();
 		init_table();
 		init_other_cpus();
+
+		return sysdev_driver_register(&cpu_sysdev_class,
+					      &mtrr_sysdev_driver);
 	}
-	return mtrr_if ? -ENXIO : 0;
+	return -ENXIO;
 }
 
 char *mtrr_strings[MTRR_NUM_TYPES] =
@@ -645,5 +701,5 @@ char *mtrr_strings[MTRR_NUM_TYPES] =
     "write-back",               /* 6 */
 };
 
-core_initcall(mtrr_init);
+subsys_initcall(mtrr_init);
 
