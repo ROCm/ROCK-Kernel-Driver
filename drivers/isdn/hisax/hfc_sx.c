@@ -147,7 +147,7 @@ write_fifo(struct IsdnCardState *cs, struct sk_buff *skb, u8 fifo, int trans_max
 	    count += fifo_size; /* free bytes */
 	  if (count < skb->len+1) return(0); /* no room */
 	  count = fifo_size - count; /* bytes still not send */
-	  if (count > 2 * trans_max) return(0); /* delay to long */
+	  if (count > 2 * trans_max) return(0); /* delay too long */
 	  count = skb->len;
 	  src = skb->data;
 	  while (count--)

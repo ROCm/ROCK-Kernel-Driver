@@ -90,7 +90,7 @@ static void host_reset(struct hpsb_host *host)
 }
 
 
-static void add_host(struct hpsb_host *host)
+static void add_host(struct hpsb_host *host, struct hpsb_highlevel *hl)
 {
         host->csr.lock = SPIN_LOCK_UNLOCKED;
 
@@ -118,7 +118,9 @@ static void add_host(struct hpsb_host *host)
 int hpsb_update_config_rom(struct hpsb_host *host, const quadlet_t *new_rom, 
 	size_t size, unsigned char rom_version)
 {
-        int ret,flags;
+	unsigned long flags;
+	int ret;
+
         spin_lock_irqsave(&host->csr.lock, flags); 
         if (rom_version != host->csr.rom_version)
                  ret = -1;
@@ -137,7 +139,9 @@ int hpsb_update_config_rom(struct hpsb_host *host, const quadlet_t *new_rom,
 int hpsb_get_config_rom(struct hpsb_host *host, quadlet_t *buffer, 
 	size_t buffersize, size_t *rom_size, unsigned char *rom_version)
 {
-        int ret,flags;
+	unsigned long flags;
+	int ret;
+
         spin_lock_irqsave(&host->csr.lock, flags); 
         *rom_version=host->csr.rom_version;
         *rom_size=host->csr.rom_size;
@@ -156,9 +160,9 @@ int hpsb_get_config_rom(struct hpsb_host *host, quadlet_t *buffer,
 static int read_maps(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
                      u64 addr, unsigned int length, u16 fl)
 {
+	unsigned long flags;
         int csraddr = addr - CSR_REGISTER_BASE;
         const char *src;
-        int flags;
 
         spin_lock_irqsave(&host->csr.lock, flags); 
 

@@ -52,7 +52,7 @@ struct vfsmount *alloc_vfsmnt(char *name)
 		INIT_LIST_HEAD(&mnt->mnt_list);
 		if (name) {
 			int size = strlen(name)+1;
-			char * newname = kmalloc(size, GFP_KERNEL);
+			char *newname = kmalloc(size, GFP_KERNEL);
 			if (newname) {
 				memcpy(newname, name, size);
 				mnt->mnt_devname = newname;
@@ -774,7 +774,7 @@ int copy_namespace(int flags, struct task_struct *tsk)
 
 	get_namespace(namespace);
 
-	if (! (flags & CLONE_NEWNS))
+	if (!(flags & CLONE_NEWNS))
 		return 0;
 
 	if (!capable(CAP_SYS_ADMIN)) {
@@ -782,7 +782,7 @@ int copy_namespace(int flags, struct task_struct *tsk)
 		return -EPERM;
 	}
 
-	new_ns = kmalloc(sizeof(struct namespace *), GFP_KERNEL);
+	new_ns = kmalloc(sizeof(struct namespace), GFP_KERNEL);
 	if (!new_ns)
 		goto out;
 

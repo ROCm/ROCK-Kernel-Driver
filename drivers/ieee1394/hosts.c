@@ -22,12 +22,8 @@
 #include "ieee1394_core.h"
 #include "highlevel.h"
 
-static struct list_head hosts = LIST_HEAD_INIT(hosts);
-static struct list_head host_drivers = LIST_HEAD_INIT(host_drivers);
-
-spinlock_t hosts_lock = SPIN_LOCK_UNLOCKED;
-spinlock_t host_drivers_lock = SPIN_LOCK_UNLOCKED;
-
+LIST_HEAD(hpsb_hosts);
+DECLARE_MUTEX(hpsb_hosts_lock);
 
 static int dummy_transmit_packet(struct hpsb_host *h, struct hpsb_packet *p)
 {
@@ -64,11 +60,10 @@ static struct hpsb_host_driver dummy_driver = {
 int hpsb_ref_host(struct hpsb_host *host)
 {
         struct list_head *lh;
-	unsigned long flags;
         int retval = 0;
 
-        spin_lock_irqsave(&hosts_lock, flags);
-        list_for_each(lh, &hosts) {
+	down(&hpsb_hosts_lock);
+        list_for_each(lh, &hpsb_hosts) {
                 if (host == list_entry(lh, struct hpsb_host, host_list)) {
 			if (try_module_get(host->driver->owner)) {
 				host->refcount++;
@@ -77,7 +72,7 @@ int hpsb_ref_host(struct hpsb_host *host)
 			break;
         	}
         }
-        spin_unlock_irqrestore(&hosts_lock, flags);
+	up(&hpsb_hosts_lock);
 
         return retval;
 }
@@ -93,16 +88,14 @@ int hpsb_ref_host(struct hpsb_host *host)
 
 void hpsb_unref_host(struct hpsb_host *host)
 {
-        unsigned long flags;
-
 	module_put(host->driver->owner);
 
-        spin_lock_irqsave(&hosts_lock, flags);
+	down(&hpsb_hosts_lock);
         host->refcount--;
 
         if (!host->refcount && host->is_shutdown)
                 kfree(host);
-        spin_unlock_irqrestore(&hosts_lock, flags);
+	up(&hpsb_hosts_lock);
 }
 
 /**
@@ -157,11 +150,9 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra)
 
 void hpsb_add_host(struct hpsb_host *host)
 {
-        unsigned long flags;
-
-        spin_lock_irqsave(&hosts_lock, flags);
-        list_add_tail(&host->host_list, &hosts);
-        spin_unlock_irqrestore(&hosts_lock, flags);
+	down(&hpsb_hosts_lock);
+        list_add_tail(&host->host_list, &hpsb_hosts);
+	up(&hpsb_hosts_lock);
 
         highlevel_add_host(host);
         host->driver->devctl(host, RESET_BUS, LONG_RESET);
@@ -169,29 +160,11 @@ void hpsb_add_host(struct hpsb_host *host)
 
 void hpsb_remove_host(struct hpsb_host *host)
 {
-        unsigned long flags;
-
+	down(&hpsb_hosts_lock);
         host->is_shutdown = 1;
         host->driver = &dummy_driver;
+	list_del(&host->host_list);
+	up(&hpsb_hosts_lock);
+
         highlevel_remove_host(host);
-
-        spin_lock_irqsave(&hosts_lock, flags);
-        list_del(&host->host_list);
-        spin_unlock_irqrestore(&hosts_lock, flags);
-}
-
-/*
- * This function calls the given function for every host currently registered.
- */
-void hl_all_hosts(void (*function)(struct hpsb_host*))
-{
-        struct list_head *lh;
-        struct hpsb_host *host;
-
-        spin_lock_irq(&hosts_lock);
-        list_for_each (lh, &hosts) {
-                host = list_entry(lh, struct hpsb_host, host_list);
-                function(host);
-	}
-        spin_unlock_irq(&hosts_lock);
 }

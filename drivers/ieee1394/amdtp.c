@@ -266,12 +266,10 @@ struct amdtp_host {
 	struct ti_ohci *ohci;
 	struct list_head stream_list;
 	spinlock_t stream_list_lock;
-	struct list_head link;
 };
 
 static struct hpsb_highlevel *amdtp_highlevel;
-static LIST_HEAD(host_list);
-static spinlock_t host_list_lock = SPIN_LOCK_UNLOCKED;
+
 
 /* FIXME: This doesn't belong here... */
 
@@ -347,7 +345,7 @@ static void stream_start_dma(struct stream *s, struct packet_list *pl)
 {
 	u32 syt_cycle, cycle_count, start_cycle;
 
-	cycle_count = reg_read(s->host->host->hostdata,
+	cycle_count = reg_read(s->host->ohci,
 			       OHCI1394_IsochronousCycleTimer) >> 12;
 	syt_cycle = (pl->last_cycle_count - PACKET_LIST_SIZE + 1) & 0x0f;
 
@@ -1169,15 +1167,9 @@ static unsigned int amdtp_poll(struct file *file, poll_table *pt)
 static int amdtp_open(struct inode *inode, struct file *file)
 {
 	struct amdtp_host *host;
+	int i = ieee1394_file_to_instance(file);
 
-	/* FIXME: We just grab the first registered host */
-	spin_lock(&host_list_lock);
-	if (!list_empty(&host_list))
-		host = list_entry(host_list.next, struct amdtp_host, link);
-	else
-		host = NULL;
-	spin_unlock(&host_list_lock);
-
+	host = hpsb_get_hostinfo_bykey(amdtp_highlevel, i);
 	if (host == NULL)
 		return -ENODEV;
 
@@ -1209,44 +1201,45 @@ static struct file_operations amdtp_fops =
 
 /* IEEE1394 Subsystem functions */
 
-static void amdtp_add_host(struct hpsb_host *host)
+static void amdtp_add_host(struct hpsb_host *host, struct hpsb_highlevel *hl)
 {
 	struct amdtp_host *ah;
+	int minor;
+	char name[16];
 
 	if (strcmp(host->driver->name, OHCI1394_DRIVER_NAME) != 0)
 		return;
 
-	ah = kmalloc(sizeof *ah, in_interrupt() ? SLAB_ATOMIC : SLAB_KERNEL);
+	ah = hpsb_create_hostinfo(hl, host, sizeof(*ah));
+	if (!ah) {
+		HPSB_ERR("amdtp: Unable able to alloc hostinfo");
+		return;
+	}
+
 	ah->host = host;
 	ah->ohci = host->hostdata;
+
+	hpsb_set_hostinfo_key(hl, host, ah->ohci->id);
+
+	minor = IEEE1394_MINOR_BLOCK_AMDTP * 16 + ah->ohci->id;
+
+	sprintf(name, "amdtp/%d", ah->ohci->id);
+
 	INIT_LIST_HEAD(&ah->stream_list);
 	spin_lock_init(&ah->stream_list_lock);
 
-	spin_lock_irq(&host_list_lock);
-	list_add_tail(&ah->link, &host_list);
-	spin_unlock_irq(&host_list_lock);
+	devfs_register(NULL, name, 0, IEEE1394_MAJOR, minor,
+		       S_IFCHR | S_IRUSR | S_IWUSR, &amdtp_fops, NULL);
 }
 
 static void amdtp_remove_host(struct hpsb_host *host)
 {
-	struct list_head *lh;
-	struct amdtp_host *ah;
+	struct amdtp_host *ah = hpsb_get_hostinfo(amdtp_highlevel, host);
 
-	spin_lock_irq(&host_list_lock);
-	list_for_each(lh, &host_list) {
-		if (list_entry(lh, struct amdtp_host, link)->host == host) {
-			list_del(lh);
-			break;
-		}
-	}
-	spin_unlock_irq(&host_list_lock);
-	
-	if (lh != &host_list) {
-		ah = list_entry(lh, struct amdtp_host, link);
-		kfree(ah);
-	}
-	else
-		HPSB_ERR("remove_host: bogus ohci host: %p", host);
+	if (ah)
+		devfs_remove("amdtp/%d", ah->ohci->id);
+
+	return;
 }
 
 static struct hpsb_highlevel_ops amdtp_highlevel_ops = {
@@ -1273,10 +1266,13 @@ static int __init amdtp_init_module (void)
  		return -EIO;
  	}
 
+	devfs_mk_dir("amdtp");
+
 	amdtp_highlevel = hpsb_register_highlevel ("amdtp",
 						   &amdtp_highlevel_ops);
 	if (amdtp_highlevel == NULL) {
 		HPSB_ERR("amdtp: unable to register highlevel ops");
+		devfs_remove("amdtp");
 		ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_AMDTP);
 		return -EIO;
 	}
@@ -1309,6 +1305,7 @@ static void __exit amdtp_exit_module (void)
 #endif
 
         hpsb_unregister_highlevel(amdtp_highlevel);
+	devfs_remove("amdtp");
         ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_AMDTP);
 
 	HPSB_INFO("Unloaded AMDTP driver");

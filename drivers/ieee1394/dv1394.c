@@ -2458,14 +2458,9 @@ static int dv1394_devfs_add_entry(struct video_card *video)
 		(video->pal_or_ntsc == DV1394_NTSC ? "NTSC" : "PAL"),
 		(video->mode == MODE_RECEIVE ? "in" : "out"));
 
-	video->devfs_handle = devfs_register(NULL, buf, 0, IEEE1394_MAJOR,
-					     IEEE1394_MINOR_BLOCK_DV1394*16 + video->id,
-					     S_IFCHR | S_IRUGO | S_IWUGO,
-					     &dv1394_fops, video);
-	if (video->devfs_handle == NULL) {
-		printk(KERN_ERR "dv1394: unable to create /dev/%s\n", buf);
-		return -ENOMEM;
-	}
+	devfs_register(NULL, buf, 0, IEEE1394_MAJOR,
+			IEEE1394_MINOR_BLOCK_DV1394*16 + video->id,
+			S_IFCHR | S_IRUGO | S_IWUGO, &dv1394_fops, video);
 	return 0;
 }
 #endif /* CONFIG_DEVFS_FS */
@@ -2650,7 +2645,7 @@ static void dv1394_remove_host (struct hpsb_host *host)
 #endif	
 }
 
-static void dv1394_add_host (struct hpsb_host *host)
+static void dv1394_add_host (struct hpsb_host *host, struct hpsb_highlevel *hl)
 {
 	struct ti_ohci *ohci;
 	char buf[16];

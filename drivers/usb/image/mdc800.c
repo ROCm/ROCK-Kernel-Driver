@@ -806,7 +806,7 @@ static ssize_t mdc800_device_write (struct file *file, const char *buf, size_t l
 		}
 		else
 		{
-			err ("Command is to long !\n");
+			err ("Command is too long !\n");
 			up (&mdc800->io_lock);
 			return -EIO;
 		}

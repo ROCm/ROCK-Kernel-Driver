@@ -180,32 +180,29 @@ static int irtty_change_speed(struct sir_dev *dev, unsigned speed)
 static int irtty_set_dtr_rts(struct sir_dev *dev, int dtr, int rts)
 {
 	struct sirtty_cb *priv = dev->priv;
-	int arg = 0;
+	int set = 0;
+	int clear = 0;
 
 	ASSERT(priv != NULL, return -1;);
 	ASSERT(priv->magic == IRTTY_MAGIC, return -1;);
 
-#ifdef TIOCM_OUT2 /* Not defined for ARM */
-	arg = TIOCM_OUT2;
-#endif
 	if (rts)
-		arg |= TIOCM_RTS;
+		set |= TIOCM_RTS;
+	else
+		clear |= TIOCM_RTS;
 	if (dtr)
-		arg |= TIOCM_DTR;
+		set |= TIOCM_DTR;
+	else
+		clear |= TIOCM_DTR;
 
 	/*
-	 * The ioctl() function, or actually set_modem_info() in serial.c
-	 * expects a pointer to the argument in user space. This is working
-	 * here because we are always called from the kIrDAd thread which
-	 * has set_fs(KERNEL_DS) permanently set. Therefore copy_from_user()
-	 * is happy with our arg-parameter being local here in kernel space.
+	 * We can't use ioctl() because it expects a non-null file structure,
+	 * and we don't have that here.
+	 * This function is not yet defined for all tty driver, so
+	 * let's be careful... Jean II
 	 */
-
-	lock_kernel();
-	if (priv->tty->driver.ioctl(priv->tty, NULL, TIOCMSET, (unsigned long) &arg)) { 
-		IRDA_DEBUG(2, "%s(), error doing ioctl!\n", __FUNCTION__);
-	}
-	unlock_kernel();
+	ASSERT(priv->tty->driver.tiocmset != NULL, return -1;);
+	priv->tty->driver.tiocmset(priv->tty, NULL, set, clear);
 
 	return 0;
 }

@@ -873,45 +873,38 @@ static int uart_get_lsr_info(struct uart_state *state, unsigned int *value)
 	return put_user(result, value);
 }
 
-static int uart_get_modem_info(struct uart_port *port, unsigned int *value)
+static int uart_tiocmget(struct tty_struct *tty, struct file *file)
 {
-	unsigned int result = port->mctrl;
+	struct uart_state *state = tty->driver_data;
+	struct uart_port *port = state->port;
+	int result = -EIO;
 
-	result |= port->ops->get_mctrl(port);
+	down(&state->sem);
+	if ((!file || !tty_hung_up_p(file)) &&
+	    !(tty->flags & (1 << TTY_IO_ERROR))) {
+		result = port->mctrl;
+		result |= port->ops->get_mctrl(port);
+	}
+	up(&state->sem);
 
-	return put_user(result, value);
+	return result;
 }
 
 static int
-uart_set_modem_info(struct uart_port *port, unsigned int cmd,
-		    unsigned int *value)
+uart_tiocmset(struct tty_struct *tty, struct file *file,
+	      unsigned int set, unsigned int clear)
 {
-	unsigned int arg, set, clear;
-	int ret = 0;
+	struct uart_state *state = tty->driver_data;
+	struct uart_port *port = state->port;
+	int ret = -EIO;
 
-	if (get_user(arg, value))
-		return -EFAULT;
-
-	arg &= TIOCM_DTR|TIOCM_RTS|TIOCM_OUT1|TIOCM_OUT2;
-
-	set = clear = 0;
-	switch (cmd) {
-	case TIOCMBIS:
-		set = arg;
-		break;
-	case TIOCMBIC:
-		clear = arg;
-		break;
-	case TIOCMSET:
-		set = arg;
-		clear = ~arg;
-		break;
-	default:
-		ret = -EINVAL;
-		break;
-	}
-	if (ret == 0)
+	down(&state->sem);
+	if ((!file || !tty_hung_up_p(file)) &&
+	    !(tty->flags & (1 << TTY_IO_ERROR))) {
 		uart_update_mctrl(port, set, clear);
+		ret = 0;
+	}
+	up(&state->sem);
 	return ret;
 }
 
@@ -922,8 +915,12 @@ static void uart_break_ctl(struct tty_struct *tty, int break_state)
 
 	BUG_ON(!kernel_locked());
 
+	down(&state->sem);
+
 	if (port->type != PORT_UNKNOWN)
 		port->ops->break_ctl(port, break_state);
+
+	up(&state->sem);
 }
 
 static int uart_do_autoconfig(struct uart_state *state)
@@ -1130,17 +1127,6 @@ uart_ioctl(struct tty_struct *tty, struct file *filp, unsigned int cmd,
 	 * protected against the tty being hung up.
 	 */
 	switch (cmd) {
-	case TIOCMGET:
-		ret = uart_get_modem_info(state->port, (unsigned int *)arg);
-		break;
-
-	case TIOCMBIS:
-	case TIOCMBIC:
-	case TIOCMSET:
-		ret = uart_set_modem_info(state->port, cmd,
-					  (unsigned int *)arg);
-		break;
-
 	case TIOCSERGETLSR: /* Get line status register */
 		ret = uart_get_lsr_info(state, (unsigned int *)arg);
 		break;
@@ -2162,6 +2148,8 @@ int uart_register_driver(struct uart_driver *drv)
 #ifdef CONFIG_PROC_FS
 	normal->read_proc	= uart_read_proc;
 #endif
+	normal->tiocmget	= uart_tiocmget;
+	normal->tiocmset	= uart_tiocmset;
 
 	/*
 	 * Initialise the UART state(s).

@@ -403,9 +403,6 @@ struct video_card {
 	/* entry in dv1394_cards */
 	struct list_head list;
 
-	/* handle to /dev/ieee1394/dv/N, NULL if devfs not in use */
-	devfs_handle_t devfs_handle;
-
 	/* OHCI card IT DMA context number, -1 if not in use */
 	int ohci_it_ctx;
 	struct ohci1394_iso_tasklet it_tasklet;

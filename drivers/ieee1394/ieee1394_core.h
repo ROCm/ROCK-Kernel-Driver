@@ -109,6 +109,11 @@ static inline unsigned int get_hpsb_generation(struct hpsb_host *host)
 }
 
 /*
+ * Send a PHY configuration packet.
+ */
+int hpsb_send_phy_config(struct hpsb_host *host, int rootid, int gapcnt);
+
+/*
  * Queue packet for transmitting, return 0 for failure.
  */
 int hpsb_send_packet(struct hpsb_packet *packet);
@@ -139,12 +144,6 @@ void hpsb_selfid_received(struct hpsb_host *host, quadlet_t sid);
  * and whether host is root now.
  */
 void hpsb_selfid_complete(struct hpsb_host *host, int phyid, int isroot);
-
-/* 
- * Check bus reset results to find cycle master
- */
-void hpsb_check_cycle_master(struct hpsb_host *host);
-
 
 /*
  * Notify core of sending a packet.  Ackcode is the ack code returned for async
@@ -224,9 +223,6 @@ int  ieee1394_register_chardev(int blocknum,           /* 0-15 */
 
 /* release a block of minor numbers */
 void ieee1394_unregister_chardev(int blocknum);
-
-/* the devfs handle for /dev/ieee1394; NULL if devfs is not in use */
-extern devfs_handle_t ieee1394_devfs_handle;
 
 /* the proc_fs entry for /proc/ieee1394 */
 extern struct proc_dir_entry *ieee1394_procfs_entry;

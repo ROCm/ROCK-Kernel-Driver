@@ -72,8 +72,6 @@ printk(KERN_INFO "raw1394:" fmt "\n" , ## args)
 #define DBGMSG(fmt, args...)
 #endif
 
-static devfs_handle_t devfs_handle;
-
 static LIST_HEAD(host_info_list);
 static int host_count;
 static spinlock_t host_info_lock = SPIN_LOCK_UNLOCKED;
@@ -190,13 +188,13 @@ static void queue_complete_cb(struct pending_request *req)
 }
 
 
-static void add_host(struct hpsb_host *host)
+static void add_host(struct hpsb_host *host, struct hpsb_highlevel *hl)
 {
         struct host_info *hi;
         unsigned long flags;
 
-        hi = (struct host_info *)kmalloc(sizeof(struct host_info),
-		in_interrupt() ? SLAB_ATOMIC : SLAB_KERNEL);
+        hi = (struct host_info *)kmalloc(sizeof(struct host_info), GFP_KERNEL);
+
         if (hi != NULL) {
                 INIT_LIST_HEAD(&hi->list);
                 hi->host = host;
@@ -2536,17 +2534,14 @@ static int __init init_raw1394(void)
                 return -ENOMEM;
         }
 
-        devfs_handle = devfs_register(NULL,
-                                      RAW1394_DEVICE_NAME, DEVFS_FL_NONE,
-                                      IEEE1394_MAJOR,
-                                      IEEE1394_MINOR_BLOCK_RAW1394 * 16,
-                                      S_IFCHR | S_IRUSR | S_IWUSR, &file_ops,
-                                      NULL);
+        devfs_register(NULL, RAW1394_DEVICE_NAME, 0,
+			IEEE1394_MAJOR, IEEE1394_MINOR_BLOCK_RAW1394 * 16,
+			S_IFCHR | S_IRUSR | S_IWUSR, &file_ops, NULL);
 
         if (ieee1394_register_chardev(IEEE1394_MINOR_BLOCK_RAW1394,
                                       THIS_MODULE, &file_ops)) {
                 HPSB_ERR("raw1394 failed to register minor device block");
-                devfs_unregister(devfs_handle);
+                devfs_remove(RAW1394_DEVICE_NAME);
                 hpsb_unregister_highlevel(hl_handle);
                 return -EBUSY;
         }
@@ -2562,7 +2557,7 @@ static void __exit cleanup_raw1394(void)
 {
 	hpsb_unregister_protocol(&raw1394_driver);
         ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_RAW1394);
-        devfs_unregister(devfs_handle);
+        devfs_remove(RAW1394_DEVICE_NAME);
         hpsb_unregister_highlevel(hl_handle);
 }
 

@@ -297,7 +297,7 @@ static void dtl1_receive(dtl1_info_t *info)
 
 		}
 
-		/* Make sure we don't stay here to long */
+		/* Make sure we don't stay here too long */
 		if (boguscount++ > 32)
 			break;
 
@@ -347,7 +347,7 @@ void dtl1_interrupt(int irq, void *dev_inst, struct pt_regs *regs)
 			break;
 		}
 
-		/* Make sure we don't stay here to long */
+		/* Make sure we don't stay here too long */
 		if (boguscount++ > 100)
 			break;
 

@@ -1853,9 +1853,10 @@ struct console mcfrs_console = {
 	.index		= -1,
 };
 
-static void __init mcfrs_console_init(void)
+static int __init mcfrs_console_init(void)
 {
 	register_console(&mcfrs_console);
+	return 0;
 }
 
 console_initcall(mcfrs_console_init);

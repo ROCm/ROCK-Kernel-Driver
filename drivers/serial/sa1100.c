@@ -836,10 +836,11 @@ static struct console sa1100_console = {
 	.index		= -1,
 };
 
-static void __init sa1100_rs_console_init(void)
+static int __init sa1100_rs_console_init(void)
 {
 	sa1100_init_ports();
 	register_console(&sa1100_console);
+	return 0;
 }
 console_initcall(sa1100_rs_console_init);
 
