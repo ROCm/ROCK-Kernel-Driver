@@ -451,6 +451,9 @@ int usb_unlink_urb(struct urb *urb)
 	if (!urb)
 		return -EINVAL;
 	if (!(urb->transfer_flags & URB_ASYNC_UNLINK)) {
+		printk(KERN_NOTICE "usb_unlink_urb() is deprecated for "
+			"synchronous unlinks.  Use usb_kill_urb()\n");
+		WARN_ON(1);
 		usb_kill_urb(urb);
 		return 0;
 	}
