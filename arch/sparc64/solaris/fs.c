@@ -28,9 +28,21 @@
 
 #include "conv.h"
 
-#define R4_DEV(DEV) ((DEV & 0xff) | ((DEV & 0xff00) << 10))
-#define R4_MAJOR(DEV) (((DEV) >> 18) & 0x3fff)
-#define R4_MINOR(DEV) ((DEV) & 0x3ffff)
+static inline u32 R4_DEV(dev_t DEV)
+{
+	return MINOR(DEV) | (MAJOR(DEV) << 18);
+}
+
+static inline unsigned R4_MAJOR(u32 DEV)
+{
+	return (DEV >> 18) & 0x3fff;
+}
+
+static inline unsigned R4_MINOR(u32 DEV)
+{
+	return DEV & 0x3ffff;
+}
+
 #define R3_VERSION	1
 #define R4_VERSION	2
 
