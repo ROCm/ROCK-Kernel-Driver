@@ -55,7 +55,7 @@ static int __devinit radeon_parse_montype_prop(struct device_node *dp, u8 **out_
 	u8 *pedid = NULL;
 	u8 *pmt = NULL;
 	u8 *tmp;
-        int i, mt;  
+        int i, mt = MT_NONE;  
 	
 	RTRACE("analyzing OF properties...\n");
 	pmt = (u8 *)get_property(dp, "display-type", NULL);
@@ -72,7 +72,9 @@ static int __devinit radeon_parse_montype_prop(struct device_node *dp, u8 **out_
 	else if (strcmp(pmt, "NONE")) {
 		printk(KERN_WARNING "radeonfb: Unknown OF display-type: %s\n", pmt);
 		return MT_NONE;
-	}
+	} else
+		return MT_NONE;
+
 	for (i = 0; propnames[i] != NULL; ++i) {
 		pedid = (u8 *)get_property(dp, propnames[i], NULL);
 		if (pedid != NULL)
@@ -645,15 +647,23 @@ static void radeon_fixup_panel_info(struct radeonfb_info *rinfo)
 		rinfo->panel_info.fbk_divider = 0xad;
 		rinfo->panel_info.use_bios_dividers = 1;
 	}
+	/* Aluminium PowerBook 15" */
+	if (machine_is_compatible("PowerBook5,4")) {
+		rinfo->panel_info.ref_divider = rinfo->pll.ref_div;
+		rinfo->panel_info.post_divider = 0x2;
+		rinfo->panel_info.fbk_divider = 0x8e;
+		rinfo->panel_info.use_bios_dividers = 1;
+	}
 	/* Aluminium PowerBook 17" */
-	if (machine_is_compatible("PowerBook5,3")) {
+	if (machine_is_compatible("PowerBook5,3") ||
+	    machine_is_compatible("PowerBook5,5")) {
 		rinfo->panel_info.ref_divider = rinfo->pll.ref_div;
 		rinfo->panel_info.post_divider = 0x4;
 		rinfo->panel_info.fbk_divider = 0x80;
 		rinfo->panel_info.use_bios_dividers = 1;
 	}
 	/* iBook G4 */
-        if (machine_is_compatible("PowerBook6,3") |
+        if (machine_is_compatible("PowerBook6,3") ||
             machine_is_compatible("PowerBook6,5")) {
 		rinfo->panel_info.ref_divider = rinfo->pll.ref_div;
 		rinfo->panel_info.post_divider = 0x6;
