@@ -189,14 +189,12 @@ static inline struct ip_vs_conn *__ip_vs_conn_in_get
 {
 	unsigned hash;
 	struct ip_vs_conn *cp;
-	struct list_head *e;
 
 	hash = ip_vs_conn_hashkey(protocol, s_addr, s_port);
 
 	ct_read_lock(hash);
 
-	list_for_each(e, &ip_vs_conn_tab[hash]) {
-		cp = list_entry(e, struct ip_vs_conn, c_list);
+	list_for_each_entry(cp, &ip_vs_conn_tab[hash], c_list) {
 		if (s_addr==cp->caddr && s_port==cp->cport &&
 		    d_port==cp->vport && d_addr==cp->vaddr &&
 		    protocol==cp->protocol) {
@@ -242,7 +240,6 @@ struct ip_vs_conn *ip_vs_conn_out_get
 {
 	unsigned hash;
 	struct ip_vs_conn *cp, *ret=NULL;
-	struct list_head *e;
 
 	/*
 	 *	Check for "full" addressed entries
@@ -251,8 +248,7 @@ struct ip_vs_conn *ip_vs_conn_out_get
 
 	ct_read_lock(hash);
 
-	list_for_each(e, &ip_vs_conn_tab[hash]) {
-		cp = list_entry(e, struct ip_vs_conn, c_list);
+	list_for_each_entry(cp, &ip_vs_conn_tab[hash], c_list) {
 		if (d_addr == cp->caddr && d_port == cp->cport &&
 		    s_port == cp->dport && s_addr == cp->daddr &&
 		    protocol == cp->protocol) {
@@ -618,19 +614,17 @@ ip_vs_conn_new(int proto, __u32 caddr, __u16 cport, __u32 vaddr, __u16 vport,
 
 static void *ip_vs_conn_array(struct seq_file *seq, loff_t pos)
 {
-	struct list_head *e;
 	int idx;
-	loff_t off = 0;
+	struct ip_vs_conn *cp;
 	
 	for(idx = 0; idx < IP_VS_CONN_TAB_SIZE; idx++) {
 		ct_read_lock_bh(idx);
-		list_for_each(e, &ip_vs_conn_tab[idx]) {
-			if (off == pos) {
+		list_for_each_entry(cp, &ip_vs_conn_tab[idx], c_list) {
+			if (pos-- == 0) {
 				seq->private = &ip_vs_conn_tab[idx];
-				return list_entry(e, struct ip_vs_conn, c_list);
+				return cp;
 			}
-			++off;
-		}	
+		}
 		ct_read_unlock_bh(idx);
 	}
 
@@ -662,9 +656,9 @@ static void *ip_vs_conn_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 	while (++idx < IP_VS_CONN_TAB_SIZE) {
 		ct_read_lock_bh(idx);
-		list_for_each(e, &ip_vs_conn_tab[idx]) {
+		list_for_each_entry(cp, &ip_vs_conn_tab[idx], c_list) {
 			seq->private = &ip_vs_conn_tab[idx];
-			return list_entry(e, struct ip_vs_conn, c_list);
+			return cp;
 		}	
 		ct_read_unlock_bh(idx);
 	}
@@ -759,7 +753,6 @@ void ip_vs_random_dropentry(void)
 {
 	int idx;
 	struct ip_vs_conn *cp;
-	struct list_head *e;
 	struct ip_vs_conn *ct;
 
 	/*
@@ -773,8 +766,7 @@ void ip_vs_random_dropentry(void)
 		 */
 		ct_write_lock(hash);
 
-		list_for_each(e, &ip_vs_conn_tab[hash]) {
-			cp = list_entry(e, struct ip_vs_conn, c_list);
+		list_for_each_entry(cp, &ip_vs_conn_tab[hash], c_list) {
 			if (!cp->cport && !(cp->flags & IP_VS_CONN_F_NO_CPORT))
 				/* connection template */
 				continue;
@@ -826,7 +818,6 @@ static void ip_vs_conn_flush(void)
 {
 	int idx;
 	struct ip_vs_conn *cp;
-	struct list_head *e;
 	struct ip_vs_conn *ct;
 
   flush_again:
@@ -836,8 +827,7 @@ static void ip_vs_conn_flush(void)
 		 */
 		ct_write_lock_bh(idx);
 
-		list_for_each(e, &ip_vs_conn_tab[idx]) {
-			cp = list_entry(e, struct ip_vs_conn, c_list);
+		list_for_each_entry(cp, &ip_vs_conn_tab[idx], c_list) {
 			atomic_inc(&cp->refcnt);
 			ct_write_unlock(idx);
 

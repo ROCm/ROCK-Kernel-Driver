@@ -214,17 +214,13 @@ int register_ip_vs_app(struct ip_vs_app *app)
  */
 void unregister_ip_vs_app(struct ip_vs_app *app)
 {
-	struct ip_vs_app *inc;
-	struct list_head *l = &app->incs_list;
+	struct ip_vs_app *inc, *nxt;
 
 	down(&__ip_vs_app_mutex);
 
-	while (l->next != l) {
-		inc = list_entry(l->next, struct ip_vs_app, a_list);
+	list_for_each_entry_safe(inc, nxt, &app->incs_list, a_list) {
 		ip_vs_app_inc_release(inc);
 	}
-
-	list_del(&app->a_list);
 
 	up(&__ip_vs_app_mutex);
 
@@ -239,13 +235,11 @@ void unregister_ip_vs_app(struct ip_vs_app *app)
  */
 struct ip_vs_app *ip_vs_app_get_by_name(char *appname)
 {
-	struct list_head *p;
 	struct ip_vs_app *app, *a = NULL;
 
 	down(&__ip_vs_app_mutex);
 
-	list_for_each (p, &ip_vs_app_list) {
-		app = list_entry(p, struct ip_vs_app, a_list);
+	list_for_each_entry(ent, &ip_vs_app_list, a_list) {
 		if (strcmp(app->name, appname))
 			continue;
 
@@ -485,18 +479,15 @@ int ip_vs_app_pkt_in(struct ip_vs_conn *cp, struct sk_buff *skb)
 /*
  *	/proc/net/ip_vs_app entry function
  */
+
 static struct ip_vs_app *ip_vs_app_idx(loff_t pos)
 {
-	loff_t off = 0;
-	struct list_head *e, *i;
+	struct ip_vs_app *app, *inc;
 
-	list_for_each(e, &ip_vs_app_list) {
-		struct ip_vs_app *app
-			= list_entry(e, struct ip_vs_app, a_list);
-		list_for_each (i, &app->incs_list) {
-			if (off == pos)
-				return list_entry(i, struct ip_vs_app, a_list);
-			++off;
+	list_for_each_entry(app, &ip_vs_app_list, a_list) {
+		list_for_each_entry(inc, &app->incs_list, a_list) {
+			if (pos-- == 0)
+				return inc;
 		}	
 	}
 	return NULL;
@@ -513,7 +504,7 @@ static void *ip_vs_app_seq_start(struct seq_file *seq, loff_t *pos)
 static void *ip_vs_app_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	struct ip_vs_app *inc, *app;
-	struct list_head *i, *e;
+	struct list_head *e;
 
 	++*pos;
 	if (v == SEQ_START_TOKEN)
@@ -522,14 +513,14 @@ static void *ip_vs_app_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	inc = v;
 	app = inc->app;
 
-	if ((i = inc->a_list.next) != &app->incs_list)
-		return list_entry(i, struct ip_vs_app, a_list);
+	if ((e = inc->a_list.next) != &app->incs_list)
+		return list_entry(e, struct ip_vs_app, a_list);
 
 	/* go on to next application */
 	for (e = app->a_list.next; e != &ip_vs_app_list; e = e->next) {
 		app = list_entry(e, struct ip_vs_app, a_list);
-		list_for_each (i, &app->incs_list) {
-			return list_entry(i, struct ip_vs_app, a_list);
+		list_for_each_entry(inc, &app->incs_list, a_list) {
+			return inc;
 		}
 	}
 	return NULL;

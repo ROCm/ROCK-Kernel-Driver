@@ -57,7 +57,7 @@ static int ip_vs_rr_update_svc(struct ip_vs_service *svc)
 static struct ip_vs_dest *
 ip_vs_rr_schedule(struct ip_vs_service *svc, struct iphdr *iph)
 {
-	register struct list_head *p, *q;
+	struct list_head *p, *q;
 	struct ip_vs_dest *dest;
 
 	IP_VS_DBG(6, "ip_vs_rr_schedule(): Scheduling...\n");
@@ -73,12 +73,12 @@ ip_vs_rr_schedule(struct ip_vs_service *svc, struct iphdr *iph)
 			continue;
 		}
 		
+	
 		dest = list_entry(q, struct ip_vs_dest, n_list);
 		if (!(dest->flags & IP_VS_DEST_F_OVERLOAD) &&
 		    atomic_read(&dest->weight) > 0)
 			/* HIT */
 			goto out;
-		q = q->next;
 	} while (q != p);
 	write_unlock(&svc->sched_lock);
 	return NULL;

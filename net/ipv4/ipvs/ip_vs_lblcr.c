@@ -171,7 +171,7 @@ static void ip_vs_dest_set_eraseall(struct ip_vs_dest_set *set)
 /* get weighted least-connection node in the destination set */
 static inline struct ip_vs_dest *ip_vs_dest_set_min(struct ip_vs_dest_set *set)
 {
-	struct ip_vs_dest_list *e;
+	register struct ip_vs_dest_list *e;
 	struct ip_vs_dest *dest, *least;
 	int loh, doh;
 
@@ -226,7 +226,7 @@ static inline struct ip_vs_dest *ip_vs_dest_set_min(struct ip_vs_dest_set *set)
 /* get weighted most-connection node in the destination set */
 static inline struct ip_vs_dest *ip_vs_dest_set_max(struct ip_vs_dest_set *set)
 {
-	struct ip_vs_dest_list *e;
+	register struct ip_vs_dest_list *e;
 	struct ip_vs_dest *dest, *most;
 	int moh, doh;
 
@@ -432,15 +432,12 @@ ip_vs_lblcr_get(struct ip_vs_lblcr_table *tbl, __u32 addr)
 {
 	unsigned hash;
 	struct ip_vs_lblcr_entry *en;
-	struct list_head *l,*e;
 
 	hash = ip_vs_lblcr_hashkey(addr);
-	l = &tbl->bucket[hash];
 
 	read_lock(&tbl->lock);
 
-	for (e=l->next; e!=l; e=e->next) {
-		en = list_entry(e, struct ip_vs_lblcr_entry, list);
+	list_for_each_entry(en, &tbl->bucket[hash], list) {
 		if (en->addr == addr) {
 			/* HIT */
 			read_unlock(&tbl->lock);
@@ -460,14 +457,11 @@ ip_vs_lblcr_get(struct ip_vs_lblcr_table *tbl, __u32 addr)
 static void ip_vs_lblcr_flush(struct ip_vs_lblcr_table *tbl)
 {
 	int i;
-	struct list_head *l;
-	struct ip_vs_lblcr_entry *en;
+	struct ip_vs_lblcr_entry *en, *nxt;
 
 	for (i=0; i<IP_VS_LBLCR_TAB_SIZE; i++) {
 		write_lock(&tbl->lock);
-		for (l=&tbl->bucket[i]; l->next!=l; ) {
-			en = list_entry(l->next,
-					struct ip_vs_lblcr_entry, list);
+		list_for_each_entry_safe(en, nxt, &tbl->bucket[i], list) {
 			ip_vs_lblcr_free(en);
 			atomic_dec(&tbl->entries);
 		}
@@ -480,19 +474,15 @@ static inline void ip_vs_lblcr_full_check(struct ip_vs_lblcr_table *tbl)
 {
 	unsigned long now = jiffies;
 	int i, j;
-	struct list_head *l, *e;
-	struct ip_vs_lblcr_entry *en;
+	struct ip_vs_lblcr_entry *en, *nxt;
 
 	for (i=0, j=tbl->rover; i<IP_VS_LBLCR_TAB_SIZE; i++) {
 		j = (j + 1) & IP_VS_LBLCR_TAB_MASK;
-		e = l = &tbl->bucket[j];
+
 		write_lock(&tbl->lock);
-		while (e->next != l) {
-			en = list_entry(e->next,
-					struct ip_vs_lblcr_entry, list);
+		list_for_each_entry_safe(en, nxt, &tbl->bucket[j], list) {
 			if ((now - en->lastuse) <
 			    sysctl_ip_vs_lblcr_expiration) {
-				e = e->next;
 				continue;
 			}
 			ip_vs_lblcr_free(en);
@@ -521,8 +511,7 @@ static void ip_vs_lblcr_check_expire(unsigned long data)
 	unsigned long now = jiffies;
 	int goal;
 	int i, j;
-	struct list_head *l, *e;
-	struct ip_vs_lblcr_entry *en;
+	struct ip_vs_lblcr_entry *en, *nxt;
 
 	tbl = (struct ip_vs_lblcr_table *)data;
 
@@ -544,15 +533,12 @@ static void ip_vs_lblcr_check_expire(unsigned long data)
 
 	for (i=0, j=tbl->rover; i<IP_VS_LBLCR_TAB_SIZE; i++) {
 		j = (j + 1) & IP_VS_LBLCR_TAB_MASK;
-		e = l = &tbl->bucket[j];
+
 		write_lock(&tbl->lock);
-		while (e->next != l) {
-			en = list_entry(e->next,
-					struct ip_vs_lblcr_entry, list);
-			if ((now - en->lastuse) < ENTRY_TIMEOUT) {
-				e = e->next;
+		list_for_each_entry_safe(en, nxt, &tbl->bucket[j], list) {
+			if ((now - en->lastuse) < ENTRY_TIMEOUT) 
 				continue;
-			}
+
 			ip_vs_lblcr_free(en);
 			atomic_dec(&tbl->entries);
 			goal--;
@@ -583,7 +569,6 @@ ip_vs_lblcr_getinfo(char *buffer, char **start, off_t offset, int length)
 	struct ip_vs_lblcr_table *tbl;
 	unsigned long now = jiffies;
 	int i;
-	struct list_head *l, *e;
 	struct ip_vs_lblcr_entry *en;
 
 	tbl = lblcr_table_list;
@@ -593,13 +578,11 @@ ip_vs_lblcr_getinfo(char *buffer, char **start, off_t offset, int length)
 	len += size;
 
 	for (i=0; i<IP_VS_LBLCR_TAB_SIZE; i++) {
-		l = &tbl->bucket[i];
 		read_lock_bh(&tbl->lock);
-		for (e=l->next; e!=l; e=e->next) {
+		list_for_each_entry(en, &tbl->bucket[i], list) {
 			char tbuf[16];
 			struct ip_vs_dest_list *d;
 
-			en = list_entry(e, struct ip_vs_lblcr_entry, list);
 			sprintf(tbuf, "%u.%u.%u.%u", NIPQUAD(en->addr));
 			size = sprintf(buffer+len, "%8lu %-16s ",
 				       now-en->lastuse, tbuf);
@@ -708,7 +691,6 @@ static int ip_vs_lblcr_update_svc(struct ip_vs_service *svc)
 static inline struct ip_vs_dest *
 __ip_vs_wlc_schedule(struct ip_vs_service *svc, struct iphdr *iph)
 {
-	register struct list_head *l, *e;
 	struct ip_vs_dest *dest, *least;
 	int loh, doh;
 
@@ -729,10 +711,7 @@ __ip_vs_wlc_schedule(struct ip_vs_service *svc, struct iphdr *iph)
 	 * The server with weight=0 is quiesced and will not receive any
 	 * new connection.
 	 */
-
-	l = &svc->destinations;
-	for (e=l->next; e!=l; e=e->next) {
-		least = list_entry(e, struct ip_vs_dest, n_list);
+	list_for_each_entry(least, &svc->destinations, n_list) {
 		if (least->flags & IP_VS_DEST_F_OVERLOAD)
 			continue;
 
@@ -748,8 +727,7 @@ __ip_vs_wlc_schedule(struct ip_vs_service *svc, struct iphdr *iph)
 	 *    Find the destination with the least load.
 	 */
   nextstage:
-	for (e=e->next; e!=l; e=e->next) {
-		dest = list_entry(e, struct ip_vs_dest, n_list);
+	list_for_each_entry(dest, &svc->destinations, n_list) {
 		if (dest->flags & IP_VS_DEST_F_OVERLOAD)
 			continue;
 
@@ -781,12 +759,9 @@ static inline int
 is_overloaded(struct ip_vs_dest *dest, struct ip_vs_service *svc)
 {
 	if (atomic_read(&dest->activeconns) > atomic_read(&dest->weight)) {
-		register struct list_head *l, *e;
 		struct ip_vs_dest *d;
 
-		l = &svc->destinations;
-		for (e=l->next; e!=l; e=e->next) {
-			d = list_entry(e, struct ip_vs_dest, n_list);
+		list_for_each_entry(d, &svc->destinations, n_list) {
 			if (atomic_read(&d->activeconns)*2
 			    < atomic_read(&d->weight)) {
 				return 1;

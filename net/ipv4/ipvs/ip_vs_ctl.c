@@ -279,7 +279,7 @@ static atomic_t ip_vs_nullsvc_counter = ATOMIC_INIT(0);
 static __inline__ unsigned
 ip_vs_svc_hashkey(unsigned proto, __u32 addr, __u16 port)
 {
-	unsigned porth = ntohs(port);
+	register unsigned porth = ntohs(port);
 
 	return (proto^ntohl(addr)^(porth>>IP_VS_SVC_TAB_BITS)^porth)
 		& IP_VS_SVC_TAB_MASK;
@@ -363,14 +363,11 @@ __ip_vs_service_get(__u16 protocol, __u32 vaddr, __u16 vport)
 {
 	unsigned hash;
 	struct ip_vs_service *svc;
-	struct list_head *l,*e;
 
 	/* Check for "full" addressed entries */
 	hash = ip_vs_svc_hashkey(protocol, vaddr, vport);
 
-	l = &ip_vs_svc_table[hash];
-	for (e=l->next; e!=l; e=e->next) {
-		svc = list_entry(e, struct ip_vs_service, s_list);
+	list_for_each_entry(svc, &ip_vs_svc_table[hash], s_list){
 		if ((svc->addr == vaddr)
 		    && (svc->port == vport)
 		    && (svc->protocol == protocol)) {
@@ -391,14 +388,11 @@ static __inline__ struct ip_vs_service *__ip_vs_svc_fwm_get(__u32 fwmark)
 {
 	unsigned hash;
 	struct ip_vs_service *svc;
-	struct list_head *l,*e;
 
 	/* Check for fwmark addressed entries */
 	hash = ip_vs_svc_fwm_hashkey(fwmark);
 
-	l = &ip_vs_svc_fwm_table[hash];
-	for (e=l->next; e!=l; e=e->next) {
-		svc = list_entry(e, struct ip_vs_service, f_list);
+	list_for_each_entry(svc, &ip_vs_svc_fwm_table[hash], f_list) {
 		if (svc->fwmark == fwmark) {
 			/* HIT */
 			atomic_inc(&svc->usecnt);
@@ -482,7 +476,7 @@ __ip_vs_unbind_svc(struct ip_vs_dest *dest)
  */
 static __inline__ unsigned ip_vs_rs_hashkey(__u32 addr, __u16 port)
 {
-	unsigned porth = ntohs(port);
+	register unsigned porth = ntohs(port);
 
 	return (ntohl(addr)^(porth>>IP_VS_RTAB_BITS)^porth)
 		& IP_VS_RTAB_MASK;
@@ -535,7 +529,6 @@ ip_vs_lookup_real_service(__u16 protocol, __u32 daddr, __u16 dport)
 {
 	unsigned hash;
 	struct ip_vs_dest *dest;
-	struct list_head *l,*e;
 
 	/*
 	 *	Check for "full" addressed entries
@@ -543,11 +536,8 @@ ip_vs_lookup_real_service(__u16 protocol, __u32 daddr, __u16 dport)
 	 */
 	hash = ip_vs_rs_hashkey(daddr, dport);
 
-	l = &ip_vs_rtable[hash];
-
 	read_lock(&__ip_vs_rs_lock);
-	for (e=l->next; e!=l; e=e->next) {
-		dest = list_entry(e, struct ip_vs_dest, d_list);
+	list_for_each_entry(dest, &ip_vs_rtable[hash], d_list) {
 		if ((dest->addr == daddr)
 		    && (dest->port == dport)
 		    && ((dest->protocol == protocol) ||
@@ -569,14 +559,11 @@ static struct ip_vs_dest *
 ip_vs_lookup_dest(struct ip_vs_service *svc, __u32 daddr, __u16 dport)
 {
 	struct ip_vs_dest *dest;
-	struct list_head *l, *e;
 
 	/*
 	 * Find the destination for the given service
 	 */
-	l = &svc->destinations;
-	for (e=l->next; e!=l; e=e->next) {
-		dest = list_entry(e, struct ip_vs_dest, n_list);
+	list_for_each_entry(dest, &svc->destinations, n_list) {
 		if ((dest->addr == daddr) && (dest->port == dport)) {
 			/* HIT */
 			return dest;
@@ -600,16 +587,12 @@ ip_vs_lookup_dest(struct ip_vs_service *svc, __u32 daddr, __u16 dport)
 static struct ip_vs_dest *
 ip_vs_trash_get_dest(struct ip_vs_service *svc, __u32 daddr, __u16 dport)
 {
-	struct ip_vs_dest *dest;
-	struct list_head *l, *e;
+	struct ip_vs_dest *dest, *nxt;
 
 	/*
 	 * Find the destination in trash
 	 */
-	l = &ip_vs_dest_trash;
-
-	for (e=l->next; e!=l; e=e->next) {
-		dest = list_entry(e, struct ip_vs_dest, n_list);
+	list_for_each_entry_safe(dest, nxt, &ip_vs_dest_trash, n_list) {
 		IP_VS_DBG(3, "Destination %u/%u.%u.%u.%u:%u still in trash, "
 			  "refcnt=%d\n",
 			  dest->vfwmark,
@@ -634,7 +617,6 @@ ip_vs_trash_get_dest(struct ip_vs_service *svc, __u32 daddr, __u16 dport)
 				  "from trash\n",
 				  dest->vfwmark,
 				  NIPQUAD(dest->addr), ntohs(dest->port));
-			e = e->prev;
 			list_del(&dest->n_list);
 			ip_vs_dst_reset(dest);
 			__ip_vs_unbind_svc(dest);
@@ -657,13 +639,9 @@ ip_vs_trash_get_dest(struct ip_vs_service *svc, __u32 daddr, __u16 dport)
  */
 static void ip_vs_trash_cleanup(void)
 {
-	struct ip_vs_dest *dest;
-	struct list_head *l;
+	struct ip_vs_dest *dest, *nxt;
 
-	l = &ip_vs_dest_trash;
-
-	while (l->next != l) {
-		dest = list_entry(l->next, struct ip_vs_dest, n_list);
+	list_for_each_entry_safe(dest, nxt, &ip_vs_dest_trash, n_list) {
 		list_del(&dest->n_list);
 		ip_vs_dst_reset(dest);
 		__ip_vs_unbind_svc(dest);
@@ -1198,8 +1176,7 @@ ip_vs_edit_service(struct ip_vs_service *svc, struct ip_vs_service_user *u)
  */
 static void __ip_vs_del_service(struct ip_vs_service *svc)
 {
-	struct list_head *l;
-	struct ip_vs_dest *dest;
+	struct ip_vs_dest *dest, *nxt;
 	struct ip_vs_scheduler *old_sched;
 
 	ip_vs_num_services--;
@@ -1220,9 +1197,7 @@ static void __ip_vs_del_service(struct ip_vs_service *svc)
 	/*
 	 *    Unlink the whole destination list
 	 */
-	l = &svc->destinations;
-	while (l->next != l) {
-		dest = list_entry(l->next, struct ip_vs_dest, n_list);
+	list_for_each_entry_safe(dest, nxt, &svc->destinations, n_list) {
 		__ip_vs_unlink_dest(svc, dest, 0);
 		__ip_vs_del_dest(dest);
 	}
@@ -1279,16 +1254,13 @@ static int ip_vs_del_service(struct ip_vs_service *svc)
 static int ip_vs_flush(void)
 {
 	int idx;
-	struct ip_vs_service *svc;
-	struct list_head *l;
+	struct ip_vs_service *svc, *nxt;
 
 	/*
 	 * Flush the service table hashed by <protocol,addr,port>
 	 */
 	for(idx = 0; idx < IP_VS_SVC_TAB_SIZE; idx++) {
-		l = &ip_vs_svc_table[idx];
-		while (l->next != l) {
-			svc = list_entry(l->next,struct ip_vs_service,s_list);
+		list_for_each_entry_safe(svc, nxt, &ip_vs_svc_table[idx], s_list) {
 			write_lock_bh(&__ip_vs_svc_lock);
 			ip_vs_svc_unhash(svc);
 			/*
@@ -1304,9 +1276,8 @@ static int ip_vs_flush(void)
 	 * Flush the service table hashed by fwmark
 	 */
 	for(idx = 0; idx < IP_VS_SVC_TAB_SIZE; idx++) {
-		l = &ip_vs_svc_fwm_table[idx];
-		while (l->next != l) {
-			svc = list_entry(l->next,struct ip_vs_service,f_list);
+		list_for_each_entry_safe(svc, nxt, 
+					 &ip_vs_svc_fwm_table[idx], f_list) {
 			write_lock_bh(&__ip_vs_svc_lock);
 			ip_vs_svc_unhash(svc);
 			/*
@@ -1336,12 +1307,10 @@ ip_vs_zero_stats(struct ip_vs_stats *stats)
 
 static int ip_vs_zero_service(struct ip_vs_service *svc)
 {
-	struct list_head *l;
 	struct ip_vs_dest *dest;
 
 	write_lock_bh(&__ip_vs_svc_lock);
-	list_for_each (l, &svc->destinations) {
-		dest = list_entry(l, struct ip_vs_dest, n_list);
+	list_for_each_entry(dest, &svc->destinations, n_list) {
 		ip_vs_zero_stats(&dest->stats);
 	}
 	ip_vs_zero_stats(&svc->stats);
@@ -1352,19 +1321,16 @@ static int ip_vs_zero_service(struct ip_vs_service *svc)
 static int ip_vs_zero_all(void)
 {
 	int idx;
-	struct list_head *l;
 	struct ip_vs_service *svc;
 
 	for(idx = 0; idx < IP_VS_SVC_TAB_SIZE; idx++) {
-		list_for_each (l, &ip_vs_svc_table[idx]) {
-			svc = list_entry(l, struct ip_vs_service, s_list);
+		list_for_each_entry(svc, &ip_vs_svc_table[idx], s_list) {
 			ip_vs_zero_service(svc);
 		}
 	}
 
 	for(idx = 0; idx < IP_VS_SVC_TAB_SIZE; idx++) {
-		list_for_each (l, &ip_vs_svc_fwm_table[idx]) {
-			svc = list_entry(l, struct ip_vs_service, f_list);
+		list_for_each_entry(svc, &ip_vs_svc_fwm_table[idx], f_list) {
 			ip_vs_zero_service(svc);
 		}
 	}
@@ -1540,26 +1506,26 @@ static struct ip_vs_service *ip_vs_info_array(struct seq_file *seq, loff_t pos)
 {
 	struct ip_vs_iter *iter = seq->private;
 	int idx;
-	struct list_head *e;
+	struct ip_vs_service *svc;
 
 	/* look in hash by protocol */
 	for (idx = 0; idx < IP_VS_SVC_TAB_SIZE; idx++) {
-		list_for_each(e, &ip_vs_svc_table[idx]) {
+		list_for_each_entry(svc, &ip_vs_svc_table[idx], s_list) {
 			if (pos-- == 0){
 				iter->table = ip_vs_svc_table;
 				iter->bucket = idx;
-				return list_entry(e, struct ip_vs_service, s_list);
+				return svc;
 			}
 		}
 	}
 
 	/* keep looking in fwmark */
 	for (idx = 0; idx < IP_VS_SVC_TAB_SIZE; idx++) {
-		list_for_each(e, &ip_vs_svc_fwm_table[idx]) {
+		list_for_each_entry(svc, &ip_vs_svc_fwm_table[idx], f_list) {
 			if (pos-- == 0) {
 				iter->table = ip_vs_svc_fwm_table;
 				iter->bucket = idx;
-				return list_entry(e, struct ip_vs_service, f_list);
+				return svc;
 			}
 		}
 	}
@@ -1595,8 +1561,9 @@ static void *ip_vs_info_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 
 		while (++iter->bucket < IP_VS_SVC_TAB_SIZE) {
-			list_for_each(e, &ip_vs_svc_table[iter->bucket]) {
-				return list_entry(e, struct ip_vs_service, s_list);
+			list_for_each_entry(svc,&ip_vs_svc_table[iter->bucket],
+					    s_list) {
+				return svc;
 			}
 		}
 
@@ -1611,8 +1578,9 @@ static void *ip_vs_info_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
  scan_fwmark:
 	while (++iter->bucket < IP_VS_SVC_TAB_SIZE) {
-		list_for_each(e, &ip_vs_svc_fwm_table[iter->bucket]) 
-			return list_entry(e, struct ip_vs_service, f_list);
+		list_for_each_entry(svc, &ip_vs_svc_fwm_table[iter->bucket],
+				    f_list) 
+			return svc;
 	}
 
 	return NULL;
@@ -1962,15 +1930,13 @@ __ip_vs_get_service_entries(const struct ip_vs_get_services *get,
 {
 	int idx, count=0;
 	struct ip_vs_service *svc;
-	struct list_head *l;
 	struct ip_vs_service_entry entry;
 	int ret = 0;
 
 	for (idx = 0; idx < IP_VS_SVC_TAB_SIZE; idx++) {
-		list_for_each (l, &ip_vs_svc_table[idx]) {
+		list_for_each_entry(svc, &ip_vs_svc_table[idx], s_list) {
 			if (count >= get->num_services)
 				goto out;
-			svc = list_entry(l, struct ip_vs_service, s_list);
 			ip_vs_copy_service(&entry, svc);
 			if (copy_to_user(&uptr->entrytable[count],
 					 &entry, sizeof(entry))) {
@@ -1982,10 +1948,9 @@ __ip_vs_get_service_entries(const struct ip_vs_get_services *get,
 	}
 
 	for (idx = 0; idx < IP_VS_SVC_TAB_SIZE; idx++) {
-		list_for_each (l, &ip_vs_svc_fwm_table[idx]) {
+		list_for_each_entry(svc, &ip_vs_svc_fwm_table[idx], f_list) {
 			if (count >= get->num_services)
 				goto out;
-			svc = list_entry(l, struct ip_vs_service, f_list);
 			ip_vs_copy_service(&entry, svc);
 			if (copy_to_user(&uptr->entrytable[count],
 					 &entry, sizeof(entry))) {
@@ -2014,14 +1979,12 @@ __ip_vs_get_dest_entries(const struct ip_vs_get_dests *get,
 	if (svc) {
 		int count = 0;
 		struct ip_vs_dest *dest;
-		struct list_head *l, *e;
 		struct ip_vs_dest_entry entry;
 
-		l = &svc->destinations;
-		for (e=l->next; e!=l; e=e->next) {
+		list_for_each_entry(dest, &svc->destinations, n_list) {
 			if (count >= get->num_dests)
 				break;
-			dest = list_entry(e, struct ip_vs_dest, n_list);
+
 			entry.addr = dest->addr;
 			entry.port = dest->port;
 			entry.conn_flags = atomic_read(&dest->conn_flags);
