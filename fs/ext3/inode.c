@@ -913,20 +913,17 @@ struct buffer_head *ext3_bread(handle_t *handle, struct inode * inode,
 			       int block, int create, int *err)
 {
 	struct buffer_head * bh;
-	int prev_blocks;
 
-	prev_blocks = inode->i_blocks;
-
-	bh = ext3_getblk (handle, inode, block, create, err);
+	bh = ext3_getblk(handle, inode, block, create, err);
 	if (!bh)
 		return bh;
 	if (buffer_uptodate(bh))
 		return bh;
-	ll_rw_block (READ, 1, &bh);
-	wait_on_buffer (bh);
+	ll_rw_block(READ, 1, &bh);
+	wait_on_buffer(bh);
 	if (buffer_uptodate(bh))
 		return bh;
-	brelse (bh);
+	put_bh(bh);
 	*err = -EIO;
 	return NULL;
 }
