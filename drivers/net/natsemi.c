@@ -177,7 +177,6 @@ c-help: http://www.scyld.com/network/natsemi.html
 /* The user-configurable values.
    These may be modified when a driver module is loaded.*/
 
-static int debug = 1; /* 1 normal messages, 0 quiet .. 7 verbose. */
 #define NATSEMI_DEF_MSG		(NETIF_MSG_DRV		| \
 				 NETIF_MSG_LINK		| \
 				 NETIF_MSG_WOL		| \
@@ -1606,7 +1605,7 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 			netdev_rx(dev);
 		}
 
-		if (intr_status & 
+		if (intr_status &
 		   (IntrTxDone | IntrTxIntr | IntrTxIdle | IntrTxErr)) {
 			spin_lock(&np->lock);
 			netdev_tx_done(dev);
