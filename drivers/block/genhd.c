@@ -52,30 +52,6 @@ static inline int dev_to_index(dev_t dev)
 	return major_to_index(MAJOR(dev));
 }
 
-/*
- * __bdevname may be called from interrupts, and must be atomic
- */
-const char *__bdevname(dev_t dev, char *buffer)
-{
-	char *name = "unknown-block";
-	unsigned int major = MAJOR(dev);
-	unsigned int minor = MINOR(dev);
-	int index = major_to_index(major);
-	struct blk_major_name *n;
-	unsigned long flags;
-
-	spin_lock_irqsave(&major_names_lock, flags);
-	for (n = major_names[index]; n; n = n->next)
-		if (n->major == major)
-			break;
-	if (n)
-		name = &(n->name[0]);
-	snprintf(buffer, BDEVNAME_SIZE, "%s(%u,%u)", name, major, minor);
-	spin_unlock_irqrestore(&major_names_lock, flags);
-
-	return buffer;
-}
-
 /* get block device names in somewhat random order */
 int get_blkdev_list(char *p)
 {
