@@ -428,7 +428,18 @@ struct xfrm_state * xfrm_find_acq_byseq(u32 seq)
 	spin_unlock_bh(&xfrm_state_lock);
 	return NULL;
 }
+ 
+u32 xfrm_get_acqseq(void)
+{
+	u32 res;
+	static u32 acqseq;
+	static spinlock_t acqseq_lock = SPIN_LOCK_UNLOCKED;
 
+	spin_lock_bh(&acqseq_lock);
+	res = (++acqseq ? : ++acqseq);
+	spin_unlock_bh(&acqseq_lock);
+	return res;
+}
 
 void
 xfrm_alloc_spi(struct xfrm_state *x, u32 minspi, u32 maxspi)
