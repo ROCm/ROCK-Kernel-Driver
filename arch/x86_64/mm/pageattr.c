@@ -183,11 +183,12 @@ int change_page_attr_addr(unsigned long address, int numpages, pgprot_t prot)
 			break; 
 		/* Handle kernel mapping too which aliases part of the
 		 * lowmem */
-		/* Disabled right now. Fixme */ 
-		if (0 && __pa(address) < KERNEL_TEXT_SIZE) {
+		if (__pa(address) < KERNEL_TEXT_SIZE) {
 			unsigned long addr2;
+			pgprot_t prot2 = prot;
 			addr2 = __START_KERNEL_map + __pa(address);
-			err = __change_page_attr(addr2, pfn, prot, PAGE_KERNEL_EXEC);
+ 			pgprot_val(prot2) &= ~_PAGE_NX;
+			err = __change_page_attr(addr2, pfn, prot2, PAGE_KERNEL_EXEC);
 		} 
 	} 	
 	up_write(&init_mm.mmap_sem); 
