@@ -11,6 +11,7 @@
 #ifdef __KERNEL__
 
 #ifndef __ASSEMBLY__
+#include <linux/config.h>
 #include <asm/processor.h>
 #include <linux/stringify.h>
 
@@ -51,7 +52,19 @@ struct thread_info {
 #define THREAD_ORDER		2
 #define THREAD_SIZE		(PAGE_SIZE << THREAD_ORDER)
 #define THREAD_SHIFT		(PAGE_SHIFT + THREAD_ORDER)
-#define alloc_thread_info(task)	((struct thread_info *)kmalloc(THREAD_SIZE, GFP_KERNEL))
+#ifdef CONFIG_DEBUG_STACK_USAGE
+#define alloc_thread_info(tsk)					\
+	({							\
+		struct thread_info *ret;			\
+								\
+		ret = kmalloc(THREAD_SIZE, GFP_KERNEL);		\
+		if (ret)					\
+			memset(ret, 0, THREAD_SIZE);		\
+		ret;						\
+	})
+#else
+#define alloc_thread_info(tsk) kmalloc(THREAD_SIZE, GFP_KERNEL)
+#endif
 #define free_thread_info(ti)	kfree(ti)
 #define get_thread_info(ti)	get_task_struct((ti)->task)
 #define put_thread_info(ti)	put_task_struct((ti)->task)
