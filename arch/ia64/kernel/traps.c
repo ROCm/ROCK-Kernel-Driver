@@ -101,6 +101,7 @@ die (const char *str, struct pt_regs *regs, long err)
 		.lock_owner =		-1,
 		.lock_owner_depth =	0
 	};
+	static int die_counter;
 
 	if (die.lock_owner != smp_processor_id()) {
 		console_verbose();
@@ -111,7 +112,8 @@ die (const char *str, struct pt_regs *regs, long err)
 	}
 
 	if (++die.lock_owner_depth < 3) {
-		printk("%s[%d]: %s %ld\n", current->comm, current->pid, str, err);
+		printk("%s[%d]: %s %ld [%d]\n",
+			current->comm, current->pid, str, err, ++die_counter);
 		show_regs(regs);
   	} else
 		printk(KERN_ERR "Recursive die() failure, output suppressed\n");
