@@ -335,8 +335,9 @@ static inline int module_is_live(struct module *mod)
 	return mod->state != MODULE_STATE_GOING;
 }
 
-/* Is this address in a module? */
+/* Is this address in a module? (second is with no locks, for oops) */
 struct module *module_text_address(unsigned long addr);
+struct module *__module_text_address(unsigned long addr);
 
 /* Returns module and fills in value, defined and namebuf, or NULL if
    symnum out of range. */
@@ -458,6 +459,12 @@ search_module_extables(unsigned long addr)
 
 /* Is this address in a module? */
 static inline struct module *module_text_address(unsigned long addr)
+{
+	return NULL;
+}
+
+/* Is this address in a module? (don't take a lock, we're oopsing) */
+static inline struct module *__module_text_address(unsigned long addr)
 {
 	return NULL;
 }

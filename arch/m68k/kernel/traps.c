@@ -911,7 +911,7 @@ void show_trace(unsigned long *stack)
 		 * down the cause of the crash will be able to figure
 		 * out the call path that was taken.
 		 */
-		if (kernel_text_address(addr)) {
+		if (__kernel_text_address(addr)) {
 #ifndef CONFIG_KALLSYMS
 			if (i % 5 == 0)
 				printk("\n       ");

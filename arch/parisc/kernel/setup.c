@@ -44,6 +44,7 @@
 #include <asm/machdep.h>	/* for pa7300lc_init() proto */
 #include <asm/pdc_chassis.h>
 #include <asm/io.h>
+#include <asm/setup.h>
 
 char	command_line[COMMAND_LINE_SIZE];
 

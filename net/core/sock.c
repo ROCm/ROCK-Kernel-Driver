@@ -118,6 +118,7 @@
 #include <net/protocol.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
+#include <net/xfrm.h>
 #include <linux/ipsec.h>
 
 #include <linux/filter.h>
@@ -1258,6 +1259,93 @@ void sock_disable_timestamp(struct sock *sk)
 	}
 }
 EXPORT_SYMBOL(sock_disable_timestamp);
+
+/*
+ *	Get a socket option on an socket.
+ *
+ *	FIX: POSIX 1003.1g is very ambiguous here. It states that
+ *	asynchronous errors should be reported by getsockopt. We assume
+ *	this means if you specify SO_ERROR (otherwise whats the point of it).
+ */
+int sock_common_getsockopt(struct socket *sock, int level, int optname,
+			   char __user *optval, int __user *optlen)
+{
+	struct sock *sk = sock->sk;
+
+	return sk->sk_prot->getsockopt(sk, level, optname, optval, optlen);
+}
+
+EXPORT_SYMBOL(sock_common_getsockopt);
+
+int sock_common_recvmsg(struct kiocb *iocb, struct socket *sock,
+			struct msghdr *msg, size_t size, int flags)
+{
+	struct sock *sk = sock->sk;
+	int addr_len = 0;
+	int err;
+
+	err = sk->sk_prot->recvmsg(iocb, sk, msg, size, flags & MSG_DONTWAIT,
+				   flags & ~MSG_DONTWAIT, &addr_len);
+	if (err >= 0)
+		msg->msg_namelen = addr_len;
+	return err;
+}
+
+EXPORT_SYMBOL(sock_common_recvmsg);
+
+/*
+ *	Set socket options on an inet socket.
+ */
+int sock_common_setsockopt(struct socket *sock, int level, int optname,
+			   char __user *optval, int optlen)
+{
+	struct sock *sk = sock->sk;
+
+	return sk->sk_prot->setsockopt(sk, level, optname, optval, optlen);
+}
+
+EXPORT_SYMBOL(sock_common_setsockopt);
+
+void sk_common_release(struct sock *sk)
+{
+	if (sk->sk_prot->destroy)
+		sk->sk_prot->destroy(sk);
+
+	/*
+	 * Observation: when sock_common_release is called, processes have
+	 * no access to socket. But net still has.
+	 * Step one, detach it from networking:
+	 *
+	 * A. Remove from hash tables.
+	 */
+
+	sk->sk_prot->unhash(sk);
+
+	/*
+	 * In this point socket cannot receive new packets, but it is possible
+	 * that some packets are in flight because some CPU runs receiver and
+	 * did hash table lookup before we unhashed socket. They will achieve
+	 * receive queue and will be purged by socket destructor.
+	 *
+	 * Also we still have packets pending on receive queue and probably,
+	 * our own packets waiting in device queues. sock_destroy will drain
+	 * receive queue, but transmitted packets will delay socket destruction
+	 * until the last reference will be released.
+	 */
+
+	sock_orphan(sk);
+
+	xfrm_sk_free_policy(sk);
+
+#ifdef INET_REFCNT_DEBUG
+	if (atomic_read(&sk->sk_refcnt) != 1)
+		printk(KERN_DEBUG "Destruction of the socket %p delayed, c=%d\n",
+		       sk, atomic_read(&sk->sk_refcnt));
+#endif
+	sock_put(sk);
+}
+
+EXPORT_SYMBOL(sk_common_release);
 
 EXPORT_SYMBOL(__lock_sock);
 EXPORT_SYMBOL(__release_sock);

@@ -149,13 +149,8 @@ sr_mod-objs	:= sr.o sr_ioctl.o sr_vendor.o
 initio-objs	:= ini9100u.o i91uscsi.o
 a100u2w-objs	:= inia100.o i60uscsi.o
 ncr53c8xx-flags-$(CONFIG_SCSI_ZALON) \
-		:= -DCONFIG_NCR53C8XX_PREFETCH \
-			-DCONFIG_SCSI_NCR53C8XX_NO_WORD_TRANSFERS \
-			-DCONFIG_SCSI_NCR53C8XX_NO_NVRAM \
-			-DSCSI_NCR_BIG_ENDIAN -DSIMULATED_INTFLY
-ncr53c8xx-flags-$(CONFIG_SCSI_NCR_Q720) \
-		:= -DCONFIG_SCSI_NCR53C8XX_NO_NVRAM \
-			-DSIMULATED_INTFLY
+		:= -DCONFIG_NCR53C8XX_PREFETCH -DSCSI_NCR_BIG_ENDIAN \
+			-DCONFIG_SCSI_NCR53C8XX_NO_WORD_TRANSFERS
 CFLAGS_ncr53c8xx.o	:= $(ncr53c8xx-flags-y) $(ncr53c8xx-flags-m)
 zalon7xx-objs	:= zalon.o ncr53c8xx.o
 NCR_Q720_mod-objs	:= NCR_Q720.o ncr53c8xx.o

@@ -1892,25 +1892,9 @@ static int tcp_v6_init_sock(struct sock *sk)
 
 static int tcp_v6_destroy_sock(struct sock *sk)
 {
-	struct tcp_opt *tp = tcp_sk(sk);
+	extern int tcp_v4_destroy_sock(struct sock *sk);
 
-	tcp_clear_xmit_timers(sk);
-
-	/* Cleanup up the write buffer. */
-  	sk_stream_writequeue_purge(sk);
-
-	/* Cleans up our, hopefully empty, out_of_order_queue. */
-  	__skb_queue_purge(&tp->out_of_order_queue);
-
-	/* Clean prequeue, it must be empty really */
-	__skb_queue_purge(&tp->ucopy.prequeue);
-
-	/* Clean up a referenced TCP bind bucket. */
-	if (tcp_sk(sk)->bind_hash)
-		tcp_put_port(sk);
-
-	atomic_dec(&tcp_sockets_allocated);
-
+	tcp_v4_destroy_sock(sk);
 	return inet6_destroy_sock(sk);
 }
 

@@ -2695,7 +2695,7 @@ int reiserfs_setattr(struct dentry *dentry, struct iattr *attr) {
                     error = DQUOT_TRANSFER(inode, attr) ? -EDQUOT : 0;
         }
         if (!error)
-            inode_setattr(inode, attr) ;
+            error = inode_setattr(inode, attr) ;
     }
 
 

@@ -225,6 +225,7 @@ __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 			 * The inode is clean, unused
 			 */
 			list_move(&inode->i_list, &inode_unused);
+			inodes_stat.nr_unused++;
 		}
 	}
 	wake_up_inode(inode);

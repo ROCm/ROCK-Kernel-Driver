@@ -47,6 +47,7 @@
 
 #include <asm/io.h>
 #include <asm/bugs.h>
+#include <asm/setup.h>
 
 /*
  * This is one of the first .c files built. Error out early

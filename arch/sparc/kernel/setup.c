@@ -47,6 +47,7 @@
 #include <asm/hardirq.h>
 #include <asm/machines.h>
 #include <asm/cpudata.h>
+#include <asm/setup.h>
 
 struct screen_info screen_info = {
 	0, 0,			/* orig-x, orig-y */

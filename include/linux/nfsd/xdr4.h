@@ -378,6 +378,7 @@ struct nfsd4_compoundargs {
 	u32 *				tmpp;
 	struct tmpbuf {
 		struct tmpbuf *next;
+		void (*release)(const void *);
 		void *buf;
 	}				*to_free;
 
@@ -449,6 +450,7 @@ extern int nfsd4_locku(struct svc_rqst *rqstp, struct svc_fh *current_fh,
 extern int
 nfsd4_release_lockowner(struct svc_rqst *rqstp,
 		struct nfsd4_release_lockowner *rlockowner);
+extern void nfsd4_release_compoundargs(struct nfsd4_compoundargs *);
 #endif
 
 /*

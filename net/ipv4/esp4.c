@@ -94,8 +94,9 @@ int esp_output(struct sk_buff **pskb)
 	if (x->props.mode) {
 		top_iph = (struct iphdr*)skb_push(*pskb, x->props.header_len);
 		esph = (struct ip_esp_hdr*)(top_iph+1);
-		if (encap && encap->encap_type) {
+		if (encap) {
 			switch (encap->encap_type) {
+			default:
 			case UDP_ENCAP_ESPINUDP:
 				uh = (struct udphdr*) esph;
 				esph = (struct ip_esp_hdr*)(uh+1);
@@ -106,14 +107,7 @@ int esp_output(struct sk_buff **pskb)
 				udpdata32 = (u32*)(uh+1);
 				udpdata32[0] = udpdata32[1] = 0;
 				esph = (struct ip_esp_hdr*)(udpdata32+2);
-				alen += 2;
 				top_iph->protocol = IPPROTO_UDP;
-				break;
-			default:
-				printk(KERN_INFO
-				       "esp_output(): Unhandled encap: %u\n",
-				       encap->encap_type);
-				top_iph->protocol = IPPROTO_ESP;
 				break;
 			}
 		} else
@@ -137,8 +131,9 @@ int esp_output(struct sk_buff **pskb)
 		esph = (struct ip_esp_hdr*)skb_push(*pskb, x->props.header_len);
 		top_iph = (struct iphdr*)skb_push(*pskb, iph->ihl*4);
 		memcpy(top_iph, &tmp_iph, iph->ihl*4);
-		if (encap && encap->encap_type) {
+		if (encap) {
 			switch (encap->encap_type) {
+			default:
 			case UDP_ENCAP_ESPINUDP:
 				uh = (struct udphdr*) esph;
 				esph = (struct ip_esp_hdr*)(uh+1);
@@ -149,14 +144,7 @@ int esp_output(struct sk_buff **pskb)
 				udpdata32 = (u32*)(uh+1);
 				udpdata32[0] = udpdata32[1] = 0;
 				esph = (struct ip_esp_hdr*)(udpdata32+2);
-				alen += 2;
 				top_iph->protocol = IPPROTO_UDP;
-				break;
-			default:
-				printk(KERN_INFO
-				       "esp_output(): Unhandled encap: %u\n",
-				       encap->encap_type);
-				top_iph->protocol = IPPROTO_ESP;
 				break;
 			}
 		} else
@@ -313,28 +301,14 @@ int esp_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_bu
 			switch (decap->decap_type) {
 			case UDP_ENCAP_ESPINUDP:
 			case UDP_ENCAP_ESPINUDP_NON_IKE:
-
-				if ((void*)uh == (void*)esph) {
-					printk(KERN_DEBUG
-					       "esp_input(): Got ESP; expecting ESPinUDP\n");
-					break;
-				}
-
 				encap_data->proto = AF_INET;
 				encap_data->saddr.a4 = iph->saddr;
 				encap_data->sport = uh->source;
 				encap_len = (void*)esph - (void*)uh;
-				if (encap_len != sizeof(*uh))
-				  printk(KERN_DEBUG
-					 "esp_input(): UDP -> ESP: too much room: %d\n",
-					 encap_len);
 				break;
 
 			default:
-				printk(KERN_INFO
-			       "esp_input(): processing unknown encap type: %u\n",
-				       decap->decap_type);
-				break;
+				goto out;
 			}
 		}
 
@@ -367,11 +341,8 @@ int esp_post_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct 
 		if (encap->encap_type != decap->decap_type)
 			return -EINVAL;
 
-		/* Next, if we don't have an encap type, then ignore it */
-		if (!encap->encap_type)
-			return 0;
-
 		switch (encap->encap_type) {
+		default:
 		case UDP_ENCAP_ESPINUDP:
 		case UDP_ENCAP_ESPINUDP_NON_IKE:
 			/*
@@ -407,11 +378,6 @@ int esp_post_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct 
 			if (!x->props.mode)
 				skb->ip_summed = CHECKSUM_UNNECESSARY;
 
-			break;
-		default:
-			printk(KERN_INFO
-			       "esp4_post_input(): Unhandled encap type: %u\n",
-			       encap->encap_type);
 			break;
 		}
 	}
@@ -549,20 +515,14 @@ int esp_init_state(struct xfrm_state *x, void *args)
 	if (x->encap) {
 		struct xfrm_encap_tmpl *encap = x->encap;
 
-		if (encap->encap_type) {
-			switch (encap->encap_type) {
-			case UDP_ENCAP_ESPINUDP:
-				x->props.header_len += sizeof(struct udphdr);
-				break;
-			case UDP_ENCAP_ESPINUDP_NON_IKE:
-				x->props.header_len += sizeof(struct udphdr) + 2 * sizeof(u32);
-				break;
-			default:
-				printk (KERN_INFO
-				"esp_init_state(): Unhandled encap type: %u\n",
-					encap->encap_type);
-				break;
-			}
+		switch (encap->encap_type) {
+		default:
+		case UDP_ENCAP_ESPINUDP:
+			x->props.header_len += sizeof(struct udphdr);
+			break;
+		case UDP_ENCAP_ESPINUDP_NON_IKE:
+			x->props.header_len += sizeof(struct udphdr) + 2 * sizeof(u32);
+			break;
 		}
 	}
 	x->data = esp;

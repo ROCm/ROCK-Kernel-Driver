@@ -1469,11 +1469,13 @@ config NFSD_V4
 	  If unsure, say N.
 
 config NFSD_TCP
-	bool "Provide NFS server over TCP support (EXPERIMENTAL)"
-	depends on NFSD && EXPERIMENTAL
+	bool "Provide NFS server over TCP support"
+	depends on NFSD
+	default y
 	help
-	  Enable NFS service over TCP connections.  This the officially
-	  still experimental, but seems to work well.
+	  If you want your NFS server to support TCP connections, say Y here.
+	  TCP connections usually perform better than the default UDP when
+	  the network is lossy or congested.  If unsure, say Y.
 
 config ROOT_NFS
 	bool "Root file system on NFS"

@@ -499,9 +499,8 @@ static int parse_options(char *options, int is_vfat, int *debug,
 	}
 	/* UTF8 doesn't provide FAT semantics */
 	if (!strcmp(opts->iocharset, "utf8")) {
-		printk(KERN_ERR "FAT: utf8 is not a valid IO charset"
-		       " for FAT filesystems\n");
-		return -EINVAL;
+		printk(KERN_ERR "FAT: utf8 is not a recommended IO charset"
+		       " for FAT filesystems, filesystem will be case sensitive!\n");
 	}
 
 	if (opts->unicode_xlate)

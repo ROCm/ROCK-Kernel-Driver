@@ -28,8 +28,9 @@ Contents
 The short story
 ---------------
 
-If you just want to use it, run the laptop_mode control script (which is included
-at the end of this document) as follows:
+To use laptop mode, you don't need to set any kernel configuration options
+or anything. You simply need to run the laptop_mode control script (which
+is included in this document) as follows:
 
 # laptop_mode start
 
@@ -78,12 +79,13 @@ Caveats
 The details
 -----------
 
-Laptop-mode is controlled by the flag /proc/sys/vm/laptop_mode. When this
-flag is set, any physical disk read operation (that might have caused the
-hard disk to spin up) causes Linux to flush all dirty blocks. The result
-of this is that after a disk has spun down, it will not be spun up anymore
-to write dirty blocks, because those blocks had already been written
-immediately after the most recent read operation
+Laptop-mode is controlled by the flag /proc/sys/vm/laptop_mode. This flag is
+present for all kernels that have the laptop mode patch, regardless of any
+configuration options. When the flag is set, any physical disk read operation
+(that might have caused the hard disk to spin up) causes Linux to flush all dirty
+blocks. The result of this is that after a disk has spun down, it will not be spun
+up anymore to write dirty blocks, because those blocks had already been written
+immediately after the most recent read operation.
 
 To increase the effectiveness of the laptop_mode strategy, the laptop_mode
 control script increases dirty_expire_centisecs and dirty_writeback_centisecs in
@@ -163,7 +165,7 @@ Control script
 Please note that this control script works for the Linux 2.4 and 2.6 series.
 
 --------------------CONTROL SCRIPT BEGIN------------------------------------------
-#! /bin/sh
+#!/bin/bash
 
 # start or stop laptop_mode, best run by a power management daemon when
 # ac gets connected/disconnected from a laptop
@@ -174,136 +176,24 @@ Please note that this control script works for the Linux 2.4 and 2.6 series.
 #				 Bart Samwel
 #				 Micha Feigin
 #				 Andrew Morton
+#				 Herve Eychenne
 #				 Dax Kelson
 #
 # Original Linux 2.4 version by: Jens Axboe
 
-# Remove an option (the first parameter) of the form option=<number> from
-# a mount options string (the rest of the parameters).
-parse_mount_opts () {
-	OPT="$1"
-	shift
-	echo "$*"			| \
-	sed 's/.*/,&,/'			| \
-	sed 's/,'"$OPT"'=[0-9]*,/,/g'	| \
-	sed 's/,,*/,/g'			| \
-	sed 's/^,//'			| \
-	sed 's/,$//'			| \
-	cat -
-}
+#############################################################################
 
-# Remove an option (the first parameter) without any arguments from
-# a mount option string (the rest of the parameters).
-parse_nonumber_mount_opts () {
-	OPT="$1"
-	shift
-	echo "$*" 			| \
-	sed 's/.*/,&,/'			| \
-	sed 's/,'"$OPT"',/,/g'		| \
-	sed 's/,,*/,/g'			| \
-	sed 's/^,//'			| \
-	sed 's/,$//'			| \
-	cat -
-}
+# Age time, in seconds. should be put into a sysconfig file
+MAX_AGE=600
 
-# Find out the state of a yes/no option (e.g. "atime"/"noatime") in
-# fstab for a given filesystem, and use this state to replace the
-# value of the option in another mount options string. The device
-# is the first argument, the option name the second, and the default
-# value the third. The remainder is the mount options string.
-#
-# Example:
-# parse_yesno_opts_wfstab /dev/hda1 atime atime defaults,noatime
-#
-# If fstab contains, say, "rw" for this filesystem, then the result
-# will be "defaults,atime".
-parse_yesno_opts_wfstab () {
-	L_DEV=$1
-	shift
-	OPT=$1
-	shift
-	DEF_OPT=$1
-	shift
-	L_OPTS="$*"
-	PARSEDOPTS1="$(parse_nonumber_mount_opts $OPT $L_OPTS)"
-	PARSEDOPTS1="$(parse_nonumber_mount_opts no$OPT $PARSEDOPTS1)"
-	# Watch for a default atime in fstab
-	FSTAB_OPTS="$(cat /etc/fstab | sed 's/  / /g' | grep ^\ *"$L_DEV " | awk '{ print $4 }')"
-	if [ -z "$(echo "$FSTAB_OPTS" | grep "$OPT")" ] ; then
-		# option not specified in fstab -- choose the default.
-		echo "$PARSEDOPTS1,$DEF_OPT"
-	else
-		# option specified in fstab: extract the value and use it
-		if [ -z "$(echo "$FSTAB_OPTS" | grep "no$OPT")" ] ; then
-			# no$OPT not found -- so we must have $OPT.
-			echo "$PARSEDOPTS1,$OPT"
-		else
-			echo "$PARSEDOPTS1,no$OPT"
-		fi
-	fi
-}
-
-# Find out the state of a numbered option (e.g. "commit=NNN") in
-# fstab for a given filesystem, and use this state to replace the
-# value of the option in another mount options string. The device
-# is the first argument, and the option name the second. The
-# remainder is the mount options string in which the replacement
-# must be done.
-#
-# Example:
-# parse_mount_opts_wfstab /dev/hda1 commit defaults,commit=7
-#
-# If fstab contains, say, "commit=3,rw" for this filesystem, then the
-# result will be "rw,commit=3".
-parse_mount_opts_wfstab () {
-	L_DEV=$1
-	shift
-	OPT=$1
-	shift
-	L_OPTS="$*"
-
-	PARSEDOPTS1="$(parse_mount_opts $OPT $L_OPTS)"
-	# Watch for a default commit in fstab
-	FSTAB_OPTS="$(cat /etc/fstab | sed 's/	/ /g' | grep ^\ *"$L_DEV " | awk '{ print $4 }')"
-	if [ -z "$(echo "$FSTAB_OPTS" | grep "$OPT=")" ] ; then
-		# option not specified in fstab: set it to 0
-		echo "$PARSEDOPTS1,$OPT=0"
-	else
-		# option specified in fstab: extract the value, and use it
-		echo -n "$PARSEDOPTS1,$OPT="
-		echo "$FSTAB_OPTS"	| \
-		sed 's/.*/,&,/'		| \
-		sed 's/.*,'"$OPT"'=//'	| \
-		sed 's/,.*//'		| \
-		cat -
-	fi
-}
-
-KLEVEL=$(
-           uname -r |
-             (
-	       IFS="." read a b c
-	       echo $a.$b
-	     )
-	 )
-case "$KLEVEL" in
-	"2.4"|"2.6")
-		true
-		;;
-	*)
-		echo "Unhandled kernel version: $KLEVEL ('uname -r' = '$(uname -r)')"
-		exit 1
-		;;
-esac
+# Read-ahead, in kilobytes
+READAHEAD=4096
 
 # Shall we remount journaled fs. with appropiate commit interval? (1=yes)
 DO_REMOUNTS=1
 
 # And shall we add the "noatime" option to that as well? (1=yes)
 DO_REMOUNT_NOATIME=1
-
-# age time, in seconds. should be put into a sysconfig file
-MAX_AGE=600
 
 # Dirty synchronous ratio.  At this percentage of dirty pages the process which
 # calls write() does its own writeback
@@ -316,8 +206,6 @@ DIRTY_RATIO=40
 # some writeout has commenced, we do a lot of it.
 #
 DIRTY_BACKGROUND_RATIO=5
-
-READAHEAD=4096		# kilobytes
 
 # kernel default dirty buffer age
 DEF_AGE=30
@@ -336,17 +224,126 @@ DEF_XFS_BUFD_INTERVAL=1
 # change this on 2.6.
 XFS_HZ=100
 
-if [ ! -e /proc/sys/vm/laptop_mode ]; then
-	echo "Kernel is not patched with laptop_mode patch."
+#############################################################################
+
+KLEVEL="$(uname -r |
+             {
+	       IFS='.' read a b c
+	       echo $a.$b
+	     }
+)"
+case "$KLEVEL" in
+	"2.4"|"2.6")
+		;;
+	*)
+		echo "Unhandled kernel version: $KLEVEL ('uname -r' = '$(uname -r)')" >&2
+		exit 1
+		;;
+esac
+
+if [ ! -e /proc/sys/vm/laptop_mode ] ; then
+	echo "Kernel is not patched with laptop_mode patch." >&2
 	exit 1
 fi
 
-if [ ! -w /proc/sys/vm/laptop_mode ]; then
-	echo "You do not have enough privileges to enable laptop_mode."
+if [ ! -w /proc/sys/vm/laptop_mode ] ; then
+	echo "You do not have enough privileges to enable laptop_mode." >&2
 	exit 1
 fi
 
-if [ $DO_REMOUNT_NOATIME -eq 1 ]; then
+# Remove an option (the first parameter) of the form option=<number> from
+# a mount options string (the rest of the parameters).
+parse_mount_opts () {
+	OPT="$1"
+	shift
+	echo ",$*," | sed		\
+	 -e 's/,'"$OPT"'=[0-9]*,/,/g'	\
+	 -e 's/,,*/,/g'			\
+	 -e 's/^,//'			\
+	 -e 's/,$//'
+}
+
+# Remove an option (the first parameter) without any arguments from
+# a mount option string (the rest of the parameters).
+parse_nonumber_mount_opts () {
+	OPT="$1"
+	shift
+	echo ",$*," | sed		\
+	 -e 's/,'"$OPT"',/,/g'		\
+	 -e 's/,,*/,/g'			\
+	 -e 's/^,//'			\
+	 -e 's/,$//'
+}
+
+# Find out the state of a yes/no option (e.g. "atime"/"noatime") in
+# fstab for a given filesystem, and use this state to replace the
+# value of the option in another mount options string. The device
+# is the first argument, the option name the second, and the default
+# value the third. The remainder is the mount options string.
+#
+# Example:
+# parse_yesno_opts_wfstab /dev/hda1 atime atime defaults,noatime
+#
+# If fstab contains, say, "rw" for this filesystem, then the result
+# will be "defaults,atime".
+parse_yesno_opts_wfstab () {
+	L_DEV="$1"
+	OPT="$2"
+	DEF_OPT="$3"
+	shift 3
+	L_OPTS="$*"
+	PARSEDOPTS1="$(parse_nonumber_mount_opts $OPT $L_OPTS)"
+	PARSEDOPTS1="$(parse_nonumber_mount_opts no$OPT $PARSEDOPTS1)"
+	# Watch for a default atime in fstab
+	FSTAB_OPTS="$(awk '$1 == "'$L_DEV'" { print $4 }' /etc/fstab)"
+	if echo "$FSTAB_OPTS" | grep "$OPT" > /dev/null ; then
+		# option specified in fstab: extract the value and use it
+		if echo "$FSTAB_OPTS" | grep "no$OPT" > /dev/null ; then
+			echo "$PARSEDOPTS1,no$OPT"
+		else
+			# no$OPT not found -- so we must have $OPT.
+			echo "$PARSEDOPTS1,$OPT"
+		fi
+	else
+		# option not specified in fstab -- choose the default.
+		echo "$PARSEDOPTS1,$DEF_OPT"
+	fi
+}
+
+# Find out the state of a numbered option (e.g. "commit=NNN") in
+# fstab for a given filesystem, and use this state to replace the
+# value of the option in another mount options string. The device
+# is the first argument, and the option name the second. The
+# remainder is the mount options string in which the replacement
+# must be done.
+#
+# Example:
+# parse_mount_opts_wfstab /dev/hda1 commit defaults,commit=7
+#
+# If fstab contains, say, "commit=3,rw" for this filesystem, then the
+# result will be "rw,commit=3".
+parse_mount_opts_wfstab () {
+	L_DEV="$1"
+	OPT="$2"
+	shift 2
+	L_OPTS="$*"
+	PARSEDOPTS1="$(parse_mount_opts $OPT $L_OPTS)"
+	# Watch for a default commit in fstab
+	FSTAB_OPTS="$(awk '$1 == "'$L_DEV'" { print $4 }' /etc/fstab)"
+	if echo "$FSTAB_OPTS" | grep "$OPT=" > /dev/null ; then
+		# option specified in fstab: extract the value, and use it
+		echo -n "$PARSEDOPTS1,$OPT="
+		echo ",$FSTAB_OPTS," | sed \
+		 -e 's/.*,'"$OPT"'=//'	\
+		 -e 's/,.*//'
+	else
+		# option not specified in fstab: set it to 0
+		echo "$PARSEDOPTS1,$OPT=0"
+	fi
+}
+
+
+if [ $DO_REMOUNT_NOATIME -eq 1 ] ; then
 	NOATIME_OPT=",noatime"
 fi
 
@@ -384,11 +381,11 @@ case "$1" in
 
 		case "$KLEVEL" in
 			"2.4")
-				echo "1"				> /proc/sys/vm/laptop_mode
+				echo 1					> /proc/sys/vm/laptop_mode
 				echo "30 500 0 0 $AGE $AGE 60 20 0"	> /proc/sys/vm/bdflush
 				;;
 			"2.6")
-				echo "5"				> /proc/sys/vm/laptop_mode
+				echo 5					> /proc/sys/vm/laptop_mode
 				echo "$AGE"				> /proc/sys/vm/dirty_writeback_centisecs
 				echo "$AGE"				> /proc/sys/vm/dirty_expire_centisecs
 				echo "$DIRTY_RATIO"			> /proc/sys/vm/dirty_ratio
@@ -418,16 +415,16 @@ case "$1" in
 		U_AGE=$((100*$DEF_UPDATE))
 		B_AGE=$((100*$DEF_AGE))
 		echo -n "Stopping laptop_mode"
-		echo "0" > /proc/sys/vm/laptop_mode
-		if [ -f /proc/sys/fs/xfs/age_buffer ] && [ ! -f /proc/sys/fs/xfs/lm_age_buffer ] ; then
+		echo 0 > /proc/sys/vm/laptop_mode
+		if [ -f /proc/sys/fs/xfs/age_buffer -a ! -f /proc/sys/fs/xfs/lm_age_buffer ] ; then
 			# These need to be restored, if there are no lm_*.
-			echo "$(($XFS_HZ*$DEF_XFS_AGE_BUFFER))" 	> /proc/sys/fs/xfs/age_buffer
-			echo "$(($XFS_HZ*$DEF_XFS_SYNC_INTERVAL))" 	> /proc/sys/fs/xfs/sync_interval
+			echo $(($XFS_HZ*$DEF_XFS_AGE_BUFFER))	 	> /proc/sys/fs/xfs/age_buffer
+			echo $(($XFS_HZ*$DEF_XFS_SYNC_INTERVAL)) 	> /proc/sys/fs/xfs/sync_interval
 		elif [ -f /proc/sys/fs/xfs/age_buffer_centisecs ] ; then
 			# These need to be restored as well.
-			echo "$((100*$DEF_XFS_AGE_BUFFER))" > /proc/sys/fs/xfs/age_buffer_centisecs
-			echo "$((100*$DEF_XFS_SYNC_INTERVAL))" > /proc/sys/fs/xfs/xfssyncd_centisecs
-			echo "$((100*$DEF_XFS_BUFD_INTERVAL))" > /proc/sys/fs/xfs/xfsbufd_centisecs
+			echo $((100*$DEF_XFS_AGE_BUFFER))	> /proc/sys/fs/xfs/age_buffer_centisecs
+			echo $((100*$DEF_XFS_SYNC_INTERVAL))	> /proc/sys/fs/xfs/xfssyncd_centisecs
+			echo $((100*$DEF_XFS_BUFD_INTERVAL))	> /proc/sys/fs/xfs/xfsbufd_centisecs
 		fi
 		case "$KLEVEL" in
 			"2.4")
@@ -440,7 +437,7 @@ case "$1" in
 				echo "$DEF_DIRTY_BACKGROUND_RATIO"	> /proc/sys/vm/dirty_background_ratio
 				;;
 		esac
-		if [ $DO_REMOUNTS -eq 1 ]; then
+		if [ $DO_REMOUNTS -eq 1 ] ; then
 			cat /etc/mtab | while read DEV MP FST OPTS DUMP PASS ; do
 				# Reset commit and atime options to defaults.
 				case "$FST" in
@@ -462,13 +459,13 @@ case "$1" in
 		echo "."
 		;;
 	*)
-		echo "Usage: $0 {start|stop}"
+		echo "Usage: $0 {start|stop}" 2>&1
+		exit 1
 		;;
 
 esac
 
 exit 0
-
 --------------------CONTROL SCRIPT END--------------------------------------------
 
 

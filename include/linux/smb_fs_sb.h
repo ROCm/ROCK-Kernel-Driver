@@ -60,9 +60,6 @@ struct smb_sb_info {
 
 	struct semaphore sem;
 
-        unsigned short     rcls; /* The error codes we received */
-        unsigned short     err;
-
 	unsigned char      header[SMB_HEADER_LEN + 20*2 + 2];
 	u32                header_len;
 	u32                smb_len;

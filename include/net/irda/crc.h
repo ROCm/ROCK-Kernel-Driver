@@ -15,19 +15,15 @@
 #define IRDA_CRC_H
 
 #include <linux/types.h>
+#include <linux/crc16.h>
 
 #define INIT_FCS  0xffff   /* Initial FCS value */
 #define GOOD_FCS  0xf0b8   /* Good final FCS value */
 
-extern __u16 const irda_crc16_table[];
-
 /* Recompute the FCS with one more character appended. */
-static inline __u16 irda_fcs(__u16 fcs, __u8 c)
-{
-	return (((fcs) >> 8) ^ irda_crc16_table[((fcs) ^ (c)) & 0xff]);
-}
+#define irda_fcs(fcs, c) crc16_byte(fcs, c)
 
 /* Recompute the FCS with len bytes appended. */
-__u16 irda_calc_crc16( __u16 fcs, __u8 const *buf, size_t len);
+#define irda_calc_crc16(fcs, buf, len) crc16(fcs, buf, len)
 
 #endif

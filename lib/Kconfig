@@ -4,8 +4,17 @@
 
 menu "Library routines"
 
+config CRC16
+	tristate "CRC16 functions"
+	help
+	  This option is provided for the case where no in-kernel-tree
+	  modules require CRC16 functions, but a module built outside the
+	  kernel tree does. Such modules that use library CRC16 functions
+	  require M here.
+
 config CRC32
 	tristate "CRC32 functions"
+	default y
 	help
 	  This option is provided for the case where no in-kernel-tree
 	  modules require CRC32 functions, but a module built outside the

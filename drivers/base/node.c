@@ -7,6 +7,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/node.h>
+#include <linux/hugetlb.h>
 #include <linux/cpumask.h>
 #include <linux/topology.h>
 
@@ -30,12 +31,6 @@ static ssize_t node_read_cpumap(struct sys_device * dev, char * buf)
 }
 
 static SYSDEV_ATTR(cpumap, S_IRUGO, node_read_cpumap, NULL);
-
-/* Can be overwritten by architecture specific code. */
-int __attribute__((weak)) hugetlb_report_node_meminfo(int node, char *buf)
-{
-	return 0;
-}
 
 #define K(x) ((x) << (PAGE_SHIFT - 10))
 static ssize_t node_read_meminfo(struct sys_device * dev, char * buf)

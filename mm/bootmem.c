@@ -371,11 +371,6 @@ void * __init __alloc_bootmem_node (pg_data_t *pgdat, unsigned long size, unsign
 	if (ptr)
 		return (ptr);
 
-	/*
-	 * Whoops, we cannot satisfy the allocation request.
-	 */
-	printk(KERN_ALERT "bootmem alloc of %lu bytes failed!\n", size);
-	panic("Out of memory");
-	return NULL;
+	return __alloc_bootmem(size, align, goal);
 }
 

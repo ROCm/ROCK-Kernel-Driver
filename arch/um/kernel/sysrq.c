@@ -23,7 +23,7 @@ void show_trace(unsigned long * stack)
         i = 1;
         while (((long) stack & (THREAD_SIZE-1)) != 0) {
                 addr = *stack++;
-		if (kernel_text_address(addr)) {
+		if (__kernel_text_address(addr)) {
 			if (i && ((i % 6) == 0))
 				printk("\n   ");
 			printk("[<%08lx>] ", addr);

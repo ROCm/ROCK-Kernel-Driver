@@ -502,7 +502,7 @@ mpt_lan_reset(struct net_device *dev)
 	LANResetRequest_t *pResetReq;
 	struct mpt_lan_priv *priv = netdev_priv(dev);
 
-	mf = mpt_get_msg_frame(LanCtx, priv->mpt_dev->id);
+	mf = mpt_get_msg_frame(LanCtx, priv->mpt_dev);
 
 	if (mf == NULL) {
 /*		dlprintk((KERN_ERR MYNAM "/reset: Evil funkiness abounds! "
@@ -520,7 +520,7 @@ mpt_lan_reset(struct net_device *dev)
 	pResetReq->MsgFlags	= 0;
 	pResetReq->Reserved2	= 0;
 
-	mpt_put_msg_frame(LanCtx, priv->mpt_dev->id, mf);
+	mpt_put_msg_frame(LanCtx, priv->mpt_dev, mf);
 
 	return 0;
 }
@@ -754,7 +754,7 @@ mpt_lan_sdu_send (struct sk_buff *skb, struct net_device *dev)
 		return 1;
 	}
 
-	mf = mpt_get_msg_frame(LanCtx, mpt_dev->id);
+	mf = mpt_get_msg_frame(LanCtx, mpt_dev);
 	if (mf == NULL) {
 		netif_stop_queue(dev);
 		spin_unlock_irqrestore(&priv->txfidx_lock, flags);
@@ -859,7 +859,7 @@ mpt_lan_sdu_send (struct sk_buff *skb, struct net_device *dev)
 	else
 		pSimple->Address.High = 0;
 
-	mpt_put_msg_frame (LanCtx, mpt_dev->id, mf);
+	mpt_put_msg_frame (LanCtx, mpt_dev, mf);
 	dev->trans_start = jiffies;
 
 	dioprintk((KERN_INFO MYNAM ": %s/%s: Sending packet. FlagsLength = %08x.\n",
@@ -1244,7 +1244,7 @@ mpt_lan_post_receive_buckets(void *dev_id)
 			(MPT_LAN_TRANSACTION32_SIZE + sizeof(SGESimple64_t));
 
 	while (buckets) {
-		mf = mpt_get_msg_frame(LanCtx, mpt_dev->id);
+		mf = mpt_get_msg_frame(LanCtx, mpt_dev);
 		if (mf == NULL) {
 			printk (KERN_ERR "%s: Unable to alloc request frame\n",
 				__FUNCTION__);
@@ -1334,7 +1334,7 @@ mpt_lan_post_receive_buckets(void *dev_id)
 		if (pSimple == NULL) {
 /**/			printk (KERN_WARNING MYNAM "/%s: No buckets posted\n",
 /**/				__FUNCTION__);
-			mpt_free_msg_frame(LanCtx, mpt_dev->id, mf);
+			mpt_free_msg_frame(LanCtx, mpt_dev, mf);
 			goto out;
 		}
 
@@ -1348,7 +1348,7 @@ mpt_lan_post_receive_buckets(void *dev_id)
  *	printk ("\n");
  */
 
-		mpt_put_msg_frame(LanCtx, mpt_dev->id, mf);
+		mpt_put_msg_frame(LanCtx, mpt_dev, mf);
 
 		priv->total_posted += i;
 		buckets -= i;
@@ -1489,7 +1489,7 @@ static int __init mpt_lan_init (void)
 		mpt_landev[j] = NULL;
 	}
 
-	for (p = mpt_adapter_find_first(); p; p = mpt_adapter_find_next(p)) {
+	list_for_each_entry(p, &ioc_list, list) {
 		for (i = 0; i < p->facts.NumberOfPorts; i++) {
 			printk (KERN_INFO MYNAM ": %s: PortNum=%x, ProtocolFlags=%02Xh (%c%c%c%c)\n",
 					p->name,

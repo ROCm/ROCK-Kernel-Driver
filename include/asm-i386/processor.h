@@ -297,9 +297,9 @@ extern unsigned int mca_pentium_flag;
 #define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 3))
 
 /*
- * Size of io_bitmap, covering ports 0 to 0x3ff.
+ * Size of io_bitmap.
  */
-#define IO_BITMAP_BITS  1024
+#define IO_BITMAP_BITS  65536
 #define IO_BITMAP_BYTES (IO_BITMAP_BITS/8)
 #define IO_BITMAP_LONGS (IO_BITMAP_BYTES/sizeof(long))
 #define IO_BITMAP_OFFSET offsetof(struct tss_struct,io_bitmap)
@@ -391,7 +391,7 @@ struct tss_struct {
 	/*
 	 * pads the TSS to be cacheline-aligned (size is 0x100)
 	 */
-	unsigned long __cacheline_filler[5];
+	unsigned long __cacheline_filler[37];
 	/*
 	 * .. and then another 0x100 bytes for emergency kernel stack
 	 */

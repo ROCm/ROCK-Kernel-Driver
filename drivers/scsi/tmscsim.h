@@ -29,215 +29,167 @@ typedef u16		USHORT;	/* 16 bits */
 typedef u32		UINT;	/* 32 bits */
 typedef unsigned long	ULONG;	/* 32/64 bits */
 
-typedef UCHAR		*PUCHAR;
-typedef USHORT		*PUSHORT;
-typedef UINT		*PUINT;
-typedef ULONG		*PULONG;
-typedef Scsi_Host_Template	*PSHT;
-typedef struct Scsi_Host	*PSH;
-typedef Scsi_Device	*PSCSIDEV;
-typedef Scsi_Cmnd	*PSCSICMD;
-typedef void		*PVOID;
-typedef struct scatterlist  *PSGL, SGL;
-
-
-/*;-----------------------------------------------------------------------*/
-typedef  struct  _SyncMsg
-{
-UCHAR		ExtendMsg;
-UCHAR		ExtMsgLen;
-UCHAR		SyncXferReq;
-UCHAR		Period;
-UCHAR		ReqOffset;
-} SyncMsg;
-/*;-----------------------------------------------------------------------*/
-typedef  struct  _Capacity
-{
-ULONG		BlockCount;
-ULONG		BlockLength;
-} Capacity;
-/*;-----------------------------------------------------------------------*/
-typedef  struct  _SGentry
-{
-ULONG		SGXferDataPtr;
-ULONG		SGXferDataLen;
-} SGentry;
-
-typedef  struct  _SGentry1
-{
-ULONG		SGXLen;
-ULONG		SGXPtr;
-} SGentry1, *PSGE;
-
 
 /*
 ;-----------------------------------------------------------------------
 ; SCSI Request Block
 ;-----------------------------------------------------------------------
 */
-struct	_SRB
+struct dc390_srb
 {
-//UCHAR		CmdBlock[12];
+//u8		CmdBlock[12];
 
-struct _SRB	*pNextSRB;
-struct _DCB	*pSRBDCB;
-PSCSICMD	pcmd;
-PSGL		pSegmentList;
+struct dc390_srb	*pNextSRB;
+struct dc390_dcb	*pSRBDCB;
+struct scsi_cmnd	*pcmd;
+struct scatterlist	*pSegmentList;
 
 /* 0x10: */
-SGL		Segmentx;	/* make a one entry of S/G list table */
+struct scatterlist Segmentx;	/* make a one entry of S/G list table */
 
 /* 0x1c: */
-ULONG		SGBusAddr;	/*;a segment starting address as seen by AM53C974A*/
-ULONG		SGToBeXferLen;	/*; to be xfer length */
-ULONG		TotalXferredLen;
-ULONG		SavedTotXLen;
-UINT		SRBState;
+unsigned long	SGBusAddr;	/*;a segment starting address as seen by AM53C974A*/
+unsigned long	SGToBeXferLen;	/*; to be xfer length */
+unsigned long	TotalXferredLen;
+unsigned long	SavedTotXLen;
+u32		SRBState;
 
 /* 0x30: */
-UCHAR		SRBStatus;
-UCHAR		SRBFlag;	/*; b0-AutoReqSense,b6-Read,b7-write */
+u8		SRBStatus;
+u8		SRBFlag;	/*; b0-AutoReqSense,b6-Read,b7-write */
 				/*; b4-settimeout,b5-Residual valid */
-UCHAR		AdaptStatus;
-UCHAR		TargetStatus;
+u8		AdaptStatus;
+u8		TargetStatus;
 
-UCHAR		ScsiPhase;
-UCHAR		TagNumber;
-UCHAR		SGIndex;
-UCHAR		SGcount;
+u8		ScsiPhase;
+u8		TagNumber;
+u8		SGIndex;
+u8		SGcount;
 
 /* 0x38: */
-UCHAR		MsgCnt;
-UCHAR		EndMessage;
-UCHAR		RetryCnt;
-UCHAR		SavedSGCount;			
+u8		MsgCnt;
+u8		EndMessage;
+u8		RetryCnt;
+u8		SavedSGCount;			
 
-ULONG		Saved_Ptr;
+unsigned long	Saved_Ptr;
 
 /* 0x40: */
-UCHAR		MsgInBuf[6];
-UCHAR		MsgOutBuf[6];
+u8		MsgInBuf[6];
+u8		MsgOutBuf[6];
 
-//UCHAR		IORBFlag;	/*;81h-Reset, 2-retry */
+//u8		IORBFlag;	/*;81h-Reset, 2-retry */
 /* 0x4c: */
 };
 
-
-typedef  struct  _SRB	 DC390_SRB, *PSRB;
 
 /*
 ;-----------------------------------------------------------------------
 ; Device Control Block
 ;-----------------------------------------------------------------------
 */
-struct	_DCB
+struct dc390_dcb
 {
-struct _DCB	*pNextDCB;
-struct _ACB	*pDCBACB;
-
-/* Aborted Commands */
-//PSCSICMD	AboIORBhead;
-//PSCSICMD	AboIORBtail;
-//ULONG		AboIORBcnt;
+struct dc390_dcb	*pNextDCB;
+struct dc390_acb	*pDCBACB;
 
 /* 0x08: */
 /* Queued SRBs */
-PSRB		pWaitingSRB;
-PSRB		pWaitLast;
-PSRB		pGoingSRB;
-PSRB		pGoingLast;
-PSRB		pActiveSRB;
-UCHAR		WaitSRBCnt;	/* Not used */
-UCHAR		GoingSRBCnt;
+struct dc390_srb	*pWaitingSRB;
+struct dc390_srb	*pWaitLast;
+struct dc390_srb	*pGoingSRB;
+struct dc390_srb	*pGoingLast;
+struct dc390_srb	*pActiveSRB;
+u8		WaitSRBCnt;	/* Not used */
+u8		GoingSRBCnt;
 
-UCHAR		DevType;
-UCHAR		MaxCommand;
+u8		DevType;
+u8		MaxCommand;
 
 /* 0x20: */
-UINT		TagMask;
+u32		TagMask;
 
-UCHAR		TargetID;	/*; SCSI Target ID  (SCSI Only) */
-UCHAR		TargetLUN;	/*; SCSI Log.  Unit (SCSI Only) */
-UCHAR		DevMode;
-UCHAR		DCBFlag;
+u8		TargetID;	/*; SCSI Target ID  (SCSI Only) */
+u8		TargetLUN;	/*; SCSI Log.  Unit (SCSI Only) */
+u8		DevMode;
+u8		DCBFlag;
 
-UCHAR		CtrlR1;
-UCHAR		CtrlR3;
-UCHAR		CtrlR4;
-UCHAR		Inquiry7;
+u8		CtrlR1;
+u8		CtrlR3;
+u8		CtrlR4;
+u8		Inquiry7;
 
 /* 0x2c: */
-UCHAR		SyncMode;	/*; 0:async mode */
-UCHAR		NegoPeriod;	/*;for nego. */
-UCHAR		SyncPeriod;	/*;for reg. */
-UCHAR		SyncOffset;	/*;for reg. and nego.(low nibble) */
+u8		SyncMode;	/*; 0:async mode */
+u8		NegoPeriod;	/*;for nego. */
+u8		SyncPeriod;	/*;for reg. */
+u8		SyncOffset;	/*;for reg. and nego.(low nibble) */
 
 /* 0x30:*/
-//UCHAR		InqDataBuf[8];
-//UCHAR		CapacityBuf[8];
+//u8		InqDataBuf[8];
+//u8		CapacityBuf[8];
 ///* 0x40: */
 };
 
-typedef  struct  _DCB	 DC390_DCB, *PDCB;
+
 /*
 ;-----------------------------------------------------------------------
 ; Adapter Control Block
 ;-----------------------------------------------------------------------
 */
-struct	_ACB
+struct dc390_acb
 {
-PSH		pScsiHost;
-struct _ACB	*pNextACB;
-USHORT		IOPortBase;
-UCHAR		IRQLevel;
-UCHAR		status;
+struct Scsi_Host *pScsiHost;
+struct dc390_acb	*pNextACB;
+u16		IOPortBase;
+u8		IRQLevel;
+u8		status;
 
-UCHAR		SRBCount;
-UCHAR		AdapterIndex;	/*; nth Adapter this driver */
-UCHAR		DCBCnt;
+u8		SRBCount;
+u8		AdapterIndex;	/*; nth Adapter this driver */
+u8		DCBCnt;
 
-UCHAR		TagMaxNum;
-UCHAR		ACBFlag;
-UCHAR		Gmode2;
-UCHAR		scan_devices;
+u8		TagMaxNum;
+u8		ACBFlag;
+u8		Gmode2;
+u8		scan_devices;
 
-PDCB		pLinkDCB;
-PDCB		pLastDCB;
-PDCB		pDCBRunRobin;
+struct dc390_dcb	*pLinkDCB;
+struct dc390_dcb	*pLastDCB;
+struct dc390_dcb	*pDCBRunRobin;
 
-PDCB		pActiveDCB;
-PSRB		pFreeSRB;
-PSRB		pTmpSRB;
+struct dc390_dcb	*pActiveDCB;
+struct dc390_srb	*pFreeSRB;
+struct dc390_srb	*pTmpSRB;
 
-UCHAR		msgin123[4];
-UCHAR		DCBmap[MAX_SCSI_ID];
-UCHAR		Connected;
-UCHAR		pad;
+u8		msgin123[4];
+u8		DCBmap[MAX_SCSI_ID];
+u8		Connected;
+u8		pad;
 
 #if defined(USE_SPINLOCKS) && USE_SPINLOCKS > 1 && (defined(CONFIG_SMP) || DEBUG_SPINLOCKS > 0)
 spinlock_t	lock;
 #endif
-UCHAR		sel_timeout;
-UCHAR		glitch_cfg;
+u8		sel_timeout;
+u8		glitch_cfg;
 
-UCHAR		MsgLen;
-UCHAR		Ignore_IRQ;	/* Not used */
+u8		MsgLen;
+u8		Ignore_IRQ;	/* Not used */
 
-PDEVDECL1;			/* Pointer to PCI cfg. space */
+struct pci_dev	*pdev;
 
-ULONG		Cmds;
-UINT		SelLost;
-UINT		SelConn;
-UINT		CmdInQ;
-UINT		CmdOutOfSRB;
+unsigned long	Cmds;
+u32		SelLost;
+u32		SelConn;
+u32		CmdInQ;
+u32		CmdOutOfSRB;
 	
 struct timer_list	Waiting_Timer;
 
-DC390_SRB	TmpSRB;
-DC390_SRB	SRB_array[MAX_SRB_CNT]; 	/* 50 SRBs */
+struct dc390_srb	TmpSRB;
+struct dc390_srb	SRB_array[MAX_SRB_CNT]; 	/* 50 SRBs */
 };
 
-typedef  struct  _ACB	 DC390_ACB, *PACB;
 
 /*;-----------------------------------------------------------------------*/
 
@@ -402,17 +354,17 @@ typedef struct {
 
 typedef struct	_SCSIInqData { /* INQUIRY */
 
-	UCHAR	 DevType;		/* Periph Qualifier & Periph Dev Type*/
-	UCHAR	 RMB_TypeMod;		/* rem media bit & Dev Type Modifier */
-	UCHAR	 Vers;			/* ISO, ECMA, & ANSI versions	     */
-	UCHAR	 RDF;			/* AEN, TRMIOP, & response data format*/
-	UCHAR	 AddLen;		/* length of additional data	     */
-	UCHAR	 Res1;			/* reserved			     */
-	UCHAR	 Res2;			/* reserved			     */
-	UCHAR	 Flags; 		/* RelADr,Wbus32,Wbus16,Sync,etc.    */
-	UCHAR	 VendorID[8];		/* Vendor Identification	     */
-	UCHAR	 ProductID[16]; 	/* Product Identification	     */
-	UCHAR	 ProductRev[4]; 	/* Product Revision		     */
+	u8	 DevType;		/* Periph Qualifier & Periph Dev Type*/
+	u8	 RMB_TypeMod;		/* rem media bit & Dev Type Modifier */
+	u8	 Vers;			/* ISO, ECMA, & ANSI versions	     */
+	u8	 RDF;			/* AEN, TRMIOP, & response data format*/
+	u8	 AddLen;		/* length of additional data	     */
+	u8	 Res1;			/* reserved			     */
+	u8	 Res2;			/* reserved			     */
+	u8	 Flags; 		/* RelADr,Wbus32,Wbus16,Sync,etc.    */
+	u8	 VendorID[8];		/* Vendor Identification	     */
+	u8	 ProductID[16]; 	/* Product Identification	     */
+	u8	 ProductRev[4]; 	/* Product Revision		     */
 
 
 } SCSI_INQDATA, *PSCSI_INQDATA;
@@ -461,10 +413,10 @@ typedef struct	_SCSIInqData { /* INQUIRY */
 */
 typedef  struct  _EEprom
 {
-UCHAR	EE_MODE1;
-UCHAR	EE_SPEED;
-UCHAR	xx1;
-UCHAR	xx2;
+u8	EE_MODE1;
+u8	EE_SPEED;
+u8	xx1;
+u8	xx2;
 } EEprom, *PEEprom;
 
 #define REAL_EE_ADAPT_SCSI_ID 64
@@ -676,7 +628,7 @@ UCHAR	xx2;
 	(inb (pACB->IOPortBase + (address)))
 
 #define DC390_read8_(address, base)		\
-	(inb ((USHORT)(base) + (address)))
+	(inb ((u16)(base) + (address)))
 
 #define DC390_read16(address)			\
 	(inw (pACB->IOPortBase + (address)))
@@ -688,7 +640,7 @@ UCHAR	xx2;
 	outb ((value), pACB->IOPortBase + (address))
 
 #define DC390_write8_(address,value,base)	\
-	outb ((value), (USHORT)(base) + (address))
+	outb ((value), (u16)(base) + (address))
 
 #define DC390_write16(address,value)		\
 	outw ((value), pACB->IOPortBase + (address))

@@ -38,7 +38,7 @@
 #include <asm/irq.h>
 #include <asm/semaphore.h>
 #include "fcp_impl.h"
-#include "../scsi/hosts.h"
+#include <scsi/scsi_host.h>
 
 /* #define FCDEBUG */
 

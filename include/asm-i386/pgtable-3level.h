@@ -101,18 +101,24 @@ static inline unsigned long pte_pfn(pte_t pte)
 		(pte.pte_high << (32 - PAGE_SHIFT));
 }
 
+extern unsigned long long __supported_pte_mask;
+
 static inline pte_t pfn_pte(unsigned long page_nr, pgprot_t pgprot)
 {
 	pte_t pte;
 
-	pte.pte_high = page_nr >> (32 - PAGE_SHIFT);
-	pte.pte_low = (page_nr << PAGE_SHIFT) | pgprot_val(pgprot);
+	pte.pte_high = (page_nr >> (32 - PAGE_SHIFT)) | \
+					(pgprot_val(pgprot) >> 32);
+	pte.pte_high &= (__supported_pte_mask >> 32);
+	pte.pte_low = ((page_nr << PAGE_SHIFT) | pgprot_val(pgprot)) & \
+							__supported_pte_mask;
 	return pte;
 }
 
 static inline pmd_t pfn_pmd(unsigned long page_nr, pgprot_t pgprot)
 {
-	return __pmd(((unsigned long long)page_nr << PAGE_SHIFT) | pgprot_val(pgprot));
+	return __pmd((((unsigned long long)page_nr << PAGE_SHIFT) | \
+			pgprot_val(pgprot)) & __supported_pte_mask);
 }
 
 /*

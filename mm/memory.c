@@ -66,12 +66,21 @@ EXPORT_SYMBOL(mem_map);
 #endif
 
 unsigned long num_physpages;
+/*
+ * A number of key systems in x86 including ioremap() rely on the assumption
+ * that high_memory defines the upper bound on direct map memory, then end
+ * of ZONE_NORMAL.  Under CONFIG_DISCONTIG this means that max_low_pfn and
+ * highstart_pfn must be the same; there must be no gap between ZONE_NORMAL
+ * and ZONE_HIGHMEM.
+ */
 void * high_memory;
 struct page *highmem_start_page;
+unsigned long vmalloc_earlyreserve;
 
 EXPORT_SYMBOL(num_physpages);
 EXPORT_SYMBOL(highmem_start_page);
 EXPORT_SYMBOL(high_memory);
+EXPORT_SYMBOL(vmalloc_earlyreserve);
 
 /*
  * We special-case the C-O-W ZERO_PAGE, because it's such
@@ -1214,6 +1223,12 @@ int vmtruncate(struct inode * inode, loff_t offset)
 
 	if (inode->i_size < offset)
 		goto do_expand;
+	/*
+	 * truncation of in-use swapfiles is disallowed - it would cause
+	 * subsequent swapout to scribble on the now-freed blocks.
+	 */
+	if (IS_SWAPFILE(inode))
+		goto out_busy;
 	i_size_write(inode, offset);
 	unmap_mapping_range(mapping, offset + PAGE_SIZE - 1, 0, 1);
 	truncate_inode_pages(mapping, offset);
@@ -1224,7 +1239,7 @@ do_expand:
 	if (limit != RLIM_INFINITY && offset > limit)
 		goto out_sig;
 	if (offset > inode->i_sb->s_maxbytes)
-		goto out;
+		goto out_big;
 	i_size_write(inode, offset);
 
 out_truncate:
@@ -1233,8 +1248,10 @@ out_truncate:
 	return 0;
 out_sig:
 	send_sig(SIGXFSZ, current, 0);
-out:
+out_big:
 	return -EFBIG;
+out_busy:
+	return -ETXTBSY;
 }
 
 EXPORT_SYMBOL(vmtruncate);

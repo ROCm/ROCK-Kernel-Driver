@@ -940,7 +940,7 @@ ahc_get_pci_bus(ahc_dev_softc_t pci)
 }
 #else
 static inline int ahc_linux_pci_init(void) {
-	return -ENODEV;
+	return 0;
 }
 static inline void ahc_linux_pci_exit(void) {
 }

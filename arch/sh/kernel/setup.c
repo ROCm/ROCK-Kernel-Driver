@@ -25,6 +25,7 @@
 #include <asm/io_generic.h>
 #include <asm/sections.h>
 #include <asm/irq.h>
+#include <asm/setup.h>
 
 #ifdef CONFIG_SH_KGDB
 #include <asm/kgdb.h>

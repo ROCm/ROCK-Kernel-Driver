@@ -44,6 +44,7 @@
 #include <asm/sections.h>
 #include <asm/btext.h>
 #include <asm/nvram.h>
+#include <asm/setup.h>
 #include <asm/system.h>
 
 extern unsigned long klimit;
@@ -629,7 +630,7 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.brk = klimit;
 	
 	/* Save unparsed command line copy for /proc/cmdline */
-	strlcpy(saved_command_line, cmd_line, sizeof(saved_command_line));
+	strlcpy(saved_command_line, cmd_line, COMMAND_LINE_SIZE);
 	*cmdline_p = cmd_line;
 
 	irqstack_early_init();
