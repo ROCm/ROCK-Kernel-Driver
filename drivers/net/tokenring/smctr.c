@@ -3064,7 +3064,7 @@ static int smctr_load_node_addr(struct net_device *dev)
         __u8 r;
 
         /* Check if node address has been specified by user. (non-0) */
-        for(i = 0; ((i < 6) && (dev->dev_addr[i] == 0)); i++);
+        for(i = 0; ((i < 6) && (dev->dev_addr[i] == 0)); i++)
         {
                 if(i != 6)
                 {
