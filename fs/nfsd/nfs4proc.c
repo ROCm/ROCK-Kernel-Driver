@@ -456,12 +456,37 @@ nfsd4_setattr(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_se
 static inline int
 nfsd4_write(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_write *write)
 {
+	struct nfs4_stateid *stp;
+	stateid_t *stateid = &write->wr_stateid;
 	u32 *p;
+	int status = nfs_ok;
 
 	/* no need to check permission - this will be done in nfsd_write() */
 
 	if (write->wr_offset >= OFFSET_MAX)
 		return nfserr_inval;
+
+	if (ZERO_STATEID(stateid) || ONE_STATEID(stateid)) {
+		dprintk("NFSD: nfsd4_write: zero stateid...\n");
+		if ((status = nfs4_share_conflict(current_fh, NFS4_SHARE_DENY_WRITE))) {
+			dprintk("NFSD: nfsd4_write: conflicting share reservation!\n");
+			goto out;
+		}
+		goto zero_stateid;
+	}
+	if ((status = nfs4_preprocess_stateid_op(current_fh, stateid, 
+					CHECK_FH, &stp))) {
+		dprintk("NFSD: nfsd4_write: couldn't process stateid!\n");
+		goto out;
+	}
+
+	status = nfserr_openmode;
+	if (!(stp->st_share_access & NFS4_SHARE_ACCESS_WRITE)) {
+		dprintk("NFSD: nfsd4_write: file not open for write!\n");
+		goto out;
+	}
+
+zero_stateid:
 
 	write->wr_bytes_written = write->wr_buflen;
 	write->wr_how_written = write->wr_stable_how;
@@ -469,9 +494,11 @@ nfsd4_write(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_writ
 	*p++ = nfssvc_boot.tv_sec;
 	*p++ = nfssvc_boot.tv_usec;
 
-	return nfsd_write(rqstp, current_fh, write->wr_offset,
+	status = nfsd_write(rqstp, current_fh, write->wr_offset,
 			  write->wr_vec, write->wr_vlen, write->wr_buflen,
 			  &write->wr_how_written);
+out:
+	return status;
 }
 
 /* This routine never returns NFS_OK!  If there are no other errors, it
