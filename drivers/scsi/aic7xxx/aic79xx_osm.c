@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#113 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#115 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -803,7 +803,7 @@ ahd_linux_map_seg(struct ahd_softc *ahd, struct scb *scb,
 
 /******************************** Macros **************************************/
 #define BUILD_SCSIID(ahd, cmd)						\
-	((((cmd)->target << TID_SHIFT) & TID) | (ahd)->our_id)
+	((((cmd)->device->id << TID_SHIFT) & TID) | (ahd)->our_id)
 
 /************************  Host template entry points *************************/
 static int	   ahd_linux_detect(Scsi_Host_Template *);
@@ -2457,10 +2457,10 @@ retry:
 static void
 ahd_linux_initialize_scsi_bus(struct ahd_softc *ahd)
 {
-	int i;
-	int numtarg;
+	u_int target_id;
+	u_int numtarg;
 
-	i = 0;
+	target_id = 0;
 	numtarg = 0;
 
 	if (aic79xx_no_reset != 0)
@@ -2475,21 +2475,15 @@ ahd_linux_initialize_scsi_bus(struct ahd_softc *ahd)
 	 * Force negotiation to async for all targets that
 	 * will not see an initial bus reset.
 	 */
-	for (; i < numtarg; i++) {
+	for (; target_id < numtarg; target_id++) {
 		struct ahd_devinfo devinfo;
 		struct ahd_initiator_tinfo *tinfo;
 		struct ahd_tmode_tstate *tstate;
-		u_int our_id;
-		u_int target_id;
-		char channel;
 
-		channel = 'A';
-		our_id = ahd->our_id;
-		target_id = i;
-		tinfo = ahd_fetch_transinfo(ahd, channel, our_id,
+		tinfo = ahd_fetch_transinfo(ahd, 'A', ahd->our_id,
 					    target_id, &tstate);
-		ahd_compile_devinfo(&devinfo, our_id, target_id,
-				    CAM_LUN_WILDCARD, channel, ROLE_INITIATOR);
+		ahd_compile_devinfo(&devinfo, ahd->our_id, target_id,
+				    CAM_LUN_WILDCARD, 'A', ROLE_INITIATOR);
 		ahd_update_neg_request(ahd, &devinfo, tstate,
 				       tinfo, AHD_NEG_ALWAYS);
 	}
@@ -3976,9 +3970,11 @@ ahd_linux_dv_timeout(struct scsi_cmnd *cmd)
 	ahd_lock(ahd, &flags);
 
 #ifdef AHD_DEBUG
-	if (ahd_debug & AHD_SHOW_DV)
+	if (ahd_debug & AHD_SHOW_DV) {
 		printf("%s: Timeout while doing DV command %x.\n",
 		       ahd_name(ahd), cmd->cmnd[0]);
+		ahd_dump_card_state(ahd);
+	}
 #endif
 	
 	/*

@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#178 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#179 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -3473,9 +3473,11 @@ ahc_linux_dv_timeout(struct scsi_cmnd *cmd)
 	ahc_lock(ahc, &flags);
 
 #ifdef AHC_DEBUG
-	if (ahc_debug & AHC_SHOW_DV)
+	if (ahc_debug & AHC_SHOW_DV) {
 		printf("%s: Timeout while doing DV command %x.\n",
 		       ahc_name(ahc), cmd->cmnd[0]);
+		ahc_dump_card_state(ahc);
+	}
 #endif
 	
 	/*

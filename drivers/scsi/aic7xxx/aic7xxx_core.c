@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#111 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#112 $
  *
  * $FreeBSD$
  */
@@ -4548,8 +4548,9 @@ ahc_init(struct ahc_softc *ahc)
 	size_t	 driver_data_size;
 	uint32_t physaddr;
 
-#ifdef AHC_DEBUG_SEQUENCER
-	ahc->flags |= AHC_SEQUENCER_DEBUG;
+#ifdef AHC_DEBUG
+	if ((ahc_debug & AHC_DEBUG_SEQUENCER) != 0)
+		ahc->flags |= AHC_SEQUENCER_DEBUG;
 #endif
 
 #ifdef AHC_PRINT_SRAM
@@ -4884,7 +4885,7 @@ ahc_init(struct ahc_softc *ahc)
 			tinfo->curr.protocol_version = 2;
 			tinfo->curr.transport_version = 2;
 		}
-		tstate->ultraenb = ultraenb;
+		tstate->ultraenb = 0;
 	}
 	ahc->user_discenable = discenable;
 	ahc->user_tagenable = tagenable;
@@ -6492,8 +6493,11 @@ ahc_loadseq(struct ahc_softc *ahc)
 	ahc_outb(ahc, SEQCTL, PERRORDIS|FAILDIS|FASTMODE);
 	ahc_restart(ahc);
 
-	if (bootverbose)
+	if (bootverbose) {
 		printf(" %d instructions downloaded\n", downloaded);
+		printf("%s: Features 0x%x, Bugs 0x%x, Flags 0x%x\n",
+		       ahc_name(ahc), ahc->features, ahc->bugs, ahc->flags);
+	}
 }
 
 static int
@@ -6711,6 +6715,7 @@ ahc_dump_card_state(struct ahc_softc *ahc)
 	struct	scb *scb;
 	struct	scb_tailq *untagged_q;
 	u_int	cur_col;
+	int	paused;
 	int	target;
 	int	maxtarget;
 	int	i;
@@ -6721,12 +6726,21 @@ ahc_dump_card_state(struct ahc_softc *ahc)
 	uint8_t scb_index;
 	uint8_t saved_scbptr;
 
-	saved_scbptr = ahc_inb(ahc, SCBPTR);
+	if (ahc_is_paused(ahc)) {
+		paused = 1;
+	} else {
+		paused = 0;
+		ahc_pause(ahc);
+	}
 
+	saved_scbptr = ahc_inb(ahc, SCBPTR);
 	last_phase = ahc_inb(ahc, LASTPHASE);
-	printf("%s: Dumping Card State %s, at SEQADDR 0x%x\n",
+	printf(">>>>>>>>>>>>>>>>>> Dump Card State Begins <<<<<<<<<<<<<<<<<\n"
+	       "%s: Dumping Card State %s, at SEQADDR 0x%x\n",
 	       ahc_name(ahc), ahc_lookup_phase_entry(last_phase)->phasemsg,
 	       ahc_inb(ahc, SEQADDR0) | (ahc_inb(ahc, SEQADDR1) << 8));
+	if (paused)
+		printf("Card was paused\n");
 	printf("ACCUM = 0x%x, SINDEX = 0x%x, DINDEX = 0x%x, ARG_2 = 0x%x\n",
 	       ahc_inb(ahc, ACCUM), ahc_inb(ahc, SINDEX), ahc_inb(ahc, DINDEX),
 	       ahc_inb(ahc, ARG_2));
@@ -6872,7 +6886,10 @@ ahc_dump_card_state(struct ahc_softc *ahc)
 	}
 
 	ahc_platform_dump_card_state(ahc);
+	printf("\n<<<<<<<<<<<<<<<<< Dump Card State Ends >>>>>>>>>>>>>>>>>>\n");
 	ahc_outb(ahc, SCBPTR, saved_scbptr);
+	if (paused == 0)
+		ahc_unpause(ahc);
 }
 
 /************************* Target Mode ****************************************/
