@@ -821,7 +821,7 @@ static int __init do_boot_cpu(int apicid)
 	unsigned long boot_error;
 	int timeout, cpu;
 	unsigned long start_eip;
-	unsigned short nmi_high, nmi_low;
+	unsigned short nmi_high = 0, nmi_low = 0;
 
 	cpu = ++cpucount;
 	/*
@@ -1052,10 +1052,9 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 * CPU too, but we do it for the sake of robustness anyway.
 	 * Makes no sense to do this check in clustered apic mode, so skip it
 	 */
-	if (!clustered_apic_mode && 
-	    !test_bit(boot_cpu_physical_apicid, &phys_cpu_present_map)) {
+	if (!check_phys_apicid_present(boot_cpu_physical_apicid)) {
 		printk("weird, boot CPU (#%d) not listed by the BIOS.\n",
-							boot_cpu_physical_apicid);
+				boot_cpu_physical_apicid);
 		phys_cpu_present_map |= (1 << hard_smp_processor_id());
 	}
 

@@ -22,7 +22,7 @@
 #endif
 #endif
 
-#ifdef CONFIG_CLUSTERED_APIC
+#ifdef CONFIG_X86_NUMAQ
  #define INT_DELIVERY_MODE 0     /* physical delivery on LOCAL quad */
 #else
  #define INT_DELIVERY_MODE 1     /* logical delivery broadcast to all procs */

@@ -84,4 +84,9 @@ static inline void setup_portio_remap(void)
 {
 }
 
+static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
+{
+	return test_bit(boot_cpu_physical_apicid, &phys_cpu_present_map);
+}
+
 #endif /* __ASM_MACH_APIC_H */
