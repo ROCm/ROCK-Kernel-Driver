@@ -8,15 +8,15 @@
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
 .S.s:
-	$(CPP) $(AFLAGS) -o $*.s $<
+	$(CPP) $(CFLAGS) $(AFLAGS) -o $*.s $<
 .S.o:
-	$(CC) $(AFLAGS) -c -o $*.o $<
+	$(CC) $(CFLAGS) $(AFLAGS) -c -o $*.o $<
 
 O_TARGET := kernel.o
 
 export-objs := alpha_ksyms.o
 
-obj-y    := entry.o traps.o process.o osf_sys.o irq.o irq_alpha.o \
+obj-y    := entry.o traps.o process.o init_task.o osf_sys.o irq.o irq_alpha.o \
 	    signal.o setup.o ptrace.o time.o semaphore.o alpha_ksyms.o
 
 #
@@ -102,11 +102,15 @@ endif # GENERIC
 
 all: kernel.o head.o
 
-asm_offsets: check_asm
-	./check_asm > $(TOPDIR)/include/asm-alpha/asm_offsets.h
-
-check_asm: check_asm.c
-	$(HOSTCC) -o $@ $< $(CPPFLAGS) -ffixed-8
+ASM_OFFSETS_H = $(TOPDIR)/include/asm-alpha/asm_offsets.h
+asm_offsets:
+	$(CC) $(CFLAGS) -S -o - check_asm.c | \
+	sed -e '/xyzzy/ { s/xyzzy //; p; }; d;' > asm_offsets.tmp
+	@if cmp -s asm_offsets.tmp $(ASM_OFFSETS_H); then \
+	  set -x; rm asm_offsets.tmp; \
+	else \
+	  set -x; mv asm_offsets.tmp $(ASM_OFFSETS_H); \
+	fi
 
 clean::
 	rm -f check_asm

@@ -74,11 +74,11 @@ clear_bit(unsigned long nr, volatile void * addr)
  * WARNING: non atomic version.
  */
 static __inline__ void
-__change_bit(unsigned long nr, volatile void * addr)
+__clear_bit(unsigned long nr, volatile void * addr)
 {
 	int *m = ((int *) addr) + (nr >> 5);
 
-	*m ^= 1 << (nr & 31);
+	*m &= ~(1 << (nr & 31));
 }
 
 static inline void
@@ -97,6 +97,17 @@ change_bit(unsigned long nr, volatile void * addr)
 	".previous"
 	:"=&r" (temp), "=m" (*m)
 	:"Ir" (1UL << (nr & 31)), "m" (*m));
+}
+
+/*
+ * WARNING: non atomic version.
+ */
+static __inline__ void
+__change_bit(unsigned long nr, volatile void * addr)
+{
+	int *m = ((int *) addr) + (nr >> 5);
+
+	*m ^= 1 << (nr & 31);
 }
 
 static inline int
@@ -181,20 +192,6 @@ __test_and_clear_bit(unsigned long nr, volatile void * addr)
 	return (old & mask) != 0;
 }
 
-/*
- * WARNING: non atomic version.
- */
-static __inline__ int
-__test_and_change_bit(unsigned long nr, volatile void * addr)
-{
-	unsigned long mask = 1 << (nr & 0x1f);
-	int *m = ((int *) addr) + (nr >> 5);
-	int old = *m;
-
-	*m = old ^ mask;
-	return (old & mask) != 0;
-}
-
 static inline int
 test_and_change_bit(unsigned long nr, volatile void * addr)
 {
@@ -218,6 +215,20 @@ test_and_change_bit(unsigned long nr, volatile void * addr)
 	:"Ir" (1UL << (nr & 31)), "m" (*m) : "memory");
 
 	return oldbit != 0;
+}
+
+/*
+ * WARNING: non atomic version.
+ */
+static __inline__ int
+__test_and_change_bit(unsigned long nr, volatile void * addr)
+{
+	unsigned long mask = 1 << (nr & 0x1f);
+	int *m = ((int *) addr) + (nr >> 5);
+	int old = *m;
+
+	*m = old ^ mask;
+	return (old & mask) != 0;
 }
 
 static inline int
@@ -264,17 +275,39 @@ static inline unsigned long ffz(unsigned long word)
 #endif
 }
 
+/*
+ * __ffs = Find First set bit in word.  Undefined if no set bit exists.
+ */
+static inline unsigned long __ffs(unsigned long word)
+{
+#if defined(__alpha_cix__) && defined(__alpha_fix__)
+	/* Whee.  EV67 can calculate it directly.  */
+	unsigned long result;
+	__asm__("cttz %1,%0" : "=r"(result) : "r"(word));
+	return result;
+#else
+	unsigned long bits, qofs, bofs;
+
+	__asm__("cmpbge $31,%1,%0" : "=r"(bits) : "r"(word));
+	qofs = ffz_b(bits);
+	__asm__("extbl %1,%2,%0" : "=r"(bits) : "r"(word), "r"(qofs));
+	bofs = ffz_b(~bits);
+
+	return qofs*8 + bofs;
+#endif
+}
+
 #ifdef __KERNEL__
 
 /*
  * ffs: find first bit set. This is defined the same way as
  * the libc and compiler builtin ffs routines, therefore
- * differs in spirit from the above ffz (man ffs).
+ * differs in spirit from the above __ffs.
  */
 
 static inline int ffs(int word)
 {
-	int result = ffz(~word);
+	int result = __ffs(word);
 	return word ? result+1 : 0;
 }
 
@@ -365,10 +398,53 @@ found_middle:
 }
 
 /*
- * The optimizer actually does good code for this case..
+ * Find next one bit in a bitmap reasonably efficiently.
+ */
+static inline unsigned long
+find_next_bit(void * addr, unsigned long size, unsigned long offset)
+{
+	unsigned long * p = ((unsigned long *) addr) + (offset >> 6);
+	unsigned long result = offset & ~63UL;
+	unsigned long tmp;
+
+	if (offset >= size)
+		return size;
+	size -= result;
+	offset &= 63UL;
+	if (offset) {
+		tmp = *(p++);
+		tmp &= ~0UL << offset;
+		if (size < 64)
+			goto found_first;
+		if (tmp)
+			goto found_middle;
+		size -= 64;
+		result += 64;
+	}
+	while (size & ~63UL) {
+		if ((tmp = *(p++)))
+			goto found_middle;
+		result += 64;
+		size -= 64;
+	}
+	if (!size)
+		return result;
+	tmp = *p;
+found_first:
+	tmp &= ~0UL >> (64 - size);
+	if (!tmp)
+		return result + size;
+found_middle:
+	return result + __ffs(tmp);
+}
+
+/*
+ * The optimizer actually does good code for this case.
  */
 #define find_first_zero_bit(addr, size) \
 	find_next_zero_bit((addr), (size), 0)
+#define find_first_bit(addr, size) \
+	find_next_bit((addr), (size), 0)
 
 #ifdef __KERNEL__
 

@@ -18,6 +18,7 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <asm/system.h>
+#include <asm/pgtable.h>
 #include <asm/machvec.h>
 
 /*
@@ -60,7 +61,10 @@ static inline void * phys_to_virt(unsigned long address)
 	return (void *) (address + IDENT_ADDR);
 }
 
-#define page_to_phys(page)	(((page) - (page)->zone->zone_mem_map) << PAGE_SHIFT)
+#define page_to_phys(page)	PAGE_TO_PA(page)
+
+/* This depends on working iommu.  */
+#define BIO_VMERGE_BOUNDARY	(alpha_mv.mv_pci_tbi ? PAGE_SIZE : 0)
 
 /*
  * Change addresses as seen by the kernel (virtual) to addresses as

@@ -134,8 +134,7 @@ extern void halt(void) __attribute__((noreturn));
 #define switch_to(prev,next,last)			\
 do {							\
 	unsigned long pcbb;				\
-	current = (next);				\
-	pcbb = virt_to_phys(&current->thread);		\
+	pcbb = virt_to_phys(&(next)->thread_info->pcb);	\
 	(last) = alpha_switch_to(pcbb, (prev));		\
 	check_mmu_context();				\
 } while (0)

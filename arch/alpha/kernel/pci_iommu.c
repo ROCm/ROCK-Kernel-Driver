@@ -411,13 +411,8 @@ pci_free_consistent(struct pci_dev *pdev, size_t size, void *cpu_addr,
    Write dma_length of each leader with the combined lengths of
    the mergable followers.  */
 
-#define SG_ENT_VIRT_ADDRESS(SG)				\
-	((SG)->address					\
-	 ? (SG)->address				\
-	 : page_address((SG)->page) + (SG)->offset)
-
-#define SG_ENT_PHYS_ADDRESS(SG)	\
-        __pa(SG_ENT_VIRT_ADDRESS(SG))
+#define SG_ENT_VIRT_ADDRESS(SG) (page_address((SG)->page) + (SG)->offset)
+#define SG_ENT_PHYS_ADDRESS(SG) __pa(SG_ENT_VIRT_ADDRESS(SG))
 
 static void
 sg_classify(struct scatterlist *sg, struct scatterlist *end, int virt_ok)

@@ -11,37 +11,42 @@ SECTIONS
   . = 0xfffffc0000810000;
 #endif
 
-  _text = .;
-  .text : { *(.text) } :kernel
-  _etext = .;
+  .text : {
+	_text = .;
+	*(.text)
+	_etext = .;
+  } :kernel
 
   /* Exception table */
-  . = ALIGN(16);
-  __start___ex_table = .;
-  __ex_table : { *(__ex_table) }
-  __stop___ex_table = .;
+  __ex_table ALIGN(16) : {
+	__start___ex_table = .;
+	*(__ex_table)
+	__stop___ex_table = .;
+  }
 
   /* Kernel symbol table */
-  . = ALIGN(8);
-  __start___ksymtab = .;
-  __ksymtab : { *(__ksymtab) }
-  __stop___ksymtab = .;
+  __ksymtab ALIGN(8) : {
+	__start___ksymtab = .;
+	*(__ksymtab)
+	__stop___ksymtab = .;
+  }
   .kstrtab : { *(.kstrtab) }
 
   /* Startup code */
-  . = ALIGN(8192);
-  __init_begin = .;
-  .text.init : { *(.text.init) }
+  .text.init ALIGN(8192) : {
+	__init_begin = .;
+	*(.text.init)
+  }
   .data.init : { *(.data.init) }
 
-  . = ALIGN(16);
-  __setup_start = .;
-  .setup.init : { *(.setup.init) }
-  __setup_end = .;
+  .setup.init ALIGN(16): {
+	__setup_start = .;
+	*(.setup.init)
+	__setup_end = .;
+  }
 
-  . = ALIGN(8);
-  __initcall_start = .;
-  .initcall.init : {
+  .initcall.init ALIGN(8): {
+	__initcall_start = .;
 	*(.initcall1.init) 
 	*(.initcall2.init) 
 	*(.initcall3.init) 
@@ -49,29 +54,37 @@ SECTIONS
 	*(.initcall5.init) 
 	*(.initcall6.init) 
 	*(.initcall7.init)
+	__initcall_end = .;
   }
-  __initcall_end = .;
-
-  . = ALIGN(2*8192);	/* Align double page for init_task_union */
-  __init_end = .;
 
   /* The initial task and kernel stack */
-  init_task : { *(init_task) }
+  .data.init_thread ALIGN(2*8192) : {
+	__init_end = .;
+	*(.data.init_thread)
+  }
 
   /* Global data */
-  _data = .;
-  .data.cacheline_aligned : { *(.data.cacheline_aligned) }
+  .data.cacheline_aligned : {
+	_data = .;
+	*(.data.cacheline_aligned)
+  }
   .rodata : { *(.rodata) *(.rodata.*) }
   .data : { *(.data) CONSTRUCTORS }
   .got : { *(.got) }
-  .sdata : { *(.sdata) }
-  _edata = .;
+  .sdata : {
+	*(.sdata)
+	_edata = .;
+  }
 
-  __bss_start = .;
-  .sbss : { *(.sbss) *(.scommon) }
-  .bss : { *(.bss) *(COMMON) }
-  __bss_stop = .;
-  _end = .;
+  .sbss : {
+	__bss_start = .;
+	*(.sbss) *(.scommon)
+  }
+  .bss : {
+	*(.bss) *(COMMON)
+	__bss_stop = .;
+	_end = .;
+  }
 
   .mdebug 0 : { *(.mdebug) }
   .note 0 : { *(.note) }

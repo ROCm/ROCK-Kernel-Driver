@@ -2,6 +2,7 @@
 #define __ASM_SMP_H
 
 #include <linux/config.h>
+#include <linux/threads.h>
 #include <asm/pal.h>
 
 /* HACK: Cabrio WHAMI return value is bogus if more than 8 bits used.. :-( */
@@ -55,7 +56,7 @@ extern int __cpu_logical_map[NR_CPUS];
 #define cpu_logical_map(cpu)  __cpu_logical_map[cpu]
 
 #define hard_smp_processor_id()	__hard_smp_processor_id()
-#define smp_processor_id()	(current->processor)
+#define smp_processor_id()	(current_thread_info()->cpu)
 
 extern unsigned long cpu_present_mask;
 #define cpu_online_map cpu_present_mask

@@ -776,7 +776,7 @@ asmlinkage unsigned long osf_getsysinfo(unsigned long op, void *buffer,
 		/* Return current software fp control & status bits.  */
 		/* Note that DU doesn't verify available space here.  */
 
- 		w = current->thread.flags & IEEE_SW_MASK;
+ 		w = current_thread_info->ieee_state & IEEE_SW_MASK;
  		w = swcr_update_status(w, rdfpcr());
 		if (put_user(w, (unsigned long *) buffer))
 			return -EFAULT;
@@ -793,7 +793,7 @@ asmlinkage unsigned long osf_getsysinfo(unsigned long op, void *buffer,
  	case GSI_UACPROC:
 		if (nbytes < sizeof(unsigned int))
 			return -EINVAL;
- 		w = (current->thread.flags >> UAC_SHIFT) & UAC_BITMASK;
+ 		w = (current_thread_info()->flags >> UAC_SHIFT) & UAC_BITMASK;
  		if (put_user(w, (unsigned int *)buffer))
  			return -EFAULT;
  		return 1;
@@ -840,8 +840,9 @@ asmlinkage unsigned long osf_setsysinfo(unsigned long op, void *buffer,
 		/* Update softare trap enable bits.  */
 		if (get_user(swcr, (unsigned long *)buffer))
 			return -EFAULT;
-		current->thread.flags &= ~IEEE_SW_MASK;
-		current->thread.flags |= swcr & IEEE_SW_MASK;
+		current_thread_info()->ieee_state
+		  = ((current_thread_info()->ieee_state & ~IEEE_SW_MASK)
+		     | (swcr & IEEE_SW_MASK));
 
 		/* Update the real fpcr.  */
 		fpcr = rdfpcr();
@@ -869,18 +870,23 @@ asmlinkage unsigned long osf_setsysinfo(unsigned long op, void *buffer,
 
  	case SSI_NVPAIRS: {
 		unsigned long v, w, i;
+		unsigned int old, new;
 		
  		for (i = 0; i < nbytes; ++i) {
+
  			if (get_user(v, 2*i + (unsigned int *)buffer))
  				return -EFAULT;
  			if (get_user(w, 2*i + 1 + (unsigned int *)buffer))
  				return -EFAULT;
  			switch (v) {
  			case SSIN_UACPROC:
- 				current->thread.flags &=
- 					~(UAC_BITMASK << UAC_SHIFT);
- 				current->thread.flags |=
- 					(w & UAC_BITMASK) << UAC_SHIFT;
+			again:
+				old = current_thread_info()->flags;
+				new = old & ~(UAC_BITMASK << UAC_SHIFT);
+				new = new | (w & UAC_BITMASK) << UAC_SHIFT;
+				if (cmpxchg(&current_thread_info()->flags,
+					    old, new) != old)
+					goto again;
  				break;
  
  			default:

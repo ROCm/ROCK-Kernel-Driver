@@ -131,8 +131,8 @@ dik_show_trace(unsigned long *sp)
 
 void show_trace_task(struct task_struct * tsk)
 {
-	struct thread_struct * thread = &tsk->thread;
-	unsigned long fp, sp = thread->ksp, base = (unsigned long) thread;
+	struct thread_info *ti = &tsk->thread_info;
+	unsigned long fp, sp = ti->pcb.ksp, base = (unsigned long) ti;
  
 	if (sp > base && sp+6*8 < base + 16*1024) {
 		fp = ((unsigned long*)sp)[6];
@@ -180,12 +180,11 @@ die_if_kernel(char * str, struct pt_regs *regs, long err, unsigned long *r9_15)
 	dik_show_trace((unsigned long *)(regs+1));
 	dik_show_code((unsigned int *)regs->pc);
 
-	if (current->thread.flags & (1UL << 63)) {
+	if (test_and_set_thread_flag (TIF_DIE_IF_KERNEL)) {
 		printk("die_if_kernel recursion detected.\n");
 		sti();
 		while (1);
 	}
-	current->thread.flags |= (1UL << 63);
 	do_exit(SIGSEGV);
 }
 
@@ -232,6 +231,13 @@ do_entIF(unsigned long type, unsigned long a1,
 	 unsigned long a5, struct pt_regs regs)
 {
 	if (!opDEC_testing || type != 4) {
+		if (type == 1) {
+			const unsigned int *data
+			  = (const unsigned int *) regs.pc;
+			printk("Kernel bug at %s:%d\n",
+			       (const char *)(data[1] | (long)data[2] << 32), 
+			       data[0]);
+		}
 		die_if_kernel((type == 1 ? "Kernel Bug" : "Instruction fault"),
 		      &regs, type, 0);
 	}
@@ -324,8 +330,8 @@ do_entIF(unsigned long type, unsigned long a1,
 		   FP registers, PAL_clrfen is not useful except for DoS
 		   attacks.  So turn the bleeding FPU back on and be done
 		   with it.  */
-		current->thread.pal_flags |= 1;
-		__reload_thread(&current->thread);
+		current_thead_info()->pcb.flags |= 1;
+		__reload_thread(&current_thread_info()->pcb);
 		return;
 
 	      case 5: /* illoc */
@@ -605,12 +611,11 @@ got_exception:
 	dik_show_code((unsigned int *)pc);
 	dik_show_trace((unsigned long *)(&regs+1));
 
-	if (current->thread.flags & (1UL << 63)) {
+	if (test_and_set_thread_flag (TIF_DIE_IF_KERNEL)) {
 		printk("die_if_kernel recursion detected.\n");
 		sti();
 		while (1);
 	}
-	current->thread.flags |= (1UL << 63);
 	do_exit(SIGSEGV);
 }
 
@@ -706,14 +711,12 @@ do_entUnaUser(void * va, unsigned long opcode,
 
 	unsigned long tmp1, tmp2, tmp3, tmp4;
 	unsigned long fake_reg, *reg_addr = &fake_reg;
-	unsigned long uac_bits;
 	long error;
 
 	/* Check the UAC bits to decide what the user wants us to do
 	   with the unaliged access.  */
 
-	uac_bits = (current->thread.flags >> UAC_SHIFT) & UAC_BITMASK;
-	if (!(uac_bits & UAC_NOPRINT)) {
+	if (!test_thread_flag (TIF_UAC_NOPRINT)) {
 		if (cnt >= 5 && jiffies - last_time > 5*HZ) {
 			cnt = 0;
 		}
@@ -724,13 +727,11 @@ do_entUnaUser(void * va, unsigned long opcode,
 		}
 		last_time = jiffies;
 	}
-	if (uac_bits & UAC_SIGBUS) {
+	if (test_thread_flag (TIF_UAC_SIGBUS))
 		goto give_sigbus;
-	}
-	if (uac_bits & UAC_NOFIX) {
-		/* Not sure why you'd want to use this, but... */
+	/* Not sure why you'd want to use this, but... */
+	if (test_thread_flag (TIF_UAC_NOFIX))
 		return;
-	}
 
 	/* Don't bother reading ds in the access check since we already
 	   know that this came from the user.  Also rely on the fact that

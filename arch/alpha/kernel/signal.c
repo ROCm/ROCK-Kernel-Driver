@@ -32,8 +32,8 @@
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
 asmlinkage void ret_from_sys_call(void);
-asmlinkage int do_signal(sigset_t *, struct pt_regs *,
-			 struct switch_stack *, unsigned long, unsigned long);
+static int do_signal(sigset_t *, struct pt_regs *, struct switch_stack *,
+		     unsigned long, unsigned long);
 
 
 int copy_siginfo_to_user(siginfo_t *to, siginfo_t *from)
@@ -618,7 +618,7 @@ syscall_restart(unsigned long r0, unsigned long r19,
  * restart. "r0" is also used as an indicator whether we can restart at
  * all (if we get here from anything but a syscall return, it will be 0)
  */
-asmlinkage int
+static int
 do_signal(sigset_t *oldset, struct pt_regs * regs, struct switch_stack * sw,
 	  unsigned long r0, unsigned long r19)
 {
@@ -743,4 +743,13 @@ do_signal(sigset_t *oldset, struct pt_regs * regs, struct switch_stack * sw,
 		ptrace_set_bpt(current);	/* re-set breakpoint */
 
 	return 0;
+}
+
+void
+do_notify_resume(sigset_t *oldset, struct pt_regs *regs,
+		 struct switch_stack *sw, unsigned long r0,
+		 unsigned long r19, unsigned long thread_info_flags)
+{
+	if (thread_info_flags & _TIF_SIGPENDING)
+		do_signal(oldset, regs, sw, r0, r19);
 }

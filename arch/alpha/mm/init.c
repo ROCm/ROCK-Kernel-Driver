@@ -40,7 +40,7 @@ unsigned long totalram_pages;
 
 extern void die_if_kernel(char *,struct pt_regs *,long);
 
-struct thread_struct original_pcb;
+static struct pcb_struct original_pcb;
 
 #ifndef CONFIG_SMP
 struct pgtable_cache_struct quicklists;
@@ -151,7 +151,7 @@ show_mem(void)
 #endif
 
 static inline unsigned long
-load_PCB(struct thread_struct * pcb)
+load_PCB(struct pcb_struct *pcb)
 {
 	register unsigned long sp __asm__("$30");
 	pcb->ksp = sp;
@@ -182,10 +182,9 @@ switch_to_system_map(void)
 	}
 
 	/* Also set up the real kernel PCB while we're at it.  */
-	init_task.thread.ptbr = newptbr;
-	init_task.thread.pal_flags = 1;	/* set FEN, clear everything else */
-	init_task.thread.flags = 0;
-	original_pcb_ptr = load_PCB(&init_task.thread);
+	init_thread_info.pcb.ptbr = newptbr;
+	init_thread_info.pcb.flags = 1;	/* set FEN, clear everything else */
+	original_pcb_ptr = load_PCB(&init_thread_info.pcb);
 	tbia();
 
 	/* Save off the contents of the original PCB so that we can
@@ -199,7 +198,7 @@ switch_to_system_map(void)
 		original_pcb_ptr = (unsigned long)
 			phys_to_virt(original_pcb_ptr);
 	}
-	original_pcb = *(struct thread_struct *) original_pcb_ptr;
+	original_pcb = *(struct pcb_struct *) original_pcb_ptr;
 }
 
 int callback_init_done;
