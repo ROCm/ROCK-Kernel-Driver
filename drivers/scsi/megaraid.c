@@ -4123,7 +4123,6 @@ mega_partsize(struct block_device *bdev, sector_t capacity, int *geom)
 	struct partition *p, *largest = NULL;
 	int i, largest_cyl;
 	int heads, cyls, sectors;
-	int capacity = capacity;
 	unsigned char *buf;
 
 	if (!(buf = scsi_bios_ptable(bdev)))

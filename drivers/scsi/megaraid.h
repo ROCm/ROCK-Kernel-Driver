@@ -214,8 +214,6 @@
     info:	     	megaraid_info,	   	/* Driver Info Function		*/\
     command:	  	megaraid_command,	/* Command Function		*/\
     queuecommand:  	megaraid_queue,		/* Queue Command Function	*/\
-    abort:	    	megaraid_abort,	  	/* Abort Command Function	*/\
-    reset:	    	megaraid_reset,	  	/* Reset Command Function	*/\
     bios_param:     	megaraid_biosparam, 	/* Disk BIOS Parameters		*/\
     can_queue:		MAX_COMMANDS,	    	/* Can Queue			*/\
     this_id:	  	7,		       	/* HBA Target ID		*/\
