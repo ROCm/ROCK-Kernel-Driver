@@ -490,12 +490,15 @@ static inline __u32 int_ln_12bits(__u32 word)
  **********************************************************************/
 
 struct entropy_store {
+	/* mostly-read data: */
+	struct poolinfo poolinfo;
+	__u32		*pool;
+
+	/* read-write data: */
+	spinlock_t lock ____cacheline_aligned_in_smp;
 	unsigned	add_ptr;
 	int		entropy_count;
 	int		input_rotate;
-	struct poolinfo poolinfo;
-	__u32		*pool;
-	spinlock_t lock;
 };
 
 /*
@@ -571,37 +574,53 @@ static void add_entropy_words(struct entropy_store *r, const __u32 *in,
 	static __u32 const twist_table[8] = {
 		         0, 0x3b6e20c8, 0x76dc4190, 0x4db26158,
 		0xedb88320, 0xd6d6a3e8, 0x9b64c2b0, 0xa00ae278 };
-	unsigned i;
-	int new_rotate;
+	unsigned long i, add_ptr, tap1, tap2, tap3, tap4, tap5;
+	int new_rotate, input_rotate;
 	int wordmask = r->poolinfo.poolwords - 1;
-	__u32 w;
+	__u32 w, next_w;
 	unsigned long flags;
 
+	/* Taps are constant, so we can load them without holding r->lock.  */
+	tap1 = r->poolinfo.tap1;
+	tap2 = r->poolinfo.tap2;
+	tap3 = r->poolinfo.tap3;
+	tap4 = r->poolinfo.tap4;
+	tap5 = r->poolinfo.tap5;
+	next_w = *in++;
+
 	spin_lock_irqsave(&r->lock, flags);
+	prefetch_range(r->pool, wordmask);
+	input_rotate = r->input_rotate;
+	add_ptr = r->add_ptr;
 
 	while (nwords--) {
-		w = rotate_left(r->input_rotate, *in++);
-		i = r->add_ptr = (r->add_ptr - 1) & wordmask;
+		w = rotate_left(input_rotate, next_w);
+		if (nwords > 0)
+			next_w = *in++;
+		i = add_ptr = (add_ptr - 1) & wordmask;
 		/*
 		 * Normally, we add 7 bits of rotation to the pool.
 		 * At the beginning of the pool, add an extra 7 bits
 		 * rotation, so that successive passes spread the
 		 * input bits across the pool evenly.
 		 */
-		new_rotate = r->input_rotate + 14;
+		new_rotate = input_rotate + 14;
 		if (i)
-			new_rotate = r->input_rotate + 7;
-		r->input_rotate = new_rotate & 31;
+			new_rotate = input_rotate + 7;
+		input_rotate = new_rotate & 31;
 
 		/* XOR in the various taps */
-		w ^= r->pool[(i + r->poolinfo.tap1) & wordmask];
-		w ^= r->pool[(i + r->poolinfo.tap2) & wordmask];
-		w ^= r->pool[(i + r->poolinfo.tap3) & wordmask];
-		w ^= r->pool[(i + r->poolinfo.tap4) & wordmask];
-		w ^= r->pool[(i + r->poolinfo.tap5) & wordmask];
+		w ^= r->pool[(i + tap1) & wordmask];
+		w ^= r->pool[(i + tap2) & wordmask];
+		w ^= r->pool[(i + tap3) & wordmask];
+		w ^= r->pool[(i + tap4) & wordmask];
+		w ^= r->pool[(i + tap5) & wordmask];
 		w ^= r->pool[i];
 		r->pool[i] = (w >> 3) ^ twist_table[w & 7];
 	}
+
+	r->input_rotate = input_rotate;
+	r->add_ptr = add_ptr;
 
 	spin_unlock_irqrestore(&r->lock, flags);
 }
