@@ -74,7 +74,7 @@ int ipv6_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 	/* Store incoming device index. When the packet will
 	   be queued, we cannot refer to skb->dev anymore.
 	 */
-	((struct inet6_skb_parm *)skb->cb)->iif = dev->ifindex;
+	IP6CB(skb)->iif = dev->ifindex;
 
 	if (skb->len < sizeof(struct ipv6hdr))
 		goto err;
