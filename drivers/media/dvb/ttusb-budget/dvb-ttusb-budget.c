@@ -223,6 +223,9 @@ static int ttusb_i2c_msg(struct ttusb *ttusb,
 
 	err = ttusb_result(ttusb, b, 0x20);
 
+        /* check if the i2c transaction was successful */
+        if ((snd_len != b[5]) || (rcv_len != b[6])) return -EREMOTEIO;
+
 	if (rcv_len > 0) {
 
 		if (err || b[0] != 0x55 || b[1] != id) {
@@ -273,7 +276,7 @@ static int ttusb_i2c_xfer(struct dvb_i2c_bus *i2c, const struct i2c_msg msg[],
 				    snd_buf, snd_len, rcv_buf, rcv_len);
 
 		if (err < rcv_len) {
-			printk("%s: i == %i\n", __FUNCTION__, i);
+			dprintk("%s: i == %i\n", __FUNCTION__, i);
 			break;
 		}
 
@@ -432,7 +435,8 @@ static int ttusb_init_controller(struct ttusb *ttusb)
 		get_version[7], get_version[8]);
 
 	if (memcmp(get_version + 4, "V 0.0", 5) &&
-	    memcmp(get_version + 4, "V 1.1", 5)) {
+	    memcmp(get_version + 4, "V 1.1", 5) &&
+   	    memcmp(get_version + 4, "V 2.1", 5)) {
 		printk
 		    ("%s: unknown STC version %c%c%c%c%c, please report!\n",
 		     __FUNCTION__, get_version[4], get_version[5],
@@ -932,7 +936,7 @@ static int ttusb_start_feed(struct dvb_demux_feed *dvbdmxfeed)
 	struct ttusb *ttusb = (struct ttusb *) dvbdmxfeed->demux;
 	struct ttusb_channel *channel;
 
-	printk("ttusb_start_feed\n");
+	dprintk("ttusb_start_feed\n");
 
 	switch (dvbdmxfeed->type) {
 	case DMX_TYPE_TS:
@@ -1004,7 +1008,7 @@ static int ttusb_stop_feed(struct dvb_demux_feed *dvbdmxfeed)
 
 static int ttusb_setup_interfaces(struct ttusb *ttusb)
 {
-	usb_reset_configuration(ttusb->dev);
+	usb_set_configuration(ttusb->dev, 1);
 	usb_set_interface(ttusb->dev, 1, 1);
 
 	ttusb->bulk_out_pipe = usb_sndbulkpipe(ttusb->dev, 1);
@@ -1186,7 +1190,7 @@ static void ttusb_disconnect(struct usb_interface *intf)
 static struct usb_device_id ttusb_table[] = {
 	{USB_DEVICE(0xb48, 0x1003)},
 	{USB_DEVICE(0xb48, 0x1004)},	/* to be confirmed ????  */
-	{USB_DEVICE(0xb48, 0x1005)},	/* to be confirmed ????  */
+	{USB_DEVICE(0xb48, 0x1005)},
 	{}
 };
 
