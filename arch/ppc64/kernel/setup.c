@@ -585,7 +585,7 @@ int set_spread_lpevents( char * str )
 	/* The parameter is the number of processors to share in processing lp events */
 	unsigned long i;
 	unsigned long val = simple_strtoul( str, NULL, 0 );
-	if ( ( val > 0 ) && ( val <= MAX_PACAS ) ) {
+	if ( ( val > 0 ) && ( val <= NR_CPUS ) ) {
 		for ( i=1; i<val; ++i )
 			paca[i].lpQueuePtr = paca[0].lpQueuePtr;
 		printk("lpevent processing spread over %ld processors\n", val);
