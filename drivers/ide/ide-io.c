@@ -218,11 +218,11 @@ static void ide_complete_pm_request (ide_drive_t *drive, struct request *rq)
 /*
  * FIXME: probably move this somewhere else, name is bad too :)
  */
-u64 ide_get_error_location(ide_drive_t *drive, char *args)
+sector_t ide_get_error_location(ide_drive_t *drive, char *args)
 {
 	u32 high, low;
 	u8 hcyl, lcyl, sect;
-	u64 sector;
+	sector_t sector;
 
 	high = 0;
 	hcyl = args[5];
@@ -244,7 +244,7 @@ u64 ide_get_error_location(ide_drive_t *drive, char *args)
 		}
 	}
 
-	sector = ((u64) high << 24) | low;
+	sector = ((sector_t) high << 24) | low;
 	return sector;
 }
 
