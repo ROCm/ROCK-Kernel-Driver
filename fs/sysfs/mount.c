@@ -16,6 +16,7 @@
 
 struct vfsmount *sysfs_mount;
 struct super_block * sysfs_sb = NULL;
+kmem_cache_t *sysfs_dir_cachep;
 
 static struct super_operations sysfs_ops = {
 	.statfs		= simple_statfs,
@@ -76,7 +77,13 @@ static struct file_system_type sysfs_fs_type = {
 
 int __init sysfs_init(void)
 {
-	int err;
+	int err = -ENOMEM;
+
+	sysfs_dir_cachep = kmem_cache_create("sysfs_dir_cache",
+					      sizeof(struct sysfs_dirent),
+					      0, 0, NULL, NULL);
+	if (!sysfs_dir_cachep)
+		goto out;
 
 	err = register_filesystem(&sysfs_fs_type);
 	if (!err) {
@@ -85,7 +92,13 @@ int __init sysfs_init(void)
 			printk(KERN_ERR "sysfs: could not mount!\n");
 			err = PTR_ERR(sysfs_mount);
 			sysfs_mount = NULL;
+			goto out_err;
 		}
-	}
+	} else
+		goto out_err;
+out:
 	return err;
+out_err:
+	kmem_cache_destroy(sysfs_dir_cachep);
+	goto out;
 }
