@@ -3372,6 +3372,7 @@ static int migration_thread(void * data)
 	rq = cpu_rq(cpu);
 	BUG_ON(rq->migration_thread != current);
 
+	set_current_state(TASK_INTERRUPTIBLE);
 	while (!kthread_should_stop()) {
 		struct list_head *head;
 		migration_req_t *req;
@@ -3393,10 +3394,10 @@ static int migration_thread(void * data)
 
 		head = &rq->migration_queue;
 
-		current->state = TASK_INTERRUPTIBLE;
 		if (list_empty(head)) {
 			spin_unlock_irq(&rq->lock);
 			schedule();
+			set_current_state(TASK_INTERRUPTIBLE);
 			continue;
 		}
 		req = list_entry(head->next, migration_req_t, list);
@@ -3417,6 +3418,7 @@ static int migration_thread(void * data)
 
 		complete(&req->done);
 	}
+	__set_current_state(TASK_RUNNING);
 	return 0;
 
 wait_to_die:
