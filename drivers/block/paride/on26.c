@@ -19,6 +19,7 @@
 #define ON26_VERSION      "1.04"
 
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -296,36 +297,34 @@ static void on26_release_proto( PIA *pi)
 {       MOD_DEC_USE_COUNT;
 }
 
-struct pi_protocol on26 = {"on26",0,5,2,1,1,
-                           on26_write_regr,
-                           on26_read_regr,
-                           on26_write_block,
-                           on26_read_block,
-                           on26_connect,
-                           on26_disconnect,
-                           on26_test_port,
-                           0,
-                           0,
-                           on26_log_adapter,
-                           on26_init_proto,
-                           on26_release_proto
-                          };
+static struct pi_protocol on26 = {
+	.name		= "on26",
+	.max_mode	= 5,
+	.epp_first	= 2,
+	.default_delay	= 1,
+	.max_units	= 1,
+	.write_regr	= on26_write_regr,
+	.read_regr	= on26_read_regr,
+	.write_block	= on26_write_block,
+	.read_block	= on26_read_block,
+	.connect	= on26_connect,
+	.disconnect	= on26_disconnect,
+	.test_port	= on26_test_port,
+	.log_adapter	= on26_log_adapter,
+	.init_proto	= on26_init_proto,
+	.release_proto	= on26_release_proto,
+};
 
-
-#ifdef MODULE
-
-int     init_module(void)
-
-{       return pi_register( &on26 ) - 1;
+static int __init on26_init(void)
+{
+	return pi_register(&on26)-1;
 }
 
-void    cleanup_module(void)
-
-{       pi_unregister( &on26 );
+static void __exit on26_exit(void)
+{
+	pi_unregister(&on26);
 }
-
-#endif
-
-/* end of on26.c */
 
 MODULE_LICENSE("GPL");
+module_init(on26_init)
+module_exit(on26_exit)
