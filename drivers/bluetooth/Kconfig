@@ -100,7 +100,7 @@ config BT_HCIBLUECARD
 	help
 	  Bluetooth HCI BlueCard (PC Card) driver.
 	  This driver provides support for Bluetooth PCMCIA devices with
-	     Anycom BlueCard interface:
+	  Anycom BlueCard interface:
 	     Anycom Bluetooth PC Card
 	     Anycom Bluetooth CF Card
 
@@ -114,11 +114,11 @@ config BT_HCIBTUART
 	  Bluetooth HCI UART (PC Card) driver.
 	  This driver provides support for Bluetooth PCMCIA devices with
 	  an UART interface:
-	  Xircom CreditCard Bluetooth Adapter
-	  Xircom RealPort2 Bluetooth Adapter
-	  Sphinx PICO Card
-	  H-Soft blue+Card
-	  Cyber-blue Compact Flash Card
+	     Xircom CreditCard Bluetooth Adapter
+	     Xircom RealPort2 Bluetooth Adapter
+	     Sphinx PICO Card
+	     H-Soft blue+Card
+	     Cyber-blue Compact Flash Card
 
 	  Say Y here to compile support for HCI UART devices into the
 	  kernel or say M to compile it as module (btuart_cs.o).
