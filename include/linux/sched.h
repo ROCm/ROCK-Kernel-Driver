@@ -235,7 +235,7 @@ struct user_struct {
 	atomic_t files;		/* How many open files does this user have? */
 
 	/* Hash table maintenance information */
-	struct user_struct *next, **pprev;
+	struct list_head uidhash_list;
 	uid_t uid;
 };
 
