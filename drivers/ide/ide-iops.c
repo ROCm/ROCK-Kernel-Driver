@@ -999,13 +999,11 @@ EXPORT_SYMBOL(ide_config_drive_speed);
  *
  * See also ide_execute_command
  */
-void ide_set_handler (ide_drive_t *drive, ide_handler_t *handler,
+void __ide_set_handler (ide_drive_t *drive, ide_handler_t *handler,
 		      unsigned int timeout, ide_expiry_t *expiry)
 {
-	unsigned long flags;
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 
-	spin_lock_irqsave(&ide_lock, flags);
 	if (hwgroup->handler != NULL) {
 		printk(KERN_CRIT "%s: ide_set_handler: handler not null; "
 			"old=%p, new=%p\n",
@@ -1015,11 +1013,21 @@ void ide_set_handler (ide_drive_t *drive, ide_handler_t *handler,
 	hwgroup->expiry		= expiry;
 	hwgroup->timer.expires	= jiffies + timeout;
 	add_timer(&hwgroup->timer);
+}
+
+EXPORT_SYMBOL(__ide_set_handler);
+
+void ide_set_handler (ide_drive_t *drive, ide_handler_t *handler,
+		      unsigned int timeout, ide_expiry_t *expiry)
+{
+	unsigned long flags;
+	spin_lock_irqsave(&ide_lock, flags);
+	__ide_set_handler(drive, handler, timeout, expiry);
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
 
 EXPORT_SYMBOL(ide_set_handler);
-
+ 
 /**
  *	ide_execute_command	-	execute an IDE command
  *	@drive: IDE drive to issue the command against
