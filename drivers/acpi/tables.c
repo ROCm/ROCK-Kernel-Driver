@@ -302,13 +302,14 @@ acpi_table_parse_madt_family (
 	enum acpi_table_id	id,
 	unsigned long		madt_size,
 	int			entry_id,
-	acpi_madt_entry_handler	handler)
+	acpi_madt_entry_handler	handler,
+	unsigned int		max_entries)
 {
 	void			*madt = NULL;
-	acpi_table_entry_header	*entry = NULL;
-	unsigned long		count = 0;
-	unsigned long		madt_end = 0;
-	unsigned int			i = 0;
+	acpi_table_entry_header	*entry;
+	unsigned int		count = 0;
+	unsigned long		madt_end;
+	unsigned int		i;
 
 	if (!handler)
 		return -EINVAL;
@@ -342,12 +343,17 @@ acpi_table_parse_madt_family (
 		((unsigned long) madt + madt_size);
 
 	while (((unsigned long) entry) < madt_end) {
-		if (entry->type == entry_id) {
-			count++;
+		if (entry->type == entry_id &&
+		    (!max_entries || count++ < max_entries))
 			handler(entry);
-		}
+
 		entry = (acpi_table_entry_header *)
 			((unsigned long) entry + entry->length);
+	}
+	if (max_entries && count > max_entries) {
+		printk(KERN_WARNING PREFIX "[%s:0x%02x] ignored %i entries of "
+		       "%i found\n", acpi_table_signatures[id], entry_id,
+		       count - max_entries, count);
 	}
 
 	return count;
@@ -357,10 +363,11 @@ acpi_table_parse_madt_family (
 int __init
 acpi_table_parse_madt (
 	enum acpi_madt_entry_id	id,
-	acpi_madt_entry_handler	handler)
+	acpi_madt_entry_handler	handler,
+	unsigned int max_entries)
 {
 	return acpi_table_parse_madt_family(ACPI_APIC, sizeof(struct acpi_table_madt),
-					    id, handler);
+					    id, handler, max_entries);
 }
 
 
@@ -585,4 +592,3 @@ acpi_table_init (void)
 
 	return 0;
 }
-
