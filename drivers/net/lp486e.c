@@ -1336,7 +1336,7 @@ static int __init lp486e_init_module(void) {
 static void __exit lp486e_cleanup_module(void) {
 	unregister_netdev(dev_lp486e);
 	release_region(dev_lp486e->base_addr, LP486E_TOTAL_SIZE);
-	kfree(dev_lp486e);
+	free_netdev(dev_lp486e);
 }
 
 module_init(lp486e_init_module);

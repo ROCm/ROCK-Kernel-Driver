@@ -1082,7 +1082,7 @@ SK_EVPARA EvPara;
 		 * invalid IO ...  :-(
 		 */
 		unregister_netdev(SkGeRootDev);
-		kfree(SkGeRootDev);
+		free_netdev(SkGeRootDev);
 		kfree(pAC);
 		SkGeRootDev = next;
 	}

@@ -2378,7 +2378,7 @@ static void __devexit eepro100_remove_one (struct pci_dev *pdev)
 								+ sizeof(struct speedo_stats),
 						sp->tx_ring, sp->tx_ring_dma);
 	pci_disable_device(pdev);
-	kfree(dev);
+	free_netdev(dev);
 }
 
 static struct pci_device_id eepro100_pci_tbl[] = {

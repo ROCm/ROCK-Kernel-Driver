@@ -338,7 +338,7 @@ static void __devexit xircom_remove(struct pci_dev *pdev)
 	}
 	release_region(dev->base_addr, 128);
 	unregister_netdev(dev);
-	kfree(dev);
+	free_netdev(dev);
 	leave("xircom_remove");
 } 
 

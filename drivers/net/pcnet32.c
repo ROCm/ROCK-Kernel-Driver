@@ -1762,7 +1762,7 @@ static void __exit pcnet32_cleanup_module(void)
 	if (lp->pci_dev)
 	    pci_unregister_driver(&pcnet32_driver);
 	pci_free_consistent(lp->pci_dev, sizeof(*lp), lp, lp->dma_addr);
-	kfree(pcnet32_dev);
+	free_netdev(pcnet32_dev);
 	pcnet32_dev = next_dev;
     }
 }

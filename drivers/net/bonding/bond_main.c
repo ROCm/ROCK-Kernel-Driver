@@ -3892,7 +3892,7 @@ static void __exit bonding_exit(void)
 		remove_proc_entry(dev->name, proc_net);
 #endif
 		unregister_netdev(dev);
-		kfree(dev);
+		free_netdev(dev);
 	}
 }
 

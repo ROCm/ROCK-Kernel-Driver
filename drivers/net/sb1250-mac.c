@@ -2929,7 +2929,7 @@ sbmac_cleanup_module(void)
 
 	        port = A_MAC_CHANNEL_BASE(idx);
 		SBMAC_WRITECSR(KSEG1ADDR(port+R_MAC_ETHERNET_ADDR), sbmac_orig_hwaddr[idx] );
-		kfree(dev);
+		free_netdev(dev);
 		dev_sbmac[idx] = NULL;
 	}
 }

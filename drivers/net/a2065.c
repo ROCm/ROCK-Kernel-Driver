@@ -820,7 +820,7 @@ static void __exit a2065_cleanup(void)
 		release_mem_region(ZTWO_PADDR(dev->base_addr),
 				   sizeof(struct lance_regs));
 		release_mem_region(ZTWO_PADDR(dev->mem_start), A2065_RAM_SIZE);
-		kfree(dev);
+		free_netdev(dev);
 		root_a2065_dev = next;
 	}
 #endif

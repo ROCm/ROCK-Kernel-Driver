@@ -852,7 +852,7 @@ static void __exit ariadne_cleanup(void)
 	unregister_netdev(dev);
 	release_mem_region(ZTWO_PADDR(dev->base_addr), sizeof(struct Am79C960));
 	release_mem_region(ZTWO_PADDR(dev->mem_start), ARIADNE_RAM_SIZE);
-	kfree(dev);
+	free_netdev(dev);
 	root_ariadne_dev = next;
     }
 #endif

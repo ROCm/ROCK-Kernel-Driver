@@ -1711,7 +1711,7 @@ static void __devexit amd8111e_remove_one(struct pci_dev *pdev)
 	if (dev) {
 		unregister_netdev(dev);
 		iounmap((void *) ((struct amd8111e_priv *)(dev->priv))->mmio);
-		kfree(dev);
+		free_netdev(dev);
 		pci_release_regions(pdev);
 		pci_disable_device(pdev);
 		pci_set_drvdata(pdev, NULL);

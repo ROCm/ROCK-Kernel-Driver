@@ -1844,7 +1844,7 @@ rio_remove1 (struct pci_dev *pdev)
 #ifdef MEM_MAPPING
 		iounmap ((char *) (dev->base_addr));
 #endif
-		kfree (dev);
+		free_netdev (dev);
 		pci_release_regions (pdev);
 		pci_disable_device (pdev);
 	}

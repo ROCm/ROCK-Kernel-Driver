@@ -1618,7 +1618,7 @@ void stop_airo_card( struct net_device *dev, int freeres )
 		unregister_netdev( dev );
 		if (ai->wifidev) {
 			unregister_netdev(ai->wifidev);
-			kfree(ai->wifidev);
+			free_netdev(ai->wifidev);
 			ai->wifidev = 0;
 		}
 		ai->registered = 0;
@@ -1633,7 +1633,7 @@ void stop_airo_card( struct net_device *dev, int freeres )
 	        release_region( dev->base_addr, 64 );
         }
 	del_airo_dev( dev );
-	kfree( dev );
+	free_netdev( dev );
 }
 
 EXPORT_SYMBOL(stop_airo_card);

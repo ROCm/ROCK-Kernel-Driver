@@ -998,7 +998,7 @@ static void __exit qec_cleanup(void)
 					     sizeof(struct sunqe_buffers),
 					     root_qec_dev->qes[i]->buffers,
 					     root_qec_dev->qes[i]->buffers_dvma);
-			kfree(root_qec_dev->qes[i]->dev);
+			free_netdev(root_qec_dev->qes[i]->dev);
 		}
 		free_irq(root_qec_dev->qec_sdev->irqs[0], (void *)root_qec_dev);
 		sbus_iounmap(root_qec_dev->gregs, GLOB_REG_SIZE);

@@ -4527,7 +4527,7 @@ static void __exit iph5526_exit(void)
 		clean_up_memory(fc[i]);
 		if (dev->priv)
 			kfree(priv);
-		kfree(dev);
+		free_netdev(dev);
 		dev = NULL;
 		i++;
 	}

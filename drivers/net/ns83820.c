@@ -438,7 +438,7 @@ struct rx_info {
 
 
 struct ns83820 {
-	struct net_device	net_dev;
+	struct net_device	net_dev;	/* must be first */
 	struct net_device_stats	stats;
 	u8			*base;
 
@@ -2057,7 +2057,7 @@ static void __devexit ns83820_remove_one(struct pci_dev *pci_dev)
 	pci_free_consistent(dev->pci_dev, 4 * DESC_SIZE * NR_RX_DESC,
 			dev->rx_info.descs, dev->rx_info.phy_descs);
 	pci_disable_device(dev->pci_dev);
-	kfree(dev);
+	free_netdev(&dev->net_dev);
 	pci_set_drvdata(pci_dev, NULL);
 }
 
