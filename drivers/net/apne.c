@@ -580,6 +580,8 @@ void cleanup_module(void)
 
 	pcmcia_reset();
 
+	release_region(IOBASE, 0x20);
+
 	free_netdev(apne_dev);
 }
 
