@@ -3,11 +3,6 @@
 #
 
 #
-# False targets.
-#
-.PHONY: dummy
-
-#
 # Special variables which should not be exported
 #
 unexport EXTRA_AFLAGS
@@ -110,9 +105,21 @@ first_rule: all_targets
 # Compile C sources (.c)
 # ---------------------------------------------------------------------------
 
-$(export-objs): export_flags := $(EXPORT_FLAGS)
+# FIXME: if we don't know if built-in or modular, assume built-in.
+# Only happens in Makefiles which override the default first_rule:
+modkern_cflags := $(CFLAGS_KERNEL)
 
-c_flags = $(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags)
+$(real-objs-y)      : modkern_cflags := $(CFLAGS_KERNEL)
+$(real-objs-y:.o=.i): modkern_cflags := $(CFLAGS_KERNEL)
+$(real-objs-y:.o=.s): modkern_cflags := $(CFLAGS_KERNEL)
+
+$(real-objs-m)      : modkern_cflags := $(CFLAGS_MODULE)
+$(real-objs-m:.o=.i): modkern_cflags := $(CFLAGS_MODULE)
+$(real-objs-m:.o=.s): modkern_cflags := $(CFLAGS_MODULE)
+
+$(export-objs)      : export_flags := $(EXPORT_FLAGS)
+
+c_flags = $(CFLAGS) $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags)
 
 cmd_cc_s_c = $(CC) $(c_flags) -S $< -o $@
 
@@ -132,7 +139,16 @@ cmd_cc_o_c = $(CC) $(c_flags) -c -o $@ $<
 # Compile assembler sources (.S)
 # ---------------------------------------------------------------------------
 
-a_flags = $(AFLAGS) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
+# FIXME (s.a.)
+modkern_aflags := $(AFLAGS_KERNEL)
+
+$(real-objs-y)      : modkern_aflags := $(AFLAGS_KERNEL)
+$(real-objs-y:.o=.s): modkern_aflags := $(AFLAGS_KERNEL)
+
+$(real-objs-m)      : modkern_aflags := $(AFLAGS_MODULE)
+$(real-objs-m:.o=.s): modkern_aflags := $(AFLAGS_MODULE)
+
+a_flags = $(AFLAGS) $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
 
 cmd_as_s_S = $(CPP) $(a_flags) $< > $@
 
@@ -166,7 +182,7 @@ endif
 all_targets: $(O_TARGET) $(L_TARGET) sub_dirs
 
 # To build objects in subdirs, we need to descend into the directories
-$(subdir-obj-y): sub_dirs
+$(sort $(subdir-obj-y)): sub_dirs ;
 
 #
 # Rule to compile a set of .o files into one .o file
@@ -267,13 +283,14 @@ modules_install: _modinst__ \
 	 $(patsubst %,_modinst_%,$(MOD_SUB_DIRS))
 
 #
-# A rule to do nothing
+# FIXME: This is usually called FORCE, to express what it's used for
 #
+.PHONY: dummy
 dummy:
 
 #
 # This is useful for testing
-#
+# FIXME: really?
 script:
 	$(SCRIPT)
 
@@ -362,7 +379,6 @@ $(export-objs): $(TOPDIR)/include/linux/modversions.h
 endif
 
 endif # CONFIG_MODULES
-
 
 #
 # include dependency files if they exist
