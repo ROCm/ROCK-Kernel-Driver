@@ -1092,7 +1092,7 @@ static int splitvma(struct mm_struct *mm, struct vm_area_struct *mpnt, unsigned 
 /* Munmap is split into 2 main parts -- this part which finds
  * what needs doing, and the areas themselves, which do the
  * work.  This now handles partial unmappings.
- * Jeremy Fitzhardine <jeremy@sw.oz.au>
+ * Jeremy Fitzhardinge <jeremy@goop.org>
  */
 int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 {
