@@ -217,8 +217,10 @@ void cb_pic_shutdown_irq (unsigned irq)
 	CB_PIC_INT1M &= ~(1 << (irq - CB_PIC_BASE_IRQ));
 }
 
-static void cb_pic_handle_irq (int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t cb_pic_handle_irq (int irq, void *dev_id,
+				      struct pt_regs *regs)
 {
+	irqreturn_t rval = IRQ_NONE;
 	unsigned status = CB_PIC_INTR;
 	unsigned enable = CB_PIC_INT1M;
 
@@ -244,13 +246,16 @@ static void cb_pic_handle_irq (int irq, void *dev_id, struct pt_regs *regs)
 
 			/* Recursively call handle_irq to handle it. */
 			handle_irq (irq, regs);
+			rval = IRQ_HANDLED;
 		} while (status);
 	}
 
 	CB_PIC_INTEN |= CB_PIC_INT1EN;
+
+	return rval;
 }
 
-
+
 static void irq_nop (unsigned irq) { }
 
 static unsigned cb_pic_startup_irq (unsigned irq)
