@@ -51,31 +51,17 @@ fw_in(unsigned int hooknum,
 	int ret = FW_BLOCK;
 	u_int16_t redirpt;
 
-	/* FIXME: Push down to extensions --RR */
-	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
-		return NF_DROP;
-
 	/* Assume worse case: any hook could change packet */
 	(*pskb)->nfcache |= NFC_UNKNOWN | NFC_ALTERED;
 	if ((*pskb)->ip_summed == CHECKSUM_HW)
 		(*pskb)->ip_summed = CHECKSUM_NONE;
-
-	/* Firewall rules can alter TOS: raw socket (tcpdump) may have
-           clone of incoming skb: don't disturb it --RR */
-	if (skb_cloned(*pskb) && !(*pskb)->sk) {
-		struct sk_buff *nskb = skb_copy(*pskb, GFP_ATOMIC);
-		if (!nskb)
-			return NF_DROP;
-		kfree_skb(*pskb);
-		*pskb = nskb;
-	}
 
 	switch (hooknum) {
 	case NF_IP_PRE_ROUTING:
 		if (fwops->fw_acct_in)
 			fwops->fw_acct_in(fwops, PF_INET,
 					  (struct net_device *)in,
-					  (*pskb)->nh.raw, &redirpt, pskb);
+					  &redirpt, pskb);
 
 		if ((*pskb)->nh.iph->frag_off & htons(IP_MF|IP_OFFSET)) {
 			*pskb = ip_ct_gather_frags(*pskb);
@@ -85,7 +71,7 @@ fw_in(unsigned int hooknum,
 		}
 
 		ret = fwops->fw_input(fwops, PF_INET, (struct net_device *)in,
-				      (*pskb)->nh.raw, &redirpt, pskb);
+				      &redirpt, pskb);
 		break;
 
 	case NF_IP_FORWARD:
@@ -95,18 +81,18 @@ fw_in(unsigned int hooknum,
 			ret = FW_ACCEPT;
 		else ret = fwops->fw_forward(fwops, PF_INET,
 					     (struct net_device *)out,
-					     (*pskb)->nh.raw, &redirpt, pskb);
+					     &redirpt, pskb);
 		break;
 
 	case NF_IP_POST_ROUTING:
 		ret = fwops->fw_output(fwops, PF_INET,
 				       (struct net_device *)out,
-				       (*pskb)->nh.raw, &redirpt, pskb);
+				       &redirpt, pskb);
 		if (ret == FW_ACCEPT || ret == FW_SKIP) {
 			if (fwops->fw_acct_out)
 				fwops->fw_acct_out(fwops, PF_INET,
 						   (struct net_device *)out,
-						   (*pskb)->nh.raw, &redirpt,
+						   &redirpt,
 						   pskb);
 
 			/* ip_conntrack_confirm return NF_DROP or NF_ACCEPT */
@@ -169,10 +155,6 @@ static unsigned int fw_confirm(unsigned int hooknum,
 			       const struct net_device *out,
 			       int (*okfn)(struct sk_buff *))
 {
-	/* FIXME: Push down to extensions --RR */
-	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
-		return NF_DROP;
-
 	return ip_conntrack_confirm(*pskb);
 }
 

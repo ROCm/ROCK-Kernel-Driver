@@ -94,6 +94,7 @@
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4/compat_firewall.h>
 #include <linux/netfilter_ipv4/ipchains_core.h>
+#include <linux/netfilter_ipv4/ip_nat_core.h>
 
 #include <net/checksum.h>
 #include <linux/proc_fs.h>
@@ -280,11 +281,13 @@ extern inline int port_match(__u16 min, __u16 max, __u16 port,
 /* Returns whether matches rule or not. */
 static int ip_rule_match(struct ip_fwkernel *f,
 			 const char *ifname,
-			 struct iphdr *ip,
+			 struct sk_buff **pskb,
 			 char tcpsyn,
 			 __u16 src_port, __u16 dst_port,
 			 char isfrag)
 {
+	struct iphdr *ip = (*pskb)->nh.iph;
+
 #define FWINV(bool,invflg) ((bool) ^ !!(f->ipfw.fw_invflg & invflg))
 	/*
 	 *	This is a bit simpler as we don't have to walk
@@ -401,7 +404,7 @@ static const char *branchname(struct ip_chain *branch,int simplebranch)
  * VERY ugly piece of code which actually
  * makes kernel printf for matching packets...
  */
-static void dump_packet(const struct iphdr *ip,
+static void dump_packet(struct sk_buff **pskb,
 			const char *ifname,
 			struct ip_fwkernel *f,
 			const ip_chainlabel chainlabel,
@@ -410,7 +413,7 @@ static void dump_packet(const struct iphdr *ip,
 			unsigned int count,
 			int syn)
 {
-	__u32 *opt = (__u32 *) (ip + 1);
+	__u32 *opt = (__u32 *) ((*pskb)->nh.iph + 1);
 	int opti;
 
 	if (f) {
@@ -422,13 +425,18 @@ static void dump_packet(const struct iphdr *ip,
 
 	printk("%s PROTO=%d %u.%u.%u.%u:%hu %u.%u.%u.%u:%hu"
 	       " L=%hu S=0x%2.2hX I=%hu F=0x%4.4hX T=%hu",
-	       ifname, ip->protocol, NIPQUAD(ip->saddr),
-	       src_port, NIPQUAD(ip->daddr),
+	       ifname, (*pskb)->nh.iph->protocol,
+	       NIPQUAD((*pskb)->nh.iph->saddr),
+	       src_port,
+	       NIPQUAD((*pskb)->nh.iph->daddr),
 	       dst_port,
-	       ntohs(ip->tot_len), ip->tos, ntohs(ip->id),
-	       ntohs(ip->frag_off), ip->ttl);
+	       ntohs((*pskb)->nh.iph->tot_len),
+	       (*pskb)->nh.iph->tos,
+	       ntohs((*pskb)->nh.iph->id),
+	       ntohs((*pskb)->nh.iph->frag_off),
+	       (*pskb)->nh.iph->ttl);
 
-	for (opti = 0; opti < (ip->ihl - sizeof(struct iphdr) / 4); opti++)
+	for (opti = 0; opti < ((*pskb)->nh.iph->ihl - sizeof(struct iphdr) / 4); opti++)
 		printk(" O=0x%8.8X", *opt++);
 	printk(" %s(#%d)\n", syn ? "SYN " : /* "PENANCE" */ "", count);
 }
@@ -509,34 +517,35 @@ static void cleanup(struct ip_chain *chain,
 
 static inline int
 ip_fw_domatch(struct ip_fwkernel *f,
-	      struct iphdr *ip,
 	      const char *rif,
 	      const ip_chainlabel label,
-	      struct sk_buff *skb,
+	      struct sk_buff **pskb,
 	      unsigned int slot,
 	      __u16 src_port, __u16 dst_port,
 	      unsigned int count,
-	      int tcpsyn)
+	      int tcpsyn,
+	      unsigned char *tos)
 {
-	f->counters[slot].bcnt+=ntohs(ip->tot_len);
+	f->counters[slot].bcnt+=ntohs((*pskb)->nh.iph->tot_len);
 	f->counters[slot].pcnt++;
 	if (f->ipfw.fw_flg & IP_FW_F_PRN) {
-		dump_packet(ip,rif,f,label,src_port,dst_port,count,tcpsyn);
+		dump_packet(pskb,rif,f,label,src_port,dst_port,count,tcpsyn);
 	}
-	ip->tos = (ip->tos & f->ipfw.fw_tosand) ^ f->ipfw.fw_tosxor;
+
+	*tos = (*tos & f->ipfw.fw_tosand) ^ f->ipfw.fw_tosxor;
 
 /* This functionality is useless in stock 2.0.x series, but we don't
  * discard the mark thing altogether, to avoid breaking ipchains (and,
  * more importantly, the ipfwadm wrapper) --PR */
 	if (f->ipfw.fw_flg & IP_FW_F_MARKABS) {
-		skb->nfmark = f->ipfw.fw_mark;
+		(*pskb)->nfmark = f->ipfw.fw_mark;
 	} else {
-		skb->nfmark += f->ipfw.fw_mark;
+		(*pskb)->nfmark += f->ipfw.fw_mark;
 	}
 	if (f->ipfw.fw_flg & IP_FW_F_NETLINK) {
 #if defined(CONFIG_NETLINK_DEV) || defined(CONFIG_NETLINK_DEV_MODULE)
-		size_t len = min_t(unsigned int, f->ipfw.fw_outputsize, ntohs(ip->tot_len))
-			+ sizeof(__u32) + sizeof(skb->nfmark) + IFNAMSIZ;
+		size_t len = min_t(unsigned int, f->ipfw.fw_outputsize, ntohs((*pskb)->nh.iph->tot_len))
+			+ sizeof(__u32) + sizeof((*pskb)->nfmark) + IFNAMSIZ;
 		struct sk_buff *outskb=alloc_skb(len, GFP_ATOMIC);
 
 		duprintf("Sending packet out NETLINK (length = %u).\n",
@@ -545,10 +554,13 @@ ip_fw_domatch(struct ip_fwkernel *f,
 			/* Prepend length, mark & interface */
 			skb_put(outskb, len);
 			*((__u32 *)outskb->data) = (__u32)len;
-			*((__u32 *)(outskb->data+sizeof(__u32))) = skb->nfmark;
+			*((__u32 *)(outskb->data+sizeof(__u32))) =
+				(*pskb)->nfmark;
 			strcpy(outskb->data+sizeof(__u32)*2, rif);
-			memcpy(outskb->data+sizeof(__u32)*2+IFNAMSIZ, ip,
-			       len-(sizeof(__u32)*2+IFNAMSIZ));
+			skb_copy_bits(*pskb,
+				((char *)(*pskb)->nh.iph - (char *)(*pskb)->data),
+				outskb->data+sizeof(__u32)*2+IFNAMSIZ,
+				len-(sizeof(__u32)*2+IFNAMSIZ));
 			netlink_broadcast(ipfwsk, outskb, 0, ~0, GFP_ATOMIC);
 		}
 		else {
@@ -571,22 +583,18 @@ ip_fw_domatch(struct ip_fwkernel *f,
  *	user checking mode (counters are not updated, TOS & mark not done).
  */
 static int
-ip_fw_check(struct iphdr *ip,
-	    const char *rif,
+ip_fw_check(const char *rif,
 	    __u16 *redirport,
 	    struct ip_chain *chain,
-	    struct sk_buff *skb,
+	    struct sk_buff **pskb,
 	    unsigned int slot,
 	    int testing)
 {
-	struct tcphdr		*tcp=(struct tcphdr *)((__u32 *)ip+ip->ihl);
-	struct udphdr		*udp=(struct udphdr *)((__u32 *)ip+ip->ihl);
-	struct icmphdr		*icmp=(struct icmphdr *)((__u32 *)ip+ip->ihl);
 	__u32			src, dst;
 	__u16			src_port = 0xFFFF, dst_port = 0xFFFF;
 	char			tcpsyn=0;
 	__u16			offset;
-	unsigned char		oldtos;
+	unsigned char		tos;
 	struct ip_fwkernel	*f;
 	int			ret = FW_SKIP+2;
 	unsigned int		count;
@@ -598,7 +606,7 @@ ip_fw_check(struct iphdr *ip,
 	 * rule is also a fragment-specific rule, non-fragments won't
 	 * match it. */
 
-	offset = ntohs(ip->frag_off) & IP_OFFSET;
+	offset = ntohs((*pskb)->nh.iph->frag_off) & IP_OFFSET;
 
 	/*
 	 *	Don't allow a fragment of TCP 8 bytes in. Nobody
@@ -606,10 +614,10 @@ ip_fw_check(struct iphdr *ip,
 	 *	in by doing a flag overwrite to pass the direction
 	 *	checks.
 	 */
-	if (offset == 1 && ip->protocol == IPPROTO_TCP)	{
+	if (offset == 1 && (*pskb)->nh.iph->protocol == IPPROTO_TCP) {
 		if (!testing && net_ratelimit()) {
 			printk("Suspect TCP fragment.\n");
-			dump_packet(ip,rif,NULL,NULL,0,0,0,0);
+			dump_packet(pskb,rif,NULL,NULL,0,0,0,0);
 		}
 		return FW_BLOCK;
 	}
@@ -621,7 +629,7 @@ ip_fw_check(struct iphdr *ip,
 	 */
 	if (offset == 0) {
 		unsigned int size_req;
-		switch (ip->protocol) {
+		switch ((*pskb)->nh.iph->protocol) {
 		case IPPROTO_TCP:
 			/* Don't care about things past flags word */
 			size_req = 16;
@@ -640,18 +648,19 @@ ip_fw_check(struct iphdr *ip,
 		 * used to rewrite port information, and thus should
 		 * be blocked.
 		 */
-		if (ntohs(ip->tot_len) < (ip->ihl<<2)+size_req) {
+		if (ntohs((*pskb)->nh.iph->tot_len) <
+		    ((*pskb)->nh.iph->ihl<<2)+size_req) {
 			if (!testing && net_ratelimit()) {
 				printk("Suspect short first fragment.\n");
-				dump_packet(ip,rif,NULL,NULL,0,0,0,0);
+				dump_packet(pskb,rif,NULL,NULL,0,0,0,0);
 			}
 			return FW_BLOCK;
 		}
 	}
 
-	src = ip->saddr;
-	dst = ip->daddr;
-	oldtos = ip->tos;
+	src = (*pskb)->nh.iph->saddr;
+	dst = (*pskb)->nh.iph->daddr;
+	tos = (*pskb)->nh.iph->tos;
 
 	/*
 	 *	If we got interface from which packet came
@@ -662,47 +671,68 @@ ip_fw_check(struct iphdr *ip,
 	 */
 
 	dprintf("Packet ");
-	switch(ip->protocol)
-	{
+	switch ((*pskb)->nh.iph->protocol) {
 		case IPPROTO_TCP:
 			dprintf("TCP ");
 			if (!offset) {
-				src_port=ntohs(tcp->source);
-				dst_port=ntohs(tcp->dest);
+				struct tcphdr tcph;
+
+				if (skb_copy_bits(*pskb,
+						  (*pskb)->nh.iph->ihl * 4,
+						  &tcph, sizeof(tcph)))
+					return FW_BLOCK;
+
+				src_port = ntohs(tcph.source);
+				dst_port = ntohs(tcph.dest);
 
 				/* Connection initilisation can only
 				 * be made when the syn bit is set and
 				 * neither of the ack or reset is
 				 * set. */
-				if(tcp->syn && !(tcp->ack || tcp->rst))
-					tcpsyn=1;
+				if (tcph.syn && !(tcph.ack || tcph.rst))
+					tcpsyn = 1;
 			}
 			break;
 		case IPPROTO_UDP:
 			dprintf("UDP ");
 			if (!offset) {
-				src_port=ntohs(udp->source);
-				dst_port=ntohs(udp->dest);
+				struct udphdr udph;
+
+				if (skb_copy_bits(*pskb,
+						  (*pskb)->nh.iph->ihl * 4,
+						  &udph, sizeof(udph)))
+					return FW_BLOCK;
+
+				src_port = ntohs(udph.source);
+				dst_port = ntohs(udph.dest);
 			}
 			break;
 		case IPPROTO_ICMP:
 			if (!offset) {
-				src_port=(__u16)icmp->type;
-				dst_port=(__u16)icmp->code;
+				struct icmphdr icmph;
+
+				if (skb_copy_bits(*pskb,
+						  (*pskb)->nh.iph->ihl * 4,
+						  &icmph, sizeof(icmph)))
+					return FW_BLOCK;
+
+				src_port = (__u16) icmph.type;
+				dst_port = (__u16) icmph.code;
 			}
 			dprintf("ICMP ");
 			break;
 		default:
-			dprintf("p=%d ",ip->protocol);
+			dprintf("p=%d ", (*pskb)->nh.iph->protocol);
 			break;
 	}
 #ifdef DEBUG_IP_FIREWALL
-	print_ip(ip->saddr);
+	print_ip((*pskb)->nh.iph->saddr);
 
 	if (offset)
 		dprintf(":fragment (%i) ", ((int)offset)<<2);
-	else if (ip->protocol==IPPROTO_TCP || ip->protocol==IPPROTO_UDP
-		 || ip->protocol==IPPROTO_ICMP)
+	else if ((*pskb)->nh.iph->protocol == IPPROTO_TCP ||
+		 (*pskb)->nh.iph->protocol == IPPROTO_UDP ||
+		 (*pskb)->nh.iph->protocol == IPPROTO_ICMP)
 		dprintf(":%hu:%hu", src_port, dst_port);
 	dprintf("\n");
 #endif
@@ -715,13 +745,14 @@ ip_fw_check(struct iphdr *ip,
 		count = 0;
 		for (; f; f = f->next) {
 			count++;
-			if (ip_rule_match(f,rif,ip,
-					  tcpsyn,src_port,dst_port,offset)) {
+			if (ip_rule_match(f, rif, pskb,
+					  tcpsyn, src_port, dst_port,
+					  offset)) {
 				if (!testing
-				    && !ip_fw_domatch(f, ip, rif, chain->label,
-						      skb, slot,
+				    && !ip_fw_domatch(f, rif, chain->label,
+						      pskb, slot,
 						      src_port, dst_port,
-						      count, tcpsyn)) {
+						      count, tcpsyn, &tos)) {
 					ret = FW_BLOCK;
 					cleanup(chain, 0, slot);
 					goto out;
@@ -780,7 +811,7 @@ ip_fw_check(struct iphdr *ip,
 				if (!testing) {
 					chain->reent[slot].counters.pcnt++;
 					chain->reent[slot].counters.bcnt
-						+= ntohs(ip->tot_len);
+						+= ntohs((*pskb)->nh.iph->tot_len);
 				}
 			}
 		}
@@ -790,10 +821,16 @@ ip_fw_check(struct iphdr *ip,
 	if (!testing) FWC_READ_UNLOCK(&ip_fw_lock);
 
 	/* Recalculate checksum if not going to reject, and TOS changed. */
-	if (ip->tos != oldtos
+	if ((*pskb)->nh.iph->tos != tos
 	    && ret != FW_REJECT && ret != FW_BLOCK
-	    && !testing)
-		ip_send_check(ip);
+	    && !testing) {
+		if (!skb_ip_make_writable(pskb, offsetof(struct iphdr, tos)+1))
+			ret = FW_BLOCK;
+		else {
+			(*pskb)->nh.iph->tos = tos;
+			ip_send_check((*pskb)->nh.iph);
+		}
+	}
 
 	if (ret == FW_REDIRECT && redirport) {
 		if ((*redirport = htons(f->ipfw.fw_redirpt)) == 0) {
@@ -1349,18 +1386,40 @@ int ip_fw_ctl(int cmd, void *m, int len)
 		if ((chain = find_label(new->fwt_label)) == NULL)
 			ret = ENOENT;
 		else {
+			struct sk_buff *tmp_skb;
+			int hdrlen;
+
+			hdrlen = sizeof(struct ip_fwpkt) -
+				sizeof(struct in_addr) -
+				IFNAMSIZ;
+
 			ip = &(new->fwt_packet.fwp_iph);
 
-			if (ip->ihl != sizeof(struct iphdr) / sizeof(int)) {
-			    duprintf("ip_fw_ctl: ip->ihl=%d, want %d\n",
-				     ip->ihl,
-				     sizeof(struct iphdr) / sizeof(int));
-			    ret = EINVAL;
-			}
-			else {
-				ret = ip_fw_check(ip, new->fwt_packet.fwp_vianame,
+			/* Fix this one up by hand, who knows how many
+			 * tools will break if we start to barf on this.
+			 */
+			if (ntohs(ip->tot_len) > hdrlen)
+				ip->tot_len = htons(hdrlen);
+
+			if (ip->ihl != sizeof(struct iphdr) / sizeof(u32)) {
+				duprintf("ip_fw_ctl: ip->ihl=%d, want %d\n",
+					 ip->ihl,
+					 sizeof(struct iphdr) / sizeof(u32));
+				ret = EINVAL;
+			} else if ((tmp_skb = alloc_skb(hdrlen,
+							GFP_ATOMIC)) == NULL) {
+				duprintf("ip_fw_ctl: tmp_skb alloc failure\n");
+				ret = EFAULT;
+			} else {
+				skb_reserve(tmp_skb, hdrlen);
+				skb_push(tmp_skb, hdrlen);
+				memcpy(tmp_skb->data, ip, hdrlen);
+				tmp_skb->nh.raw =
+					(unsigned char *) tmp_skb->data;
+				ret = ip_fw_check(new->fwt_packet.fwp_vianame,
 						  NULL, chain,
-						  NULL, SLOT_NUMBER(), 1);
+						  &tmp_skb, SLOT_NUMBER(), 1);
+				kfree_skb(tmp_skb);
 				switch (ret) {
 				case FW_ACCEPT:
 					ret = 0; break;
@@ -1690,41 +1749,37 @@ static int ip_chain_name_procinfo(char *buffer, char **start,
  *	Interface to the generic firewall chains.
  */
 int ipfw_input_check(struct firewall_ops *this, int pf,
-		     struct net_device *dev, void *phdr, void *arg,
+		     struct net_device *dev, void *arg,
 		     struct sk_buff **pskb)
 {
-	return ip_fw_check(phdr, dev->name,
-			   arg, IP_FW_INPUT_CHAIN, *pskb, SLOT_NUMBER(), 0);
+	return ip_fw_check(dev->name,
+			   arg, IP_FW_INPUT_CHAIN, pskb, SLOT_NUMBER(), 0);
 }
 
 int ipfw_output_check(struct firewall_ops *this, int pf,
-		      struct net_device *dev, void *phdr, void *arg,
+		      struct net_device *dev, void *arg,
 		      struct sk_buff **pskb)
 {
 	/* Locally generated bogus packets by root. <SIGH>. */
-	if (((struct iphdr *)phdr)->ihl * 4 < sizeof(struct iphdr)
-	    || (*pskb)->len < sizeof(struct iphdr))
+	if ((*pskb)->len < sizeof(struct iphdr) ||
+	    (*pskb)->nh.iph->ihl * 4 < sizeof(struct iphdr))
 		return FW_ACCEPT;
-	return ip_fw_check(phdr, dev->name,
-			   arg, IP_FW_OUTPUT_CHAIN, *pskb, SLOT_NUMBER(), 0);
+	return ip_fw_check(dev->name,
+			   arg, IP_FW_OUTPUT_CHAIN, pskb, SLOT_NUMBER(), 0);
 }
 
 int ipfw_forward_check(struct firewall_ops *this, int pf,
-		       struct net_device *dev, void *phdr, void *arg,
+		       struct net_device *dev, void *arg,
 		       struct sk_buff **pskb)
 {
-	return ip_fw_check(phdr, dev->name,
-			   arg, IP_FW_FORWARD_CHAIN, *pskb, SLOT_NUMBER(), 0);
+	return ip_fw_check(dev->name,
+			   arg, IP_FW_FORWARD_CHAIN, pskb, SLOT_NUMBER(), 0);
 }
 
-struct firewall_ops ipfw_ops=
-{
-	NULL,
-	ipfw_forward_check,
-	ipfw_input_check,
-	ipfw_output_check,
-	NULL,
-	NULL
+struct firewall_ops ipfw_ops = {
+	.fw_forward	=	ipfw_forward_check,
+	.fw_input	=	ipfw_input_check,
+	.fw_output	=	ipfw_output_check,
 };
 
 int ipfw_init_or_cleanup(int init)

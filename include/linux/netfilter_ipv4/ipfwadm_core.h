@@ -250,7 +250,7 @@ extern int ip_masq_ctl(int, void *, int);
 
 extern int ip_fw_masq_timeouts(void *user, int len);
 
-extern int ip_fw_chk(struct iphdr *, struct net_device *, __u16 *,
+extern int ip_fw_chk(struct sk_buff **, struct net_device *, __u16 *,
 		     struct ip_fw *, int, int);
 #endif /* KERNEL */
 #endif /* _IP_FW_H */

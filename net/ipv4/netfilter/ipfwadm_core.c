@@ -126,6 +126,7 @@
 #include <linux/netfilter_ipv4/ipfwadm_core.h>
 #include <linux/netfilter_ipv4/compat_firewall.h>
 #include <linux/netfilter_ipv4/lockhelp.h>
+#include <linux/netfilter_ipv4/ip_nat_core.h>
 
 #include <net/checksum.h>
 #include <linux/proc_fs.h>
@@ -259,18 +260,18 @@ static char *rule_name(struct ip_fw *f, int mode, char *buf)
 	}
 }
 
-static void print_packet(struct iphdr *ip,
+static void print_packet(struct sk_buff **pskb,
 			 u16 src_port, u16 dst_port, u16 icmp_type,
 			 char *chain, char *rule, char *devname)
 {
-	__u32 *opt = (__u32 *) (ip + 1);
+	__u32 *opt = (__u32 *) ((*pskb)->nh.iph + 1);
 	int opti;
-	__u16 foff = ntohs(ip->frag_off);
+	__u16 foff = ntohs((*pskb)->nh.iph->frag_off);
+	int protocol = (*pskb)->nh.iph->protocol;
 
 	printk(KERN_INFO "IP %s %s%s", chain, rule, devname);
 
-	switch(ip->protocol)
-	{
+	switch (protocol) {
 	case IPPROTO_TCP:
 		printk(" TCP ");
 		break;
@@ -281,22 +282,28 @@ static void print_packet(struct iphdr *ip,
 		printk(" ICMP/%d ", icmp_type);
 		break;
 	default:
-		printk(" PROTO=%d ", ip->protocol);
+		printk(" PROTO=%d ", protocol);
 		break;
-	}
-	print_ip(ip->saddr);
-	if(ip->protocol == IPPROTO_TCP || ip->protocol == IPPROTO_UDP)
+	};
+
+	print_ip((*pskb)->nh.iph->saddr);
+	if (protocol == IPPROTO_TCP || protocol == IPPROTO_UDP)
 		printk(":%hu", src_port);
 	printk(" ");
-	print_ip(ip->daddr);
-	if(ip->protocol == IPPROTO_TCP || ip->protocol == IPPROTO_UDP)
+	print_ip((*pskb)->nh.iph->daddr);
+	if (protocol == IPPROTO_TCP || protocol == IPPROTO_UDP)
 		printk(":%hu", dst_port);
 	printk(" L=%hu S=0x%2.2hX I=%hu FO=0x%4.4hX T=%hu",
-	       ntohs(ip->tot_len), ip->tos, ntohs(ip->id),
-	       foff & IP_OFFSET, ip->ttl);
-	if (foff & IP_DF) printk(" DF=1");
-	if (foff & IP_MF) printk(" MF=1");
-	for (opti = 0; opti < (ip->ihl - sizeof(struct iphdr) / 4); opti++)
+	       ntohs((*pskb)->nh.iph->tot_len),
+	       (*pskb)->nh.iph->tos,
+	       ntohs((*pskb)->nh.iph->id),
+	       foff & IP_OFFSET,
+	       (*pskb)->nh.iph->ttl);
+	if (foff & IP_DF)
+		printk(" DF=1");
+	if (foff & IP_MF)
+		printk(" MF=1");
+	for (opti = 0; opti < ((*pskb)->nh.iph->ihl - sizeof(struct iphdr) / 4); opti++)
 		printk(" O=0x%8.8X", *opt++);
 	printk("\n");
 }
@@ -314,13 +321,11 @@ static void print_packet(struct iphdr *ip,
  */
 
 
-int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
+int ip_fw_chk(struct sk_buff **pskb,
+	      struct net_device *rif, __u16 *redirport,
 	      struct ip_fw *chain, int policy, int mode)
 {
 	struct ip_fw *f;
-	struct tcphdr		*tcp=(struct tcphdr *)((__u32 *)ip+ip->ihl);
-	struct udphdr		*udp=(struct udphdr *)((__u32 *)ip+ip->ihl);
-	struct icmphdr		*icmp=(struct icmphdr *)((__u32 *)ip+ip->ihl);
 	__u32			src, dst;
 	__u16			src_port=0xFFFF, dst_port=0xFFFF, icmp_type=0xFF;
 	unsigned short		f_prt=0, prt;
@@ -328,15 +333,13 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 	unsigned short		offset;
 	int			answer;
 	unsigned char		tosand, tosxor;
+	int			protocol;
 
 	/*
 	 *	If the chain is empty follow policy. The BSD one
 	 *	accepts anything giving you a time window while
 	 *	flushing and rebuilding the tables.
 	 */
-
-	src = ip->saddr;
-	dst = ip->daddr;
 
 	/*
 	 *	This way we handle fragmented packets.
@@ -352,7 +355,8 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 	 *	of system.
 	 */
 
-	offset = ntohs(ip->frag_off) & IP_OFFSET;
+	offset = ntohs((*pskb)->nh.iph->frag_off) & IP_OFFSET;
+	protocol = (*pskb)->nh.iph->protocol;
 
 	/*
 	 *	Don't allow a fragment of TCP 8 bytes in. Nobody
@@ -361,19 +365,21 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 	 *	checks.
 	 */
 
-	if (offset == 1 && ip->protocol == IPPROTO_TCP)
+	if (offset == 1 && protocol == IPPROTO_TCP)
 		return FW_BLOCK;
 
 	if (offset!=0 && !(mode & (IP_FW_MODE_ACCT_IN|IP_FW_MODE_ACCT_OUT)) &&
-		(ip->protocol == IPPROTO_TCP || ip->protocol == IPPROTO_UDP ||
-			ip->protocol == IPPROTO_ICMP))
+		(protocol == IPPROTO_TCP ||
+		 protocol == IPPROTO_UDP ||
+		 protocol == IPPROTO_ICMP))
 		return FW_ACCEPT;
 
 	/*
 	 *	 Header fragment for TCP is too small to check the bits.
 	 */
 
-	if(ip->protocol==IPPROTO_TCP && (ip->ihl<<2)+16 > ntohs(ip->tot_len))
+	if (protocol == IPPROTO_TCP &&
+	    ((*pskb)->nh.iph->ihl<<2)+16 > ntohs((*pskb)->nh.iph->tot_len))
 		return FW_BLOCK;
 
 	/*
@@ -382,11 +388,13 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 	 *	But only too short for a packet with ports...
 	 */
 
-	else if((ntohs(ip->tot_len)<8+(ip->ihl<<2))&&(ip->protocol==IPPROTO_TCP || ip->protocol==IPPROTO_UDP))
+	else if ((ntohs((*pskb)->nh.iph->tot_len) <
+		  8 + ((*pskb)->nh.iph->ihl << 2)) &&
+		 (protocol == IPPROTO_TCP || protocol == IPPROTO_UDP))
 		return FW_BLOCK;
 
-	src = ip->saddr;
-	dst = ip->daddr;
+	src = (*pskb)->nh.iph->saddr;
+	dst = (*pskb)->nh.iph->daddr;
 
 	/*
 	 *	If we got interface from which packet came
@@ -397,54 +405,76 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 	 */
 
 	dprintf1("Packet ");
-	switch(ip->protocol)
-	{
+	switch (protocol) {
 		case IPPROTO_TCP:
 			dprintf1("TCP ");
 			/* ports stay 0xFFFF if it is not the first fragment */
 			if (!offset) {
-				src_port=ntohs(tcp->source);
-				dst_port=ntohs(tcp->dest);
-				if(!tcp->ack && !tcp->rst)
+				struct tcphdr tcph;
+
+				if (skb_copy_bits(*pskb,
+						  (*pskb)->nh.iph->ihl * 4,
+						  &tcph, sizeof(tcph)))
+					return FW_BLOCK;
+
+				src_port = ntohs(tcph.source);
+				dst_port = ntohs(tcph.dest);
+
+				if(!tcph.ack && !tcph.rst)
 					/* We do NOT have ACK, value TRUE */
-					notcpack=1;
-				if(!tcp->syn || !notcpack)
+					notcpack = 1;
+				if(!tcph.syn || !notcpack)
 					/* We do NOT have SYN, value TRUE */
-					notcpsyn=1;
+					notcpsyn = 1;
 			}
-			prt=IP_FW_F_TCP;
+			prt = IP_FW_F_TCP;
 			break;
 		case IPPROTO_UDP:
 			dprintf1("UDP ");
 			/* ports stay 0xFFFF if it is not the first fragment */
 			if (!offset) {
-				src_port=ntohs(udp->source);
-				dst_port=ntohs(udp->dest);
+				struct udphdr udph;
+
+				if (skb_copy_bits(*pskb,
+						  (*pskb)->nh.iph->ihl * 4,
+						  &udph, sizeof(udph)))
+					return FW_BLOCK;
+
+				src_port = ntohs(udph.source);
+				dst_port = ntohs(udph.dest);
 			}
-			prt=IP_FW_F_UDP;
+			prt = IP_FW_F_UDP;
 			break;
 		case IPPROTO_ICMP:
 			/* icmp_type stays 255 if it is not the first fragment */
-			if (!offset)
-				icmp_type=(__u16)(icmp->type);
-			dprintf2("ICMP:%d ",icmp_type);
-			prt=IP_FW_F_ICMP;
+			if (!offset) {
+				struct icmphdr icmph;
+
+				if (skb_copy_bits(*pskb,
+						  (*pskb)->nh.iph->ihl * 4,
+						  &icmph, sizeof(icmph)))
+					return FW_BLOCK;
+
+				icmp_type = (__u16) icmph.type;
+			}
+			dprintf2("ICMP:%d ", icmp_type);
+			prt = IP_FW_F_ICMP;
 			break;
 		default:
-			dprintf2("p=%d ",ip->protocol);
-			prt=IP_FW_F_ALL;
+			dprintf2("p=%d ", protocol);
+			prt = IP_FW_F_ALL;
 			break;
 	}
 #ifdef DEBUG_IP_FIREWALL
-	dprint_ip(ip->saddr);
+	dprint_ip(src);
 
-	if (ip->protocol==IPPROTO_TCP || ip->protocol==IPPROTO_UDP)
+	if (protocol == IPPROTO_TCP || protocol == IPPROTO_UDP)
 		/* This will print 65535 when it is not the first fragment! */
 		dprintf2(":%d ", src_port);
-	dprint_ip(ip->daddr);
-	if (ip->protocol==IPPROTO_TCP || ip->protocol==IPPROTO_UDP)
+	dprint_ip(dst);
+	if (protocol == IPPROTO_TCP || protocol == IPPROTO_UDP)
 		/* This will print 65535 when it is not the first fragment! */
-		dprintf2(":%d ",dst_port);
+		dprintf2(":%d ", dst_port);
 	dprintf1("\n");
 #endif
 
@@ -453,8 +483,7 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 	else
 		WRITE_LOCK(&ip_fw_lock);
 	
-	for (f=chain;f;f=f->fw_next)
-	{
+	for (f = chain; f; f = f->fw_next) {
 		/*
 		 *	This is a bit simpler as we don't have to walk
 		 *	an interface chain as you do in BSD - same logic
@@ -474,14 +503,14 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 		 */
 		match = 0x00;
 
-		if ((src&f->fw_smsk.s_addr)==f->fw_src.s_addr
-		&&  (dst&f->fw_dmsk.s_addr)==f->fw_dst.s_addr)
+		if ((src & f->fw_smsk.s_addr) == f->fw_src.s_addr &&
+		    (dst & f->fw_dmsk.s_addr) == f->fw_dst.s_addr)
 			/* normal direction */
 			match |= 0x01;
 
 		if ((f->fw_flg & IP_FW_F_BIDIR) &&
-		    (dst&f->fw_smsk.s_addr)==f->fw_src.s_addr
-		&&  (src&f->fw_dmsk.s_addr)==f->fw_dst.s_addr)
+		    (dst & f->fw_smsk.s_addr) == f->fw_src.s_addr &&
+		    (src & f->fw_dmsk.s_addr) == f->fw_dst.s_addr)
 			/* reverse direction */
 			match |= 0x02;
 
@@ -491,9 +520,8 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 		/*
 		 *	Look for a VIA device match
 		 */
-		if(f->fw_viadev)
-		{
-			if(rif!=f->fw_viadev)
+		if (f->fw_viadev) {
+			if (rif != f->fw_viadev)
 				continue;	/* Mismatch */
 		}
 
@@ -560,14 +588,13 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 		 	continue;
 
 		f_prt=f->fw_flg&IP_FW_F_KIND;
-		if (f_prt!=IP_FW_F_ALL)
-		{
+		if (f_prt != IP_FW_F_ALL) {
 			/*
 			 *	Specific firewall - packet's protocol
 			 *	must match firewall's.
 			 */
 
-			if(prt!=f_prt)
+			if (prt != f_prt)
 				continue;
 
 			if((prt==IP_FW_F_ICMP &&
@@ -592,14 +619,14 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 		{
 			char buf[16];
 
-			print_packet(ip, src_port, dst_port, icmp_type,
+			print_packet(pskb, src_port, dst_port, icmp_type,
 				     chain_name(chain, mode),
 				     rule_name(f, mode, buf),
 				     rif ? rif->name : "-");
 		}
 #endif
 		if (mode != IP_FW_MODE_CHK) {
-			f->fw_bcnt+=ntohs(ip->tot_len);
+			f->fw_bcnt += ntohs((*pskb)->nh.iph->tot_len);
 			f->fw_pcnt++;
 		}
 		if (!(mode & (IP_FW_MODE_ACCT_IN|IP_FW_MODE_ACCT_OUT)))
@@ -614,23 +641,30 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 		 * of firewall.
 		 */
 
-		if (f!=NULL) {
-			policy=f->fw_flg;
-			tosand=f->fw_tosand;
-			tosxor=f->fw_tosxor;
+		if (f != NULL) {
+			policy = f->fw_flg;
+			tosand = f->fw_tosand;
+			tosxor = f->fw_tosxor;
 		} else {
-			tosand=0xFF;
-			tosxor=0x00;
+			tosand = 0xFF;
+			tosxor = 0x00;
 		}
 
-		if (policy&IP_FW_F_ACCEPT) {
+		if (policy & IP_FW_F_ACCEPT) {
 			/* Adjust priority and recompute checksum */
-			__u8 old_tos = ip->tos;
-			ip->tos = (old_tos & tosand) ^ tosxor;
-			if (ip->tos != old_tos)
-		 		ip_send_check(ip);
+			__u8 tos = (*pskb)->nh.iph->tos;
+
+			if (((tos & tosand) ^ tosxor) != tos) {
+				if (!skb_ip_make_writable(pskb,
+					  offsetof(struct iphdr, tos)+1))
+					goto drop_it;
+
+				(*pskb)->nh.iph->tos = (tos & tosand) ^ tosxor;
+		 		ip_send_check((*pskb)->nh.iph);
+			}
+
 #ifdef CONFIG_IP_TRANSPARENT_PROXY
-			if (policy&IP_FW_F_REDIR) {
+			if (policy & IP_FW_F_REDIR) {
 				if (redirport)
 					if ((*redirport = htons(f->fw_pts[f->fw_nsp+f->fw_ndp])) == 0) {
 						/* Wildcard redirection.
@@ -643,30 +677,36 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 			} else
 #endif
 #ifdef CONFIG_IP_MASQUERADE
-			if (policy&IP_FW_F_MASQ)
+			if (policy & IP_FW_F_MASQ)
 				answer = FW_MASQUERADE;
 			else
 #endif
 				answer = FW_ACCEPT;
 
-		} else if(policy&IP_FW_F_ICMPRPL)
+		} else if (policy & IP_FW_F_ICMPRPL)
 			answer = FW_REJECT;
-		else
+		else {
+		drop_it:
 			answer = FW_BLOCK;
+		}
 
 #ifdef CONFIG_IP_FIREWALL_NETLINK
-		if((policy&IP_FW_F_PRN) && (answer == FW_REJECT || answer == FW_BLOCK))
+		if ((policy & IP_FW_F_PRN) && (answer == FW_REJECT || answer == FW_BLOCK))
 		{
-			struct sk_buff *skb=alloc_skb(128, (mode == IP_FW_MODE_CHK) ?
-							GFP_KERNEL : GFP_ATOMIC);
-			if(skb)
-			{
+			struct sk_buff *skb = alloc_skb(128,
+					(mode == IP_FW_MODE_CHK) ?
+					GFP_KERNEL : GFP_ATOMIC);
+			if (skb) {
 				int len = min_t(unsigned int,
-					      128, ntohs(ip->tot_len));
+					128,
+					ntohs((*pskb)->nh.iph->tot_len));
 
-				skb_put(skb,len);
-				memcpy(skb->data,ip,len);
-				if(netlink_post(NETLINK_FIREWALL, skb))
+				skb_put(skb, len);
+				skb_copy_bits(*pskb,
+					((char *)(*pskb)->nh.iph -
+					 (char *)(*pskb)->data),
+					skb->data, len);
+				if (netlink_post(NETLINK_FIREWALL, skb))
 					kfree_skb(skb);
 			}
 		}
@@ -706,6 +746,9 @@ static void free_fw_chain(struct ip_fw *volatile* chainptr)
 		struct ip_fw *ftmp;
 		ftmp = *chainptr;
 		*chainptr = ftmp->fw_next;
+		if (ftmp->fw_viadev
+		    && ftmp->fw_viadev != (struct net_device *)-1)
+			dev_put(ftmp->fw_viadev);
 		kfree(ftmp);
 		/* We will block in cleanup's unregister sockopt if unloaded,
 		   so this is safe. */
@@ -856,6 +899,9 @@ static int del_from_chain(struct ip_fw *volatile*chainptr, struct ip_fw *frwl)
 		if(matches)
 		{
 			was_found=1;
+			if (ftmp->fw_viadev
+			    && ftmp->fw_viadev != (struct net_device *)-1)
+				dev_put(ftmp->fw_viadev);
 			if (ltmp)
 			{
 				ltmp->fw_next=ftmp->fw_next;
@@ -1035,9 +1081,15 @@ int ip_fw_ctl(int stage, void *m, int len)
 
 	if ( cmd == IP_FW_CHECK )
 	{
+		struct sk_buff *tmp_skb;
 		struct net_device *viadev;
 		struct ip_fwpkt *ipfwp;
 		struct iphdr *ip;
+		int hdrlen, ret;
+
+		hdrlen = sizeof(struct ip_fwpkt) -
+			sizeof(struct in_addr) -
+			IFNAMSIZ;
 
 		if ( len != sizeof(struct ip_fwpkt) )
 		{
@@ -1061,12 +1113,34 @@ int ip_fw_ctl(int stage, void *m, int len)
 			printk("ip_fw_ctl: ip->ihl=%d, want %d\n",ip->ihl,
 					sizeof(struct iphdr)/sizeof(int));
 #endif
+			dev_put(viadev);
 			return(EINVAL);
 		}
 
-		switch (ip_fw_chk(ip, viadev, NULL, *chains[fwtype],
-				*policies[fwtype], IP_FW_MODE_CHK))
-		{
+		/* Fix this one up by hand, who knows how many
+		 * tools will break if we start to barf on this.
+		 */
+		if (ntohs(ip->tot_len) > hdrlen)
+			ip->tot_len = htons(hdrlen);
+
+		if ((tmp_skb = alloc_skb(hdrlen, GFP_ATOMIC)) == NULL) {
+#ifdef DEBUG_IP_FIREWALL
+			printk("ip_fw_ctl: tmp_skb alloc failure\n");
+#endif
+			dev_put(viadev);
+			return(EFAULT);
+		}
+		skb_reserve(tmp_skb, hdrlen);
+		skb_push(tmp_skb, hdrlen);
+		memcpy(tmp_skb->data, ip, hdrlen);
+
+		ret = ip_fw_chk(&tmp_skb, viadev, NULL, *chains[fwtype],
+				*policies[fwtype], IP_FW_MODE_CHK);
+
+		kfree_skb(tmp_skb);
+		dev_put(viadev);
+
+		switch (ret) {
 			case FW_ACCEPT:
 				return(0);
 	    		case FW_REDIRECT:
@@ -1242,55 +1316,50 @@ static int ip_fw_fwd_procinfo(char *buffer, char **start, off_t offset,
  */
 
 int ipfw_input_check(struct firewall_ops *this, int pf,
-		     struct net_device *dev, void *phdr, void *arg,
+		     struct net_device *dev, void *arg,
 		     struct sk_buff **pskb)
 {
-	return ip_fw_chk(phdr, dev, arg, ip_fw_in_chain, ip_fw_in_policy,
+	return ip_fw_chk(pskb, dev, arg, ip_fw_in_chain, ip_fw_in_policy,
 			 IP_FW_MODE_FW);
 }
 
 int ipfw_output_check(struct firewall_ops *this, int pf,
-		      struct net_device *dev, void *phdr, void *arg,
+		      struct net_device *dev, void *arg,
 		      struct sk_buff **pskb)
 {
-	return ip_fw_chk(phdr, dev, arg, ip_fw_out_chain, ip_fw_out_policy,
+	return ip_fw_chk(pskb, dev, arg, ip_fw_out_chain, ip_fw_out_policy,
 			 IP_FW_MODE_FW);
 }
 
 int ipfw_forward_check(struct firewall_ops *this, int pf,
-		       struct net_device *dev, void *phdr, void *arg,
+		       struct net_device *dev, void *arg,
 		       struct sk_buff **pskb)
 {
-	return ip_fw_chk(phdr, dev, arg, ip_fw_fwd_chain, ip_fw_fwd_policy,
+	return ip_fw_chk(pskb, dev, arg, ip_fw_fwd_chain, ip_fw_fwd_policy,
 			 IP_FW_MODE_FW);
 }
 
 #ifdef CONFIG_IP_ACCT
 int ipfw_acct_in(struct firewall_ops *this, int pf, struct net_device *dev,
-		 void *phdr, void *arg, struct sk_buff **pskb)
+		 void *arg, struct sk_buff **pskb)
 {
-	return ip_fw_chk(phdr,dev,NULL,ip_acct_chain,0,IP_FW_MODE_ACCT_IN);
+	return ip_fw_chk(pskb,dev,NULL,ip_acct_chain,0,IP_FW_MODE_ACCT_IN);
 }
 
 int ipfw_acct_out(struct firewall_ops *this, int pf, struct net_device *dev,
-		  void *phdr, void *arg, struct sk_buff **pskb)
+		  void *arg, struct sk_buff **pskb)
 {
-	return ip_fw_chk(phdr,dev,NULL,ip_acct_chain,0,IP_FW_MODE_ACCT_OUT);
+	return ip_fw_chk(pskb,dev,NULL,ip_acct_chain,0,IP_FW_MODE_ACCT_OUT);
 }
 #endif
 
-struct firewall_ops ipfw_ops=
-{
-	NULL,
-	ipfw_forward_check,
-	ipfw_input_check,
-	ipfw_output_check,
+struct firewall_ops ipfw_ops = {
+	.fw_forward	=	ipfw_forward_check,
+	.fw_input	=	ipfw_input_check,
+	.fw_output	=	ipfw_output_check,
 #ifdef CONFIG_IP_ACCT
-	ipfw_acct_in,
-	ipfw_acct_out
-#else
-	NULL,
-	NULL
+	.fw_acct_in	=	ipfw_acct_in,
+	.fw_acct_out	=	ipfw_acct_out,
 #endif
 };
 
@@ -1311,23 +1380,29 @@ int ipfw_device_event(struct notifier_block *this, unsigned long event, void *pt
 		for (chn = 0; chn < IP_FW_CHAINS; chn++)
 			for (fw = *chains[chn]; fw; fw = fw->fw_next)
 				if ((fw->fw_vianame)[0] && !strncmp(devname,
-						fw->fw_vianame, IFNAMSIZ))
+					    fw->fw_vianame, IFNAMSIZ)) {
+					dev_hold(dev);
 					fw->fw_viadev = dev;
+				}
 	} else if (event == NETDEV_DOWN) {
 		for (chn = 0; chn < IP_FW_CHAINS; chn++)
 			for (fw = *chains[chn]; fw; fw = fw->fw_next)
 				/* we could compare just the pointers ... */
 				if ((fw->fw_vianame)[0] && !strncmp(devname,
-						fw->fw_vianame, IFNAMSIZ))
+						    fw->fw_vianame, IFNAMSIZ)){
+					if (fw->fw_viadev
+					    && fw->fw_viadev != (struct net_device *)-1)
+						dev_put(fw->fw_viadev);
 					fw->fw_viadev = (struct net_device*)-1;
+				}
 	}
 
 	WRITE_UNLOCK(&ip_fw_lock);
 	return NOTIFY_DONE;
 }
 
-static struct notifier_block ipfw_dev_notifier={
-	.notifier_call	= ipfw_device_event,
+static struct notifier_block ipfw_dev_notifier = {
+	.notifier_call	=	ipfw_device_event,
 };
 
 #endif
