@@ -419,12 +419,34 @@ void bd_forget(struct inode *inode)
 
 int bd_claim(struct block_device *bdev, void *holder)
 {
-	int res = -EBUSY;
+	int res;
 	spin_lock(&bdev_lock);
-	if (!bdev->bd_holder || bdev->bd_holder == holder) {
-		bdev->bd_holder = holder;
+
+	/* first decide result */
+	if (bdev->bd_holder == holder)
+		res = 0;	 /* already a holder */
+	else if (bdev->bd_holder != NULL)
+		res = -EBUSY; 	 /* held by someone else */
+	else if (bdev->bd_contains == bdev)
+		res = 0;  	 /* is a whole device which isn't held */
+
+	else if (bdev->bd_contains->bd_holder == bd_claim)
+		res = 0; 	 /* is a partition of a device that is being partitioned */
+	else if (bdev->bd_contains->bd_holder != NULL)
+		res = -EBUSY;	 /* is a partition of a held device */
+	else
+		res = 0;	 /* is a partition of an un-held device */
+
+	/* now impose change */
+	if (res==0) {
+		/* note that for a whole device bd_holders
+		 * will be incremented twice, and bd_holder will
+		 * be set to bd_claim before being set to holder
+		 */
+		bdev->bd_contains->bd_holders ++;
+		bdev->bd_contains->bd_holder = bd_claim;
 		bdev->bd_holders++;
-		res = 0;
+		bdev->bd_holder = holder;
 	}
 	spin_unlock(&bdev_lock);
 	return res;
@@ -433,6 +455,8 @@ int bd_claim(struct block_device *bdev, void *holder)
 void bd_release(struct block_device *bdev)
 {
 	spin_lock(&bdev_lock);
+	if (!--bdev->bd_contains->bd_holders)
+		bdev->bd_contains->bd_holder = NULL;
 	if (!--bdev->bd_holders)
 		bdev->bd_holder = NULL;
 	spin_unlock(&bdev_lock);
