@@ -44,14 +44,6 @@
 
 // #define VICAM_DEBUG
 
-#ifndef MODULE_LICENSE
-#define MODULE_LICENSE(a)
-#endif
-
-#ifndef bool
-#define bool int
-#endif
-
 #ifdef VICAM_DEBUG
 #define ADBG(lineno,fmt,args...) printk(fmt, jiffies, __FUNCTION__, lineno, ##args)
 #define DBG(fmt,args...) ADBG((__LINE__),KERN_DEBUG __FILE__"(%ld):%s (%d):"fmt,##args)
@@ -418,10 +410,10 @@ struct vicam_camera {
 
 	struct semaphore busy_lock;	// guard against SMP multithreading
 
-	bool is_initialized;
+	int is_initialized;
 	u8 open_count;
 	u8 bulkEndpoint;
-	bool needsDummyRead;
+	int needsDummyRead;
 
 #if defined(CONFIG_VIDEO_PROC_FS)
 	struct proc_dir_entry *proc_dir;
@@ -838,7 +830,7 @@ inline void writepixel(char *rgb, int Y, int Cr, int Cb)
 //   Copyright (C) 2002 Monroe Williams (monroe@pobox.com)
 // --------------------------------------------------------------------------------
 
-void vicam_decode_color( char *data, char *rgb)
+static void vicam_decode_color( char *data, char *rgb)
 {
 	int x,y;
 	int Cr, Cb;
@@ -1069,7 +1061,7 @@ vicam_mmap(struct file *file, struct vm_area_struct *vma)
 
 static struct proc_dir_entry *vicam_proc_root = NULL;
 
-int vicam_read_helper(char *page, char **start, off_t off,
+static int vicam_read_helper(char *page, char **start, off_t off,
 				int count, int *eof, int value)
 {
 	char *out = page;
@@ -1090,21 +1082,21 @@ int vicam_read_helper(char *page, char **start, off_t off,
 	return len;
 }
 
-int vicam_read_proc_shutter(char *page, char **start, off_t off,
+static int vicam_read_proc_shutter(char *page, char **start, off_t off,
 				int count, int *eof, void *data)
 {
 	return vicam_read_helper(page,start,off,count,eof,
 				((struct vicam_camera *)data)->shutter_speed);
 }
 
-int vicam_read_proc_gain(char *page, char **start, off_t off,
+static int vicam_read_proc_gain(char *page, char **start, off_t off,
 				int count, int *eof, void *data)
 {
 	return vicam_read_helper(page,start,off,count,eof,
 				((struct vicam_camera *)data)->gain);
 }
 
-int vicam_write_proc_shutter(struct file *file, const char *buffer,
+static int vicam_write_proc_shutter(struct file *file, const char *buffer,
 				unsigned long count, void *data)
 {
 	struct vicam_camera *cam = (struct vicam_camera *)data;
@@ -1114,7 +1106,7 @@ int vicam_write_proc_shutter(struct file *file, const char *buffer,
 	return count;
 }
 
-int vicam_write_proc_gain(struct file *file, const char *buffer,
+static int vicam_write_proc_gain(struct file *file, const char *buffer,
 				unsigned long count, void *data)
 {
 	struct vicam_camera *cam = (struct vicam_camera *)data;
@@ -1126,7 +1118,7 @@ int vicam_write_proc_gain(struct file *file, const char *buffer,
 
 
 
-void
+static void
 vicam_create_proc_root(void)
 {
 	vicam_proc_root = create_proc_entry("video/vicam", S_IFDIR, 0);
@@ -1138,14 +1130,14 @@ vicam_create_proc_root(void)
 		       "could not create /proc entry for vicam!");
 }
 
-void
+static void
 vicam_destroy_proc_root(void)
 {
 	if (vicam_proc_root)
 		remove_proc_entry("video/vicam", 0);
 }
 
-void
+static void
 vicam_create_proc_entry(struct vicam_camera *cam)
 {
 	char name[64];
@@ -1186,7 +1178,7 @@ vicam_create_proc_entry(struct vicam_camera *cam)
 	}
 }
 
-void
+static void
 vicam_destroy_proc_entry(void *ptr)
 {
 	struct vicam_camera *cam = (struct vicam_camera *) ptr;
@@ -1203,6 +1195,11 @@ vicam_destroy_proc_entry(void *ptr)
 
 }
 
+#else
+static inline void vicam_create_proc_root(void) { }
+static inline void vicam_destroy_proc_root(void) { }
+static inline void vicam_create_proc_entry(struct vicam_camera *cam) { }
+static inline void vicam_destroy_proc_entry(void *ptr) { }
 #endif
 
 static struct file_operations vicam_fops = {
@@ -1323,9 +1320,7 @@ vicam_disconnect(struct usb_interface *intf)
 	
 	video_unregister_device(&cam->vdev);
 
-#if defined(CONFIG_VIDEO_PROC_FS)
 	vicam_destroy_proc_entry(cam);
-#endif
 
 	kfree(cam);
 
@@ -1338,9 +1333,7 @@ static int __init
 usb_vicam_init(void)
 {
 	DBG(KERN_INFO "ViCam-based WebCam driver startup\n");
-#if defined(CONFIG_VIDEO_PROC_FS)
 	vicam_create_proc_root();
-#endif
 	if (usb_register(&vicam_driver) != 0)
 		printk(KERN_WARNING "usb_register failed!\n");
 	return 0;
@@ -1353,9 +1346,7 @@ usb_vicam_exit(void)
 	       "ViCam-based WebCam driver shutdown\n");
 
 	usb_deregister(&vicam_driver);
-#if defined(CONFIG_VIDEO_PROC_FS)
 	vicam_destroy_proc_root();
-#endif
 }
 
 module_init(usb_vicam_init);
