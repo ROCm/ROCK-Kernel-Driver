@@ -840,6 +840,9 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 		case OP_CREATE:
 			op->status = nfsd4_create(rqstp, current_fh, &op->u.create);
 			break;
+		case OP_DELEGRETURN:
+			op->status = nfsd4_delegreturn(rqstp, current_fh, &op->u.delegreturn);
+			break;
 		case OP_GETATTR:
 			op->status = nfsd4_getattr(rqstp, current_fh, &op->u.getattr);
 			break;

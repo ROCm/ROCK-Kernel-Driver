@@ -615,6 +615,18 @@ nfsd4_decode_create(struct nfsd4_compoundargs *argp, struct nfsd4_create *create
 }
 
 static inline int
+nfsd4_decode_delegreturn(struct nfsd4_compoundargs *argp, struct nfsd4_delegreturn *dr)
+{
+	DECODE_HEAD;
+
+	READ_BUF(sizeof(stateid_t));
+	READ32(dr->dr_stateid.si_generation);
+	COPYMEM(&dr->dr_stateid.si_opaque, sizeof(stateid_opaque_t));
+
+	DECODE_TAIL;
+}
+
+static inline int
 nfsd4_decode_getattr(struct nfsd4_compoundargs *argp, struct nfsd4_getattr *getattr)
 {
 	return nfsd4_decode_bitmap(argp, getattr->ga_bmval);
@@ -1169,6 +1181,9 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 			break;
 		case OP_CREATE:
 			op->status = nfsd4_decode_create(argp, &op->u.create);
+			break;
+		case OP_DELEGRETURN:
+			op->status = nfsd4_decode_delegreturn(argp, &op->u.delegreturn);
 			break;
 		case OP_GETATTR:
 			op->status = nfsd4_decode_getattr(argp, &op->u.getattr);
@@ -2450,6 +2465,8 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 		break;
 	case OP_CREATE:
 		nfsd4_encode_create(resp, op->status, &op->u.create);
+		break;
+	case OP_DELEGRETURN:
 		break;
 	case OP_GETATTR:
 		op->status = nfsd4_encode_getattr(resp, op->status, &op->u.getattr);

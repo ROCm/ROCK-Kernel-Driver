@@ -2332,6 +2332,22 @@ out:
 	return status;
 }
 
+int
+nfsd4_delegreturn(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_delegreturn *dr)
+{
+	int status;
+
+	if ((status = fh_verify(rqstp, current_fh, S_IFREG, 0)))
+		goto out;
+
+	nfs4_lock_state();
+	status = nfs4_preprocess_stateid_op(current_fh, &dr->dr_stateid, DELEG_RET);
+	nfs4_unlock_state();
+out:
+	return status;
+}
+
+
 /* 
  * Lock owner state (byte-range locks)
  */
