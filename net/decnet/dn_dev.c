@@ -36,9 +36,11 @@
 #include <linux/skbuff.h>
 #include <linux/rtnetlink.h>
 #include <linux/sysctl.h>
+#include <linux/notifier.h>
 #include <asm/uaccess.h>
 #include <net/neighbour.h>
 #include <net/dst.h>
+#include <net/flow.h>
 #include <net/dn.h>
 #include <net/dn_dev.h>
 #include <net/dn_route.h>
@@ -61,6 +63,7 @@ dn_address decnet_address = 0;
 
 static rwlock_t dndev_lock = RW_LOCK_UNLOCKED;
 static struct net_device *decnet_default_device;
+static struct notifier_block *dnaddr_chain;
 
 static struct dn_dev *dn_dev_create(struct net_device *dev, int *err);
 static void dn_dev_delete(struct net_device *dev);
@@ -478,7 +481,7 @@ static void dn_dev_del_ifa(struct dn_dev *dn_db, struct dn_ifaddr **ifap, int de
 	}
 
 	rtmsg_ifa(RTM_DELADDR, ifa1);
-
+	notifier_call_chain(&dnaddr_chain, NETDEV_DOWN, ifa1);
 	if (destroy) {
 		dn_dev_free_ifa(ifa1);
 
@@ -513,6 +516,7 @@ static int dn_dev_insert_ifa(struct dn_dev *dn_db, struct dn_ifaddr *ifa)
 	dn_db->ifa_list = ifa;
 
 	rtmsg_ifa(RTM_NEWADDR, ifa);
+	notifier_call_chain(&dnaddr_chain, NETDEV_UP, ifa);
 
 	return 0;
 }
@@ -609,7 +613,7 @@ int dn_dev_ioctl(unsigned int cmd, void *arg)
 				dn_dev_del_ifa(dn_db, ifap, 0);
 			}
 
-			ifa->ifa_local = dn_saddr2dn(sdn);
+			ifa->ifa_local = ifa->ifa_address = dn_saddr2dn(sdn);
 
 			ret = dn_dev_set_ifa(dev, ifa);
 	}
@@ -686,7 +690,10 @@ static int dn_dev_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh, void *a
 	if ((ifa = dn_dev_alloc_ifa()) == NULL)
 		return -ENOBUFS;
 
+	if (!rta[IFA_ADDRESS - 1])
+		rta[IFA_ADDRESS - 1] = rta[IFA_LOCAL - 1];
 	memcpy(&ifa->ifa_local, RTA_DATA(rta[IFA_LOCAL-1]), 2);
+	memcpy(&ifa->ifa_address, RTA_DATA(rta[IFA_ADDRESS-1]), 2);
 	ifa->ifa_flags = ifm->ifa_flags;
 	ifa->ifa_scope = ifm->ifa_scope;
 	ifa->ifa_dev = dn_db;
@@ -716,7 +723,10 @@ static int dn_dev_fill_ifaddr(struct sk_buff *skb, struct dn_ifaddr *ifa,
 	ifm->ifa_flags = ifa->ifa_flags | IFA_F_PERMANENT;
 	ifm->ifa_scope = ifa->ifa_scope;
 	ifm->ifa_index = ifa->ifa_dev->dev->ifindex;
-	RTA_PUT(skb, IFA_LOCAL, 2, &ifa->ifa_local);
+	if (ifa->ifa_address)
+		RTA_PUT(skb, IFA_ADDRESS, 2, &ifa->ifa_address);
+	if (ifa->ifa_local)
+		RTA_PUT(skb, IFA_LOCAL, 2, &ifa->ifa_local);
 	if (ifa->ifa_label[0])
 		RTA_PUT(skb, IFA_LABEL, IFNAMSIZ, &ifa->ifa_label);
 	nlh->nlmsg_len = skb->tail - b;
@@ -758,10 +768,7 @@ static int dn_dev_dump_ifaddr(struct sk_buff *skb, struct netlink_callback *cb)
 	s_idx = cb->args[0];
 	s_dn_idx = dn_idx = cb->args[1];
 	read_lock(&dev_base_lock);
-	for(dev = dev_base, idx = 0; dev; dev = dev->next) {
-		if ((dn_db = dev->dn_ptr) == NULL)
-			continue;
-		idx++;
+	for(dev = dev_base, idx = 0; dev; dev = dev->next, idx++) {
 		if (idx < s_idx)
 			continue;
 		if (idx > s_idx)
@@ -773,7 +780,10 @@ static int dn_dev_dump_ifaddr(struct sk_buff *skb, struct netlink_callback *cb)
 			if (dn_idx < s_dn_idx)
 				continue;
 
-			if (dn_dev_fill_ifaddr(skb, ifa, NETLINK_CB(cb->skb).pid, cb->nlh->nlmsg_seq, RTM_NEWADDR) <= 0)
+			if (dn_dev_fill_ifaddr(skb, ifa,
+					       NETLINK_CB(cb->skb).pid,
+					       cb->nlh->nlmsg_seq,
+					       RTM_NEWADDR) <= 0)
 				goto done;
 		}
 	}
@@ -871,8 +881,6 @@ static void dn_send_endnode_hello(struct net_device *dev, struct dn_ifaddr *ifa)
 	dn_rt_finish_output(skb, dn_rt_all_rt_mcast, msg->id);
 }
 
-
-#ifdef CONFIG_DECNET_ROUTER
 
 #define DRDELAY (5 * HZ)
 
@@ -981,12 +989,6 @@ static void dn_send_brd_hello(struct net_device *dev, struct dn_ifaddr *ifa)
 	else
 		dn_send_router_hello(dev, ifa);
 }
-#else
-static void dn_send_brd_hello(struct net_device *dev, struct dn_ifaddr *ifa)
-{
-	dn_send_endnode_hello(dev, ifa);
-}
-#endif
 
 #if 0
 static void dn_send_ptp_hello(struct net_device *dev, struct dn_ifaddr *ifa)
@@ -1175,7 +1177,7 @@ void dn_dev_up(struct net_device *dev)
 	if ((ifa = dn_dev_alloc_ifa()) == NULL)
 		return;
 
-	ifa->ifa_local = addr;
+	ifa->ifa_local = ifa->ifa_address = addr;
 	ifa->ifa_flags = 0;
 	ifa->ifa_scope = RT_SCOPE_UNIVERSE;
 	strcpy(ifa->ifa_label, dev->name);
@@ -1274,6 +1276,15 @@ void dn_dev_devices_on(void)
 	rtnl_unlock();
 }
 
+int register_dnaddr_notifier(struct notifier_block *nb)
+{
+	return notifier_chain_register(&dnaddr_chain, nb);
+}
+
+int unregister_dnaddr_notifier(struct notifier_block *nb)
+{
+	return notifier_chain_unregister(&dnaddr_chain, nb);
+}
 
 #ifdef CONFIG_DECNET_SIOCGIFCONF
 /*
@@ -1390,43 +1401,21 @@ static int decnet_dev_get_info(char *buffer, char **start, off_t offset, int len
 
 static struct rtnetlink_link dnet_rtnetlink_table[RTM_MAX-RTM_BASE+1] = 
 {
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			},
-
-	{ dn_dev_rtm_newaddr,	NULL,			},
-	{ dn_dev_rtm_deladdr,	NULL,			},
-	{ NULL,			dn_dev_dump_ifaddr,	},
-	{ NULL,			NULL,			},
+	 [4] = { .doit   = dn_dev_rtm_newaddr,	},
+	 [5] = { .doit   = dn_dev_rtm_deladdr,	},
+	 [6] = { .dumpit = dn_dev_dump_ifaddr,	},
 
 #ifdef CONFIG_DECNET_ROUTER
-	{ dn_fib_rtm_newroute,	NULL,			},
-	{ dn_fib_rtm_delroute,	NULL,			},
-	{ dn_cache_getroute,	dn_fib_dump,		},
-	{ NULL,			NULL,			},
+	 [8] = { .doit   = dn_fib_rtm_newroute,	},
+	 [9] = { .doit   = dn_fib_rtm_delroute,	},
+	[10] = { .doit   = dn_cache_getroute, .dumpit = dn_fib_dump, },
+	[16] = { .doit   = dn_fib_rtm_newrule, },
+	[17] = { .doit   = dn_fib_rtm_delrule, },
+	[18] = { .dumpit = dn_fib_dump_rules,  },
 #else
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			},
-	{ dn_cache_getroute,	dn_cache_dump,		},
-	{ NULL,			NULL,			},
+	[10] = { .doit   = dn_cache_getroute, .dumpit = dn_cache_dump, },
 #endif
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			},
 
-#ifdef CONFIG_DECNET_ROUTER
-	{ dn_fib_rtm_newrule,	NULL,			},
-	{ dn_fib_rtm_delrule,	NULL,			},
-	{ NULL,			dn_fib_dump_rules,	},
-	{ NULL,			NULL,			}
-#else
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			},
-	{ NULL,			NULL,			}
-#endif
 };
 
 #ifdef MODULE

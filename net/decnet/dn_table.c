@@ -30,6 +30,7 @@
 #include <linux/route.h> /* RTF_xxx */
 #include <net/neighbour.h>
 #include <net/dst.h>
+#include <net/flow.h>
 #include <net/dn.h>
 #include <net/dn_route.h>
 #include <net/dn_fib.h>
@@ -45,7 +46,7 @@ struct dn_zone
 	u32			dz_hashmask;
 #define DZ_HASHMASK(dz)	((dz)->dz_hashmask)
 	int			dz_order;
-	u32			dz_mask;
+	u16			dz_mask;
 #define DZ_MASK(dz)	((dz)->dz_mask)
 };
 
@@ -73,53 +74,53 @@ for( ; ((f) = *(fp)) != NULL; (fp) = &(f)->fn_next)
 #define DN_FIB_SCAN_KEY(f, fp, key) \
 for( ; ((f) = *(fp)) != NULL && dn_key_eq((f)->fn_key, (key)); (fp) = &(f)->fn_next)
 
+#define RT_TABLE_MIN 1
 
 static rwlock_t dn_fib_tables_lock = RW_LOCK_UNLOCKED;
-static struct dn_fib_table *dn_fib_tables[DN_NUM_TABLES + 1];
+struct dn_fib_table *dn_fib_tables[RT_TABLE_MAX + 1];
 
 static kmem_cache_t *dn_hash_kmem;
 static int dn_fib_hash_zombies;
 
-static __inline__ dn_fib_idx_t dn_hash(dn_fib_key_t key, struct dn_zone *dz)
+static inline dn_fib_idx_t dn_hash(dn_fib_key_t key, struct dn_zone *dz)
 {
-	u32 h = ntohs(key.datum)>>(16 - dz->dz_order);
+	u16 h = ntohs(key.datum)>>(16 - dz->dz_order);
 	h ^= (h >> 10);
 	h ^= (h >> 6);
-	h ^= (h >> 3);
 	h &= DZ_HASHMASK(dz);
 	return *(dn_fib_idx_t *)&h;
 }
 
-static __inline__ dn_fib_key_t dz_key(u16 dst, struct dn_zone *dz)
+static inline dn_fib_key_t dz_key(u16 dst, struct dn_zone *dz)
 {
 	dn_fib_key_t k;
 	k.datum = dst & DZ_MASK(dz);
 	return k;
 }
 
-static __inline__ struct dn_fib_node **dn_chain_p(dn_fib_key_t key, struct dn_zone *dz)
+static inline struct dn_fib_node **dn_chain_p(dn_fib_key_t key, struct dn_zone *dz)
 {
 	return &dz->dz_hash[dn_hash(key, dz).datum];
 }
 
-static __inline__ struct dn_fib_node *dz_chain(dn_fib_key_t key, struct dn_zone *dz)
+static inline struct dn_fib_node *dz_chain(dn_fib_key_t key, struct dn_zone *dz)
 {
 	return dz->dz_hash[dn_hash(key, dz).datum];
 }
 
-static __inline__ int dn_key_eq(dn_fib_key_t a, dn_fib_key_t b)
+static inline int dn_key_eq(dn_fib_key_t a, dn_fib_key_t b)
 {
 	return a.datum == b.datum;
 }
 
-static __inline__ int dn_key_leq(dn_fib_key_t a, dn_fib_key_t b)
+static inline int dn_key_leq(dn_fib_key_t a, dn_fib_key_t b)
 {
 	return a.datum <= b.datum;
 }
 
-static __inline__ void dn_rebuild_zone(struct dn_zone *dz,
-					struct dn_fib_node **old_ht,
-					int old_divisor)
+static inline void dn_rebuild_zone(struct dn_zone *dz,
+				   struct dn_fib_node **old_ht,
+				   int old_divisor)
 {
 	int i;
 	struct dn_fib_node *f, **fp, *next;
@@ -290,6 +291,8 @@ static int dn_fib_dump_info(struct sk_buff *skb, u32 pid, u32 seq, int event,
         rtm->rtm_protocol = fi->fib_protocol;
         if (fi->fib_priority)
                 RTA_PUT(skb, RTA_PRIORITY, 4, &fi->fib_priority);
+	if (rtnetlink_put_metrics(skb, fi->fib_metrics) < 0)
+		goto rtattr_failure;
         if (fi->fib_nhs == 1) {
                 if (fi->fib_nh->nh_gw)
                         RTA_PUT(skb, RTA_GATEWAY, 2, &fi->fib_nh->nh_gw);
@@ -654,7 +657,7 @@ static int dn_fib_table_delete(struct dn_fib_table *tb, struct rtmsg *r, struct 
         return -ESRCH;
 }
 
-static __inline__ int dn_flush_list(struct dn_fib_node **fp, int z, struct dn_hash *table)
+static inline int dn_flush_list(struct dn_fib_node **fp, int z, struct dn_hash *table)
 {
 	int found = 0;
 	struct dn_fib_node *f;
@@ -696,8 +699,7 @@ static int dn_fib_table_flush(struct dn_fib_table *tb)
 	return found;
 }
 
-static int dn_fib_table_lookup(struct dn_fib_table *tb, const struct dn_fib_key *
-key, struct dn_fib_res *res)
+static int dn_fib_table_lookup(struct dn_fib_table *tb, const struct flowi *flp, struct dn_fib_res *res)
 {
         int err;
 	struct dn_zone *dz;
@@ -706,25 +708,29 @@ key, struct dn_fib_res *res)
 	read_lock(&dn_fib_tables_lock);
 	for(dz = t->dh_zone_list; dz; dz = dz->dz_next) {
 		struct dn_fib_node *f;
-		dn_fib_key_t k = dz_key(key->dst, dz);
+		dn_fib_key_t k = dz_key(flp->fld_dst, dz);
 
 		for(f = dz_chain(k, dz); f; f = f->fn_next) {
-			if (!dn_key_leq(k, f->fn_key))
-				break;
-			else
-				continue;
+			if (!dn_key_eq(k, f->fn_key)) {
+				if (dn_key_leq(k, f->fn_key))
+					break;
+				else
+					continue;
+			}
 
 			f->fn_state |= DN_S_ACCESSED;
 
 			if (f->fn_state&DN_S_ZOMBIE)
 				continue;
-			if (f->fn_scope < key->scope)
+
+			if (f->fn_scope < flp->fld_scope)
 				continue;
 
-			err = dn_fib_semantic_match(f->fn_type, DN_FIB_INFO(f), key, res);
+			err = dn_fib_semantic_match(f->fn_type, DN_FIB_INFO(f), flp, res);
+
 			if (err == 0) {
 				res->type = f->fn_type;
-				res->scope = f->fn_scope;
+				res->scope = f->fn_scope; 
 				res->prefixlen = dz->dz_order;
 				goto out;
 			}
@@ -763,7 +769,7 @@ static void dn_fib_node_get_info(int type, int dead, struct dn_fib_info *fi, u16
 
 	if (fi) {
 		len = sprintf(buffer, "%s\t%04x\t%04x\t%04x\t%d\t%u\t%d\t%04x\t%d\t%u\t%u",
-				fi->fib_dev ? fi->fib_dev->name : "*", prefix,
+				fi->dn_fib_dev ? fi->dn_fib_dev->name : "*", prefix,
 				fi->fib_nh->nh_gw, flags, 0, 0, fi->fib_priority,
 				mask, 0, 0, 0);
 	} else {
@@ -823,10 +829,10 @@ struct dn_fib_table *dn_fib_get_table(int n, int create)
 {
         struct dn_fib_table *t;
 
-        if (n < DN_MIN_TABLE)
+        if (n < RT_TABLE_MIN)
                 return NULL;
 
-        if (n > DN_NUM_TABLES)
+        if (n > RT_TABLE_MAX)
                 return NULL;
 
         if (dn_fib_tables[n]) 
@@ -839,7 +845,7 @@ struct dn_fib_table *dn_fib_get_table(int n, int create)
                 printk(KERN_DEBUG "DECnet: BUG! Attempt to create routing table from interrupt\n"); 
                 return NULL;
         }
-        if ((t = kmalloc(sizeof(struct dn_fib_table), GFP_KERNEL)) == NULL)
+        if ((t = kmalloc(sizeof(struct dn_fib_table) + sizeof(struct dn_hash), GFP_KERNEL)) == NULL)
                 return NULL;
 
         memset(t, 0, sizeof(struct dn_fib_table));
@@ -853,6 +859,7 @@ struct dn_fib_table *dn_fib_get_table(int n, int create)
 	t->get_info = dn_fib_table_get_info;
 #endif
         t->dump = dn_fib_table_dump;
+	memset(t->data, 0, sizeof(struct dn_hash));
         dn_fib_tables[n] = t;
 
         return t;
@@ -876,7 +883,7 @@ struct dn_fib_table *dn_fib_empty_table(void)
 {
         int id;
 
-        for(id = DN_MIN_TABLE; id <= DN_NUM_TABLES; id++)
+        for(id = RT_TABLE_MIN; id <= RT_TABLE_MAX; id++)
                 if (dn_fib_tables[id] == NULL)
                         return dn_fib_get_table(id, 1);
         return NULL;
@@ -894,7 +901,7 @@ void __exit dn_fib_table_cleanup(void)
 {
 	int i;
 
-	for (i = 0; i < DN_NUM_TABLES + 1; ++i)
+	for (i = RT_TABLE_MIN; i <= RT_TABLE_MAX; ++i)
 		dn_fib_del_tree(i);
 
 	return;

@@ -25,7 +25,18 @@ struct flowi {
 			struct in6_addr *	saddr;
 			__u32			flowlabel;
 		} ip6_u;
+
+		struct {
+			__u16			daddr;
+			__u16			saddr;
+			__u32			fwmark;
+			__u8			scope;
+		} dn_u;
 	} nl_u;
+#define fld_dst		nl_u.dn_u.daddr
+#define fld_src		nl_u.dn_u.saddr
+#define fld_fwmark	nl_u.dn_u.fwmark
+#define fld_scope	nl_u.dn_u.scope
 #define fl6_dst		nl_u.ip6_u.daddr
 #define fl6_src		nl_u.ip6_u.saddr
 #define fl6_flowlabel	nl_u.ip6_u.flowlabel
@@ -47,6 +58,14 @@ struct flowi {
 			__u8	type;
 			__u8	code;
 		} icmpt;
+
+		struct {
+			__u16	sport;
+			__u16	dport;
+			__u8	objnum;
+			__u8	objnamel; /* Not 16 bits since max val is 16 */
+			__u8	objname[16]; /* Not zero terminated */
+		} dnports;
 
 		__u32		spi;
 	} uli_u;

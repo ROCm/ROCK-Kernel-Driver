@@ -26,25 +26,16 @@ Steve's quick list of things that need finishing off:
  o Start to hack together user level software and add more DECnet support
    in ifconfig for example. 
 
- o Test adding/deleting of routes
-
- o Test route lookup
-
- o Test /proc/net/decnet_route route listing works correctly (maybe I'll
-   change the format of this file... atm its very similar to the IPv4 route
-   file)
-
  o Find all the commonality between DECnet and IPv4 routing code and extract 
    it into a small library of routines. [probably a project for 2.7.xx]
-
- o Test ip_gre tunneling works... it did the last time I tested it and it
-   will have to if I'm to test routing properly.
 
  o Add the routing message grabbing netfilter module [written, tested,
    awaiting merge]
 
- o Add perfect socket hashing - an idea suggested by Paul Koning [part written,
-   awaiting debugging and merge]
+ o Add perfect socket hashing - an idea suggested by Paul Koning. Currently
+   we have a half-way house scheme which seems to work reasonably well, but
+   the full scheme is still worth implementing, its not not top of my list
+   right now.
 
  o Add session control message flow control
 
@@ -53,4 +44,6 @@ Steve's quick list of things that need finishing off:
  o DECnet sendpages() function
 
  o AIO for DECnet
+
+ o Eliminate dn_db->parms.blksize
 
