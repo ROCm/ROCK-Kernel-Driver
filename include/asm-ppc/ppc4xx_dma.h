@@ -137,9 +137,10 @@ extern unsigned long DMA_MODE_WRITE, DMA_MODE_READ;
 #define DMA_TCE_ENABLE     (1<<(8-DMA_CR_OFFSET))
 #define SET_DMA_TCE(x)     (((x)&0x1)<<(8-DMA_CR_OFFSET))
 
-#define DMA_DEC            (1<<(2)	/* Address Decrement */
+#define DMA_DEC            (1<<(2))	/* Address Decrement */
 #define SET_DMA_DEC(x)     (((x)&0x1)<<2)
 #define GET_DMA_DEC(x)     (((x)&DMA_DEC)>>2)
+
 
 /*
  * Transfer Modes
@@ -243,6 +244,14 @@ typedef uint32_t sgl_handle_t;
 #define DMA_SG1            (1<<6)
 #define DMA_SG2            (1<<5)
 #define DMA_SG3            (1<<4)
+
+/* DMA Channel Count Register */
+#define DMA_CTC_BTEN     (1<<23)    /* Burst Enable/Disable bit */
+#define DMA_CTC_BSIZ_MSK (3<<21)    /* Mask of the Burst size bits */
+#define DMA_CTC_BSIZ_2   (0)
+#define DMA_CTC_BSIZ_4   (1<<21)
+#define DMA_CTC_BSIZ_8   (2<<21)
+#define DMA_CTC_BSIZ_16  (3<<21)
 
 /*
  * DMA SG Command Register
@@ -482,6 +491,7 @@ typedef struct {
 	char td;		/* transfer direction */
 #endif
 
+	char int_on_final_sg;/* for scatter/gather - only interrupt on last sg */
 } ppc_dma_ch_t;
 
 /*
@@ -545,6 +555,9 @@ extern int ppc4xx_delete_dma_sgl_element(sgl_handle_t, phys_addr_t *, phys_addr_
 extern int ppc4xx_alloc_dma_handle(sgl_handle_t *, unsigned int, unsigned int);
 extern void ppc4xx_free_dma_handle(sgl_handle_t);
 extern int ppc4xx_get_dma_status(void);
+extern int ppc4xx_enable_burst(unsigned int);
+extern int ppc4xx_disable_burst(unsigned int);
+extern int ppc4xx_set_burst_size(unsigned int, unsigned int);
 extern void ppc4xx_set_src_addr(int dmanr, phys_addr_t src_addr);
 extern void ppc4xx_set_dst_addr(int dmanr, phys_addr_t dst_addr);
 extern void ppc4xx_enable_dma(unsigned int dmanr);

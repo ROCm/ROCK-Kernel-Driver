@@ -120,6 +120,12 @@ ppc4xx_add_dma_sgl(sgl_handle_t handle, phys_addr_t src_addr, phys_addr_t dst_ad
 		psgl->ptail = psgl->phead;
 		psgl->ptail_dma = psgl->phead_dma;
 	} else {
+		if(p_dma_ch->int_on_final_sg) {
+			/* mask out all dma interrupts, except error, on tail
+			before adding new tail. */
+			psgl->ptail->control_count &=
+				~(SG_TCI_ENABLE | SG_ETI_ENABLE);
+		}
 		psgl->ptail->next = psgl->ptail_dma + sizeof(ppc_sgl_t);
 		psgl->ptail++;
 		psgl->ptail_dma += sizeof(ppc_sgl_t);
@@ -217,7 +223,7 @@ ppc4xx_get_dma_sgl_residue(sgl_handle_t handle, phys_addr_t * src_addr,
 	}
 
 	sgl_addr = (ppc_sgl_t *) __va(mfdcr(DCRN_ASG0 + (psgl->dmanr * 0x8)));
-	count_left = mfdcr(DCRN_DMACT0 + (psgl->dmanr * 0x8));
+	count_left = mfdcr(DCRN_DMACT0 + (psgl->dmanr * 0x8)) & SG_COUNT_MASK;
 
 	if (!sgl_addr) {
 		printk("ppc4xx_get_dma_sgl_residue: sgl addr register is null\n");
@@ -351,10 +357,11 @@ ppc4xx_delete_dma_sgl_element(sgl_handle_t handle, phys_addr_t * src_dma_addr,
 int
 ppc4xx_alloc_dma_handle(sgl_handle_t * phandle, unsigned int mode, unsigned int dmanr)
 {
-	sgl_list_info_t *psgl;
+	sgl_list_info_t *psgl=NULL;
 	dma_addr_t dma_addr;
 	ppc_dma_ch_t *p_dma_ch = &dma_channels[dmanr];
 	uint32_t sg_command;
+	uint32_t ctc_settings;
 	void *ret;
 
 	if (dmanr >= MAX_PPC4xx_DMA_CHANNELS) {
@@ -411,6 +418,11 @@ ppc4xx_alloc_dma_handle(sgl_handle_t * phandle, unsigned int mode, unsigned int 
 	/* Enable SGL control access */
 	mtdcr(DCRN_ASGC, sg_command);
 	psgl->sgl_control = SG_ERI_ENABLE | SG_LINK;
+
+	/* keep control count register settings */
+	ctc_settings = mfdcr(DCRN_DMACT0 + (dmanr * 0x8))
+		& (DMA_CTC_BSIZ_MSK | DMA_CTC_BTEN); /*burst mode settings*/
+	psgl->sgl_control |= ctc_settings;
 
 	if (p_dma_ch->int_enable) {
 		if (p_dma_ch->tce_enable)
