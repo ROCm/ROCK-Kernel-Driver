@@ -201,17 +201,17 @@ static ssize_t show_alarms(struct device *dev, char *buf)
 	return sprintf(buf, "%d\n", data->alarms);
 }
 
-static DEVICE_ATTR(temp_input1, S_IRUGO, show_temp_input1, NULL);
-static DEVICE_ATTR(temp_input2, S_IRUGO, show_temp_input2, NULL);
-static DEVICE_ATTR(temp_input3, S_IRUGO, show_temp_input3, NULL);
-static DEVICE_ATTR(temp_input4, S_IRUGO, show_temp_input4, NULL);
-static DEVICE_ATTR(temp_max1, S_IWUSR | S_IRUGO, show_temp_high1,
+static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp_input1, NULL);
+static DEVICE_ATTR(temp2_input, S_IRUGO, show_temp_input2, NULL);
+static DEVICE_ATTR(temp3_input, S_IRUGO, show_temp_input3, NULL);
+static DEVICE_ATTR(temp4_input, S_IRUGO, show_temp_input4, NULL);
+static DEVICE_ATTR(temp1_max, S_IWUSR | S_IRUGO, show_temp_high1,
     set_temp_high1);
-static DEVICE_ATTR(temp_max2, S_IWUSR | S_IRUGO, show_temp_high2,
+static DEVICE_ATTR(temp2_max, S_IWUSR | S_IRUGO, show_temp_high2,
     set_temp_high2);
-static DEVICE_ATTR(temp_max3, S_IWUSR | S_IRUGO, show_temp_high3,
+static DEVICE_ATTR(temp3_max, S_IWUSR | S_IRUGO, show_temp_high3,
     set_temp_high3);
-static DEVICE_ATTR(temp_max4, S_IWUSR | S_IRUGO, show_temp_high4,
+static DEVICE_ATTR(temp4_max, S_IWUSR | S_IRUGO, show_temp_high4,
     set_temp_high4);
 static DEVICE_ATTR(temp_crit, S_IWUSR | S_IRUGO, show_temp_crit,
     set_temp_crit);
@@ -320,14 +320,14 @@ static int lm83_detect(struct i2c_adapter *adapter, int address, int kind)
 	 */
 
 	/* Register sysfs hooks */
-	device_create_file(&new_client->dev, &dev_attr_temp_input1);
-	device_create_file(&new_client->dev, &dev_attr_temp_input2);
-	device_create_file(&new_client->dev, &dev_attr_temp_input3);
-	device_create_file(&new_client->dev, &dev_attr_temp_input4);
-	device_create_file(&new_client->dev, &dev_attr_temp_max1);
-	device_create_file(&new_client->dev, &dev_attr_temp_max2);
-	device_create_file(&new_client->dev, &dev_attr_temp_max3);
-	device_create_file(&new_client->dev, &dev_attr_temp_max4);
+	device_create_file(&new_client->dev, &dev_attr_temp1_input);
+	device_create_file(&new_client->dev, &dev_attr_temp2_input);
+	device_create_file(&new_client->dev, &dev_attr_temp3_input);
+	device_create_file(&new_client->dev, &dev_attr_temp4_input);
+	device_create_file(&new_client->dev, &dev_attr_temp1_max);
+	device_create_file(&new_client->dev, &dev_attr_temp2_max);
+	device_create_file(&new_client->dev, &dev_attr_temp3_max);
+	device_create_file(&new_client->dev, &dev_attr_temp4_max);
 	device_create_file(&new_client->dev, &dev_attr_temp_crit);
 	device_create_file(&new_client->dev, &dev_attr_alarms);
 

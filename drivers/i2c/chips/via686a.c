@@ -482,10 +482,10 @@ static ssize_t set_in##offset##_max (struct device *dev,	\
 {								\
 	return set_in_max(dev, buf, count, 0x##offset);		\
 }								\
-static DEVICE_ATTR(in_input##offset, S_IRUGO, show_in##offset, NULL) 	\
-static DEVICE_ATTR(in_min##offset, S_IRUGO | S_IWUSR, 		\
+static DEVICE_ATTR(in##offset##_input, S_IRUGO, show_in##offset, NULL) 	\
+static DEVICE_ATTR(in##offset##_min, S_IRUGO | S_IWUSR, 	\
 		show_in##offset##_min, set_in##offset##_min)	\
-static DEVICE_ATTR(in_max##offset, S_IRUGO | S_IWUSR, 		\
+static DEVICE_ATTR(in##offset##_max, S_IRUGO | S_IWUSR, 	\
 		show_in##offset##_max, set_in##offset##_max)
 
 show_in_offset(0);
@@ -556,10 +556,10 @@ static ssize_t set_temp_##offset##_hyst (struct device *dev, 		\
 {									\
 	return set_temp_hyst(dev, buf, count, 0x##offset - 1);		\
 }									\
-static DEVICE_ATTR(temp_input##offset, S_IRUGO, show_temp_##offset, NULL) \
-static DEVICE_ATTR(temp_max##offset, S_IRUGO | S_IWUSR, 		\
+static DEVICE_ATTR(temp##offset##_input, S_IRUGO, show_temp_##offset, NULL) \
+static DEVICE_ATTR(temp##offset##_max, S_IRUGO | S_IWUSR, 		\
 		show_temp_##offset##_over, set_temp_##offset##_over) 	\
-static DEVICE_ATTR(temp_hyst##offset, S_IRUGO | S_IWUSR, 		\
+static DEVICE_ATTR(temp##offset##_max_hyst, S_IRUGO | S_IWUSR, 		\
 		show_temp_##offset##_hyst, set_temp_##offset##_hyst)	
 
 show_temp_offset(1);
@@ -631,10 +631,10 @@ static ssize_t set_fan_##offset##_div (struct device *dev, 		\
 {									\
 	return set_fan_div(dev, buf, count, 0x##offset - 1);		\
 }									\
-static DEVICE_ATTR(fan_input##offset, S_IRUGO, show_fan_##offset, NULL) \
-static DEVICE_ATTR(fan_min##offset, S_IRUGO | S_IWUSR, 			\
+static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_fan_##offset, NULL) \
+static DEVICE_ATTR(fan##offset##_min, S_IRUGO | S_IWUSR, 		\
 		show_fan_##offset##_min, set_fan_##offset##_min) 	\
-static DEVICE_ATTR(fan_div##offset, S_IRUGO | S_IWUSR, 			\
+static DEVICE_ATTR(fan##offset##_div, S_IRUGO | S_IWUSR, 		\
 		show_fan_##offset##_div, set_fan_##offset##_div)
 
 show_fan_offset(1);
@@ -653,7 +653,7 @@ static DEVICE_ATTR(alarms, S_IRUGO | S_IWUSR, show_alarms, NULL);
    smbus_driver and isa_driver, and clients could be of either kind */
 static struct i2c_driver via686a_driver = {
 	.owner		= THIS_MODULE,
-	.name		= "VIA686A",
+	.name		= "via686a",
 	.id		= I2C_DRIVERID_VIA686A,
 	.flags		= I2C_DF_NOTIFY,
 	.attach_adapter	= via686a_attach_adapter,
@@ -742,36 +742,36 @@ static int via686a_detect(struct i2c_adapter *adapter, int address, int kind)
 	via686a_init_client(new_client);
 
 	/* Register sysfs hooks */
-	device_create_file(&new_client->dev, &dev_attr_in_input0);
-	device_create_file(&new_client->dev, &dev_attr_in_input1);
-	device_create_file(&new_client->dev, &dev_attr_in_input2);
-	device_create_file(&new_client->dev, &dev_attr_in_input3);
-	device_create_file(&new_client->dev, &dev_attr_in_input4);
-	device_create_file(&new_client->dev, &dev_attr_in_min0);
-	device_create_file(&new_client->dev, &dev_attr_in_min1);
-	device_create_file(&new_client->dev, &dev_attr_in_min2);
-	device_create_file(&new_client->dev, &dev_attr_in_min3);
-	device_create_file(&new_client->dev, &dev_attr_in_min4);
-	device_create_file(&new_client->dev, &dev_attr_in_max0);
-	device_create_file(&new_client->dev, &dev_attr_in_max1);
-	device_create_file(&new_client->dev, &dev_attr_in_max2);
-	device_create_file(&new_client->dev, &dev_attr_in_max3);
-	device_create_file(&new_client->dev, &dev_attr_in_max4);
-	device_create_file(&new_client->dev, &dev_attr_temp_input1);
-	device_create_file(&new_client->dev, &dev_attr_temp_input2);
-	device_create_file(&new_client->dev, &dev_attr_temp_input3);
-	device_create_file(&new_client->dev, &dev_attr_temp_max1);
-	device_create_file(&new_client->dev, &dev_attr_temp_max2);
-	device_create_file(&new_client->dev, &dev_attr_temp_max3);
-	device_create_file(&new_client->dev, &dev_attr_temp_hyst1);
-	device_create_file(&new_client->dev, &dev_attr_temp_hyst2);
-	device_create_file(&new_client->dev, &dev_attr_temp_hyst3);
-	device_create_file(&new_client->dev, &dev_attr_fan_input1);
-	device_create_file(&new_client->dev, &dev_attr_fan_input2);
-	device_create_file(&new_client->dev, &dev_attr_fan_min1);
-	device_create_file(&new_client->dev, &dev_attr_fan_min2);
-	device_create_file(&new_client->dev, &dev_attr_fan_div1);
-	device_create_file(&new_client->dev, &dev_attr_fan_div2);
+	device_create_file(&new_client->dev, &dev_attr_in0_input);
+	device_create_file(&new_client->dev, &dev_attr_in1_input);
+	device_create_file(&new_client->dev, &dev_attr_in2_input);
+	device_create_file(&new_client->dev, &dev_attr_in3_input);
+	device_create_file(&new_client->dev, &dev_attr_in4_input);
+	device_create_file(&new_client->dev, &dev_attr_in0_min);
+	device_create_file(&new_client->dev, &dev_attr_in1_min);
+	device_create_file(&new_client->dev, &dev_attr_in2_min);
+	device_create_file(&new_client->dev, &dev_attr_in3_min);
+	device_create_file(&new_client->dev, &dev_attr_in4_min);
+	device_create_file(&new_client->dev, &dev_attr_in0_max);
+	device_create_file(&new_client->dev, &dev_attr_in1_max);
+	device_create_file(&new_client->dev, &dev_attr_in2_max);
+	device_create_file(&new_client->dev, &dev_attr_in3_max);
+	device_create_file(&new_client->dev, &dev_attr_in4_max);
+	device_create_file(&new_client->dev, &dev_attr_temp1_input);
+	device_create_file(&new_client->dev, &dev_attr_temp2_input);
+	device_create_file(&new_client->dev, &dev_attr_temp3_input);
+	device_create_file(&new_client->dev, &dev_attr_temp1_max);
+	device_create_file(&new_client->dev, &dev_attr_temp2_max);
+	device_create_file(&new_client->dev, &dev_attr_temp3_max);
+	device_create_file(&new_client->dev, &dev_attr_temp1_max_hyst);
+	device_create_file(&new_client->dev, &dev_attr_temp2_max_hyst);
+	device_create_file(&new_client->dev, &dev_attr_temp3_max_hyst);
+	device_create_file(&new_client->dev, &dev_attr_fan1_input);
+	device_create_file(&new_client->dev, &dev_attr_fan2_input);
+	device_create_file(&new_client->dev, &dev_attr_fan1_min);
+	device_create_file(&new_client->dev, &dev_attr_fan2_min);
+	device_create_file(&new_client->dev, &dev_attr_fan1_div);
+	device_create_file(&new_client->dev, &dev_attr_fan2_div);
 	device_create_file(&new_client->dev, &dev_attr_alarms);
 
 	return 0;

@@ -6,7 +6,7 @@
               IT8712F  Super I/O chip w/LPC interface & SMbus
               Sis950   A clone of the IT8705F
 
-    Copyright (c) 2001 Chris Gauthron <chrisg@0-in.com> 
+    Copyright (C) 2001 Chris Gauthron <chrisg@0-in.com> 
     Largely inspired by lm78.c of the same package
 
     This program is free software; you can redistribute it and/or modify
@@ -56,12 +56,6 @@ SENSORS_INSMOD_4(it87, it8705, it8712, sis950);
 
 /* Update battery voltage after every reading if true */
 static int update_vbat = 0;
-
-
-/* Enable Temp1 as thermal resistor */
-/* Enable Temp2 as thermal diode */
-/* Enable Temp3 as thermal resistor */
-static int temp_type = 0x2a;
 
 /* Many IT87 constants specified below */
 
@@ -231,7 +225,7 @@ static void it87_init_client(struct i2c_client *client, struct it87_data *data);
 
 static struct i2c_driver it87_driver = {
 	.owner		= THIS_MODULE,
-	.name		= "IT87xx",
+	.name		= "it87",
 	.id		= I2C_DRIVERID_IT87,
 	.flags		= I2C_DF_NOTIFY,
 	.attach_adapter	= it87_attach_adapter,
@@ -293,7 +287,7 @@ static ssize_t							\
 {								\
 	return show_in(dev, buf, 0x##offset);			\
 }								\
-static DEVICE_ATTR(in_input##offset, S_IRUGO, show_in##offset, NULL)
+static DEVICE_ATTR(in##offset##_input, S_IRUGO, show_in##offset, NULL)
 
 #define limit_in_offset(offset)					\
 static ssize_t							\
@@ -316,9 +310,9 @@ static ssize_t set_in##offset##_max (struct device *dev,	\
 {								\
 	return set_in_max(dev, buf, count, 0x##offset);		\
 }								\
-static DEVICE_ATTR(in_min##offset, S_IRUGO | S_IWUSR, 		\
+static DEVICE_ATTR(in##offset##_min, S_IRUGO | S_IWUSR, 	\
 		show_in##offset##_min, set_in##offset##_min)	\
-static DEVICE_ATTR(in_max##offset, S_IRUGO | S_IWUSR, 		\
+static DEVICE_ATTR(in##offset##_max, S_IRUGO | S_IWUSR, 	\
 		show_in##offset##_max, set_in##offset##_max)
 
 show_in_offset(0);
@@ -406,10 +400,10 @@ static ssize_t set_temp_##offset##_min (struct device *dev, 		\
 {									\
 	return set_temp_min(dev, buf, count, 0x##offset - 1);		\
 }									\
-static DEVICE_ATTR(temp_input##offset, S_IRUGO, show_temp_##offset, NULL) \
-static DEVICE_ATTR(temp_max##offset, S_IRUGO | S_IWUSR, 		\
+static DEVICE_ATTR(temp##offset##_input, S_IRUGO, show_temp_##offset, NULL) \
+static DEVICE_ATTR(temp##offset##_max, S_IRUGO | S_IWUSR, 		\
 		show_temp_##offset##_max, set_temp_##offset##_max) 	\
-static DEVICE_ATTR(temp_min##offset, S_IRUGO | S_IWUSR, 		\
+static DEVICE_ATTR(temp##offset##_min, S_IRUGO | S_IWUSR, 		\
 		show_temp_##offset##_min, set_temp_##offset##_min)	
 
 show_temp_offset(1);
@@ -422,10 +416,10 @@ static ssize_t show_sensor(struct device *dev, char *buf, int nr)
 	struct it87_data *data = i2c_get_clientdata(client);
 	it87_update_client(client);
 	if (data->sensor & (1 << nr))
-	    return sprintf(buf, "1\n");
+		return sprintf(buf, "3\n");  /* thermal diode */
 	if (data->sensor & (8 << nr))
-	    return sprintf(buf, "2\n");
-	return sprintf(buf, "0\n");
+		return sprintf(buf, "2\n");  /* thermistor */
+	return sprintf(buf, "0\n");      /* disabled */
 }
 static ssize_t set_sensor(struct device *dev, const char *buf, 
 		size_t count, int nr)
@@ -436,10 +430,13 @@ static ssize_t set_sensor(struct device *dev, const char *buf,
 
 	data->sensor &= ~(1 << nr);
 	data->sensor &= ~(8 << nr);
-	if (val == 1)
+	/* 3 = thermal diode; 2 = thermistor; 0 = disabled */
+	if (val == 3)
 	    data->sensor |= 1 << nr;
 	else if (val == 2)
 	    data->sensor |= 8 << nr;
+	else if (val != 0)
+		return -1;
 	it87_write_value(client, IT87_REG_TEMP_ENABLE, data->sensor);
 	return count;
 }
@@ -453,7 +450,7 @@ static ssize_t set_sensor_##offset (struct device *dev, 		\
 {									\
 	return set_sensor(dev, buf, count, 0x##offset - 1);		\
 }									\
-static DEVICE_ATTR(sensor##offset, S_IRUGO | S_IWUSR,	 		\
+static DEVICE_ATTR(temp##offset##_type, S_IRUGO | S_IWUSR,	 		\
 		show_sensor_##offset, set_sensor_##offset)
 
 show_sensor_offset(1);
@@ -554,10 +551,10 @@ static ssize_t set_fan_##offset##_div (struct device *dev, 		\
 {									\
 	return set_fan_div(dev, buf, count, 0x##offset - 1);		\
 }									\
-static DEVICE_ATTR(fan_input##offset, S_IRUGO, show_fan_##offset, NULL) \
-static DEVICE_ATTR(fan_min##offset, S_IRUGO | S_IWUSR, 			\
+static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_fan_##offset, NULL) \
+static DEVICE_ATTR(fan##offset##_min, S_IRUGO | S_IWUSR, 		\
 		show_fan_##offset##_min, set_fan_##offset##_min) 	\
-static DEVICE_ATTR(fan_div##offset, S_IRUGO | S_IWUSR, 			\
+static DEVICE_ATTR(fan##offset##_div, S_IRUGO | S_IWUSR, 		\
 		show_fan_##offset##_div, set_fan_##offset##_div)
 
 show_fan_offset(1);
@@ -706,52 +703,52 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	it87_init_client(new_client, data);
 
 	/* Register sysfs hooks */
-	device_create_file(&new_client->dev, &dev_attr_in_input0);
-	device_create_file(&new_client->dev, &dev_attr_in_input1);
-	device_create_file(&new_client->dev, &dev_attr_in_input2);
-	device_create_file(&new_client->dev, &dev_attr_in_input3);
-	device_create_file(&new_client->dev, &dev_attr_in_input4);
-	device_create_file(&new_client->dev, &dev_attr_in_input5);
-	device_create_file(&new_client->dev, &dev_attr_in_input6);
-	device_create_file(&new_client->dev, &dev_attr_in_input7);
-	device_create_file(&new_client->dev, &dev_attr_in_input8);
-	device_create_file(&new_client->dev, &dev_attr_in_min0);
-	device_create_file(&new_client->dev, &dev_attr_in_min1);
-	device_create_file(&new_client->dev, &dev_attr_in_min2);
-	device_create_file(&new_client->dev, &dev_attr_in_min3);
-	device_create_file(&new_client->dev, &dev_attr_in_min4);
-	device_create_file(&new_client->dev, &dev_attr_in_min5);
-	device_create_file(&new_client->dev, &dev_attr_in_min6);
-	device_create_file(&new_client->dev, &dev_attr_in_min7);
-	device_create_file(&new_client->dev, &dev_attr_in_max0);
-	device_create_file(&new_client->dev, &dev_attr_in_max1);
-	device_create_file(&new_client->dev, &dev_attr_in_max2);
-	device_create_file(&new_client->dev, &dev_attr_in_max3);
-	device_create_file(&new_client->dev, &dev_attr_in_max4);
-	device_create_file(&new_client->dev, &dev_attr_in_max5);
-	device_create_file(&new_client->dev, &dev_attr_in_max6);
-	device_create_file(&new_client->dev, &dev_attr_in_max7);
-	device_create_file(&new_client->dev, &dev_attr_temp_input1);
-	device_create_file(&new_client->dev, &dev_attr_temp_input2);
-	device_create_file(&new_client->dev, &dev_attr_temp_input3);
-	device_create_file(&new_client->dev, &dev_attr_temp_max1);
-	device_create_file(&new_client->dev, &dev_attr_temp_max2);
-	device_create_file(&new_client->dev, &dev_attr_temp_max3);
-	device_create_file(&new_client->dev, &dev_attr_temp_min1);
-	device_create_file(&new_client->dev, &dev_attr_temp_min2);
-	device_create_file(&new_client->dev, &dev_attr_temp_min3);
-	device_create_file(&new_client->dev, &dev_attr_sensor1);
-	device_create_file(&new_client->dev, &dev_attr_sensor2);
-	device_create_file(&new_client->dev, &dev_attr_sensor3);
-	device_create_file(&new_client->dev, &dev_attr_fan_input1);
-	device_create_file(&new_client->dev, &dev_attr_fan_input2);
-	device_create_file(&new_client->dev, &dev_attr_fan_input3);
-	device_create_file(&new_client->dev, &dev_attr_fan_min1);
-	device_create_file(&new_client->dev, &dev_attr_fan_min2);
-	device_create_file(&new_client->dev, &dev_attr_fan_min3);
-	device_create_file(&new_client->dev, &dev_attr_fan_div1);
-	device_create_file(&new_client->dev, &dev_attr_fan_div2);
-	device_create_file(&new_client->dev, &dev_attr_fan_div3);
+	device_create_file(&new_client->dev, &dev_attr_in0_input);
+	device_create_file(&new_client->dev, &dev_attr_in1_input);
+	device_create_file(&new_client->dev, &dev_attr_in2_input);
+	device_create_file(&new_client->dev, &dev_attr_in3_input);
+	device_create_file(&new_client->dev, &dev_attr_in4_input);
+	device_create_file(&new_client->dev, &dev_attr_in5_input);
+	device_create_file(&new_client->dev, &dev_attr_in6_input);
+	device_create_file(&new_client->dev, &dev_attr_in7_input);
+	device_create_file(&new_client->dev, &dev_attr_in8_input);
+	device_create_file(&new_client->dev, &dev_attr_in0_min);
+	device_create_file(&new_client->dev, &dev_attr_in1_min);
+	device_create_file(&new_client->dev, &dev_attr_in2_min);
+	device_create_file(&new_client->dev, &dev_attr_in3_min);
+	device_create_file(&new_client->dev, &dev_attr_in4_min);
+	device_create_file(&new_client->dev, &dev_attr_in5_min);
+	device_create_file(&new_client->dev, &dev_attr_in6_min);
+	device_create_file(&new_client->dev, &dev_attr_in7_min);
+	device_create_file(&new_client->dev, &dev_attr_in0_max);
+	device_create_file(&new_client->dev, &dev_attr_in1_max);
+	device_create_file(&new_client->dev, &dev_attr_in2_max);
+	device_create_file(&new_client->dev, &dev_attr_in3_max);
+	device_create_file(&new_client->dev, &dev_attr_in4_max);
+	device_create_file(&new_client->dev, &dev_attr_in5_max);
+	device_create_file(&new_client->dev, &dev_attr_in6_max);
+	device_create_file(&new_client->dev, &dev_attr_in7_max);
+	device_create_file(&new_client->dev, &dev_attr_temp1_input);
+	device_create_file(&new_client->dev, &dev_attr_temp2_input);
+	device_create_file(&new_client->dev, &dev_attr_temp3_input);
+	device_create_file(&new_client->dev, &dev_attr_temp1_max);
+	device_create_file(&new_client->dev, &dev_attr_temp2_max);
+	device_create_file(&new_client->dev, &dev_attr_temp3_max);
+	device_create_file(&new_client->dev, &dev_attr_temp1_min);
+	device_create_file(&new_client->dev, &dev_attr_temp2_min);
+	device_create_file(&new_client->dev, &dev_attr_temp3_min);
+	device_create_file(&new_client->dev, &dev_attr_temp1_type);
+	device_create_file(&new_client->dev, &dev_attr_temp2_type);
+	device_create_file(&new_client->dev, &dev_attr_temp3_type);
+	device_create_file(&new_client->dev, &dev_attr_fan1_input);
+	device_create_file(&new_client->dev, &dev_attr_fan2_input);
+	device_create_file(&new_client->dev, &dev_attr_fan3_input);
+	device_create_file(&new_client->dev, &dev_attr_fan1_min);
+	device_create_file(&new_client->dev, &dev_attr_fan2_min);
+	device_create_file(&new_client->dev, &dev_attr_fan3_min);
+	device_create_file(&new_client->dev, &dev_attr_fan1_div);
+	device_create_file(&new_client->dev, &dev_attr_fan2_div);
+	device_create_file(&new_client->dev, &dev_attr_fan3_div);
 	device_create_file(&new_client->dev, &dev_attr_alarms);
 
 	return 0;
@@ -888,7 +885,7 @@ static void it87_init_client(struct i2c_client *client, struct it87_data *data)
 
 	/* Enable Temp1-Temp3 */
 	data->sensor = (it87_read_value(client, IT87_REG_TEMP_ENABLE) & 0xc0);
-	data->sensor |= temp_type & 0x3f;
+	data->sensor |= 0x2a; /* Temp1,Temp3=thermistor; Temp2=thermal diode */
 	it87_write_value(client, IT87_REG_TEMP_ENABLE, data->sensor);
 
 	/* Enable fans */
@@ -967,6 +964,8 @@ static void it87_update_client(struct i2c_client *client)
 			(it87_read_value(client, IT87_REG_ALARM2) << 8) |
 			(it87_read_value(client, IT87_REG_ALARM3) << 16);
 
+		data->sensor = it87_read_value(client, IT87_REG_TEMP_ENABLE);
+
 		data->last_updated = jiffies;
 		data->valid = 1;
 	}
@@ -989,8 +988,6 @@ MODULE_AUTHOR("Chris Gauthron <chrisg@0-in.com>");
 MODULE_DESCRIPTION("IT8705F, IT8712F, Sis950 driver");
 MODULE_PARM(update_vbat, "i");
 MODULE_PARM_DESC(update_vbat, "Update vbat if set else return powerup value");
-MODULE_PARM(temp_type, "i");
-MODULE_PARM_DESC(temp_type, "Temperature sensor type, normally leave unset");
 MODULE_LICENSE("GPL");
 
 module_init(sm_it87_init);

@@ -175,7 +175,7 @@ int i2c_del_adapter(struct i2c_adapter *adap)
 		driver = list_entry(item, struct i2c_driver, list);
 		if (driver->detach_adapter)
 			if ((res = driver->detach_adapter(adap))) {
-				dev_warn(&adap->dev, "can't detach adapter"
+				dev_warn(&adap->dev, "can't detach adapter "
 					 "while detaching driver %s: driver not "
 					 "detached!", driver->name);
 				goto out_unlock;
@@ -618,7 +618,7 @@ int i2c_control(struct i2c_client *client,
 	int ret = 0;
 	struct i2c_adapter *adap = client->adapter;
 
-	dev_dbg(&client->dev, "i2c ioctl, cmd: 0x%x, arg: %#lx\n", cmd, arg);
+	dev_dbg(&client->adapter->dev, "i2c ioctl, cmd: 0x%x, arg: %#lx\n", cmd, arg);
 	switch (cmd) {
 		case I2C_RETRIES:
 			adap->retries = arg;
