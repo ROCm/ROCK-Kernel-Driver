@@ -34,3 +34,4 @@ obj-$(CONFIG_USB_WACOM)		+= wacom.o
 obj-$(CONFIG_USB_KBTAB)		+= kbtab.o
 obj-$(CONFIG_USB_POWERMATE)	+= powermate.o
 obj-$(CONFIG_USB_XPAD)		+= xpad.o
+obj-$(CONFIG_USB_ATI_REMOTE)	+= ati_remote.o
