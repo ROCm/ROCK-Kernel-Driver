@@ -605,7 +605,7 @@ struct vm_area_struct *get_gate_vma(struct task_struct *tsk)
 	if (test_tsk_thread_flag(tsk, TIF_IA32)) {
 		/* lookup code assumes the pages are present. set them up
 		   now */
-		if (__map_syscall32(tsk->mm, 0xfffe000) < 0)
+		if (__map_syscall32(tsk->mm, VSYSCALL32_BASE) < 0)
 			return NULL;
 		return &gate32_vma;
 	}
