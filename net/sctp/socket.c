@@ -1216,9 +1216,11 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 	 * Otherwise, set MSG_EOR indicating the end of a message. 
 	 */
 	if (skb_len > copied) {
+		msg->msg_flags &= ~MSG_EOR;
+		if (flags & MSG_PEEK)
+			goto out_free;	
 		sctp_skb_pull(skb, copied);
 		skb_queue_head(&sk->receive_queue, skb);
-		msg->msg_flags &= ~MSG_EOR;
 		goto out;
 	} else {
 		 msg->msg_flags |= MSG_EOR;
