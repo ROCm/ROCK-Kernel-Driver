@@ -1179,6 +1179,8 @@ running once the system is up.
 
 	stram_swap=	[HW,M68k]
 
+	supported	Only allow loading of supported kernel modules.
+
 	swiotlb=	[IA-64] Number of I/O TLB slabs
  
 	switches=	[HW,M68k]

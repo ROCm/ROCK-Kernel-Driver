@@ -60,6 +60,14 @@
 /* Allow unsupported modules switch. */ 
 int unsupported = 1;  /* default to be permissive. */
 
+static int __init supported_setup(char *str)
+{
+	unsupported = 0;
+	printk("Allow loading of supported modules only.\n");
+	return 1;
+}
+__setup("supported", supported_setup);
+
 /* Protects module list */
 static spinlock_t modlist_lock = SPIN_LOCK_UNLOCKED;
 
