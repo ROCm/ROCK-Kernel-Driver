@@ -126,8 +126,8 @@ acpi_pci_bind (
 	acpi_status		status = AE_OK;
 	struct acpi_pci_data	*data = NULL;
 	struct acpi_pci_data	*pdata = NULL;
-	char			pathname[ACPI_PATHNAME_MAX] = {0};
-	struct acpi_buffer	buffer = {ACPI_PATHNAME_MAX, pathname};
+	char			*pathname = NULL;
+	struct acpi_buffer	buffer = {0, NULL};
 	acpi_handle		handle = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_pci_bind");
@@ -135,9 +135,18 @@ acpi_pci_bind (
 	if (!device || !device->parent)
 		return_VALUE(-EINVAL);
 
-	data = kmalloc(sizeof(struct acpi_pci_data), GFP_KERNEL);
-	if (!data)
+	pathname = kmalloc(ACPI_PATHNAME_MAX, GFP_KERNEL);
+	if(!pathname)
 		return_VALUE(-ENOMEM);
+	memset(pathname, 0, ACPI_PATHNAME_MAX);
+	buffer.length = ACPI_PATHNAME_MAX;
+	buffer.pointer = pathname;
+
+	data = kmalloc(sizeof(struct acpi_pci_data), GFP_KERNEL);
+	if (!data){
+		kfree (pathname);
+		return_VALUE(-ENOMEM);
+	}
 	memset(data, 0, sizeof(struct acpi_pci_data));
 
 	acpi_get_name(device->handle, ACPI_FULL_PATHNAME, &buffer);
@@ -253,6 +262,7 @@ acpi_pci_bind (
 	}
 
 end:
+	kfree(pathname);
 	if (result)
 		kfree(data);
 
@@ -269,17 +279,29 @@ acpi_pci_bind_root (
 	int			result = 0;
 	acpi_status		status = AE_OK;
 	struct acpi_pci_data	*data = NULL;
-	char			pathname[ACPI_PATHNAME_MAX] = {0};
-	struct acpi_buffer	buffer = {ACPI_PATHNAME_MAX, pathname};
+	char			*pathname = NULL;
+	struct acpi_buffer	buffer = {0, NULL};
 
 	ACPI_FUNCTION_TRACE("acpi_pci_bind_root");
 
-	if (!device || !id || !bus)
+	pathname = (char *)kmalloc(ACPI_PATHNAME_MAX, GFP_KERNEL);
+	if(!pathname)
+		return_VALUE(-ENOMEM);
+	memset(pathname, 0, ACPI_PATHNAME_MAX);
+
+	buffer.length = sizeof(pathname);
+	buffer.pointer = pathname;
+
+	if (!device || !id || !bus){
+		kfree(pathname);
 		return_VALUE(-EINVAL);
+	}
 
 	data = kmalloc(sizeof(struct acpi_pci_data), GFP_KERNEL);
-	if (!data)
+	if (!data){
+		kfree(pathname);
 		return_VALUE(-ENOMEM);
+	}
 	memset(data, 0, sizeof(struct acpi_pci_data));
 
 	data->id = *id;
@@ -301,6 +323,7 @@ acpi_pci_bind_root (
 	}
 
 end:
+	kfree(pathname);
 	if (result != 0)
 		kfree(data);
 

@@ -787,9 +787,81 @@ acpi_ec_stop (
 	return_VALUE(0);
 }
 
+static acpi_status __init
+acpi_fake_ecdt_callback (
+	acpi_handle	handle,
+	u32		Level,
+	void		*context,
+	void		**retval)
+{
+	acpi_status	status;
 
-int __init
-acpi_ec_ecdt_probe (void)
+	status = acpi_walk_resources(handle, METHOD_NAME__CRS,
+		acpi_ec_io_ports, ec_ecdt);
+	if (ACPI_FAILURE(status))
+		return status;
+	ec_ecdt->status_addr = ec_ecdt->command_addr;
+
+	ec_ecdt->uid = -1;
+	acpi_evaluate_integer(handle, "_UID", NULL, &ec_ecdt->uid);
+
+	status = acpi_evaluate_integer(handle, "_GPE", NULL, &ec_ecdt->gpe_bit);
+	if (ACPI_FAILURE(status))
+		return status;
+	ec_ecdt->lock = SPIN_LOCK_UNLOCKED;
+	ec_ecdt->global_lock = TRUE;
+	ec_ecdt->handle = handle;
+
+	printk(KERN_INFO PREFIX  "GPE=0x%02x, ports=0x%2x, 0x%2x\n",
+		(u32) ec_ecdt->gpe_bit, (u32) ec_ecdt->command_addr.address,
+		(u32) ec_ecdt->data_addr.address);
+
+	return AE_CTRL_TERMINATE;
+}
+
+/*
+ * Some BIOS (such as some from Gateway laptops) access EC region very early
+ * such as in BAT0._INI or EC._INI before an EC device is found and
+ * do not provide an ECDT. According to ACPI spec, ECDT isn't mandatorily
+ * required, but if EC regison is accessed early, it is required.
+ * The routine tries to workaround the BIOS bug by pre-scan EC device
+ * It assumes that _CRS, _HID, _GPE, _UID methods of EC don't touch any
+ * op region (since _REG isn't invoked yet). The assumption is true for
+ * all systems found.
+ */
+static int __init
+acpi_ec_fake_ecdt(void)
+{
+	acpi_status	status;
+	int		ret = 0;
+
+	printk(KERN_INFO PREFIX "Try to make an fake ECDT\n");
+
+	ec_ecdt = kmalloc(sizeof(struct acpi_ec), GFP_KERNEL);
+	if (!ec_ecdt) {
+		ret = -ENOMEM;
+		goto error;
+	}
+	memset(ec_ecdt, 0, sizeof(struct acpi_ec));
+
+	status = acpi_get_devices (ACPI_EC_HID,
+				acpi_fake_ecdt_callback,
+				NULL,
+				NULL);
+	if (ACPI_FAILURE(status)) {
+		kfree(ec_ecdt);
+		ec_ecdt = NULL;
+		ret = -ENODEV;
+		goto error;
+	}
+	return 0;
+error:
+	printk(KERN_ERR PREFIX "Can't make an fake ECDT\n");
+	return ret;
+}
+
+static int __init
+acpi_ec_get_real_ecdt(void)
 {
 	acpi_status		status;
 	struct acpi_table_ecdt 	*ecdt_ptr;
@@ -797,11 +869,11 @@ acpi_ec_ecdt_probe (void)
 	status = acpi_get_firmware_table("ECDT", 1, ACPI_LOGICAL_ADDRESSING, 
 		(struct acpi_table_header **) &ecdt_ptr);
 	if (ACPI_FAILURE(status))
-		return 0;
+		return -ENODEV;
 
 	printk(KERN_INFO PREFIX "Found ECDT\n");
 
-	 /*
+	/*
 	 * Generate a temporary ec context to use until the namespace is scanned
 	 */
 	ec_ecdt = kmalloc(sizeof(struct acpi_ec), GFP_KERNEL);
@@ -822,6 +894,31 @@ acpi_ec_ecdt_probe (void)
 	if (ACPI_FAILURE(status)) {
 		goto error;
 	}
+
+	return 0;
+error:
+	printk(KERN_ERR PREFIX "Could not use ECDT\n");
+	kfree(ec_ecdt);
+	ec_ecdt = NULL;
+
+	return -ENODEV;
+}
+
+static int __initdata acpi_fake_ecdt_enabled;
+int __init
+acpi_ec_ecdt_probe (void)
+{
+	acpi_status		status;
+	int			ret;
+
+	ret = acpi_ec_get_real_ecdt();
+	/* Try to make a fake ECDT */
+	if (ret && acpi_fake_ecdt_enabled) {
+		ret = acpi_ec_fake_ecdt();
+	}
+
+	if (ret)
+		return 0;
 
 	/*
 	 * Install GPE handler
@@ -895,3 +992,9 @@ acpi_ec_exit (void)
 }
 #endif /* 0 */
 
+static int __init acpi_fake_ecdt_setup(char *str)
+{
+	acpi_fake_ecdt_enabled = 1;
+	return 0;
+}
+__setup("acpi_fake_ecdt", acpi_fake_ecdt_setup);

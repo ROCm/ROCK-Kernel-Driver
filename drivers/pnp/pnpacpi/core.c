@@ -236,6 +236,8 @@ static acpi_status __init pnpacpi_add_device_handler(acpi_handle handle,
 
 	if (!acpi_bus_get_device(handle, &device))
 		pnpacpi_add_device(device);
+	else
+		return AE_CTRL_DEPTH;
 	return AE_OK;
 }
 
@@ -247,9 +249,7 @@ int __init pnpacpi_init(void)
 	}
 	pnp_info("PnP ACPI init");
 	pnp_register_protocol(&pnpacpi_protocol);
-	acpi_walk_namespace(ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT,
-			ACPI_UINT32_MAX, pnpacpi_add_device_handler,
-			NULL, NULL);
+	acpi_get_devices(NULL, pnpacpi_add_device_handler, NULL, NULL);
 	pnp_info("PnP ACPI: found %d devices", num);
 	return 0;
 }
