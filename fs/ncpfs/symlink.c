@@ -7,18 +7,20 @@
  *  the file to make sure we don't accidentally use a non-link file
  *  as a link.
  *
+ *  When using the NFS namespace, we set the mode to indicate a symlink and
+ *  don't bother with the magic numbers.
+ *
  *  from linux/fs/ext2/symlink.c
  *
  *  Copyright (C) 1998-99, Frank A. Vorstenbosch
  *
  *  ncpfs symlink handling code
  *  NLS support (c) 1999 Petr Vandrovec
+ *  Modified 2000 Ben Harris, University of Cambridge for NFS NS meta-info
  *
  */
 
 #include <linux/config.h>
-
-#ifdef CONFIG_NCPFS_EXTRAS
 
 #include <asm/uaccess.h>
 
@@ -28,7 +30,6 @@
 #include <linux/time.h>
 #include <linux/mm.h>
 #include <linux/stat.h>
-#include <linux/smp_lock.h>
 #include "ncplib_kernel.h"
 
 
@@ -38,30 +39,25 @@
 #define NCP_SYMLINK_MAGIC0	le32_to_cpu(0x6c6d7973)     /* "symlnk->" */
 #define NCP_SYMLINK_MAGIC1	le32_to_cpu(0x3e2d6b6e)
 
-int ncp_create_new(struct inode *dir, struct dentry *dentry,
-                          int mode,int attributes);
-
 /* ----- read a symbolic link ------------------------------------------ */
 
 static int ncp_symlink_readpage(struct file *file, struct page *page)
 {
 	struct inode *inode = page->mapping->host;
-	int error, length, len, cnt;
-	char *link;
+	int error, length, len;
+	char *link, *rawlink;
 	char *buf = kmap(page);
 
 	error = -ENOMEM;
-	for (cnt = 0; (link=(char *)kmalloc(NCP_MAX_SYMLINK_SIZE, GFP_NFS))==NULL; cnt++) {
-		if (cnt > 10)
-			goto fail;
-		schedule();
-	}
+	rawlink=(char *)kmalloc(NCP_MAX_SYMLINK_SIZE, GFP_NFS);
+	if (!rawlink)
+		goto fail;
 
 	if (ncp_make_open(inode,O_RDONLY))
 		goto failEIO;
 
 	error=ncp_read_kernel(NCP_SERVER(inode),NCP_FINFO(inode)->file_handle,
-                         0,NCP_MAX_SYMLINK_SIZE,link,&length);
+                         0,NCP_MAX_SYMLINK_SIZE,rawlink,&length);
 
 	ncp_inode_close(inode);
 	/* Close file handle if no other users... */
@@ -69,14 +65,20 @@ static int ncp_symlink_readpage(struct file *file, struct page *page)
 	if (error)
 		goto failEIO;
 
-	if (length<NCP_MIN_SYMLINK_SIZE || 
-	    ((__u32 *)link)[0]!=NCP_SYMLINK_MAGIC0 ||
-	    ((__u32 *)link)[1]!=NCP_SYMLINK_MAGIC1)
-	    	goto failEIO;
+	if (NCP_FINFO(inode)->flags & NCPI_KLUDGE_SYMLINK) {
+		if (length<NCP_MIN_SYMLINK_SIZE || 
+		    ((__u32 *)rawlink)[0]!=NCP_SYMLINK_MAGIC0 ||
+		    ((__u32 *)rawlink)[1]!=NCP_SYMLINK_MAGIC1)
+		    	goto failEIO;
+		link = rawlink + 8;
+		length -= 8;
+	} else {
+		link = rawlink;
+	}
 
 	len = NCP_MAX_SYMLINK_SIZE;
-	error = ncp_vol2io(NCP_SERVER(inode), buf, &len, link+8, length-8, 0);
-	kfree(link);
+	error = ncp_vol2io(NCP_SERVER(inode), buf, &len, link, length, 0);
+	kfree(rawlink);
 	if (error)
 		goto fail;
 	SetPageUptodate(page);
@@ -86,7 +88,7 @@ static int ncp_symlink_readpage(struct file *file, struct page *page)
 
 failEIO:
 	error = -EIO;
-	kfree(link);
+	kfree(rawlink);
 fail:
 	SetPageError(page);
 	kunmap(page);
@@ -105,62 +107,76 @@ struct address_space_operations ncp_symlink_aops = {
  
 int ncp_symlink(struct inode *dir, struct dentry *dentry, const char *symname) {
 	struct inode *inode;
-	char *link;
-	int length, err, i;
+	char *rawlink;
+	int length, err, i, outlen;
+	int kludge;
+	int mode, attr;
+	unsigned int hdr;
 
-#ifdef DEBUG
-	PRINTK("ncp_symlink(dir=%p,dentry=%p,symname=%s)\n",dir,dentry,symname);
+	DPRINTK("ncp_symlink(dir=%p,dentry=%p,symname=%s)\n",dir,dentry,symname);
+
+	if (ncp_is_nfs_extras(NCP_SERVER(dir), NCP_FINFO(dir)->volNumber))
+		kludge = 0;
+	else
+#ifdef CONFIG_NCPFS_EXTRAS
+	if (NCP_SERVER(dir)->m.flags & NCP_MOUNT_SYMLINKS)
+		kludge = 1;
+	else
 #endif
-
-	if (!(NCP_SERVER(dir)->m.flags & NCP_MOUNT_SYMLINKS))
-		return -EPERM;	/* EPERM is returned by VFS if symlink procedure does not exist */
-
-	if ((length=strlen(symname))>NCP_MAX_SYMLINK_SIZE-8)
-		return -EINVAL;
-
-	if ((link=(char *)kmalloc(length+9,GFP_NFS))==NULL)
+	/* EPERM is returned by VFS if symlink procedure does not exist */
+		return -EPERM;
+  
+	rawlink=(char *)kmalloc(NCP_MAX_SYMLINK_SIZE, GFP_NFS);
+	if (!rawlink)
 		return -ENOMEM;
 
-	err = -EIO;
-	lock_kernel();
-	if (ncp_create_new(dir,dentry,0,aSHARED|aHIDDEN))
+	if (kludge) {
+		mode = 0;
+		attr = aSHARED | aHIDDEN;
+		((__u32 *)rawlink)[0]=NCP_SYMLINK_MAGIC0;
+		((__u32 *)rawlink)[1]=NCP_SYMLINK_MAGIC1;
+		hdr = 8;
+	} else {
+		mode = S_IFLNK | S_IRWXUGO;
+		attr = 0;
+		hdr = 0;
+	}			
+
+	length = strlen(symname);
+	/* map to/from server charset, do not touch upper/lower case as
+	   symlink can point out of ncp filesystem */
+	outlen = NCP_MAX_SYMLINK_SIZE - hdr;
+	err = ncp_io2vol(NCP_SERVER(dir), rawlink + hdr, &outlen, symname, length, 0);
+	if (err)
 		goto failfree;
+
+	outlen += hdr;
+
+	err = -EIO;
+	if (ncp_create_new(dir,dentry,mode,0,attr)) {
+		goto failfree;
+	}
 
 	inode=dentry->d_inode;
 
 	if (ncp_make_open(inode, O_WRONLY))
 		goto failfree;
 
-	((__u32 *)link)[0]=NCP_SYMLINK_MAGIC0;
-	((__u32 *)link)[1]=NCP_SYMLINK_MAGIC1;
-
-	/* map to/from server charset, do not touch upper/lower case as
-	   symlink can point out of ncp filesystem */
-	length += 1;
-	err = ncp_io2vol(NCP_SERVER(inode),link+8,&length,symname,length-1,0);
-	if (err)
-		goto fail;
-
-	if(ncp_write_kernel(NCP_SERVER(inode), NCP_FINFO(inode)->file_handle, 
-	    		    0, length+8, link, &i) || i!=length+8) {
-		err = -EIO;
+	if (ncp_write_kernel(NCP_SERVER(inode), NCP_FINFO(inode)->file_handle, 
+			     0, outlen, rawlink, &i) || i!=outlen) {
 		goto fail;
 	}
 
 	ncp_inode_close(inode);
 	ncp_make_closed(inode);
-	unlock_kernel();
-	kfree(link);
+	kfree(rawlink);
 	return 0;
-
-fail:
+fail:;
 	ncp_inode_close(inode);
 	ncp_make_closed(inode);
-failfree:
-	unlock_kernel();
-	kfree(link);
-	return err;	
+failfree:;
+	kfree(rawlink);
+	return err;
 }
-#endif
 
 /* ----- EOF ----- */
