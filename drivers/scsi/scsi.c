@@ -83,7 +83,6 @@
  * Data declarations.
  */
 unsigned long scsi_pid;
-struct scsi_cmnd *last_cmnd;
 static unsigned long serial_number;
 
 /*
