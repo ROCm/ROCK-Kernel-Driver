@@ -207,7 +207,6 @@
 #include <linux/module.h>
 #include <linux/config.h> 
 #include <linux/kdev_t.h>
-#include <asm/io.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/ioport.h>
@@ -226,6 +225,9 @@
 #include <linux/init.h>
 #include <linux/miscdevice.h>
 #include <linux/bitops.h>
+
+#include <asm/io.h>
+#include <asm/uaccess.h>
 
 /* The 3.0.0 version of sxboards/sxwindow.h  uses BYTE and WORD.... */
 #define BYTE u8
