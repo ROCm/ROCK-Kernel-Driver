@@ -1394,22 +1394,24 @@ rtl8169_tx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 
 	while (tx_left > 0) {
 		int entry = dirty_tx % NUM_TX_DESC;
+		struct sk_buff *skb = tp->Tx_skbuff[entry];
+		u32 status;
 
 		rmb();
-		if (!(le32_to_cpu(tp->TxDescArray[entry].status) & OWNbit)) {
-			struct sk_buff *skb = tp->Tx_skbuff[entry];
+		status = le32_to_cpu(tp->TxDescArray[entry].status);
+		if (status & OWNbit)
+			break;
 
-			/* FIXME: is it really accurate for TxErr ? */
-			tp->stats.tx_bytes += skb->len >= ETH_ZLEN ?
-					      skb->len : ETH_ZLEN;
-			tp->stats.tx_packets++;
-			rtl8169_unmap_tx_skb(tp->pci_dev, tp->Tx_skbuff + entry,
-					     tp->TxDescArray + entry);
-			dev_kfree_skb_irq(skb);
-			tp->Tx_skbuff[entry] = NULL;
-			dirty_tx++;
-			tx_left--;
-		}
+		/* FIXME: is it really accurate for TxErr ? */
+		tp->stats.tx_bytes += skb->len >= ETH_ZLEN ?
+				      skb->len : ETH_ZLEN;
+		tp->stats.tx_packets++;
+		rtl8169_unmap_tx_skb(tp->pci_dev, tp->Tx_skbuff + entry,
+				     tp->TxDescArray + entry);
+		dev_kfree_skb_irq(skb);
+		tp->Tx_skbuff[entry] = NULL;
+		dirty_tx++;
+		tx_left--;
 	}
 
 	if (tp->dirty_tx != dirty_tx) {
