@@ -476,6 +476,7 @@ static int __init set_preferred_console(void)
 {
 	struct device_node *prom_stdout;
 	char *name;
+	int offset;
 
 	/* The user has requested a console so this is already set up. */
 	if (strstr(saved_command_line, "console="))
@@ -493,7 +494,6 @@ static int __init set_preferred_console(void)
 		int i;
 		u32 *reg = (u32 *)get_property(prom_stdout, "reg", &i);
 		if (i > 8) {
-			int offset;
 			switch (reg[1]) {
 				case 0x3f8:
 					offset = 0;
@@ -511,15 +511,19 @@ static int __init set_preferred_console(void)
 					/* We dont recognise the serial port */
 					return -ENODEV;
 			}
-
-			return add_preferred_console("ttyS", offset, NULL);
 		}
-	} else if (strcmp(name, "vty") == 0) {
+	} else if (strcmp(name, "vty") == 0)
 		/* pSeries LPAR virtual console */
 		return add_preferred_console("hvc", 0, NULL);
-	}
+	else if (strcmp(name, "ch-a") == 0)
+		offset = 0;
+	else if (strcmp(name, "ch-b") == 0)
+		offset = 1;
+	else
+		return -ENODEV;
 
-	return -ENODEV;
+	return add_preferred_console("ttyS", offset, NULL);
+
 }
 console_initcall(set_preferred_console);
 
