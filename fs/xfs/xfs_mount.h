@@ -539,7 +539,7 @@ typedef struct xfs_mod_sb {
 extern xfs_mount_t *xfs_mount_init(void);
 extern void	xfs_mod_sb(xfs_trans_t *, __int64_t);
 extern void	xfs_mount_free(xfs_mount_t *mp, int remove_bhv);
-extern int	xfs_mountfs(struct vfs *, xfs_mount_t *mp, dev_t, int);
+extern int	xfs_mountfs(struct vfs *, xfs_mount_t *mp, int);
 
 extern int	xfs_unmountfs(xfs_mount_t *, struct cred *);
 extern void	xfs_unmountfs_close(xfs_mount_t *, struct cred *);
