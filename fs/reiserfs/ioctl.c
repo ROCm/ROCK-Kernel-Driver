@@ -49,7 +49,7 @@ int reiserfs_unpack (struct inode * inode, struct file * filp)
     if (REISERFS_I(inode)->i_flags & i_nopack_mask) {
         return 0 ;
     }
-    lock_kernel();
+    reiserfs_write_lock(inode->i_sb);
 
     /* we need to make sure nobody is changing the file size beneath
     ** us
@@ -88,6 +88,6 @@ out_unlock:
 
 out:
     up(&inode->i_sem) ;
-    unlock_kernel();    
+    reiserfs_write_unlock(inode->i_sb);
     return retval;
 }

@@ -69,12 +69,12 @@ static void reiserfs_write_super (struct super_block * s)
 {
 
   int dirty = 0 ;
-  lock_kernel() ;
+  reiserfs_write_lock(s);
   if (!(s->s_flags & MS_RDONLY)) {
     dirty = flush_old_commits(s, 1) ;
   }
   s->s_dirt = dirty;
-  unlock_kernel() ;
+  reiserfs_write_unlock(s);
 }
 
 static void reiserfs_write_super_lockfs (struct super_block * s)
@@ -82,7 +82,7 @@ static void reiserfs_write_super_lockfs (struct super_block * s)
 
   int dirty = 0 ;
   struct reiserfs_transaction_handle th ;
-  lock_kernel() ;
+  reiserfs_write_lock(s);
   if (!(s->s_flags & MS_RDONLY)) {
     journal_begin(&th, s, 1) ;
     reiserfs_prepare_for_journal(s, SB_BUFFER_WITH_SB(s), 1);
@@ -91,7 +91,7 @@ static void reiserfs_write_super_lockfs (struct super_block * s)
     journal_end(&th, s, 1) ;
   }
   s->s_dirt = dirty;
-  unlock_kernel() ;
+  reiserfs_write_unlock(s);
 }
 
 void reiserfs_unlockfs(struct super_block *s) {
@@ -455,7 +455,7 @@ static void reiserfs_dirty_inode (struct inode * inode) {
 	                  inode->i_ino) ;
         return ;
     }
-    lock_kernel() ;
+    reiserfs_write_lock(inode->i_sb);
 
     /* this is really only used for atime updates, so they don't have
     ** to be included in O_SYNC or fsync
@@ -463,7 +463,7 @@ static void reiserfs_dirty_inode (struct inode * inode) {
     journal_begin(&th, inode->i_sb, 1) ;
     reiserfs_update_sd (&th, inode);
     journal_end(&th, inode->i_sb, 1) ;
-    unlock_kernel() ;
+    reiserfs_write_unlock(inode->i_sb);
 }
 
 struct super_operations reiserfs_sops = 
