@@ -38,7 +38,7 @@ MODULE_LICENSE("GPL");
 
 static int kill_proto(const struct ip_conntrack *i, void *data)
 {
-	return (i->tuplehash[IP_CT_DIR_ORIGINAL].dst.protonum == 
+	return (i->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.protonum == 
 			*((u_int8_t *) data));
 }
 
