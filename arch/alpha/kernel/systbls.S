@@ -216,7 +216,8 @@ sys_call_table:
 	.quad alpha_ni_syscall
 	.quad alpha_ni_syscall
 	.quad alpha_ni_syscall
-	.quad osf_swapon
+	/* The OSF swapon has two extra arguments, but we ignore them.  */
+	.quad sys_swapon
 	.quad sys_msgctl			/* 200 */
 	.quad sys_msgget
 	.quad sys_msgrcv

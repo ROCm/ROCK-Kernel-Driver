@@ -417,18 +417,6 @@ osf_utsname(char *name)
 	return error;
 }
 
-asmlinkage int
-osf_swapon(const char *path, int flags, int lowat, int hiwat)
-{
-	int ret;
-
-	/* for now, simply ignore lowat and hiwat... */
-	lock_kernel();
-	ret = sys_swapon(path, flags);
-	unlock_kernel();
-	return ret;
-}
-
 asmlinkage unsigned long
 sys_getpagesize(void)
 {
