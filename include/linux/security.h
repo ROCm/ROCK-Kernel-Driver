@@ -594,6 +594,17 @@ struct swap_info_struct;
  *	@flag contains the desired (requested) permission set
  *	Return 0 if permission is granted.
  *
+ * Security hooks for individual messages held in System V IPC message queues
+ * @msg_msg_alloc_security:
+ *	Allocate and attach a security structure to the msg->security field.
+ *	The security field is initialized to NULL when the structure is first
+ *	created.
+ *	@msg contains the message structure to be modified.
+ *	Return 0 if operation was successful and permission is granted.
+ * @msg_msg_free_security:
+ *	Deallocate the security structure for this message.
+ *	@msg contains the message structure to be modified.
+ *
  * Security hooks for System V IPC Message Queues
  *
  * @msg_queue_alloc_security:
@@ -605,6 +616,39 @@ struct swap_info_struct;
  * @msg_queue_free_security:
  *	Deallocate security structure for this message queue.
  *	@msq contains the message queue structure to be modified.
+ * @msg_queue_associate:
+ *	Check permission when a message queue is requested through the
+ *	msgget system call.  This hook is only called when returning the
+ *	message queue identifier for an existing message queue, not when a
+ *	new message queue is created.
+ *	@msq contains the message queue to act upon.
+ *	@msqflg contains the operation control flags.
+ *	Return 0 if permission is granted.
+ * @msg_queue_msgctl:
+ *	Check permission when a message control operation specified by @cmd
+ *	is to be performed on the message queue @msq.
+ *	The @msq may be NULL, e.g. for IPC_INFO or MSG_INFO.
+ *	@msq contains the message queue to act upon.  May be NULL.
+ *	@cmd contains the operation to be performed.
+ *	Return 0 if permission is granted.  
+ * @msg_queue_msgsnd:
+ *	Check permission before a message, @msg, is enqueued on the message
+ *	queue, @msq.
+ *	@msq contains the message queue to send message to.
+ *	@msg contains the message to be enqueued.
+ *	@msqflg contains operational flags.
+ *	Return 0 if permission is granted.
+ * @msg_queue_msgrcv:
+ *	Check permission before a message, @msg, is removed from the message
+ *	queue, @msq.  The @target task structure contains a pointer to the 
+ *	process that will be receiving the message (not equal to the current 
+ *	process when inline receives are being performed).
+ *	@msq contains the message queue to retrieve message from.
+ *	@msg contains the message destination.
+ *	@target contains the task structure for recipient process.
+ *	@type contains the type of message requested.
+ *	@mode contains the operational flags.
+ *	Return 0 if permission is granted.
  *
  * Security hooks for System V Shared Memory Segments
  *
@@ -617,6 +661,29 @@ struct swap_info_struct;
  * @shm_free_security:
  *	Deallocate the security struct for this memory segment.
  *	@shp contains the shared memory structure to be modified.
+ * @shm_associate:
+ *	Check permission when a shared memory region is requested through the
+ *	shmget system call.  This hook is only called when returning the shared
+ *	memory region identifier for an existing region, not when a new shared
+ *	memory region is created.
+ *	@shp contains the shared memory structure to be modified.
+ *	@shmflg contains the operation control flags.
+ *	Return 0 if permission is granted.
+ * @shm_shmctl:
+ *	Check permission when a shared memory control operation specified by
+ *	@cmd is to be performed on the shared memory region @shp.
+ *	The @shp may be NULL, e.g. for IPC_INFO or SHM_INFO.
+ *	@shp contains shared memory structure to be modified.
+ *	@cmd contains the operation to be performed.
+ *	Return 0 if permission is granted.
+ * @shm_shmat:
+ *	Check permissions prior to allowing the shmat system call to attach the
+ *	shared memory segment @shp to the data segment of the calling process.
+ *	The attaching address is specified by @shmaddr.
+ *	@shp contains the shared memory structure to be modified.
+ *	@shmaddr contains the address to attach memory region to.
+ *	@shmflg contains the operational flags.
+ *	Return 0 if permission is granted.
  *
  * Security hooks for System V Semaphores
  *
@@ -629,6 +696,30 @@ struct swap_info_struct;
  * @sem_free_security:
  *	deallocate security struct for this semaphore
  *	@sma contains the semaphore structure.
+ * @sem_associate:
+ *	Check permission when a semaphore is requested through the semget
+ *	system call.  This hook is only called when returning the semaphore
+ *	identifier for an existing semaphore, not when a new one must be
+ *	created.
+ *	@sma contains the semaphore structure.
+ *	@semflg contains the operation control flags.
+ *	Return 0 if permission is granted.
+ * @sem_semctl:
+ *	Check permission when a semaphore operation specified by @cmd is to be
+ *	performed on the semaphore @sma.  The @sma may be NULL, e.g. for 
+ *	IPC_INFO or SEM_INFO.
+ *	@sma contains the semaphore structure.  May be NULL.
+ *	@cmd contains the operation to be performed.
+ *	Return 0 if permission is granted.
+ * @sem_semop
+ *	Check permissions before performing operations on members of the
+ *	semaphore set @sma.  If the @alter flag is nonzero, the semaphore set 
+ *      may be modified.
+ *	@sma contains the semaphore structure.
+ *	@sops contains the operations to perform.
+ *	@nsops contains the number of operations to perform.
+ *	@alter contains the flag indicating whether changes are to be made.
+ *	Return 0 if permission is granted.
  *
  * @ptrace:
  *	Check permission before allowing the @parent process to trace the
@@ -828,14 +919,33 @@ struct security_operations {
 
 	int (*ipc_permission) (struct kern_ipc_perm * ipcp, short flag);
 
+	int (*msg_msg_alloc_security) (struct msg_msg * msg);
+	void (*msg_msg_free_security) (struct msg_msg * msg);
+
 	int (*msg_queue_alloc_security) (struct msg_queue * msq);
 	void (*msg_queue_free_security) (struct msg_queue * msq);
+	int (*msg_queue_associate) (struct msg_queue * msq, int msqflg);
+	int (*msg_queue_msgctl) (struct msg_queue * msq, int cmd);
+	int (*msg_queue_msgsnd) (struct msg_queue * msq,
+				 struct msg_msg * msg, int msqflg);
+	int (*msg_queue_msgrcv) (struct msg_queue * msq,
+				 struct msg_msg * msg,
+				 struct task_struct * target,
+				 long type, int mode);
 
 	int (*shm_alloc_security) (struct shmid_kernel * shp);
 	void (*shm_free_security) (struct shmid_kernel * shp);
+	int (*shm_associate) (struct shmid_kernel * shp, int shmflg);
+	int (*shm_shmctl) (struct shmid_kernel * shp, int cmd);
+	int (*shm_shmat) (struct shmid_kernel * shp, 
+			  char *shmaddr, int shmflg);
 
 	int (*sem_alloc_security) (struct sem_array * sma);
 	void (*sem_free_security) (struct sem_array * sma);
+	int (*sem_associate) (struct sem_array * sma, int semflg);
+	int (*sem_semctl) (struct sem_array * sma, int cmd);
+	int (*sem_semop) (struct sem_array * sma, 
+			  struct sembuf * sops, unsigned nsops, int alter);
 
 	/* allow module stacking */
 	int (*register_security) (const char *name,
@@ -1334,6 +1444,16 @@ static inline int security_ipc_permission (struct kern_ipc_perm *ipcp,
 	return security_ops->ipc_permission (ipcp, flag);
 }
 
+static inline int security_msg_msg_alloc (struct msg_msg * msg)
+{
+	return security_ops->msg_msg_alloc_security (msg);
+}
+
+static inline void security_msg_msg_free (struct msg_msg * msg)
+{
+	security_ops->msg_msg_free_security(msg);
+}
+
 static inline int security_msg_queue_alloc (struct msg_queue *msq)
 {
 	return security_ops->msg_queue_alloc_security (msq);
@@ -1342,6 +1462,31 @@ static inline int security_msg_queue_alloc (struct msg_queue *msq)
 static inline void security_msg_queue_free (struct msg_queue *msq)
 {
 	security_ops->msg_queue_free_security (msq);
+}
+
+static inline int security_msg_queue_associate (struct msg_queue * msq, 
+						int msqflg)
+{
+	return security_ops->msg_queue_associate (msq, msqflg);
+}
+
+static inline int security_msg_queue_msgctl (struct msg_queue * msq, int cmd)
+{
+	return security_ops->msg_queue_msgctl (msq, cmd);
+}
+
+static inline int security_msg_queue_msgsnd (struct msg_queue * msq,
+					     struct msg_msg * msg, int msqflg)
+{
+	return security_ops->msg_queue_msgsnd (msq, msg, msqflg);
+}
+
+static inline int security_msg_queue_msgrcv (struct msg_queue * msq,
+					     struct msg_msg * msg,
+					     struct task_struct * target,
+					     long type, int mode)
+{
+	return security_ops->msg_queue_msgrcv (msq, msg, target, type, mode);
 }
 
 static inline int security_shm_alloc (struct shmid_kernel *shp)
@@ -1354,6 +1499,23 @@ static inline void security_shm_free (struct shmid_kernel *shp)
 	security_ops->shm_free_security (shp);
 }
 
+static inline int security_shm_associate (struct shmid_kernel * shp, 
+					  int shmflg)
+{
+	return security_ops->shm_associate(shp, shmflg);
+}
+
+static inline int security_shm_shmctl (struct shmid_kernel * shp, int cmd)
+{
+	return security_ops->shm_shmctl (shp, cmd);
+}
+
+static inline int security_shm_shmat (struct shmid_kernel * shp, 
+				      char *shmaddr, int shmflg)
+{
+	return security_ops->shm_shmat(shp, shmaddr, shmflg);
+}
+
 static inline int security_sem_alloc (struct sem_array *sma)
 {
 	return security_ops->sem_alloc_security (sma);
@@ -1364,6 +1526,22 @@ static inline void security_sem_free (struct sem_array *sma)
 	security_ops->sem_free_security (sma);
 }
 
+static inline int security_sem_associate (struct sem_array * sma, int semflg)
+{
+	return security_ops->sem_associate (sma, semflg);
+}
+
+static inline int security_sem_semctl (struct sem_array * sma, int cmd)
+{
+	return security_ops->sem_semctl(sma, cmd);
+}
+
+static inline int security_sem_semop (struct sem_array * sma, 
+				      struct sembuf * sops, unsigned nsops, 
+				      int alter)
+{
+	return security_ops->sem_semop(sma, sops, nsops, alter);
+}
 
 /* prototypes */
 extern int security_scaffolding_startup	(void);
@@ -1835,6 +2013,14 @@ static inline int security_ipc_permission (struct kern_ipc_perm *ipcp,
 	return 0;
 }
 
+static inline int security_msg_msg_alloc (struct msg_msg * msg)
+{
+	return 0;
+}
+
+static inline void security_msg_msg_free (struct msg_msg * msg)
+{ }
+
 static inline int security_msg_queue_alloc (struct msg_queue *msq)
 {
 	return 0;
@@ -1842,6 +2028,31 @@ static inline int security_msg_queue_alloc (struct msg_queue *msq)
 
 static inline void security_msg_queue_free (struct msg_queue *msq)
 { }
+
+static inline int security_msg_queue_associate (struct msg_queue * msq, 
+						int msqflg)
+{
+	return 0;
+}
+
+static inline int security_msg_queue_msgctl (struct msg_queue * msq, int cmd)
+{
+	return 0;
+}
+
+static inline int security_msg_queue_msgsnd (struct msg_queue * msq,
+					     struct msg_msg * msg, int msqflg)
+{
+	return 0;
+}
+
+static inline int security_msg_queue_msgrcv (struct msg_queue * msq,
+					     struct msg_msg * msg,
+					     struct task_struct * target,
+					     long type, int mode)
+{
+	return 0;
+}
 
 static inline int security_shm_alloc (struct shmid_kernel *shp)
 {
@@ -1851,6 +2062,23 @@ static inline int security_shm_alloc (struct shmid_kernel *shp)
 static inline void security_shm_free (struct shmid_kernel *shp)
 { }
 
+static inline int security_shm_associate (struct shmid_kernel * shp, 
+					  int shmflg)
+{
+	return 0;
+}
+
+static inline int security_shm_shmctl (struct shmid_kernel * shp, int cmd)
+{
+	return 0;
+}
+
+static inline int security_shm_shmat (struct shmid_kernel * shp, 
+				      char *shmaddr, int shmflg)
+{
+	return 0;
+}
+
 static inline int security_sem_alloc (struct sem_array *sma)
 {
 	return 0;
@@ -1859,6 +2087,22 @@ static inline int security_sem_alloc (struct sem_array *sma)
 static inline void security_sem_free (struct sem_array *sma)
 { }
 
+static inline int security_sem_associate (struct sem_array * sma, int semflg)
+{
+	return 0;
+}
+
+static inline int security_sem_semctl (struct sem_array * sma, int cmd)
+{
+	return 0;
+}
+
+static inline int security_sem_semop (struct sem_array * sma, 
+				      struct sembuf * sops, unsigned nsops, 
+				      int alter)
+{
+	return 0;
+}
 
 #endif	/* CONFIG_SECURITY */
 

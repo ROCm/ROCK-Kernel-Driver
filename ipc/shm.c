@@ -257,8 +257,12 @@ asmlinkage long sys_shmget (key_t key, size_t size, int shmflg)
 			err = -EINVAL;
 		else if (ipcperms(&shp->shm_perm, shmflg))
 			err = -EACCES;
-		else
-			err = shm_buildid(id, shp->shm_perm.seq);
+		else {
+			int shmid = shm_buildid(id, shp->shm_perm.seq);
+			err = security_shm_associate(shp, shmflg);
+			if (!err)
+				err = shmid;
+		}
 		shm_unlock(shp);
 	}
 	up(&shm_ids.sem);
@@ -399,6 +403,10 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 	{
 		struct shminfo64 shminfo;
 
+		err = security_shm_shmctl(NULL, cmd);
+		if (err)
+			return err;
+
 		memset(&shminfo,0,sizeof(shminfo));
 		shminfo.shmmni = shminfo.shmseg = shm_ctlmni;
 		shminfo.shmmax = shm_ctlmax;
@@ -416,6 +424,10 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 	case SHM_INFO:
 	{
 		struct shm_info shm_info;
+
+		err = security_shm_shmctl(NULL, cmd);
+		if (err)
+			return err;
 
 		memset(&shm_info,0,sizeof(shm_info));
 		down(&shm_ids.sem);
@@ -458,6 +470,9 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 		err=-EACCES;
 		if (ipcperms (&shp->shm_perm, S_IRUGO))
 			goto out_unlock;
+		err = security_shm_shmctl(shp, cmd);
+		if (err)
+			goto out_unlock;
 		kernel_to_ipc64_perm(&shp->shm_perm, &tbuf.shm_perm);
 		tbuf.shm_segsz	= shp->shm_segsz;
 		tbuf.shm_atime	= shp->shm_atim;
@@ -495,6 +510,11 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 		err = shm_checkid(shp,shmid);
 		if(err)
 			goto out_unlock;
+
+		err = security_shm_shmctl(shp, cmd);
+		if (err)
+			goto out_unlock;
+		
 		if(cmd==SHM_LOCK) {
 			if (!is_file_hugepages(shp->shm_file))
 				shmem_lock(shp->shm_file, 1);
@@ -527,12 +547,18 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 		err = shm_checkid(shp, shmid);
 		if(err)
 			goto out_unlock_up;
+
 		if (current->euid != shp->shm_perm.uid &&
 		    current->euid != shp->shm_perm.cuid && 
 		    !capable(CAP_SYS_ADMIN)) {
 			err=-EPERM;
 			goto out_unlock_up;
 		}
+
+		err = security_shm_shmctl(shp, cmd);
+		if (err)
+			goto out_unlock_up;
+
 		if (shp->shm_nattch){
 			shp->shm_flags |= SHM_DEST;
 			/* Do not find it any more */
@@ -565,6 +591,10 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 			goto out_unlock_up;
 		}
 
+		err = security_shm_shmctl(shp, cmd);
+		if (err)
+			goto out_unlock_up;
+		
 		shp->shm_perm.uid = setbuf.uid;
 		shp->shm_perm.gid = setbuf.gid;
 		shp->shm_flags = (shp->shm_flags & ~S_IRWXUGO)
@@ -653,6 +683,13 @@ asmlinkage long sys_shmat (int shmid, char *shmaddr, int shmflg, ulong *raddr)
 		err = -EACCES;
 		goto out;
 	}
+
+	err = security_shm_shmat(shp, shmaddr, shmflg);
+	if (err) {
+		shm_unlock(shp);
+		return err;
+	}
+		
 	file = shp->shm_file;
 	size = file->f_dentry->d_inode->i_size;
 	shp->shm_nattch++;
