@@ -718,8 +718,10 @@ static int __init shaper_init(void)
 		if (!dev) 
 			break;
 
-		if (register_netdev(dev))
+		if (register_netdev(dev)) {
+			free_netdev(dev);
 			break;
+		}
 
 		devs[i] = dev;
 		shapers_registered++;
@@ -737,9 +739,12 @@ static void __exit shaper_exit (void)
 {
 	int i;
 
-	for (i = 0; i < shapers_registered; i++)
-		if (devs[i])
+	for (i = 0; i < shapers_registered; i++) {
+		if (devs[i]) {
 			unregister_netdev(devs[i]);
+			free_netdev(devs[i]);
+		}
+	}
 
 	kfree(devs);
 	devs = NULL;

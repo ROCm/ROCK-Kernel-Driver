@@ -491,7 +491,7 @@ err_out_kfree:
 err_out_region:
 	release_region(ioaddr, pdev ? PFI_K_CSR_IO_LEN : PI_ESIC_K_CSR_IO_LEN);
 err_out:
-	kfree(dev);
+	free_netdev(dev);
 	return err;
 }
 

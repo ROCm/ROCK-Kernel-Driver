@@ -569,14 +569,13 @@ static struct net_device *corkscrew_found_device(struct net_device *dev,
 
 #ifdef MODULE
 	/* Allocate and fill new device structure. */
-	int dev_size = sizeof(struct net_device) + sizeof(struct corkscrew_private) + 15;	/* Pad for alignment */
+	int dev_size = sizeof(struct corkscrew_private);
 
-	dev = (struct net_device *) kmalloc(dev_size, GFP_KERNEL);
+	dev = alloc_etherdev(dev_size);
 	if (!dev)
-		return NULL;
+		goto err_out;
 	memset(dev, 0, dev_size);
-	/* Align the Rx and Tx ring entries.  */
-	dev->priv = (void *) (((long) dev + sizeof(struct net_device) + 15) & ~15);
+
 	vp = (struct corkscrew_private *) dev->priv;
 	dev->base_addr = ioaddr;
 	dev->irq = irq;
@@ -593,19 +592,16 @@ static struct net_device *corkscrew_found_device(struct net_device *dev,
 		vp->full_duplex = 0;
 		vp->bus_master = 0;
 	}
-	ether_setup(dev);
 	vp->next_module = root_corkscrew_dev;
 	root_corkscrew_dev = dev;
 	SET_MODULE_OWNER(dev);
-	if (register_netdev(dev) != 0) {
-		kfree(dev);
-		return NULL;
-	}
+	if (register_netdev(dev) < 0)
+		goto err_free_dev;
 #else				/* not a MODULE */
 	/* Caution: quad-word alignment required for rings! */
 	dev->priv = kmalloc(sizeof(struct corkscrew_private), GFP_KERNEL);
 	if (!dev->priv)
-		return NULL;
+		goto err_out;
 	memset(dev->priv, 0, sizeof(struct corkscrew_private));
 	dev = init_etherdev(dev, sizeof(struct corkscrew_private));
 	dev->base_addr = ioaddr;
@@ -627,6 +623,11 @@ static struct net_device *corkscrew_found_device(struct net_device *dev,
 	corkscrew_probe1(dev);
 #endif				/* MODULE */
 	return dev;
+
+err_free_dev:
+	free_netdev(dev);
+err_out:
+	return NULL;
 }
 
 static int corkscrew_probe1(struct net_device *dev)

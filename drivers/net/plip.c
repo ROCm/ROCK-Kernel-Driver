@@ -1306,17 +1306,23 @@ static void plip_attach (struct parport *port)
 
 		if (!nl->pardev) {
 			printk(KERN_ERR "%s: parport_register failed\n", name);
-			kfree(dev);
+			goto err_free_dev;
 			return;
 		}
 
 		if (register_netdev(dev)) {
 			printk(KERN_ERR "%s: network register failed\n", name);
-			kfree(dev);
-		} else {
-			dev_plip[unit++] = dev;
+			goto err_parport_unregister;
 		}
+		dev_plip[unit++] = dev;
 	}
+	return;
+
+err_parport_unregister:
+	parport_unregister_device(nl->pardev);
+err_free_dev:
+	free_netdev(dev);
+	return;
 }
 
 /* plip_detach() is called (by the parport code) when a port is

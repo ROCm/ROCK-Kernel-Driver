@@ -96,7 +96,7 @@ static int __init dummy_init_module(void)
 		return -ENOMEM;
 
 	if ((err = register_netdev(dev_dummy))) {
-		kfree(dev_dummy);
+		free_netdev(dev_dummy);
 		dev_dummy = NULL;
 	}
 	return err;
