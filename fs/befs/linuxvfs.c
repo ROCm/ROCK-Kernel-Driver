@@ -430,7 +430,7 @@ befs_init_inodecache(void)
 {
 	befs_inode_cachep = kmem_cache_create("befs_inode_cache",
 					      sizeof (struct befs_inode_info),
-					      0, SLAB_HWCACHE_ALIGN,
+					      0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					      init_once, NULL);
 	if (befs_inode_cachep == NULL) {
 		printk(KERN_ERR "befs_init_inodecache: "

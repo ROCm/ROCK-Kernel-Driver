@@ -1552,7 +1552,7 @@ static void __init dcache_init(unsigned long mempages)
 	dentry_cache = kmem_cache_create("dentry_cache",
 					 sizeof(struct dentry),
 					 0,
-					 SLAB_HWCACHE_ALIGN,
+					 SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					 NULL, NULL);
 	if (!dentry_cache)
 		panic("Cannot create dentry cache");

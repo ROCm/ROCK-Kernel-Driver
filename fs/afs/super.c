@@ -81,7 +81,7 @@ int __init afs_fs_init(void)
 	afs_inode_cachep = kmem_cache_create("afs_inode_cache",
 						sizeof(afs_vnode_t),
 						0,
-						SLAB_HWCACHE_ALIGN,
+						SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 						afs_i_init_once,
 						NULL);
 	if (!afs_inode_cachep) {

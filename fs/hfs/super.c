@@ -72,7 +72,7 @@ static int init_inodecache(void)
 {
 	hfs_inode_cachep = kmem_cache_create("hfs_inode_cache",
 					     sizeof(struct hfs_inode_info),
-					     0, SLAB_HWCACHE_ALIGN,
+					     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					     init_once, NULL);
 	if (hfs_inode_cachep == NULL)
 		return -ENOMEM;
