@@ -17,7 +17,6 @@ enum { OP_NONE, OP_EXEC, OP_FORK, OP_TRACE_ON, OP_REBOOT, OP_HALT, OP_CB };
 struct cpu_task {
 	int pid;
 	void *task;
-	void *idle;
 };
 
 extern struct cpu_task cpu_tasks[];

@@ -6,12 +6,15 @@
 /* 2001-09-28...2002-04-17
  * Partition stuff by James_McMechan@hotmail.com
  * old style ubd by setting UBD_SHIFT to 0
+ * 2002-09-27...2002-10-18 massive tinkering for 2.5
+ * partitions have changed in 2.5
  */
 
 #define MAJOR_NR UBD_MAJOR
 #define UBD_SHIFT 4
 
 #include "linux/config.h"
+#include "linux/module.h"
 #include "linux/blk.h"
 #include "linux/blkdev.h"
 #include "linux/hdreg.h"
@@ -51,7 +54,6 @@ static int ubd_open(struct inode * inode, struct file * filp);
 static int ubd_release(struct inode * inode, struct file * file);
 static int ubd_ioctl(struct inode * inode, struct file * file,
 		     unsigned int cmd, unsigned long arg);
-static int ubd_revalidate(kdev_t rdev);
 
 #define MAX_DEV (8)
 #define MAX_MINOR (MAX_DEV << UBD_SHIFT)
@@ -59,10 +61,10 @@ static int ubd_revalidate(kdev_t rdev);
 #define DEVICE_NR(n) (minor(n) >> UBD_SHIFT)
 
 static struct block_device_operations ubd_blops = {
-        .open =		ubd_open,
-        .release =	ubd_release,
-        .ioctl =	ubd_ioctl,
-        .revalidate =	ubd_revalidate,
+        .owner		= THIS_MODULE,
+        .open		= ubd_open,
+        .release	= ubd_release,
+        .ioctl		= ubd_ioctl,
 };
 
 /* Protected by the queue_lock */
@@ -171,8 +173,6 @@ static void make_ide_entries(char *dev_name)
 {
 	struct proc_dir_entry *dir, *ent;
 	char name[64];
-
-	if(!fake_ide) return;
 
 	if(proc_ide_root == NULL) make_proc_ide();
 
@@ -417,74 +417,133 @@ static int ubd_file_size(struct ubd *dev, __u64 *size_out)
 	return(os_file_size(file, size_out));
 }
 
+static void ubd_close(struct ubd *dev)
+{
+	os_close_file(dev->fd);
+	if(dev->cow.file == NULL)
+		return;
+
+	os_close_file(dev->cow.fd);
+	vfree(dev->cow.bitmap);
+	dev->cow.bitmap = NULL;
+}
+
+static int ubd_open_dev(struct ubd *dev)
+{
+	struct openflags flags;
+	int err, n, create_cow, *create_ptr;
+
+	create_cow = 0;
+	create_ptr = (dev->cow.file != NULL) ? &create_cow : NULL;
+	dev->fd = open_ubd_file(dev->file, &dev->openflags, &dev->cow.file,
+				&dev->cow.bitmap_offset, &dev->cow.bitmap_len, 
+				&dev->cow.data_offset, create_ptr);
+
+	if((dev->fd == -ENOENT) && create_cow){
+		n = dev - ubd_dev;
+		dev->fd = create_cow_file(dev->file, dev->cow.file, 
+					  dev->openflags, 1 << 9,
+					  &dev->cow.bitmap_offset, 
+					  &dev->cow.bitmap_len,
+					  &dev->cow.data_offset);
+		if(dev->fd >= 0){
+			printk(KERN_INFO "Creating \"%s\" as COW file for "
+			       "\"%s\"\n", dev->file, dev->cow.file);
+		}
+	}
+
+	if(dev->fd < 0) return(dev->fd);
+
+	if(dev->cow.file != NULL){
+		err = -ENOMEM;
+		dev->cow.bitmap = (void *) vmalloc(dev->cow.bitmap_len);
+		if(dev->cow.bitmap == NULL) goto error;
+		flush_tlb_kernel_vm();
+
+		err = read_cow_bitmap(dev->fd, dev->cow.bitmap, 
+				      dev->cow.bitmap_offset, 
+				      dev->cow.bitmap_len);
+		if(err) goto error;
+
+		flags = dev->openflags;
+		flags.w = 0;
+		err = open_ubd_file(dev->cow.file, &flags, NULL, NULL, NULL, 
+				    NULL, NULL);
+		if(err < 0) goto error;
+		dev->cow.fd = err;
+	}
+	return(0);
+ error:
+	os_close_file(dev->fd);
+	return(err);
+}
+
+static int ubd_new_disk(int major, u64 size, char *name, int unit,
+			struct gendisk **disk_out, devfs_handle_t dir_handle,
+			devfs_handle_t *handle_out)
+{
+	char devfs_name[sizeof("nnnnnn\0")];
+	struct gendisk *disk;
+	int minor = unit << UBD_SHIFT;
+
+	disk = alloc_disk(1 << UBD_SHIFT);
+	if(disk == NULL)
+		return(-ENOMEM);
+
+	disk->major = major;
+	disk->first_minor = minor;
+	disk->fops = &ubd_blops;
+	set_capacity(disk, size / 512);
+	/* needs to be ubd -> /dev/ubd/discX/disc */
+	sprintf(disk->disk_name, "ubd");
+	*disk_out = disk;
+
+	/* /dev/ubd/N style names */
+	sprintf(devfs_name, "%d", unit);
+	*handle_out = devfs_register(dir_handle, devfs_name,
+				     DEVFS_FL_REMOVABLE, major, minor,
+				     S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |
+				     S_IWGRP, &ubd_blops, NULL);
+	add_disk(disk);
+	return(0);
+}
+
 /* Initialized in an initcall, and unchanged thereafter */
 devfs_handle_t ubd_dir_handle;
 devfs_handle_t ubd_fake_dir_handle;
 
 static int ubd_add(int n)
 {
-	char name[sizeof("nnnnnn\0")];
 	struct ubd *dev = &ubd_dev[n];
-	struct gendisk *disk, *fake_disk = NULL;
-	u64 size;
+	int err;
 
-	if (!dev->file)
-		goto out;
+	if (!dev->file || dev->is_dir)
+		return(-ENODEV);
 
-	disk = alloc_disk(1 << UBD_SHIFT);
-	if (!disk)
-		return -1;
-	disk->major = MAJOR_NR;
-	disk->first_minor = n << UBD_SHIFT;
-	disk->fops = &ubd_blops;
-	if (fakehd_set)
-		sprintf(disk->disk_name, "hd%c", n + 'a');
-	else
-		sprintf(disk->disk_name, "ubd%d", n);
+	if (ubd_open_dev(dev))
+		return(-ENODEV);
 
-	if (fake_major) {
-		fake_disk = alloc_disk(1 << UBD_SHIFT);
-		if (!fake_disk) {
-			put_disk(disk);
-			return -1;
-		}
-		fake_disk->major = fake_major;
-		fake_disk->first_minor = n << UBD_SHIFT;
-		fake_disk->fops = &ubd_blops;
-		sprintf(fake_disk->disk_name, "ubd%d", n);
-		fake_gendisk[n] = fake_disk;
-	}
+	err = ubd_file_size(dev, &dev->size);
+	if(err)
+		return(err);
 
-	ubd_gendisk[n] = disk;
-
-	if (!dev->is_dir && ubd_file_size(dev, &size) == 0) {
-		set_capacity(disk, size/512);
-		if (fake_major)
-			set_capacity(fake_disk, size/512);
-	}
+	err = ubd_new_disk(MAJOR_NR, dev->size, "ubd", n, &ubd_gendisk[n], 
+			   ubd_dir_handle, &dev->real);
+	if(err) 
+		return(err);
  
-	sprintf(name, "%d", n);
-	dev->real = devfs_register(ubd_dir_handle, name, DEVFS_FL_REMOVABLE, 
-				   MAJOR_NR, n << UBD_SHIFT, S_IFBLK | 
-				   S_IRUSR | S_IWUSR | S_IRGRP |S_IWGRP,
-				   &ubd_blops, NULL);
+	if(fake_major)
+		ubd_new_disk(fake_major, dev->size, "ubd%d", n, 
+			     &fake_gendisk[n], ubd_fake_dir_handle, 
+			     &dev->fake);
 
-	if (fake_major) {
-		dev->fake = devfs_register(ubd_fake_dir_handle, name, 
-					   DEVFS_FL_REMOVABLE, fake_major,
-					   n << UBD_SHIFT, 
-					   S_IFBLK | S_IRUSR | S_IWUSR | 
-					   S_IRGRP | S_IWGRP, &ubd_blops,
-					   NULL);
-		add_disk(fake_disk);
-	}
- 
-	add_disk(disk);
-	make_ide_entries(disk->disk_name);
-	return(0);
+	/* perhaps this should also be under the "if (fake_major)" above */
+	/* using the fake_disk->disk_name and also the fakehd_set name */
+	if (fake_ide)
+		make_ide_entries(ubd_gendisk[n]->disk_name);
 
- out:
-	return(-1);
+	ubd_close(dev);
+	return 0;
 }
 
 static int ubd_config(char *str)
@@ -515,34 +574,39 @@ static int ubd_config(char *str)
 static int ubd_remove(char *str)
 {
 	struct ubd *dev;
-	int n, err;
+	int n, err = -ENODEV;
 
-	if(!isdigit(*str)) 
-		return(-1);
+	if(!isdigit(*str))
+		return(err);	/* it should be a number 0-7/a-h */
+
 	n = *str - '0';
 	if(n > MAX_DEV) 
-		return(-1);
+		return(err);
+
 	dev = &ubd_dev[n];
+	if(dev->count > 0)
+		return(-EBUSY);	/* you cannot remove a open disk */
 
 	err = 0;
  	spin_lock(&ubd_lock);
+
+	if(ubd_gendisk[n] == NULL)
+		goto out;
+
 	del_gendisk(ubd_gendisk[n]);
 	put_disk(ubd_gendisk[n]);
 	ubd_gendisk[n] = NULL;
-	if (fake_major) {
+	if(dev->real != NULL) 
+		devfs_unregister(dev->real);
+
+	if(fake_gendisk[n] != NULL){
 		del_gendisk(fake_gendisk[n]);
 		put_disk(fake_gendisk[n]);
 		fake_gendisk[n] = NULL;
+		if(dev->fake != NULL) 
+			devfs_unregister(dev->fake);
 	}
-	if(dev->file == NULL)
-		goto out;
-	err = -1;
-	if(dev->count > 0)
-		goto out;
-	if(dev->real != NULL) 
-		devfs_unregister(dev->real);
-	if(dev->fake != NULL) 
-		devfs_unregister(dev->fake);
+
 	*dev = ((struct ubd) DEFAULT_UBD);
 	err = 0;
  out:
@@ -625,66 +689,6 @@ int ubd_driver_init(void){
 }
 
 device_initcall(ubd_driver_init);
-
-static void ubd_close(struct ubd *dev)
-{
-	os_close_file(dev->fd);
-	if(dev->cow.file != NULL) {
-		os_close_file(dev->cow.fd);
-		vfree(dev->cow.bitmap);
-		dev->cow.bitmap = NULL;
-	}
-}
-
-static int ubd_open_dev(struct ubd *dev)
-{
-	struct openflags flags;
-	int err, n, create_cow, *create_ptr;
-
-	create_cow = 0;
-	create_ptr = (dev->cow.file != NULL) ? &create_cow : NULL;
-	dev->fd = open_ubd_file(dev->file, &dev->openflags, &dev->cow.file,
-				&dev->cow.bitmap_offset, &dev->cow.bitmap_len, 
-				&dev->cow.data_offset, create_ptr);
-
-	if((dev->fd == -ENOENT) && create_cow){
-		n = dev - ubd_dev;
-		dev->fd = create_cow_file(dev->file, dev->cow.file, 
-					  dev->openflags, 1 << 9,
-					  &dev->cow.bitmap_offset, 
-					  &dev->cow.bitmap_len,
-					  &dev->cow.data_offset);
-		if(dev->fd >= 0){
-			printk(KERN_INFO "Creating \"%s\" as COW file for "
-			       "\"%s\"\n", dev->file, dev->cow.file);
-		}
-	}
-
-	if(dev->fd < 0) return(dev->fd);
-
-	if(dev->cow.file != NULL){
-		err = -ENOMEM;
-		dev->cow.bitmap = (void *) vmalloc(dev->cow.bitmap_len);
-		if(dev->cow.bitmap == NULL) goto error;
-		flush_tlb_kernel_vm();
-
-		err = read_cow_bitmap(dev->fd, dev->cow.bitmap, 
-				      dev->cow.bitmap_offset, 
-				      dev->cow.bitmap_len);
-		if(err) goto error;
-
-		flags = dev->openflags;
-		flags.w = 0;
-		err = open_ubd_file(dev->cow.file, &flags, NULL, NULL, NULL, 
-				    NULL, NULL);
-		if(err < 0) goto error;
-		dev->cow.fd = err;
-	}
-	return(0);
- error:
-	os_close_file(dev->fd);
-	return(err);
-}
 
 static int ubd_open(struct inode *inode, struct file *filp)
 {
@@ -915,32 +919,6 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 		return(0);
 	}
 	return(-EINVAL);
-}
-
-static int ubd_revalidate(kdev_t rdev)
-{
-	__u64 size;
-	int n, err;
-	struct ubd *dev;
-
-	n = minor(rdev) >> UBD_SHIFT;
-	dev = &ubd_dev[n];
-
-	err = 0;
-	spin_lock(&ubd_lock);
-	if(dev->is_dir) 
-		goto out;
-	
-	err = ubd_file_size(dev, &size);
-	if (!err) {
-		set_capacity(ubd_gendisk[n], size / 512);
-		if(fake_major != 0)
-			set_capacity(fake_gendisk[n], size / 512);
-		dev->size = size;
-	}
- out:
-	spin_unlock(&ubd_lock);
-	return err;
 }
 
 /*
