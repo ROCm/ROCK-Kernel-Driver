@@ -413,7 +413,7 @@ acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
 			break;
 	}
 	if (p < pend) {
-		for (q = pend; q >= p; q--)
+		for (q = pend - 1; q >= p; q--)
 			*(q + 1) = *q;
 	}
 	p->start_paddr = paddr;
