@@ -45,8 +45,8 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, str
 #ifdef CONFIG_SMP
 	else {
 		cpu_tlbstate[cpu].state = TLBSTATE_OK;
-		if (cpu_tlbstate[cpu].active_mm != next)
-			BUG();
+		BUG_ON(cpu_tlbstate[cpu].active_mm != next);
+
 		if (!test_and_set_bit(cpu, &next->cpu_vm_mask)) {
 			/* We were in lazy tlb mode and leave_mm disabled 
 			 * tlb flush IPI delivery. We must reload %cr3.
