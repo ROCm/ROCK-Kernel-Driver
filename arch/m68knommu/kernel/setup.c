@@ -120,6 +120,9 @@ void (*mach_power_off)( void ) = NULL;
 #if defined(CONFIG_M5272)
 	#define CPU "COLDFIRE(m5272)"
 #endif
+#if defined(CONFIG_M5282)
+	#define CPU "COLDFIRE(m5282)"
+#endif
 #if defined(CONFIG_M5307)
 	#define	CPU "COLDFIRE(m5307)"
 #endif
@@ -220,10 +223,6 @@ void setup_arch(char **cmdline_p)
 #endif
 		(int) memory_start, (int) memory_end,
 		(int) memory_end, (int) _ramend);
-#endif
-
-#ifdef CONFIG_BLK_DEV_BLKMEM
-	ROOT_DEV = MKDEV(BLKMEM_MAJOR, 0);
 #endif
 
 	/* Keep a copy of command line */

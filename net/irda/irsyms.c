@@ -167,7 +167,9 @@ EXPORT_SYMBOL(async_unwrap_char);
 EXPORT_SYMBOL(irda_calc_crc16);
 EXPORT_SYMBOL(irda_crc16_table);
 EXPORT_SYMBOL(irda_start_timer);
+#ifdef CONFIG_ISA
 EXPORT_SYMBOL(setup_dma);
+#endif
 EXPORT_SYMBOL(infrared_mode);
 
 #ifdef CONFIG_IRTTY
@@ -248,7 +250,7 @@ void irda_notify_init(notify_t *notify)
 	notify->flow_indication = NULL;
 	notify->status_indication = NULL;
 	notify->instance = NULL;
-	strncpy(notify->name, "Unknown", NOTIFY_MAX_NAME);
+	strlcpy(notify->name, "Unknown", sizeof(notify->name));
 }
 
 /*

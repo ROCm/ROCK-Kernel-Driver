@@ -927,10 +927,10 @@ static int pegasus_ethtool_ioctl(struct net_device *dev, void *useraddr)
 	/* get driver-specific version/etc. info */
 	case ETHTOOL_GDRVINFO:{
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-			strncpy(info.driver, driver_name,
-				sizeof (info.driver) - 1);
-			strncpy(info.version, DRIVER_VERSION,
-				sizeof (info.version) - 1);
+			strlcpy(info.driver, driver_name,
+				sizeof (info.driver));
+			strlcpy(info.version, DRIVER_VERSION,
+				sizeof (info.version));
 			if (copy_to_user(useraddr, &info, sizeof (info)))
 				return -EFAULT;
 			return 0;
@@ -1273,6 +1273,7 @@ static void pegasus_disconnect(struct usb_interface *intf)
 }
 
 static struct usb_driver pegasus_driver = {
+	.owner = THIS_MODULE,
 	.name = driver_name,
 	.probe = pegasus_probe,
 	.disconnect = pegasus_disconnect,

@@ -249,7 +249,7 @@ control.  In fact, the controls with "XXX [Playback|Capture]
 [Volume|Switch]" will be checked in addition.
 
 The current assignment of these mixer elements is listed in the proc
-file, /proc/asound/cardX/mixer_oss, which will be like the following
+file, /proc/asound/cardX/oss_mixer, which will be like the following
 
 	VOLUME "Master" 0
 	BASS "" 0
@@ -267,7 +267,7 @@ For changing the assignment, you can write the configuration to this
 proc file.  For example, to map "Wave Playback" to the PCM volume,
 send the command like the following:
 
-	% echo 'VOLUME "Wave Playback" 0' > /proc/asound/card0/mixer_oss
+	% echo 'VOLUME "Wave Playback" 0' > /proc/asound/card0/oss_mixer
 
 The command is exactly as same as listed in the proc file.  You can
 change one or more elements, one volume per line.  In the last

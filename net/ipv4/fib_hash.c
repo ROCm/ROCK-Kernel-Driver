@@ -151,17 +151,6 @@ static rwlock_t fib_hash_lock = RW_LOCK_UNLOCKED;
 
 #define FZ_MAX_DIVISOR ((PAGE_SIZE<<MAX_ORDER) / sizeof(struct fib_node *))
 
-static unsigned long size_to_order(unsigned long size)
-{
-	unsigned long order;
-
-	for (order = 0; order < MAX_ORDER; order++) {
-		if ((PAGE_SIZE << order) >= size)
-			break;
-	}
-	return order;
-}
-
 static struct fib_node **fz_hash_alloc(int divisor)
 {
 	unsigned long size = divisor * sizeof(struct fib_node *);
@@ -170,7 +159,7 @@ static struct fib_node **fz_hash_alloc(int divisor)
 		return kmalloc(size, GFP_KERNEL);
 	} else {
 		return (struct fib_node **)
-			__get_free_pages(GFP_KERNEL, size_to_order(size));
+			__get_free_pages(GFP_KERNEL, get_order(size));
 	}
 }
 
@@ -201,7 +190,7 @@ static void fz_hash_free(struct fib_node **hash, int divisor)
 		kfree(hash);
 	else
 		free_pages((unsigned long) hash,
-			   size_to_order(divisor * sizeof(struct fib_node *)));
+			   get_order(divisor * sizeof(struct fib_node *)));
 }
 
 static void fn_rehash_zone(struct fn_zone *fz)

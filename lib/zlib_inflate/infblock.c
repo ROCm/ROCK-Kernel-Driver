@@ -65,10 +65,11 @@ local const uInt border[] = { /* Order of the bit length code lengths */
  */
 
 
-void zlib_inflate_blocks_reset(s, z, c)
-inflate_blocks_statef *s;
-z_streamp z;
-uLongf *c;
+void zlib_inflate_blocks_reset(
+	inflate_blocks_statef *s,
+	z_streamp z,
+	uLongf *c
+)
 {
   if (c != Z_NULL)
     *c = s->check;
@@ -82,10 +83,11 @@ uLongf *c;
     z->adler = s->check = (*s->checkfn)(0L, (const Bytef *)Z_NULL, 0);
 }
 
-inflate_blocks_statef *zlib_inflate_blocks_new(z, c, w)
-z_streamp z;
-check_func c;
-uInt w;
+inflate_blocks_statef *zlib_inflate_blocks_new(
+	z_streamp z,
+	check_func c,
+	uInt w
+)
 {
   inflate_blocks_statef *s;
 
@@ -100,10 +102,11 @@ uInt w;
 }
 
 
-int zlib_inflate_blocks(s, z, r)
-inflate_blocks_statef *s;
-z_streamp z;
-int r;
+int zlib_inflate_blocks(
+	inflate_blocks_statef *s,
+	z_streamp z,
+	int r
+)
 {
   uInt t;               /* temporary storage */
   uLong b;              /* bit buffer */
@@ -325,19 +328,21 @@ int r;
 }
 
 
-int zlib_inflate_blocks_free(s, z)
-inflate_blocks_statef *s;
-z_streamp z;
+int zlib_inflate_blocks_free(
+	inflate_blocks_statef *s,
+	z_streamp z
+)
 {
   zlib_inflate_blocks_reset(s, z, Z_NULL);
   return Z_OK;
 }
 
 
-void zlib_inflate_set_dictionary(s, d, n)
-inflate_blocks_statef *s;
-const Bytef *d;
-uInt  n;
+void zlib_inflate_set_dictionary(
+	inflate_blocks_statef *s,
+	const Bytef *d,
+	uInt  n
+)
 {
   memcpy(s->window, d, n);
   s->read = s->write = s->window + n;
@@ -348,8 +353,9 @@ uInt  n;
  * by Z_SYNC_FLUSH or Z_FULL_FLUSH. 
  * IN assertion: s != Z_NULL
  */
-int zlib_inflate_blocks_sync_point(s)
-inflate_blocks_statef *s;
+int zlib_inflate_blocks_sync_point(
+	inflate_blocks_statef *s
+)
 {
   return s->mode == LENS;
 }

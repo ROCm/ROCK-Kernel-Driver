@@ -556,8 +556,8 @@ void tcp_update_metrics(struct sock *sk)
 			if (m >= dst_metric(dst, RTAX_RTTVAR))
 				dst->metrics[RTAX_RTTVAR-1] = m;
 			else
-				dst->metrics[RTAX_RTT-1] -=
-					(dst->metrics[RTAX_RTT-1] - m)>>2;
+				dst->metrics[RTAX_RTTVAR-1] -=
+					(dst->metrics[RTAX_RTTVAR-1] - m)>>2;
 		}
 
 		if (tp->snd_ssthresh >= 0xFFFF) {
@@ -2352,7 +2352,7 @@ static void tcp_reset(struct sock *sk)
 			sk->err = ECONNRESET;
 	}
 
-	if (!test_bit(SOCK_DEAD, &sk->flags))
+	if (!sock_flag(sk, SOCK_DEAD))
 		sk->error_report(sk);
 
 	tcp_done(sk);
@@ -2379,7 +2379,7 @@ static void tcp_fin(struct sk_buff *skb, struct sock *sk, struct tcphdr *th)
 	tcp_schedule_ack(tp);
 
 	sk->shutdown |= RCV_SHUTDOWN;
-	__clear_bit(SOCK_DONE, &sk->flags);
+	sock_reset_flag(sk, SOCK_DONE);
 
 	switch(sk->state) {
 		case TCP_SYN_RECV:
@@ -2428,7 +2428,7 @@ static void tcp_fin(struct sk_buff *skb, struct sock *sk, struct tcphdr *th)
 		tcp_sack_reset(tp);
 	tcp_mem_reclaim(sk);
 
-	if (!test_bit(SOCK_DEAD, &sk->flags)) {
+	if (!sock_flag(sk, SOCK_DEAD)) {
 		sk->state_change(sk);
 
 		/* Do not send POLL_HUP for half duplex close. */
@@ -2743,9 +2743,9 @@ queue_and_out:
 
 		tcp_fast_path_check(sk, tp);
 
-		if (eaten > 0) {
+		if (eaten > 0)
 			__kfree_skb(skb);
-		} else if (!test_bit(SOCK_DEAD, &sk->flags))
+		else if (!sock_flag(sk, SOCK_DEAD))
 			sk->data_ready(sk, 0);
 		return;
 	}
@@ -3247,7 +3247,7 @@ static void tcp_check_urg(struct sock * sk, struct tcphdr * th)
 	 * buggy users.
 	 */
 	if (tp->urg_seq == tp->copied_seq && tp->urg_data &&
-	    !test_bit(SOCK_URGINLINE, &sk->flags) &&
+	    !sock_flag(sk, SOCK_URGINLINE) &&
 	    tp->copied_seq != tp->rcv_nxt) {
 		struct sk_buff *skb = skb_peek(&sk->receive_queue);
 		tp->copied_seq++;
@@ -3284,7 +3284,7 @@ static void tcp_urg(struct sock *sk, struct sk_buff *skb, struct tcphdr *th)
 			if (skb_copy_bits(skb, ptr, &tmp, 1))
 				BUG();
 			tp->urg_data = TCP_URG_VALID | tmp;
-			if (!test_bit(SOCK_DEAD, &sk->flags))
+			if (!sock_flag(sk, SOCK_DEAD))
 				sk->data_ready(sk,0);
 		}
 	}
@@ -3699,7 +3699,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 		tcp_init_metrics(sk);
 		tcp_init_buffer_space(sk);
 
-		if (test_bit(SOCK_KEEPOPEN, &sk->flags))
+		if (sock_flag(sk, SOCK_KEEPOPEN))
 			tcp_reset_keepalive_timer(sk, keepalive_time_when(tp));
 
 		if (!tp->snd_wscale)
@@ -3714,7 +3714,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 		mb();
 		tcp_set_state(sk, TCP_ESTABLISHED);
 
-		if(!test_bit(SOCK_DEAD, &sk->flags)) {
+		if (!sock_flag(sk, SOCK_DEAD)) {
 			sk->state_change(sk);
 			sk_wake_async(sk, 0, POLL_OUT);
 		}
@@ -3977,10 +3977,10 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 				sk->shutdown |= SEND_SHUTDOWN;
 				dst_confirm(sk->dst_cache);
 
-				if (!test_bit(SOCK_DEAD, &sk->flags)) {
+				if (!sock_flag(sk, SOCK_DEAD))
 					/* Wake up lingering close() */
 					sk->state_change(sk);
-				} else {
+				else {
 					int tmo;
 
 					if (tp->linger2 < 0 ||

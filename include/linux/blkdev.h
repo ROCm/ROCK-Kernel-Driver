@@ -179,7 +179,8 @@ struct blk_queue_tag {
 	unsigned long *tag_map;		/* bit map of free/busy tags */
 	struct list_head busy_list;	/* fifo list of busy tags */
 	int busy;			/* current depth */
-	int max_depth;
+	int max_depth;			/* what we will send to device */
+	int real_max_depth;		/* what the array can hold */
 };
 
 struct request_queue
@@ -452,6 +453,7 @@ extern struct request *blk_queue_find_tag(request_queue_t *, int);
 extern void blk_queue_end_tag(request_queue_t *, struct request *);
 extern int blk_queue_init_tags(request_queue_t *, int);
 extern void blk_queue_free_tags(request_queue_t *);
+extern int blk_queue_resize_tags(request_queue_t *, int);
 extern void blk_queue_invalidate_tags(request_queue_t *);
 extern void blk_congestion_wait(int rw, long timeout);
 

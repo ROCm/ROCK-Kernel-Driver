@@ -1401,10 +1401,10 @@ static int ipx_release(struct socket *sock)
 	if (!sk)
 		goto out;
 
-	if (!test_bit(SOCK_DEAD, &sk->flags))
+	if (!sock_flag(sk, SOCK_DEAD))
 		sk->state_change(sk);
 
-	__set_bit(SOCK_DEAD, &sk->flags);
+	sock_set_flag(sk, SOCK_DEAD);
 	sock->sk = NULL;
 	ipx_destroy_socket(sk);
 out:

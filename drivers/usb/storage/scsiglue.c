@@ -171,9 +171,11 @@ static int usb_storage_queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
 /* This is always called with scsi_lock(srb->host) held */
 static int usb_storage_command_abort( Scsi_Cmnd *srb )
 {
-	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
+	struct Scsi_Host *host = srb->device->host;
+	struct us_data *us = (struct us_data *) host->hostdata[0];
+	int state = atomic_read(&us->sm_state);
 
-	US_DEBUGP("command_abort() called\n");
+	US_DEBUGP("%s called\n", __FUNCTION__);
 
 	/* Is this command still active? */
 	if (us->srb != srb) {
@@ -181,7 +183,31 @@ static int usb_storage_command_abort( Scsi_Cmnd *srb )
 		return FAILED;
 	}
 
-	return usb_stor_abort_transport(us);
+	/* Normally the current state is RUNNING.  If the control thread
+	 * hasn't even started processing this command, the state will be
+	 * IDLE.  Anything else is a bug. */
+	if (state != US_STATE_RUNNING && state != US_STATE_IDLE) {
+		printk(KERN_ERR USB_STORAGE "Error in %s: "
+			"invalid state %d\n", __FUNCTION__, state);
+		return FAILED;
+	}
+
+	/* Set state to ABORTING, set the ABORTING bit, and release the lock */
+	atomic_set(&us->sm_state, US_STATE_ABORTING);
+	set_bit(US_FLIDX_ABORTING, &us->flags);
+	scsi_unlock(host);
+
+	/* If the state was RUNNING, stop an ongoing USB transfer */
+	if (state == US_STATE_RUNNING)
+		usb_stor_stop_transport(us);
+
+	/* Wait for the aborted command to finish */
+	wait_for_completion(&us->notify);
+
+	/* Reacquire the lock and allow USB transfers to resume */
+	scsi_lock(host);
+	clear_bit(US_FLIDX_ABORTING, &us->flags);
+	return SUCCESS;
 }
 
 /* This invokes the transport reset mechanism to reset the state of the
@@ -193,7 +219,7 @@ static int usb_storage_device_reset( Scsi_Cmnd *srb )
 	int state = atomic_read(&us->sm_state);
 	int result;
 
-	US_DEBUGP("device_reset() called\n" );
+	US_DEBUGP("%s called\n", __FUNCTION__);
 	if (state != US_STATE_IDLE) {
 		printk(KERN_ERR USB_STORAGE "Error in %s: "
 			"invalid state %d\n", __FUNCTION__, state);
@@ -219,39 +245,49 @@ static int usb_storage_device_reset( Scsi_Cmnd *srb )
 	return result;
 }
 
-/* This resets the device port */
+/* This resets the device's USB port. */
 /* It refuses to work if there's more than one interface in
-   this device, so that other users are not affected. */
+ * the device, so that other users are not affected. */
 /* This is always called with scsi_lock(srb->host) held */
-
 static int usb_storage_bus_reset( Scsi_Cmnd *srb )
 {
-	struct us_data *us;
+	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
+	int state = atomic_read(&us->sm_state);
 	int result;
 
-	/* we use the usb_reset_device() function to handle this for us */
-	US_DEBUGP("bus_reset() called\n");
+	US_DEBUGP("%s called\n", __FUNCTION__);
+	if (state != US_STATE_IDLE) {
+		printk(KERN_ERR USB_STORAGE "Error in %s: "
+			"invalid state %d\n", __FUNCTION__, state);
+		return FAILED;
+	}
+
+	/* set the state and release the lock */
+	atomic_set(&us->sm_state, US_STATE_RESETTING);
 	scsi_unlock(srb->device->host);
-	us = (struct us_data *)srb->device->host->hostdata[0];
 
 	/* The USB subsystem doesn't handle synchronisation between
 	   a device's several drivers. Therefore we reset only devices
-	   with one interface which we of course own.
+	   with just one interface, which we of course own.
 	*/
-	
+
 	//FIXME: needs locking against config changes
-	
-	if ( us->pusb_dev->actconfig->desc.bNumInterfaces == 1) {
-		/* attempt to reset the port */
+
+	if (us->pusb_dev->actconfig->desc.bNumInterfaces == 1) {
+
+		/* lock the device and attempt to reset the port */
+		down(&(us->dev_semaphore));
 		result = usb_reset_device(us->pusb_dev);
+		up(&(us->dev_semaphore));
 		US_DEBUGP("usb_reset_device returns %d\n", result);
 	} else {
 		result = -EBUSY;
-		US_DEBUGP("cannot reset a multiinterface device. failing to reset.\n");
+		US_DEBUGP("Refusing to reset a multi-interface device\n");
 	}
 
-	US_DEBUGP("bus_reset() complete\n");
+	/* lock access to the state and clear it */
 	scsi_lock(srb->device->host);
+	atomic_set(&us->sm_state, US_STATE_IDLE);
 	return result < 0 ? FAILED : SUCCESS;
 }
 
@@ -264,33 +300,21 @@ static int usb_storage_bus_reset( Scsi_Cmnd *srb )
 #define SPRINTF(args...) \
 	do { if (pos < buffer+length) pos += sprintf(pos, ## args); } while (0)
 
-static int usb_storage_proc_info (char *buffer, char **start, off_t offset,
-		int length, int hostno, int inout)
+static int usb_storage_proc_info (struct Scsi_Host *hostptr, char *buffer, char **start, off_t offset,
+		int length, int inout)
 {
 	struct us_data *us;
 	char *pos = buffer;
-	struct Scsi_Host *hostptr;
 	unsigned long f;
 
 	/* if someone is sending us data, just throw it away */
 	if (inout)
 		return length;
 
-	/* find our data from the given hostno */
-	hostptr = scsi_host_hn_get(hostno);
-	if (!hostptr) {	 /* if we couldn't find it, we return an error */
-		return -ESRCH;
-	}
 	us = (struct us_data*)hostptr->hostdata[0];
 
-	/* if we couldn't find it, we return an error */
-	if (!us) {
-		scsi_host_put(hostptr);
-		return -ESRCH;
-	}
-
 	/* print the controller name */
-	SPRINTF("   Host scsi%d: usb-storage\n", hostno);
+	SPRINTF("   Host scsi%d: usb-storage\n", hostptr->host_no);
 
 	/* print product, vendor, and serial number strings */
 	SPRINTF("       Vendor: %s\n", us->vendor);
@@ -318,9 +342,6 @@ static int usb_storage_proc_info (char *buffer, char **start, off_t offset,
 
 		*(pos++) = '\n';
 		}
-
-	/* release the reference count on this host */
-	scsi_host_put(hostptr);
 
 	/*
 	 * Calculate start of next buffer, and return value.

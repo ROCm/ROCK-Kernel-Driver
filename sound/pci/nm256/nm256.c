@@ -230,8 +230,9 @@ struct snd_nm256 {
 	u32 all_coeff_buf;		/* coefficient buffer */
 	u32 coeff_buf[2];		/* coefficient buffer for each stream */
 
-	int coeffs_current;		/* coeff. table is loaded? */
-	int use_cache;			/* use one big coef. table */
+	unsigned int coeffs_current: 1;	/* coeff. table is loaded? */
+	unsigned int use_cache: 1;	/* use one big coef. table */
+	unsigned int latitude_workaround: 1; /* Dell Latitude LS workaround needed */
 
 	int mixer_base;			/* register offset of ac97 mixer */
 	int mixer_status_offset;	/* offset of mixer status reg. */
@@ -1042,7 +1043,7 @@ snd_nm256_interrupt(int irq, void *dev_id, struct pt_regs *dummy)
 static irqreturn_t
 snd_nm256_interrupt_zx(int irq, void *dev_id, struct pt_regs *dummy)
 {
-	nm256_t *chip = snd_magic_cast(nm256_t, dev_id, return);
+	nm256_t *chip = snd_magic_cast(nm256_t, dev_id, return IRQ_NONE);
 	u32 status;
 	u8 cbyte;
 
@@ -1181,9 +1182,10 @@ snd_nm256_ac97_reset(ac97_t *ac97)
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	/* Reset the mixer.  'Tis magic!  */
 	snd_nm256_writeb(chip, 0x6c0, 1);
-#if 0 /* Dell latitude LS will lock up by this */
-	snd_nm256_writeb(chip, 0x6cc, 0x87);
-#endif
+	if (chip->latitude_workaround) {
+		/* Dell latitude LS will lock up by this */
+		snd_nm256_writeb(chip, 0x6cc, 0x87);
+	}
 	snd_nm256_writeb(chip, 0x6cc, 0x80);
 	snd_nm256_writeb(chip, 0x6cc, 0x0);
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
@@ -1194,7 +1196,7 @@ static int __devinit
 snd_nm256_mixer(nm256_t *chip)
 {
 	ac97_t ac97;
-	int i;
+	int i, err;
 	/* looks like nm256 hangs up when unexpected registers are touched... */
 	static int mixer_regs[] = {
 		AC97_MASTER, AC97_HEADPHONE, AC97_MASTER_MONO,
@@ -1210,11 +1212,19 @@ snd_nm256_mixer(nm256_t *chip)
 	ac97.reset = snd_nm256_ac97_reset;
 	ac97.write = snd_nm256_ac97_write;
 	ac97.read = snd_nm256_ac97_read;
+	ac97.scaps = AC97_SCAP_AUDIO; /* we support audio! */
 	ac97.limited_regs = 1;
 	for (i = 0; mixer_regs[i] >= 0; i++)
 		set_bit(mixer_regs[i], ac97.reg_accessed);
 	ac97.private_data = chip;
-	return snd_ac97_mixer(chip->card, &ac97, &chip->ac97);
+	err = snd_ac97_mixer(chip->card, &ac97, &chip->ac97);
+	if (err < 0)
+		return err;
+	if (! (chip->ac97->id & (0xf0000000))) {
+		/* looks like an invalid id */
+		sprintf(chip->card->mixername, "%s AC97", chip->card->driver);
+	}
+	return 0;
 }
 
 /* 
@@ -1394,6 +1404,7 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 		.dev_free =	snd_nm256_dev_free,
 	};
 	u32 addr;
+	u16 subsystem_vendor, subsystem_device;
 
 	*chip_ret = NULL;
 
@@ -1529,6 +1540,15 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 	chip->mixer_base = NM_MIXER_OFFSET;
 
 	chip->coeffs_current = 0;
+
+	/* check workarounds */
+	chip->latitude_workaround = 1;
+	pci_read_config_word(pci, PCI_SUBSYSTEM_VENDOR_ID, &subsystem_vendor);
+	pci_read_config_word(pci, PCI_SUBSYSTEM_ID, &subsystem_device);
+	if (subsystem_vendor == 0x104d && subsystem_device == 0x8041) {
+		/* this workaround will cause lock-up after suspend/resume on Sony PCG-F305 */
+		chip->latitude_workaround = 0;
+	}
 
 	snd_nm256_init_chip(chip);
 

@@ -179,6 +179,7 @@ snd_wavefront_pnp (int dev, snd_wavefront_card_t *acard, struct pnp_card_link *c
 	*/
 
 	if (cs4232_pcm_port[dev] != SNDRV_AUTO_PORT)
+		pnp_resource_change(&cfg->port_resource[0], cs4232_pcm_port[dev], 4);
 	if (fm_port[dev] != SNDRV_AUTO_PORT)
 		pnp_resource_change(&cfg->port_resource[1], fm_port[dev], 4);
 	if (dma1[dev] != SNDRV_AUTO_DMA)
@@ -710,6 +711,9 @@ static int __init alsa_card_wavefront_init(void)
 	cards += pnp_register_card_driver(&wavefront_pnpc_driver);
 #endif
 	if (!cards) {
+#ifdef CONFIG_PNP
+		pnp_unregister_card_driver(&wavefront_pnpc_driver);
+#endif
 #ifdef MODULE
 		printk (KERN_ERR "No WaveFront cards found or devices busy\n");
 #endif
@@ -722,7 +726,9 @@ static void __exit alsa_card_wavefront_exit(void)
 {
 	int idx;
 
+#ifdef CONFIG_PNP
 	pnp_unregister_card_driver(&wavefront_pnpc_driver);
+#endif
 	for (idx = 0; idx < SNDRV_CARDS; idx++)
 		snd_card_free(snd_wavefront_legacy[idx]);
 }

@@ -104,7 +104,7 @@ static inline int gamma_dma_is_ready(drm_device_t *dev)
 	return(!GAMMA_READ(GAMMA_DMACOUNT));
 }
 
-void gamma_dma_service(int irq, void *device, struct pt_regs *regs)
+irqreturn_t gamma_dma_service(int irq, void *device, struct pt_regs *regs)
 {
 	drm_device_t	 *dev = (drm_device_t *)device;
 	drm_device_dma_t *dma = dev->dma;
@@ -119,7 +119,8 @@ void gamma_dma_service(int irq, void *device, struct pt_regs *regs)
 	GAMMA_WRITE(GAMMA_GINTFLAGS, 0x2001);
 	if (gamma_dma_is_ready(dev)) {
 				/* Free previous buffer */
-		if (test_and_set_bit(0, &dev->dma_flag)) return;
+		if (test_and_set_bit(0, &dev->dma_flag))
+			return IRQ_HANDLED;
 		if (dma->this_buffer) {
 			gamma_free_buffer(dev, dma->this_buffer);
 			dma->this_buffer = NULL;
@@ -127,8 +128,9 @@ void gamma_dma_service(int irq, void *device, struct pt_regs *regs)
 		clear_bit(0, &dev->dma_flag);
 
 				/* Dispatch new buffer */
-		schedule_work(&dev->tq);
+		schedule_work(&dev->work);
 	}
+	return IRQ_HANDLED;
 }
 
 /* Only called by gamma_dma_schedule. */
@@ -612,7 +614,7 @@ static int gamma_do_init_dma( drm_device_t *dev, drm_gamma_init_t *init )
 	} else {
 		DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
 
-		DRM_IOREMAP( dev_priv->buffers );
+		DRM_IOREMAP( dev_priv->buffers, dev );
 
 		buf = dma->buflist[GLINT_DRI_BUF_COUNT];
 		pgt = buf->address;
@@ -651,7 +653,7 @@ int gamma_do_cleanup_dma( drm_device_t *dev )
 		drm_gamma_private_t *dev_priv = dev->dev_private;
 
 		if ( dev_priv->buffers != NULL )
-			DRM_IOREMAPFREE( dev_priv->buffers );
+			DRM_IOREMAPFREE( dev_priv->buffers, dev );
 
 		DRM(free)( dev->dev_private, sizeof(drm_gamma_private_t),
 			   DRM_MEM_DRIVER );

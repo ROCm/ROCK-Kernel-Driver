@@ -178,7 +178,7 @@ acpi_psx_execute (
 
 	/* Create and initialize a new walk state */
 
-	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT, NULL, NULL, NULL);
+	walk_state = acpi_ds_create_walk_state (0, NULL, NULL, NULL);
 	if (!walk_state) {
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}

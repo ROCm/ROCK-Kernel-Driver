@@ -147,6 +147,9 @@ extern int FASTCALL(aio_complete(struct kiocb *iocb, long res, long res2));
 extern void FASTCALL(__put_ioctx(struct kioctx *ctx));
 struct mm_struct;
 extern void FASTCALL(exit_aio(struct mm_struct *mm));
+extern struct kioctx *lookup_ioctx(unsigned long ctx_id);
+extern int FASTCALL(io_submit_one(struct kioctx *ctx,
+			struct iocb *user_iocb, struct iocb *iocb));
 
 /* semi private, but used by the 32bit emulations: */
 struct kioctx *lookup_ioctx(unsigned long ctx_id);

@@ -201,6 +201,11 @@ acpi_ns_compare_names (
 	char                            *name1,
 	char                            *name2);
 
+void
+acpi_ns_remove_reference (
+	struct acpi_namespace_node      *node);
+
+
 /*
  * Namespace modification - nsmodify
  */

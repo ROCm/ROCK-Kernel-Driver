@@ -342,6 +342,7 @@ static void driver_disconnect(struct usb_interface *intf)
 }
 
 struct usb_driver usbdevfs_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"usbfs",
 	.probe =	driver_probe,
 	.disconnect =	driver_disconnect,

@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm_pci.c#21 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm_pci.c#23 $
  */
 
 #include "aic79xx_osm.h"
@@ -156,19 +156,21 @@ ahd_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	pci_set_master(pdev);
 
 	if (sizeof(bus_addr_t) > 4) {
-		uint64_t memsize;
+		uint64_t   memsize;
+		bus_addr_t mask_64bit;
+		bus_addr_t mask_39bit;
 
 		memsize = ahd_linux_get_memsize();
-		if (memsize >= 0x8000000000
-	 	 && ahd_pci_set_dma_mask(pdev, 0xFFFFFFFFFFFFFFFFULL) == 0) {
+		mask_64bit = (bus_addr_t)(0xFFFFFFFFFFFFFFFFULL&(bus_addr_t)~0);
+		mask_39bit = (bus_addr_t)(0x7FFFFFFFFFULL&(bus_addr_t)~0);
+		if (memsize >= 0x8000000000ULL
+	 	 && ahd_pci_set_dma_mask(pdev, mask_64bit) == 0) {
 			ahd->flags |= AHD_64BIT_ADDRESSING;
-			ahd->platform_data->hw_dma_mask =
-			    (bus_addr_t)(0xFFFFFFFFFFFFFFFFULL&(bus_addr_t)~0);
+			ahd->platform_data->hw_dma_mask = mask_64bit;
 		} else if (memsize > 0x80000000
-			&& ahd_pci_set_dma_mask(pdev, 0x7FFFFFFFFFULL) == 0) {
+			&& ahd_pci_set_dma_mask(pdev, mask_39bit) == 0) {
 			ahd->flags |= AHD_39BIT_ADDRESSING;
-			ahd->platform_data->hw_dma_mask =
-			    (bus_addr_t)(0x7FFFFFFFFFULL & (bus_addr_t)~0);
+			ahd->platform_data->hw_dma_mask = mask_39bit;
 		}
 	} else {
 		ahd_pci_set_dma_mask(pdev, 0xFFFFFFFF);

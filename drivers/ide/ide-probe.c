@@ -693,7 +693,7 @@ static void hwif_register (ide_hwif_t *hwif)
 	u32 i = 0;
 
 	/* register with global device tree */
-	strncpy(hwif->gendev.bus_id,hwif->name,BUS_ID_SIZE);
+	strlcpy(hwif->gendev.bus_id,hwif->name,BUS_ID_SIZE);
 	snprintf(hwif->gendev.name,DEVICE_NAME_SIZE,"IDE Controller");
 	hwif->gendev.driver_data = hwif;
 	if (hwif->pci_dev)
@@ -1226,7 +1226,7 @@ static int ata_lock(dev_t dev, void *data)
 	return 0;
 }
 
-struct gendisk *ata_probe(dev_t dev, int *part, void *data)
+struct kobject *ata_probe(dev_t dev, int *part, void *data)
 {
 	ide_hwif_t *hwif = data;
 	int unit = *part >> PARTN_BITS;
@@ -1443,8 +1443,6 @@ int ideprobe_init (void)
 }
 
 #ifdef MODULE
-extern int (*ide_xlate_1024_hook)(struct block_device *, int, int, const char *);
-
 int init_module (void)
 {
 	unsigned int index;
@@ -1453,14 +1451,12 @@ int init_module (void)
 		ide_unregister(index);
 	ideprobe_init();
 	create_proc_ide_interfaces();
-	ide_xlate_1024_hook = ide_xlate_1024;
 	return 0;
 }
 
 void cleanup_module (void)
 {
 	ide_probe = NULL;
-	ide_xlate_1024_hook = 0;
 }
 MODULE_LICENSE("GPL");
 #endif /* MODULE */

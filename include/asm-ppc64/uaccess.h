@@ -206,6 +206,7 @@ copy_from_user(void *to, const void *from, unsigned long n)
 		return __copy_tofrom_user(to, from, n);
 	if ((unsigned long)from < TASK_SIZE) {
 		over = (unsigned long)from + n - TASK_SIZE;
+		memset(to + over, 0, over);
 		return __copy_tofrom_user(to, from, n - over) + over;
 	}
 	return n;

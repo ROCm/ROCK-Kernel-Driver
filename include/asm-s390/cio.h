@@ -128,6 +128,7 @@ struct ccw1 {
 #define CCW_CMD_NOOP		0x03
 #define CCW_CMD_BASIC_SENSE	0x04
 #define CCW_CMD_TIC		0x08
+#define CCW_CMD_STLCK           0x14
 #define CCW_CMD_SENSE_PGID	0x34
 #define CCW_CMD_SUSPEND_RECONN	0x5B
 #define CCW_CMD_RDC		0x64

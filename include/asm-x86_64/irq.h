@@ -32,4 +32,8 @@ extern void disable_irq(unsigned int);
 extern void disable_irq_nosync(unsigned int);
 extern void enable_irq(unsigned int);
 
+#ifdef CONFIG_X86_LOCAL_APIC
+#define ARCH_HAS_NMI_WATCHDOG		/* See include/linux/nmi.h */
+#endif
+
 #endif /* _ASM_IRQ_H */

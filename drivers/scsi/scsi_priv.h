@@ -41,9 +41,6 @@
 #define SCSI_SENSE_VALID(scmd) \
 	(((scmd)->sense_buffer[0] & 0x70) == 0x70)
 
-struct Scsi_Device_Template;
-
-
 /*
  * scsi_target: representation of a scsi target, for now, this is only
  * used for single_lun devices. If no one has active IO to the target,
@@ -58,7 +55,8 @@ struct scsi_target {
 /* hosts.c */
 extern void scsi_host_busy_inc(struct Scsi_Host *, Scsi_Device *);
 extern void scsi_host_busy_dec_and_test(struct Scsi_Host *, Scsi_Device *);
-extern struct Scsi_Host *scsi_host_get_next(struct Scsi_Host *);
+extern struct Scsi_Host *scsi_host_lookup(unsigned short);
+extern void scsi_host_put(struct Scsi_Host *);
 extern void scsi_host_init(void);
 
 /* scsi.c */
@@ -68,9 +66,6 @@ extern void scsi_destroy_command_freelist(struct Scsi_Host *shost);
 extern void scsi_done(struct scsi_cmnd *cmd);
 extern void scsi_finish_command(struct scsi_cmnd *cmd);
 extern int scsi_retry_command(struct scsi_cmnd *cmd);
-extern int scsi_attach_device(struct scsi_device *sdev);
-extern void scsi_detach_device(struct scsi_device *sdev);
-extern void scsi_rescan_device(struct scsi_device *sdev);
 extern int scsi_insert_special_req(struct scsi_request *sreq, int);
 extern void scsi_init_cmd_from_req(struct scsi_cmnd *cmd,
 		struct scsi_request *sreq);
@@ -108,7 +103,7 @@ extern void scsi_exit_procfs(void);
 # define scsi_proc_host_add(shost)	do { } while (0)
 # define scsi_proc_host_rm(shost)	do { } while (0)
 # define scsi_init_procfs()		(0)
-# define scsi_exit_procfs		do { } while (0)
+# define scsi_exit_procfs()		do { } while (0)
 #endif /* CONFIG_PROC_FS */
 
 /* scsi_scan.c */
@@ -117,16 +112,23 @@ extern void scsi_forget_host(struct Scsi_Host *shost);
 extern void scsi_free_sdev(struct scsi_device *);
 extern void scsi_free_shost(struct Scsi_Host *);
 extern void scsi_host_get(struct Scsi_Host *);
+extern void scsi_rescan_device(struct device *dev);
 
 /* scsi_sysfs.c */
 extern int scsi_device_register(struct scsi_device *);
 extern void scsi_device_unregister(struct scsi_device *);
-extern int scsi_upper_driver_register(struct Scsi_Device_Template *);
-extern void scsi_upper_driver_unregister(struct Scsi_Device_Template *);
 extern void scsi_sysfs_init_host(struct Scsi_Host *);
 extern int scsi_sysfs_add_host(struct Scsi_Host *, struct device *);
 extern void scsi_sysfs_remove_host(struct Scsi_Host *);
 extern int scsi_sysfs_register(void);
 extern void scsi_sysfs_unregister(void);
+
+/* definitions for the linker default sections covering the host
+ * class and device attributes */
+extern struct class_device_attribute *scsi_sysfs_shost_attrs[];
+extern struct device_attribute *scsi_sysfs_sdev_attrs[];
+
+extern struct class shost_class;
+extern struct bus_type scsi_bus_type;
 
 #endif /* _SCSI_PRIV_H */

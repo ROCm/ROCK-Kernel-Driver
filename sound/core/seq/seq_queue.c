@@ -241,7 +241,7 @@ queue_t *snd_seq_queue_find_name(char *name)
 
 	for (i = 0; i < SNDRV_SEQ_MAX_QUEUES; i++) {
 		if ((q = queueptr(i)) != NULL) {
-			if (strncpy(q->name, name, sizeof(q->name)) == 0)
+			if (strncmp(q->name, name, sizeof(q->name)) == 0)
 				return q;
 			queuefree(q);
 		}

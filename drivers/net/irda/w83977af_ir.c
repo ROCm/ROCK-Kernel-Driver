@@ -299,11 +299,8 @@ static int w83977af_close(struct w83977af_ir *self)
 #endif /* CONFIG_USE_W977_PNP */
 
 	/* Remove netdevice */
-	if (self->netdev) {
-		rtnl_lock();
-		unregister_netdevice(self->netdev);
-		rtnl_unlock();
-	}
+	if (self->netdev)
+		unregister_netdev(self->netdev);
 
 	/* Release the PORT that this driver is using */
 	IRDA_DEBUG(0 , "%s(), Releasing Region %03x\n", 
@@ -524,6 +521,7 @@ int w83977af_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 		/* Check for empty frame */
 		if (!skb->len) {
 			w83977af_change_speed(self, speed); 
+			dev->trans_start = jiffies;
 			dev_kfree_skb(skb);
 			return 0;
 		} else
@@ -579,6 +577,7 @@ int w83977af_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 		switch_bank(iobase, SET0);
 		outb(ICR_ETXTHI, iobase+ICR);
 	}
+	dev->trans_start = jiffies;
 	dev_kfree_skb(skb);
 
 	/* Restore set register */

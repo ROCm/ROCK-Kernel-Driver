@@ -129,11 +129,74 @@ static struct pci_dev *find_k8_nb(void)
 	int cpu = smp_processor_id(); 
 	pci_for_each_dev(dev) {
 		if (dev->bus->number==0 && PCI_FUNC(dev->devfn)==3 &&
-		    PCI_SLOT(dev->devfn) == (24+cpu))
+		    PCI_SLOT(dev->devfn) == (24U+cpu))
 			return dev;
 	}
 	return NULL;
 }
+
+/* When we have kallsyms we can afford kmcedecode too. */
+
+static char *transaction[] = { 
+	"instruction", "data", "generic", "reserved"
+}; 
+static char *cachelevel[] = { 
+	"level 0", "level 1", "level 2", "level generic"
+};
+static char *memtrans[] = { 
+	"generic error", "generic read", "generic write", "data read",
+	"data write", "instruction fetch", "prefetch", "snoop",
+	"?", "?", "?", "?", "?", "?", "?"
+};
+static char *partproc[] = { 
+	"local node origin", "local node response", 
+	"local node observed", "generic" 
+};
+static char *timeout[] = { 
+	"request didn't time out",
+	"request timed out"
+};
+static char *memoryio[] = { 
+	"memory access", "res.", "i/o access", "generic"
+}; 
+static char *extendederr[] = { 
+	"ecc error", 
+	"crc error",
+	"sync error",
+	"mst abort",
+	"tgt abort",
+	"gart error",
+	"rmw error",
+	"wdog error",
+	"chipkill ecc error", 
+	"<9>","<10>","<11>","<12>",
+	"<13>","<14>","<15>"
+}; 
+static char *highbits[32] = { 
+	[31] = "previous error lost", 
+	[30] = "error overflow",
+	[29] = "error uncorrected",
+	[28] = "error enable",
+	[27] = "misc error valid",
+	[26] = "error address valid", 
+	[25] = "processor context corrupt", 
+	[24] = "res24",
+	[23] = "res23",
+	/* 22-15 ecc syndrome bits */
+	[14] = "corrected ecc error",
+	[13] = "uncorrected ecc error",
+	[12] = "res12",
+	[11] = "res11",
+	[10] = "res10",
+	[9] = "res9",
+	[8] = "dram scrub error", 
+	[7] = "res7",
+	/* 6-4 ht link number of error */ 
+	[3] = "res3",
+	[2] = "res2",
+	[1] = "err cpu0",
+	[0] = "err cpu1",
+};
 
 static void check_k8_nb(void)
 {
@@ -149,20 +212,52 @@ static void check_k8_nb(void)
 		return;
 	printk(KERN_ERR "Northbridge status %08x%08x\n",
 	       statushigh,statuslow); 
-	if (statuslow & 0x10) 
-		printk(KERN_ERR "GART error %d\n", statuslow & 0xf); 
-	if (statushigh & (1<<31))
-		printk(KERN_ERR "Lost an northbridge error\n"); 
-	if (statushigh & (1<<25))
-		printk(KERN_EMERG "NB status: unrecoverable\n"); 
+
+	unsigned short errcode = statuslow & 0xffff;	
+	switch (errcode >> 8) { 
+	case 0: 					
+		printk(KERN_ERR "    GART TLB error %s %s\n", 
+		       transaction[(errcode >> 2) & 3], 
+		       cachelevel[errcode & 3]);
+		break;
+	case 1: 
+		if (errcode & (1<<11)) { 
+			printk(KERN_ERR "    bus error %s %s %s %s %s\n",
+			       partproc[(errcode >> 10) & 0x3],
+			       timeout[(errcode >> 9) & 1],
+			       memtrans[(errcode >> 4) & 0xf],
+			       memoryio[(errcode >> 2) & 0x3], 
+			       cachelevel[(errcode & 0x3)]); 
+		} else if (errcode & (1<<8)) { 
+			printk(KERN_ERR "    memory error %s %s %s\n",
+			       memtrans[(errcode >> 4) & 0xf],
+			       transaction[(errcode >> 2) & 0x3],
+			       cachelevel[(errcode & 0x3)]);
+		} else {
+			printk(KERN_ERR "    unknown error code %x\n", errcode); 
+		}
+		break;
+	} 
+	if (statushigh & ((1<<14)|(1<<13)))
+		printk(KERN_ERR "    ECC syndrome bits %x\n", 
+		       (((statuslow >> 24) & 0xff)  << 8) | ((statushigh >> 15) & 0x7f));
+	errcode = (statuslow >> 16) & 0xf;
+	printk(KERN_ERR "    extended error %s\n", extendederr[(statuslow >> 16) & 0xf]); 
+	
+	/* should only print when it was a HyperTransport related error. */
+	printk(KERN_ERR "    link number %x\n", (statushigh >> 4) & 3);
+
+	int i;
+	for (i = 0; i < 32; i++) 
+		if (highbits[i] && (statushigh & (1<<i)))
+			printk(KERN_ERR "    %s\n", highbits[i]); 
+
 	if (statushigh & (1<<26)) { 
 		u32 addrhigh, addrlow; 
 		pci_read_config_dword(nb, 0x54, &addrhigh); 
 		pci_read_config_dword(nb, 0x50, &addrlow); 
-		printk(KERN_ERR "NB error address %08x%08x\n", addrhigh,addrlow); 
+		printk(KERN_ERR "    error address %08x%08x\n", addrhigh,addrlow); 
 	}
-	if (statushigh & (1<<29))
-		printk(KERN_EMERG "Error uncorrected\n"); 
 	statushigh &= ~(1<<31); 
 	pci_write_config_dword(nb, 0x4c, statushigh); 		
 }

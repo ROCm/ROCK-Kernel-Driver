@@ -708,12 +708,10 @@ brlvger_ioctl(struct inode *inode, struct file *file,
 	case BRLVGER_GET_INFO: {
 		struct brlvger_info vi;
 
-		strncpy(vi.driver_version, DRIVER_VERSION,
+		strlcpy(vi.driver_version, DRIVER_VERSION,
 			sizeof(vi.driver_version));
-		vi.driver_version[sizeof(vi.driver_version)-1] = 0;
-		strncpy(vi.driver_banner, longbanner,
+		strlcpy(vi.driver_banner, longbanner,
 			sizeof(vi.driver_banner));
-		vi.driver_banner[sizeof(vi.driver_banner)-1] = 0;
 
 		vi.display_length = priv->plength;
 		

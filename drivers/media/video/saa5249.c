@@ -171,7 +171,7 @@ static int saa5249_attach(struct i2c_adapter *adap, int addr, int kind)
 		return -ENOMEM;
 	}
 	memset(t, 0, sizeof(*t));
-	strncpy(client->dev.name, IF_NAME, DEVICE_NAME_SIZE);
+	strlcpy(client->dev.name, IF_NAME, DEVICE_NAME_SIZE);
 	init_MUTEX(&t->lock);
 	
 	/*

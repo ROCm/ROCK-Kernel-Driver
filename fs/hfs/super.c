@@ -72,7 +72,7 @@ static int init_inodecache(void)
 {
 	hfs_inode_cachep = kmem_cache_create("hfs_inode_cache",
 					     sizeof(struct hfs_inode_info),
-					     0, SLAB_HWCACHE_ALIGN,
+					     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					     init_once, NULL);
 	if (hfs_inode_cachep == NULL)
 		return -ENOMEM;
@@ -100,7 +100,7 @@ static struct super_operations hfs_super_operations = {
 /*================ File-local variables ================*/
 
 static struct super_block *hfs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_bdev(fs_type, flags, dev_name, data, hfs_fill_super);
 }

@@ -72,7 +72,7 @@ extern int show_mac_interrupts(struct seq_file *, void *);
 extern void iop_preinit(void);
 extern void iop_init(void);
 extern void via_init(void);
-extern void via_init_clock(void (*func)(int, void *, struct pt_regs *));
+extern void via_init_clock(irqreturn_t (*func)(int, void *, struct pt_regs *));
 extern void via_flush_cache(void);
 extern void oss_init(void);
 extern void psc_init(void);
@@ -94,7 +94,7 @@ void mac_bang(int irq, void *vector, struct pt_regs *p)
 	mac_reset();
 }
 
-static void mac_sched_init(void (*vector)(int, void *, struct pt_regs *))
+static void mac_sched_init(irqreturn_t (*vector)(int, void *, struct pt_regs *))
 {
 	via_init_clock(vector);
 }
@@ -106,9 +106,9 @@ void mac_waitbut (void)
 }
 #endif
 
-extern void mac_default_handler(int, void *, struct pt_regs *);
+extern irqreturn_t mac_default_handler(int, void *, struct pt_regs *);
 
-void (*mac_handlers[8])(int, void *, struct pt_regs *)=
+irqreturn_t (*mac_handlers[8])(int, void *, struct pt_regs *)=
 {
 	mac_default_handler,
 	mac_default_handler,

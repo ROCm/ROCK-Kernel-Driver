@@ -12,6 +12,7 @@
 #include <asm/processor.h>
 #include <asm/segment.h>
 #include <asm/thread_info.h>
+#include <asm/ia32.h>
 
 #define DEFINE(sym, val) \
         asm volatile("\n->" #sym " %0 " #val : : "i" (val))
@@ -43,5 +44,21 @@ int main(void)
 	ENTRY(irqstackptr);
 	BLANK();
 #undef ENTRY
+#define ENTRY(entry) DEFINE(IA32_SIGCONTEXT_ ## entry, offsetof(struct sigcontext_ia32, entry))
+	ENTRY(eax);
+	ENTRY(ebx);
+	ENTRY(ecx);
+	ENTRY(edx);
+	ENTRY(esi);
+	ENTRY(edi);
+	ENTRY(ebp);
+	ENTRY(esp);
+	ENTRY(eip);
+	BLANK();
+#undef ENTRY
+	DEFINE(IA32_RT_SIGFRAME_sigcontext,
+	       offsetof (struct rt_sigframe32, uc.uc_mcontext));
+	BLANK();
+
 	return 0;
 }

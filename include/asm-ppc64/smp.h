@@ -34,7 +34,6 @@ extern void smp_send_tlb_invalidate(int);
 extern void smp_send_xmon_break(int cpu);
 struct pt_regs;
 extern void smp_message_recv(int, struct pt_regs *);
-extern void smp_send_reschedule_all(void);
 
 #define NO_PROC_ID		0xFF            /* No processor magic marker */
 

@@ -737,6 +737,9 @@ static int usb_hub_port_reset(struct usb_device *hub, int port,
 		if (status != -1) {
 			usb_clear_port_feature(hub,
 				port + 1, USB_PORT_FEAT_C_RESET);
+			dev->state = status
+					? USB_STATE_NOTATTACHED
+					: USB_STATE_DEFAULT;
 			return status;
 		}
 
@@ -753,7 +756,7 @@ static int usb_hub_port_reset(struct usb_device *hub, int port,
 	return -1;
 }
 
-void usb_hub_port_disable(struct usb_device *hub, int port)
+int usb_hub_port_disable(struct usb_device *hub, int port)
 {
 	int ret;
 
@@ -761,6 +764,8 @@ void usb_hub_port_disable(struct usb_device *hub, int port)
 	if (ret)
 		dev_err(hubdev(hub), "cannot disable port %d (err = %d)\n",
 			port + 1, ret);
+
+	return ret;
 }
 
 /* USB 2.0 spec, 7.1.7.3 / fig 7-29:
@@ -1114,6 +1119,7 @@ static struct usb_device_id hub_id_table [] = {
 MODULE_DEVICE_TABLE (usb, hub_id_table);
 
 static struct usb_driver hub_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"hub",
 	.probe =	hub_probe,
 	.disconnect =	hub_disconnect,
@@ -1198,12 +1204,18 @@ int usb_physical_reset_device(struct usb_device *dev)
 	if (port < 0)
 		return -ENOENT;
 
+	descriptor = kmalloc(sizeof *descriptor, GFP_NOIO);
+	if (!descriptor) {
+		return -ENOMEM;
+	}
+
 	down(&usb_address0_sem);
 
 	/* Send a reset to the device */
 	if (usb_hub_port_reset(parent, port, dev, HUB_SHORT_RESET_TIME)) {
 		usb_hub_port_disable(parent, port);
 		up(&usb_address0_sem);
+		kfree(descriptor);
 		return(-ENODEV);
 	}
 
@@ -1213,6 +1225,7 @@ int usb_physical_reset_device(struct usb_device *dev)
 		err("USB device not accepting new address (error=%d)", ret);
 		usb_hub_port_disable(parent, port);
 		up(&usb_address0_sem);
+		kfree(descriptor);
 		return ret;
 	}
 
@@ -1230,10 +1243,7 @@ int usb_physical_reset_device(struct usb_device *dev)
 	 * If nothing changed, we reprogram the configuration and then
 	 * the alternate settings.
 	 */
-	descriptor = kmalloc(sizeof *descriptor, GFP_NOIO);
-	if (!descriptor) {
-		return -ENOMEM;
-	}
+
 	ret = usb_get_descriptor(dev, USB_DT_DEVICE, 0, descriptor,
 			sizeof(*descriptor));
 	if (ret < 0) {
@@ -1260,7 +1270,7 @@ int usb_physical_reset_device(struct usb_device *dev)
 					"(expected %Zi, got %i)",
 					dev->devpath,
 					sizeof(dev->descriptor), ret);
-        
+
 			clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 			dev->devnum = -1;
 			return -EIO;

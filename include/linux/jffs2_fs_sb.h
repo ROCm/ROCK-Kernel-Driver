@@ -1,4 +1,4 @@
-/* $Id: jffs2_fs_sb.h,v 1.35 2002/11/12 09:42:18 dwmw2 Exp $ */
+/* $Id: jffs2_fs_sb.h,v 1.37 2003/01/17 16:04:44 dwmw2 Exp $ */
 
 #ifndef _JFFS2_FS_SB
 #define _JFFS2_FS_SB
@@ -8,6 +8,8 @@
 #include <linux/workqueue.h>
 #include <linux/completion.h>
 #include <asm/semaphore.h>
+#include <linux/timer.h>
+#include <linux/wait.h>
 #include <linux/list.h>
 
 #define JFFS2_SB_FLAG_RO 1
@@ -73,6 +75,7 @@ struct jffs2_sb_info {
 						   against erase completion handler */
 	wait_queue_head_t erase_wait;		/* For waiting for erases to complete */
 
+	wait_queue_head_t inocache_wq;
 	struct jffs2_inode_cache **inocache_list;
 	spinlock_t inocache_lock;
 	

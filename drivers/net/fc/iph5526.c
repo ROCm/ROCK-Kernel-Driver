@@ -134,7 +134,7 @@ clone_list[] __initdata  = {
 	{0,}
 };
 
-static void tachyon_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t tachyon_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void tachyon_interrupt_handler(int irq, void* dev_id, struct pt_regs* regs);
 
 static int initialize_register_pointers(struct fc_info *fi);
@@ -234,7 +234,7 @@ int __init iph5526_probe(struct net_device *dev)
 {
 	if (pci_present() && (iph5526_probe_pci(dev) == 0))
 		return 0;
-    return -ENODEV;
+	return -ENODEV;
 }
 
 static int __init iph5526_probe_pci(struct net_device *dev)
@@ -242,37 +242,30 @@ static int __init iph5526_probe_pci(struct net_device *dev)
 #ifdef MODULE
 	struct fc_info *fi = (struct fc_info *)dev->priv;
 #else
-	struct fc_info *fi;
+	struct fc_info *fi = fc[count];
 	static int count;
+	int err;
  
-	if(fc[count] != NULL) {
-		if (dev == NULL) {
-			dev = init_fcdev(NULL, 0);
-			if (dev == NULL)
-				return -ENOMEM;
-		}
-		fi = fc[count];
-#endif
-		fi->dev = dev;
-		dev->base_addr = fi->base_addr;
-		dev->irq = fi->irq;
-		if (dev->priv == NULL) 
-			dev->priv = fi; 
-		fcdev_init(dev);
-		/* Assign ur MAC address.
-		 */
-		dev->dev_addr[0] = (fi->g.my_port_name_high & 0x0000FF00) >> 8;
-		dev->dev_addr[1] = fi->g.my_port_name_high;
-		dev->dev_addr[2] = (fi->g.my_port_name_low & 0xFF000000) >> 24;
-		dev->dev_addr[3] = (fi->g.my_port_name_low & 0x00FF0000) >> 16;
-		dev->dev_addr[4] = (fi->g.my_port_name_low & 0x0000FF00) >> 8;
-		dev->dev_addr[5] = fi->g.my_port_name_low;
-#ifndef MODULE
-		count++;
-	}
-	else
+	if (!fi)
 		return -ENODEV;
+
+	fc_setup(dev);
+	count++;
 #endif
+	fi->dev = dev;
+	dev->base_addr = fi->base_addr;
+	dev->irq = fi->irq;
+	if (dev->priv == NULL) 
+		dev->priv = fi; 
+	fcdev_init(dev);
+	/* Assign ur MAC address.
+	 */
+	dev->dev_addr[0] = (fi->g.my_port_name_high & 0x0000FF00) >> 8;
+	dev->dev_addr[1] = fi->g.my_port_name_high;
+	dev->dev_addr[2] = (fi->g.my_port_name_low & 0xFF000000) >> 24;
+	dev->dev_addr[3] = (fi->g.my_port_name_low & 0x00FF0000) >> 16;
+	dev->dev_addr[4] = (fi->g.my_port_name_low & 0x0000FF00) >> 8;
+	dev->dev_addr[5] = fi->g.my_port_name_low;
 	display_cache(fi);
 	return 0;
 }
@@ -287,9 +280,6 @@ static int __init fcdev_init(struct net_device *dev)
 	dev->change_mtu = iph5526_change_mtu; 
 	dev->tx_timeout = iph5526_timeout;
 	dev->watchdog_timeo = 5*HZ;
-#ifndef MODULE
-	fc_setup(dev);
-#endif
 	return 0;
 }
 
@@ -623,7 +613,7 @@ u_int bus_addr, bus_indx_addr, i;
 }
 
 
-static void tachyon_interrupt(int irq, void* dev_id, struct pt_regs* regs)
+static irqreturn_t tachyon_interrupt(int irq, void* dev_id, struct pt_regs* regs)
 {
 struct Scsi_Host *host = dev_id;
 struct iph5526_hostdata *hostdata = (struct iph5526_hostdata *)host->hostdata;
@@ -632,6 +622,7 @@ u_long flags;
 	spin_lock_irqsave(&fi->fc_lock, flags);
 	tachyon_interrupt_handler(irq, dev_id, regs);
 	spin_unlock_irqrestore(&fi->fc_lock, flags);
+	return IRQ_HANDLED;
 }
 
 static void tachyon_interrupt_handler(int irq, void* dev_id, struct pt_regs* regs)
@@ -3720,12 +3711,13 @@ struct fc_info *fi = (struct fc_info*)dev->priv;
 
 int iph5526_detect(Scsi_Host_Template *tmpt)
 {
-struct Scsi_Host *host = NULL;
-struct iph5526_hostdata *hostdata;
-struct fc_info *fi = NULL;
-int no_of_hosts = 0, timeout, i, j, count = 0;
-u_int pci_maddr = 0;
-struct pci_dev *pdev = NULL;
+	struct Scsi_Host *host = NULL;
+	struct iph5526_hostdata *hostdata;
+	struct fc_info *fi = NULL;
+	int no_of_hosts = 0, i, j, count = 0;
+	u_int pci_maddr = 0;
+	struct pci_dev *pdev = NULL;
+	unsigned long timeout;
 
 	tmpt->proc_name = "iph5526";
 	if (pci_present() == 0) {
@@ -4505,7 +4497,7 @@ static int scsi_registered;
 
 int init_module(void)
 {
-int i = 0;
+	int i = 0;
 
 	driver_template.module = THIS_MODULE;
 	scsi_register_host(&driver_template);
@@ -4518,43 +4510,39 @@ int i = 0;
 	}
 
 	while(fc[i] != NULL) {
-		dev_fc[i] = NULL;
-		dev_fc[i] = init_fcdev(dev_fc[i], 0);	
-		if (dev_fc[i] == NULL) {
+		struct net_device *dev = alloc_fcdev(0);
+		int err;
+
+		if (!dev) {
 			printk("iph5526.c: init_fcdev failed for card #%d\n", i+1);
 			break;
 		}
-		dev_fc[i]->irq = irq;
-		dev_fc[i]->mem_end = bad;
-		dev_fc[i]->base_addr = io;
-		dev_fc[i]->init = iph5526_probe;
-		dev_fc[i]->priv = fc[i];
-		fc[i]->dev = dev_fc[i];
-		if (register_fcdev(dev_fc[i]) != 0) {
-			kfree(dev_fc[i]);
-			dev_fc[i] = NULL;
-			if (i == 0) {
-				printk("iph5526.c: IP registeration failed!!!\n");
-				return -ENODEV;
-			}
+		dev->priv = fc[i];
+		iph5526_probe_pci(dev);
+		err = register_netdev(dev);
+		if (err < 0) {
+			kfree(dev);
+			printk("iph5526.c: init_fcdev failed for card #%d\n", i+1);
+			break;
 		}
+		dev_fc[i] = dev;
 		i++;
 	}
 	if (i == 0)
 		return -ENODEV;
-	
+
 	return 0;
 }
 
 void cleanup_module(void)
 {
-int i = 0;
+	int i = 0;
 	while(fc[i] != NULL) {
-	struct net_device *dev = fc[i]->dev;
-	void *priv = dev->priv;
+		struct net_device *dev = fc[i]->dev;
+		void *priv = dev->priv;
 		fc[i]->g.dont_init = TRUE;
 		take_tachyon_offline(fc[i]);
-		unregister_fcdev(dev);
+		unregister_netdev(dev);
 		clean_up_memory(fc[i]);
 		if (dev->priv)
 			kfree(priv);

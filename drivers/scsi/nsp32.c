@@ -278,15 +278,13 @@ static const int nsp32_table_pci_num =
 /*
  * function declaration
  */
-static int nsp32_detect(Scsi_Host_Template *);
 static int nsp32_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 static const char *nsp32_info(struct Scsi_Host *);
 static int nsp32_eh_abort(Scsi_Cmnd *);
 static int nsp32_eh_bus_reset(Scsi_Cmnd *);
 static int nsp32_eh_host_reset(Scsi_Cmnd *);
 static int nsp32_reset(Scsi_Cmnd *, unsigned int);
-static int nsp32_release(struct Scsi_Host *);
-static int nsp32_proc_info(char *, char **, off_t, int, int, int);
+static int nsp32_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
 static int __devinit nsp32_probe(struct pci_dev *, const struct pci_device_id *);
 static void __devexit nsp32_remove(struct pci_dev *);
 static int __init init_nsp32(void);
@@ -335,11 +333,10 @@ static inline int nsp32_prom_get(nsp32_hw_data *, int);
 /*
  * max_sectors is currently limited up to 128.
  */
-static Scsi_Host_Template driver_template = {
-	.proc_name =			"nsp32",
+static Scsi_Host_Template nsp32_template = {
 	.name =				"Workbit NinjaSCSI-32Bi/UDE",
+	.proc_name =			"nsp32",
 	.proc_info =			nsp32_proc_info,
-	.detect =			nsp32_detect,
 	.info =				nsp32_info,
 	.queuecommand =			nsp32_queuecommand,
 	.can_queue =			1,
@@ -352,12 +349,6 @@ static Scsi_Host_Template driver_template = {
 	.eh_device_reset_handler =	NULL,
 	.eh_bus_reset_handler =		nsp32_eh_bus_reset,
 	.eh_host_reset_handler =	nsp32_eh_host_reset,
-	.release =			nsp32_release,
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,2))
-	.use_new_eh_code =        	1,
-#else
-	/* .highmem_io =		1,	*/
-#endif
 };
 
 #include "nsp32_io.h"
@@ -1555,18 +1546,16 @@ static irqreturn_t do_nsp32_isr(int irq, void *dev_id, struct pt_regs *regs)
 #undef SPRINTF
 #define SPRINTF(args...) \
         do { if(pos < buffer + length) pos += sprintf(pos, ## args); } while(0)
-static int nsp32_proc_info(char  *buffer,
+static int nsp32_proc_info(struct Scsi_Host *host, char  *buffer,
 			   char **start,
 			   off_t  offset,
 			   int    length,
-			   int    hostno,
 			   int    inout)
 {
 	char *pos = buffer;
 	int thislength;
 	unsigned long flags;
 	nsp32_hw_data *data;
-	struct Scsi_Host *host = NULL;
 	unsigned int base;
 	unsigned char mode_reg;
 
@@ -1575,19 +1564,12 @@ static int nsp32_proc_info(char  *buffer,
 		return -EINVAL;
 	}
 
-	/* search this HBA host */
-	
-	host = scsi_host_hn_get(hostno);
-	
-	if (host == NULL) {
-		return -ESRCH;
-	}
 	data = (nsp32_hw_data *)host->hostdata;
 	base = host->io_port;
 
 	SPRINTF("NinjaSCSI-32 status\n\n");
 	SPRINTF("Driver version:        %s\n",		nsp32_release_version);
-	SPRINTF("SCSI host No.:         %d\n",		hostno);
+	SPRINTF("SCSI host No.:         %d\n",		host->host_no);
 	SPRINTF("IRQ:                   %d\n",		host->irq);
 	SPRINTF("IO:                    0x%lx-0x%lx\n", host->io_port, host->io_port + host->n_io_port - 1);
 	SPRINTF("MMIO(virtual address): 0x%lx\n",	host->base);
@@ -1627,7 +1609,7 @@ static int nsp32_proc_info(char  *buffer,
  *	0x900-0xbff: (map same 0x800-0x8ff I/O port image repeatedly)
  *	0xc00-0xfff: CardBus status registers
  */
-static int nsp32_detect(Scsi_Host_Template *sht)
+static int nsp32_detect(struct pci_dev *pdev)
 {
 	struct Scsi_Host *host;	/* registered host structure */
 	int ret;
@@ -1639,7 +1621,7 @@ static int nsp32_detect(Scsi_Host_Template *sht)
 	/*
 	 * register this HBA as SCSI device
 	 */
-	host = scsi_register(sht, sizeof(nsp32_hw_data));
+	host = scsi_register(&nsp32_template, sizeof(nsp32_hw_data));
 	if (host == NULL) {
 		nsp32_msg (KERN_ERR, "failed to scsi register");
 		goto err;
@@ -1802,8 +1784,6 @@ static int nsp32_detect(Scsi_Host_Template *sht)
 		 "NinjaSCSI-32Bi/UDE: irq %d, io 0x%lx+0x%x",
 		 host->irq, host->io_port, host->n_io_port);
 
-	sht->name = data->info_str;
-
 	/*
 	 * SCSI bus reset
 	 *
@@ -1841,7 +1821,9 @@ static int nsp32_detect(Scsi_Host_Template *sht)
 		goto free_irq;
         }
 
-	return 1;
+	scsi_add_host(host, &pdev->dev);
+	pci_set_drvdata(pdev, host);
+	return 0;
 
  free_irq:
 	free_irq(host->irq, data);
@@ -1861,43 +1843,7 @@ static int nsp32_detect(Scsi_Host_Template *sht)
 	scsi_unregister(host);
 
  err:
-	return 0;
-}
-
-static int nsp32_release(struct Scsi_Host *shpnt)
-{
-	nsp32_hw_data *data = (nsp32_hw_data *)shpnt->hostdata;
-
-	if (data->lunt_list) {
-		kfree(data->lunt_list);
-	}
-
-	if (data->autoparam) {
-		pci_free_consistent(data->Pci, AUTOPARAM_SIZE,
-					data->autoparam, data->apaddr);
-	}
-
-	if (data->sg_list) {
-		pci_free_consistent(data->Pci, 
-			(sizeof(struct nsp32_sgtable) * NSP_SG_SIZE * MAX_TARGET * MAX_LUN),
-			data->sg_list, data->sgaddr);
-	}
-
-	DEBUG(0, "free irq\n");
-	if (shpnt->irq) {
-		free_irq(shpnt->irq, data);
-	}
-
-	DEBUG(0, "free io\n");
-	if (shpnt->io_port && shpnt->n_io_port) {
-		release_region(shpnt->io_port, shpnt->n_io_port);
-	}
-
-	if (data->MmioAddress != 0) {
-		iounmap((void *)(data->MmioAddress));
-	}
-
-	return 0;
+	return 1;
 }
 
 static const char *nsp32_info(struct Scsi_Host *shpnt)
@@ -2040,11 +1986,7 @@ static int __devinit nsp32_probe(struct pci_dev *pdev, const struct pci_device_i
 
 	pci_set_master(pdev);
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,5,2))
-	scsi_register_host(&driver_template);
-#else
-	scsi_register_module(MODULE_SCSI_HA, &driver_template);
-#endif
+	ret = nsp32_detect(pdev);
 
 	nsp32_msg(KERN_INFO, "nsp32 irq: %i mmio: 0x%lx slot: %s model: %s",
 		  pdev->irq, data->MmioAddress, pdev->slot_name,
@@ -2052,18 +1994,23 @@ static int __devinit nsp32_probe(struct pci_dev *pdev, const struct pci_device_i
 
 	nsp32_dbg(NSP32_DEBUG_REGISTER, "exit");
 
-	return 0;
+	return ret;
 }
 
 static void __devexit nsp32_remove(struct pci_dev *pdev)
 {
-	nsp32_dbg(NSP32_DEBUG_REGISTER, "enter");
-	
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,5,2))
-	scsi_unregister_host(&driver_template);
-#else
-	scsi_unregister_module(MODULE_SCSI_HA, &driver_template);
-#endif
+	struct Scsi_Host *shpnt = pci_get_drvdata(pdev);
+	nsp32_hw_data *data = (nsp32_hw_data *)shpnt->hostdata;
+
+	kfree(data->lunt_list);
+	pci_free_consistent(data->Pci, AUTOPARAM_SIZE,
+			data->autoparam, data->apaddr);
+	pci_free_consistent(data->Pci, 
+		(sizeof(struct nsp32_sgtable) * NSP_SG_SIZE*MAX_TARGET*MAX_LUN),
+		data->sg_list, data->sgaddr);
+	free_irq(shpnt->irq, data);
+	release_region(shpnt->io_port, shpnt->n_io_port);
+	iounmap((void *)(data->MmioAddress));
 }
 
 static struct pci_device_id nsp32_pci_table[] __devinitdata = {

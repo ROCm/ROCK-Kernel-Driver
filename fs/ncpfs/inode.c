@@ -72,7 +72,7 @@ static int init_inodecache(void)
 {
 	ncp_inode_cachep = kmem_cache_create("ncp_inode_cache",
 					     sizeof(struct ncp_inode_info),
-					     0, SLAB_HWCACHE_ALIGN,
+					     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					     init_once, NULL);
 	if (ncp_inode_cachep == NULL)
 		return -ENOMEM;
@@ -955,7 +955,7 @@ int ncp_current_malloced;
 #endif
 
 static struct super_block *ncp_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_nodev(fs_type, flags, data, ncp_fill_super);
 }

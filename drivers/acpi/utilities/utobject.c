@@ -149,7 +149,7 @@ acpi_ut_create_buffer_object (
 	acpi_size                       buffer_size)
 {
 	union acpi_operand_object       *buffer_desc;
-	u8                              *buffer;
+	u8                              *buffer = NULL;
 
 
 	ACPI_FUNCTION_TRACE_U32 ("ut_create_buffer_object", buffer_size);
@@ -163,14 +163,18 @@ acpi_ut_create_buffer_object (
 		return_PTR (NULL);
 	}
 
-	/* Allocate the actual buffer */
+	/* Create an actual buffer only if size > 0 */
 
-	buffer = ACPI_MEM_CALLOCATE (buffer_size);
-	if (!buffer) {
-		ACPI_REPORT_ERROR (("create_buffer: could not allocate size %X\n",
-			(u32) buffer_size));
-		acpi_ut_remove_reference (buffer_desc);
-		return_PTR (NULL);
+	if (buffer_size > 0) {
+		/* Allocate the actual buffer */
+
+		buffer = ACPI_MEM_CALLOCATE (buffer_size);
+		if (!buffer) {
+			ACPI_REPORT_ERROR (("create_buffer: could not allocate size %X\n",
+				(u32) buffer_size));
+			acpi_ut_remove_reference (buffer_desc);
+			return_PTR (NULL);
+		}
 	}
 
 	/* Complete buffer object initialization */

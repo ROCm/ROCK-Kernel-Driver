@@ -433,12 +433,11 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 	ax25_start_t3timer(ax25);
 	ax25_start_idletimer(ax25);
 
-	if (sk != NULL) {
-		if (!test_bit(SOCK_DEAD, &sk->flags))
+	if (sk) {
+		if (!sock_flag(sk, SOCK_DEAD))
 			sk->data_ready(sk, skb->len);
-	} else {
+	} else
 		kfree_skb(skb);
-	}
 
 	return 0;
 }

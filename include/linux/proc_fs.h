@@ -74,6 +74,12 @@ struct proc_dir_entry {
 	kdev_t	rdev;
 };
 
+struct kcore_list {
+	struct kcore_list *next;
+	unsigned long addr;
+	size_t size;
+};
+
 #ifdef CONFIG_PROC_FS
 
 extern struct proc_dir_entry proc_root;
@@ -87,6 +93,8 @@ extern void proc_root_init(void);
 extern void proc_misc_init(void);
 
 struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry);
+struct dentry *proc_pid_unhash(struct task_struct *p);
+void proc_pid_flush(struct dentry *proc_dentry);
 int proc_pid_readdir(struct file * filp, void * dirent, filldir_t filldir);
 
 extern struct proc_dir_entry *create_proc_entry(const char *name, mode_t mode,
@@ -177,6 +185,12 @@ static inline void proc_net_remove(const char *name)
 	remove_proc_entry(name,proc_net);
 }
 
+/*
+ * fs/proc/kcore.c
+ */
+extern void kclist_add(struct kcore_list *, void *, size_t);
+extern struct kcore_list *kclist_del(void *);
+
 #else
 
 #define proc_root_driver NULL
@@ -184,6 +198,9 @@ static inline void proc_net_remove(const char *name)
 static inline struct proc_dir_entry *proc_net_create(const char *name, mode_t mode, 
 	get_info_t *get_info) {return NULL;}
 static inline void proc_net_remove(const char *name) {}
+
+static inline struct dentry *proc_pid_unhash(struct task_struct *p) { return NULL; }
+static inline void proc_pid_flush(struct dentry *proc_dentry) { }
 
 static inline struct proc_dir_entry *create_proc_entry(const char *name,
 	mode_t mode, struct proc_dir_entry *parent) { return NULL; }
@@ -210,6 +227,16 @@ static inline void proc_tty_unregister_driver(struct tty_driver *driver) {};
 
 extern struct proc_dir_entry proc_root;
 
+static inline void kclist_add(struct kcore_list *new, void *addr, size_t size)
+{
+}
+static inline struct kcore_list * kclist_del(void *addr)
+{
+	return NULL;
+}
+
+static inline void kclist_add(struct kcore_list *new, void *addr, size_t size) {};
+static inline struct kcore_list * kclist_del(void *addr) {return NULL};
 #endif /* CONFIG_PROC_FS */
 
 struct proc_inode {

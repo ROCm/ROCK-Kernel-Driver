@@ -322,7 +322,7 @@ static int shutdown (struct Scsi_Host *host);
 static void abnormal_finished (struct NCR53c7x0_cmd *cmd, int result);
 static int disable (struct Scsi_Host *host);
 static int NCR53c7xx_run_tests (struct Scsi_Host *host);
-static void NCR53c7x0_intr(int irq, void *dev_id, struct pt_regs * regs);
+static irqreturn_t NCR53c7x0_intr(int irq, void *dev_id, struct pt_regs * regs);
 static void NCR53c7x0_intfly (struct Scsi_Host *host);
 static int ncr_halt (struct Scsi_Host *host);
 static void intr_phase_mismatch (struct Scsi_Host *host, struct NCR53c7x0_cmd 
@@ -4226,7 +4226,7 @@ restart:
 }
 
 /*
- * Function : static void NCR53c7x0_intr (int irq, void *dev_id, struct pt_regs * regs)
+ * Function : static irqreturn_t NCR53c7x0_intr (int irq, void *dev_id, struct pt_regs * regs)
  *
  * Purpose : handle NCR53c7x0 interrupts for all NCR devices sharing
  *	the same IRQ line.  
@@ -4239,14 +4239,16 @@ restart:
  * script interrupt handler will call back to this function.
  */
 
-static void 
-NCR53c7x0_intr (int irq, void *dev_id, struct pt_regs * regs) {
+static irqreturn_t
+NCR53c7x0_intr (int irq, void *dev_id, struct pt_regs * regs)
+{
     NCR53c7x0_local_declare();
     struct Scsi_Host *host;			/* Host we are looking at */
     unsigned char istat; 			/* Values of interrupt regs */
     struct NCR53c7x0_hostdata *hostdata;	/* host->hostdata[0] */
     struct NCR53c7x0_cmd *cmd;			/* command which halted */
     u32 *dsa;					/* DSA */
+    int handled = 0;
 
 #ifdef NCR_DEBUG
     char buf[80];				/* Debugging sprintf buffer */
@@ -4263,6 +4265,7 @@ NCR53c7x0_intr (int irq, void *dev_id, struct pt_regs * regs) {
      */
 
     while ((istat = NCR53c7x0_read8(hostdata->istat)) & (ISTAT_SIP|ISTAT_DIP)) {
+	handled = 1;
 	hostdata->dsp_changed = 0;
 	hostdata->dstat_valid = 0;
     	hostdata->state = STATE_HALTED;
@@ -4347,6 +4350,7 @@ NCR53c7x0_intr (int irq, void *dev_id, struct pt_regs * regs) {
 	    }
 	}
     }
+    return IRQ_HANDLED;
 }
 
 

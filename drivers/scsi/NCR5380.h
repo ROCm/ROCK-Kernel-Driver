@@ -310,7 +310,10 @@ static int NCR5380_bus_reset(Scsi_Cmnd * cmd);
 static int NCR5380_host_reset(Scsi_Cmnd * cmd);
 static int NCR5380_device_reset(Scsi_Cmnd * cmd);
 static int NCR5380_queue_command(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *));
-
+#ifdef NCR5380_proc_info
+int NCR5380_proc_info(struct Scsi_Host *instance, char *buffer, char **start,
+off_t offset, int length, int inout);
+#endif
 
 static void NCR5380_reselect(struct Scsi_Host *instance);
 static int NCR5380_select(struct Scsi_Host *instance, Scsi_Cmnd * cmd, int tag);

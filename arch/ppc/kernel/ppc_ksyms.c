@@ -26,6 +26,7 @@
 #include <asm/bitops.h>
 #include <asm/checksum.h>
 #include <asm/pgtable.h>
+#include <asm/tlbflush.h>
 #include <linux/adb.h>
 #include <linux/cuda.h>
 #include <linux/pmu.h>
@@ -156,6 +157,7 @@ EXPORT_SYMBOL(mm_ptov);
 EXPORT_SYMBOL(ioremap);
 EXPORT_SYMBOL(__ioremap);
 EXPORT_SYMBOL(iounmap);
+EXPORT_SYMBOL(ioremap_bot);	/* aka VMALLOC_END */
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 EXPORT_SYMBOL(ppc_ide_md);
@@ -197,6 +199,7 @@ EXPORT_SYMBOL(flush_icache_range);
 EXPORT_SYMBOL(flush_dcache_range);
 EXPORT_SYMBOL(flush_icache_user_range);
 EXPORT_SYMBOL(flush_dcache_page);
+EXPORT_SYMBOL(flush_tlb_kernel_range);
 #ifdef CONFIG_ALTIVEC
 EXPORT_SYMBOL(last_task_used_altivec);
 EXPORT_SYMBOL(giveup_altivec);

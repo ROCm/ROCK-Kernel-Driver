@@ -175,7 +175,7 @@ int
 ipmi_register_all_cmd_rcvr(ipmi_user_t user)
 {
 	unsigned long flags;
-	int rv = -EBUSY;
+	int           rv = -EBUSY;
 
 	write_lock_irqsave(&(user->intf->users_lock), flags);
 	write_lock(&(user->intf->cmd_rcvr_lock));
@@ -194,7 +194,7 @@ int
 ipmi_unregister_all_cmd_rcvr(ipmi_user_t user)
 {
 	unsigned long flags;
-	int rv = -EINVAL;
+	int           rv = -EINVAL;
 
 	write_lock_irqsave(&(user->intf->users_lock), flags);
 	write_lock(&(user->intf->cmd_rcvr_lock));
@@ -431,6 +431,7 @@ static int intf_start_seq_timer(ipmi_smi_t           intf,
 	{
 		struct seq_table *ent = &(intf->seq_table[seq]);
 		ent->timeout = ent->orig_timeout;
+		rv = 0;
 	}
 	spin_unlock_irqrestore(&(intf->seq_lock), flags);
 
@@ -1023,7 +1024,7 @@ int ipmi_register_smi(struct ipmi_smi_handlers *handlers,
 	int              rv;
 	ipmi_smi_t       new_intf;
 	struct list_head *entry;
-	unsigned long     flags;
+	unsigned long    flags;
 
 
 	/* Make sure the driver is actually initialized, this handles

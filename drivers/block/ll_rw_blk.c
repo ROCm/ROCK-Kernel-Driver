@@ -413,11 +413,12 @@ struct request *blk_queue_find_tag(request_queue_t *q, int tag)
 {
 	struct blk_queue_tag *bqt = q->queue_tags;
 
-	if (unlikely(bqt == NULL || bqt->max_depth < tag))
+	if (unlikely(bqt == NULL || tag >= bqt->real_max_depth))
 		return NULL;
 
 	return bqt->tag_index[tag];
 }
+
 /**
  * blk_queue_free_tags - release tag maintenance info
  * @q:  the request queue for the device
@@ -448,6 +449,42 @@ void blk_queue_free_tags(request_queue_t *q)
 	q->queue_flags &= ~(1 << QUEUE_FLAG_QUEUED);
 }
 
+static int init_tag_map(struct blk_queue_tag *tags, int depth)
+{
+	int bits, i;
+
+	if (depth > (queue_nr_requests*2)) {
+		depth = (queue_nr_requests*2);
+		printk(KERN_ERR "%s: adjusted depth to %d\n", __FUNCTION__, depth);
+	}
+
+	tags->tag_index = kmalloc(depth * sizeof(struct request *), GFP_ATOMIC);
+	if (!tags->tag_index)
+		goto fail;
+
+	bits = (depth / BLK_TAGS_PER_LONG) + 1;
+	tags->tag_map = kmalloc(bits * sizeof(unsigned long), GFP_ATOMIC);
+	if (!tags->tag_map)
+		goto fail;
+
+	memset(tags->tag_index, 0, depth * sizeof(struct request *));
+	memset(tags->tag_map, 0, bits * sizeof(unsigned long));
+	tags->max_depth = depth;
+	tags->real_max_depth = bits * BITS_PER_LONG;
+
+	/*
+	 * set the upper bits if the depth isn't a multiple of the word size
+	 */
+	for (i = depth; i < bits * BLK_TAGS_PER_LONG; i++)
+		__set_bit(i, tags->tag_map);
+
+	return 0;
+fail:
+	kfree(tags->tag_index);
+	return -ENOMEM;
+}
+
+
 /**
  * blk_queue_init_tags - initialize the queue tag info
  * @q:  the request queue for the device
@@ -456,37 +493,16 @@ void blk_queue_free_tags(request_queue_t *q)
 int blk_queue_init_tags(request_queue_t *q, int depth)
 {
 	struct blk_queue_tag *tags;
-	int bits, i;
-
-	if (depth > (queue_nr_requests*2)) {
-		depth = (queue_nr_requests*2);
-		printk("blk_queue_init_tags: adjusted depth to %d\n", depth);
-	}
 
 	tags = kmalloc(sizeof(struct blk_queue_tag),GFP_ATOMIC);
 	if (!tags)
 		goto fail;
 
-	tags->tag_index = kmalloc(depth * sizeof(struct request *), GFP_ATOMIC);
-	if (!tags->tag_index)
-		goto fail_index;
+	if (init_tag_map(tags, depth))
+		goto fail;
 
-	bits = (depth / BLK_TAGS_PER_LONG) + 1;
-	tags->tag_map = kmalloc(bits * sizeof(unsigned long), GFP_ATOMIC);
-	if (!tags->tag_map)
-		goto fail_map;
-
-	memset(tags->tag_index, 0, depth * sizeof(struct request *));
-	memset(tags->tag_map, 0, bits * sizeof(unsigned long));
 	INIT_LIST_HEAD(&tags->busy_list);
 	tags->busy = 0;
-	tags->max_depth = depth;
-
-	/*
-	 * set the upper bits if the depth isn't a multiple of the word size
-	 */
-	for (i = depth; i < bits * BLK_TAGS_PER_LONG; i++)
-		__set_bit(i, tags->tag_map);
 
 	/*
 	 * assign it, all done
@@ -494,13 +510,54 @@ int blk_queue_init_tags(request_queue_t *q, int depth)
 	q->queue_tags = tags;
 	q->queue_flags |= (1 << QUEUE_FLAG_QUEUED);
 	return 0;
-
-fail_map:
-	kfree(tags->tag_index);
-fail_index:
-	kfree(tags);
 fail:
+	kfree(tags);
 	return -ENOMEM;
+}
+
+/**
+ * blk_queue_resize_tags - change the queueing depth
+ * @q:  the request queue for the device
+ * @new_depth: the new max command queueing depth
+ *
+ *  Notes:
+ *    Must be called with the queue lock held.
+ **/
+int blk_queue_resize_tags(request_queue_t *q, int new_depth)
+{
+	struct blk_queue_tag *bqt = q->queue_tags;
+	struct request **tag_index;
+	unsigned long *tag_map;
+	int bits, max_depth;
+
+	if (!bqt)
+		return -ENXIO;
+
+	/*
+	 * don't bother sizing down
+	 */
+	if (new_depth <= bqt->real_max_depth) {
+		bqt->max_depth = new_depth;
+		return 0;
+	}
+
+	/*
+	 * save the old state info, so we can copy it back
+	 */
+	tag_index = bqt->tag_index;
+	tag_map = bqt->tag_map;
+	max_depth = bqt->real_max_depth;
+
+	if (init_tag_map(bqt, new_depth))
+		return -ENOMEM;
+
+	memcpy(bqt->tag_index, tag_index, max_depth * sizeof(struct request *));
+	bits = max_depth / BLK_TAGS_PER_LONG;
+	memcpy(bqt->tag_map, tag_map, bits * sizeof(unsigned long));
+
+	kfree(tag_index);
+	kfree(tag_map);
+	return 0;
 }
 
 /**
@@ -524,7 +581,7 @@ void blk_queue_end_tag(request_queue_t *q, struct request *rq)
 
 	BUG_ON(tag == -1);
 
-	if (unlikely(tag >= bqt->max_depth))
+	if (unlikely(tag >= bqt->real_max_depth))
 		return;
 
 	if (unlikely(!__test_and_clear_bit(tag, bqt->tag_map))) {

@@ -218,9 +218,9 @@ extern char empty_zero_page[PAGE_SIZE];
 /* Mask and four different kinds of invalid pages. */
 #define _PAGE_INVALID_MASK	0x601
 #define _PAGE_INVALID_EMPTY	0x400
-#define _PAGE_INVALID_NONE	0x001
-#define _PAGE_INVALID_SWAP	0x200
-#define _PAGE_INVALID_FILE	0x201
+#define _PAGE_INVALID_NONE	0x401
+#define _PAGE_INVALID_SWAP	0x600
+#define _PAGE_INVALID_FILE	0x601
 
 #ifndef __s390x__
 

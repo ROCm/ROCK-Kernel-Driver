@@ -218,6 +218,7 @@ static struct us_unusual_dev us_unusual_dev_list[] = {
 };
 
 struct usb_driver usb_storage_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"usb-storage",
 	.probe =	storage_probe,
 	.disconnect =	storage_disconnect,
@@ -373,7 +374,7 @@ static int usb_stor_control_thread(void * __us)
 				memcpy(us->srb->sense_buffer, 
 				       usb_stor_sense_invalidCDB, 
 				       sizeof(usb_stor_sense_invalidCDB));
-				us->srb->result = CHECK_CONDITION << 1;
+				us->srb->result = SAM_STAT_CHECK_CONDITION;
 		}
 
 		/* Handle those devices which need us to fake 
@@ -386,7 +387,7 @@ static int usb_stor_control_thread(void * __us)
 
 			US_DEBUGP("Faking INQUIRY command\n");
 			fill_inquiry_response(us, data_ptr, 36);
-			us->srb->result = GOOD << 1;
+			us->srb->result = SAM_STAT_GOOD;
 		}
 
 		/* we've got a command, let's do it! */
@@ -411,9 +412,11 @@ static int usb_stor_control_thread(void * __us)
 			US_DEBUGP("scsi command aborted\n");
 		}
 
-		/* in case an abort request was received after the command
-		 * completed, we must use a separate test to see whether
-		 * we need to signal that the abort has finished */
+		/* If an abort request was received we need to signal that
+		 * the abort has finished.  The proper test for this is
+		 * sm_state == US_STATE_ABORTING, not srb->result == DID_ABORT,
+		 * because an abort request might be received after all the
+		 * USB processing was complete. */
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING)
 			complete(&(us->notify));
 
@@ -714,7 +717,6 @@ static int storage_probe(struct usb_interface *intf,
 		us->transport_name = "Bulk";
 		us->transport = usb_stor_Bulk_transport;
 		us->transport_reset = usb_stor_Bulk_reset;
-		us->max_lun = usb_stor_Bulk_max_lun(us);
 		break;
 
 #ifdef CONFIG_USB_STORAGE_HP8200e
@@ -841,6 +843,10 @@ static int storage_probe(struct usb_interface *intf,
 	if (usb_stor_allocate_urbs(us))
 		goto BadDevice;
 
+	/* For bulk-only devices, determine the max LUN value */
+	if (us->protocol == US_PR_BULK)
+		us->max_lun = usb_stor_Bulk_max_lun(us);
+
 	/*
 	 * Since this is a new device, we need to generate a scsi 
 	 * host definition, and register with the higher SCSI layers
@@ -886,11 +892,8 @@ static int storage_probe(struct usb_interface *intf,
 	/* set the hostdata to prepare for scanning */
 	us->host->hostdata[0] = (unsigned long)us;
 
-	/* associate this host with our interface */
-	scsi_set_device(us->host, &intf->dev);
-
 	/* now add the host */
-	result = scsi_add_host(us->host, NULL);
+	result = scsi_add_host(us->host, &intf->dev);
 	if (result) {
 		printk(KERN_WARNING USB_STORAGE
 			"Unable to add the scsi host\n");
@@ -941,15 +944,12 @@ static void storage_disconnect(struct usb_interface *intf)
 		sdev->online = 0;
 	scsi_unlock(us->host);
 
+	/* prevent new USB transfers and stop the current command */
+	set_bit(US_FLIDX_DISCONNECTING, &us->flags);
+	usb_stor_stop_transport(us);
+
 	/* lock device access -- no need to unlock, as we're going away */
 	down(&(us->dev_semaphore));
-
-	/* Complete all pending commands with * cmd->result = DID_ERROR << 16.
-	 * Since we only queue one command at a time, this is pretty easy. */
-	if (us->srb) {
-		us->srb->result = DID_ERROR << 16;
-		us->srb->scsi_done(us->srb);
-	}
 
 	/* TODO: somehow, wait for the device to
 	 * be 'idle' (tasklet completion) */

@@ -522,8 +522,7 @@ int proc_ide_write_settings
 			if (*p != ':')
 				goto parse_error;
 			len = IDE_MIN(p - start, MAX_LEN);
-			strncpy(name, start, IDE_MIN(len, MAX_LEN));
-			name[len] = 0;
+			strlcpy(name, start, IDE_MIN(len, MAX_LEN));
 
 			if (n > 0) {
 				--n;
@@ -713,7 +712,6 @@ void create_proc_ide_drives(ide_hwif_t *hwif)
 
 	for (d = 0; d < MAX_DRIVES; d++) {
 		ide_drive_t *drive = &hwif->drives[d];
-		ide_driver_t *driver = drive->driver;
 
 		if (!drive->present)
 			continue;
@@ -721,13 +719,8 @@ void create_proc_ide_drives(ide_hwif_t *hwif)
 			continue;
 
 		drive->proc = proc_mkdir(drive->name, parent);
-		if (drive->proc) {
+		if (drive->proc)
 			ide_add_proc_entries(drive->proc, generic_drive_entries, drive);
-			if (driver) {
-				ide_add_proc_entries(drive->proc, generic_subdriver_entries, drive);
-				ide_add_proc_entries(drive->proc, driver->proc, drive);
-			}
-		}
 		sprintf(name,"ide%d/%s", (drive->name[2]-'a')/2, drive->name);
 		ent = proc_symlink(drive->name, proc_ide_root, name);
 		if (!ent) return;
@@ -735,34 +728,6 @@ void create_proc_ide_drives(ide_hwif_t *hwif)
 }
 
 EXPORT_SYMBOL(create_proc_ide_drives);
-
-void recreate_proc_ide_device(ide_hwif_t *hwif, ide_drive_t *drive)
-{
-	struct proc_dir_entry *ent;
-	struct proc_dir_entry *parent = hwif->proc;
-	char name[64];
-
-	if (drive->present && !drive->proc) {
-		drive->proc = proc_mkdir(drive->name, parent);
-		if (drive->proc)
-			ide_add_proc_entries(drive->proc, generic_drive_entries, drive);
-
-/*
- * assume that we have these already, however, should test FIXME!
- * if (driver) {
- *      ide_add_proc_entries(drive->proc, generic_subdriver_entries, drive);
- *      ide_add_proc_entries(drive->proc, driver->proc, drive);
- * }
- *
- */
-		sprintf(name,"ide%d/%s", (drive->name[2]-'a')/2, drive->name);
-		ent = proc_symlink(drive->name, proc_ide_root, name);
-		if (!ent)
-			return;
-	}
-}
-
-EXPORT_SYMBOL(recreate_proc_ide_device);
 
 void destroy_proc_ide_device(ide_hwif_t *hwif, ide_drive_t *drive)
 {
@@ -910,16 +875,11 @@ EXPORT_SYMBOL(proc_ide_create);
 void proc_ide_destroy(void)
 {
 #ifdef CONFIG_BLK_DEV_IDEPCI
-	ide_pci_host_proc_t *p = ide_pci_host_proc_list;
-	char name[32];
+	ide_pci_host_proc_t *p;
 
-	while ((p->name != NULL) && (p->set) && (p->get_info != NULL)) {
-		name[0] = '\0';
-		sprintf(name, "ide/%s", p->name);
+	for (p = ide_pci_host_proc_list; p; p = p->next) {
 		if (p->set == 2)
 			remove_proc_entry(p->name, p->parent);
-		if (p->next == NULL) break;
-		p = p->next;
 	}
 #endif /* CONFIG_BLK_DEV_IDEPCI */
 	remove_proc_entry("ide/drivers", proc_ide_root);

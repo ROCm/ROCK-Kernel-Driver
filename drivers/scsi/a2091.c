@@ -28,11 +28,13 @@
 static struct Scsi_Host *first_instance = NULL;
 static Scsi_Host_Template *a2091_template;
 
-static void a2091_intr (int irq, void *dummy, struct pt_regs *fp)
+static irqreturn_t a2091_intr (int irq, void *dummy, struct pt_regs *fp)
 {
     unsigned long flags;
     unsigned int status;
     struct Scsi_Host *instance;
+    int handled = 0;
+
     for (instance = first_instance; instance &&
 	 instance->hostt == a2091_template; instance = instance->next)
     {
@@ -44,8 +46,10 @@ static void a2091_intr (int irq, void *dummy, struct pt_regs *fp)
 		spin_lock_irqsave(&instance->host_lock, flags);
 		wd33c93_intr (instance);
 		spin_unlock_irqrestore(&instance->host_lock, flags);
+		handled = 1;
 	}
     }
+    return IRQ_RETVAL(handled);
 }
 
 static int dma_setup (Scsi_Cmnd *cmd, int dir_in)
@@ -229,6 +233,13 @@ int __init a2091_detect(Scsi_Host_Template *tpnt)
     return num_a2091;
 }
 
+static int a2091_bus_reset(Scsi_Cmnd *cmd)
+{
+	/* FIXME perform bus-specific reset */
+	wd33c93_host_reset(cmd);
+	return SUCCESS;
+}
+
 #define HOSTS_C
 
 static Scsi_Host_Template driver_template = {
@@ -237,8 +248,9 @@ static Scsi_Host_Template driver_template = {
 	.detect			= a2091_detect,
 	.release		= a2091_release,
 	.queuecommand		= wd33c93_queuecommand,
-	.abort			= wd33c93_abort,
-	.reset			= wd33c93_reset,
+	.eh_abort_handler	= wd33c93_abort,
+	.eh_bus_reset_handler	= a2091_bus_reset,
+	.eh_host_reset_handler	= wd33c93_host_reset,
 	.can_queue		= CAN_QUEUE,
 	.this_id		= 7,
 	.sg_tablesize		= SG_ALL,

@@ -2243,8 +2243,7 @@ static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
         info->screen_base = (char *)rinfo->fb_base;
 
 	/* Fill fix common fields */
-	strncpy(info->fix.id, rinfo->name, sizeof(info->fix.id));
-	info->fix.id[sizeof(info->fix.id) - 1] = '\0';
+	strlcpy(info->fix.id, rinfo->name, sizeof(info->fix.id));
         info->fix.smem_start = rinfo->fb_base_phys;
         info->fix.smem_len = rinfo->video_ram;
         info->fix.type = FB_TYPE_PACKED_PIXELS;

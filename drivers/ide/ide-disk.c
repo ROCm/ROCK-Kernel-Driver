@@ -247,7 +247,7 @@ static ide_startstop_t write_intr (ide_drive_t *drive)
  *
  * Returns 0 on success.
  *
- * Note that we may be called from two contexts - the do_rw_disk context
+ * Note that we may be called from two contexts - __ide_do_rw_disk() context
  * and IRQ context. The IRQ can happen any time after we've output the
  * full "mcount" number of sectors, so we must make sure we update the
  * state _before_ we output the final part of the data!
@@ -351,11 +351,11 @@ static ide_startstop_t multwrite_intr (ide_drive_t *drive)
 }
 
 /*
- * do_rw_disk() issues READ and WRITE commands to a disk,
+ * __ide_do_rw_disk() issues READ and WRITE commands to a disk,
  * using LBA if supported, or CHS otherwise, to address sectors.
  * It also takes care of issuing special DRIVE_CMDs.
  */
-static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, sector_t block)
+ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector_t block)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	u8 lba48		= (drive->addressing == 1) ? 1 : 0;
@@ -366,11 +366,6 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, secto
 
 	if (driver_blocked)
 		panic("Request while ide driver is blocked?");
-
-#if defined(CONFIG_BLK_DEV_PDC4030) || defined(CONFIG_BLK_DEV_PDC4030_MODULE)
-	if (IS_PDC4030_DRIVE)
-		return promise_rw_disk(drive, rq, block);
-#endif /* CONFIG_BLK_DEV_PDC4030 */
 
 	if (drive->using_tcq && idedisk_start_tag(drive, rq)) {
 		if (!ata_pending_commands(drive))
@@ -550,10 +545,11 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, secto
 		}
 		return ide_started;
 	}
-	blk_dump_rq_flags(rq, "do_rw_disk - bad command");
+	blk_dump_rq_flags(rq, "__ide_do_rw_disk - bad command");
 	ide_end_request(drive, 0, 0);
 	return ide_stopped;
 }
+EXPORT_SYMBOL_GPL(__ide_do_rw_disk);
 
 #else /* CONFIG_IDE_TASKFILE_IO */
 
@@ -562,15 +558,15 @@ static ide_startstop_t lba_28_rw_disk(ide_drive_t *, struct request *, unsigned 
 static ide_startstop_t lba_48_rw_disk(ide_drive_t *, struct request *, unsigned long long);
 
 /*
- * do_rw_disk() issues READ and WRITE commands to a disk,
+ * __ide_do_rw_disk() issues READ and WRITE commands to a disk,
  * using LBA if supported, or CHS otherwise, to address sectors.
  * It also takes care of issuing special DRIVE_CMDs.
  */
-static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, sector_t block)
+ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector_t block)
 {
 	BUG_ON(drive->blocked);
 	if (!blk_fs_request(rq)) {
-		blk_dump_rq_flags(rq, "do_rw_disk - bad command");
+		blk_dump_rq_flags(rq, "__ide_do_rw_disk - bad command");
 		ide_end_request(drive, 0, 0);
 		return ide_stopped;
 	}
@@ -580,11 +576,6 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, secto
 	 *
 	 * need to add split taskfile operations based on 28bit threshold.
 	 */
-
-#if defined(CONFIG_BLK_DEV_PDC4030) || defined(CONFIG_BLK_DEV_PDC4030_MODULE)
-        if (IS_PDC4030_DRIVE)
-                return promise_rw_disk(drive, rq, block);
-#endif /* CONFIG_BLK_DEV_PDC4030 */
 
 	if (drive->using_tcq && idedisk_start_tag(drive, rq)) {
 		if (!ata_pending_commands(drive))
@@ -601,6 +592,7 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, secto
 	/* 28-bit CHS : DIE DIE DIE piece of legacy crap!!! */
 	return chs_rw_disk(drive, rq, (unsigned long) block);
 }
+EXPORT_SYMBOL_GPL(__ide_do_rw_disk);
 
 static task_ioreg_t get_command (ide_drive_t *drive, int cmd)
 {
@@ -759,6 +751,16 @@ static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, u
 }
 
 #endif /* CONFIG_IDE_TASKFILE_IO */
+
+static ide_startstop_t ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector_t block)
+{
+	ide_hwif_t *hwif = HWIF(drive);
+
+	if (hwif->rw_disk)
+		return hwif->rw_disk(drive, rq, block);
+	else
+		return __ide_do_rw_disk(drive, rq, block);
+}
 
 static int do_idedisk_flushcache(ide_drive_t *drive);
 
@@ -1541,11 +1543,6 @@ static void idedisk_setup (ide_drive_t *drive)
 	struct hd_driveid *id = drive->id;
 	unsigned long capacity;
 
-#if 0
-	if (IS_PDC4030_DRIVE)
-		DRIVER(drive)->do_request = promise_rw_disk;
-#endif
-	
 	idedisk_add_settings(drive);
 
 	if (drive->id_read == 0)
@@ -1674,7 +1671,7 @@ static ide_driver_t idedisk_driver = {
 	.supports_dsc_overlap	= 0,
 	.cleanup		= idedisk_cleanup,
 	.flushcache		= do_idedisk_flushcache,
-	.do_request		= do_rw_disk,
+	.do_request		= ide_do_rw_disk,
 	.sense			= idedisk_dump_status,
 	.error			= idedisk_error,
 	.abort			= idedisk_abort,
@@ -1817,7 +1814,6 @@ static int idedisk_attach(ide_drive_t *drive)
 	}
 	DRIVER(drive)->busy--;
 	g->minors = 1 << PARTN_BITS;
-	g->minor_shift = PARTN_BITS;
 	strcpy(g->devfs_name, drive->devfs_name);
 	g->driverfs_dev = &drive->gendev;
 	g->flags = drive->removable ? GENHD_FL_REMOVABLE : 0;

@@ -76,6 +76,7 @@ static const char data_name [] = "CDC Ethernet Data";
 
 #define MIN_PACKET	sizeof(struct ethhdr)
 #define	MAX_PACKET	ETH_DATA_LEN	/* biggest packet we'll rx/tx */
+#define RX_EXTRA	20		/* guard against rx overflows */
 
 /* FIXME allow high speed jumbograms */
 
@@ -1107,7 +1108,7 @@ eth_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 	}
 
 	/* respond with data transfer before status phase? */
-	if (value > 0) {
+	if (value >= 0) {
 		req->length = value;
 		value = usb_ep_queue (gadget->ep0, req, GFP_ATOMIC);
 		if (value < 0) {
@@ -1226,7 +1227,7 @@ rx_submit (struct eth_dev *dev, struct usb_request *req, int gfp_flags)
 	int			retval = 0;
 	size_t			size;
 
-	size = (sizeof (struct ethhdr) + dev->net.mtu);
+	size = (sizeof (struct ethhdr) + dev->net.mtu + RX_EXTRA);
 
 	if ((skb = alloc_skb (size, gfp_flags)) == 0) {
 		DEBUG (dev, "no rx skb\n");

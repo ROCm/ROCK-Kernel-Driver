@@ -68,13 +68,19 @@ int inode_setattr(struct inode * inode, struct iattr * attr)
 	int error = 0;
 
 	if (ia_valid & ATTR_SIZE) {
-		if (attr->ia_size != inode->i_size)
+		if (attr->ia_size != inode->i_size) {
 			error = vmtruncate(inode, attr->ia_size);
-		if (error || (ia_valid == ATTR_SIZE))
-			goto out;
+			if (error || (ia_valid == ATTR_SIZE))
+				goto out;
+		} else {
+			/*
+			 * We skipped the truncate but must still update
+			 * timestamps
+			 */
+			ia_valid |= ATTR_MTIME|ATTR_CTIME;
+		}
 	}
 
-	lock_kernel();
 	if (ia_valid & ATTR_UID)
 		inode->i_uid = attr->ia_uid;
 	if (ia_valid & ATTR_GID)
@@ -86,12 +92,13 @@ int inode_setattr(struct inode * inode, struct iattr * attr)
 	if (ia_valid & ATTR_CTIME)
 		inode->i_ctime = attr->ia_ctime;
 	if (ia_valid & ATTR_MODE) {
-		inode->i_mode = attr->ia_mode;
+		umode_t mode = attr->ia_mode;
+
 		if (!in_group_p(inode->i_gid) && !capable(CAP_FSETID))
-			inode->i_mode &= ~S_ISGID;
+			mode &= ~S_ISGID;
+		inode->i_mode = mode;
 	}
 	mark_inode_dirty(inode);
-	unlock_kernel();
 out:
 	return error;
 }

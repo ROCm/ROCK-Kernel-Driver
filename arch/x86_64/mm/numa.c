@@ -15,7 +15,7 @@
 #include <asm/dma.h>
 #include <asm/numa.h>
 
-#define Dprintk(x...) printk(x)
+#define Dprintk(x...)
 
 struct pglist_data *node_data[MAXNODE];
 bootmem_data_t plat_node_bdata[MAX_NUMNODES];
@@ -104,8 +104,11 @@ void __init setup_node_bootmem(int nodeid, unsigned long start, unsigned long en
 
 	reserve_bootmem_node(NODE_DATA(nodeid), nodedata_phys, pgdat_size); 
 	reserve_bootmem_node(NODE_DATA(nodeid), bootmap_start, bootmap_pages<<PAGE_SHIFT);
-	if (nodeid + 1 > numnodes) 
+	if (nodeid + 1 > numnodes) { 
 		numnodes = nodeid + 1;
+		printk(KERN_INFO 
+		       "setup_node_bootmem: enlarging numnodes to %d\n", numnodes);
+	}
 	nodes_present |= (1UL << nodeid); 
 } 
 
@@ -121,7 +124,7 @@ void __init setup_node_zones(int nodeid)
 	start_pfn = node_start_pfn(nodeid);
 	end_pfn = node_end_pfn(nodeid);
 
-	printk("setting up node %d %lx-%lx\n", nodeid, start_pfn, end_pfn); 
+	printk(KERN_INFO "setting up node %d %lx-%lx\n", nodeid, start_pfn, end_pfn); 
 	
 	/* All nodes > 0 have a zero length zone DMA */ 
 	dma_end_pfn = __pa(MAX_DMA_ADDRESS) >> PAGE_SHIFT; 

@@ -67,6 +67,7 @@ struct irport_cb {
 	__u32 new_speed;
 	int mode;
 	int index;                 /* Instance index */
+	int transmitting;	   /* Are we transmitting ? */
 
 	spinlock_t lock;           /* For serializing operations */
 

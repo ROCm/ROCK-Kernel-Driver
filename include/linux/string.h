@@ -28,11 +28,17 @@ extern char * strcpy(char *,const char *);
 #ifndef __HAVE_ARCH_STRNCPY
 extern char * strncpy(char *,const char *, __kernel_size_t);
 #endif
+#ifndef __HAVE_ARCH_STRLCPY
+size_t strlcpy(char *, const char *, size_t);
+#endif
 #ifndef __HAVE_ARCH_STRCAT
 extern char * strcat(char *, const char *);
 #endif
 #ifndef __HAVE_ARCH_STRNCAT
 extern char * strncat(char *, const char *, __kernel_size_t);
+#endif
+#ifndef __HAVE_ARCH_STRLCAT
+extern size_t strlcat(char *, const char *, __kernel_size_t);
 #endif
 #ifndef __HAVE_ARCH_STRCMP
 extern int strcmp(const char *,const char *);

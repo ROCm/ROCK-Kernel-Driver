@@ -105,9 +105,9 @@
 #define RAMK_INIT_CONTENTS_NO_END					      \
 		. = ALIGN (4096) ;					      \
 		__init_start = . ;					      \
-			_sinittext = .;					      \
+			__sinittext = .;				      \
 			*(.init.text)	/* 2.5 convention */		      \
-			_einittext = .;					      \
+			__einittext = .;				      \
 			*(.init.data)					      \
 			*(.text.init)	/* 2.4 convention */		      \
 			*(.data.init)					      \

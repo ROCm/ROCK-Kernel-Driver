@@ -10,6 +10,7 @@
  * Modified by:   Dag Brattli <dagb@cs.uit.no>
  * 
  *     Copyright (c) 1999 Dag Brattli, All Rights Reserved.
+ *     Copyright (c) 2000-2003 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -59,7 +60,7 @@ int ircomm_open_tsap(struct ircomm_cb *self)
 	notify.flow_indication       = ircomm_ttp_flow_indication;
 	notify.disconnect_indication = ircomm_ttp_disconnect_indication;
 	notify.instance = self;
-	strncpy(notify.name, "IrCOMM", NOTIFY_MAX_NAME);
+	strlcpy(notify.name, "IrCOMM", sizeof(notify.name));
 
 	self->tsap = irttp_open_tsap(LSAP_ANY, DEFAULT_INITIAL_CREDIT,
 				     &notify);
@@ -94,9 +95,14 @@ int ircomm_ttp_connect_request(struct ircomm_cb *self,
 
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
+	/* Don't forget to refcount it - should be NULL anyway */
+	if(userdata)
+		skb_get(userdata);
+
 	ret = irttp_connect_request(self->tsap, info->dlsap_sel,
 				    info->saddr, info->daddr, NULL, 
 				    TTP_SAR_DISABLE, userdata); 
+
 	return ret;
 }	
 
@@ -106,13 +112,18 @@ int ircomm_ttp_connect_request(struct ircomm_cb *self,
  *    
  *
  */
-int ircomm_ttp_connect_response(struct ircomm_cb *self, struct sk_buff *skb)
+int ircomm_ttp_connect_response(struct ircomm_cb *self,
+				struct sk_buff *userdata)
 {
 	int ret;
 
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 	
-	ret = irttp_connect_response(self->tsap, TTP_SAR_DISABLE, skb);
+	/* Don't forget to refcount it - should be NULL anyway */
+	if(userdata)
+		skb_get(userdata);
+
+	ret = irttp_connect_response(self->tsap, TTP_SAR_DISABLE, userdata);
 
 	return ret;
 }
@@ -126,7 +137,8 @@ int ircomm_ttp_connect_response(struct ircomm_cb *self, struct sk_buff *skb)
  *    some of them are sent after connection establishment, so this can 
  *    increase the latency a bit.
  */
-int ircomm_ttp_data_request(struct ircomm_cb *self, struct sk_buff *skb, 
+int ircomm_ttp_data_request(struct ircomm_cb *self,
+			    struct sk_buff *skb, 
 			    int clen)
 {
 	int ret;
@@ -140,6 +152,10 @@ int ircomm_ttp_data_request(struct ircomm_cb *self, struct sk_buff *skb,
 	 * only frames, to make things easier and avoid queueing
 	 */
 	ASSERT(skb_headroom(skb) >= IRCOMM_HEADER_SIZE, return -1;);
+
+	/* Don't forget to refcount it - see ircomm_tty_do_softint() */
+	skb_get(skb);
+
 	skb_push(skb, IRCOMM_HEADER_SIZE);
 
 	skb->data[0] = clen;
@@ -147,7 +163,7 @@ int ircomm_ttp_data_request(struct ircomm_cb *self, struct sk_buff *skb,
 	ret = irttp_data_request(self->tsap, skb);
 	if (ret) {
 		ERROR("%s(), failed\n", __FUNCTION__);
-		dev_kfree_skb(skb);
+		/* irttp_data_request already free the packet */
 	}
 
 	return ret;
@@ -172,6 +188,9 @@ int ircomm_ttp_data_indication(void *instance, void *sap,
 
 	ircomm_do_event(self, IRCOMM_TTP_DATA_INDICATION, skb, NULL);
 
+	/* Drop reference count - see ircomm_tty_data_indication(). */
+	dev_kfree_skb(skb);
+
 	return 0;
 }
 
@@ -189,12 +208,11 @@ void ircomm_ttp_connect_confirm(void *instance, void *sap,
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRCOMM_MAGIC, return;);
 	ASSERT(skb != NULL, return;);
-	ASSERT(qos != NULL, return;);
+	ASSERT(qos != NULL, goto out;);
 
 	if (max_sdu_size != TTP_SAR_DISABLE) {
 		ERROR("%s(), SAR not allowed for IrCOMM!\n", __FUNCTION__);
-		dev_kfree_skb(skb);
-		return;
+		goto out;
 	}
 
 	info.max_data_size = irttp_get_max_seg_size(self->tsap)
@@ -203,6 +221,10 @@ void ircomm_ttp_connect_confirm(void *instance, void *sap,
 	info.qos = qos;
 
 	ircomm_do_event(self, IRCOMM_TTP_CONNECT_CONFIRM, skb, &info);
+
+out:
+	/* Drop reference count - see ircomm_tty_connect_confirm(). */
+	dev_kfree_skb(skb);
 }
 
 /*
@@ -226,12 +248,11 @@ void ircomm_ttp_connect_indication(void *instance, void *sap,
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRCOMM_MAGIC, return;);
 	ASSERT(skb != NULL, return;);
-	ASSERT(qos != NULL, return;);
+	ASSERT(qos != NULL, goto out;);
 
 	if (max_sdu_size != TTP_SAR_DISABLE) {
 		ERROR("%s(), SAR not allowed for IrCOMM!\n", __FUNCTION__);
-		dev_kfree_skb(skb);
-		return;
+		goto out;
 	}
 
 	info.max_data_size = irttp_get_max_seg_size(self->tsap)
@@ -240,6 +261,10 @@ void ircomm_ttp_connect_indication(void *instance, void *sap,
 	info.qos = qos;
 
 	ircomm_do_event(self, IRCOMM_TTP_CONNECT_INDICATION, skb, &info);
+
+out:
+	/* Drop reference count - see ircomm_tty_connect_indication(). */
+	dev_kfree_skb(skb);
 }
 
 /*
@@ -253,6 +278,10 @@ int ircomm_ttp_disconnect_request(struct ircomm_cb *self,
 				  struct ircomm_info *info)
 {
 	int ret;
+
+	/* Don't forget to refcount it - should be NULL anyway */
+	if(userdata)
+		skb_get(userdata);
 
 	ret = irttp_disconnect_request(self->tsap, userdata, P_NORMAL);
 
@@ -280,6 +309,10 @@ void ircomm_ttp_disconnect_indication(void *instance, void *sap,
 	info.reason = reason;
 
 	ircomm_do_event(self, IRCOMM_TTP_DISCONNECT_INDICATION, skb, &info);
+
+	/* Drop reference count - see ircomm_tty_disconnect_indication(). */
+	if(skb)
+		dev_kfree_skb(skb);
 }
 
 /*

@@ -1820,8 +1820,7 @@ static void __init in2000_setup(char *str, int *ints)
 	int i;
 	char *p1, *p2;
 
-	strncpy(setup_buffer, str, SETUP_BUFFER_SIZE);
-	setup_buffer[SETUP_BUFFER_SIZE - 1] = '\0';
+	strlcpy(setup_buffer, str, SETUP_BUFFER_SIZE);
 	p1 = setup_buffer;
 	i = 0;
 	while (*p1 && (i < MAX_SETUP_ARGS)) {
@@ -2155,7 +2154,7 @@ static int in2000_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 }
 
 
-static int in2000_proc_info(char *buf, char **start, off_t off, int len, int hn, int in)
+static int in2000_proc_info(struct Scsi_Host *instance, char *buf, char **start, off_t off, int len, int in)
 {
 
 #ifdef PROC_INTERFACE
@@ -2163,17 +2162,11 @@ static int in2000_proc_info(char *buf, char **start, off_t off, int len, int hn,
 	char *bp;
 	char tbuf[128];
 	unsigned long flags;
-	struct Scsi_Host *instance;
 	struct IN2000_hostdata *hd;
 	Scsi_Cmnd *cmd;
 	int x, i;
 	static int stop = 0;
 
-	instance = scsi_host_hn_get(hn);
-	if (!instance) {
-		printk("*** Hmm... Can't find host #%d!\n", hn);
-		return (-ESRCH);
-	}
 	hd = (struct IN2000_hostdata *) instance->hostdata;
 
 /* If 'in' is TRUE we need to _read_ the proc file. We accept the following

@@ -389,9 +389,14 @@ int ndisc_output(struct sk_buff *skb)
 	return -EINVAL;
 }
 
-static inline void ndisc_rt_init(struct rt6_info *rt, struct net_device *dev,
-			    struct neighbour *neigh)
+static inline struct dst_entry *ndisc_dst_alloc(struct net_device *dev, 
+						struct neighbour *neigh)
 {
+	struct rt6_info *rt = ip6_dst_alloc();
+
+	if (unlikely(rt == NULL))
+		goto out;
+
 	rt->rt6i_dev	  = dev;
 	rt->rt6i_nexthop  = neigh;
 	rt->rt6i_expires  = 0;
@@ -399,6 +404,8 @@ static inline void ndisc_rt_init(struct rt6_info *rt, struct net_device *dev,
 	rt->rt6i_metric   = 0;
 	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = 255;
 	rt->u.dst.output  = ndisc_output;
+out:
+	return (struct dst_entry *)rt;
 }
 
 static inline void ndisc_flow_init(struct flowi *fl, u8 type,
@@ -420,7 +427,6 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 	struct inet6_ifaddr *ifp;
 	struct inet6_dev *idev;
 	struct flowi fl;
-	struct rt6_info *rt = NULL;
 	struct dst_entry* dst;
         struct sock *sk = ndisc_socket->sk;
 	struct in6_addr *src_addr;
@@ -431,27 +437,22 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 
 	len = sizeof(struct icmp6hdr) + sizeof(struct in6_addr);
 
-	rt = ip6_dst_alloc();
-	if (!rt) 
-		return;
-
 	/* for anycast or proxy, solicited_addr != src_addr */
 	ifp = ipv6_get_ifaddr(solicited_addr, dev);
  	if (ifp) {
 		src_addr = solicited_addr;
 		in6_ifa_put(ifp);
 	} else {
-		if (ipv6_dev_get_saddr(dev, daddr, &tmpaddr, 0)) {
-			dst_free(dst);
+		if (ipv6_dev_get_saddr(dev, daddr, &tmpaddr, 0))
 			return;
-		}
 		src_addr = &tmpaddr;
 	}
 
 	ndisc_flow_init(&fl, NDISC_NEIGHBOUR_ADVERTISEMENT, src_addr, daddr);
-	ndisc_rt_init(rt, dev, neigh);	
 
-	dst = (struct dst_entry*)rt;
+	dst = ndisc_dst_alloc(dev, neigh);	
+	if (!dst)
+		return;
 
 	err = xfrm_lookup(&dst, &fl, NULL, 0);
 	if (err < 0) {
@@ -518,7 +519,6 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 		   struct in6_addr *daddr, struct in6_addr *saddr) 
 {
 	struct flowi fl;
-	struct rt6_info *rt = NULL;
 	struct dst_entry* dst;
 	struct inet6_dev *idev;
         struct sock *sk = ndisc_socket->sk;
@@ -535,14 +535,11 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 		saddr = &addr_buf;
 	}
 
-	rt = ip6_dst_alloc();
-	if (!rt) 
-		return;
-
 	ndisc_flow_init(&fl, NDISC_NEIGHBOUR_SOLICITATION, saddr, daddr);
-	ndisc_rt_init(rt, dev, neigh);	
 
-	dst = (struct dst_entry*)rt;
+	dst = ndisc_dst_alloc(dev, neigh);
+	if (!dst)
+		return;
 	dst_clone(dst);
 
 	err = xfrm_lookup(&dst, &fl, NULL, 0);
@@ -601,7 +598,6 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
 		   struct in6_addr *daddr)
 {
 	struct flowi fl;
-	struct rt6_info *rt = NULL;
 	struct dst_entry* dst;
 	struct inet6_dev *idev;
 	struct sock *sk = ndisc_socket->sk;
@@ -611,14 +607,11 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
         int len;
 	int err;
 
-	rt = ip6_dst_alloc();
-	if (!rt) 
-		return;
-
 	ndisc_flow_init(&fl, NDISC_ROUTER_SOLICITATION, saddr, daddr);
-	ndisc_rt_init(rt, dev, NULL);
 
-	dst = (struct dst_entry*)rt;
+	dst = ndisc_dst_alloc(dev, NULL);
+	if (!dst)
+		return;
 	dst_clone(dst);
 
 	err = xfrm_lookup(&dst, &fl, NULL, 0);
@@ -1299,12 +1292,6 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 	int hlen;
 
 	dev = skb->dev;
-	rt = rt6_lookup(&skb->nh.ipv6h->saddr, NULL, dev->ifindex, 1);
-
-	if (rt == NULL)
-		return;
-
-	dst = (struct dst_entry*)rt;
 
 	if (ipv6_get_lladdr(dev, &saddr_buf)) {
  		ND_PRINTK1("redirect: no link_local addr for dev\n");
@@ -1313,7 +1300,12 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 
 	ndisc_flow_init(&fl, NDISC_REDIRECT, &saddr_buf, &skb->nh.ipv6h->saddr);
 
+	rt = rt6_lookup(&skb->nh.ipv6h->saddr, NULL, dev->ifindex, 1);
+	if (rt == NULL)
+		return;
+	dst = &rt->u.dst;
 	dst_clone(dst);
+
 	err = xfrm_lookup(&dst, &fl, NULL, 0);
 	if (err) {
 		dst_release(dst);

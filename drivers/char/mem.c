@@ -707,9 +707,6 @@ static int __init chr_dev_init(void)
 #ifdef CONFIG_FTAPE
 	ftape_init();
 #endif
-#if defined(CONFIG_S390_TAPE) && defined(CONFIG_S390_TAPE_CHAR)
-	tapechar_init();
-#endif
 	return 0;
 }
 

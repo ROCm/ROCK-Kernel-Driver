@@ -63,7 +63,6 @@ struct madgemc_card {
 static struct madgemc_card *madgemc_card_list;
 
 
-int madgemc_probe(void);
 static int madgemc_open(struct net_device *dev);
 static int madgemc_close(struct net_device *dev);
 static int madgemc_chipset_init(struct net_device *dev);
@@ -152,7 +151,7 @@ static void madgemc_sifwritew(struct net_device *dev, unsigned short val, unsign
 
 
 
-int __init madgemc_probe(void)
+static int __init madgemc_probe(void)
 {	
 	static int versionprinted;
 	struct net_device *dev;
@@ -178,12 +177,14 @@ int __init madgemc_probe(void)
 		if (versionprinted++ == 0)
 			printk("%s", version);
 
-		if ((dev = init_trdev(NULL, 0))==NULL) {
+		dev = alloc_trdev(0);
+		if (dev == NULL) {
 			printk("madgemc: unable to allocate dev space\n");
 			if (madgemc_card_list)
 				return 0;
 			return -1;
 		}
+
 		SET_MODULE_OWNER(dev);
 		dev->dma = 0;
 
@@ -196,7 +197,7 @@ int __init madgemc_probe(void)
 		card = kmalloc(sizeof(struct madgemc_card), GFP_KERNEL);
 		if (card==NULL) {
 			printk("madgemc: unable to allocate card struct\n");
-			kfree(dev); /* release_trdev? */
+			kfree(dev);
 			if (madgemc_card_list)
 				return 0;
 			return -1;
@@ -332,7 +333,7 @@ int __init madgemc_probe(void)
 		 */ 
 		outb(0, dev->base_addr + MC_CONTROL_REG0); /* sanity */
 		madgemc_setsifsel(dev, 1);
-		if(request_irq(dev->irq, madgemc_interrupt, SA_SHIRQ,
+		if (request_irq(dev->irq, madgemc_interrupt, SA_SHIRQ,
 			       "madgemc", dev)) 
 			goto getout;
 		
@@ -383,33 +384,22 @@ int __init madgemc_probe(void)
 
 		dev->open = madgemc_open;
 		dev->stop = madgemc_close;
-		
-		if (register_trdev(dev) == 0) {
+
+		if (register_netdev(dev) == 0) {
 			/* Enlist in the card list */
 			card->next = madgemc_card_list;
 			madgemc_card_list = card;
-		} else {
-			printk("madgemc: register_trdev() returned non-zero.\n");
-			release_region(dev->base_addr-MADGEMC_SIF_OFFSET, 
-			       MADGEMC_IO_EXTENT); 
-			
-			kfree(card);
-			tmsdev_term(dev);
-			kfree(dev);
-			if (madgemc_card_list)
-				return 0;
-			return -1;
+			slot++;
+			continue; /* successful, try to find another */
 		}
-
-		slot++;
-		continue; /* successful, try to find another */
 		
+		free_irq(dev->irq, dev);
 	getout:
 		release_region(dev->base_addr-MADGEMC_SIF_OFFSET, 
 			       MADGEMC_IO_EXTENT); 
 	getout1:
 		kfree(card);
-		kfree(dev); /* release_trdev? */
+		kfree(dev);
 		slot++;
 	}
 
@@ -773,26 +763,14 @@ static int madgemc_mcaproc(char *buf, int slot, void *d)
 	return len;
 }
 
-#ifdef MODULE
-
-int init_module(void)
-{
-	/* Probe for cards. */
-	if (madgemc_probe()) {
-		printk(KERN_NOTICE "madgemc.c: No cards found.\n");
-	}
-	/* lock_tms380_module(); */
-	return (0);
-}
-
-void cleanup_module(void)
+static void __exit madgemc_exit(void)
 {
 	struct net_device *dev;
 	struct madgemc_card *this_card;
 	
 	while (madgemc_card_list) {
 		dev = madgemc_card_list->dev;
-		unregister_trdev(dev);
+		unregister_netdev(dev);
 		release_region(dev->base_addr-MADGEMC_SIF_OFFSET, MADGEMC_IO_EXTENT);
 		free_irq(dev->irq, dev);
 		tmsdev_term(dev);
@@ -801,9 +779,10 @@ void cleanup_module(void)
 		madgemc_card_list = this_card->next;
 		kfree(this_card);
 	}
-	/* unlock_tms380_module(); */
 }
-#endif /* MODULE */
+
+module_init(madgemc_probe);
+module_exit(madgemc_exit);
 
 MODULE_LICENSE("GPL");
 

@@ -3,7 +3,7 @@
 /*
  *	mcfsim.h -- ColdFire System Integration Module support.
  *
- *	(C) Copyright 1999-2002, Greg Ungerer (gerg@snapgear.com)
+ *	(C) Copyright 1999-2003, Greg Ungerer (gerg@snapgear.com)
  * 	(C) Copyright 2000, Lineo Inc. (www.lineo.com) 
  */
 
@@ -15,7 +15,7 @@
 #include <linux/config.h>
 
 /*
- *	Include 5204, 5206, 5249, 5272, 5307 or 5407 specific addresses.
+ *	Include 5204, 5206, 5249, 5272, 5282, 5307 or 5407 specific addresses.
  */
 #if defined(CONFIG_M5204)
 #include <asm/m5204sim.h>
@@ -25,6 +25,8 @@
 #include <asm/m5249sim.h>
 #elif defined(CONFIG_M5272)
 #include <asm/m5272sim.h>
+#elif defined(CONFIG_M5282)
+#include <asm/m5282sim.h>
 #elif defined(CONFIG_M5307)
 #include <asm/m5307sim.h>
 #elif defined(CONFIG_M5407)

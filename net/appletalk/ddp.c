@@ -192,7 +192,7 @@ static void atalk_destroy_timer(unsigned long data)
 	struct sock *sk = (struct sock *)data;
 
 	if (!atomic_read(&sk->wmem_alloc) &&
-	    !atomic_read(&sk->rmem_alloc) && test_bit(SOCK_DEAD, &sk->flags))
+	    !atomic_read(&sk->rmem_alloc) && sock_flag(sk, SOCK_DEAD))
 		sock_put(sk);
 	else {
 		sk->timer.expires = jiffies + SOCK_DESTROY_TIME;
@@ -206,7 +206,7 @@ static inline void atalk_destroy_socket(struct sock *sk)
 	skb_queue_purge(&sk->receive_queue);
 
 	if (!atomic_read(&sk->wmem_alloc) &&
-	    !atomic_read(&sk->rmem_alloc) && test_bit(SOCK_DEAD, &sk->flags))
+	    !atomic_read(&sk->rmem_alloc) && sock_flag(sk, SOCK_DEAD))
 		sock_put(sk);
 	else {
 		init_timer(&sk->timer);
@@ -1006,9 +1006,10 @@ static int atalk_release(struct socket *sock)
 	struct sock *sk = sock->sk;
 
 	if (sk) {
-		if (!test_bit(SOCK_DEAD, &sk->flags))
+		if (!sock_flag(sk, SOCK_DEAD)) {
 			sk->state_change(sk);
-		__set_bit(SOCK_DEAD, &sk->flags);
+			sock_set_flag(sk, SOCK_DEAD);
+		}
 		sock->sk = NULL;
 		atalk_destroy_socket(sk);
 	}
@@ -1149,7 +1150,7 @@ static int atalk_connect(struct socket *sock, struct sockaddr *uaddr,
 		return -EAFNOSUPPORT;
 
 	if (addr->sat_addr.s_node == ATADDR_BCAST &&
-			!test_bit(SOCK_BROADCAST, &sk->flags)) {
+	    !sock_flag(sk, SOCK_BROADCAST)) {
 #if 1	
 		printk(KERN_WARNING "%s is broken and did not set "
 				    "SO_BROADCAST. It will break when 2.2 is "
@@ -1515,7 +1516,7 @@ static int atalk_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr 
 
 		/* netatalk doesn't implement this check */
 		if (usat->sat_addr.s_node == ATADDR_BCAST &&
-				!test_bit(SOCK_BROADCAST, &sk->flags)) {
+		    !sock_flag(sk, SOCK_BROADCAST)) {
 			printk(KERN_INFO "SO_BROADCAST: Fix your netatalk as "
 					 "it will break before 2.2\n");
 #if 0

@@ -598,8 +598,7 @@ __tagtable(ATAG_REVISION, parse_tag_revision);
 
 static int __init parse_tag_cmdline(const struct tag *tag)
 {
-	strncpy(default_command_line, tag->u.cmdline.cmdline, COMMAND_LINE_SIZE);
-	default_command_line[COMMAND_LINE_SIZE - 1] = '\0';
+	strlcpy(default_command_line, tag->u.cmdline.cmdline, COMMAND_LINE_SIZE);
 	return 0;
 }
 

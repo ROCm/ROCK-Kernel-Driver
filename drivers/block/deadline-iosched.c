@@ -313,11 +313,6 @@ static void deadline_remove_request(request_queue_t *q, struct request *rq)
 		deadline_del_drq_hash(drq);
 		deadline_del_drq_rb(dd, drq);
 	}
-
-	if (q->last_merge == &rq->queuelist)
-		q->last_merge = NULL;
-
-	list_del_init(&rq->queuelist);
 }
 
 static int

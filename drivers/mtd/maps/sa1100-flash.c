@@ -3,7 +3,7 @@
  * 
  * (C) 2000 Nicolas Pitre <nico@cam.org>
  * 
- * $Id: sa1100-flash.c,v 1.28 2002/05/07 13:48:38 abz Exp $
+ * $Id: sa1100-flash.c,v 1.36 2003/05/29 08:59:35 dwmw2 Exp $
  */
 
 #include <linux/config.h>
@@ -11,6 +11,9 @@
 #include <linux/types.h>
 #include <linux/ioport.h>
 #include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/errno.h>
+#include <linux/slab.h>
 
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
@@ -32,59 +35,6 @@
  * This isnt complete yet, so...
  */
 #define CONFIG_MTD_SA1100_STATICMAP 1
-
-static __u8 sa1100_read8(struct map_info *map, unsigned long ofs)
-{
-	return readb(map->map_priv_1 + ofs);
-}
-
-static __u16 sa1100_read16(struct map_info *map, unsigned long ofs)
-{
-	return readw(map->map_priv_1 + ofs);
-}
-
-static __u32 sa1100_read32(struct map_info *map, unsigned long ofs)
-{
-	return readl(map->map_priv_1 + ofs);
-}
-
-static void sa1100_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
-{
-	memcpy(to, (void *)(map->map_priv_1 + from), len);
-}
-
-static void sa1100_write8(struct map_info *map, __u8 d, unsigned long adr)
-{
-	writeb(d, map->map_priv_1 + adr);
-}
-
-static void sa1100_write16(struct map_info *map, __u16 d, unsigned long adr)
-{
-	writew(d, map->map_priv_1 + adr);
-}
-
-static void sa1100_write32(struct map_info *map, __u32 d, unsigned long adr)
-{
-	writel(d, map->map_priv_1 + adr);
-}
-
-static void sa1100_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
-{
-	memcpy((void *)(map->map_priv_1 + to), from, len);
-}
-
-static struct map_info sa1100_map __initdata = {
-	.name		= "SA1100 flash",
-	.read8		= sa1100_read8,
-	.read16		= sa1100_read16,
-	.read32		= sa1100_read32,
-	.copy_from	= sa1100_copy_from,
-	.write8		= sa1100_write8,
-	.write16	= sa1100_write16,
-	.write32	= sa1100_write32,
-	.copy_to	= sa1100_copy_to,
-};
-
 
 #ifdef CONFIG_MTD_SA1100_STATICMAP
 /*
@@ -959,6 +909,7 @@ struct sa_info {
 	unsigned long size;
 	int width;
 	void *vbase;
+        void (*set_vpp)(struct map_info *, int);
 	struct map_info *map;
 	struct mtd_info *mtd;
 	struct resource *res;
@@ -981,6 +932,8 @@ static int __init sa1100_setup_mtd(struct sa_info *sa, int nr, struct mtd_info *
 	if (!maps)
 		return -ENOMEM;
 
+	memset(maps, 0, sizeof(struct map_info) * nr);
+
 	/*
 	 * Claim and then map the memory regions.
 	 */
@@ -995,7 +948,6 @@ static int __init sa1100_setup_mtd(struct sa_info *sa, int nr, struct mtd_info *
 		}
 
 		sa[i].map = maps + i;
-		memcpy(sa[i].map, &sa1100_map, sizeof(struct map_info));
 
 		sa[i].vbase = ioremap(sa[i].base, sa[i].size);
 		if (!sa[i].vbase) {
@@ -1003,9 +955,13 @@ static int __init sa1100_setup_mtd(struct sa_info *sa, int nr, struct mtd_info *
 			break;
 		}
 
-		sa[i].map->map_priv_1 = (unsigned long)sa[i].vbase;
+		sa[i].map->virt = (unsigned long)sa[i].vbase;
+		sa[i].map->phys = sa[i].base;
+		sa[i].map->set_vpp = sa[i].set_vpp;
 		sa[i].map->buswidth = sa[i].width;
 		sa[i].map->size = sa[i].size;
+
+		simple_map_init(sa[i].map);
 
 		/*
 		 * Now let's probe for the actual flash.  Do it here since
@@ -1016,7 +972,7 @@ static int __init sa1100_setup_mtd(struct sa_info *sa, int nr, struct mtd_info *
 			ret = -ENXIO;
 			break;
 		}
-		sa[i].mtd->module = THIS_MODULE;
+		sa[i].mtd->owner = THIS_MODULE;
 		subdev[i] = sa[i].mtd;
 
 		printk(KERN_INFO "SA1100 flash: CFI device at 0x%08lx, %dMiB, "
@@ -1105,9 +1061,75 @@ static void __exit sa1100_destroy_mtd(struct sa_info *sa, struct mtd_info *mtd)
 	kfree(sa[0].map);
 }
 
+/*
+ * A Thought: can we automatically detect the flash?
+ *  - Check to see if the region is busy (yes -> failure)
+ *  - Is the MSC setup for flash (no -> failure)
+ *  - Probe for flash
+ */
+
+static struct map_info sa1100_probe_map __initdata = {
+	.name		= "SA1100-flash",
+};
+
+static void __init sa1100_probe_one_cs(unsigned int msc, unsigned long phys)
+{
+	struct mtd_info *mtd;
+
+	printk(KERN_INFO "* Probing 0x%08lx: MSC = 0x%04x %d bit ",
+		phys, msc & 0xffff, msc & MSC_RBW ? 16 : 32);
+
+	if (check_mem_region(phys, 0x08000000)) {
+		printk("busy\n");
+		return;
+	}
+
+	if ((msc & 3) == 1) {
+		printk("wrong type\n");
+		return;
+	}
+
+	sa1100_probe_map.buswidth = msc & MSC_RBW ? 2 : 4;
+	sa1100_probe_map.size = SZ_1M;
+	sa1100_probe_map.phys = phys;
+	sa1100_probe_map.virt = (unsigned long)ioremap(phys, SZ_1M);
+	if (sa1100_probe_map.virt == 0)
+		goto fail;
+	simple_map_init(&sa1100_probe_map);
+
+	/* Shame cfi_probe blurts out kernel messages... */
+	mtd = do_map_probe("cfi_probe", &sa1100_probe_map);
+	if (mtd)
+		map_destroy(mtd);
+	iounmap((void *)sa1100_probe_map.virt);
+
+	if (!mtd)
+		goto fail;
+
+	printk("pass\n");
+	return;
+
+ fail:
+	printk("failed\n");
+}
+
+static void __init sa1100_probe_flash(void)
+{
+	printk(KERN_INFO "-- SA11xx Flash probe.  Please report results.\n");
+	sa1100_probe_one_cs(MSC0, SA1100_CS0_PHYS);
+	sa1100_probe_one_cs(MSC0 >> 16, SA1100_CS1_PHYS);
+	sa1100_probe_one_cs(MSC1, SA1100_CS2_PHYS);
+	sa1100_probe_one_cs(MSC1 >> 16, SA1100_CS3_PHYS);
+	sa1100_probe_one_cs(MSC2, SA1100_CS4_PHYS);
+	sa1100_probe_one_cs(MSC2 >> 16, SA1100_CS5_PHYS);
+	printk(KERN_INFO "-- SA11xx Flash probe complete.\n");
+}
+
 static int __init sa1100_locate_flash(void)
 {
 	int i, nr = -ENODEV;
+
+	sa1100_probe_flash();
 
 	if (machine_is_adsbitsy()) {
 		info[0].base = SA1100_CS1_PHYS;
@@ -1162,7 +1184,7 @@ static int __init sa1100_locate_flash(void)
 		nr = 1;
 	}
 	if (machine_is_h3xxx()) {
-		sa1100_map.set_vpp = h3xxx_set_vpp;
+		info[0].set_vpp = h3xxx_set_vpp;
 		info[0].base = SA1100_CS0_PHYS;
 		info[0].size = SZ_32M;
 		nr = 1;
@@ -1178,7 +1200,7 @@ static int __init sa1100_locate_flash(void)
 		nr = 1;
 	}
 	if (machine_is_jornada720()) {
-		sa1100_map.set_vpp = jornada720_set_vpp;
+		info[0].set_vpp = jornada720_set_vpp;
 		info[0].base = SA1100_CS0_PHYS;
 		info[0].size = SZ_32M;
 		nr = 1;
@@ -1273,10 +1295,8 @@ static int __init sa1100_locate_flash(void)
 	return nr;
 }
 
-extern int parse_redboot_partitions(struct mtd_info *master, struct mtd_partition **pparts);
-extern int parse_cmdline_partitions(struct mtd_info *master, struct mtd_partition **pparts, char *);
-
 static struct mtd_partition *parsed_parts;
+const char *part_probes[] = { "cmdlinepart", "RedBoot", NULL };
 
 static void __init sa1100_locate_partitions(struct mtd_info *mtd)
 {
@@ -1287,17 +1307,10 @@ static void __init sa1100_locate_partitions(struct mtd_info *mtd)
 		/*
 		 * Partition selection stuff.
 		 */
-#ifdef CONFIG_MTD_CMDLINE_PARTS
-		nr_parts = parse_cmdline_partitions(mtd, &parsed_parts, "sa1100");
+#ifdef CONFIG_MTD_PARTITIONS
+		nr_parts = parse_mtd_partitions(mtd, part_probes, &parsed_parts, 0);
 		if (nr_parts > 0) {
-			part_type = "command line";
-			break;
-		}
-#endif
-#ifdef CONFIG_MTD_REDBOOT_PARTS
-		nr_parts = parse_redboot_partitions(mtd, &parsed_parts);
-		if (nr_parts > 0) {
-			part_type = "RedBoot";
+			part_type = "dynamic";
 			break;
 		}
 #endif

@@ -76,7 +76,7 @@ static int sci_request_irq(struct sci_port *port);
 static void sci_free_irq(struct sci_port *port);
 static int sci_init_drivers(void);
 
-static struct tty_driver sci_driver, sci_callout_driver;
+static struct tty_driver sci_driver;
 
 static struct sci_port sci_ports[SCI_NPORTS] = SCI_INIT;
 static struct tty_struct *sci_table[SCI_NPORTS] = { NULL, };
@@ -844,10 +844,7 @@ static int sci_open(struct tty_struct * tty, struct file * filp)
 	}
 
 	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = port->gs.normal_termios;
-		else 
-			*tty->termios = port->gs.callout_termios;
+		*tty->termios = port->gs.normal_termios;
 		sci_set_real_termios(port);
 	}
 
@@ -861,9 +858,6 @@ static int sci_open(struct tty_struct * tty, struct file * filp)
 #endif
 
 	sci_enable_rx_interrupts(port);
-
-	port->gs.session = current->session;
-	port->gs.pgrp = current->pgrp;
 
 	return 0;
 
@@ -1038,30 +1032,13 @@ static int sci_init_drivers(void)
 	sci_driver.read_proc = sci_read_proc;
 #endif
 
-	sci_callout_driver = sci_driver;
-#ifdef CONFIG_DEVFS_FS
-	sci_callout_driver.name = "cusc/";
-#else
-	sci_callout_driver.name = "cusc";
-#endif
-	sci_callout_driver.major = SCI_MAJOR+1;
-	sci_callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-	sci_callout_driver.read_proc = NULL;
-
 	if ((error = tty_register_driver(&sci_driver))) {
 		printk(KERN_ERR "sci: Couldn't register SCI driver, error = %d\n",
 		       error);
 		return 1;
 	}
-	if ((error = tty_register_driver(&sci_callout_driver))) {
-		tty_unregister_driver(&sci_driver);
-		printk(KERN_ERR "sci: Couldn't register SCI callout driver, error = %d\n",
-		       error);
-		return 1;
-	}
 
 	for (port = &sci_ports[0]; port < &sci_ports[SCI_NPORTS]; port++) {
-		port->gs.callout_termios = sci_callout_driver.init_termios;
 		port->gs.normal_termios	= sci_driver.init_termios;
 		port->gs.magic = SCI_MAGIC;
 		port->gs.close_delay = HZ/2;
@@ -1142,7 +1119,6 @@ module_init(sci_init);
 void cleanup_module(void)
 {
 	tty_unregister_driver(&sci_driver);
-	tty_unregister_driver(&sci_callout_driver);
 }
 
 #include "generic_serial.c"

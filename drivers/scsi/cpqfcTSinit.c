@@ -921,10 +921,9 @@ static int copy_info(struct info_str *info, char *fmt, ...)
 
 // Routine to get data for /proc RAM filesystem
 //
-int cpqfcTS_proc_info (char *buffer, char **start, off_t offset, int length, 
-		       int hostno, int inout)
+int cpqfcTS_proc_info (struct Scsi_Host *host, char *buffer, char **start, off_t offset, int length, 
+		       int inout)
 {
-  struct Scsi_Host *host;
   Scsi_Cmnd DumCmnd;
   int Chan, Targ, i;
   struct info_str info;
@@ -932,11 +931,6 @@ int cpqfcTS_proc_info (char *buffer, char **start, off_t offset, int length,
   PTACHYON fcChip;
   PFC_LOGGEDIN_PORT pLoggedInPort;
   char buf[81];
-
-  // Search the Scsi host list for our controller
-  host = scsi_host_hn_get(hostno);
-
-  if (!host) return -ESRCH;
 
   if (inout) return -EINVAL;
 
@@ -969,7 +963,7 @@ int cpqfcTS_proc_info (char *buffer, char **start, off_t offset, int length,
     				NULL,     // DON'T search list for FC WWN
     				NULL))){   // DON'T care about end of list
 	copy_info(&info, "Host: scsi%d Channel: %02d TargetId: %02d -> WWN: ",
-			   hostno, Chan, Targ);
+			   host->host_no, Chan, Targ);
         for( i=3; i>=0; i--)        // copy the LOGIN port's WWN
           copy_info(&info, "%02X", pLoggedInPort->u.ucWWN[i]);
         for( i=7; i>3; i--)             // copy the LOGIN port's WWN

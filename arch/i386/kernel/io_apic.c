@@ -352,9 +352,7 @@ static inline void balance_irq(int cpu, int irq)
 	unsigned long allowed_mask;
 	unsigned int new_cpu;
 		
-	if (irqbalance_disabled == IRQBALANCE_CHECK_ARCH && NO_BALANCE_IRQ)
-		return;
-	else if (irqbalance_disabled) 
+	if (irqbalance_disabled)
 		return; 
 
 	allowed_mask = cpu_online_map & irq_affinity[irq];
@@ -614,6 +612,9 @@ static int __init balanced_irq_init(void)
 	struct cpuinfo_x86 *c;
 
         c = &boot_cpu_data;
+	/* When not overwritten by the command line ask subarchitecture. */
+	if (irqbalance_disabled == IRQBALANCE_CHECK_ARCH)
+		irqbalance_disabled = NO_BALANCE_IRQ;
 	if (irqbalance_disabled)
 		return 0;
 	

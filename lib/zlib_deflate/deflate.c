@@ -164,11 +164,12 @@ local const config configuration_table[10] = {
     memset((charf *)s->head, 0, (unsigned)(s->hash_size-1)*sizeof(*s->head));
 
 /* ========================================================================= */
-int zlib_deflateInit_(strm, level, version, stream_size)
-    z_streamp strm;
-    int level;
-    const char *version;
-    int stream_size;
+int zlib_deflateInit_(
+	z_streamp strm,
+	int level,
+	const char *version,
+	int stream_size
+)
 {
     return zlib_deflateInit2_(strm, level, Z_DEFLATED, MAX_WBITS,
 			      DEF_MEM_LEVEL,
@@ -177,16 +178,16 @@ int zlib_deflateInit_(strm, level, version, stream_size)
 }
 
 /* ========================================================================= */
-int zlib_deflateInit2_(strm, level, method, windowBits, memLevel, strategy,
-		       version, stream_size)
-    z_streamp strm;
-    int  level;
-    int  method;
-    int  windowBits;
-    int  memLevel;
-    int  strategy;
-    const char *version;
-    int stream_size;
+int zlib_deflateInit2_(
+	z_streamp strm,
+	int  level,
+	int  method,
+	int  windowBits,
+	int  memLevel,
+	int  strategy,
+	const char *version,
+	int stream_size
+)
 {
     deflate_state *s;
     int noheader = 0;
@@ -254,10 +255,11 @@ int zlib_deflateInit2_(strm, level, method, windowBits, memLevel, strategy,
 }
 
 /* ========================================================================= */
-int zlib_deflateSetDictionary (strm, dictionary, dictLength)
-    z_streamp strm;
-    const Bytef *dictionary;
-    uInt  dictLength;
+int zlib_deflateSetDictionary(
+	z_streamp strm,
+	const Bytef *dictionary,
+	uInt  dictLength
+)
 {
     deflate_state *s;
     uInt length = dictLength;
@@ -297,8 +299,9 @@ int zlib_deflateSetDictionary (strm, dictionary, dictLength)
 }
 
 /* ========================================================================= */
-int zlib_deflateReset (strm)
-    z_streamp strm;
+int zlib_deflateReset(
+	z_streamp strm
+)
 {
     deflate_state *s;
     
@@ -327,10 +330,11 @@ int zlib_deflateReset (strm)
 }
 
 /* ========================================================================= */
-int zlib_deflateParams(strm, level, strategy)
-    z_streamp strm;
-    int level;
-    int strategy;
+int zlib_deflateParams(
+	z_streamp strm,
+	int level,
+	int strategy
+)
 {
     deflate_state *s;
     compress_func func;
@@ -404,9 +408,10 @@ local void flush_pending(strm)
 }
 
 /* ========================================================================= */
-int zlib_deflate (strm, flush)
-    z_streamp strm;
-    int flush;
+int zlib_deflate(
+	z_streamp strm,
+	int flush
+)
 {
     int old_flush; /* value of flush param for previous deflate call */
     deflate_state *s;
@@ -541,8 +546,9 @@ int zlib_deflate (strm, flush)
 }
 
 /* ========================================================================= */
-int zlib_deflateEnd (strm)
-    z_streamp strm;
+int zlib_deflateEnd(
+	z_streamp strm
+)
 {
     int status;
     deflate_state *s;
@@ -564,9 +570,10 @@ int zlib_deflateEnd (strm)
 /* =========================================================================
  * Copy the source state to the destination state.
  */
-int zlib_deflateCopy (dest, source)
-    z_streamp dest;
-    z_streamp source;
+int zlib_deflateCopy (
+	z_streamp dest,
+	z_streamp source
+)
 {
 #ifdef MAXSEG_64K
     return Z_STREAM_ERROR;
@@ -623,10 +630,11 @@ int zlib_deflateCopy (dest, source)
  * allocating a large strm->next_in buffer and copying from it.
  * (See also flush_pending()).
  */
-local int read_buf(strm, buf, size)
-    z_streamp strm;
-    Bytef *buf;
-    unsigned size;
+local int read_buf(
+	z_streamp strm,
+	Bytef *buf,
+	unsigned size
+)
 {
     unsigned len = strm->avail_in;
 

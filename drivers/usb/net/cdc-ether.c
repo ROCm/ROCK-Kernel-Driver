@@ -1342,6 +1342,7 @@ static void CDCEther_disconnect( struct usb_interface *intf )
 //////////////////////////////////////////////////////////////////////////////
 
 static struct usb_driver CDCEther_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"CDCEther",
 	.probe =	CDCEther_probe,
 	.disconnect =	CDCEther_disconnect,

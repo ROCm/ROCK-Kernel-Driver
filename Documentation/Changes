@@ -83,8 +83,6 @@ almost certainly bugs (mainly, but not exclusively, in the kernel) that
 will need to be fixed in order to use these compilers. In any case, using
 pgcc instead of plain gcc is just asking for trouble.
 
-gcc 2.91.66 (egcs-1.1.2) continues to be supported for SPARC64 requirements.
-
 The Red Hat gcc 2.96 compiler subtree can also be used to build this tree.
 You should ensure you use gcc-2.96-74 or later. gcc-2.96-54 will not build
 the kernel correctly.

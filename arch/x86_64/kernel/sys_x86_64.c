@@ -117,5 +117,5 @@ asmlinkage long sys_uname(struct new_utsname * name)
 asmlinkage long wrap_sys_shmat(int shmid, char *shmaddr, int shmflg)
 {
 	unsigned long raddr;
-	return sys_shmat(shmid,shmaddr,shmflg,&raddr) ?: raddr;
+	return sys_shmat(shmid,shmaddr,shmflg,&raddr) ?: (long)raddr;
 } 

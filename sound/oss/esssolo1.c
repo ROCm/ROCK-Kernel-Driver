@@ -721,8 +721,8 @@ static int mixer_ioctl(struct solo1_state *s, unsigned int cmd, unsigned long ar
 	}
         if (cmd == SOUND_MIXER_INFO) {
 		mixer_info info;
-		strncpy(info.id, "Solo1", sizeof(info.id));
-		strncpy(info.name, "ESS Solo1", sizeof(info.name));
+		strlcpy(info.id, "Solo1", sizeof(info.id));
+		strlcpy(info.name, "ESS Solo1", sizeof(info.name));
 		info.modify_counter = s->mix.modcnt;
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
@@ -730,8 +730,8 @@ static int mixer_ioctl(struct solo1_state *s, unsigned int cmd, unsigned long ar
 	}
 	if (cmd == SOUND_OLD_MIXER_INFO) {
 		_old_mixer_info info;
-		strncpy(info.id, "Solo1", sizeof(info.id));
-		strncpy(info.name, "ESS Solo1", sizeof(info.name));
+		strlcpy(info.id, "Solo1", sizeof(info.id));
+		strlcpy(info.name, "ESS Solo1", sizeof(info.name));
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;

@@ -27,19 +27,10 @@ struct matroxfb_dh_fb_info {
 		unsigned int	len;
 			      } mmio;
 
-	struct display*		currcon_display;
-	
 	int			interlaced:1;
 
-	union {
-#ifdef FBCON_HAS_CFB16
-		u_int16_t	cfb16[16];
-#endif
-#ifdef FBCON_HAS_CFB32
-		u_int32_t	cfb32[16];
-#endif
-	} cmap;
-	struct { unsigned red, green, blue, transp; } palette[16];
+	u_int32_t cmap[17];
+	struct { unsigned red, green, blue, transp; } palette[17];
 };
 
 #endif /* __MATROXFB_CRTC2_H__ */

@@ -33,6 +33,8 @@
  *	Yuji SEKIYA @USAGI		:	Don't assign a same IPv6
  *						address on a same interface.
  *	YOSHIFUJI Hideaki @USAGI	:	ARCnet support
+ *	YOSHIFUJI Hideaki @USAGI	:	convert /proc/net/if_inet6 to
+ *						seq_file.
  */
 
 #include <linux/config.h>
@@ -75,6 +77,9 @@
 #endif
 
 #include <asm/uaccess.h>
+
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 
 #define IPV6_MAX_ADDRESSES 16
 
@@ -342,6 +347,11 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 			return NULL;
 		}
 
+		/* One reference from device.  We must do this before
+		 * we invoke __ipv6_regen_rndid().
+		 */
+		in6_dev_hold(ndev);
+
 #ifdef CONFIG_IPV6_PRIVACY
 		get_random_bytes(ndev->rndid, sizeof(ndev->rndid));
 		get_random_bytes(ndev->entropy, sizeof(ndev->entropy));
@@ -362,8 +372,6 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 
 		write_lock_bh(&addrconf_lock);
 		dev->ip6_ptr = ndev;
-		/* One reference from device */
-		in6_dev_hold(ndev);
 		write_unlock_bh(&addrconf_lock);
 
 		ipv6_mc_init_dev(ndev);
@@ -2090,57 +2098,141 @@ static void addrconf_dad_completed(struct inet6_ifaddr *ifp)
 }
 
 #ifdef CONFIG_PROC_FS
-static int iface_proc_info(char *buffer, char **start, off_t offset,
-			   int length)
+struct if6_iter_state {
+	int bucket;
+};
+
+static inline struct inet6_ifaddr *if6_get_bucket(struct seq_file *seq, loff_t *pos)
 {
-	struct inet6_ifaddr *ifp;
 	int i;
-	int len = 0;
-	off_t pos=0;
-	off_t begin=0;
+	struct inet6_ifaddr *ifa = NULL;
+	loff_t l = *pos;
+	struct if6_iter_state *state = seq->private;
 
-	for (i=0; i < IN6_ADDR_HSIZE; i++) {
-		read_lock_bh(&addrconf_hash_lock);
-		for (ifp=inet6_addr_lst[i]; ifp; ifp=ifp->lst_next) {
-			int j;
-
-			for (j=0; j<16; j++) {
-				sprintf(buffer + len, "%02x",
-					ifp->addr.s6_addr[j]);
-				len += 2;
-			}
-
-			len += sprintf(buffer + len,
-				       " %02x %02x %02x %02x %8s\n",
-				       ifp->idev->dev->ifindex,
-				       ifp->prefix_len,
-				       ifp->scope,
-				       ifp->flags,
-				       ifp->idev->dev->name);
-			pos=begin+len;
-			if(pos<offset) {
-				len=0;
-				begin=pos;
-			}
-			if(pos>offset+length) {
-				read_unlock_bh(&addrconf_hash_lock);
-				goto done;
-			}
+	for (; state->bucket < IN6_ADDR_HSIZE; ++state->bucket)
+		for (i = 0, ifa = inet6_addr_lst[state->bucket]; ifa; ++i, ifa=ifa->lst_next) {
+			if (l--)
+				continue;
+			*pos = i;
+			goto out;
 		}
-		read_unlock_bh(&addrconf_hash_lock);
-	}
-
-done:
-
-	*start=buffer+(offset-begin);
-	len-=(offset-begin);
-	if(len>length)
-		len=length;
-	if(len<0)
-		len=0;
-	return len;
+out:
+	return ifa;
 }
 
+static void *if6_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	read_lock_bh(&addrconf_hash_lock);
+	return *pos ? if6_get_bucket(seq, pos) : (void *)1;
+}
+
+static void *if6_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct inet6_ifaddr *ifa;
+	struct if6_iter_state *state;
+
+	if (v == (void *)1) {
+		ifa = if6_get_bucket(seq, pos);
+		goto out;
+	}
+
+	state = seq->private;
+
+	ifa = v;
+	ifa = ifa->lst_next;
+	if (ifa)
+		goto out;
+
+	if (++state->bucket >= IN6_ADDR_HSIZE)
+		goto out;
+
+	*pos = 0;
+	ifa = if6_get_bucket(seq, pos);
+out:
+	++*pos;
+	return ifa;
+}
+
+static inline void if6_iface_seq_show(struct seq_file *seq, struct inet6_ifaddr *ifp)
+{
+	seq_printf(seq,
+		   "%04x%04x%04x%04x%04x%04x%04x%04x %02x %02x %02x %02x %8s\n",
+		   NIP6(ifp->addr),
+		   ifp->idev->dev->ifindex,
+		   ifp->prefix_len,
+		   ifp->scope,
+		   ifp->flags,
+		   ifp->idev->dev->name);
+}
+
+static int if6_seq_show(struct seq_file *seq, void *v)
+{
+	if (v == (void *)1)
+		return 0;
+	else
+		if6_iface_seq_show(seq, v);
+	return 0;
+}
+
+static void if6_seq_stop(struct seq_file *seq, void *v)
+{
+	read_unlock_bh(&addrconf_hash_lock);
+}
+
+static struct seq_operations if6_seq_ops = {
+	.start	= if6_seq_start,
+	.next	= if6_seq_next,
+	.show	= if6_seq_show,
+	.stop	= if6_seq_stop,
+};
+
+static int if6_seq_open(struct inode *inode, struct file *file)
+{
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct if6_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+
+	if (!s)
+		goto out;
+	memset(s, 0, sizeof(*s));
+
+	rc = seq_open(file, &if6_seq_ops);
+	if (rc)
+		goto out_kfree;
+
+	seq = file->private_data;
+	seq->private = s;
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
+}
+
+static struct file_operations if6_fops = {
+	.owner		= THIS_MODULE,
+	.open		= if6_seq_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release_private,
+};
+
+int __init if6_proc_init(void)
+{
+	struct proc_dir_entry *p;
+	int rc = 0;
+
+	p = create_proc_entry("if_inet6", S_IRUGO, proc_net);
+	if (p)
+		p->proc_fops = &if6_fops;
+	else
+		rc = -ENOMEM;
+	return rc;
+}
+void if6_proc_exit(void)
+{
+	proc_net_remove("if_inet6");
+}
 #endif	/* CONFIG_PROC_FS */
 
 /*
@@ -2727,10 +2819,6 @@ void __init addrconf_init(void)
 	rtnl_unlock();
 #endif
 
-#ifdef CONFIG_PROC_FS
-	proc_net_create("if_inet6", 0, iface_proc_info);
-#endif
-	
 	addrconf_verify(0);
 	rtnetlink_links[PF_INET6] = inet6_rtnetlink_table;
 #ifdef CONFIG_SYSCTL

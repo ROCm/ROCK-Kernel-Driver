@@ -189,7 +189,7 @@ static int tcp_write_timeout(struct sock *sk)
 		}
 
 		retry_until = sysctl_tcp_retries2;
-		if (test_bit(SOCK_DEAD, &sk->flags)) {
+		if (sock_flag(sk, SOCK_DEAD)) {
 			int alive = (tp->rto < TCP_RTO_MAX);
  
 			retry_until = tcp_orphan_retries(sk, alive);
@@ -297,7 +297,7 @@ static void tcp_probe_timer(struct sock *sk)
 	 */
 	max_probes = sysctl_tcp_retries2;
 
-	if (test_bit(SOCK_DEAD, &sk->flags)) {
+	if (sock_flag(sk, SOCK_DEAD)) {
 		int alive = ((tp->rto<<tp->backoff) < TCP_RTO_MAX);
  
 		max_probes = tcp_orphan_retries(sk, alive);
@@ -327,7 +327,7 @@ static void tcp_retransmit_timer(struct sock *sk)
 
 	BUG_TRAP(!skb_queue_empty(&sk->write_queue));
 
-	if (tp->snd_wnd == 0 && !test_bit(SOCK_DEAD, &sk->flags) &&
+	if (!tp->snd_wnd && !sock_flag(sk, SOCK_DEAD) &&
 	    !((1<<sk->state)&(TCPF_SYN_SENT|TCPF_SYN_RECV))) {
 		/* Receiver dastardly shrinks window. Our retransmits
 		 * become zero probes, but we should not timeout this
@@ -571,7 +571,7 @@ void tcp_set_keepalive(struct sock *sk, int val)
 	if ((1<<sk->state)&(TCPF_CLOSE|TCPF_LISTEN))
 		return;
 
-	if (val && !test_bit(SOCK_KEEPOPEN, &sk->flags))
+	if (val && !sock_flag(sk, SOCK_KEEPOPEN))
 		tcp_reset_keepalive_timer(sk, keepalive_time_when(tcp_sk(sk)));
 	else if (!val)
 		tcp_delete_keepalive_timer(sk);
@@ -597,7 +597,7 @@ static void tcp_keepalive_timer (unsigned long data)
 		goto out;
 	}
 
-	if (sk->state == TCP_FIN_WAIT2 && test_bit(SOCK_DEAD, &sk->flags)) {
+	if (sk->state == TCP_FIN_WAIT2 && sock_flag(sk, SOCK_DEAD)) {
 		if (tp->linger2 >= 0) {
 			int tmo = tcp_fin_time(tp) - TCP_TIMEWAIT_LEN;
 
@@ -610,7 +610,7 @@ static void tcp_keepalive_timer (unsigned long data)
 		goto death;
 	}
 
-	if (!test_bit(SOCK_KEEPOPEN, &sk->flags) || sk->state == TCP_CLOSE)
+	if (!sock_flag(sk, SOCK_KEEPOPEN) || sk->state == TCP_CLOSE)
 		goto out;
 
 	elapsed = keepalive_time_when(tp);

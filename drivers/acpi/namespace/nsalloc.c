@@ -116,19 +116,33 @@ acpi_ns_delete_node (
 	prev_node = NULL;
 	next_node = parent_node->child;
 
+	/* Find the node that is the previous peer in the parent's child list */
+
 	while (next_node != node) {
 		prev_node = next_node;
 		next_node = prev_node->peer;
 	}
 
 	if (prev_node) {
+		/* Node is not first child, unlink it */
+
 		prev_node->peer = next_node->peer;
 		if (next_node->flags & ANOBJ_END_OF_PEER_LIST) {
 			prev_node->flags |= ANOBJ_END_OF_PEER_LIST;
 		}
 	}
 	else {
-		parent_node->child = next_node->peer;
+		/* Node is first child (has no previous peer) */
+
+		if (next_node->flags & ANOBJ_END_OF_PEER_LIST) {
+			/* No peers at all */
+
+			parent_node->child = NULL;
+		}
+		else {   /* Link peer list to parent */
+
+			parent_node->child = next_node->peer;
+		}
 	}
 
 
@@ -222,7 +236,7 @@ acpi_ns_install_node (
 	struct acpi_namespace_node      *node,          /* New Child*/
 	acpi_object_type                type)
 {
-	u16                             owner_id = TABLE_ID_DSDT;
+	u16                             owner_id = 0;
 	struct acpi_namespace_node      *child_node;
 #ifdef ACPI_ALPHABETIC_NAMESPACE
 
@@ -355,6 +369,7 @@ acpi_ns_delete_children (
 {
 	struct acpi_namespace_node      *child_node;
 	struct acpi_namespace_node      *next_node;
+	struct acpi_namespace_node      *node;
 	u8                              flags;
 
 
@@ -399,6 +414,25 @@ acpi_ns_delete_children (
 		 * Detach an object if there is one, then free the child node
 		 */
 		acpi_ns_detach_object (child_node);
+
+		/*
+		 * Decrement the reference count(s) of all parents up to
+		 * the root! (counts were incremented when the node was created)
+		 */
+		node = child_node;
+		while ((node = acpi_ns_get_parent_node (node)) != NULL) {
+			node->reference_count--;
+		}
+
+		/* There should be only one reference remaining on this node */
+
+		if (child_node->reference_count != 1) {
+			ACPI_REPORT_WARNING (("Existing references (%d) on node being deleted (%p)\n",
+				child_node->reference_count, child_node));
+		}
+
+		/* Now we can delete the node */
+
 		ACPI_MEM_FREE (child_node);
 
 		/* And move on to the next child in the list */
@@ -512,7 +546,7 @@ acpi_ns_delete_namespace_subtree (
  *
  ******************************************************************************/
 
-static void
+void
 acpi_ns_remove_reference (
 	struct acpi_namespace_node      *node)
 {

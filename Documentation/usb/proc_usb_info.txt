@@ -1,10 +1,11 @@
 /proc/bus/usb filesystem output
 ===============================
-(version 2002.03.19)
+(version 2003.05.30)
 
 
-The /proc filesystem for USB devices provides /proc/bus/usb/drivers
-and /proc/bus/usb/devices, as well as /proc/bus/usb/BBB/DDD files.
+The usbfs filesystem for USB devices is traditionally mounted at
+/proc/bus/usb.  It provides the /proc/bus/usb/devices file, as well as
+the /proc/bus/usb/BBB/DDD files.
 
 
 **NOTE**: If /proc/bus/usb appears empty, and a host controller
@@ -66,30 +67,6 @@ root, only root can write such user mode drivers.  You can selectively
 grant read/write permissions to other users by using "chmod".  Also,
 usbfs mount options such as "devmode=0666" may be helpful.
 
-
-
-THE /proc/bus/usb/drivers FILE:
--------------------------------
-Each of the USB device drivers linked into your kernel (statically,
-or dynamically using "modprobe") is listed in the "drivers" file.
-Here's an example from one system:
-
-         usbdevfs
-         hub
-  0- 15: usblp
-         usbnet
-         serial
-         usb-storage
-         pegasus
-
-If you see this file, "usbdevfs" and "hub" will always be listed,
-since those are part of the "usbcore" framework.
-
-Drivers that use the USB major number (180) to provide character devices
-will include a range of minor numbers, as shown above for the "usblp"
-(actually "printer.o") module.  USB device drivers can of course use any
-major number, but it's easy to use the USB range since there's explicit
-support for subdividing it in the USB device driver framework.
 
 
 THE /proc/bus/usb/devices FILE:

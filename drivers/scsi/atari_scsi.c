@@ -195,8 +195,8 @@ static int falcon_classify_cmd( Scsi_Cmnd *cmd );
 static unsigned long atari_dma_xfer_len( unsigned long wanted_len,
                                          Scsi_Cmnd *cmd, int write_flag );
 #endif
-static void scsi_tt_intr( int irq, void *dummy, struct pt_regs *fp);
-static void scsi_falcon_intr( int irq, void *dummy, struct pt_regs *fp);
+static irqreturn_t scsi_tt_intr( int irq, void *dummy, struct pt_regs *fp);
+static irqreturn_t scsi_falcon_intr( int irq, void *dummy, struct pt_regs *fp);
 static void falcon_release_lock_if_possible( struct NCR5380_hostdata *
                                              hostdata );
 static void falcon_get_lock( void );
@@ -315,7 +315,7 @@ static void scsi_dma_buserr (int irq, void *dummy, struct pt_regs *fp)
 #endif
 
 
-static void scsi_tt_intr (int irq, void *dummy, struct pt_regs *fp)
+static irqreturn_t scsi_tt_intr (int irq, void *dummy, struct pt_regs *fp)
 {
 #ifdef REAL_DMA
 	int dma_stat;
@@ -403,10 +403,11 @@ static void scsi_tt_intr (int irq, void *dummy, struct pt_regs *fp)
 	/* To be sure the int is not masked */
 	atari_enable_irq( IRQ_TT_MFP_SCSI );
 #endif
+	return IRQ_HANDLED;
 }
 
 
-static void scsi_falcon_intr (int irq, void *dummy, struct pt_regs *fp)
+static irqreturn_t scsi_falcon_intr (int irq, void *dummy, struct pt_regs *fp)
 {
 #ifdef REAL_DMA
 	int dma_stat;
@@ -463,6 +464,7 @@ static void scsi_falcon_intr (int irq, void *dummy, struct pt_regs *fp)
 #endif /* REAL_DMA */
 
 	NCR5380_intr (0, 0, 0);
+	return IRQ_HANDLED;
 }
 
 

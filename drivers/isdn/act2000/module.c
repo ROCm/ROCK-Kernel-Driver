@@ -601,7 +601,7 @@ act2000_alloccard(int bus, int port, int irq, char *id)
 		ISDN_FEATURE_P_UNKNOWN;
         card->interface.hl_hdrlen = 20;
         card->ptype = ISDN_PTYPE_EURO;
-        strncpy(card->interface.id, id, sizeof(card->interface.id) - 1);
+        strlcpy(card->interface.id, id, sizeof(card->interface.id));
         for (i=0; i<ACT2000_BCH; i++) {
                 card->bch[i].plci = 0x8000;
                 card->bch[i].ncci = 0x8000;

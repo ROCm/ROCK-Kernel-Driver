@@ -226,10 +226,8 @@ static void __init root_nfs_parse(char *name, char *buf)
 			}
 		}
 	}
-	if (name[0] && strcmp(name, "default")) {
-		strncpy(buf, name, NFS_MAXPATHLEN-1);
-		buf[NFS_MAXPATHLEN-1] = 0;
-	}
+	if (name[0] && strcmp(name, "default"))
+		strlcpy(buf, name, NFS_MAXPATHLEN);
 }
 
 
@@ -340,8 +338,7 @@ int __init nfs_root_setup(char *line)
 {
 	ROOT_DEV = Root_NFS;
 	if (line[0] == '/' || line[0] == ',' || (line[0] >= '0' && line[0] <= '9')) {
-		strncpy(nfs_root_name, line, sizeof(nfs_root_name));
-		nfs_root_name[sizeof(nfs_root_name)-1] = '\0';
+		strlcpy(nfs_root_name, line, sizeof(nfs_root_name));
 	} else {
 		int n = strlen(line) + strlen(NFS_ROOT);
 		if (n >= sizeof(nfs_root_name))

@@ -685,7 +685,7 @@ int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 		return -EFAULT;
 	if (__get_user(data32, &u_ifreq32->ifr_ifru.ifru_data))
 		return -EFAULT;
-	data64 = A(data32);
+	data64 = (void __user *)A(data32);
 
 	u_ifreq64 = compat_alloc_user_space(sizeof(*u_ifreq64));
 

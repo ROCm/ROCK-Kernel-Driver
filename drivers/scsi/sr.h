@@ -25,8 +25,7 @@
 #define IOCTL_TIMEOUT 30*HZ
 
 typedef struct scsi_cd {
-	struct Scsi_Device_Template *driver;
-	struct list_head list;
+	struct scsi_driver *driver;
 	unsigned capacity;	/* size in blocks                       */
 	Scsi_Device *device;
 	unsigned int vendor;	/* vendor code, see sr_vendor.c         */

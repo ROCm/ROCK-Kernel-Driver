@@ -334,14 +334,11 @@ struct z8530_channel
 	struct tty_struct 	*tty;		/* Attached terminal */
 	int			line;		/* Minor number */
 	struct termios		normal_termios;	/* Terminal settings */
-	struct termios		callout_termios;
 	wait_queue_head_t	open_wait;	/* Tasks waiting to open */
 	wait_queue_head_t	close_wait;	/* and for close to end */
 	unsigned long		event;		/* Pending events */
 	int			fdcount;    	/* # of fd on device */
 	int			blocked_open;	/* # of blocked opens */
-	long			session; 	/* Session of opening process */
-	long			pgrp; 		/* pgrp of opening process */
 	int			x_char;		/* XON/XOF char */
 	unsigned char 		*xmit_buf;	/* Transmit pointer */
 	int			xmit_head;	/* Transmit ring */

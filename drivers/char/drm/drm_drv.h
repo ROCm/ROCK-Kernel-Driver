@@ -453,7 +453,7 @@ static int DRM(takedown)( drm_device_t *dev )
 					DRM_DEBUG( "mtrr_del=%d\n", retcode );
 				}
 #endif
-				DRM(ioremapfree)( map->handle, map->size );
+				DRM(ioremapfree)( map->handle, map->size, dev );
 				break;
 			case _DRM_SHM:
 				vfree(map->handle);
@@ -559,7 +559,9 @@ static int __init drm_init( void )
 
 	drm_device_t *dev;
 	int i;
+#if __HAVE_CTX_BITMAP
 	int retcode;
+#endif
 	DRM_DEBUG( "\n" );
 
 #ifdef MODULE

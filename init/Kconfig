@@ -108,7 +108,31 @@ config LOG_BUF_SHIFT
 		     13 =>  8 KB
 		     12 =>  4 KB
 
-endmenu
+
+menuconfig EMBEDDED
+	bool "Remove kernel features (for embedded systems)"
+	help
+	  This option allows certain base kernel features to be removed from
+	  the build.  This is for specialized environments which can tolerate
+	  a "non-standard" kernel.  Only use this if you really know what you
+	  are doing.
+
+config FUTEX
+	bool "Enable futex support" if EMBEDDED
+	default y
+	help
+	  Disabling this option will cause the kernel to be built without
+	  support for "fast userspace mutexes".  The resulting kernel may not
+	  run glibc-based applications correctly.
+
+config EPOLL
+	bool "Enable eventpoll support" if EMBEDDED
+	default y
+	help
+	  Disabling this option will cause the kernel to be built without
+	  support for epoll family of system calls.
+
+endmenu		# General setup
 
 
 menu "Loadable module support"
@@ -181,4 +205,3 @@ config KMOD
 	  in <file:Documentation/kmod.txt>.
 
 endmenu
-

@@ -442,7 +442,7 @@ static int tumbler_info_mono(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinf
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
 	uinfo->count = 1;
 	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = info->max;
+	uinfo->value.integer.max = info->max - 1;
 	return 0;
 }
 
@@ -867,6 +867,8 @@ static void tumbler_reset_audio(pmac_t *chip)
 {
 	pmac_tumbler_t *mix = chip->mixer_data;
 
+	write_audio_gpio(&mix->audio_reset, 0);
+	mdelay(200);
 	write_audio_gpio(&mix->audio_reset, 1);
 	mdelay(100);
 	write_audio_gpio(&mix->audio_reset, 0);
@@ -970,9 +972,6 @@ int __init snd_pmac_tumbler_init(pmac_t *chip)
 	chip->mixer_data = mix;
 	chip->mixer_free = tumbler_cleanup;
 
-	if ((err = tumbler_init(chip)) < 0)
-		return err;
-
 	/* set up TAS */
 	tas_node = find_devices("deq");
 	if (tas_node == NULL)
@@ -1017,6 +1016,9 @@ int __init snd_pmac_tumbler_init(pmac_t *chip)
 		return err;
 	chip->speaker_sw_ctl = snd_ctl_new1(&tumbler_speaker_sw, chip);
 	if ((err = snd_ctl_add(chip->card, chip->speaker_sw_ctl)) < 0)
+		return err;
+
+	if ((err = tumbler_init(chip)) < 0)
 		return err;
 
 #ifdef CONFIG_PMAC_PBOOK

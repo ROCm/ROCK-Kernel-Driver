@@ -230,7 +230,7 @@ out:
  * The usual module blurb.
  */
 static struct super_block *vxfs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_bdev(fs_type, flags, dev_name, data, vxfs_fill_super);
 }
@@ -247,7 +247,8 @@ static int __init
 vxfs_init(void)
 {
 	vxfs_inode_cachep = kmem_cache_create("vxfs_inode",
-			sizeof(struct vxfs_inode_info), 0, 0, NULL, NULL);
+			sizeof(struct vxfs_inode_info), 0, 
+			SLAB_RECLAIM_ACCOUNT, NULL, NULL);
 	if (vxfs_inode_cachep)
 		return (register_filesystem(&vxfs_fs_type));
 	return -ENOMEM;

@@ -260,7 +260,7 @@ static int xfrm_add_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 	if (!x)
 		return err;
 
-	x1 = xfrm_state_lookup(&x->props.saddr, x->id.spi, x->id.proto, x->props.family);
+	x1 = xfrm_state_lookup(&x->id.daddr, x->id.spi, x->id.proto, x->props.family);
 	if (x1) {
 		xfrm_state_put(x);
 		xfrm_state_put(x1);
@@ -277,7 +277,7 @@ static int xfrm_del_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 	struct xfrm_state *x;
 	struct xfrm_usersa_id *p = NLMSG_DATA(nlh);
 
-	x = xfrm_state_lookup(&p->saddr, p->spi, p->proto, p->family);
+	x = xfrm_state_lookup(&p->daddr, p->spi, p->proto, p->family);
 	if (x == NULL)
 		return -ESRCH;
 
@@ -403,7 +403,7 @@ static int xfrm_get_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 	struct sk_buff *resp_skb;
 	int err;
 
-	x = xfrm_state_lookup(&p->saddr, p->spi, p->proto, p->family);
+	x = xfrm_state_lookup(&p->daddr, p->spi, p->proto, p->family);
 	err = -ESRCH;
 	if (x == NULL)
 		goto out_noput;
@@ -634,6 +634,7 @@ static int xfrm_add_policy(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfr
 	struct xfrm_userpolicy_info *p = NLMSG_DATA(nlh);
 	struct xfrm_policy *xp;
 	int err;
+	int excl;
 
 	err = verify_newpolicy_info(p);
 	if (err)
@@ -643,7 +644,8 @@ static int xfrm_add_policy(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfr
 	if (!xp)
 		return err;
 
-	err = xfrm_policy_insert(p->dir, xp, 1);
+	excl = nlh->nlmsg_type == XFRM_MSG_NEWPOLICY;
+	err = xfrm_policy_insert(p->dir, xp, excl);
 	if (err) {
 		kfree(xp);
 		return err;
@@ -803,6 +805,7 @@ static const int xfrm_msg_min[(XFRM_MSG_MAX + 1 - XFRM_MSG_BASE)] = {
 	NLMSG_LENGTH(sizeof(struct xfrm_userspi_info)),	/* ALLOC SPI */
 	NLMSG_LENGTH(sizeof(struct xfrm_user_acquire)),	/* ACQUIRE */
 	NLMSG_LENGTH(sizeof(struct xfrm_user_expire)),	/* EXPIRE */
+	NLMSG_LENGTH(sizeof(struct xfrm_userpolicy_info)),/* UPD POLICY */
 };
 
 static struct xfrm_link {
@@ -822,6 +825,9 @@ static struct xfrm_link {
 		.dump	=	xfrm_dump_policy,
 	},
 	{	.doit	=	xfrm_alloc_userspi	},
+	{},
+	{},
+	{	.doit	=	xfrm_add_policy 	},
 };
 
 static int xfrm_done(struct netlink_callback *cb)

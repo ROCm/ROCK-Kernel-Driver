@@ -328,7 +328,7 @@ void ax25_destroy_socket(ax25_cb *ax25)
 				ax25_cb *sax25 = ax25_sk(skb->sk);
 
 				/* Queue the unaccepted socket for death */
-				__set_bit(SOCK_DEAD, &skb->sk->flags);
+				sock_set_flag(skb->sk, SOCK_DEAD);
 
 				ax25_start_heartbeat(sax25);
 				sax25->state = AX25_STATE_0;
@@ -743,9 +743,8 @@ static int ax25_getsockopt(struct socket *sock, int level, int optname,
 		ax25_dev = ax25->ax25_dev;
 
 		if (ax25_dev != NULL && ax25_dev->dev != NULL) {
-			strncpy(devname, ax25_dev->dev->name, IFNAMSIZ);
-			length = min_t(unsigned int, strlen(ax25_dev->dev->name)+1, maxlen);
-			devname[length-1] = '\0';
+			strlcpy(devname, ax25_dev->dev->name, sizeof(devname));
+			length = strlen(devname) + 1;
 		} else {
 			*devname = '\0';
 			length = 1;
@@ -982,8 +981,8 @@ static int ax25_release(struct socket *sock)
 			sk->state                = TCP_CLOSE;
 			sk->shutdown            |= SEND_SHUTDOWN;
 			sk->state_change(sk);
-			__set_bit(SOCK_DEAD, &sk->flags);
-			__set_bit(SOCK_DESTROY, &sk->flags);
+			sock_set_flag(sk, SOCK_DEAD);
+			sock_set_flag(sk, SOCK_DESTROY);
 			break;
 
 		default:
@@ -993,7 +992,7 @@ static int ax25_release(struct socket *sock)
 		sk->state     = TCP_CLOSE;
 		sk->shutdown |= SEND_SHUTDOWN;
 		sk->state_change(sk);
-		__set_bit(SOCK_DEAD, &sk->flags);
+		sock_set_flag(sk, SOCK_DEAD);
 		ax25_destroy_socket(ax25);
 	}
 

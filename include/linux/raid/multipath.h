@@ -2,7 +2,6 @@
 #define _MULTIPATH_H
 
 #include <linux/raid/md.h>
-#include <linux/bio.h>
 
 struct multipath_info {
 	mdk_rdev_t	*rdev;
@@ -10,7 +9,7 @@ struct multipath_info {
 
 struct multipath_private_data {
 	mddev_t			*mddev;
-	struct multipath_info	multipaths[MD_SB_DISKS];
+	struct multipath_info	*multipaths;
 	int			raid_disks;
 	int			working_disks;
 	spinlock_t		device_lock;

@@ -46,6 +46,24 @@
 
 /* Change Log
  * 
+ * 2.3.13       05/08/03
+ * o Feature remove: /proc/net/PRO_LAN_Adapters support gone completely
+ * o Feature remove: IDIAG support (use ethtool -t instead)
+ * o Cleanup: fixed spelling mistakes found by community
+ * o Feature add: ethtool cable diag test
+ * o Feature add: ethtool parameter support (ring size, xsum, flow ctrl)
+ * o Cleanup: move e100_asf_enable under CONFIG_PM to avoid warning
+ *   [Stephen Rothwell (sfr@canb.auug.org.au)]
+ * o Bug fix: don't call any netif_carrier_* until netdev registered.
+ *   [Andrew Morton (akpm@digeo.com)]
+ * o Cleanup: replace (skb->len - skb->data_len) with skb_headlen(skb)
+ *   [jmorris@intercode.com.au]
+ * o Bug fix: cleanup of Tx skbs after running ethtool diags
+ * o Bug fix: incorrect reporting of ethtool diag overall results
+ * o Bug fix: must hold xmit_lock before stopping queue in ethtool
+ *   operations that require reset h/w and driver structures.
+ * o Bug fix: statistic command failure would stop statistic collection.
+ * 
  * 2.2.21	02/11/03
  * o Removed marketing brand strings. Instead, Using generic string 
  *   "Intel(R) PRO/100 Network Connection" for all adapters.
@@ -61,21 +79,6 @@
  * o New feature: added ICH5 support
  * 
  * 2.1.27	11/20/02
- *   o Bug fix: Device command timeout due to SMBus processing during init
- *   o Bug fix: Not setting/clearing I (Interrupt) bit in tcb correctly
- *   o Bug fix: Not using EEPROM WoL setting as default in ethtool
- *   o Bug fix: Not able to set autoneg on using ethtool when interface down
- *   o Bug fix: Not able to change speed/duplex using ethtool/mii
- *     when interface up
- *   o Bug fix: Ethtool shows autoneg on when forced to 100/Full
- *   o Bug fix: Compiler error when CONFIG_PROC_FS not defined
- *   o Bug fix: 2.5.44 e100 doesn't load with preemptive kernel enabled
- *     (sleep while holding spinlock)
- *   o Bug fix: 2.1.24-k1 doesn't display complete statistics
- *   o Bug fix: System panic due to NULL watchdog timer dereference during
- *     ifconfig down, rmmod and insmod
- *
- * 2.1.24       10/7/02
  */
  
 #include <linux/config.h>
@@ -121,14 +124,13 @@ extern void e100_config_wol(struct e100_private *bdp);
 extern u32 e100_run_diag(struct net_device *dev, u64 *test_info, u32 flags);
 static int e100_ethtool_test(struct net_device *, struct ifreq *);
 static int e100_ethtool_gstrings(struct net_device *, struct ifreq *);
-static char *test_strings[] = {
-	"E100_EEPROM_TEST_FAIL",
-	"E100_CHIP_TIMEOUT",
-	"E100_ROM_TEST_FAIL",
-	"E100_REG_TEST_FAIL",
-	"E100_MAC_TEST_FAIL",
-	"E100_LPBK_MAC_FAIL",
-	"E100_LPBK_PHY_FAIL"
+static char test_strings[][ETH_GSTRING_LEN] = {
+	"Link test     (on/offline)",
+	"Eeprom test   (on/offline)",
+	"Self test        (offline)",
+	"Mac loopback     (offline)",
+	"Phy loopback     (offline)",
+	"Cable diagnostic (offline)"
 };
 
 static int e100_ethtool_led_blink(struct net_device *, struct ifreq *);
@@ -139,10 +141,10 @@ static unsigned char e100_delayed_exec_non_cu_cmd(struct e100_private *,
 						  nxmit_cb_entry_t *);
 static void e100_free_nontx_list(struct e100_private *);
 static void e100_non_tx_background(unsigned long);
-
+static inline void e100_tx_skb_free(struct e100_private *bdp, tcb_t *tcb);
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2003 Intel Corporation";
-char e100_driver_version[]="2.2.21-k1";
+char e100_driver_version[]="2.3.13-k1";
 const char *e100_full_driver_name = "Intel(R) PRO/100 Network Driver";
 char e100_short_driver_name[] = "e100";
 static int e100nics = 0;
@@ -155,6 +157,7 @@ static void e100_vlan_rx_kill_vid(struct net_device *netdev, u16 vid);
 static int e100_notify_reboot(struct notifier_block *, unsigned long event, void *ptr);
 static int e100_suspend(struct pci_dev *pcid, u32 state);
 static int e100_resume(struct pci_dev *pcid);
+static unsigned char e100_asf_enabled(struct e100_private *bdp);
 struct notifier_block e100_notifier_reboot = {
         .notifier_call  = e100_notify_reboot,
         .next           = NULL,
@@ -182,8 +185,6 @@ struct notifier_block e100_notifier_reboot = {
 static u8 e100_D101M_checksum(struct e100_private *, struct sk_buff *);
 static u8 e100_D102_check_checksum(rfd_t *);
 static int e100_ioctl(struct net_device *, struct ifreq *, int);
-static int e100_open(struct net_device *);
-static int e100_close(struct net_device *);
 static int e100_change_mtu(struct net_device *, int);
 static int e100_xmit_frame(struct sk_buff *, struct net_device *);
 static unsigned char e100_init(struct e100_private *);
@@ -193,7 +194,6 @@ struct net_device_stats *e100_get_stats(struct net_device *);
 static irqreturn_t e100intr(int, void *, struct pt_regs *);
 static void e100_print_brd_conf(struct e100_private *);
 static void e100_set_multi(struct net_device *);
-void e100_set_speed_duplex(struct e100_private *);
 
 static u8 e100_pci_setup(struct pci_dev *, struct e100_private *);
 static u8 e100_sw_init(struct e100_private *);
@@ -215,7 +215,6 @@ u16 e100_eeprom_calculate_chksum(struct e100_private *adapter);
 
 static unsigned char e100_clr_cntrs(struct e100_private *);
 static unsigned char e100_load_microcode(struct e100_private *);
-static unsigned char e100_hw_init(struct e100_private *);
 static unsigned char e100_setup_iaaddr(struct e100_private *, u8 *);
 static unsigned char e100_update_stats(struct e100_private *bdp);
 
@@ -228,7 +227,6 @@ static void e100_set_bool_option(struct e100_private *bdp, int, u32, int,
 				 char *);
 unsigned char e100_wait_exec_cmplx(struct e100_private *, u32, u8, u8);
 void e100_exec_cmplx(struct e100_private *, u32, u8);
-static unsigned char e100_asf_enabled(struct e100_private *bdp);
 
 /**
  * e100_get_rx_struct - retrieve cell to hold skb buff from the pool
@@ -639,25 +637,7 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	} else {
 		bdp->rfd_size = 16;
 	}
-	e100_check_options(e100nics, bdp);
 
-	if (!e100_init(bdp)) {
-		printk(KERN_ERR "e100: Failed to initialize, instance #%d\n",
-		       e100nics);
-		rc = -ENODEV;
-		goto err_pci;
-	}
-
-	/* Check if checksum is valid */
-	cal_checksum = e100_eeprom_calculate_chksum(bdp);
-	read_checksum = e100_eeprom_read(bdp, (bdp->eeprom_size - 1));
-	if (cal_checksum != read_checksum) {
-                printk(KERN_ERR "e100: Corrupted EEPROM on instance #%d\n",
-		       e100nics);
-                rc = -ENODEV;
-                goto err_pci;
-	}
-	
 	dev->vlan_rx_register = e100_vlan_rx_register;
 	dev->vlan_rx_add_vid = e100_vlan_rx_add_vid;
 	dev->vlan_rx_kill_vid = e100_vlan_rx_kill_vid;
@@ -675,15 +655,32 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	dev->features = NETIF_F_SG | NETIF_F_HW_CSUM |
 			NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
 		
-	e100nics++;
-
-	e100_get_speed_duplex_caps(bdp);
-
 	if ((rc = register_netdev(dev)) != 0) {
 		goto err_pci;
 	}
-        memcpy(bdp->ifname, dev->name, IFNAMSIZ);
-        bdp->ifname[IFNAMSIZ-1] = 0;	
+
+	e100_check_options(e100nics, bdp);
+
+	if (!e100_init(bdp)) {
+		printk(KERN_ERR "e100: Failed to initialize, instance #%d\n",
+		       e100nics);
+		rc = -ENODEV;
+		goto err_unregister_netdev;
+	}
+
+	/* Check if checksum is valid */
+	cal_checksum = e100_eeprom_calculate_chksum(bdp);
+	read_checksum = e100_eeprom_read(bdp, (bdp->eeprom_size - 1));
+	if (cal_checksum != read_checksum) {
+                printk(KERN_ERR "e100: Corrupted EEPROM on instance #%d\n",
+		       e100nics);
+                rc = -ENODEV;
+                goto err_unregister_netdev;
+	}
+	
+	e100nics++;
+
+	e100_get_speed_duplex_caps(bdp);
 
 	printk(KERN_NOTICE
 	       "e100: %s: %s\n", 
@@ -709,6 +706,8 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 
 	goto out;
 
+err_unregister_netdev:
+	unregister_netdev(dev);
 err_pci:
 	iounmap(bdp->scb);
 	pci_release_regions(pcid);
@@ -974,7 +973,7 @@ e100_set_bool_option(struct e100_private *bdp, int val, u32 mask,
 	}
 }
 
-static int
+int
 e100_open(struct net_device *dev)
 {
 	struct e100_private *bdp;
@@ -1012,7 +1011,11 @@ e100_open(struct net_device *dev)
 
 	mod_timer(&(bdp->watchdog_timer), jiffies + (2 * HZ));
 
-	netif_start_queue(dev);
+	if (dev->flags & IFF_UP)
+		/* Otherwise process may sleep forever */
+		netif_wake_queue(dev);
+	else
+		netif_start_queue(dev);
 
 	e100_start_ru(bdp);
 	if ((rc = request_irq(dev->irq, &e100intr, SA_SHIRQ,
@@ -1033,7 +1036,7 @@ exit:
 	return rc;
 }
 
-static int
+int
 e100_close(struct net_device *dev)
 {
 	struct e100_private *bdp = dev->priv;
@@ -1074,7 +1077,8 @@ e100_xmit_frame(struct sk_buff *skb, struct net_device *dev)
 		goto exit2;
 	}
 
-	if (!TCBS_AVAIL(bdp->tcb_pool) ||
+	/* tcb list may be empty temporarily during releasing resources */
+	if (!TCBS_AVAIL(bdp->tcb_pool) || (bdp->tcb_phys == 0) ||
 	    (bdp->non_tx_command_state != E100_NON_TX_IDLE)) {
 		notify_stop = true;
 		rc = 1;
@@ -1285,10 +1289,8 @@ e100_init(struct e100_private *bdp)
 	/* read NIC's part number */
 	e100_rd_pwa_no(bdp);
 
-	if (!e100_hw_init(bdp)) {
-		printk(KERN_ERR "e100: hw init failed\n");
+	if (!e100_hw_init(bdp))
 		return false;
-	}
 	/* Interrupts are enabled after device reset */
 	e100_disable_clear_intr(bdp);
 
@@ -1330,6 +1332,8 @@ e100_sw_init(struct e100_private *bdp)
 	spin_lock_init(&(bdp->bd_non_tx_lock));
 	spin_lock_init(&(bdp->config_lock));
 	spin_lock_init(&(bdp->mdi_access_lock));
+	/* Initialize configuration data */
+	e100_config_init(bdp);
 
 	return 1;
 }
@@ -1384,11 +1388,11 @@ e100_tco_workaround(struct e100_private *bdp)
  *      true - If the adapter was initialized
  *      false - If the adapter failed initialization
  */
-unsigned char __devinit
+unsigned char
 e100_hw_init(struct e100_private *bdp)
 {
 	if (!e100_phy_init(bdp))
-		return false;
+		goto err;
 
 	e100_sw_reset(bdp, PORT_SELECTIVE_RESET);
 
@@ -1398,27 +1402,25 @@ e100_hw_init(struct e100_private *bdp)
 
 	/* Load the CU BASE (set to 0, because we use linear mode) */
 	if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE, 0))
-		return false;
+		goto err;
 
 	if (!e100_wait_exec_cmplx(bdp, 0, SCB_RUC_LOAD_BASE, 0))
-		return false;
+		goto err;
 
 	/* Load interrupt microcode  */
 	if (e100_load_microcode(bdp)) {
 		bdp->flags |= DF_UCODE_LOADED;
 	}
 
-	e100_config_init(bdp);
-	if (!e100_config(bdp)) {
-		return false;
-	}
+	if (!e100_config(bdp))
+		goto err;
 
 	if (!e100_setup_iaaddr(bdp, bdp->device->dev_addr))
-		return false;
+		goto err;
 
 	/* Clear the internal counters */
 	if (!e100_clr_cntrs(bdp))
-		return false;
+		goto err;
 
 	/* Change for 82558 enhancement */
 	/* If 82558/9 and if the user has enabled flow control, set up the
@@ -1431,6 +1433,9 @@ e100_hw_init(struct e100_private *bdp)
 	}
 
 	return true;
+err:
+	printk(KERN_ERR "e100: hw init failed\n");
+	return false;
 }
 
 /**
@@ -1591,9 +1596,22 @@ e100_alloc_tcb_pool(struct e100_private *bdp)
 void
 e100_free_tcb_pool(struct e100_private *bdp)
 {
+	tcb_t *tcb;
+	int i;
+	/* Return tx skbs */ 
+	for (i = 0; i < bdp->params.TxDescriptors; i++) {
+	  	tcb = bdp->tcb_pool.data;
+		tcb += bdp->tcb_pool.head;
+  		e100_tx_skb_free(bdp, tcb);
+		if (NEXT_TCB_TOUSE(bdp->tcb_pool.head) == bdp->tcb_pool.tail)
+		  	break;
+		bdp->tcb_pool.head = NEXT_TCB_TOUSE(bdp->tcb_pool.head);
+	}
 	pci_free_consistent(bdp->pdev,
 			    sizeof (tcb_t) * bdp->params.TxDescriptors,
 			    bdp->tcb_pool.data, bdp->tcb_phys);
+	bdp->tcb_pool.head = 0;
+	bdp->tcb_pool.tail = 1;	
 	bdp->tcb_phys = 0;
 }
 
@@ -1747,12 +1765,10 @@ e100_watchdog(struct net_device *dev)
 				e100_set_multi(dev);
 			}
 		}
-
-		/* Update the statistics needed by the upper interface */
-		/* This should be the last statistic related command
-		 * as it's async. now */
-		e100_dump_stats_cntrs(bdp);
 	}
+	/* Issue command to dump statistics from device.        */
+	/* Check for command completion on next watchdog timer. */
+	e100_dump_stats_cntrs(bdp);
 
 	wmb();
 
@@ -2544,6 +2560,7 @@ e100_update_stats(struct e100_private *bdp)
 	pcmd_complete = e100_cmd_complete_location(bdp);
 	if (*pcmd_complete != le32_to_cpu(DUMP_RST_STAT_COMPLETED) &&
 	    *pcmd_complete != le32_to_cpu(DUMP_STAT_COMPLETED)) {
+		*pcmd_complete = 0;
 		return false;
 	}
 
@@ -3041,23 +3058,6 @@ e100_isolate_driver(struct e100_private *bdp)
 	e100_sw_reset(bdp, PORT_SELECTIVE_RESET);
 }
 
-void
-e100_set_speed_duplex(struct e100_private *bdp)
-{
-	int carrier_ok;
-	/* Device may lose link with some siwtches when */
-	/* changing speed/duplex to non-autoneg. e100   */
-	/* needs to remember carrier state in order to  */
-	/* start watchdog timer for recovering link     */
-	if ((carrier_ok = netif_carrier_ok(bdp->device)))
-		e100_isolate_driver(bdp);
-	e100_phy_set_speed_duplex(bdp, true);
-	e100_config_fc(bdp);	/* re-config flow-control if necessary */
-	e100_config(bdp);	
-	if (carrier_ok)
-		e100_deisolate_driver(bdp, false);
-}
-
 static void
 e100_tcb_add_C_bit(struct e100_private *bdp)
 {
@@ -3213,6 +3213,144 @@ e100_do_ethtool_ioctl(struct net_device *dev, struct ifreq *ifr)
 	case ETHTOOL_PHYS_ID:
 		rc = e100_ethtool_led_blink(dev,ifr);
 		break;
+#ifdef	ETHTOOL_GRINGPARAM
+	case ETHTOOL_GRINGPARAM: {
+		struct ethtool_ringparam ering;
+		struct e100_private *bdp = dev->priv;
+		memset((void *) &ering, 0, sizeof(ering));
+		ering.rx_max_pending = E100_MAX_RFD;
+		ering.tx_max_pending = E100_MAX_TCB;
+		ering.rx_pending = bdp->params.RxDescriptors;
+		ering.tx_pending = bdp->params.TxDescriptors;
+		rc = copy_to_user(ifr->ifr_data, &ering, sizeof(ering))
+			? -EFAULT : 0;
+		return rc;
+	}
+#endif
+#ifdef	ETHTOOL_SRINGPARAM
+	case ETHTOOL_SRINGPARAM: {
+		struct ethtool_ringparam ering;
+		struct e100_private *bdp = dev->priv;
+		if (copy_from_user(&ering, ifr->ifr_data, sizeof(ering)))
+			return -EFAULT;
+		if (ering.rx_pending > E100_MAX_RFD 
+		    || ering.rx_pending < E100_MIN_RFD)
+			return -EINVAL;
+		if (ering.tx_pending > E100_MAX_TCB 
+		    || ering.tx_pending < E100_MIN_TCB)
+			return -EINVAL;
+		if (netif_running(dev)) {
+			spin_lock_bh(&dev->xmit_lock);
+			e100_close(dev);
+			spin_unlock_bh(&dev->xmit_lock);
+			/* Use new values to open interface */
+			bdp->params.RxDescriptors = ering.rx_pending;
+			bdp->params.TxDescriptors = ering.tx_pending;
+			e100_hw_init(bdp);
+			e100_open(dev);
+		}
+		else {
+			bdp->params.RxDescriptors = ering.rx_pending;
+			bdp->params.TxDescriptors = ering.tx_pending;
+		}
+		return 0;
+	}
+#endif
+#ifdef	ETHTOOL_GPAUSEPARAM
+	case ETHTOOL_GPAUSEPARAM: {
+		struct ethtool_pauseparam epause;
+		struct e100_private *bdp = dev->priv;
+		memset((void *) &epause, 0, sizeof(epause));
+		if ((bdp->flags & IS_BACHELOR)
+		    && (bdp->params.b_params & PRM_FC)) {
+			epause.autoneg = 1;
+			if (bdp->flags && DF_LINK_FC_CAP) {
+				epause.rx_pause = 1;
+				epause.tx_pause = 1;
+			}
+			if (bdp->flags && DF_LINK_FC_TX_ONLY)
+				epause.tx_pause = 1;
+		}
+		rc = copy_to_user(ifr->ifr_data, &epause, sizeof(epause))
+			? -EFAULT : 0;
+		return rc;
+	}
+#endif
+#ifdef	ETHTOOL_SPAUSEPARAM
+	case ETHTOOL_SPAUSEPARAM: {
+		struct ethtool_pauseparam epause;
+		struct e100_private *bdp = dev->priv;
+		if (!(bdp->flags & IS_BACHELOR))
+			return -EINVAL;
+		if (copy_from_user(&epause, ifr->ifr_data, sizeof(epause)))
+			return -EFAULT;
+		if (epause.autoneg == 1)
+			bdp->params.b_params |= PRM_FC;
+		else
+			bdp->params.b_params &= ~PRM_FC;
+		if (netif_running(dev)) {
+			spin_lock_bh(&dev->xmit_lock);
+			e100_close(dev);
+			spin_unlock_bh(&dev->xmit_lock);
+			e100_hw_init(bdp);
+			e100_open(dev);
+		}
+		return 0;
+	}
+#endif
+#ifdef	ETHTOOL_GRXCSUM
+	case ETHTOOL_GRXCSUM:
+	case ETHTOOL_GTXCSUM:
+	case ETHTOOL_GSG:
+	{	struct ethtool_value eval;
+		struct e100_private *bdp = dev->priv;
+		memset((void *) &eval, 0, sizeof(eval));
+		if ((ecmd.cmd == ETHTOOL_GRXCSUM) 
+		    && (bdp->params.b_params & PRM_XSUMRX))
+			eval.data = 1;
+		else
+			eval.data = 0;
+		rc = copy_to_user(ifr->ifr_data, &eval, sizeof(eval))
+			? -EFAULT : 0;
+		return rc;
+	}
+#endif
+#ifdef	ETHTOOL_SRXCSUM
+	case ETHTOOL_SRXCSUM:
+	case ETHTOOL_STXCSUM:
+	case ETHTOOL_SSG:
+	{	struct ethtool_value eval;
+		struct e100_private *bdp = dev->priv;
+		if (copy_from_user(&eval, ifr->ifr_data, sizeof(eval)))
+			return -EFAULT;
+		if (ecmd.cmd == ETHTOOL_SRXCSUM) {
+			if (eval.data == 1) { 
+				if (bdp->rev_id >= D101MA_REV_ID)
+					bdp->params.b_params |= PRM_XSUMRX;
+				else
+					return -EINVAL;
+			} else {
+				if (bdp->rev_id >= D101MA_REV_ID)
+					bdp->params.b_params &= ~PRM_XSUMRX;
+				else
+					return 0;
+			}
+		} else {
+			if (eval.data == 1)
+				return -EINVAL;
+			else
+				return 0;
+		}
+		if (netif_running(dev)) {
+			spin_lock_bh(&dev->xmit_lock);
+			e100_close(dev);
+			spin_unlock_bh(&dev->xmit_lock);
+			e100_hw_init(bdp);
+			e100_open(dev);
+		}
+		return 0;
+	}
+#endif
 	default:
 		break;
 	}			//switch
@@ -3298,7 +3436,13 @@ e100_ethtool_set_settings(struct net_device *dev, struct ifreq *ifr)
 	if ((ecmd.autoneg == AUTONEG_ENABLE)
 	    && (bdp->speed_duplex_caps & SUPPORTED_Autoneg)) {
 		bdp->params.e100_speed_duplex = E100_AUTONEG;
-		e100_set_speed_duplex(bdp);
+		if (netif_running(dev)) {
+			spin_lock_bh(&dev->xmit_lock);
+			e100_close(dev);
+			spin_unlock_bh(&dev->xmit_lock);
+			e100_hw_init(bdp);
+			e100_open(dev);
+		}
 	} else {
 		if (ecmd.speed == SPEED_10) {
 			if (ecmd.duplex == DUPLEX_HALF) {
@@ -3329,7 +3473,13 @@ e100_ethtool_set_settings(struct net_device *dev, struct ifreq *ifr)
 		if (bdp->speed_duplex_caps & ethtool_new_speed_duplex) {
 			bdp->params.e100_speed_duplex =
 				e100_new_speed_duplex;
-			e100_set_speed_duplex(bdp);
+			if (netif_running(dev)) {
+				spin_lock_bh(&dev->xmit_lock);
+				e100_close(dev);
+				spin_unlock_bh(&dev->xmit_lock);
+				e100_hw_init(bdp);
+				e100_open(dev);
+			}
 		} else {
 			return -EOPNOTSUPP;
 		} 
@@ -3364,14 +3514,14 @@ e100_ethtool_test(struct net_device *dev, struct ifreq *ifr)
 	struct ethtool_test *info;
 	int rc = -EFAULT;
 
-	info = kmalloc(sizeof(*info) + E100_MAX_TEST_RES * sizeof(u64),
+	info = kmalloc(sizeof(*info) + max_test_res * sizeof(u64),
 		       GFP_ATOMIC);
 
 	if (!info)
 		return -ENOMEM;
 
 	memset((void *) info, 0, sizeof(*info) +
-				 E100_MAX_TEST_RES * sizeof(u64));
+				 max_test_res * sizeof(u64));
 
 	if (copy_from_user(info, ifr->ifr_data, sizeof(*info)))
 		goto exit;
@@ -3379,7 +3529,7 @@ e100_ethtool_test(struct net_device *dev, struct ifreq *ifr)
 	info->flags = e100_run_diag(dev, info->data, info->flags);
 
 	if (!copy_to_user(ifr->ifr_data, info,
-			 sizeof(*info) + E100_MAX_TEST_RES * sizeof(u64)))
+			 sizeof(*info) + max_test_res * sizeof(u64)))
 		rc = 0;
 exit:
 	kfree(info);
@@ -3393,6 +3543,7 @@ e100_ethtool_gregs(struct net_device *dev, struct ifreq *ifr)
 	u32 regs_buff[E100_REGS_LEN];
 	struct ethtool_regs regs = {ETHTOOL_GREGS};
 	void *addr = ifr->ifr_data;
+	u16 mdi_reg;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
@@ -3405,6 +3556,8 @@ e100_ethtool_gregs(struct net_device *dev, struct ifreq *ifr)
 	regs_buff[0] = readb(&(bdp->scb->scb_cmd_hi)) << 24 |
 		readb(&(bdp->scb->scb_cmd_low)) << 16 |
 		readw(&(bdp->scb->scb_status));
+	e100_mdi_read(bdp, MII_NCONFIG, bdp->phy_addr, &mdi_reg);
+	regs_buff[1] = mdi_reg;
 
 	if(copy_to_user(addr, &regs, sizeof(regs)))
 		return -EFAULT;
@@ -3428,7 +3581,13 @@ e100_ethtool_nway_rst(struct net_device *dev, struct ifreq *ifr)
 
 	if ((bdp->speed_duplex_caps & SUPPORTED_Autoneg) &&
 	    (bdp->params.e100_speed_duplex == E100_AUTONEG)) {
-		e100_set_speed_duplex(bdp);
+		if (netif_running(dev)) {
+			spin_lock_bh(&dev->xmit_lock);
+			e100_close(dev);
+			spin_unlock_bh(&dev->xmit_lock);
+			e100_hw_init(bdp);
+			e100_open(dev);
+		}
 	} else {
 		return -EFAULT;
 	}
@@ -3454,7 +3613,7 @@ e100_ethtool_get_drvinfo(struct net_device *dev, struct ifreq *ifr)
 	info.n_stats = E100_STATS_LEN;
 	info.regdump_len  = E100_REGS_LEN * sizeof(u32);
 	info.eedump_len = (bdp->eeprom_size << 1);	
-	info.testinfo_len = E100_MAX_TEST_RES;
+	info.testinfo_len = max_test_res;
 	if (copy_to_user(ifr->ifr_data, &info, sizeof (info)))
 		return -EFAULT;
 
@@ -3804,15 +3963,15 @@ static int e100_ethtool_gstrings(struct net_device *dev, struct ifreq *ifr)
 	switch (info.string_set) {
 	case ETH_SS_TEST: {
 		int ret = 0;
-		if (info.len > E100_MAX_TEST_RES)
-			info.len = E100_MAX_TEST_RES;
+		if (info.len > max_test_res)
+			info.len = max_test_res;
 		strings = kmalloc(info.len * ETH_GSTRING_LEN, GFP_ATOMIC);
 		if (!strings)
 			return -ENOMEM;
 		memset(strings, 0, info.len * ETH_GSTRING_LEN);
 
 		for (i = 0; i < info.len; i++) {
-			sprintf(strings + i * ETH_GSTRING_LEN, "%-31s",
+			sprintf(strings + i * ETH_GSTRING_LEN, "%s",
 				test_strings[i]);
 		}
 		if (copy_to_user(ifr->ifr_data, &info, sizeof (info)))
@@ -3881,7 +4040,13 @@ e100_mii_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 					bdp->params.e100_speed_duplex = E100_SPEED_10_FULL;
 				else
 					bdp->params.e100_speed_duplex = E100_SPEED_10_HALF;
-				e100_set_speed_duplex(bdp);
+				if (netif_running(dev)) {
+					spin_lock_bh(&dev->xmit_lock);
+					e100_close(dev);
+					spin_unlock_bh(&dev->xmit_lock);
+					e100_hw_init(bdp);
+					e100_open(dev);
+				}
 		}
 		else 
 			/* Only allows changing speed/duplex */
@@ -4164,7 +4329,6 @@ e100_resume(struct pci_dev *pcid)
 
 	return 0;
 }
-#endif /* CONFIG_PM */
 
 /**
  * e100_asf_enabled - checks if ASF is configured on the current adaper
@@ -4190,6 +4354,7 @@ e100_asf_enabled(struct e100_private *bdp)
 	}
 	return false;
 }
+#endif /* CONFIG_PM */
 
 #ifdef E100_CU_DEBUG
 unsigned char

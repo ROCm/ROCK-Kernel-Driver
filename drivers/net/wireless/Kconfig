@@ -203,11 +203,24 @@ config PLX_HERMES
 	depends on PCI && HERMES && EXPERIMENTAL
 	help
 	  Enable support for PCMCIA cards supported by the "Hermes" (aka
-	  orinoco_cs) driver when used in PLX9052 based PCI adaptors.  These
+	  orinoco) driver when used in PLX9052 based PCI adaptors.  These
 	  adaptors are not a full PCMCIA controller but act as a more limited
 	  PCI <-> PCMCIA bridge.  Several vendors sell such adaptors so that
 	  802.11b PCMCIA cards can be used in desktop machines.  The Netgear
 	  MA301 is such an adaptor.
+
+	  Support for these adaptors is so far still incomplete and buggy.
+	  You have been warned.
+
+config TMD_HERMES
+	tristate "Hermes in TMD7160 based PCI adaptor support (EXPERIMENTAL)"
+	depends on PCI && HERMES && EXPERIMENTAL
+	help
+	  Enable support for PCMCIA cards supported by the "Hermes" (aka
+	  orinoco) driver when used in TMD7160 based PCI adaptors.  These
+	  adaptors are not a full PCMCIA controller but act as a more limited
+	  PCI <-> PCMCIA bridge.  Several vendors sell such adaptors so that
+	  802.11b PCMCIA cards can be used in desktop machines.
 
 	  Support for these adaptors is so far still incomplete and buggy.
 	  You have been warned.

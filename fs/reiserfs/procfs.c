@@ -350,6 +350,7 @@ int reiserfs_on_disk_super_in_proc( char *buffer, char **start, off_t offset,
 	struct reiserfs_sb_info *sb_info;
 	struct reiserfs_super_block *rs;
 	int hash_code;
+	__u32 flags;
 	int len = 0;
     
 	sb = procinfo_prologue((int)data);
@@ -358,6 +359,7 @@ int reiserfs_on_disk_super_in_proc( char *buffer, char **start, off_t offset,
 	sb_info = REISERFS_SB(sb);
 	rs = sb_info -> s_rs;
 	hash_code = DFL( s_hash_function_code );
+	flags = DJF( s_flags );
 
 	len += sprintf( &buffer[ len ], 
 			"block_count: \t%i\n"
@@ -373,6 +375,7 @@ int reiserfs_on_disk_super_in_proc( char *buffer, char **start, off_t offset,
 			"tree_height: \t%i\n"
 			"bmap_nr: \t%i\n"
 			"version: \t%i\n"
+			"flags: \t%x[%s]\n"
 			"reserved_for_journal: \t%i\n",
 
 			DFL( s_block_count ),
@@ -391,6 +394,9 @@ int reiserfs_on_disk_super_in_proc( char *buffer, char **start, off_t offset,
 			DF( s_tree_height ),
 			DF( s_bmap_nr ),
 			DF( s_version ),
+			flags,
+			( flags & reiserfs_attrs_cleared )
+			? "attrs_cleared" : "",
 			DF (s_reserved_for_journal));
 
 	procinfo_epilogue( sb );

@@ -141,11 +141,9 @@ int pcxx_nbios=sizeof(pcxx_bios);
 
 #define FEPTIMEOUT 200000  
 #define SERIAL_TYPE_NORMAL	1
-#define SERIAL_TYPE_CALLOUT	2
 #define PCXE_EVENT_HANGUP   1
 
 struct tty_driver pcxe_driver;
-struct tty_driver pcxe_callout;
 static int pcxe_refcount;
 
 static struct timer_list pcxx_timer;
@@ -240,8 +238,6 @@ void cleanup_module()
 
 	if ((e1 = tty_unregister_driver(&pcxe_driver)))
 		printk("SERIAL: failed to unregister serial driver (%d)\n", e1);
-	if ((e2 = tty_unregister_driver(&pcxe_callout)))
-		printk("SERIAL: failed to unregister callout driver (%d)\n",e2);
 
 	cleanup_board_resources();
 	kfree(digi_channels);
@@ -341,13 +337,8 @@ static int pcxx_waitcarrier(struct tty_struct *tty,struct file *filp,struct chan
 	int	retval = 0;
 	int	do_clocal = 0;
 
-	if (info->asyncflags & ASYNC_CALLOUT_ACTIVE) {
-		if (info->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1;
-	} else {
-		if (tty->termios->c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
+	if (tty->termios->c_cflag & CLOCAL)
+		do_clocal = 1;
 
 	/*
 	 * Block waiting for the carrier detect and the line to become free
@@ -360,12 +351,10 @@ static int pcxx_waitcarrier(struct tty_struct *tty,struct file *filp,struct chan
 
 	for (;;) {
 		cli();
-		if ((info->asyncflags & ASYNC_CALLOUT_ACTIVE) == 0) {
-			globalwinon(info);
-			info->omodem |= DTR|RTS;
-			fepcmd(info, SETMODEM, DTR|RTS, 0, 10, 1);
-			memoff(info);
-		}
+		globalwinon(info);
+		info->omodem |= DTR|RTS;
+		fepcmd(info, SETMODEM, DTR|RTS, 0, 10, 1);
+		memoff(info);
 		sti();
 		set_current_state(TASK_INTERRUPTIBLE);
 		if(tty_hung_up_p(filp) || (info->asyncflags & ASYNC_INITIALIZED) == 0) {
@@ -375,8 +364,7 @@ static int pcxx_waitcarrier(struct tty_struct *tty,struct file *filp,struct chan
 				retval = -ERESTARTSYS;	
 			break;
 		}
-		if ((info->asyncflags & ASYNC_CALLOUT_ACTIVE) == 0 &&
-		    (info->asyncflags & ASYNC_CLOSING) == 0 &&
+		if ((info->asyncflags & ASYNC_CLOSING) == 0 &&
 			(do_clocal || (info->imodem & info->dcd)))
 			break;
 		if(signal_pending(current)) {
@@ -476,56 +464,29 @@ int pcxe_open(struct tty_struct *tty, struct file * filp)
 		else
 			return -ERESTARTSYS;
 	}
-	/*
-	 * If this is a callout device, then just make sure the normal
-	 * device isn't being used.
-	 */
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-		if (ch->asyncflags & ASYNC_NORMAL_ACTIVE)
-			return -EBUSY;
-		if (ch->asyncflags & ASYNC_CALLOUT_ACTIVE) {
-			if ((ch->asyncflags & ASYNC_SESSION_LOCKOUT) &&
-		    		(ch->session != current->session))
-			    return -EBUSY;
-			if((ch->asyncflags & ASYNC_PGRP_LOCKOUT) &&
-			    (ch->pgrp != current->pgrp))
-			    return -EBUSY;
-		}
-		ch->asyncflags |= ASYNC_CALLOUT_ACTIVE;
-	}
-	else {
-		if (filp->f_flags & O_NONBLOCK) {
-			if(ch->asyncflags & ASYNC_CALLOUT_ACTIVE)
-				return -EBUSY;
-		}
-		else {
-			/* this has to be set in order for the "block until
-			 * CD" code to work correctly.  i'm not sure under
-			 * what circumstances asyncflags should be set to
-			 * ASYNC_NORMAL_ACTIVE though
-			 * brian@ilinx.com
-			 */
-			ch->asyncflags |= ASYNC_NORMAL_ACTIVE;
-			if ((retval = pcxx_waitcarrier(tty, filp, ch)) != 0)
-				return retval;
-		}
+
+	if (!(filp->f_flags & O_NONBLOCK)) {
+		/* this has to be set in order for the "block until
+		 * CD" code to work correctly.  i'm not sure under
+		 * what circumstances asyncflags should be set to
+		 * ASYNC_NORMAL_ACTIVE though
+		 * brian@ilinx.com
+		 */
 		ch->asyncflags |= ASYNC_NORMAL_ACTIVE;
+		if ((retval = pcxx_waitcarrier(tty, filp, ch)) != 0)
+			return retval;
 	}
+	ch->asyncflags |= ASYNC_NORMAL_ACTIVE;
  	
 	save_flags(flags);
 	cli();
 	if((ch->count == 1) && (ch->asyncflags & ASYNC_SPLIT_TERMIOS)) {
-		if(tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = ch->normal_termios;
-		else 
-			*tty->termios = ch->callout_termios;
+		*tty->termios = ch->normal_termios;
 		globalwinon(ch);
 		pcxxparam(tty,ch);
 		memoff(ch);
 	}
 
-	ch->session = current->session;
-	ch->pgrp = current->pgrp;
 	restore_flags(flags);
 	return 0;
 } 
@@ -605,8 +566,6 @@ static void pcxe_close(struct tty_struct * tty, struct file * filp)
 		*/
 		if(info->asyncflags & ASYNC_NORMAL_ACTIVE)
 			info->normal_termios = *tty->termios;
-		if(info->asyncflags & ASYNC_CALLOUT_ACTIVE)
-			info->callout_termios = *tty->termios;
 		tty->closing = 1;
 		if(info->asyncflags & ASYNC_INITIALIZED) {
 			setup_empty_event(tty,info);		
@@ -644,8 +603,7 @@ static void pcxe_close(struct tty_struct * tty, struct file * filp)
 			}
 			wake_up_interruptible(&info->open_wait);
 		}
-		info->asyncflags &= ~(ASYNC_NORMAL_ACTIVE|
-							  ASYNC_CALLOUT_ACTIVE|ASYNC_CLOSING);
+		info->asyncflags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 		wake_up_interruptible(&info->close_wait);
 		restore_flags(flags);
 	}
@@ -665,7 +623,7 @@ void pcxe_hangup(struct tty_struct *tty)
 		ch->event = 0;
 		ch->count = 0;
 		ch->tty = NULL;
-		ch->asyncflags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+		ch->asyncflags &= ~ASYNC_NORMAL_ACTIVE;
 		wake_up_interruptible(&ch->open_wait);
 		restore_flags(flags);
 	}
@@ -1257,12 +1215,6 @@ int __init pcxe_init(void)
 	pcxe_driver.start = pcxe_start;
 	pcxe_driver.hangup = pcxe_hangup;
 
-	pcxe_callout = pcxe_driver;
-	pcxe_callout.name = "cud";
-	pcxe_callout.major = DIGICU_MAJOR;
-	pcxe_callout.subtype = SERIAL_TYPE_CALLOUT;
-	pcxe_callout.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-
 	for(crd=0; crd < numcards; crd++) {
 		bd = &boards[crd];
 		outb(FEPRST, bd->port);
@@ -1619,7 +1571,6 @@ load_fep:
 			ch->close_delay = 50;
 			ch->count = 0;
 			ch->blocked_open = 0;
-			ch->callout_termios = pcxe_callout.init_termios;
 			ch->normal_termios = pcxe_driver.init_termios;
 			init_waitqueue_head(&ch->open_wait);
 			init_waitqueue_head(&ch->close_wait);
@@ -1649,12 +1600,6 @@ load_fep:
 	if(ret) {
 		printk(KERN_ERR "Couldn't register PC/Xe driver\n");
 		goto cleanup_boards;
-	}
-
-	ret = tty_register_driver(&pcxe_callout);
-	if(ret) {
-		printk(KERN_ERR "Couldn't register PC/Xe callout\n");
-		goto cleanup_pcxe_driver;
 	}
 
 	/*
@@ -1760,7 +1705,7 @@ static void doevent(int crd)
 
 		if (event & MODEMCHG_IND) {
 			ch->imodem = mstat;
-			if (ch->asyncflags & (ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE)) {
+			if (ch->asyncflags & ASYNC_NORMAL_ACTIVE) {
 				if (ch->asyncflags & ASYNC_CHECK_CD) {
 					if (mstat & ch->dcd) {
 						wake_up_interruptible(&ch->open_wait);
@@ -2377,7 +2322,7 @@ static void do_softint(void *private_)
 			if(test_and_clear_bit(PCXE_EVENT_HANGUP, &info->event)) {
 				tty_hangup(tty);
 				wake_up_interruptible(&info->open_wait);
-				info->asyncflags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+				info->asyncflags &= ~ASYNC_NORMAL_ACTIVE;
 			}
 		}
 	}

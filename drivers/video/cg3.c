@@ -253,8 +253,7 @@ cg3_init_fix(struct fb_info *info, int linebytes)
 {
 	struct cg3_par *par = (struct cg3_par *)info->par;
 
-	strncpy(info->fix.id, par->sdev->prom_name, sizeof(info->fix.id) - 1);
-	info->fix.id[sizeof(info->fix.id)-1] = 0;
+	strlcpy(info->fix.id, par->sdev->prom_name, sizeof(info->fix.id));
 
 	info->fix.type = FB_TYPE_PACKED_PIXELS;
 	info->fix.visual = FB_VISUAL_PSEUDOCOLOR;

@@ -1,10 +1,11 @@
 /*
  * bus.c - bus driver management
+ *
+ * Copyright (c) 2002-3 Patrick Mochel
+ * Copyright (c) 2002-3 Open Source Development Labs
  * 
- * Copyright (c) 2002 Patrick Mochel
- *		 2002 Open Source Development Lab
- * 
- * 
+ * This file is released under the GPLv2
+ *
  */
 
 #undef DEBUG
@@ -431,7 +432,7 @@ int bus_add_driver(struct device_driver * drv)
 	if (bus) {
 		pr_debug("bus %s: add driver %s\n",bus->name,drv->name);
 
-		strncpy(drv->kobj.name,drv->name,KOBJ_NAME_LEN);
+		strlcpy(drv->kobj.name,drv->name,KOBJ_NAME_LEN);
 		drv->kobj.kset = &bus->drivers;
 
 		if ((error = kobject_register(&drv->kobj))) {
@@ -540,15 +541,15 @@ struct bus_type * find_bus(char * name)
  */
 int bus_register(struct bus_type * bus)
 {
-	strncpy(bus->subsys.kset.kobj.name,bus->name,KOBJ_NAME_LEN);
+	strlcpy(bus->subsys.kset.kobj.name,bus->name,KOBJ_NAME_LEN);
 	subsys_set_kset(bus,bus_subsys);
 	subsystem_register(&bus->subsys);
 
-	snprintf(bus->devices.kobj.name,KOBJ_NAME_LEN,"devices");
+	strlcpy(bus->devices.kobj.name, "devices", KOBJ_NAME_LEN);
 	bus->devices.subsys = &bus->subsys;
 	kset_register(&bus->devices);
 
-	snprintf(bus->drivers.kobj.name,KOBJ_NAME_LEN,"drivers");
+	strlcpy(bus->drivers.kobj.name, "drivers", KOBJ_NAME_LEN);
 	bus->drivers.subsys = &bus->subsys;
 	bus->drivers.ktype = &ktype_driver;
 	kset_register(&bus->drivers);

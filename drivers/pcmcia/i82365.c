@@ -1560,7 +1560,7 @@ static int __init init_i82365(void)
     i82365_data.nsock = sockets;
     i82365_class_data.dev = &i82365_device.dev;
     i82365_class_data.class_data = &i82365_data;
-    strncpy(i82365_class_data.class_id, "i82365", BUS_ID_SIZE);
+    strlcpy(i82365_class_data.class_id, "i82365", BUS_ID_SIZE);
     
     platform_device_register(&i82365_device);
     class_device_register(&i82365_class_data);

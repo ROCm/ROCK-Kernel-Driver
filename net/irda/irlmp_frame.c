@@ -11,7 +11,7 @@
  * 
  *     Copyright (c) 1998-1999 Dag Brattli <dagb@cs.uit.no>
  *     All Rights Reserved.
- *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
+ *     Copyright (c) 2000-2003 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -144,7 +144,6 @@ void irlmp_link_data_indication(struct lap_cb *self, struct sk_buff *skb,
 		} else {
 			IRDA_DEBUG(2, "%s(), received data frame\n", __FUNCTION__);
 		}
-		dev_kfree_skb(skb);
 		return;
 	}
 
@@ -168,16 +167,13 @@ void irlmp_link_data_indication(struct lap_cb *self, struct sk_buff *skb,
 			break;
 		case ACCESSMODE_CMD:
 			IRDA_DEBUG(0, "Access mode cmd not implemented!\n");
-			dev_kfree_skb(skb);
 			break;
 		case ACCESSMODE_CNF:
 			IRDA_DEBUG(0, "Access mode cnf not implemented!\n");
-			dev_kfree_skb(skb);
 			break;
 		default:
 			IRDA_DEBUG(0, "%s(), Unknown control frame %02x\n",
 				   __FUNCTION__, fp[2]);
-			dev_kfree_skb(skb);
 			break;
 		}
 	} else if (unreliable) {
@@ -230,16 +226,12 @@ void irlmp_link_unitdata_indication(struct lap_cb *self, struct sk_buff *skb)
 	if (pid & 0x80) {
 		IRDA_DEBUG(0, "%s(), extension in PID not supp!\n",
 			   __FUNCTION__);
-		dev_kfree_skb(skb);
-
 		return;
 	}
 
 	/* Check if frame is addressed to the connectionless LSAP */
 	if ((slsap_sel != LSAP_CONNLESS) || (dlsap_sel != LSAP_CONNLESS)) {
 		IRDA_DEBUG(0, "%s(), dropping frame!\n", __FUNCTION__);
-		dev_kfree_skb(skb);
-		
 		return;
 	}
 	
@@ -264,7 +256,6 @@ void irlmp_link_unitdata_indication(struct lap_cb *self, struct sk_buff *skb)
 		irlmp_connless_data_indication(lsap, skb);
 	else {
 		IRDA_DEBUG(0, "%s(), found no matching LSAP!\n", __FUNCTION__);
-		dev_kfree_skb(skb);
 	}
 }
 #endif /* CONFIG_IRDA_ULTRA */
@@ -278,7 +269,7 @@ void irlmp_link_unitdata_indication(struct lap_cb *self, struct sk_buff *skb)
 void irlmp_link_disconnect_indication(struct lap_cb *lap, 
 				      struct irlap_cb *irlap, 
 				      LAP_REASON reason, 
-				      struct sk_buff *userdata)
+				      struct sk_buff *skb)
 {
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
@@ -288,9 +279,7 @@ void irlmp_link_disconnect_indication(struct lap_cb *lap,
 	lap->reason = reason;
 	lap->daddr = DEV_ADDR_ANY;
 
-        /* FIXME: must do something with the userdata if any */
-	if (userdata)
-		dev_kfree_skb(userdata);
+        /* FIXME: must do something with the skb if any */
 	
 	/*
 	 *  Inform station state machine
@@ -327,7 +316,7 @@ void irlmp_link_connect_indication(struct lap_cb *self, __u32 saddr,
  *
  */
 void irlmp_link_connect_confirm(struct lap_cb *self, struct qos_info *qos, 
-				struct sk_buff *userdata)
+				struct sk_buff *skb)
 {
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
@@ -335,9 +324,7 @@ void irlmp_link_connect_confirm(struct lap_cb *self, struct qos_info *qos,
 	ASSERT(self->magic == LMP_LAP_MAGIC, return;);
 	ASSERT(qos != NULL, return;);
 
-	/* Don't need use the userdata for now */
-	if (userdata)
-		dev_kfree_skb(userdata);
+	/* Don't need use the skb for now */
 
 	/* Copy QoS settings for this session */
 	self->qos = qos;

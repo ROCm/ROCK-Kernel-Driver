@@ -2,7 +2,18 @@ The kobject Infrastructure
 
 Patrick Mochel <mochel@osdl.org>
 
-7 January 2003
+Updated: 3 June 2003
+
+
+Copyright (c)  Patrick Mochel
+Copyright (c)  Open Source Development Labs
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.2
+or any later version published by the Free Software Foundation;
+with no Invariant Sections, no Front-Cover Texts, and no Back-Cover Texts.
+A copy of the license is included in the section entitled "GNU
+Free Documentation License".
+
 
 
 0. Introduction
@@ -100,6 +111,28 @@ it is already positive.
 When a kobject's reference count reaches 0, the method struct
 kobj_type::release() (which the kobject's kset points to) is called.
 This allows any memory allocated for the object to be freed.
+
+
+NOTE!!! 
+
+It is _imperative_ that you supply a desctructor for dynamically
+allocated kobjects to free them if you are using kobject reference
+counts. The reference count controls the duration of the lifetime of
+the object. If it goes to 0, then it is assumed that the object  will
+be freed and cannot be used. 
+
+More importantly, you must free the object there, and not immediately
+after an unregister call. If someone else is referencing the object
+(e.g. through a sysfs file), they will obtain a reference to the
+object, assume it's valid and operate on it. If the object is
+unregistered and freed in the meantime, the operation will then
+reference freed memory and go boom. 
+
+This can be prevented, in the simplest case, by defining a release
+method and freeing the object from there only. Note that this will not
+secure reference count/object management models that use a dual
+reference count or do other wacky things with the reference count
+(like the networking layer). 
 
 
 1.4 sysfs

@@ -1,7 +1,7 @@
 /***************************************************************************/
 
 /*
- *	linux/arch/m68knommu/platform/5307/timers.c
+ *	timers.c -- generic ColdFire hardware timer support.
  *
  *	Copyright (C) 1999-2003, Greg Ungerer (gerg@snapgear.com)
  */
@@ -34,6 +34,13 @@ unsigned int	mcf_timerlevel = 5;
 
 static volatile struct mcftimer *mcf_timerp;
 
+/*
+ *	These provide the underlying interrupt vector support.
+ *	Unfortunately it is a little different on each ColdFire.
+ */
+extern void mcf_settimericr(int timer, int level);
+extern int mcf_timerirqpending(int timer);
+
 /***************************************************************************/
 
 void coldfire_tick(void)
@@ -42,7 +49,9 @@ void coldfire_tick(void)
 	mcf_timerp->ter = MCFTIMER_TER_CAP | MCFTIMER_TER_REF;
 }
 
-void coldfire_timer_init(void (*handler)(int, void *, struct pt_regs *))
+/***************************************************************************/
+
+void coldfire_timer_init(irqreturn_t (*handler)(int, void *, struct pt_regs *))
 {
 	/* Set up an internal TIMER as poll clock */
 	mcf_timerp = (volatile struct mcftimer *) (MCF_MBAR + MCFTIMER_BASE1);
@@ -64,12 +73,21 @@ void coldfire_timer_init(void (*handler)(int, void *, struct pt_regs *))
 
 unsigned long coldfire_timer_offset(void)
 {
-	unsigned long trr, tcn;
+	unsigned long trr, tcn, offset;
 
-	/* Get the values as longs for accurate calculation. */
-	tcn = mcf_timerp->tcn;
-	trr = mcf_timerp->trr;
-	return((tcn * (1000000 / HZ)) / trr);
+	/*
+	 * The change to pointer and de-reference is to force the compiler
+	 * to read the registers with a single 16bit access. Otherwise it
+	 * does some crazy 8bit read combining.
+	 */
+	tcn = *(&mcf_timerp->tcn);
+	trr = *(&mcf_timerp->trr);
+	offset = (tcn * (1000000 / HZ)) / trr;
+
+	/* Check if we just wrapped the counters and maybe missed a tick */
+	if ((offset < (1000000 / HZ / 2)) && mcf_timerirqpending(1))
+		offset += 1000000 / HZ;
+	return offset;
 }
 
 /***************************************************************************/
@@ -104,6 +122,8 @@ void coldfire_profile_tick(int irq, void *dummy, struct pt_regs *regs)
                 }
         }
 }
+
+/***************************************************************************/
 
 void coldfire_profile_init(void)
 {

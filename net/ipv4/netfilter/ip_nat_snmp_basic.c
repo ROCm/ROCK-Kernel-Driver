@@ -1306,7 +1306,7 @@ static unsigned int nat_help(struct ip_conntrack *ct,
 static struct ip_nat_helper snmp = { 
 	{ NULL, NULL },
 	"snmp",
-	IP_NAT_HELPER_F_STANDALONE,
+	0,
 	THIS_MODULE,
 	{ { 0, { __constant_htons(SNMP_PORT) } },
 	  { 0, { 0 }, IPPROTO_UDP } },
@@ -1317,7 +1317,7 @@ static struct ip_nat_helper snmp = {
 static struct ip_nat_helper snmp_trap = { 
 	{ NULL, NULL },
 	"snmp_trap",
-	IP_NAT_HELPER_F_STANDALONE,
+	0,
 	THIS_MODULE,
 	{ { 0, { __constant_htons(SNMP_TRAP_PORT) } },
 	  { 0, { 0 }, IPPROTO_UDP } },

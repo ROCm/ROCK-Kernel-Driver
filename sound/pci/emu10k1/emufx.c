@@ -1033,7 +1033,7 @@ static int snd_emu10k1_list_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *icod
 			memset(&gctl, 0, sizeof(gctl));
 			id = &ctl->kcontrol->id;
 			gctl.id.iface = id->iface;
-			strncpy(gctl.id.name, id->name, sizeof(gctl.id.name));
+			strlcpy(gctl.id.name, id->name, sizeof(gctl.id.name));
 			gctl.id.index = id->index;
 			gctl.id.device = id->device;
 			gctl.id.subdevice = id->subdevice;
@@ -1063,8 +1063,7 @@ static int snd_emu10k1_icode_poke(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 	down(&emu->fx8010.lock);
 	if ((err = snd_emu10k1_verify_controls(emu, icode)) < 0)
 		goto __error;
-	strncpy(emu->fx8010.name, icode->name, sizeof(emu->fx8010.name)-1);
-	emu->fx8010.name[sizeof(emu->fx8010.name)-1] = '\0';
+	strlcpy(emu->fx8010.name, icode->name, sizeof(emu->fx8010.name));
 	/* stop FX processor - this may be dangerous, but it's better to miss
 	   some samples than generate wrong ones - [jk] */
 	if (emu->audigy)
@@ -1092,8 +1091,7 @@ static int snd_emu10k1_icode_peek(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 	int err;
 
 	down(&emu->fx8010.lock);
-	strncpy(icode->name, emu->fx8010.name, sizeof(icode->name)-1);
-	emu->fx8010.name[sizeof(emu->fx8010.name)-1] = '\0';
+	strlcpy(icode->name, emu->fx8010.name, sizeof(icode->name));
 	/* ok, do the main job */
 	snd_emu10k1_gpr_peek(emu, icode);
 	snd_emu10k1_tram_peek(emu, icode);
@@ -2206,7 +2204,7 @@ static int snd_emu10k1_fx8010_info(emu10k1_t *emu, emu10k1_fx8010_info_t *info)
 	unsigned short fxbus_mask, extin_mask, extout_mask;
 	int res;
 
-	memset(info, 0, sizeof(*info));
+	memset(info, 0, sizeof(info));
 	info->card = emu->card_type;
 	info->internal_tram_size = emu->fx8010.itram_size;
 	info->external_tram_size = emu->fx8010.etram_size;

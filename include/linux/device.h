@@ -3,21 +3,9 @@
  *
  * Copyright (c) 2001-2003 Patrick Mochel <mochel@osdl.org>
  *
- * This is a relatively simple centralized driver model.
- * The data structures were mainly lifted directly from the PCI
- * driver model. These are thought to be the common fields that
- * are relevant to all device buses.
+ * This file is released under the GPLv2
  *
- * All the devices are arranged in a tree. All devices should
- * have some sort of parent bus of whom they are children of.
- * Devices should not be direct children of the system root.
- *
- * Device drivers should not directly call the device_* routines
- * or access the contents of struct device directly. Instead,
- * abstract that from the drivers and write bus-specific wrappers
- * that do it for you.
- *
- * See Documentation/driver-model.txt for more information.
+ * See Documentation/driver-model/ for more information.
  */
 
 #ifndef _DEVICE_H_
@@ -169,6 +157,8 @@ struct class {
 
 	int	(*hotplug)(struct class_device *dev, char **envp, 
 			   int num_envp, char *buffer, int buffer_size);
+
+	void	(*release)(struct class_device *dev);
 };
 
 extern int class_register(struct class *);
@@ -204,6 +194,7 @@ struct class_device {
 	void			* class_data;	/* class-specific data */
 
 	char	class_id[BUS_ID_SIZE];	/* unique to this class */
+	void	(*release)(struct class_device * class_dev);
 };
 
 static inline void *

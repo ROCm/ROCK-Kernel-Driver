@@ -178,9 +178,9 @@ out:
 struct buffer_head *fat_extend_dir(struct inode *inode)
 {
 	struct super_block *sb = inode->i_sb;
-	int nr, sector, last_sector;
 	struct buffer_head *bh, *res = NULL;
-	int cluster_size = MSDOS_SB(sb)->cluster_size;
+	int nr, cluster_size = MSDOS_SB(sb)->cluster_size;
+	sector_t sector, last_sector;
 
 	if (MSDOS_SB(sb)->fat_bits != 32) {
 		if (inode->i_ino == MSDOS_ROOT_INO)
@@ -191,7 +191,7 @@ struct buffer_head *fat_extend_dir(struct inode *inode)
 	if (nr < 0)
 		return ERR_PTR(nr);
 	
-	sector = MSDOS_SB(sb)->data_start + (nr - 2) * cluster_size;
+	sector = ((sector_t)nr - 2) * cluster_size + MSDOS_SB(sb)->data_start;
 	last_sector = sector + cluster_size;
 	for ( ; sector < last_sector; sector++) {
 		if ((bh = sb_getblk(sb, sector))) {
@@ -289,11 +289,13 @@ void fat_date_unix2dos(int unix_date,unsigned short *time,
  */
 
 int fat__get_entry(struct inode *dir, loff_t *pos,struct buffer_head **bh,
-    struct msdos_dir_entry **de, int *ino)
+		   struct msdos_dir_entry **de, loff_t *i_pos)
 {
 	struct super_block *sb = dir->i_sb;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
-	int sector, offset, iblock;
+	sector_t phys, iblock;
+	loff_t offset;
+	int err;
 
 next:
 	offset = *pos;
@@ -302,14 +304,14 @@ next:
 
 	*bh = NULL;
 	iblock = *pos >> sb->s_blocksize_bits;
-	sector = fat_bmap(dir, iblock);
-	if (sector <= 0)
+	err = fat_bmap(dir, iblock, &phys);
+	if (err || !phys)
 		return -1;	/* beyond EOF or error */
 
-	*bh = sb_bread(sb, sector);
+	*bh = sb_bread(sb, phys);
 	if (*bh == NULL) {
-		printk(KERN_ERR "FAT: Directory bread(block %d) failed\n",
-		       sector);
+		printk(KERN_ERR "FAT: Directory bread(block %llu) failed\n",
+		       phys);
 		/* skip this block */
 		*pos = (iblock + 1) << sb->s_blocksize_bits;
 		goto next;
@@ -318,7 +320,7 @@ next:
 	offset &= sb->s_blocksize - 1;
 	*pos += sizeof(struct msdos_dir_entry);
 	*de = (struct msdos_dir_entry *)((*bh)->b_data + offset);
-	*ino = (sector << sbi->dir_per_block_bits) + (offset >> MSDOS_DIR_BITS);
+	*i_pos = ((loff_t)phys << sbi->dir_per_block_bits) + (offset >> MSDOS_DIR_BITS);
 
 	return 0;
 }
@@ -357,7 +359,7 @@ next:
     done = !IS_FREE(data[entry].name) \
       && ( \
            ( \
-             (MSDOS_SB(sb)->fat_bits != 32) ? 0 : (CF_LE_W(data[entry].starthi) << 16) \
+             (sbi->fat_bits != 32) ? 0 : (CF_LE_W(data[entry].starthi) << 16) \
            ) \
            | CF_LE_W(data[entry].start) \
          ) == *number;
@@ -374,35 +376,38 @@ next:
 	    (*number)++; \
     }
 
-static int raw_scan_sector(struct super_block *sb,int sector,const char *name,
-    int *number,int *ino,struct buffer_head **res_bh,
-    struct msdos_dir_entry **res_de)
+static int raw_scan_sector(struct super_block *sb, sector_t sector,
+			   const char *name, int *number, loff_t *i_pos,
+			   struct buffer_head **res_bh,
+			   struct msdos_dir_entry **res_de)
 {
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	struct buffer_head *bh;
 	struct msdos_dir_entry *data;
 	int entry,start,done;
 
-	if (!(bh = sb_bread(sb,sector)))
+	if (!(bh = sb_bread(sb, sector)))
 		return -EIO;
 	data = (struct msdos_dir_entry *) bh->b_data;
-	for (entry = 0; entry < MSDOS_SB(sb)->dir_per_block; entry++) {
+	for (entry = 0; entry < sbi->dir_per_block; entry++) {
 /* RSS_COUNT:  if (data[entry].name == name) done=true else done=false. */
 		if (name) {
 			RSS_NAME
 		} else {
-			if (!ino) RSS_COUNT
+			if (!i_pos) RSS_COUNT
 			else {
 				if (number) RSS_START
 				else RSS_FREE
 			}
 		}
 		if (done) {
-			if (ino)
-				*ino = sector * MSDOS_SB(sb)->dir_per_block + entry;
-			start = CF_LE_W(data[entry].start);
-			if (MSDOS_SB(sb)->fat_bits == 32) {
-				start |= (CF_LE_W(data[entry].starthi) << 16);
+			if (i_pos) {
+				*i_pos = ((loff_t)sector << sbi->dir_per_block_bits) + entry;
 			}
+			start = CF_LE_W(data[entry].start);
+			if (sbi->fat_bits == 32)
+				start |= (CF_LE_W(data[entry].starthi) << 16);
+
 			if (!res_bh)
 				brelse(bh);
 			else {
@@ -422,16 +427,19 @@ static int raw_scan_sector(struct super_block *sb,int sector,const char *name,
  * requested entry is found or the end of the directory is reached.
  */
 
-static int raw_scan_root(struct super_block *sb,const char *name,int *number,int *ino,
-    struct buffer_head **res_bh,struct msdos_dir_entry **res_de)
+static int raw_scan_root(struct super_block *sb, const char *name,
+			 int *number, loff_t *i_pos,
+			 struct buffer_head **res_bh,
+			 struct msdos_dir_entry **res_de)
 {
 	int count,cluster;
 
 	for (count = 0;
 	     count < MSDOS_SB(sb)->dir_entries / MSDOS_SB(sb)->dir_per_block;
 	     count++) {
-		if ((cluster = raw_scan_sector(sb,MSDOS_SB(sb)->dir_start+count,
-					       name,number,ino,res_bh,res_de)) >= 0)
+		cluster = raw_scan_sector(sb, MSDOS_SB(sb)->dir_start + count,
+					  name, number, i_pos, res_bh, res_de);
+		if (cluster >= 0)
 			return cluster;
 	}
 	return -ENOENT;
@@ -443,24 +451,29 @@ static int raw_scan_root(struct super_block *sb,const char *name,int *number,int
  * requested entry is found or the end of the directory is reached.
  */
 
-static int raw_scan_nonroot(struct super_block *sb,int start,const char *name,
-    int *number,int *ino,struct buffer_head **res_bh,struct msdos_dir_entry
-    **res_de)
+static int raw_scan_nonroot(struct super_block *sb, int start, const char *name,
+			    int *number, loff_t *i_pos,
+			    struct buffer_head **res_bh,
+			    struct msdos_dir_entry **res_de)
 {
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	int count, cluster;
 	unsigned long dir_size = 0;
+	sector_t sector;
 
 #ifdef DEBUG
 	printk("raw_scan_nonroot: start=%d\n",start);
 #endif
 	do {
-		for (count = 0; count < MSDOS_SB(sb)->cluster_size; count++) {
-			if ((cluster = raw_scan_sector(sb,(start-2)*
-			    MSDOS_SB(sb)->cluster_size+MSDOS_SB(sb)->data_start+
-			    count,name,number,ino,res_bh,res_de)) >= 0)
+		for (count = 0; count < sbi->cluster_size; count++) {
+			sector = ((sector_t)start - 2) * sbi->cluster_size
+				+ count + sbi->data_start;
+			cluster = raw_scan_sector(sb, sector, name, number,
+						  i_pos, res_bh, res_de);
+			if (cluster >= 0)
 				return cluster;
 		}
-		dir_size += 1 << MSDOS_SB(sb)->cluster_bits;
+		dir_size += 1 << sbi->cluster_bits;
 		if (dir_size > FAT_MAX_DIR_SIZE) {
 			fat_fs_panic(sb, "Directory %d: "
 				     "exceeded the maximum size of directory",
@@ -492,13 +505,13 @@ static int raw_scan_nonroot(struct super_block *sb,int start,const char *name,
  */
 
 static int raw_scan(struct super_block *sb, int start, const char *name,
-    int *number, int *ino, struct buffer_head **res_bh,
-    struct msdos_dir_entry **res_de)
+		    loff_t *i_pos, struct buffer_head **res_bh,
+		    struct msdos_dir_entry **res_de)
 {
 	if (start)
-		return raw_scan_nonroot(sb,start,name,number,ino,res_bh,res_de);
+		return raw_scan_nonroot(sb,start,name,NULL,i_pos,res_bh,res_de);
 	else
-		return raw_scan_root(sb,name,number,ino,res_bh,res_de);
+		return raw_scan_root(sb,name,NULL,i_pos,res_bh,res_de);
 }
 
 /*
@@ -507,19 +520,21 @@ static int raw_scan(struct super_block *sb, int start, const char *name,
  */
 int fat_subdirs(struct inode *dir)
 {
-	int count;
+	struct msdos_sb_info *sbi = MSDOS_SB(dir->i_sb);
+	int number;
 
-	count = 0;
-	if ((dir->i_ino == MSDOS_ROOT_INO) &&
-	    (MSDOS_SB(dir->i_sb)->fat_bits != 32)) {
-		(void) raw_scan_root(dir->i_sb,NULL,&count,NULL,NULL,NULL);
-	} else {
-		if ((dir->i_ino != MSDOS_ROOT_INO) &&
-		    !MSDOS_I(dir)->i_start) return 0; /* in mkdir */
-		else (void) raw_scan_nonroot(dir->i_sb,MSDOS_I(dir)->i_start,
-		    NULL,&count,NULL,NULL,NULL);
+	number = 0;
+	if ((dir->i_ino == MSDOS_ROOT_INO) && (sbi->fat_bits != 32))
+		raw_scan_root(dir->i_sb, NULL, &number, NULL, NULL, NULL);
+	else {
+		if ((dir->i_ino != MSDOS_ROOT_INO) && !MSDOS_I(dir)->i_start)
+			return 0; /* in mkdir */
+		else {
+			raw_scan_nonroot(dir->i_sb, MSDOS_I(dir)->i_start,
+					 NULL, &number, NULL, NULL, NULL);
+		}
 	}
-	return count;
+	return number;
 }
 
 
@@ -528,12 +543,12 @@ int fat_subdirs(struct inode *dir)
  * for an empty directory slot (name is NULL). Returns an error code or zero.
  */
 
-int fat_scan(struct inode *dir,const char *name,struct buffer_head **res_bh,
-    struct msdos_dir_entry **res_de,int *ino)
+int fat_scan(struct inode *dir, const char *name, struct buffer_head **res_bh,
+	     struct msdos_dir_entry **res_de, loff_t *i_pos)
 {
 	int res;
 
-	res = raw_scan(dir->i_sb,MSDOS_I(dir)->i_start,
-		       name, NULL, ino, res_bh, res_de);
-	return res<0 ? res : 0;
+	res = raw_scan(dir->i_sb, MSDOS_I(dir)->i_start, name, i_pos,
+		       res_bh, res_de);
+	return (res < 0) ? res : 0;
 }

@@ -31,6 +31,7 @@
 #include <linux/inetdevice.h>
 #include <linux/if_arp.h>
 #include <linux/random.h>
+#include <linux/module.h>
 #include <net/arp.h>
 
 #include <net/irda/irda.h>
@@ -61,6 +62,7 @@ int irlan_eth_init(struct net_device *dev)
 	dev->hard_start_xmit    = irlan_eth_xmit; 
 	dev->get_stats	        = irlan_eth_get_stats;
 	dev->set_multicast_list = irlan_eth_set_multicast_list;
+	SET_MODULE_OWNER(dev);
 
 	ether_setup(dev);
 	
@@ -112,8 +114,6 @@ int irlan_eth_open(struct net_device *dev)
 	self->disconnect_reason = 0;
 	irlan_client_wakeup(self, self->saddr, self->daddr);
 
-	irlan_mod_inc_use_count();
-
 	/* Make sure we have a hardware address before we return, so DHCP clients gets happy */
 	interruptible_sleep_on(&self->open_wait);
 	
@@ -138,8 +138,6 @@ int irlan_eth_close(struct net_device *dev)
 	/* Stop device */
 	netif_stop_queue(dev);
 	
-	irlan_mod_dec_use_count();
-
 	irlan_close_data_channel(self);
 	irlan_close_tsaps(self);
 
@@ -206,7 +204,7 @@ int irlan_eth_xmit(struct sk_buff *skb, struct net_device *dev)
 		 * confuse do_dev_queue_xmit() in dev.c! I have
 		 * tried :-) DB 
 		 */
-		dev_kfree_skb(skb);
+		/* irttp_data_request already free the packet */
 		self->stats.tx_dropped++;
 	} else {
 		self->stats.tx_packets++;

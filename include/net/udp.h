@@ -26,6 +26,7 @@
 #include <linux/ip.h>
 #include <net/sock.h>
 #include <net/snmp.h>
+#include <linux/seq_file.h>
 
 #define UDP_HTABLE_SIZE		128
 
@@ -77,4 +78,21 @@ DECLARE_SNMP_STAT(struct udp_mib, udp_statistics);
 #define UDP_INC_STATS_BH(field)		SNMP_INC_STATS_BH(udp_statistics, field)
 #define UDP_INC_STATS_USER(field) 	SNMP_INC_STATS_USER(udp_statistics, field)
 
+/* /proc */
+struct udp_seq_afinfo {
+	struct module		*owner;
+	char			*name;
+	sa_family_t		family;
+	int 			(*seq_show) (struct seq_file *m, void *v);
+	struct file_operations	*seq_fops;
+};
+
+struct udp_iter_state {
+	sa_family_t		family;
+	int			bucket;
+	struct seq_operations	seq_ops;
+};
+
+extern int udp_proc_register(struct udp_seq_afinfo *afinfo);
+extern void udp_proc_unregister(struct udp_seq_afinfo *afinfo);
 #endif	/* _UDP_H */

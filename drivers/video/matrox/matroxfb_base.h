@@ -42,6 +42,7 @@
 #include <linux/timer.h>
 #include <linux/pci.h>
 #include <linux/spinlock.h>
+#include <linux/kd.h>
 
 #include <asm/io.h>
 #include <asm/unaligned.h>
@@ -49,14 +50,9 @@
 #include <asm/mtrr.h>
 #endif
 
-#include <video/fbcon.h>
-#include <video/fbcon-cfb4.h>
-#include <video/fbcon-cfb8.h>
-#include <video/fbcon-cfb16.h>
-#include <video/fbcon-cfb24.h>
-#include <video/fbcon-cfb32.h>
+#include "../console/fbcon.h"
 
-#if defined(CONFIG_PPC)
+#if defined(CONFIG_ALL_PPC)
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
 #include <video/macmodes.h>
@@ -64,8 +60,6 @@
 
 /* always compile support for 32MB... It cost almost nothing */
 #define CONFIG_FB_MATROX_32MB
-
-#define FBCON_HAS_VGATEXT
 
 #ifdef MATROXFB_DEBUG
 
@@ -338,8 +332,6 @@ struct matroxfb_par
 		unsigned int pixels;
 		unsigned int chunks;
 		      } ydstorg;
-	void		(*putc)(u_int32_t, u_int32_t, struct display*, int, int, int);
-	void		(*putcs)(u_int32_t, u_int32_t, struct display*, const unsigned short*, int, int, int);
 };
 
 struct matrox_fb_info;
@@ -347,7 +339,6 @@ struct matrox_fb_info;
 struct matrox_DAC1064_features {
 	u_int8_t	xvrefctrl;
 	u_int8_t	xmiscctrl;
-	unsigned int	cursorimage;
 };
 
 struct matrox_accel_features {
@@ -398,12 +389,21 @@ struct matrox_accel_data {
 	u_int32_t	m_opmode;
 };
 
+struct v4l2_queryctrl;
+struct v4l2_control;
+
 struct matrox_altout {
 	const char	*name;
 	int		(*compute)(void* altout_dev, struct my_timming* input);
 	int		(*program)(void* altout_dev);
 	int		(*start)(void* altout_dev);
 	int		(*verifymode)(void* altout_dev, u_int32_t mode);
+	int		(*getqueryctrl)(void* altout_dev,
+					struct v4l2_queryctrl* ctrl);
+	int		(*getctrl)(void* altout_dev, 
+				   struct v4l2_control* ctrl);
+	int		(*setctrl)(void* altout_dev, 
+				   struct v4l2_control* ctrl);
 };
 
 #define MATROXFB_SRC_NONE	0
@@ -424,9 +424,16 @@ struct matrox_bios {
 		      } output;
 };
 
+extern struct display fb_display[];
+
 struct matrox_switch;
 struct matroxfb_driver;
 struct matroxfb_dh_fb_info;
+
+struct matrox_vsync {
+	wait_queue_head_t	wait;
+	unsigned int		cnt;
+};
 
 struct matrox_fb_info {
 	struct fb_info		fbcon;
@@ -436,6 +443,9 @@ struct matrox_fb_info {
 	int			dead;
 	unsigned int		usecount;
 
+	unsigned int		userusecount;
+	unsigned long		irq_flags;
+
 	struct matroxfb_par	curr;
 	struct matrox_hw_state	hw;
 
@@ -444,17 +454,23 @@ struct matrox_fb_info {
 	struct pci_dev*		pcidev;
 
 	struct {
+		struct matrox_vsync	vsync;
 		unsigned int	pixclock;
 		int		mnp;
 			      } crtc1;
 	struct {
+		struct matrox_vsync	vsync;
 		unsigned int 	pixclock;
 		int		mnp;
 	struct matroxfb_dh_fb_info*	info;
 	struct rw_semaphore	lock;
 			      } crtc2;
 	struct {
- 	struct rw_semaphore	lock;
+	struct rw_semaphore	lock;
+	struct {
+		int brightness, contrast, saturation, hue, gamma;
+		int testout, deflicker;
+				} tvo_params;
 			      } altout;
 #define MATROXFB_MAX_OUTPUTS		3
 	struct {
@@ -486,7 +502,6 @@ struct matrox_fb_info {
 	unsigned int	max_pixel_clock;
 
 	struct matrox_switch*	hw_switch;
-	struct display*	currcon_display;
 
 	struct {
 		struct matrox_pll_features pll;
@@ -511,11 +526,6 @@ struct matrox_fb_info {
 		int		plnwt;
 		int		srcorg;
 			      } capable;
-	struct {
-		unsigned int	size;
-		unsigned int	mgabase;
-		vaddr_t		vbase;
-			      } fastfont;
 #ifdef CONFIG_MTRR
 	struct {
 		int		vram;
@@ -529,9 +539,6 @@ struct matrox_fb_info {
 		int		nobios;
 		int		nopciretry;
 		int		noinit;
-		int		inverse;
-		int		hwcursor;
-		int		blink;
 		int		sgram;
 #ifdef CONFIG_FB_MATROX_32MB
 		int		support32MB;
@@ -555,18 +562,7 @@ struct matrox_fb_info {
 		int		dualhead;
 		unsigned int	fbResource;
 			      } devflags;
-	struct display_switch	dispsw;
-	struct {
-		int		x;
-		int		y;
-		unsigned int	w;
-		unsigned int	u;
-		unsigned int	d;
-		unsigned int	type;
-		int		state;
-		int		redraw;
-		struct timer_list timer;
-			      } cursor;
+	struct fb_ops		fbops;
 	struct matrox_bios	bios;
 	struct {
 		struct matrox_pll_limits	pixel;
@@ -600,21 +596,10 @@ struct matrox_fb_info {
 				      } memory;
 			      } values;
 	struct { unsigned red, green, blue, transp; } palette[256];
-/* These ifdefs must be last! They differ for module & non-module compiles */
-#if defined(FBCON_HAS_CFB16) || defined(FBCON_HAS_CFB24) || defined(FBCON_HAS_CFB32)
-	union {
-#ifdef FBCON_HAS_CFB16
-		u_int16_t	cfb16[16];
-#endif
-#ifdef FBCON_HAS_CFB24
-		u_int32_t	cfb24[16];
-#endif
-#ifdef FBCON_HAS_CFB32
-		u_int32_t	cfb32[16];
-#endif
-	} cmap;
-#endif
+	u_int32_t cmap[17];
 };
+
+#define info2minfo(info) container_of(info, struct matrox_fb_info, fbcon)
 
 #ifdef CONFIG_FB_MATROX_MULTIHEAD
 #define ACCESS_FBINFO2(info, x) (info->x)
@@ -629,14 +614,7 @@ struct matrox_fb_info {
 #define PMINFO2  minfo
 #define PMINFO   PMINFO2 ,
 
-static inline struct matrox_fb_info* mxinfo(const struct display* p) {
-	return container_of(p->fb_info, struct matrox_fb_info, fbcon);
-}
-
-#define PMXINFO(p)	   mxinfo(p),
 #define MINFO_FROM(x)	   struct matrox_fb_info* minfo = x
-#define MINFO_FROM_DISP(x) MINFO_FROM(mxinfo(x))
-
 #else
 
 extern struct matrox_fb_info matroxfb_global_mxinfo;
@@ -653,24 +631,17 @@ extern struct matrox_fb_info matroxfb_global_mxinfo;
 #define PMINFO2
 #define PMINFO
 
-#if 0
-static inline struct matrox_fb_info* mxinfo(const struct display* p) {
-	return &matroxfb_global_mxinfo;
-}
-#endif
-
-#define PMXINFO(p)
 #define MINFO_FROM(x)
-#define MINFO_FROM_DISP(x)
 
 #endif
+
+#define MINFO_FROM_INFO(x) MINFO_FROM(info2minfo(x))
 
 struct matrox_switch {
 	int	(*preinit)(WPMINFO2);
 	void	(*reset)(WPMINFO2);
-	int	(*init)(WPMINFO struct my_timming*, struct display*);
-	void	(*restore)(WPMINFO struct display*);
-	int	(*selhwcursor)(WPMINFO2);
+	int	(*init)(WPMINFO struct my_timming*);
+	void	(*restore)(WPMINFO2);
 };
 
 struct matroxfb_driver {
@@ -746,7 +717,7 @@ void matroxfb_unregister_driver(struct matroxfb_driver* drv);
 
 #define M_FIFOSTATUS	0x1E10
 #define M_STATUS	0x1E14
-
+#define M_ICLEAR	0x1E18
 #define M_IEN		0x1E1C
 
 #define M_VCOUNT	0x1E20
@@ -868,7 +839,8 @@ extern void matroxfb_DAC_out(CPMINFO int reg, int val);
 extern int matroxfb_DAC_in(CPMINFO int reg);
 extern struct list_head matroxfb_list;
 extern void matroxfb_var2my(struct fb_var_screeninfo* fvsi, struct my_timming* mt);
-extern int matroxfb_switch(int con, struct fb_info *);
+extern int matroxfb_wait_for_sync(WPMINFO u_int32_t crtc);
+extern int matroxfb_enable_irq(WPMINFO int reenable);
 
 #ifdef MATROXFB_USE_SPINLOCKS
 #define CRITBEGIN  spin_lock_irqsave(&ACCESS_FBINFO(lock.accel), critflags);

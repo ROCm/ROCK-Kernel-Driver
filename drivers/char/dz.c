@@ -1095,8 +1095,6 @@ static void dz_close(struct tty_struct *tty, struct file *filp)
 	 */
 	if (info->flags & DZ_NORMAL_ACTIVE)
 		info->normal_termios = *tty->termios;
-	if (info->flags & DZ_CALLOUT_ACTIVE)
-		info->callout_termios = *tty->termios;
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify the line
 	 * discipline to only process XON/XOFF characters.
@@ -1136,7 +1134,7 @@ static void dz_close(struct tty_struct *tty, struct file *filp)
 		wake_up_interruptible(&info->open_wait);
 	}
 
-	info->flags &= ~(DZ_NORMAL_ACTIVE | DZ_CALLOUT_ACTIVE | DZ_CLOSING);
+	info->flags &= ~(DZ_NORMAL_ACTIVE | DZ_CLOSING);
 	wake_up_interruptible(&info->close_wait);
 
 	restore_flags(flags);
@@ -1153,7 +1151,7 @@ static void dz_hangup (struct tty_struct *tty)
 	shutdown(info);
 	info->event = 0;
 	info->count = 0;
-	info->flags &= ~(DZ_NORMAL_ACTIVE | DZ_CALLOUT_ACTIVE);
+	info->flags &= ~DZ_NORMAL_ACTIVE;
 	info->tty = 0;
 	wake_up_interruptible(&info->open_wait);
 }
@@ -1180,47 +1178,18 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
 	}
 
 	/*
-	 * If this is a callout device, then just make sure the normal
-	 * device isn't being used.
-	 */
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-		if (info->flags & DZ_NORMAL_ACTIVE)
-			return -EBUSY;
-    
-		if ((info->flags & DZ_CALLOUT_ACTIVE) &&
-		    (info->flags & DZ_SESSION_LOCKOUT) &&
-		    (info->session != current->session))
-			return -EBUSY;
-    
-		if ((info->flags & DZ_CALLOUT_ACTIVE) &&
-		    (info->flags & DZ_PGRP_LOCKOUT) &&
-		    (info->pgrp != current->pgrp))
-			return -EBUSY;
-
-		info->flags |= DZ_CALLOUT_ACTIVE;
-		return 0;
-	}
-
-	/*
 	 * If non-blocking mode is set, or the port is not enabled, then make
 	 * the check up front and then exit.
 	 */
 	if ((filp->f_flags & O_NONBLOCK) ||
 	    (tty->flags & (1 << TTY_IO_ERROR))) {
-		if (info->flags & DZ_CALLOUT_ACTIVE)
-			return -EBUSY;
 		info->flags |= DZ_NORMAL_ACTIVE;
 
 		return 0;
 	}
 
-	if (info->flags & DZ_CALLOUT_ACTIVE) {
-		if (info->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1;
-	} else {
-		if (tty->termios->c_cflag & CLOCAL)
+	if (tty->termios->c_cflag & CLOCAL)
 		do_clocal = 1;
-	}
 
 	/*
 	 * Block waiting for the carrier detect and the line to become free
@@ -1239,8 +1208,7 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
 			retval = -EAGAIN;
 			break;
 		}
-		if (!(info->flags & DZ_CALLOUT_ACTIVE) &&
-		    !(info->flags & DZ_CLOSING) && do_clocal)
+		if (!(info->flags & DZ_CLOSING) && do_clocal)
 			break;
 		if (signal_pending(current)) {
 			retval = -ERESTARTSYS;
@@ -1301,15 +1269,9 @@ static int dz_open (struct tty_struct *tty, struct file *filp)
 		return retval;
 
 	if ((info->count == 1) && (info->flags & DZ_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = info->normal_termios;
-		else 
-			*tty->termios = info->callout_termios;
+		*tty->termios = info->normal_termios;
 		change_speed(info);
 	}
-
-	info->session = current->session;
-	info->pgrp = current->pgrp;
 
 	return 0;
 }
@@ -1369,23 +1331,8 @@ int __init dz_init(void)
 	serial_driver.start = dz_start;
 	serial_driver.hangup = dz_hangup;
 
-	/*
-	 * The callout device is just like normal device except for major
-	 * number and the subtype code.
-	 */
-	callout_driver = serial_driver;
-#if (LINUX_VERSION_CODE > 0x2032D && defined(CONFIG_DEVFS_FS))
-	callout_driver.name = "cua";
-#else
-	callout_driver.name = "cua/";
-#endif
-	callout_driver.major = TTYAUX_MAJOR;
-	callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-
 	if (tty_register_driver (&serial_driver))
 		panic("Couldn't register serial driver\n");
-	if (tty_register_driver (&callout_driver))
-		panic("Couldn't register callout driver\n");
 
 	save_flags(flags); cli();
 	for (i=0; i < DZ_NB_PORT;  i++) {
@@ -1411,7 +1358,6 @@ int __init dz_init(void)
 		info->tqueue.data = info;
 		info->tqueue_hangup.routine = do_serial_hangup;
 		info->tqueue_hangup.data = info;
-		info->callout_termios = callout_driver.init_termios;
 		info->normal_termios = serial_driver.init_termios;
 		init_waitqueue_head(&info->open_wait); 
 		init_waitqueue_head(&info->close_wait); 
@@ -1427,7 +1373,6 @@ int __init dz_init(void)
 		       info->port, SERIAL);
 
 		tty_register_device(&serial_driver, info->line, NULL);
-		tty_register_device(&callout_driver, info->line, NULL);
 	}
 
 	/* Reset the chip */

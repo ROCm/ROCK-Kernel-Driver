@@ -238,7 +238,7 @@ static int lance_probe( struct net_device *dev);
 static int lance_open( struct net_device *dev );
 static void lance_init_ring( struct net_device *dev );
 static int lance_start_xmit( struct sk_buff *skb, struct net_device *dev );
-static void lance_interrupt( int irq, void *dev_id, struct pt_regs *fp );
+static irqreturn_t lance_interrupt( int irq, void *dev_id, struct pt_regs *fp );
 static int lance_rx( struct net_device *dev );
 static int lance_close( struct net_device *dev );
 static struct net_device_stats *lance_get_stats( struct net_device *dev );
@@ -620,7 +620,7 @@ static int lance_start_xmit( struct sk_buff *skb, struct net_device *dev )
 
 /* The LANCE interrupt handler. */
 
-static void lance_interrupt( int irq, void *dev_id, struct pt_regs *fp)
+static irqreturn_t lance_interrupt( int irq, void *dev_id, struct pt_regs *fp)
 {
 	struct net_device *dev = dev_id;
 	struct lance_private *lp = dev->priv;
@@ -629,7 +629,7 @@ static void lance_interrupt( int irq, void *dev_id, struct pt_regs *fp)
 
 	if (dev == NULL) {
 		DPRINTK( 1, ( "lance_interrupt(): invalid dev_id\n" ));
-		return;
+		return IRQ_NONE;
 	}
 
 	if (in_interrupt)
@@ -688,7 +688,7 @@ static void lance_interrupt( int irq, void *dev_id, struct pt_regs *fp)
 					REGA(CSR3) = CSR3_BSWP;
 					lance_init_ring(dev);
 					REGA(CSR0) = CSR0_STRT | CSR0_INEA;
-					return;
+					return IRQ_HANDLED;
 				}
 			} else if(head->flag & (TMD1_ENP | TMD1_STP)) {
 				
@@ -743,7 +743,7 @@ static void lance_interrupt( int irq, void *dev_id, struct pt_regs *fp)
 	DPRINTK( 2, ( "%s: exiting interrupt, csr0=%#04x.\n",
 				  dev->name, DREG ));
 	in_interrupt = 0;
-	return;
+	return IRQ_HANDLED;
 }
 
 /* get packet, toss into skbuff */

@@ -478,8 +478,7 @@ static int instr_put(snd_seq_kinstr_ops_t *ops,
 	}
 	instr->ops = ops;
 	instr->instr = put.id.instr;
-	strncpy(instr->name, put.data.name, sizeof(instr->name)-1);
-	instr->name[sizeof(instr->name)-1] = '\0';
+	strlcpy(instr->name, put.data.name, sizeof(instr->name));
 	instr->type = put.data.type;
 	if (instr->type == SNDRV_SEQ_INSTR_ATYPE_DATA) {
 		result = ops->put(ops->private_data,

@@ -448,6 +448,7 @@ static int snd_cs4231_trigger(snd_pcm_substream_t *substream,
 	cs4231_t *chip = snd_pcm_substream_chip(substream);
 	int result = 0;
 	unsigned int what;
+	struct list_head *pos;
 	snd_pcm_substream_t *s;
 	int do_start;
 
@@ -467,8 +468,8 @@ static int snd_cs4231_trigger(snd_pcm_substream_t *substream,
 	}
 
 	what = 0;
-	s = substream;
-	do {
+	snd_pcm_group_for_each(pos, substream) {
+		s = snd_pcm_group_substream_entry(pos);
 		if (s == chip->playback_substream) {
 			what |= CS4231_PLAYBACK_ENABLE;
 			snd_pcm_trigger_done(s, substream);
@@ -476,8 +477,7 @@ static int snd_cs4231_trigger(snd_pcm_substream_t *substream,
 			what |= CS4231_RECORD_ENABLE;
 			snd_pcm_trigger_done(s, substream);
 		}
-		s = s->link_next;
-	} while (s != substream);
+	}
 	spin_lock(&chip->reg_lock);
 	if (do_start) {
 		chip->image[CS4231_IFACE_CTRL] |= what;

@@ -83,8 +83,6 @@ struct gendisk {
 	int major;			/* major number of driver */
 	int first_minor;
 	int minors;
-	int minor_shift;		/* number of times minor is shifted to
-					   get real minor */
 	char disk_name[16];		/* name of major driver */
 	struct hd_struct **part;	/* [indexed by minor] */
 	struct block_device_operations *fops;
@@ -365,12 +363,12 @@ extern void add_partition(struct gendisk *, int, sector_t, sector_t);
 extern void delete_partition(struct gendisk *, int);
 
 extern struct gendisk *alloc_disk(int minors);
-extern struct gendisk *get_disk(struct gendisk *disk);
+extern struct kobject *get_disk(struct gendisk *disk);
 extern void put_disk(struct gendisk *disk);
 
 extern void blk_register_region(dev_t dev, unsigned long range,
 			struct module *module,
-			struct gendisk *(*probe)(dev_t, int *, void *),
+			struct kobject *(*probe)(dev_t, int *, void *),
 			int (*lock)(dev_t, void *),
 			void *data);
 extern void blk_unregister_region(dev_t dev, unsigned long range);

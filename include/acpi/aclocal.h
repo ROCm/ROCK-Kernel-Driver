@@ -87,8 +87,8 @@ typedef u32                                     acpi_mutex_handle;
 #define ACPI_MTX_DEBUG_CMD_COMPLETE     11
 #define ACPI_MTX_DEBUG_CMD_READY        12
 
-#define MAX_MTX                         12
-#define NUM_MTX                         MAX_MTX+1
+#define MAX_MUTEX                       12
+#define NUM_MUTEX                       MAX_MUTEX+1
 
 
 #if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
@@ -140,12 +140,8 @@ struct acpi_mutex_info
 typedef u16                                     acpi_owner_id;
 #define ACPI_OWNER_TYPE_TABLE           0x0
 #define ACPI_OWNER_TYPE_METHOD          0x1
-#define ACPI_FIRST_METHOD_ID            0x0000
-#define ACPI_FIRST_TABLE_ID             0x8000
-
-/* TBD: [Restructure] get rid of the need for this! */
-
-#define TABLE_ID_DSDT                   (acpi_owner_id) 0x8000
+#define ACPI_FIRST_METHOD_ID            0x0001
+#define ACPI_FIRST_TABLE_ID             0xF000
 
 
 /* Field access granularities */
@@ -232,11 +228,16 @@ struct acpi_table_desc
 	u64                             physical_address;
 	u32                             aml_length;
 	acpi_size                       length;
-	u32                             count;
 	acpi_owner_id                   table_id;
 	u8                              type;
 	u8                              allocation;
 	u8                              loaded_into_namespace;
+};
+
+struct acpi_table_list
+{
+	struct acpi_table_desc          *next;
+	u32                             count;
 };
 
 
@@ -853,16 +854,6 @@ struct acpi_bit_register_info
 #define ACPI_RDESC_TYPE_WORD_ADDRESS_SPACE      0x88
 #define ACPI_RDESC_TYPE_EXTENDED_XRUPT          0x89
 #define ACPI_RDESC_TYPE_QWORD_ADDRESS_SPACE     0x8A
-
-
-/* String version of device HIDs and UIDs */
-
-#define ACPI_DEVICE_ID_LENGTH                   0x09
-
-struct acpi_device_id
-{
-	char                    buffer[ACPI_DEVICE_ID_LENGTH];
-};
 
 
 /*****************************************************************************

@@ -1,0 +1,13 @@
+# ALSA PA-RISC drivers
+
+menu "ALSA PA-RISC devices"
+	depends on SND!=n && PARISC
+
+config SND_HARMONY
+	tristate "Harmony/Vivace sound chip"
+	depends on SND
+	help
+	  Say 'Y' or 'M' to include support for Harmony/Vivace soundchip
+	  on HP712s, 715/new and many other GSC based machines.
+
+endmenu

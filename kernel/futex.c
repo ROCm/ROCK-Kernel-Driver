@@ -2,15 +2,15 @@
  *  Fast Userspace Mutexes (which I call "Futexes!").
  *  (C) Rusty Russell, IBM 2002
  *
+ *  Generalized futexes, futex requeueing, misc fixes by Ingo Molnar
+ *  (C) Copyright 2003 Red Hat Inc, All Rights Reserved
+ *
  *  Thanks to Ben LaHaise for yelling "hashed waitqueues" loudly
  *  enough at me, Linus for the original (flawed) idea, Matthew
  *  Kirkwood for proof-of-concept implementation.
  *
  *  "The futexes are also cursed."
  *  "But they come in a choice of three flavours!"
- *
- *  Generalized futexes for every mapping type, Ingo Molnar, 2002
- *
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -93,19 +93,18 @@ static inline struct list_head *hash_futex(struct page *page, int offset)
 							FUTEX_HASHBITS)];
 }
 
-/* Waiter either waiting in FUTEX_WAIT or poll(), or expecting signal */
-static inline void tell_waiter(struct futex_q *q)
-{
-	wake_up_all(&q->waiters);
-	if (q->filp)
-		send_sigio(&q->filp->f_owner, q->fd, POLL_IN);
-}
-
 /*
  * Get kernel address of the user page and pin it.
  *
  * Must be called with (and returns with) all futex-MM locks held.
  */
+static inline struct page *__pin_page_atomic (struct page *page)
+{
+	if (!PageReserved(page))
+		get_page(page);
+	return page;
+}
+
 static struct page *__pin_page(unsigned long addr)
 {
 	struct mm_struct *mm = current->mm;
@@ -116,11 +115,8 @@ static struct page *__pin_page(unsigned long addr)
 	 * Do a quick atomic lookup first - this is the fastpath.
 	 */
 	page = follow_page(mm, addr, 0);
-	if (likely(page != NULL)) {	
-		if (!PageReserved(page))
-			get_page(page);
-		return page;
-	}
+	if (likely(page != NULL))
+		return __pin_page_atomic(page);
 
 	/*
 	 * No luck - need to fault in the page:
@@ -150,16 +146,11 @@ repeat_lookup:
 	return page;
 }
 
-static inline void unpin_page(struct page *page)
-{
-	put_page(page);
-}
-
 /*
  * Wake up all waiters hashed on the physical page that is mapped
  * to this virtual address:
  */
-static int futex_wake(unsigned long uaddr, int offset, int num)
+static inline int futex_wake(unsigned long uaddr, int offset, int num)
 {
 	struct list_head *i, *next, *head;
 	struct page *page;
@@ -181,7 +172,9 @@ static int futex_wake(unsigned long uaddr, int offset, int num)
 		if (this->page == page && this->offset == offset) {
 			list_del_init(i);
 			__detach_vcache(&this->vcache);
-			tell_waiter(this);
+			wake_up_all(&this->waiters);
+			if (this->filp)
+				send_sigio(&this->filp->f_owner, this->fd, POLL_IN);
 			ret++;
 			if (ret >= num)
 				break;
@@ -189,7 +182,7 @@ static int futex_wake(unsigned long uaddr, int offset, int num)
 	}
 
 	unlock_futex_mm();
-	unpin_page(page);
+	put_page(page);
 
 	return ret;
 }
@@ -208,12 +201,73 @@ static void futex_vcache_callback(vcache_t *vcache, struct page *new_page)
 	spin_lock(&futex_lock);
 
 	if (!list_empty(&q->list)) {
+		put_page(q->page);
 		q->page = new_page;
+		__pin_page_atomic(new_page);
 		list_del(&q->list);
 		list_add_tail(&q->list, head);
 	}
 
 	spin_unlock(&futex_lock);
+}
+
+/*
+ * Requeue all waiters hashed on one physical page to another
+ * physical page.
+ */
+static inline int futex_requeue(unsigned long uaddr1, int offset1,
+	unsigned long uaddr2, int offset2, int nr_wake, int nr_requeue)
+{
+	struct list_head *i, *next, *head1, *head2;
+	struct page *page1 = NULL, *page2 = NULL;
+	int ret = 0;
+
+	lock_futex_mm();
+
+	page1 = __pin_page(uaddr1 - offset1);
+	if (!page1)
+		goto out;
+	page2 = __pin_page(uaddr2 - offset2);
+	if (!page2)
+		goto out;
+
+	head1 = hash_futex(page1, offset1);
+	head2 = hash_futex(page2, offset2);
+
+	list_for_each_safe(i, next, head1) {
+		struct futex_q *this = list_entry(i, struct futex_q, list);
+
+		if (this->page == page1 && this->offset == offset1) {
+			list_del_init(i);
+			__detach_vcache(&this->vcache);
+			if (++ret <= nr_wake) {
+				wake_up_all(&this->waiters);
+				if (this->filp)
+					send_sigio(&this->filp->f_owner,
+							this->fd, POLL_IN);
+			} else {
+				put_page(this->page);
+				__pin_page_atomic (page2);
+				list_add_tail(i, head2);
+				__attach_vcache(&this->vcache, uaddr2,
+					current->mm, futex_vcache_callback);
+				this->offset = offset2;
+				this->page = page2;
+				if (ret - nr_wake >= nr_requeue)
+					break;
+			}
+		}
+	}
+
+out:
+	unlock_futex_mm();
+
+	if (page1)
+		put_page(page1);
+	if (page2)
+		put_page(page2);
+
+	return ret;
 }
 
 static inline void __queue_me(struct futex_q *q, struct page *page,
@@ -252,7 +306,7 @@ static inline int unqueue_me(struct futex_q *q)
 	return ret;
 }
 
-static int futex_wait(unsigned long uaddr,
+static inline int futex_wait(unsigned long uaddr,
 		      int offset,
 		      int val,
 		      unsigned long time)
@@ -273,14 +327,17 @@ static int futex_wait(unsigned long uaddr,
 	}
 	__queue_me(&q, page, uaddr, offset, -1, NULL);
 
-	unlock_futex_mm();
-
-	/* Page is pinned, but may no longer be in this address space. */
+	/*
+	 * Page is pinned, but may no longer be in this address space.
+	 * It cannot schedule, so we access it with the spinlock held.
+	 */
 	if (get_user(curval, (int *)uaddr) != 0) {
+		unlock_futex_mm();
 		ret = -EFAULT;
 		goto out;
 	}
 	if (curval != val) {
+		unlock_futex_mm();
 		ret = -EWOULDBLOCK;
 		goto out;
 	}
@@ -288,13 +345,15 @@ static int futex_wait(unsigned long uaddr,
 	 * The get_user() above might fault and schedule so we
 	 * cannot just set TASK_INTERRUPTIBLE state when queueing
 	 * ourselves into the futex hash. This code thus has to
-	 * rely on the FUTEX_WAKE code doing a wakeup after removing
+	 * rely on the futex_wake() code doing a wakeup after removing
 	 * the waiter from the list.
 	 */
 	add_wait_queue(&q.waiters, &wait);
 	set_current_state(TASK_INTERRUPTIBLE);
-	if (!list_empty(&q.list))
+	if (!list_empty(&q.list)) {
+		unlock_futex_mm();
 		time = schedule_timeout(time);
+	}
 	set_current_state(TASK_RUNNING);
 	/*
 	 * NOTE: we don't remove ourselves from the waitqueue because
@@ -310,7 +369,7 @@ out:
 	/* Were we woken up anyway? */
 	if (!unqueue_me(&q))
 		ret = 0;
-	unpin_page(page);
+	put_page(q.page);
 
 	return ret;
 }
@@ -320,7 +379,7 @@ static int futex_close(struct inode *inode, struct file *filp)
 	struct futex_q *q = filp->private_data;
 
 	unqueue_me(q);
-	unpin_page(q->page);
+	put_page(q->page);
 	kfree(filp->private_data);
 	return 0;
 }
@@ -416,11 +475,12 @@ static int futex_fd(unsigned long uaddr, int offset, int signal)
 	page = NULL;
 out:
 	if (page)
-		unpin_page(page);
+		put_page(page);
 	return ret;
 }
 
-long do_futex(unsigned long uaddr, int op, int val, unsigned long timeout)
+long do_futex(unsigned long uaddr, int op, int val, unsigned long timeout,
+		unsigned long uaddr2, int val2)
 {
 	unsigned long pos_in_page;
 	int ret;
@@ -442,28 +502,50 @@ long do_futex(unsigned long uaddr, int op, int val, unsigned long timeout)
 		/* non-zero val means F_SETOWN(getpid()) & F_SETSIG(val) */
 		ret = futex_fd(uaddr, pos_in_page, val);
 		break;
+	case FUTEX_REQUEUE:
+	{
+		unsigned long pos_in_page2 = uaddr2 % PAGE_SIZE;
+
+		/* Must be "naturally" aligned */
+		if (pos_in_page2 % sizeof(u32))
+			return -EINVAL;
+
+		ret = futex_requeue(uaddr, pos_in_page, uaddr2, pos_in_page2,
+				    val, val2);
+		break;
+	}
 	default:
-		ret = -EINVAL;
+		ret = -ENOSYS;
 	}
 	return ret;
 }
 
-asmlinkage long sys_futex(u32 __user *uaddr, int op, int val, struct timespec __user *utime)
+
+asmlinkage long sys_futex(u32 __user *uaddr, int op, int val,
+			  struct timespec __user *utime, u32 __user *uaddr2)
 {
 	struct timespec t;
 	unsigned long timeout = MAX_SCHEDULE_TIMEOUT;
+	int val2 = 0;
 
 	if ((op == FUTEX_WAIT) && utime) {
 		if (copy_from_user(&t, utime, sizeof(t)) != 0)
 			return -EFAULT;
 		timeout = timespec_to_jiffies(&t) + 1;
 	}
-	return do_futex((unsigned long)uaddr, op, val, timeout);
+	/*
+	 * requeue parameter in 'utime' if op == FUTEX_REQUEUE.
+	 */
+	if (op == FUTEX_REQUEUE)
+		val2 = (int) (long) utime;
+
+	return do_futex((unsigned long)uaddr, op, val, timeout,
+			(unsigned long)uaddr2, val2);
 }
 
 static struct super_block *
 futexfs_get_sb(struct file_system_type *fs_type,
-	       int flags, char *dev_name, void *data)
+	       int flags, const char *dev_name, void *data)
 {
 	return get_sb_pseudo(fs_type, "futex", NULL, 0xBAD1DEA);
 }

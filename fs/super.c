@@ -259,9 +259,6 @@ retry:
 	return s;
 }
 
-struct vfsmount *alloc_vfsmnt(char *name);
-void free_vfsmnt(struct vfsmount *mnt);
-
 void drop_super(struct super_block *sb)
 {
 	up_read(&sb->s_umount);
@@ -558,7 +555,7 @@ static int test_bdev_super(struct super_block *s, void *data)
 }
 
 struct super_block *get_sb_bdev(struct file_system_type *fs_type,
-	int flags, char *dev_name, void * data,
+	int flags, const char *dev_name, void *data,
 	int (*fill_super)(struct super_block *, void *, int))
 {
 	struct block_device *bdev;
@@ -663,7 +660,7 @@ struct super_block *get_sb_single(struct file_system_type *fs_type,
 }
 
 struct vfsmount *
-do_kern_mount(const char *fstype, int flags, char *name, void *data)
+do_kern_mount(const char *fstype, int flags, const char *name, void *data)
 {
 	struct file_system_type *type = get_fs_type(fstype);
 	struct super_block *sb = ERR_PTR(-ENOMEM);
@@ -702,5 +699,5 @@ out:
 
 struct vfsmount *kern_mount(struct file_system_type *type)
 {
-	return do_kern_mount(type->name, 0, (char *)type->name, NULL);
+	return do_kern_mount(type->name, 0, type->name, NULL);
 }

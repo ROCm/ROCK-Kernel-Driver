@@ -105,10 +105,14 @@ static void jfs_destroy_inode(struct inode *inode)
 	}
 
 #ifdef CONFIG_JFS_POSIX_ACL
-	if (ji->i_acl && (ji->i_acl != JFS_ACL_NOT_CACHED))
+	if (ji->i_acl != JFS_ACL_NOT_CACHED) {
 		posix_acl_release(ji->i_acl);
-	if (ji->i_default_acl && (ji->i_default_acl != JFS_ACL_NOT_CACHED))
+		ji->i_acl = JFS_ACL_NOT_CACHED;
+	}
+	if (ji->i_default_acl != JFS_ACL_NOT_CACHED) {
 		posix_acl_release(ji->i_default_acl);
+		ji->i_default_acl = JFS_ACL_NOT_CACHED;
+	}
 #endif
 
 	kmem_cache_free(jfs_inode_cachep, ji);
@@ -372,8 +376,9 @@ static void jfs_unlockfs(struct super_block *sb)
 			txResume(sb);
 	}
 }
-static struct super_block *jfs_get_sb(struct file_system_type *fs_type,
-		int flags, char *dev_name, void *data)
+
+static struct super_block *jfs_get_sb(struct file_system_type *fs_type, 
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_bdev(fs_type, flags, dev_name, data, jfs_fill_super);
 }
@@ -444,8 +449,8 @@ static int __init init_jfs_fs(void)
 	int rc;
 
 	jfs_inode_cachep =
-	    kmem_cache_create("jfs_ip", sizeof(struct jfs_inode_info), 0, 0,
-			      init_once, NULL);
+	    kmem_cache_create("jfs_ip", sizeof(struct jfs_inode_info), 0, 
+			    SLAB_RECLAIM_ACCOUNT, init_once, NULL);
 	if (jfs_inode_cachep == NULL)
 		return -ENOMEM;
 

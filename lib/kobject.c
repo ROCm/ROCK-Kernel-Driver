@@ -3,6 +3,11 @@
  *
  * Copyright (c) 2002-2003 Patrick Mochel <mochel@osdl.org>
  *
+ * This file is released under the GPLv2.
+ *
+ *
+ * Please see the file Documentation/kobject.txt for critical information
+ * about using the kobject interface.
  */
 
 #undef DEBUG

@@ -738,8 +738,8 @@ static int sunos_nfs_mount(char *dir_name, int linux_flags, void *data)
 	if(IS_ERR(the_name))
 		return PTR_ERR(the_name);
 
-	strncpy (linux_nfs_mount.hostname, the_name, 254);
-	linux_nfs_mount.hostname [255] = 0;
+	strlcpy(linux_nfs_mount.hostname, the_name,
+		sizeof(linux_nfs_mount.hostname));
 	putname (the_name);
 	
 	return do_mount ("", dir_name, "nfs", linux_flags, &linux_nfs_mount);

@@ -2777,9 +2777,8 @@ int __init clgenfb_init(void)
 	fb_info->gen.parsize = sizeof (struct clgenfb_par);
 	fb_info->gen.fbhw = &clgen_hwswitch;
 
-	strncpy (fb_info->gen.info.modename, clgen_board_info[btype].name,
+	strlcpy (fb_info->gen.info.modename, clgen_board_info[btype].name,
 		 sizeof (fb_info->gen.info.modename));
-	fb_info->gen.info.modename [sizeof (fb_info->gen.info.modename) - 1] = 0;
 
 	fb_info->gen.info.fbops = &clgenfb_ops;
 	fb_info->gen.info.disp = &disp;

@@ -382,6 +382,8 @@ struct inode {
 	struct list_head	i_devices;
 	struct pipe_inode_info	*i_pipe;
 	struct block_device	*i_bdev;
+	struct cdev		*i_cdev;
+	int			i_cindex;
 
 	unsigned long		i_dnotify_mask; /* Directory notify events */
 	struct dnotify_struct	*i_dnotify; /* for directory notifications */
@@ -917,7 +919,8 @@ struct file_system_type {
 	const char *name;
 	struct subsystem subsys;
 	int fs_flags;
-	struct super_block *(*get_sb) (struct file_system_type *, int, char *, void *);
+	struct super_block *(*get_sb) (struct file_system_type *, int,
+				       const char *, void *);
 	void (*kill_sb) (struct super_block *);
 	struct module *owner;
 	struct file_system_type * next;
@@ -925,7 +928,7 @@ struct file_system_type {
 };
 
 struct super_block *get_sb_bdev(struct file_system_type *fs_type,
-	int flags, char *dev_name, void * data,
+	int flags, const char *dev_name, void *data,
 	int (*fill_super)(struct super_block *, void *, int));
 struct super_block *get_sb_single(struct file_system_type *fs_type,
 	int flags, void *data,
@@ -1056,13 +1059,12 @@ extern void bd_release(struct block_device *);
 extern void blk_run_queues(void);
 
 /* fs/char_dev.c */
-extern int register_chrdev_region(unsigned int, unsigned int, int,
-				  const char *, struct file_operations *);
+extern int alloc_chrdev_region(dev_t *, unsigned, unsigned, char *);
+extern int register_chrdev_region(dev_t, unsigned, char *);
 extern int register_chrdev(unsigned int, const char *,
 			   struct file_operations *);
 extern int unregister_chrdev(unsigned int, const char *);
-extern int unregister_chrdev_region(unsigned int, unsigned int, int,
-				    const char *);
+extern void unregister_chrdev_region(dev_t, unsigned);
 extern int chrdev_open(struct inode *, struct file *);
 
 /* fs/block_dev.c */
@@ -1116,7 +1118,7 @@ extern void sync_filesystems(int wait);
 extern void emergency_sync(void);
 extern void emergency_remount(void);
 extern int do_remount_sb(struct super_block *sb, int flags,
-			void *data, int force);
+			 void *data, int force);
 extern sector_t bmap(struct inode *, sector_t);
 extern int setattr_mask(unsigned int);
 extern int notify_change(struct dentry *, struct iattr *);

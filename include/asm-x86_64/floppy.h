@@ -64,7 +64,7 @@ static irqreturn_t floppy_hardint(int irq, void *dev_id, struct pt_regs * regs)
 #endif
 	if(!doing_pdma) {
 		floppy_interrupt(irq, dev_id, regs);
-		return;
+		return IRQ_HANDLED;
 	}
 
 #ifdef TRACE_FLPY_INT
@@ -96,7 +96,7 @@ static irqreturn_t floppy_hardint(int irq, void *dev_id, struct pt_regs * regs)
 	calls++;
 #endif
 	if(st == 0x20)
-		return;
+		return IRQ_HANDLED;
 	if(!(st & 0x20)) {
 		virtual_dma_residue += virtual_dma_count;
 		virtual_dma_count=0;

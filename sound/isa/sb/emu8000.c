@@ -1144,6 +1144,8 @@ snd_emu8000_new(snd_card_t *card, int index, long port, int seq_ports, snd_seq_d
 		strcpy(awe->name, "EMU-8000");
 		*(emu8000_t**)SNDRV_SEQ_DEVICE_ARGPTR(awe) = hw;
 	}
+#else
+	awe = NULL;
 #endif
 	if (awe_ret)
 		*awe_ret = awe;

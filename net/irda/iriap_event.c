@@ -11,6 +11,7 @@
  *
  *     Copyright (c) 1997, 1999-2000 Dag Brattli <dagb@cs.uit.no>,
  *     All Rights Reserved.
+ *     Copyright (c) 2000-2003 Jean Tourrilhes <jt@hpl.hp.com>
  *
  *     This program is free software; you can redistribute it and/or
  *     modify it under the terms of the GNU General Public License as
@@ -174,8 +175,11 @@ static void state_s_disconnect(struct iriap_cb *self, IRIAP_EVENT event,
 	switch (event) {
 	case IAP_CALL_REQUEST_GVBC:
 		iriap_next_client_state(self, S_CONNECTING);
-		ASSERT(self->skb == NULL, return;);
-		self->skb = skb;
+		ASSERT(self->request_skb == NULL, return;);
+		/* Don't forget to refcount it -
+		 * see iriap_getvaluebyclass_request(). */
+		skb_get(skb);
+		self->request_skb = skb;
 		iriap_connect_request(self);
 		break;
 	case IAP_LM_DISCONNECT_INDICATION:
@@ -251,20 +255,21 @@ static void state_s_call(struct iriap_cb *self, IRIAP_EVENT event,
 static void state_s_make_call(struct iriap_cb *self, IRIAP_EVENT event,
 			      struct sk_buff *skb)
 {
+	struct sk_buff *tx_skb;
+
 	ASSERT(self != NULL, return;);
 
 	switch (event) {
 	case IAP_CALL_REQUEST:
-		skb = self->skb;
-		self->skb = NULL;
+		/* Already refcounted - see state_s_disconnect() */
+		tx_skb = self->request_skb;
+		self->request_skb = NULL;
 
-		irlmp_data_request(self->lsap, skb);
+		irlmp_data_request(self->lsap, tx_skb);
 		iriap_next_call_state(self, S_OUTSTANDING);
 		break;
 	default:
 		IRDA_DEBUG(0, "%s(), Unknown event %d\n", __FUNCTION__, event);
-		if (skb)
-			dev_kfree_skb(skb);
 		break;
 	}
 }
@@ -379,10 +384,6 @@ static void state_r_disconnect(struct iriap_cb *self, IRIAP_EVENT event,
 		 *  care about LM_Idle_request()!
 		 */
 		iriap_next_r_connect_state(self, R_RECEIVING);
-
-		if (skb)
-			dev_kfree_skb(skb);
-
 		break;
 	default:
 		IRDA_DEBUG(0, "%s(), unknown event %d\n", __FUNCTION__, event);
@@ -450,7 +451,6 @@ static void state_r_receiving(struct iriap_cb *self, IRIAP_EVENT event,
 		IRDA_DEBUG(0, "%s(), unknown event!\n", __FUNCTION__);
 		break;
 	}
-
 }
 
 /*
@@ -465,11 +465,8 @@ static void state_r_execute(struct iriap_cb *self, IRIAP_EVENT event,
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
 	ASSERT(skb != NULL, return;);
-
-	if (!self || self->magic != IAS_MAGIC) {
-		IRDA_DEBUG(0, "%s(), bad pointer self\n", __FUNCTION__);
-		return;
-	}
+	ASSERT(self != NULL, return;);
+	ASSERT(self->magic == IAS_MAGIC, return;);
 
 	switch (event) {
 	case IAP_CALL_RESPONSE:
@@ -478,6 +475,10 @@ static void state_r_execute(struct iriap_cb *self, IRIAP_EVENT event,
 		 *  to state Receiving instead, DB.
 		 */
 		iriap_next_r_connect_state(self, R_RECEIVING);
+
+		/* Don't forget to refcount it - see
+		 * iriap_getvaluebyclass_response(). */
+		skb_get(skb);
 
 		irlmp_data_request(self->lsap, skb);
 		break;

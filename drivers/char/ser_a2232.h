@@ -49,10 +49,6 @@
 /* Some magic is always good - Who knows :) */
 #define A2232_MAGIC 0x000a2232
 
-/* for the tty_struct subtype field */
-#define A2232_TTY_SUBTYPE_NORMAL	1
-#define A2232_TTY_SUBTYPE_CALLOUT	2
-
 /* A2232 port structure to keep track of the
    status of every single line used */
 struct a2232_port{

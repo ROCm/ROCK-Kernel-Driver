@@ -2026,8 +2026,6 @@ set_multicast_list(struct net_device *dev)
 	    dev->trans_start = jiffies;
 	}
     }
-    
-    return;
 }
 
 /*

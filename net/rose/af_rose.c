@@ -356,8 +356,9 @@ void rose_destroy_socket(struct sock *sk)
 	rose_clear_queues(sk);		/* Flush the queues */
 
 	while ((skb = skb_dequeue(&sk->receive_queue)) != NULL) {
-		if (skb->sk != sk) {			/* A pending connection */
-			__set_bit(SOCK_DEAD, &skb->sk->flags);	/* Queue the unaccepted socket for death */
+		if (skb->sk != sk) {	/* A pending connection */
+			/* Queue the unaccepted socket for death */
+			sock_set_flag(skb->sk, SOCK_DEAD);
 			rose_start_heartbeat(skb->sk);
 			rose_sk(skb->sk)->state = ROSE_STATE_0;
 		}
@@ -637,8 +638,8 @@ static int rose_release(struct socket *sock)
 		sk->state    = TCP_CLOSE;
 		sk->shutdown |= SEND_SHUTDOWN;
 		sk->state_change(sk);
-		__set_bit(SOCK_DEAD, &sk->flags);
-		__set_bit(SOCK_DESTROY, &sk->flags);
+		sock_set_flag(sk, SOCK_DEAD);
+		sock_set_flag(sk, SOCK_DESTROY);
 		break;
 
 	default:
@@ -1010,7 +1011,7 @@ int rose_rx_call_request(struct sk_buff *skb, struct net_device *dev, struct ros
 
 	rose_start_heartbeat(make);
 
-	if (!test_bit(SOCK_DEAD, &sk->flags))
+	if (!sock_flag(sk, SOCK_DEAD))
 		sk->data_ready(sk, skb->len);
 
 	return 1;
@@ -1535,7 +1536,6 @@ static void __exit rose_exit(void)
 			dev_rose[i].priv = NULL;
 			unregister_netdev(&dev_rose[i]);
 		}
-		kfree(dev_rose[i].name);
 	}
 
 	kfree(dev_rose);

@@ -21,11 +21,7 @@
 #include <sound/driver.h>
 #include <linux/version.h>
 #include <linux/init.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 0)
 #include <linux/jiffies.h>
-#else
-#include <linux/sched.h>
-#endif
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/wait.h>
@@ -58,8 +54,8 @@ MODULE_DEVICES("{{ALSA,Dummy soundcard}}");
 #if 0 /* ICE1712 emulation */
 #define MAX_BUFFER_SIZE		(256 * 1024)
 #define USE_FORMATS		SNDRV_PCM_FMTBIT_S32_LE
-#define USE_CHANNELS_MIN	12
-#define USE_CHANNELS_MAX	12
+#define USE_CHANNELS_MIN	10
+#define USE_CHANNELS_MAX	10
 #define USE_PERIODS_MIN		1
 #define USE_PERIODS_MAX		1024
 #endif
@@ -247,8 +243,8 @@ static void snd_card_dummy_pcm_timer_function(unsigned long data)
 	dpcm->pcm_irq_pos += dpcm->pcm_jiffie;
 	dpcm->pcm_buf_pos += dpcm->pcm_jiffie;
 	dpcm->pcm_buf_pos %= dpcm->pcm_size;
-	while (dpcm->pcm_irq_pos >= dpcm->pcm_count) {
-		dpcm->pcm_irq_pos -= dpcm->pcm_count;
+	if (dpcm->pcm_irq_pos >= dpcm->pcm_count) {
+		dpcm->pcm_irq_pos %= dpcm->pcm_count;
 		snd_pcm_period_elapsed(dpcm->substream);
 	}
 	spin_unlock_irq(&dpcm->lock);	
@@ -430,7 +426,7 @@ static int snd_dummy_volume_info(snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t 
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
 	uinfo->count = 2;
-	uinfo->value.integer.min = 0;
+	uinfo->value.integer.min = -50;
 	uinfo->value.integer.max = 100;
 	return 0;
 }
@@ -455,8 +451,16 @@ static int snd_dummy_volume_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	int change, addr = kcontrol->private_value;
 	int left, right;
 
-	left = ucontrol->value.integer.value[0] % 101;
-	right = ucontrol->value.integer.value[1] % 101;
+	left = ucontrol->value.integer.value[0];
+	if (left < -50)
+		left = -50;
+	if (left > 100)
+		left = 100;
+	right = ucontrol->value.integer.value[1];
+	if (right < -50)
+		right = -50;
+	if (right > 100)
+		right = 100;
 	spin_lock_irqsave(&dummy->mixer_lock, flags);
 	change = dummy->mixer_volume[addr][0] != left ||
 	         dummy->mixer_volume[addr][1] != right;

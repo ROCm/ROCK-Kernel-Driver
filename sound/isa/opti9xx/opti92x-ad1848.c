@@ -43,10 +43,8 @@
 #endif	/* CS4231 */
 #include <sound/mpu401.h>
 #include <sound/opl3.h>
-#ifdef USE_OPL4
 #ifndef OPTi93X
-#include "opl4.h" /* <sound/opl4.h> */
-#endif
+#include <sound/opl4.h>
 #endif
 #define SNDRV_LEGACY_FIND_FREE_IRQ
 #define SNDRV_LEGACY_FIND_FREE_DMA
@@ -278,13 +276,6 @@ static int snd_opti9xx_first_hit = 1;
 static snd_card_t *snd_opti9xx_legacy = SNDRV_DEFAULT_PTR1;
 
 #ifdef CONFIG_PNP
-
-#define ISAPNP_OPTI9XX(_va, _vb, _vc, _device, _fa, _fb, _fc, _audio, _mpu401) \
-	{ \
-		ISAPNP_CARD_ID(_va, _vb, _vc, _device), \
-		.devs = { ISAPNP_DEVICE_ID(_fa, _fb, _fc, _audio), \
-			ISAPNP_DEVICE_ID(_fa, _fb, _fc, _mpu401), } \
-	}
 
 static struct pnp_card_device_id snd_opti9xx_pnpids[] = {
 #ifndef OPTi93X
@@ -969,8 +960,10 @@ static int snd_opti93x_trigger(snd_pcm_substream_t *substream,
 	case SNDRV_PCM_TRIGGER_STOP:
 	{
 		unsigned int what = 0;
-		snd_pcm_substream_t *s = substream;
-		do {
+		struct list_head *pos;
+		snd_pcm_substream_t *s;
+		snd_pcm_group_for_each(pos, substream) {
+			s = snd_pcm_group_substream_entry(pos);
 			if (s == chip->playback_substream) {
 				what |= OPTi93X_PLAYBACK_ENABLE;
 				snd_pcm_trigger_done(s, substream);
@@ -978,8 +971,7 @@ static int snd_opti93x_trigger(snd_pcm_substream_t *substream,
 				what |= OPTi93X_CAPTURE_ENABLE;
 				snd_pcm_trigger_done(s, substream);
 			}
-			s = s->link_next;
-		} while (s != substream);
+		}
 		spin_lock(&chip->lock);
 		if (cmd == SNDRV_PCM_TRIGGER_START) {
 			snd_opti93x_out_mask(chip, OPTi93X_IFACE_CONF, what, what);
@@ -1946,7 +1938,7 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 	chip = (opti9xx_t *)card->private_data;
 
 #ifdef CONFIG_PNP
-	if (isapnp && (hw = snd_card_opti9xx_pnp(chip, pcard, pid)) > 0) {
+	if (isapnp && pcard && (hw = snd_card_opti9xx_pnp(chip, pcard, pid)) > 0) {
 		switch (hw) {
 		case 0x0924:
 			hw = OPTi9XX_HW_82C924;
@@ -2111,7 +2103,6 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 
 	if (chip->fm_port > 0) {
 		opl3_t *opl3 = NULL;
-#ifdef USE_OPL4
 #ifndef OPTi93X
 		if (chip->hardware == OPTi9XX_HW_82C928 ||
 		    chip->hardware == OPTi9XX_HW_82C929 ||
@@ -2130,7 +2121,6 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 			}
 		}
 #endif	/* !OPTi93X */
-#endif
 		if (!opl3 && snd_opl3_create(card,
 					     chip->fm_port,
 					     chip->fm_port + 2,
@@ -2201,8 +2191,15 @@ static int __init alsa_card_opti9xx_init(void)
 {
 	int cards, error;
 
+#ifdef CONFIG_PNP
 	cards = pnp_register_card_driver(&opti9xx_pnpc_driver);
+#else
+	cards = 0;
+#endif
 	if (cards == 0 && (error = snd_card_opti9xx_probe(NULL, NULL)) < 0) {
+#ifdef CONFIG_PNP
+		pnp_unregister_card_driver(&opti9xx_pnpc_driver);
+#endif
 #ifdef MODULE
 #ifdef OPTi93X
 		printk(KERN_ERR "no OPTi 82C93x soundcard found\n");

@@ -20,8 +20,19 @@
 #include <asm/io.h>
 
 
-struct resource ioport_resource = { "PCI IO", 0x0000, IO_SPACE_LIMIT, IORESOURCE_IO };
-struct resource iomem_resource = { "PCI mem", 0UL, ~0UL, IORESOURCE_MEM };
+struct resource ioport_resource = {
+	.name	= "PCI IO",
+	.start	= 0x0000,
+	.end	= IO_SPACE_LIMIT,
+	.flags	= IORESOURCE_IO,
+};
+
+struct resource iomem_resource = {
+	.name	= "PCI mem",
+	.start	= 0UL,
+	.end	= ~0UL,
+	.flags	= IORESOURCE_MEM,
+};
 
 static rwlock_t resource_lock = RW_LOCK_UNLOCKED;
 

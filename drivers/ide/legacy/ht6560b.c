@@ -53,13 +53,7 @@
 
 #include <asm/io.h>
 
-#ifdef CONFIG_BLK_DEV_HT6560B_MODULE
-# define _IDE_C
-# include "ide_modes.h"
-# undef _IDE_C
-#else
-# include "ide_modes.h"
-#endif /* CONFIG_BLK_DEV_HT6560B_MODULE */
+#include "ide_modes.h"
 
 /* #define DEBUG */  /* remove comments for DEBUG messages */
 

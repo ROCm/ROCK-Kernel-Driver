@@ -1,14 +1,16 @@
 /*
  * power.c - power management functions for the device tree.
  * 
- * Copyright (c) 2002 Patrick Mochel
- *		 2002 Open Source Development Lab
+ * Copyright (c) 2002-3 Patrick Mochel
+ *		 2002-3 Open Source Development Lab
+ * 
+ * This file is released under the GPLv2
  * 
  *  Kai Germaschewski contributed to the list walking routines.
  *
  */
 
-#undef DEBUG
+#define DEBUG
 
 #include <linux/device.h>
 #include <linux/module.h>
@@ -88,10 +90,12 @@ void device_shutdown(void)
 	down_write(&devices_subsys.rwsem);
 	list_for_each(entry,&devices_subsys.kset.list) {
 		struct device * dev = to_dev(entry);
+		pr_debug("shutting down %s: ",dev->name);
 		if (dev->driver && dev->driver->shutdown) {
-			pr_debug("shutting down %s\n",dev->name);
+			pr_debug("Ok\n");
 			dev->driver->shutdown(dev);
-		}
+		} else
+			pr_debug("Ignored.\n");
 	}
 	up_write(&devices_subsys.rwsem);
 }

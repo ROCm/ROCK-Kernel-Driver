@@ -512,7 +512,7 @@ static int diva_add_card(DESCRIPTOR * d)
 	sync_req.GetName.Req = 0;
 	sync_req.GetName.Rc = IDI_SYNC_REQ_GET_NAME;
 	card->d.request((ENTITY *) & sync_req);
-	strncpy(card->name, sync_req.GetName.name, sizeof(card->name));
+	strlcpy(card->name, sync_req.GetName.name, sizeof(card->name));
 	ctrl = &card->capi_ctrl;
 	strcpy(ctrl->name, card->name);
 	ctrl->register_appl = diva_register_appl;
@@ -528,7 +528,7 @@ static int diva_add_card(DESCRIPTOR * d)
 		return (0);
 	}
 	card->Id = find_free_id();
-	strncpy(ctrl->manu, M_COMPANY, CAPI_MANUFACTURER_LEN);
+	strlcpy(ctrl->manu, M_COMPANY, sizeof(ctrl->manu));
 	ctrl->version.majorversion = 2;
 	ctrl->version.minorversion = 0;
 	ctrl->version.majormanuversion = DRRELMAJOR;
@@ -544,7 +544,7 @@ static int diva_add_card(DESCRIPTOR * d)
 		sprintf(serial, "%ld", sync_req.GetSerial.serial);
 	}
 	serial[CAPI_SERIAL_LEN - 1] = 0;
-	strncpy(ctrl->serial, serial, CAPI_SERIAL_LEN);
+	strlcpy(ctrl->serial, serial, sizeof(ctrl->serial));
 
 	a = &adapter[card->Id - 1];
 	card->adapter = a;

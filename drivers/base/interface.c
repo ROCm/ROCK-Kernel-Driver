@@ -1,8 +1,12 @@
 /*
  * drivers/base/interface.c - common driverfs interface that's exported to 
  * 	the world for all devices.
- * Copyright (c) 2002 Patrick Mochel
- *		 2002 Open Source Development Lab
+ *
+ * Copyright (c) 2002-3 Patrick Mochel
+ * Copyright (c) 2002-3 Open Source Development Labs
+ * 
+ * This file is released under the GPLv2
+ *
  */
 
 #include <linux/device.h>

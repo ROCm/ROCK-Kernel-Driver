@@ -32,11 +32,12 @@ int fat_get_block(struct inode *inode, sector_t iblock,
 		  struct buffer_head *bh_result, int create)
 {
 	struct super_block *sb = inode->i_sb;
-	unsigned long phys;
+	sector_t phys;
+	int err;
 
-	phys = fat_bmap(inode, iblock);
-	if (phys < 0)
-		return phys;
+	err = fat_bmap(inode, iblock, &phys);
+	if (err)
+		return err;
 	if (phys) {
 		map_bh(bh_result, sb, phys);
 		return 0;
@@ -55,9 +56,9 @@ int fat_get_block(struct inode *inode, sector_t iblock,
 			return error;
 	}
 	MSDOS_I(inode)->mmu_private += sb->s_blocksize;
-	phys = fat_bmap(inode, iblock);
-	if (phys < 0)
-		return phys;
+	err = fat_bmap(inode, iblock, &phys);
+	if (err)
+		return err;
 	if (!phys)
 		BUG();
 	set_buffer_new(bh_result);

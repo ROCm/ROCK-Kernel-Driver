@@ -338,10 +338,8 @@ int snd_seq_set_port_info(client_port_t * port, snd_seq_port_info_t * info)
 	snd_assert(port && info, return -EINVAL);
 
 	/* set port name */
-	if (info->name[0]) {
-		strncpy(port->name, info->name, sizeof(port->name)-1);
-		port->name[sizeof(port->name)-1] = '\0';
-	}
+	if (info->name[0])
+		strlcpy(port->name, info->name, sizeof(port->name));
 	
 	/* set capabilities */
 	port->capability = info->capability;
@@ -363,7 +361,7 @@ int snd_seq_get_port_info(client_port_t * port, snd_seq_port_info_t * info)
 	snd_assert(port && info, return -EINVAL);
 
 	/* get port name */
-	strncpy(info->name, port->name, sizeof(info->name));
+	strlcpy(info->name, port->name, sizeof(info->name));
 	
 	/* get capabilities */
 	info->capability = port->capability;
@@ -621,10 +619,8 @@ int snd_seq_event_port_attach(int client,
 	/* Set up the port */
 	memset(&portinfo, 0, sizeof(portinfo));
 	portinfo.addr.client = client;
-	if (portname)
-		strncpy(portinfo.name, portname, sizeof(portinfo.name));
-	else
-		sprintf(portinfo.name, "Unamed port");
+	strlcpy(portinfo.name, portname ? portname : "Unamed port",
+		sizeof(portinfo.name));
 
 	portinfo.capability = cap;
 	portinfo.type = type;

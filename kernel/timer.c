@@ -517,6 +517,7 @@ static void second_overflow(void)
 	if (xtime.tv_sec % 86400 == 0) {
 	    xtime.tv_sec--;
 	    wall_to_monotonic.tv_sec++;
+	    time_interpolator_update(-NSEC_PER_SEC);
 	    time_state = TIME_OOP;
 	    clock_was_set();
 	    printk(KERN_NOTICE "Clock: inserting leap second 23:59:60 UTC\n");
@@ -527,6 +528,7 @@ static void second_overflow(void)
 	if ((xtime.tv_sec + 1) % 86400 == 0) {
 	    xtime.tv_sec++;
 	    wall_to_monotonic.tv_sec--;
+	    time_interpolator_update(NSEC_PER_SEC);
 	    time_state = TIME_WAIT;
 	    clock_was_set();
 	    printk(KERN_NOTICE "Clock: deleting leap second 23:59:59 UTC\n");
@@ -605,7 +607,7 @@ static void second_overflow(void)
 /* in the NTP reference this is called "hardclock()" */
 static void update_wall_time_one_tick(void)
 {
-	long time_adjust_step;
+	long time_adjust_step, delta_nsec;
 
 	if ( (time_adjust_step = time_adjust) != 0 ) {
 	    /* We are doing an adjtime thing. 
@@ -621,11 +623,11 @@ static void update_wall_time_one_tick(void)
 		time_adjust_step = tickadj;
 	     else if (time_adjust < -tickadj)
 		time_adjust_step = -tickadj;
-	     
+
 	    /* Reduce by this step the amount of time left  */
 	    time_adjust -= time_adjust_step;
 	}
-	xtime.tv_nsec += tick_nsec + time_adjust_step * 1000;
+	delta_nsec = tick_nsec + time_adjust_step * 1000;
 	/*
 	 * Advance the phase, once it gets to one microsecond, then
 	 * advance the tick more.
@@ -634,13 +636,15 @@ static void update_wall_time_one_tick(void)
 	if (time_phase <= -FINEUSEC) {
 		long ltemp = -time_phase >> (SHIFT_SCALE - 10);
 		time_phase += ltemp << (SHIFT_SCALE - 10);
-		xtime.tv_nsec -= ltemp;
+		delta_nsec -= ltemp;
 	}
 	else if (time_phase >= FINEUSEC) {
 		long ltemp = time_phase >> (SHIFT_SCALE - 10);
 		time_phase -= ltemp << (SHIFT_SCALE - 10);
-		xtime.tv_nsec += ltemp;
+		delta_nsec += ltemp;
 	}
+	xtime.tv_nsec += delta_nsec;
+	time_interpolator_update(delta_nsec);
 }
 
 /*
@@ -660,6 +664,7 @@ static void update_wall_time(unsigned long ticks)
 	if (xtime.tv_nsec >= 1000000000) {
 	    xtime.tv_nsec -= 1000000000;
 	    xtime.tv_sec++;
+	    time_interpolator_update(NSEC_PER_SEC);
 	    second_overflow();
 	}
 }
@@ -777,7 +782,6 @@ unsigned long wall_jiffies = INITIAL_JIFFIES;
 #ifndef ARCH_HAVE_XTIME_LOCK
 seqlock_t xtime_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
 #endif
-unsigned long last_time_offset;
 
 /*
  * This function runs timers and the timer-tq in bottom half context.
@@ -811,7 +815,6 @@ static inline void update_times(void)
 		wall_jiffies += ticks;
 		update_wall_time(ticks);
 	}
-	last_time_offset = 0;
 	calc_load(ticks);
 }
   
@@ -1221,3 +1224,80 @@ void __init init_timers(void)
 	register_cpu_notifier(&timers_nb);
 	open_softirq(TIMER_SOFTIRQ, run_timer_softirq, NULL);
 }
+
+#ifdef CONFIG_TIME_INTERPOLATION
+
+volatile unsigned long last_nsec_offset;
+
+struct time_interpolator *time_interpolator;
+
+#ifndef __HAVE_ARCH_CMPXCHG
+spinlock_t last_nsec_offset_lock = SPIN_LOCK_UNLOCKED;
+#endif
+
+static struct {
+	spinlock_t lock;		/* lock protecting list */
+	struct time_interpolator *list;	/* list of registered interpolators */
+} ti_global = {
+	.lock = SPIN_LOCK_UNLOCKED
+};
+
+static inline int
+is_better_time_interpolator(struct time_interpolator *new)
+{
+	if (!time_interpolator)
+		return 1;
+	return new->frequency > 2*time_interpolator->frequency
+		|| (unsigned long) new->drift < (unsigned long) time_interpolator->drift;
+}
+
+void
+register_time_interpolator(struct time_interpolator *ti)
+{
+	spin_lock(&ti_global.lock);
+	{
+		write_seqlock_irq(&xtime_lock);
+		{
+			if (is_better_time_interpolator(ti))
+				time_interpolator = ti;
+		}
+		write_sequnlock_irq(&xtime_lock);
+
+		ti->next = ti_global.list;
+		ti_global.list = ti;
+	}
+	spin_unlock(&ti_global.lock);
+}
+
+void
+unregister_time_interpolator(struct time_interpolator *ti)
+{
+	struct time_interpolator *curr, **prev;
+
+	spin_lock(&ti_global.lock);
+	{
+		prev = &ti_global.list;
+		for (curr = *prev; curr; curr = curr->next) {
+			if (curr == ti) {
+				*prev = curr->next;
+				break;
+			}
+			prev = &curr->next;
+		}
+		write_seqlock_irq(&xtime_lock);
+		{
+			if (ti == time_interpolator) {
+				/* we lost the best time-interpolator: */
+				time_interpolator = NULL;
+				/* find the next-best interpolator */
+				for (curr = ti_global.list; curr; curr = curr->next)
+					if (is_better_time_interpolator(curr))
+						time_interpolator = curr;
+			}
+		}
+		write_sequnlock_irq(&xtime_lock);
+	}
+	spin_unlock(&ti_global.lock);
+}
+
+#endif /* CONFIG_TIME_INTERPOLATION */

@@ -1003,7 +1003,7 @@ static int wanpipe_release(struct socket *sock)
 
 	sock->sk = NULL;
 	sk->socket = NULL;
-	__set_bit(SOCK_DEAD, &sk->flags);
+	sock_set_flag(sk, SOCK_DEAD);
 
 	/* Purge queues */
 	skb_queue_purge(&sk->receive_queue);
@@ -1075,7 +1075,7 @@ static void release_driver(struct sock *sk)
 		while ((skb=skb_dequeue(&sk->receive_queue))!=NULL){
 			if ((deadsk = get_newsk_from_skb(skb))){
 				DBG_PRINTK (KERN_INFO "wansock: RELEASE: FOUND DEAD SOCK\n");
-				__set_bit(SOCK_DEAD, &deadsk->flags);
+				sock_set_flag(deadsk, SOCK_DEAD);
 				start_cleanup_timer(deadsk);
 			}
 			kfree_skb(skb);
@@ -1408,8 +1408,7 @@ static int wanpipe_bind(struct socket *sock, struct sockaddr *uaddr, int addr_le
 		/* Bind a socket to a interface name 
                  * This is used by PVC mostly
                  */
-		strncpy(name,sll->sll_device,14);
-		name[14]=0;
+		strlcpy(name,sll->sll_device,sizeof(name));
 		dev = dev_get_by_name(name);
 		if (dev == NULL){
 			printk(KERN_INFO "wansock: Failed to get Dev from name: %s,\n",

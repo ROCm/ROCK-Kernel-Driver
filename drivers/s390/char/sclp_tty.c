@@ -16,6 +16,8 @@
 #include <linux/sched.h>
 #include <linux/wait.h>
 #include <linux/slab.h>
+#include <linux/err.h>
+#include <linux/init.h>
 #include <asm/uaccess.h>
 
 #include "ctrlchar.h"
@@ -55,7 +57,7 @@ static struct tty_struct *sclp_tty;
 static unsigned char sclp_tty_chars[SCLP_TTY_BUF_SIZE];
 static unsigned short int sclp_tty_chars_count;
 
-static struct tty_driver sclp_tty_driver;
+struct tty_driver sclp_tty_driver;
 static struct tty_struct * sclp_tty_table[1];
 static struct termios * sclp_tty_termios[1];
 static struct termios * sclp_tty_termios_locked[1];
@@ -710,7 +712,7 @@ static struct sclp_register sclp_input_event =
 	.receiver_fn = sclp_tty_receiver
 };
 
-void
+int __init
 sclp_tty_init(void)
 {
 	void *page;
@@ -718,20 +720,20 @@ sclp_tty_init(void)
 	int rc;
 
 	if (!CONSOLE_IS_SCLP)
-		return;
+		return 0;
 	rc = sclp_rw_init();
-	if (rc != 0) {
+	if (rc) {
 		printk(KERN_ERR SCLP_TTY_PRINT_HEADER
 		       "could not register tty - "
 		       "sclp_rw_init returned %d\n", rc);
-		return;
+		return rc;
 	}
 	/* Allocate pages for output buffering */
 	INIT_LIST_HEAD(&sclp_tty_pages);
 	for (i = 0; i < MAX_KMEM_PAGES; i++) {
 		page = (void *) get_zeroed_page(GFP_KERNEL | GFP_DMA);
 		if (page == NULL)
-			return;
+			return -ENOMEM;
 		list_add_tail((struct list_head *) page, &sclp_tty_pages);
 	}
 	INIT_LIST_HEAD(&sclp_tty_outqueue);
@@ -753,8 +755,9 @@ sclp_tty_init(void)
 	sclp_tty_chars_count = 0;
 	sclp_tty = NULL;
 
-	if (sclp_register(&sclp_input_event) != 0)
-		return;
+	rc = sclp_register(&sclp_input_event);
+	if (rc)
+		return rc;
 
 	memset (&sclp_tty_driver, 0, sizeof(struct tty_driver));
 	sclp_tty_driver.magic = TTY_DRIVER_MAGIC;
@@ -810,8 +813,10 @@ sclp_tty_init(void)
 	sclp_tty_driver.write_proc = NULL;
 
 	rc = tty_register_driver(&sclp_tty_driver);
-	if (rc != 0)
+	if (rc)
 		printk(KERN_ERR SCLP_TTY_PRINT_HEADER
 		       "could not register tty - "
-		       "sclp_drv_register returned %d\n", rc);
+		       "tty_register_driver returned %d\n", rc);
+	return rc;
 }
+module_init(sclp_tty_init);
