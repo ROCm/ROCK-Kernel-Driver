@@ -138,7 +138,6 @@ EXPORT_SYMBOL(page_address);
 EXPORT_SYMBOL(get_user_pages);
 
 /* filesystem internal functions */
-EXPORT_SYMBOL(def_blk_fops);
 EXPORT_SYMBOL(update_atime);
 EXPORT_SYMBOL(get_fs_type);
 EXPORT_SYMBOL(user_get_super);
@@ -161,7 +160,6 @@ EXPORT_SYMBOL(filp_open);
 EXPORT_SYMBOL(filp_close);
 EXPORT_SYMBOL(put_filp);
 EXPORT_SYMBOL(files_lock);
-EXPORT_SYMBOL(check_disk_change);
 EXPORT_SYMBOL(invalidate_inodes);
 EXPORT_SYMBOL(__invalidate_device);
 EXPORT_SYMBOL(invalidate_inode_pages);
@@ -171,16 +169,6 @@ EXPORT_SYMBOL(inode_setattr);
 EXPORT_SYMBOL(inode_change_ok);
 EXPORT_SYMBOL(write_inode_now);
 EXPORT_SYMBOL(notify_change);
-EXPORT_SYMBOL(set_blocksize);
-EXPORT_SYMBOL(sb_set_blocksize);
-EXPORT_SYMBOL(sb_min_blocksize);
-EXPORT_SYMBOL(bdget);
-EXPORT_SYMBOL(bdput);
-EXPORT_SYMBOL(bd_claim);
-EXPORT_SYMBOL(bd_release);
-EXPORT_SYMBOL(open_bdev_excl);
-EXPORT_SYMBOL(close_bdev_excl);
-EXPORT_SYMBOL(open_by_devnum);
 EXPORT_SYMBOL(blockdev_direct_IO);
 EXPORT_SYMBOL(file_ra_state_init);
 EXPORT_SYMBOL(generic_ro_fops);
@@ -240,10 +228,6 @@ EXPORT_SYMBOL(tty_std_termios);
 
 /* block device driver support */
 EXPORT_SYMBOL(bmap);
-EXPORT_SYMBOL(blkdev_open);
-EXPORT_SYMBOL(blkdev_get);
-EXPORT_SYMBOL(blkdev_put);
-EXPORT_SYMBOL(ioctl_by_bdev);
 EXPORT_SYMBOL(read_dev_sector);
 EXPORT_SYMBOL(iov_shorten);
 EXPORT_SYMBOL_GPL(default_backing_dev_info);
