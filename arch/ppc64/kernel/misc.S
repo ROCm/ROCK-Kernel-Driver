@@ -266,24 +266,6 @@ _GLOBAL(__flush_dcache_icache)
 	blr
 	
 /*
- * Copy a whole page.  Assumes a 4096B page size.
- */
-_GLOBAL(copy_page)
-	clrrdi	r3,r3,12           	    /* Page align */
-	clrrdi	r4,r4,12           	    /* Page align */
-	li	r5,256
-	mtctr	r5
-	addi	r3,r3,-8
-	addi	r4,r4,-8
-
-1:      ld 	r6,8(r4)
-        ldu	r7,16(r4)
-	std     r6,8(r3) 
-	stdu    r7,16(r3) 
-	bdnz+	1b
-	blr  
-
-/*
  * I/O string operations
  *
  * insb(port, buf, len)
@@ -649,7 +631,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_init_module
 	.llong .sys32_delete_module
 	.llong .sys32_get_kernel_syms	/* 130 */
-	.llong .sys32_quotactl
+	.llong .sys_quotactl
 	.llong .sys32_getpgid
 	.llong .sys_fchdir
 	.llong .sys32_bdflush
@@ -740,7 +722,11 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_lremovexattr
 	.llong .sys_fremovexattr	/* 220 */
 	.llong .sys_futex
-	.rept NR_syscalls-221
+	.llong .sys_ni_syscall		/* reserved for tux */
+	.llong .sys32_sched_setaffinity
+	.llong .sys32_sched_getaffinity
+
+	.rept NR_syscalls-224
 		.llong .sys_ni_syscall
 	.endr
 #endif
@@ -969,6 +955,10 @@ _GLOBAL(sys_call_table)
 	.llong .sys_lremovexattr
 	.llong .sys_fremovexattr	/* 220 */
 	.llong .sys_futex
-	.rept NR_syscalls-221
+	.llong .sys_ni_syscall		/* reserved for tux */
+	.llong .sys_sched_setaffinity
+	.llong .sys_sched_getaffinity
+
+	.rept NR_syscalls-224
 	.llong .sys_ni_syscall
 	.endr

@@ -85,7 +85,8 @@ struct paca_struct {
 	u8 xProcEnabled;		/* 1=soft enabled			0x78 */
 	u8 xHrdIntCount;		/* Count of active hardware interrupts  0x79  */
 	u8 prof_enabled;		/* 1=iSeries profiling enabled          0x7A */
-	u8 resv1[5];			/*					0x7B-0x7F */
+	u8 stab_cache_pointer;	
+	u8 resv1[4];			/*					0x7B-0x7F */
 
 /*=====================================================================================
  * CACHE_LINE_2 0x0080 - 0x00FF

@@ -85,14 +85,10 @@ extern struct task_struct *current_set[NR_CPUS];
 
 void mm_init_ppc64(void);
 
-unsigned long *pmac_find_end_of_memory(void);
-extern unsigned long *find_end_of_memory(void);
-
 extern pgd_t ioremap_dir[];
 pgd_t * ioremap_pgd = (pgd_t *)&ioremap_dir;
 
 static void map_io_page(unsigned long va, unsigned long pa, int flags);
-extern void die_if_kernel(char *,struct pt_regs *,long);
 
 unsigned long klimit = (unsigned long)_end;
 
@@ -246,20 +242,17 @@ static void map_io_page(unsigned long ea, unsigned long pa, int flags)
 void
 flush_tlb_mm(struct mm_struct *mm)
 {
-	if (mm->map_count) {
-		struct vm_area_struct *mp;
-		for (mp = mm->mmap; mp != NULL; mp = mp->vm_next)
-			__flush_tlb_range(mm, mp->vm_start, mp->vm_end);
-	} else {
-		/* MIKEC: It is not clear why this is needed */
-		/* paulus: it is needed to clear out stale HPTEs
-		 * when an address space (represented by an mm_struct)
-		 * is being destroyed. */
-		__flush_tlb_range(mm, USER_START, USER_END);
-	}
+	struct vm_area_struct *mp;
+
+	spin_lock(&mm->page_table_lock);
+
+	for (mp = mm->mmap; mp != NULL; mp = mp->vm_next)
+		__flush_tlb_range(mm, mp->vm_start, mp->vm_end);
 
 	/* XXX are there races with checking cpu_vm_mask? - Anton */
 	mm->cpu_vm_mask = 0;
+
+	spin_unlock(&mm->page_table_lock);
 }
 
 /*
@@ -399,47 +392,40 @@ __flush_tlb_range(struct mm_struct *mm, unsigned long start, unsigned long end)
 		flush_hash_range(context, i, local);
 }
 
-
-void __init free_initmem(void)
+void free_initmem(void)
 {
-	unsigned long a;
-	unsigned long num_freed_pages = 0;
-#define FREESEC(START,END,CNT) do { \
-	a = (unsigned long)(&START); \
-	for (; a < (unsigned long)(&END); a += PAGE_SIZE) { \
-	  	clear_bit(PG_reserved, &mem_map[MAP_NR(a)].flags); \
-		set_page_count(mem_map+MAP_NR(a), 1); \
-		free_page(a); \
-		CNT++; \
-	} \
-} while (0)
+	unsigned long addr;
 
-	FREESEC(__init_begin,__init_end,num_freed_pages);
-
-	printk ("Freeing unused kernel memory: %ldk init\n",
-		PGTOKB(num_freed_pages));
+	addr = (unsigned long)(&__init_begin);
+	for (; addr < (unsigned long)(&__init_end); addr += PAGE_SIZE) {
+		ClearPageReserved(virt_to_page(addr));
+		set_page_count(virt_to_page(addr), 1);
+		free_page(addr);
+		totalram_pages++;
+	}
+	printk ("Freeing unused kernel memory: %dk freed\n",
+		(&__init_end - &__init_begin) >> 10);
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
 void free_initrd_mem(unsigned long start, unsigned long end)
 {
-	unsigned long xstart = start;
+	if (start < end)
+		printk ("Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
 	for (; start < end; start += PAGE_SIZE) {
-		ClearPageReserved(mem_map + MAP_NR(start));
-		set_page_count(mem_map+MAP_NR(start), 1);
+		ClearPageReserved(virt_to_page(start));
+		set_page_count(virt_to_page(start), 1);
 		free_page(start);
 		totalram_pages++;
 	}
-	printk ("Freeing initrd memory: %ldk freed\n", (end - xstart) >> 10);
 }
 #endif
-
-
 
 /*
  * Do very early mm setup.
  */
-void __init mm_init_ppc64(void) {
+void __init mm_init_ppc64(void)
+{
 	struct paca_struct *lpaca;
 	unsigned long guard_page, index;
 
@@ -466,8 +452,6 @@ void __init mm_init_ppc64(void) {
 
 	ppc_md.progress("MM:exit", 0x211);
 }
-
-
 
 /*
  * Initialize the bootmem system and give it all the memory we
@@ -582,11 +566,11 @@ void __init mem_init(void)
 		for (addr = (unsigned long)sysmap;
 		     addr < PAGE_ALIGN((unsigned long)sysmap+sysmap_size) ;
 		     addr += PAGE_SIZE)
-			SetPageReserved(mem_map + MAP_NR(addr));
+			SetPageReserved(virt_to_page(addr));
 	
 	for (addr = KERNELBASE; addr <= (unsigned long)__va(lmb_end_of_DRAM());
 	     addr += PAGE_SIZE) {
-		if (!PageReserved(mem_map + MAP_NR(addr)))
+		if (!PageReserved(virt_to_page(addr)))
 			continue;
 		if (addr < (ulong) etext)
 			codepages++;
@@ -665,6 +649,8 @@ int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
  * fault has been handled by updating a PTE in the linux page tables.
  * We use it to preload an HPTE into the hash table corresponding to
  * the updated linux PTE.
+ * 
+ * This must always be called with the mm->page_table_lock held
  */
 void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 		      pte_t pte)

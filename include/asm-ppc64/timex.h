@@ -18,7 +18,6 @@
 		<< (SHIFT_SCALE-SHIFT_HZ)) / HZ)
 
 typedef unsigned long cycles_t;
-extern cycles_t cacheflush_time;
 
 static inline cycles_t get_cycles(void)
 {

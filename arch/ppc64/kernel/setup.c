@@ -130,6 +130,14 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	/* This should be fixed properly in kernel/resource.c */
 	iomem_resource.end = MEM_SPACE_LIMIT;
 
+#ifdef CONFIG_XMON_DEFAULT
+	debugger = xmon;
+	debugger_bpt = xmon_bpt;
+	debugger_sstep = xmon_sstep;
+	debugger_iabr_match = xmon_iabr_match;
+	debugger_dabr_match = xmon_dabr_match;
+#endif
+
 	/* pSeries systems are identified in prom.c via OF. */
 	if ( itLpNaca.xLparInstalled == 1 )
 		naca->platform = PLATFORM_ISERIES_LPAR;
@@ -507,11 +515,6 @@ void __init setup_arch(char **cmdline_p)
 
 	ppc_md.progress("setup_arch:enter", 0x3eab);
 
-#if defined(CONFIG_KGDB)
-	kgdb_map_scc();
-	set_debug_traps();
-	breakpoint();
-#endif
 	/*
 	 * Set cache line size based on type of cpu as a default.
 	 * Systems with OF can look in the properties on the cpu node(s)
@@ -541,26 +544,6 @@ void __init setup_arch(char **cmdline_p)
 	paging_init();
 	sort_exception_table();
 	ppc_md.progress("setup_arch: exit", 0x3eab);
-}
-
-void exception_trace(unsigned long trap)
-{
-	unsigned long x, srr0, srr1, reg20, reg1, reg21;
-
-	asm("mflr %0" : "=r" (x) :);
-	asm("mfspr %0,0x1a" : "=r" (srr0) :);
-	asm("mfspr %0,0x1b" : "=r" (srr1) :);
-	asm("mr %0,1" : "=r" (reg1) :);
-	asm("mr %0,20" : "=r" (reg20) :);
-	asm("mr %0,21" : "=r" (reg21) :);
-
-	udbg_puts("\n");
-	udbg_puts("Took an exception : "); udbg_puthex(x); udbg_puts("\n");
-	udbg_puts("   "); udbg_puthex(reg1); udbg_puts("\n");
-	udbg_puts("   "); udbg_puthex(reg20); udbg_puts("\n");
-	udbg_puts("   "); udbg_puthex(reg21); udbg_puts("\n");
-	udbg_puts("   "); udbg_puthex(srr0); udbg_puts("\n");
-	udbg_puts("   "); udbg_puthex(srr1); udbg_puts("\n");
 }
 
 int set_spread_lpevents( char * str )

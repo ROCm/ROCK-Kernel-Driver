@@ -878,7 +878,7 @@ prom_initialize_tce_table(void)
 	phandle node;
 	ihandle phb_node;
         unsigned long offset = reloc_offset();
-	char compatible[64], path[64], type[64];
+	char compatible[64], path[64], type[64], model[64];
 	unsigned long i, table = 0;
 	unsigned long base, vbase, align;
 	unsigned int minalign, minsize;
@@ -893,16 +893,25 @@ prom_initialize_tce_table(void)
 	for (node = 0; prom_next_node(&node); ) {
 		compatible[0] = 0;
 		type[0] = 0;
+		model[0] = 0;
 		call_prom(RELOC("getprop"), 4, 1, node, RELOC("compatible"),
 			  compatible, sizeof(compatible));
 		call_prom(RELOC("getprop"), 4, 1, node, RELOC("device_type"),
 			  type, sizeof(type));
+		call_prom(RELOC("getprop"), 4, 1, node, RELOC("model"),
+			  model, sizeof(model));
 
-		if ((compatible[0] == 0) ||
-		   ((strstr(compatible, RELOC("python")) == NULL) &&
-		    (strstr(compatible, RELOC("Speedwagon")) == NULL))) {
-			continue;
+		/* Keep the old logic in tack to avoid regression. */
+		if (compatible[0] != 0) {
+			if((strstr(compatible, RELOC("python")) == NULL) &&
+			   (strstr(compatible, RELOC("Speedwagon")) == NULL))
+				continue;
+		} else if (model[0] != 0) {
+			if ((strstr(model, RELOC("ython")) == NULL) &&
+			    (strstr(model, RELOC("peedwagon")) == NULL))
+				continue;
 		}
+
 		if ((type[0] == 0) || (strstr(type, RELOC("pci")) == NULL)) {
 			continue;
 		}
