@@ -364,7 +364,6 @@ struct _snd_via82xx {
 	unsigned char spdif_ctrl_saved;
 	unsigned char capture_src_saved[2];
 	unsigned int mpu_port_saved;
-	u32 pci_state[16];
 #endif
 
 	unsigned char playback_volume[4][2]; /* for VIA8233/C/8235; default = 0 */
@@ -1893,7 +1892,6 @@ static int snd_via82xx_suspend(snd_card_t *card, unsigned int state)
 		chip->capture_src_saved[1] = inb(chip->port + VIA_REG_CAPTURE_CHANNEL + 0x10);
 	}
 
-	pci_save_state(chip->pci, chip->pci_state);
 	pci_set_power_state(chip->pci, 3);
 	pci_disable_device(chip->pci);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
@@ -1906,7 +1904,6 @@ static int snd_via82xx_resume(snd_card_t *card, unsigned int state)
 	int idx, i;
 
 	pci_enable_device(chip->pci);
-	pci_restore_state(chip->pci, chip->pci_state);
 	pci_set_power_state(chip->pci, 0);
 
 	snd_via82xx_chip_init(chip);

@@ -261,10 +261,6 @@ struct snd_atiixp {
 
 	int spdif_over_aclink;		/* passed from the module option */
 	struct semaphore open_mutex;	/* playback open mutex */
-
-#ifdef CONFIG_PM
-	u32 pci_state[16];
-#endif
 };
 
 
@@ -1134,7 +1130,6 @@ static int snd_atiixp_suspend(snd_card_t *card, unsigned int state)
 	snd_atiixp_aclink_down(chip);
 	snd_atiixp_chip_stop(chip);
 
-	pci_save_state(chip->pci, chip->pci_state);
 	pci_set_power_state(chip->pci, 3);
 	pci_disable_device(chip->pci);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
@@ -1147,7 +1142,6 @@ static int snd_atiixp_resume(snd_card_t *card, unsigned int state)
 	int i;
 
 	pci_enable_device(chip->pci);
-	pci_restore_state(chip->pci, chip->pci_state);
 	pci_set_power_state(chip->pci, 0);
 
 	snd_atiixp_aclink_reset(chip);
