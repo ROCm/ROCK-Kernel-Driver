@@ -136,16 +136,8 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 	struct sysinfo i;
 	int len, committed;
 	struct page_state ps;
-	int cpu;
 	unsigned long inactive;
 	unsigned long active;
-	unsigned long flushes = 0;
-	unsigned long non_flushes = 0;
-
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		flushes += mmu_gathers[cpu].flushes;
-		non_flushes += mmu_gathers[cpu].avoided_flushes;
-	}
 
 	get_page_state(&ps);
 	get_zone_counts(&active, &inactive);
@@ -181,9 +173,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		"Mapped:       %8lu kB\n"
 		"Committed_AS: %8u kB\n"
 		"PageTables:   %8lu kB\n"
-		"ReverseMaps:  %8lu\n"
-		"TLB flushes:  %8lu\n"
-		"non flushes:  %8lu\n",
+		"ReverseMaps:  %8lu\n",
 		K(i.totalram),
 		K(i.freeram),
 		K(i.sharedram),
@@ -203,9 +193,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(ps.nr_mapped),
 		K(committed),
 		K(ps.nr_page_table_pages),
-		ps.nr_reverse_maps,
-		flushes,
-		non_flushes
+		ps.nr_reverse_maps
 		);
 
 #ifdef CONFIG_HUGETLB_PAGE
