@@ -1710,9 +1710,6 @@ static int journal_read(struct super_block *p_s_sb) {
     printk("clm-2076: device is readonly, unable to replay log\n") ;
     return -1 ;
   }
-  if (continue_replay && (p_s_sb->s_flags & MS_RDONLY)) {
-    printk("Warning, log replay starting on readonly filesystem\n") ;    
-  }
 
   /* ok, there are transactions that need to be replayed.  start with the first log block, find
   ** all the valid transactions, and pick out the oldest.
