@@ -308,7 +308,7 @@ static int sx_fw_ioctl (struct inode *inode, struct file *filp,
 static int sx_init_drivers(void);
 
 
-static struct tty_driver sx_driver;
+static struct tty_driver *sx_driver;
 
 static struct sx_board boards[SX_NBOARDS];
 static struct sx_port *sx_ports;
@@ -2210,6 +2210,24 @@ static int probe_si (struct sx_board *board)
 	return 1;
 }
 
+static struct tty_operations sx_ops = {
+	.break_ctl = sx_break,
+	.open	= sx_open,
+	.close = gs_close,
+	.write = gs_write,
+	.put_char = gs_put_char,
+	.flush_chars = gs_flush_chars,
+	.write_room = gs_write_room,
+	.chars_in_buffer = gs_chars_in_buffer,
+	.flush_buffer = gs_flush_buffer,
+	.ioctl = sx_ioctl,
+	.throttle = sx_throttle,
+	.unthrottle = sx_unthrottle,
+	.set_termios = gs_set_termios,
+	.stop = gs_stop,
+	.start = gs_start,
+	.hangup = gs_hangup,
+};
 
 static int sx_init_drivers(void)
 {
@@ -2217,38 +2235,23 @@ static int sx_init_drivers(void)
 
 	func_enter();
 
-	memset(&sx_driver, 0, sizeof(sx_driver));
-	sx_driver.magic = TTY_DRIVER_MAGIC;
-	sx_driver.owner = THIS_MODULE;
-	sx_driver.driver_name = "specialix_sx";
-	sx_driver.name = "ttyX";
-	sx_driver.major = SX_NORMAL_MAJOR;
-	sx_driver.num = sx_nports;
-	sx_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	sx_driver.subtype = SERIAL_TYPE_NORMAL;
-	sx_driver.init_termios = tty_std_termios;
-	sx_driver.init_termios.c_cflag =
+	sx_driver = alloc_tty_driver(sx_nports);
+	if (!sx_driver)
+		return 1;
+	sx_driver->owner = THIS_MODULE;
+	sx_driver->driver_name = "specialix_sx";
+	sx_driver->name = "ttyX";
+	sx_driver->major = SX_NORMAL_MAJOR;
+	sx_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	sx_driver->subtype = SERIAL_TYPE_NORMAL;
+	sx_driver->init_termios = tty_std_termios;
+	sx_driver->init_termios.c_cflag =
 	  B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	sx_driver.flags = TTY_DRIVER_REAL_RAW;
-	sx_driver.break_ctl = sx_break;
+	sx_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(sx_driver, &sx_ops);
 
-	sx_driver.open	= sx_open;
-	sx_driver.close = gs_close;
-	sx_driver.write = gs_write;
-	sx_driver.put_char = gs_put_char;
-	sx_driver.flush_chars = gs_flush_chars;
-	sx_driver.write_room = gs_write_room;
-	sx_driver.chars_in_buffer = gs_chars_in_buffer;
-	sx_driver.flush_buffer = gs_flush_buffer;
-	sx_driver.ioctl = sx_ioctl;
-	sx_driver.throttle = sx_throttle;
-	sx_driver.unthrottle = sx_unthrottle;
-	sx_driver.set_termios = gs_set_termios;
-	sx_driver.stop = gs_stop;
-	sx_driver.start = gs_start;
-	sx_driver.hangup = gs_hangup;
-
-	if ((error = tty_register_driver(&sx_driver))) {
+	if ((error = tty_register_driver(sx_driver))) {
+		put_tty_driver(sx_driver);
 		printk(KERN_ERR "sx: Couldn't register sx driver, error = %d\n",
 		       error);
 		return 1;
@@ -2349,7 +2352,8 @@ static int sx_init_portstructs (int nboards, int nports)
 static void __exit sx_release_drivers(void)
 {
 	func_enter();
-	tty_unregister_driver(&sx_driver);
+	tty_unregister_driver(sx_driver);
+	put_tty_driver(sx_driver);
 	func_exit();
 }
 
