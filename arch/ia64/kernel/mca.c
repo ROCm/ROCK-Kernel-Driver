@@ -782,10 +782,8 @@ ia64_mca_wakeup_int_handler(int wakeup_irq, void *arg, struct pt_regs *ptregs)
  */
 
 static void
-ia64_return_to_sal_check(void)
+ia64_return_to_sal_check(int recover)
 {
-	pal_processor_state_info_t *psp = (pal_processor_state_info_t *)
-		&ia64_sal_to_os_handoff_state.proc_state_param;
 
 	/* Copy over some relevant stuff from the sal_to_os_mca_handoff
 	 * so that it can be used at the time of os_mca_to_sal_handoff
@@ -796,15 +794,10 @@ ia64_return_to_sal_check(void)
 	ia64_os_to_sal_handoff_state.imots_sal_check_ra =
 		ia64_sal_to_os_handoff_state.imsto_sal_check_ra;
 
-	/*
-	 * Did we correct the error? At the moment the only error that
-	 * we fix is a TLB error, if any other kind of error occurred
-	 * we must reboot.
-	 */
-	if (psp->cc == 1 && psp->bc == 1 && psp->rc == 1 && psp->uc == 1)
-		ia64_os_to_sal_handoff_state.imots_os_status = IA64_MCA_COLD_BOOT;
-	else
+	if (recover)
 		ia64_os_to_sal_handoff_state.imots_os_status = IA64_MCA_CORRECTED;
+	else
+		ia64_os_to_sal_handoff_state.imots_os_status = IA64_MCA_COLD_BOOT;
 
 	/* Default = tell SAL to return to same context */
 	ia64_os_to_sal_handoff_state.imots_context = IA64_MCA_SAME_CONTEXT;
@@ -833,6 +826,10 @@ ia64_return_to_sal_check(void)
 void
 ia64_mca_ucmc_handler(void)
 {
+	pal_processor_state_info_t *psp = (pal_processor_state_info_t *)
+		&ia64_sal_to_os_handoff_state.proc_state_param;
+	int recover = psp->tc && !(psp->cc || psp->bc || psp->rc || psp->uc);
+
 	/* Get the MCA error record and log it */
 	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_MCA, 0);
 
@@ -843,7 +840,7 @@ ia64_mca_ucmc_handler(void)
 	ia64_mca_wakeup_all();
 
 	/* Return to SAL */
-	ia64_return_to_sal_check();
+	ia64_return_to_sal_check(recover);
 }
 
 static DECLARE_WORK(cmc_disable_work, ia64_mca_cmc_vector_disable_keventd, NULL);
