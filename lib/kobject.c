@@ -31,10 +31,21 @@ void kobject_init(struct kobject * kobj)
 
 int kobject_register(struct kobject * kobj)
 {
+	struct subsystem * s = subsys_get(kobj->subsys);
+	struct kobject * parent = kobject_get(kobj->parent);
+
 	pr_debug("kobject %s: registering\n",kobj->name);
-	if (kobj->parent)
-		kobject_get(kobj->parent);
-	return 0;
+	if (s) {
+		down_write(&s->rwsem);
+		if (parent) 
+			list_add_tail(&kobj->entry,&parent->entry);
+		else {
+			list_add_tail(&kobj->entry,&s->list);
+			kobj->parent = &s->kobj;
+		}
+		up_write(&s->rwsem);
+	}
+	return sysfs_create_dir(kobj);
 }
 
 /**
@@ -53,6 +64,12 @@ int kobject_register(struct kobject * kobj)
 void kobject_unregister(struct kobject * kobj)
 {
 	pr_debug("kobject %s: unregistering\n",kobj->name);
+	sysfs_remove_dir(kobj);
+	if (kobj->subsys) {
+		down_write(&kobj->subsys->rwsem);
+		list_del_init(&kobj->entry);
+		up_write(&kobj->subsys->rwsem);
+	}
 	kobject_put(kobj);
 }
 
@@ -64,7 +81,7 @@ void kobject_unregister(struct kobject * kobj)
 struct kobject * kobject_get(struct kobject * kobj)
 {
 	struct kobject * ret = kobj;
-	if (atomic_read(&kobj->refcount) > 0)
+	if (kobj && atomic_read(&kobj->refcount) > 0)
 		atomic_inc(&kobj->refcount);
 	else
 		ret = NULL;
@@ -78,21 +95,68 @@ struct kobject * kobject_get(struct kobject * kobj)
  *	Decrement the refcount, and check if 0. If it is, then 
  *	we're gonna need to clean it up, and decrement the refcount
  *	of its parent.
+ *
+ *	@kobj->parent could point to its subsystem, which we also 
+ *	want to decrement the reference count for. We always dec 
+ *	the refcount for the parent, but only do so for the subsystem
+ *	if it points to a different place than the parent.
  */
 
 void kobject_put(struct kobject * kobj)
 {
 	struct kobject * parent = kobj->parent;
+	struct subsystem * s = kobj->subsys;
 
 	if (!atomic_dec_and_test(&kobj->refcount))
 		return;
+
 	pr_debug("kobject %s: cleaning up\n",kobj->name);
-	if (parent)
+	if (s) {
+		if (s->release)
+			s->release(kobj);
+		if (&s->kobj != parent)
+			subsys_put(s);
+	} 
+
+	if (parent) 
 		kobject_put(parent);
 }
+
+
+void subsystem_init(struct subsystem * s)
+{
+	kobject_init(&s->kobj);
+	init_rwsem(&s->rwsem);
+	INIT_LIST_HEAD(&s->list);
+}
+
+/**
+ *	subsystem_register - register a subsystem.
+ *	@s:	the subsystem we're registering.
+ */
+
+int subsystem_register(struct subsystem * s)
+{
+	subsystem_init(s);
+	if (s->parent)
+		s->kobj.parent = &s->parent->kobj;
+	pr_debug("subsystem %s: registering\n",s->kobj.name);
+	return kobject_register(&s->kobj);
+}
+
+void subsystem_unregister(struct subsystem * s)
+{
+	pr_debug("subsystem %s: unregistering\n",s->kobj.name);
+	kobject_unregister(&s->kobj);
+}
+
 
 EXPORT_SYMBOL(kobject_init);
 EXPORT_SYMBOL(kobject_register);
 EXPORT_SYMBOL(kobject_unregister);
 EXPORT_SYMBOL(kobject_get);
 EXPORT_SYMBOL(kobject_put);
+
+EXPORT_SYMBOL(subsystem_init);
+EXPORT_SYMBOL(subsystem_register);
+EXPORT_SYMBOL(subsystem_unregister);
