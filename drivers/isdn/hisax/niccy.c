@@ -175,12 +175,8 @@ niccy_release(struct IsdnCardState *cs)
 		val = inl(cs->hw.niccy.cfg_reg + PCI_IRQ_CTRL_REG);
 		val &= PCI_IRQ_DISABLE;
 		outl(val, cs->hw.niccy.cfg_reg + PCI_IRQ_CTRL_REG);
-		release_region(cs->hw.niccy.cfg_reg, 0x40);
-		release_region(cs->hw.niccy.isac, 4);
-	} else {
-		release_region(cs->hw.niccy.isac, 2);
-		release_region(cs->hw.niccy.isac_ale, 2);
 	}
+	hisax_release_resources(cs);
 }
 
 static int
@@ -265,23 +261,10 @@ setup_niccy(struct IsdnCard *card)
 		cs->hw.niccy.cfg_reg = 0;
 		cs->subtyp = NICCY_PNP;
 		cs->irq = card->para[0];
-		if (!request_region(cs->hw.niccy.isac, 2, "niccy data")) {
-			printk(KERN_WARNING
-				"HiSax: %s data port %x-%x already in use\n",
-				CardType[card->typ],
-				cs->hw.niccy.isac,
-				cs->hw.niccy.isac + 1);
-			return (0);
-		}
-		if (!request_region(cs->hw.niccy.isac_ale, 2, "niccy addr")) {
-			printk(KERN_WARNING
-				"HiSax: %s address port %x-%x already in use\n",
-				CardType[card->typ],
-				cs->hw.niccy.isac_ale,
-				cs->hw.niccy.isac_ale + 1);
-			release_region(cs->hw.niccy.isac, 2);
-			return (0);
-		}
+		if (!request_io(&cs->rs, cs->hw.niccy.isac, 2, "niccy data"))
+			goto err;
+		if (!request_io(&cs->rs, cs->hw.niccy.isac_ale, 2, "niccy addr"))
+			goto err;
 	} else {
 #if CONFIG_PCI
 		u_int pci_ioaddr;
@@ -320,23 +303,11 @@ setup_niccy(struct IsdnCard *card)
 		cs->hw.niccy.isac_ale = pci_ioaddr + ISAC_PCI_ADDR;
 		cs->hw.niccy.hscx = pci_ioaddr + HSCX_PCI_DATA;
 		cs->hw.niccy.hscx_ale = pci_ioaddr + HSCX_PCI_ADDR;
-		if (!request_region(cs->hw.niccy.isac, 4, "niccy")) {
-			printk(KERN_WARNING
-				"HiSax: %s data port %x-%x already in use\n",
-				CardType[card->typ],
-				cs->hw.niccy.isac,
-				cs->hw.niccy.isac + 4);
-			return (0);
-		}
-		if (!request_region(cs->hw.niccy.cfg_reg, 0x40, "niccy pci")) {
-			printk(KERN_WARNING
-			       "HiSax: %s pci port %x-%x already in use\n",
-				CardType[card->typ],
-				cs->hw.niccy.cfg_reg,
-				cs->hw.niccy.cfg_reg + 0x40);
-			release_region(cs->hw.niccy.isac, 4);
-			return (0);
-		}
+
+		if (!request_io(&cs->rs, cs->hw.niccy.isac, 4, "niccy"))
+			goto err;
+		if (!request_io(&cs->rs, cs->hw.niccy.cfg_reg, 0x40, "niccy pci"))
+			goto err;
 #else
 		printk(KERN_WARNING "Niccy: io0 0 and NO_PCI_BIOS\n");
 		printk(KERN_WARNING "Niccy: unable to config NICCY PCI\n");
@@ -355,8 +326,9 @@ setup_niccy(struct IsdnCard *card)
 	if (HscxVersion(cs, "Niccy:")) {
 		printk(KERN_WARNING
 		    "Niccy: wrong HSCX versions check IO address\n");
-		niccy_release(cs);
-		return (0);
 	}
-	return (1);
+	return 1;
+ err:
+	niccy_release(cs);
+	return 0;
 }

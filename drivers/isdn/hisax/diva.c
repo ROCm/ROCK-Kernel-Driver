@@ -362,25 +362,11 @@ diva_ipacx_pci_irq(int intno, void *dev_id, struct pt_regs *regs)
 static void
 diva_release(struct IsdnCardState *cs)
 {
-	int bytecnt;
-
 	del_timer(&cs->hw.diva.tl);
 	if (cs->hw.diva.cfg_reg)
 		byteout(cs->hw.diva.ctrl, 0); /* LED off, Reset */
 
-	if (cs->subtyp == DIVA_ISA)
-		bytecnt = 8;
-	else
-		bytecnt = 32;
-	if (cs->hw.diva.cfg_reg)
-		release_region(cs->hw.diva.cfg_reg, bytecnt);
-}
-
-static void
-diva_ipac_isa_release(struct IsdnCardState *cs)
-{
-	if (cs->hw.diva.cfg_reg)
-		release_region(cs->hw.diva.cfg_reg, 8);
+	hisax_release_resources(cs);
 }
 
 static void
@@ -561,7 +547,7 @@ static struct card_ops diva_ops = {
 static struct card_ops diva_ipac_isa_ops = {
 	.init     = ipac_init,
 	.reset    = diva_ipac_isa_reset,
-	.release  = diva_ipac_isa_release,
+	.release  = hisax_release_resources,
 	.irq_func = ipac_irq,
 };
 
@@ -798,16 +784,8 @@ ready:
 			cs->hw.diva.pci_cfg);
 	if ((cs->subtyp != DIVA_IPAC_PCI) &&
 	    (cs->subtyp != DIVA_IPACX_PCI)   ) {
-		if (check_region(cs->hw.diva.cfg_reg, bytecnt)) {
-			printk(KERN_WARNING
-			       "HiSax: %s config port %lx-%lx already in use\n",
-			       CardType[card->typ],
-			       cs->hw.diva.cfg_reg,
-			       cs->hw.diva.cfg_reg + bytecnt);
-			return (0);
-		} else {
-			request_region(cs->hw.diva.cfg_reg, bytecnt, "diva isdn");
-		}
+		if (!request_io(&cs->rs, cs->hw.diva.cfg_reg, bytecnt, "diva isdn"))
+			return 0;
 	}
 	cs->cardmsg = &Diva_card_msg;
 	if (cs->subtyp == DIVA_IPAC_ISA) {

@@ -117,7 +117,6 @@ static struct pci_dev *dev_netjet __initdata = NULL;
 int __init
 setup_netjet_s(struct IsdnCard *card)
 {
-	int bytecnt;
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
@@ -211,26 +210,17 @@ setup_netjet_s(struct IsdnCard *card)
 
 #endif /* CONFIG_PCI */
 
-	bytecnt = 256;
-
 	printk(KERN_INFO
 		"NETjet-S: PCI card configured at %#lx IRQ %d\n",
 		cs->hw.njet.base, cs->irq);
-	if (check_region(cs->hw.njet.base, bytecnt)) {
-		printk(KERN_WARNING
-		       "HiSax: %s config port %#lx-%#lx already in use\n",
-		       CardType[card->typ],
-		       cs->hw.njet.base,
-		       cs->hw.njet.base + bytecnt);
-		return (0);
-	} else {
-		request_region(cs->hw.njet.base, bytecnt, "netjet-s isdn");
-	}
+	if (!request_io(&cs->rs, cs->hw.njet.base, 0x100, "netjet-s isdn"))
+		return 0;
+	
 	nj_s_reset(cs);
 	cs->dc_hw_ops = &netjet_dc_ops;
 	cs->cardmsg = &NETjet_S_card_msg;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &nj_s_ops;
 	ISACVersion(cs, "NETjet-S:");
-	return (1);
+	return 1;
 }

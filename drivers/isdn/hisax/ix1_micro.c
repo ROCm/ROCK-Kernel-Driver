@@ -140,13 +140,6 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
 
-static void
-ix1_release(struct IsdnCardState *cs)
-{
-	if (cs->hw.ix1.cfg_reg)
-		release_region(cs->hw.ix1.cfg_reg, 4);
-}
-
 static int
 ix1_reset(struct IsdnCardState *cs)
 {
@@ -171,7 +164,7 @@ ix1_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 static struct card_ops ix1_ops = {
 	.init     = inithscxisac,
 	.reset    = ix1_reset,
-	.release  = ix1_release,
+	.release  = hisax_release_resources,
 	.irq_func = hscxisac_irq,
 };
 
@@ -247,17 +240,9 @@ setup_ix1micro(struct IsdnCard *card)
 	cs->hw.ix1.hscx = card->para[1] + HSCX_DATA_OFFSET;
 	cs->hw.ix1.cfg_reg = card->para[1];
 	cs->irq = card->para[0];
-	if (cs->hw.ix1.cfg_reg) {
-		if (check_region((cs->hw.ix1.cfg_reg), 4)) {
-			printk(KERN_WARNING
-			  "HiSax: %s config port %x-%x already in use\n",
-			       CardType[card->typ],
-			       cs->hw.ix1.cfg_reg,
-			       cs->hw.ix1.cfg_reg + 4);
-			return (0);
-		} else
-			request_region(cs->hw.ix1.cfg_reg, 4, "ix1micro cfg");
-	}
+	if (!request_io(&cs->rs, cs->hw.ix1.cfg_reg, 4, "ix1micro cfg"))
+		goto err;
+	
 	printk(KERN_INFO
 	       "HiSax: %s config irq:%d io:0x%X\n",
 	       CardType[cs->typ], cs->irq,
@@ -271,8 +256,10 @@ setup_ix1micro(struct IsdnCard *card)
 	if (HscxVersion(cs, "ix1-Micro:")) {
 		printk(KERN_WARNING
 		    "ix1-Micro: wrong HSCX versions check IO address\n");
-		ix1_release(cs);
-		return (0);
+		goto err;
 	}
-	return (1);
+	return 1;
+ err:
+	hisax_release_resources(cs);
+	return 0;
 }

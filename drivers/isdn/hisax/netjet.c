@@ -1029,6 +1029,6 @@ netjet_release(struct IsdnCardState *cs)
 	byteout(cs->hw.njet.base + NETJET_IRQMASK0, 0);
 	byteout(cs->hw.njet.base + NETJET_IRQMASK1, 0);
 	releasetiger(cs);
-	release_region(cs->hw.njet.base, 256);
+	hisax_release_resources(cs);
 }
 

@@ -132,13 +132,6 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
 
-static void
-mic_release(struct IsdnCardState *cs)
-{
-	if (cs->hw.mic.cfg_reg)
-		release_region(cs->hw.mic.cfg_reg, 8);
-}
-
 static int
 mic_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
@@ -147,14 +140,13 @@ mic_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 
 static struct card_ops mic_ops = {
 	.init     = inithscxisac,
-	.release  = mic_release,
+	.release  = hisax_release_resources,
 	.irq_func = hscxisac_irq,
 };
 
 int __init
 setup_mic(struct IsdnCard *card)
 {
-	int bytecnt;
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
@@ -163,22 +155,15 @@ setup_mic(struct IsdnCard *card)
 	if (cs->typ != ISDN_CTYPE_MIC)
 		return (0);
 
-	bytecnt = 8;
 	cs->hw.mic.cfg_reg = card->para[1];
 	cs->irq = card->para[0];
 	cs->hw.mic.adr = cs->hw.mic.cfg_reg + MIC_ADR;
 	cs->hw.mic.isac = cs->hw.mic.cfg_reg + MIC_ISAC;
 	cs->hw.mic.hscx = cs->hw.mic.cfg_reg + MIC_HSCX;
 
-	if (!request_region((cs->hw.mic.cfg_reg), bytecnt, "mic isdn")) {
-		printk(KERN_WARNING
-		       "HiSax: %s config port %x-%x already in use\n",
-		       CardType[card->typ],
-		       cs->hw.mic.cfg_reg,
-		       cs->hw.mic.cfg_reg + bytecnt);
-		return (0);
-	}
-
+	if (!request_io(&cs->rs, cs->hw.mic.cfg_reg, 8, "mic isdn"))
+		goto err;
+  
 	printk(KERN_INFO
 	       "mic: defined at 0x%x IRQ %d\n",
 	       cs->hw.mic.cfg_reg,
@@ -191,8 +176,10 @@ setup_mic(struct IsdnCard *card)
 	if (HscxVersion(cs, "mic:")) {
 		printk(KERN_WARNING
 		    "mic: wrong HSCX versions check IO address\n");
-		mic_release(cs);
-		return (0);
+		goto err;
 	}
-	return (1);
+	return 1;
+ err:
+	hisax_release_resources(cs);
+	return 0;
 }

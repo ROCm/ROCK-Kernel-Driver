@@ -170,7 +170,7 @@ static struct card_ops sportster_ops = {
 static int __init
 get_io_range(struct IsdnCardState *cs)
 {
-	int i, j, adr;
+	int i, adr;
 	
 	for (i=0;i<64;i++) {
 		adr = cs->hw.spt.cfg_reg + i *1024;
@@ -178,20 +178,18 @@ get_io_range(struct IsdnCardState *cs)
 			printk(KERN_WARNING
 				"HiSax: %s config port %x-%x already in use\n",
 				CardType[cs->typ], adr, adr + 8);
-			break;
+			goto err;
 		}
 	}
-	if (i==64)
-		return(1);
-	else {
-		for (j=0; j<i; j++) {
-			adr = cs->hw.spt.cfg_reg + j *1024;
-			release_region(adr, 8);
-		}
-		return(0);
+	return 1;
+ err:
+	for (i=i-1; i >= 0; i--) {
+		adr = cs->hw.spt.cfg_reg + i *1024;
+		release_region(adr, 8);
 	}
+	return 0;
 }
-
+  
 int __init
 setup_sportster(struct IsdnCard *card)
 {

@@ -387,8 +387,6 @@ elsa_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 static void
 elsa_release(struct IsdnCardState *cs)
 {
-	int bytecnt = 8;
-
 	del_timer(&cs->hw.elsa.tl);
 #if ARCOFI_USE
 	clear_arcofi(cs);
@@ -398,28 +396,23 @@ elsa_release(struct IsdnCardState *cs)
 	if (cs->subtyp == ELSA_QS1000PCI) {
 		byteout(cs->hw.elsa.cfg + 0x4c, 0x01);  /* disable IRQ */
 		writereg(cs, cs->hw.elsa.isac, IPAC_ATX, 0xff);
-		bytecnt = 2;
-		release_region(cs->hw.elsa.cfg, 0x80);
 	}
 	if (cs->subtyp == ELSA_QS3000PCI) {
 		byteout(cs->hw.elsa.cfg + 0x4c, 0x03); /* disable ELSA PCI IRQ */
 		writereg(cs, cs->hw.elsa.isac, IPAC_ATX, 0xff);
-		release_region(cs->hw.elsa.cfg, 0x80);
 	}
  	if (cs->subtyp == ELSA_PCMCIA_IPAC) {
 		writereg(cs, cs->hw.elsa.isac, IPAC_ATX, 0xff);
  	}
+#if ARCOFI_USE
 	if ((cs->subtyp == ELSA_PCFPRO) ||
 		(cs->subtyp == ELSA_QS3000) ||
 		(cs->subtyp == ELSA_PCF) ||
 		(cs->subtyp == ELSA_QS3000PCI)) {
-		bytecnt = 16;
-#if ARCOFI_USE
 		release_modem(cs);
-#endif
 	}
-	if (cs->hw.elsa.base)
-		release_region(cs->hw.elsa.base, bytecnt);
+#endif
+	hisax_release_resources(cs);
 }
 
 static int
@@ -532,28 +525,14 @@ check_arcofi(struct IsdnCardState *cs)
 				"Elsa: %s detected modem at 0x%lx\n",
 				Elsa_Types[cs->subtyp],
 				cs->hw.elsa.base+8);
-			release_region(cs->hw.elsa.base, 8);
-			if (!request_region(cs->hw.elsa.base, 16,"elsa isdn modem")) {
-				printk(KERN_WARNING
-				"HiSax: %s config port %lx-%lx already in use\n",
-				Elsa_Types[cs->subtyp],
-				cs->hw.elsa.base + 8,
-				cs->hw.elsa.base + 16);
-			}
+			request_io(&cs->rs, cs->hw.elsa.base+8, 8, "elsa isdn modem");
 		} else if (cs->subtyp==ELSA_PCC16) {
 			cs->subtyp = ELSA_PCF;
 			printk(KERN_INFO
 				"Elsa: %s detected modem at 0x%lx\n",
 				Elsa_Types[cs->subtyp],
 				cs->hw.elsa.base+8);
-			release_region(cs->hw.elsa.base, 8);
-			if (!request_region(cs->hw.elsa.base, 16,"elsa isdn modem")) {
-				printk(KERN_WARNING
-				"HiSax: %s config port %lx-%lx already in use\n",
-				Elsa_Types[cs->subtyp],
-				cs->hw.elsa.base + 8,
-				cs->hw.elsa.base + 16);
-			}
+			request_io(&cs->rs, cs->hw.elsa.base+8, 8, "elsa isdn modem");
 		} else
 			printk(KERN_INFO
 				"Elsa: %s detected modem at 0x%lx\n",
@@ -1081,29 +1060,17 @@ setup_elsa(struct IsdnCard *card)
 	   reserved for us by the card manager. So we do not check it
 	   here, it would fail. */
 	if (cs->typ != ISDN_CTYPE_ELSA_PCMCIA)
-		if (!request_region(cs->hw.elsa.base, bytecnt, "elsa isdn")) {		
-			printk(KERN_WARNING
-			       "HiSax: %s config port %#lx-%#lx already in use\n",
-			       CardType[card->typ],
-			       cs->hw.elsa.base,
-			       cs->hw.elsa.base + bytecnt);
-			return (0);
-		}
+		if (!request_io(&cs->rs, cs->hw.elsa.base, bytecnt, "elsa isdn"))
+			goto err;
 	
-	if ((cs->subtyp == ELSA_QS1000PCI) || (cs->subtyp == ELSA_QS3000PCI)) {
-		if (!request_region(cs->hw.elsa.cfg, 0x80, "elsa isdn pci")) {
-			printk(KERN_WARNING
-			       "HiSax: %s pci port %x-%x already in use\n",
-				CardType[card->typ],
-				cs->hw.elsa.cfg,
-				cs->hw.elsa.cfg + 0x80);
-			release_region(cs->hw.elsa.base, bytecnt);
-			return (0);
-		}
-	}
+	if ((cs->subtyp == ELSA_QS1000PCI) || (cs->subtyp == ELSA_QS3000PCI))
+		if (!request_io(&cs->rs, cs->hw.elsa.cfg, 0x80, "elsa isdn pci"))
+			goto err;
+
 #if ARCOFI_USE
 	init_arcofi(cs);
 #endif
+
 	cs->hw.elsa.tl.function = (void *) elsa_led_handler;
 	cs->hw.elsa.tl.data = (long) cs;
 	init_timer(&cs->hw.elsa.tl);
@@ -1116,15 +1083,13 @@ setup_elsa(struct IsdnCard *card)
 			if (!TimerRun(cs)) {
 				printk(KERN_WARNING
 				       "Elsa: timer do not start\n");
-				elsa_release(cs);
-				return (0);
+				goto err;
 			}
 		}
 		HZDELAY(1);	/* wait >=10 ms */
 		if (TimerRun(cs)) {
 			printk(KERN_WARNING "Elsa: timer do not run down\n");
-			elsa_release(cs);
-			return (0);
+			goto err;
 		}
 		printk(KERN_INFO "Elsa: timer OK; resetting card\n");
 	}
@@ -1143,9 +1108,8 @@ setup_elsa(struct IsdnCard *card)
 		ISACVersion(cs, "Elsa:");
 		if (HscxVersion(cs, "Elsa:")) {
 			printk(KERN_WARNING
-				"Elsa: wrong HSCX versions check IO address\n");
-			elsa_release(cs);
-			return (0);
+			       "Elsa: wrong HSCX versions check IO address\n");
+			goto err;
 		}
 	}
 	if (cs->subtyp == ELSA_PC) {
@@ -1157,5 +1121,8 @@ setup_elsa(struct IsdnCard *card)
 		writeitac(cs, ITAC_SCIE, 0);
 		writeitac(cs, ITAC_STIE, 0);
 	}
-	return (1);
+	return 1;
+ err:
+	elsa_release(cs);
+	return 0;
 }

@@ -592,7 +592,7 @@ static void
 avm_pcipnp_release(struct IsdnCardState *cs)
 {
 	outb(0, cs->hw.avm.cfg_reg + 2);
-	release_region(cs->hw.avm.cfg_reg, 32);
+	hisax_release_resources(cs);
 }
 
 static struct card_ops avm_pci_ops = {
@@ -693,15 +693,10 @@ setup_avm_pcipnp(struct IsdnCard *card)
 	}
 ready:
 	cs->hw.avm.isac = cs->hw.avm.cfg_reg + 0x10;
-	if (!request_region((cs->hw.avm.cfg_reg), 32, (cs->subtyp == AVM_FRITZ_PCI)
-			 ? "avm PCI" : "avm PnP")) {
-		printk(KERN_WARNING
-		       "HiSax: %s config port %x-%x already in use\n",
-		       CardType[card->typ],
-		       cs->hw.avm.cfg_reg,
-		       cs->hw.avm.cfg_reg + 31);
-		return (0);
-	}
+	if (!request_io(&cs->rs, cs->hw.avm.cfg_reg, 32,
+		 cs->subtyp == AVM_FRITZ_PCI ? "avm PCI" : "avm PnP"))
+		goto err;
+	
 	switch (cs->subtyp) {
 	  case AVM_FRITZ_PCI:
 		val = inl(cs->hw.avm.cfg_reg);
@@ -726,5 +721,8 @@ ready:
 	cs->cardmsg = &AVM_card_msg;
 	cs->card_ops = &avm_pci_ops;
 	ISACVersion(cs, (cs->subtyp == AVM_FRITZ_PCI) ? "AVM PCI:" : "AVM PnP:");
-	return (1);
+	return 1;
+ err:
+	hisax_release_resources(cs);
+	return 0;
 }

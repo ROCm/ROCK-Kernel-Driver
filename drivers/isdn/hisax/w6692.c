@@ -639,9 +639,9 @@ static void
 w6692_release(struct IsdnCardState *cs)
 {
 	w6692_write_reg(cs, W_IMASK, 0xff);
-	release_region(cs->hw.w6692.iobase, 256);
 	if (cs->subtyp == W6692_USR)
 		w6692_write_reg(cs, W_XDATA, 0x04);
+	hisax_release_resources(cs);
 }
 
 static int
@@ -738,15 +738,9 @@ setup_w6692(struct IsdnCard *card)
 	printk(KERN_INFO "Found: %s %s, I/O base: 0x%x, irq: %d\n",
 	       id_list[cs->subtyp].vendor_name, id_list[cs->subtyp].card_name,
 	       pci_ioaddr, pci_irq);
-	if (!request_region((cs->hw.w6692.iobase), 256,
-			    id_list[cs->subtyp].card_name)) {
-		printk(KERN_WARNING
-		       "HiSax: %s I/O ports %x-%x already in use\n",
-		       id_list[cs->subtyp].card_name,
-		       cs->hw.w6692.iobase,
-		       cs->hw.w6692.iobase + 255);
-		return (0);
-	}
+	if (!request_io(&cs->rs, cs->hw.w6692.iobase, 0x100, id_list[cs->subtyp].card_name))
+		return 0;
+	
 #else
 	printk(KERN_WARNING "HiSax: W6692 and NO_PCI_BIOS\n");
 	printk(KERN_WARNING "HiSax: W6692 unable to config\n");

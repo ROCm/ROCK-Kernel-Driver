@@ -149,6 +149,35 @@
 /* #define I4L_IRQ_FLAG SA_INTERRUPT */
 #define I4L_IRQ_FLAG    0
 
+struct res {
+	struct list_head node;
+	const char *name;
+	unsigned long start, end;
+	unsigned long flags;
+	union {
+		void *ioremap_addr;
+	} r_u;
+};
+
+struct resources {
+	struct list_head res_head;
+};
+
+void
+resources_init(struct resources *rs);
+
+void
+resources_release(struct resources *rs);
+
+unsigned long
+request_io(struct resources *rs, unsigned long start, int len,
+	   const char *name);
+
+void *
+request_mmio(struct resources *rs, unsigned long start, int len,
+	     const char *name);
+
+
 /*
  * Statemachine
  */
@@ -563,8 +592,8 @@ struct teles3_hw {
 
 struct teles0_hw {
 	unsigned int cfg_reg;
-	unsigned long membase;
 	unsigned long phymem;
+	void *membase;
 };
 
 struct avm_hw {
@@ -730,9 +759,8 @@ struct hfcD_hw {
 
 struct isurf_hw {
 	unsigned int reset;
-	unsigned long phymem;
-	unsigned long isac;
-	unsigned long isar;
+	void *isac;
+	void *isar;
 	struct isar_reg isar_r;
 };
 
@@ -919,6 +947,7 @@ struct IsdnCardState {
 	spinlock_t lock;
 	struct card_ops *card_ops;
 	int protocol;
+	struct resources rs;
 	unsigned int irq;
 	unsigned long irq_flags;
 	long HW_Flags;
@@ -993,6 +1022,9 @@ struct IsdnCardState {
 	int err_rx;
 #endif
 };
+
+void
+hisax_release_resources(struct IsdnCardState *cs);
 
 #define  MON0_RX	1
 #define  MON1_RX	2
@@ -1436,5 +1468,6 @@ L4L3(struct PStack *st, int pr, void *arg)
 {
 	st->l3.l4l3(st, pr, arg);
 }
+
 
 #endif

@@ -391,20 +391,6 @@ sedlbauer_reset(struct IsdnCardState *cs)
 }
 
 static void
-sedlbauer_release(struct IsdnCardState *cs)
-{
-	int bytecnt = 8;
-
-	if (cs->subtyp == SEDL_SPEED_FAX) {
-		bytecnt = 16;
-	} else if (cs->hw.sedl.bus == SEDL_BUS_PCI) {
-		bytecnt = 256;
-	}
-	if (cs->hw.sedl.cfg_reg)
-		release_region(cs->hw.sedl.cfg_reg, bytecnt);
-}
-
-static void
 sedlbauer_isar_release(struct IsdnCardState *cs)
 {
 	isar_write(cs, 0, ISAR_IRQBIT, 0);
@@ -412,7 +398,7 @@ sedlbauer_isar_release(struct IsdnCardState *cs)
 	sedlbauer_reset(cs);
 	isar_write(cs, 0, ISAR_IRQBIT, 0);
 	isac_write(cs, ISAC_MASK, 0xFF);
-	sedlbauer_release(cs);
+	hisax_release_resources(cs);
 }
 
 static int
@@ -452,14 +438,14 @@ sedlbauer_isar_init(struct IsdnCardState *cs)
 static struct card_ops sedlbauer_ops = {
 	.init     = inithscxisac,
 	.reset    = sedlbauer_reset,
-	.release  = sedlbauer_release,
+	.release  = hisax_release_resources,
 	.irq_func = sedlbauer_interrupt,
 };
 
 static struct card_ops sedlbauer_ipac_ops = {
 	.init     = ipac_init,
 	.reset    = sedlbauer_reset,
-	.release  = sedlbauer_release,
+	.release  = hisax_release_resources,
 	.irq_func = ipac_irq,
 };
 
@@ -546,7 +532,7 @@ setup_sedlbauer(struct IsdnCard *card)
 							printk(KERN_ERR "Sedlbauer PnP:some resources are missing %ld/%lx\n",
 								card->para[0], card->para[1]);
 							pd->deactivate(pd);
-							return(0);
+							goto err;
 						}
 						cs->hw.sedl.cfg_reg = card->para[1];
 						cs->irq = card->para[0];
@@ -561,7 +547,7 @@ setup_sedlbauer(struct IsdnCard *card)
 						goto ready;
 					} else {
 						printk(KERN_ERR "Sedlbauer PnP: PnP error card found, no device\n");
-						return(0);
+						goto err;
 					}
 				}
 				pdev++;
@@ -576,21 +562,21 @@ setup_sedlbauer(struct IsdnCard *card)
 #if CONFIG_PCI
 		if (!pci_present()) {
 			printk(KERN_ERR "Sedlbauer: no PCI bus present\n");
-			return(0);
+			goto err;
 		}
 		if ((dev_sedl = pci_find_device(PCI_VENDOR_ID_TIGERJET,
 				PCI_DEVICE_ID_TIGERJET_100, dev_sedl))) {
 			if (pci_enable_device(dev_sedl))
-				return(0);
+				goto err;
 			cs->irq = dev_sedl->irq;
 			if (!cs->irq) {
 				printk(KERN_WARNING "Sedlbauer: No IRQ for PCI card found\n");
-				return(0);
+				goto err;
 			}
 			cs->hw.sedl.cfg_reg = pci_resource_start(dev_sedl, 0);
 		} else {
 			printk(KERN_WARNING "Sedlbauer: No PCI card found\n");
-			return(0);
+			goto err;
 		}
 		cs->irq_flags |= SA_SHIRQ;
 		cs->hw.sedl.bus = SEDL_BUS_PCI;
@@ -602,7 +588,7 @@ setup_sedlbauer(struct IsdnCard *card)
 			cs->hw.sedl.cfg_reg);
 		if (sub_id != PCI_SUB_ID_SEDLBAUER) {
 			printk(KERN_ERR "Sedlbauer: unknown sub id %#x\n", sub_id);
-			return(0);
+			goto err;
 		}
 		if (sub_vendor_id == PCI_SUBVENDOR_SPEEDFAX_PYRAMID) {
 			cs->hw.sedl.chip = SEDL_CHIP_ISAC_ISAR;
@@ -616,7 +602,7 @@ setup_sedlbauer(struct IsdnCard *card)
 		} else {
 			printk(KERN_ERR "Sedlbauer: unknown sub vendor id %#x\n",
 				sub_vendor_id);
-			return(0);
+			goto err;
 		}
 		bytecnt = 256;
 		cs->hw.sedl.reset_on = SEDL_ISAR_PCI_ISAR_RESET_ON;
@@ -631,7 +617,7 @@ setup_sedlbauer(struct IsdnCard *card)
 		byteout(cs->hw.sedl.cfg_reg +3, cs->hw.sedl.reset_off);
 #else
 		printk(KERN_WARNING "Sedlbauer: NO_PCI_BIOS\n");
-		return (0);
+		goto err;
 #endif /* CONFIG_PCI */
 	}	
 ready:	
@@ -639,14 +625,9 @@ ready:
 	 * reserved for us by the card manager. So we do not check it
 	 * here, it would fail.
 	 */
-	if (cs->hw.sedl.bus != SEDL_BUS_PCMCIA &&
-	    (!request_region((cs->hw.sedl.cfg_reg), bytecnt, "sedlbauer isdn"))) {
-		printk(KERN_WARNING
-			"HiSax: %s config port %x-%x already in use\n",
-			CardType[card->typ],
-			cs->hw.sedl.cfg_reg,
-			cs->hw.sedl.cfg_reg + bytecnt);
-			return (0);
+	if (cs->hw.sedl.bus != SEDL_BUS_PCMCIA) {
+		if (!request_io(&cs->rs, cs->hw.sedl.cfg_reg, bytecnt, "sedlbauer isdn"))
+			goto err;
 	}
 
 	printk(KERN_INFO
@@ -740,8 +721,7 @@ ready:
 			if (ver < 0) {
 				printk(KERN_WARNING
 					"Sedlbauer: wrong ISAR version (ret = %d)\n", ver);
-				sedlbauer_release(cs);
-				return (0);
+				goto err;
 			}
 		} else {
 			if (cs->hw.sedl.bus == SEDL_BUS_PCMCIA) {
@@ -764,11 +744,13 @@ ready:
 			if (HscxVersion(cs, "Sedlbauer:")) {
 				printk(KERN_WARNING
 					"Sedlbauer: wrong HSCX versions check IO address\n");
-				sedlbauer_release(cs);
-				return (0);
+				goto err;
 			}
 			sedlbauer_reset(cs);
 		}
 	}
-	return (1);
+	return 1;
+ err:
+	hisax_release_resources(cs);
+	return 0;
 }

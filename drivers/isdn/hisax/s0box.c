@@ -166,12 +166,6 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
  
-void
-s0box_release(struct IsdnCardState *cs)
-{
-	release_region(cs->hw.teles3.cfg_reg, 8);
-}
-
 static int
 S0Box_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
@@ -180,7 +174,7 @@ S0Box_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 
 static struct card_ops s0box_ops = {
 	.init     = inithscxisac,
-	.release  = s0box_release,
+	.release  = hisax_release_resources,
 	.irq_func = hscxisac_irq,
 };
 
@@ -203,14 +197,8 @@ setup_s0box(struct IsdnCard *card)
 	cs->hw.teles3.hscxfifo[0] = cs->hw.teles3.hscx[0] + 0x3e;
 	cs->hw.teles3.hscxfifo[1] = cs->hw.teles3.hscx[1] + 0x3e;
 	cs->irq = card->para[0];
-	if (!request_region(cs->hw.teles3.cfg_reg,8, "S0Box parallel I/O")) {
-		printk(KERN_WARNING
-		       "HiSax: %s ports %x-%x already in use\n",
-		       CardType[cs->typ],
-                       cs->hw.teles3.cfg_reg,
-                       cs->hw.teles3.cfg_reg + 7);
-		return 0;
-	} 
+	if (!request_io(&cs->rs, cs->hw.teles3.cfg_reg, 8, "S0Box parallel I/O"))
+		goto err;
 	printk(KERN_INFO
 	       "HiSax: %s config irq:%d isac:0x%x  cfg:0x%x\n",
 	       CardType[cs->typ], cs->irq,
@@ -226,8 +214,10 @@ setup_s0box(struct IsdnCard *card)
 	if (HscxVersion(cs, "S0Box:")) {
 		printk(KERN_WARNING
 		       "S0Box: wrong HSCX versions check IO address\n");
-		s0box_release(cs);
-		return (0);
+		goto err;
 	}
-	return (1);
+	return 1;
+ err:
+	hisax_release_resources(cs);
+	return 0;
 }

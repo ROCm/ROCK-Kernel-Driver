@@ -318,7 +318,7 @@ hfcsx_release(struct IsdnCardState *cs)
 	schedule_timeout((30 * HZ) / 1000);	/* Timeout 30ms */
 	Write_hfc(cs, HFCSX_CIRM, 0);	/* Reset Off */
 	del_timer(&cs->hw.hfcsx.timer);
-	release_region(cs->hw.hfcsx.base, 2); /* release IO-Block */
+	hisax_release_resources(cs);
 	kfree(cs->hw.hfcsx.extra);
 	cs->hw.hfcsx.extra = NULL;
 }
@@ -1236,45 +1236,40 @@ setup_hfcsx(struct IsdnCard *card)
 	cs->hw.hfcsx.fifo = 255;
 	if ((cs->typ == ISDN_CTYPE_HFC_SX) || 
 	    (cs->typ == ISDN_CTYPE_HFC_SP_PCMCIA)) {
-	        if ((!cs->hw.hfcsx.base) || 
-		    check_region((cs->hw.hfcsx.base), 2)) {
-		  printk(KERN_WARNING
-			 "HiSax: HFC-SX io-base %#lx already in use\n",
-		          cs->hw.hfcsx.base);
-		  return(0);
-		} else {
-		  request_region(cs->hw.hfcsx.base, 2, "HFCSX isdn");
-		}
+		if (!request_io(&cs->rs, cs->hw.hfcsx.base, 2, "HFCSX isdn"))
+			return 0;
 		byteout(cs->hw.hfcsx.base, cs->hw.hfcsx.base & 0xFF);
 		byteout(cs->hw.hfcsx.base + 1,
 			((cs->hw.hfcsx.base >> 8) & 3) | 0x54);
 		udelay(10);
 	        cs->hw.hfcsx.chip = Read_hfc(cs,HFCSX_CHIP_ID);
                 switch (cs->hw.hfcsx.chip >> 4) {
-		  case 1: 
-		    tmp[0] ='+';
-		    break;
-		  case 9: 
-		    tmp[0] ='P';
-		    break;
-		  default:
-		    printk(KERN_WARNING
-			   "HFC-SX: invalid chip id 0x%x\n",
-			   cs->hw.hfcsx.chip >> 4);
-		    release_region(cs->hw.hfcsx.base, 2);
-		    return(0);
+		case 1: 
+			tmp[0] ='+';
+			break;
+		case 9: 
+			tmp[0] ='P';
+			break;
+		default:
+			printk(KERN_WARNING "HFC-SX: invalid chip id 0x%x\n",
+			       cs->hw.hfcsx.chip >> 4);
+			hisax_release_resources(cs);
+		    return 0;
 		}  
 		if (!ccd_sp_irqtab[cs->irq & 0xF]) {
-		  printk(KERN_WARNING 
-			 "HFC_SX: invalid irq %d specified\n",cs->irq & 0xF);
-		  release_region(cs->hw.hfcsx.base, 2);
-		  return(0);
+			printk(KERN_WARNING 
+			       "HFC_SX: invalid irq %d specified\n",
+			       cs->irq & 0xF);
+			hisax_release_resources(cs);
+			return 0;
 		}  
-		if (!(cs->hw.hfcsx.extra = (void *)
-		      kmalloc(sizeof(struct hfcsx_extra), GFP_ATOMIC))) {
-		  release_region(cs->hw.hfcsx.base, 2);
-		  printk(KERN_WARNING "HFC-SX: unable to allocate memory\n");
-		  return(0);
+		cs->hw.hfcsx.extra = kmalloc(sizeof(struct hfcsx_extra), 
+					     GFP_ATOMIC);
+		if (!cs->hw.hfcsx.extra) {
+			hisax_release_resources(cs);
+			printk(KERN_WARNING
+			       "HFC-SX: unable to allocate memory\n");
+			return 0;
 		}
 
 		printk(KERN_INFO

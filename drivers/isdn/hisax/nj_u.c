@@ -121,7 +121,6 @@ static struct pci_dev *dev_netjet __initdata = NULL;
 int __init
 setup_netjet_u(struct IsdnCard *card)
 {
-	int bytecnt;
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 #if CONFIG_PCI
@@ -209,24 +208,17 @@ setup_netjet_u(struct IsdnCard *card)
 
 #endif /* CONFIG_PCI */
 
-	bytecnt = 256;
-
 	printk(KERN_INFO
 		"NETspider-U: PCI card configured at %#lx IRQ %d\n",
 		cs->hw.njet.base, cs->irq);
-	if (!request_region(cs->hw.njet.base, bytecnt, "netspider-u isdn")) {
-		printk(KERN_WARNING
-		       "HiSax: %s config port %#lx-%#lx already in use\n",
-		       CardType[card->typ],
-		       cs->hw.njet.base,
-		       cs->hw.njet.base + bytecnt);
-		return (0);
-	}
+	if (!request_io(&cs->rs, cs->hw.njet.base, 0x100, "netjet-s isdn"))
+		return 0;
+	
 	nj_u_reset(cs);
 	cs->dc_hw_ops = &netjet_dc_ops;
 	cs->cardmsg = &NETjet_U_card_msg;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &nj_u_ops;
 	ICCVersion(cs, "NETspider-U:");
-	return (1);
+	return 1;
 }

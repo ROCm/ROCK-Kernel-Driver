@@ -45,7 +45,7 @@ const char *telespci_revision = "$Revision: 2.16.6.5 $";
 static u8
 isac_read(struct IsdnCardState *cs, u8 off)
 {
-	unsigned long adr = cs->hw.teles0.membase + 0x200;
+	void *adr = cs->hw.teles0.membase + 0x200;
 	unsigned int portdata;
 
 	ZORAN_WAIT_NOBUSY;
@@ -63,7 +63,7 @@ isac_read(struct IsdnCardState *cs, u8 off)
 static void
 isac_write(struct IsdnCardState *cs, u8 off, u8 data)
 {
-	unsigned long adr = cs->hw.teles0.membase + 0x200;
+	void *adr = cs->hw.teles0.membase + 0x200;
 	unsigned int portdata;
 
 	ZORAN_WAIT_NOBUSY;
@@ -80,7 +80,7 @@ isac_write(struct IsdnCardState *cs, u8 off, u8 data)
 static void
 isac_read_fifo(struct IsdnCardState *cs, u8 *data, int size)
 {
-	unsigned long adr = cs->hw.teles0.membase + 0x200;
+	void *adr = cs->hw.teles0.membase + 0x200;
 	unsigned int portdata;
 	int i;
 
@@ -99,7 +99,7 @@ isac_read_fifo(struct IsdnCardState *cs, u8 *data, int size)
 static void
 isac_write_fifo(struct IsdnCardState *cs, u8 *data, int size)
 {
-	unsigned long adr = cs->hw.teles0.membase + 0x200;
+	void *adr = cs->hw.teles0.membase + 0x200;
 	unsigned int portdata;
 	int i;
 
@@ -124,7 +124,7 @@ static struct dc_hw_ops isac_ops = {
 static u8
 hscx_read(struct IsdnCardState *cs, int hscx, u8 off)
 {
-	unsigned long adr = cs->hw.teles0.membase + 0x200;
+	void *adr = cs->hw.teles0.membase + 0x200;
 	unsigned int portdata;
 
 	ZORAN_WAIT_NOBUSY;
@@ -141,7 +141,7 @@ hscx_read(struct IsdnCardState *cs, int hscx, u8 off)
 static void
 hscx_write(struct IsdnCardState *cs, int hscx, u8 off, u8 data)
 {
-	unsigned long adr = cs->hw.teles0.membase + 0x200;
+	void *adr = cs->hw.teles0.membase + 0x200;
 	unsigned int portdata;
 
 	ZORAN_WAIT_NOBUSY;
@@ -157,7 +157,7 @@ hscx_write(struct IsdnCardState *cs, int hscx, u8 off, u8 data)
 static void
 hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
 {
-	unsigned long adr = cs->hw.teles0.membase + 0x200;
+	void *adr = cs->hw.teles0.membase + 0x200;
 	unsigned int portdata;
 	int i;
 
@@ -176,7 +176,7 @@ hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
 static void
 hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
 {
-	unsigned long adr = cs->hw.teles0.membase + 0x200;
+	void *adr = cs->hw.teles0.membase + 0x200;
 	unsigned int portdata;
 	int i;
 
@@ -271,7 +271,7 @@ setup_telespci(struct IsdnCard *card)
 			printk(KERN_WARNING "Teles: No IRQ for PCI card found\n");
 			return(0);
 		}
-		cs->hw.teles0.membase = (u_long) ioremap(pci_resource_start(dev_tel, 0),
+		cs->hw.teles0.membase = ioremap(pci_resource_start(dev_tel, 0),
 			PAGE_SIZE);
 		printk(KERN_INFO "Found: Zoran, base-address: 0x%lx, irq: 0x%x\n",
 			pci_resource_start(dev_tel, 0), dev_tel->irq);
@@ -295,7 +295,7 @@ setup_telespci(struct IsdnCard *card)
 	/* writel(0x00800000, cs->hw.teles0.membase + 0x200); */
 
 	printk(KERN_INFO
-	       "HiSax: %s config irq:%d mem:%lx\n",
+	       "HiSax: %s config irq:%d mem:%p\n",
 	       CardType[cs->typ], cs->irq,
 	       cs->hw.teles0.membase);
 

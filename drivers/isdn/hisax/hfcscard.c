@@ -69,8 +69,7 @@ hfcs_release(struct IsdnCardState *cs)
 {
 	release2bds0(cs);
 	del_timer(&cs->hw.hfcD.timer);
-	if (cs->hw.hfcD.addr)
-		release_region(cs->hw.hfcD.addr, 2);
+	hisax_release_resources(cs);
 }
 
 static int
@@ -234,16 +233,8 @@ setup_hfcs(struct IsdnCard *card)
 		cs->hw.hfcD.bfifosize = 7*1024 + 512;
 	} else
 		return (0);
-	if (check_region((cs->hw.hfcD.addr), 2)) {
-		printk(KERN_WARNING
-		       "HiSax: %s config port %x-%x already in use\n",
-		       CardType[card->typ],
-		       cs->hw.hfcD.addr,
-		       cs->hw.hfcD.addr + 2);
-		return (0);
-	} else {
-		request_region(cs->hw.hfcD.addr, 2, "HFCS isdn");
-	}
+	if (!request_io(&cs->rs, cs->hw.hfcD.addr, 2, "HFCS isdn"))
+		return 0;
 	printk(KERN_INFO
 	       "HFCS: defined at 0x%x IRQ %d HZ %d\n",
 	       cs->hw.hfcD.addr,

@@ -280,7 +280,6 @@ static struct pci_dev *dev_netjet __initdata = NULL;
 int __init
 setup_enternow_pci(struct IsdnCard *card)
 {
-	int bytecnt;
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
@@ -359,19 +358,11 @@ setup_enternow_pci(struct IsdnCard *card)
 
 #endif /* CONFIG_PCI */
 
-	bytecnt = 256;
-
 	printk(KERN_INFO
 		"enter:now PCI: PCI card configured at 0x%lx IRQ %d\n",
 		cs->hw.njet.base, cs->irq);
-	if (!request_region(cs->hw.njet.base, bytecnt, "Fn_ISDN")) {
-		printk(KERN_WARNING
-			   "HiSax: %s config port %lx-%lx already in use\n",
-			   CardType[card->typ],
-			   cs->hw.njet.base,
-			   cs->hw.njet.base + bytecnt);
-		return (0);
-	}
+	if (!request_io(&cs->rs, cs->hw.njet.base, 0x100, "Fn_ISDN"))
+		return 0;
 	reset_enpci(cs);
 	cs->hw.njet.last_is0 = 0;
 	cs->dc_hw_ops = &enternow_ops;
@@ -381,31 +372,5 @@ setup_enternow_pci(struct IsdnCard *card)
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &enpci_ops;
 
-        return (1);
+        return 1;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

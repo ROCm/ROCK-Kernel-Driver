@@ -188,13 +188,6 @@ ipac_writefifo(struct IsdnCardState *cs, u8 off, u8 * data, int size)
 
 BUILD_IPAC_OPS(ipac);
 
-static void
-asuscom_release(struct IsdnCardState *cs)
-{
-	if (cs->hw.asus.cfg_reg)
-		release_region(cs->hw.asus.cfg_reg, 8);
-}
-
 static int
 asuscom_reset(struct IsdnCardState *cs)
 {
@@ -233,14 +226,14 @@ Asus_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 static struct card_ops asuscom_ops = {
 	.init     = inithscxisac,
 	.reset    = asuscom_reset,
-	.release  = asuscom_release,
+	.release  = hisax_release_resources,
 	.irq_func = hscxisac_irq,
 };
 
 static struct card_ops asuscom_ipac_ops = {
 	.init     = ipac_init,
 	.reset    = asuscom_ipac_reset,
-	.release  = asuscom_release,
+	.release  = hisax_release_resources,
 	.irq_func = ipac_irq,
 };
 
@@ -319,15 +312,8 @@ setup_asuscom(struct IsdnCard *card)
 	bytecnt = 8;
 	cs->hw.asus.cfg_reg = card->para[1];
 	cs->irq = card->para[0];
-	if (!request_region((cs->hw.asus.cfg_reg), bytecnt,
-			    "asuscom isdn")) {
-		printk(KERN_WARNING
-		       "HiSax: %s config port %x-%x already in use\n",
-		       CardType[card->typ],
-		       cs->hw.asus.cfg_reg,
-		       cs->hw.asus.cfg_reg + bytecnt);
-		return (0);
-	}
+	if (!request_io(&cs->rs, cs->hw.asus.cfg_reg, bytecnt, "asuscom isdn"))
+		goto err;
 	printk(KERN_INFO "ISDNLink: defined at 0x%x IRQ %d\n",
 		cs->hw.asus.cfg_reg, cs->irq);
 	cs->cardmsg = &Asus_card_msg;
@@ -355,11 +341,13 @@ setup_asuscom(struct IsdnCard *card)
 		if (HscxVersion(cs, "ISDNLink:")) {
 			printk(KERN_WARNING
 		     	"ISDNLink: wrong HSCX versions check IO address\n");
-			asuscom_release(cs);
-			return (0);
+			goto err;
 		}
 	}
 	printk(KERN_INFO "ISDNLink: resetting card\n");
 	cs->card_ops->reset(cs);
-	return (1);
+	return 1;
+ err:
+	hisax_release_resources(cs);
+	return 0;
 }
