@@ -743,7 +743,7 @@ struct inode_operations {
 	int (*readlink) (struct dentry *, char __user *,int);
 	int (*follow_link) (struct dentry *, struct nameidata *);
 	void (*truncate) (struct inode *);
-	int (*permission) (struct inode *, int);
+	int (*permission) (struct inode *, int, struct nameidata *);
 	int (*setattr) (struct dentry *, struct iattr *);
 	int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
 	int (*setxattr) (struct dentry *, const char *,const void *,size_t,int);
@@ -1121,7 +1121,7 @@ extern int do_remount_sb(struct super_block *sb, int flags,
 extern sector_t bmap(struct inode *, sector_t);
 extern int setattr_mask(unsigned int);
 extern int notify_change(struct dentry *, struct iattr *);
-extern int permission(struct inode *, int);
+extern int permission(struct inode *, int, struct nameidata *);
 extern int vfs_permission(struct inode *, int);
 extern int get_write_access(struct inode *);
 extern int deny_write_access(struct file *);

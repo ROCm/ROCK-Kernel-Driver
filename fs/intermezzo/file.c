@@ -53,7 +53,7 @@
 /*
  * these are initialized in super.c
  */
-extern int presto_permission(struct inode *inode, int mask);
+extern int presto_permission(struct inode *inode, int mask, struct nameidata *nd);
 
 
 static int presto_open_upcall(int minor, struct dentry *de)

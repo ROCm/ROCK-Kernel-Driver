@@ -431,7 +431,8 @@ linvfs_follow_link(
 STATIC int
 linvfs_permission(
 	struct inode	*inode,
-	int		mode)
+	int		mode,
+	struct nameidata *nd)
 {
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	int		error;

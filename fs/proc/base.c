@@ -334,7 +334,7 @@ out:
 	goto exit;
 }
 
-static int proc_permission(struct inode *inode, int mask)
+static int proc_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
 	if (vfs_permission(inode, mask) != 0)
 		return -EACCES;

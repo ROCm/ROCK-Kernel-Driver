@@ -147,7 +147,7 @@ exit:
 }
 
 
-int coda_permission(struct inode *inode, int mask)
+int coda_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
         int error = 0;
  

@@ -309,7 +309,7 @@ check_capabilities:
  * BKL held [before 2.5.x]
  */
 int
-ext2_permission(struct inode *inode, int mask)
+ext2_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
 	return __ext2_permission(inode, mask, 1);
 }

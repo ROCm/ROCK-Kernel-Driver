@@ -1240,7 +1240,7 @@ out:
 }
 
 int
-nfs_permission(struct inode *inode, int mask)
+nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
 	struct nfs_access_cache *cache = &NFS_I(inode)->cache_access;
 	struct rpc_cred *cred;

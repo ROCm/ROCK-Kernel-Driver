@@ -178,7 +178,7 @@ cifs_statfs(struct super_block *sb, struct kstatfs *buf)
 	return 0;		/* always return success? what if volume is no longer available? */
 }
 
-static int cifs_permission(struct inode * inode, int mask)
+static int cifs_permission(struct inode * inode, int mask, struct nameidata *nd)
 {
 	/* the server does permission checks, we do not need to do it here */
 	return 0;

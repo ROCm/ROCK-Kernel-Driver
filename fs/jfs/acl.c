@@ -208,7 +208,7 @@ check_capabilities:
 
 	return -EACCES;
 }
-int jfs_permission(struct inode * inode, int mask)
+int jfs_permission(struct inode * inode, int mask, struct nameidata *nd)
 {
 	return __jfs_permission(inode, mask, 0);
 }

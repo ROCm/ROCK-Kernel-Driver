@@ -312,7 +312,7 @@ check_capabilities:
  * inode->i_sem: up
  */
 int
-ext3_permission(struct inode *inode, int mask)
+ext3_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
 	return __ext3_permission(inode, mask, 1);
 }

@@ -1584,12 +1584,12 @@ nfsd_permission(struct svc_export *exp, struct dentry *dentry, int acc)
 	    inode->i_uid == current->fsuid)
 		return 0;
 
-	err = permission(inode, acc & (MAY_READ|MAY_WRITE|MAY_EXEC));
+	err = permission(inode, acc & (MAY_READ|MAY_WRITE|MAY_EXEC), NULL);
 
 	/* Allow read access to binaries even when mode 111 */
 	if (err == -EACCES && S_ISREG(inode->i_mode) &&
 	    acc == (MAY_READ | MAY_OWNER_OVERRIDE))
-		err = permission(inode, MAY_EXEC);
+		err = permission(inode, MAY_EXEC, NULL);
 
 	return err? nfserrno(err) : 0;
 }

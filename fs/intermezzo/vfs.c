@@ -134,7 +134,7 @@ static inline int may_delete(struct inode *dir,struct dentry *victim, int isdir)
         int error;
         if (!victim->d_inode || victim->d_parent->d_inode != dir)
                 return -ENOENT;
-        error = permission(dir,MAY_WRITE | MAY_EXEC);
+        error = permission(dir,MAY_WRITE | MAY_EXEC, NULL);
         if (error)
                 return error;
         if (IS_APPEND(dir))
@@ -158,7 +158,7 @@ static inline int may_create(struct inode *dir, struct dentry *child) {
                 return -EEXIST;
         if (IS_DEADDIR(dir))
                 return -ENOENT;
-        return permission(dir,MAY_WRITE | MAY_EXEC);
+        return permission(dir,MAY_WRITE | MAY_EXEC, NULL);
 }
 
 #ifdef PRESTO_DEBUG
@@ -1840,7 +1840,7 @@ int presto_rename_dir(struct presto_file_set *fset, struct dentry *old_parent,
          * we'll need to flip '..'.
          */
         if (new_dir != old_dir) {
-                error = permission(old_dentry->d_inode, MAY_WRITE);
+                error = permission(old_dentry->d_inode, MAY_WRITE, NULL);
         }
         if (error)
                 return error;

@@ -203,7 +203,7 @@ int vfs_permission(struct inode * inode, int mask)
 	return -EACCES;
 }
 
-int permission(struct inode * inode,int mask)
+int permission(struct inode * inode,int mask, struct nameidata *nd)
 {
 	int retval;
 	int submask;
@@ -212,7 +212,7 @@ int permission(struct inode * inode,int mask)
 	submask = mask & ~MAY_APPEND;
 
 	if (inode->i_op && inode->i_op->permission)
-		retval = inode->i_op->permission(inode, submask);
+		retval = inode->i_op->permission(inode, submask, nd);
 	else
 		retval = vfs_permission(inode, submask);
 	if (retval)
@@ -588,7 +588,7 @@ int link_path_walk(const char * name, struct nameidata *nd)
 
 		err = exec_permission_lite(inode);
 		if (err == -EAGAIN) { 
-			err = permission(inode, MAY_EXEC);
+			err = permission(inode, MAY_EXEC, nd);
 		}
  		if (err)
 			break;
@@ -876,7 +876,7 @@ static struct dentry * __lookup_hash(struct qstr *name, struct dentry * base, st
 	int err;
 
 	inode = base->d_inode;
-	err = permission(inode, MAY_EXEC);
+	err = permission(inode, MAY_EXEC, nd);
 	dentry = ERR_PTR(err);
 	if (err)
 		goto out;
@@ -996,12 +996,12 @@ static inline int check_sticky(struct inode *dir, struct inode *inode)
  * 10. We don't allow removal of NFS sillyrenamed files; it's handled by
  *     nfs_async_unlink().
  */
-static inline int may_delete(struct inode *dir,struct dentry *victim, int isdir)
+static inline int may_delete(struct inode *dir,struct dentry *victim,int isdir)
 {
 	int error;
 	if (!victim->d_inode || victim->d_parent->d_inode != dir)
 		return -ENOENT;
-	error = permission(dir,MAY_WRITE | MAY_EXEC);
+	error = permission(dir,MAY_WRITE | MAY_EXEC, NULL);
 	if (error)
 		return error;
 	if (IS_APPEND(dir))
@@ -1031,12 +1031,14 @@ static inline int may_delete(struct inode *dir,struct dentry *victim, int isdir)
  *  3. We should have write and exec permissions on dir
  *  4. We can't do it if dir is immutable (done in permission())
  */
-static inline int may_create(struct inode *dir, struct dentry *child) {
+static inline int may_create(struct inode *dir, struct dentry *child,
+			     struct nameidata *nd)
+{
 	if (child->d_inode)
 		return -EEXIST;
 	if (IS_DEADDIR(dir))
 		return -ENOENT;
-	return permission(dir,MAY_WRITE | MAY_EXEC);
+	return permission(dir,MAY_WRITE | MAY_EXEC, nd);
 }
 
 /* 
@@ -1108,7 +1110,7 @@ void unlock_rename(struct dentry *p1, struct dentry *p2)
 int vfs_create(struct inode *dir, struct dentry *dentry, int mode,
 		struct nameidata *nd)
 {
-	int error = may_create(dir, dentry);
+	int error = may_create(dir, dentry, nd);
 
 	if (error)
 		return error;
@@ -1144,7 +1146,7 @@ int may_open(struct nameidata *nd, int acc_mode, int flag)
 	if (S_ISDIR(inode->i_mode) && (flag & FMODE_WRITE))
 		return -EISDIR;
 
-	error = permission(inode, acc_mode);
+	error = permission(inode, acc_mode, nd);
 	if (error)
 		return error;
 
@@ -1398,7 +1400,7 @@ fail:
 
 int vfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 {
-	int error = may_create(dir, dentry);
+	int error = may_create(dir, dentry, NULL);
 
 	if (error)
 		return error;
@@ -1469,7 +1471,7 @@ out:
 
 int vfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
-	int error = may_create(dir, dentry);
+	int error = may_create(dir, dentry, NULL);
 
 	if (error)
 		return error;
@@ -1715,7 +1717,7 @@ slashes:
 
 int vfs_symlink(struct inode *dir, struct dentry *dentry, const char *oldname)
 {
-	int error = may_create(dir, dentry);
+	int error = may_create(dir, dentry, NULL);
 
 	if (error)
 		return error;
@@ -1777,7 +1779,7 @@ int vfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_de
 	if (!inode)
 		return -ENOENT;
 
-	error = may_create(dir, new_dentry);
+	error = may_create(dir, new_dentry, NULL);
 	if (error)
 		return error;
 
@@ -1898,7 +1900,7 @@ int vfs_rename_dir(struct inode *old_dir, struct dentry *old_dentry,
 	 * we'll need to flip '..'.
 	 */
 	if (new_dir != old_dir) {
-		error = permission(old_dentry->d_inode, MAY_WRITE);
+		error = permission(old_dentry->d_inode, MAY_WRITE, NULL);
 		if (error)
 			return error;
 	}
@@ -1976,7 +1978,7 @@ int vfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		return error;
 
 	if (!new_dentry->d_inode)
-		error = may_create(new_dir, new_dentry);
+		error = may_create(new_dir, new_dentry, NULL);
 	else
 		error = may_delete(new_dir, new_dentry, is_dir);
 	if (error)

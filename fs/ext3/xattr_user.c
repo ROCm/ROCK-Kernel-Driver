@@ -49,7 +49,7 @@ ext3_xattr_user_get(struct inode *inode, const char *name,
 #ifdef CONFIG_EXT3_FS_POSIX_ACL
 	error = ext3_permission_locked(inode, MAY_READ);
 #else
-	error = permission(inode, MAY_READ);
+	error = permission(inode, MAY_READ, NULL);
 #endif
 	if (error)
 		return error;
@@ -73,7 +73,7 @@ ext3_xattr_user_set(struct inode *inode, const char *name,
 #ifdef CONFIG_EXT3_FS_POSIX_ACL
 	error = ext3_permission_locked(inode, MAY_WRITE);
 #else
-	error = permission(inode, MAY_WRITE);
+	error = permission(inode, MAY_WRITE, NULL);
 #endif
 	if (error)
 		return error;
