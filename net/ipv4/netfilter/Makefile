@@ -1,18 +1,10 @@
 #
 # Makefile for the netfilter modules on top of IPv4.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definition is now in the main makefile...
 
 O_TARGET := netfilter.o
 
 export-objs = ip_conntrack_standalone.o ip_fw_compat.o ip_nat_standalone.o ip_tables.o arp_tables.o
-
-# Multipart objects.
-list-multi		:= ip_conntrack.o iptable_nat.o ipfwadm.o ipchains.o
 
 # objects for the conntrack and NAT core (used by standalone and backw. compat)
 ip_nf_conntrack-objs	:= ip_conntrack_core.o ip_conntrack_proto_generic.o ip_conntrack_proto_tcp.o ip_conntrack_proto_udp.o ip_conntrack_proto_icmp.o
@@ -95,15 +87,3 @@ obj-$(CONFIG_IP_NF_COMPAT_IPFWADM) += ipfwadm.o
 obj-$(CONFIG_IP_NF_QUEUE) += ip_queue.o
 
 include $(TOPDIR)/Rules.make
-
-ip_conntrack.o: $(ip_conntrack-objs)
-	$(LD) -r -o $@ $(ip_conntrack-objs)
-
-iptable_nat.o: $(iptable_nat-objs)
-	$(LD) -r -o $@ $(iptable_nat-objs)
-
-ipfwadm.o: $(ipfwadm-objs)
-	$(LD) -r -o $@ $(ipfwadm-objs)
-
-ipchains.o: $(ipchains-objs)
-	$(LD) -r -o $@ $(ipchains-objs)

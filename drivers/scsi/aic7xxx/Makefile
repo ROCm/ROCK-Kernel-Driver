@@ -1,12 +1,8 @@
 #
-# drivers/scsi/aic7xxx/Makefile
-#
 # Makefile for the Linux aic7xxx SCSI driver.
 #
 
 O_TARGET := aic7xxx_drv.o
-
-list-multi	:= aic7xxx_mod.o
 
 obj-$(CONFIG_SCSI_AIC7XXX)	+= aic7xxx_mod.o
 
@@ -30,9 +26,6 @@ endif
 MOD_TARGET = aic7xxx.o
 
 include $(TOPDIR)/Rules.make
-
-aic7xxx_mod.o: aic7xxx_seq.h aic7xxx_reg.h $(AIC7XXX_OBJS)
-	$(LD) $(LD_RFLAG) -r -o $@ $(AIC7XXX_OBJS)
 
 ifeq ($(CONFIG_AIC7XXX_BUILD_FIRMWARE),y)
 aic7xxx_seq.h aic7xxx_reg.h: aic7xxx.seq aic7xxx.reg aicasm/aicasm
