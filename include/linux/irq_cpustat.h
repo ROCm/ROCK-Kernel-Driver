@@ -17,9 +17,8 @@
  * definitions instead of differing sets for each arch.
  */
 
-extern irq_cpustat_t irq_stat[];			/* defined in asm/hardirq.h */
-
-#ifndef __ARCH_IRQ_STAT /* Some architectures can do this more efficiently */ 
+#ifndef __ARCH_IRQ_STAT
+extern irq_cpustat_t irq_stat[];		/* defined in asm/hardirq.h */
 #ifdef CONFIG_SMP
 #define __IRQ_STAT(cpu, member)	(irq_stat[cpu].member)
 #else
@@ -31,8 +30,11 @@ extern irq_cpustat_t irq_stat[];			/* defined in asm/hardirq.h */
 #define softirq_pending(cpu)	__IRQ_STAT((cpu), __softirq_pending)
 #define local_softirq_pending()	softirq_pending(smp_processor_id())
 #define syscall_count(cpu)	__IRQ_STAT((cpu), __syscall_count)
+#define local_syscall_count()	syscall_count(smp_processor_id())
 #define ksoftirqd_task(cpu)	__IRQ_STAT((cpu), __ksoftirqd_task)
+#define local_ksoftirqd_task()	ksoftirqd_task(smp_processor_id())
+
   /* arch dependent irq_stat fields */
-#define nmi_count(cpu)		__IRQ_STAT((cpu), __nmi_count)		/* i386, ia64 */
+#define nmi_count(cpu)		__IRQ_STAT((cpu), __nmi_count)	/* i386 */
 
 #endif	/* __irq_cpustat_h */

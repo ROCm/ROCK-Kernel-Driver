@@ -34,7 +34,10 @@
    - Tasklets: serialized wrt itself.
  */
 
+#ifndef __ARCH_IRQ_STAT
 irq_cpustat_t irq_stat[NR_CPUS] ____cacheline_aligned;
+EXPORT_SYMBOL(irq_stat);
+#endif
 
 static struct softirq_action softirq_vec[32] __cacheline_aligned_in_smp;
 
@@ -322,7 +325,7 @@ static int ksoftirqd(void * __bind_cpu)
 	__set_current_state(TASK_INTERRUPTIBLE);
 	mb();
 
-	ksoftirqd_task(cpu) = current;
+	local_ksoftirqd_task() = current;
 
 	for (;;) {
 		if (!local_softirq_pending())
