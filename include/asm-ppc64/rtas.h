@@ -166,7 +166,7 @@ extern struct flash_block_list_header rtas_firmware_flash_list;
 
 extern struct rtas_t rtas;
 
-extern void enter_rtas(struct rtas_args *);
+extern void enter_rtas(unsigned long);
 extern int rtas_token(const char *service);
 extern long rtas_call(int token, int, int, unsigned long *, ...);
 extern void call_rtas_display_status(char);

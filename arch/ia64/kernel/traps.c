@@ -22,29 +22,6 @@
 #include <asm/processor.h>
 #include <asm/uaccess.h>
 
-/*
- * fp_emulate() needs to be able to access and update all floating point registers.  Those
- * saved in pt_regs can be accessed through that structure, but those not saved, will be
- * accessed directly.  To make this work, we need to ensure that the compiler does not end
- * up using a preserved floating point register on its own.  The following achieves this
- * by declaring preserved registers that are not marked as "fixed" as global register
- * variables.
- */
-#ifdef ASM_SUPPORTED
-register double f2 asm ("f2"); register double f3 asm ("f3");
-register double f4 asm ("f4"); register double f5 asm ("f5");
-
-register long f16 asm ("f16"); register long f17 asm ("f17");
-register long f18 asm ("f18"); register long f19 asm ("f19");
-register long f20 asm ("f20"); register long f21 asm ("f21");
-register long f22 asm ("f22"); register long f23 asm ("f23");
-
-register double f24 asm ("f24"); register double f25 asm ("f25");
-register double f26 asm ("f26"); register double f27 asm ("f27");
-register double f28 asm ("f28"); register double f29 asm ("f29");
-register double f30 asm ("f30"); register double f31 asm ("f31");
-#endif
-
 extern spinlock_t timerlist_lock;
 
 fpswa_interface_t *fpswa_interface;

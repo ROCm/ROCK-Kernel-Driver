@@ -6,13 +6,6 @@
  *               Stephane Eranian <eranian@hpl.hp.com>
  */
 
-
-#define RDEP(x)	(1UL<<(x))
-
-#if defined(CONFIG_ITANIUM) || defined (CONFIG_MCKINLEY)
-#error "This file should not be used when CONFIG_ITANIUM or CONFIG_MCKINLEY is defined"
-#endif
-
 static pfm_reg_desc_t pfm_gen_pmc_desc[PMU_MAX_PMCS]={
 /* pmc0  */ { PFM_REG_CONTROL , 0, 0x1UL, -1UL, NULL, NULL, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
 /* pmc1  */ { PFM_REG_CONTROL , 0, 0x0UL, -1UL, NULL, NULL, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
@@ -40,10 +33,9 @@ static pfm_reg_desc_t pfm_gen_pmd_desc[PMU_MAX_PMDS]={
 /*
  * impl_pmcs, impl_pmds are computed at runtime to minimize errors!
  */
-static pmu_config_t pmu_conf={
+static pmu_config_t pmu_conf_gen={
 	.pmu_name   = "Generic",
 	.pmu_family = 0xff, /* any */
-	.enabled    = 0,
 	.ovfl_val   = (1UL << 32) - 1,
 	.num_ibrs   = 0, /* does not use */
 	.num_dbrs   = 0, /* does not use */

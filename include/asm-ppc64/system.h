@@ -64,6 +64,7 @@ struct pt_regs;
 #ifdef CONFIG_DEBUGGER
 
 extern int (*__debugger)(struct pt_regs *regs);
+extern int (*__debugger_ipi)(struct pt_regs *regs);
 extern int (*__debugger_bpt)(struct pt_regs *regs);
 extern int (*__debugger_sstep)(struct pt_regs *regs);
 extern int (*__debugger_iabr_match)(struct pt_regs *regs);
@@ -79,6 +80,7 @@ static inline int __NAME(struct pt_regs *regs) \
 }
 
 DEBUGGER_BOILERPLATE(debugger)
+DEBUGGER_BOILERPLATE(debugger_ipi)
 DEBUGGER_BOILERPLATE(debugger_bpt)
 DEBUGGER_BOILERPLATE(debugger_sstep)
 DEBUGGER_BOILERPLATE(debugger_iabr_match)
@@ -91,6 +93,7 @@ extern void xmon_init(void);
 
 #else
 static inline int debugger(struct pt_regs *regs) { return 0; }
+static inline int debugger_ipi(struct pt_regs *regs) { return 0; }
 static inline int debugger_bpt(struct pt_regs *regs) { return 0; }
 static inline int debugger_sstep(struct pt_regs *regs) { return 0; }
 static inline int debugger_iabr_match(struct pt_regs *regs) { return 0; }

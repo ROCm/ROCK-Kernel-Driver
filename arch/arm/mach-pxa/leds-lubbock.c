@@ -88,7 +88,7 @@ void lubbock_leds_event(led_event_t evt)
 		break;
 
 	case led_green_on:
-		hw_led_state |= D21;;
+		hw_led_state |= D21;
 		break;
 
 	case led_green_off:
@@ -96,7 +96,7 @@ void lubbock_leds_event(led_event_t evt)
 		break;
 
 	case led_amber_on:
-		hw_led_state |= D22;;
+		hw_led_state |= D22;
 		break;
 
 	case led_amber_off:
@@ -104,7 +104,7 @@ void lubbock_leds_event(led_event_t evt)
 		break;
 
 	case led_red_on:
-		hw_led_state |= D23;;
+		hw_led_state |= D23;
 		break;
 
 	case led_red_off:

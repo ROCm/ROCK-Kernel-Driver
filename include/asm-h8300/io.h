@@ -33,21 +33,29 @@
  * swap functions are sometimes needed to interface little-endian hardware
  */
 
-/*
- * CHANGES
- * 
- * 020325   Added some #define's for the COBRA5272 board
- *          (hede)
- */
-
 static inline unsigned short _swapw(volatile unsigned short v)
 {
-    return ((v << 8) | (v >> 8));
+	unsigned short r,t;
+	__asm__("mov.b %w2,%x1\n\t"
+		"mov.b %x2,%w1\n\t"
+		"mov.w %1,%0"
+		:"=r"(r),"=r"(t)
+		:"r"(v));
+	return r;
 }
 
 static inline unsigned int _swapl(volatile unsigned long v)
 {
-    return ((v << 24) | ((v & 0xff00) << 8) | ((v & 0xff0000) >> 8) | (v >> 24));
+	unsigned int r,t;
+	__asm__("mov.b %w2,%x1\n\t"
+		"mov.b %x2,%w1\n\t"
+		"mov.w %f1,%e0\n\t"
+		"mov.w %e2,%f1\n\t"
+		"mov.b %w1,%x0\n\t"
+		"mov.b %x1,%w0"
+		:"=r"(r),"=r"(t)
+		:"r"(v));
+	return r;
 }
 
 #define readb(addr) \
@@ -96,7 +104,7 @@ static inline void io_outsw(unsigned int addr, const void *buf, int len)
 	volatile unsigned short *ap = (volatile unsigned short *) addr;
 	unsigned short *bp = (unsigned short *) buf;
 	while (len--)
-		*ap = *bp++;
+		*ap = _swapw(*bp++);
 }
 
 static inline void io_outsl(unsigned int addr, const void *buf, int len)
@@ -104,7 +112,7 @@ static inline void io_outsl(unsigned int addr, const void *buf, int len)
 	volatile unsigned int *ap = (volatile unsigned int *) addr;
 	unsigned long *bp = (unsigned long *) buf;
 	while (len--)
-		*ap = *bp++;
+		*ap = _swapl(*bp++);
 }
 
 static inline void io_insb(unsigned int addr, void *buf, int len)
@@ -129,7 +137,7 @@ static inline void io_insw(unsigned int addr, void *buf, int len)
 	volatile unsigned short *ap = (volatile unsigned short *) addr;
 	unsigned short *bp = (unsigned short *) buf;
 	while (len--)
-		*bp++ = *ap;
+		*bp++ = _swapw(*ap);
 }
 
 static inline void io_insl(unsigned int addr, void *buf, int len)
@@ -137,7 +145,7 @@ static inline void io_insl(unsigned int addr, void *buf, int len)
 	volatile unsigned int *ap = (volatile unsigned int *) addr;
 	unsigned long *bp = (unsigned long *) buf;
 	while (len--)
-		*bp++ = *ap;
+		*bp++ = _swapl(*ap);
 }
 
 /*

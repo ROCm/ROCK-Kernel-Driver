@@ -1284,7 +1284,7 @@ static void __init build_zonelists(pg_data_t *pgdat)
  		for (node = 0; node < local_node; node++)
  			j = build_zonelists_node(NODE_DATA(node), zonelist, j, k);
  
-		zonelist->zones[j++] = NULL;
+		zonelist->zones[j] = NULL;
 	}
 }
 

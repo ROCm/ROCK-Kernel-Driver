@@ -328,6 +328,34 @@ sn_pci_fixup_slot(struct pci_dev *dev)
 			cmd |= PCI_COMMAND_MEMORY;
 	}
 
+        /*
+	 * Assign addresses to the ROMs, but don't enable them yet
+	 * Also note that we only map display card ROMs due to PIO mapping
+	 * space scarcity.
+	 */
+        if ((dev->class >> 16) == PCI_BASE_CLASS_DISPLAY) {
+                unsigned long addr;
+                size = dev->resource[PCI_ROM_RESOURCE].end -
+                        dev->resource[PCI_ROM_RESOURCE].start;
+
+                if (size) {
+                        addr = (unsigned long) pciio_pio_addr(vhdl, 0,
+					      PCIIO_SPACE_ROM,
+					      0, size, 0, PIOMAP_FIXED);
+                        if (!addr) {
+                                dev->resource[PCI_ROM_RESOURCE].start = 0;
+                                dev->resource[PCI_ROM_RESOURCE].end = 0;
+                                printk("sn_pci_fixup(): ROM pio map failure "
+				       "for %s\n", dev->slot_name);
+                        }
+                        addr |= __IA64_UNCACHED_OFFSET;
+                        dev->resource[PCI_ROM_RESOURCE].start = addr;
+                        dev->resource[PCI_ROM_RESOURCE].end = addr + size;
+                        if (dev->resource[PCI_ROM_RESOURCE].flags & IORESOURCE_MEM)
+                                cmd |= PCI_COMMAND_MEMORY;
+                }
+        }
+
 	/*
 	 * Update the Command Word on the Card.
 	 */
@@ -712,7 +740,7 @@ pci_bus_to_hcl_cvlink(void)
 			
 			/* Is this PCI bus associated with this moduleid? */
 			moduleid = NODE_MODULEID(
-				NASID_TO_COMPACT_NODEID(pcibr_soft->bs_nasid));
+				nasid_to_cnodeid(pcibr_soft->bs_nasid));
 			if (modules[i]->id == moduleid) {
 				struct pcibr_list_s *new_element;
 
@@ -791,8 +819,7 @@ sn_pci_init (void)
 	struct list_head *ln;
 	struct pci_bus *pci_bus = NULL;
 	struct pci_dev *pci_dev = NULL;
-	extern int numnodes;
-	int cnode, ret;
+	int ret;
 #ifdef CONFIG_PROC_FS
 	extern void register_sn_procfs(void);
 #endif

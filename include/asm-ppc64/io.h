@@ -326,7 +326,7 @@ static inline unsigned long in_le64(volatile unsigned long *addr)
 			     "rldicl %1,%1,32,0\n"
 			     "rlwimi %0,%1,8,8,31\n"
 			     "rlwimi %0,%1,24,16,23\n"
-			     : "=r" (ret), "=r" (tmp) : "b" (addr) , "m" (*addr));
+			     : "=r" (ret) , "=r" (tmp) : "b" (addr) , "m" (*addr));
 	return ret;
 }
 
@@ -339,7 +339,7 @@ static inline unsigned long in_be64(volatile unsigned long *addr)
 	return ret;
 }
 
-static inline void out_le64(volatile unsigned long *addr, int val)
+static inline void out_le64(volatile unsigned long *addr, unsigned long val)
 {
 	unsigned long tmp;
 
@@ -351,9 +351,9 @@ static inline void out_le64(volatile unsigned long *addr, int val)
 			     "rldicl %1,%1,32,0\n"
 			     "rlwimi %0,%1,8,8,31\n"
 			     "rlwimi %0,%1,24,16,23\n"
-			     "std %0,0(%2)\n"
+			     "std %0,0(%3)\n"
 			     "sync"
-			     : "=r" (tmp) : "r" (val), "b" (addr) , "m" (*addr));
+			     : "=&r" (tmp) , "=&r" (val) : "1" (val) , "b" (addr) , "m" (*addr));
 }
 
 static inline void out_be64(volatile unsigned long *addr, int val)

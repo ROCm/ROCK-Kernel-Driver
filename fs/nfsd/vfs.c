@@ -1184,6 +1184,7 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 {
 	struct dentry	*dentry, *dnew;
 	int		err, cerr;
+	umode_t		mode;
 
 	err = nfserr_noent;
 	if (!flen || !plen)
@@ -1202,6 +1203,11 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	if (IS_ERR(dnew))
 		goto out_nfserr;
 
+	mode = S_IALLUGO;
+	/* Only the MODE ATTRibute is even vaguely meaningful */
+	if (iap && (iap->ia_valid & ATTR_MODE))
+		mode = iap->ia_mode & S_IALLUGO;
+
 	if (unlikely(path[plen] != 0)) {
 		char *path_alloced = kmalloc(plen+1, GFP_KERNEL);
 		if (path_alloced == NULL)
@@ -1209,30 +1215,15 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		else {
 			strncpy(path_alloced, path, plen);
 			path_alloced[plen] = 0;
-			err = vfs_symlink(dentry->d_inode, dnew, path_alloced);
+			err = vfs_symlink(dentry->d_inode, dnew, path_alloced, mode);
 			kfree(path_alloced);
 		}
 	} else
-		err = vfs_symlink(dentry->d_inode, dnew, path);
+		err = vfs_symlink(dentry->d_inode, dnew, path, mode);
 
 	if (!err) {
 		if (EX_ISSYNC(fhp->fh_export))
 			nfsd_sync_dir(dentry);
-		if (iap) {
-			iap->ia_valid &= ATTR_MODE; /* Only the MODE ATTRibute is 
-						     * even vaguely meaningful */
-			if (iap->ia_valid) {
-				iap->ia_valid |= ATTR_CTIME;
-				iap->ia_mode = (iap->ia_mode&S_IALLUGO)
-					| S_IFLNK;
-				if (notify_change(dnew, iap)==0)
-					if (EX_ISSYNC(fhp->fh_export))
-						write_inode_now(dentry->d_inode, 1);
-				/* errors from notify_change are not
-				 * propagated to client
-				 */
-		       }
-		}
 	} else
 		err = nfserrno(err);
 	fh_unlock(fhp);

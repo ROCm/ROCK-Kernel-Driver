@@ -40,16 +40,12 @@
 
 #if defined(__H8300H__)
 #define CPU "H8/300H"
+#include <asm/regs306x.h>
 #endif
 
 #if defined(__H8300S__)
 #define CPU "H8S"
-#endif
-
-#if defined(CONFIG_INTELFLASH)
-#define BLKOFFSET 512
-#else
-#define BLKOFFSET 0
+#include <asm/regs267x.h>
 #endif
 
 #define STUBSIZE 0xc000;
@@ -57,8 +53,6 @@
 unsigned long rom_length;
 unsigned long memory_start;
 unsigned long memory_end;
-
-struct task_struct *_current_task;
 
 char command_line[512];
 char saved_command_line[512];
@@ -107,12 +101,11 @@ void __init setup_arch(char **cmdline_p)
 	memory_start = (unsigned long) &_ramstart;
 
 	/* allow for ROMFS on the end of the kernel */
-	if (memcmp((void *)(memory_start + BLKOFFSET), "-rom1fs-", 8) == 0) {
+	if (memcmp((void *)memory_start, "-rom1fs-", 8) == 0) {
 #if defined(CONFIG_BLK_DEV_INITRD)
-		initrd_start = memory_start += BLKOFFSET;
+		initrd_start = memory_start;
 		initrd_end = memory_start += be32_to_cpu(((unsigned long *) (memory_start))[2]);
 #else
-		memory_start += BLKOFFSET;
 		memory_start += be32_to_cpu(((unsigned long *) memory_start)[2]);
 #endif
 	}
@@ -190,6 +183,16 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	paging_init();
 	h8300_gpio_init();
+#if defined(CONFIG_H8300_AKI3068NET) && defined(CONFIG_IDE)
+	{
+#define AREABIT(addr) (1 << (((addr) >> 21) & 7))
+		/* setup BSC */
+		volatile unsigned char *abwcr = (volatile unsigned char *)ABWCR;
+		volatile unsigned char *cscr = (volatile unsigned char *)CSCR;
+		*abwcr &= ~(AREABIT(CONFIG_H8300_IDE_BASE) | AREABIT(CONFIG_H8300_IDE_ALT));
+		*cscr  |= (AREABIT(CONFIG_H8300_IDE_BASE) | AREABIT(CONFIG_H8300_IDE_ALT)) | 0x0f;
+	}
+#endif
 #ifdef DEBUG
 	printk(KERN_DEBUG "Done setup_arch\n");
 #endif

@@ -204,7 +204,7 @@ hwgfs_mk_symlink(
 
 	error = hwgfs_decode(dir, name, 0, &parent_inode, &dentry);
 	if (likely(!error)) {
-		error = vfs_symlink(parent_inode, dentry, link);
+		error = vfs_symlink(parent_inode, dentry, link, S_IALLUGO);
 		dentry->d_fsdata = info;
 		if (handle)
 			*handle = dentry;

@@ -53,7 +53,7 @@ struct biovec_pool {
  * unsigned short
  */
 
-#define BV(x) { .nr_vecs = x, .name = "biovec-" #x }
+#define BV(x) { .nr_vecs = x, .name = "biovec-"__stringify(x) }
 static struct biovec_pool bvec_array[BIOVEC_NR_POOLS] = {
 	BV(1), BV(4), BV(16), BV(64), BV(128), BV(BIO_MAX_PAGES),
 };

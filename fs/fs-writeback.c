@@ -310,11 +310,6 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 				list_move(&inode->i_list, &sb->s_dirty);
 				continue;
 			}
-			/*
-			 * Assume that all inodes on this superblock are memory
-			 * backed.  Skip the superblock.
-			 */
-			break;
 		}
 
 		if (wbc->nonblocking && bdi_write_congested(bdi)) {

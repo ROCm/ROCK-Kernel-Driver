@@ -76,7 +76,7 @@ hub_xp_error_handler(
 	/* Get the error state of the hub */
 	e_state = error_state_get(hub_v);
 
-	cnode = NASID_TO_COMPACT_NODEID(nasid);
+	cnode = nasid_to_cnodeid(nasid);
 
 	xswitch = NODEPDA(cnode)->basew_xc;
 
@@ -119,7 +119,7 @@ is_widget_pio_enabled(ioerror_t *ioerror)
 		return(0);
 
 	/* Get the nasid for the cnode */
-	src_nasid = COMPACT_TO_NASID_NODEID(src_node);
+	src_nasid = cnodeid_to_nasid(src_node);
 	if (src_nasid == INVALID_NASID)
 		return(0);
 

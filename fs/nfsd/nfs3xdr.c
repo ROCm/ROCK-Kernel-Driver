@@ -936,7 +936,7 @@ encode_entry(struct readdir_cd *ccd, const char *name,
 			memmove(tmp, (caddr_t)tmp+len1, len2);
 
 			/* update offset */
-			if (((cd->offset - tmp) << 2) <= len1)
+			if (((cd->offset - tmp) << 2) < len1)
 				cd->offset = p + (cd->offset - tmp);
 			else
 				cd->offset -= len1 >> 2;

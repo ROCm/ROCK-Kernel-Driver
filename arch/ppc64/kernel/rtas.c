@@ -79,7 +79,7 @@ call_rtas_display_status(char c)
 	args->rets  = (rtas_arg_t *)&(args->args[1]);
 	args->args[0] = (int)c;
 
-	enter_rtas((void *)__pa((unsigned long)args));	
+	enter_rtas(__pa(args));
 
 	spin_unlock_irqrestore(&rtas.lock, s);
 }
@@ -115,9 +115,9 @@ __log_rtas_error(struct rtas_args *rtas_args)
 	get_paca()->xRtas = err_args;
 
 	PPCDBG(PPCDBG_RTAS, "\tentering rtas with 0x%lx\n",
-	       (void *)__pa((unsigned long)&err_args));
-	enter_rtas((void *)__pa((unsigned long)&get_paca()->xRtas));
-	PPCDBG(PPCDBG_RTAS, "\treturned from rtas ...\n");	
+	       __pa(&err_args));
+	enter_rtas(__pa(&get_paca()->xRtas));
+	PPCDBG(PPCDBG_RTAS, "\treturned from rtas ...\n");
 
 	err_args = get_paca()->xRtas;
 	get_paca()->xRtas = temp_args;
@@ -174,8 +174,8 @@ rtas_call(int token, int nargs, int nret,
 		rtas_args->rets[i] = 0;
 
 	PPCDBG(PPCDBG_RTAS, "\tentering rtas with 0x%lx\n",
-		(void *)__pa((unsigned long)rtas_args));
-	enter_rtas((void *)__pa((unsigned long)rtas_args));
+		__pa(rtas_args));
+	enter_rtas(__pa(rtas_args));
 	PPCDBG(PPCDBG_RTAS, "\treturned from rtas ...\n");
 
 	if (rtas_args->rets[0] == -1)
@@ -480,7 +480,7 @@ asmlinkage int ppc_rtas(struct rtas_args __user *uargs)
 	spin_lock_irqsave(&rtas.lock, flags);
 
 	get_paca()->xRtas = args;
-	enter_rtas((void *)__pa((unsigned long)&get_paca()->xRtas));
+	enter_rtas(__pa(&get_paca()->xRtas));
 	args = get_paca()->xRtas;
 
 	spin_unlock_irqrestore(&rtas.lock, flags);
@@ -515,7 +515,7 @@ void rtas_stop_self(void)
 
 	printk("%u %u Ready to die...\n",
 	       smp_processor_id(), hard_smp_processor_id());
-	enter_rtas((void *)__pa(rtas_args));
+	enter_rtas(__pa(rtas_args));
 
 	panic("Alas, I survived.\n");
 }

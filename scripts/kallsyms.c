@@ -5,12 +5,13 @@
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
  *
- * Usage: nm -n vmlinux | scripts/kallsyms > symbols.S
+ * Usage: nm -n vmlinux | scripts/kallsyms [--all-symbols] > symbols.S
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 struct sym_entry {
 	unsigned long long addr;
@@ -22,11 +23,12 @@ struct sym_entry {
 static struct sym_entry *table;
 static int size, cnt;
 static unsigned long long _stext, _etext, _sinittext, _einittext;
+static int all_symbols = 0;
 
 static void
 usage(void)
 {
-	fprintf(stderr, "Usage: kallsyms < in.map > out.S\n");
+	fprintf(stderr, "Usage: kallsyms [--all-symbols] < in.map > out.S\n");
 	exit(1);
 }
 
@@ -44,6 +46,19 @@ read_symbol(FILE *in, struct sym_entry *s)
 		}
 		return -1;
 	}
+
+	/* Ignore most absolute/undefined (?) symbols. */
+	if (strcmp(str, "_stext") == 0)
+		_stext = s->addr;
+	else if (strcmp(str, "_etext") == 0)
+		_etext = s->addr;
+	else if (strcmp(str, "_sinittext") == 0)
+		_sinittext = s->addr;
+	else if (strcmp(str, "_einittext") == 0)
+		_einittext = s->addr;
+	else if (toupper(s->type) == 'A' || toupper(s->type) == 'U')
+		return -1;
+
 	s->sym = strdup(str);
 	return 0;
 }
@@ -51,9 +66,11 @@ read_symbol(FILE *in, struct sym_entry *s)
 static int
 symbol_valid(struct sym_entry *s)
 {
-	if ((s->addr < _stext || s->addr > _etext)
-	    && (s->addr < _sinittext || s->addr > _einittext))
-		return 0;
+	if (!all_symbols) {
+		if ((s->addr < _stext || s->addr > _etext)
+		    && (s->addr < _sinittext || s->addr > _einittext))
+			return 0;
+	}
 
 	if (strstr(s->sym, "_compiled."))
 		return 0;
@@ -64,8 +81,6 @@ symbol_valid(struct sym_entry *s)
 static void
 read_map(FILE *in)
 {
-	int i;
-
 	while (!feof(in)) {
 		if (cnt >= size) {
 			size += 10000;
@@ -77,16 +92,6 @@ read_map(FILE *in)
 		}
 		if (read_symbol(in, &table[cnt]) == 0)
 			cnt++;
-	}
-	for (i = 0; i < cnt; i++) {
-		if (strcmp(table[i].sym, "_stext") == 0)
-			_stext = table[i].addr;
-		if (strcmp(table[i].sym, "_etext") == 0)
-			_etext = table[i].addr;
-		if (strcmp(table[i].sym, "_sinittext") == 0)
-			_sinittext = table[i].addr;
-		if (strcmp(table[i].sym, "_einittext") == 0)
-			_einittext = table[i].addr;
 	}
 }
 
@@ -147,7 +152,9 @@ write_src(void)
 int
 main(int argc, char **argv)
 {
-	if (argc != 1)
+	if (argc == 2 && strcmp(argv[1], "--all-symbols") == 0)
+		all_symbols = 1;
+	else if (argc != 1)
 		usage();
 
 	read_map(stdin);
