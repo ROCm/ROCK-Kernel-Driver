@@ -158,7 +158,7 @@ typedef struct vg46x_state_t {
     u_char		ctl, ema;
 } vg46x_state_t;
 
-typedef struct socket_info_t {
+struct i82365_socket {
     u_short		type, flags;
     struct pcmcia_socket	socket;
     unsigned int	number;
@@ -175,11 +175,11 @@ typedef struct socket_info_t {
 	cirrus_state_t		cirrus;
 	vg46x_state_t		vg46x;
     } state;
-} socket_info_t;
+};
 
 /* Where we keep track of our sockets... */
 static int sockets = 0;
-static socket_info_t socket[8] = {
+static struct i82365_socket socket[8] = {
     { 0, }, /* ... */
 };
 
@@ -351,7 +351,7 @@ static void cirrus_set_state(u_short s)
 
 static u_int __init cirrus_set_opts(u_short s, char *buf)
 {
-    socket_info_t *t = &socket[s];
+    struct i82365_socket *t = &socket[s];
     cirrus_state_t *p = &socket[s].state.cirrus;
     u_int mask = 0xffff;
 
@@ -457,7 +457,7 @@ static u_int __init vg46x_set_opts(u_short s, char *buf)
 
 static void get_bridge_state(u_short s)
 {
-    socket_info_t *t = &socket[s];
+    struct i82365_socket *t = &socket[s];
     if (t->flags & IS_CIRRUS)
 	cirrus_get_state(s);
     else if (t->flags & IS_VADEM)
@@ -466,7 +466,7 @@ static void get_bridge_state(u_short s)
 
 static void set_bridge_state(u_short s)
 {
-    socket_info_t *t = &socket[s];
+    struct i82365_socket *t = &socket[s];
     if (t->flags & IS_CIRRUS)
 	cirrus_set_state(s);
     else {
@@ -708,7 +708,7 @@ static void __init add_pcic(int ns, int type)
 {
     u_int mask = 0, i, base;
     int use_pci = 0, isa_irq = 0;
-    socket_info_t *t = &socket[sockets-ns];
+    struct i82365_socket *t = &socket[sockets-ns];
 
     base = sockets-ns;
     if (t->ioaddr > 0) request_region(t->ioaddr, 2, "i82365");
@@ -975,7 +975,7 @@ static void pcic_interrupt_wrapper(u_long data)
 
 static int pcic_register_callback(struct pcmcia_socket *s, void (*handler)(void *, unsigned int), void * info)
 {
-    unsigned int sock = container_of(s, struct socket_info_t, socket)->number;
+    unsigned int sock = container_of(s, struct i82365_socket, socket)->number;
     socket[sock].handler = handler;
     socket[sock].info = info;
     return 0;
@@ -985,7 +985,7 @@ static int pcic_register_callback(struct pcmcia_socket *s, void (*handler)(void 
 
 static int pcic_inquire_socket(struct pcmcia_socket *s, socket_cap_t *cap)
 {
-    unsigned int sock = container_of(s, struct socket_info_t, socket)->number;
+    unsigned int sock = container_of(s, struct i82365_socket, socket)->number;
     *cap = socket[sock].cap;
     return 0;
 } /* pcic_inquire_socket */
@@ -1029,7 +1029,7 @@ static int i365_get_status(u_short sock, u_int *value)
 
 static int i365_get_socket(u_short sock, socket_state_t *state)
 {
-    socket_info_t *t = &socket[sock];
+    struct i82365_socket *t = &socket[sock];
     u_char reg, vcc, vpp;
     
     reg = i365_get(sock, I365_POWER);
@@ -1101,7 +1101,7 @@ static int i365_get_socket(u_short sock, socket_state_t *state)
 
 static int i365_set_socket(u_short sock, socket_state_t *state)
 {
-    socket_info_t *t = &socket[sock];
+    struct i82365_socket *t = &socket[sock];
     u_char reg;
     
     DEBUG(1, "i82365: SetSocket(%d, flags %#3.3x, Vcc %d, Vpp %d, "
@@ -1297,7 +1297,7 @@ static int i365_set_mem_map(u_short sock, struct pccard_mem_map *mem)
 static int proc_read_info(char *buf, char **start, off_t pos,
 			  int count, int *eof, void *data)
 {
-    socket_info_t *s = data;
+    struct i82365_socket *s = data;
     char *p = buf;
     p += sprintf(p, "type:     %s\npsock:    %d\n",
 		 pcic[s->type].name, s->psock);
@@ -1307,7 +1307,7 @@ static int proc_read_info(char *buf, char **start, off_t pos,
 static int proc_read_exca(char *buf, char **start, off_t pos,
 			  int count, int *eof, void *data)
 {
-    u_short sock = (socket_info_t *)data - socket;
+    u_short sock = (struct i82365_socket *)data - socket;
     char *p = buf;
     int i, top;
     
@@ -1330,7 +1330,7 @@ static int proc_read_exca(char *buf, char **start, off_t pos,
 
 static void pcic_proc_setup(struct pcmcia_socket *sock, struct proc_dir_entry *base)
 {
-    socket_info_t *s = container_of(sock, struct socket_info_t, socket);
+    struct i82365_socket *s = container_of(sock, struct i82365_socket, socket);
 
     if (s->flags & IS_ALIVE)
     	return;
@@ -1370,7 +1370,7 @@ static void pcic_proc_remove(u_short sock)
 
 static int pcic_get_status(struct pcmcia_socket *s, u_int *value)
 {
-	unsigned int sock = container_of(s, struct socket_info_t, socket)->number;
+	unsigned int sock = container_of(s, struct i82365_socket, socket)->number;
 
 	if (socket[sock].flags & IS_ALIVE) {
 		*value = 0;
@@ -1382,7 +1382,7 @@ static int pcic_get_status(struct pcmcia_socket *s, u_int *value)
 
 static int pcic_get_socket(struct pcmcia_socket *s, socket_state_t *state)
 {
-	unsigned int sock = container_of(s, struct socket_info_t, socket)->number;
+	unsigned int sock = container_of(s, struct i82365_socket, socket)->number;
 
 	if (socket[sock].flags & IS_ALIVE)
 		return -EINVAL;
@@ -1392,7 +1392,7 @@ static int pcic_get_socket(struct pcmcia_socket *s, socket_state_t *state)
 
 static int pcic_set_socket(struct pcmcia_socket *s, socket_state_t *state)
 {
-	unsigned int sock = container_of(s, struct socket_info_t, socket)->number;
+	unsigned int sock = container_of(s, struct i82365_socket, socket)->number;
 
 	if (socket[sock].flags & IS_ALIVE)
 		return -EINVAL;
@@ -1402,7 +1402,7 @@ static int pcic_set_socket(struct pcmcia_socket *s, socket_state_t *state)
 
 static int pcic_set_io_map(struct pcmcia_socket *s, struct pccard_io_map *io)
 {
-	unsigned int sock = container_of(s, struct socket_info_t, socket)->number;
+	unsigned int sock = container_of(s, struct i82365_socket, socket)->number;
 	if (socket[sock].flags & IS_ALIVE)
 		return -EINVAL;
 
@@ -1411,7 +1411,7 @@ static int pcic_set_io_map(struct pcmcia_socket *s, struct pccard_io_map *io)
 
 static int pcic_set_mem_map(struct pcmcia_socket *s, struct pccard_mem_map *mem)
 {
-	unsigned int sock = container_of(s, struct socket_info_t, socket)->number;
+	unsigned int sock = container_of(s, struct i82365_socket, socket)->number;
 	if (socket[sock].flags & IS_ALIVE)
 		return -EINVAL;
 
