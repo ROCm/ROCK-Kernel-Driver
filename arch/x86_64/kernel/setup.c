@@ -218,6 +218,11 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		if (!memcmp(from, "acpi=ht", 7)) { 
 			acpi_ht = 1; 
 		}
+
+		/* acpi=strict disables out-of-spec workarounds */
+		else if (!memcmp(from, "acpi=strict", 11)) {
+			acpi_strict = 1;
+		}
 #endif
 
 		if (!memcmp(from, "nolapic", 7) ||
@@ -793,13 +798,12 @@ struct cpu_model_info {
 	char *model_names[16];
 };
 
-/*
- * This does the hard work of actually picking apart the CPU stuff...
- */
-void __init identify_cpu(struct cpuinfo_x86 *c)
+/* Do some early cpuid on the boot CPU to get some parameter that are
+   needed before check_bugs. Everything advanced is in identify_cpu
+   below. */
+void __init early_identify_cpu(struct cpuinfo_x86 *c)
 {
-	int i;
-	u32 xlvl, tfms;
+	u32 tfms;
 
 	c->loops_per_jiffy = loops_per_jiffy;
 	c->x86_cache_size = -1;
@@ -807,6 +811,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_model = c->x86_mask = 0;	/* So far unknown... */
 	c->x86_vendor_id[0] = '\0'; /* Unset */
 	c->x86_model_id[0] = '\0';  /* Unset */
+	c->x86_clflush_size = 64;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
 
 	/* Get vendor name */
@@ -816,6 +821,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	      (int *)&c->x86_vendor_id[4]);
 		
 	get_cpu_vendor(c);
+
 	/* Initialize the standard set of capabilities */
 	/* Note that the vendor-specific code below might override */
 
@@ -837,6 +843,17 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 		/* Have CPUID level 0 only - unheard of */
 		c->x86 = 4;
 	}
+}
+
+/*
+ * This does the hard work of actually picking apart the CPU stuff...
+ */
+void __init identify_cpu(struct cpuinfo_x86 *c)
+{
+	int i;
+	u32 xlvl;
+
+	early_identify_cpu(c);
 
 	/* AMD-defined flags: level 0x80000001 */
 	xlvl = cpuid_eax(0x80000000);
@@ -853,7 +870,6 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 		if (  xlvl >= 0x80860001 )
 			c->x86_capability[2] = cpuid_edx(0x80860001);
 	}
-
 
 	/*
 	 * Vendor-specific initialization.  In this section we

@@ -31,7 +31,7 @@
 #define ARGOFFSET R11
 #define SWFRAME ORIG_RAX
 
-	.macro SAVE_ARGS addskip=0,norcx=0 	
+	.macro SAVE_ARGS addskip=0,norcx=0,nor891011=0
 	subq  $9*8+\addskip,%rsp
 	CFI_ADJUST_CFA_OFFSET	9*8+\addskip
 	movq  %rdi,8*8(%rsp) 
@@ -47,6 +47,8 @@
 	.endif
 	movq  %rax,4*8(%rsp) 
 	CFI_OFFSET	rax,4*8-(9*8+\addskip)
+	.if \nor891011
+	.else
 	movq  %r8,3*8(%rsp) 
 	CFI_OFFSET	r8,3*8-(9*8+\addskip)
 	movq  %r9,2*8(%rsp) 
@@ -55,17 +57,21 @@
 	CFI_OFFSET	r10,1*8-(9*8+\addskip)
 	movq  %r11,(%rsp) 
 	CFI_OFFSET	r11,-(9*8+\addskip)
+	.endif
 	.endm
 
 #define ARG_SKIP 9*8
-	.macro RESTORE_ARGS skiprax=0,addskip=0,skiprcx=0,skipr11=0
+	.macro RESTORE_ARGS skiprax=0,addskip=0,skiprcx=0,skipr11=0,skipr8910=0,skiprdx=0
 	.if \skipr11
 	.else
 	movq (%rsp),%r11
 	.endif
+	.if \skipr8910
+	.else
 	movq 1*8(%rsp),%r10
 	movq 2*8(%rsp),%r9
 	movq 3*8(%rsp),%r8
+	.endif
 	.if \skiprax
 	.else
 	movq 4*8(%rsp),%rax
@@ -74,7 +80,10 @@
 	.else
 	movq 5*8(%rsp),%rcx
 	.endif
+	.if \skiprdx
+	.else
 	movq 6*8(%rsp),%rdx
+	.endif
 	movq 7*8(%rsp),%rsi
 	movq 8*8(%rsp),%rdi
 	.if ARG_SKIP+\addskip > 0

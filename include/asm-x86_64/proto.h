@@ -21,6 +21,7 @@ extern void syscall_init(void);
 
 extern void ia32_syscall(void);
 extern void ia32_cstar_target(void); 
+extern void ia32_sysenter_target(void); 
 
 extern void calibrate_delay(void);
 extern void cpu_idle(void);
@@ -36,6 +37,8 @@ extern int numa_setup(char *opt);
 
 extern int setup_early_printk(char *); 
 extern void early_printk(const char *fmt, ...) __attribute__((format(printf,1,2)));
+
+extern void early_identify_cpu(struct cpuinfo_x86 *c);
 
 extern int k8_scan_nodes(unsigned long start, unsigned long end);
 
@@ -68,6 +71,7 @@ extern void show_regs(struct pt_regs * regs);
 
 extern int map_syscall32(struct mm_struct *mm, unsigned long address);
 extern char *syscall32_page;
+extern void syscall32_cpu_init(void);
 
 extern void setup_node_bootmem(int nodeid, unsigned long start, unsigned long end);
 
