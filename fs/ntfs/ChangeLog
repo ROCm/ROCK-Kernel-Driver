@@ -38,6 +38,22 @@ ToDo/Notes:
 	- Rename {{re,}init,get,put}_attr_search_ctx() to
 	  ntfs_attr_{{re,}init,get,put}_search_ctx() as well as the type
 	  attr_search_context to ntfs_attr_search_ctx.
+	- Force use of ntfs_attr_find() in ntfs_attr_lookup() when searching
+	  for the attribute list attribute itself.
+	- Fix endianness bug in ntfs_external_attr_find().
+	- Change ntfs_{external_,}attr_find() to return 0 on success, -ENOENT
+	  if the attribute is not found, and -EIO on real error.  In the case
+	  of -ENOENT, the search context is updated to describe the attribute
+	  before which the attribute being searched for would need to be
+	  inserted if such an action were to be desired and in the case of
+	  ntfs_external_attr_find() the search context is also updated to
+	  indicate the attribute list entry before which the attribute list
+	  entry of the attribute being searched for would need to be inserted
+	  if such an action were to be desired.  Also make ntfs_find_attr()
+	  static and remove its prototype from attrib.h as it is not used
+	  anywhere other than attrib.c.  Update ntfs_attr_lookup() and all
+	  callers of ntfs_{external,}attr_{find,lookup}() for the new return
+	  values.
 
 2.1.17 - Fix bugs in mount time error code paths and other updates.
 

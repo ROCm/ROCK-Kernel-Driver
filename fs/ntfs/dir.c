@@ -106,11 +106,15 @@ MFT_REF ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 		goto err_out;
 	}
 	/* Find the index root attribute in the mft record. */
-	if (!ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
-			0, ctx)) {
-		ntfs_error(sb, "Index root attribute missing in directory "
-				"inode 0x%lx.", dir_ni->mft_no);
-		err = -EIO;
+	err = ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
+			0, ctx);
+	if (unlikely(err)) {
+		if (err == -ENOENT) {
+			ntfs_error(sb, "Index root attribute missing in "
+					"directory inode 0x%lx.",
+					dir_ni->mft_no);
+			err = -EIO;
+		}
 		goto err_out;
 	}
 	/* Get to the index root value (it's been verified in read_inode). */
@@ -655,11 +659,15 @@ u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 		goto err_out;
 	}
 	/* Find the index root attribute in the mft record. */
-	if (!ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
-			0, ctx)) {
-		ntfs_error(sb, "Index root attribute missing in directory "
-				"inode 0x%lx.", dir_ni->mft_no);
-		err = -EIO;
+	err = ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
+			0, ctx);
+	if (unlikely(err)) {
+		if (err == -ENOENT) {
+			ntfs_error(sb, "Index root attribute missing in "
+					"directory inode 0x%lx.",
+					dir_ni->mft_no);
+			err = -EIO;
+		}
 		goto err_out;
 	}
 	/* Get to the index root value (it's been verified in read_inode). */
@@ -1183,8 +1191,9 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	/* Get the offset into the index root attribute. */
 	ir_pos = (s64)fpos;
 	/* Find the index root attribute in the mft record. */
-	if (unlikely(!ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE,
-			0, NULL, 0, ctx))) {
+	err = ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
+			0, ctx);
+	if (unlikely(err)) {
 		ntfs_error(sb, "Index root attribute missing in directory "
 				"inode 0x%lx.", vdir->i_ino);
 		goto err_out;

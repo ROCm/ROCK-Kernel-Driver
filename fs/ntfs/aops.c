@@ -402,11 +402,10 @@ int ntfs_readpage(struct file *file, struct page *page)
 		err = -ENOMEM;
 		goto unm_err_out;
 	}
-	if (unlikely(!ntfs_attr_lookup(ni->type, ni->name, ni->name_len,
-			CASE_SENSITIVE, 0, NULL, 0, ctx))) {
-		err = -ENOENT;
+	err = ntfs_attr_lookup(ni->type, ni->name, ni->name_len,
+			CASE_SENSITIVE, 0, NULL, 0, ctx);
+	if (unlikely(err))
 		goto put_unm_err_out;
-	}
 
 	/* Starting position of the page within the attribute value. */
 	attr_pos = page->index << PAGE_CACHE_SHIFT;
@@ -1122,11 +1121,10 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 		err = -ENOMEM;
 		goto err_out;
 	}
-	if (unlikely(!ntfs_attr_lookup(ni->type, ni->name, ni->name_len,
-			CASE_SENSITIVE, 0, NULL, 0, ctx))) {
-		err = -ENOENT;
+	err = ntfs_attr_lookup(ni->type, ni->name, ni->name_len,
+			CASE_SENSITIVE, 0, NULL, 0, ctx);
+	if (unlikely(err))
 		goto err_out;
-	}
 
 	/* Starting position of the page within the attribute value. */
 	attr_pos = page->index << PAGE_CACHE_SHIFT;
@@ -1896,11 +1894,10 @@ static int ntfs_commit_write(struct file *file, struct page *page,
 		err = -ENOMEM;
 		goto err_out;
 	}
-	if (unlikely(!ntfs_attr_lookup(ni->type, ni->name, ni->name_len,
-			CASE_SENSITIVE, 0, NULL, 0, ctx))) {
-		err = -ENOENT;
+	err = ntfs_attr_lookup(ni->type, ni->name, ni->name_len,
+			CASE_SENSITIVE, 0, NULL, 0, ctx);
+	if (unlikely(err))
 		goto err_out;
-	}
 
 	/* Starting position of the page within the attribute value. */
 	attr_pos = page->index << PAGE_CACHE_SHIFT;
