@@ -530,9 +530,8 @@ out:
  *	A socket has left a multicast group on device dev
  */
 
-int ip_mc_dec_group(struct in_device *in_dev, u32 addr)
+void ip_mc_dec_group(struct in_device *in_dev, u32 addr)
 {
-	int err = -ESRCH;
 	struct ip_mc_list *i, **ip;
 	
 	ASSERT_RTNL();
@@ -549,13 +548,11 @@ int ip_mc_dec_group(struct in_device *in_dev, u32 addr)
 					ip_rt_multicast_event(in_dev);
 
 				ip_ma_put(i);
-				return 0;
+				return;
 			}
-			err = 0;
 			break;
 		}
 	}
-	return -ESRCH;
 }
 
 /* Device going down */
