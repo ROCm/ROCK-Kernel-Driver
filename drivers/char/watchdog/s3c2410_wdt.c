@@ -55,13 +55,17 @@
 
 #define PFX "s3c2410-wdt: "
 
-#define CONFIG_WATCHDOG_NOWAYOUT		(0)
 #define CONFIG_S3C2410_WATCHDOG_ATBOOT		(0)
 #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME	(15)
 
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+
 static int tmr_margin	= CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME;
 static int tmr_atboot	= CONFIG_S3C2410_WATCHDOG_ATBOOT;
-static int nowayout	= CONFIG_WATCHDOG_NOWAYOUT;
 static int soft_noboot	= 0;
 static int debug	= 0;
 
