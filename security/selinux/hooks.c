@@ -1515,7 +1515,8 @@ static void selinux_bprm_compute_creds(struct linux_binprm *bprm)
 	struct bprm_security_struct *bsec;
 	u32 sid;
 	struct av_decision avd;
-	int rc;
+	struct itimerval itimer;
+	int rc, i;
 
 	secondary_ops->bprm_compute_creds(bprm);
 
@@ -1564,6 +1565,26 @@ static void selinux_bprm_compute_creds(struct linux_binprm *bprm)
 
 		/* Close files for which the new task SID is not authorized. */
 		flush_unauthorized_files(current->files);
+
+		/* Check whether the new SID can inherit signal state
+		   from the old SID.  If not, clear itimers to avoid
+		   subsequent signal generation and flush and unblock
+		   signals. This must occur _after_ the task SID has
+                  been updated so that any kill done after the flush
+                  will be checked against the new SID. */
+		rc = avc_has_perm(tsec->osid, tsec->sid, SECCLASS_PROCESS,
+				  PROCESS__SIGINH, NULL, NULL);
+		if (rc) {
+			memset(&itimer, 0, sizeof itimer);
+			for (i = 0; i < 3; i++)
+				do_setitimer(i, &itimer, NULL);
+			flush_signals(current);
+			spin_lock_irq(&current->sighand->siglock);
+			flush_signal_handlers(current, 1);
+			sigemptyset(&current->blocked);
+			recalc_sigpending();
+			spin_unlock_irq(&current->sighand->siglock);
+		}
 
 		/* Wake up the parent if it is waiting so that it can
 		   recheck wait permission to the new task SID. */
