@@ -71,6 +71,7 @@
 #include <linux/udp.h>
 #include <linux/cache.h>
 #include <asm/io.h>
+#include <asm/irq.h>
 #include <asm/uaccess.h>
 
 /* VLAN tagging feature enable/disable */
