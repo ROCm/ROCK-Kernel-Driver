@@ -23,6 +23,7 @@
 #include <linux/swap.h>
 
 #include "ntfs.h"
+#include "bitmap.h"
 
 /**
  * __format_mft_record - initialize an empty mft record
@@ -1095,4 +1096,159 @@ static int ntfs_mft_writepage(struct page *page, struct writeback_control *wbc)
 	return 0;
 }
 
+static const char *es = "  Leaving inconsistent metadata.  Unmount and run "
+		"chkdsk.";
+
+/**
+ * ntfs_extent_mft_record_free - free an extent mft record on an ntfs volume
+ * @ni:		ntfs inode of the mapped extent mft record to free
+ * @m:		mapped extent mft record of the ntfs inode @ni
+ *
+ * Free the mapped extent mft record @m of the extent ntfs inode @ni.
+ *
+ * Note that this function unmaps the mft record and closes and destroys @ni
+ * internally and hence you cannot use either @ni nor @m any more after this
+ * function returns success.
+ *
+ * On success return 0 and on error return -errno.  @ni and @m are still valid
+ * in this case and have not been freed.
+ *
+ * For some errors an error message is displayed and the success code 0 is
+ * returned and the volume is then left dirty on umount.  This makes sense in
+ * case we could not rollback the changes that were already done since the
+ * caller no longer wants to reference this mft record so it does not matter to
+ * the caller if something is wrong with it as long as it is properly detached
+ * from the base inode.
+ */
+int ntfs_extent_mft_record_free(ntfs_inode *ni, MFT_RECORD *m)
+{
+	unsigned long mft_no = ni->mft_no;
+	ntfs_volume *vol = ni->vol;
+	ntfs_inode *base_ni;
+	ntfs_inode **extent_nis;
+	int i, err;
+	le16 old_seq_no;
+	u16 seq_no;
+	
+	BUG_ON(NInoAttr(ni));
+	BUG_ON(ni->nr_extents != -1);
+
+	down(&ni->extent_lock);
+	base_ni = ni->ext.base_ntfs_ino;
+	up(&ni->extent_lock);
+
+	BUG_ON(base_ni->nr_extents <= 0);
+
+	ntfs_debug("Entering for extent inode 0x%lx, base inode 0x%lx.\n",
+			mft_no, base_ni->mft_no);
+
+	down(&base_ni->extent_lock);
+
+	/* Make sure we are holding the only reference to the extent inode. */
+	if (atomic_read(&ni->count) > 2) {
+		ntfs_error(vol->sb, "Tried to free busy extent inode 0x%lx, "
+				"not freeing.", base_ni->mft_no);
+		up(&base_ni->extent_lock);
+		return -EBUSY;
+	}
+
+	/* Dissociate the ntfs inode from the base inode. */
+	extent_nis = base_ni->ext.extent_ntfs_inos;
+	err = -ENOENT;
+	for (i = 0; i < base_ni->nr_extents; i++) {
+		if (ni != extent_nis[i])
+			continue;
+		extent_nis += i;
+		base_ni->nr_extents--;
+		memmove(extent_nis, extent_nis + 1, (base_ni->nr_extents - i) *
+				sizeof(ntfs_inode*));
+		err = 0;
+		break;
+	}
+
+	up(&base_ni->extent_lock);
+
+	if (unlikely(err)) {
+		ntfs_error(vol->sb, "Extent inode 0x%lx is not attached to "
+				"its base inode 0x%lx.", mft_no,
+				base_ni->mft_no);
+		BUG();
+	}
+
+	/*
+	 * The extent inode is no longer attached to the base inode so no one
+	 * can get a reference to it any more.
+	 */
+
+	/* Mark the mft record as not in use. */
+	m->flags &= const_cpu_to_le16(~const_le16_to_cpu(MFT_RECORD_IN_USE));
+
+	/* Increment the sequence number, skipping zero, if it is not zero. */
+	old_seq_no = m->sequence_number;
+	seq_no = le16_to_cpu(old_seq_no);
+	if (seq_no == 0xffff)
+		seq_no = 1;
+	else if (seq_no)
+		seq_no++;
+	m->sequence_number = cpu_to_le16(seq_no);
+
+	/*
+	 * Set the ntfs inode dirty and write it out.  We do not need to worry
+	 * about the base inode here since whatever caused the extent mft
+	 * record to be freed is guaranteed to do it already.
+	 */
+	NInoSetDirty(ni);
+	err = write_mft_record(ni, m, 0);
+	if (unlikely(err)) {
+		ntfs_error(vol->sb, "Failed to write mft record 0x%lx, not "
+				"freeing.", mft_no);
+		goto rollback;
+	}
+rollback_error:
+	/* Unmap and throw away the now freed extent inode. */
+	unmap_extent_mft_record(ni);
+	ntfs_clear_extent_inode(ni);
+
+	/* Clear the bit in the $MFT/$BITMAP corresponding to this record. */
+	err = ntfs_bitmap_clear_bit(vol->mftbmp_ino, mft_no);
+	if (unlikely(err)) {
+		/*
+		 * The extent inode is gone but we failed to deallocate it in
+		 * the mft bitmap.  Just emit a warning and leave the volume
+		 * dirty on umount.
+		 */
+		ntfs_error(vol->sb, "Failed to clear bit in mft bitmap.%s", es);
+		NVolSetErrors(vol);
+	}
+	return 0;
+rollback:
+	/* Rollback what we did... */
+	down(&base_ni->extent_lock);
+	extent_nis = base_ni->ext.extent_ntfs_inos;
+	if (!(base_ni->nr_extents & 3)) {
+		int new_size = (base_ni->nr_extents + 4) * sizeof(ntfs_inode*);
+
+		extent_nis = (ntfs_inode**)kmalloc(new_size, GFP_NOFS);
+		if (unlikely(!extent_nis)) {
+			ntfs_error(vol->sb, "Failed to allocate internal "
+					"buffer during rollback.%s", es);
+			up(&base_ni->extent_lock);
+			NVolSetErrors(vol);
+			goto rollback_error;
+		}
+		if (base_ni->nr_extents) {
+			BUG_ON(!base_ni->ext.extent_ntfs_inos);
+			memcpy(extent_nis, base_ni->ext.extent_ntfs_inos,
+					new_size - 4 * sizeof(ntfs_inode*));
+			kfree(base_ni->ext.extent_ntfs_inos);
+		}
+		base_ni->ext.extent_ntfs_inos = extent_nis;
+	}
+	m->flags |= MFT_RECORD_IN_USE;
+	m->sequence_number = old_seq_no;
+	extent_nis[base_ni->nr_extents++] = ni;
+	up(&base_ni->extent_lock);
+	mark_mft_record_dirty(ni);
+	return err;
+}
 #endif /* NTFS_RW */
