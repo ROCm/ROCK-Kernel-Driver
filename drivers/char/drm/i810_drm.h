@@ -166,6 +166,9 @@ typedef struct _drm_i810_sarea {
 
 	int vertex_prim;
 
+	int pf_enabled;               /* is pageflipping allowed? */
+	int pf_active;
+	int pf_current_page;	    /* which buffer is being displayed? */
 } drm_i810_sarea_t;
 
 /* WARNING: If you change any of these defines, make sure to change the
@@ -189,6 +192,7 @@ typedef struct _drm_i810_sarea {
 #define DRM_IOCTL_I810_OV0FLIP		DRM_IO ( 0x4b)
 #define DRM_IOCTL_I810_MC		DRM_IOW( 0x4c, drm_i810_mc_t)
 #define DRM_IOCTL_I810_RSTATUS		DRM_IO ( 0x4d )
+#define DRM_IOCTL_I810_FLIP             DRM_IO ( 0x4e )
 
 typedef struct _drm_i810_clear {
 	int clear_color;

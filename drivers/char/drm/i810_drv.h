@@ -75,7 +75,20 @@ typedef struct drm_i810_private {
 	int overlay_physical;
 	int w, h;
 	int pitch;
+  	int back_pitch;
+	int depth_pitch;
 
+	int do_boxes;
+	int dma_used;
+
+	int current_page;
+	int page_flipping;
+
+	wait_queue_head_t irq_queue;
+   	atomic_t irq_received;
+   	atomic_t irq_emitted;
+  
+        int front_offset;
 } drm_i810_private_t;
 
 				/* i810_dma.c */
@@ -124,6 +137,8 @@ int i810_swap_bufs(struct inode *inode, struct file *filp,
 int i810_clear_bufs(struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long arg);
 
+int i810_flip_bufs(struct inode *inode, struct file *filp,
+		   unsigned int cmd, unsigned long arg);
 
 #define I810_BASE(reg)		((unsigned long) \
 				dev_priv->mmio_map->handle)
@@ -225,12 +240,15 @@ int i810_clear_bufs(struct inode *inode, struct file *filp,
 #define CMD_OP_Z_BUFFER_INFO     ((0x0<<29)|(0x16<<23))
 #define CMD_OP_DESTBUFFER_INFO   ((0x0<<29)|(0x15<<23))
 #define CMD_OP_FRONTBUFFER_INFO  ((0x0<<29)|(0x14<<23))
+#define CMD_OP_WAIT_FOR_EVENT    ((0x0<<29)|(0x03<<23))
 
 #define BR00_BITBLT_CLIENT   0x40000000
 #define BR00_OP_COLOR_BLT    0x10000000
 #define BR00_OP_SRC_COPY_BLT 0x10C00000
 #define BR13_SOLID_PATTERN   0x80000000
 
-
+#define WAIT_FOR_PLANE_A_SCANLINES (1<<1) 
+#define WAIT_FOR_PLANE_A_FLIP      (1<<2) 
+#define WAIT_FOR_VBLANK (1<<3)
 
 #endif
