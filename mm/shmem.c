@@ -750,9 +750,9 @@ static int shmem_getpage(struct inode *inode, unsigned long idx, struct page **p
 	 * Normally, filepage is NULL on entry, and either found
 	 * uptodate immediately, or allocated and zeroed, or read
 	 * in under swappage, which is then assigned to filepage.
-	 * But shmem_readpage and shmem_prepare_write pass in a locked
-	 * filepage, which may be found not uptodate by other callers
-	 * too, and may need to be copied from the swappage read in.
+	 * But shmem_prepare_write passes in a locked filepage,
+	 * which may be found not uptodate by other callers too,
+	 * and may need to be copied from the swappage read in.
 	 */
 repeat:
 	if (!filepage)
@@ -1102,19 +1102,9 @@ static struct inode_operations shmem_symlink_inode_operations;
 static struct inode_operations shmem_symlink_inline_operations;
 
 /*
- * tmpfs itself makes no use of generic_file_read, generic_file_mmap
- * or generic_file_write; but shmem_readpage, shmem_prepare_write and
- * simple_commit_write let a tmpfs file be used below the loop driver.
+ * Normally tmpfs makes no use of shmem_prepare_write, but it
+ * lets a tmpfs file be used read-write below the loop driver.
  */
-static int
-shmem_readpage(struct file *file, struct page *page)
-{
-	struct inode *inode = page->mapping->host;
-	int error = shmem_getpage(inode, page->index, &page, SGP_CACHE);
-	unlock_page(page);
-	return error;
-}
-
 static int
 shmem_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
 {
@@ -1751,7 +1741,6 @@ static struct address_space_operations shmem_aops = {
 	.writepage	= shmem_writepage,
 	.set_page_dirty	= __set_page_dirty_nobuffers,
 #ifdef CONFIG_TMPFS
-	.readpage	= shmem_readpage,
 	.prepare_write	= shmem_prepare_write,
 	.commit_write	= simple_commit_write,
 #endif
