@@ -45,12 +45,13 @@ config 6xx
 	  There are four types of PowerPC chips supported.  The more common
 	  types (601, 603, 604, 740, 750, 7400), the Motorola embedded
 	  versions (821, 823, 850, 855, 860, 8260), the IBM embedded versions
-	  (403 and 405) and the high end 64 bit Power processors (POWER 3)
+	  (403 and 405) and the high end 64 bit Power processors (POWER 3,
+	  POWER4, and IBM 970 also known as G5)
 	  Unless you are building a kernel for one of the embedded processor
-	  systems, or a 64 bit IBM RS/6000, choose 6xx.  Note that the kernel
-	  runs in 32-bit mode even on 64-bit chips.  Also note that because
-	  the 82xx family has a 603e core, specific support for that chipset
-	  is asked later on.
+	  systems, 64 bit IBM RS/6000 or an Apple G5, choose 6xx.
+	  Note that the kernel runs in 32-bit mode even on 64-bit chips.
+	  Also note that because the 82xx family has a 603e core, specific
+	  support for that chipset is asked later on.
 
 config 40x
 	bool "40x"
@@ -60,6 +61,9 @@ config 44x
 
 config POWER3
 	bool "POWER3"
+
+config POWER4
+	bool "POWER4 and 970 (G5)"
 
 config 8xx
 	bool "8xx"
@@ -73,7 +77,8 @@ config PTE_64BIT
 
 config ALTIVEC
 	bool "AltiVec Support"
-	depends on 6xx && !8260
+	depends on 6xx || POWER4
+	depends on !8260
 	---help---
 	  This option enables kernel support for the Altivec extensions to the
 	  PowerPC processor. The kernel currently supports saving and restoring
@@ -200,7 +205,7 @@ config CPU_FREQ_PMAC
 
 config PPC601_SYNC_FIX
 	bool "Workarounds for PPC601 bugs"
-	depends on 6xx && !POWER3
+	depends on 6xx
 	help
 	  Some versions of the PPC601 (the first PowerPC chip) have bugs which
 	  mean that extra synchronization instructions are required near
@@ -216,12 +221,12 @@ source arch/ppc/platforms/4xx/Kconfig
 
 config PPC64BRIDGE
 	bool
-	depends on POWER3
+	depends on POWER3 || POWER4
 	default y
 
 config PPC_STD_MMU
 	bool
-	depends on 6xx || POWER3
+	depends on 6xx || POWER3 || POWER4
 	default y
 
 config NOT_COHERENT_CACHE
@@ -459,7 +464,7 @@ endchoice
 
 choice
 	prompt "Machine Type"
-	depends on 6xx || POWER3
+	depends on 6xx || POWER3 || POWER4
 	default PPC_MULTIPLATFORM
 	---help---
 	  Linux currently supports several different kinds of PowerPC-based
@@ -952,7 +957,7 @@ config ISA
 
 config GENERIC_ISA_DMA
 	bool
-	depends on POWER3 || 6xx && !8260
+	depends on POWER3 || POWER4 || 6xx && !8260
 	default y
 
 config EISA
