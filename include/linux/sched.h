@@ -638,6 +638,8 @@ static inline void mmdrop(struct mm_struct * mm)
 
 /* mmput gets rid of the mappings and all user-space */
 extern void mmput(struct mm_struct *);
+/* Grab a reference to the mm if its not already going away */
+extern struct mm_struct *mmgrab(struct mm_struct *);
 /* Remove the current tasks stale references to the old mm_struct */
 extern void mm_release(struct task_struct *, struct mm_struct *);
 
@@ -745,7 +747,7 @@ static inline struct mm_struct * get_task_mm(struct task_struct * task)
 	task_lock(task);
 	mm = task->mm;
 	if (mm)
-		atomic_inc(&mm->mm_users);
+		mm = mmgrab(mm);
 	task_unlock(task);
 
 	return mm;

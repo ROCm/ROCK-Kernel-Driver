@@ -37,6 +37,8 @@
 static int video_nr = -1;
 MODULE_PARM(video_nr, "i");
 
+#warning please convert me from procfs to sysfs
+#define USES_PROC_FS 0
 /*
  * Local prototypes.
  */

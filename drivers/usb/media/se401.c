@@ -130,6 +130,9 @@ static void rvfree(void *mem, unsigned long size)
  *
  ***************************************************************************/
 
+#warning please convert me from procfs to sysfs
+#undef CONFIG_VIDEO_PROC_FS
+
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
 
 static struct proc_dir_entry *se401_proc_entry = NULL;

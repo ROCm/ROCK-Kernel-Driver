@@ -43,6 +43,7 @@
 #include <asm/setup.h>
 #include <asm/arch_hooks.h>
 #include <asm/sections.h>
+#include <asm/io_apic.h>
 #include "setup_arch_pre.h"
 #include "mach_resources.h"
 

@@ -5,16 +5,6 @@
 menu "Video For Linux"
 	depends on VIDEO_DEV!=n
 
-config VIDEO_PROC_FS
-	bool "V4L information in proc filesystem"
-	depends on PROC_FS
-	help
-	  If you say Y here, you are able to access video device information
-	  in /proc/video.
-
-	  To use this option, you have to check, that the "/proc file system
-	  support" (CONFIG_PROC_FS) is enabled too.
-
 comment "Video Adapters"
 
 config VIDEO_BT848

@@ -31,12 +31,6 @@
 #include <asm/kdebug.h>
 #include <asm/proto.h>
 
-#ifdef CONFIG_PCI_NAMES
-#define pci_pretty_name(dev) ((dev)->pretty_name)
-#else
-#define pci_pretty_name(dev) ""
-#endif
-
 dma_addr_t bad_dma_address;
 
 unsigned long iommu_bus_base;	/* GART remapping area (physical) */
