@@ -264,10 +264,14 @@ static void synaptics_pt_activate(struct psmouse *psmouse)
 	struct synaptics_data *priv = psmouse->private;
 
 	/* adjust the touchpad to child's choice of protocol */
-	if (child && child->type >= PSMOUSE_GENPS) {
-		priv->mode |= SYN_BIT_FOUR_BYTE_CLIENT;
+	if (child) {
+		if (child->type >= PSMOUSE_GENPS)
+			priv->mode |= SYN_BIT_FOUR_BYTE_CLIENT;
+		else
+			priv->mode &= ~SYN_BIT_FOUR_BYTE_CLIENT;
+
 		if (synaptics_mode_cmd(psmouse, priv->mode))
-			printk(KERN_INFO "synaptics: failed to enable 4-byte guest protocol\n");
+			printk(KERN_INFO "synaptics: failed to switch guest protocol\n");
 	}
 }
 
