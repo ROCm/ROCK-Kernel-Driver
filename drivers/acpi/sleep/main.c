@@ -32,16 +32,16 @@ static u32 acpi_suspend_states[] = {
 
 /**
  *	acpi_pm_prepare - Do preliminary suspend work.
- *	@state:		suspend state we're entering.
+ *	@pm_state:		suspend state we're entering.
  *
  *	Make sure we support the state. If we do, and we need it, set the
  *	firmware waking vector and do arch-specific nastiness to get the 
  *	wakeup code to the waking vector. 
  */
 
-static int acpi_pm_prepare(u32 state)
+static int acpi_pm_prepare(u32 pm_state)
 {
-	u32 acpi_state = acpi_suspend_states[state];
+	u32 acpi_state = acpi_suspend_states[pm_state];
 
 	if (!sleep_states[acpi_state])
 		return -EPERM;
@@ -49,7 +49,7 @@ static int acpi_pm_prepare(u32 state)
 	/* do we have a wakeup address for S2 and S3? */
 	/* Here, we support only S4BIOS, those we set the wakeup address */
 	/* S4OS is only supported for now via swsusp.. */
-	if (state == PM_SUSPEND_MEM || state == PM_SUSPEND_DISK) {
+	if (pm_state == PM_SUSPEND_MEM || pm_state == PM_SUSPEND_DISK) {
 		if (!acpi_wakeup_address)
 			return -EFAULT;
 		acpi_set_firmware_waking_vector(
@@ -63,23 +63,23 @@ static int acpi_pm_prepare(u32 state)
 
 /**
  *	acpi_pm_enter - Actually enter a sleep state.
- *	@state:		State we're entering.
+ *	@pm_state:		State we're entering.
  *
  *	Flush caches and go to sleep. For STR or STD, we have to call 
  *	arch-specific assembly, which in turn call acpi_enter_sleep_state().
  *	It's unfortunate, but it works. Please fix if you're feeling frisky.
  */
 
-static int acpi_pm_enter(u32 state)
+static int acpi_pm_enter(u32 pm_state)
 {
 	acpi_status status = AE_OK;
 	unsigned long flags = 0;
-	u32 acpi_state = acpi_suspend_states[state];
+	u32 acpi_state = acpi_suspend_states[pm_state];
 
 	ACPI_FLUSH_CPU_CACHE();
 
 	/* Do arch specific saving of state. */
-	if (state > PM_SUSPEND_STANDBY) {
+	if (pm_state > PM_SUSPEND_STANDBY) {
 		int error = acpi_save_state_mem();
 		if (error)
 			return error;
@@ -87,7 +87,7 @@ static int acpi_pm_enter(u32 state)
 
 
 	local_irq_save(flags);
-	switch (state)
+	switch (pm_state)
 	{
 	case PM_SUSPEND_STANDBY:
 		barrier();
@@ -115,7 +115,7 @@ static int acpi_pm_enter(u32 state)
 	 * And, in the case of the latter, the memory image should have already
 	 * been loaded from disk.
 	 */
-	if (state > PM_SUSPEND_STANDBY)
+	if (pm_state > PM_SUSPEND_STANDBY)
 		acpi_restore_state_mem();
 
 
@@ -125,15 +125,17 @@ static int acpi_pm_enter(u32 state)
 
 /**
  *	acpi_pm_finish - Finish up suspend sequence.
- *	@state:		State we're coming out of.
+ *	@pm_state:		State we're coming out of.
  *
  *	This is called after we wake back up (or if entering the sleep state
  *	failed). 
  */
 
-static int acpi_pm_finish(u32 state)
+static int acpi_pm_finish(u32 pm_state)
 {
-	acpi_leave_sleep_state(state);
+	u32 acpi_state = acpi_suspend_states[pm_state];
+
+	acpi_leave_sleep_state(acpi_state);
 
 	/* reset firmware waking vector */
 	acpi_set_firmware_waking_vector((acpi_physical_address) 0);
@@ -174,7 +176,7 @@ static int __init acpi_sleep_init(void)
 		return 0;
 
 	printk(KERN_INFO PREFIX "(supports");
-	for (i=0; i<ACPI_S_STATE_COUNT; i++) {
+	for (i=0; i < ACPI_S_STATE_COUNT; i++) {
 		acpi_status status;
 		u8 type_a, type_b;
 		status = acpi_get_sleep_type_data(i, &type_a, &type_b);

@@ -2234,7 +2234,6 @@ acpi_processor_get_info (
 		 * (In particular, allocating the IO range for Cardbus)
 		 */
 		request_region(pr->throttling.address, 6, "ACPI CPU throttle");
-		request_region(acpi_fadt.xpm_tmr_blk.address, 4, "ACPI timer");
 	}
 
 	acpi_processor_get_power_info(pr);

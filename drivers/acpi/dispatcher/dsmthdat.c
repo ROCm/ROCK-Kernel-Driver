@@ -656,11 +656,13 @@ acpi_ds_store_object_to_local (
 						new_obj_desc, current_obj_desc));
 
 				/*
-				 * Store this object to the Node
-				 * (perform the indirect store)
+				 * Store this object to the Node (perform the indirect store)
+				 * NOTE: No implicit conversion is performed, as per the ACPI
+				 * specification rules on storing to Locals/Args.
 				 */
 				status = acpi_ex_store_object_to_node (new_obj_desc,
-						 current_obj_desc->reference.object, walk_state);
+						 current_obj_desc->reference.object, walk_state,
+						 ACPI_NO_IMPLICIT_CONVERSION);
 
 				/* Remove local reference if we copied the object above */
 
