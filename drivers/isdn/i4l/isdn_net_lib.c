@@ -221,7 +221,8 @@ isdn_net_set_encap(isdn_net_local *lp, int encap)
 	if (lp->ops && lp->ops->cleanup)
 		lp->ops->cleanup(lp);
 
-	if (encap < 0 || encap >= ISDN_NET_ENCAP_NR) {
+	if (encap < 0 || encap >= ISDN_NET_ENCAP_NR ||
+	    !isdn_netif_ops[encap]) {
 		lp->p_encap = -1;
 		lp->ops = NULL;
 		retval = -EINVAL;
@@ -1063,7 +1064,7 @@ isdn_net_open(struct net_device *dev)
 	if (lp->ops->open)
 		retval = lp->ops->open(lp);
 
-	if (!retval)
+	if (retval)
 		return retval;
 	
 	netif_start_queue(dev);
@@ -1079,7 +1080,6 @@ isdn_net_open(struct net_device *dev)
 /*
  * Shutdown a net-interface.
  */
-// FIXME share?
 static int
 isdn_net_close(struct net_device *dev)
 {
@@ -1093,14 +1093,14 @@ isdn_net_close(struct net_device *dev)
 
 	netif_stop_queue(dev);
 
-	list_for_each_safe(l, n, &lp->online) {
-		sdev = list_entry(l, isdn_net_dev, online);
+	list_for_each_safe(l, n, &lp->slaves) {
+		sdev = list_entry(l, isdn_net_dev, slaves);
 		isdn_net_hangup(sdev);
 	}
 	/* The hangup will make the refcnt drop back to
 	 * 1 (referenced by list only) soon. */
 	spin_lock_irqsave(&running_devs_lock, flags);
-	while (atomic_read(&dev->refcnt) != 1) {
+	while (atomic_read(&lp->refcnt) != 1) {
 		spin_unlock_irqrestore(&running_devs_lock, flags);
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(HZ/10);
@@ -1878,7 +1878,6 @@ isdn_net_stat_callback(int idx, isdn_ctrl *c)
 	isdn_net_dev *idev = isdn_slot_idev(idx);
 
 	if (!idev) {
-		HERE;
 		return 0;
 	}
 	switch (c->command) {
@@ -2018,8 +2017,9 @@ isdn_net_local_busy(isdn_net_local *mlp)
 /*
  * For the given net device, this will get a non-busy channel out of the
  * corresponding bundle.
+ * must hold mlp->xmit_lock
  */
-static inline isdn_net_dev *
+isdn_net_dev *
 isdn_net_get_xmit_dev(isdn_net_local *mlp)
 {
 	isdn_net_dev *idev;
@@ -2041,7 +2041,7 @@ isdn_net_inc_frame_cnt(isdn_net_dev *idev)
 {
 	isdn_net_local *mlp = idev->mlp;
 
-	if (isdn_net_local_busy(mlp))
+	if (isdn_net_dev_busy(idev))
 		isdn_BUG();
 		
 	idev->frame_cnt++;
@@ -2060,7 +2060,7 @@ isdn_net_dec_frame_cnt(isdn_net_dev *idev)
 
 	idev->frame_cnt--;
 
-	if (isdn_net_local_busy(mlp))
+	if (isdn_net_dev_busy(idev))
 		isdn_BUG();
 
 	if (!was_busy)

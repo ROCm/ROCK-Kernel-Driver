@@ -11,11 +11,12 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/interrupt.h>
 #include <linux/init.h>
 #include "isdnloop.h"
 
 static char *revision = "$Revision: 1.11.6.7 $";
-static char *isdnloop_id;
+static char *isdnloop_id = "loop0";
 
 MODULE_DESCRIPTION("ISDN4Linux: Pseudo Driver that simulates an ISDN card");
 MODULE_AUTHOR("Fritz Elfert");

@@ -342,9 +342,9 @@ typedef struct isdn_net_local_s {
 					  protected by serializing config
 					  ioctls / no change allowed when
 					  interface is running             */
-  struct list_head       online;       /* circular list of all bundled
-					  channels, which are currently
-					  online                           
+  struct list_head       online;       /* list of all bundled channels 
+					  which can be used for actual
+					  data (IP) transfer              
 					  protected by xmit_lock           */
 
   spinlock_t             xmit_lock;    /* used to protect the xmit path of 
