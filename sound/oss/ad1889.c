@@ -354,9 +354,9 @@ int ad1889_read_proc (char *page, char **start, off_t off,
 	for (i = 0; i < AD_MAX_STATES; i++) {
 		out += sprintf(out, "DMA status for %s:\n", 
 			(i == AD_WAV_STATE ? "WAV" : "ADC")); 
-		out += sprintf(out, "\t\t0x%p (IOVA: 0x%u)\n", 
+		out += sprintf(out, "\t\t0x%p (IOVA: 0x%llu)\n",
 			dev->state[i].dmabuf.rawbuf,
-			dev->state[i].dmabuf.dma_handle);
+			(unsigned long long)dev->state[i].dmabuf.dma_handle);
 
 		out += sprintf(out, "\tread ptr: offset %u\n", 
 			(unsigned int)dev->state[i].dmabuf.rd_ptr);
