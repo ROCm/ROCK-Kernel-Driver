@@ -633,7 +633,8 @@ static void bcsp_timed_event(unsigned long arg)
 	struct sk_buff *skb;
 	unsigned long flags;
 
-	BT_ERR("Timeout, retransmitting %u pkts", bcsp->unack.qlen);
+	BT_DBG("hu %p retransmitting %u pkts", hu, bcsp->unack.qlen);
+
 	spin_lock_irqsave(&bcsp->unack.lock, flags);
 
 	while ((skb = __skb_dequeue_tail(&bcsp->unack)) != NULL) {
