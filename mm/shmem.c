@@ -515,9 +515,8 @@ static int shmem_writepage(struct page * page)
 
 	if (!PageLocked(page))
 		BUG();
-
-	if (!(current->flags & PF_MEMALLOC))
-		return fail_writepage(page);
+	if (page_mapped(page))
+		BUG();
 
 	mapping = page->mapping;
 	index = page->index;
@@ -549,6 +548,19 @@ static int shmem_writepage(struct page * page)
 	spin_unlock(&info->lock);
 	swap_free(swap);
 	return fail_writepage(page);
+}
+
+static int shmem_writepages(struct address_space *mapping, struct writeback_control *wbc)
+{
+	return 0;
+}
+
+static int shmem_vm_writeback(struct page *page, struct writeback_control *wbc)
+{
+	clear_page_dirty(page);
+	if (shmem_writepage(page) < 0)
+		set_page_dirty(page);
+	return 0;
 }
 
 /*
@@ -1524,6 +1536,8 @@ static void destroy_inodecache(void)
 
 static struct address_space_operations shmem_aops = {
 	.writepage	= shmem_writepage,
+	.writepages	= shmem_writepages,
+	.vm_writeback	= shmem_vm_writeback,
 	.set_page_dirty	= __set_page_dirty_nobuffers,
 };
 
