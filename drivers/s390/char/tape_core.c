@@ -237,10 +237,7 @@ __tape_halt_io(struct tape_device *device, struct tape_request *request)
 
 	rc = 0;
 	for (retries = 0; retries < 5; retries++) {
-		if (retries < 2)
-			rc = ccw_device_halt(device->cdev, (long) request);
-		else
-			rc = ccw_device_clear(device->cdev, (long) request);
+		rc = ccw_device_clear(device->cdev, (long) request);
 
 		if (rc == 0) {                     /* Termination successful */
 			request->rc     = -EIO;
@@ -1016,63 +1013,6 @@ tape_mtop(struct tape_device *device, int mt_op, int mt_count)
 }
 
 /*
- * Hutplug event support.
- */
-void
-tape_hotplug_event(struct tape_device *device, int devmaj, int action) {
-#ifdef CONFIG_HOTPLUG
-	char *argv[3];
-	char *envp[8];
-	char  busid[20];
-	char  major[20];
-	char  minor[20];
-
-	/* Call the busid DEVNO to be compatible with old tape.agent. */
-	sprintf(busid, "DEVNO=%s",   device->cdev->dev.bus_id);
-	sprintf(major, "MAJOR=%d",   devmaj);
-	sprintf(minor, "MINOR=%d",   device->first_minor);
-
-	argv[0] = hotplug_path;
-	argv[1] = "tape";
-	argv[2] = NULL;
-
-	envp[0] = "HOME=/";
-	envp[1] = "PATH=/sbin:/bin:/usr/sbin:/usr/bin";
-
-	switch (action) {
-		case TAPE_HOTPLUG_CHAR_ADD:
-		case TAPE_HOTPLUG_BLOCK_ADD:
-			envp[2] = "ACTION=add";
-			break;
-		case TAPE_HOTPLUG_CHAR_REMOVE:
-		case TAPE_HOTPLUG_BLOCK_REMOVE:
-			envp[2] = "ACTION=remove";
-			break;
-		default:
-			BUG();
-	}
-	switch (action) {
-		case TAPE_HOTPLUG_CHAR_ADD:
-		case TAPE_HOTPLUG_CHAR_REMOVE:
-			envp[3] = "INTERFACE=char";
-			break;
-		case TAPE_HOTPLUG_BLOCK_ADD:
-		case TAPE_HOTPLUG_BLOCK_REMOVE:
-			envp[3] = "INTERFACE=block";
-			break;
-		default:
-			BUG();
-	}
-	envp[4] = busid;
-	envp[5] = major;
-	envp[6] = minor;
-	envp[7] = NULL;
-
-	call_usermodehelper(argv[0], argv, envp, 0);
-#endif
-}
-
-/*
  * Tape init function.
  */
 static int
@@ -1083,7 +1023,7 @@ tape_init (void)
 #ifdef DBF_LIKE_HELL
 	debug_set_level(tape_dbf_area, 6);
 #endif
-	DBF_EVENT(3, "tape init: ($Revision: 1.41 $)\n");
+	DBF_EVENT(3, "tape init: ($Revision: 1.44 $)\n");
 	tape_proc_init();
 	tapechar_init ();
 	tapeblock_init ();
@@ -1108,7 +1048,7 @@ tape_exit(void)
 MODULE_AUTHOR("(C) 2001 IBM Deutschland Entwicklung GmbH by Carsten Otte and "
 	      "Michael Holzheu (cotte@de.ibm.com,holzheu@de.ibm.com)");
 MODULE_DESCRIPTION("Linux on zSeries channel attached "
-		   "tape device driver ($Revision: 1.41 $)");
+		   "tape device driver ($Revision: 1.44 $)");
 MODULE_LICENSE("GPL");
 
 module_init(tape_init);
