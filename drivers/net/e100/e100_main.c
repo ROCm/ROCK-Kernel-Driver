@@ -87,6 +87,8 @@
 #include "e100_config.h"
 #include "e100_phy.h"
 
+extern void e100_force_speed_duplex_to_phy(struct e100_private *bdp);
+
 static char e100_gstrings_stats[][ETH_GSTRING_LEN] = {
 	"rx_packets", "tx_packets", "rx_bytes", "tx_bytes", "rx_errors",
 	"tx_errors", "rx_dropped", "tx_dropped", "multicast", "collisions",
@@ -1707,6 +1709,11 @@ e100_watchdog(struct net_device *dev)
 	} else {
 		if (netif_running(dev))
 			netif_stop_queue(dev);
+		/* When changing to non-autoneg, device may lose  */
+		/* link with some switches. e100 will try to      */
+		/* revover link by sending command to PHY layer   */
+		if (bdp->params.e100_speed_duplex != E100_AUTONEG)
+			e100_force_speed_duplex_to_phy(bdp);
 	}
 
 	rmb();
@@ -3023,12 +3030,17 @@ e100_isolate_driver(struct e100_private *bdp)
 void
 e100_set_speed_duplex(struct e100_private *bdp)
 {
-	if (netif_carrier_ok(bdp->device))
+	int carrier_ok;
+	/* Device may lose link with some siwtches when */
+	/* changing speed/duplex to non-autoneg. e100   */
+	/* needs to remember carrier state in order to  */
+	/* start watchdog timer for recovering link     */
+	if ((carrier_ok = netif_carrier_ok(bdp->device)))
 		e100_isolate_driver(bdp);
 	e100_phy_set_speed_duplex(bdp, true);
 	e100_config_fc(bdp);	/* re-config flow-control if necessary */
 	e100_config(bdp);	
-	if (netif_carrier_ok(bdp->device))
+	if (carrier_ok)
 		e100_deisolate_driver(bdp, false);
 }
 
