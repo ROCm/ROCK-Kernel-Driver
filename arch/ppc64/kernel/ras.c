@@ -1,4 +1,3 @@
-
 /*
  * ras.c
  * Copyright (C) 2001 Dave Engebretsen IBM Corporation
@@ -80,7 +79,7 @@ static int __init init_ras_IRQ(void)
 				       "number for %s\n", np->full_name);
 				break;
 			}
-			request_irq(virq + NUM_8259_INTERRUPTS, 
+			request_irq(irq_offset_up(virq),
 				    ras_error_interrupt, 0, 
 				    "RAS_ERROR", NULL);
 			ireg++;
@@ -98,7 +97,7 @@ static int __init init_ras_IRQ(void)
 				       " number for %s\n", np->full_name);
 				break;
 			}
-			request_irq(virq + NUM_8259_INTERRUPTS, 
+			request_irq(irq_offset_up(virq),
 				    ras_epow_interrupt, 0, 
 				    "RAS_EPOW", NULL);
 			ireg++;

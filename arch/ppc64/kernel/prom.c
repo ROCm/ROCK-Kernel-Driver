@@ -2191,7 +2191,7 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 			printk(KERN_CRIT "Could not allocate interrupt "
 			       "number for %s\n", np->full_name);
 		} else
-			np->intrs[i].line = openpic_to_irq(virq);
+			np->intrs[i].line = irq_offset_up(virq);
 
 		/* We offset irq numbers for the u3 MPIC by 128 in PowerMac */
 		if (systemcfg->platform == PLATFORM_POWERMAC && ic && ic->parent) {
@@ -3019,7 +3019,7 @@ static int of_finish_dynamic_node_interrupts(struct device_node *node)
 			       "number for %s\n", node->full_name);
 			return -ENOMEM;
 		}
-		node->intrs[i].line = openpic_to_irq(virq);
+		node->intrs[i].line = irq_offset_up(virq);
 		if (n > 1)
 			node->intrs[i].sense = irq[1];
 		if (n > 2) {

@@ -14,6 +14,7 @@
 
 #include <linux/config.h>
 #include <linux/cpumask.h>
+#include <linux/irq.h>
 
 #define OPENPIC_SIZE	0x40000
 
@@ -38,11 +39,4 @@ extern void openpic_init_processor(u_int cpumask);
 extern void openpic_setup_ISU(int isu_num, unsigned long addr);
 extern void openpic_cause_IPI(u_int ipi, u_int cpumask);
 
-extern inline int openpic_to_irq(int irq)
-{
-	if (systemcfg->platform == PLATFORM_POWERMAC)
-		return irq;
-	return irq += NUM_8259_INTERRUPTS;
-}
-/*extern int open_pic_irq_offset;*/
 #endif /* _PPC64_KERNEL_OPEN_PIC_H */

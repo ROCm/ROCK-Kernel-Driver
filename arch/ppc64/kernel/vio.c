@@ -26,7 +26,6 @@
 #include <asm/ppcdebug.h>
 #include <asm/vio.h>
 #include <asm/hvcall.h>
-#include "open_pic.h"
 
 #define DBGENTER() pr_debug("%s entered\n", __FUNCTION__)
 
@@ -256,7 +255,7 @@ struct vio_dev * __devinit vio_register_device(struct device_node *of_node)
 			printk(KERN_ERR "Unable to allocate interrupt "
 			       "number for %s\n", of_node->full_name);
 		} else
-			viodev->irq = openpic_to_irq(virq);
+			viodev->irq = irq_offset_up(virq);
 	}
 
 	/* init generic 'struct device' fields: */

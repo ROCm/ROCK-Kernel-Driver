@@ -59,7 +59,6 @@ struct hw_interrupt_type xics_8259_pic = {
 static struct radix_tree_root irq_map = RADIX_TREE_INIT(GFP_KERNEL);
 
 #define XICS_IPI		2
-#define XICS_IRQ_OFFSET		0x10
 #define XICS_IRQ_SPURIOUS	0
 
 /* Want a priority other than 0.  Various HW issues require this. */
@@ -217,7 +216,7 @@ xics_ops pSeriesLP_ops = {
 
 static unsigned int xics_startup(unsigned int virq)
 {
-	virq -= XICS_IRQ_OFFSET;
+	virq = irq_offset_down(virq);
 	if (radix_tree_insert(&irq_map, virt_irq_to_real(virq),
 			      &virt_irq_to_real_map[virq]) == -ENOMEM)
 		printk(KERN_CRIT "Out of memory creating real -> virtual"
@@ -242,8 +241,7 @@ static void xics_enable_irq(unsigned int virq)
 	long call_status;
 	unsigned int server;
 
-	virq -= XICS_IRQ_OFFSET;
-	irq = virt_irq_to_real(virq);
+	irq = virt_irq_to_real(irq_offset_down(virq));
 	if (irq == XICS_IPI)
 		return;
 
@@ -301,25 +299,25 @@ static void xics_disable_irq(unsigned int virq)
 {
 	unsigned int irq;
 
-	virq -= XICS_IRQ_OFFSET;
-	irq = virt_irq_to_real(virq);
+	irq = virt_irq_to_real(irq_offset_down(virq));
 	xics_disable_real_irq(irq);
 }
 
-static void xics_end_irq(unsigned int	irq)
+static void xics_end_irq(unsigned int irq)
 {
 	int cpu = smp_processor_id();
 
 	iosync();
-	ops->xirr_info_set(cpu, ((0xff<<24) |
-				 (virt_irq_to_real(irq-XICS_IRQ_OFFSET))));
+	ops->xirr_info_set(cpu, ((0xff << 24) |
+				 (virt_irq_to_real(irq_offset_down(irq)))));
+
 }
 
 static void xics_mask_and_ack_irq(unsigned int irq)
 {
 	int cpu = smp_processor_id();
 
-	if (irq < XICS_IRQ_OFFSET) {
+	if (irq < irq_offset_value()) {
 		i8259_pic.ack(irq);
 		iosync();
 		ops->xirr_info_set(cpu, ((0xff<<24) |
@@ -345,7 +343,8 @@ int xics_get_irq(struct pt_regs *regs)
 		irq = i8259_irq(cpu);
 		if (irq == -1) {
 			/* Spurious cascaded interrupt.  Still must ack xics */
-                        xics_end_irq(XICS_IRQ_OFFSET + xics_irq_8259_cascade);
+			xics_end_irq(irq_offset_up(xics_irq_8259_cascade));
+
 			irq = -1;
 		}
 	} else if (vec == XICS_IRQ_SPURIOUS) {
@@ -359,7 +358,7 @@ int xics_get_irq(struct pt_regs *regs)
 			       " disabling it.\n", vec);
 			xics_disable_real_irq(vec);
 		} else
-			irq += XICS_IRQ_OFFSET;
+			irq = irq_offset_up(irq);
 	}
 	return irq;
 }
@@ -541,9 +540,9 @@ nextnode:
 	xics_8259_pic.enable = i8259_pic.enable;
 	xics_8259_pic.disable = i8259_pic.disable;
 	for (i = 0; i < 16; ++i)
-		irq_desc[i].handler = &xics_8259_pic;
+		get_irq_desc(i)->handler = &xics_8259_pic;
 	for (; i < NR_IRQS; ++i)
-		irq_desc[i].handler = &xics_pic;
+		get_irq_desc(i)->handler = &xics_pic;
 
 	ops->cppr_info(boot_cpuid, 0xff);
 	iosync();
@@ -559,7 +558,7 @@ static int __init xics_setup_i8259(void)
 {
 	if (naca->interrupt_controller == IC_PPC_XIC &&
 	    xics_irq_8259_cascade != -1) {
-		if (request_irq(xics_irq_8259_cascade + XICS_IRQ_OFFSET,
+		if (request_irq(irq_offset_up(xics_irq_8259_cascade),
 				no_action, 0, "8259 cascade", 0))
 			printk(KERN_ERR "xics_init_IRQ: couldn't get 8259 cascade\n");
 		i8259_init();
@@ -574,9 +573,9 @@ void xics_request_IPIs(void)
 	virt_irq_to_real_map[XICS_IPI] = XICS_IPI;
 
 	/* IPIs are marked SA_INTERRUPT as they must run with irqs disabled */
-	request_irq(XICS_IPI + XICS_IRQ_OFFSET, xics_ipi_action, SA_INTERRUPT,
+	request_irq(irq_offset_up(XICS_IPI), xics_ipi_action, SA_INTERRUPT,
 		    "IPI", 0);
-	irq_desc[XICS_IPI+XICS_IRQ_OFFSET].status |= IRQ_PER_CPU;
+	get_irq_desc(irq_offset_up(XICS_IPI))->status |= IRQ_PER_CPU;
 }
 #endif
 
@@ -589,8 +588,7 @@ static void xics_set_affinity(unsigned int virq, cpumask_t cpumask)
 	cpumask_t allcpus = CPU_MASK_ALL;
 	cpumask_t tmp = CPU_MASK_NONE;
 
-	virq -= XICS_IRQ_OFFSET;
-	irq = virt_irq_to_real(virq);
+	irq = virt_irq_to_real(irq_offset_down(virq));
 	if (irq == XICS_IPI)
 		return;
 

@@ -25,8 +25,8 @@
 #include <linux/version.h>
 #include <linux/tty.h>
 #include <linux/root_dev.h>
-#include <linux/cpu.h>
 #include <linux/notifier.h>
+#include <linux/cpu.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/processor.h>
@@ -224,6 +224,7 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	if (systemcfg->platform & PLATFORM_PSERIES) {
 		early_console_initialized = 1;
 		register_console(&udbg_console);
+		__irq_offset_value = NUM_ISA_INTERRUPTS;
 		finish_device_tree();
 		chrp_init(r3, r4, r5, r6, r7);
 
