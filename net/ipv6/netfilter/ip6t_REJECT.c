@@ -145,6 +145,7 @@ static void send_reset(struct sk_buff *oldskb)
 	}
 
 	nskb->dst = dst;
+	dst_hold(dst);
 
 	skb_reserve(nskb, hh_len + dst->header_len);
 
@@ -242,7 +243,7 @@ static void send_unreach(struct sk_buff *skb_in, unsigned char code)
 
 		if (!(type & ICMPV6_INFOMSG_MASK)) {
 			if (net_ratelimit())
-				DEBUGP("ip6t_REJECT: no reply to icmp error\n");
+				printk(KERN_DEBUG "ip6t_REJECT: no reply to icmp error\n");
 			return;
 		}
         } else if (proto == IPPROTO_UDP) {
@@ -278,8 +279,6 @@ static void send_unreach(struct sk_buff *skb_in, unsigned char code)
 	fl.fl_icmp_code = code;
 
 	if (ip6_dst_lookup(NULL, &dst, &fl)) {
-		if (net_ratelimit())
-			DEBUGP("can't find dst");
 		return;
 	}
 
@@ -316,6 +315,7 @@ static void send_unreach(struct sk_buff *skb_in, unsigned char code)
 
 	nskb->priority = 0;
 	nskb->dst = dst;
+	dst_hold(dst);
 
 	skb_reserve(nskb, hh_len + dst->header_len);
 
