@@ -62,6 +62,21 @@ config I2C_I801
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-i801.
 
+config I2C_I810
+	tristate "Intel 810/815"
+	depends on I2C && PCI && EXPERIMENTAL
+	help
+	  If you say yes to this option, support will be included for the Intel
+	  810/815 family of mainboard I2C interfaces.  Specifically, the 
+	  following versions of the chipset is supported:
+	    i810AA
+	    i810AB
+	    i810E
+	    i815
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-i810.
+
 config I2C_ISA
 	tristate "ISA Bus support"
 	depends on I2C && ISA && EXPERIMENTAL
