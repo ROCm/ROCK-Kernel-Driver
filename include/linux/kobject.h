@@ -26,6 +26,9 @@
 
 #define KOBJ_NAME_LEN	20
 
+/* counter to tag the hotplug event, read only except for the kobject core */
+extern u64 hotplug_seqnum;
+
 struct kobject {
 	char			* k_name;
 	char			name[KOBJ_NAME_LEN];
@@ -59,9 +62,7 @@ extern void kobject_unregister(struct kobject *);
 extern struct kobject * kobject_get(struct kobject *);
 extern void kobject_put(struct kobject *);
 
-extern void kobject_hotplug(const char *action, struct kobject *);
-
-extern char * kobject_get_path(struct kset *, struct kobject *, int);
+extern char * kobject_get_path(struct kobject *, int);
 
 struct kobj_type {
 	void (*release)(struct kobject *);
@@ -233,6 +234,34 @@ struct subsys_attribute {
 
 extern int subsys_create_file(struct subsystem * , struct subsys_attribute *);
 extern void subsys_remove_file(struct subsystem * , struct subsys_attribute *);
+
+
+#ifdef CONFIG_HOTPLUG
+extern void kobject_hotplug(const char *action, struct kobject *kobj);
+#else
+static inline void kobject_hotplug(const char *action, struct kobject *kobj) { }
+#endif
+
+
+#ifdef CONFIG_KOBJECT_UEVENT
+extern int kobject_uevent(const char *signal, struct kobject *kobj,
+			  struct attribute *attr);
+
+extern int kobject_uevent_atomic(const char *signal, struct kobject *kobj,
+				 struct attribute *attr);
+#else
+static inline int kobject_uevent(const char *signal, struct kobject *kobj,
+				 struct attribute *attr)
+{
+	return 0;
+}
+
+static inline int kobject_uevent_atomic(const char *signal, struct kobject *kobj,
+					struct attribute *attr)
+{
+	return 0;
+}
+#endif
 
 #endif /* __KERNEL__ */
 #endif /* _KOBJECT_H_ */
