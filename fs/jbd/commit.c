@@ -639,10 +639,29 @@ wait_for_iobuf:
 	JBUFFER_TRACE(descriptor, "write commit block");
 	{
 		struct buffer_head *bh = jh2bh(descriptor);
+		int ret;
 
 		set_buffer_dirty(bh);
-		sync_dirty_buffer(bh);
-		if (unlikely(!buffer_uptodate(bh)))
+		if (journal->j_flags & JFS_BARRIER)
+			set_buffer_ordered(bh);
+		ret = sync_dirty_buffer(bh);
+		if (ret == -EOPNOTSUPP && (journal->j_flags & JFS_BARRIER)) {
+			char b[BDEVNAME_SIZE];
+
+			printk(KERN_WARNING
+				"JBD: barrier-based sync failed on %s - "
+				"disabling barriers\n",
+				bdevname(journal->j_dev, b));
+			spin_lock(&journal->j_state_lock);
+			journal->j_flags &= ~JFS_BARRIER;
+			spin_unlock(&journal->j_state_lock);
+
+			/* And try again, without the barrier */
+			clear_buffer_ordered(bh);
+			set_buffer_dirty(bh);
+			ret = sync_dirty_buffer(bh);
+		}
+		if (unlikely(ret == -EIO))
 			err = -EIO;
 		put_bh(bh);		/* One for getblk() */
 		journal_put_journal_head(descriptor);

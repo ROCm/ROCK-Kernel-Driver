@@ -160,6 +160,39 @@ static int md_fail_request (request_queue_t *q, struct bio *bio)
 	return 0;
 }
 
+int md_flush_mddev(mddev_t *mddev, sector_t *error_sector)
+{
+	struct list_head *tmp;
+	mdk_rdev_t *rdev;
+	int ret = 0;
+
+	/*
+	 * this list iteration is done without any locking in md?!
+	 */
+	ITERATE_RDEV(mddev, rdev, tmp) {
+		request_queue_t *r_queue = bdev_get_queue(rdev->bdev);
+		int err;
+
+		if (!r_queue->issue_flush_fn)
+			err = -EOPNOTSUPP;
+		else
+			err = r_queue->issue_flush_fn(r_queue, rdev->bdev->bd_disk, error_sector);
+
+		if (!ret)
+			ret = err;
+	}
+
+	return ret;
+}
+
+static int md_flush_all(request_queue_t *q, struct gendisk *disk,
+			 sector_t *error_sector)
+{
+	mddev_t *mddev = q->queuedata;
+
+	return md_flush_mddev(mddev, error_sector);
+}
+
 static inline mddev_t *mddev_get(mddev_t *mddev)
 {
 	atomic_inc(&mddev->active);
@@ -1645,6 +1678,7 @@ static int do_md_run(mddev_t * mddev)
 	 */
 	mddev->queue->queuedata = mddev;
 	mddev->queue->make_request_fn = mddev->pers->make_request;
+	mddev->queue->issue_flush_fn = md_flush_all;
 
 	mddev->changed = 1;
 	return 0;

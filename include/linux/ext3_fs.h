@@ -324,6 +324,8 @@ struct ext3_inode {
 #define EXT3_MOUNT_NO_UID32		0x2000  /* Disable 32-bit UIDs */
 #define EXT3_MOUNT_XATTR_USER		0x4000	/* Extended user attributes */
 #define EXT3_MOUNT_POSIX_ACL		0x8000	/* POSIX Access Control Lists */
+/* hole for EXT3_MOUNT_RESERVATION */
+#define EXT3_MOUNT_BARRIER		0x20000 /* Use block barriers */
 
 /* Compatibility, for having both ext2_fs.h and ext3_fs.h included at once */
 #ifndef _LINUX_EXT2_FS_H

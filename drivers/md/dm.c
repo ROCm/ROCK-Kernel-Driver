@@ -597,6 +597,21 @@ static int dm_request(request_queue_t *q, struct bio *bio)
 	return 0;
 }
 
+static int dm_flush_all(request_queue_t *q, struct gendisk *disk,
+			sector_t *error_sector)
+{
+	struct mapped_device *md = q->queuedata;
+	struct dm_table *map = dm_get_table(md);
+	int ret = -ENXIO;
+
+	if (map) {
+		ret = dm_table_flush_all(md->map);
+		dm_table_put(map);
+	}
+
+	return ret;
+}
+
 static void dm_unplug_all(request_queue_t *q)
 {
 	struct mapped_device *md = q->queuedata;
@@ -764,6 +779,7 @@ static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 	md->queue->backing_dev_info.congested_data = md;
 	blk_queue_make_request(md->queue, dm_request);
 	md->queue->unplug_fn = dm_unplug_all;
+	md->queue->issue_flush_fn = dm_flush_all;
 
 	md->io_pool = mempool_create(MIN_IOS, mempool_alloc_slab,
 				     mempool_free_slab, _io_cache);
