@@ -102,14 +102,6 @@ static int iic_ite_getclock(void *data)
 }
 
 
-#if 0
-static void iic_ite_sleep(unsigned long timeout)
-{
-	schedule_timeout( timeout * HZ);
-}
-#endif
-
-
 /* Put this process to sleep.  We will wake up when the
  * IIC controller interrupts.
  */
