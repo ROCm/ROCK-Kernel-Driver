@@ -51,12 +51,13 @@ config IEEE1394_OUI_DB
 comment "Device Drivers"
 	depends on IEEE1394
 
-comment "Texas Instruments PCILynx requires I2C bit-banging"
-	depends on IEEE1394 && (I2C=n || I2C_ALGOBIT=n)
+comment "Texas Instruments PCILynx requires I2C"
+	depends on IEEE1394 && I2C=n
 
 config IEEE1394_PCILYNX
 	tristate "Texas Instruments PCILynx support"
-	depends on PCI && IEEE1394 && I2C_ALGOBIT
+	depends on PCI && IEEE1394 && I2C
+	select I2C_ALGOBIT
 	help
 	  Say Y here if you have an IEEE-1394 controller with the Texas
 	  Instruments PCILynx chip.  Note: this driver is written for revision

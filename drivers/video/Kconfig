@@ -579,7 +579,8 @@ config FB_MATROX_G100
 
 config FB_MATROX_I2C
 	tristate "Matrox I2C support"
-	depends on FB_MATROX && I2C_ALGOBIT
+	depends on FB_MATROX && I2C
+	select I2C_ALGOBIT
 	---help---
 	  This drivers creates I2C buses which are needed for accessing the
 	  DDC (I2C) bus present on all Matroxes, an I2C bus which

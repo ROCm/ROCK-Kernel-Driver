@@ -49,7 +49,8 @@ config I2C_AMD8111
 
 config I2C_ELEKTOR
 	tristate "Elektor ISA card"
-	depends on I2C_ALGOPCF && ISA && BROKEN_ON_SMP
+	depends on I2C && ISA && BROKEN_ON_SMP
+	select I2C_ALGOPCF
 	help
 	  This supports the PCF8584 ISA bus I2C adapter.  Say Y if you own
 	  such an adapter.
@@ -59,7 +60,8 @@ config I2C_ELEKTOR
 
 config I2C_ELV
 	tristate "ELV adapter"
-	depends on I2C_ALGOBIT
+	depends on I2C
+	select I2C_ALGOBIT
 	help
 	  This supports parallel-port I2C adapters called ELV.  Say Y if you
 	  own such an adapter.
@@ -86,7 +88,8 @@ config I2C_I801
 
 config I2C_I810
 	tristate "Intel 810/815"
-	depends on I2C_ALGOBIT && PCI && EXPERIMENTAL
+	depends on I2C && PCI && EXPERIMENTAL
+	select I2C_ALGOBIT
 	help
 	  If you say yes to this option, support will be included for the Intel
 	  810/815 family of mainboard I2C interfaces.  Specifically, the 
@@ -119,7 +122,8 @@ config I2C_ISA
 
 config I2C_ITE
 	tristate "ITE I2C Adapter"
-	depends on I2C_ALGOITE
+	depends on I2C
+	select I2C_ALGOITE
 	help
 	  This supports the ITE8172 I2C peripheral found on some MIPS
 	  systems. Say Y if you have one of these. You should also say Y for
@@ -150,7 +154,8 @@ config I2C_NFORCE2
 
 config I2C_PHILIPSPAR
 	tristate "Philips style parallel port adapter"
-	depends on I2C_ALGOBIT && PARPORT
+	depends on I2C && PARPORT
+	select I2C_ALGOBIT
 	help
 	  This supports parallel-port I2C adapters made by Philips.
 
@@ -159,7 +164,8 @@ config I2C_PHILIPSPAR
 
 config I2C_PARPORT
 	tristate "Parallel port adapter"
-	depends on I2C_ALGOBIT && PARPORT
+	depends on I2C && PARPORT
+	select I2C_ALGOBIT
 	help
 	  This supports parallel port I2C adapters such as the ones made by
 	  Philips or Velleman, Analog Devices evaluation boards, and more.
@@ -179,7 +185,8 @@ config I2C_PARPORT
 
 config I2C_PARPORT_LIGHT
 	tristate "Parallel port adapter (light)"
-	depends on I2C_ALGOBIT 
+	depends on I2C
+	select I2C_ALGOBIT
 	help
 	  This supports parallel port I2C adapters such as the ones made by
 	  Philips or Velleman, Analog Devices evaluation boards, and more.
@@ -219,7 +226,8 @@ config I2C_PIIX4
 
 config I2C_PROSAVAGE
 	tristate "S3/VIA (Pro)Savage"
-	depends on I2C_ALGOBIT && PCI && EXPERIMENTAL
+	depends on I2C && PCI && EXPERIMENTAL
+	select I2C_ALGOBIT
 	help
 	  If you say yes to this option, support will be included for the
 	  I2C bus and DDC bus of the S3VIA embedded Savage4 and ProSavage8
@@ -233,11 +241,13 @@ config I2C_PROSAVAGE
 
 config I2C_RPXLITE
 	tristate "Embedded Planet RPX Lite/Classic support"
-	depends on (RPXLITE || RPXCLASSIC) && I2C_ALGO8XX
+	depends on (RPXLITE || RPXCLASSIC) && I2C
+	select I2C_ALGO8XX
 
 config I2C_SAVAGE4
 	tristate "S3 Savage 4"
-	depends on I2C_ALGOBIT && PCI && EXPERIMENTAL
+	depends on I2C && PCI && EXPERIMENTAL
+	select I2C_ALGOBIT
 	help
 	  If you say yes to this option, support will be included for the 
 	  S3 Savage 4 I2C interface.
@@ -247,7 +257,8 @@ config I2C_SAVAGE4
 
 config SCx200_I2C
 	tristate "NatSemi SCx200 I2C using GPIO pins"
-	depends on SCx200_GPIO && I2C_ALGOBIT
+	depends on SCx200_GPIO && I2C
+	select I2C_ALGOBIT
 	help
 	  Enable the use of two GPIO pins of a SCx200 processor as an I2C bus.
 
@@ -322,7 +333,8 @@ config I2C_SIS96X
 
 config I2C_VELLEMAN
 	tristate "Velleman K8000 adapter"
-	depends on I2C_ALGOBIT
+	depends on I2C
+	select I2C_ALGOBIT
 	help
 	  This supports the Velleman K8000 parallel-port I2C adapter.  Say Y
 	  if you own such an adapter.
@@ -332,7 +344,8 @@ config I2C_VELLEMAN
 
 config I2C_VIA
 	tristate "VIA 82C586B"
-	depends on I2C_ALGOBIT && PCI && EXPERIMENTAL
+	depends on I2C && PCI && EXPERIMENTAL
+	select I2C_ALGOBIT
 	help
 
 	  If you say yes to this option, support will be included for the VIA
@@ -362,7 +375,8 @@ config I2C_VIAPRO
 
 config I2C_VOODOO3
 	tristate "Voodoo 3"
-	depends on I2C_ALGOBIT && PCI && EXPERIMENTAL
+	depends on I2C && PCI && EXPERIMENTAL
+	select I2C_ALGOBIT
 	help
 
 	  If you say yes to this option, support will be included for the
