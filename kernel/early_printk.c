@@ -13,6 +13,7 @@
 #define MAX_XPOS	80
 
 static int current_ypos = 1, current_xpos = 0; 
+extern char saved_command_line[];
 
 static void early_vga_write(struct console *con, const char *str, unsigned n)
 {
