@@ -40,7 +40,7 @@
 /* Set the copy breakpoint for the copy-only-tiny-frames scheme.
  * Setting to > 1518 effectively disables this feature.
  */
-static int rx_copybreak = 0;
+static int rx_copybreak = 200;
 
 /* end user-configurable values */
 
