@@ -924,13 +924,10 @@ EXPORT_SYMBOL(mark_buffer_dirty_inode);
  */
 int __set_page_dirty_buffers(struct page *page)
 {
-	struct address_space * const mapping = page_mapping(page);
-	int ret = 0;
+	struct address_space * const mapping = page->mapping;
 
-	if (mapping == NULL) {
-		SetPageDirty(page);
-		goto out;
-	}
+	BUG_ON(!mapping);
+	BUG_ON(PageSwapCache(page));
 
 	spin_lock(&mapping->private_lock);
 	if (page_has_buffers(page)) {
@@ -952,18 +949,17 @@ int __set_page_dirty_buffers(struct page *page)
 
 	if (!TestSetPageDirty(page)) {
 		spin_lock_irq(&mapping->tree_lock);
-		if (page_mapping(page)) {	/* Race with truncate? */
+		if (page->mapping) {	/* Race with truncate? */
 			if (!mapping->backing_dev_info->memory_backed)
 				inc_page_state(nr_dirty);
-			radix_tree_tag_set(&mapping->page_tree, !PageSwapCache(page) ? page->index : page->private,
+			radix_tree_tag_set(&mapping->page_tree, page->index,
 						PAGECACHE_TAG_DIRTY);
 		}
 		spin_unlock_irq(&mapping->tree_lock);
 		__mark_inode_dirty(mapping->host, I_DIRTY_PAGES);
 	}
 	
-out:
-	return ret;
+	return 0;
 }
 EXPORT_SYMBOL(__set_page_dirty_buffers);
 

@@ -559,7 +559,8 @@ int __set_page_dirty_nobuffers(struct page *page)
 						   PAGECACHE_TAG_DIRTY);
 			}
 			spin_unlock_irq(&mapping->tree_lock);
-			if (!PageSwapCache(page))
+			/* swapcache has null mapping->host */
+			if (mapping->host)
 				__mark_inode_dirty(mapping->host,
 							I_DIRTY_PAGES);
 		}
@@ -577,14 +578,15 @@ EXPORT_SYMBOL(__set_page_dirty_nobuffers);
  */
 int fastcall set_page_dirty(struct page *page)
 {
-	if (page_mapping(page)) {
-		int (*spd)(struct page *);
+	struct address_space *mapping = page_mapping(page);
 
-		spd = page_mapping(page)->a_ops->set_page_dirty;
+	if (likely(mapping)) {
+		int (*spd)(struct page *) = mapping->a_ops->set_page_dirty;
 		if (spd)
 			return (*spd)(page);
+		return __set_page_dirty_buffers(page);
 	}
-	return __set_page_dirty_buffers(page);
+	return TestSetPageDirty(page);
 }
 EXPORT_SYMBOL(set_page_dirty);
 
