@@ -144,6 +144,7 @@ struct dummy {
 	struct usb_gadget_driver	*driver;
 	struct dummy_request		fifo_req;
 	u8				fifo_buf [FIFO_SIZE];
+	u16				devstatus;
 
 	struct hcd_dev			*hdev;
 
@@ -156,6 +157,8 @@ struct dummy {
 	u32				port_status;
 	int				started;
 	struct completion		released;
+	unsigned			resuming:1;
+	unsigned long			re_timeout;
 };
 
 static struct dummy	*the_controller;
@@ -556,8 +559,37 @@ static int dummy_g_get_frame (struct usb_gadget *_gadget)
 	return tv.tv_usec / 1000;
 }
 
+static int dummy_wakeup (struct usb_gadget *_gadget)
+{
+	struct dummy	*dum;
+
+	dum = container_of (_gadget, struct dummy, gadget);
+	if ((dum->devstatus & (1 << USB_DEVICE_REMOTE_WAKEUP)) == 0
+			|| !(dum->port_status & (1 << USB_PORT_FEAT_SUSPEND)))
+		return -EINVAL;
+
+	/* hub notices our request, issues downstream resume, etc */
+	dum->resuming = 1;
+	dum->port_status |= (1 << USB_PORT_FEAT_C_SUSPEND);
+	return 0;
+}
+
+static int dummy_set_selfpowered (struct usb_gadget *_gadget, int value)
+{
+	struct dummy	*dum;
+
+	dum = container_of (_gadget, struct dummy, gadget);
+	if (value)
+		dum->devstatus |= (1 << USB_DEVICE_SELF_POWERED);
+	else
+		dum->devstatus &= ~(1 << USB_DEVICE_SELF_POWERED);
+	return 0;
+}
+
 static const struct usb_gadget_ops dummy_ops = {
 	.get_frame	= dummy_g_get_frame,
+	.wakeup		= dummy_wakeup,
+	.set_selfpowered = dummy_set_selfpowered,
 };
 
 /*-------------------------------------------------------------------------*/
@@ -652,6 +684,9 @@ usb_gadget_register_driver (struct usb_gadget_driver *driver)
 	dum->gadget.name = gadget_name;
 	dum->gadget.ops = &dummy_ops;
 	dum->gadget.is_dualspeed = 1;
+
+	dum->devstatus = 0;
+	dum->resuming = 0;
 
 	INIT_LIST_HEAD (&dum->gadget.ep_list);
 	for (i = 0; i < DUMMY_ENDPOINTS; i++) {
@@ -1130,8 +1165,19 @@ restart:
 				break;
 			case USB_REQ_SET_FEATURE:
 				if (setup.bRequestType == Dev_Request) {
-					// remote wakeup, and (hs) test mode
-					value = -EOPNOTSUPP;
+					value = 0;
+					switch (setup.wValue) {
+					case USB_DEVICE_REMOTE_WAKEUP:
+						break;
+					default:
+						value = -EOPNOTSUPP;
+					}
+					if (value == 0) {
+						dum->devstatus |=
+							(1 << setup.wValue);
+						maybe_set_status (urb, 0);
+					}
+
 				} else if (setup.bRequestType == Ep_Request) {
 					// endpoint halt
 					ep2 = find_endpoint (dum,
@@ -1147,9 +1193,17 @@ restart:
 				break;
 			case USB_REQ_CLEAR_FEATURE:
 				if (setup.bRequestType == Dev_Request) {
-					// remote wakeup
-					value = 0;
-					maybe_set_status (urb, 0);
+					switch (setup.wValue) {
+					case USB_DEVICE_REMOTE_WAKEUP:
+						dum->devstatus &= ~(1 <<
+							USB_DEVICE_REMOTE_WAKEUP);
+						value = 0;
+						maybe_set_status (urb, 0);
+						break;
+					default:
+						value = -EOPNOTSUPP;
+						break;
+					}
 				} else if (setup.bRequestType == Ep_Request) {
 					// endpoint halt
 					ep2 = find_endpoint (dum,
@@ -1185,6 +1239,10 @@ restart:
 		break;
 	}
 	buf [0] = ep2->halted;
+						} else if (setup.bRequestType ==
+								Dev_InRequest) {
+							buf [0] = (u8)
+								dum->devstatus;
 						} else
 							buf [0] = 0;
 					}
@@ -1338,8 +1396,21 @@ static int dummy_hub_control (
 	case ClearHubFeature:
 		break;
 	case ClearPortFeature:
-		// FIXME won't some of these need special handling?
-		dum->port_status &= ~(1 << wValue);
+		switch (wValue) {
+		case USB_PORT_FEAT_SUSPEND:
+			/* 20msec resume signaling */
+			dum->resuming = 1;
+			dum->re_timeout = jiffies + ((HZ * 20)/1000);
+			break;
+		case USB_PORT_FEAT_POWER:
+			dum->port_status = 0;
+			dum->address = 0;
+			dum->hdev = 0;
+			dum->resuming = 0;
+			break;
+		default:
+			dum->port_status &= ~(1 << wValue);
+		}
 		break;
 	case GetHubDescriptor:
 		hub_descriptor ((struct usb_hub_descriptor *) buf);
@@ -1350,33 +1421,28 @@ static int dummy_hub_control (
 	case GetPortStatus:
 		if (wIndex != 1)
 			retval = -EPIPE;
-		((u16 *) buf)[0] = cpu_to_le16 (dum->port_status);
-		((u16 *) buf)[1] = cpu_to_le16 (dum->port_status >> 16);
-		break;
-	case SetHubFeature:
-		retval = -EPIPE;
-		break;
-	case SetPortFeature:
-		if (wValue == USB_PORT_FEAT_RESET) {
-			/* if it's already running, disconnect first */
-			if (dum->port_status & USB_PORT_STAT_ENABLE) {
-				dum->port_status &= ~(USB_PORT_STAT_ENABLE
-						| USB_PORT_STAT_LOW_SPEED
-						| USB_PORT_STAT_HIGH_SPEED);
-				if (dum->driver) {
-					dev_dbg (hardware, "disconnect\n");
-					stop_activity (dum, dum->driver);
-				}
 
-				/* FIXME test that code path! */
-			} else
-				dum->port_status |=
-					(1 << USB_PORT_FEAT_C_ENABLE);
-
-			dum->port_status |= USB_PORT_STAT_ENABLE |
-				  (1 << USB_PORT_FEAT_C_RESET);
+		/* whoever resets or resumes must GetPortStatus to
+		 * complete it!!
+		 */
+		if (dum->resuming && time_after (jiffies, dum->re_timeout)) {
+			dum->port_status |= (1 << USB_PORT_FEAT_C_SUSPEND);
+			dum->port_status &= ~(1 << USB_PORT_FEAT_SUSPEND);
+			dum->resuming = 0;
+			dum->re_timeout = 0;
+			if (dum->driver->resume) {
+				spin_unlock (&dum->lock);
+				dum->driver->resume (&dum->gadget);
+				spin_lock (&dum->lock);
+			}
+		}
+		if ((dum->port_status & (1 << USB_PORT_FEAT_RESET)) != 0
+				&& time_after (jiffies, dum->re_timeout)) {
+			dum->port_status |= (1 << USB_PORT_FEAT_C_RESET);
+			dum->port_status &= ~(1 << USB_PORT_FEAT_RESET);
+			dum->re_timeout = 0;
 			if (dum->driver) {
-
+				dum->port_status |= USB_PORT_STAT_ENABLE;
 				/* give it the best speed we agree on */
 				dum->gadget.speed = dum->driver->speed;
 				dum->gadget.ep0->maxpacket = 64;
@@ -1395,8 +1461,42 @@ static int dummy_hub_control (
 					break;
 				}
 			}
-		} else
+		}
+		((u16 *) buf)[0] = cpu_to_le16 (dum->port_status);
+		((u16 *) buf)[1] = cpu_to_le16 (dum->port_status >> 16);
+		break;
+	case SetHubFeature:
+		retval = -EPIPE;
+		break;
+	case SetPortFeature:
+		switch (wValue) {
+		case USB_PORT_FEAT_SUSPEND:
+			dum->port_status |= (1 << USB_PORT_FEAT_SUSPEND);
+			if (dum->driver->suspend) {
+				spin_unlock (&dum->lock);
+				dum->driver->suspend (&dum->gadget);
+				spin_lock (&dum->lock);
+			}
+			break;
+		case USB_PORT_FEAT_RESET:
+			/* if it's already running, disconnect first */
+			if (dum->port_status & USB_PORT_STAT_ENABLE) {
+				dum->port_status &= ~(USB_PORT_STAT_ENABLE
+						| USB_PORT_STAT_LOW_SPEED
+						| USB_PORT_STAT_HIGH_SPEED);
+				if (dum->driver) {
+					dev_dbg (hardware, "disconnect\n");
+					stop_activity (dum, dum->driver);
+				}
+
+				/* FIXME test that code path! */
+			}
+			/* 50msec reset signaling */
+			dum->re_timeout = jiffies + ((HZ * 50)/1000);
+			/* FALLTHROUGH */
+		default:
 			dum->port_status |= (1 << wValue);
+		}
 		break;
 
 	default:
