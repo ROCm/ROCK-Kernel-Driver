@@ -1276,6 +1276,10 @@ static void *arp_get_idx(struct seq_file *seq, loff_t pos)
 
 static void *arp_seq_start(struct seq_file *seq, loff_t *pos)
 {
+	struct arp_iter_state* state = seq->private;
+
+	state->is_pneigh = 0;
+	state->bucket = 0;
 	return *pos ? arp_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
@@ -1399,7 +1403,6 @@ static int arp_seq_open(struct inode *inode, struct file *file)
 
 	seq	     = file->private_data;
 	seq->private = s;
-	memset(s, 0, sizeof(*s));
 out:
 	return rc;
 out_kfree:
