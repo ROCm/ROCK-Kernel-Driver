@@ -72,7 +72,7 @@ static inline void nfs_forget_cached_acls(struct inode *inode)
 {
 }
 
-static inline void __nfs_forget_cached_acls(struct inode *inode)
+static inline void __nfs_forget_cached_acls(struct nfs_inode *nfsi)
 {
 }
 #endif
@@ -194,7 +194,6 @@ nfs_umount_begin(struct super_block *sb)
 	if ((rpc = server->client) != NULL)
 		rpc_killall_tasks(rpc);
 #ifdef CONFIG_NFS_ACL
-	/* FIXME: Is this really necessary? */
 	if ((rpc = server->client_acl) != NULL)
 		rpc_killall_tasks(rpc);
 #endif  /* CONFIG_NFS_ACL */

@@ -487,10 +487,6 @@ struct net_device
 
 	/* class/net/name entry */
 	struct class_device	class_dev;
-
-	/* use dev_id in conjunction with shared network cards*/
-	unsigned short           dev_id; 
-
 	/* how much padding had been added by alloc_netdev() */
 	int padded;
 };
