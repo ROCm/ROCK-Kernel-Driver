@@ -44,7 +44,7 @@ void dcookie_unregister(struct dcookie_user * user);
  * Returns 0 on success, with *cookie filled in
  */
 int get_dcookie(struct dentry * dentry, struct vfsmount * vfsmnt,
-	u32 * cookie);
+	unsigned long * cookie);
 
 #else
 
@@ -59,7 +59,7 @@ void dcookie_unregister(struct dcookie_user * user)
 }
  
 static inline int get_dcookie(struct dentry * dentry,
-	struct vfsmount * vfsmnt, u32 * cookie)
+	struct vfsmount * vfsmnt, unsigned long * cookie)
 {
 	return -ENOSYS;
 } 
