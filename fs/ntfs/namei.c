@@ -21,6 +21,7 @@
  */
 
 #include "ntfs.h"
+#include "dir.h"
 
 /**
  * ntfs_lookup - find the inode represented by a dentry in a directory inode
@@ -43,6 +44,48 @@
  * dentry @dent. The dentry is then termed a negative dentry.
  *
  * Only if an actual error occurs, do we return an error via ERR_PTR().
+ *
+ * TODO: Implement the below! (AIA)
+ *
+ * In order to handle the case insensitivity issues of NTFS with regards to the
+ * dcache and the dcache requiring only one dentry per directory, we deal with
+ * dentry aliases that only differ in case in ->ntfs_lookup() while maintining
+ * a case sensitive dcache. This means that we get the full benefit of dcache
+ * speed when the file/directory is looked up with the same case as returned by
+ * ->ntfs_readdir() but that a lookup for any other case (or for the short file
+ * name) will not find anything in dcache and will enter ->ntfs_lookup()
+ * instead, where we search the directory for a fully matching file name
+ * (including case) and if that is not found, we search for a file name that
+ * matches with different case and if that has non-POSIX semantics we return
+ * that. We actually do only one search (case sensitive) and keep tabs on
+ * whether we have found a case insensitive match in the process.
+ *
+ * To simplify matters for us, we do not treat the short vs long filenames as
+ * two hard links but instead if the lookup matches a short filename, we
+ * return the dentry for the corresponding long filename instead.
+ *
+ * There are three cases we need to distinguish here:
+ *
+ * 1) @dent perfectly matches (i.e. including case) a directory entry with a
+ *    file name in the WIN32 or POSIX namespaces. In this case
+ *    ntfs_lookup_inode_by_name() will return with name set to NULL and we
+ *    just d_add() @dent.
+ * 2) @dent matches (not including case) a directory entry with a file name in
+ *    the WIN32 or POSIX namespaces. In this case ntfs_lookup_inode_by_name()
+ *    will return with name set to point to a kmalloc()ed ntfs_name structure
+ *    containing the properly cased little endian Unicode name. We convert the
+ *    name to the current NLS code page, search if a dentry with this name
+ *    already exists and if so return that instead of @dent. The VFS will then
+ *    destroy the old @dent and use the one we returned. If a dentry is not
+ *    found, we allocate a new one, d_add() it, and return it as above.
+ * 3) @dent matches either perfectly or not (i.e. we don't care about case) a
+ *    directory entry with a file name in the DOS namespace. In this case
+ *    ntfs_lookup_inode_by_name() will return with name set to point to a
+ *    kmalloc()ed ntfs_name structure containing the mft reference (cpu endian)
+ *    of the inode. We use the mft reference to read the inode and to find the
+ *    file name in the WIN32 namespace corresponding to the matched short file
+ *    name. We then convert the name to the current NLS code page, and proceed
+ *    searching for a dentry with this name, etc, as in case 2), above.
  */
 static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent)
 {
@@ -52,6 +95,7 @@ static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent)
 	unsigned long dent_ino;
 	uchar_t *uname;
 	int uname_len;
+	ntfs_name *name = NULL;
 
 	ntfs_debug("Looking up %s in directory inode 0x%lx.",
 			dent->d_name.name, dir_ino->i_ino);
@@ -62,8 +106,12 @@ static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent)
 		ntfs_error(vol->sb, "Failed to convert name to Unicode.");
 		return ERR_PTR(uname_len);
 	}
-	mref = ntfs_lookup_inode_by_name(NTFS_I(dir_ino), uname, uname_len);
+	mref = ntfs_lookup_inode_by_name(NTFS_I(dir_ino), uname, uname_len,
+			&name);
 	kmem_cache_free(ntfs_name_cache, uname);
+	// TODO: Handle name. (AIA)
+	if (name)
+		kfree(name);
 	if (!IS_ERR_MREF(mref)) {
 		dent_ino = (unsigned long)MREF(mref);
 		ntfs_debug("Found inode 0x%lx. Calling iget.", dent_ino);
@@ -102,7 +150,10 @@ static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent)
 	return ERR_PTR(MREF_ERR(mref));
 }
 
+/*
+ * Inode operations for directories.
+ */
 struct inode_operations ntfs_dir_inode_ops = {
-	lookup:		ntfs_lookup,	/* lookup directory. */
+	lookup:		ntfs_lookup,	/* VFS: Lookup directory. */
 };
 
