@@ -33,7 +33,7 @@ extern const struct linux_logo logo_superh_vga16;
 extern const struct linux_logo logo_superh_clut224;
 
 
-const struct linux_logo * __init find_logo(int depth)
+const struct linux_logo *fb_find_logo(int depth)
 {
 	const struct linux_logo *logo = 0;
 
