@@ -77,7 +77,7 @@ static inline pidmap_t *next_free_map(pidmap_t *map, int *max_steps)
 			 * Free the page if someone raced with us
 			 * installing it:
 			 */
-			if (cmpxchg(&map->page, NULL, page))
+			if (cmpxchg(&map->page, NULL, (void *) page))
 				free_page(page);
 			if (!map->page)
 				break;

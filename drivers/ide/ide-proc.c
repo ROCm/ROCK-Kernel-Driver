@@ -548,7 +548,7 @@ int proc_ide_read_capacity
 		len = sprintf(page, "(none)\n");
         else
 		len = sprintf(page,"%llu\n",
-			      (u64) ((ide_driver_t *)drive->driver)->capacity(drive));
+			      (long long) ((ide_driver_t *)drive->driver)->capacity(drive));
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
