@@ -349,7 +349,8 @@ int hpfs_unlink(struct inode *dir, struct dentry *dentry)
 	lock_kernel();
 	hpfs_adjust_length((char *)name, &len);
 again:
-	hpfs_lock_2inodes(dir, inode);
+	hpfs_lock_inode(dir);
+	hpfs_lock_inode(inode);
 	err = -ENOENT;
 	de = map_dirent(dir, hpfs_i(dir)->i_dno, (char *)name, len, &dno, &qbh);
 	if (!de)
@@ -376,7 +377,8 @@ again:
 		if (rep++)
 			break;
 
-		hpfs_unlock_2inodes(dir, inode);
+		hpfs_unlock_inode(inode);
+		hpfs_unlock_inode(dir);
 		d_drop(dentry);
 		spin_lock(&dentry->d_lock);
 		if (atomic_read(&dentry->d_count) > 1 ||
@@ -407,7 +409,8 @@ again:
 out1:
 	hpfs_brelse4(&qbh);
 out:
-	hpfs_unlock_2inodes(dir, inode);
+	hpfs_unlock_inode(inode);
+	hpfs_unlock_inode(dir);
 	unlock_kernel();
 	return err;
 }
@@ -427,7 +430,8 @@ int hpfs_rmdir(struct inode *dir, struct dentry *dentry)
 
 	hpfs_adjust_length((char *)name, &len);
 	lock_kernel();
-	hpfs_lock_2inodes(dir, inode);
+	hpfs_lock_inode(dir);
+	hpfs_lock_inode(inode);
 	err = -ENOENT;
 	de = map_dirent(dir, hpfs_i(dir)->i_dno, (char *)name, len, &dno, &qbh);
 	if (!de)
@@ -465,7 +469,8 @@ int hpfs_rmdir(struct inode *dir, struct dentry *dentry)
 out1:
 	hpfs_brelse4(&qbh);
 out:
-	hpfs_unlock_2inodes(dir, inode);
+	hpfs_unlock_inode(inode);
+	hpfs_unlock_inode(dir);
 	unlock_kernel();
 	return err;
 }
@@ -522,7 +527,10 @@ int hpfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	hpfs_adjust_length((char *)old_name, &old_len);
 
 	lock_kernel();
-	hpfs_lock_3inodes(old_dir, new_dir, i);
+	hpfs_lock_inode(old_dir);
+	if (new_dir != old_dir)
+		hpfs_lock_inode(new_dir);
+	hpfs_lock_inode(i);
 	
 	/* Erm? Moving over the empty non-busy directory is perfectly legal */
 	if (new_inode && S_ISDIR(new_inode->i_mode)) {
@@ -601,7 +609,10 @@ int hpfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	hpfs_i(i)->i_conv = hpfs_sb(i->i_sb)->sb_conv;
 	hpfs_decide_conv(i, (char *)new_name, new_len);
 	end1:
-	hpfs_unlock_3inodes(old_dir, new_dir, i);
+	hpfs_unlock_inode(i);
+	if (old_dir != new_dir)
+		hpfs_unlock_inode(new_dir);
+	hpfs_unlock_inode(old_dir);
 	unlock_kernel();
 	return err;
 }
