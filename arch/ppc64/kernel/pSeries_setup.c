@@ -379,10 +379,7 @@ static void __init pSeries_init_early(void)
 	}
 
 
-	if (iommu_off)
-		pci_dma_init_direct();
-	else
-		tce_init_pSeries();
+	iommu_init_early_pSeries();
 
 	pSeries_discover_pic();
 

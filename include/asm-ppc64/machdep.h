@@ -70,6 +70,8 @@ struct machdep_calls {
 				    long index,
 				    long npages);
 	void		(*tce_flush)(struct iommu_table *tbl);
+	void		(*iommu_dev_setup)(struct pci_dev *dev);
+	void		(*iommu_bus_setup)(struct pci_bus *bus);
 
 	int		(*probe)(int platform);
 	void		(*setup_arch)(void);

@@ -1743,17 +1743,6 @@ static int of_finish_dynamic_node(struct device_node *node)
 		node->devfn = (regs[0] >> 8) & 0xff;
 	}
 
-	/* fixing up iommu_table */
-
-#ifdef CONFIG_PPC_PSERIES
-	if (strcmp(node->name, "pci") == 0 &&
-	    get_property(node, "ibm,dma-window", NULL)) {
-		node->bussubno = node->busno;
-		iommu_devnode_init_pSeries(node);
-	} else
-		node->iommu_table = parent->iommu_table;
-#endif /* CONFIG_PPC_PSERIES */
-
 out:
 	of_node_put(parent);
 	return err;

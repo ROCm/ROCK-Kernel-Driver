@@ -16,7 +16,7 @@ obj-y               :=	setup.o entry.o traps.o irq.o idle.o dma.o \
 obj-$(CONFIG_PPC_OF) +=	of_device.o
 
 pci-obj-$(CONFIG_PPC_ISERIES)	+= iSeries_pci.o iSeries_pci_reset.o
-pci-obj-$(CONFIG_PPC_MULTIPLATFORM)	+= pci_dn.o pci_dma_direct.o
+pci-obj-$(CONFIG_PPC_MULTIPLATFORM)	+= pci_dn.o pci_direct_iommu.o
 
 obj-$(CONFIG_PCI)	+= pci.o pci_iommu.o iomap.o $(pci-obj-y)
 

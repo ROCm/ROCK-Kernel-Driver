@@ -68,7 +68,6 @@ extern void hvlog(char *fmt, ...);
 
 /* Function Prototypes */
 extern void ppcdbg_initialize(void);
-extern void tce_init_iSeries(void);
 
 static void build_iSeries_Memory_Map(void);
 static void setup_iSeries_cache_sizes(void);
@@ -344,7 +343,7 @@ static void __init iSeries_parse_cmdline(void)
 	/*
 	 * Initialize the DMA/TCE management
 	 */
-	tce_init_iSeries();
+	iommu_init_early_iSeries();
 
 	/*
 	 * Initialize the table which translate Linux physical addresses to

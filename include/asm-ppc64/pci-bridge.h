@@ -79,6 +79,14 @@ static inline struct device_node *pci_device_to_OF_node(struct pci_dev *dev)
 		return fetch_dev_dn(dev);
 }
 
+static inline struct device_node *pci_bus_to_OF_node(struct pci_bus *bus)
+{
+	if (bus->self)
+		return pci_device_to_OF_node(bus->self);
+	else
+		return bus->sysdata; /* Must be root bus (PHB) */
+}
+
 extern void pci_process_bridge_OF_ranges(struct pci_controller *hose,
 					 struct device_node *dev);
 
