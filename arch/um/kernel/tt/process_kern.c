@@ -451,7 +451,7 @@ void set_init_pid(int pid)
 		      err);
 }
 
-int singlestepping(void *t)
+int singlestepping_tt(void *t)
 {
 	struct task_struct *task = t;
 
