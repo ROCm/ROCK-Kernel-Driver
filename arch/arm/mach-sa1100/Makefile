@@ -9,7 +9,7 @@ obj-n :=
 obj-  :=
 led-y := leds.o
 
-export-objs := dma.o generic.o pcipool.o pm.o sa1111.o sa1111-pcibuf.o
+export-objs := dma.o generic.o pm.o
 
 # This needs to be cleaned up.  We probably need to have SA1100
 # and SA1110 config symbols.
@@ -20,9 +20,6 @@ obj-$(CONFIG_SA1100_HACKKIT)		+= cpu-sa1110.o
 obj-$(CONFIG_SA1100_LART)		+= cpu-sa1100.o
 obj-$(CONFIG_SA1100_PT_SYSTEM3)		+= cpu-sa1110.o
 endif
-
-# Next, the SA1111 stuff.
-obj-$(CONFIG_SA1111)			+= sa1111.o sa1111-pcibuf.o pcipool.o
 
 # Specific board support
 obj-$(CONFIG_SA1100_ADSBITSY)		+= adsbitsy.o
@@ -113,4 +110,4 @@ obj-$(CONFIG_LEDS) += $(led-y)
 #obj-$(CONFIG_SA1100_USB)		+= usb/
 
 # Miscelaneous functions
-obj-$(CONFIG_PM) += pm.o sleep.o
+obj-$(CONFIG_PM)			+= pm.o sleep.o
