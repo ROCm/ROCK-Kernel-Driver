@@ -69,8 +69,6 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/wanrouter.h>
-#include <linux/netlink.h>
-#include <linux/rtnetlink.h>
 #include <linux/if_bridge.h>
 #include <linux/init.h>
 #include <linux/poll.h>
@@ -142,6 +140,31 @@ static struct file_operations socket_file_ops = {
  */
 
 static struct net_proto_family *net_families[NPROTO];
+
+static __inline__ void net_family_bug(int family)
+{
+	printk(KERN_ERR "%d is not yet sock_registered!\n", family);
+	BUG();
+}
+
+int net_family_get(int family)
+{
+	int rc = 1;
+
+	if (likely(net_families[family] != NULL))
+		rc = try_module_get(net_families[family]->owner);
+	else
+		net_family_bug(family);
+	return rc;
+}
+
+void net_family_put(int family)
+{
+	if (likely(net_families[family] != NULL))
+		module_put(net_families[family]->owner);
+	else
+		net_family_bug(family);
+}
 
 #if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 static atomic_t net_family_lockct = ATOMIC_INIT(0);
@@ -511,7 +534,7 @@ void sock_release(struct socket *sock)
 
 		sock->ops->release(sock);
 		sock->ops = NULL;
-		module_put(net_families[family]->owner);
+		net_family_put(family);
 	}
 
 	if (sock->fasync_list)
@@ -1064,7 +1087,7 @@ int sock_create(int family, int type, int protocol, struct socket **res)
 	sock->type  = type;
 
 	i = -EBUSY;
-	if (!try_module_get(net_families[family]->owner))
+	if (!net_family_get(family))
 		goto out_release;
 
 	if ((i = net_families[family]->create(sock, protocol)) < 0) 
@@ -1953,17 +1976,6 @@ void __init sock_init(void)
 	 *  do_initcalls is run.  
 	 */
 
-
-	/*
-	 * The netlink device handler may be needed early.
-	 */
-
-#ifdef CONFIG_NET
-	rtnetlink_init();
-#endif
-#ifdef CONFIG_NETLINK_DEV
-	init_netlink();
-#endif
 #ifdef CONFIG_NETFILTER
 	netfilter_init();
 #endif
