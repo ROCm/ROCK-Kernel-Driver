@@ -481,11 +481,11 @@ static void w9968cf_configure_camera(struct w9968cf_device*,struct usb_device*,
 static void w9968cf_adjust_configuration(struct w9968cf_device*);
 static int w9968cf_turn_on_led(struct w9968cf_device*);
 static int w9968cf_init_chip(struct w9968cf_device*);
-static int w9968cf_set_picture(struct w9968cf_device*, struct video_picture);
-static int w9968cf_set_window(struct w9968cf_device*, struct video_window);
 static inline u16 w9968cf_valid_palette(u16 palette);
 static inline u16 w9968cf_valid_depth(u16 palette);
 static inline u8 w9968cf_need_decompression(u16 palette);
+static int w9968cf_set_picture(struct w9968cf_device*, struct video_picture);
+static int w9968cf_set_window(struct w9968cf_device*, struct video_window);
 static int w9968cf_postprocess_frame(struct w9968cf_device*, 
                                      struct w9968cf_frame_t*);
 static int w9968cf_adjust_window_size(struct w9968cf_device*, u16* w, u16* h);
@@ -1709,6 +1709,50 @@ static int w9968cf_init_chip(struct w9968cf_device* cam)
 
 
 /*--------------------------------------------------------------------------
+  Return non-zero if the palette is supported, 0 otherwise.
+  --------------------------------------------------------------------------*/
+static inline u16 w9968cf_valid_palette(u16 palette)
+{
+	u8 i = 0;
+	while (w9968cf_formatlist[i].palette != 0) {
+		if (palette == w9968cf_formatlist[i].palette)
+			return palette;
+		i++;
+	}
+	return 0;
+}
+
+
+/*--------------------------------------------------------------------------
+  Return the depth corresponding to the given palette.
+  Palette _must_ be supported !
+  --------------------------------------------------------------------------*/
+static inline u16 w9968cf_valid_depth(u16 palette)
+{
+	u8 i=0;
+	while (w9968cf_formatlist[i].palette != palette)
+		i++;
+
+	return w9968cf_formatlist[i].depth;
+}
+
+
+/*--------------------------------------------------------------------------
+  Return non-zero if the format requires decompression, 0 otherwise.
+  --------------------------------------------------------------------------*/
+static inline u8 w9968cf_need_decompression(u16 palette)
+{
+	u8 i = 0;
+	while (w9968cf_formatlist[i].palette != 0) {
+		if (palette == w9968cf_formatlist[i].palette)
+			return w9968cf_formatlist[i].compression;
+		i++;
+	}
+	return 0;
+}
+
+
+/*--------------------------------------------------------------------------
   Change the picture settings of the camera.
   Return 0 on success, a negative number otherwise.
   --------------------------------------------------------------------------*/
@@ -1963,50 +2007,6 @@ w9968cf_set_window(struct w9968cf_device* cam, struct video_window win)
 error:
 	DBG(1, "Failed to change the capture area size")
 	return err;
-}
-
-
-/*--------------------------------------------------------------------------
-  Return non-zero if the palette is supported, 0 otherwise.
-  --------------------------------------------------------------------------*/
-static inline u16 w9968cf_valid_palette(u16 palette)
-{
-	u8 i = 0;
-	while (w9968cf_formatlist[i].palette != 0) {
-		if (palette == w9968cf_formatlist[i].palette)
-			return palette;
-		i++;
-	}
-	return 0;
-}
-
-
-/*--------------------------------------------------------------------------
-  Return the depth corresponding to the given palette.
-  Palette _must_ be supported !
-  --------------------------------------------------------------------------*/
-static inline u16 w9968cf_valid_depth(u16 palette)
-{
-	u8 i=0;
-	while (w9968cf_formatlist[i].palette != palette)
-		i++;
-
-	return w9968cf_formatlist[i].depth;
-}
-
-
-/*--------------------------------------------------------------------------
-  Return non-zero if the format requires decompression, 0 otherwise.
-  --------------------------------------------------------------------------*/
-static inline u8 w9968cf_need_decompression(u16 palette)
-{
-	u8 i = 0;
-	while (w9968cf_formatlist[i].palette != 0) {
-		if (palette == w9968cf_formatlist[i].palette)
-			return w9968cf_formatlist[i].compression;
-		i++;
-	}
-	return 0;
 }
 
 
