@@ -610,6 +610,8 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 			}
 			if ((temp_len = strnlen(value, 300)) < 300) {
 				vol->UNC = kmalloc(temp_len+1,GFP_KERNEL);
+				if(vol->UNC == NULL)
+					return 1;
 				strcpy(vol->UNC,value);
 				if (strncmp(vol->UNC, "//", 2) == 0) {
 					vol->UNC[0] = '\\';
@@ -757,6 +759,8 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 		}
 		if ((temp_len = strnlen(devname, 300)) < 300) {
 			vol->UNC = kmalloc(temp_len+1,GFP_KERNEL);
+			if(vol->UNC == NULL)
+				return 1;
 			strcpy(vol->UNC,devname);
 			if (strncmp(vol->UNC, "//", 2) == 0) {
 				vol->UNC[0] = '\\';
