@@ -282,8 +282,8 @@ int __init detect_pdc4030(ide_hwif_t *hwif)
 	hwif->OUTB(0xF3, IDE_SECTOR_REG);
 	hwif->OUTB(0x14, IDE_SELECT_REG);
 	hwif->OUTB(PROMISE_EXTENDED_COMMAND, IDE_COMMAND_REG);
-	
-	ide_delay_50ms();
+
+	msleep(50);
 
 	if (hwif->INB(IDE_ERROR_REG) == 'P' &&
 	    hwif->INB(IDE_NSECTOR_REG) == 'T' &&

@@ -1387,22 +1387,6 @@ void ide_add_generic_settings (ide_drive_t *drive)
 		ide_add_setting(drive,	"ide-scsi",		SETTING_RW,					-1,		HDIO_SET_IDE_SCSI,		TYPE_BYTE,	0,	1,				1,		1,		&drive->scsi,			ide_atapi_to_scsi);
 }
 
-/*
- * Delay for *at least* 50ms.  As we don't know how much time is left
- * until the next tick occurs, we wait an extra tick to be safe.
- * This is used only during the probing/polling for drives at boot time.
- *
- * However, its usefullness may be needed in other places, thus we export it now.
- * The future may change this to a millisecond setable delay.
- */
-void ide_delay_50ms (void)
-{
-	__set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(1+HZ/20);
-}
-
-EXPORT_SYMBOL(ide_delay_50ms);
-
 int system_bus_clock (void)
 {
 	return((int) ((!system_bus_speed) ? ide_system_bus_speed() : system_bus_speed ));
