@@ -661,11 +661,14 @@ int vc_cons_allocated(unsigned int i)
 static void visual_init(int currcons, int init)
 {
     /* ++Geert: sw->con_init determines console size */
+    if (sw)
+	module_put(sw->owner);
     sw = conswitchp;
 #ifndef VT_SINGLE_DRIVER
     if (con_driver_map[currcons])
 	sw = con_driver_map[currcons];
 #endif
+    __module_get(sw->owner);
     cons_num = currcons;
     display_fg = &master_display_fg;
     vc_cons[currcons].d->vc_uni_pagedir_loc = &vc_cons[currcons].d->vc_uni_pagedir;
@@ -2668,25 +2671,38 @@ static void clear_buffer_attributes(int currcons)
  *	and become default driver for newly opened ones.
  */
 
-void take_over_console(const struct consw *csw, int first, int last, int deflt)
+int take_over_console(const struct consw *csw, int first, int last, int deflt)
 {
 	int i, j = -1;
 	const char *desc;
+	struct module *owner;
+
+	owner = csw->owner;
+	if (!try_module_get(owner))
+		return -ENODEV;
 
 	acquire_console_sem();
 
 	desc = csw->con_startup();
 	if (!desc) {
 		release_console_sem();
-		return;
+		module_put(owner);
+		return -ENODEV;
 	}
-	if (deflt)
+	if (deflt) {
+		if (conswitchp)
+			module_put(conswitchp->owner);
+		__module_get(owner);
 		conswitchp = csw;
+	}
 
 	for (i = first; i <= last; i++) {
 		int old_was_color;
 		int currcons = i;
 
+		if (con_driver_map[i])
+			module_put(con_driver_map[i]->owner);
+		__module_get(owner);
 		con_driver_map[i] = csw;
 
 		if (!vc_cons[i].d || !vc_cons[i].d->vc_sw)
@@ -2721,6 +2737,9 @@ void take_over_console(const struct consw *csw, int first, int last, int deflt)
 		printk("to %s\n", desc);
 
 	release_console_sem();
+
+	module_put(owner);
+	return 0;
 }
 
 void give_up_console(const struct consw *csw)
@@ -2728,8 +2747,10 @@ void give_up_console(const struct consw *csw)
 	int i;
 
 	for(i = 0; i < MAX_NR_CONSOLES; i++)
-		if (con_driver_map[i] == csw)
+		if (con_driver_map[i] == csw) {
+			module_put(csw->owner);
 			con_driver_map[i] = NULL;
+		}
 }
 
 #endif

@@ -11,6 +11,7 @@
 #include <linux/console.h>
 #include <linux/vt_kern.h>
 #include <linux/init.h>
+#include <linux/module.h>
 
 /*
  *  Dummy console driver
@@ -58,6 +59,7 @@ static int dummycon_dummy(void)
  */
 
 const struct consw dummy_con = {
+    .owner =		THIS_MODULE,
     .con_startup =	dummycon_startup,
     .con_init =		dummycon_init,
     .con_deinit =	DUMMY,

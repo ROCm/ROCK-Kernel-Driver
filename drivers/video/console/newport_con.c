@@ -705,6 +705,7 @@ static int newport_dummy(struct vc_data *c)
 #define DUMMY (void *) newport_dummy
 
 const struct consw newport_con = {
+    .owner =		THIS_MODULE,
     .con_startup =	newport_startup,
     .con_init =		newport_init,
     .con_deinit =	newport_deinit,
@@ -726,9 +727,7 @@ const struct consw newport_con = {
 #ifdef MODULE
 static int __init newport_console_init(void)
 {
-	take_over_console(&newport_con, 0, MAX_NR_CONSOLES - 1, 1);
-
-	return 0;
+	return take_over_console(&newport_con, 0, MAX_NR_CONSOLES - 1, 1);
 }
 
 static void __exit newport_console_exit(void)

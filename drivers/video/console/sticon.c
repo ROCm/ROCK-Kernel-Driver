@@ -354,6 +354,7 @@ static void sticon_save_screen(struct vc_data *conp)
 }
 
 static struct consw sti_con = {
+	.owner			= THIS_MODULE,
 	.con_startup		= sticon_startup,
 	.con_init		= sticon_init,
 	.con_deinit		= sticon_deinit,
@@ -390,7 +391,7 @@ int __init sticonsole_init(void)
 
     if (conswitchp == &dummy_con) {
 	printk(KERN_INFO "sticon: Initializing STI text console.\n");
-	take_over_console(&sti_con, 0, MAX_NR_CONSOLES - 1, 1);
+	return take_over_console(&sti_con, 0, MAX_NR_CONSOLES - 1, 1);
     }
     return 0;
 }
