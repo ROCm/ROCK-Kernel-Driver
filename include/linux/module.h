@@ -370,6 +370,8 @@ extern struct module *module_list;
 #define EXPORT_SYMBOL_NOVERS(var)  error this_object_must_be_defined_as_export_objs_in_the_Makefile
 #define EXPORT_SYMBOL_GPL(var)  error this_object_must_be_defined_as_export_objs_in_the_Makefile
 
+__asm__(".section __ksymtab,\"a\"\n.previous");
+
 #else
 
 #define __EXPORT_SYMBOL(sym, str)			\
