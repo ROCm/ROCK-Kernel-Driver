@@ -22,6 +22,9 @@
  * 
  * Reads with count = 0 should always return 0.
  * -- Julian Bradfield 1999-06-07.
+ *
+ * FIFOs and Pipes now generate SIGIO for both readers and writers.
+ * -- Jeremy Elson <jelson@circlemud.org> 2001-08-16
  */
 
 /* Drop the inode semaphore and wait for a pipe event, atomically */
@@ -117,12 +120,14 @@ do_more_read:
 		 * room.
 		 */
 		wake_up_interruptible(PIPE_WAIT(*inode));
+ 		kill_fasync(PIPE_FASYNC_WRITERS(*inode), SIGIO, POLL_OUT);
 		if (!PIPE_EMPTY(*inode))
 			BUG();
 		goto do_more_read;
 	}
 	/* Signal writers asynchronously that there is more room.  */
 	wake_up_interruptible(PIPE_WAIT(*inode));
+ 	kill_fasync(PIPE_FASYNC_WRITERS(*inode), SIGIO, POLL_OUT);
 
 	ret = read;
 out:
@@ -215,6 +220,7 @@ pipe_write(struct file *filp, const char *buf, size_t count, loff_t *ppos)
 			 * to do idle reschedules.
 			 */
 			wake_up_interruptible(PIPE_WAIT(*inode));
+ 			kill_fasync(PIPE_FASYNC_READERS(*inode), SIGIO, POLL_IN);
 			PIPE_WAITING_WRITERS(*inode)++;
 			pipe_wait(inode);
 			PIPE_WAITING_WRITERS(*inode)--;
@@ -228,6 +234,7 @@ pipe_write(struct file *filp, const char *buf, size_t count, loff_t *ppos)
 
 	/* Signal readers asynchronously that there is more data.  */
 	wake_up_interruptible(PIPE_WAIT(*inode));
+	kill_fasync(PIPE_FASYNC_READERS(*inode), SIGIO, POLL_IN);
 
 	inode->i_ctime = inode->i_mtime = CURRENT_TIME;
 	mark_inode_dirty(inode);
@@ -308,6 +315,8 @@ pipe_release(struct inode *inode, int decr, int decw)
 		kfree(info);
 	} else {
 		wake_up_interruptible(PIPE_WAIT(*inode));
+		kill_fasync(PIPE_FASYNC_READERS(*inode), SIGIO, POLL_IN);
+		kill_fasync(PIPE_FASYNC_WRITERS(*inode), SIGIO, POLL_OUT);
 	}
 	up(PIPE_SEM(*inode));
 
@@ -315,14 +324,72 @@ pipe_release(struct inode *inode, int decr, int decw)
 }
 
 static int
+pipe_read_fasync(int fd, struct file *filp, int on)
+{
+	struct inode *inode = filp->f_dentry->d_inode;
+	int retval;
+
+	down(PIPE_SEM(*inode));
+	retval = fasync_helper(fd, filp, on, PIPE_FASYNC_READERS(*inode));
+	up(PIPE_SEM(*inode));
+
+	if (retval < 0)
+		return retval;
+
+	return 0;
+}
+
+
+static int
+pipe_write_fasync(int fd, struct file *filp, int on)
+{
+	struct inode *inode = filp->f_dentry->d_inode;
+	int retval;
+
+	down(PIPE_SEM(*inode));
+	retval = fasync_helper(fd, filp, on, PIPE_FASYNC_WRITERS(*inode));
+	up(PIPE_SEM(*inode));
+
+	if (retval < 0)
+		return retval;
+
+	return 0;
+}
+
+
+static int
+pipe_rdwr_fasync(int fd, struct file *filp, int on)
+{
+	struct inode *inode = filp->f_dentry->d_inode;
+	int retval;
+
+	down(PIPE_SEM(*inode));
+
+	retval = fasync_helper(fd, filp, on, PIPE_FASYNC_READERS(*inode));
+
+	if (retval >= 0)
+		retval = fasync_helper(fd, filp, on, PIPE_FASYNC_WRITERS(*inode));
+
+	up(PIPE_SEM(*inode));
+
+	if (retval < 0)
+		return retval;
+
+	return 0;
+}
+
+
+static int
 pipe_read_release(struct inode *inode, struct file *filp)
 {
+	pipe_read_fasync(-1, filp, 0);
 	return pipe_release(inode, 1, 0);
 }
 
 static int
 pipe_write_release(struct inode *inode, struct file *filp)
 {
+	pipe_write_fasync(-1, filp, 0);
 	return pipe_release(inode, 0, 1);
 }
 
@@ -331,6 +398,7 @@ pipe_rdwr_release(struct inode *inode, struct file *filp)
 {
 	int decr, decw;
 
+	pipe_rdwr_fasync(-1, filp, 0);
 	decr = (filp->f_mode & FMODE_READ) != 0;
 	decw = (filp->f_mode & FMODE_WRITE) != 0;
 	return pipe_release(inode, decr, decw);
@@ -383,6 +451,7 @@ struct file_operations read_fifo_fops = {
 	ioctl:		pipe_ioctl,
 	open:		pipe_read_open,
 	release:	pipe_read_release,
+	fasync:         pipe_read_fasync,
 };
 
 struct file_operations write_fifo_fops = {
@@ -393,6 +462,7 @@ struct file_operations write_fifo_fops = {
 	ioctl:		pipe_ioctl,
 	open:		pipe_write_open,
 	release:	pipe_write_release,
+	fasync:         pipe_write_fasync,
 };
 
 struct file_operations rdwr_fifo_fops = {
@@ -403,6 +473,7 @@ struct file_operations rdwr_fifo_fops = {
 	ioctl:		pipe_ioctl,
 	open:		pipe_rdwr_open,
 	release:	pipe_rdwr_release,
+	fasync:         pipe_rdwr_fasync,
 };
 
 struct file_operations read_pipe_fops = {
@@ -413,6 +484,7 @@ struct file_operations read_pipe_fops = {
 	ioctl:		pipe_ioctl,
 	open:		pipe_read_open,
 	release:	pipe_read_release,
+	fasync:         pipe_read_fasync,
 };
 
 struct file_operations write_pipe_fops = {
@@ -423,6 +495,7 @@ struct file_operations write_pipe_fops = {
 	ioctl:		pipe_ioctl,
 	open:		pipe_write_open,
 	release:	pipe_write_release,
+	fasync:         pipe_write_fasync,
 };
 
 struct file_operations rdwr_pipe_fops = {
@@ -433,6 +506,7 @@ struct file_operations rdwr_pipe_fops = {
 	ioctl:		pipe_ioctl,
 	open:		pipe_rdwr_open,
 	release:	pipe_rdwr_release,
+	fasync:         pipe_rdwr_fasync,
 };
 
 struct inode* pipe_new(struct inode* inode)
@@ -453,6 +527,7 @@ struct inode* pipe_new(struct inode* inode)
 	PIPE_READERS(*inode) = PIPE_WRITERS(*inode) = 0;
 	PIPE_WAITING_READERS(*inode) = PIPE_WAITING_WRITERS(*inode) = 0;
 	PIPE_RCOUNTER(*inode) = PIPE_WCOUNTER(*inode) = 1;
+	*PIPE_FASYNC_READERS(*inode) = *PIPE_FASYNC_WRITERS(*inode) = NULL;
 
 	return inode;
 fail_page:
