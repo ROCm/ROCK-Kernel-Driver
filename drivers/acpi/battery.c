@@ -340,7 +340,7 @@ acpi_battery_check (
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
 
-struct proc_dir_entry		*acpi_battery_dir = NULL;
+struct proc_dir_entry		*acpi_battery_dir;
 
 static int
 acpi_battery_read_info (

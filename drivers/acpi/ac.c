@@ -108,7 +108,7 @@ acpi_ac_get_state (
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
 
-struct proc_dir_entry		*acpi_ac_dir = NULL;
+struct proc_dir_entry		*acpi_ac_dir;
 
 int acpi_ac_seq_show(struct seq_file *seq, void *offset)
 {

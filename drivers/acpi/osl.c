@@ -62,13 +62,13 @@ struct acpi_os_dpc
 #ifdef ENABLE_DEBUGGER
 #include <linux/kdb.h>
 /* stuff for debugger support */
-int acpi_in_debugger = 0;
+int acpi_in_debugger;
 extern char line_buf[80];
 #endif /*ENABLE_DEBUGGER*/
 
-static int acpi_irq_irq = 0;
-static OSD_HANDLER acpi_irq_handler = NULL;
-static void *acpi_irq_context = NULL;
+static int acpi_irq_irq;
+static OSD_HANDLER acpi_irq_handler;
+static void *acpi_irq_context;
 
 acpi_status
 acpi_os_initialize(void)
