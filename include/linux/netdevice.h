@@ -561,7 +561,7 @@ static inline void __netif_schedule(struct net_device *dev)
 		cpu = smp_processor_id();
 		dev->next_sched = softnet_data[cpu].output_queue;
 		softnet_data[cpu].output_queue = dev;
-		cpu_raise_softirq(cpu, NET_TX_SOFTIRQ);
+		raise_softirq_irqoff(NET_TX_SOFTIRQ);
 		local_irq_restore(flags);
 	}
 }
@@ -612,7 +612,7 @@ static inline void dev_kfree_skb_irq(struct sk_buff *skb)
 		cpu = smp_processor_id();
 		skb->next = softnet_data[cpu].completion_queue;
 		softnet_data[cpu].completion_queue = skb;
-		cpu_raise_softirq(cpu, NET_TX_SOFTIRQ);
+		raise_softirq_irqoff(NET_TX_SOFTIRQ);
 		local_irq_restore(flags);
 	}
 }
@@ -779,7 +779,7 @@ static inline void __netif_rx_schedule(struct net_device *dev)
 		dev->quota += dev->weight;
 	else
 		dev->quota = dev->weight;
-	__cpu_raise_softirq(cpu, NET_RX_SOFTIRQ);
+	__raise_softirq_irqoff(NET_RX_SOFTIRQ);
 	local_irq_restore(flags);
 }
 
@@ -805,7 +805,7 @@ static inline int netif_rx_reschedule(struct net_device *dev, int undo)
 		local_irq_save(flags);
 		cpu = smp_processor_id();
 		list_add_tail(&dev->poll_list, &softnet_data[cpu].poll_list);
-		__cpu_raise_softirq(cpu, NET_RX_SOFTIRQ);
+		__raise_softirq_irqoff(NET_RX_SOFTIRQ);
 		local_irq_restore(flags);
 		return 1;
 	}
