@@ -25,9 +25,9 @@
 #include <linux/i2c.h>
 #include "dvbdev.h"
 #include "dvb_net.h"
+#include "bttv.h"
 
 struct dvb_bt8xx_card {
-
 	struct list_head list;
 	u8 active;
 	char card_name[32];
