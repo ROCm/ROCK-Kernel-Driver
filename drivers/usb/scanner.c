@@ -1,7 +1,7 @@
 /* -*- linux-c -*- */
 
 /* 
- * Driver for USB Scanners (linux-2.4.0test1-ac7)
+ * Driver for USB Scanners (linux-2.4.0)
  *
  * Copyright (C) 1999, 2000 David E. Nelson
  *
@@ -208,6 +208,26 @@
  *    - Added the Epson Expression1600 ID's. Thanks to Karl Heinz
  *      Kremer <khk@khk.net>.
  *
+ * 0.4.5  2/28/2001
+ *    - Added Mustek ID's (BearPaw 2400, 1200 CU Plus, BearPaw 1200F).
+ *      Thanks to Henning Meier-Geinitz <henningmg@gmx.de>.
+ *    - Added read_timeout module parameter to override RD_NAK_TIMEOUT
+ *      when read()'ing from devices.
+ *    - Stalled pipes are now checked and cleared with
+ *      usb_clear_halt() for the read_scanner() function. This should
+ *      address the "funky result: -32" error messages.
+ *    - Removed Microtek scanner ID's.  Microtek scanners are now
+ *      supported via the drivers/usb/microtek.c driver.
+ *    - Added scanner specific read timeout's.
+ *    - Return status errors are NEGATIVE!!!  This should address the
+ *      "funky result: -110" error messages.
+ *    - Replaced USB_ST_TIMEOUT with ETIMEDOUT.
+ *    - rd_nak was still defined in MODULE_PARM.  It's been updated with
+ *      read_timeout.  Thanks to Mark W. Webb <markwebb@adelphia.net> for
+ *      reporting this bug.
+ *    - Added Epson Perfection 1640SU and 1640SU Photo.  Thanks to
+ *      Jean-Luc <f5ibh@db0bm.ampr.org>.
+ *
  *  TODO
  *
  *    - Performance
@@ -235,89 +255,13 @@
  *    System: Pentium 120, 80 MB RAM, OHCI, Linux 2.3.23, HP 4100C USB Scanner
  *            300 dpi scan of the entire bed
  *      24 Bit Color ~ 70 secs - 3.6 Mbit/sec
- *       8 Bit Gray  ~ 17 secs - 4.2 Mbit/sec
- */
+ *       8 Bit Gray ~ 17 secs - 4.2 Mbit/sec */
 
 /* 
  * Scanner definitions, macros, module info, 
  * debug/ioctl/data_dump enable, and other constants.
  */ 
 #include "scanner.h"
-
-/* Table of scanners that may work with this driver */
-static struct usb_device_id scanner_device_ids [] = {
-	/* Acer */
-	{ USB_DEVICE(0x04a5, 0x2060) },	/* Prisa Acerscan 620U & 640U (!)*/
-	{ USB_DEVICE(0x04a5, 0x2040) },	/* Prisa AcerScan 620U (!) */
-	{ USB_DEVICE(0x04a5, 0x2022) },	/* Vuego Scan Brisa 340U */
-	/* Agfa */
-	{ USB_DEVICE(0x06bd, 0x0001) },	/* SnapScan 1212U */
-	{ USB_DEVICE(0x06bd, 0x0002) },	/* SnapScan 1236U */
-	{ USB_DEVICE(0x06bd, 0x2061) },	/* Another SnapScan 1212U (?)*/
-	{ USB_DEVICE(0x06bd, 0x0100) },	/* SnapScan Touch */
-	/* Colorado -- See Primax/Colorado below */
-	/* Epson -- See Seiko/Epson below */
-	/* Genius */
-	{ USB_DEVICE(0x0458, 0x2001) },	/* ColorPage-Vivid Pro */
-	/* Hewlett Packard */
-	{ USB_DEVICE(0x03f0, 0x0205) },	/* 3300C */
-	{ USB_DEVICE(0x03f0, 0x0101) },	/* 4100C */
-	{ USB_DEVICE(0x03f0, 0x0105) },	/* 4200C */
-	{ USB_DEVICE(0x03f0, 0x0102) },	/* PhotoSmart S20 */
-	{ USB_DEVICE(0x03f0, 0x0401) },	/* 5200C */
-	{ USB_DEVICE(0x03f0, 0x0701) },	/* 5300C */
-	{ USB_DEVICE(0x03f0, 0x0201) },	/* 6200C */
-	{ USB_DEVICE(0x03f0, 0x0601) },	/* 6300C */
-	/* iVina */
-	{ USB_DEVICE(0x0638, 0x0268) },     /* 1200U */
-	/* Microtek */
-	{ USB_DEVICE(0x05da, 0x0099) },	/* ScanMaker X6 - X6U */
-	{ USB_DEVICE(0x05da, 0x0094) },	/* Phantom 336CX - C3 */
-	{ USB_DEVICE(0x05da, 0x00a0) },	/* Phantom 336CX - C3 #2 */
-	{ USB_DEVICE(0x05da, 0x009a) },	/* Phantom C6 */
-	{ USB_DEVICE(0x05da, 0x00a3) },	/* ScanMaker V6USL */
-	{ USB_DEVICE(0x05da, 0x80a3) },	/* ScanMaker V6USL #2 */
-	{ USB_DEVICE(0x05da, 0x80ac) },	/* ScanMaker V6UL - SpicyU */
-	/* Mustek */
-	{ USB_DEVICE(0x055f, 0x0001) },	/* 1200 CU */
-	{ USB_DEVICE(0x0400, 0x1000) },	/* BearPaw 1200 */
-	{ USB_DEVICE(0x055f, 0x0002) },	/* 600 CU */
-	{ USB_DEVICE(0x055f, 0x0003) },	/* 1200 USB */
-	{ USB_DEVICE(0x055f, 0x0006) },	/* 1200 UB */
-	/* Primax/Colorado */
-	{ USB_DEVICE(0x0461, 0x0300) },	/* G2-300 #1 */
-	{ USB_DEVICE(0x0461, 0x0380) },	/* G2-600 #1 */
-	{ USB_DEVICE(0x0461, 0x0301) },	/* G2E-300 #1 */
-	{ USB_DEVICE(0x0461, 0x0381) },	/* ReadyScan 636i */
-	{ USB_DEVICE(0x0461, 0x0302) },	/* G2-300 #2 */
-	{ USB_DEVICE(0x0461, 0x0382) },	/* G2-600 #2 */
-	{ USB_DEVICE(0x0461, 0x0303) },	/* G2E-300 #2 */
-	{ USB_DEVICE(0x0461, 0x0383) },	/* G2E-600 */
-	{ USB_DEVICE(0x0461, 0x0340) },	/* Colorado USB 9600 */
-	{ USB_DEVICE(0x0461, 0x0360) },	/* Colorado USB 19200 */
-	{ USB_DEVICE(0x0461, 0x0341) },	/* Colorado 600u */
-	{ USB_DEVICE(0x0461, 0x0361) },	/* Colorado 1200u */
-	/* Seiko/Epson Corp. */
-	{ USB_DEVICE(0x04b8, 0x0101) },	/* Perfection 636U and 636Photo */
-	{ USB_DEVICE(0x04b8, 0x0103) },	/* Perfection 610 */
-	{ USB_DEVICE(0x04b8, 0x0104) },	/* Perfection 1200U and 1200Photo*/
-	{ USB_DEVICE(0x04b8, 0x0106) },	/* Stylus Scan 2500 */
-	{ USB_DEVICE(0x04b8, 0x0107) },	/* Expression 1600 */
-	/* Umax */
-	{ USB_DEVICE(0x1606, 0x0010) },	/* Astra 1220U */
-	{ USB_DEVICE(0x1606, 0x0030) },	/* Astra 2000U */
-	{ USB_DEVICE(0x1606, 0x0230) },	/* Astra 2200U */
-	/* Visioneer */
-	{ USB_DEVICE(0x04a7, 0x0221) },	/* OneTouch 5300 USB */
-	{ USB_DEVICE(0x04a7, 0x0211) },	/* OneTouch 7600 USB */
-	{ USB_DEVICE(0x04a7, 0x0231) },	/* 6100 USB */
-	{ USB_DEVICE(0x04a7, 0x0311) },	/* 6200 EPP/USB */
-	{ USB_DEVICE(0x04a7, 0x0321) },	/* OneTouch 8100 EPP/USB */
-	{ USB_DEVICE(0x04a7, 0x0331) }, /* OneTouch 8600 EPP/USB */
-	{ }				/* Terminating entry */
-};
-
-MODULE_DEVICE_TABLE (usb, scanner_device_ids);
 
 
 static void
@@ -475,9 +419,9 @@ write_scanner(struct file * file, const char * buffer,
 		result = usb_bulk_msg(dev,usb_sndbulkpipe(dev, scn->bulk_out_ep), obuf, this_write, &partial, 60*HZ);
 		dbg("write stats(%d): result:%d this_write:%d partial:%d", scn_minor, result, this_write, partial);
 
-		if (result == USB_ST_TIMEOUT) {	/* NAK -- shouldn't happen */
+		if (result == -ETIMEDOUT) {	/* NAK -- shouldn't happen */
 			warn("write_scanner: NAK recieved.");
-			ret = -ETIME;
+			ret = result;
 			break;
 		} else if (result < 0) { /* We should not get any I/O errors */
 			warn("write_scanner(%d): funky result: %d. Please notify the maintainer.", scn_minor, result);
@@ -559,7 +503,7 @@ read_scanner(struct file * file, char * buffer,
 
 		this_read = (count >= IBUF_SIZE) ? IBUF_SIZE : count;
 
-		result = usb_bulk_msg(dev, usb_rcvbulkpipe(dev, scn->bulk_in_ep), ibuf, this_read, &partial, RD_NAK_TIMEOUT);
+		result = usb_bulk_msg(dev, usb_rcvbulkpipe(dev, scn->bulk_in_ep), ibuf, this_read, &partial, scn->rd_nak_timeout);
 		dbg("read stats(%d): result:%d this_read:%d partial:%d count:%d", scn_minor, result, this_read, partial, count);
 
 /*
@@ -576,22 +520,34 @@ read_scanner(struct file * file, char * buffer,
  * Ctrl-C's are acted upon in a reasonable amount of time.
  */
 
-		if (result == USB_ST_TIMEOUT && !partial) { /* Timeout
-                                                               and no
-                                                               data */
-			if (--rd_expire <= 0) {
-				warn("read_scanner(%d): excessive NAK's received", scn_minor);
-				ret = -ETIME;
-				break;
-			} else {
-				interruptible_sleep_on_timeout(&scn->rd_wait_q, RD_NAK_TIMEOUT);
-				continue;
+		if (result == -ETIMEDOUT) { /* NAK */
+			if (!partial) { /* No data */
+				if (--rd_expire <= 0) {	/* Give it up */
+					warn("read_scanner(%d): excessive NAK's received", scn_minor);
+					ret = result;
+					break;
+				} else { /* Keep trying to read data */
+					interruptible_sleep_on_timeout(&scn->rd_wait_q, scn->rd_nak_timeout);
+					continue;
+				}
+			} else { /* Timeout w/ some data */
+				goto data_recvd;
 			}
+		}
+		
+		if (result == -EPIPE) { /* No hope */
+			if(usb_clear_halt(dev, scn->bulk_in_ep)) {
+				err("read_scanner(%d): Failure to clear endpoint halt condition (%d).", scn_minor, ret);
+			}
+			ret = result;
+			break;
 		} else if ((result < 0) && (result != USB_ST_DATAUNDERRUN)) {
 			warn("read_scanner(%d): funky result:%d. Please notify the maintainer.", scn_minor, (int)result);
 			ret = -EIO;
 			break;
 		}
+
+	data_recvd:
 
 #ifdef RD_DATA_DUMP
 		if (partial) {
@@ -826,6 +782,26 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 		return NULL;
 	}
 	dbg("probe_scanner(%d): ibuf address:%p", scn_minor, scn->ibuf);
+	
+
+	switch (dev->descriptor.idVendor) { /* Scanner specific read timeout parameters */
+	case 0x04b8:		/* Seiko/Epson */
+		scn->rd_nak_timeout = HZ * 40;
+		break;
+	case 0x055f:		/* Mustek */
+	case 0x0400:		/* Another Mustek */
+	case 0x0ff5:		/* And yet another Mustek */
+		scn->rd_nak_timeout = HZ * 1;
+	default:
+		scn->rd_nak_timeout = RD_NAK_TIMEOUT;
+	}
+
+
+	if (read_timeout > 0) {	/* User specified read timeout overrides everything */
+		info("probe_scanner: User specified USB read timeout - %d", read_timeout);
+		scn->rd_nak_timeout = read_timeout;
+	}
+
 
 	scn->bulk_in_ep = have_bulk_in;
 	scn->bulk_out_ep = have_bulk_out;

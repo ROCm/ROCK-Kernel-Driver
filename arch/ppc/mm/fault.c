@@ -276,7 +276,7 @@ unsigned long va_to_phys(unsigned long address)
 	
 	pte = va_to_pte(address);
 	if (pte)
-		return(((unsigned long)(pte_val(*pte)) & PAGE_MASK) | (address & ~(PAGE_MASK-1)));
+		return(((unsigned long)(pte_val(*pte)) & PAGE_MASK) | (address & ~(PAGE_MASK)));
 	return (0);
 }
 

@@ -616,11 +616,15 @@ de600_rx_intr(struct net_device *dev)
 	for (i = size; i > 0; --i, ++buffer)
 		*buffer = de600_read_byte(READ_DATA, dev);
 
-	((struct net_device_stats *)(dev->priv))->rx_packets++; /* count all receives */
-
 	skb->protocol=eth_type_trans(skb,dev);
 
 	netif_rx(skb);
+
+	/* update stats */
+	dev->last_rx = jiffies;
+	((struct net_device_stats *)(dev->priv))->rx_packets++; /* count all receives */
+	((struct net_device_stats *)(dev->priv))->rx_bytes += size; /* count all received bytes */
+
 	/*
 	 * If any worth-while packets have been received, netif_rx()
 	 * has done a mark_bh(INET_BH) for us and will work on them

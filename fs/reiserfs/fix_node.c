@@ -840,7 +840,7 @@ void free_buffers_in_tb (
 
 
 /* Get new buffers for storing new nodes that are created while balancing.
- * Returns:	SCHEDULE_OCCURED - schedule occured while the function worked;
+ * Returns:	SCHEDULE_OCCURRED - schedule occurred while the function worked;
  *	        CARRY_ON - schedule didn't occur while the function worked;
  *	        NO_DISK_SPACE - no disk space.
  */
@@ -1077,7 +1077,7 @@ static void decrement_key (struct cpu_key * p_s_key)
  * Calculate left/right common parent of the current node and L[h]/R[h].
  * Calculate left/right delimiting key position.
  * Returns:	PATH_INCORRECT   - path in the tree is not correct;
- 		SCHEDULE_OCCURRED - schedule occured while the function worked;
+ 		SCHEDULE_OCCURRED - schedule occurred while the function worked;
  *	        CARRY_ON         - schedule didn't occur while the function worked;
  */
 static int  get_far_parent (struct tree_balance *   p_s_tb,
@@ -1198,7 +1198,7 @@ static int  get_far_parent (struct tree_balance *   p_s_tb,
  * S[n_path_offset] and L[n_path_offset]/R[n_path_offset]: F[n_path_offset], FL[n_path_offset],
  * FR[n_path_offset], CFL[n_path_offset], CFR[n_path_offset].
  * Calculate numbers of left and right delimiting keys position: lkey[n_path_offset], rkey[n_path_offset].
- * Returns:	SCHEDULE_OCCURRED - schedule occured while the function worked;
+ * Returns:	SCHEDULE_OCCURRED - schedule occurred while the function worked;
  *	        CARRY_ON - schedule didn't occur while the function worked;
  */
 static int  get_parents (struct tree_balance * p_s_tb, int n_h)
@@ -1340,7 +1340,7 @@ static inline int can_node_be_removed (int mode, int lfree, int sfree, int rfree
  *	h	current level of the node;
  *	inum	item number in S[h];
  *	mode	i - insert, p - paste;
- * Returns:	1 - schedule occured; 
+ * Returns:	1 - schedule occurred; 
  *	        0 - balancing for higher levels needed;
  *	       -1 - no balancing for higher levels needed;
  *	       -2 - no disk space.
@@ -1678,7 +1678,7 @@ static int ip_check_balance (struct tree_balance * tb, int h)
  *	h	current level of the node;
  *	inum	item number in S[h];
  *	mode	i - insert, p - paste;
- * Returns:	1 - schedule occured; 
+ * Returns:	1 - schedule occurred; 
  *	        0 - balancing for higher levels needed;
  *	       -1 - no balancing for higher levels needed;
  *	       -2 - no disk space.
@@ -1848,7 +1848,7 @@ static int dc_check_balance_internal (struct tree_balance * tb, int h)
  *	h	current level of the node;
  *	inum	item number in S[h];
  *	mode	i - insert, p - paste;
- * Returns:	1 - schedule occured; 
+ * Returns:	1 - schedule occurred; 
  *	        0 - balancing for higher levels needed;
  *	       -1 - no balancing for higher levels needed;
  *	       -2 - no disk space.
@@ -1951,7 +1951,7 @@ static int dc_check_balance_leaf (struct tree_balance * tb, int h)
  *	h	current level of the node;
  *	inum	item number in S[h];
  *	mode	d - delete, c - cut.
- * Returns:	1 - schedule occured; 
+ * Returns:	1 - schedule occurred; 
  *	        0 - balancing for higher levels needed;
  *	       -1 - no balancing for higher levels needed;
  *	       -2 - no disk space.
@@ -1985,7 +1985,7 @@ static int dc_check_balance (struct tree_balance * tb, int h)
  *	h	current level of the node;
  *	inum	item number in S[h];
  *	mode	i - insert, p - paste, d - delete, c - cut.
- * Returns:	1 - schedule occured; 
+ * Returns:	1 - schedule occurred; 
  *	        0 - balancing for higher levels needed;
  *	       -1 - no balancing for higher levels needed;
  *	       -2 - no disk space.
@@ -2075,7 +2075,7 @@ static int  get_direct_parent(
 /* Using lnum[n_h] and rnum[n_h] we should determine what neighbors
  * of S[n_h] we
  * need in order to balance S[n_h], and get them if necessary.
- * Returns:	SCHEDULE_OCCURRED - schedule occured while the function worked;
+ * Returns:	SCHEDULE_OCCURRED - schedule occurred while the function worked;
  *	        CARRY_ON - schedule didn't occur while the function worked;
  */
 static int  get_neighbors(

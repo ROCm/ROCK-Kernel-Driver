@@ -86,7 +86,27 @@ extern struct kernel_param __setup_start, __setup_end;
 #define __FINIT		.previous
 #define __INITDATA	.section	".data.init","aw"
 
+/**
+ * module_init() - driver initialization entry point
+ * @x: function to be run at kernel boot time or module insertion
+ * 
+ * module_init() will add the driver initialization routine in
+ * the "__initcall.int" code segment if the driver is checked as
+ * "y" or static, or else it will wrap the driver initialization
+ * routine with init_module() which is used by insmod and
+ * modprobe when the driver is used as a module.
+ */
 #define module_init(x)	__initcall(x);
+
+/**
+ * module_exit() - driver exit entry point
+ * @x: function to be run when driver is removed
+ * 
+ * module_exit() will wrap the driver clean-up code
+ * with cleanup_module() when used with rmmod when
+ * the driver is a module.  If the driver is statically
+ * compiled into the kernel, module_exit() has no effect.
+ */
 #define module_exit(x)	__exitcall(x);
 
 #else

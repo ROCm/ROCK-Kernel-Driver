@@ -516,6 +516,8 @@
 #define _MACH_8260	0x00002000	/* Generic 8260 */
 #define _MACH_tqm860	0x00004000	/* TQM860/L */
 #define _MACH_tqm8xxL	0x00008000	/* TQM8xxL */
+#define _MACH_spd8xxL	0x00010000	/* SPD8xx */
+#define _MACH_ibms8	0x00020000	/* IVMS8 */
 
 /* see residual.h for these */
 #define _PREP_Motorola 0x01  /* motorola prep */

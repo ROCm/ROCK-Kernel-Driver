@@ -596,7 +596,7 @@ struct super_block *usbdevfs_read_super(struct super_block *s, void *data, int s
 	return NULL;
 }
 
-static DECLARE_FSTYPE(usbdevice_fs_type, "usbdevfs", usbdevfs_read_super, 0);
+static DECLARE_FSTYPE(usbdevice_fs_type, "usbdevfs", usbdevfs_read_super, FS_SINGLE);
 
 /* --------------------------------------------------------------------- */
 
@@ -691,6 +691,7 @@ int __init usbdevfs_init(void)
 		return ret;
 	if ((ret = register_filesystem(&usbdevice_fs_type)))
 		usb_deregister(&usbdevfs_driver);
+	kern_mount(&usbdevice_fs_type);
 #ifdef CONFIG_PROC_FS		
 	/* create mount point for usbdevfs */
 	usbdir = proc_mkdir("usb", proc_bus);
@@ -702,6 +703,7 @@ void __exit usbdevfs_cleanup(void)
 {
 	usb_deregister(&usbdevfs_driver);
 	unregister_filesystem(&usbdevice_fs_type);
+	kern_umount(usbdevice_fs_type.kern_mnt);
 #ifdef CONFIG_PROC_FS	
         if (usbdir)
                 remove_proc_entry("usb", proc_bus);

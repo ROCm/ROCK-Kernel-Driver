@@ -29,9 +29,13 @@
 #define PAGE_CACHE_ALIGN(addr)	(((addr)+PAGE_CACHE_SIZE-1)&PAGE_CACHE_MASK)
 
 #define page_cache_get(x)	get_page(x)
-#define page_cache_alloc()	alloc_pages(GFP_HIGHUSER, 0)
 #define page_cache_free(x)	__free_page(x)
 #define page_cache_release(x)	__free_page(x)
+
+static inline struct page *page_cache_alloc(struct address_space *x)
+{
+	return alloc_pages(x->gfp_mask, 0);
+}
 
 /*
  * From a kernel address, get the "struct page *"

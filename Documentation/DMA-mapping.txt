@@ -59,7 +59,7 @@ In the failure case, you have two options:
 1) Use some non-DMA mode for data transfer, if possible.
 2) Ignore this device and do not initialize it.
 
-It is recommended that your driver print a kernel KERN_WARN message
+It is recommended that your driver print a kernel KERN_WARNING message
 when you do one of these two things.  In this manner, if a user of
 your driver reports that performance is bad or that the device is not
 even detected, you can ask him for the kernel messages to find out

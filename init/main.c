@@ -151,6 +151,7 @@ static struct dev_name_struct {
 	{ "nfs",     0x00ff },
 	{ "hda",     0x0300 },
 	{ "hdb",     0x0340 },
+	{ "loop",    0x0700 },
 	{ "hdc",     0x1600 },
 	{ "hdd",     0x1640 },
 	{ "hde",     0x2100 },

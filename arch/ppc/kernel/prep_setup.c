@@ -215,7 +215,6 @@ no_l2:
 void __init
 prep_setup_arch(void)
 {
-	extern char cmd_line[];
 	unsigned char reg;
 #if 0 /* unused?? */
 	unsigned char ucMothMemType;
@@ -272,8 +271,6 @@ prep_setup_arch(void)
               }
       }
 
-	printk("Boot arguments: %s\n", cmd_line);
-	
 #ifdef CONFIG_SOUND_CS4232
 	/*
 	 * setup proper values for the cs4232 driver so we don't have

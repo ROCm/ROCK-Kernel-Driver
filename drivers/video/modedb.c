@@ -3,6 +3,9 @@
  *
  *	Copyright (C) 1999 Geert Uytterhoeven
  *
+ *	2001 - Documented with DocBook
+ *	- Brad Douglas <brad@neruo.com>
+ *
  *  This file is subject to the terms and conditions of the GNU General Public
  *  License. See the file COPYING in the main directory of this archive for
  *  more details.
@@ -276,6 +279,20 @@ static int PROC_CONSOLE(const struct fb_info *info)
 	return MINOR(current->tty->device) - 1;
 }
 
+
+/**
+ *	__fb_try_mode - test a video mode
+ *	@var: frame buffer user defined part of display
+ *	@info: frame buffer info structure
+ *	@mode: frame buffer video mode structure
+ *	@bpp: color depth in bits per pixel
+ *
+ *	Tries a video mode to test it's validity for device @info.
+ *
+ *	Returns 1 on success.
+ *
+ */
+
 int __fb_try_mode(struct fb_var_screeninfo *var, struct fb_info *info,
 		  const struct fb_videomode *mode, unsigned int bpp)
 {
@@ -306,21 +323,37 @@ int __fb_try_mode(struct fb_var_screeninfo *var, struct fb_info *info,
 }
 
 
-    /*
-     *
-     *  Find a suitable video mode
-     *
-     *  Valid mode specifiers (mode_option):
-     *
-     *	<xres>x<yres>[-<bpp>][@<refresh>]
-     *	<name>[-<bpp>][@<refresh>]
-     *
-     *  with <xres>, <yres>, <bpp> and <refresh> decimal numbers and <name> a
-     *  string
-     *
-     *  The passed struct fb_var_screeninfo is _not_ cleared! This allows you
-     *  to supply values for e.g. the grayscale and accel_flags fields.
-     */
+/**
+ *	fb_find_mode - finds a valid video mode
+ *	@var: frame buffer user defined part of display
+ *	@info: frame buffer info structure
+ *	@mode_option: string video mode to find
+ *	@db: video mode database
+ *	@dbsize: size of @db
+ *	@default_mode: default video mode to fall back to
+ *	@default_bpp: default color depth in bits per pixel
+ *
+ *	Finds a suitable video mode, starting with the specified mode
+ *	in @mode_option with fallback to @default_mode.  If
+ *	@default_mode fails, all modes in the video mode database will
+ *	be tried.
+ *
+ *	Valid mode specifiers for @mode_option:
+ *
+ *	<xres>x<yres>[-<bpp>][@<refresh>] or
+ *	<name>[-<bpp>][@<refresh>]
+ *
+ *	with <xres>, <yres>, <bpp> and <refresh> decimal numbers and
+ *	<name> a string.
+ *
+ *	NOTE: The passed struct @var is _not_ cleared!  This allows you
+ *	to supply values for e.g. the grayscale and accel_flags fields.
+ *
+ *	Returns zero for failure, 1 if using specified @mode_option,
+ *	2 if using specified @mode_option with an ignored refresh rate,
+ *	3 if default mode is used, 4 if fall back to any valid mode.
+ *
+ */
 
 int __init fb_find_mode(struct fb_var_screeninfo *var,
 			struct fb_info *info, const char *mode_option,

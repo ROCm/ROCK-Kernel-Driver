@@ -62,7 +62,7 @@ static unsigned int sonic_debug = 1;
 #endif
 
 /*
- * Base address and interupt of the SONIC controller on JAZZ boards
+ * Base address and interrupt of the SONIC controller on JAZZ boards
  */
 static struct {
     unsigned int port;

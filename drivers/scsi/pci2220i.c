@@ -2016,7 +2016,7 @@ static void Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
 	del_timer (&padapter->timer);
 	if ( status )
 		{
-		DEB (printk ("\npci2220i Interupt hanlder return error"));
+		DEB (printk ("\npci2220i Interrupt handler return error"));
 		zl = DecodeError (padapter, status);
 		}
 	else

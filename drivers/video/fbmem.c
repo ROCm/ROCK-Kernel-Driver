@@ -3,6 +3,9 @@
  *
  *  Copyright (C) 1994 Martin Schaller
  *
+ *	2001 - Documented with DocBook
+ *	- Brad Douglas <brad@neruo.com>
+ *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file COPYING in the main directory of this archive
  * for more details.
@@ -115,6 +118,8 @@ extern int sisfb_init(void);
 extern int sisfb_setup(char*);
 extern int stifb_init(void);
 extern int stifb_setup(char*);
+extern int radeonfb_init(void);
+extern int radeonfb_setup(char*);
 
 static struct {
 	const char *name;
@@ -166,6 +171,9 @@ static struct {
 #endif
 #ifdef CONFIG_FB_RIVA
 	{ "riva", rivafb_init, rivafb_setup },
+#endif
+#ifdef CONFIG_FB_RADEON
+	{ "radeon", radeonfb_init, radeonfb_setup },
 #endif
 #ifdef CONFIG_FB_CONTROL
 	{ "controlfb", control_init, control_setup },
@@ -683,6 +691,17 @@ static struct file_operations fb_fops = {
 
 static devfs_handle_t devfs_handle;
 
+
+/**
+ *	register_framebuffer - registers a frame buffer device
+ *	@fb_info: frame buffer info structure
+ *
+ *	Registers a frame buffer device @fb_info.
+ *
+ *	Returns negative errno on error, or zero for success.
+ *
+ */
+
 int
 register_framebuffer(struct fb_info *fb_info)
 {
@@ -732,6 +751,17 @@ register_framebuffer(struct fb_info *fb_info)
 	return 0;
 }
 
+
+/**
+ *	unregister_framebuffer - releases a frame buffer device
+ *	@fb_info: frame buffer info structure
+ *
+ *	Unregisters a frame buffer device @fb_info.
+ *
+ *	Returns negative errno on error, or zero for success.
+ *
+ */
+
 int
 unregister_framebuffer(struct fb_info *fb_info)
 {
@@ -751,6 +781,16 @@ unregister_framebuffer(struct fb_info *fb_info)
 	num_registered_fb--;
 	return 0;
 }
+
+
+/**
+ *	fbmem_init - init frame buffer subsystem
+ *
+ *	Initialize the frame buffer subsystem.
+ *
+ *	NOTE: This function is _only_ to be called by drivers/char/mem.c.
+ *
+ */
 
 void __init 
 fbmem_init(void)
@@ -781,9 +821,18 @@ fbmem_init(void)
 			fb_drivers[i].init();
 }
 
-    /*
-     *  Command line options
-     */
+
+/**
+ *	video_setup - process command line options
+ *	@options: string of options
+ *
+ *	Process command line options for frame buffer subsystem.
+ *
+ *	NOTE: This function is a __setup and __init function.
+ *
+ *	Returns zero.
+ *
+ */
 
 int __init video_setup(char *options)
 {

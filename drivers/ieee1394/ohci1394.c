@@ -1129,7 +1129,7 @@ static void ohci_irq_handler(int irq, void *dev_id,
 		/*
 		 * Problem: How can I ensure that the AT bottom half will be
 		 * executed before the AR bottom half (both events may have
-		 * occured within a single irq event)
+		 * occurred within a single irq event)
 		 * Quick hack: just launch it within the IRQ handler
 		 */
 		if (event & OHCI1394_reqTxComplete) { 

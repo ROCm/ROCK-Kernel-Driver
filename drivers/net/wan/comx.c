@@ -380,6 +380,7 @@ int comx_rx(struct net_device *dev, struct sk_buff *skb)
 	}
 	if (skb) {
 		netif_rx(skb);
+		dev->last_rx = jiffies;
 	}
 	return 0;
 }

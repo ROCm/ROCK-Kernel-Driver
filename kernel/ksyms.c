@@ -121,6 +121,7 @@ EXPORT_SYMBOL(deactivate_page);
 EXPORT_SYMBOL(kmap_high);
 EXPORT_SYMBOL(kunmap_high);
 EXPORT_SYMBOL(highmem_start_page);
+EXPORT_SYMBOL(create_bounce);
 #endif
 
 /* filesystem internal functions */

@@ -88,41 +88,41 @@
 
 /*  PCI COMMAND REGISTER bits
  */
-#define V3_COMMAND_M_FBB_EN             BIT9
-#define V3_COMMAND_M_SERR_EN            BIT8
-#define V3_COMMAND_M_PAR_EN             BIT6
-#define V3_COMMAND_M_MASTER_EN          BIT2
-#define V3_COMMAND_M_MEM_EN             BIT1
-#define V3_COMMAND_M_IO_EN              BIT0
+#define V3_COMMAND_M_FBB_EN             (1 << 9)
+#define V3_COMMAND_M_SERR_EN            (1 << 8)
+#define V3_COMMAND_M_PAR_EN             (1 << 6)
+#define V3_COMMAND_M_MASTER_EN          (1 << 2)
+#define V3_COMMAND_M_MEM_EN             (1 << 1)
+#define V3_COMMAND_M_IO_EN              (1 << 0)
 
 /*  SYSTEM REGISTER bits
  */
-#define V3_SYSTEM_M_RST_OUT             BIT15
-#define V3_SYSTEM_M_LOCK                BIT14 
+#define V3_SYSTEM_M_RST_OUT             (1 << 15)
+#define V3_SYSTEM_M_LOCK                (1 << 14)
 
 /*  PCI_CFG bits
  */
-#define V3_PCI_CFG_M_RETRY_EN           BIT10
-#define V3_PCI_CFG_M_AD_LOW1            BIT9
-#define V3_PCI_CFG_M_AD_LOW0            BIT8
+#define V3_PCI_CFG_M_RETRY_EN           (1 << 10)
+#define V3_PCI_CFG_M_AD_LOW1            (1 << 9)
+#define V3_PCI_CFG_M_AD_LOW0            (1 << 8)
 
 /*  PCI_BASE register bits (PCI -> Local Bus)
  */
 #define V3_PCI_BASE_M_ADR_BASE          0xFFF00000
 #define V3_PCI_BASE_M_ADR_BASEL         0x000FFF00
-#define V3_PCI_BASE_M_PREFETCH          BIT3
-#define V3_PCI_BASE_M_TYPE              BIT2+BIT1
-#define V3_PCI_BASE_M_IO                BIT0
+#define V3_PCI_BASE_M_PREFETCH          (1 << 3)
+#define V3_PCI_BASE_M_TYPE              (3 << 1)
+#define V3_PCI_BASE_M_IO                (1 << 0)
 
 /*  PCI MAP register bits (PCI -> Local bus)
  */
 #define V3_PCI_MAP_M_MAP_ADR            0xFFF00000
-#define V3_PCI_MAP_M_RD_POST_INH        BIT15
-#define V3_PCI_MAP_M_ROM_SIZE           BIT11+BIT10
-#define V3_PCI_MAP_M_SWAP               BIT9+BIT8
+#define V3_PCI_MAP_M_RD_POST_INH        (1 << 15)
+#define V3_PCI_MAP_M_ROM_SIZE           (3 << 10)
+#define V3_PCI_MAP_M_SWAP               (3 << 8)
 #define V3_PCI_MAP_M_ADR_SIZE           0x000000F0
-#define V3_PCI_MAP_M_REG_EN             BIT1	
-#define V3_PCI_MAP_M_ENABLE             BIT0
+#define V3_PCI_MAP_M_REG_EN             (1 << 1)
+#define V3_PCI_MAP_M_ENABLE             (1 << 0)
 
 /*  9 => 512M window size
  */
@@ -134,15 +134,15 @@
 /*  LB_BASE register bits (Local bus -> PCI)
  */
 #define V3_LB_BASE_M_MAP_ADR            0xFFF00000
-#define V3_LB_BASE_M_SWAP               BIT9+BIT8
+#define V3_LB_BASE_M_SWAP               (3 << 8)
 #define V3_LB_BASE_M_ADR_SIZE           0x000000F0
-#define V3_LB_BASE_M_PREFETCH           BIT3
-#define V3_LB_BASE_M_ENABLE             BIT0
+#define V3_LB_BASE_M_PREFETCH           (1 << 3)
+#define V3_LB_BASE_M_ENABLE             (1 << 0)
 
 /*  LB_MAP register bits (Local bus -> PCI)
  */
 #define V3_LB_MAP_M_MAP_ADR             0xFFF0
 #define V3_LB_MAP_M_TYPE                0x000E
-#define V3_LB_MAP_M_AD_LOW_EN           BIT0
+#define V3_LB_MAP_M_AD_LOW_EN           (1 << 0)
 
 #endif

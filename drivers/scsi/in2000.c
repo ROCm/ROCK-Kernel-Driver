@@ -681,7 +681,7 @@ no:
          else {
             write1_io(0, IO_FIFO_READ);   /* put fifo in read mode */
             hostdata->fifo = FI_FIFO_READING;
-            cmd->SCp.have_data_in = 0;    /* nothing transfered yet */
+            cmd->SCp.have_data_in = 0;    /* nothing transferred yet */
             }
 
          }

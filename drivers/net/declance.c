@@ -999,7 +999,7 @@ static void lance_set_multicast_retry(unsigned long _opaque)
 	lance_set_multicast(dev);
 }
 
-static int __init dec_lance_init(struct net_device *dev, const int type)
+static int __init dec_lance_init(const int type)
 {
 	static unsigned version_printed;
 	struct net_device *dev;
@@ -1008,6 +1008,7 @@ static int __init dec_lance_init(struct net_device *dev, const int type)
 	int i, ret;
 	unsigned long esar_base;
 	unsigned char *esar;
+	struct net_device *dev;
 
 #ifndef CONFIG_TC
 	system_base = KN01_LANCE_BASE;
@@ -1018,12 +1019,12 @@ static int __init dec_lance_init(struct net_device *dev, const int type)
 	if (dec_lance_debug && version_printed++ == 0)
 		printk(version);
 
-	dev = init_etherdev(0, sizeof(struct lance_private));
+	dev = init_etherdev(NULL, sizeof(struct lance_private));
 	if (!dev)
 		return -ENOMEM;
 
 	/* init_etherdev ensures the data structures used by the LANCE are aligned. */
-	lp = (struct lance_private *) dev->priv;
+	lp = dev->priv;
 	spin_lock_init(&lp->lock);
 
 	switch (type) {
@@ -1206,7 +1207,6 @@ err_out:
 /* Find all the lance cards on the system and initialize them */
 static int __init dec_lance_probe(void)
 {
-	struct net_device *dev = NULL;
 	static int called = 0;
 
 #ifdef MODULE
@@ -1244,7 +1244,7 @@ static int __init dec_lance_probe(void)
 	}
 #endif
 
-	return dec_lance_init(dev, type);
+	return dec_lance_init(type);
 }
 
 static void __exit dec_lance_cleanup(void)

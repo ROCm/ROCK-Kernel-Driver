@@ -49,15 +49,6 @@
 
 extern void xmon_irq(int, void *, struct pt_regs *);
 extern void xmon(struct pt_regs *excp);
-
-
-/* Data cache block flush - write out the cache line containing the
-   specified address and then invalidate it in the cache. */
-extern __inline__ void dcbf(void *line)
-{
-	asm("dcbf %0,%1; sync" : : "r" (line), "r" (0));
-}
-
 extern void print_backtrace(unsigned long *);
 extern void show_regs(struct pt_regs * regs);
 extern void flush_instruction_cache(void);

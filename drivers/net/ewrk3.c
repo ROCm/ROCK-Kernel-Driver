@@ -997,19 +997,6 @@ static int ewrk3_rx(struct net_device *dev)
 							isa_memcpy_fromio(p, buf, pkt_len);
 						}
 
-						/*
-						   ** Notify the upper protocol layers that there is another
-						   ** packet to handle
-						 */
-						skb->protocol = eth_type_trans(skb, dev);
-						netif_rx(skb);
-
-						/*
-						   ** Update stats
-						 */
-						dev->last_rx = jiffies;
-						lp->stats.rx_packets++;
-						lp->stats.rx_bytes += pkt_len;
 						for (i = 1; i < EWRK3_PKT_STAT_SZ - 1; i++) {
 							if (pkt_len < i * EWRK3_PKT_BIN_SZ) {
 								lp->pktStats.bins[i]++;
@@ -1031,6 +1018,19 @@ static int ewrk3_rx(struct net_device *dev)
 						if (lp->pktStats.bins[0] == 0) {	/* Reset counters */
 							memset(&lp->pktStats, 0, sizeof(lp->pktStats));
 						}
+						/*
+						   ** Notify the upper protocol layers that there is another
+						   ** packet to handle
+						 */
+						skb->protocol = eth_type_trans(skb, dev);
+						netif_rx(skb);
+
+						/*
+						   ** Update stats
+						 */
+						dev->last_rx = jiffies;
+						lp->stats.rx_packets++;
+						lp->stats.rx_bytes += pkt_len;
 					} else {
 						printk("%s: Insufficient memory; nuking packet.\n", dev->name);
 						lp->stats.rx_dropped++;		/* Really, deferred. */

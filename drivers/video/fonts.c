@@ -4,6 +4,9 @@
  *    Created 1995 by Geert Uytterhoeven
  *    Rewritten 1998 by Martin Mares <mj@ucw.cz>
  *
+ *	2001 - Documented with DocBook
+ *	- Brad Douglas <brad@neruo.com>
+ *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file COPYING in the main directory of this archive
  * for more details.
@@ -61,9 +64,17 @@ static struct fbcon_font_desc *fbcon_fonts[] = {
 #error No fonts configured.
 #endif
 
-   /*
-    *    Find a font with a specific name
-    */
+
+/**
+ *	fbcon_find_font - find a font
+ *	@name: string name of a font
+ *
+ *	Find a specified font with string name @name.
+ *
+ *	Returns %NULL if no font found, or a pointer to the
+ *	specified font.
+ *
+ */
 
 struct fbcon_font_desc *fbcon_find_font(char *name)
 {
@@ -76,9 +87,18 @@ struct fbcon_font_desc *fbcon_find_font(char *name)
 }
 
 
-   /*
-    *    Get the default font for a specific screen size
-    */
+/**
+ *	fbcon_get_default_font - get default font
+ *	@xres: screen size of X
+ *	@yres: screen size of Y
+ *
+ *	Get the default font for a specified screen size.
+ *	Dimensions are in pixels.
+ *
+ *	Returns %NULL if no font is found, or a pointer to the
+ *	chosen font.
+ *
+ */
 
 struct fbcon_font_desc *fbcon_get_default_font(int xres, int yres)
 {

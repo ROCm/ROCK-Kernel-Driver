@@ -14,6 +14,8 @@ MOD_SUB_DIRS	:=
 MOD_IN_SUB_DIRS	:=
 ALL_SUB_DIRS	:= $(SUB_DIRS) pcmcia
 
+subdir-$(CONFIG_SCSI_AIC7XXX)	+= aic7xxx
+
 ifeq ($(CONFIG_PCMCIA),y)
   SUB_DIRS += pcmcia
   MOD_IN_SUB_DIRS += pcmcia
@@ -63,7 +65,7 @@ obj-$(CONFIG_SCSI_ULTRASTOR)	+= ultrastor.o
 obj-$(CONFIG_SCSI_AHA152X)	+= aha152x.o
 obj-$(CONFIG_SCSI_AHA1542)	+= aha1542.o
 obj-$(CONFIG_SCSI_AHA1740)	+= aha1740.o
-obj-$(CONFIG_SCSI_AIC7XXX)	+= aic7xxx.o
+obj-$(CONFIG_SCSI_AIC7XXX_OLD)	+= aic7xxx_old.o
 obj-$(CONFIG_SCSI_IPS)		+= ips.o
 obj-$(CONFIG_SCSI_FD_MCS)	+= fd_mcs.o
 obj-$(CONFIG_SCSI_FUTURE_DOMAIN)+= fdomain.o
@@ -147,7 +149,6 @@ initio.o: $(initio-objs)
 
 a100u2w.o: $(a100u2w-objs)
 	$(LD) -r -o $@ $(a100u2w-objs)
-
 
 53c8xx_d.h: 53c7,8xx.scr script_asm.pl
 	ln -sf 53c7,8xx.scr fake8.c

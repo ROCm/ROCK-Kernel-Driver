@@ -3,6 +3,9 @@
  *
  *	Created 15 Jun 1997 by Geert Uytterhoeven
  *
+ *	2001 - Documented with DocBook
+ *	- Brad Douglas <brad@neruo.com>
+ *
  *  This file is subject to the terms and conditions of the GNU General Public
  *  License.  See the file COPYING in the main directory of this archive for
  *  more details.
@@ -73,9 +76,18 @@ static struct fb_cmap default_16_colors = {
 };
 
 
-    /*
-     *  Allocate a colormap
-     */
+/**
+ *	fb_alloc_cmap - allocate a colormap
+ *	@cmap: frame buffer colormap structure
+ *	@len: length of @cmap
+ *	@transp: boolean, 1 if there is transparency, 0 otherwise
+ *
+ *	Allocates memory for a colormap @cmap.  @len is the
+ *	number of entries in the palette.
+ *
+ *	Returns -1 errno on error, or zero on success.
+ *
+ */
 
 int fb_alloc_cmap(struct fb_cmap *cmap, int len, int transp)
 {
@@ -113,9 +125,20 @@ int fb_alloc_cmap(struct fb_cmap *cmap, int len, int transp)
 }
 
 
-    /*
-     *  Copy a colormap
-     */
+/**
+ *	fb_copy_cmap - copy a colormap
+ *	@from: frame buffer colormap structure
+ *	@to: frame buffer colormap structure
+ *	@fsfromto: determine copy method
+ *
+ *	Copy contents of colormap from @from to @to.
+ *
+ *	@fsfromto accepts the following integer parameters:
+ *	0: memcpy function
+ *	1: copy_from_user() function to copy from userspace
+ *	2: copy_to_user() function to copy to userspace
+ *
+ */
 
 void fb_copy_cmap(struct fb_cmap *from, struct fb_cmap *to, int fsfromto)
 {
@@ -159,9 +182,18 @@ void fb_copy_cmap(struct fb_cmap *from, struct fb_cmap *to, int fsfromto)
 }
 
 
-    /*
-     *  Get the colormap for a screen
-     */
+/**
+ *	fb_get_cmap - get a colormap
+ *	@cmap: frame buffer colormap
+ *	@kspc: boolean, 0 copy local, 1 put_user() function
+ *	@getcolreg: pointer to a function to get a color register
+ *	@info: frame buffer info structure
+ *
+ *	Get a colormap @cmap for a screen of device @info.
+ *
+ *	Returns negative errno on error, or zero on success.
+ *
+ */
 
 int fb_get_cmap(struct fb_cmap *cmap, int kspc,
     	    	int (*getcolreg)(u_int, u_int *, u_int *, u_int *, u_int *,
@@ -205,9 +237,17 @@ int fb_get_cmap(struct fb_cmap *cmap, int kspc,
 }
 
 
-    /*
-     *  Set the colormap for a screen
-     */
+/**
+ *	fb_set_cmap - set the colormap
+ *	@cmap: frame buffer colormap structure
+ *	@kspc: boolean, 0 copy local, 1 get_user() function
+ *	@info: frame buffer info structure
+ *
+ *	Sets the colormap @cmap for a screen of device @info.
+ *
+ *	Returns negative errno on error, or zero on success.
+ *
+ */
 
 int fb_set_cmap(struct fb_cmap *cmap, int kspc,
     	    	int (*setcolreg)(u_int, u_int, u_int, u_int, u_int,
@@ -253,9 +293,16 @@ int fb_set_cmap(struct fb_cmap *cmap, int kspc,
 }
 
 
-    /*
-     *  Get the default colormap for a specific screen depth
-     */
+/**
+ *	fb_default_cmap - get default colormap
+ *	@len: size of palette for a depth
+ *
+ *	Gets the default colormap for a specific screen depth.  @len
+ *	is the size of the palette for a particular screen depth.
+ *
+ *	Returns pointer to a frame buffer colormap structure.
+ *
+ */
 
 struct fb_cmap *fb_default_cmap(int len)
 {
@@ -269,9 +316,12 @@ struct fb_cmap *fb_default_cmap(int len)
 }
 
 
-    /*
-     *  Invert all default colormaps
-     */
+/**
+ *	fb_invert_cmaps - invert all defaults colormaps
+ *
+ *	Invert all default colormaps.
+ *
+ */
 
 void fb_invert_cmaps(void)
 {

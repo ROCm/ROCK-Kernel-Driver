@@ -492,46 +492,26 @@ STATIC int scsi_test_unit_ready(Scsi_Cmnd * SCpnt)
 {
 	static unsigned char tur_command[6] =
 	{TEST_UNIT_READY, 0, 0, 0, 0, 0};
-	unsigned char scsi_result0[256], *scsi_result = NULL;
 
 	memcpy((void *) SCpnt->cmnd, (void *) tur_command,
 	       sizeof(tur_command));
 
 	SCpnt->cmnd[1] = SCpnt->lun << 5;
 
-	scsi_result = (!SCpnt->host->hostt->unchecked_isa_dma)
-	    ? &scsi_result0[0] : kmalloc(512, GFP_ATOMIC | GFP_DMA);
-
-	if (scsi_result == NULL) {
-		printk("cannot allocate scsi_result in scsi_test_unit_ready.\n");
-		return FAILED;
-	}
 	/*
-	 * Zero the sense buffer.  Some host adapters automatically always request
-	 * sense, so it is not a good idea that SCpnt->request_buffer and
-	 * SCpnt->sense_buffer point to the same address (DB).
-	 * 0 is not a valid sense code. 
+	 * Zero the sense buffer.  The SCSI spec mandates that any
+	 * untransferred sense data should be interpreted as being zero.
 	 */
 	memset((void *) SCpnt->sense_buffer, 0, sizeof(SCpnt->sense_buffer));
-	memset((void *) scsi_result, 0, 256);
 
-	SCpnt->request_buffer = scsi_result;
-	SCpnt->request_bufflen = 256;
+	SCpnt->request_buffer = NULL;
+	SCpnt->request_bufflen = 0;
 	SCpnt->use_sg = 0;
 	SCpnt->cmd_len = COMMAND_SIZE(SCpnt->cmnd[0]);
 	SCpnt->underflow = 0;
 	SCpnt->sc_data_direction = SCSI_DATA_NONE;
 
 	scsi_send_eh_cmnd(SCpnt, SENSE_TIMEOUT);
-
-	/* Last chance to have valid sense data */
-	if (!scsi_sense_valid(SCpnt))
-		memcpy((void *) SCpnt->sense_buffer,
-		       SCpnt->request_buffer,
-		       sizeof(SCpnt->sense_buffer));
-
-	if (scsi_result != &scsi_result0[0] && scsi_result != NULL)
-		kfree(scsi_result);
 
 	/*
 	 * When we eventually call scsi_finish, we really wish to complete
@@ -549,6 +529,9 @@ STATIC int scsi_test_unit_ready(Scsi_Cmnd * SCpnt)
 	/*
 	 * Hey, we are done.  Let's look to see what happened.
 	 */
+	SCSI_LOG_ERROR_RECOVERY(3,
+		printk("scsi_test_unit_ready: SCpnt %p eh_state %x\n",
+		SCpnt, SCpnt->eh_state));
 	return SCpnt->eh_state;
 }
 
@@ -671,11 +654,8 @@ STATIC void scsi_send_eh_cmnd(Scsi_Cmnd * SCpnt, int timeout)
 		spin_unlock_irqrestore(&io_request_lock, flags);
 
 		SCpnt->result = temp;
-		if (scsi_eh_completed_normally(SCpnt)) {
-			SCpnt->eh_state = SUCCESS;
-		} else {
-			SCpnt->eh_state = FAILED;
-		}
+		/* Fall through to code below to examine status. */
+		SCpnt->eh_state = SUCCESS;
 	}
 
 	/*
@@ -683,7 +663,10 @@ STATIC void scsi_send_eh_cmnd(Scsi_Cmnd * SCpnt, int timeout)
 	 * did complete normally.
 	 */
 	if (SCpnt->eh_state == SUCCESS) {
-		switch (scsi_eh_completed_normally(SCpnt)) {
+		int ret = scsi_eh_completed_normally(SCpnt);
+		SCSI_LOG_ERROR_RECOVERY(3,
+			printk("scsi_send_eh_cmnd: scsi_eh_completed_normally %x\n", ret));
+		switch (ret) {
 		case SUCCESS:
 			SCpnt->eh_state = SUCCESS;
 			break;
@@ -1104,7 +1087,6 @@ int scsi_decide_disposition(Scsi_Cmnd * SCpnt)
  */
 STATIC int scsi_eh_completed_normally(Scsi_Cmnd * SCpnt)
 {
-	int rtn;
 	/*
 	 * First check the host byte, to see if there is anything in there
 	 * that would indicate what we need to do.
@@ -1144,11 +1126,7 @@ STATIC int scsi_eh_completed_normally(Scsi_Cmnd * SCpnt)
 	case COMMAND_TERMINATED:
 		return SUCCESS;
 	case CHECK_CONDITION:
-		rtn = scsi_check_sense(SCpnt);
-		if (rtn == NEEDS_RETRY) {
-			return FAILED;
-		}
-		return rtn;
+		return scsi_check_sense(SCpnt);
 	case CONDITION_GOOD:
 	case INTERMEDIATE_GOOD:
 	case INTERMEDIATE_C_GOOD:
@@ -1634,8 +1612,10 @@ STATIC int scsi_unjam_host(struct Scsi_Host *host)
 						 * FIXME(eric) - is this really the correct thing to do?
 						 */
 						if (rtn != SUCCESS) {
-							SCloop->device->online = FALSE;
-							SCloop->host->host_failed--;
+							printk(KERN_INFO "scsi: device set offline - not ready or command retry failed after bus reset: host %d channel %d id %d lun %d\n", SDloop->host->host_no, SDloop->channel, SDloop->id, SDloop->lun);
+
+							SDloop->online = FALSE;
+							SDloop->host->host_failed--;
 							scsi_eh_finish_command(&SCdone, SCloop);
 						}
 					}
@@ -1725,8 +1705,9 @@ STATIC int scsi_unjam_host(struct Scsi_Host *host)
 							}
 						}
 						if (rtn != SUCCESS) {
-							SCloop->device->online = FALSE;
-							SCloop->host->host_failed--;
+							printk(KERN_INFO "scsi: device set offline - not ready or command retry failed after host reset: host %d channel %d id %d lun %d\n", SDloop->host->host_no, SDloop->channel, SDloop->id, SDloop->lun);
+							SDloop->online = FALSE;
+							SDloop->host->host_failed--;
 							scsi_eh_finish_command(&SCdone, SCloop);
 						}
 					}
@@ -1753,7 +1734,11 @@ STATIC int scsi_unjam_host(struct Scsi_Host *host)
 	for (SDpnt = host->host_queue; SDpnt; SDpnt = SDpnt->next) {
 		for (SCloop = SDpnt->device_queue; SCloop; SCloop = SCloop->next) {
 			if (SCloop->state == SCSI_STATE_FAILED || SCloop->state == SCSI_STATE_TIMEOUT) {
-				SCloop->device->online = FALSE;
+				SDloop = SCloop->device;
+				if (SDloop->online == TRUE) {
+					printk(KERN_INFO "scsi: device set offline - command error recover failed: host %d channel %d id %d lun %d\n", SDloop->host->host_no, SDloop->channel, SDloop->id, SDloop->lun);
+					SDloop->online = FALSE;
+				}
 
 				/*
 				 * This should pass the failure up to the top level driver, and
@@ -1765,7 +1750,7 @@ STATIC int scsi_unjam_host(struct Scsi_Host *host)
 					SCloop->result |= (DRIVER_TIMEOUT << 24);
 				}
 				SCSI_LOG_ERROR_RECOVERY(3, printk("Finishing command for device %d %x\n",
-				    SCloop->device->id, SCloop->result));
+				    SDloop->id, SCloop->result));
 
 				scsi_eh_finish_command(&SCdone, SCloop);
 			}

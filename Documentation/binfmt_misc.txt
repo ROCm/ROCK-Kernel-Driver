@@ -81,6 +81,6 @@ unexpected behaviour and be a security hazard.
 
 
 There is a web page about binfmt_misc at
-http://www.anatom.uni-tuebingen.de/~richi/linux/binfmt_misc.html
+http://www.tat.physik.uni-tuebingen.de/~rguenth/linux/binfmt_misc.html
 
-Richard Günther, richard.guenther@student.uni-tuebingen.de
+Richard Günther <rguenth@tat.physik.uni-tuebingen.de>

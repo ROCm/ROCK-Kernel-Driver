@@ -5,7 +5,7 @@
    Modifications By: Joel Jacobson <linux@3ware.com>
    		     Arnaldo Carvalho de Melo <acme@conectiva.com.br>
 
-   Copyright (C) 1999-2000 3ware Inc.
+   Copyright (C) 1999-2001 3ware Inc.
 
    Kernel compatablity By: 	Andre Hedrick <andre@suse.com>
    Non-Copyright (C) 2000	Andre Hedrick <andre@suse.com>
@@ -67,6 +67,15 @@
                  systems.
    08/21/00    - release previously allocated resources on failure at
                  tw_allocate_memory (acme)
+   1.02.00.003 - Fix tw_interrupt() to report error to scsi layer when
+                 controller status is non-zero.
+                 Added handling of request_sense opcode.
+                 Fix possible null pointer dereference in 
+                 tw_reset_device_extension()
+   1.02.00.004 - Add support for device id of 3ware 7000 series controllers.
+                 Make tw_setfeature() call with interrupts disabled.
+                 Register interrupt handler before enabling interrupts.
+                 Clear attention interrupt before draining aen queue.
 */
 
 #include <linux/module.h>
@@ -112,7 +121,7 @@ static struct notifier_block tw_notifier = {
 };
 
 /* Globals */
-char *tw_driver_version="1.02.00.002";
+char *tw_driver_version="1.02.00.004";
 TW_Device_Extension *tw_device_extension_list[TW_MAX_SLOT];
 int tw_device_extension_count = 0;
 
@@ -581,174 +590,179 @@ int tw_findcards(Scsi_Host_Template *tw_host)
 	struct pci_dev *tw_pci_dev = NULL;
 	u32 status_reg_value;
 	unsigned char c = 1;
+	int i;
+	u16 device[TW_NUMDEVICES] = { TW_DEVICE_ID, TW_DEVICE_ID2 };
 
 	dprintk(KERN_NOTICE "3w-xxxx: tw_findcards()\n");
-	while ((tw_pci_dev = pci_find_device(TW_VENDOR_ID, TW_DEVICE_ID, tw_pci_dev))) {
-		if (pci_enable_device(tw_pci_dev))
-			continue;
-		/* Prepare temporary device extension */
-		tw_dev=(TW_Device_Extension *)kmalloc(sizeof(TW_Device_Extension), GFP_ATOMIC);
-		if (tw_dev == NULL) {
-			printk(KERN_WARNING "3w-xxxx: tw_findcards(): kmalloc() failed for card %d.\n", numcards);
-			continue;
-		}
-		memset(tw_dev, 0, sizeof(TW_Device_Extension));
 
-		error = tw_initialize_device_extension(tw_dev);
-		if (error) {
-			printk(KERN_WARNING "3w-xxxx: tw_findcards(): Couldn't initialize device extension for card %d.\n", numcards);
-			tw_free_device_extension(tw_dev);
-			kfree(tw_dev);
-			continue;
-		}
+	for (i=0;i<TW_NUMDEVICES;i++) {
+		while ((tw_pci_dev = pci_find_device(TW_VENDOR_ID, device[i], tw_pci_dev))) {
+			if (pci_enable_device(tw_pci_dev))
+				continue;
+			/* Prepare temporary device extension */
+			tw_dev=(TW_Device_Extension *)kmalloc(sizeof(TW_Device_Extension), GFP_ATOMIC);
+			if (tw_dev == NULL) {
+				printk(KERN_WARNING "3w-xxxx: tw_findcards(): kmalloc() failed for card %d.\n", numcards);
+				continue;
+			}
+			memset(tw_dev, 0, sizeof(TW_Device_Extension));
 
-		/* Calculate the cards register addresses */
-		tw_dev->registers.base_addr = pci_resource_start(tw_pci_dev, 0);
-		tw_dev->registers.control_reg_addr = pci_resource_start(tw_pci_dev, 0);
-		tw_dev->registers.status_reg_addr = pci_resource_start(tw_pci_dev, 0) + 0x4;
-		tw_dev->registers.command_que_addr = pci_resource_start(tw_pci_dev, 0) + 0x8;
-		tw_dev->registers.response_que_addr = pci_resource_start(tw_pci_dev, 0) + 0xC;
-		/* Save pci_dev struct to device extension */
-		tw_dev->tw_pci_dev = tw_pci_dev;
-
-		/* Poll status register for 60 secs for 'Controller Ready' flag */
-		if (tw_poll_status(tw_dev, TW_STATUS_MICROCONTROLLER_READY, 60)) {
-			printk(KERN_WARNING "3w-xxxx: tw_findcards(): Microcontroller not ready for card %d.\n", numcards);
-			tw_free_device_extension(tw_dev);
-			kfree(tw_dev);
-			continue;
-		}
-
-		/* Disable interrupts on the card */
-		tw_disable_interrupts(tw_dev);
-
-		while (tries < TW_MAX_RESET_TRIES) {
-			/* Do soft reset */
-			tw_soft_reset(tw_dev);
-
-			error = tw_aen_drain_queue(tw_dev);
+			error = tw_initialize_device_extension(tw_dev);
 			if (error) {
-				printk(KERN_WARNING "3w-xxxx: tw_findcards(): No attention interrupt for card %d.\n", numcards);
-				tries++;
+				printk(KERN_WARNING "3w-xxxx: tw_findcards(): Couldn't initialize device extension for card %d.\n", numcards);
+				tw_free_device_extension(tw_dev);
+				kfree(tw_dev);
 				continue;
 			}
 
-			/* Check for controller errors */
-			if (tw_check_errors(tw_dev)) {
-				printk(KERN_WARNING "3w-xxxx: tw_findcards(): Controller errors found, soft resetting card %d.\n", numcards);
-				tries++;
+			/* Calculate the cards register addresses */
+			tw_dev->registers.base_addr = pci_resource_start(tw_pci_dev, 0);
+			tw_dev->registers.control_reg_addr = pci_resource_start(tw_pci_dev, 0);
+			tw_dev->registers.status_reg_addr = pci_resource_start(tw_pci_dev, 0) + 0x4;
+			tw_dev->registers.command_que_addr = pci_resource_start(tw_pci_dev, 0) + 0x8;
+			tw_dev->registers.response_que_addr = pci_resource_start(tw_pci_dev, 0) + 0xC;
+			/* Save pci_dev struct to device extension */
+			tw_dev->tw_pci_dev = tw_pci_dev;
+
+			/* Poll status register for 60 secs for 'Controller Ready' flag */
+			if (tw_poll_status(tw_dev, TW_STATUS_MICROCONTROLLER_READY, 60)) {
+				printk(KERN_WARNING "3w-xxxx: tw_findcards(): Microcontroller not ready for card %d.\n", numcards);
+				tw_free_device_extension(tw_dev);
+				kfree(tw_dev);
 				continue;
 			}
 
-			/* Empty the response queue */
-			error = tw_empty_response_que(tw_dev);
-			if (error) {
-				printk(KERN_WARNING "3w-xxxx: tw_findcards(): Couldn't empty response queue for card %d.\n", numcards);
-				tries++;
+			/* Disable interrupts on the card */
+			tw_disable_interrupts(tw_dev);
+			
+			while (tries < TW_MAX_RESET_TRIES) {
+				/* Do soft reset */
+				tw_soft_reset(tw_dev);
+			  
+				error = tw_aen_drain_queue(tw_dev);
+				if (error) {
+					printk(KERN_WARNING "3w-xxxx: tw_findcards(): No attention interrupt for card %d.\n", numcards);
+					tries++;
+					continue;
+				}
+
+				/* Check for controller errors */
+				if (tw_check_errors(tw_dev)) {
+					printk(KERN_WARNING "3w-xxxx: tw_findcards(): Controller errors found, soft resetting card %d.\n", numcards);
+					tries++;
+					continue;
+				}
+
+				/* Empty the response queue */
+				error = tw_empty_response_que(tw_dev);
+				if (error) {
+					printk(KERN_WARNING "3w-xxxx: tw_findcards(): Couldn't empty response queue for card %d.\n", numcards);
+					tries++;
+					continue;
+				}
+
+				/* Now the controller is in a good state */
+				break;
+			}
+
+			if (tries >= TW_MAX_RESET_TRIES) {
+				printk(KERN_WARNING "3w-xxxx: tw_findcards(): Controller error or no attention interrupt: giving up for card %d.\n", numcards);
+				tw_free_device_extension(tw_dev);
+				kfree(tw_dev);
 				continue;
 			}
 
-			/* Now the controller is in a good state */
-			break;
-		}
-
-		if (tries >= TW_MAX_RESET_TRIES) {
-			printk(KERN_WARNING "3w-xxxx: tw_findcards(): Controller error or no attention interrupt: giving up for card %d.\n", numcards);
-			tw_free_device_extension(tw_dev);
-			kfree(tw_dev);
-			continue;
-		}
-
-		/* Make sure that io region isn't already taken */
-		if (check_region((tw_dev->tw_pci_dev->resource[0].start), TW_IO_ADDRESS_RANGE)) {
-			printk(KERN_WARNING "3w-xxxx: tw_findcards(): Couldn't get io range 0x%lx-0x%lx for card %d.\n", 
-				(tw_dev->tw_pci_dev->resource[0].start), 
-				(tw_dev->tw_pci_dev->resource[0].start) + 
-				TW_IO_ADDRESS_RANGE, numcards);
-			tw_free_device_extension(tw_dev);
-			kfree(tw_dev);
-			continue;
-		}
+			/* Make sure that io region isn't already taken */
+			if (check_region((tw_dev->tw_pci_dev->resource[0].start), TW_IO_ADDRESS_RANGE)) {
+				printk(KERN_WARNING "3w-xxxx: tw_findcards(): Couldn't get io range 0x%lx-0x%lx for card %d.\n", 
+				       (tw_dev->tw_pci_dev->resource[0].start), 
+				       (tw_dev->tw_pci_dev->resource[0].start) + 
+				       TW_IO_ADDRESS_RANGE, numcards);
+				tw_free_device_extension(tw_dev);
+				kfree(tw_dev);
+				continue;
+			}
     
-		/* Reserve the io address space */
-		request_region((tw_dev->tw_pci_dev->resource[0].start), TW_IO_ADDRESS_RANGE, TW_DEVICE_NAME);
-		error = tw_initialize_units(tw_dev);
-		if (error) {
-			printk(KERN_WARNING "3w-xxxx: tw_findcards(): Couldn't initialize units for card %d.\n", numcards);
-			release_region((tw_dev->tw_pci_dev->resource[0].start), TW_IO_ADDRESS_RANGE);
-			tw_free_device_extension(tw_dev);
-			kfree(tw_dev);
-			continue;
-		}
+			/* Reserve the io address space */
+			request_region((tw_dev->tw_pci_dev->resource[0].start), TW_IO_ADDRESS_RANGE, TW_DEVICE_NAME);
+			error = tw_initialize_units(tw_dev);
+			if (error) {
+				printk(KERN_WARNING "3w-xxxx: tw_findcards(): Couldn't initialize units for card %d.\n", numcards);
+				release_region((tw_dev->tw_pci_dev->resource[0].start), TW_IO_ADDRESS_RANGE);
+				tw_free_device_extension(tw_dev);
+				kfree(tw_dev);
+				continue;
+			}
 
-		error = tw_initconnection(tw_dev, TW_INIT_MESSAGE_CREDITS);
-		if (error) {
-			printk(KERN_WARNING "3w-xxxx: tw_findcards(): Couldn't initconnection for card %d.\n", numcards);
-			release_region((tw_dev->tw_pci_dev->resource[0].start), TW_IO_ADDRESS_RANGE);
-			tw_free_device_extension(tw_dev);
-			kfree(tw_dev);
-			continue;
-		}
+			error = tw_initconnection(tw_dev, TW_INIT_MESSAGE_CREDITS);
+			if (error) {
+				printk(KERN_WARNING "3w-xxxx: tw_findcards(): Couldn't initconnection for card %d.\n", numcards);
+				release_region((tw_dev->tw_pci_dev->resource[0].start), TW_IO_ADDRESS_RANGE);
+				tw_free_device_extension(tw_dev);
+				kfree(tw_dev);
+				continue;
+			}
 
-		/* Calculate max cmds per lun */
-		if (tw_dev->num_units > 0)
-			tw_host->cmd_per_lun = (TW_Q_LENGTH-2)/tw_dev->num_units;
+			/* Calculate max cmds per lun */
+			if (tw_dev->num_units > 0)
+				tw_host->cmd_per_lun = (TW_Q_LENGTH-2)/tw_dev->num_units;
 
 		/* Register the card with the kernel SCSI layer */
-		host = scsi_register(tw_host, sizeof(TW_Device_Extension));
-		if( host == NULL)
-		{
-			release_region((tw_dev->tw_pci_dev->resource[0].start), TW_IO_ADDRESS_RANGE);
-			tw_free_device_extension(tw_dev);
-			kfree(tw_dev);
-			continue;
-		}
+			host = scsi_register(tw_host, sizeof(TW_Device_Extension));
+			if( host == NULL)
+			{
+				release_region((tw_dev->tw_pci_dev->resource[0].start), TW_IO_ADDRESS_RANGE);
+				tw_free_device_extension(tw_dev);
+				kfree(tw_dev);
+				continue;
+			}
 
-		status_reg_value = inl(tw_dev->registers.status_reg_addr);
+			status_reg_value = inl(tw_dev->registers.status_reg_addr);
 
-		dprintk(KERN_NOTICE "scsi%d : Found a 3ware Storage Controller at 0x%x, IRQ: %d P-chip: %d.%d\n", host->host_no,
+			dprintk(KERN_NOTICE "scsi%d : Found a 3ware Storage Controller at 0x%x, IRQ: %d P-chip: %d.%d\n", host->host_no,
 				(u32)(tw_pci_dev->resource[0].start), tw_pci_dev->irq, 
 				(status_reg_value & TW_STATUS_MAJOR_VERSION_MASK) >> 28, 
 				(status_reg_value & TW_STATUS_MINOR_VERSION_MASK) >> 24);
 
-		if (host->hostdata) {
-			tw_dev2 = (TW_Device_Extension *)host->hostdata;
-			memcpy(tw_dev2, tw_dev, sizeof(TW_Device_Extension));
-			tw_device_extension_list[tw_device_extension_count] = tw_dev2;
-			numcards++;
-			tw_device_extension_count = numcards;
-			tw_dev2->host = host;
-		} else { 
-			printk(KERN_WARNING "3w-xxxx: tw_findcards(): Bad scsi host data for card %d.\n", numcards-1);
-			scsi_unregister(host);
-			release_region((tw_dev->tw_pci_dev->resource[0].start), TW_IO_ADDRESS_RANGE);
-			tw_free_device_extension(tw_dev);
-			kfree(tw_dev);
-			continue;
+			if (host->hostdata) {
+				tw_dev2 = (TW_Device_Extension *)host->hostdata;
+				memcpy(tw_dev2, tw_dev, sizeof(TW_Device_Extension));
+				tw_device_extension_list[tw_device_extension_count] = tw_dev2;
+				numcards++;
+				tw_device_extension_count = numcards;
+				tw_dev2->host = host;
+			} else { 
+				printk(KERN_WARNING "3w-xxxx: tw_findcards(): Bad scsi host data for card %d.\n", numcards-1);
+				scsi_unregister(host);
+				release_region((tw_dev->tw_pci_dev->resource[0].start), TW_IO_ADDRESS_RANGE);
+				tw_free_device_extension(tw_dev);
+				kfree(tw_dev);
+				continue;
+			}
+
+			/* Tell the firmware we support shutdown notification*/
+			tw_setfeature(tw_dev2, 2, 1, &c);
+
+			/* Now setup the interrupt handler */
+			error = tw_setup_irq(tw_dev2);
+			if (error) {
+				printk(KERN_WARNING "3w-xxxx: tw_findcards(): Error requesting irq for card %d.\n", numcards-1);
+				scsi_unregister(host);
+				release_region((tw_dev->tw_pci_dev->resource[0].start), TW_IO_ADDRESS_RANGE);
+
+				tw_free_device_extension(tw_dev);
+				kfree(tw_dev);
+				numcards--;
+				continue;
+			}
+
+			/* Re-enable interrupts on the card */
+			tw_enable_interrupts(tw_dev2);
+
+			/* Free the temporary device extension */
+			if (tw_dev)
+				kfree(tw_dev);
 		}
-    
-		/* Re-enable interrupts on the card */
-		tw_enable_interrupts(tw_dev2);
-
-		/* Now setup the interrupt handler */
-		error = tw_setup_irq(tw_dev2);
-		if (error) {
-			printk(KERN_WARNING "3w-xxxx: tw_findcards(): Error requesting irq for card %d.\n", numcards-1);
-			scsi_unregister(host);
-			release_region((tw_dev->tw_pci_dev->resource[0].start), TW_IO_ADDRESS_RANGE);
-
-			tw_free_device_extension(tw_dev);
-			kfree(tw_dev);
-			numcards--;
-			continue;
-		}
-
-		/* Free the temporary device extension */
-		if (tw_dev)
-			kfree(tw_dev);
-
-		/* Tell the firmware we support shutdown notification*/
-		tw_setfeature(tw_dev2, 2, 1, &c);
 	}
 
 	if (numcards == 0) 
@@ -1089,15 +1103,14 @@ static void tw_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		/* Handle attention interrupt */
 		if (do_attention_interrupt) {
 			dprintk(KERN_NOTICE "3w-xxxx: tw_interrupt(): Received attention interrupt.\n");
+			dprintk(KERN_WARNING "3w-xxxx: tw_interrupt(): Clearing attention interrupt.\n");
+			tw_clear_attention_interrupt(tw_dev);
 			tw_state_request_start(tw_dev, &request_id);
 			error = tw_aen_read_queue(tw_dev, request_id);
 			if (error) {
 				printk(KERN_WARNING "3w-xxxx: tw_interrupt(): Error reading aen queue.\n");
 				tw_dev->state[request_id] = TW_S_COMPLETED;
 				tw_state_request_finish(tw_dev, request_id);
-			} else {
-				dprintk(KERN_WARNING "3w-xxxx: tw_interrupt(): Clearing attention interrupt.\n");
-				tw_clear_attention_interrupt(tw_dev);
 			}
 		}
 
@@ -1133,13 +1146,15 @@ static void tw_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 				response_que.value = inl(response_que_addr);
 				request_id = response_que.u.response_id;
 				command_packet = (TW_Command *)tw_dev->command_packet_virtual_address[request_id];
+				error = 0;
 				if (command_packet->status != 0) {
-					printk(KERN_WARNING "3w-xxxx: tw_interrupt(): Bad response, status = 0x%x, flags = 0x%x.\n", command_packet->status, command_packet->flags);
+					printk(KERN_WARNING "3w-xxxx: tw_interrupt(): Bad response, status = 0x%x, flags = 0x%x, unit = 0x%x.\n", command_packet->status, command_packet->flags, command_packet->byte3.unit);
+					error = 1;
 				}
 				if (tw_dev->state[request_id] != TW_S_POSTED) {
 					printk(KERN_WARNING "3w-xxxx: tw_interrupt(): Received a request id (%d) (opcode = 0x%x) that wasn't posted.\n", request_id, command_packet->byte0.opcode);
+					error = 1;
 				}
-				error = 0;
 				dprintk(KERN_NOTICE "3w-xxxx: tw_interrupt(): Response queue request id: %d.\n", request_id);
 				/* Check for internal command */
 				if (tw_dev->srb[request_id] == 0) {
@@ -1183,8 +1198,8 @@ static void tw_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 					}
 					if (error) {
 						/* Tell scsi layer there was an error */
-						printk(KERN_WARNING "3w-xxxx: tw_interrupt(): Scsi Error.\n");
-						tw_dev->srb[request_id]->result = (DID_ERROR << 16);
+						dprintk(KERN_WARNING "3w-xxxx: tw_interrupt(): Scsi Error.\n");
+						tw_dev->srb[request_id]->result = (DID_RESET << 16);
 					} else {
 						/* Tell scsi layer command was a success */
 						tw_dev->srb[request_id]->result = (DID_OK << 16);
@@ -1467,8 +1482,11 @@ int tw_reset_device_extension(TW_Device_Extension *tw_dev)
 		    (tw_dev->state[i] != TW_S_INITIAL) &&
 		    (tw_dev->state[i] != TW_S_COMPLETED)) {
 			srb = tw_dev->srb[i];
-			srb->result = (DID_RESET << 16);
-			tw_dev->srb[i]->scsi_done(tw_dev->srb[i]);
+			if (srb != NULL) {
+				srb = tw_dev->srb[i];
+				srb->result = (DID_RESET << 16);
+				tw_dev->srb[i]->scsi_done(tw_dev->srb[i]);
+			}
 		}
 	}
 
@@ -1818,6 +1836,10 @@ int tw_scsi_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 			dprintk(KERN_NOTICE "3w-xxxx: tw_scsi_queue(): caught READ_CAPACITY.\n");
 			error = tw_scsiop_read_capacity(tw_dev, request_id);
 			break;
+	        case REQUEST_SENSE:
+		        dprintk(KERN_NOTICE "3w-xxxx: tw_scsi_queue(): caught REQUEST_SENSE.\n");
+		        error = tw_scsiop_request_sense(tw_dev, request_id);
+		        break;
 		case TW_IOCTL:
 			dprintk(KERN_NOTICE "3w-xxxx: tw_scsi_queue(): caught TW_SCSI_IOCTL.\n");
 			error = tw_ioctl(tw_dev, request_id);
@@ -2172,6 +2194,23 @@ int tw_scsiop_read_write(TW_Device_Extension *tw_dev, int request_id)
 
 	return 0;
 } /* End tw_scsiop_read_write() */
+
+/* This function will handle the request sense scsi command */
+int tw_scsiop_request_sense(TW_Device_Extension *tw_dev, int request_id)
+{
+       dprintk(KERN_NOTICE "3w-xxxx: tw_scsiop_request_sense()\n");
+  
+       /* For now we just zero the sense buffer */
+       memset(tw_dev->srb[request_id]->request_buffer, 0, tw_dev->srb[request_id]->request_bufflen);
+       tw_dev->state[request_id] = TW_S_COMPLETED;
+       tw_state_request_finish(tw_dev, request_id);
+  
+       /* If we got a request_sense, we probably want a reset, return error */
+       tw_dev->srb[request_id]->result = (DID_ERROR << 16);
+       tw_dev->srb[request_id]->scsi_done(tw_dev->srb[request_id]);
+  
+       return 0;
+} /* End tw_scsiop_request_sense() */
 
 /* This function will handle test unit ready scsi command */
 int tw_scsiop_test_unit_ready(TW_Device_Extension *tw_dev, int request_id)

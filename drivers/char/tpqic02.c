@@ -30,6 +30,8 @@
  *
  * You are not allowed to change this line nor the text above.
  *
+ * 2001/02/26	Minor s/suser/capable/
+ *
  * 1996/10/10   Emerald changes
  *
  * 1996/05/21	Misc changes+merges+cleanups + I/O reservations
@@ -208,7 +210,7 @@ static void qic02_release_resources(void);
  * must ensure that a large enough buffer is passed to the kernel, in order
  * to reduce tape repositioning wear and tear.
  */
-static unsigned long buffaddr;	/* physical address of buffer */
+static void *buffaddr;	/* virtual address of buffer */
 
 /* This translates minor numbers to the corresponding recording format: */
 static const char *format_names[] = {
@@ -1376,7 +1378,7 @@ static inline void dma_transfer(void)
 	flags=claim_dma_lock();
 	clear_dma_ff(QIC02_TAPE_DMA);
 	set_dma_mode(QIC02_TAPE_DMA, dma_mode);
-	set_dma_addr(QIC02_TAPE_DMA, buffaddr+dma_bytes_done);	/* full address */
+	set_dma_addr(QIC02_TAPE_DMA, virt_to_bus(buffaddr) + dma_bytes_done);
 	set_dma_count(QIC02_TAPE_DMA, TAPE_BLKSIZE);
 
 	/* start tape DMA controller */
@@ -1921,7 +1923,7 @@ static ssize_t qic02_tape_read(struct file * filp, char * buf, size_t count, lof
 	    /* copy buffer to user-space in one go */
 	    if (bytes_done>0)
 	    {
-		err = copy_to_user( (void *) buf, (void *) bus_to_virt(buffaddr), bytes_done);
+		err = copy_to_user(buf, buffaddr, bytes_done);
 		if (err)
 		{
 		    return -EFAULT;
@@ -2074,7 +2076,7 @@ static ssize_t qic02_tape_write( struct file * filp,  const char * buf,
 	/* copy from user to DMA buffer and initiate transfer. */
 	if (bytes_todo>0)
 	{
-	    err = copy_from_user( (void *) bus_to_virt(buffaddr), (const void *) buf, bytes_todo);
+	    err = copy_from_user(buffaddr, buf, bytes_todo);
 	    if (err)
 	    {
 		return -EFAULT;
@@ -2198,7 +2200,7 @@ static int qic02_tape_open_no_use_count(struct inode * inode, struct file * filp
 
     if (MINOR(dev)==255)	/* special case for resetting */
     {
-	if (suser())
+	if (capable(CAP_SYS_ADMIN))
 	{
 	    return (tape_reset(1)==TE_OK) ? -EAGAIN : -ENXIO;
 	}
@@ -2607,7 +2609,7 @@ static int qic02_tape_ioctl(struct inode * inode, struct file * filp,
 	
 	CHECK_IOC_SIZE(mtconfiginfo);
 	
-	if (!suser())
+	if (!capable(CAP_SYS_ADMIN))
 	{
 	    return -EPERM;
 	}
@@ -2780,7 +2782,7 @@ static void qic02_release_resources(void)
     release_region(QIC02_TAPE_PORT, QIC02_TAPE_PORT_RANGE);
     if (buffaddr)
     {
-	free_pages(buffaddr, get_order(TPQBUF_SIZE));
+	free_pages((unsigned long)buffaddr, get_order(TPQBUF_SIZE));
     }
     buffaddr = 0; /* Better to cause a panic than overwite someone else */
     status_zombie = YES;
@@ -2830,9 +2832,7 @@ static int qic02_get_resources(void)
     request_region(QIC02_TAPE_PORT, QIC02_TAPE_PORT_RANGE, TPQIC02_NAME);
     
     /* Setup the page-address for the dma transfer. */
-
-    /*** TODO: does _get_dma_pages() really return the physical address?? ****/
-    buffaddr = __get_dma_pages(GFP_KERNEL,get_order(TPQBUF_SIZE));
+    buffaddr = (void *)__get_dma_pages(GFP_KERNEL, get_order(TPQBUF_SIZE));
     
     if (!buffaddr)
     {
@@ -2840,7 +2840,7 @@ static int qic02_get_resources(void)
 	return -EBUSY; /* Not ideal, EAGAIN perhaps? */
     }
     
-    memset( (void*) buffaddr, 0, TPQBUF_SIZE );
+    memset(buffaddr, 0, TPQBUF_SIZE);
     
     printk(TPQIC02_NAME ": Settings: IRQ %d, DMA %d, IO 0x%x, IFC %s\n",
 	   QIC02_TAPE_IRQ, QIC02_TAPE_DMA,

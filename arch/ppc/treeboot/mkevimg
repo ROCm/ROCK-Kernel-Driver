@@ -431,7 +431,7 @@ require 'elf.pl';
 
   close(BOOT);
 
-  print("\nBoot image file \"$ofile\" built successfuly.\n\n");
+  print("\nBoot image file \"$ofile\" built successfully.\n\n");
 
   exit(0);
 }

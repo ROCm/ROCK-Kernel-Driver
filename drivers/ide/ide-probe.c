@@ -614,9 +614,14 @@ static int init_irq (ide_hwif_t *hwif)
 {
 	unsigned long flags;
 	unsigned int index;
-	ide_hwgroup_t *hwgroup;
+	ide_hwgroup_t *hwgroup, *new_hwgroup;
 	ide_hwif_t *match = NULL;
 
+	
+	/* Allocate the buffer and potentially sleep first */
+	
+	new_hwgroup = kmalloc(sizeof(ide_hwgroup_t),GFP_KERNEL);
+	
 	save_flags(flags);	/* all CPUs */
 	cli();			/* all CPUs */
 
@@ -650,10 +655,14 @@ static int init_irq (ide_hwif_t *hwif)
 	 */
 	if (match) {
 		hwgroup = match->hwgroup;
+		if(new_hwgroup)
+			kfree(new_hwgroup);
 	} else {
-		hwgroup = kmalloc(sizeof(ide_hwgroup_t), GFP_KERNEL);
-		if (!hwgroup)
+		hwgroup = new_hwgroup;
+		if (!hwgroup) {
+			restore_flags(flags);	/* all CPUs */
 			return 1;
+		}
 		memset(hwgroup, 0, sizeof(ide_hwgroup_t));
 		hwgroup->hwif     = hwif->next = hwif;
 		hwgroup->rq       = NULL;

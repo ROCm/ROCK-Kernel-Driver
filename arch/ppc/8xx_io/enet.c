@@ -154,20 +154,26 @@ static void set_multicast_list(struct net_device *dev);
 /*static	ushort	my_enet_addr[] = { 0x0800, 0x3e26, 0x1559 };*/
 
 /* Typically, 860(T) boards use SCC1 for Ethernet, and other 8xx boards
- * use SCC2.  This is easily extended if necessary.
+ * use SCC2. Some even may use SCC3.
+ * This is easily extended if necessary.
  */
-#ifdef CONFIG_SCC2_ENET
+#if defined(CONFIG_SCC3_ENET)
+#define CPM_CR_ENET	CPM_CR_CH_SCC3
+#define PROFF_ENET	PROFF_SCC3
+#define SCC_ENET	2		/* Index, not number! */
+#define CPMVEC_ENET	CPMVEC_SCC3
+#elif defined(CONFIG_SCC2_ENET)
 #define CPM_CR_ENET	CPM_CR_CH_SCC2
 #define PROFF_ENET	PROFF_SCC2
 #define SCC_ENET	1		/* Index, not number! */
 #define CPMVEC_ENET	CPMVEC_SCC2
-#endif
-
-#ifdef CONFIG_SCC1_ENET
-#define CPM_CR_ENET CPM_CR_CH_SCC1
+#elif defined(CONFIG_SCC1_ENET)
+#define CPM_CR_ENET	CPM_CR_CH_SCC1
 #define PROFF_ENET	PROFF_SCC1
-#define SCC_ENET	0
+#define SCC_ENET	0		/* Index, not number! */
 #define CPMVEC_ENET	CPMVEC_SCC1
+#else
+#error CONFIG_SCCx_ENET not defined
 #endif
 
 static int
@@ -642,10 +648,11 @@ int __init scc_enet_init(void)
 	volatile	scc_t		*sccp;
 	volatile	scc_enet_t	*ep;
 	volatile	immap_t		*immap;
+	extern unsigned long _get_IMMR(void);
 
 	cp = cpmp;	/* Get pointer to Communication Processor */
 
-	immap = (immap_t *)IMAP_ADDR;	/* and to internal registers */
+	immap = (immap_t *)(_get_IMMR() & 0xFFFF0000);	/* and to internal registers */
 
 	bd = (bd_t *)__res;
 
@@ -683,28 +690,47 @@ int __init scc_enet_init(void)
 	 * It can't last though......
 	 */
 
+#if (defined(PA_ENET_RXD) && defined(PA_ENET_TXD))
 	/* Configure port A pins for Txd and Rxd.
 	*/
-	immap->im_ioport.iop_papar |= (PA_ENET_RXD | PA_ENET_TXD);
+	immap->im_ioport.iop_papar |=  (PA_ENET_RXD | PA_ENET_TXD);
 	immap->im_ioport.iop_padir &= ~(PA_ENET_RXD | PA_ENET_TXD);
-	immap->im_ioport.iop_paodr &= ~PA_ENET_TXD;
+	immap->im_ioport.iop_paodr &=                ~PA_ENET_TXD;
+#elif (defined(PB_ENET_RXD) && defined(PB_ENET_TXD))
+	/* Configure port B pins for Txd and Rxd.
+	*/
+	immap->im_cpm.cp_pbpar |=  (PB_ENET_RXD | PB_ENET_TXD);
+	immap->im_cpm.cp_pbdir &= ~(PB_ENET_RXD | PB_ENET_TXD);
+	immap->im_cpm.cp_pbodr &=		 ~PB_ENET_TXD;
+#else
+#error Exactly ONE pair of PA_ENET_[RT]XD, PB_ENET_[RT]XD must be defined
+#endif
+
+#if defined(PC_ENET_LBK)
+	/* Configure port C pins to disable External Loopback
+	 */
+	immap->im_ioport.iop_pcpar &= ~PC_ENET_LBK;
+	immap->im_ioport.iop_pcdir |=  PC_ENET_LBK;
+	immap->im_ioport.iop_pcso  &= ~PC_ENET_LBK;
+	immap->im_ioport.iop_pcdat &= ~PC_ENET_LBK;	/* Disable Loopback */
+#endif	/* PC_ENET_LBK */
 
 	/* Configure port C pins to enable CLSN and RENA.
 	*/
 	immap->im_ioport.iop_pcpar &= ~(PC_ENET_CLSN | PC_ENET_RENA);
 	immap->im_ioport.iop_pcdir &= ~(PC_ENET_CLSN | PC_ENET_RENA);
-	immap->im_ioport.iop_pcso |= (PC_ENET_CLSN | PC_ENET_RENA);
+	immap->im_ioport.iop_pcso  |=  (PC_ENET_CLSN | PC_ENET_RENA);
 
 	/* Configure port A for TCLK and RCLK.
 	*/
-	immap->im_ioport.iop_papar |= (PA_ENET_TCLK | PA_ENET_RCLK);
+	immap->im_ioport.iop_papar |=  (PA_ENET_TCLK | PA_ENET_RCLK);
 	immap->im_ioport.iop_padir &= ~(PA_ENET_TCLK | PA_ENET_RCLK);
 
 	/* Configure Serial Interface clock routing.
 	 * First, clear all SCC bits to zero, then set the ones we want.
 	 */
 	cp->cp_sicr &= ~SICR_ENET_MASK;
-	cp->cp_sicr |= SICR_ENET_CLKRT;
+	cp->cp_sicr |=  SICR_ENET_CLKRT;
 
 	/* Manual says set SDDR, but I can't find anything with that
 	 * name.  I think it is a misprint, and should be SDCR.  This
@@ -884,20 +910,17 @@ int __init scc_enet_init(void)
 	/* It is now OK to enable the Ethernet transmitter.
 	 * Unfortunately, there are board implementation differences here.
 	 */
-#if (defined(CONFIG_MBX) || defined(CONFIG_TQM860) || defined(CONFIG_TQM860L) || defined(CONFIG_FPS850))
-	immap->im_ioport.iop_pcpar |= PC_ENET_TENA;
+#if   (!defined (PB_ENET_TENA) &&  defined (PC_ENET_TENA))
+	immap->im_ioport.iop_pcpar |=  PC_ENET_TENA;
 	immap->im_ioport.iop_pcdir &= ~PC_ENET_TENA;
-#endif
-
-#if (defined(CONFIG_TQM8xxL) && !defined(CONFIG_FPS850))
+#elif ( defined (PB_ENET_TENA) && !defined (PC_ENET_TENA))
 	cp->cp_pbpar |= PB_ENET_TENA;
 	cp->cp_pbdir |= PB_ENET_TENA;
+#else
+#error Configuration Error: define exactly ONE of PB_ENET_TENA, PC_ENET_TENA
 #endif
 
 #if defined(CONFIG_RPXLITE) || defined(CONFIG_RPXCLASSIC)
-	cp->cp_pbpar |= PB_ENET_TENA;
-	cp->cp_pbdir |= PB_ENET_TENA;
-
 	/* And while we are here, set the configuration to enable ethernet.
 	*/
 	*((volatile uint *)RPX_CSR_ADDR) &= ~BCSR0_ETHLPBK;
@@ -906,9 +929,6 @@ int __init scc_enet_init(void)
 #endif
 
 #ifdef CONFIG_BSEIP
-	cp->cp_pbpar |= PB_ENET_TENA;
-	cp->cp_pbdir |= PB_ENET_TENA;
-
 	/* BSE uses port B and C for PHY control.
 	*/
 	cp->cp_pbpar &= ~(PB_BSE_POWERUP | PB_BSE_FDXDIS);
@@ -941,11 +961,12 @@ int __init scc_enet_init(void)
 	*/
 	sccp->scc_gsmrl |= (SCC_GSMRL_ENR | SCC_GSMRL_ENT);
 
-	printk("%s: CPM ENET Version 0.2, ", dev->name);
+	printk("%s: CPM ENET Version 0.2 on SCC%d, ", dev->name, SCC_ENET+1);
 	for (i=0; i<5; i++)
 		printk("%02x:", dev->dev_addr[i]);
 	printk("%02x\n", dev->dev_addr[5]);
 
 	return 0;
 }
+
 

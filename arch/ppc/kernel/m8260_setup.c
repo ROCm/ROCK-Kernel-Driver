@@ -85,10 +85,6 @@ void __init adbdev_init(void)
 void __init
 m8260_setup_arch(void)
 {
-	extern char cmd_line[];
-	
-	printk("Boot arguments: %s\n", cmd_line);
-
 	/* Reset the Communication Processor Module.
 	*/
 	m8260_cpm_reset();

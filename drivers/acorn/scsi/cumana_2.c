@@ -90,7 +90,7 @@ MODULE_PARM_DESC(term, "SCSI bus termination");
 /*
  * Use term=0,1,0,0,0 to turn terminators on/off
  */
-int term[MAX_ECARDS] = { 1, 1, 1, 1, 1, 1, 1, 1 };
+static int term[MAX_ECARDS] = { 1, 1, 1, 1, 1, 1, 1, 1 };
 
 #define NR_SG	256
 

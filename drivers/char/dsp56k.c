@@ -265,7 +265,7 @@ static ssize_t dsp56k_read(struct file *file, char *buf, size_t count,
 	}
 
 	default:
-		printk("DSP56k driver: Unknown minor device: %d\n", dev);
+		printk(KERN_ERR "DSP56k driver: Unknown minor device: %d\n", dev);
 		return -ENXIO;
 	}
 }
@@ -327,7 +327,7 @@ static ssize_t dsp56k_write(struct file *file, const char *buf, size_t count,
 		return -EFAULT;
 	}
 	default:
-		printk("DSP56k driver: Unknown minor device: %d\n", dev);
+		printk(KERN_ERR "DSP56k driver: Unknown minor device: %d\n", dev);
 		return -ENXIO;
 	}
 }
@@ -416,7 +416,7 @@ static int dsp56k_ioctl(struct inode *inode, struct file *file,
 		return 0;
 
 	default:
-		printk("DSP56k driver: Unknown minor device: %d\n", dev);
+		printk(KERN_ERR "DSP56k driver: Unknown minor device: %d\n", dev);
 		return -ENXIO;
 	}
 }
@@ -469,7 +469,7 @@ static int dsp56k_open(struct inode *inode, struct file *file)
 		break;
 
 	default:
-		printk("DSP56k driver: Unknown minor device: %d\n", dev);
+		printk(KERN_ERR "DSP56k driver: Unknown minor device: %d\n", dev);
 		return -ENXIO;
 	}
 
@@ -490,7 +490,7 @@ static int dsp56k_release(struct inode *inode, struct file *file)
 
 		break;
 	default:
-		printk("DSP56k driver: Unknown minor device: %d\n", dev);
+		printk(KERN_ERR "DSP56k driver: Unknown minor device: %d\n", dev);
 		return -ENXIO;
 	}
 
@@ -511,7 +511,9 @@ static struct file_operations dsp56k_fops = {
 
 static devfs_handle_t devfs_handle;
 
-int __init dsp56k_init(void)
+static const char banner[] __initdata = KERN_INFO "DSP56k driver installed\n";
+
+static int __init dsp56k_init_driver(void)
 {
 	if(!MACH_IS_ATARI || !ATARIHW_PRESENT(DSP56K)) {
 		printk("DSP56k driver: Hardware not present\n");
@@ -522,27 +524,19 @@ int __init dsp56k_init(void)
 		printk("DSP56k driver: Unable to register driver\n");
 		return -ENODEV;
 	}
-	devfs_handle = devfs_register (NULL, "dsp56k", DEVFS_FL_DEFAULT,
-				       DSP56K_MAJOR, 0,
-				       S_IFCHR | S_IRUSR | S_IWUSR,
-				       &dsp56k_fops, NULL);
+	devfs_handle = devfs_register(NULL, "dsp56k", DEVFS_FL_DEFAULT,
+				      DSP56K_MAJOR, 0,
+				      S_IFCHR | S_IRUSR | S_IWUSR,
+				      &dsp56k_fops, NULL);
 
-	dsp56k.in_use = 0;
-
-	printk("DSP56k driver installed\n");
-
+	printk(banner);
 	return 0;
 }
+module_init(dsp56k_init_driver);
 
-#ifdef MODULE
-int init_module(void)
-{
-	return dsp56k_init();
-}
-
-void cleanup_module(void)
+static void __exit dsp56k_cleanup_driver(void)
 {
 	devfs_unregister_chrdev(DSP56K_MAJOR, "dsp56k");
-	devfs_unregister (devfs_handle);
+	devfs_unregister(devfs_handle);
 }
-#endif /* MODULE */
+module_exit(dsp56k_cleanup_driver);

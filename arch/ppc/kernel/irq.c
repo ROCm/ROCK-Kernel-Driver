@@ -7,8 +7,8 @@
  *    Copyright (C) 1992 Linus Torvalds
  *  Adapted from arch/i386 by Gary Thomas
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
- *  Updated and modified by Cort Dougan (cort@cs.nmt.edu)
- *    Copyright (C) 1996 Cort Dougan
+ *  Updated and modified by Cort Dougan <cort@fsmlabs.com>
+ *    Copyright (C) 1996-2001 Cort Dougan
  *  Adapted for Power Macintosh by Paul Mackerras
  *    Copyright (C) 1996 Paul Mackerras (paulus@cs.anu.edu.au)
  *  Amiga/APUS changes by Jesper Skov (jskov@cygnus.co.uk).
@@ -258,7 +258,10 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 	
 	retval = setup_irq(irq, action);
 	if (retval)
+	{
 		kfree(action);
+		return retval;
+	}
 		
 	return 0;
 }
@@ -464,13 +467,11 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 			ppc_spurious_interrupts++;
 			printk(KERN_DEBUG "Unhandled interrupt %x, disabled\n", irq);
 			/* We can't call disable_irq here, it would deadlock */
-			if (!desc->depth)
-				desc->depth = 1;
+			++desc->depth;
 			desc->status |= IRQ_DISABLED;
-			/* This is not a real spurrious interrupt, we
-			 * have to eoi it, so we jump to out
-			 */
 			mask_irq(irq);
+			/* This is a real interrupt, we have to eoi it,
+			   so we jump to out */
 			goto out;
 		}
 		status &= ~IRQ_PENDING; /* we commit to handling */

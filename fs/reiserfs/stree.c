@@ -734,7 +734,7 @@ int search_by_key (struct super_block * p_s_sb,
 	    return IO_ERROR;
 	}
 
-	/* It is possible that schedule occured. We must check whether the key
+	/* It is possible that schedule occurred. We must check whether the key
 	   to search is still in the tree rooted from the current buffer. If
 	   not then repeat search from the root. */
 	if ( fs_changed (fs_gen, p_s_sb) && 
@@ -1509,7 +1509,7 @@ static void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
 	retval = search_item (th->t_super, &cpu_key, &path);
 	if (retval == IO_ERROR) {
 	    reiserfs_warning ("vs-: reiserfs_delete_solid_item: "
-			      "i/o failure occured trying to delete %K\n", &cpu_key);
+			      "i/o failure occurred trying to delete %K\n", &cpu_key);
 	    break;
 	}
 	if (retval != ITEM_FOUND) {
@@ -1857,7 +1857,7 @@ void reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
     retval = search_for_position_by_key(p_s_inode->i_sb, &s_item_key, &s_search_path);
     if (retval == IO_ERROR) {
 	reiserfs_warning ("vs-5657: reiserfs_do_truncate: "
-			  "i/o failure occured trying to truncate %K\n", &s_item_key);
+			  "i/o failure occurred trying to truncate %K\n", &s_item_key);
 	return;
     }
     if (retval == POSITION_FOUND || retval == FILE_NOT_FOUND) {

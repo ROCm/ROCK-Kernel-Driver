@@ -237,7 +237,6 @@ static void __init sio_init(void)
 void __init
 chrp_setup_arch(void)
 {
-	extern char cmd_line[];
 	struct device_node *device;
 
 	/* init to some ~sane value until calibrate_delay() runs */
@@ -252,7 +251,6 @@ chrp_setup_arch(void)
 	else
 #endif
 		ROOT_DEV = to_kdev_t(0x0802); /* sda2 (sda1 is for the kernel) */
-	printk("Boot arguments: %s\n", cmd_line);
 
 	/* Lookup PCI host bridges */
 	chrp_find_bridges();

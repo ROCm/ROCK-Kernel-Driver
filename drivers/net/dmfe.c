@@ -353,8 +353,18 @@ static int __init dmfe_init_one (struct pci_dev *pdev,
 	int i;
 	struct net_device *dev;
 	u32 dev_rev;
+	u16 pci_command;
 
 	DMFE_DBUG(0, "dmfe_probe()", 0);
+
+	/* Enable Master/IO access, Disable memory access */
+	i = pci_enable_device(pdev);
+	if (i) return i;
+
+	pci_set_master(pdev);
+	pci_read_config_word(pdev, PCI_COMMAND, &pci_command);
+	pci_command &= ~PCI_COMMAND_MEMORY;
+	pci_write_config_word(pdev, PCI_COMMAND, pci_command);
 
 	pci_iobase = pci_resource_start(pdev, 0);
 	pci_irqline = pdev->irq;
@@ -371,11 +381,6 @@ static int __init dmfe_init_one (struct pci_dev *pdev,
 		printk(KERN_ERR "dmfe: I/O base is zero\n");
 		goto err_out;
 	}
-
-	/* Enable Master/IO access, Disable memory access */
-	if (pci_enable_device(pdev))
-		goto err_out;
-	pci_set_master(pdev);
 
 #if 0	/* pci_{enable_device,set_master} sets minimum latency for us now */
 
@@ -511,7 +516,7 @@ static int dmfe_open(struct net_device *dev)
 		db->dm910x_chk_mode = 1;	/* Enter the check mode */
 	}
 
-	/* Initilize DM910X board */
+	/* Initialize DM910X board */
 	dmfe_init_dm910x(dev);
 
 	/* set and active a timer process */
@@ -526,9 +531,9 @@ static int dmfe_open(struct net_device *dev)
 	return 0;
 }
 
-/* Initilize DM910X board
+/* Initialize DM910X board
    Reset DM910X board
-   Initilize TX/Rx descriptor chain structure
+   Initialize TX/Rx descriptor chain structure
    Send the set-up frame
    Enable Tx/Rx machine
  */
@@ -559,7 +564,7 @@ static void dmfe_init_dm910x(struct net_device *dev)
 		db->op_mode = db->media_mode;
 	dmfe_process_mode(db);
 
-	/* Initiliaze Transmit/Receive decriptor and CR3/4 */
+	/* Initialize Transmit/Receive decriptor and CR3/4 */
 	dmfe_descriptor_init(db, ioaddr);
 
 	/* Init CR6 to program DM910x operation */
@@ -623,10 +628,10 @@ static int dmfe_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (db->tx_packet_cnt < TX_MAX_SEND_CNT) {
 		txptr->tdes0 = 0x80000000;	/* set owner bit to DM910X */
 		db->tx_packet_cnt++;	/* Ready to send count */
-		outl(0x1, dev->base_addr + DCR1);	/* Issue Tx polling comand */
+		outl(0x1, dev->base_addr + DCR1);	/* Issue Tx polling command */
 	} else {
 		db->tx_queue_cnt++;	/* queue the tx packet */
-		outl(0x1, dev->base_addr + DCR1);	/* Issue Tx polling comand */
+		outl(0x1, dev->base_addr + DCR1);	/* Issue Tx polling command */
 	}
 
 	/* Tx resource check */
@@ -673,7 +678,7 @@ static int dmfe_stop(struct net_device *dev)
 }
 
 /*
-   DM9102 insterrupt handler
+   DM9102 interrupt handler
    receive the packet to upper layer, free the transmitted packet
  */
 
@@ -999,7 +1004,7 @@ static void dmfe_timer(unsigned long data)
    Stop DM910X board
    Free Tx/Rx allocated memory
    Reset DM910X board
-   Re-initilize DM910X board
+   Re-initialize DM910X board
  */
 static void dmfe_dynamic_reset(struct net_device *dev)
 {
@@ -1027,7 +1032,7 @@ static void dmfe_dynamic_reset(struct net_device *dev)
 	db->wait_reset = 0;
 	db->rx_error_cnt = 0;
 
-	/* Re-initilize DM910X board */
+	/* Re-initialize DM910X board */
 	dmfe_init_dm910x(dev);
 
 	/* Leave dynamic reser route */
@@ -1139,7 +1144,7 @@ static void update_cr6(u32 cr6_data, u32 ioaddr)
 }
 
 /* Send a setup frame for DM9132
-   This setup frame initilize DM910X addres filter mode
+   This setup frame initialize DM910X address filter mode
  */
 static void dm9132_id_table(struct net_device *dev, int mc_cnt)
 {
@@ -1180,7 +1185,7 @@ static void dm9132_id_table(struct net_device *dev, int mc_cnt)
 }
 
 /* Send a setup frame for DM9102/DM9102A
-   This setup frame initilize DM910X addres filter mode
+   This setup frame initialize DM910X address filter mode
  */
 static void send_filter_frame(struct net_device *dev, int mc_cnt)
 {
@@ -1429,11 +1434,11 @@ static void phy_write(u32 iobase, u8 phy_addr, u8 offset, u16 phy_data, u32 chip
 		phy_write_1bit(ioaddr, PHY_DATA_0);
 		phy_write_1bit(ioaddr, PHY_DATA_1);
 
-		/* Send Phy addres */
+		/* Send Phy address */
 		for (i = 0x10; i > 0; i = i >> 1)
 			phy_write_1bit(ioaddr, phy_addr & i ? PHY_DATA_1 : PHY_DATA_0);
 
-		/* Send register addres */
+		/* Send register address */
 		for (i = 0x10; i > 0; i = i >> 1)
 			phy_write_1bit(ioaddr, offset & i ? PHY_DATA_1 : PHY_DATA_0);
 
@@ -1476,11 +1481,11 @@ static u16 phy_read(u32 iobase, u8 phy_addr, u8 offset, u32 chip_id)
 		phy_write_1bit(ioaddr, PHY_DATA_1);
 		phy_write_1bit(ioaddr, PHY_DATA_0);
 
-		/* Send Phy addres */
+		/* Send Phy address */
 		for (i = 0x10; i > 0; i = i >> 1)
 			phy_write_1bit(ioaddr, phy_addr & i ? PHY_DATA_1 : PHY_DATA_0);
 
-		/* Send register addres */
+		/* Send register address */
 		for (i = 0x10; i > 0; i = i >> 1)
 			phy_write_1bit(ioaddr, offset & i ? PHY_DATA_1 : PHY_DATA_0);
 
@@ -1570,7 +1575,7 @@ MODULE_PARM(chkmode, "i");
 
 /*	Description: 
  *	when user used insmod to add module, system invoked init_module()
- *	to initilize and register.
+ *	to initialize and register.
  */
  
 static int __init dmfe_init_module(void)
@@ -1599,12 +1604,10 @@ static int __init dmfe_init_module(void)
 	rc = pci_module_init(&dmfe_driver);
 	if (rc < 0)
 		return rc;
-	if (rc >= 0) {
-		printk (KERN_INFO "Davicom DM91xx net driver loaded, version "
-			DMFE_VERSION "\n");
-		return 0;
-	}
-	return -ENODEV;
+
+	printk (KERN_INFO "Davicom DM91xx net driver loaded, version "
+		DMFE_VERSION "\n");
+	return 0;
 }
 
 /*

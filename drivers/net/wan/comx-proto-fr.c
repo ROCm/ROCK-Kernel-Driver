@@ -505,9 +505,9 @@ static int fr_xmit(struct sk_buff *skb, struct net_device *dev)
 		struct sk_buff *newskb=skb_clone(skb, GFP_ATOMIC);
 		newskb->dev=fr->master;
 		dev_queue_xmit(newskb);
-		dev_kfree_skb(skb);
-		ch->stats.tx_packets++;
 		ch->stats.tx_bytes += skb->len;
+		ch->stats.tx_packets++;
+		dev_kfree_skb(skb);
 	} else {
 		netif_stop_queue(dev);
 		for (; dir ; dir = dir->next) {

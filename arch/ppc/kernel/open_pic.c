@@ -42,6 +42,45 @@ static volatile unsigned char* chrp_int_ack_special;
 
 OpenPIC_SourcePtr ISU[OPENPIC_MAX_ISU];
 
+/* Global Operations */
+static void openpic_disable_8259_pass_through(void);
+static u_int openpic_irq(void);
+static void openpic_eoi(void);
+static void openpic_set_priority(u_int pri);
+static void openpic_set_spurious(u_int vector);
+
+#ifdef CONFIG_SMP
+/* Interprocessor Interrupts */
+static void openpic_initipi(u_int ipi, u_int pri, u_int vector);
+static void openpic_ipi_action(int cpl, void *dev_id, struct pt_regs *regs);
+#endif
+
+/* Timer Interrupts */
+static void openpic_inittimer(u_int timer, u_int pri, u_int vector);
+static void openpic_maptimer(u_int timer, u_int cpumask);
+
+/* Interrupt Sources */
+static void openpic_enable_irq(u_int irq);
+static void openpic_disable_irq(u_int irq);
+static void openpic_initirq(u_int irq, u_int pri, u_int vector, int polarity,
+			    int is_level);
+static void openpic_mapirq(u_int irq, u_int cpumask);
+
+/*
+ * These functions are not used but the code is kept here
+ * for completeness and future reference.
+ */
+#ifdef notused
+static void openpic_reset(void);
+static void openpic_enable_8259_pass_through(void);
+static u_int openpic_get_priority(void);
+static u_int openpic_get_spurious(void);
+static void openpic_set_sense(u_int irq, int sense);
+#endif /* notused */
+
+/*
+ * Description of the openpic for the higher-level irq code
+ */
 static void openpic_end_irq(unsigned int irq_nr);
 static void openpic_ack_irq(unsigned int irq_nr);
 static void openpic_set_affinity(unsigned int irq_nr, unsigned long cpumask);
@@ -370,17 +409,19 @@ void find_ISUs(void)
 #endif
 }
 
-static inline void openpic_reset(void)
+#ifdef notused
+static void openpic_reset(void)
 {
 	openpic_setfield(&OpenPIC->Global.Global_Configuration0,
 			 OPENPIC_CONFIG_RESET);
 }
 
-static inline void openpic_enable_8259_pass_through(void)
+static void openpic_enable_8259_pass_through(void)
 {
 	openpic_clearfield(&OpenPIC->Global.Global_Configuration0,
 			   OPENPIC_CONFIG_8259_PASSTHROUGH_DISABLE);
 }
+#endif /* notused */
 
 static void openpic_disable_8259_pass_through(void)
 {
@@ -412,8 +453,8 @@ static void openpic_eoi(void)
 	(void)openpic_read(&OpenPIC->THIS_CPU.EOI);
 }
 
-
-static inline u_int openpic_get_priority(void)
+#ifdef notused
+static u_int openpic_get_priority(void)
 {
 	DECL_THIS_CPU;
 
@@ -421,6 +462,7 @@ static inline u_int openpic_get_priority(void)
 	return openpic_readfield(&OpenPIC->THIS_CPU.Current_Task_Priority,
 				 OPENPIC_CURRENT_TASK_PRIORITY_MASK);
 }
+#endif /* notused */
 
 static void openpic_set_priority(u_int pri)
 {
@@ -435,11 +477,13 @@ static void openpic_set_priority(u_int pri)
 /*
  *  Get/set the spurious vector
  */
-static inline u_int openpic_get_spurious(void)
+#ifdef notused
+static u_int openpic_get_spurious(void)
 {
 	return openpic_readfield(&OpenPIC->Global.Spurious_Vector,
 				 OPENPIC_VECTOR_MASK);
 }
+#endif /* notused */
 
 static void openpic_set_spurious(u_int vec)
 {
@@ -604,21 +648,6 @@ static void __init openpic_maptimer(u_int timer, u_int cpumask)
 static void openpic_enable_irq(u_int irq)
 {
 	check_arg_irq(irq);
-
-        /*
-         * Never want to disable a timer or ipi irq
-         * (only want to disable irqs within an ISU).
-         */
-        if (((irq >= OPENPIC_VEC_IPI+open_pic_irq_offset)   &&
-           (irq <  OPENPIC_VEC_IPI+open_pic_irq_offset+OPENPIC_NUM_IPI)) ||
-           ((irq >= OPENPIC_VEC_TIMER+open_pic_irq_offset) &&
-            (irq <  OPENPIC_VEC_TIMER+open_pic_irq_offset+OPENPIC_NUM_TIMERS)))
-        {
-        /* silently ignore the enable of the timer or ipi irq. */
-        return;
-        }
-
-
 	openpic_clearfield(&GET_ISU(irq - open_pic_irq_offset).Vector_Priority, OPENPIC_MASK);
 	/* make sure mask gets to controller before we return to user */
 	do {
@@ -632,19 +661,6 @@ static void openpic_disable_irq(u_int irq)
 	u32 vp;
 	
 	check_arg_irq(irq);
-        /*
-         * Never want to disable a timer or ipi irq
-         * (only want to disable irqs within an ISU).
-         */
-        if (((irq >= OPENPIC_VEC_IPI+open_pic_irq_offset)   &&
-             (irq <  OPENPIC_VEC_IPI+open_pic_irq_offset+OPENPIC_NUM_IPI)) ||
-             ((irq >= OPENPIC_VEC_TIMER+open_pic_irq_offset) &&
-             (irq <  OPENPIC_VEC_TIMER+open_pic_irq_offset+OPENPIC_NUM_TIMERS)))
-        {
-                panic("openpic_disable_irq - disabling non-ISU irq");
-        }
-
-
 	openpic_setfield(&GET_ISU(irq - open_pic_irq_offset).Vector_Priority, OPENPIC_MASK);
 	/* make sure mask gets to controller before we return to user */
 	do {
@@ -667,11 +683,13 @@ void openpic_enable_ipi(u_int irq)
 	openpic_clearfield_IPI(&OpenPIC->Global.IPI_Vector_Priority(irq), OPENPIC_MASK);
 
 }
+
 void openpic_disable_ipi(u_int irq)
 {
-   /* NEVER disable an IPI... that's just plain wrong! */
+	irq -= (OPENPIC_VEC_IPI+open_pic_irq_offset);
+	check_arg_ipi(irq);
+	openpic_setfield_IPI(&OpenPIC->Global.IPI_Vector_Priority(irq), OPENPIC_MASK);
 }
-
 #endif
 
 /*
@@ -702,39 +720,33 @@ static void openpic_mapirq(u_int irq, u_int physmask)
 	openpic_write(&GET_ISU(irq).Destination, physmask);
 }
 
+#ifdef notused
 /*
  *  Set the sense for an interrupt source (and disable it!)
  *
  *  sense: 1 for level, 0 for edge
  */
-static inline void openpic_set_sense(u_int irq, int sense)
+static void openpic_set_sense(u_int irq, int sense)
 {
 	openpic_safe_writefield(&GET_ISU(irq).Vector_Priority,
 				OPENPIC_SENSE_LEVEL,
 				(sense ? OPENPIC_SENSE_LEVEL : 0));
 }
+#endif /* notused */
 
 /* No spinlocks, should not be necessary with the OpenPIC
  * (1 register = 1 interrupt and we have the desc lock).
  */
 static void openpic_ack_irq(unsigned int irq_nr)
 {
-#if 1 /* masking should be unnecessary, but I still get spurrious */
 	openpic_disable_irq(irq_nr);
-#endif		
-	if ((irq_desc[irq_nr].status & IRQ_LEVEL) == 0)
-		openpic_eoi();
+	openpic_eoi();
 }
 
 static void openpic_end_irq(unsigned int irq_nr)
 {
-	if ((irq_desc[irq_nr].status & IRQ_LEVEL) != 0)
-		openpic_eoi();
-	
-#if 1 /* masking should be unnecessary, but I still get spurrious */
 	if (!(irq_desc[irq_nr].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
 		openpic_enable_irq(irq_nr);
-#endif
 }
 
 static void openpic_set_affinity(unsigned int irq_nr, unsigned long cpumask)
@@ -745,23 +757,11 @@ static void openpic_set_affinity(unsigned int irq_nr, unsigned long cpumask)
 #ifdef CONFIG_SMP
 static void openpic_ack_ipi(unsigned int irq_nr)
 {
+	openpic_eoi();
 }
 
 static void openpic_end_ipi(unsigned int irq_nr)
 {
-	/* IPIs are marked IRQ_PER_CPU. This has the side effect of
-	 * preventing the IRQ_PENDING/IRQ_INPROGRESS logic from
-	 * applying to them. We EOI them late to avoid re-entering.
-	 * however, I'm wondering if we could simply let them have the
-	 * SA_INTERRUPT flag and let them execute with all interrupts OFF.
-	 * This would have the side effect of either running cross-CPU
-	 * functions with interrupts off, or we can re-enable them explicitely
-	 * with a __sti() in smp_call_function_interrupt(), since
-	 * smp_call_function() is protected by a spinlock.
-	 * Or maybe we shouldn't set the IRQ_PER_CPU flag on cross-CPU
-	 * function calls IPI at all but that would make a special case.
-	 */
-	openpic_eoi();
 }
 
 static void openpic_ipi_action(int cpl, void *dev_id, struct pt_regs *regs)
@@ -791,8 +791,11 @@ openpic_get_irq(struct pt_regs *regs)
 			irq = i8259_irq( smp_processor_id() );
 		openpic_eoi();
         }
-	if (irq == OPENPIC_VEC_SPURIOUS + open_pic_irq_offset)
+	if (irq == OPENPIC_VEC_SPURIOUS + open_pic_irq_offset) {
 		irq = -1;
+		/* That's not SMP safe ... but who cares ? */
+		ppc_spurious_interrupts++;
+	}
 	return irq;
 }
 

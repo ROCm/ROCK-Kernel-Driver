@@ -22,6 +22,7 @@
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <linux/cache.h>
+#include <linux/module.h>
 
 #include <asm/uaccess.h>
 
@@ -1250,6 +1251,7 @@ kmem_cache_t *dquot_cachep;
 
 /* SLAB cache for buffer_head structures */
 kmem_cache_t *bh_cachep;
+EXPORT_SYMBOL(bh_cachep);
 
 void __init vfs_caches_init(unsigned long mempages)
 {

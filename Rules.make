@@ -123,7 +123,7 @@ endif
 # This make dependencies quickly
 #
 fastdep: dummy
-	$(TOPDIR)/scripts/mkdep $(wildcard *.[chS] local.h.master) > .depend
+	$(TOPDIR)/scripts/mkdep $(CFLAGS) $(EXTRA_CFLAGS) -- $(wildcard *.[chS]) > .depend
 ifdef ALL_SUB_DIRS
 	$(MAKE) $(patsubst %,_sfdep_%,$(ALL_SUB_DIRS)) _FASTDEP_ALL_SUB_DIRS="$(ALL_SUB_DIRS)"
 endif
@@ -150,7 +150,7 @@ endif
 #
 ALL_MOBJS = $(filter-out $(obj-y), $(obj-m))
 ifneq "$(strip $(ALL_MOBJS))" ""
-PDWN=$(shell $(CONFIG_SHELL) $(TOPDIR)/scripts/pathdown.sh)
+MOD_DESTDIR ?= $(shell $(CONFIG_SHELL) $(TOPDIR)/scripts/pathdown.sh)
 endif
 
 unexport MOD_DIRS
@@ -172,8 +172,8 @@ modules: $(ALL_MOBJS) dummy \
 .PHONY: _modinst__
 _modinst__: dummy
 ifneq "$(strip $(ALL_MOBJS))" ""
-	mkdir -p $(MODLIB)/kernel/$(PDWN)
-	cp $(ALL_MOBJS) $(MODLIB)/kernel/$(PDWN)
+	mkdir -p $(MODLIB)/kernel/$(MOD_DESTDIR)
+	cp $(ALL_MOBJS) $(MODLIB)/kernel/$(MOD_DESTDIR)$(MOD_TARGET)
 endif
 
 .PHONY: modules_install
@@ -222,9 +222,9 @@ endif
 
 $(MODINCL)/%.ver: %.c
 	@if [ ! -r $(MODINCL)/$*.stamp -o $(MODINCL)/$*.stamp -ot $< ]; then \
-		echo '$(CC) $(CFLAGS) -E -D__GENKSYMS__ $<'; \
+		echo '$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -E -D__GENKSYMS__ $<'; \
 		echo '| $(GENKSYMS) $(genksyms_smp_prefix) -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp'; \
-		$(CC) $(CFLAGS) -E -D__GENKSYMS__ $< \
+		$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -E -D__GENKSYMS__ $< \
 		| $(GENKSYMS) $(genksyms_smp_prefix) -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp; \
 		if [ -r $@ ] && cmp -s $@ $@.tmp; then echo $@ is unchanged; rm -f $@.tmp; \
 		else echo mv $@.tmp $@; mv -f $@.tmp $@; fi; \

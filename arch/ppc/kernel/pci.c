@@ -109,7 +109,7 @@ pcibios_fixup_resources(struct pci_dev* dev)
 		struct resource *res = dev->resource + i;
 		if (!res->start)
 			continue;
-		if (res->flags & IORESOURCE_MEM) {
+		if ((res->flags & IORESOURCE_MEM) && hose->pci_mem_offset) {
 			res->start += hose->pci_mem_offset;
 			res->end += hose->pci_mem_offset;
 #ifdef DEBUG
@@ -121,7 +121,9 @@ pcibios_fixup_resources(struct pci_dev* dev)
 
 		if ((res->flags & IORESOURCE_IO)
 		    && (unsigned long) hose->io_base_virt != isa_io_base) {
-			unsigned long offs = (unsigned long) hose->io_base_virt - isa_io_base;
+			unsigned long offs;
+
+			offs = (unsigned long)hose->io_base_virt - isa_io_base;
 			res->start += offs;
 			res->end += offs;
 			printk("Fixup IO res, dev: %x.%x, res_start: %lx->%lx\n",
@@ -245,13 +247,30 @@ pcibios_allocate_bus_resources(struct list_head *bus_list)
 	}
 }
 
+static inline void alloc_resource(struct pci_dev *dev, int idx)
+{
+	struct resource *pr, *r = &dev->resource[idx];
+
+	DBG("PCI:%x:%x:%x: Resource %08lx-%08lx (f=%lx)\n",
+	    dev->bus->number, dev->devfn >> 3, dev->devfn & 7,
+	    r->start, r->end, r->flags);
+	pr = pci_find_parent_resource(dev, r);
+	if (!pr || request_resource(pr, r) < 0) {
+		printk(KERN_ERR "PCI: Cannot allocate resource region %d"
+		       " of device %s\n", idx, dev->slot_name);
+		/* We'll assign a new address later */
+		r->end -= r->start;
+		r->start = 0;
+	}
+}
+
 static void __init
 pcibios_allocate_resources(int pass)
 {
 	struct pci_dev *dev;
 	int idx, disabled;
 	u16 command;
-	struct resource *r, *pr;
+	struct resource *r;
 
 	pci_for_each_dev(dev) {
 		pci_read_config_word(dev, PCI_COMMAND, &command);
@@ -259,7 +278,7 @@ pcibios_allocate_resources(int pass)
 			r = &dev->resource[idx];
 			if (r->parent)		/* Already allocated */
 				continue;
-			if (!r->start)		/* Address not assigned at all */
+			if (!r->start)		/* Not assigned at all */
 				continue;
 			if (r->end == 0xffffffff) {
 				/* LongTrail OF quirk: unassigned */
@@ -273,28 +292,19 @@ pcibios_allocate_resources(int pass)
 				disabled = !(command & PCI_COMMAND_IO);
 			else
 				disabled = !(command & PCI_COMMAND_MEMORY);
-			if (pass == disabled) {
-				DBG("PCI: Resource %08lx-%08lx (f=%lx, d=%d, p=%d)\n",
-				    r->start, r->end, r->flags, disabled, pass);
-				pr = pci_find_parent_resource(dev, r);
-				if (!pr || request_resource(pr, r) < 0) {
-					printk(KERN_ERR "PCI: Cannot allocate resource region %d of device %s\n", idx, dev->slot_name);
-					/* We'll assign a new address later */
-					r->end -= r->start;
-					r->start = 0;
-				}
-			}
+			if (pass == disabled)
+				alloc_resource(dev, idx);
 		}
-		if (!pass) {
-			r = &dev->resource[PCI_ROM_RESOURCE];
-			if (r->flags & PCI_ROM_ADDRESS_ENABLE) {
-				/* Turn the ROM off, leave the resource region, but keep it unregistered. */
-				u32 reg;
-				DBG("PCI: Switching off ROM of %s\n", dev->slot_name);
-				r->flags &= ~PCI_ROM_ADDRESS_ENABLE;
-				pci_read_config_dword(dev, dev->rom_base_reg, &reg);
-				pci_write_config_dword(dev, dev->rom_base_reg, reg & ~PCI_ROM_ADDRESS_ENABLE);
-			}
+		if (pass)
+			continue;
+		r = &dev->resource[PCI_ROM_RESOURCE];
+		if (r->flags & PCI_ROM_ADDRESS_ENABLE) {
+			/* Turn the ROM off, leave the resource region, but keep it unregistered. */
+			u32 reg;
+			DBG("PCI: Switching off ROM of %s\n", dev->slot_name);
+			r->flags &= ~PCI_ROM_ADDRESS_ENABLE;
+			pci_read_config_dword(dev, dev->rom_base_reg, &reg);
+			pci_write_config_dword(dev, dev->rom_base_reg, reg & ~PCI_ROM_ADDRESS_ENABLE);
 		}
 	}
 }
@@ -315,17 +325,18 @@ pcibios_assign_resources(void)
 
 		for(idx=0; idx<6; idx++) {
 			r = &dev->resource[idx];
-
+#if 0	/* we don't need this PC-ism */
 			/*
 			 *  Don't touch IDE controllers and I/O ports of video cards!
 			 */
 			if ((class == PCI_CLASS_STORAGE_IDE && idx < 4) ||
 			    (class == PCI_CLASS_DISPLAY_VGA && (r->flags & IORESOURCE_IO)))
 				continue;
+#endif
 
 			/*
 			 *  We shall assign a new address to this resource, either because
-			 *  the BIOS forgot to do so or because we have decided the old
+			 *  the BIOS (sic) forgot to do so or because we have decided the old
 			 *  address was unusable for some reason.
 			 */
 			if (!r->start && r->end &&
@@ -572,7 +583,7 @@ pcibios_init(void)
 {
 	struct pci_controller *hose;
 	struct pci_bus *bus;
-	int next_busno;
+	int next_busno, i;
 
 	printk("PCI: Probing PCI hardware\n");
 
@@ -582,6 +593,17 @@ pcibios_init(void)
 			hose->first_busno = next_busno;
 		hose->last_busno = 0xff;
 		bus = pci_scan_bus(hose->first_busno, hose->ops, hose);
+		if (hose->io_resource.flags) {
+			unsigned long offs;
+
+			offs = (unsigned long)hose->io_base_virt - isa_io_base;
+			hose->io_resource.start += offs;
+			hose->io_resource.end += offs;
+			bus->resource[0] = &hose->io_resource;
+		}
+		for (i = 0; i < 3; ++i)
+			if (hose->mem_resources[i].flags)
+				bus->resource[i+1] = &hose->mem_resources[i];
 		hose->bus = bus;
 		hose->last_busno = bus->subordinate;
 		if (pci_assign_all_busses || next_busno <= hose->last_busno)
@@ -654,8 +676,20 @@ unsigned long resource_fixup(struct pci_dev * dev, struct resource * res,
 
 void __init pcibios_fixup_bus(struct pci_bus *bus)
 {
+	struct pci_controller *hose;
+
 	pci_read_bridge_bases(bus);
-	
+
+	hose = pci_bus_to_hose(bus->number);
+
+	/* Apply pci_mem_offset to bridge mem resource */
+	if (hose->first_busno != bus->number)
+		if (bus->resource[1]->start && (bus->resource[1]->end != -1))
+		{
+			bus->resource[1]->start += hose->pci_mem_offset;
+			bus->resource[1]->end += hose->pci_mem_offset;
+		}
+
 	if ( ppc_md.pcibios_fixup_bus )
 		ppc_md.pcibios_fixup_bus(bus);
 }
@@ -773,6 +807,32 @@ pci_resource_to_bus(struct pci_dev *pdev, struct resource *res)
 /* Obsolete functions. Should be removed once the symbios driver
  * is fixed
  */
+unsigned long
+phys_to_bus(unsigned long pa)
+{
+	struct pci_controller *hose;
+	int i;
+
+	for (hose = hose_head; hose; hose = hose->next) {
+		for (i = 0; i < 3; ++i) {
+			if (pa >= hose->mem_resources[i].start
+			    && pa <= hose->mem_resources[i].end) {
+				/*
+				 * XXX the hose->pci_mem_offset really
+				 * only applies to mem_resources[0].
+				 * We need a way to store an offset for
+				 * the others.  -- paulus
+				 */
+				if (i == 0)
+					pa -= hose->pci_mem_offset;
+				return pa;
+			}
+		}
+	}
+	/* hmmm, didn't find it */
+	return 0;
+}
+
 unsigned long
 pci_phys_to_bus(unsigned long pa, int busnr)
 {

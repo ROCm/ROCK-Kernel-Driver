@@ -238,12 +238,12 @@ static void smc_interrupt(int irq, void *, struct pt_regs *regs);
  . This is a separate procedure to handle the receipt of a packet, to
  . leave the interrupt code looking slightly cleaner
 */
-inline static void smc_rcv( struct net_device *dev );
+static inline void smc_rcv( struct net_device *dev );
 /*
  . This handles a TX interrupt, which is only called when an error
  . relating to a packet is sent.
 */
-inline static void smc_tx( struct net_device * dev );
+static inline void smc_tx( struct net_device * dev );
 
 /*
  ------------------------------------------------------------
@@ -616,7 +616,7 @@ static void smc_hardware_send_packet( struct net_device * dev )
 	if ( packet_no & 0x80 ) {
 		/* or isn't there?  BAD CHIP! */
 		printk(KERN_DEBUG CARDNAME": Memory allocation failed. \n");
-		dev_kfree_skb_irq(skb);
+		dev_kfree_skb_any(skb);
 		lp->saved_skb = NULL;
 		netif_wake_queue(dev);
 		return;
@@ -679,7 +679,7 @@ static void smc_hardware_send_packet( struct net_device * dev )
 	PRINTK2((CARDNAME": Sent packet of length %d \n",length));
 
 	lp->saved_skb = NULL;
-	dev_kfree_skb_irq (skb);
+	dev_kfree_skb_any (skb);
 
 	dev->trans_start = jiffies;
 
@@ -1341,9 +1341,9 @@ static void smc_rcv(struct net_device *dev)
 		skb = dev_alloc_skb( packet_length + 5);
 
 		if ( skb == NULL ) {
-			printk(KERN_NOTICE CARDNAME
-			": Low memory, packet dropped.\n");
+			printk(KERN_NOTICE CARDNAME ": Low memory, packet dropped.\n");
 			lp->stats.rx_dropped++;
+			goto done;
 		}
 
 		/*
@@ -1396,6 +1396,8 @@ static void smc_rcv(struct net_device *dev)
 			lp->stats.rx_length_errors++;
 		if ( status & RS_BADCRC)	lp->stats.rx_crc_errors++;
 	}
+
+done:
 	/*  error or good, tell the card to get rid of this packet */
 	outw( MC_RELEASE, ioaddr + MMU_CMD );
 

@@ -36,7 +36,7 @@ typedef struct {
     int mode;			/* Transfer mode                */
     int host;			/* Host number (for proc)       */
     Scsi_Cmnd *cur_cmd;		/* Current queued command       */
-    struct tq_struct imm_tq;	/* Polling interupt stuff       */
+    struct tq_struct imm_tq;	/* Polling interrupt stuff       */
     unsigned long jstart;	/* Jiffies at start             */
     unsigned failed:1;		/* Failure flag                 */
     unsigned dp:1;		/* Data phase present           */

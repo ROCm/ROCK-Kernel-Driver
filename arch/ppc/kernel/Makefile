@@ -70,6 +70,7 @@ obj-$(CONFIG_8260)		+= m8260_setup.o ppc8260_pic.o
 
 include $(TOPDIR)/Rules.make
 
+entry.o: entry.S ppc_defs.h
 head.o: head.S ppc_defs.h
 head_4xx.o: head_4xx.S ppc_defs.h
 head_8xx.o: head_8xx.S ppc_defs.h

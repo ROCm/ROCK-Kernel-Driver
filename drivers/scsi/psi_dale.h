@@ -527,7 +527,7 @@ typedef struct _IDENTIFY_DATA
 	USHORT	PIOCycleTime		:8;		// 51 Transfer Cycle Timing - PIO
 	USHORT	Reserved6			:8;		// 52                       - DMA
 	USHORT	DMACycleTime		:8;		// 52                       - DMA
-	USHORT	Valid_54_58			:1;		// 53 words 54 - 58 are vaild
+	USHORT	Valid_54_58			:1;		// 53 words 54 - 58 are valid
 	USHORT	Valid_64_70			:1;		// 53 words 64 - 70 are valid
 	USHORT	Reserved7			:14;	// 53
 	USHORT	LogNumCyl;					// 54 Current Translation - Num Cyl

@@ -968,26 +968,6 @@ _GLOBAL(set_context)
 	SYNC
 	blr
 
-/* Jump into the system reset for the rom.
- * We first disable the MMU, and then jump to the ROM reset address.
- *
- * r3 is the board info structure, r4 is the location for starting.
- * I use this for building a small kernel that can load other kernels,
- * rather than trying to write or rely on a rom monitor that can tftp load.
- */
-       .globl  m8xx_gorom
-m8xx_gorom:
-       li      r5,MSR_KERNEL & ~(MSR_IR|MSR_DR)
-       lis     r6,2f@h
-       addis   r6,r6,-KERNELBASE@h
-       ori     r6,r6,2f@l
-       mtspr   SRR0,r6
-       mtspr   SRR1,r5
-       rfi
-2:
-       mtlr    r4
-       blr
-
 #ifdef CONFIG_8xx_CPU6
 /* It's here because it is unique to the 8xx.
  * It is important we get called with interrupts disabled.  I used to

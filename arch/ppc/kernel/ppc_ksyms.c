@@ -46,6 +46,10 @@
 #endif /* CONFIG_SMP */
 #include <asm/time.h>
 
+#ifdef  CONFIG_8xx
+#include "../8xx_io/commproc.h"
+#endif
+
 /* Tell string.h we don't want memcpy etc. as cpp defines */
 #define EXPORT_SYMTAB_STROPS
 
@@ -94,7 +98,7 @@ EXPORT_SYMBOL_NOVERS(isa_mem_base);
 EXPORT_SYMBOL_NOVERS(pci_dram_offset);
 #endif
 EXPORT_SYMBOL(ISA_DMA_THRESHOLD);
-EXPORT_SYMBOL(DMA_MODE_READ);
+EXPORT_SYMBOL_NOVERS(DMA_MODE_READ);
 EXPORT_SYMBOL(DMA_MODE_WRITE);
 #ifndef CONFIG_8xx
 #if defined(CONFIG_ALL_PPC)
@@ -192,6 +196,9 @@ EXPORT_SYMBOL(last_task_used_altivec);
 EXPORT_SYMBOL(giveup_altivec);
 #endif /* CONFIG_ALTIVEC */
 #ifdef CONFIG_SMP
+EXPORT_SYMBOL(global_irq_lock);
+EXPORT_SYMBOL(global_irq_count);
+EXPORT_SYMBOL(global_irq_holder);
 EXPORT_SYMBOL(__global_cli);
 EXPORT_SYMBOL(__global_sti);
 EXPORT_SYMBOL(__global_save_flags);
@@ -242,11 +249,11 @@ EXPORT_SYMBOL(set_backlight_level);
 EXPORT_SYMBOL(set_backlight_enable);
 EXPORT_SYMBOL(register_backlight_controller);
 #endif /* CONFIG_PMAC_BACKLIGHT */
-EXPORT_SYMBOL_NOVERS(sys_ctrler);
 #ifndef CONFIG_MACH_SPECIFIC
 EXPORT_SYMBOL_NOVERS(have_of);
 #endif /* CONFIG_MACH_SPECIFIC */
 #if defined(CONFIG_ALL_PPC)
+EXPORT_SYMBOL_NOVERS(sys_ctrler);
 EXPORT_SYMBOL(find_devices);
 EXPORT_SYMBOL(find_type_devices);
 EXPORT_SYMBOL(find_compatible_devices);
@@ -280,7 +287,9 @@ EXPORT_SYMBOL(bootx_update_display);
 #if defined(CONFIG_SCSI) && defined(CONFIG_ALL_PPC)
 EXPORT_SYMBOL(note_scsi_host);
 #endif
+#ifdef CONFIG_VT
 EXPORT_SYMBOL(kd_mksound);
+#endif
 #ifdef CONFIG_NVRAM
 EXPORT_SYMBOL(nvram_read_byte);
 EXPORT_SYMBOL(nvram_write_byte);
@@ -342,11 +351,18 @@ EXPORT_SYMBOL(debugger_dabr_match);
 EXPORT_SYMBOL(debugger_fault_handler);
 #endif
 
+#ifdef  CONFIG_8xx
+EXPORT_SYMBOL(request_8xxirq);
+EXPORT_SYMBOL(cpm_install_handler);
+EXPORT_SYMBOL(cpm_free_handler);
+#endif /* CONFIG_8xx */
+
 EXPORT_SYMBOL(ret_to_user_hook);
 EXPORT_SYMBOL(do_softirq);
 EXPORT_SYMBOL(next_mmu_context);
 EXPORT_SYMBOL(set_context);
 EXPORT_SYMBOL(mmu_context_overflow);
+EXPORT_SYMBOL_NOVERS(disarm_decr);
 #if !defined(CONFIG_8xx) && !defined(CONFIG_4xx)
 extern long *intercept_table;
 EXPORT_SYMBOL(intercept_table);

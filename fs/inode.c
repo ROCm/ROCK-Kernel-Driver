@@ -613,6 +613,7 @@ static void clean_inode(struct inode *inode)
 	inode->i_bdev = NULL;
 	inode->i_data.a_ops = &empty_aops;
 	inode->i_data.host = inode;
+	inode->i_data.gfp_mask = GFP_HIGHUSER;
 	inode->i_mapping = &inode->i_data;
 }
 

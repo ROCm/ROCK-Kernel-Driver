@@ -23,7 +23,7 @@
  *  Revision 1.8  2000/11/17 16:53:35  bjornw
  *  Added detection of frame-type in Rexit, so that mmu_bus_fault can
  *  use ret_from_intr in the return-path to check for signals (like SEGV)
- *  and other foul things that might have occured during the fault.
+ *  and other foul things that might have occurred during the fault.
  *
  *  Revision 1.7  2000/10/06 15:04:28  bjornw
  *  Include mof in register savings

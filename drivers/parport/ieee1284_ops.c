@@ -50,9 +50,6 @@ size_t parport_ieee1284_write_compat (struct parport *port,
 	if (port->irq != PARPORT_IRQ_NONE) {
 		parport_enable_irq (port);
 		no_irq = 0;
-
-		/* Clear out previous irqs. */
-		while (!down_trylock (&port->physport->ieee1284.irq));
 	}
 
 	port->physport->ieee1284.phase = IEEE1284_PH_FWD_DATA;
@@ -192,6 +189,7 @@ size_t parport_ieee1284_read_nibble (struct parport *port,
 			DPRINTK (KERN_DEBUG
 				 "%s: Nibble timeout at event 9 (%d bytes)\n",
 				 port->name, i/2);
+			parport_frob_control (port, PARPORT_CONTROL_AUTOFD, 0);
 			break;
 		}
 

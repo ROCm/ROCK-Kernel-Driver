@@ -559,7 +559,7 @@ static inline int page_cache_read(struct file * file, unsigned long offset)
 	if (page)
 		return 0;
 
-	page = page_cache_alloc();
+	page = page_cache_alloc(mapping);
 	if (!page)
 		return -ENOMEM;
 
@@ -1174,7 +1174,7 @@ no_cached_page:
 		 */
 		if (!cached_page) {
 			spin_unlock(&pagecache_lock);
-			cached_page = page_cache_alloc();
+			cached_page = page_cache_alloc(mapping);
 			if (!cached_page) {
 				desc->error = -ENOMEM;
 				break;
@@ -1474,7 +1474,7 @@ success:
 	 */
 	old_page = page;
 	if (no_share) {
-		struct page *new_page = page_cache_alloc();
+		struct page *new_page = alloc_page(GFP_HIGHUSER);
 
 		if (new_page) {
 			copy_user_highpage(new_page, old_page, address);
@@ -2319,7 +2319,7 @@ repeat:
 	page = __find_get_page(mapping, index, hash);
 	if (!page) {
 		if (!cached_page) {
-			cached_page = page_cache_alloc();
+			cached_page = page_cache_alloc(mapping);
 			if (!cached_page)
 				return ERR_PTR(-ENOMEM);
 		}
@@ -2382,7 +2382,7 @@ repeat:
 	page = __find_lock_page(mapping, index, hash);
 	if (!page) {
 		if (!*cached_page) {
-			*cached_page = page_cache_alloc();
+			*cached_page = page_cache_alloc(mapping);
 			if (!*cached_page)
 				return NULL;
 		}

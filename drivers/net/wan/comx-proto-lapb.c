@@ -311,6 +311,7 @@ static void comxlapb_connected(void *token, int reason)
 		skb->pkt_type = PACKET_HOST;
 
 		netif_rx(skb);
+		ch->dev->last_rx = jiffies;
 	}
 
 	for (; comxdir; comxdir = comxdir->next) {
@@ -350,6 +351,7 @@ static void comxlapb_disconnected(void *token, int reason)
 		skb->pkt_type = PACKET_HOST;
 
 		netif_rx(skb);
+		ch->dev->last_rx = jiffies;
 	}
 
 	for (; comxdir; comxdir = comxdir->next) {

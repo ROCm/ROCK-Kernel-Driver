@@ -679,12 +679,8 @@ S: Belgium
 
 N: Cort Dougan
 E: cort@fsmlabs.com
-W: http://www.ppc.kernel.org/~cort/
+W: http://www.fsmlabs.com/linuxppcbk.html
 D: PowerPC
-S: Finite State Machine Labs
-S: P.O. 1829
-S: Socorro, New Mexico 87801
-S: USA
 
 N: Oleg Drokin
 E: green@ccssu.crimea.ua
@@ -1026,11 +1022,11 @@ S: Toronto, Ontario, M4Y 2W4
 S: Canada
 
 N: Richard Günther
-E: richard.guenther@student.uni-tuebingen.de
+E: rguenth@tat.physik.uni-tuebingen.de
+W: http://www.tat.physik.uni-tuebingen.de/~rguenth
 P: 2048/2E829319 2F 83 FC 93 E9 E4 19 E2  93 7A 32 42 45 37 23 57
 D: binfmt_misc
-S: Fichtenweg 3/511
-S: 72076 Tübingen
+S: 72074 Tübingen
 S: Germany
 
 N: Justin Guyett
@@ -1347,9 +1343,7 @@ S: USA
 
 N: Dave Jones
 E: davej@suse.de
-E: dave@powertweak.com
-E: djones2@glam.ac.uk
-W: http://powertweak.sourceforge.net
+W: http://www.suse.de/~davej
 D: Moved PCI bridge tuning to userspace (Powertweak).
 D: Centaur/IDT Winchip/Winchip 2 tweaks.
 D: AFFS fixes for 2.3.x
@@ -2191,15 +2185,15 @@ S: Harrison, Arkansas  72602-1815
 S: USA
 
 N: Kai Petzke
-E: wpp@marie.physik.tu-berlin.de
-W: http://physik.tu-berlin.de/~wpp
-P: 1024/B42868C1 D9 59 B9 98 BB 93 05 38  2E 3E 31 79 C3 65 5D E1 
+E: petzke@teltarif.de
+W: http://www.teltarif.de/
+P: 1024/B42868C1 D9 59 B9 98 BB 93 05 38  2E 3E 31 79 C3 65 5D E1
 D: Driver for Laser Magnetic Storage CD-ROM
 D: Some kernel bug fixes
 D: Port of the database Postgres
-D: "Unix fuer Jedermann" a German introduction to linux (see my web page)
-S: M"ullerstr. 69
-S: 13349 Berlin
+D: Book: "Linux verstehen und anwenden" (Hanser-Verlag)
+S: Triftstra=DFe 55
+S: 13353 Berlin
 S: Germany
 
 N: Emanuel Pirker

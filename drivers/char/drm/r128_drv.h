@@ -447,6 +447,11 @@ extern int R128_READ_PLL(drm_device_t *dev, int addr);
 		DRM_INFO( "ADVANCE_RING() tail=0x%06x wr=0x%06x\n",	\
 			  write, dev_priv->ring.tail );			\
 	}								\
+	if ( write < 32 ) {						\
+		memcpy( dev_priv->ring.end,				\
+			dev_priv->ring.start,				\
+			write * sizeof(u32) );				\
+	}								\
 	r128_flush_write_combine();					\
 	dev_priv->ring.tail = write;					\
 	R128_WRITE( R128_PM4_BUFFER_DL_WPTR, write );			\

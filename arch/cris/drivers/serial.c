@@ -146,7 +146,7 @@
  *
  * Revision 1.24  2000/02/09 18:02:28  bjornw
  * * Clear serial errors (overrun, framing, parity) correctly. Before, the
- *   receiver would get stuck if an error occured and we did not restart
+ *   receiver would get stuck if an error occurred and we did not restart
  *   the input DMA.
  * * Cosmetics (indentation, some code made into inlines)
  * * Some more debug options
@@ -1371,7 +1371,7 @@ ser_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			} 
 			else { /* it was a valid byte, now let the dma do the rest */
 #ifdef SERIAL_DEBUG_INTR
-				printk("** OK, disabling ser_interupts\n");
+				printk("** OK, disabling ser_interrupts\n");
 #endif
 				e100_disable_serial_data_irq(info);
 			}

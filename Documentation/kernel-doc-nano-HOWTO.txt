@@ -57,7 +57,8 @@ format of your choice (for example, 'db2html ...').
 If you want to see man pages instead, you can do this:
 
 $ cd linux
-$ scripts/kernel-doc -man $(find -name '*.c' '*.h') | split-man.pl /tmp/man
+$ scripts/kernel-doc -man $(find -name '*.c') | split-man.pl /tmp/man
+$ scripts/kernel-doc -man $(find -name '*.h') | split-man.pl /tmp/man
 
 Here is split-man.pl:
 
@@ -68,7 +69,7 @@ if ($#ARGV < 0) {
    die "where do I put the results?\n";
 }
 
-mkdir $ARGV[0],0777 or die "Can't create $ARGV[0]: $!\n";
+mkdir $ARGV[0],0777;
 $state = 0;
 while (<STDIN>) {
     if (/^\.TH \"[^\"]*\" 4 \"([^\"]*)\"/) {

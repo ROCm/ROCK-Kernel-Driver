@@ -181,7 +181,7 @@ struct cops_local
         int board;			/* Holds what board type is. */
 	int nodeid;			/* Set to 1 once have nodeid. */
         unsigned char node_acquire;	/* Node ID when acquired. */
-        struct at_addr node_addr;	/* Full node addres */
+        struct at_addr node_addr;	/* Full node address */
 };
 
 /* Index to functions, as function prototypes. */

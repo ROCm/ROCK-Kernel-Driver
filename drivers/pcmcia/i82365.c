@@ -210,13 +210,13 @@ static struct timer_list poll_timer;
 		  PCI_COMMAND_MASTER|PCI_COMMAND_WAIT)
 
 /* These definitions must match the pcic table! */
-typedef enum pcic_id {
 #ifdef CONFIG_ISA
+typedef enum pcic_id {
     IS_I82365A, IS_I82365B, IS_I82365DF,
     IS_IBM, IS_RF5Cx96, IS_VLSI, IS_VG468, IS_VG469,
     IS_PD6710, IS_PD672X, IS_VT83C469,
-#endif
 } pcic_id;
+#endif
 
 /* Flags for classifying groups of controllers */
 #define IS_VADEM	0x0001

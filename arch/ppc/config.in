@@ -57,14 +57,25 @@ if [ "$CONFIG_8xx" = "y" ]; then
 	"RPX-Lite	CONFIG_RPXLITE		\
 	 RPX-Classic	CONFIG_RPXCLASSIC	\
 	 BSE-IP		CONFIG_BSEIP		\
-	 TQM8xxL	CONFIG_TQM8xxL		\
-	 TQM860L	CONFIG_TQM860L		\
-	 TQM860		CONFIG_TQM860		\
+ 	 TQM823L	CONFIG_TQM823L		\
+ 	 TQM850L	CONFIG_TQM850L		\
+ 	 TQM855L	CONFIG_TQM855L		\
+  	 TQM860L	CONFIG_TQM860L		\
+ 	 FPS850L	CONFIG_FPS850L		\
+  	 TQM860		CONFIG_TQM860		\
+ 	 SPD823TS	CONFIG_SPD823TS		\
+ 	 IVMS8		CONFIG_IVMS8		\
+ 	 SM850		CONFIG_SM850		\
 	 MBX		CONFIG_MBX		\
 	 WinCept	CONFIG_WINCEPT"		RPX-Lite
-	 
-  if [ "$CONFIG_TQM8xxL" = "y" ]; then
-    bool 'FPS850 Mainboard' CONFIG_FPS850
+
+  if [ "$CONFIG_TQM823L" = "y" -o \
+       "$CONFIG_TQM850L" = "y" -o \
+       "$CONFIG_FPS850L" = "y" -o \
+       "$CONFIG_TQM855L" = "y" -o \
+       "$CONFIG_TQM860L" = "y" -o \
+       "$CONFIG_SM850"   = "y" ]; then
+ 	define_bool	CONFIG_TQM8xxL	y
   fi
 fi
 
@@ -298,6 +309,11 @@ if [ "$CONFIG_ALL_PPC" = "y" ]; then
     else
       bool '   Support for ADB keyboard (old driver)' CONFIG_ADB_KEYBOARD
     fi
+  fi
+  # This is for drivers/macintosh/mac_hid.o, which is needed if the input
+  # layer is used.
+  if [ "$CONFIG_INPUT" != "n" ]; then
+    define_bool CONFIG_MAC_HID y
   fi
 fi
 endmenu

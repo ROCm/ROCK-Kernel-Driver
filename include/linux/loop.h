@@ -9,17 +9,23 @@
  * Written by Theodore Ts'o, 3/29/93.
  *
  * Copyright 1993 by Theodore Ts'o.  Redistribution of this file is
- * permitted under the GNU Public License.
+ * permitted under the GNU General Public License.
  */
 
 #define LO_NAME_SIZE	64
 #define LO_KEY_SIZE	32
 
 #ifdef __KERNEL__
-       
+
+/* Possible states of device */
+enum {
+	Lo_unbound,
+	Lo_bound,
+	Lo_rundown,
+};
+
 struct loop_device {
 	int		lo_number;
-	struct dentry	*lo_dentry;
 	int		lo_refcnt;
 	kdev_t		lo_device;
 	int		lo_offset;
@@ -39,19 +45,45 @@ struct loop_device {
 	struct file *	lo_backing_file;
 	void		*key_data; 
 	char		key_reserved[48]; /* for use by the filter modules */
+
+	int		lo_blksize;
+	int		old_gfp_mask;
+
+	spinlock_t		lo_lock;
+	struct buffer_head	*lo_bh;
+	struct buffer_head	*lo_bhtail;
+	int			lo_state;
+	struct semaphore	lo_sem;
+	struct semaphore	lo_ctl_mutex;
+	struct semaphore	lo_bh_mutex;
+	atomic_t		lo_pending;
 };
 
 typedef	int (* transfer_proc_t)(struct loop_device *, int cmd,
 				char *raw_buf, char *loop_buf, int size,
 				int real_block);
 
+extern inline int lo_do_transfer(struct loop_device *lo, int cmd, char *rbuf,
+				 char *lbuf, int size, int rblock)
+{
+	if (!lo->transfer)
+		return 0;
+
+	return lo->transfer(lo, cmd, rbuf, lbuf, size, rblock);
+}
+
+/*
+ * used to throttle loop_thread so bdflush/kswapd doesn't go nuts
+ */
+#define LOOP_MAX_BUFFERS	2048
+
 #endif /* __KERNEL__ */
 
 /*
  * Loop flags
  */
-#define LO_FLAGS_DO_BMAP	0x00000001
-#define LO_FLAGS_READ_ONLY	0x00000002
+#define LO_FLAGS_DO_BMAP	1
+#define LO_FLAGS_READ_ONLY	2
 
 /* 
  * Note that this structure gets the wrong offsets when directly used
@@ -102,9 +134,8 @@ struct loop_info {
 /* Support for loadable transfer modules */
 struct loop_func_table {
 	int number; 	/* filter type */ 
-	int (*transfer)(struct loop_device *lo, int cmd, 
-			char *raw_buf, char *loop_buf, int size,
-			int real_block);
+	int (*transfer)(struct loop_device *lo, int cmd, char *raw_buf,
+			char *loop_buf, int size, int real_block);
 	int (*init)(struct loop_device *, struct loop_info *); 
 	/* release is called from loop_unregister_transfer or clr_fd */
 	int (*release)(struct loop_device *); 

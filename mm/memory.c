@@ -870,7 +870,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	 * Ok, we need to copy. Oh, well..
 	 */
 	spin_unlock(&mm->page_table_lock);
-	new_page = page_cache_alloc();
+	new_page = alloc_page(GFP_HIGHUSER);
 	if (!new_page)
 		return -1;
 	spin_lock(&mm->page_table_lock);

@@ -1248,7 +1248,7 @@ void acornscsi_dma_xfer(AS_Host *host)
 
 /*
  * Function: void acornscsi_dma_adjust(AS_Host *host)
- * Purpose : adjust DMA pointers & count for bytes transfered to
+ * Purpose : adjust DMA pointers & count for bytes transferred to
  *	     SBIC but not SCSI bus.
  * Params  : host - host to adjust DMA count for
  */

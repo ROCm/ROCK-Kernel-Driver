@@ -63,9 +63,9 @@ pci_find_slot(unsigned int bus, unsigned int devfn)
 /**
  * pci_find_subsys - begin or continue searching for a PCI device by vendor/subvendor/device/subdevice id
  * @vendor: PCI vendor id to match, or %PCI_ANY_ID to match all vendor ids
- * @device: PCI device id to match, or %PCI_ANY_ID to match all vendor ids
+ * @device: PCI device id to match, or %PCI_ANY_ID to match all device ids
  * @ss_vendor: PCI subsystem vendor id to match, or %PCI_ANY_ID to match all vendor ids
- * @ss_device: PCI subsystem device id to match, or %PCI_ANY_ID to match all vendor ids
+ * @ss_device: PCI subsystem device id to match, or %PCI_ANY_ID to match all device ids
  * @from: Previous PCI device found in search, or %NULL for new search.
  *
  * Iterates through the list of known PCI devices.  If a PCI device is
@@ -97,7 +97,7 @@ pci_find_subsys(unsigned int vendor, unsigned int device,
 /**
  * pci_find_device - begin or continue searching for a PCI device by vendor/device id
  * @vendor: PCI vendor id to match, or %PCI_ANY_ID to match all vendor ids
- * @device: PCI device id to match, or %PCI_ANY_ID to match all vendor ids
+ * @device: PCI device id to match, or %PCI_ANY_ID to match all device ids
  * @from: Previous PCI device found in search, or %NULL for new search.
  *
  * Iterates through the list of known PCI devices.  If a PCI device is
@@ -122,7 +122,8 @@ pci_find_device(unsigned int vendor, unsigned int device, const struct pci_dev *
  * found with a matching @class, a pointer to its device structure is
  * returned.  Otherwise, %NULL is returned.
  * A new search is initiated by passing %NULL to the @from argument.
- * Otherwise if @from is not %NULL, searches continue from next device on the global list.
+ * Otherwise if @from is not %NULL, searches continue from next device
+ * on the global list.
  */
 struct pci_dev *
 pci_find_class(unsigned int class, const struct pci_dev *from)
@@ -144,9 +145,9 @@ pci_find_class(unsigned int class, const struct pci_dev *from)
  * @cap: capability code
  *
  * Tell if a device supports a given PCI capability.
- * Returns the address of the requested capability structure within the device's PCI 
- * configuration space or 0 in case the device does not support it.
- * Possible values for @flags:
+ * Returns the address of the requested capability structure within the
+ * device's PCI configuration space or 0 in case the device does not
+ * support it.  Possible values for @cap:
  *
  *  %PCI_CAP_ID_PM           Power Management 
  *
@@ -387,10 +388,10 @@ err_out:
 static LIST_HEAD(pci_drivers);
 
 /**
- * pci_match_device - Tell if a PCI device structure has a matching PCI device
+ * pci_match_device - Tell if a PCI device structure has a matching PCI device id structure
  * @ids: array of PCI device id structures to search in
  * @dev: the PCI device structure to match against
- *
+ * 
  * Used by a driver to check whether a PCI device present in the
  * system is in its list of supported devices.Returns the matching
  * pci_device_id structure or %NULL if there is no match.
@@ -441,7 +442,8 @@ out:
  * 
  * Adds the driver structure to the list of registered drivers
  * Returns the number of pci devices which were claimed by the driver
- * during registration.
+ * during registration.  The driver remains registered even if the
+ * return value is zero.
  */
 int
 pci_register_driver(struct pci_driver *drv)
@@ -462,8 +464,9 @@ pci_register_driver(struct pci_driver *drv)
  * @drv: the driver structure to unregister
  * 
  * Deletes the driver structure from the list of registered PCI drivers,
- * gives it a chance to clean up and marks the devices for which it
- * was responsible as driverless.
+ * gives it a chance to clean up by calling its remove() function for
+ * each device it was responsible for, and marks those devices as
+ * driverless.
  */
 
 void
@@ -1367,6 +1370,8 @@ EXPORT_SYMBOL(pci_devices);
 EXPORT_SYMBOL(pci_root_buses);
 EXPORT_SYMBOL(pci_enable_device);
 EXPORT_SYMBOL(pci_find_capability);
+EXPORT_SYMBOL(pci_release_regions);
+EXPORT_SYMBOL(pci_request_regions);
 EXPORT_SYMBOL(pci_find_class);
 EXPORT_SYMBOL(pci_find_device);
 EXPORT_SYMBOL(pci_find_slot);

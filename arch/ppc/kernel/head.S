@@ -1135,7 +1135,7 @@ copy_and_flush:
 #ifdef CONFIG_APUS
 /*
  * On APUS the physical base address of the kernel is not known at compile
- * time, which means the __pa/__va constants used are incorect. In the
+ * time, which means the __pa/__va constants used are incorrect. In the
  * __init section is recorded the virtual addresses of instructions using
  * these constants, so all that has to be done is fix these before
  * continuing the kernel boot.

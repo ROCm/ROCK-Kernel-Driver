@@ -122,43 +122,62 @@ static int set_rtc_time(void)
 #define SCL		0x02
 #define SDA		0x01
 
-static int ioc_control;
+/*
+ * We must preserve all non-i2c output bits in IOC_CONTROL.
+ * Note also that we need to preserve the value of SCL and
+ * SDA outputs as well (which may be different from the
+ * values read back from IOC_CONTROL).
+ */
+static u_int force_ones;
 
 static void ioc_setscl(void *data, int state)
 {
+	u_int ioc_control = ioc_readb(IOC_CONTROL) & ~(SCL | SDA);
+	u_int ones = force_ones;
+
 	if (state)
-		ioc_control |= SCL;
+		ones |= SCL;
 	else
-		ioc_control &= ~SCL;
- 	outb(ioc_control, IOC_CONTROL);
+		ones &= ~SCL;
+
+	force_ones = ones;
+
+ 	ioc_writeb(ioc_control | ones, IOC_CONTROL);
 }
 
 static void ioc_setsda(void *data, int state)
 {
+	u_int ioc_control = ioc_readb(IOC_CONTROL) & ~(SCL | SDA);
+	u_int ones = force_ones;
+
 	if (state)
-		ioc_control |= SDA;
+		ones |= SDA;
 	else
-		ioc_control &= ~SDA;
- 	outb(ioc_control, IOC_CONTROL);
+		ones &= ~SDA;
+
+	force_ones = ones;
+
+ 	ioc_writeb(ioc_control | ones, IOC_CONTROL);
 }
 
 static int ioc_getscl(void *data)
 {
-	return (inb(IOC_CONTROL) & SCL) != 0;
+	return (ioc_readb(IOC_CONTROL) & SCL) != 0;
 }
 
 static int ioc_getsda(void *data)
 {
-	return (inb(IOC_CONTROL) & SDA) != 0;
+	return (ioc_readb(IOC_CONTROL) & SDA) != 0;
 }
 
 static struct i2c_algo_bit_data ioc_data = {
-	NULL,
-	ioc_setsda,
-	ioc_setscl,
-	ioc_getsda,
-	ioc_getscl,
-	80, 80, 100
+	setsda:		ioc_setsda,
+	setscl:		ioc_setscl,
+	getsda:		ioc_getsda,
+	getscl:		ioc_getscl,
+	udelay:		 80,
+	mdelay:		 80,
+	timeout:	100
 };
 
 static int ioc_client_reg(struct i2c_client *client)
@@ -184,22 +203,16 @@ static int ioc_client_unreg(struct i2c_client *client)
 }
 
 static struct i2c_adapter ioc_ops = {
-	"IOC/IOMD",
-	I2C_HW_B_IOC,
-	NULL,
-	&ioc_data,
-	NULL,
-	NULL,
-	ioc_client_reg,
-	ioc_client_unreg
+	name:			"IOC/IOMD",
+	id:			I2C_HW_B_IOC,
+	algo_data:		&ioc_data,
+	client_register:	ioc_client_reg,
+	client_unregister:	ioc_client_unreg
 };
 
 static int __init i2c_ioc_init(void)
 {
-	ioc_control = inb(IOC_CONTROL) | FORCE_ONES;
-
-	ioc_setscl(NULL, 1);
-	ioc_setsda(NULL, 1);
+	force_ones = FORCE_ONES | SCL | SDA;
 
 	return i2c_bit_add_bus(&ioc_ops);
 }

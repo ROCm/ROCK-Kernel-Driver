@@ -696,6 +696,9 @@ static void arcnet_timeout(struct net_device *dev)
 		       msg, status, lp->intmask, lp->lasttrans_dest);
 		lp->last_timeout = jiffies;
 	}
+
+	if (lp->cur_tx == -1)
+		netif_wake_queue(dev);
 }
 
 

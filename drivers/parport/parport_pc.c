@@ -89,6 +89,7 @@ static struct superio_struct {	/* For Super-IO chips autodetection */
 } superios[NR_SUPERIOS] __devinitdata = { {0,},};
 
 static int user_specified __devinitdata = 0;
+static int registered_parport;
 
 /* frob_control, but for ECR */
 static void frob_econtrol (struct parport *pb, unsigned char m,
@@ -2605,8 +2606,10 @@ static int __init parport_pc_find_ports (int autoirq, int autodma)
 	count += parport_pc_find_nonpci_ports (autoirq, autodma);
 
 	r = pci_register_driver (&parport_pc_pci_driver);
-	if (r > 0)
+	if (r >= 0) {
+		registered_parport = 1;
 		count += r;
+	}
 
 	return count;
 }
@@ -2667,6 +2670,7 @@ int init_module(void)
 	/* Work out how many ports we have, then get parport_share to parse
 	   the irq values. */
 	unsigned int i;
+	int ret;
 	for (i = 0; i < PARPORT_PC_MAX_PORTS && io[i]; i++);
 	if (i) {
 		if (parport_parse_irqs(i, irq, irqval)) return 1;
@@ -2691,7 +2695,11 @@ int init_module(void)
 			}
 	}
 
-	return !parport_pc_init (io, io_hi, irqval, dmaval);
+	ret = !parport_pc_init (io, io_hi, irqval, dmaval);
+	if (ret && registered_parport)
+		pci_unregister_driver (&parport_pc_pci_driver);
+
+	return ret;
 }
 
 void cleanup_module(void)

@@ -275,6 +275,9 @@ int __init mac8390_probe(struct net_device *dev)
 		return -ENODEV;
 
 	dev = init_etherdev(dev, 0);
+	if (!dev)
+		return -ENOMEM;
+	SET_MODULE_OWNER(dev);
 
 	if (!version_printed) {
 		printk(KERN_INFO "%s", version);
@@ -445,7 +448,7 @@ int __init mac8390_probe(struct net_device *dev)
 	}
 
 	/* We should hopefully not get here */
-	printk(KERN_ERR "Probe unsucessful.\n");
+	printk(KERN_ERR "Probe unsuccessful.\n");
 	return -ENODEV;
 
  membad:
@@ -630,7 +633,8 @@ static int __init ns8390_probe1(struct net_device *dev, int word16, char *model_
 
 static int ns8390_open(struct net_device *dev)
 {
-	MOD_INC_USE_COUNT;
+	int ret;
+
 	ei_open(dev);
 
 	/* At least on my card (a Focus Enhancements PDS card) I start */
@@ -639,11 +643,10 @@ static int ns8390_open(struct net_device *dev)
 	/*                             - funaho@jurai.org (1999-05-17) */
 
 	/* Non-slow interrupt, works around issues with the SONIC driver */
-	if (request_irq(dev->irq, ei_interrupt, 0, "8390 Ethernet", dev)) 
-	{
+	ret = request_irq(dev->irq, ei_interrupt, 0, dev->name, dev); 
+	if (ret) {
 		printk ("%s: unable to get IRQ %d.\n", dev->name, dev->irq);
-		MOD_DEC_USE_COUNT;
-		return -EAGAIN;
+		return ret;
 	}
 	return 0;
 }
@@ -654,7 +657,6 @@ static void ns8390_no_reset(struct net_device *dev)
 		printk("Need to reset the NS8390 t=%lu...", jiffies);
 	ei_status.txing = 0;
 	if (ei_debug > 1) printk("reset not supported\n");
-	return;
 }
 
 static int ns8390_close_card(struct net_device *dev)
@@ -663,7 +665,6 @@ static int ns8390_close_card(struct net_device *dev)
 		printk("%s: Shutting down ethercard.\n", dev->name);
 	free_irq(dev->irq, dev);
 	ei_close(dev);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

@@ -100,14 +100,14 @@ extern void __secondary_start_psurge3(void);	/* Temporary horrible hack */
 #define PSURGE_QUAD_CKSTOP_RDBK	8
 #define PSURGE_QUAD_RESET_CTL	11
 
-#define PSURGE_QUAD_OUT(r, v)	(out_8((u8 *)(quad_base+((r)<<2)+1), (v)))
-#define PSURGE_QUAD_IN(r)	(in_8((u8 *)(quad_base+((r)<<2)+1)) & 0x0f)
+#define PSURGE_QUAD_OUT(r, v)	(out_8(quad_base + ((r) << 4) + 4, (v)))
+#define PSURGE_QUAD_IN(r)	(in_8(quad_base + ((r) << 4) + 4) & 0x0f)
 #define PSURGE_QUAD_BIS(r, v)	(PSURGE_QUAD_OUT((r), PSURGE_QUAD_IN(r) | (v)))
 #define PSURGE_QUAD_BIC(r, v)	(PSURGE_QUAD_OUT((r), PSURGE_QUAD_IN(r) & ~(v)))
 
 /* virtual addresses for the above */
 static volatile u8 *hhead_base;
-static volatile u32 *quad_base;
+static volatile u8 *quad_base;
 static volatile u32 *psurge_pri_intr;
 static volatile u8 *psurge_sec_intr;
 static volatile u32 *psurge_start;
@@ -216,7 +216,7 @@ smp_psurge_message_pass(int target, int msg, unsigned long data, int wait)
 
 /*
  * Determine a quad card presence. We read the board ID register, we
- * for the data bus to change to something else, and we read it again.
+ * force the data bus to change to something else, and we read it again.
  * It it's stable, then the register probably exist (ugh !)
  */
 static int __init psurge_quad_probe(void)
@@ -303,11 +303,7 @@ static int __init smp_psurge_probe(void)
 	psurge_type = psurge_quad_probe();
 	if (psurge_type != PSURGE_DUAL) {
 		psurge_quad_init();
-		/* I believe we could "count" CPUs by counting 1 bits
-		 * in procbits on a quad board. For now, we assume 4,
-		 * non-present CPUs will just be seen as "stuck".
-		 * (hope they are the higher-numbered ones -- paulus)
-		 */
+		/* All released cards using this HW design have 4 CPUs */
 		ncpus = 4;
 	} else {
 		iounmap((void *) quad_base);
@@ -424,11 +420,10 @@ smp_openpic_message_pass(int target, int msg, unsigned long data, int wait)
 		break;
 	case MSG_ALL_BUT_SELF:
 		openpic_cause_IPI(msg,
-       			0xffffffff & ~(1 << smp_hw_index[smp_processor_id()])); 
-
+				  0xffffffff & ~(1 << smp_processor_id()));
 		break;
 	default:
-		openpic_cause_IPI(msg, smp_hw_index[1<<target]);
+		openpic_cause_IPI(msg, 1<<target);
 		break;
 	}
 }
@@ -437,27 +432,14 @@ static int
 smp_core99_probe(void)
 {
 	struct device_node *cpus;
-	int *pp;
 	int i, ncpus = 1;
 
 	if (ppc_md.progress) ppc_md.progress("smp_core99_probe", 0x345);
-#if 0	/* Paulus method.. doesn't seem to work on earlier dual G4's??*/
-	cpus = find_devices("cpus");
-	if (cpus != 0) {
-		pp = (int *) get_property(cpus, "#cpus", NULL);
-		if (pp != NULL)
-			ncpus = *pp;
-	}
-#else	/* My original method -- Troy <hozer@drgw.net> */
-	
 	cpus = find_type_devices("cpu");
-	if (cpus){
-		for ( ncpus = 1; cpus->next; cpus = cpus->next ){
-					ncpus++;
-		}
-	}
-#endif
-	printk("smp_core99_probe: OF reports %d cpus\n", ncpus);
+	if (cpus)
+		while ((cpus = cpus->next) != NULL)
+			++ncpus;
+	printk("smp_core99_probe: found %d cpus\n", ncpus);
 	if (ncpus > 1) {
 		openpic_request_IPIs();
 		for (i = 1; i < ncpus; ++i)
@@ -1010,6 +992,9 @@ void __init smp_boot_cpus(void)
 
 	/* Setup CPU 0 last (important) */
 	smp_ops->setup_cpu(0);
+	
+	if (smp_num_cpus < 2)
+		smp_tb_synchronized = 1;
 }
 
 void __init smp_software_tb_sync(int cpu)
@@ -1027,17 +1012,6 @@ void __init smp_software_tb_sync(int cpu)
 	register unsigned long start = 0;
 	register unsigned long stop = 0;
 	register unsigned long temp = 0;
-	
-	if (smp_num_cpus < 2) {
-		smp_tb_synchronized = 1;
-		return;
-	}
-
-	/* This code need fixing on >2 CPUs --BenH/paulus */
-	if (smp_num_cpus > 2) {
-		smp_tb_synchronized = 0;
-		return;
-	}
 
 	set_tb(0, 0);
 
@@ -1107,6 +1081,7 @@ void __init smp_commence(void)
 	if (ppc_md.progress) ppc_md.progress("smp_commence", 0x370);
 	wmb();
 	smp_commenced = 1;
+
 	/* if the smp_ops->setup_cpu function has not already synched the
 	 * timebases with a nicer hardware-based method, do so now
 	 *
@@ -1117,9 +1092,9 @@ void __init smp_commence(void)
 	 * since if this code runs pretty early and needs all cpus that
 	 * reported in in smp_callin_map to be working
 	 *
-	 * NOTE2: this code doesn't seem to work on > 2 cpus. -- paulus
+	 * NOTE2: this code doesn't seem to work on > 2 cpus. -- paulus/BenH
 	 */
-	if (!smp_tb_synchronized) {
+	if (!smp_tb_synchronized && smp_num_cpus == 2) {
 		unsigned long flags;
 		__save_and_cli(flags);	
 		smp_software_tb_sync(0);
@@ -1142,7 +1117,7 @@ void __init smp_callin(void)
 	while(!smp_commenced)
 		barrier();
 	/* see smp_commence for more info */
-	if (!smp_tb_synchronized){
+	if (!smp_tb_synchronized && smp_num_cpus == 2) {
 		smp_software_tb_sync(cpu);
 	}
 	__sti();

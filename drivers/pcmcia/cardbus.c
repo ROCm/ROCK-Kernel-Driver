@@ -288,7 +288,6 @@ int cb_alloc(socket_info_t * s)
 			if (res->flags)
 				pci_assign_resource(dev, r);
 		}
-		pci_enable_device(dev); /* XXX check return */
 
 		/* Does this function have an interrupt at all? */
 		pci_readb(dev, PCI_INTERRUPT_PIN, &irq_pin);
@@ -297,6 +296,7 @@ int cb_alloc(socket_info_t * s)
 			pci_writeb(dev, PCI_INTERRUPT_LINE, irq);
 		}
 
+		pci_enable_device(dev); /* XXX check return */
 		pci_insert_device(dev, bus);
 	}
 

@@ -1195,10 +1195,6 @@ static void eth16i_rx(struct net_device *dev)
 			}
 
 			skb->protocol=eth_type_trans(skb, dev);
-			netif_rx(skb);
-			dev->last_rx = jiffies;
-			lp->stats.rx_packets++;
-			lp->stats.rx_bytes += pkt_len;
 
 			if( eth16i_debug > 5 ) {
 				int i;
@@ -1208,6 +1204,10 @@ static void eth16i_rx(struct net_device *dev)
 					printk(KERN_DEBUG " %02x", skb->data[i]);
 				printk(KERN_DEBUG ".\n");
 			}
+			netif_rx(skb);
+			dev->last_rx = jiffies;
+			lp->stats.rx_packets++;
+			lp->stats.rx_bytes += pkt_len;
 
 		} /* else */
 

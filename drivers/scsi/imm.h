@@ -118,7 +118,7 @@ int imm_sg = SG_ALL;		/* enable/disable scatter-gather. */
 #define IMM_BURST_SIZE	512	/* data burst size */
 #define IMM_SELECT_TMO  500	/* 500 how long to wait for target ? */
 #define IMM_SPIN_TMO    5000	/* 50000 imm_wait loop limiter */
-#define IMM_DEBUG	0	/* debuging option */
+#define IMM_DEBUG	0	/* debugging option */
 #define IN_EPP_MODE(x) (x == IMM_EPP_8 || x == IMM_EPP_16 || x == IMM_EPP_32)
 
 /* args to imm_connect */

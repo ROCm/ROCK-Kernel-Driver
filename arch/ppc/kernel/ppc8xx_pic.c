@@ -153,6 +153,20 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 	irq += i8259_pic.irq_offset;
 	return (request_8xxirq(irq, handler, irqflags, devname, dev_id));
 #else
-	panic("request_irq");
+	/*
+	 * Handle other "well-known" interrupts, but panic on unknown ones.
+	 */
+	switch (irq) {
+#ifdef	IDE0_INTERRUPT
+	case IDE0_INTERRUPT:		/* fall through */
+#endif
+#ifdef	IDE1_INTERRUPT
+	case IDE1_INTERRUPT:		/* fall through */
+#endif
+		return (request_8xxirq(irq, handler, irqflags, devname, dev_id));
+	
+	default:			/* unknown IRQ -> panic */
+		panic("request_irq");
+	}
 #endif
 }

@@ -3,8 +3,9 @@
    
    Written By: Adam Radford <linux@3ware.com>
    Modifications By: Joel Jacobson <linux@3ware.com>
+   		     Arnaldo Carvalho de Melo <acme@conectiva.com.br>
 
-   Copyright (C) 1999 3ware Inc.
+   Copyright (C) 1999-2001 3ware Inc.
 
    Kernel compatablity By:	Andre Hedrick <andre@suse.com>
    Non-Copyright (C) 2000	Andre Hedrick <andre@suse.com>
@@ -97,6 +98,8 @@
 #define TW_DEVICE_NAME			       "3ware Storage Controller"
 #define TW_VENDOR_ID (0x13C1)	/* 3ware */
 #define TW_DEVICE_ID (0x1000)	/* Storage Controller */
+#define TW_DEVICE_ID2 (0x1001)  /* 7000 series controller */
+#define TW_NUMDEVICES 2
 
 /* Command packet opcodes */
 #define TW_OP_NOP	      0x0
@@ -328,6 +331,7 @@ int tw_scsiop_inquiry_complete(TW_Device_Extension *tw_dev, int request_id);
 int tw_scsiop_read_capacity(TW_Device_Extension *tw_dev, int request_id);
 int tw_scsiop_read_capacity_complete(TW_Device_Extension *tw_dev, int request_id);
 int tw_scsiop_read_write(TW_Device_Extension *tw_dev, int request_id);
+int tw_scsiop_request_sense(TW_Device_Extension *tw_dev, int request_id);
 int tw_scsiop_test_unit_ready(TW_Device_Extension *tw_dev, int request_id);
 int tw_setfeature(TW_Device_Extension *tw_dev, int parm, int param_size, 
 		  unsigned char *val);

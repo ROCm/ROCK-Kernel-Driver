@@ -4,7 +4,7 @@
  * (The PPA3 is the embedded controller in the ZIP drive.)
  * 
  * (c) 1995,1996 Grant R. Guenther, grant@torque.net,
- * under the terms of the GNU Public License.
+ * under the terms of the GNU General Public License.
  * 
  * Current Maintainer: David Campbell (Perth, Western Australia, GMT+0800)
  *                     campbell@torque.net
@@ -29,7 +29,7 @@ typedef struct {
     int mode;			/* Transfer mode                */
     int host;			/* Host number (for proc)       */
     Scsi_Cmnd *cur_cmd;		/* Current queued command       */
-    struct tq_struct ppa_tq;	/* Polling interupt stuff       */
+    struct tq_struct ppa_tq;	/* Polling interrupt stuff       */
     unsigned long jstart;	/* Jiffies at start             */
     unsigned long recon_tmo;    /* How many usecs to wait for reconnection (6th bit) */
     unsigned int failed:1;	/* Failure flag                 */

@@ -1594,7 +1594,7 @@ int ibmmca_detect (Scsi_Host_Template * scsi_template)
       if ((pos[2] & 1) == 1) /* is the subsystem chip enabled ? */
 	port = IM_IO_PORT;
       else { /* if disabled, no IRQs will be generated, as the chip won't
-	      * listen to the incomming commands and will do really nothing,
+	      * listen to the incoming commands and will do really nothing,
 	      * except for listening to the pos-register settings. If this
 	      * happens, I need to hugely think about it, as one has to
 	      * write something to the MCA-Bus pos register in order to

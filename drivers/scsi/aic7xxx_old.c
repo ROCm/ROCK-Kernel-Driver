@@ -248,15 +248,15 @@
 #include "sd.h"
 #include "scsi.h"
 #include "hosts.h"
-#include "aic7xxx.h"
+#include "aic7xxx_old/aic7xxx.h"
 
-#include "aic7xxx/sequencer.h"
-#include "aic7xxx/scsi_message.h"
-#include "aic7xxx_reg.h"
+#include "aic7xxx_old/sequencer.h"
+#include "aic7xxx_old/scsi_message.h"
+#include "aic7xxx_old/aic7xxx_reg.h"
 #include <scsi/scsicam.h>
 
 #include <linux/stat.h>
-#include <linux/slab.h>        /* for kmalloc() */
+#include <linux/malloc.h>        /* for kmalloc() */
 
 #include <linux/config.h>        /* for CONFIG_PCI */
 
@@ -311,8 +311,8 @@
  * You can try raising me if tagged queueing is enabled, or lowering
  * me if you only have 4 SCBs.
  */
-#ifdef CONFIG_AIC7XXX_CMDS_PER_DEVICE
-#define AIC7XXX_CMDS_PER_DEVICE CONFIG_AIC7XXX_CMDS_PER_DEVICE
+#ifdef CONFIG_AIC7XXX_OLD_CMDS_PER_DEVICE
+#define AIC7XXX_CMDS_PER_DEVICE CONFIG_AIC7XXX_OLD_CMDS_PER_DEVICE
 #else
 #define AIC7XXX_CMDS_PER_DEVICE 8
 #endif
@@ -323,7 +323,7 @@
  * NOTE: Do NOT enable this when running on kernels version 1.2.x and below.
  * NOTE: This does affect performance since it has to maintain statistics.
  */
-#ifdef CONFIG_AIC7XXX_PROC_STATS
+#ifdef CONFIG_AIC7XXX_OLD_PROC_STATS
 #define AIC7XXX_PROC_STATS
 #endif
 
@@ -347,7 +347,7 @@ typedef struct
  * Make a define that will tell the driver not to use tagged queueing
  * by default.
  */
-#ifdef CONFIG_AIC7XXX_TCQ_ON_BY_DEFAULT
+#ifdef CONFIG_AIC7XXX_OLD_TCQ_ON_BY_DEFAULT
 #define DEFAULT_TAG_COMMANDS {0, 0, 0, 0, 0, 0, 0, 0,\
                               0, 0, 0, 0, 0, 0, 0, 0}
 #else
@@ -935,7 +935,7 @@ struct aic7xxx_host {
    * We are grouping things here....first, items that get either read or
    * written with nearly every interrupt
    */
-  volatile ahc_flag_type   flags;
+  volatile long            flags;
   ahc_feature              features;         /* chip features */
   unsigned long            base;             /* card base address */
   volatile unsigned char  *maddr;            /* memory mapped address */
@@ -1626,7 +1626,7 @@ restart_sequencer(struct aic7xxx_host *p)
  * prototype, our code has to be ordered that way, it's a left-over from
  * the original driver days.....I should fix it some time DL).
  */
-#include "aic7xxx_seq.c"
+#include "aic7xxx_old/aic7xxx_seq.c"
 
 /*+F*************************************************************************
  * Function:
@@ -11328,7 +11328,7 @@ aic7xxx_panic_abort(struct aic7xxx_host *p, Scsi_Cmnd *cmd)
   printk("aic7xxx driver version %s/%s\n", AIC7XXX_C_VERSION,
          UTS_RELEASE);
   printk("Controller type:\n    %s\n", board_names[p->board_name_index]);
-  printk("p->flags=0x%x, p->chip=0x%x, p->features=0x%x, "
+  printk("p->flags=0x%lx, p->chip=0x%x, p->features=0x%x, "
          "sequencer %s paused\n",
      p->flags, p->chip, p->features,
     (aic_inb(p, HCNTRL) & PAUSE) ? "is" : "isn't" );
@@ -12215,7 +12215,7 @@ aic7xxx_print_scratch_ram(struct aic7xxx_host *p)
 }
 
 
-#include "aic7xxx_proc.c"
+#include "aic7xxx_old/aic7xxx_proc.c"
 
 /* Eventually this will go into an include file, but this will be later */
 static Scsi_Host_Template driver_template = AIC7XXX;

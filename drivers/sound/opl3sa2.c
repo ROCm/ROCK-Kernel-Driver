@@ -806,6 +806,16 @@ static void __exit unload_opl3sa2(struct address_info* hw_config, int card)
 
 
 #if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+
+struct isapnp_device_id isapnp_opl3sa2_list[] __initdata = {
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('Y','M','H'), ISAPNP_FUNCTION(0x0021),
+		NULL },
+	{0}
+};
+
+MODULE_DEVICE_TABLE(isapnp, isapnp_opl3sa2_list);
+
 static int __init opl3sa2_isapnp_probe(struct address_info* hw_cfg,
 				       struct address_info* mss_cfg,
 				       struct address_info* mpu_cfg,
@@ -908,13 +918,17 @@ static int __init init_opl3sa2(void)
 						  &cfg_mpu[card],
 						  card) < 0) {
 			if(!opl3sa2_cards_num)
-				printk(KERN_NOTICE "opl3sa2: No cards found\n");
-			break;
+				printk(KERN_INFO "opl3sa2: No PnP cards found\n");
+			if(io == -1)
+				break;
+			isapnp=0;
+			printk(KERN_INFO "opl3sa2: Search for a card at 0x%d.\n", io);
+			/* Fall through */
 		}
 #endif
 		/* If a user wants an I/O then assume they meant it */
 		
-		if(!isapnp && io == -1 ) {
+		if(!isapnp) {
 			if(io == -1 || irq == -1 || dma == -1 ||
 			   dma2 == -1 || mss_io == -1) {
 				printk(KERN_ERR

@@ -321,7 +321,7 @@ int uncached_readdir(nfs_readdir_descriptor_t *desc, void *dirent,
 		desc->page = NULL;
 	}
 
-	page = page_cache_alloc();
+	page = alloc_page(GFP_HIGHUSER);
 	if (!page) {
 		status = -ENOMEM;
 		goto out;

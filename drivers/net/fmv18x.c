@@ -52,6 +52,7 @@ static const char *version =
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <linux/errno.h>
+#include <linux/spinlock.h>
 
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -79,6 +80,7 @@ struct net_local {
 	uint rx_started:1;			/* Packets are Rxing. */
 	uchar tx_queue;				/* Number of packet on the Tx queue. */
 	ushort tx_queue_len;		/* Current length of the Tx queue. */
+	spinlock_t lock;
 };
 
 
@@ -161,6 +163,7 @@ static int __init fmv18x_probe1(struct net_device *dev, short ioaddr)
 	char irqmap[4] = {3, 7, 10, 15};
 	char irqmap_pnp[8] = {3, 4, 5, 7, 9, 10, 11, 15};
 	unsigned int i, irq, retval;
+	struct net_local *lp;
 
 	/* Resetting the chip doesn't reset the ISA interface, so don't bother.
 	   That means we have to be careful with the register values we probe for.
@@ -268,6 +271,8 @@ static int __init fmv18x_probe1(struct net_device *dev, short ioaddr)
 		goto out_irq;
 	}
 	memset(dev->priv, 0, sizeof(struct net_local));
+	lp = dev->priv;
+	spin_lock_init(&lp->lock);
 
 	dev->open		= net_open;
 	dev->stop		= net_close;
@@ -292,7 +297,7 @@ out:
 
 static int net_open(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = dev->priv;
 	int ioaddr = dev->base_addr;
 
 	/* Set the configuration register 0 to 32K 100ns. byte-wide memory,
@@ -326,7 +331,7 @@ static int net_open(struct net_device *dev)
 
 static void net_timeout(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = dev->priv;
 	int ioaddr = dev->base_addr;
 	unsigned long flags;
 	
@@ -346,8 +351,7 @@ static void net_timeout(struct net_device *dev)
 		htons(inw(ioaddr+FJ_CONFIG0)));
 	lp->stats.tx_errors++;
 	/* ToDo: We should try to restart the adaptor... */
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lp->lock, flags);
 
 	/* Initialize LAN Controller and LAN Card */
 	outb(0xda, ioaddr + CONFIG_0);   /* Initialize LAN Controller */
@@ -355,19 +359,20 @@ static void net_timeout(struct net_device *dev)
 	outb(0x00, ioaddr + FJ_CONFIG1); /* Disable IRQ of LAN Card */
 	outb(0x00, ioaddr + FJ_BUFCNTL); /* Reset ? I'm not sure */
 	net_open(dev);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lp->lock, flags);
+
+	netif_wake_queue(dev);
 }
 
 static int net_send_packet(struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = dev->priv;
 	int ioaddr = dev->base_addr;
 	short length = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
 	unsigned char *buf = skb->data;
+	unsigned long flags;
 
 	/* Block a transmit from overlapping.  */
-	
-	netif_stop_queue(dev);
 	
 	if (length > ETH_FRAME_LEN) {
 		if (net_debug)
@@ -383,6 +388,7 @@ static int net_send_packet(struct sk_buff *skb, struct net_device *dev)
 	   codes we possibly catch a Tx interrupt. Thus we flag off
 	   tx_queue_ready, so that we prevent the interrupt routine
 	   (net_interrupt) to start transmitting. */
+	spin_lock_irqsave(&lp->lock, flags);
 	lp->tx_queue_ready = 0;
 	{
 		outw(length, ioaddr + DATAPORT);
@@ -391,6 +397,8 @@ static int net_send_packet(struct sk_buff *skb, struct net_device *dev)
 		lp->tx_queue_len += length + 2;
 	}
 	lp->tx_queue_ready = 1;
+	spin_unlock_irqrestore(&lp->lock, flags);
+
 	if (lp->tx_started == 0) {
 		/* If the Tx is idle, always trigger a transmit. */
 		outb(0x80 | lp->tx_queue, ioaddr + TX_START);
@@ -398,10 +406,10 @@ static int net_send_packet(struct sk_buff *skb, struct net_device *dev)
 		lp->tx_queue_len = 0;
 		dev->trans_start = jiffies;
 		lp->tx_started = 1;
-		netif_wake_queue(dev);
 	} else if (lp->tx_queue_len < 4096 - 1502)
 		/* Yes, there is room for one more packet. */
-		netif_wake_queue(dev);
+	else
+		netif_stop_queue(dev);
 
 	dev_kfree_skb(skb);
 	return 0;
@@ -417,7 +425,7 @@ net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	int ioaddr, status;
 
 	ioaddr = dev->base_addr;
-	lp = (struct net_local *)dev->priv;
+	lp = dev->priv;
 	status = inw(ioaddr + TX_STATUS);
 	outw(status, ioaddr + TX_STATUS);
 
@@ -447,6 +455,7 @@ net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			lp->stats.collisions++;
 		}
 		if (status & 0x82) {
+			spin_lock(&lp->lock);
 			lp->stats.tx_packets++;
 			if (lp->tx_queue && lp->tx_queue_ready) {
 				outb(0x80 | lp->tx_queue, ioaddr + TX_START);
@@ -458,6 +467,7 @@ net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				lp->tx_started = 0;
 				netif_wake_queue(dev);	/* Inform upper layers. */
 			}
+			spin_unlock(&lp->lock);
 		}
 	}
 	return;
@@ -466,7 +476,7 @@ net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 /* We have a good packet(s), get it/them out of the buffers. */
 static void net_rx(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = dev->priv;
 	int ioaddr = dev->base_addr;
 	int boguscount = 5;
 
@@ -581,7 +591,7 @@ static int net_close(struct net_device *dev)
    closed. */
 static struct net_device_stats *net_get_stats(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = dev->priv;
 	return &lp->stats;
 }
 

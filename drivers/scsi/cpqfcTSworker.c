@@ -422,7 +422,7 @@ void cpqfcTS_WorkTask( struct Scsi_Host *HostAdapter)
     
 //      printk(" *ELS %Xh* ", fcLQ->Qitem[QconsumerNdx].Type);
       // if PortDiscDone is not set, it means the SendLogins routine
-      // failed to complete -- assume that LDn occured, so login frames
+      // failed to complete -- assume that LDn occurred, so login frames
       // are invalid
       if( !cpqfcHBAdata->PortDiscDone) // cleared by LDn
       {
@@ -4143,7 +4143,7 @@ ULONG cpqfcTSBuildExchange(
   TachLiteIRE* pIRE;
   TachLiteTWE* pTWE;
   TachLiteTRE* pTRE;
-  ULONG fcp_dl;           // total byte length of DATA transfered
+  ULONG fcp_dl;           // total byte length of DATA transferred
   ULONG fl;               // frame length (FC frame size, 128, 256, 512, 1024)
   ULONG sgPairs;          // number of valid scatter/gather pairs
   int FCP_SCSI_command;

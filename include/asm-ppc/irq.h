@@ -88,23 +88,31 @@ irq_cannonicalize(int irq)
 #define	SIU_IRQ7	(14)
 #define	SIU_LEVEL7	(15)
 
+/* Now include the board configuration specific associations.
+*/
+#include <asm/mpc8xx.h>
+
 /* The internal interrupts we can configure as we see fit.
  * My personal preference is CPM at level 2, which puts it above the
  * MBX PCI/ISA/IDE interrupts.
  */
+#ifndef PIT_INTERRUPT
 #define PIT_INTERRUPT		SIU_LEVEL0
+#endif
+#ifndef	CPM_INTERRUPT
 #define CPM_INTERRUPT		SIU_LEVEL2
+#endif
+#ifndef	PCMCIA_INTERRUPT
 #define PCMCIA_INTERRUPT	SIU_LEVEL6
+#endif
+#ifndef	DEC_INTERRUPT
 #define DEC_INTERRUPT		SIU_LEVEL7
+#endif
 
 /* Some internal interrupt registers use an 8-bit mask for the interrupt
  * level instead of a number.
  */
 #define	mk_int_int_mask(IL) (1 << (7 - (IL/2)))
-
-/* Now include the board configuration specific associations.
-*/
-#include <asm/mpc8xx.h>
 
 /* always the same on 8xx -- Cort */
 static __inline__ int irq_cannonicalize(int irq)

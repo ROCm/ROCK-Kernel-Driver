@@ -153,7 +153,9 @@ static void usb_drivers_purge(struct usb_driver *driver,struct usb_device *dev)
 			down(&driver->serialize);
 			driver->disconnect(dev, interface->private_data);
 			up(&driver->serialize);
-			usb_driver_release_interface(driver, interface);
+			/* if driver->disconnect didn't release the interface */
+			if (interface->driver)
+				usb_driver_release_interface(driver, interface);
 			/*
 			 * This will go through the list looking for another
 			 * driver that can handle the device
@@ -349,6 +351,7 @@ void usb_release_bandwidth(struct usb_device *dev, struct urb *urb, int isoc)
  *
  *	Creates a USB host controller bus structure with the specified 
  *	usb_operations and initializes all the necessary internal objects.
+ *	(For use only by USB Host Controller Drivers.)
  *
  *	If no memory is available, NULL is returned.
  *
@@ -382,6 +385,7 @@ struct usb_bus *usb_alloc_bus(struct usb_operations *op)
  *	usb_free_bus - frees the memory used by a bus structure
  *	@bus: pointer to the bus to free
  *
+ *	(For use only by USB Host Controller Drivers.)
  */
 void usb_free_bus(struct usb_bus *bus)
 {
@@ -395,6 +399,7 @@ void usb_free_bus(struct usb_bus *bus)
  *	usb_register_bus - registers the USB host controller with the usb core
  *	@bus: pointer to the bus to register
  *
+ *	(For use only by USB Host Controller Drivers.)
  */
 void usb_register_bus(struct usb_bus *bus)
 {
@@ -415,6 +420,12 @@ void usb_register_bus(struct usb_bus *bus)
 	info("new USB bus registered, assigned bus number %d", bus->busnum);
 }
 
+/**
+ *	usb_deregister_bus - deregisters the USB host controller
+ *	@bus: pointer to the bus to deregister
+ *
+ *	(For use only by USB Host Controller Drivers.)
+ */
 void usb_deregister_bus(struct usb_bus *bus)
 {
 	info("USB bus %d deregistered", bus->busnum);
@@ -502,56 +513,69 @@ void usb_driver_release_interface(struct usb_driver *driver, struct usb_interfac
 }
 
 
-/* usb_match_id searches an array of usb_device_id's and returns
-   the first one that matches the device and interface.
-
-   Parameters:
-   	"id" is an array of usb_device_id's is terminated by an entry
-	 containing all zeroes.
-
-	 "dev" and "interface" are the device and interface for which
-	 a match is sought.
-
-   If no match is found or if the "id" pointer is NULL, then
-   usb_match_id returns NULL.
-
-
-   What constitutes a match:
-
-   A zero in any element of a usb_device_id entry is a wildcard
-   (i.e., that field always matches).  For there to be a match,
-   *every* nonzero element of the usb_device_id must match the
-   provided device and interface in.  The comparison is for equality,
-   except for one pair of fields: usb_match_id.bcdDevice_{lo,hi} define
-   an inclusive range that dev->descriptor.bcdDevice must be in.
-
-   If interface->altsettings does not exist (i.e., there are no
-   interfaces defined), then bInterface{Class,SubClass,Protocol}
-   only match if they are all zeroes.
-
-
-   What constitutes a good "usb_device_id"?
-
-   The match algorithm is very simple, so that intelligence in
-   driver selection must come from smart driver id records.
-   Unless you have good reasons to use another selection policy,
-   provide match elements only in related groups:
-
-    * device specifiers (vendor and product IDs; and maybe
-      a revision range for that product);
-    * generic device specs (class/subclass/protocol);
-    * interface specs (class/subclass/protocol).
-    
-   Within those groups, work from least specific to most specific.
-   For example, don't give a product version range without vendor
-   and product IDs.
-
-   "driver_info" is not considered by the kernel matching algorithm,
-   but you can create a wildcard "matches anything" usb_device_id
-   as your driver's "modules.usbmap" entry if you provide only an
-   id with a nonzero "driver_info" field.
-*/   
-
+/**
+ * usb_match_id - find first usb_device_id matching device or interface
+ * @dev: the device whose descriptors are considered when matching
+ * @interface: the interface of interest
+ * @id: array of usb_device_id structures, terminated by zero entry
+ *
+ * usb_match_id searches an array of usb_device_id's and returns
+ * the first one matching the device or interface, or null.
+ * This is used when binding (or rebinding) a driver to an interface.
+ * Most USB device drivers will use this indirectly, through the usb core,
+ * but some layered driver frameworks use it directly.
+ * These device tables are exported with MODULE_DEVICE_TABLE, through
+ * modutils and "modules.usbmap", to support the driver loading
+ * functionality of USB hotplugging.
+ *
+ * What Matches:
+ *
+ * The "match_flags" element in a usb_device_id controls which
+ * members are used.  If the corresponding bit is set, the
+ * value in the device_id must match its corresponding member
+ * in the device or interface descriptor, or else the device_id
+ * does not match.
+ *
+ * "driver_info" is normally used only by device drivers,
+ * but you can create a wildcard "matches anything" usb_device_id
+ * as a driver's "modules.usbmap" entry if you provide an id with
+ * only a nonzero "driver_info" field.  If you do this, the USB device
+ * driver's probe() routine should use additional intelligence to
+ * decide whether to bind to the specified interface.
+ * 
+ * What Makes Good usb_device_id Tables:
+ *
+ * The match algorithm is very simple, so that intelligence in
+ * driver selection must come from smart driver id records.
+ * Unless you have good reasons to use another selection policy,
+ * provide match elements only in related groups, and order match
+ * specifiers from specific to general.  Use the macros provided
+ * for that purpose if you can.
+ *
+ * The most specific match specifiers use device descriptor
+ * data.  These are commonly used with product-specific matches;
+ * the USB_DEVICE macro lets you provide vendor and product IDs,
+ * and you can also matche against ranges of product revisions.
+ * These are widely used for devices with application or vendor
+ * specific bDeviceClass values.
+ *
+ * Matches based on device class/subclass/protocol specifications
+ * are slightly more general; use the USB_DEVICE_INFO macro, or
+ * its siblings.  These are used with single-function devices
+ * where bDeviceClass doesn't specify that each interface has
+ * its own class. 
+ *
+ * Matches based on interface class/subclass/protocol are the
+ * most general; they let drivers bind to any interface on a
+ * multiple-function device.  Use the USB_INTERFACE_INFO
+ * macro, or its siblings, to match class-per-interface style 
+ * devices (as recorded in bDeviceClass).
+ *  
+ * Within those groups, remember that not all combinations are
+ * meaningful.  For example, don't give a product version range
+ * without vendor and product IDs; or specify a protocol without
+ * its associated class and subclass.
+ */   
 const struct usb_device_id *
 usb_match_id(struct usb_device *dev, struct usb_interface *interface,
 	     const struct usb_device_id *id)
@@ -827,7 +851,7 @@ static inline void
 call_policy (char *verb, struct usb_device *dev)
 { } 
 
-#endif	/* KMOD */
+#endif	/* CONFIG_HOTPLUG */
 
 
 /*
@@ -1639,7 +1663,9 @@ void usb_disconnect(struct usb_device **pdev)
 				down(&driver->serialize);
 				driver->disconnect(dev, interface->private_data);
 				up(&driver->serialize);
-				usb_driver_release_interface(driver, interface);
+				/* if driver->disconnect didn't release the interface */
+				if (interface->driver)
+					usb_driver_release_interface(driver, interface);
 			}
 		}
 	}

@@ -657,7 +657,7 @@ static void aic_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 	};
     }
     if ( interruptEvent & INT_BusReset ) {
-	PRINT(KERN_INFO, aic->id, "bus reset occured");
+	PRINT(KERN_INFO, aic->id, "bus reset occurred");
 	if (!host->in_bus_reset) {
 	    hpsb_bus_reset(host);
 	}

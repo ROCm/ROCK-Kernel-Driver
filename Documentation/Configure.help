@@ -5469,6 +5469,45 @@ CONFIG_SCSI_AHA1740
 
 Adaptec AIC7xxx chipset SCSI controller support
 CONFIG_SCSI_AIC7XXX
+  This driver supports all of Adaptec's PCI based SCSI controllers (not
+  the hardware RAID controllers though) as well as the aic7770 based
+  EISA and VLB SCSI controllers (the 274x and 284x series).  This is
+  an Adaptec sponsored driver written by Justin Gibbs.  It is intended
+  to replace the previous aic7xxx driver maintained by Doug Ledford since
+  Doug is no longer maintaining that driver.
+
+Default number of TCQ commands per device
+CONFIG_AIC7XXX_CMDS_PER_DEVICE
+  Specify the number of commands you would like to allocate per SCSI
+  device when Tagged Command Queueing (TCQ) is enabled on that device.
+
+  This is an upper bound value for the number of tagged transactions
+  to be used for any device.  The aic7xxx driver will automatically
+  vary this number based on device behavior.  For devices with a
+  fixed maximum, the driver will eventually lock to this maximum
+  and display a console message inidicating this value.
+
+  Note: Unless you experience some type of device failure, the default
+	value, no enforced limit, should work for you.
+
+  Default: 253
+
+Initial Bus Reset Settle Delay
+CONFIG_AIC7XXX_RESET_DELAY
+  The number of milliseconds to delay after an initial bus reset.
+  The bus settle delay following all error recovery actions is
+  dictated by the SCSI layer and is not affected by this value.
+
+  Default: 5000 (5 seconds)
+
+Old Adaptec AIC7xxx chipset SCSI controller support
+CONFIG_SCSI_AIC7XXX_OLD
+  WARNING This driver is an older aic7xxx driver and is no longer under
+  active development.  Adaptec, Inc. is writing a new driver to take the
+  place of this one, and it is recommended that whenever possible, people
+  should use the new Adaptec written driver instead of this one.  This
+  driver will eventually be phased out entirely.
+
   This is support for the various aic7xxx based Adaptec SCSI
   controllers. These include the 274x EISA cards; 284x VLB cards;
   2902, 2910, 293x, 294x, 394x, 3985 and several other PCI and
@@ -5490,7 +5529,7 @@ CONFIG_SCSI_AIC7XXX
 
   Information on the configuration options for this controller can be
   found by checking the help file for each of the available
-  configuration options. You should read drivers/scsi/README.aic7xxx
+  configuration options. You should read drivers/scsi/aic7xxx_old/README.aic7xxx
   at a minimum before contacting the maintainer with any questions.
   The SCSI-HOWTO, available from
   http://www.linuxdoc.org/docs.html#howto , can also be of great
@@ -5499,10 +5538,10 @@ CONFIG_SCSI_AIC7XXX
   If you want to compile this driver as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want),
   say M here and read Documentation/modules.txt. The module will be
-  called aic7xxx.o.
+  called aic7xxx_old.o.
 
 Enable or Disable Tagged Command Queueing by default
-CONFIG_AIC7XXX_TCQ_ON_BY_DEFAULT
+CONFIG_AIC7XXX_OLD_TCQ_ON_BY_DEFAULT
   This option causes the aic7xxx driver to attempt to use Tagged
   Command Queueing (TCQ) on all devices that claim to support it. 
 
@@ -5536,7 +5575,7 @@ CONFIG_AIC7XXX_TCQ_ON_BY_DEFAULT
   reduce performance.
 
 Default number of TCQ commands per device
-CONFIG_AIC7XXX_CMDS_PER_DEVICE
+CONFIG_AIC7XXX_OLD_CMDS_PER_DEVICE
   Specify the number of commands you would like to allocate per SCSI
   device when Tagged Command Queueing (TCQ) is enabled on that device.
 
@@ -5557,7 +5596,7 @@ CONFIG_AIC7XXX_CMDS_PER_DEVICE
   Default: 8
 
 Collect statistics to report in /proc
-CONFIG_AIC7XXX_PROC_STATS
+CONFIG_AIC7XXX_OLD_PROC_STATS
   This option tells the driver to keep track of how many commands have
   been sent to each particular device and report that information to
   the user via the /proc/scsi/aic7xxx/n file, where n is the number of
@@ -5568,21 +5607,6 @@ CONFIG_AIC7XXX_PROC_STATS
   you also say Y to "/proc file system support", below. 
 
   If unsure, say N.
-
-Delay in seconds after SCSI bus reset
-CONFIG_AIC7XXX_RESET_DELAY
-  This sets how long the driver will wait after resetting the SCSI bus
-  before attempting to communicate with the devices on the SCSI bus
-  again. This delay will be used during the reset phase at bootup time
-  as well as after any reset that might occur during normal operation.
-  Reasonable numbers range anywhere from 5 to 15 seconds depending on
-  your devices. DAT tape drives are notorious for needing more time
-  after a bus reset to be ready for the next command, but most hard
-  drives and CD-ROM devices are ready in only a few seconds. This
-  option has a maximum upper limit of 20 seconds to avoid bad
-  interactions between the aic7xxx driver and the rest of the Linux
-  kernel. The default value has been reduced to 5 seconds. If this
-  doesn't work with your hardware, try increasing this value.
 
 IBM ServeRAID Support
 CONFIG_SCSI_IPS
@@ -8390,22 +8414,6 @@ CONFIG_NI65
   module, say M here and read Documentation/modules.txt as well as
   Documentation/networking/net-modules.txt.
 
-RealTek 8129 (not 8019/8029/8139!) support (EXPERIMENTAL)
-CONFIG_RTL8129
-  This is NOT for RTL-8139 cards.  Instead, select the 8139too driver
-  (CONFIG_8139TOO).
-  This is a driver for the Fast Ethernet PCI network cards based on
-  the RTL8129 chip. If you have one of those, say Y and
-  read the Ethernet-HOWTO, available from
-  http://www.linuxdoc.org/docs.html#howto .
-
-  Note: the 8029 is a NE2000 PCI clone, you can use the NE2K-PCI driver.
-
-  If you want to compile this driver as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want),
-  say M here and read Documentation/modules.txt. This is recommended.
-  The module will be called rtl8129.o.
-
 RealTek RTL-8139 PCI Fast Ethernet Adapter support
 CONFIG_8139TOO
   This is a driver for the Fast Ethernet PCI network cards based on
@@ -8481,7 +8489,7 @@ CONFIG_ADAPTEC_STARFIRE
   If you want to compile this driver as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want),
   say M here and read Documentation/modules.txt. This is recommended.
-  The module will be called starfile.o.
+  The module will be called starfire.o.
   
 Alteon AceNIC/3Com 3C985/NetGear GA620 Gigabit support
 CONFIG_ACENIC
@@ -9399,7 +9407,7 @@ CONFIG_IBMOL
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
-  The module will will be called olympic.o. If you want to compile it
+  The module will be called olympic.o. If you want to compile it
   as a module, say M here and read Documentation/modules.txt.
 
   Also read the file Documentation/networking/olympic.txt or check the
@@ -9439,7 +9447,7 @@ CONFIG_TMS380TR
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
-  The module will will be called tms380tr.o. If you want to compile it
+  The module will be called tms380tr.o. If you want to compile it
   as a module, say M here and read Documentation/modules.txt.
 
 Generic TMS380 PCI support
@@ -9454,7 +9462,7 @@ CONFIG_TMSPCI
 
   This driver is available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
-  The module will will be called tmspci.o. If you want to compile it
+  The module will be called tmspci.o. If you want to compile it
   as a module, say M here and read Documentation/modules.txt.
 
 Madge Smart 16/4 PCI Mk2 support
@@ -9464,7 +9472,7 @@ CONFIG_ABYSS
 
   This driver is available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
-  The module will will be called abyss.o. If you want to compile it
+  The module will be called abyss.o. If you want to compile it
   as a module, say M here and read Documentation/modules.txt.
 
 Madge Smart 16/4 Ringode MicroChannel 
@@ -9474,7 +9482,7 @@ CONFIG_MADGEMC
 
   This driver is available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
-  The module will will be called madgemc.o. If you want to compile it
+  The module will be called madgemc.o. If you want to compile it
   as a module, say M here and read Documentation/modules.txt.
 
 SMC ISA TokenRing adapter support
@@ -9490,7 +9498,7 @@ CONFIG_SMCTR
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
-  The module will will be called smctr.o. If you want to compile it
+  The module will be called smctr.o. If you want to compile it
   as a module, say M here and read Documentation/modules.txt.
 
 Sun Happy Meal 10/100baseT support

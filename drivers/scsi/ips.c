@@ -4831,7 +4831,7 @@ ips_init_copperhead(ips_ha_t *ha) {
       }
 
       if (j >= 45)
-         /* error occured */
+         /* error occurred */
          return (0);
 
       PostByte[i] = inb(ha->io_addr + IPS_REG_ISPR);
@@ -4855,7 +4855,7 @@ ips_init_copperhead(ips_ha_t *ha) {
       }
 
       if (j >= 240)
-         /* error occured */
+         /* error occurred */
          return (0);
 
       ConfigByte[i] = inb(ha->io_addr + IPS_REG_ISPR);
@@ -4920,7 +4920,7 @@ ips_init_copperhead_memio(ips_ha_t *ha) {
       }
 
       if (j >= 45)
-         /* error occured */
+         /* error occurred */
          return (0);
 
       PostByte[i] = readb(ha->mem_ptr + IPS_REG_ISPR);
@@ -4944,7 +4944,7 @@ ips_init_copperhead_memio(ips_ha_t *ha) {
       }
 
       if (j >= 240)
-         /* error occured */
+         /* error occurred */
          return (0);
 
       ConfigByte[i] = readb(ha->mem_ptr + IPS_REG_ISPR);
@@ -4961,7 +4961,7 @@ ips_init_copperhead_memio(ips_ha_t *ha) {
    }
 
    if (i >= 240)
-      /* error occured */
+      /* error occurred */
       return (0);
 
    /* setup CCCR */
@@ -5011,7 +5011,7 @@ ips_init_morpheus(ips_ha_t *ha) {
    }
 
    if (i >= 45) {
-      /* error occured */
+      /* error occurred */
       printk(KERN_WARNING "(%s%d) timeout waiting for post.\n",
              ips_name, ha->host_num);
 
@@ -5042,7 +5042,7 @@ ips_init_morpheus(ips_ha_t *ha) {
    }
 
    if (i >= 240) {
-      /* error occured */
+      /* error occurred */
       printk(KERN_WARNING "(%s%d) timeout waiting for config.\n",
              ips_name, ha->host_num);
 
@@ -5657,7 +5657,7 @@ ips_wait(ips_ha_t *ha, int time, int intr) {
       } else if (intr == IPS_INTR_IORL) {
          if (ha->waitflag == FALSE) {
             /*
-             * controller generated an interupt to
+             * controller generated an interrupt to
              * acknowledge completion of the command
              * and ips_intr() has serviced the interrupt.
              */
@@ -5681,7 +5681,7 @@ ips_wait(ips_ha_t *ha, int time, int intr) {
       } else if (intr == IPS_INTR_HAL) {
          if (ha->waitflag == FALSE) {
             /*
-             * controller generated an interupt to
+             * controller generated an interrupt to
              * acknowledge completion of the command
              * and ips_intr() has serviced the interrupt.
              */

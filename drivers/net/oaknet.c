@@ -53,7 +53,7 @@
 
 static const char *name = "National DP83902AV";
 
-static struct net_device *oaknet_devs = NULL;
+static struct net_device *oaknet_devs;
 
 
 /* Function Prototypes */
@@ -94,6 +94,7 @@ static int __init oaknet_init(void)
 {
 	register int i;
 	int reg0, regd;
+	int ret;
 	struct net_device tmp, *dev = NULL;
 #if 0
 	unsigned long ioaddr = OAKNET_IO_BASE; 
@@ -102,6 +103,8 @@ static int __init oaknet_init(void)
 #endif
 	bd_t *bip = (bd_t *)__res;
 
+	if (!ioaddr)
+		return -ENOMEM;
 	/*
 	 * This MUST happen here because of the nic_* macros
 	 * which have an implicit dependency on dev->base_addr.
@@ -110,15 +113,15 @@ static int __init oaknet_init(void)
 	tmp.base_addr = ioaddr;
 	dev = &tmp;
 
+	ret = -EBUSY;
 	if (!request_region(OAKNET_IO_BASE, OAKNET_IO_SIZE, name))
-		return -EBUSY;
+		goto out_unmap;
 
 	/* Quick register check to see if the device is really there. */
 
-	if ((reg0 = ei_ibp(ioaddr)) == 0xFF) {
-		release_region(OAKNET_IO_BASE, OAKNET_IO_SIZE);
-		return (ENODEV);
-	}
+	ret = -ENODEV;
+	if ((reg0 = ei_ibp(ioaddr)) == 0xFF)
+		goto out_region;
 
 	/*
 	 * That worked. Now a more thorough check, using the multicast
@@ -134,13 +137,11 @@ static int __init oaknet_init(void)
 
 	/* It's no good. Fix things back up and leave. */
 
+	ret = -ENODEV;
 	if (ei_ibp(ioaddr + EN0_COUNTER0) != 0) {
 		ei_obp(reg0, ioaddr);
 		ei_obp(regd, ioaddr + 0x0D);
-		dev->base_addr = 0;
-
-		release_region(dev->base_addr, OAKNET_IO_SIZE);
-		return (-ENODEV);
+		goto out_region;
 	}
 
 	/*
@@ -149,10 +150,9 @@ static int __init oaknet_init(void)
 	 */
 
 	dev = init_etherdev(NULL, 0);
-	if (!dev) {
-		release_region(dev->base_addr, OAKNET_IO_SIZE);
-		return (-ENOMEM);
-	}
+	ret = -ENOMEM;
+	if (!dev)
+		goto out_region;
 	SET_MODULE_OWNER(dev);
 	oaknet_devs = dev;
 
@@ -166,10 +166,10 @@ static int __init oaknet_init(void)
 
 	/* Allocate 8390-specific device-private area and fields. */
 
+	ret = -ENOMEM;
 	if (ethdev_init(dev)) {
 		printk(" unable to get memory for dev->priv.\n");
-		release_region(dev->base_addr, OAKNET_IO_SIZE);
-		return (-ENOMEM);
+		goto out_dev;
 	}
 
 	/*
@@ -182,12 +182,11 @@ static int __init oaknet_init(void)
 
 	/* Attempt to get the interrupt line */
 
+	ret = -EAGAIN;
 	if (request_irq(dev->irq, ei_interrupt, 0, name, dev)) {
 		printk("%s: unable to request interrupt %d.\n",
 		       dev->name, dev->irq);
-		kfree(dev->priv);
-		release_region(dev->base_addr, OAKNET_IO_SIZE);
-		return (EAGAIN);
+		goto out_priv;
 	}
 
 	/* Tell the world about what and where we've found. */
@@ -218,6 +217,16 @@ static int __init oaknet_init(void)
 	NS8390_init(dev, FALSE);
 
 	return (0);
+out_priv:
+	kfree(dev->priv);
+out_dev:
+	unregister_netdev(dev);
+	kfree(dev);
+out_region:
+	release_region(OAKNET_IO_BASE, OAKNET_IO_SIZE);
+out_unmap:
+	iounmap(ioaddr);
+	return ret;
 }
 
 /*
@@ -303,8 +312,6 @@ oaknet_reset_8390(struct net_device *dev)
 	ei_obp(E8390_STOP | E8390_NODMA | E8390_PAGE0, base + E8390_CMD);
 	ei_status.txing = 0;
 	ei_status.dmaing = 0;
-
-	return;
 }
 
 /*
@@ -365,8 +372,6 @@ oaknet_get_8390_hdr(struct net_device *dev, struct e8390_pkt_hdr *hdr,
 
 	outb_p(ENISR_RDC, base + EN0_ISR);	/* ACK Remote DMA interrupt */
 	ei_status.dmaing &= ~0x01;
-
-	return;
 }
 
 /*
@@ -444,8 +449,6 @@ oaknet_block_input(struct net_device *dev, int count, struct sk_buff *skb,
 #ifdef OAKNET_DISINT
 	restore_flags(flags);
 #endif
-
-	return;
 }
 
 /*
@@ -627,8 +630,6 @@ retry:
 	
 	ei_obp(ENISR_RDC, base + EN0_ISR);	/* Ack intr. */
 	ei_status.dmaing &= ~0x01;
-
-	return;
 }
 
 /*
@@ -636,7 +637,7 @@ retry:
  *
  * Description:
  *   This routine prints out a last-ditch informative message to the console
- *   indicating that a DMA error occured. If you see this, it's the last
+ *   indicating that a DMA error occurred. If you see this, it's the last
  *   thing you'll see.
  *
  * Input(s):
@@ -658,8 +659,6 @@ oaknet_dma_error(struct net_device *dev, const char *name)
 	       "[DMAstat:%d][irqlock:%d][intr:%ld]\n",
 	       dev->name, name, ei_status.dmaing, ei_status.irqlock,
 	       dev->interrupt);
-
-	return;
 }
 
 /*
@@ -686,12 +685,13 @@ static void __exit oaknet_cleanup_module (void)
 		void *priv = oaknet_devs->priv;
 		free_irq(oaknet_devs->irq, oaknet_devs);
 		release_region(ioaddr, OAKNET_IO_SIZE);
+		iounmap(ioaddr);
 		unregister_netdev(oaknet_dev);
 		kfree(priv);
 	}
 
-	oaknet_devs = NULL;
-
+	/* Convert to loop once driver supports multiple devices. */
+	kfree(oaknet_devs);
 }
 
 module_init(oaknet_init_module);

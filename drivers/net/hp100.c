@@ -45,6 +45,8 @@
 **   along with this program; if not, write to the Free Software
 **   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 **
+** 1.57b -> 1.57c - Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+**   - release resources on failure in init_module
 **
 ** 1.57 -> 1.57b - Jean II
 **   - fix spinlocks, SMP is now working !
@@ -265,12 +267,14 @@ static struct hp100_eisa_id hp100_eisa_ids[] = {
 
 #define HP100_EISA_IDS_SIZE	(sizeof(hp100_eisa_ids)/sizeof(struct hp100_eisa_id))
 
+#ifdef CONFIG_PCI
 static struct hp100_pci_id hp100_pci_ids[] = {
   { PCI_VENDOR_ID_HP, 		PCI_DEVICE_ID_HP_J2585A },
   { PCI_VENDOR_ID_HP,		PCI_DEVICE_ID_HP_J2585B },
   { PCI_VENDOR_ID_COMPEX,	PCI_DEVICE_ID_COMPEX_ENET100VG4 },
   { PCI_VENDOR_ID_COMPEX2,	PCI_DEVICE_ID_COMPEX2_100VG }
 };
+#endif
 
 #define HP100_PCI_IDS_SIZE	(sizeof(hp100_pci_ids)/sizeof(struct hp100_pci_id))
 
@@ -1896,7 +1900,7 @@ static void hp100_rx( struct net_device *dev )
 
   /* First get indication of received lan packet */
   /* RX_PKT_CND indicates the number of packets which have been fully */
-  /* received onto the card but have not been fully transfered of the card */
+  /* received onto the card but have not been fully transferred of the card */
   packets = hp100_inb( RX_PKT_CNT );
 #ifdef HP100_DEBUG_RX
   if ( packets > 1 )
@@ -1967,11 +1971,6 @@ static void hp100_rx( struct net_device *dev )
 	    insl( ioaddr + HP100_REG_DATA32, ptr, pkt_len >> 2 );
       
 	  skb->protocol = eth_type_trans( skb, dev );
-
-	  netif_rx( skb );
-	  dev->last_rx = jiffies;
-	  lp->stats.rx_packets++;
-	  lp->stats.rx_bytes += pkt_len;
       
 #ifdef HP100_DEBUG_RX
 	  printk( "hp100: %s: rx: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
@@ -1979,6 +1978,10 @@ static void hp100_rx( struct net_device *dev )
 		  ptr[ 0 ], ptr[ 1 ], ptr[ 2 ], ptr[ 3 ], ptr[ 4 ], ptr[ 5 ],
 		  ptr[ 6 ], ptr[ 7 ], ptr[ 8 ], ptr[ 9 ], ptr[ 10 ], ptr[ 11 ] );
 #endif
+	  netif_rx( skb );
+	  dev->last_rx = jiffies;
+	  lp->stats.rx_packets++;
+	  lp->stats.rx_bytes += pkt_len;
 	}
   
       /* Indicate the card that we have got the packet */
@@ -3017,16 +3020,34 @@ void hp100_RegisterDump( struct net_device *dev )
 #ifdef MODULE
 
 /* Parameters set by insmod */
-int hp100_port[5] = { 0, -1, -1, -1, -1 };
+static int hp100_port[5] = { 0, -1, -1, -1, -1 };
 MODULE_PARM(hp100_port, "1-5i");
 
 /* Allocate 5 string of length IFNAMSIZ, one string for each device */
-char hp100_name[5][IFNAMSIZ] = { "", "", "", "", "" };
+static char hp100_name[5][IFNAMSIZ] = { "", "", "", "", "" };
 /* Allow insmod to write those 5 strings individually */
 MODULE_PARM(hp100_name, "1-5c" __MODULE_STRING(IFNAMSIZ));
 
 /* List of devices */
-static struct net_device *hp100_devlist[5] = { NULL, NULL, NULL, NULL, NULL };
+static struct net_device *hp100_devlist[5];
+
+static void release_dev(int i)
+{
+	struct net_device *d = hp100_devlist[i];
+	struct hp100_private *p = (struct hp100_private *)d->priv;
+
+	unregister_netdev(d);
+	release_region(d->base_addr, HP100_REGION_SIZE);
+
+	if (p->mode == 1) /* busmaster */
+		kfree(p->page_vaddr); 
+	if (p->mem_ptr_virt)
+		iounmap(p->mem_ptr_virt);
+	kfree(d->priv);
+	d->priv = NULL;
+	kfree(d);
+	hp100_devlist[i] = NULL;
+}
 
 /*
  * Note: if you have more than five 100vg cards in your pc, feel free to
@@ -3053,6 +3074,8 @@ int init_module( void )
     {
       /* Create device and set basics args */
       hp100_devlist[i] = kmalloc(sizeof(struct net_device), GFP_KERNEL);
+      if (!hp100_devlist[i])
+	goto fail;
       memset(hp100_devlist[i], 0x00, sizeof(struct net_device));
 #if LINUX_VERSION_CODE >= 0x020362	/* 2.3.99-pre7 */
       memcpy(hp100_devlist[i]->name, hp100_name[i], IFNAMSIZ);	/* Copy name */
@@ -3075,6 +3098,13 @@ int init_module( void )
     }			/* Loop over all devices */
 
   return cards > 0 ? 0 : -ENODEV;
+ fail:
+  while (cards && --i)
+	  if (hp100_devlist[i]) {
+		release_dev(i);
+		--cards;
+	  }
+  return -ENOMEM;
 }
 
 void cleanup_module( void )
@@ -3084,18 +3114,7 @@ void cleanup_module( void )
   /* TODO: Check if all skb's are released/freed. */
   for(i = 0; i < 5; i++)
     if(hp100_devlist[i] != (struct net_device *) NULL)
-      {
-	unregister_netdev( hp100_devlist[i] );
-	release_region( hp100_devlist[i]->base_addr, HP100_REGION_SIZE );
-	if( ((struct hp100_private *)hp100_devlist[i]->priv)->mode==1 ) /* busmaster */
-	  kfree( ((struct hp100_private *)hp100_devlist[i]->priv)->page_vaddr ); 
-	if ( ((struct hp100_private *)hp100_devlist[i]->priv) -> mem_ptr_virt )
-	  iounmap( ((struct hp100_private *)hp100_devlist[i]->priv) -> mem_ptr_virt );
-	kfree( hp100_devlist[i]->priv );
-	hp100_devlist[i]->priv = NULL;
-	kfree(hp100_devlist[i]);
-	hp100_devlist[i] = (struct net_device *) NULL;
-      }
+	    release_dev(i);
 }
 
 #endif		/* MODULE */

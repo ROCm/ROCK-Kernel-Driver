@@ -1,7 +1,7 @@
 /*
  * Aic7xxx register and scratch ram definitions.
  *
- * Copyright (c) 1994-1998 Justin Gibbs.
+ * Copyright (c) 1994-2001 Justin Gibbs.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -9,16 +9,12 @@
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions, and the following disclaimer,
- *    without modification, immediately at the beginning of the file.
+ *    without modification.
  * 2. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
  *
- * Where this Software is combined with software released under the terms of 
- * the GNU Public License ("GPL") and the terms of the GPL would require the 
- * combined work to also be released under the terms of the GPL, the terms
- * and conditions of this License will apply in addition to those of the
- * GPL with the exception of any terms or conditions of this License that
- * conflict with, or are expressly prohibited by, the GPL.
+ * Alternatively, this software may be distributed under the terms of the
+ * GNU Public License ("GPL").
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -32,7 +28,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: aic7xxx.reg,v 1.4 1997/06/27 19:38:39 gibbs Exp $
+ * $Id: //depot/src/aic7xxx/aic7xxx.reg#13 $
+ *
+ * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.reg,v 1.31 2000/11/10 20:13:40 gibbs Exp $
  */
 
 /*
@@ -114,6 +112,8 @@ register SCSISIGI {
 	mask	PHASE_MASK	CDI|IOI|MSGI
 	mask	P_DATAOUT	0x00
 	mask	P_DATAIN	IOI
+	mask	P_DATAOUT_DT	P_DATAOUT|MSGI
+	mask	P_DATAIN_DT	P_DATAIN|MSGI
 	mask	P_COMMAND	CDI
 	mask	P_MESGOUT	CDI|MSGI
 	mask	P_STATUS	CDI|IOI
@@ -160,8 +160,10 @@ register SCSIRATE {
 	address			0x004
 	access_mode RW
 	bit	WIDEXFER	0x80		/* Wide transfer control */
+	bit	ENABLE_CRC	0x40		/* CRC for D-Phases */
+	bit	SINGLE_EDGE	0x10		/* Disable DT Transfers */
 	mask	SXFR		0x70		/* Sync transfer rate */
-	mask	SXFR_ULTRA2	0x7f		/* Sync transfer rate */
+	mask	SXFR_ULTRA2	0x0f		/* Sync transfer rate */
 	mask	SOFS		0x0f		/* Sync offset */
 }
 
@@ -174,6 +176,8 @@ register SCSIID	{
 	address			0x005
 	access_mode RW
 	mask	TID		0xf0		/* Target ID mask */
+	mask	TWIN_TID	0x70
+	bit	TWIN_CHNLB	0x80
 	mask	OID		0x0f		/* Our ID mask */
 	/*
 	 * SCSI Maximum Offset (p. 4-61 aic7890/91 Data Book)
@@ -213,24 +217,27 @@ register STCNT {
 	access_mode RW
 }
 
-/*
- * Option Mode Register (Alternate Mode) (p. 5-198)
- * This register is used to set certain options on Ultra3 based chips.
- * The chip must be in alternate mode (bit ALT_MODE in SFUNCT must be set)
- */
+/* ALT_MODE register on Ultra160 chips */
 register OPTIONMODE {
 	address			0x008
 	access_mode RW
-	bit	AUTORATEEN	0x80
-	bit	AUTOACKEN	0x40
-	bit	ATNMGMNTEN	0x20
-	bit	BUSFREEREV	0x10
-	bit	EXPPHASEDIS	0x08
-	bit	SCSIDATL_IMGEN	0x04
-	bit	AUTO_MSGOUT_DE	0x02
+	bit	AUTORATEEN		0x80
+	bit	AUTOACKEN		0x40
+	bit	ATNMGMNTEN		0x20
+	bit	BUSFREEREV		0x10
+	bit	EXPPHASEDIS		0x08
+	bit	SCSIDATL_IMGEN		0x04
+	bit	AUTO_MSGOUT_DE		0x02
 	bit	DIS_MSGIN_DUALEDGE	0x01
+	mask	OPTIONMODE_DEFAULTS	AUTO_MSGOUT_DE|DIS_MSGIN_DUALEDGE
 }
 
+/* ALT_MODE register on Ultra160 chips */
+register TARGCRCCNT {
+	address			0x00a
+	size	2
+	access_mode RW
+}
 
 /*
  * Clear SCSI Interrupt 0 (p. 3-20)
@@ -243,6 +250,7 @@ register CLRSINT0 {
 	bit	CLRSELDI	0x20
 	bit	CLRSELINGO	0x10
 	bit	CLRSWRAP	0x08
+	bit	CLRIOERR	0x08	/* Ultra2 Only */
 	bit	CLRSPIORDY	0x02
 }
 
@@ -304,13 +312,12 @@ register SSTAT2 {
 	address			0x00d
 	access_mode RO
 	bit	OVERRUN		0x80
-	bit	SHVALID		0x40
-	bit	WIDE_RES	0x20
+	bit	SHVALID		0x40	/* Shaddow Layer non-zero */
 	bit	EXP_ACTIVE	0x10	/* SCSI Expander Active */
-	bit	CRCVALERR	0x08	/* CRC Value Error */
-	bit	CRCENDERR	0x04	/* CRC End Error */
-	bit	CRCREQERR	0x02	/* CRC REQ Error */
-	bit	DUAL_EDGE_ERROR	0x01	/* Invalid pins for Dual Edge phase */
+	bit	CRCVALERR	0x08	/* CRC doesn't match (U3 only) */
+	bit	CRCENDERR	0x04	/* No terminal CRC packet (U3 only) */
+	bit	CRCREQERR	0x02	/* Illegal CRC packet req (U3 only) */
+	bit	DUAL_EDGE_ERR	0x01	/* Incorrect data phase (U3 only) */
 	mask	SFCNT		0x1f
 }
 
@@ -376,12 +383,12 @@ register SIMODE1 {
  */
 register SCSIBUSL {
 	address			0x012
-	access_mode RO
+	access_mode RW
 }
 
 register SCSIBUSH {
 	address			0x013
-	access_mode RO
+	access_mode RW
 }
 
 /*
@@ -410,6 +417,7 @@ register SELTIMER {
 	bit	STAGE3		0x04
 	bit	STAGE2		0x02
 	bit	STAGE1		0x01
+	alias	TARGIDIN
 }
 
 /*
@@ -422,6 +430,25 @@ register SELID {
 	access_mode RW
 	mask	SELID_MASK	0xf0
 	bit	ONEBIT		0x08
+}
+
+register SCAMCTL {
+	address			0x01a
+	access_mode RW
+	bit	ENSCAMSELO	0x80
+	bit	CLRSCAMSELID	0x40
+	bit	ALTSTIM		0x20
+	bit	DFLTTID		0x10
+	mask	SCAMLVL		0x03
+}
+
+/*
+ * Target Mode Selecting in ID bitmask (aic7890/91/96/97)
+ */
+register TARGID {
+	address			0x01b
+	size			2
+	access_mode RW
 }
 
 /*
@@ -445,6 +472,59 @@ register SPIOCAP {
 	bit	SSPIOCPS	0x01	/* Termination and cable detection */
 }
 
+register BRDCTL	{
+	address			0x01d
+	bit	BRDDAT7		0x80
+	bit	BRDDAT6		0x40
+	bit	BRDDAT5		0x20
+	bit	BRDSTB		0x10
+	bit	BRDCS		0x08
+	bit	BRDRW		0x04
+	bit	BRDCTL1		0x02
+	bit	BRDCTL0		0x01
+	/* 7890 Definitions */
+	bit	BRDDAT4		0x10
+	bit	BRDDAT3		0x08
+	bit	BRDDAT2		0x04
+	bit	BRDRW_ULTRA2	0x02
+	bit	BRDSTB_ULTRA2	0x01
+}
+
+/*
+ * Serial EEPROM Control (p. 4-92 in 7870 Databook)
+ * Controls the reading and writing of an external serial 1-bit
+ * EEPROM Device.  In order to access the serial EEPROM, you must
+ * first set the SEEMS bit that generates a request to the memory
+ * port for access to the serial EEPROM device.  When the memory
+ * port is not busy servicing another request, it reconfigures
+ * to allow access to the serial EEPROM.  When this happens, SEERDY
+ * gets set high to verify that the memory port access has been
+ * granted.  
+ *
+ * After successful arbitration for the memory port, the SEECS bit of 
+ * the SEECTL register is connected to the chip select.  The SEECK, 
+ * SEEDO, and SEEDI are connected to the clock, data out, and data in 
+ * lines respectively.  The SEERDY bit of SEECTL is useful in that it 
+ * gives us an 800 nsec timer.  After a write to the SEECTL register, 
+ * the SEERDY goes high 800 nsec later.  The one exception to this is 
+ * when we first request access to the memory port.  The SEERDY goes 
+ * high to signify that access has been granted and, for this case, has 
+ * no implied timing.
+ *
+ * See 93cx6.c for detailed information on the protocol necessary to 
+ * read the serial EEPROM.
+ */
+register SEECTL {
+	address			0x01e
+	bit	EXTARBACK	0x80
+	bit	EXTARBREQ	0x40
+	bit	SEEMS		0x20
+	bit	SEERDY		0x10
+	bit	SEECS		0x08
+	bit	SEECK		0x04
+	bit	SEEDO		0x02
+	bit	SEEDI		0x01
+}
 /*
  * SCSI Block Control (p. 3-32)
  * Controls Bus type and channel selection.  In a twin channel configuration
@@ -585,30 +665,22 @@ register BCTL {
 	bit	ENABLE		0x01
 }
 
-register DSCOMMAND0 {
-	address			0x084
-	access_mode RW
-	bit	CACHETHEN	0x80
-	bit	DPARCKEN	0x40
-	bit	MPARCKEN	0x20
-	bit	EXTREQLCK	0x10
-	bit	INTSCBRAMSEL	0x08
-	bit	RAMPS		0x04
-	bit	USCBSIZE32	0x02
-	bit	CIOPARCKEN	0x01
-}
-
 /*
  * On the aic78X0 chips, Board Control is replaced by the DSCommand
  * register (p. 4-64)
  */
-register DSCOMMAND {
+register DSCOMMAND0 {
 	address			0x084
 	access_mode RW
 	bit	CACHETHEN	0x80	/* Cache Threshold enable */
 	bit	DPARCKEN	0x40	/* Data Parity Check Enable */
 	bit	MPARCKEN	0x20	/* Memory Parity Check Enable */
 	bit	EXTREQLCK	0x10	/* External Request Lock */
+	/* aic7890/91/96/97 only */
+	bit	INTSCBRAMSEL	0x08	/* Internal SCB RAM Select */
+	bit	RAMPS		0x04	/* External SCB RAM Present */
+	bit	USCBSIZE32	0x02	/* Use 32byte SCB Page Size */
+	bit	CIOPARCKEN	0x01	/* Internal bus parity error enable */
 }
 
 /*
@@ -622,7 +694,7 @@ register BUSTIME {
 }
 
 /*
- * Bus Speed (p. 3-45)
+ * Bus Speed (p. 3-45) aic7770 only
  */
 register BUSSPD {
 	address			0x086
@@ -631,7 +703,25 @@ register BUSSPD {
 	mask	STBOFF		0x38
 	mask	STBON		0x07
 	mask	DFTHRSH_100	0xc0
+	mask	DFTHRSH_75	0x80
 }
+
+/* aic7850/55/60/70/80/95 only */
+register DSPCISTATUS {
+	address			0x086
+	mask	DFTHRSH_100	0xc0
+}
+
+/* aic7890/91/96/97 only */
+register HS_MAILBOX {
+	address			0x086
+	mask	HOST_MAILBOX	0xF0
+	mask	SEQ_MAILBOX	0x0F
+	mask	HOST_TQINPOS	0x80	/* Boundary at either 0 or 128 */
+}
+
+const	HOST_MAILBOX_SHIFT	4
+const	SEQ_MAILBOX_SHIFT	0
 
 /*
  * Host Control (p. 3-47) R/W
@@ -668,7 +758,7 @@ register HCNT {
 
 /*
  * SCB Pointer (p. 3-49)
- * Gate one of the four SCBs into the SCBARRAY window.
+ * Gate one of the SCBs into the SCBARRAY window.
  */
 register SCBPTR {
 	address			0x090
@@ -690,31 +780,48 @@ register INTSTAT {
 	mask	SEND_REJECT	0x10|SEQINT	/* sending a message reject */
 	mask	NO_IDENT	0x20|SEQINT	/* no IDENTIFY after reconnect*/
 	mask	NO_MATCH	0x30|SEQINT	/* no cmd match for reconnect */
-	mask	EXTENDED_MSG	0x40|SEQINT	/* Extended message received */
-	mask	WIDE_RESIDUE	0x50|SEQINT	/* need kernel to back up */
-						/* the SG array for us */
-	mask	REJECT_MSG	0x60|SEQINT	/* Reject message received */
+	mask	IGN_WIDE_RES	0x40|SEQINT	/* Complex IGN Wide Res Msg */
+	mask	RESIDUAL	0x50|SEQINT	/* Residual byte count != 0 */
+	mask	HOST_MSG_LOOP	0x60|SEQINT	/*
+						 * The bus is ready for the
+						 * host to perform another
+						 * message transaction.  This
+						 * mechanism is used for things
+						 * like sync/wide negotiation
+						 * that require a kernel based
+						 * message state engine.
+						 */
 	mask	BAD_STATUS	0x70|SEQINT	/* Bad status from target */
-	mask	RESIDUAL	0x80|SEQINT	/* Residual byte count != 0 */
-	mask	AWAITING_MSG	0xa0|SEQINT	/*
-						 * Kernel requested to specify
-						 * a message to this target
-						 * (command was null), so tell
-						 * it that it can fill the
-						 * message buffer.
+	mask	PERR_DETECTED	0x80|SEQINT	/*
+						 * Either the phase_lock
+						 * or inb_next routine has
+						 * noticed a parity error.
 						 */
-	mask	TRACEPOINT	0xb0|SEQINT
-	mask	TRACEPOINT2	0xc0|SEQINT
-	mask	MSGIN_PHASEMIS	0xd0|SEQINT	/*
-						 * Target changed phase on us
-						 * when we were expecting
-						 * another msgin byte.
-						 */
-	mask	DATA_OVERRUN	0xe0|SEQINT	/*
+	mask	DATA_OVERRUN	0x90|SEQINT	/*
 						 * Target attempted to write
 						 * beyond the bounds of its
 						 * command.
 						 */
+	mask	MKMSG_FAILED	0xa0|SEQINT	/*
+						 * Target completed command
+						 * without honoring our ATN
+						 * request to issue a message. 
+						 */
+	mask	MISSED_BUSFREE	0xb0|SEQINT	/*
+						 * The sequencer never saw
+						 * the bus go free after
+						 * either a command complete
+						 * or disconnect message.
+						 */
+	mask	SCB_MISMATCH	0xc0|SEQINT	/*
+						 * Downloaded SCB's tag does
+						 * not match the entry we
+						 * intended to download.
+						 */
+	mask	NO_FREE_SCB	0xd0|SEQINT	/*
+						 * get_free_or_disc_scb failed.
+						 */
+	mask	OUT_OF_RANGE	0xe0|SEQINT
 
 	mask	SEQINT_MASK	0xf0|SEQINT	/* SEQINT Status Codes */
 	mask	INT_PEND  (BRKADRINT|SEQINT|SCSIINT|CMDCMPLT)
@@ -735,7 +842,6 @@ register ERROR {
 	bit	SQPARERR	0x08
 	bit	ILLOPCODE	0x04
 	bit	ILLSADDR	0x02
-	bit	DSCTMOUT	0x02	/* Ultra3 only */
 	bit	ILLHADDR	0x01
 }
 
@@ -779,6 +885,16 @@ register DFSTATUS {
 	bit	FIFOEMP		0x01
 }
 
+register DFWADDR {
+	address			0x95
+	access_mode RW
+}
+
+register DFRADDR {
+	address			0x97
+	access_mode RW
+}
+
 register DFDAT {
 	address			0x099
 	access_mode RW
@@ -815,17 +931,6 @@ register QINCNT	{
 }
 
 /*
- * SCSIDATL IMAGE Register (p. 5-104)
- * Write to this register also go to SCSIDATL but this register will preserve
- * the data for later reading as long as the SCSIDATL_IMGEN bit in the
- * OPTIONMODE register is set.
- */
-register SCSIDATL_IMG {
-	address			0x09c
-	access_mode RW
-}
-
-/*
  * Queue Out FIFO (p. 3-61)
  * Queue of SCBs that have completed and await the host
  */
@@ -834,20 +939,17 @@ register QOUTFIFO {
 	access_mode WO
 }
 
-/*
- * CRC Control 1 Register (p. 5-105)
- * Control bits for the Ultra 160/m CRC facilities
- */
 register CRCCONTROL1 {
 	address			0x09d
 	access_mode RW
-	bit	CRCONSEEN	0x80 /* CRC ON Single Edge ENable */
-	bit	CRCVALCHKEN	0x40 /* CRC Value Check Enable */
-	bit	CRCENDCHKEN	0x20 /* CRC End Check Enable */
-	bit	CRCREQCHKEN	0x10
-	bit	TARGCRCENDEN	0x08 /* Enable End CRC transfer when target */
-	bit	TARGCRCCNTEN	0x04 /* Enable CRC transfer when target */
+	bit	CRCONSEEN		0x80
+	bit	CRCVALCHKEN		0x40
+	bit	CRCENDCHKEN		0x20
+	bit	CRCREQCHKEN		0x10
+	bit	TARGCRCENDEN		0x08
+	bit	TARGCRCCNTEN		0x04
 }
+
 
 /*
  * Queue Out Count (p. 3-61)
@@ -858,19 +960,15 @@ register QOUTCNT {
 	access_mode RO
 }
 
-/*
- * SCSI Phase Register (p. 5-106)
- * Current bus phase
- */
 register SCSIPHASE {
 	address			0x09e
 	access_mode RO
-	bit	SP_STATUS		0x20
-	bit	SP_COMMAND		0x10
-	bit	SP_MSG_IN		0x08
-	bit	SP_MSG_OUT		0x04
-	bit	SP_DATA_IN		0x02
-	bit	SP_DATA_OUT	0x01
+	bit	STATUS_PHASE	0x20
+	bit	COMMAND_PHASE	0x10
+	bit	MSG_IN_PHASE	0x08
+	bit	MSG_OUT_PHASE	0x04
+	bit	DATA_IN_PHASE	0x02
+	bit	DATA_OUT_PHASE	0x01
 }
 
 /*
@@ -887,33 +985,19 @@ register SFUNCT {
  */
 scb {
 	address			0x0a0
-	SCB_CONTROL {
-		size	1
-		bit	MK_MESSAGE      0x80
-		bit	DISCENB         0x40
-		bit	TAG_ENB		0x20
-		bit	DISCONNECTED	0x04
-		mask	SCB_TAG_TYPE	0x03
+	SCB_CDB_PTR {
+		size	4
+		alias	SCB_RESIDUAL_DATACNT
+		alias	SCB_CDB_STORE
+		alias	SCB_TARGET_INFO
 	}
-	SCB_TCL {
-		size	1
-		bit	SELBUSB		0x08
-		mask	TID		0xf0
-		mask	LID		0x07
-	}
-	SCB_TARGET_STATUS {
-		size	1
-	}
-	SCB_SGCOUNT {
-		size	1
-	}
-	SCB_SGPTR {
+	SCB_RESIDUAL_SGPTR {
 		size	4
 	}
-	SCB_RESID_SGCNT {
+	SCB_SCSI_STATUS {
 		size	1
 	}
-	SCB_RESID_DCNT	{
+	SCB_CDB_STORE_PAD {
 		size	3
 	}
 	SCB_DATAPTR {
@@ -921,30 +1005,66 @@ scb {
 	}
 	SCB_DATACNT {
 		/*
-		 * Really only 3 bytes, but padded to make
-		 * the kernel's job easier.
+		 * The last byte is really the high address bits for
+		 * the data address.
 		 */
 		size	4
+		bit	SG_LAST_SEG		0x80	/* In the fourth byte */
+		mask	SG_HIGH_ADDR_BITS	0x7F	/* In the fourth byte */
 	}
-	SCB_CMDPTR {
+	SCB_SGPTR {
 		size	4
+		bit	SG_RESID_VALID	0x04	/* In the first byte */
+		bit	SG_FULL_RESID	0x02	/* In the first byte */
+		bit	SG_LIST_NULL	0x01	/* In the first byte */
 	}
-	SCB_CMDLEN {
+	SCB_CONTROL {
+		size	1
+		bit	TARGET_SCB			0x80
+		bit	DISCENB				0x40
+		bit	TAG_ENB				0x20
+		bit	MK_MESSAGE			0x10
+		bit	ULTRAENB			0x08
+		bit	DISCONNECTED			0x04
+		mask	SCB_TAG_TYPE			0x03
+	}
+	SCB_SCSIID {
+		size	1
+		bit	TWIN_CHNLB			0x80
+		mask	TWIN_TID			0x70
+		mask	TID				0xf0
+		mask	OID				0x0f
+	}
+	SCB_LUN {
+		mask	LID				0xff
 		size	1
 	}
 	SCB_TAG {
 		size	1
 	}
+	SCB_CDB_LEN {
+		size	1
+	}
+	SCB_SCSIRATE {
+		size	1
+	}
+	SCB_SCSIOFFSET {
+		size	1
+	}
 	SCB_NEXT {
 		size	1
 	}
-	SCB_PREV {
-		size	1
+	SCB_64_SPARE {
+		size	16
 	}
-	SCB_BUSYTARGETS {
-		size	4
+	SCB_64_BTT {
+		size	16
 	}
 }
+
+const	SCB_UPLOAD_SIZE		32
+const	SCB_DOWNLOAD_SIZE	32
+const	SCB_DOWNLOAD_SIZE_64	48
 
 const	SG_SIZEOF	0x08		/* sizeof(struct ahc_dma) */
 
@@ -969,11 +1089,6 @@ register STATUS_2840 {
 
 /* --------------------- AIC-7870-only definitions -------------------- */
 
-register DSPCISTATUS {
-	address			0x086
-	mask	DFTHRSH_100	0xc0
-}
-
 register CCHADDR {
 	address			0x0E0
 	size 8
@@ -995,7 +1110,7 @@ register CCSGCTL {
 	address			0x0EB
 	bit	CCSGDONE	0x80
 	bit	CCSGEN		0x08
-	bit	FLAG		0x02
+	bit	SG_FETCH_NEEDED 0x02	/* Bit used for software state */
 	bit	CCSGRESET	0x01
 }
 
@@ -1021,6 +1136,14 @@ register CCSCBRAM {
 	address			0xEC
 }
 
+/*
+ * SCB bank address (7895/7896/97 only)
+ */
+register SCBBADDR {
+	address			0x0F0
+	access_mode RW
+}
+
 register CCSCBPTR {
 	address			0x0F1
 }
@@ -1029,16 +1152,8 @@ register HNSCB_QOFF {
 	address			0x0F4
 }
 
-register HESCB_QOFF {
-	address			0x0F5
-}
-
 register SNSCB_QOFF {
 	address			0x0F6
-}
-
-register SESCB_QOFF {
-	address			0x0F7
 }
 
 register SDSCB_QOFF {
@@ -1047,11 +1162,9 @@ register SDSCB_QOFF {
 
 register QOFF_CTLSTA {
 	address			0x0FA
-	bit	ESTABLISH_SCB_AVAIL	0x80
 	bit	SCB_AVAIL	0x40
 	bit	SNSCB_ROLLOVER	0x20
 	bit	SDSCB_ROLLOVER	0x10
-	bit	SESCB_ROLLOVER	0x08
 	mask	SCB_QSIZE	0x07
 	mask	SCB_QSIZE_256	0x06
 }
@@ -1078,66 +1191,22 @@ register DFF_THRSH {
 	mask	WR_DFTHRSH_MAX	0x70
 }
 
-register SG_CACHEPTR {
-	access_mode RW
+register SG_CACHE_PRE {
+	access_mode WO
 	address			0x0fc
-	mask	SG_USER_DATA	0xfc
+	mask	SG_ADDR_MASK	0xf8
+	bit	ODD_SEG		0x04
 	bit	LAST_SEG	0x02
 	bit	LAST_SEG_DONE	0x01
 }
 
-register BRDCTL	{
-	address			0x01d
-	bit	BRDDAT7		0x80
-	bit	BRDDAT6		0x40
-	bit	BRDDAT5		0x20
-	bit	BRDSTB		0x10
-	bit	BRDCS		0x08
-	bit	BRDRW		0x04
-	bit	BRDCTL1		0x02
-	bit	BRDCTL0		0x01
-	/* 7890 Definitions */
-	bit	BRDDAT4		0x10
-	bit	BRDDAT3		0x08
-	bit	BRDDAT2		0x04
-	bit	BRDRW_ULTRA2	0x02
-	bit	BRDSTB_ULTRA2	0x01
-}
-
-/*
- * Serial EEPROM Control (p. 4-92 in 7870 Databook)
- * Controls the reading and writing of an external serial 1-bit
- * EEPROM Device.  In order to access the serial EEPROM, you must
- * first set the SEEMS bit that generates a request to the memory
- * port for access to the serial EEPROM device.  When the memory
- * port is not busy servicing another request, it reconfigures
- * to allow access to the serial EEPROM.  When this happens, SEERDY
- * gets set high to verify that the memory port access has been
- * granted.  
- *
- * After successful arbitration for the memory port, the SEECS bit of 
- * the SEECTL register is connected to the chip select.  The SEECK, 
- * SEEDO, and SEEDI are connected to the clock, data out, and data in 
- * lines respectively.  The SEERDY bit of SEECTL is useful in that it 
- * gives us an 800 nsec timer.  After a write to the SEECTL register, 
- * the SEERDY goes high 800 nsec later.  The one exception to this is 
- * when we first request access to the memory port.  The SEERDY goes 
- * high to signify that access has been granted and, for this case, has 
- * no implied timing.
- *
- * See 93cx6.c for detailed information on the protocol necessary to 
- * read the serial EEPROM.
- */
-register SEECTL {
-	address			0x01e
-	bit	EXTARBACK	0x80
-	bit	EXTARBREQ	0x40
-	bit	SEEMS		0x20
-	bit	SEERDY		0x10
-	bit	SEECS		0x08
-	bit	SEECK		0x04
-	bit	SEEDO		0x02
-	bit	SEEDI		0x01
+register SG_CACHE_SHADOW {
+	access_mode RO
+	address			0x0fc
+	mask	SG_ADDR_MASK	0xf8
+	bit	ODD_SEG		0x04
+	bit	LAST_SEG	0x02
+	bit	LAST_SEG_DONE	0x01
 }
 /* ---------------------- Scratch RAM Offsets ------------------------- */
 /* These offsets are either to values that are initialized by the board's
@@ -1160,20 +1229,45 @@ scratch_ram {
 	/*
 	 * 1 byte per target starting at this address for configuration values
 	 */
-	TARG_SCSIRATE {
+	BUSY_TARGETS {
+		alias		TARG_SCSIRATE
 		size		16
 	}
 	/*
-	 * Bit vector of targets that have ULTRA enabled.
+	 * Bit vector of targets that have ULTRA enabled as set by
+	 * the BIOS.  The Sequencer relies on a per-SCB field to
+	 * control whether to enable Ultra transfers or not.  During
+	 * initialization, we read this field and reuse it for 2
+	 * entries in the busy target table.
 	 */
 	ULTRA_ENB {
+		alias		CMDSIZE_TABLE
 		size		2
 	}
 	/*
-	 * Bit vector of targets that have disconnection disabled.
+	 * Bit vector of targets that have disconnection disabled as set by
+	 * the BIOS.  The Sequencer relies in a per-SCB field to control the
+	 * disconnect priveldge.  During initialization, we read this field
+	 * and reuse it for 2 entries in the busy target table.
 	 */
 	DISC_DSB {
 		size		2
+	}
+	CMDSIZE_TABLE_TAIL {
+		size		4
+	}
+	/*
+	 * Partial transfer past cacheline end to be
+	 * transferred using an extra S/G.
+	 */
+	MWI_RESIDUAL {
+		size		1
+	}
+	/*
+	 * SCBID of the next SCB to be started by the controller.
+	 */
+	NEXT_QUEUED_SCB {
+		size		1
 	}
 	/*
 	 * Single byte buffer used to designate the type or message
@@ -1198,28 +1292,26 @@ scratch_ram {
 	}
 	SEQ_FLAGS {
 		size		1
-		bit	IDENTIFY_SEEN	0x80
-		bit	SCBPTR_VALID	0x20
-		bit	DPHASE		0x10
-		bit	AMTARGET	0x08
-		bit	WIDE_BUS	0x02
-		bit	TWIN_BUS	0x01
+		bit	IDENTIFY_SEEN		0x80
+		bit	TARGET_CMD_IS_TAGGED	0x40
+		bit	DPHASE			0x20
+		/* Target flags */
+		bit	TARG_CMD_PENDING	0x10
+		bit	CMDPHASE_PENDING	0x08
+		bit	DPHASE_PENDING		0x04
+		bit	SPHASE_PENDING		0x02
+		bit	NO_DISCONNECT		0x01
 	}
 	/*
 	 * Temporary storage for the
 	 * target/channel/lun of a
 	 * reconnecting target
 	 */
-	SAVED_TCL {
+	SAVED_SCSIID {
 		size		1
 	}
-	/* Working value of the number of SG segments left */
-	SG_COUNT {
+	SAVED_LUN {
 		size		1
-	}
-	/* Working value of SG pointer */
-	SG_NEXT	{
-		size		4
 	}
 	/*
 	 * The last bus phase as seen by the sequencer. 
@@ -1261,23 +1353,25 @@ scratch_ram {
 		size		1
 	}
 	/*
+	 * head of list of SCBs that have
+	 * completed but have not been
+	 * put into the qoutfifo.
+	 */
+	COMPLETE_SCBH {
+		size		1
+	}
+	/*
 	 * Address of the hardware scb array in the host.
 	 */
 	HSCB_ADDR {
 		size		4
 	}
 	/*
-	 * Address of the 256 byte array storing the SCBID of outstanding
-	 * untagged SCBs indexed by TCL.
+	 * Base address of our shared data with the kernel driver in host
+	 * memory.  This includes the qoutfifo and target mode
+	 * incoming command queue.
 	 */
-	SCBID_ADDR {
-		size		4
-	}
-	/*
-	 * Address of the array of command descriptors used to store
-	 * information about incoming selections.
-	 */
-	TMODE_CMDADDR {
+	SHARED_DATA_ADDR {
 		size		4
 	}
 	KERNEL_QINPOS {
@@ -1290,18 +1384,25 @@ scratch_ram {
 		size		1
 	}
 	/*
-	 * Offset into the command descriptor array for the next
-	 * available desciptor to use.
+	 * Kernel and sequencer offsets into the queue of
+	 * incoming target mode command descriptors.  The
+	 * queue is full when the KERNEL_TQINPOS == TQINPOS.
 	 */
-	TMODE_CMDADDR_NEXT {
+	KERNEL_TQINPOS {
+		size		1
+	}
+	TQINPOS {                
 		size		1
 	}
 	ARG_1 {
 		size		1
-		mask	SEND_MSG	0x80
-		mask	SEND_SENSE	0x40
-		mask	SEND_REJ	0x20
-		mask	MSGOUT_PHASEMIS	0x10
+		mask	SEND_MSG		0x80
+		mask	SEND_SENSE		0x40
+		mask	SEND_REJ		0x20
+		mask	MSGOUT_PHASEMIS		0x10
+		mask	EXIT_MSG_LOOP		0x08
+		mask	CONT_MSG_LOOP		0x04
+		mask	CONT_TARG_SESSION	0x02
 		alias	RETURN_1
 	}
 	ARG_2 {
@@ -1317,14 +1418,48 @@ scratch_ram {
 	}
 
 	/*
-	 * Number of times we have filled the CCSGRAM with prefetched
-	 * SG elements.
+	 * Interrupt kernel for a message to this target on
+	 * the next transaction.  This is usually used for
+	 * negotiation requests.
 	 */
-	PREFETCH_CNT {
+	TARGET_MSG_REQUEST {
+		size		2
+	}
+
+	/*
+	 * Sequences the kernel driver has okayed for us.  This allows
+	 * the driver to do things like prevent initiator or target
+	 * operations.
+	 */
+	SCSISEQ_TEMPLATE {
+		size		1
+		bit	ENSELO		0x40
+		bit	ENSELI		0x20
+		bit	ENRSELI		0x10
+		bit	ENAUTOATNO	0x08
+		bit	ENAUTOATNI	0x04
+		bit	ENAUTOATNP	0x02
+	}
+
+	/*
+	 * Track whether the transfer byte count for
+	 * the current data phase is odd.
+	 */
+	DATA_COUNT_ODD {
 		size		1
 	}
 
+	/*
+	 * The initiator specified tag for this target mode transaction.
+	 */
+	INITIATOR_TAG {
+		size		1
+	}
 
+	SEQ_FLAGS2 {
+		size		1
+		bit	SCB_DMA		0x01
+	}
 	/*
 	 * These are reserved registers in the card's scratch ram.  Some of
 	 * the values are specified in the AHA2742 technical reference manual
@@ -1335,8 +1470,15 @@ scratch_ram {
 		size		1
 		bit	TERM_ENB	0x80
 		bit	RESET_SCSI	0x40
+		bit	ENSPCHK		0x20
 		mask	HSCSIID		0x07	/* our SCSI ID */
 		mask	HWSCSIID	0x0f	/* our SCSI ID if Wide Bus */
+	}
+	INTDEF {
+		address		0x05c
+		size		1
+		bit	EDGE_TRIG	0x80
+		mask	VECTOR		0x0f
 	}
 	HOSTCONF {
 		address		0x05d
@@ -1358,15 +1500,12 @@ scratch_ram {
 	}
 }
 
+const TID_SHIFT		4
 const SCB_LIST_NULL	0xff
+const TARGET_CMD_CMPLT	0xfe
 
 const CCSGADDR_MAX	0x80
 const CCSGRAM_MAXSEGS	16
-
-/* Offsets into the SCBID array where different data is stored */
-const UNTAGGEDSCB_OFFSET	0
-const QOUTFIFO_OFFSET		1
-const QINFIFO_OFFSET		2
 
 /* WDTR Message values */
 const BUS_8_BIT			0x00
@@ -1381,16 +1520,23 @@ const HOST_MSG			0xff
 
 /* Target mode command processing constants */
 const CMD_GROUP_CODE_SHIFT	0x05
-const CMD_GROUP0_BYTE_DELTA	-4
-const CMD_GROUP2_BYTE_DELTA	-6
-const CMD_GROUP4_BYTE_DELTA	4
-const CMD_GROUP5_BYTE_DELTA	11
+
+const STATUS_BUSY		0x08
+const STATUS_QUEUE_FULL	0x28
+const SCB_TARGET_PHASES		0
+const SCB_TARGET_DATA_DIR	1
+const SCB_TARGET_STATUS		2
+const SCB_INITIATOR_TAG		3
+const TARGET_DATA_IN		1
 
 /*
  * Downloaded (kernel inserted) constants
  */
-
-/*
- * Number of command descriptors in the command descriptor array.
- */
-const TMODE_NUMCMDS	download
+/* Offsets into the SCBID array where different data is stored */
+const QOUTFIFO_OFFSET download
+const QINFIFO_OFFSET download
+const CACHESIZE_MASK download
+const INVERTED_CACHESIZE_MASK download
+const SG_PREFETCH_CNT download
+const SG_PREFETCH_ALIGN_MASK download
+const SG_PREFETCH_ADDR_MASK download

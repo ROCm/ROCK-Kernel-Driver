@@ -386,8 +386,8 @@ int get_cpuinfo(char *buffer)
 	if ( i )
 		len += sprintf(buffer+len, "\n");
 	len += sprintf(buffer+len,"total bogomips\t: %lu.%02lu\n",
-		       (bogosum+2500)/500000,
-		       (bogosum+2500)/5000 % 100);
+		       (bogosum+2500)/(500000/HZ),
+		       (bogosum+2500)/(5000/HZ) % 100);
 #endif /* CONFIG_SMP */
 
 	/*

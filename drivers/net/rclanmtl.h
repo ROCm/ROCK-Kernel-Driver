@@ -445,7 +445,7 @@ void RCProcI2OMsgQ(struct net_device *dev);
  /*
  ** Disable and Enable I2O interrupts.  I2O interrupts are enabled at Init time
  ** but can be disabled and re-enabled through these two function calls.
- ** Packets will still be put into any posted recieved buffers and packets will
+ ** Packets will still be put into any posted received buffers and packets will
  ** be sent through RCI2OSendPacket() functions.  Disabling I2O interrupts
  ** will prevent hardware interrupt to host even though the outbound I2O msg
  ** queue is not emtpy.

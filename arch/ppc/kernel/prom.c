@@ -757,8 +757,11 @@ prom_init(int r3, int r4, prom_entry pp)
 		setup_disp_fake_bi(RELOC(prom_disp_node));
 #endif
 
-	/* If OpenFirmware version >= 3, then use quiesce call */
-	if (prom_version >= 3) {
+	/* If pmac, then use quiesce call. We can't rely on prom_version
+	 * since some old iMacs appear to have an incorrect /openprom/model
+	 * entry in the device tree
+	 */
+	if (!chrp) {
 		prom_print(RELOC("Calling quiesce ...\n"));
 		call_prom(RELOC("quiesce"), 0, 0);
 	}

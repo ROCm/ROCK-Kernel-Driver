@@ -445,7 +445,7 @@ typedef struct {
 struct sonic_local {
     sonic_cda_t   cda;                     /* virtual CPU address of CDA */
     sonic_td_t    tda[SONIC_NUM_TDS];      /* transmit descriptor area */
-    sonic_rr_t    rra[SONIC_NUM_RRS];      /* receive resource arrea */
+    sonic_rr_t    rra[SONIC_NUM_RRS];      /* receive resource area */
     sonic_rd_t    rda[SONIC_NUM_RDS];      /* receive descriptor area */
     struct sk_buff* tx_skb[SONIC_NUM_TDS]; /* skbuffs for packets to transmit */
     unsigned int  tx_laddr[SONIC_NUM_TDS]; /* logical DMA address fro skbuffs */

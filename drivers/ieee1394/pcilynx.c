@@ -1127,7 +1127,7 @@ static void lynx_irq_handler(int irq, void *dev_id,
 
         if (intmask & PCI_INT_1394) {
                 if (linkint & LINK_INT_PHY_TIMEOUT) {
-                        PRINT(KERN_INFO, lynx->id, "PHY timeout occured");
+                        PRINT(KERN_INFO, lynx->id, "PHY timeout occurred");
                 }
                 if (linkint & LINK_INT_PHY_BUSRESET) {
                         PRINT(KERN_INFO, lynx->id, "bus reset interrupt");

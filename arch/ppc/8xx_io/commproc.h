@@ -324,7 +324,7 @@ typedef struct scc_param {
 */
 #define SCC_EB	((u_char)0x10)	/* Set big endian byte order */
 
-/* CPM Ethernet through SCC1.
+/* CPM Ethernet through SCCx.
  */
 typedef struct scc_enet {
 	sccp_t	sen_genscc;
@@ -379,6 +379,8 @@ typedef struct scc_enet {
 	ushort	sen_taddrl;	/* temp address (LSB) */
 } scc_enet_t;
 
+/***  MBX  ************************************************************/
+
 #ifdef CONFIG_MBX
 /* Bits in parallel I/O port registers that have to be set/cleared
  * to configure the pins for SCC1 use.  The TCLK and RCLK seem unique
@@ -399,7 +401,9 @@ typedef struct scc_enet {
  */
 #define SICR_ENET_MASK	((uint)0x000000ff)
 #define SICR_ENET_CLKRT	((uint)0x0000003d)
-#endif
+#endif	/* CONFIG_MBX */
+
+/***  RPXLITE  ********************************************************/
 
 #ifdef CONFIG_RPXLITE
 /* This ENET stuff is for the MPC850 with ethernet on SCC2.  Some of
@@ -416,7 +420,9 @@ typedef struct scc_enet {
 
 #define SICR_ENET_MASK	((uint)0x0000ff00)
 #define SICR_ENET_CLKRT	((uint)0x00003d00)
-#endif
+#endif	/* CONFIG_RPXLITE */
+
+/***  BSEIP  **********************************************************/
 
 #ifdef CONFIG_BSEIP
 /* This ENET stuff is for the MPC823 with ethernet on SCC2.
@@ -438,7 +444,9 @@ typedef struct scc_enet {
 
 #define SICR_ENET_MASK	((uint)0x0000ff00)
 #define SICR_ENET_CLKRT	((uint)0x00002c00)
-#endif
+#endif	/* CONFIG_BSEIP */
+
+/***  RPXCLASSIC  *****************************************************/
 
 #ifdef CONFIG_RPXCLASSIC
 /* Bits in parallel I/O port registers that have to be set/cleared
@@ -457,27 +465,63 @@ typedef struct scc_enet {
  */
 #define SICR_ENET_MASK	((uint)0x000000ff)
 #define SICR_ENET_CLKRT	((uint)0x0000003d)
-#endif
+#endif	/* CONFIG_RPXCLASSIC */
 
-#if (defined(CONFIG_TQM860) || defined(CONFIG_TQM860L))
-/*
- * TQM860 and TQM860L Configuration:
- *
- * Signal       PAR     DIR     ODR     DAT     Function
- * Port A,  5    1       0       -       -       TCLK (CLK3) for Ethernet
- * Port A,  7    1       0       -       -       RCLK (CLK1) for Ethernet
- * Port A, 14    1       0       -       -       TXD for Ethernet (SCC1)
- * Port A, 15    1       0       -       -       RXD for Ethernet (SCC1)
- * Port C,  7    0       0       0       -       -> ETH-LOOP
- * Port C, 10    0       0       1       -       CD  for Ethernet (SCC1)
- * Port C, 11    0       0       1       -       CTS for Ethernet (SCC1)
- * Port C, 15    *       *       0       -       TENA/RTS for Ethernet
+/***  TQM823L, TQM850L  ***********************************************/
+
+#if defined(CONFIG_TQM823L) || defined(CONFIG_TQM850L)
+/* Bits in parallel I/O port registers that have to be set/cleared
+ * to configure the pins for SCC1 use.
  */
+#define PA_ENET_RXD	((ushort)0x0004)	/* PA 13 */
+#define PA_ENET_TXD	((ushort)0x0008)	/* PA 12 */
+#define PA_ENET_RCLK	((ushort)0x0100)	/* PA  7 */
+#define PA_ENET_TCLK	((ushort)0x0400)	/* PA  5 */
 
+#define PB_ENET_TENA	((uint)0x00002000)	/* PB 18 */
+
+#define PC_ENET_CLSN	((ushort)0x0040)	/* PC  9 */
+#define PC_ENET_RENA	((ushort)0x0080)	/* PC  8 */
+
+/* Control bits in the SICR to route TCLK (CLK3) and RCLK (CLK1) to
+ * SCC2.  Also, make sure GR2 (bit 16) and SC2 (bit 17) are zero.
+ */
+#define SICR_ENET_MASK	((uint)0x0000ff00)
+#define SICR_ENET_CLKRT	((uint)0x00002600)
+#endif	/* CONFIG_TQM823L, CONFIG_TQM850L */
+
+/***  FPS850L  *********************************************************/
+
+#ifdef CONFIG_FPS850L
+/* Bits in parallel I/O port registers that have to be set/cleared
+ * to configure the pins for SCC1 use.
+ */
+#define PA_ENET_RXD	((ushort)0x0004)	/* PA 13 */
+#define PA_ENET_TXD	((ushort)0x0008)	/* PA 12 */
+#define PA_ENET_RCLK	((ushort)0x0100)	/* PA  7 */
+#define PA_ENET_TCLK	((ushort)0x0400)	/* PA  5 */
+
+#define PC_ENET_TENA	((ushort)0x0002)	/* PC 14 */
+#define PC_ENET_CLSN	((ushort)0x0040)	/* PC  9 */
+#define PC_ENET_RENA	((ushort)0x0080)	/* PC  8 */
+
+/* Control bits in the SICR to route TCLK (CLK2) and RCLK (CLK4) to
+ * SCC2.  Also, make sure GR2 (bit 16) and SC2 (bit 17) are zero.
+ */
+#define SICR_ENET_MASK	((uint)0x0000ff00)
+#define SICR_ENET_CLKRT	((uint)0x00002600)
+#endif	/* CONFIG_FPS850L */
+
+/***  TQM860L  ********************************************************/
+
+#ifdef CONFIG_TQM860L
+/* Bits in parallel I/O port registers that have to be set/cleared
+ * to configure the pins for SCC1 use.
+ */
 #define PA_ENET_RXD	((ushort)0x0001)	/* PA 15 */
 #define PA_ENET_TXD	((ushort)0x0002)	/* PA 14 */
-#define PA_ENET_TCLK	((ushort)0x0400)	/* PA  5 */
 #define PA_ENET_RCLK	((ushort)0x0100)	/* PA  7 */
+#define PA_ENET_TCLK	((ushort)0x0400)	/* PA  5 */
 
 #define PC_ENET_TENA	((ushort)0x0001)	/* PC 15 */
 #define PC_ENET_CLSN	((ushort)0x0010)	/* PC 11 */
@@ -488,51 +532,59 @@ typedef struct scc_enet {
  */
 #define SICR_ENET_MASK	((uint)0x000000ff)
 #define SICR_ENET_CLKRT	((uint)0x00000026)
+#endif	/* CONFIG_TQM860L */
 
-#endif	/* CONFIG_TQM860, TQM860L */
+/***  SPD823TS  *******************************************************/
 
-#ifdef CONFIG_TQM8xxL
-/*
- * TQM8xxL Configuration (except TQM860L):
- *
- * Signal       PAR     DIR     ODR     DAT     Function
- * Port A,  5    1       0       -       -       TCLK (CLK3) for Ethernet
- * Port A,  7    1       0       -       -       RCLK (CLK1) for Ethernet
- * Port A, 12    1       0       -       -       TXD for Ethernet (SCC2)
- * Port A, 13    1       0       -       -       RXD for Ethernet (SCC2)
- * Port B, 18    1       1       -       -       TENA/RTS for Ethernet on STK8xx
- * Port C,  7    0       0       0       -       -> ETH-LOOP
- * Port C,  8    0       0       1       -       CD  for Ethernet (SCC2)
- * Port C,  9    0       0       1       -       CTS for Ethernet (SCC2)
- * Port C, 14    *       *       0       -       TENA/RTS for Ethernet on FPS850
- *
- * Note: Using PC14 as RTS2 (TENA) does not work on the TQM850L when
- * used with the starter-kit mainboard; we *must* use PB18 instead.
- * For the FPS850 system, we *must* use PC14 :-(
+#ifdef CONFIG_SPD823TS
+/* Bits in parallel I/O port registers that have to be set/cleared
+ * to configure the pins for SCC2 use.
  */
-
+#define PA_ENET_MDC	((ushort)0x0001)	/* PA 15 !!! */
+#define PA_ENET_MDIO	((ushort)0x0002)	/* PA 14 !!! */
 #define PA_ENET_RXD	((ushort)0x0004)	/* PA 13 */
 #define PA_ENET_TXD	((ushort)0x0008)	/* PA 12 */
-#define PA_ENET_RCLK	((ushort)0x0100)	/* PA  7 */
+#define PA_ENET_RCLK	((ushort)0x0200)	/* PA  6 */
 #define PA_ENET_TCLK	((ushort)0x0400)	/* PA  5 */
 
-#ifndef	CONFIG_FPS850	/* not valid on FPS board */
-#define	PB_ENET_TENA	((uint)0x00002000)
-#endif	/* !CONFIG_FPS850 */
+#define PB_ENET_TENA	((uint)0x00002000)	/* PB 18 */
 
-#ifdef	CONFIG_FPS850	/* FPS uses default configuration */
-#define PC_ENET_TENA	((ushort)0x0002)	/* PC 14 */
-#endif	/* CONFIG_FPS850 */
 #define PC_ENET_CLSN	((ushort)0x0040)	/* PC  9 */
 #define PC_ENET_RENA	((ushort)0x0080)	/* PC  8 */
+#define	PC_ENET_RESET	((ushort)0x0100)	/* PC  7 !!! */
 
-/* Control bits in the SICR to route TCLK (CLK3) and RCLK (CLK1) to
+/* Control bits in the SICR to route TCLK (CLK3) and RCLK (CLK2) to
  * SCC2.  Also, make sure GR2 (bit 16) and SC2 (bit 17) are zero.
  */
 #define SICR_ENET_MASK	((uint)0x0000ff00)
-#define SICR_ENET_CLKRT	((uint)0x00002600)
+#define SICR_ENET_CLKRT	((uint)0x00002E00)
+#endif	/* CONFIG_SPD823TS */
 
-#endif	/* CONFIG_TQM8xxL */
+
+/***  SM850  *********************************************************/
+
+/* The SM850 Service Module uses SCC2 for IrDA and SCC3 for Ethernet */
+
+#ifdef CONFIG_SM850
+#define PB_ENET_RXD	((uint)0x00000004)	/* PB 29 */
+#define PB_ENET_TXD	((uint)0x00000002)	/* PB 30 */
+#define PA_ENET_RCLK	((ushort)0x0100)	/* PA  7 */
+#define PA_ENET_TCLK	((ushort)0x0400)	/* PA  5 */
+
+#define PC_ENET_LBK	((ushort)0x0008)	/* PC 12 */
+#define PC_ENET_TENA	((ushort)0x0004)	/* PC 13 */
+
+#define PC_ENET_RENA	((ushort)0x0800)	/* PC  4 */
+#define PC_ENET_CLSN	((ushort)0x0400)	/* PC  5 */
+
+/* Control bits in the SICR to route TCLK (CLK3) and RCLK (CLK1) to
+ * SCC3.  Also, make sure GR3 (bit 8) and SC3 (bit 9) are zero.
+ */
+#define SICR_ENET_MASK	((uint)0x00FF0000)
+#define SICR_ENET_CLKRT	((uint)0x00260000)
+#endif	/* CONFIG_SM850 */
+
+/*********************************************************************/
 
 /* SCC Event register as used by Ethernet.
 */
@@ -723,8 +775,6 @@ typedef struct iic {
 #define	CPMVEC_PIO_PC4		((ushort)0x01)
 #define	CPMVEC_ERROR		((ushort)0x00)
 
-extern void cpm_install_handler(int vec, void (*handler)(void *), void *dev_id);
-
 /* CPM interrupt configuration vector.
 */
 #define	CICR_SCD_SCC4		((uint)0x00c00000)	/* SCC4 @ SCCd */
@@ -735,4 +785,8 @@ extern void cpm_install_handler(int vec, void (*handler)(void *), void *dev_id);
 #define CICR_HP_MASK		((uint)0x00001f00)	/* Hi-pri int. */
 #define CICR_IEN		((uint)0x00000080)	/* Int. enable */
 #define CICR_SPS		((uint)0x00000001)	/* SCC Spread */
+
+extern void cpm_install_handler(int vec, void (*handler)(void *), void *dev_id);
+extern void cpm_free_handler(int vec);
+
 #endif /* __CPM_8XX__ */

@@ -1701,7 +1701,7 @@ int cpqfcTSGetLPSM( PTACHYON fcChip, char cErrorString[])
 // removal time (load and unload times)
 // ALGORITHM notes:
 // Memory allocation varies by compiler and platform.  In the worst case,
-// we are only assured BYTE allignment, but in the best case, we can
+// we are only assured BYTE alignment, but in the best case, we can
 // request allocation on any desired boundary.  Our strategy: pad the
 // allocation request size (i.e. waste memory) so that we are assured
 // of passing desired boundary near beginning of contiguous space, then

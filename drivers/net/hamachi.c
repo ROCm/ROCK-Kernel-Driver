@@ -477,6 +477,7 @@ enum desc_status_bits {
 };
 
 #define PRIV_ALIGN   15    				/* Required alignment mask */
+#define MII_CNT		4
 struct hamachi_private {
 	/* Descriptor rings first for alignment.  Tx requires a second descriptor
 	   for status. */
@@ -503,7 +504,7 @@ struct hamachi_private {
 	/* MII transceiver section. */
 	int mii_cnt;								/* MII device addresses. */
 	u16 advertising;							/* NWay media advertisement */
-	unsigned char phys[2];					/* MII device addresses. */
+	unsigned char phys[MII_CNT];		/* MII device addresses, only first one used. */
 	u_int32_t rx_int_var, tx_int_var;	/* interrupt control variables */
 	u_int32_t option;							/* Hold on to a copy of the options */
 	u_int8_t pad[16];							/* Used for 32-byte alignment */
@@ -554,7 +555,7 @@ static int __init hamachi_init_one (struct pci_dev *pdev,
 	struct hamachi_private *hmp;
 	int option, i, rx_int_var, tx_int_var, boguscnt;
 	int chip_id = ent->driver_data;
-	int irq = pdev->irq;
+	int irq;
 	long ioaddr;
 	static int card_idx = 0;
 	struct net_device *dev;
@@ -562,15 +563,17 @@ static int __init hamachi_init_one (struct pci_dev *pdev,
 	if (hamachi_debug > 0  &&  did_version++ == 0)
 		printk(version);
 
+	if (pci_enable_device(pdev))
+		return -EIO;
+
 	ioaddr = pci_resource_start(pdev, 0);
 #ifdef __alpha__				/* Really "64 bit addrs" */
 	ioaddr |= (pci_resource_start(pdev, 1) << 32);
 #endif
 
-	if (pci_enable_device(pdev))
-		return -EIO;
 	pci_set_master(pdev);
 
+	irq = pdev->irq;
 	ioaddr = (long) ioremap(ioaddr, 0x400);
 	if (!ioaddr)
 		return -ENOMEM;
@@ -703,7 +706,7 @@ static int __init hamachi_init_one (struct pci_dev *pdev,
 
 	if (chip_tbl[hmp->chip_id].flags & CanHaveMII) {
 		int phy, phy_idx = 0;
-		for (phy = 0; phy < 32 && phy_idx < 4; phy++) {
+		for (phy = 0; phy < 32 && phy_idx < MII_CNT; phy++) {
 			int mii_status = mdio_read(ioaddr, phy, 1);
 			if (mii_status != 0xffff  &&
 				mii_status != 0x0000) {
@@ -1062,7 +1065,6 @@ static void hamachi_tx_timeout(struct net_device *dev)
 	hmp->dirty_rx = (unsigned int)(i - RX_RING_SIZE);
 	/* Mark the last entry as wrapping the ring. */
 	hmp->rx_ring[RX_RING_SIZE-1].status_n_length |= cpu_to_le32(DescEndRing);
-
 
 	/* Trigger an immediate transmit demand. */
 	dev->trans_start = jiffies;

@@ -298,8 +298,9 @@ static void __init gg2_pcibios_fixup_bus(struct pci_bus *bus)
     	bus->resource[1] = &gg2_resources.pci_mem;
 }
 
-static void process_bridge_ranges(struct pci_controller *hose,
-				  struct device_node *dev, int index)
+/* this is used by the pmac_pci code too... - paulus */
+void process_bridge_ranges(struct pci_controller *hose,
+			   struct device_node *dev, int primary)
 {
 	unsigned int *ranges;
 	int rlen = 0;
@@ -316,31 +317,34 @@ static void process_bridge_ranges(struct pci_controller *hose,
 				break;
 			hose->io_base_phys = ranges[3];
 			hose->io_base_virt = ioremap(ranges[3], ranges[5]);
-			if (index == 0) {
+			if (primary)
 				isa_io_base = (unsigned long) hose->io_base_virt;
-				printk("isa_io_base=%lx\n", isa_io_base);
-			}
 			res = &hose->io_resource;
 			res->flags = IORESOURCE_IO;
+			res->start = ranges[2];
 			break;
 		case 2:		/* memory space */
-			if (index == 0 && ranges[1] == 0 && ranges[2] == 0){
-				isa_mem_base = ranges[3];
-				printk("isa_mem_base=%lx\n", isa_mem_base);
+			memno = 0;
+			if (ranges[1] == 0 && ranges[2] == 0
+			    && ranges[5] <= (16 << 20)) {
+				/* 1st 16MB, i.e. ISA memory area */
+				if (primary)
+					isa_mem_base = ranges[3];
+				memno = 1;
 			}
-			if (memno == 0) {
+			while (memno < 3 && hose->mem_resources[memno].flags)
+				++memno;
+			if (memno == 0)
 				hose->pci_mem_offset = ranges[3] - ranges[2];
-				printk("pci_mem_offset=%lx for this bridge\n",
-				       hose->pci_mem_offset);
+			if (memno < 3) {
+				res = &hose->mem_resources[memno];
+				res->flags = IORESOURCE_MEM;
+				res->start = ranges[3];
 			}
-			res = &hose->mem_resources[memno];
-			res->flags = IORESOURCE_MEM;
-			++memno;
 			break;
 		}
 		if (res != NULL) {
 			res->name = dev->full_name;
-			res->start = ranges[3];
 			res->end = res->start + ranges[5] - 1;
 			res->parent = NULL;
 			res->sibling = NULL;
@@ -401,7 +405,7 @@ ibm_add_bridges(struct device_node *dev)
        		hose->cfg_addr = (volatile unsigned int *) cfg;
        		hose->cfg_data = cfg + 0x10;
 
-		process_bridge_ranges(hose, dev, index);
+		process_bridge_ranges(hose, dev, index == 0);
 
 #ifdef CONFIG_POWER3
                 openpic_setup_ISU(index, opprop[index+1]);

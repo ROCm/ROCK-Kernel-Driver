@@ -908,6 +908,8 @@ static int open_aux(struct inode * inode, struct file * file)
 							   controller. */
 	aux_write_ack(AUX_ENABLE_DEV); /* Enable aux device */
 	kbd_write_cmd(AUX_INTS_ON); /* Enable controller ints */
+	
+	mdelay(2);			/* Ensure we follow the kbc access delay rules.. */
 
 	send_data(KBD_CMD_ENABLE);	/* try to workaround toshiba4030cdt problem */
 

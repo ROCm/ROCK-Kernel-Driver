@@ -609,6 +609,11 @@ static int __devinit netdrv_init_board (struct pci_dev *pdev,
 	SET_MODULE_OWNER(dev);
 	tp = dev->priv;
 
+	/* enable device (incl. PCI PM wakeup), and bus-mastering */
+	rc = pci_enable_device (pdev);
+	if (rc)
+		goto err_out;
+
 	pio_start = pci_resource_start (pdev, 0);
 	pio_end = pci_resource_end (pdev, 0);
 	pio_flags = pci_resource_flags (pdev, 0);
@@ -623,8 +628,6 @@ static int __devinit netdrv_init_board (struct pci_dev *pdev,
 	 * we talk to the chip directly */
 	DPRINTK("PIO region size == 0x%02X\n", pio_len);
 	DPRINTK("MMIO region size == 0x%02lX\n", mmio_len);
-	if (pio_len == RTL8139B_IO_SIZE)
-		tp->chipset = CH_8139B;
 
 	/* make sure PCI base addr 0 is PIO */
 	if (!(pio_flags & IORESOURCE_IO)) {
@@ -648,24 +651,9 @@ static int __devinit netdrv_init_board (struct pci_dev *pdev,
 		goto err_out;
 	}
 
-	/* make sure our PIO region in PCI space is available */
-	if (!request_region (pio_start, pio_len, dev->name)) {
-		printk (KERN_ERR PFX "no I/O resource available, aborting\n");
-		rc = -EBUSY;
-		goto err_out;
-	}
-
-	/* make sure our MMIO region in PCI space is available */
-	if (!request_mem_region (mmio_start, mmio_len, dev->name)) {
-		printk (KERN_ERR PFX "no mem resource available, aborting\n");
-		rc = -EBUSY;
-		goto err_out_free_pio;
-	}
-
-	/* enable device (incl. PCI PM wakeup), and bus-mastering */
-	rc = pci_enable_device (pdev);
+	rc = pci_request_regions (pdev, dev->name);
 	if (rc)
-		goto err_out_free_mmio;
+		goto err_out;
 
 	pci_set_master (pdev);
 
@@ -677,7 +665,7 @@ static int __devinit netdrv_init_board (struct pci_dev *pdev,
 	if (ioaddr == NULL) {
 		printk (KERN_ERR PFX "cannot remap MMIO, aborting\n");
 		rc = -EIO;
-		goto err_out_free_mmio;
+		goto err_out_free_res;
 	}
 #endif /* USE_IO_OPS */
 
@@ -692,14 +680,7 @@ static int __devinit netdrv_init_board (struct pci_dev *pdev,
 			udelay (10);
 
 	/* Bring the chip out of low-power mode. */
-	if (tp->chipset == CH_8139B) {
-		NETDRV_W8 (Config1, NETDRV_R8 (Config1) & ~(1<<4));
-		NETDRV_W8 (Config4, NETDRV_R8 (Config4) & ~(1<<2));
-	} else {
-		/* handle RTL8139A and RTL8139 cases */
-		/* XXX from becker driver. is this right?? */
-		NETDRV_W8 (Config1, 0);
-	}
+	/* <insert device-specific code here> */
 
 #ifndef USE_IO_OPS
 	/* sanity checks -- ensure PIO and MMIO registers agree */
@@ -708,19 +689,6 @@ static int __devinit netdrv_init_board (struct pci_dev *pdev,
 	assert (inb (pio_start+TxConfig) == readb (ioaddr+TxConfig));
 	assert (inb (pio_start+RxConfig) == readb (ioaddr+RxConfig));
 #endif /* !USE_IO_OPS */
-
-	/* make sure chip thinks PIO and MMIO are enabled */
-	tmp8 = NETDRV_R8 (Config1);
-	if ((tmp8 & Cfg1_PIO) == 0) {
-		printk (KERN_ERR PFX "PIO not enabled, Cfg1=%02X, aborting\n", tmp8);
-		rc = -EIO;
-		goto err_out_iounmap;
-	}
-	if ((tmp8 & Cfg1_MMIO) == 0) {
-		printk (KERN_ERR PFX "MMIO not enabled, Cfg1=%02X, aborting\n", tmp8);
-		rc = -EIO;
-		goto err_out_iounmap;
-	}
 
 	/* identify chip attached to board */
 	tmp = NETDRV_R8 (ChipVersion);
@@ -747,15 +715,10 @@ match:
 	*dev_out = dev;
 	return 0;
 
-err_out_iounmap:
-	assert (ioaddr > 0);
 #ifndef USE_IO_OPS
-	iounmap (ioaddr);
+err_out_free_res:
+	pci_release_regions (pdev);
 #endif /* !USE_IO_OPS */
-err_out_free_mmio:
-	release_mem_region (mmio_start, mmio_len);
-err_out_free_pio:
-	release_region (pio_start, pio_len);
 err_out:
 	unregister_netdev (dev);
 	kfree (dev);
@@ -886,7 +849,7 @@ static void __devexit netdrv_remove_one (struct pci_dev *pdev)
 
 	assert (dev != NULL);
 
-	np = (struct netdrv_private *) (dev->priv);
+	np = dev->priv;
 	assert (np != NULL);
 
 	unregister_netdev (dev);
@@ -895,10 +858,7 @@ static void __devexit netdrv_remove_one (struct pci_dev *pdev)
 	iounmap (np->mmio_addr);
 #endif /* !USE_IO_OPS */
 
-	release_region (pci_resource_start (pdev, 0),
-			pci_resource_len (pdev, 0));
-	release_mem_region (pci_resource_start (pdev, 1),
-			    pci_resource_len (pdev, 1));
+	pci_release_regions (pdev);
 
 #ifndef NETDRV_NDEBUG
 	/* poison memory before freeing */

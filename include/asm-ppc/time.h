@@ -2,7 +2,7 @@
  * $Id: time.h,v 1.12 1999/08/27 04:21:23 cort Exp $
  * Common time prototypes and such for all ppc machines.
  *
- * Written by Cort Dougan (cort@cs.nmt.edu) to merge
+ * Written by Cort Dougan (cort@fsmlabs.com) to merge
  * Paul Mackerras' version and mine for PReP and Pmac.
  */
 
@@ -16,6 +16,7 @@
 extern unsigned tb_ticks_per_jiffy;
 extern unsigned tb_to_us;
 extern unsigned tb_last_stamp;
+extern unsigned long disarm_decr[NR_CPUS];
 
 extern void to_tm(int tim, struct rtc_time * tm);
 extern time_t last_rtc_update;

@@ -500,7 +500,7 @@ static int lp_ioctl(struct inode *inode, struct file *file,
 			if (copy_to_user((int *) arg, &LP_STAT(minor),
 					sizeof(struct lp_stats)))
 				return -EFAULT;
-			if (suser())
+			if (capable(CAP_SYS_ADMIN))
 				memset(&LP_STAT(minor), 0,
 						sizeof(struct lp_stats));
 			break;

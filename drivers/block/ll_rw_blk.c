@@ -1239,9 +1239,6 @@ int __init blk_dev_init(void)
 #ifdef CONFIG_BLK_DEV_RAM
 	rd_init();
 #endif
-#ifdef CONFIG_BLK_DEV_LOOP
-	loop_init();
-#endif
 #ifdef CONFIG_ISP16_CDI
 	isp16_init();
 #endif

@@ -50,12 +50,14 @@ dep_tristate 'ACARD SCSI support' CONFIG_SCSI_ACARD $CONFIG_SCSI
 dep_tristate 'Adaptec AHA152X/2825 support' CONFIG_SCSI_AHA152X $CONFIG_SCSI
 dep_tristate 'Adaptec AHA1542 support' CONFIG_SCSI_AHA1542 $CONFIG_SCSI
 dep_tristate 'Adaptec AHA1740 support' CONFIG_SCSI_AHA1740 $CONFIG_SCSI
-dep_tristate 'Adaptec AIC7xxx support' CONFIG_SCSI_AIC7XXX $CONFIG_SCSI
-if [ "$CONFIG_SCSI_AIC7XXX" != "n" ]; then
-   bool '  Enable Tagged Command Queueing (TCQ) by default' CONFIG_AIC7XXX_TCQ_ON_BY_DEFAULT
-   int  '  Maximum number of TCQ commands per device' CONFIG_AIC7XXX_CMDS_PER_DEVICE 8
-   bool '  Collect statistics to report in /proc' CONFIG_AIC7XXX_PROC_STATS
-   int  '  Delay in seconds after SCSI bus reset' CONFIG_AIC7XXX_RESET_DELAY 5
+source drivers/scsi/aic7xxx/Config.in
+if [ "$CONFIG_SCSI_AIC7XXX" != "y" ]; then
+   dep_tristate 'Old Adaptec AIC7xxx support' CONFIG_SCSI_AIC7XXX_OLD $CONFIG_SCSI
+   if [ "$CONFIG_SCSI_AIC7XXX_OLD" != "n" ]; then
+      bool '  Enable Tagged Command Queueing (TCQ) by default' CONFIG_AIC7XXX_OLD_TCQ_ON_BY_DEFAULT
+      int  '  Maximum number of TCQ commands per device' CONFIG_AIC7XXX_OLD_CMDS_PER_DEVICE 8
+      bool '  Collect statistics to report in /proc' CONFIG_AIC7XXX_OLD_PROC_STATS
+   fi
 fi
 dep_tristate 'AdvanSys SCSI support' CONFIG_SCSI_ADVANSYS $CONFIG_SCSI
 dep_tristate 'Always IN2000 SCSI support' CONFIG_SCSI_IN2000 $CONFIG_SCSI

@@ -676,6 +676,10 @@ static int __init  AM53C974_init(Scsi_Host_Template * tpnt, struct pci_dev *pdev
 #endif
 
 	instance = scsi_register(tpnt, sizeof(struct AM53C974_hostdata));
+	if (!instance) {
+		printk(KERN_WARNING "AM53C974: Unable to register host, aborting.\n");
+		return 0;
+	}
 	hostdata = (struct AM53C974_hostdata *) instance->hostdata;
 	instance->base = 0;
 	instance->io_port = pci_resource_start(pdev, 0);

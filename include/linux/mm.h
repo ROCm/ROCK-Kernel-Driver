@@ -481,11 +481,6 @@ extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int);
 
 #define GFP_DMA		__GFP_DMA
 
-/* Flag - indicates that the buffer can be taken from high memory which is not
-   permanently mapped by the kernel */
-
-#define GFP_HIGHMEM	__GFP_HIGHMEM
-
 /* vma is the first one with  address < vma->vm_end,
  * and even  address < vma->vm_start. Have to extend vma. */
 static inline int expand_stack(struct vm_area_struct * vma, unsigned long address)

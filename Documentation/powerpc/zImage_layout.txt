@@ -1,7 +1,7 @@
           Information about the Linux/PPC kernel images
 =====================================================================
 
-Please mail me me (Cort Dougan, cort@cs.nmt.edu) if you have questions,
+Please mail me (Cort Dougan, cort@fsmlabs.com) if you have questions,
 comments or corrections.
 
 This document is meant to answer several questions I've had about how

@@ -60,12 +60,6 @@ static struct net_device_stats *bond_get_stats(struct net_device *dev);
 
 static struct net_device *this_bond;
 
-static int bond_open(struct net_device *dev)
-{
-	MOD_INC_USE_COUNT;
-	return 0;
-}
-
 static void release_one_slave(struct net_device *master, slave_t *slave)
 {
 	bonding_t *bond = master->priv;
@@ -81,7 +75,6 @@ static void release_one_slave(struct net_device *master, slave_t *slave)
 
 	dev_put(slave->dev);
 	kfree(slave);
-	MOD_DEC_USE_COUNT;
 }
 
 static int bond_close(struct net_device *master)
@@ -92,7 +85,6 @@ static int bond_close(struct net_device *master)
 	while ((slave = bond->next) != (slave_t*)bond)
 		release_one_slave(master, slave);
 
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -142,7 +134,6 @@ static int bond_enslave(struct net_device *master, struct net_device *dev)
 
 	spin_unlock_bh(&master->xmit_lock);
 
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -210,9 +201,7 @@ static int bond_event(struct notifier_block *this, unsigned long event, void *pt
 }
 
 static struct notifier_block bond_netdev_notifier={
-	bond_event,
-	NULL,
-	0
+	notifier_call: bond_event 
 };
 
 static int __init bond_init(struct net_device *dev)
@@ -233,7 +222,6 @@ static int __init bond_init(struct net_device *dev)
 	/* Initialize the device structure. */
 	dev->hard_start_xmit = bond_xmit;
 	dev->get_stats	= bond_get_stats;
-	dev->open = bond_open;
 	dev->stop = bond_close;
 	dev->set_multicast_list = bond_set_multicast_list;
 	dev->do_ioctl = bond_ioctl;
@@ -289,20 +277,20 @@ static struct net_device_stats *bond_get_stats(struct net_device *dev)
 	return &bond->stats;
 }
 
-static struct net_device dev_bond = {
-		"",
-		0, 0, 0, 0,
-	 	0x0, 0,
-	 	0, 0, 0, NULL, bond_init };
+static struct net_device dev_bond;
 
 static int __init bonding_init(void)
 {
 	/* Find a name for this unit */
-	int err=dev_alloc_name(&dev_bond,"bond%d");
+	int err;
+	
+	dev_bond.init = bond_init;
 
+	err = dev_alloc_name(&dev_bond,"bond%d");
 	if (err<0)
 		return err;
 
+	SET_MODULE_OWNER(&dev_bond);
 	if (register_netdev(&dev_bond) != 0)
 		return -EIO;
 

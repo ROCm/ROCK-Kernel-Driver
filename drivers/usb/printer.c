@@ -1,5 +1,5 @@
 /*
- * printer.c  Version 0.6
+ * printer.c  Version 0.8
  *
  * Copyright (c) 1999 Michael Gee	<michael@linuxspecific.com>
  * Copyright (c) 1999 Pavel Machek	<pavel@suse.cz>
@@ -17,7 +17,8 @@
  *	v0.4 - fixes in unidirectional mode
  *	v0.5 - add DEVICE_ID string support
  *	v0.6 - never time out
- *	v0.? - fixed bulk-IN read and poll (David Paschal, paschal@rcsis.com)
+ *	v0.7 - fixed bulk-IN read and poll (David Paschal, paschal@rcsis.com)
+ *	v0.8 - add devfs support
  */
 
 /*
@@ -45,6 +46,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/lp.h>
+#include <linux/devfs_fs_kernel.h>
 #undef DEBUG
 #include <linux/usb.h>
 
@@ -78,6 +80,7 @@ MFG:HEWLETT-PACKARD;MDL:DESKJET 970C;CMD:MLC,PCL,PML;CLASS:PRINTER;DESCRIPTION:H
 
 struct usblp {
 	struct usb_device 	*dev;			/* USB device */
+	devfs_handle_t		devfs;			/* devfs device */
 	struct urb		readurb, writeurb;	/* The urbs */
 	wait_queue_head_t	wait;			/* Zzzzz ... */
 	int			readcount;		/* Counter for reads */
@@ -89,6 +92,8 @@ struct usblp {
 	unsigned char		*device_id_string;	/* IEEE 1284 DEVICE ID string (ptr) */
 							/* first 2 bytes are (big-endian) length */
 };
+
+extern devfs_handle_t usb_devfs_handle;			/* /dev/usb dir. */
 
 static struct usblp *usblp_table[USBLP_MINORS];
 
@@ -245,6 +250,7 @@ static int usblp_release(struct inode *inode, struct file *file)
 		return 0;
 	}
 
+	devfs_unregister(usblp->devfs);
 	usblp_table[usblp->minor] = NULL;
 	kfree(usblp->device_id_string);
 	kfree(usblp);
@@ -454,6 +460,16 @@ static unsigned int usblp_quirks (__u16 vendor, __u16 product)
 	return 0;
 }
 
+static struct file_operations usblp_fops = {
+	owner:		THIS_MODULE,
+	read:		usblp_read,
+	write:		usblp_write,
+	poll:		usblp_poll,
+	ioctl:		usblp_ioctl,
+	open:		usblp_open,
+	release:	usblp_release,
+};
+
 static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 			 const struct usb_device_id *id)
 {
@@ -464,6 +480,7 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 	int alts = dev->actconfig->interface[ifnum].act_altsetting;
 	int length, err;
 	char *buf;
+	char name[6];
 
 	/* If a bidirectional interface exists, use it. */
 	for (i = 0; i < dev->actconfig->interface[ifnum].num_altsetting; i++) {
@@ -573,6 +590,17 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 	usblp_check_status(usblp, 0);
 #endif
 
+	sprintf(name, "lp%d", minor);
+	
+	/* Create with perms=664 */
+	usblp->devfs = devfs_register(usb_devfs_handle, name,
+				      DEVFS_FL_DEFAULT, USB_MAJOR,
+				      USBLP_MINOR_BASE + minor,
+				      S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP |
+				      S_IWGRP, &usblp_fops, NULL);
+	if (usblp->devfs == NULL)
+		err("usblp%d: device node registration failed", minor);
+
 	info("usblp%d: USB %sdirectional printer dev %d if %d alt %d",
 		minor, bidir ? "Bi" : "Uni", dev->devnum, ifnum, alts);
 
@@ -600,19 +628,10 @@ static void usblp_disconnect(struct usb_device *dev, void *ptr)
 
 	kfree(usblp->device_id_string);
 
+	devfs_unregister(usblp->devfs);
 	usblp_table[usblp->minor] = NULL;
 	kfree(usblp);
 }
-
-static struct file_operations usblp_fops = {
-	owner:		THIS_MODULE,
-	read:		usblp_read,
-	write:		usblp_write,
-	poll:		usblp_poll,
-	ioctl:		usblp_ioctl,
-	open:		usblp_open,
-	release:	usblp_release,
-};
 
 static struct usb_device_id usblp_ids [] = {
 	{ USB_INTERFACE_INFO(7, 1, 1) },

@@ -2945,10 +2945,9 @@ uhci_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 	/* Search for the IO base address.. */
 	for (i = 0; i < 6; i++) {
 
-		unsigned int io_addr = dev->resource[i].start;
-		unsigned int io_size =
-		dev->resource[i].end - dev->resource[i].start + 1;
-		if (!(dev->resource[i].flags & IORESOURCE_IO))
+		unsigned int io_addr = pci_resource_start(dev, i);
+		unsigned int io_size = pci_resource_len(dev, i);
+		if (!(pci_resource_flags(dev,i) & IORESOURCE_IO))
 			continue;
 
 		/* Is it already in use? */

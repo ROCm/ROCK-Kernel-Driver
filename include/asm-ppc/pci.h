@@ -34,6 +34,7 @@ extern unsigned long pci_resource_to_bus(struct pci_dev *pdev, struct resource *
  * 
  * Obsolete ! Drivers should now use pci_resource_to_bus
  */
+extern unsigned long phys_to_bus(unsigned long pa);
 extern unsigned long pci_phys_to_bus(unsigned long pa, int busnr);
 extern unsigned long pci_bus_to_phys(unsigned int ba, int busnr);
     

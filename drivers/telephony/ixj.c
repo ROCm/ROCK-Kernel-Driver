@@ -6300,6 +6300,7 @@ extern __inline__ int ixj_register_pcmcia(void)
 {
 	return 0;
 }
+#endif /* CONFIG_PCMCIA */
 
 #if defined(CONFIG_ISAPNP)
 extern __inline__ int ixj_probe_isa(int *cnt)
@@ -6448,7 +6449,6 @@ int __init ixj_probe_isa(int *cnt)
 	return 0;
 }
 #endif /* CONFIG_ISAPNP */
-#endif /* CONFIG_PCMCIA */
 
 #if defined(CONFIG_PCI)
 int __init ixj_probe_pci(int *cnt)

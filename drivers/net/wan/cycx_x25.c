@@ -3,7 +3,7 @@
 *
 * Author:	Arnaldo Carvalho de Melo <acme@conectiva.com.br>
 *
-* Copyright:	(c) 1998-2000 Arnaldo Carvalho de Melo
+* Copyright:	(c) 1998-2001 Arnaldo Carvalho de Melo
 *
 * Based on sdla_x25.c by Gene Kozin <genek@compuserve.com>
 *
@@ -12,6 +12,7 @@
 *		as published by the Free Software Foundation; either version
 *		2 of the License, or (at your option) any later version.
 * ============================================================================
+* 2001/01/12	acme		use dev_kfree_skb_irq on interrupt context
 * 2000/04/02	acme		dprintk, cycx_debug
 * 				fixed the bug introduced in get_dev_by_lcn and
 * 				get_dev_by_dte_addr by the anonymous hacker
@@ -794,7 +795,7 @@ static void rx_intr (cycx_t *card, TX25Cmd *cmd)
 
 	if (skb_tailroom(skb) < pktlen) {
 		/* No room for the packet. Call off the whole thing! */
-		dev_kfree_skb(skb);
+		dev_kfree_skb_irq(skb);
 		chan->rx_skb = NULL;
 
 		if (bitm)
@@ -812,14 +813,14 @@ static void rx_intr (cycx_t *card, TX25Cmd *cmd)
 	if (bitm)
 		return; /* more data is coming */
 
-	dev->last_rx = jiffies;		/* timestamp */
 	chan->rx_skb = NULL;		/* dequeue packet */
 
 	++chan->ifstats.rx_packets;
-	chan->ifstats.rx_bytes += skb->len;
+	chan->ifstats.rx_bytes += pktlen;
 
 	skb->mac.raw = skb->data;
 	netif_rx(skb);
+	dev->last_rx = jiffies;		/* timestamp */
 }
 
 /* Connect interrupt handler. */

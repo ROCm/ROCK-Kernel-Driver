@@ -213,7 +213,7 @@ int __init ultramca_probe(struct net_device *dev)
 	dev->mem_start = 0;
 	num_pages      = 40;
 
-	switch (j) {	/* 'j' = card-# in const array above [hs] */
+	switch (adapter) {	/* card-# in const array above [hs] */
 		case _61c8_SMC_Ethercard_PLUS_Elite_A_BNC_AUI_WD8013EP_A:
 		case _61c9_SMC_Ethercard_PLUS_Elite_A_UTP_AUI_WD8013EP_A:
 		{
@@ -373,9 +373,9 @@ static void ultramca_get_8390_hdr(struct net_device *dev, struct e8390_pkt_hdr *
 
 #ifdef notdef
 	/* Officially this is what we are doing, but the readl() is faster */
-	memcpy_fromio(hdr, hdr_start, sizeof(struct e8390_pkt_hdr));
+	isa_memcpy_fromio(hdr, hdr_start, sizeof(struct e8390_pkt_hdr));
 #else
-	((unsigned int*)hdr)[0] = readl(hdr_start);
+	((unsigned int*)hdr)[0] = isa_readl(hdr_start);
 #endif
 }
 
@@ -390,12 +390,12 @@ static void ultramca_block_input(struct net_device *dev, int count, struct sk_bu
 	if (xfer_start + count > dev->rmem_end) {
 		/* We must wrap the input move. */
 		int semi_count = dev->rmem_end - xfer_start;
-		memcpy_fromio(skb->data, xfer_start, semi_count);
+		isa_memcpy_fromio(skb->data, xfer_start, semi_count);
 		count -= semi_count;
-		memcpy_fromio(skb->data + semi_count, dev->rmem_start, count);
+		isa_memcpy_fromio(skb->data + semi_count, dev->rmem_start, count);
 	} else {
 		/* Packet is in one chunk -- we can copy + cksum. */
-		eth_io_copy_and_sum(skb, xfer_start, count, 0);
+		isa_eth_io_copy_and_sum(skb, xfer_start, count, 0);
 	}
 
 }
@@ -405,7 +405,7 @@ static void ultramca_block_output(struct net_device *dev, int count, const unsig
 {
 	unsigned long shmem = dev->mem_start + ((start_page - START_PG) << 8);
 
-	memcpy_toio(shmem, buf, count);
+	isa_memcpy_toio(shmem, buf, count);
 }
 
 static int ultramca_close_card(struct net_device *dev)

@@ -20,16 +20,16 @@
 static struct i2c_driver pcf8583_driver;
 
 static unsigned short ignore[] = { I2C_CLIENT_END };
-static unsigned short normal_addr[] = { 0x50, 0x51, I2C_CLIENT_END };
+static unsigned short normal_addr[] = { 0x50, I2C_CLIENT_END };
 
 static struct i2c_client_address_data addr_data = {
-	force:			ignore,
+	normal_i2c:		normal_addr,
+	normal_i2c_range:	ignore,
+	probe:			ignore,
+	probe_range:		ignore,
 	ignore:			ignore,
 	ignore_range:		ignore,
-	normal_i2c:		ignore,
-	normal_i2c_range:	normal_addr,
-	probe:			ignore,
-	probe_range:		ignore
+	force:			ignore,
 };
 
 #define DAT(x) ((unsigned int)(x->data))
@@ -86,7 +86,10 @@ pcf8583_get_datetime(struct i2c_client *client, struct rtc_tm *dt)
 	};
 	int ret = -EIO;
 
-	if (i2c_transfer(client->adapter, msgs, 2) == 2) {
+	memset(buf, 0, sizeof(buf));
+
+	ret = i2c_transfer(client->adapter, msgs, 2);
+	if (ret == 2) {
 		dt->year_off = buf[4] >> 6;
 		dt->wday     = buf[5] >> 5;
 
@@ -126,6 +129,8 @@ pcf8583_set_datetime(struct i2c_client *client, struct rtc_tm *dt, int datetoo)
 	}
 
 	ret = i2c_master_send(client, (char *)buf, len);
+	if (ret == len)
+		ret = 0;
 
 	buf[1] = DAT(client);
 	i2c_master_send(client, (char *)buf, 2);
@@ -219,12 +224,12 @@ pcf8583_command(struct i2c_client *client, unsigned int cmd, void *arg)
 }
 
 static struct i2c_driver pcf8583_driver = {
-	"PCF8583",
-	I2C_DRIVERID_PCF8583,
-	I2C_DF_NOTIFY,
-	pcf8583_probe,
-	pcf8583_detach,
-	pcf8583_command
+	name:		"PCF8583",
+	id:		I2C_DRIVERID_PCF8583,
+	flags:		I2C_DF_NOTIFY,
+	attach_adapter:	pcf8583_probe,
+	detach_client:	pcf8583_detach,
+	command:	pcf8583_command
 };
 
 static __init int pcf8583_init(void)

@@ -61,22 +61,6 @@ m8xx_cpm_reset(uint host_page_addr)
 	imp = (immap_t *)IMAP_ADDR;
 	commproc = (cpm8xx_t *)&imp->im_cpm;
 
-#ifdef notdef
-	/* We can't do this.  It seems to blow away the microcode
-	 * patch that EPPC-Bug loaded for us.  EPPC-Bug uses SCC1 for
-	 * Ethernet, SMC1 for the console, and I2C for serial EEPROM.
-	 * Our own drivers quickly reset all of these.
-	 */
-
-	/* Perform a reset.
-	*/
-	commproc->cp_cpcr = (CPM_CR_RST | CPM_CR_FLG);
-
-	/* Wait for it.
-	*/
-	while (commproc->cp_cpcr & CPM_CR_FLG);
-#endif
-
 	/* Set SDMA Bus Request priority 5.
 	 * On 860T, this also enables FEC priority 6.  I am not sure
 	 * this is what we realy want for some applications, but the
@@ -168,6 +152,14 @@ cpm_error_interrupt(void *dev)
 void
 cpm_install_handler(int vec, void (*handler)(void *), void *dev_id)
 {
+
+	/* If null handler, assume we are trying to free the IRQ.
+	*/
+	if (!handler) {
+		cpm_free_handler(vec);
+		return;
+	}
+
 	if (cpm_vecs[vec].handler != 0)
 		printk("CPM interrupt %x replacing %x\n",
 			(uint)handler, (uint)cpm_vecs[vec].handler);
@@ -226,8 +218,9 @@ m8xx_cpm_hostalloc(uint size)
  * The internal baud rate clock is the system clock divided by 16.
  * This assumes the baudrate is 16x oversampled by the uart.
  */
-#define BRG_INT_CLK	(((bd_t *)__res)->bi_intfreq * 1000000)
-#define BRG_UART_CLK	(BRG_INT_CLK/16)
+#define BRG_INT_CLK		(((bd_t *)__res)->bi_intfreq * 1000000)
+#define BRG_UART_CLK		(BRG_INT_CLK/16)
+#define BRG_UART_CLK_DIV16	(BRG_UART_CLK/16)
 
 void
 m8xx_cpm_setbrg(uint brg, uint rate)
@@ -238,6 +231,12 @@ m8xx_cpm_setbrg(uint brg, uint rate)
 	*/
 	bp = (uint *)&cpmp->cp_brgc1;
 	bp += brg;
-	*bp = ((BRG_UART_CLK / rate) << 1) | CPM_BRG_EN;
+	/* The BRG has a 12-bit counter.  For really slow baud rates (or
+	 * really fast processors), we may have to further divide by 16.
+	 */
+	if (((BRG_UART_CLK / rate) - 1) < 4096)
+		*bp = (((BRG_UART_CLK / rate) - 1) << 1) | CPM_BRG_EN;
+	else
+		*bp = (((BRG_UART_CLK_DIV16 / rate) - 1) << 1) |
+						CPM_BRG_EN | CPM_BRG_DIV16;
 }
-

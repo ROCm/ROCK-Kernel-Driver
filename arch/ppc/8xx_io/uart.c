@@ -53,10 +53,22 @@ extern int  kgdb_output_string (const char* s, unsigned int count);
 
 /* this defines the index into rs_table for the port to use
 */
-#ifndef CONFIG_SERIAL_CONSOLE_PORT
-#define CONFIG_SERIAL_CONSOLE_PORT	0
-#endif
-#endif
+# ifndef CONFIG_SERIAL_CONSOLE_PORT
+#  ifdef CONFIG_SCC3_ENET
+#   ifdef CONFIG_8xx_CONS_SMC2
+#    define CONFIG_SERIAL_CONSOLE_PORT	0	/* Console on SMC2 is 1st port */
+#   else
+#    error "Can't use SMC1 for console with Ethernet on SCC3"
+#   endif
+#  else	/* ! CONFIG_SCC3_ENET */
+#   ifdef CONFIG_8xx_CONS_SMC2			/* Console on SMC2 */
+#    define CONFIG_SERIAL_CONSOLE_PORT	1
+#   else					/* Console on SMC1 */
+#    define CONFIG_SERIAL_CONSOLE_PORT	0
+#   endif /* CONFIG_8xx_CONS_SMC2 */
+#  endif  /* CONFIG_SCC3_ENET */
+# endif	  /* CONFIG_SERIAL_CONSOLE_PORT */
+#endif	  /* CONFIG_SERIAL_CONSOLE */
 
 #if 0
 /* SCC2 for console
@@ -118,14 +130,22 @@ static int serial_console_setup(struct console *co, char *options);
  */
 static struct serial_state rs_table[] = {
 	/* UART CLK   PORT          IRQ      FLAGS  NUM   */
-	{ 0,     0, PROFF_SMC1, CPMVEC_SMC1,   0,    0 },    /* SMC1 ttyS0 */
-#ifdef CONFIG_8xxSMC2
-	{ 0,     0, PROFF_SMC2, CPMVEC_SMC2,   0,    1 },    /* SMC2 ttyS1 */
+#ifndef CONFIG_SCC3_ENET	/* SMC1 not usable with Ethernet on SCC3 */
+  	{ 0,     0, PROFF_SMC1, CPMVEC_SMC1,   0,    0 },    /* SMC1 ttyS0 */
 #endif
-#ifdef CONFIG_8xxSCC
-	{ 0,     0, PROFF_SCC2, CPMVEC_SCC2,   0,    (NUM_IS_SCC | 1) },    /* SCC2 ttyS2 */
-	{ 0,     0, PROFF_SCC3, CPMVEC_SCC3,   0,    (NUM_IS_SCC | 2) },    /* SCC3 ttyS3 */
-#endif
+#if !defined(CONFIG_USB_MPC8xx) && !defined(CONFIG_USB_CLIENT_MPC8xx)
+# ifdef CONFIG_8xxSMC2
+  	{ 0,     0, PROFF_SMC2, CPMVEC_SMC2,   0,    1 },    /* SMC2 ttyS1 */
+# endif
+# ifdef CONFIG_8xxSCC
+  	{ 0,     0, PROFF_SCC2, CPMVEC_SCC2,   0,    (NUM_IS_SCC | 1) },    /* SCC2 ttyS2 */
+  	{ 0,     0, PROFF_SCC3, CPMVEC_SCC3,   0,    (NUM_IS_SCC | 2) },    /* SCC3 ttyS3 */
+# endif
+  #else /* CONFIG_USB_xxx */
+# ifdef CONFIG_8xxSCC
+  	{ 0,     0, PROFF_SCC3, CPMVEC_SCC3,   0,    (NUM_IS_SCC | 2) },    /* SCC3 ttyS3 */
+# endif
+#endif	/* CONFIG_USB_xxx */
 };
 
 #define NR_PORTS	(sizeof(rs_table)/sizeof(struct serial_state))
@@ -2733,10 +2753,10 @@ int __init rs_8xx_init(void)
 				cp->cp_pbdir &= ~iobits;
 				cp->cp_pbodr &= ~iobits;
 #else
+				iobits = 0xc0;
 				if (idx == 0) {
 					/* SMC1 on Port B, like all 8xx.
 					*/
-					iobits = 0xc0;
 					cp->cp_pbpar |= iobits;
 					cp->cp_pbdir &= ~iobits;
 					cp->cp_pbodr &= ~iobits;
@@ -2744,7 +2764,6 @@ int __init rs_8xx_init(void)
 				else {
 					/* SMC2 is on Port A.
 					*/
-					iobits = 0x300;
 					immap->im_ioport.iop_papar |= iobits;
 					immap->im_ioport.iop_padir &= ~iobits;
 					immap->im_ioport.iop_paodr &= ~iobits;
@@ -2836,6 +2855,9 @@ static int __init serial_console_setup(struct console *co, char *options)
 	for (bidx = 0; bidx < (sizeof(baud_table) / sizeof(int)); bidx++)
 		if (bd->bi_baudrate == baud_table[bidx])
 			break;
+	/* make sure we have a useful value */
+	if (bidx == (sizeof(baud_table) / sizeof(int)))
+		bidx = 13;	/* B9600 */
 
 	co->cflag = CREAD|CLOCAL|bidx|CS8;
 	baud_idx = bidx;
@@ -2958,7 +2980,7 @@ static int __init serial_console_setup(struct console *co, char *options)
 		*/
 		chan = smc_chan_map[idx];
 		cp->cp_cpcr = mk_cr_cmd(chan, CPM_CR_INIT_TRX) | CPM_CR_FLG;
-		printk("");
+		printk("%s", "");
 		while (cp->cp_cpcr & CPM_CR_FLG);
 
 		/* Set UART mode, 8 bit, no parity, one stop.

@@ -4,7 +4,7 @@
  * PowerPC version, stolen from the i386 version.
  *
  * Used in CONFIG_HIGHMEM systems for memory pages which
- * are not addressable by direct kernel virtual adresses.
+ * are not addressable by direct kernel virtual addresses.
  *
  * Copyright (C) 1999 Gerhard Wichert, Siemens AG
  *		      Gerhard.Wichert@pdb.siemens.de

@@ -862,9 +862,6 @@ ioc3_open(struct net_device *dev)
 	ioc3_init(dev);
 
 	netif_start_queue(dev);
-
-	MOD_INC_USE_COUNT;
-
 	return 0;
 }
 
@@ -880,9 +877,6 @@ ioc3_close(struct net_device *dev)
 	free_irq(dev->irq, dev);
 
 	ioc3_free_rings(ip);
-
-	MOD_DEC_USE_COUNT;
-
 	return 0;
 }
 
@@ -894,13 +888,14 @@ static int ioc3_pci_init(struct pci_dev *pdev)
 	struct ioc3 *ioc3;
 	unsigned long ioc3_base, ioc3_size;
 	u32 vendor, model, rev;
-	int phy;
+	int phy, err;
 
 	dev = init_etherdev(0, sizeof(struct ioc3_private));
 
 	if (!dev)
 		return -ENOMEM;
 
+	SET_MODULE_OWNER(dev);
 	ip = dev->priv;
 	memset(ip, 0, sizeof(*ip));
 
@@ -916,6 +911,11 @@ static int ioc3_pci_init(struct pci_dev *pdev)
 	ioc3_base = pdev->resource[0].start;
 	ioc3_size = pdev->resource[0].end - ioc3_base;
 	ioc3 = (struct ioc3 *) ioremap(ioc3_base, ioc3_size);
+	if (!ioc3) {
+		printk(KERN_CRIT"%s: Unable to map device I/O.\n", dev->name);
+		err = -ENOMEM;
+		goto out_free;
+	}
 	ip->regs = ioc3;
 
 	spin_lock_init(&ip->ioc3_lock);
@@ -930,11 +930,8 @@ static int ioc3_pci_init(struct pci_dev *pdev)
 	phy = ip->phy;
 	if (phy == -1) {
 		printk(KERN_CRIT"%s: Didn't find a PHY, goodbye.\n", dev->name);
-		ioc3_stop(dev);
-		free_irq(dev->irq, dev);
-		ioc3_free_rings(ip);
-
-		return -ENODEV;
+		err = -ENODEV;
+		goto out_stop;
 	}
 
 	mii0 = mii_read(ioc3, phy, 0);
@@ -967,11 +964,19 @@ static int ioc3_pci_init(struct pci_dev *pdev)
 	dev->set_multicast_list	= ioc3_set_multicast_list;
 
 	return 0;
+
+out_stop:
+	ioc3_stop(dev);
+	free_irq(dev->irq, dev);
+	ioc3_free_rings(ip);
+out_free:
+	kfree(dev);
+	return err;
 }
 
 static int __init ioc3_probe(void)
 {
-	static int called = 0;
+	static int called;
 	int cards = 0;
 
 	if (called)
@@ -1192,10 +1197,8 @@ static void ioc3_set_multicast_list(struct net_device *dev)
 	}
 }
 
-#ifdef MODULE
 MODULE_AUTHOR("Ralf Baechle <ralf@oss.sgi.com>");
 MODULE_DESCRIPTION("SGI IOC3 Ethernet driver");
-#endif /* MODULE */
 
 module_init(ioc3_probe);
 module_exit(ioc3_cleanup_module);

@@ -67,7 +67,7 @@ static int esp_iosb_dma_irq_p(struct NCR_ESP * espdev);
 
 volatile unsigned char cmd_buffer[16];
 				/* This is where all commands are put
-				 * before they are transfered to the ESP chip
+				 * before they are transferred to the ESP chip
 				 * via PIO.
 				 */
 

@@ -3686,7 +3686,7 @@ static void wavelan_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 * the spinlock. */
 	spin_lock(&lp->spinlock);
 
-	/* Check modem interupt */
+	/* Check modem interrupt */
 	if ((hasr = hasr_read(ioaddr)) & HASR_MMC_INTR) {
 		u8 dce_status;
 
@@ -3913,8 +3913,6 @@ static int wavelan_open(device * dev)
 	}
 	wv_splx(lp, &flags);
 	
-	MOD_INC_USE_COUNT;
-
 #ifdef DEBUG_CALLBACK_TRACE
 	printk(KERN_DEBUG "%s: <-wavelan_open()\n", dev->name);
 #endif
@@ -3946,8 +3944,6 @@ static int wavelan_close(device * dev)
 	wv_splx(lp, &flags);
 
 	free_irq(dev->irq, dev);
-
-	MOD_DEC_USE_COUNT;
 
 #ifdef DEBUG_CALLBACK_TRACE
 	printk(KERN_DEBUG "%s: <-wavelan_close()\n", dev->name);
@@ -4019,8 +4015,10 @@ static int __init wavelan_config(device * dev)
 
 	/* Initialize device structures */
 	dev->priv = kmalloc(sizeof(net_local), GFP_KERNEL);
-	if (dev->priv == NULL)
+	if (dev->priv == NULL) {
+		release_region(ioaddr, sizeof(ha_t));
 		return -ENOMEM;
+	}
 	memset(dev->priv, 0x00, sizeof(net_local));
 	lp = (net_local *) dev->priv;
 
@@ -4045,6 +4043,7 @@ static int __init wavelan_config(device * dev)
 	 */
 	ether_setup(dev);
 
+	SET_MODULE_OWNER(dev);
 	dev->open = wavelan_open;
 	dev->stop = wavelan_close;
 	dev->hard_start_xmit = wavelan_packet_xmit;
@@ -4287,7 +4286,7 @@ void cleanup_module(void)
 
 /*
  * This software may only be used and distributed
- * according to the terms of the GNU Public License.
+ * according to the terms of the GNU General Public License.
  *
  * This software was developed as a component of the
  * Linux operating system.

@@ -43,7 +43,7 @@ static struct page* ncp_file_mmap_nopage(struct vm_area_struct *area,
 	int bufsize;
 	int pos;
 
-	page = alloc_page(GFP_HIGHMEM); /* ncpfs has nothing against GFP_HIGHMEM
+	page = alloc_page(GFP_HIGHUSER); /* ncpfs has nothing against high pages
 	           as long as recvmsg and memset works on it */
 	if (!page)
 		return page;

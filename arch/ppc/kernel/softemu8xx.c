@@ -75,12 +75,12 @@ Soft_emulate_8xx(struct pt_regs *regs)
 		sdisp = (instword & 0xffff);
 		ea = (uint *)(regs->gpr[idxreg] + sdisp);
 		if (copy_from_user(ip, ea, sizeof(double)))
-			retval = EFAULT;
+			retval = -EFAULT;
 		break;
 		
 	case LFDU:
 		if (copy_from_user(ip, ea, sizeof(double)))
-			retval = EFAULT;
+			retval = -EFAULT;
 		else
 			regs->gpr[idxreg] = (uint)ea;
 		break;
@@ -88,7 +88,7 @@ Soft_emulate_8xx(struct pt_regs *regs)
 		sdisp = (instword & 0xffff);
 		ea = (uint *)(regs->gpr[idxreg] + sdisp);
 		if (copy_from_user(ip, ea, sizeof(float)))
-			retval = EFAULT;
+			retval = -EFAULT;
 		break;
 	case STFD:
 		/* this is a 16 bit quantity that is sign extended
@@ -97,12 +97,12 @@ Soft_emulate_8xx(struct pt_regs *regs)
 		sdisp = (instword & 0xffff);
 		ea = (uint *)(regs->gpr[idxreg] + sdisp);
 		if (copy_to_user(ea, ip, sizeof(double)))
-			retval = EFAULT;
+			retval = -EFAULT;
 		break;
 
 	case STFDU:
 		if (copy_to_user(ea, ip, sizeof(double)))
-			retval = EFAULT;
+			retval = -EFAULT;
 		else
 			regs->gpr[idxreg] = (uint)ea;
 		break;

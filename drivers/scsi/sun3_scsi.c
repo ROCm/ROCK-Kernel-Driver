@@ -34,7 +34,7 @@
 
 
 /*
- * This is from mac_scsi.h, but hey, maybe this is usefull for Sun3 too! :)
+ * This is from mac_scsi.h, but hey, maybe this is useful for Sun3 too! :)
  *
  * Options :
  *
@@ -118,7 +118,7 @@ static Scsi_Cmnd *sun3_dma_setup_done = NULL;
 /* dvma buffer to allocate -- 32k should hopefully be more than sufficient */
 #define SUN3_DVMA_BUFSIZE 0xe000
 
-/* minimum number of bytes to to dma on */
+/* minimum number of bytes to do dma on */
 #define SUN3_DMA_MINSIZE 128
 
 static volatile unsigned char *sun3_scsi_regp;

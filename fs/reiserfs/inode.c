@@ -1261,7 +1261,7 @@ static int reiserfs_new_directory (struct reiserfs_transaction_handle *th,
     retval = search_item (sb, &key, path);
     if (retval == IO_ERROR) {
 	reiserfs_warning ("vs-13080: reiserfs_new_directory: "
-			  "i/o failure occured creating new directory\n");
+			  "i/o failure occurred creating new directory\n");
 	return -EIO;
     }
     if (retval == ITEM_FOUND) {
@@ -1297,7 +1297,7 @@ static int reiserfs_new_symlink (struct reiserfs_transaction_handle *th,
     retval = search_item (sb, &key, path);
     if (retval == IO_ERROR) {
 	reiserfs_warning ("vs-13080: reiserfs_new_symlinik: "
-			  "i/o failure occured creating new symlink\n");
+			  "i/o failure occurred creating new symlink\n");
 	return -EIO;
     }
     if (retval == ITEM_FOUND) {

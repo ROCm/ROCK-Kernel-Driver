@@ -132,7 +132,7 @@ struct rw_semaphore
 
 #define DECLARE_RWSEM(name) __DECLARE_RWSEM_GENERIC(name, 0, 0)
 #define DECLARE_RWSEM_READ_LOCKED(name) __DECLARE_RWSEM_GENERIC(name, 1, 0)
-#define DECLAER_RWSEM_WRITE_LOCKED(name) __DECLARE_RWSEM_GENERIC(name, 0, 1)
+#define DECLARE_RWSEM_WRITE_LOCKED(name) __DECLARE_RWSEM_GENERIC(name, 0, 1)
 
 extern inline void init_rwsem(struct rw_semaphore *sem)
 {

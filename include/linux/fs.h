@@ -381,6 +381,7 @@ struct address_space {
 	struct vm_area_struct	*i_mmap;	/* list of private mappings */
 	struct vm_area_struct	*i_mmap_shared; /* list of shared mappings */
 	spinlock_t		i_shared_lock;  /* and spinlock protecting it */
+	int			gfp_mask;	/* how to allocate the pages */
 };
 
 struct block_device {

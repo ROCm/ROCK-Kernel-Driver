@@ -549,7 +549,7 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 	 *	number of sectors.  If we are done, the command block will
 	 *	be released, and the queue function will be goosed.  If we
 	 *	are not done, then scsi_end_request will directly goose
-	 *	the the queue.
+	 *	the queue.
 	 *
 	 *	We can just use scsi_queue_next_request() here.  This
 	 *	would be used if we just wanted to retry, for example.

@@ -2,7 +2,7 @@
 =====================================================================
 
 This document and the related code was written by me (Cort Dougan), please
-email me (cort@cs.nmt.edu) if you have questions, comments or corrections.
+email me (cort@fsmlabs.com) if you have questions, comments or corrections.
 
 Last Change: 2.16.98
 

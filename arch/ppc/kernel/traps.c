@@ -237,7 +237,7 @@ emulate_instruction(struct pt_regs *regs)
 		return retval;
 
 	if (get_user(instword, (uint *)(regs->nip)))
-		return EFAULT;
+		return -EFAULT;
 
 	/* Emulate the mfspr rD, PVR.
 	 */
@@ -281,7 +281,7 @@ ProgramCheckException(struct pt_regs *regs)
 		/* Try to emulate it if we should. */
 		int errcode;
 		if ((errcode = emulate_instruction(regs))) {
-			if (errcode == EFAULT)
+			if (errcode == -EFAULT)
 				_exception(SIGBUS, regs);
 			else
 				_exception(SIGILL, regs);

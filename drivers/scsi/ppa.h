@@ -126,7 +126,7 @@ int ppa_sg = SG_ALL;		/* enable/disable scatter-gather. */
 #define PPA_SELECT_TMO  5000	/* how long to wait for target ? */
 #define PPA_SPIN_TMO    50000	/* ppa_wait loop limiter */
 #define PPA_RECON_TMO   500	/* scsi reconnection loop limiter */
-#define PPA_DEBUG	0	/* debuging option */
+#define PPA_DEBUG	0	/* debugging option */
 #define IN_EPP_MODE(x) (x == PPA_EPP_8 || x == PPA_EPP_16 || x == PPA_EPP_32)
 
 /* args to ppa_connect */

@@ -28,7 +28,7 @@ By default, SIGIO will be delivered to the process and no other useful
 information.  However, if the F_SETSIG fcntl(2) call is used to let the
 kernel know which signal to deliver, a siginfo structure will be passed to
 the signal handler and the si_fd member of that structure will contain the
-file descriptor associated with the direcory in which the event occured.
+file descriptor associated with the directory in which the event occurred.
 
 Preferably the application will choose one of the real time signals
 (SIGRTMIN + <n>) so that the notifications may be queued.  This is

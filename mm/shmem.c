@@ -321,7 +321,7 @@ struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address, i
 		inode->i_sb->u.shmem_sb.free_blocks--;
 		spin_unlock (&inode->i_sb->u.shmem_sb.stat_lock);
 		/* Ok, get a new page */
-		page = page_cache_alloc();
+		page = page_cache_alloc(mapping);
 		if (!page)
 			goto oom;
 		clear_user_highpage(page, address);
@@ -338,7 +338,7 @@ cached_page:
 	up(&inode->i_sem);
 
 	if (no_share) {
-		struct page *new_page = page_cache_alloc();
+		struct page *new_page = page_cache_alloc(inode->i_mapping);
 
 		if (new_page) {
 			copy_user_highpage(new_page, page, address);

@@ -1,8 +1,8 @@
 /*
 
 	Hardware driver for Intel i810 Random Number Generator (RNG)
-	Copyright 2000 Jeff Garzik <jgarzik@mandrakesoft.com>
-	Copyright 2000 Philipp Rumpf <prumpf@tux.org>
+	Copyright 2000,2001 Jeff Garzik <jgarzik@mandrakesoft.com>
+	Copyright 2000,2001 Philipp Rumpf <prumpf@mandrakesoft.com>
 
 	Driver Web site:  http://sourceforge.net/projects/gkernel/
 
@@ -141,6 +141,16 @@
 	in regular code, and spin_lock in the timer function, to
 	serialize access to the RNG hardware area.
 
+	NOTE: request_mem_region was removed, for two reasons:
+	1) Only one RNG is supported by this driver, 2) The location
+	used by the RNG is a fixed location in MMIO-addressable memory,
+	3) users with properly working BIOS e820 handling will always
+	have the region in which the RNG is located reserved, so
+	request_mem_region calls always fail for proper setups.
+	However, for people who use mem=XX, BIOS e820 information is
+	-not- in /proc/iomem, and request_mem_region(RNG_ADDR) can
+	succeed.
+
 	----------------------------------------------------------
 
 	Change history:
@@ -189,6 +199,10 @@
 	* Call misc_register() from rng_init_one.
 	* Fix O_NONBLOCK to occur before we schedule.
 
+	Version 0.9.4:
+	* Fix: Remove request_mem_region
+	* Fix: Horrible bugs in FIPS calculation and test execution
+
  */
 
 
@@ -212,7 +226,7 @@
 /*
  * core module and version information
  */
-#define RNG_VERSION "0.9.3"
+#define RNG_VERSION "0.9.4"
 #define RNG_MODULE_NAME "i810_rng"
 #define RNG_DRIVER_NAME   RNG_MODULE_NAME " hardware driver " RNG_VERSION
 #define PFX RNG_MODULE_NAME ": "
@@ -221,7 +235,7 @@
 /*
  * debugging macros
  */
-#undef RNG_DEBUG /* define to 1 to enable copious debugging info */
+#undef RNG_DEBUG /* define to enable copious debugging info */
 
 #ifdef RNG_DEBUG
 /* note: prints function name for you */
@@ -230,8 +244,8 @@
 #define DPRINTK(fmt, args...)
 #endif
 
-#define RNG_NDEBUG 0        /* define to 1 to disable lightweight runtime checks */
-#if RNG_NDEBUG
+#undef RNG_NDEBUG        /* define to disable lightweight runtime checks */
+#ifdef RNG_NDEBUG
 #define assert(expr)
 #else
 #define assert(expr) \
@@ -368,8 +382,11 @@ static void rng_timer_tick (unsigned long data)
 
 		/* fitness testing via FIPS, if we have enough data */
 		rng_fips_test_store (rng_data);
-		if (rng_fips_counter > RNG_FIPS_TEST_THRESHOLD)
+		rng_fips_counter++;
+		if (rng_fips_counter == RNG_FIPS_TEST_THRESHOLD) {
 			rng_run_fips_test ();
+			rng_fips_counter = 0;
+		}
 	} else {
 		spin_unlock (&rng_lock);
 	}
@@ -734,17 +751,11 @@ static int __init rng_init_one (struct pci_dev *dev)
 	if (pci_enable_device (dev))
 		return -EIO;
 
-	if (!request_mem_region (RNG_ADDR, RNG_ADDR_LEN, RNG_MODULE_NAME)) {
-		printk (KERN_ERR PFX "cannot reserve RNG region\n");
-		DPRINTK ("EXIT, returning -EBUSY\n");
-		return -EBUSY;
-	}
-
 	rc = misc_register (&rng_miscdev);
 	if (rc) {
 		printk (KERN_ERR PFX "cannot register misc device\n");
 		DPRINTK ("EXIT, returning %d\n", rc);
-		goto err_out_free_res;
+		goto err_out;
 	}
 
 	rng_mem = ioremap (RNG_ADDR, RNG_ADDR_LEN);
@@ -788,8 +799,7 @@ err_out_free_map:
 	iounmap (rng_mem);
 err_out_free_miscdev:
 	misc_deregister (&rng_miscdev);
-err_out_free_res:
-	release_mem_region (RNG_ADDR, RNG_ADDR_LEN);
+err_out:
 	return rc;
 }
 
@@ -866,7 +876,6 @@ static void __exit rng_cleanup (void)
 	rng_sysctl (0);
 
 	iounmap (rng_mem);
-	release_mem_region (RNG_ADDR, RNG_ADDR_LEN);
 
 	rng_pdev = NULL;
 
@@ -935,7 +944,7 @@ static void rng_fips_test_store (int rng_data)
 
 			/* Check if we just failed longrun test */
 			if (rlength >= 33)
-				rng_test &= 8;
+				rng_test |= 8;
 			rlength = 0;
 			/* flip the current run type */
 			last_bit = current_bit;
@@ -963,16 +972,16 @@ static void rng_run_fips_test (void)
 	else {
 		runs[5 + (6 * current_bit)]++;
 		if (rlength >= 33)
-			rng_test &= 8;
+			rng_test |= 8;
 	}
 	/* Ones test */
 	if ((ones >= 10346) || (ones <= 9654))
-		rng_test &= 1;
+		rng_test |= 1;
 	/* Poker calcs */
 	for (i = 0, j = 0; i < 16; i++)
 		j += poker[i] * poker[i];
 	if ((j >= 1580457) || (j <= 1562821))
-		rng_test &= 2;
+		rng_test |= 2;
 	if ((runs[0] < 2267) || (runs[0] > 2733) ||
 	    (runs[1] < 1079) || (runs[1] > 1421) ||
 	    (runs[2] < 502) || (runs[2] > 748) ||
@@ -985,7 +994,7 @@ static void rng_run_fips_test (void)
 	    (runs[9] < 223) || (runs[9] > 402) ||
 	    (runs[10] < 90) || (runs[10] > 223) ||
 	    (runs[11] < 90) || (runs[11] > 223)) {
-		rng_test &= 4;
+		rng_test |= 4;
 	}
 
 	rng_test = !rng_test;

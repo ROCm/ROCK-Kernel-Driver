@@ -60,7 +60,7 @@ struct scb_struct
   unsigned short cbl_offset;    /* pointeroffset, command block list */
   unsigned short rfa_offset;    /* pointeroffset, receive frame area */
   unsigned short crc_errs;      /* CRC-Error counter */
-  unsigned short aln_errs;      /* allignmenterror counter */
+  unsigned short aln_errs;      /* alignmenterror counter */
   unsigned short rsc_errs;      /* Resourceerror counter */
   unsigned short ovrn_errs;     /* OVerrunerror counter */
 };

@@ -29,6 +29,8 @@
 
 #undef DEBUG
 
+extern void process_bridge_ranges(struct pci_controller *hose,
+				  struct device_node *dev, int primary);
 static void add_bridges(struct device_node *dev);
 
 /* XXX Could be per-controller, but I don't think we risk anything by
@@ -372,7 +374,7 @@ static inline void grackle_set_loop_snoop(struct pci_controller *bp, int enable)
 	(void)in_le32((volatile unsigned int *)bp->cfg_data);
 }
 
-static void __init
+static int __init
 setup_uninorth(struct pci_controller* hose, struct reg_property* addr)
 {
 	pci_assign_all_busses = 1;
@@ -380,6 +382,7 @@ setup_uninorth(struct pci_controller* hose, struct reg_property* addr)
 	hose->ops = &macrisc_pci_ops;
 	hose->cfg_addr = ioremap(addr->address + 0x800000, 0x1000);
 	hose->cfg_data = ioremap(addr->address + 0xc00000, 0x1000);
+#if 0 /* done in process_bridge_ranges now - paulus */
 	hose->io_base_phys = addr->address;
 	/* is 0x10000 enough for io space ? */
 	hose->io_base_virt = (void *)ioremap(addr->address, 0x10000);
@@ -389,6 +392,9 @@ setup_uninorth(struct pci_controller* hose, struct reg_property* addr)
 	 */
 	if (addr->address == 0xf2000000)
 		isa_io_base = (unsigned long)hose->io_base_virt;
+#endif
+	/* We "know" that the bridge at f2000000 has the PCI slots. */
+	return addr->address == 0xf2000000;
 }
 
 static void __init
@@ -399,8 +405,10 @@ setup_bandit(struct pci_controller* hose, struct reg_property* addr)
 		ioremap(addr->address + 0x800000, 0x1000);
 	hose->cfg_data = (volatile unsigned char *)
 		ioremap(addr->address + 0xc00000, 0x1000);
+#if 0 /* done in process_bridge_ranges now - paulus */
 	hose->io_base_phys = addr->address;
 	hose->io_base_virt = (void *) ioremap(addr->address, 0x10000);
+#endif
 	init_bandit(hose);
 }
 
@@ -413,19 +421,23 @@ setup_chaos(struct pci_controller* hose, struct reg_property* addr)
 		ioremap(addr->address + 0x800000, 0x1000);
 	hose->cfg_data = (volatile unsigned char *)
 		ioremap(addr->address + 0xc00000, 0x1000);
+#if 0 /* done in process_bridge_ranges now - paulus */
 	hose->io_base_phys = addr->address;
 	hose->io_base_virt = (void *) ioremap(addr->address, 0x10000);
+#endif
 }
 
 void __init
 setup_grackle(struct pci_controller *hose, unsigned io_space_size)
 {
 	setup_indirect_pci(hose, 0xfec00000, 0xfee00000);
+#if 0 /* done in process_bridge_ranges now - paulus */
 	hose->io_base_phys = 0xfe000000;
 	hose->io_base_virt = (void *) ioremap(0xfe000000, io_space_size);
 	pci_dram_offset = 0;
 	isa_mem_base = 0xfd000000;
 	isa_io_base = (unsigned long) hose->io_base_virt;
+#endif
 	if (machine_is_compatible("AAPL,PowerBook1998"))
 		grackle_set_loop_snoop(hose, 1);
 #if 0	/* Disabled for now, HW problems ??? */
@@ -445,6 +457,7 @@ static void __init add_bridges(struct device_node *dev)
 	struct reg_property *addr;
 	char* disp_name;
 	int *bus_range;
+	int first = 1, primary;
 	
 	for (; dev != NULL; dev = dev->next) {
 		addr = (struct reg_property *) get_property(dev, "reg", &len);
@@ -467,8 +480,9 @@ static void __init add_bridges(struct device_node *dev)
 		hose->last_busno = bus_range ? bus_range[1] : 0xff;
 
 		disp_name = NULL;
+		primary = first;
 		if (device_is_compatible(dev, "uni-north")) {
-			setup_uninorth(hose, addr);
+			primary = setup_uninorth(hose, addr);
 			disp_name = "UniNorth";
 		} else if (strcmp(dev->name, "pci") == 0) {
 			/* XXX assume this is a mpc106 (grackle) */
@@ -480,6 +494,7 @@ static void __init add_bridges(struct device_node *dev)
 		} else if (strcmp(dev->name, "chaos") == 0) {
 			setup_chaos(hose, addr);
 			disp_name = "Chaos";
+			primary = 0;
 		}
 		printk(KERN_INFO "Found %s PCI host bridge at 0x%08x. Firmware bus number: %d->%d\n",
 			disp_name, addr->address, hose->first_busno, hose->last_busno);
@@ -488,12 +503,14 @@ static void __init add_bridges(struct device_node *dev)
 			hose, hose->cfg_addr, hose->cfg_data);
 #endif		
 		
-		/* Setup a default isa_io_base */
-		if (isa_io_base == 0)
-			isa_io_base = (unsigned long)hose->io_base_virt;
+		/* Interpret the "ranges" property */
+		/* This also maps the I/O region and sets isa_io/mem_base */
+		process_bridge_ranges(hose, dev, primary);
 
 		/* Fixup "bus-range" OF property */
 		fixup_bus_range(dev);
+
+		first &= !primary;
 	}
 }
 

@@ -847,10 +847,12 @@ static int set_serial_info (struct dz_serial *info, struct serial_struct *new_in
   if (!new_info)
     return -EFAULT;
 
-  copy_from_user (&new_serial, new_info, sizeof(new_serial));
+  if(copy_from_user (&new_serial, new_info, sizeof(new_serial)))
+    return -EFAULT;
+    
   old_info = *info;
 
-  if (!suser())
+  if (!capable(CAP_SYS_ADMIN))
     return -EPERM;
 
   if (info->count > 1)

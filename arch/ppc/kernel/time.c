@@ -67,6 +67,8 @@
 
 #include <asm/time.h>
 
+unsigned long disarm_decr[NR_CPUS];
+
 #ifdef CONFIG_SMP
 extern void smp_local_timer_interrupt(struct pt_regs *);
 extern int smp_tb_synchronized;
@@ -147,7 +149,6 @@ int timer_interrupt(struct pt_regs * regs)
 	
 	if (!user_mode(regs))
 		ppc_do_profile(instruction_pointer(regs));
-
 	do { 
 		jiffy_stamp += tb_ticks_per_jiffy;
 	  	if (smp_processor_id()) continue;
@@ -184,7 +185,8 @@ int timer_interrupt(struct pt_regs * regs)
 		}
 		write_unlock(&xtime_lock);
 	} while((next_dec = tb_ticks_per_jiffy - tb_delta(&jiffy_stamp)) < 0);
-	set_dec(next_dec);
+	if ( !disarm_decr[smp_processor_id()] )
+		set_dec(next_dec);
 	last_jiffy_stamp(cpu) = jiffy_stamp;
 
 #ifdef CONFIG_SMP
