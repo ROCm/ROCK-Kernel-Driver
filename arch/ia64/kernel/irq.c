@@ -368,7 +368,7 @@ unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
 		 * use the action we have.
 		 */
 		action = NULL;
-		if (!(status & (IRQ_DISABLED | IRQ_INPROGRESS))) {
+		if (likely(!(status & (IRQ_DISABLED | IRQ_INPROGRESS)))) {
 			action = desc->action;
 			status &= ~IRQ_PENDING; /* we commit to handling */
 			status |= IRQ_INPROGRESS; /* we are handling it */
@@ -381,7 +381,7 @@ unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
 		 * a different instance of this same irq, the other processor
 		 * will take care of it.
 		 */
-		if (!action)
+		if (unlikely(!action))
 			goto out;
 
 		/*
@@ -403,8 +403,8 @@ unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
 				break;
 			desc->status &= ~IRQ_PENDING;
 		}
-		desc->status &= ~IRQ_INPROGRESS;
 	  out:
+		desc->status &= ~IRQ_INPROGRESS;
 		/*
 		 * The ->end() handler has to deal with interrupts which got
 		 * disabled while the handler was running.

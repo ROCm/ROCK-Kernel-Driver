@@ -446,6 +446,9 @@ efi_init (void)
 		} else if (efi_guidcmp(config_tables[i].guid, SAL_SYSTEM_TABLE_GUID) == 0) {
 			efi.sal_systab = __va(config_tables[i].table);
 			printk(" SALsystab=0x%lx", config_tables[i].table);
+		} else if (efi_guidcmp(config_tables[i].guid, HCDP_TABLE_GUID) == 0) {
+			efi.hcdp = __va(config_tables[i].table);
+			printk(" HCDP=0x%lx", config_tables[i].table);
 		}
 	}
 	printk("\n");

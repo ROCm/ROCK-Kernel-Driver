@@ -160,6 +160,10 @@ set_rte (unsigned int vector, unsigned long dest)
 	int pin;
 	char redir;
 
+#ifdef DEBUG_IRQ_ROUTING
+	printk(KERN_DEBUG "set_rte: routing vector 0x%02x to 0x%lx\n", vector, dest);
+#endif
+
 	pin = iosapic_irq[vector].pin;
 	if (pin < 0)
 		return;		/* not an IOSAPIC interrupt */
@@ -406,7 +410,7 @@ iosapic_reassign_vector (int vector)
 	    || iosapic_irq[vector].polarity || iosapic_irq[vector].trigger)
 	{
 		new_vector = ia64_alloc_irq();
-		printk("Reassigning Vector 0x%x to 0x%x\n", vector, new_vector);
+		printk("Reassigning vector 0x%x to 0x%x\n", vector, new_vector);
 		memcpy (&iosapic_irq[new_vector], &iosapic_irq[vector],
 			sizeof(struct iosapic_irq));
 		memset (&iosapic_irq[vector], 0, sizeof(struct iosapic_irq));
@@ -757,10 +761,11 @@ iosapic_pci_fixup (int phase)
 				if (!(smp_int_redirect & SMP_IRQ_REDIRECTION)) {
 					static int cpu_index = 0;
 
-					set_rte(vector, cpu_physical_id(cpu_index) & 0xffff);
+					while (!cpu_online(cpu_index))
+						if (++cpu_index >= NR_CPUS)
+							cpu_index = 0;
 
-					for (cpu_index++; !cpu_online(cpu_index % NR_CPUS); cpu_index++);
-                                        cpu_index %= NR_CPUS;
+					set_rte(vector, cpu_physical_id(cpu_index) & 0xffff);
 				} else {
 					/*
 					 * Direct the interrupt vector to the current cpu,

@@ -474,7 +474,7 @@ acpi_find_rsdp (void)
 }
 
 
-#ifdef CONFIG_SERIAL_ACPI
+#ifdef CONFIG_SERIAL_8250_ACPI
 
 #include <linux/acpi_serial.h>
 
@@ -529,7 +529,7 @@ acpi_parse_spcr (unsigned long phys_addr, unsigned long size)
 	return 0;
 }
 
-#endif /* CONFIG_SERIAL_ACPI */
+#endif /* CONFIG_SERIAL_8250_ACPI */
 
 
 int __init
@@ -587,7 +587,7 @@ acpi_boot_init (char *cmdline)
 	if (acpi_table_parse(ACPI_FACP, acpi_parse_fadt) < 1)
 		printk(KERN_ERR PREFIX "Can't find FADT\n");
 
-#ifdef CONFIG_SERIAL_ACPI
+#ifdef CONFIG_SERIAL_8250_ACPI
 	/*
 	 * TBD: Need phased approach to table parsing (only do those absolutely
 	 *      required during boot-up).  Recommend expanding concept of fix-

@@ -245,7 +245,14 @@ if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
    bool '  Disable VHPT' CONFIG_DISABLE_VHPT
    bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ
 
-   bool '  Early printk support (requires VGA!)' CONFIG_IA64_EARLY_PRINTK
+   bool '  Early printk support' CONFIG_IA64_EARLY_PRINTK
+   if [ "$CONFIG_IA64_EARLY_PRINTK" != "n" ]; then
+      bool '    Early printk on MMIO serial port' CONFIG_IA64_EARLY_PRINTK_UART
+      if [ "$CONFIG_IA64_EARLY_PRINTK_UART" != "n" ]; then
+         hex '      UART MMIO base address' CONFIG_IA64_EARLY_PRINTK_UART_BASE ff5e0000
+      fi
+      bool '    Early printk on VGA' CONFIG_IA64_EARLY_PRINTK_VGA
+   fi
    bool '  Debug memory allocations' CONFIG_DEBUG_SLAB
    bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK
    bool '  Turn on compare-and-exchange bug checking (slow!)' CONFIG_IA64_DEBUG_CMPXCHG

@@ -450,7 +450,7 @@ sba_search_bitmap(struct ioc *ioc, unsigned long bits_wanted)
 		** We need the alignment to invalidate I/O TLB using
 		** SBA HW features in the unmap path.
 		*/
-		unsigned long o = 1 << get_order(bits_wanted << IOVP_SHIFT);
+		unsigned long o = 1UL << get_order(bits_wanted << IOVP_SHIFT);
 		uint bitshiftcnt = ROUNDUP(ioc->res_bitshift, o);
 		unsigned long mask;
 
@@ -1005,7 +1005,7 @@ sba_coalesce_chunks(struct ioc *ioc, struct scatterlist *startsg,
 		** Prepare for first/next DMA stream
 		*/
 		dma_len = sba_sg_len(startsg);
-		dma_offset = sba_sg_address(startsg);
+		dma_offset = (unsigned long) sba_sg_address(startsg);
 		startsg++;
 		nents--;
 
@@ -1016,7 +1016,7 @@ sba_coalesce_chunks(struct ioc *ioc, struct scatterlist *startsg,
 		** to take advantage of the block IO TLB flush.
 		*/
 		while (nents) {
-			unsigned int end_offset = dma_offset + dma_len;
+			unsigned long end_offset = dma_offset + dma_len;
 
 			/* prev entry must end on a page boundary */
 			if (end_offset & IOVP_MASK)
@@ -1114,9 +1114,9 @@ int sba_map_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents,
 #endif
 	/* Fast path single entry scatterlists. */
 	if (nents == 1) {
-		sba_sg_iova(sglist) = (char *)sba_map_single(dev,
-						sba_sg_iova(sglist),
-						sba_sg_len(sglist), direction);
+		sba_sg_iova(sglist) = sba_map_single(dev,
+						     (void *) sba_sg_iova(sglist),
+						     sba_sg_len(sglist), direction);
 		sba_sg_iova_len(sglist) = sba_sg_len(sglist);
 #ifdef CONFIG_PROC_FS
 		/*
@@ -1455,7 +1455,7 @@ sba_common_init(struct sba_device *sba_dev)
 			sba_dev->ioc[i].pdir_base[0] = 0x8000badbadc0ffeeULL;
 
 			for (reserved_iov = 0xA0000 ; reserved_iov < 0xC0000 ; reserved_iov += IOVP_SIZE) {
-				u64 *res_ptr = sba_dev->ioc[i].res_map;
+				u64 *res_ptr = (u64 *) sba_dev->ioc[i].res_map;
 				int index = PDIR_INDEX(reserved_iov);
 				int res_word;
 				u64 mask;
@@ -1586,8 +1586,8 @@ void __init sba_init(void)
 
 	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
 		if (pci_resource_flags(device, i) == IORESOURCE_MEM) {
-			hpa = ioremap(pci_resource_start(device, i),
-				pci_resource_len(device, i));
+			hpa = (u64) ioremap(pci_resource_start(device, i),
+					    pci_resource_len(device, i));
 			break;
 		}
 	}
@@ -1595,7 +1595,7 @@ void __init sba_init(void)
 	func_id = READ_REG(hpa + SBA_FUNC_ID);
 
 	if (func_id == ZX1_FUNC_ID_VALUE) {
-		(void)strcpy(sba_rev, "zx1");
+		strcpy(sba_rev, "zx1");
 		func_offset = zx1_func_offsets;
 	} else {
 		return;

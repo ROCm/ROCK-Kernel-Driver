@@ -108,7 +108,7 @@ free_initmem (void)
 
 	addr = (unsigned long) &__init_begin;
 	for (; addr < (unsigned long) &__init_end; addr += PAGE_SIZE) {
-		clear_bit(PG_reserved, &virt_to_page(addr)->flags);
+		ClearPageReserved(virt_to_page(addr));
 		set_page_count(virt_to_page(addr), 1);
 		free_page(addr);
 		++totalram_pages;
@@ -162,9 +162,9 @@ free_initrd_mem (unsigned long start, unsigned long end)
 		if (!virt_addr_valid(start))
 			continue;
 		page = virt_to_page(start);
-		clear_bit(PG_reserved, &page->flags);
+		ClearPageReserved(page);
 		set_page_count(page, 1);
-		__free_page(page);
+		free_page(page);
 		++totalram_pages;
 	}
 }

@@ -60,6 +60,8 @@ flush_tlb_page (struct vm_area_struct *vma, unsigned long addr)
 #else
 	if (vma->vm_mm == current->active_mm)
 		asm volatile ("ptc.l %0,%1" :: "r"(addr), "r"(PAGE_SHIFT << 2) : "memory");
+	else
+		vma->vm_mm->context = 0;
 #endif
 }
 

@@ -130,6 +130,8 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 	siginfo_t siginfo;
 	int sig, code;
 
+	die_if_kernel("bad break", regs, break_num);
+
 	/* SIGILL, SIGFPE, SIGSEGV, and SIGBUS want these field initialized: */
 	siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
 	siginfo.si_imm = break_num;

@@ -12,112 +12,65 @@
 #include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/acpi.h>
-#include <asm/iosapic.h>
-#include <asm/efi.h>
 
-#include "../drivers/acpi/include/platform/acgcc.h"
-#include "../drivers/acpi/include/actypes.h"
-#include "../drivers/acpi/include/acexcep.h"
-#include "../drivers/acpi/include/acpixf.h"
-#include "../drivers/acpi/include/actbl.h"
-#include "../drivers/acpi/include/acconfig.h"
-#include "../drivers/acpi/include/acmacros.h"
-#include "../drivers/acpi/include/aclocal.h"
-#include "../drivers/acpi/include/acobject.h"
-#include "../drivers/acpi/include/acstruct.h"
-#include "../drivers/acpi/include/acnamesp.h"
-#include "../drivers/acpi/include/acutils.h"
-#include "../drivers/acpi/acpi_bus.h"
+#include <asm/dma.h>
+#include <asm/efi.h>
+#include <asm/iosapic.h>
+
+extern acpi_status acpi_evaluate_integer (acpi_handle, acpi_string, acpi_object_list *,
+					  unsigned long *);
 
 #define PFX "hpzx1: "
 
-struct fake_pci_dev {
-	struct fake_pci_dev *next;
-	unsigned char bus;
-	unsigned int devfn;
-	int sizing;		// in middle of BAR sizing operation?
-	unsigned long csr_base;
-	unsigned int csr_size;
-	unsigned long mapped_csrs;	// ioremapped
-};
+static int hpzx1_devices;
 
-static struct fake_pci_dev *fake_pci_head, **fake_pci_tail = &fake_pci_head;
+struct fake_pci_dev {
+	unsigned long csr_base;
+	unsigned long csr_size;
+	unsigned long mapped_csrs;	// ioremapped
+	int sizing;			// in middle of BAR sizing operation?
+};
 
 static struct pci_ops *orig_pci_ops;
 
-static inline struct fake_pci_dev *
-fake_pci_find_slot(unsigned char bus, unsigned int devfn)
-{
-	struct fake_pci_dev *dev;
-
-	for (dev = fake_pci_head; dev; dev = dev->next)
-		if (dev->bus == bus && dev->devfn == devfn)
-			return dev;
-	return NULL;
+#define HP_CFG_RD(sz, bits, name)						\
+static int hp_cfg_read##sz (struct pci_dev *dev, int where, u##bits *value)	\
+{										\
+	struct fake_pci_dev *fake_dev;						\
+	if (!(fake_dev = (struct fake_pci_dev *) dev->sysdata))			\
+		return orig_pci_ops->name(dev, where, value);			\
+										\
+	if (where == PCI_BASE_ADDRESS_0) {					\
+		if (fake_dev->sizing)						\
+			*value = ~(fake_dev->csr_size - 1);			\
+		else								\
+			*value = (fake_dev->csr_base &				\
+				    PCI_BASE_ADDRESS_MEM_MASK) |		\
+				PCI_BASE_ADDRESS_SPACE_MEMORY;			\
+		fake_dev->sizing = 0;						\
+		return PCIBIOS_SUCCESSFUL;					\
+	}									\
+	*value = read##sz(fake_dev->mapped_csrs + where);			\
+	if (where == PCI_COMMAND)						\
+		*value |= PCI_COMMAND_MEMORY; /* SBA omits this */		\
+	return PCIBIOS_SUCCESSFUL;						\
 }
 
-static struct fake_pci_dev *
-alloc_fake_pci_dev(void)
-{
-        struct fake_pci_dev *dev;
-
-        dev = kmalloc(sizeof(*dev), GFP_KERNEL);
-	if (!dev)
-		return NULL;
-
-	memset(dev, 0, sizeof(*dev));
-
-        *fake_pci_tail = dev;
-        fake_pci_tail = &dev->next;
-
-        return dev;
-}
-
-#define HP_CFG_RD(sz, bits, name) \
-static int hp_cfg_read##sz (struct pci_dev *dev, int where, u##bits *value) \
-{ \
-	struct fake_pci_dev *fake_dev; \
-	if (!(fake_dev = fake_pci_find_slot(dev->bus->number, dev->devfn))) \
-		return orig_pci_ops->name(dev, where, value); \
-	\
-	switch (where) { \
-	case PCI_COMMAND: \
-		*value = read##sz(fake_dev->mapped_csrs + where); \
-		*value |= PCI_COMMAND_MEMORY; /* SBA omits this */ \
-		break; \
-	case PCI_BASE_ADDRESS_0: \
-		if (fake_dev->sizing) \
-			*value = ~(fake_dev->csr_size - 1); \
-		else \
-			*value = (fake_dev->csr_base & \
-				    PCI_BASE_ADDRESS_MEM_MASK) | \
-				PCI_BASE_ADDRESS_SPACE_MEMORY; \
-		fake_dev->sizing = 0; \
-		break; \
-	default: \
-		*value = read##sz(fake_dev->mapped_csrs + where); \
-		break; \
-	} \
-	return PCIBIOS_SUCCESSFUL; \
-}
-
-#define HP_CFG_WR(sz, bits, name) \
-static int hp_cfg_write##sz (struct pci_dev *dev, int where, u##bits value) \
-{ \
-	struct fake_pci_dev *fake_dev; \
-	if (!(fake_dev = fake_pci_find_slot(dev->bus->number, dev->devfn))) \
-		return orig_pci_ops->name(dev, where, value); \
-	\
-	switch (where) { \
-	case PCI_BASE_ADDRESS_0: \
-		if (value == (u##bits) ~0) \
-			fake_dev->sizing = 1; \
-		break; \
-	default: \
-		write##sz(value, fake_dev->mapped_csrs + where); \
-		break; \
-	} \
-	return PCIBIOS_SUCCESSFUL; \
+#define HP_CFG_WR(sz, bits, name)						\
+static int hp_cfg_write##sz (struct pci_dev *dev, int where, u##bits value)	\
+{										\
+	struct fake_pci_dev *fake_dev;						\
+										\
+	if (!(fake_dev = (struct fake_pci_dev *) dev->sysdata))			\
+		return orig_pci_ops->name(dev, where, value);			\
+										\
+	if (where == PCI_BASE_ADDRESS_0) {					\
+		if (value == (u##bits) ~0)					\
+			fake_dev->sizing = 1;					\
+		return PCIBIOS_SUCCESSFUL;					\
+	} else									\
+		write##sz(value, fake_dev->mapped_csrs + where);		\
+	return PCIBIOS_SUCCESSFUL;						\
 }
 
 HP_CFG_RD(b,  8, read_byte)
@@ -136,51 +89,86 @@ static struct pci_ops hp_pci_conf = {
 	hp_cfg_writel,
 };
 
-/*
- * Assume we'll never have a physical slot higher than 0x10, so we can
- * use slots above that for "fake" PCI devices to represent things
- * that only show up in the ACPI namespace.
- */
-#define HP_MAX_SLOT	0x10
-
-static struct fake_pci_dev *
-hpzx1_fake_pci_dev(unsigned long addr, unsigned int bus, unsigned int size)
+static void
+hpzx1_fake_pci_dev(char *name, unsigned int busnum, unsigned long addr, unsigned int size)
 {
-	struct fake_pci_dev *dev;
-	int slot;
+	struct fake_pci_dev *fake;
+	int slot, ret;
+	struct pci_dev *dev;
+	struct pci_bus *b, *bus = NULL;
+	u8 hdr;
 
-	// Note: lspci thinks 0x1f is invalid
-	for (slot = 0x1e; slot > HP_MAX_SLOT; slot--) {
-		if (!fake_pci_find_slot(bus, PCI_DEVFN(slot, 0)))
+        fake = kmalloc(sizeof(*fake), GFP_KERNEL);
+	if (!fake) {
+		printk(KERN_ERR PFX "No memory for %s (0x%p) sysdata\n", name, (void *) addr);
+		return;
+	}
+
+	memset(fake, 0, sizeof(*fake));
+	fake->csr_base = addr;
+	fake->csr_size = size;
+	fake->mapped_csrs = (unsigned long) ioremap(addr, size);
+	fake->sizing = 0;
+
+	pci_for_each_bus(b)
+		if (busnum == b->number) {
+			bus = b;
 			break;
-	}
-	if (slot == HP_MAX_SLOT) {
-		printk(KERN_ERR PFX
-			"no slot space for device (0x%p) on bus 0x%02x\n",
-			(void *) addr, bus);
-		return NULL;
+		}
+
+	if (!bus) {
+		printk(KERN_ERR PFX "No host bus 0x%02x for %s (0x%p)\n",
+		       busnum, name, (void *) addr);
+		kfree(fake);
+		return;
 	}
 
-	dev = alloc_fake_pci_dev();
+	for (slot = 0x1e; slot; slot--)
+		if (!pci_find_slot(busnum, PCI_DEVFN(slot, 0)))
+			break;
+
+	if (slot < 0) {
+		printk(KERN_ERR PFX "No space for %s (0x%p) on bus 0x%02x\n",
+		       name, (void *) addr, busnum);
+		kfree(fake);
+		return;
+	}
+
+        dev = kmalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev) {
-		printk(KERN_ERR PFX
-			"no memory for device (0x%p) on bus 0x%02x\n",
-			(void *) addr, bus);
-		return NULL;
+		printk(KERN_ERR PFX "No memory for %s (0x%p)\n", name, (void *) addr);
+		kfree(fake);
+		return;
 	}
 
+	bus->ops = &hp_pci_conf;	// replace pci ops for this bus
+
+	memset(dev, 0, sizeof(*dev));
 	dev->bus = bus;
+	dev->sysdata = fake;
+	dev->dev.parent = bus->dev;
+	dev->dev.bus = &pci_bus_type;
 	dev->devfn = PCI_DEVFN(slot, 0);
-	dev->csr_base = addr;
-	dev->csr_size = size;
+	pci_read_config_word(dev, PCI_VENDOR_ID, &dev->vendor);
+	pci_read_config_word(dev, PCI_DEVICE_ID, &dev->device);
+	pci_read_config_byte(dev, PCI_HEADER_TYPE, &hdr);
+	dev->hdr_type = hdr & 0x7f;
 
-	/*
-	 * Drivers should ioremap what they need, but we have to do
-	 * it here, too, so PCI config accesses work.
-	 */
-	dev->mapped_csrs = (unsigned long) ioremap(dev->csr_base, dev->csr_size);
+	pci_setup_device(dev);
 
-	return dev;
+	// pci_insert_device() without running /sbin/hotplug
+	list_add_tail(&dev->bus_list, &bus->devices);
+	list_add_tail(&dev->global_list, &pci_devices);
+
+	strcpy(dev->dev.name, dev->name);
+	strcpy(dev->dev.bus_id, dev->slot_name);
+	ret = device_register(&dev->dev);
+	if (ret < 0)
+		printk(KERN_INFO PFX "fake device registration failed (%d)\n", ret);
+
+	printk(KERN_INFO PFX "%s at 0x%lx; pci dev %s\n", name, addr, dev->slot_name);
+
+	hpzx1_devices++;
 }
 
 typedef struct {
@@ -190,10 +178,10 @@ typedef struct {
 	u8	csr_length[8];
 } acpi_hp_vendor_long;
 
-#define HP_CCSR_LENGTH 0x21
-#define HP_CCSR_TYPE 0x2
-#define HP_CCSR_GUID EFI_GUID(0x69e9adf9, 0x924f, 0xab5f,			\
-			      0xf6, 0x4a, 0x24, 0xd2, 0x01, 0x37, 0x0e, 0xad)
+#define HP_CCSR_LENGTH	0x21
+#define HP_CCSR_TYPE	0x2
+#define HP_CCSR_GUID	EFI_GUID(0x69e9adf9, 0x924f, 0xab5f,				\
+				 0xf6, 0x4a, 0x24, 0xd2, 0x01, 0x37, 0x0e, 0xad)
 
 extern acpi_status acpi_get_crs(acpi_handle, acpi_buffer *);
 extern acpi_resource *acpi_get_crs_next(acpi_buffer *, int *);
@@ -214,7 +202,7 @@ hp_csr_space(acpi_handle obj, u64 *csr_base, u64 *csr_length)
 	*csr_length = 0;
 
 	status = acpi_get_crs(obj, &buf);
-	if (status != AE_OK) {
+	if (ACPI_FAILURE(status)) {
 		printk(KERN_ERR PFX "Unable to get _CRS data on object\n");
 		return status;
 	}
@@ -255,13 +243,12 @@ static acpi_status
 hpzx1_sba_probe(acpi_handle obj, u32 depth, void *context, void **ret)
 {
 	u64 csr_base = 0, csr_length = 0;
-	char *name = context;
-	struct fake_pci_dev *dev;
 	acpi_status status;
+	char *name = context;
+	char fullname[16];
 
 	status = hp_csr_space(obj, &csr_base, &csr_length);
-
-	if (status != AE_OK)
+	if (ACPI_FAILURE(status))
 		return status;
 
 	/*
@@ -269,14 +256,10 @@ hpzx1_sba_probe(acpi_handle obj, u32 depth, void *context, void **ret)
 	 * includes both SBA and IOC.  Make SBA and IOC show up
 	 * separately in PCI space.
 	 */
-	if ((dev = hpzx1_fake_pci_dev(csr_base, 0, 0x1000)))
-		printk(KERN_INFO PFX "%s SBA at 0x%lx; pci dev %02x:%02x.%d\n",
-			name, csr_base, dev->bus,
-			PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
-	if ((dev = hpzx1_fake_pci_dev(csr_base + 0x1000, 0, 0x1000)))
-		printk(KERN_INFO PFX "%s IOC at 0x%lx; pci dev %02x:%02x.%d\n",
-			name, csr_base + 0x1000, dev->bus,
-			PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
+	sprintf(fullname, "%s SBA", name);
+	hpzx1_fake_pci_dev(fullname, 0, csr_base, 0x1000);
+	sprintf(fullname, "%s IOC", name);
+	hpzx1_fake_pci_dev(fullname, 0, csr_base + 0x1000, 0x1000);
 
 	return AE_OK;
 }
@@ -284,28 +267,24 @@ hpzx1_sba_probe(acpi_handle obj, u32 depth, void *context, void **ret)
 static acpi_status
 hpzx1_lba_probe(acpi_handle obj, u32 depth, void *context, void **ret)
 {
-	acpi_status status;
 	u64 csr_base = 0, csr_length = 0;
+	acpi_status status;
+	NATIVE_UINT busnum;
 	char *name = context;
-	NATIVE_UINT busnum = 0;
-	struct fake_pci_dev *dev;
+	char fullname[32];
 
 	status = hp_csr_space(obj, &csr_base, &csr_length);
-
-	if (status != AE_OK)
+	if (ACPI_FAILURE(status))
 		return status;
 
 	status = acpi_evaluate_integer(obj, METHOD_NAME__BBN, NULL, &busnum);
 	if (ACPI_FAILURE(status)) {
-		printk(KERN_ERR PFX "evaluate _BBN fail=0x%x\n", status);
+		printk(KERN_WARNING PFX "evaluate _BBN fail=0x%x\n", status);
 		busnum = 0;	// no _BBN; stick it on bus 0
 	}
 
-	if ((dev = hpzx1_fake_pci_dev(csr_base, busnum, csr_length)))
-		printk(KERN_INFO PFX "%s LBA at 0x%lx, _BBN 0x%02x; "
-			"pci dev %02x:%02x.%d\n",
-			name, csr_base, (unsigned int) busnum, dev->bus,
-			PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
+	sprintf(fullname, "%s _BBN 0x%02x", name, (unsigned int) busnum);
+	hpzx1_fake_pci_dev(fullname, busnum, csr_base, csr_length);
 
 	return AE_OK;
 }
@@ -314,6 +293,8 @@ static void
 hpzx1_acpi_dev_init(void)
 {
 	extern struct pci_ops *pci_root_ops;
+
+	orig_pci_ops = pci_root_ops;
 
 	/*
 	 * Make fake PCI devices for the following hardware in the
@@ -329,10 +310,10 @@ hpzx1_acpi_dev_init(void)
 	 */
 	acpi_get_devices("HWP0001", hpzx1_sba_probe, "HWP0001", NULL);
 #ifdef CONFIG_IA64_HP_PROTO
-	if (fake_pci_tail != &fake_pci_head) {
+	if (hpzx1_devices) {
 #endif
-	acpi_get_devices("HWP0002", hpzx1_lba_probe, "HWP0002", NULL);
-	acpi_get_devices("HWP0003", hpzx1_lba_probe, "HWP0003", NULL);
+	acpi_get_devices("HWP0002", hpzx1_lba_probe, "HWP0002 PCI LBA", NULL);
+	acpi_get_devices("HWP0003", hpzx1_lba_probe, "HWP0003 AGP LBA", NULL);
 
 #ifdef CONFIG_IA64_HP_PROTO
 	}
@@ -343,48 +324,25 @@ hpzx1_acpi_dev_init(void)
 	 * if we didn't find anything, add the things we know are
 	 * there.
 	 */
-	if (fake_pci_tail == &fake_pci_head) {
+	if (hpzx1_devices == 0) {
 		u64 hpa, csr_base;
-		struct fake_pci_dev *dev;
 
 		csr_base = 0xfed00000UL;
-		hpa = (u64) ioremap(csr_base, 0x1000);
+		hpa = (u64) ioremap(csr_base, 0x2000);
 		if (__raw_readl(hpa) == ZX1_FUNC_ID_VALUE) {
-			if ((dev = hpzx1_fake_pci_dev(csr_base, 0, 0x1000)))
-				printk(KERN_INFO PFX "HWP0001 SBA at 0x%lx; "
-					"pci dev %02x:%02x.%d\n", csr_base,
-					dev->bus, PCI_SLOT(dev->devfn),
-					PCI_FUNC(dev->devfn));
-			if ((dev = hpzx1_fake_pci_dev(csr_base + 0x1000, 0,
-					0x1000)))
-				printk(KERN_INFO PFX "HWP0001 IOC at 0x%lx; "
-					"pci dev %02x:%02x.%d\n",
-					csr_base + 0x1000,
-					dev->bus, PCI_SLOT(dev->devfn),
-					PCI_FUNC(dev->devfn));
+			hpzx1_fake_pci_dev("HWP0001 SBA", 0, csr_base, 0x1000);
+			hpzx1_fake_pci_dev("HWP0001 IOC", 0, csr_base + 0x1000,
+					    0x1000);
 
 			csr_base = 0xfed24000UL;
 			iounmap(hpa);
 			hpa = (u64) ioremap(csr_base, 0x1000);
-			if ((dev = hpzx1_fake_pci_dev(csr_base, 0x40, 0x1000)))
-				printk(KERN_INFO PFX "HWP0003 AGP LBA at "
-					"0x%lx; pci dev %02x:%02x.%d\n",
-					csr_base,
-					dev->bus, PCI_SLOT(dev->devfn),
-					PCI_FUNC(dev->devfn));
+			hpzx1_fake_pci_dev("HWP0003 AGP LBA", 0x40, csr_base,
+					    0x1000);
 		}
 		iounmap(hpa);
 	}
 #endif
-
-	if (fake_pci_tail == &fake_pci_head)
-		return;
-
-	/*
-	 * Replace PCI ops, but only if we made fake devices.
-	 */
-	orig_pci_ops = pci_root_ops;
-	pci_root_ops = &hp_pci_conf;
 }
 
 extern void sba_init(void);
@@ -392,9 +350,16 @@ extern void sba_init(void);
 void
 hpzx1_pci_fixup (int phase)
 {
-	if (phase == 0)
-		hpzx1_acpi_dev_init();
 	iosapic_pci_fixup(phase);
-        if (phase == 1)
+	switch (phase) {
+	      case 0:
+		/* zx1 has a hardware I/O TLB which lets us DMA from any device to any address */
+		MAX_DMA_ADDRESS = ~0UL;
+		break;
+
+	      case 1:
+		hpzx1_acpi_dev_init();
 		sba_init();
+		break;
+	}
 }

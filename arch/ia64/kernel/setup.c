@@ -347,6 +347,14 @@ setup_arch (char **cmdline_p)
 #ifdef CONFIG_ACPI_BOOT
 	acpi_boot_init(*cmdline_p);
 #endif
+#ifdef CONFIG_SERIAL_HCDP
+	if (efi.hcdp) {
+		void setup_serial_hcdp(void *);
+
+		/* Setup the serial ports described by HCDP */
+		setup_serial_hcdp(efi.hcdp);
+	}
+#endif
 #ifdef CONFIG_VT
 # if defined(CONFIG_DUMMY_CONSOLE)
 	conswitchp = &dummy_con;

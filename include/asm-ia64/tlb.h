@@ -123,13 +123,20 @@ tlb_gather_mmu (struct mm_struct *mm, unsigned int full_mm_flush)
 	mmu_gather_t *tlb = &mmu_gathers[smp_processor_id()];
 
 	tlb->mm = mm;
-	tlb->nr = 0;
-	if (full_mm_flush || num_online_cpus() == 1)
-		/*
-		 * Use fast mode if only 1 CPU is online or if we're tearing down the
-		 * entire address space.
-		 */
-		tlb->nr =  ~0U;
+	/*
+	 * Use fast mode if only 1 CPU is online.
+	 *
+	 * It would be tempting to turn on fast-mode for full_mm_flush as well.  But this
+	 * doesn't work because of speculative accesses and software prefetching: the page
+	 * table of "mm" may (and usually is) the currently active page table and even
+	 * though the kernel won't do any user-space accesses during the TLB shoot down, a
+	 * compiler might use speculation or lfetch.fault on what happens to be a valid
+	 * user-space address.  This in turn could trigger a TLB miss fault (or a VHPT
+	 * walk) and re-insert a TLB entry we just removed.  Slow mode avoids such
+	 * problems.  (We could make fast-mode work by switching the current task to a
+	 * different "mm" during the shootdown.) --davidm 08/02/2002
+	 */
+	tlb->nr = (num_online_cpus() == 1) ? ~0U : 0;
 	tlb->fullmm = full_mm_flush;
 	tlb->freed = 0;
 	tlb->start_addr = ~0UL;
