@@ -1091,10 +1091,6 @@ Details:
  *      mid level does not recognize it, then the LLD that controls
  *      the device receives the ioctl. According to recent Unix standards
  *      unsupported ioctl() 'cmd' numbers should return -ENOTTY.
- *      However the mid level returns -EINVAL for unrecognized 'cmd'
- *      numbers when this function is not supplied by the driver.
- *      Unfortunately some applications expect -EINVAL and react badly
- *      when -ENOTTY is returned; stick with -EINVAL.
  *
  *      Optionally defined in: LLD
  **/
