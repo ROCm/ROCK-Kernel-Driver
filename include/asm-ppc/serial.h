@@ -28,8 +28,6 @@
 #include <platforms/sandpoint_serial.h>
 #elif defined(CONFIG_SPRUCE)
 #include <platforms/spruce_serial.h>
-#elif defined(CONFIG_ZX4500)
-#include <platforms/zx4500_serial.h>
 #elif defined(CONFIG_40x)
 #include <asm/ibm4xx.h>
 #else

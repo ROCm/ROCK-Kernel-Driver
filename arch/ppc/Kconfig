@@ -450,9 +450,6 @@ config EV64260
 config SPRUCE
 	bool "IBM-Spruce"
 
-config MENF1
-	bool "MEN-F1"
-
 config LOPEC
 	bool "Motorola-LoPEC"
 
@@ -489,9 +486,6 @@ config GEMINI
 	  Select Gemini if configuring for a Synergy Microsystems' Gemini
 	  series Single Board Computer.  More information is available at:
 	  <http://www.synergymicro.com/PressRel/97_10_15.html>.
-
-config ZX4500
-	bool "Zynx-ZX4500"
 
 endchoice
 
@@ -536,7 +530,7 @@ config WILLOW
 
 config MPC10X_STORE_GATHERING
 	bool "Enable MPC10x store gathering"
-	depends on FORCE || MENF1 || SANDPOINT || ZX4500
+	depends on FORCE || SANDPOINT
 
 config GT64260
 	bool
@@ -1528,7 +1522,7 @@ config BOOTX_TEXT
 
 config SERIAL_TEXT_DEBUG
 	bool "Support for early boot texts over serial port"
-	depends on 4xx || GT64260 || LOPEC || MCPN765 || PPLUS || PRPMC800 || SANDPOINT || ZX4500
+	depends on 4xx || GT64260 || LOPEC || MCPN765 || PPLUS || PRPMC800 || SANDPOINT
 
 config OCP
 	bool

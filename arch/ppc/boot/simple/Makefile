@@ -61,12 +61,6 @@ ZIMAGEINITRD			:= zImage.initrd-STRIPELF
 END				:= gemini
 TFTPIMAGE			:= /tftpboot/zImage.$(END)
 endif
-ifeq ($(CONFIG_MENF1),y)
-ZIMAGE				:= zImage-MENF1
-ZIMAGEINITRD			:= zImage.initrd-MENF1
-EXTRA				:= chrpmap.o
-TFTPIMAGE			:= /tftpboot/zImage.menf1
-endif
 ifeq ($(CONFIG_K2),y)
 EXTRA				:= legacy.o
 TFTPIMAGE			:= /tftpboot/zImage.k2
@@ -99,12 +93,6 @@ ZIMAGEINITRD			:= zImage.initrd-TREE
 END				:= spruce
 ENTRYPOINT			:= 0x00800000
 MISC				:= misc-spruce.o
-TFTPIMAGE			:= /tftpboot/zImage.$(END)
-endif
-ifeq ($(CONFIG_ZX4500),y)
-ZIMAGE				:= zImage-STRIPELF
-ZIMAGEINITRD			:= zImage.initrd-STRIPELF
-END				:= zx4500
 TFTPIMAGE			:= /tftpboot/zImage.$(END)
 endif
 ifeq ($(CONFIG_SMP),y)
@@ -207,12 +195,6 @@ $(images)/zImage-TREE: $(obj)/zvmlinux $(MKTREE)
 $(images)/zImage.initrd-TREE: $(obj)/zvmlinux.initrd $(MKTREE)
 	$(MKTREE) $(obj)/zvmlinux.initrd $(images)/zImage.initrd.$(END) \
 		$(ENTRYPOINT)
-
-$(images)/zImage-MENF1: $(obj)/zvmlinux $(MKPREP)
-	$(MKPREP) -pbp $(obj)/zvmlinux $(images)/zImage.menf1
-
-$(images)/zImage.initrd-MENF1: $(obj)/zvmlinux.initrd $(MKPREP)
-	$(MKPREP) -pbp $(obj)/zvmlinux.initrd $(images)/zImage.initrd.menf1
 
 $(images)/zImage-PPLUS: $(obj)/zvmlinux $(MKPREP) $(MKBUGBOOT)
 	$(MKPREP) -pbp $(obj)/zvmlinux $(images)/zImage.pplus

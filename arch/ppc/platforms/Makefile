@@ -45,7 +45,6 @@ obj-$(CONFIG_PRPMC750)		+= prpmc750_setup.o prpmc750_pci.o
 obj-$(CONFIG_PRPMC800)		+= prpmc800_setup.o prpmc800_pci.o
 obj-$(CONFIG_SANDPOINT)		+= sandpoint_setup.o sandpoint_pci.o
 obj-$(CONFIG_SPRUCE)		+= spruce_setup.o spruce_pci.o
-obj-$(CONFIG_ZX4500)		+= zx4500_setup.o zx4500_pci.o
 
 ifeq ($(CONFIG_SMP),y)
 obj-$(CONFIG_PPC_PMAC)		+= pmac_smp.o
