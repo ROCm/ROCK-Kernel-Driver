@@ -769,7 +769,7 @@ static int read_super_block (struct super_block * s, int offset)
     if ( rs->s_v1.s_root_block == -1 ) {
        brelse(bh) ;
        printk("dev %s: Unfinished reiserfsck --rebuild-tree run detected. Please run\n"
-              "reiserfsck --rebuild-tree and wait for a completion. If that fais\n"
+              "reiserfsck --rebuild-tree and wait for a completion. If that fails\n"
               "get newer reiserfsprogs package\n", s->s_id);
        return 1;
     }
