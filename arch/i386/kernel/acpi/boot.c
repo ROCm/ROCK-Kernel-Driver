@@ -26,9 +26,13 @@
 #include <linux/init.h>
 #include <linux/acpi.h>
 #include <asm/pgalloc.h>
+#include <asm/apic.h>
+#include <asm/mpspec.h>
 
+#if defined (CONFIG_X86_LOCAL_APIC)
 #include <mach_apic.h>
 #include <mach_mpparse.h>
+#endif
 
 #define PREFIX			"ACPI: "
 
