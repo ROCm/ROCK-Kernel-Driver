@@ -136,11 +136,11 @@ config SENSORS_LM85
 
 config SENSORS_LM90
 	tristate "National Semiconductor LM90 and compatibles"
-	depends on I2C && EXPERIMENTAL
+	depends on I2C
 	select I2C_SENSOR
 	help
-	  If you say yes here you get support for National Semiconductor LM90
-	  and Analog Devices ADM1032 sensor chips.
+	  If you say yes here you get support for National Semiconductor LM90,
+	  LM89 and LM99, and Analog Devices ADM1032 sensor chips.
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called lm90.
