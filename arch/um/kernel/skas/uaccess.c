@@ -54,15 +54,23 @@ static int do_op(unsigned long addr, int len, int is_write,
 
 static void do_buffer_op(void *jmpbuf, void *arg_ptr)
 {
-	va_list args = *((va_list *) arg_ptr);
-	unsigned long addr = va_arg(args, unsigned long);
-	int len = va_arg(args, int);
-	int is_write = va_arg(args, int);
-	int (*op)(unsigned long, int, void *) = va_arg(args, void *);
-	void *arg = va_arg(args, void *);
-	int *res = va_arg(args, int *);
-	int size = min(PAGE_ALIGN(addr) - addr, (unsigned long) len);
-	int remain = len, n;
+	va_list args;
+	unsigned long addr;
+	int len, is_write, size, remain, n;
+	int (*op)(unsigned long, int, void *);
+	void *arg;
+	int *res;
+
+	va_copy(args, *(va_list *)arg_ptr);
+	addr = va_arg(args, unsigned long);
+	len = va_arg(args, int);
+	is_write = va_arg(args, int);
+	op = va_arg(args, void *);
+	arg = va_arg(args, void *);
+	res = va_arg(args, int *);
+	va_end(args);
+	size = min(PAGE_ALIGN(addr) - addr, (unsigned long) len);
+	remain = len;
 
 	current->thread.fault_catcher = jmpbuf;
 	n = do_op(addr, size, is_write, op, arg);
