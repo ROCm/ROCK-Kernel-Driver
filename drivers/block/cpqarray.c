@@ -318,9 +318,7 @@ MODULE_PARM(eisa, "1-8i");
  */
 int __init cpqarray_init(void)
 {
-	if(cpqarray_init_step2() == 0) 	/* all the block dev num already used */
-		return -ENODEV;		/* or no controllers were found */
-	return 0;
+	return (cpqarray_init_step2());
 }
 
 static void release_io_mem(ctlr_info_t *c)
@@ -559,18 +557,21 @@ static struct pci_driver cpqarray_pci_driver = {
 };
 
 /*
- *  This is it.  Find all the controllers and register them.  I really hate
- *  stealing all these major device numbers.
+ *  This is it.  Find all the controllers and register them.
  *  returns the number of block devices registered.
  */
 int __init cpqarray_init_step2(void)
 {
 	int num_cntlrs_reg = 0;
 	int i;
+	int rc = 0;
 
 	/* detect controllers */
 	printk(DRIVER_NAME "\n");
-	pci_register_driver(&cpqarray_pci_driver);
+/* TODO: If it's an eisa only system, will rc return negative? */
+	rc = pci_register_driver(&cpqarray_pci_driver);
+	if (rc < 0)
+		return rc;
 	cpqarray_eisa_detect();
 	
 	for (i=0; i < MAX_CTLR; i++) {
