@@ -91,11 +91,18 @@ masquerade_target(struct sk_buff **pskb,
 #ifdef CONFIG_IP_ROUTE_FWMARK
 						.fwmark = (*pskb)->nfmark
 #endif
-					      } },
-				    .oif = out->ifindex };
+					      } } };
 		if (ip_route_output_key(&rt, &fl) != 0) {
-			/* Shouldn't happen */
-			printk("MASQUERADE: No route: Rusty's brain broke!\n");
+			/* Funky routing can do this. */
+			if (net_ratelimit())
+				printk("MASQUERADE:"
+				       " No route: Rusty's brain broke!\n");
+			return NF_DROP;
+		}
+		if (rt->u.dst.dev != out) {
+			if (net_ratelimit())
+				printk("MASQUERADE:"
+				       " Route sent us somewhere else.\n");
 			return NF_DROP;
 		}
 	}

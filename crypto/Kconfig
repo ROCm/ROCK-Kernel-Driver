@@ -126,6 +126,13 @@ config CRYPTO_AES
 
 	  See http://csrc.nist.gov/encryption/aes/ for more information.
 
+config CRYPTO_CAST5
+	tristate "CAST5 (CAST-128) cipher algorithm"
+	depends on CRYPTO
+	help
+	  The CAST5 encryption algorithm (synonymous with CAST-128) is
+	  described in RFC2144.
+
 config CRYPTO_DEFLATE
 	tristate "Deflate compression algorithm"
 	depends on CRYPTO

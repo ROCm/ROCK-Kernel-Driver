@@ -186,7 +186,6 @@ Original developers of the crypto algorithms:
   Dag Arne Osvik (Serpent)
   Brian Gladman (AES)
 
-
 SHA1 algorithm contributors:
   Jean-Francois Dive
   
@@ -213,6 +212,9 @@ AES algorithm contributors:
   Herbert Valerio Riedel
   Kyle McMartin
   Adam J. Richter
+
+CAST5 algorithm contributors:
+  Kartikey Mahendra Bhatt (original developers unknown, FSF copyright).
 
 Generic scatterwalk code by Adam J. Richter <adam@yggdrasil.com>
 

@@ -201,6 +201,6 @@ int br_stp_handle_bpdu(struct sk_buff *skb)
  out:
 	spin_unlock_bh(&br->lock);
  err:
-	kfree(skb);
+	kfree_skb(skb);
 	return 0;
 }

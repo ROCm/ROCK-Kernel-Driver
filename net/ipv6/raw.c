@@ -833,6 +833,7 @@ static int rawv6_getsockopt(struct sock *sk, int level, int optname,
 			val = -1;
 		else
 			val = opt->offset;
+		break;
 
 	default:
 		return -ENOPROTOOPT;
