@@ -315,8 +315,6 @@ CIFSSMBTDis(const int xid, struct cifsTconInfo *tcon)
 		return 0;  
 	}
 
-/* BB remove (from server) list of shares - but with smp safety  BB */
-/* BB is ses active - do we need to check here - but how? BB */
 	if((tcon->ses == 0) || (tcon->ses->server == 0)) {    
 		up(&tcon->tconSem);
 		return -EIO;
