@@ -75,6 +75,14 @@ config X86_SUMMIT
 
 	  If you don't have one of these computers, you should say N here.
 
+config X86_BIGSMP
+	bool "Support for other sub-arch SMP systems with more than 8 CPUs"
+	help
+	  This option is needed for the systems that have more than 8 CPUs
+	  and if the system is not of any sub-arch type above.
+
+	  If you don't have such a system, you should say N here.
+
 # Visual Workstation support is utterly broken.
 # If you want to see it working mail an VW540 to hch@infradead.org 8)
 #config X86_VISWS
