@@ -605,7 +605,18 @@ int __init tun_init(void)
 
 void tun_cleanup(void)
 {
+	struct net_device *dev, *nxt;
+
 	misc_deregister(&tun_miscdev);  
+
+	rtnl_lock();
+	for (dev = dev_base; dev; dev = nxt) {
+		nxt = dev->next;
+		if (dev->init == tun_net_init) 
+			unregister_netdevice(dev);
+	}
+	rtnl_unlock();
+	
 }
 
 module_init(tun_init);
