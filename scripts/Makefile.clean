@@ -35,7 +35,7 @@ subdir-ymn	:= $(addprefix $(obj)/,$(subdir-ymn))
 
 # ==========================================================================
 
-__clean-files := $(wildcard $(EXTRA_TARGETS) $(host-progs) $(clean-files))
+__clean-files := $(wildcard $(EXTRA_TARGETS) $(host-progs) $(clean-files) $(targets))
 
 quiet_cmd_clean = CLEAN   $(obj)
       cmd_clean = rm -f $(__clean-files); $(clean-rule)

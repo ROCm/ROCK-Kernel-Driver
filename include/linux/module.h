@@ -150,13 +150,7 @@ void *__symbol_get(const char *symbol);
 void *__symbol_get_gpl(const char *symbol);
 #define symbol_get(x) ((typeof(&x))(__symbol_get(MODULE_SYMBOL_PREFIX #x)))
 
-#ifdef __GENKSYMS__
-
-/* genksyms doesn't handle GPL-only symbols yet */
-#define EXPORT_SYMBOL_GPL EXPORT_SYMBOL
-	
-#else
-
+#ifndef __GENKSYMS__
 #ifdef CONFIG_MODVERSIONS
 /* Mark the CRC weak since genksyms apparently decides not to
  * generate a checksums for some symbols */
@@ -188,7 +182,7 @@ void *__symbol_get_gpl(const char *symbol);
 #endif
 
 /* We don't mangle the actual symbol anymore, so no need for
- * special casing EXPORT_SYMBOL_NOVERS */
+ * special casing EXPORT_SYMBOL_NOVERS.  FIXME: Deprecated */
 #define EXPORT_SYMBOL_NOVERS(sym) EXPORT_SYMBOL(sym)
 
 struct module_ref
