@@ -25,13 +25,9 @@
 #include <net/scm.h>
 #include <net/sock.h>
 #include <asm/uaccess.h>
-#include <net/compat_socket.h>
+#include <net/compat.h>
 
 #define AA(__x)		((unsigned long)(__x))
-
-extern asmlinkage long sys_getsockopt(int fd, int level, int optname,
-				       void * optval, int *optlen);
-
 
 static inline int iov_from_user_compat_to_kern(struct iovec *kiov,
 					  struct compat_iovec *uiov32,
@@ -40,7 +36,8 @@ static inline int iov_from_user_compat_to_kern(struct iovec *kiov,
 	int tot_len = 0;
 
 	while(niov > 0) {
-		u32 len, buf;
+		compat_uptr_t buf;
+		compat_size_t len;
 
 		if(get_user(len, &uiov32->iov_len) ||
 		   get_user(buf, &uiov32->iov_base)) {
@@ -57,27 +54,23 @@ static inline int iov_from_user_compat_to_kern(struct iovec *kiov,
 	return tot_len;
 }
 
-int msghdr_from_user_compat_to_kern(struct msghdr *kmsg, struct compat_msghdr *umsg)
+int get_compat_msghdr(struct msghdr *kmsg, struct compat_msghdr *umsg)
 {
 	compat_uptr_t tmp1, tmp2, tmp3;
-	int err;
 
-	err = get_user(tmp1, &umsg->msg_name);
-	err |= __get_user(tmp2, &umsg->msg_iov);
-	err |= __get_user(tmp3, &umsg->msg_control);
-	if (err)
+	if (!access_ok(VERIFY_READ, umsg, sizeof(*umsg)) ||
+	    __get_user(tmp1, &umsg->msg_name) ||
+	    __get_user(kmsg->msg_namelen, &umsg->msg_namelen) ||
+	    __get_user(tmp2, &umsg->msg_iov) ||
+	    __get_user(kmsg->msg_iovlen, &umsg->msg_iovlen) ||
+	    __get_user(tmp3, &umsg->msg_control) ||
+	    __get_user(kmsg->msg_controllen, &umsg->msg_controllen) ||
+	    __get_user(kmsg->msg_flags, &umsg->msg_flags))
 		return -EFAULT;
-
 	kmsg->msg_name = compat_ptr(tmp1);
 	kmsg->msg_iov = compat_ptr(tmp2);
 	kmsg->msg_control = compat_ptr(tmp3);
-
-	err = get_user(kmsg->msg_namelen, &umsg->msg_namelen);
-	err |= get_user(kmsg->msg_iovlen, &umsg->msg_iovlen);
-	err |= get_user(kmsg->msg_controllen, &umsg->msg_controllen);
-	err |= get_user(kmsg->msg_flags, &umsg->msg_flags);
-	
-	return err;
+	return 0;
 }
 
 /* I've named the args so it is easy to tell whose space the pointers are in. */
@@ -116,6 +109,34 @@ int verify_compat_iovec(struct msghdr *kern_msg, struct iovec *kern_iov,
 	return tot_len;
 }
 
+/* Bleech... */
+#define CMSG_COMPAT_ALIGN(len)	ALIGN((len), sizeof(s32))
+
+#define CMSG_COMPAT_DATA(cmsg)				\
+	((void *)((char *)(cmsg) + CMSG_COMPAT_ALIGN(sizeof(struct compat_cmsghdr))))
+#define CMSG_COMPAT_SPACE(len)				\
+	(CMSG_COMPAT_ALIGN(sizeof(struct compat_cmsghdr)) + CMSG_COMPAT_ALIGN(len))
+#define CMSG_COMPAT_LEN(len)				\
+	(CMSG_COMPAT_ALIGN(sizeof(struct compat_cmsghdr)) + (len))
+
+#define CMSG_COMPAT_FIRSTHDR(msg)			\
+	(((msg)->msg_controllen) >= sizeof(struct compat_cmsghdr) ?	\
+	 (struct compat_cmsghdr *)((msg)->msg_control) :		\
+	 (struct compat_cmsghdr *)NULL)
+
+static inline struct compat_cmsghdr *cmsg_compat_nxthdr(struct msghdr *msg,
+		struct compat_cmsghdr *cmsg, int cmsg_len)
+{
+	struct compat_cmsghdr *ptr;
+
+	ptr = (struct compat_cmsghdr *)(((unsigned char *)cmsg) +
+			CMSG_COMPAT_ALIGN(cmsg_len));
+	if ((unsigned long)((char *)(ptr + 1) - (char *)msg->msg_control) >
+			msg->msg_controllen)
+		return NULL;
+	return ptr;
+}
+
 /* There is a lot of hair here because the alignment rules (and
  * thus placement) of cmsg headers and length are different for
  * 32-bit apps.  -DaveM
@@ -146,7 +167,7 @@ int cmsghdr_from_user_compat_to_kern(struct msghdr *kmsg,
 		tmp = ((ucmlen - CMSG_COMPAT_ALIGN(sizeof(*ucmsg))) +
 		       CMSG_ALIGN(sizeof(struct cmsghdr)));
 		kcmlen += tmp;
-		ucmsg = CMSG_COMPAT_NXTHDR(kmsg, ucmsg, ucmlen);
+		ucmsg = cmsg_compat_nxthdr(kmsg, ucmsg, ucmlen);
 	}
 	if(kcmlen == 0)
 		return -EINVAL;
@@ -180,7 +201,7 @@ int cmsghdr_from_user_compat_to_kern(struct msghdr *kmsg,
 
 		/* Advance. */
 		kcmsg = (struct cmsghdr *)((char *)kcmsg + CMSG_ALIGN(tmp));
-		ucmsg = CMSG_COMPAT_NXTHDR(kmsg, ucmsg, ucmlen);
+		ucmsg = cmsg_compat_nxthdr(kmsg, ucmsg, ucmlen);
 	}
 
 	/* Ok, looks like we made it.  Hook it up and return success. */
@@ -303,7 +324,7 @@ void scm_detach_fds_compat(struct msghdr *kmsg, struct scm_cookie *scm)
  *		IPV6_RTHDR	ipv6 routing exthdr	32-bit clean
  *		IPV6_AUTHHDR	ipv6 auth exthdr	32-bit clean
  */
-void cmsg_compat_recvmsg_fixup(struct msghdr *kmsg, unsigned long orig_cmsg_uptr)
+static void cmsg_compat_recvmsg_fixup(struct msghdr *kmsg, unsigned long orig_cmsg_uptr)
 {
 	unsigned char *workbuf, *wp;
 	unsigned long bufsz, space_avail;
@@ -364,120 +385,139 @@ fail:
 	kmsg->msg_control = (void *) orig_cmsg_uptr;
 }
 
+int put_compat_msg_controllen(struct msghdr *msg_sys,
+		struct compat_msghdr *msg_compat, unsigned long cmsg_ptr)
+{
+	unsigned long ucmsg_ptr;
+	compat_size_t uclen;
+
+	if ((unsigned long)msg_sys->msg_control != cmsg_ptr)
+		cmsg_compat_recvmsg_fixup(msg_sys, cmsg_ptr);
+	ucmsg_ptr = ((unsigned long)msg_sys->msg_control);
+	uclen = (compat_size_t) (ucmsg_ptr - cmsg_ptr);
+	return __put_user(uclen, &msg_compat->msg_controllen);
+}
+
 extern asmlinkage long sys_setsockopt(int fd, int level, int optname,
-				      char *optval, int optlen);
+				     char *optval, int optlen);
+
+/*
+ * For now, we assume that the compatibility and native version
+ * of struct ipt_entry are the same - sfr.  FIXME
+ */
+struct compat_ipt_replace {
+	char			name[IPT_TABLE_MAXNAMELEN];
+	u32			valid_hooks;
+	u32			num_entries;
+	u32			size;
+	u32			hook_entry[NF_IP_NUMHOOKS];
+	u32			underflow[NF_IP_NUMHOOKS];
+	u32			num_counters;
+	compat_uptr_t		counters;	/* struct ipt_counters * */
+	struct ipt_entry	entries[0];
+};
 
 static int do_netfilter_replace(int fd, int level, int optname,
 				char *optval, int optlen)
 {
-	struct ipt_replace32 {
-		char name[IPT_TABLE_MAXNAMELEN];
-		__u32 valid_hooks;
-		__u32 num_entries;
-		__u32 size;
-		__u32 hook_entry[NF_IP_NUMHOOKS];
-		__u32 underflow[NF_IP_NUMHOOKS];
-		__u32 num_counters;
-		__u32 counters;
-		struct ipt_entry entries[0];
-	} *repl32 = (struct ipt_replace32 *)optval;
+	struct compat_ipt_replace *urepl = (struct compat_ipt_replace *)optval;
 	struct ipt_replace *krepl;
-	struct ipt_counters *counters32;
-	__u32 origsize;
-	unsigned int kreplsize, kcountersize;
+	struct ipt_counters *ucounters;
+	u32 origsize;
+	unsigned int kreplsize;
 	mm_segment_t old_fs;
 	int ret;
+	int i;
+	compat_uptr_t ucntrs;
 
-	if (optlen < sizeof(repl32))
-		return -EINVAL;
-
-	if (copy_from_user(&origsize,
-			&repl32->size,
-			sizeof(origsize)))
+	if (get_user(origsize, &urepl->size))
 		return -EFAULT;
 
-	kreplsize = sizeof(*krepl) + origsize;
-	kcountersize = krepl->num_counters * sizeof(struct ipt_counters);
-
 	/* Hack: Causes ipchains to give correct error msg --RR */
-	if (optlen != kreplsize)
+	if (optlen != sizeof(*urepl) + origsize)
 		return -ENOPROTOOPT;
 
+	kreplsize = sizeof(*krepl) + origsize - num_entries *
+		(sizeof(struct compat_ipt_entry) - sizeof(struct ipt_entry));
 	krepl = (struct ipt_replace *)kmalloc(kreplsize, GFP_KERNEL);
 	if (krepl == NULL)
 		return -ENOMEM;
 
-	if (copy_from_user(krepl, optval, kreplsize)) {
-		kfree(krepl);
-		return -EFAULT;
+	ret = -EFAULT;
+	krepl->size = origsize;
+	if (!access_ok(VERIFY_READ, urepl, optlen) ||
+	    __copy_from_user(krepl->name, urepl->name, sizeof(urepl->name)) ||
+	    __get_user(krepl->valid_hooks, &urepl->valid_hooks) ||
+	    __get_user(krepl->num_entries, &urepl->num_entries) ||
+	    __get_user(krepl->num_counters, &urepl->num_counters) ||
+	    __get_user(ucntrs, &urepl->counters) ||
+	    __copy_from_user(krepl->entries, &urepl->entries, origsize))
+		goto out_free;
+	for (i = 0; i < NF_IP_NUM_HOOKS; i++) {
+		if (__get_user(krepl->hook_entry[i], &urepl->hook_entry[i]) ||
+		    __get_user(krepl->underflow[i], &urepl->underflow[i]))
+			goto out_free;
 	}
 
-	counters32 = (struct ipt_counters *)AA(
-		((struct ipt_replace32 *)krepl)->counters);
-
-	kcountersize = krepl->num_counters * sizeof(struct ipt_counters);
-	krepl->counters = (struct ipt_counters *)kmalloc(
-					kcountersize, GFP_KERNEL);
-	if (krepl->counters == NULL) {
-		kfree(krepl);
-		return -ENOMEM;
-	}
+	/*
+	 * Since struct ipt_counters just contains two u_int64_t members
+	 * we can just do the access_ok check here and pass the (converted)
+	 * pointer into the standard syscall.  We hope that the pointer is
+	 * not misaligned ...
+	 */
+	krepl->counters = compat_ptr(ucntrs);
+	if (!access_ok(VERIFY_WRITE, krepl->counters,
+			krepl->num_counters * sizeof(struct ipt_counters)))
+		goto out_free;
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	ret = sys_setsockopt(fd, level, optname,
-			     (char *)krepl, kreplsize);
+	ret = sys_setsockopt(fd, level, optname, (char *)krepl, kreplsize);
 	set_fs(old_fs);
 
-	if (ret == 0 &&
-		copy_to_user(counters32, krepl->counters, kcountersize))
-			ret = -EFAULT;
-
-	kfree(krepl->counters);
+out_free:
 	kfree(krepl);
-
 	return ret;
 }
+
+/*
+ * A struct sock_filter is architecture independent.
+ */
+struct compat_sock_fprog {
+	u16		len;
+	compat_uptr_t	filter;		/* struct sock_filter * */
+};
 
 static int do_set_attach_filter(int fd, int level, int optname,
 				char *optval, int optlen)
 {
-	struct sock_fprog32 {
-		__u16 len;
-		__u32 filter;
-	} *fprog32 = (struct sock_fprog32 *)optval;
+	struct compat_sock_fprog *fprog32 = (struct compat_sock_fprog *)optval;
 	struct sock_fprog kfprog;
 	struct sock_filter *kfilter;
-	unsigned int fsize;
 	mm_segment_t old_fs;
 	compat_uptr_t uptr;
 	int ret;
 
-	if (get_user(kfprog.len, &fprog32->len) ||
+	if (!access_ok(VERIFY_READ, fprog32, sizeof(*fprog32)) ||
+	    __get_user(kfprog.len, &fprog32->len) ||
 	    __get_user(uptr, &fprog32->filter))
 		return -EFAULT;
 
 	kfprog.filter = compat_ptr(uptr);
-	fsize = kfprog.len * sizeof(struct sock_filter);
-
-	kfilter = (struct sock_filter *)kmalloc(fsize, GFP_KERNEL);
-	if (kfilter == NULL)
-		return -ENOMEM;
-
-	if (copy_from_user(kfilter, kfprog.filter, fsize)) {
-		kfree(kfilter);
+	/*
+	 * Since struct sock_filter is architecure independent,
+	 * we can just do the access_ok check and pass the
+	 * same pointer to the real syscall.
+	 */
+	if (!access_ok(VERIFY_READ, kfprog.filter,
+			kfprog.len * sizeof(struct sock_filter)))
 		return -EFAULT;
-	}
-
-	kfprog.filter = kfilter;
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 	ret = sys_setsockopt(fd, level, optname,
 			     (char *)&kfprog, sizeof(kfprog));
 	set_fs(old_fs);
-
-	kfree(kfilter);
 
 	return ret;
 }
@@ -489,9 +529,10 @@ static int do_set_icmpv6_filter(int fd, int level, int optname,
 	mm_segment_t old_fs;
 	int ret, i;
 
+	if (optlen < sizeof(*kfilter))
+		return -EINVAL;
 	if (copy_from_user(&kfilter, optval, sizeof(kfilter)))
 		return -EFAULT;
-
 
 	for (i = 0; i < 8; i += 2) {
 		u32 tmp = kfilter.data[i];
@@ -518,7 +559,8 @@ static int do_set_sock_timeout(int fd, int level, int optname, char *optval, int
 
 	if (optlen < sizeof(*up))
 		return -EINVAL;
-	if (get_user(ktime.tv_sec, &up->tv_sec) ||
+	if (!access_ok(VERIFY_READ, up, sizeof(*up)) ||
+	    __get_user(ktime.tv_sec, &up->tv_sec) ||
 	    __get_user(ktime.tv_usec, &up->tv_usec))
 		return -EFAULT;
 	old_fs = get_fs();
@@ -547,7 +589,11 @@ asmlinkage long compat_sys_setsockopt(int fd, int level, int optname,
 	return sys_setsockopt(fd, level, optname, optval, optlen);
 }
 
-static int do_get_sock_timeout(int fd, int level, int optname, char *optval, int *optlen)
+extern asmlinkage long sys_getsockopt(int fd, int level, int optname,
+				       void * optval, int *optlen);
+
+static int do_get_sock_timeout(int fd, int level, int optname, char *optval,
+		int *optlen)
 {
 	struct compat_timeval *up = (struct compat_timeval *) optval;
 	struct timeval ktime;
@@ -566,7 +612,8 @@ static int do_get_sock_timeout(int fd, int level, int optname, char *optval, int
 
 	if (!err) {
 		if (put_user(sizeof(*up), optlen) ||
-		    put_user(ktime.tv_sec, &up->tv_sec) ||
+		    !access_ok(VERIFY_WRITE, up, sizeof(*up)) ||
+		    __put_user(ktime.tv_sec, &up->tv_sec) ||
 		    __put_user(ktime.tv_usec, &up->tv_usec))
 			err = -EFAULT;
 	}
@@ -588,27 +635,21 @@ static unsigned char nas[18]={AL(0),AL(3),AL(3),AL(3),AL(2),AL(3),
 				AL(6),AL(2),AL(5),AL(5),AL(3),AL(3)};
 #undef AL
 
-extern asmlinkage long sys_bind(int fd, struct sockaddr *umyaddr, int addrlen);
-extern asmlinkage long sys_connect(int fd, struct sockaddr *uservaddr,
-				  int addrlen);
-extern asmlinkage long sys_accept(int fd, struct sockaddr *upeer_sockaddr,
-				 int *upeer_addrlen); 
-extern asmlinkage long sys_getsockname(int fd, struct sockaddr *usockaddr,
-				      int *usockaddr_len);
-extern asmlinkage long sys_getpeername(int fd, struct sockaddr *usockaddr,
-				      int *usockaddr_len);
-extern asmlinkage long sys_send(int fd, void *buff, size_t len, unsigned flags);
-extern asmlinkage long sys_sendto(int fd, u32 buff, compat_size_t len,
-				   unsigned flags, u32 addr, int addr_len);
-extern asmlinkage long sys_recv(int fd, void *ubuf, size_t size, unsigned flags);
-extern asmlinkage long sys_recvfrom(int fd, u32 ubuf, compat_size_t size,
-				     unsigned flags, u32 addr, u32 addr_len);
-extern asmlinkage long sys_socket(int family, int type, int protocol);
-extern asmlinkage long sys_socketpair(int family, int type, int protocol,
-				     int usockvec[2]);
-extern asmlinkage long sys_shutdown(int fd, int how);
-extern asmlinkage long sys_listen(int fd, int backlog);
-
+extern asmlinkage long sys_bind(int, struct sockaddr *, int);
+extern asmlinkage long sys_connect(int, struct sockaddr *, int);
+extern asmlinkage long sys_accept(int, struct sockaddr *, int *); 
+extern asmlinkage long sys_getsockname(int, struct sockaddr *, int *);
+extern asmlinkage long sys_getpeername(int, struct sockaddr *, int *);
+extern asmlinkage long sys_send(int, void *, size_t, unsigned);
+extern asmlinkage long sys_sendto(int, void *, size_t, unsigned,
+		struct sockaddr *, int);
+extern asmlinkage long sys_recv(int, void *, size_t, unsigned);
+extern asmlinkage long sys_recvfrom(int, void *, size_t, unsigned,
+		struct sockaddr *, int *);
+extern asmlinkage long sys_socket(int, int, int);
+extern asmlinkage long sys_socketpair(int, int, int, int [2]);
+extern asmlinkage long sys_shutdown(int, int);
+extern asmlinkage long sys_listen(int, int);
 
 asmlinkage long compat_sys_sendmsg(int fd, struct compat_msghdr *msg, unsigned flags)
 {
