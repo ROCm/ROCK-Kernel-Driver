@@ -933,13 +933,16 @@ static void handle_stripe(struct stripe_head *sh)
 		test_bit(R5_UPTODATE, &dev->flags))
 	       || (failed == 1 && failed_num == sh->pd_idx))
 	    ) {
-	    /* any written block on an uptodate or failed drive can be returned */
+	    /* any written block on an uptodate or failed drive can be returned.
+	     * Note that if we 'wrote' to a failed drive, it will be UPTODATE, but 
+	     * never LOCKED, so we don't need to test 'failed' directly.
+	     */
 	    for (i=disks; i--; )
 		if (sh->dev[i].written) {
 		    dev = &sh->dev[i];
-		    if (!test_bit(R5_Insync, &sh->dev[sh->pd_idx].flags) &&
-			(!test_bit(R5_LOCKED, &dev->flags) && test_bit(R5_UPTODATE, &dev->flags)) ) {
-			/* maybe we can return some write requests */
+		    if (!test_bit(R5_LOCKED, &dev->flags) &&
+			 test_bit(R5_UPTODATE, &dev->flags) ) {
+			/* We can return any write requests */
 			    struct bio *wbi, *wbi2;
 			    PRINTK("Return write for disc %d\n", i);
 			    wbi = dev->written;
