@@ -173,7 +173,7 @@ repeat:
 		spin_unlock(&transaction->t_handle_lock);
 		prepare_to_wait(&journal->j_wait_transaction_locked, &wait,
 				TASK_UNINTERRUPTIBLE);
-		__log_start_commit(journal, transaction);
+		__log_start_commit(journal, transaction->t_tid);
 		spin_unlock(&journal->j_state_lock);
 		schedule();
 		finish_wait(&journal->j_wait_transaction_locked, &wait);
@@ -396,6 +396,7 @@ int journal_restart(handle_t *handle, int nblocks)
 	J_ASSERT(transaction->t_updates > 0);
 	J_ASSERT(journal_current_handle() == handle);
 
+	spin_lock(&journal->j_state_lock);
 	spin_lock(&transaction->t_handle_lock);
 	transaction->t_outstanding_credits -= handle->h_buffer_credits;
 	transaction->t_updates--;
@@ -405,7 +406,8 @@ int journal_restart(handle_t *handle, int nblocks)
 	spin_unlock(&transaction->t_handle_lock);
 
 	jbd_debug(2, "restarting handle %p\n", handle);
-	log_start_commit(journal, transaction);
+	__log_start_commit(journal, transaction->t_tid);
+	spin_unlock(&journal->j_state_lock);
 
 	handle->h_buffer_credits = nblocks;
 	ret = start_this_handle(journal, handle);
@@ -1382,6 +1384,7 @@ int journal_stop(handle_t *handle)
 	}
 
 	current->journal_info = NULL;
+	spin_lock(&journal->j_state_lock);
 	spin_lock(&transaction->t_handle_lock);
 	transaction->t_outstanding_credits -= handle->h_buffer_credits;
 	transaction->t_updates--;
@@ -1415,8 +1418,9 @@ int journal_stop(handle_t *handle)
 		jbd_debug(2, "transaction too old, requesting commit for "
 					"handle %p\n", handle);
 		/* This is non-blocking */
-		log_start_commit(journal, transaction);
-		
+		__log_start_commit(journal, transaction->t_tid);
+		spin_unlock(&journal->j_state_lock);
+
 		/*
 		 * Special case: JFS_SYNC synchronous updates require us
 		 * to wait for the commit to complete.  
@@ -1425,6 +1429,7 @@ int journal_stop(handle_t *handle)
 			err = log_wait_commit(journal, tid);
 	} else {
 		spin_unlock(&transaction->t_handle_lock);
+		spin_unlock(&journal->j_state_lock);
 	}
 
 	jbd_free_handle(handle);

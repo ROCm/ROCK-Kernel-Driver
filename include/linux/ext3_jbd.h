@@ -184,17 +184,6 @@ static inline handle_t *ext3_journal_current_handle(void)
 	return journal_current_handle();
 }
 
-static inline void
-ext3_log_start_commit(journal_t *journal, transaction_t *transaction)
-{
-	log_start_commit(journal, transaction);
-}
-
-static inline void ext3_log_wait_commit(journal_t *journal, tid_t tid)
-{
-	log_wait_commit(journal, tid);
-}
-
 static inline int ext3_journal_extend(handle_t *handle, int nblocks)
 {
 	return journal_extend(handle, nblocks);

@@ -1811,7 +1811,7 @@ void ext3_write_super (struct super_block * sb)
 	if (down_trylock(&sb->s_lock) == 0)
 		BUG();
 	sb->s_dirt = 0;
-	log_start_commit(EXT3_SB(sb)->s_journal, NULL);
+	journal_start_commit(EXT3_SB(sb)->s_journal, NULL);
 }
 
 static int ext3_sync_fs(struct super_block *sb, int wait)
@@ -1819,9 +1819,10 @@ static int ext3_sync_fs(struct super_block *sb, int wait)
 	tid_t target;
 
 	sb->s_dirt = 0;
-	target = log_start_commit(EXT3_SB(sb)->s_journal, NULL);
-	if (wait)
-		log_wait_commit(EXT3_SB(sb)->s_journal, target);
+	if (journal_start_commit(EXT3_SB(sb)->s_journal, &target)) {
+		if (wait)
+			log_wait_commit(EXT3_SB(sb)->s_journal, target);
+	}
 	return 0;
 }
 

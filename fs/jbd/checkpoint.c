@@ -124,7 +124,6 @@ static void jbd_sync_bh(journal_t *journal, struct buffer_head *bh)
  * checkpoint.  (journal_remove_checkpoint() deletes the transaction when
  * the last checkpoint buffer is cleansed)
  *
- * Called with the journal locked.
  * Called with j_list_lock held.
  */
 static int __cleanup_transaction(journal_t *journal, transaction_t *transaction)
@@ -167,16 +166,11 @@ static int __cleanup_transaction(journal_t *journal, transaction_t *transaction)
 
 			spin_unlock(&journal->j_list_lock);
 			jbd_unlock_bh_state(bh);
-			log_start_commit(journal, t);
+			log_start_commit(journal, tid);
 			log_wait_commit(journal, tid);
 			goto out_return_1;
 		}
 
-		/*
-		 * We used to test for (jh->b_list != BUF_CLEAN) here.
-		 * But unmap_underlying_metadata() can place buffer onto
-		 * BUF_CLEAN.
-		 */
 		/*
 		 * AKPM: I think the buffer_jbddirty test is redundant - it
 		 * shouldn't have NULL b_transaction?
@@ -322,7 +316,7 @@ int log_do_checkpoint(journal_t *journal, int nblocks)
 		int cleanup_ret, retry = 0;
 		tid_t this_tid;
 
-		transaction = journal->j_checkpoint_transactions->t_cpprev;
+		transaction = journal->j_checkpoint_transactions->t_cpnext;
 		this_tid = transaction->t_tid;
 		jh = transaction->t_checkpoint_list;
 		last_jh = jh->b_cpprev;
@@ -359,7 +353,7 @@ int log_do_checkpoint(journal_t *journal, int nblocks)
 		 * If someone cleaned up this transaction while we slept, we're
 		 * done
 		 */
-		if (journal->j_checkpoint_transactions->t_cpprev != transaction)
+		if (journal->j_checkpoint_transactions->t_cpnext != transaction)
 			continue;
 		/*
 		 * Maybe it's a new transaction, but it fell at the same

@@ -988,12 +988,13 @@ extern void	journal_switch_revoke_table(journal_t *journal);
  */
 
 int __log_space_left(journal_t *); /* Called with journal locked */
-extern tid_t	log_start_commit (journal_t *, transaction_t *);
-extern tid_t	__log_start_commit(journal_t *, transaction_t *);
-extern int	log_wait_commit (journal_t *, tid_t);
-extern int	log_do_checkpoint (journal_t *, int);
+int log_start_commit(journal_t *journal, tid_t tid);
+int __log_start_commit(journal_t *journal, tid_t tid);
+int journal_start_commit(journal_t *journal, tid_t *tid);
+int log_wait_commit(journal_t *journal, tid_t tid);
+int log_do_checkpoint(journal_t *journal, int nblocks);
 
-void __log_wait_for_space(journal_t *, int nblocks);
+void __log_wait_for_space(journal_t *journal, int nblocks);
 extern void	__journal_drop_transaction(journal_t *, transaction_t *);
 extern int	cleanup_journal_tail(journal_t *);
 

@@ -73,7 +73,7 @@ EXPORT_SYMBOL(journal_errno);
 EXPORT_SYMBOL(journal_ack_err);
 EXPORT_SYMBOL(journal_clear_err);
 EXPORT_SYMBOL(log_wait_commit);
-EXPORT_SYMBOL(log_start_commit);
+EXPORT_SYMBOL(journal_start_commit);
 EXPORT_SYMBOL(journal_wipe);
 EXPORT_SYMBOL(journal_blocks_per_page);
 EXPORT_SYMBOL(journal_invalidatepage);
@@ -433,52 +433,55 @@ int __log_space_left(journal_t *journal)
 }
 
 /*
- * Called under j_state_lock.
+ * Called under j_state_lock.  Returns true if a transaction was started.
  */
-tid_t __log_start_commit(journal_t *journal, transaction_t *transaction)
+int __log_start_commit(journal_t *journal, tid_t target)
 {
-	tid_t target = journal->j_commit_request;
-
-	/*
-	 * A NULL transaction asks us to commit the currently running
-	 * transaction, if there is one.  
-	 */
-	if (transaction)
-		target = transaction->t_tid;
-	else {
-		transaction = journal->j_running_transaction;
-		if (!transaction)
-			goto out;
-		target = transaction->t_tid;
-	}
-		
 	/*
 	 * Are we already doing a recent enough commit?
 	 */
-	if (tid_geq(journal->j_commit_request, target))
-		goto out;
+	if (!tid_geq(journal->j_commit_request, target)) {
+		/*
+		 * We want a new commit: OK, mark the request and wakup the
+		 * commit thread.  We do _not_ do the commit ourselves.
+		 */
 
-	/*
-	 * We want a new commit: OK, mark the request and wakup the
-	 * commit thread.  We do _not_ do the commit ourselves.
-	 */
-
-	journal->j_commit_request = target;
-	jbd_debug(1, "JBD: requesting commit %d/%d\n",
-		  journal->j_commit_request,
-		  journal->j_commit_sequence);
-	wake_up(&journal->j_wait_commit);
-
-out:
-	return target;
+		journal->j_commit_request = target;
+		jbd_debug(1, "JBD: requesting commit %d/%d\n",
+			  journal->j_commit_request,
+			  journal->j_commit_sequence);
+		wake_up(&journal->j_wait_commit);
+		return 1;
+	}
+	return 0;
 }
 
-tid_t log_start_commit(journal_t *journal, transaction_t *transaction)
+int log_start_commit(journal_t *journal, tid_t tid)
 {
-	tid_t ret;
+	int ret;
 
 	spin_lock(&journal->j_state_lock);
-	ret = __log_start_commit(journal, transaction);
+	ret = __log_start_commit(journal, tid);
+	spin_unlock(&journal->j_state_lock);
+	return ret;
+}
+
+/*
+ * Start a commit of the current running transaction (if any).  Returns true
+ * if a transaction was started, and fills its tid in at *ptid
+ */
+int journal_start_commit(journal_t *journal, tid_t *ptid)
+{
+	int ret = 0;
+
+	spin_lock(&journal->j_state_lock);
+	if (journal->j_running_transaction) {
+		tid_t tid = journal->j_running_transaction->t_tid;
+
+		ret = __log_start_commit(journal, tid);
+		if (ret && ptid)
+			*ptid = tid;
+	}
 	spin_unlock(&journal->j_state_lock);
 	return ret;
 }
@@ -1243,7 +1246,7 @@ int journal_flush(journal_t *journal)
 	/* Force everything buffered to the log... */
 	if (journal->j_running_transaction) {
 		transaction = journal->j_running_transaction;
-		__log_start_commit(journal, transaction);
+		__log_start_commit(journal, transaction->t_tid);
 	} else if (journal->j_committing_transaction)
 		transaction = journal->j_committing_transaction;
 
@@ -1374,7 +1377,7 @@ void __journal_abort_hard(journal_t *journal)
 	journal->j_flags |= JFS_ABORT;
 	transaction = journal->j_running_transaction;
 	if (transaction)
-		__log_start_commit(journal, transaction);
+		__log_start_commit(journal, transaction->t_tid);
 	spin_unlock(&journal->j_state_lock);
 }
 
