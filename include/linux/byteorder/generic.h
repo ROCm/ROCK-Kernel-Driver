@@ -147,10 +147,10 @@
  * Do the prototypes. Somebody might want to take the
  * address or some such sick thing..
  */
-extern __u32			ntohl(__u32);
-extern __u32			htonl(__u32);
-extern unsigned short int	ntohs(unsigned short int);
-extern unsigned short int	htons(unsigned short int);
+extern __u32			ntohl(__be32);
+extern __be32			htonl(__u32);
+extern __u16			ntohs(__be16);
+extern __be16			htons(__u16);
 
 #if defined(__GNUC__) && (__GNUC__ >= 2) && defined(__OPTIMIZE__)
 

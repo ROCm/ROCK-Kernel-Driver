@@ -60,8 +60,8 @@
  * See USB 2.0 spec Table 11-19 and Table 11-20
  */
 struct usb_port_status {
-	__u16 wPortStatus;
-	__u16 wPortChange;	
+	__le16 wPortStatus;
+	__le16 wPortChange;	
 } __attribute__ ((packed));
 
 /* 
@@ -103,8 +103,8 @@ struct usb_port_status {
 #define HUB_CHAR_PORTIND        0x0080 /* D7       */
 
 struct usb_hub_status {
-	__u16 wHubStatus;
-	__u16 wHubChange;
+	__le16 wHubStatus;
+	__le16 wHubChange;
 } __attribute__ ((packed));
 
 /*

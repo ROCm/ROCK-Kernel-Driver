@@ -495,21 +495,22 @@ static int tcpdiag_dump(struct sk_buff *skb, struct netlink_callback *cb)
 			sk_for_each(sk, node, &tcp_listening_hash[i]) {
 				struct inet_opt *inet = inet_sk(sk);
 				if (num < s_num)
-					continue;
+					goto next_listen;
 				if (!(r->tcpdiag_states&TCPF_LISTEN) ||
 				    r->id.tcpdiag_dport)
-					continue;
+					goto next_listen;
 				if (r->id.tcpdiag_sport != inet->sport &&
 				    r->id.tcpdiag_sport)
-					continue;
+					goto next_listen;
 				if (bc && !tcpdiag_bc_run(RTA_DATA(bc), RTA_PAYLOAD(bc), sk))
-					continue;
+					goto next_listen;
 				if (tcpdiag_fill(skb, sk, r->tcpdiag_ext,
 						 NETLINK_CB(cb->skb).pid,
 						 cb->nlh->nlmsg_seq) <= 0) {
 					tcp_listen_unlock();
 					goto done;
 				}
+next_listen:
 				++num;
 			}
 		}
@@ -537,22 +538,23 @@ skip_listen_ht:
 			struct inet_opt *inet = inet_sk(sk);
 
 			if (num < s_num)
-				continue;
+				goto next_normal;
 			if (!(r->tcpdiag_states & (1 << sk->sk_state)))
-				continue;
+				goto next_normal;
 			if (r->id.tcpdiag_sport != inet->sport &&
 			    r->id.tcpdiag_sport)
-				continue;
+				goto next_normal;
 			if (r->id.tcpdiag_dport != inet->dport && r->id.tcpdiag_dport)
-				continue;
+				goto next_normal;
 			if (bc && !tcpdiag_bc_run(RTA_DATA(bc), RTA_PAYLOAD(bc), sk))
-				continue;
+				goto next_normal;
 			if (tcpdiag_fill(skb, sk, r->tcpdiag_ext,
 					 NETLINK_CB(cb->skb).pid,
 					 cb->nlh->nlmsg_seq) <= 0) {
 				read_unlock_bh(&head->lock);
 				goto done;
 			}
+next_normal:
 			++num;
 		}
 
@@ -562,21 +564,22 @@ skip_listen_ht:
 				struct inet_opt *inet = inet_sk(sk);
 
 				if (num < s_num)
-					continue;
+					goto next_dying;
 				if (r->id.tcpdiag_sport != inet->sport &&
 				    r->id.tcpdiag_sport)
-					continue;
+					goto next_dying;
 				if (r->id.tcpdiag_dport != inet->dport &&
 				    r->id.tcpdiag_dport)
-					continue;
+					goto next_dying;
 				if (bc && !tcpdiag_bc_run(RTA_DATA(bc), RTA_PAYLOAD(bc), sk))
-					continue;
+					goto next_dying;
 				if (tcpdiag_fill(skb, sk, r->tcpdiag_ext,
 						 NETLINK_CB(cb->skb).pid,
 						 cb->nlh->nlmsg_seq) <= 0) {
 					read_unlock_bh(&head->lock);
 					goto done;
 				}
+next_dying:
 				++num;
 			}
 		}

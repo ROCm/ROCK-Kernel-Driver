@@ -128,13 +128,13 @@ static inline void set_tss_desc(unsigned cpu, void *addr)
 { 
 	set_tssldt_descriptor(&cpu_gdt_table[cpu][GDT_ENTRY_TSS], (unsigned long)addr, 
 			      DESC_TSS,
-			      sizeof(struct tss_struct)); 
+			      sizeof(struct tss_struct) - 1);
 } 
 
 static inline void set_ldt_desc(unsigned cpu, void *addr, int size)
 { 
 	set_tssldt_descriptor(&cpu_gdt_table[cpu][GDT_ENTRY_LDT], (unsigned long)addr, 
-			      DESC_LDT, size * 8);
+			      DESC_LDT, size * 8 - 1);
 }
 
 static inline void set_seg_base(unsigned cpu, int entry, void *base)

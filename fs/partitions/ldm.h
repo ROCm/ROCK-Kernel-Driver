@@ -99,9 +99,9 @@ struct parsed_partitions;
 #define TOC_BITMAP2		"log"		/* bitmaps in the TOCBLOCK. */
 
 /* Most numbers we deal with are big-endian and won't be aligned. */
-#define BE16(x)			((u16)be16_to_cpu(get_unaligned((u16*)(x))))
-#define BE32(x)			((u32)be32_to_cpu(get_unaligned((u32*)(x))))
-#define BE64(x)			((u64)be64_to_cpu(get_unaligned((u64*)(x))))
+#define BE16(x)			((u16)be16_to_cpu(get_unaligned((__be16*)(x))))
+#define BE32(x)			((u32)be32_to_cpu(get_unaligned((__be32*)(x))))
+#define BE64(x)			((u64)be64_to_cpu(get_unaligned((__be64*)(x))))
 
 /* Borrowed from msdos.c */
 #define SYS_IND(p)		(get_unaligned(&(p)->sys_ind))

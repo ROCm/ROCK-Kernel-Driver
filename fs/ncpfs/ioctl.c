@@ -299,7 +299,9 @@ int ncp_ioctl(struct inode *inode, struct file *filp,
 	case NCP_IOC_SETROOT:
 		{
 			struct ncp_setroot_ioctl sr;
-			__u32 vnum, de, dosde;
+			__u32 vnum;
+			__le32 de;
+			__le32 dosde;
 			struct dentry* dentry;
 
 			if (!capable(CAP_SYS_ADMIN))

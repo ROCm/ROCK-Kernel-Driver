@@ -19,8 +19,9 @@ int hfsplus_block_allocate(struct super_block *sb, u32 size, u32 offset, u32 *ma
 {
 	struct page *page;
 	struct address_space *mapping;
-	u32 *pptr, *curr, *end;
-	u32 val, mask, start, len;
+	__be32 *pptr, *curr, *end;
+	u32 mask, start, len, n;
+	__be32 val;
 	int i;
 
 	len = *max;
@@ -44,10 +45,10 @@ int hfsplus_block_allocate(struct super_block *sb, u32 size, u32 offset, u32 *ma
 	/* scan the first partial u32 for zero bits */
 	val = *curr;
 	if (~val) {
-		val = be32_to_cpu(val);
+		n = be32_to_cpu(val);
 		mask = (1U << 31) >> i;
 		for (; i < 32; mask >>= 1, i++) {
-			if (!(val & mask))
+			if (!(n & mask))
 				goto found;
 		}
 	}
@@ -58,10 +59,10 @@ int hfsplus_block_allocate(struct super_block *sb, u32 size, u32 offset, u32 *ma
 		while (curr < end) {
 			val = *curr;
 			if (~val) {
-				val = be32_to_cpu(val);
+				n = be32_to_cpu(val);
 				mask = 1 << 31;
 				for (i = 0; i < 32; mask >>= 1, i++) {
-					if (!(val & mask))
+					if (!(n & mask))
 						goto found;
 				}
 			}
@@ -92,27 +93,27 @@ found:
 	/* do any partial u32 at the start */
 	len = min(size - start, len);
 	while (1) {
-		val |= mask;
+		n |= mask;
 		if (++i >= 32)
 			break;
 		mask >>= 1;
-		if (!--len || val & mask)
+		if (!--len || n & mask)
 			goto done;
 	}
 	if (!--len)
 		goto done;
-	*curr++ = cpu_to_be32(val);
+	*curr++ = cpu_to_be32(n);
 	/* do full u32s */
 	while (1) {
 		while (curr < end) {
-			val = be32_to_cpu(*curr);
+			n = be32_to_cpu(*curr);
 			if (len < 32)
 				goto last;
-			if (val) {
+			if (n) {
 				len = 32;
 				goto last;
 			}
-			*curr++ = 0xffffffffU;
+			*curr++ = cpu_to_be32(0xffffffff);
 			len -= 32;
 		}
 		set_page_dirty(page);
@@ -128,13 +129,13 @@ last:
 	/* do any partial u32 at end */
 	mask = 1U << 31;
 	for (i = 0; i < len; i++) {
-		if (val & mask)
+		if (n & mask)
 			break;
-		val |= mask;
+		n |= mask;
 		mask >>= 1;
 	}
 done:
-	*curr = cpu_to_be32(val);
+	*curr = cpu_to_be32(n);
 	set_page_dirty(page);
 	kunmap(page);
 	*max = offset + (curr - pptr) * 32 + i - start;
@@ -150,7 +151,7 @@ int hfsplus_block_free(struct super_block *sb, u32 offset, u32 count)
 {
 	struct page *page;
 	struct address_space *mapping;
-	u32 *pptr, *curr, *end;
+	__be32 *pptr, *curr, *end;
 	u32 mask, len, pnr;
 	int i;
 

@@ -1129,7 +1129,7 @@ static int usblp_cache_device_id_string(struct usblp *usblp)
 	/* First two bytes are length in big-endian.
 	 * They count themselves, and we copy them into
 	 * the user's buffer. */
-	length = be16_to_cpu(*((u16 *)usblp->device_id_string));
+	length = be16_to_cpu(*((__be16 *)usblp->device_id_string));
 	if (length < 2)
 		length = 2;
 	else if (length >= USBLP_DEVICE_ID_SIZE)

@@ -605,16 +605,16 @@ static u8 *fetch_item(__u8 *start, __u8 *end, struct hid_item *item)
 		case 2:
 			if ((end - start) < 2) 
 				return NULL;
-			item->data.u16 = le16_to_cpu(get_unaligned((__u16*)start));
-			start = (__u8 *)((__u16 *)start + 1);
+			item->data.u16 = le16_to_cpu(get_unaligned((__le16*)start));
+			start = (__u8 *)((__le16 *)start + 1);
 			return start;
 
 		case 3:
 			item->size++;
 			if ((end - start) < 4)
 				return NULL;
-			item->data.u32 = le32_to_cpu(get_unaligned((__u32*)start));
-			start = (__u8 *)((__u32 *)start + 1);
+			item->data.u32 = le32_to_cpu(get_unaligned((__le32*)start));
+			start = (__u8 *)((__le32 *)start + 1);
 			return start;
 	}
 
@@ -756,15 +756,15 @@ static __inline__ __u32 s32ton(__s32 value, unsigned n)
 static __inline__ __u32 extract(__u8 *report, unsigned offset, unsigned n)
 {
 	report += (offset >> 5) << 2; offset &= 31;
-	return (le64_to_cpu(get_unaligned((__u64*)report)) >> offset) & ((1 << n) - 1);
+	return (le64_to_cpu(get_unaligned((__le64*)report)) >> offset) & ((1 << n) - 1);
 }
 
 static __inline__ void implement(__u8 *report, unsigned offset, unsigned n, __u32 value)
 {
 	report += (offset >> 5) << 2; offset &= 31;
-	put_unaligned((get_unaligned((__u64*)report)
+	put_unaligned((get_unaligned((__le64*)report)
 		& cpu_to_le64(~((((__u64) 1 << n) - 1) << offset)))
-		| cpu_to_le64((__u64)value << offset), (__u64*)report);
+		| cpu_to_le64((__u64)value << offset), (__le64*)report);
 }
 
 /*

@@ -624,15 +624,15 @@ static int i2o_cfg_evt_get(unsigned long arg, struct file *fp)
 	return 0;
 }
 
-#if BITS_PER_LONG == 64
+#ifdef CONFIG_COMPAT
 static int i2o_cfg_passthru32(unsigned fd, unsigned cmnd, unsigned long arg,
 			      struct file *file)
 {
 	struct i2o_cmd_passthru32 __user *cmd;
 	struct i2o_controller *c;
-	u32 *user_msg;
+	u32 __user *user_msg;
 	u32 *reply = NULL;
-	u32 *user_reply = NULL;
+	u32 __user *user_reply = NULL;
 	u32 size = 0;
 	u32 reply_size = 0;
 	u32 rcode = 0;
@@ -752,7 +752,7 @@ static int i2o_cfg_passthru32(unsigned fd, unsigned cmnd, unsigned long arg,
 			    flag_count & 0x04000000 /*I2O_SGL_FLAGS_DIR */ ) {
 				// TODO 64bit fix
 				if (copy_from_user
-				    (p->virt, (void *)(u64) sg[i].addr_bus,
+				    (p->virt, (void __user *)(unsigned long)sg[i].addr_bus,
 				     sg_size)) {
 					printk(KERN_DEBUG
 					       "%s: Could not copy SG buf %d FROM user\n",
@@ -1105,7 +1105,7 @@ static int i2o_cfg_ioctl(struct inode *inode, struct file *fp, unsigned int cmd,
 		ret = i2o_cfg_evt_get(arg, fp);
 		break;
 
-#if BITS_PER_LONG != 64
+#ifndef CONFIG_COMPAT
 	case I2OPASSTHRU:
 		ret = i2o_cfg_passthru(arg);
 		break;
@@ -1225,7 +1225,7 @@ static int __init i2o_config_init(void)
 		misc_deregister(&i2o_miscdev);
 		return -EBUSY;
 	}
-#if BITS_PER_LONG ==64
+#ifdef CONFIG_COMPAT
 	register_ioctl32_conversion(I2OPASSTHRU32, i2o_cfg_passthru32);
 	register_ioctl32_conversion(I2OGETIOPS, (void *)sys_ioctl);
 #endif
@@ -1234,7 +1234,7 @@ static int __init i2o_config_init(void)
 
 static void i2o_config_exit(void)
 {
-#if BITS_PER_LONG ==64
+#ifdef CONFIG_COMPAT
 	unregister_ioctl32_conversion(I2OPASSTHRU32);
 	unregister_ioctl32_conversion(I2OGETIOPS);
 #endif

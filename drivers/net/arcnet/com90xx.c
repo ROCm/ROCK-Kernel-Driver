@@ -566,7 +566,7 @@ static void com90xx_copy_to_card(struct net_device *dev, int bufnum, int offset,
 				 void *buf, int count)
 {
 	struct arcnet_local *lp = (struct arcnet_local *) dev->priv;
-	void *memaddr = lp->mem_start + bufnum * 512 + offset;
+	void __iomem *memaddr = lp->mem_start + bufnum * 512 + offset;
 	TIME("memcpy_toio", count, memcpy_toio(memaddr, buf, count));
 }
 
@@ -575,7 +575,7 @@ static void com90xx_copy_from_card(struct net_device *dev, int bufnum, int offse
 				   void *buf, int count)
 {
 	struct arcnet_local *lp = (struct arcnet_local *) dev->priv;
-	void *memaddr = lp->mem_start + bufnum * 512 + offset;
+	void __iomem *memaddr = lp->mem_start + bufnum * 512 + offset;
 	TIME("memcpy_fromio", count, memcpy_fromio(buf, memaddr, count));
 }
 

@@ -286,7 +286,7 @@ static int read_mii_word(pegasus_t * pegasus, __u8 phy, __u8 indx, __u16 * regd)
 {
 	int i;
 	__u8 data[4] = { phy, 0, 0, indx };
-	__u16 regdi;
+	__le16 regdi;
 
 	set_register(pegasus, PhyCtrl, 0);
 	set_registers(pegasus, PhyAddr, sizeof (data), data);
@@ -347,7 +347,7 @@ static int read_eprom_word(pegasus_t * pegasus, __u8 index, __u16 * retdata)
 {
 	int i;
 	__u8 tmp;
-	__u16 retdatai;
+	__le16 retdatai;
 
 	set_register(pegasus, EpromCtrl, 0);
 	set_register(pegasus, EpromOffset, index);
@@ -417,7 +417,7 @@ static inline void get_node_id(pegasus_t * pegasus, __u8 * id)
 
 	for (i = 0; i < 3; i++) {
 		read_eprom_word(pegasus, i, &w16);
-		((__u16 *) id)[i] = cpu_to_le16p(&w16);
+		((__le16 *) id)[i] = cpu_to_le16p(&w16);
 	}
 }
 
@@ -581,7 +581,7 @@ static void read_bulk_callback(struct urb *urb, struct pt_regs *regs)
 	if (!count)
 		goto goon;
 
-	rx_status = le32_to_cpu(*(int *) (urb->transfer_buffer + count - 4));
+	rx_status = le32_to_cpu(*(__le32 *) (urb->transfer_buffer + count - 4));
 	if (rx_status & 0x000e0000) {
 		dbg("%s: RX packet error %x", net->name, rx_status & 0xe0000);
 		pegasus->stats.rx_errors++;
@@ -594,7 +594,7 @@ static void read_bulk_callback(struct urb *urb, struct pt_regs *regs)
 		goto goon;
 	}
 	if (pegasus->chip == 0x8513) {
-		pkt_len = le32_to_cpu(*(int *)urb->transfer_buffer);
+		pkt_len = le32_to_cpu(*(__le32 *)urb->transfer_buffer);
 		pkt_len &= 0x0fff;
 		pegasus->rx_skb->data += 2;
 	} else {
@@ -774,7 +774,7 @@ static int pegasus_start_xmit(struct sk_buff *skb, struct net_device *net)
 
 	netif_stop_queue(net);
 
-	((__u16 *) pegasus->tx_buff)[0] = cpu_to_le16(l16);
+	((__le16 *) pegasus->tx_buff)[0] = cpu_to_le16(l16);
 	memcpy(pegasus->tx_buff + 2, skb->data, skb->len);
 	usb_fill_bulk_urb(pegasus->tx_urb, pegasus->usb,
 			  usb_sndbulkpipe(pegasus->usb, 2),

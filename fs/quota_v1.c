@@ -115,8 +115,8 @@ out:
 
 /* Header of new quota format */
 struct v2_disk_dqheader {
-	__u32 dqh_magic;        /* Magic number identifying file */
-	__u32 dqh_version;      /* File version */
+	__le32 dqh_magic;        /* Magic number identifying file */
+	__le32 dqh_version;      /* File version */
 };
 
 static int v1_check_quota_file(struct super_block *sb, int type)

@@ -508,11 +508,11 @@ posix_acl_access_list (struct inode *inode, const char *name, int namelen, char 
 }
 
 struct reiserfs_xattr_handler posix_acl_access_handler = {
-    prefix: XATTR_NAME_ACL_ACCESS,
-    get: posix_acl_access_get,
-    set: posix_acl_access_set,
-    del: posix_acl_access_del,
-    list: posix_acl_access_list,
+	.prefix = XATTR_NAME_ACL_ACCESS,
+	.get = posix_acl_access_get,
+	.set = posix_acl_access_set,
+	.del = posix_acl_access_del,
+	.list = posix_acl_access_list,
 };
 
 static int
@@ -561,9 +561,9 @@ posix_acl_default_list (struct inode *inode, const char *name, int namelen, char
 }
 
 struct reiserfs_xattr_handler posix_acl_default_handler = {
-    prefix: XATTR_NAME_ACL_DEFAULT,
-    get: posix_acl_default_get,
-    set: posix_acl_default_set,
-    del: posix_acl_default_del,
-    list: posix_acl_default_list,
+	.prefix = XATTR_NAME_ACL_DEFAULT,
+	.get = posix_acl_default_get,
+	.set = posix_acl_default_set,
+	.del = posix_acl_default_del,
+	.list = posix_acl_default_list,
 };

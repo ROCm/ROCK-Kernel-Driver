@@ -203,7 +203,7 @@ struct kaweth_ethernet_configuration
 	__u8 reserved2;
 	eth_addr_t hw_addr;
 	__u32 statistics_mask;
-	__u16 segment_size;
+	__le16 segment_size;
 	__u16 max_multicast_filters;
 	__u8 reserved3;
 } __attribute__ ((packed));
@@ -588,7 +588,7 @@ static void kaweth_usb_receive(struct urb *urb, struct pt_regs *regs)
 	int count = urb->actual_length;
 	int count2 = urb->transfer_buffer_length;
 
-	__u16 pkt_len = le16_to_cpup((u16 *)kaweth->rx_buf);
+	__u16 pkt_len = le16_to_cpup((__le16 *)kaweth->rx_buf);
 
 	struct sk_buff *skb;
 
@@ -763,7 +763,7 @@ static void kaweth_usb_transmit_complete(struct urb *urb, struct pt_regs *regs)
 static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 {
 	struct kaweth_device *kaweth = net->priv;
-	u16 *private_header;
+	__le16 *private_header;
 
 	int res;
 
@@ -794,7 +794,7 @@ static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 		}
 	}
 
-	private_header = (u16 *)__skb_push(skb, 2);
+	private_header = (__le16 *)__skb_push(skb, 2);
 	*private_header = cpu_to_le16(skb->len-2);
 	kaweth->tx_skb = skb;
 

@@ -841,7 +841,7 @@ qla2x00_init_rings(scsi_qla_host_t *ha)
 
 	/* Clear outstanding commands array. */
 	for (cnt = 0; cnt < MAX_OUTSTANDING_COMMANDS; cnt++)
-		ha->outstanding_cmds[cnt] = 0;
+		ha->outstanding_cmds[cnt] = NULL;
 
 	ha->current_outstanding_cmd = 0;
 
@@ -4131,7 +4131,7 @@ qla2x00_abort_isp(scsi_qla_host_t *ha)
 		for (cnt = 1; cnt < MAX_OUTSTANDING_COMMANDS; cnt++) {
 			sp = ha->outstanding_cmds[cnt];
 			if (sp) {
-				ha->outstanding_cmds[cnt] = 0;
+				ha->outstanding_cmds[cnt] = NULL;
 				if (ha->actthreads)
 					ha->actthreads--;
 				sp->lun_queue->out_cnt--;

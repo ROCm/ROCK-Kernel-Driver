@@ -32,6 +32,7 @@
 #include <asm/timex.h>
 #include <asm/proto.h>
 #include <asm/hpet.h>
+#include <asm/sections.h>
 #include <linux/cpufreq.h>
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/apic.h>
@@ -179,17 +180,27 @@ int do_settimeofday(struct timespec *tv)
 
 EXPORT_SYMBOL(do_settimeofday);
 
-#if defined(CONFIG_SMP) && defined(CONFIG_FRAME_POINTER)
 unsigned long profile_pc(struct pt_regs *regs)
 {
 	unsigned long pc = instruction_pointer(regs);
 
-	if (in_lock_functions(pc))
-		return *(unsigned long *)regs->rbp;
+	/* Assume the lock function has either no stack frame or only a single word.
+	   This checks if the address on the stack looks like a kernel text address.
+	   There is a small window for false hits, but in that case the tick
+	   is just accounted to the spinlock function.
+	   Better would be to write these functions in assembler again
+	   and check exactly. */
+	if (in_lock_functions(pc)) {
+		char *v = *(char **)regs->rsp;
+		if ((v >= _stext && v <= _etext) ||
+			(v >= _sinittext && v <= _einittext) ||
+			(v >= (char *)MODULES_VADDR  && v <= (char *)MODULES_END))
+			return (unsigned long)v;
+		return ((unsigned long *)regs->rsp)[1];
+	}
 	return pc;
 }
 EXPORT_SYMBOL(profile_pc);
-#endif
 
 /*
  * In order to set the CMOS clock precisely, set_rtc_mmss has to be called 500
@@ -802,9 +813,9 @@ void __init time_init(void)
                 outl(0x800038a0, 0xcf8);
                 outl(0xff000001, 0xcfc);
                 outl(0x800038a0, 0xcf8);
-                hpet_address = inl(0xcfc) & 0xfffffffe;
+                vxtime.hpet_address = inl(0xcfc) & 0xfffffffe;
 		printk(KERN_WARNING "time.c: WARNING: Enabled HPET "
-		       "at %#lx.\n", hpet_address);
+		       "at %#lx.\n", vxtime.hpet_address);
         }
 #endif
 	if (nohpet)
@@ -873,11 +884,12 @@ static int time_suspend(struct sys_device *dev, u32 state)
 
 static int time_resume(struct sys_device *dev)
 {
+	unsigned long flags;
 	unsigned long sec = get_cmos_time() + clock_cmos_diff;
-	write_seqlock_irq(&xtime_lock);
+	write_seqlock_irqsave(&xtime_lock,flags);
 	xtime.tv_sec = sec;
 	xtime.tv_nsec = 0;
-	write_sequnlock_irq(&xtime_lock);
+	write_sequnlock_irqrestore(&xtime_lock,flags);
 	return 0;
 }
 

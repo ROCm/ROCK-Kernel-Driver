@@ -19,11 +19,11 @@
  * contiguous starting at block 1.
  */
 struct new_pmap {
-	u16	pmSig;		/* signature */
-	u16	reSigPad;	/* padding */
-	u32	pmMapBlkCnt;	/* partition blocks count */
-	u32	pmPyPartStart;	/* physical block start of partition */
-	u32	pmPartBlkCnt;	/* physical block count of partition */
+	__be16	pmSig;		/* signature */
+	__be16	reSigPad;	/* padding */
+	__be32	pmMapBlkCnt;	/* partition blocks count */
+	__be32	pmPyPartStart;	/* physical block start of partition */
+	__be32	pmPartBlkCnt;	/* physical block count of partition */
 	u8	pmPartName[32];	/* (null terminated?) string
 				   giving the name of this
 				   partition */
@@ -41,11 +41,11 @@ struct new_pmap {
  * one of these.
  */
 struct old_pmap {
-	u16		pdSig;	/* Signature bytes */
+	__be16		pdSig;	/* Signature bytes */
 	struct 	old_pmap_entry {
-		u32	pdStart;
-		u32	pdSize;
-		u32	pdFSID;
+		__be32	pdStart;
+		__be32	pdSize;
+		__be32	pdFSID;
 	}	pdEntry[42];
 } __packed;
 
@@ -59,7 +59,7 @@ int hfs_part_find(struct super_block *sb,
 		  sector_t *part_start, sector_t *part_size)
 {
 	struct buffer_head *bh;
-	u16 *data;
+	__be16 *data;
 	int i, size, res;
 
 	res = -ENOENT;

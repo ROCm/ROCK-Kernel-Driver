@@ -242,7 +242,7 @@ static void catc_rx_done(struct urb *urb, struct pt_regs *regs)
 
 	do {
 		if(!catc->is_f5u011) {
-			pkt_len = le16_to_cpup((u16*)pkt_start);
+			pkt_len = le16_to_cpup((__le16*)pkt_start);
 			if (pkt_len > urb->actual_length) {
 				catc->stats.rx_length_errors++;
 				catc->stats.rx_errors++;
@@ -303,7 +303,7 @@ static void catc_irq_done(struct urb *urb, struct pt_regs *regs)
 		else if (data[1] & 0x20)
 			linksts = LinkBad;
 	} else {
-		hasdata = (unsigned int)(be16_to_cpup((u16*)data) & 0x0fff);
+		hasdata = (unsigned int)(be16_to_cpup((__be16*)data) & 0x0fff);
 		if (data[0] == 0x90)
 			linksts = LinkGood;
 		else if (data[0] == 0xA0)

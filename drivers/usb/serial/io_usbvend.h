@@ -347,7 +347,7 @@ struct edge_compatibility_descriptor
 											// (Currently must be 0).
 	__u8	MajorVersion;			// Firmware version: xx.
 	__u8	MinorVersion;			//  yy.
-	__u16	BuildNumber;			//  zzzz (LE format)
+	__le16	BuildNumber;			//  zzzz (LE format)
 
 	// The following structure contains __u32s, with each bit
 	// specifying whether the EPiC device supports the given
@@ -443,19 +443,19 @@ struct edge_manuf_descriptor {
 
 	__u8	SerNumLength;				// F0C USB string descriptor len
 	__u8	SerNumDescType;				// F0D USB descriptor type (=STRING type)
-	__u16	SerialNumber[MAX_SERIALNUMBER_LEN];	// F0E "01-01-000100" Unicode Serial Number
+	__le16	SerialNumber[MAX_SERIALNUMBER_LEN];	// F0E "01-01-000100" Unicode Serial Number
 
 	__u8	AssemblyNumLength;			// F26 USB string descriptor len
 	__u8	AssemblyNumDescType;			// F27 USB descriptor type (=STRING type)
-	__u16	AssemblyNumber[MAX_ASSEMBLYNUMBER_LEN];	// F28 "350-1000-01-A " assembly number
+	__le16	AssemblyNumber[MAX_ASSEMBLYNUMBER_LEN];	// F28 "350-1000-01-A " assembly number
 
 	__u8	OemAssyNumLength;			// F44 USB string descriptor len
 	__u8	OemAssyNumDescType;			// F45 USB descriptor type (=STRING type)
-	__u16	OemAssyNumber[MAX_ASSEMBLYNUMBER_LEN];	// F46 "xxxxxxxxxxxxxx" OEM assembly number
+	__le16	OemAssyNumber[MAX_ASSEMBLYNUMBER_LEN];	// F46 "xxxxxxxxxxxxxx" OEM assembly number
 
 	__u8	ManufDateLength;			// F62 USB string descriptor len
 	__u8	ManufDateDescType;			// F63 USB descriptor type (=STRING type)
-	__u16	ManufDate[6];				// F64 "MMDDYY" manufacturing date
+	__le16	ManufDate[6];				// F64 "MMDDYY" manufacturing date
 
 	__u8	Reserved3[0x4D];			// F70 -- unused, set to 0 --
 
@@ -532,19 +532,19 @@ struct edge_boot_descriptor {
 	__u8		DescVer;		// C2 Desc version/format
 	__u8		Reserved1;		// C3 -- unused, set to 0 --
 
-	__u16		BootCodeLength;		// C4 Boot code goes from FF:0000 to FF:(len-1)
+	__le16		BootCodeLength;		// C4 Boot code goes from FF:0000 to FF:(len-1)
 						//	  (LE format)
 
 	__u8		MajorVersion;		// C6 Firmware version: xx.
 	__u8		MinorVersion;		// C7			yy.
-	__u16		BuildNumber;		// C8			zzzz (LE format)
+	__le16		BuildNumber;		// C8			zzzz (LE format)
 	
 	__u16		EnumRootDescTable;	// CA Root of ROM-based descriptor table
 	__u8		NumDescTypes;		// CC Number of supported descriptor types
 
 	__u8		Reserved4;		// CD Fix Compiler Packing
 
-	__u16		Capabilities;		// CE-CF Capabilities flags (LE format)
+	__le16		Capabilities;		// CE-CF Capabilities flags (LE format)
 	__u8		Reserved2[0x28];	// D0 -- unused, set to 0 --
 	__u8		UConfig0;		// F8 930-defined CPU configuration byte 0
 	__u8		UConfig1;		// F9 930-defined CPU configuration byte 1

@@ -29,7 +29,7 @@ void hfs_bnode_read(struct hfs_bnode *node, void *buf,
 
 u16 hfs_bnode_read_u16(struct hfs_bnode *node, int off)
 {
-	u16 data;
+	__be16 data;
 	// optimize later...
 	hfs_bnode_read(node, &data, off, 2);
 	return be16_to_cpu(data);
@@ -72,9 +72,9 @@ void hfs_bnode_write(struct hfs_bnode *node, void *buf, int off, int len)
 
 void hfs_bnode_write_u16(struct hfs_bnode *node, int off, u16 data)
 {
-	data = cpu_to_be16(data);
+	__be16 v = cpu_to_be16(data);
 	// optimize later...
-	hfs_bnode_write(node, &data, off, 2);
+	hfs_bnode_write(node, &v, off, 2);
 }
 
 void hfs_bnode_write_u8(struct hfs_bnode *node, int off, u8 data)
@@ -136,7 +136,7 @@ void hfs_bnode_move(struct hfs_bnode *node, int dst, int src, int len)
 void hfs_bnode_dump(struct hfs_bnode *node)
 {
 	struct hfs_bnode_desc desc;
-	u32 cnid;
+	__be32 cnid;
 	int i, off, key_off;
 
 	dprint(DBG_BNODE_MOD, "bnode: %d\n", node->this);
@@ -173,7 +173,7 @@ void hfs_bnode_unlink(struct hfs_bnode *node)
 {
 	struct hfs_btree *tree;
 	struct hfs_bnode *tmp;
-	u32 cnid;
+	__be32 cnid;
 
 	tree = node->tree;
 	if (node->prev) {

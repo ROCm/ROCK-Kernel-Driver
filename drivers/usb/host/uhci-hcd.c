@@ -232,7 +232,7 @@ static void uhci_remove_td(struct uhci_hcd *uhci, struct uhci_td *td)
 /*
  * Inserts a td into qh list at the top.
  */
-static void uhci_insert_tds_in_qh(struct uhci_qh *qh, struct urb *urb, u32 breadth)
+static void uhci_insert_tds_in_qh(struct uhci_qh *qh, struct urb *urb, __le32 breadth)
 {
 	struct list_head *tmp, *head;
 	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
@@ -376,7 +376,7 @@ static void uhci_insert_qh(struct uhci_hcd *uhci, struct uhci_qh *skelqh, struct
 static void uhci_remove_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
 {
 	struct uhci_qh *pqh;
-	u32 newlink;
+	__le32 newlink;
 	unsigned int age;
 
 	if (!qh)

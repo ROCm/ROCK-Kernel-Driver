@@ -36,7 +36,6 @@ core-y	+= arch/m32r/kernel/	\
 	   arch/m32r/mm/	\
 	   arch/m32r/boot/
 
-drivers-y			+= arch/m32r/drivers/
 drivers-$(CONFIG_OPROFILE)	+= arch/m32r/oprofile/
 
 boot := arch/m32r/boot

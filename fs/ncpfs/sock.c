@@ -337,7 +337,7 @@ static void info_server(struct ncp_server *server, unsigned int id, const void *
 {
 	if (server->info_sock) {
 		struct kvec iov[2];
-		__u32 hdr[2];
+		__be32 hdr[2];
 	
 		hdr[0] = cpu_to_be32(len + 8);
 		hdr[1] = cpu_to_be32(id);

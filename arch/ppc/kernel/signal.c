@@ -270,7 +270,7 @@ save_user_regs(struct pt_regs *regs, struct mcontext __user *frame, int sigret)
 static int
 restore_user_regs(struct pt_regs *regs, struct mcontext __user *sr, int sig)
 {
-	unsigned long save_r2;
+	unsigned long save_r2 = 0;
 #if defined(CONFIG_ALTIVEC) || defined(CONFIG_SPE)
 	unsigned long msr;
 #endif
