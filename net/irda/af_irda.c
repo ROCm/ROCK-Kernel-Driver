@@ -415,6 +415,7 @@ static void irda_getvalue_confirm(int result, __u16 obj_id,
  * hint bits), and then wake up any process waiting for answer...
  */
 static void irda_selective_discovery_indication(discovery_t *discovery,
+						DISCOVERY_MODE mode,
 						void *priv)
 {
 	struct irda_sock *self;
@@ -1286,6 +1287,9 @@ static int irda_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 		/* Check if we are still connected */
 		if (sk->state != TCP_ESTABLISHED)
 			return -ENOTCONN;
+		/* Handle signals */
+		if (signal_pending(current)) 
+			return -ERESTARTSYS;
 	}
 
 	/* Check that we don't send out to big frames */

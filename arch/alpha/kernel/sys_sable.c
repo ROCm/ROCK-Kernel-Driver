@@ -24,6 +24,7 @@
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/core_t2.h>
+#include <asm/tlbflush.h>
 
 #include "proto.h"
 #include "irq_impl.h"

@@ -19,6 +19,8 @@
 #include <asm/system.h>
 #include <asm/pci.h>
 #include <asm/hwrpb.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 
 #define __EXTERN_INLINE inline
 #include <asm/io.h>

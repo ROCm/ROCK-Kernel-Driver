@@ -713,8 +713,6 @@ static void irtty_write_wakeup(struct tty_struct *tty)
 
 		self->tx_buff.data += actual;
 		self->tx_buff.len  -= actual;
-
-		self->stats.tx_packets++;		      
 	} else {		
 		/* 
 		 *  Now serial buffer is almost free & we can start 
@@ -722,6 +720,8 @@ static void irtty_write_wakeup(struct tty_struct *tty)
 		 */
 		IRDA_DEBUG(5, __FUNCTION__ "(), finished with frame!\n");
 		
+		self->stats.tx_packets++;		      
+
 		tty->flags &= ~(1 << TTY_DO_WRITE_WAKEUP);
 
 		if (self->new_speed) {

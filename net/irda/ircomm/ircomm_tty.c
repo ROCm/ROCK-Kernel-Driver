@@ -416,7 +416,7 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 		self->line = line;
 		self->tqueue.routine = ircomm_tty_do_softint;
 		self->tqueue.data = self;
-		self->max_header_size = 5;
+		self->max_header_size = IRCOMM_TTY_HDR_UNITIALISED;
 		self->max_data_size = 64-self->max_header_size;
 		self->close_delay = 5*HZ/10;
 		self->closing_wait = 30*HZ;
@@ -695,6 +695,20 @@ static int ircomm_tty_write(struct tty_struct *tty, int from_user,
 	ASSERT(self != NULL, return -1;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return -1;);
 
+	/* We may receive packets from the TTY even before we have finished
+	 * our setup. Not cool.
+	 * The problem is that we would allocate a skb with bogus header and
+	 * data size, and when adding data to it later we would get
+	 * confused.
+	 * Better to not accept data until we are properly setup. Use bogus
+	 * header size to check that (safest way to detect it).
+	 * Jean II */
+	if (self->max_header_size == IRCOMM_TTY_HDR_UNITIALISED) {
+		/* TTY will retry */
+		IRDA_DEBUG(2, __FUNCTION__ "() : not initialised\n");
+		return len;
+	}
+
 	save_flags(flags);
 	cli();
 
@@ -791,8 +805,12 @@ static int ircomm_tty_write_room(struct tty_struct *tty)
 	ASSERT(self != NULL, return -1;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return -1;);
 
-	/* Check if we are allowed to transmit any data */
-	if (tty->hw_stopped)
+	/* Check if we are allowed to transmit any data.
+	 * hw_stopped is the regular flow control.
+	 * max_header_size tells us if the channel is initialised or not.
+	 * Jean II */
+	if ((tty->hw_stopped) ||
+	    (self->max_header_size == IRCOMM_TTY_HDR_UNITIALISED))
 		ret = 0;
 	else {
 		save_flags(flags);

@@ -542,6 +542,7 @@ int ext3_new_block (handle_t *handle, struct inode * inode,
 	int i, j, k, tmp, alloctmp;
 	int bitmap_nr;
 	int fatal = 0, err;
+	int performed_allocation = 0;
 	struct super_block * sb;
 	struct ext3_group_desc * gdp;
 	struct ext3_super_block * es;
@@ -644,8 +645,7 @@ int ext3_new_block (handle_t *handle, struct inode * inode,
 	}
 
 	/* No space left on the device */
-	unlock_super (sb);
-	return 0;
+	goto out;
 
 search_back:
 	/* 
@@ -694,6 +694,7 @@ got_block:
 	J_ASSERT_BH(bh, !ext3_test_bit(j, bh->b_data));
 	BUFFER_TRACE(bh, "setting bitmap bit");
 	ext3_set_bit(j, bh->b_data);
+	performed_allocation = 1;
 
 #ifdef CONFIG_JBD_DEBUG
 	{
@@ -815,6 +816,11 @@ out:
 		ext3_std_error(sb, fatal);
 	}
 	unlock_super (sb);
+	/*
+	 * Undo the block allocation
+	 */
+	if (!performed_allocation)
+		DQUOT_FREE_BLOCK(inode, 1);
 	return 0;
 	
 }

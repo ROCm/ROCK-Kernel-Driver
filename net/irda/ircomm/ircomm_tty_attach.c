@@ -47,6 +47,7 @@
 
 static void ircomm_tty_ias_register(struct ircomm_tty_cb *self);
 static void ircomm_tty_discovery_indication(discovery_t *discovery,
+					    DISCOVERY_MODE mode,
 					    void *priv);
 static void ircomm_tty_getvalue_confirm(int result, __u16 obj_id, 
 					struct ias_value *value, void *priv);
@@ -305,12 +306,27 @@ int ircomm_tty_send_initial_parameters(struct ircomm_tty_cb *self)
  *
  */
 static void ircomm_tty_discovery_indication(discovery_t *discovery,
+					    DISCOVERY_MODE mode,
 					    void *priv)
 {
 	struct ircomm_tty_cb *self;
 	struct ircomm_tty_info info;
 
 	IRDA_DEBUG(2, __FUNCTION__"()\n");
+
+	/* Important note :
+	 * We need to drop all passive discoveries.
+	 * The LSAP management of IrComm is deficient and doesn't deal
+	 * with the case of two instance connecting to each other
+	 * simultaneously (it will deadlock in LMP).
+	 * The proper fix would be to use the same technique as in IrNET,
+	 * to have one server socket and separate instances for the
+	 * connecting/connected socket.
+	 * The workaround is to drop passive discovery, which drastically
+	 * reduce the probability of this happening.
+	 * Jean II */
+	if(mode == DISCOVERY_PASSIVE)
+		return;
 
 	info.daddr = discovery->daddr;
 	info.saddr = discovery->saddr;

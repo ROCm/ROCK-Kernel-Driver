@@ -26,6 +26,7 @@
 #include <asm/irq.h>
 #include <asm/pgtable.h>
 #include <asm/core_cia.h>
+#include <asm/tlbflush.h>
 
 #include "proto.h"
 #include "irq_impl.h"

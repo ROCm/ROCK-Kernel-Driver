@@ -174,6 +174,12 @@ static void irlap_poll_timer_expired(void *data)
 	irlap_do_event(self, POLL_TIMER_EXPIRED, NULL, NULL);
 }
 
+/*
+ * Calculate and set time before we will have to send back the pf bit
+ * to the peer. Use in primary.
+ * Make sure that state is XMIT_P/XMIT_S when calling this function
+ * (and that nobody messed up with the state). - Jean II
+ */
 void irlap_start_poll_timer(struct irlap_cb *self, int timeout)
 {
 	ASSERT(self != NULL, return;);
@@ -1163,15 +1169,26 @@ static int irlap_state_nrm_p(struct irlap_cb *self, IRLAP_EVENT event,
 				self->ack_required = TRUE;
 			
 				irlap_wait_min_turn_around(self, &self->qos_tx);
-				/* 
-				 * Important to switch state before calling
-				 * upper layers
+
+				/* Call higher layer *before* changing state
+				 * to give them a chance to send data in the
+				 * next LAP frame.
+				 * Jean II */
+				irlap_data_indication(self, skb, FALSE);
+
+				/* XMIT states are the most dangerous state
+				 * to be in, because user requests are
+				 * processed directly and may change state.
+				 * On the other hand, in NDM_P, those
+				 * requests are queued and we will process
+				 * them when we return to irlap_do_event().
+				 * Jean II
 				 */
 				irlap_next_state(self, LAP_XMIT_P);
 
-				irlap_data_indication(self, skb, FALSE);
-
-				/* This is the last frame */
+				/* This is the last frame.
+				 * Make sure it's always called in XMIT state.
+				 * - Jean II */
 				irlap_start_poll_timer(self, self->poll_timeout);
 			}
 			break;
@@ -1309,6 +1326,7 @@ static int irlap_state_nrm_p(struct irlap_cb *self, IRLAP_EVENT event,
 		} else {
 			del_timer(&self->final_timer);
 			irlap_data_indication(self, skb, TRUE);
+			irlap_next_state(self, LAP_XMIT_P);
 			printk(__FUNCTION__ "(): RECV_UI_FRAME: next state %s\n", irlap_state[self->state]);
 			irlap_start_poll_timer(self, self->poll_timeout);
 		}
