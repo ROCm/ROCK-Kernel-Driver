@@ -163,9 +163,6 @@ static rwlock_t devtree_lock = RW_LOCK_UNLOCKED;
 
 static unsigned long call_prom(const char *service, int nargs, int nret, ...);
 static void prom_panic(const char *reason);
-static unsigned long copy_device_tree(unsigned long);
-static unsigned long inspect_node(phandle, struct device_node *, unsigned long,
-				  unsigned long, struct device_node ***);
 static unsigned long check_display(unsigned long);
 static int prom_next_node(phandle *);
 static struct bi_record * prom_bi_rec_verify(struct bi_record *);
@@ -1591,29 +1588,6 @@ check_display(unsigned long mem)
 	return DOUBLEWORD_ALIGN(mem);
 }
 
-/*
- * Make a copy of the device tree from the PROM.
- */
-static unsigned long __init
-copy_device_tree(unsigned long mem_start)
-{
-	phandle root;
-	unsigned long new_start;
-	struct device_node **allnextp;
-	unsigned long offset = reloc_offset();
-	unsigned long mem_end = mem_start + (8<<20);
-
-	root = call_prom(RELOC("peer"), 1, 1, (phandle)0);
-	if (root == (phandle)0) {
-		prom_panic(RELOC("couldn't get device tree root\n"));
-	}
-	allnextp = &RELOC(allnodes);
-	mem_start = DOUBLEWORD_ALIGN(mem_start);
-	new_start = inspect_node(root, 0, mem_start, mem_end, &allnextp);
-	*allnextp = 0;
-	return new_start;
-}
-
 static unsigned long __init
 inspect_node(phandle node, struct device_node *dad,
 	     unsigned long mem_start, unsigned long mem_end,
@@ -1721,6 +1695,28 @@ inspect_node(phandle node, struct device_node *dad,
 	return mem_start;
 }
 
+/*
+ * Make a copy of the device tree from the PROM.
+ */
+static unsigned long __init
+copy_device_tree(unsigned long mem_start)
+{
+	phandle root;
+	unsigned long new_start;
+	struct device_node **allnextp;
+	unsigned long offset = reloc_offset();
+	unsigned long mem_end = mem_start + (8<<20);
+
+	root = call_prom(RELOC("peer"), 1, 1, (phandle)0);
+	if (root == (phandle)0) {
+		prom_panic(RELOC("couldn't get device tree root\n"));
+	}
+	allnextp = &RELOC(allnodes);
+	mem_start = DOUBLEWORD_ALIGN(mem_start);
+	new_start = inspect_node(root, 0, mem_start, mem_end, &allnextp);
+	*allnextp = 0;
+	return new_start;
+}
 
 /* Verify bi_recs are good */
 static struct bi_record *
