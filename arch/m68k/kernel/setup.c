@@ -39,7 +39,6 @@
 #endif
 #ifdef CONFIG_SUN3X
 #include <asm/dvma.h>
-extern void sun_serial_setup(void);
 #endif
 
 unsigned long m68k_machtype;
