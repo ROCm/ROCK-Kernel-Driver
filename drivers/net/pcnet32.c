@@ -1611,7 +1611,7 @@ pcnet32_tx_timeout (struct net_device *dev)
 	for (i = 0 ; i < TX_RING_SIZE; i++)
 	printk("%s %08x %04x %08x %04x", i & 1 ? "" : "\n ",
 	       le32_to_cpu(lp->tx_ring[i].base),
-	       (-le16_to_cpu(lp->tx_ring[i].length)) & 0xffff
+	       (-le16_to_cpu(lp->tx_ring[i].length)) & 0xffff,
 	       le32_to_cpu(lp->tx_ring[i].misc),
 	       le16_to_cpu(lp->tx_ring[i].status));
 	printk("\n");
