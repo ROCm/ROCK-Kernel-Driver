@@ -280,13 +280,13 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 		pCifsFile->netfid = netfid;
 		pCifsFile->invalidHandle = FALSE;
 		up(&pCifsFile->fh_sem);
-		pCifsInode = CIFS_I(file->f_dentry->d_inode);
+		pCifsInode = CIFS_I(inode);
 		if(pCifsInode) {
 			if (pTcon->ses->capabilities & CAP_UNIX)
-				rc = cifs_get_inode_info_unix(&file->f_dentry->d_inode,
+				rc = cifs_get_inode_info_unix(inode,
 						full_path, inode->i_sb);
 			else
-				rc = cifs_get_inode_info(&file->f_dentry->d_inode,
+				rc = cifs_get_inode_info(inode,
 						full_path, buf, inode->i_sb);
 
 			if(oplock == OPLOCK_EXCLUSIVE) {
