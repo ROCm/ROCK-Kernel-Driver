@@ -43,7 +43,6 @@
 #include <linux/poll.h>
 #include <linux/rwsem.h>
 #include <linux/kref.h>
-#include <linux/ioctl32.h>
 
 #include <asm/uaccess.h>
 
@@ -502,14 +501,14 @@ static int ib_umad_close(struct inode *inode, struct file *filp)
 }
 
 static struct file_operations umad_fops = {
-	.owner 	 = THIS_MODULE,
-	.read 	 = ib_umad_read,
-	.write 	 = ib_umad_write,
-	.poll 	 = ib_umad_poll,
+	.owner 	        = THIS_MODULE,
+	.read 	        = ib_umad_read,
+	.write 	        = ib_umad_write,
+	.poll 	        = ib_umad_poll,
 	.unlocked_ioctl = ib_umad_ioctl,
-	.compat_ioctl = ib_umad_ioctl,
-	.open 	 = ib_umad_open,
-	.release = ib_umad_close
+	.compat_ioctl   = ib_umad_ioctl,
+	.open 	        = ib_umad_open,
+	.release        = ib_umad_close
 };
 
 static struct ib_client umad_client = {
@@ -704,8 +703,6 @@ static int __init ib_umad_init(void)
 	}
 
 	return 0;
-
-	ib_unregister_client(&umad_client);
 
 out_class:
 	class_unregister(&umad_class);
