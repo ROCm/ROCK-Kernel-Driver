@@ -1623,7 +1623,7 @@ static int read_eeprom (void __iomem *ioaddr, int location, int addr_len)
 static void cp_set_d3_state (struct cp_private *cp)
 {
 	pci_enable_wake (cp->pdev, 0, 1); /* Enable PME# generation */
-	pci_set_power_state (cp->pdev, 3);
+	pci_set_power_state (cp->pdev, PCI_D3hot);
 }
 
 static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
@@ -1813,7 +1813,7 @@ static void cp_remove_one (struct pci_dev *pdev)
 		BUG();
 	unregister_netdev(dev);
 	iounmap(cp->regs);
-	if (cp->wol_enabled) pci_set_power_state (pdev, 0);
+	if (cp->wol_enabled) pci_set_power_state (pdev, PCI_D0);
 	pci_release_regions(pdev);
 	pci_clear_mwi(pdev);
 	pci_disable_device(pdev);
@@ -1863,7 +1863,7 @@ static int cp_resume (struct pci_dev *pdev)
 	netif_device_attach (dev);
 	
 	if (cp->pdev && cp->wol_enabled) {
-		pci_set_power_state (cp->pdev, 0);
+		pci_set_power_state (cp->pdev, PCI_D0);
 		pci_restore_state (cp->pdev);
 	}
 	

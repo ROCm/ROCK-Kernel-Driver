@@ -1014,7 +1014,7 @@ speedo_open(struct net_device *dev)
 	if (netif_msg_ifup(sp))
 		printk(KERN_DEBUG "%s: speedo_open() irq %d.\n", dev->name, dev->irq);
 
-	pci_set_power_state(sp->pdev, 0);
+	pci_set_power_state(sp->pdev, PCI_D0);
 
 	/* Set up the Tx queue early.. */
 	sp->cur_tx = 0;
@@ -1963,7 +1963,7 @@ speedo_close(struct net_device *dev)
 	if (netif_msg_ifdown(sp))
 		printk(KERN_DEBUG "%s: %d multicast blocks dropped.\n", dev->name, i);
 
-	pci_set_power_state(sp->pdev, 2);
+	pci_set_power_state(sp->pdev, PCI_D2);
 
 	return 0;
 }
@@ -2088,7 +2088,7 @@ static int speedo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		   access from the timeout handler.
 		   They are currently serialized only with MDIO access from the
 		   timer routine.  2000/05/09 SAW */
-		saved_acpi = pci_set_power_state(sp->pdev, 0);
+		saved_acpi = pci_set_power_state(sp->pdev, PCI_D0);
 		t = del_timer_sync(&sp->timer);
 		data->val_out = mdio_read(dev, data->phy_id & 0x1f, data->reg_num & 0x1f);
 		if (t)
@@ -2099,7 +2099,7 @@ static int speedo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	case SIOCSMIIREG:		/* Write MII PHY register. */
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		saved_acpi = pci_set_power_state(sp->pdev, 0);
+		saved_acpi = pci_set_power_state(sp->pdev, PCI_D0);
 		t = del_timer_sync(&sp->timer);
 		mdio_write(dev, data->phy_id, data->reg_num, data->val_in);
 		if (t)
