@@ -53,6 +53,16 @@ static void i2cproc_remove(int bus);
 #endif /* CONFIG_PROC_FS */
 
 
+int i2c_device_probe(struct device *dev)
+{
+	return -ENODEV;
+}
+
+int i2c_device_remove(struct device *dev)
+{
+	return 0;
+}
+
 /* ---------------------------------------------------
  * registering functions 
  * --------------------------------------------------- 
@@ -204,6 +214,16 @@ int i2c_add_driver(struct i2c_driver *driver)
 	drivers[i] = driver;
 	
 	DEB(printk(KERN_DEBUG "i2c-core.o: driver %s registered.\n",driver->name));
+
+	/* add the driver to the list of i2c drivers in the driver core */
+	driver->driver.name = driver->name;
+	driver->driver.bus = &i2c_bus_type;
+	driver->driver.probe = i2c_device_probe;
+	driver->driver.remove = i2c_device_remove;
+
+	res = driver_register(&driver->driver);
+	if (res)
+		goto out_unlock;
 	
 	/* now look for instances of driver on our adapters
 	 */
@@ -235,6 +255,8 @@ int i2c_del_driver(struct i2c_driver *driver)
 		res = -ENODEV;
 		goto out_unlock;
 	}
+
+	driver_unregister(&driver->driver);
 
 	/* Have a look at each adapter, if clients of this driver are still
 	 * attached. If so, detach them to be able to kill the driver 
