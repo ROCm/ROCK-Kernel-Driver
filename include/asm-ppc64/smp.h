@@ -19,6 +19,7 @@
 
 #include <linux/config.h>
 #include <linux/threads.h>
+#include <linux/cpumask.h>
 #include <linux/kernel.h>
 
 #ifdef CONFIG_SMP
@@ -27,30 +28,13 @@
 
 #include <asm/paca.h>
 
-extern unsigned long cpu_online_map;
-
 extern void smp_message_pass(int target, int msg, unsigned long data, int wait);
 extern void smp_send_tlb_invalidate(int);
 extern void smp_send_xmon_break(int cpu);
 struct pt_regs;
 extern void smp_message_recv(int, struct pt_regs *);
 
-#define cpu_online(cpu)	test_bit((cpu), &cpu_online_map)
-
 #define cpu_possible(cpu)	paca[cpu].active
-
-static inline unsigned int num_online_cpus(void)
-{
-	return hweight64(cpu_online_map);
-}
-
-static inline unsigned int any_online_cpu(unsigned long mask)
-{
-	if (mask & cpu_online_map)
-		return __ffs(mask & cpu_online_map);
-
-	return NR_CPUS;
-}
 
 #define smp_processor_id() (get_paca()->xPacaIndex)
 

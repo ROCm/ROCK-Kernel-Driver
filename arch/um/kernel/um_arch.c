@@ -57,7 +57,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 
 	index = (struct cpuinfo_um *)v - cpu_data;
 #ifdef CONFIG_SMP
-	if (!(cpu_online_map & (1 << index)))
+	if (!cpu_online(index))
 		return 0;
 #endif
 

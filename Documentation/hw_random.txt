@@ -1,17 +1,17 @@
-	Hardware driver for Intel i810 Random Number Generator (RNG)
+	Hardware driver for Intel/AMD/VIA Random Number Generators (RNG)
 	Copyright 2000,2001 Jeff Garzik <jgarzik@pobox.com>
 	Copyright 2000,2001 Philipp Rumpf <prumpf@mandrakesoft.com>
 
 Introduction:
 
-	The i810_rng device driver is software that makes use of a
-	special hardware feature on the Intel i8xx-based chipsets,
+	The hw_random device driver is software that makes use of a
+	special hardware feature on your CPU or motherboard,
 	a Random Number Generator (RNG).
 
 	In order to make effective use of this device driver, you
 	should download the support software as well.  Download the
-	latest version of the "intel-rng-tools" package from the
-	i810_rng driver's official Web site:
+	latest version of the "rng-tools" package from the
+	hw_random driver's official Web site:
 
 		http://sourceforge.net/projects/gkernel/
 
@@ -29,14 +29,14 @@ Theory of operation:
 
 	Character driver.  Using the standard open()
 	and read() system calls, you can read random data from
-	the i810 RNG device.  This data is NOT CHECKED by any
+	the hardware RNG device.  This data is NOT CHECKED by any
 	fitness tests, and could potentially be bogus (if the
 	hardware is faulty or has been tampered with).  Data is only
 	output if the hardware "has-data" flag is set, but nevertheless
 	a security-conscious person would run fitness tests on the
 	data before assuming it is truly random.
 
-	/dev/intel_rng is char device major 10, minor 183.
+	/dev/hwrandom is char device major 10, minor 183.
 
 Driver notes:
 
@@ -69,6 +69,10 @@ Driver details:
 	did the "brains" and all the testing.
 
 Change history:
+
+	Version 1.0.0:
+	* Merge Intel, AMD, VIA RNG drivers into one.
+	  Further changelog in BitKeeper.
 
 	Version 0.9.8:
 	* Support other i8xx chipsets by adding 82801E detection

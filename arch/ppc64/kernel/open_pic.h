@@ -13,6 +13,7 @@
 #define _PPC64_KERNEL_OPEN_PIC_H
 
 #include <linux/config.h>
+#include <linux/cpumask.h>
 
 #define OPENPIC_SIZE	0x40000
 

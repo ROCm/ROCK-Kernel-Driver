@@ -5,9 +5,6 @@
 
 #include "linux/config.h"
 
-/* CPU online map, set by smp_boot_cpus */
-unsigned long cpu_online_map = 1;
-
 #ifdef CONFIG_SMP
 
 #include "linux/sched.h"
@@ -23,6 +20,9 @@ unsigned long cpu_online_map = 1;
 #include "kern.h"
 #include "irq_user.h"
 #include "os.h"
+
+/* CPU online map, set by smp_boot_cpus */
+unsigned long cpu_online_map = cpumask_of_cpu(0);
 
 /* Per CPU bogomips and other parameters
  * The only piece used here is the ipi pipe, which is set before SMP is
@@ -104,8 +104,8 @@ void smp_send_stop(void)
 	printk("done\n");
 }
 
-static unsigned long smp_commenced_mask;
-static volatile unsigned long smp_callin_map = 0;
+static cpumask_t smp_commenced_mask;
+static cpumask_t smp_callin_map = CPU_MASK_NONE;
 
 static int idle_proc(void *cpup)
 {
@@ -120,15 +120,15 @@ static int idle_proc(void *cpup)
 		     current->thread.mode.tt.extern_pid);
  
 	wmb();
-	if (test_and_set_bit(cpu, &smp_callin_map)) {
+	if (cpu_test_and_set(cpu, &smp_callin_map)) {
 		printk("huh, CPU#%d already present??\n", cpu);
 		BUG();
 	}
 
-	while (!test_bit(cpu, &smp_commenced_mask))
+	while (!cpu_isset(cpu, &smp_commenced_mask))
 		cpu_relax();
 
-	set_bit(cpu, &cpu_online_map);
+	cpu_set(cpu, cpu_online_map);
 	default_idle();
 	return(0);
 }
@@ -159,8 +159,8 @@ void smp_prepare_cpus(unsigned int maxcpus)
 	unsigned long waittime;
 	int err, cpu;
 
-	set_bit(0, &cpu_online_map);
-	set_bit(0, &smp_callin_map);
+	cpu_set(0, cpu_online_map);
+	cpu_set(0, smp_callin_map);
 
 	err = os_pipe(cpu_data[0].ipi_pipe, 1, 1);
 	if(err)	panic("CPU#0 failed to create IPI pipe, errno = %d", -err);
@@ -177,10 +177,10 @@ void smp_prepare_cpus(unsigned int maxcpus)
 		unhash_process(idle);
 
 		waittime = 200000000;
-		while (waittime-- && !test_bit(cpu, &smp_callin_map))
+		while (waittime-- && !cpu_isset(cpu, smp_callin_map))
 			cpu_relax();
 
-		if (test_bit(cpu, &smp_callin_map))
+		if (cpu_isset(cpu, smp_callin_map))
 			printk("done\n");
 		else printk("failed\n");
 	}
@@ -188,13 +188,13 @@ void smp_prepare_cpus(unsigned int maxcpus)
 
 void smp_prepare_boot_cpu(void)
 {
-	set_bit(smp_processor_id(), &cpu_online_map);
+	cpu_set(smp_processor_id(), cpu_online_map);
 }
 
 int __cpu_up(unsigned int cpu)
 {
-	set_bit(cpu, &smp_commenced_mask);
-	while (!test_bit(cpu, &cpu_online_map))
+	cpu_set(cpu, smp_commenced_mask);
+	while (!cpu_isset(cpu, cpu_online_map))
 		mb();
 	return(0);
 }
@@ -271,7 +271,7 @@ int smp_call_function(void (*_func)(void *info), void *_info, int nonatomic,
 
 	for (i=0;i<NR_CPUS;i++)
 		if((i != current->thread_info->cpu) && 
-		   test_bit(i, &cpu_online_map))
+		   cpu_isset(i, cpu_online_map))
 			write(cpu_data[i].ipi_pipe[1], "C", 1);
 
 	while (atomic_read(&scf_started) != cpus)

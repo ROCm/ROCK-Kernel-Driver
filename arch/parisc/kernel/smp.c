@@ -62,14 +62,14 @@ volatile struct task_struct *smp_init_current_idle_task;
 
 static volatile int smp_commenced = 0;   /* Set when the idlers are all forked */
 static volatile int cpu_now_booting = 0;      /* track which CPU is booting */
-volatile unsigned long cpu_online_map = 0;   /* Bitmap of online CPUs */
-#define IS_LOGGED_IN(cpunum) (test_bit(cpunum, (atomic_t *)&cpu_online_map))
+cpumask_t cpu_online_map = CPU_MASK_NONE;   /* Bitmap of online CPUs */
+#define IS_LOGGED_IN(cpunum) (cpu_isset(cpunum, cpu_online_map))
 
 int smp_num_cpus = 1;
 int smp_threads_ready = 0;
 unsigned long cache_decay_ticks;
 static int max_cpus = -1;			     /* Command line */
-unsigned long cpu_present_mask;
+cpumask_t cpu_present_mask;
 
 struct smp_call_struct {
 	void (*func) (void *info);
@@ -139,7 +139,7 @@ halt_processor(void)
 #else
 	/* REVISIT : redirect I/O Interrupts to another CPU? */
 	/* REVISIT : does PM *know* this CPU isn't available? */
-	clear_bit(smp_processor_id(), (void *)&cpu_online_map);
+	cpu_clear(smp_processor_id(), cpu_online_map);
 	local_irq_disable();
 	for (;;)
 		;
@@ -443,7 +443,7 @@ smp_cpu_init(int cpunum)
 	mb();
 
 	/* Well, support 2.4 linux scheme as well. */
-	if (test_and_set_bit(cpunum, (unsigned long *) (&cpu_online_map)))
+	if (cpu_test_and_set(cpunum, cpu_online_map))
 	{
 		extern void machine_halt(void); /* arch/parisc.../process.c */
 
@@ -624,13 +624,14 @@ void __init smp_boot_cpus(void)
 	printk(KERN_DEBUG "SMP: bootstrap CPU ID is %d\n",bootstrap_processor);
 	init_task.thread_info->cpu = bootstrap_processor; 
 	current->thread_info->cpu = bootstrap_processor;
-	cpu_online_map = 1 << bootstrap_processor; /* Mark Boostrap processor as present */
+	/* Mark Boostrap processor as present */
+	cpu_online_map = cpumask_of_cpu(bootstrap_processor);
 	current->active_mm = &init_mm;
 
 #ifdef ENTRY_SYS_CPUS
 	cpu_data[0].state = STATE_RUNNING;
 #endif
-	cpu_present_mask = 1UL << bootstrap_processor;
+	cpu_present_mask = cpumask_of_cpu(bootstrap_processor);
 
 	/* Nothing to do when told not to.  */
 	if (max_cpus == 0) {
@@ -709,8 +710,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 void __devinit smp_prepare_boot_cpu(void)
 {
-	set_bit(smp_processor_id(), &cpu_online_map);
-	set_bit(smp_processor_id(), &cpu_present_mask);
+	cpu_set(smp_processor_id(), cpu_online_map);
+	cpu_set(smp_processor_id(), cpu_present_mask);
 }
 
 int __devinit __cpu_up(unsigned int cpu)

@@ -125,7 +125,7 @@ static inline void switch_mm(struct mm_struct *old_mm, struct mm_struct *mm, str
 	}
 
 	{
-		unsigned long vm_mask = (1UL << smp_processor_id());
+		int cpu = smp_processor_id();
 
 		/* Even if (mm == old_mm) we _must_ check
 		 * the cpu_vm_mask.  If we do not we could
@@ -133,8 +133,8 @@ static inline void switch_mm(struct mm_struct *old_mm, struct mm_struct *mm, str
 		 * smp_flush_tlb_{page,range,mm} on sparc64
 		 * and lazy tlb switches work. -DaveM
 		 */
-		if (!ctx_valid || !(mm->cpu_vm_mask & vm_mask)) {
-			mm->cpu_vm_mask |= vm_mask;
+		if (!ctx_valid || !cpu_isset(cpu, mm->cpu_vm_mask)) {
+			cpu_set(cpu, mm->cpu_vm_mask);
 			__flush_tlb_mm(CTX_HWBITS(mm->context), SECONDARY_CONTEXT);
 		}
 	}
@@ -148,14 +148,14 @@ extern void __flush_tlb_mm(unsigned long, unsigned long);
 /* Activate a new MM instance for the current task. */
 static inline void activate_mm(struct mm_struct *active_mm, struct mm_struct *mm)
 {
-	unsigned long vm_mask;
+	int cpu;
 
 	spin_lock(&mm->page_table_lock);
 	if (!CTX_VALID(mm->context))
 		get_new_mmu_context(mm);
-	vm_mask = (1UL << smp_processor_id());
-	if (!(mm->cpu_vm_mask & vm_mask))
-		mm->cpu_vm_mask |= vm_mask;
+	cpu = smp_processor_id();
+	if (!cpu_isset(cpu, mm->cpu_vm_mask))
+		cpu_set(cpu, mm->cpu_vm_mask);
 	spin_unlock(&mm->page_table_lock);
 
 	load_secondary_context(mm);

@@ -98,13 +98,15 @@ static inline void global_flush_tlb(void)
 
 static inline void __flush_tlb_mm(struct mm_struct * mm)
 {
+	cpumask_t local_cpumask;
 	preempt_disable();
-	if (mm->cpu_vm_mask != (1UL << smp_processor_id())) {
+	local_cpumask = cpumask_of_cpu(smp_processor_id());
+	if (cpus_equal(mm->cpu_vm_mask, local_cpumask)) {
 		/* mm was active on more than one cpu. */
 		if (mm == current->active_mm &&
 		    atomic_read(&mm->mm_users) == 1)
 			/* this cpu is the only one using the mm. */
-			mm->cpu_vm_mask = 1UL << smp_processor_id();
+			mm->cpu_vm_mask = local_cpumask;
 		global_flush_tlb();
 	} else
 		local_flush_tlb();

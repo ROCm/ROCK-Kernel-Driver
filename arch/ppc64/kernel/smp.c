@@ -53,7 +53,7 @@ int smp_threads_ready;
 unsigned long cache_decay_ticks;
 
 /* initialised so it doesn't end up in bss */
-unsigned long cpu_online_map = 0;
+cpumask_t cpu_online_map = CPU_MASK_NONE;
 
 static struct smp_ops_t *smp_ops;
 
@@ -574,7 +574,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 void __devinit smp_prepare_boot_cpu(void)
 {
-	set_bit(smp_processor_id(), &cpu_online_map);
+	cpu_set(smp_processor_id(), cpu_online_map);
 	/* FIXME: what about cpu_possible()? */
 }
 
@@ -635,7 +635,7 @@ int __devinit __cpu_up(unsigned int cpu)
 
 	if (smp_ops->give_timebase)
 		smp_ops->give_timebase();
-	set_bit(cpu, &cpu_online_map);
+	cpu_set(cpu, cpu_online_map);
 	return 0;
 }
 

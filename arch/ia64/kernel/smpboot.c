@@ -79,13 +79,13 @@ int cpucount;
 task_t *task_for_booting_cpu;
 
 /* Bitmask of currently online CPUs */
-volatile unsigned long cpu_online_map;
-unsigned long phys_cpu_present_map;
+cpumask_t cpu_online_map;
+cpumask_t phys_cpu_present_map;
 
 /* which logical CPU number maps to which CPU (physical APIC ID) */
 volatile int ia64_cpu_to_sapicid[NR_CPUS];
 
-static volatile unsigned long cpu_callin_map;
+static volatile cpumask_t cpu_callin_map;
 
 struct smp_boot_data smp_boot_data __initdata;
 
@@ -282,7 +282,7 @@ smp_callin (void)
 	cpuid = smp_processor_id();
 	phys_id = hard_smp_processor_id();
 
-	if (test_and_set_bit(cpuid, &cpu_online_map)) {
+	if (cpu_test_and_set(cpuid, cpu_online_map)) {
 		printk(KERN_ERR "huh, phys CPU#0x%x, CPU#0x%x already present??\n",
 		       phys_id, cpuid);
 		BUG();
@@ -327,7 +327,7 @@ smp_callin (void)
 	/*
 	 * Allow the master to continue.
 	 */
-	set_bit(cpuid, &cpu_callin_map);
+	cpu_set(cpuid, cpu_callin_map);
 	Dprintk("Stack on CPU %d at about %p\n",cpuid, &cpuid);
 }
 
@@ -391,19 +391,19 @@ do_boot_cpu (int sapicid, int cpu)
 	 */
 	Dprintk("Waiting on callin_map ...");
 	for (timeout = 0; timeout < 100000; timeout++) {
-		if (test_bit(cpu, &cpu_callin_map))
+		if (cpu_isset(cpu, cpu_callin_map))
 			break;  /* It has booted */
 		udelay(100);
 	}
 	Dprintk("\n");
 
-	if (test_bit(cpu, &cpu_callin_map)) {
+	if (cpu_isset(cpu, cpu_callin_map)) {
 		/* number CPUs logically, starting from 1 (BSP is 0) */
 		printk(KERN_INFO "CPU%d: CPU has booted.\n", cpu);
 	} else {
 		printk(KERN_ERR "Processor 0x%x/0x%x is stuck.\n", cpu, sapicid);
 		ia64_cpu_to_sapicid[cpu] = -1;
-		clear_bit(cpu, &cpu_online_map);  /* was set in smp_callin() */
+		cpu_clear(cpu, cpu_online_map);  /* was set in smp_callin() */
 		return -EINVAL;
 	}
 	return 0;
@@ -446,13 +446,14 @@ smp_build_cpu_map (void)
 		ia64_cpu_to_sapicid[cpu] = -1;
 
 	ia64_cpu_to_sapicid[0] = boot_cpu_id;
-	phys_cpu_present_map = 1;
+	cpus_clear(phys_cpu_present_map);
+	cpu_set(0, phys_cpu_present_map);
 
 	for (cpu = 1, i = 0; i < smp_boot_data.cpu_count; i++) {
 		sapicid = smp_boot_data.cpu_phys_id[i];
 		if (sapicid == boot_cpu_id)
 			continue;
-		phys_cpu_present_map |= (1UL << cpu);
+		cpu_set(cpu, phys_cpu_present_map);
 		ia64_cpu_to_sapicid[cpu] = sapicid;
 		cpu++;
 	}
@@ -463,7 +464,7 @@ smp_build_cpu_map (void)
 /* on which node is each logical CPU (one cacheline even for 64 CPUs) */
 volatile char cpu_to_node_map[NR_CPUS] __cacheline_aligned;
 /* which logical CPUs are on which nodes */
-volatile unsigned long node_to_cpu_mask[MAX_NUMNODES] __cacheline_aligned;
+volatile cpumask_t node_to_cpu_mask[MAX_NUMNODES] __cacheline_aligned;
 
 /*
  * Build cpu to node mapping and initialize the per node cpu masks.
@@ -474,7 +475,7 @@ build_cpu_to_node_map (void)
 	int cpu, i, node;
 
 	for(node=0; node<MAX_NUMNODES; node++)
-		node_to_cpu_mask[node] = 0;
+		cpus_clear(node_to_cpu_mask[node]);
 	for(cpu = 0; cpu < NR_CPUS; ++cpu) {
 		/*
 		 * All Itanium NUMA platforms I know use ACPI, so maybe we
@@ -492,7 +493,7 @@ build_cpu_to_node_map (void)
 #endif
 		cpu_to_node_map[cpu] = node;
 		if (node >= 0)
-			node_to_cpu_mask[node] |= (1UL << cpu);
+			cpu_set(cpu, node_to_cpu_mask[node]);
 	}
 }
 
@@ -515,8 +516,8 @@ smp_prepare_cpus (unsigned int max_cpus)
 	/*
 	 * We have the boot CPU online for sure.
 	 */
-	set_bit(0, &cpu_online_map);
-	set_bit(0, &cpu_callin_map);
+	cpu_set(0, cpu_online_map);
+	cpu_set(0, cpu_callin_map);
 
 	local_cpu_data->loops_per_jiffy = loops_per_jiffy;
 	ia64_cpu_to_sapicid[0] = boot_cpu_id;
@@ -531,15 +532,18 @@ smp_prepare_cpus (unsigned int max_cpus)
 	 */
 	if (!max_cpus) {
 		printk(KERN_INFO "SMP mode deactivated.\n");
-		cpu_online_map = phys_cpu_present_map = 1;
+		cpus_clear(cpu_online_map);
+		cpus_clear(phys_cpu_present_map);
+		cpu_set(1, cpu_online_map);
+		cpu_set(1, phys_cpu_present_map);
 		return;
 	}
 }
 
 void __devinit smp_prepare_boot_cpu(void)
 {
-	set_bit(smp_processor_id(), &cpu_online_map);
-	set_bit(smp_processor_id(), &cpu_callin_map);
+	cpu_set(smp_processor_id(), cpu_online_map);
+	cpu_set(smp_processor_id(), cpu_callin_map);
 }
 
 void

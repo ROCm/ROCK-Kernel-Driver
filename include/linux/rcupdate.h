@@ -40,6 +40,7 @@
 #include <linux/spinlock.h>
 #include <linux/threads.h>
 #include <linux/percpu.h>
+#include <linux/cpumask.h>
 
 /**
  * struct rcu_head - callback structure for use with RCU
@@ -67,7 +68,7 @@ struct rcu_ctrlblk {
 	spinlock_t	mutex;		/* Guard this struct                  */
 	long		curbatch;	/* Current batch number.	      */
 	long		maxbatch;	/* Max requested batch number.        */
-	unsigned long	rcu_cpu_mask; 	/* CPUs that need to switch in order  */
+	cpumask_t	rcu_cpu_mask; 	/* CPUs that need to switch in order  */
 					/* for current batch to proceed.      */
 };
 
@@ -114,7 +115,7 @@ static inline int rcu_pending(int cpu)
 	     rcu_batch_before(RCU_batch(cpu), rcu_ctrlblk.curbatch)) ||
 	    (list_empty(&RCU_curlist(cpu)) &&
 			 !list_empty(&RCU_nxtlist(cpu))) ||
-	    test_bit(cpu, &rcu_ctrlblk.rcu_cpu_mask))
+	    cpu_isset(cpu, rcu_ctrlblk.rcu_cpu_mask))
 		return 1;
 	else
 		return 0;

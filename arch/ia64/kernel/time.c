@@ -41,12 +41,12 @@ unsigned long last_cli_ip;
 static void
 do_profile (unsigned long ip)
 {
-	extern unsigned long prof_cpu_mask;
+	extern cpumask_t prof_cpu_mask;
 
 	if (!prof_buffer)
 		return;
 
-	if (!((1UL << smp_processor_id()) & prof_cpu_mask))
+	if (!cpu_isset(smp_processor_id(), prof_cpu_mask))
 		return;
 
 	ip -= (unsigned long) _stext;

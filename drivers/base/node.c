@@ -7,6 +7,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/node.h>
+#include <linux/cpumask.h>
 #include <linux/topology.h>
 
 static struct sysdev_class node_class = {
@@ -17,7 +18,17 @@ static struct sysdev_class node_class = {
 static ssize_t node_read_cpumap(struct sys_device * dev, char * buf)
 {
 	struct node *node_dev = to_node(dev);
-        return sprintf(buf,"%lx\n",node_dev->cpumap);
+	cpumask_t tmp = node_dev->cpumap;
+	int k, len = 0;
+
+	for (k = 0; k < sizeof(cpumask_t)/sizeof(u16); ++k) {
+		int j = sprintf(buf, "%04hx", (u16)cpus_coerce(tmp));
+		len += j;
+		buf += j;
+		cpus_shift_right(tmp, tmp, 16);
+	}
+        len += sprintf(buf, "\n");
+	return len;
 }
 static SYSDEV_ATTR(cpumap,S_IRUGO,node_read_cpumap,NULL);
 

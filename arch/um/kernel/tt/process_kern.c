@@ -419,7 +419,7 @@ static int start_kernel_proc(void *unused)
 	cpu_tasks[0].pid = pid;
 	cpu_tasks[0].task = current;
 #ifdef CONFIG_SMP
- 	cpu_online_map = 1;
+ 	cpu_online_map = cpumask_of_cpu(0);
 #endif
 	if(debug) os_stop_process(pid);
 	start_kernel();

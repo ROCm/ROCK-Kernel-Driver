@@ -505,7 +505,7 @@ static inline int __test_bit(unsigned long nr, const volatile unsigned long *ptr
 	unsigned char ch;
 
 	addr = (unsigned long) ptr + ((nr ^ (__BITOPS_WORDSIZE - 8)) >> 3);
-	ch = *(unsigned char *) addr;
+	ch = *(volatile unsigned char *) addr;
 	return (ch >> (nr & 7)) & 1;
 }
 

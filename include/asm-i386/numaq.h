@@ -28,7 +28,7 @@
 
 #ifdef CONFIG_X86_NUMAQ
 
-#define MAX_NUMNODES		8
+#define MAX_NUMNODES		16
 extern void get_memcfg_numaq(void);
 #define get_memcfg_numa() get_memcfg_numaq()
 
@@ -159,7 +159,7 @@ struct sys_cfg_data {
 
 static inline unsigned long *get_zholes_size(int nid)
 {
-	return 0;
+	return NULL;
 }
 #endif /* CONFIG_X86_NUMAQ */
 #endif /* NUMAQ_H */
