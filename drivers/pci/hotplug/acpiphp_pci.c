@@ -83,8 +83,8 @@ static int init_config_space (struct acpiphp_func *func)
 		if (bar & PCI_BASE_ADDRESS_SPACE_IO) {
 			/* This is IO */
 
-			len = bar & 0xFFFFFFFC;
-			len = ~len + 1;
+			len = bar & (PCI_BASE_ADDRESS_IO_MASK & 0xFFFF);
+			len = len & ~(len - 1);
 
 			dbg("len in IO %x, BAR %d\n", len, count);
 
@@ -226,8 +226,8 @@ static int detect_used_resource (struct acpiphp_bridge *bridge, struct pci_dev *
 		if (len & PCI_BASE_ADDRESS_SPACE_IO) {
 			/* This is IO */
 			base = bar & 0xFFFFFFFC;
-			len &= 0xFFFFFFFC;
-			len = ~len + 1;
+			len = len & (PCI_BASE_ADDRESS_IO_MASK & 0xFFFF);
+			len = len & ~(len - 1);
 
 			dbg("BAR[%d] %08x - %08x (IO)\n", count, (u32)base, (u32)base + len - 1);
 
@@ -351,8 +351,8 @@ int acpiphp_init_func_resource (struct acpiphp_func *func)
 		if (len & PCI_BASE_ADDRESS_SPACE_IO) {
 			/* This is IO */
 			base = bar & 0xFFFFFFFC;
-			len &= 0xFFFFFFFC;
-			len = ~len + 1;
+			len = len & (PCI_BASE_ADDRESS_IO_MASK & 0xFFFF);
+			len = len & ~(len - 1);
 
 			dbg("BAR[%d] %08x - %08x (IO)\n", count, (u32)base, (u32)base + len - 1);
 
@@ -485,14 +485,13 @@ int acpiphp_configure_function (struct acpiphp_func *func)
  * @func: function to be unconfigured
  *
  */
-int acpiphp_unconfigure_function (struct acpiphp_func *func)
+void acpiphp_unconfigure_function (struct acpiphp_func *func)
 {
 	struct acpiphp_bridge *bridge;
-	int retval = 0;
 
 	/* if pci_dev is NULL, ignore it */
 	if (!func->pci_dev)
-		goto err_exit;
+		return;
 
 	pci_remove_bus_device(func->pci_dev);
 
@@ -505,7 +504,4 @@ int acpiphp_unconfigure_function (struct acpiphp_func *func)
 	acpiphp_move_resource(&func->p_mem_head, &bridge->p_mem_head);
 	acpiphp_move_resource(&func->bus_head, &bridge->bus_head);
 	spin_unlock(&bridge->res_lock);
-
- err_exit:
-	return retval;
 }
