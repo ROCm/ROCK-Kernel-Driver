@@ -741,8 +741,6 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
 	if ((s->state & (SOCKET_PRESENT|SOCKET_CARDBUS)) == SOCKET_PRESENT) {
 		if (client->EventMask & CS_EVENT_CARD_INSERTION)
 			EVENT(client, CS_EVENT_CARD_INSERTION, CS_EVENT_PRI_LOW);
-		else
-			client->PendingEvents |= CS_EVENT_CARD_INSERTION;
 	}
 
 	up(&s->skt_sem);
