@@ -20,6 +20,7 @@
 #include <asm/paca.h>
 
 struct naca_struct *naca;
+struct systemcfg *systemcfg;
 
 /* The Paca is an array with one entry per processor.  Each contains an 
  * ItLpPaca, which contains the information shared between the 
@@ -65,9 +66,9 @@ struct naca_struct *naca;
 
 struct paca_struct paca[MAX_PACAS] __page_aligned = {
 #ifdef CONFIG_PPC_ISERIES
-	PACAINITDATA( 0, 1, &xItLpQueue, 0, 0xc000000000005000),
+	PACAINITDATA( 0, 1, &xItLpQueue, 0, STAB0_VIRT_ADDR),
 #else
-	PACAINITDATA( 0, 1, 0, 0x5000, 0xc000000000005000),
+	PACAINITDATA( 0, 1, 0, STAB0_PHYS_ADDR, STAB0_VIRT_ADDR),
 #endif
 	PACAINITDATA( 1, 0, 0, 0, 0),
 	PACAINITDATA( 2, 0, 0, 0, 0),

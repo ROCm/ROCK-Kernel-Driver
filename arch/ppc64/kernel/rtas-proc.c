@@ -201,7 +201,7 @@ void proc_rtas_init(void)
 	struct proc_dir_entry *entry;
 
 	rtas_node = find_devices("rtas");
-	if ((rtas_node == NULL) || (naca->platform == PLATFORM_ISERIES_LPAR)) {
+	if ((rtas_node == NULL) || (systemcfg->platform == PLATFORM_ISERIES_LPAR)) {
 		return;
 	}
 	
