@@ -498,9 +498,9 @@ static unsigned int ata_scsi_verify_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 
 	tf->nsect = n_sect & 0xff;
 
-	tf->hob_lbah = (sect >> 16) & 0xff;
-	tf->hob_lbam = (sect >> 8) & 0xff;
-	tf->hob_lbal = sect & 0xff;
+	tf->lbah = (sect >> 16) & 0xff;
+	tf->lbam = (sect >> 8) & 0xff;
+	tf->lbal = sect & 0xff;
 
 	return 0;
 }
@@ -600,7 +600,7 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 				return 1;
 
 			/* stores LBA27:24 in lower 4 bits of device reg */
-			tf->device |= scsicmd[2];
+			tf->device |= scsicmd[6];
 
 			qc->nsect = scsicmd[13];
 		}
