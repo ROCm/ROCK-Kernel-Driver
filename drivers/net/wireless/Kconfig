@@ -224,8 +224,8 @@ config PCI_HERMES
 config ATMEL
       tristate "Atmel at76c50x chipset  802.11b support"
       depends on NET_RADIO && EXPERIMENTAL
-      enable FW_LOADER
-      enable CRC32
+      select FW_LOADER
+      select CRC32
        ---help---
         A driver 802.11b wireless cards based on the Atmel fast-vnet
         chips. This driver supports standard Linux wireless extensions. 
