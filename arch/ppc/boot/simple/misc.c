@@ -29,7 +29,6 @@
 #include <asm/reg.h>
 
 #include "nonstdio.h"
-#include "zlib.h"
 
 /* Default cmdline */
 #ifdef CONFIG_CMDLINE
@@ -220,7 +219,7 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	puts("\n");
 
 	puts("Uncompressing Linux...");
-	gunzip(NULL, 0x400000, zimage_start, &zimage_size);
+	gunzip(0x0, 0x400000, zimage_start, &zimage_size);
 	puts("done.\n");
 
 	/* get the bi_rec address */

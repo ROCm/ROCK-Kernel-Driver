@@ -22,7 +22,6 @@
 #endif
 
 #include "nonstdio.h"
-#include "zlib.h"
 
 /* The linker tells us where the image is. */
 extern char __image_begin, __image_end;
