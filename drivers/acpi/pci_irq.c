@@ -285,8 +285,9 @@ acpi_pci_irq_derive (
 	 * Attempt to derive an IRQ for this device from a parent bridge's
 	 * PCI interrupt routing entry (a.k.a. the "bridge swizzle").
 	 */
-	while (!irq && (bridge = bridge->bus->self)) {
-		pin = (pin + PCI_SLOT(dev->devfn)) % 4;
+	while (!irq && bridge->bus->self) {
+		pin = (pin + PCI_SLOT(bridge->devfn)) % 4;
+		bridge = bridge->bus->self;
 		irq = acpi_pci_irq_lookup(0, bridge->bus->number, PCI_SLOT(bridge->devfn), pin);
 	}
 
