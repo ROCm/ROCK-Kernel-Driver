@@ -24,8 +24,8 @@
  *	current->start_stack, so we round each of these in order to be able
  *	to write an integer number of pages.
  *
- * Copyright (C) 1998, 1999, 2001 Hewlett-Packard Co
- * Copyright (C) 1998, 1999, 2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Modified 1998, 1999, 2001
+ *	David Mosberger-Tang <davidm@hpl.hp.com>, Hewlett-Packard Co
  */
 
 #include <linux/ptrace.h>

@@ -2,8 +2,8 @@
 #define _ASM_IA64_CURRENT_H
 
 /*
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- *	David Mosberger-Tang <davidm@hpl.hp.com>
+ * Modified 1998-2000
+ *	David Mosberger-Tang <davidm@hpl.hp.com>, Hewlett-Packard Co
  */
 
 #include <asm/intrinsics.h>

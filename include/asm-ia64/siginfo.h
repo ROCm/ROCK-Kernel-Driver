@@ -2,8 +2,10 @@
 #define _ASM_IA64_SIGINFO_H
 
 /*
- * Copyright (C) 1998-2002 Hewlett-Packard Co
- *	David Mosberger-Tang <davidm@hpl.hp.com>
+ * Based on <asm-i386/siginfo.h>.
+ *
+ * Modified 1998-2002
+ *	David Mosberger-Tang <davidm@hpl.hp.com>, Hewlett-Packard Co
  */
 
 #define SI_PAD_SIZE	((SI_MAX_SIZE/sizeof(int)) - 4)

@@ -4,8 +4,9 @@
 #include <linux/types.h>
 
 /*
- * The main single-value unaligned transfer routines.  Derived from
- * the Linux/Alpha version.
+ * The main single-value unaligned transfer routines.
+ *
+ * Based on <asm-alpha/unaligned.h>.
  *
  * Copyright (C) 1998, 1999, 2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>

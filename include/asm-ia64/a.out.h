@@ -7,8 +7,8 @@
  * probably would be better to clean up binfmt_elf.c so it does not
  * necessarily depend on there being a.out support.
  *
- * Copyright (C) 1998-2002 Hewlett-Packard Co
- *	David Mosberger-Tang <davidm@hpl.hp.com>
+ * Modified 1998-2002
+ *	David Mosberger-Tang <davidm@hpl.hp.com>, Hewlett-Packard Co.
  */
 
 #include <linux/types.h>

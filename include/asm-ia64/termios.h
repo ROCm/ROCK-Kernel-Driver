@@ -2,8 +2,8 @@
 #define _ASM_IA64_TERMIOS_H
 
 /*
- * Copyright (C) 1999 Hewlett-Packard Co
- * Copyright (C) 1999 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Modified 1999
+ *	David Mosberger-Tang <davidm@hpl.hp.com>, Hewlett-Packard Co
  *
  * 99/01/28	Added N_IRDA and N_SMSBLOCK
  */
