@@ -128,16 +128,7 @@ ip_nat_fn(unsigned int hooknum,
 		WRITE_LOCK(&ip_nat_lock);
 		/* Seen it before?  This can happen for loopback, retrans,
 		   or local packets.. */
-		if (!(info->initialized & (1 << maniptype))
-#ifndef CONFIG_IP_NF_NAT_LOCAL
-		    /* If this session has already been confirmed we must not
-		     * touch it again even if there is no mapping set up.
-		     * Can only happen on local->local traffic with
-		     * CONFIG_IP_NF_NAT_LOCAL disabled.
-		     */
-		    && !(ct->status & IPS_CONFIRMED)
-#endif
-		    ) {
+		if (!(info->initialized & (1 << maniptype))) {
 			unsigned int ret;
 
 			if (ct->master
@@ -146,15 +137,14 @@ ip_nat_fn(unsigned int hooknum,
 				ret = call_expect(master_ct(ct), pskb, 
 						  hooknum, ct, info);
 			} else {
-#ifdef CONFIG_IP_NF_NAT_LOCAL
 				/* LOCAL_IN hook doesn't have a chain!  */
 				if (hooknum == NF_IP_LOCAL_IN)
 					ret = alloc_null_binding(ct, info,
 								 hooknum);
 				else
-#endif
-				ret = ip_nat_rule_find(pskb, hooknum, in, out,
-						       ct, info);
+					ret = ip_nat_rule_find(pskb, hooknum,
+					                       in, out, ct,
+					                       info);
 			}
 
 			if (ret != NF_ACCEPT) {
@@ -234,7 +224,6 @@ ip_nat_out(unsigned int hooknum,
 	return ip_nat_fn(hooknum, pskb, in, out, okfn);
 }
 
-#ifdef CONFIG_IP_NF_NAT_LOCAL
 static unsigned int
 ip_nat_local_fn(unsigned int hooknum,
 		struct sk_buff **pskb,
@@ -260,7 +249,6 @@ ip_nat_local_fn(unsigned int hooknum,
 		return ip_route_me_harder(pskb) == 0 ? ret : NF_DROP;
 	return ret;
 }
-#endif
 
 /* We must be after connection tracking and before packet filtering. */
 
@@ -282,7 +270,6 @@ static struct nf_hook_ops ip_nat_out_ops = {
 	.priority	= NF_IP_PRI_NAT_SRC,
 };
 
-#ifdef CONFIG_IP_NF_NAT_LOCAL
 /* Before packet filtering, change destination */
 static struct nf_hook_ops ip_nat_local_out_ops = {
 	.hook		= ip_nat_local_fn,
@@ -300,7 +287,6 @@ static struct nf_hook_ops ip_nat_local_in_ops = {
 	.hooknum	= NF_IP_LOCAL_IN,
 	.priority	= NF_IP_PRI_NAT_SRC,
 };
-#endif
 
 /* Protocol registration. */
 int ip_nat_protocol_register(struct ip_nat_protocol *proto)
@@ -357,7 +343,6 @@ static int init_or_cleanup(int init)
 		printk("ip_nat_init: can't register out hook.\n");
 		goto cleanup_inops;
 	}
-#ifdef CONFIG_IP_NF_NAT_LOCAL
 	ret = nf_register_hook(&ip_nat_local_out_ops);
 	if (ret < 0) {
 		printk("ip_nat_init: can't register local out hook.\n");
@@ -368,16 +353,13 @@ static int init_or_cleanup(int init)
 		printk("ip_nat_init: can't register local in hook.\n");
 		goto cleanup_localoutops;
 	}
-#endif
 	return ret;
 
  cleanup:
-#ifdef CONFIG_IP_NF_NAT_LOCAL
 	nf_unregister_hook(&ip_nat_local_in_ops);
  cleanup_localoutops:
 	nf_unregister_hook(&ip_nat_local_out_ops);
  cleanup_outops:
-#endif
 	nf_unregister_hook(&ip_nat_out_ops);
  cleanup_inops:
 	nf_unregister_hook(&ip_nat_in_ops);

@@ -182,7 +182,6 @@ find_appropriate_src(const struct ip_conntrack_tuple *tuple,
 	return 0;
 }
 
-#ifdef CONFIG_IP_NF_NAT_LOCAL
 /* If it's really a local destination manip, it may need to do a
    source manip too. */
 static int
@@ -202,7 +201,6 @@ do_extra_mangle(u_int32_t var_ip, u_int32_t *other_ipp)
 	ip_rt_put(rt);
 	return 1;
 }
-#endif
 
 /* Simple way to iterate through all. */
 static inline int fake_cmp(const struct ip_conntrack *ct,
@@ -301,7 +299,6 @@ find_best_ips_proto(struct ip_conntrack_tuple *tuple,
 			 * do_extra_mangle last time. */
 			*other_ipp = saved_ip;
 
-#ifdef CONFIG_IP_NF_NAT_LOCAL
 			if (hooknum == NF_IP_LOCAL_OUT
 			    && *var_ipp != orig_dstip
 			    && !do_extra_mangle(*var_ipp, other_ipp)) {
@@ -312,7 +309,6 @@ find_best_ips_proto(struct ip_conntrack_tuple *tuple,
 				 * anyway. */
 				continue;
 			}
-#endif
 
 			/* Count how many others map onto this. */
 			score = count_maps(tuple->src.ip, tuple->dst.ip,
@@ -356,13 +352,11 @@ find_best_ips_proto_fast(struct ip_conntrack_tuple *tuple,
 		else {
 			/* Only do extra mangle when required (breaks
                            socket binding) */
-#ifdef CONFIG_IP_NF_NAT_LOCAL
 			if (tuple->dst.ip != mr->range[0].min_ip
 			    && hooknum == NF_IP_LOCAL_OUT
 			    && !do_extra_mangle(mr->range[0].min_ip,
 						&tuple->src.ip))
 				return NULL;
-#endif
 			tuple->dst.ip = mr->range[0].min_ip;
 		}
 	}
@@ -473,10 +467,8 @@ get_unique_tuple(struct ip_conntrack_tuple *tuple,
 static unsigned int opposite_hook[NF_IP_NUMHOOKS]
 = { [NF_IP_PRE_ROUTING] = NF_IP_POST_ROUTING,
     [NF_IP_POST_ROUTING] = NF_IP_PRE_ROUTING,
-#ifdef CONFIG_IP_NF_NAT_LOCAL
     [NF_IP_LOCAL_OUT] = NF_IP_LOCAL_IN,
     [NF_IP_LOCAL_IN] = NF_IP_LOCAL_OUT,
-#endif
 };
 
 unsigned int
