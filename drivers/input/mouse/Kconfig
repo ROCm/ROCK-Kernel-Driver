@@ -14,7 +14,8 @@ config INPUT_MOUSE
 config MOUSE_PS2
 	tristate "PS/2 mouse"
 	default y
-	depends on INPUT && INPUT_MOUSE && SERIO
+	depends on INPUT && INPUT_MOUSE
+	select SERIO_I8042
 	---help---
 	  Say Y here if you have a PS/2 mouse connected to your system. This
 	  includes the standard 2 or 3-button PS/2 mouse, as well as PS/2
@@ -31,7 +32,7 @@ config MOUSE_PS2
 config MOUSE_PS2_SYNAPTICS
 	bool "Synaptics TouchPad"
 	default n
-	depends on INPUT && INPUT_MOUSE && SERIO && MOUSE_PS2
+	depends on INPUT && INPUT_MOUSE && MOUSE_PS2
 	---help---
 	  Say Y here if you have a Synaptics TouchPad connected to your system.
 	  This touchpad is found on many modern laptop computers.
@@ -46,7 +47,8 @@ config MOUSE_PS2_SYNAPTICS
 
 config MOUSE_SERIAL
 	tristate "Serial mouse"
-	depends on INPUT && INPUT_MOUSE && SERIO
+	depends on INPUT && INPUT_MOUSE
+	select SERIO
 	---help---
 	  Say Y here if you have a serial (RS-232, COM port) mouse connected
 	  to your system. This includes Sun, MouseSystems, Microsoft,

@@ -803,11 +803,11 @@ asmlinkage int irix_setpgrp(int flags)
 	printk("[%s:%d] setpgrp(%d) ", current->comm, current->pid, flags);
 #endif
 	if(!flags)
-		error = current->pgrp;
+		error = process_group(current);
 	else
 		error = sys_setsid();
 #ifdef DEBUG_PROCGRPS
-	printk("returning %d\n", current->pgrp);
+	printk("returning %d\n", process_group(current));
 #endif
 
 	return error;

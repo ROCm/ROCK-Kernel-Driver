@@ -33,10 +33,8 @@ config USB
 
 	  It doesn't normally hurt to select them all if you are not certain.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called usbcore.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, say M here: the
+	  module will be called usbcore.
 
 source "drivers/usb/core/Kconfig"
 
@@ -82,10 +80,8 @@ config USB_USS720
 	  Say Y here if you own an USS-720 USB->Parport cable and intend to
 	  connect anything other than a printer to it.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called uss720. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, say M here: the
+	  module will be called uss720.
 
 source "drivers/usb/serial/Kconfig"
 

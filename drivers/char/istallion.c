@@ -2303,7 +2303,7 @@ static void stli_dohangup(void *arg)
 
 	/*
 	 * FIXME: There's a module removal race here: tty_hangup
-	 * calls schedule_task which will call into this
+	 * calls schedule_work which will call into this
 	 * driver later.
 	 */
 	portp = (stliport_t *) arg;
@@ -2944,7 +2944,7 @@ static inline int stli_hostcmd(stlibrd_t *brdp, stliport_t *portp)
 			    ((portp->sigs & TIOCM_CD) == 0)) {
 				if (portp->flags & ASYNC_CHECK_CD) {
 					if (tty)
-						schedule_task(&portp->tqhangup);
+						schedule_work(&portp->tqhangup);
 				}
 			}
 		}

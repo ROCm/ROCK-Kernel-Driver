@@ -199,8 +199,6 @@ typedef union {
 #define ABS(a)          ((a) < 0 ? -(a) : (a))
 #define NR_ITEMS(x)     (int)(sizeof(x)/ sizeof(*x))
 
-extern int ftape_init(void);
-
 #endif  /* __KERNEL__ */
 
 #endif

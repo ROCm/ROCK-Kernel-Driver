@@ -31,6 +31,8 @@
 
 #include <asm/uaccess.h>
 
+#include "pnpbios.h"
+
 static struct proc_dir_entry *proc_pnp = NULL;
 static struct proc_dir_entry *proc_pnp_boot = NULL;
 
@@ -213,6 +215,9 @@ int pnpbios_interface_attach_device(struct pnp_bios_node * node)
 	struct proc_dir_entry *ent;
 
 	sprintf(name, "%02x", node->handle);
+
+	if (!proc_pnp)
+		return -EIO;
 	if ( !pnpbios_dont_use_current_config ) {
 		ent = create_proc_entry(name, 0, proc_pnp);
 		if (ent) {
@@ -221,6 +226,9 @@ int pnpbios_interface_attach_device(struct pnp_bios_node * node)
 			ent->data = (void *)(long)(node->handle);
 		}
 	}
+
+	if (!proc_pnp_boot)
+		return -EIO;
 	ent = create_proc_entry(name, 0, proc_pnp_boot);
 	if (ent) {
 		ent->read_proc = proc_read_node;
@@ -228,6 +236,7 @@ int pnpbios_interface_attach_device(struct pnp_bios_node * node)
 		ent->data = (void *)(long)(node->handle+0x100);
 		return 0;
 	}
+
 	return -EIO;
 }
 
@@ -257,8 +266,9 @@ void __exit pnpbios_proc_exit(void)
 {
 	int i;
 	char name[3];
-	
-	if (!proc_pnp) return;
+
+	if (!proc_pnp)
+		return;
 
 	for (i=0; i<0xff; i++) {
 		sprintf(name, "%02x", i);
