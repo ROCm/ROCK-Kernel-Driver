@@ -1,6 +1,7 @@
 
 #include "isdn_ppp_ccp.h"
 #include "isdn_common.h"
+#include "isdn_net.h"
 #include "isdn_ppp.h"
 #include <linux/ppp-comp.h>
 
@@ -52,13 +53,28 @@ ippp_ccp_reset_free_state(struct ippp_ccp *ccp, unsigned char id)
 	ccp->reset->rs[id] = NULL;
 }
 
-static inline void
+static void
 do_xmit_reset(struct ippp_ccp *ccp, unsigned char code, unsigned char id,
 	      unsigned char *data, int len)
 {
-	ccp->xmit_reset(ccp->priv,
-			ccp->proto == PPP_COMP ? PPP_CCP : PPP_CCPFRAG,
-			code, id, data, len);
+	struct sk_buff *skb;
+	unsigned char *p;
+	u16 proto = ccp->proto == PPP_COMP ? PPP_CCP : PPP_CCPFRAG;
+
+	skb = ccp->alloc_skb(ccp->priv, 4 + len, GFP_ATOMIC);
+	ccp->push_header(ccp->priv, skb, proto);
+
+	p = skb_put(skb, 4);
+	p += put_u8 (p, code);
+	p += put_u8 (p, id);
+	p += put_u16(p, len + 4);
+
+	if (len)
+		memcpy(skb_put(skb, len), data, len);
+
+	isdn_ppp_frame_log("ccp-xmit", skb->data, skb->len, 32, -1, -1);
+
+	ccp->xmit(ccp->priv, skb);
 }
 
 /* The timer callback function which is called when a ResetReq has timed out,
@@ -181,17 +197,12 @@ ippp_ccp_reset_xmit(struct ippp_ccp *ccp,
 /* ====================================================================== */
 
 struct ippp_ccp *
-ippp_ccp_alloc(int proto, void *priv,
-	       void (*xmit_reset)(void *priv, int proto, unsigned char code,
-				  unsigned char id, unsigned char *data, 
-				  int len),
-	       void (*kick_up)(void *priv))
+ippp_ccp_alloc(void)
 {
 	struct ippp_ccp *ccp;
 
 	ccp = kmalloc(sizeof(*ccp), GFP_ATOMIC); // FIXME
 	memset(ccp, 0, sizeof(*ccp));
-	ccp->proto = proto;
 	ccp->mru = 1524;      /* MRU, default 1524 */
 	ccp->reset = kmalloc(sizeof(*ccp->reset), GFP_ATOMIC); // FIXME alloc together?
 	if (!ccp->reset) {
@@ -199,9 +210,6 @@ ippp_ccp_alloc(int proto, void *priv,
 		return NULL;
 	}
 	memset(ccp->reset, 0, sizeof(*ccp->reset));
-	ccp->priv = priv;
-	ccp->xmit_reset = xmit_reset;
-	ccp->kick_up = kick_up;
 	return ccp;
 }
 
@@ -231,9 +239,9 @@ ippp_ccp_set_mru(struct ippp_ccp *ccp, unsigned int mru)
 }
 
 unsigned int
-ippp_ccp_get_flags(struct ippp_ccp *ccp);
+ippp_ccp_get_flags(struct ippp_ccp *ccp)
 {
-	return idev->ccp->compflags & (SC_DC_ERROR|SC_DC_FERROR);
+	return ccp->compflags & (SC_DC_ERROR|SC_DC_FERROR);
 }
 
 /*

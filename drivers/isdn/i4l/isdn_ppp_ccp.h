@@ -26,17 +26,14 @@ struct ippp_ccp {
 	int                         mru;
 	int                         debug;
 	void                       *priv;
-	void (*xmit_reset)(void *priv, int proto, unsigned char code,
-			   unsigned char id, unsigned char *data, int len);
-	void (*kick_up)(void *priv);
+	void            (*xmit)(void *priv, struct sk_buff *skb);
+	void            (*kick_up)(void *priv);
+	void            (*push_header)(void *priv, struct sk_buff *skb, u16);
+	struct sk_buff *(*alloc_skb)(void *priv, int len, int gfp_mask);
 };
 
 struct ippp_ccp *
-ippp_ccp_alloc(int proto, void *priv,
-	       void (*xmit_reset)(void *priv, int proto, unsigned char code,
-				  unsigned char id, unsigned char *data, 
-				  int len),
-	       void (*kick_up)(void *priv));
+ippp_ccp_alloc(void);
 
 void
 ippp_ccp_free(struct ippp_ccp *ccp);

@@ -43,17 +43,28 @@ static void
 isdn_ppp_receive_ccp(isdn_net_dev * net_dev, isdn_net_local * lp,
 		     struct sk_buff *skb,int proto);
 
+static struct sk_buff *
+isdn_ppp_dev_alloc_skb(void *priv, int len, int gfp_mask);
+
+static void
+isdn_ppp_dev_push_header(void *priv, struct sk_buff *skb, u16 proto);
+
+static void
+isdn_ppp_dev_xmit(void *priv, struct sk_buff *skb);
+
+static struct sk_buff *
+isdn_ppp_lp_alloc_skb(void *priv, int len, int gfp_mask);
+
+static void
+isdn_ppp_lp_push_header(void *priv, struct sk_buff *skb, u16 proto);
+
 static void
 isdn_ppp_send_ccp(isdn_net_dev *net_dev, isdn_net_local *lp,
 		  struct sk_buff *skb);
 
 /* New CCP stuff */
 static void
-isdn_ppp_ccp_kick_up(void *priv);
-
-static void
-isdn_ppp_ccp_xmit_reset(void *priv, int proto, unsigned char code,
-			unsigned char id, unsigned char *data, int len);
+isdn_ppp_dev_kick_up(void *priv);
 
 #ifdef CONFIG_ISDN_MPP
 static ippp_bundle * isdn_ppp_bundle_arr = NULL;
@@ -107,7 +118,7 @@ isdn_ppp_frame_log(char *info, char *data, int len, int maxlen,int unit,int slot
 }
 
 
-void
+static void
 isdn_ppp_push_header(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
 {
 	unsigned char *p;
@@ -259,12 +270,17 @@ isdn_ppp_bind(isdn_net_dev *idev)
 	/* seq no last seen, maybe set to bundle min, when joining? */
 	idev->pppseq = -1;
 
-	idev->ccp = ippp_ccp_alloc(PPP_COMPFRAG, idev, isdn_ppp_ccp_xmit_reset,
-				   isdn_ppp_ccp_kick_up);
+	idev->ccp = ippp_ccp_alloc();
 	if (!idev->ccp) {
 		retval = -ENOMEM;
 		goto out;
 	}
+	idev->ccp->proto       = PPP_COMPFRAG;
+	idev->ccp->priv        = idev;
+	idev->ccp->alloc_skb   = isdn_ppp_dev_alloc_skb;
+	idev->ccp->push_header = isdn_ppp_dev_push_header;
+	idev->ccp->xmit        = isdn_ppp_dev_xmit;
+	idev->ccp->kick_up     = isdn_ppp_dev_kick_up;
 
 #ifdef CONFIG_ISDN_MPP
 	retval = isdn_ppp_mp_init(lp, NULL);
@@ -1930,14 +1946,14 @@ isdn_ppp_hangup_slave(char *name)
 /* Push an empty CCP Data Frame up to the daemon to wake it up and let it
    generate a CCP Reset-Request or tear down CCP altogether */
 
-static void isdn_ppp_ccp_kick_up(void *priv)
+static void isdn_ppp_dev_kick_up(void *priv)
 {
 	isdn_net_dev *idev = priv;
 
 	isdn_ppp_fill_rq(NULL, 0, PPP_COMP, idev->ppp_slot);
 }
 
-static void isdn_ppp_ccp_lp_kick_up(void *priv)
+static void isdn_ppp_lp_kick_up(void *priv)
 {
 	isdn_net_local *lp = priv;
 	isdn_net_dev *idev;
@@ -1952,43 +1968,52 @@ static void isdn_ppp_ccp_lp_kick_up(void *priv)
 
 /* Send a CCP Reset-Request or Reset-Ack directly from the kernel. */
 
-static void
-isdn_ppp_ccp_xmit_reset(void *priv, int proto, unsigned char code,
-			unsigned char id, unsigned char *data, int len)
+static struct sk_buff *
+__isdn_ppp_alloc_skb(isdn_net_dev *idev, int len, unsigned int gfp_mask)
 {
-	isdn_net_dev *idev = priv;
+	int hl = IPPP_MAX_HEADER + isdn_slot_hdrlen(idev->isdn_slot); 
 	struct sk_buff *skb;
-	unsigned char *p;
-	int hl;
 
-	hl = isdn_slot_hdrlen(idev->isdn_slot);
-	skb = alloc_skb(len + hl + IPPP_MAX_HEADER, GFP_ATOMIC);
-	if(!skb) {
-		printk(KERN_WARNING
-		       "ippp: CCP cannot send reset - out of memory\n");
-		return;
-	}
-	skb_reserve(skb, hl+16);
+	skb = alloc_skb(hl + len, gfp_mask);
+	if (!skb)
+		return NULL;
 
-	isdn_ppp_push_header(idev, skb, proto);
-
-	p = skb_put(skb, 4);
-	p += put_u8 (p, code);
-	p += put_u8 (p, id);
-	p += put_u16(p, len + 4);
-
-	if (len)
-		memcpy(skb_put(skb, len), data, len);
-
-	isdn_ppp_frame_log("ccp-xmit", skb->data, skb->len, 32, -1,
-			   idev->ppp_slot);
-
-	isdn_net_write_super(idev, skb);
+	skb_reserve(skb, hl);
+	return skb;
 }
 
-static void isdn_ppp_ccp_lp_xmit_reset(void *priv, int proto,
-				       unsigned char code, unsigned char id,
-				       unsigned char *data, int len)
+static struct sk_buff *
+isdn_ppp_dev_alloc_skb(void *priv, int len, int gfp_mask)
+{
+	isdn_net_dev *idev = priv;
+
+	return __isdn_ppp_alloc_skb(idev, len, gfp_mask);
+}
+
+static struct sk_buff *
+isdn_ppp_lp_alloc_skb(void *priv, int len, int gfp_mask)
+{
+	isdn_net_local *lp = priv;
+	isdn_net_dev *idev;
+
+	if (list_empty(&lp->online)) {
+		isdn_BUG();
+		return NULL;
+	}
+	idev = list_entry(lp->online.next, isdn_net_dev, online);
+	return __isdn_ppp_alloc_skb(idev, len, gfp_mask);
+}
+
+static void
+isdn_ppp_dev_push_header(void *priv, struct sk_buff *skb, u16 proto)
+{
+	isdn_net_dev *idev = priv;
+
+	isdn_ppp_push_header(idev, skb, proto);
+}
+
+static void
+isdn_ppp_lp_push_header(void *priv, struct sk_buff *skb, u16 proto)
 {
 	isdn_net_local *lp = priv;
 	isdn_net_dev *idev;
@@ -1998,7 +2023,29 @@ static void isdn_ppp_ccp_lp_xmit_reset(void *priv, int proto,
 		return;
 	}
 	idev = list_entry(lp->online.next, isdn_net_dev, online);
-	isdn_ppp_ccp_xmit_reset(idev, proto, code, id, data, len);
+	isdn_ppp_push_header(idev, skb, proto);
+}
+
+static void
+isdn_ppp_dev_xmit(void *priv, struct sk_buff *skb)
+{
+	isdn_net_dev *idev = priv;
+
+	isdn_net_write_super(idev, skb);
+}
+
+static void
+isdn_ppp_lp_xmit(void *priv, struct sk_buff *skb)
+{
+	isdn_net_local *lp = priv;
+	isdn_net_dev *idev;
+
+	if (list_empty(&lp->online)) {
+		isdn_BUG();
+		return;
+	}
+	idev = list_entry(lp->online.next, isdn_net_dev, online);
+	isdn_net_write_super(idev, skb);
 }
 
 
@@ -2087,10 +2134,15 @@ isdn_ppp_open(isdn_net_local *lp)
 #ifdef CONFIG_ISDN_PPP_VJ
 	lp->slcomp = slhc_init(16, 16);
 #endif
-	lp->ccp = ippp_ccp_alloc(PPP_COMPFRAG, lp, isdn_ppp_ccp_lp_xmit_reset,
-				   isdn_ppp_ccp_lp_kick_up);
+	lp->ccp = ippp_ccp_alloc();
 	if (!lp->ccp)
 		return -ENOMEM;
+	lp->ccp->proto       = PPP_COMP;
+	lp->ccp->priv        = lp;
+	lp->ccp->alloc_skb   = isdn_ppp_lp_alloc_skb;
+	lp->ccp->push_header = isdn_ppp_lp_push_header;
+	lp->ccp->xmit        = isdn_ppp_lp_xmit;
+	lp->ccp->kick_up     = isdn_ppp_lp_kick_up;
 
 	return 0;
 }
