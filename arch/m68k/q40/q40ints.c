@@ -204,8 +204,9 @@ void q40_process_int (int level, struct pt_regs *fp)
  * this stuff doesn't really belong here..
 */
 
-int ql_ticks=0;              /* 200Hz ticks since last jiffie */
-static int sound_ticks=0;
+int ql_ticks;              /* 200Hz ticks since last jiffie */
+static int sound_ticks;
+short q40rtc_oldsecs;
 
 #define SVOL 45
 
@@ -242,9 +243,9 @@ static void q40_timer_int (int irq, void * dev, struct pt_regs * regs)
 	*DAC_RIGHT=sval;
       }
 #if defined(CONFIG_Q40RTC) || defined(CONFIG_GEN_RTC)
-    if (gen_rtc_irq_ctrl && (q40rtc_oldsecs != RTC_SECS))
+    if (gen_rtc_irq_ctrl && (q40rtc_oldsecs != Q40_RTC_SECS))
       {
-	q40rtc_oldsecs = RTC_SECS;
+	q40rtc_oldsecs = Q40_RTC_SECS;
 	gen_rtc_irq_flags = RTC_UIE;
 	gen_rtc_interrupt(0);
       }
