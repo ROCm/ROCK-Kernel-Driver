@@ -58,6 +58,8 @@ static int set_rtc_mmss(unsigned long);
 
 struct sparc64_tick_ops *tick_ops;
 
+#define TICK_PRIV_BIT	(1UL << 63)
+
 static void tick_disable_protection(void)
 {
 	/* Set things up so user can access tick register for profiling
@@ -65,18 +67,17 @@ static void tick_disable_protection(void)
 	 * read back of %tick after writing it.
 	 */
 	__asm__ __volatile__(
-	"	sethi	%%hi(0x80000000), %%g1\n"
 	"	ba,pt	%%xcc, 1f\n"
-	"	 sllx	%%g1, 32, %%g1\n"
+	"	 nop\n"
 	"	.align	64\n"
 	"1:	rd	%%tick, %%g2\n"
 	"	add	%%g2, 6, %%g2\n"
-	"	andn	%%g2, %%g1, %%g2\n"
+	"	andn	%%g2, %0, %%g2\n"
 	"	wrpr	%%g2, 0, %%tick\n"
 	"	rdpr	%%tick, %%g0"
 	: /* no outputs */
-	: /* no inputs */
-	: "g1", "g2");
+	: "r" (TICK_PRIV_BIT)
+	: "g2");
 }
 
 static void tick_init_tick(unsigned long offset)
@@ -85,13 +86,14 @@ static void tick_init_tick(unsigned long offset)
 
 	__asm__ __volatile__(
 	"	rd	%%tick, %%g1\n"
+	"	andn	%%g1, %1, %%g1\n"
 	"	ba,pt	%%xcc, 1f\n"
 	"	 add	%%g1, %0, %%g1\n"
 	"	.align	64\n"
 	"1:	wr	%%g1, 0x0, %%tick_cmpr\n"
 	"	rd	%%tick_cmpr, %%g0"
 	: /* no outputs */
-	: "r" (offset)
+	: "r" (offset), "r" (TICK_PRIV_BIT)
 	: "g1");
 }
 
@@ -103,7 +105,7 @@ static unsigned long tick_get_tick(void)
 			     "mov	%0, %0"
 			     : "=r" (ret));
 
-	return ret;
+	return ret & ~TICK_PRIV_BIT;
 }
 
 static unsigned long tick_get_compare(void)
@@ -151,14 +153,15 @@ static unsigned long tick_add_tick(unsigned long adj, unsigned long offset)
 	__asm__ __volatile__("rd	%%tick, %0\n\t"
 			     "add	%0, %2, %0\n\t"
 			     "wrpr	%0, 0, %%tick\n\t"
+			     "andn	%0, %4, %1\n\t"
 			     "ba,pt	%%xcc, 1f\n\t"
-			     " add	%0, %3, %1\n\t"
+			     " add	%1, %3, %1\n\t"
 			     ".align	64\n"
 			     "1:\n\t"
 			     "wr	%1, 0, %%tick_cmpr\n\t"
 			     "rd	%%tick_cmpr, %%g0"
 			     : "=&r" (new_tick), "=&r" (tmp)
-			     : "r" (adj), "r" (offset));
+			     : "r" (adj), "r" (offset), "r" (TICK_PRIV_BIT));
 
 	return new_tick;
 }
@@ -178,21 +181,20 @@ static void stick_init_tick(unsigned long offset)
 
 	/* Let the user get at STICK too. */
 	__asm__ __volatile__(
-	"	sethi	%%hi(0x80000000), %%g1\n"
-	"	sllx	%%g1, 32, %%g1\n"
 	"	rd	%%asr24, %%g2\n"
-	"	andn	%%g2, %%g1, %%g2\n"
+	"	andn	%%g2, %0, %%g2\n"
 	"	wr	%%g2, 0, %%asr24"
 	: /* no outputs */
-	: /* no inputs */
+	: "r" (TICK_PRIV_BIT)
 	: "g1", "g2");
 
 	__asm__ __volatile__(
 	"	rd	%%asr24, %%g1\n"
+	"	andn	%%g1, %1, %%g1\n"
 	"	add	%%g1, %0, %%g1\n"
 	"	wr	%%g1, 0x0, %%asr25"
 	: /* no outputs */
-	: "r" (offset)
+	: "r" (offset), "r" (TICK_PRIV_BIT)
 	: "g1");
 }
 
@@ -203,7 +205,7 @@ static unsigned long stick_get_tick(void)
 	__asm__ __volatile__("rd	%%asr24, %0"
 			     : "=r" (ret));
 
-	return ret;
+	return ret & ~TICK_PRIV_BIT;
 }
 
 static unsigned long stick_get_compare(void)
@@ -223,10 +225,11 @@ static unsigned long stick_add_tick(unsigned long adj, unsigned long offset)
 	__asm__ __volatile__("rd	%%asr24, %0\n\t"
 			     "add	%0, %2, %0\n\t"
 			     "wr	%0, 0, %%asr24\n\t"
-			     "add	%0, %3, %1\n\t"
+			     "andn	%0, %4, %1\n\t"
+			     "add	%1, %3, %1\n\t"
 			     "wr	%1, 0, %%asr25"
 			     : "=&r" (new_tick), "=&r" (tmp)
-			     : "r" (adj), "r" (offset));
+			     : "r" (adj), "r" (offset), "r" (TICK_PRIV_BIT));
 
 	return new_tick;
 }
@@ -353,13 +356,13 @@ static void hbtick_init_tick(unsigned long offset)
 	 */
 	__hbird_write_stick(__hbird_read_stick());
 
-	val = __hbird_read_stick() & ~(1UL << 63);
+	val = __hbird_read_stick() & ~TICK_PRIV_BIT;
 	__hbird_write_compare(val + offset);
 }
 
 static unsigned long hbtick_get_tick(void)
 {
-	return __hbird_read_stick() & ~(1UL << 63);
+	return __hbird_read_stick() & ~TICK_PRIV_BIT;
 }
 
 static unsigned long hbtick_get_compare(void)
@@ -374,7 +377,7 @@ static unsigned long hbtick_add_tick(unsigned long adj, unsigned long offset)
 	val = __hbird_read_stick() + adj;
 	__hbird_write_stick(val);
 
-	val &= ~(1UL << 63);
+	val &= ~TICK_PRIV_BIT;
 	__hbird_write_compare(val + offset);
 
 	return val;
@@ -384,7 +387,7 @@ static unsigned long hbtick_add_compare(unsigned long adj)
 {
 	unsigned long val = __hbird_read_compare() + adj;
 
-	val &= ~(1UL << 63);
+	val &= ~TICK_PRIV_BIT;
 	__hbird_write_compare(val);
 
 	return val;
