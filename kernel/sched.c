@@ -69,8 +69,6 @@
 #define USER_PRIO(p)		((p)-MAX_RT_PRIO)
 #define TASK_USER_PRIO(p)	USER_PRIO((p)->static_prio)
 #define MAX_USER_PRIO		(USER_PRIO(MAX_PRIO))
-#define AVG_TIMESLICE	(MIN_TIMESLICE + ((MAX_TIMESLICE - MIN_TIMESLICE) *\
-			(MAX_PRIO-1-NICE_TO_PRIO(0))/(MAX_USER_PRIO - 1)))
 
 /*
  * Some helpers for converting nanosecond timing to jiffy resolution
@@ -82,11 +80,11 @@
  * These are the 'tuning knobs' of the scheduler:
  *
  * Minimum timeslice is 5 msecs (or 1 jiffy, whichever is larger),
- * default timeslice is 100 msecs, maximum timeslice is 200 msecs.
+ * default timeslice is 100 msecs, maximum timeslice is 800 msecs.
  * Timeslices get refilled after they expire.
  */
 #define MIN_TIMESLICE		max(5 * HZ / 1000, 1)
-#define MAX_TIMESLICE		(200 * HZ / 1000)
+#define DEF_TIMESLICE		(100 * HZ / 1000)
 #define ON_RUNQUEUE_WEIGHT	 30
 #define CHILD_PENALTY		 95
 #define PARENT_PENALTY		100
@@ -94,7 +92,7 @@
 #define PRIO_BONUS_RATIO	 25
 #define MAX_BONUS		(MAX_USER_PRIO * PRIO_BONUS_RATIO / 100)
 #define INTERACTIVE_DELTA	  2
-#define MAX_SLEEP_AVG		(AVG_TIMESLICE * MAX_BONUS)
+#define MAX_SLEEP_AVG		(DEF_TIMESLICE * MAX_BONUS)
 #define STARVATION_LIMIT	(MAX_SLEEP_AVG)
 #define NS_MAX_SLEEP_AVG	(JIFFIES_TO_NS(MAX_SLEEP_AVG))
 #define CREDIT_LIMIT		100
@@ -163,25 +161,24 @@
 	((p)->prio < (rq)->curr->prio)
 
 /*
- * BASE_TIMESLICE scales user-nice values [ -20 ... 19 ]
- * to time slice values.
+ * task_timeslice() scales user-nice values [ -20 ... 0 ... 19 ]
+ * to time slice values: [800ms ... 100ms ... 5ms]
  *
  * The higher a thread's priority, the bigger timeslices
  * it gets during one round of execution. But even the lowest
  * priority thread gets MIN_TIMESLICE worth of execution time.
- *
- * task_timeslice() is the interface that is used by the scheduler.
  */
 
-#define BASE_TIMESLICE(p) \
-	max(MAX_TIMESLICE * (MAX_PRIO - (p)->static_prio) / (MAX_USER_PRIO), \
-		MIN_TIMESLICE)
+#define SCALE_PRIO(x, prio) \
+	max(x * (MAX_PRIO - prio) / (MAX_USER_PRIO/2), MIN_TIMESLICE)
 
 static unsigned int task_timeslice(task_t *p)
 {
-	return BASE_TIMESLICE(p);
+	if (p->static_prio < NICE_TO_PRIO(0))
+		return SCALE_PRIO(DEF_TIMESLICE*4, p->static_prio);
+	else
+		return SCALE_PRIO(DEF_TIMESLICE, p->static_prio);
 }
-
 #define task_hot(p, now, sd) ((now) - (p)->timestamp < (sd)->cache_hot_time)
 
 enum idle_type
@@ -792,7 +789,7 @@ static void recalc_task_prio(task_t *p, unsigned long long now)
 		if (p->mm && p->activated != -1 &&
 			sleep_time > INTERACTIVE_SLEEP(p)) {
 				p->sleep_avg = JIFFIES_TO_NS(MAX_SLEEP_AVG -
-						AVG_TIMESLICE);
+						DEF_TIMESLICE);
 				if (!HIGH_CREDIT(p))
 					p->interactive_credit++;
 		} else {
@@ -1434,8 +1431,8 @@ void fastcall sched_exit(task_t * p)
 	rq = task_rq_lock(p->parent, &flags);
 	if (p->first_time_slice) {
 		p->parent->time_slice += p->time_slice;
-		if (unlikely(p->parent->time_slice > MAX_TIMESLICE))
-			p->parent->time_slice = MAX_TIMESLICE;
+		if (unlikely(p->parent->time_slice > task_timeslice(p)))
+			p->parent->time_slice = task_timeslice(p);
 	}
 	if (p->sleep_avg < p->parent->sleep_avg)
 		p->parent->sleep_avg = p->parent->sleep_avg /
