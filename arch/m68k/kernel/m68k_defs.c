@@ -78,13 +78,13 @@ int main(void)
 	DEFINE(BIR_SIZE, offsetof(struct bi_record, size));
 	DEFINE(BIR_DATA, offsetof(struct bi_record, data));
 
-	/* offsets into fbcon_font_desc (video/font.h) */
-	DEFINE(FBCON_FONT_DESC_IDX, offsetof(struct fbcon_font_desc, idx));
-	DEFINE(FBCON_FONT_DESC_NAME, offsetof(struct fbcon_font_desc, name));
-	DEFINE(FBCON_FONT_DESC_WIDTH, offsetof(struct fbcon_font_desc, width));
-	DEFINE(FBCON_FONT_DESC_HEIGHT, offsetof(struct fbcon_font_desc, height));
-	DEFINE(FBCON_FONT_DESC_DATA, offsetof(struct fbcon_font_desc, data));
-	DEFINE(FBCON_FONT_DESC_PREF, offsetof(struct fbcon_font_desc, pref));
+	/* offsets into font_desc (drivers/video/console/font.h) */
+	DEFINE(FONT_DESC_IDX, offsetof(struct font_desc, idx));
+	DEFINE(FONT_DESC_NAME, offsetof(struct font_desc, name));
+	DEFINE(FONT_DESC_WIDTH, offsetof(struct font_desc, width));
+	DEFINE(FONT_DESC_HEIGHT, offsetof(struct font_desc, height));
+	DEFINE(FONT_DESC_DATA, offsetof(struct font_desc, data));
+	DEFINE(FONT_DESC_PREF, offsetof(struct font_desc, pref));
 
 	/* signal defines */
 	DEFINE(SIGSEGV, SIGSEGV);

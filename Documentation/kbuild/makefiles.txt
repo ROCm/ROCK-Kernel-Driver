@@ -213,7 +213,7 @@ The top Makefile exports the following variables:
 
 	$(GENKSYMS) contains the command used to generate kernel symbol
 	signatures when CONFIG_MODVERSIONS is enabled.	The genksyms
-	command comes from the modutils package.
+	command comes from the module-init-tools package.
 
     CROSS_COMPILE
 

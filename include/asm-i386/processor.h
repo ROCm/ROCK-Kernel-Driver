@@ -19,6 +19,9 @@
 #include <linux/config.h>
 #include <linux/threads.h>
 
+/* flag for disabling the tsc */
+extern int tsc_disable;
+
 struct desc_struct {
 	unsigned long a,b;
 };
@@ -486,7 +489,7 @@ static inline void rep_nop(void)
 #define cpu_relax()	rep_nop()
 
 /* Prefetch instructions for Pentium III and AMD Athlon */
-#ifdef 	CONFIG_MPENTIUMIII
+#ifdef 	CONFIG_X86_PREFETCH
 
 #define ARCH_HAS_PREFETCH
 extern inline void prefetch(const void *x)

@@ -473,6 +473,8 @@ void do_io(struct io_thread_req *req)
 				    &req->sector_mask) == bit))
 			end++;
 
+		if(end != nsectors)
+			printk("end != nsectors\n");
 		off = req->offset + req->offsets[bit] + 
 			start * req->sectorsize;
 		len = (end - start) * req->sectorsize;

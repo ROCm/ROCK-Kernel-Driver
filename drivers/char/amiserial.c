@@ -213,7 +213,7 @@ static void rs_stop(struct tty_struct *tty)
 	if (serial_paranoia_check(info, tty->device, "rs_stop"))
 		return;
 
-	save_flags(flags); cli();
+	local_irq_save(flags);
 	if (info->IER & UART_IER_THRI) {
 		info->IER &= ~UART_IER_THRI;
 		/* disable Tx interrupt and remove any pending interrupts */
@@ -222,7 +222,7 @@ static void rs_stop(struct tty_struct *tty)
 		custom.intreq = IF_TBE;
 		mb();
 	}
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void rs_start(struct tty_struct *tty)
@@ -233,7 +233,7 @@ static void rs_start(struct tty_struct *tty)
 	if (serial_paranoia_check(info, tty->device, "rs_start"))
 		return;
 
-	save_flags(flags); cli();
+	local_irq_save(flags);
 	if (info->xmit.head != info->xmit.tail
 	    && info->xmit.buf
 	    && !(info->IER & UART_IER_THRI)) {
@@ -244,7 +244,7 @@ static void rs_start(struct tty_struct *tty)
 		custom.intreq = IF_SETCLR | IF_TBE;
 		mb();
 	}
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /*
@@ -601,7 +601,7 @@ static int startup(struct async_struct * info)
 	if (!page)
 		return -ENOMEM;
 
-	save_flags(flags); cli();
+	local_irq_save(flags);
 
 	if (info->flags & ASYNC_INITIALIZED) {
 		free_page(page);
@@ -672,11 +672,11 @@ static int startup(struct async_struct * info)
 	change_speed(info, 0);
 
 	info->flags |= ASYNC_INITIALIZED;
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return 0;
 
 errout:
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return retval;
 }
 
@@ -698,7 +698,7 @@ static void shutdown(struct async_struct * info)
 	printk("Shutting down serial port %d ....\n", info->line);
 #endif
 
-	save_flags(flags); cli(); /* Disable interrupts */
+	local_irq_save(flags); /* Disable interrupts */
 
 	/*
 	 * clear delta_msr_wait queue to avoid mem leaks: we may free the irq
@@ -734,7 +734,7 @@ static void shutdown(struct async_struct * info)
 		set_bit(TTY_IO_ERROR, &info->tty->flags);
 
 	info->flags &= ~ASYNC_INITIALIZED;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 
@@ -862,7 +862,7 @@ static void change_speed(struct async_struct *info,
 	 */
 	if ((cflag & CREAD) == 0)
 		info->ignore_status_mask |= UART_LSR_DR;
-	save_flags(flags); cli();
+	local_irq_save(flags);
 
 	{
 	  short serper;
@@ -880,7 +880,7 @@ static void change_speed(struct async_struct *info,
 	}
 
 	info->LCR = cval;				/* Save LCR */
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void rs_put_char(struct tty_struct *tty, unsigned char ch)
@@ -894,17 +894,17 @@ static void rs_put_char(struct tty_struct *tty, unsigned char ch)
 	if (!tty || !info->xmit.buf)
 		return;
 
-	save_flags(flags); cli();
+	local_irq_save(flags);
 	if (CIRC_SPACE(info->xmit.head,
 		       info->xmit.tail,
 		       SERIAL_XMIT_SIZE) == 0) {
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return;
 	}
 
 	info->xmit.buf[info->xmit.head++] = ch;
 	info->xmit.head &= SERIAL_XMIT_SIZE-1;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void rs_flush_chars(struct tty_struct *tty)
@@ -921,14 +921,14 @@ static void rs_flush_chars(struct tty_struct *tty)
 	    || !info->xmit.buf)
 		return;
 
-	save_flags(flags); cli();
+	local_irq_save(flags);
 	info->IER |= UART_IER_THRI;
 	custom.intena = IF_SETCLR | IF_TBE;
 	mb();
 	/* set a pending Tx Interrupt, transmitter should restart now */
 	custom.intreq = IF_SETCLR | IF_TBE;
 	mb();
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static int rs_write(struct tty_struct * tty, int from_user,
@@ -944,7 +944,7 @@ static int rs_write(struct tty_struct * tty, int from_user,
 	if (!tty || !info->xmit.buf || !tmp_buf)
 		return 0;
 
-	save_flags(flags);
+	local_save_flags(flags);
 	if (from_user) {
 		down(&tmp_buf_sem);
 		while (1) {
@@ -961,7 +961,7 @@ static int rs_write(struct tty_struct * tty, int from_user,
 					ret = -EFAULT;
 				break;
 			}
-			cli();
+			local_irq_disable();
 			c1 = CIRC_SPACE_TO_END(info->xmit.head,
 					       info->xmit.tail,
 					       SERIAL_XMIT_SIZE);
@@ -970,14 +970,14 @@ static int rs_write(struct tty_struct * tty, int from_user,
 			memcpy(info->xmit.buf + info->xmit.head, tmp_buf, c);
 			info->xmit.head = ((info->xmit.head + c) &
 					   (SERIAL_XMIT_SIZE-1));
-			restore_flags(flags);
+			local_irq_restore(flags);
 			buf += c;
 			count -= c;
 			ret += c;
 		}
 		up(&tmp_buf_sem);
 	} else {
-		cli();
+		local_irq_disable();
 		while (1) {
 			c = CIRC_SPACE_TO_END(info->xmit.head,
 					      info->xmit.tail,
@@ -994,20 +994,20 @@ static int rs_write(struct tty_struct * tty, int from_user,
 			count -= c;
 			ret += c;
 		}
-		restore_flags(flags);
+		local_irq_restore(flags);
 	}
 	if (info->xmit.head != info->xmit.tail
 	    && !tty->stopped
 	    && !tty->hw_stopped
 	    && !(info->IER & UART_IER_THRI)) {
 		info->IER |= UART_IER_THRI;
-		cli();
+		local_irq_disable();
 		custom.intena = IF_SETCLR | IF_TBE;
 		mb();
 		/* set a pending Tx Interrupt, transmitter should restart now */
 		custom.intreq = IF_SETCLR | IF_TBE;
 		mb();
-		restore_flags(flags);
+		local_irq_restore(flags);
 	}
 	return ret;
 }
@@ -1037,9 +1037,9 @@ static void rs_flush_buffer(struct tty_struct *tty)
 
 	if (serial_paranoia_check(info, tty->device, "rs_flush_buffer"))
 		return;
-	save_flags(flags); cli();
+	local_irq_save(flags);
 	info->xmit.head = info->xmit.tail = 0;
-	restore_flags(flags);
+	local_irq_restore(flags);
 	wake_up_interruptible(&tty->write_wait);
 	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
 	    tty->ldisc.write_wakeup)
@@ -1063,8 +1063,7 @@ static void rs_send_xchar(struct tty_struct *tty, char ch)
 		/* Make sure transmit interrupts are on */
 
 	        /* Check this ! */
-	        save_flags(flags);
-		cli();
+	        local_irq_save(flags);
 		if(!(custom.intenar & IF_TBE)) {
 		    custom.intena = IF_SETCLR | IF_TBE;
 		    mb();
@@ -1072,7 +1071,7 @@ static void rs_send_xchar(struct tty_struct *tty, char ch)
 		    custom.intreq = IF_SETCLR | IF_TBE;
 		    mb();
 		}
-		restore_flags(flags);
+		local_irq_restore(flags);
 
 		info->IER |= UART_IER_THRI;
 	}
@@ -1106,9 +1105,9 @@ static void rs_throttle(struct tty_struct * tty)
 	if (tty->termios->c_cflag & CRTSCTS)
 		info->MCR &= ~SER_RTS;
 
-	save_flags(flags); cli();
+	local_irq_save(flags);
 	rtsdtr_ctrl(info->MCR);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void rs_unthrottle(struct tty_struct * tty)
@@ -1133,9 +1132,9 @@ static void rs_unthrottle(struct tty_struct * tty)
 	}
 	if (tty->termios->c_cflag & CRTSCTS)
 		info->MCR |= SER_RTS;
-	save_flags(flags); cli();
+	local_irq_save(flags);
 	rtsdtr_ctrl(info->MCR);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /*
@@ -1256,10 +1255,10 @@ static int get_lsr_info(struct async_struct * info, unsigned int *value)
 	unsigned int result;
 	unsigned long flags;
 
-	save_flags(flags); cli();
+	local_irq_save(flags);
 	status = custom.serdatr;
 	mb();
-	restore_flags(flags);
+	local_irq_restore(flags);
 	result = ((status & SDR_TSRE) ? TIOCSER_TEMT : 0);
 	if (copy_to_user(value, &result, sizeof(int)))
 		return -EFAULT;
@@ -1274,9 +1273,9 @@ static int get_modem_info(struct async_struct * info, unsigned int *value)
 	unsigned long flags;
 
 	control = info->MCR;
-	save_flags(flags); cli();
+	local_irq_save(flags);
 	status = ciab.pra;
-	restore_flags(flags);
+	local_irq_restore(flags);
 	result =  ((control & SER_RTS) ? TIOCM_RTS : 0)
 		| ((control & SER_DTR) ? TIOCM_DTR : 0)
 		| (!(status  & SER_DCD) ? TIOCM_CAR : 0)
@@ -1317,9 +1316,9 @@ static int set_modem_info(struct async_struct * info, unsigned int cmd,
 	default:
 		return -EINVAL;
 	}
-	save_flags(flags); cli();
+	local_irq_save(flags);
 	rtsdtr_ctrl(info->MCR);
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return 0;
 }
 
@@ -1334,13 +1333,13 @@ static void rs_break(struct tty_struct *tty, int break_state)
 	if (serial_paranoia_check(info, tty->device, "rs_break"))
 		return;
 
-	save_flags(flags); cli();
+	local_irq_save(flags);
 	if (break_state == -1)
 	  custom.adkcon = AC_SETCLR | AC_UARTBRK;
 	else
 	  custom.adkcon = AC_UARTBRK;
 	mb();
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 
@@ -1394,18 +1393,18 @@ static int rs_ioctl(struct tty_struct *tty, struct file * file,
 		 * Caller should use TIOCGICOUNT to see which one it was
 		 */
 		case TIOCMIWAIT:
-			save_flags(flags); cli();
+			local_irq_save(flags);
 			/* note the counters on entry */
 			cprev = info->state->icount;
-			restore_flags(flags);
+			local_irq_restore(flags);
 			while (1) {
 				interruptible_sleep_on(&info->delta_msr_wait);
 				/* see if a signal did it */
 				if (signal_pending(current))
 					return -ERESTARTSYS;
-				save_flags(flags); cli();
+				local_irq_save(flags);
 				cnow = info->state->icount; /* atomic copy */
-				restore_flags(flags);
+				local_irq_restore(flags);
 				if (cnow.rng == cprev.rng && cnow.dsr == cprev.dsr && 
 				    cnow.dcd == cprev.dcd && cnow.cts == cprev.cts)
 					return -EIO; /* no change => error */
@@ -1426,9 +1425,9 @@ static int rs_ioctl(struct tty_struct *tty, struct file * file,
 		 *     RI where only 0->1 is counted.
 		 */
 		case TIOCGICOUNT:
-			save_flags(flags); cli();
+			local_irq_save(flags);
 			cnow = info->state->icount;
-			restore_flags(flags);
+			local_irq_restore(flags);
 			icount.cts = cnow.cts;
 			icount.dsr = cnow.dsr;
 			icount.rng = cnow.rng;
@@ -1473,9 +1472,9 @@ static void rs_set_termios(struct tty_struct *tty, struct termios *old_termios)
 	if ((old_termios->c_cflag & CBAUD) &&
 	    !(cflag & CBAUD)) {
 		info->MCR &= ~(SER_DTR|SER_RTS);
-		save_flags(flags); cli();
+		local_irq_save(flags);
 		rtsdtr_ctrl(info->MCR);
-		restore_flags(flags);
+		local_irq_restore(flags);
 	}
 
 	/* Handle transition away from B0 status */
@@ -1486,9 +1485,9 @@ static void rs_set_termios(struct tty_struct *tty, struct termios *old_termios)
 		    !test_bit(TTY_THROTTLED, &tty->flags)) {
 			info->MCR |= SER_RTS;
 		}
-		save_flags(flags); cli();
+		local_irq_save(flags);
 		rtsdtr_ctrl(info->MCR);
-		restore_flags(flags);
+		local_irq_restore(flags);
 	}
 
 	/* Handle turning off CRTSCTS */
@@ -1532,12 +1531,12 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 
 	state = info->state;
 
-	save_flags(flags); cli();
+	local_irq_save(flags);
 
 	if (tty_hung_up_p(filp)) {
 		DBG_CNT("before DEC-hung");
 		MOD_DEC_USE_COUNT;
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return;
 	}
 
@@ -1564,7 +1563,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	if (state->count) {
 		DBG_CNT("before DEC-2");
 		MOD_DEC_USE_COUNT;
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return;
 	}
 	info->flags |= ASYNC_CLOSING;
@@ -1624,7 +1623,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 			 ASYNC_CLOSING);
 	wake_up_interruptible(&info->close_wait);
 	MOD_DEC_USE_COUNT;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /*
@@ -1797,19 +1796,19 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	printk("block_til_ready before block: ttys%d, count = %d\n",
 	       state->line, state->count);
 #endif
-	save_flags(flags); cli();
+	local_irq_save(flags);
 	if (!tty_hung_up_p(filp)) {
 		extra_count = 1;
 		state->count--;
 	}
-	restore_flags(flags);
+	local_irq_restore(flags);
 	info->blocked_open++;
 	while (1) {
-		save_flags(flags); cli();
+		local_irq_save(flags);
 		if (!(info->flags & ASYNC_CALLOUT_ACTIVE) &&
 		    (tty->termios->c_cflag & CBAUD))
 		        rtsdtr_ctrl(SER_DTR|SER_RTS);
-		restore_flags(flags);
+		local_irq_restore(flags);
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (tty_hung_up_p(filp) ||
 		    !(info->flags & ASYNC_INITIALIZED)) {
@@ -2009,10 +2008,10 @@ static inline int line_info(char *buf, struct serial_state *state)
 		info->quot = 0;
 		info->tty = 0;
 	}
-	save_flags(flags); cli();
+	local_irq_save(flags);
 	status = ciab.pra;
 	control = info ? info->MCR : status;
-	restore_flags(flags); 
+	local_irq_restore(flags);
 
 	stat_buf[0] = 0;
 	stat_buf[1] = 0;
@@ -2207,8 +2206,7 @@ static int __init rs_init(void)
 	state->baud_base = amiga_colorclock;
 	state->xmit_fifo_size = 1;
 
-	save_flags (flags);
-	cli();
+	local_irq_save(flags);
 
 	/* set ISRs, and then disable the rx interrupts */
 	request_irq(IRQ_AMIGA_TBE, ser_tx_int, 0, "serial TX", state);
@@ -2222,7 +2220,7 @@ static int __init rs_init(void)
 	custom.intreq = IF_RBF | IF_TBE;
 	mb();
 
-	restore_flags (flags);
+	local_irq_restore(flags);
 
 	/*
 	 * set the appropriate directions for the modem control flags,

@@ -635,7 +635,7 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 		 * interface.
 		 */
                 if ((regs->cs & 3) == 0)
-                       goto clear_TF;
+                       goto clear_TF_reenable;
 		if ((tsk->ptrace & (PT_DTRACE|PT_PTRACED)) == PT_DTRACE)
 			goto clear_TF;
 	}
@@ -652,6 +652,9 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 clear_dr7:
 	asm("movq %0,%%db7"::"r"(0UL));
 	return;
+
+clear_TF_reenable:
+	set_tsk_thread_flag(tsk, TIF_SINGLESTEP);
 
 clear_TF:
 	regs->eflags &= ~TF_MASK;

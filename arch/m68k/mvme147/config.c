@@ -23,6 +23,7 @@
 #include <linux/major.h>
 #include <linux/genhd.h>
 #include <linux/rtc.h>
+#include <linux/interrupt.h>
 
 #include <asm/bootinfo.h>
 #include <asm/system.h>
@@ -209,10 +210,9 @@ static void scc_write (char ch)
 
 void m147_scc_write (struct console *co, const char *str, unsigned count)
 {
-	unsigned long	flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	while (count--)
 	{
@@ -220,7 +220,7 @@ void m147_scc_write (struct console *co, const char *str, unsigned count)
 			scc_write ('\r');
 		scc_write (*str++);
 	}
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 void mvme147_init_console_port (struct console *co, int cflag)

@@ -57,6 +57,7 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 
 #include <asm/setup.h>
 #include <asm/uaccess.h>
@@ -2050,8 +2051,7 @@ static void st_ovsc_switch(void)
 
     if (!(atari_switches & ATARI_SWITCH_OVSC_MASK))
 	return;
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
 
     mfp.tim_ct_b = 0x10;
     mfp.active_edge |= 8;
@@ -2079,7 +2079,7 @@ static void st_ovsc_switch(void)
 			   ((atari_switches&ATARI_SWITCH_OVSC_SND6) ? 0x40:0) |
 			   ((atari_switches&ATARI_SWITCH_OVSC_SND7) ? 0x80:0);
     }
-    restore_flags(flags);
+    local_irq_restore(flags);
 }
 
 /* ------------------- External Video ---------------------- */

@@ -820,31 +820,42 @@ asmlinkage void buserr_c(struct frame *fp)
 
 
 static int kstack_depth_to_print = 48;
-extern struct module kernel_module;
+
+extern char _stext, _etext;
+
+#ifdef CONFIG_MODULES
+
+/* FIXME: Accessed without a lock --RR */
+extern struct list_head modules;
 
 static inline int kernel_text_address(unsigned long addr)
 {
-#ifdef CONFIG_MODULES
 	struct module *mod;
-#endif
-	extern char _stext, _etext;
 
 	if (addr >= (unsigned long) &_stext &&
 	    addr <= (unsigned long) &_etext)
 		return 1;
 
-#ifdef CONFIG_MODULES
-	for (mod = module_list; mod != &kernel_module; mod = mod->next) {
+	list_for_each_entry(mod, &modules, list) {
 		/* mod_bound tests for addr being inside the vmalloc'ed
 		 * module area. Of course it'd be better to test only
 		 * for the .text subset... */
-		if (mod_bound(addr, 0, mod))
+		if (mod_bound((void *)addr, 0, mod))
 			return 1;
 	}
-#endif
 
 	return 0;
 }
+
+#else // !CONFIG_MODULES
+
+static inline int kernel_text_address(unsigned long addr)
+{
+	return (addr >= (unsigned long) &_stext &&
+		addr <= (unsigned long) &_etext);
+}
+
+#endif // !CONFIG_MODULES
 
 void show_trace(unsigned long *stack)
 {

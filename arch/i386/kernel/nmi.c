@@ -123,7 +123,7 @@ static int __init setup_nmi_watchdog(char *str)
 		nmi_watchdog = nmi;
 	if ((nmi == NMI_LOCAL_APIC) &&
 			(boot_cpu_data.x86_vendor == X86_VENDOR_AMD) &&
-			(boot_cpu_data.x86 == 6))
+	  		(boot_cpu_data.x86 == 6 || boot_cpu_data.x86 == 15))
 		nmi_watchdog = nmi;
 	/*
 	 * We can enable the IO-APIC watchdog
@@ -294,7 +294,7 @@ void __pminit setup_apic_nmi_watchdog (void)
 {
 	switch (boot_cpu_data.x86_vendor) {
 	case X86_VENDOR_AMD:
-		if (boot_cpu_data.x86 != 6)
+		if (boot_cpu_data.x86 != 6 && boot_cpu_data.x86 != 15)
 			return;
 		setup_k7_watchdog();
 		break;

@@ -288,9 +288,13 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
  * nop for these.
  */
  
+#ifdef CONFIG_X86_SSE2
+#define mb()	asm volatile("mfence" ::: "memory")
+#define rmb()	asm volatile("lfence" ::: "memory")
+#else
 #define mb() 	__asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory")
 #define rmb()	mb()
-
+#endif
 /**
  * read_barrier_depends - Flush all pending reads that subsequents reads
  * depend on.

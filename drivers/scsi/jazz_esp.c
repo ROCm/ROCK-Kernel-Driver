@@ -18,7 +18,6 @@
 #include "scsi.h"
 #include "hosts.h"
 #include "NCR53C9x.h"
-#include "jazz_esp.h"
 
 #include <asm/irq.h>
 #include <asm/jazz.h>
@@ -273,3 +272,21 @@ static void dma_led_on(struct NCR_ESP *esp)
     *(unsigned char *)JAZZ_HDC_LED = 1;
 #endif    
 }
+
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "esp",
+	.proc_info		= &esp_proc_info,
+	.name			= "ESP 100/100a/200",
+	.detect			= jazz_esp_detect,
+	.info			= esp_info,
+	.command		= esp_command,
+	.queuecommand		= esp_queue,
+	.eh_abort_handler	= esp_abort,
+	.eh_bus_reset_handler	= esp_reset,
+	.can_queue		= 7,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 1,
+	.use_clustering		= DISABLE_CLUSTERING,
+};
+

@@ -11,6 +11,10 @@
 
 #include <asm/timer.h>
 #include <asm/io.h>
+/* processor.h for distable_tsc flag */
+#include <asm/processor.h>
+
+int tsc_disable __initdata = 0;
 
 extern int x86_udelay_tsc;
 extern spinlock_t i8253_lock;
@@ -286,6 +290,18 @@ static int init_tsc(void)
 	}
 	return -ENODEV;
 }
+
+/* disable flag for tsc.  Takes effect by clearing the TSC cpu flag
+ * in cpu/common.c */
+static int __init tsc_setup(char *str)
+{
+	tsc_disable = 1;
+	return 1;
+}
+
+__setup("notsc", tsc_setup);
+
+
 
 /************************************************************/
 

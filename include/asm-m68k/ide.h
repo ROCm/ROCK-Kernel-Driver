@@ -147,26 +147,28 @@ static __inline__ void ide_init_default_hwifs(void)
 #ifdef CONFIG_ATARI
 #define ATA_ARCH_LOCK
 
-static __inline__ void ide_release_lock (int *ide_lock)
+extern int ide_intr_lock;
+
+static __inline__ void ide_release_lock (void)
 {
 	if (MACH_IS_ATARI) {
-		if (*ide_lock == 0) {
+		if (ide_intr_lock == 0) {
 			printk("ide_release_lock: bug\n");
 			return;
 		}
-		*ide_lock = 0;
+		ide_intr_lock = 0;
 		stdma_release();
 	}
 }
 
-static __inline__ void ide_get_lock (int *ide_lock, void (*handler)(int, void *, struct pt_regs *), void *data)
+static __inline__ void ide_get_lock(void (*handler)(int, void *, struct pt_regs *), void *data)
 {
 	if (MACH_IS_ATARI) {
-		if (*ide_lock == 0) {
+		if (ide_intr_lock == 0) {
 			if (in_interrupt() > 0)
 				panic( "Falcon IDE hasn't ST-DMA lock in interrupt" );
 			stdma_lock(handler, data);
-			*ide_lock = 1;
+			ide_intr_lock = 1;
 		}
 	}
 }

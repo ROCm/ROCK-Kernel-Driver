@@ -574,7 +574,7 @@ static int lance_start_xmit( struct sk_buff *skb, struct net_device *dev )
 #endif	
 	/* We're not prepared for the int until the last flags are set/reset.
 	 * And the int may happen already after setting the OWN_CHIP... */
-	save_and_cli(flags);
+	local_irq_save(flags);
 
 	/* Mask to ring buffer boundary. */
 	entry = lp->new_tx;
@@ -610,7 +610,7 @@ static int lance_start_xmit( struct sk_buff *skb, struct net_device *dev )
 	    TMD1_OWN_HOST) 
 		netif_start_queue(dev);
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	return 0;
 }
