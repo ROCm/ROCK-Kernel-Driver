@@ -22,6 +22,11 @@ struct desc_struct {
 	unsigned long a,b;
 };
 
+#define desc_empty(desc) \
+		(!((desc)->a + (desc)->b))
+
+#define desc_equal(desc1, desc2) \
+		(((desc1)->a == (desc2)->a) && ((desc1)->b == (desc2)->b))
 /*
  * Default implementation of macro that returns current
  * instruction pointer ("program counter").
@@ -359,6 +364,8 @@ struct tss_struct {
 };
 
 struct thread_struct {
+/* cached TLS descriptors. */
+	struct desc_struct tls_array[GDT_ENTRY_TLS_ENTRIES];
 	unsigned long	esp0;
 	unsigned long	eip;
 	unsigned long	esp;
@@ -376,11 +383,10 @@ struct thread_struct {
 	unsigned long		v86flags, v86mask, v86mode, saved_esp0;
 /* IO permissions */
 	unsigned long	*ts_io_bitmap;
-/* TLS cached descriptor */
-	struct desc_struct tls_desc;
 };
 
 #define INIT_THREAD  {						\
+	{ { 0, 0 } , },						\
 	0,							\
 	0, 0, 0, 0, 						\
 	{ [0 ... 7] = 0 },	/* debugging registers */	\
@@ -401,7 +407,7 @@ struct thread_struct {
 	0,0,0,0, /* esp,ebp,esi,edi */				\
 	0,0,0,0,0,0, /* es,cs,ss */				\
 	0,0,0,0,0,0, /* ds,fs,gs */				\
-	LDT_ENTRY,0, /* ldt */					\
+	GDT_ENTRY_LDT,0, /* ldt */					\
 	0, INVALID_IO_BITMAP_OFFSET, /* tace, bitmap */		\
 	{~0, } /* ioperm */					\
 }

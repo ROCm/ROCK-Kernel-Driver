@@ -170,7 +170,7 @@ static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
 	struct mm_struct * mm = current->mm;
 	__u32 entry_1, entry_2, *lp;
 	int error;
-	struct modify_ldt_ldt_s ldt_info;
+	struct user_desc ldt_info;
 
 	error = -EINVAL;
 	if (bytecount != sizeof(ldt_info))
@@ -200,32 +200,17 @@ static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
 
    	/* Allow LDTs to be cleared by the user. */
    	if (ldt_info.base_addr == 0 && ldt_info.limit == 0) {
-		if (oldmode ||
-		    (ldt_info.contents == 0		&&
-		     ldt_info.read_exec_only == 1	&&
-		     ldt_info.seg_32bit == 0		&&
-		     ldt_info.limit_in_pages == 0	&&
-		     ldt_info.seg_not_present == 1	&&
-		     ldt_info.useable == 0 )) {
+		if (oldmode || LDT_empty(&ldt_info)) {
 			entry_1 = 0;
 			entry_2 = 0;
 			goto install;
 		}
 	}
 
-	entry_1 = ((ldt_info.base_addr & 0x0000ffff) << 16) |
-		  (ldt_info.limit & 0x0ffff);
-	entry_2 = (ldt_info.base_addr & 0xff000000) |
-		  ((ldt_info.base_addr & 0x00ff0000) >> 16) |
-		  (ldt_info.limit & 0xf0000) |
-		  ((ldt_info.read_exec_only ^ 1) << 9) |
-		  (ldt_info.contents << 10) |
-		  ((ldt_info.seg_not_present ^ 1) << 15) |
-		  (ldt_info.seg_32bit << 22) |
-		  (ldt_info.limit_in_pages << 23) |
-		  0x7000;
-	if (!oldmode)
-		entry_2 |= (ldt_info.useable << 20);
+	entry_1 = LDT_entry_a(&ldt_info);
+	entry_2 = LDT_entry_b(&ldt_info);
+	if (oldmode)
+		entry_2 &= ~(1 << 20);
 
 	/* Install the new entry ...  */
 install:
