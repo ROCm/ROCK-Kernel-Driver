@@ -152,15 +152,15 @@ int ipv6_addr_type(struct in6_addr *addr)
 		int type = IPV6_ADDR_MULTICAST;
 
 		switch((st & htonl(0x00FF0000))) {
-			case htonl(0x00010000):
+			case __constant_htonl(0x00010000):
 				type |= IPV6_ADDR_LOOPBACK;
 				break;
 
-			case htonl(0x00020000):
+			case __constant_htonl(0x00020000):
 				type |= IPV6_ADDR_LINKLOCAL;
 				break;
 
-			case htonl(0x00050000):
+			case __constant_htonl(0x00050000):
 				type |= IPV6_ADDR_SITELOCAL;
 				break;
 		};
