@@ -104,9 +104,12 @@ reset_netjet_s(struct IsdnCardState *cs)
 	cs->hw.njet.ctrl_reg = 0xff;  /* Reset On */
 	byteout(cs->hw.njet.base + NETJET_CTRL, cs->hw.njet.ctrl_reg);
 	mdelay(10);
-	cs->hw.njet.ctrl_reg = 0x00;  /* Reset Off and status read clear */
 	/* now edge triggered for TJ320 GE 13/07/00 */
 	/* see comment in IRQ function */
+	if (cs->subtyp) /* TJ320 */
+		cs->hw.njet.ctrl_reg = 0x40;  /* Reset Off and status read clear */
+	else
+		cs->hw.njet.ctrl_reg = 0x00;  /* Reset Off and status read clear */
 	byteout(cs->hw.njet.base + NETJET_CTRL, cs->hw.njet.ctrl_reg);
 	mdelay(10);
 	cs->hw.njet.auxd = 0;
@@ -151,7 +154,7 @@ static struct pci_dev *dev_netjet __initdata = NULL;
 int __init
 setup_netjet_s(struct IsdnCard *card)
 {
-	int bytecnt;
+	int bytecnt,cfg;
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
@@ -183,6 +186,15 @@ setup_netjet_s(struct IsdnCard *card)
 				printk(KERN_WARNING "NETjet-S: No IO-Adr for PCI card found\n");
 				return(0);
 			}
+			/* the TJ300 and TJ320 must be detected, the IRQ handling is different
+			 * unfortunatly the chips use the same device ID, but the TJ320 has
+			 * the bit20 in status PCI cfg register set
+			 */
+			pci_read_config_dword(dev_netjet, 0x04, &cfg);
+			if (cfg & 0x00100000)
+				cs->subtyp = 1; /* TJ320 */
+			else
+				cs->subtyp = 0; /* TJ300 */
 			/* 2001/10/04 Christoph Ersfeld, Formula-n Europe AG www.formula-n.com */
 			if ((dev_netjet->subsystem_vendor == 0x55) &&
 				(dev_netjet->subsystem_device == 0x02)) {
@@ -240,8 +252,8 @@ setup_netjet_s(struct IsdnCard *card)
 	bytecnt = 256;
 
 	printk(KERN_INFO
-		"NETjet-S: PCI card configured at %#lx IRQ %d\n",
-		cs->hw.njet.base, cs->irq);
+		"NETjet-S: %s card configured at %#lx IRQ %d\n",
+		cs->subtyp ? "TJ320" : "TJ300", cs->hw.njet.base, cs->irq);
 	if (!request_region(cs->hw.njet.base, bytecnt, "netjet-s isdn")) {
 		printk(KERN_WARNING
 		       "HiSax: %s config port %#lx-%#lx already in use\n",
