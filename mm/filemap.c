@@ -60,6 +60,7 @@
  *      ->swap_list_lock
  *        ->swap_device_lock	(exclusive_swap_page, others)
  *          ->mapping->page_lock
+ *
  *  ->mmap_sem
  *    ->i_shared_sem		(various places)
  *
@@ -69,10 +70,12 @@
  *  ->inode_lock
  *    ->sb_lock			(fs/fs-writeback.c)
  *    ->mapping->page_lock	(__sync_single_inode)
+ *
  *  ->page_table_lock
  *    ->swap_device_lock	(try_to_unmap_one)
  *    ->private_lock		(try_to_unmap_one)
  *    ->page_lock		(try_to_unmap_one)
+ *    ->zone.lru_lock		(follow_page->mark_page_accessed)
  */
 
 /*

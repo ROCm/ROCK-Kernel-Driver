@@ -646,8 +646,12 @@ follow_page(struct mm_struct *mm, unsigned long address, int write)
 	if (pte_present(pte)) {
 		if (!write || (pte_write(pte) && pte_dirty(pte))) {
 			pfn = pte_pfn(pte);
-			if (pfn_valid(pfn))
-				return pfn_to_page(pfn);
+			if (pfn_valid(pfn)) {
+				struct page *page = pfn_to_page(pfn);
+
+				mark_page_accessed(page);
+				return page;
+			}
 		}
 	}
 
