@@ -767,6 +767,14 @@ static int check_version(Elf_Shdr *sechdrs,
 	}
 	return 1;
 }
+
+/* First part is kernel version, which we ignore. */
+static inline int same_magic(const char *amagic, const char *bmagic)
+{
+	amagic += strcspn(amagic, " ");
+	bmagic += strcspn(bmagic, " ");
+	return strcmp(amagic, bmagic) == 0;
+}
 #else
 static inline int check_version(Elf_Shdr *sechdrs,
 				unsigned int versindex,
@@ -776,6 +784,11 @@ static inline int check_version(Elf_Shdr *sechdrs,
 				unsigned int symidx)
 {
 	return 1;
+}
+
+static inline int same_magic(const char *amagic, const char *bmagic)
+{
+	return strcmp(amagic, bmagic) == 0;
 }
 #endif /* CONFIG_MODVERSIONS */
 
@@ -1177,7 +1190,7 @@ static struct module *load_module(void *umod,
 		tainted |= TAINT_FORCED_MODULE;
 		printk(KERN_WARNING "%s: no version magic, tainting kernel.\n",
 		       mod->name);
-	} else if (strcmp((char *)sechdrs[vmagindex].sh_addr, vermagic) != 0) {
+	} else if (!same_magic((char *)sechdrs[vmagindex].sh_addr, vermagic)) {
 		printk(KERN_ERR "%s: version magic '%s' should be '%s'\n",
 		       mod->name, (char*)sechdrs[vmagindex].sh_addr, vermagic);
 		err = -ENOEXEC;
