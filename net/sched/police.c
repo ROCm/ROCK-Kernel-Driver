@@ -224,7 +224,7 @@ override:
 		}
 	}
 	/* No failure allowed after this point */
-	spin_lock(&p->lock);
+	spin_lock_bh(&p->lock);
 	if (R_tab != NULL) {
 		qdisc_put_rtab(p->R_tab);
 		p->R_tab = R_tab;
@@ -254,7 +254,7 @@ override:
 		gen_replace_estimator(&p->bstats, &p->rate_est, p->stats_lock, est);
 #endif
 
-	spin_unlock(&p->lock);
+	spin_unlock_bh(&p->lock);
 	if (ret != ACT_P_CREATED)
 		return ret;
 

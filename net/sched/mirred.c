@@ -126,7 +126,7 @@ tcf_mirred_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,
 		}
 	}
 
-	spin_lock(&p->lock);
+	spin_lock_bh(&p->lock);
 	p->action = parm->action;
 	p->eaction = parm->eaction;
 	if (parm->ifindex) {
@@ -137,7 +137,7 @@ tcf_mirred_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,
 		dev_hold(dev);
 		p->ok_push = ok_push;
 	}
-	spin_unlock(&p->lock);
+	spin_unlock_bh(&p->lock);
 	if (ret == ACT_P_CREATED)
 		tcf_hash_insert(p);
 
