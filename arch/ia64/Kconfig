@@ -846,7 +846,7 @@ config MAGIC_SYSRQ
 
 config IA64_EARLY_PRINTK
 	bool "Early printk support"
-	depends on DEBUG_KERNEL
+	depends on DEBUG_KERNEL && !IA64_GENERIC
 	help
 	  Selecting this option uses the VGA screen or serial console for
 	  printk() output before the consoles are initialised.  It is useful
