@@ -31,8 +31,13 @@
 #define CIFS_XATTR_DOS_ATTRIB "user.DosAttrib"
 #define CIFS_XATTR_USER_PREFIX "user."
 #define CIFS_XATTR_SYSTEM_PREFIX "system."
-#define CIFS_XATTR_OS2_PREFIX "os2." /* BB should check for this someday */
-/* also note could add check for security prefix XATTR_SECURITY_PREFIX */ 
+#define CIFS_XATTR_OS2_PREFIX "os2."
+#define CIFS_XATTR_SECURITY_PREFIX ".security"
+#define CIFS_XATTR_TRUSTED_PREFIX "trusted."
+#define XATTR_TRUSTED_PREFIX_LEN  8
+#define XATTR_SECURITY_PREFIX_LEN 9
+/* BB need to add server (Samba e.g) support for security and trusted prefix */
+  
 
 
 int cifs_removexattr(struct dentry * direntry, const char * ea_name)
@@ -240,7 +245,13 @@ ssize_t cifs_getxattr(struct dentry * direntry, const char * ea_name,
 #else 
 		cFYI(1,("query POSIX default ACL not supported yet"));
 #endif
-    } else {
+	} else if(strncmp(ea_name,
+		  CIFS_XATTR_TRUSTED_PREFIX,XATTR_TRUSTED_PREFIX_LEN) == 0) {
+		cFYI(1,("Trusted xattr namespace not supported yet"));
+	} else if(strncmp(ea_name,
+		  CIFS_XATTR_SECURITY_PREFIX,XATTR_SECURITY_PREFIX_LEN) == 0) {
+		cFYI(1,("Security xattr namespace not supported yet"));
+	} else {
 		cFYI(1,("illegal xattr name request %s (only user namespace supported)",ea_name));
 	}
 
