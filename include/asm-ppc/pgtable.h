@@ -65,13 +65,23 @@ extern unsigned long ioremap_bot, ioremap_base;
  * and ITLB, respectively (see "mmu.h" for definitions).
  */
 
-/* PMD_SHIFT determines the size of the area mapped by the second-level page tables */
-#define PMD_SHIFT	22
+/*
+ * The normal case is that PTEs are 32-bits and we have a 1-page
+ * 1024-entry pgdir pointing to 1-page 1024-entry PTE pages.  -- paulus
+ *
+ * For any >32-bit physical address platform, we can use the following
+ * two level page table layout where the pgdir is 8KB and the MS 13 bits
+ * are an index to the second level table.  The combined pgdir/pmd first
+ * level has 2048 entries and the second level has 512 64-bit PTE entries.
+ * -Matt
+ */
+/* PMD_SHIFT determines the size of the area mapped by the PTE pages */
+#define PMD_SHIFT	(PAGE_SHIFT + PTE_SHIFT)
 #define PMD_SIZE	(1UL << PMD_SHIFT)
 #define PMD_MASK	(~(PMD_SIZE-1))
 
-/* PGDIR_SHIFT determines what a third-level page table entry can map */
-#define PGDIR_SHIFT	22
+/* PGDIR_SHIFT determines what a top-level page table entry can map */
+#define PGDIR_SHIFT	PMD_SHIFT
 #define PGDIR_SIZE	(1UL << PGDIR_SHIFT)
 #define PGDIR_MASK	(~(PGDIR_SIZE-1))
 
@@ -79,9 +89,10 @@ extern unsigned long ioremap_bot, ioremap_base;
  * entries per page directory level: our page-table tree is two-level, so
  * we don't really have any PMD directory.
  */
-#define PTRS_PER_PTE	1024
+#define PTRS_PER_PTE	(1 << PTE_SHIFT)
 #define PTRS_PER_PMD	1
-#define PTRS_PER_PGD	1024
+#define PTRS_PER_PGD	(1 << (32 - PGDIR_SHIFT))
+
 #define USER_PTRS_PER_PGD	(TASK_SIZE / PGDIR_SIZE)
 #define FIRST_USER_PGD_NR	0
 
@@ -89,7 +100,7 @@ extern unsigned long ioremap_bot, ioremap_base;
 #define KERNEL_PGD_PTRS (PTRS_PER_PGD-USER_PGD_PTRS)
 
 #define pte_ERROR(e) \
-	printk("%s:%d: bad pte %08lx.\n", __FILE__, __LINE__, pte_val(e))
+	printk("%s:%d: bad pte "PTE_FMT".\n", __FILE__, __LINE__, pte_val(e))
 #define pmd_ERROR(e) \
 	printk("%s:%d: bad pmd %08lx.\n", __FILE__, __LINE__, pmd_val(e))
 #define pgd_ERROR(e) \
@@ -113,7 +124,11 @@ extern unsigned long ioremap_bot, ioremap_base;
  * of RAM.  -- Cort
  */
 #define VMALLOC_OFFSET (0x1000000) /* 16M */
+#ifdef CONFIG_44x
+#define VMALLOC_START (((_ALIGN((long)high_memory, PPC44x_PIN_SIZE) + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1)))
+#else
 #define VMALLOC_START ((((long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1)))
+#endif
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
 #define VMALLOC_END	ioremap_bot
 
@@ -169,6 +184,44 @@ extern unsigned long ioremap_bot, ioremap_base;
 #define _PMD_SIZE_4M	0x0c0
 #define _PMD_SIZE_16M	0x0e0
 #define PMD_PAGE_SIZE(pmdval)	(1024 << (((pmdval) & _PMD_SIZE) >> 4))
+
+#elif defined(CONFIG_44x)
+/*
+ * Definitions for PPC440
+ *
+ * Because of the 3 word TLB entries to support 36-bit addressing,
+ * the attribute are difficult to map in such a fashion that they
+ * are easily loaded during exception processing.  I decided to
+ * organize the entry so the ERPN is the only portion in the
+ * upper word of the PTE and the attribute bits below are packed
+ * in as sensibly as they can be in the area below a 4KB page size
+ * oriented RPN.  This at least makes it easy to load the RPN and
+ * ERPN fields in the TLB. -Matt
+ *
+ * Note that these bits preclude future use of a page size
+ * less than 4KB.
+ */
+#define _PAGE_PRESENT	0x00000001		/* S: PTE valid */
+#define	_PAGE_RW	0x00000002		/* S: Write permission */
+#define	_PAGE_DIRTY	0x00000004		/* S: Page dirty */
+#define _PAGE_ACCESSED	0x00000008		/* S: Page referenced */
+#define _PAGE_HWWRITE	0x00000010		/* H: Dirty & RW */
+#define _PAGE_HWEXEC	0x00000020		/* H: Execute permission */
+#define	_PAGE_USER	0x00000040		/* S: User page */
+#define	_PAGE_ENDIAN	0x00000080		/* H: E bit */
+#define	_PAGE_GUARDED	0x00000100		/* H: G bit */
+#define	_PAGE_COHERENT	0x00000200		/* H: M bit */
+#define _PAGE_FILE	0x00000400		/* S: nonlinear file mapping */
+#define	_PAGE_NO_CACHE	0x00000400		/* H: I bit */
+#define	_PAGE_WRITETHRU	0x00000800		/* H: W bit */
+
+/* TODO: Add large page lowmem mapping support */
+#define _PMD_PRESENT	0
+#define _PMD_PRESENT_MASK (PAGE_MASK)
+#define _PMD_BAD	(~PAGE_MASK)
+
+/* ERPN in a PTE never gets cleared, ignore it */
+#define _PTE_NONE_MASK	0xffffffff00000000ULL
 
 #elif defined(CONFIG_8xx)
 /* Definitions for 8xx embedded chips. */
@@ -270,7 +323,11 @@ extern unsigned long ioremap_bot, ioremap_base;
 
 #define _PAGE_BASE	(_PAGE_PRESENT | _PAGE_ACCESSED)
 #define _PAGE_WRENABLE	(_PAGE_RW | _PAGE_DIRTY | _PAGE_HWWRITE)
+#ifndef CONFIG_44x
 #define _PAGE_KERNEL	(_PAGE_BASE | _PAGE_SHARED | _PAGE_WRENABLE)
+#else
+#define _PAGE_KERNEL	(_PAGE_BASE | _PAGE_SHARED | _PAGE_WRENABLE | _PAGE_GUARDED)
+#endif
 
 #ifdef CONFIG_PPC_STD_MMU
 /* On standard PPC MMU, no user access implies kernel read/write access,
@@ -283,7 +340,7 @@ extern unsigned long ioremap_bot, ioremap_base;
 #define _PAGE_IO	(_PAGE_KERNEL | _PAGE_NO_CACHE | _PAGE_GUARDED)
 #define _PAGE_RAM	(_PAGE_KERNEL | _PAGE_HWEXEC)
 
-#if defined(CONFIG_KGDB) || defined(CONFIG_XMON)
+#if defined(CONFIG_KGDB) || defined(CONFIG_XMON) || defined(CONFIG_BDI_SWITCH)
 /* We want the debuggers to be able to set breakpoints anywhere, so
  * don't write protect the kernel text */
 #define _PAGE_RAM_TEXT	_PAGE_RAM
@@ -420,6 +477,8 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
  *
  * pte_update clears and sets bit atomically, and returns
  * the old pte value.
+ * The ((unsigned long)(p+1) - 4) hack is to get to the least-significant
+ * 32 bits of the PTE regardless of whether PTEs are 32 or 64 bits.
  */
 static inline unsigned long pte_update(pte_t *p, unsigned long clr,
 				       unsigned long set)
@@ -434,7 +493,7 @@ static inline unsigned long pte_update(pte_t *p, unsigned long clr,
 "	stwcx.	%1,0,%3\n\
 	bne-	1b"
 	: "=&r" (old), "=&r" (tmp), "=m" (*p)
-	: "r" (p), "r" (clr), "r" (set), "m" (*p)
+	: "r" ((unsigned long)(p+1) - 4), "r" (clr), "r" (set), "m" (*p)
 	: "cc" );
 	return old;
 }
@@ -485,11 +544,25 @@ static inline void ptep_mkdirty(pte_t *ptep)
 
 #define pte_same(A,B)	(((pte_val(A) ^ pte_val(B)) & ~_PAGE_HASHPTE) == 0)
 
+/*
+ * Note that on Book E processors, the pmd contains the kernel virtual
+ * (lowmem) address of the pte page.  The physical address is less useful
+ * because everything runs with translation enabled (even the TLB miss
+ * handler).  On everything else the pmd contains the physical address
+ * of the pte page.  -- paulus
+ */
+#ifndef CONFIG_BOOKE
 #define pmd_page_kernel(pmd)	\
 	((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
 #define pmd_page(pmd)		\
 	(mem_map + (pmd_val(pmd) >> PAGE_SHIFT))
-
+#else
+#define pmd_page_kernel(pmd)	\
+	((unsigned long) (pmd_val(pmd) & PAGE_MASK))
+#define pmd_page(pmd)		\
+	(mem_map + (__pa(pmd_val(pmd)) >> PAGE_SHIFT))
+#endif
+	
 /* to find an entry in a kernel page-table-directory */
 #define pgd_offset_k(address) pgd_offset(&init_mm, address)
 
@@ -516,7 +589,8 @@ static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 #define pte_unmap(pte)		kunmap_atomic(pte, KM_PTE0)
 #define pte_unmap_nested(pte)	kunmap_atomic(pte, KM_PTE1)
 
-extern pgd_t swapper_pg_dir[1024];
+extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+
 extern void paging_init(void);
 
 /*

@@ -13,6 +13,8 @@ CFLAGS_prom_init.o      += -mrelocatable-lib
 CFLAGS_btext.o          += -mrelocatable-lib
 
 obj-$(CONFIG_PPCBUG_NVRAM)	+= prep_nvram.o
+obj-$(CONFIG_44x)		+= ibm44x_common.o
+obj-$(CONFIG_440GP)		+= ibm440gp_common.o
 ifeq ($(CONFIG_4xx),y)
 obj-$(CONFIG_4xx)		+= ppc4xx_pic.o
 obj-$(CONFIG_40x)		+= ppc4xx_setup.o
@@ -33,6 +35,7 @@ obj-$(CONFIG_PPC_CHRP)		+= open_pic.o indirect_pci.o i8259.o
 obj-$(CONFIG_PPC_PREP)		+= open_pic.o indirect_pci.o i8259.o
 obj-$(CONFIG_ADIR)		+= i8259.o indirect_pci.o pci_auto.o \
 					todc_time.o
+obj-$(CONFIG_EBONY)		+= indirect_pci.o pci_auto.o todc_time.o
 obj-$(CONFIG_EV64260)		+= gt64260_common.o gt64260_pic.o \
 					indirect_pci.o todc_time.o pci_auto.o
 obj-$(CONFIG_GEMINI)		+= open_pic.o i8259.o indirect_pci.o
@@ -46,6 +49,7 @@ obj-$(CONFIG_MENF1)		+= todc_time.o i8259.o mpc10x_common.o \
 					pci_auto.o indirect_pci.o
 obj-$(CONFIG_MVME5100)		+= open_pic.o todc_time.o indirect_pci.o \
 					i8259.o pci_auto.o pplus_common.o
+obj-$(CONFIG_OCOTEA)		+= indirect_pci.o pci_auto.o todc_time.o
 obj-$(CONFIG_PAL4)		+= cpc700_pic.o
 obj-$(CONFIG_PCORE)		+= mpc10x_common.o todc_time.o i8259.o \
 					indirect_pci.o pci_auto.o

@@ -28,7 +28,7 @@
 #include <platforms/sandpoint.h>
 #elif defined(CONFIG_SPRUCE)
 #include <platforms/spruce_serial.h>
-#elif defined(CONFIG_40x)
+#elif defined(CONFIG_4xx)
 #include <asm/ibm4xx.h>
 #else
 

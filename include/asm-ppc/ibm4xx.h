@@ -122,7 +122,25 @@ void ppc4xx_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #define PCI_DRAM_OFFSET	0
 #endif
 
+#elif CONFIG_44x
+
+#if defined(CONFIG_EBONY)
+#include <platforms/4xx/ebony.h>
+#endif
+
+#if defined(CONFIG_OCOTEA)
+#include <platforms/4xx/ocotea.h>
+#endif
 
 #endif /* CONFIG_40x */
+
+#ifndef __ASSEMBLY__
+/*
+ * The "residual" board information structure the boot loader passes
+ * into the kernel.
+ */
+extern bd_t __res;
+#endif
+
 #endif /* __ASM_IBM4XX_H__ */
 #endif /* __KERNEL__ */
