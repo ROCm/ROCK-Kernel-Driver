@@ -265,7 +265,7 @@ static char * card_names[] = {
 	"Tvia/IGST CyberPro 5050"
 };
 
-static struct pci_device_id trident_pci_tbl [] __devinitdata = {
+static struct pci_device_id trident_pci_tbl [] = {
 	{PCI_VENDOR_ID_TRIDENT, PCI_DEVICE_ID_TRIDENT_4DWAVE_DX,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, TRIDENT_4D_DX},
 	{PCI_VENDOR_ID_TRIDENT, PCI_DEVICE_ID_TRIDENT_4DWAVE_NX,

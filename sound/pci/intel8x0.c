@@ -395,7 +395,7 @@ struct _snd_intel8x0 {
 #endif
 };
 
-static struct pci_device_id snd_intel8x0_ids[] __devinitdata = {
+static struct pci_device_id snd_intel8x0_ids[] = {
 	{ 0x8086, 0x2415, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* 82801AA */
 	{ 0x8086, 0x2425, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* 82901AB */
 	{ 0x8086, 0x2445, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* 82801BA */
@@ -2479,7 +2479,7 @@ static int __devinit snd_intel8x0_joystick_probe(struct pci_dev *pci,
 	return 0;
 }
 
-static struct pci_device_id snd_intel8x0_joystick_ids[] __devinitdata = {
+static struct pci_device_id snd_intel8x0_joystick_ids[] = {
 	{ 0x8086, 0x2410, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* 82801AA */
 	{ 0x8086, 0x2420, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* 82901AB */
 	{ 0x8086, 0x2440, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 }, /* ICH2 */

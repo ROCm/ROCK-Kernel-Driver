@@ -328,7 +328,7 @@ static char *card_names[] = {
 .driver_data = TYPE,				\
 }
 
-static struct pci_device_id m3_id_table[] __initdata = {
+static struct pci_device_id m3_id_table[] = {
     M3_DEVICE(0x1988, ESS_ALLEGRO),
     M3_DEVICE(0x1998, ESS_MAESTRO3),
     M3_DEVICE(0x199a, ESS_MAESTRO3HW),

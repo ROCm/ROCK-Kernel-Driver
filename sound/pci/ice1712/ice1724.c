@@ -77,7 +77,7 @@ MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #define PCI_DEVICE_ID_VT1724		0x1724
 #endif
 
-static struct pci_device_id snd_vt1724_ids[] __devinitdata = {
+static struct pci_device_id snd_vt1724_ids[] = {
 	{ PCI_VENDOR_ID_ICE, PCI_DEVICE_ID_VT1724, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ 0, }
 };

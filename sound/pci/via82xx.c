@@ -452,7 +452,7 @@ struct _snd_via82xx {
 	snd_info_entry_t *proc_entry;
 };
 
-static struct pci_device_id snd_via82xx_ids[] __devinitdata = {
+static struct pci_device_id snd_via82xx_ids[] = {
 	{ 0x1106, 0x3058, PCI_ANY_ID, PCI_ANY_ID, 0, 0, TYPE_CARD_VIA686, },	/* 686A */
 	{ 0x1106, 0x3059, PCI_ANY_ID, PCI_ANY_ID, 0, 0, TYPE_CARD_VIA8233, },	/* VT8233 */
 	{ 0, }

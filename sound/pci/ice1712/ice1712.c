@@ -103,7 +103,7 @@ MODULE_PARM_SYNTAX(omni, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
 #define PCI_DEVICE_ID_ICE_1712		0x1712
 #endif
 
-static struct pci_device_id snd_ice1712_ids[] __devinitdata = {
+static struct pci_device_id snd_ice1712_ids[] = {
 	{ PCI_VENDOR_ID_ICE, PCI_DEVICE_ID_ICE_1712, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },   /* ICE1712 */
 	{ 0, }
 };

@@ -437,7 +437,7 @@ extern void *snd_hammerfall_get_buffer(struct pci_dev *, dma_addr_t *dmaaddr);
 extern void snd_hammerfall_free_buffer(struct pci_dev *, void *ptr);
 #endif
 
-static struct pci_device_id snd_hdsp_ids[] __devinitdata = {
+static struct pci_device_id snd_hdsp_ids[] = {
 	{
 		.vendor = PCI_VENDOR_ID_XILINX,
 		.device = PCI_DEVICE_ID_XILINX_HAMMERFALL_DSP, 

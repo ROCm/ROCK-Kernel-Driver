@@ -69,7 +69,7 @@ MODULE_PARM(wavetable_size, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(wavetable_size, "Maximum memory size in kB for wavetable synth.");
 MODULE_PARM_SYNTAX(wavetable_size, SNDRV_ENABLED ",default:8192,skill:advanced");
 
-static struct pci_device_id snd_trident_ids[] __devinitdata = {
+static struct pci_device_id snd_trident_ids[] = {
 	{ 0x1023, 0x2000, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },	/* Trident 4DWave DX PCI Audio */
 	{ 0x1023, 0x2001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },	/* Trident 4DWave NX PCI Audio */
 	{ 0x1039, 0x7018, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },	/* SiS SI7018 PCI Audio */
