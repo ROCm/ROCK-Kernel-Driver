@@ -45,6 +45,7 @@
 #include "revo.h"
 #include "aureon.h"
 #include "vt1720_mobo.h"
+#include "pontis.h"
 
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
@@ -55,6 +56,7 @@ MODULE_SUPPORTED_DEVICE("{"
 	       AMP_AUDIO2000_DEVICE_DESC
 	       AUREON_DEVICE_DESC
 	       VT1720_MOBO_DEVICE_DESC
+	       PONTIS_DEVICE_DESC
 		"{VIA,VT1720},"
 		"{VIA,VT1724},"
 		"{ICEnsemble,Generic ICE1724},"
@@ -1861,6 +1863,7 @@ static struct snd_ice1712_card_info *card_tables[] __devinitdata = {
 	snd_vt1724_amp_cards, 
 	snd_vt1724_aureon_cards,
 	snd_vt1720_mobo_cards,
+	snd_vt1720_pontis_cards,
 	0,
 };
 
