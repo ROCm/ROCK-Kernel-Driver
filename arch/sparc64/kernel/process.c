@@ -107,10 +107,8 @@ void kpreempt_maybe(void)
 
 	if (local_irq_count(cpu) == 0 &&
 	    local_bh_count(cpu) == 0 &&
-	    test_thread_flag(TIF_NEED_RESCHED)) {
-		current->state = TASK_RUNNING;
+	    test_thread_flag(TIF_NEED_RESCHED))
 		schedule();
-	}
 }
 #endif
 

@@ -620,11 +620,10 @@ asmlinkage void syscall_trace(void)
 	if (!(current->ptrace & PT_PTRACED))
 		return;
 	current->exit_code = SIGTRAP;
-	preempt_disable();
 	current->state = TASK_STOPPED;
 	notify_parent(current, SIGCHLD);
 	schedule();
-	preempt_enable();
+
 	/*
 	 * this isn't the same as continuing with a signal, but it will do
 	 * for normal use.  strace only continues with a signal if the

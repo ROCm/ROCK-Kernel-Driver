@@ -1436,7 +1436,9 @@ ret_from_syscall:
 		 * %o7 for us.  Check performance counter stuff too.
 		 */
 		andn		%o7, _TIF_NEWCHILD, %l0
+#if CONFIG_SMP || CONFIG_PREEMPT
 		call		schedule_tail
+#endif
 		 stx		%l0, [%g6 + TI_FLAGS]
 		andcc		%l0, _TIF_PERFCTR, %g0
 		be,pt		%icc, 1f

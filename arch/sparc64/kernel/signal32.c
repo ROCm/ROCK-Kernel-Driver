@@ -1387,11 +1387,9 @@ int do_signal32(sigset_t *oldset, struct pt_regs * regs,
 
 		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
 			current->exit_code = signr;
-			preempt_disable();
 			current->state = TASK_STOPPED;
 			notify_parent(current, SIGCHLD);
 			schedule();
-			preempt_enable();
 			if (!(signr = current->exit_code))
 				continue;
 			current->exit_code = 0;
@@ -1445,15 +1443,13 @@ int do_signal32(sigset_t *oldset, struct pt_regs * regs,
 			case SIGSTOP: {
 				struct signal_struct *sig;
 
+				current->state = TASK_STOPPED;
 				current->exit_code = signr;
 				sig = current->parent->sig;
-				preempt_disable();
-				current->state = TASK_STOPPED;
 				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags &
 				      SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();
-				preempt_enable();
 				continue;
 			}
 			case SIGQUIT: case SIGILL: case SIGTRAP:
