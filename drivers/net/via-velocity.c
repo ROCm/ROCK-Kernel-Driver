@@ -1248,6 +1248,28 @@ static inline void velocity_rx_csum(struct rx_desc *rd, struct sk_buff *skb)
 }
 
 /**
+ *	velocity_iph_realign	-	IP header alignment
+ *	@vptr: velocity we are handling
+ *	@skb: network layer packet buffer
+ *	@pkt_size: received data size
+ *
+ *	Align IP header on a 2 bytes boundary. This behavior can be
+ *	configured by the user.
+ */
+static inline void velocity_iph_realign(struct velocity_info *vptr,
+					struct sk_buff *skb, int pkt_size)
+{
+	/* FIXME - memmove ? */
+	if (vptr->flags & VELOCITY_FLAGS_IP_ALIGN) {
+		int i;
+
+		for (i = pkt_size; i >= 0; i--)
+			*(skb->data + i + 2) = *(skb->data + i);
+		skb_reserve(skb, 2);
+	}
+}
+
+/**
  *	velocity_receive_frame	-	received packet processor
  *	@vptr: velocity we are handling
  *	@idx: ring index
@@ -1261,6 +1283,7 @@ static int velocity_receive_frame(struct velocity_info *vptr, int idx)
 	struct net_device_stats *stats = &vptr->stats;
 	struct velocity_rd_info *rd_info = &(vptr->rd_info[idx]);
 	struct rx_desc *rd = &(vptr->rd_ring[idx]);
+	int pkt_len = rd->rdesc0.len;
 	struct sk_buff *skb;
 
 	if (rd->rdesc0.RSR & (RSR_STP | RSR_EDP)) {
@@ -1280,16 +1303,9 @@ static int velocity_receive_frame(struct velocity_info *vptr, int idx)
 	rd_info->skb_dma = (dma_addr_t) NULL;
 	rd_info->skb = NULL;
 
-	/* FIXME - memmove ? */
-	if (vptr->flags & VELOCITY_FLAGS_IP_ALIGN) {
-		int i;
-		for (i = rd->rdesc0.len + 4; i >= 0; i--)
-			*(skb->data + i + 2) = *(skb->data + i);
-		skb->data += 2;
-		skb->tail += 2;
-	}
+	velocity_iph_realign(vptr, skb, pkt_len);
 
-	skb_put(skb, (rd->rdesc0.len - 4));
+	skb_put(skb, pkt_len - 4);
 	skb->protocol = eth_type_trans(skb, skb->dev);
 
 	/*
@@ -1309,7 +1325,7 @@ static int velocity_receive_frame(struct velocity_info *vptr, int idx)
 	 *	FIXME: need rx_copybreak handling
 	 */
 
-	stats->rx_bytes += skb->len;
+	stats->rx_bytes += pkt_len;
 	netif_rx(skb);
 
 	return 0;
