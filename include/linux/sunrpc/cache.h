@@ -97,7 +97,8 @@ struct cache_detail {
 	struct proc_dir_entry   *flush_ent, *channel_ent, *content_ent;
 
 	atomic_t		readers;		/* how many time is /chennel open */
-	time_t			last_close;		/* it no readers, when did last close */
+	time_t			last_close;		/* if no readers, when did last close */
+	time_t			last_warn;		/* when we last warned about no readers */
 };
 
 

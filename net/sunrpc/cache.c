@@ -214,6 +214,7 @@ void cache_register(struct cache_detail *cd)
 	cd->entries = 0;
 	atomic_set(&cd->readers, 0);
 	cd->last_close = 0;
+	cd->last_warn = -1;
 	list_add(&cd->others, &cache_list);
 	spin_unlock(&cache_list_lock);
 
@@ -905,7 +906,15 @@ void qword_addhex(char **bpp, int *lp, char *buf, int blen)
 	*lp = len;
 }
 
-			
+void warn_no_listener(struct cache_detail *detail)
+{
+	if (detail->last_warn != detail->last_close) {
+		detail->last_warn = detail->last_close;
+		printk(KERN_WARNING "nfsd: nobody listening for %s upcall;"
+				" has some daemon %s?\n", detail->name,
+		      		detail->last_close?"died" : "not been started");
+	}
+}
 
 /*
  * register an upcall request to user-space.
@@ -923,9 +932,10 @@ static int cache_make_upcall(struct cache_detail *detail, struct cache_head *h)
 		return -EINVAL;
 
 	if (atomic_read(&detail->readers) == 0 &&
-	    detail->last_close < get_seconds() - 60)
-		/* nobody is listening */
-		return -EINVAL;
+	    detail->last_close < get_seconds() - 30) {
+			warn_no_listener(detail);
+			return -EINVAL;
+	}
 
 	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	if (!buf)
