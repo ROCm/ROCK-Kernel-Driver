@@ -835,8 +835,8 @@ static int stream_alloc_packet_lists(struct stream *s)
 		max_nevents = fraction_ceil(&s->samples_per_cycle);
 
 	max_packet_size = max_nevents * s->dimension * 4 + 8;
-	s->packet_pool = hpsb_pci_pool_create("packet pool", s->host->ohci->dev,
-					 max_packet_size, 0, 0 ,SLAB_KERNEL);
+	s->packet_pool = pci_pool_create("packet pool", s->host->ohci->dev,
+					 max_packet_size, 0, 0);
 
 	if (s->packet_pool == NULL)
 		return -1;
@@ -1021,9 +1021,9 @@ struct stream *stream_alloc(struct amdtp_host *host)
 		return NULL;
 	}
 
-	s->descriptor_pool = hpsb_pci_pool_create("descriptor pool", host->ohci->dev,
+	s->descriptor_pool = pci_pool_create("descriptor pool", host->ohci->dev,
 					     sizeof(struct descriptor_block),
-					     16, 0 ,SLAB_KERNEL);
+					     16, 0);
 
 	if (s->descriptor_pool == NULL) {
 		kfree(s->input);

@@ -126,11 +126,9 @@ int esp6_output(struct sk_buff *skb)
 	}
 
 	spin_lock_bh(&x->lock);
-	if ((err = xfrm_state_check_expire(x)) != 0)
+	err = xfrm_check_output(x, skb, AF_INET6);
+	if (err)
 		goto error;
-	if ((err = xfrm_state_check_space(x, skb)) != 0)
-		goto error;
-
 	err = -ENOMEM;
 
 	/* Strip IP header in transport mode. Save it. */

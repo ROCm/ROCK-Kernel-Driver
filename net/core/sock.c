@@ -591,8 +591,6 @@ struct sock *sk_alloc(int family, int priority, int zero_it, kmem_cache_t *slab)
 {
 	struct sock *sk = NULL;
 
-	if (!net_family_get(family))
-		goto out;
 	if (!slab)
 		slab = sk_cachep;
 	sk = kmem_cache_alloc(slab, priority);
@@ -604,16 +602,14 @@ struct sock *sk_alloc(int family, int priority, int zero_it, kmem_cache_t *slab)
 			sock_lock_init(sk);
 		}
 		sk->slab = slab;
-	} else
-		net_family_put(family);
-out:
+	}
 	return sk;
 }
 
 void sk_free(struct sock *sk)
 {
 	struct sk_filter *filter;
-	const int family = sk->family;
+	struct module *owner = sk->owner;
 
 	if (sk->destruct)
 		sk->destruct(sk);
@@ -628,7 +624,7 @@ void sk_free(struct sock *sk)
 		printk(KERN_DEBUG "sk_free: optmem leakage (%d bytes) detected.\n", atomic_read(&sk->omem_alloc));
 
 	kmem_cache_free(sk->slab, sk);
-	net_family_put(family);
+	module_put(owner);
 }
 
 void __init sk_init(void)
@@ -1112,6 +1108,7 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	sk->rcvlowat		=	1;
 	sk->rcvtimeo		=	MAX_SCHEDULE_TIMEOUT;
 	sk->sndtimeo		=	MAX_SCHEDULE_TIMEOUT;
+	sk->owner		=	NULL;
 
 	atomic_set(&sk->refcnt, 1);
 }

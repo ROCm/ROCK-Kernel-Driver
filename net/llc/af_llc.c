@@ -1023,6 +1023,7 @@ static struct net_proto_family llc_ui_family_ops = {
 
 static struct proto_ops llc_ui_ops = {
 	.family	     = PF_LLC,
+	.owner       = THIS_MODULE,
 	.release     = llc_ui_release,
 	.bind	     = llc_ui_bind,
 	.connect     = llc_ui_connect,

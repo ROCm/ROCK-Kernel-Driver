@@ -950,6 +950,7 @@ static int packet_create(struct socket *sock, int protocol)
 		sock->ops = &packet_ops_spkt;
 #endif
 	sock_init_data(sock,sk);
+	sk_set_owner(sk, THIS_MODULE);
 
 	po = pkt_sk(sk) = kmalloc(sizeof(*po), GFP_KERNEL);
 	if (!po)
@@ -1705,7 +1706,7 @@ out:
 #ifdef CONFIG_SOCK_PACKET
 struct proto_ops packet_ops_spkt = {
 	.family =	PF_PACKET,
-
+	.owner =	THIS_MODULE,
 	.release =	packet_release,
 	.bind =		packet_bind_spkt,
 	.connect =	sock_no_connect,
@@ -1727,7 +1728,7 @@ struct proto_ops packet_ops_spkt = {
 
 struct proto_ops packet_ops = {
 	.family =	PF_PACKET,
-
+	.owner =	THIS_MODULE,
 	.release =	packet_release,
 	.bind =		packet_bind,
 	.connect =	sock_no_connect,

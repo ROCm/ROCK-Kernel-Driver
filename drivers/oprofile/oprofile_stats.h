@@ -13,7 +13,7 @@
 #include <asm/atomic.h>
  
 struct oprofile_stat_struct {
-	atomic_t sample_lost_mmap_sem;
+	atomic_t sample_lost_no_mm;
 	atomic_t event_lost_overflow;
 };
 

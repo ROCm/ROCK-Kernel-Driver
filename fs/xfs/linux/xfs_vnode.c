@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs.h>
+#include "xfs.h"
 
 
 uint64_t vn_generation;		/* vnode generation number */
@@ -40,8 +40,8 @@ spinlock_t vnumber_lock = SPIN_LOCK_UNLOCKED;
  * Dedicated vnode inactive/reclaim sync semaphores.
  * Prime number of hash buckets since address is used as the key.
  */
-#define NVSYNC			37
-#define vptosync(v)		(&vsync[((unsigned long)v) % NVSYNC])
+#define NVSYNC                  37
+#define vptosync(v)             (&vsync[((unsigned long)v) % NVSYNC])
 sv_t vsync[NVSYNC];
 
 /*

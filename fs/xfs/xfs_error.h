@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -29,27 +29,27 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef __XFS_ERROR_H__
-#define __XFS_ERROR_H__
+#ifndef	__XFS_ERROR_H__
+#define	__XFS_ERROR_H__
 
 #define prdev(fmt,dev,args...) \
 	printk("XFS: device 0x%x- " fmt "\n", (unsigned)dev, ## args)
 
 #define XFS_ERECOVER	1	/* Failure to recover log */
 #define XFS_ELOGSTAT	2	/* Failure to stat log in user space */
-#define XFS_ENOLOGSPACE 3	/* Reservation too large */
+#define XFS_ENOLOGSPACE	3	/* Reservation too large */
 #define XFS_ENOTSUP	4	/* Operation not supported */
-#define XFS_ENOLSN	5	/* Can't find the lsn you asked for */
+#define	XFS_ENOLSN	5	/* Can't find the lsn you asked for */
 #define XFS_ENOTFOUND	6
 #define XFS_ENOTXFS	7	/* Not XFS filesystem */
 
 #ifdef DEBUG
-#define XFS_ERROR_NTRAP 10
+#define	XFS_ERROR_NTRAP	10
 extern int	xfs_etrap[XFS_ERROR_NTRAP];
 extern int	xfs_error_trap(int);
-#define XFS_ERROR(e)	xfs_error_trap(e)
+#define	XFS_ERROR(e)	xfs_error_trap(e)
 #else
-#define XFS_ERROR(e)	(e)
+#define	XFS_ERROR(e)	(e)
 #endif
 
 struct xfs_mount;
@@ -98,15 +98,15 @@ xfs_hex_dump(void *p, int length);
 #define XFS_ERRTAG_IFLUSH_4				4
 #define XFS_ERRTAG_IFLUSH_5				5
 #define XFS_ERRTAG_IFLUSH_6				6
-#define XFS_ERRTAG_DA_READ_BUF				7
-#define XFS_ERRTAG_BTREE_CHECK_LBLOCK			8
-#define XFS_ERRTAG_BTREE_CHECK_SBLOCK			9
-#define XFS_ERRTAG_ALLOC_READ_AGF			10
-#define XFS_ERRTAG_IALLOC_READ_AGI			11
-#define XFS_ERRTAG_ITOBP_INOTOBP			12
-#define XFS_ERRTAG_IUNLINK				13
-#define XFS_ERRTAG_IUNLINK_REMOVE			14
-#define XFS_ERRTAG_DIR_INO_VALIDATE			15
+#define	XFS_ERRTAG_DA_READ_BUF				7
+#define	XFS_ERRTAG_BTREE_CHECK_LBLOCK			8
+#define	XFS_ERRTAG_BTREE_CHECK_SBLOCK			9
+#define	XFS_ERRTAG_ALLOC_READ_AGF			10
+#define	XFS_ERRTAG_IALLOC_READ_AGI			11
+#define	XFS_ERRTAG_ITOBP_INOTOBP			12
+#define	XFS_ERRTAG_IUNLINK				13
+#define	XFS_ERRTAG_IUNLINK_REMOVE			14
+#define	XFS_ERRTAG_DIR_INO_VALIDATE			15
 #define XFS_ERRTAG_BULKSTAT_READ_CHUNK			16
 #define XFS_ERRTAG_IODONE_IOERR				17
 #define XFS_ERRTAG_STRATREAD_IOERR			18
@@ -145,7 +145,7 @@ xfs_hex_dump(void *p, int length);
 extern int	xfs_error_test(int, int *, char *, int, char *, unsigned long);
 void xfs_error_test_init(void);
 
-#define XFS_NUM_INJECT_ERROR				10
+#define	XFS_NUM_INJECT_ERROR				10
 
 #ifdef __ANSI_CPP__
 #define XFS_TEST_ERROR(expr, mp, tag, rf)		\

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -48,17 +48,17 @@ struct xfs_da_args;
 #undef XFS_DIR2_TRACE
 #endif	/* !DEBUG */
 
-#define XFS_DIR2_GTRACE_SIZE		4096	/* global buffer */
-#define XFS_DIR2_KTRACE_SIZE		32	/* per-inode buffer */
+#define	XFS_DIR2_GTRACE_SIZE		4096	/* global buffer */
+#define	XFS_DIR2_KTRACE_SIZE		32	/* per-inode buffer */
 
-#define XFS_DIR2_KTRACE_ARGS		1	/* args only */
-#define XFS_DIR2_KTRACE_ARGS_B		2	/* args + buffer */
-#define XFS_DIR2_KTRACE_ARGS_BB		3	/* args + 2 buffers */
-#define XFS_DIR2_KTRACE_ARGS_DB		4	/* args, db, buffer */
-#define XFS_DIR2_KTRACE_ARGS_I		5	/* args, inum */
-#define XFS_DIR2_KTRACE_ARGS_S		6	/* args, int */
-#define XFS_DIR2_KTRACE_ARGS_SB		7	/* args, int, buffer */
-#define XFS_DIR2_KTRACE_ARGS_BIBII	8	/* args, buf/int/buf/int/int */
+#define	XFS_DIR2_KTRACE_ARGS		1	/* args only */
+#define	XFS_DIR2_KTRACE_ARGS_B		2	/* args + buffer */
+#define	XFS_DIR2_KTRACE_ARGS_BB		3	/* args + 2 buffers */
+#define	XFS_DIR2_KTRACE_ARGS_DB		4	/* args, db, buffer */
+#define	XFS_DIR2_KTRACE_ARGS_I		5	/* args, inum */
+#define	XFS_DIR2_KTRACE_ARGS_S		6	/* args, int */
+#define	XFS_DIR2_KTRACE_ARGS_SB		7	/* args, int, buffer */
+#define	XFS_DIR2_KTRACE_ARGS_BIBII	8	/* args, buf/int/buf/int/int */
 
 #ifdef XFS_DIR2_TRACE
 
@@ -79,14 +79,14 @@ void xfs_dir2_trace_args_sb(char *where, struct xfs_da_args *args, int s,
 
 #else	/* XFS_DIR2_TRACE */
 
-#define xfs_dir2_trace_args(where, args)
-#define xfs_dir2_trace_args_b(where, args, bp)
-#define xfs_dir2_trace_args_bb(where, args, lbp, dbp)
-#define xfs_dir2_trace_args_bibii(where, args, bs, ss, bd, sd, c)
-#define xfs_dir2_trace_args_db(where, args, db, bp)
-#define xfs_dir2_trace_args_i(where, args, i)
-#define xfs_dir2_trace_args_s(where, args, s)
-#define xfs_dir2_trace_args_sb(where, args, s, bp)
+#define	xfs_dir2_trace_args(where, args)
+#define	xfs_dir2_trace_args_b(where, args, bp)
+#define	xfs_dir2_trace_args_bb(where, args, lbp, dbp)
+#define	xfs_dir2_trace_args_bibii(where, args, bs, ss, bd, sd, c)
+#define	xfs_dir2_trace_args_db(where, args, db, bp)
+#define	xfs_dir2_trace_args_i(where, args, i)
+#define	xfs_dir2_trace_args_s(where, args, s)
+#define	xfs_dir2_trace_args_sb(where, args, s, bp)
 
 #endif	/* XFS_DIR2_TRACE */
 

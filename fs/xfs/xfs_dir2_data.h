@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_DIR2_DATA_H__
-#define __XFS_DIR2_DATA_H__
+#define	__XFS_DIR2_DATA_H__
 
 /*
  * Directory format 2, data block structures.
@@ -44,30 +44,30 @@ struct xfs_trans;
 /*
  * Constants.
  */
-#define XFS_DIR2_DATA_MAGIC	0x58443244	/* XD2D: for multiblock dirs */
-#define XFS_DIR2_DATA_ALIGN_LOG 3		/* i.e., 8 bytes */
-#define XFS_DIR2_DATA_ALIGN	(1 << XFS_DIR2_DATA_ALIGN_LOG)
-#define XFS_DIR2_DATA_FREE_TAG	0xffff
-#define XFS_DIR2_DATA_FD_COUNT	3
+#define	XFS_DIR2_DATA_MAGIC	0x58443244	/* XD2D: for multiblock dirs */
+#define	XFS_DIR2_DATA_ALIGN_LOG	3		/* i.e., 8 bytes */
+#define	XFS_DIR2_DATA_ALIGN	(1 << XFS_DIR2_DATA_ALIGN_LOG)
+#define	XFS_DIR2_DATA_FREE_TAG	0xffff
+#define	XFS_DIR2_DATA_FD_COUNT	3
 
 /*
  * Directory address space divided into sections,
  * spaces separated by 32gb.
  */
-#define XFS_DIR2_SPACE_SIZE	(1ULL << (32 + XFS_DIR2_DATA_ALIGN_LOG))
-#define XFS_DIR2_DATA_SPACE	0
-#define XFS_DIR2_DATA_OFFSET	(XFS_DIR2_DATA_SPACE * XFS_DIR2_SPACE_SIZE)
-#define XFS_DIR2_DATA_FIRSTDB(mp)	\
+#define	XFS_DIR2_SPACE_SIZE	(1ULL << (32 + XFS_DIR2_DATA_ALIGN_LOG))
+#define	XFS_DIR2_DATA_SPACE	0
+#define	XFS_DIR2_DATA_OFFSET	(XFS_DIR2_DATA_SPACE * XFS_DIR2_SPACE_SIZE)
+#define	XFS_DIR2_DATA_FIRSTDB(mp)	\
 	XFS_DIR2_BYTE_TO_DB(mp, XFS_DIR2_DATA_OFFSET)
 
 /*
  * Offsets of . and .. in data space (always block 0)
  */
-#define XFS_DIR2_DATA_DOT_OFFSET	\
+#define	XFS_DIR2_DATA_DOT_OFFSET	\
 	((xfs_dir2_data_aoff_t)sizeof(xfs_dir2_data_hdr_t))
-#define XFS_DIR2_DATA_DOTDOT_OFFSET	\
+#define	XFS_DIR2_DATA_DOTDOT_OFFSET	\
 	(XFS_DIR2_DATA_DOT_OFFSET + XFS_DIR2_DATA_ENTSIZE(1))
-#define XFS_DIR2_DATA_FIRST_OFFSET		\
+#define	XFS_DIR2_DATA_FIRST_OFFSET		\
 	(XFS_DIR2_DATA_DOTDOT_OFFSET + XFS_DIR2_DATA_ENTSIZE(2))
 
 /*
@@ -141,7 +141,7 @@ typedef struct xfs_dir2_data {
 int xfs_dir2_data_entsize(int n);
 #define XFS_DIR2_DATA_ENTSIZE(n)	xfs_dir2_data_entsize(n)
 #else
-#define XFS_DIR2_DATA_ENTSIZE(n)	\
+#define	XFS_DIR2_DATA_ENTSIZE(n)	\
 	((int)(roundup(offsetof(xfs_dir2_data_entry_t, name[0]) + (n) + \
 		 (uint)sizeof(xfs_dir2_data_off_t), XFS_DIR2_DATA_ALIGN)))
 #endif
@@ -151,9 +151,9 @@ int xfs_dir2_data_entsize(int n);
  */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_DATA_ENTRY_TAG_P)
 xfs_dir2_data_off_t *xfs_dir2_data_entry_tag_p(xfs_dir2_data_entry_t *dep);
-#define XFS_DIR2_DATA_ENTRY_TAG_P(dep)	xfs_dir2_data_entry_tag_p(dep)
+#define	XFS_DIR2_DATA_ENTRY_TAG_P(dep)	xfs_dir2_data_entry_tag_p(dep)
 #else
-#define XFS_DIR2_DATA_ENTRY_TAG_P(dep)	\
+#define	XFS_DIR2_DATA_ENTRY_TAG_P(dep)	\
 	((xfs_dir2_data_off_t *)\
 	 ((char *)(dep) + XFS_DIR2_DATA_ENTSIZE((dep)->namelen) - \
 	  (uint)sizeof(xfs_dir2_data_off_t)))
@@ -165,10 +165,10 @@ xfs_dir2_data_off_t *xfs_dir2_data_entry_tag_p(xfs_dir2_data_entry_t *dep);
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_DATA_UNUSED_TAG_P)
 xfs_dir2_data_off_t *xfs_dir2_data_unused_tag_p_arch(
 	xfs_dir2_data_unused_t *dup, xfs_arch_t arch);
-#define XFS_DIR2_DATA_UNUSED_TAG_P_ARCH(dup,arch) \
+#define	XFS_DIR2_DATA_UNUSED_TAG_P_ARCH(dup,arch) \
 	xfs_dir2_data_unused_tag_p_arch(dup,arch)
 #else
-#define XFS_DIR2_DATA_UNUSED_TAG_P_ARCH(dup,arch)	\
+#define	XFS_DIR2_DATA_UNUSED_TAG_P_ARCH(dup,arch)	\
 	((xfs_dir2_data_off_t *)\
 	 ((char *)(dup) + INT_GET((dup)->length, arch) \
 			- (uint)sizeof(xfs_dir2_data_off_t)))
@@ -182,7 +182,7 @@ xfs_dir2_data_off_t *xfs_dir2_data_unused_tag_p_arch(
 extern void
 	xfs_dir2_data_check(struct xfs_inode *dp, struct xfs_dabuf *bp);
 #else
-#define xfs_dir2_data_check(dp,bp)
+#define	xfs_dir2_data_check(dp,bp)
 #endif
 
 extern xfs_dir2_data_free_t *

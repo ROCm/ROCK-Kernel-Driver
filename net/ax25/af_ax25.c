@@ -845,6 +845,7 @@ int ax25_create(struct socket *sock, int protocol)
 	}
 
 	sock_init_data(sock, sk);
+	sk_set_owner(sk, THIS_MODULE);
 
 	sk->destruct = ax25_free_sock;
 	sock->ops    = &ax25_proto_ops;
@@ -880,6 +881,7 @@ struct sock *ax25_make_new(struct sock *osk, struct ax25_dev *ax25_dev)
 	}
 
 	sock_init_data(NULL, sk);
+	sk_set_owner(sk, THIS_MODULE);
 
 	sk->destruct = ax25_free_sock;
 	sk->type     = osk->type;
@@ -1913,7 +1915,7 @@ static struct net_proto_family ax25_family_ops = {
 
 static struct proto_ops ax25_proto_ops = {
 	.family =	PF_AX25,
-
+	.owner =	THIS_MODULE,
 	.release =	ax25_release,
 	.bind =		ax25_bind,
 	.connect =	ax25_connect,

@@ -42,6 +42,7 @@
 #include <linux/pci.h>
 #include <linux/fs.h>
 #include <linux/poll.h>
+#include <linux/kdev_t.h>
 #include <asm/byteorder.h>
 #include <asm/atomic.h>
 #include <asm/io.h>

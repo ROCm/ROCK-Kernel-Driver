@@ -41,12 +41,21 @@ extern unsigned long empty_zero_page[1024];
 #ifndef __ASSEMBLY__
 #ifdef CONFIG_X86_PAE
 # include <asm/pgtable-3level.h>
+
+/*
+ * Need to initialise the X86 PAE caches
+ */
+extern void pgtable_cache_init(void);
+
 #else
 # include <asm/pgtable-2level.h>
+
+/*
+ * No page table caches to initialise
+ */
+#define pgtable_cache_init()	do { } while (0)
+
 #endif
-
-void pgtable_cache_init(void);
-
 #endif
 
 #define PMD_SIZE	(1UL << PMD_SHIFT)
@@ -183,6 +192,7 @@ extern unsigned long pg0[1024];
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
  */
+static inline int pte_user(pte_t pte)		{ return (pte).pte_low & _PAGE_USER; }
 static inline int pte_read(pte_t pte)		{ return (pte).pte_low & _PAGE_USER; }
 static inline int pte_exec(pte_t pte)		{ return (pte).pte_low & _PAGE_USER; }
 static inline int pte_dirty(pte_t pte)		{ return (pte).pte_low & _PAGE_DIRTY; }

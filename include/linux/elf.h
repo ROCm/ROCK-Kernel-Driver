@@ -29,8 +29,11 @@ typedef __s64	Elf64_Sxword;
 #define PT_NOTE    4
 #define PT_SHLIB   5
 #define PT_PHDR    6
+#define PT_LOOS	   0x60000000
+#define PT_HIOS	   0x6fffffff
 #define PT_LOPROC  0x70000000
 #define PT_HIPROC  0x7fffffff
+#define PT_GNU_EH_FRAME		0x6474e550
 #define PT_MIPS_REGINFO		0x70000000
 
 /* Flags in the e_flags field of the header */

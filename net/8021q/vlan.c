@@ -66,9 +66,8 @@ unsigned short vlan_default_dev_flags = 1;
 
 static struct packet_type vlan_packet_type = {
 	.type = __constant_htons(ETH_P_8021Q),
-	.dev =NULL,
 	.func = vlan_skb_recv, /* VLAN receive method */
-	.data = (void *)(-1),  /* Set here '(void *)1' when this code can SHARE SKBs */
+	.data = (void *)1,     /* understands shared skb */
 };
 
 /* End of global variables definitions. */

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -35,7 +35,36 @@
  * GROT: figure out how to recover gracefully when bmap returns ENOSPC.
  */
 
-#include <xfs.h>
+#include "xfs.h"
+
+#include "xfs_macros.h"
+#include "xfs_types.h"
+#include "xfs_inum.h"
+#include "xfs_log.h"
+#include "xfs_trans.h"
+#include "xfs_sb.h"
+#include "xfs_ag.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
+#include "xfs_dmapi.h"
+#include "xfs_mount.h"
+#include "xfs_alloc_btree.h"
+#include "xfs_bmap_btree.h"
+#include "xfs_ialloc_btree.h"
+#include "xfs_alloc.h"
+#include "xfs_btree.h"
+#include "xfs_attr_sf.h"
+#include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
+#include "xfs_dinode.h"
+#include "xfs_inode_item.h"
+#include "xfs_inode.h"
+#include "xfs_bmap.h"
+#include "xfs_da_btree.h"
+#include "xfs_attr.h"
+#include "xfs_attr_leaf.h"
+#include "xfs_error.h"
+#include "xfs_bit.h"
 
 /*
  * xfs_attr_leaf.c
@@ -865,7 +894,7 @@ xfs_attr_leaf_add(xfs_dabuf_t *bp, xfs_da_args_t *args)
 
 	/*
 	 * After compaction, the block is guaranteed to have only one
-	 * free region, in freemap[0].	If it is not big enough, give up.
+	 * free region, in freemap[0].  If it is not big enough, give up.
 	 */
 	if (INT_GET(hdr->freemap[0].size, ARCH_CONVERT)
 				< (entsize + sizeof(xfs_attr_leaf_entry_t)))
@@ -1068,7 +1097,7 @@ xfs_attr_leaf_compact(xfs_trans_t *trans, xfs_dabuf_t *bp)
  *
  * This code adjusts the args->index/blkno and args->index2/blkno2 fields
  * to match what it is doing in splitting the attribute leaf block.  Those
- * values are used in "atomic rename" operations on attributes.	 Note that
+ * values are used in "atomic rename" operations on attributes.  Note that
  * the "new" and "old" values can end up in different blocks.
  */
 STATIC void
@@ -1285,7 +1314,7 @@ xfs_attr_leaf_figure_balance(xfs_da_state_t *state,
 	entry = &leaf1->entries[0];
 	for (count = index = 0; count < max; entry++, index++, count++) {
 
-#define XFS_ATTR_ABS(A) (((A) < 0) ? -(A) : (A))
+#define XFS_ATTR_ABS(A)	(((A) < 0) ? -(A) : (A))
 		/*
 		 * The new entry is in the first block, account for it.
 		 */
@@ -1708,7 +1737,7 @@ xfs_attr_leaf_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 		memset(tmpbuffer, 0, state->blocksize);
 		tmp_leaf = (xfs_attr_leafblock_t *)tmpbuffer;
 		tmp_hdr = &tmp_leaf->hdr;
-		tmp_hdr->info = save_hdr->info; /* struct copy */
+		tmp_hdr->info = save_hdr->info;	/* struct copy */
 		INT_ZERO(tmp_hdr->count, ARCH_CONVERT);
 		INT_SET(tmp_hdr->firstused, ARCH_CONVERT, state->blocksize);
 		if (INT_ISZERO(tmp_hdr->firstused, ARCH_CONVERT)) {
@@ -2004,7 +2033,7 @@ xfs_attr_leaf_moveents(xfs_attr_leafblock_t *leaf_s, int start_s,
 #ifdef GROT
 		/*
 		 * Code to drop INCOMPLETE entries.  Difficult to use as we
-		 * may also need to change the insertion index.	 Code turned
+		 * may also need to change the insertion index.  Code turned
 		 * off for 6.2, should be revisited later.
 		 */
 		if (entry_s->flags & XFS_ATTR_INCOMPLETE) { /* skip partials? */
@@ -2291,9 +2320,9 @@ xfs_attr_leaf_list_int(xfs_dabuf_t *bp, xfs_attr_list_context_t *context)
 	return(retval);
 }
 
-#define ATTR_ENTBASESIZE		/* minimum bytes used by an attr */ \
+#define	ATTR_ENTBASESIZE		/* minimum bytes used by an attr */ \
 	(((struct attrlist_ent *) 0)->a_name - (char *) 0)
-#define ATTR_ENTSIZE(namelen)		/* actual bytes used by an attr */ \
+#define	ATTR_ENTSIZE(namelen)		/* actual bytes used by an attr */ \
 	((ATTR_ENTBASESIZE + (namelen) + 1 + sizeof(u_int32_t)-1) \
 	 & ~(sizeof(u_int32_t)-1))
 
@@ -2957,7 +2986,7 @@ xfs_attr_rolltrans(xfs_trans_t **transp, xfs_inode_t *dp)
 	 * Reserve space in the log for th next transaction.
 	 * This also pushes items in the "AIL", the list of logged items,
 	 * out to disk if they are taking up space at the tail of the log
-	 * that we want to use.	 This requires that either nothing be locked
+	 * that we want to use.  This requires that either nothing be locked
 	 * across this call, or that anything that is locked be logged in
 	 * the prior and the next transactions.
 	 */

@@ -1,9 +1,11 @@
+
 /*
  *  ATI Mach64 GX Support
  */
 
 #include <linux/delay.h>
 #include <linux/fb.h>
+#include <linux/sched.h>
 
 #include <asm/io.h>
 
@@ -337,8 +339,8 @@ const struct aty_dac_ops aty_dac_att21c498 = {
      *  ATI 18818 / ICS 2595 Clock Chip
      */
 
-static int aty_var_to_pll_18818(const struct fb_info *info, u32 vclk_per,
-				u8 bpp, union aty_pll *pll)
+static int aty_var_to_pll_18818(const struct fb_info *info,
+				u32 vclk_per, u8 bpp, union aty_pll *pll)
 {
 	u32 MHz100;		/* in 0.01 MHz */
 	u32 program_bits;
@@ -493,7 +495,7 @@ const struct aty_pll_ops aty_pll_ati18818_1 = {
      *  STG 1703 Clock Chip
      */
 
-static int aty_var_to_pll_1703(const struct fb_info *info, u32 vclk_per,
+static int aty_var_to_pll_1703(const struct fb_info *info,
 			       u32 vclk_per, u8 bpp, union aty_pll *pll)
 {
 	u32 mhz100;		/* in 0.01 MHz */
@@ -609,7 +611,7 @@ const struct aty_pll_ops aty_pll_stg1703 = {
      *  Chrontel 8398 Clock Chip
      */
 
-static int aty_var_to_pll_8398(const struct fb_info *info, u32 vclk_per,
+static int aty_var_to_pll_8398(const struct fb_info *info,
 			       u32 vclk_per, u8 bpp, union aty_pll *pll)
 {
 	u32 tempA, tempB, fOut, longMHz100, diff, preDiff;

@@ -708,11 +708,9 @@ csz_dequeue(struct Qdisc* sch)
 	 */
 	if (q->wd_expires) {
 		unsigned long delay = PSCHED_US2JIFFIE(q->wd_expires);
-		del_timer(&q->wd_timer);
 		if (delay == 0)
 			delay = 1;
-		q->wd_timer.expires = jiffies + delay;
-		add_timer(&q->wd_timer);
+		mod_timer(&q->wd_timer, jiffies + delay);
 		sch->stats.overlimits++;
 	}
 #endif

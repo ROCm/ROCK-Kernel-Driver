@@ -58,12 +58,35 @@ static int exit_task_notify(struct notifier_block * self, unsigned long val, voi
  * must concern ourselves with. First, when a task is about to
  * exit (exit_mmap()), we should process the buffer to deal with
  * any samples in the CPU buffer, before we lose the ->mmap information
- * we need. Second, a task may unmap (part of) an executable mmap,
- * so we want to process samples before that happens too
+ * we need. It is vital to get this case correct, otherwise we can
+ * end up trying to access a freed task_struct.
  */
 static int mm_notify(struct notifier_block * self, unsigned long val, void * data)
 {
 	sync_cpu_buffers();
+	return 0;
+}
+
+
+/* Second, a task may unmap (part of) an executable mmap,
+ * so we want to process samples before that happens too. This is merely
+ * a QOI issue not a correctness one.
+ */
+static int munmap_notify(struct notifier_block * self, unsigned long val, void * data)
+{
+	/* Note that we cannot sync the buffers directly, because we might end up
+	 * taking the the mmap_sem that we hold now inside of event_buffer_read()
+	 * on a page fault, whilst holding buffer_sem - deadlock.
+	 *
+	 * This would mean a threaded reader of the event buffer, but we should
+	 * prevent it anyway.
+	 *
+	 * Delaying the work in a context that doesn't hold the mmap_sem means
+	 * that we won't lose samples from other mappings that current() may
+	 * have. Note that either way, we lose any pending samples for what is
+	 * being unmapped.
+	 */
+	schedule_work(&sync_wq);
 	return 0;
 }
 
@@ -92,7 +115,7 @@ static struct notifier_block exit_task_nb = {
 };
 
 static struct notifier_block exec_unmap_nb = {
-	.notifier_call	= mm_notify,
+	.notifier_call	= munmap_notify,
 };
 
 static struct notifier_block exit_mmap_nb = {
@@ -147,6 +170,8 @@ void sync_stop(void)
 	profile_event_unregister(EXIT_MMAP, &exit_mmap_nb);
 	profile_event_unregister(EXEC_UNMAP, &exec_unmap_nb);
 	del_timer_sync(&sync_timer);
+	/* timer might have queued work, make sure it's completed. */
+	flush_scheduled_work();
 }
 
  
@@ -296,6 +321,8 @@ static void add_sample(struct mm_struct * mm, struct op_sample * s, int in_kerne
 		add_sample_entry(s->eip, s->event);
 	} else if (mm) {
 		add_us_sample(mm, s);
+	} else {
+		atomic_inc(&oprofile_stats.sample_lost_no_mm);
 	}
 }
  
@@ -310,26 +337,23 @@ static void release_mm(struct mm_struct * mm)
 /* Take the task's mmap_sem to protect ourselves from
  * races when we do lookup_dcookie().
  */
-static struct mm_struct * take_task_mm(struct task_struct * task)
+static struct mm_struct * take_tasks_mm(struct task_struct * task)
 {
-	struct mm_struct * mm = task->mm;
- 
-	/* if task->mm !NULL, mm_count must be at least 1. It cannot
-	 * drop to 0 without the task exiting, which will have to sleep
-	 * on buffer_sem first. So we do not need to mark mm_count
-	 * ourselves.
+	struct mm_struct * mm;
+       
+	/* Subtle. We don't need to keep a reference to this task's mm,
+	 * because, for the mm to be freed on another CPU, that would have
+	 * to go through the task exit notifier, which ends up sleeping
+	 * on the buffer_sem we hold, so we end up with mutual exclusion
+	 * anyway.
 	 */
+	task_lock(task);
+	mm = task->mm;
+	task_unlock(task);
+ 
 	if (mm) {
-		/* More ugliness. If a task took its mmap
-		 * sem then came to sleep on buffer_sem we
-		 * will deadlock waiting for it. So we can
-		 * but try. This will lose samples :/
-		 */
-		if (!down_read_trylock(&mm->mmap_sem)) {
-			/* FIXME: this underestimates samples lost */
-			atomic_inc(&oprofile_stats.sample_lost_mmap_sem);
-			mm = NULL;
-		}
+		/* needed to walk the task's VMAs */
+		down_read(&mm->mmap_sem);
 	}
  
 	return mm;
@@ -399,7 +423,7 @@ static void sync_buffer(struct oprofile_cpu_buffer * cpu_buf)
 				new = (struct task_struct *)s->event;
 
 				release_mm(mm);
-				mm = take_task_mm(new);
+				mm = take_tasks_mm(new);
 
 				cookie = get_exec_dcookie(mm);
 				add_user_ctx_switch(new->pid, cookie);
@@ -460,4 +484,3 @@ static void timer_ping(unsigned long data)
 	schedule_work(&sync_wq);
 	/* timer is re-added by the scheduled task */
 }
-

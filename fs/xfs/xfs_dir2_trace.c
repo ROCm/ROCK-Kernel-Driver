@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -34,8 +34,20 @@
  * xfs_dir2_trace.c
  * Tracing for xfs v2 directories.
  */
-#include <xfs.h>
+#include "xfs.h"
 
+#include "xfs_types.h"
+#include "xfs_inum.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
+#include "xfs_bmap_btree.h"
+#include "xfs_attr_sf.h"
+#include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
+#include "xfs_dinode.h"
+#include "xfs_inode.h"
+#include "xfs_da_btree.h"
+#include "xfs_dir2_trace.h"
 
 #ifdef DEBUG
 ktrace_t	*xfs_dir2_trace_buf;

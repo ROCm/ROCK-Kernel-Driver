@@ -42,6 +42,8 @@
 #ifndef _NET_PPP_COMP_H
 #define _NET_PPP_COMP_H
 
+struct module;
+
 /*
  * The following symbols control whether we include code for
  * various compression methods.
@@ -106,6 +108,9 @@ struct compressor {
 
 	/* Return decompression statistics */
 	void	(*decomp_stat) (void *state, struct compstat *stats);
+
+	/* Used in locking compressor modules */
+	struct module *owner;
 };
 
 /*

@@ -8,21 +8,21 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/init.h>
 #include <linux/notifier.h>
 #include <linux/smp.h>
 #include <linux/irq.h>
 #include <linux/oprofile.h>
+#include <linux/profile.h>
+#include <linux/init.h>
 #include <asm/ptrace.h>
  
 static int timer_notify(struct notifier_block * self, unsigned long val, void * data)
 {
 	struct pt_regs * regs = (struct pt_regs *)data;
 	int cpu = smp_processor_id();
-	unsigned long pc = regs->iaoq[0];
-	int is_kernel = !user_mode(regs);
+	unsigned long eip = instruction_pointer(regs);
  
-	oprofile_add_sample(pc, is_kernel, 0, cpu);
+	oprofile_add_sample(eip, !user_mode(regs), 0, cpu);
 	return 0;
 }
  

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -118,11 +118,11 @@ typedef enum {
  * Conversion between vnode types/modes and encoded type/mode as
  * seen by stat(2) and mknod(2).
  */
-extern enum vtype	iftovt_tab[];
-extern ushort		vttoif_tab[];
-#define IFTOVT(M)	(iftovt_tab[((M) & S_IFMT) >> 12])
-#define VTTOIF(T)	(vttoif_tab[(int)(T)])
-#define MAKEIMODE(T, M) (VTTOIF(T) | ((M) & ~S_IFMT))
+extern enum vtype       iftovt_tab[];
+extern ushort           vttoif_tab[];
+#define IFTOVT(M)       (iftovt_tab[((M) & S_IFMT) >> 12])
+#define VTTOIF(T)       (vttoif_tab[(int)(T)])
+#define MAKEIMODE(T, M)	(VTTOIF(T) | ((M) & ~S_IFMT))
 
 /*
  * Vnode flags.
@@ -142,8 +142,8 @@ typedef enum vrwlock	{ VRWLOCK_NONE, VRWLOCK_READ,
  * VN_INACTIVE_NOCACHE implies that the file system behavior
  * has disassociated its state and bhv_desc_t from the vnode.
  */
-#define VN_INACTIVE_CACHE	0
-#define VN_INACTIVE_NOCACHE	1
+#define	VN_INACTIVE_CACHE	0
+#define	VN_INACTIVE_NOCACHE	1
 
 /*
  * Values for the cmd code given to VOP_VNODE_CHANGE.
@@ -203,10 +203,10 @@ typedef int	(*vop_bmap_t)(bhv_desc_t *, xfs_off_t, ssize_t, int,
 typedef int	(*vop_reclaim_t)(bhv_desc_t *);
 typedef int	(*vop_attr_get_t)(bhv_desc_t *, char *, char *, int *, int,
 				struct cred *);
-typedef int	(*vop_attr_set_t)(bhv_desc_t *, char *, char *, int, int,
+typedef	int	(*vop_attr_set_t)(bhv_desc_t *, char *, char *, int, int,
 				struct cred *);
-typedef int	(*vop_attr_remove_t)(bhv_desc_t *, char *, int, struct cred *);
-typedef int	(*vop_attr_list_t)(bhv_desc_t *, char *, int, int,
+typedef	int	(*vop_attr_remove_t)(bhv_desc_t *, char *, int, struct cred *);
+typedef	int	(*vop_attr_list_t)(bhv_desc_t *, char *, int, int,
 				struct attrlist_cursor_kern *, struct cred *);
 typedef void	(*vop_link_removed_t)(bhv_desc_t *, vnode_t *, int);
 typedef void	(*vop_vnode_change_t)(bhv_desc_t *, vchange_t, __psint_t);
@@ -218,7 +218,7 @@ typedef int	(*vop_iflush_t)(bhv_desc_t *, int);
 
 
 typedef struct vnodeops {
-	bhv_position_t	vn_position;	/* position within behavior chain */
+	bhv_position_t  vn_position;    /* position within behavior chain */
 	vop_open_t		vop_open;
 	vop_read_t		vop_read;
 	vop_write_t		vop_write;
@@ -274,31 +274,31 @@ typedef struct vnodeops {
 	rv = _VOP_(vop_open, vp)((vp)->v_fbhv, cr)
 #define VOP_GETATTR(vp, vap, f, cr, rv)					\
 	rv = _VOP_(vop_getattr, vp)((vp)->v_fbhv, vap, f, cr)
-#define VOP_SETATTR(vp, vap, f, cr, rv)					\
+#define	VOP_SETATTR(vp, vap, f, cr, rv)					\
 	rv = _VOP_(vop_setattr, vp)((vp)->v_fbhv, vap, f, cr)
-#define VOP_ACCESS(vp, mode, cr, rv)					\
+#define	VOP_ACCESS(vp, mode, cr, rv)					\
 	rv = _VOP_(vop_access, vp)((vp)->v_fbhv, mode, cr)
-#define VOP_LOOKUP(vp,d,vpp,f,rdir,cr,rv)				\
+#define	VOP_LOOKUP(vp,d,vpp,f,rdir,cr,rv)				\
 	rv = _VOP_(vop_lookup, vp)((vp)->v_fbhv,d,vpp,f,rdir,cr)
 #define VOP_CREATE(dvp,d,vap,vpp,cr,rv)					\
 	rv = _VOP_(vop_create, dvp)((dvp)->v_fbhv,d,vap,vpp,cr)
 #define VOP_REMOVE(dvp,d,cr,rv)						\
 	rv = _VOP_(vop_remove, dvp)((dvp)->v_fbhv,d,cr)
-#define VOP_LINK(tdvp,fvp,d,cr,rv)					\
+#define	VOP_LINK(tdvp,fvp,d,cr,rv)					\
 	rv = _VOP_(vop_link, tdvp)((tdvp)->v_fbhv,fvp,d,cr)
-#define VOP_RENAME(fvp,fnm,tdvp,tnm,cr,rv)				\
+#define	VOP_RENAME(fvp,fnm,tdvp,tnm,cr,rv)				\
 	rv = _VOP_(vop_rename, fvp)((fvp)->v_fbhv,fnm,tdvp,tnm,cr)
-#define VOP_MKDIR(dp,d,vap,vpp,cr,rv)					\
+#define	VOP_MKDIR(dp,d,vap,vpp,cr,rv)					\
 	rv = _VOP_(vop_mkdir, dp)((dp)->v_fbhv,d,vap,vpp,cr)
 #define	VOP_RMDIR(dp,d,cr,rv)	 					\
 	rv = _VOP_(vop_rmdir, dp)((dp)->v_fbhv,d,cr)
-#define VOP_READDIR(vp,uiop,cr,eofp,rv)					\
+#define	VOP_READDIR(vp,uiop,cr,eofp,rv)					\
 	rv = _VOP_(vop_readdir, vp)((vp)->v_fbhv,uiop,cr,eofp)
-#define VOP_SYMLINK(dvp,d,vap,tnm,vpp,cr,rv)				\
+#define	VOP_SYMLINK(dvp,d,vap,tnm,vpp,cr,rv)				\
 	rv = _VOP_(vop_symlink, dvp) ((dvp)->v_fbhv,d,vap,tnm,vpp,cr)
-#define VOP_READLINK(vp,uiop,cr,rv)					\
+#define	VOP_READLINK(vp,uiop,cr,rv)					\
 	rv = _VOP_(vop_readlink, vp)((vp)->v_fbhv,uiop,cr)
-#define VOP_FSYNC(vp,f,cr,b,e,rv)					\
+#define	VOP_FSYNC(vp,f,cr,b,e,rv)					\
 	rv = _VOP_(vop_fsync, vp)((vp)->v_fbhv,f,cr,b,e)
 #define VOP_INACTIVE(vp, cr, rv)					\
 	rv = _VOP_(vop_inactive, vp)((vp)->v_fbhv, cr)
@@ -318,11 +318,11 @@ typedef struct vnodeops {
 	rv = _VOP_(vop_reclaim, vp)((vp)->v_fbhv)
 #define VOP_ATTR_GET(vp, name, val, vallenp, fl, cred, rv)		\
 	rv = _VOP_(vop_attr_get, vp)((vp)->v_fbhv,name,val,vallenp,fl,cred)
-#define VOP_ATTR_SET(vp, name, val, vallen, fl, cred, rv)		\
+#define	VOP_ATTR_SET(vp, name, val, vallen, fl, cred, rv)		\
 	rv = _VOP_(vop_attr_set, vp)((vp)->v_fbhv,name,val,vallen,fl,cred)
-#define VOP_ATTR_REMOVE(vp, name, flags, cred, rv)			\
+#define	VOP_ATTR_REMOVE(vp, name, flags, cred, rv)			\
 	rv = _VOP_(vop_attr_remove, vp)((vp)->v_fbhv,name,flags,cred)
-#define VOP_ATTR_LIST(vp, buf, buflen, fl, cursor, cred, rv)		\
+#define	VOP_ATTR_LIST(vp, buf, buflen, fl, cursor, cred, rv)		\
 	rv = _VOP_(vop_attr_list, vp)((vp)->v_fbhv,buf,buflen,fl,cursor,cred)
 #define VOP_LINK_REMOVED(vp, dvp, linkzero)				\
 	(void)_VOP_(vop_link_removed, vp)((vp)->v_fbhv, dvp, linkzero)
@@ -569,12 +569,12 @@ static __inline__ void vn_flagclr(struct vnode *vp, uint flag)
 /*
  * Flags to VOP_SETATTR/VOP_GETATTR.
  */
-#define ATTR_UTIME	0x01	/* non-default utime(2) request */
-#define ATTR_EXEC	0x02	/* invocation from exec(2) */
-#define ATTR_COMM	0x04	/* yield common vp attributes */
-#define ATTR_DMI	0x08	/* invocation from a DMI function */
-#define ATTR_LAZY	0x80	/* set/get attributes lazily */
-#define ATTR_NONBLOCK	0x100	/* return EAGAIN if operation would block */
+#define	ATTR_UTIME	0x01	/* non-default utime(2) request */
+#define	ATTR_EXEC	0x02	/* invocation from exec(2) */
+#define	ATTR_COMM	0x04	/* yield common vp attributes */
+#define	ATTR_DMI	0x08	/* invocation from a DMI function */
+#define	ATTR_LAZY	0x80	/* set/get attributes lazily */
+#define	ATTR_NONBLOCK	0x100	/* return EAGAIN if operation would block */
 #define ATTR_NOLOCK	0x200	/* Don't grab any conflicting locks */
 #define ATTR_NOSIZETOK	0x400	/* Don't get the DVN_SIZE_READ token */
 
@@ -588,33 +588,33 @@ static __inline__ void vn_flagclr(struct vnode *vp, uint flag)
 
 #if (defined(CONFIG_XFS_VNODE_TRACING))
 
-#define VNODE_TRACE_SIZE	16		/* number of trace entries */
+#define	VNODE_TRACE_SIZE	16		/* number of trace entries */
 
 /*
  * Tracing entries.
  */
-#define VNODE_KTRACE_ENTRY	1
-#define VNODE_KTRACE_EXIT	2
-#define VNODE_KTRACE_HOLD	3
-#define VNODE_KTRACE_REF	4
-#define VNODE_KTRACE_RELE	5
+#define	VNODE_KTRACE_ENTRY	1
+#define	VNODE_KTRACE_EXIT	2
+#define	VNODE_KTRACE_HOLD	3
+#define	VNODE_KTRACE_REF	4
+#define	VNODE_KTRACE_RELE	5
 
 extern void vn_trace_entry(struct vnode *, char *, inst_t *);
 extern void vn_trace_exit(struct vnode *, char *, inst_t *);
 extern void vn_trace_hold(struct vnode *, char *, int, inst_t *);
 extern void vn_trace_ref(struct vnode *, char *, int, inst_t *);
 extern void vn_trace_rele(struct vnode *, char *, int, inst_t *);
-#define VN_TRACE(vp)		\
+#define	VN_TRACE(vp)		\
 	vn_trace_ref(vp, __FILE__, __LINE__, (inst_t *)__return_address)
 
 #else	/* ! (defined(CONFIG_XFS_VNODE_TRACING)) */
 
-#define vn_trace_entry(a,b,c)
-#define vn_trace_exit(a,b,c)
-#define vn_trace_hold(a,b,c,d)
-#define vn_trace_ref(a,b,c,d)
-#define vn_trace_rele(a,b,c,d)
-#define VN_TRACE(vp)
+#define	vn_trace_entry(a,b,c)
+#define	vn_trace_exit(a,b,c)
+#define	vn_trace_hold(a,b,c,d)
+#define	vn_trace_ref(a,b,c,d)
+#define	vn_trace_rele(a,b,c,d)
+#define	VN_TRACE(vp)
 
 #endif	/* ! (defined(CONFIG_XFS_VNODE_TRACING)) */
 

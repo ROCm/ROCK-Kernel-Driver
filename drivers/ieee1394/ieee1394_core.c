@@ -31,6 +31,8 @@
 #include <linux/moduleparam.h>
 #include <linux/proc_fs.h>
 #include <linux/bitops.h>
+#include <linux/workqueue.h>
+#include <linux/kdev_t.h>
 #include <asm/byteorder.h>
 #include <asm/semaphore.h>
 
@@ -42,7 +44,6 @@
 #include "ieee1394_transactions.h"
 #include "csr.h"
 #include "nodemgr.h"
-#include "ieee1394_hotplug.h"
 #include "dma.h"
 #include "iso.h"
 
@@ -437,7 +438,7 @@ void hpsb_packet_sent(struct hpsb_host *host, struct hpsb_packet *packet,
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
         up(&packet->state_change);
-        hpsb_schedule_work(&host->timeout_tq);
+        schedule_work(&host->timeout_tq);
 }
 
 /**
@@ -985,7 +986,7 @@ void abort_timedouts(struct hpsb_host *host)
         }
 
         if (!list_empty(&host->pending_packets))
-		hpsb_schedule_work(&host->timeout_tq);
+		schedule_work(&host->timeout_tq);
 
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 

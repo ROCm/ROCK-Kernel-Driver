@@ -67,7 +67,7 @@ struct packet_task {
 	struct sk_buff *skb;	/* Socket buffer we are sending */
 	nodeid_t dest_node;	/* Destination of the packet */
 	u64 addr;		/* Address */
-	struct hpsb_queue_struct tq;	/* The task */
+	struct work_struct tq;	/* The task */
 	eth1394_tx_type tx_type;	/* Send data via GASP or Write Req. */
 };
 

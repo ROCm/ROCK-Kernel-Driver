@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -40,23 +40,23 @@
  * divisions (MINT). This is actually a header for the data structure which
  * will have an ml_list with more than one element.
  *
- *	-------------------------------
- *	| ml_msen_type | ml_mint_type |
- *	-------------------------------
- *	| ml_level     | ml_grade     |
- *	-------------------------------
- *	| ml_catcount		      |
- *	-------------------------------
- *	| ml_divcount		      |
- *	-------------------------------
- *	| category 1		      |
- *	| . . .			      |
- *	| category N		      | (where N = ml_catcount)
- *	-------------------------------
- *	| division 1		      |
- *	| . . .			      |
- *	| division M		      | (where M = ml_divcount)
- *	-------------------------------
+ *      -------------------------------
+ *      | ml_msen_type | ml_mint_type |
+ *      -------------------------------
+ *      | ml_level     | ml_grade     |
+ *      -------------------------------
+ *      | ml_catcount                 |
+ *      -------------------------------
+ *      | ml_divcount                 |
+ *      -------------------------------
+ *      | category 1                  |
+ *      | . . .                       |
+ *      | category N                  | (where N = ml_catcount)
+ *      -------------------------------
+ *      | division 1                  |
+ *      | . . .                       |
+ *      | division M                  | (where M = ml_divcount)
+ *      -------------------------------
  */
 #define XFS_MAC_MAX_SETS	250
 typedef struct xfs_mac_label {
@@ -70,18 +70,18 @@ typedef struct xfs_mac_label {
 	__uint16_t	ml_list[XFS_MAC_MAX_SETS];
 } xfs_mac_label_t;
 
-/* MSEN label type names. Choose an upper case ASCII character.	 */
+/* MSEN label type names. Choose an upper case ASCII character.  */
 #define XFS_MSEN_ADMIN_LABEL	'A'	/* Admin: low<admin != tcsec<high */
 #define XFS_MSEN_EQUAL_LABEL	'E'	/* Wildcard - always equal */
 #define XFS_MSEN_HIGH_LABEL	'H'	/* System High - always dominates */
-#define XFS_MSEN_MLD_HIGH_LABEL 'I'	/* System High, multi-level dir */
+#define XFS_MSEN_MLD_HIGH_LABEL	'I'	/* System High, multi-level dir */
 #define XFS_MSEN_LOW_LABEL	'L'	/* System Low - always dominated */
 #define XFS_MSEN_MLD_LABEL	'M'	/* TCSEC label on a multi-level dir */
 #define XFS_MSEN_MLD_LOW_LABEL	'N'	/* System Low, multi-level dir */
 #define XFS_MSEN_TCSEC_LABEL	'T'	/* TCSEC label */
 #define XFS_MSEN_UNKNOWN_LABEL	'U'	/* unknown label */
 
-/* MINT label type names. Choose a lower case ASCII character.	*/
+/* MINT label type names. Choose a lower case ASCII character.  */
 #define XFS_MINT_BIBA_LABEL	'b'	/* Dual of a TCSEC label */
 #define XFS_MINT_EQUAL_LABEL	'e'	/* Wildcard - always equal */
 #define XFS_MINT_HIGH_LABEL	'h'	/* High Grade - always dominates */
@@ -110,7 +110,7 @@ extern int  xfs_mac_iaccess(struct xfs_inode *, mode_t, cred_t *);
 #define _MAC_EXISTS		xfs_mac_vhaslabel
 
 #else
-#define _MAC_XFS_IACCESS(i,m,c) (0)
+#define _MAC_XFS_IACCESS(i,m,c)	(0)
 #define _MAC_VACCESS(v,c,m)	(0)
 #define _MAC_EXISTS		(NULL)
 #endif

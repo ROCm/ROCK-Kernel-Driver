@@ -694,7 +694,7 @@ static struct net_proto_family econet_family_ops = {
 
 static struct proto_ops SOCKOPS_WRAPPED(econet_ops) = {
 	.family =	PF_ECONET,
-
+	.owner =	THIS_MODULE,
 	.release =	econet_release,
 	.bind =		econet_bind,
 	.connect =	sock_no_connect,

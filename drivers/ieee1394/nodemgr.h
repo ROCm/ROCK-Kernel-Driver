@@ -21,6 +21,8 @@
 #define _IEEE1394_NODEMGR_H
 
 #include <linux/device.h>
+#include "ieee1394_core.h"
+#include "ieee1394_hotplug.h"
 
 #define CONFIG_ROM_BUS_INFO_LENGTH(q)		((q) >> 24)
 #define CONFIG_ROM_BUS_CRC_LENGTH(q)		(((q) >> 16) & 0xff)
@@ -141,6 +143,34 @@ struct node_entry {
 	/* XXX Must be last in the struct! */
 	quadlet_t quadlets[0];
 };
+
+struct hpsb_protocol_driver {
+	/* The name of the driver, e.g. SBP2 or IP1394 */
+	const char *name;
+
+	/*
+	 * The device id table describing the protocols and/or devices
+	 * supported by this driver.  This is used by the nodemgr to
+	 * decide if a driver could support a given node, but the
+	 * probe function below can implement further protocol
+	 * dependent or vendor dependent checking.
+	 */
+	struct ieee1394_device_id *id_table;
+
+	/*
+	 * The update function is called when the node has just
+	 * survived a bus reset, i.e. it is still present on the bus.
+	 * However, it may be necessary to reestablish the connection
+	 * or login into the node again, depending on the protocol.
+	 */
+	void (*update)(struct unit_directory *ud);
+
+	/* Our LDM structure */
+	struct device_driver driver;
+};
+
+int hpsb_register_protocol(struct hpsb_protocol_driver *driver);
+void hpsb_unregister_protocol(struct hpsb_protocol_driver *driver);
 
 static inline int hpsb_node_entry_valid(struct node_entry *ne)
 {

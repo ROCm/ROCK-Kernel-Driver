@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -29,17 +29,17 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef __XFS_SUPPORT_DEBUG_H__
-#define __XFS_SUPPORT_DEBUG_H__
+#ifndef	__XFS_SUPPORT_DEBUG_H__
+#define	__XFS_SUPPORT_DEBUG_H__
 
 #include <stdarg.h>
 
-#define CE_DEBUG	7		/* debug	*/
-#define CE_CONT		6		/* continuation */
-#define CE_NOTE		5		/* notice	*/
-#define CE_WARN		4		/* warning	*/
-#define CE_ALERT	1		/* alert	*/
-#define CE_PANIC	0		/* panic	*/
+#define CE_DEBUG        7               /* debug        */
+#define CE_CONT         6               /* continuation */
+#define CE_NOTE         5               /* notice       */
+#define CE_WARN         4               /* warning      */
+#define CE_ALERT        1               /* alert        */
+#define CE_PANIC        0               /* panic        */
 
 extern void icmn_err(int, char *, va_list);
 extern void cmn_err(int, char *, ...);
@@ -49,7 +49,7 @@ extern void cmn_err(int, char *, ...);
 #  define ASSERT(EX)	((void)0) /* avoid "constant in conditional" babble */
 # else
 #  define ASSERT(EX) ((!doass||(EX))?((void)0):assfail(#EX, __FILE__, __LINE__))
-# endif /* lint */
+# endif	/* lint */
 #else
 # define ASSERT(x)	((void)0)
 #endif
@@ -62,6 +62,6 @@ extern int get_thread_id(void);
 #endif
 
 #define ASSERT_ALWAYS(EX)  ((EX)?((void)0):assfail(#EX, __FILE__, __LINE__))
-#define debug_stop_all_cpus(param)	/* param is "cpumask_t *" */
+#define	debug_stop_all_cpus(param)	/* param is "cpumask_t *" */
 
-#endif	/* __XFS_SUPPORT_DEBUG_H__ */
+#endif  /* __XFS_SUPPORT_DEBUG_H__ */

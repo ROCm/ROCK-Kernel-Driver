@@ -952,7 +952,6 @@ rpciod(void *ptr)
 	wait_queue_head_t *assassin = (wait_queue_head_t*) ptr;
 	int		rounds = 0;
 
-	MOD_INC_USE_COUNT;
 	lock_kernel();
 	/*
 	 * Let our maker know we're running ...
@@ -995,7 +994,6 @@ rpciod(void *ptr)
 
 	dprintk("RPC: rpciod exiting\n");
 	unlock_kernel();
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -1027,7 +1025,6 @@ rpciod_up(void)
 {
 	int error = 0;
 
-	MOD_INC_USE_COUNT;
 	down(&rpciod_sema);
 	dprintk("rpciod_up: pid %d, users %d\n", rpciod_pid, rpciod_users);
 	rpciod_users++;
@@ -1051,7 +1048,6 @@ rpciod_up(void)
 	error = 0;
 out:
 	up(&rpciod_sema);
-	MOD_DEC_USE_COUNT;
 	return error;
 }
 
@@ -1060,7 +1056,6 @@ rpciod_down(void)
 {
 	unsigned long flags;
 
-	MOD_INC_USE_COUNT;
 	down(&rpciod_sema);
 	dprintk("rpciod_down pid %d sema %d\n", rpciod_pid, rpciod_users);
 	if (rpciod_users) {
@@ -1097,7 +1092,6 @@ rpciod_down(void)
 	spin_unlock_irqrestore(&current->sighand->siglock, flags);
 out:
 	up(&rpciod_sema);
-	MOD_DEC_USE_COUNT;
 }
 
 #ifdef RPC_DEBUG

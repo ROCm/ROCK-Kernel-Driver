@@ -175,7 +175,7 @@ oprofile_arch_init(struct oprofile_operations **ops)
 	}
 
 	if (!lmodel)
-		return ENODEV;
+		return -ENODEV;
 	model = lmodel;
 
 	oprof_axp_ops.cpu_type = lmodel->cpu_type;

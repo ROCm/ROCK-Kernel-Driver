@@ -4815,7 +4815,10 @@
 13be  Miroku Jyoho Service Co. Ltd
 13bf  Sharewave Inc
 13c0  Microgate Corporation
-	0010  SyncLink WAN Adapter
+	0010  SyncLink Adapter v1
+	0020  SyncLink SCC Adapter
+	0030  SyncLink Multiport Adapter
+	0210  SyncLink Adapter v2
 13c1  3ware Inc
 	1000  3ware ATA-RAID
 	1001  3ware 7000-series ATA-RAID
@@ -5456,7 +5459,9 @@
 14f9  AG COMMUNICATIONS
 14fa  WANDEL & GOCHERMANN
 14fb  TRANSAS MARINE (UK) Ltd
-14fc  QUADRICS Supercomputers World
+14fc  Quadrics Ltd
+	0000  QsNet Elan3 Network Adapter
+	0001  QsNetII Elan4 Network Adapter
 14fd  JAPAN Computer Industry Inc
 14fe  ARCHTEK TELECOM Corp
 14ff  TWINHEAD INTERNATIONAL Corp

@@ -499,6 +499,7 @@ struct sock *sctp_v4_create_accept_sk(struct sock *sk,
 		goto out;
 
 	sock_init_data(NULL, newsk);
+	sk_set_owner(newsk, THIS_MODULE);
 
 	newsk->type = SOCK_STREAM;
 
@@ -748,6 +749,7 @@ struct notifier_block sctp_inetaddr_notifier = {
 /* Socket operations.  */
 struct proto_ops inet_seqpacket_ops = {
 	.family      = PF_INET,
+	.owner       = THIS_MODULE,
 	.release     = inet_release,       /* Needs to be wrapped... */
 	.bind        = inet_bind,
 	.connect     = inet_dgram_connect,

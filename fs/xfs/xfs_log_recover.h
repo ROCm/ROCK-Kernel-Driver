@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -29,17 +29,17 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef __XFS_LOG_RECOVER_H__
+#ifndef	__XFS_LOG_RECOVER_H__
 #define __XFS_LOG_RECOVER_H__
 
 /*
  * Macros, structures, prototypes for internal log manager use.
  */
 
-#define XLOG_RHASH_BITS	 4
-#define XLOG_RHASH_SIZE 16
+#define XLOG_RHASH_BITS  4
+#define XLOG_RHASH_SIZE	16
 #define XLOG_RHASH_SHIFT 2
-#define XLOG_RHASH(tid) \
+#define XLOG_RHASH(tid)	\
 	((((__uint32_t)tid)>>XLOG_RHASH_SHIFT) & (XLOG_RHASH_SIZE-1))
 
 #define XLOG_MAX_REGIONS_IN_ITEM   (XFS_MAX_BLOCKSIZE / XFS_BLI_CHUNK / 2 + 1)
@@ -73,9 +73,9 @@ typedef struct xlog_recover {
  * This is the number of entries in the l_buf_cancel_table used during
  * recovery.
  */
-#define XLOG_BC_TABLE_SIZE	64
+#define	XLOG_BC_TABLE_SIZE	64
 
-#define XLOG_RECOVER_PASS1	1
-#define XLOG_RECOVER_PASS2	2
+#define	XLOG_RECOVER_PASS1	1
+#define	XLOG_RECOVER_PASS2	2
 
 #endif	/* __XFS_LOG_RECOVER_H__ */

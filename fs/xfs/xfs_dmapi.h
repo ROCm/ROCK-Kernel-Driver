@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -35,9 +35,9 @@
 /*	Values used to define the on-disk version of dm_attrname_t. All
  *	on-disk attribute names start with the 8-byte string "SGI_DMI_".
  *
- *	In the on-disk inode, DMAPI attribute names consist of the user-provided
- *	name with the DMATTR_PREFIXSTRING pre-pended.  This string must NEVER be
- *	changed.
+ *      In the on-disk inode, DMAPI attribute names consist of the user-provided
+ *      name with the DMATTR_PREFIXSTRING pre-pended.  This string must NEVER be
+ *      changed.
  */
 
 #define DMATTR_PREFIXLEN	8
@@ -80,13 +80,13 @@ typedef enum {
 #define HAVE_DM_RIGHT_T
 
 /* Defines for determining if an event message should be sent. */
-#define DM_EVENT_ENABLED(vfsp, ip, event) ( \
+#define	DM_EVENT_ENABLED(vfsp, ip, event) ( \
 	unlikely ((vfsp)->vfs_flag & VFS_DMI) && \
 		( ((ip)->i_d.di_dmevmask & (1 << event)) || \
 		  ((ip)->i_mount->m_dmevmask & (1 << event)) ) \
 	)
 
-#define DM_EVENT_ENABLED_IO(vfsp, io, event) ( \
+#define	DM_EVENT_ENABLED_IO(vfsp, io, event) ( \
 	unlikely ((vfsp)->vfs_flag & VFS_DMI) && \
 		( ((io)->io_dmevmask & (1 << event)) || \
 		  ((io)->io_mount->m_dmevmask & (1 << event)) ) \
@@ -111,18 +111,18 @@ typedef enum {
 	(1 << DM_EVENT_DESTROY)		)
 
 /* Events valid in dm_set_eventlist() when called with a file handle for
-   a regular file or a symlink.	 These events are persistent.
+   a regular file or a symlink.  These events are persistent.
 */
 
-#define DM_XFS_VALID_FILE_EVENTS	( \
+#define	DM_XFS_VALID_FILE_EVENTS	( \
 	(1 << DM_EVENT_ATTRIBUTE)	| \
 	(1 << DM_EVENT_DESTROY)		)
 
 /* Events valid in dm_set_eventlist() when called with a file handle for
-   a directory.	 These events are persistent.
+   a directory.  These events are persistent.
 */
 
-#define DM_XFS_VALID_DIRECTORY_EVENTS	( \
+#define	DM_XFS_VALID_DIRECTORY_EVENTS	( \
 	(1 << DM_EVENT_CREATE)		| \
 	(1 << DM_EVENT_POSTCREATE)	| \
 	(1 << DM_EVENT_REMOVE)		| \
@@ -137,7 +137,7 @@ typedef enum {
 	(1 << DM_EVENT_DESTROY)		)
 
 /* Events supported by the XFS filesystem. */
-#define DM_XFS_SUPPORTED_EVENTS		( \
+#define	DM_XFS_SUPPORTED_EVENTS		( \
 	(1 << DM_EVENT_MOUNT)		| \
 	(1 << DM_EVENT_PREUNMOUNT)	| \
 	(1 << DM_EVENT_UNMOUNT)		| \
@@ -189,4 +189,4 @@ extern struct bhv_vfsops xfs_dmops;
 extern int dmapi_init(void);
 extern void dmapi_uninit(void);
 
-#endif	/* __XFS_DMAPI_H__ */
+#endif  /* __XFS_DMAPI_H__ */
