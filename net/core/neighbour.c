@@ -803,10 +803,10 @@ static __inline__ void neigh_update_hhs(struct neighbour *neigh)
    -- flags
 	NEIGH_UPDATE_F_OVERRIDE allows to override existing lladdr,
 				if it is different.
-	NEIGH_UPDATE_F_SUSPECT_CONNECTED will suspect existing "connected"
+	NEIGH_UPDATE_F_WEAK_OVERRIDE will suspect existing "connected"
 				lladdr instead of overriding it 
 				if it is different.
-	NEIGH_UPDATE_F_RETAIN_STATE allows to retain current state
+				It also allows to retain current state
 				if lladdr is unchanged.
 	NEIGH_UPDATE_F_ADMIN	means that the change is administrative.
 
@@ -880,7 +880,7 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 	err = 0;
 	if (old & NUD_VALID) {
 		if (lladdr != neigh->ha && !(flags & NEIGH_UPDATE_F_OVERRIDE)) {
-			if ((flags & NEIGH_UPDATE_F_SUSPECT_CONNECTED) &&
+			if ((flags & NEIGH_UPDATE_F_WEAK_OVERRIDE) &&
 			    (old & NUD_CONNECTED)) {
 				lladdr = neigh->ha;
 				new = NUD_STALE;
@@ -888,8 +888,9 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 				goto out;
 		} else {
 			if (lladdr == neigh->ha && new == NUD_STALE &&
-			    ((flags & NEIGH_UPDATE_F_RETAIN_STATE) ||
-			     (old & NUD_CONNECTED)))
+			    ((flags & NEIGH_UPDATE_F_WEAK_OVERRIDE) ||
+			     (old & NUD_CONNECTED))
+			    )
 				new = old;
 		}
 	}
