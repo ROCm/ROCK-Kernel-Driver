@@ -16,6 +16,7 @@
 #include <linux/file.h>
 #include <linux/timex.h>
 #include <linux/major.h>
+#include <linux/compat.h>
 
 #include <asm/uaccess.h>
 #include <asm/string.h>
@@ -597,12 +598,8 @@ asmlinkage int solaris_setrlimit64(unsigned int resource, struct rlimit *rlim)
 	return ret;
 }
 
-struct timeval32 {
-	int tv_sec, tv_usec;
-};
-
 struct sol_ntptimeval {
-	struct timeval32 time;
+	struct compat_timeval time;
 	s32 maxerror;
 	s32 esterror;
 };

@@ -391,9 +391,6 @@ affs_get_block(struct inode *inode, sector_t block, struct buffer_head *bh_resul
 	affs_unlock_ext(inode);
 	return 0;
 
-err_small:
-	affs_error(inode->i_sb,"get_block","Block < 0");
-	return -EIO;
 err_big:
 	affs_error(inode->i_sb,"get_block","strange block request %d", block);
 	return -EIO;

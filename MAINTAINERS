@@ -1597,7 +1597,8 @@ L:	ultralinux@vger.kernel.org
 S:	Maintained
 
 SPARC (sparc32):
-S:	Unmaintained
+L:	sparclinux@vger.kernel.org
+S:	Unmaintained - please send patches to mailing list
 
 SPECIALIX IO8+ MULTIPORT SERIAL CARD DRIVER
 P:	Roger Wolff

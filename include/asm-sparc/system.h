@@ -53,9 +53,6 @@ extern unsigned long empty_bad_page;
 extern unsigned long empty_bad_page_table;
 extern unsigned long empty_zero_page;
 
-extern struct linux_romvec *romvec;
-#define halt() romvec->pv_halt()
-
 extern void sun_do_break(void);
 extern int serial_console;
 extern int stop_a_enabled;

@@ -777,7 +777,7 @@ void ioport_init(void)
 	default:
 		printk("ioport_init: cpu type %d is unknown.\n",
 		    sparc_cpu_model);
-		halt();
+		prom_halt();
 	};
 
 }

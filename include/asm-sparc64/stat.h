@@ -3,6 +3,7 @@
 #define _SPARC64_STAT_H
 
 #include <linux/types.h>
+#include <linux/compat.h>
 #include <linux/time.h>
 
 struct stat32 {
@@ -14,11 +15,11 @@ struct stat32 {
 	__kernel_gid_t32   st_gid;
 	__kernel_dev_t32   st_rdev;
 	__kernel_off_t32   st_size;
-	__kernel_time_t32  st_atime;
+	compat_time_t    st_atime;
 	unsigned int       __unused1;
-	__kernel_time_t32  st_mtime;
+	compat_time_t    st_mtime;
 	unsigned int       __unused2;
-	__kernel_time_t32  st_ctime;
+	compat_time_t    st_ctime;
 	unsigned int       __unused3;
 	__kernel_off_t32   st_blksize;
 	__kernel_off_t32   st_blocks;
