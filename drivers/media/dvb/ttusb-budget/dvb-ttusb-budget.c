@@ -1055,7 +1055,8 @@ static ssize_t stc_read(struct file *file, char *buf, size_t count,
 	if (tc < 0)
 		return 0;
 
-	copy_to_user(buf, stc_firmware + *offset, tc);
+	if (copy_to_user(buf, stc_firmware + *offset, tc))
+		return -EFAULT;
 
 	*offset += tc;
 
