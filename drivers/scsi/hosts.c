@@ -315,7 +315,7 @@ int scsi_add_host(struct Scsi_Host *shost)
 			sht->info ? sht->info(shost) : sht->name);
 
 	device_register(&shost->host_driverfs_dev);
-	scan_scsis(shost, 0, 0, 0, 0);
+	scsi_scan_host(shost);
 			
 	for (sdev = shost->host_queue; sdev; sdev = sdev->next) {
 		if (sdev->host->hostt != sht)
