@@ -587,6 +587,10 @@ ia32_sys_call_table:
 	.quad compat_sys_mq_getsetattr
 	.quad quiet_ni_syscall		/* reserved for kexec */
 	.quad sys32_waitid
+	.quad quiet_ni_syscall		/* sys_altroot */
+	.quad sys_add_key
+	.quad sys_request_key
+	.quad sys_keyctl
 	/* don't forget to change IA32_NR_syscalls */
 ia32_syscall_end:		
 	.rept IA32_NR_syscalls-(ia32_syscall_end-ia32_sys_call_table)/8
