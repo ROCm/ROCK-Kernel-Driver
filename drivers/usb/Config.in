@@ -4,7 +4,13 @@
 mainmenu_option next_comment
 comment 'USB support'
 
-dep_tristate 'Support for USB' CONFIG_USB $CONFIG_PCI
+# ARM SA1111 chips have a non-PCI based "OHCI-compatible" USB host interface.
+if [ "$CONFIG_PCI" = "y" -o "$CONFIG_SA1111" = "y" ]; then
+   tristate 'Support for USB' CONFIG_USB
+else
+   define_bool CONFIG_USB n
+fi
+
 if [ "$CONFIG_USB" = "y" -o  "$CONFIG_USB" = "m" ]; then
    source drivers/usb/core/Config.in
 
