@@ -33,10 +33,6 @@ static int matroxfb_dh_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 	if (regno >= 16)
 		return 1;
-	m2info->palette[regno].red = red;
-	m2info->palette[regno].blue = blue;
-	m2info->palette[regno].green = green;
-	m2info->palette[regno].transp = transp;
 	if (m2info->fbcon.var.grayscale) {
 		/* gray = 0.30*R + 0.59*G + 0.11*B */
 		red = green = blue = (red * 77 + green * 151 + blue * 28) >> 8;

@@ -595,7 +595,6 @@ struct matrox_fb_info {
 					dll:1;
 				      } memory;
 			      } values;
-	struct { unsigned red, green, blue, transp; } palette[256];
 	u_int32_t cmap[17];
 };
 

@@ -627,11 +627,6 @@ static int matroxfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	if (regno >= ACCESS_FBINFO(curr.cmap_len))
 		return 1;
 
-	ACCESS_FBINFO(palette[regno].red)   = red;
-	ACCESS_FBINFO(palette[regno].green) = green;
-	ACCESS_FBINFO(palette[regno].blue)  = blue;
-	ACCESS_FBINFO(palette[regno].transp) = transp;
-
 	if (ACCESS_FBINFO(fbcon).var.grayscale) {
 		/* gray = 0.30*R + 0.59*G + 0.11*B */
 		red = green = blue = (red * 77 + green * 151 + blue * 28) >> 8;
@@ -748,19 +743,6 @@ static int matroxfb_set_par(struct fb_info *info)
 		else
 			ACCESS_FBINFO(curr.ydstorg.pixels) = (ydstorg * 8) / var->bits_per_pixel;
 		ACCESS_FBINFO(curr.final_bppShift) = matroxfb_get_final_bppShift(PMINFO var->bits_per_pixel);
-		if (visual == MX_VISUAL_PSEUDOCOLOR) {
-			int i;
-
-			for (i = 0; i < 16; i++) {
-				int j;
-
-				j = color_table[i];
-				ACCESS_FBINFO(palette[i].red)   = default_red[j];
-				ACCESS_FBINFO(palette[i].green) = default_grn[j];
-				ACCESS_FBINFO(palette[i].blue)  = default_blu[j];
-			}
-		}
-
 		{	struct my_timming mt;
 			struct matrox_hw_state* hw;
 			int out;
