@@ -145,7 +145,8 @@ ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 .config:
 	@echo '***'
 	@echo '*** You have not yet configured your kernel!'
-	@echo '*** Please run "make xconfig/menuconfig/config/oldconfig"'
+	@echo '*** Please run some configurator (do "make xconfig" or'
+	@echo '*** "make menuconfig" or "make oldconfig" or "make config").'
 	@echo '***'
 	@exit 1
 
