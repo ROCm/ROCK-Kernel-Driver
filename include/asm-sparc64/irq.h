@@ -117,8 +117,6 @@ static __inline__ char *__irq_itoa(unsigned int irq)
 extern void disable_irq(unsigned int);
 #define disable_irq_nosync disable_irq
 extern void enable_irq(unsigned int);
-extern void sparc64_init_timers(void (*lvl10_irq)(int, void *, struct pt_regs *),
-				unsigned long *);
 extern unsigned int build_irq(int pil, int inofixup, unsigned long iclr, unsigned long imap);
 extern unsigned int sbus_build_irq(void *sbus, unsigned int ino);
 extern unsigned int psycho_build_irq(void *psycho, int imap_off, int ino, int need_dma_sync);
