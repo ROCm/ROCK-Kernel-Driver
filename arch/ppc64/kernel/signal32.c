@@ -29,6 +29,8 @@
 #include <asm/unistd.h>
 #include <asm/cacheflush.h>
 
+#define DEBUG_SIG 0
+
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 /* 
  * These are the flags in the MSR that the user is allowed to change
