@@ -22,7 +22,7 @@
 
 #include <linux/config.h>
 #include <linux/errno.h>
-#include <linux/sys.h>
+#include <asm/unistd.h>
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/mmu.h>
@@ -301,6 +301,8 @@ _GLOBAL(_switch)
 	REST_8GPRS(14, r1)
 	REST_10GPRS(22, r1)
 
+	/* convert old thread to its task_struct for return value */
+	addi	r3,r3,-THREAD
 	ld	r7,_NIP(r1)	/* Return to _switch caller in new task */
 	mtlr	r7
 	addi	r1,r1,SWITCH_FRAME_SIZE
