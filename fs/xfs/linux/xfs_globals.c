@@ -69,3 +69,5 @@ mutex_t		xfs_Gqm_lock;
 EXPORT_SYMBOL(xfs_Gqm);
 EXPORT_SYMBOL(xfs_next_bit);
 EXPORT_SYMBOL(xfs_contig_bits);
+EXPORT_SYMBOL(xfs_bmbt_get_all);
+
