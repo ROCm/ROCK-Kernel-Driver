@@ -778,7 +778,7 @@ static inline void double_rq_unlock(runqueue_t *rq1, runqueue_t *rq2)
 		spin_unlock(&rq2->lock);
 }
 
-#if CONFIG_NUMA
+#ifdef CONFIG_NUMA
 /*
  * If dest_cpu is allowed for this process, migrate the task to it.
  * This is accomplished by forcing the cpu_allowed mask to only
@@ -1104,7 +1104,7 @@ out:
 #define IDLE_NODE_REBALANCE_TICK (IDLE_REBALANCE_TICK * 5)
 #define BUSY_NODE_REBALANCE_TICK (BUSY_REBALANCE_TICK * 100)
 
-#if CONFIG_NUMA
+#ifdef CONFIG_NUMA
 static void balance_node(runqueue_t *this_rq, int idle, int this_cpu)
 {
 	int node = find_busiest_node(cpu_to_node(this_cpu));
@@ -1121,7 +1121,7 @@ static void balance_node(runqueue_t *this_rq, int idle, int this_cpu)
 
 static void rebalance_tick(runqueue_t *this_rq, int idle)
 {
-#if CONFIG_NUMA
+#ifdef CONFIG_NUMA
 	int this_cpu = smp_processor_id();
 #endif
 	unsigned long j = jiffies;
@@ -1135,7 +1135,7 @@ static void rebalance_tick(runqueue_t *this_rq, int idle)
 	 * are not balanced.)
 	 */
 	if (idle) {
-#if CONFIG_NUMA
+#ifdef CONFIG_NUMA
 		if (!(j % IDLE_NODE_REBALANCE_TICK))
 			balance_node(this_rq, idle, this_cpu);
 #endif
@@ -1146,7 +1146,7 @@ static void rebalance_tick(runqueue_t *this_rq, int idle)
 		}
 		return;
 	}
-#if CONFIG_NUMA
+#ifdef CONFIG_NUMA
 	if (!(j % BUSY_NODE_REBALANCE_TICK))
 		balance_node(this_rq, idle, this_cpu);
 #endif
@@ -2268,7 +2268,7 @@ void __init init_idle(task_t *idle, int cpu)
 	local_irq_restore(flags);
 
 	/* Set the preempt count _outside_ the spinlocks! */
-#if CONFIG_PREEMPT
+#ifdef CONFIG_PREEMPT
 	idle->thread_info->preempt_count = (idle->lock_depth >= 0);
 #else
 	idle->thread_info->preempt_count = 0;
