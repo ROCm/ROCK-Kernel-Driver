@@ -1,26 +1,11 @@
 /*
- *	ALi M7101 PMU Computer Watchdog Timer driver for Linux 2.4.x
+ *	ALi M7101 PMU Computer Watchdog Timer driver
  *
- *	Based on w83877f_wdt.c by Scott Jennings <management@oro.net>
+ *	Based on w83877f_wdt.c by Scott Jennings <linuxdrivers@oro.net>
  *	and the Cobalt kernel WDT timer driver by Tim Hockin
  *	                                      <thockin@cobaltnet.com>
  *
  *	(c)2002 Steve Hill <steve@navaho.co.uk>
- * 
- *  Theory of operation:
- *  A Watchdog Timer (WDT) is a hardware circuit that can 
- *  reset the computer system in case of a software fault.
- *  You probably knew that already.
- *
- *  Usually a userspace daemon will notify the kernel WDT driver
- *  via the /proc/watchdog special device file that userspace is
- *  still alive, at regular intervals.  When such a notification
- *  occurs, the driver will usually tell the hardware watchdog
- *  that everything is in order, and that the watchdog should wait
- *  for yet another little while to reset the system.
- *  If userspace fails (RAM error, kernel bug, whatever), the
- *  notifications cease to occur, and the hardware watchdog will
- *  reset the system (causing a reboot) after the timeout occurs.
  *
  *  This WDT driver is different from most other Linux WDT
  *  drivers in that the driver will ping the watchdog by itself,
@@ -30,6 +15,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/types.h>
 #include <linux/timer.h>
 #include <linux/miscdevice.h>
@@ -38,7 +24,6 @@
 #include <linux/notifier.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
-#include <linux/moduleparam.h>
 #include <linux/pci.h>
 
 #include <asm/io.h>
@@ -46,6 +31,7 @@
 #include <asm/system.h>
 
 #define OUR_NAME "alim7101_wdt"
+#define PFX OUR_NAME ": "
 
 #define WDT_ENABLE 0x9C
 #define WDT_DISABLE 0x8C
@@ -79,7 +65,7 @@ static int nowayout = 1;
 #else
 static int nowayout = 0;
 #endif
- 
+
 module_param(nowayout, int, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
@@ -90,25 +76,25 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CON
 static void wdt_timer_ping(unsigned long data)
 {
 	/* If we got a heartbeat pulse within the WDT_US_INTERVAL
-	 * we agree to ping the WDT 
+	 * we agree to ping the WDT
 	 */
 	char	tmp;
 
-	if(time_before(jiffies, next_heartbeat)) 
+	if(time_before(jiffies, next_heartbeat))
 	{
 		/* Ping the WDT (this is actually a disarm/arm sequence) */
 		pci_read_config_byte(alim7101_pmu, 0x92, &tmp);
 		pci_write_config_byte(alim7101_pmu, ALI_7101_WDT, (tmp & ~ALI_WDT_ARM));
 		pci_write_config_byte(alim7101_pmu, ALI_7101_WDT, (tmp | ALI_WDT_ARM));
 	} else {
-		printk(KERN_INFO OUR_NAME ": Heartbeat lost! Will not ping the watchdog\n");
+		printk(KERN_WARNING PFX "Heartbeat lost! Will not ping the watchdog\n");
 	}
 	/* Re-set the timer interval */
 	timer.expires = jiffies + WDT_INTERVAL;
 	add_timer(&timer);
 }
 
-/* 
+/*
  * Utility routines
  */
 
@@ -133,11 +119,11 @@ static void wdt_startup(void)
 	wdt_change(WDT_ENABLE);
 
 	/* Start the timer */
-	timer.expires = jiffies + WDT_INTERVAL;	
+	timer.expires = jiffies + WDT_INTERVAL;
 	add_timer(&timer);
 
 
-	printk(KERN_INFO OUR_NAME ": Watchdog timer is now enabled.\n");  
+	printk(KERN_INFO PFX "Watchdog timer is now enabled.\n");
 }
 
 static void wdt_turnoff(void)
@@ -145,7 +131,7 @@ static void wdt_turnoff(void)
 	/* Stop the timer */
 	del_timer_sync(&timer);
 	wdt_change(WDT_DISABLE);
-	printk(KERN_INFO OUR_NAME ": Watchdog timer is now disabled...\n");
+	printk(KERN_INFO PFX "Watchdog timer is now disabled...\n");
 }
 
 /*
@@ -173,14 +159,13 @@ static ssize_t fop_write(struct file * file, const char * buf, size_t count, lof
 				if (get_user(c, buf+ofs))
 					return -EFAULT;
 				if (c == 'V')
-					wdt_expect_close = 1;
+					wdt_expect_close = 42;
 			}
 		}
 		/* someone wrote to us, we should restart timer */
 		next_heartbeat = jiffies + WDT_HEARTBEAT;
-		return 1;
-	};
-	return 0;
+	}
+	return count;
 }
 
 static int fop_open(struct inode * inode, struct file * file)
@@ -195,12 +180,13 @@ static int fop_open(struct inode * inode, struct file * file)
 
 static int fop_close(struct inode * inode, struct file * file)
 {
-	if(wdt_expect_close)
+	if(wdt_expect_close == 42)
 		wdt_turnoff();
-	else
-		printk(KERN_INFO OUR_NAME ": device file closed unexpectedly. Will not stop the WDT!\n");
-
+	else {
+		printk(KERN_CRIT PFX "device file closed unexpectedly. Will not stop the WDT!\n");
+	}
 	clear_bit(0, &wdt_is_open);
+	wdt_expect_close = 0;
 	return 0;
 }
 
@@ -210,9 +196,9 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 	{
 		.options = WDIOF_MAGICCLOSE,
 		.firmware_version = 1,
-		.identity = "ALiM7101"
+		.identity = "ALiM7101",
 	};
-	
+
 	switch(cmd)
 	{
 		case WDIOC_GETSUPPORT:
@@ -231,13 +217,13 @@ static struct file_operations wdt_fops = {
 	.write=		fop_write,
 	.open=		fop_open,
 	.release=	fop_close,
-	.ioctl=		fop_ioctl
+	.ioctl=		fop_ioctl,
 };
 
 static struct miscdevice wdt_miscdev = {
 	.minor=WATCHDOG_MINOR,
 	.name="watchdog",
-	.fops=&wdt_fops
+	.fops=&wdt_fops,
 };
 
 /*
@@ -256,21 +242,21 @@ static int wdt_notify_sys(struct notifier_block *this, unsigned long code, void 
 		 * reboot with no heartbeat
 		 */
 		wdt_change(WDT_ENABLE);
-		printk(KERN_INFO OUR_NAME ": Watchdog timer is now enabled with no heartbeat - should reboot in ~1 second.\n");
+		printk(KERN_INFO PFX "Watchdog timer is now enabled with no heartbeat - should reboot in ~1 second.\n");
 	}
 	return NOTIFY_DONE;
 }
- 
+
 /*
  *	The WDT needs to learn about soft shutdowns in order to
- *	turn the timebomb registers off. 
+ *	turn the timebomb registers off.
  */
- 
+
 static struct notifier_block wdt_notifier=
 {
 	.notifier_call = wdt_notify_sys,
 	.next = 0,
-	.priority = 0
+	.priority = 0,
 };
 
 static void __exit alim7101_wdt_unload(void)
@@ -287,10 +273,10 @@ static int __init alim7101_wdt_init(void)
 	struct pci_dev *ali1543_south;
 	char tmp;
 
-	printk(KERN_INFO OUR_NAME ": Steve Hill <steve@navaho.co.uk>.\n");
+	printk(KERN_INFO PFX "Steve Hill <steve@navaho.co.uk>.\n");
 	alim7101_pmu = pci_find_device(PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M7101,NULL);
 	if (!alim7101_pmu) {
-		printk(KERN_INFO OUR_NAME ": ALi M7101 PMU not present - WDT not set\n");
+		printk(KERN_INFO PFX "ALi M7101 PMU not present - WDT not set\n");
 		return -EBUSY;
 	}
 
@@ -299,12 +285,12 @@ static int __init alim7101_wdt_init(void)
 
 	ali1543_south = pci_find_device(PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M1533, NULL);
 	if (!ali1543_south) {
-		printk(KERN_INFO OUR_NAME ": ALi 1543 South-Bridge not present - WDT not set\n");
+		printk(KERN_INFO PFX "ALi 1543 South-Bridge not present - WDT not set\n");
 		return -EBUSY;
 	}
 	pci_read_config_byte(ali1543_south, 0x5e, &tmp);
 	if ((tmp & 0x1e) != 0x12) {
-		printk(KERN_INFO OUR_NAME ": ALi 1543 South-Bridge does not have the correct revision number (???1001?) - WDT not set\n");
+		printk(KERN_INFO PFX "ALi 1543 South-Bridge does not have the correct revision number (???1001?) - WDT not set\n");
 		return -EBUSY;
 	}
 
@@ -313,21 +299,32 @@ static int __init alim7101_wdt_init(void)
 	timer.data = 1;
 
 	rc = misc_register(&wdt_miscdev);
-	if (rc)
-		return rc;
+	if (rc) {
+		printk(KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
+			wdt_miscdev.minor, rc);
+		goto err_out;
+	}
 
 	rc = register_reboot_notifier(&wdt_notifier);
 	if (rc) {
-		misc_deregister(&wdt_miscdev);
-		return rc;
+		printk(KERN_ERR PFX "cannot register reboot notifier (err=%d)\n",
+			rc);
+		goto err_out_miscdev;
 	}
 
-	printk(KERN_INFO OUR_NAME ": WDT driver for ALi M7101 initialised.\n");
+	printk(KERN_INFO PFX "WDT driver for ALi M7101 initialised. (nowayout=%d)\n",
+		nowayout);
 	return 0;
+
+err_out_miscdev:
+	misc_deregister(&wdt_miscdev);
+err_out:
+        return rc;
 }
 
 module_init(alim7101_wdt_init);
 module_exit(alim7101_wdt_unload);
 
 MODULE_AUTHOR("Steve Hill");
+MODULE_DESCRIPTION("ALi M7101 PMU Computer Watchdog Timer driver");
 MODULE_LICENSE("GPL");
