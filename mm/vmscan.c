@@ -377,7 +377,7 @@ static int shrink_list(struct list_head *page_list, struct scan_control *sc)
 		if (page_mapped(page) || PageSwapCache(page))
 			sc->nr_scanned++;
 
-		referenced = page_referenced(page, 1);
+		referenced = page_referenced(page, 1, sc->priority <= 0);
 		/* In active use or really unfreeable?  Activate it. */
 		if (referenced && page_mapping_inuse(page))
 			goto activate_locked;
@@ -715,7 +715,7 @@ refill_inactive_zone(struct zone *zone, struct scan_control *sc)
 		if (page_mapped(page)) {
 			if (!reclaim_mapped ||
 			    (total_swap_pages == 0 && PageAnon(page)) ||
-			    page_referenced(page, 0)) {
+			    page_referenced(page, 0, sc->priority <= 0)) {
 				list_add(&page->lru, &l_active);
 				continue;
 			}
