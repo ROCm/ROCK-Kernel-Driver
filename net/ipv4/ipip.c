@@ -231,12 +231,10 @@ struct ip_tunnel * ipip_tunnel_locate(struct ip_tunnel_parm *parms, int create)
 	if (!create)
 		return NULL;
 
-	MOD_INC_USE_COUNT;
 	dev = kmalloc(sizeof(*dev) + sizeof(*t), GFP_KERNEL);
-	if (dev == NULL) {
-		MOD_DEC_USE_COUNT;
+	if (dev == NULL)
 		return NULL;
-	}
+
 	memset(dev, 0, sizeof(*dev) + sizeof(*t));
 	dev->priv = (void*)(dev+1);
 	nt = (struct ip_tunnel*)dev->priv;
@@ -256,6 +254,7 @@ struct ip_tunnel * ipip_tunnel_locate(struct ip_tunnel_parm *parms, int create)
 			goto failed;
 		memcpy(nt->parms.name, dev->name, IFNAMSIZ);
 	}
+	SET_MODULE_OWNER(dev);
 	if (register_netdevice(dev) < 0)
 		goto failed;
 
@@ -266,16 +265,13 @@ struct ip_tunnel * ipip_tunnel_locate(struct ip_tunnel_parm *parms, int create)
 
 failed:
 	kfree(dev);
-	MOD_DEC_USE_COUNT;
 	return NULL;
 }
 
 static void ipip_tunnel_destructor(struct net_device *dev)
 {
-	if (dev != &ipip_fb_tunnel_dev) {
+	if (dev != &ipip_fb_tunnel_dev)
 		kfree(dev);
-		MOD_DEC_USE_COUNT;
-	}
 }
 
 static void ipip_tunnel_uninit(struct net_device *dev)
@@ -682,8 +678,6 @@ ipip_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 	struct ip_tunnel_parm p;
 	struct ip_tunnel *t;
 
-	MOD_INC_USE_COUNT;
-
 	switch (cmd) {
 	case SIOCGETTUNNEL:
 		t = NULL;
@@ -782,7 +776,6 @@ ipip_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 	}
 
 done:
-	MOD_DEC_USE_COUNT;
 	return err;
 }
 
@@ -858,29 +851,11 @@ static int ipip_tunnel_init(struct net_device *dev)
 	return 0;
 }
 
-#ifdef MODULE
-static int ipip_fb_tunnel_open(struct net_device *dev)
-{
-	MOD_INC_USE_COUNT;
-	return 0;
-}
-
-static int ipip_fb_tunnel_close(struct net_device *dev)
-{
-	MOD_DEC_USE_COUNT;
-	return 0;
-}
-#endif
-
 int __init ipip_fb_tunnel_init(struct net_device *dev)
 {
 	struct iphdr *iph;
 
 	ipip_tunnel_init_gen(dev);
-#ifdef MODULE
-	dev->open		= ipip_fb_tunnel_open;
-	dev->stop		= ipip_fb_tunnel_close;
-#endif
 
 	iph = &ipip_fb_tunnel.parms.iph;
 	iph->version		= 4;
@@ -910,6 +885,7 @@ int __init ipip_init(void)
 	}
 
 	ipip_fb_tunnel_dev.priv = (void*)&ipip_fb_tunnel;
+	SET_MODULE_OWNER(&ipip_fb_tunnel_dev);
 	register_netdev(&ipip_fb_tunnel_dev);
 	return 0;
 }

@@ -501,6 +501,15 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	       real_dev->ifindex);
 #endif
 	    
+	if (register_netdevice(new_dev))
+		goto out_free_newdev_priv;
+
+	/* NOTE:  We have a reference to the real device,
+	 * so hold on to the reference. May fail if we are being removed
+	 */
+	if (!try_module_get(THIS_MODULE))
+		goto out_free_unregister;
+
 	/* So, got the sucker initialized, now lets place
 	 * it into our local structure.
 	 */
@@ -514,7 +523,7 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	if (!grp) { /* need to add a new group */
 		grp = kmalloc(sizeof(struct vlan_group), GFP_KERNEL);
 		if (!grp)
-			goto out_free_newdev_priv;
+			goto out_free_put;
 					
 		/* printk(KERN_ALERT "VLAN REGISTER:  Allocated new group.\n"); */
 		memset(grp, 0, sizeof(struct vlan_group));
@@ -535,24 +544,18 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	if (real_dev->features & NETIF_F_HW_VLAN_FILTER)
 		real_dev->vlan_rx_add_vid(real_dev, VLAN_ID);
 
-	register_netdevice(new_dev);
-
 	rtnl_unlock();
 
-	/* NOTE:  We have a reference to the real device,
-	 * so hold on to the reference.
-	 */
-	if (!try_module_get(THIS_MODULE))
-		goto out_module_dying;
 
 #ifdef VLAN_DEBUG
 	printk(VLAN_DBG "Allocated new device successfully, returning.\n");
 #endif
 	return new_dev;
+out_free_put:
+	module_put(THIS_MODULE);
 
-out_module_dying:
-	rtnl_lock();
-	unregister_netdevice(new_dev);
+out_free_unregister:
+	unregister_netdev(new_dev);
 
 out_free_newdev_priv:
 	kfree(new_dev->priv);
