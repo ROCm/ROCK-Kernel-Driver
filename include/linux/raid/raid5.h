@@ -181,7 +181,7 @@ struct stripe_head {
  * is put on a "delayed" queue until there are no stripes currently
  * in a pre-read phase.  Further, if the "delayed" queue is empty when
  * a stripe is put on it then we "plug" the queue and do not process it
- * until an unplug call is made. (blk_run_queues is run).
+ * until an unplug call is made. (the unplug_io_fn() is called).
  *
  * When preread is initiated on a stripe, we set PREREAD_ACTIVE and add
  * it to the count of prereading stripes.
