@@ -426,6 +426,11 @@ struct usb_device {
 	struct usb_device *children[USB_MAXCHILDREN];
 };
 
+/* usb_free_dev can be called anywhere from usb_dec_dev_use */
+extern struct usb_device *usb_alloc_dev(struct usb_device *parent,
+	struct usb_bus *);
+extern void usb_free_dev(struct usb_device *);
+
 /* for when layers above USB add new non-USB drivers */
 extern void usb_scan_devices(void);
 
@@ -455,27 +460,11 @@ static inline void usb_inc_dev_use (struct usb_device *dev)
  * @dev: the device no longer being referenced
  *
  * Each live reference to a device should be refcounted.
- *
- * Drivers for USB interfaces should normally release such references in
- * their disconnect() methods, and record them in probe().
- *
- * Note that driver disconnect() methods must guarantee that when they
- * return, all of their outstanding references to the device (and its
- * interfaces) are cleaned up.  That means that all pending URBs from
- * this driver must have completed, and that no more copies of the device
- * handle are saved in driver records (including other kernel threads).
  */
 static inline void usb_dec_dev_use (struct usb_device *dev)
 {
-	if (atomic_dec_and_test (&dev->refcnt)) {
-		/* May only go to zero when usbcore finishes
-		 * usb_disconnect() processing:  khubd or HCDs.
-		 *
-		 * If you hit this BUG() it's likely a problem
-		 * with some driver's disconnect() routine.
-		 */
-		BUG ();
-	}
+	if (atomic_dec_and_test(&dev->refcnt))
+		usb_free_dev(dev);
 }
 
 

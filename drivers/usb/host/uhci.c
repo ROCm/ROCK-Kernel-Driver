@@ -109,19 +109,6 @@ static void wakeup_hc(struct uhci *uhci);
 #define MAX_URB_LOOP	2048		/* Maximum number of linked URB's */
 
 /*
- * Only the USB core should call uhci_alloc_dev and uhci_free_dev
- */
-static int uhci_alloc_dev(struct usb_device *dev)
-{
-	return 0;
-}
-
-static int uhci_free_dev(struct usb_device *dev)
-{
-	return 0;
-}
-
-/*
  * Technically, updating td->status here is a race, but it's not really a
  * problem. The worst that can happen is that we set the IOC bit again
  * generating a spurios interrupt. We could fix this by creating another
@@ -1882,8 +1869,6 @@ static int uhci_get_current_frame_number(struct usb_device *dev)
 }
 
 struct usb_operations uhci_device_operations = {
-	allocate:		uhci_alloc_dev,
-	deallocate:		uhci_free_dev,
 	get_frame_number:	uhci_get_current_frame_number,
 	submit_urb:		uhci_submit_urb,
 	unlink_urb:		uhci_unlink_urb,

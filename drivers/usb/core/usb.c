@@ -962,7 +962,8 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 
 	init_MUTEX(&dev->serialize);
 
-	dev->bus->op->allocate(dev);
+	if (dev->bus->op->allocate)
+		dev->bus->op->allocate(dev);
 
 	return dev;
 }
@@ -978,16 +979,8 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
  */
 void usb_free_dev(struct usb_device *dev)
 {
-	if (in_interrupt ())
-		BUG ();
-	if (!atomic_dec_and_test (&dev->refcnt)) {
-		/* MUST go to zero here, else someone's hanging on to
-		 * a device that's supposed to have been cleaned up!!
-		 */
-		BUG ();
-	}
-
-	dev->bus->op->deallocate (dev);
+	if (dev->bus->op->deallocate)
+		dev->bus->op->deallocate(dev);
 	usb_destroy_configuration (dev);
 	usb_bus_put (dev->bus);
 	kfree (dev);
@@ -1933,8 +1926,9 @@ void usb_disconnect(struct usb_device **pdev)
 		put_device(&dev->dev);
 	}
 
-	/* Free up the device itself */
-	usb_free_dev(dev);
+	/* Decrement the reference count, it'll auto free everything when */
+	/* it hits 0 which could very well be now */
+	usb_dec_dev_use(dev);
 }
 
 /**
