@@ -624,18 +624,8 @@ resume_kernel:
 	beq+	restore
 	andi.	r0,r3,MSR_EE	/* interrupts off? */
 	beq	restore		/* don't schedule if so */
-1:	lis	r0,PREEMPT_ACTIVE@h
-	stw	r0,TI_PREEMPT(r9)
-	ori	r10,r10,MSR_EE
-	SYNC
-	MTMSRD(r10)		/* hard-enable interrupts */
-	bl	schedule
-	LOAD_MSR_KERNEL(r10,MSR_KERNEL)
-	SYNC
-	MTMSRD(r10)		/* disable interrupts */
+1:	bl	preempt_schedule_irq
 	rlwinm	r9,r1,0,0,18
-	li	r0,0
-	stw	r0,TI_PREEMPT(r9)
 	lwz	r3,TI_FLAGS(r9)
 	andi.	r0,r3,_TIF_NEED_RESCHED
 	bne-	1b
