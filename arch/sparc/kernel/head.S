@@ -25,6 +25,7 @@
 #include <asm/winmacro.h>
 #include <asm/thread_info.h>	/* TI_UWINMASK */
 #include <asm/errno.h>
+#include <asm/pgtsrmmu.h>	/* SRMMU_PGDIR_SHIFT */
 
 	.data
 /* 
@@ -623,12 +624,8 @@ srmmu_remap:
 		/* Ok, pull in the PTD. */
 		lda	[%o1] ASI_M_BYPASS, %o2		! This is the 0x0 16MB pgd
 
-		/* Calculate to KERNBASE entry.
-		 *
-		 * XXX Should not use empirical constant, but Gas gets an  XXX
-		 * XXX upset stomach with the bitshift I would have to use XXX
-		 */
-		add	%o1, 0x3c0, %o3		
+		/* Calculate to KERNBASE entry. */
+		add	%o1, KERNBASE >> (SRMMU_PGDIR_SHIFT - 2), %o3		
 
 		/* Poke the entry into the calculated address. */
 		sta	%o2, [%o3] ASI_M_BYPASS
@@ -672,7 +669,7 @@ srmmu_nviking:
 		sll	%g1, 0x8, %g1			! make phys addr for l1 tbl
 
 		lda	[%g1] ASI_M_BYPASS, %g2		! get level1 entry for 0x0
-		add	%g1, 0x3c0, %g3			! XXX AWAY WITH EMPIRICALS
+		add	%g1, KERNBASE >> (SRMMU_PGDIR_SHIFT - 2), %g3
 		sta	%g2, [%g3] ASI_M_BYPASS		! place at KERNBASE entry
 		b	go_to_highmem
 		 nop					! wheee....
