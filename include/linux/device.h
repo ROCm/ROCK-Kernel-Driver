@@ -265,7 +265,6 @@ struct device {
 	struct list_head children;
 	struct device 	* parent;
 
-	struct completion * complete;	/* Notification for freeing device. */
 	struct kobject kobj;
 	char	bus_id[BUS_ID_SIZE];	/* position on parent bus */
 
@@ -313,7 +312,6 @@ dev_set_drvdata (struct device *dev, void *data)
  */
 extern int device_register(struct device * dev);
 extern void device_unregister(struct device * dev);
-extern void device_unregister_wait(struct device * dev);
 extern void device_initialize(struct device * dev);
 extern int device_add(struct device * dev);
 extern void device_del(struct device * dev);
