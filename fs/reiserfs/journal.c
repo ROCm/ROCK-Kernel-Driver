@@ -655,6 +655,17 @@ static int submit_barrier_buffer(struct buffer_head *bh) {
     return submit_bh(WRITE_BARRIER, bh) ;
 }
 
+static void check_barrier_completion(struct super_block *s,
+                                     struct buffer_head *bh) {
+    if (buffer_eopnotsupp(bh)) {
+	clear_buffer_eopnotsupp(bh);
+	disable_barrier(s);
+	set_buffer_uptodate(bh);
+	set_buffer_dirty(bh);
+	sync_dirty_buffer(bh);
+    }
+}
+
 #define CHUNK_SIZE 32
 struct buffer_chunk {
     struct buffer_head *bh[CHUNK_SIZE];
@@ -1032,6 +1043,7 @@ static int flush_commit_list(struct super_block *s, struct reiserfs_journal_list
   } else
       wait_on_buffer(jl->j_commit_bh);
 
+  check_barrier_completion(s, jl->j_commit_bh);
   if (!buffer_uptodate(jl->j_commit_bh)) {
     reiserfs_panic(s, "journal-615: buffer write failed\n") ;
   }
@@ -1142,6 +1154,7 @@ static int _update_journal_header_block(struct super_block *p_s_sb, unsigned lon
 	    goto sync;
 	}
 	wait_on_buffer(SB_JOURNAL(p_s_sb)->j_header_bh);
+	check_barrier_completion(p_s_sb, SB_JOURNAL(p_s_sb)->j_header_bh);
     } else {
 sync:
 	set_buffer_dirty(SB_JOURNAL(p_s_sb)->j_header_bh) ;

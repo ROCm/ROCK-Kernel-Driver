@@ -587,7 +587,7 @@ enum {
 	Opt_abort, Opt_data_journal, Opt_data_ordered, Opt_data_writeback,
 	Opt_usrjquota, Opt_grpjquota, Opt_offusrjquota, Opt_offgrpjquota,
 	Opt_jqfmt_vfsold, Opt_jqfmt_vfsv0,
-	Opt_ignore, Opt_err,
+	Opt_ignore, Opt_barrier, Opt_err,
 };
 
 static match_table_t tokens = {
@@ -632,6 +632,7 @@ static match_table_t tokens = {
 	{Opt_ignore, "noquota"},
 	{Opt_ignore, "quota"},
 	{Opt_ignore, "usrquota"},
+	{Opt_barrier, "barrier=%u"},
 	{Opt_err, NULL}
 };
 
@@ -896,6 +897,14 @@ clear_qf_name:
 #endif
 		case Opt_abort:
 			set_opt(sbi->s_mount_opt, ABORT);
+			break;
+		case Opt_barrier:
+			if (match_int(&args[0], &option))
+				return 0;
+			if (option)
+				set_opt(sbi->s_mount_opt, BARRIER);
+			else
+				clear_opt(sbi->s_mount_opt, BARRIER);
 			break;
 		case Opt_ignore:
 			break;
@@ -1599,16 +1608,23 @@ out_fail:
  * initial mount, once the journal has been initialised but before we've
  * done any recovery; and again on any subsequent remount. 
  */
-static void ext3_init_journal_params(struct ext3_sb_info *sbi, 
-				     journal_t *journal)
+static void ext3_init_journal_params(struct super_block *sb, journal_t *journal)
 {
+	struct ext3_sb_info *sbi = EXT3_SB(sb);
+
 	if (sbi->s_commit_interval)
 		journal->j_commit_interval = sbi->s_commit_interval;
 	/* We could also set up an ext3-specific default for the commit
 	 * interval here, but for now we'll just fall back to the jbd
 	 * default. */
-}
 
+	spin_lock(&journal->j_state_lock);
+	if (test_opt(sb, BARRIER))
+		journal->j_flags |= JFS_BARRIER;
+	else
+		journal->j_flags &= ~JFS_BARRIER;
+	spin_unlock(&journal->j_state_lock);
+}
 
 static journal_t *ext3_get_journal(struct super_block *sb, int journal_inum)
 {
@@ -1646,7 +1662,7 @@ static journal_t *ext3_get_journal(struct super_block *sb, int journal_inum)
 		return NULL;
 	}
 	journal->j_private = sb;
-	ext3_init_journal_params(EXT3_SB(sb), journal);
+	ext3_init_journal_params(sb, journal);
 	return journal;
 }
 
@@ -1731,7 +1747,7 @@ static journal_t *ext3_get_dev_journal(struct super_block *sb,
 		goto out_journal;
 	}
 	EXT3_SB(sb)->journal_bdev = bdev;
-	ext3_init_journal_params(EXT3_SB(sb), journal);
+	ext3_init_journal_params(sb, journal);
 	return journal;
 out_journal:
 	journal_destroy(journal);
@@ -2028,7 +2044,7 @@ int ext3_remount (struct super_block * sb, int * flags, char * data)
 
 	es = sbi->s_es;
 
-	ext3_init_journal_params(sbi, sbi->s_journal);
+	ext3_init_journal_params(sb, sbi->s_journal);
 
 	if ((*flags & MS_RDONLY) != (sb->s_flags & MS_RDONLY)) {
 		if (sbi->s_mount_opt & EXT3_MOUNT_ABORT)
