@@ -785,26 +785,7 @@ static inline int pci_module_init(struct pci_driver *drv)
 {
 	int rc = pci_register_driver (drv);
 
-	if (rc > 0)
-		return 0;
-
-	/* iff CONFIG_HOTPLUG and built into kernel, we should
-	 * leave the driver around for future hotplug events.
-	 * For the module case, a hotplug daemon of some sort
-	 * should load a module in response to an insert event. */
-#if defined(CONFIG_HOTPLUG) && !defined(MODULE)
-	if (rc == 0)
-		return 0;
-#else
-	if (rc == 0)
-		rc = -ENODEV;		
-#endif
-
-	/* if we get here, we need to clean up pci driver instance
-	 * and return some sort of error */
-	pci_unregister_driver (drv);
-	
-	return rc;
+	return rc < 0 ? rc : 0;
 }
 
 /*
