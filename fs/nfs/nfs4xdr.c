@@ -262,6 +262,14 @@ static int nfs_stat_to_errno(int);
 				op_decode_hdr_maxsz + \
 				decode_getattr_maxsz + \
 				decode_getfh_maxsz)
+#define NFS4_enc_lookup_root_sz (compound_encode_hdr_maxsz + \
+				encode_putrootfh_maxsz + \
+				encode_getattr_maxsz + \
+				encode_getfh_maxsz)
+#define NFS4_dec_lookup_root_sz (compound_decode_hdr_maxsz + \
+				decode_putrootfh_maxsz + \
+				decode_getattr_maxsz + \
+				decode_getfh_maxsz)
 
 
 
@@ -1088,14 +1096,8 @@ encode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 		case OP_LINK:
 			status = encode_link(xdr, &cp->ops[i].u.link);
 			break;
-		case OP_LOOKUP:
-			status = encode_lookup(xdr, cp->ops[i].u.lookup.lo_name);
-			break;
 		case OP_PUTFH:
 			status = encode_putfh(xdr, cp->ops[i].u.putfh.pf_fhandle);
-			break;
-		case OP_PUTROOTFH:
-			status = encode_putrootfh(xdr);
 			break;
 		case OP_READDIR:
 			status = encode_readdir(xdr, &cp->ops[i].u.readdir, req);
@@ -1181,6 +1183,27 @@ static int nfs4_xdr_enc_lookup(struct rpc_rqst *req, uint32_t *p, const struct n
 	if ((status = encode_getfh(&xdr)) != 0)
 		goto out;
 	status = encode_getfattr(&xdr, args->bitmask);
+out:
+	return status;
+}
+
+/*
+ * Encode LOOKUP_ROOT request
+ */
+static int nfs4_xdr_enc_lookup_root(struct rpc_rqst *req, uint32_t *p, const struct nfs4_lookup_root_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	if ((status = encode_putrootfh(&xdr)) != 0)
+		goto out;
+	if ((status = encode_getfh(&xdr)) == 0)
+		status = encode_getfattr(&xdr, args->bitmask);
 out:
 	return status;
 }
@@ -2902,14 +2925,8 @@ decode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 		case OP_LINK:
 			status = decode_link(xdr, &op->u.link);
 			break;
-		case OP_LOOKUP:
-			status = decode_lookup(xdr);
-			break;
 		case OP_PUTFH:
 			status = decode_putfh(xdr);
-			break;
-		case OP_PUTROOTFH:
-			status = decode_putrootfh(xdr);
 			break;
 		case OP_READDIR:
 			status = decode_readdir(xdr, req, &op->u.readdir);
@@ -3024,6 +3041,26 @@ static int nfs4_xdr_dec_lookup(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_
 	if ((status = decode_getfh(&xdr, res->fh)) != 0)
 		goto out;
 	status = decode_getfattr(&xdr, res->fattr, res->server);
+out:
+	return status;
+}
+
+/*
+ * Decode LOOKUP_ROOT response
+ */
+static int nfs4_xdr_dec_lookup_root(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_lookup_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+	
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		goto out;
+	if ((status = decode_putrootfh(&xdr)) != 0)
+		goto out;
+	if ((status = decode_getfh(&xdr, res->fh)) == 0)
+		status = decode_getfattr(&xdr, res->fattr, res->server);
 out:
 	return status;
 }
@@ -3538,6 +3575,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(ACCESS,		enc_access,	dec_access),
   PROC(GETATTR,		enc_getattr,	dec_getattr),
   PROC(LOOKUP,		enc_lookup,	dec_lookup),
+  PROC(LOOKUP_ROOT,	enc_lookup_root,	dec_lookup_root),
 };
 
 struct rpc_version		nfs_version4 = {

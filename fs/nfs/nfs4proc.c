@@ -54,7 +54,7 @@
 #define GET_OP(cp,name)		&cp->ops[cp->req_nops].u.name
 #define OPNUM(cp)		cp->ops[cp->req_nops].opnum
 
-static int nfs4_proc_fsinfo(struct nfs_server *, struct nfs_fh *, struct nfs_fsinfo *);
+static int nfs4_do_fsinfo(struct nfs_server *, struct nfs_fh *, struct nfs_fsinfo *);
 static int nfs4_async_handle_error(struct rpc_task *, struct nfs_server *);
 extern u32 *nfs4_decode_dirent(u32 *p, struct nfs_entry *entry, int plus);
 extern struct rpc_procinfo nfs4_procedures[];
@@ -253,17 +253,6 @@ nfs4_setup_link(struct nfs4_compound *cp, struct qstr *name,
 }
 
 static void
-nfs4_setup_lookup(struct nfs4_compound *cp, struct qstr *q)
-{
-	struct nfs4_lookup *lookup = GET_OP(cp, lookup);
-
-	lookup->lo_name = q;
-
-	OPNUM(cp) = OP_LOOKUP;
-	cp->req_nops++;
-}
-
-static void
 nfs4_setup_putfh(struct nfs4_compound *cp, struct nfs_fh *fhandle)
 {
 	struct nfs4_putfh *putfh = GET_OP(cp, putfh);
@@ -272,13 +261,6 @@ nfs4_setup_putfh(struct nfs4_compound *cp, struct nfs_fh *fhandle)
 
 	OPNUM(cp) = OP_PUTFH;
 	cp->req_nops++;
-}
-
-static void
-nfs4_setup_putrootfh(struct nfs4_compound *cp)
-{
-        OPNUM(cp) = OP_PUTROOTFH;
-        cp->req_nops++;
 }
 
 static void
@@ -821,30 +803,60 @@ nfs4_open_revalidate(struct inode *dir, struct dentry *dentry, int openflags)
 	return 0;
 }
 
-static int
-nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
-		   struct nfs_fsinfo *info)
+static int nfs4_lookup_root(struct nfs_server *server, struct nfs_fh *fhandle,
+		struct nfs_fsinfo *info)
 {
-	struct nfs4_compound	compound;
-	struct nfs4_op		ops[4];
+	struct nfs_fattr *	fattr = info->fattr;
+	struct nfs4_lookup_root_arg args = {
+		.bitmask = nfs4_fattr_bitmap,
+	};
+	struct nfs4_lookup_res res = {
+		.server = server,
+		.fattr = fattr,
+		.fh = fhandle,
+	};
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_LOOKUP_ROOT],
+		.rpc_argp = &args,
+		.rpc_resp = &res,
+	};
+	fattr->valid = 0;
+	return rpc_call_sync(server->client, &msg, 0);
+}
+
+static int nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
+		struct nfs_fsinfo *info)
+{
 	struct nfs_fattr *	fattr = info->fattr;
 	unsigned char *		p;
 	struct qstr		q;
-	int			status;
+	struct nfs4_lookup_arg args = {
+		.dir_fh = fhandle,
+		.name = &q,
+		.bitmask = nfs4_fattr_bitmap,
+	};
+	struct nfs4_lookup_res res = {
+		.server = server,
+		.fattr = fattr,
+		.fh = fhandle,
+	};
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_LOOKUP],
+		.rpc_argp = &args,
+		.rpc_resp = &res,
+	};
+	int status;
 
 	/*
 	 * Now we do a separate LOOKUP for each component of the mount path.
 	 * The LOOKUPs are done separately so that we can conveniently
 	 * catch an ERR_WRONGSEC if it occurs along the way...
 	 */
-	p = server->mnt_path;
-	fattr->valid = 0;
-	nfs4_setup_compound(&compound, ops, server, "getrootfh");
-	nfs4_setup_putrootfh(&compound);
-	nfs4_setup_getattr(&compound, fattr);
-	nfs4_setup_getfh(&compound, fhandle);
-	if ((status = nfs4_call_compound(&compound, NULL, 0)))
+	status = nfs4_lookup_root(server, fhandle, info);
+	if (status)
 		goto out;
+
+	p = server->mnt_path;
 	for (;;) {
 		while (*p == '/')
 			p++;
@@ -856,12 +868,7 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 		q.len = p - q.name;
 
 		fattr->valid = 0;
-		nfs4_setup_compound(&compound, ops, server, "mount");
-		nfs4_setup_putfh(&compound, fhandle);
-		nfs4_setup_lookup(&compound, &q);
-		nfs4_setup_getattr(&compound, fattr);
-		nfs4_setup_getfh(&compound, fhandle);
-		status = nfs4_call_compound(&compound, NULL, 0);
+		status = rpc_call_sync(server->client, &msg, 0);
 		if (!status)
 			continue;
 		if (status == -ENOENT) {
@@ -870,10 +877,10 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 		}
 		break;
 	}
+	if (status == 0)
+		status = nfs4_do_fsinfo(server, fhandle, info);
 out:
-	if (status)
-		return nfs4_map_errors(status);
-	return nfs4_proc_fsinfo(server, fhandle, info);
+	return nfs4_map_errors(status);
 }
 
 static int nfs4_proc_getattr(struct inode *inode, struct nfs_fattr *fattr)
@@ -1468,9 +1475,8 @@ nfs4_proc_statfs(struct nfs_server *server, struct nfs_fh *fhandle,
 	return nfs4_map_errors(nfs4_call_compound(&compound, NULL, 0));
 }
 
-static int
-nfs4_proc_fsinfo(struct nfs_server *server, struct nfs_fh *fhandle,
-		 struct nfs_fsinfo *fsinfo)
+static int nfs4_do_fsinfo(struct nfs_server *server, struct nfs_fh *fhandle,
+		struct nfs_fsinfo *fsinfo)
 {
 	struct rpc_message msg = {
 		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_FSINFO],
@@ -1479,6 +1485,12 @@ nfs4_proc_fsinfo(struct nfs_server *server, struct nfs_fh *fhandle,
 	};
 
 	return nfs4_map_errors(rpc_call_sync(server->client, &msg, 0));
+}
+
+static int nfs4_proc_fsinfo(struct nfs_server *server, struct nfs_fh *fhandle, struct nfs_fsinfo *fsinfo)
+{
+	fsinfo->fattr->valid = 0;
+	return nfs4_map_errors(nfs4_do_fsinfo(server, fhandle, fsinfo));
 }
 
 static int

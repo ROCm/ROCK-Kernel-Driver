@@ -550,10 +550,6 @@ struct nfs4_link {
 	struct nfs4_change_info *	ln_cinfo;         /* response */
 };
 
-struct nfs4_lookup {
-	struct qstr *			lo_name;          /* request */
-};
-
 struct nfs4_lookup_arg {
 	const struct nfs_fh *		dir_fh;
 	const struct qstr *		name;
@@ -564,6 +560,10 @@ struct nfs4_lookup_res {
 	const struct nfs_server *	server;
 	struct nfs_fattr *		fattr;
 	struct nfs_fh *			fh;
+};
+
+struct nfs4_lookup_root_arg {
+	const u32 *			bitmask;
 };
 
 struct nfs4_open {
@@ -644,7 +644,6 @@ struct nfs4_op {
 		struct nfs4_getattr	getattr;
 		struct nfs4_getfh	getfh;
 		struct nfs4_link	link;
-		struct nfs4_lookup	lookup;
 		struct nfs4_open	open;
 		struct nfs4_open_confirm open_confirm;
 		struct nfs4_putfh	putfh;
