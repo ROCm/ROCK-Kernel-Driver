@@ -203,7 +203,7 @@ scripts/docproc scripts/fixdep scripts/split-include : scripts ;
 
 .PHONY: scripts
 scripts:
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts
+	$(Q)$(MAKE) $(build)=scripts
 
 # Objects we will link into vmlinux / subdirs we need to visit
 # ---------------------------------------------------------------------------
@@ -315,7 +315,7 @@ define rule_vmlinux__
 	  echo '  Generating build number'
 	  . $(src)/scripts/mkversion > .tmp_version
 	  mv -f .tmp_version .version
-	  $(Q)$(MAKE) -f scripts/Makefile.build obj=init
+	  $(Q)$(MAKE) $(build)=init
 	)
 	$(call cmd,vmlinux__)
 	echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
@@ -385,7 +385,7 @@ $(sort $(vmlinux-objs)): $(SUBDIRS) ;
 
 .PHONY: $(SUBDIRS)
 $(SUBDIRS): .hdepend prepare
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=$@
+	$(Q)$(MAKE) $(build)=$@
 
 #	Things we need done before we descend to build or make
 #	module versions are listed in "prepare"
@@ -408,17 +408,17 @@ targets += arch/$(ARCH)/vmlinux.lds.s
 # ---------------------------------------------------------------------------
 
 %.s: %.c scripts FORCE
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(@D) $@
+	$(Q)$(MAKE) $(build)=$(@D) $@
 %.i: %.c scripts FORCE
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(@D) $@
+	$(Q)$(MAKE) $(build)=$(@D) $@
 %.o: %.c scripts FORCE
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(@D) $@
+	$(Q)$(MAKE) $(build)=$(@D) $@
 %.lst: %.c scripts FORCE
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(@D) $@
+	$(Q)$(MAKE) $(build)=$(@D) $@
 %.s: %.S scripts FORCE
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(@D) $@
+	$(Q)$(MAKE) $(build)=$(@D) $@
 %.o: %.S scripts FORCE
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(@D) $@
+	$(Q)$(MAKE) $(build)=$(@D) $@
 
 # 	FIXME: The asm symlink changes when $(ARCH) changes. That's
 #	hard to detect, but I suppose "make mrproper" is a good idea
@@ -439,7 +439,7 @@ include/config/MARKER: scripts/split-include include/linux/autoconf.h
 # 	with it and forgot to run make oldconfig
 
 include/linux/autoconf.h: .config
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts/kconfig scripts/kconfig/conf
+	$(Q)$(MAKE) $(build)=scripts/kconfig scripts/kconfig/conf
 	./scripts/kconfig/conf -s arch/$(ARCH)/Kconfig
 
 # Generate some files
@@ -657,13 +657,13 @@ ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 	make_with_config
 
 scripts/kconfig/conf scripts/kconfig/mconf scripts/kconfig/qconf: scripts/fixdep FORCE
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts/kconfig $@
+	$(Q)$(MAKE) $(build)=scripts/kconfig $@
 
 xconfig: scripts/kconfig/qconf
 	./scripts/kconfig/qconf arch/$(ARCH)/Kconfig
 
 menuconfig: scripts/kconfig/mconf
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts/lxdialog
+	$(Q)$(MAKE) $(build)=scripts/lxdialog
 	./scripts/kconfig/mconf arch/$(ARCH)/Kconfig
 
 config: scripts/kconfig/conf
@@ -719,7 +719,7 @@ MRPROPER_DIRS += \
 clean-dirs += $(ALL_SUBDIRS) Documentation/DocBook scripts
 
 $(addprefix _clean_,$(clean-dirs)):
-	$(Q)$(MAKE) -f scripts/Makefile.clean obj=$(patsubst _clean_%,%,$@)
+	$(Q)$(MAKE) $(clean)=$(patsubst _clean_%,%,$@)
 
 quiet_cmd_rmclean = RM  $$(CLEAN_FILES)
 cmd_rmclean	  = rm -f $(CLEAN_FILES)
@@ -819,7 +819,7 @@ help:
 # Documentation targets
 # ---------------------------------------------------------------------------
 sgmldocs psdocs pdfdocs htmldocs: scripts
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=Documentation/DocBook $@
+	$(Q)$(MAKE) $(build)=Documentation/DocBook $@
 
 # Scripts to check various things for consistency
 # ---------------------------------------------------------------------------
@@ -907,9 +907,20 @@ define update-if-changed
 		mv -f $@.tmp $@; \
 	fi
 endef
+
+# Shorthand for $(Q)$(MAKE) -f scripts/Makefile.build obj=
+# Usage:
+# $(Q)$(MAKE) $(build)=dir
+build := -f scripts/Makefile.build obj
+
+# Shorthand for $(Q)$(MAKE) scripts/Makefile.clean obj=dir
+# Usage:
+# $(Q)$(MAKE) $(clean)=dir
+clean := -f scripts/Makefile.clean obj
+
 #	$(call descend,<dir>,<target>)
 #	Recursively call a sub-make in <dir> with target <target>
-
+# Usage is deprecated, because make do not see this as an invocation of make.
 descend =$(Q)$(MAKE) -f scripts/Makefile.build obj=$(1) $(2)
 
 FORCE:

@@ -286,7 +286,7 @@ targets += $(host-csingle)  $(host-cmulti) $(host-cobjs)\
 
 .PHONY: $(subdir-ym)
 $(subdir-ym):
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=$@
+	$(Q)$(MAKE) $(build)=$@
 
 # Add FORCE to the prequisites of a target to force it to be always rebuilt.
 # ---------------------------------------------------------------------------
