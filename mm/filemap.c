@@ -104,6 +104,7 @@ void __remove_from_page_cache(struct page *page)
 
 	if (likely(!PageSwapCache(page))) {
 		BUG_ON(PageAnon(page));
+		WARN_ON(page->mapcount);
 		radix_tree_delete(&mapping->page_tree, page->index);
 		page->mapping = NULL;
 	} else {

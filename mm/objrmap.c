@@ -351,8 +351,13 @@ void fastcall page_remove_rmap(struct page *page)
 		 * We can find the mappings by walking the object vma
 		 * chain for that object.
 		 */
-		BUG_ON(!page->mapping);
 		BUG_ON(PageSwapCache(page));
+		/*
+		 * This maybe a page cache removed from pagecache
+		 * before all ptes have been unmapped, warn in such
+		 * a case.
+		 */
+		WARN_ON(!page->mapping);
 	}
   
  out_unlock:
