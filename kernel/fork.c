@@ -450,7 +450,7 @@ void mm_release(struct task_struct *tsk, struct mm_struct *mm)
 		complete(vfork_done);
 	}
 	if (tsk->clear_child_tid && atomic_read(&mm->mm_users) > 1) {
-		u32 * tidptr = tsk->clear_child_tid;
+		u32 __user * tidptr = tsk->clear_child_tid;
 		tsk->clear_child_tid = NULL;
 
 		/*
@@ -738,7 +738,7 @@ static inline void copy_flags(unsigned long clone_flags, struct task_struct *p)
 	p->flags = new_flags;
 }
 
-asmlinkage long sys_set_tid_address(int *tidptr)
+asmlinkage long sys_set_tid_address(int __user *tidptr)
 {
 	current->clear_child_tid = tidptr;
 
@@ -757,8 +757,8 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 			    unsigned long stack_start,
 			    struct pt_regs *regs,
 			    unsigned long stack_size,
-			    int *parent_tidptr,
-			    int *child_tidptr)
+			    int __user *parent_tidptr,
+			    int __user *child_tidptr)
 {
 	int retval;
 	struct task_struct *p = NULL;
@@ -1073,8 +1073,8 @@ struct task_struct *do_fork(unsigned long clone_flags,
 			    unsigned long stack_start,
 			    struct pt_regs *regs,
 			    unsigned long stack_size,
-			    int *parent_tidptr,
-			    int *child_tidptr)
+			    int __user *parent_tidptr,
+			    int __user *child_tidptr)
 {
 	struct task_struct *p;
 	int trace = 0;

@@ -96,18 +96,18 @@ struct proto_ops {
 	struct module	*owner;
 	int		(*release)   (struct socket *sock);
 	int		(*bind)	     (struct socket *sock,
-				      struct sockaddr *umyaddr,
+				      struct sockaddr *myaddr,
 				      int sockaddr_len);
 	int		(*connect)   (struct socket *sock,
-				      struct sockaddr *uservaddr,
+				      struct sockaddr *vaddr,
 				      int sockaddr_len, int flags);
 	int		(*socketpair)(struct socket *sock1,
 				      struct socket *sock2);
 	int		(*accept)    (struct socket *sock,
 				      struct socket *newsock, int flags);
 	int		(*getname)   (struct socket *sock,
-				      struct sockaddr *uaddr,
-				      int *usockaddr_len, int peer);
+				      struct sockaddr *addr,
+				      int *sockaddr_len, int peer);
 	unsigned int	(*poll)	     (struct file *file, struct socket *sock,
 				      struct poll_table_struct *wait);
 	int		(*ioctl)     (struct socket *sock, unsigned int cmd,
@@ -115,9 +115,9 @@ struct proto_ops {
 	int		(*listen)    (struct socket *sock, int len);
 	int		(*shutdown)  (struct socket *sock, int flags);
 	int		(*setsockopt)(struct socket *sock, int level,
-				      int optname, char *optval, int optlen);
+				      int optname, char __user *optval, int optlen);
 	int		(*getsockopt)(struct socket *sock, int level,
-				      int optname, char *optval, int *optlen);
+				      int optname, char __user *optval, int __user *optlen);
 	int		(*sendmsg)   (struct kiocb *iocb, struct socket *sock,
 				      struct msghdr *m, int total_len);
 	int		(*recvmsg)   (struct kiocb *iocb, struct socket *sock,

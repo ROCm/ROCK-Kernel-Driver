@@ -802,7 +802,7 @@ out:
 }
 
 ssize_t
-generic_file_aio_read(struct kiocb *iocb, char *buf, size_t count, loff_t pos)
+generic_file_aio_read(struct kiocb *iocb, char __user *buf, size_t count, loff_t pos)
 {
 	struct iovec local_iov = { .iov_base = buf, .iov_len = count };
 
@@ -812,7 +812,7 @@ generic_file_aio_read(struct kiocb *iocb, char *buf, size_t count, loff_t pos)
 EXPORT_SYMBOL(generic_file_aio_read);
 
 ssize_t
-generic_file_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
+generic_file_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct iovec local_iov = { .iov_base = buf, .iov_len = count };
 	struct kiocb kiocb;
@@ -846,7 +846,7 @@ int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long o
 }
 
 ssize_t generic_file_sendfile(struct file *in_file, loff_t *ppos,
-			 size_t count, read_actor_t actor, void *target)
+			 size_t count, read_actor_t actor, void __user *target)
 {
 	read_descriptor_t desc;
 
@@ -1412,7 +1412,7 @@ void remove_suid(struct dentry *dentry)
 
 static inline int
 filemap_copy_from_user(struct page *page, unsigned long offset,
-			const char *buf, unsigned bytes)
+			const char __user *buf, unsigned bytes)
 {
 	char *kaddr;
 	int left;
@@ -1437,7 +1437,7 @@ __filemap_copy_from_user_iovec(char *vaddr,
 	int left = 0;
 
 	while (bytes) {
-		char *buf = iov->iov_base + base;
+		char __user *buf = iov->iov_base + base;
 		int copy = min(bytes, iov->iov_len - base);
 		base = 0;
 		if ((left = __copy_from_user(vaddr, buf, copy)))
@@ -1601,7 +1601,7 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 	const struct iovec *cur_iov = iov; /* current iovec */
 	size_t		iov_base = 0;	   /* offset in the current iovec */
 	unsigned long	seg;
-	char		*buf;
+	char __user	*buf;
 
 	ocount = 0;
 	for (seg = 0; seg < nr_segs; seg++) {
@@ -1775,13 +1775,13 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 	return ret;
 }
 
-ssize_t generic_file_aio_write(struct kiocb *iocb, const char *buf,
+ssize_t generic_file_aio_write(struct kiocb *iocb, const char __user *buf,
 			       size_t count, loff_t pos)
 {
 	struct file *file = iocb->ki_filp;
 	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
 	ssize_t err;
-	struct iovec local_iov = { .iov_base = (void *)buf, .iov_len = count };
+	struct iovec local_iov = { .iov_base = (void __user *)buf, .iov_len = count };
 
 	BUG_ON(iocb->ki_pos != pos);
 
@@ -1795,12 +1795,12 @@ ssize_t generic_file_aio_write(struct kiocb *iocb, const char *buf,
 EXPORT_SYMBOL(generic_file_aio_write);
 EXPORT_SYMBOL(generic_file_aio_write_nolock);
 
-ssize_t generic_file_write(struct file *file, const char *buf,
+ssize_t generic_file_write(struct file *file, const char __user *buf,
 			   size_t count, loff_t *ppos)
 {
 	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
 	ssize_t		err;
-	struct iovec local_iov = { .iov_base = (void *)buf, .iov_len = count };
+	struct iovec local_iov = { .iov_base = (void __user *)buf, .iov_len = count };
 
 	down(&inode->i_sem);
 	err = generic_file_write_nolock(file, &local_iov, 1, ppos);

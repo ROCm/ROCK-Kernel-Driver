@@ -9,6 +9,7 @@
 #include <linux/sockios.h>		/* the SIOCxxx I/O controls	*/
 #include <linux/uio.h>			/* iovec support		*/
 #include <linux/types.h>		/* pid_t			*/
+#include <linux/compiler.h>		/* __user			*/
 
 typedef unsigned short	sa_family_t;
 
@@ -242,8 +243,8 @@ struct ucred {
 #define MSG_CMSG_COMPAT	0		/* We never have 32 bit fixups */
 #endif
 
-extern asmlinkage long sys_sendmsg(int fd, struct msghdr *msg, unsigned flags);
-extern asmlinkage long sys_recvmsg(int fd, struct msghdr *msg, unsigned flags);
+extern asmlinkage long sys_sendmsg(int fd, struct msghdr __user *msg, unsigned flags);
+extern asmlinkage long sys_recvmsg(int fd, struct msghdr __user *msg, unsigned flags);
 
 
 
@@ -285,8 +286,8 @@ extern int csum_partial_copy_fromiovecend(unsigned char *kdata,
 extern int verify_iovec(struct msghdr *m, struct iovec *iov, char *address, int mode);
 extern int memcpy_toiovec(struct iovec *v, unsigned char *kdata, int len);
 extern void memcpy_tokerneliovec(struct iovec *iov, unsigned char *kdata, int len);
-extern int move_addr_to_user(void *kaddr, int klen, void *uaddr, int *ulen);
-extern int move_addr_to_kernel(void *uaddr, int ulen, void *kaddr);
+extern int move_addr_to_user(void *kaddr, int klen, void __user *uaddr, int __user *ulen);
+extern int move_addr_to_kernel(void __user *uaddr, int ulen, void *kaddr);
 extern int put_cmsg(struct msghdr*, int level, int type, int len, void *data);
 
 #endif

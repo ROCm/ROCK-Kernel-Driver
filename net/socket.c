@@ -95,9 +95,9 @@
 #include <linux/netfilter.h>
 
 static int sock_no_open(struct inode *irrelevant, struct file *dontcare);
-static ssize_t sock_aio_read(struct kiocb *iocb, char *buf,
+static ssize_t sock_aio_read(struct kiocb *iocb, char __user *buf,
 			 size_t size, loff_t pos);
-static ssize_t sock_aio_write(struct kiocb *iocb, const char *buf,
+static ssize_t sock_aio_write(struct kiocb *iocb, const char __user *buf,
 			  size_t size, loff_t pos);
 static int sock_mmap(struct file *file, struct vm_area_struct * vma);
 
@@ -218,7 +218,7 @@ static DEFINE_PER_CPU(int, sockets_in_use) = 0;
  *	invalid addresses -EFAULT is returned. On a success 0 is returned.
  */
 
-int move_addr_to_kernel(void *uaddr, int ulen, void *kaddr)
+int move_addr_to_kernel(void __user *uaddr, int ulen, void *kaddr)
 {
 	if(ulen<0||ulen>MAX_SOCK_ADDR)
 		return -EINVAL;
@@ -246,7 +246,7 @@ int move_addr_to_kernel(void *uaddr, int ulen, void *kaddr)
  *	specified. Zero is returned for a success.
  */
  
-int move_addr_to_user(void *kaddr, int klen, void *uaddr, int *ulen)
+int move_addr_to_user(void *kaddr, int klen, void __user *uaddr, int __user *ulen)
 {
 	int err;
 	int len;
@@ -591,7 +591,7 @@ int sock_recvmsg(struct socket *sock, struct msghdr *msg, int size, int flags)
  *	area ubuf...ubuf+size-1 is writable before asking the protocol.
  */
 
-static ssize_t sock_aio_read(struct kiocb *iocb, char *ubuf,
+static ssize_t sock_aio_read(struct kiocb *iocb, char __user *ubuf,
 			 size_t size, loff_t pos)
 {
 	struct sock_iocb *x = kiocb_to_siocb(iocb);
@@ -624,7 +624,7 @@ static ssize_t sock_aio_read(struct kiocb *iocb, char *ubuf,
  *	is readable by the user process.
  */
 
-static ssize_t sock_aio_write(struct kiocb *iocb, const char *ubuf,
+static ssize_t sock_aio_write(struct kiocb *iocb, const char __user *ubuf,
 			  size_t size, loff_t pos)
 {
 	struct sock_iocb *x = kiocb_to_siocb(iocb);
@@ -646,7 +646,7 @@ static ssize_t sock_aio_write(struct kiocb *iocb, const char *ubuf,
 	x->async_msg.msg_flags = !(iocb->ki_filp->f_flags & O_NONBLOCK) ? 0 : MSG_DONTWAIT;
 	if (sock->type == SOCK_SEQPACKET)
 		x->async_msg.msg_flags |= MSG_EOR;
-	x->async_iov.iov_base = (void *)ubuf;
+	x->async_iov.iov_base = (void __user *)ubuf;
 	x->async_iov.iov_len = size;
 	
 	return __sock_sendmsg(iocb, sock, &x->async_msg, size);
@@ -1124,7 +1124,7 @@ out_release:
  *	Create a pair of connected sockets.
  */
 
-asmlinkage long sys_socketpair(int family, int type, int protocol, int usockvec[2])
+asmlinkage long sys_socketpair(int family, int type, int protocol, int __user *usockvec)
 {
 	struct socket *sock1, *sock2;
 	int fd1, fd2, err;
@@ -1194,7 +1194,7 @@ out:
  *	the protocol layer (having also checked the address is ok).
  */
 
-asmlinkage long sys_bind(int fd, struct sockaddr *umyaddr, int addrlen)
+asmlinkage long sys_bind(int fd, struct sockaddr __user *umyaddr, int addrlen)
 {
 	struct socket *sock;
 	char address[MAX_SOCK_ADDR];
@@ -1256,7 +1256,7 @@ asmlinkage long sys_listen(int fd, int backlog)
  *	clean when we restucture accept also.
  */
 
-asmlinkage long sys_accept(int fd, struct sockaddr *upeer_sockaddr, int *upeer_addrlen)
+asmlinkage long sys_accept(int fd, struct sockaddr __user *upeer_sockaddr, int __user *upeer_addrlen)
 {
 	struct socket *sock, *newsock;
 	int err, len;
@@ -1326,7 +1326,7 @@ out_release:
  *	include the -EINPROGRESS status for such sockets.
  */
 
-asmlinkage long sys_connect(int fd, struct sockaddr *uservaddr, int addrlen)
+asmlinkage long sys_connect(int fd, struct sockaddr __user *uservaddr, int addrlen)
 {
 	struct socket *sock;
 	char address[MAX_SOCK_ADDR];
@@ -1356,7 +1356,7 @@ out:
  *	name to user space.
  */
 
-asmlinkage long sys_getsockname(int fd, struct sockaddr *usockaddr, int *usockaddr_len)
+asmlinkage long sys_getsockname(int fd, struct sockaddr __user *usockaddr, int __user *usockaddr_len)
 {
 	struct socket *sock;
 	char address[MAX_SOCK_ADDR];
@@ -1386,7 +1386,7 @@ out:
  *	name to user space.
  */
 
-asmlinkage long sys_getpeername(int fd, struct sockaddr *usockaddr, int *usockaddr_len)
+asmlinkage long sys_getpeername(int fd, struct sockaddr __user *usockaddr, int __user *usockaddr_len)
 {
 	struct socket *sock;
 	char address[MAX_SOCK_ADDR];
@@ -1414,8 +1414,8 @@ asmlinkage long sys_getpeername(int fd, struct sockaddr *usockaddr, int *usockad
  *	the protocol.
  */
 
-asmlinkage long sys_sendto(int fd, void * buff, size_t len, unsigned flags,
-			   struct sockaddr *addr, int addr_len)
+asmlinkage long sys_sendto(int fd, void __user * buff, size_t len, unsigned flags,
+			   struct sockaddr __user *addr, int addr_len)
 {
 	struct socket *sock;
 	char address[MAX_SOCK_ADDR];
@@ -1457,7 +1457,7 @@ out:
  *	Send a datagram down a socket. 
  */
 
-asmlinkage long sys_send(int fd, void * buff, size_t len, unsigned flags)
+asmlinkage long sys_send(int fd, void __user * buff, size_t len, unsigned flags)
 {
 	return sys_sendto(fd, buff, len, flags, NULL, 0);
 }
@@ -1468,8 +1468,8 @@ asmlinkage long sys_send(int fd, void * buff, size_t len, unsigned flags)
  *	sender address from kernel to user space.
  */
 
-asmlinkage long sys_recvfrom(int fd, void * ubuf, size_t size, unsigned flags,
-			     struct sockaddr *addr, int *addr_len)
+asmlinkage long sys_recvfrom(int fd, void __user * ubuf, size_t size, unsigned flags,
+			     struct sockaddr __user *addr, int __user *addr_len)
 {
 	struct socket *sock;
 	struct iovec iov;
@@ -1508,7 +1508,7 @@ out:
  *	Receive a datagram from a socket. 
  */
 
-asmlinkage long sys_recv(int fd, void * ubuf, size_t size, unsigned flags)
+asmlinkage long sys_recv(int fd, void __user * ubuf, size_t size, unsigned flags)
 {
 	return sys_recvfrom(fd, ubuf, size, flags, NULL, NULL);
 }
@@ -1518,7 +1518,7 @@ asmlinkage long sys_recv(int fd, void * ubuf, size_t size, unsigned flags)
  *	to pass the user mode parameter for the protocols to sort out.
  */
 
-asmlinkage long sys_setsockopt(int fd, int level, int optname, char *optval, int optlen)
+asmlinkage long sys_setsockopt(int fd, int level, int optname, char __user *optval, int optlen)
 {
 	int err;
 	struct socket *sock;
@@ -1548,7 +1548,7 @@ asmlinkage long sys_setsockopt(int fd, int level, int optname, char *optval, int
  *	to pass a user mode parameter for the protocols to sort out.
  */
 
-asmlinkage long sys_getsockopt(int fd, int level, int optname, char *optval, int *optlen)
+asmlinkage long sys_getsockopt(int fd, int level, int optname, char __user *optval, int __user *optlen)
 {
 	int err;
 	struct socket *sock;
@@ -1607,9 +1607,9 @@ asmlinkage long sys_shutdown(int fd, int how)
  *	BSD sendmsg interface
  */
 
-asmlinkage long sys_sendmsg(int fd, struct msghdr *msg, unsigned flags)
+asmlinkage long sys_sendmsg(int fd, struct msghdr __user *msg, unsigned flags)
 {
-	struct compat_msghdr *msg_compat = (struct compat_msghdr *)msg;
+	struct compat_msghdr __user *msg_compat = (struct compat_msghdr __user *)msg;
 	struct socket *sock;
 	char address[MAX_SOCK_ADDR];
 	struct iovec iovstack[UIO_FASTIOV], *iov = iovstack;
@@ -1670,7 +1670,12 @@ asmlinkage long sys_sendmsg(int fd, struct msghdr *msg, unsigned flags)
 				goto out_freeiov;
 		}
 		err = -EFAULT;
-		if (copy_from_user(ctl_buf, msg_sys.msg_control, ctl_len))
+		/*
+		 * Careful! Before this, msg_sys.msg_control contains a user pointer.
+		 * Afterwards, it will be a kernel pointer. Thus the compiler-assisted
+		 * checking falls down on this.
+		 */
+		if (copy_from_user(ctl_buf, (void __user *) msg_sys.msg_control, ctl_len))
 			goto out_freectl;
 		msg_sys.msg_control = ctl_buf;
 	}
@@ -1696,9 +1701,9 @@ out:
  *	BSD recvmsg interface
  */
 
-asmlinkage long sys_recvmsg(int fd, struct msghdr *msg, unsigned int flags)
+asmlinkage long sys_recvmsg(int fd, struct msghdr __user *msg, unsigned int flags)
 {
-	struct compat_msghdr *msg_compat = (struct compat_msghdr *)msg;
+	struct compat_msghdr __user *msg_compat = (struct compat_msghdr __user *)msg;
 	struct socket *sock;
 	struct iovec iovstack[UIO_FASTIOV];
 	struct iovec *iov=iovstack;
@@ -1710,8 +1715,8 @@ asmlinkage long sys_recvmsg(int fd, struct msghdr *msg, unsigned int flags)
 	char addr[MAX_SOCK_ADDR];
 
 	/* user mode address pointers */
-	struct sockaddr *uaddr;
-	int *uaddr_len;
+	struct sockaddr __user *uaddr;
+	int __user *uaddr_len;
 	
 	if (MSG_CMSG_COMPAT & flags) {
 		if (get_compat_msghdr(&msg_sys, msg_compat))
@@ -1742,7 +1747,7 @@ asmlinkage long sys_recvmsg(int fd, struct msghdr *msg, unsigned int flags)
 	 *	kernel msghdr to use the kernel address space)
 	 */
 	 
-	uaddr = msg_sys.msg_name;
+	uaddr = (void __user *) msg_sys.msg_name;
 	uaddr_len = COMPAT_NAMELEN(msg);
 	if (MSG_CMSG_COMPAT & flags) {
 		err = verify_compat_iovec(&msg_sys, iov, addr, VERIFY_WRITE);
@@ -1806,7 +1811,7 @@ static unsigned char nargs[18]={AL(0),AL(3),AL(3),AL(3),AL(2),AL(3),
  *  it is set by the callees. 
  */
 
-asmlinkage long sys_socketcall(int call, unsigned long *args)
+asmlinkage long sys_socketcall(int call, unsigned long __user *args)
 {
 	unsigned long a[6];
 	unsigned long a0,a1;
@@ -1828,54 +1833,54 @@ asmlinkage long sys_socketcall(int call, unsigned long *args)
 			err = sys_socket(a0,a1,a[2]);
 			break;
 		case SYS_BIND:
-			err = sys_bind(a0,(struct sockaddr *)a1, a[2]);
+			err = sys_bind(a0,(struct sockaddr __user *)a1, a[2]);
 			break;
 		case SYS_CONNECT:
-			err = sys_connect(a0, (struct sockaddr *)a1, a[2]);
+			err = sys_connect(a0, (struct sockaddr __user *)a1, a[2]);
 			break;
 		case SYS_LISTEN:
 			err = sys_listen(a0,a1);
 			break;
 		case SYS_ACCEPT:
-			err = sys_accept(a0,(struct sockaddr *)a1, (int *)a[2]);
+			err = sys_accept(a0,(struct sockaddr __user *)a1, (int __user *)a[2]);
 			break;
 		case SYS_GETSOCKNAME:
-			err = sys_getsockname(a0,(struct sockaddr *)a1, (int *)a[2]);
+			err = sys_getsockname(a0,(struct sockaddr __user *)a1, (int __user *)a[2]);
 			break;
 		case SYS_GETPEERNAME:
-			err = sys_getpeername(a0, (struct sockaddr *)a1, (int *)a[2]);
+			err = sys_getpeername(a0, (struct sockaddr __user *)a1, (int __user *)a[2]);
 			break;
 		case SYS_SOCKETPAIR:
-			err = sys_socketpair(a0,a1, a[2], (int *)a[3]);
+			err = sys_socketpair(a0,a1, a[2], (int __user *)a[3]);
 			break;
 		case SYS_SEND:
-			err = sys_send(a0, (void *)a1, a[2], a[3]);
+			err = sys_send(a0, (void __user *)a1, a[2], a[3]);
 			break;
 		case SYS_SENDTO:
-			err = sys_sendto(a0,(void *)a1, a[2], a[3],
-					 (struct sockaddr *)a[4], a[5]);
+			err = sys_sendto(a0,(void __user *)a1, a[2], a[3],
+					 (struct sockaddr __user *)a[4], a[5]);
 			break;
 		case SYS_RECV:
-			err = sys_recv(a0, (void *)a1, a[2], a[3]);
+			err = sys_recv(a0, (void __user *)a1, a[2], a[3]);
 			break;
 		case SYS_RECVFROM:
-			err = sys_recvfrom(a0, (void *)a1, a[2], a[3],
-					   (struct sockaddr *)a[4], (int *)a[5]);
+			err = sys_recvfrom(a0, (void __user *)a1, a[2], a[3],
+					   (struct sockaddr __user *)a[4], (int __user *)a[5]);
 			break;
 		case SYS_SHUTDOWN:
 			err = sys_shutdown(a0,a1);
 			break;
 		case SYS_SETSOCKOPT:
-			err = sys_setsockopt(a0, a1, a[2], (char *)a[3], a[4]);
+			err = sys_setsockopt(a0, a1, a[2], (char __user *)a[3], a[4]);
 			break;
 		case SYS_GETSOCKOPT:
-			err = sys_getsockopt(a0, a1, a[2], (char *)a[3], (int *)a[4]);
+			err = sys_getsockopt(a0, a1, a[2], (char __user *)a[3], (int __user *)a[4]);
 			break;
 		case SYS_SENDMSG:
-			err = sys_sendmsg(a0, (struct msghdr *) a1, a[2]);
+			err = sys_sendmsg(a0, (struct msghdr __user *) a1, a[2]);
 			break;
 		case SYS_RECVMSG:
-			err = sys_recvmsg(a0, (struct msghdr *) a1, a[2]);
+			err = sys_recvmsg(a0, (struct msghdr __user *) a1, a[2]);
 			break;
 		default:
 			err = -EINVAL;

@@ -116,7 +116,7 @@ sys_sigaction(int sig, const struct old_sigaction __user *act,
 }
 
 asmlinkage int
-sys_sigaltstack(const stack_t *uss, stack_t *uoss)
+sys_sigaltstack(const stack_t __user *uss, stack_t __user *uoss)
 {
 	struct pt_regs *regs = (struct pt_regs *) &uss;
 	return do_sigaltstack(uss, uoss, regs->esp);
@@ -244,6 +244,11 @@ asmlinkage int sys_rt_sigreturn(unsigned long __unused)
 		goto badframe;
 	/* It is more difficult to avoid calling this function than to
 	   call it and ignore errors.  */
+	/*
+	 * THIS CANNOT WORK! "&st" is a kernel address, and "do_sigaltstack()"
+	 * takes a user address (and verifies that it is a user address). End
+	 * result: it does exactly _nothing_.
+	 */
 	do_sigaltstack(&st, NULL, regs->esp);
 
 	return eax;
