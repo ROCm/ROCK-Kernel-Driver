@@ -356,10 +356,9 @@ static struct file_operations proc_slabinfo_operations = {
 	.release	= seq_release,
 };
 
-static int kstat_read_proc(char *page, char **start, off_t off,
-				 int count, int *eof, void *data)
+int show_stat(struct seq_file *p, void *v)
 {
-	int i, len;
+	int i;
 	extern unsigned long total_forks;
 	u64 jif;
 	unsigned int sum = 0, user = 0, nice = 0, system = 0, idle = 0, iowait = 0, irq = 0, softirq = 0;
@@ -379,10 +378,10 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 	jif = ((u64)now.tv_sec * HZ) + (now.tv_usec/(1000000/HZ)) - jif;
 	do_div(jif, HZ);
 
-	for (i = 0 ; i < NR_CPUS; i++) {
+	for (i = 0; i < NR_CPUS; i++) {
 		int j;
 
-		if(!cpu_online(i)) continue;
+		if (!cpu_online(i)) continue;
 		user += kstat_cpu(i).cpustat.user;
 		nice += kstat_cpu(i).cpustat.nice;
 		system += kstat_cpu(i).cpustat.system;
@@ -394,7 +393,7 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 			sum += kstat_cpu(i).irqs[j];
 	}
 
-	len = sprintf(page, "cpu  %u %u %u %u %u %u %u\n",
+	seq_printf(p, "cpu  %u %u %u %u %u %u %u\n",
 		jiffies_to_clock_t(user),
 		jiffies_to_clock_t(nice),
 		jiffies_to_clock_t(system),
@@ -402,9 +401,9 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 		jiffies_to_clock_t(iowait),
 		jiffies_to_clock_t(irq),
 		jiffies_to_clock_t(softirq));
-	for (i = 0 ; i < NR_CPUS; i++){
+	for (i = 0; i < NR_CPUS; i++){
 		if (!cpu_online(i)) continue;
-		len += sprintf(page + len, "cpu%d %u %u %u %u %u %u %u\n",
+		seq_printf(p, "cpu%d %u %u %u %u %u %u %u\n",
 			i,
 			jiffies_to_clock_t(kstat_cpu(i).cpustat.user),
 			jiffies_to_clock_t(kstat_cpu(i).cpustat.nice),
@@ -414,14 +413,25 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 			jiffies_to_clock_t(kstat_cpu(i).cpustat.irq),
 			jiffies_to_clock_t(kstat_cpu(i).cpustat.softirq));
 	}
-	len += sprintf(page + len, "intr %u", sum);
+	seq_printf(p, "intr %u", sum);
 
 #if !defined(CONFIG_PPC64) && !defined(CONFIG_ALPHA)
-	for (i = 0 ; i < NR_IRQS ; i++)
-		len += sprintf(page + len, " %u", kstat_irqs(i));
+{
+	static int last_irq = 0;
+
+	for (i = last_irq; i < NR_IRQS; i++) {
+		if (irq_desc[i].action) {
+			if (i > last_irq)
+				last_irq = i;
+		}
+	}
+
+	for (i = 0; i <= last_irq; i++)
+		seq_printf(p, " %u", kstat_irqs(i));
+}
 #endif
 
-	len += sprintf(page + len,
+	seq_printf(p,
 		"\nctxt %lu\n"
 		"btime %lu\n"
 		"processes %lu\n"
@@ -433,8 +443,38 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 		nr_running(),
 		nr_iowait());
 
-	return proc_calc_metrics(page, start, off, count, eof, len);
+	return 0;
 }
+
+static int stat_open(struct inode *inode, struct file *file)
+{
+	unsigned size = 4096 * (1 + num_online_cpus() / 32);
+	char *buf;
+	struct seq_file *m;
+	int res;
+
+	/* don't ask for more than the kmalloc() max size, currently 128 KB */
+	if (size > 128 * 1024)
+		size = 128 * 1024;
+	buf = kmalloc(size, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	res = single_open(file, show_stat, NULL);
+	if (!res) {
+		m = file->private_data;
+		m->buf = buf;
+		m->size = size;
+	} else
+		kfree(buf);
+	return res;
+}
+static struct file_operations proc_stat_operations = {
+	.open		= stat_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
 
 static int devices_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
@@ -626,7 +666,6 @@ void __init proc_misc_init(void)
 #ifdef CONFIG_STRAM_PROC
 		{"stram",	stram_read_proc},
 #endif
-		{"stat",	kstat_read_proc},
 		{"devices",	devices_read_proc},
 		{"filesystems",	filesystems_read_proc},
 		{"cmdline",	cmdline_read_proc},
@@ -648,6 +687,7 @@ void __init proc_misc_init(void)
 		entry->proc_fops = &proc_kmsg_operations;
 	create_seq_entry("cpuinfo", 0, &proc_cpuinfo_operations);
 	create_seq_entry("partitions", 0, &proc_partitions_operations);
+	create_seq_entry("stat", 0, &proc_stat_operations);
 	create_seq_entry("interrupts", 0, &proc_interrupts_operations);
 	create_seq_entry("slabinfo",S_IWUSR|S_IRUGO,&proc_slabinfo_operations);
 	create_seq_entry("buddyinfo",S_IRUGO, &fragmentation_file_operations);
