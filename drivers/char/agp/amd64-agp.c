@@ -90,7 +90,7 @@ static int amd64_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
 
 	/* gatt table should be empty. */
 	while (j < (pg_start + mem->page_count)) {
-		if (!PGE_EMPTY(agp_bridge, agp_bridge->gatt_table[j]))
+		if (!PGE_EMPTY(agp_bridge, readl(agp_bridge->gatt_table+j)))
 			return -EBUSY;
 		j++;
 	}
@@ -108,7 +108,7 @@ static int amd64_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
 		pte |=(tmp & 0x00000000fffff000ULL);
 		pte |= GPTE_VALID | GPTE_COHERENT;
 
-		agp_bridge->gatt_table[j] = pte;
+		writel(pte, agp_bridge->gatt_table+j);
 	}
 	amd64_tlbflush(mem);
 	return 0;
