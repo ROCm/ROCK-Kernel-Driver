@@ -68,7 +68,7 @@
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "5.2.30.1-k1";
+char e1000_driver_version[] = "5.2.30.1-k2";
 char e1000_copyright[] = "Copyright (c) 1999-2004 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -529,7 +529,8 @@ e1000_probe(struct pci_dev *pdev,
 	INIT_WORK(&adapter->tx_timeout_task,
 		(void (*)(void *))e1000_tx_timeout_task, netdev);
 
-	register_netdev(netdev);
+	if((err = register_netdev(netdev)))
+		goto err_register;
 
 	/* we're going to reset, so assume we have no link for now */
 
@@ -574,6 +575,7 @@ e1000_probe(struct pci_dev *pdev,
 	cards_found++;
 	return 0;
 
+err_register:
 err_sw_init:
 err_eeprom:
 	iounmap(adapter->hw.hw_addr);
