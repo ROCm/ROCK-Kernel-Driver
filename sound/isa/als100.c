@@ -32,15 +32,12 @@
 #include <sound/opl3.h>
 #include <sound/sb.h>
 
-#define chip_t sb_t
-
 #define PFX "als100: "
 
 MODULE_AUTHOR("Massimo Piccioni <dafastidio@libero.it>");
 MODULE_DESCRIPTION("Avance Logic ALS1X0");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Avance Logic,ALS100 - PRO16PNP},"
+MODULE_SUPPORTED_DEVICE("{{Avance Logic,ALS100 - PRO16PNP},"
 	        "{Avance Logic,ALS110},"
 	        "{Avance Logic,ALS120},"
 	        "{Avance Logic,ALS200},"
@@ -63,34 +60,24 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for als100 based soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for als100 based soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable als100 based soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for als100 driver.");
-MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
 module_param_array(mpu_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU-401 port # for als100 driver.");
-MODULE_PARM_SYNTAX(mpu_port, SNDRV_PORT12_DESC);
 module_param_array(fm_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(fm_port, "FM port # for als100 driver.");
-MODULE_PARM_SYNTAX(fm_port, SNDRV_PORT12_DESC);
 module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for als100 driver.");
-MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
 module_param_array(mpu_irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_irq, "MPU-401 IRQ # for als100 driver.");
-MODULE_PARM_SYNTAX(mpu_irq, SNDRV_IRQ_DESC);
 module_param_array(dma8, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma8, "8-bit DMA # for als100 driver.");
-MODULE_PARM_SYNTAX(dma8, SNDRV_DMA8_DESC);
 module_param_array(dma16, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma16, "16-bit DMA # for als100 driver.");
-MODULE_PARM_SYNTAX(dma16, SNDRV_DMA16_DESC);
 
 struct snd_card_als100 {
 	int dev_no;

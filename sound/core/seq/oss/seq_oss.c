@@ -22,6 +22,7 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 #include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/minors.h>
@@ -35,7 +36,6 @@
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("OSS-compatible sequencer module");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
 /* Takashi says this is really only for sound-service-0-, but this is OK. */
 MODULE_ALIAS_SNDRV_MINOR(SNDRV_MINOR_OSS_SEQUENCER);
 MODULE_ALIAS_SNDRV_MINOR(SNDRV_MINOR_OSS_MUSIC);
@@ -177,9 +177,14 @@ static int
 odev_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	seq_oss_devinfo_t *dp;
+	int err;
 	dp = file->private_data;
 	snd_assert(dp != NULL, return -EIO);
-	return snd_seq_oss_ioctl(dp, cmd, arg);
+	/* FIXME: need to unlock BKL to allow preemption */
+	unlock_kernel();
+	err = snd_seq_oss_ioctl(dp, cmd, arg);
+	lock_kernel();
+	return err;
 }
 
 

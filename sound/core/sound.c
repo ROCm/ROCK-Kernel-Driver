@@ -44,19 +44,14 @@ static int device_mode = S_IFCHR | S_IRUGO | S_IWUGO;
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Advanced Linux Sound Architecture driver for soundcards.");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_SUPPORTED_DEVICE("sound");
 module_param(major, int, 0444);
 MODULE_PARM_DESC(major, "Major # for sound driver.");
-MODULE_PARM_SYNTAX(major, "default:116,skill:devel");
 module_param(cards_limit, int, 0444);
 MODULE_PARM_DESC(cards_limit, "Count of auto-loadable soundcards.");
-MODULE_PARM_SYNTAX(cards_limit, "default:8,skill:advanced");
 MODULE_ALIAS_CHARDEV_MAJOR(CONFIG_SND_MAJOR);
 #ifdef CONFIG_DEVFS_FS
 module_param(device_mode, int, 0444);
 MODULE_PARM_DESC(device_mode, "Device file permission mask for devfs.");
-MODULE_PARM_SYNTAX(device_mode, "default:0666,base:8");
 #endif
 MODULE_ALIAS_CHARDEV_MAJOR(CONFIG_SND_MAJOR);
 
@@ -339,39 +334,29 @@ int __exit snd_minor_info_done(void)
 static int __init alsa_sound_init(void)
 {
 	short controlnum;
-#ifdef CONFIG_SND_OSSEMUL
 	int err;
-#endif
 	int card;
 
 	snd_major = major;
 	snd_ecards_limit = cards_limit;
 	for (card = 0; card < SNDRV_CARDS; card++)
 		INIT_LIST_HEAD(&snd_minors_hash[card]);
-#ifdef CONFIG_SND_OSSEMUL
 	if ((err = snd_oss_init_module()) < 0)
 		return err;
-#endif
 	devfs_mk_dir("snd");
 	if (register_chrdev(major, "alsa", &snd_fops)) {
 		snd_printk(KERN_ERR "unable to register native major device number %d\n", major);
 		devfs_remove("snd");
 		return -EIO;
 	}
-#ifdef CONFIG_SND_DEBUG_MEMORY
 	snd_memory_init();
-#endif
 	if (snd_info_init() < 0) {
-#ifdef CONFIG_SND_DEBUG_MEMORY
 		snd_memory_done();
-#endif
 		unregister_chrdev(major, "alsa");
 		devfs_remove("snd");
 		return -ENOMEM;
 	}
-#ifdef CONFIG_SND_OSSEMUL
 	snd_info_minor_register();
-#endif
 	for (controlnum = 0; controlnum < cards_limit; controlnum++) {
 		devfs_mk_cdev(MKDEV(major, controlnum<<5), S_IFCHR | device_mode, "snd/controlC%d", controlnum);
 		class_simple_device_add(sound_class, MKDEV(major, controlnum<<5), NULL, "controlC%d", controlnum);
@@ -391,13 +376,9 @@ static void __exit alsa_sound_exit(void)
 		class_simple_device_remove(MKDEV(major, controlnum<<5));
 	}
 
-#ifdef CONFIG_SND_OSSEMUL
 	snd_info_minor_unregister();
-#endif
 	snd_info_done();
-#ifdef CONFIG_SND_DEBUG_MEMORY
 	snd_memory_done();
-#endif
 	if (unregister_chrdev(major, "alsa") != 0)
 		snd_printk(KERN_ERR "unable to unregister major device number %d\n", major);
 	devfs_remove("snd");
@@ -405,24 +386,6 @@ static void __exit alsa_sound_exit(void)
 
 module_init(alsa_sound_init)
 module_exit(alsa_sound_exit)
-
-#ifndef MODULE
-
-/* format is: snd=major,cards_limit[,device_mode] */
-
-static int __init alsa_sound_setup(char *str)
-{
-	(void)(get_option(&str,&major) == 2 &&
-	       get_option(&str,&cards_limit) == 2);
-#ifdef CONFIG_DEVFS_FS
-	(void)(get_option(&str,&device_mode) == 2);
-#endif
-	return 1;
-}
-
-__setup("snd=", alsa_sound_setup);
-
-#endif /* ifndef MODULE */
 
   /* sound.c */
 EXPORT_SYMBOL(snd_major);
@@ -439,14 +402,11 @@ EXPORT_SYMBOL(snd_unregister_oss_device);
   /* memory.c */
 #ifdef CONFIG_SND_DEBUG_MEMORY
 EXPORT_SYMBOL(snd_hidden_kmalloc);
+EXPORT_SYMBOL(snd_hidden_kcalloc);
 EXPORT_SYMBOL(snd_hidden_kfree);
 EXPORT_SYMBOL(snd_hidden_vmalloc);
 EXPORT_SYMBOL(snd_hidden_vfree);
-EXPORT_SYMBOL(_snd_magic_kmalloc);
-EXPORT_SYMBOL(_snd_magic_kcalloc);
-EXPORT_SYMBOL(snd_magic_kfree);
 #endif
-EXPORT_SYMBOL(snd_kcalloc);
 EXPORT_SYMBOL(snd_kmalloc_strdup);
 EXPORT_SYMBOL(copy_to_user_fromio);
 EXPORT_SYMBOL(copy_from_user_toio);

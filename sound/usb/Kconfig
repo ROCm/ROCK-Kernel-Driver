@@ -11,5 +11,15 @@ config SND_USB_AUDIO
 	help
 	  Say 'Y' or 'M' to include support for USB audio and USB MIDI devices.
 
+config SND_USB_USX2Y
+	tristate "Tascam US-122, US-224 and US-428 USB driver"
+	depends on SND && USB
+	select SND_HWDEP
+	select SND_RAWMIDI
+	select SND_PCM
+	help
+	  Say 'Y' or 'M' to include support for Tascam USB Audio/MIDI 
+	  interfaces or controllers US-122, US-224 and US-428.
+
 endmenu
 

@@ -146,14 +146,14 @@ snd_emux_create_port(snd_emux_t *emu, char *name,
 	int i, type, cap;
 
 	/* Allocate structures for this channel */
-	if ((p = snd_magic_kcalloc(snd_emux_port_t, 0, GFP_KERNEL)) == NULL) {
+	if ((p = kcalloc(1, sizeof(*p), GFP_KERNEL)) == NULL) {
 		snd_printk("no memory\n");
 		return NULL;
 	}
-	p->chset.channels = snd_kcalloc(max_channels * sizeof(snd_midi_channel_t), GFP_KERNEL);
+	p->chset.channels = kcalloc(max_channels, sizeof(snd_midi_channel_t), GFP_KERNEL);
 	if (p->chset.channels == NULL) {
 		snd_printk("no memory\n");
-		snd_magic_kfree(p);
+		kfree(p);
 		return NULL;
 	}
 	for (i = 0; i < max_channels; i++)
@@ -192,14 +192,14 @@ free_port(void *private_data)
 {
 	snd_emux_port_t *p;
 
-	p = snd_magic_cast(snd_emux_port_t, private_data, return);
+	p = private_data;
 	if (p) {
 #ifdef SNDRV_EMUX_USE_RAW_EFFECT
 		snd_emux_delete_effect(p);
 #endif
 		if (p->chset.channels)
 			kfree(p->chset.channels);
-		snd_magic_kfree(p);
+		kfree(p);
 	}
 }
 
@@ -257,7 +257,7 @@ snd_emux_event_input(snd_seq_event_t *ev, int direct, void *private_data,
 {
 	snd_emux_port_t *port;
 
-	port = snd_magic_cast(snd_emux_port_t, private_data, return -EINVAL);
+	port = private_data;
 	snd_assert(port != NULL && ev != NULL, return -EINVAL);
 
 	snd_midi_process_event(&emux_ops, ev, &port->chset);
@@ -308,7 +308,7 @@ snd_emux_use(void *private_data, snd_seq_port_subscribe_t *info)
 	snd_emux_port_t *p;
 	snd_emux_t *emu;
 
-	p = snd_magic_cast(snd_emux_port_t, private_data, return -EINVAL);
+	p = private_data;
 	snd_assert(p != NULL, return -EINVAL);
 	emu = p->emu;
 	snd_assert(emu != NULL, return -EINVAL);
@@ -329,7 +329,7 @@ snd_emux_unuse(void *private_data, snd_seq_port_subscribe_t *info)
 	snd_emux_port_t *p;
 	snd_emux_t *emu;
 
-	p = snd_magic_cast(snd_emux_port_t, private_data, return -EINVAL);
+	p = private_data;
 	snd_assert(p != NULL, return -EINVAL);
 	emu = p->emu;
 	snd_assert(emu != NULL, return -EINVAL);
@@ -383,7 +383,7 @@ int snd_emux_init_virmidi(snd_emux_t *emu, snd_card_t *card)
 	if (emu->midi_ports <= 0)
 		return 0;
 
-	emu->vmidi = snd_kcalloc(sizeof(snd_rawmidi_t*) * emu->midi_ports, GFP_KERNEL);
+	emu->vmidi = kcalloc(emu->midi_ports, sizeof(snd_rawmidi_t*), GFP_KERNEL);
 	if (emu->vmidi == NULL)
 		return -ENOMEM;
 
@@ -392,7 +392,7 @@ int snd_emux_init_virmidi(snd_emux_t *emu, snd_card_t *card)
 		snd_virmidi_dev_t *rdev;
 		if (snd_virmidi_new(card, emu->midi_devidx + i, &rmidi) < 0)
 			goto __error;
-		rdev = snd_magic_cast(snd_virmidi_dev_t, rmidi->private_data, continue);
+		rdev = rmidi->private_data;
 		sprintf(rmidi->name, "%s Synth MIDI", emu->name);
 		rdev->seq_mode = SNDRV_VIRMIDI_SEQ_ATTACH;
 		rdev->client = emu->client;

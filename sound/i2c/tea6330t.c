@@ -30,8 +30,6 @@ MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Routines for control of the TEA6330T circuit via i2c bus");
 MODULE_LICENSE("GPL");
 
-#define chip_t tea6330t_t
-
 #define TEA6330T_ADDR			(0x80>>1) /* fixed address */
 
 #define TEA6330T_SADDR_VOLUME_LEFT	0x00	/* volume left */
@@ -259,8 +257,6 @@ static int snd_tea6330t_put_treble(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 	return change;
 }
 
-#define TEA6330T_CONTROLS (sizeof(snd_tea6330t_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_tea6330t_controls[] = {
 TEA6330T_MASTER_SWITCH("Master Playback Switch", 0),
 TEA6330T_MASTER_VOLUME("Master Playback Volume", 0),
@@ -270,8 +266,8 @@ TEA6330T_TREBLE("Tone Control - Treble", 0)
 
 static void snd_tea6330_free(snd_i2c_device_t *device)
 {
-	tea6330t_t *tea = snd_magic_cast(tea6330t_t, device->private_data, return);
-	snd_magic_kfree(tea);
+	tea6330t_t *tea = device->private_data;
+	kfree(tea);
 }
                                         
 int snd_tea6330t_update_mixer(snd_card_t * card,
@@ -286,11 +282,11 @@ int snd_tea6330t_update_mixer(snd_card_t * card,
 	u8 default_treble, default_bass;
 	unsigned char bytes[7];
 
-	tea = snd_magic_kcalloc(tea6330t_t, 0, GFP_KERNEL);
+	tea = kcalloc(1, sizeof(*tea), GFP_KERNEL);
 	if (tea == NULL)
 		return -ENOMEM;
 	if ((err = snd_i2c_device_create(bus, "TEA6330T", TEA6330T_ADDR, &device)) < 0) {
-		snd_magic_kfree(tea);
+		kfree(tea);
 		return err;
 	}
 	tea->device = device;
@@ -336,7 +332,7 @@ int snd_tea6330t_update_mixer(snd_card_t * card,
 	if ((err = snd_component_add(card, "TEA6330T")) < 0)
 		goto __error;
 
-	for (idx = 0; idx < TEA6330T_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_tea6330t_controls); idx++) {
 		knew = &snd_tea6330t_controls[idx];
 		if (tea->treble == 0 && !strcmp(knew->name, "Tone Control - Treble"))
 			continue;

@@ -54,18 +54,14 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for Sun AMD7930 soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for Sun AMD7930 soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable Sun AMD7930 soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 MODULE_AUTHOR("Thomas K. Dyas and David S. Miller");
 MODULE_DESCRIPTION("Sun AMD7930");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Sun,AMD7930}}");
+MODULE_SUPPORTED_DEVICE("{{Sun,AMD7930}}");
 
 /* Device register layout.  */
 
@@ -345,7 +341,6 @@ typedef struct snd_amd7930 {
 	unsigned int		regs_size;
 	struct snd_amd7930	*next;
 } amd7930_t;
-#define chip_t amd7930_t
 
 static amd7930_t *amd7930_list;
 
@@ -475,7 +470,6 @@ static __const__ __u16 ger_coeff[] = {
 	0x000b, /* 16.9 dB */
 	0x000f  /* 18. dB */
 };
-#define NR_GER_COEFFS (sizeof(ger_coeff) / sizeof(ger_coeff[0]))
 
 /* Update amd7930_map settings and program them into the hardware.
  * The amd->lock is held and local interrupts are disabled.
@@ -487,7 +481,7 @@ static void __amd7930_update_map(amd7930_t *amd)
 
 	map->gx = gx_coeff[amd->rgain];
 	map->stgr = gx_coeff[amd->mgain];
-	level = (amd->pgain * (256 + NR_GER_COEFFS)) >> 8;
+	level = (amd->pgain * (256 + ARRAY_SIZE(ger_coeff))) >> 8;
 	if (level >= 256) {
 		map->ger = ger_coeff[level - 256];
 		map->gr = gx_coeff[255];
@@ -764,7 +758,7 @@ static snd_pcm_ops_t snd_amd7930_capture_ops = {
 
 static void snd_amd7930_pcm_free(snd_pcm_t *pcm)
 {
-	amd7930_t *amd = snd_magic_cast(amd7930_t, pcm->private_data, return);
+	amd7930_t *amd = pcm->private_data;
 
 	amd->pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
@@ -916,8 +910,6 @@ static snd_kcontrol_new_t amd7930_controls[] __initdata = {
 	},
 };
 
-#define NUM_AMD7930_CONTROLS (sizeof(amd7930_controls)/sizeof(snd_kcontrol_new_t))
-
 static int __init snd_amd7930_mixer(amd7930_t *amd)
 {
 	snd_card_t *card;
@@ -928,7 +920,7 @@ static int __init snd_amd7930_mixer(amd7930_t *amd)
 	card = amd->card;
 	strcpy(card->mixername, card->shortname);
 
-	for (idx = 0; idx < NUM_AMD7930_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(amd7930_controls); idx++) {
 		if ((err = snd_ctl_add(card,
 				       snd_ctl_new1(&amd7930_controls[idx], amd))) < 0)
 			return err;
@@ -947,14 +939,14 @@ static int snd_amd7930_free(amd7930_t *amd)
 	if (amd->regs)
 		sbus_iounmap(amd->regs, amd->regs_size);
 
-	snd_magic_kfree(amd);
+	kfree(amd);
 
 	return 0;
 }
 
 static int snd_amd7930_dev_free(snd_device_t *device)
 {
-	amd7930_t *amd = snd_magic_cast(amd7930_t, device->device_data, return -ENXIO);
+	amd7930_t *amd = device->device_data;
 
 	return snd_amd7930_free(amd);
 }
@@ -976,7 +968,7 @@ static int __init snd_amd7930_create(snd_card_t *card,
 	int err;
 
 	*ramd = NULL;
-	amd = snd_magic_kcalloc(amd7930_t, 0, GFP_KERNEL);
+	amd = kcalloc(1, sizeof(*amd), 0, GFP_KERNEL);
 	if (amd == NULL)
 		return -ENOMEM;
 

@@ -36,8 +36,6 @@
 #include "ac97_id.h"
 #include "ac97_local.h"
 
-#define chip_t ac97_t
-
 /*
  *  PCM support
  */
@@ -430,7 +428,7 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 	unsigned int rates;
 	ac97_t *codec;
 
-	rpcms = snd_kcalloc(sizeof(struct ac97_pcm) * pcms_count, GFP_KERNEL);
+	rpcms = kcalloc(pcms_count, sizeof(struct ac97_pcm), GFP_KERNEL);
 	if (rpcms == NULL)
 		return -ENOMEM;
 	memset(avail_slots, 0, sizeof(avail_slots));
@@ -489,7 +487,10 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 				rpcm->r[0].rslots[j] = tmp;
 				rpcm->r[0].codec[j] = bus->codec[j];
 				rpcm->r[0].rate_table[j] = rate_table[pcm->stream][j];
-				rates = get_rates(rpcm, j, tmp, 0);
+				if (bus->no_vra)
+					rates = SNDRV_PCM_RATE_48000;
+				else
+					rates = get_rates(rpcm, j, tmp, 0);
 				if (pcm->exclusive)
 					avail_slots[pcm->stream][j] &= ~tmp;
 			}

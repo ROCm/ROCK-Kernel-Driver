@@ -23,6 +23,7 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/minors.h>
@@ -202,7 +203,7 @@ static client_t *seq_create_client1(int client_index, int poolsize)
 	client_t *client;
 
 	/* init client data */
-	client = snd_kcalloc(sizeof(client_t), GFP_KERNEL);
+	client = kcalloc(1, sizeof(*client), GFP_KERNEL);
 	if (client == NULL)
 		return NULL;
 	client->pool = snd_seq_pool_new(poolsize);
@@ -547,36 +548,6 @@ static int update_timestamp_of_queue(snd_seq_event_t *event, int queue, int real
 
 
 /*
- * expand a quoted event.
- */
-static int expand_quoted_event(snd_seq_event_t *event)
-{
-	snd_seq_event_t *quoted;
-
-	quoted = event->data.quote.event;
-	if (quoted == NULL) {
-		snd_printd("seq: quoted event is NULL\n");
-		return -EINVAL;
-	}
-
-	event->type = quoted->type;
-	event->tag = quoted->tag;
-	event->source = quoted->source;
-	/* don't use quoted destination */
-	event->data = quoted->data;
-	/* use quoted timestamp only if subscription/port didn't update it */
-	if (event->queue == SNDRV_SEQ_QUEUE_DIRECT) {
-		event->flags = quoted->flags;
-		event->queue = quoted->queue;
-		event->time = quoted->time;
-	} else {
-		event->flags = (event->flags & SNDRV_SEQ_TIME_STAMP_MASK)
-			| (quoted->flags & ~SNDRV_SEQ_TIME_STAMP_MASK);
-	}
-	return 0;
-}
-
-/*
  * deliver an event to the specified destination.
  * if filter is non-zero, client filter bitmap is tested.
  *
@@ -590,7 +561,7 @@ static int snd_seq_deliver_single_event(client_t *client,
 	client_t *dest = NULL;
 	client_port_t *dest_port = NULL;
 	int result = -ENOENT;
-	int direct, quoted = 0;
+	int direct;
 
 	direct = snd_seq_ev_is_direct(event);
 
@@ -610,14 +581,6 @@ static int snd_seq_deliver_single_event(client_t *client,
 	if (dest_port->timestamping)
 		update_timestamp_of_queue(event, dest_port->time_queue,
 					  dest_port->time_real);
-
-	if (event->type == SNDRV_SEQ_EVENT_KERNEL_QUOTE) {
-		quoted = 1;
-		if (expand_quoted_event(event) < 0) {
-			result = 0; /* do not send bounce error */
-			goto __skip;
-		}
-	}
 
 	switch (dest->type) {
 	case USER_CLIENT:
@@ -641,14 +604,7 @@ static int snd_seq_deliver_single_event(client_t *client,
 		snd_seq_client_unlock(dest);
 
 	if (result < 0 && !direct) {
-		if (quoted) {
-			/* return directly to the original source */
-			dest = snd_seq_client_use_ptr(event->source.client);
-			result = bounce_error_event(dest, event, result, atomic, hop);
-			snd_seq_client_unlock(dest);
-		} else {
-			result = bounce_error_event(client, event, result, atomic, hop);
-		}
+		result = bounce_error_event(client, event, result, atomic, hop);
 	}
 	return result;
 }
@@ -1694,6 +1650,13 @@ static int snd_seq_ioctl_get_queue_tempo(client_t * client, void __user *arg)
 
 
 /* SET_QUEUE_TEMPO ioctl() */
+int snd_seq_set_queue_tempo(int client, snd_seq_queue_tempo_t *tempo)
+{
+	if (!snd_seq_queue_check_access(tempo->queue, client))
+		return -EPERM;
+	return snd_seq_queue_timer_set_tempo(tempo->queue, client, tempo);
+}
+
 static int snd_seq_ioctl_set_queue_tempo(client_t * client, void __user *arg)
 {
 	int result;
@@ -1702,15 +1665,8 @@ static int snd_seq_ioctl_set_queue_tempo(client_t * client, void __user *arg)
 	if (copy_from_user(&tempo, arg, sizeof(tempo)))
 		return -EFAULT;
 
-	if (snd_seq_queue_check_access(tempo.queue, client->number)) {
-		result = snd_seq_queue_timer_set_tempo(tempo.queue, client->number, &tempo);
-		if (result < 0)
-			return result;
-	} else {
-		return -EPERM;
-	}	
-
-	return 0;
+	result = snd_seq_set_queue_tempo(client->number, &tempo);
+	return result < 0 ? result : 0;
 }
 
 
@@ -2176,10 +2132,15 @@ static int snd_seq_ioctl(struct inode *inode, struct file *file,
 			 unsigned int cmd, unsigned long arg)
 {
 	client_t *client = (client_t *) file->private_data;
+	int err;
 
 	snd_assert(client != NULL, return -ENXIO);
 		
-	return snd_seq_do_ioctl(client, cmd, (void __user *) arg);
+	/* FIXME: need to unlock BKL to allow preemption */
+	unlock_kernel();
+	err = snd_seq_do_ioctl(client, cmd, (void __user *) arg);
+	lock_kernel();
+	return err;
 }
 
 
@@ -2261,8 +2222,7 @@ static int kernel_client_enqueue(int client, snd_seq_event_t *ev,
 
 	if (ev->type == SNDRV_SEQ_EVENT_NONE)
 		return 0; /* ignore this */
-	if (ev->type == SNDRV_SEQ_EVENT_KERNEL_ERROR ||
-	    ev->type == SNDRV_SEQ_EVENT_KERNEL_QUOTE)
+	if (ev->type == SNDRV_SEQ_EVENT_KERNEL_ERROR)
 		return -EINVAL; /* quoted events can't be enqueued */
 
 	/* fill in client number */

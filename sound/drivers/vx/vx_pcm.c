@@ -48,13 +48,12 @@
 #include <sound/driver.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/delay.h>
 #include <sound/core.h>
 #include <sound/asoundef.h>
 #include <sound/pcm.h>
 #include <sound/vx_core.h>
 #include "vx_cmd.h"
-
-#define chip_t	vx_core_t
 
 
 /*
@@ -381,7 +380,7 @@ static int vx_send_irqa(vx_core_t *chip)
  */
 static int vx_toggle_pipe(vx_core_t *chip, vx_pipe_t *pipe, int state)
 {
-	int err, i, cur_state, delay;
+	int err, i, cur_state;
 
 	/* Check the pipe is not already in the requested state */
 	if (vx_get_pipe_state(chip, pipe, &cur_state) < 0)
@@ -394,17 +393,14 @@ static int vx_toggle_pipe(vx_core_t *chip, vx_pipe_t *pipe, int state)
 	 * enough sound buffer for this pipe)
 	 */
 	if (state) {
-		int delay = CAN_START_DELAY;
 		for (i = 0 ; i < MAX_WAIT_FOR_DSP; i++) {
-			snd_vx_delay(chip, delay);
 			err = vx_pipe_can_start(chip, pipe);
 			if (err > 0)
 				break;
 			/* Wait for a few, before asking again
 			 * to avoid flooding the DSP with our requests
 			 */
-			if ((i % 4 ) == 0)
-				delay <<= 1;
+			mdelay(1);
 		}
 	}
     
@@ -418,15 +414,12 @@ static int vx_toggle_pipe(vx_core_t *chip, vx_pipe_t *pipe, int state)
 	 * reaching the expected state before returning
 	 * Check one pipe only (since they are synchronous)
 	 */
-	delay = WAIT_STATE_DELAY;
 	for (i = 0; i < MAX_WAIT_FOR_DSP; i++) {
-		snd_vx_delay(chip, delay);
 		err = vx_get_pipe_state(chip, pipe, &cur_state);
 		if (err < 0 || cur_state == state)
 			break;
 		err = -EIO;
-		if ((i % 4 ) == 0)
-			delay <<= 1;
+		mdelay(1);
 	}
 	return err < 0 ? -EIO : 0;
 }
@@ -480,7 +473,7 @@ static int vx_alloc_pipe(vx_core_t *chip, int capture,
 		return err;
 
 	/* initialize the pipe record */
-	pipe = snd_magic_kcalloc(vx_pipe_t, 0, GFP_KERNEL);
+	pipe = kcalloc(1, sizeof(*pipe), GFP_KERNEL);
 	if (! pipe) {
 		/* release the pipe */
 		vx_init_rmh(&rmh, CMD_FREE_PIPE);
@@ -514,7 +507,7 @@ static int vx_free_pipe(vx_core_t *chip, vx_pipe_t *pipe)
 	vx_set_pipe_cmd_params(&rmh, pipe->is_capture, pipe->number, 0);
 	vx_send_msg(chip, &rmh);
 
-	snd_magic_kfree(pipe);
+	kfree(pipe);
 	return 0;
 }
 
@@ -629,7 +622,7 @@ static int vx_pcm_playback_close(snd_pcm_substream_t *subs)
 	if (! subs->runtime->private_data)
 		return -EINVAL;
 
-	pipe = snd_magic_cast(vx_pipe_t, subs->runtime->private_data, return -EINVAL);
+	pipe = subs->runtime->private_data;
 
 	if (--pipe->references == 0) {
 		chip->playback_pipes[pipe->number] = NULL;
@@ -778,8 +771,8 @@ static void vx_pcm_playback_update(vx_core_t *chip, snd_pcm_substream_t *subs, v
 static void vx_pcm_delayed_start(unsigned long arg)
 {
 	snd_pcm_substream_t *subs = (snd_pcm_substream_t *)arg;
-	vx_core_t *chip = snd_magic_cast(vx_core_t, subs->pcm->private_data, return);
-	vx_pipe_t *pipe = snd_magic_cast(vx_pipe_t, subs->runtime->private_data, return);
+	vx_core_t *chip = subs->pcm->private_data;
+	vx_pipe_t *pipe = subs->runtime->private_data;
 	int err;
 
 	/*  printk( KERN_DEBUG "DDDD tasklet delayed start jiffies = %ld\n", jiffies);*/
@@ -801,7 +794,7 @@ static void vx_pcm_delayed_start(unsigned long arg)
 static int vx_pcm_trigger(snd_pcm_substream_t *subs, int cmd)
 {
 	vx_core_t *chip = snd_pcm_substream_chip(subs);
-	vx_pipe_t *pipe = snd_magic_cast(vx_pipe_t, subs->runtime->private_data, return -EINVAL);
+	vx_pipe_t *pipe = subs->runtime->private_data;
 	int err;
 
 	if (chip->chip_status & VX_STAT_IS_STALE)
@@ -846,7 +839,7 @@ static int vx_pcm_trigger(snd_pcm_substream_t *subs, int cmd)
 static snd_pcm_uframes_t vx_pcm_playback_pointer(snd_pcm_substream_t *subs)
 {
 	snd_pcm_runtime_t *runtime = subs->runtime;
-	vx_pipe_t *pipe = snd_magic_cast(vx_pipe_t, runtime->private_data, return -EINVAL);
+	vx_pipe_t *pipe = runtime->private_data;
 	return pipe->position;
 }
 
@@ -874,7 +867,7 @@ static int vx_pcm_prepare(snd_pcm_substream_t *subs)
 {
 	vx_core_t *chip = snd_pcm_substream_chip(subs);
 	snd_pcm_runtime_t *runtime = subs->runtime;
-	vx_pipe_t *pipe = snd_magic_cast(vx_pipe_t, runtime->private_data, return -EINVAL);
+	vx_pipe_t *pipe = runtime->private_data;
 	int err, data_mode;
 	// int max_size, nchunks;
 
@@ -1037,7 +1030,7 @@ static int vx_pcm_capture_close(snd_pcm_substream_t *subs)
 	
 	if (! subs->runtime->private_data)
 		return -EINVAL;
-	pipe = snd_magic_cast(vx_pipe_t, subs->runtime->private_data, return -EINVAL);
+	pipe = subs->runtime->private_data;
 	chip->capture_pipes[pipe->number] = NULL;
 
 	pipe_out_monitoring = pipe->monitoring_pipe;
@@ -1141,7 +1134,7 @@ static void vx_pcm_capture_update(vx_core_t *chip, snd_pcm_substream_t *subs, vx
 static snd_pcm_uframes_t vx_pcm_capture_pointer(snd_pcm_substream_t *subs)
 {
 	snd_pcm_runtime_t *runtime = subs->runtime;
-	vx_pipe_t *pipe = snd_magic_cast(vx_pipe_t, runtime->private_data, return -EINVAL);
+	vx_pipe_t *pipe = runtime->private_data;
 	return bytes_to_frames(runtime, pipe->hw_ptr);
 }
 
@@ -1265,7 +1258,7 @@ static int vx_init_audio_io(vx_core_t *chip)
  */
 static void snd_vx_pcm_free(snd_pcm_t *pcm)
 {
-	vx_core_t *chip = snd_magic_cast(vx_core_t, pcm->private_data, return);
+	vx_core_t *chip = pcm->private_data;
 	chip->pcm[pcm->device] = NULL;
 	if (chip->playback_pipes) {
 		kfree(chip->playback_pipes);

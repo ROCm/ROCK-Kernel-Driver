@@ -46,8 +46,11 @@ unsigned int snd_seq_oss_readq_poll(seq_oss_readq_t *readq, struct file *file, p
 int snd_seq_oss_readq_puts(seq_oss_readq_t *readq, int dev, unsigned char *data, int len);
 int snd_seq_oss_readq_put_event(seq_oss_readq_t *readq, evrec_t *ev);
 int snd_seq_oss_readq_put_timestamp(seq_oss_readq_t *readq, unsigned long curt, int seq_mode);
-evrec_t *snd_seq_oss_readq_pick(seq_oss_readq_t *q, int blocking, unsigned long *rflags);
-void snd_seq_oss_readq_unlock(seq_oss_readq_t *q, unsigned long flags);
-void snd_seq_oss_readq_free(seq_oss_readq_t *q, unsigned long flags);
+int snd_seq_oss_readq_pick(seq_oss_readq_t *q, evrec_t *rec);
+void snd_seq_oss_readq_wait(seq_oss_readq_t *q);
+void snd_seq_oss_readq_free(seq_oss_readq_t *q);
+
+#define snd_seq_oss_readq_lock(q, flags) spin_lock_irqsave(&(q)->lock, flags)
+#define snd_seq_oss_readq_unlock(q, flags) spin_unlock_irqrestore(&(q)->lock, flags)
 
 #endif
