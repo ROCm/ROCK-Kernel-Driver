@@ -118,7 +118,7 @@ int dragen2_cs8900_setup(struct net_device *dev)
 
 static void init_hardware(void)
 {
-#if CONFIG_DIRECT_IO_ACCESS
+#ifdef CONFIG_DIRECT_IO_ACCESS
 	SCR = 0x10;					/* allow user access to internal registers */
 #endif
 
