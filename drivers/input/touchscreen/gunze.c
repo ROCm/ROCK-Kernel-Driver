@@ -124,7 +124,7 @@ static void gunze_connect(struct serio *serio, struct serio_dev *dev)
 	memset(gunze, 0, sizeof(struct gunze));
 
 	init_input_dev(&gunze->dev);
-	gunze->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);	
+	gunze->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 	gunze->dev.absbit[0] = BIT(ABS_X) | BIT(ABS_Y);
 	gunze->dev.keybit[LONG(BTN_TOUCH)] = BIT(BTN_TOUCH);
 

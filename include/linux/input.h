@@ -655,7 +655,7 @@ struct ff_periodic_effect {
 	struct ff_envelope envelope;
 
 /* Only used if waveform == FF_CUSTOM */
-	__u32 custom_len;	/* Number of samples  */	
+	__u32 custom_len;	/* Number of samples */
 	__s16 *custom_data;	/* Buffer of samples */
 /* Note: the data pointed by custom_data is copied by the driver. You can
  * therefore dispose of the memory after the upload/update */

@@ -1,11 +1,11 @@
 /*
  * $Id: h3600_ts_input.c,v 1.4 2002/01/23 06:39:37 jsimmons Exp $
  *
- *  Copyright (c) 2001 "Crazy" James Simmons jsimmons@transvirtual.com 
+ *  Copyright (c) 2001 "Crazy" James Simmons jsimmons@transvirtual.com
  *
- *  Sponsored by Transvirtual Technology. 
- * 
- *  Derived from the code in h3600_ts.[ch] by Charles Flynn  
+ *  Sponsored by Transvirtual Technology.
+ *
+ *  Derived from the code in h3600_ts.[ch] by Charles Flynn
  */
 
 /*
@@ -75,7 +75,7 @@
 #define MAX_ID                  14
 
 #define H3600_MAX_LENGTH 16
-#define H3600_KEY 0xf 
+#define H3600_KEY 0xf
 
 #define H3600_SCANCODE_RECORD	1	 /* 1 -> record button */
 #define H3600_SCANCODE_CALENDAR 2	 /* 2 -> calendar */
@@ -118,13 +118,13 @@ static void npower_button_handler(int irq, void *dev_id, struct pt_regs *regs)
         int down = (GPLR & GPIO_BITSY_NPOWER_BUTTON) ? 0 : 1;
 	struct input_dev *dev = (struct input_dev *) dev_id;
 
-	/* 
-	 * This interrupt is only called when we release the key. So we have 
+	/*
+	 * This interrupt is only called when we release the key. So we have
 	 * to fake a key press.
-	 */ 	
+	 */
 	input_regs(dev, regs);
 	input_report_key(dev, KEY_SUSPEND, 1);
-	input_report_key(dev, KEY_SUSPEND, down); 	
+	input_report_key(dev, KEY_SUSPEND, down);
 	input_sync(dev);
 }
 
@@ -144,18 +144,18 @@ unsigned int h3600_flite_power(struct input_dev *dev, enum flite_pwr pwr)
 	unsigned char brightness = ((pwr==FLITE_PWR_OFF) ? 0:flite_brightness);
 	struct h3600_dev *ts = dev->private;
 
-	/* Must be in this order */	
+	/* Must be in this order */
        	ts->serio->write(ts->serio, 1);
 	ts->serio->write(ts->serio, pwr);
-      	ts->serio->write(ts->serio, brightness); 
+      	ts->serio->write(ts->serio, brightness);
 	return 0;
 }
 
 static int suspended = 0;
-static int h3600ts_pm_callback(struct pm_dev *pm_dev, pm_request_t req, 
+static int h3600ts_pm_callback(struct pm_dev *pm_dev, pm_request_t req,
 				void *data)
 {
-	struct input_dev *dev = (struct input_dev *) data;	
+	struct input_dev *dev = (struct input_dev *) data;
 
         switch (req) {
         case PM_SUSPEND: /* enter D1-D3 */
@@ -183,7 +183,7 @@ static int h3600ts_pm_callback(struct pm_dev *pm_dev, pm_request_t req,
 /*
  * This function translates the native event packets to linux input event
  * packets. Some packets coming from serial are not touchscreen related. In
- * this case we send them off to be processed elsewhere. 
+ * this case we send them off to be processed elsewhere.
  */
 static void h3600ts_process_packet(struct h3600_dev *ts, struct pt_regs *regs)
 {
@@ -206,7 +206,7 @@ static void h3600ts_process_packet(struct h3600_dev *ts, struct pt_regs *regs)
                 Note: This is true for non interrupt generated key events.
                 */
                 case KEYBD_ID:
-			down = (ts->buf[0] & 0x80) ? 0 : 1; 
+			down = (ts->buf[0] & 0x80) ? 0 : 1;
 
 			switch (ts->buf[0] & 0x7f) {
 				case H3600_SCANCODE_RECORD:
@@ -218,7 +218,7 @@ static void h3600ts_process_packet(struct h3600_dev *ts, struct pt_regs *regs)
 				case H3600_SCANCODE_CONTACTS:
 					key = KEY_PROG2;
                                         break;
-				case H3600_SCANCODE_Q:        
+				case H3600_SCANCODE_Q:
 					key = KEY_Q;
                                         break;
 				case H3600_SCANCODE_START:
@@ -237,9 +237,9 @@ static void h3600ts_process_packet(struct h3600_dev *ts, struct pt_regs *regs)
 					key = KEY_DOWN;
                                         break;
 				default:
-					key = 0;	
-			}	
-                        if (key) 
+					key = 0;
+			}
+                        if (key)
                         	input_report_key(dev, key, down);
                         break;
                 /*
@@ -251,13 +251,13 @@ static void h3600ts_process_packet(struct h3600_dev *ts, struct pt_regs *regs)
                  *       byte 0    1       2       3
                  */
                 case TOUCHS_ID:
-			if (!touched) { 
+			if (!touched) {
 				input_report_key(dev, BTN_TOUCH, 1);
 				touched = 1;
-			}			
+			}
 
 			if (ts->len) {
-				unsigned short x, y;				
+				unsigned short x, y;
 
 				x = ts->buf[0]; x <<= 8; x += ts->buf[1];
                                 y = ts->buf[2]; y <<= 8; y += ts->buf[3];
@@ -267,7 +267,7 @@ static void h3600ts_process_packet(struct h3600_dev *ts, struct pt_regs *regs)
 			} else {
 		               	input_report_key(dev, BTN_TOUCH, 0);
 				touched = 0;
-			}	
+			}
                         break;
 		default:
 			/* Send a non input event elsewhere */
@@ -280,7 +280,7 @@ static void h3600ts_process_packet(struct h3600_dev *ts, struct pt_regs *regs)
 /*
  * h3600ts_event() handles events from the input module.
  */
-static int h3600ts_event(struct input_dev *dev, unsigned int type, 
+static int h3600ts_event(struct input_dev *dev, unsigned int type,
 		 	 unsigned int code, int value)
 {
 	struct h3600_dev *ts = dev->private;
@@ -290,7 +290,7 @@ static int h3600ts_event(struct input_dev *dev, unsigned int type,
 		//	ts->serio->write(ts->serio, SOME_CMD);
 			return 0;
 		}
-	}					
+	}
 	return -1;
 }
 
@@ -323,12 +323,12 @@ static void h3600ts_interrupt(struct serio *serio, unsigned char data,
         struct h3600_dev *ts = serio->private;
 
 	/*
-         * We have a new frame coming in. 
+         * We have a new frame coming in.
          */
 	switch (state) {
 		case STATE_SOF:
         		if (data == CHAR_SOF)
-                		state = STATE_ID;	
+                		state = STATE_ID;
 			return;
         	case STATE_ID:
 			ts->event = (data & 0xf0) >> 4;
@@ -344,7 +344,7 @@ static void h3600ts_interrupt(struct serio *serio, unsigned char data,
 		case STATE_DATA:
 			ts->chksum += data;
 			ts->buf[ts->idx]= data;
-			if(++ts->idx == ts->len) 
+			if(++ts->idx == ts->len)
                         	state = STATE_EOF;
 			break;
 		case STATE_EOF:
@@ -382,7 +382,7 @@ static void h3600ts_connect(struct serio *serio, struct serio_dev *dev)
         set_GPIO_IRQ_edge( GPIO_BITSY_NPOWER_BUTTON, GPIO_RISING_EDGE );
 
         if (request_irq(IRQ_GPIO_BITSY_ACTION_BUTTON, action_button_handler,
-			SA_SHIRQ | SA_INTERRUPT | SA_SAMPLE_RANDOM,	
+			SA_SHIRQ | SA_INTERRUPT | SA_SAMPLE_RANDOM,
 			"h3600_action", &ts->dev)) {
 		printk(KERN_ERR "h3600ts.c: Could not allocate Action Button IRQ!\n");
 		kfree(ts);
@@ -390,7 +390,7 @@ static void h3600ts_connect(struct serio *serio, struct serio_dev *dev)
 	}
 
         if (request_irq(IRQ_GPIO_BITSY_NPOWER_BUTTON, npower_button_handler,
-			SA_SHIRQ | SA_INTERRUPT | SA_SAMPLE_RANDOM, 
+			SA_SHIRQ | SA_INTERRUPT | SA_SAMPLE_RANDOM,
 			"h3600_suspend", &ts->dev)) {
 		free_irq(IRQ_GPIO_BITSY_ACTION_BUTTON, &ts->dev);
 		printk(KERN_ERR "h3600ts.c: Could not allocate Power Button IRQ!\n");
@@ -400,7 +400,7 @@ static void h3600ts_connect(struct serio *serio, struct serio_dev *dev)
 	/* Now we have things going we setup our input device */
 	ts->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS) | BIT(EV_LED) | BIT(EV_PWR);
 	ts->dev.absbit[0] = BIT(ABS_X) | BIT(ABS_Y);
-	ts->dev.ledbit[0] = BIT(LED_SLEEP); 
+	ts->dev.ledbit[0] = BIT(LED_SLEEP);
 
 	ts->dev.absmin[ABS_X] = 60;   ts->dev.absmin[ABS_Y] = 35;
 	ts->dev.absmax[ABS_X] = 985; ts->dev.absmax[ABS_Y] = 1024;
@@ -442,7 +442,7 @@ static void h3600ts_connect(struct serio *serio, struct serio_dev *dev)
 
 	//h3600_flite_control(1, 25);     /* default brightness */
 #ifdef CONFIG_PM
-	ts->dev.pm_dev = pm_register(PM_ILLUMINATION_DEV, PM_SYS_LIGHT, 
+	ts->dev.pm_dev = pm_register(PM_ILLUMINATION_DEV, PM_SYS_LIGHT,
 					h3600ts_pm_callback);
 	printk("registered pm callback\n");
 #endif
@@ -458,7 +458,7 @@ static void h3600ts_connect(struct serio *serio, struct serio_dev *dev)
 static void h3600ts_disconnect(struct serio *serio)
 {
 	struct h3600_dev *ts = serio->private;
-	
+
         free_irq(IRQ_GPIO_BITSY_ACTION_BUTTON, &ts->dev);
         free_irq(IRQ_GPIO_BITSY_NPOWER_BUTTON, &ts->dev);
 	input_unregister_device(&ts->dev);
