@@ -33,7 +33,6 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/device.h>
-#include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>
 
@@ -149,22 +148,18 @@ static int driverfs_mknod(struct inode *dir, struct dentry *dentry, int mode, in
 static int driverfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
 	int res;
-	lock_kernel();
 	dentry->d_op = &driverfs_dentry_dir_ops;
  	res = driverfs_mknod(dir, dentry, mode | S_IFDIR, 0);
  	if (!res)
  		dir->i_nlink++;
-	unlock_kernel();
 	return res;
 }
 
 static int driverfs_create(struct inode *dir, struct dentry *dentry, int mode)
 {
 	int res;
-	lock_kernel();
 	dentry->d_op = &driverfs_dentry_file_ops;
  	res = driverfs_mknod(dir, dentry, mode | S_IFREG, 0);
-	unlock_kernel();
 	return res;
 }
 
@@ -212,10 +207,7 @@ static int driverfs_empty(struct dentry *dentry)
 static int driverfs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	struct inode *inode = dentry->d_inode;
-
-	lock_kernel();
 	inode->i_nlink--;
-	unlock_kernel();
 	dput(dentry);
 	return 0;
 }
@@ -365,7 +357,7 @@ driverfs_file_lseek(struct file *file, loff_t offset, int orig)
 {
 	loff_t retval = -EINVAL;
 
-	lock_kernel();
+	down(&file->f_dentry->d_inode->i_sem);
 	switch(orig) {
 	case 0:
 		if (offset > 0) {
@@ -382,7 +374,7 @@ driverfs_file_lseek(struct file *file, loff_t offset, int orig)
 	default:
 		break;
 	}
-	unlock_kernel();
+	up(&file->f_dentry->d_inode->i_sem);
 	return retval;
 }
 
