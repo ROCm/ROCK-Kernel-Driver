@@ -38,11 +38,22 @@ struct ethtool_drvinfo {
 	u32	regdump_len;	/* Amount of data from ETHTOOL_GREGS */
 };
 
+#define SOPASS_MAX	6
+/* wake-on-lan settings */
+struct ethtool_wolinfo {
+	u32	cmd;
+	u32	supported;
+	u32	wolopts;
+	u8	sopass[SOPASS_MAX]; /* SecureOn(tm) password */
+};
+
 /* CMDs currently supported */
 #define ETHTOOL_GSET		0x00000001 /* Get settings. */
 #define ETHTOOL_SSET		0x00000002 /* Set settings, privileged. */
 #define ETHTOOL_GDRVINFO	0x00000003 /* Get driver info. */
 #define ETHTOOL_GREGS		0x00000004 /* Get NIC registers, privileged. */
+#define ETHTOOL_GWOL		0x00000005 /* Get wake-on-lan options. */
+#define ETHTOOL_SWOL		0x00000006 /* Set wake-on-lan options. */
 
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET
@@ -108,5 +119,14 @@ struct ethtool_drvinfo {
  */
 #define AUTONEG_DISABLE		0x00
 #define AUTONEG_ENABLE		0x01
+
+/* Wake-On-Lan options. */
+#define WAKE_PHY		(1 << 0)
+#define WAKE_UCAST		(1 << 1)
+#define WAKE_MCAST		(1 << 2)
+#define WAKE_BCAST		(1 << 3)
+#define WAKE_ARP		(1 << 4)
+#define WAKE_MAGIC		(1 << 5)
+#define WAKE_MAGICSECURE	(1 << 6) /* only meaningful if WAKE_MAGIC */
 
 #endif /* _LINUX_ETHTOOL_H */

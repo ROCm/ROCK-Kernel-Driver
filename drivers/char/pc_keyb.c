@@ -63,6 +63,7 @@ static void kbd_write_output_w(int data);
 #ifdef CONFIG_PSMOUSE
 static void aux_write_ack(int val);
 static void __aux_write_ack(int val);
+static int aux_reconnect = 0;
 #endif
 
 static spinlock_t kbd_controller_lock = SPIN_LOCK_UNLOCKED;
@@ -81,7 +82,8 @@ static volatile unsigned char resend;
 
 static int __init psaux_init(void);
 
-#define AUX_RECONNECT 170 /* scancode when ps2 device is plugged (back) in */
+#define AUX_RECONNECT1 0xaa	/* scancode1 when ps2 device is plugged (back) in */
+#define AUX_RECONNECT2 0x00	/* scancode2 when ps2 device is plugged (back) in */
  
 static struct aux_queue *queue;	/* Mouse data buffer. */
 static int aux_count;
@@ -396,6 +398,7 @@ char pckbd_unexpected_up(unsigned char keycode)
 static inline void handle_mouse_event(unsigned char scancode)
 {
 #ifdef CONFIG_PSMOUSE
+	static unsigned char prev_code;
 	if (mouse_reply_expected) {
 		if (scancode == AUX_ACK) {
 			mouse_reply_expected--;
@@ -403,12 +406,15 @@ static inline void handle_mouse_event(unsigned char scancode)
 		}
 		mouse_reply_expected = 0;
 	}
-	else if(scancode == AUX_RECONNECT){
-		queue->head = queue->tail = 0;  /* Flush input queue */
+	else if(scancode == AUX_RECONNECT2 && prev_code == AUX_RECONNECT1
+		&& aux_reconnect) {
+		printk (KERN_INFO "PS/2 mouse reconnect detected\n");
+		queue->head = queue->tail = 0;	/* Flush input queue */
 		__aux_write_ack(AUX_ENABLE_DEV);  /* ping the mouse :) */
 		return;
 	}
 
+	prev_code = scancode;
 	add_mouse_randomness(scancode);
 	if (aux_count) {
 		int head = queue->head;
@@ -834,6 +840,14 @@ void __init pckbd_init_hw(void)
 }
 
 #if defined CONFIG_PSMOUSE
+
+static int __init aux_reconnect_setup (char *str)
+{
+	aux_reconnect = 1;
+	return 1;
+}
+
+__setup("psaux-reconnect", aux_reconnect_setup);
 
 /*
  * Check if this is a dual port controller.

@@ -979,9 +979,13 @@ static void generic_file_readahead(int reada_ok,
 
 static inline void check_used_once (struct page *page)
 {
-	if (!page->age) {
-		page->age = PAGE_AGE_START;
-		ClearPageReferenced(page);
+	if (!PageActive(page)) {
+		if (page->age)
+			activate_page(page);
+		else {
+			page->age = PAGE_AGE_START;
+			ClearPageReferenced(page);
+		}
 	}
 }
 

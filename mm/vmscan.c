@@ -806,79 +806,70 @@ int inactive_shortage(void)
 }
 
 /*
- * Refill_inactive is the function used to scan and age the pages on
- * the active list and in the working set of processes, moving the
- * little-used pages to the inactive list.
- *
- * When called by kswapd, we try to deactivate as many pages as needed
- * to recover from the inactive page shortage. This makes it possible
- * for kswapd to keep up with memory demand so user processes can get
- * low latency on memory allocations.
- *
- * However, when the system starts to get overloaded we can get called
- * by user processes. For user processes we want to both reduce the
- * latency and make sure that multiple user processes together don't
- * deactivate too many pages. To achieve this we simply do less work
- * when called from a user process.
+ * Loop until we are no longer under an inactive or free
+ * shortage. Return 1 on success, 0 if we failed to get
+ * there even after "maxtry" loops.
  */
-
-static int refill_inactive(unsigned int gfp_mask)
+#define INACTIVE_SHORTAGE 1
+#define FREE_SHORTAGE 2
+#define GENERAL_SHORTAGE 4
+static int do_try_to_free_pages(unsigned int gfp_mask, int user)
 {
-	int progress = 0, maxtry;
+	/* Always walk at least the active queue when called */
+	int shortage = INACTIVE_SHORTAGE;
+	int maxtry;
 
 	maxtry = 1 << DEF_PRIORITY;
-
 	do {
+		/*
+		 * If needed, we move pages from the active list
+		 * to the inactive list.
+		 */
+		if (shortage & INACTIVE_SHORTAGE) {
+			/* Walk the VM space for a bit.. */
+			swap_out(DEF_PRIORITY, gfp_mask);
+
+			/* ..and refill the inactive list */
+			refill_inactive_scan(DEF_PRIORITY);
+		}
+
+		/*
+		 * If we're low on free pages, move pages from the
+		 * inactive_dirty list to the inactive_clean list.
+		 *
+		 * Usually bdflush will have pre-cleaned the pages
+		 * before we get around to moving them to the other
+		 * list, so this is a relatively cheap operation.
+		 */
+		if (shortage & FREE_SHORTAGE)
+			page_launder(gfp_mask, user);
+
+		/* 	
+		 * Reclaim unused slab cache if we were short on memory.
+		 */
+		if (shortage & GENERAL_SHORTAGE) {
+			shrink_dcache_memory(DEF_PRIORITY, gfp_mask);
+			shrink_icache_memory(DEF_PRIORITY, gfp_mask);
+
+			kmem_cache_reap(gfp_mask);
+		}
+
 		if (current->need_resched) {
 			 __set_current_state(TASK_RUNNING);
 			schedule();
-			if (!inactive_shortage())
-				return 1;
 		}
 
-		/* Walk the VM space for a bit.. */
-		swap_out(DEF_PRIORITY, gfp_mask);
-
-		/* ..and refill the inactive list */
-		progress += refill_inactive_scan(DEF_PRIORITY);
+		shortage = 0;
+		if (inactive_shortage())
+			shortage |= INACTIVE_SHORTAGE | GENERAL_SHORTAGE;
+		if (free_shortage())
+			shortage |= FREE_SHORTAGE | GENERAL_SHORTAGE;
 
 		if (--maxtry <= 0)
 			break;
-	} while (inactive_shortage());
+	} while (shortage);
 
-	return progress;
-}
-
-static int do_try_to_free_pages(unsigned int gfp_mask, int user)
-{
-	int ret = 0;
-
-	/*
-	 * If needed, we move pages from the active list
-	 * to the inactive list.
-	 */
-	if (inactive_shortage()) 
-		ret += refill_inactive(gfp_mask);
-
-	/*
-	 * If we're low on free pages, move pages from the
-	 * inactive_dirty list to the inactive_clean list.
-	 *
-	 * Usually bdflush will have pre-cleaned the pages
-	 * before we get around to moving them to the other
-	 * list, so this is a relatively cheap operation.
-	 */
-	ret += page_launder(gfp_mask, user);
-
-	ret += shrink_dcache_memory(DEF_PRIORITY, gfp_mask);
-	ret += shrink_icache_memory(DEF_PRIORITY, gfp_mask);
-
-	/* 	
-	 * Reclaim unused slab cache if memory is low.
-	 */
-	kmem_cache_reap(gfp_mask);
-
-	return ret;
+	return !shortage;
 }
 
 DECLARE_WAIT_QUEUE_HEAD(kswapd_wait);
@@ -925,47 +916,22 @@ int kswapd(void *unused)
 	for (;;) {
 		static long recalc = 0;
 
-		/* If needed, try to free some memory. */
-		if (inactive_shortage() || free_shortage()) 
-			do_try_to_free_pages(GFP_KSWAPD, 0);
-
 		/* Once a second ... */
 		if (time_after(jiffies, recalc + HZ)) {
 			recalc = jiffies;
 
 			/* Recalculate VM statistics. */
 			recalculate_vm_stats();
-
-			/* Do background page aging. */
-			refill_inactive_scan(DEF_PRIORITY);
 		}
 
-		/* 
-		 * We go to sleep if either the free page shortage
-		 * or the inactive page shortage is gone. We do this
-		 * because:
-		 * 1) we need no more free pages   or
-		 * 2) the inactive pages need to be flushed to disk,
-		 *    it wouldn't help to eat CPU time now ...
-		 *
-		 * We go to sleep for one second, but if it's needed
-		 * we'll be woken up earlier...
-		 */
-		if (!free_shortage() || !inactive_shortage()) {
-			run_task_queue(&tq_disk);
-			interruptible_sleep_on_timeout(&kswapd_wait, HZ);
-		/*
-		 * If we couldn't free enough memory, we see if it was
-		 * due to the system just not having enough memory.
-		 * If that is the case, the only solution is to kill
-		 * a process (the alternative is enternal deadlock).
-		 *
-		 * If there still is enough memory around, we just loop
-		 * and try free some more memory...
-		 */
-		} else if (out_of_memory()) {
-			oom_kill();
+		if (!do_try_to_free_pages(GFP_KSWAPD, 1)) {
+			if (out_of_memory())
+				oom_kill();
+			continue;
 		}
+
+		run_task_queue(&tq_disk);
+		interruptible_sleep_on_timeout(&kswapd_wait, HZ);
 	}
 }
 
