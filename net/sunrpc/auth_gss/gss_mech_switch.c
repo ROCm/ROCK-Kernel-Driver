@@ -70,6 +70,7 @@ gss_mech_register(struct xdr_netobj * mech_type, struct gss_api_ops * ops)
 	}
 	gm->gm_oid.len = mech_type->len;
 	if (!(gm->gm_oid.data = kmalloc(mech_type->len, GFP_KERNEL))) {
+		kfree(gm);
 		printk("Failed to allocate memory in gss_mech_register");
 		return -1;
 	}
