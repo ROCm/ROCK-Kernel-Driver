@@ -42,18 +42,17 @@ read(struct file * file, char __user * userbuf, size_t count, loff_t * off)
 
 	ret = fill_read(dentry, buffer, offs, count);
 	if (ret < 0) 
-		goto Done;
+		return ret;
 	count = ret;
 
-	ret = -EFAULT;
-	if (copy_to_user(userbuf, buffer, count) != 0)
-		goto Done;
+	if (copy_to_user(userbuf, buffer + offs, count) != 0)
+		return -EINVAL;
+
+	printk("offs = %lld, *off = %lld, count = %zd\n", offs, *off, count);
 
 	*off = offs + count;
-	ret = count;
 
- Done:
-	return ret;
+	return count;
 }
 
 static int
@@ -72,7 +71,6 @@ static ssize_t write(struct file * file, const char __user * userbuf,
 	struct dentry *dentry = file->f_dentry;
 	int size = dentry->d_inode->i_size;
 	loff_t offs = *off;
-	int ret;
 
 	if (count > PAGE_SIZE)
 		count = PAGE_SIZE;
@@ -83,16 +81,13 @@ static ssize_t write(struct file * file, const char __user * userbuf,
 			count = size - offs;
 	}
 
-	ret = -EFAULT;
-	if (copy_from_user(buffer, userbuf, count))
-		goto Done;
+	if (copy_from_user(buffer + offs, userbuf, count))
+		return -EFAULT;
 
 	count = flush_write(dentry, buffer, offs, count);
 	if (count > 0)
 		*off = offs + count;
-	ret = count;
- Done:
-	return ret;
+	return count;
 }
 
 static int open(struct inode * inode, struct file * file)

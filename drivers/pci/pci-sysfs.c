@@ -3,6 +3,8 @@
  *
  * (C) Copyright 2002 Greg Kroah-Hartman
  * (C) Copyright 2002 IBM Corp.
+ * (C) Copyright 2003 Matthew Wilcox
+ * (C) Copyright 2003 Hewlett-Packard
  *
  * File attributes for PCI devices
  *
@@ -60,6 +62,108 @@ pci_show_resources(struct device * dev, char * buf)
 
 static DEVICE_ATTR(resource,S_IRUGO,pci_show_resources,NULL);
 
+static ssize_t
+pci_read_config(struct kobject *kobj, char *buf, loff_t off, size_t count)
+{
+	struct pci_dev *dev = to_pci_dev(container_of(kobj,struct device,kobj));
+	unsigned int size = 64;
+
+	/* Several chips lock up trying to read undefined config space */
+	if (capable(CAP_SYS_ADMIN)) {
+		size = 256;
+	} else if (dev->hdr_type == PCI_HEADER_TYPE_CARDBUS) {
+		size = 128;
+	}
+
+	if (off > size)
+		return 0;
+	if (off + count > size) {
+		size -= off;
+		count = size;
+	} else {
+		size = count;
+	}
+
+	while (off & 3) {
+		unsigned char val;
+		pci_read_config_byte(dev, off, &val);
+		buf[off] = val;
+		off++;
+		if (--size == 0)
+			break;
+	}
+
+	while (size > 3) {
+		unsigned int val;
+		pci_read_config_dword(dev, off, &val);
+		buf[off] = val & 0xff;
+		buf[off + 1] = (val >> 8) & 0xff;
+		buf[off + 2] = (val >> 16) & 0xff;
+		buf[off + 3] = (val >> 24) & 0xff;
+		off += 4;
+		size -= 4;
+	}
+
+	while (size > 0) {
+		unsigned char val;
+		pci_read_config_byte(dev, off, &val);
+		buf[off] = val;
+		off++;
+		--size;
+	}
+
+	return count;
+}
+
+static ssize_t
+pci_write_config(struct kobject *kobj, char *buf, loff_t off, size_t count)
+{
+	struct pci_dev *dev = to_pci_dev(container_of(kobj,struct device,kobj));
+	unsigned int size = count;
+
+	if (off > 256)
+		return 0;
+	if (off + count > 256) {
+		size = 256 - off;
+		count = size;
+	}
+
+	while (off & 3) {
+		pci_write_config_byte(dev, off, buf[off]);
+		off++;
+		if (--size == 0)
+			break;
+	}
+
+	while (size > 3) {
+		unsigned int val = buf[off];
+		val |= (unsigned int) buf[off + 1] << 8;
+		val |= (unsigned int) buf[off + 2] << 16;
+		val |= (unsigned int) buf[off + 3] << 24;
+		pci_write_config_dword(dev, off, val);
+		off += 4;
+		size -= 4;
+	}
+
+	while (size > 0) {
+		pci_write_config_byte(dev, off, buf[off]);
+		off++;
+		--size;
+	}
+
+	return count;
+}
+
+static struct bin_attribute pci_config_attr = {
+	.attr =	{
+		.name = "config",
+		.mode = S_IRUGO | S_IWUSR,
+	},
+	.size = 256,
+	.read = pci_read_config,
+	.write = pci_write_config,
+};
+
 void pci_create_sysfs_dev_files (struct pci_dev *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -72,4 +176,5 @@ void pci_create_sysfs_dev_files (struct pci_dev *pdev)
 	device_create_file (dev, &dev_attr_class);
 	device_create_file (dev, &dev_attr_irq);
 	device_create_file (dev, &dev_attr_resource);
+	sysfs_create_bin_file(&dev->kobj, &pci_config_attr);
 }
