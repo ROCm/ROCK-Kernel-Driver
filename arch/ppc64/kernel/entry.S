@@ -469,6 +469,7 @@ do_work:
 	b	.ret_from_except
 
 unrecov_restore:
+	mfspr   r13,SPRG3
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	.unrecoverable_exception
 	b	unrecov_restore
