@@ -3,7 +3,6 @@
  *	Index to functions.
  */
 
-int el1_probe(struct net_device *dev);
 static int  el1_probe1(struct net_device *dev, int ioaddr);
 static int  el_open(struct net_device *dev);
 static void el_timeout(struct net_device *dev);

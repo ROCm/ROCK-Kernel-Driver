@@ -136,16 +136,13 @@ static const char version[] =
 
 #include "3c501.h"
 
-/* A zero-terminated list of I/O addresses to be probed.
-   The 3c501 can be at many locations, but here are the popular ones. */
-static unsigned int netcard_portlist[] __initdata = { 
-	0x280, 0x300, 0
-};
-
-
 /*
  *	The boilerplate probe code.
  */
+
+static int io=0x280;
+static int irq=5;
+static int mem_start;
 
 /**
  * el1_probe:		-	probe for a 3c501
@@ -160,23 +157,47 @@ static unsigned int netcard_portlist[] __initdata = {
  * probe and failing to find anything.
  */
  
-int __init el1_probe(struct net_device *dev)
+struct net_device * __init el1_probe(int unit)
 {
-	int i;
-	int base_addr = dev->base_addr;
+	struct net_device *dev = alloc_etherdev(sizeof(struct net_local));
+	static unsigned ports[] = { 0x280, 0x300, 0};
+	unsigned *port;
+	int err = 0;
+
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
+
+	if (unit >= 0) {
+		sprintf(dev->name, "eth%d", unit);
+		netdev_boot_setup_check(dev);
+		io = dev->base_addr;
+		irq = dev->irq;
+		mem_start = dev->mem_start & 7;
+	}
 
 	SET_MODULE_OWNER(dev);
 
-	if (base_addr > 0x1ff)	/* Check a single specified location. */
-		return el1_probe1(dev, base_addr);
-	else if (base_addr != 0)	/* Don't probe at all. */
-		return -ENXIO;
-
-	for (i = 0; netcard_portlist[i]; i++)
-		if (el1_probe1(dev, netcard_portlist[i]) == 0)
-			return 0;
-
-	return -ENODEV;
+	if (io > 0x1ff) {	/* Check a single specified location. */
+		err = el1_probe1(dev, io);
+	} else if (io != 0) {
+		err = -ENXIO;		/* Don't probe at all. */
+	} else {
+		for (port = ports; *port && el1_probe1(dev, *port); port++)
+			;
+		if (!*port)
+			err = -ENODEV;
+	}
+	if (err)
+		goto out;
+	err = register_netdev(dev);
+	if (err)
+		goto out1;
+	return dev;
+out1:
+	release_region(dev->base_addr, EL1_IO_EXTENT);
+out:
+	free_netdev(dev);
+	return ERR_PTR(err);
 }
 
 /**
@@ -240,6 +261,8 @@ static int __init el1_probe1(struct net_device *dev, int ioaddr)
 	 *	high.
 	 */
 
+	dev->irq = irq;
+
 	if (dev->irq < 2)
 	{
 		unsigned long irq_mask;
@@ -267,8 +290,8 @@ static int __init el1_probe1(struct net_device *dev, int ioaddr)
 	dev->base_addr = ioaddr;
 	memcpy(dev->dev_addr, station_addr, ETH_ALEN);
 
-	if (dev->mem_start & 0xf)
-		el_debug = dev->mem_start & 0x7;
+	if (mem_start & 0xf)
+		el_debug = mem_start & 0x7;
 	if (autoirq)
 		dev->irq = autoirq;
 
@@ -282,17 +305,7 @@ static int __init el1_probe1(struct net_device *dev, int ioaddr)
 	if (el_debug)
 		printk(KERN_DEBUG "%s", version);
 
-	/*
-	 *	Initialize the device structure.
-	 */
-
-	dev->priv = kmalloc(sizeof(struct net_local), GFP_KERNEL);
-	if (dev->priv == NULL) {
-		release_region(ioaddr, EL1_IO_EXTENT);
-		return -ENOMEM;
-	}
 	memset(dev->priv, 0, sizeof(struct net_local));
-
 	lp=dev->priv;
 	spin_lock_init(&lp->lock);
 	
@@ -308,13 +321,6 @@ static int __init el1_probe1(struct net_device *dev, int ioaddr)
 	dev->get_stats = &el1_get_stats;
 	dev->set_multicast_list = &set_multicast_list;
 	dev->ethtool_ops = &netdev_ethtool_ops;
-
-	/*
-	 *	Setup the generic properties
-	 */
-
-	ether_setup(dev);
-
 	return 0;
 }
 
@@ -884,14 +890,8 @@ static struct ethtool_ops netdev_ethtool_ops = {
 
 #ifdef MODULE
 
-static struct net_device dev_3c501 = {
-	.init		= el1_probe,
-	.base_addr	= 0x280,
-	.irq		= 5,
-};
+static struct net_device *dev_3c501;
 
-static int io=0x280;
-static int irq=5;
 MODULE_PARM(io, "i");
 MODULE_PARM(irq, "i");
 MODULE_PARM_DESC(io, "EtherLink I/O base address");
@@ -911,10 +911,9 @@ MODULE_PARM_DESC(irq, "EtherLink IRQ number");
  
 int init_module(void)
 {
-	dev_3c501.irq=irq;
-	dev_3c501.base_addr=io;
-	if (register_netdev(&dev_3c501) != 0)
-		return -EIO;
+	dev_3c501 = el1_probe(-1);
+	if (IS_ERR(dev_3c501))
+		return PTR_ERR(dev_3c501);
 	return 0;
 }
 
@@ -927,19 +926,10 @@ int init_module(void)
  
 void cleanup_module(void)
 {
-	unregister_netdev(&dev_3c501);
-
-	/*
-	 *	Free up the private structure, or leak memory :-)
-	 */
-
-	kfree(dev_3c501.priv);
-	dev_3c501.priv = NULL;	/* gets re-allocated by el1_probe1 */
-
-	/*
-	 *	If we don't do this, we can't re-insmod it later.
-	 */
-	release_region(dev_3c501.base_addr, EL1_IO_EXTENT);
+	struct net_device *dev = dev_3c501;
+	unregister_netdev(dev);
+	release_region(dev->base_addr, EL1_IO_EXTENT);
+	free_netdev(dev);
 }
 
 #endif /* MODULE */
