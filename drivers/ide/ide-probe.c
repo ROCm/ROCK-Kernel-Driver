@@ -1,4 +1,5 @@
-/*
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
  *  Copyright (C) 1994-1998  Linus Torvalds & authors (see below)
  *
  *  Mostly written by Mark Lord <mlord@pobox.com>
@@ -47,7 +48,7 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
-static inline void do_identify (ide_drive_t *drive, byte cmd)
+static inline void do_identify(struct ata_device *drive, u8 cmd)
 {
 	int bswap = 1;
 	struct hd_driveid *id;
@@ -121,7 +122,7 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 	drive->present = 1;
 
 	/*
-	 * Check for an ATAPI device
+	 * Check for an ATAPI device:
 	 */
 	if (cmd == WIN_PIDENTIFY) {
 		byte type = (id->config >> 8) & 0x1f;
@@ -172,7 +173,7 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 	}
 
 	/*
-	 * Not an ATAPI device: looks like a "regular" hard disk
+	 * Not an ATAPI device: looks like a "regular" hard disk:
 	 */
 	if (id->config & (1<<7))
 		drive->removable = 1;
@@ -185,7 +186,7 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 	 */
 
 	if (drive_is_flashcard(drive)) {
-		ide_drive_t *mate = &drive->channel->drives[1 ^ drive->select.b.unit];
+		struct ata_device *mate = &drive->channel->drives[1 ^ drive->select.b.unit];
 		if (!mate->ata_flash) {
 			mate->present = 0;
 			mate->noprobe = 1;
@@ -204,26 +205,37 @@ err_misc:
 	kfree(id);
 err_kmalloc:
 	drive->present = 0;
+
 	return;
 }
 
 /*
- * try_to_identify() sends an ATA(PI) IDENTIFY request to a drive
- * and waits for a response.  It also monitors irqs while this is
- * happening, in hope of automatically determining which one is
- * being used by the interface.
+ * Sends an ATA(PI) IDENTIFY request to a drive and wait for a response.  It
+ * also monitor irqs while this is happening, in hope of automatically
+ * determining which one is being used by the interface.
  *
  * Returns:	0  device was identified
  *		1  device timed-out (no response to identify request)
  *		2  device aborted the command (refused to identify itself)
  */
-static int actual_try_to_identify (ide_drive_t *drive, byte cmd)
+static int identify(struct ata_device *drive, u8 cmd)
 {
 	int rc;
+	int autoprobe = 0;
+	unsigned long cookie = 0;
 	ide_ioreg_t hd_status;
 	unsigned long timeout;
-	byte s, a;
+	u8 s;
+	u8 a;
 
+
+	if (IDE_CONTROL_REG && !drive->channel->irq) {
+		autoprobe = 1;
+		cookie = probe_irq_on();
+		OUT_BYTE(drive->ctl,IDE_CONTROL_REG);	/* enable device irq */
+	}
+
+	rc = 1;
 	if (IDE_CONTROL_REG) {
 		/* take a deep breath */
 		ide_delay_50ms();
@@ -247,19 +259,18 @@ static int actual_try_to_identify (ide_drive_t *drive, byte cmd)
 #if CONFIG_BLK_DEV_PDC4030
 	if (drive->channel->chipset == ide_pdc4030) {
 		/* DC4030 hosted drives need their own identify... */
-		extern int pdc4030_identify(ide_drive_t *);
-		if (pdc4030_identify(drive)) {
-			return 1;
-		}
+		extern int pdc4030_identify(struct ata_device *);
+
+		if (pdc4030_identify(drive))
+			goto out;
 	} else
-#endif /* CONFIG_BLK_DEV_PDC4030 */
+#endif
 		OUT_BYTE(cmd,IDE_COMMAND_REG);		/* ask drive for ID */
 	timeout = ((cmd == WIN_IDENTIFY) ? WAIT_WORSTCASE : WAIT_PIDENTIFY) / 2;
 	timeout += jiffies;
 	do {
-		if (0 < (signed long)(jiffies - timeout)) {
-			return 1;	/* drive timed-out */
-		}
+		if (time_after(jiffies, timeout))
+			goto out;	/* drive timed-out */
 		ide_delay_50ms();		/* give drive a breather */
 	} while (IN_BYTE(hd_status) & BUSY_STAT);
 
@@ -274,23 +285,8 @@ static int actual_try_to_identify (ide_drive_t *drive, byte cmd)
 		__restore_flags(flags);	/* local CPU only */
 	} else
 		rc = 2;			/* drive refused ID */
-	return rc;
-}
 
-static int try_to_identify (ide_drive_t *drive, byte cmd)
-{
-	int retval;
-	int autoprobe = 0;
-	unsigned long cookie = 0;
-
-	if (IDE_CONTROL_REG && !drive->channel->irq) {
-		autoprobe = 1;
-		cookie = probe_irq_on();
-		OUT_BYTE(drive->ctl,IDE_CONTROL_REG);	/* enable device irq */
-	}
-
-	retval = actual_try_to_identify(drive, cmd);
-
+out:
 	if (autoprobe) {
 		int irq;
 		OUT_BYTE(drive->ctl | 0x02, IDE_CONTROL_REG);	/* mask device irq */
@@ -304,7 +300,8 @@ static int try_to_identify (ide_drive_t *drive, byte cmd)
 				printk("%s: IRQ probe failed (0x%lx)\n", drive->name, cookie);
 		}
 	}
-	return retval;
+
+	return rc;
 }
 
 
@@ -324,10 +321,11 @@ static int try_to_identify (ide_drive_t *drive, byte cmd)
  *		3  bad status from device (possible for ATAPI drives)
  *		4  probe was not attempted because failure was obvious
  */
-static int do_probe (ide_drive_t *drive, byte cmd)
+static int do_probe(struct ata_device *drive, byte cmd)
 {
 	int rc;
 	struct ata_channel *hwif = drive->channel;
+
 	if (drive->present) {	/* avoid waiting for inappropriate probes */
 		if ((drive->type != ATA_DISK) && (cmd == WIN_IDENTIFY))
 			return 4;
@@ -348,11 +346,10 @@ static int do_probe (ide_drive_t *drive, byte cmd)
 		return 3;    /* no i/f present: mmm.. this should be a 4 -ml */
 	}
 
-	if (OK_STAT(GET_STAT(),READY_STAT,BUSY_STAT)
-	 || drive->present || cmd == WIN_PIDENTIFY)
+	if (OK_STAT(GET_STAT(),READY_STAT,BUSY_STAT) || drive->present || cmd == WIN_PIDENTIFY)
 	{
-		if ((rc = try_to_identify(drive,cmd)))   /* send cmd and wait */
-			rc = try_to_identify(drive,cmd); /* failed: try again */
+		if ((rc = identify(drive,cmd)))   /* send cmd and wait */
+			rc = identify(drive,cmd); /* failed: try again */
 		if (rc == 1 && cmd == WIN_PIDENTIFY && drive->autotune != 2) {
 			unsigned long timeout;
 			printk("%s: no response (status = 0x%02x), resetting drive\n", drive->name, GET_STAT());
@@ -363,14 +360,14 @@ static int do_probe (ide_drive_t *drive, byte cmd)
 			timeout = jiffies;
 			while ((GET_STAT() & BUSY_STAT) && time_before(jiffies, timeout + WAIT_WORSTCASE))
 				ide_delay_50ms();
-			rc = try_to_identify(drive, cmd);
+			rc = identify(drive, cmd);
 		}
 		if (rc == 1)
 			printk("%s: no response (status = 0x%02x)\n", drive->name, GET_STAT());
 		(void) GET_STAT();		/* ensure drive irq is clear */
-	} else {
+	} else
 		rc = 3;				/* not present or maybe ATAPI */
-	}
+
 	if (drive->select.b.unit != 0) {
 		SELECT_DRIVE(hwif,&hwif->drives[0]);	/* exit with drive0 selected */
 		ide_delay_50ms();
@@ -379,10 +376,7 @@ static int do_probe (ide_drive_t *drive, byte cmd)
 	return rc;
 }
 
-/*
- *
- */
-static void enable_nest(ide_drive_t *drive)
+static void enable_nest(struct ata_device *drive)
 {
 	unsigned long timeout;
 
@@ -392,7 +386,7 @@ static void enable_nest(ide_drive_t *drive)
 	OUT_BYTE(EXABYTE_ENABLE_NEST, IDE_COMMAND_REG);
 	timeout = jiffies + WAIT_WORSTCASE;
 	do {
-		if (jiffies > timeout) {
+		if (time_after(jiffies, timeout)) {
 			printk("failed (timeout)\n");
 			return;
 		}
@@ -411,17 +405,21 @@ static void enable_nest(ide_drive_t *drive)
 /*
  * Tests for existence of a given drive using do_probe().
  */
-static inline void probe_for_drive (ide_drive_t *drive)
+static inline void probe_for_drive(struct ata_device *drive)
 {
 	if (drive->noprobe)			/* skip probing? */
 		return;
+
 	if (do_probe(drive, WIN_IDENTIFY) >= 2) { /* if !(success||timed-out) */
 		do_probe(drive, WIN_PIDENTIFY); /* look for ATAPI device */
 	}
+
 	if (drive->id && strstr(drive->id->model, "E X A B Y T E N E S T"))
 		enable_nest(drive);
+
 	if (!drive->present)
 		return;			/* drive not found */
+
 	if (drive->id == NULL) {		/* identification failed? */
 		if (drive->type == ATA_DISK) {
 			printk ("%s: non-IDE drive, CHS=%d/%d/%d\n",
@@ -545,7 +543,7 @@ static void channel_probe(struct ata_channel *ch)
 		do {
 			ide_delay_50ms();
 			stat = IN_BYTE(ch->io_ports[IDE_STATUS_OFFSET]);
-		} while ((stat & BUSY_STAT) && 0 < (signed long)(timeout - jiffies));
+		} while ((stat & BUSY_STAT) && time_before(jiffies, timeout));
 	}
 
 	__restore_flags(flags);	/* local CPU only */
@@ -568,34 +566,7 @@ not_found:
 	__restore_flags(flags);
 }
 
-/*
- * init request queue
- */
-static void init_device_queue(struct ata_device *drive)
-{
-	request_queue_t *q = &drive->queue;
-	int max_sectors = 255;
-
-	q->queuedata = drive->channel;
-	blk_init_queue(q, do_ide_request, &ide_lock);
-	blk_queue_segment_boundary(q, 0xffff);
-
-	/* IDE can do up to 128K per request, pdc4030 needs smaller limit */
-#ifdef CONFIG_BLK_DEV_PDC4030
-	if (drive->channel->chipset == ide_pdc4030)
-		max_sectors = 127;
-#endif
-	blk_queue_max_sectors(q, max_sectors);
-
-	/* IDE DMA can do PRD_ENTRIES number of segments. */
-	blk_queue_max_hw_segments(q, PRD_SEGMENTS);
-
-	/* This is a driver limit and could be eliminated. */
-	blk_queue_max_phys_segments(q, PRD_SEGMENTS);
-}
-
 #if MAX_HWIFS > 1
-
 /*
  * This is used to simplify logic in init_irq() below.
  *
@@ -607,18 +578,19 @@ static void init_device_queue(struct ata_device *drive)
  *
  * This routine detects and reports such situations, but does not fix them.
  */
-static void save_match(struct ata_channel *hwif, struct ata_channel *new,
-		struct ata_channel **match)
+static struct ata_channel *save_match(struct ata_channel *ch, struct ata_channel *h,
+		struct ata_channel *match)
 {
-	struct ata_channel *m = *match;
+	if (match && match->hwgroup && match->hwgroup != h->hwgroup) {
+		if (!h->hwgroup)
+			return match;
 
-	if (m && m->hwgroup && m->hwgroup != new->hwgroup) {
-		if (!new->hwgroup)
-			return;
-		printk("%s: potential irq problem with %s and %s\n", hwif->name, new->name, m->name);
+		printk("%s: potential irq problem with %s and %s\n", ch->name,h->name, match->name);
 	}
-	if (!m || m->irq != hwif->irq) /* don't undo a prior perfect match */
-		*match = new;
+	if (!match || match->irq != ch->irq) /* don't undo a prior perfect match */
+		match = h;
+
+	return match;
 }
 #endif
 
@@ -643,10 +615,8 @@ static int init_irq(struct ata_channel *ch)
 	ide_hwgroup_t *new_hwgroup;
 	struct ata_channel *match = NULL;
 
-
-	/* Allocate the buffer and potentially sleep first */
-
-	new_hwgroup = kmalloc(sizeof(ide_hwgroup_t),GFP_KERNEL);
+	/* Spare allocation before sleep. */
+	new_hwgroup = kmalloc(sizeof(*hwgroup), GFP_KERNEL);
 
 	spin_lock_irqsave(&ide_lock, flags);
 	ch->hwgroup = NULL;
@@ -658,19 +628,22 @@ static int init_irq(struct ata_channel *ch)
 	for (i = 0; i < MAX_HWIFS; ++i) {
 		struct ata_channel *h = &ide_hwifs[i];
 
-		if (h->hwgroup) {  /* scan only initialized channels */
-			if (ch->irq == h->irq) {
-				ch->sharing_irq = h->sharing_irq = 1;
-				if (ch->chipset != ide_pci || h->chipset != ide_pci)
-					save_match(ch, h, &match);
+		/* scan only initialized channels */
+		if (!h->hwgroup)
+			continue;
 
-				/* FIXME: This is still confusing. What would
-				 * happen if we match-ed two times?
-				 */
+		if (ch->irq != h->irq)
+		        continue;
 
-				if (ch->serialized || h->serialized)
-					save_match(ch, h, &match);
-			}
+		ch->sharing_irq = h->sharing_irq = 1;
+
+		if (ch->chipset != ide_pci || h->chipset != ide_pci ||
+		     ch->serialized || h->serialized) {
+			if (match && match->hwgroup && match->hwgroup != h->hwgroup)
+				printk("%s: potential irq problem with %s and %s\n", ch->name, h->name, match->name);
+			/* don't undo a prior perfect match */
+			if (!match || match->irq != ch->irq)
+				match = h;
 		}
 	}
 #endif
@@ -721,6 +694,8 @@ static int init_irq(struct ata_channel *ch)
 	ch->hwgroup = hwgroup;
 	for (i = 0; i < MAX_DRIVES; ++i) {
 		struct ata_device *drive = &ch->drives[i];
+		request_queue_t *q;
+		int max_sectors = 255;
 
 		if (!drive->present)
 			continue;
@@ -728,7 +703,27 @@ static int init_irq(struct ata_channel *ch)
 		if (!hwgroup->XXX_drive)
 			hwgroup->XXX_drive = drive;
 
-		init_device_queue(drive);
+		/*
+		 * Init the per device request queue
+		 */
+
+		q = &drive->queue;
+		q->queuedata = drive->channel;
+		blk_init_queue(q, do_ide_request, &ide_lock);
+		blk_queue_segment_boundary(q, 0xffff);
+
+		/* ATA can do up to 128K per request, pdc4030 needs smaller limit */
+#ifdef CONFIG_BLK_DEV_PDC4030
+		if (drive->channel->chipset == ide_pdc4030)
+			max_sectors = 127;
+#endif
+		blk_queue_max_sectors(q, max_sectors);
+
+		/* IDE DMA can do PRD_ENTRIES number of segments. */
+		blk_queue_max_hw_segments(q, PRD_ENTRIES);
+
+		/* FIXME: This is a driver limit and could be eliminated. */
+		blk_queue_max_phys_segments(q, PRD_ENTRIES);
 	}
 	spin_unlock_irqrestore(&ide_lock, flags);
 
@@ -755,80 +750,10 @@ static int init_irq(struct ata_channel *ch)
 }
 
 /*
- * init_gendisk() (as opposed to ide_geninit) is called for each major device,
- * after probing for drives, to allocate partition tables and other data
- * structures needed for the routines in genhd.c.  ide_geninit() gets called
- * somewhat later, during the partition check.
- */
-static void init_gendisk(struct ata_channel *hwif)
-{
-	struct gendisk *gd;
-	unsigned int unit, minors, i;
-	extern devfs_handle_t ide_devfs_handle;
-
-	minors = MAX_DRIVES * (1 << PARTN_BITS);
-
-	gd = kmalloc (sizeof(struct gendisk), GFP_KERNEL);
-	if (!gd)
-		goto err_kmalloc_gd;
-
-	gd->sizes = kmalloc (minors * sizeof(int), GFP_KERNEL);
-	if (!gd->sizes)
-		goto err_kmalloc_gd_sizes;
-
-	gd->part = kmalloc (minors * sizeof(struct hd_struct), GFP_KERNEL);
-	if (!gd->part)
-		goto err_kmalloc_gd_part;
-	memset(gd->part, 0, minors * sizeof(struct hd_struct));
-
-	for (unit = 0; unit < MAX_DRIVES; ++unit)
-		hwif->drives[unit].part = &gd->part[unit << PARTN_BITS];
-
-	gd->major	= hwif->major;		/* our major device number */
-	gd->major_name	= IDE_MAJOR_NAME;	/* treated special in genhd.c */
-	gd->minor_shift	= PARTN_BITS;		/* num bits for partitions */
-	gd->nr_real	= MAX_DRIVES;		/* current num real drives */
-	gd->next	= NULL;			/* linked list of major devs */
-	gd->fops        = ide_fops;             /* file operations */
-	gd->de_arr	= kmalloc(sizeof(*gd->de_arr) * MAX_DRIVES, GFP_KERNEL);
-	gd->flags	= kmalloc(sizeof(*gd->flags) * MAX_DRIVES, GFP_KERNEL);
-	if (gd->de_arr)
-		memset(gd->de_arr, 0, sizeof(*gd->de_arr) * MAX_DRIVES);
-	if (gd->flags)
-		memset(gd->flags, 0, sizeof(*gd->flags) * MAX_DRIVES);
-
-	hwif->gd = gd;
-	add_gendisk(gd);
-
-	for (unit = 0; unit < MAX_DRIVES; ++unit) {
-		char name[80];
-
-		ide_add_generic_settings(hwif->drives + unit);
-		hwif->drives[unit].dn = ((hwif->unit ? 2 : 0) + unit);
-		sprintf (name, "host%d/bus%d/target%d/lun%d",
-			hwif->index, hwif->unit, unit, hwif->drives[unit].lun);
-		if (hwif->drives[unit].present)
-			hwif->drives[unit].de = devfs_mk_dir(ide_devfs_handle, name, NULL);
-	}
-	return;
-
-err_kmalloc_bs:
-	kfree(gd->part);
-err_kmalloc_gd_part:
-	kfree(gd->sizes);
-err_kmalloc_gd_sizes:
-	kfree(gd);
-err_kmalloc_gd:
-	printk(KERN_CRIT "(ide::init_gendisk) Out of memory\n");
-	return;
-}
-
-/*
  * Returns the queue which corresponds to a given device.
  *
  * FIXME: this should take struct block_device * as argument in future.
  */
-
 static request_queue_t *ata_get_queue(kdev_t dev)
 {
 	struct ata_channel *ch = (struct ata_channel *)blk_dev[major(dev)].data;
@@ -837,8 +762,15 @@ static request_queue_t *ata_get_queue(kdev_t dev)
 	return &ch->drives[DEVICE_NR(dev) & 1].queue;
 }
 
+/* Number of minor numbers we consume par channel. */
+#define ATA_MINORS	(MAX_DRIVES * (1 << PARTN_BITS))
+
 static void channel_init(struct ata_channel *ch)
 {
+	struct gendisk *gd;
+	unsigned int unit;
+	extern devfs_handle_t ide_devfs_handle;
+
 	if (!ch->present)
 		return;
 
@@ -888,33 +820,96 @@ static void channel_init(struct ata_channel *ch)
 		printk(KERN_INFO "%s: probed IRQ %d failed, using default.\n", ch->name, ch->irq);
 	}
 
-	init_gendisk(ch);
+	/* Initialize partition and global device data.  ide_geninit() gets
+	 * called somewhat later, during the partition check.
+	 */
+
+	gd = kmalloc (sizeof(struct gendisk), GFP_KERNEL);
+	if (!gd)
+		goto err_kmalloc_gd;
+
+	gd->sizes = kmalloc(ATA_MINORS * sizeof(int), GFP_KERNEL);
+	if (!gd->sizes)
+		goto err_kmalloc_gd_sizes;
+
+	gd->part = kmalloc(ATA_MINORS * sizeof(struct hd_struct), GFP_KERNEL);
+	if (!gd->part)
+		goto err_kmalloc_gd_part;
+	memset(gd->part, 0, ATA_MINORS * sizeof(struct hd_struct));
+
+	for (unit = 0; unit < MAX_DRIVES; ++unit)
+		ch->drives[unit].part = &gd->part[unit << PARTN_BITS];
+
+	gd->major	= ch->major;		/* our major device number */
+	gd->major_name	= IDE_MAJOR_NAME;	/* treated special in genhd.c */
+	gd->minor_shift	= PARTN_BITS;		/* num bits for partitions */
+	gd->nr_real	= MAX_DRIVES;		/* current num real drives */
+	gd->next	= NULL;			/* linked list of major devs */
+	gd->fops        = ide_fops;             /* file operations */
+
+	gd->de_arr	= kmalloc(sizeof(*gd->de_arr) * MAX_DRIVES, GFP_KERNEL);
+	if (gd->de_arr)
+		memset(gd->de_arr, 0, sizeof(*gd->de_arr) * MAX_DRIVES);
+	else
+	    goto err_kmalloc_gd_de_arr;
+
+	gd->flags	= kmalloc(sizeof(*gd->flags) * MAX_DRIVES, GFP_KERNEL);
+	if (gd->flags)
+		memset(gd->flags, 0, sizeof(*gd->flags) * MAX_DRIVES);
+	else
+	    goto err_kmalloc_gd_flags;
+
+	ch->gd = gd;
+	add_gendisk(gd);
+
+	for (unit = 0; unit < MAX_DRIVES; ++unit) {
+		char name[80];
+
+		ide_add_generic_settings(ch->drives + unit);
+		ch->drives[unit].dn = ((ch->unit ? 2 : 0) + unit);
+		sprintf(name, "host%d/bus%d/target%d/lun%d",
+			ch->index, ch->unit, unit, ch->drives[unit].lun);
+		if (ch->drives[unit].present)
+			ch->drives[unit].de = devfs_mk_dir(ide_devfs_handle, name, NULL);
+	}
+
 	blk_dev[ch->major].data = ch;
 	blk_dev[ch->major].queue = ata_get_queue;
 
-	/* all went well, flag this channel entry as valid */
+	/* All went well, flag this channel entry as valid again. */
 	ch->present = 1;
 
 	return;
+
+err_kmalloc_gd_flags:
+	kfree(gd->de_arr);
+err_kmalloc_gd_de_arr:
+	kfree(gd->part);
+err_kmalloc_gd_part:
+	kfree(gd->sizes);
+err_kmalloc_gd_sizes:
+	kfree(gd);
+err_kmalloc_gd:
+	printk(KERN_CRIT "(%s) Out of memory\n", __FUNCTION__);
 }
 
 int ideprobe_init (void)
 {
-	unsigned int index;
+	unsigned int i;
 	int probe[MAX_HWIFS];
 
-	memset(probe, 0, MAX_HWIFS * sizeof(int));
-	for (index = 0; index < MAX_HWIFS; ++index)
-		probe[index] = !ide_hwifs[index].present;
+	for (i = 0; i < MAX_HWIFS; ++i)
+		probe[i] = !ide_hwifs[i].present;
 
 	/*
 	 * Probe for drives in the usual way.. CMOS/BIOS, then poke at ports
 	 */
-	for (index = 0; index < MAX_HWIFS; ++index)
-		if (probe[index])
-			channel_probe(&ide_hwifs[index]);
-	for (index = 0; index < MAX_HWIFS; ++index)
-		if (probe[index])
-			channel_init(&ide_hwifs[index]);
+	for (i = 0; i < MAX_HWIFS; ++i)
+		if (probe[i])
+			channel_probe(&ide_hwifs[i]);
+	for (i = 0; i < MAX_HWIFS; ++i)
+		if (probe[i])
+			channel_init(&ide_hwifs[i]);
+
 	return 0;
 }

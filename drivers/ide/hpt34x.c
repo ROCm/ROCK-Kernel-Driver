@@ -249,14 +249,14 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 						     ide_dma_off_quietly);
 }
 
-static int config_drive_xfer_rate (ide_drive_t *drive)
+static int config_drive_xfer_rate(struct ata_device *drive, struct request *rq)
 {
 	struct hd_driveid *id = drive->id;
 	ide_dma_action_t dma_func = ide_dma_on;
 
 	if (id && (id->capability & 1) && drive->channel->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
+		if (ide_dmaproc(ide_dma_bad_drive, drive, rq)) {
 			dma_func = ide_dma_off;
 			goto fast_ata_pio;
 		}
@@ -278,7 +278,7 @@ try_dma_modes:
 				if (dma_func != ide_dma_on)
 					goto no_dma_set;
 			}
-		} else if (ide_dmaproc(ide_dma_good_drive, drive)) {
+		} else if (ide_dmaproc(ide_dma_good_drive, drive, rq)) {
 			if (id->eide_dma_time > 150) {
 				goto no_dma_set;
 			}
@@ -301,7 +301,7 @@ no_dma_set:
 		dma_func = ide_dma_off;
 #endif /* CONFIG_HPT34X_AUTODMA */
 
-	return drive->channel->dmaproc(dma_func, drive);
+	return drive->channel->udma(dma_func, drive, rq);
 }
 
 /*
@@ -312,7 +312,7 @@ no_dma_set:
  * by HighPoint|Triones Technologies, Inc.
  */
 
-int hpt34x_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
+int hpt34x_dmaproc (ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *hwif = drive->channel;
 	unsigned long dma_base = hwif->dma_base;
@@ -321,7 +321,7 @@ int hpt34x_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 
 	switch (func) {
 		case ide_dma_check:
-			return config_drive_xfer_rate(drive);
+			return config_drive_xfer_rate(drive, rq);
 		case ide_dma_read:
 			reading = 1 << 3;
 		case ide_dma_write:
@@ -347,7 +347,7 @@ int hpt34x_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 		default:
 			break;
 	}
-	return ide_dmaproc(func, drive);	/* use standard DMA stuff */
+	return ide_dmaproc(func, drive, rq);	/* use standard DMA stuff */
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
@@ -423,7 +423,7 @@ void __init ide_init_hpt34x(struct ata_channel *hwif)
 		else
 			hwif->autodma = 0;
 
-		hwif->dmaproc = &hpt34x_dmaproc;
+		hwif->udma = &hpt34x_dmaproc;
 		hwif->highmem = 1;
 	} else {
 		hwif->drives[0].autotune = 1;

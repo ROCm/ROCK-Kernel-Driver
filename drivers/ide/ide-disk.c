@@ -1,11 +1,12 @@
-/*
- *  Copyright (C) 1994-1998  Linus Torvalds and authors:
+/***** vi:set ts=8 sts=8 sw=8:************************************************
  *
- *	Mark Lord <mlord@pobox.com>
- *	Gadi Oxman <gadio@netvision.net.il>
- *	Andre Hedrick <andre@linux-ide.org>
- *	Jens Axboe <axboe@suse.de>
- *	Marcin Dalecki <dalecki@evision.ag>
+ *  Copyright (C) 1994-1998,2002  Linus Torvalds and authors:
+ *
+ *	Mark Lord	<mlord@pobox.com>
+ *	Gadi Oxman	<gadio@netvision.net.il>
+ *	Andre Hedrick	<andre@linux-ide.org>
+ *	Jens Axboe	<axboe@suse.de>
+ *	Marcin Dalecki	<martin@dalecki.de>
  *
  * This is the ATA disk device driver, as evolved from hd.c and ide.c.
  */
