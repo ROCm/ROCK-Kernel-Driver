@@ -1326,7 +1326,7 @@ static int __init sunsu_kbd_ms_init(void)
 			up->serio.type |= SERIO_SUNKBD;
 			up->serio.name = "sukbd";
 		} else {
-			up->serio.type |= SERIO_SUN;
+			up->serio.type |= (SERIO_SUN | (1 << 16));
 			up->serio.name = "sums";
 		}
 		up->serio.phys = (i == 0 ? "su/serio0" : "su/serio1");

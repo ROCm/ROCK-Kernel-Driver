@@ -215,6 +215,23 @@ static void __cg14_reset(struct cg14_par *par)
 	sbus_writeb(val, &regs->mcr);
 }
 
+static int cg14_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
+{
+	struct cg14_par *par = (struct cg14_par *) info->par;
+	unsigned long flags;
+
+	/* We just use this to catch switches out of
+	 * graphics mode.
+	 */
+	spin_lock_irqsave(&par->lock, flags);
+	__cg14_reset(par);
+	spin_unlock_irqrestore(&par->lock, flags);
+
+	if (var->xoffset || var->yoffset || var->vmode)
+		return -EINVAL;
+	return 0;
+}
+
 /**
  *      cg14_setcolreg - Optional function. Sets a color register.
  *      @regno: boolean, 0 copy local, 1 get_user() function
