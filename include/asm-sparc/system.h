@@ -164,7 +164,7 @@ extern __inline__ void setipl(unsigned long __orig_psr)
 		: "memory", "cc");
 }
 
-extern __inline__ void __cli(void)
+extern __inline__ void local_irq_disable(void)
 {
 	unsigned long tmp;
 
@@ -179,7 +179,7 @@ extern __inline__ void __cli(void)
 		: "memory");
 }
 
-extern __inline__ void __sti(void)
+extern __inline__ void local_irq_enable(void)
 {
 	unsigned long tmp;
 
@@ -241,13 +241,9 @@ extern __inline__ unsigned long read_psr_and_cli(void)
 	return retval;
 }
 
-#define __save_flags(flags)	((flags) = getipl())
-#define __save_and_cli(flags)	((flags) = read_psr_and_cli())
-#define __restore_flags(flags)	setipl((flags))
-#define local_irq_disable()		__cli()
-#define local_irq_enable()		__sti()
-#define local_irq_save(flags)		__save_and_cli(flags)
-#define local_irq_restore(flags)	__restore_flags(flags)
+#define local_save_flags(flags)	((flags) = getipl())
+#define local_irq_save(flags)	((flags) = read_psr_and_cli())
+#define local_irq_restore(flags)	setipl((flags))
 
 #ifdef CONFIG_SMP
 
@@ -266,11 +262,11 @@ extern void __global_restore_flags(unsigned long flags);
 
 #else
 
-#define cli() __cli()
-#define sti() __sti()
-#define save_flags(x) __save_flags(x)
-#define restore_flags(x) __restore_flags(x)
-#define save_and_cli(x) __save_and_cli(x)
+#define cli() local_irq_disable()
+#define sti() local_irq_enable()
+#define save_flags(x) local_save_flags(x)
+#define restore_flags(x) local_irq_restore(x)
+#define save_and_cli(x) local_irq_save(x)
 
 #endif
 

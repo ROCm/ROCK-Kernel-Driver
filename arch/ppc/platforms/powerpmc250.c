@@ -174,7 +174,7 @@ powerpmc250_calibrate_decr(void)
 static void
 powerpmc250_restart(char *cmd)
 {
-	__cli();
+	local_irq_disable();
 	/* Hard reset */
 	writeb(0x11, 0xfe000332);
 	while(1);
@@ -183,7 +183,7 @@ powerpmc250_restart(char *cmd)
 static void
 powerpmc250_halt(void)
 {
-	__cli();
+	local_irq_disable();
 	while (1);
 }
 

@@ -199,7 +199,7 @@ extern inline void do_exception(struct pt_regs *regs, unsigned long error_code)
 	 * task's user address space, so we can switch on the
 	 * interrupts again and then search the VMAs
 	 */
-	__sti();
+	local_irq_enable();
 
         down_read(&mm->mmap_sem);
 
@@ -440,7 +440,7 @@ pfault_interrupt(struct pt_regs *regs, __u16 error_code)
 	 * now safely switch on interrupts.
 	 */
 	if (regs->psw.mask & PSW_PROBLEM_STATE)
-		__sti();
+		local_irq_enable();
 
 	if (subcode & 0x0080) {
 		/* signal bit is set -> a page has been swapped in by VM */

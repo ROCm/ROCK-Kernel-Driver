@@ -807,7 +807,7 @@ static void n_tty_set_termios(struct tty_struct *tty, struct termios * old)
 	    I_ICRNL(tty) || I_INLCR(tty) || L_ICANON(tty) ||
 	    I_IXON(tty) || L_ISIG(tty) || L_ECHO(tty) ||
 	    I_PARMRK(tty)) {
-		__cli(); // FIXME: is this safe?
+		local_irq_disable(); // FIXME: is this safe?
 		memset(tty->process_char_map, 0, 256/8);
 
 		if (I_IGNCR(tty) || I_ICRNL(tty))
@@ -843,7 +843,7 @@ static void n_tty_set_termios(struct tty_struct *tty, struct termios * old)
 			set_bit(SUSP_CHAR(tty), tty->process_char_map);
 		}
 		clear_bit(__DISABLED_CHAR, tty->process_char_map);
-		__sti(); // FIXME: is this safe?
+		local_irq_enable(); // FIXME: is this safe?
 		tty->raw = 0;
 		tty->real_raw = 0;
 	} else {

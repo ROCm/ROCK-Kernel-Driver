@@ -231,7 +231,7 @@ static void show(char * str)
 
 
 /*
- * We have to allow irqs to arrive between __sti and __cli
+ * We have to allow irqs to arrive between local_irq_enable and local_irq_disable
  */
 #define SYNC_OTHER_CORES(x) barrier()
 
@@ -276,9 +276,9 @@ again:
 				show("get_irqlock");
 				count = (~0 >> 1);
 			}
-			__sti();
+			local_irq_enable();
 			SYNC_OTHER_CORES(cpu);
-			__cli();
+			local_irq_disable();
 		}
 		goto again;
 	}
@@ -302,11 +302,11 @@ void __global_cli(void)
 {
 	unsigned long flags;
 
-	__save_flags(flags);
+	local_save_flags(flags);
 
 	if ((flags & PSR_PIL) != PSR_PIL) {
 		int cpu = smp_processor_id();
-		__cli();
+		local_irq_disable();
 		if (!local_irq_count(cpu))
 			get_irqlock(cpu);
 	}
@@ -318,7 +318,7 @@ void __global_sti(void)
 
 	if (!local_irq_count(cpu))
 		release_irqlock(cpu);
-	__sti();
+	local_irq_enable();
 }
 
 /*
@@ -333,7 +333,7 @@ unsigned long __global_save_flags(void)
 	unsigned long flags, retval;
 	unsigned long local_enabled = 0;
 
-	__save_flags(flags);
+	local_save_flags(flags);
 
 	if ((flags & PSR_PIL) != PSR_PIL)
 		local_enabled = 1;
@@ -361,10 +361,10 @@ void __global_restore_flags(unsigned long flags)
 		__global_sti();
 		break;
 	case 2:
-		__cli();
+		local_irq_disable();
 		break;
 	case 3:
-		__sti();
+		local_irq_enable();
 		break;
 	default:
 	{

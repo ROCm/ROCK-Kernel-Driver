@@ -288,14 +288,14 @@ static void par96_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		par96_rx(dev, bc);
 		if (--bc->modem.arb_divider <= 0) {
 			bc->modem.arb_divider = 6;
-			__sti();
+			local_irq_enable();
 			hdlcdrv_arbitrate(dev, &bc->hdrv);
 		}
 	}
-	__sti();
+	local_irq_enable();
 	hdlcdrv_transmitter(dev, &bc->hdrv);
 	hdlcdrv_receiver(dev, &bc->hdrv);
-        __cli();
+        local_irq_disable();
 }
 
 /* --------------------------------------------------------------------- */

@@ -16,7 +16,7 @@ do { \
 	if (task->lock_depth >= 0) \
 		spin_unlock(&kernel_flag); \
 	release_irqlock(cpu); \
-	__sti(); \
+	local_irq_enable(); \
 } while (0)
 
 /*

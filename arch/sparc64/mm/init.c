@@ -1411,7 +1411,7 @@ void __init paging_init(void)
 	 */
 	pt  = phys_base | _PAGE_VALID | _PAGE_SZ4MB;
 	pt |= _PAGE_CP | _PAGE_CV | _PAGE_P | _PAGE_L | _PAGE_W;
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	if (tlb_type == spitfire) {
 		__asm__ __volatile__(
 	"	stxa	%1, [%0] %3\n"
@@ -1469,7 +1469,7 @@ void __init paging_init(void)
 			: "memory");
 		}
 	}
-	__restore_flags(flags);
+	local_irq_restore(flags);
 	
 	/* Now set kernel pgd to upper alias so physical page computations
 	 * work.

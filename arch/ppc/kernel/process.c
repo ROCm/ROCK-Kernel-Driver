@@ -202,8 +202,8 @@ void __switch_to(struct task_struct *prev, struct task_struct *new)
 	struct thread_struct *new_thread, *old_thread;
 	unsigned long s;
 	
-	__save_flags(s);
-	__cli();
+	local_save_flags(s);
+	local_irq_disable();
 #if CHECK_STACK
 	check_stack(prev);
 	check_stack(new);
@@ -246,7 +246,7 @@ void __switch_to(struct task_struct *prev, struct task_struct *new)
 	new_thread = &new->thread;
 	old_thread = &current->thread;
 	_switch(old_thread, new_thread);
-	__restore_flags(s);
+	local_irq_restore(s);
 }
 
 void show_regs(struct pt_regs * regs)

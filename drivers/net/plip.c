@@ -518,7 +518,7 @@ plip_bh_timeout_error(struct net_device *dev, struct net_local *nl,
 	spin_unlock_irq(&nl->lock);
 	if (error == HS_TIMEOUT) {
 		DISABLE(dev->irq);
-		synchronize_irq();
+		synchronize_irq(dev->irq);
 	}
 	disable_parport_interrupts (dev);
 	netif_stop_queue (dev);
@@ -840,7 +840,7 @@ plip_send_packet(struct net_device *dev, struct net_local *nl,
 			if (c0 & 0x08) {
 				spin_unlock_irq(&nl->lock);
 				DISABLE(dev->irq);
-				synchronize_irq();
+				synchronize_irq(dev->irq);
 				if (nl->connection == PLIP_CN_RECEIVE) {
 					/* Interrupted.
 					   We don't need to enable irq,
@@ -1178,7 +1178,7 @@ plip_close(struct net_device *dev)
 
 	netif_stop_queue (dev);
 	DISABLE(dev->irq);
-	synchronize_irq();
+	synchronize_irq(dev->irq);
 
 	if (dev->irq == -1)
 	{
