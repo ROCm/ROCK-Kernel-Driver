@@ -108,7 +108,7 @@ ia64_insn_group_barrier (void)
 #define set_mb(var, value)	do { (var) = (value); mb(); } while (0)
 #define set_wmb(var, value)	do { (var) = (value); mb(); } while (0)
 
-#define safe_halt()         ia64_pal_halt(1)                /* PAL_HALT */
+#define safe_halt()         ia64_pal_halt_light()    /* PAL_HALT_LIGHT */
 
 /*
  * The group barrier in front of the rsm & ssm are necessary to ensure

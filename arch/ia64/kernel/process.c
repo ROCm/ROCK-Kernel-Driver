@@ -169,7 +169,10 @@ do_notify_resume_user (sigset_t *oldset, struct sigscratch *scr, long in_syscall
 void
 default_idle (void)
 {
-	/* may want to do PAL_LIGHT_HALT here... */
+#ifdef CONFIG_IA64_PAL_IDLE
+	if (!need_resched())
+		safe_halt();
+#endif
 }
 
 void __attribute__((noreturn))
@@ -177,6 +180,10 @@ cpu_idle (void *unused)
 {
 	/* endless idle loop with no priority at all */
 	while (1) {
+		void (*idle)(void) = pm_idle;
+		if (!idle)
+			idle = default_idle;
+
 #ifdef CONFIG_SMP
 		if (!need_resched())
 			min_xtp();
@@ -186,10 +193,7 @@ cpu_idle (void *unused)
 #ifdef CONFIG_IA64_SGI_SN
 			snidle();
 #endif
-			if (pm_idle)
-				(*pm_idle)();
-			else
-				default_idle();
+			(*idle)();
 		}
 
 #ifdef CONFIG_IA64_SGI_SN
