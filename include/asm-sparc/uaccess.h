@@ -104,7 +104,7 @@ __get_user_check((x),__gu_addr,sizeof(*(ptr)),__typeof__(*(ptr))); })
  * doing multiple accesses to the same area (the user has to do the
  * checks by hand with "access_ok()")
  */
-#define __put_user(x,ptr) __put_user_nocheck((x),(ptr),sizeof(*(ptr)))
+#define __put_user(x,ptr) __put_user_nocheck((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
 #define __get_user(x,ptr) __get_user_nocheck((x),(ptr),sizeof(*(ptr)),__typeof__(*(ptr)))
 
 struct __large_struct { unsigned long buf[100]; };
