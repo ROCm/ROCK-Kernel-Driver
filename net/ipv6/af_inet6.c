@@ -63,12 +63,6 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
-#if 0 /*def MODULE*/
-static int unloadable;     /* XX: Turn to one when all is ok within the
-			      module for allowing unload */
-MODULE_PARM(unloadable, "i");
-#endif
-
 MODULE_AUTHOR("Cast of dozens");
 MODULE_DESCRIPTION("IPv6 protocol stack for Linux");
 MODULE_LICENSE("GPL");
@@ -556,17 +550,6 @@ struct net_proto_family inet6_family_ops = {
 	.create = inet6_create,
 	.owner	= THIS_MODULE,
 };
-
-#ifdef MODULE
-#if 0 /* FIXME --RR */
-int ipv6_unload(void)
-{
-	if (!unloadable) return 1;
-	/* We keep internally 3 raw sockets */
-	return atomic_read(&(__this_module.uc.usecount)) - 3;
-}
-#endif
-#endif
 
 #ifdef CONFIG_SYSCTL
 extern void ipv6_sysctl_register(void);
