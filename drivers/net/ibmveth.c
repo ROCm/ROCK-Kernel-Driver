@@ -105,7 +105,7 @@ static struct proc_dir_entry *ibmveth_proc_dir;
 
 static const char ibmveth_driver_name[] = "ibmveth";
 static const char ibmveth_driver_string[] = "IBM i/pSeries Virtual Ethernet Driver";
-#define ibmveth_driver_version "1.01"
+#define ibmveth_driver_version "1.02"
 
 MODULE_AUTHOR("Santiago Leon <santil@us.ibm.com>");
 MODULE_DESCRIPTION("IBM i/pSeries Virtual Ethernet Driver");
