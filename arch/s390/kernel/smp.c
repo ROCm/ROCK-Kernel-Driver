@@ -350,6 +350,7 @@ void smp_ptlb_all(void)
 {
         on_each_cpu(smp_ptlb_callback, NULL, 0, 1);
 }
+EXPORT_SYMBOL(smp_ptlb_all);
 #endif /* ! CONFIG_ARCH_S390X */
 
 /*

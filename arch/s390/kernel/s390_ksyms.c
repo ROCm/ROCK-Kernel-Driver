@@ -54,6 +54,7 @@ EXPORT_SYMBOL_NOVERS(strnlen);
 EXPORT_SYMBOL_NOVERS(strrchr);
 EXPORT_SYMBOL_NOVERS(strstr);
 EXPORT_SYMBOL_NOVERS(strpbrk);
+EXPORT_SYMBOL_NOVERS(strcpy);
 
 /*
  * binfmt_elf loader 

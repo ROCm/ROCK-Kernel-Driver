@@ -533,7 +533,6 @@ static inline _syscall1(int,dup,int,fd)
 static inline _syscall3(int,execve,const char *,file,char **,argv,char **,envp)
 static inline _syscall3(int,open,const char *,file,int,flag,int,mode)
 static inline _syscall1(int,close,int,fd)
-static inline _syscall1(int,_exit,int,exitcode)
 static inline _syscall2(long,stat,char *,filename,struct stat *,statbuf)
 
 static inline pid_t waitpid(int pid, int *wait_stat, int flags)

@@ -35,6 +35,7 @@ cflags-$(CONFIG_MARCH_Z990) += $(call check_gcc,-march=z990,)
 CFLAGS		+= $(cflags-y)
 CFLAGS		+= $(call check_gcc,-finline-limit=10000,)
 CFLAGS 		+= -pipe -fno-strength-reduce -Wno-sign-compare 
+CFLAGS		+= -mbackchain
 
 OBJCOPYFLAGS	:= -O binary
 LDFLAGS_vmlinux := -e start

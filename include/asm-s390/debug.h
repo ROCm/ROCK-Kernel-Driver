@@ -35,11 +35,7 @@ struct __debug_entry{
 
 #ifdef __KERNEL__
 #include <linux/version.h>
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
- #include <asm/spinlock.h>
-#else
- #include <linux/spinlock.h>
-#endif /* LINUX_VERSION_CODE */
+#include <linux/spinlock.h>
 #include <linux/kernel.h>
 #include <linux/time.h>
 #include <linux/proc_fs.h>
