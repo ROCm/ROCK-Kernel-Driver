@@ -322,13 +322,13 @@ setup_arch (char **cmdline_p)
 #ifdef CONFIG_ACPI_BOOT
 	acpi_boot_init();
 #endif
+#ifdef CONFIG_SERIAL_8250_CONSOLE
 #ifdef CONFIG_SERIAL_8250_HCDP
 	if (efi.hcdp) {
 		void setup_serial_hcdp(void *);
 		setup_serial_hcdp(efi.hcdp);
 	}
 #endif
-#ifdef CONFIG_SERIAL_8250_CONSOLE
 	/*
 	 * Without HCDP, we won't discover any serial ports until the serial driver looks
 	 * in the ACPI namespace.  If ACPI claims there are some legacy devices, register
