@@ -1,5 +1,5 @@
 /*
- * $Id: ctcmain.c,v 1.43 2003/05/27 11:34:23 mschwide Exp $
+ * $Id: ctcmain.c,v 1.47 2003/09/22 13:40:51 cohuck Exp $
  *
  * CTC / ESCON network driver
  *
@@ -36,7 +36,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.43 $
+ * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.47 $
  *
  */
 
@@ -102,7 +102,7 @@ MODULE_LICENSE("GPL");
 #define READ			0
 #define WRITE			1
 
-#define CTC_ID_SIZE             DEVICE_ID_SIZE+3
+#define CTC_ID_SIZE             BUS_ID_SIZE+3
 
 
 struct ctc_profile {
@@ -272,7 +272,7 @@ static void
 print_banner(void)
 {
 	static int printed = 0;
-	char vbuf[] = "$Revision: 1.43 $";
+	char vbuf[] = "$Revision: 1.47 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -1791,7 +1791,7 @@ add_channel(struct ccw_device *cdev, enum channel_types type)
 	ch->ccw[7].cda = 0;
 
 	ch->cdev = cdev;
-	snprintf(ch->id, DEVICE_ID_SIZE, "ch-%s", cdev->dev.bus_id);
+	snprintf(ch->id, CTC_ID_SIZE, "ch-%s", cdev->dev.bus_id);
 	ch->type = type;
 	ch->fsm = init_fsm(ch->id, ch_state_names,
 			   ch_event_names, NR_CH_STATES, NR_CH_EVENTS,
@@ -2786,8 +2786,23 @@ ctc_proto_store(struct device *dev, const char *buf, size_t count)
 
 static DEVICE_ATTR(protocol, 0644, ctc_proto_show, ctc_proto_store);
 
+static ssize_t
+ctc_type_show(struct device *dev, char *buf)
+{
+	struct ccwgroup_device *cgdev;
+
+	cgdev = to_ccwgroupdev(dev);
+	if (!cgdev)
+		return -ENODEV;
+
+	return sprintf(buf, "%s\n", cu3088_type[cgdev->cdev[0]->id.driver_info]);
+}
+
+static DEVICE_ATTR(type, 0444, ctc_type_show, NULL);
+
 static struct attribute *ctc_attr[] = {
 	&dev_attr_protocol.attr,
+	&dev_attr_type.attr,
 	NULL,
 };
 
@@ -2845,8 +2860,6 @@ ctc_probe_device(struct ccwgroup_device *cgdev)
 	cgdev->dev.driver_data = priv;
 	cgdev->cdev[0]->dev.driver_data = priv;
 	cgdev->cdev[1]->dev.driver_data = priv;
-	snprintf(cgdev->dev.name, DEVICE_NAME_SIZE, "%s",
-		 cu3088_type[cgdev->cdev[0]->id.driver_info]);
 
 	return 0;
 }
@@ -2875,8 +2888,8 @@ ctc_new_device(struct ccwgroup_device *cgdev)
 
 	type = get_channel_type(&cgdev->cdev[0]->id);
 	
-	snprintf(read_id, DEVICE_ID_SIZE, "ch-%s", cgdev->cdev[0]->dev.bus_id);
-	snprintf(write_id, DEVICE_ID_SIZE, "ch-%s", cgdev->cdev[1]->dev.bus_id);
+	snprintf(read_id, CTC_ID_SIZE, "ch-%s", cgdev->cdev[0]->dev.bus_id);
+	snprintf(write_id, CTC_ID_SIZE, "ch-%s", cgdev->cdev[1]->dev.bus_id);
 
 	if (add_channel(cgdev->cdev[0], type))
 		return -ENOMEM;
