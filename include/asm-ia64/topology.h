@@ -60,4 +60,7 @@
  */
 #define __node_to_memblk(node) (node)
 
+/* Cross-node load balancing interval. */
+#define NODE_BALANCE_RATE 10
+
 #endif /* _ASM_IA64_TOPOLOGY_H */

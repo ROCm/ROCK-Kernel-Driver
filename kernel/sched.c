@@ -67,6 +67,7 @@
 #define INTERACTIVE_DELTA	2
 #define MAX_SLEEP_AVG		(2*HZ)
 #define STARVATION_LIMIT	(2*HZ)
+#define NODE_THRESHOLD          125
 
 /*
  * If a task is 'interactive' then we reinsert it in the active
@@ -155,6 +156,8 @@ struct runqueue {
 	int prev_nr_running[NR_CPUS];
 #ifdef CONFIG_NUMA
 	atomic_t *node_nr_running;
+	unsigned int nr_balanced;
+	int prev_node_load[MAX_NUMNODES];
 #endif
 	task_t *migration_thread;
 	struct list_head migration_queue;
@@ -735,14 +738,52 @@ void sched_balance_exec(void)
 	}
 }
 
-static inline unsigned long cpus_to_balance(int this_cpu)
+/*
+ * Find the busiest node. All previous node loads contribute with a 
+ * geometrically deccaying weight to the load measure:
+ *      load_{t} = load_{t-1}/2 + nr_node_running_{t}
+ * This way sudden load peaks are flattened out a bit.
+ */
+static int find_busiest_node(int this_node)
 {
-	return __node_to_cpu_mask(__cpu_to_node(this_cpu));
+	int i, node = -1, load, this_load, maxload;
+	
+	this_load = maxload = (this_rq()->prev_node_load[this_node] >> 1)
+		+ atomic_read(&node_nr_running[this_node]);
+	this_rq()->prev_node_load[this_node] = this_load;
+	for (i = 0; i < numnodes; i++) {
+		if (i == this_node)
+			continue;
+		load = (this_rq()->prev_node_load[i] >> 1)
+			+ atomic_read(&node_nr_running[i]);
+		this_rq()->prev_node_load[i] = load;
+		if (load > maxload && (100*load > NODE_THRESHOLD*this_load)) {
+			maxload = load;
+			node = i;
+		}
+	}
+	return node;
+}
+
+static inline unsigned long cpus_to_balance(int this_cpu, runqueue_t *this_rq)
+{
+	int this_node = __cpu_to_node(this_cpu);
+	/*
+	 * Avoid rebalancing between nodes too often.
+	 * We rebalance globally once every NODE_BALANCE_RATE load balances.
+	 */
+	if (++(this_rq->nr_balanced) == NODE_BALANCE_RATE) {
+		int node = find_busiest_node(this_node);
+		this_rq->nr_balanced = 0;
+		if (node >= 0)
+			return (__node_to_cpu_mask(node) | (1UL << this_cpu));
+	}
+	return __node_to_cpu_mask(this_node);
 }
 
 #else /* !CONFIG_NUMA */
 
-static inline unsigned long cpus_to_balance(int this_cpu)
+static inline unsigned long cpus_to_balance(int this_cpu, runqueue_t *this_rq)
 {
 	return cpu_online_map;
 }
@@ -890,7 +931,7 @@ static void load_balance(runqueue_t *this_rq, int idle)
 	task_t *tmp;
 
 	busiest = find_busiest_queue(this_rq, this_cpu, idle, &imbalance,
-					cpus_to_balance(this_cpu));
+					cpus_to_balance(this_cpu, this_rq));
 	if (!busiest)
 		goto out;
 
