@@ -130,9 +130,6 @@ struct font_desc *get_default_font(int xres, int yres)
     return g;
 }
 
-int init_module(void) { return 0; };
-void cleanup_module(void) {};
-
 EXPORT_SYMBOL(fonts);
 EXPORT_SYMBOL(find_font);
 EXPORT_SYMBOL(get_default_font);
