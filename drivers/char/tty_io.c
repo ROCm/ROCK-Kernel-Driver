@@ -2143,31 +2143,16 @@ int tty_register_driver(struct tty_driver *driver)
  */
 int tty_unregister_driver(struct tty_driver *driver)
 {
-	int	retval;
-	struct tty_driver *p;
-	int	i, found = 0;
+	int retval, i;
 	struct termios *tp;
-	const char *othername = NULL;
-	
+
 	if (*driver->refcount)
 		return -EBUSY;
 
-	list_for_each_entry(p, &tty_drivers, tty_drivers) {
-		if (p == driver)
-			found++;
-		else if (p->major == driver->major)
-			othername = p->name;
-	}
-	
-	if (!found)
-		return -ENOENT;
-
-	if (othername == NULL) {
-		retval = unregister_chrdev(driver->major, driver->name);
-		if (retval)
-			return retval;
-	} else
-		register_chrdev(driver->major, othername, &tty_fops);
+	retval = unregister_chrdev_region(driver->major, driver->minor_start,
+					  driver->num, driver->name);
+	if (retval)
+		return retval;
 
 	list_del(&driver->tty_drivers);
 

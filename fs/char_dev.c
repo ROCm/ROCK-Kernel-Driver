@@ -174,7 +174,8 @@ int register_chrdev(unsigned int major, const char *name,
 }
 
 /* todo: make void - error printk here */
-int unregister_chrdev(unsigned int major, const char * name)
+int unregister_chrdev_region(unsigned int major, unsigned int baseminor,
+			     int minorct, const char *name)
 {
 	struct char_device_struct *cd, **cp;
 	int ret = 0;
@@ -184,7 +185,9 @@ int unregister_chrdev(unsigned int major, const char * name)
 
 	write_lock(&chrdevs_lock);
 	for (cp = &chrdevs[i]; *cp; cp = &(*cp)->next)
-		if ((*cp)->major == major)
+		if ((*cp)->major == major &&
+		    (*cp)->baseminor == baseminor &&
+		    (*cp)->minorct == minorct)
 			break;
 	if (!*cp || strcmp((*cp)->name, name))
 		ret = -EINVAL;
@@ -196,6 +199,11 @@ int unregister_chrdev(unsigned int major, const char * name)
 	write_unlock(&chrdevs_lock);
 
 	return ret;
+}
+
+int unregister_chrdev(unsigned int major, const char *name)
+{
+	return unregister_chrdev_region(major, 0, 256, name);
 }
 
 /*
