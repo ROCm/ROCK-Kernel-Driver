@@ -573,6 +573,8 @@ source "drivers/pnp/Kconfig"
 
 source "drivers/block/Kconfig"
 
+source "drivers/ide/Kconfig"
+
 source "drivers/ieee1394/Kconfig"
 
 source "drivers/message/i2o/Kconfig"
