@@ -11,8 +11,6 @@ include/linux/version.h: arch/$(ARCH)/Makefile
 # EXTRAVERSION...
 MODLIB := $(INSTALL_MOD_PATH)/lib/modules/$(KERNELRELEASE)
 
-MAKEBOOT = $(MAKE) -C $(ARCH_DIR)/boot
-
 ifeq ($(CONFIG_DEBUGSYM),y)
 DEBUG = -g
 CFLAGS := $(subst -fomit-frame-pointer,,$(CFLAGS))
@@ -106,11 +104,9 @@ archclean: sysclean
 	find . \( -name '*.bb' -o -name '*.bbg' -o -name '*.da' \
 		-o -name '*.gcov' \) -type f -print | xargs rm -f
 	rm -f linux x.i gmon.out $(ARCH_DIR)/link.ld $(GEN_HEADERS)
-	@$(MAKEBOOT) clean
 
 archdep: 
 	for d in $(ARCH_SUBDIRS); do $(MAKE) -C $$d fastdep; done
-	@$(MAKEBOOT) dep
 
 $(SYMLINK_HEADERS):
 	cd $(TOPDIR)/$(dir $@) ; \
