@@ -384,6 +384,80 @@ sn_pci_fixup_slot(struct pci_dev *dev)
 	return 0;
 }
 
+#ifdef CONFIG_HOTPLUG_PCI_SGI
+
+void
+sn_dma_flush_clear(struct sn_flush_device_list *dma_flush_list,
+                   unsigned long start, unsigned long end)
+{
+
+        int i;
+
+        dma_flush_list->pin = -1;
+        dma_flush_list->bus = -1;
+        dma_flush_list->slot = -1;
+
+        for (i = 0; i < PCI_ROM_RESOURCE; i++)
+                if ((dma_flush_list->bar_list[i].start == start) &&
+                    (dma_flush_list->bar_list[i].end == end)) {
+                        dma_flush_list->bar_list[i].start = 0;
+                        dma_flush_list->bar_list[i].end = 0;
+                        break;
+                }           
+
+}
+
+/*
+ * sn_pci_unfixup_slot() - This routine frees a slot's resources
+ * consistent with the Linux PCI abstraction layer.  Resources released
+ * back to our PCI provider include PIO maps to BAR space and interrupt
+ * objects.
+ */
+void
+sn_pci_unfixup_slot(struct pci_dev *dev)
+{
+	struct sn_device_sysdata *device_sysdata;
+	vertex_hdl_t vhdl;
+	pciio_intr_t intr_handle;
+	unsigned int irq;
+	unsigned long size;
+	int idx;
+
+	device_sysdata = SN_DEVICE_SYSDATA(dev);
+
+	vhdl = device_sysdata->vhdl;
+
+	if (device_sysdata->dma_flush_list)
+		for (idx = 0; idx < PCI_ROM_RESOURCE; idx++) {
+			size = dev->resource[idx].end -
+				dev->resource[idx].start;
+			if (size == 0) continue;
+
+			sn_dma_flush_clear(device_sysdata->dma_flush_list,
+				   	   dev->resource[idx].start,
+				   	   dev->resource[idx].end);
+		}
+
+	intr_handle = device_sysdata->intr_handle;
+	if (intr_handle) {
+		extern void unregister_pcibr_intr(int, pcibr_intr_t);
+		irq = intr_handle->pi_irq;
+		irqpdaindr->device_dev[irq] = NULL;
+		unregister_pcibr_intr(irq, (pcibr_intr_t) intr_handle);
+		pciio_intr_disconnect(intr_handle);
+		pciio_intr_free(intr_handle);
+	}
+
+	for (idx = 0; idx < PCI_ROM_RESOURCE; idx++) {
+		if (device_sysdata->pio_map[idx]) {
+			pciio_piomap_done (device_sysdata->pio_map[idx]);
+			pciio_piomap_free (device_sysdata->pio_map[idx]);
+		}
+	}
+
+}
+#endif /* CONFIG_HOTPLUG_PCI_SGI */
+
 struct sn_flush_nasid_entry flush_nasid_list[MAX_NASIDS];
 
 /* Initialize the data structures for flushing write buffers after a PIO read.
@@ -533,6 +607,7 @@ sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int 
 	}
 	return p;
 }
+
 
 /*
  * linux_bus_cvlink() Creates a link between the Linux PCI Bus number
@@ -774,7 +849,7 @@ sn_pci_init (void)
 			printk(KERN_WARNING
 				"sn_pci_fixup: sn_pci_fixup_bus fails : error %d\n",
 					ret);
-			return;
+			return 0;
 		}
 	}
 
@@ -805,7 +880,7 @@ sn_pci_init (void)
 			printk(KERN_WARNING
 				"sn_pci_fixup: sn_pci_fixup_slot fails : error %d\n",
 					ret);
-			return;
+			return 0;
 		}
 	}
 
