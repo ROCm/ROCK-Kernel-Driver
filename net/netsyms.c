@@ -292,6 +292,7 @@ extern int (*dlci_ioctl_hook)(unsigned int, void *);
 EXPORT_SYMBOL(dlci_ioctl_hook);
 #endif
 
+EXPORT_SYMBOL(xfrm_user_policy);
 EXPORT_SYMBOL(km_waitq);
 EXPORT_SYMBOL(xfrm_cfg_sem);
 EXPORT_SYMBOL(xfrm_policy_alloc);
