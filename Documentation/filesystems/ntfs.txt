@@ -273,6 +273,19 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.1.13:
+	- Implement writing of inodes (access time updates are not implemented
+	  yet so mounting with -o noatime,nodiratime is enforced).
+	- Enable writing out of resident files so you can now overwrite any
+	  uncompressed, unencrypted, nonsparse file as long as you do not
+	  change the file size.
+	- Add housekeeping of ntfs system files so that ntfsfix no longer needs
+	  to be run after writing to an NTFS volume.
+	  NOTE:  This still leaves quota tracking and user space journalling on
+	  the side but they should not cause data corruption.  In the worst
+	  case the charged quotas will be out of date ($Quota) and some
+	  userspace applications might get confused due to the out of date
+	  userspace journal ($UsnJrnl).
 2.1.12:
 	- Fix the second fix to the decompression engine from the 2.1.9 release
 	  and some further internals cleanups.

@@ -1,4 +1,4 @@
-ToDo:
+ToDo/Notes:
 	- Find and fix bugs.
 	- Either invalidate quotas or update the quota charges on NTFS 3.x
 	  volumes with quota tracking enabled ($Quota).
@@ -32,8 +32,10 @@ ToDo:
 	  inode having been discarded already.  Whether this can actually ever
 	  happen is unclear however so it is worth waiting until someone hits
 	  the problem.
+	- Enable the code for setting the NT4 compatibility flag when we start
+	  making NTFS 1.2 specific modifications.
 
-2.1.13 - WIP.
+2.1.13 - Enable overwriting of resident files and housekeeping of system files.
 
 	- Implement writing of mft records (fs/ntfs/mft.[hc]), which includes
 	  keeping the mft mirror in sync with the mft when mirrored mft records
@@ -70,6 +72,15 @@ ToDo:
 	  are present and ask the user to email us if they see this happening.
 	- Add functions ntfs_{clear,set}_volume_flags(), to modify the volume
 	  information flags (fs/ntfs/super.c).
+	- Mark the volume dirty when (re)mounting read-write and mark it clean
+	  when unmounting or remounting read-only.  If any volume errors are
+	  found, the volume is left marked dirty to force chkdsk to run.
+	- Add code to set the NT4 compatibility flag when (re)mounting
+	  read-write for newer NTFS versions but leave it commented out for now
+	  since we do not make any modifications that are NTFS 1.2 specific yet
+	  and since setting this flag breaks Captive-NTFS which is not nice.
+	  This code must be enabled once we start writing NTFS 1.2 specific
+	  changes otherwise Windows NTFS driver might crash / cause corruption.
 
 2.1.12 - Fix the second fix to the decompression engine and some cleanups.
 

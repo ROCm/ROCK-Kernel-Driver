@@ -933,44 +933,77 @@ static int ntfs_mft_writepage(struct page *page, struct writeback_control *wbc)
 		na.name = NULL;
 		na.name_len = 0;
 		na.type = AT_UNUSED;
-
 		/*
 		 * Check if the inode corresponding to this mft record is in
 		 * the VFS inode cache and obtain a reference to it if it is.
 		 */
-		vi = ilookup5(sb, mft_no, (test_t)ntfs_test_inode, &na);
+		ntfs_debug("Looking for inode 0x%lx in icache.", mft_no);
+		/*
+		 * For inode 0, i.e. $MFT itself, we cannot use ilookup5() from
+		 * here or we deadlock because the inode is already locked by
+		 * the kernel (fs/fs-writeback.c::__sync_single_inode()) and
+		 * ilookup5() waits until the inode is unlocked before
+		 * returning it and it never gets unlocked because
+		 * ntfs_mft_writepage() never returns.  )-:  Fortunately, we
+		 * have inode 0 pinned in icache for the duration of the mount
+		 * so we can access it directly.
+		 */
+		if (!mft_no) {
+			/* Balance the below iput(). */
+			vi = igrab(mft_vi);
+			BUG_ON(vi != mft_vi);
+		} else
+			vi = ilookup5(sb, mft_no, (test_t)ntfs_test_inode, &na);
 		if (vi) {
+			ntfs_debug("Inode 0x%lx is in icache.", mft_no);
 			/* The inode is in icache.  Check if it is dirty. */
 			ni = NTFS_I(vi);
 			if (!NInoDirty(ni)) {
 				/* The inode is not dirty, skip this record. */
+				ntfs_debug("Inode 0x%lx is not dirty, "
+						"continuing search.", mft_no);
 				iput(vi);
 				continue;
 			}
+			ntfs_debug("Inode 0x%lx is dirty, aborting search.",
+					mft_no);
 			/* The inode is dirty, no need to search further. */
 			iput(vi);
 			is_dirty = TRUE;
 			break;
 		}
+		ntfs_debug("Inode 0x%lx is not in icache.", mft_no);
 		/* The inode is not in icache. */
 		/* Skip the record if it is not a mft record (type "FILE"). */
-		if (!ntfs_is_mft_recordp(maddr))
+		if (!ntfs_is_mft_recordp(maddr)) {
+			ntfs_debug("Mft record 0x%lx is not a FILE record, "
+					"continuing search.", mft_no);
 			continue;
+		}
 		m = (MFT_RECORD*)maddr;
 		/*
 		 * Skip the mft record if it is not in use.  FIXME:  What about
 		 * deleted/deallocated (extent) inodes?  (AIA)
 		 */
-		if (!(m->flags & MFT_RECORD_IN_USE))
+		if (!(m->flags & MFT_RECORD_IN_USE)) {
+			ntfs_debug("Mft record 0x%lx is not in use, "
+					"continuing search.", mft_no);
 			continue;
+		}
 		/* Skip the mft record if it is a base inode. */
-		if (!m->base_mft_record)
+		if (!m->base_mft_record) {
+			ntfs_debug("Mft record 0x%lx is a base record, "
+					"continuing search.", mft_no);
 			continue;
+		}
 		/*
 		 * This is an extent mft record.  Check if the inode
 		 * corresponding to its base mft record is in icache.
 		 */
 		na.mft_no = MREF_LE(m->base_mft_record);
+		ntfs_debug("Mft record 0x%lx is an extent record.  Looking "
+				"for base inode 0x%lx in icache.", mft_no,
+				na.mft_no);
 		vi = ilookup5(sb, na.mft_no, (test_t)ntfs_test_inode,
 				&na);
 		if (!vi) {
@@ -978,8 +1011,11 @@ static int ntfs_mft_writepage(struct page *page, struct writeback_control *wbc)
 			 * The base inode is not in icache.  Skip this extent
 			 * mft record.
 			 */
+			ntfs_debug("Base inode 0x%lx is not in icache, "
+					"continuing search.", na.mft_no);
 			continue;
 		}
+		ntfs_debug("Base inode 0x%lx is in icache.", na.mft_no);
 		/*
 		 * The base inode is in icache.  Check if it has the extent
 		 * inode corresponding to this extent mft record attached.
