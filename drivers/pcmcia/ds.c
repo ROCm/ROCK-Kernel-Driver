@@ -285,7 +285,6 @@ int pcmcia_register_driver(struct pcmcia_driver *driver)
 	if (!driver)
 		return -EINVAL;
 
- 	driver->use_count = 0;
 	driver->drv.bus = &pcmcia_bus_type;
 
 	return driver_register(&driver->drv);
@@ -307,10 +306,16 @@ static struct proc_dir_entry *proc_pccard = NULL;
 static int proc_read_drivers_callback(struct device_driver *driver, void *d)
 {
 	char **p = d;
-	struct pcmcia_driver *p_dev = container_of(driver, 
+	struct pcmcia_driver *p_drv = container_of(driver,
 						   struct pcmcia_driver, drv);
 
-	*p += sprintf(*p, "%-24.24s 1 %d\n", driver->name, p_dev->use_count);
+	*p += sprintf(*p, "%-24.24s 1 %d\n", p_drv->drv.name,
+#ifdef CONFIG_MODULE_UNLOAD
+		      (p_drv->owner) ? module_refcount(p_drv->owner) : 1
+#else
+		      1
+#endif
+	);
 	d = (void *) p;
 
 	return 0;
@@ -593,7 +598,6 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	/* finally here the parent client is registered */
 	s->parent->clients = client;
 
-	p_drv->use_count++;
 	if (p_drv->attach) {
 		p_dev->instance = p_drv->attach();
 		if (!p_dev->instance) {
@@ -727,7 +731,6 @@ static int unbind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 			/* detach the "instance" */
 			p_drv = to_pcmcia_drv(p_dev->dev.driver);
 			if (p_drv) {
-				p_drv->use_count--;
 				if ((p_drv->detach) && (p_dev->instance))
 					p_drv->detach(p_dev->instance);
 				module_put(p_drv->owner);

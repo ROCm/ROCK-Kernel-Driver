@@ -132,7 +132,6 @@ struct pcmcia_socket;
 extern struct bus_type pcmcia_bus_type;
 
 struct pcmcia_driver {
-	int			use_count;
 	dev_link_t		*(*attach)(void);
 	void			(*detach)(dev_link_t *);
 	struct module		*owner;
