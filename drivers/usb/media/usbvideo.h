@@ -327,7 +327,8 @@ int usbvideo_register(
 	const int num_extra,
 	const char *driverName,
 	const usbvideo_cb_t *cbTable,
-	struct module *md);
+	struct module *md,
+	const struct usb_device_id *id_table);
 uvd_t *usbvideo_AllocateDevice(usbvideo_t *cams);
 int usbvideo_RegisterVideoDevice(uvd_t *uvd);
 void usbvideo_Deregister(usbvideo_t **uvt);

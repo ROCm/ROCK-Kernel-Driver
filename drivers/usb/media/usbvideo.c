@@ -749,7 +749,8 @@ int usbvideo_register(
 	const int num_extra,
 	const char *driverName,
 	const usbvideo_cb_t *cbTbl,
-	struct module *md )
+	struct module *md,
+	const struct usb_device_id *id_table)
 {
 	static const char proc[] = "usbvideo_register";
 	usbvideo_t *cams;
@@ -839,6 +840,7 @@ int usbvideo_register(
 	cams->usbdrv.name = cams->drvName;
 	cams->usbdrv.probe = cams->cb.probe;
 	cams->usbdrv.disconnect = cams->cb.disconnect;
+	cams->usbdrv.id_table = id_table;
 
 #if USES_PROC_FS
 	if (cams->uses_procfs) {

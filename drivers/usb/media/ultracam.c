@@ -659,6 +659,12 @@ static void *ultracam_probe(struct usb_device *dev, unsigned int ifnum ,const st
 	return uvd;
 }
 
+
+static struct usb_device_id id_table[] = {
+	{ USB_DEVICE(ULTRACAM_VENDOR_ID, ULTRACAM_PRODUCT_ID) },
+	{ }  /* Terminating entry */
+};
+
 /*
  * ultracam_init()
  *
@@ -682,7 +688,8 @@ static int __init ultracam_init(void)
 		sizeof(ultracam_t),
 		"ultracam",
 		&cbTbl,
-		THIS_MODULE);
+		THIS_MODULE,
+		id_table);
 }
 
 static void __exit ultracam_cleanup(void)
@@ -690,16 +697,7 @@ static void __exit ultracam_cleanup(void)
 	usbvideo_Deregister(&cams);
 }
 
-#if defined(usb_device_id_ver)
-
-static __devinitdata struct usb_device_id id_table[] = {
-	{ USB_DEVICE(ULTRACAM_VENDOR_ID, ULTRACAM_PRODUCT_ID) },
-	{ }  /* Terminating entry */
-};
 MODULE_DEVICE_TABLE(usb, id_table);
-
-
-#endif /* defined(usb_device_id_ver) */
 MODULE_LICENSE("GPL");
 
 module_init(ultracam_init);
