@@ -1,8 +1,8 @@
 This file contains brief information about the SCSI tape driver.
 The driver is currently maintained by Kai Mäkisara (email
-Kai.Makisara@metla.fi)
+Kai.Makisara@kolumbus.fi)
 
-Last modified: Sat Dec 14 14:35:30 2002 by makisara
+Last modified: Sun Apr  6 22:44:13 2003 by makisara
 
 
 BASICS
@@ -132,7 +132,7 @@ minimum allowable buffer size.
 Asynchronous writing. Writing the buffer contents to the tape is
 started and the write call returns immediately. The status is checked
 at the next tape operation. Asynchronous writes are not done with
-direct i/o.
+direct i/o and not in fixed block mode.
 
 Buffered writes and asynchronous writes may in some rare cases cause
 problems in multivolume operations if there is not enough space on the
@@ -142,11 +142,6 @@ Read ahead for fixed block mode (ST_READ_AHEAD). Filling the buffer is
 attempted even if the user does not want to get all of the data at
 this read command. Should be disabled for those drives that don't like
 a filemark to truncate a read request or that don't like backspacing.
-
-The threshold for triggering asynchronous write in fixed block mode
-is defined by ST_WRITE_THRESHOLD. This may be optimized for each
-use pattern. The default triggers asynchronous write after three
-default sized writes (10 kB) from tar.
 
 Scatter/gather buffers (buffers that consist of chunks non-contiguous
 in the physical memory) are used if contiguous buffers can't be

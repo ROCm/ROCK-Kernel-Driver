@@ -1,9 +1,9 @@
 /*
    The compile-time configurable defaults for the Linux SCSI tape driver.
 
-   Copyright 1995-2002 Kai Makisara.
+   Copyright 1995-2003 Kai Makisara.
 
-   Last modified: Fri Jul 26 15:54:31 2002 by makisara
+   Last modified: Mon Apr  7 22:49:18 2003 by makisara
 */
 
 #ifndef _ST_OPTIONS_H
@@ -38,11 +38,6 @@
 /* The minimum tape driver buffer size in kilobytes in fixed block mode.
    Must be non-zero. */
 #define ST_FIXED_BUFFER_BLOCKS 32
-
-/* The number of kilobytes of data in the buffer that triggers an
-   asynchronous write in fixed block mode. See also ST_ASYNC_WRITES
-   below. */
-#define ST_WRITE_THRESHOLD_BLOCKS 30
 
 /* Maximum number of scatter/gather segments */
 #define ST_MAX_SG      256
