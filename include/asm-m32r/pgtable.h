@@ -343,6 +343,19 @@ static __inline__ void ptep_mkdirty(pte_t *ptep)
 }
 
 /*
+ * Macro and implementation to make a page protection as uncachable.
+ */
+static __inline__ pgprot_t pgprot_noncached(pgprot_t _prot)
+{
+	unsigned long prot = pgprot_val(_prot);
+
+	prot |= _PAGE_NONCACHABLE;
+	return __pgprot(prot);
+}
+
+#define pgprot_writecombine(prot) pgprot_noncached(prot)
+
+/*
  * Conversion functions: convert a page and protection to a page entry,
  * and a page entry and page directory to the page they refer to.
  */
