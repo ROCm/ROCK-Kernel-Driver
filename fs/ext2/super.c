@@ -28,7 +28,7 @@
 #include <asm/uaccess.h>
 #include "ext2.h"
 #include "xattr.h"
-
+#include "acl.h"
 
 static void ext2_sync_super(struct super_block *sb,
 			    struct ext2_super_block *es);
@@ -155,6 +155,10 @@ static struct inode *ext2_alloc_inode(struct super_block *sb)
 	ei = (struct ext2_inode_info *)kmem_cache_alloc(ext2_inode_cachep, SLAB_KERNEL);
 	if (!ei)
 		return NULL;
+#ifdef CONFIG_EXT2_FS_POSIX_ACL
+	ei->i_acl = EXT2_ACL_NOT_CACHED;
+	ei->i_default_acl = EXT2_ACL_NOT_CACHED;
+#endif
 	return &ei->vfs_inode;
 }
 
@@ -191,6 +195,26 @@ static void destroy_inodecache(void)
 		printk(KERN_INFO "ext2_inode_cache: not all structures were freed\n");
 }
 
+#ifdef CONFIG_EXT2_FS_POSIX_ACL
+
+static void ext2_clear_inode(struct inode *inode)
+{
+	struct ext2_inode_info *ei = EXT2_I(inode);
+
+	if (ei->i_acl && ei->i_acl != EXT2_ACL_NOT_CACHED) {
+		posix_acl_release(ei->i_acl);
+		ei->i_acl = EXT2_ACL_NOT_CACHED;
+	}
+	if (ei->i_default_acl && ei->i_default_acl != EXT2_ACL_NOT_CACHED) {
+		posix_acl_release(ei->i_default_acl);
+		ei->i_default_acl = EXT2_ACL_NOT_CACHED;
+	}
+}
+
+#else
+# define ext2_clear_inode NULL
+#endif
+
 static struct super_operations ext2_sops = {
 	.alloc_inode	= ext2_alloc_inode,
 	.destroy_inode	= ext2_destroy_inode,
@@ -202,6 +226,7 @@ static struct super_operations ext2_sops = {
 	.write_super	= ext2_write_super,
 	.statfs		= ext2_statfs,
 	.remount_fs	= ext2_remount,
+	.clear_inode	= ext2_clear_inode,
 };
 
 /* Yes, most of these are left as NULL!!
@@ -285,6 +310,13 @@ static int parse_options (char * options,
 			set_opt (sbi->s_mount_opt, XATTR_USER);
 		else if (!strcmp (this_char, "nouser_xattr"))
 			clear_opt (sbi->s_mount_opt, XATTR_USER);
+		else
+#endif
+#ifdef CONFIG_EXT2_FS_POSIX_ACL
+		if (!strcmp(this_char, "acl"))
+			set_opt(sbi->s_mount_opt, POSIX_ACL);
+		else if (!strcmp(this_char, "noacl"))
+			clear_opt(sbi->s_mount_opt, POSIX_ACL);
 		else
 #endif
 		if (!strcmp (this_char, "bsddf"))
@@ -571,6 +603,8 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 		set_opt(sbi->s_mount_opt, NO_UID32);
 	if (def_mount_opts & EXT2_DEFM_XATTR_USER)
 		set_opt(sbi->s_mount_opt, XATTR_USER);
+	if (def_mount_opts & EXT2_DEFM_ACL)
+		set_opt(sbi->s_mount_opt, POSIX_ACL);
 	
 	if (le16_to_cpu(sbi->s_es->s_errors) == EXT2_ERRORS_PANIC)
 		set_opt(sbi->s_mount_opt, ERRORS_PANIC);
@@ -582,6 +616,10 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	
 	if (!parse_options ((char *) data, sbi))
 		goto failed_mount;
+
+	sb->s_flags = (sb->s_flags & ~MS_POSIXACL) |
+		((EXT2_SB(sb)->s_mount_opt & EXT2_MOUNT_POSIX_ACL) ?
+		 MS_POSIXACL : 0);
 
 	if (le32_to_cpu(es->s_rev_level) == EXT2_GOOD_OLD_REV &&
 	    (EXT2_HAS_COMPAT_FEATURE(sb, ~0U) ||
@@ -827,6 +865,9 @@ static int ext2_remount (struct super_block * sb, int * flags, char * data)
 	 */
 	if (!parse_options (data, sbi))
 		return -EINVAL;
+
+	sb->s_flags = (sb->s_flags & ~MS_POSIXACL) |
+		((sbi->s_mount_opt & EXT2_MOUNT_POSIX_ACL) ? MS_POSIXACL : 0);
 
 	es = sbi->s_es;
 	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))

@@ -20,6 +20,10 @@ struct ext2_inode_info {
 	__u32	i_prealloc_block;
 	__u32	i_prealloc_count;
 	__u32	i_dir_start_lookup;
+#ifdef CONFIG_EXT2_FS_POSIX_ACL
+	struct posix_acl	*i_acl;
+	struct posix_acl	*i_default_acl;
+#endif
 	rwlock_t i_meta_lock;
 	struct inode	vfs_inode;
 };
@@ -85,6 +89,7 @@ extern void ext2_delete_inode (struct inode *);
 extern int ext2_sync_inode (struct inode *);
 extern void ext2_discard_prealloc (struct inode *);
 extern void ext2_truncate (struct inode *);
+extern int ext2_setattr (struct dentry *, struct iattr *);
 
 /* ioctl.c */
 extern int ext2_ioctl (struct inode *, struct file *, unsigned int,

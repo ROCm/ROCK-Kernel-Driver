@@ -22,7 +22,6 @@
  *  Assorted race fixes, rewrite of ext2_get_block() by Al Viro, 2000
  */
 
-#include "ext2.h"
 #include <linux/smp_lock.h>
 #include <linux/time.h>
 #include <linux/highuid.h>
@@ -31,6 +30,8 @@
 #include <linux/module.h>
 #include <linux/buffer_head.h>
 #include <linux/mpage.h>
+#include "ext2.h"
+#include "acl.h"
 
 MODULE_AUTHOR("Remy Card and others");
 MODULE_DESCRIPTION("Second Extended Filesystem");
@@ -982,6 +983,10 @@ void ext2_read_inode (struct inode * inode)
 	struct ext2_inode * raw_inode = ext2_get_inode(inode->i_sb, ino, &bh);
 	int n;
 
+#ifdef CONFIG_EXT2_FS_POSIX_ACL
+	ei->i_acl = EXT2_ACL_NOT_CACHED;
+	ei->i_default_acl = EXT2_ACL_NOT_CACHED;
+#endif
 	if (IS_ERR(raw_inode))
  		goto bad_inode;
 
@@ -1177,3 +1182,18 @@ int ext2_sync_inode (struct inode *inode)
 {
 	return ext2_update_inode (inode, 1);
 }
+
+int ext2_setattr(struct dentry *dentry, struct iattr *iattr)
+{
+	struct inode *inode = dentry->d_inode;
+	int error;
+
+	error = inode_change_ok(inode, iattr);
+	if (error)
+		return error;
+	inode_setattr(inode, iattr);
+	if (iattr->ia_valid & ATTR_MODE)
+		error = ext2_acl_chmod(inode);
+	return error;
+}
+

@@ -21,6 +21,7 @@
 #include <linux/time.h>
 #include "ext2.h"
 #include "xattr.h"
+#include "acl.h"
 
 /*
  * Called when an inode is released. Note that this is different
@@ -60,4 +61,6 @@ struct inode_operations ext2_file_inode_operations = {
 	.getxattr	= ext2_getxattr,
 	.listxattr	= ext2_listxattr,
 	.removexattr	= ext2_removexattr,
+	.setattr	= ext2_setattr,
+	.permission	= ext2_permission,
 };

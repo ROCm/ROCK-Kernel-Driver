@@ -970,6 +970,18 @@ config EXT2_FS_XATTR
 
 	  If unsure, say N.
 
+config EXT2_FS_POSIX_ACL
+	bool "Ext2 POSIX Access Control Lists"
+	depends on EXT2_FS_XATTR
+	---help---
+	  Posix Access Control Lists (ACLs) support permissions for users and
+	  groups beyond the owner/group/world scheme.
+
+	  To learn more about Access Control Lists, visit the Posix ACLs for
+	  Linux website <http://acl.bestbits.at/>.
+
+	  If you don't know what Access Control Lists are, say N
+
 config SYSV_FS
 	tristate "System V/Xenix/V7/Coherent file system support"
 	---help---

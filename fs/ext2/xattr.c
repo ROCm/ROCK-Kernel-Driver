@@ -60,6 +60,7 @@
 #include <asm/semaphore.h>
 #include "ext2.h"
 #include "xattr.h"
+#include "acl.h"
 
 /* These symbols may be needed by a module. */
 EXPORT_SYMBOL(ext2_xattr_register);
@@ -1100,19 +1101,35 @@ init_ext2_xattr(void)
 	err = ext2_xattr_register(EXT2_XATTR_INDEX_USER, &ext2_xattr_user_handler);
 	if (err)
 		return err;
+#ifdef CONFIG_EXT2_FS_POSIX_ACL
+	err = init_ext2_acl();
+	if (err)
+		goto out;
+#endif
 	ext2_xattr_cache = mb_cache_create("ext2_xattr", NULL,
 		sizeof(struct mb_cache_entry) +
 		sizeof(struct mb_cache_entry_index), 1, 6);
 	if (!ext2_xattr_cache) {
-		ext2_xattr_unregister(EXT2_XATTR_INDEX_USER, &ext2_xattr_user_handler);
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto out1;
 	}
 	return 0;
+out1:
+#ifdef CONFIG_EXT2_FS_POSIX_ACL
+	exit_ext2_acl();
+out:
+#endif
+	ext2_xattr_unregister(EXT2_XATTR_INDEX_USER,
+			      &ext2_xattr_user_handler);
+	return err;
 }
 
 void
 exit_ext2_xattr(void)
 {
 	mb_cache_destroy(ext2_xattr_cache);
+#ifdef CONFIG_EXT2_FS_POSIX_ACL
+	exit_ext2_acl();
+#endif
 	ext2_xattr_unregister(EXT2_XATTR_INDEX_USER, &ext2_xattr_user_handler);
 }
