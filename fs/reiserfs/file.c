@@ -141,19 +141,19 @@ out:
 }
 
 struct file_operations reiserfs_file_operations = {
-    read:	generic_file_read,
-    write:	generic_file_write,
-    ioctl:	reiserfs_ioctl,
-    mmap:	generic_file_mmap,
-    release:	reiserfs_file_release,
-    fsync:	reiserfs_sync_file,
-    sendfile:	generic_file_sendfile,
+    .read	= generic_file_read,
+    .write	= generic_file_write,
+    .ioctl	= reiserfs_ioctl,
+    .mmap	= generic_file_mmap,
+    .release	= reiserfs_file_release,
+    .fsync	= reiserfs_sync_file,
+    .sendfile	= generic_file_sendfile,
 };
 
 
 struct  inode_operations reiserfs_file_inode_operations = {
-    truncate:	reiserfs_vfs_truncate_file,
-    setattr:    reiserfs_setattr,
+    .truncate	= reiserfs_vfs_truncate_file,
+    .setattr    = reiserfs_setattr,
 };
 
 
