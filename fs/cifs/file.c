@@ -283,10 +283,10 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 		pCifsInode = CIFS_I(inode);
 		if(pCifsInode) {
 			if (pTcon->ses->capabilities & CAP_UNIX)
-				rc = cifs_get_inode_info_unix(inode,
+				rc = cifs_get_inode_info_unix(&inode,
 						full_path, inode->i_sb);
 			else
-				rc = cifs_get_inode_info(inode,
+				rc = cifs_get_inode_info(&inode,
 						full_path, buf, inode->i_sb);
 
 			if(oplock == OPLOCK_EXCLUSIVE) {
@@ -353,6 +353,7 @@ cifs_close(struct inode *inode, struct file *file)
 		info on this inode, much less write behind and read ahead */
 		CIFS_I(inode)->clientCanCacheRead = FALSE;
 		CIFS_I(inode)->clientCanCacheAll  = FALSE;
+		invalidate_remote_inode(inode);
 	}
 	if((rc ==0) && CIFS_I(inode)->write_behind_rc)
 		rc = CIFS_I(inode)->write_behind_rc;

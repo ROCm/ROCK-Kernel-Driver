@@ -1,9 +1,10 @@
 Version 0.99
 ------------
-Invalidate local inode cached pages on oplock break so client does not
-continue using data modified in server copy of file.  Do not reconnect
+Invalidate local inode cached pages on oplock break and when last file
+instance is closed so that the client does not continue using stale local
+copy rather than later modified server copy of file.  Do not reconnect
 when server drops the tcp session prematurely before negotiate
-protocol response. 
+protocol response.  Fix oops in roepen_file when dentry freed.
 
 Version 0.98
 ------------
