@@ -76,13 +76,13 @@ static void end_buffer_read_file_async(struct buffer_head *bh, int uptodate)
 		SetPageError(page);
 
 	spin_lock_irqsave(&page_uptodate_lock, flags);
-	clear_buffer_async(bh);
+	clear_buffer_async_read(bh);
 	unlock_buffer(bh);
 
 	tmp = bh->b_this_page;
 	while (tmp != bh) {
 		if (buffer_locked(tmp)) {
-			if (buffer_async(tmp))
+			if (buffer_async_read(tmp))
 				goto still_busy;
 		} else if (!buffer_uptodate(tmp))
 			SetPageError(page);
@@ -218,7 +218,7 @@ handle_zblock:
 			struct buffer_head *tbh = arr[i];
 			lock_buffer(tbh);
 			tbh->b_end_io = end_buffer_read_file_async;
-			set_buffer_async(tbh);
+			set_buffer_async_read(tbh);
 		}
 		/* Finally, start i/o on the buffers. */
 		for (i = 0; i < nr; i++)
@@ -378,13 +378,13 @@ static void end_buffer_read_mftbmp_async(struct buffer_head *bh, int uptodate)
 		SetPageError(page);
 
 	spin_lock_irqsave(&page_uptodate_lock, flags);
-	clear_buffer_async(bh);
+	clear_buffer_async_read(bh);
 	unlock_buffer(bh);
 
 	tmp = bh->b_this_page;
 	while (tmp != bh) {
 		if (buffer_locked(tmp)) {
-			if (buffer_async(tmp))
+			if (buffer_async_read(tmp))
 				goto still_busy;
 		} else if (!buffer_uptodate(tmp))
 			SetPageError(page);
@@ -501,7 +501,7 @@ handle_zblock:
 			struct buffer_head *tbh = arr[i];
 			lock_buffer(tbh);
 			tbh->b_end_io = end_buffer_read_mftbmp_async;
-			set_buffer_async(tbh);
+			set_buffer_async_read(tbh);
 		}
 		/* Finally, start i/o on the buffers. */
 		for (i = 0; i < nr; i++)
@@ -574,13 +574,13 @@ static void end_buffer_read_mst_async(struct buffer_head *bh, int uptodate)
 		SetPageError(page);
 
 	spin_lock_irqsave(&page_uptodate_lock, flags);
-	clear_buffer_async(bh);
+	clear_buffer_async_read(bh);
 	unlock_buffer(bh);
 
 	tmp = bh->b_this_page;
 	while (tmp != bh) {
 		if (buffer_locked(tmp)) {
-			if (buffer_async(tmp))
+			if (buffer_async_read(tmp))
 				goto still_busy;
 		} else if (!buffer_uptodate(tmp))
 			SetPageError(page);
@@ -758,7 +758,7 @@ handle_zblock:
 			struct buffer_head *tbh = arr[i];
 			lock_buffer(tbh);
 			tbh->b_end_io = end_buffer_read_mst_async;
-			set_buffer_async(tbh);
+			set_buffer_async_read(tbh);
 		}
 		/* Finally, start i/o on the buffers. */
 		for (i = 0; i < nr; i++)
