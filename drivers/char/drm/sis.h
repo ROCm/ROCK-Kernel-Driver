@@ -64,15 +64,4 @@
 
 #define __HAVE_COUNTERS		5
 
-/* Buffer customization:
- */
-#define DRIVER_AGP_BUFFERS_MAP( dev )					\
-	((drm_sis_private_t *)((dev)->dev_private))->buffers
-
-extern int sis_init_context(int context);
-extern int sis_final_context(int context);
-
-#define DRIVER_CTX_CTOR sis_init_context
-#define DRIVER_CTX_DTOR sis_final_context
-
 #endif

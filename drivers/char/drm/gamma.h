@@ -77,38 +77,12 @@
 #define __HAVE_OLD_DMA			1
 #define __HAVE_PCI_DMA			1
 
-#define __HAVE_DRIVER_FOPS_READ		1
-#define __HAVE_DRIVER_FOPS_POLL		1
-
 #define __HAVE_MULTIPLE_DMA_QUEUES	1
 #define __HAVE_DMA_WAITQUEUE		1
 
-#define __HAVE_DMA_WAITLIST		1
-#define __HAVE_DMA_FREELIST		1
-
-#define __HAVE_DMA_FLUSH		1
-#define __HAVE_DMA_SCHEDULE		1
-
-#define __HAVE_DMA_READY		1
-#define DRIVER_DMA_READY() do {						\
-	gamma_dma_ready(dev);						\
-} while (0)
-
-#define __HAVE_DMA_QUIESCENT		1
-#define DRIVER_DMA_QUIESCENT() do {					\
-	drm_gamma_private_t *dev_priv =					\
-		(drm_gamma_private_t *)dev->dev_private;		\
-	if (dev_priv->num_rast == 2)					\
-		gamma_dma_quiescent_dual(dev);				\
-	else gamma_dma_quiescent_single(dev);				\
-	return 0;							\
-} while (0)
+/* removed from DRM HAVE_DMA_FREELIST & HAVE_DMA_SCHEDULE */
 
 #define __HAVE_IRQ			1
 #define __HAVE_IRQ_BH			1
-
-#define DRIVER_AGP_BUFFERS_MAP( dev )					\
-	((drm_gamma_private_t *)((dev)->dev_private))->buffers
-
 
 #endif /* __GAMMA_H__ */

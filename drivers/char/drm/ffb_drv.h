@@ -274,3 +274,10 @@ typedef struct ffb_dev_priv {
 	/* Context table. */
 	struct ffb_hw_context	*hw_state[FFB_MAX_CTXS];
 } ffb_dev_priv_t;
+
+extern struct file_operations DRM(fops);
+extern unsigned long ffb_get_unmapped_area(struct file *filp,
+					   unsigned long hint,
+					   unsigned long len,
+					   unsigned long pgoff,
+					   unsigned long flags);

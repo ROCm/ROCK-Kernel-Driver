@@ -187,6 +187,7 @@ static inline void drm_ioremapfree(void *pt, unsigned long size, drm_device_t *d
 	iounmap(pt);
 }
 
+
 #if DEBUG_MEMORY
 #include "drm_memory_debug.h"
 #else

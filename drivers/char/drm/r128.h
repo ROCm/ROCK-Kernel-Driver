@@ -79,42 +79,11 @@
    [DRM_IOCTL_NR(DRM_IOCTL_R128_INDIRECT)]   = { r128_cce_indirect, 1, 1 }, \
    [DRM_IOCTL_NR(DRM_IOCTL_R128_GETPARAM)]   = { r128_getparam, 1, 0 },
 
-/* Driver customization:
- */
-#define DRIVER_PRERELEASE() do {					\
-	if ( dev->dev_private ) {					\
-		drm_r128_private_t *dev_priv = dev->dev_private;	\
-		if ( dev_priv->page_flipping ) {			\
-			r128_do_cleanup_pageflip( dev );		\
-		}							\
-	}								\
-} while (0)
-
-#define DRIVER_PRETAKEDOWN() do {					\
-	r128_do_cleanup_cce( dev );					\
-} while (0)
-
 /* DMA customization:
  */
 #define __HAVE_DMA		1
 #define __HAVE_IRQ		1
 #define __HAVE_VBL_IRQ		1
 #define __HAVE_SHARED_IRQ       1
-
-#if 0
-/* GH: Remove this for now... */
-#define __HAVE_DMA_QUIESCENT	1
-#define DRIVER_DMA_QUIESCENT() do {					\
-	drm_r128_private_t *dev_priv = dev->dev_private;		\
-	return r128_do_cce_idle( dev_priv );				\
-} while (0)
-#endif
-
-/* Buffer customization:
- */
-#define DRIVER_BUF_PRIV_T	drm_r128_buf_priv_t
-
-#define DRIVER_AGP_BUFFERS_MAP( dev )					\
-	((drm_r128_private_t *)((dev)->dev_private))->buffers
 
 #endif
