@@ -876,6 +876,46 @@ void ide_stall_queue (ide_drive_t *drive, unsigned long timeout)
 	drive->sleep = timeout + jiffies;
 }
 
+void ide_unpin_hwgroup(ide_drive_t *drive)
+{
+	ide_hwgroup_t *hwgroup = HWGROUP(drive);
+
+	if (hwgroup) {
+		spin_lock_irq(&ide_lock);
+		HWGROUP(drive)->busy = 0;
+		drive->blocked = 0;
+		do_ide_request(drive->queue);
+		spin_unlock_irq(&ide_lock);
+	}
+}
+
+void ide_pin_hwgroup(ide_drive_t *drive)
+{
+	ide_hwgroup_t *hwgroup = HWGROUP(drive);
+
+	/*
+	 * should only happen very early, so not a problem
+	 */
+	if (!hwgroup)
+		return;
+
+	spin_lock_irq(&ide_lock);
+	do {
+		if (!hwgroup->busy && !drive->blocked && !drive->doing_barrier)
+			break;
+		spin_unlock_irq(&ide_lock);
+		schedule_timeout(HZ/100);
+		spin_lock_irq(&ide_lock);
+	} while (hwgroup->busy || drive->blocked || drive->doing_barrier);
+
+	/*
+	 * we've now secured exclusive access to this hwgroup
+	 */
+	hwgroup->busy = 1;
+	drive->blocked = 1;
+	spin_unlock_irq(&ide_lock);
+}
+
 EXPORT_SYMBOL(ide_stall_queue);
 
 #define WAKEUP(drive)	((drive)->service_start + 2 * (drive)->service_time)

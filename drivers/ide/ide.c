@@ -1277,18 +1277,28 @@ static int set_io_32bit(ide_drive_t *drive, int arg)
 static int set_using_dma (ide_drive_t *drive, int arg)
 {
 #ifdef CONFIG_BLK_DEV_IDEDMA
+	int ret = -EPERM;
+
+	ide_pin_hwgroup(drive);
+
 	if (!drive->id || !(drive->id->capability & 1))
-		return -EPERM;
+		goto out;
 	if (HWIF(drive)->ide_dma_check == NULL)
-		return -EPERM;
+		goto out;
+	ret = -EIO;
 	if (arg) {
-		if (HWIF(drive)->ide_dma_check(drive)) return -EIO;
-		if (HWIF(drive)->ide_dma_on(drive)) return -EIO;
+		if (HWIF(drive)->ide_dma_check(drive))
+			goto out;
+		if (HWIF(drive)->ide_dma_on(drive))
+			goto out;
 	} else {
 		if (__ide_dma_off(drive))
-			return -EIO;
+			goto out;
 	}
-	return 0;
+	ret = 0;
+out:
+	ide_unpin_hwgroup(drive);
+	return ret;
 #else
 	return -EPERM;
 #endif

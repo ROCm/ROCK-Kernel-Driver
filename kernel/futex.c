@@ -538,8 +538,6 @@ static int futex_wait(unsigned long uaddr, int val, unsigned long time)
 		return 0;
 	if (time == 0)
 		return -ETIMEDOUT;
-	/* A spurious wakeup should never happen. */
-	WARN_ON(!signal_pending(current));
 	return -EINTR;
 
  out_unqueue:

@@ -1497,6 +1497,9 @@ extern irqreturn_t ide_intr(int irq, void *dev_id, struct pt_regs *regs);
 extern void do_ide_request(request_queue_t *);
 extern void ide_init_subdrivers(void);
 
+extern void ide_pin_hwgroup(ide_drive_t *);
+extern void ide_unpin_hwgroup(ide_drive_t *);
+
 extern struct block_device_operations ide_fops[];
 extern ide_proc_entry_t generic_subdriver_entries[];
 
