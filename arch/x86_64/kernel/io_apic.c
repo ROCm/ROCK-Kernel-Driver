@@ -212,7 +212,6 @@ static int __init enable_ioapic_setup(char *str)
 __setup("noapic", disable_ioapic_setup);
 __setup("apic", enable_ioapic_setup);
 
-#ifndef CONFIG_SMP
 #include <asm/pci-direct.h>
 #include <linux/pci_ids.h>
 #include <linux/pci.h>
@@ -277,7 +276,6 @@ void __init check_ioapic(void)
 		}
 	}
 } 
-#endif
 
 static int __init ioapic_pirq_setup(char *str)
 {
