@@ -409,7 +409,7 @@ static int iSeries_Scan_Bridge_Slot(HvBusNumber Bus,
 	iSeries_assign_IRQ(Irq, Bus, 0, EADsIdSel);
 	PPCDBG(PPCDBG_BUSWALK,
 		"PCI:- allocate and assign IRQ 0x%02X.%02X.%02X = 0x%02X\n",
-		Bus, 0, AgentId, Irq);
+		Bus, 0, EADsIdSel, Irq);
 
 	/*
 	 * Connect all functions of any device found.  

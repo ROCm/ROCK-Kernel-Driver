@@ -58,6 +58,7 @@
 extern void abort(void);
 extern void ppcdbg_initialize(void);
 extern void iSeries_pcibios_init(void);
+extern void tce_init_iSeries(void);
 
 static void build_iSeries_Memory_Map(void);
 static void setup_iSeries_cache_sizes(void);

@@ -289,6 +289,7 @@ static void __init pcibios_claim_one_bus(struct pci_bus *b)
 		pcibios_claim_one_bus(child_bus);
 }
 
+#ifndef CONFIG_PPC_ISERIES
 static void __init pcibios_claim_of_setup(void)
 {
 	struct list_head *lb;
@@ -298,6 +299,7 @@ static void __init pcibios_claim_of_setup(void)
 		pcibios_claim_one_bus(b);
 	}
 }
+#endif
 
 static int __init pcibios_init(void)
 {
