@@ -1324,19 +1324,13 @@ static int snd_ctl_dev_disconnect(snd_device_t *device)
 }
 
 /*
- * de-registration of the control device
+ * free all controls
  */
-static int snd_ctl_dev_unregister(snd_device_t *device)
+static int snd_ctl_dev_free(snd_device_t *device)
 {
 	snd_card_t *card = device->device_data;
-	int err, cardnum;
 	snd_kcontrol_t *control;
 
-	snd_assert(card != NULL, return -ENXIO);
-	cardnum = card->number;
-	snd_assert(cardnum >= 0 && cardnum < SNDRV_CARDS, return -ENXIO);
-	if ((err = snd_unregister_device(SNDRV_DEVICE_TYPE_CONTROL, card, 0)) < 0)
-		return err;
 	down_write(&card->controls_rwsem);
 	while (!list_empty(&card->controls)) {
 		control = snd_kcontrol(card->controls.next);
@@ -1347,12 +1341,29 @@ static int snd_ctl_dev_unregister(snd_device_t *device)
 }
 
 /*
+ * de-registration of the control device
+ */
+static int snd_ctl_dev_unregister(snd_device_t *device)
+{
+	snd_card_t *card = device->device_data;
+	int err, cardnum;
+
+	snd_assert(card != NULL, return -ENXIO);
+	cardnum = card->number;
+	snd_assert(cardnum >= 0 && cardnum < SNDRV_CARDS, return -ENXIO);
+	if ((err = snd_unregister_device(SNDRV_DEVICE_TYPE_CONTROL, card, 0)) < 0)
+		return err;
+	return snd_ctl_dev_free(device);
+}
+
+/*
  * create control core:
  * called from init.c
  */
 int snd_ctl_create(snd_card_t *card)
 {
 	static snd_device_ops_t ops = {
+		.dev_free = snd_ctl_dev_free,
 		.dev_register =	snd_ctl_dev_register,
 		.dev_disconnect = snd_ctl_dev_disconnect,
 		.dev_unregister = snd_ctl_dev_unregister
