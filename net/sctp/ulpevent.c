@@ -82,6 +82,7 @@ struct sctp_ulpevent *sctp_ulpevent_init(struct sctp_ulpevent *event,
 	return event;
 }
 
+
 /* Dispose of an event.  */
 void sctp_ulpevent_free(struct sctp_ulpevent *event)
 {
@@ -336,7 +337,7 @@ struct sctp_ulpevent *sctp_ulpevent_make_remote_error(
 	/* Copy the skb to a new skb with room for us to prepend
 	 * notification with.
 	 */
-	skb = skb_copy_expand(chunk->skb, sizeof(struct sctp_remote_error), 
+	skb = skb_copy_expand(chunk->skb, sizeof(struct sctp_remote_error),
 			      0, gfp);
 
 	/* Pull off the rest of the cause TLV from the chunk.  */
@@ -502,7 +503,7 @@ struct sctp_ulpevent *sctp_ulpevent_make_send_failed(
 	memcpy(&ssf->ssf_info, &chunk->sinfo, sizeof(struct sctp_sndrcvinfo));
 
 	/* Per TSVWG discussion with Randy. Allow the application to
-	 * ressemble a fragmented message. 
+	 * ressemble a fragmented message.
 	 */
 	ssf->ssf_info.sinfo_flags = chunk->chunk_hdr->flags;
 
@@ -596,7 +597,7 @@ fail:
  * 5.2.2 SCTP Header Information Structure (SCTP_SNDRCV)
  */
 struct sctp_ulpevent *sctp_ulpevent_make_rcvmsg(struct sctp_association *asoc,
-						struct sctp_chunk *chunk, 
+						struct sctp_chunk *chunk,
 						int gfp)
 {
 	struct sctp_ulpevent *event;
@@ -793,6 +794,7 @@ struct sctp_ulpevent *sctp_ulpevent_make_pdapi(
 	 *
 	 * The association id field, holds the identifier for the association.
 	 */
+	sctp_ulpevent_set_owner(skb, asoc);
 	pd->pdapi_assoc_id = sctp_assoc2id(asoc);
 
 	return event;
@@ -824,11 +826,25 @@ void sctp_ulpevent_read_sndrcvinfo(const struct sctp_ulpevent *event,
 	}
 }
 
+/* Stub skb destructor.  */
+static void sctp_stub_rfree(struct sk_buff *skb)
+{
+/* WARNING:  This function is just a warning not to use the
+ * skb destructor.  If the skb is shared, we may get the destructor
+ * callback on some processor that does not own the sock_lock.  This
+ * was occuring with PACKET socket applications that were monitoring
+ * our skbs.   We can't take the sock_lock, because we can't risk
+ * recursing if we do really own the sock lock.  Instead, do all
+ * of our rwnd manipulation while we own the sock_lock outright.
+ */
+}
+
 /* Do accounting for bytes just read by user.  */
 static void sctp_rcvmsg_rfree(struct sk_buff *skb)
 {
 	struct sctp_association *asoc;
 	struct sctp_ulpevent *event;
+	struct sk_buff *frag;
 
 	/* Current stack structures assume that the rcv buffer is
 	 * per socket.   For UDP style sockets this is not true as
@@ -836,9 +852,16 @@ static void sctp_rcvmsg_rfree(struct sk_buff *skb)
 	 * Use the local private area of the skb to track the owning
 	 * association.
 	 */
+
 	event = sctp_skb2event(skb);
 	asoc = event->asoc;
 	sctp_assoc_rwnd_increase(asoc, skb_headlen(skb));
+
+	/* Don't forget the fragments. */
+	for (frag = skb_shinfo(skb)->frag_list; frag; frag = frag->next) {
+		/* NOTE:  skb_shinfos are recursive. */
+		sctp_rcvmsg_rfree(frag);
+	}
 	sctp_association_put(asoc);
 }
 
@@ -859,8 +882,7 @@ static void sctp_ulpevent_set_owner_r(struct sk_buff *skb,
 	event = sctp_skb2event(skb);
 	event->asoc = asoc;
 
-	skb->destructor = sctp_rcvmsg_rfree;
-
+	skb->destructor = sctp_stub_rfree;
 	sctp_assoc_rwnd_decrease(asoc, skb_headlen(skb));
 }
 
@@ -868,7 +890,6 @@ static void sctp_ulpevent_set_owner_r(struct sk_buff *skb,
 static void sctp_ulpevent_rfree(struct sk_buff *skb)
 {
 	struct sctp_ulpevent *event;
-
 	event = sctp_skb2event(skb);
 	sctp_association_put(event->asoc);
 }
@@ -888,5 +909,28 @@ static void sctp_ulpevent_set_owner(struct sk_buff *skb,
 	skb->sk = asoc->base.sk;
 	event = sctp_skb2event(skb);
 	event->asoc = (struct sctp_association *)asoc;
-	skb->destructor = sctp_ulpevent_rfree;
+	skb->destructor = sctp_stub_rfree;
+}
+
+/* Free a ulpevent that has an owner.  See comments in
+ * sctp_stub_rfree().
+ */
+void sctp_ulpevent_kfree_skb(struct sk_buff *skb)
+{
+	struct sctp_ulpevent *event;
+
+	event = sctp_skb2event(skb);
+	if (sctp_ulpevent_is_notification(event))
+		sctp_ulpevent_rfree(skb);
+	else
+		sctp_rcvmsg_rfree(skb);
+	kfree_skb(skb);
+}
+
+/* Purge the skb lists holding ulpevents. */
+void sctp_queue_purge_ulpevents(struct sk_buff_head *list)
+{
+	struct sk_buff *skb;
+	while ((skb = skb_dequeue(list)) != NULL)
+		sctp_ulpevent_kfree_skb(skb);
 }
