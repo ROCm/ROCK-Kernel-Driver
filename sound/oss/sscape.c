@@ -1268,6 +1268,7 @@ static int __init init_ss_ms_sound(struct address_info *hw_config)
 {
 	int i, irq_bits = 0xff;
 	int ad_flags = 0;
+	struct resource *ports;
 	
 	if (devc->failed)
 	{
@@ -1296,8 +1297,17 @@ static int __init init_ss_ms_sound(struct address_info *hw_config)
 		ad_flags = 0x12345677;	/* Tell that we may have a CS4248 chip (Spea-V7 Media FX) */
 	else if (sscape_is_pnp)
 		ad_flags = 0x87654321;  /* Tell that we have a soundscape pnp with 1845 chip */
-	if (!ad1848_detect(hw_config->io_base, &ad_flags, hw_config->osp))
+
+	ports = request_region(hw_config->io_base, 4, "ad1848");
+	if (!ports) {
+		printk(KERN_ERR "soundscape: ports busy\n");
 		return 0;
+	}
+
+	if (!ad1848_detect(ports, &ad_flags, hw_config->osp)) {
+		release_region(hw_config->io_base, 4);
+		return 0;
+	}
 
  	if (!sscape_is_pnp)  /*pnp is already setup*/
  	{
@@ -1322,7 +1332,7 @@ static int __init init_ss_ms_sound(struct address_info *hw_config)
  				
 	hw_config->slots[0] = ad1848_init(
 			sscape_is_pnp ? "SoundScape" : "SoundScape PNP",
-			hw_config->io_base,
+			ports,
 			hw_config->irq,
 			hw_config->dma,
 			hw_config->dma,

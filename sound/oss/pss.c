@@ -1039,14 +1039,20 @@ static coproc_operations pss_coproc_operations =
 static int __init probe_pss_mss(struct address_info *hw_config)
 {
 	volatile int timeout;
+	struct resource *ports;
 	int        my_mix = -999;	/* gcc shut up */
 
 	if (!pss_initialized)
 		return 0;
 
-	if (check_region(hw_config->io_base, 8))
-	{
+	if (!request_region(hw_config->io_base, 4, "WSS config")) {
 		printk(KERN_ERR "PSS: WSS I/O port conflicts.\n");
+		return 0;
+	}
+	ports = request_region(hw_config->io_base + 4, 4, "ad1848");
+	if (!ports) {
+		printk(KERN_ERR "PSS: WSS I/O port conflicts.\n");
+		release_region(hw_config->io_base, 4);
 		return 0;
 	}
 	if (!set_io_base(devc, CONF_WSS, hw_config->io_base)) {
@@ -1077,7 +1083,7 @@ static int __init probe_pss_mss(struct address_info *hw_config)
 	  (timeout < 100000); timeout++)
 		;
 
-	if (!probe_ms_sound(hw_config))
+	if (!probe_ms_sound(hw_config, ports))
 		goto fail;
 
 	devc->ad_mixer_dev = NO_WSS_MIXER;
@@ -1094,7 +1100,7 @@ static int __init probe_pss_mss(struct address_info *hw_config)
 		}
 	}
 	pss_mixer_reset(devc);
-	attach_ms_sound(hw_config, THIS_MODULE);	/* Slot 0 */
+	attach_ms_sound(hw_config, ports, THIS_MODULE);	/* Slot 0 */
 
 	if (hw_config->slots[0] != -1)
 	{
@@ -1108,6 +1114,8 @@ static int __init probe_pss_mss(struct address_info *hw_config)
 	}
 	return 1;
 fail:
+	release_region(hw_config->io_base + 4, 4);
+	release_region(hw_config->io_base, 4);
 	return 0;
 }
 

@@ -478,6 +478,7 @@ static int __init probe_mad16(struct address_info *hw_config)
 	int dma = hw_config->dma, dma2 = hw_config->dma2;
 	unsigned char dma2_bit = 0;
 	int base;
+	struct resource *ports;
 
 	mad16_osp = hw_config->osp;
 
@@ -536,11 +537,13 @@ static int __init probe_mad16(struct address_info *hw_config)
 		return 0;
 	}
 
-	if (check_region(hw_config->io_base + 4, 4) {
+	ports = request_region(hw_config->io_base + 4, 4, "ad1848");
+	if (!ports) {
 		printk(KERN_ERR "MSS: I/O port conflict\n");
 		return 0;
 	}
 	if (!request_region(hw_config->io_base, 4, "mad16 WSS config")) {
+		release_region(hw_config->io_base + 4, 4);
 		printk(KERN_ERR "MSS: I/O port conflict\n");
 		return 0;
 	}
@@ -582,7 +585,7 @@ static int __init probe_mad16(struct address_info *hw_config)
 		mad_write(MC5_PORT, 0x05);
 		mad_write(MC6_PORT, 0x03);
 	}
-	if (!ad1848_detect(hw_config->io_base + 4, &ad_flags, mad16_osp))
+	if (!ad1848_detect(ports, &ad_flags, mad16_osp))
 		goto fail;
 
 	if (ad_flags & (AD_F_CS4231 | AD_F_CS4248))
@@ -609,7 +612,7 @@ static int __init probe_mad16(struct address_info *hw_config)
 
 got_it:
 	ad_flags = 0;
-	if (!ad1848_detect(hw_config->io_base + 4, &ad_flags, mad16_osp))
+	if (!ad1848_detect(ports, &ad_flags, mad16_osp))
 		goto fail;
 
 	if (!wss_init(hw_config))
@@ -653,7 +656,7 @@ got_it:
 
 	outb((bits | dma_bits[dma] | dma2_bit), config_port);	/* Write IRQ+DMA setup */
 
-	hw_config->slots[0] = ad1848_init("mad16 WSS", hw_config->io_base + 4,
+	hw_config->slots[0] = ad1848_init("mad16 WSS", ports,
 					  hw_config->irq,
 					  dma,
 					  dma2, 0,
@@ -662,6 +665,7 @@ got_it:
 	return 1;
 
 fail:
+	release_region(hw_config->io_base + 4, 4);
 	release_region(hw_config->io_base, 4);
 	return 0;
 }

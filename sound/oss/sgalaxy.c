@@ -86,20 +86,30 @@ static int __init sb_cmd( int base, unsigned char val )
 
 static int __init probe_sgalaxy( struct address_info *ai )
 {
+	struct resource *ports;
 	int n;
 
-	if ( check_region( ai->io_base, 8 ) ) {
+	if (!request_region(ai->io_base, 4, "WSS config")) {
 		printk(KERN_ERR "sgalaxy: WSS IO port 0x%03x not available\n", ai->io_base);
+		return 0;
+	}
+
+	ports = request_region(ai->io_base + 4, 4, "ad1848");
+	if (!ports) {
+		printk(KERN_ERR "sgalaxy: WSS IO port 0x%03x not available\n", ai->io_base);
+		release_region(ai->io_base, 4);
 		return 0;
 	}
 
 	if (!request_region( ai->ai_sgbase, 0x10, "SoundGalaxy SB")) {
 		printk(KERN_ERR "sgalaxy: SB IO port 0x%03x not available\n", ai->ai_sgbase);
+		release_region(ai->io_base + 4, 4);
+		release_region(ai->io_base, 4);
 		return 0;
 	}
-
-	if ( ad1848_detect( ai->io_base+4, NULL, ai->osp ) )
-		goto out;
+        
+	if (ad1848_detect(ports, NULL, ai->osp))
+		goto out;  /* The card is already active, check irq etc... */
         
 	/* switch to MSS/WSS mode */
    
@@ -111,12 +121,14 @@ static int __init probe_sgalaxy( struct address_info *ai )
 	sleep( HZ/10 );
 
 out:
-      	if (!probe_ms_sound(ai)) {
+      	if (!probe_ms_sound(ai, ports)) {
+		release_region(ai->io_base + 4, 4);
+		release_region(ai->io_base, 4);
 		release_region(ai->ai_sgbase, 0x10);
 		return 0;
 	}
 
-	attach_ms_sound(ai, THIS_MODULE);
+	attach_ms_sound(ai, ports, THIS_MODULE);
 	n=ai->slots[0];
 	
 	if (n!=-1 && audio_devs[n]->mixer_dev != -1 ) {

@@ -125,6 +125,7 @@ static int __init init_trix_wss(struct address_info *hw_config)
 	static unsigned char dma_bits[4] = {
 		1, 2, 0, 3
 	};
+	struct resource *ports;
 	int config_port = hw_config->io_base + 0;
 	int dma1 = hw_config->dma, dma2 = hw_config->dma2;
 	int old_num_mixers = num_mixers;
@@ -175,14 +176,15 @@ static int __init init_trix_wss(struct address_info *hw_config)
 	 * system returns 0x04 while some cards (AudioTrix Pro for example)
 	 * return 0x00.
 	 */
-	if (check_region(hw_config->io_base + 4, 4))
-	{
+	ports = request_region(hw_config->io_base + 4, 4, "ad1848");
+	if (!ports) {
 		printk(KERN_ERR "AudioTrix: MSS I/O port conflict (%x)\n", hw_config->io_base);
 		return 0;
 	}
 
 	if (!request_region(hw_config->io_base, 4, "MSS config")) {
 		printk(KERN_ERR "AudioTrix: MSS I/O port conflict (%x)\n", hw_config->io_base);
+		release_region(hw_config->io_base + 4, 4);
 		return 0;
 	}
 
@@ -212,7 +214,7 @@ static int __init init_trix_wss(struct address_info *hw_config)
 		goto fail;
 	}
 
-	ret = ad1848_detect(hw_config->io_base + 4, NULL, hw_config->osp);
+	ret = ad1848_detect(ports, NULL, hw_config->osp);
 	if (!ret)
 		goto fail;
 
@@ -243,7 +245,7 @@ static int __init init_trix_wss(struct address_info *hw_config)
 
 	outb((bits), config_port);	/* Write IRQ+DMA setup */
 
-	hw_config->slots[0] = ad1848_init("AudioTrix Pro", hw_config->io_base + 4,
+	hw_config->slots[0] = ad1848_init("AudioTrix Pro", ports,
 					  hw_config->irq,
 					  dma1,
 					  dma2,
@@ -262,6 +264,7 @@ static int __init init_trix_wss(struct address_info *hw_config)
 
 fail:
 	release_region(hw_config->io_base, 4);
+	release_region(hw_config->io_base + 4, 4);
 	return 0;
 }
 
