@@ -670,6 +670,7 @@ static void intr_callback(struct urb *urb)
 	pegasus_t *pegasus = urb->context;
 	struct net_device *net;
 	__u8 *d;
+	int status;
 
 	if (!pegasus)
 		return;
@@ -677,7 +678,9 @@ static void intr_callback(struct urb *urb)
 	switch (urb->status) {
 	case 0:
 		break;
+	case -ECONNRESET:	/* unlink */
 	case -ENOENT:
+	case -ESHUTDOWN:
 		return;
 	default:
 		info("intr status %d", urb->status);
@@ -700,6 +703,11 @@ static void intr_callback(struct urb *urb)
 			netif_carrier_on(net);
 		}
 	}
+
+	status = usb_submit_urb (urb, SLAB_ATOMIC);
+	if (status)
+		err ("%s: can't resubmit interrupt urb, %d",
+				net->name, status);
 }
 
 static void pegasus_tx_timeout(struct net_device *net)

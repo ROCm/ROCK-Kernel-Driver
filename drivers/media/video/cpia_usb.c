@@ -100,7 +100,8 @@ static struct cpia_camera_ops cpia_usb_ops = {
 	cpia_usb_streamStop,
 	cpia_usb_streamRead,
 	cpia_usb_close,
-	0
+	0,
+	THIS_MODULE
 };
 
 static struct cam_data *cam_list;
@@ -548,7 +549,7 @@ static int cpia_probe(struct usb_interface *intf,
 	}
 
 	spin_lock( &cam_list_lock_usb );
-	cpia_add_to_list(cam_list, cam);
+	cpia_add_to_list(&cam_list, &cam);
 	spin_unlock( &cam_list_lock_usb );
 
 	dev_set_drvdata(&intf->dev, cam);
@@ -602,7 +603,7 @@ static void cpia_disconnect(struct usb_interface *intf)
 
 	ucpia = (struct usb_cpia *) cam->lowlevel_data;
 	spin_lock( &cam_list_lock_usb );
-	cpia_remove_from_list(cam);
+	cpia_remove_from_list(&cam);
 	spin_unlock( &cam_list_lock_usb );
 	
 	/* Don't even try to reset the altsetting if we're disconnected */

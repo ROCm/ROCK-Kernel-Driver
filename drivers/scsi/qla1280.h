@@ -1324,22 +1324,12 @@ void qla1280_setup(char *s, int *dummy);
  */
 
 #define QLA1280_LINUX_TEMPLATE {				\
-	next: NULL,						\
-	module: NULL,						\
-	proc_dir: NULL,						\
 	proc_info: qla1280_proc_info,				\
 	name: "Qlogic ISP 1280/12160",				\
 	detect: qla1280_detect,					\
 	release: qla1280_release,				\
 	info: qla1280_info,					\
-	ioctl: NULL,						\
-	command: NULL,						\
 	queuecommand: qla1280_queuecommand,			\
-	eh_strategy_handler: NULL,				\
-	eh_abort_handler: NULL,					\
-	eh_device_reset_handler: NULL,				\
-	eh_bus_reset_handler: NULL,				\
-	eh_host_reset_handler: NULL,				\
 /*	use_new_eh_code: 0, */					\
 	abort: qla1280_abort,					\
 	reset: qla1280_reset,					\

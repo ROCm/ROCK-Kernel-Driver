@@ -3,22 +3,6 @@
 
 #ifdef _IBM_LANA_DRIVER_
 
-/* version-dependent functions/structures */
-
-#if LINUX_VERSION_CODE >= 0x020318
-#define IBMLANA_READB(addr) isa_readb(addr)
-#define IBMLANA_TOIO(dest, src, len) isa_memcpy_toio(dest, src, len)
-#define IBMLANA_FROMIO(dest, src, len) isa_memcpy_fromio(dest, src, len)
-#define IBMLANA_SETIO(dest, val, len) isa_memset_io(dest, val, len)
-#define IBMLANA_NETDEV net_device
-#else
-#define IBMLANA_READB(addr) readb(addr)
-#define IBMLANA_TOIO(dest, src, len) memcpy_toio(dest, src, len)
-#define IBMLANA_FROMIO(dest, src, len) memcpy_fromio(dest, src, len)
-#define IBMLANA_SETIO(dest, val, len) memset_io(dest, val, len)
-#define IBMLANA_NETDEV device
-#endif
-
 /* maximum packet size */
 
 #define PKTSIZE 1524
@@ -33,25 +17,27 @@
 /* media enumeration - defined in a way that it fits onto the LAN/A's
    POS registers... */
 
-typedef enum { Media_10BaseT, Media_10Base5,
+typedef enum { 
+	Media_10BaseT, Media_10Base5,
 	Media_Unknown, Media_10Base2, Media_Count
 } ibmlana_medium;
 
 /* private structure */
 
 typedef struct {
-	unsigned int slot;	/* MCA-Slot-#                       */
+	unsigned int slot;		/* MCA-Slot-#                       */
 	struct net_device_stats stat;	/* packet statistics            */
-	int realirq;		/* memorizes actual IRQ, even when 
-				   currently not allocated          */
-	ibmlana_medium medium;	/* physical cannector               */
-	u32 tdastart, txbufstart,	/* addresses                        */
-	 rrastart, rxbufstart, rdastart, rxbufcnt, txusedcnt;
-	int nextrxdescr,	/* next rx descriptor to be used    */
-	 lastrxdescr,		/* last free rx descriptor          */
-	 nexttxdescr,		/* last tx descriptor to be used    */
-	 currtxdescr,		/* tx descriptor currently tx'ed    */
-	 txused[TXBUFCNT];	/* busy flags                       */
+	int realirq;			/* memorizes actual IRQ, even when 
+					   currently not allocated          */
+	ibmlana_medium medium;		/* physical cannector               */
+	u32 	tdastart, txbufstart,	/* addresses                        */
+		rrastart, rxbufstart, rdastart, rxbufcnt, txusedcnt;
+	int 	nextrxdescr,		/* next rx descriptor to be used    */
+		lastrxdescr,		/* last free rx descriptor          */
+		nexttxdescr,		/* last tx descriptor to be used    */
+		currtxdescr,		/* tx descriptor currently tx'ed    */
+		txused[TXBUFCNT];	/* busy flags                       */
+	spinlock_t lock;
 } ibmlana_priv;
 
 /* this card uses quite a lot of I/O ports...luckily the MCA bus decodes 
@@ -289,7 +275,7 @@ typedef struct {
 
 #endif				/* _IBM_LANA_DRIVER_ */
 
-extern int ibmlana_probe(struct IBMLANA_NETDEV *);
+extern int ibmlana_probe(struct net_device *);
 
 
 #endif	/* _IBM_LANA_INCLUDE_ */

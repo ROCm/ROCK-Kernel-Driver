@@ -1575,11 +1575,9 @@ static int nsp32_proc_info(char  *buffer,
 	}
 
 	/* search this HBA host */
-	for (host=scsi_hostlist; host; host=host->next) {
-		if (host->host_no == hostno) {
-			break;
-		}
-	}
+	
+	host = scsi_host_hn_get(hostno);
+	
 	if (host == NULL) {
 		return -ESRCH;
 	}

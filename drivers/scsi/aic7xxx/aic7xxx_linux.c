@@ -398,26 +398,26 @@ MODULE_DESCRIPTION("Adaptec Aic77XX/78XX SCSI Host Bus Adapter driver");
 MODULE_LICENSE("Dual BSD/GPL");
 #endif
 MODULE_PARM(aic7xxx, "s");
-MODULE_PARM_DESC(aic7xxx, "period delimited, options string.
-	verbose			Enable verbose/diagnostic logging
-	no_probe		Disable EISA/VLB controller probing
-	no_reset		Supress initial bus resets
-	extended		Enable extended geometry on all controllers
-	periodic_otag		Send an ordered tagged transaction periodically
-				to prevent tag starvation.  This may be
-				required by some older disk drives/RAID arrays. 
-	reverse_scan		Sort PCI devices highest Bus/Slot to lowest
-	tag_info:<tag_str>	Set per-target tag depth
-	seltime:<int>		Selection Timeout(0/256ms,1/128ms,2/64ms,3/32ms)
-
-	Sample /etc/modules.conf line:
-		Enable verbose logging
-		Disable EISA/VLB probing
-		Set tag depth on Controller 2/Target 2 to 10 tags
-		Shorten the selection timeout to 128ms from its default of 256
-
-	options aic7xxx='\"verbose.no_probe.tag_info:{{}.{}.{..10}}.seltime:1\"'
-");
+MODULE_PARM_DESC(aic7xxx, "period delimited, options string.\n" \
+"	verbose			Enable verbose/diagnostic logging\n" \
+"	no_probe		Disable EISA/VLB controller probing\n" \
+"	no_reset		Supress initial bus resets\n" \
+"	extended		Enable extended geometry on all controllers\n" \
+"	periodic_otag		Send an ordered tagged transaction periodically\n" \
+"				to prevent tag starvation.  This may be\n" \
+"				required by some older disk drives/RAID arrays. \n" \
+"	reverse_scan		Sort PCI devices highest Bus/Slot to lowest\n" \
+"	tag_info:<tag_str>	Set per-target tag depth\n" \
+"	seltime:<int>		Selection Timeout(0/256ms,1/128ms,2/64ms,3/32ms)\n" \
+"\n" \
+"	Sample /etc/modules.conf line:\n" \
+"		Enable verbose logging\n" \
+"		Disable EISA/VLB probing\n" \
+"		Set tag depth on Controller 2/Target 2 to 10 tags\n" \
+"		Shorten the selection timeout to 128ms from its default of 256\n" \
+" \n" \
+"	options aic7xxx='\"verbose.no_probe.tag_info:{{}.{}.{..10}}.seltime:1\"'\n"
+);
 #endif
 
 static void ahc_linux_handle_scsi_status(struct ahc_softc *,

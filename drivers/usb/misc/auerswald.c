@@ -1014,30 +1014,39 @@ static void auerswald_int_complete (struct urb * urb)
         pauerbuf_t   bp = NULL;
         pauerswald_t cp = (pauerswald_t) urb->context;
 
-        dbg ("auerswald_int_complete called");
+        dbg ("%s called", __FUNCTION__);
 
-        /* do not respond to an error condition */
-        if (urb->status != 0) {
-                dbg ("nonzero URB status = %d", urb->status);
-                return;
-        }
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
+		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
+	}
 
         /* check if all needed data was received */
 	if (urb->actual_length < AU_IRQMINSIZE) {
                 dbg ("invalid data length received: %d bytes", urb->actual_length);
-                return;
+		goto exit;
         }
 
         /* check the command code */
         if (cp->intbufp[0] != AU_IRQCMDID) {
                 dbg ("invalid command received: %d", cp->intbufp[0]);
-                return;
+		goto exit;
         }
 
         /* check the command type */
         if (cp->intbufp[1] != AU_BLOCKRDY) {
                 dbg ("invalid command type received: %d", cp->intbufp[1]);
-                return;
+		goto exit;
         }
 
         /* now extract the information */
@@ -1047,13 +1056,13 @@ static void auerswald_int_complete (struct urb * urb)
         /* check the channel id */
         if (channelid >= AUH_TYPESIZE) {
                 dbg ("invalid channel id received: %d", channelid);
-                return;
+		goto exit;
         }
 
         /* check the byte count */
         if (bytecount > (cp->maxControlLength+AUH_SIZE)) {
                 dbg ("invalid byte count received: %d", bytecount);
-                return;
+		goto exit;
         }
         dbg ("Service Channel = %d", channelid);
         dbg ("Byte Count = %d", bytecount);
@@ -1077,7 +1086,7 @@ static void auerswald_int_complete (struct urb * urb)
 		   The only real solution is: having enought buffers!
 		   Or perhaps temporary disabling the int endpoint?
 		*/
-		return;
+		goto exit;
         }
 
 	/* fill the control message */
@@ -1098,6 +1107,11 @@ static void auerswald_int_complete (struct urb * urb)
                 auerswald_ctrlread_complete( bp->urbp);
 		/* here applies the same problem as above: device locking! */
         }
+exit:
+	ret = usb_submit_urb (urb, GFP_ATOMIC);
+	if (ret)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, ret);
 }
 
 /* int memory deallocation

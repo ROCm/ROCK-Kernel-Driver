@@ -438,16 +438,34 @@ static void hci_usb_interrupt(struct urb *urb)
 	__u8 *data = urb->transfer_buffer;
 	int count = urb->actual_length;
 	int len = HCI_EVENT_HDR_SIZE;
+	int status;
 
 	BT_DBG("%s urb %p count %d", husb->hdev.name, urb, count);
 
 	if (!test_bit(HCI_RUNNING, &husb->hdev.flags))
 		return;
 
-	if (urb->status || !count) {
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		BT_DBG("%s urb shutting down with status: %d",
+				husb->hdev.name, urb->status);
+		return;
+	default:
+		BT_ERR("%s nonzero urb status received: %d",
+				husb->hdev.name, urb->status);
+		goto exit;
+	}
+
+	if (!count) {
 		BT_DBG("%s intr status %d, count %d", 
 				husb->hdev.name, urb->status, count);
-		return;
+		goto exit;
 	}
 
 	read_lock(&husb->completion_lock);
@@ -499,12 +517,18 @@ static void hci_usb_interrupt(struct urb *urb)
 
 done:
 	read_unlock(&husb->completion_lock);
-	return;
+	goto exit;
 
 bad_len:
 	BT_ERR("%s bad frame len %d expected %d", husb->hdev.name, count, len);
 	husb->hdev.stat.err_rx++;
 	read_unlock(&husb->completion_lock);
+
+exit:
+	status = usb_submit_urb (urb, GFP_ATOMIC);
+	if (status)
+		BT_ERR ("%s usb_submit_urb failed with result %d",
+				husb->hdev.name, status);
 }
 
 static void hci_usb_tx_complete(struct urb *urb)

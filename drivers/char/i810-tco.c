@@ -244,9 +244,9 @@ static int i810tco_ioctl (struct inode *inode, struct file *file,
 	int options, retval = -EINVAL;
 
 	static struct watchdog_info ident = {
-		options:		WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
-		firmware_version:	0,
-		identity:		"i810 TCO timer",
+		.options =		WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
+		.firmware_version =	0,
+		.identity =		"i810 TCO timer",
 	};
 	switch (cmd) {
 		default:
@@ -371,17 +371,17 @@ static unsigned char __init i810tco_getdevice (void)
 }
 
 static struct file_operations i810tco_fops = {
-	owner:		THIS_MODULE,
-	write:		i810tco_write,
-	ioctl:		i810tco_ioctl,
-	open:		i810tco_open,
-	release:	i810tco_release,
+	.owner =	THIS_MODULE,
+	.write =	i810tco_write,
+	.ioctl =	i810tco_ioctl,
+	.open =		i810tco_open,
+	.release =	i810tco_release,
 };
 
 static struct miscdevice i810tco_miscdev = {
-	minor:		WATCHDOG_MINOR,
-	name:		"watchdog",
-	fops:		&i810tco_fops,
+	.minor =	WATCHDOG_MINOR,
+	.name =		"watchdog",
+	.fops =		&i810tco_fops,
 };
 
 static int __init watchdog_init (void)

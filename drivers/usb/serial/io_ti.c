@@ -1623,6 +1623,7 @@ static void edge_interrupt_callback (struct urb *urb)
 	int length = urb->actual_length;
 	int port_number;
 	int function;
+	int status;
 	__u8 lsr;
 	__u8 msr;
 
@@ -1632,21 +1633,31 @@ static void edge_interrupt_callback (struct urb *urb)
 		return;
 	}
 
-	if (urb->status) {
-		dbg("%s - nonzero control read status received: %d", __FUNCTION__, urb->status);
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
 		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
 	}
 
 	if (!length) {
 		dbg ("%s - no data in urb", __FUNCTION__);
-		return;
+		goto exit;
 	}
 		
 	usb_serial_debug_data (__FILE__, __FUNCTION__, length, data);
 		
 	if (length != 2) {
 		dbg ("%s - expecting packet of size 2, got %d", __FUNCTION__, length);
-		return;
+		goto exit;
 	}
 
 	port_number = TIUMP_GET_PORT_FROM_CODE (data[0]);
@@ -1694,6 +1705,12 @@ static void edge_interrupt_callback (struct urb *urb)
 		break;
 		
 	}
+
+exit:
+	status = usb_submit_urb (urb, GFP_ATOMIC);
+	if (status)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, status);
 }
 
 static void edge_bulk_in_callback (struct urb *urb)
@@ -1758,7 +1775,6 @@ static void edge_bulk_in_callback (struct urb *urb)
 
 exit:
 	/* continue always trying to read */
-	urb->dev = edge_port->port->serial->dev;
 	status = usb_submit_urb (urb, GFP_ATOMIC);
 	if (status)
 		err ("%s - usb_submit_urb failed with result %d",

@@ -194,10 +194,9 @@ struct resource mca_standard_resources[] = {
 
 #define MCA_STANDARD_RESOURCES	(sizeof(mca_standard_resources)/sizeof(struct resource))
 
-void __init mca_init(void)
+int __init mca_init(void)
 {
 	unsigned int i, j;
-	unsigned long flags;
 
 	/* WARNING: Be careful when making changes here. Putting an adapter
 	 * and the motherboard simultaneously into setup mode may result in
@@ -209,16 +208,16 @@ void __init mca_init(void)
 	/* Make sure the MCA bus is present */
 
 	if(!MCA_bus)
-		return;
-	printk("Micro Channel bus detected.\n");
+		return -ENODEV;
+	printk(KERN_INFO "Micro Channel bus detected.\n");
 
 	/* Allocate MCA_info structure (at address divisible by 8) */
 
 	mca_info = (struct MCA_info *)kmalloc(sizeof(struct MCA_info), GFP_KERNEL);
 
 	if(mca_info == NULL) {
-		printk("Failed to allocate memory for mca_info!");
-		return;
+		printk(KERN_ERR "Failed to allocate memory for mca_info!");
+		return -ENOMEM;
 	}
 	memset(mca_info, 0, sizeof(struct MCA_info));
 
@@ -320,6 +319,8 @@ void __init mca_init(void)
 #ifdef CONFIG_PROC_FS
 	mca_do_proc_init();
 #endif
+
+	return 0;
 }
 
 subsys_initcall(mca_init);
@@ -329,16 +330,16 @@ subsys_initcall(mca_init);
 static void mca_handle_nmi_slot(int slot, int check_flag)
 {
 	if(slot < MCA_MAX_SLOT_NR) {
-		printk("NMI: caused by MCA adapter in slot %d (%s)\n", slot+1,
+		printk(KERN_CRIT "NMI: caused by MCA adapter in slot %d (%s)\n", slot+1,
 			mca_info->slot[slot].name);
 	} else if(slot == MCA_INTEGSCSI) {
-		printk("NMI: caused by MCA integrated SCSI adapter (%s)\n",
+		printk(KERN_CRIT "NMI: caused by MCA integrated SCSI adapter (%s)\n",
 			mca_info->slot[slot].name);
 	} else if(slot == MCA_INTEGVIDEO) {
-		printk("NMI: caused by MCA integrated video adapter (%s)\n",
+		printk(KERN_CRIT "NMI: caused by MCA integrated video adapter (%s)\n",
 			mca_info->slot[slot].name);
 	} else if(slot == MCA_MOTHERBOARD) {
-		printk("NMI: caused by motherboard (%s)\n",
+		printk(KERN_CRIT "NMI: caused by motherboard (%s)\n",
 			mca_info->slot[slot].name);
 	}
 
@@ -350,7 +351,7 @@ static void mca_handle_nmi_slot(int slot, int check_flag)
 		pos6 = mca_read_pos(slot, 6);
 		pos7 = mca_read_pos(slot, 7);
 
-		printk("NMI: POS 6 = 0x%x, POS 7 = 0x%x\n", pos6, pos7);
+		printk(KERN_CRIT "NMI: POS 6 = 0x%x, POS 7 = 0x%x\n", pos6, pos7);
 	}
 
 } /* mca_handle_nmi_slot */
@@ -367,21 +368,19 @@ void mca_handle_nmi(void)
 	 * adapter was responsible for the error.
 	 */
 
-	for(i = 0; i < MCA_NUMADAPTERS; i++) {
+	for(i = 0; i < MCA_NUMADAPTERS; i++) 
+	{
+		/* Bit 7 of POS 5 is reset when this adapter has a hardware
+		 * error. Bit 7 it reset if there's error information
+		 * available in POS 6 and 7.
+		 */
+		pos5 = mca_read_pos(i, 5);
 
-	/* Bit 7 of POS 5 is reset when this adapter has a hardware
-	 * error. Bit 7 it reset if there's error information
-	 * available in POS 6 and 7.
-	 */
-
-	pos5 = mca_read_pos(i, 5);
-
-	if(!(pos5 & 0x80)) {
+		if(!(pos5 & 0x80)) {
 			mca_handle_nmi_slot(i, !(pos5 & 0x40));
 			return;
 		}
 	}
-
 	mca_nmi_hook();
 } /* mca_handle_nmi */
 

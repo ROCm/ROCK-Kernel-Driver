@@ -938,7 +938,7 @@ static void depca_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&lp->lock);
 }
 
-
+/* Called with lp->lock held */
 static int depca_rx(struct net_device *dev)
 {
 	struct depca_private *lp = (struct depca_private *) dev->priv;
@@ -1036,6 +1036,7 @@ static int depca_rx(struct net_device *dev)
 
 /*
 ** Buffer sent - check for buffer errors.
+** Called with lp->lock held
 */
 static int depca_tx(struct net_device *dev)
 {
@@ -2003,7 +2004,7 @@ static int depca_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		spin_lock_irqsave(&lp->lock, flags);
 		memcpy(buf, &lp->pktStats, ioc->len);
 		spin_unlock_irqrestore(&lp->lock, flags);
-		if (copy_to_user(ioc->data, &lp->pktStats, ioc->len))
+		if (copy_to_user(ioc->data, buf, ioc->len))
 			status = -EFAULT;
 		kfree(buf);
 		break;

@@ -1,0 +1,39 @@
+CONFIG_DVB_ALPS_BSRU6
+  A DVB-S tuner module. 
+  
+  Say Y when you want to support this frontend.
+
+  If you don't know what tuner module is soldered on your 
+  DVB adapter simply enable all supported frontends, the 
+  right one will get autodetected.
+
+CONFIG_DVB_ALPS_BSRV2
+  A DVB-S tuner module. Say Y when you want to support this frontend.
+
+  If you don't know what tuner module is soldered on your 
+  DVB adapter simply enable all supported frontends, the 
+  right one will get autodetected.
+
+CONFIG_DVB_GRUNDIG_29504_491
+  A DVB-S tuner module. Say Y when you want to support this frontend.
+
+  If you don't know what tuner module is soldered on your 
+  DVB adapter simply enable all supported frontends, the 
+  right one will get autodetected.
+
+CONFIG_DVB_GRUNDIG_29504_401
+  A DVB-T tuner module. Say Y when you want to support this frontend.
+
+  If you don't know what tuner module is soldered on your 
+  DVB adapter simply enable all supported frontends, the 
+  right one will get autodetected.
+
+CONFIG_DVB_VES1820
+  The VES1820 Demodulator is used on many DVB-C PCI cards and in some
+  DVB-C SetTopBoxes. Say Y when you see this demodulator chip near your
+  tuner module.
+
+  If you don't know what tuner module is soldered on your 
+  DVB adapter simply enable all supported frontends, the 
+  right one will get autodetected.
+

@@ -173,7 +173,7 @@ static int find_free_id(void)
     }
 		diva_os_leave_spin_lock (&ll_lock, &old_irql, "find free id");
     return(num);
-next_id:
+next_id:;
   }
 	diva_os_leave_spin_lock (&ll_lock, &old_irql, "find free id");
   return(999);
