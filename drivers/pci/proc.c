@@ -373,32 +373,6 @@ static struct seq_operations proc_bus_pci_devices_op = {
 
 struct proc_dir_entry *proc_bus_pci_dir;
 
-/* driverfs files */
-static ssize_t pci_show_irq(struct device * dev, char * buf)
-{
-	struct pci_dev * pci_dev = to_pci_dev(dev);
-	return sprintf(buf,"%u\n",pci_dev->irq);
-}
-
-static DEVICE_ATTR(irq,S_IRUGO,pci_show_irq,NULL);
-
-static ssize_t pci_show_resources(struct device * dev, char * buf)
-{
-	struct pci_dev * pci_dev = to_pci_dev(dev);
-	char * str = buf;
-	int i;
-
-	for (i = 0; i < DEVICE_COUNT_RESOURCE && pci_resource_start(pci_dev,i); i++) {
-		str += sprintf(str,LONG_FORMAT LONG_FORMAT LONG_FORMAT "\n",
-			       pci_resource_start(pci_dev,i),
-			       pci_resource_end(pci_dev,i),
-			       pci_resource_flags(pci_dev,i));
-	}
-	return (str - buf);
-}
-
-static DEVICE_ATTR(resource,S_IRUGO,pci_show_resources,NULL);
-
 int pci_proc_attach_device(struct pci_dev *dev)
 {
 	struct pci_bus *bus = dev->bus;
@@ -422,8 +396,6 @@ int pci_proc_attach_device(struct pci_dev *dev)
 	e->data = dev;
 	e->size = PCI_CFG_SPACE_SIZE;
 
-	device_create_file(&dev->dev,&dev_attr_irq);
-	device_create_file(&dev->dev,&dev_attr_resource);
 	return 0;
 }
 

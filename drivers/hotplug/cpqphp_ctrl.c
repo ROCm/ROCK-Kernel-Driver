@@ -188,6 +188,8 @@ static u8 handle_presence_change(u16 change, struct controller * ctrl)
 			rc++;
 
 			p_slot = find_slot(ctrl, hp_slot + (readb(ctrl->hpc_reg + SLOT_MASK) >> 4));
+			if (!p_slot)
+				return 0;
 
 			// If the switch closed, must be a button
 			// If not in button mode, nevermind
@@ -1765,19 +1767,17 @@ void cpqhp_event_stop_thread (void)
 static int update_slot_info (struct controller *ctrl, struct slot *slot)
 {
 	struct hotplug_slot_info *info;
-	char buffer[SLOT_NAME_SIZE];
 	int result;
 
 	info = kmalloc (sizeof (struct hotplug_slot_info), GFP_KERNEL);
 	if (!info)
 		return -ENOMEM;
 
-	make_slot_name (&buffer[0], SLOT_NAME_SIZE, slot);
 	info->power_status = get_slot_enabled(ctrl, slot);
 	info->attention_status = cpq_get_attention_status(ctrl, slot);
 	info->latch_status = cpq_get_latch_status(ctrl, slot);
 	info->adapter_status = get_presence_status(ctrl, slot);
-	result = pci_hp_change_slot_info(buffer, info);
+	result = pci_hp_change_slot_info(slot->hotplug_slot, info);
 	kfree (info);
 	return result;
 }
@@ -1799,8 +1799,12 @@ static void interrupt_event_handler(struct controller *ctrl)
 				hp_slot = ctrl->event_queue[loop].hp_slot;
 
 				func = cpqhp_slot_find(ctrl->bus, (hp_slot + ctrl->slot_device_offset), 0);
+				if (!func)
+					return;
 
 				p_slot = find_slot(ctrl, hp_slot + ctrl->slot_device_offset);
+				if (!p_slot)
+					return;
 
 				dbg("hp_slot %d, func %p, p_slot %p\n",
 				    hp_slot, func, p_slot);
@@ -2511,8 +2515,14 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 		// Setup the IO, memory, and prefetchable windows
 
 		io_node = get_max_resource(&(resources->io_head), 0x1000);
+		if (!io_node)
+			return -ENOMEM;
 		mem_node = get_max_resource(&(resources->mem_head), 0x100000);
+		if (!mem_node)
+			return -ENOMEM;
 		p_mem_node = get_max_resource(&(resources->p_mem_head), 0x100000);
+		if (!p_mem_node)
+			return -ENOMEM;
 		dbg("Setup the IO, memory, and prefetchable windows\n");
 		dbg("io_node\n");
 		dbg("(base, len, next) (%x, %x, %p)\n", io_node->base, io_node->length, io_node->next);
