@@ -135,6 +135,9 @@
 #include <linux/cdrom.h>
 
 #define MAJOR_NR CDU535_CDROM_MAJOR
+#define DEVICE_NAME "SONY-CDU535"
+#define DEVICE_INTR do_cdu535
+#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 
 #define sony535_cd_base_io sonycd535 /* for compatible parameter passing with "insmod" */

@@ -76,6 +76,8 @@
 #include <asm/io.h>
 
 #define MAJOR_NR OPTICS_CDROM_MAJOR
+#define DEVICE_NAME "DOLPHIN 8000AT CD-ROM"
+#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 
 #include <linux/cdrom.h>

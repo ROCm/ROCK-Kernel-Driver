@@ -51,6 +51,8 @@
 #include <asm/types.h>
 
 #define MAJOR_NR NBD_MAJOR
+#define DEVICE_NAME "nbd"
+#define DEVICE_NR(device) (minor(device))
 #include <linux/nbd.h>
 
 #define LO_MAGIC 0x68797548

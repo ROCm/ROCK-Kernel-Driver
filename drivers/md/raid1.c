@@ -27,6 +27,8 @@
 #define MAJOR_NR MD_MAJOR
 #define MD_DRIVER
 #define MD_PERSONALITY
+#define DEVICE_NAME "Multiple devices driver"
+#define DEVICE_NR(device) (minor(device))
 
 /*
  * Number of guaranteed r1bios in case of extreme VM load:

@@ -53,6 +53,8 @@ MODULE_LICENSE("GPL");
 
 #define MAJOR_NR COMPAQ_SMART2_MAJOR
 #define LOCAL_END_REQUEST
+#define DEVICE_NAME "ida"
+#define DEVICE_NR(device) (minor(device) >> 4)
 #include <linux/blk.h>
 #include <linux/blkdev.h>
 #include <linux/genhd.h>

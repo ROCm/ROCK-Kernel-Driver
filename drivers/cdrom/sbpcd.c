@@ -380,6 +380,7 @@
 #include "sbpcd.h"
 
 #define MAJOR_NR MATSUSHITA_CDROM_MAJOR
+#define DEVICE_NAME "Matsushita CD-ROM controller #1"
 
 #include <linux/blk.h>
 

@@ -102,6 +102,8 @@
 #include <asm/uaccess.h>
 
 #define MAJOR_NR MITSUMI_CDROM_MAJOR
+#define DEVICE_NAME "Mitsumi CD-ROM"
+#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 
 #define mcd_port mcd		/* for compatible parameter passing with "insmod" */

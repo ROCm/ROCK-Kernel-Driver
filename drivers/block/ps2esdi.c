@@ -33,6 +33,8 @@
 #ifdef  CONFIG_BLK_DEV_PS2
 
 #define MAJOR_NR PS2ESDI_MAJOR
+#define DEVICE_NAME "PS/2 ESDI"
+#define DEVICE_NR(device) (minor(device) >> 6)
 
 #include <linux/errno.h>
 #include <linux/sched.h>

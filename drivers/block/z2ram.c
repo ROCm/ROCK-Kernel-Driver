@@ -26,6 +26,8 @@
 */
 
 #define MAJOR_NR    Z2RAM_MAJOR
+#define DEVICE_NAME "Z2RAM"
+#define DEVICE_NR(device) (minor(device))
 
 #include <linux/major.h>
 #include <linux/slab.h>

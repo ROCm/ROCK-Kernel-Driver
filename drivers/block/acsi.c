@@ -44,6 +44,9 @@
  */
 
 #define MAJOR_NR ACSI_MAJOR
+#define DEVICE_NAME "ACSI"
+#define DEVICE_INTR do_acsi
+#define DEVICE_NR(device) (minor(device) >> 4)
 
 #include <linux/config.h>
 #include <linux/module.h>

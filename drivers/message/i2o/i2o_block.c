@@ -72,6 +72,8 @@
 #include <linux/wait.h>
 
 #define MAJOR_NR I2O_MAJOR
+#define DEVICE_NAME "I2O block"
+#define DEVICE_NR(device) (minor(device)>>4)
 
 #include <linux/blk.h>
 

@@ -79,6 +79,9 @@
 #include <asm/irq.h>
 
 #define MAJOR_NR FLOPPY_MAJOR
+#define DEVICE_NAME "floppy"
+#define DEVICE_INTR do_floppy
+#define DEVICE_NR(device) ( (minor(device) & 3) | ((minor(device) & 0x80 ) >> 5 ))
 #include <linux/blk.h>
 
 #undef DEBUG /* print _LOTS_ of infos */

@@ -52,6 +52,8 @@
 #include <asm/dma.h>
 
 #define MAJOR_NR XT_DISK_MAJOR
+#define DEVICE_NAME "xt disk"
+#define DEVICE_NR(device) (minor(device) >> 6)
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 

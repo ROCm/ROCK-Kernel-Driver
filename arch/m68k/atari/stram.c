@@ -35,6 +35,8 @@
 #ifdef CONFIG_STRAM_SWAP
 #define MAJOR_NR    Z2RAM_MAJOR
 #define do_z2_request do_stram_request
+#define DEVICE_NAME "Z2RAM"
+#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 #undef DEVICE_NAME
 #define DEVICE_NAME	"stram"

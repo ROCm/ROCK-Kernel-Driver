@@ -24,6 +24,8 @@
 #define MAJOR_NR MD_MAJOR
 #define MD_DRIVER
 #define MD_PERSONALITY
+#define DEVICE_NAME "Multiple devices driver"
+#define DEVICE_NR(device) (minor(device))
 
 static int create_strip_zones (mddev_t *mddev)
 {
