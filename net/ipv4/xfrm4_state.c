@@ -98,7 +98,8 @@ __xfrm4_find_acq(u8 mode, u32 reqid, u8 proto,
 		x0->props.family = AF_INET;
 		x0->lft.hard_add_expires_seconds = XFRM_ACQ_EXPIRES;
 		xfrm_state_hold(x0);
-		mod_timer(&x0->timer, jiffies + XFRM_ACQ_EXPIRES*HZ);
+		x0->timer.expires = jiffies + XFRM_ACQ_EXPIRES*HZ;
+		add_timer(&x0->timer);
 		xfrm_state_hold(x0);
 		list_add_tail(&x0->bydst, xfrm4_state_afinfo.state_bydst+h);
 		wake_up(&km_waitq);
