@@ -144,8 +144,9 @@ struct udsl_instance_data *minor_data[MAX_UDSL];
 static const char udsl_driver_name[] = "Alcatel SpeedTouch USB";
 
 /* data thread */
-static int datapid = 0;
 DECLARE_WAIT_QUEUE_HEAD (udsl_wqh);
+static DECLARE_COMPLETION(thread_grave);
+static unsigned int datapid;
 
 #ifdef DEBUG_PACKET
 int udsl_print_packet (const unsigned char *data, int len);
@@ -443,9 +444,9 @@ int udsl_atm_processqueue_thread (void *data)
 	};
 
 	remove_wait_queue (&udsl_wqh, &wait);
-	datapid = 0;
 	PDEBUG ("SpeedSARd is exiting\n");
-	return 0;
+	complete_and_exit(&thread_grave, 0);
+	return 0; //never reached
 }
 
 
@@ -461,16 +462,7 @@ void udsl_atm_sar_stop (void)
 	/* Kill the thread */
 	ret = kill_proc (datapid, SIGTERM, 1);
 	if (!ret) {
-		/* Wait 10 seconds */
-		int count = 10 * 100;
-
-		while (datapid && --count) {
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout (1);
-		}
-
-		if (!count)
-			err ("giving up on killing SpeedSAR thread.");
+		wait_for_completion(&thread_grave);
 	}
 }
 
