@@ -86,6 +86,24 @@ static u8 wl3501_fpage[] = {
 	[3] = WL3501_BSS_FPAGE3,
 };
 
+/*
+ * Conversion from Channel (this->chan) to frequency, this information
+ * was obtained from the Planet WAP 1000 Access Point web interface. -acme
+ */
+static int wl3501_chan2freq[] = {
+	[0] = 2412,
+	[1] = 2417,
+	[2] = 2422,
+	[3] = 2427,
+	[4] = 2432,
+	[5] = 2437,
+	[6] = 2442,
+	[7] = 2447,
+	[8] = 2452,
+	[9] = 2457,
+	[10] = 2462,
+};
+
 #define wl3501_outb(a, b) { outb(a, b); WL3501_SLOW_DOWN_IO; }
 #define wl3501_outb_p(a, b) { outb_p(a, b); WL3501_SLOW_DOWN_IO; }
 #define wl3501_outsb(a, b, c) { outsb(a, b, c); WL3501_SLOW_DOWN_IO; }
@@ -1829,8 +1847,8 @@ static int wl3501_get_freq(struct net_device *dev, struct iw_request_info *info,
 {
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 
-	wrqu->freq.m = this->chan;
-	wrqu->freq.e = 0;
+	wrqu->freq.m = wl3501_chan2freq[this->chan] * 100000;
+	wrqu->freq.e = 1;
 	return 0;
 }
 
