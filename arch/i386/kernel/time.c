@@ -333,11 +333,12 @@ static int time_suspend(struct sys_device *dev, u32 state)
 
 static int time_resume(struct sys_device *dev)
 {
+	unsigned long flags;
 	unsigned long sec = get_cmos_time() + clock_cmos_diff;
-	write_seqlock_irq(&xtime_lock);
+	write_seqlock_irqsave(&xtime_lock,flags);
 	xtime.tv_sec = sec;
 	xtime.tv_nsec = 0;
-	write_sequnlock_irq(&xtime_lock);
+	write_sequnlock_irqrestore(&xtime_lock,flags);
 	return 0;
 }
 
