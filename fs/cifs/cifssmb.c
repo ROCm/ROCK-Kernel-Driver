@@ -77,7 +77,7 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 	   for those three - in the calling routine */
 	if(tcon) {
 		if((tcon->ses) && (tcon->ses->server)){
-			struct nls_table *nls_codepage = load_nls_default();
+			struct nls_table *nls_codepage;
 				/* Give Demultiplex thread up to 10 seconds to 
 					reconnect, should be greater than cifs socket
 					timeout which is 7 seconds */
@@ -88,7 +88,7 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 					/* on "soft" mounts we wait once */
 					if((tcon->retry == FALSE) || 
 					   (tcon->ses->status == CifsExiting)) {
-						unload_nls(nls_codepage);
+						cFYI(1,("gave up waiting on reconnect in smb_init"));
 						return -EHOSTDOWN;
 					} /* else "hard" mount - keep retrying until 
 					process is killed or server comes back up */
@@ -97,6 +97,7 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 				 
 			}
 			
+			nls_codepage = load_nls_default();
 		/* need to prevent multiple threads trying to
 		simultaneously reconnect the same SMB session */
 			down(&tcon->ses->sesSem);
