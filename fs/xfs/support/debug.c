@@ -88,6 +88,7 @@ cmn_err(register int level, char *fmt, ...)
 	vsprintf(message, fp, ap);
 	switch (level) {
 	case CE_CONT:
+	case CE_WARN:
 		printk("%s", message);
 		break;
 	case CE_DEBUG:
@@ -112,6 +113,7 @@ icmn_err(register int level, char *fmt, va_list ap)
 	vsprintf(message, fmt, ap);
 	switch (level) {
 	case CE_CONT:
+	case CE_WARN:
 		printk("%s", message);
 		break;
 	case CE_DEBUG:
