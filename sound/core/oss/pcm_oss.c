@@ -1554,13 +1554,16 @@ static int snd_pcm_oss_open(struct inode *inode, struct file *file)
 		err = -ENODEV;
 		goto __error1;
 	}
+	err = snd_card_file_add(pcm->card, file);
+	if (err < 0)
+		goto __error1;
 	if (!try_inc_mod_count(pcm->card->module)) {
 		err = -EFAULT;
-		goto __error1;
+		goto __error2;
 	}
 	if (snd_task_name(current, task_name, sizeof(task_name)) < 0) {
 		err = -EFAULT;
-		goto __error1;
+		goto __error;
 	}
 	if (file->f_mode & FMODE_WRITE)
 		psetup = snd_pcm_oss_look_for_setup(pcm, SNDRV_PCM_STREAM_PLAYBACK, task_name);
@@ -1584,13 +1587,12 @@ static int snd_pcm_oss_open(struct inode *inode, struct file *file)
 
 	init_waitqueue_entry(&wait, current);
 	add_wait_queue(&pcm->open_wait, &wait);
+	down(&pcm->open_mutex);
 	while (1) {
-		down(&pcm->open_mutex);
 		err = snd_pcm_oss_open_file(file, pcm, &pcm_oss_file,
 					    minor, psetup, csetup);
 		if (err >= 0)
 			break;
-		up(&pcm->open_mutex);
 		if (err == -EAGAIN) {
 			if (nonblock) {
 				err = -EBUSY;
@@ -1599,7 +1601,9 @@ static int snd_pcm_oss_open(struct inode *inode, struct file *file)
 		} else
 			break;
 		set_current_state(TASK_INTERRUPTIBLE);
+		up(&pcm->open_mutex);
 		schedule();
+		down(&pcm->open_mutex);
 		if (signal_pending(current)) {
 			err = -ERESTARTSYS;
 			break;
@@ -1607,13 +1611,15 @@ static int snd_pcm_oss_open(struct inode *inode, struct file *file)
 	}
 	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&pcm->open_wait, &wait);
+	up(&pcm->open_mutex);
 	if (err < 0)
 		goto __error;
-	up(&pcm->open_mutex);
 	return err;
 
       __error:
       	dec_mod_count(pcm->card->module);
+      __error2:
+      	snd_card_file_remove(pcm->card, file);
       __error1:
 #ifdef LINUX_2_2
 	MOD_DEC_USE_COUNT;
@@ -1639,6 +1645,7 @@ static int snd_pcm_oss_release(struct inode *inode, struct file *file)
 	up(&pcm->open_mutex);
 	wake_up(&pcm->open_wait);
 	dec_mod_count(pcm->card->module);
+	snd_card_file_remove(pcm->card, file);
 #ifdef LINUX_2_2
 	MOD_DEC_USE_COUNT;
 #endif
@@ -2108,7 +2115,7 @@ static snd_minor_t snd_pcm_oss_reg =
 	.f_ops =	&snd_pcm_oss_f_reg,
 };
 
-static void register_oss_dsp(unsigned short native_minor, snd_pcm_t *pcm, int index)
+static void register_oss_dsp(snd_pcm_t *pcm, int index)
 {
 	char name[128];
 	sprintf(name, "dsp%i%i", pcm->card->number, pcm->device);
@@ -2119,14 +2126,13 @@ static void register_oss_dsp(unsigned short native_minor, snd_pcm_t *pcm, int in
 	}
 }
 
-static int snd_pcm_oss_register_minor(unsigned short native_minor,
-				      snd_pcm_t * pcm)
+static int snd_pcm_oss_register_minor(snd_pcm_t * pcm)
 {
 	pcm->oss.reg = 0;
 	if (dsp_map[pcm->card->number] == pcm->device) {
 		char name[128];
 		int duplex;
-		register_oss_dsp(native_minor, pcm, 0);
+		register_oss_dsp(pcm, 0);
 		duplex = (pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream_count > 0 && 
 			      pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream_count && 
 			      !(pcm->info_flags & SNDRV_PCM_INFO_HALF_DUPLEX));
@@ -2137,10 +2143,12 @@ static int snd_pcm_oss_register_minor(unsigned short native_minor,
 				      name);
 #endif
 		pcm->oss.reg++;
+		pcm->oss.reg_mask |= 1;
 	}
 	if (adsp_map[pcm->card->number] == pcm->device) {
-		register_oss_dsp(native_minor, pcm, 1);
+		register_oss_dsp(pcm, 1);
 		pcm->oss.reg++;
+		pcm->oss.reg_mask |= 2;
 	}
 
 	if (pcm->oss.reg)
@@ -2149,20 +2157,32 @@ static int snd_pcm_oss_register_minor(unsigned short native_minor,
 	return 0;
 }
 
-static int snd_pcm_oss_unregister_minor(unsigned short native_minor,
-				        snd_pcm_t * pcm)
+static int snd_pcm_oss_disconnect_minor(snd_pcm_t * pcm)
 {
 	if (pcm->oss.reg) {
-		if (dsp_map[pcm->card->number] == pcm->device) {
+		if (pcm->oss.reg_mask & 1) {
+			pcm->oss.reg_mask &= ~1;
 			snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_PCM,
 						  pcm->card, 0);
+		}
+		if (pcm->oss.reg_mask & 2) {
+			pcm->oss.reg_mask &= ~2;
+			snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_PCM,
+						  pcm->card, 1);
+		}
+	}
+	return 0;
+}
+
+static int snd_pcm_oss_unregister_minor(snd_pcm_t * pcm)
+{
+	snd_pcm_oss_disconnect_minor(pcm);
+	if (pcm->oss.reg) {
+		if (dsp_map[pcm->card->number] == pcm->device) {
 #ifdef SNDRV_OSS_INFO_DEV_AUDIO
 			snd_oss_info_unregister(SNDRV_OSS_INFO_DEV_AUDIO, pcm->card->number);
 #endif
 		}
-		if (adsp_map[pcm->card->number] == pcm->device)
-			snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_PCM,
-						  pcm->card, 1);
 		pcm->oss.reg = 0;
 		snd_pcm_oss_proc_done(pcm);
 	}
@@ -2172,6 +2192,7 @@ static int snd_pcm_oss_unregister_minor(unsigned short native_minor,
 static snd_pcm_notify_t snd_pcm_oss_notify =
 {
 	.n_register =	snd_pcm_oss_register_minor,
+	.n_disconnect = snd_pcm_oss_disconnect_minor,
 	.n_unregister =	snd_pcm_oss_unregister_minor,
 };
 
@@ -2180,8 +2201,6 @@ static int __init alsa_pcm_oss_init(void)
 	int i;
 	int err;
 
-	if ((err = snd_pcm_notify(&snd_pcm_oss_notify, 0)) < 0)
-		return err;
 	/* check device map table */
 	for (i = 0; i < SNDRV_CARDS; i++) {
 		if (dsp_map[i] < 0 || dsp_map[i] >= SNDRV_PCM_DEVICES) {
@@ -2193,6 +2212,8 @@ static int __init alsa_pcm_oss_init(void)
 			adsp_map[i] = 1;
 		}
 	}
+	if ((err = snd_pcm_notify(&snd_pcm_oss_notify, 0)) < 0)
+		return err;
 	return 0;
 }
 

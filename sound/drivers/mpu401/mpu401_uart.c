@@ -401,12 +401,17 @@ int snd_mpu401_uart_new(snd_card_t * card, int device,
 	spin_lock_init(&mpu->timer_lock);
 	mpu->hardware = hardware;
 	if (!integrated) {
-		if ((mpu->res = request_region(port, 2, "MPU401 UART")) == NULL) {
+		int res_size = hardware == MPU401_HW_PC98II ? 4 : 2;
+		if ((mpu->res = request_region(port, res_size, "MPU401 UART")) == NULL) {
 			snd_device_free(card, rmidi);
 			return -EBUSY;
 		}
 	}
 	mpu->port = port;
+	if (hardware == MPU401_HW_PC98II)
+		mpu->cport = port + 2;
+	else
+		mpu->cport = port + 1;
 	if (irq >= 0 && irq_flags) {
 		if (request_irq(irq, snd_mpu401_uart_interrupt, irq_flags, "MPU401 UART", (void *) mpu)) {
 			snd_printk("unable to grab IRQ %d\n", irq);

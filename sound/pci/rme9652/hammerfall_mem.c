@@ -178,7 +178,7 @@ void snd_hammerfall_free_buffer (struct pci_dev *pcidev, void *addr)
 	printk ("Hammerfall memory allocator: unknown buffer address or PCI device ID");
 }
 
-static void hammerfall_free_buffers (void)
+static void __exit hammerfall_free_buffers (void)
 
 {
 	int i;

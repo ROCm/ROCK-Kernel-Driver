@@ -23,8 +23,37 @@
  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  * 
  * 
- *   ToDo: full duplex (32, 32/8, 32Pro)
+ * ****************************************************************************
+ * 
+ * Note #1 "Sek'd models" ................................... martin 2002-12-07
+ * 
+ * Identical soundcards by Sek'd were labeled:
+ * RME Digi 32     = Sek'd Prodif 32
+ * RME Digi 32 Pro = Sek'd Prodif 96
+ * RME Digi 32/8   = Sek'd Prodif Gold
+ * 
+ * ****************************************************************************
+ * 
+ * Note #2 "full duplex mode" ............................... martin 2002-12-07
+ * 
+ * Full duplex doesn't work. All cards (32, 32/8, 32Pro) are working identical
+ * in this mode. Rec data and play data are using the same buffer therefore. At
+ * first you have got the playing bits in the buffer and then (after playing
+ * them) they were overwitten by the captured sound of the CS8412/14. Both 
+ * modes (play/record) are running harmonically hand in hand in the same buffer
+ * and you have only one start bit plus one interrupt bit to control this 
+ * paired action.
+ * This is opposite to the latter rme96 where playing and capturing is totally
+ * separated and so their full duplex mode is supported by alsa (using two 
+ * start bits and two interrupts for two different buffers). 
+ * But due to the wrong sequence of playing and capturing ALSA shows no solved
+ * full duplex support for the rme32 at the moment. That's bad, but I'm not
+ * able to solve it. Are you motivated enough to solve this problem now? Your
+ * patch would be welcome!
+ * 
+ * ****************************************************************************
  */
+
 
 #include <sound/driver.h>
 #include <linux/delay.h>
@@ -80,29 +109,29 @@ MODULE_DEVICES("{{RME,Digi32}," "{RME,Digi32/8}," "{RME,Digi32 PRO}}");
 #define RME32_IO_RESET_POS          0x20100
 
 /* Write control register bits */
-#define RME32_WCR_START     (1 << 0)
-#define RME32_WCR_MONO      (1 << 1)    /* 0: stereo, 1: mono
+#define RME32_WCR_START     (1 << 0)    /* startbit */
+#define RME32_WCR_MONO      (1 << 1)    /* 0=stereo, 1=mono
                                            Setting the whole card to mono
-                                           don't seems to be very useful.
+                                           doesn't seem to be very useful.
                                            A software-solution can handle 
                                            full-duplex with one direction in
                                            stereo and the other way in mono. 
                                            So, the hardware should work all 
                                            the time in stereo! */
-#define RME32_WCR_MODE24    (1 << 2)
-#define RME32_WCR_SEL       (1 << 3)
-#define RME32_WCR_FREQ_0    (1 << 4)
+#define RME32_WCR_MODE24    (1 << 2)    /* 0=16bit, 1=32bit */
+#define RME32_WCR_SEL       (1 << 3)    /* 0=input on output, 1=normal playback/capture */
+#define RME32_WCR_FREQ_0    (1 << 4)    /* frequency (play) */
 #define RME32_WCR_FREQ_1    (1 << 5)
-#define RME32_WCR_INP_0     (1 << 6)
+#define RME32_WCR_INP_0     (1 << 6)    /* input switch */
 #define RME32_WCR_INP_1     (1 << 7)
-#define RME32_WCR_RESET     (1 << 8)
-#define RME32_WCR_MUTE      (1 << 9)
-#define RME32_WCR_PRO       (1 << 10)
-#define RME32_WCR_DS_BM     (1 << 11)	/* only PRO/Adat-Version */
-#define RME32_WCR_ADAT      (1 << 12)	/* only Adat-Version */
-#define RME32_WCR_AUTOSYNC  (1 << 13)
-#define RME32_WCR_PD        (1 << 14)	/* only PRO-Version */
-#define RME32_WCR_EMP       (1 << 15)	/* only PRO-Version */
+#define RME32_WCR_RESET     (1 << 8)    /* Reset address */
+#define RME32_WCR_MUTE      (1 << 9)    /* digital mute for output */
+#define RME32_WCR_PRO       (1 << 10)   /* 1=professional, 0=consumer */
+#define RME32_WCR_DS_BM     (1 << 11)	/* 1=DoubleSpeed (only PRO-Version); 1=BlockMode (only Adat-Version) */
+#define RME32_WCR_ADAT      (1 << 12)	/* Adat Mode (only Adat-Version) */
+#define RME32_WCR_AUTOSYNC  (1 << 13)   /* AutoSync */
+#define RME32_WCR_PD        (1 << 14)	/* DAC Reset (only PRO-Version) */
+#define RME32_WCR_EMP       (1 << 15)	/* 1=Emphasis on (only PRO-Version) */
 
 #define RME32_WCR_BITPOS_FREQ_0 4
 #define RME32_WCR_BITPOS_FREQ_1 5
@@ -111,13 +140,13 @@ MODULE_DEVICES("{{RME,Digi32}," "{RME,Digi32/8}," "{RME,Digi32 PRO}}");
 
 /* Read control register bits */
 #define RME32_RCR_AUDIO_ADDR_MASK 0x10001
-#define RME32_RCR_LOCK      (1 << 23)
-#define RME32_RCR_ERF       (1 << 26)
-#define RME32_RCR_FREQ_0    (1 << 27)
+#define RME32_RCR_LOCK      (1 << 23)   /* 1=locked, 0=not locked */
+#define RME32_RCR_ERF       (1 << 26)   /* 1=Error, 0=no Error */
+#define RME32_RCR_FREQ_0    (1 << 27)   /* CS841x frequency (record) */
 #define RME32_RCR_FREQ_1    (1 << 28)
 #define RME32_RCR_FREQ_2    (1 << 29)
-#define RME32_RCR_KMODE     (1 << 30)
-#define RME32_RCR_IRQ       (1 << 31)
+#define RME32_RCR_KMODE     (1 << 30)   /* card mode: 1=PLL, 0=quartz */
+#define RME32_RCR_IRQ       (1 << 31)   /* interrupt */
 
 #define RME32_RCR_BITPOS_F0 27
 #define RME32_RCR_BITPOS_F1 28
@@ -153,11 +182,11 @@ MODULE_DEVICES("{{RME,Digi32}," "{RME,Digi32/8}," "{RME,Digi32 PRO}}");
 #ifndef PCI_DEVICE_ID_DIGI32
 # define PCI_DEVICE_ID_DIGI32 0x9896
 #endif
-#ifndef PCI_DEVICE_ID_DIGI32_8
-# define PCI_DEVICE_ID_DIGI32_8 0x9898
-#endif
 #ifndef PCI_DEVICE_ID_DIGI32_PRO
 # define PCI_DEVICE_ID_DIGI32_PRO 0x9897
+#endif
+#ifndef PCI_DEVICE_ID_DIGI32_8
+# define PCI_DEVICE_ID_DIGI32_8 0x9898
 #endif
 
 typedef struct snd_rme32 {
@@ -291,21 +320,21 @@ static snd_pcm_hardware_t snd_rme32_playback_spdif_info = {
 			 SNDRV_PCM_INFO_MMAP_VALID |
 			 SNDRV_PCM_INFO_INTERLEAVED | 
 			 SNDRV_PCM_INFO_PAUSE),
-	formats:	(SNDRV_PCM_FMTBIT_S16_LE | 
+	.formats =	(SNDRV_PCM_FMTBIT_S16_LE | 
 			 SNDRV_PCM_FMTBIT_S32_LE),
-	rates:		(SNDRV_PCM_RATE_32000 |
+	.rates =	(SNDRV_PCM_RATE_32000 |
 			 SNDRV_PCM_RATE_44100 | 
 			 SNDRV_PCM_RATE_48000),
-	rate_min:	32000,
-	rate_max:	48000,
-	channels_min:	2,
-	channels_max:	2,
-	buffer_bytes_max: RME32_BUFFER_SIZE,
-	period_bytes_min: RME32_BLOCK_SIZE,
-	period_bytes_max: RME32_BLOCK_SIZE,
-	periods_min:	RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
-	periods_max:	RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
-	fifo_size:	0,
+	.rate_min =	32000,
+	.rate_max =	48000,
+	.channels_min =	2,
+	.channels_max =	2,
+	.buffer_bytes_max = RME32_BUFFER_SIZE,
+	.period_bytes_min = RME32_BLOCK_SIZE,
+	.period_bytes_max = RME32_BLOCK_SIZE,
+	.periods_min =	RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	.periods_max =	RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	.fifo_size =	0,
 };
 
 /*
@@ -314,20 +343,23 @@ static snd_pcm_hardware_t snd_rme32_playback_spdif_info = {
 static snd_pcm_hardware_t snd_rme32_capture_spdif_info = {
 	.info =		(SNDRV_PCM_INFO_MMAP |
 			 SNDRV_PCM_INFO_MMAP_VALID |
-			 SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_PAUSE),
-	formats:	(SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S32_LE),
-	rates:		(SNDRV_PCM_RATE_32000 |
-			 SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000),
-	rate_min:	32000,
-	rate_max:	48000,
-	channels_min:	2,
-	channels_max:	2,
-	buffer_bytes_max: RME32_BUFFER_SIZE,
-	period_bytes_min: RME32_BLOCK_SIZE,
-	period_bytes_max: RME32_BLOCK_SIZE,
-	periods_min:	RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
-	periods_max:	RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
-	fifo_size:	0,
+			 SNDRV_PCM_INFO_INTERLEAVED | 
+			 SNDRV_PCM_INFO_PAUSE),
+	.formats =	(SNDRV_PCM_FMTBIT_S16_LE | 
+			 SNDRV_PCM_FMTBIT_S32_LE),
+	.rates =	(SNDRV_PCM_RATE_32000 |
+			 SNDRV_PCM_RATE_44100 | 
+			 SNDRV_PCM_RATE_48000),
+	.rate_min =	32000,
+	.rate_max =	48000,
+	.channels_min =	2,
+	.channels_max =	2,
+	.buffer_bytes_max = RME32_BUFFER_SIZE,
+	.period_bytes_min = RME32_BLOCK_SIZE,
+	.period_bytes_max = RME32_BLOCK_SIZE,
+	.periods_min =	RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	.periods_max =	RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	.fifo_size =	0,
 };
 
 /*
@@ -339,19 +371,19 @@ static snd_pcm_hardware_t snd_rme32_playback_adat_info =
 			      SNDRV_PCM_INFO_MMAP_VALID |
 			      SNDRV_PCM_INFO_INTERLEAVED |
 			      SNDRV_PCM_INFO_PAUSE),
-	formats:             SNDRV_PCM_FMTBIT_S16_LE,
-	rates:	             (SNDRV_PCM_RATE_44100 | 
+	.formats=            SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =             (SNDRV_PCM_RATE_44100 | 
 			      SNDRV_PCM_RATE_48000),
-	rate_min:            44100,
-	rate_max:            48000,
-	channels_min:        8,
-	channels_max:	     8,
-	buffer_bytes_max:   RME32_BUFFER_SIZE,
-	period_bytes_min:   RME32_BLOCK_SIZE,
-	period_bytes_max:   RME32_BLOCK_SIZE,
-	periods_min:	     RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
-	periods_max:	     RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
-	fifo_size:	     0,
+	.rate_min =          44100,
+	.rate_max =          48000,
+	.channels_min =      8,
+	.channels_max =	     8,
+	.buffer_bytes_max =  RME32_BUFFER_SIZE,
+	.period_bytes_min =  RME32_BLOCK_SIZE,
+	.period_bytes_max =  RME32_BLOCK_SIZE,
+	.periods_min =	    RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	.periods_max =	    RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	.fifo_size =	    0,
 };
 
 /*
@@ -363,19 +395,19 @@ static snd_pcm_hardware_t snd_rme32_capture_adat_info =
 			      SNDRV_PCM_INFO_MMAP_VALID |
 			      SNDRV_PCM_INFO_INTERLEAVED |
 			      SNDRV_PCM_INFO_PAUSE),
-	formats:             SNDRV_PCM_FMTBIT_S16_LE,
-	rates:	             (SNDRV_PCM_RATE_44100 | 
+	.formats =           SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =             (SNDRV_PCM_RATE_44100 | 
 			      SNDRV_PCM_RATE_48000),
-	rate_min:            44100,
-	rate_max:            48000,
-	channels_min:        8,
-	channels_max:	     8,
-	buffer_bytes_max:   RME32_BUFFER_SIZE,
-	period_bytes_min:   RME32_BLOCK_SIZE,
-	period_bytes_max:   RME32_BLOCK_SIZE,
-	periods_min:	     RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
-	periods_max:	     RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
-	fifo_size:           0,
+	.rate_min =          44100,
+	.rate_max =          48000,
+	.channels_min =	     8,
+	.channels_max =	     8,
+	.buffer_bytes_max =  RME32_BUFFER_SIZE,
+	.period_bytes_min =  RME32_BLOCK_SIZE,
+	.period_bytes_max =  RME32_BLOCK_SIZE,
+	.periods_min =	     RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	.periods_max =	     RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	.fifo_size =         0,
 };
 
 static void snd_rme32_reset_dac(rme32_t *rme32)

@@ -37,9 +37,10 @@ snd_pcm_t *snd_pcm_devices[SNDRV_CARDS * SNDRV_PCM_DEVICES];
 static LIST_HEAD(snd_pcm_notify_list);
 static DECLARE_MUTEX(register_mutex);
 
-int snd_pcm_free(snd_pcm_t *pcm);
+static int snd_pcm_free(snd_pcm_t *pcm);
 static int snd_pcm_dev_free(snd_device_t *device);
 static int snd_pcm_dev_register(snd_device_t *device);
+static int snd_pcm_dev_disconnect(snd_device_t *device);
 static int snd_pcm_dev_unregister(snd_device_t *device);
 
 void snd_pcm_lock(int xup)
@@ -590,7 +591,7 @@ int snd_pcm_new_stream(snd_pcm_t *pcm, int stream, int substream_count)
 }				
 
 int snd_pcm_new(snd_card_t * card, char *id, int device,
-	        int playback_count, int capture_count,
+		int playback_count, int capture_count,
 	        snd_pcm_t ** rpcm)
 {
 	snd_pcm_t *pcm;
@@ -598,6 +599,7 @@ int snd_pcm_new(snd_card_t * card, char *id, int device,
 	static snd_device_ops_t ops = {
 		.dev_free = snd_pcm_dev_free,
 		.dev_register =	snd_pcm_dev_register,
+		.dev_disconnect = snd_pcm_dev_disconnect,
 		.dev_unregister = snd_pcm_dev_unregister
 	};
 
@@ -653,7 +655,7 @@ static void snd_pcm_free_stream(snd_pcm_str_t * pstr)
 #endif
 }
 
-int snd_pcm_free(snd_pcm_t *pcm)
+static int snd_pcm_free(snd_pcm_t *pcm)
 {
 	snd_assert(pcm != NULL, return -ENXIO);
 	if (pcm->private_free)
@@ -664,7 +666,7 @@ int snd_pcm_free(snd_pcm_t *pcm)
 	return 0;
 }
 
-int snd_pcm_dev_free(snd_device_t *device)
+static int snd_pcm_dev_free(snd_device_t *device)
 {
 	snd_pcm_t *pcm = snd_magic_cast(snd_pcm_t, device->device_data, return -ENXIO);
 	return snd_pcm_free(pcm);
@@ -696,7 +698,7 @@ int snd_pcm_open_substream(snd_pcm_t *pcm, int stream,
 		return -ENODEV;
 
 	card = pcm->card;
-	read_lock(&card->control_rwlock);
+	down_read(&card->controls_rwsem);
 	list_for_each(list, &card->ctl_files) {
 		kctl = snd_ctl_file(list);
 		if (kctl->pid == current->pid) {
@@ -704,7 +706,7 @@ int snd_pcm_open_substream(snd_pcm_t *pcm, int stream,
 			break;
 		}
 	}
-	read_unlock(&card->control_rwlock);
+	up_read(&card->controls_rwsem);
 
 	if (pstr->substream_count == 0)
 		return -ENODEV;
@@ -793,7 +795,7 @@ void snd_pcm_release_substream(snd_pcm_substream_t *substream)
 	substream->pstr->substream_opened--;
 }
 
-int snd_pcm_dev_register(snd_device_t *device)
+static int snd_pcm_dev_register(snd_device_t *device)
 {
 	int idx, cidx, err;
 	unsigned short minor;
@@ -837,7 +839,25 @@ int snd_pcm_dev_register(snd_device_t *device)
 	list_for_each(list, &snd_pcm_notify_list) {
 		snd_pcm_notify_t *notify;
 		notify = list_entry(list, snd_pcm_notify_t, list);
-		notify->n_register(-1 /* idx + SNDRV_MINOR_PCM */, pcm);
+		notify->n_register(pcm);
+	}
+	snd_pcm_lock(1);
+	return 0;
+}
+
+static int snd_pcm_dev_disconnect(snd_device_t *device)
+{
+	snd_pcm_t *pcm = snd_magic_cast(snd_pcm_t, device->device_data, return -ENXIO);
+	struct list_head *list;
+	int idx;
+
+	snd_pcm_lock(0);
+	idx = (pcm->card->number * SNDRV_PCM_DEVICES) + pcm->device;
+	snd_pcm_devices[idx] = NULL;
+	list_for_each(list, &snd_pcm_notify_list) {
+		snd_pcm_notify_t *notify;
+		notify = list_entry(list, snd_pcm_notify_t, list);
+		notify->n_disconnect(pcm);
 	}
 	snd_pcm_lock(1);
 	return 0;
@@ -853,10 +873,7 @@ static int snd_pcm_dev_unregister(snd_device_t *device)
 	snd_assert(pcm != NULL, return -ENXIO);
 	snd_pcm_lock(0);
 	idx = (pcm->card->number * SNDRV_PCM_DEVICES) + pcm->device;
-	if (snd_pcm_devices[idx] != pcm) {
-		snd_pcm_lock(1);
-		return -EINVAL;
-	}
+	snd_pcm_devices[idx] = NULL;
 	for (cidx = 0; cidx < 2; cidx++) {
 		devtype = -1;
 		switch (cidx) {
@@ -874,9 +891,8 @@ static int snd_pcm_dev_unregister(snd_device_t *device)
 	list_for_each(list, &snd_pcm_notify_list) {
 		snd_pcm_notify_t *notify;
 		notify = list_entry(list, snd_pcm_notify_t, list);
-		notify->n_unregister(-1 /* SNDRV_MINOR_PCM + idx */, pcm);
+		notify->n_unregister(pcm);
 	}
-	snd_pcm_devices[idx] = NULL;
 	snd_pcm_lock(1);
 	return snd_pcm_free(pcm);
 }
@@ -892,16 +908,14 @@ int snd_pcm_notify(snd_pcm_notify_t *notify, int nfree)
 		for (idx = 0; idx < SNDRV_CARDS * SNDRV_PCM_DEVICES; idx++) {
 			if (snd_pcm_devices[idx] == NULL)
 				continue;
-			notify->n_unregister(-1 /* idx + SNDRV_MINOR_PCM */,
-				             snd_pcm_devices[idx]);
+			notify->n_unregister(snd_pcm_devices[idx]);
 		}
 	} else {
 		list_add_tail(&notify->list, &snd_pcm_notify_list);
 		for (idx = 0; idx < SNDRV_CARDS * SNDRV_PCM_DEVICES; idx++) {
 			if (snd_pcm_devices[idx] == NULL)
 				continue;
-			notify->n_register(-1 /* idx + SNDRV_MINOR_PCM */,
-				           snd_pcm_devices[idx]);
+			notify->n_register(snd_pcm_devices[idx]);
 		}
 	}
 	snd_pcm_lock(1);

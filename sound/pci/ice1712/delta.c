@@ -189,19 +189,18 @@ static void delta_spdif_default_get(ice1712_t *ice, snd_ctl_elem_value_t * ucont
 
 static int delta_spdif_default_put(ice1712_t *ice, snd_ctl_elem_value_t * ucontrol)
 {
-	unsigned long flags;
 	unsigned int val;
 	int change;
 
 	val = snd_cs8403_encode_spdif_bits(&ucontrol->value.iec958);
-	spin_lock_irqsave(&ice->reg_lock, flags);
+	spin_lock_irq(&ice->reg_lock);
 	change = ice->spdif.cs8403_bits != val;
 	ice->spdif.cs8403_bits = val;
 	if (change && ice->playback_pro_substream == NULL) {
-		spin_unlock_irqrestore(&ice->reg_lock, flags);
+		spin_unlock_irq(&ice->reg_lock);
 		snd_ice1712_delta_cs8403_spdif_write(ice, val);
 	} else {
-		spin_unlock_irqrestore(&ice->reg_lock, flags);
+		spin_unlock_irq(&ice->reg_lock);
 	}
 	return change;
 }
@@ -213,19 +212,18 @@ static void delta_spdif_stream_get(ice1712_t *ice, snd_ctl_elem_value_t * ucontr
 
 static int delta_spdif_stream_put(ice1712_t *ice, snd_ctl_elem_value_t * ucontrol)
 {
-	unsigned long flags;
 	unsigned int val;
 	int change;
 
 	val = snd_cs8403_encode_spdif_bits(&ucontrol->value.iec958);
-	spin_lock_irqsave(&ice->reg_lock, flags);
+	spin_lock_irq(&ice->reg_lock);
 	change = ice->spdif.cs8403_stream_bits != val;
 	ice->spdif.cs8403_stream_bits = val;
 	if (change && ice->playback_pro_substream != NULL) {
-		spin_unlock_irqrestore(&ice->reg_lock, flags);
+		spin_unlock_irq(&ice->reg_lock);
 		snd_ice1712_delta_cs8403_spdif_write(ice, val);
 	} else {
-		spin_unlock_irqrestore(&ice->reg_lock, flags);
+		spin_unlock_irq(&ice->reg_lock);
 	}
 	return change;
 }
@@ -257,9 +255,12 @@ static int delta1010lt_ak4524_start(ice1712_t *ice, unsigned char *saved, int ch
 /*
  * change the rate of AK4524 on Delta 44/66, AP, 1010LT
  */
-static void delta_ak4524_set_rate_val(ice1712_t *ice, unsigned char val)
+static void delta_ak4524_set_rate_val(ice1712_t *ice, unsigned int rate)
 {
 	unsigned char tmp, tmp2;
+
+	if (rate == 0)	/* no hint - S/PDIF input is master, simply return */
+		return;
 
 	/* check before reset ak4524 to avoid unnecessary clicks */
 	down(&ice->gpio_mutex);
@@ -267,7 +268,7 @@ static void delta_ak4524_set_rate_val(ice1712_t *ice, unsigned char val)
 	up(&ice->gpio_mutex);
 	tmp2 = tmp;
 	tmp2 &= ~ICE1712_DELTA_DFS; 
-	if (val == 15 || val == 11 || val == 7)
+	if (rate > 48000)
 		tmp2 |= ICE1712_DELTA_DFS;
 	if (tmp == tmp2)
 		return;
@@ -275,12 +276,9 @@ static void delta_ak4524_set_rate_val(ice1712_t *ice, unsigned char val)
 	/* do it again */
 	snd_ice1712_ak4524_reset(ice, 1);
 	down(&ice->gpio_mutex);
-	tmp = snd_ice1712_read(ice, ICE1712_IREG_GPIO_DATA);
-	if (val == 15 || val == 11 || val == 7) {
+	tmp = snd_ice1712_read(ice, ICE1712_IREG_GPIO_DATA) & ~ICE1712_DELTA_DFS;
+	if (rate > 48000)
 		tmp |= ICE1712_DELTA_DFS;
-	} else {
-		tmp &= ~ICE1712_DELTA_DFS;
-	}
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, tmp);
 	up(&ice->gpio_mutex);
 	snd_ice1712_ak4524_reset(ice, 0);
@@ -385,9 +383,11 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 	case ICE1712_SUBDEVICE_DELTA410:
 		ak->num_adcs = ak->num_dacs = 2;
 		ak->type = SND_AK4528;
+		ak->caddr = 2;
 		if (ice->eeprom.subvendor == ICE1712_SUBDEVICE_DELTA410) {
 			ak->num_dacs = 8;
 			ak->type = SND_AK4529;
+			ak->caddr = 0;
 		}
 		ak->cif = 0; /* the default level of the CIF pin from AK4528/4529 */
 		ak->data_mask = ICE1712_DELTA_AP_DOUT;
@@ -402,6 +402,7 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 	case ICE1712_SUBDEVICE_DELTA1010LT:
 		ak->num_adcs = ak->num_dacs = 8;
 		ak->type = SND_AK4524;
+		ak->caddr = 2;
 		ak->cif = 0; /* the default level of the CIF pin from AK4524 */
 		ak->data_mask = ICE1712_DELTA_1010LT_DOUT;
 		ak->clk_mask = ICE1712_DELTA_1010LT_CCLK;
@@ -417,6 +418,7 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 	case ICE1712_SUBDEVICE_DELTA44:
 		ak->num_adcs = ak->num_dacs = 4;
 		ak->type = SND_AK4524;
+		ak->caddr = 2;
 		ak->cif = 0; /* the default level of the CIF pin from AK4524 */
 		ak->data_mask = ICE1712_DELTA_CODEC_SERIAL_DATA;
 		ak->clk_mask = ICE1712_DELTA_CODEC_SERIAL_CLOCK;
