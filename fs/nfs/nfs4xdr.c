@@ -51,12 +51,6 @@
 #include <linux/nfs4.h>
 #include <linux/nfs_fs.h>
 
-/* Emperically, it seems that the NFS client gets confused if
- * cookies larger than this are returned -- presumably a
- * signedness issue?
- */
-#define COOKIE_MAX		0x7fffffff
-
 #define NFSDBG_FACILITY		NFSDBG_XDR
 
 /* Mapping from NFS error code to "errno" error code. */
@@ -2188,9 +2182,6 @@ nfs4_decode_dirent(uint32_t *p, struct nfs_entry *entry, int plus)
 	entry->name = (const char *) p;
 	p += XDR_QUADLEN(entry->len);
 
-	if (entry->cookie > COOKIE_MAX)
-		entry->cookie = COOKIE_MAX;
-	
 	/*
 	 * In case the server doesn't return an inode number,
 	 * we fake one here.  (We don't use inode number 0,
