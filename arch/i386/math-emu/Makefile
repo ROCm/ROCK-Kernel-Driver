@@ -9,8 +9,8 @@ DEBUG	=
 PARANOID = -DPARANOID
 CFLAGS	:= $(CFLAGS) $(PARANOID) $(DEBUG) -fno-builtin $(MATH_EMULATION)
 
-.S.o:
-	$(CC) $(AFLAGS) $(PARANOID) -c $<
+USE_STANDARD_AS_RULE	:= true
+EXTRA_AFLAGS	:= $(PARANOID)
 
 # From 'C' language sources:
 C_OBJS =fpu_entry.o errors.o \

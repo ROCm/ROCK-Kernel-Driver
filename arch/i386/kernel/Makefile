@@ -7,8 +7,8 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-.S.o:
-	$(CC) $(AFLAGS) -traditional -c $< -o $*.o
+EXTRA_AFLAGS	:= -traditional
+USE_STANDARD_AS_RULE	:= true
 
 all: first_rule kernel.o head.o init_task.o
 
