@@ -356,7 +356,6 @@ extern int			ip6_dst_lookup(struct sock *sk,
  */
 
 extern int			ip6_output(struct sk_buff **pskb);
-extern int			ip6_output2(struct sk_buff **pskb);
 extern int			ip6_forward(struct sk_buff *skb);
 extern int			ip6_input(struct sk_buff *skb);
 extern int			ip6_mc_input(struct sk_buff *skb);

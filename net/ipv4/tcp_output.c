@@ -1389,8 +1389,7 @@ void tcp_send_delayed_ack(struct sock *sk)
 	}
 	tp->ack.pending |= TCP_ACK_SCHED|TCP_ACK_TIMER;
 	tp->ack.timeout = timeout;
-	if (!mod_timer(&tp->delack_timer, timeout))
-		sock_hold(sk);
+	sk_reset_timer(sk, &tp->delack_timer, timeout);
 }
 
 /* This routine sends an ack and also updates the window. */
