@@ -95,6 +95,13 @@ typedef struct xfs_alloc_arg {
 
 #ifdef __KERNEL__
 
+#if defined(XFS_ALLOC_TRACE)
+/*
+ * Allocation tracing buffer size.
+ */
+#define	XFS_ALLOC_TRACE_SIZE	4096
+extern ktrace_t *xfs_alloc_trace_buf;
+
 /*
  * Types for alloc tracing.
  */
@@ -104,24 +111,7 @@ typedef struct xfs_alloc_arg {
 #define	XFS_ALLOC_KTRACE_BUSY	4
 #define	XFS_ALLOC_KTRACE_UNBUSY	5
 #define	XFS_ALLOC_KTRACE_BUSYSEARCH	6
-
-
-/*
- * Allocation tracing buffer size.
- */
-#define	XFS_ALLOC_TRACE_SIZE	4096
-
-#ifdef	XFS_ALL_TRACE
-#define	XFS_ALLOC_TRACE
 #endif
-
-#if !defined(DEBUG)
-#undef	XFS_ALLOC_TRACE
-#endif
-
-/*
- * Prototypes for visible xfs_alloc.c routines
- */
 
 /*
  * Compute and fill in value of m_ag_maxlevels.

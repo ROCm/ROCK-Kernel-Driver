@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -51,7 +51,7 @@
 #include "xfs_bmap.h"
 #include "xfs_error.h"
 #include "xfs_quota.h"
-#include "xfs_rw.h"
+#include "xfs_refcache.h"
 #include "xfs_utils.h"
 #include "xfs_trans_space.h"
 #include "xfs_da_btree.h"
@@ -343,8 +343,7 @@ xfs_rename(
 	src_is_directory = ((src_ip->i_d.di_mode & S_IFMT) == S_IFDIR);
 
 	/*
-	 * Drop the locks on our inodes so that we can do the ancestor
-	 * check if necessary and start the transaction.
+	 * Drop the locks on our inodes so that we can start the transaction.
 	 */
 	xfs_rename_unlock4(inodes, XFS_ILOCK_SHARED);
 
@@ -486,7 +485,7 @@ xfs_rename(
 		error = xfs_droplink(tp, target_ip);
 		if (error) {
 			rename_which_error_return = __LINE__;
-			goto abort_return;;
+			goto abort_return;
 		}
 		target_ip_dropped = 1;
 
@@ -627,6 +626,7 @@ xfs_rename(
 	 */
 	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 	if (target_ip != NULL) {
+		xfs_refcache_purge_ip(target_ip);
 		IRELE(target_ip);
 	}
 	/*

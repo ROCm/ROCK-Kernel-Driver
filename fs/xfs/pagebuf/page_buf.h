@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -48,11 +48,6 @@
 #include <linux/uio.h>
 
 /*
- * Turn this on to get pagebuf lock ownership
-#define PAGEBUF_LOCK_TRACKING
-*/
-
-/*
  *	Base types
  */
 
@@ -60,8 +55,6 @@
 typedef loff_t page_buf_daddr_t;
 
 #define PAGE_BUF_DADDR_NULL ((page_buf_daddr_t) (-1LL))
-
-typedef size_t page_buf_dsize_t;		/* size of buffer in blocks */
 
 #define page_buf_ctob(pp)	((pp) * PAGE_CACHE_SIZE)
 #define page_buf_btoc(dd)	(((dd) + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT)
@@ -74,29 +67,6 @@ typedef enum page_buf_rw_e {
 	PBRW_ZERO = 3			/* Zero target memory */
 } page_buf_rw_t;
 
-typedef enum {				/* pbm_flags values */
-	PBMF_EOF =		0x01,	/* mapping contains EOF		*/
-	PBMF_HOLE =		0x02,	/* mapping covers a hole	*/
-	PBMF_DELAY =		0x04,	/* mapping covers delalloc region  */
-	PBMF_UNWRITTEN =	0x20,	/* mapping covers allocated	*/
-					/* but uninitialized file data	*/
-	PBMF_NEW =		0x40	/* just allocated		*/
-} bmap_flags_t;
-
-typedef enum {
-	/* base extent manipulation calls */
-	BMAP_READ = (1 << 0),		/* read extents */
-	BMAP_WRITE = (1 << 1),		/* create extents */
-	BMAP_ALLOCATE = (1 << 2),	/* delayed allocate to real extents */
-	BMAP_UNWRITTEN  = (1 << 3),	/* unwritten extents to real extents */
-	/* modifiers */
-	BMAP_IGNSTATE = (1 << 4),	/* ignore unwritten state on read */
-	BMAP_DIRECT = (1 << 5),		/* direct instead of buffered write */
-	BMAP_MMAP = (1 << 6),		/* allocate for mmap write */
-	BMAP_SYNC = (1 << 7),		/* sync write */
-	BMAP_TRYLOCK = (1 << 8),	/* non-blocking request */
-	BMAP_DEVICE = (1 << 9),		/* we only want to know the device */
-} bmapi_flags_t;
 
 typedef enum page_buf_flags_e {		/* pb_flags values */
 	PBF_READ = (1 << 0),	/* buffer intended for reading from device */
@@ -123,12 +93,13 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 	_PBF_PRIVATE_BH = (1 << 17), /* do not use public buffer heads	   */
 	_PBF_ALL_PAGES_MAPPED = (1 << 18), /* all pages in range mapped	   */
 	_PBF_ADDR_ALLOCATED = (1 << 19), /* pb_addr space was allocated	   */
-	_PBF_MEM_ALLOCATED = (1 << 20), /* pb_mem+underlying pages alloc'd */
+	_PBF_MEM_ALLOCATED = (1 << 20), /* underlying pages are allocated  */
+	_PBF_MEM_SLAB = (1 << 21), /* underlying pages are slab allocated  */
 
-	PBF_FORCEIO = (1 << 21),
-	PBF_FLUSH = (1 << 22),	/* flush disk write cache		   */
-	PBF_READ_AHEAD = (1 << 23),
-	PBF_RUN_QUEUES = (1 << 24), /* run block device task queue	   */
+	PBF_FORCEIO = (1 << 22), /* ignore any cache state		   */
+	PBF_FLUSH = (1 << 23),	/* flush disk write cache		   */
+	PBF_READ_AHEAD = (1 << 24), /* asynchronous read-ahead		   */
+	PBF_RUN_QUEUES = (1 << 25), /* run block device task queue	   */
 
 } page_buf_flags_t;
 
@@ -144,36 +115,6 @@ typedef struct pb_target {
 	unsigned int		pbr_sshift;
 	size_t			pbr_smask;
 } pb_target_t;
-
-/*
- *	page_buf_bmap_t:  File system I/O map
- *
- * The pbm_bn, pbm_offset and pbm_length fields are expressed in disk blocks.
- * The pbm_length field specifies the size of the underlying backing store
- * for the particular mapping.
- *
- * The pbm_bsize, pbm_size and pbm_delta fields are in bytes and indicate
- * the size of the mapping, the number of bytes that are valid to access
- * (read or write), and the offset into the mapping, given the offset
- * supplied to the file I/O map routine.  pbm_delta is the offset of the
- * desired data from the beginning of the mapping.
- *
- * When a request is made to read beyond the logical end of the object,
- * pbm_size may be set to 0, but pbm_offset and pbm_length should be set to
- * the actual amount of underlying storage that has been allocated, if any.
- */
-
-typedef struct page_buf_bmap_s {
-	page_buf_daddr_t pbm_bn;	/* block number in file system	    */
-	pb_target_t	*pbm_target;	/* device to do I/O to		    */
-	loff_t		pbm_offset;	/* byte offset of mapping in file   */
-	size_t		pbm_delta;	/* offset of request into bmap	    */
-	size_t		pbm_bsize;	/* size of this mapping in bytes    */
-	bmap_flags_t	pbm_flags;	/* options flags for mapping	    */
-} page_buf_bmap_t;
-
-typedef page_buf_bmap_t pb_bmap_t;
-
 
 /*
  *	page_buf_t:  Buffer structure for page cache-based buffers
@@ -380,5 +321,20 @@ extern void pagebuf_delwri_dequeue(
 
 extern int pagebuf_init(void);
 extern void pagebuf_terminate(void);
+
+
+#ifdef PAGEBUF_TRACE
+extern ktrace_t *pagebuf_trace_buf;
+extern void pagebuf_trace(
+		page_buf_t *,		/* buffer being traced		*/
+		char *,			/* description of operation	*/
+		void *,			/* arbitrary diagnostic value	*/
+		void *);		/* return address		*/
+#else
+# define pagebuf_trace(pb, id, ptr, ra)	do { } while (0)
+#endif
+
+#define pagebuf_target_name(target)	\
+	({ char __b[BDEVNAME_SIZE]; bdevname((target)->pbr_bdev, __b); __b; })
 
 #endif /* __PAGE_BUF_H__ */

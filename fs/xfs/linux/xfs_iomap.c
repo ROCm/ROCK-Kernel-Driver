@@ -67,6 +67,7 @@
 #include "xfs_buf_item.h"
 #include "xfs_trans_space.h"
 #include "xfs_utils.h"
+#include "xfs_iomap.h"
 
 #define XFS_WRITEIO_ALIGN(mp,off)	(((off) >> mp->m_writeio_log) \
 						<< mp->m_writeio_log)
@@ -74,14 +75,14 @@
 #define XFS_WRITE_IMAPS		XFS_BMAP_MAX_NMAP
 
 STATIC int
-_xfs_imap_to_bmap(
+xfs_imap_to_bmap(
 	xfs_iocore_t	*io,
 	xfs_off_t	offset,
-	int		new,
 	xfs_bmbt_irec_t *imap,
-	page_buf_bmap_t	*pbmapp,
+	xfs_iomap_t	*iomapp,
 	int		imaps,			/* Number of imap entries */
-	int		pbmaps)			/* Number of pbmap entries */
+	int		iomaps,			/* Number of iomap entries */
+	int		flags)
 {
 	xfs_mount_t	*mp;
 	xfs_fsize_t	nisize;
@@ -93,35 +94,32 @@ _xfs_imap_to_bmap(
 	if (io->io_new_size > nisize)
 		nisize = io->io_new_size;
 
-	for (pbm = 0; imaps && pbm < pbmaps; imaps--, pbmapp++, imap++, pbm++) {
-		pbmapp->pbm_target = io->io_flags & XFS_IOCORE_RT ?
+	for (pbm = 0; imaps && pbm < iomaps; imaps--, iomapp++, imap++, pbm++) {
+		iomapp->iomap_target = io->io_flags & XFS_IOCORE_RT ?
 			mp->m_rtdev_targp : mp->m_ddev_targp;
-		pbmapp->pbm_offset = XFS_FSB_TO_B(mp, imap->br_startoff);
-		pbmapp->pbm_delta = offset - pbmapp->pbm_offset;
-		pbmapp->pbm_bsize = XFS_FSB_TO_B(mp, imap->br_blockcount);
-		pbmapp->pbm_flags = 0;
+		iomapp->iomap_offset = XFS_FSB_TO_B(mp, imap->br_startoff);
+		iomapp->iomap_delta = offset - iomapp->iomap_offset;
+		iomapp->iomap_bsize = XFS_FSB_TO_B(mp, imap->br_blockcount);
+		iomapp->iomap_flags = flags;
 
 		start_block = imap->br_startblock;
 		if (start_block == HOLESTARTBLOCK) {
-			pbmapp->pbm_bn = PAGE_BUF_DADDR_NULL;
-			pbmapp->pbm_flags = PBMF_HOLE;
+			iomapp->iomap_bn = IOMAP_DADDR_NULL;
+			iomapp->iomap_flags = IOMAP_HOLE;
 		} else if (start_block == DELAYSTARTBLOCK) {
-			pbmapp->pbm_bn = PAGE_BUF_DADDR_NULL;
-			pbmapp->pbm_flags = PBMF_DELAY;
+			iomapp->iomap_bn = IOMAP_DADDR_NULL;
+			iomapp->iomap_flags = IOMAP_DELAY;
 		} else {
-			pbmapp->pbm_bn = XFS_FSB_TO_DB_IO(io, start_block);
+			iomapp->iomap_bn = XFS_FSB_TO_DB_IO(io, start_block);
 			if (ISUNWRITTEN(imap))
-				pbmapp->pbm_flags |= PBMF_UNWRITTEN;
+				iomapp->iomap_flags |= IOMAP_UNWRITTEN;
 		}
 
-		if ((pbmapp->pbm_offset + pbmapp->pbm_bsize) >= nisize) {
-			pbmapp->pbm_flags |= PBMF_EOF;
+		if ((iomapp->iomap_offset + iomapp->iomap_bsize) >= nisize) {
+			iomapp->iomap_flags |= IOMAP_EOF;
 		}
 
-		if (new)
-			pbmapp->pbm_flags |= PBMF_NEW;
-
-		offset += pbmapp->pbm_bsize - pbmapp->pbm_delta;
+		offset += iomapp->iomap_bsize - iomapp->iomap_delta;
 	}
 	return pbm;	/* Return the number filled */
 }
@@ -132,54 +130,54 @@ xfs_iomap(
 	xfs_off_t	offset,
 	ssize_t		count,
 	int		flags,
-	page_buf_bmap_t	*pbmapp,
-	int		*npbmaps)
+	xfs_iomap_t	*iomapp,
+	int		*niomaps)
 {
 	xfs_mount_t	*mp = io->io_mount;
 	xfs_fileoff_t	offset_fsb, end_fsb;
 	int		error = 0;
-	int		new = 0;
 	int		lockmode = 0;
 	xfs_bmbt_irec_t	imap;
 	int		nimaps = 1;
-	int		bmap_flags = 0;
+	int		bmapi_flags = 0;
+	int		iomap_flags = 0;
 
 	if (XFS_FORCED_SHUTDOWN(mp))
-		return -XFS_ERROR(EIO);
+		return XFS_ERROR(EIO);
 
 	switch (flags &
-		(BMAP_READ | BMAP_WRITE | BMAP_ALLOCATE |
-		 BMAP_UNWRITTEN | BMAP_DEVICE)) {
-	case BMAP_READ:
+		(BMAPI_READ | BMAPI_WRITE | BMAPI_ALLOCATE |
+		 BMAPI_UNWRITTEN | BMAPI_DEVICE)) {
+	case BMAPI_READ:
 		lockmode = XFS_LCK_MAP_SHARED(mp, io);
-		bmap_flags = XFS_BMAPI_ENTIRE;
-		if (flags & BMAP_IGNSTATE)
-			bmap_flags |= XFS_BMAPI_IGSTATE;
+		bmapi_flags = XFS_BMAPI_ENTIRE;
+		if (flags & BMAPI_IGNSTATE)
+			bmapi_flags |= XFS_BMAPI_IGSTATE;
 		break;
-	case BMAP_WRITE:
+	case BMAPI_WRITE:
 		lockmode = XFS_ILOCK_EXCL|XFS_EXTSIZE_WR;
-		bmap_flags = 0;
+		bmapi_flags = 0;
 		XFS_ILOCK(mp, io, lockmode);
 		break;
-	case BMAP_ALLOCATE:
+	case BMAPI_ALLOCATE:
 		lockmode = XFS_ILOCK_SHARED|XFS_EXTSIZE_RD;
-		bmap_flags = XFS_BMAPI_ENTIRE;
+		bmapi_flags = XFS_BMAPI_ENTIRE;
 		/* Attempt non-blocking lock */
-		if (flags & BMAP_TRYLOCK) {
+		if (flags & BMAPI_TRYLOCK) {
 			if (!XFS_ILOCK_NOWAIT(mp, io, lockmode))
 				return XFS_ERROR(EAGAIN);
 		} else {
 			XFS_ILOCK(mp, io, lockmode);
 		}
 		break;
-	case BMAP_UNWRITTEN:
+	case BMAPI_UNWRITTEN:
 		goto phase2;
-	case BMAP_DEVICE:
+	case BMAPI_DEVICE:
 		lockmode = XFS_LCK_MAP_SHARED(mp, io);
-		pbmapp->pbm_target = io->io_flags & XFS_IOCORE_RT ?
+		iomapp->iomap_target = io->io_flags & XFS_IOCORE_RT ?
 			mp->m_rtdev_targp : mp->m_ddev_targp;
 		error = 0;
-		*npbmaps = 1;
+		*niomaps = 1;
 		goto out;
 	default:
 		BUG();
@@ -192,30 +190,30 @@ xfs_iomap(
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 
 	error = XFS_BMAPI(mp, NULL, io, offset_fsb,
-			(xfs_filblks_t)(end_fsb - offset_fsb) ,
-			bmap_flags,  NULL, 0, &imap,
+			(xfs_filblks_t)(end_fsb - offset_fsb),
+			bmapi_flags,  NULL, 0, &imap,
 			&nimaps, NULL);
 
 	if (error)
 		goto out;
 
 phase2:
-	switch (flags & (BMAP_WRITE|BMAP_ALLOCATE|BMAP_UNWRITTEN)) {
-	case BMAP_WRITE:
+	switch (flags & (BMAPI_WRITE|BMAPI_ALLOCATE|BMAPI_UNWRITTEN)) {
+	case BMAPI_WRITE:
 		/* If we found an extent, return it */
 		if (nimaps && (imap.br_startblock != HOLESTARTBLOCK))
 			break;
 
-		if (flags & (BMAP_DIRECT|BMAP_MMAP)) {
+		if (flags & (BMAPI_DIRECT|BMAPI_MMAP)) {
 			error = XFS_IOMAP_WRITE_DIRECT(mp, io, offset,
 					count, flags, &imap, &nimaps, nimaps);
 		} else {
 			error = XFS_IOMAP_WRITE_DELAY(mp, io, offset, count,
 					flags, &imap, &nimaps);
 		}
-		new = 1;
+		iomap_flags = IOMAP_NEW;
 		break;
-	case BMAP_ALLOCATE:
+	case BMAPI_ALLOCATE:
 		/* If we found an extent, return it */
 		XFS_IUNLOCK(mp, io, lockmode);
 		lockmode = 0;
@@ -225,7 +223,7 @@ phase2:
 
 		error = XFS_IOMAP_WRITE_ALLOCATE(mp, io, &imap, &nimaps);
 		break;
-	case BMAP_UNWRITTEN:
+	case BMAPI_UNWRITTEN:
 		lockmode = 0;
 		error = XFS_IOMAP_WRITE_UNWRITTEN(mp, io, offset, count);
 		nimaps = 0;
@@ -233,10 +231,10 @@ phase2:
 	}
 
 	if (nimaps) {
-		*npbmaps = _xfs_imap_to_bmap(io, offset, new, &imap,
-					pbmapp, nimaps, *npbmaps);
-	} else if (npbmaps) {
-		*npbmaps = 0;
+		*niomaps = xfs_imap_to_bmap(io, offset, &imap,
+					iomapp, nimaps, *niomaps, iomap_flags);
+	} else if (niomaps) {
+		*niomaps = 0;
 	}
 
 out:
@@ -251,29 +249,25 @@ xfs_flush_space(
 	int		*fsynced,
 	int		*ioflags)
 {
-	vnode_t		*vp = XFS_ITOV(ip);
-
 	switch (*fsynced) {
 	case 0:
 		if (ip->i_delayed_blks) {
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
-			filemap_fdatawrite(LINVFS_GET_IP(vp)->i_mapping);
+			xfs_flush_inode(ip);
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
 			*fsynced = 1;
 		} else {
-			*ioflags |= BMAP_SYNC;
+			*ioflags |= BMAPI_SYNC;
 			*fsynced = 2;
 		}
 		return 0;
 	case 1:
 		*fsynced = 2;
-		*ioflags |= BMAP_SYNC;
+		*ioflags |= BMAPI_SYNC;
 		return 0;
 	case 2:
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		sync_blockdev(vp->v_vfsp->vfs_super->s_bdev);
-		xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
-						XFS_LOG_FORCE|XFS_LOG_SYNC);
+		xfs_flush_device(ip);
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		*fsynced = 3;
 		return 0;
@@ -400,7 +394,7 @@ xfs_iomap_write_direct(
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 	xfs_trans_ihold(tp, ip);
 
-	if (!(flags & BMAP_MMAP) && (offset < ip->i_d.di_size || rt))
+	if (!(flags & BMAPI_MMAP) && (offset < ip->i_d.di_size || rt))
 		bmapi_flag |= XFS_BMAPI_PREALLOC;
 
 	/*
@@ -499,7 +493,7 @@ retry:
 	 * We don't bother with this for sync writes, because we need
 	 * to minimize the amount we write for good performance.
 	 */
-	if (!(ioflag & BMAP_SYNC) && ((offset + count) > ip->i_d.di_size)) {
+	if (!(ioflag & BMAPI_SYNC) && ((offset + count) > ip->i_d.di_size)) {
 		xfs_off_t	aligned_offset;
 		unsigned int	iosize;
 		xfs_fileoff_t	ioalign;

@@ -66,13 +66,6 @@
 #include "xfs_error.h"
 #include "xfs_bit.h"
 
-#if defined(XFSDEBUG) && defined(CONFIG_KDB)
-#undef xfs_buftrace
-#define xfs_buftrace(A,B) \
-	printk("    xfs_buftrace : %s (0x%p)\n", A, B); \
-	BUG();
-#endif
-
 /*
  * xfs_da_btree.c
  *

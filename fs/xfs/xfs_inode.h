@@ -99,6 +99,13 @@ struct xfs_mount;
 struct xfs_trans;
 struct xfs_dquot;
 
+#if defined(XFS_ILOCK_TRACE)
+#define XFS_ILOCK_KTRACE_SIZE	32
+extern ktrace_t *xfs_ilock_trace_buf;
+extern void xfs_ilock_trace(struct xfs_inode *, int, unsigned int, inst_t *);
+#else
+#define	xfs_ilock_trace(i,n,f,ra)
+#endif
 
 /*
  * This structure is used to communicate which extents of a file
@@ -264,7 +271,10 @@ typedef struct xfs_inode {
 	sema_t			i_flock;	/* inode flush lock */
 	atomic_t		i_pincount;	/* inode pin count */
 	wait_queue_head_t	i_ipin_wait;	/* inode pinning wait queue */
-
+#ifdef HAVE_REFCACHE
+	struct xfs_inode	**i_refcache;	/* ptr to entry in ref cache */
+	struct xfs_inode	*i_release;	/* inode to unref */
+#endif
 	/* I/O state */
 	xfs_iocore_t		i_iocore;	/* I/O core */
 
@@ -280,15 +290,22 @@ typedef struct xfs_inode {
 	struct xfs_inode	*i_cnext;	/* cluster hash link forward */
 	struct xfs_inode	*i_cprev;	/* cluster hash link backward */
 
-#ifdef DEBUG
 	/* Trace buffers per inode. */
+#ifdef XFS_BMAP_TRACE
 	struct ktrace		*i_xtrace;	/* inode extent list trace */
+#endif
+#ifdef XFS_BMBT_TRACE
 	struct ktrace		*i_btrace;	/* inode bmap btree trace */
+#endif
+#ifdef XFS_RW_TRACE
 	struct ktrace		*i_rwtrace;	/* inode read/write trace */
-	struct ktrace		*i_strat_trace;	/* inode strat_write trace */
+#endif
+#ifdef XFS_ILOCK_TRACE
 	struct ktrace		*i_lock_trace;	/* inode lock/unlock trace */
+#endif
+#ifdef XFS_DIR2_TRACE
 	struct ktrace		*i_dir_trace;	/* inode directory trace */
-#endif /* DEBUG */
+#endif
 } xfs_inode_t;
 
 #endif	/* __KERNEL__ */
@@ -535,12 +552,6 @@ extern struct kmem_zone	*xfs_ifork_zone;
 extern struct kmem_zone	*xfs_inode_zone;
 extern struct kmem_zone	*xfs_ili_zone;
 extern struct vnodeops	xfs_vnodeops;
-
-#ifdef XFS_ILOCK_TRACE
-#define XFS_ILOCK_KTRACE_SIZE	32
-void	xfs_ilock_trace(xfs_inode_t *ip, int lock, unsigned int lockflags,
-			inst_t *ra);
-#endif
 
 #endif	/* __KERNEL__ */
 

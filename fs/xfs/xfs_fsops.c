@@ -51,6 +51,7 @@
 #include "xfs_fsops.h"
 #include "xfs_itable.h"
 #include "xfs_rw.h"
+#include "xfs_refcache.h"
 #include "xfs_trans_space.h"
 #include "xfs_rtalloc.h"
 #include "xfs_dir2.h"
@@ -592,6 +593,9 @@ xfs_fs_freeze(
 
 	/* Stop new writers */
 	xfs_start_freeze(mp, XFS_FREEZE_WRITE);
+
+	/* Flush the refcache */
+	xfs_refcache_purge_mp(mp);
 
 	/* Flush delalloc and delwri data */
 	VFS_SYNC(vfsp, SYNC_DELWRI|SYNC_WAIT, NULL, error);

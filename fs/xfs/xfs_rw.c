@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -149,6 +149,9 @@ xfs_do_force_shutdown(
 		xfs_cmn_err(XFS_PTAG_SHUTDOWN_CORRUPT, CE_ALERT, mp,
     "Corruption of in-memory data detected.  Shutting down filesystem: %s",
 			mp->m_fsname);
+		if (XFS_ERRLEVEL_HIGH <= xfs_error_level) {
+			xfs_stack_trace();
+		}
 	} else if (!(flags & XFS_FORCE_UMOUNT)) {
 		if (logerror) {
 			xfs_cmn_err(XFS_PTAG_SHUTDOWN_LOGERROR, CE_ALERT, mp,
@@ -350,55 +353,4 @@ xfs_bwrite(
 		xfs_force_shutdown(mp, XFS_METADATA_IO_ERROR);
 	}
 	return (error);
-}
-
-/*
- * xfs_inval_cached_pages()
- * This routine is responsible for keeping direct I/O and buffered I/O
- * somewhat coherent.  From here we make sure that we're at least
- * temporarily holding the inode I/O lock exclusively and then call
- * the page cache to flush and invalidate any cached pages.  If there
- * are no cached pages this routine will be very quick.
- */
-void
-xfs_inval_cached_pages(
-	vnode_t		*vp,
-	xfs_iocore_t	*io,
-	xfs_off_t	offset,
-	int		write,
-	int		relock)
-{
-	xfs_mount_t	*mp;
-
-	if (!VN_CACHED(vp)) {
-		return;
-	}
-
-	mp = io->io_mount;
-
-	/*
-	 * We need to get the I/O lock exclusively in order
-	 * to safely invalidate pages and mappings.
-	 */
-	if (relock) {
-		XFS_IUNLOCK(mp, io, XFS_IOLOCK_SHARED);
-		XFS_ILOCK(mp, io, XFS_IOLOCK_EXCL);
-	}
-
-	/* Writing beyond EOF creates a hole that must be zeroed */
-	if (write && (offset > XFS_SIZE(mp, io))) {
-		xfs_fsize_t	isize;
-
-		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
-		isize = XFS_SIZE(mp, io);
-		if (offset > isize) {
-			xfs_zero_eof(vp, io, offset, isize, offset);
-		}
-		XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
-	}
-
-	VOP_FLUSHINVAL_PAGES(vp, ctooff(offtoct(offset)), -1, FI_REMAPF_LOCKED);
-	if (relock) {
-		XFS_ILOCK_DEMOTE(mp, io, XFS_IOLOCK_EXCL);
-	}
 }
