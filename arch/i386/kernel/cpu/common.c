@@ -358,7 +358,9 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	       boot_cpu_data.x86_capability[3]);
 
 	/* Init Machine Check Exception if available. */
+#ifdef CONFIG_X86_MCE
 	mcheck_init(c);
+#endif
 }
 /*
  *	Perform early boot up checks for a valid TSC. See arch/i386/kernel/time.c
