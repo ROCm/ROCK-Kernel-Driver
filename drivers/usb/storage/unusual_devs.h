@@ -745,12 +745,6 @@ UNUSUAL_DEV(  0x097a, 0x0001, 0x0000, 0x0001,
  		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_MODE_XLATE ),
 
-UNUSUAL_DEV(  0x0a16, 0x8888, 0x0100, 0x0100,
-		"IBM",
-		"IBM USB Memory Key",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_INQUIRY ),
-
 /* This Pentax still camera is not conformant
  * to the USB storage specification: -
  * - It does not like the INQUIRY command. So we must handle this command
