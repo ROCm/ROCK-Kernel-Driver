@@ -3,7 +3,6 @@
 #
 CONFIG_ARM=y
 CONFIG_MMU=y
-CONFIG_SWAP=y
 CONFIG_UID16=y
 CONFIG_RWSEM_GENERIC_SPINLOCK=y
 
@@ -15,6 +14,7 @@ CONFIG_RWSEM_GENERIC_SPINLOCK=y
 #
 # General setup
 #
+CONFIG_SWAP=y
 CONFIG_SYSVIPC=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y
@@ -284,6 +284,7 @@ CONFIG_NETDEVICES=y
 # Ethernet (10 or 100Mbit)
 #
 CONFIG_NET_ETHERNET=y
+# CONFIG_MII is not set
 # CONFIG_HAPPYMEAL is not set
 # CONFIG_SUNGEM is not set
 # CONFIG_NET_VENDOR_3COM is not set
@@ -299,6 +300,7 @@ CONFIG_NET_PCI=y
 # CONFIG_ADAPTEC_STARFIRE is not set
 # CONFIG_DGRS is not set
 CONFIG_EEPRO100=y
+# CONFIG_EEPRO100_PIO is not set
 # CONFIG_E100 is not set
 # CONFIG_FEALNX is not set
 # CONFIG_NATSEMI is not set
@@ -504,6 +506,7 @@ CONFIG_UNIX98_PTY_COUNT=256
 # CONFIG_AGP is not set
 # CONFIG_DRM is not set
 # CONFIG_RAW_DRIVER is not set
+# CONFIG_HANGCHECK_TIMER is not set
 
 #
 # Multimedia devices
@@ -536,50 +539,66 @@ CONFIG_VIDEO_DEV=y
 #
 # File systems
 #
+CONFIG_EXT2_FS=y
+# CONFIG_EXT2_FS_XATTR is not set
+# CONFIG_EXT3_FS is not set
+# CONFIG_JBD is not set
+# CONFIG_REISERFS_FS is not set
+# CONFIG_JFS_FS is not set
+# CONFIG_XFS_FS is not set
+# CONFIG_MINIX_FS is not set
+# CONFIG_ROMFS_FS is not set
 # CONFIG_QUOTA is not set
 # CONFIG_AUTOFS_FS is not set
 # CONFIG_AUTOFS4_FS is not set
-# CONFIG_REISERFS_FS is not set
-# CONFIG_EXT3_FS is not set
-# CONFIG_JBD is not set
+
+#
+# CD-ROM/DVD Filesystems
+#
+# CONFIG_ISO9660_FS is not set
+# CONFIG_UDF_FS is not set
+
+#
+# DOS/FAT/NT Filesystems
+#
 # CONFIG_FAT_FS is not set
+# CONFIG_NTFS_FS is not set
+
+#
+# Pseudo filesystems
+#
+CONFIG_PROC_FS=y
+CONFIG_DEVPTS_FS=y
+CONFIG_TMPFS=y
+CONFIG_RAMFS=y
+
+#
+# Miscellaneous filesystems
+#
 # CONFIG_JFFS_FS is not set
 CONFIG_JFFS2_FS=y
 CONFIG_JFFS2_FS_DEBUG=0
 # CONFIG_CRAMFS is not set
-CONFIG_TMPFS=y
-CONFIG_RAMFS=y
-# CONFIG_ISO9660_FS is not set
-# CONFIG_JFS_FS is not set
-# CONFIG_MINIX_FS is not set
 # CONFIG_VXFS_FS is not set
-# CONFIG_NTFS_FS is not set
 # CONFIG_HPFS_FS is not set
-CONFIG_PROC_FS=y
-CONFIG_DEVPTS_FS=y
 # CONFIG_QNX4FS_FS is not set
-# CONFIG_ROMFS_FS is not set
-CONFIG_EXT2_FS=y
-# CONFIG_EXT2_FS_XATTR is not set
 # CONFIG_SYSV_FS is not set
-# CONFIG_UDF_FS is not set
 # CONFIG_UFS_FS is not set
-# CONFIG_XFS_FS is not set
 
 #
 # Network File Systems
 #
-# CONFIG_CODA_FS is not set
 CONFIG_NFS_FS=y
 # CONFIG_NFS_V3 is not set
-CONFIG_ROOT_NFS=y
 # CONFIG_NFSD is not set
-CONFIG_SUNRPC=y
+CONFIG_ROOT_NFS=y
 CONFIG_LOCKD=y
 # CONFIG_EXPORTFS is not set
-# CONFIG_CIFS is not set
 # CONFIG_SMB_FS is not set
+# CONFIG_CIFS is not set
 # CONFIG_NCP_FS is not set
+# CONFIG_CODA_FS is not set
+CONFIG_SUNRPC=y
 
 #
 # Partition Types
