@@ -209,7 +209,7 @@ void new_thread(void *stack, void **switch_buf_ptr, void **fork_buf_ptr,
 		void (*handler)(int))
 {
 	unsigned long flags;
-	jmp_buf switch_buf, fork_buf;
+	sigjmp_buf switch_buf, fork_buf;
 
 	*switch_buf_ptr = &switch_buf;
 	*fork_buf_ptr = &fork_buf;
@@ -233,7 +233,7 @@ void new_thread(void *stack, void **switch_buf_ptr, void **fork_buf_ptr,
 
 void thread_wait(void *sw, void *fb)
 {
-	jmp_buf buf, **switch_buf = sw, *fork_buf;
+	sigjmp_buf buf, **switch_buf = sw, *fork_buf;
 
 	*switch_buf = &buf;
 	fork_buf = fb;
@@ -295,23 +295,23 @@ void restore_registers(union uml_pt_regs *regs)
 
 void switch_threads(void *me, void *next)
 {
-	jmp_buf my_buf, **me_ptr = me, *next_buf = next;
+	sigjmp_buf my_buf, **me_ptr = me, *next_buf = next;
 	
 	*me_ptr = &my_buf;
 	if(sigsetjmp(my_buf, 1) == 0)
 		siglongjmp(*next_buf, 1);
 }
 
-static jmp_buf initial_jmpbuf;
+static sigjmp_buf initial_jmpbuf;
 
 /* XXX Make these percpu */
 static void (*cb_proc)(void *arg);
 static void *cb_arg;
-static jmp_buf *cb_back;
+static sigjmp_buf *cb_back;
 
 int start_idle_thread(void *stack, void *switch_buf_ptr, void **fork_buf_ptr)
 {
-	jmp_buf **switch_buf = switch_buf_ptr;
+	sigjmp_buf **switch_buf = switch_buf_ptr;
 	int n;
 
 	*fork_buf_ptr = &initial_jmpbuf;
@@ -347,7 +347,7 @@ void remove_sigstack(void)
 
 void initial_thread_cb_skas(void (*proc)(void *), void *arg)
 {
-	jmp_buf here;
+	sigjmp_buf here;
 
 	cb_proc = proc;
 	cb_arg = arg;

@@ -297,7 +297,7 @@ void __init check_ptrace(void)
 
 int run_kernel_thread(int (*fn)(void *), void *arg, void **jmp_ptr)
 {
-	jmp_buf buf;
+	sigjmp_buf buf;
 	int n;
 
 	*jmp_ptr = &buf;
