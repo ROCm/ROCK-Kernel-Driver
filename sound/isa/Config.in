@@ -20,7 +20,7 @@ dep_tristate 'Sound Blaster 1.0/2.0/Pro (8-bit)' CONFIG_SND_SB8 $CONFIG_SND
 dep_tristate 'Sound Blaster 16 (PnP)' CONFIG_SND_SB16 $CONFIG_SND
 dep_tristate 'Sound Blaster AWE (32,64) (PnP)' CONFIG_SND_SBAWE $CONFIG_SND
 if [ "$CONFIG_SND_SB16" != "n" -o "$CONFIG_SND_SBAWE" != "n" ]; then
-  dep_bool 'Sound Blaster 16/AWE CSP support' CONFIG_SND_SB16_CSP
+  dep_bool 'Sound Blaster 16/AWE CSP support' CONFIG_SND_SB16_CSP $CONFIG_SND
 fi
 dep_tristate 'Turtle Beach Maui,Tropez,Tropez+ (Wavefront)' CONFIG_SND_WAVEFRONT $CONFIG_SND
 dep_tristate 'Avance Logic ALS100/ALS120' CONFIG_SND_ALS100 $CONFIG_SND

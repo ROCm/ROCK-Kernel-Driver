@@ -19,13 +19,13 @@ if [ "$CONFIG_SND" != "n" ]; then
   source sound/core/Config.in
   source sound/drivers/Config.in
 fi
-if [ "$CONFIG_SND" != "n" -a "$CONFIG_ISA" == "y" ]; then
+if [ "$CONFIG_SND" != "n" -a "$CONFIG_ISA" = "y" ]; then
   source sound/isa/Config.in
 fi
-if [ "$CONFIG_SND" != "n" -a "$CONFIG_PCI" == "y" ]; then
+if [ "$CONFIG_SND" != "n" -a "$CONFIG_PCI" = "y" ]; then
   source sound/pci/Config.in
 fi
-if [ "$CONFIG_SND" != "n" -a "$CONFIG_PPC" == "y" ]; then
+if [ "$CONFIG_SND" != "n" -a "$CONFIG_PPC" = "y" ]; then
   source sound/ppc/Config.in
 fi
 
