@@ -8,6 +8,7 @@
 #include <linux/in.h>
 #include <linux/spinlock.h>
 #include <linux/sched.h>
+#include <linux/vmalloc.h>
 
 #include "flask.h"
 #include "avc.h"
