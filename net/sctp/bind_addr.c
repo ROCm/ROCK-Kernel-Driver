@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2003
  * Copyright (c) Cisco 1999,2000
  * Copyright (c) Motorola 1999,2000,2001
- * Copyright (c) International Business Machines Corp., 2001,2002
  * Copyright (c) La Monte H.P. Yarroll 2001
  *
  * This file is part of the SCTP kernel reference implementation.
@@ -223,9 +223,10 @@ union sctp_params sctp_bind_addrs_to_raw(const struct sctp_bind_addr *bp,
 	int len;
 	struct sctp_sockaddr_entry *addr;
 	struct list_head *pos;
+	struct sctp_af *af;
+
 	addrparms_len = 0;
 	len = 0;
-	struct sctp_af *af;
 
 	/* Allocate enough memory at once. */
 	list_for_each(pos, &bp->address_list) {
