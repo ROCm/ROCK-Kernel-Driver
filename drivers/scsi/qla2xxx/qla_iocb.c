@@ -338,15 +338,15 @@ qla2x00_start_scsi(srb_t *sp)
 	uint16_t	cnt;
 	uint16_t	req_cnt;
 	uint16_t	tot_dsds;
-	device_reg_t	*reg;
+	device_reg_t __iomem *reg;
 	char		tag[2];
 
 	/* Setup device pointers. */
 	ret = 0;
 	fclun = sp->lun_queue->fclun;
 	ha = fclun->fcport->ha;
-	cmd = sp->cmd;
 	reg = ha->iobase;
+	cmd = sp->cmd;
 
 	/* Send marker if required */
 	if (ha->marker_needed != 0) {
@@ -547,7 +547,7 @@ qla2x00_marker(scsi_qla_host_t *ha, uint16_t loop_id, uint16_t lun,
 request_t *
 qla2x00_req_pkt(scsi_qla_host_t *ha)
 {
-	device_reg_t	*reg = ha->iobase;
+	device_reg_t __iomem *reg = ha->iobase;
 	request_t	*pkt = NULL;
 	uint16_t	cnt;
 	uint32_t	*dword_ptr;
@@ -616,7 +616,7 @@ qla2x00_req_pkt(scsi_qla_host_t *ha)
 request_t *
 qla2x00_ms_req_pkt(scsi_qla_host_t *ha, srb_t  *sp)
 {
-	device_reg_t	*reg = ha->iobase;
+	device_reg_t __iomem *reg = ha->iobase;
 	request_t	*pkt = NULL;
 	uint16_t	cnt, i, index;
 	uint32_t	*dword_ptr;
@@ -706,7 +706,7 @@ qla2x00_ms_req_pkt(scsi_qla_host_t *ha, srb_t  *sp)
 void
 qla2x00_isp_cmd(scsi_qla_host_t *ha)
 {
-	device_reg_t *reg = ha->iobase;
+	device_reg_t __iomem *reg = ha->iobase;
 
 	DEBUG5(printk("%s(): IOCB data:\n", __func__));
 	DEBUG5(qla2x00_dump_buffer(

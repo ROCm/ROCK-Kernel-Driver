@@ -43,7 +43,7 @@ irqreturn_t
 qla2100_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	scsi_qla_host_t	*ha;
-	device_reg_t	*reg;
+	device_reg_t __iomem *reg;
 	int		status;
 	unsigned long	flags;
 	unsigned long	iter;
@@ -127,7 +127,7 @@ irqreturn_t
 qla2300_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	scsi_qla_host_t	*ha;
-	device_reg_t	*reg;
+	device_reg_t __iomem *reg;
 	int		status;
 	unsigned long	flags;
 	unsigned long	iter;
@@ -235,17 +235,17 @@ static void
 qla2x00_mbx_completion(scsi_qla_host_t *ha, uint16_t mb0)
 {
 	uint16_t	cnt;
-	uint16_t	*wptr;
-	device_reg_t	*reg = ha->iobase;
+	uint16_t __iomem *wptr;
+	device_reg_t __iomem *reg = ha->iobase;
 
 	/* Load return mailbox registers. */
 	ha->flags.mbox_int = 1;
 	ha->mailbox_out[0] = mb0;
-	wptr = (uint16_t *)MAILBOX_REG(ha, reg, 1);
+	wptr = (uint16_t __iomem *)MAILBOX_REG(ha, reg, 1);
 
 	for (cnt = 1; cnt < ha->mbx_count; cnt++) {
 		if (IS_QLA2200(ha) && cnt == 8) 
-			wptr = (uint16_t *)MAILBOX_REG(ha, reg, 8);
+			wptr = (uint16_t __iomem *)MAILBOX_REG(ha, reg, 8);
 		if (cnt == 4 || cnt == 5)
 			ha->mailbox_out[cnt] = qla2x00_debounce_register(wptr);
 		else
@@ -277,7 +277,7 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 	uint16_t	handle_cnt;
 	uint16_t	cnt;
 	uint32_t	handles[5];
-	device_reg_t	*reg = ha->iobase;
+	device_reg_t __iomem *reg = ha->iobase;
 	uint32_t	rscn_entry, host_pid;
 	uint8_t		rscn_queue_index;
 
@@ -724,7 +724,7 @@ qla2x00_process_completed_request(struct scsi_qla_host *ha, uint32_t index)
 void
 qla2x00_process_response_queue(struct scsi_qla_host *ha)
 {
-	device_reg_t	*reg = ha->iobase;
+	device_reg_t __iomem *reg = ha->iobase;
 	sts_entry_t	*pkt;
 	uint16_t        handle_cnt;
 	uint16_t        cnt;

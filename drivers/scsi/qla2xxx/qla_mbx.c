@@ -58,12 +58,13 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 {
 	int		rval;
 	unsigned long    flags = 0;
-	device_reg_t     *reg       = ha->iobase;
+	device_reg_t __iomem *reg = ha->iobase;
 	struct timer_list	tmp_intr_timer;
 	uint8_t		abort_active = test_bit(ABORT_ISP_ACTIVE, &ha->dpc_flags);
 	uint8_t		io_lock_on = ha->flags.init_done;
 	uint16_t	command;
-	uint16_t	*iptr, *optr;
+	uint16_t	*iptr;
+	uint16_t __iomem *optr;
 	uint32_t	cnt;
 	uint32_t	mboxes;
 	unsigned long	mbx_flags = 0;
@@ -101,7 +102,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 
 	/* Load mailbox registers. */
-	optr = (uint16_t *)MAILBOX_REG(ha, reg, 0);
+	optr = (uint16_t __iomem *)MAILBOX_REG(ha, reg, 0);
 
 	iptr = mcp->mb;
 	command = mcp->mb[0];
@@ -109,7 +110,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 
 	for (cnt = 0; cnt < ha->mbx_count; cnt++) {
 		if (IS_QLA2200(ha) && cnt == 8)
-			optr = (uint16_t *)MAILBOX_REG(ha, reg, 8);
+			optr = (uint16_t __iomem *)MAILBOX_REG(ha, reg, 8);
 		if (mboxes & BIT_0)
 			WRT_REG_WORD(optr, *iptr);
 
@@ -209,6 +210,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 
 	/* Check whether we timed out */
 	if (ha->flags.mbox_int) {
+		uint16_t *iptr2;
 
 		DEBUG3_11(printk("qla2x00_mailbox_cmd: cmd %x completed.\n",
 		    command);)
@@ -223,15 +225,15 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 		}
 
 		/* Load return mailbox registers. */
-		optr = mcp->mb;
+		iptr2 = mcp->mb;
 		iptr = (uint16_t *)&ha->mailbox_out[0];
 		mboxes = mcp->in_mb;
 		for (cnt = 0; cnt < ha->mbx_count; cnt++) {
 			if (mboxes & BIT_0)
-				*optr = *iptr;
+				*iptr2 = *iptr;
 
 			mboxes >>= 1;
-			optr++;
+			iptr2++;
 			iptr++;
 		}
 	} else {
