@@ -83,8 +83,6 @@ struct socket_info {
 				    3 = operational card */
 	int 	io_base; 	/* base io address of the socket */
 	
-	unsigned int pending_events; /* Pending events on this interface */
-	
 	struct pcmcia_socket socket;
 	struct pci_dev *dev;	/* The PCI device for the socket */
 };
@@ -319,23 +317,6 @@ static int to_cycles(int ns)
 
 /* Interrupt handler functionality */
 
-static void i82092aa_bh(void *dummy)
-{
-        unsigned int events;
-	int i;
-                
-        for (i=0; i < socket_count; i++) {
-        	events = xchg(&(sockets[i].pending_events),0);
-        	printk("events = %x \n",events);
-        	if (events)
-			pcmcia_parse_events(&sockets[i].socket, events);
-	}
-}
-                                                                                                                                        
-
-static DECLARE_WORK(i82092aa_task, i82092aa_bh, NULL);
-        
-
 static irqreturn_t i82092aa_interrupt(int irq, void *dev, struct pt_regs *regs)
 {
 	int i;
@@ -383,8 +364,7 @@ static irqreturn_t i82092aa_interrupt(int irq, void *dev, struct pt_regs *regs)
 			}
 			
 			if (events) {
-				sockets[i].pending_events |= events;
-				schedule_work(&i82092aa_task);
+				pcmcia_parse_events(&sockets[i].socket, events);
 			}
 			active |= events;
 		}

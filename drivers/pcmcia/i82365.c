@@ -861,35 +861,6 @@ static void __init isa_probe(void)
 
 /*====================================================================*/
 
-static u_int pending_events[8];
-static spinlock_t pending_event_lock = SPIN_LOCK_UNLOCKED;
-
-static void pcic_bh(void *dummy)
-{
-	u_int events;
-	int i;
-
-	for (i=0; i < sockets; i++) {
-		spin_lock_irq(&pending_event_lock);
-		events = pending_events[i];
-		pending_events[i] = 0;
-		spin_unlock_irq(&pending_event_lock);
-		/* 
-		SS_DETECT events need a small delay here. The reason for this is that 
-		the "is there a card" electronics need time to see the card after the
-		"we have a card coming in" electronics have seen it. 
-		*/
-		if (events & SS_DETECT) 
-			mdelay(4);
-		if (events)
-			pcmcia_parse_events(&socket[i].socket, events);
-	}
-}
-
-static DECLARE_WORK(pcic_task, pcic_bh, NULL);
-
-static unsigned long last_detect_jiffies;
-
 static irqreturn_t pcic_interrupt(int irq, void *dev,
 				    struct pt_regs *regs)
 {
@@ -914,20 +885,7 @@ static irqreturn_t pcic_interrupt(int irq, void *dev,
 		continue;
 	    }
 	    events = (csc & I365_CSC_DETECT) ? SS_DETECT : 0;
-	    
-	    
-	    /* Several sockets will send multiple "new card detected"
-	       events in rapid succession. However, the rest of the pcmcia expects 
-	       only one such event. We just ignore these events by having a
-               timeout */
 
-	    if (events) {
-	    	if ((jiffies - last_detect_jiffies)<(HZ/20)) 
-	    		events = 0;
-	    	last_detect_jiffies = jiffies;
-	    	
-	    }
-	
 	    if (i365_get(i, I365_INTCTL) & I365_PC_IOCARD)
 		events |= (csc & I365_CSC_STSCHG) ? SS_STSCHG : 0;
 	    else {
@@ -938,12 +896,9 @@ static irqreturn_t pcic_interrupt(int irq, void *dev,
 	    ISA_UNLOCK(i, flags);
 	    DEBUG(2, "i82365: socket %d event 0x%02x\n", i, events);
 
-	    if (events) {
-		    spin_lock(&pending_event_lock);
-		    pending_events[i] |= events;
-		    spin_unlock(&pending_event_lock);
-		    schedule_work(&pcic_task);
-	    }
+	    if (events)
+		pcmcia_parse_events(&socket[i].socket, events);
+
 	    active |= events;
 	}
 	if (!active) break;

@@ -99,9 +99,6 @@ struct yenta_socket {
 	struct pci_dev *dev;
 	int cb_irq, io_irq;
 	void *base;
-	spinlock_t event_lock;
-	unsigned int events;
-	struct work_struct tq_task;
 	struct timer_list poll_timer;
 
 	struct pcmcia_socket socket;

@@ -555,26 +555,6 @@ static void __exit exit_tcic(void)
 
 /*====================================================================*/
 
-static u_int pending_events[2];
-static spinlock_t pending_event_lock = SPIN_LOCK_UNLOCKED;
-
-static void tcic_bh(void *dummy)
-{
-	u_int events;
-	int i;
-
-	for (i=0; i < sockets; i++) {
-		spin_lock_irq(&pending_event_lock);
-		events = pending_events[i];
-		pending_events[i] = 0;
-		spin_unlock_irq(&pending_event_lock);
-		if (events)
-			pcmcia_parse_events(&socket_table[i].socket, events);
-	}
-}
-
-static DECLARE_WORK(tcic_task, tcic_bh, NULL);
-
 static irqreturn_t tcic_interrupt(int irq, void *dev, struct pt_regs *regs)
 {
     int i, quick = 0;
@@ -614,10 +594,7 @@ static irqreturn_t tcic_interrupt(int irq, void *dev, struct pt_regs *regs)
 	    events |= (latch & TCIC_SSTAT_LBAT2) ? SS_BATWARN : 0;
 	}
 	if (events) {
-		spin_lock(&pending_event_lock);
-		pending_events[i] |= events;
-		spin_unlock(&pending_event_lock);
-		schedule_work(&tcic_task);
+		pcmcia_parse_events(&socket_table[i].socket, events);
 	}
     }
 

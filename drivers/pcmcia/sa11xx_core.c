@@ -38,15 +38,13 @@
 #include <linux/init.h>
 #include <linux/config.h>
 #include <linux/cpufreq.h>
-#include <linux/delay.h>
 #include <linux/ioport.h>
 #include <linux/kernel.h>
-#include <linux/workqueue.h>
 #include <linux/timer.h>
 #include <linux/mm.h>
 #include <linux/notifier.h>
-#include <linux/version.h>
 #include <linux/interrupt.h>
+#include <linux/spinlock.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
@@ -263,29 +261,27 @@ static int sa1100_pcmcia_suspend(struct pcmcia_socket *sock)
 	return ret;
 }
 
+static spinlock_t status_lock = SPIN_LOCK_UNLOCKED;
 
-/* sa1100_pcmcia_task_handler()
- * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
- * Processes serviceable socket events using the "eventd" thread context.
- *
- * Event processing (specifically, the invocation of the Card Services event
- * callback) occurs in this thread rather than in the actual interrupt
- * handler due to the use of scheduling operations in the PCMCIA core.
+/* sa1100_check_status()
+ * ^^^^^^^^^^^^^^^^^^^^^
  */
-static void sa1100_pcmcia_task_handler(void *data)
+static void sa1100_check_status(struct sa1100_pcmcia_socket *skt)
 {
-	struct sa1100_pcmcia_socket *skt = data;
 	unsigned int events;
 
 	DEBUG(4, "%s(): entering PCMCIA monitoring thread\n", __FUNCTION__);
 
 	do {
 		unsigned int status;
+		unsigned long flags;
 
 		status = sa1100_pcmcia_skt_state(skt);
 
+		spin_lock_irqsave(&status_lock, flags);
 		events = (status ^ skt->status) & skt->cs_state.csc_mask;
 		skt->status = status;
+		spin_unlock_irqrestore(&status_lock, flags);
 
 		DEBUG(2, "events: %s%s%s%s%s%s\n",
 			events == 0         ? "<NONE>"   : "",
@@ -311,7 +307,7 @@ static void sa1100_pcmcia_poll_event(unsigned long dummy)
 
 	mod_timer(&skt->poll_timer, jiffies + SA1100_PCMCIA_POLL_PERIOD);
 
-	schedule_work(&skt->work);
+	sa1100_check_status(skt);
 }
 
 
@@ -330,7 +326,7 @@ static irqreturn_t sa1100_pcmcia_interrupt(int irq, void *dev, struct pt_regs *r
 
 	DEBUG(3, "%s(): servicing IRQ %d\n", __FUNCTION__, irq);
 
-	schedule_work(&skt->work);
+	sa1100_check_status(skt);
 
 	return IRQ_HANDLED;
 }
@@ -732,8 +728,6 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 		skt->socket.ss_entry = &sa11xx_pcmcia_operations;
 		skt->socket.owner = ops->owner;
 		skt->socket.dev.dev = dev;
-
-		INIT_WORK(&skt->work, sa1100_pcmcia_task_handler, skt);
 
 		init_timer(&skt->poll_timer);
 		skt->poll_timer.function = sa1100_pcmcia_poll_event;
