@@ -405,6 +405,7 @@ static int __devinit snd_ice1712_ews_init(ice1712_t *ice)
 	case ICE1712_SUBDEVICE_EWS88MT:
 		ak->num_adcs = ak->num_dacs = 8;
 		ak->type = SND_AK4524;
+		ak->caddr = 2;
 		ak->cif = 1; /* CIF high */
 		ak->data_mask = ICE1712_EWS88_SERIAL_DATA;
 		ak->clk_mask = ICE1712_EWS88_SERIAL_CLOCK;
@@ -418,6 +419,7 @@ static int __devinit snd_ice1712_ews_init(ice1712_t *ice)
 	case ICE1712_SUBDEVICE_EWX2496:
 		ak->num_adcs = ak->num_dacs = 2;
 		ak->type = SND_AK4524;
+		ak->caddr = 2;
 		ak->cif = 1; /* CIF high */
 		ak->data_mask = ICE1712_EWS88_SERIAL_DATA;
 		ak->clk_mask = ICE1712_EWS88_SERIAL_CLOCK;
@@ -431,6 +433,7 @@ static int __devinit snd_ice1712_ews_init(ice1712_t *ice)
 	case ICE1712_SUBDEVICE_DMX6FIRE:
 		ak->num_adcs = ak->num_dacs = 6;
 		ak->type = SND_AK4524;
+		ak->caddr = 2;
 		ak->cif = 1; /* CIF high */
 		ak->data_mask = ICE1712_6FIRE_SERIAL_DATA;
 		ak->clk_mask = ICE1712_6FIRE_SERIAL_CLOCK;
