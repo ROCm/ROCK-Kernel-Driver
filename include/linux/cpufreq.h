@@ -20,6 +20,7 @@
 #include <linux/device.h>
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
+#include <linux/completion.h>
 
 #define CPUFREQ_NAME_LEN 16
 
@@ -31,17 +32,15 @@
 int cpufreq_register_notifier(struct notifier_block *nb, unsigned int list);
 int cpufreq_unregister_notifier(struct notifier_block *nb, unsigned int list);
 
-#define CPUFREQ_TRANSITION_NOTIFIER     (0)
-#define CPUFREQ_POLICY_NOTIFIER         (1)
-
-#define CPUFREQ_ALL_CPUS        ((NR_CPUS))
+#define CPUFREQ_TRANSITION_NOTIFIER	(0)
+#define CPUFREQ_POLICY_NOTIFIER		(1)
 
 
 /********************** cpufreq policy notifiers *********************/
 
-#define CPUFREQ_POLICY_POWERSAVE        (1)
-#define CPUFREQ_POLICY_PERFORMANCE      (2)
-#define CPUFREQ_POLICY_GOVERNOR         (3)
+#define CPUFREQ_POLICY_POWERSAVE	(1)
+#define CPUFREQ_POLICY_PERFORMANCE	(2)
+#define CPUFREQ_POLICY_GOVERNOR		(3)
 
 /* Frequency values here are CPU kHz so that hardware which doesn't run 
  * with some frequencies can complain without having to guess what per 
@@ -52,30 +51,34 @@ int cpufreq_unregister_notifier(struct notifier_block *nb, unsigned int list);
 
 struct cpufreq_governor;
 
-#define CPUFREQ_ETERNAL (-1)
+#define CPUFREQ_ETERNAL			(-1)
 struct cpufreq_cpuinfo {
-	unsigned int            max_freq;
-	unsigned int            min_freq;
-	unsigned int            transition_latency;
+	unsigned int		max_freq;
+	unsigned int		min_freq;
+	unsigned int		transition_latency; /* in 10^(-9) s */
 };
 
 struct cpufreq_policy {
-	unsigned int            cpu;    /* cpu nr or CPUFREQ_ALL_CPUS */
-	unsigned int            min;    /* in kHz */
-	unsigned int            max;    /* in kHz */
-	unsigned int            cur;    /* in kHz, only needed if cpufreq
+	unsigned int		cpu;    /* cpu nr */
+	struct cpufreq_cpuinfo	cpuinfo;/* see above */
+
+	unsigned int		min;    /* in kHz */
+	unsigned int		max;    /* in kHz */
+	unsigned int		cur;    /* in kHz, only needed if cpufreq
 					 * governors are used */
-        unsigned int            policy; /* see above */
-	struct cpufreq_governor *governor; /* see below */
-	struct cpufreq_cpuinfo  cpuinfo;     /* see above */
-	struct kobject		kobj;
+        unsigned int		policy; /* see above */
+	struct cpufreq_governor	*governor; /* see below */
+
  	struct semaphore	lock;   /* CPU ->setpolicy or ->target may
 					   only be called once a time */
+
+	struct kobject		kobj;
+	struct completion	kobj_unregister;
 };
 
-#define CPUFREQ_ADJUST          (0)
-#define CPUFREQ_INCOMPATIBLE    (1)
-#define CPUFREQ_NOTIFY          (2)
+#define CPUFREQ_ADJUST		(0)
+#define CPUFREQ_INCOMPATIBLE	(1)
+#define CPUFREQ_NOTIFY		(2)
 
 
 /******************** cpufreq transition notifiers *******************/
@@ -84,7 +87,7 @@ struct cpufreq_policy {
 #define CPUFREQ_POSTCHANGE	(1)
 
 struct cpufreq_freqs {
-	unsigned int cpu;      /* cpu nr or CPUFREQ_ALL_CPUS */
+	unsigned int cpu;	/* cpu nr */
 	unsigned int old;
 	unsigned int new;
 };
@@ -125,11 +128,11 @@ static inline unsigned long cpufreq_scale(unsigned long old, u_int div, u_int mu
 #define CPUFREQ_GOV_LIMITS 3
 
 struct cpufreq_governor {
-	char			name[CPUFREQ_NAME_LEN];
-	int	(*governor)	(struct cpufreq_policy *policy,
+	char	name[CPUFREQ_NAME_LEN];
+	int 	(*governor)	(struct cpufreq_policy *policy,
 				 unsigned int event);
 	struct list_head	governor_list;
-	struct module           *owner;
+	struct module		*owner;
 };
 
 /* pass a target to the cpufreq driver 
@@ -154,18 +157,22 @@ void cpufreq_unregister_governor(struct cpufreq_governor *governor);
 struct freq_attr;
 
 struct cpufreq_driver {
-	/* needed by all drivers */
-	int	(*verify)	(struct cpufreq_policy *policy);
-	struct cpufreq_policy	*policy;
+	struct module           *owner;
 	char			name[CPUFREQ_NAME_LEN];
+
+	struct cpufreq_policy	*policy;
+
+	/* needed by all drivers */
+	int	(*init)		(struct cpufreq_policy *policy);
+	int	(*verify)	(struct cpufreq_policy *policy);
+
 	/* define one out of two */
 	int	(*setpolicy)	(struct cpufreq_policy *policy);
 	int	(*target)	(struct cpufreq_policy *policy,
 				 unsigned int target_freq,
 				 unsigned int relation);
-	struct module           *owner;
-	/* optional, for the moment */
-	int	(*init)		(struct cpufreq_policy *policy);
+
+	/* optional */
 	int	(*exit)		(struct cpufreq_policy *policy);
 	struct freq_attr	**attr;
 };
@@ -306,8 +313,4 @@ void cpufreq_frequency_table_put_attr(unsigned int cpu);
 
 
 #endif /* CONFIG_CPU_FREQ_TABLE */
-
-/* Currently exported only for the proc interface, remove when that goes */
-extern struct cpufreq_driver *cpufreq_driver;
-
 #endif /* _LINUX_CPUFREQ_H */
