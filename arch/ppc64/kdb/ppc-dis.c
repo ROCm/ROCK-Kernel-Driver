@@ -1,5 +1,6 @@
 /* ppc-dis.c -- Disassemble PowerPC instructions
-   Copyright 1994 Free Software Foundation, Inc.
+   Copyright 1994, 1995, 2000, 2001, 2002, 2003
+   Free Software Foundation, Inc.
    Written by Ian Lance Taylor, Cygnus Support
 
 This file is part of GDB, GAS, and the GNU binutils.
@@ -17,6 +18,7 @@ the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this file; see the file COPYING.  If not, write to the Free
 Software Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
+
 #ifdef __KERNEL__
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -24,16 +26,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  *
 #include <linux/kdb.h>
 #include "ppc.h"
 
-#if 0
-#include <setjmp.h>
-#endif
-
-#else
-#include <stdio.h>
-#include "sysdep.h"
-#include "dis-asm.h"
-#include "opcode/ppc.h"
-#endif
 bfd_vma
 bfd_getb32 (addr)
      register const bfd_byte *addr;
@@ -59,49 +51,107 @@ bfd_getl32 (addr)
   v |= (unsigned long) addr[3] << 24;
   return (bfd_vma) v;
 }
+
+#else
+#include <stdio.h>
+#include "sysdep.h"
+#include "dis-asm.h"
+#include "opcode/ppc.h"
+#endif
+
 /* This file provides several disassembler functions, all of which use
    the disassembler interface defined in dis-asm.h.  Several functions
    are provided because this file handles disassembly for the PowerPC
    in both big and little endian mode and also for the POWER (RS/6000)
    chip.  */
 
-static int print_insn_powerpc PARAMS ((bfd_vma, struct disassemble_info *,
-				       int bigendian, int dialect));
+static int print_insn_powerpc (bfd_vma, struct disassemble_info *, int, int);
 
-/* Print a big endian PowerPC instruction.  For convenience, also
-   disassemble instructions supported by the Motorola PowerPC 601
-   and the Altivec vector unit.  */
+struct dis_private {
+  /* Stash the result of parsing disassembler_options here.  */
+  int dialect;
+};
 
-int
-print_insn_big_powerpc (memaddr, info)
-     bfd_vma memaddr;
-     struct disassemble_info *info;
+/* Determine which set of machines to disassemble for.  PPC403/601 or
+   BookE.  For convenience, also disassemble instructions supported
+   by the AltiVec vector unit.  */
+
+static int
+powerpc_dialect (struct disassemble_info *info)
 {
-  return print_insn_powerpc (memaddr, info, 1,
-			     PPC_OPCODE_PPC | PPC_OPCODE_601 |
-			     PPC_OPCODE_ALTIVEC);
+  int dialect = PPC_OPCODE_PPC | PPC_OPCODE_ALTIVEC;
+
+  if (BFD_DEFAULT_TARGET_SIZE == 64)
+    dialect |= PPC_OPCODE_64;
+
+  if (info->disassembler_options
+      && strstr (info->disassembler_options, "booke") != NULL)
+    dialect |= PPC_OPCODE_BOOKE | PPC_OPCODE_BOOKE64;
+  else if ((info->mach == bfd_mach_ppc_e500)
+	   || (info->disassembler_options
+	       && strstr (info->disassembler_options, "e500") != NULL))
+    {
+      dialect |= PPC_OPCODE_BOOKE
+	| PPC_OPCODE_SPE | PPC_OPCODE_ISEL
+	| PPC_OPCODE_EFS | PPC_OPCODE_BRLOCK
+	| PPC_OPCODE_PMR | PPC_OPCODE_CACHELCK
+	| PPC_OPCODE_RFMCI;
+      /* efs* and AltiVec conflict.  */
+      dialect &= ~PPC_OPCODE_ALTIVEC;
+    }
+  else if (info->disassembler_options
+	   && strstr (info->disassembler_options, "efs") != NULL)
+    {
+      dialect |= PPC_OPCODE_EFS;
+      /* efs* and AltiVec conflict.  */
+      dialect &= ~PPC_OPCODE_ALTIVEC;
+    }
+  else
+    dialect |= (PPC_OPCODE_403 | PPC_OPCODE_601 | PPC_OPCODE_CLASSIC
+		| PPC_OPCODE_COMMON);
+
+  if (info->disassembler_options
+      && strstr (info->disassembler_options, "power4") != NULL)
+    dialect |= PPC_OPCODE_POWER4;
+
+  if (info->disassembler_options
+      && strstr (info->disassembler_options, "any") != NULL)
+    dialect |= PPC_OPCODE_ANY;
+
+  if (info->disassembler_options)
+    {
+      if (strstr (info->disassembler_options, "32") != NULL)
+	dialect &= ~PPC_OPCODE_64;
+      else if (strstr (info->disassembler_options, "64") != NULL)
+	dialect |= PPC_OPCODE_64;
+    }
+
+  ((struct dis_private *) &info->private_data)->dialect = dialect;
+  return dialect;
 }
 
-/* Print a little endian PowerPC instruction.  For convenience, also
-   disassemble instructions supported by the Motorola PowerPC 601
-   and the Altivec vector unit.  */
+/* Print a big endian PowerPC instruction.  */
 
 int
-print_insn_little_powerpc (memaddr, info)
-     bfd_vma memaddr;
-     struct disassemble_info *info;
+print_insn_big_powerpc (bfd_vma memaddr, struct disassemble_info *info)
 {
-  return print_insn_powerpc (memaddr, info, 0,
-			     PPC_OPCODE_PPC | PPC_OPCODE_601 |
-			     PPC_OPCODE_ALTIVEC);
+  int dialect = ((struct dis_private *) &info->private_data)->dialect;
+  return print_insn_powerpc (memaddr, info, 1, dialect);
+}
+
+/* Print a little endian PowerPC instruction.  */
+
+int
+print_insn_little_powerpc (bfd_vma memaddr, struct disassemble_info *info)
+{
+  int dialect = ((struct dis_private *) &info->private_data)->dialect;
+  return print_insn_powerpc (memaddr, info, 0, dialect);
 }
 
 /* Print a POWER (RS/6000) instruction.  */
 
 int
-print_insn_rs6000 (memaddr, info)
-     bfd_vma memaddr;
-     struct disassemble_info *info;
+print_insn_rs6000 (bfd_vma memaddr, struct disassemble_info *info)
 {
   return print_insn_powerpc (memaddr, info, 1, PPC_OPCODE_POWER);
 }
@@ -109,11 +159,10 @@ print_insn_rs6000 (memaddr, info)
 /* Print a PowerPC or POWER instruction.  */
 
 static int
-print_insn_powerpc (memaddr, info, bigendian, dialect)
-     bfd_vma memaddr;
-     struct disassemble_info *info;
-     int bigendian;
-     int dialect;
+print_insn_powerpc (bfd_vma memaddr,
+		    struct disassemble_info *info,
+		    int bigendian,
+		    int dialect)
 {
   bfd_byte buffer[4];
   int status;
@@ -122,7 +171,8 @@ print_insn_powerpc (memaddr, info, bigendian, dialect)
   const struct powerpc_opcode *opcode_end;
   unsigned long op;
 
-  (*info->fprintf_func) (info->stream, "  ");
+  if (dialect == 0)
+    dialect = powerpc_dialect (info);
 
   status = (*info->read_memory_func) (memaddr, buffer, 4, info);
   if (status != 0)
@@ -142,6 +192,7 @@ print_insn_powerpc (memaddr, info, bigendian, dialect)
   /* Find the first match in the opcode table.  We could speed this up
      a bit by doing a binary search on the major opcode.  */
   opcode_end = powerpc_opcodes + powerpc_num_opcodes;
+ again:
   for (opcode = powerpc_opcodes; opcode < opcode_end; opcode++)
     {
       unsigned long table_op;
@@ -169,7 +220,7 @@ print_insn_powerpc (memaddr, info, bigendian, dialect)
 	{
 	  operand = powerpc_operands + *opindex;
 	  if (operand->extract)
-	    (*operand->extract) (insn, &invalid);
+	    (*operand->extract) (insn, dialect, &invalid);
 	}
       if (invalid)
 	continue;
@@ -196,7 +247,7 @@ print_insn_powerpc (memaddr, info, bigendian, dialect)
 
 	  /* Extract the value from the instruction.  */
 	  if (operand->extract)
-	    value = (*operand->extract) (insn, (int *) NULL);
+	    value = (*operand->extract) (insn, dialect, &invalid);
 	  else
 	    {
 	      value = (insn >> operand->shift) & ((1 << operand->bits) - 1);
@@ -244,14 +295,9 @@ print_insn_powerpc (memaddr, info, bigendian, dialect)
 
 		  cr = value >> 2;
 		  if (cr != 0)
-		    (*info->fprintf_func) (info->stream, "4*cr%d", cr);
+		    (*info->fprintf_func) (info->stream, "4*cr%d+", cr);
 		  cc = value & 3;
-		  if (cc != 0)
-		    {
-		      if (cr != 0)
-			(*info->fprintf_func) (info->stream, "+");
-		      (*info->fprintf_func) (info->stream, "%s", cbnames[cc]);
-		    }
+		  (*info->fprintf_func) (info->stream, "%s", cbnames[cc]);
 		}
 	    }
 
@@ -274,8 +320,31 @@ print_insn_powerpc (memaddr, info, bigendian, dialect)
       return 4;
     }
 
+  if ((dialect & PPC_OPCODE_ANY) != 0)
+    {
+      dialect = ~PPC_OPCODE_ANY;
+      goto again;
+    }
+
   /* We could not find a match.  */
   (*info->fprintf_func) (info->stream, ".long 0x%lx", insn);
 
   return 4;
 }
+
+#ifndef __KERNEL__
+void
+print_ppc_disassembler_options (FILE *stream)
+{
+  fprintf (stream, "\n\
+The following PPC specific disassembler options are supported for use with\n\
+the -M switch:\n");
+
+  fprintf (stream, "  booke|booke32|booke64    Disassemble the BookE instructions\n");
+  fprintf (stream, "  e500|e500x2              Disassemble the e500 instructions\n");
+  fprintf (stream, "  efs                      Disassemble the EFS instructions\n");
+  fprintf (stream, "  power4                   Disassemble the Power4 instructions\n");
+  fprintf (stream, "  32                       Do not disassemble 64-bit instructions\n");
+  fprintf (stream, "  64                       Allow disassembly of 64-bit instructions\n");
+}
+#endif
