@@ -167,11 +167,6 @@ EXPORT_SYMBOL_GPL(unregister_profile_notifier);
 EXPORT_SYMBOL_GPL(profile_event_register);
 EXPORT_SYMBOL_GPL(profile_event_unregister);
 
-#ifdef CONFIG_PROC_FS
-#include <linux/proc_fs.h>
-#include <asm/uaccess.h>
-#include <asm/ptrace.h>
-
 void profile_hit(int type, void *__pc)
 {
 	unsigned long pc;
@@ -189,6 +184,11 @@ void profile_tick(int type, struct pt_regs *regs)
 	if (!user_mode(regs) && cpu_isset(smp_processor_id(), prof_cpu_mask))
 		profile_hit(type, (void *)profile_pc(regs));
 }
+
+#ifdef CONFIG_PROC_FS
+#include <linux/proc_fs.h>
+#include <asm/uaccess.h>
+#include <asm/ptrace.h>
 
 static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
@@ -227,4 +227,82 @@ void create_prof_cpu_mask(struct proc_dir_entry *root_irq_dir)
 	entry->read_proc = prof_cpu_mask_read_proc;
 	entry->write_proc = prof_cpu_mask_write_proc;
 }
+
+/*
+ * This function accesses profiling information. The returned data is
+ * binary: the sampling step and the actual contents of the profile
+ * buffer. Use of the program readprofile is recommended in order to
+ * get meaningful info out of these data.
+ */
+static ssize_t
+read_profile(struct file *file, char __user *buf, size_t count, loff_t *ppos)
+{
+	unsigned long p = *ppos;
+	ssize_t read;
+	char * pnt;
+	unsigned int sample_step = 1 << prof_shift;
+
+	if (p >= (prof_len+1)*sizeof(unsigned int))
+		return 0;
+	if (count > (prof_len+1)*sizeof(unsigned int) - p)
+		count = (prof_len+1)*sizeof(unsigned int) - p;
+	read = 0;
+
+	while (p < sizeof(unsigned int) && count > 0) {
+		put_user(*((char *)(&sample_step)+p),buf);
+		buf++; p++; count--; read++;
+	}
+	pnt = (char *)prof_buffer + p - sizeof(unsigned int);
+	if (copy_to_user(buf,(void *)pnt,count))
+		return -EFAULT;
+	read += count;
+	*ppos += read;
+	return read;
+}
+
+/*
+ * Writing to /proc/profile resets the counters
+ *
+ * Writing a 'profiling multiplier' value into it also re-sets the profiling
+ * interrupt frequency, on architectures that support this.
+ */
+static ssize_t write_profile(struct file *file, const char __user *buf,
+			     size_t count, loff_t *ppos)
+{
+#ifdef CONFIG_SMP
+	extern int setup_profiling_timer (unsigned int multiplier);
+
+	if (count == sizeof(int)) {
+		unsigned int multiplier;
+
+		if (copy_from_user(&multiplier, buf, sizeof(int)))
+			return -EFAULT;
+
+		if (setup_profiling_timer(multiplier))
+			return -EINVAL;
+	}
+#endif
+
+	memset(prof_buffer, 0, prof_len * sizeof(*prof_buffer));
+	return count;
+}
+
+static struct file_operations proc_profile_operations = {
+	.read		= read_profile,
+	.write		= write_profile,
+};
+
+static int __init create_proc_profile(void)
+{
+	struct proc_dir_entry *entry;
+
+	if (!prof_on)
+		return 0;
+	if (!(entry = create_proc_entry("profile", S_IWUSR | S_IRUGO, NULL)))
+		return 0;
+	entry->proc_fops = &proc_profile_operations;
+	entry->size = (1+prof_len) * sizeof(atomic_t);
+	return 0;
+}
+module_init(create_proc_profile);
 #endif /* CONFIG_PROC_FS */
