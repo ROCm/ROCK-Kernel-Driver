@@ -50,7 +50,7 @@
 
 #include "bnep.h"
 
-#ifndef CONFIG_BNEP_DEBUG
+#ifndef CONFIG_BLUEZ_BNEP_DEBUG
 #undef  BT_DBG
 #define BT_DBG( A... )
 #endif

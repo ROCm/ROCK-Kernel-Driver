@@ -52,7 +52,7 @@
 
 #define VERSION "0.3"
 
-#ifndef CONFIG_RFCOMM_DEBUG
+#ifndef CONFIG_BLUEZ_RFCOMM_DEBUG
 #undef  BT_DBG
 #define BT_DBG(D...)
 #endif
@@ -1679,7 +1679,10 @@ int __init rfcomm_init(void)
 	kernel_thread(rfcomm_run, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
 
 	rfcomm_init_sockets();
+
+#ifdef CONFIG_BLUEZ_RFCOMM_TTY
 	rfcomm_init_ttys();
+#endif
 
 	BT_INFO("BlueZ RFCOMM ver %s", VERSION);
 	BT_INFO("Copyright (C) 2002 Maxim Krasnyansky <maxk@qualcomm.com>");
@@ -1698,7 +1701,10 @@ void rfcomm_cleanup(void)
 	while (atomic_read(&running))
 		schedule();
 
+#ifdef CONFIG_BLUEZ_RFCOMM_TTY
 	rfcomm_cleanup_ttys();
+#endif
+
 	rfcomm_cleanup_sockets();
 	return;
 }
