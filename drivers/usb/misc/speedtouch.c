@@ -735,9 +735,6 @@ void udsl_usb_data_receive (struct urb *urb, struct pt_regs *regs)
 			return;
 		}
 		break;
-	case -EPIPE:		/* stall or babble */
-		usb_clear_halt (urb->dev, usb_rcvbulkpipe (urb->dev, UDSL_ENDPOINT_DATA_IN));
-		break;
 	case -ENOENT:		/* buffer was unlinked */
 	case -EILSEQ:		/* unplug or timeout */
 	case -ETIMEDOUT:	/* unplug or timeout */
