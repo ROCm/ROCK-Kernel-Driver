@@ -10,7 +10,7 @@
 typedef struct { 
 	int size;
 	struct semaphore sem;
-	void *	ldt;
+	void *ldt;
 } mm_context_t;
 
 #endif

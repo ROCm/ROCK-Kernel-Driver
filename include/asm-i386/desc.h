@@ -86,14 +86,17 @@ static inline void load_TLS(struct thread_struct *t, unsigned int cpu)
 
 static inline void clear_LDT(void)
 {
-	set_ldt_desc(smp_processor_id(), &default_ldt[0], 5);
+	int cpu = get_cpu();
+
+	set_ldt_desc(cpu, &default_ldt[0], 5);
 	load_LDT_desc();
+	put_cpu();
 }
 
 /*
  * load one particular LDT into the current CPU
  */
-static inline void load_LDT (mm_context_t *pc)
+static inline void load_LDT_nolock(mm_context_t *pc, int cpu)
 {
 	void *segments = pc->ldt;
 	int count = pc->size;
@@ -103,8 +106,15 @@ static inline void load_LDT (mm_context_t *pc)
 		count = 5;
 	}
 		
-	set_ldt_desc(smp_processor_id(), segments, count);
+	set_ldt_desc(cpu, segments, count);
 	load_LDT_desc();
+}
+
+static inline void load_LDT(mm_context_t *pc)
+{
+	int cpu = get_cpu();
+	load_LDT_nolock(pc, cpu);
+	put_cpu();
 }
 
 #endif /* !__ASSEMBLY__ */
