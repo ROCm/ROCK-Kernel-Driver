@@ -1097,7 +1097,7 @@ int scsi_device_cancel(struct scsi_device *sdev, int recovery)
 	struct list_head *lh, *lh_sf;
 	unsigned long flags;
 
-	sdev->sdev_state = SDEV_CANCEL;
+	scsi_device_set_state(sdev, SDEV_CANCEL);
 
 	spin_lock_irqsave(&sdev->list_lock, flags);
 	list_for_each_entry(scmd, &sdev->cmd_list, list) {

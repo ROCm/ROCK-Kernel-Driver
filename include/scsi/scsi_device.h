@@ -15,7 +15,7 @@ struct scsi_mode_data;
  * sdev state
  */
 enum scsi_device_state {
-	SDEV_CREATED,		/* device created but not added to sysfs
+	SDEV_CREATED = 1,	/* device created but not added to sysfs
 				 * Only internal commands allowed (for inq) */
 	SDEV_RUNNING,		/* device properly configured
 				 * All commands allowed */
@@ -23,6 +23,9 @@ enum scsi_device_state {
 				 * Only error handler commands allowed */
 	SDEV_DEL,		/* device deleted 
 				 * no commands allowed */
+	SDEV_QUIESCE,		/* Device quiescent.  No block commands
+				 * will be accepted, only specials (which
+				 * originate in the mid-layer) */
 };
 
 struct scsi_device {
@@ -170,4 +173,8 @@ extern int scsi_set_medium_removal(struct scsi_device *, char);
 extern int scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 			   unsigned char *buffer, int len, int timeout,
 			   int retries, struct scsi_mode_data *data);
+extern int scsi_device_set_state(struct scsi_device *sdev,
+				 enum scsi_device_state state);
+extern int scsi_device_quiesce(struct scsi_device *sdev);
+extern void scsi_device_resume(struct scsi_device *sdev);
 #endif /* _SCSI_SCSI_DEVICE_H */
