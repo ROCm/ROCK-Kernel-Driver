@@ -441,6 +441,7 @@ enum register_offsets {
 #define DSPCFG_VAL	0x5040
 #define SDCFG_VAL	0x008c	/* set voltage thresholds for Signal Detect */
 #define DSPCFG_LOCK	0x20	/* coefficient lock bit in DSPCFG */
+#define DSPCFG_COEF	0x1000	/* see coefficient (in TSTDAT) bit in DSPCFG */
 #define TSTDAT_FIXED	0xe8	/* magic number for bad coefficients */
 
 /* misc PCI space registers */
@@ -1243,7 +1244,8 @@ static void init_phy_fixup(struct net_device *dev)
 		writew(1, ioaddr + PGSEL);
 		writew(PMDCSR_VAL, ioaddr + PMDCSR);
 		writew(TSTDAT_VAL, ioaddr + TSTDAT);
-		np->dspcfg = DSPCFG_VAL;
+		np->dspcfg = (np->srr <= SRR_DP83815_C)?
+			DSPCFG_VAL : (DSPCFG_COEF | readw(ioaddr + DSPCFG));
 		writew(np->dspcfg, ioaddr + DSPCFG);
 		writew(SDCFG_VAL, ioaddr + SDCFG);
 		writew(0, ioaddr + PGSEL);
