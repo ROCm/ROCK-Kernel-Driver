@@ -10,35 +10,31 @@
 #include <linux/errno.h>
 #include "base.h"
 
+#define to_dev(node) container_of(node,struct device,driver_list)
 
-int driver_for_each_dev(struct device_driver * drv, void * data, int (*callback)(struct device *, void * ))
+int driver_for_each_dev(struct device_driver * drv, void * data, 
+			int (*callback)(struct device *, void * ))
 {
-	struct device * next;
-	struct device * dev = NULL;
 	struct list_head * node;
+	struct device * prev = NULL;
 	int error = 0;
 
 	get_driver(drv);
 	spin_lock(&device_lock);
-	node = drv->devices.next;
-	while (node != &drv->devices) {
-		next = list_entry(node,struct device,driver_list);
-		get_device_locked(next);
-		spin_unlock(&device_lock);
-
-		if (dev)
-			put_device(dev);
-		dev = next;
-		if ((error = callback(dev,data))) {
-			put_device(dev);
-			break;
+	list_for_each(node,&drv->devices) {
+		struct device * dev = get_device_locked(to_dev(node));
+		if (dev) {
+			spin_unlock(&device_lock);
+			error = callback(dev,data);
+			if (prev)
+				put_device(prev);
+			prev = dev;
+			spin_lock(&device_lock);
+			if (error)
+				break;
 		}
-		spin_lock(&device_lock);
-		node = dev->driver_list.next;
 	}
 	spin_unlock(&device_lock);
-	if (dev)
-		put_device(dev);
 	put_driver(drv);
 	return error;
 }

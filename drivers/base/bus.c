@@ -16,6 +16,9 @@
 
 static LIST_HEAD(bus_driver_list);
 
+#define to_dev(node) container_of(node,struct device,bus_list)
+#define to_drv(node) container_of(node,struct device_driver,bus_list)
+
 /**
  * bus_for_each_dev - walk list of devices and do something to each
  * @bus:	bus in question
@@ -26,42 +29,41 @@ static LIST_HEAD(bus_driver_list);
  * counting on devices as we touch each one.
  *
  * Algorithm:
- * Take the bus lock and get the first node in the list. We increment
- * the reference count and unlock the bus. If we have a device from a 
- * previous iteration, we decrement the reference count. 
- * After we call the callback, we get the next node in the list and loop.
- * At the end, if @dev is not null, we still have it pinned, so we need
- * to let it go.
+ * Take device_lock and get the first node in the list. 
+ * Try and increment the reference count on it. If we can't, it's in the
+ * process of being removed, but that process hasn't acquired device_lock.
+ * It's still in the list, so we grab the next node and try that one. 
+ * We drop the lock to call the callback.
+ * We can't decrement the reference count yet, because we need the next
+ * node in the list. So, we set @prev to point to the current device.
+ * On the next go-round, we decrement the reference count on @prev, so if 
+ * it's being removed, it won't affect us.
  */
 int bus_for_each_dev(struct bus_type * bus, void * data, 
 		     int (*callback)(struct device * dev, void * data))
 {
-	struct device * next;
-	struct device * dev = NULL;
 	struct list_head * node;
+	struct device * prev = NULL;
 	int error = 0;
 
 	get_bus(bus);
 	spin_lock(&device_lock);
-	node = bus->devices.next;
-	while (node != &bus->devices) {
-		next = list_entry(node,struct device,bus_list);
-		get_device_locked(next);
-		spin_unlock(&device_lock);
-
-		if (dev)
-			put_device(dev);
-		dev = next;
-		if ((error = callback(dev,data))) {
-			put_device(dev);
-			break;
+	list_for_each(node,&bus->devices) {
+		struct device * dev = get_device_locked(to_dev(node));
+		if (dev) {
+			spin_unlock(&device_lock);
+			error = callback(dev,data);
+			if (prev)
+				put_device(prev);
+			prev = dev;
+			spin_lock(&device_lock);
+			if (error)
+				break;
 		}
-		spin_lock(&device_lock);
-		node = dev->bus_list.next;
 	}
 	spin_unlock(&device_lock);
-	if (dev)
-		put_device(dev);
+	if (prev)
+		put_device(prev);
 	put_bus(bus);
 	return error;
 }
@@ -69,34 +71,30 @@ int bus_for_each_dev(struct bus_type * bus, void * data,
 int bus_for_each_drv(struct bus_type * bus, void * data,
 		     int (*callback)(struct device_driver * drv, void * data))
 {
-	struct device_driver * next;
-	struct device_driver * drv = NULL;
 	struct list_head * node;
+	struct device_driver * prev = NULL;
 	int error = 0;
 
 	/* pin bus in memory */
 	get_bus(bus);
 
 	spin_lock(&device_lock);
-	node = bus->drivers.next;
-	while (node != &bus->drivers) {
-		next = list_entry(node,struct device_driver,bus_list);
-		get_driver(next);
-		spin_unlock(&device_lock);
-
-		if (drv)
-			put_driver(drv);
-		drv = next;
-		if ((error = callback(drv,data))) {
-			put_driver(drv);
-			break;
+	list_for_each(node,&bus->drivers) {
+		struct device_driver * drv = get_driver(to_drv(node));
+		if (drv) {
+			spin_unlock(&device_lock);
+			error = callback(drv,data);
+			if (prev)
+				put_driver(prev);
+			prev = drv;
+			spin_lock(&device_lock);
+			if (error)
+				break;
 		}
-		spin_lock(&device_lock);
-		node = drv->bus_list.next;
 	}
 	spin_unlock(&device_lock);
-	if (drv)
-		put_driver(drv);
+	if (prev)
+		put_driver(prev);
 	put_bus(bus);
 	return error;
 }
@@ -134,9 +132,6 @@ void bus_remove_device(struct device * dev)
 {
 	if (dev->bus) {
 		device_remove_symlink(&dev->bus->device_dir,dev->bus_id);
-		spin_lock(&device_lock);
-		list_del_init(&dev->bus_list);
-		spin_unlock(&device_lock);
 		put_bus(dev->bus);
 	}
 }

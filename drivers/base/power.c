@@ -14,6 +14,8 @@
 #include <linux/module.h>
 #include "base.h"
 
+#define to_dev(node) container_of(node,struct device,g_list)
+
 /**
  * device_suspend - suspend all devices on the device tree
  * @state:	state we're entering
@@ -25,30 +27,26 @@
  */
 int device_suspend(u32 state, u32 level)
 {
-	struct device * dev;
-	struct device * prev = &device_root;
+	struct list_head * node;
+	struct device * prev = NULL;
 	int error = 0;
 
 	printk(KERN_EMERG "Suspending Devices\n");
 
-	get_device(prev);
-
 	spin_lock(&device_lock);
-	dev = g_list_to_dev(prev->g_list.next);
-	while(dev != &device_root && !error) {
-		get_device_locked(dev);
-		spin_unlock(&device_lock);
-		put_device(prev);
-
-		if (dev->driver && dev->driver->suspend)
-			error = dev->driver->suspend(dev,state,level);
-
-		spin_lock(&device_lock);
-		prev = dev;
-		dev = g_list_to_dev(prev->g_list.next);
+	list_for_each(node,&device_root.g_list) {
+		struct device * dev = get_device_locked(dev);
+		if (dev) {
+			spin_unlock(&device_lock);
+			if (dev->driver && dev->driver->suspend)
+				error = dev->driver->suspend(dev,state,level);
+			if (prev)
+				put_device(prev);
+			prev = dev;
+			spin_lock(&device_lock);
+		}
 	}
 	spin_unlock(&device_lock);
-	put_device(prev);
 
 	return error;
 }
@@ -63,27 +61,23 @@ int device_suspend(u32 state, u32 level)
  */
 void device_resume(u32 level)
 {
-	struct device * dev;
-	struct device * prev = &device_root;
-
-	get_device(prev);
+	struct list_head * node;
+	struct device * prev = NULL;
 
 	spin_lock(&device_lock);
-	dev = g_list_to_dev(prev->g_list.prev);
-	while(dev != &device_root) {
-		get_device_locked(dev);
-		spin_unlock(&device_lock);
-		put_device(prev);
-
-		if (dev->driver && dev->driver->resume)
-			dev->driver->resume(dev,level);
-
-		spin_lock(&device_lock);
-		prev = dev;
-		dev = g_list_to_dev(prev->g_list.prev);
+	list_for_each_prev(node,&device_root.g_list) {
+		struct device * dev = get_device_locked(to_dev(node));
+		if (dev) {
+			spin_unlock(&device_lock);
+			if (dev->driver && dev->driver->resume)
+				dev->driver->resume(dev,level);
+			if (prev)
+				put_device(prev);
+			prev = dev;
+			spin_lock(&device_lock);
+		}
 	}
 	spin_unlock(&device_lock);
-	put_device(prev);
 
 	printk(KERN_EMERG "Devices Resumed\n");
 }
@@ -98,29 +92,25 @@ void device_resume(u32 level)
  */
 void device_shutdown(void)
 {
-	struct device * dev;
-	struct device * prev = &device_root;
+	struct list_head * node;
+	struct device * prev = NULL;
 
 	printk(KERN_EMERG "Shutting down devices\n");
 
-	get_device(prev);
-
 	spin_lock(&device_lock);
-	dev = g_list_to_dev(prev->g_list.next);
-	while(dev != &device_root) {
-		dev = get_device_locked(dev);
-		spin_unlock(&device_lock);
-		put_device(prev);
-
-		if (dev->driver && dev->driver->remove)
-			dev->driver->remove(dev);
-
-		spin_lock(&device_lock);
-		prev = dev;
-		dev = g_list_to_dev(prev->g_list.next);
+	list_for_each(node,&device_root.g_list) {
+		struct device * dev = get_device_locked(to_dev(node));
+		if (dev) {
+			spin_unlock(&device_lock);
+			if (dev->driver && dev->driver->remove)
+				dev->driver->remove(dev);
+			if (prev)
+				put_device(prev);
+			prev = dev;
+			spin_lock(&device_lock);
+		}
 	}
 	spin_unlock(&device_lock);
-	put_device(prev);
 }
 
 EXPORT_SYMBOL(device_suspend);
