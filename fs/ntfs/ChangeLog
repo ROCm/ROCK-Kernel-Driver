@@ -27,6 +27,10 @@ ToDo/Notes:
 	  where we did not clear ctx->al_entry but it was still set due to
 	  changes in ntfs_attr_lookup() and ntfs_external_attr_find() in
 	  particular.
+	- Fix another stupid bug in fs/ntfs/attrib.c::ntfs_external_attr_find()
+	  where we forgot to unmap the extent mft record when we had finished
+	  enumerating an attribute which caused a bug check to trigger when the
+	  VFS calls ->clear_inode.
 
 2.1.19 - Many cleanups, improvements, and a minor bug fix.
 

@@ -278,7 +278,7 @@ ChangeLog
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
 2.1.20:
-	- Fix a stupid bug introduced in 2.1.18 release.
+	- Fix two stupid bugs introduced in 2.1.18 release.
 2.1.19:
 	- Minor bugfix in handling of the default upcase table.
 	- Many internal cleanups and improvements.  Many thanks to Linus
