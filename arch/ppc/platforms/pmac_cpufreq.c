@@ -320,10 +320,6 @@ out:
 
 	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
-#ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_cur_freq[0]	= cur_freq;
-#endif
-
 	driver->verify		= &pmac_cpufreq_verify;
 	driver->setpolicy	= &pmac_cpufreq_setpolicy;
 	driver->init		= NULL;
