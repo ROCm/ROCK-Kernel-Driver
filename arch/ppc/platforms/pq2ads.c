@@ -14,33 +14,13 @@
  * option) any later version.
  */
 
-#include <linux/config.h>
-#include <linux/seq_file.h>
+#include <linux/init.h>
 
 #include <asm/mpc8260.h>
-#include <asm/machdep.h>
-
-static void (*callback_setup_arch)(void);
-
-extern void m8260_init(unsigned long r3, unsigned long r4,
-	unsigned long r5, unsigned long r6, unsigned long r7);
-
-static void __init
-pq2ads_setup_arch(void)
-{
-	printk("PQ2 ADS Port\n");
-	callback_setup_arch();
-        *(volatile uint *)(BCSR_ADDR + 4) &= ~BCSR1_RS232_EN2;
-}
 
 void __init
-platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
-	      unsigned long r6, unsigned long r7)
+m82xx_board_init(void)
 {
-	/* Generic 8260 platform initialization */
-	m8260_init(r3, r4, r5, r6, r7);
-
-	/* Anything special for this platform */
-	callback_setup_arch	= ppc_md.setup_arch;
-	ppc_md.setup_arch	= pq2ads_setup_arch;
+	/* Enable the 2nd UART port */
+        *(volatile uint *)(BCSR_ADDR + 4) &= ~BCSR1_RS232_EN2;
 }

@@ -16,10 +16,10 @@
  */
 
 #include <linux/config.h>
-#include <linux/seq_file.h>
 #include <linux/stddef.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
+#include <linux/init.h>
 
 #include <asm/mpc8260.h>
 #include <asm/machdep.h>
@@ -28,22 +28,11 @@
 #include <asm/immap_cpm2.h>
 #include <asm/pci.h>
 
-static void (*callback_setup_arch)(void);
 static void (*callback_init_IRQ)(void);
 
 extern unsigned char __res[sizeof(bd_t)];
 
-extern void m8260_init(unsigned long r3, unsigned long r4,
-	unsigned long r5, unsigned long r6, unsigned long r7);
-
 extern void (*late_time_init)(void);
-
-static void __init
-sbc82xx_setup_arch(void)
-{
-	printk("SBC PowerQUICC II Port\n");
-	callback_setup_arch();
-}
 
 #ifdef CONFIG_GEN_RTC
 TODC_ALLOC();
@@ -220,21 +209,14 @@ static int sbc82xx_pci_map_irq(struct pci_dev *dev, unsigned char idsel,
 	return PCI_IRQ_TABLE_LOOKUP;
 }
 
-
-
 void __init
-platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
-	      unsigned long r6, unsigned long r7)
+m82xx_board_init(void)
 {
-	/* Generic 8260 platform initialization */
-	m8260_init(r3, r4, r5, r6, r7);
-
 	/* u-boot may be using one of the FCC Ethernet devices.
 	   Use the MAC address to the SCC. */
 	__res[offsetof(bd_t, bi_enetaddr[5])] &= ~3;
 
 	/* Anything special for this platform */
-	callback_setup_arch	= ppc_md.setup_arch;
 	callback_init_IRQ	= ppc_md.init_IRQ;
 
 	ppc_md.setup_arch	= sbc82xx_setup_arch;

@@ -14,17 +14,11 @@
  * option) any later version.
  */
 
-#include <linux/config.h>
-#include <linux/seq_file.h>
+#include <linux/init.h>
 
 #include <asm/immap_cpm2.h>
 #include <asm/mpc8260.h>
 #include <asm/machdep.h>
-
-static void (*callback_setup_arch)(void);
-
-extern void m8260_init(unsigned long r3, unsigned long r4,
-	unsigned long r5, unsigned long r6, unsigned long r7);
 
 static int
 tqm8260_set_rtc_time(unsigned long time)
@@ -41,23 +35,10 @@ tqm8260_get_rtc_time(void)
 	return ((cpm2_map_t *)CPM_MAP_ADDR)->im_sit.sit_tmcnt;
 }
 
-static void __init
-tqm8260_setup_arch(void)
-{
-	printk("IN2 Systems TQM8260 port\n");
-	callback_setup_arch();
-}
-
 void __init
-platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
-	      unsigned long r6, unsigned long r7)
+m82xx_board_init(void)
 {
-	/* Generic 8260 platform initialization */
-	m8260_init(r3, r4, r5, r6, r7);
-
 	/* Anything special for this platform */
 	ppc_md.set_rtc_time	= tqm8260_set_rtc_time;
 	ppc_md.get_rtc_time	= tqm8260_get_rtc_time;
-
-	callback_setup_arch	= ppc_md.setup_arch;
-	ppc_md.setup_arch	= tqm8260_setup_arch;
+}
