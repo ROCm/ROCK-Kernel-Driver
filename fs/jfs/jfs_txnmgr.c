@@ -1,5 +1,5 @@
 /*
- *   Copyright (C) International Business Machines Corp., 2000-2003
+ *   Copyright (C) International Business Machines Corp., 2000-2004
  *   Portions Copyright (C) Christoph Hellwig, 2001-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
@@ -1354,7 +1354,7 @@ static int txLog(struct jfs_log * log, struct tblock * tblk, struct commit * cd)
 
 		/* initialize lrd common */
 		ip = tlck->ip;
-		lrd->aggregate = cpu_to_le32(new_encode_dev(ip->i_sb->s_bdev->bd_dev));
+		lrd->aggregate = cpu_to_le32(JFS_SBI(ip->i_sb)->aggregate);
 		lrd->log.redopage.fileset = cpu_to_le32(JFS_IP(ip)->fileset);
 		lrd->log.redopage.inode = cpu_to_le32(ip->i_ino);
 
