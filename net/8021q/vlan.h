@@ -30,14 +30,48 @@ I'll bet they might prove useful again... --Ben
 
 extern unsigned short vlan_name_type;
 
-/* Counter for how many NON-VLAN protos we've received on a VLAN. */
-extern unsigned long vlan_bad_proto_recvd;
-
 int vlan_ioctl_handler(unsigned long arg);
 
-/* Add some headers for the public VLAN methods. */
-int unregister_802_1Q_vlan_device(const char* vlan_IF_name);
-struct net_device *register_802_1Q_vlan_device(const char* eth_IF_name,
-                                               unsigned short VID);
+#define VLAN_GRP_HASH_SHIFT	5
+#define VLAN_GRP_HASH_SIZE	(1 << VLAN_GRP_HASH_SHIFT)
+#define VLAN_GRP_HASH_MASK	(VLAN_GRP_HASH_SIZE - 1)
+extern struct vlan_group *vlan_group_hash[VLAN_GRP_HASH_SIZE];
+extern spinlock_t vlan_group_lock;
+
+/*  Find a VLAN device by the MAC address of it's Ethernet device, and
+ *  it's VLAN ID.  The default configuration is to have VLAN's scope
+ *  to be box-wide, so the MAC will be ignored.  The mac will only be
+ *  looked at if we are configured to have a seperate set of VLANs per
+ *  each MAC addressable interface.  Note that this latter option does
+ *  NOT follow the spec for VLANs, but may be useful for doing very
+ *  large quantities of VLAN MUX/DEMUX onto FrameRelay or ATM PVCs.
+ *
+ *  Must be invoked with vlan_group_lock held and that lock MUST NOT
+ *  be dropped until a reference is obtained on the returned device.
+ *  You may drop the lock earlier if you are running under the RTNL
+ *  semaphore, however.
+ */
+struct net_device *__find_vlan_dev(struct net_device* real_dev,
+				   unsigned short VID); /* vlan.c */
+
+/* found in vlan_dev.c */
+int vlan_dev_rebuild_header(struct sk_buff *skb);
+int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
+                  struct packet_type* ptype);
+int vlan_dev_hard_header(struct sk_buff *skb, struct net_device *dev,
+                         unsigned short type, void *daddr, void *saddr,
+                         unsigned len);
+int vlan_dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev);
+int vlan_dev_hwaccel_hard_start_xmit(struct sk_buff *skb, struct net_device *dev);
+int vlan_dev_change_mtu(struct net_device *dev, int new_mtu);
+int vlan_dev_set_mac_address(struct net_device *dev, void* addr);
+int vlan_dev_open(struct net_device* dev);
+int vlan_dev_stop(struct net_device* dev);
+int vlan_dev_init(struct net_device* dev);
+void vlan_dev_destruct(struct net_device* dev);
+int vlan_dev_set_ingress_priority(char* dev_name, __u32 skb_prio, short vlan_prio);
+int vlan_dev_set_egress_priority(char* dev_name, __u32 skb_prio, short vlan_prio);
+int vlan_dev_set_vlan_flag(char* dev_name, __u32 flag, short flag_val);
+void vlan_dev_set_multicast_list(struct net_device *vlan_dev);
 
 #endif /* !(__BEN_VLAN_802_1Q_INC__) */

@@ -44,10 +44,8 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
 	 tristate '    Multi-Protocol Over ATM (MPOA) support' CONFIG_ATM_MPOA
       fi
    fi
-
-   dep_tristate '802.1Q VLAN Support (EXPERIMENTAL)' CONFIG_VLAN_8021Q $CONFIG_EXPERIMENTAL
-
 fi
+tristate '802.1Q VLAN Support' CONFIG_VLAN_8021Q
 
 comment ' '
 tristate 'The IPX protocol' CONFIG_IPX

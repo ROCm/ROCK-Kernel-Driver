@@ -52,70 +52,16 @@ struct vlan_hdr {
    unsigned short       h_vlan_encapsulated_proto; /* packet type ID field (or len) */
 };
 
-/*  Find a VLAN device by the MAC address of it's Ethernet device, and
- *  it's VLAN ID.  The default configuration is to have VLAN's scope
- *  to be box-wide, so the MAC will be ignored.  The mac will only be
- *  looked at if we are configured to have a seperate set of VLANs per
- *  each MAC addressable interface.  Note that this latter option does
- *  NOT follow the spec for VLANs, but may be useful for doing very
- *  large quantities of VLAN MUX/DEMUX onto FrameRelay or ATM PVCs.
- */
-struct net_device *find_802_1Q_vlan_dev(struct net_device* real_dev,
-                                        unsigned short VID); /* vlan.c */
+#define VLAN_VID_MASK	0xfff
 
 /* found in af_inet.c */
 extern int (*vlan_ioctl_hook)(unsigned long arg);
-
-/* found in vlan_dev.c */
-struct net_device_stats* vlan_dev_get_stats(struct net_device* dev);
-int vlan_dev_rebuild_header(struct sk_buff *skb);
-int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
-                  struct packet_type* ptype);
-int vlan_dev_hard_header(struct sk_buff *skb, struct net_device *dev,
-                         unsigned short type, void *daddr, void *saddr,
-                         unsigned len);
-int vlan_dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev);
-int vlan_dev_change_mtu(struct net_device *dev, int new_mtu);
-int vlan_dev_set_mac_address(struct net_device *dev, void* addr);
-int vlan_dev_open(struct net_device* dev);
-int vlan_dev_stop(struct net_device* dev);
-int vlan_dev_init(struct net_device* dev);
-void vlan_dev_destruct(struct net_device* dev);
-void vlan_dev_copy_and_sum(struct sk_buff *dest, unsigned char *src,
-                           int length, int base);
-int vlan_dev_set_ingress_priority(char* dev_name, __u32 skb_prio, short vlan_prio);
-int vlan_dev_set_egress_priority(char* dev_name, __u32 skb_prio, short vlan_prio);
-int vlan_dev_set_vlan_flag(char* dev_name, __u32 flag, short flag_val);
-
-/* VLAN multicast stuff */
-/* Delete all of the MC list entries from this vlan device.  Also deals
- * with the underlying device...
- */
-void vlan_flush_mc_list(struct net_device* dev);
-/* copy the mc_list into the vlan_info structure. */
-void vlan_copy_mc_list(struct dev_mc_list* mc_list, struct vlan_dev_info* vlan_info);
-/** dmi is a single entry into a dev_mc_list, a single node.  mc_list is
- *  an entire list, and we'll iterate through it.
- */
-int vlan_should_add_mc(struct dev_mc_list *dmi, struct dev_mc_list *mc_list);
-/** Taken from Gleb + Lennert's VLAN code, and modified... */
-void vlan_dev_set_multicast_list(struct net_device *vlan_dev);
-
-int vlan_collection_add_vlan(struct vlan_collection* vc, unsigned short vlan_id,
-                             unsigned short flags);
-int vlan_collection_remove_vlan(struct vlan_collection* vc,
-                                struct net_device* vlan_dev);
-int vlan_collection_remove_vlan_id(struct vlan_collection* vc, unsigned short vlan_id);
-
-/* found in vlan.c */
-/* Our listing of VLAN group(s) */
-extern struct vlan_group* p802_1Q_vlan_list;
 
 #define VLAN_NAME "vlan"
 
 /* if this changes, algorithm will have to be reworked because this
  * depends on completely exhausting the VLAN identifier space.  Thus
- * it gives constant time look-up, but it many cases it wastes memory.
+ * it gives constant time look-up, but in many cases it wastes memory.
  */
 #define VLAN_GROUP_ARRAY_LEN 4096
 
@@ -170,56 +116,73 @@ struct vlan_dev_info {
 
 /* inline functions */
 
-/* Used in vlan_skb_recv */
-static inline struct sk_buff *vlan_check_reorder_header(struct sk_buff *skb)
+static inline struct net_device_stats *vlan_dev_get_stats(struct net_device *dev)
 {
-	if (VLAN_DEV_INFO(skb->dev)->flags & 1) {
-		skb = skb_share_check(skb, GFP_ATOMIC);
-		if (skb) {
-			/* Lifted from Gleb's VLAN code... */
-			memmove(skb->data - ETH_HLEN,
-				skb->data - VLAN_ETH_HLEN, 12);
-			skb->mac.raw += VLAN_HLEN;
-		}
-	}
-
-	return skb;
+	return &(VLAN_DEV_INFO(dev)->dev_stats);
 }
 
-static inline unsigned short vlan_dev_get_egress_qos_mask(struct net_device* dev,
-							  struct sk_buff* skb)
+static inline __u32 vlan_get_ingress_priority(struct net_device *dev,
+					      unsigned short vlan_tag)
 {
-	struct vlan_priority_tci_mapping *mp =
-		VLAN_DEV_INFO(dev)->egress_priority_map[(skb->priority & 0xF)];
+	struct vlan_dev_info *vip = VLAN_DEV_INFO(dev);
 
-	while (mp) {
-		if (mp->priority == skb->priority) {
-			return mp->vlan_qos; /* This should already be shifted to mask
-					      * correctly with the VLAN's TCI
-					      */
-		}
-		mp = mp->next;
-	}
-	return 0;
+	return vip->ingress_priority_map[(vlan_tag >> 13) & 0x7];
 }
 
-static inline int vlan_dmi_equals(struct dev_mc_list *dmi1,
-                                  struct dev_mc_list *dmi2)
-{
-	return ((dmi1->dmi_addrlen == dmi2->dmi_addrlen) &&
-		(memcmp(dmi1->dmi_addr, dmi2->dmi_addr, dmi1->dmi_addrlen) == 0));
-}
+/* VLAN tx hw acceleration helpers. */
+struct vlan_skb_tx_cookie {
+	u32	magic;
+	u32	vlan_tag;
+};
 
-static inline void vlan_destroy_mc_list(struct dev_mc_list *mc_list)
-{
-	struct dev_mc_list *dmi = mc_list;
-	struct dev_mc_list *next;
+#define VLAN_TX_COOKIE_MAGIC	0x564c414e	/* "VLAN" in ascii. */
+#define VLAN_TX_SKB_CB(__skb)	((struct vlan_skb_tx_cookie *)&((__skb)->cb[0]))
+#define vlan_tx_tag_present(__skb) \
+	(VLAN_TX_SKB_CB(__skb)->magic == VLAN_TX_COOKIE_MAGIC)
+#define vlan_tx_tag_get(__skb)	(VLAN_TX_SKB_CB(__skb)->vlan_tag)
 
-	while(dmi) {
-		next = dmi->next;
-		kfree(dmi);
-		dmi = next;
+/* VLAN rx hw acceleration helper.  This acts like netif_rx().  */
+static inline int vlan_hwaccel_rx(struct sk_buff *skb, struct vlan_group *grp,
+				  unsigned short vlan_tag)
+{
+	struct net_device_stats *stats;
+
+	skb->dev = grp->vlan_devices[vlan_tag & VLAN_VID_MASK];
+	if (skb->dev == NULL) {
+		kfree_skb(skb);
+
+		/* Not NET_RX_DROP, this is not being dropped
+		 * due to congestion.
+		 */
+		return 0;
 	}
+
+	skb->dev->last_rx = jiffies;
+
+	stats = vlan_dev_get_stats(skb->dev);
+	stats->rx_packets++;
+	stats->rx_bytes += skb->len;
+
+	skb->priority = vlan_get_ingress_priority(skb->dev, vlan_tag);
+	switch (skb->pkt_type) {
+	case PACKET_BROADCAST:
+		break;
+
+	case PACKET_MULTICAST:
+		stats->multicast++;
+		break;
+
+	case PACKET_OTHERHOST:
+		/* Our lower layer thinks this is not local, let's make sure.
+		 * This allows the VLAN to have a different MAC than the underlying
+		 * device, and still route correctly.
+		 */
+		if (!memcmp(skb->mac.ethernet->h_dest, skb->dev->dev_addr, ETH_ALEN))
+			skb->pkt_type = PACKET_HOST;
+		break;
+	};
+
+	return netif_rx(skb);
 }
 
 #endif /* __KERNEL__ */
