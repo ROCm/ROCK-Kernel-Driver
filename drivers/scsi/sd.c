@@ -860,7 +860,12 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 			break;
 		}
 					
-					
+		/*
+		 * The device does not want the automatic start to be issued.
+		 */
+		if (sdkp->device->no_start_on_add) {
+			break;
+		}
 
 		/*
 		 * If manual intervention is required, or this is an

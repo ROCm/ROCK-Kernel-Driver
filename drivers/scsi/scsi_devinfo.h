@@ -14,3 +14,4 @@
 #define BLIST_LARGELUN		0x200	/* LUNs past 7 on a SCSI-2 device */
 #define BLIST_INQUIRY_36	0x400	/* override additional length field */
 #define BLIST_INQUIRY_58	0x800	/* ... for broken inquiry responses */
+#define BLIST_NOSTARTONADD      0x1000  /* do not do automatic start on add */
