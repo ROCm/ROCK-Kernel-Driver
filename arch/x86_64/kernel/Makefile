@@ -5,7 +5,7 @@
 extra-y 	:= head.o head64.o init_task.o vmlinux.lds
 EXTRA_AFLAGS	:= -traditional
 obj-y	:= process.o semaphore.o signal.o entry.o traps.o irq.o \
-		ptrace.o i8259.o ioport.o ldt.o setup.o time.o sys_x86_64.o \
+		ptrace.o time.o ioport.o ldt.o setup.o i8259.o sys_x86_64.o \
 		x8664_ksyms.o i387.o syscall.o vsyscall.o \
 		setup64.o bootflag.o e820.o reboot.o warmreboot.o quirks.o
 obj-y += mce.o
