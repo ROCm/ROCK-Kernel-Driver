@@ -448,7 +448,7 @@ static void count_pages(void)
 
 
 /**
- *	copy_pages - Atmoically snapshot memory.
+ *	copy_pages - Atomically snapshot memory.
  *
  *	Iterate over all the pages in the system and copy each one 
  *	into its corresponding location in the pagedir.
