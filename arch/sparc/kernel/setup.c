@@ -233,7 +233,6 @@ extern void sun4c_probe_vac(void);
 extern char cputypval;
 extern unsigned long start, end;
 extern void panic_setup(char *, int *);
-extern void srmmu_end_memory(unsigned long, unsigned long *);
 
 extern unsigned short root_flags;
 extern unsigned short root_dev;
