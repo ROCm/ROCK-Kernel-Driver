@@ -1055,7 +1055,7 @@ make_route:
 	rt->fl.oif        = oldflp->oif;
 	rt->fl.iif        = 0;
 #ifdef CONFIG_DECNET_ROUTE_FWMARK
-	rt->fl.fld_fwmark = flp->fld_fwmark;
+	rt->fl.fld_fwmark = oldflp->fld_fwmark;
 #endif
 
 	rt->rt_saddr      = fl.fld_src;
@@ -1180,7 +1180,7 @@ static int dn_route_input_slow(struct sk_buff *skb)
 				       .saddr = cb->src,
 				       .scope = RT_SCOPE_UNIVERSE,
 #ifdef CONFIG_DECNET_ROUTE_FWMARK
-				       .fwmark = skb->fwmark
+				       .fwmark = skb->nfmark
 #endif
 				    } },
 			    .iif = skb->dev->ifindex };
