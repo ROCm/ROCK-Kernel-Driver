@@ -84,7 +84,7 @@ struct snd_sg_buf {
 	int tblsize;	/* allocated table size */
 	struct snd_sg_page *table;	/* address table */
 	struct page **page_table;	/* page table (for vmap/vunmap) */
-	const struct snd_dma_device *dev;
+	struct snd_dma_device dev;
 };
 
 /*
@@ -103,9 +103,6 @@ static inline dma_addr_t snd_sgbuf_get_addr(struct snd_sg_buf *sgbuf, size_t off
 	return sgbuf->table[offset >> PAGE_SHIFT].addr + offset % PAGE_SIZE;
 }
 
-
-/* snd_dma_device management */
-void snd_dma_device_init(const struct snd_dma_device *dev, int type, void *data);
 
 /* allocate/release a buffer */
 int snd_dma_alloc_pages(const struct snd_dma_device *dev, size_t size,

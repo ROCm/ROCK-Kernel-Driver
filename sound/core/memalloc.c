@@ -84,10 +84,7 @@ struct snd_mem_list {
  *  Hacks
  */
 
-#ifdef CONFIG_PCI
-
 #if defined(__i386__) || defined(__ppc__) || defined(__x86_64__)
-#define HACK_PCI_ALLOC_CONSISTENT
 
 /*
  * A hack to allocate large buffers via dma_alloc_coherent()
@@ -111,7 +108,7 @@ static void *snd_dma_hack_alloc_coherent(struct device *dev, size_t size,
 	void *ret;
 	u64 dma_mask;
 
-	if (dev == NULL)
+	if (dev == NULL || !dev->dma_mask)
 		return dma_alloc_coherent(dev, size, dma_handle, flags);
 	dma_mask = *dev->dma_mask;
 	*dev->dma_mask = 0xffffffff; 	/* do without masking */
@@ -137,7 +134,6 @@ static void *snd_dma_hack_alloc_coherent(struct device *dev, size_t size,
 #define dma_alloc_coherent snd_dma_hack_alloc_coherent
 
 #endif /* arch */
-#endif /* CONFIG_PCI */
 
 /*
  *
@@ -937,8 +933,6 @@ __setup("snd-page-alloc=", snd_mem_setup);
 /*
  * exports
  */
-EXPORT_SYMBOL(snd_dma_device_init);
-
 EXPORT_SYMBOL(snd_dma_alloc_pages);
 EXPORT_SYMBOL(snd_dma_alloc_pages_fallback);
 EXPORT_SYMBOL(snd_dma_free_pages);

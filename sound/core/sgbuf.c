@@ -33,17 +33,17 @@
 int snd_free_sgbuf_pages(struct snd_dma_buffer *dmab)
 {
 	struct snd_sg_buf *sgbuf = dmab->private_data;
-	struct snd_dma_buffer dmab;
+	struct snd_dma_buffer tmpb;
 	int i;
 
 	if (! sgbuf)
 		return -EINVAL;
 
 	for (i = 0; i < sgbuf->pages; i++) {
-		dmab.area = sgbuf->table[i].buf;
-		dmab.addr = sgbuf->table[i].addr;
-		dmab.bytes = PAGE_SIZE;
-		snd_dma_free_pages(sgbuf->dev, &dmab);
+		tmpb.area = sgbuf->table[i].buf;
+		tmpb.addr = sgbuf->table[i].addr;
+		tmpb.bytes = PAGE_SIZE;
+		snd_dma_free_pages(&sgbuf->dev, &tmpb);
 	}
 	if (dmab->area)
 		vunmap(dmab->area);
@@ -65,9 +65,7 @@ void *snd_malloc_sgbuf_pages(const struct snd_dma_device *dev,
 {
 	struct snd_sg_buf *sgbuf;
 	unsigned int i, pages;
-	void *ptr;
-	dma_addr_t addr;
-	struct snd_dma_buffer dmab;
+	struct snd_dma_buffer tmpb;
 
 	dmab->area = NULL;
 	dmab->addr = 0;
@@ -75,7 +73,11 @@ void *snd_malloc_sgbuf_pages(const struct snd_dma_device *dev,
 	if (! sgbuf)
 		return NULL;
 	memset(sgbuf, 0, sizeof(*sgbuf));
-	sgbuf->dev = dev;
+	sgbuf->dev = *dev;
+	if (dev->type == SNDRV_DMA_TYPE_PCI_SG)
+		sgbuf->dev.type = SNDRV_DMA_TYPE_PCI;
+	else
+		sgbuf->dev.type =SNDRV_DMA_TYPE_DEV;
 	pages = snd_sgbuf_aligned_pages(size);
 	sgbuf->tblsize = sgbuf_align_table(pages);
 	sgbuf->table = kmalloc(sizeof(*sgbuf->table) * sgbuf->tblsize, GFP_KERNEL);
@@ -89,15 +91,15 @@ void *snd_malloc_sgbuf_pages(const struct snd_dma_device *dev,
 
 	/* allocate each page */
 	for (i = 0; i < pages; i++) {
-		if (snd_dma_alloc_pages(dev, PAGE_SIZE, &dmab) < 0) {
+		if (snd_dma_alloc_pages(&sgbuf->dev, PAGE_SIZE, &tmpb) < 0) {
 			if (res_size == NULL)
 				goto _failed;
 			*res_size = size = sgbuf->pages * PAGE_SIZE;
 			break;
 		}
-		sgbuf->table[i].buf = dmab.area;
-		sgbuf->table[i].addr = dmab.addr;
-		sgbuf->page_table[i] = virt_to_page(ptr);
+		sgbuf->table[i].buf = tmpb.area;
+		sgbuf->table[i].addr = tmpb.addr;
+		sgbuf->page_table[i] = virt_to_page(tmpb.area);
 		sgbuf->pages++;
 	}
 
