@@ -43,10 +43,9 @@ static void
 mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
 {
 	writel(0, host->base + MMCICOMMAND);
+
 	host->mrq = NULL;
 	host->cmd = NULL;
-	host->data = NULL;
-	host->buffer = NULL;
 
 	if (mrq->data)
 		mrq->data->bytes_xfered = host->data_xfered;
@@ -58,6 +57,13 @@ mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
 	spin_unlock(&host->lock);
 	mmc_request_done(host->mmc, mrq);
 	spin_lock(&host->lock);
+}
+
+static void mmci_stop_data(struct mmci_host *host)
+{
+	writel(0, host->base + MMCIDATACTRL);
+	host->data = NULL;
+	host->buffer = NULL;
 }
 
 static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
@@ -147,7 +153,8 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
 		status |= MCI_DATAEND;
 	}
 	if (status & MCI_DATAEND) {
-		host->data = NULL;
+		mmci_stop_data(host);
+
 		if (!data->stop) {
 			mmci_request_end(host, data->mrq);
 		} else {

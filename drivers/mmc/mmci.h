@@ -109,7 +109,10 @@
 	MCI_CMDRESPENDMASK|MCI_CMDSENTMASK|MCI_DATAENDMASK|		\
 	MCI_DATABLOCKENDMASK)
 
-#define MCI_FIFOSIZE	16
+/*
+ * The size of the FIFO in bytes.
+ */
+#define MCI_FIFOSIZE	(16*4)
 	
 #define MCI_FIFOHALFSIZE (MCI_FIFOSIZE / 2)
 
@@ -139,5 +142,3 @@ struct mmci_host {
 	void			*buffer;
 	unsigned int		size;
 };
-
-#define to_mmci_host(mmc)	container_of(mmc, struct mmci_host, mmc)
