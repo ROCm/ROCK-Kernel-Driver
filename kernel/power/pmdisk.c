@@ -894,11 +894,10 @@ static int submit(int rw, pgoff_t page_off, void * page)
 		goto Done;
 	}
 
-	rw |= BIO_RW_SYNC;
 	if (rw == WRITE)
 		bio_set_pages_dirty(bio);
 	start_io();
-	submit_bio(rw,bio);
+	submit_bio(rw|BIO_RW_SYNC,bio);
 	wait_io();
  Done:
 	bio_put(bio);

@@ -11,6 +11,7 @@
 
 #include "dm-log.h"
 #include "dm-io.h"
+#include "dm.h"
 
 static LIST_HEAD(_log_types);
 static spinlock_t _lock = SPIN_LOCK_UNLOCKED;

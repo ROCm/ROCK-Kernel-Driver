@@ -23,6 +23,7 @@
 
 #include <linux/fs.h>
 #include <linux/buffer_head.h>
+#include <linux/blkdev.h>
 
 #include "ntfs.h"
 

@@ -1744,6 +1744,9 @@ pagebuf_delwri_flush(
 		pagebuf_rele(pb);
 	}
 
+	if (flags & PBDF_WAIT)
+		blk_run_address_space(target->pbr_mapping);
+
 	if (pinptr)
 		*pinptr = pincount;
 }
