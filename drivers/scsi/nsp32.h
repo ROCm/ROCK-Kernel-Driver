@@ -563,7 +563,7 @@ typedef struct _nsp32_hw_data {
 	int           IrqNumber;
 	int           BaseAddress;
 	int           NumAddress;
-	unsigned long MmioAddress;
+	void __iomem *MmioAddress;
 #define NSP32_MMIO_OFFSET 0x0800
 	unsigned long MmioLength;
 
