@@ -103,19 +103,19 @@ do_masquerade(struct sk_buff **pskb, const struct net_device *dev)
 }
 
 void
-check_for_masq_error(struct sk_buff *skb)
+check_for_masq_error(struct sk_buff **pskb)
 {
 	enum ip_conntrack_info ctinfo;
 	struct ip_conntrack *ct;
 
-	ct = ip_conntrack_get(skb, &ctinfo);
+	ct = ip_conntrack_get(*pskb, &ctinfo);
 	/* Wouldn't be here if not tracked already => masq'ed ICMP
            ping or error related to masq'd connection */
 	IP_NF_ASSERT(ct);
 	if (ctinfo == IP_CT_RELATED) {
-		icmp_reply_translation(skb, ct, NF_IP_PRE_ROUTING,
+		icmp_reply_translation(pskb, ct, NF_IP_PRE_ROUTING,
 				       CTINFO2DIR(ctinfo));
-		icmp_reply_translation(skb, ct, NF_IP_POST_ROUTING,
+		icmp_reply_translation(pskb, ct, NF_IP_POST_ROUTING,
 				       CTINFO2DIR(ctinfo));
 	}
 }
@@ -152,10 +152,10 @@ check_for_demasq(struct sk_buff **pskb)
 				    && skb_linearize(*pskb, GFP_ATOMIC) != 0)
 					return NF_DROP;
 
-				icmp_reply_translation(*pskb, ct,
+				icmp_reply_translation(pskb, ct,
 						       NF_IP_PRE_ROUTING,
 						       CTINFO2DIR(ctinfo));
-				icmp_reply_translation(*pskb, ct,
+				icmp_reply_translation(pskb, ct,
 						       NF_IP_POST_ROUTING,
 						       CTINFO2DIR(ctinfo));
 			}
