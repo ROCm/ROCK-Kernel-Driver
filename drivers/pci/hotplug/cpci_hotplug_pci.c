@@ -448,7 +448,7 @@ static int cpci_configure_bridge(struct pci_bus* bus, struct pci_dev* dev)
 }
 
 static int configure_visit_pci_dev(struct pci_dev_wrapped *wrapped_dev,
-			struct pci_bus_wrapped *wrapped_bus)
+				   struct pci_bus_wrapped *wrapped_bus)
 {
 	int rc;
 	struct pci_dev *dev = wrapped_dev->dev;
@@ -461,8 +461,8 @@ static int configure_visit_pci_dev(struct pci_dev_wrapped *wrapped_dev,
 	 * We need to fix up the hotplug representation with the Linux
 	 * representation.
 	 */
-	slot = cpci_find_slot(dev->bus, dev->devfn);
-	if(slot) {
+	if(wrapped_dev->data) {
+		slot = (struct slot*) wrapped_dev->data;
 		slot->dev = dev;
 	}
 
@@ -504,8 +504,8 @@ static int unconfigure_visit_pci_dev_phase2(struct pci_dev_wrapped *wrapped_dev,
 	/*
 	 * Now remove the hotplug representation.
 	 */
-	slot = cpci_find_slot(dev->bus, dev->devfn);
-	if(slot) {
+	if(wrapped_dev->data) {
+		slot = (struct slot*) wrapped_dev->data;
 		slot->dev = NULL;
 	} else {
 		dbg("No hotplug representation for %02x:%02x.%x",
@@ -603,6 +603,10 @@ int cpci_configure_slot(struct slot* slot)
 				continue;
 			wrapped_dev.dev = dev;
 			wrapped_bus.bus = slot->dev->bus;
+			if(i)
+				wrapped_dev.data = NULL;
+			else
+				wrapped_dev.data = (void*) slot;
 			rc = pci_visit_dev(&configure_functions, &wrapped_dev, &wrapped_bus);
 		}
 	}
@@ -635,9 +639,14 @@ int cpci_unconfigure_slot(struct slot* slot)
 		if(dev) {
 			wrapped_dev.dev = dev;
 			wrapped_bus.bus = dev->bus;
+ 			if(i)
+ 				wrapped_dev.data = NULL;
+ 			else
+ 				wrapped_dev.data = (void*) slot;
 			dbg("%s - unconfigure phase 2", __FUNCTION__);
 			rc = pci_visit_dev(&unconfigure_functions_phase2,
-					   &wrapped_dev, &wrapped_bus);
+					   &wrapped_dev,
+					   &wrapped_bus);
 			if(rc)
 				break;
 		}
