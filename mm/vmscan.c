@@ -285,12 +285,6 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 #endif /* CONFIG_SWAP */
 
 		/*
-		 * FIXME: this is CPU-inefficient for shared mappings.
-		 * try_to_unmap() will set the page dirty and ->vm_writeback
-		 * will write it.  So we're back to page-at-a-time writepage
-		 * in LRU order.
-		 */
-		/*
 		 * If the page is dirty, only perform writeback if that write
 		 * will be non-blocking.  To prevent this allocation from being
 		 * stalled by pagecache activity.  But note that there may be
@@ -308,13 +302,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		 * See swapfile.c:page_queue_congested().
 		 */
 		if (PageDirty(page)) {
-			int (*writeback)(struct page *,
-					struct writeback_control *);
 			struct backing_dev_info *bdi;
-			const int cluster_size = SWAP_CLUSTER_MAX;
-			struct writeback_control wbc = {
-				.nr_to_write = cluster_size,
-			};
 
 			if (!is_page_cache_freeable(page))
 				goto keep_locked;
@@ -326,13 +314,15 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 			if (bdi != current->backing_dev_info &&
 					bdi_write_congested(bdi))
 				goto keep_locked;
+			if (test_clear_page_dirty(page)) {
+				write_lock(&mapping->page_lock);
+				list_move(&page->list, &mapping->locked_pages);
+				write_unlock(&mapping->page_lock);
 
-			writeback = mapping->a_ops->vm_writeback;
-			if (writeback == NULL)
-				writeback = generic_vm_writeback;
-			(*writeback)(page, &wbc);
-			*max_scan -= (cluster_size - wbc.nr_to_write);
-			goto keep;
+				if (mapping->a_ops->writepage(page) == -EAGAIN)
+					__set_page_dirty_nobuffers(page);
+				goto keep;
+			}
 		}
 
 		/*
@@ -478,6 +468,7 @@ shrink_cache(const int nr_pages, struct zone *zone,
 			nr_taken++;
 		}
 		zone->nr_inactive -= nr_taken;
+		zone->pages_scanned += nr_taken;
 		spin_unlock_irq(&zone->lru_lock);
 
 		if (nr_taken == 0)
@@ -722,28 +713,34 @@ shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
  * This is the direct reclaim path, for page-allocating processes.  We only
  * try to reclaim pages from zones which will satisfy the caller's allocation
  * request.
+ *
+ * We reclaim from a zone even if that zone is over pages_high.  Because:
+ * a) The caller may be trying to free *extra* pages to satisfy a higher-order
+ *    allocation or
+ * b) The zones may be over pages_high but they must go *over* pages_high to
+ *    satisfy the `incremental min' zone defense algorithm.
+ *
+ * Returns the number of reclaimed pages.
+ *
+ * If a zone is deemed to be full of pinned pages then just give it a light
+ * scan then give up on it.
  */
 static int
 shrink_caches(struct zone *classzone, int priority, int *total_scanned,
-		int gfp_mask, const int nr_pages, int order,
-		struct page_state *ps)
+		int gfp_mask, const int nr_pages, struct page_state *ps)
 {
 	struct zone *first_classzone;
 	struct zone *zone;
-	int nr_mapped = 0;
 	int ret = 0;
 
 	first_classzone = classzone->zone_pgdat->node_zones;
 	for (zone = classzone; zone >= first_classzone; zone--) {
+		int to_reclaim = max(nr_pages, SWAP_CLUSTER_MAX);
+		int nr_mapped = 0;
 		int max_scan;
-		int to_reclaim;
 
-		to_reclaim = zone->pages_high - zone->free_pages;
-		if (order == 0 && to_reclaim < 0)
-			continue;	/* zone has enough memory */
-
-		to_reclaim = min(to_reclaim, SWAP_CLUSTER_MAX);
-		to_reclaim = max(to_reclaim, nr_pages);
+		if (zone->all_unreclaimable && priority != DEF_PRIORITY)
+			continue;	/* Let kswapd poll it */
 
 		/*
 		 * If we cannot reclaim `nr_pages' pages by scanning twice
@@ -754,8 +751,7 @@ shrink_caches(struct zone *classzone, int priority, int *total_scanned,
 			max_scan = to_reclaim * 2;
 		ret += shrink_zone(zone, max_scan, gfp_mask,
 				to_reclaim, &nr_mapped, ps, priority);
-		*total_scanned += max_scan;
-		*total_scanned += nr_mapped;
+		*total_scanned += max_scan + nr_mapped;
 		if (ret >= nr_pages)
 			break;
 	}
@@ -796,11 +792,11 @@ try_to_free_pages(struct zone *classzone,
 		get_page_state(&ps);
 		nr_reclaimed += shrink_caches(classzone, priority,
 					&total_scanned, gfp_mask,
-					nr_pages, order, &ps);
+					nr_pages, &ps);
 		if (nr_reclaimed >= nr_pages)
 			return 1;
 		if (total_scanned == 0)
-			return 1;	/* All zones had enough free memory */
+			printk("%s: I am buggy\n", __FUNCTION__);
 		if (!(gfp_mask & __GFP_FS))
 			break;		/* Let the caller handle it */
 		/*
@@ -828,6 +824,14 @@ try_to_free_pages(struct zone *classzone,
  * special.
  *
  * Returns the number of pages which were actually freed.
+ *
+ * There is special handling here for zones which are full of pinned pages.
+ * This can happen if the pages are all mlocked, or if they are all used by
+ * device drivers (say, ZONE_DMA).  Or if they are all in use by hugetlb.
+ * What we do is to detect the case where all pages in the zone have been
+ * scanned twice and there has been zero successful reclaim.  Mark the zone as
+ * dead and from now on, only perform a short scan.  Basically we're polling
+ * the zone for when the problem goes away.
  */
 static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 {
@@ -843,6 +847,9 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 			int nr_mapped = 0;
 			int max_scan;
 			int to_reclaim;
+
+			if (zone->all_unreclaimable && priority != DEF_PRIORITY)
+				continue;
 
 			if (nr_pages && to_free > 0) {	/* Software suspend */
 				to_reclaim = min(to_free, SWAP_CLUSTER_MAX*8);
@@ -860,6 +867,10 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 			to_free -= shrink_zone(zone, max_scan, GFP_KSWAPD,
 					to_reclaim, &nr_mapped, ps, priority);
 			shrink_slab(max_scan + nr_mapped, GFP_KSWAPD);
+			if (zone->all_unreclaimable)
+				continue;
+			if (zone->pages_scanned > zone->present_pages * 2)
+				zone->all_unreclaimable = 1;
 		}
 		if (all_zones_ok)
 			break;
@@ -920,6 +931,18 @@ int kswapd(void *p)
 	}
 }
 
+/*
+ * A zone is low on free memory, so wake its kswapd task to service it.
+ */
+void wakeup_kswapd(struct zone *zone)
+{
+	if (zone->free_pages > zone->pages_low)
+		return;
+	if (!waitqueue_active(&zone->zone_pgdat->kswapd_wait))
+		return;
+	wake_up_interruptible(&zone->zone_pgdat->kswapd_wait);
+}
+
 #ifdef CONFIG_SOFTWARE_SUSPEND
 /*
  * Try to free `nr_pages' of memory, system-wide.  Returns the number of freed
@@ -949,7 +972,6 @@ int shrink_all_memory(int nr_pages)
 static int __init kswapd_init(void)
 {
 	pg_data_t *pgdat;
-	printk("Starting kswapd\n");
 	swap_setup();
 	for_each_pgdat(pgdat)
 		kernel_thread(kswapd, pgdat, CLONE_KERNEL);

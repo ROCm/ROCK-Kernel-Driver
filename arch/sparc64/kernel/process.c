@@ -568,18 +568,24 @@ asmlinkage int sparc_do_fork(unsigned long clone_flags,
 			     unsigned long stack_size)
 {
 	struct task_struct *p;
-	unsigned long tid_ptr = 0;
+	unsigned long parent_tid_ptr = 0;
+	unsigned long child_tid_ptr = 0;
 
 	clone_flags &= ~CLONE_IDLETASK;
 
-	if (clone_flags & (CLONE_SETTID | CLONE_CLEARTID)) {
-		tid_ptr = regs->u_regs[UREG_G2];
-		if (test_thread_flag(TIF_32BIT))
-			tid_ptr &= 0xffffffff;
+	if (clone_flags & (CLONE_CHILD_SETTID | CLONE_CHILD_CLEARTID)) {
+		parent_tid_ptr = regs->u_regs[UREG_G2];
+		child_tid_ptr = regs->u_regs[UREG_G3];
+		if (test_thread_flag(TIF_32BIT)) {
+			parent_tid_ptr &= 0xffffffff;
+			child_tid_ptr &= 0xffffffff;
+		}
 	}
 
 	p = do_fork(clone_flags, stack_start,
-		    regs, stack_size, (int *) tid_ptr);
+		    regs, stack_size,
+		    (int *) parent_tid_ptr,
+		    (int *) child_tid_ptr);
 
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
@@ -601,7 +607,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 	p->thread.smp_lock_pc = 0;
 #endif
 
-	p->user_tid = NULL;
+	p->set_child_tid = p->clear_child_tid = NULL;
 
 	/* Calculate offset to stack_frame & pt_regs */
 	child_trap_frame = ((char *)t) + (THREAD_SIZE - (TRACEREG_SZ+REGWIN_SZ));

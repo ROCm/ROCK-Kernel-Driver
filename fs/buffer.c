@@ -1640,8 +1640,6 @@ static int __block_write_full_page(struct inode *inode,
 	last_block = (inode->i_size - 1) >> inode->i_blkbits;
 
 	if (!page_has_buffers(page)) {
-		if (S_ISBLK(inode->i_mode))
-			buffer_error();
 		if (!PageUptodate(page))
 			buffer_error();
 		create_empty_buffers(page, 1 << inode->i_blkbits,
@@ -1966,6 +1964,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 	struct buffer_head *bh, *head, *arr[MAX_BUF_PER_PAGE];
 	unsigned int blocksize, blocks;
 	int nr, i;
+	int fully_mapped = 1;
 
 	if (!PageLocked(page))
 		PAGE_BUG(page);
@@ -1988,6 +1987,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 			continue;
 
 		if (!buffer_mapped(bh)) {
+			fully_mapped = 0;
 			if (iblock < lblock) {
 				if (get_block(inode, iblock, bh, 0))
 					SetPageError(page);
@@ -2009,6 +2009,9 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 		}
 		arr[nr++] = bh;
 	} while (i++, iblock++, (bh = bh->b_this_page) != head);
+
+	if (fully_mapped)
+		SetPageMappedToDisk(page);
 
 	if (!nr) {
 		/*
@@ -2205,6 +2208,198 @@ int generic_commit_write(struct file *file, struct page *page,
 	}
 	return 0;
 }
+
+/*
+ * On entry, the page is fully not uptodate.
+ * On exit the page is fully uptodate in the areas outside (from,to)
+ */
+int nobh_prepare_write(struct page *page, unsigned from, unsigned to,
+			get_block_t *get_block)
+{
+	struct inode *inode = page->mapping->host;
+	const unsigned blkbits = inode->i_blkbits;
+	const unsigned blocksize = 1 << blkbits;
+	struct buffer_head map_bh;
+	struct buffer_head *read_bh[MAX_BUF_PER_PAGE];
+	unsigned block_in_page;
+	unsigned block_start;
+	sector_t block_in_file;
+	char *kaddr;
+	int nr_reads = 0;
+	int i;
+	int ret = 0;
+	int is_mapped_to_disk = 1;
+	int dirtied_it = 0;
+
+	if (PageMappedToDisk(page))
+		return 0;
+
+	block_in_file = (sector_t)page->index << (PAGE_CACHE_SHIFT - blkbits);
+	map_bh.b_page = page;
+
+	/*
+	 * We loop across all blocks in the page, whether or not they are
+	 * part of the affected region.  This is so we can discover if the
+	 * page is fully mapped-to-disk.
+	 */
+	for (block_start = 0, block_in_page = 0;
+		  block_start < PAGE_CACHE_SIZE;
+		  block_in_page++, block_start += blocksize) {
+		unsigned block_end = block_start + blocksize;
+		int create;
+
+		map_bh.b_state = 0;
+		create = 1;
+		if (block_start >= to)
+			create = 0;
+		ret = get_block(inode, block_in_file + block_in_page,
+					&map_bh, create);
+		if (ret)
+			goto failed;
+		if (!buffer_mapped(&map_bh))
+			is_mapped_to_disk = 0;
+		if (buffer_new(&map_bh))
+			unmap_underlying_metadata(map_bh.b_bdev,
+							map_bh.b_blocknr);
+		if (PageUptodate(page))
+			continue;
+		if (buffer_new(&map_bh) || !buffer_mapped(&map_bh)) {
+			kaddr = kmap_atomic(page, KM_USER0);
+			if (block_start < from) {
+				memset(kaddr+block_start, 0, from-block_start);
+				dirtied_it = 1;
+			}
+			if (block_end > to) {
+				memset(kaddr + to, 0, block_end - to);
+				dirtied_it = 1;
+			}
+			flush_dcache_page(page);
+			kunmap_atomic(kaddr, KM_USER0);
+			continue;
+		}
+		if (buffer_uptodate(&map_bh))
+			continue;	/* reiserfs does this */
+		if (block_start < from || block_end > to) {
+			struct buffer_head *bh = alloc_buffer_head();
+
+			if (!bh) {
+				ret = -ENOMEM;
+				goto failed;
+			}
+			bh->b_state = map_bh.b_state;
+			atomic_set(&bh->b_count, 0);
+			bh->b_this_page = 0;
+			bh->b_page = page;
+			bh->b_blocknr = map_bh.b_blocknr;
+			bh->b_size = blocksize;
+			bh->b_data = (char *)block_start;
+			bh->b_bdev = map_bh.b_bdev;
+			bh->b_private = NULL;
+			read_bh[nr_reads++] = bh;
+		}
+	}
+
+	if (nr_reads) {
+		ll_rw_block(READ, nr_reads, read_bh);
+		for (i = 0; i < nr_reads; i++) {
+			wait_on_buffer(read_bh[i]);
+			if (!buffer_uptodate(read_bh[i]))
+				ret = -EIO;
+			free_buffer_head(read_bh[i]);
+			read_bh[i] = NULL;
+		}
+		if (ret)
+			goto failed;
+	}
+
+	if (is_mapped_to_disk)
+		SetPageMappedToDisk(page);
+	SetPageUptodate(page);
+
+	/*
+	 * Setting the page dirty here isn't necessary for the prepare_write
+	 * function - commit_write will do that.  But if/when this function is
+	 * used within the pagefault handler to ensure that all mmapped pages
+	 * have backing space in the filesystem, we will need to dirty the page
+	 * if its contents were altered.
+	 */
+	if (dirtied_it)
+		set_page_dirty(page);
+
+	return 0;
+
+failed:
+	for (i = 0; i < nr_reads; i++) {
+		if (read_bh[i])
+			free_buffer_head(read_bh[i]);
+	}
+
+	/*
+	 * Error recovery is pretty slack.  Clear the page and mark it dirty
+	 * so we'll later zero out any blocks which _were_ allocated.
+	 */
+	kaddr = kmap_atomic(page, KM_USER0);
+	memset(kaddr, 0, PAGE_CACHE_SIZE);
+	kunmap_atomic(kaddr, KM_USER0);
+	SetPageUptodate(page);
+	set_page_dirty(page);
+	return ret;
+}
+EXPORT_SYMBOL(nobh_prepare_write);
+
+int nobh_commit_write(struct file *file, struct page *page,
+		unsigned from, unsigned to)
+{
+	struct inode *inode = page->mapping->host;
+	loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
+
+	set_page_dirty(page);
+	if (pos > inode->i_size) {
+		inode->i_size = pos;
+		mark_inode_dirty(inode);
+	}
+	return 0;
+}
+EXPORT_SYMBOL(nobh_commit_write);
+
+/*
+ * This function assumes that ->prepare_write() uses nobh_prepare_write().
+ */
+int nobh_truncate_page(struct address_space *mapping, loff_t from)
+{
+	struct inode *inode = mapping->host;
+	unsigned blocksize = 1 << inode->i_blkbits;
+	pgoff_t index = from >> PAGE_CACHE_SHIFT;
+	unsigned offset = from & (PAGE_CACHE_SIZE-1);
+	unsigned to;
+	struct page *page;
+	struct address_space_operations *a_ops = mapping->a_ops;
+	char *kaddr;
+	int ret = 0;
+
+	if ((offset & (blocksize - 1)) == 0)
+		goto out;
+
+	ret = -ENOMEM;
+	page = grab_cache_page(mapping, index);
+	if (!page)
+		goto out;
+
+	to = (offset + blocksize) & ~(blocksize - 1);
+	ret = a_ops->prepare_write(NULL, page, offset, to);
+	if (ret == 0) {
+		kaddr = kmap_atomic(page, KM_USER0);
+		memset(kaddr + offset, 0, PAGE_CACHE_SIZE - offset);
+		flush_dcache_page(page);
+		kunmap_atomic(kaddr, KM_USER0);
+		set_page_dirty(page);
+	}
+	unlock_page(page);
+	page_cache_release(page);
+out:
+	return ret;
+}
+EXPORT_SYMBOL(nobh_truncate_page);
 
 int block_truncate_page(struct address_space *mapping,
 			loff_t from, get_block_t *get_block)

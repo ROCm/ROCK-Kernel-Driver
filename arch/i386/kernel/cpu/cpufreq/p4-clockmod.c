@@ -78,7 +78,7 @@ static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 	}
 #endif
 	set_cpus_allowed(current, affected_cpu_map);
-	BUG_ON(!(smp_processor_id() & affected_cpu_map));
+	BUG_ON(!(affected_cpu_map & (1 << smp_processor_id())));
 
 	/* get current state */
 	rdmsr(MSR_IA32_THERM_CONTROL, l, h);
@@ -136,14 +136,14 @@ static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 }
 
 
-static void cpufreq_p4_setpolicy(struct cpufreq_policy *policy)
+static int cpufreq_p4_setpolicy(struct cpufreq_policy *policy)
 {
 	unsigned int    i;
 	unsigned int    newstate = 0;
 	unsigned int    number_states = 0;
 
 	if (!cpufreq_p4_driver || !stock_freq || !policy)
-		return;
+		return -EINVAL;
 
 	if (policy->policy == CPUFREQ_POLICY_POWERSAVE)
 	{
@@ -183,16 +183,17 @@ static void cpufreq_p4_setpolicy(struct cpufreq_policy *policy)
 			min_state = newstate - (number_states - 1);
 		}
 	} */
+	return 0;
 }
 
 
-static void cpufreq_p4_verify(struct cpufreq_policy *policy)
+static int cpufreq_p4_verify(struct cpufreq_policy *policy)
 {
 	unsigned int    number_states = 0;
 	unsigned int    i;
 
 	if (!cpufreq_p4_driver || !stock_freq || !policy)
-		return;
+		return -EINVAL;
 
 	if (!cpu_online(policy->cpu))
 		policy->cpu = CPUFREQ_ALL_CPUS;
@@ -205,10 +206,10 @@ static void cpufreq_p4_verify(struct cpufreq_policy *policy)
 			number_states++;
 
 	if (number_states)
-		return;
+		return 0;
 
 	policy->max = (stock_freq / 8) * (((unsigned int) ((policy->max * 8) / stock_freq)) + 1);
-	return;
+	return 0;
 }
 
 
@@ -255,9 +256,10 @@ int __init cpufreq_p4_init(void)
 		stock_freq = cpu_khz;
 
 #ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_min_freq    = stock_freq / 8;
-	for (i=0;i<NR_CPUS;i++)
+	for (i=0;i<NR_CPUS;i++) {
+		driver->cpu_min_freq[i] = stock_freq / 8;
 		driver->cpu_cur_freq[i] = stock_freq;
+	}
 #endif
 
 	driver->verify        = &cpufreq_p4_verify;
@@ -274,15 +276,15 @@ int __init cpufreq_p4_init(void)
 		driver->policy[i].cpu    = i;
 	}
 
-	ret = cpufreq_register(driver);
-	if (ret) {
-		kfree(driver);
-		return ret;
-	}
-
 	cpufreq_p4_driver = driver;
 	
-	return 0;
+	ret = cpufreq_register(driver);
+	if (ret) {
+		cpufreq_p4_driver = NULL;
+		kfree(driver);
+	}
+
+	return ret;
 }
 
 

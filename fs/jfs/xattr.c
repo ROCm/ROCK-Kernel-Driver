@@ -706,7 +706,7 @@ static int can_set_system_xattr(struct inode *inode, const char *name,
 }
 
 static int can_set_xattr(struct inode *inode, const char *name,
-			 void *value, size_t value_len)
+			 const void *value, size_t value_len)
 {
 	if (IS_RDONLY(inode))
 		return -EROFS;
@@ -735,7 +735,7 @@ static int can_set_xattr(struct inode *inode, const char *name,
 #endif
 }
 
-int __jfs_setxattr(struct inode *inode, const char *name, void *value,
+int __jfs_setxattr(struct inode *inode, const char *name, const void *value,
 		   size_t value_len, int flags)
 {
 	struct jfs_ea_list *ealist;
@@ -874,7 +874,7 @@ int __jfs_setxattr(struct inode *inode, const char *name, void *value,
 	return rc;
 }
 
-int jfs_setxattr(struct dentry *dentry, const char *name, void *value,
+int jfs_setxattr(struct dentry *dentry, const char *name, const void *value,
 		 size_t value_len, int flags)
 {
 	if (value == NULL) {	/* empty EA, do not remove */

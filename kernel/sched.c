@@ -1745,13 +1745,15 @@ void io_schedule(void)
 	atomic_dec(&rq->nr_iowait);
 }
 
-void io_schedule_timeout(long timeout)
+long io_schedule_timeout(long timeout)
 {
 	struct runqueue *rq = this_rq();
+	long ret;
 
 	atomic_inc(&rq->nr_iowait);
-	schedule_timeout(timeout);
+	ret = schedule_timeout(timeout);
 	atomic_dec(&rq->nr_iowait);
+	return ret;
 }
 
 /**

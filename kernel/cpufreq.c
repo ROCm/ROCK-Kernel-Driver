@@ -4,7 +4,7 @@
  *  Copyright (C) 2001 Russell King
  *            (C) 2002 Dominik Brodowski <linux@brodo.de>
  *
- *  $Id: cpufreq.c,v 1.45 2002/10/08 14:54:23 db Exp $
+ *  $Id: cpufreq.c,v 1.50 2002/11/11 15:35:48 db Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -69,8 +69,8 @@ static struct cpufreq_policy default_policy = {
 /**
  * A few values needed by the 2.4.-compatible API
  */
-static unsigned int     cpu_max_freq;
-static unsigned int     cpu_min_freq;
+static unsigned int     cpu_max_freq[NR_CPUS];
+static unsigned int     cpu_min_freq[NR_CPUS];
 static unsigned int     cpu_cur_freq[NR_CPUS];
 #endif
 
@@ -228,6 +228,10 @@ static int cpufreq_proc_read (
 			continue;
 
 		cpufreq_get_policy(&policy, i);
+
+		if (!policy.max_cpu_freq)
+			continue;
+
 		min_pctg = (policy.min * 100) / policy.max_cpu_freq;
 		max_pctg = (policy.max * 100) / policy.max_cpu_freq;
 
@@ -378,7 +382,7 @@ int cpufreq_setmax(unsigned int cpu)
 {
 	if (!cpu_online(cpu) && (cpu != CPUFREQ_ALL_CPUS))
 		return -EINVAL;
-	return cpufreq_set(cpu_max_freq, cpu);
+	return cpufreq_set(cpu_max_freq[cpu], cpu);
 }
 EXPORT_SYMBOL_GPL(cpufreq_setmax);
 
@@ -807,13 +811,14 @@ int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu)
 	policy->min    = cpufreq_driver->policy[cpu].min;
 	policy->max    = cpufreq_driver->policy[cpu].max;
 	policy->policy = cpufreq_driver->policy[cpu].policy;
-	policy->max_cpu_freq = cpufreq_driver->policy[0].max_cpu_freq;
+	policy->max_cpu_freq = cpufreq_driver->policy[cpu].max_cpu_freq;
 	policy->cpu    = cpu;
 
 	up(&cpufreq_driver_sem);
 
 	return 0;
 }
+EXPORT_SYMBOL(cpufreq_get_policy);
 
 
 /**
@@ -825,6 +830,7 @@ int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu)
 int cpufreq_set_policy(struct cpufreq_policy *policy)
 {
 	unsigned int i;
+	int ret;
 
 	down(&cpufreq_driver_sem);
 	if (!cpufreq_driver || !cpufreq_driver->verify || 
@@ -834,12 +840,20 @@ int cpufreq_set_policy(struct cpufreq_policy *policy)
 		return -EINVAL;
 	}
 
-	down(&cpufreq_notifier_sem);
+	if (policy->cpu == CPUFREQ_ALL_CPUS)
+		policy->max_cpu_freq = cpufreq_driver->policy[0].max_cpu_freq;
+	else
+		policy->max_cpu_freq = cpufreq_driver->policy[policy->cpu].max_cpu_freq;
 
-	policy->max_cpu_freq = cpufreq_driver->policy[0].max_cpu_freq;
 
 	/* verify the cpu speed can be set within this limit */
-	cpufreq_driver->verify(policy);
+	ret = cpufreq_driver->verify(policy);
+	if (ret) {
+		up(&cpufreq_driver_sem);
+		return ret;
+	}
+
+	down(&cpufreq_notifier_sem);
 
 	/* adjust if neccessary - all reasons */
 	notifier_call_chain(&cpufreq_policy_notifier_list, CPUFREQ_ADJUST,
@@ -851,7 +865,12 @@ int cpufreq_set_policy(struct cpufreq_policy *policy)
 
 	/* verify the cpu speed can be set within this limit,
 	   which might be different to the first one */
-	cpufreq_driver->verify(policy);
+	ret = cpufreq_driver->verify(policy);
+	if (ret) {
+		up(&cpufreq_notifier_sem);
+		up(&cpufreq_driver_sem);
+		return ret;
+	}
 
 	/* notification of the new policy */
 	notifier_call_chain(&cpufreq_policy_notifier_list, CPUFREQ_NOTIFY,
@@ -879,11 +898,11 @@ int cpufreq_set_policy(struct cpufreq_policy *policy)
 		cpu_cur_freq[policy->cpu] = policy->max;
 #endif
 
-	cpufreq_driver->setpolicy(policy);
+	ret = cpufreq_driver->setpolicy(policy);
 	
 	up(&cpufreq_driver_sem);
 
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL(cpufreq_set_policy);
 
@@ -968,6 +987,8 @@ EXPORT_SYMBOL_GPL(cpufreq_notify_transition);
 int cpufreq_register(struct cpufreq_driver *driver_data)
 {
 	unsigned int            ret;
+	unsigned int            i;
+	struct cpufreq_policy   policy;
 
 	if (cpufreq_driver)
 		return -EBUSY;
@@ -979,41 +1000,55 @@ int cpufreq_register(struct cpufreq_driver *driver_data)
 	down(&cpufreq_driver_sem);
 	cpufreq_driver        = driver_data;
 	
-	if (!default_policy.policy)
-		default_policy.policy = driver_data->policy[0].policy;
-	if (!default_policy.min)
-		default_policy.min = driver_data->policy[0].min;
-	if (!default_policy.max)
-		default_policy.max = driver_data->policy[0].max;
-	default_policy.cpu = CPUFREQ_ALL_CPUS;
+	/* check for a default policy - if it exists, use it on _all_ CPUs*/
+	for (i=0; i<NR_CPUS; i++)
+	{
+		if (default_policy.policy)
+			cpufreq_driver->policy[i].policy = default_policy.policy;
+		if (default_policy.min)
+			cpufreq_driver->policy[i].min = default_policy.min;
+		if (default_policy.max)
+			cpufreq_driver->policy[i].max = default_policy.max;
+	}
+
+	/* set default policy on all CPUs. Must be called per-CPU and not
+	 * with CPUFREQ_ALL_CPUs as there might be no common policy for all
+	 * CPUs (UltraSPARC etc.)
+	 */
+	for (i=0; i<NR_CPUS; i++)
+	{
+		policy.policy = cpufreq_driver->policy[i].policy;
+		policy.min    = cpufreq_driver->policy[i].min;
+		policy.max    = cpufreq_driver->policy[i].max;
+		policy.cpu    = i;
+		up(&cpufreq_driver_sem);
+		ret = cpufreq_set_policy(&policy);
+		down(&cpufreq_driver_sem);
+		if (ret) {
+			cpufreq_driver = NULL;
+			up(&cpufreq_driver_sem);
+			return ret;
+		}
+	}
 
 	up(&cpufreq_driver_sem);
-
-	ret = cpufreq_set_policy(&default_policy);
 
 	cpufreq_proc_init();
 
 #ifdef CONFIG_CPU_FREQ_24_API
-	down(&cpufreq_driver_sem);
-	cpu_min_freq          = driver_data->cpu_min_freq;
-	cpu_max_freq          = driver_data->policy[0].max_cpu_freq;
+ 	down(&cpufreq_driver_sem);
+	for (i=0; i<NR_CPUS; i++) 
 	{
-		unsigned int i;
-		for (i=0; i<NR_CPUS; i++) {
-			cpu_cur_freq[i] = driver_data->cpu_cur_freq[i];
-		}
+		cpu_min_freq[i] = driver_data->cpu_min_freq[i];
+		cpu_max_freq[i] = driver_data->policy[i].max_cpu_freq;
+		cpu_cur_freq[i] = driver_data->cpu_cur_freq[i];
 	}
 	up(&cpufreq_driver_sem);
 
 	cpufreq_sysctl_init();
 #endif
-	if (ret) {
-		down(&cpufreq_driver_sem);
-		cpufreq_driver = NULL;
-		up(&cpufreq_driver_sem);
-	}
 
-	return ret;
+	return 0;
 }
 EXPORT_SYMBOL_GPL(cpufreq_register);
 
@@ -1061,6 +1096,7 @@ int cpufreq_restore(void)
 {
 	struct cpufreq_policy policy;
 	unsigned int i;
+	unsigned int ret = 0;
 
 	if (in_interrupt())
 		panic("cpufreq_restore() called from interrupt context!");
@@ -1081,10 +1117,10 @@ int cpufreq_restore(void)
 		policy.cpu    = i;
 		up(&cpufreq_driver_sem);
 
-		cpufreq_set_policy(&policy);
+		ret += cpufreq_set_policy(&policy);
 	}
 
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(cpufreq_restore);
 #else

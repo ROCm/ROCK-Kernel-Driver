@@ -17,6 +17,8 @@ enum bdi_state {
 	BDI_pdflush,		/* A pdflush thread is working this device */
 	BDI_write_congested,	/* The write queue is getting full */
 	BDI_read_congested,	/* The read queue is getting full */
+	BDI_write_active,	/* There are one or more queued writes */
+	BDI_read_active,	/* There are one or more queued reads */
 	BDI_unused,		/* Available bits start here */
 };
 
@@ -40,6 +42,16 @@ static inline int bdi_read_congested(struct backing_dev_info *bdi)
 static inline int bdi_write_congested(struct backing_dev_info *bdi)
 {
 	return test_bit(BDI_write_congested, &bdi->state);
+}
+
+static inline int bdi_read_active(struct backing_dev_info *bdi)
+{
+	return test_bit(BDI_read_active, &bdi->state);
+}
+
+static inline int bdi_write_active(struct backing_dev_info *bdi)
+{
+	return test_bit(BDI_write_active, &bdi->state);
 }
 
 #endif		/* _LINUX_BACKING_DEV_H */
