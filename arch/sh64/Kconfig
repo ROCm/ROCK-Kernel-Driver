@@ -263,58 +263,10 @@ source "fs/Kconfig"
 
 source "arch/sh64/oprofile/Kconfig"
 
-menu "Kernel hacking"
-
-config MAGIC_SYSRQ
-	bool "Magic SysRq key"
-	help
-	  If you say Y here, you will have some control over the system even
-	  if the system crashes for example during kernel debugging (e.g., you
-	  will be able to flush the buffer cache to disk, reboot the system
-	  immediately or dump some status information). This is accomplished
-	  by pressing various keys while holding SysRq (Alt+PrintScreen). It
-	  also works on a serial console (on PC hardware at least), if you
-	  send a BREAK and then within 5 seconds a command keypress. The
-	  keys are documented in Documentation/sysrq.txt. Don't say Y unless
-	  you really know what this hack does.
-
-config EARLY_PRINTK
-	bool "Early SCIF console support"
-
-config DEBUG_KERNEL_WITH_GDB_STUB
-	bool "GDB Stub kernel debug"
-
-config SH64_PROC_TLB
-	bool "Debug: report TLB fill/purge activity through /proc/tlb"
-	depends on PROC_FS
-
-config SH64_PROC_ASIDS
-	bool "Debug: report ASIDs through /proc/asids"
-	depends on PROC_FS
-
-config SH64_SR_WATCH
-	bool "Debug: set SR.WATCH to enable hardware watchpoints and trace"
-
-config SH_ALPHANUMERIC
-	bool "Enable debug outputs to on-board alphanumeric display"
-
-config SH_NO_BSS_INIT
-	bool "Avoid zeroing BSS (to speed-up startup on suitable platforms)"
-
-config FRAME_POINTER
-	bool "Compile the kernel with frame pointers"
-	default y if KGDB
-	help
-	  If you say Y here the resulting kernel image will be slightly larger
-	  and slower, but it will give very useful debugging information.
-	  If you don't debug the kernel, you can say N, but we may not be able
-	  to solve problems without frame pointers.
-
-endmenu
+source "arch/sh64/Kconfig.debug"
 
 source "security/Kconfig"
 
 source "crypto/Kconfig"
 
 source "lib/Kconfig"
-

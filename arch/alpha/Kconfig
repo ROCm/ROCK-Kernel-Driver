@@ -462,11 +462,6 @@ config ALPHA_SRM
 
 	  If unsure, say N.
 
-config EARLY_PRINTK
-	bool
-	depends on ALPHA_GENERIC || ALPHA_SRM
-	default y
-
 config EISA
 	bool
 	depends on ALPHA_GENERIC || ALPHA_JENSEN || ALPHA_ALCOR || ALPHA_MIKASA || ALPHA_SABLE || ALPHA_LYNX || ALPHA_NORITAKE || ALPHA_RAWHIDE
@@ -593,104 +588,7 @@ source "fs/Kconfig"
 
 source "arch/alpha/oprofile/Kconfig"
 
-menu "Kernel hacking"
-
-config ALPHA_LEGACY_START_ADDRESS
-	bool "Legacy kernel start address"
-	depends on ALPHA_GENERIC
-	default n
-	---help---
-	  The 2.4 kernel changed the kernel start address from 0x310000
-	  to 0x810000 to make room for the Wildfire's larger SRM console.
-	  Recent consoles on Titan and Marvel machines also require the
-	  extra room.
-
-	  If you're using aboot 0.7 or later, the bootloader will examine the
-	  ELF headers to determine where to transfer control. Unfortunately,
-	  most older bootloaders -- APB or MILO -- hardcoded the kernel start
-	  address rather than examining the ELF headers, and the result is a
-	  hard lockup.
-
-	  Say Y if you have a broken bootloader.  Say N if you do not, or if
-	  you wish to run on Wildfire, Titan, or Marvel.
-
-config ALPHA_LEGACY_START_ADDRESS
-	bool
-	depends on !ALPHA_GENERIC && !ALPHA_TITAN && !ALPHA_MARVEL && !ALPHA_WILDFIRE
-	default y
-
-config DEBUG_KERNEL
-	bool "Kernel debugging"
-	help
-	  Say Y here if you are developing drivers or trying to debug and
-	  identify kernel problems.
-
-config MATHEMU
-	tristate "Kernel FP software completion" if DEBUG_KERNEL && !SMP
-	default y if !DEBUG_KERNEL || SMP
-	help
-	  This option is required for IEEE compliant floating point arithmetic
-	  on the Alpha. The only time you would ever not say Y is to say M in
-	  order to debug the code. Say Y unless you know what you are doing.
-
-config DEBUG_SLAB
-	bool "Debug memory allocations"
-	depends on DEBUG_KERNEL
-	help
-	  Say Y here to have the kernel do limited verification on memory
-	  allocation as well as poisoning memory on free to catch use of freed
-	  memory.
-
-config MAGIC_SYSRQ
-	bool "Magic SysRq key"
-	depends on DEBUG_KERNEL
-	help
-	  If you say Y here, you will have some control over the system even
-	  if the system crashes for example during kernel debugging (e.g., you
-	  will be able to flush the buffer cache to disk, reboot the system
-	  immediately or dump some status information). This is accomplished
-	  by pressing various keys while holding SysRq (Alt+PrintScreen). It
-	  also works on a serial console (on PC hardware at least), if you
-	  send a BREAK and then within 5 seconds a command keypress. The
-	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
-	  unless you really know what this hack does.
-
-config DEBUG_SPINLOCK
-	bool "Spinlock debugging"
-	depends on DEBUG_KERNEL
-	help
-	  Say Y here and build SMP to catch missing spinlock initialization
-	  and certain other kinds of spinlock errors commonly made.  This is
-	  best used in conjunction with the NMI watchdog so that spinlock
-	  deadlocks are also debuggable.
-
-config DEBUG_RWLOCK
-	bool "Read-write spinlock debugging"
-	depends on DEBUG_KERNEL
-	help
-	  If you say Y here then read-write lock processing will count how many
-	  times it has tried to get the lock and issue an error message after
-	  too many attempts.  If you suspect a rwlock problem or a kernel
-	  hacker asks for this option then say Y.  Otherwise say N.
-
-config DEBUG_SEMAPHORE
-	bool "Semaphore debugging"
-	depends on DEBUG_KERNEL
-	help
-	  If you say Y here then semaphore processing will issue lots of
-	  verbose debugging messages.  If you suspect a semaphore problem or a
-	  kernel hacker asks for this option then say Y.  Otherwise say N.
-
-config DEBUG_INFO
-	bool "Compile the kernel with debug info"
-	depends on DEBUG_KERNEL
-	help
-          If you say Y here the resulting kernel image will include
-	  debugging info resulting in a larger kernel image.
-	  Say Y here only if you plan to use gdb to debug the kernel.
-	  If you don't debug the kernel, you can say N.
-
-endmenu
+source "arch/alpha/Kconfig.debug"
 
 source "security/Kconfig"
 

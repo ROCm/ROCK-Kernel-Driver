@@ -1,0 +1,28 @@
+menu "Kernel hacking"
+
+source "lib/Kconfig.debug"
+
+#bool 'Debug kmalloc/kfree' CONFIG_DEBUG_MALLOC
+config PROFILE
+	bool "Kernel profiling support"
+
+config PROFILE_SHIFT
+	int "Profile shift count"
+	depends on PROFILE
+	default "2"
+
+config ETRAX_KGDB
+	bool "Use kernel GDB debugger"
+	---help---
+	  The CRIS version of gdb can be used to remotely debug a running
+	  Linux kernel via the serial debug port.  Provided you have gdb-cris
+	  installed, run gdb-cris vmlinux, then type
+
+	  (gdb) set remotebaud 115200           <- kgdb uses 115200 as default
+	  (gdb) target remote /dev/ttyS0        <- maybe you use another port
+
+	  This should connect you to your booted kernel (or boot it now if you
+	  didn't before).  The kernel halts when it boots, waiting for gdb if
+	  this option is turned on!
+
+endmenu
