@@ -155,7 +155,7 @@ static void sermouse_process_ms(struct sermouse *sermouse, signed char data)
 
 				case SERIO_MZ:
 					input_report_key(dev, BTN_MIDDLE, (data >> 4) & 1);
-					input_report_rel(dev, REL_WHEEL, (data & 7) - (data & 8));
+					input_report_rel(dev, REL_WHEEL,  (data & 8) - (data & 7));
 					break;
 			}
 					
@@ -204,7 +204,7 @@ static void sermouse_interrupt(struct serio *serio, unsigned char data, unsigned
 {
 	struct sermouse *sermouse = serio->private;
 
-	if (time_after(jiffies, sermouse->last + HZ/20)) sermouse->count = 0;
+	if (time_after(jiffies, sermouse->last + HZ/10)) sermouse->count = 0;
 	sermouse->last = jiffies;
 
 	if (sermouse->type > SERIO_SUN)
