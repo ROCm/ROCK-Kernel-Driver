@@ -570,24 +570,18 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 	struct cifsFileInfo *open_file = NULL;
 	struct list_head *tmp;
 	struct list_head *tmp1;
-	int xid;
-
-	xid = GetXid();
 
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 
 	/* figure out which file struct to use 
 	if (file->private_data == NULL) {
-		FreeXid(xid);
 		return -EBADF;
 	}     
 	 */
 	if (!mapping) {
-		FreeXid(xid);
 		return -EFAULT;
 	} else if(!mapping->host) {
-		FreeXid(xid);
 		return -EFAULT;
 	}
 
@@ -597,14 +591,12 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 
 	if((to > PAGE_CACHE_SIZE) || (from > to)) {
 		kunmap(page);
-		FreeXid(xid);
 		return -EIO;
 	}
 
 	/* racing with truncate? */
 	if(offset > mapping->host->i_size) {
 		kunmap(page);
-		FreeXid(xid);
 		return 0; /* don't care */
 	}
 
@@ -648,7 +640,6 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 	}
 
 	kunmap(page);
-	FreeXid(xid);
 	return rc;
 }
 
