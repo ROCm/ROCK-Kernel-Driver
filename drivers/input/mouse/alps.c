@@ -36,21 +36,21 @@
 #define ALPS_PASS	0x20
 
 static struct alps_model_info alps_model_data[] = {
-	{ { 0x33, 0x02, 0x0a },	0x88, 0xf8, ALPS_OLDPROTO },
+	{ { 0x33, 0x02, 0x0a },	0x88, 0xf8, ALPS_OLDPROTO },		/* UMAX-530T */
 	{ { 0x53, 0x02, 0x0a },	0xf8, 0xf8, 0 },
 	{ { 0x53, 0x02, 0x14 },	0xf8, 0xf8, 0 },
 	{ { 0x63, 0x02, 0x0a },	0xf8, 0xf8, 0 },
 	{ { 0x63, 0x02, 0x14 },	0xf8, 0xf8, 0 },
 	{ { 0x63, 0x02, 0x28 },	0xf8, 0xf8, 0 },
-	{ { 0x63, 0x02, 0x3c },	0x8f, 0x8f, ALPS_WHEEL },
-	{ { 0x63, 0x02, 0x50 },	0xef, 0xef, ALPS_FW_BK },
+	{ { 0x63, 0x02, 0x3c },	0x8f, 0x8f, ALPS_WHEEL },		/* Toshiba Satellite S2400-103 */
+	{ { 0x63, 0x02, 0x50 },	0xef, 0xef, ALPS_FW_BK },		/* NEC Versa L320 */
 	{ { 0x63, 0x02, 0x64 },	0xf8, 0xf8, 0 },
-	{ { 0x63, 0x03, 0xc8 }, 0xf8, 0xf8, ALPS_PASS },
+	{ { 0x63, 0x03, 0xc8 }, 0xf8, 0xf8, ALPS_PASS },		/* Dell Latitude D800 */
 	{ { 0x73, 0x02, 0x0a },	0xf8, 0xf8, 0 },
 	{ { 0x73, 0x02, 0x14 },	0xf8, 0xf8, 0 },
 	{ { 0x20, 0x02, 0x0e },	0xf8, 0xf8, ALPS_PASS | ALPS_DUALPOINT }, /* XXX */
 	{ { 0x22, 0x02, 0x0a },	0xf8, 0xf8, ALPS_PASS | ALPS_DUALPOINT },
-	{ { 0x22, 0x02, 0x14 }, 0xf8, 0xf8, ALPS_PASS | ALPS_DUALPOINT },
+	{ { 0x22, 0x02, 0x14 }, 0xff, 0xff, ALPS_PASS | ALPS_DUALPOINT }, /* Dell Latitude D600 */
 };
 
 /*
@@ -88,10 +88,10 @@ static void alps_process_packet(struct psmouse *psmouse, struct pt_regs *regs)
 		input_report_key(dev2, BTN_LEFT,   packet[0] & 1);    
 		input_report_key(dev2, BTN_RIGHT,  packet[0] & 2);
 		input_report_key(dev2, BTN_MIDDLE, packet[0] & 4);
-		input_report_rel(dev2, REL_X, packet[1] ?
-			(int) packet[1] - (int) ((packet[0] << 4) & 0x100) : 0);
-		input_report_rel(dev2, REL_Y, packet[2] ?
-			(int) ((packet[0] << 3) & 0x100) - (int) packet[2] : 0);
+		input_report_rel(dev2, REL_X,
+			packet[1] ? packet[1] - ((packet[0] << 4) & 0x100) : 0);
+		input_report_rel(dev2, REL_Y,
+			packet[2] ? ((packet[0] << 3) & 0x100) - packet[2] : 0);
 		input_sync(dev2);
 		return;
 	}
@@ -100,27 +100,29 @@ static void alps_process_packet(struct psmouse *psmouse, struct pt_regs *regs)
 		left = packet[2] & 0x08;
 		right = packet[2] & 0x10;
 		middle = 0;
-		x = (packet[1] & 0x7f) | ((packet[0] & 0x07) << 7);
-		y = (packet[4] & 0x7f) | ((packet[3] & 0x07) << 7);
+		x = packet[1] | ((packet[0] & 0x07) << 7);
+		y = packet[4] | ((packet[3] & 0x07) << 7);
 		z = packet[5];
 	} else {
 		left = packet[3] & 1;
 		right = packet[3] & 2;
 		middle = packet[3] & 4;
-		x = (packet[1] & 0x7f) | ((packet[2] & 0x78) << (7 - 3));
-		y = (packet[4] & 0x7f) | ((packet[3] & 0x70) << (7 - 4));
+		x = packet[1] | ((packet[2] & 0x78) << (7 - 3));
+		y = packet[4] | ((packet[3] & 0x70) << (7 - 4));
 		z = packet[5];
 	}
 
 	ges = packet[2] & 1;
 	fin = packet[2] & 2;
 
+	input_report_key(dev, BTN_LEFT, left);
+	input_report_key(dev, BTN_RIGHT, right);
+	input_report_key(dev, BTN_MIDDLE, middle);
+
 	if ((priv->i->flags & ALPS_DUALPOINT) && z == 127) {
-		input_report_key(dev2, BTN_LEFT,   left);    
-		input_report_key(dev2, BTN_RIGHT,  right);
-		input_report_key(dev2, BTN_MIDDLE, middle);
 		input_report_rel(dev2, REL_X,  (x > 383 ? (x - 768) : x));
-		input_report_rel(dev2, REL_Y, -(y > 255 ? (x - 512) : y));
+		input_report_rel(dev2, REL_Y, -(y > 255 ? (y - 512) : y));
+		input_sync(dev);
 		input_sync(dev2);
 		return;
 	}
@@ -153,9 +155,6 @@ static void alps_process_packet(struct psmouse *psmouse, struct pt_regs *regs)
 	input_report_abs(dev, ABS_PRESSURE, z);
 	input_report_key(dev, BTN_TOOL_FINGER, z > 0);
 
-	input_report_key(dev, BTN_LEFT, left);
-	input_report_key(dev, BTN_RIGHT, right);
-	input_report_key(dev, BTN_MIDDLE, middle);
 
 	if (priv->i->flags & ALPS_WHEEL)
 		input_report_rel(dev, REL_WHEEL, ((packet[0] >> 4) & 0x07) | ((packet[2] >> 2) & 0x08));
