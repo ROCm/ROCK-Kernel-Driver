@@ -276,9 +276,9 @@ static inline struct usb_bluetooth* get_usb_bluetooth (struct usb_bluetooth *blu
 }
 
 
-static inline struct usb_bluetooth *get_bluetooth_by_minor (int minor)
+static inline struct usb_bluetooth *get_bluetooth_by_index (int index)
 {
-	return bluetooth_table[minor];
+	return bluetooth_table[index];
 }
 
 
@@ -357,7 +357,7 @@ static int bluetooth_open (struct tty_struct *tty, struct file * filp)
 	tty->driver_data = NULL;
 
 	/* get the bluetooth object associated with this tty pointer */
-	bluetooth = get_bluetooth_by_minor (minor(tty->device));
+	bluetooth = get_bluetooth_by_index (tty->index);
 
 	if (bluetooth_paranoia_check (bluetooth, __FUNCTION__)) {
 		return -ENODEV;
@@ -1298,7 +1298,7 @@ static struct tty_driver bluetooth_tty_driver = {
 	.magic =		TTY_DRIVER_MAGIC,
 	.owner =		THIS_MODULE,
 	.driver_name =		"usb-bluetooth",
-	.name =			"usb/ttub/%d",
+	.name =			"usb/ttub/",
 	.major =		BLUETOOTH_TTY_MAJOR,
 	.minor_start =		0,
 	.num =			BLUETOOTH_TTY_MINORS,

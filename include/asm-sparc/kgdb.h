@@ -52,43 +52,43 @@ struct kgdb_frame {
 #define KGDB_NPC    0x114
 
 #define SAVE_KGDB_GLOBALS(reg) \
-        std     %g0, [%reg + REGWIN_SZ + KGDB_G0]; \
-        std     %g2, [%reg + REGWIN_SZ + KGDB_G2]; \
-        std     %g4, [%reg + REGWIN_SZ + KGDB_G4]; \
-        std     %g6, [%reg + REGWIN_SZ + KGDB_G6];
+        std     %g0, [%reg + STACKFRAME_SZ + KGDB_G0]; \
+        std     %g2, [%reg + STACKFRAME_SZ + KGDB_G2]; \
+        std     %g4, [%reg + STACKFRAME_SZ + KGDB_G4]; \
+        std     %g6, [%reg + STACKFRAME_SZ + KGDB_G6];
 
 #define SAVE_KGDB_INS(reg) \
-        std     %i0, [%reg + REGWIN_SZ + KGDB_I0]; \
-        std     %i2, [%reg + REGWIN_SZ + KGDB_I2]; \
-        std     %i4, [%reg + REGWIN_SZ + KGDB_I4]; \
-        std     %i6, [%reg + REGWIN_SZ + KGDB_I6];
+        std     %i0, [%reg + STACKFRAME_SZ + KGDB_I0]; \
+        std     %i2, [%reg + STACKFRAME_SZ + KGDB_I2]; \
+        std     %i4, [%reg + STACKFRAME_SZ + KGDB_I4]; \
+        std     %i6, [%reg + STACKFRAME_SZ + KGDB_I6];
 
 #define SAVE_KGDB_SREGS(reg, reg_y, reg_psr, reg_wim, reg_tbr, reg_pc, reg_npc) \
-        st      %reg_y, [%reg + REGWIN_SZ + KGDB_Y]; \
-        st      %reg_psr, [%reg + REGWIN_SZ + KGDB_PSR]; \
-        st      %reg_wim, [%reg + REGWIN_SZ + KGDB_WIM]; \
-        st      %reg_tbr, [%reg + REGWIN_SZ + KGDB_TBR]; \
-        st      %reg_pc, [%reg + REGWIN_SZ + KGDB_PC]; \
-        st      %reg_npc, [%reg + REGWIN_SZ + KGDB_NPC];
+        st      %reg_y, [%reg + STACKFRAME_SZ + KGDB_Y]; \
+        st      %reg_psr, [%reg + STACKFRAME_SZ + KGDB_PSR]; \
+        st      %reg_wim, [%reg + STACKFRAME_SZ + KGDB_WIM]; \
+        st      %reg_tbr, [%reg + STACKFRAME_SZ + KGDB_TBR]; \
+        st      %reg_pc, [%reg + STACKFRAME_SZ + KGDB_PC]; \
+        st      %reg_npc, [%reg + STACKFRAME_SZ + KGDB_NPC];
 
 #define LOAD_KGDB_GLOBALS(reg) \
-        ld      [%reg + REGWIN_SZ + KGDB_G1], %g1; \
-        ldd     [%reg + REGWIN_SZ + KGDB_G2], %g2; \
-        ldd     [%reg + REGWIN_SZ + KGDB_G4], %g4; \
-        ldd     [%reg + REGWIN_SZ + KGDB_G6], %g6;
+        ld      [%reg + STACKFRAME_SZ + KGDB_G1], %g1; \
+        ldd     [%reg + STACKFRAME_SZ + KGDB_G2], %g2; \
+        ldd     [%reg + STACKFRAME_SZ + KGDB_G4], %g4; \
+        ldd     [%reg + STACKFRAME_SZ + KGDB_G6], %g6;
 
 #define LOAD_KGDB_INS(reg) \
-        ldd     [%reg + REGWIN_SZ + KGDB_I0], %i0; \
-        ldd     [%reg + REGWIN_SZ + KGDB_I2], %i2; \
-        ldd     [%reg + REGWIN_SZ + KGDB_I4], %i4; \
-        ldd     [%reg + REGWIN_SZ + KGDB_I6], %i6;
+        ldd     [%reg + STACKFRAME_SZ + KGDB_I0], %i0; \
+        ldd     [%reg + STACKFRAME_SZ + KGDB_I2], %i2; \
+        ldd     [%reg + STACKFRAME_SZ + KGDB_I4], %i4; \
+        ldd     [%reg + STACKFRAME_SZ + KGDB_I6], %i6;
 
 #define LOAD_KGDB_SREGS(reg, reg_y, reg_psr, reg_wim, reg_tbr, reg_pc, reg_npc) \
-	ld	[%reg + REGWIN_SZ + KGDB_Y], %reg_y; \
-	ld	[%reg + REGWIN_SZ + KGDB_PSR], %reg_psr; \
-	ld	[%reg + REGWIN_SZ + KGDB_WIM], %reg_wim; \
-	ld	[%reg + REGWIN_SZ + KGDB_TBR], %reg_tbr; \
-	ld	[%reg + REGWIN_SZ + KGDB_PC], %reg_pc; \
-	ld	[%reg + REGWIN_SZ + KGDB_NPC], %reg_npc;
+	ld	[%reg + STACKFRAME_SZ + KGDB_Y], %reg_y; \
+	ld	[%reg + STACKFRAME_SZ + KGDB_PSR], %reg_psr; \
+	ld	[%reg + STACKFRAME_SZ + KGDB_WIM], %reg_wim; \
+	ld	[%reg + STACKFRAME_SZ + KGDB_TBR], %reg_tbr; \
+	ld	[%reg + STACKFRAME_SZ + KGDB_PC], %reg_pc; \
+	ld	[%reg + STACKFRAME_SZ + KGDB_NPC], %reg_npc;
 
 #endif /* !(_SPARC_KGDB_H) */

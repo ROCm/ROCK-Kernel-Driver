@@ -117,8 +117,8 @@ static void check_unthrottle(struct tty_struct * tty)
 {
 	if (tty->count &&
 	    test_and_clear_bit(TTY_THROTTLED, &tty->flags) && 
-	    tty->driver.unthrottle)
-		tty->driver.unthrottle(tty);
+	    tty->driver->unthrottle)
+		tty->driver->unthrottle(tty);
 }
 
 /*
@@ -183,7 +183,7 @@ static int opost(unsigned char c, struct tty_struct *tty)
 {
 	int	space, spaces;
 
-	space = tty->driver.write_room(tty);
+	space = tty->driver->write_room(tty);
 	if (!space)
 		return -1;
 
@@ -195,7 +195,7 @@ static int opost(unsigned char c, struct tty_struct *tty)
 			if (O_ONLCR(tty)) {
 				if (space < 2)
 					return -1;
-				tty->driver.put_char(tty, '\r');
+				tty->driver->put_char(tty, '\r');
 				tty->column = 0;
 			}
 			tty->canon_column = tty->column;
@@ -217,7 +217,7 @@ static int opost(unsigned char c, struct tty_struct *tty)
 				if (space < spaces)
 					return -1;
 				tty->column += spaces;
-				tty->driver.write(tty, 0, "        ", spaces);
+				tty->driver->write(tty, 0, "        ", spaces);
 				return 0;
 			}
 			tty->column += spaces;
@@ -234,7 +234,7 @@ static int opost(unsigned char c, struct tty_struct *tty)
 			break;
 		}
 	}
-	tty->driver.put_char(tty, c);
+	tty->driver->put_char(tty, c);
 	return 0;
 }
 
@@ -250,7 +250,7 @@ static ssize_t opost_block(struct tty_struct * tty,
 	int 	i;
 	char	*cp;
 
-	space = tty->driver.write_room(tty);
+	space = tty->driver->write_room(tty);
 	if (!space)
 		return 0;
 	if (nr > space)
@@ -296,9 +296,9 @@ static ssize_t opost_block(struct tty_struct * tty,
 		}
 	}
 break_out:
-	if (tty->driver.flush_chars)
-		tty->driver.flush_chars(tty);
-	i = tty->driver.write(tty, 0, buf, i);	
+	if (tty->driver->flush_chars)
+		tty->driver->flush_chars(tty);
+	i = tty->driver->write(tty, 0, buf, i);	
 	return i;
 }
 
@@ -306,7 +306,7 @@ break_out:
 
 static inline void put_char(unsigned char c, struct tty_struct *tty)
 {
-	tty->driver.put_char(tty, c);
+	tty->driver->put_char(tty, c);
 }
 
 /* Must be called only when L_ECHO(tty) is true. */
@@ -452,8 +452,8 @@ static inline void isig(int sig, struct tty_struct *tty, int flush)
 		kill_pg(tty->pgrp, sig, 1);
 	if (flush || !L_NOFLSH(tty)) {
 		n_tty_flush_buffer(tty);
-		if (tty->driver.flush_buffer)
-			tty->driver.flush_buffer(tty);
+		if (tty->driver->flush_buffer)
+			tty->driver->flush_buffer(tty);
 	}
 }
 
@@ -782,8 +782,8 @@ static void n_tty_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 				break;
 			}
 		}
-		if (tty->driver.flush_chars)
-			tty->driver.flush_chars(tty);
+		if (tty->driver->flush_chars)
+			tty->driver->flush_chars(tty);
 	}
 
 	if (!tty->icanon && (tty->read_cnt >= tty->minimum_to_wake)) {
@@ -800,8 +800,8 @@ static void n_tty_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 	if (n_tty_receive_room(tty) < TTY_THRESHOLD_THROTTLE) {
 		/* check TTY_THROTTLED first so it indicates our state */
 		if (!test_and_set_bit(TTY_THROTTLED, &tty->flags) &&
-		    tty->driver.throttle)
-			tty->driver.throttle(tty);
+		    tty->driver->throttle)
+			tty->driver->throttle(tty);
 	}
 }
 
@@ -869,7 +869,7 @@ static void n_tty_set_termios(struct tty_struct *tty, struct termios * old)
 		tty->raw = 1;
 		if ((I_IGNBRK(tty) || (!I_BRKINT(tty) && !I_PARMRK(tty))) &&
 		    (I_IGNPAR(tty) || !I_INPCK(tty)) &&
-		    (tty->driver.flags & TTY_DRIVER_REAL_RAW))
+		    (tty->driver->flags & TTY_DRIVER_REAL_RAW))
 			tty->real_raw = 1;
 		else
 			tty->real_raw = 0;
@@ -1205,10 +1205,10 @@ static ssize_t write_chan(struct tty_struct * tty, struct file * file,
 					break;
 				b++; nr--;
 			}
-			if (tty->driver.flush_chars)
-				tty->driver.flush_chars(tty);
+			if (tty->driver->flush_chars)
+				tty->driver->flush_chars(tty);
 		} else {
-			c = tty->driver.write(tty, 1, b, nr);
+			c = tty->driver->write(tty, 1, b, nr);
 			if (c < 0) {
 				retval = c;
 				goto break_out;
@@ -1251,7 +1251,7 @@ static unsigned int normal_poll(struct tty_struct * tty, struct file * file, pol
 		else
 			tty->minimum_to_wake = 1;
 	}
-	if (tty->driver.chars_in_buffer(tty) < WAKEUP_CHARS)
+	if (tty->driver->chars_in_buffer(tty) < WAKEUP_CHARS)
 		mask |= POLLOUT | POLLWRNORM;
 	return mask;
 }

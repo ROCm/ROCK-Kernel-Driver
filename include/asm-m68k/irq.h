@@ -45,7 +45,7 @@
 
 #define IRQ_SCHED_TIMER	(8)    /* interrupt source for scheduling timer */
 
-static __inline__ int irq_cannonicalize(int irq)
+static __inline__ int irq_canonicalize(int irq)
 {
 	return irq;
 }

@@ -31,7 +31,6 @@
 #define _LINUX_DS_H
 
 #include <pcmcia/bulkmem.h>
-#include <linux/device.h>
 #include <pcmcia/cs_types.h>
 
 typedef struct tuple_parse_t {
@@ -107,6 +106,7 @@ typedef union ds_ioctl_arg_t {
 #define DS_BIND_MTD			_IOWR('d', 64, mtd_info_t)
 
 #ifdef __KERNEL__
+#include <linux/device.h>
 
 typedef struct dev_node_t {
     char		dev_name[DEV_NAME_LEN];

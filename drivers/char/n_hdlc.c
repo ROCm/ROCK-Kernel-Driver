@@ -319,9 +319,9 @@ static int n_hdlc_tty_open (struct tty_struct *tty)
 	struct n_hdlc *n_hdlc = tty2n_hdlc (tty);
 
 	if (debuglevel >= DEBUG_LEVEL_INFO)	
-		printk("%s(%d)n_hdlc_tty_open() called (major=%u,minor=%u)\n",
+		printk("%s(%d)n_hdlc_tty_open() called (device=%s)\n",
 		__FILE__,__LINE__,
-		major(tty->device), minor(tty->device));
+		tty->name);
 		
 	/* There should not be an existing table for this slot. */
 	if (n_hdlc) {
@@ -348,8 +348,8 @@ static int n_hdlc_tty_open (struct tty_struct *tty)
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer (tty);
 
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer (tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer (tty);
 		
 	if (debuglevel >= DEBUG_LEVEL_INFO)	
 		printk("%s(%d)n_hdlc_tty_open() success\n",__FILE__,__LINE__);
@@ -403,7 +403,7 @@ static void n_hdlc_send_frames (struct n_hdlc *n_hdlc, struct tty_struct *tty)
 			
 		/* Send the next block of data to device */
 		tty->flags |= (1 << TTY_DO_WRITE_WAKEUP);
-		actual = tty->driver.write(tty, 0, tbuf->buf, tbuf->count);
+		actual = tty->driver->write(tty, 0, tbuf->buf, tbuf->count);
 		    
 		/* if transmit error, throw frame away by */
 		/* pretending it was accepted by driver */
@@ -780,8 +780,8 @@ static int n_hdlc_tty_ioctl (struct tty_struct *tty, struct file * file,
 
 	case TIOCOUTQ:
 		/* get the pending tx byte count in the driver */
-		count = tty->driver.chars_in_buffer ?
-				tty->driver.chars_in_buffer(tty) : 0;
+		count = tty->driver->chars_in_buffer ?
+				tty->driver->chars_in_buffer(tty) : 0;
 		/* add size of next output frame in queue */
 		spin_lock_irqsave(&n_hdlc->tx_buf_list.spinlock,flags);
 		if (n_hdlc->tx_buf_list.head)

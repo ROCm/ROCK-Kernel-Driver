@@ -839,7 +839,7 @@ static int sscape_alloc_dma(sscape_info *devc)
 	devc->raw_buf_phys = virt_to_bus(start_addr);
 
 	for (page = virt_to_page(start_addr); page <= virt_to_page(end_addr); page++)
-		mem_map_reserve(page);
+		SetPageReserved(page);
 	return 1;
 }
 
@@ -855,7 +855,7 @@ static void sscape_free_dma(sscape_info *devc)
 	end_addr = start_addr + devc->buffsize;
 
 	for (page = virt_to_page(start_addr); page <= virt_to_page(end_addr); page++)
-		mem_map_unreserve(page);
+		ClearPageReserved(page);
 
 	free_pages((unsigned long) devc->raw_buf, sz);
 	devc->raw_buf = NULL;

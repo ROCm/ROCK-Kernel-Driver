@@ -56,19 +56,11 @@
 #include <linux/bio.h>
 #include <linux/buffer_head.h>		/* for invalidate_bdev() */
 #include <linux/backing-dev.h>
-#include <linux/initrd.h>
 #include <linux/blkpg.h>
 #include <asm/uaccess.h>
 
 /* The RAM disk size is now a parameter */
 #define NUM_RAMDISKS 16		/* This cannot be overridden (yet) */ 
-
-#ifdef CONFIG_BLK_DEV_INITRD
-static int initrd_users;
-static spinlock_t initrd_users_lock = SPIN_LOCK_UNLOCKED;
-unsigned long initrd_start, initrd_end;
-int initrd_below_start_ok;
-#endif
 
 /* Various static variables go here.  Most are used only in the RAM disk code.
  */
@@ -269,53 +261,6 @@ static int rd_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 	return error;
 }
 
-
-#ifdef CONFIG_BLK_DEV_INITRD
-
-static struct block_device_operations rd_bd_op;
-static struct gendisk *initrd_disk;
-
-static ssize_t initrd_read(struct file *file, char *buf,
-			   size_t count, loff_t *ppos)
-{
-	int left;
-
-	left = initrd_end - initrd_start - *ppos;
-	if (count > left) count = left;
-	if (count == 0) return 0;
-	if (copy_to_user(buf, (char *)initrd_start + *ppos, count))
-		return -EFAULT;
-	*ppos += count;
-	return count;
-}
-
-
-static int initrd_release(struct inode *inode,struct file *file)
-{
-	extern void free_initrd_mem(unsigned long, unsigned long);
-
-	blkdev_put(inode->i_bdev, BDEV_FILE);
-
-	spin_lock(&initrd_users_lock);
-	if (!--initrd_users) {
-		spin_unlock(&initrd_users_lock);
-		del_gendisk(initrd_disk);
-		free_initrd_mem(initrd_start, initrd_end);
-		initrd_start = 0;
-	} else {
-		spin_unlock(&initrd_users_lock);
-	}
-	return 0;
-}
-
-
-static struct file_operations initrd_fops = {
-	.read =		initrd_read,
-	.release =	initrd_release,
-};
-
-#endif
-
 static struct backing_dev_info rd_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
@@ -324,18 +269,6 @@ static struct backing_dev_info rd_backing_dev_info = {
 static int rd_open(struct inode * inode, struct file * filp)
 {
 	int unit = minor(inode->i_rdev);
-
-#ifdef CONFIG_BLK_DEV_INITRD
-	if (unit == INITRD_MINOR) {
-		spin_lock(&initrd_users_lock);
-		initrd_users++;
-		spin_unlock(&initrd_users_lock);
-		if (!initrd_start) 
-			return -ENODEV;
-		filp->f_op = &initrd_fops;
-		return 0;
-	}
-#endif
 
 	/*
 	 * Immunize device against invalidate_buffers() and prune_icache().
@@ -375,9 +308,7 @@ static void __exit rd_cleanup (void)
 		del_gendisk(rd_disks[i]);
 		put_disk(rd_disks[i]);
 	}
-#ifdef CONFIG_BLK_DEV_INITRD
-	put_disk(initrd_disk);
-#endif
+
 	devfs_remove("rd");
 	unregister_blkdev(RAMDISK_MAJOR, "ramdisk" );
 }
@@ -395,17 +326,6 @@ static int __init rd_init (void)
 		       rd_blocksize);
 		rd_blocksize = BLOCK_SIZE;
 	}
-
-#ifdef CONFIG_BLK_DEV_INITRD
-	initrd_disk = alloc_disk(1);
-	if (!initrd_disk)
-		return -ENOMEM;
-	initrd_disk->major = RAMDISK_MAJOR;
-	initrd_disk->first_minor = INITRD_MINOR;
-	initrd_disk->fops = &rd_bd_op;	
-	sprintf(initrd_disk->disk_name, "initrd");
-	sprintf(initrd_disk->devfs_name, "rd/initrd");
-#endif
 
 	for (i = 0; i < NUM_RAMDISKS; i++) {
 		rd_disks[i] = alloc_disk(1);
@@ -436,12 +356,6 @@ static int __init rd_init (void)
 		add_disk(rd_disks[i]);
 	}
 
-#ifdef CONFIG_BLK_DEV_INITRD
-	/* We ought to separate initrd operations here */
-	set_capacity(initrd_disk, (initrd_end-initrd_start+511)>>9);
-	add_disk(initrd_disk);
-#endif
-
 	/* rd_size is given in kB */
 	printk("RAMDISK driver initialized: "
 	       "%d RAM disks of %dK size %d blocksize\n",
@@ -451,9 +365,6 @@ static int __init rd_init (void)
 out:
 	while (i--)
 		put_disk(rd_disks[i]);
-#ifdef CONFIG_BLK_DEV_INITRD
-	put_disk(initrd_disk);
-#endif
 	return err;
 }
 

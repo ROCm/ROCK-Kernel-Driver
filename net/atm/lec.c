@@ -552,15 +552,9 @@ static struct atmdev_ops lecdev_ops = {
 };
 
 static struct atm_dev lecatm_dev = {
-        &lecdev_ops,
-        NULL,	    /*PHY*/
-        "lec",	    /*type*/
-        999,	    /*dummy device number*/
-        NULL,NULL,  /*no VCCs*/
-        NULL,NULL,  /*no data*/
-        0,	    /*no flags*/
-        NULL,	    /* no local address*/
-        { 0 }	    /*no ESI or rest of the atm_dev struct things*/
+	.ops	= &lecdev_ops,
+	.type	= "lec",
+	.number	= 999,	/* dummy device number */
 };
 
 /*

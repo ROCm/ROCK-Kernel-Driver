@@ -802,12 +802,12 @@ static void __init register_memory(unsigned long max_low_pfn)
    APs have less capabilities than the boot processor are not handled. 
     
    In this case boot with "noreplacement". */ 
-void __init apply_alternatives(void *start, void *end) 
+void apply_alternatives(void *start, void *end) 
 { 
 	struct alt_instr *a; 
 	int diff, i, k;
 
-	for (a = start; a < end; 
+	for (a = start; a < (struct alt_instr *)end; 
 	     a = (void *)ALIGN((unsigned long)(a + 1) + a->instrlen, 4)) { 
 		if (!boot_cpu_has(a->cpuid))
 			continue;

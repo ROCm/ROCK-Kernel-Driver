@@ -1402,7 +1402,7 @@ receive_chars(struct e100_serial *info)
 
 	if (!E100_RTS_GET(info) &&
 	    CIRC_SPACE(info->recv.head, info->recv.tail, SERIAL_RECV_SIZE) < TTY_THROTTLE_LIMIT)
-		info->tty->driver.throttle(info->tty);
+		info->tty->driver->throttle(info->tty);
 	
 	START_FLUSH_FAST_TIMER(info, "receive_chars");
 
@@ -1658,7 +1658,7 @@ flush_to_flip_buffer(struct e100_serial *info)
 	/* unthrottle if we have throttled */
 	if (E100_RTS_GET(info) &&
 	    CIRC_SPACE(info->recv.head, info->recv.tail, SERIAL_RECV_SIZE) > TTY_THROTTLE_LIMIT)
-		tty->driver.unthrottle(info->tty);
+		tty->driver->unthrottle(info->tty);
 }
 
 static _INLINE_ void
@@ -3049,8 +3049,8 @@ rs_close(struct tty_struct *tty, struct file * filp)
 #endif
 
 	shutdown(info);
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
@@ -3169,7 +3169,7 @@ block_til_ready(struct tty_struct *tty, struct file * filp,
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 		if (info->flags & ASYNC_NORMAL_ACTIVE)
 			return -EBUSY;
 		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
@@ -3289,7 +3289,7 @@ rs_open(struct tty_struct *tty, struct file * filp)
 
 	/* find which port we want to open */
 
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = tty->index;
   
 	if (line < 0 || line >= NR_PORTS)
 		return -ENODEV;
@@ -3302,8 +3302,7 @@ rs_open(struct tty_struct *tty, struct file * filp)
 		return -ENODEV; 
   
 #ifdef SERIAL_DEBUG_OPEN
-	printk("[%d] rs_open %s%d, count = %d\n", current->pid,
-	       tty->driver.name, info->line,
+	printk("[%d] rs_open %s, count = %d\n", current->pid, tty->name,
 	       info->count);
 #endif
 
@@ -3359,7 +3358,7 @@ rs_open(struct tty_struct *tty, struct file * filp)
 	}
 
 	if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = info->normal_termios;
 		else 
 			*tty->termios = info->callout_termios;

@@ -120,6 +120,12 @@ int ip6_ra_control(struct sock *sk, int sel, void (*destructor)(struct sock *))
 	return 0;
 }
 
+extern int ip6_mc_source(int add, int omode, struct sock *sk,
+	struct group_source_req *pgsr);
+extern int ip6_mc_msfilter(struct sock *sk, struct group_filter *gsf);
+extern int ip6_mc_msfget(struct sock *sk, struct group_filter *gsf,
+	struct group_filter *optval, int *optlen);
+
 
 int ipv6_setsockopt(struct sock *sk, int level, int optname, char *optval, 
 		    int optlen)
@@ -393,12 +399,13 @@ done:
 			break;
 		}
 		psin6 = (struct sockaddr_in6 *)&greq.gr_group;
-		if (optname == IPV6_ADD_MEMBERSHIP)
+		if (optname == MCAST_JOIN_GROUP)
 			retv = ipv6_sock_mc_join(sk, greq.gr_interface,
 				&psin6->sin6_addr);
 		else
 			retv = ipv6_sock_mc_drop(sk, greq.gr_interface,
 				&psin6->sin6_addr);
+		break;
 	}
 	case MCAST_JOIN_SOURCE_GROUP:
 	case MCAST_LEAVE_SOURCE_GROUP:
@@ -414,7 +421,8 @@ done:
 			retv = -EFAULT;
 			break;
 		}
-		if (greqs.gsr_group.ss_family != AF_INET6) {
+		if (greqs.gsr_group.ss_family != AF_INET6 ||
+		    greqs.gsr_source.ss_family != AF_INET6) {
 			retv = -EADDRNOTAVAIL;
 			break;
 		}

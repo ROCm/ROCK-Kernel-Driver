@@ -158,7 +158,8 @@ EXPORT_SYMBOL(rtc_lock);
 EXPORT_SYMBOL(mostek_lock);
 EXPORT_SYMBOL(mstk48t02_regs);
 #if CONFIG_SUN_AUXIO
-EXPORT_SYMBOL(auxio_register);
+EXPORT_SYMBOL(set_auxio);
+EXPORT_SYMBOL(get_auxio);
 #endif
 EXPORT_SYMBOL(request_fast_irq);
 EXPORT_SYMBOL(io_remap_page_range);

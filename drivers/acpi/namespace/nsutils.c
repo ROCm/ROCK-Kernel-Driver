@@ -76,31 +76,38 @@ acpi_ns_report_error (
 	acpi_status                     lookup_status)
 {
 	acpi_status                     status;
-	char                            *name;
+	char                            *name = NULL;
 
-
-	/* Convert path to external format */
-
-	status = acpi_ns_externalize_name (ACPI_UINT32_MAX, internal_name, NULL, &name);
 
 	acpi_os_printf ("%8s-%04d: *** Error: Looking up ",
 		module_name, line_number);
 
-	/* Print target name */
+	if (lookup_status == AE_BAD_CHARACTER) {
+		/* There is a non-ascii character in the name */
 
-	if (ACPI_SUCCESS (status)) {
-		acpi_os_printf ("[%s]", name);
+		acpi_os_printf ("[0x%4.4X] (NON-ASCII)\n", *(ACPI_CAST_PTR (u32, internal_name)));
 	}
 	else {
-		acpi_os_printf ("[COULD NOT EXTERNALIZE NAME]");
+		/* Convert path to external format */
+
+		status = acpi_ns_externalize_name (ACPI_UINT32_MAX, internal_name, NULL, &name);
+
+		/* Print target name */
+
+		if (ACPI_SUCCESS (status)) {
+			acpi_os_printf ("[%s]", name);
+		}
+		else {
+			acpi_os_printf ("[COULD NOT EXTERNALIZE NAME]");
+		}
+
+		if (name) {
+			ACPI_MEM_FREE (name);
+		}
 	}
 
 	acpi_os_printf (" in namespace, %s\n",
 		acpi_format_exception (lookup_status));
-
-	if (name) {
-		ACPI_MEM_FREE (name);
-	}
 }
 
 
@@ -609,7 +616,7 @@ acpi_ns_externalize_name (
 			/* <count> 4-byte names */
 
 			names_index = prefix_length + 2;
-			num_segments = (u32) (u8) internal_name[(acpi_native_uint) (prefix_length + 1)];
+			num_segments = (acpi_native_uint) (u8) internal_name[(acpi_native_uint) (prefix_length + 1)];
 			break;
 
 		case AML_DUAL_NAME_PREFIX:

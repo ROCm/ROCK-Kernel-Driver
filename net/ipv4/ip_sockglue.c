@@ -631,7 +631,7 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 				kfree(msf);
 				break;
 			}
-			err = ip_mc_msfilter(sk, msf);
+			err = ip_mc_msfilter(sk, msf, 0);
 			kfree(msf);
 			break;
 		}
@@ -670,7 +670,142 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 				omode = MCAST_INCLUDE;
 				add = 0;
 			}
-			err = ip_mc_source(add, omode, sk, &mreqs);
+			err = ip_mc_source(add, omode, sk, &mreqs, 0);
+			break;
+		}
+		case MCAST_JOIN_GROUP:
+		case MCAST_LEAVE_GROUP: 
+		{
+			struct group_req greq;
+			struct sockaddr_in *psin;
+			struct ip_mreqn mreq;
+
+			if (optlen < sizeof(struct group_req))
+				goto e_inval;
+			err = -EFAULT;
+			if(copy_from_user(&greq, optval, sizeof(greq)))
+				break;
+			psin = (struct sockaddr_in *)&greq.gr_group;
+			if (psin->sin_family != AF_INET)
+				goto e_inval;
+			memset(&mreq, 0, sizeof(mreq));
+			mreq.imr_multiaddr = psin->sin_addr;
+			mreq.imr_ifindex = greq.gr_interface;
+
+			if (optname == MCAST_JOIN_GROUP)
+				err = ip_mc_join_group(sk, &mreq);
+			else
+				err = ip_mc_leave_group(sk, &mreq);
+			break;
+		}
+		case MCAST_JOIN_SOURCE_GROUP:
+		case MCAST_LEAVE_SOURCE_GROUP:
+		case MCAST_BLOCK_SOURCE:
+		case MCAST_UNBLOCK_SOURCE:
+		{
+			struct group_source_req greqs;
+			struct ip_mreq_source mreqs;
+			struct sockaddr_in *psin;
+			int omode, add;
+
+			if (optlen != sizeof(struct group_source_req))
+				goto e_inval;
+			if (copy_from_user(&greqs, optval, sizeof(greqs))) {
+				err = -EFAULT;
+				break;
+			}
+			if (greqs.gsr_group.ss_family != AF_INET ||
+			    greqs.gsr_source.ss_family != AF_INET) {
+				err = -EADDRNOTAVAIL;
+				break;
+			}
+			psin = (struct sockaddr_in *)&greqs.gsr_group;
+			mreqs.imr_multiaddr = psin->sin_addr.s_addr;
+			psin = (struct sockaddr_in *)&greqs.gsr_source;
+			mreqs.imr_sourceaddr = psin->sin_addr.s_addr;
+			mreqs.imr_interface = 0; /* use index for mc_source */
+
+			if (optname == MCAST_BLOCK_SOURCE) {
+				omode = MCAST_EXCLUDE;
+				add = 1;
+			} else if (optname == MCAST_UNBLOCK_SOURCE) {
+				omode = MCAST_EXCLUDE;
+				add = 0;
+			} else if (optname == MCAST_JOIN_SOURCE_GROUP) {
+				struct ip_mreqn mreq;
+
+				psin = (struct sockaddr_in *)&greqs.gsr_group;
+				mreq.imr_multiaddr = psin->sin_addr;
+				mreq.imr_address.s_addr = 0;
+				mreq.imr_ifindex = greqs.gsr_interface;
+				err = ip_mc_join_group(sk, &mreq);
+				if (err)
+					break;
+				omode = MCAST_INCLUDE;
+				add = 1;
+			} else /* MCAST_LEAVE_SOURCE_GROUP */ {
+				omode = MCAST_INCLUDE;
+				add = 0;
+			}
+			err = ip_mc_source(add, omode, sk, &mreqs,
+				greqs.gsr_interface);
+			break;
+		}
+		case MCAST_MSFILTER:
+		{
+			struct sockaddr_in *psin;
+			struct ip_msfilter *msf = 0;
+			struct group_filter *gsf = 0;
+			int msize, i, ifindex;
+
+			if (optlen < GROUP_FILTER_SIZE(0))
+				goto e_inval;
+			gsf = (struct group_filter *)kmalloc(optlen,GFP_KERNEL);
+			if (gsf == 0) {
+				err = -ENOBUFS;
+				break;
+			}
+			err = -EFAULT;
+			if (copy_from_user(gsf, optval, optlen)) {
+				goto mc_msf_out;
+			}
+			if (GROUP_FILTER_SIZE(gsf->gf_numsrc) < optlen) {
+				err = EINVAL;
+				goto mc_msf_out;
+			}
+			msize = IP_MSFILTER_SIZE(gsf->gf_numsrc);
+			msf = (struct ip_msfilter *)kmalloc(msize,GFP_KERNEL);
+			if (msf == 0) {
+				err = -ENOBUFS;
+				goto mc_msf_out;
+			}
+			ifindex = gsf->gf_interface;
+			psin = (struct sockaddr_in *)&gsf->gf_group;
+			if (psin->sin_family != AF_INET) {
+				err = -EADDRNOTAVAIL;
+				goto mc_msf_out;
+			}
+			msf->imsf_multiaddr = psin->sin_addr.s_addr;
+			msf->imsf_interface = 0;
+			msf->imsf_fmode = gsf->gf_fmode;
+			msf->imsf_numsrc = gsf->gf_numsrc;
+			err = -EADDRNOTAVAIL;
+			for (i=0; i<gsf->gf_numsrc; ++i) {
+				psin = (struct sockaddr_in *)&gsf->gf_slist[i];
+
+				if (psin->sin_family != AF_INET)
+					goto mc_msf_out;
+				msf->imsf_slist[i] = psin->sin_addr.s_addr;
+			}
+			kfree(gsf);
+			gsf = 0;
+
+			err = ip_mc_msfilter(sk, msf, ifindex);
+mc_msf_out:
+			if (msf)
+				kfree(msf);
+			if (gsf)
+				kfree(gsf);
 			break;
 		}
 		case IP_ROUTER_ALERT:	
@@ -826,12 +961,34 @@ int ip_getsockopt(struct sock *sk, int level, int optname, char *optval, int *op
 			struct ip_msfilter msf;
 			int err;
 
-			if (len < IP_MSFILTER_SIZE(0))
+			if (len < IP_MSFILTER_SIZE(0)) {
+				release_sock(sk);
 				return -EINVAL;
-			if (copy_from_user(&msf, optval, IP_MSFILTER_SIZE(0)))
+			}
+			if (copy_from_user(&msf, optval, IP_MSFILTER_SIZE(0))) {
+				release_sock(sk);
 				return -EFAULT;
+			}
 			err = ip_mc_msfget(sk, &msf,
 				(struct ip_msfilter *)optval, optlen);
+			release_sock(sk);
+			return err;
+		}
+		case MCAST_MSFILTER:
+		{
+			struct group_filter gsf;
+			int err;
+
+			if (len < GROUP_FILTER_SIZE(0)) {
+				release_sock(sk);
+				return -EINVAL;
+			}
+			if (copy_from_user(&gsf, optval, GROUP_FILTER_SIZE(0))) {
+				release_sock(sk);
+				return -EFAULT;
+			}
+			err = ip_mc_gsfget(sk, &gsf,
+				(struct group_filter *)optval, optlen);
 			release_sock(sk);
 			return err;
 		}

@@ -58,7 +58,6 @@
 #include <linux/genhd.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
-#include <linux/buffer_head.h>
 
 #define _IDE_DISK
 
@@ -1743,7 +1742,6 @@ static int idedisk_release(struct inode *inode, struct file *filp)
 		memset(&args, 0, sizeof(ide_task_t));
 		args.tfRegister[IDE_COMMAND_OFFSET] = WIN_DOORUNLOCK;
 		args.command_type = ide_cmd_type_parser(&args);
-		invalidate_bdev(inode->i_bdev, 0);
 		if (drive->doorlocking && ide_raw_taskfile(drive, &args, NULL))
 			drive->doorlocking = 0;
 	}

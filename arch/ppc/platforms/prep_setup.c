@@ -976,7 +976,7 @@ mk48t59_calibrate_decr(void)
 }
 
 static unsigned int __prep
-prep_irq_cannonicalize(u_int irq)
+prep_irq_canonicalize(u_int irq)
 {
 	if (irq == 2)
 	{
@@ -1150,7 +1150,7 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.setup_arch     = prep_setup_arch;
 	ppc_md.show_percpuinfo = prep_show_percpuinfo;
 	ppc_md.show_cpuinfo   = NULL; /* set in prep_setup_arch() */
-	ppc_md.irq_cannonicalize = prep_irq_cannonicalize;
+	ppc_md.irq_canonicalize = prep_irq_canonicalize;
 	ppc_md.init_IRQ       = prep_init_IRQ;
 	/* this gets changed later on if we have an OpenPIC -- Cort */
 	ppc_md.get_irq        = i8259_irq;

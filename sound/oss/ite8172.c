@@ -640,7 +640,7 @@ static inline void dealloc_dmabuf(struct it8172_state *s, struct dmabuf *db)
 	/* undo marking the pages as reserved */
 	pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 	for (page = virt_to_page(db->rawbuf); page <= pend; page++)
-	    mem_map_unreserve(page);
+	    ClearPageReserved(page);
 	pci_free_consistent(s->dev, PAGE_SIZE << db->buforder,
 			    db->rawbuf, db->dmaaddr);
     }
@@ -670,7 +670,7 @@ static int prog_dmabuf(struct it8172_state *s, struct dmabuf *db,
 	   otherwise remap_page_range doesn't do what we want */
 	pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 	for (page = virt_to_page(db->rawbuf); page <= pend; page++)
-	    mem_map_reserve(page);
+	    SetPageReserved(page);
     }
 
     db->count = 0;

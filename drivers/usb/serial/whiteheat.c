@@ -646,8 +646,8 @@ static void whiteheat_close(struct usb_serial_port *port, struct file * filp)
 	}
 */
 
-	if (port->tty->driver.flush_buffer)
-		port->tty->driver.flush_buffer(port->tty);
+	if (port->tty->driver->flush_buffer)
+		port->tty->driver->flush_buffer(port->tty);
 	if (port->tty->ldisc.flush_buffer)
 		port->tty->ldisc.flush_buffer(port->tty);
 

@@ -539,16 +539,8 @@ tty3270_write_proc(struct file *file, const char *buffer,
 	 */
 	tubp = NULL;
 	tty = current->tty;
-	if (tty) {
-		if (tub_major(tty->device) == IBM_TTY3270_MAJOR)
-			tubp = (*tubminors)[tub_minor(tty->device)];
-#ifdef CONFIG_TN3270_CONSOLE
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
-		if (CONSOLE_IS_3270 && tty->device == S390_CONSOLE_DEV)
-			tubp = tub3270_con_tubp;
-#endif /* LINUX_VERSION_CODE */
-#endif /* CONFIG_TN3270_CONSOLE */
-	}
+	if (tty && tty->driver == &tty3270_driver)
+		tubp = (*tubminors)[tty->index];
 	if (tubp) {
 		if ((rc = tty3270_aid_set(tubp, mybuf, mycount + 1)))
 			return rc > 0? count: rc;

@@ -35,7 +35,6 @@
 #include <pcmcia/cistpl.h>
 #include <pcmcia/cisreg.h>
 #include <pcmcia/ds.h>
-#include <pcmcia/bus_ops.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>

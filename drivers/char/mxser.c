@@ -94,7 +94,7 @@
 #define 	UART_MCR_AFE		0x20
 #define 	UART_LSR_SPECIAL	0x1E
 
-#define PORTNO(x)		(minor((x)->device) - (x)->driver.minor_start)
+#define PORTNO(x)		((x)->index)
 
 #define RELEVANT_IFLAG(iflag)	(iflag & (IGNBRK|BRKINT|IGNPAR|PARMRK|INPCK))
 
@@ -758,7 +758,7 @@ static int mxser_open(struct tty_struct *tty, struct file *filp)
 		return (retval);
 
 	if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = info->normal_termios;
 		else
 			*tty->termios = info->callout_termios;
@@ -862,8 +862,8 @@ static void mxser_close(struct tty_struct *tty, struct file *filp)
 		}
 	}
 	mxser_shutdown(info);
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
@@ -1574,7 +1574,7 @@ static int mxser_block_til_ready(struct tty_struct *tty, struct file *filp,
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 		if (info->flags & ASYNC_NORMAL_ACTIVE)
 			return (-EBUSY);
 		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&

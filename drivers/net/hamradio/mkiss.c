@@ -384,7 +384,7 @@ static void ax_encaps(struct ax_disp *ax, unsigned char *icp, int len)
 			 break;
 		}
 		ax->tty->flags |= (1 << TTY_DO_WRITE_WAKEUP);
-		actual = ax->tty->driver.write(ax->tty, 0, ax->xbuff, count);
+		actual = ax->tty->driver->write(ax->tty, 0, ax->xbuff, count);
 		ax->tx_packets++;
 		ax->dev->trans_start = jiffies;
 		ax->xleft = count - actual;
@@ -392,7 +392,7 @@ static void ax_encaps(struct ax_disp *ax, unsigned char *icp, int len)
 	} else {
 		count = kiss_esc(p, (unsigned char *) ax->mkiss->xbuff, len);
 		ax->mkiss->tty->flags |= (1 << TTY_DO_WRITE_WAKEUP);
-		actual = ax->mkiss->tty->driver.write(ax->mkiss->tty, 0, ax->mkiss->xbuff, count);
+		actual = ax->mkiss->tty->driver->write(ax->mkiss->tty, 0, ax->mkiss->xbuff, count);
 		ax->tx_packets++;
 		ax->mkiss->dev->trans_start = jiffies;
 		ax->mkiss->xleft = count - actual;
@@ -429,7 +429,7 @@ static void ax25_write_wakeup(struct tty_struct *tty)
 		return;
 	}
 
-	actual = tty->driver.write(tty, 0, ax->xhead, ax->xleft);
+	actual = tty->driver->write(tty, 0, ax->xhead, ax->xleft);
 	ax->xleft -= actual;
 	ax->xhead += actual;
 }
@@ -475,7 +475,7 @@ static int ax_xmit(struct sk_buff *skb, struct net_device *dev)
 		}
 
 		printk(KERN_ERR "mkiss: %s: transmit timed out, %s?\n", dev->name,
-		       (ax->tty->driver.chars_in_buffer(ax->tty) || ax->xleft) ?
+		       (ax->tty->driver->chars_in_buffer(ax->tty) || ax->xleft) ?
 		       "bad line quality" : "driver error");
 
 		ax->xleft = 0;
@@ -643,8 +643,8 @@ static int ax25_open(struct tty_struct *tty)
 	ax->mkiss = NULL;
 	tmp_ax    = NULL;
 
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 

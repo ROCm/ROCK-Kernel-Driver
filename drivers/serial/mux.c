@@ -456,7 +456,7 @@ static int __init mux_probe(struct parisc_device *dev)
 
 		card->drv.owner = THIS_MODULE;
 		card->drv.driver_name = "ttyB";
-		card->drv.dev_name = "ttyB%d";
+		card->drv.dev_name = "ttyB";
 		card->drv.major = MUX_MAJOR;
 		card->drv.minor = port_cnt;
 		card->drv.nr = UART_NR;

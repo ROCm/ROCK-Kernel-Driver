@@ -101,7 +101,7 @@ acpi_rs_irq_resource (
 	 * Point to the 16-bits of Bytes 1 and 2
 	 */
 	buffer += 1;
-	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+	ACPI_MOVE_16_TO_16 (&temp16, buffer);
 
 	output_struct->data.irq.number_of_interrupts = 0;
 
@@ -242,7 +242,7 @@ acpi_rs_irq_stream (
 		temp16 |= 0x1 << temp8;
 	}
 
-	ACPI_MOVE_UNALIGNED16_TO_16 (buffer, &temp16);
+	ACPI_MOVE_16_TO_16 (buffer, &temp16);
 	buffer += 2;
 
 	/*
@@ -317,7 +317,7 @@ acpi_rs_extended_irq_resource (
 	 * Point past the Descriptor to get the number of bytes consumed
 	 */
 	buffer += 1;
-	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+	ACPI_MOVE_16_TO_16 (&temp16, buffer);
 
 	*bytes_consumed = temp16 + 3;
 	output_struct->id = ACPI_RSTYPE_EXT_IRQ;
@@ -374,7 +374,7 @@ acpi_rs_extended_irq_resource (
 	 * Cycle through every IRQ in the table
 	 */
 	for (index = 0; index < temp8; index++) {
-		ACPI_MOVE_UNALIGNED32_TO_32 (
+		ACPI_MOVE_32_TO_32 (
 			&output_struct->data.extended_irq.interrupts[index], buffer);
 
 		/* Point to the next IRQ */
@@ -533,7 +533,7 @@ acpi_rs_extended_irq_stream (
 
 	for (index = 0; index < linked_list->data.extended_irq.number_of_interrupts;
 		 index++) {
-		ACPI_MOVE_UNALIGNED32_TO_32 (buffer,
+		ACPI_MOVE_32_TO_32 (buffer,
 				  &linked_list->data.extended_irq.interrupts[index]);
 		buffer += 4;
 	}
@@ -557,7 +557,7 @@ acpi_rs_extended_irq_stream (
 		 * Buffer needs to be set to the length of the sting + one for the
 		 * terminating null
 		 */
-		buffer += (ACPI_STRLEN (linked_list->data.extended_irq.resource_source.string_ptr) + 1);
+		buffer += (acpi_size)(ACPI_STRLEN (linked_list->data.extended_irq.resource_source.string_ptr) + 1);
 	}
 
 	/*

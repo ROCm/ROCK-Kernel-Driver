@@ -3698,7 +3698,7 @@ static int wanpipe_tty_open(struct tty_struct *tty, struct file * filp)
 	
 	if (!tty->driver_data){
 		int port;
-		port = minor(tty->device) - tty->driver.minor_start;
+		port = tty->index;
 		if ((port < 0) || (port >= NR_PORTS)) 
 			return -ENODEV;
 		

@@ -59,7 +59,7 @@ extern struct rt6_info		*rt6_lookup(struct in6_addr *daddr,
 					    struct in6_addr *saddr,
 					    int oif, int flags);
 
-extern struct rt6_info		*ndisc_get_dummy_rt(void);
+extern struct rt6_info		*ip6_dst_alloc(void);
 
 /*
  *	support functions for ND

@@ -161,7 +161,7 @@ void mask_irq(int irq)
 
 	DBG_IRQ(irq, ("mask_irq(%d) %d+%d eiem 0x%lx\n", irq,
 				IRQ_REGION(irq), IRQ_OFFSET(irq), cpu_eiem));
-	irq = irq_cannonicalize(irq);
+	irq = irq_canonicalize(irq);
 	region = irq_region[IRQ_REGION(irq)];
 	if (region->ops.mask_irq)
 		region->ops.mask_irq(region->data.dev, IRQ_OFFSET(irq));
@@ -173,7 +173,7 @@ void unmask_irq(int irq)
 
 	DBG_IRQ(irq, ("unmask_irq(%d) %d+%d eiem 0x%lx\n", irq,
 				IRQ_REGION(irq), IRQ_OFFSET(irq), cpu_eiem));
-	irq = irq_cannonicalize(irq);
+	irq = irq_canonicalize(irq);
 	region = irq_region[IRQ_REGION(irq)];
 	if (region->ops.unmask_irq)
 		region->ops.unmask_irq(region->data.dev, IRQ_OFFSET(irq));
@@ -185,7 +185,7 @@ void disable_irq(int irq)
 
 	DBG_IRQ(irq, ("disable_irq(%d) %d+%d eiem 0x%lx\n", irq,
 				IRQ_REGION(irq), IRQ_OFFSET(irq), cpu_eiem));
-	irq = irq_cannonicalize(irq);
+	irq = irq_canonicalize(irq);
 	region = irq_region[IRQ_REGION(irq)];
 	if (region->ops.disable_irq)
 		region->ops.disable_irq(region->data.dev, IRQ_OFFSET(irq));
@@ -199,7 +199,7 @@ void enable_irq(int irq)
 
 	DBG_IRQ(irq, ("enable_irq(%d) %d+%d eiem 0x%lx\n", irq,
 				IRQ_REGION(irq), IRQ_OFFSET(irq), cpu_eiem));
-	irq = irq_cannonicalize(irq);
+	irq = irq_canonicalize(irq);
 	region = irq_region[IRQ_REGION(irq)];
 
 	if (region->ops.enable_irq)
@@ -594,7 +594,7 @@ int request_irq(unsigned int irq,
 	printk(KERN_INFO "request_irq(%d, %p, 0x%lx, %s, %p)\n",irq, handler, irqflags, devname, dev_id);
 #endif
 
-	irq = irq_cannonicalize(irq);
+	irq = irq_canonicalize(irq);
 	/* request_irq()/free_irq() may not be called from interrupt context. */
 	if (in_interrupt())
 		BUG();
@@ -654,7 +654,7 @@ void free_irq(unsigned int irq, void *dev_id)
 	struct irqaction *action, **p;
 
 	/* See comments in request_irq() about interrupt context */
-	irq = irq_cannonicalize(irq);
+	irq = irq_canonicalize(irq);
 	
 	if (in_interrupt()) BUG();
 

@@ -27,8 +27,8 @@ extern devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
 				      umode_t mode, void *ops, void *info);
 extern int devfs_mk_bdev(dev_t dev, umode_t mode, const char *fmt, ...)
 	__attribute__((format (printf, 3, 4)));
-extern int devfs_mk_symlink (const char *name, const char *link);
-extern devfs_handle_t devfs_mk_dir(const char *fmt, ...)
+extern int devfs_mk_symlink(const char *name, const char *link);
+extern int devfs_mk_dir(const char *fmt, ...)
 	__attribute__((format (printf, 1, 2)));
 extern void devfs_remove(const char *fmt, ...)
 	__attribute__((format (printf, 1, 2)));
@@ -55,9 +55,9 @@ static inline int devfs_mk_symlink (const char *name, const char *link)
 {
     return 0;
 }
-static inline devfs_handle_t devfs_mk_dir(const char *fmt, ...)
+static inline int devfs_mk_dir(const char *fmt, ...)
 {
-    return NULL;
+	return 0;
 }
 static inline void devfs_remove(const char *fmt, ...)
 {

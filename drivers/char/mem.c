@@ -22,6 +22,7 @@
 #include <linux/tty.h>
 #include <linux/capability.h>
 #include <linux/smp_lock.h>
+#include <linux/devfs_fs_kernel.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>

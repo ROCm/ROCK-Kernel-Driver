@@ -145,7 +145,7 @@ static void __init pdev_cookie_fillin(struct pci_pbm_info *pbm,
 		 * there must be a damn good reason for it.
 		 *
 		 * So what we do is delete the device from the
-		 * PCI device tree completely.  This scenerio
+		 * PCI device tree completely.  This scenario
 		 * is seen, for example, on CP1500 for the
 		 * second EBUS/HappyMeal pair if the external
 		 * connector for it is not present.

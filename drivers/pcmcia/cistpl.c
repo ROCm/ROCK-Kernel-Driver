@@ -269,8 +269,8 @@ void write_cis_mem(socket_info_t *s, int attr, u_int addr,
 static void read_cis_cache(socket_info_t *s, int attr, u_int addr,
 			   u_int len, void *ptr)
 {
-    int i, ret;
-    char *caddr;
+    struct cis_cache_entry *cis;
+    int ret;
 
     if (s->fake_cis) {
 	if (s->fake_cis_len > addr+len)
@@ -279,32 +279,55 @@ static void read_cis_cache(socket_info_t *s, int attr, u_int addr,
 	    memset(ptr, 0xff, len);
 	return;
     }
-    caddr = s->cis_cache;
-    for (i = 0; i < s->cis_used; i++) {
-	if ((s->cis_table[i].addr == addr) &&
-	    (s->cis_table[i].len == len) &&
-	    (s->cis_table[i].attr == attr)) break;
-	caddr += s->cis_table[i].len;
+
+    list_for_each_entry(cis, &s->cis_cache, node) {
+	if (cis->addr == addr && cis->len == len && cis->attr == attr) {
+	    memcpy(ptr, cis->cache, len);
+	    return;
+	}
     }
-    if (i < s->cis_used) {
-	memcpy(ptr, caddr, len);
-	return;
-    }
+
 #ifdef CONFIG_CARDBUS
     if (s->state & SOCKET_CARDBUS)
 	ret = read_cb_mem(s, attr, addr, len, ptr);
     else
 #endif
 	ret = read_cis_mem(s, attr, addr, len, ptr);
-    /* Copy data into the cache, if there is room */
-    if ((ret == 0) && (i < MAX_CIS_TABLE) &&
-	(caddr+len < s->cis_cache+MAX_CIS_DATA)) {
-	s->cis_table[i].addr = addr;
-	s->cis_table[i].len = len;
-	s->cis_table[i].attr = attr;
-	s->cis_used++;
-	memcpy(caddr, ptr, len);
-    }	    
+
+    /* Copy data into the cache */
+    cis = kmalloc(sizeof(struct cis_cache_entry) + len, GFP_KERNEL);
+    if (cis) {
+	cis->addr = addr;
+	cis->len = len;
+	cis->attr = attr;
+	memcpy(cis->cache, ptr, len);
+	list_add(&cis->node, &s->cis_cache);
+    }
+}
+
+static void
+remove_cis_cache(socket_info_t *s, int attr, u_int addr, u_int len)
+{
+	struct cis_cache_entry *cis;
+
+	list_for_each_entry(cis, &s->cis_cache, node)
+		if (cis->addr == addr && cis->len == len && cis->attr == attr) {
+			list_del(&cis->node);
+			kfree(cis);
+			break;
+		}
+}
+
+void destroy_cis_cache(socket_info_t *s)
+{
+	struct list_head *l, *n;
+
+	list_for_each_safe(l, n, &s->cis_cache) {
+		struct cis_cache_entry *cis = list_entry(l, struct cis_cache_entry, node);
+
+		list_del(&cis->node);
+		kfree(cis);
+	}
 }
 
 /*======================================================================
@@ -316,24 +339,25 @@ static void read_cis_cache(socket_info_t *s, int attr, u_int addr,
 
 int verify_cis_cache(socket_info_t *s)
 {
-    char buf[256], *caddr;
-    int i;
-    
-    caddr = s->cis_cache;
-    for (i = 0; i < s->cis_used; i++) {
+	struct cis_cache_entry *cis;
+	char buf[256];
+
+	list_for_each_entry(cis, &s->cis_cache, node) {
+		int len = cis->len;
+
+		if (len > 256)
+			len = 256;
 #ifdef CONFIG_CARDBUS
-	if (s->state & SOCKET_CARDBUS)
-	    read_cb_mem(s, s->cis_table[i].attr, s->cis_table[i].addr,
-			s->cis_table[i].len, buf);
-	else
+		if (s->state & SOCKET_CARDBUS)
+			read_cb_mem(s, cis->attr, cis->addr, len, buf);
+		else
 #endif
-	    read_cis_mem(s, s->cis_table[i].attr, s->cis_table[i].addr,
-			 s->cis_table[i].len, buf);
-	if (memcmp(buf, caddr, s->cis_table[i].len) != 0)
-	    break;
-	caddr += s->cis_table[i].len;
-    }
-    return (i < s->cis_used);
+			read_cis_mem(s, cis->attr, cis->addr, len, buf);
+
+		if (memcmp(buf, cis->cache, len) != 0)
+			return -1;
+	}
+	return 0;
 }
 
 /*======================================================================
@@ -449,14 +473,16 @@ static int follow_link(socket_info_t *s, tuple_t *tuple)
 	if ((link[0] == CISTPL_LINKTARGET) && (link[1] >= 3) &&
 	    (strncmp(link+2, "CIS", 3) == 0))
 	    return ofs;
+	remove_cis_cache(s, SPACE(tuple->Flags), ofs, 5);
 	/* Then, we try the wrong spot... */
 	ofs = ofs >> 1;
     }
     read_cis_cache(s, SPACE(tuple->Flags), ofs, 5, link);
-    if ((link[0] != CISTPL_LINKTARGET) || (link[1] < 3) ||
-	(strncmp(link+2, "CIS", 3) != 0))
-	return -1;
-    return ofs;
+    if ((link[0] == CISTPL_LINKTARGET) && (link[1] >= 3) &&
+	(strncmp(link+2, "CIS", 3) == 0))
+	return ofs;
+    remove_cis_cache(s, SPACE(tuple->Flags), ofs, 5);
+    return -1;
 }
 
 int pcmcia_get_next_tuple(client_handle_t handle, tuple_t *tuple)

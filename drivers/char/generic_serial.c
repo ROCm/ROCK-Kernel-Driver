@@ -112,7 +112,7 @@ int gs_write(struct tty_struct * tty, int from_user,
 
 	if (!tty) return 0;
 
-	port = tty->driver;
+	port = tty->driver_data;
 
 	if (!port) return 0;
 
@@ -622,7 +622,7 @@ int gs_block_til_ready(void *port_, struct file * filp)
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver.subtype == GS_TYPE_CALLOUT) {
+	if (tty->driver->subtype == GS_TYPE_CALLOUT) {
 		if (port->flags & ASYNC_NORMAL_ACTIVE)
 			return -EBUSY;
 		if ((port->flags & ASYNC_CALLOUT_ACTIVE) &&
@@ -794,8 +794,8 @@ void gs_close(struct tty_struct * tty, struct file * filp)
 
 	port->flags &= ~GS_ACTIVE;
 
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;

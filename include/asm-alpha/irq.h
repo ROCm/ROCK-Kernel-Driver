@@ -64,7 +64,7 @@
 # define NR_IRQS	16
 #endif
 
-static __inline__ int irq_cannonicalize(int irq)
+static __inline__ int irq_canonicalize(int irq)
 {
 	/*
 	 * XXX is this true for all Alpha's?  The old serial driver

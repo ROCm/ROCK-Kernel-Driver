@@ -67,7 +67,7 @@ lopec_show_cpuinfo(struct seq_file *m)
 }
 
 static u32
-lopec_irq_cannonicalize(u32 irq)
+lopec_irq_canonicalize(u32 irq)
 {
 	if (irq == 2)
 		return 9;
@@ -360,7 +360,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.setup_arch = lopec_setup_arch;
 	ppc_md.show_cpuinfo = lopec_show_cpuinfo;
-	ppc_md.irq_cannonicalize = lopec_irq_cannonicalize;
+	ppc_md.irq_canonicalize = lopec_irq_canonicalize;
 	ppc_md.init_IRQ = lopec_init_IRQ;
 	ppc_md.get_irq = openpic_get_irq;
 

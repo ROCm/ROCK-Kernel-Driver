@@ -1089,7 +1089,7 @@ void kbd_keycode(unsigned int keycode, int down, struct pt_regs *regs)
 		clear_bit(keycode, key_down);
 
 	if (rep && (!vc_kbd_mode(kbd, VC_REPEAT) || (tty && 
-		(!L_ECHO(tty) && tty->driver.chars_in_buffer(tty))))) {
+		(!L_ECHO(tty) && tty->driver->chars_in_buffer(tty))))) {
 		/*
 		 * Don't repeat a key if the input buffers are not empty and the
 		 * characters get aren't echoed locally. This makes key repeat 

@@ -941,7 +941,7 @@ static int alloc_dmabuf(struct i810_state *state)
 	/* now mark the pages as reserved; otherwise remap_page_range doesn't do what we want */
 	pend = virt_to_page(rawbuf + (PAGE_SIZE << order) - 1);
 	for (page = virt_to_page(rawbuf); page <= pend; page++)
-		mem_map_reserve(page);
+		SetPageReserved(page);
 
 	return 0;
 }
@@ -956,7 +956,7 @@ static void dealloc_dmabuf(struct i810_state *state)
 		/* undo marking the pages as reserved */
 		pend = virt_to_page(dmabuf->rawbuf + (PAGE_SIZE << dmabuf->buforder) - 1);
 		for (page = virt_to_page(dmabuf->rawbuf); page <= pend; page++)
-			mem_map_unreserve(page);
+			ClearPageReserved(page);
 		pci_free_consistent(state->card->pci_dev, PAGE_SIZE << dmabuf->buforder,
 				    dmabuf->rawbuf, dmabuf->dma_handle);
 	}

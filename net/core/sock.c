@@ -589,8 +589,10 @@ static kmem_cache_t *sk_cachep;
  */
 struct sock *sk_alloc(int family, int priority, int zero_it, kmem_cache_t *slab)
 {
-	struct sock *sk;
-       
+	struct sock *sk = NULL;
+
+	if (!net_family_get(family))
+		goto out;
 	if (!slab)
 		slab = sk_cachep;
 	sk = kmem_cache_alloc(slab, priority);
@@ -602,14 +604,16 @@ struct sock *sk_alloc(int family, int priority, int zero_it, kmem_cache_t *slab)
 			sock_lock_init(sk);
 		}
 		sk->slab = slab;
-	}
-
+	} else
+		net_family_put(family);
+out:
 	return sk;
 }
 
 void sk_free(struct sock *sk)
 {
 	struct sk_filter *filter;
+	const int family = sk->family;
 
 	if (sk->destruct)
 		sk->destruct(sk);
@@ -624,6 +628,7 @@ void sk_free(struct sock *sk)
 		printk(KERN_DEBUG "sk_free: optmem leakage (%d bytes) detected.\n", atomic_read(&sk->omem_alloc));
 
 	kmem_cache_free(sk->slab, sk);
+	net_family_put(family);
 }
 
 void __init sk_init(void)
@@ -768,8 +773,13 @@ struct sk_buff *sock_alloc_send_pskb(struct sock *sk, unsigned long header_len,
 				     unsigned long data_len, int noblock, int *errcode)
 {
 	struct sk_buff *skb;
+	unsigned int gfp_mask;
 	long timeo;
 	int err;
+
+	gfp_mask = sk->allocation;
+	if (gfp_mask & __GFP_WAIT)
+		gfp_mask |= __GFP_REPEAT;
 
 	timeo = sock_sndtimeo(sk, noblock);
 	while (1) {
