@@ -15,8 +15,8 @@ ACPI_MODULE_NAME		("scan")
 #define STRUCT_TO_INT(s)	(*((int*)&s))
 
 extern struct acpi_device		*acpi_root;
-extern struct acpi_device 		*fixed_pwr_button;
-extern struct acpi_device 		*fixed_sleep_button;
+struct acpi_device 		*acpi_fixed_pwr_button;
+struct acpi_device 		*acpi_fixed_sleep_button;
 
 
 #define ACPI_BUS_CLASS			"system_bus"
@@ -902,12 +902,11 @@ acpi_bus_scan_fixed (
 	struct acpi_device	*root)
 {
 	int			result = 0;
-	struct acpi_device	*device = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_bus_scan_fixed");
 
-	fixed_pwr_button = NULL;
-	fixed_sleep_button = NULL;
+	acpi_fixed_pwr_button = NULL;
+	acpi_fixed_sleep_button = NULL;
 
 
 	if (!root)
@@ -917,11 +916,11 @@ acpi_bus_scan_fixed (
 	 * Enumerate all fixed-feature devices.
 	 */
 	if (acpi_fadt.pwr_button == 0)
-		result = acpi_bus_add(&fixed_pwr_button, acpi_root, 
+		result = acpi_bus_add(&acpi_fixed_pwr_button, acpi_root, 
 			NULL, ACPI_BUS_TYPE_POWER_BUTTON);
 
 	if (acpi_fadt.sleep_button == 0)
-		result = acpi_bus_add(&fixed_sleep_button, acpi_root, 
+		result = acpi_bus_add(&acpi_fixed_sleep_button, acpi_root, 
 			NULL, ACPI_BUS_TYPE_SLEEP_BUTTON);
 
 	return_VALUE(result);
