@@ -89,7 +89,6 @@
  * @write_wait: a wait_queue_head_t used by the port.
  * @work: work queue entry for the line discipline waking up.
  * @open_count: number of times this port has been opened.
- * @sem: struct semaphore used to lock this structure.
  *
  * This structure is used by the usb-serial core and drivers for the specific
  * ports of a device.
@@ -116,7 +115,6 @@ struct usb_serial_port {
 	wait_queue_head_t	write_wait;
 	struct work_struct	work;
 	int			open_count;
-	struct semaphore	sem;
 	struct device		dev;
 };
 #define to_usb_serial_port(d) container_of(d, struct usb_serial_port, dev)
@@ -164,8 +162,10 @@ struct usb_serial {
 	__u16				vendor;
 	__u16				product;
 	struct usb_serial_port		port[MAX_NUM_PORTS];
+	struct kobject			kobj;
 	void *				private;
 };
+#define to_usb_serial(d) container_of(d, struct usb_serial, kobj)
 
 #define NUM_DONT_CARE	(-1)
 
