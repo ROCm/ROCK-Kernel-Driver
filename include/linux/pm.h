@@ -186,8 +186,30 @@ static inline void pm_dev_idle(struct pm_dev *dev) {}
 
 #endif /* CONFIG_PM */
 
+
+/*
+ * Callbacks for platform drivers to implement.
+ */
 extern void (*pm_idle)(void);
 extern void (*pm_power_off)(void);
+
+enum {
+	PM_SUSPEND_ON,
+	PM_SUSPEND_STANDBY,
+	PM_SUSPEND_MEM,
+	PM_SUSPEND_DISK,
+	PM_SUSPEND_MAX,
+};
+
+extern int (*pm_power_down)(u32 state);
+
+
+extern int pm_suspend(u32 state);
+
+
+/*
+ * Device power management
+ */
 
 struct device;
 
