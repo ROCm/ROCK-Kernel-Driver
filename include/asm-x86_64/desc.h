@@ -118,6 +118,7 @@ static inline void set_tssldt_descriptor(void *ptr, unsigned long tss, unsigned 
 	d.base1 = PTR_MIDDLE(tss) & 0xFF; 
 	d.type = type;
 	d.p = 1; 
+	d.g = 1;
 	d.limit1 = (size >> 16) & 0xF;
 	d.base2 = (PTR_MIDDLE(tss) >> 8) & 0xFF; 
 	d.base3 = PTR_HIGH(tss); 

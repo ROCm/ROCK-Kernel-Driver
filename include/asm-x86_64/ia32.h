@@ -100,8 +100,11 @@ typedef struct siginfo32 {
 
 		/* POSIX.1b timers */
 		struct {
-			unsigned int _timer1;
-			unsigned int _timer2;
+			int _tid;		/* timer id */
+			int _overrun;		/* overrun count */
+			sigval_t32 _sigval;	/* same as below */
+			int _sys_private;	/* not to be passed to user */
+			int _overrun_incr;	/* amount to add to overrun */
 		} _timer;
 
 		/* POSIX.1b signals */
@@ -164,9 +167,12 @@ struct ustat32 {
 
 #ifdef __KERNEL__
 struct user_desc;
+struct siginfo_t;
 int do_get_thread_area(struct thread_struct *t, struct user_desc *u_info);
 int do_set_thread_area(struct thread_struct *t, struct user_desc *u_info);
 int ia32_child_tls(struct task_struct *p, struct pt_regs *childregs);
+int ia32_copy_siginfo_from_user(siginfo_t *to, siginfo_t32 __user *from);
+int ia32_copy_siginfo_to_user(siginfo_t32 __user *to, siginfo_t *from);
 #endif
 
 #endif /* !CONFIG_IA32_SUPPORT */

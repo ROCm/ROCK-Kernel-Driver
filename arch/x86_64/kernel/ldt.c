@@ -107,7 +107,6 @@ int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 		retval = copy_ldt(&mm->context, &old_mm->context);
 		up(&old_mm->context.sem);
 	}
-	rwlock_init(&mm->context.ldtlock);
 	return retval;
 }
 
@@ -216,10 +215,8 @@ static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
 
 	/* Install the new entry ...  */
 install:
-	write_lock(&mm->context.ldtlock); 
 	*lp	= entry_1;
 	*(lp+1)	= entry_2;
-	write_unlock(&mm->context.ldtlock);
 	error = 0;
 
 out_unlock:

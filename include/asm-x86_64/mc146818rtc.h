@@ -24,11 +24,6 @@ outb_p((addr),RTC_PORT(0)); \
 outb_p((val),RTC_PORT(1)); \
 })
 
-#ifndef CONFIG_HPET_TIMER
 #define RTC_IRQ 8
-#else
-/* Temporary workaround due to IRQ routing problem. */
-#define RTC_IRQ 0
-#endif
 
 #endif /* _ASM_MC146818RTC_H */

@@ -33,18 +33,28 @@
 
 	.macro SAVE_ARGS addskip=0,norcx=0 	
 	subq  $9*8+\addskip,%rsp
+	CFI_ADJUST_CFA_OFFSET	9*8+\addskip
 	movq  %rdi,8*8(%rsp) 
+	CFI_OFFSET	rdi,8*8-(9*8+\addskip)
 	movq  %rsi,7*8(%rsp) 
+	CFI_OFFSET	rsi,7*8-(9*8+\addskip)
 	movq  %rdx,6*8(%rsp)
+	CFI_OFFSET	rdx,6*8-(9*8+\addskip)
 	.if \norcx
 	.else
 	movq  %rcx,5*8(%rsp)
+	CFI_OFFSET	rcx,5*8-(9*8+\addskip)
 	.endif
 	movq  %rax,4*8(%rsp) 
+	CFI_OFFSET	rax,4*8-(9*8+\addskip)
 	movq  %r8,3*8(%rsp) 
+	CFI_OFFSET	r8,3*8-(9*8+\addskip)
 	movq  %r9,2*8(%rsp) 
+	CFI_OFFSET	r9,2*8-(9*8+\addskip)
 	movq  %r10,1*8(%rsp) 
+	CFI_OFFSET	r10,1*8-(9*8+\addskip)
 	movq  %r11,(%rsp) 
+	CFI_OFFSET	r11,-(9*8+\addskip)
 	.endm
 
 #define ARG_SKIP 9*8
@@ -69,6 +79,7 @@
 	movq 8*8(%rsp),%rdi
 	.if ARG_SKIP+\addskip > 0
 	addq $ARG_SKIP+\addskip,%rsp
+	CFI_ADJUST_CFA_OFFSET	-(ARG_SKIP+\addskip)
 	.endif
 	.endm	
 
@@ -87,12 +98,19 @@
 #define REST_SKIP 6*8			
 	.macro SAVE_REST
 	subq $REST_SKIP,%rsp
+	CFI_ADJUST_CFA_OFFSET	REST_SKIP
 	movq %rbx,5*8(%rsp) 
+	CFI_OFFSET	rbx,5*8-(REST_SKIP)
 	movq %rbp,4*8(%rsp) 
+	CFI_OFFSET	rbp,4*8-(REST_SKIP)
 	movq %r12,3*8(%rsp) 
+	CFI_OFFSET	r12,3*8-(REST_SKIP)
 	movq %r13,2*8(%rsp) 
+	CFI_OFFSET	r13,2*8-(REST_SKIP)
 	movq %r14,1*8(%rsp) 
+	CFI_OFFSET	r14,1*8-(REST_SKIP)
 	movq %r15,(%rsp) 
+	CFI_OFFSET	r15,0*8-(REST_SKIP)
 	.endm		
 
 	.macro RESTORE_REST
@@ -103,6 +121,7 @@
 	movq 4*8(%rsp),%rbp
 	movq 5*8(%rsp),%rbx
 	addq $REST_SKIP,%rsp
+	CFI_ADJUST_CFA_OFFSET	-(REST_SKIP)
 	.endm
 		
 	.macro SAVE_ALL
