@@ -630,18 +630,14 @@ int __init scc_enet_init(void)
 
 	bd = (bd_t *)__res;
 
-	/* Allocate some private information.
-	*/
-	cep = (struct scc_enet_private *)kmalloc(sizeof(*cep), GFP_KERNEL);
-	if (cep == NULL)
-		return -ENOMEM;
-
-	__clear_user(cep,sizeof(*cep));
-	spin_lock_init(&cep->lock);
-
 	/* Create an Ethernet device instance.
 	*/
-	dev = init_etherdev(0, 0);
+	dev = alloc_etherdev(sizeof(*cep));
+	if (!dev)
+		return -ENOMEM;
+
+	cep = dev->priv;
+	spin_lock_init(&cep->lock);
 
 	/* Get pointer to SCC area in parameter RAM.
 	*/
@@ -771,6 +767,7 @@ int __init scc_enet_init(void)
 		/* Allocate a page.
 		*/
 		mem_addr = __get_free_page(GFP_KERNEL);
+		/* BUG: no check for failure */
 
 		/* Initialize the BD for every fragment in the page.
 		*/
@@ -808,6 +805,7 @@ int __init scc_enet_init(void)
 	/* Install our interrupt handler.
 	*/
 	request_irq(SIU_INT_ENET, scc_enet_interrupt, 0, "enet", dev);
+	/* BUG: no check for failure */
 
 	/* Set GSMR_H to enable all normal operating modes.
 	 * Set GSMR_L to enable Ethernet to MC68160.
@@ -837,7 +835,6 @@ int __init scc_enet_init(void)
 	io->iop_pdatc |= PC_EST8260_ENET_NOTFD;
 
 	dev->base_addr = (unsigned long)ep;
-	dev->priv = cep;
 
 	/* The CPM Ethernet specific entries in the device structure. */
 	dev->open = scc_enet_open;
@@ -851,6 +848,12 @@ int __init scc_enet_init(void)
 	/* And last, enable the transmit and receive processing.
 	*/
 	sccp->scc_gsmrl |= (SCC_GSMRL_ENR | SCC_GSMRL_ENT);
+
+	err = register_netdev(dev);
+	if (err) {
+		kfree(dev);
+		return err;
+	}
 
 	printk("%s: SCC ENET Version 0.1, ", dev->name);
 	for (i=0; i<5; i++)
