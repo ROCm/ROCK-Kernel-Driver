@@ -287,6 +287,7 @@ struct signal_struct {
 	int leader;
 
 	struct tty_struct *tty; /* NULL if no tty */
+#define HAS_TTY_STRUCT_IN_SIGNAL_STRUCT 42
 };
 
 /*
