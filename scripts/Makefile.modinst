@@ -4,14 +4,10 @@
 
 src := $(obj)
 
-no-rules.make := 1
-
 .PHONY: modules_install
 modules_install:
 
 include .config
-
-#$(warning $(CONFIG_X86))
 
 include $(obj)/Makefile
 

@@ -4,8 +4,6 @@
 
 src := $(obj)
 
-no-rules.make := 1
-
 .PHONY: __build
 __build:
 
@@ -16,8 +14,6 @@ include $(obj)/Makefile
 # Standard vars
 
 comma   := ,
-empty   :=
-space   := $(empty) $(empty)
 
 # bug traps
 # ===========================================================================
@@ -37,7 +33,7 @@ $(warning kbuild: $(obj)/Makefile - list-multi := $(list-multi) is obsolete in 2
 endif
 
 ifndef obj
-$(warning kbuild: Rules.make is included improperly)
+$(warning kbuild: Makefile.build is included improperly)
 endif
 
 # Figure out what we need to build from the various variables
@@ -59,17 +55,12 @@ __subdir-y	:= $(patsubst %/,%,$(filter %/, $(obj-y)))
 subdir-y	+= $(__subdir-y)
 __subdir-m	:= $(patsubst %/,%,$(filter %/, $(obj-m)))
 subdir-m	+= $(__subdir-m)
-__subdir-n	:= $(patsubst %/,%,$(filter %/, $(obj-n)))
-subdir-n	+= $(__subdir-n)
-__subdir-	:= $(patsubst %/,%,$(filter %/, $(obj-)))
-subdir-		+= $(__subdir-)
 obj-y		:= $(patsubst %/, %/built-in.o, $(obj-y))
 obj-m		:= $(filter-out %/, $(obj-m))
 
 # Subdirectories we need to descend into
 
 subdir-ym	:= $(sort $(subdir-y) $(subdir-m))
-subdir-ymn      := $(sort $(subdir-ym) $(subdir-n) $(subdir-))
 
 # export.o is never a composite object, since $(export-objs) has a
 # fixed meaning (== objects which EXPORT_SYMBOL())
@@ -114,8 +105,6 @@ multi-used-m	:= $(addprefix $(obj)/,$(multi-used-m))
 multi-objs-y	:= $(addprefix $(obj)/,$(multi-objs-y))
 multi-objs-m	:= $(addprefix $(obj)/,$(multi-objs-m))
 subdir-ym	:= $(addprefix $(obj)/,$(subdir-ym))
-subdir-ymn	:= $(addprefix $(obj)/,$(subdir-ymn))
-clean-files	:= $(addprefix $(obj)/,$(clean-files))
 host-progs	:= $(addprefix $(obj)/,$(host-progs))
 host-progs-single     := $(addprefix $(obj)/,$(host-progs-single))
 host-progs-multi      := $(addprefix $(obj)/,$(host-progs-multi))

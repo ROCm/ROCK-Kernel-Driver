@@ -4,14 +4,16 @@
 
 src := $(obj)
 
-no-rules.make := 1
-
 .PHONY: modver
 modver:
 
 include .config
 
 include $(obj)/Makefile
+
+# Standard vars
+
+comma   := ,
 
 # Figure out what we need to build from the various variables
 # ===========================================================================
@@ -32,31 +34,11 @@ __subdir-y	:= $(patsubst %/,%,$(filter %/, $(obj-y)))
 subdir-y	+= $(__subdir-y)
 __subdir-m	:= $(patsubst %/,%,$(filter %/, $(obj-m)))
 subdir-m	+= $(__subdir-m)
-__subdir-n	:= $(patsubst %/,%,$(filter %/, $(obj-n)))
-subdir-n	+= $(__subdir-n)
-__subdir-	:= $(patsubst %/,%,$(filter %/, $(obj-)))
-subdir-		+= $(__subdir-)
 obj-y		:= $(patsubst %/, %/built-in.o, $(obj-y))
 obj-m		:= $(filter-out %/, $(obj-m))
 
 # Subdirectories we need to descend into
-
 subdir-ym	:= $(sort $(subdir-y) $(subdir-m))
-subdir-ymn      := $(sort $(subdir-ym) $(subdir-n) $(subdir-))
-
-# export.o is never a composite object, since $(export-objs) has a
-# fixed meaning (== objects which EXPORT_SYMBOL())
-__obj-y = $(filter-out export.o,$(obj-y))
-__obj-m = $(filter-out export.o,$(obj-m))
-
-# if $(foo-objs) exists, foo.o is a composite object 
-multi-used-y := $(sort $(foreach m,$(__obj-y), $(if $($(m:.o=-objs)), $(m))))
-multi-used-m := $(sort $(foreach m,$(__obj-m), $(if $($(m:.o=-objs)), $(m))))
-
-# Build list of the parts of our composite objects, our composite
-# objects depend on those (obviously)
-multi-objs-y := $(foreach m, $(multi-used-y), $($(m:.o=-objs)))
-multi-objs-m := $(foreach m, $(multi-used-m), $($(m:.o=-objs)))
 
 # $(subdir-obj-y) is the list of objects in $(obj-y) which do not live
 # in the local directory
@@ -69,30 +51,12 @@ real-objs-m := $(foreach m, $(obj-m), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m
 # Only build module versions for files which are selected to be built
 export-objs := $(filter $(export-objs),$(real-objs-y) $(real-objs-m))
 
-host-progs-single     := $(foreach m,$(host-progs),$(if $($(m)-objs),,$(m)))
-host-progs-multi      := $(foreach m,$(host-progs),$(if $($(m)-objs),$(m)))
-host-progs-multi-objs := $(foreach m,$(host-progs-multi),$($(m)-objs))
-
 # Add subdir path
 
-EXTRA_TARGETS	:= $(addprefix $(obj)/,$(EXTRA_TARGETS))
-obj-y		:= $(addprefix $(obj)/,$(obj-y))
-obj-m		:= $(addprefix $(obj)/,$(obj-m))
 export-objs	:= $(addprefix $(obj)/,$(export-objs))
-subdir-obj-y	:= $(addprefix $(obj)/,$(subdir-obj-y))
 real-objs-y	:= $(addprefix $(obj)/,$(real-objs-y))
 real-objs-m	:= $(addprefix $(obj)/,$(real-objs-m))
-multi-used-y	:= $(addprefix $(obj)/,$(multi-used-y))
-multi-used-m	:= $(addprefix $(obj)/,$(multi-used-m))
-multi-objs-y	:= $(addprefix $(obj)/,$(multi-objs-y))
-multi-objs-m	:= $(addprefix $(obj)/,$(multi-objs-m))
 subdir-ym	:= $(addprefix $(obj)/,$(subdir-ym))
-subdir-ymn	:= $(addprefix $(obj)/,$(subdir-ymn))
-clean-files	:= $(addprefix $(obj)/,$(clean-files))
-host-progs	:= $(addprefix $(obj)/,$(host-progs))
-host-progs-single     := $(addprefix $(obj)/,$(host-progs-single))
-host-progs-multi      := $(addprefix $(obj)/,$(host-progs-multi))
-host-progs-multi-objs := $(addprefix $(obj)/,$(host-progs-multi-objs))
 
 # The temporary file to save gcc -MD generated dependencies must not
 # contain a comma
@@ -128,7 +92,7 @@ endif
 
 #	Don't include modversions.h, we're just about to generate it here.
 
-CFLAGS_MODULE := $(filter-out -include linux/modversions.h,$(CFLAGS_MODULE))
+CFLAGS_MODULE := $(filter-out -include include/linux/modversions.h,$(CFLAGS_MODULE))
 
 $(addprefix $(MODVERDIR)/,$(real-objs-y:.o=.ver)): modkern_cflags := $(CFLAGS_KERNEL)
 $(addprefix $(MODVERDIR)/,$(real-objs-m:.o=.ver)): modkern_cflags := $(CFLAGS_MODULE)

@@ -4,8 +4,6 @@
 
 src := $(obj)
 
-no-rules.make := 1
-
 .PHONY: __clean
 __clean:
 
