@@ -95,7 +95,7 @@ void task_protections(unsigned long address)
 	if(mprotect((void *) stack, page_size(), prot) < 0)
 		panic("protecting guard page failed, errno = %d", errno);
 #endif
-	pages = (1 << CONFIG_KERNEL_STACK_ORDER) - 2;
+	pages = (1 << UML_CONFIG_KERNEL_STACK_ORDER) - 2;
 	prot = PROT_READ | PROT_WRITE | PROT_EXEC;
 	if(mprotect((void *) stack, pages * page_size(), prot) < 0)
 		panic("protecting stack failed, errno = %d", errno);
