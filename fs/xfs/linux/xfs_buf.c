@@ -364,22 +364,25 @@ _pagebuf_lookup_pages(
 	uint			flags)
 {
 	struct address_space	*mapping = bp->pb_target->pbr_mapping;
+	unsigned int		sectorshift = bp->pb_target->pbr_sshift;
 	size_t			blocksize = bp->pb_target->pbr_bsize;
-	size_t			size = bp->pb_count_desired, nbytes;
-	size_t			offset = bp->pb_offset;
+	size_t			size = bp->pb_count_desired;
+	size_t			nbytes, offset;
 	int			gfp_mask = pb_to_gfp(flags);
 	unsigned short		page_count, i;
 	pgoff_t			first;
 	loff_t			end;
 	int			error;
 
-	first = (bp->pb_file_offset - bp->pb_offset) >> PAGE_CACHE_SHIFT;
 	end = bp->pb_file_offset + bp->pb_buffer_length;
 	page_count = page_buf_btoc(end) - page_buf_btoct(bp->pb_file_offset);
 
 	error = _pagebuf_get_pages(bp, page_count, flags);
 	if (unlikely(error))
 		return error;
+
+	offset = bp->pb_offset;
+	first = bp->pb_file_offset >> PAGE_CACHE_SHIFT;
 
 	for (i = 0; i < bp->pb_page_count; i++) {
 		struct page	*page;
@@ -421,18 +424,17 @@ _pagebuf_lookup_pages(
 				if (flags & PBF_READ)
 					bp->pb_locked = 1;
 			} else if (!PagePrivate(page)) {
-				uint sectorshift = bp->pb_target->pbr_sshift;
-				ulong range, i;
+				unsigned long	j, range;
 
 				/*
 				 * In this case page->private holds a bitmap
 				 * of uptodate sectors within the page
 				 */
 				range = (offset + nbytes) >> sectorshift;
-				for (i = offset >> sectorshift; i < range; i++)
-					if (!test_bit(i, &page->private))
+				for (j = offset >> sectorshift; j < range; j++)
+					if (!test_bit(j, &page->private))
 						break;
-				if (i == range)
+				if (j == range)
 					page_count++;
 			}
 		}
@@ -445,12 +447,16 @@ _pagebuf_lookup_pages(
 			unlock_page(bp->pb_pages[i]);
 	}
 
-	bp->pb_flags &= ~PBF_NONE;
 	bp->pb_flags |= (_PBF_PAGECACHE|_PBF_MEM_ALLOCATED);
 
-	/* if some pages aren't uptodate mark that in the buffer */
-	if (page_count != bp->pb_page_count)
-		bp->pb_flags |= PBF_PARTIAL;
+	if (page_count) {
+		/* if we have any uptodate pages, mark that in the buffer */
+		bp->pb_flags &= ~PBF_NONE;
+
+		/* if some pages aren't uptodate, mark that in the buffer */
+		if (page_count != bp->pb_page_count)
+			bp->pb_flags |= PBF_PARTIAL;
+	}
 
 	PB_TRACE(bp, "lookup_pages", (long)page_count);
 	return error;
@@ -1269,7 +1275,7 @@ bio_end_io_pagebuf(
 		} else if (blocksize == PAGE_CACHE_SIZE) {
 			SetPageUptodate(page);
 		} else if (!PagePrivate(page)) {
-			unsigned int	j, range;
+			unsigned long	j, range;
 
 			ASSERT(blocksize < PAGE_CACHE_SIZE);
 			range = (bvec->bv_offset + bvec->bv_len) >> sectorshift;
