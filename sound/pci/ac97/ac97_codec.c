@@ -1635,6 +1635,14 @@ static void snd_ac97_determine_rates(ac97_t *ac97, int reg, int shadow_reg, unsi
 {
 	unsigned int result = 0;
 
+	if (ac97->bus->no_vra) {
+		*r_result = SNDRV_PCM_RATE_48000;
+		if ((ac97->flags & AC97_DOUBLE_RATE) &&
+		    reg == AC97_PCM_FRONT_DAC_RATE)
+			*r_result |= SNDRV_PCM_RATE_96000;
+		return;
+	}
+
 	if ((ac97->ext_id & AC97_EI_DRA) && reg == AC97_PCM_FRONT_DAC_RATE)
 		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS,
 				     AC97_EA_DRA, 0);
@@ -2038,9 +2046,11 @@ int snd_ac97_mixer(ac97_bus_t *bus, ac97_template_t *template, ac97_t **rac97)
 		ac97->addr = (ac97->ext_id & AC97_EI_ADDR_MASK) >> AC97_EI_ADDR_SHIFT;
 	else
 		ac97->addr = (ac97->ext_mid & AC97_MEI_ADDR_MASK) >> AC97_MEI_ADDR_SHIFT;
-	if (ac97->ext_id & 0x0189) {	/* L/R, MIC, SDAC, LDAC VRA support */
+	if (ac97->ext_id & 0x01c9) {	/* L/R, MIC, SDAC, LDAC VRA support */
 		reg = snd_ac97_read(ac97, AC97_EXTENDED_STATUS);
-		reg |= ac97->ext_id & 0x0189;
+		reg |= ac97->ext_id & 0x01c0; /* LDAC/SDAC/CDAC */
+		if (! bus->no_vra)
+			reg |= ac97->ext_id & 0x0009; /* VRA/VRM */
 		snd_ac97_write_cache(ac97, AC97_EXTENDED_STATUS, reg);
 	}
 	if ((ac97->ext_id & AC97_EI_DRA) && bus->dra) {
