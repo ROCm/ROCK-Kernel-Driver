@@ -19,20 +19,36 @@
 
 int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
-	unsigned dsize = ((cursor->image.width + 7) >> 3) * cursor->image.height;
 	unsigned int scan_align = info->pixmap.scan_align - 1;
 	unsigned int buf_align = info->pixmap.buf_align - 1;
-	unsigned int i, size, s_pitch, d_pitch;
+	unsigned int i, size, dsize, s_pitch, d_pitch;
 	u8 *dst, src[64];
 
-	s_pitch = (cursor->image.width + 7) >> 3;
+	info->cursor.enable = (cursor->set & FB_CUR_SETCUR) ? 1 : 0;
+
+	if (cursor->set & FB_CUR_SETSIZE) {
+		info->cursor.image.width = cursor->image.width;
+		info->cursor.image.height = cursor->image.height;
+		cursor->set |= FB_CUR_SETSHAPE;
+	}
+
+	s_pitch = (info->cursor.image.width + 7) >> 3;
+	dsize = s_pitch * info->cursor.image.height;
 	d_pitch = (s_pitch + scan_align) & ~scan_align;
-	size = d_pitch * cursor->image.height + buf_align;
+	size = d_pitch * info->cursor.image.height + buf_align;
 	size &= ~buf_align;
 	dst = info->pixmap.addr + fb_get_buffer_offset(info, size);
 	info->cursor.image.data = dst;
 
-	info->cursor.enable = (cursor->set & FB_CUR_SETCUR) ? 1 : 0;
+	if (cursor->set & FB_CUR_SETSHAPE) {
+		if (info->cursor.mask)
+			kfree(info->cursor.mask);
+		info->cursor.mask = kmalloc(dsize, GFP_KERNEL);
+		if (cursor->mask)
+			memcpy(info->cursor.mask, cursor->mask, dsize);
+		else
+			memset(info->cursor.mask, 0, dsize);
+	}
 
 	if (cursor->set & FB_CUR_SETPOS) {
 		info->cursor.image.dx = cursor->image.dx;
@@ -53,40 +69,28 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		info->cursor.image.depth = cursor->image.depth;
 	}
 
-	if (cursor->set & FB_CUR_SETSIZE) {
-		info->cursor.image.width = cursor->image.width;
-		info->cursor.image.height = cursor->image.height;
-		cursor->set |= FB_CUR_SETSHAPE;
-	}	
-
-	if (cursor->set & FB_CUR_SETSHAPE) {
-		if (info->cursor.mask)	kfree(info->cursor.mask);
-		info->cursor.mask = kmalloc(dsize, GFP_KERNEL);
-		memcpy(info->cursor.mask, cursor->mask, dsize);
-	}	
-	
-	if (cursor->enable) {
+	if (info->cursor.enable) {
 		switch (cursor->rop) {
 		case ROP_XOR:
 			for (i = 0; i < dsize; i++) {
-				src[i] =  (cursor->image.data[i] &
-					   cursor->mask[i]) ^
-					   cursor->dest[i];
+				src[i] = (cursor->image.data[i] &
+					  cursor->mask[i]) ^
+				    	  cursor->dest[i];
 			}
 			break;
 		case ROP_COPY:
 		default:
 			for (i = 0; i < dsize; i++) {
 				src[i] = cursor->image.data[i] &
-					 cursor->mask[i];
+				    	 cursor->mask[i];
 			}
 			break;
 		}
-		move_buf_aligned(info, dst, src, d_pitch, s_pitch, 
-				 cursor->image.height); 
+		move_buf_aligned(info, dst, src, d_pitch, s_pitch,
+				 cursor->image.height);
 	} else {
-		move_buf_aligned(info, dst, cursor->dest, s_pitch, d_pitch, 
-			  	 cursor->image.height);
+		move_buf_aligned(info, dst, cursor->dest, s_pitch, d_pitch,
+				 cursor->image.height);
 	}
 	info->fbops->fb_imageblit(info, &info->cursor.image);
 	return 0;
