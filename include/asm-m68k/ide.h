@@ -50,19 +50,6 @@
 #define MAX_HWIFS	4	/* same as the other archs */
 #endif
 
-
-static __inline__ int ide_default_irq(unsigned long base)
-{
-	  return 0;
-}
-
-static __inline__ unsigned long ide_default_io_base(int index)
-{
-          return 0;
-}
-
-#define ide_init_default_irq(base)	(0)
-
 /*
  * Get rid of defs from io.h - ide has its private and conflicting versions
  * Since so far no single m68k platform uses ISA/PCI I/O space for IDE, we

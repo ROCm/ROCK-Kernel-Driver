@@ -22,6 +22,8 @@
 #define MAX_HWIFS	2
 #endif
 
+#define IDE_ARCH_OBSOLETE_DEFAULTS
+
 static inline int ide_default_irq_hp600(unsigned long base)
 {
 	switch (base) {

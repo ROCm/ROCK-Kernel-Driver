@@ -305,6 +305,13 @@ static inline void ide_std_init_ports(hw_regs_t *hw,
 
 #include <asm/ide.h>
 
+/* needed on alpha, x86/x86_64, ia64, mips, ppc32 and sh */
+#ifndef IDE_ARCH_OBSOLETE_DEFAULTS
+# define ide_default_io_base(index)	(0)
+# define ide_default_irq(base)		(0)
+# define ide_init_default_irq(base)	(0)
+#endif
+
 /*
  * ide_init_hwif_ports() is OBSOLETE and will be removed in 2.7 series.
  * New ports shouldn't define IDE_ARCH_OBSOLETE_INIT in <asm/ide.h>.

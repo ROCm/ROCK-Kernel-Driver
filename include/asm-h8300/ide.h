@@ -16,11 +16,6 @@
 #ifdef __KERNEL__
 /****************************************************************************/
 
-#define ide_default_irq(base)		(0)
-#define ide_default_io_base(index)	(0)
-
-#define ide_init_default_irq(base)	(0)
-
 #define MAX_HWIFS	1
 
 #include <asm-generic/ide_iops.h>
