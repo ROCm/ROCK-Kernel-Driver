@@ -31,6 +31,7 @@
 #include <linux/ioport.h>
 
 #include <asm/hardware.h>
+#include <asm/mach-types.h>
 #include <asm/irq.h>
 #include <asm/hardware/sa1111.h>
 

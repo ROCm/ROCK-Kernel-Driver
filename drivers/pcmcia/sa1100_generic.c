@@ -110,12 +110,11 @@ sa1100_pcmcia_default_mecr_timing(unsigned int sock, unsigned int cpu_speed,
  * Call board specific BS value calculation to allow boards
  * to tweak the BS values.
  */
-static int sa1100_pcmcia_set_mecr(int sock)
+static int sa1100_pcmcia_set_mecr(int sock, unsigned int cpu_clock)
 {
 	struct sa1100_pcmcia_socket *skt;
 	u32 mecr;
-	int clock;
-	long flags;
+	unsigned long flags;
 	unsigned int bs;
 
 	if (sock < 0 || sock > SA1100_PCMCIA_MAX_SOCK)
@@ -125,8 +124,7 @@ static int sa1100_pcmcia_set_mecr(int sock)
 
 	local_irq_save(flags);
 
-	clock = cpufreq_get(0);
-	bs = pcmcia_low_level->socket_get_timing(sock, clock, skt->speed_io);
+	bs = pcmcia_low_level->socket_get_timing(sock, cpu_clock, skt->speed_io);
 
 	mecr = MECR;
 	MECR_FAST_SET(mecr, sock, 0);
@@ -652,7 +650,7 @@ sa1100_pcmcia_set_io_map(unsigned int sock, struct pccard_io_map *map)
     if ( map->speed == 0)
        map->speed = SA1100_PCMCIA_IO_ACCESS;
 
-	sa1100_pcmcia_set_mecr( sock );
+	sa1100_pcmcia_set_mecr(sock, cpufreq_get(0));
   }
 
   if (map->stop == 1)
@@ -741,7 +739,7 @@ sa1100_pcmcia_set_mem_map(unsigned int sock, struct pccard_mem_map *map)
 			  map->speed = SA1100_PCMCIA_5V_MEM_ACCESS;
 	  }
 
-	  sa1100_pcmcia_set_mecr( sock );
+	  sa1100_pcmcia_set_mecr(sock, cpufreq_get(0));
 
   }
 
@@ -885,9 +883,8 @@ static void sa1100_pcmcia_update_mecr(unsigned int clock)
 {
 	unsigned int sock;
 
-	for (sock = 0; sock < SA1100_PCMCIA_MAX_SOCK; ++sock) {
-		sa1100_pcmcia_set_mecr(sock);
-	}
+	for (sock = 0; sock < SA1100_PCMCIA_MAX_SOCK; ++sock)
+		sa1100_pcmcia_set_mecr(sock, clock);
 }
 
 /* sa1100_pcmcia_notifier()
@@ -904,31 +901,31 @@ static int
 sa1100_pcmcia_notifier(struct notifier_block *nb, unsigned long val,
 		       void *data)
 {
-  struct cpufreq_info *ci = data;
+	struct cpufreq_freqs *freqs = data;
 
-  switch (val) {
-  case CPUFREQ_PRECHANGE:
-    if (ci->new_freq > ci->old_freq) {
-      DEBUG(2, "%s(): new frequency %u.%uMHz > %u.%uMHz, pre-updating\n",
-	    __FUNCTION__,
-	    ci->new_freq / 1000, (ci->new_freq / 100) % 10,
-	    ci->old_freq / 1000, (ci->old_freq / 100) % 10);
-      sa1100_pcmcia_update_mecr(ci->new_freq);
-    }
-    break;
+	switch (val) {
+	case CPUFREQ_PRECHANGE:
+		if (freqs->new > freqs->old) {
+			DEBUG(2, "%s(): new frequency %u.%uMHz > %u.%uMHz, "
+				"pre-updating\n", __FUNCTION__,
+			    freqs->new / 1000, (freqs->new / 100) % 10,
+			    freqs->old / 1000, (freqs->old / 100) % 10);
+			sa1100_pcmcia_update_mecr(freqs->new);
+		}
+		break;
 
-  case CPUFREQ_POSTCHANGE:
-    if (ci->new_freq < ci->old_freq) {
-      DEBUG(2, "%s(): new frequency %u.%uMHz < %u.%uMHz, post-updating\n",
-	    __FUNCTION__,
-	    ci->new_freq / 1000, (ci->new_freq / 100) % 10,
-	    ci->old_freq / 1000, (ci->old_freq / 100) % 10);
-      sa1100_pcmcia_update_mecr(ci->new_freq);
-    }
-    break;
-  }
+	case CPUFREQ_POSTCHANGE:
+		if (freqs->new < freqs->old) {
+			DEBUG(2, "%s(): new frequency %u.%uMHz < %u.%uMHz, "
+				"post-updating\n", __FUNCTION__,
+			    freqs->new / 1000, (freqs->new / 100) % 10,
+			    freqs->old / 1000, (freqs->old / 100) % 10);
+			sa1100_pcmcia_update_mecr(freqs->new);
+		}
+		break;
+	}
 
-  return 0;
+	return 0;
 }
 
 static struct notifier_block sa1100_pcmcia_notifier_block = {
@@ -946,7 +943,7 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 	struct pcmcia_init pcmcia_init;
 	struct pcmcia_state state[SA1100_PCMCIA_MAX_SOCK];
 	struct pcmcia_state_array state_array;
-	unsigned int i;
+	unsigned int i, cpu_clock;
 	int ret;
 
 	/*
@@ -986,6 +983,8 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 		goto shutdown;
 	}
 
+	cpu_clock = cpufreq_get(0);
+
 	/*
 	 * We initialize the MECR to default values here, because we are
 	 * not guaranteed to see a SetIOMap operation at runtime.
@@ -1019,7 +1018,7 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 			goto out_err;
 		}
 
-		sa1100_pcmcia_set_mecr( i );
+		sa1100_pcmcia_set_mecr(i, cpu_clock);
 	}
 
 
@@ -1110,7 +1109,7 @@ static int __init sa1100_pcmcia_init(void)
 	servinfo_t info;
 	int ret, i;
 
-	printk(KERN_INFO "SA-1100 PCMCIA (CS release %s)\n", CS_RELEASE);
+	printk(KERN_INFO "SA11x0 PCMCIA (CS release %s)\n", CS_RELEASE);
 
 	CardServices(GetCardServicesInfo, &info);
 	if (info.Revision != CS_RELEASE_CODE) {
@@ -1127,7 +1126,8 @@ static int __init sa1100_pcmcia_init(void)
 	}
 
 #ifdef CONFIG_CPU_FREQ
-	ret = cpufreq_register_notifier(&sa1100_pcmcia_notifier_block);
+	ret = cpufreq_register_notifier(&sa1100_pcmcia_notifier_block,
+					CPUFREQ_TRANSITION_NOTIFIER);
 	if (ret < 0) {
 		printk(KERN_ERR "Unable to register CPU frequency change "
 			"notifier (%d)\n", ret);
@@ -1135,14 +1135,8 @@ static int __init sa1100_pcmcia_init(void)
 	}
 #endif
 
-#ifdef CONFIG_SA1100_ADSBITSY
-	pcmcia_adsbitsy_init();
-#endif
 #ifdef CONFIG_SA1100_ASSABET
 	pcmcia_assabet_init();
-#endif
-#ifdef CONFIG_SA1100_BADGE4
-	pcmcia_badge4_init();
 #endif
 #ifdef CONFIG_SA1100_CERF
 	pcmcia_cerf_init();
@@ -1156,23 +1150,8 @@ static int __init sa1100_pcmcia_init(void)
 #ifdef CONFIG_SA1100_GRAPHICSCLIENT
 	pcmcia_gcplus_init();
 #endif
-#ifdef CONFIG_SA1100_GRAPHICSMASTER
-	pcmcia_graphicsmaster_init();
-#endif
-#ifdef CONFIG_SA1100_JORNADA720
-	pcmcia_jornada720_init();
-#endif
-#ifdef CONFIG_ASSABET_NEPONSET
-	pcmcia_neponset_init();
-#endif
 #ifdef CONFIG_SA1100_PANGOLIN
 	pcmcia_pangolin_init();
-#endif
-#ifdef CONFIG_SA1100_PFS168
-	pcmcia_pfs_init();
-#endif
-#ifdef CONFIG_SA1100_PT_SYSTEM3
-	pcmcia_system3_init();
 #endif
 #ifdef CONFIG_SA1100_SHANNON
 	pcmcia_shannon_init();
@@ -1185,9 +1164,6 @@ static int __init sa1100_pcmcia_init(void)
 #endif
 #ifdef CONFIG_SA1100_TRIZEPS
 	pcmcia_trizeps_init();
-#endif
-#ifdef CONFIG_SA1100_XP860
-	pcmcia_xp860_init();
 #endif
 #ifdef CONFIG_SA1100_YOPY
 	pcmcia_yopy_init();
@@ -1203,14 +1179,8 @@ static int __init sa1100_pcmcia_init(void)
  */
 static void __exit sa1100_pcmcia_exit(void)
 {
-#ifdef CONFIG_SA1100_ADSBITSY
-	pcmcia_adsbitsy_exit();
-#endif
 #ifdef CONFIG_SA1100_ASSABET
 	pcmcia_assabet_exit();
-#endif
-#ifdef CONFIG_SA1100_BADGE4
-	pcmcia_badge4_exit();
 #endif
 #ifdef CONFIG_SA1100_CERF
 	pcmcia_cerf_exit();
@@ -1224,20 +1194,8 @@ static void __exit sa1100_pcmcia_exit(void)
 #ifdef CONFIG_SA1100_GRAPHICSCLIENT
 	pcmcia_gcplus_exit();
 #endif
-#ifdef CONFIG_SA1100_GRAPHICSMASTER
-	pcmcia_graphicsmaster_exit();
-#endif
-#ifdef CONFIG_SA1100_JORNADA720
-	pcmcia_jornada720_exit();
-#endif
-#ifdef CONFIG_ASSABET_NEPONSET
-	pcmcia_neponset_exit();
-#endif
 #ifdef CONFIG_SA1100_PANGOLIN
 	pcmcia_pangolin_exit();
-#endif
-#ifdef CONFIG_SA1100_PFS168
-	pcmcia_pfs_exit();
 #endif
 #ifdef CONFIG_SA1100_SHANNON
 	pcmcia_shannon_exit();
@@ -1247,9 +1205,6 @@ static void __exit sa1100_pcmcia_exit(void)
 #endif
 #ifdef CONFIG_SA1100_STORK
 	pcmcia_stork_exit();
-#endif
-#ifdef CONFIG_SA1100_XP860
-	pcmcia_xp860_exit();
 #endif
 #ifdef CONFIG_SA1100_YOPY
 	pcmcia_yopy_exit();
@@ -1261,7 +1216,7 @@ static void __exit sa1100_pcmcia_exit(void)
 	}
 
 #ifdef CONFIG_CPU_FREQ
-	cpufreq_unregister_notifier(&sa1100_pcmcia_notifier_block);
+	cpufreq_unregister_notifier(&sa1100_pcmcia_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
 #endif
 }
 

@@ -28,11 +28,9 @@
 #include <asm/io.h>
 #include <asm/system.h>
 
-#undef DEBUG
+#include "generic.h"
 
-extern unsigned int sa11x0_freq_to_ppcr(unsigned int khz);
-extern unsigned int sa11x0_validatespeed(unsigned int cpu, unsigned int khz);
-extern unsigned int sa11x0_getspeed(void);
+#undef DEBUG
 
 struct sdram_params {
 	u_char  rows;		/* bits				 */
@@ -214,15 +212,16 @@ sdram_update_refresh(u_int cpu_khz, struct sdram_params *sdram)
  * above, we can match for an exact frequency.  If we don't find
  * an exact match, we will to set the lowest frequency to be safe.
  */
-static void sa1110_setspeed(unsigned int cpu, unsigned int khz)
+static void sa1110_setspeed(struct cpufreq_policy *policy)
 {
 	struct sdram_params *sdram = &sdram_params;
+	struct cpufreq_freqs freqs;
 	struct sdram_info sd;
 	unsigned long flags;
 	unsigned int ppcr, unused;
 
-	ppcr = sa11x0_freq_to_ppcr(khz);
-	sdram_calculate_timing(&sd, khz, sdram);
+	ppcr = sa11x0_freq_to_ppcr(policy->max);
+	sdram_calculate_timing(&sd, policy->max, sdram);
 
 #if 0
 	/*
@@ -230,7 +229,7 @@ static void sa1110_setspeed(unsigned int cpu, unsigned int khz)
 	 * and errata, but they seem to work.  Need to get a storage
 	 * scope on to the SDRAM signals to work out why.
 	 */
-	if (khz < 147500) {
+	if (policy->max < 147500) {
 		sd.mdrefr |= MDREFR_K1DB2;
 		sd.mdcas[0] = 0xaaaaaa7f;
 	} else {
@@ -240,6 +239,13 @@ static void sa1110_setspeed(unsigned int cpu, unsigned int khz)
 	sd.mdcas[1] = 0xaaaaaaaa;
 	sd.mdcas[2] = 0xaaaaaaaa;
 #endif
+
+	freqs.old = sa11x0_getspeed();
+	freqs.new = policy->max;
+	freqs.cpu = CPUFREQ_ALL_CPUS;
+
+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+
 	/*
 	 * The clock could be going away for some time.  Set the SDRAMs
 	 * to refresh rapidly (every 64 memory clock cycles).  To get
@@ -257,7 +263,7 @@ static void sa1110_setspeed(unsigned int cpu, unsigned int khz)
 	 * the programming.
 	 */
 	local_irq_save(flags);
-	asm("mcr p15, 0, %0, c10, c4" : : "r" (0));
+	asm("mcr p15, 0, %0, c7, c10, 4" : : "r" (0));
 	udelay(10);
 	__asm__ __volatile__("
 		b	2f
@@ -282,19 +288,22 @@ static void sa1110_setspeed(unsigned int cpu, unsigned int khz)
 	/*
 	 * Now, return the SDRAM refresh back to normal.
 	 */
-	sdram_update_refresh(khz, sdram);
+	sdram_update_refresh(policy->max, sdram);
+
+	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 }
 
-static struct cpufreq_freqs sa1110_freqs = {
-	.min		= 59000,
-	.max		= 287000,
+static struct cpufreq_policy sa1110_policy = {
+	.cpu		= 0,
+	.policy		= CPUFREQ_POLICY_POWERSAVE,
+	.max_cpu_freq	= 287000,
 };
 
 static struct cpufreq_driver sa1110_driver = {
-	.freq		= &sa1110_freqs,
-	.validate	= sa11x0_validatespeed,
-	.setspeed	= sa1110_setspeed,
-	.sync		= 1,
+	.verify		= sa11x0_verify_speed,
+	.setpolicy	= sa1110_setspeed,
+	.policy		= &sa1110_policy,
+	.cpu_min_freq	= 59000,
 };
 
 static int __init sa1110_clk_init(void)
@@ -318,8 +327,11 @@ static int __init sa1110_clk_init(void)
 
 		memcpy(&sdram_params, sdram, sizeof(sdram_params));
 
-		sa1110_freqs.cur = sa11x0_getspeed();
-		sa1110_setspeed(0, sa1110_freqs.cur);
+		sa1110_driver.cpu_cur_freq[0] =
+		sa1110_policy.min =
+		sa1110_policy.max = sa11x0_getspeed();
+
+		sa1110_setspeed(&sa1110_policy);
 
 		return cpufreq_register(&sa1110_driver);
 	}

@@ -335,6 +335,16 @@ hex 'Compressed ROM boot loader BSS address' CONFIG_ZBOOT_ROM_BSS 0
 if [ "$CONFIG_ARCH_SA1100" = "y" -o \
      "$CONFIG_ARCH_INTEGRATOR" = "y" ]; then
    dep_bool 'Support CPU clock change (EXPERIMENTAL)' CONFIG_CPU_FREQ $CONFIG_EXPERIMENTAL
+else
+   define_bool CONFIG_CPU_FREQ n
+fi
+
+if [ "$CONFIG_CPU_FREQ" = "y" ]; then
+   define_bool CONFIG_CPU_FREQ_24_API y
+   define_bool CONFIG_CPU_FREQ_26_API y
+else
+   define_bool CONFIG_CPU_FREQ_24_API n
+   define_bool CONFIG_CPU_FREQ_26_API n
 fi
 
 source drivers/pci/Config.in

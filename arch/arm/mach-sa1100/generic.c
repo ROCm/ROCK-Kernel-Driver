@@ -55,20 +55,26 @@ unsigned int sa11x0_freq_to_ppcr(unsigned int khz)
 
 	khz /= 100;
 
-	for (i = NR_FREQS - 1; i > 0; i--)
-		if (cclk_frequency_100khz[i] <= khz)
+	for (i = 0; i < ARRAY_SIZE(cclk_frequency_100khz); i--)
+		if (cclk_frequency_100khz[i] >= khz)
 			break;
 
 	return i;
 }
 
 /*
- * Validate the speed in khz.  If we can't generate the precise
- * frequency requested, round it down (to be on the safe side).
+ * Validate the policy.  We aren't able to do any fancy in-kernel
+ * scaling, so we force min=max, and set the policy to "performance".
+ * If we can't generate the precise frequency requested, round it up.
  */
-unsigned int sa11x0_validatespeed(unsigned int cpu, unsigned int khz)
+void sa11x0_verify_speed(struct cpufreq_policy *policy)
 {
-	return cclk_frequency_100khz[sa11x0_freq_to_ppcr(khz)] * 100;
+	if (policy->max > policy->max_cpu_freq)
+		policy->max = policy->max_cpu_freq;
+
+	policy->max = cclk_frequency_100khz[sa11x0_freq_to_ppcr(policy->max)] * 100;
+	policy->min = policy->max;
+	policy->policy = CPUFREQ_POLICY_POWERSAVE;
 }
 
 unsigned int sa11x0_getspeed(void)

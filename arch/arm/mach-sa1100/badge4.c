@@ -32,7 +32,6 @@
 #include <asm/mach/serial_sa1100.h>
 
 #include "generic.h"
-#include "sa1111.h"
 
 static int __init badge4_sa1111_init(void)
 {
@@ -45,7 +44,7 @@ static int __init badge4_sa1111_init(void)
 	/*
 	 * Probe for SA1111.
 	 */
-	return sa1111_init(NULL, BADGE4_SA1111_BASE, BADGE4_IRQ_GPIO_SA1111);
+	return sa1111_init(BADGE4_SA1111_BASE, BADGE4_IRQ_GPIO_SA1111);
 }
 
 static int __init badge4_init(void)
