@@ -72,7 +72,15 @@ symbol_valid(struct sym_entry *s)
 			return 0;
 	}
 
-	if (strstr(s->sym, "_compiled."))
+	/* Exclude symbols which vary between passes.  Passes 1 and 2 must have
+	 * identical symbol lists.  The kallsyms_* symbols below are only added
+	 * after pass 1, they would be included in pass 2 when --all-symbols is
+	 * specified so exclude them to get a stable symbol list.
+	 */
+	if (strstr(s->sym, "_compiled.") ||
+	    strcmp(s->sym, "kallsyms_addresses") == 0 ||
+	    strcmp(s->sym, "kallsyms_num_syms") == 0 ||
+	    strcmp(s->sym, "kallsyms_names") == 0)
 		return 0;
 
 	return 1;
