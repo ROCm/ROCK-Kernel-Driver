@@ -1,4 +1,4 @@
-CONFIG_ISDN
+CONFIG_ISDN_BOOL
   ISDN ("Integrated Services Digital Networks", called RNIS in France)
   is a special type of fully digital telephone service; it's mostly
   used to connect to your Internet service provider (with SLIP or
@@ -9,6 +9,9 @@ CONFIG_ISDN
   provider purchased an ISDN line from the phone company.  For
   details, read <http://alumni.caltech.edu/~dank/isdn/> on the WWW.
 
+  Select this option if you want your kernel to support ISDN.
+
+CONFIG_ISDN
   This driver allows you to use an ISDN-card for networking
   connections and as dialin/out device.  The isdn-tty's have a built
   in AT-compatible modem emulator.  Network devices support autodial,
@@ -17,6 +20,11 @@ CONFIG_ISDN
   suitable for German BTX.  On D-Channel, the protocols EDSS1
   (Euro-ISDN) and 1TR6 (German style) are supported.  See
   <file:Documentation/isdn/README> for more information.
+
+  ISDN support in the linux kernel is moving towards a new API,
+  called CAPI (Common ISDN Application Programming Interface).
+  Therefore the old ISDN4Linux layer is becoming obsolete. It is 
+  still usable, though, if you select this option.
 
   If you want to compile the ISDN code as a module ( = code which can
   be inserted in and removed from the running kernel whenever you
