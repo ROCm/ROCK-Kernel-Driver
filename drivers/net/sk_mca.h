@@ -178,7 +178,4 @@ typedef struct {		/* LANCE Rx descriptor               */
 
 #endif				/* _SK_MCA_DRIVER_ */
 
-extern int skmca_probe(struct net_device *);
-
-
 #endif	/* _SK_MCA_INCLUDE_ */
