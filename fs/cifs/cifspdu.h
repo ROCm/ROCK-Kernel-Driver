@@ -1567,8 +1567,8 @@ typedef struct {
 #define FILE_DEVICE_NETWORK_REDIRECTOR  0x00000028
 
 typedef struct {
-	__u32 DeviceType;
-	__u32 DeviceCharacteristics;
+	__le32 DeviceType;
+	__le32 DeviceCharacteristics;
 } FILE_SYSTEM_DEVICE_INFO;	/* device info, level 0x104 */
 
 typedef struct {

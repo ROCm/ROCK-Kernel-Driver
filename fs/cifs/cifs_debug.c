@@ -126,26 +126,27 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 	i = 0;
 	read_lock(&GlobalSMBSeslock);
 	list_for_each(tmp, &GlobalTreeConnectionList) {
+		__u32 dev_type;
 		i++;
 		tcon = list_entry(tmp, struct cifsTconInfo, cifsConnectionList);
+		dev_type = le32_to_cpu(tcon->fsDevInfo.DeviceType);
 		length =
 		    sprintf(buf,
 			    "\n%d) %s Uses: %d Type: %s Characteristics: 0x%x Attributes: 0x%x\nPathComponentMax: %d Status: %d",
 			    i, tcon->treeName,
 			    atomic_read(&tcon->useCount),
 			    tcon->nativeFileSystem,
-			    tcon->fsDevInfo.DeviceCharacteristics,
+			    le32_to_cpu(tcon->fsDevInfo.DeviceCharacteristics),
 			    tcon->fsAttrInfo.Attributes,
 			    tcon->fsAttrInfo.MaxPathNameComponentLength,tcon->tidStatus);
 		buf += length;        
-		if (tcon->fsDevInfo.DeviceType == FILE_DEVICE_DISK)
+		if (dev_type == FILE_DEVICE_DISK)
 			length = sprintf(buf, " type: DISK ");
-		else if (tcon->fsDevInfo.DeviceType == FILE_DEVICE_CD_ROM)
+		else if (dev_type == FILE_DEVICE_CD_ROM)
 			length = sprintf(buf, " type: CDROM ");
 		else
 			length =
-			    sprintf(buf, " type: %d ",
-				    tcon->fsDevInfo.DeviceType);
+			    sprintf(buf, " type: %d ", dev_type);
 		buf += length;
 		if(tcon->tidStatus == CifsNeedReconnect) {
 			buf += sprintf(buf, "\tDISCONNECTED ");

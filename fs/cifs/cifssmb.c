@@ -2431,10 +2431,6 @@ QFSDeviceRetry:
 			    (FILE_SYSTEM_DEVICE_INFO
 			     *) (((char *) &pSMBr->hdr.Protocol) +
 				 data_offset);
-			response_data->DeviceType = 
-				le32_to_cpu(response_data->DeviceType);
-			response_data->DeviceCharacteristics = 
-				le32_to_cpu(response_data->DeviceCharacteristics);
 			memcpy(&tcon->fsDevInfo, response_data,
 			       sizeof (FILE_SYSTEM_DEVICE_INFO));
 		}
