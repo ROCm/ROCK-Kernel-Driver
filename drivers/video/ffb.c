@@ -580,7 +580,7 @@ static void ffb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
 	struct ffb_par *par = (struct ffb_par *) info->par;
 	struct ffb_fbc *fbc = par->fbc;
-	u8 *data = (u8 *) image->data;
+	const u8 *data = image->data;
 	unsigned long flags;
 	u32 fg, bg, xy;
 	u64 fgbg;

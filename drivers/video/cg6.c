@@ -328,7 +328,7 @@ static void cg6_imageblit(struct fb_info *info, const struct fb_image *image)
 {
 	struct cg6_par *par = (struct cg6_par *) info->par;
 	struct cg6_fbc *fbc = par->fbc;
-	u8 *data = image->data;
+	const u8 *data = image->data;
 	unsigned long flags;
 	u32 x, y;
 	int i, width;
