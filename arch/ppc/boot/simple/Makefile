@@ -3,11 +3,6 @@
 #
 # Author: Tom Rini <trini@mvista.com>
 #
-# 2001-2002 (c) MontaVista, Software, Inc.  This file is licensed under
-# the terms of the GNU General Public License version 2.  This program
-# is licensed "as is" without any warranty of any kind, whether express
-# or implied.
-#
 # Notes:
 # (1) For machine targets which produce more than one image, define
 # ZNETBOOT and ZNETBOOTRD to the image which should be available for
@@ -32,6 +27,12 @@ images				:= $(boot)/images
 # Normally, we use the 'misc.c' file for decompress_kernel and
 # whatnot.  Sometimes we need to override this however.
 misc-y	:= misc.o
+
+# Additionally, we normally don't need to mess with the L2 / L3 caches
+# if present on 'classic' PPC.
+cacheflag-y	:= -DCLEAR_CACHES=""
+# This file will flush / disable the L2, and L3 if present.
+clear_L2_L3	:= $(boot)/simple/clear.S
 
 #
 # See arch/ppc/kconfig and arch/ppc/platforms/Kconfig
@@ -60,6 +61,7 @@ zimageinitrd-$(CONFIG_OCOTEA)		:= zImage.initrd-TREE
 
      extra.o-$(CONFIG_EV64260)		:= direct.o misc-ev64260.o
    tftpimage-$(CONFIG_EV64260)		:= /tftpboot/zImage.ev64260
+   cacheflag-$(CONFIG_EV64260)		:= -include $(clear_L2_L3)
 
       zimage-$(CONFIG_GEMINI)		:= zImage-STRIPELF
 zimageinitrd-$(CONFIG_GEMINI)		:= zImage.initrd-STRIPELF
@@ -68,33 +70,32 @@ zimageinitrd-$(CONFIG_GEMINI)		:= zImage.initrd-STRIPELF
 
      extra.o-$(CONFIG_K2)		:= legacy.o
    tftpimage-$(CONFIG_K2)		:= /tftpboot/zImage.k2
+   cacheflag-$(CONFIG_K2)		:= -include $(clear_L2_L3)
 
-# kconfig 'feature', only one of these will ever by 'y' at a time.
+# kconfig 'feature', only one of these will ever be 'y' at a time.
 # The rest will be unset.
-multi := $(CONFIG_MCPN765)$(CONFIG_MVME5100)$(CONFIG_PRPMC750) \
+motorola := $(CONFIG_MCPN765)$(CONFIG_MVME5100)$(CONFIG_PRPMC750) \
 $(CONFIG_PRPMC800)$(CONFIG_LOPEC)$(CONFIG_PPLUS)
-      zimage-$(multi)			:= zImage-PPLUS
-zimageinitrd-$(multi)			:= zImage.initrd-PPLUS
-   tftpimage-$(multi)			:= /tftpboot/zImage.pplus
-    znetboot-$(multi)			:= zImage.pplus
-  znetbootrd-$(multi)			:= zImage.initrd.pplus
+pcore := $(CONFIG_PCORE)$(CONFIG_POWERPMC250)
+
+      zimage-$(motorola)		:= zImage-PPLUS
+zimageinitrd-$(motorola)		:= zImage.initrd-PPLUS
+   tftpimage-$(motorola)		:= /tftpboot/zImage.pplus
+    znetboot-$(motorola)		:= zImage.pplus
+  znetbootrd-$(motorola)		:= zImage.initrd.pplus
 
 # Overrides previous assingment
      extra.o-$(CONFIG_PPLUS)		:= legacy.o
 
-      zimage-$(CONFIG_PCORE)		:= zImage-STRIPELF
-zimageinitrd-$(CONFIG_PCORE)		:= zImage.initrd-STRIPELF
-     extra.o-$(CONFIG_PCORE)		:= chrpmap.o
-         end-$(CONFIG_PCORE)		:= pcore
-   tftpimage-$(CONFIG_PCORE)		:= /tftpboot/zImage.$(end-y)
-
-      zimage-$(CONFIG_POWERPMC250)	:= zImage-STRIPELF
-zimageinitrd-$(CONFIG_POWERPMC250)	:= zImage.initrd-STRIPELF
-     extra.o-$(CONFIG_POWERPMC250)	:= chrpmap.o
-         end-$(CONFIG_POWERPMC250)	:= pcore
-   tftpimage-$(CONFIG_POWERPMC250)	:= /tftpboot/zImage.$(end-y)
+      zimage-$(pcore)			:= zImage-STRIPELF
+zimageinitrd-$(pcore)			:= zImage.initrd-STRIPELF
+     extra.o-$(pcore)			:= chrpmap.o
+         end-$(pcore)			:= pcore
+   tftpimage-$(pcore)			:= /tftpboot/zImage.$(end-y)
+   cacheflag-$(pcore)			:= -include $(clear_L2_L3)
 
    tftpimage-$(CONFIG_SANDPOINT)	:= /tftpboot/zImage.sandpoint
+   cacheflag-$(CONFIG_SANDPOINT)	:= -include $(clear_L2_L3)
 
       zimage-$(CONFIG_SPRUCE)		:= zImage-TREE
 zimageinitrd-$(CONFIG_SPRUCE)		:= zImage.initrd-TREE
@@ -112,6 +113,8 @@ tftpimage-$(CONFIG_SMP)	+= .smp
 extra-aflags-$(CONFIG_REDWOOD_4)	:= -Wa,-m405
 extra.o-$(CONFIG_REDWOOD_4)		:= rw4/rw4_init.o rw4/rw4_init_brd.o
 EXTRA_AFLAGS := $(extra-aflags-y)
+# head.o needs to get the cacheflags defined.
+AFLAGS_head.o				+= $(cacheflag-y)
 
 # Linker args.  This specifies where the image will be run at.
 LD_ARGS				:= -T $(boot)/ld.script \
