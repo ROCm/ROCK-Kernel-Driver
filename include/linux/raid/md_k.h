@@ -143,8 +143,6 @@ static inline void mark_disk_nonsync(mdp_disk_t * d)
 struct mdk_rdev_s
 {
 	struct list_head same_set;	/* RAID devices within the same set */
-	struct list_head all;		/* all RAID devices */
-	struct list_head pending;	/* undetected RAID devices */
 
 	kdev_t dev;			/* Device number */
 	kdev_t old_dev;			/*  "" when it was last imported */
@@ -239,30 +237,23 @@ extern mdp_disk_t *get_spare(mddev_t *mddev);
  * iterates through some rdev ringlist. It's safe to remove the
  * current 'rdev'. Dont touch 'tmp' though.
  */
-#define ITERATE_RDEV_GENERIC(head,field,rdev,tmp)			\
+#define ITERATE_RDEV_GENERIC(head,rdev,tmp)				\
 									\
 	for ((tmp) = (head).next;					\
-		(rdev) = (list_entry((tmp), mdk_rdev_t, field)),	\
+		(rdev) = (list_entry((tmp), mdk_rdev_t, same_set)),	\
 			(tmp) = (tmp)->next, (tmp)->prev != &(head)	\
 		; )
 /*
  * iterates through the 'same array disks' ringlist
  */
 #define ITERATE_RDEV(mddev,rdev,tmp)					\
-	ITERATE_RDEV_GENERIC((mddev)->disks,same_set,rdev,tmp)
-
-
-/*
- * Iterates through all 'RAID managed disks'
- */
-#define ITERATE_RDEV_ALL(rdev,tmp)					\
-	ITERATE_RDEV_GENERIC(all_raid_disks,all,rdev,tmp)
+	ITERATE_RDEV_GENERIC((mddev)->disks,rdev,tmp)
 
 /*
  * Iterates through 'pending RAID disks'
  */
 #define ITERATE_RDEV_PENDING(rdev,tmp)					\
-	ITERATE_RDEV_GENERIC(pending_raid_disks,pending,rdev,tmp)
+	ITERATE_RDEV_GENERIC(pending_raid_disks,rdev,tmp)
 
 #define xchg_values(x,y) do { __typeof__(x) __tmp = x; \
 				x = y; y = __tmp; } while (0)

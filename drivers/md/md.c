@@ -550,7 +550,6 @@ static int match_mddev_units(mddev_t *mddev1, mddev_t *mddev2)
 	return 0;
 }
 
-static LIST_HEAD(all_raid_disks);
 static LIST_HEAD(pending_raid_disks);
 
 static void bind_rdev_to_array(mdk_rdev_t * rdev, mddev_t * mddev)
@@ -629,14 +628,9 @@ static void export_rdev(mdk_rdev_t * rdev)
 	printk(KERN_INFO "md: export_rdev(%s)\n",partition_name(rdev->dev));
 	if (rdev->mddev)
 		MD_BUG();
-	unlock_rdev(rdev);
 	free_disk_sb(rdev);
-	list_del_init(&rdev->all);
-	if (!list_empty(&rdev->pending)) {
-		printk(KERN_INFO "md: (%s was pending)\n",
-			partition_name(rdev->dev));
-		list_del_init(&rdev->pending);
-	}
+	list_del_init(&rdev->same_set);
+	unlock_rdev(rdev);
 #ifndef MODULE
 	md_autodetect_dev(rdev->dev);
 #endif
@@ -1044,8 +1038,6 @@ static mdk_rdev_t *md_import_device(kdev_t newdev, int on_disk)
 			rdev->desc_nr = -1;
 		}
 	}
-	list_add(&rdev->all, &all_raid_disks);
-	INIT_LIST_HEAD(&rdev->pending);
 	INIT_LIST_HEAD(&rdev->same_set);
 
 	if (rdev->faulty && rdev->sb)
@@ -1821,7 +1813,7 @@ static void autorun_array(mddev_t *mddev)
 
 /*
  * lets try to run arrays based on all disks that have arrived
- * until now. (those are in the ->pending list)
+ * until now. (those are in pending_raid_disks)
  *
  * the method: pick the first pending disk, collect all disks with
  * the same UUID, remove all from the pending list and put them into
@@ -1841,7 +1833,7 @@ static void autorun_devices(void)
 	printk(KERN_INFO "md: autorun ...\n");
 	while (!list_empty(&pending_raid_disks)) {
 		rdev0 = list_entry(pending_raid_disks.next,
-					 mdk_rdev_t, pending);
+					 mdk_rdev_t, same_set);
 
 		printk(KERN_INFO "md: considering %s ...\n", partition_name(rdev0->dev));
 		INIT_LIST_HEAD(&candidates);
@@ -1854,8 +1846,7 @@ static void autorun_devices(void)
 					continue;
 				}
 				printk(KERN_INFO "md:  adding %s ...\n", partition_name(rdev->dev));
-				list_del(&rdev->pending);
-				list_add(&rdev->pending, &candidates);
+				list_move(&rdev->same_set, &candidates);
 			}
 		}
 		/*
@@ -1878,9 +1869,9 @@ static void autorun_devices(void)
 			mddev_unlock(mddev);
 		} else {
 			printk(KERN_INFO "md: created md%d\n", mdidx(mddev));
-			ITERATE_RDEV_GENERIC(candidates,pending,rdev,tmp) {
+			ITERATE_RDEV_GENERIC(candidates,rdev,tmp) {
+				list_del_init(&rdev->same_set);
 				bind_rdev_to_array(rdev, mddev);
-				list_del_init(&rdev->pending);
 			}
 			autorun_array(mddev);
 			mddev_unlock(mddev);
@@ -1888,7 +1879,7 @@ static void autorun_devices(void)
 		/* on success, candidates will be empty, on error
 		 * it wont...
 		 */
-		ITERATE_RDEV_GENERIC(candidates,pending,rdev,tmp)
+		ITERATE_RDEV_GENERIC(candidates,rdev,tmp)
 			export_rdev(rdev);
 		mddev_put(mddev);
 	}
@@ -1944,7 +1935,7 @@ static int autostart_array(kdev_t startdev)
 						partition_name(startdev));
 		goto abort;
 	}
-	list_add(&start_rdev->pending, &pending_raid_disks);
+	list_add(&start_rdev->same_set, &pending_raid_disks);
 
 	sb = start_rdev->sb;
 
@@ -1973,7 +1964,7 @@ static int autostart_array(kdev_t startdev)
 			       partition_name(dev));
 			continue;
 		}
-		list_add(&rdev->pending, &pending_raid_disks);
+		list_add(&rdev->same_set, &pending_raid_disks);
 	}
 
 	/*
@@ -2897,15 +2888,10 @@ static int status_unused(char * page)
 
 	sz += sprintf(page + sz, "unused devices: ");
 
-	ITERATE_RDEV_ALL(rdev,tmp) {
-		if (list_empty(&rdev->same_set)) {
-			/*
-			 * The device is not yet used by any array.
-			 */
-			i++;
-			sz += sprintf(page + sz, "%s ",
-				partition_name(rdev->dev));
-		}
+	ITERATE_RDEV_PENDING(rdev,tmp) {
+		i++;
+		sz += sprintf(page + sz, "%s ",
+			      partition_name(rdev->dev));
 	}
 	if (!i)
 		sz += sprintf(page + sz, "<none>");
@@ -3556,7 +3542,7 @@ static void autostart_arrays(void)
 			MD_BUG();
 			continue;
 		}
-		list_add(&rdev->pending, &pending_raid_disks);
+		list_add(&rdev->same_set, &pending_raid_disks);
 	}
 	dev_cnt = 0;
 
