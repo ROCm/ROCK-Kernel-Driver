@@ -28,6 +28,17 @@ ToDo:
 	- Enable NFS exporting of NTFS.
 	- Use fake inodes for address space i/o.
 
+2.0.14 - Run list merging code cleanup, minor locking changes, typo fixes.
+
+	- Change fs/ntfs/super.c::ntfs_statfs() to not rely on BKL by moving
+	  the locking out of super.c::get_nr_free_mft_records() and taking and
+	  dropping the mftbmp_lock rw_semaphore in ntfs_statfs() itself.
+	- Bring attribute run list merging code (fs/ntfs/attrib.c) in sync with
+	  current userspace ntfs library code. This means that if a merge
+	  fails the original run lists are always left unmodified instead of
+	  being silently corrupted.
+	- Misc typo fixes.
+
 2.0.13 - Use iget5_locked() in preparation for fake inodes and small cleanups.
 
 	- Remove nr_mft_bits and the now superfluous union with nr_mft_records
