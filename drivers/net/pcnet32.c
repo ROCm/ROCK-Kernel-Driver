@@ -1633,12 +1633,16 @@ pcnet32_tx_timeout (struct net_device *dev)
 	   lp->cur_rx);
 	for (i = 0 ; i < RX_RING_SIZE; i++)
 	printk("%s %08x %04x %08x %04x", i & 1 ? "" : "\n ",
-	       lp->rx_ring[i].base, -lp->rx_ring[i].buf_length,
-	       lp->rx_ring[i].msg_length, (unsigned)lp->rx_ring[i].status);
+	       le32_to_cpu(lp->rx_ring[i].base),
+	       le16_to_cpu(-lp->rx_ring[i].buf_length),
+	       le32_to_cpu(lp->rx_ring[i].msg_length),
+	       le16_to_cpu((unsigned)lp->rx_ring[i].status));
 	for (i = 0 ; i < TX_RING_SIZE; i++)
 	printk("%s %08x %04x %08x %04x", i & 1 ? "" : "\n ",
-	       lp->tx_ring[i].base, -lp->tx_ring[i].length,
-	       lp->tx_ring[i].misc, (unsigned)lp->tx_ring[i].status);
+	       le32_to_cpu(lp->tx_ring[i].base),
+	       le16_to_cpu(-lp->tx_ring[i].length),
+	       le32_to_cpu(lp->tx_ring[i].misc),
+	       le16_to_cpu((unsigned)lp->tx_ring[i].status));
 	printk("\n");
     }
     pcnet32_restart(dev, 0x0042);
