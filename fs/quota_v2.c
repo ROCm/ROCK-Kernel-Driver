@@ -430,7 +430,8 @@ static int v2_write_dquot(struct dquot *dquot)
 	}
 	else
 		ret = 0;
-	dqstats.writes++;
+	++dqstats_array[DQSTATS_WRITES];
+
 	return ret;
 }
 
@@ -644,7 +645,8 @@ static int v2_read_dquot(struct dquot *dquot)
 		set_fs(fs);
 		disk2memdqb(&dquot->dq_dqb, &ddquot);
 	}
-	dqstats.reads++;
+	++dqstats_array[DQSTATS_READS];
+
 	return ret;
 }
 

@@ -118,11 +118,11 @@ static void put_quota_format(struct quota_format_type *fmt)
  * list is used for the sync and invalidate operations, which must look
  * at every dquot.
  *
- * Unused dquots (dq_count == 0) are added to the free_dquots list when
- * freed, and this list is searched whenever we need an available dquot.
- * Dquots are removed from the list as soon as they are used again, and
- * nr_free_dquots gives the number of dquots on the list. When dquot is
- * invalidated it's completely released from memory.
+ * Unused dquots (dq_count == 0) are added to the free_dquots list when freed,
+ * and this list is searched whenever we need an available dquot.  Dquots are
+ * removed from the list as soon as they are used again, and
+ * dqstats_array[DQSTATS_FREE] gives the number of dquots on the list. When
+ * dquot is invalidated it's completely released from memory.
  *
  * Dquots with a specific identity (device, type and id) are placed on
  * one of the dquot_hash[] hash chains. The provides an efficient search
@@ -148,7 +148,7 @@ static LIST_HEAD(inuse_list);
 static LIST_HEAD(free_dquots);
 static struct list_head dquot_hash[NR_DQHASH];
 
-struct dqstats dqstats;
+__u32 dqstats_array[DQSTATS_SIZE];
 
 static void dqput(struct dquot *);
 static struct dquot *dqduplicate(struct dquot *);
@@ -207,14 +207,14 @@ static inline struct dquot *find_dquot(unsigned int hashent, struct super_block 
 static inline void put_dquot_head(struct dquot *dquot)
 {
 	list_add(&dquot->dq_free, &free_dquots);
-	nr_free_dquots++;
+	++dqstats_array[DQSTATS_FREE];
 }
 
 /* Add a dquot to the tail of the free list */
 static inline void put_dquot_last(struct dquot *dquot)
 {
 	list_add(&dquot->dq_free, free_dquots.prev);
-	nr_free_dquots++;
+	++dqstats_array[DQSTATS_FREE];
 }
 
 /* Move dquot to the head of free list (it must be already on it) */
@@ -230,7 +230,7 @@ static inline void remove_free_dquot(struct dquot *dquot)
 		return;
 	list_del(&dquot->dq_free);
 	INIT_LIST_HEAD(&dquot->dq_free);
-	nr_free_dquots--;
+	--dqstats_array[DQSTATS_FREE];
 }
 
 static inline void put_inuse(struct dquot *dquot)
@@ -238,12 +238,12 @@ static inline void put_inuse(struct dquot *dquot)
 	/* We add to the back of inuse list so we don't have to restart
 	 * when traversing this list and we block */
 	list_add(&dquot->dq_inuse, inuse_list.prev);
-	nr_dquots++;
+	++dqstats_array[DQSTATS_ALLOCATED];
 }
 
 static inline void remove_inuse(struct dquot *dquot)
 {
-	nr_dquots--;
+	--dqstats_array[DQSTATS_ALLOCATED];
 	list_del(&dquot->dq_inuse);
 }
 
@@ -403,7 +403,8 @@ restart:
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++)
 		if ((cnt == type || type == -1) && sb_has_quota_enabled(sb, cnt) && info_dirty(&dqopt->info[cnt]))
 			dqopt->ops[cnt]->write_file_info(sb, cnt);
-	dqstats.syncs++;
+	++dqstats_array[DQSTATS_SYNCS];
+
 	return 0;
 }
 
@@ -490,7 +491,7 @@ int shrink_dqcache_memory(int priority, unsigned int gfp_mask)
 	int count = 0;
 
 	lock_kernel();
-	count = nr_free_dquots / priority;
+	count = dqstats_array[DQSTATS_FREE] / priority;
 	prune_dqcache(count);
 	unlock_kernel();
 	kmem_cache_shrink(dquot_cachep);
@@ -516,7 +517,7 @@ static void dqput(struct dquot *dquot)
 	}
 #endif
 
-	dqstats.drops++;
+	++dqstats_array[DQSTATS_DROPS];
 we_slept:
 	if (dquot->dq_dup_ref && dquot->dq_count - dquot->dq_dup_ref <= 1) {	/* Last unduplicated reference? */
 		__wait_dup_drop(dquot);
@@ -588,15 +589,15 @@ we_slept:
 			goto we_slept;
 		}
 		dquot = empty;
-        	dquot->dq_id = id;
+		dquot->dq_id = id;
 		/* hash it first so it can be found */
 		insert_dquot_hash(dquot);
-        	read_dqblk(dquot);
+		read_dqblk(dquot);
 	} else {
 		if (!dquot->dq_count)
 			remove_free_dquot(dquot);
 		get_dquot_ref(dquot);
-		dqstats.cache_hits++;
+		++dqstats_array[DQSTATS_CACHE_HITS];
 		wait_on_dquot(dquot);
 		if (empty)
 			dqput(empty);
@@ -607,8 +608,8 @@ we_slept:
 		dqput(dquot);
 		return NODQUOT;
 	}
-	dquot->dq_referenced++;
-	dqstats.lookups++;
+	++dquot->dq_referenced;
+	++dqstats_array[DQSTATS_LOOKUPS];
 
 	return dquot;
 }
@@ -628,7 +629,8 @@ static struct dquot *dqduplicate(struct dquot *dquot)
 		printk(KERN_ERR "VFS: dqduplicate(): Locked quota to be duplicated!\n");
 	get_dquot_dup_ref(dquot);
 	dquot->dq_referenced++;
-	dqstats.lookups++;
+	++dqstats_array[DQSTATS_LOOKUPS];
+
 	return dquot;
 }
 
@@ -643,7 +645,7 @@ static void dqputduplicate(struct dquot *dquot)
 	if (!dquot->dq_dup_ref)
 		wake_up(&dquot->dq_wait_free);
 	put_dquot_ref(dquot);
-	dqstats.drops++;
+	++dqstats_array[DQSTATS_DROPS];
 }
 
 static int dqinit_needed(struct inode *inode, int type)
@@ -1277,7 +1279,7 @@ int vfs_quota_off(struct super_block *sb, int type)
 		dqopt->info[cnt].dqi_igrace = 0;
 		dqopt->info[cnt].dqi_bgrace = 0;
 		dqopt->ops[cnt] = NULL;
-	}	
+	}
 	up(&dqopt->dqoff_sem);
 out:
 	unlock_kernel();
@@ -1461,41 +1463,6 @@ int vfs_set_info(struct super_block *sb, int type, struct if_dqinfo *ii)
 	return 0;
 }
 
-#ifdef CONFIG_PROC_FS
-static int read_stats(char *buffer, char **start, off_t offset, int count, int *eof, void *data)
-{
-	int len;
-	struct quota_format_type *actqf;
-
-	dqstats.allocated_dquots = nr_dquots;
-	dqstats.free_dquots = nr_free_dquots;
-
-	len = sprintf(buffer, "Version %u\n", __DQUOT_NUM_VERSION__);
-	len += sprintf(buffer + len, "Formats");
-	lock_kernel();
-	for (actqf = quota_formats; actqf; actqf = actqf->qf_next)
-		len += sprintf(buffer + len, " %u", actqf->qf_fmt_id);
-	unlock_kernel();
-	len += sprintf(buffer + len, "\n%u %u %u %u %u %u %u %u\n",
-			dqstats.lookups, dqstats.drops,
-			dqstats.reads, dqstats.writes,
-			dqstats.cache_hits, dqstats.allocated_dquots,
-			dqstats.free_dquots, dqstats.syncs);
-
-	if (offset >= len) {
-		*start = buffer;
-		*eof = 1;
-		return 0;
-	}
-	*start = buffer + offset;
-	if ((len -= offset) > count)
-		return count;
-	*eof = 1;
-
-	return len;
-}
-#endif
-
 struct quotactl_ops vfs_quotactl_ops = {
 	quota_on:	vfs_quota_on,
 	quota_off:	vfs_quota_off,
@@ -1507,8 +1474,7 @@ struct quotactl_ops vfs_quotactl_ops = {
 };
 
 static ctl_table fs_table[] = {
-	{FS_NRDQUOT, "dquot-nr", &nr_dquots, 2*sizeof(int),
-	 0444, NULL, &proc_dointvec},
+	{FS_DQSTATS, "dqstats", dqstats_array, sizeof(dqstats_array), 0444, NULL, &proc_dointvec},
 	{},
 };
 
@@ -1524,14 +1490,12 @@ static int __init dquot_init(void)
 	register_sysctl_table(dquot_table, 0);
 	for (i = 0; i < NR_DQHASH; i++)
 		INIT_LIST_HEAD(dquot_hash + i);
-	printk(KERN_NOTICE "VFS: Diskquotas version %s initialized\n", __DQUOT_VERSION__);
-#ifdef CONFIG_PROC_FS
-	create_proc_read_entry("fs/quota", 0, 0, read_stats, NULL);
-#endif
+	printk(KERN_NOTICE "VFS: Disk quotas v%s\n", __DQUOT_VERSION__);
+
 	return 0;
 }
 __initcall(dquot_init);
 
 EXPORT_SYMBOL(register_quota_format);
 EXPORT_SYMBOL(unregister_quota_format);
-EXPORT_SYMBOL(dqstats);
+EXPORT_SYMBOL(dqstats_array);
