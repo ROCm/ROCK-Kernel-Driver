@@ -2425,7 +2425,7 @@ int uart_register_port(struct uart_driver *drv, struct uart_port *port)
 		state->port->regshift = port->regshift;
 		state->port->iotype   = port->iotype;
 		state->port->flags    = port->flags;
-		state->port->line     = drv->state - state;
+		state->port->line     = state - drv->state;
 
 		__uart_register_port(drv, state, state->port);
 
