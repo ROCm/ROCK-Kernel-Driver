@@ -31,7 +31,6 @@
 #include <linux/highmem.h>
 #include <linux/module.h>
 #include <linux/writeback.h>
-#include <linux/mempool.h>
 #include <linux/hash.h>
 #include <linux/suspend.h>
 #include <linux/buffer_head.h>
@@ -2619,6 +2618,24 @@ void ll_rw_block(int rw, int nr, struct buffer_head *bhs[])
 }
 
 /*
+ * For a data-integrity writeout, we need to wait upon any in-progress I/O
+ * and then start new I/O and then wait upon it.
+ */
+void sync_dirty_buffer(struct buffer_head *bh)
+{
+	WARN_ON(atomic_read(&bh->b_count) < 1);
+	lock_buffer(bh);
+	if (test_clear_buffer_dirty(bh)) {
+		get_bh(bh);
+		bh->b_end_io = end_buffer_io_sync;
+		submit_bh(WRITE, bh);
+		wait_on_buffer(bh);
+	} else {
+		unlock_buffer(bh);
+	}
+}
+
+/*
  * Sanity checks for try_to_free_buffers.
  */
 static void check_ttfb_buffer(struct page *page, struct buffer_head *bh)
@@ -2773,7 +2790,6 @@ asmlinkage long sys_bdflush(int func, long data)
  * Buffer-head allocation
  */
 static kmem_cache_t *bh_cachep;
-static mempool_t *bh_mempool;
 
 /*
  * Once the number of bh's in the machine exceeds this level, we start
@@ -2807,7 +2823,7 @@ static void recalc_bh_state(void)
 	
 struct buffer_head *alloc_buffer_head(void)
 {
-	struct buffer_head *ret = mempool_alloc(bh_mempool, GFP_NOFS);
+	struct buffer_head *ret = kmem_cache_alloc(bh_cachep, GFP_NOFS);
 	if (ret) {
 		preempt_disable();
 		__get_cpu_var(bh_accounting).nr++;
@@ -2821,7 +2837,7 @@ EXPORT_SYMBOL(alloc_buffer_head);
 void free_buffer_head(struct buffer_head *bh)
 {
 	BUG_ON(!list_empty(&bh->b_assoc_buffers));
-	mempool_free(bh, bh_mempool);
+	kmem_cache_free(bh_cachep, bh);
 	preempt_disable();
 	__get_cpu_var(bh_accounting).nr--;
 	recalc_bh_state();
@@ -2829,7 +2845,8 @@ void free_buffer_head(struct buffer_head *bh)
 }
 EXPORT_SYMBOL(free_buffer_head);
 
-static void init_buffer_head(void *data, kmem_cache_t *cachep, unsigned long flags)
+static void
+init_buffer_head(void *data, kmem_cache_t *cachep, unsigned long flags)
 {
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 			    SLAB_CTOR_CONSTRUCTOR) {
@@ -2839,19 +2856,6 @@ static void init_buffer_head(void *data, kmem_cache_t *cachep, unsigned long fla
 		INIT_LIST_HEAD(&bh->b_assoc_buffers);
 	}
 }
-
-static void *bh_mempool_alloc(int gfp_mask, void *pool_data)
-{
-	return kmem_cache_alloc(bh_cachep, gfp_mask);
-}
-
-static void bh_mempool_free(void *element, void *pool_data)
-{
-	return kmem_cache_free(bh_cachep, element);
-}
-
-#define NR_RESERVED (10*MAX_BUF_PER_PAGE)
-#define MAX_UNUSED_BUFFERS NR_RESERVED+20
 
 static void buffer_init_cpu(int cpu)
 {
@@ -2889,8 +2893,6 @@ void __init buffer_init(void)
 	bh_cachep = kmem_cache_create("buffer_head",
 			sizeof(struct buffer_head), 0,
 			0, init_buffer_head, NULL);
-	bh_mempool = mempool_create(MAX_UNUSED_BUFFERS, bh_mempool_alloc,
-				bh_mempool_free, NULL);
 	for (i = 0; i < ARRAY_SIZE(bh_wait_queue_heads); i++)
 		init_waitqueue_head(&bh_wait_queue_heads[i].wqh);
 

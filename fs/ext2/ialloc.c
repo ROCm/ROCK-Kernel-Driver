@@ -146,10 +146,8 @@ void ext2_free_inode (struct inode * inode)
 		mark_buffer_dirty(EXT2_SB(sb)->s_sbh);
 	}
 	mark_buffer_dirty(bitmap_bh);
-	if (sb->s_flags & MS_SYNCHRONOUS) {
-		ll_rw_block(WRITE, 1, &bitmap_bh);
-		wait_on_buffer(bitmap_bh);
-	}
+	if (sb->s_flags & MS_SYNCHRONOUS)
+		sync_dirty_buffer(bitmap_bh);
 	sb->s_dirt = 1;
 error_return:
 	brelse(bitmap_bh);
@@ -485,10 +483,8 @@ repeat:
 	ext2_set_bit(i, bitmap_bh->b_data);
 
 	mark_buffer_dirty(bitmap_bh);
-	if (sb->s_flags & MS_SYNCHRONOUS) {
-		ll_rw_block(WRITE, 1, &bitmap_bh);
-		wait_on_buffer(bitmap_bh);
-	}
+	if (sb->s_flags & MS_SYNCHRONOUS)
+		sync_dirty_buffer(bitmap_bh);
 	brelse(bitmap_bh);
 
 	ino = group * EXT2_INODES_PER_GROUP(sb) + i + 1;

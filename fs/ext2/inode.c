@@ -443,10 +443,8 @@ static int ext2_alloc_branch(struct inode *inode,
 		 * But we now rely upon generic_osync_inode()
 		 * and b_inode_buffers.  But not for directories.
 		 */
-		if (S_ISDIR(inode->i_mode) && IS_DIRSYNC(inode)) {
-			ll_rw_block(WRITE, 1, &bh);
-			wait_on_buffer(bh);
-		}
+		if (S_ISDIR(inode->i_mode) && IS_DIRSYNC(inode))
+			sync_dirty_buffer(bh);
 		parent = nr;
 	}
 	if (n == num)
@@ -1208,8 +1206,7 @@ static int ext2_update_inode(struct inode * inode, int do_sync)
 		raw_inode->i_block[n] = ei->i_data[n];
 	mark_buffer_dirty(bh);
 	if (do_sync) {
-		ll_rw_block (WRITE, 1, &bh);
-		wait_on_buffer (bh);
+		sync_dirty_buffer(bh);
 		if (buffer_req(bh) && !buffer_uptodate(bh)) {
 			printk ("IO error syncing ext2 inode [%s:%08lx]\n",
 				sb->s_id, (unsigned long) ino);

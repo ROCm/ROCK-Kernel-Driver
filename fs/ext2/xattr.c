@@ -774,8 +774,7 @@ ext2_xattr_set2(struct inode *inode, struct buffer_head *old_bh,
 		}
 		mark_buffer_dirty(new_bh);
 		if (IS_SYNC(inode)) {
-			ll_rw_block(WRITE, 1, &new_bh);
-			wait_on_buffer(new_bh); 
+			sync_dirty_buffer(new_bh);
 			error = -EIO;
 			if (buffer_req(new_bh) && !buffer_uptodate(new_bh))
 				goto cleanup;
@@ -865,10 +864,8 @@ ext2_xattr_delete_inode(struct inode *inode)
 		HDR(bh)->h_refcount = cpu_to_le32(
 			le32_to_cpu(HDR(bh)->h_refcount) - 1);
 		mark_buffer_dirty(bh);
-		if (IS_SYNC(inode)) {
-			ll_rw_block(WRITE, 1, &bh);
-			wait_on_buffer(bh);
-		}
+		if (IS_SYNC(inode))
+			sync_dirty_buffer(bh);
 		DQUOT_FREE_BLOCK(inode, 1);
 	}
 	EXT2_I(inode)->i_file_acl = 0;
