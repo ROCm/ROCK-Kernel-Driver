@@ -672,7 +672,7 @@ retry:
 		if (!ret) {
 			unlock_page(page);
 		} else {
-			free_huge_page(page);
+			huge_page_release(page);	
 			if (ret == -EEXIST)
 				goto retry;
 			else

@@ -555,6 +555,7 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 
 		idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
 			+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));
+	retry:
 		page = find_get_page(mapping, idx);
 		if (!page) {
 			/* charge the fs quota first */
@@ -569,10 +570,13 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 				goto out;
 			}
 			ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
-			unlock_page(page);
+			if (!ret)
+				unlock_page(page);
 			if (ret) {
 				hugetlb_put_quota(mapping);
-				free_huge_page(page);
+				huge_page_release(page);
+				if (ret == -EEXIST)
+					goto retry;
 				goto out;
 			}
 		}

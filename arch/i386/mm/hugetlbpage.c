@@ -356,6 +356,7 @@ hugetlb_alloc_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	
 	idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
 		+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));
+ retry:
 	page = find_get_page(mapping, idx);
 	if (!page) {
 		/* Should do this at prefault time, but that gets us into
@@ -383,9 +384,11 @@ hugetlb_alloc_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 		ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
 		if (!ret)
 			unlock_page(page);
-		if (ret) {
+		if (ret) {        		
 			hugetlb_put_quota(mapping);
-			free_huge_page(page);
+			huge_page_release(page);
+			if (ret == -EEXIST)
+				goto retry;
 			ret = VM_FAULT_SIGBUS;
 			goto out;
 		}
