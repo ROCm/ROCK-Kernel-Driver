@@ -971,10 +971,6 @@ set_dec_cpu6:
 	.data
 	.globl	sdata
 sdata:
-	.globl	init_thread_union
-init_thread_union:
-	.space	8192
-
 	.globl	empty_zero_page
 empty_zero_page:
 	.space	4096
