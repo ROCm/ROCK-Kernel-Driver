@@ -25,7 +25,5 @@ void cdev_del(struct cdev *);
 
 void cd_forget(struct inode *);
 
-#define cdev_set_name(cdev, args...) kobject_set_name(&((cdev)->kobj), ##args)
-
 #endif
 #endif

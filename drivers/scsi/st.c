@@ -3888,7 +3888,6 @@ static int st_probe(struct device *dev)
 				       dev_num);
 				goto out_free_tape;
 			}
-			cdev_set_name(cdev, "%sm%d%s", disk->disk_name, mode, j ? "n" : "");
 			cdev->owner = THIS_MODULE;
 			cdev->ops = &st_fops;
 

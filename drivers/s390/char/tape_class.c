@@ -46,9 +46,6 @@ struct cdev *register_tape_dev(
 	cdev->owner = fops->owner;
 	cdev->ops   = fops;
 	cdev->dev   = dev;
-	cdev_set_name(cdev, devname);
-	for (s = strchr(cdev->kobj.name, '/'); s; s = strchr(s, '/'))
-		*s = '!';
 
 	rc = cdev_add(cdev, cdev->dev, 1);
 	if (rc) {
