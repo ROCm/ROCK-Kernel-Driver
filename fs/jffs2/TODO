@@ -1,6 +1,5 @@
-$Id: TODO,v 1.7 2002/03/11 12:36:59 dwmw2 Exp $
+$Id: TODO,v 1.9 2002/07/11 10:39:04 dwmw2 Exp $
 
- - Locking audit. Even more so now 2.5 took away the BKL.
  - disable compression in commit_write()?
  - fine-tune the allocation / GC thresholds
  - chattr support - turning on/off and tuning compression per-inode
@@ -9,7 +8,6 @@ $Id: TODO,v 1.7 2002/03/11 12:36:59 dwmw2 Exp $
 	mount doesn't have to read the flash twice for large files.
 	Make this a per-inode option, changable with chattr, so you can
 	decide which inodes should be in-core immediately after mount.
- - stop it depending on a block device.
  - test, test, test
 
  - NAND flash support:
@@ -22,3 +20,25 @@ $Id: TODO,v 1.7 2002/03/11 12:36:59 dwmw2 Exp $
 	- timed flush of old wbuf
 	- fix magical second arg of jffs2_flush_wbuf(). Split into two or more functions instead.
 
+
+ - Optimisations:
+   - Stop GC from decompressing and immediately recompressing nodes which could
+     just be copied intact.
+   - Furthermore, in the case where it could be copied intact we don't even need
+     to call iget() for it -- if we use (raw_node_raw->flash_offset & 2) as a flag
+     to show a node can be copied intact and it's _not_ in icache, we could just do
+     it, fix up the next_in_ino list and move on. We would need a way to find out
+     _whether_ it's in icache though -- if it's in icache we also need to do the 
+     fragment lists, etc. P'raps a flag or pointer in the jffs2_inode_cache could
+     help.
+   - Stop keeping name in-core with struct jffs2_full_dirent. If we keep the hash in 
+     the full dirent, we only need to go to the flash in lookup() when we think we've
+     got a match, and in readdir(). 
+   - Doubly-linked next_in_ino list to allow us to free obsoleted raw_node_refs immediately?
+   - Remove totlen from jffs2_raw_node_ref? Need to have totlen passed into
+	jffs2_mark_node_obsolete(). Can all callers work it out?
+   - Don't check data CRC on node scan during mount. We don't really need to know 
+	yet. This means we can't build up node fragment lists, and hence can't 
+	build accurate clean/dirty information. But we don't _need_ that for reading,
+	only for writing. And in fact we don't even need it for writing until we 
+	start to need GC.

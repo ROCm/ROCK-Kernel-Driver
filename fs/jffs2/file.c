@@ -5,33 +5,9 @@
  *
  * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
  *
- * The original JFFS, from which the design for JFFS2 was derived,
- * was designed and implemented by Axis Communications AB.
+ * For licensing information, see the file 'LICENCE' in this directory.
  *
- * The contents of this file are subject to the Red Hat eCos Public
- * License Version 1.1 (the "Licence"); you may not use this file
- * except in compliance with the Licence.  You may obtain a copy of
- * the Licence at http://www.redhat.com/
- *
- * Software distributed under the Licence is distributed on an "AS IS"
- * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.
- * See the Licence for the specific language governing rights and
- * limitations under the Licence.
- *
- * The Original Code is JFFS2 - Journalling Flash File System, version 2
- *
- * Alternatively, the contents of this file may be used under the
- * terms of the GNU General Public License version 2 (the "GPL"), in
- * which case the provisions of the GPL are applicable instead of the
- * above.  If you wish to allow the use of your version of this file
- * only under the terms of the GPL and not to allow others to use your
- * version of this file under the RHEPL, indicate your decision by
- * deleting the provisions above and replace them with the notice and
- * other provisions required by the GPL.  If you do not delete the
- * provisions above, a recipient may use your version of this file
- * under either the RHEPL or the GPL.
- *
- * $Id: file.c,v 1.70 2002/03/05 09:55:07 dwmw2 Exp $
+ * $Id: file.c,v 1.75 2002/07/23 17:00:45 dwmw2 Exp $
  *
  */
 
@@ -43,7 +19,6 @@
 #include <linux/pagemap.h>
 #include <linux/crc32.h>
 #include <linux/jffs2.h>
-#include <linux/smp_lock.h>
 #include "nodelist.h"
 
 extern int generic_file_open(struct inode *, struct file *) __attribute__((weak));
@@ -66,36 +41,38 @@ int jffs2_fsync(struct file *filp, struct dentry *dentry, int datasync)
 	 * maybe we have to think about it to find a smarter
 	 * solution.
 	 */
+	down(&c->alloc_sem);
 	down(&f->sem);
 	jffs2_flush_wbuf(c,2);
 	up(&f->sem);
+	up(&c->alloc_sem);
 			
 	return 0;	
 }
 
 struct file_operations jffs2_file_operations =
 {
-	llseek:		generic_file_llseek,
-	open:		generic_file_open,
-	read:		generic_file_read,
-	write:		generic_file_write,
-	ioctl:		jffs2_ioctl,
-	mmap:		generic_file_mmap,
-	fsync:		jffs2_fsync
+	.llseek =	generic_file_llseek,
+	.open =		generic_file_open,
+	.read =		generic_file_read,
+	.write =	generic_file_write,
+	.ioctl =	jffs2_ioctl,
+	.mmap =		generic_file_mmap,
+	.fsync =	jffs2_fsync
 };
 
 /* jffs2_file_inode_operations */
 
 struct inode_operations jffs2_file_inode_operations =
 {
-	setattr:	jffs2_setattr
+	.setattr =	jffs2_setattr
 };
 
 struct address_space_operations jffs2_file_address_operations =
 {
-	readpage:	jffs2_readpage,
-	prepare_write:	jffs2_prepare_write,
-	commit_write:	jffs2_commit_write
+	.readpage =	jffs2_readpage,
+	.prepare_write =jffs2_prepare_write,
+	.commit_write =	jffs2_commit_write
 };
 
 int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
@@ -110,12 +87,11 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 	int mdatalen = 0;
 	unsigned int ivalid;
 	uint32_t phys_ofs, alloclen;
-	int ret = 0;
-	lock_kernel();
+	int ret;
 	D1(printk(KERN_DEBUG "jffs2_setattr(): ino #%lu\n", inode->i_ino));
 	ret = inode_change_ok(inode, iattr);
 	if (ret) 
-		goto out;
+		return ret;
 
 	/* Special cases - we don't want more than one data node
 	   for these types on the medium at any time. So setattr
@@ -132,14 +108,12 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 	} else if (S_ISLNK(inode->i_mode)) {
 		mdatalen = f->metadata->size;
 		mdata = kmalloc(f->metadata->size, GFP_USER);
-		if (!mdata) {
-			ret = -ENOMEM;
-			goto out;
-		}
+		if (!mdata)
+			return -ENOMEM;
 		ret = jffs2_read_dnode(c, f->metadata, mdata, 0, mdatalen);
 		if (ret) {
 			kfree(mdata);
-			goto out;
+			return ret;
 		}
 		D1(printk(KERN_DEBUG "jffs2_setattr(): Writing %d bytes of symlink target\n", mdatalen));
 	}
@@ -148,8 +122,7 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 	if (!ri) {
 		if (S_ISLNK(inode->i_mode))
 			kfree(mdata);
-		ret = -ENOMEM;
-		goto out;
+		return -ENOMEM;
 	}
 		
 	ret = jffs2_reserve_space(c, sizeof(*ri) + mdatalen, &phys_ofs, &alloclen, ALLOC_NORMAL);
@@ -157,7 +130,7 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 		jffs2_free_raw_inode(ri);
 		if (S_ISLNK(inode->i_mode & S_IFMT))
 			 kfree(mdata);
-		goto out;
+		return ret;
 	}
 	down(&f->sem);
 	ivalid = iattr->ia_valid;
@@ -206,8 +179,7 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 		jffs2_complete_reservation(c);
 		jffs2_free_raw_inode(ri);
 		up(&f->sem);
-		ret = PTR_ERR(new_metadata);
-		goto out;
+		return PTR_ERR(new_metadata);
 	}
 	/* It worked. Update the inode */
 	inode->i_atime = ri->atime;
@@ -241,9 +213,7 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 	up(&f->sem);
 	jffs2_complete_reservation(c);
 
-out:
-	unlock_kernel();	
-	return ret;
+	return 0;
 }
 
 int jffs2_do_readpage_nolock (struct inode *inode, struct page *pg)
@@ -288,18 +258,18 @@ int jffs2_do_readpage_unlock(struct inode *inode, struct page *pg)
 
 int jffs2_readpage (struct file *filp, struct page *pg)
 {
-	struct jffs2_inode_info *f = JFFS2_INODE_INFO(filp->f_dentry->d_inode);
+	struct jffs2_inode_info *f = JFFS2_INODE_INFO(pg->mapping->host);
 	int ret;
 	
 	down(&f->sem);
-	ret = jffs2_do_readpage_unlock(filp->f_dentry->d_inode, pg);
+	ret = jffs2_do_readpage_unlock(pg->mapping->host, pg);
 	up(&f->sem);
 	return ret;
 }
 
 int jffs2_prepare_write (struct file *filp, struct page *pg, unsigned start, unsigned end)
 {
-	struct inode *inode = filp->f_dentry->d_inode;
+	struct inode *inode = pg->mapping->host;
 	struct jffs2_inode_info *f = JFFS2_INODE_INFO(inode);
 	uint32_t pageofs = pg->index << PAGE_CACHE_SHIFT;
 	int ret = 0;
@@ -383,7 +353,7 @@ int jffs2_commit_write (struct file *filp, struct page *pg, unsigned start, unsi
 	/* Actually commit the write from the page cache page we're looking at.
 	 * For now, we write the full page out each time. It sucks, but it's simple
 	 */
-	struct inode *inode = filp->f_dentry->d_inode;
+	struct inode *inode = pg->mapping->host;
 	struct jffs2_inode_info *f = JFFS2_INODE_INFO(inode);
 	struct jffs2_sb_info *c = JFFS2_SB_INFO(inode->i_sb);
 	struct jffs2_raw_inode *ri;
