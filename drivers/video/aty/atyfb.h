@@ -36,17 +36,13 @@ struct pll_ct {
 	u8 pll_ref_div;
 	u8 pll_gen_cntl;
 	u8 mclk_fb_div;
-	u8 mclk_fb_mult;	/* 2 ro 4 */
-	u8 sclk_fb_div;
 	u8 pll_vclk_cntl;
 	u8 vclk_post_div;
 	u8 vclk_fb_div;
 	u8 pll_ext_cntl;
-	u8 spll_cntl2;
 	u32 dsp_config;		/* Mach64 GTB DSP */
 	u32 dsp_on_off;		/* Mach64 GTB DSP */
 	u8 mclk_post_div_real;
-	u8 xclk_post_div_real;
 	u8 vclk_post_div_real;
 };
 
@@ -79,7 +75,6 @@ struct atyfb_par {
 	u32 ref_clk_per;
 	u32 pll_per;
 	u32 mclk_per;
-	u32 xclk_per;
 	u8 bus_type;
 	u8 ram_type;
 	u8 mem_refresh_rate;
@@ -123,7 +118,7 @@ struct atyfb_par {
 #define M64F_EXTRA_BRIGHT	0x00020000
 #define M64F_LT_SLEEP		0x00040000
 #define M64F_XL_DLL		0x00080000
-#define M64F_MFB_TIMES_4	0x00100000
+
 
     /*
      *  Register access
@@ -153,33 +148,6 @@ static inline void aty_st_le32(int regindex, u32 val,
 	out_le32((volatile u32 *)(par->ati_regbase + regindex), val);
 #else
 	writel(val, par->ati_regbase + regindex);
-#endif
-}
-
-static inline u16 aty_ld_le16(int regindex, const struct atyfb_par *par)
-{
-	/* Hack for bloc 1, should be cleanly optimized by compiler */
-	if (regindex >= 0x400)
-		regindex -= 0x800;
-
-#if defined(__mc68000__)
-	return le16_to_cpu(*((volatile u16 *)(par->ati_regbase + regindex)));
-#else
-	return readw(par->ati_regbase + regindex);
-#endif
-}
-
-static inline void aty_st_le16(int regindex, u16 val,
-				const struct atyfb_par *par)
-{
-	/* Hack for bloc 1, should be cleanly optimized by compiler */
-	if (regindex >= 0x400)
-		regindex -= 0x800;
-
-#if defined(__mc68000__)
-	*((volatile u16 *)(par->ati_regbase + regindex)) = cpu_to_le16(val);
-#else
-	writew(val, par->ati_regbase + regindex);
 #endif
 }
 
@@ -220,19 +188,6 @@ static inline u8 aty_ld_pll(int offset, const struct atyfb_par *par)
 	return res;
 }
 
-
-/* 
- * CT Family only.
- */
-static inline void aty_st_pll(int offset, u8 val,
-				const struct atyfb_par *par)
-{
-	/* write addr byte */
-	aty_st_8(CLOCK_CNTL + 1, (offset << 2) | PLL_WR_EN, par);
-	/* write the register value */
-	aty_st_8(CLOCK_CNTL + 2, val, par);
-	aty_st_8(CLOCK_CNTL + 1, (offset << 2) & ~PLL_WR_EN, par); 
-}
 
     /*
      *  DAC operations
