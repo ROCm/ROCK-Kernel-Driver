@@ -171,7 +171,7 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 
 	num_processors++;
 
-	if (m->mpc_apicid > MAX_APICS) {
+	if (MAX_APICS - m->mpc_apicid <= 0) {
 		printk(KERN_WARNING "Processor #%d INVALID. (Max ID: %d).\n",
 			m->mpc_apicid, MAX_APICS);
 		--num_processors;
@@ -803,7 +803,7 @@ void __init mp_register_lapic (
 	struct mpc_config_processor processor;
 	int			boot_cpu = 0;
 	
-	if (id >= MAX_APICS) {
+	if (MAX_APICS - id <= 0) {
 		printk(KERN_WARNING "Processor #%d invalid (max %d)\n",
 			id, MAX_APICS);
 		return;

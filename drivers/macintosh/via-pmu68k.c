@@ -107,7 +107,7 @@ struct notifier_block *sleep_notifier_list;
 static int pmu_probe(void);
 static int pmu_init(void);
 static void pmu_start(void);
-static void pmu_interrupt(int irq, void *arg, struct pt_regs *regs);
+static irqreturn_t pmu_interrupt(int irq, void *arg, struct pt_regs *regs);
 static int pmu_send_request(struct adb_request *req, int sync);
 static int pmu_autopoll(int devs);
 void pmu_poll(void);
@@ -572,7 +572,7 @@ pmu_poll()
 	local_irq_restore(flags);
 }
 
-static void 
+static irqreturn_t
 pmu_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct adb_request *req;
@@ -688,6 +688,7 @@ finish:
 	printk("pmu_interrupt: exit state %d acr %02X, b %02X data_index %d/%d adb_int_pending %d\n",
 		pmu_state, (uint) via1[ACR], (uint) via2[B], data_index, data_len, adb_int_pending);
 #endif
+	return IRQ_HANDLED;
 }
 
 static void 

@@ -1,5 +1,6 @@
 #ifndef __ASM_MACH_APIC_H
 #define __ASM_MACH_APIC_H
+#include <asm/smp.h>
 
 #define SEQUENTIAL_APICID
 #ifdef SEQUENTIAL_APICID
@@ -40,18 +41,10 @@ static inline unsigned long check_apicid_present(int bit)
 
 #define apicid_cluster(apicid) (apicid & 0xF0)
 
-static inline unsigned get_apic_id(unsigned long x) 
-{ 
-	return (((x)>>24)&0x0F);
-} 
-
-#define		GET_APIC_ID(x)	get_apic_id(x)
-
 static inline unsigned long calculate_ldr(unsigned long old)
 {
 	unsigned long id;
-	id = xapic_phys_to_log_apicid(
-			GET_APIC_LOGICAL_ID(*(unsigned long *)(APIC_BASE+APIC_LDR)));
+	id = xapic_phys_to_log_apicid(hard_smp_processor_id());
 	return ((old & ~APIC_LDR_MASK) | SET_APIC_LOGICAL_ID(id));
 }
 
@@ -134,8 +127,6 @@ static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 {
 	return (1);
 }
-
-#define		APIC_ID_MASK		(0x0F<<24)
 
 static inline unsigned int cpu_mask_to_apicid (unsigned long cpumask)
 {

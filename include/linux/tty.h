@@ -345,7 +345,6 @@ struct tty_struct {
 extern void tty_write_flush(struct tty_struct *);
 
 extern struct termios tty_std_termios;
-extern struct tty_struct * redirect;
 extern struct tty_ldisc ldiscs[];
 extern int fg_console, last_console, want_console;
 

@@ -15,7 +15,7 @@
 #include <linux/security.h>
 #include <linux/eventpoll.h>
 #include <linux/mount.h>
-
+#include <linux/cdev.h>
 
 /* sysctl tunables... */
 struct files_stat_struct files_stat = {
@@ -166,6 +166,8 @@ void __fput(struct file *file)
 	if (file->f_op && file->f_op->release)
 		file->f_op->release(inode, file);
 	security_file_free(file);
+	if (unlikely(inode->i_cdev != NULL))
+		cdev_put(inode->i_cdev);
 	fops_put(file->f_op);
 	if (file->f_mode & FMODE_WRITE)
 		put_write_access(inode);

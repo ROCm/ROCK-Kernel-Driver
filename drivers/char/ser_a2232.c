@@ -116,7 +116,7 @@ static __inline__ volatile struct a2232memory *a2232mem (unsigned int board);
 static __inline__ void a2232_receive_char(	struct a2232_port *port,
 						int ch, int err );
 /* The interrupt service routine */
-static void a2232_vbl_inter(int irq, void *data, struct pt_regs *fp);
+static irqreturn_t a2232_vbl_inter(int irq, void *data, struct pt_regs *fp);
 /* Initialize the port structures */
 static void a2232_init_portstructs(void);
 /* Initialize and register TTY drivers. */
@@ -533,7 +533,7 @@ static __inline__ void a2232_receive_char(	struct a2232_port *port,
 	tty_flip_buffer_push(tty);
 }
 
-static void a2232_vbl_inter(int irq, void *data, struct pt_regs *fp)
+static irqreturn_t a2232_vbl_inter(int irq, void *data, struct pt_regs *fp)
 {
 #if A2232_IOBUFLEN != 256
 #error "Re-Implement a2232_vbl_inter()!"
@@ -673,6 +673,7 @@ int ch, err, n, p;
 		} // if events in CD queue
 		
 	} // for every completely initialized A2232 board
+	return IRQ_HANDLED;
 }
 
 static void a2232_init_portstructs(void)

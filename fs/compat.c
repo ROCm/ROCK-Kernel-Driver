@@ -31,6 +31,7 @@
 #include <linux/smp_lock.h>
 #include <linux/ctype.h>
 #include <linux/module.h>
+#include <net/sock.h>		/* siocdevprivate_ioctl */
 
 #include <asm/uaccess.h>
 

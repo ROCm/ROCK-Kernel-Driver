@@ -53,6 +53,7 @@
 #include <linux/pci.h>
 #include <linux/serial.h>
 #include <linux/watchdog.h>
+#include <net/sock.h>		/* siocdevprivate_ioctl */
 
 #include <scsi/scsi.h>
 /* Ugly hack. */

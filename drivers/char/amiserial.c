@@ -490,7 +490,7 @@ static _INLINE_ void check_modem_status(struct async_struct *info)
 	}
 }
 
-static void ser_vbl_int( int irq, void *data, struct pt_regs *regs)
+static irqreturn_t ser_vbl_int( int irq, void *data, struct pt_regs *regs)
 {
         /* vbl is just a periodic interrupt we tie into to update modem status */
 	struct async_struct * info = IRQ_ports;
@@ -500,9 +500,10 @@ static void ser_vbl_int( int irq, void *data, struct pt_regs *regs)
 	 */
 	if(info->IER & UART_IER_MSI)
 	  check_modem_status(info);
+	return IRQ_HANDLED;
 }
 
-static void ser_rx_int(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t ser_rx_int(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct async_struct * info;
 
@@ -512,16 +513,17 @@ static void ser_rx_int(int irq, void *dev_id, struct pt_regs * regs)
 
 	info = IRQ_ports;
 	if (!info || !info->tty)
-		return;
+		return IRQ_NONE;
 
 	receive_chars(info);
 	info->last_active = jiffies;
 #ifdef SERIAL_DEBUG_INTR
 	printk("end.\n");
 #endif
+	return IRQ_HANDLED;
 }
 
-static void ser_tx_int(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t ser_tx_int(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct async_struct * info;
 
@@ -532,7 +534,7 @@ static void ser_tx_int(int irq, void *dev_id, struct pt_regs * regs)
 
 	  info = IRQ_ports;
 	  if (!info || !info->tty)
-	    return;
+		return IRQ_NONE;
 
 	  transmit_chars(info);
 	  info->last_active = jiffies;
@@ -540,6 +542,7 @@ static void ser_tx_int(int irq, void *dev_id, struct pt_regs * regs)
 	  printk("end.\n");
 #endif
 	}
+	return IRQ_HANDLED;
 }
 
 /*

@@ -336,7 +336,7 @@ void __exit_signal(struct task_struct *tsk)
 		 * If there is any task waiting for the group exit
 		 * then notify it:
 		 */
-		if (sig->group_exit_task && atomic_read(&sig->count) <= 2) {
+		if (sig->group_exit_task && atomic_read(&sig->count) == sig->notify_count) {
 			wake_up_process(sig->group_exit_task);
 			sig->group_exit_task = NULL;
 		}
@@ -1346,6 +1346,9 @@ do_notify_parent_cldstop(struct task_struct *tsk, struct task_struct *parent)
 	spin_unlock_irqrestore(&sighand->siglock, flags);
 }
 
+
+#ifndef HAVE_ARCH_GET_SIGNAL_TO_DELIVER
+
 static void
 finish_stop(int stop_count)
 {
@@ -1459,9 +1462,6 @@ do_signal_stop(int signr)
 
 	finish_stop(stop_count);
 }
-
-
-#ifndef HAVE_ARCH_GET_SIGNAL_TO_DELIVER
 
 /*
  * Do appropriate magic when group_stop_count > 0.

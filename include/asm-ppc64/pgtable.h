@@ -377,5 +377,14 @@ extern void hpte_init_iSeries(void);
 
 typedef pte_t *pte_addr_t;
 
+long pSeries_lpar_hpte_insert(unsigned long hpte_group,
+			      unsigned long va, unsigned long prpn,
+			      int secondary, unsigned long hpteflags,
+			      int bolted, int large);
+
+long pSeries_hpte_insert(unsigned long hpte_group, unsigned long va,
+			 unsigned long prpn, int secondary,
+			 unsigned long hpteflags, int bolted, int large);
+
 #endif /* __ASSEMBLY__ */
 #endif /* _PPC64_PGTABLE_H */

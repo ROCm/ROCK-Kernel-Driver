@@ -43,19 +43,19 @@
 extern int ints_inited;
 
 
-void q40_irq2_handler (int, void *, struct pt_regs *fp);
+irqreturn_t q40_irq2_handler (int, void *, struct pt_regs *fp);
 
 
-extern void (*q40_sys_default_handler[]) (int, void *, struct pt_regs *);
+extern irqreturn_t (*q40_sys_default_handler[]) (int, void *, struct pt_regs *);
 
-static void q40_defhand (int irq, void *dev_id, struct pt_regs *fp);
-static void sys_default_handler(int lev, void *dev_id, struct pt_regs *regs);
+static irqreturn_t q40_defhand (int irq, void *dev_id, struct pt_regs *fp);
+static irqreturn_t sys_default_handler(int lev, void *dev_id, struct pt_regs *regs);
 
 
 #define DEVNAME_SIZE 24
 
 static struct q40_irq_node {
-	void		(*handler)(int, void *, struct pt_regs *);
+	irqreturn_t	(*handler)(int, void *, struct pt_regs *);
 	unsigned long	flags;
 	void		*dev_id;
   /*        struct q40_irq_node *next;*/
@@ -106,7 +106,7 @@ void q40_init_IRQ (void)
 }
 
 int q40_request_irq(unsigned int irq,
-		void (*handler)(int, void *, struct pt_regs *),
+		irqreturn_t (*handler)(int, void *, struct pt_regs *),
                 unsigned long flags, const char *devname, void *dev_id)
 {
   /*printk("q40_request_irq %d, %s\n",irq,devname);*/
@@ -198,9 +198,10 @@ void q40_free_irq(unsigned int irq, void *dev_id)
 }
 
 
-void q40_process_int (int level, struct pt_regs *fp)
+irqreturn_t q40_process_int (int level, struct pt_regs *fp)
 {
   printk("unexpected interrupt %x\n",level);
+  return IRQ_HANDLED;
 }
 
 /* 
@@ -231,9 +232,9 @@ void q40_mksound(unsigned int hz, unsigned int ticks)
   sound_ticks=ticks<<1;
 }
 
-static void (*q40_timer_routine)(int, void *, struct pt_regs *);
+static irqreturn_t (*q40_timer_routine)(int, void *, struct pt_regs *);
 
-static void q40_timer_int (int irq, void * dev, struct pt_regs * regs)
+static irqreturn_t q40_timer_int (int irq, void * dev, struct pt_regs * regs)
 {
     ql_ticks = ql_ticks ? 0 : 1;
     if (sound_ticks)
@@ -244,12 +245,12 @@ static void q40_timer_int (int irq, void * dev, struct pt_regs * regs)
 	*DAC_RIGHT=sval;
       }
 
-    if (ql_ticks) return;
-
-    q40_timer_routine(irq, dev, regs);
+    if (!ql_ticks)
+	q40_timer_routine(irq, dev, regs);
+    return IRQ_HANDLED;
 }
 
-void q40_sched_init (void (*timer_routine)(int, void *, struct pt_regs *))
+void q40_sched_init (irqreturn_t (*timer_routine)(int, void *, struct pt_regs *))
 {
     int timer_irq;
 
@@ -312,7 +313,7 @@ static int aliased_irq=0;  /* how many times inside handler ?*/
 
 
 /* got level 2 interrupt, dispatch to ISA or keyboard/timer IRQs */
-void q40_irq2_handler (int vec, void *devname, struct pt_regs *fp)
+irqreturn_t q40_irq2_handler (int vec, void *devname, struct pt_regs *fp)
 {
   unsigned mir, mer;
   int irq,i;
@@ -378,7 +379,7 @@ void q40_irq2_handler (int vec, void *devname, struct pt_regs *fp)
 #endif
 			  }
 // used to do 'goto repeat;' her, this delayed bh processing too long
-			  return;
+			  return IRQ_HANDLED;
 		  }
 	  }
 	  if (mer && ccleirq>0 && !aliased_irq) 
@@ -390,6 +391,7 @@ void q40_irq2_handler (int vec, void *devname, struct pt_regs *fp)
 	  irq_tab[Q40_IRQ_KEYBOARD].count++;
 	  irq_tab[Q40_IRQ_KEYBOARD].handler(Q40_IRQ_KEYBOARD,irq_tab[Q40_IRQ_KEYBOARD].dev_id,fp);
   }
+  return IRQ_HANDLED;
 }
 
 int show_q40_interrupts (struct seq_file *p, void *v)
@@ -409,16 +411,18 @@ int show_q40_interrupts (struct seq_file *p, void *v)
 }
 
 
-static void q40_defhand (int irq, void *dev_id, struct pt_regs *fp)
+static irqreturn_t q40_defhand (int irq, void *dev_id, struct pt_regs *fp)
 {
 	printk ("Unknown q40 interrupt 0x%02x\n", irq);
+	return IRQ_NONE;
 }
-static void sys_default_handler(int lev, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sys_default_handler(int lev, void *dev_id, struct pt_regs *regs)
 {
 	printk ("Uninitialised interrupt level %d\n", lev);
+	return IRQ_NONE;
 }
 
- void (*q40_sys_default_handler[SYS_IRQS]) (int, void *, struct pt_regs *) = {
+ irqreturn_t (*q40_sys_default_handler[SYS_IRQS]) (int, void *, struct pt_regs *) = {
 	 sys_default_handler,sys_default_handler,sys_default_handler,sys_default_handler,
 	 sys_default_handler,sys_default_handler,sys_default_handler,sys_default_handler
  };

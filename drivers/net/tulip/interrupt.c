@@ -194,10 +194,10 @@ static int tulip_rx(struct net_device *dev)
 				if (tp->rx_buffers[entry].mapping !=
 				    le32_to_cpu(tp->rx_ring[entry].buffer1)) {
 					printk(KERN_ERR "%s: Internal fault: The skbuff addresses "
-					       "do not match in tulip_rx: %08x vs. %08x %p / %p.\n",
+					       "do not match in tulip_rx: %08x vs. %Lx %p / %p.\n",
 					       dev->name,
 					       le32_to_cpu(tp->rx_ring[entry].buffer1),
-					       tp->rx_buffers[entry].mapping,
+					       (u64)tp->rx_buffers[entry].mapping,
 					       skb->head, temp);
 				}
 #endif

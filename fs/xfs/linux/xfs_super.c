@@ -329,7 +329,8 @@ STATIC int
 init_inodecache( void )
 {
 	linvfs_inode_cachep = kmem_cache_create("linvfs_icache",
-				sizeof(vnode_t), 0, SLAB_HWCACHE_ALIGN,
+				sizeof(vnode_t), 0, 
+				SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 				init_once, NULL);
 
 	if (linvfs_inode_cachep == NULL)

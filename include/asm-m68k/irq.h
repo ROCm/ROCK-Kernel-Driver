@@ -2,6 +2,7 @@
 #define _M68K_IRQ_H_
 
 #include <linux/config.h>
+#include <linux/interrupt.h>
 
 /*
  * # of m68k interrupts
@@ -76,7 +77,7 @@ extern void (*disable_irq)(unsigned int);
 struct pt_regs;
 
 extern int sys_request_irq(unsigned int, 
-	void (*)(int, void *, struct pt_regs *), 
+	irqreturn_t (*)(int, void *, struct pt_regs *), 
 	unsigned long, const char *, void *);
 extern void sys_free_irq(unsigned int, void *);
 
@@ -98,7 +99,7 @@ extern void sys_free_irq(unsigned int, void *);
  * interrupt source (if it supports chaining).
  */
 typedef struct irq_node {
-	void		(*handler)(int, void *, struct pt_regs *);
+	irqreturn_t	(*handler)(int, void *, struct pt_regs *);
 	unsigned long	flags;
 	void		*dev_id;
 	const char	*devname;
@@ -109,7 +110,7 @@ typedef struct irq_node {
  * This structure has only 4 elements for speed reasons
  */
 typedef struct irq_handler {
-	void		(*handler)(int, void *, struct pt_regs *);
+	irqreturn_t	(*handler)(int, void *, struct pt_regs *);
 	unsigned long	flags;
 	void		*dev_id;
 	const char	*devname;

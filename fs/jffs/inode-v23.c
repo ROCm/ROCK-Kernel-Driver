@@ -1806,9 +1806,11 @@ init_jffs_fs(void)
 	jffs_proc_root = proc_mkdir("jffs", proc_root_fs);
 #endif
 	fm_cache = kmem_cache_create("jffs_fm", sizeof(struct jffs_fm),
-				     0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+				     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT, 
+				     NULL, NULL);
 	node_cache = kmem_cache_create("jffs_node",sizeof(struct jffs_node),
-				       0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+				       0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT, 
+				       NULL, NULL);
 	return register_filesystem(&jffs_fs_type);
 }
 

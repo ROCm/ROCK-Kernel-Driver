@@ -382,6 +382,8 @@ struct inode {
 	struct list_head	i_devices;
 	struct pipe_inode_info	*i_pipe;
 	struct block_device	*i_bdev;
+	struct cdev		*i_cdev;
+	int			i_cindex;
 
 	unsigned long		i_dnotify_mask; /* Directory notify events */
 	struct dnotify_struct	*i_dnotify; /* for directory notifications */
@@ -1056,13 +1058,12 @@ extern void bd_release(struct block_device *);
 extern void blk_run_queues(void);
 
 /* fs/char_dev.c */
-extern int register_chrdev_region(unsigned int, unsigned int, int,
-				  const char *, struct file_operations *);
+extern int alloc_chrdev_region(dev_t *, unsigned, char *);
+extern int register_chrdev_region(dev_t, unsigned, char *);
 extern int register_chrdev(unsigned int, const char *,
 			   struct file_operations *);
 extern int unregister_chrdev(unsigned int, const char *);
-extern int unregister_chrdev_region(unsigned int, unsigned int, int,
-				    const char *);
+extern void unregister_chrdev_region(dev_t, unsigned);
 extern int chrdev_open(struct inode *, struct file *);
 
 /* fs/block_dev.c */

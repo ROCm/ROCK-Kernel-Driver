@@ -87,6 +87,8 @@ extern void proc_root_init(void);
 extern void proc_misc_init(void);
 
 struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry);
+struct dentry *proc_pid_unhash(struct task_struct *p);
+void proc_pid_flush(struct dentry *proc_dentry);
 int proc_pid_readdir(struct file * filp, void * dirent, filldir_t filldir);
 
 extern struct proc_dir_entry *create_proc_entry(const char *name, mode_t mode,

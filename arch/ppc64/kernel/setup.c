@@ -193,9 +193,9 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	printk("naca                          = 0x%p\n", naca);
 	printk("naca->pftSize                 = 0x%lx\n", naca->pftSize);
 	printk("naca->debug_switch            = 0x%lx\n", naca->debug_switch);
-	printk("naca->interrupt_controller    = 0x%d\n", naca->interrupt_controller);
+	printk("naca->interrupt_controller    = 0x%ld\n", naca->interrupt_controller);
 	printk("systemcf                      = 0x%p\n", systemcfg);
-	printk("systemcfg->processorCount     = 0x%x\n", systemcfg->processorCount);
+	printk("systemcfg->processorCount     = 0x%lx\n", systemcfg->processorCount);
 	printk("systemcfg->physicalMemorySize = 0x%lx\n", systemcfg->physicalMemorySize);
 	printk("systemcfg->dCacheL1LineSize   = 0x%x\n", systemcfg->dCacheL1LineSize);
 	printk("systemcfg->iCacheL1LineSize   = 0x%x\n", systemcfg->iCacheL1LineSize);

@@ -1715,7 +1715,8 @@ static int __init init_ntfs_fs(void)
 	}
 
 	ntfs_inode_cache = kmem_cache_create(ntfs_inode_cache_name,
-			sizeof(ntfs_inode), 0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+			sizeof(ntfs_inode), 0, 
+			SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT, NULL, NULL);
 	if (!ntfs_inode_cache) {
 		printk(KERN_CRIT "NTFS: Failed to create %s!\n",
 				ntfs_inode_cache_name);
@@ -1723,7 +1724,8 @@ static int __init init_ntfs_fs(void)
 	}
 
 	ntfs_big_inode_cache = kmem_cache_create(ntfs_big_inode_cache_name,
-			sizeof(big_ntfs_inode), 0, SLAB_HWCACHE_ALIGN,
+			sizeof(big_ntfs_inode), 0, 
+			SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 			ntfs_big_inode_init_once, NULL);
 	if (!ntfs_big_inode_cache) {
 		printk(KERN_CRIT "NTFS: Failed to create %s!\n",

@@ -440,7 +440,7 @@ static int init_inodecache(void)
 {
 	reiserfs_inode_cachep = kmem_cache_create("reiser_inode_cache",
 					     sizeof(struct reiserfs_inode_info),
-					     0, SLAB_HWCACHE_ALIGN,
+					     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					     init_once, NULL);
 	if (reiserfs_inode_cachep == NULL)
 		return -ENOMEM;
@@ -708,6 +708,24 @@ for old setups still work */
     return 1;
 }
 
+static void handle_attrs( struct super_block *s )
+{
+	struct reiserfs_super_block * rs;
+
+	if( reiserfs_attrs( s ) ) {
+		rs = SB_DISK_SUPER_BLOCK (s);
+		if( old_format_only(s) ) {
+			reiserfs_warning( "reiserfs: cannot support attributes on 3.5.x disk format\n" );
+			REISERFS_SB(s) -> s_mount_opt &= ~ ( 1 << REISERFS_ATTRS );
+			return;
+		}
+		if( !( le32_to_cpu( rs -> s_flags ) & reiserfs_attrs_cleared ) ) {
+				reiserfs_warning( "reiserfs: cannot support attributes until flag is set in super-block\n" );
+				REISERFS_SB(s) -> s_mount_opt &= ~ ( 1 << REISERFS_ATTRS );
+		}
+	}
+}
+
 static int reiserfs_remount (struct super_block * s, int * mount_flags, char * arg)
 {
   struct reiserfs_super_block * rs;
@@ -720,6 +738,8 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
   if (!reiserfs_parse_options(s, arg, &mount_options, &blocks, NULL))
     return -EINVAL;
   
+  handle_attrs( s );
+
   if(blocks) {
     int rc = reiserfs_resize(s, blocks);
     if (rc != 0)
@@ -1318,6 +1338,8 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     }
     // mark hash in super block: it could be unset. overwrite should be ok
     set_sb_hash_function_code( rs, function2code(sbi->s_hash_function ) );
+
+    handle_attrs( s );
 
     reiserfs_proc_info_init( s );
     reiserfs_proc_register( s, "version", reiserfs_version_in_proc );

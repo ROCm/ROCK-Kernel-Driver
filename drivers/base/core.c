@@ -211,7 +211,7 @@ int device_add(struct device *dev)
 		 dev->bus_id, dev->name);
 
 	/* first, register with generic layer. */
-	strncpy(dev->kobj.name,dev->bus_id,KOBJ_NAME_LEN);
+	strlcpy(dev->kobj.name,dev->bus_id,KOBJ_NAME_LEN);
 	if (parent)
 		dev->kobj.parent = &parent->kobj;
 

@@ -10,6 +10,7 @@
 #include <linux/smp.h>
 #include <linux/init.h>
 #include <asm/mach-default/mach_apic.h>
+#include <asm/mach-default/mach_apicdef.h>
 #include <asm/mach-default/mach_ipi.h>
 #include <asm/mach-default/mach_mpparse.h>
 

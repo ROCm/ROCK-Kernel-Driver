@@ -91,7 +91,7 @@ extern inline int any_online_cpu(unsigned int mask)
 #ifdef APIC_DEFINITION
 extern int hard_smp_processor_id(void);
 #else
-#include <mach_apic.h>
+#include <mach_apicdef.h>
 static inline int hard_smp_processor_id(void)
 {
 	/* we don't want to mark this access volatile - bad code generation */

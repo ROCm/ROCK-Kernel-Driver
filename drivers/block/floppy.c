@@ -4212,7 +4212,7 @@ static struct platform_device floppy_device = {
 	},
 };
 
-static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
+static struct kobject *floppy_find(dev_t dev, int *part, void *data)
 {
 	int drive = (*part&3) | ((*part&0x80) >> 5);
 	if (drive >= N_DRIVE ||

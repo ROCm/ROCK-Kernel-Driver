@@ -37,8 +37,8 @@ mark_mm_hugetlb(struct mm_struct *mm, struct vm_area_struct *vma)
 		mm->used_hugetlb = 1;
 }
 
-#ifndef ARCH_HAS_VALID_HUGEPAGE_RANGE
-#define check_valid_hugepage_range(addr, len)	0
+#ifndef ARCH_HAS_HUGEPAGE_ONLY_RANGE
+#define is_hugepage_only_range(addr, len)	0
 #endif
 
 #else /* !CONFIG_HUGETLB_PAGE */
@@ -62,7 +62,7 @@ static inline int is_vm_hugetlb_page(struct vm_area_struct *vma)
 #define follow_huge_pmd(mm, addr, pmd, write)	0
 #define is_aligned_hugepage_range(addr, len)	0
 #define pmd_huge(x)	0
-#define check_valid_hugepage_range(addr, len)	0
+#define is_hugepage_only_range(addr, len)	0
 
 #ifndef HPAGE_MASK
 #define HPAGE_MASK	0		/* Keep the compiler happy */

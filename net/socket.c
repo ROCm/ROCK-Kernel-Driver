@@ -311,7 +311,7 @@ static int init_inodecache(void)
 {
 	sock_inode_cachep = kmem_cache_create("sock_inode_cache",
 					     sizeof(struct socket_alloc),
-					     0, SLAB_HWCACHE_ALIGN,
+					     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					     init_once, NULL);
 	if (sock_inode_cachep == NULL)
 		return -ENOMEM;

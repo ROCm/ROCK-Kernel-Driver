@@ -107,15 +107,6 @@ static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 	return (1);
 }
 
-#define APIC_ID_MASK (0xF<<24)
-
-static inline unsigned get_apic_id(unsigned long x)
-{
-	        return (((x)>>24)&0x0F);
-}
-
-#define         GET_APIC_ID(x)  get_apic_id(x)
-
 static inline unsigned int cpu_mask_to_apicid (unsigned long cpumask)
 {
 	int num_bits_set;

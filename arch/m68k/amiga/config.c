@@ -71,12 +71,12 @@ static char amiga_model_name[13] = "Amiga ";
 
 extern char m68k_debug_device[];
 
-static void amiga_sched_init(void (*handler)(int, void *, struct pt_regs *));
+static void amiga_sched_init(irqreturn_t (*handler)(int, void *, struct pt_regs *));
 /* amiga specific irq functions */
 extern void amiga_init_IRQ (void);
-extern void (*amiga_default_handler[]) (int, void *, struct pt_regs *);
+extern irqreturn_t (*amiga_default_handler[]) (int, void *, struct pt_regs *);
 extern int amiga_request_irq (unsigned int irq,
-			      void (*handler)(int, void *, struct pt_regs *),
+			      irqreturn_t (*handler)(int, void *, struct pt_regs *),
                               unsigned long flags, const char *devname,
 			      void *dev_id);
 extern void amiga_free_irq (unsigned int irq, void *dev_id);
@@ -491,7 +491,7 @@ void __init config_amiga(void)
 
 static unsigned short jiffy_ticks;
 
-static void __init amiga_sched_init(void (*timer_routine)(int, void *,
+static void __init amiga_sched_init(irqreturn_t (*timer_routine)(int, void *,
 							  struct pt_regs *))
 {
 	static struct resource sched_res = {

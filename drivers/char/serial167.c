@@ -400,7 +400,7 @@ cy_sched_event(struct cyclades_port *info, int event)
    whenever the card wants its hand held--chars
    received, out buffer empty, modem change, etc.
  */
-static void
+static irqreturn_t
 cd2401_rxerr_interrupt(int irq, void *dev_id, struct pt_regs *fp)
 {
     struct tty_struct *tty;
@@ -418,7 +418,7 @@ cd2401_rxerr_interrupt(int irq, void *dev_id, struct pt_regs *fp)
     if ((err = base_addr[CyRISR]) & CyTIMEOUT) {
 	/* This is a receive timeout interrupt, ignore it */
 	base_addr[CyREOIR] = CyNOTRANS;
-	return;
+	return IRQ_HANDLED;
     }
 
     /* Read a byte of data if there is any - assume the error
@@ -432,13 +432,13 @@ cd2401_rxerr_interrupt(int irq, void *dev_id, struct pt_regs *fp)
     /* if there is nowhere to put the data, discard it */
     if(info->tty == 0) {
 	base_addr[CyREOIR] = rfoc ? 0 : CyNOTRANS;
-	return;
+	return IRQ_HANDLED;
     }
     else { /* there is an open port for this data */
 	tty = info->tty;
 	if(err & info->ignore_status_mask){
 	    base_addr[CyREOIR] = rfoc ? 0 : CyNOTRANS;
-	    return;
+	    return IRQ_HANDLED;
 	}
 	if (tty->flip.count < TTY_FLIPBUF_SIZE){
 	    tty->flip.count++;
@@ -488,9 +488,10 @@ cd2401_rxerr_interrupt(int irq, void *dev_id, struct pt_regs *fp)
     queue_task(&tty->flip.tqueue, &tq_timer);
     /* end of service */
     base_addr[CyREOIR] = rfoc ? 0 : CyNOTRANS;
+    return IRQ_HANDLED;
 } /* cy_rxerr_interrupt */
 
-static void
+static irqreturn_t
 cd2401_modem_interrupt(int irq, void *dev_id, struct pt_regs *fp)
 {
     struct cyclades_port *info;
@@ -543,9 +544,10 @@ cd2401_modem_interrupt(int irq, void *dev_id, struct pt_regs *fp)
 	}
     }
     base_addr[CyMEOIR] = 0;
+    return IRQ_HANDLED;
 } /* cy_modem_interrupt */
 
-static void
+static irqreturn_t
 cd2401_tx_interrupt(int irq, void *dev_id, struct pt_regs *fp)
 {
     struct cyclades_port *info;
@@ -569,7 +571,7 @@ cd2401_tx_interrupt(int irq, void *dev_id, struct pt_regs *fp)
     if( (channel < 0) || (NR_PORTS <= channel) ){
 	base_addr[CyIER] &= ~(CyTxMpty|CyTxRdy);
 	base_addr[CyTEOIR] = CyNOTRANS;
-	return;
+	return IRQ_HANDLED;
     }
     info->last_active = jiffies;
     if(info->tty == 0){
@@ -578,7 +580,7 @@ cd2401_tx_interrupt(int irq, void *dev_id, struct pt_regs *fp)
 	    cy_sched_event(info, Cy_EVENT_WRITE_WAKEUP);
         }
 	base_addr[CyTEOIR] = CyNOTRANS;
-	return;
+	return IRQ_HANDLED;
     }
 
     /* load the on-chip space available for outbound data */
@@ -662,9 +664,10 @@ cd2401_tx_interrupt(int irq, void *dev_id, struct pt_regs *fp)
 	cy_sched_event(info, Cy_EVENT_WRITE_WAKEUP);
     }
     base_addr[CyTEOIR] = (char_count != saved_cnt) ? 0 : CyNOTRANS;
+    return IRQ_HANDLED;
 } /* cy_tx_interrupt */
 
-static void
+static irqreturn_t
 cd2401_rx_interrupt(int irq, void *dev_id, struct pt_regs *fp)
 {
     struct tty_struct *tty;
@@ -722,6 +725,7 @@ cd2401_rx_interrupt(int irq, void *dev_id, struct pt_regs *fp)
     }
     /* end of service */
     base_addr[CyREOIR] = save_cnt ? 0 : CyNOTRANS;
+    return IRQ_HANDLED;
 } /* cy_rx_interrupt */
 
 /*

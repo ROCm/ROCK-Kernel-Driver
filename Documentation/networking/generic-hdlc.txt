@@ -38,8 +38,10 @@ Usually you want something like:
 	sethdlc hdlc0 cisco interval 10 timeout 25
 or
 	sethdlc hdlc0 rs232 clock ext
-	sethdlc fr lmi ansi
-	sethdlc create 99
+	sethdlc hdlc0 fr lmi ansi
+	sethdlc hdlc0 create 99
+	ifconfig hdlc0 up
+	ifconfig pvc0 localIP pointopoint remoteIP
 
 In Frame Relay mode, ifconfig master hdlc device up (without assigning
 any IP address to it) before using pvc devices.
