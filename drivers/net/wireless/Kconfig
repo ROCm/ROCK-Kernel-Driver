@@ -307,18 +307,18 @@ config PCMCIA_WL3501
 	 It has basic support for Linux wireless extensions and initial
 	 micro support for ethtool.
 
-comment "Prism GT/Duette 802.11(a/b/g) PCI/PCMCIA support"
+comment "Prism GT/Duette 802.11(a/b/g) PCI/Cardbus support"
 	depends on NET_RADIO && PCI
 config PRISM54
-	tristate 'Intersil Prism GT/Duette/Indigo PCI/PCMCIA' 
+	tristate 'Intersil Prism GT/Duette/Indigo PCI/Cardbus' 
 	depends on PCI && NET_RADIO && EXPERIMENTAL && HOTPLUG
 	select FW_LOADER
 	---help---
 	  Enable PCI and Cardbus support for the following chipset based cards:
 
-	  ISL3880 - Prism GT		802.11 b/g
-	  ISL3877 - Prism Indigo	802.11 a
-	  ISL3890 - Prism Duette	802.11 a/b/g
+	  ISL3880 - Prism GT            802.11 b/g
+	  ISL3877 - Prism Indigo        802.11 a
+	  ISL3890 - Prism Duette        802.11 a/b/g
 	  
 	  For a complete list of supported cards visit <http://prism54.org>.
 	  Here is the latest confirmed list of supported cards:
@@ -335,8 +335,9 @@ config PRISM54
 	  Peabird WLG-PCI PCI Card
 	  Sitecom WL-100i Cardbus Card
 	  Sitecom WL-110i PCI Card
-	  SMC2802W - EZ Connect g 2.4GHz 54 Mbps Wireless PCI Card
-	  SMC2835W - EZ Connect g 2.4GHz 54 Mbps Wireless Cardbus Card
+	  SMC2802W -    EZ Connect g 2.4GHz 54 Mbps Wireless PCI Card
+	  SMC2835W -    EZ Connect g 2.4GHz 54 Mbps Wireless Cardbus Card
+	  SMC2835W-V2 - EZ Connect g 2.4GHz 54 Mbps Wireless Cardbus Card
 	  Z-Com XG-900 PCI Card
 	  Zyxel G-100 Cardbus Card
 

@@ -22,6 +22,7 @@
 #include <linux/netdevice.h>
 #include <linux/module.h>
 #include <linux/pci.h>
+#include <linux/moduleparam.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
@@ -38,7 +39,7 @@
         Global variable definition section
 ******************************************************************************/
 int pc_debug = VERBOSE;
-MODULE_PARM(pc_debug, "i");
+module_param(pc_debug, int, 0);
 
 /******************************************************************************
     Driver general functions

@@ -63,6 +63,7 @@ islpci_eth_cleanup_transmit(islpci_private *priv,
 					 priv->pci_map_tx_address[index],
 					 skb->len, PCI_DMA_TODEVICE);
 			dev_kfree_skb_irq(skb);
+			skb = NULL;
 		}
 		/* increment the free data low queue pointer */
 		priv->free_data_tx++;
@@ -238,6 +239,7 @@ islpci_eth_transmit(struct sk_buff *skb, struct net_device *ndev)
  drop_free:
 	/* free the skbuf structure before aborting */
 	dev_kfree_skb(skb);
+	skb = NULL;
 
 	priv->statistics.tx_dropped++;
 	spin_unlock_irqrestore(&priv->slock, flags);
@@ -346,8 +348,10 @@ islpci_eth_receive(islpci_private *priv)
 	     skb->data[0], skb->data[1], skb->data[2], skb->data[3],
 	     skb->data[4], skb->data[5]);
 #endif
-	if (discard)
+	if (discard) {
 		dev_kfree_skb(skb);
+		skb = NULL;
+	}
 	else
 		netif_rx(skb);
 
@@ -388,6 +392,7 @@ islpci_eth_receive(islpci_private *priv)
 
 			/* free the skbuf structure before aborting */
 			dev_kfree_skb((struct sk_buff *) skb);
+			skb = NULL;
 			break;
 		}
 		/* update the fragment address */
