@@ -320,7 +320,8 @@ tracesys_sigexit:
 #ifdef __LP64__
 /* Use ENTRY_SAME for 32-bit syscalls which are the same on wide and
  * narrow palinux.  Use ENTRY_DIFF for those where a 32-bit specific
- * implementation is required on wide palinux.
+ * implementation is required on wide palinux.  Use ENTRY_COMP where
+ * the compatability layer has a useful 32-bit implementation.
  */
 #define ENTRY_SAME(_name_) .dword sys_##_name_
 #define ENTRY_DIFF(_name_) .dword sys32_##_name_
@@ -597,7 +598,7 @@ sys_call_table:
 	ENTRY_SAME(ni_syscall)		/* tkill */
 
 	ENTRY_SAME(sendfile64)
-	ENTRY_SAME(futex)		/* 210 */
+	ENTRY_COMP(futex)		/* 210 */
 	ENTRY_SAME(sched_setaffinity)
 	ENTRY_SAME(sched_getaffinity)
 	ENTRY_SAME(set_thread_area)

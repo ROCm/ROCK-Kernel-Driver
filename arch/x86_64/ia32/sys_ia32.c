@@ -2199,26 +2199,6 @@ long sys32_sched_getaffinity(pid_t pid, unsigned int len,
 	return err;
 }
 
-extern int sys_futex(unsigned long uaddr, int op, int val, struct timespec *t); 
-
-asmlinkage long
-sys32_futex(unsigned long uaddr, int op, int val, struct compat_timespec *utime32)
-{
-	struct timespec t;
-	mm_segment_t oldfs = get_fs(); 
-	int err;
-
-	if (utime32 && get_compat_timespec(&t, utime32))
-		return -EFAULT;
-
-	/* the set_fs is safe because futex doesn't use the seg limit 
-	   for valid page checking of uaddr. */ 
-	set_fs(KERNEL_DS); 
-	err = sys_futex(uaddr, op, val, utime32 ? &t : NULL);
-	set_fs(oldfs); 
-	return err; 
-}
-
 extern long sys_io_setup(unsigned nr_reqs, aio_context_t *ctx);
 
 long sys32_io_setup(unsigned nr_reqs, u32 *ctx32p)

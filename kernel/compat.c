@@ -16,6 +16,7 @@
 #include <linux/errno.h>
 #include <linux/time.h>
 #include <linux/signal.h>
+#include <linux/sched.h>	/* for MAX_SCHEDULE_TIMEOUT */
 
 #include <asm/uaccess.h>
 
@@ -207,4 +208,20 @@ asmlinkage long compat_sys_sigprocmask(int how, compat_old_sigset_t *set,
 	if (ret == 0)
 		ret = put_user(s, oset);
 	return ret;
+}
+
+extern long do_futex(u32 *, int, int, unsigned long);
+
+asmlinkage long compat_sys_futex(u32 *uaddr, int op, int val,
+		struct compat_timespec *utime)
+{
+	struct timespec t;
+	unsigned long timeout = MAX_SCHEDULE_TIMEOUT;
+
+	if ((op == FUTEX_WAIT) && utime) {
+		if (get_compat_timespec(&t, utime))
+			return -EFAULT;
+		timeout = timespec_to_jiffies(t) + 1;
+	}
+	return do_futex((unsigned long)uaddr, op, val, timeout);
 }
