@@ -1,13 +1,6 @@
 #
 # Makefile for the kernel character device drivers.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definitions are now inherited from the
-# parent makes..
-#
 
 #
 # This file contains the font map for the default (hardware) font
@@ -26,8 +19,6 @@ export-objs     :=	busmouse.o console.o keyboard.o sysrq.o \
 			sonypi.o tty_io.o tty_ioctl.o generic_serial.o rtc.o
 
 mod-subdirs	:=	ftape drm pcmcia
-
-list-multi	:=	
 
 KEYMAP   =defkeymap.o
 KEYBD    =pc_keyb.o

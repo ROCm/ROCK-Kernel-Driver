@@ -4,7 +4,6 @@
 
 O_TARGET := s390-char.o
 
-list-multi	:= tub3270.o tape390.o
 export-objs	:= hwc_rw.o
 
 tub3270-objs := tuball.o tubfs.o tubtty.o \
@@ -25,10 +24,3 @@ obj-$(CONFIG_TN3270) += tub3270.o
 obj-$(CONFIG_S390_TAPE) += tape390.o
 
 include $(TOPDIR)/Rules.make
-
-tub3270.o: $(tub3270-objs)
-	$(LD) -r -o $@ $(tub3270-objs)
-
-tape390.o: $(tape390-objs)
-	$(LD) -r -o $@ $(tape390-objs)
-
