@@ -665,7 +665,6 @@ struct thread_struct {
 	unsigned long	ksp;		/* Kernel stack pointer */
 	struct pt_regs	*regs;		/* Pointer to saved register state */
 	mm_segment_t	fs;		/* for get_fs() validation */
-	void		*pgdir;		/* root of page-table tree */
 	signed long     last_syscall;
 	double		fpr[32];	/* Complete floating point set */
 	unsigned long	fpscr_pad;	/* fpr ... fpscr must be contiguous */
@@ -678,7 +677,6 @@ struct thread_struct {
 	INIT_SP, /* ksp */ \
 	(struct pt_regs *)INIT_SP - 1, /* regs */ \
 	KERNEL_DS, /*fs*/ \
-	swapper_pg_dir, /* pgdir */ \
 	0, /* last_syscall */ \
 	{0}, 0, 0 \
 }
