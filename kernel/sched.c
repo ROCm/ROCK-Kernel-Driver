@@ -770,7 +770,7 @@ skip_bitmap:
 		idx = sched_find_first_bit(array->bitmap);
 	else
 		idx = find_next_bit(array->bitmap, MAX_PRIO, idx);
-	if (idx == MAX_PRIO) {
+	if (idx >= MAX_PRIO) {
 		if (array == busiest->expired) {
 			array = busiest->active;
 			goto new_array;

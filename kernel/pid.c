@@ -131,7 +131,7 @@ next_map:
 	 */
 scan_more:
 	offset = find_next_zero_bit(map->page, BITS_PER_PAGE, offset);
-	if (offset == BITS_PER_PAGE)
+	if (offset >= BITS_PER_PAGE)
 		goto next_map;
 	if (test_and_set_bit(offset, map->page))
 		goto scan_more;
