@@ -59,6 +59,7 @@
 #include <asm/irq.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <scsi/scsi_device.h>
+#include <scsi/scsi_host.h>
 #include <asm/pci.h>
 #else
 /* From drivers/scsi */
@@ -112,7 +113,7 @@
 #define LPFC_DRIVER_NAME    "lpfc"
 
 #ifndef LPFC_DRIVER_VERSION
-#define LPFC_DRIVER_VERSION "2.10c"
+#define LPFC_DRIVER_VERSION "2.10d"
 #define OSGT_DRIVER_VERSION "1.08"
 #endif
 
@@ -593,6 +594,7 @@ lpfc_linux_attach(int instance, Scsi_Host_Template * tmpt, struct pci_dev *pdev)
 	init_waitqueue_head(&plxhba->linkevtwq);
 	init_waitqueue_head(&plxhba->rscnevtwq);
 	init_waitqueue_head(&plxhba->ctevtwq);
+	spin_lock_init(&plxhba->iodonelock.elx_lock);
 
 	if ((rc = lpfc_pcimap(phba))) {
 		elx_kmem_free(phba->pHbaOSEnv, sizeof (LINUX_HBA_t));
@@ -738,7 +740,7 @@ lpfc_linux_attach(int instance, Scsi_Host_Template * tmpt, struct pci_dev *pdev)
 #endif
 	plxhba->host = host;
 
-	host->can_queue = clp[ELX_CFG_DFT_HBA_Q_DEPTH].a_current;
+	host->can_queue = clp[ELX_CFG_DFT_HBA_Q_DEPTH].a_current - 10;
 
 	/*
 	 * Adjust the number of id's
@@ -804,7 +806,7 @@ lpfc_linux_attach(int instance, Scsi_Host_Template * tmpt, struct pci_dev *pdev)
       LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
 	scsi_set_pci_device(host, pdev);
 #endif
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	pci_set_drvdata(pdev, host);
 	scsi_add_host(host, &pdev->dev);
 	scsi_scan_host(host);
@@ -1256,6 +1258,7 @@ lpfc_local_timeout(unsigned long data)
 	uint32_t i;
 	unsigned long cflag;
 	unsigned long iflag;
+	unsigned long flag;
 	unsigned long sflag;
 
 	cflag = 0;
@@ -1283,12 +1286,15 @@ lpfc_local_timeout(unsigned long data)
 			ELX_DRVR_LOCK(phba, iflag);
 			plxhba = (LINUX_HBA_t *) phba->pHbaOSEnv;
 			host = plxhba->host;
+			spin_lock_irqsave(&plxhba->iodonelock.elx_lock, flag);
 			/* Flush all done commands for this hba */
 			if (plxhba->iodone.q_first) {
 				cmnd = (Scsi_Cmnd *) plxhba->iodone.q_first;
 				plxhba->iodone.q_first = 0;
 				plxhba->iodone.q_last = 0;
 				plxhba->iodone.q_cnt = 0;
+				spin_unlock_irqrestore(&plxhba->iodonelock.
+						       elx_lock, flag);
 				while (cmnd) {
 					next_cmnd =
 					    (Scsi_Cmnd *) cmnd->host_scribble;
@@ -1307,6 +1313,9 @@ lpfc_local_timeout(unsigned long data)
 					ELX_DRVR_LOCK(phba, iflag);
 					cmnd = next_cmnd;
 				}
+			} else {
+				spin_unlock_irqrestore(&plxhba->iodonelock.
+						       elx_lock, flag);
 			}
 			ELX_DRVR_UNLOCK(phba, iflag);
 		}
@@ -2179,10 +2188,10 @@ lpfc_intr_handler(int irq, void *dev_id, struct pt_regs * regs)
 	LINUX_HBA_t *plxhba;
 	Scsi_Cmnd *cmnd;
 	Scsi_Cmnd *next_cmnd;
-	struct Scsi_Host *host;
 	int i;
-	unsigned long iflag;
+	unsigned long iflag, flag;
 	unsigned long sflag;
+	struct Scsi_Host *host;
 
 	/* Sanity check dev_id parameter */
 	phba = (elxHBA_t *) dev_id;
@@ -2212,12 +2221,14 @@ lpfc_intr_handler(int irq, void *dev_id, struct pt_regs * regs)
 
 	plxhba = (LINUX_HBA_t *) phba->pHbaOSEnv;
 	host = plxhba->host;
+	spin_lock_irqsave(&plxhba->iodonelock.elx_lock, flag);
 	/* Flush all done commands */
 	if (plxhba->iodone.q_first) {
 		cmnd = (Scsi_Cmnd *) plxhba->iodone.q_first;
 		plxhba->iodone.q_first = 0;
 		plxhba->iodone.q_last = 0;
 		plxhba->iodone.q_cnt = 0;
+		spin_unlock_irqrestore(&plxhba->iodonelock.elx_lock, flag);
 		while (cmnd) {
 			next_cmnd = (Scsi_Cmnd *) cmnd->host_scribble;
 			cmnd->host_scribble = 0;
@@ -2233,6 +2244,8 @@ lpfc_intr_handler(int irq, void *dev_id, struct pt_regs * regs)
 			ELX_DRVR_LOCK(phba, iflag);
 			cmnd = next_cmnd;
 		}
+	} else {
+		spin_unlock_irqrestore(&plxhba->iodonelock.elx_lock, flag);
 	}
 
 	lpfc_isr &= ~((uint32_t) (1 << smp_processor_id()));
@@ -2334,6 +2347,8 @@ lpfc_config_setup(elxHBA_t * phba)
 	ELX_SLI_t *psli;
 	int i;
 	int brd;
+	int clpastringidx = 0;
+	char clpastring[32];
 
 	clp = &phba->config[0];
 	plhba = (LPFCHBA_t *) phba->pHbaProto;
@@ -2382,10 +2397,18 @@ lpfc_config_setup(elxHBA_t * phba)
 			if (clp[LPFC_CFG_CR_DELAY].a_current == 0)
 				continue;
 
+		/* Display lpfc-param as lpfc_param */
+		clpastringidx = 0;
+		while ((clpastring[clpastringidx] =
+			clp[i].a_string[clpastringidx])) {
+			if (clpastring[clpastringidx] == '-')
+				clpastring[clpastringidx] = '_';
+			clpastringidx++;
+		}
 		elx_printf_log(phba->brd_no, &elx_msgBlk0413,	/* ptr to msg structure */
 			       elx_mes0413,	/* ptr to msg */
 			       elx_msgBlk0413.msgPreambleStr,	/* begin varargs */
-			       clp[i].a_string, clp[i].a_low, clp[i].a_hi, clp[i].a_default);	/* end varargs */
+			       clpastring, clp[i].a_low, clp[i].a_hi, clp[i].a_default);	/* end varargs */
 
 		clp[i].a_current = clp[i].a_default;
 
@@ -2394,6 +2417,11 @@ lpfc_config_setup(elxHBA_t * phba)
 	switch (((SWAP_LONG(phba->pci_id)) >> 16) & 0xffff) {
 	case PCI_DEVICE_ID_LP101:
 		clp[ELX_CFG_DFT_HBA_Q_DEPTH].a_current = LPFC_LP101_HBA_Q_DEPTH;
+		break;
+	case PCI_DEVICE_ID_RFLY:
+	case PCI_DEVICE_ID_PFLY:
+	case PCI_DEVICE_ID_TFLY:
+		clp[ELX_CFG_DFT_HBA_Q_DEPTH].a_current = LPFC_LC_HBA_Q_DEPTH;
 		break;
 	default:
 		clp[ELX_CFG_DFT_HBA_Q_DEPTH].a_current = LPFC_DFT_HBA_Q_DEPTH;

@@ -2974,16 +2974,11 @@ lpfc_els_retry(elxHBA_t * phba, ELX_IOCBQ_t * cmdiocb, ELX_IOCBQ_t * rspiocb)
 				if (targetp->tmofunc) {
 					elx_clk_can(phba, targetp->tmofunc);
 				}
-				targetp->tmofunc = elx_clk_set(phba,
-							       (clp
-								[ELX_CFG_NODEV_TMO].
-								a_current +
-								clp
-								[ELX_CFG_LINKDOWN_TMO].
-								a_current),
-							       lpfc_npr_timeout,
-							       (void *)targetp,
-							       (void *)0);
+				targetp->tmofunc =
+				    elx_clk_set(phba,
+						clp[ELX_CFG_NODEV_TMO].
+						a_current, lpfc_npr_timeout,
+						(void *)targetp, (void *)0);
 			}
 			return (1);
 		}
@@ -3229,16 +3224,11 @@ lpfc_cmpl_els_logo_acc(elxHBA_t * phba,
 				if (targetp->tmofunc) {
 					elx_clk_can(phba, targetp->tmofunc);
 				}
-				targetp->tmofunc = elx_clk_set(phba,
-							       (clp
-								[ELX_CFG_NODEV_TMO].
-								a_current +
-								clp
-								[ELX_CFG_LINKDOWN_TMO].
-								a_current),
-							       lpfc_npr_timeout,
-							       (void *)targetp,
-							       (void *)0);
+				targetp->tmofunc =
+				    elx_clk_set(phba,
+						clp[ELX_CFG_NODEV_TMO].
+						a_current, lpfc_npr_timeout,
+						(void *)targetp, (void *)0);
 			}
 
 			if (ndlp->nlp_tmofunc) {
@@ -3264,16 +3254,11 @@ lpfc_cmpl_els_logo_acc(elxHBA_t * phba,
 				if (targetp->tmofunc) {
 					elx_clk_can(phba, targetp->tmofunc);
 				}
-				targetp->tmofunc = elx_clk_set(phba,
-							       (clp
-								[ELX_CFG_NODEV_TMO].
-								a_current +
-								clp
-								[ELX_CFG_LINKDOWN_TMO].
-								a_current),
-							       lpfc_npr_timeout,
-							       (void *)targetp,
-							       (void *)0);
+				targetp->tmofunc =
+				    elx_clk_set(phba,
+						clp[ELX_CFG_NODEV_TMO].
+						a_current, lpfc_npr_timeout,
+						(void *)targetp, (void *)0);
 			}
 		}
 		break;
@@ -4793,17 +4778,32 @@ lpfc_linkdown(elxHBA_t * phba)
 								    targetp->
 								    tmofunc);
 						}
-						targetp->tmofunc =
-						    elx_clk_set(phba,
-								(clp
-								 [ELX_CFG_NODEV_TMO].
-								 a_current +
-								 clp
-								 [ELX_CFG_LINKDOWN_TMO].
-								 a_current),
-								lpfc_npr_timeout,
-								(void *)targetp,
-								(void *)0);
+						if (clp[ELX_CFG_NODEV_TMO].
+						    a_current >
+						    clp[ELX_CFG_LINKDOWN_TMO].
+						    a_current) {
+							targetp->tmofunc =
+							    elx_clk_set(phba,
+									clp
+									[ELX_CFG_NODEV_TMO].
+									a_current,
+									lpfc_npr_timeout,
+									(void *)
+									targetp,
+									(void *)
+									0);
+						} else {
+							targetp->tmofunc =
+							    elx_clk_set(phba,
+									clp
+									[ELX_CFG_LINKDOWN_TMO].
+									a_current,
+									lpfc_npr_timeout,
+									(void *)
+									targetp,
+									(void *)
+									0);
+						}
 					} else {
 						elx_sched_flush_target(phba,
 								       targetp,
@@ -6240,6 +6240,7 @@ lpfc_freenode(elxHBA_t * phba, LPFC_NODELIST_t * ndlp)
 		lpfc_set_failmask(phba, ndlp, ELX_DEV_DISCONNECTED,
 				  ELX_SET_BITMASK);
 	}
+
 	return (0);
 }
 
@@ -7282,6 +7283,7 @@ lpfc_linkdown_timeout(elxHBA_t * phba, void *l1, void *l2)
 		elx_sched_flush_hba(phba, IOSTAT_DRIVER_REJECT,
 				    IOERR_SLI_ABORTED);
 	}
+
 	return;
 }
 
@@ -7299,6 +7301,9 @@ lpfc_nodev_timeout(elxHBA_t * phba, void *l1, void *l2)
 		       elx_msgBlk0203.msgPreambleStr,	/* begin varargs */
 		       ndlp->nlp_DID, ndlp->nlp_flag, ndlp->nlp_state, ndlp->nle.nlp_rpi);	/* end varargs */
 
+	ndlp->nlp_flag &= ~(NLP_NODEV_TMO | NLP_DELAY_TMO);
+	ndlp->nlp_tmofunc = 0;
+
 	ndlp->nle.nlp_rflag &= ~NLP_NPR_ACTIVE;
 	targetp = ndlp->nlp_Target;
 	if (targetp) {
@@ -7310,8 +7315,6 @@ lpfc_nodev_timeout(elxHBA_t * phba, void *l1, void *l2)
 			targetp->tmofunc = 0;
 		}
 	}
-	ndlp->nlp_flag &= ~(NLP_NODEV_TMO | NLP_DELAY_TMO);
-	ndlp->nlp_tmofunc = 0;
 	lpfc_disc_state_machine(phba, ndlp, (void *)0, NLP_EVT_DEVICE_RM);
 	return;
 }
@@ -7645,7 +7648,9 @@ lpfc_disc_retry_rptlun(elxHBA_t * phba, void *l1, void *l2)
 
 	targetp = (ELXSCSITARGET_t *) l1;
 	ndlp = (LPFC_NODELIST_t *) targetp->pcontext;
-	lpfc_disc_issue_rptlun(phba, ndlp);
+	if (ndlp) {
+		lpfc_disc_issue_rptlun(phba, ndlp);
+	}
 }
 
 /*****************************************************************************/
@@ -8631,6 +8636,11 @@ lpfc_handle_eratt(elxHBA_t * phba, uint32_t status)
 {
 	ELX_SLI_t *psli;
 	LPFCHBA_t *plhba;
+	ELX_SLI_RING_t *pring;
+	ELX_IOCBQ_t *iocb, *next_iocb;
+	IOCB_t *icmd = NULL, *cmd = NULL;
+	ELX_SCSI_BUF_t *elx_cmd;
+	unsigned long iflag;
 	volatile uint32_t status1, status2;
 
 	psli = &phba->sli;
@@ -8647,6 +8657,47 @@ lpfc_handle_eratt(elxHBA_t * phba, uint32_t status)
 			       elx_msgBlk1301.msgPreambleStr,	/* begin varargs */
 			       status, status1, status2);	/* end varargs */
 		plhba->fc_flag |= FC_ESTABLISH_LINK;
+
+		/* 
+		 * Firmware stops when it triggled erratt with HS_FFER6.
+		 * That could cause the I/Os dropped by the firmware.
+		 * Error iocb (I/O) on txcmplq and let the SCSI layer 
+		 * retry it after re-establishing link. 
+		 */
+		pring = &psli->ring[psli->fcp_ring];
+		next_iocb = (ELX_IOCBQ_t *) pring->txcmplq.q_f;
+		while (next_iocb != (ELX_IOCBQ_t *) & pring->txcmplq) {
+			iocb = next_iocb;
+			next_iocb = next_iocb->q_f;
+			cmd = &iocb->iocb;
+
+			/* Must be a FCP command */
+			if ((cmd->ulpCommand != CMD_FCP_ICMND64_CR) &&
+			    (cmd->ulpCommand != CMD_FCP_IWRITE64_CR) &&
+			    (cmd->ulpCommand != CMD_FCP_IREAD64_CR)) {
+				continue;
+			}
+
+			/* context1 MUST be a ELX_SCSI_BUF_t */
+			elx_cmd = (ELX_SCSI_BUF_t *) (iocb->context1);
+			if (elx_cmd == 0) {
+				continue;
+			}
+
+			elx_deque(iocb);
+			pring->txcmplq.q_cnt--;
+			if (iocb->iocb_cmpl) {
+				icmd = &iocb->iocb;
+				icmd->ulpStatus = IOSTAT_DRIVER_REJECT;
+				icmd->un.ulpWord[4] = IOERR_SLI_ABORTED;
+				ELX_SLI_UNLOCK(phba, iflag);
+				(iocb->iocb_cmpl) ((void *)phba, iocb, iocb);
+				ELX_SLI_LOCK(phba, iflag);
+			} else {
+				elx_mem_put(phba, MEM_IOCB, (uint8_t *) iocb);
+			}
+		}
+
 		lpfc_offline(phba);
 		if (lpfc_online(phba) == 0) {	/* Initialize the HBA */
 			if (plhba->fc_estabtmo) {
@@ -17564,12 +17615,21 @@ lpfc_rcv_logo_plogi_issue(elxHBA_t * phba,
 		if (targetp->tmofunc) {
 			elx_clk_can(phba, targetp->tmofunc);
 		}
-		targetp->tmofunc = elx_clk_set(phba,
-					       (clp[ELX_CFG_NODEV_TMO].
-						a_current +
-						clp[ELX_CFG_LINKDOWN_TMO].
-						a_current), lpfc_npr_timeout,
-					       (void *)targetp, (void *)0);
+		if (clp[ELX_CFG_NODEV_TMO].a_current >
+		    clp[ELX_CFG_LINKDOWN_TMO].a_current) {
+			targetp->tmofunc =
+			    elx_clk_set(phba, clp[ELX_CFG_NODEV_TMO].a_current,
+					lpfc_npr_timeout, (void *)targetp,
+					(void *)0);
+		} else {
+			targetp->tmofunc = elx_clk_set(phba,
+						       clp
+						       [ELX_CFG_LINKDOWN_TMO].
+						       a_current,
+						       lpfc_npr_timeout,
+						       (void *)targetp,
+						       (void *)0);
+		}
 	}
 	ndlp->nle.nlp_rflag |= NLP_NPR_ACTIVE;
 	ndlp->nlp_flag |= NLP_DELAY_TMO;
@@ -18939,12 +18999,19 @@ lpfc_device_unk_prli_compl(elxHBA_t * phba,
 		/* now start a nodev timer */
 		ndlp->nlp_flag |= NLP_NODEV_TMO;
 		ndlp->nle.nlp_rflag |= NLP_NPR_ACTIVE;
-		ndlp->nlp_tmofunc = elx_clk_set(phba,
-						clp[ELX_CFG_LINKDOWN_TMO].
-						a_current +
-						clp[ELX_CFG_NODEV_TMO].
-						a_current, lpfc_nodev_timeout,
-						(void *)ndlp, (void *)0);
+		if (clp[ELX_CFG_NODEV_TMO].a_current >
+		    clp[ELX_CFG_LINKDOWN_TMO].a_current) {
+			ndlp->nlp_tmofunc =
+			    elx_clk_set(phba, clp[ELX_CFG_NODEV_TMO].a_current,
+					lpfc_nodev_timeout, (void *)ndlp,
+					(void *)0);
+		} else {
+			ndlp->nlp_tmofunc =
+			    elx_clk_set(phba,
+					clp[ELX_CFG_LINKDOWN_TMO].a_current,
+					lpfc_nodev_timeout, (void *)ndlp,
+					(void *)0);
+		}
 
 		/* Start nodev timer */
 		elx_printf_log(phba->brd_no, &elx_msgBlk0706,	/* ptr to msg structure */
@@ -19138,12 +19205,17 @@ uint32_t
 lpfc_cmpl_logo_mapped_node(elxHBA_t * phba,
 			   LPFC_NODELIST_t * ndlp, void *arg, uint32_t evt)
 {
+	ELXSCSITARGET_t *targetp;
+
 	/* save binding on binding list */
 	if (ndlp->nlp_listp_bind) {
 		lpfc_nlp_bind(phba, ndlp->nlp_listp_bind);
 
-		elx_sched_flush_target(phba, ndlp->nlp_Target,
-				       IOSTAT_DRIVER_REJECT, IOERR_SLI_ABORTED);
+		if ((targetp = ndlp->nlp_Target)) {
+			elx_sched_flush_target(phba, targetp,
+					       IOSTAT_DRIVER_REJECT,
+					       IOERR_SLI_ABORTED);
+		}
 		ndlp->nlp_listp_bind = 0;
 		ndlp->nlp_pan = 0;
 		ndlp->nlp_sid = 0;
@@ -19407,12 +19479,21 @@ lpfc_device_rm_mapped_node(elxHBA_t * phba,
 		if (targetp->tmofunc) {
 			elx_clk_can(phba, targetp->tmofunc);
 		}
-		targetp->tmofunc = elx_clk_set(phba,
-					       (clp[ELX_CFG_NODEV_TMO].
-						a_current +
-						clp[ELX_CFG_LINKDOWN_TMO].
-						a_current), lpfc_npr_timeout,
-					       (void *)targetp, (void *)0);
+		if (clp[ELX_CFG_NODEV_TMO].a_current >
+		    clp[ELX_CFG_LINKDOWN_TMO].a_current) {
+			targetp->tmofunc =
+			    elx_clk_set(phba, clp[ELX_CFG_NODEV_TMO].a_current,
+					lpfc_npr_timeout, (void *)targetp,
+					(void *)0);
+		} else {
+			targetp->tmofunc = elx_clk_set(phba,
+						       clp
+						       [ELX_CFG_LINKDOWN_TMO].
+						       a_current,
+						       lpfc_npr_timeout,
+						       (void *)targetp,
+						       (void *)0);
+		}
 	}
 	lpfc_set_failmask(phba, ndlp, ELX_DEV_DISAPPEARED, ELX_SET_BITMASK);
 	return (ndlp->nlp_state);
@@ -19457,12 +19538,21 @@ lpfc_device_unk_mapped_node(elxHBA_t * phba,
 		if (targetp->tmofunc) {
 			elx_clk_can(phba, targetp->tmofunc);
 		}
-		targetp->tmofunc = elx_clk_set(phba,
-					       (clp[ELX_CFG_NODEV_TMO].
-						a_current +
-						clp[ELX_CFG_LINKDOWN_TMO].
-						a_current), lpfc_npr_timeout,
-					       (void *)targetp, (void *)0);
+		if (clp[ELX_CFG_NODEV_TMO].a_current >
+		    clp[ELX_CFG_LINKDOWN_TMO].a_current) {
+			targetp->tmofunc =
+			    elx_clk_set(phba, clp[ELX_CFG_NODEV_TMO].a_current,
+					lpfc_npr_timeout, (void *)targetp,
+					(void *)0);
+		} else {
+			targetp->tmofunc = elx_clk_set(phba,
+						       clp
+						       [ELX_CFG_LINKDOWN_TMO].
+						       a_current,
+						       lpfc_npr_timeout,
+						       (void *)targetp,
+						       (void *)0);
+		}
 	}
 
 	ndlp->nle.nlp_rflag |= NLP_NPR_ACTIVE;
@@ -19482,12 +19572,19 @@ lpfc_device_unk_mapped_node(elxHBA_t * phba,
 
 		/* now start a nodev timer */
 		ndlp->nlp_flag |= NLP_NODEV_TMO;
-		ndlp->nlp_tmofunc = elx_clk_set(phba,
-						clp[ELX_CFG_LINKDOWN_TMO].
-						a_current +
-						clp[ELX_CFG_NODEV_TMO].
-						a_current, lpfc_nodev_timeout,
-						(void *)ndlp, (void *)0);
+		if (clp[ELX_CFG_NODEV_TMO].a_current >
+		    clp[ELX_CFG_LINKDOWN_TMO].a_current) {
+			ndlp->nlp_tmofunc =
+			    elx_clk_set(phba, clp[ELX_CFG_NODEV_TMO].a_current,
+					lpfc_nodev_timeout, (void *)ndlp,
+					(void *)0);
+		} else {
+			ndlp->nlp_tmofunc =
+			    elx_clk_set(phba,
+					clp[ELX_CFG_LINKDOWN_TMO].a_current,
+					lpfc_nodev_timeout, (void *)ndlp,
+					(void *)0);
+		}
 
 		/* Start nodev timer */
 		elx_printf_log(phba->brd_no, &elx_msgBlk0700,	/* ptr to msg structure */
@@ -19862,8 +19959,6 @@ lpfc_add_bind(elxHBA_t * phba, uint8_t bind_type,	/* NN/PN/DID */
 					  ELX_SET_BITMASK);
 			ndlp->nlp_state = NLP_STE_MAPPED_NODE;
 			lpfc_disc_issue_rptlun(phba, ndlp);
-		} else {
-
 		}
 	}
 	return (0);
@@ -20423,7 +20518,7 @@ lpfc_scsi_timeout_handler(elxHBA_t * phba, void *arg1, void *arg2)
 		cmd = &piocb->iocb;
 		elx_cmd = (ELX_SCSI_BUF_t *) piocb->context1;
 
-		if (piocb->iocb_flag & ELX_IO_IOCTL) {
+		if (piocb->iocb_flag & (ELX_IO_IOCTL | ELX_IO_POLL)) {
 			continue;
 		}
 

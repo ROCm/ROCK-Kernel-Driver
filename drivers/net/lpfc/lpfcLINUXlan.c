@@ -92,7 +92,7 @@ MODULE_DESCRIPTION("Emulex LightPulse Fibre Channel driver - Open Source");
 MODULE_AUTHOR("Emulex Corporation - tech.support@emulex.com");
 
 #ifndef LPFN_DRIVER_VERSION
-#define LPFN_DRIVER_VERSION "2.10c"
+#define LPFN_DRIVER_VERSION "2.10d"
 #endif				/* LPFC_DRIVER_VERSION */
 
 char *lpfn_release_version = LPFN_DRIVER_VERSION;

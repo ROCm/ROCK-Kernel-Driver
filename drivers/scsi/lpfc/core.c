@@ -1944,7 +1944,7 @@ message:  Ring <ringno> handler: unexpected Rctl <Rctl> Type <Type> received
 descript: The Rctl/Type of a received frame did not match any for the configured masks
           for the specified ring.           
 data:     None
-severity: Error
+severity: Warning
 log:      Always
 action:   This error could indicate a software driver or firmware 
           problem. If problems persist report these errors to 
@@ -1955,9 +1955,9 @@ char elx_mes0313[] =
 msgLogDef elx_msgBlk0313 = {
 	ELX_LOG_MSG_MB_0313,
 	elx_mes0313,
-	elx_msgPreambleSLe,
+	elx_msgPreambleSLw,
 	ELX_MSG_OPUT_GLOB_CTRL,
-	ELX_LOG_MSG_TYPE_ERR,
+	ELX_LOG_MSG_TYPE_WARN,
 	LOG_SLI,
 	ERRID_LOG_UNEXPECT_EVENT
 };
@@ -3628,13 +3628,13 @@ msgLogDef elx_msgBlk0737 = {
 /*
 msgName: elx_mes0747
 message:  Cmpl Target Reset
-descript: A driver initiated Target Reset completed.
-data:     (1) scsi_id (2) lun_id (3) statLocalError (4) *cmd + WD7
+descript: Target Reset completed.
+data:     (1) scsi_id (2) lun_id (3) Error (4) statLocalError (5) *cmd + WD7
 severity: Information
 log:      LOG_FCP verbose
 action:   No action needed, informational
 */
-char elx_mes0747[] = "%sCmpl Target Reset Data: x%x x%x x%x x%x";
+char elx_mes0747[] = "%sCmpl Target Reset Data: x%x x%x x%x x%x x%x";
 msgLogDef elx_msgBlk0747 = {
 	ELX_LOG_MSG_FP_0747,
 	elx_mes0747,
@@ -3648,13 +3648,13 @@ msgLogDef elx_msgBlk0747 = {
 /*
 msgName: elx_mes0748
 message:  Cmpl LUN Reset
-descript: A driver initiated LUN Reset completed.
-data:     (1) scsi_id (2) lun_id (3) statLocalError (4) *cmd + WD7
+descript: LUN Reset completed.
+data:     (1) scsi_id (2) lun_id (3) Error (4) statLocalError (5) *cmd + WD7
 severity: Information
 log:      LOG_FCP verbose
 action:   No action needed, informational
 */
-char elx_mes0748[] = "%sCmpl LUN Reset Data: x%x x%x x%x x%x";
+char elx_mes0748[] = "%sCmpl LUN Reset Data: x%x x%x x%x x%x x%x";
 msgLogDef elx_msgBlk0748 = {
 	ELX_LOG_MSG_FP_0748,
 	elx_mes0748,
@@ -3668,13 +3668,13 @@ msgLogDef elx_msgBlk0748 = {
 /*
 msgName: elx_mes0749
 message:  Cmpl Abort Task Set
-descript: A driver initiated Abort Task Set completed.
-data:     (1) scsi_id (2) lun_id (3) statLocalError (4) *cmd + WD7
+descript: Abort Task Set completed.
+data:     (1) scsi_id (2) lun_id (3) Error (4) statLocalError (5) *cmd + WD7
 severity: Information
 log:      LOG_FCP verbose
 action:   No action needed, informational
 */
-char elx_mes0749[] = "%sCmpl Abort Task Set Data: x%x x%x x%x x%x";
+char elx_mes0749[] = "%sCmpl Abort Task Set Data: x%x x%x x%x x%x x%x";
 msgLogDef elx_msgBlk0749 = {
 	ELX_LOG_MSG_FP_0749,
 	elx_mes0749,
@@ -6520,13 +6520,6 @@ elx_scsi_prep_task_mgmt_cmd(elxHBA_t * phba,
 		piocb->ulpTimeout = elx_cmd->timeout;
 	}
 
-	/*
-	 * Setup driver timeout, in case the command does not complete
-	 * Driver timeout should be greater than ulpTimeout
-	 */
-
-	piocbq->drvrTimeout = elx_cmd->timeout + ELX_DRVR_TIMEOUT;
-
 	lun_device->pnode = ndlp;
 	elx_cmd->pLun = lun_device;
 
@@ -6659,8 +6652,20 @@ elx_scsi_lun_reset(ELX_SCSI_BUF_t * external_cmd,
 			}
 			memset((void *)piocbqrsp, 0, sizeof (ELX_IOCBQ_t));
 
+			piocbq->iocb_flag |= ELX_IO_POLL;
 			piocbq->iocb_cmpl = elx_sli_wake_iocb_high_priority;
-			ret = elx_sli_issue_iocb_wait_high_priority(phba, &phba->sli.ring[psli->fcp_ring], piocbq, SLI_IOCB_USE_TXQ, piocbqrsp, 60);	/* 60 secs */
+
+			ret =
+			    elx_sli_issue_iocb_wait_high_priority(phba,
+								  &phba->sli.
+								  ring[psli->
+								       fcp_ring],
+								  piocbq,
+								  SLI_IOCB_USE_TXQ,
+								  piocbqrsp,
+								  elx_cmd->
+								  timeout +
+								  ELX_DRVR_TIMEOUT);
 			ret = (ret == IOCB_SUCCESS) ? 1 : 0;
 
 			elx_cmd->result = piocbqrsp->iocb.un.ulpWord[4];
@@ -6690,7 +6695,7 @@ elx_scsi_lun_reset(ELX_SCSI_BUF_t * external_cmd,
 				elx_printf_log(phba->brd_no, &elx_msgBlk0748,	/* ptr to msg structure */
 					       elx_mes0748,	/* ptr to msg */
 					       elx_msgBlk0748.msgPreambleStr,	/* begin varargs */
-					       elx_cmd->scsi_target, elx_cmd->scsi_lun, elx_cmd->status, elx_cmd->result);	/* end varargs */
+					       elx_cmd->scsi_target, elx_cmd->scsi_lun, ret, elx_cmd->status, elx_cmd->result);	/* end varargs */
 			}
 		} else {
 
@@ -6765,9 +6770,20 @@ elx_scsi_tgt_reset(ELX_SCSI_BUF_t * external_cmd,
 			}
 			memset((void *)piocbqrsp, 0, sizeof (ELX_IOCBQ_t));
 
+			piocbq->iocb_flag |= ELX_IO_POLL;
 			piocbq->iocb_cmpl = elx_sli_wake_iocb_high_priority;
 
-			ret = elx_sli_issue_iocb_wait_high_priority(phba, &phba->sli.ring[psli->fcp_ring], piocbq, SLI_IOCB_HIGH_PRIORITY, piocbqrsp, 60);	/* 60 secs */
+			ret =
+			    elx_sli_issue_iocb_wait_high_priority(phba,
+								  &phba->sli.
+								  ring[psli->
+								       fcp_ring],
+								  piocbq,
+								  SLI_IOCB_HIGH_PRIORITY,
+								  piocbqrsp,
+								  elx_cmd->
+								  timeout +
+								  ELX_DRVR_TIMEOUT);
 			ret = (ret == IOCB_SUCCESS) ? 1 : 0;
 
 			elx_cmd->result = piocbqrsp->iocb.un.ulpWord[4];

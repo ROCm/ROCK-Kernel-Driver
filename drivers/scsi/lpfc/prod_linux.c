@@ -1851,6 +1851,9 @@ elx_abort_handler(Scsi_Cmnd * cmnd)
 		return (0);
 	}
 
+	/* set command timeout to 60 seconds */
+	elx_cmd->timeout = 60;
+
 	/* SCSI layer issued abort device */
 	elx_printf_log(phba->brd_no, &elx_msgBlk0712,	/* ptr to msg structure */
 		       elx_mes0712,	/* ptr to msg */
@@ -1864,7 +1867,7 @@ elx_abort_handler(Scsi_Cmnd * cmnd)
 	elx_printf_log(phba->brd_no, &elx_msgBlk0749,	/* ptr to msg structure */
 		       elx_mes0749,	/* ptr to msg */
 		       elx_msgBlk0749.msgPreambleStr,	/* begin varargs */
-		       elx_cmd->scsi_target, elx_cmd->scsi_lun, elx_cmd->status, elx_cmd->result);	/* end varargs */
+		       elx_cmd->scsi_target, elx_cmd->scsi_lun, rc, elx_cmd->status, elx_cmd->result);	/* end varargs */
 
 	ELX_DRVR_UNLOCK(phba, iflag);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
@@ -1899,6 +1902,9 @@ elx_reset_lun_handler(Scsi_Cmnd * cmnd)
 	ELX_DRVR_LOCK(phba, iflag);
 	elx_cmd = (ELX_SCSI_BUF_t *) cmnd->host_scribble;
 
+	/* set command timeout to 60 seconds */
+	elx_cmd->timeout = 60;
+
 	/* SCSI layer issued abort device */
 	elx_printf_log(phba->brd_no, &elx_msgBlk0713,	/* ptr to msg structure */
 		       elx_mes0713,	/* ptr to msg */
@@ -1913,7 +1919,7 @@ elx_reset_lun_handler(Scsi_Cmnd * cmnd)
 	elx_printf_log(phba->brd_no, &elx_msgBlk0747,	/* ptr to msg structure */
 		       elx_mes0747,	/* ptr to msg */
 		       elx_msgBlk0747.msgPreambleStr,	/* begin varargs */
-		       elx_cmd->scsi_target, elx_cmd->scsi_lun, elx_cmd->status, elx_cmd->result);	/* end varargs */
+		       elx_cmd->scsi_target, elx_cmd->scsi_lun, rc, elx_cmd->status, elx_cmd->result);	/* end varargs */
 
 	ELX_DRVR_UNLOCK(phba, iflag);
 
@@ -2202,25 +2208,28 @@ elx_os_fcp_err_handle(ELX_SCSI_BUF_t * elx_cmd, elx_xlat_err_t * presult)
 			 * Give Check Condition priority over Read Check 
 			 */
 
-			if (fcprsp->rspStatus3 != SCSI_STAT_CHECK_COND) {
-				/* FCP Read Check Error */
-				elx_printf_log(phba->brd_no, &elx_msgBlk0734,	/* ptr to msg structure */
-					       elx_mes0734,	/* ptr to msg */
-					       elx_msgBlk0734.msgPreambleStr,	/* begin varargs */
+			if (fcprsp->rspStatus3 != SCSI_STAT_BUSY) {
+				if (fcprsp->rspStatus3 != SCSI_STAT_CHECK_COND) {
+					/* FCP Read Check Error */
+					elx_printf_log(phba->brd_no, &elx_msgBlk0734,	/* ptr to msg structure */
+						       elx_mes0734,	/* ptr to msg */
+						       elx_msgBlk0734.msgPreambleStr,	/* begin varargs */
+						       SWAP_DATA(fcpcmd->fcpDl), SWAP_DATA(fcprsp->rspResId), iocb->un.fcpi.fcpi_parm, cmnd->cmnd[0]);	/* end varargs */
+
+					presult->host_status = DID_ERROR;
+					cmnd->resid = cmnd->request_bufflen;
+					scsi_status =
+					    (uint32_t) (fcprsp->rspStatus3);
+					fcprsp->rspSnsLen = 0;
+					return (scsi_status);
+				}
+
+				/* FCP Read Check Error with Check Condition */
+				elx_printf_log(phba->brd_no, &elx_msgBlk0735,	/* ptr to msg structure */
+					       elx_mes0735,	/* ptr to msg */
+					       elx_msgBlk0735.msgPreambleStr,	/* begin varargs */
 					       SWAP_DATA(fcpcmd->fcpDl), SWAP_DATA(fcprsp->rspResId), iocb->un.fcpi.fcpi_parm, cmnd->cmnd[0]);	/* end varargs */
-
-				presult->host_status = DID_ERROR;
-				cmnd->resid = cmnd->request_bufflen;
-				scsi_status = (uint32_t) (fcprsp->rspStatus3);
-				fcprsp->rspSnsLen = 0;
-				return (scsi_status);
 			}
-
-			/* FCP Read Check Error with Check Condition */
-			elx_printf_log(phba->brd_no, &elx_msgBlk0735,	/* ptr to msg structure */
-				       elx_mes0735,	/* ptr to msg */
-				       elx_msgBlk0735.msgPreambleStr,	/* begin varargs */
-				       SWAP_DATA(fcpcmd->fcpDl), SWAP_DATA(fcprsp->rspResId), iocb->un.fcpi.fcpi_parm, cmnd->cmnd[0]);	/* end varargs */
 		}
 	}
 
@@ -2288,7 +2297,11 @@ elx_os_fcp_err_handle(ELX_SCSI_BUF_t * elx_cmd, elx_xlat_err_t * presult)
 			elx_scsi_lower_lun_qthrottle(phba, elx_cmd);
 		}
 		break;
-
+	case SCSI_STAT_BUSY:
+		presult->host_status = DID_BUS_BUSY;
+		scsi_status = (uint32_t) (fcprsp->rspStatus3);
+		presult->action_flag |= ELX_DELAY_IODONE;
+		break;
 	case SCSI_STAT_CHECK_COND:
 		{
 			uint32_t i;
@@ -2345,8 +2358,10 @@ elx_iodone(elxHBA_t * phba, ELX_SCSI_BUF_t * elx_cmd)
 {
 	Scsi_Cmnd *lnx_cmnd = (Scsi_Cmnd *) elx_cmd->pOSCmd;
 	LINUX_HBA_t *plxhba = (LINUX_HBA_t *) phba->pHbaOSEnv;
+	ELXSCSILUN_t *lun_device;
 	uint32_t *lp;
 	int datadir;
+	unsigned long flag;
 
 	if ((lnx_cmnd->result) || (elx_cmd->fcp_rsp->rspSnsLen)) {
 		lp = (uint32_t *) lnx_cmnd->sense_buffer;
@@ -2355,6 +2370,12 @@ elx_iodone(elxHBA_t * phba, ELX_SCSI_BUF_t * elx_cmd)
 			       elx_mes0710,	/* ptr to msg */
 			       elx_msgBlk0710.msgPreambleStr,	/* begin varargs */
 			       elx_cmd->scsi_target, (uint32_t) elx_cmd->scsi_lun, lnx_cmnd->result, *lp, *(lp + 3), lnx_cmnd->retries, lnx_cmnd->resid);	/* end varargs */
+		lun_device = elx_find_lun_device(elx_cmd);
+		if (lnx_cmnd->result && lun_device &&
+		    (lun_device->pTarget->targetFlags & FC_NPR_ACTIVE)) {
+			lnx_cmnd->result =
+			    ScsiResult(DID_BUS_BUSY, SCSI_STAT_BUSY);
+		}
 	}
 
 	datadir = elx_cmd->OS_io_info.datadir;
@@ -2378,10 +2399,13 @@ elx_iodone(elxHBA_t * phba, ELX_SCSI_BUF_t * elx_cmd)
 			       scsi_to_pci_dma_dir(datadir));
 #endif
 	}
-
 	elx_free_scsi_buf(elx_cmd);
 
 	plxhba = (LINUX_HBA_t *) phba->pHbaOSEnv;
+	/* If Link Down Timer or Nodev Timer is running for this I/O
+	 * put it on a different queue.
+	 */
+	spin_lock_irqsave(&plxhba->iodonelock.elx_lock, flag);
 	/* Queue iodone to be called at end of ISR */
 	if (plxhba->iodone.q_first) {
 		((Scsi_Cmnd *) (plxhba->iodone.q_last))->host_scribble =
@@ -2392,6 +2416,7 @@ elx_iodone(elxHBA_t * phba, ELX_SCSI_BUF_t * elx_cmd)
 	plxhba->iodone.q_last = (ELX_SLINK_t *) lnx_cmnd;
 	plxhba->iodone.q_cnt++;
 	lnx_cmnd->host_scribble = 0;
+	spin_unlock_irqrestore(&plxhba->iodonelock.elx_lock, flag);
 
 	return;
 }

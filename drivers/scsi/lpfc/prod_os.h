@@ -56,8 +56,9 @@ typedef struct elxLinuxHba {
 	elx_lck_t schlock;
 	elx_lck_t disclock;
 	elx_lck_t ioclock;
-	ELX_SLINK_t iodone;
 	elx_lck_t hiprilock;
+	elx_lck_t iodonelock;
+	ELX_SLINK_t iodone;
 	atomic_t cmnds_in_flight;
 	struct net_device_stats ndstats;
 
