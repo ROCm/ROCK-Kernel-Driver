@@ -259,7 +259,8 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 		}
 	}
 
-	dev = alloc_etherdev(0);
+	/* Allocate net_device, dev->priv; fill in 8390 specific dev fields. */
+	dev = alloc_ei_netdev();
 	if (!dev) {
 		printk (KERN_ERR PFX "cannot allocate ethernet device\n");
 		goto err_out_free_res;
@@ -331,13 +332,6 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 	dev->base_addr = ioaddr;
 	pci_set_drvdata(pdev, dev);
 
-	/* Allocate dev->priv and fill in 8390 specific dev fields. */
-	if (ethdev_init(dev)) {
-		printk (KERN_ERR "ne2kpci(%s): unable to get memory for dev->priv.\n",
-			pci_name(pdev));
-		goto err_out_free_netdev;
-	}
-
 	ei_status.name = pci_clone_list[chip_idx].name;
 	ei_status.tx_start_page = start_page;
 	ei_status.stop_page = stop_page;
@@ -366,7 +360,7 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 
 	i = register_netdev(dev);
 	if (i)
-		goto err_out_free_8390;
+		goto err_out_free_netdev;
 
 	printk("%s: %s found at %#lx, IRQ %d, ",
 		   dev->name, pci_clone_list[chip_idx].name, ioaddr, dev->irq);
@@ -377,10 +371,8 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 
 	return 0;
 
-err_out_free_8390:
-	kfree(dev->priv);
 err_out_free_netdev:
-	kfree (dev);
+	free_netdev (dev);
 err_out_free_res:
 	release_region (ioaddr, NE_IO_EXTENT);
 	pci_set_drvdata (pdev, NULL);
@@ -635,8 +627,8 @@ static void __devexit ne2k_pci_remove_one (struct pci_dev *pdev)
 
 	unregister_netdev(dev);
 	release_region(dev->base_addr, NE_IO_EXTENT);
-	kfree(dev->priv);
 	free_netdev(dev);
+	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
 }
 
