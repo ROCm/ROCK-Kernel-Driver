@@ -7,6 +7,7 @@ ifeq ($(CONFIG_ISDN_PPP),y)
 endif
 
 obj-$(CONFIG_E1000) += e1000/
+obj-$(CONFIG_IBM_EMAC) += ibm_emac/
 obj-$(CONFIG_IXGB) += ixgb/
 obj-$(CONFIG_BONDING) += bonding/
 
