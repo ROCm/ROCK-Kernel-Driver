@@ -32,6 +32,7 @@
 
 #include <sound/driver.h>
 #include <linux/time.h>
+#include <linux/delay.h>
 #include <linux/init.h>
 #include <sound/core.h>
 #include "au88x0.h"
@@ -81,7 +82,7 @@ static int vortex_game_open(struct gameport *gameport, int mode)
 		hwwrite(vortex->mmio, VORTEX_CTRL2,
 			hwread(vortex->mmio,
 			       VORTEX_CTRL2) | CTRL2_GAME_ADCMODE);
-		wait_ms(VORTEX_GAME_DWAIT);
+		msleep(VORTEX_GAME_DWAIT);
 		return 0;
 	case GAMEPORT_MODE_RAW:
 		hwwrite(vortex->mmio, VORTEX_CTRL2,

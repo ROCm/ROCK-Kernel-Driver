@@ -267,12 +267,6 @@ extern int dmasound_catchRadius;
 */
 #define BS_VAL 1
 
-static inline void wait_ms(unsigned int ms)
-{
-	current->state = TASK_UNINTERRUPTIBLE;
-	schedule_timeout(1 + ms * HZ / 1000);
-}
-
 #define SW_INPUT_VOLUME_SCALE	4
 #define SW_INPUT_VOLUME_DEFAULT	(128 / SW_INPUT_VOLUME_SCALE)
 

@@ -189,12 +189,12 @@ int radeon_probe_i2c_connector(struct radeonfb_info *rinfo, int conn, u8 **out_e
 		 */
 		OUTREG(reg, INREG(reg) & ~(VGA_DDC_DATA_OUT_EN));
 		(void)INREG(reg);
-		wait_ms(13);
+		msleep(13);
 
 		OUTREG(reg, INREG(reg) & ~(VGA_DDC_CLK_OUT_EN));
 		(void)INREG(reg);
 		for (j = 0; j < 5; j++) {
-			wait_ms(10);
+			msleep(10);
 			if (INREG(reg) & VGA_DDC_CLK_INPUT)
 				break;
 		}
@@ -203,13 +203,13 @@ int radeon_probe_i2c_connector(struct radeonfb_info *rinfo, int conn, u8 **out_e
 
 		OUTREG(reg, INREG(reg) | VGA_DDC_DATA_OUT_EN);
 		(void)INREG(reg);
-		wait_ms(15);
+		msleep(15);
 		OUTREG(reg, INREG(reg) | VGA_DDC_CLK_OUT_EN);
 		(void)INREG(reg);
-		wait_ms(15);
+		msleep(15);
 		OUTREG(reg, INREG(reg) & ~(VGA_DDC_DATA_OUT_EN));
 		(void)INREG(reg);
-		wait_ms(15);
+		msleep(15);
 
 		/* Do the real work */
 		edid = radeon_do_probe_i2c_edid(&rinfo->i2c[conn-1]);
@@ -217,19 +217,19 @@ int radeon_probe_i2c_connector(struct radeonfb_info *rinfo, int conn, u8 **out_e
 		OUTREG(reg, INREG(reg) | 
 				(VGA_DDC_DATA_OUT_EN | VGA_DDC_CLK_OUT_EN));
 		(void)INREG(reg);
-		wait_ms(15);
+		msleep(15);
 		
 		OUTREG(reg, INREG(reg) & ~(VGA_DDC_CLK_OUT_EN));
 		(void)INREG(reg);
 		for (j = 0; j < 10; j++) {
-			wait_ms(10);
+			msleep(10);
 			if (INREG(reg) & VGA_DDC_CLK_INPUT)
 				break;
 		}
 
 		OUTREG(reg, INREG(reg) & ~(VGA_DDC_DATA_OUT_EN));
 		(void)INREG(reg);
-		wait_ms(15);
+		msleep(15);
 		OUTREG(reg, INREG(reg) |
 				(VGA_DDC_DATA_OUT_EN | VGA_DDC_CLK_OUT_EN));
 		(void)INREG(reg);
