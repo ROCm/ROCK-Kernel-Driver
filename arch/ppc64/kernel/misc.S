@@ -742,7 +742,7 @@ _GLOBAL(sys_call_table32)
         .llong .sys32_getdents
 	.llong .ppc32_select
 	.llong .sys_flock
-	.llong .sys32_msync
+	.llong .sys_msync
 	.llong .sys32_readv		/* 145 */
 	.llong .sys32_writev
 	.llong .sys32_getsid
@@ -750,7 +750,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_sysctl
 	.llong .sys_mlock		/* 150 */
 	.llong .sys_munlock
-	.llong .sys32_mlockall
+	.llong .sys_mlockall
 	.llong .sys_munlockall
 	.llong .sys32_sched_setparam
 	.llong .sys32_sched_getparam	/* 155 */
