@@ -269,6 +269,7 @@ struct myri_eth {
 	/* These are frequently accessed, keep together
 	 * to obtain good cache hit rates.
 	 */
+	spinlock_t			irq_lock;
 	struct myri_shmem		*shmem;		/* Shared data structures.    */
 	unsigned long			cregs;		/* Control register space.    */
 	struct recvq			*rqack;		/* Where we ack rx's.         */
