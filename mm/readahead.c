@@ -363,9 +363,9 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 	} else {
 		/*
 		 * A miss - lseek, pagefault, pread, etc.  Shrink the readahead
-		 * window by 25%.
+		 * window.
 		 */
-		ra->next_size -= ra->next_size / 4 + 2;
+		ra->next_size -= 2;
 	}
 
 	if ((long)ra->next_size > (long)max)
@@ -447,7 +447,7 @@ page_cache_readaround(struct address_space *mapping, struct file_ra_state *ra,
 			struct file *filp, unsigned long offset)
 {
 	if (ra->next_size != -1UL) {
-		const unsigned long min = get_min_readahead(ra) * 2;
+		const unsigned long min = get_min_readahead(ra) * 4;
 		unsigned long target;
 		unsigned long backward;
 
