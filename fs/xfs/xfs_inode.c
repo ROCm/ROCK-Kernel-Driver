@@ -1210,6 +1210,18 @@ xfs_ialloc(
 		break;
 	case IFREG:
 	case IFDIR:
+		if (pip->i_d.di_flags &
+		    (XFS_DIFLAG_NOATIME|XFS_DIFLAG_NODUMP|XFS_DIFLAG_SYNC)) {
+			if ((pip->i_d.di_flags & XFS_DIFLAG_NOATIME) &&
+			    xfs_inherit_noatime)
+				ip->i_d.di_flags |= XFS_DIFLAG_NOATIME;
+			if ((pip->i_d.di_flags & XFS_DIFLAG_NODUMP) &&
+			    xfs_inherit_nodump)
+				ip->i_d.di_flags |= XFS_DIFLAG_NODUMP;
+			if ((pip->i_d.di_flags & XFS_DIFLAG_SYNC) &&
+			    xfs_inherit_sync)
+				ip->i_d.di_flags |= XFS_DIFLAG_SYNC;
+		}
 	case IFLNK:
 		ip->i_d.di_format = XFS_DINODE_FMT_EXTENTS;
 		ip->i_df.if_flags = XFS_IFEXTENTS;
@@ -2884,7 +2896,7 @@ xfs_iflush(
 	enum { INT_DELWRI = (1 << 0), INT_ASYNC = (1 << 1) };
 	SPLDECL(s);
 
-	XFS_STATS_INC(xfsstats.xs_iflush_count);
+	XFS_STATS_INC(xs_iflush_count);
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
 	ASSERT(valusema(&ip->i_flock) <= 0);
@@ -3057,8 +3069,8 @@ xfs_iflush(
 	mutex_spinunlock(&ch->ch_lock, s);
 
 	if (clcount) {
-		XFS_STATS_INC(xfsstats.xs_icluster_flushcnt);
-		XFS_STATS_ADD(xfsstats.xs_icluster_flushinode, clcount);
+		XFS_STATS_INC(xs_icluster_flushcnt);
+		XFS_STATS_ADD(xs_icluster_flushinode, clcount);
 	}
 
 	/*
@@ -3500,6 +3512,9 @@ xfs_iaccess(
 		if (IS_RDONLY(inode) &&
 		    (S_ISREG(imode) || S_ISDIR(imode) || S_ISLNK(imode)))
 			return XFS_ERROR(EROFS);
+
+		if (IS_IMMUTABLE(inode))
+			return XFS_ERROR(EACCES);
 	}
 
 	/*
@@ -3623,7 +3638,7 @@ xfs_ichgtime(xfs_inode_t *ip,
 	 * Don't update access timestamps on reads if mounted "noatime"
 	 * Throw it away if anyone asks us.
 	 */
-	if (ip->i_mount->m_flags & XFS_MOUNT_NOATIME &&
+	if ((ip->i_mount->m_flags & XFS_MOUNT_NOATIME || IS_NOATIME(inode)) &&
 	    ((flags & (XFS_ICHGTIME_ACC|XFS_ICHGTIME_MOD|XFS_ICHGTIME_CHG))
 			== XFS_ICHGTIME_ACC))
 		return;

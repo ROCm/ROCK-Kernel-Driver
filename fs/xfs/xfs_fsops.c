@@ -53,7 +53,6 @@
 #include "xfs_rw.h"
 #include "xfs_trans_space.h"
 #include "xfs_rtalloc.h"
-#include "xfs_dir.h"
 #include "xfs_dir2.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
@@ -172,7 +171,7 @@ xfs_growfs_data_private(
 		if (nb < mp->m_sb.sb_dblocks)
 			return XFS_ERROR(EINVAL);
 	}
-	new = in->newblocks - mp->m_sb.sb_dblocks;
+	new = nb - mp->m_sb.sb_dblocks;
 	oagcount = mp->m_sb.sb_agcount;
 	if (nagcount > oagcount) {
 		down_write(&mp->m_peraglock);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -561,10 +561,9 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 		if (sbp->seqno == 0 || sbp == sbuf)
 			lastresid = uio->uio_resid;
 		XFS_PUT_COOKIE(p.cook, mp, 0, sbp[1].seqno, sbp[1].hash);
-#if XFS_BIG_FILESYSTEMS
-		p.ino = sbp->ino + mp->m_inoadd;
-#else
 		p.ino = sbp->ino;
+#if XFS_BIG_INUMS
+		p.ino += mp->m_inoadd;
 #endif
 		p.name = sbp->name;
 		p.namelen = sbp->namelen;
@@ -1835,7 +1834,6 @@ xfs_dir_leaf_moveents(xfs_dir_leafblock_t *leaf_s, int start_s,
 	entry_d = &leaf_d->entries[start_d];
 	for (i = 0; i < count; entry_s++, entry_d++, i++) {
 		ASSERT(INT_GET(entry_s->nameidx, ARCH_CONVERT) >= INT_GET(hdr_s->firstused, ARCH_CONVERT));
-		ASSERT(entry_s->namelen < MAXNAMELEN);
 		tmp = XFS_DIR_LEAF_ENTSIZE_BYENTRY(entry_s);
 		INT_MOD(hdr_d->firstused, ARCH_CONVERT, -(tmp));
 		entry_d->hashval = entry_s->hashval; /* INT_: direct copy */
@@ -2142,10 +2140,9 @@ xfs_dir_leaf_getdents_int(
 		 * then restore the UIO to the first entry in the current
 		 * run of equal-hashval entries (probably one 1 entry long).
 		 */
-#if XFS_BIG_FILESYSTEMS
-		p.ino = XFS_GET_DIR_INO_ARCH(mp, namest->inumber, ARCH_CONVERT) + mp->m_inoadd;
-#else
 		p.ino = XFS_GET_DIR_INO_ARCH(mp, namest->inumber, ARCH_CONVERT);
+#if XFS_BIG_INUMS
+		p.ino += mp->m_inoadd;
 #endif
 		p.name = (char *)namest->name;
 		p.namelen = entry->namelen;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -47,7 +47,7 @@ typedef	__uint32_t	xfs_agino_t;	/* within allocation grp inode number */
  * Used in some places where having 64-bits in the 32-bit kernels
  * costs too much.
  */
-#if XFS_BIG_FILESYSTEMS
+#if XFS_BIG_INUMS
 typedef	xfs_ino_t	xfs_intino_t;
 #else
 typedef	__uint32_t	xfs_intino_t;
@@ -162,7 +162,7 @@ xfs_agino_t xfs_offbno_to_agino(struct xfs_mount *mp, xfs_agblock_t b, int o);
 	((xfs_agino_t)(((b) << XFS_INO_OFFSET_BITS(mp)) | (o)))
 #endif
 
-#if XFS_BIG_FILESYSTEMS
+#if XFS_BIG_INUMS
 #define	XFS_MAXINUMBER		((xfs_ino_t)((1ULL << 56) - 1ULL))
 #define	XFS_INO64_OFFSET	((xfs_ino_t)(1ULL << 32))
 #else
