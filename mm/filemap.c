@@ -367,15 +367,17 @@ static int invalidate_list_pages2(struct address_space * mapping,
 	while (curr != head) {
 		page = list_entry(curr, struct page, list);
 
-		if (PageWriteback(page)) {
-			write_unlock(&mapping->page_lock);
-			wait_on_page_writeback(page);
-			unlocked = 1;
-			write_lock(&mapping->page_lock);
-			goto restart;
-		}
 		if (!TestSetPageLocked(page)) {
 			int __unlocked;
+
+			if (PageWriteback(page)) {
+				write_unlock(&mapping->page_lock);
+				wait_on_page_writeback(page);
+				unlocked = 1;
+				write_lock(&mapping->page_lock);
+				unlock_page(page);
+				goto restart;
+			}
 
 			__unlocked = invalidate_this_page2(mapping, page, curr, head);
 			unlock_page(page);
