@@ -98,6 +98,10 @@ running once the system is up.
 				strictly ACPI specification compliant.
 
 			See also Documentation/pm.txt.
+
+	acpi_sleep=	[HW,ACPI] Sleep options
+			Format: { s3_bios, s3_mode }
+			See Documentation/power/video.txt
  
 	acpi_pic_sci=	[HW,ACPI] ACPI System Control Interrupt trigger mode
 			Format: { level | edge }
