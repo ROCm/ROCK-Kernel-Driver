@@ -126,8 +126,8 @@ extern void scsi_exit_procfs(void);
 #endif /* CONFIG_PROC_FS */
 
 /* scsi_scan.c */
-int scsi_scan_host_selected(struct Scsi_Host *, unsigned int, unsigned int,
-			    unsigned int, int);
+extern int scsi_scan_host_selected(struct Scsi_Host *, unsigned int,
+				   unsigned int, unsigned int, int);
 extern void scsi_forget_host(struct Scsi_Host *);
 extern void scsi_free_sdev(struct scsi_device *);
 extern void scsi_rescan_device(struct device *);
