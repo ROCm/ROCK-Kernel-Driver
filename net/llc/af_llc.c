@@ -28,7 +28,6 @@
 #include <linux/init.h>
 #include <net/llc.h>
 #include <net/llc_sap.h>
-#include <net/llc_station.h>
 #include <net/llc_pdu.h>
 #include <net/llc_conn.h>
 #include <net/llc_proc.h>

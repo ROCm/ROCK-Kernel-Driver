@@ -15,6 +15,14 @@
 #include <net/llc_if.h>
 #include <linux/llc.h>
 
+#define LLC_EVENT                1
+#define LLC_PACKET               2
+
+#define LLC_P_TIME               2
+#define LLC_ACK_TIME             1
+#define LLC_REJ_TIME             3
+#define LLC_BUSY_TIME            3
+
 struct llc_timer {
 	struct timer_list timer;
 	u16		  expire;	/* timer expire time */

@@ -17,7 +17,6 @@
 #include <net/llc.h>
 #include <net/llc_sap.h>
 #include <net/llc_conn.h>
-#include <net/llc_station.h>
 #include <net/llc_c_ac.h>
 #include <net/llc_s_ac.h>
 #include <net/llc_c_ev.h>
@@ -25,6 +24,31 @@
 #include <net/llc_s_ev.h>
 #include <net/llc_s_st.h>
 #include <net/llc_pdu.h>
+
+/**
+ * struct llc_station - LLC station component
+ *
+ * SAP and connection resource manager, one per adapter.
+ *
+ * @state - state of station
+ * @xid_r_count - XID response PDU counter
+ * @mac_sa - MAC source address
+ * @sap_list - list of related SAPs
+ * @ev_q - events entering state mach.
+ * @mac_pdu_q - PDUs ready to send to MAC
+ */
+struct llc_station {
+	u8			    state;
+	u8			    xid_r_count;
+	struct timer_list	    ack_timer;
+	u8			    retry_count;
+	u8			    maximum_retry;
+	struct {
+		struct sk_buff_head list;
+		spinlock_t	    lock;
+	} ev_q;
+	struct sk_buff_head	    mac_pdu_q;
+};
 
 /* Types of events (possible values in 'ev->type') */
 #define LLC_STATION_EV_TYPE_SIMPLE	1

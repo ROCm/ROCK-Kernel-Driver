@@ -26,7 +26,6 @@
 #include <net/llc_c_st.h>
 #include <net/llc_pdu.h>
 #include <net/llc.h>
-#include <net/llc_station.h>
 
 #include "llc_output.h"
 

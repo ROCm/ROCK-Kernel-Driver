@@ -14,7 +14,6 @@
 
 #include <linux/init.h>
 #include <net/llc_sap.h>
-#include <net/llc_station.h>
 #include <net/llc_conn.h>
 #include <net/sock.h>
 #include <linux/tcp.h>
