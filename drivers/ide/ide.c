@@ -358,24 +358,6 @@ int ide_system_bus_speed (void)
 	return system_bus_speed;
 }
 
-/**
- *	current_capacity	-	drive capacity
- *	@drive: drive to query
- *
- *	Return the current capacity (in sectors) of a drive according to
- *	its current geometry/LBA settings. Empty removables are reported
- *	as size zero.
- */
-
-sector_t current_capacity (ide_drive_t *drive)
-{
-	if (!drive->present)
-		return 0;
-	return DRIVER(drive)->capacity(drive);
-}
-
-EXPORT_SYMBOL(current_capacity);
-
 static int ide_open (struct inode * inode, struct file * filp)
 {
 	return -ENXIO;

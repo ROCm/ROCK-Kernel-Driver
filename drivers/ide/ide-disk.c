@@ -1248,7 +1248,7 @@ static int idedisk_media_changed(struct gendisk *disk)
 static int idedisk_revalidate_disk(struct gendisk *disk)
 {
 	ide_drive_t *drive = disk->private_data;
-	set_capacity(disk, current_capacity(drive));
+	set_capacity(disk, idedisk_capacity(drive));
 	return 0;
 }
 
@@ -1292,7 +1292,7 @@ static int idedisk_attach(ide_drive_t *drive)
 	strcpy(g->devfs_name, drive->devfs_name);
 	g->driverfs_dev = &drive->gendev;
 	g->flags = drive->removable ? GENHD_FL_REMOVABLE : 0;
-	set_capacity(g, current_capacity(drive));
+	set_capacity(g, idedisk_capacity(drive));
 	g->fops = &idedisk_ops;
 	add_disk(g);
 	return 0;

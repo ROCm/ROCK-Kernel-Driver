@@ -1188,11 +1188,6 @@ extern void ide_fixstring(u8 *, const int, const int);
 extern int ide_wait_stat(ide_startstop_t *, ide_drive_t *, u8, u8, unsigned long);
 
 /*
- * Return the current idea about the total capacity of this drive.
- */
-extern sector_t current_capacity (ide_drive_t *drive);
-
-/*
  * Start a reset operation for an IDE interface.
  * The caller should return immediately after invoking this.
  */
