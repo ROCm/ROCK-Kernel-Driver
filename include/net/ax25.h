@@ -9,6 +9,8 @@
 #include <linux/config.h>
 #include <linux/ax25.h>
 #include <linux/spinlock.h>
+#include <linux/timer.h>
+#include <asm/atomic.h>
 
 #define	AX25_T1CLAMPLO  		1
 #define	AX25_T1CLAMPHI 			(30 * HZ)
@@ -148,10 +150,12 @@ typedef struct {
 
 typedef struct ax25_route {
 	struct ax25_route	*next;
+	atomic_t		ref;
 	ax25_address		callsign;
-	struct net_device		*dev;
+	struct net_device	*dev;
 	ax25_digi		*digipeat;
 	char			ip_mode;
+	struct timer_list	timer;
 } ax25_route;
 
 typedef struct {
