@@ -400,6 +400,68 @@ static void remove_super(struct super_block *s)
 	put_super(s);
 }
 
+static void generic_shutdown_super(struct super_block *sb)
+{
+	struct dentry *root = sb->s_root;
+	struct super_operations *sop = sb->s_op;
+
+	if (root) {
+		sb->s_root = NULL;
+		shrink_dcache_parent(root);
+		dput(root);
+		fsync_super(sb);
+		lock_super(sb);
+		lock_kernel();
+		sb->s_flags &= ~MS_ACTIVE;
+		/* bad name - it should be evict_inodes() */
+		invalidate_inodes(sb);
+		if (sop) {
+			if (sop->write_super && sb->s_dirt)
+				sop->write_super(sb);
+			if (sop->put_super)
+				sop->put_super(sb);
+		}
+
+		/* Forget any remaining inodes */
+		if (invalidate_inodes(sb)) {
+			printk("VFS: Busy inodes after unmount. "
+			   "Self-destruct in 5 seconds.  Have a nice day...\n");
+		}
+
+		unlock_kernel();
+		unlock_super(sb);
+	}
+	remove_super(sb);
+}
+
+static void shutdown_super(struct super_block *sb)
+{
+	struct file_system_type *fs = sb->s_type;
+	kdev_t dev = sb->s_dev;
+	struct block_device *bdev = sb->s_bdev;
+
+	/* Need to clean after the sucker */
+	if (fs->fs_flags & FS_LITTER && sb->s_root)
+		d_genocide(sb->s_root);
+	generic_shutdown_super(sb);
+	if (bdev)
+		blkdev_put(bdev, BDEV_FS);
+	else
+		put_anon_dev(dev);
+}
+
+void kill_super(struct super_block *sb)
+{
+	struct file_system_type *fs = sb->s_type;
+
+	if (!deactivate_super(sb))
+		return;
+
+	down_write(&sb->s_umount);
+	shutdown_super(sb);
+	put_filesystem(fs);
+}
+
 struct vfsmount *alloc_vfsmnt(char *name);
 void free_vfsmnt(struct vfsmount *mnt);
 
@@ -806,55 +868,6 @@ out_mnt:
 out:
 	put_filesystem(type);
 	return (struct vfsmount *)sb;
-}
-
-void kill_super(struct super_block *sb)
-{
-	struct dentry *root = sb->s_root;
-	struct file_system_type *fs = sb->s_type;
-	struct super_operations *sop = sb->s_op;
-	kdev_t dev = sb->s_dev;
-	struct block_device *bdev = sb->s_bdev;
-
-	if (!deactivate_super(sb))
-		return;
-
-	down_write(&sb->s_umount);
-	if (sb->s_root) {
-		sb->s_root = NULL;
-		/* Need to clean after the sucker */
-		if (fs->fs_flags & FS_LITTER)
-			d_genocide(root);
-		shrink_dcache_parent(root);
-		dput(root);
-		fsync_super(sb);
-		lock_super(sb);
-		lock_kernel();
-		sb->s_flags &= ~MS_ACTIVE;
-		/* bad name - it should be evict_inodes() */
-		invalidate_inodes(sb);
-		if (sop) {
-			if (sop->write_super && sb->s_dirt)
-				sop->write_super(sb);
-			if (sop->put_super)
-				sop->put_super(sb);
-		}
-
-		/* Forget any remaining inodes */
-		if (invalidate_inodes(sb)) {
-			printk("VFS: Busy inodes after unmount. "
-			   "Self-destruct in 5 seconds.  Have a nice day...\n");
-		}
-
-		unlock_kernel();
-		unlock_super(sb);
-	}
-	remove_super(sb);
-	if (bdev)
-		blkdev_put(bdev, BDEV_FS);
-	else
-		put_anon_dev(dev);
-	put_filesystem(fs);
 }
 
 struct vfsmount *kern_mount(struct file_system_type *type)
