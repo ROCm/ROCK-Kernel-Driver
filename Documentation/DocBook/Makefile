@@ -7,11 +7,10 @@
 # list of DOCBOOKS.
 
 DOCBOOKS := wanbook.sgml z8530book.sgml mcabook.sgml videobook.sgml \
-	    parportbook.sgml kernel-hacking.sgml \
-	    kernel-locking.sgml via-audio.sgml mousedrivers.sgml \
-	    deviceiobook.sgml procfs-guide.sgml tulip-user.sgml \
-	    writing_usb_driver.sgml scsidrivers.sgml sis900.sgml \
-	    kernel-api.sgml journal-api.sgml lsm.sgml usb.sgml \
+	    kernel-hacking.sgml kernel-locking.sgml via-audio.sgml \
+	    mousedrivers.sgml deviceiobook.sgml procfs-guide.sgml \
+	    tulip-user.sgml writing_usb_driver.sgml scsidrivers.sgml \
+	    sis900.sgml kernel-api.sgml journal-api.sgml lsm.sgml usb.sgml \
 	    gadget.sgml libata.sgml
 
 ###
@@ -91,16 +90,6 @@ $(BOOKS): $(KERNELDOC)
 C-procfs-example = procfs_example.sgml
 C-procfs-example2 = $(addprefix $(obj)/,$(C-procfs-example))
 $(obj)/procfs-guide.sgml: $(C-procfs-example2)
-
-###
-# The parportbook includes a few images.
-# Force them to be build before the books 
-IMG-parportbook := parport-share.fig parport-multi.fig parport-structure.fig
-IMG-parportbook2 := $(addprefix $(obj)/,$(IMG-parportbook))
-EPS-parportbook := $(patsubst %.fig,%.eps, $(IMG-parportbook2))
-PNG-parportbook := $(patsubst %.fig,%.png, $(IMG-parportbook2))
-$(obj)/parportbook.html: $(PNG-parportbook)
-$(obj)/parportbook.ps $(obj)/parportbook.pdf: $(EPS-parportbook) $(PNG-parportbook)
 
 ###
 # Rules to generate postscript, PDF and HTML
@@ -194,8 +183,6 @@ clean-files := $(DOCBOOKS) \
 	$(patsubst %.sgml, %.pdf,  $(DOCBOOKS)) \
 	$(patsubst %.sgml, %.html, $(DOCBOOKS)) \
 	$(patsubst %.sgml, %.9,    $(DOCBOOKS)) \
-	$(patsubst %.fig,%.eps,    $(IMG-parportbook)) \
-	$(patsubst %.fig,%.png,    $(IMG-parportbook)) \
 	$(C-procfs-example)
 
 ifneq ($(wildcard $(patsubst %.html,%,$(HTML))),)
