@@ -395,8 +395,6 @@ is_valid_oplock_break(struct smb_hdr *buf)
 				netfile = list_entry(tmp1,struct cifsFileInfo,tlist);
 				if(pSMB->Fid == netfile->netfid) {
 					struct cifsInodeInfo *pCifsInode;
-			/* BB Add following logic to mark inode for write through 
-              		    inode->i_data.a_ops = &cifs_addr_ops_writethrough; */
 					read_unlock(&GlobalSMBSeslock);
 					cFYI(1,("Matching file id, processing oplock break"));
 					pCifsInode = 

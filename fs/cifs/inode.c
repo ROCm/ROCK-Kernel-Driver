@@ -125,7 +125,7 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		inode->i_nlink = le64_to_cpu(findData.Nlinks);
 		findData.NumOfBytes = le64_to_cpu(findData.NumOfBytes);
 		findData.EndOfFile = le64_to_cpu(findData.EndOfFile);
-		inode->i_size = findData.EndOfFile;
+		i_size_write(inode,findData.EndOfFile);
 /* blksize needs to be multiple of two. So safer to default to blksize
 	and blkbits set in superblock so 2**blkbits and blksize will match */
 /*		inode->i_blksize =
@@ -272,7 +272,7 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 				inode->i_mode &= ~(S_IWUGO);
    /* BB add code here - validate if device or weird share or device type? */
 		}
-		inode->i_size = le64_to_cpu(pfindData->EndOfFile);
+		i_size_write(inode,le64_to_cpu(pfindData->EndOfFile));
 		pfindData->AllocationSize = le64_to_cpu(pfindData->AllocationSize);
 		inode->i_blocks =
 	                (inode->i_blksize - 1 + pfindData->AllocationSize) >> inode->i_blkbits;
@@ -480,7 +480,7 @@ cifs_rmdir(struct inode *inode, struct dentry *direntry)
 
 	if (!rc) {
 		inode->i_nlink--;
-		direntry->d_inode->i_size = 0;
+		i_size_write(direntry->d_inode,0);
 		direntry->d_inode->i_nlink = 0;
 	}
 

@@ -572,7 +572,7 @@ cifs_write(struct file * file, const char *write_data,
 		CURRENT_TIME;
 	if (bytes_written > 0) {
 		if (*poffset > file->f_dentry->d_inode->i_size)
-			file->f_dentry->d_inode->i_size = *poffset;
+			i_size_write(file->f_dentry->d_inode, *poffset);
 	}
 	mark_inode_dirty_sync(file->f_dentry->d_inode);
 	FreeXid(xid);
@@ -713,7 +713,7 @@ cifs_commit_write(struct file *file, struct page *page, unsigned offset,
 	xid = GetXid();
 
 	if (position > inode->i_size){
-		inode->i_size = position;
+		i_size_write(inode, position);
 		if (file->private_data == NULL) {
 			rc = -EBADF;
 		} else {
@@ -727,11 +727,15 @@ cifs_commit_write(struct file *file, struct page *page, unsigned offset,
 					if(rc != 0)
 						break;
 				}
-                if(!open_file->closePend)
-				    rc = CIFSSMBSetFileSize(xid, cifs_sb->tcon, 
-						position, open_file->netfid,
-						open_file->pid,FALSE);
-                else {
+                if(!open_file->closePend) {
+			rc = CIFSSMBSetFileSize(xid, cifs_sb->tcon, 
+					position, open_file->netfid,
+					open_file->pid,FALSE);
+			/* need to zero out the rest of the page */
+			if(to < PAGE_CACHE_SIZE)
+				memset(page+to,0,PAGE_CACHE_SIZE-to);
+		
+		} else {
                     rc = -EBADF;
                     break;
                 }
@@ -1142,7 +1146,7 @@ fill_in_inode(struct inode *tmp_inode,
 	}/* could add code here - to validate if device or weird share type? */
 
 	/* can not fill in nlink here as in qpathinfo version and Unx search */
-	tmp_inode->i_size = pfindData->EndOfFile;
+	i_size_write(tmp_inode,pfindData->EndOfFile);
 	tmp_inode->i_blocks =
 		(tmp_inode->i_blksize - 1 + pfindData->AllocationSize) >> tmp_inode->i_blkbits;
 	if (pfindData->AllocationSize < pfindData->EndOfFile)
@@ -1216,7 +1220,7 @@ unix_fill_in_inode(struct inode *tmp_inode,
 
 	pfindData->NumOfBytes = le64_to_cpu(pfindData->NumOfBytes);
 	pfindData->EndOfFile = le64_to_cpu(pfindData->EndOfFile);
-	tmp_inode->i_size = pfindData->EndOfFile;
+	i_size_write(tmp_inode,pfindData->EndOfFile);
 	tmp_inode->i_blocks =
                 (tmp_inode->i_blksize - 1 + pfindData->NumOfBytes) >> tmp_inode->i_blkbits;
 
@@ -1817,24 +1821,3 @@ struct address_space_operations cifs_addr_ops = {
 	.sync_page = cifs_sync_page,
 	/*.direct_IO = */
 };
-
-struct address_space_operations cifs_addr_ops_writethrough = {
-	.readpage = cifs_readpage,
-	.readpages = cifs_readpages,
-	.writepage = cifs_writepage,
-	.prepare_write = simple_prepare_write,
-	.commit_write = cifs_commit_write,
-	.sync_page = cifs_sync_page,
-	/*.direct_IO = 	 */
-};
-
-struct address_space_operations cifs_addr_ops_nocache = {
-	.readpage = cifs_readpage,
-	.readpages = cifs_readpages,
-	.writepage = cifs_writepage,
-	.prepare_write = simple_prepare_write,
-	.commit_write = cifs_commit_write,
-	.sync_page = cifs_sync_page,
-	/*.direct_IO = */
-};
-
