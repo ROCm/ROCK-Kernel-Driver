@@ -1806,22 +1806,23 @@ static int __block_write_full_page(struct inode *inode, struct page *page,
 
 	do {
 		get_bh(bh);
-		if (buffer_mapped(bh) && buffer_dirty(bh)) {
-			if (wbc->sync_mode != WB_SYNC_NONE) {
-				lock_buffer(bh);
-			} else {
-				if (test_set_buffer_locked(bh)) {
+		if (!buffer_mapped(bh))
+			continue;
+		if (wbc->sync_mode != WB_SYNC_NONE) {
+			lock_buffer(bh);
+		} else {
+			if (test_set_buffer_locked(bh)) {
+				if (buffer_dirty(bh))
 					__set_page_dirty_nobuffers(page);
-					continue;
-				}
+				continue;
 			}
-			if (test_clear_buffer_dirty(bh)) {
-				if (!buffer_uptodate(bh))
-					buffer_error();
-				mark_buffer_async_write(bh);
-			} else {
-				unlock_buffer(bh);
-			}
+		}
+		if (test_clear_buffer_dirty(bh)) {
+			if (!buffer_uptodate(bh))
+				buffer_error();
+			mark_buffer_async_write(bh);
+		} else {
+			unlock_buffer(bh);
 		}
 	} while ((bh = bh->b_this_page) != head);
 
