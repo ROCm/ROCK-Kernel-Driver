@@ -1156,7 +1156,7 @@ rtl8169_hw_start(struct net_device *dev)
 
 static inline void rtl8169_make_unusable_by_asic(struct RxDesc *desc)
 {
-	desc->addr = 0x0badbadbadbadbad;
+	desc->addr = 0x0badbadbadbadbadull;
 	desc->status &= ~cpu_to_le32(OWNbit | RsvdMask);
 }
 
