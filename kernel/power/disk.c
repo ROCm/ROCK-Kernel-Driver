@@ -49,6 +49,7 @@ static int power_down(u32 mode)
 	local_irq_save(flags);
 	switch(mode) {
 	case PM_DISK_PLATFORM:
+		device_shutdown();
 		device_power_down(PM_SUSPEND_DISK);
 		error = pm_ops->enter(PM_SUSPEND_DISK);
 		break;
@@ -83,10 +84,20 @@ static int in_suspend __nosavedata = 0;
 
 static void free_some_memory(void)
 {
-	printk("Freeing memory: ");
-	while (shrink_all_memory(10000))
-		printk(".");
-	printk("|\n");
+	unsigned int i = 0;
+	unsigned int tmp;
+	unsigned long pages = 0;
+	char *p = "-\\|/";
+	
+	printk("Freeing memory...  ");
+	while (tmp = shrink_all_memory(10000)) {
+		pages += tmp;
+		printk("\b%c", p[i]);
+		i++;
+		if (i > 3)
+			i = 0;
+	}
+	printk("\bdone (%li pages freed)\n", pages);
 }
 
 

@@ -74,8 +74,6 @@
 /* References to section boundaries */
 extern char __nosave_begin, __nosave_end;
 
-extern int is_head_of_free_region(struct page *);
-
 /* Variables to be preserved over suspend */
 int pagedir_order_check;
 int nr_copy_pages_check;
@@ -296,15 +294,19 @@ static int data_write(void)
 {
 	int error = 0;
 	int i;
-
-	printk( "Writing data to swap (%d pages): ", nr_copy_pages );
+	unsigned int mod = nr_copy_pages / 100;
+	
+	if (!mod)
+		mod = 1;
+	
+	printk( "Writing data to swap (%d pages)...     ", nr_copy_pages );
 	for (i = 0; i < nr_copy_pages && !error; i++) {
-		if (!(i%100))
-			printk( "." );
+		if (!(i%mod))
+			printk( "\b\b\b\b%3d%%", i / mod );
 		error = write_page((pagedir_nosave+i)->address,
 					  &((pagedir_nosave+i)->swap_address));
 	}
-	printk(" %d Pages done.\n",i);
+	printk("\b\b\b\bdone\n");
 	return error;
 }
 
@@ -423,12 +425,12 @@ struct highmem_page *highmem_copy = NULL;
 static int save_highmem_zone(struct zone *zone)
 {
 	unsigned long zone_pfn;
+	mark_free_pages(zone);
 	for (zone_pfn = 0; zone_pfn < zone->spanned_pages; ++zone_pfn) {
 		struct page *page;
 		struct highmem_page *save;
 		void *kaddr;
 		unsigned long pfn = zone_pfn + zone->zone_start_pfn;
-		int chunk_size;
 
 		if (!(pfn%1000))
 			printk(".");
@@ -445,11 +447,8 @@ static int save_highmem_zone(struct zone *zone)
 			printk("highmem reserved page?!\n");
 			continue;
 		}
-		if ((chunk_size = is_head_of_free_region(page))) {
-			pfn += chunk_size - 1;
-			zone_pfn += chunk_size - 1;
+		if (PageNosaveFree(page))
 			continue;
-		}
 		save = kmalloc(sizeof(struct highmem_page), GFP_ATOMIC);
 		if (!save)
 			return -ENOMEM;
@@ -528,14 +527,11 @@ static int pfn_is_nosave(unsigned long pfn)
 static int saveable(struct zone * zone, unsigned long * zone_pfn)
 {
 	unsigned long pfn = *zone_pfn + zone->zone_start_pfn;
-	unsigned long chunk_size;
 	struct page * page;
 
 	if (!pfn_valid(pfn))
 		return 0;
 
-	if (!(pfn%1000))
-		printk(".");
 	page = pfn_to_page(pfn);
 	BUG_ON(PageReserved(page) && PageNosave(page));
 	if (PageNosave(page))
@@ -544,10 +540,8 @@ static int saveable(struct zone * zone, unsigned long * zone_pfn)
 		pr_debug("[nosave pfn 0x%lx]", pfn);
 		return 0;
 	}
-	if ((chunk_size = is_head_of_free_region(page))) {
-		*zone_pfn += chunk_size - 1;
+	if (PageNosaveFree(page))
 		return 0;
-	}
 
 	return 1;
 }
@@ -561,6 +555,7 @@ static void count_data_pages(void)
 
 	for_each_zone(zone) {
 		if (!is_highmem(zone)) {
+			mark_free_pages(zone);
 			for (zone_pfn = 0; zone_pfn < zone->spanned_pages; ++zone_pfn)
 				nr_copy_pages += saveable(zone, &zone_pfn);
 		}
@@ -575,21 +570,18 @@ static void copy_data_pages(void)
 	struct pbe * pbe = pagedir_nosave;
 	
 	for_each_zone(zone) {
-		if (!is_highmem(zone))
-			for (zone_pfn = 0; zone_pfn < zone->spanned_pages; ++zone_pfn) {
-				if (saveable(zone, &zone_pfn)) {
-					struct page * page;
-					page = pfn_to_page(zone_pfn + zone->zone_start_pfn);
-					pbe->orig_address = (long) page_address(page);
-					/* Copy page is dangerous: it likes to mess with
-					   preempt count on specific cpus. Wrong preempt 
-					   count is then copied, oops. 
-					*/
-					copy_page((void *)pbe->address, 
-						  (void *)pbe->orig_address);
-					pbe++;
-				}
+		if (is_highmem(zone))
+			continue;
+		for (zone_pfn = 0; zone_pfn < zone->spanned_pages; ++zone_pfn) {
+			if (saveable(zone, &zone_pfn)) {
+				struct page * page;
+				page = pfn_to_page(zone_pfn + zone->zone_start_pfn);
+				pbe->orig_address = (long) page_address(page);
+				/* copy_page is no usable for copying task structs. */
+				memcpy((void *)pbe->address, (void *)pbe->orig_address, PAGE_SIZE);
+				pbe++;
 			}
+		}
 	}
 }
 
@@ -681,9 +673,9 @@ static int alloc_pagedir(void)
 	calc_order();
 	pagedir_save = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC | __GFP_COLD,
 							     pagedir_order);
-	if(!pagedir_save)
+	if (!pagedir_save)
 		return -ENOMEM;
-	memset(pagedir_save,0,(1 << pagedir_order) * PAGE_SIZE);
+	memset(pagedir_save, 0, (1 << pagedir_order) * PAGE_SIZE);
 	pagedir_nosave = pagedir_save;
 	return 0;
 }
@@ -788,6 +780,7 @@ static int swsusp_alloc(void)
 int suspend_prepare_image(void)
 {
 	unsigned int nr_needed_pages = 0;
+	int error;
 
 	pr_debug("swsusp: critical section: \n");
 	if (save_highmem()) {
@@ -800,7 +793,9 @@ int suspend_prepare_image(void)
 	printk("swsusp: Need to copy %u pages\n",nr_copy_pages);
 	nr_needed_pages = nr_copy_pages + PAGES_FOR_IO;
 
-	swsusp_alloc();
+	error = swsusp_alloc();
+	if (error)
+		return error;
 	
 	/* During allocating of suspend pagedir, new cold pages may appear. 
 	 * Kill them.
@@ -1154,14 +1149,18 @@ static int __init data_read(void)
 	struct pbe * p;
 	int error;
 	int i;
-
+	int mod = nr_copy_pages / 100;
+	
+	if (!mod)
+		mod = 1;
+	
 	if ((error = swsusp_pagedir_relocate()))
 		return error;
 
-	printk( "Reading image data (%d pages): ", nr_copy_pages );
+	printk( "Reading image data (%d pages):     ", nr_copy_pages );
 	for(i = 0, p = pagedir_nosave; i < nr_copy_pages && !error; i++, p++) {
-		if (!(i%100))
-			printk( "." );
+		if (!(i%mod))
+			printk( "\b\b\b\b%3d%%", i / mod );
 		error = bio_read_page(swp_offset(p->swap_address),
 				  (void *)p->address);
 	}

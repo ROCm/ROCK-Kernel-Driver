@@ -880,12 +880,14 @@ int radeonfb_pci_suspend(struct pci_dev *pdev, u32 state)
 		radeon_engine_idle();
 	}
 
-	/* Blank display and LCD */
-	radeonfb_blank(VESA_POWERDOWN, info);
+	if (system_state != SYSTEM_SNAPSHOT) {
+		/* Blank display and LCD */
+		radeonfb_blank(VESA_POWERDOWN, info);
 
-	/* Sleep */
-	rinfo->asleep = 1;
-	rinfo->lock_blank = 1;
+		/* Sleep */
+		rinfo->asleep = 1;
+		rinfo->lock_blank = 1;
+	}
 
 	/* Suspend the chip to D2 state when supported
 	 */
