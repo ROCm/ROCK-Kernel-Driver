@@ -718,7 +718,7 @@ CONFIG_AGP=y
 # CONFIG_AGP_ALI is not set
 # CONFIG_AGP_ATI is not set
 # CONFIG_AGP_AMD is not set
-# CONFIG_AGP_AMD_8151 is not set
+# CONFIG_AGP_AMD64 is not set
 CONFIG_AGP_INTEL=y
 # CONFIG_AGP_NVIDIA is not set
 # CONFIG_AGP_SIS is not set

@@ -675,7 +675,7 @@ static __init int init_k8_gatt(struct agp_kern_info *info)
 	return -1; 
 } 
 
-extern int agp_amdk8_init(void);
+extern int agp_amd64_init(void);
 
 static int __init pci_iommu_init(void)
 { 
@@ -690,7 +690,7 @@ static int __init pci_iommu_init(void)
 	/* Makefile puts PCI initialization via subsys_initcall first. */
 	/* Add other K8 AGP bridge drivers here */
 	no_agp = no_agp || 
-		(agp_amdk8_init() < 0) || 
+		(agp_amd64_init() < 0) || 
 		(agp_copy_info(&info) < 0); 
 #endif	
 
