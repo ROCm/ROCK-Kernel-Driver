@@ -1496,14 +1496,18 @@ out:
 static void d_unhash(struct dentry *dentry)
 {
 	dget(dentry);
+	spin_lock(&dcache_lock);
 	switch (atomic_read(&dentry->d_count)) {
 	default:
+		spin_unlock(&dcache_lock);
 		shrink_dcache_parent(dentry);
+		spin_lock(&dcache_lock);
 		if (atomic_read(&dentry->d_count) != 2)
 			break;
 	case 2:
-		d_drop(dentry);
+		list_del_init(&dentry->d_hash);
 	}
+	spin_unlock(&dcache_lock);
 }
 
 int vfs_rmdir(struct inode *dir, struct dentry *dentry)
