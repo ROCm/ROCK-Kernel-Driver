@@ -1,4 +1,4 @@
-/* $Id: divasfunc.c,v 1.22 2003/09/09 06:46:29 schindler Exp $
+/* $Id: divasfunc.c,v 1.23 2004/04/08 01:17:57 armin Exp $
  *
  * Low level driver for Eicon DIVA Server ISDN cards.
  *
@@ -29,7 +29,6 @@ extern PISDN_ADAPTER IoAdapters[MAX_ADAPTER];
 
 #define MAX_DESCRIPTORS  32
 
-extern void diva_run_trap_script(PISDN_ADAPTER IoAdapter, dword ANum);
 extern char *DRIVERRELEASE_DIVAS;
 
 static dword notify_handle;
@@ -87,10 +86,8 @@ void diva_xdi_didd_register_adapter(int card)
 		DAdapter.request((ENTITY *) & req);
 		if (req.didd_add_adapter.e.Rc != 0xff) {
 			DBG_ERR(("DIDD register A(%d) failed !", card))
-		} else {
-			IoAdapters[card - 1]->os_trap_nfy_Fnc =
-			    diva_run_trap_script;
 		}
+		IoAdapters[card - 1]->os_trap_nfy_Fnc = NULL;
 	}
 }
 
