@@ -2,7 +2,6 @@
 # Appletalk driver configuration
 #
 
-mainmenu_option next_comment
 dep_mbool 'Appletalk interfaces support' CONFIG_DEV_APPLETALK $CONFIG_ATALK
 if [ "$CONFIG_DEV_APPLETALK" = "y" ]; then
    tristate '  Apple/Farallon LocalTalk PC support' CONFIG_LTPC
