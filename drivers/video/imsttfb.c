@@ -1211,7 +1211,7 @@ imsttfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	if (flags & FB_CUR_SETSIZE) {
         }
 
-        if (flags & (FB_CUR_SETSHAPE | FB_CUR_SETCMAP | FB_CUR_SETDEST)) {
+        if (flags & (FB_CUR_SETSHAPE | FB_CUR_SETCMAP)) {
                 int fg_idx = cursor->image.fg_color;
                 int width = (cursor->image.width+7)/8;
                 u8 *dat = (u8 *) cursor->image.data;
