@@ -194,7 +194,7 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	printk("naca->pftSize                 = 0x%lx\n", naca->pftSize);
 	printk("naca->debug_switch            = 0x%lx\n", naca->debug_switch);
 	printk("naca->interrupt_controller    = 0x%ld\n", naca->interrupt_controller);
-	printk("systemcf                      = 0x%p\n", systemcfg);
+	printk("systemcfg                      = 0x%p\n", systemcfg);
 	printk("systemcfg->processorCount     = 0x%lx\n", systemcfg->processorCount);
 	printk("systemcfg->physicalMemorySize = 0x%lx\n", systemcfg->physicalMemorySize);
 	printk("systemcfg->dCacheL1LineSize   = 0x%x\n", systemcfg->dCacheL1LineSize);
@@ -256,7 +256,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		return 0;
 	}
 
-	if (!(cpu_online_map & (1<<cpu_id)))
+	if (!(cpu_online_map & (1UL << cpu_id)))
 		return 0;
 
 #ifdef CONFIG_SMP
@@ -584,7 +584,7 @@ int set_spread_lpevents( char * str )
 	/* The parameter is the number of processors to share in processing lp events */
 	unsigned long i;
 	unsigned long val = simple_strtoul( str, NULL, 0 );
-	if ( ( val > 0 ) && ( val <= MAX_PACAS ) ) {
+	if ( ( val > 0 ) && ( val <= NR_CPUS ) ) {
 		for ( i=1; i<val; ++i )
 			paca[i].lpQueuePtr = paca[0].lpQueuePtr;
 		printk("lpevent processing spread over %ld processors\n", val);

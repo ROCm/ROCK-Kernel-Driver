@@ -609,7 +609,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall		/* old profil syscall */
 	.llong .compat_sys_statfs
 	.llong .compat_sys_fstatfs		/* 100 */
-	.llong .sys_ioperm
+	.llong .sys_ni_syscall		/* old ioperm syscall */
 	.llong .compat_sys_socketcall
 	.llong .sys32_syslog
 	.llong .compat_sys_setitimer
@@ -852,7 +852,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_ni_syscall		/* old profil syscall holder */
 	.llong .sys_statfs
 	.llong .sys_fstatfs		/* 100 */
-	.llong .sys_ioperm
+	.llong .sys_ni_syscall		/* old ioperm syscall */
 	.llong .sys_socketcall
 	.llong .sys_syslog
 	.llong .sys_setitimer
