@@ -992,8 +992,8 @@ Module parameters
 		  [VIA686A/686B only]
     ac97_clock	- AC'97 codec clock base (default 48000Hz)
     dxs_support	- support DXS channels,
-		  0 = auto (default), 1 = enable, 2 = disable,
-		  3 = 48k only
+		  0 = auto, 1 = enable, 2 = disable,
+		  3 = 48k only (default)
 		  [VIA8233/C,8235 only]
 
     Module supports autoprobe and multiple bus-master chips (max 8).
@@ -1007,11 +1007,9 @@ Module parameters
     Note: VIA8233/5 (not VIA8233A) can support DXS (direct sound)
 	  channels as the first PCM.  With this device, up to 4
 	  streams can be played at the same time.  On some motherboards,
-	  these channels don't work properly due to the bug of BIOS.
-	  If you experience that the playback on this PCM is noisy,
-	  try to specify dxs_support option to 2 or 3.  In most cases
-	  dxs_support=3 would suffice, so you can keep the multi-play
-	  capability.
+	  these channels don't work properly except for 48k due to the
+	  bug of BIOS.  For supporting other sample rates, try to
+	  specify dxs_support=0.
 
     Note: for the MPU401 on VIA823x, use snd-mpu401 driver
 	  additonally.  The mpu_port option is for VIA686 chips only.

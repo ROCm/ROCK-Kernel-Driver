@@ -74,7 +74,7 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static long mpu_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 48000};
-static int dxs_support[SNDRV_CARDS];
+static int dxs_support[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 3};
 
 MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(index, "Index value for VIA 82xx bridge.");
@@ -2083,7 +2083,7 @@ module_exit(alsa_card_via82xx_exit)
 #ifndef MODULE
 
 /* format is: snd-via82xx=enable,index,id,
-			  mpu_port,ac97_clock */
+			  mpu_port,ac97_clock,dxs_support */
 
 static int __init alsa_card_via82xx_setup(char *str)
 {
@@ -2095,7 +2095,8 @@ static int __init alsa_card_via82xx_setup(char *str)
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
 	       get_option(&str,(int *)&mpu_port[nr_dev]) == 2 &&
-	       get_option(&str,&ac97_clock[nr_dev]) == 2);
+	       get_option(&str,&ac97_clock[nr_dev]) == 2 &&
+	       get_option(&str,&dxs_support[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }
