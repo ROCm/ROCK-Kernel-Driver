@@ -474,8 +474,17 @@ static int i8042_enable_mux_mode(struct i8042_values *values, unsigned char *mux
 	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param != 0xa9)
 		return -1;
 	param = 0xa4;
-	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param == 0x5b)
+	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param == 0x5b) {
+
+/*
+ * Do another loop test with the 0x5a value. Doing anything else upsets
+ * Profusion/ServerWorks OSB4 chipsets.
+ */
+
+		param = 0x5a;
+		i8042_command(&param, I8042_CMD_AUX_LOOP);
 		return -1;
+	}
 
 	if (mux_version)
 		*mux_version = ~param;
@@ -532,8 +541,8 @@ static int __init i8042_check_mux(struct i8042_values *values)
 		return -1;
 	
 	/* Workaround for broken chips which seem to support MUX, but in reality don't. */
-	/* They all report version 12.10 */
-	if (mux_version == 0xCA)
+	/* They all report version 10.12 */
+	if (mux_version == 0xAC)
 		return -1;
 
 	printk(KERN_INFO "i8042.c: Detected active multiplexing controller, rev %d.%d.\n",
