@@ -755,14 +755,16 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 
 	if(lockType == LOCKING_ANDX_OPLOCK_RELEASE) {
 		timeout = -1; /* no response expected */
+		pSMB->Timeout = 0;
+	} else if (waitFlag == TRUE) {
+		timeout = 3;  /* blocking operation, no timeout */
+		pSMB->Timeout = -1; /* blocking - do not time out */
+	} else {
+		pSMB->Timeout = 0;
 	}
 
 	pSMB->NumberOfLocks = cpu_to_le32(numLock);
 	pSMB->NumberOfUnlocks = cpu_to_le32(numUnlock);
-	if(waitFlag)
-		pSMB->Timeout = 3;  /* blocking - do time out */
-	else
-		pSMB->Timeout = 0;
 	pSMB->LockType = lockType;
 	pSMB->AndXCommand = 0xFF;	/* none */
 	pSMB->Fid = smb_file_id; /* netfid stays le */
