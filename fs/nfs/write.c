@@ -764,6 +764,7 @@ int
 nfs_flush_incompatible(struct file *file, struct page *page)
 {
 	struct inode	*inode = page->mapping->host;
+	struct rpc_cred	*cred = nfs_file_cred(file);
 	struct nfs_page	*req;
 	int		status = 0;
 	/*
@@ -776,7 +777,7 @@ nfs_flush_incompatible(struct file *file, struct page *page)
 	 */
 	req = nfs_find_request(inode,page);
 	if (req) {
-		if (req->wb_file != file || req->wb_page != page)
+		if (req->wb_file != file || req->wb_cred != cred || req->wb_page != page)
 			status = nfs_wb_page(inode, page);
 		nfs_release_request(req);
 	}
