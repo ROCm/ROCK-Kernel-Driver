@@ -2,10 +2,10 @@
 # Video configuration
 #
 
-menu "Frame-buffer support"
+menu "Graphics support"
 
 config FB
-	bool "Support for frame buffer devices (EXPERIMENTAL)"
+	bool "Support for frame buffer devices"
 	---help---
 	  The frame buffer device provides an abstraction for the graphics
 	  hardware. It represents the frame buffer of some video hardware and
@@ -38,14 +38,9 @@ config FB
 	  (e.g. an accelerated X server) and that are not frame buffer
 	  device-aware may cause unexpected results. If unsure, say N.
 
-config DUMMY_CONSOLE
-	bool
-	depends on FB
-	default y
-
 config FB_CLGEN
-	tristate "Cirrus Logic support (EXPERIMENTAL)"
-	depends on FB && EXPERIMENTAL && (AMIGA || PCI)
+	tristate "Cirrus Logic support"
+	depends on FB && (AMIGA || PCI)
 	---help---
 	  This enables support for Cirrus Logic GD542x/543x based boards on
 	  Amiga: SD64, Piccolo, Picasso II/II+, Picasso IV, or EGS Spectrum.
@@ -59,8 +54,8 @@ config FB_CLGEN
 	  before you next recompile the kernel.
 
 config FB_PM2
-	tristate "Permedia2 support (EXPERIMENTAL)"
-	depends on FB && EXPERIMENTAL && (AMIGA || PCI)
+	tristate "Permedia2 support"
+	depends on FB && (AMIGA || PCI)
 	help
 	  This is the frame buffer device driver for the Permedia2 AGP frame
 	  buffer card from ASK, aka `Graphic Blaster Exxtreme'.  There is a
@@ -206,8 +201,8 @@ config FB_CYBER
 	  Cybervision 64 3D card, as they use incompatible video chips.
 
 config FB_VIRGE
-	bool "Amiga CyberVision3D support (EXPERIMENTAL)"
-	depends on FB && ZORRO && EXPERIMENTAL
+	bool "Amiga CyberVision3D support "
+	depends on FB && ZORRO
 	help
 	  This enables support for the Cybervision 64/3D graphics card from
 	  Phase5. Please note that its use is not all that intuitive (i.e. if
@@ -217,16 +212,16 @@ config FB_VIRGE
 	  Cybervision 64 card, as they use incompatible video chips.
 
 config FB_RETINAZ3
-	tristate "Amiga RetinaZ3 support (EXPERIMENTAL)"
-	depends on FB && ZORRO && EXPERIMENTAL
+	tristate "Amiga RetinaZ3 support"
+	depends on FB && ZORRO
 	help
 	  This enables support for the Retina Z3 graphics card. Say N unless
 	  you have a Retina Z3 or plan to get one before you next recompile
 	  the kernel.
 
 config FB_FM2
-	bool "Amiga FrameMaster II/Rainbow II support (EXPERIMENTAL)"
-	depends on FB && ZORRO && EXPERIMENTAL
+	bool "Amiga FrameMaster II/Rainbow II support"
+	depends on FB && ZORRO
 	help
 	  This is the frame buffer device driver for the Amiga FrameMaster
 	  card from BSC (exhibited 1992 but not shipped as a CBM product).
@@ -237,33 +232,6 @@ config FB_ATARI
 	help
 	  This is the frame buffer device driver for the builtin graphics
 	  chipset found in Ataris.
-
-config FB_ATY
-	tristate "ATI Mach64 display support (EXPERIMENTAL)" if EXPERIMENTAL && PCI
-	depends on FB
-	help
-	  This driver supports graphics boards with the ATI Mach64 chips.
-	  Say Y if you have such a graphics board.
-
-	  The driver is also available as a module ( = code which can be
-	  inserted and removed from the running kernel whenever you want). The
-	  module will be called atyfb.o. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
-
-config FB_ATY
-	prompt "ATI Mach64 display support"
-	depends on FB && (SPARC64 && PCI && FB_PCI || ATARI)
-
-config FB_ATY_GX
-	bool "Mach64 GX support (EXPERIMENTAL)" if EXPERIMENTAL && PCI
-	depends on FB_ATY
-	default y if ATARI
-	help
-	  Say Y here to support use of the ATI Mach64 Graphics Expression
-	  board (or other boards based on the Mach64 GX chipset) as a
-	  framebuffer device.  The ATI product support page for these boards
-	  is at
-	  <http://support.ati.com/products/pc/mach64/graphics_xpression.html>.
 
 config FB_OF
 	bool "Open Firmware frame buffer device support"
@@ -302,7 +270,7 @@ config FB_CT65550
 
 config FB_IMSTT
 	bool "IMS Twin Turbo display support"
-	depends on FB && PPC
+	depends on FB && PCI
 	help
 	  The IMS Twin Turbo is a PCI-based frame buffer card bundled with
 	  many Macintosh and compatible computers.
@@ -368,15 +336,20 @@ config FB_TGA
 
 config FB_VESA
 	bool "VESA VGA graphics console"
-	depends on FB && X86
+	depends on FB && (X86 || X86_64)
 	help
 	  This is the frame buffer device driver for generic VESA 2.0
 	  compliant graphic cards. The older VESA 1.2 cards are not supported.
 	  You will get a boot time penguin logo at no additional cost. Please
 	  read <file:Documentation/fb/vesafb.txt>. If unsure, say Y.
 
+config VIDEO_SELECT
+	bool
+	depends on FB_VESA
+	default y
+
 config FB_HGA
-	tristate "Hercules mono graphics console (EXPERIMENTAL)"
+	tristate "Hercules mono graphics console"
 	depends on FB && X86
 	help
 	  Say Y here if you have a Hercules mono graphics card.
@@ -486,8 +459,8 @@ config E1355_FB_BASE
 	  discussion.
 
 config FB_RIVA
-	tristate "nVidia Riva support (EXPERIMENTAL)"
-	depends on FB && EXPERIMENTAL && PCI
+	tristate "nVidia Riva support"
+	depends on FB && PCI
 	help
 	  This driver supports graphics boards with the nVidia Riva/Geforce
 	  chips.
@@ -499,8 +472,8 @@ config FB_RIVA
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config FB_MATROX
-	tristate "Matrox acceleration (EXPERIMENTAL)"
-	depends on FB && EXPERIMENTAL && PCI
+	tristate "Matrox acceleration"
+	depends on FB && PCI
 	---help---
 	  Say Y here if you have a Matrox Millennium, Matrox Millennium II,
 	  Matrox Mystique, Matrox Mystique 220, Matrox Productiva G100, Matrox
@@ -654,19 +627,9 @@ config FB_MATROX_MULTIHEAD
 	  There is no need for enabling 'Matrox multihead support' if you have
 	  only one Matrox card in the box.
 
-config FB_ATY_CT
-	bool "Mach64 CT/VT/GT/LT (incl. 3D RAGE) support" if EXPERIMENTAL
-	depends on PCI && FB_ATY
-	default y if SPARC64 && FB_PCI
-	help
-	  Say Y here to support use of ATI's 64-bit Rage boards (or other
-	  boards based on the Mach64 CT, VT, GT, and LT chipsets) as a
-	  framebuffer device.  The ATI product support page for these boards
-	  is at <http://support.ati.com/products/pc/mach64/>.
-
 config FB_RADEON
-	tristate "ATI Radeon display support (EXPERIMENTAL)"
-	depends on FB && EXPERIMENTAL && PCI
+	tristate "ATI Radeon display support"
+	depends on FB && PCI
 	help
 	  Choose this option if you want to use an ATI Radeon graphics card as
 	  a framebuffer device.  There are both PCI and AGP versions.  You
@@ -675,8 +638,8 @@ config FB_RADEON
 	  <http://www.ati.com/na/pages/products/pc/radeon32/index.html>.
 
 config FB_ATY128
-	tristate "ATI Rage128 display support (EXPERIMENTAL)"
-	depends on FB && EXPERIMENTAL && PCI
+	tristate "ATI Rage128 display support"
+	depends on FB && PCI
 	help
 	  This driver supports graphics boards with the ATI Rage128 chips.
 	  Say Y if you have such a graphics board and read
@@ -687,9 +650,42 @@ config FB_ATY128
 	  module will be called aty128fb.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
+config FB_ATY
+	tristate "ATI Mach64 display support" if PCI || ATARI
+	depends on FB
+	help
+	  This driver supports graphics boards with the ATI Mach64 chips.
+	  Say Y if you have such a graphics board.
+
+	  The driver is also available as a module ( = code which can be
+	  inserted and removed from the running kernel whenever you want). The
+	  module will be called atyfb.o. If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.
+
+config FB_ATY_CT
+	bool "Mach64 CT/VT/GT/LT (incl. 3D RAGE) support"
+	depends on PCI && FB_ATY
+	default y if SPARC64 && FB_PCI
+	help
+	  Say Y here to support use of ATI's 64-bit Rage boards (or other
+	  boards based on the Mach64 CT, VT, GT, and LT chipsets) as a
+	  framebuffer device.  The ATI product support page for these boards
+	  is at <http://support.ati.com/products/pc/mach64/>.
+
+config FB_ATY_GX
+	bool "Mach64 GX support" if PCI
+	depends on FB_ATY
+	default y if ATARI
+	help
+	  Say Y here to support use of the ATI Mach64 Graphics Expression
+	  board (or other boards based on the Mach64 GX chipset) as a
+	  framebuffer device.  The ATI product support page for these boards
+	  is at
+	  <http://support.ati.com/products/pc/mach64/graphics_xpression.html>.
+
 config FB_SIS
-	tristate "SIS acceleration (EXPERIMENTAL)"
-	depends on FB && EXPERIMENTAL && PCI
+	tristate "SIS acceleration"
+	depends on FB && PCI
 	help
 	  This is the frame buffer device driver for the SiS 630 and 640 Super
 	  Socket 7 UMA cards.  Specs available at <http://www.sis.com.tw/>.
@@ -710,8 +706,8 @@ config FB_SIS_315
 	  card.  Specs available at <http://www.sis.com.tw/>.
 
 config FB_NEOMAGIC
-	tristate "NeoMagic display support (EXPERIMENTAL)"
-	depends on FB && EXPERIMENTAL && PCI
+	tristate "NeoMagic display support"
+	depends on FB && PCI
 	help
 	  This driver supports notebooks with NeoMagic PCI chips.
 	  Say Y if you have such a graphics card. 
@@ -722,8 +718,8 @@ config FB_NEOMAGIC
 	  module, say M here and read Documentation/modules.txt.
 
 config FB_3DFX
-	tristate "3Dfx Banshee/Voodoo3 display support (EXPERIMENTAL)"
-	depends on FB && EXPERIMENTAL && PCI
+	tristate "3Dfx Banshee/Voodoo3 display support"
+	depends on FB && PCI
 	help
 	  This driver supports graphics boards with the 3Dfx Banshee/Voodoo3
 	  chips. Say Y if you have such a graphics board.
@@ -734,8 +730,8 @@ config FB_3DFX
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config FB_VOODOO1
-	tristate "3Dfx Voodoo Graphics (sst1) support (EXPERIMENTAL)"
-	depends on FB && EXPERIMENTAL && PCI
+	tristate "3Dfx Voodoo Graphics (sst1) support"
+	depends on FB && PCI
 	---help---
 	  Say Y here if you have a 3Dfx Voodoo Graphics (Voodoo1/sst1) or 
 	  Voodoo2 (cvg) based graphics card.
@@ -751,8 +747,8 @@ config FB_VOODOO1
 	  options and other important info  support.
 
 config FB_TRIDENT
-	tristate "Trident support (EXPERIMENTAL)"
-	depends on FB && EXPERIMENTAL && PCI
+	tristate "Trident support"
+	depends on FB && PCI
 	---help---
 	  This driver is supposed to support graphics boards with the
 	  Trident CyberXXXX/Image/CyberBlade chips mostly found in laptops
@@ -767,8 +763,8 @@ config FB_TRIDENT
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config FB_PM3
-	tristate "Permedia3 support (EXPERIMENTAL)"
-	depends on FB && EXPERIMENTAL && PCI
+	tristate "Permedia3 support"
+	depends on FB && PCI
 	help
 	  This is the frame buffer device driver for the 3DLabs Permedia3
 	  chipset, used in Formac ProFormance III, 3DLabs Oxygen VX1 &
@@ -868,8 +864,8 @@ config FB_TX3912
 	  Say Y here to enable kernel support for the on-board framebuffer.
 
 config FB_VIRTUAL
-	tristate "Virtual Frame Buffer support (ONLY FOR TESTING!) (EXPERIMENTAL)"
-	depends on FB && EXPERIMENTAL
+	tristate "Virtual Frame Buffer support (ONLY FOR TESTING!)"
+	depends on FB
 	---help---
 	  This is a `virtual' frame buffer device. It operates on a chunk of
 	  unswappable kernel memory instead of on the memory of a graphics
@@ -887,262 +883,7 @@ config FB_VIRTUAL
 
 	  If unsure, say N.
 
-config FBCON_ADVANCED
-	bool "Advanced low level driver options"
-	depends on FB
-	---help---
-	  The frame buffer console uses character drawing routines that are
-	  tailored to the specific organization of pixels in the memory of
-	  your graphics hardware. These are called the low level frame buffer
-	  console drivers. Note that they are used for text console output
-	  only; they are NOT needed for graphical applications.
-
-	  If you say N here, the needed low level drivers are automatically
-	  enabled, depending on what frame buffer devices you selected above.
-	  This is recommended for most users.
-
-	  If you say Y here, you have more fine-grained control over which low
-	  level drivers are enabled. You can e.g. leave out low level drivers
-	  for color depths you do not intend to use for text consoles.
-
-	  Low level frame buffer console drivers can be modules ( = code which
-	  can be inserted and removed from the running kernel whenever you
-	  want). The modules will be called fbcon-*.o. If you want to compile
-	  (some of) them as modules, read <file:Documentation/modules.txt>.
-
-	  If unsure, say N.
-
-config FBCON_MFB
-	tristate "Monochrome support" if FBCON_ADVANCED
-	depends on FB
-	default m if !FBCON_ADVANCED && !FB_ACORN && FB_AMIGA!=y && !FB_ATARI && FB_CYBER!=y && !FB_BWTWO && FB_RETINAZ3!=y && !FB_VIRGE && FB_CLGEN!=y && (FB_AMIGA=m || FB_CYBER=m || FB_RETINAZ3=m || FB_CLGEN=m)
-	default y if !FBCON_ADVANCED && (FB_ACORN || FB_AMIGA=y || FB_ATARI || FB_CYBER=y || FB_BWTWO || FB_RETINAZ3=y || FB_VIRGE || FB_CLGEN=y)
-	help
-	  This is the low level frame buffer console driver for monochrome
-	  (2 colors) packed pixels.
-
-config FBCON_CFB2
-	tristate "2 bpp packed pixels support" if FBCON_ADVANCED
-	depends on FB
-	default y if !FBCON_ADVANCED && (FB_ACORN || FB_SA1100)
-	help
-	  This is the low level frame buffer console driver for 2 bits per
-	  pixel (4 colors) packed pixels.
-
-config FBCON_CFB4
-	tristate "4 bpp packed pixels support" if FBCON_ADVANCED
-	depends on FB
-	default y if !FBCON_ADVANCED && (FB_ACORN || FB_SA1100)
-	help
-	  This is the low level frame buffer console driver for 4 bits per
-	  pixel (16 colors) packed pixels.
-
-config FBCON_CFB8
-	tristate "8 bpp packed pixels support" if FBCON_ADVANCED
-	depends on FB
-	default m if !FBCON_ADVANCED && !FB_ACORN && !FB_ATARI && !FB_P9100 && FB_CYBER2000!=y && FB_RADEON!=y && FB_TGA!=y && FB_SIS!=y && FB_PM3!=y && !FB_TCX && !FB_CGTHREE && !FB_CONTROL && FB_CLGEN!=y && !FB_CGFOURTEEN && FB_TRIDENT!=y && !FB_VIRGE && FB_CYBER!=y && !FB_VALKYRIE && !FB_PLATINUM && !FB_IGA && FB_MATROX!=y && !FB_CT65550 && FB_PM2!=y && !FB_SA1100 && (FB_CYBER2000=m || FB_RADEON=m || FB_TGA=m || FB_SIS=m || FB_PM3=m || FB_CLGEN=m || FB_TRIDENT=m || FB_CYBER=m || FB_MATROX=m || FB_PM2=m)
-	default y if !FBCON_ADVANCED && (FB_ACORN || FB_ATARI || FB_P9100 || FB_CYBER2000=y || FB_RADEON=y || FB_TGA=y || FB_SIS=y || FB_PM3=y || FB_TCX || FB_CGTHREE || FB_CONTROL || FB_CLGEN=y || FB_CGFOURTEEN || FB_TRIDENT=y || FB_VIRGE || FB_CYBER=y || FB_VALKYRIE || FB_PLATINUM || FB_IGA || FB_MATROX=y || FB_CT65550 || FB_PM2=y || FB_SA1100)
-	help
-	  This is the low level frame buffer console driver for 8 bits per
-	  pixel (256 colors) packed pixels.
-
-config FBCON_CFB16
-	tristate "16 bpp packed pixels support" if FBCON_ADVANCED
-	depends on FB
-	default m if !FBCON_ADVANCED && !FB_ATARI && FB_PM3!=y && FB_SIS!=y && FB_PVR2!=y && FB_TRIDENT!=y && !FB_TBOX && FB_VOODOO1!=y && FB_RADEON!=y && !FB_CONTROL && FB_CLGEN!=y && !FB_VIRGE && FB_CYBER!=y && !FB_VALKYRIE && !FB_PLATINUM && !FB_CT65550 && FB_MATROX!=y && FB_PM2!=y && FB_CYBER2000!=y && !FB_SA1100 && (FB_SIS=m || FB_RADEON=m || FB_PVR2=m || FB_TRIDENT=m || FB_VOODOO1=m || FB_PM3=m || FB_CLGEN=m || FB_CYBER=m || FB_MATROX=m || FB_PM2=m || FB_CYBER2000=m || FB_SA1100)
-	default y if !FBCON_ADVANCED && (FB_ATARI || FB_PM3=y || FB_SIS=y || FB_PVR2=y || FB_TRIDENT=y || FB_TBOX || FB_VOODOO1=y || FB_RADEON=y || FB_CONTROL || FB_CLGEN=y || FB_VIRGE || FB_CYBER=y || FB_VALKYRIE || FB_PLATINUM || FB_CT65550 || FB_MATROX=y || FB_PM2=y || FB_CYBER2000=y || FB_SA1100)
-	help
-	  This is the low level frame buffer console driver for 15 or 16 bits
-	  per pixel (32K or 64K colors, also known as `hicolor') packed
-	  pixels.
-
-config FBCON_CFB24
-	tristate "24 bpp packed pixels support" if FBCON_ADVANCED
-	depends on FB
-	default m if !FBCON_ADVANCED && FB_ATY!=y && FB_VIRTUAL!=y && FB_CLGEN!=y && !FB_VESA && FB_MATROX!=y && FB_PM2!=y && FB_ATY128!=y && FB_RADEON!=y && FB_CYBER2000!=y && FB_PVR2!=y && FB_VOODOO1!=y && FB_NEOMAGIC!=y && (FB_ATY=m || FB_VIRTUAL=m || FB_CLGEN=m || FB_MATROX=m || FB_PM2=m || FB_ATY128=m || FB_RADEON=m || FB_CYBER2000=m || FB_PVR2=m || FB_VOODOO1=m || FB_NEOMAGIC=y)
-	default y if !FBCON_ADVANCED && (FB_ATY=y || FB_VIRTUAL=y || FB_CLGEN=y || FB_VESA || FB_MATROX=y || FB_PM2=y || FB_ATY128=y || FB_RADEON=y || FB_CYBER2000=y || FB_PVR2=y || FB_VOODOO1=y || FB_NEOMAGIC=y)
-	help
-	  This is the low level frame buffer console driver for 24 bits per
-	  pixel (16M colors, also known as `truecolor') packed pixels. It is
-	  NOT for `sparse' 32 bits per pixel mode.
-
-config FBCON_CFB32
-	tristate "32 bpp packed pixels support" if FBCON_ADVANCED
-	depends on FB
-	default m if !FBCON_ADVANCED && !FB_ATARI && FB_RADEON!=y && FB_VOODOO1!=y && FB_TRIDENT!=y && !FB_CONTROL && FB_CLGEN!=y && FB_TGA!=y && !FB_PLATINUM && FB_MATROX!=y && FB_PM2!=y && FB_PVR2!=y && FB_PM3!=y && FB_SIS!=y && (FB_RADEON=m || FB_VOODOO1=m || FB_TRIDENT=m || FB_CLGEN=m || FB_TGA=m || FB_MATROX=m || FB_PM2=m || FB_SIS=m || FB_PVR2=m || FB_PM3=m)
-	default y if !FBCON_ADVANCED && (FB_ATARI || FB_RADEON=y || FB_VOODOO1=y || FB_TRIDENT=y || FB_CONTROL || FB_CLGEN=y || FB_TGA=y || FB_PLATINUM || FB_MATROX=y || FB_PM2=y || FB_PVR2=y || FB_PM3=y || FB_SIS=y)
-	help
-	  This is the low level frame buffer console driver for 32 bits per
-	  pixel (16M colors, also known as `truecolor') sparse packed pixels.
-
-config FBCON_ACCEL
-	tristate "Hardware acceleration support" if FBCON_ADVANCED
-	depends on FB
-	default m if !FBCON_ADVANCED && FB_NEOMAGIC!=y && !FB_VESA && !FB_FM2 && FB_HIT!=y && !FB_HP300 && !FB_Q40 && !FB_ANAKIN && !FB_G364 && FB_VIRTUAL!=y && !FB_CLPS711X && !FB_PMAG_BA && !FB_PMAGB_B && FB_3DFX!=y && !FB_TX3912 && !FB_MAXINE && !FB_APOLLO && FB_ATY!=y && !FB_MAC && FB_RIVA!=y && !FB_OF && FB_SGIVW!=y && (FB_NEOMAGIC=m || FB_HIT=m || FB_VIRTUAL=m || FB_3DFX=m || FB_RIVA=m || FB_SGIVW=m)
-	default y if !FBCON_ADVANCED && (FB_NEOMAGIC=y || FB_VESA || FB_FM2 || FB_HIT=y || FB_HP300 || FB_Q40 || FB_ANAKIN || FB_G364 || FB_VIRTUAL=y || FB_CLPS711X || FB_PMAG_BA || FB_PMAGB_B || FB_3DFX=y || FB_TX3912 || FB_MAXINE || FB_APOLLO || FB_ATY=y || FB_MAC || FB_RIVA=y || FB_OF || FB_SGIVW=y)
-
-config FBCON_AFB
-	tristate "Amiga bitplanes support" if FBCON_ADVANCED
-	depends on FB
-	default m if !FBCON_ADVANCED && FB_AMIGA=m
-	default y if !FBCON_ADVANCED && FB_AMIGA=y
-	help
-	  This is the low level frame buffer console driver for 1 to 8
-	  bitplanes (2 to 256 colors) on Amiga.
-
-config FBCON_ILBM
-	tristate "Amiga interleaved bitplanes support" if FBCON_ADVANCED
-	depends on FB
-	default m if !FBCON_ADVANCED && FB_AMIGA=m
-	default y if !FBCON_ADVANCED && FB_AMIGA=y
-	help
-	  This is the low level frame buffer console driver for 1 to 8
-	  interleaved bitplanes (2 to 256 colors) on Amiga.
-
-config FBCON_IPLAN2P2
-	tristate "Atari interleaved bitplanes (2 planes) support" if FBCON_ADVANCED
-	depends on FB
-	default y if !FBCON_ADVANCED && FB_ATARI
-	help
-	  This is the low level frame buffer console driver for 2 interleaved
-	  bitplanes (4 colors) on Atari.
-
-config FBCON_IPLAN2P4
-	tristate "Atari interleaved bitplanes (4 planes) support" if FBCON_ADVANCED
-	depends on FB
-	default y if !FBCON_ADVANCED && FB_ATARI
-	help
-	  This is the low level frame buffer console driver for 4 interleaved
-	  bitplanes (16 colors) on Atari.
-
-config FBCON_IPLAN2P8
-	tristate "Atari interleaved bitplanes (8 planes) support" if FBCON_ADVANCED
-	depends on FB
-	default y if !FBCON_ADVANCED && FB_ATARI
-	help
-	  This is the low level frame buffer console driver for 8 interleaved
-	  bitplanes (256 colors) on Atari.
-
-#      tristate '    Atari interleaved bitplanes (16 planes) support' CONFIG_FBCON_IPLAN2P16
-config FBCON_VGA_PLANES
-	tristate "VGA 16-color planar support" if FBCON_ADVANCED
-	depends on FB
-	default m if !FBCON_ADVANCED && FB_VGA16=m
-	default y if !FBCON_ADVANCED && FB_VGA16=y
-	help
-	  This low level frame buffer console driver enable the kernel to use
-	  the 16-color planar modes of the old VGA cards where the bits of
-	  each pixel are separated into 4 planes.
-
-	  Only answer Y here if you have a (very old) VGA card that isn't VESA
-	  2 compatible.
-
-config FBCON_HGA
-	tristate "HGA monochrome support (EXPERIMENTAL)" if FBCON_ADVANCED
-	depends on FB
-	default m if !FBCON_ADVANCED && FB_HGA=m
-	default y if !FBCON_ADVANCED && FB_HGA=y
-	help
-	  This is the low level frame buffer console driver for Hercules mono
-	  graphics cards.
-
-# Guess what we need
-config FBCON_STI
-	tristate
-	depends on !FBCON_ADVANCED && FB_STI
-	default y
-
-config FBCON_FONTWIDTH8_ONLY
-	bool "Support only 8 pixels wide fonts"
-	depends on FB
-	help
-	  Answer Y here will make the kernel provide only the 8x8 fonts (these
-	  are the less readable).
-
-	  If unsure, say N.
-
-config FONT_SUN8x16
-	bool "Sparc console 8x16 font"
-	depends on FB && (!SPARC32 && !SPARC64 && FBCON_FONTS || SPARC32 || SPARC64)
-	help
-	  This is the high resolution console font for Sun machines. Say Y.
-
-config FONT_SUN12x22
-	bool "Sparc console 12x22 font (not supported by all drivers)"
-	depends on FB && !FBCON_FONTWIDTH8_ONLY && (!SPARC32 && !SPARC64 && FBCON_FONTS || SPARC32 || SPARC64)
-	help
-	  This is the high resolution console font for Sun machines with very
-	  big letters (like the letters used in the SPARC PROM). If the
-	  standard font is unreadable for you, say Y, otherwise say N.
-
-config FBCON_FONTS
-	bool "Select other fonts" if SPARC32 || SPARC64
-	depends on FB
-	help
-	  Say Y here if you would like to use fonts other than the default
-	  your frame buffer console usually use.
-
-	  Note that the answer to this question won't directly affect the
-	  kernel: saying N will just cause the configurator to skip all
-	  the questions about foreign fonts.
-
-	  If unsure, say N (the default choices are safe).
-
-config FBCON_FONTS
-	prompt "Select compiled-in fonts"
-	depends on FB && !SPARC32 && !SPARC64
-
-config FONT_8x8
-	bool "VGA 8x8 font" if FBCON_FONTS
-	depends on FB
-	default y if !SPARC32 && !SPARC64 && !FBCON_FONTS
-	help
-	  This is the "high resolution" font for the VGA frame buffer (the one
-	  provided by the text console 80x50 (and higher) modes).
-
-	  Note that this is a poor quality font. The VGA 8x16 font is quite a
-	  lot more readable.
-
-	  Given the resolution provided by the frame buffer device, answer N
-	  here is safe.
-
-config FONT_8x16
-	bool "VGA 8x16 font" if FBCON_FONTS
-	depends on FB
-	default y if !SPARC32 && !SPARC64 && !FBCON_FONTS
-	help
-	  This is the "high resolution" font for the VGA frame buffer (the one
-	  provided by the VGA text console 80x25 mode.
-
-	  If unsure, say Y.
-
-config FONT_6x11
-	bool "Mac console 6x11 font (not supported by all drivers)" if FBCON_FONTS
-	depends on FB && !FBCON_FONTWIDTH8_ONLY
-	default y if !SPARC32 && !SPARC64 && !FBCON_FONTS && MAC
-	help
-	  Small console font with Macintosh-style high-half glyphs.  Some Mac
-	  framebuffer drivers don't support this one at all.
-
-config FONT_PEARL_8x8
-	bool "Pearl (old m68k) console 8x8 font" if FBCON_FONTS
-	depends on FB
-	default y if !SPARC32 && !SPARC64 && !FBCON_FONTS && AMIGA
-	help
-	  Small console font with PC-style control-character and high-half
-	  glyphs.
-
-config FONT_ACORN_8x8
-	bool "Acorn console 8x8 font" if FBCON_FONTS
-	depends on FB
-	default y if !SPARC32 && !SPARC64 && !FBCON_FONTS && ARM && ARCH_ACORN
-	help
-	  Small console font with PC-style control characters and high-half
-	  glyphs.
-
-config FONT_MINI_4x6
-	bool "Mini 4x6 font"
-	depends on !SPARC32 && !SPARC64 && FBCON_FONTS
+source "drivers/video/console/Kconfig"
 
 endmenu
 

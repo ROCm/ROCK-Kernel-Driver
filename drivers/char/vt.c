@@ -90,7 +90,6 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/vt_kern.h>
 #include <linux/selection.h>
-#include <linux/console_struct.h>
 #include <linux/kbd_kern.h>
 #include <linux/consolemap.h>
 #include <linux/timer.h>
@@ -691,106 +690,106 @@ int vc_allocate(unsigned int currcons)	/* return 0 on success */
 	return 0;
 }
 
+inline int resize_screen(int currcons, int width, int height)
+{
+	/* Resizes the resolution of the display adapater */
+	int err = 0;
+
+	if (vcmode != KD_GRAPHICS && sw->con_resize)
+		err = sw->con_resize(vc_cons[currcons].d, width, height);
+	return err;
+}
+
 /*
  * Change # of rows and columns (0 means unchanged/the size of fg_console)
  * [this is to be used together with some user program
  * like resize that changes the hardware videomode]
  */
-int vc_resize(unsigned int lines, unsigned int cols,
-	      unsigned int first, unsigned int last)
+int vc_resize(int currcons, unsigned int cols, unsigned int lines)
 {
-	unsigned int cc, ll, ss, sr, todo = 0;
-	unsigned int currcons = fg_console, i;
-	unsigned short *newscreens[MAX_NR_CONSOLES];
+	unsigned long old_origin, new_origin, new_scr_end, rlth, rrem, err = 0;
+	unsigned int old_cols, old_rows, old_row_size, old_screen_size;
+	unsigned int new_cols, new_rows, new_row_size, new_screen_size;
+	unsigned short *newscreen;
 
-	cc = (cols ? cols : video_num_columns);
-	ll = (lines ? lines : video_num_lines);
-	sr = cc << 1;
-	ss = sr * ll;
+	if (!vc_cons_allocated(currcons))
+		return -ENXIO;
 
- 	for (currcons = first; currcons <= last; currcons++) {
-		if (!vc_cons_allocated(currcons) ||
-		    (cc == video_num_columns && ll == video_num_lines))
-			newscreens[currcons] = NULL;
-		else {
-			unsigned short *p = (unsigned short *) kmalloc(ss, GFP_USER);
-			if (!p) {
-				for (i = first; i < currcons; i++)
-					if (newscreens[i])
-						kfree(newscreens[i]);
-				return -ENOMEM;
-			}
-			newscreens[currcons] = p;
-			todo++;
-		}
-	}
-	if (!todo)
+	new_cols = (cols ? cols : video_num_columns);
+	new_rows = (lines ? lines : video_num_lines);
+	new_row_size = new_cols << 1;
+	new_screen_size = new_row_size * new_rows;
+
+	if (new_cols == video_num_columns && new_rows == video_num_lines)
 		return 0;
 
-	for (currcons = first; currcons <= last; currcons++) {
-		unsigned int occ, oll, oss, osr;
-		unsigned long ol, nl, nlend, rlth, rrem;
-		if (!newscreens[currcons] || !vc_cons_allocated(currcons))
-			continue;
+	newscreen = (unsigned short *) kmalloc(new_screen_size, GFP_USER);
+	if (!newscreen)
+		return -ENOMEM;
 
-		oll = video_num_lines;
-		occ = video_num_columns;
-		osr = video_size_row;
-		oss = screenbuf_size;
+	old_rows = video_num_lines;
+	old_cols = video_num_columns;
+	old_row_size = video_size_row;
+	old_screen_size = screenbuf_size;
 
-		video_num_lines = ll;
-		video_num_columns = cc;
-		video_size_row = sr;
-		screenbuf_size = ss;
+	video_num_lines = new_rows;
+	video_num_columns = new_cols;
+	video_size_row = new_row_size;
+	screenbuf_size = new_screen_size;
 
-		rlth = min(osr, sr);
-		rrem = sr - rlth;
-		ol = origin;
-		nl = (long) newscreens[currcons];
-		nlend = nl + ss;
-		if (ll < oll)
-			ol += (oll - ll) * osr;
+	err = resize_screen(currcons, new_cols, new_rows);
+	if (err)
+		return err;
 
-		update_attr(currcons);
+	rlth = min(old_row_size, new_row_size);
+	rrem = new_row_size - rlth;
+	old_origin = origin;
+	new_origin = (long) newscreen;
+	new_scr_end = new_origin + new_screen_size;
+	if (new_rows < old_rows)
+		old_origin += (old_rows - new_rows) * old_row_size;
 
-		while (ol < scr_end) {
-			scr_memcpyw((unsigned short *) nl, (unsigned short *) ol, rlth);
-			if (rrem)
-				scr_memsetw((void *)(nl + rlth), video_erase_char, rrem);
-			ol += osr;
-			nl += sr;
-		}
-		if (nlend > nl)
-			scr_memsetw((void *) nl, video_erase_char, nlend - nl);
-		if (kmalloced)
-			kfree(screenbuf);
-		screenbuf = newscreens[currcons];
-		kmalloced = 1;
-		screenbuf_size = ss;
-		set_origin(currcons);
+	update_attr(currcons);
 
-		/* do part of a reset_terminal() */
-		top = 0;
-		bottom = video_num_lines;
-		gotoxy(currcons, x, y);
-		save_cur(currcons);
+	while (old_origin < scr_end) {
+		scr_memcpyw((unsigned short *) new_origin, (unsigned short *) old_origin, rlth);
+		if (rrem)
+			scr_memsetw((void *)(new_origin + rlth), video_erase_char, rrem);
+		old_origin += old_row_size;
+		new_origin += new_row_size;
+	}
+	if (new_scr_end > new_origin)
+		scr_memsetw((void *) new_origin, video_erase_char, new_scr_end - new_origin);
+	if (kmalloced)
+		kfree(screenbuf);
+	screenbuf = newscreen;
+	kmalloced = 1;
+	screenbuf_size = new_screen_size;
+	if (IS_VISIBLE)
+		err = resize_screen(currcons, new_cols, new_rows);
+	set_origin(currcons);
 
-		if (console_table[currcons]) {
-			struct winsize ws, *cws = &console_table[currcons]->winsize;
-			memset(&ws, 0, sizeof(ws));
-			ws.ws_row = video_num_lines;
-			ws.ws_col = video_num_columns;
-			if ((ws.ws_row != cws->ws_row || ws.ws_col != cws->ws_col) &&
-			    console_table[currcons]->pgrp > 0)
-				kill_pg(console_table[currcons]->pgrp, SIGWINCH, 1);
-			*cws = ws;
-		}
+	/* do part of a reset_terminal() */
+	top = 0;
+	bottom = video_num_lines;
+	gotoxy(currcons, x, y);
+	save_cur(currcons);
 
-		if (IS_VISIBLE)
-			update_screen(currcons);
+	if (vc_cons[currcons].d->vc_tty) {
+		struct winsize ws, *cws = &vc_cons[currcons].d->vc_tty->winsize;
+
+		memset(&ws, 0, sizeof(ws));
+		ws.ws_row = video_num_lines;
+		ws.ws_col = video_num_columns;
+		if ((ws.ws_row != cws->ws_row || ws.ws_col != cws->ws_col) &&
+		    vc_cons[currcons].d->vc_tty->pgrp > 0)
+			kill_pg(vc_cons[currcons].d->vc_tty->pgrp, SIGWINCH, 1);
+		*cws = ws;
 	}
 
-	return 0;
+	if (IS_VISIBLE)
+		update_screen(currcons);
+	return err;
 }
 
 
@@ -1200,7 +1199,7 @@ static void set_mode(int currcons, int on_off)
 			case 3:	/* 80/132 mode switch unimplemented */
 				deccolm = on_off;
 #if 0
-				(void) vc_resize(video_num_lines, deccolm ? 132 : 80);
+				(void) vc_resize(deccolm ? 132 : 80, video_num_lines);
 				/* this alone does not suffice; some user mode
 				   utility has to change the hardware regs */
 #endif
@@ -3025,6 +3024,7 @@ EXPORT_SYMBOL(vc_resize);
 EXPORT_SYMBOL(fg_console);
 EXPORT_SYMBOL(console_blank_hook);
 EXPORT_SYMBOL(vt_cons);
+EXPORT_SYMBOL(vc_cons);
 #ifndef VT_SINGLE_DRIVER
 EXPORT_SYMBOL(take_over_console);
 EXPORT_SYMBOL(give_up_console);

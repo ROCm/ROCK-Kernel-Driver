@@ -335,37 +335,7 @@ source "drivers/media/Kconfig"
 
 source "fs/Kconfig"
 
-
-menu "Console drivers"
-	depends on VT
-
-config STI_CONSOLE
-	bool "STI console"
-	help
-	  STI refers to the HP "Standard Text Interface" which is a set of
-	  BIOS routines contained in a ROM chip in HP PA-RISC based machines.
-	  Enabling this option will give you an 8 color text console on
-	  most of the PA-RISC systems.
-	  Really old HP boxes may not have STI, in which case you must use the
-	  PDC console or your primary serial port as a console.
-	
-	  The text console uses a strange memory layout, and changing the 
-	  plane mask to create colored characters requires calls to the STI 
-	  routines. Because of that do not expect it to be actually very fast,
-	  but it is sufficient for basic text console functions, including fonts.
-	
-	  The alternative is to use your primary serial port as a console.
-	
-	  It is safe to enable this option, so you should probably say "Y".
-
-config DUMMY_CONSOLE
-	bool
-	depends on STI_CONSOLE || SERIAL_8250_CONSOLE
-	default y
-
 source "drivers/video/Kconfig"
-
-endmenu
 
 menu "Sound"
 
