@@ -2297,19 +2297,30 @@ static void ata_pio_block(struct ata_port *ap)
 		}
 	}
 
-	/* handle BSY=0, DRQ=0 as error */
-	if ((status & ATA_DRQ) == 0) {
-		ap->pio_task_state = PIO_ST_ERR;
-		return;
-	}
-
 	qc = ata_qc_from_tag(ap, ap->active_tag);
 	assert(qc != NULL);
 
-	if (is_atapi_taskfile(&qc->tf))
+	if (is_atapi_taskfile(&qc->tf)) {
+		/* no more data to transfer or unsupported ATAPI command */
+		if ((status & ATA_DRQ) == 0) {
+			ap->pio_task_state = PIO_ST_IDLE;
+
+			ata_irq_on(ap);
+
+			ata_qc_complete(qc, status);
+			return;
+		}
+
 		atapi_pio_bytes(qc);
-	else
+	} else {
+		/* handle BSY=0, DRQ=0 as error */
+		if ((status & ATA_DRQ) == 0) {
+			ap->pio_task_state = PIO_ST_ERR;
+			return;
+		}
+
 		ata_pio_sector(qc);
+	}
 }
 
 static void ata_pio_error(struct ata_port *ap)
