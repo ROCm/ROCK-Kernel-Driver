@@ -54,8 +54,53 @@
 #include "xfs_iomap.h"
 #include <linux/mpage.h>
 
+STATIC void count_page_state(struct page *, int *, int *, int *);
 STATIC void convert_page(struct inode *, struct page *,
 			xfs_iomap_t *, void *, int, int);
+
+#if defined(XFS_RW_TRACE)
+void
+xfs_page_trace(
+	int		tag,
+	struct inode	*inode,
+	struct page	*page,
+	int		mask)
+{
+	xfs_inode_t	*ip;
+	bhv_desc_t	*bdp;
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+	loff_t		isize = i_size_read(inode);
+	loff_t		offset = page->index << PAGE_CACHE_SHIFT;
+	int		delalloc, unmapped, unwritten;
+
+	count_page_state(page, &delalloc, &unmapped, &unwritten);
+
+	bdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops);
+	ip = XFS_BHVTOI(bdp);
+	if (!ip->i_rwtrace)
+		return;
+
+	ktrace_enter(ip->i_rwtrace,
+		(void *)((unsigned long)tag),
+		(void *)ip,
+		(void *)inode,
+		(void *)page,
+		(void *)((unsigned long)mask),
+		(void *)((unsigned long)((ip->i_d.di_size >> 32) & 0xffffffff)),
+		(void *)((unsigned long)(ip->i_d.di_size & 0xffffffff)),
+		(void *)((unsigned long)((isize >> 32) & 0xffffffff)),
+		(void *)((unsigned long)(isize & 0xffffffff)),
+		(void *)((unsigned long)((offset >> 32) & 0xffffffff)),
+		(void *)((unsigned long)(offset & 0xffffffff)),
+		(void *)((unsigned long)delalloc),
+		(void *)((unsigned long)unmapped),
+		(void *)((unsigned long)unwritten),
+		(void *)NULL,
+		(void *)NULL);
+}
+#else
+#define xfs_page_trace(tag, inode, page, mask)
+#endif
 
 void
 linvfs_unwritten_done(
@@ -1085,13 +1130,16 @@ linvfs_writepage(
 	int			delalloc, unmapped, unwritten;
 	struct inode		*inode = page->mapping->host;
 
+	xfs_page_trace(XFS_WRITEPAGE_ENTER, inode, page, 0);
+
 	/*
 	 * We need a transaction if:
 	 *  1. There are delalloc buffers on the page
-	 *  2. The page is upto date and we have unmapped buffers
-	 *  3. The page is upto date and we have no buffers
+	 *  2. The page is uptodate and we have unmapped buffers
+	 *  3. The page is uptodate and we have no buffers
 	 *  4. There are unwritten buffers on the page
 	 */
+
 	if (!page_has_buffers(page)) {
 		unmapped = 1;
 		need_trans = 1;
@@ -1165,6 +1213,8 @@ linvfs_release_page(
 {
 	struct inode		*inode = page->mapping->host;
 	int			dirty, delalloc, unmapped, unwritten;
+
+	xfs_page_trace(XFS_RELEASEPAGE_ENTER, inode, page, gfp_mask);
 
 	count_page_state(page, &delalloc, &unmapped, &unwritten);
 	if (!delalloc && !unwritten)

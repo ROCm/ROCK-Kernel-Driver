@@ -45,9 +45,7 @@ struct xfs_iomap;
 /*
  * Defines for the trace mechanisms in xfs_lrw.c.
  */
-#define	XFS_RW_KTRACE_SIZE	64
-#define	XFS_STRAT_KTRACE_SIZE	64
-#define	XFS_STRAT_GTRACE_SIZE	512
+#define	XFS_RW_KTRACE_SIZE	128
 
 #define	XFS_READ_ENTER		1
 #define	XFS_WRITE_ENTER		2
@@ -69,6 +67,12 @@ struct xfs_iomap;
 #define	XFS_INVAL_CACHED	18
 #define	XFS_DIORD_ENTER		19
 #define	XFS_DIOWR_ENTER		20
+#define	XFS_SENDFILE_ENTER	21
+#define	XFS_WRITEPAGE_ENTER	22
+#define	XFS_RELEASEPAGE_ENTER	23
+#define	XFS_IOMAP_ALLOC_ENTER	24
+#define	XFS_IOMAP_ALLOC_MAP	25
+#define	XFS_IOMAP_UNWRITTEN	26
 extern void xfs_rw_enter_trace(int, struct xfs_iocore *,
 			const struct iovec *, size_t, loff_t, int);
 extern void xfs_inval_cached_trace(struct xfs_iocore *,
