@@ -2171,7 +2171,8 @@ static void scsi_dump_status(int level)
                                        SCpnt->target,
                                        SCpnt->lun,
 
-                                       kdevname(SCpnt->request->rq_dev),
+                                       SCpnt->request->rq_disk ?
+                                       SCpnt->request->rq_disk->disk_name : "?",
                                        (unsigned long long)SCpnt->request->sector,
 				       SCpnt->request->nr_sectors,
 				       (long)SCpnt->request->current_nr_sectors,

@@ -905,12 +905,13 @@ scsi_show_extd_sense(unsigned char asc, unsigned char ascq) {
 static void
 print_sense_internal(const char * devclass, 
 		     const unsigned char * sense_buffer,
-		     kdev_t dev)
+		     struct request *req)
 {
 	int s, sense_class, valid, code, info;
 	const char * error = NULL;
 	unsigned char asc, ascq;
 	const char *sense_txt;
+	char *name = req->rq_disk ? req->rq_disk->disk_name : "?";
     
 	sense_class = (sense_buffer[0] >> 4) & 0x07;
 	code = sense_buffer[0] & 0xf;
@@ -954,10 +955,10 @@ print_sense_internal(const char * devclass,
 		sense_txt = scsi_sense_key_string(sense_buffer[2]);
 		if (sense_txt)
 			printk("%s%s: sense key %s\n",
-			       devclass, kdevname(dev), sense_txt);
+			       devclass, name, sense_txt);
 		else
 			printk("%s%s: sense = %2x %2x\n",
-			       devclass, kdevname(dev),
+			       devclass, name,
 			       sense_buffer[0], sense_buffer[2]);
 
 		asc = ascq = 0;
@@ -981,10 +982,10 @@ print_sense_internal(const char * devclass,
 		sense_txt = scsi_sense_key_string(sense_buffer[0]);
 		if (sense_txt)
 			printk("%s%s: old sense key %s\n",
-			       devclass, kdevname(dev), sense_txt);
+			       devclass, name, sense_txt);
 		else
 			printk("%s%s: sense = %2x %2x\n",
-			       devclass, kdevname(dev),
+			       devclass, name,
 			       sense_buffer[0], sense_buffer[2]);
 
 		printk("Non-extended sense class %d code 0x%0x\n",
@@ -1006,13 +1007,13 @@ print_sense_internal(const char * devclass,
 void print_sense(const char * devclass, Scsi_Cmnd * SCpnt)
 {
 	print_sense_internal(devclass, SCpnt->sense_buffer,
-			     SCpnt->request->rq_dev);
+			     SCpnt->request);
 }
 
 void print_req_sense(const char * devclass, Scsi_Request * SRpnt)
 {
 	print_sense_internal(devclass, SRpnt->sr_sense_buffer,
-			     SRpnt->sr_request->rq_dev);
+			     SRpnt->sr_request);
 }
 
 #if (CONSTANTS & CONST_MSG) 

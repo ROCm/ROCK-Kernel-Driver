@@ -1263,8 +1263,8 @@ static ide_startstop_t idefloppy_do_request (ide_drive_t *drive, struct request 
 	unsigned long block = (unsigned long)block_s;
 
 #if IDEFLOPPY_DEBUG_LOG
-	printk(KERN_INFO "rq_status: %d, rq_dev: %u, flags: %lx, errors: %d\n",
-			rq->rq_status, (unsigned int) rq->rq_dev,
+	printk(KERN_INFO "rq_status: %d, dev: %s, flags: %lx, errors: %d\n",
+			rq->rq_status, rq->rq_disk->disk_name,
 			rq->flags, rq->errors);
 	printk(KERN_INFO "sector: %ld, nr_sectors: %ld, "
 			"current_nr_sectors: %ld\n", (long)rq->sector,
