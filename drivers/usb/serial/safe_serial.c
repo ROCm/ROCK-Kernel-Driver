@@ -211,12 +211,12 @@ static void safe_read_bulk_callback (struct urb *urb)
 	dbg ("%s", __FUNCTION__);
 
 	if (!serial) {
-		dbg (__FUNCTION__ " - bad serial pointer, exiting");
+		dbg ("%s - bad serial pointer, exiting", __FUNCTION__);
 		return;
 	}
 
 	if (urb->status) {
-		dbg (__FUNCTION__ " - nonzero read bulk status received: %d", urb->status);
+		dbg ("%s - nonzero read bulk status received: %d", __FUNCTION__, urb->status);
 		return;
 	}
 
@@ -242,18 +242,18 @@ static void safe_read_bulk_callback (struct urb *urb)
 
 			if (actual_length <= (length - 2)) {
 
-				info (__FUNCTION__ " - actual: %d", actual_length);
+				info ("%s - actual: %d", __FUNCTION__, actual_length);
 
 				for (i = 0; i < actual_length; i++) {
 					tty_insert_flip_char (port->tty, data[i], 0);
 				}
 				tty_flip_buffer_push (port->tty);
 			} else {
-				err (__FUNCTION__ " - inconsistant lengths %d:%d", actual_length,
-				     length);
+				err ("%s - inconsistant lengths %d:%d", __FUNCTION__,
+				     actual_length, length);
 			}
 		} else {
-			err (__FUNCTION__ " - bad CRC %x", fcs);
+			err ("%s - bad CRC %x", __FUNCTION__, fcs);
 		}
 	} else {
 		for (i = 0; i < length; i++) {
@@ -269,7 +269,7 @@ static void safe_read_bulk_callback (struct urb *urb)
 		       safe_read_bulk_callback, port);
 
 	if ((result = usb_submit_urb (urb, GFP_ATOMIC))) {
-		err (__FUNCTION__ " - failed resubmitting read urb, error %d", result);
+		err ("%s - failed resubmitting read urb, error %d", __FUNCTION__, result);
 	}
 }
 
@@ -285,7 +285,7 @@ static int safe_write (struct usb_serial_port *port, int from_user, const unsign
 	     count);
 
 	if (!port->write_urb) {
-		dbg (__FUNCTION__ " - write urb NULL");
+		dbg ("%s - write urb NULL", __FUNCTION__);
 		return (0);
 	}
 
@@ -293,15 +293,15 @@ static int safe_write (struct usb_serial_port *port, int from_user, const unsign
 	     port->write_urb->transfer_buffer_length);
 
 	if (!port->write_urb->transfer_buffer_length) {
-		dbg (__FUNCTION__ " - write urb transfer_buffer_length zero");
+		dbg ("%s - write urb transfer_buffer_length zero", __FUNCTION__);
 		return (0);
 	}
 	if (count == 0) {
-		dbg (__FUNCTION__ " - write request of 0 bytes");
+		dbg ("%s - write request of 0 bytes", __FUNCTION__);
 		return (0);
 	}
 	if (port->write_urb->status == -EINPROGRESS) {
-		dbg (__FUNCTION__ " - already writing");
+		dbg ("%s - already writing", __FUNCTION__);
 		return (0);
 	}
 
@@ -360,10 +360,10 @@ static int safe_write (struct usb_serial_port *port, int from_user, const unsign
 #endif
 	port->write_urb->dev = serial->dev;
 	if ((result = usb_submit_urb (port->write_urb, GFP_KERNEL))) {
-		err (__FUNCTION__ " - failed submitting write urb, error %d", result);
+		err ("%s - failed submitting write urb, error %d", __FUNCTION__, result);
 		return 0;
 	}
-	dbg (__FUNCTION__ " urb: %p submitted", port->write_urb);
+	dbg ("%s urb: %p submitted", __FUNCTION__, port->write_urb);
 
 	return (count);
 }

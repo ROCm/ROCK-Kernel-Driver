@@ -112,7 +112,7 @@ static void padzero(unsigned long elf_bss)
 #define STACK_ADD(sp, items) ((elf_addr_t *)(sp) + (items))
 #define STACK_ROUND(sp, items) \
 	((15 + (unsigned long) ((sp) + (items))) &~ 15UL)
-#define STACK_ALLOC(sp, len) ({ elf_addr_t old_sp = sp; sp += len; old_sp; })
+#define STACK_ALLOC(sp, len) ({ elf_addr_t *old_sp = sp; sp += len; old_sp; })
 #else
 #define STACK_ADD(sp, items) ((elf_addr_t *)(sp) - (items))
 #define STACK_ROUND(sp, items) \
@@ -129,7 +129,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	int argc = bprm->argc;
 	int envc = bprm->envc;
 	elf_addr_t *argv, *envp;
-	elf_addr_t *sp, u_platform;
+	elf_addr_t *sp, *u_platform;
 	const char *k_platform = ELF_PLATFORM;
 	int items;
 	elf_addr_t elf_info[30];
@@ -142,6 +142,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	 * merely difficult.
 	 */
 
+	u_platform = NULL;
 	if (k_platform) {
 		size_t len = strlen(k_platform) + 1;
 
@@ -160,8 +161,8 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 		if (smp_num_siblings > 1)
 			STACK_ALLOC(p, ((current->pid % 64) << 7));
 #endif
-		u_platform = STACK_ALLOC(p, len);
-		__copy_to_user((void *)u_platform, k_platform, len);
+		u_platform = (elf_addr_t *) STACK_ALLOC(p, len);
+		__copy_to_user(u_platform, k_platform, len);
 	}
 
 	/* Create the ELF interpreter info */
@@ -189,7 +190,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	NEW_AUX_ENT(AT_GID, (elf_addr_t) current->gid);
 	NEW_AUX_ENT(AT_EGID, (elf_addr_t) current->egid);
 	if (k_platform) {
-		NEW_AUX_ENT(AT_PLATFORM, u_platform);
+		NEW_AUX_ENT(AT_PLATFORM, (elf_addr_t)(long)u_platform);
 	}
 	NEW_AUX_ENT(AT_NULL, 0);
 #undef NEW_AUX_ENT
@@ -217,8 +218,8 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	if (interp_aout) {
 		argv = sp + 2;
 		envp = argv + argc + 1;
-		__put_user((elf_addr_t)argv, sp++);
-		__put_user((elf_addr_t)envp, sp++);
+		__put_user((elf_addr_t)(long)argv, sp++);
+		__put_user((elf_addr_t)(long)envp, sp++);
 	} else {
 		argv = sp;
 		envp = argv + argc + 1;

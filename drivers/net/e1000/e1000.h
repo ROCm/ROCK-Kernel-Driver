@@ -63,6 +63,7 @@
 #include <net/pkt_sched.h>
 #include <linux/list.h>
 #include <linux/reboot.h>
+#include <net/checksum.h>
 #include <linux/tqueue.h>
 #include <linux/ethtool.h>
 #include <linux/if_vlan.h>

@@ -35,6 +35,7 @@ obj-$(CONFIG_DECNET)		+= decnet/
 obj-$(CONFIG_ECONET)		+= econet/
 obj-$(CONFIG_VLAN_8021Q)	+= 8021q/
 obj-$(CONFIG_LLC)		+= llc/
+obj-$(CONFIG_IP_SCTP)		+= sctp/
 
 ifeq ($(CONFIG_NET),y)
 obj-$(CONFIG_MODULES)		+= netsyms.o

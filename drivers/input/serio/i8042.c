@@ -299,7 +299,7 @@ static void i8042_close(struct serio *port)
  */
 
 static struct i8042_values i8042_kbd_values = {
-	.irq =		I8042_KBD_IRQ,
+	.irq =		0,
 	.irqen =	I8042_CTR_KBDINT,
 	.disable =	I8042_CTR_KBDDIS,
 	.name =		"KBD",
@@ -318,7 +318,7 @@ static struct serio i8042_kbd_port =
 };
 
 static struct i8042_values i8042_aux_values = {
-	.irq =		I8042_AUX_IRQ,
+	.irq =		0,
 	.irqen =	I8042_CTR_AUXINT,
 	.disable =	I8042_CTR_AUXDIS,
 	.name =		"AUX",
@@ -638,8 +638,11 @@ static int __init i8042_port_register(struct i8042_values *values, struct serio 
 
 	serio_register_port(port);
 
-	printk(KERN_INFO "serio: i8042 %s port at %#x,%#x irq %d\n",
-		values->name, I8042_DATA_REG, I8042_COMMAND_REG, values->irq);
+	printk(KERN_INFO "serio: i8042 %s port at %#lx,%#lx irq %d\n",
+	       values->name,
+	       (unsigned long) I8042_DATA_REG,
+	       (unsigned long) I8042_COMMAND_REG,
+	       values->irq);
 
 	return 0;
 }
@@ -716,6 +719,9 @@ int __init i8042_init(void)
 
 	if (!i8042_platform_init())
 		return -EBUSY;
+
+	i8042_kbd_values.irq = I8042_KBD_IRQ;
+	i8042_aux_values.irq = I8042_AUX_IRQ;
 
 	if (i8042_controller_init())
 		return -ENODEV;

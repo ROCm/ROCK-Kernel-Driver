@@ -306,10 +306,20 @@ static inline int ip_queue_xmit2(struct sk_buff *skb)
 		iph = skb->nh.iph;
 	}
 
-	if (skb->len > rt->u.dst.pmtu)
-		goto fragment;
+	if (skb->len > rt->u.dst.pmtu) {
+		unsigned int hlen;
+		if (!(sk->route_caps&NETIF_F_TSO))
+			goto fragment;
 
-	ip_select_ident(iph, &rt->u.dst, sk);
+		/* Hack zone: all this must be done by TCP. */
+		hlen = ((skb->h.raw - skb->data) + (skb->h.th->doff << 2));
+		skb_shinfo(skb)->tso_size = rt->u.dst.pmtu - hlen;
+		skb_shinfo(skb)->tso_segs =
+			(skb->len - hlen + skb_shinfo(skb)->tso_size - 1)/
+				skb_shinfo(skb)->tso_size - 1;
+	}
+
+	ip_select_ident_more(iph, &rt->u.dst, sk, skb_shinfo(skb)->tso_segs);
 
 	/* Add an IP checksum. */
 	ip_send_check(iph);
@@ -371,7 +381,7 @@ int ip_queue_xmit(struct sk_buff *skb)
 				    sk->bound_dev_if))
 			goto no_route;
 		__sk_dst_set(sk, &rt->u.dst);
-		sk->route_caps = rt->u.dst.dev->features;
+		tcp_v4_setup_caps(sk, &rt->u.dst);
 	}
 	skb->dst = dst_clone(&rt->u.dst);
 
@@ -577,7 +587,7 @@ static int ip_build_xmit_slow(struct sock *sk,
 					 * for packets without DF or having
 					 * been fragmented.
 					 */
-					__ip_select_ident(iph, &rt->u.dst);
+					__ip_select_ident(iph, &rt->u.dst, 0);
 					id = iph->id;
 				}
 

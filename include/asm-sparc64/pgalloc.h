@@ -5,6 +5,7 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/mm.h>
 
 #include <asm/page.h>
 #include <asm/spitfire.h>

@@ -705,19 +705,5 @@ void sun_do_break(void)
 	prom_cmdline();
 }
 
-#ifdef CONFIG_MAGIC_SYSRQ
-/* Because we use the generic input layer keyboard drivers for
- * everything, this PC sysrq translation table is all we need.
- */
-unsigned char kbd_sysrq_xlate[128] =
-	"\000\0331234567890-=\177\t"			/* 0x00 - 0x0f */
-	"qwertyuiop[]\r\000as"				/* 0x10 - 0x1f */
-	"dfghjkl;'`\000\\zxcv"				/* 0x20 - 0x2f */
-	"bnm,./\000*\000 \000\201\202\203\204\205"	/* 0x30 - 0x3f */
-	"\206\207\210\211\212\000\000789-456+1"		/* 0x40 - 0x4f */
-	"230\177\000\000\213\214\000\000\000\000\000\000\000\000\000\000" /* 0x50 - 0x5f */
-	"\r\000/";					/* 0x60 - 0x6f */
-#endif
-
 int serial_console;
 int stop_a_enabled = 1;

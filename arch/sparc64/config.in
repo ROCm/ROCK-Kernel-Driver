@@ -13,6 +13,7 @@ tristate 'UltraSPARC-III bootbus i2c controller driver' CONFIG_BBC_I2C
 
 define_bool CONFIG_VT y
 define_bool CONFIG_VT_CONSOLE y
+define_bool CONFIG_HW_CONSOLE y
 
 bool 'Symmetric multi-processing support' CONFIG_SMP
 bool 'Preemptible Kernel' CONFIG_PREEMPT

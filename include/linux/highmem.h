@@ -22,7 +22,7 @@ static inline unsigned int nr_free_highpages(void) { return 0; }
 
 static inline void *kmap(struct page *page) { return page_address(page); }
 
-#define kunmap(page) do { } while (0)
+#define kunmap(page) do { (void) (page); } while (0)
 
 #define kmap_atomic(page,idx)		kmap(page)
 #define kunmap_atomic(page,idx)		kunmap(page)

@@ -1820,23 +1820,13 @@ do_gettimeofday:	/* %o0 = timevalp */
 	ldx	[%g3 + %lo(timer_tick_offset)], %g3
 	or	%g2, %lo(xtime), %g2
 	or	%g1, %lo(timer_tick_compare), %g1
-1:	rdpr	%ver, %o2
-	sethi	%hi(CHEETAH_ID), %o1
-	srlx	%o2, 32, %o2
-	or	%o1, %lo(CHEETAH_ID), %o1
-	membar	#Sync
+1:	membar	#Sync
 	ldda	[%g2] ASI_NUCLEUS_QUAD_LDD, %o4
-	cmp	%o2, %o1
-	be,a,pn	%xcc, 3f
-	 rd	%asr24, %o1
-	sethi	%hi(CHEETAH_PLUS_ID), %o1
-	or	%o1, %lo(CHEETAH_PLUS_ID), %o1
-	cmp	%o2, %o1
-	bne,pt	%xcc, 2f
-	 nop
+	BRANCH_IF_ANY_CHEETAH(o2,o1,2f)
 	ba,pt	%xcc, 3f
+	 rd	%tick, %o1
+2:	ba,pt	%xcc, 3f
 	 rd	%asr24, %o1
-2:	rd	%tick, %o1
 3:	ldx	[%g1], %g7
 	membar	#Sync
 	ldda	[%g2] ASI_NUCLEUS_QUAD_LDD, %o2

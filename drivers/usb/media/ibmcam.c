@@ -251,7 +251,7 @@ static videosize_t ibmcam_size_to_videosize(int size)
  */
 static ParseState_t ibmcam_find_header(struct uvd *uvd) /* FIXME: Add frame here */
 {
-	usbvideo_frame_t *frame;
+	struct usbvideo_frame *frame;
 	ibmcam_t *icam;
 
 	if ((uvd->curframe) < 0 || (uvd->curframe >= USBVIDEO_NUMFRAMES)) {
@@ -399,7 +399,7 @@ case IBMCAM_MODEL_4:
  */
 static ParseState_t ibmcam_parse_lines(
 	struct uvd *uvd,
-	usbvideo_frame_t *frame,
+	struct usbvideo_frame *frame,
 	long *pcopylen)
 {
 	unsigned char *f;
@@ -664,7 +664,7 @@ static ParseState_t ibmcam_parse_lines(
  */
 static ParseState_t ibmcam_model2_320x240_parse_lines(
 	struct uvd *uvd,
-	usbvideo_frame_t *frame,
+	struct usbvideo_frame *frame,
 	long *pcopylen)
 {
 	unsigned char *f, *la, *lb;
@@ -818,7 +818,7 @@ static ParseState_t ibmcam_model2_320x240_parse_lines(
 
 static ParseState_t ibmcam_model3_parse_lines(
 	struct uvd *uvd,
-	usbvideo_frame_t *frame,
+	struct usbvideo_frame *frame,
 	long *pcopylen)
 {
 	unsigned char *data;
@@ -963,7 +963,7 @@ static ParseState_t ibmcam_model3_parse_lines(
  */
 static ParseState_t ibmcam_model4_128x96_parse_lines(
 	struct uvd *uvd,
-	usbvideo_frame_t *frame,
+	struct usbvideo_frame *frame,
 	long *pcopylen)
 {
 	const unsigned char *data_rv, *data_gv, *data_bv;
@@ -1049,7 +1049,7 @@ static ParseState_t ibmcam_model4_128x96_parse_lines(
  * History:
  * 1/21/00  Created.
  */
-void ibmcam_ProcessIsocData(struct uvd *uvd, usbvideo_frame_t *frame)
+void ibmcam_ProcessIsocData(struct uvd *uvd, struct usbvideo_frame *frame)
 {
 	ParseState_t newstate;
 	long copylen = 0;
@@ -3921,7 +3921,7 @@ static struct usb_device_id id_table[] = {
  */
 static int __init ibmcam_init(void)
 {
-	usbvideo_cb_t cbTbl;
+	struct usbvideo_cb cbTbl;
 	memset(&cbTbl, 0, sizeof(cbTbl));
 	cbTbl.probe = ibmcam_probe;
 	cbTbl.setupOnOpen = ibmcam_setup_on_open;

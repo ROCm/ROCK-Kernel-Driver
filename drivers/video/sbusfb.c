@@ -242,48 +242,49 @@ static void sbusfb_clear_margin(struct display *p, int s)
 
 		rects [0] = 0;
 		rects [1] = 0;
-		rects [2] = fb->var.xres_virtual;
+		rects [2] = fb->info.var.xres_virtual;
 		rects [3] = fb->y_margin;
 		rects [4] = 0;
 		rects [5] = fb->y_margin;
 		rects [6] = fb->x_margin;
-		rects [7] = fb->var.yres_virtual;
-		rects [8] = fb->var.xres_virtual - fb->x_margin;
+		rects [7] = fb->info.var.yres_virtual;
+		rects [8] = fb->info.var.xres_virtual - fb->x_margin;
 		rects [9] = fb->y_margin;
-		rects [10] = fb->var.xres_virtual;
-		rects [11] = fb->var.yres_virtual;
+		rects [10] = fb->info.var.xres_virtual;
+		rects [11] = fb->info.var.yres_virtual;
 		rects [12] = fb->x_margin;
-		rects [13] = fb->var.yres_virtual - fb->y_margin;
-		rects [14] = fb->var.xres_virtual - fb->x_margin;
-		rects [15] = fb->var.yres_virtual;
+		rects [13] = fb->info.var.yres_virtual - fb->y_margin;
+		rects [14] = fb->info.var.xres_virtual - fb->x_margin;
+		rects [15] = fb->info.var.yres_virtual;
 		(*fb->fill)(fb, p, s, 4, rects);
 	} else {
 		unsigned char *fb_base = fb->info.screen_base, *q;
-		int skip_bytes = fb->y_margin * fb->var.xres_virtual;
-		int scr_size = fb->var.xres_virtual * fb->var.yres_virtual;
+		int skip_bytes = fb->y_margin * fb->info.var.xres_virtual;
+		int scr_size = fb->info.var.xres_virtual
+			* fb->info.var.yres_virtual;
 		int h, he, incr, size;
 
-		he = fb->var.yres;
-		if (fb->var.bits_per_pixel == 1) {
+		he = fb->info.var.yres;
+		if (fb->info.var.bits_per_pixel == 1) {
 			fb_base -= (skip_bytes + fb->x_margin) / 8;
 			skip_bytes /= 8;
 			scr_size /= 8;
 			fb_memset255 (fb_base, skip_bytes - fb->x_margin / 8);
 			fb_memset255 (fb_base + scr_size - skip_bytes + fb->x_margin / 8, skip_bytes - fb->x_margin / 8);
-			incr = fb->var.xres_virtual / 8;
+			incr = fb->info.var.xres_virtual / 8;
 			size = fb->x_margin / 8 * 2;
 			for (q = fb_base + skip_bytes - fb->x_margin / 8, h = 0;
 			     h <= he; q += incr, h++)
 				fb_memset255 (q, size);
 		} else {
 			fb_base -= (skip_bytes + fb->x_margin);
-			memset (fb_base, attr_bgcol(p,s), skip_bytes - fb->x_margin);
-			memset (fb_base + scr_size - skip_bytes + fb->x_margin, attr_bgcol(p,s), skip_bytes - fb->x_margin);
-			incr = fb->var.xres_virtual;
+			fb_memset (fb_base, attr_bgcol(p,s), skip_bytes - fb->x_margin);
+			fb_memset (fb_base + scr_size - skip_bytes + fb->x_margin, attr_bgcol(p,s), skip_bytes - fb->x_margin);
+			incr = fb->info.var.xres_virtual;
 			size = fb->x_margin * 2;
 			for (q = fb_base + skip_bytes - fb->x_margin, h = 0;
 			     h <= he; q += incr, h++)
-				memset (q, attr_bgcol(p,s), size);
+				fb_memset (q, attr_bgcol(p,s), size);
 		}
 	}
 }
@@ -913,8 +914,8 @@ static void __init sbusfb_init_fb(int node, int parent, int fbtype,
 		prom_palette = sbusfb_palette;
 	
 	memset(fb, 0, sizeof(struct fb_info_sbusfb));
-	fix = &fb->fix;
-	var = &fb->var;
+	fix = &fb->info.fix;
+	var = &fb->info.var;
 	disp = &fb->disp;
 	type = &fb->type;
 	
@@ -929,7 +930,7 @@ static void __init sbusfb_init_fb(int node, int parent, int fbtype,
 	memset(&fb->emulations, 0xff, sizeof(fb->emulations));
 	fb->emulations[0] = fbtype;
 	
-#ifndef __sparc_v9__
+#ifdef CONFIG_SPARC32
 	fb->info.screen_base = (unsigned char *)prom_getintdefault(node, "address", 0);
 #endif
 	

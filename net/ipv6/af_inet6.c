@@ -274,7 +274,7 @@ do_oom:
 
 
 /* bind for INET6 API */
-static int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
+int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct sockaddr_in6 *addr=(struct sockaddr_in6 *)uaddr;
 	struct sock *sk = sock->sk;
@@ -370,7 +370,7 @@ static int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	return 0;
 }
 
-static int inet6_release(struct socket *sock)
+int inet6_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
 
@@ -415,7 +415,7 @@ int inet6_destroy_sock(struct sock *sk)
  *	This does both peername and sockname.
  */
  
-static int inet6_getname(struct socket *sock, struct sockaddr *uaddr,
+int inet6_getname(struct socket *sock, struct sockaddr *uaddr,
 		 int *uaddr_len, int peer)
 {
 	struct sockaddr_in6 *sin=(struct sockaddr_in6 *)uaddr;
@@ -451,7 +451,7 @@ static int inet6_getname(struct socket *sock, struct sockaddr *uaddr,
 	return(0);
 }
 
-static int inet6_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
+int inet6_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	struct sock *sk = sock->sk;
 	int err = -EINVAL;
@@ -547,7 +547,7 @@ struct proto_ops inet6_dgram_ops = {
 	.sendpage =	sock_no_sendpage,
 };
 
-static struct net_proto_family inet6_family_ops = {
+struct net_proto_family inet6_family_ops = {
 	.family =PF_INET6,
 	.create =inet6_create,
 };
