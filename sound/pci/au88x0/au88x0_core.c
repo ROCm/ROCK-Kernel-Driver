@@ -2477,32 +2477,32 @@ static void vortex_codec_init(vortex_t * vortex)
 
 	for (i = 0; i < 32; i++) {
 		hwwrite(vortex->mmio, (VORTEX_CODEC_CHN + (i << 2)), 0);
-		udelay(2000);
+		msleep(2);
 	}
 	if (0) {
 		hwwrite(vortex->mmio, VORTEX_CODEC_CTRL, 0x8068);
-		udelay(1000);
+		msleep(1);
 		hwwrite(vortex->mmio, VORTEX_CODEC_CTRL, 0x00e8);
-		udelay(1000);
+		msleep(1);
 	} else {
 		hwwrite(vortex->mmio, VORTEX_CODEC_CTRL, 0x00a8);
-		udelay(2000);
+		msleep(2);
 		hwwrite(vortex->mmio, VORTEX_CODEC_CTRL, 0x80a8);
-		udelay(2000);
+		msleep(2);
 		hwwrite(vortex->mmio, VORTEX_CODEC_CTRL, 0x80e8);
-		udelay(2000);
+		msleep(2);
 		hwwrite(vortex->mmio, VORTEX_CODEC_CTRL, 0x80a8);
-		udelay(2000);
+		msleep(2);
 		hwwrite(vortex->mmio, VORTEX_CODEC_CTRL, 0x00a8);
-		udelay(2000);
+		msleep(2);
 		hwwrite(vortex->mmio, VORTEX_CODEC_CTRL, 0x00e8);
 	}
 	for (i = 0; i < 32; i++) {
 		hwwrite(vortex->mmio, (VORTEX_CODEC_CHN + (i << 2)), 0);
-		udelay(5000);
+		msleep(5);
 	}
 	hwwrite(vortex->mmio, VORTEX_CODEC_CTRL, 0xe8);
-	udelay(1000);
+	msleep(1);
 	/* Enable codec channels 0 and 1. */
 	hwwrite(vortex->mmio, VORTEX_CODEC_EN,
 		hwread(vortex->mmio, VORTEX_CODEC_EN) | EN_CODEC);
@@ -2671,10 +2671,10 @@ static int vortex_core_init(vortex_t * vortex)
 	printk(KERN_INFO "Vortex: init.... ");
 	/* Hardware Init. */
 	hwwrite(vortex->mmio, VORTEX_CTRL, 0xffffffff);
-	udelay(5000);
+	msleep(5);
 	hwwrite(vortex->mmio, VORTEX_CTRL,
 		hwread(vortex->mmio, VORTEX_CTRL) & 0xffdfffff);
-	udelay(5000);
+	msleep(5);
 	/* Reset IRQ flags */
 	hwwrite(vortex->mmio, VORTEX_IRQ_SOURCE, 0xffffffff);
 	hwread(vortex->mmio, VORTEX_IRQ_STAT);
@@ -2741,7 +2741,7 @@ static int vortex_core_shutdown(vortex_t * vortex)
 
 	hwwrite(vortex->mmio, VORTEX_IRQ_CTRL, 0);
 	hwwrite(vortex->mmio, VORTEX_CTRL, 0);
-	udelay(5000);
+	msleep(5);
 	hwwrite(vortex->mmio, VORTEX_IRQ_SOURCE, 0xffff);
 
 	printk(KERN_INFO "done.\n");
