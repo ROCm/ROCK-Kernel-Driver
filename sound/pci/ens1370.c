@@ -593,7 +593,7 @@ static void snd_es1371_codec_write(ac97_t *ac97,
 		}
 		spin_unlock_irqrestore(&ensoniq->reg_lock, flags);
 	}
-	snd_printk("codec write timeout at 0x%lx [0x%lx]\n", ES_REG(ensoniq, 1371_CODEC), inl(ES_REG(ensoniq, 1371_CODEC)));
+	snd_printk("codec write timeout at 0x%lx [0x%x]\n", ES_REG(ensoniq, 1371_CODEC), inl(ES_REG(ensoniq, 1371_CODEC)));
 }
 
 static unsigned short snd_es1371_codec_read(ac97_t *ac97,
@@ -641,14 +641,14 @@ static unsigned short snd_es1371_codec_read(ac97_t *ac97,
 			}
 			spin_unlock_irqrestore(&ensoniq->reg_lock, flags);
 			if (++fail > 10) {
-				snd_printk("codec read timeout (final) at 0x%lx, reg = 0x%x [0x%lx]\n", ES_REG(ensoniq, 1371_CODEC), reg, inl(ES_REG(ensoniq, 1371_CODEC)));
+				snd_printk("codec read timeout (final) at 0x%lx, reg = 0x%x [0x%x]\n", ES_REG(ensoniq, 1371_CODEC), reg, inl(ES_REG(ensoniq, 1371_CODEC)));
 				return 0;
 			}
 			goto __again;
 		}
 		spin_unlock_irqrestore(&ensoniq->reg_lock, flags);
 	}
-	snd_printk("es1371: codec read timeout at 0x%lx [0x%lx]\n", ES_REG(ensoniq, 1371_CODEC), inl(ES_REG(ensoniq, 1371_CODEC)));
+	snd_printk("es1371: codec read timeout at 0x%lx [0x%x]\n", ES_REG(ensoniq, 1371_CODEC), inl(ES_REG(ensoniq, 1371_CODEC)));
 	return 0;
 }
 

@@ -518,7 +518,11 @@ static int snd_rawmidi_release(struct inode *inode, struct file *file)
 
 int snd_rawmidi_info(snd_rawmidi_substream_t *substream, snd_rawmidi_info_t *info)
 {
-	snd_rawmidi_t *rmidi = substream->rmidi;
+	snd_rawmidi_t *rmidi;
+	
+	if (substream == NULL)
+		return -ENODEV;
+	rmidi = substream->rmidi;
 	memset(info, 0, sizeof(*info));
 	info->card = rmidi->card->number;
 	info->device = rmidi->device;

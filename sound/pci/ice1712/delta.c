@@ -83,8 +83,13 @@ static unsigned char ap_cs8427_codec_select(ice1712_t *ice)
 {
 	unsigned char tmp;
 	tmp = snd_ice1712_read(ice, ICE1712_IREG_GPIO_DATA);
-	tmp |= ICE1712_DELTA_AP_CCLK | ICE1712_DELTA_AP_CS_CODEC;
-	tmp &= ~ICE1712_DELTA_AP_CS_DIGITAL;
+	if (ice->eeprom.subvendor == ICE1712_SUBDEVICE_DELTA1010LT) {
+		tmp &= ~ICE1712_DELTA_1010LT_CS;
+		tmp |= ICE1712_DELTA_1010LT_CCLK | ICE1712_DELTA_1010LT_CS_CS8427;
+	} else { /* Audiophile */
+		tmp |= ICE1712_DELTA_AP_CCLK | ICE1712_DELTA_AP_CS_CODEC;
+		tmp &= ~ICE1712_DELTA_AP_CS_DIGITAL;
+	}
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, tmp);
 	udelay(5);
 	return tmp;
@@ -93,7 +98,12 @@ static unsigned char ap_cs8427_codec_select(ice1712_t *ice)
 /* deassert chip select */
 static void ap_cs8427_codec_deassert(ice1712_t *ice, unsigned char tmp)
 {
-	tmp |= ICE1712_DELTA_AP_CS_DIGITAL;
+	if (ice->eeprom.subvendor == ICE1712_SUBDEVICE_DELTA1010LT) {
+		tmp &= ~ICE1712_DELTA_1010LT_CS;
+		tmp |= ICE1712_DELTA_1010LT_CS_NONE;
+	} else { /* Audiophile */
+		tmp |= ICE1712_DELTA_AP_CS_DIGITAL;
+	}
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, tmp);
 }
 
@@ -227,12 +237,25 @@ static int delta_spdif_stream_put(ice1712_t *ice, snd_ctl_elem_value_t * ucontro
 static int delta_ak4524_start(ice1712_t *ice, unsigned char *saved, int chip)
 {
 	snd_ice1712_save_gpio_status(ice, saved);
-	ice->ak4524.codecs_mask = chip == 0 ? ICE1712_DELTA_CODEC_CHIP_A : ICE1712_DELTA_CODEC_CHIP_B;
+	ice->ak4524.cs_mask =
+	ice->ak4524.cs_addr = chip == 0 ? ICE1712_DELTA_CODEC_CHIP_A :
+					  ICE1712_DELTA_CODEC_CHIP_B;
 	return 0;
 }
 
 /*
- * change the rate of AK4524 on Delta 44/66 and AP
+ * AK4524 on Delta1010LT to choose the chip address
+ */
+static int delta1010lt_ak4524_start(ice1712_t *ice, unsigned char *saved, int chip)
+{
+	snd_ice1712_save_gpio_status(ice, saved);
+	ice->ak4524.cs_mask = ICE1712_DELTA_1010LT_CS;
+	ice->ak4524.cs_addr = chip << 4;
+	return 0;
+}
+
+/*
+ * change the rate of AK4524 on Delta 44/66, AP, 1010LT
  */
 static void delta_ak4524_set_rate_val(ice1712_t *ice, unsigned char val)
 {
@@ -319,6 +342,7 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 		ice->num_total_dacs = ice->omni ? 8 : 4;
 		break;
 	case ICE1712_SUBDEVICE_DELTA1010:
+	case ICE1712_SUBDEVICE_DELTA1010LT:
 		ice->num_total_dacs = 8;
 		break;
 	}
@@ -326,6 +350,7 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 	/* initialize spdif */
 	switch (ice->eeprom.subvendor) {
 	case ICE1712_SUBDEVICE_AUDIOPHILE:
+	case ICE1712_SUBDEVICE_DELTA1010LT:
 		if ((err = snd_i2c_bus_create(ice->card, "ICE1712 GPIO 1", NULL, &ice->i2c)) < 0) {
 			snd_printk("unable to create I2C bus\n");
 			return err;
@@ -358,8 +383,23 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 		ak->cif = 0; /* the default level of the CIF pin from AK4524 */
 		ak->data_mask = ICE1712_DELTA_AP_DOUT;
 		ak->clk_mask = ICE1712_DELTA_AP_CCLK;
-		ak->codecs_mask = ICE1712_DELTA_AP_CS_CODEC; /* select AK4528 codec */
+		ak->cs_mask = ak->cs_addr = ICE1712_DELTA_AP_CS_CODEC; /* select AK4528 codec */
+		ak->cs_none = 0;
 		ak->add_flags = ICE1712_DELTA_AP_CS_DIGITAL; /* assert digital high */
+		ak->mask_flags = 0;
+		ak->ops.set_rate_val = delta_ak4524_set_rate_val;
+		snd_ice1712_ak4524_init(ice);
+		break;
+	case ICE1712_SUBDEVICE_DELTA1010LT:
+		ak->num_adcs = ak->num_dacs = 8;
+		ak->cif = 0; /* the default level of the CIF pin from AK4524 */
+		ak->data_mask = ICE1712_DELTA_1010LT_DOUT;
+		ak->clk_mask = ICE1712_DELTA_1010LT_CCLK;
+		ak->cs_mask = ak->cs_addr = 0; /* set later */
+		ak->cs_none = ICE1712_DELTA_1010LT_CS_NONE;
+		ak->add_flags = 0;
+		ak->mask_flags = 0;
+		ak->ops.start = delta1010lt_ak4524_start;
 		ak->ops.set_rate_val = delta_ak4524_set_rate_val;
 		snd_ice1712_ak4524_init(ice);
 		break;
@@ -369,8 +409,10 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 		ak->cif = 0; /* the default level of the CIF pin from AK4524 */
 		ak->data_mask = ICE1712_DELTA_CODEC_SERIAL_DATA;
 		ak->clk_mask = ICE1712_DELTA_CODEC_SERIAL_CLOCK;
-		ak->codecs_mask = 0; /* set later */
+		ak->cs_mask = ak->cs_addr = 0; /* set later */
+		ak->cs_none = 0;
 		ak->add_flags = 0;
+		ak->mask_flags = 0;
 		ak->ops.start = delta_ak4524_start;
 		ak->ops.set_rate_val = delta_ak4524_set_rate_val;
 		snd_ice1712_ak4524_init(ice);
@@ -387,6 +429,8 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 
 static snd_kcontrol_new_t snd_ice1712_delta1010_wordclock_select __devinitdata =
 ICE1712_GPIO(SNDRV_CTL_ELEM_IFACE_PCM, "Word Clock Sync", 0, ICE1712_DELTA_WORD_CLOCK_SELECT, 1, 0);
+static snd_kcontrol_new_t snd_ice1712_delta1010lt_wordclock_select __devinitdata =
+ICE1712_GPIO(SNDRV_CTL_ELEM_IFACE_PCM, "Word Clock Sync", 0, ICE1712_DELTA_1010LT_WORDCLOCK, 1, 0);
 static snd_kcontrol_new_t snd_ice1712_delta1010_wordclock_status __devinitdata =
 ICE1712_GPIO(SNDRV_CTL_ELEM_IFACE_PCM, "Word Clock Status", 0, ICE1712_DELTA_WORD_CLOCK_STATUS, 1, SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE);
 static snd_kcontrol_new_t snd_ice1712_deltadio2496_spdif_in_select __devinitdata =
@@ -411,6 +455,11 @@ static int __devinit snd_ice1712_delta_add_controls(ice1712_t *ice)
 		break;
 	case ICE1712_SUBDEVICE_DELTADIO2496:
 		err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_ice1712_deltadio2496_spdif_in_select, ice));
+		if (err < 0)
+			return err;
+		break;
+	case ICE1712_SUBDEVICE_DELTA1010LT:
+		err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_ice1712_delta1010lt_wordclock_select, ice));
 		if (err < 0)
 			return err;
 		break;

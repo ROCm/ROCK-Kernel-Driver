@@ -413,7 +413,7 @@ static int snd_emu10k1_fx8010_register_irq_handler(emu10k1_t *emu,
 	
 	snd_runtime_check(emu, return -EINVAL);
 	snd_runtime_check(handler, return -EINVAL);
-	irq = kmalloc(sizeof(*irq), GFP_KERNEL);
+	irq = kmalloc(sizeof(*irq), GFP_ATOMIC);
 	if (irq == NULL)
 		return -ENOMEM;
 	irq->handler = handler;
