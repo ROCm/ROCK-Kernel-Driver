@@ -58,17 +58,6 @@ config I2C_ELEKTOR
 	  This support is also available as a module.  If so, the module 
 	  will be called i2c-elektor.
 
-config I2C_ELV
-	tristate "ELV adapter"
-	depends on I2C
-	select I2C_ALGOBIT
-	help
-	  This supports parallel-port I2C adapters called ELV.  Say Y if you
-	  own such an adapter.
-
-	  This support is also available as a module.  If so, the module 
-	  will be called i2c-elv.
-
 config I2C_HYDRA
 	tristate "CHRP Apple Hydra Mac I/O I2C interface"
 	depends on I2C && PCI && PPC_CHRP && EXPERIMENTAL
