@@ -518,22 +518,24 @@ void txEnd(tid_t tid)
 	/*
 	 * mark the tblock not active
 	 */
-	--log->active;
+	if (--log->active == 0) {
+		clear_bit(log_FLUSH, &log->flag);
 
-	/*
-	 * synchronize with logsync barrier
-	 */
-	if (test_bit(log_SYNCBARRIER, &log->flag) && log->active == 0) {
-		/* forward log syncpt */
-		/* lmSync(log); */
+		/*
+		 * synchronize with logsync barrier
+		 */
+		if (test_bit(log_SYNCBARRIER, &log->flag)) {
+			/* forward log syncpt */
+			/* lmSync(log); */
 
-		jfs_info("     log barrier off: 0x%x", log->lsn);
+			jfs_info("log barrier off: 0x%x", log->lsn);
 
-		/* enable new transactions start */
-		clear_bit(log_SYNCBARRIER, &log->flag);
+			/* enable new transactions start */
+			clear_bit(log_SYNCBARRIER, &log->flag);
 
-		/* wakeup all waitors for logsync barrier */
-		TXN_WAKEUP(&log->syncwait);
+			/* wakeup all waitors for logsync barrier */
+			TXN_WAKEUP(&log->syncwait);
+		}
 	}
 
 	/*
