@@ -145,6 +145,6 @@ EXPORT_SYMBOL(csum_partial);
  */
 unsigned short ip_compute_csum(unsigned char * buff, int len)
 {
-	return ~csum_partial(buff,len,0); 
+	return csum_fold(csum_partial(buff,len,0));
 }
 
