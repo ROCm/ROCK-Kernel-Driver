@@ -787,11 +787,56 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	struct dst_entry *dst;
 	int addr_len = msg->msg_namelen;
 	int ulen = len;
-	int addr_type;
 	int hlimit = -1;
 	int corkreq = up->corkflag || msg->msg_flags&MSG_MORE;
 	int err;
-	
+
+	/* destination address check */
+	if (sin6) {
+		if (addr_len < offsetof(struct sockaddr, sa_data))
+			return -EINVAL;
+
+		switch (sin6->sin6_family) {
+		case AF_INET6:
+			if (addr_len < SIN6_LEN_RFC2133)
+				return -EINVAL;
+			daddr = &sin6->sin6_addr;
+			break;
+		case AF_INET:
+			goto do_udp_sendmsg;
+		case AF_UNSPEC:
+			msg->msg_name = sin6 = NULL;
+			msg->msg_namelen = addr_len = 0;
+			daddr = NULL;
+			break;
+		default:
+			return -EINVAL;
+		}
+	} else if (!up->pending) {
+		if (sk->sk_state != TCP_ESTABLISHED)
+			return -EDESTADDRREQ;
+		daddr = &np->daddr;
+	} else 
+		daddr = NULL;
+
+	if (daddr) {
+		if (ipv6_addr_type(daddr) == IPV6_ADDR_MAPPED) {
+			struct sockaddr_in sin;
+			sin.sin_family = AF_INET;
+			sin.sin_port = sin6 ? sin6->sin6_port : inet->dport;
+			sin.sin_addr.s_addr = daddr->s6_addr[3];
+			msg->msg_name = &sin;
+			msg->msg_namelen = sizeof(sin);
+do_udp_sendmsg:
+			if (__ipv6_only_sock(sk))
+				return -ENETUNREACH;
+			return udp_sendmsg(iocb, sk, msg, len);
+		}
+	}
+
+	if (up->pending == AF_INET)
+		return udp_sendmsg(iocb, sk, msg, len);
+
 	/* Rough check on arithmetic overflow,
 	   better check is made in ip6_build_xmit
 	   */
@@ -805,6 +850,10 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 		 */
 		lock_sock(sk);
 		if (likely(up->pending)) {
+			if (unlikely(up->pending != AF_INET6)) {
+				release_sock(sk);
+				return -EINVAL;
+			}
 			dst = NULL;
 			goto do_append_data;
 		}
@@ -815,18 +864,6 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	memset(fl, 0, sizeof(*fl));
 
 	if (sin6) {
-		if (sin6->sin6_family == AF_INET) {
-			if (__ipv6_only_sock(sk))
-				return -ENETUNREACH;
-			return udp_sendmsg(iocb, sk, msg, len);
-		}
-
-		if (addr_len < SIN6_LEN_RFC2133)
-			return -EINVAL;
-
-		if (sin6->sin6_family && sin6->sin6_family != AF_INET6)
-			return -EINVAL;
-
 		if (sin6->sin6_port == 0)
 			return -EINVAL;
 
@@ -862,24 +899,6 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 		fl->fl_ip_dport = inet->dport;
 		daddr = &np->daddr;
 		fl->fl6_flowlabel = np->flow_label;
-	}
-
-	addr_type = ipv6_addr_type(daddr);
-
-	if (addr_type == IPV6_ADDR_MAPPED) {
-		struct sockaddr_in sin;
-
-		if (__ipv6_only_sock(sk))
-			return -ENETUNREACH;
-
-		sin.sin_family = AF_INET;
-		sin.sin_addr.s_addr = daddr->s6_addr32[3];
-		sin.sin_port = inet->cork.fl.fl_ip_dport;
-		msg->msg_name = (struct sockaddr *)(&sin);
-		msg->msg_namelen = sizeof(sin);
-		fl6_sock_release(flowlabel);
-
-		return udp_sendmsg(iocb, sk, msg, len);
 	}
 
 	if (!fl->oif)
@@ -950,7 +969,7 @@ back_from_confirm:
 		goto out;
 	}
 
-	up->pending = 1;
+	up->pending = AF_INET6;
 
 do_append_data:
 	up->len += ulen;
