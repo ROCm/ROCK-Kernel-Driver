@@ -94,7 +94,7 @@ int fcntl_dirnotify(int fd, struct file *filp, unsigned long arg)
 		prev = &odn->dn_next;
 	}
 
-	error = f_setown(filp, current->pid, 1);
+	error = f_setown(filp, current->tgid, 1);
 	if (error)
 		goto out_free;
 
