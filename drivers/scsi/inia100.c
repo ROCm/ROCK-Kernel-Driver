@@ -111,7 +111,6 @@ static int setup_called = 0;
 /* ---- INTERNAL VARIABLES ---- */
 #define NUMBER(arr)     (sizeof(arr) / sizeof(arr[0]))
 static char *setup_str = (char *) NULL;
-static struct inia100_Adpt_Struc *inia100_adpt;
 
 static void inia100_intr(int, void *, struct pt_regs *);
 static void inia100_panic(char *msg);
@@ -131,6 +130,7 @@ extern int abort_SCB(ORC_HCS * hcsp, ORC_SCB * pScb);
 extern int orc_abort_srb(ORC_HCS * hcsp, Scsi_Cmnd *SCpnt);
 extern void get_orcPCIConfig(ORC_HCS * pCurHcb, int ch_idx);
 extern int init_orchid(ORC_HCS * hcsp);
+extern struct inia100_Adpt_Struc *inia100_adpt;
 
 /*****************************************************************************
  Function name  : inia100AppendSRBToQueue
