@@ -1,5 +1,5 @@
 # drivers/mtd/maps/Kconfig
-# $Id: Kconfig,v 1.38 2004/11/24 19:42:51 rpurdie Exp $
+# $Id: Kconfig,v 1.39 2004/12/09 18:39:54 holindho Exp $
 
 menu "Mapping drivers for chip access"
 	depends on MTD!=n
@@ -375,7 +375,7 @@ config MTD_ARCTIC
 
 config MTD_EBONY
 	tristate "Flash devices mapped on IBM 440GP Ebony"
-	depends on MTD_CFI && PPC32 && 44x && EBONY
+	depends on MTD_JEDECPROBE && PPC32 && 44x && EBONY
 	help
 	  This enables access routines for the flash chips on the IBM 440GP
 	  Ebony board. If you have one of these boards and would like to
