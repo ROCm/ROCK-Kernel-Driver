@@ -147,9 +147,7 @@ as_indicate_complete:
 			return 0;
 		case as_close:
 			set_bit(ATM_VF_RELEASED,&vcc->flags);
-			clear_bit(ATM_VF_READY,&vcc->flags);
-			vcc->sk->sk_err = -msg->reply;
-			clear_bit(ATM_VF_WAITING, &vcc->flags);
+			vcc_release_async(vcc, msg->reply);
 			break;
 		case as_modify:
 			modify_qos(vcc,msg);
@@ -205,9 +203,7 @@ static void purge_vcc(struct atm_vcc *vcc)
 	if (vcc->sk->sk_family == PF_ATMSVC &&
 	    !test_bit(ATM_VF_META,&vcc->flags)) {
 		set_bit(ATM_VF_RELEASED,&vcc->flags);
-		vcc->sk->sk_err = EUNATCH;
-		clear_bit(ATM_VF_WAITING, &vcc->flags);
-		vcc->sk->sk_state_change(vcc->sk);
+		vcc_release_async(vcc, -EUNATCH);
 	}
 }
 

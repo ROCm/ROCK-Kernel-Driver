@@ -178,6 +178,7 @@ static void vcc_destroy_socket(struct sock *sk)
 	struct atm_vcc *vcc = atm_sk(sk);
 	struct sk_buff *skb;
 
+	set_bit(ATM_VF_CLOSE, &vcc->flags);
 	clear_bit(ATM_VF_READY, &vcc->flags);
 	if (vcc->dev) {
 		if (vcc->dev->ops->close)
@@ -216,6 +217,7 @@ int vcc_release(struct socket *sock)
 void vcc_release_async(struct atm_vcc *vcc, int reply)
 {
 	set_bit(ATM_VF_CLOSE, &vcc->flags);
+	vcc->sk->sk_shutdown |= RCV_SHUTDOWN;
 	vcc->sk->sk_err = -reply;
 	clear_bit(ATM_VF_WAITING, &vcc->flags);
 	vcc->sk->sk_state_change(vcc->sk);
