@@ -200,7 +200,7 @@ static void program_drive_counts (ide_drive_t *drive, int setup_count, int activ
 	 */
 	if (channel) {
 		drive->drive_data = setup_count;
-		setup_count = IDE_MAX(drives[0].drive_data,
+		setup_count = max(drives[0].drive_data,
 					drives[1].drive_data);
 		cmdprintk("Secondary interface, setup_count = %d\n",
 					setup_count);
