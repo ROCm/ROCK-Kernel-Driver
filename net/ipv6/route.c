@@ -89,6 +89,8 @@ static int		 ip6_dst_gc(void);
 static int		ip6_pkt_discard(struct sk_buff *skb);
 static void		ip6_link_failure(struct sk_buff *skb);
 static void		ip6_rt_update_pmtu(struct dst_entry *dst, u32 mtu);
+static int		ipv6_get_mtu(struct net_device *dev);
+static unsigned int	ipv6_advmss(unsigned int mtu);
 
 static struct dst_ops ip6_dst_ops = {
 	.family			=	AF_INET6,
@@ -603,6 +605,8 @@ struct dst_entry *ndisc_dst_alloc(struct net_device *dev,
 	rt->rt6i_metric   = 0;
 	atomic_set(&rt->u.dst.__refcnt, 1);
 	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = 255;
+	rt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(rt->rt6i_dev);
+	rt->u.dst.metrics[RTAX_ADVMSS-1] = ipv6_advmss(dst_pmtu(&rt->u.dst));
 	rt->u.dst.output  = output;
 
 	write_lock_bh(&rt6_lock);
@@ -678,7 +682,7 @@ static int ipv6_get_mtu(struct net_device *dev)
 	return mtu;
 }
 
-static inline unsigned int ipv6_advmss(unsigned int mtu)
+static unsigned int ipv6_advmss(unsigned int mtu)
 {
 	mtu -= sizeof(struct ipv6hdr) + sizeof(struct tcphdr);
 

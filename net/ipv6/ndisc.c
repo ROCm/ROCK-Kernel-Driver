@@ -416,7 +416,7 @@ void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 
 	ndisc_flow_init(&fl, NDISC_NEIGHBOUR_ADVERTISEMENT, src_addr, daddr);
 
-	dst = ndisc_dst_alloc(dev, neigh, daddr, ip6_output2);
+	dst = ndisc_dst_alloc(dev, neigh, daddr, ip6_output);
 	if (!dst)
 		return;
 
@@ -506,7 +506,7 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 
 	ndisc_flow_init(&fl, NDISC_NEIGHBOUR_SOLICITATION, saddr, daddr);
 
-	dst = ndisc_dst_alloc(dev, neigh, daddr, ip6_output2);
+	dst = ndisc_dst_alloc(dev, neigh, daddr, ip6_output);
 	if (!dst)
 		return;
 
@@ -581,7 +581,7 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
 
 	ndisc_flow_init(&fl, NDISC_ROUTER_SOLICITATION, saddr, daddr);
 
-	dst = ndisc_dst_alloc(dev, NULL, daddr, ip6_output2);
+	dst = ndisc_dst_alloc(dev, NULL, daddr, ip6_output);
 	if (!dst)
 		return;
 

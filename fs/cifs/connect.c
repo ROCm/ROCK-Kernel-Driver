@@ -95,9 +95,15 @@ cifs_reconnect(struct TCP_Server_Info *server)
 	struct cifsTconInfo *tcon;
 	struct mid_q_entry * mid_entry;
 	
-	if(server->tcpStatus == CifsExiting)
+	spin_lock(&GlobalMid_Lock);
+	if(server->tcpStatus == CifsExiting) {
+		/* the demux thread will exit normally 
+		next time through the loop */
+		spin_unlock(&GlobalMid_Lock);
 		return rc;
-	server->tcpStatus = CifsNeedReconnect;
+	} else
+		server->tcpStatus = CifsNeedReconnect;
+	spin_unlock(&GlobalMid_Lock);
 	server->maxBuf = 0;
 
 	cFYI(1, ("Reconnecting tcp session "));
@@ -164,7 +170,10 @@ cifs_reconnect(struct TCP_Server_Info *server)
 			schedule_timeout(3 * HZ);
 		} else {
 			atomic_inc(&tcpSesReconnectCount);
-			server->tcpStatus = CifsGood;
+			spin_lock(&GlobalMid_Lock);
+			if(server->tcpStatus != CifsExiting)
+				server->tcpStatus = CifsGood;
+			spin_unlock(&GlobalMid_Lock);
 			atomic_set(&server->inFlight,0);
 			wake_up(&server->response_q);
 		}
@@ -243,12 +252,14 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				/* some servers kill tcp session rather than returning
 					smb negprot error in which case reconnecting here is
 					not going to help - return error to mount */
+				spin_lock(&GlobalMid_Lock);
 				server->tcpStatus = CifsExiting;
+				spin_unlock(&GlobalMid_Lock);
 				wake_up(&server->response_q);
 				break;
 			}
 
-			cFYI(1,("Reconnecting after unexpected rcvmsg error "));
+			cFYI(1,("Reconnecting after unexpected peek error %d",length));
 			cifs_reconnect(server);
 			csocket = server->ssocket;
 			wake_up(&server->response_q);
@@ -280,7 +291,9 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 					/* if nack on negprot (rather than 
 					ret of smb negprot error) reconnecting
 					not going to help, ret error to mount */
+					spin_lock(&GlobalMid_Lock);
 					server->tcpStatus = CifsExiting;
+					spin_unlock(&GlobalMid_Lock);
 					/* wake up thread doing negprot */
 					wake_up(&server->response_q);
 					break;
@@ -391,7 +404,9 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 			}
 		}
 	}
+	spin_lock(&GlobalMid_Lock);
 	server->tcpStatus = CifsExiting;
+	spin_unlock(&GlobalMid_Lock);
 	atomic_set(&server->inFlight, 0);
 	/* Although there should not be any requests blocked on 
 	this queue it can not hurt to be paranoid and try to wake up requests
@@ -1226,6 +1241,9 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			init_waitqueue_head(&srvTcp->response_q);
 			init_waitqueue_head(&srvTcp->request_q);
 			INIT_LIST_HEAD(&srvTcp->pending_mid_q);
+			/* at this point we are the only ones with the pointer
+			to the struct since the kernel thread not created yet
+			so no need to spinlock this init of tcpStatus */
 			srvTcp->tcpStatus = CifsNew;
 			init_MUTEX(&srvTcp->tcpSem);
 			kernel_thread((void *)(void *)cifs_demultiplex_thread, srvTcp,
@@ -1342,9 +1360,12 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 
 /* on error free sesinfo and tcon struct if needed */
 	if (rc) {
-		if(atomic_read(&srvTcp->socketUseCount) == 0)
-                	srvTcp->tcpStatus = CifsExiting;
-		           /* If find_unc succeeded then rc == 0 so we can not end */
+		if(atomic_read(&srvTcp->socketUseCount) == 0) {
+			spin_lock(&GlobalMid_Lock);
+			srvTcp->tcpStatus = CifsExiting;
+			spin_unlock(&GlobalMid_Lock);
+		}
+		 /* If find_unc succeeded then rc == 0 so we can not end */
 		if (tcon)  /* up here accidently freeing someone elses tcon struct */
 			tconInfoFree(tcon);
 		if (existingCifsSes == 0) {
@@ -2791,7 +2812,7 @@ int cifs_setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo,
 	char ntlm_session_key[CIFS_SESSION_KEY_SIZE];
 	int ntlmv2_flag = FALSE;
 
-    /* what if server changes its buffer size after dropping the session? */
+	/* what if server changes its buffer size after dropping the session? */
 	if(pSesInfo->server->maxBuf == 0) /* no need to send on reconnect */ {
 		rc = CIFSSMBNegotiate(xid, pSesInfo);
 		if(rc == -EAGAIN) /* retry only once on 1st time connection */ {
@@ -2799,8 +2820,15 @@ int cifs_setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo,
 			if(rc == -EAGAIN) 
 				rc = -EHOSTDOWN;
 		}
-		if(rc == 0)
-			pSesInfo->server->tcpStatus = CifsGood;
+		if(rc == 0) {
+			spin_lock(&GlobalMid_Lock);
+			if(pSesInfo->server->tcpStatus != CifsExiting)
+				pSesInfo->server->tcpStatus = CifsGood;
+			else
+				rc = -EHOSTDOWN;
+			spin_unlock(&GlobalMid_Lock);
+
+		}
 	}
 	if (!rc) {
 		pSesInfo->capabilities = pSesInfo->server->capabilities;
