@@ -384,14 +384,14 @@ static struct {
 
 /* internal cache of cache description objs */
 static kmem_cache_t cache_cache = {
-	slabs_full:	LIST_HEAD_INIT(cache_cache.slabs_full),
-	slabs_partial:	LIST_HEAD_INIT(cache_cache.slabs_partial),
-	slabs_free:	LIST_HEAD_INIT(cache_cache.slabs_free),
-	objsize:	sizeof(kmem_cache_t),
-	flags:		SLAB_NO_REAP,
-	spinlock:	SPIN_LOCK_UNLOCKED,
-	colour_off:	L1_CACHE_BYTES,
-	name:		"kmem_cache",
+	.slabs_full	= LIST_HEAD_INIT(cache_cache.slabs_full),
+	.slabs_partial	= LIST_HEAD_INIT(cache_cache.slabs_partial),
+	.slabs_free	= LIST_HEAD_INIT(cache_cache.slabs_free),
+	.objsize	= sizeof(kmem_cache_t),
+	.flags		= SLAB_NO_REAP,
+	.spinlock	= SPIN_LOCK_UNLOCKED,
+	.colour_off	= L1_CACHE_BYTES,
+	.name		= "kmem_cache",
 };
 
 /* Guard access to the cache-chain. */
@@ -2053,10 +2053,10 @@ static int s_show(struct seq_file *m, void *p)
  */
 
 struct seq_operations slabinfo_op = {
-	start:	s_start,
-	next:	s_next,
-	stop:	s_stop,
-	show:	s_show
+	.start	= s_start,
+	.next	= s_next,
+	.stop	= s_stop,
+	.show	= s_show,
 };
 
 #define MAX_SLABINFO_WRITE 128

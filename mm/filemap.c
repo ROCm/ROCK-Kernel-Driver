@@ -1346,7 +1346,7 @@ page_not_uptodate:
 }
 
 static struct vm_operations_struct generic_file_vm_ops = {
-	nopage:		filemap_nopage,
+	.nopage		= filemap_nopage,
 };
 
 /* This is used for a general mmap of a disk file */

@@ -1312,14 +1312,14 @@ static int shmem_follow_link(struct dentry *dentry, struct nameidata *nd)
 }
 
 static struct inode_operations shmem_symlink_inline_operations = {
-	readlink:	shmem_readlink_inline,
-	follow_link:	shmem_follow_link_inline,
+	.readlink	= shmem_readlink_inline,
+	.follow_link	= shmem_follow_link_inline,
 };
 
 static struct inode_operations shmem_symlink_inode_operations = {
-	truncate:	shmem_truncate,
-	readlink:	shmem_readlink,
-	follow_link:	shmem_follow_link,
+	.truncate	= shmem_truncate,
+	.readlink	= shmem_readlink,
+	.follow_link	= shmem_follow_link,
 };
 
 static int shmem_parse_options(char *options, int *mode, uid_t *uid, gid_t *gid, unsigned long * blocks, unsigned long *inodes)
@@ -1520,52 +1520,52 @@ static void destroy_inodecache(void)
 }
 
 static struct address_space_operations shmem_aops = {
-	writepage:	shmem_writepage,
-	set_page_dirty:	__set_page_dirty_nobuffers,
+	.writepage	= shmem_writepage,
+	.set_page_dirty	= __set_page_dirty_nobuffers,
 };
 
 static struct file_operations shmem_file_operations = {
-	mmap:	shmem_mmap,
+	.mmap		= shmem_mmap,
 #ifdef CONFIG_TMPFS
-	read:	shmem_file_read,
-	write:	shmem_file_write,
-	fsync:	shmem_sync_file,
+	.read		= shmem_file_read,
+	.write		= shmem_file_write,
+	.fsync		= shmem_sync_file,
 #endif
 };
 
 static struct inode_operations shmem_inode_operations = {
-	truncate:	shmem_truncate,
-	setattr:	shmem_notify_change,
+	.truncate	= shmem_truncate,
+	.setattr	= shmem_notify_change,
 };
 
 static struct inode_operations shmem_dir_inode_operations = {
 #ifdef CONFIG_TMPFS
-	create:		shmem_create,
-	lookup:		simple_lookup,
-	link:		shmem_link,
-	unlink:		shmem_unlink,
-	symlink:	shmem_symlink,
-	mkdir:		shmem_mkdir,
-	rmdir:		shmem_rmdir,
-	mknod:		shmem_mknod,
-	rename:		shmem_rename,
+	.create		= shmem_create,
+	.lookup		= simple_lookup,
+	.link		= shmem_link,
+	.unlink		= shmem_unlink,
+	.symlink	= shmem_symlink,
+	.mkdir		= shmem_mkdir,
+	.rmdir		= shmem_rmdir,
+	.mknod		= shmem_mknod,
+	.rename		= shmem_rename,
 #endif
 };
 
 static struct super_operations shmem_ops = {
-	alloc_inode:	shmem_alloc_inode,
-	destroy_inode:	shmem_destroy_inode,
+	.alloc_inode	= shmem_alloc_inode,
+	.destroy_inode	= shmem_destroy_inode,
 #ifdef CONFIG_TMPFS
-	statfs:		shmem_statfs,
-	remount_fs:	shmem_remount_fs,
+	.statfs		= shmem_statfs,
+	.remount_fs	= shmem_remount_fs,
 #endif
-	delete_inode:	shmem_delete_inode,
-	drop_inode:	generic_delete_inode,
-	put_super:	shmem_put_super,
+	.delete_inode	= shmem_delete_inode,
+	.drop_inode	= generic_delete_inode,
+	.put_super	= shmem_put_super,
 };
 
 static struct vm_operations_struct shmem_vm_ops = {
-	nopage:	shmem_nopage,
+	.nopage		= shmem_nopage,
 };
 
 static struct super_block *shmem_get_sb(struct file_system_type *fs_type,
@@ -1577,17 +1577,17 @@ static struct super_block *shmem_get_sb(struct file_system_type *fs_type,
 #ifdef CONFIG_TMPFS
 /* type "shm" will be tagged obsolete in 2.5 */
 static struct file_system_type shmem_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"shmem",
-	get_sb:		shmem_get_sb,
-	kill_sb:	kill_litter_super,
+	.owner		= THIS_MODULE,
+	.name		= "shmem",
+	.get_sb		= shmem_get_sb,
+	.kill_sb	= kill_litter_super,
 };
 #endif
 static struct file_system_type tmpfs_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"tmpfs",
-	get_sb:		shmem_get_sb,
-	kill_sb:	kill_litter_super,
+	.owner		= THIS_MODULE,
+	.name		= "tmpfs",
+	.get_sb		= shmem_get_sb,
+	.kill_sb	= kill_litter_super,
 };
 static struct vfsmount *shm_mnt;
 
