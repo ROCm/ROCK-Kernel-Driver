@@ -212,7 +212,7 @@ typedef struct {
 /* these common regs are cleared before mode setting so they do not
  * interfere with anything
  */
-reg_val common_regs[] = {
+static reg_val common_regs[] = {
 	{ OVR_CLR, 0 },	
 	{ OVR_WID_LEFT_RIGHT, 0 },
 	{ OVR_WID_TOP_BOTTOM, 0 },
@@ -224,7 +224,7 @@ reg_val common_regs[] = {
 	{ CAP0_TRIG_CNTL, 0 },
 };
 
-reg_val common_regs_m6[] = {
+static reg_val common_regs_m6[] = {
 	{ OVR_CLR,      0 },
 	{ OVR_WID_LEFT_RIGHT,   0 },
 	{ OVR_WID_TOP_BOTTOM,   0 },

@@ -138,6 +138,8 @@ extern int tx3912fb_init(void);
 extern int tx3912fb_setup(char*);
 extern int radeonfb_init(void);
 extern int radeonfb_setup(char*);
+extern int radeonfb_old_init(void);
+extern int radeonfb_old_setup(char*);
 extern int e1355fb_init(void);
 extern int e1355fb_setup(char*);
 extern int pvr2fb_init(void);
@@ -226,7 +228,7 @@ static struct {
 	{ "radeonfb", radeonfb_init, radeonfb_setup },
 #endif
 #ifdef CONFIG_FB_RADEON_OLD
-	{ "radeonfb_old", radeonfb_init, radeonfb_setup },
+	{ "radeonfb_old", radeonfb_old_init, radeonfb_old_setup },
 #endif
 #ifdef CONFIG_FB_CONTROL
 	{ "controlfb", control_init, control_setup },
