@@ -1279,11 +1279,14 @@ getorigdst(struct sock *sk, int optval, void *user, int *len)
 {
 	struct inet_opt *inet = inet_sk(sk);
 	struct ip_conntrack_tuple_hash *h;
-	struct ip_conntrack_tuple tuple = { { inet->rcv_saddr,
-						{ .tcp = { inet->sport } } },
-					    { inet->daddr,
-						{ .tcp = { inet->dport } },
-					      IPPROTO_TCP } };
+	struct ip_conntrack_tuple tuple;
+	
+	IP_CT_TUPLE_U_BLANK(&tuple);
+	tuple.src.ip = inet->rcv_saddr;
+	tuple.src.u.tcp.port = inet->sport;
+	tuple.dst.ip = inet->daddr;
+	tuple.dst.u.tcp.port = inet->dport;
+	tuple.dst.protonum = IPPROTO_TCP;
 
 	/* We only do TCP at the moment: is there a better way? */
 	if (strcmp(sk->sk_prot->name, "TCP")) {
