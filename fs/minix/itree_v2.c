@@ -28,7 +28,7 @@ static int block_to_path(struct inode * inode, long block, int offsets[DEPTH])
 
 	if (block < 0) {
 		printk("minix_bmap: block<0");
-	} else if (block >= (inode->i_sb->u.minix_sb.s_max_size/BLOCK_SIZE)) {
+	} else if (block >= (minix_sb(inode->i_sb)->s_max_size/BLOCK_SIZE)) {
 		printk("minix_bmap: block>big");
 	} else if (block < 7) {
 		offsets[n++] = block;
