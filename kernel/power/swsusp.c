@@ -62,6 +62,7 @@
 #include <linux/syscalls.h>
 #include <linux/console.h>
 #include <linux/highmem.h>
+#include <linux/bio.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
@@ -70,25 +71,16 @@
 
 #include "power.h"
 
-unsigned char software_suspend_enabled = 0;
-
-#define NORESUME		1
-#define RESUME_SPECIFIED	2
-
 /* References to section boundaries */
 extern char __nosave_begin, __nosave_end;
 
 extern int is_head_of_free_region(struct page *);
 
-/* Locks */
-spinlock_t suspend_pagedir_lock __nosavedata = SPIN_LOCK_UNLOCKED;
-
 /* Variables to be preserved over suspend */
-static int pagedir_order_check;
-static int nr_copy_pages_check;
+int pagedir_order_check;
+int nr_copy_pages_check;
 
-static int resume_status;
-static char resume_file[256] = "";			/* For resume= kernel option */
+extern char resume_file[];
 static dev_t resume_device;
 /* Local variables that should not be affected by save */
 unsigned int nr_copy_pages __nosavedata = 0;
@@ -107,19 +99,19 @@ unsigned int nr_copy_pages __nosavedata = 0;
    MMU hardware.
  */
 suspend_pagedir_t *pagedir_nosave __nosavedata = NULL;
-static suspend_pagedir_t *pagedir_save;
-static int pagedir_order __nosavedata = 0;
+suspend_pagedir_t *pagedir_save;
+int pagedir_order __nosavedata = 0;
 
-struct link {
-	char dummy[PAGE_SIZE - sizeof(swp_entry_t)];
-	swp_entry_t next;
-};
+#define SWSUSP_SIG	"S1SUSPEND"
 
-union diskpage {
-	union swap_header swh;
-	struct link link;
-	struct suspend_header sh;
-};
+struct swsusp_header {
+	char reserved[PAGE_SIZE - 20 - sizeof(swp_entry_t)];
+	swp_entry_t swsusp_info;
+	char	orig_sig[10];
+	char	sig[10];
+} __attribute__((packed, aligned(PAGE_SIZE))) swsusp_header;
+
+struct swsusp_info swsusp_info;
 
 /*
  * XXX: We try to keep some more pages free so that I/O operations succeed
@@ -154,27 +146,6 @@ static const char name_resume[] = "Resume Machine: ";
  * Saving part...
  */
 
-static __inline__ int fill_suspend_header(struct suspend_header *sh)
-{
-	memset((char *)sh, 0, sizeof(*sh));
-
-	sh->version_code = LINUX_VERSION_CODE;
-	sh->num_physpages = num_physpages;
-	strncpy(sh->machine, system_utsname.machine, 8);
-	strncpy(sh->version, system_utsname.version, 20);
-	/* FIXME: Is this bogus? --RR */
-	sh->num_cpus = num_online_cpus();
-	sh->page_size = PAGE_SIZE;
-	sh->suspend_pagedir = pagedir_nosave;
-	BUG_ON (pagedir_save != pagedir_nosave);
-	sh->num_pbes = nr_copy_pages;
-	/* TODO: needed? mounted fs' last mounted date comparison
-	 * [so they haven't been mounted since last suspend.
-	 * Maybe it isn't.] [we'd need to do this for _all_ fs-es]
-	 */
-	return 0;
-}
-
 /* We memorize in swapfile_used what swap devices are used for suspension */
 #define SWAPFILE_UNUSED    0
 #define SWAPFILE_SUSPEND   1	/* This is the suspending device */
@@ -182,46 +153,29 @@ static __inline__ int fill_suspend_header(struct suspend_header *sh)
 
 static unsigned short swapfile_used[MAX_SWAPFILES];
 static unsigned short root_swap;
-#define MARK_SWAP_SUSPEND 0
-#define MARK_SWAP_RESUME 2
 
-static void mark_swapfiles(swp_entry_t prev, int mode)
+static int mark_swapfiles(swp_entry_t prev)
 {
-	swp_entry_t entry;
-	union diskpage *cur;
-	struct page *page;
+	int error;
 
-	if (root_swap == 0xFFFF)  /* ignored */
-		return;
-
-	page = alloc_page(GFP_ATOMIC);
-	if (!page)
-		panic("Out of memory in mark_swapfiles");
-	cur = page_address(page);
-	/* XXX: this is dirty hack to get first page of swap file */
-	entry = swp_entry(root_swap, 0);
-	rw_swap_page_sync(READ, entry, page);
-
-	if (mode == MARK_SWAP_RESUME) {
-	  	if (!memcmp("S1",cur->swh.magic.magic,2))
-		  	memcpy(cur->swh.magic.magic,"SWAP-SPACE",10);
-		else if (!memcmp("S2",cur->swh.magic.magic,2))
-			memcpy(cur->swh.magic.magic,"SWAPSPACE2",10);
-		else printk("%sUnable to find suspended-data signature (%.10s - misspelled?\n", 
-		      	name_resume, cur->swh.magic.magic);
+	rw_swap_page_sync(READ, 
+			  swp_entry(root_swap, 0),
+			  virt_to_page((unsigned long)&swsusp_header));
+	if (!memcmp("SWAP-SPACE",swsusp_header.sig,10) ||
+	    !memcmp("SWAPSPACE2",swsusp_header.sig,10)) {
+		memcpy(swsusp_header.orig_sig,swsusp_header.sig,10);
+		memcpy(swsusp_header.sig,SWSUSP_SIG,10);
+		swsusp_header.swsusp_info = prev;
+		error = rw_swap_page_sync(WRITE, 
+					  swp_entry(root_swap, 0),
+					  virt_to_page((unsigned long)
+						       &swsusp_header));
 	} else {
-	  	if ((!memcmp("SWAP-SPACE",cur->swh.magic.magic,10)))
-		  	memcpy(cur->swh.magic.magic,"S1SUSP....",10);
-		else if ((!memcmp("SWAPSPACE2",cur->swh.magic.magic,10)))
-			memcpy(cur->swh.magic.magic,"S2SUSP....",10);
-		else panic("\nSwapspace is not swapspace (%.10s)\n", cur->swh.magic.magic);
-		cur->link.next = prev; /* prev is the first/last swap page of the resume area */
-		/* link.next lies *no more* in last 4/8 bytes of magic */
+		pr_debug("swsusp: Partition is not swap space.\n");
+		error = -ENODEV;
 	}
-	rw_swap_page_sync(WRITE, entry, page);
-	__free_page(page);
+	return error;
 }
-
 
 /*
  * Check whether the swap device is the specified resume
@@ -243,7 +197,7 @@ static int is_resume_device(const struct swap_info_struct *swap_info)
 		resume_device == MKDEV(imajor(inode), iminor(inode));
 }
 
-static void read_swapfiles(void) /* This is called before saving image */
+int swsusp_swap_check(void) /* This is called before saving image */
 {
 	int i, len;
 	
@@ -274,113 +228,230 @@ static void read_swapfiles(void) /* This is called before saving image */
 		}
 	}
 	swap_list_unlock();
+	return (root_swap != 0xffff) ? 0 : -ENODEV;
 }
 
-static void lock_swapdevices(void) /* This is called after saving image so modification
-				      will be lost after resume... and that's what we want. */
+/**
+ * This is called after saving image so modification
+ * will be lost after resume... and that's what we want.
+ * we make the device unusable. A new call to
+ * lock_swapdevices can unlock the devices. 
+ */
+static void lock_swapdevices(void)
 {
 	int i;
 
 	swap_list_lock();
 	for(i = 0; i< MAX_SWAPFILES; i++)
 		if(swapfile_used[i] == SWAPFILE_IGNORED) {
-			swap_info[i].flags ^= 0xFF; /* we make the device unusable. A new call to
-						       lock_swapdevices can unlock the devices. */
+			swap_info[i].flags ^= 0xFF;
 		}
 	swap_list_unlock();
 }
 
-/**
- *    write_suspend_image - Write entire image to disk.
- *
- *    After writing suspend signature to the disk, suspend may no
- *    longer fail: we have ready-to-run image in swap, and rollback
- *    would happen on next reboot -- corrupting data.
- *
- *    Note: The buffer we allocate to use to write the suspend header is
- *    not freed; its not needed since the system is going down anyway
- *    (plus it causes an oops and I'm lazy^H^H^H^Htoo busy).
- */
-static int write_suspend_image(void)
-{
-	int i;
-	swp_entry_t entry, prev = { 0 };
-	int nr_pgdir_pages = SUSPEND_PD_PAGES(nr_copy_pages);
-	union diskpage *cur,  *buffer = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
-	unsigned long address;
-	struct page *page;
 
-	if (!buffer)
-		return -ENOMEM;
+
+/**
+ *	write_swap_page - Write one page to a fresh swap location.
+ *	@addr:	Address we're writing.
+ *	@loc:	Place to store the entry we used.
+ *
+ *	Allocate a new swap entry and 'sync' it. Note we discard -EIO
+ *	errors. That is an artifact left over from swsusp. It did not 
+ *	check the return of rw_swap_page_sync() at all, since most pages
+ *	written back to swap would return -EIO.
+ *	This is a partial improvement, since we will at least return other
+ *	errors, though we need to eventually fix the damn code.
+ */
+
+static int write_page(unsigned long addr, swp_entry_t * loc)
+{
+	swp_entry_t entry;
+	int error = 0;
+
+	entry = get_swap_page();
+	if (swp_offset(entry) && 
+	    swapfile_used[swp_type(entry)] == SWAPFILE_SUSPEND) {
+		error = rw_swap_page_sync(WRITE, entry,
+					  virt_to_page(addr));
+		if (error == -EIO)
+			error = 0;
+		if (!error)
+			*loc = entry;
+	} else
+		error = -ENOSPC;
+	return error;
+}
+
+
+/**
+ *	free_data - Free the swap entries used by the saved image.
+ *
+ *	Walk the list of used swap entries and free each one. 
+ */
+
+static void data_free(void)
+{
+	swp_entry_t entry;
+	int i;
+
+	for (i = 0; i < nr_copy_pages; i++) {
+		entry = (pagedir_nosave + i)->swap_address;
+		if (entry.val)
+			swap_free(entry);
+		else
+			break;
+		(pagedir_nosave + i)->swap_address = (swp_entry_t){0};
+	}
+}
+
+
+/**
+ *	write_data - Write saved image to swap.
+ *
+ *	Walk the list of pages in the image and sync each one to swap.
+ */
+
+static int data_write(void)
+{
+	int error = 0;
+	int i;
 
 	printk( "Writing data to swap (%d pages): ", nr_copy_pages );
-	for (i=0; i<nr_copy_pages; i++) {
+	for (i = 0; i < nr_copy_pages && !error; i++) {
 		if (!(i%100))
 			printk( "." );
-		entry = get_swap_page();
-		if (!entry.val)
-			panic("\nNot enough swapspace when writing data" );
-		
-		if (swapfile_used[swp_type(entry)] != SWAPFILE_SUSPEND)
-			panic("\nPage %d: not enough swapspace on suspend device", i );
-	    
-		address = (pagedir_nosave+i)->address;
-		page = virt_to_page(address);
-		rw_swap_page_sync(WRITE, entry, page);
-		(pagedir_nosave+i)->swap_address = entry;
+		error = write_page((pagedir_nosave+i)->address,
+					  &((pagedir_nosave+i)->swap_address));
 	}
-	printk( "|\n" );
-	printk( "Writing pagedir (%d pages): ", nr_pgdir_pages);
-	for (i=0; i<nr_pgdir_pages; i++) {
-		cur = (union diskpage *)((char *) pagedir_nosave)+i;
-		BUG_ON ((char *) cur != (((char *) pagedir_nosave) + i*PAGE_SIZE));
-		printk( "." );
-		entry = get_swap_page();
-		if (!entry.val) {
-			printk(KERN_CRIT "Not enough swapspace when writing pgdir\n" );
-			panic("Don't know how to recover");
-			free_page((unsigned long) buffer);
-			return -ENOSPC;
-		}
+	printk(" %d Pages done.\n",i);
+	return error;
+}
 
-		if(swapfile_used[swp_type(entry)] != SWAPFILE_SUSPEND)
-			panic("\nNot enough swapspace for pagedir on suspend device" );
+#ifdef DEBUG
+static void dump_info(void)
+{
+	printk(" swsusp: Version: %u\n",swsusp_info.version_code);
+	printk(" swsusp: Num Pages: %ld\n",swsusp_info.num_physpages);
+	printk(" swsusp: UTS Sys: %s\n",swsusp_info.uts.sysname);
+	printk(" swsusp: UTS Node: %s\n",swsusp_info.uts.nodename);
+	printk(" swsusp: UTS Release: %s\n",swsusp_info.uts.release);
+	printk(" swsusp: UTS Version: %s\n",swsusp_info.uts.version);
+	printk(" swsusp: UTS Machine: %s\n",swsusp_info.uts.machine);
+	printk(" swsusp: UTS Domain: %s\n",swsusp_info.uts.domainname);
+	printk(" swsusp: CPUs: %d\n",swsusp_info.cpus);
+	printk(" swsusp: Image: %ld Pages\n",swsusp_info.image_pages);
+	printk(" swsusp: Pagedir: %ld Pages\n",swsusp_info.pagedir_pages);
+}
+#else
+static void dump_info(void)
+{
 
-		BUG_ON (sizeof(swp_entry_t) != sizeof(long));
-		BUG_ON (PAGE_SIZE % sizeof(struct pbe));
+}
+#endif
 
-		cur->link.next = prev;				
-		page = virt_to_page((unsigned long)cur);
-		rw_swap_page_sync(WRITE, entry, page);
-		prev = entry;
-	}
-	printk("H");
-	BUG_ON (sizeof(struct suspend_header) > PAGE_SIZE-sizeof(swp_entry_t));
-	BUG_ON (sizeof(union diskpage) != PAGE_SIZE);
-	BUG_ON (sizeof(struct link) != PAGE_SIZE);
-	entry = get_swap_page();
-	if (!entry.val)
-		panic( "\nNot enough swapspace when writing header" );
-	if (swapfile_used[swp_type(entry)] != SWAPFILE_SUSPEND)
-		panic("\nNot enough swapspace for header on suspend device" );
+static void init_header(void)
+{
+	memset(&swsusp_info,0,sizeof(swsusp_info));
+	swsusp_info.version_code = LINUX_VERSION_CODE;
+	swsusp_info.num_physpages = num_physpages;
+	memcpy(&swsusp_info.uts,&system_utsname,sizeof(system_utsname));
 
-	cur = (void *) buffer;
-	if (fill_suspend_header(&cur->sh))
-		BUG();		/* Not a BUG_ON(): we want fill_suspend_header to be called, always */
-		
-	cur->link.next = prev;
+	swsusp_info.suspend_pagedir = pagedir_nosave;
+	swsusp_info.cpus = num_online_cpus();
+	swsusp_info.image_pages = nr_copy_pages;
+	dump_info();
+}
 
-	page = virt_to_page((unsigned long)cur);
-	rw_swap_page_sync(WRITE, entry, page);
-	prev = entry;
+/**
+ *	write_header - Fill and write the suspend header.
+ *	@entry:	Location of the last swap entry used.
+ *
+ *	Allocate a page, fill header, write header. 
+ *
+ *	@entry is the location of the last pagedir entry written on 
+ *	entrance. On exit, it contains the location of the header. 
+ */
+
+static int write_header(swp_entry_t * entry)
+{
+	return write_page((unsigned long)&swsusp_info,entry);
+}
+
+
+static int close_swap(void)
+{
+	swp_entry_t entry;
+	int error;
+	error = write_header(&entry);
 
 	printk( "S" );
-	mark_swapfiles(prev, MARK_SWAP_SUSPEND);
+	if (!error)
+		error = mark_swapfiles(entry);
 	printk( "|\n" );
-
-	MDELAY(1000);
-	return 0;
+	return error;
 }
+
+/**
+ *	free_pagedir - Free pages used by the page directory.
+ */
+
+static void free_pagedir_entries(void)
+{
+	int num = swsusp_info.pagedir_pages;
+	int i;
+
+	for (i = 0; i < num; i++)
+		swap_free(swsusp_info.pagedir[i]);
+}
+
+
+/**
+ *	write_pagedir - Write the array of pages holding the page directory.
+ *	@last:	Last swap entry we write (needed for header).
+ */
+
+static int write_pagedir(void)
+{
+	unsigned long addr = (unsigned long)pagedir_nosave;
+	int error = 0;
+	int n = SUSPEND_PD_PAGES(nr_copy_pages);
+	int i;
+
+	swsusp_info.pagedir_pages = n;
+	printk( "Writing pagedir (%d pages)\n", n);
+	for (i = 0; i < n && !error; i++, addr += PAGE_SIZE)
+		error = write_page(addr,&swsusp_info.pagedir[i]);
+	return error;
+}
+
+/**
+ *	write_suspend_image - Write entire image and metadata.
+ *
+ */
+
+static int write_suspend_image(void)
+{
+	int error;
+
+	init_header();
+	if ((error = data_write()))
+		goto FreeData;
+
+	if ((error = write_pagedir()))
+		goto FreePagedir;
+
+	if ((error = close_swap()))
+		goto FreePagedir;
+ Done:
+	return error;
+ FreePagedir:
+	free_pagedir_entries();
+ FreeData:
+	data_free();
+	goto Done;
+}
+
 
 #ifdef CONFIG_HIGHMEM
 struct highmem_page {
@@ -476,56 +547,85 @@ static int pfn_is_nosave(unsigned long pfn)
 	return (pfn >= nosave_begin_pfn) && (pfn < nosave_end_pfn);
 }
 
-/* if *pagedir_p != NULL it also copies the counted pages */
-static int count_and_copy_zone(struct zone *zone, struct pbe **pagedir_p)
-{
-	unsigned long zone_pfn, chunk_size, nr_copy_pages = 0;
-	struct pbe *pbe = *pagedir_p;
-	for (zone_pfn = 0; zone_pfn < zone->spanned_pages; ++zone_pfn) {
-		struct page *page;
-		unsigned long pfn = zone_pfn + zone->zone_start_pfn;
+/**
+ *	saveable - Determine whether a page should be cloned or not.
+ *	@pfn:	The page
+ *
+ *	We save a page if it's Reserved, and not in the range of pages
+ *	statically defined as 'unsaveable', or if it isn't reserved, and
+ *	isn't part of a free chunk of pages.
+ *	If it is part of a free chunk, we update @pfn to point to the last 
+ *	page of the chunk.
+ */
 
-		if (!(pfn%1000))
-			printk(".");
-		if (!pfn_valid(pfn))
-			continue;
-		page = pfn_to_page(pfn);
-		BUG_ON(PageReserved(page) && PageNosave(page));
-		if (PageNosave(page))
-			continue;
-		if (PageReserved(page) && pfn_is_nosave(pfn)) {
-			PRINTK("[nosave pfn 0x%lx]", pfn);
-			continue;
-		}
-		if ((chunk_size = is_head_of_free_region(page))) {
-			pfn += chunk_size - 1;
-			zone_pfn += chunk_size - 1;
-			continue;
-		}
-		nr_copy_pages++;
-		if (!pbe)
-			continue;
-		pbe->orig_address = (long) page_address(page);
-		/* Copy page is dangerous: it likes to mess with
-		   preempt count on specific cpus. Wrong preempt count is then copied,
-		   oops. */
-		copy_page((void *)pbe->address, (void *)pbe->orig_address);
-		pbe++;
+static int saveable(struct zone * zone, unsigned long * zone_pfn)
+{
+	unsigned long pfn = *zone_pfn + zone->zone_start_pfn;
+	unsigned long chunk_size;
+	struct page * page;
+
+	if (!pfn_valid(pfn))
+		return 0;
+
+	if (!(pfn%1000))
+		printk(".");
+	page = pfn_to_page(pfn);
+	BUG_ON(PageReserved(page) && PageNosave(page));
+	if (PageNosave(page))
+		return 0;
+	if (PageReserved(page) && pfn_is_nosave(pfn)) {
+		PRINTK("[nosave pfn 0x%lx]", pfn);
+		return 0;
 	}
-	*pagedir_p = pbe;
-	return nr_copy_pages;
+	if ((chunk_size = is_head_of_free_region(page))) {
+		*zone_pfn += chunk_size - 1;
+		return 0;
+	}
+
+	return 1;
 }
 
-static int count_and_copy_data_pages(struct pbe *pagedir_p)
+static void count_data_pages(void)
 {
-	int nr_copy_pages = 0;
 	struct zone *zone;
+	unsigned long zone_pfn;
+
+	nr_copy_pages = 0;
+
+	for_each_zone(zone) {
+		if (!is_highmem(zone)) {
+			for (zone_pfn = 0; zone_pfn < zone->spanned_pages; ++zone_pfn)
+				nr_copy_pages += saveable(zone, &zone_pfn);
+		}
+	}
+}
+
+
+static void copy_data_pages(void)
+{
+	struct zone *zone;
+	unsigned long zone_pfn;
+	struct pbe * pbe = pagedir_nosave;
+	
 	for_each_zone(zone) {
 		if (!is_highmem(zone))
-			nr_copy_pages += count_and_copy_zone(zone, &pagedir_p);
+			for (zone_pfn = 0; zone_pfn < zone->spanned_pages; ++zone_pfn) {
+				if (saveable(zone, &zone_pfn)) {
+					struct page * page;
+					page = pfn_to_page(zone_pfn + zone->zone_start_pfn);
+					pbe->orig_address = (long) page_address(page);
+					/* Copy page is dangerous: it likes to mess with
+					   preempt count on specific cpus. Wrong preempt 
+					   count is then copied, oops. 
+					*/
+					copy_page((void *)pbe->address, 
+						  (void *)pbe->orig_address);
+					pbe++;
+				}
+			}
 	}
-	return nr_copy_pages;
 }
+
 
 static void free_suspend_pagedir_zone(struct zone *zone, unsigned long pagedir)
 {
@@ -547,76 +647,156 @@ static void free_suspend_pagedir_zone(struct zone *zone, unsigned long pagedir)
 	}
 }
 
-static void free_suspend_pagedir(unsigned long this_pagedir)
+void swsusp_free(void)
 {
+	unsigned long p = (unsigned long)pagedir_save;
 	struct zone *zone;
 	for_each_zone(zone) {
 		if (!is_highmem(zone))
-			free_suspend_pagedir_zone(zone, this_pagedir);
+			free_suspend_pagedir_zone(zone, p);
 	}
-	free_pages(this_pagedir, pagedir_order);
+	free_pages(p, pagedir_order);
 }
 
-static suspend_pagedir_t *create_suspend_pagedir(int nr_copy_pages)
+
+static void calc_order(void)
 {
-	int i;
-	suspend_pagedir_t *pagedir;
-	struct pbe *p;
-	struct page *page;
+	int diff;
+	int order;
 
-	pagedir_order = get_bitmask_order(SUSPEND_PD_PAGES(nr_copy_pages));
-
-	p = pagedir = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC | __GFP_COLD, pagedir_order);
-	if (!pagedir)
-		return NULL;
-
-	page = virt_to_page(pagedir);
-	for(i=0; i < 1<<pagedir_order; i++)
-		SetPageNosave(page++);
-		
-	while(nr_copy_pages--) {
-		p->address = get_zeroed_page(GFP_ATOMIC | __GFP_COLD);
-		if (!p->address) {
-			free_suspend_pagedir((unsigned long) pagedir);
-			return NULL;
+	order = get_bitmask_order(SUSPEND_PD_PAGES(nr_copy_pages));
+	nr_copy_pages += 1 << order;
+	do {
+		diff = get_bitmask_order(SUSPEND_PD_PAGES(nr_copy_pages)) - order;
+		if (diff) {
+			order += diff;
+			nr_copy_pages += 1 << diff;
 		}
-		SetPageNosave(virt_to_page(p->address));
-		p->orig_address = 0;
-		p++;
-	}
-	return pagedir;
+	} while(diff);
+	pagedir_order = order;
 }
 
-static int prepare_suspend_processes(void)
+
+/**
+ *	alloc_pagedir - Allocate the page directory.
+ *
+ *	First, determine exactly how many contiguous pages we need, 
+ *	allocate them, then mark each 'unsavable'.
+ */
+
+static int alloc_pagedir(void)
 {
-	sys_sync();	/* Syncing needs pdflushd, so do it before stopping processes */
-	if (freeze_processes()) {
-		printk( KERN_ERR "Suspend failed: Not all processes stopped!\n" );
-		thaw_processes();
-		return 1;
-	}
+	calc_order();
+	pagedir_save = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC | __GFP_COLD, 
+							     pagedir_order);
+	if(!pagedir_save)
+		return -ENOMEM;
+	memset(pagedir_save,0,(1 << pagedir_order) * PAGE_SIZE);
+	pagedir_nosave = pagedir_save;
 	return 0;
 }
 
-/*
- * Try to free as much memory as possible, but do not OOM-kill anyone
+
+/**
+ *	alloc_image_pages - Allocate pages for the snapshot.
  *
- * Notice: all userland should be stopped at this point, or livelock is possible.
  */
-static void free_some_memory(void)
+
+static int alloc_image_pages(void)
 {
-	printk("Freeing memory: ");
-	while (shrink_all_memory(10000))
-		printk(".");
-	printk("|\n");
+	struct pbe * p;
+	int i;
+
+	for (i = 0, p = pagedir_save; i < nr_copy_pages; i++, p++) {
+		p->address = get_zeroed_page(GFP_ATOMIC | __GFP_COLD);
+		if(!p->address)
+			goto Error;
+		SetPageNosave(virt_to_page(p->address));
+	}
+	return 0;
+ Error:
+	do { 
+		if (p->address)
+			free_page(p->address);
+		p->address = 0;
+	} while (p-- > pagedir_save);
+	return -ENOMEM;
 }
 
-static int suspend_prepare_image(void)
+
+/**
+ *	enough_free_mem - Make sure we enough free memory to snapshot.
+ *
+ *	Returns TRUE or FALSE after checking the number of available 
+ *	free pages.
+ */
+
+static int enough_free_mem(void)
+{
+	if(nr_free_pages() < (nr_copy_pages + PAGES_FOR_IO)) {
+		pr_debug("swsusp: Not enough free pages: Have %d\n",
+			 nr_free_pages());
+		return 0;
+	}
+	return 1;
+}
+
+
+/**
+ *	enough_swap - Make sure we have enough swap to save the image.
+ *
+ *	Returns TRUE or FALSE after checking the total amount of swap 
+ *	space avaiable.
+ *
+ *	FIXME: si_swapinfo(&i) returns all swap devices information.
+ *	We should only consider resume_device. 
+ */
+
+static int enough_swap(void)
 {
 	struct sysinfo i;
-	unsigned int nr_needed_pages = 0;
+
+	si_swapinfo(&i);
+	if (i.freeswap < (nr_copy_pages + PAGES_FOR_IO))  {
+		pr_debug("swsusp: Not enough swap. Need %ld\n",i.freeswap);
+		return 0;
+	}
+	return 1;
+}
+
+static int swsusp_alloc(void)
+{
+	int error;
+
+	pr_debug("suspend: (pages needed: %d + %d free: %d)\n",
+		 nr_copy_pages,PAGES_FOR_IO,nr_free_pages());
 
 	pagedir_nosave = NULL;
+	if (!enough_free_mem())
+		return -ENOMEM;
+
+	if (!enough_swap())
+		return -ENOSPC;
+
+	if ((error = alloc_pagedir())) {
+		pr_debug("suspend: Allocating pagedir failed.\n");
+		return error;
+	}
+	if ((error = alloc_image_pages())) {
+		pr_debug("suspend: Allocating image pages failed.\n");
+		swsusp_free();
+		return error;
+	}
+
+	nr_copy_pages_check = nr_copy_pages;
+	pagedir_order_check = pagedir_order;
+	return 0;
+}
+
+int suspend_prepare_image(void)
+{
+	unsigned int nr_needed_pages = 0;
+
 	printk( "/critical section: ");
 #ifdef CONFIG_HIGHMEM
 	printk( "handling highmem" );
@@ -627,39 +807,18 @@ static int suspend_prepare_image(void)
 	printk(", ");
 #endif
 
-	printk("counting pages to copy" );
 	drain_local_pages();
-	nr_copy_pages = count_and_copy_data_pages(NULL);
+	count_data_pages();
+	printk("swsusp: Need to copy %u pages\n",nr_copy_pages);
 	nr_needed_pages = nr_copy_pages + PAGES_FOR_IO;
+
+	swsusp_alloc();
 	
-	printk(" (pages needed: %d+%d=%d free: %d)\n",nr_copy_pages,PAGES_FOR_IO,nr_needed_pages,nr_free_pages());
-	if(nr_free_pages() < nr_needed_pages) {
-		printk(KERN_CRIT "%sCouldn't get enough free pages, on %d pages short\n",
-		       name_suspend, nr_needed_pages-nr_free_pages());
-		root_swap = 0xFFFF;
-		return -ENOMEM;
-	}
-	si_swapinfo(&i);	/* FIXME: si_swapinfo(&i) returns all swap devices information.
-				   We should only consider resume_device. */
-	if (i.freeswap < nr_needed_pages)  {
-		printk(KERN_CRIT "%sThere's not enough swap space available, on %ld pages short\n",
-		       name_suspend, nr_needed_pages-i.freeswap);
-		return -ENOSPC;
-	}
-
-	PRINTK( "Alloc pagedir\n" ); 
-	pagedir_save = pagedir_nosave = create_suspend_pagedir(nr_copy_pages);
-	if (!pagedir_nosave) {
-		/* Pagedir is big, one-chunk allocation. It is easily possible for this allocation to fail */
-		printk(KERN_CRIT "%sCouldn't allocate continuous pagedir\n", name_suspend);
-		return -ENOMEM;
-	}
-	nr_copy_pages_check = nr_copy_pages;
-	pagedir_order_check = pagedir_order;
-
-	drain_local_pages();	/* During allocating of suspend pagedir, new cold pages may appear. Kill them */
-	if (nr_copy_pages != count_and_copy_data_pages(pagedir_nosave))	/* copy */
-		BUG();
+	/* During allocating of suspend pagedir, new cold pages may appear. 
+	 * Kill them.
+	 */
+	drain_local_pages();
+	copy_data_pages();
 
 	/*
 	 * End of critical section. From now on, we can write to memory,
@@ -671,201 +830,74 @@ static int suspend_prepare_image(void)
 	return 0;
 }
 
-static void suspend_save_image(void)
-{
-	device_resume();
 
-	lock_swapdevices();
-	write_suspend_image();
-	lock_swapdevices();	/* This will unlock ignored swap devices since writing is finished */
-
-	/* It is important _NOT_ to umount filesystems at this point. We want
-	 * them synced (in case something goes wrong) but we DO not want to mark
-	 * filesystem clean: it is not. (And it does not matter, if we resume
-	 * correctly, we'll mark system clean, anyway.)
-	 */
-}
-
-static void suspend_power_down(void)
-{
-	extern int C_A_D;
-	C_A_D = 0;
-	printk(KERN_EMERG "%s%s Trying to power down.\n", name_suspend, TEST_SWSUSP ? "Disable TEST_SWSUSP. NOT ": "");
-#ifdef CONFIG_VT
-	PRINTK(KERN_EMERG "shift_state: %04x\n", shift_state);
-	mdelay(1000);
-	if (TEST_SWSUSP ^ (!!(shift_state & (1 << KG_CTRL))))
-		machine_restart(NULL);
-	else
-#endif
-	{
-		device_suspend(3);
-		device_shutdown();
-		machine_power_off();
-	}
-
-	printk(KERN_EMERG "%sProbably not capable for powerdown. System halted.\n", name_suspend);
-	machine_halt();
-	while (1);
-	/* NOTREACHED */
-}
-
-/*
- * Magic happens here
+/* It is important _NOT_ to umount filesystems at this point. We want
+ * them synced (in case something goes wrong) but we DO not want to mark
+ * filesystem clean: it is not. (And it does not matter, if we resume
+ * correctly, we'll mark system clean, anyway.)
  */
-
-asmlinkage void do_magic_resume_1(void)
+int swsusp_write(void)
 {
-	barrier();
-	mb();
-	spin_lock_irq(&suspend_pagedir_lock);	/* Done to disable interrupts */ 
+	int error;
+	device_resume();
+	lock_swapdevices();
+	error = write_suspend_image();
+	/* This will unlock ignored swap devices since writing is finished */
+	lock_swapdevices();
+	return error;
 
-	device_power_down(3);
-	PRINTK( "Waiting for DMAs to settle down...\n");
-	mdelay(1000);	/* We do not want some readahead with DMA to corrupt our memory, right?
-			   Do it with disabled interrupts for best effect. That way, if some
-			   driver scheduled DMA, we have good chance for DMA to finish ;-). */
 }
 
-asmlinkage void do_magic_resume_2(void)
+
+extern asmlinkage int swsusp_arch_suspend(void);
+extern asmlinkage int swsusp_arch_resume(void);
+
+
+asmlinkage int swsusp_save(void)
+{
+	int error = 0;
+
+	if ((error = swsusp_swap_check()))
+		return error;
+	return suspend_prepare_image();
+}
+
+int swsusp_suspend(void)
+{
+	int error;
+	if ((error = arch_prepare_suspend()))
+		return error;
+	local_irq_disable();
+	save_processor_state();
+	error = swsusp_arch_suspend();
+	restore_processor_state();
+	local_irq_enable();
+	return error;
+}
+
+
+asmlinkage int swsusp_restore(void)
 {
 	BUG_ON (nr_copy_pages_check != nr_copy_pages);
 	BUG_ON (pagedir_order_check != pagedir_order);
-
-	__flush_tlb_global();		/* Even mappings of "global" things (vmalloc) need to be fixed */
-
-	PRINTK( "Freeing prev allocated pagedir\n" );
-	free_suspend_pagedir((unsigned long) pagedir_save);
-
-#ifdef CONFIG_HIGHMEM
-	printk( "Restoring highmem\n" );
-	restore_highmem();
-#endif
-	printk("done, devices\n");
-
-	device_power_up();
-	spin_unlock_irq(&suspend_pagedir_lock);
-	device_resume();
-
-	/* Fixme: this is too late; we should do this ASAP to avoid "infinite reboots" problem */
-	PRINTK( "Fixing swap signatures... " );
-	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
-	PRINTK( "ok\n" );
-
-#ifdef SUSPEND_CONSOLE
-	acquire_console_sem();
-	update_screen(fg_console);
-	release_console_sem();
-#endif
+	
+	/* Even mappings of "global" things (vmalloc) need to be fixed */
+	__flush_tlb_global();
+	return 0;
 }
 
-/* do_magic() is implemented in arch/?/kernel/suspend_asm.S, and basically does:
-
-	if (!resume) {
-		do_magic_suspend_1();
-		save_processor_state();
-		SAVE_REGISTERS
-		do_magic_suspend_2();
-		return;
-	}
-	GO_TO_SWAPPER_PAGE_TABLES
-	do_magic_resume_1();
-	COPY_PAGES_BACK
-	RESTORE_REGISTERS
+int swsusp_resume(void)
+{
+	int error;
+	local_irq_disable();
+	save_processor_state();
+	error = swsusp_arch_resume();
 	restore_processor_state();
-	do_magic_resume_2();
-
- */
-
-asmlinkage void do_magic_suspend_1(void)
-{
-	mb();
-	barrier();
-	BUG_ON(in_atomic());
-	spin_lock_irq(&suspend_pagedir_lock);
+	local_irq_enable();
+	return error;
 }
 
-asmlinkage void do_magic_suspend_2(void)
-{
-	int is_problem;
-	read_swapfiles();
-	device_power_down(3);
-	is_problem = suspend_prepare_image();
-	device_power_up();
-	spin_unlock_irq(&suspend_pagedir_lock);
-	if (!is_problem) {
-		kernel_fpu_end();	/* save_processor_state() does kernel_fpu_begin, and we need to revert it in order to pass in_atomic() checks */
-		BUG_ON(in_atomic());
-		suspend_save_image();
-		suspend_power_down();	/* FIXME: if suspend_power_down is commented out, console is lost after few suspends ?! */
-	}
 
-	printk(KERN_EMERG "%sSuspend failed, trying to recover...\n", name_suspend);
-	MDELAY(1000); /* So user can wait and report us messages if armageddon comes :-) */
-
-	barrier();
-	mb();
-	spin_lock_irq(&suspend_pagedir_lock);	/* Done to disable interrupts */ 
-
-	free_pages((unsigned long) pagedir_nosave, pagedir_order);
-	spin_unlock_irq(&suspend_pagedir_lock);
-
-	device_resume();
-	PRINTK( "Fixing swap signatures... " );
-	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
-	PRINTK( "ok\n" );
-}
-
-/*
- * This is main interface to the outside world. It needs to be
- * called from process context.
- */
-int software_suspend(void)
-{
-	int res;
-	if (!software_suspend_enabled)
-		return -EAGAIN;
-
-	software_suspend_enabled = 0;
-	might_sleep();
-
-	if (arch_prepare_suspend()) {
-		printk("%sArchitecture failed to prepare\n", name_suspend);
-		return -EPERM;
-	}		
-	if (pm_prepare_console())
-		printk( "%sCan't allocate a console... proceeding\n", name_suspend);
-	if (!prepare_suspend_processes()) {
-
-		/* At this point, all user processes and "dangerous"
-                   kernel threads are stopped. Free some memory, as we
-                   need half of memory free. */
-
-		free_some_memory();
-		disable_nonboot_cpus();
-		/* Save state of all device drivers, and stop them. */
-		printk("Suspending devices... ");
-		if ((res = device_suspend(3))==0) {
-			/* If stopping device drivers worked, we proceed basically into
-			 * suspend_save_image.
-			 *
-			 * do_magic(0) returns after system is resumed.
-			 *
-			 * do_magic() copies all "used" memory to "free" memory, then
-			 * unsuspends all device drivers, and writes memory to disk
-			 * using normal kernel mechanism.
-			 */
-			do_magic(0);
-		}
-		thaw_processes();
-		enable_nonboot_cpus();
-	} else
-		res = -EBUSY;
-	software_suspend_enabled = 1;
-	MDELAY(1000);
-	pm_restore_console();
-	return res;
-}
 
 /* More restore stuff */
 
@@ -874,7 +906,7 @@ int software_suspend(void)
 /*
  * Returns true if given address/order collides with any orig_address 
  */
-static int does_collide_order(suspend_pagedir_t *pagedir, unsigned long addr,
+static int __init does_collide_order(suspend_pagedir_t *pagedir, unsigned long addr,
 		int order)
 {
 	int i;
@@ -892,7 +924,7 @@ static int does_collide_order(suspend_pagedir_t *pagedir, unsigned long addr,
  * We check here that pagedir & pages it points to won't collide with pages
  * where we're going to restore from the loaded pages later
  */
-static int check_pagedir(void)
+static int __init check_pagedir(void)
 {
 	int i;
 
@@ -910,7 +942,7 @@ static int check_pagedir(void)
 	return 0;
 }
 
-static int relocate_pagedir(void)
+static int __init swsusp_pagedir_relocate(void)
 {
 	/*
 	 * We have to avoid recursion (not to overflow kernel stack),
@@ -953,7 +985,88 @@ static int relocate_pagedir(void)
 		free_pages((unsigned long)f, pagedir_order);
 	}
 	printk("|\n");
-	return ret;
+	return check_pagedir();
+}
+
+/**
+ *	Using bio to read from swap.
+ *	This code requires a bit more work than just using buffer heads
+ *	but, it is the recommended way for 2.5/2.6.
+ *	The following are to signal the beginning and end of I/O. Bios
+ *	finish asynchronously, while we want them to happen synchronously.
+ *	A simple atomic_t, and a wait loop take care of this problem.
+ */
+
+static atomic_t io_done = ATOMIC_INIT(0);
+
+static void start_io(void)
+{
+	atomic_set(&io_done,1);
+}
+
+static int end_io(struct bio * bio, unsigned int num, int err)
+{
+	atomic_set(&io_done,0);
+	return 0;
+}
+
+static void wait_io(void)
+{
+	while(atomic_read(&io_done))
+		io_schedule();
+}
+
+
+static struct block_device * resume_bdev;
+
+/**
+ *	submit - submit BIO request.
+ *	@rw:	READ or WRITE.
+ *	@off	physical offset of page.
+ *	@page:	page we're reading or writing.
+ *
+ *	Straight from the textbook - allocate and initialize the bio.
+ *	If we're writing, make sure the page is marked as dirty.
+ *	Then submit it and wait.
+ */
+
+static int submit(int rw, pgoff_t page_off, void * page)
+{
+	int error = 0;
+	struct bio * bio;
+
+	bio = bio_alloc(GFP_ATOMIC,1);
+	if (!bio)
+		return -ENOMEM;
+	bio->bi_sector = page_off * (PAGE_SIZE >> 9);
+	bio_get(bio);
+	bio->bi_bdev = resume_bdev;
+	bio->bi_end_io = end_io;
+
+	if (bio_add_page(bio, virt_to_page(page), PAGE_SIZE, 0) < PAGE_SIZE) {
+		printk("swsusp: ERROR: adding page to bio at %ld\n",page_off);
+		error = -EFAULT;
+		goto Done;
+	}
+
+	if (rw == WRITE)
+		bio_set_pages_dirty(bio);
+	start_io();
+	submit_bio(rw | (1 << BIO_RW_SYNC), bio);
+	wait_io();
+ Done:
+	bio_put(bio);
+	return error;
+}
+
+int bio_read_page(pgoff_t page_off, void * page)
+{
+	return submit(READ,page_off,page);
+}
+
+int bio_write_page(pgoff_t page_off, void * page)
+{
+	return submit(WRITE,page_off,page);
 }
 
 /*
@@ -961,275 +1074,174 @@ static int relocate_pagedir(void)
  * I really don't think that it's foolproof but more than nothing..
  */
 
-static int sanity_check_failed(char *reason)
+static const char * __init sanity_check(void)
 {
-	printk(KERN_ERR "%s%s\n", name_resume, reason);
-	return -EPERM;
+	dump_info();
+	if(swsusp_info.version_code != LINUX_VERSION_CODE)
+		return "kernel version";
+	if(swsusp_info.num_physpages != num_physpages)
+		return "memory size";
+	if (strcmp(swsusp_info.uts.sysname,system_utsname.sysname))
+		return "system type";
+	if (strcmp(swsusp_info.uts.release,system_utsname.release))
+		return "kernel release";
+	if (strcmp(swsusp_info.uts.version,system_utsname.version))
+		return "version";
+	if (strcmp(swsusp_info.uts.machine,system_utsname.machine))
+		return "machine";
+	if(swsusp_info.cpus != num_online_cpus())
+		return "number of cpus";
+	return NULL;
 }
 
-static int sanity_check(struct suspend_header *sh)
+
+static int __init check_header(void)
 {
-	if (sh->version_code != LINUX_VERSION_CODE)
-		return sanity_check_failed("Incorrect kernel version");
-	if (sh->num_physpages != num_physpages)
-		return sanity_check_failed("Incorrect memory size");
-	if (strncmp(sh->machine, system_utsname.machine, 8))
-		return sanity_check_failed("Incorrect machine type");
-	if (strncmp(sh->version, system_utsname.version, 20))
-		return sanity_check_failed("Incorrect version");
-	if (sh->num_cpus != num_online_cpus())
-		return sanity_check_failed("Incorrect number of cpus");
-	if (sh->page_size != PAGE_SIZE)
-		return sanity_check_failed("Incorrect PAGE_SIZE");
-	return 0;
+	const char * reason = NULL;
+	int error;
+
+	if ((error = bio_read_page(swp_offset(swsusp_header.swsusp_info), &swsusp_info)))
+		return error;
+
+ 	/* Is this same machine? */
+	if ((reason = sanity_check())) {
+		printk(KERN_ERR "swsusp: Resume mismatch: %s\n",reason);
+		return -EPERM;
+	}
+	nr_copy_pages = swsusp_info.image_pages;
+	return error;
 }
 
-static int bdev_read_page(struct block_device *bdev, long pos, void *buf)
+static int __init check_sig(void)
 {
-	struct buffer_head *bh;
-	BUG_ON (pos%PAGE_SIZE);
-	bh = __bread(bdev, pos/PAGE_SIZE, PAGE_SIZE);
-	if (!bh || (!bh->b_data)) {
-		return -1;
-	}
-	memcpy(buf, bh->b_data, PAGE_SIZE);	/* FIXME: may need kmap() */
-	BUG_ON(!buffer_uptodate(bh));
-	brelse(bh);
-	return 0;
-} 
+	int error;
 
-static int bdev_write_page(struct block_device *bdev, long pos, void *buf)
-{
-#if 0
-	struct buffer_head *bh;
-	BUG_ON (pos%PAGE_SIZE);
-	bh = __bread(bdev, pos/PAGE_SIZE, PAGE_SIZE);
-	if (!bh || (!bh->b_data)) {
-		return -1;
+	memset(&swsusp_header,0,sizeof(swsusp_header));
+	if ((error = bio_read_page(0,&swsusp_header)))
+		return error;
+	if (!memcmp(SWSUSP_SIG,swsusp_header.sig,10)) {
+		memcpy(swsusp_header.sig,swsusp_header.orig_sig,10);
+
+		/*
+		 * Reset swap signature now.
+		 */
+		error = bio_write_page(0,&swsusp_header);
+	} else { 
+		pr_debug(KERN_ERR "swsusp: Invalid partition type.\n");
+		return -EINVAL;
 	}
-	memcpy(bh->b_data, buf, PAGE_SIZE);	/* FIXME: may need kmap() */
-	BUG_ON(!buffer_uptodate(bh));
-	generic_make_request(WRITE, bh);
-	if (!buffer_uptodate(bh))
-		printk(KERN_CRIT "%sWarning %s: Fixing swap signatures unsuccessful...\n", name_resume, resume_file);
-	wait_on_buffer(bh);
-	brelse(bh);
-	return 0;
-#endif
-	printk(KERN_CRIT "%sWarning %s: Fixing swap signatures unimplemented...\n", name_resume, resume_file);
-	return 0;
+	if (!error)
+		pr_debug("swsusp: Signature found, resuming\n");
+	return error;
+}
+
+
+int __init verify(void)
+{
+	int error;
+
+	if (!(error = check_sig()))
+		error = check_header();
+	return error;
+}
+
+
+/**
+ *	swsusp_read_data - Read image pages from swap.
+ *
+ *	You do not need to check for overlaps, check_pagedir()
+ *	already did that.
+ */
+
+static int __init data_read(void)
+{
+	struct pbe * p;
+	int error;
+	int i;
+
+	if ((error = swsusp_pagedir_relocate()))
+		return error;
+
+	printk( "Reading image data (%d pages): ", nr_copy_pages );
+	for(i = 0, p = pagedir_nosave; i < nr_copy_pages && !error; i++, p++) {
+		if (!(i%100))
+			printk( "." );
+		error = bio_read_page(swp_offset(p->swap_address),
+				  (void *)p->address);
+	}
+	printk(" %d done.\n",i);
+	return error;
+
 }
 
 extern dev_t __init name_to_dev_t(const char *line);
 
-static int __init __read_suspend_image(struct block_device *bdev, union diskpage *cur, int noresume)
+static int __init read_pagedir(void)
 {
-	swp_entry_t next;
-	int i, nr_pgdir_pages;
+	unsigned long addr;
+	int i, n = swsusp_info.pagedir_pages;
+	int error = 0;
 
-#define PREPARENEXT \
-	{	next = cur->link.next; \
-		next.val = swp_offset(next) * PAGE_SIZE; \
-        }
+	pagedir_order = get_bitmask_order(n);
 
-	if (bdev_read_page(bdev, 0, cur)) return -EIO;
-
-	if ((!memcmp("SWAP-SPACE",cur->swh.magic.magic,10)) ||
-	    (!memcmp("SWAPSPACE2",cur->swh.magic.magic,10))) {
-		printk(KERN_ERR "%sThis is normal swap space\n", name_resume );
-		return -EINVAL;
-	}
-
-	PREPARENEXT; /* We have to read next position before we overwrite it */
-
-	if (!memcmp("S1",cur->swh.magic.magic,2))
-		memcpy(cur->swh.magic.magic,"SWAP-SPACE",10);
-	else if (!memcmp("S2",cur->swh.magic.magic,2))
-		memcpy(cur->swh.magic.magic,"SWAPSPACE2",10);
-	else {
-		if (noresume)
-			return -EINVAL;
-		panic("%sUnable to find suspended-data signature (%.10s - misspelled?\n", 
-			name_resume, cur->swh.magic.magic);
-	}
-	if (noresume) {
-		/* We don't do a sanity check here: we want to restore the swap
-		   whatever version of kernel made the suspend image;
-		   We need to write swap, but swap is *not* enabled so
-		   we must write the device directly */
-		printk("%s: Fixing swap signatures %s...\n", name_resume, resume_file);
-		bdev_write_page(bdev, 0, cur);
-	}
-
-	printk( "%sSignature found, resuming\n", name_resume );
-	MDELAY(1000);
-
-	if (bdev_read_page(bdev, next.val, cur)) return -EIO;
-	if (sanity_check(&cur->sh)) 	/* Is this same machine? */	
-		return -EPERM;
-	PREPARENEXT;
-
-	pagedir_save = cur->sh.suspend_pagedir;
-	nr_copy_pages = cur->sh.num_pbes;
-	nr_pgdir_pages = SUSPEND_PD_PAGES(nr_copy_pages);
-	pagedir_order = get_bitmask_order(nr_pgdir_pages);
-
-	pagedir_nosave = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC, pagedir_order);
-	if (!pagedir_nosave)
+	addr =__get_free_pages(GFP_ATOMIC, pagedir_order);
+	if (!addr)
 		return -ENOMEM;
+	pagedir_nosave = (struct pbe *)addr;
 
-	PRINTK( "%sReading pagedir, ", name_resume );
+	pr_debug("pmdisk: Reading pagedir (%d Pages)\n",n);
 
-	/* We get pages in reverse order of saving! */
-	for (i=nr_pgdir_pages-1; i>=0; i--) {
-		BUG_ON (!next.val);
-		cur = (union diskpage *)((char *) pagedir_nosave)+i;
-		if (bdev_read_page(bdev, next.val, cur)) return -EIO;
-		PREPARENEXT;
+	for (i = 0; i < n && !error; i++, addr += PAGE_SIZE) {
+		unsigned long offset = swp_offset(swsusp_info.pagedir[i]);
+		if (offset)
+			error = bio_read_page(offset, (void *)addr);
+		else
+			error = -EFAULT;
 	}
-	BUG_ON (next.val);
-
-	if (relocate_pagedir())
-		return -ENOMEM;
-	if (check_pagedir())
-		return -ENOMEM;
-
-	printk( "Reading image data (%d pages): ", nr_copy_pages );
-	for(i=0; i < nr_copy_pages; i++) {
-		swp_entry_t swap_address = (pagedir_nosave+i)->swap_address;
-		if (!(i%100))
-			printk( "." );
-		/* You do not need to check for overlaps...
-		   ... check_pagedir already did this work */
-		if (bdev_read_page(bdev, swp_offset(swap_address) * PAGE_SIZE, (char *)((pagedir_nosave+i)->address)))
-			return -EIO;
-	}
-	printk( "|\n" );
-	return 0;
+	if (error)
+		free_pages((unsigned long)pagedir_nosave,pagedir_order);
+	return error;
 }
 
-static int __init read_suspend_image(const char * specialfile, int noresume)
+static int __init read_suspend_image(void)
 {
-	union diskpage *cur;
-	unsigned long scratch_page = 0;
-	int error;
-	char b[BDEVNAME_SIZE];
+	int error = 0;
 
-	resume_device = name_to_dev_t(specialfile);
-	scratch_page = get_zeroed_page(GFP_ATOMIC);
-	cur = (void *) scratch_page;
-	if (cur) {
-		struct block_device *bdev;
-		printk("Resuming from device %s\n",
-				__bdevname(resume_device, b));
-		bdev = open_by_devnum(resume_device, FMODE_READ);
-		if (IS_ERR(bdev)) {
-			error = PTR_ERR(bdev);
-		} else {
-			set_blocksize(bdev, PAGE_SIZE);
-			error = __read_suspend_image(bdev, cur, noresume);
-			blkdev_put(bdev);
-		}
-	} else error = -ENOMEM;
-
-	if (scratch_page)
-		free_page(scratch_page);
-	switch (error) {
-		case 0:
-			PRINTK("Reading resume file was successful\n");
-			break;
-		case -EINVAL:
-			break;
-		case -EIO:
-			printk( "%sI/O error\n", name_resume);
-			break;
-		case -ENOENT:
-			printk( "%s%s: No such file or directory\n", name_resume, specialfile);
-			break;
-		case -ENOMEM:
-			printk( "%sNot enough memory\n", name_resume);
-			break;
-		default:
-			printk( "%sError %d resuming\n", name_resume, error );
+	if ((error = verify()))
+		return error;
+	if ((error = read_pagedir()))
+		return error;
+	if ((error = data_read())) {
+		free_pages((unsigned long)pagedir_nosave,pagedir_order);
 	}
-	MDELAY(1000);
 	return error;
 }
 
 /**
- *	software_resume - Resume from a saved image.
- *
- *	Called as a late_initcall (so all devices are discovered and 
- *	initialized), we call swsusp to see if we have a saved image or not.
- *	If so, we quiesce devices, then restore the saved image. We will 
- *	return above (in pm_suspend_disk() ) if everything goes well. 
- *	Otherwise, we fail gracefully and return to the normally 
- *	scheduled program.
- *
+ *	pmdisk_read - Read saved image from swap.
  */
-static int __init software_resume(void)
+
+int __init swsusp_read(void)
 {
-	if (num_online_cpus() > 1) {
-		printk(KERN_WARNING "Software Suspend has malfunctioning SMP support. Disabled :(\n");	
-		return -EINVAL;
-	}
-	/* We enable the possibility of machine suspend */
-	software_suspend_enabled = 1;
-	if (!resume_status)
-		return 0;
+	int error;
 
-	printk( "%s", name_resume );
-	if (resume_status == NORESUME) {
-		if(resume_file[0])
-			read_suspend_image(resume_file, 1);
-		printk( "disabled\n" );
-		return 0;
-	}
-	MDELAY(1000);
+	if (!strlen(resume_file))
+		return -ENOENT;
 
-	if (pm_prepare_console())
-		printk("swsusp: Can't allocate a console... proceeding\n");
+	resume_device = name_to_dev_t(resume_file);
+	pr_debug("swsusp: Resume From Partition: %s\n", resume_file);
 
-	if (!resume_file[0] && resume_status == RESUME_SPECIFIED) {
-		printk( "suspension device unspecified\n" );
-		return -EINVAL;
-	}
+	resume_bdev = open_by_devnum(resume_device, FMODE_READ);
+	if (!IS_ERR(resume_bdev)) {
+		set_blocksize(resume_bdev, PAGE_SIZE);
+		error = read_suspend_image();
+		blkdev_put(resume_bdev);
+	} else
+		error = PTR_ERR(resume_bdev);
 
-	printk( "resuming from %s\n", resume_file);
-	if (read_suspend_image(resume_file, 0))
-		goto read_failure;
-	/* FIXME: Should we stop processes here, just to be safer? */
-	disable_nonboot_cpus();
-	device_suspend(3);
-	do_magic(1);
-	panic("This never returns");
-
-read_failure:
-	pm_restore_console();
-	return 0;
+	if (!error)
+		pr_debug("Reading resume file was successful\n");
+	else
+		pr_debug("pmdisk: Error %d resuming\n", error);
+	return error;
 }
-
-late_initcall(software_resume);
-
-static int __init resume_setup(char *str)
-{
-	if (resume_status == NORESUME)
-		return 1;
-
-	strncpy( resume_file, str, 255 );
-	resume_status = RESUME_SPECIFIED;
-
-	return 1;
-}
-
-static int __init noresume_setup(char *str)
-{
-	resume_status = NORESUME;
-	return 1;
-}
-
-__setup("noresume", noresume_setup);
-__setup("resume=", resume_setup);
-
-EXPORT_SYMBOL(software_suspend);
-EXPORT_SYMBOL(software_suspend_enabled);

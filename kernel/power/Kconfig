@@ -42,33 +42,12 @@ config SOFTWARE_SUSPEND
 
 	  For more information take a look at Documentation/power/swsusp.txt.
 
-config PM_DISK
-	bool "Suspend-to-Disk Support"
-	depends on PM && SWAP && X86 && !X86_64
-	---help---
-	  Suspend-to-disk is a power management state in which the contents
-	  of memory are stored on disk and the entire system is shut down or
-	  put into a low-power state (e.g. ACPI S4). When the computer is 
-	  turned back on, the stored image is loaded from disk and execution
-	  resumes from where it left off before suspending. 
-
-	  This config option enables the core infrastructure necessary to 
-	  perform the suspend and resume transition. 
-
-	  Currently, this suspend-to-disk implementation is based on a forked
-	  version of the swsusp code base. As such, it's still experimental,
-	  and still relies on CONFIG_SWAP. 
-
-	  More information can be found in Documentation/power/.
-
-	  If unsure, Say N.
-
-config PM_DISK_PARTITION
+config PM_STD_PARTITION
 	string "Default resume partition"
-	depends on PM_DISK
+	depends on SOFTWARE_SUSPEND
 	default ""
 	---help---
-	  The default resume partition is the partition that the pmdisk suspend-
+	  The default resume partition is the partition that the suspend-
 	  to-disk implementation will look for a suspended disk image. 
 
 	  The partition specified here will be different for almost every user. 
@@ -77,15 +56,9 @@ config PM_DISK_PARTITION
 
 	  The partition specified can be overridden by specifying:
 
-		pmdisk=/dev/<other device> 
+		resume=/dev/<other device> 
 
 	  which will set the resume partition to the device specified. 
-
-	  One may also do: 
-
-		pmdisk=off
-
-	  to inform the kernel not to perform a resume transition. 
 
 	  Note there is currently not a way to specify which device to save the
 	  suspended image to. It will simply pick the first available swap 
