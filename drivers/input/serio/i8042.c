@@ -29,22 +29,28 @@ MODULE_DESCRIPTION("i8042 keyboard and mouse controller driver");
 MODULE_LICENSE("GPL");
 
 static unsigned int i8042_noaux;
-module_param(i8042_noaux, bool, 0);
+module_param_named(noaux, i8042_noaux, bool, 0);
+MODULE_PARM_DESC(noaux, "Do not probe or use AUX (mouse) port.");
 
 static unsigned int i8042_nomux;
-module_param(i8042_nomux, bool, 0);
+module_param_named(nomux, i8042_nomux, bool, 0);
+MODULE_PARM_DESC(nomux, "Do not check whether an active multiplexing conrtoller is present.");
 
 static unsigned int i8042_unlock;
-module_param(i8042_unlock, bool, 0);
+module_param_named(unlock, i8042_unlock, bool, 0);
+MODULE_PARM_DESC(unlock, "Ignore keyboard lock.");
 
 static unsigned int i8042_reset;
-module_param(i8042_reset, bool, 0);
+module_param_named(reset, i8042_reset, bool, 0);
+MODULE_PARM_DESC(reset, "Reset controller during init and cleanup.");
 
 static unsigned int i8042_direct;
-module_param(i8042_direct, bool, 0);
+module_param_named(direct, i8042_direct, bool, 0);
+MODULE_PARM_DESC(direct, "Put keyboard port into non-translated mode.");
 
 static unsigned int i8042_dumbkbd;
-module_param(i8042_dumbkbd, bool, 0);
+module_param_named(dumbkbd, i8042_dumbkbd, bool, 0);
+MODULE_PARM_DESC(dumbkbd, "Pretend that controller can only read data from keyboard");
 
 #undef DEBUG
 #include "i8042.h"
