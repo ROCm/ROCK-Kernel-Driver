@@ -527,7 +527,7 @@ static inline request_queue_t *bdev_get_queue(struct block_device *bdev)
 
 static inline void blk_run_backing_dev(struct backing_dev_info *bdi)
 {
-	if (bdi)
+	if (bdi && bdi->unplug_io_fn)
 		bdi->unplug_io_fn(bdi);
 }
 

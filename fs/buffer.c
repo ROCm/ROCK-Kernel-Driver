@@ -2939,7 +2939,10 @@ EXPORT_SYMBOL(try_to_free_buffers);
 
 int block_sync_page(struct page *page)
 {
-	blk_run_address_space(page->mapping);
+	struct address_space *mapping;
+	smp_mb();
+	mapping = page->mapping;
+	blk_run_address_space(mapping);
 	return 0;
 }
 
