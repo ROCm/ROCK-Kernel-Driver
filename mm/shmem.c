@@ -1986,6 +1986,8 @@ static int shmem_fill_super(struct super_block *sb,
 		sbinfo->free_inodes = inodes;
 	}
 	sb->s_xattr = shmem_xattr_handlers;
+#else
+	sb->s_flags |= MS_NOUSER;
 #endif
 
 	sb->s_maxbytes = SHMEM_MAX_BYTES;
