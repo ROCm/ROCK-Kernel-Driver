@@ -25,7 +25,7 @@
 #include <linux/quotaops.h>
 #include <linux/mount.h>
 
-#include "ntfs.h"
+#include "aops.h"
 #include "dir.h"
 #include "debug.h"
 #include "inode.h"
@@ -33,6 +33,7 @@
 #include "malloc.h"
 #include "mft.h"
 #include "time.h"
+#include "ntfs.h"
 
 /**
  * ntfs_test_inode - compare two (possibly fake) inodes for equality
@@ -2271,7 +2272,7 @@ int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt)
  * ntfs_truncate - called when the i_size of an ntfs inode is changed
  * @vi:		inode for which the i_size was changed
  *
- * We don't support i_size changes yet.
+ * We do not support i_size changes yet.
  *
  * The kernel guarantees that @vi is a regular file (S_ISREG() is true) and
  * that the change is allowed.
@@ -2505,9 +2506,16 @@ int ntfs_write_inode(struct inode *vi, int sync)
 	 * dirty, since we are going to write this mft record below in any case
 	 * and the base mft record may actually not have been modified so it
 	 * might not need to be written out.
+	 * NOTE: It is not a problem when the inode for $MFT itself is being
+	 * written out as mark_ntfs_record_dirty() will only set I_DIRTY_PAGES
+	 * on the $MFT inode and hence ntfs_write_inode() will not be
+	 * re-invoked because of it which in turn is ok since the dirtied mft
+	 * record will be cleaned and written out to disk below, i.e. before
+	 * this function returns.
 	 */
 	if (modified && !NInoTestSetDirty(ctx->ntfs_ino))
-		__set_page_dirty_nobuffers(ctx->ntfs_ino->page);
+		mark_ntfs_record_dirty(ctx->ntfs_ino, ctx->ntfs_ino->page,
+				ctx->ntfs_ino->page_ofs);
 	ntfs_attr_put_search_ctx(ctx);
 	/* Now the access times are updated, write the base mft record. */
 	if (NInoDirty(ni))
