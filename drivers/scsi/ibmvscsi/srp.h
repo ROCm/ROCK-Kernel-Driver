@@ -52,14 +52,15 @@ enum SRP_DESCRIPTOR_FORMATS {
 };
 
 struct memory_descriptor {
-	u64 virtual_address;
+	u32 reserved;
+	u32 virtual_address;
 	u32 memory_handle;
 	u32 length;
 };
 
 struct indirect_descriptor {
 	struct memory_descriptor head;
-	u64 total_length;
+	u32 total_length;
 	struct memory_descriptor list[1];
 };
 
