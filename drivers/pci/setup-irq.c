@@ -53,7 +53,8 @@ pdev_fixup_irq(struct pci_dev *dev,
 		irq = 0;
 	dev->irq = irq;
 
-	DBGC((KERN_ERR "PCI fixup irq: (%s) got %d\n", dev->dev.name, dev->irq));
+	DBGC((KERN_ERR "PCI fixup irq: (%s) got %d\n", 
+		dev->dev.kobj.name, dev->irq));
 
 	/* Always tell the device, so the driver knows what is
 	   the real IRQ to use; the device does not use it. */
