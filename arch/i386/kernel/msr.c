@@ -115,9 +115,13 @@ static void msr_smp_rdmsr(void *cmd_block)
 static inline int do_wrmsr(int cpu, u32 reg, u32 eax, u32 edx)
 {
   struct msr_command cmd;
+  int ret;
 
+  preempt_disable();
   if ( cpu == smp_processor_id() ) {
-    return wrmsr_eio(reg, eax, edx);
+    ret = wrmsr_eio(reg, eax, edx);
+    preempt_enable();
+    return ret;
   } else {
     cmd.cpu = cpu;
     cmd.reg = reg;
@@ -125,6 +129,7 @@ static inline int do_wrmsr(int cpu, u32 reg, u32 eax, u32 edx)
     cmd.data[1] = edx;
     
     smp_call_function(msr_smp_wrmsr, &cmd, 1, 1);
+    preempt_enable();
     return cmd.err;
   }
 }

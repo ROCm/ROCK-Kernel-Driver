@@ -897,6 +897,7 @@ enum pci_board_num_t {
 
 	pbn_b0_bt_1_460800,
 	pbn_b0_bt_2_460800,
+	pbn_b0_bt_4_460800,
 
 	pbn_b0_bt_1_921600,
 	pbn_b0_bt_2_921600,
@@ -1036,6 +1037,12 @@ static struct pci_board pci_boards[] __devinitdata = {
 	[pbn_b0_bt_2_460800] = {
 		.flags		= FL_BASE0|FL_BASE_BARS,
 		.num_ports	= 2,
+		.base_baud	= 460800,
+		.uart_offset	= 8,
+	},
+	[pbn_b0_bt_4_460800] = {
+		.flags		= FL_BASE0|FL_BASE_BARS,
+		.num_ports	= 4,
 		.base_baud	= 460800,
 		.uart_offset	= 8,
 	},
@@ -1928,6 +1935,12 @@ static struct pci_device_id serial_pci_tbl[] __devinitdata = {
 	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_QUATRO_B,
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
 		pbn_b0_bt_2_115200 },
+	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_OCTO_A,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_b0_bt_4_460800 },
+	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_OCTO_B,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+		pbn_b0_bt_4_460800 },
 	{	PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_PORT_PLUS,
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
 		pbn_b0_bt_2_460800 },

@@ -784,7 +784,8 @@ struct dentry * d_alloc_root(struct inode * root_inode)
 	struct dentry *res = NULL;
 
 	if (root_inode) {
-		res = d_alloc(NULL, &(const struct qstr) { "/", 1, 0 });
+		static const struct qstr name = { .name = "/", .len = 1, .hash = 0 };
+		res = d_alloc(NULL, &name);
 		if (res) {
 			res->d_sb = root_inode->i_sb;
 			res->d_parent = res;
@@ -994,12 +995,12 @@ struct dentry * d_lookup(struct dentry * parent, struct qstr * name)
 		/*
 		 * If dentry is moved, fail the lookup
 		 */ 
-		if (unlikely(move_count != dentry->d_move_count)) 
-			break;
-		if (!d_unhashed(dentry)) {
-			atomic_inc(&dentry->d_count);
-			dentry->d_vfs_flags |= DCACHE_REFERENCED;
-			found = dentry;
+		if (likely(move_count == dentry->d_move_count)) {
+			if (!d_unhashed(dentry)) {
+				atomic_inc(&dentry->d_count);
+				dentry->d_vfs_flags |= DCACHE_REFERENCED;
+				found = dentry;
+			}
 		}
 		spin_unlock(&dentry->d_lock);
 		break;

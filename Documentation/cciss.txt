@@ -9,6 +9,10 @@ This driver is known to work with the following cards:
 	* SA 5i 
 	* SA 532
 	* SA 5312
+	* SA 641
+	* SA 642
+	* SA 6400
+	* SA 6400 U320 Expansion Module
 
 If nodes are not already created in the /dev/cciss directory
 

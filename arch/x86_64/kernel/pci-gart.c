@@ -419,6 +419,7 @@ static __init int init_k8_gatt(agp_kern_info *info)
 		panic("Cannot allocate GATT table"); 
 	memset(gatt, 0, gatt_size); 
 	change_page_attr(virt_to_page(gatt), gatt_size/PAGE_SIZE, PAGE_KERNEL_NOCACHE);
+	global_flush_tlb();
 	agp_gatt_table = gatt;
 	
 	for_all_nb(dev) { 

@@ -70,6 +70,7 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/genhd.h>
 #include <asm/bitops.h>
 #include "internal.h"
 
@@ -266,6 +267,18 @@ void devfs_dealloc_devnum(umode_t mode, dev_t devnum)
 	up(&device_list_mutex);
 }
 
+struct unique_numspace
+{
+    spinlock_t init_lock;
+    unsigned char sem_initialised;
+    unsigned int num_free;          /*  Num free in bits       */
+    unsigned int length;            /*  Array length in bytes  */
+    unsigned long *bits;
+    struct semaphore semaphore;
+};
+
+#define UNIQUE_NUMBERSPACE_INITIALISER {SPIN_LOCK_UNLOCKED, 0, 0, 0, NULL}
+
 
 /**
  *	devfs_alloc_unique_number - Allocate a unique (positive) number.
@@ -339,3 +352,82 @@ void devfs_dealloc_unique_number (struct unique_numspace *space, int number)
     if (!was_set) PRINTK ("(): number %d was already free\n", number);
 }   /*  End Function devfs_dealloc_unique_number  */
 EXPORT_SYMBOL(devfs_dealloc_unique_number);
+
+static struct unique_numspace disc_numspace = UNIQUE_NUMBERSPACE_INITIALISER;
+static struct unique_numspace cdrom_numspace = UNIQUE_NUMBERSPACE_INITIALISER;
+
+void devfs_create_partitions(struct gendisk *dev)
+{
+	int pos = 0;
+	devfs_handle_t dir;
+	char dirname[64], symlink[16];
+
+	if (dev->flags & GENHD_FL_DEVFS) {
+		dir = dev->de;
+		if (!dir)  /*  Aware driver wants to block disc management  */
+			return;
+		pos = devfs_generate_path(dir, dirname + 3, sizeof dirname-3);
+		if (pos < 0)
+			return;
+		strncpy(dirname + pos, "../", 3);
+	} else {
+		/*  Unaware driver: construct "real" directory  */
+		sprintf(dirname, "../%s/disc%d", dev->disk_name,
+			dev->first_minor >> dev->minor_shift);
+		dir = devfs_mk_dir(dirname + 3);
+		dev->de = dir;
+	}
+	dev->number = devfs_alloc_unique_number (&disc_numspace);
+	sprintf(symlink, "discs/disc%d", dev->number);
+	devfs_mk_symlink(symlink, dirname + pos);
+	dev->disk_de = devfs_register(dir, "disc", 0,
+			    dev->major, dev->first_minor,
+			    S_IFBLK | S_IRUSR | S_IWUSR, dev->fops, NULL);
+}
+
+void devfs_create_cdrom(struct gendisk *dev)
+{
+	char vname[23];
+
+	dev->number = devfs_alloc_unique_number(&cdrom_numspace);
+	sprintf(vname, "cdroms/cdrom%d", dev->number);
+	if (dev->de) {
+		int pos;
+		char rname[64];
+
+		dev->disk_de = devfs_register(dev->de, "cd", DEVFS_FL_DEFAULT,
+				     dev->major, dev->first_minor,
+				     S_IFBLK | S_IRUGO | S_IWUGO,
+				     dev->fops, NULL);
+
+		pos = devfs_generate_path(dev->disk_de, rname+3, sizeof(rname)-3);
+		if (pos >= 0) {
+			strncpy(rname + pos, "../", 3);
+			devfs_mk_symlink(vname, rname + pos);
+		}
+	} else {
+		dev->disk_de = devfs_register (NULL, vname, DEVFS_FL_DEFAULT,
+				    dev->major, dev->first_minor,
+				    S_IFBLK | S_IRUGO | S_IWUGO,
+				    dev->fops, NULL);
+	}
+}
+
+void devfs_remove_partitions(struct gendisk *dev)
+{
+	devfs_unregister(dev->disk_de);
+	dev->disk_de = NULL;
+
+	if (dev->flags & GENHD_FL_CD) {
+		if (dev->de)
+			devfs_remove("cdroms/cdrom%d", dev->number);
+		devfs_dealloc_unique_number(&cdrom_numspace, dev->number);
+	} else {
+		devfs_remove("discs/disc%d", dev->number);
+		if (!(dev->flags & GENHD_FL_DEVFS)) {
+			devfs_unregister(dev->de);
+			dev->de = NULL;
+		}
+		devfs_dealloc_unique_number(&disc_numspace, dev->number);
+	}
+}

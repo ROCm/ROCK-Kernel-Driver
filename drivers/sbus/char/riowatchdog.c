@@ -1,4 +1,4 @@
-/* $Id: riowatchdog.c,v 1.3 2001/10/08 22:19:51 davem Exp $
+/* $Id: riowatchdog.c,v 1.3.2.2 2002/01/23 18:48:02 davem Exp $
  * riowatchdog.c - driver for hw watchdog inside Super I/O of RIO
  *
  * Copyright (C) 2001 David S. Miller (davem@redhat.com)
@@ -127,8 +127,11 @@ static int riowd_release(struct inode *inode, struct file *filp)
 static int riowd_ioctl(struct inode *inode, struct file *filp,
 		       unsigned int cmd, unsigned long arg)
 {
-	static struct watchdog_info info = { 0, 0, "Natl. Semiconductor PC97317" };
+	static struct watchdog_info info = {
+	       	WDIOF_SETTIMEOUT, 0, "Natl. Semiconductor PC97317"
+	};
 	unsigned int options;
+	int new_margin;
 
 	switch (cmd) {
 	case WDIOC_GETSUPPORT:
@@ -158,6 +161,18 @@ static int riowd_ioctl(struct inode *inode, struct file *filp,
 			return -EINVAL;
 
 		break;
+
+	case WDIOC_SETTIMEOUT:
+		if (get_user(new_margin, (int *)arg))
+			return -EFAULT;
+		if ((new_margin < 60) || (new_margin > (255 * 60)))
+		    return -EINVAL;
+		riowd_timeout = (new_margin + 59) / 60;
+		riowd_pingtimer();
+		/* Fall */
+
+	case WDIOC_GETTIMEOUT:
+		return put_user(riowd_timeout * 60, (int *)arg);
 
 	default:
 		return -EINVAL;

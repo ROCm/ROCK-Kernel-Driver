@@ -64,6 +64,7 @@ static inline void do_cpuid(int cpu, u32 reg, u32 *data)
 {
   struct cpuid_command cmd;
   
+  preempt_disable();
   if ( cpu == smp_processor_id() ) {
     cpuid(reg, &data[0], &data[1], &data[2], &data[3]);
   } else {
@@ -73,6 +74,7 @@ static inline void do_cpuid(int cpu, u32 reg, u32 *data)
     
     smp_call_function(cpuid_smp_cpuid, &cmd, 1, 1);
   }
+  preempt_enable();
 }
 #else /* ! CONFIG_SMP */
 

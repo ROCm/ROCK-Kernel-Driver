@@ -144,8 +144,6 @@ static int mycontrolmsg(const char *funcname,
 #define rcvcontrolmsg(priv,a,b,c,d,e,f) \
     controlmsg(priv, USB_DIR_IN, a,b,c,d,e,f)
 
-extern devfs_handle_t usb_devfs_handle; /* /dev/usb dir. */
-
 /* ----------------------------------------------------------------------- */
 
 /* Data */
@@ -294,7 +292,7 @@ brlvger_probe (struct usb_interface *intf,
 	/* protects against reentrance: once we've found a free slot
 	   we reserve it.*/
 	static DECLARE_MUTEX(reserve_sem);
-        char devfs_name[16];
+        char devfs_name[20];
 
 	actifsettings = dev->actconfig->interface->altsetting;
 
@@ -375,8 +373,8 @@ brlvger_probe (struct usb_interface *intf,
 	};
 	dbg("Display length: %d", priv->plength);
 
-	sprintf(devfs_name, "brlvger%d", priv->subminor);
-	priv->devfs = devfs_register(usb_devfs_handle, devfs_name,
+	sprintf(devfs_name, "usb/brlvger%d", priv->subminor);
+	priv->devfs = devfs_register(NULL, devfs_name,
 				     DEVFS_FL_DEFAULT, USB_MAJOR,
 				     BRLVGER_MINOR+priv->subminor,
 				     S_IFCHR |S_IRUSR|S_IWUSR |S_IRGRP|S_IWGRP,

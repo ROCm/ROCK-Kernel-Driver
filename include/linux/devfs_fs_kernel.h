@@ -20,20 +20,9 @@
 
 typedef struct devfs_entry * devfs_handle_t;
 
+struct gendisk;
+
 #ifdef CONFIG_DEVFS_FS
-
-struct unique_numspace
-{
-    spinlock_t init_lock;
-    unsigned char sem_initialised;
-    unsigned int num_free;          /*  Num free in bits       */
-    unsigned int length;            /*  Array length in bytes  */
-    unsigned long *bits;
-    struct semaphore semaphore;
-};
-
-#define UNIQUE_NUMBERSPACE_INITIALISER {SPIN_LOCK_UNLOCKED, 0, 0, 0, NULL}
-
 extern devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
 				      unsigned int flags,
 				      unsigned int major, unsigned int minor,
@@ -47,21 +36,11 @@ extern void devfs_remove(const char *fmt, ...)
 extern int devfs_generate_path (devfs_handle_t de, char *path, int buflen);
 extern int devfs_register_tape (devfs_handle_t de);
 extern void devfs_unregister_tape(int num);
-extern int devfs_alloc_unique_number (struct unique_numspace *space);
-extern void devfs_dealloc_unique_number (struct unique_numspace *space,
-					 int number);
-
+extern void devfs_create_partitions(struct gendisk *dev);
+extern void devfs_create_cdrom(struct gendisk *dev);
+extern void devfs_remove_partitions(struct gendisk *dev);
 extern void mount_devfs_fs (void);
-
 #else  /*  CONFIG_DEVFS_FS  */
-
-struct unique_numspace
-{
-    char dummy;
-};
-
-#define UNIQUE_NUMBERSPACE_INITIALISER {0}
-
 static inline devfs_handle_t devfs_register (devfs_handle_t dir,
 					     const char *name,
 					     unsigned int flags,
@@ -99,14 +78,14 @@ static inline int devfs_register_tape (devfs_handle_t de)
 static inline void devfs_unregister_tape(int num)
 {
 }
-static inline int devfs_alloc_unique_number (struct unique_numspace *space)
+static inline void devfs_create_partitions(struct gendisk *dev)
 {
-    return -1;
 }
-static inline void devfs_dealloc_unique_number (struct unique_numspace *space,
-						int number)
+static inline void devfs_create_cdrom(struct gendisk *dev)
 {
-    return;
+}
+static inline void devfs_remove_partitions(struct gendisk *dev)
+{
 }
 static inline void mount_devfs_fs (void)
 {

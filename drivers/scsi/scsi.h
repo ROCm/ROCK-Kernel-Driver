@@ -193,7 +193,7 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 #define SCSI_LOG_HLCOMPLETE_BITS          3
 #define SCSI_LOG_IOCTL_BITS               3
 
-#if CONFIG_SCSI_LOGGING
+#ifdef CONFIG_SCSI_LOGGING
 
 #define SCSI_CHECK_LOGGING(SHIFT, BITS, LEVEL, CMD)     \
 {                                                       \

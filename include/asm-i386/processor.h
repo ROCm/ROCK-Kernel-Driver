@@ -419,7 +419,7 @@ static inline void load_esp0(struct tss_struct *tss, unsigned long esp0)
 {
 	tss->esp0 = esp0;
 	/* This can only happen when SEP is enabled, no need to test "SEP"arately */
-	if (tss->ss1 != __KERNEL_CS) {
+	if ((unlikely(tss->ss1 != __KERNEL_CS))) {
 		tss->ss1 = __KERNEL_CS;
 		wrmsr(MSR_IA32_SYSENTER_CS, __KERNEL_CS, 0);
 	}
