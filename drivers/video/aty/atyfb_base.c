@@ -270,8 +270,11 @@ static unsigned long phys_size[FB_MAX] __initdata = { 0, };
 static unsigned long phys_guiregbase[FB_MAX] __initdata = { 0, };
 #endif
 
+#ifdef CONFIG_FB_ATY_GX
 static char m64n_gx[] __initdata = "mach64GX (ATI888GX00)";
 static char m64n_cx[] __initdata = "mach64CX (ATI888CX00)";
+#endif /* CONFIG_FB_ATY_GX */
+#ifdef CONFIG_FB_ATY_CT
 static char m64n_ct[] __initdata = "mach64CT (ATI264CT)";
 static char m64n_et[] __initdata = "mach64ET (ATI264ET)";
 static char m64n_vta3[] __initdata = "mach64VTA3 (ATI264VT)";
@@ -294,6 +297,7 @@ static char m64n_ltp_a[] __initdata = "3D RAGE LT PRO (AGP)";
 static char m64n_ltp_p[] __initdata = "3D RAGE LT PRO (PCI)";
 static char m64n_mob_p[] __initdata = "3D RAGE Mobility (PCI)";
 static char m64n_mob_a[] __initdata = "3D RAGE Mobility (AGP)";
+#endif /* CONFIG_FB_ATY_CT */
 
 
 static struct {
@@ -357,12 +361,16 @@ static struct {
 };
 
 static char ram_dram[] __initdata = "DRAM";
+#ifdef CONFIG_FB_ATY_GX
 static char ram_vram[] __initdata = "VRAM";
+#endif /* CONFIG_FB_ATY_GX */
+#ifdef CONFIG_FB_ATY_CT
 static char ram_edo[] __initdata = "EDO";
 static char ram_sdram[] __initdata = "SDRAM";
 static char ram_sgram[] __initdata = "SGRAM";
 static char ram_wram[] __initdata = "WRAM";
 static char ram_off[] __initdata = "OFF";
+#endif /* CONFIG_FB_ATY_CT */
 static char ram_resv[] __initdata = "RESV";
 
 #ifdef CONFIG_FB_ATY_GX
@@ -2486,9 +2494,11 @@ int __init atyfb_init(void)
 	 *  Map the video memory (physical address given) to somewhere in the
 	 *  kernel address space.
 	 */
-	info->frame_buffer = ioremap(phys_vmembase[m64_num], phys_size[m64_num]);
+	info->frame_buffer = (unsigned long)ioremap(phys_vmembase[m64_num],
+						    phys_size[m64_num]);
 	info->frame_buffer_phys = info->frame_buffer;  /* Fake! */
-	info->ati_regbase = ioremap(phys_guiregbase[m64_num], 0x10000)+0xFC00ul;
+	info->ati_regbase = (unsigned long)ioremap(phys_guiregbase[m64_num],
+						   0x10000)+0xFC00ul;
 	info->ati_regbase_phys = info->ati_regbase;  /* Fake! */
 
 	aty_st_le32(CLOCK_CNTL, 0x12345678, info);
@@ -2748,10 +2758,17 @@ static int atyfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
     aty_st_8(DAC_CNTL, i, info);
     aty_st_8(DAC_MASK, 0xff, info);
     scale = (M64_HAS(INTEGRATED) && info->current_par.crtc.bpp == 16) ? 3 : 0;
+#ifdef CONFIG_ATARI
+    out_8(&info->aty_cmap_regs->windex, regno << scale);
+    out_8(&info->aty_cmap_regs->lut, red);
+    out_8(&info->aty_cmap_regs->lut, green);
+    out_8(&info->aty_cmap_regs->lut, blue);
+#else
     writeb(regno << scale, &info->aty_cmap_regs->windex);
     writeb(red, &info->aty_cmap_regs->lut);
     writeb(green, &info->aty_cmap_regs->lut);
     writeb(blue, &info->aty_cmap_regs->lut);
+#endif
     if (regno < 16)
 	switch (info->current_par.crtc.bpp) {
 #ifdef FBCON_HAS_CFB16
