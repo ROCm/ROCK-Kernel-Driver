@@ -1,3 +1,4 @@
+
 #
 # Network device configuration
 #
@@ -213,7 +214,7 @@ config NET_ETHERNET
 	  the questions about Ethernet network cards. If unsure, say N.
 
 config MII
-	tristate "generic Media Independent Interface device support"
+	tristate "Generic Media Independent Interface device support"
 	depends on NET_ETHERNET
 	help
 	  Most ethernet controllers have MII transceiver either as an external
