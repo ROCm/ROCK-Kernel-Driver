@@ -2,7 +2,7 @@
  * volume.h - Defines for volume structures in NTFS Linux kernel driver. Part
  *	      of the Linux-NTFS project.
  *
- * Copyright (c) 2001,2002 Anton Altaparmakov.
+ * Copyright (c) 2001-2004 Anton Altaparmakov.
  * Copyright (c) 2002 Richard Russon.
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -10,13 +10,13 @@
  * by the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * This program/include file is distributed in the hope that it will be 
- * useful, but WITHOUT ANY WARRANTY; without even the implied warranty 
+ * This program/include file is distributed in the hope that it will be
+ * useful, but WITHOUT ANY WARRANTY; without even the implied warranty
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program (in the main directory of the Linux-NTFS 
+ * along with this program (in the main directory of the Linux-NTFS
  * distribution in the file COPYING); if not, write to the Free Software
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
@@ -25,6 +25,7 @@
 #define _LINUX_NTFS_VOLUME_H
 
 #include "types.h"
+#include "layout.h"
 
 /*
  * The NTFS in memory super block structure.
@@ -83,13 +84,17 @@ typedef struct {
 					   bits in mft bitmap. */
 
 	struct inode *mftmirr_ino;	/* The VFS inode of $MFTMirr. */
+	int mftmirr_size;		/* Size of mft mirror in mft records. */
+
 	struct inode *lcnbmp_ino;	/* The VFS inode of $Bitmap. */
 	struct rw_semaphore lcnbmp_lock; /* Lock for serializing accesses to the
 					    cluster bitmap ($Bitmap/$DATA). */
+
 	struct inode *vol_ino;		/* The VFS inode of $Volume. */
-	unsigned long vol_flags;	/* Volume flags (VOLUME_*). */
+	VOLUME_FLAGS vol_flags;		/* Volume flags (VOLUME_*). */
 	u8 major_ver;			/* Ntfs major version of volume. */
 	u8 minor_ver;			/* Ntfs minor version of volume. */
+
 	struct inode *root_ino;		/* The VFS inode of the root
 					   directory. */
 	struct inode *secure_ino;	/* The VFS inode of $Secure (NTFS3.0+
@@ -133,4 +138,3 @@ NVOL_FNS(ShowSystemFiles)
 NVOL_FNS(CaseSensitive)
 
 #endif /* _LINUX_NTFS_VOLUME_H */
-

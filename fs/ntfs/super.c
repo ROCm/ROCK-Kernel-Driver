@@ -9,13 +9,13 @@
  * by the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * This program/include file is distributed in the hope that it will be 
- * useful, but WITHOUT ANY WARRANTY; without even the implied warranty 
+ * This program/include file is distributed in the hope that it will be
+ * useful, but WITHOUT ANY WARRANTY; without even the implied warranty
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program (in the main directory of the Linux-NTFS 
+ * along with this program (in the main directory of the Linux-NTFS
  * distribution in the file COPYING); if not, write to the Free Software
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
@@ -102,7 +102,7 @@ static BOOL parse_options(ntfs_volume *vol, char *opt)
 			if (*v)						\
 				goto needs_val;				\
 		}							\
-	} 
+	}
 #define NTFS_GETOPT(option, variable)					\
 	if (!strcmp(p, option)) {					\
 		if (!v || !*v)						\
@@ -110,14 +110,14 @@ static BOOL parse_options(ntfs_volume *vol, char *opt)
 		variable = simple_strtoul(ov = v, &v, 0);		\
 		if (*v)							\
 			goto needs_val;					\
-	} 
+	}
 #define NTFS_GETOPT_BOOL(option, variable)				\
 	if (!strcmp(p, option)) {					\
 		BOOL val;						\
 		if (!simple_getbool(v, &val))				\
 			goto needs_bool;				\
 		variable = val;						\
-	} 
+	}
 #define NTFS_GETOPT_OPTIONS_ARRAY(option, variable, opt_array)		\
 	if (!strcmp(p, option)) {					\
 		int _i;							\
@@ -400,7 +400,7 @@ static BOOL is_boot_sector_ntfs(const struct super_block *sb,
 			le32_to_cpu(b->bpb.large_sectors) || b->bpb.fats)
 		goto not_ntfs;
 	/* Check clusters per file mft record value is valid. */
-	if ((u8)b->clusters_per_mft_record < 0xe1 || 
+	if ((u8)b->clusters_per_mft_record < 0xe1 ||
 			(u8)b->clusters_per_mft_record > 0xf7)
 		switch (b->clusters_per_mft_record) {
 		case 1: case 2: case 4: case 8: case 16: case 32: case 64:
@@ -409,7 +409,7 @@ static BOOL is_boot_sector_ntfs(const struct super_block *sb,
 			goto not_ntfs;
 		}
 	/* Check clusters per index block value is valid. */
-	if ((u8)b->clusters_per_index_record < 0xe1 || 
+	if ((u8)b->clusters_per_index_record < 0xe1 ||
 			(u8)b->clusters_per_index_record > 0xf7)
 		switch (b->clusters_per_index_record) {
 		case 1: case 2: case 4: case 8: case 16: case 32: case 64:
@@ -529,7 +529,7 @@ hotfix_primary_boot_sector:
  * parse_ntfs_boot_sector - parse the boot sector and store the data in @vol
  * @vol:	volume structure to initialise with data from boot sector
  * @b:		boot sector to parse
- * 
+ *
  * Parse the ntfs boot sector @b and store all imporant information therein in
  * the ntfs super block @vol. Return TRUE on success and FALSE on error.
  */
@@ -592,10 +592,10 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 	ntfs_debug("vol->mft_record_size_mask = 0x%x",
 			vol->mft_record_size_mask);
 	ntfs_debug("vol->mft_record_size_bits = %i (0x%x)",
-			vol->mft_record_size_bits, vol->mft_record_size_bits); 
+			vol->mft_record_size_bits, vol->mft_record_size_bits);
 	clusters_per_index_record = b->clusters_per_index_record;
 	ntfs_debug("clusters_per_index_record = %i (0x%x)",
-			clusters_per_index_record, clusters_per_index_record); 
+			clusters_per_index_record, clusters_per_index_record);
 	if (clusters_per_index_record > 0)
 		vol->index_record_size = vol->cluster_size <<
 				(ffs(clusters_per_index_record) - 1);
@@ -610,7 +610,7 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 	vol->index_record_size_mask = vol->index_record_size - 1;
 	vol->index_record_size_bits = ffs(vol->index_record_size) - 1;
 	ntfs_debug("vol->index_record_size = %i (0x%x)",
-			vol->index_record_size, vol->index_record_size); 
+			vol->index_record_size, vol->index_record_size);
 	ntfs_debug("vol->index_record_size_mask = 0x%x",
 			vol->index_record_size_mask);
 	ntfs_debug("vol->index_record_size_bits = %i (0x%x)",
@@ -657,6 +657,20 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 	}
 	vol->mftmirr_lcn = ll;
 	ntfs_debug("vol->mftmirr_lcn = 0x%Lx", (long long)vol->mftmirr_lcn);
+	/*
+	 * Work out the size of the mft mirror in number of mft records. If the
+	 * cluster size is less than or equal to the size taken by four mft
+	 * records, the mft mirror stores the first four mft records. If the
+	 * cluster size is bigger than the size taken by four mft records, the
+	 * mft mirror contains as many mft records as will fit into one
+	 * cluster.
+	 */
+	if (vol->cluster_size <= (4 << vol->mft_record_size_bits))
+		vol->mftmirr_size = 4;
+	else
+		vol->mftmirr_size = vol->cluster_size >>
+				vol->mft_record_size_bits;
+	ntfs_debug("vol->mftmirr_size = %i", vol->mftmirr_size);
 	vol->serial_no = le64_to_cpu(b->volume_serial_number);
 	ntfs_debug("vol->serial_no = 0x%Lx",
 			(unsigned long long)vol->serial_no);
@@ -920,7 +934,7 @@ get_ctx_vol_failed:
 	/*
 	 * Get the inode for the attribute definitions file and parse the
 	 * attribute definitions.
-	 */ 
+	 */
 	tmp_ino = ntfs_iget(sb, FILE_AttrDef);
 	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
 		if (!IS_ERR(tmp_ino))
@@ -1321,24 +1335,36 @@ struct super_operations ntfs_mount_sops = {
 struct super_operations ntfs_sops = {
 	.alloc_inode	= ntfs_alloc_big_inode,	  /* VFS: Allocate new inode. */
 	.destroy_inode	= ntfs_destroy_big_inode, /* VFS: Deallocate inode. */
-	//.dirty_inode	= ntfs_dirty_inode,	  /* VFS: Called from
-	//					     __mark_inode_dirty(). */
-	//.write_inode	= NULL,		  /* VFS: Write dirty inode to disk. */
-	.put_inode	= ntfs_put_inode, /* VFS: Called just before the inode
-					     reference count is decreased. */
-	//.delete_inode	= NULL,		  /* VFS: Delete inode from disk. Called
-	//				     when i_count becomes 0 and i_nlink
-	//				     is also 0. */
-	.put_super	= ntfs_put_super, /* Syscall: umount. */
-	//write_super	= NULL,		  /* Flush dirty super block to disk. */
-	//write_super_lockfs	= NULL,	  /* ? */
-	//unlockfs	= NULL,		  /* ? */
-	.statfs		= ntfs_statfs,	  /* Syscall: statfs */
-	.remount_fs	= ntfs_remount,	  /* Syscall: mount -o remount. */
+	.put_inode	= ntfs_put_inode,	  /* VFS: Called just before
+						     the inode reference count
+						     is decreased. */
+#ifdef NTFS_RW
+	//.dirty_inode	= NULL,			/* VFS: Called from
+	//					   __mark_inode_dirty(). */
+	//.write_inode	= NULL,			/* VFS: Write dirty inode to
+	//					   disk. */
+	//.drop_inode	= NULL,			/* VFS: Called just after the
+	//					   inode reference count has
+	//					   been decreased to zero.
+	//					   NOTE: The inode lock is
+	//					   held. See fs/inode.c::
+	//					   generic_drop_inode(). */
+	//.delete_inode	= NULL,			/* VFS: Delete inode from disk.
+	//					   Called when i_count becomes
+	//					   0 and i_nlink is also 0. */
+	//.write_super	= NULL,			/* Flush dirty super block to
+	//					   disk. */
+	//.write_super_lockfs	= NULL,		/* ? */
+	//.unlockfs	= NULL,			/* ? */
+#endif
+	.put_super	= ntfs_put_super,	/* Syscall: umount. */
+	.statfs		= ntfs_statfs,		/* Syscall: statfs */
+	.remount_fs	= ntfs_remount,		/* Syscall: mount -o remount. */
 	.clear_inode	= ntfs_clear_big_inode,	/* VFS: Called when an inode is
 						   removed from memory. */
-	//.umount_begin	= NULL,		     /* Forced umount. */
-	.show_options	= ntfs_show_options, /* Show mount options in proc. */
+	//.umount_begin	= NULL,			/* Forced umount. */
+	.show_options	= ntfs_show_options,	/* Show mount options in
+						   proc. */
 };
 
 
@@ -1474,7 +1500,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 			ntfs_error(sb, "Not an NTFS volume.");
 		goto err_out_now;
 	}
-	
+
 	/*
 	 * Extract the data from the boot sector and setup the ntfs super block
 	 * using it.
@@ -1489,7 +1515,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 		goto err_out_now;
 	}
 
-	/* 
+	/*
 	 * TODO: When we start coping with sector sizes different from
 	 * NTFS_BLOCK_SIZE, we now probably need to set the blocksize of the
 	 * device (probably to NTFS_BLOCK_SIZE).
@@ -1500,7 +1526,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 
 	/*
 	 * Ntfs allows 63 bits for the file size, i.e. correct would be:
-	 * 	sb->s_maxbytes = ~0ULL >> 1;
+	 *	sb->s_maxbytes = ~0ULL >> 1;
 	 * But the kernel uses a long as the page cache page index which on
 	 * 32-bit architectures is only 32-bits. MAX_LFS_FILESIZE is kernel
 	 * defined to the maximum the page cache page index can cope with
@@ -1757,7 +1783,7 @@ static int __init init_ntfs_fs(void)
 	}
 
 	ntfs_inode_cache = kmem_cache_create(ntfs_inode_cache_name,
-			sizeof(ntfs_inode), 0, 
+			sizeof(ntfs_inode), 0,
 			SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT, NULL, NULL);
 	if (!ntfs_inode_cache) {
 		printk(KERN_CRIT "NTFS: Failed to create %s!\n",
@@ -1766,7 +1792,7 @@ static int __init init_ntfs_fs(void)
 	}
 
 	ntfs_big_inode_cache = kmem_cache_create(ntfs_big_inode_cache_name,
-			sizeof(big_ntfs_inode), 0, 
+			sizeof(big_ntfs_inode), 0,
 			SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 			ntfs_big_inode_init_once, NULL);
 	if (!ntfs_big_inode_cache) {
