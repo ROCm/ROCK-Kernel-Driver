@@ -107,7 +107,7 @@ static int sg_emulated_host(request_queue_t *q, int *p)
 
 static int sg_io(request_queue_t *q, struct sg_io_hdr *uptr)
 {
-	int i, err;
+	int err;
 	struct sg_io_hdr hdr;
 	struct request *rq;
 	void *buffer;
