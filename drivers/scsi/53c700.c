@@ -1998,8 +1998,11 @@ NCR_700_set_period(struct scsi_device *SDp, int period)
 	struct NCR_700_Host_Parameters *hostdata = 
 		(struct NCR_700_Host_Parameters *)SDp->host->hostdata[0];
 	
-	if(!hostdata->fast || period < hostdata->min_period)
+	if(!hostdata->fast)
 		return;
+
+	if(period < hostdata->min_period)
+		period = hostdata->min_period;
 
 	spi_period(SDp) = period;
 	NCR_700_clear_flag(SDp, NCR_700_DEV_NEGOTIATED_SYNC);
@@ -2012,11 +2015,14 @@ NCR_700_set_offset(struct scsi_device *SDp, int offset)
 {
 	struct NCR_700_Host_Parameters *hostdata = 
 		(struct NCR_700_Host_Parameters *)SDp->host->hostdata[0];
+	int max_offset = hostdata->chip710
+		? NCR_710_MAX_OFFSET : NCR_700_MAX_OFFSET;
 	
-	if(!hostdata->fast ||
-	   offset > (hostdata->chip710
-		     ? NCR_710_MAX_OFFSET : NCR_700_MAX_OFFSET))
+	if(!hostdata->fast)
 		return;
+
+	if(offset > max_offset)
+		offset = max_offset;
 
 	/* if we're currently async, make sure the period is reasonable */
 	if(spi_offset(SDp) == 0 && (spi_period(SDp) < hostdata->min_period ||
@@ -2107,8 +2113,10 @@ EXPORT_SYMBOL(NCR_700_release);
 EXPORT_SYMBOL(NCR_700_intr);
 
 static struct spi_function_template NCR_700_transport_functions =  {
-	.set_period = NCR_700_set_period,
-	.set_offset = NCR_700_set_offset,
+	.set_period	= NCR_700_set_period,
+	.show_period	= 1,
+	.set_offset	= NCR_700_set_offset,
+	.show_offset	= 1,
 };
 
 static int __init NCR_700_init(void)
