@@ -12,9 +12,9 @@
 #include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/acpi.h>
+#include <linux/efi.h>
 
 #include <asm/dma.h>
-#include <asm/efi.h>
 #include <asm/iosapic.h>
 
 extern acpi_status acpi_evaluate_integer (acpi_handle, acpi_string, acpi_object_list *,

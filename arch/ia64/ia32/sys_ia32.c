@@ -46,6 +46,7 @@
 #include <linux/nfsd/syscall.h>
 #include <linux/poll.h>
 #include <linux/personality.h>
+#include <linux/ptrace.h>
 #include <linux/stat.h>
 #include <linux/ipc.h>
 

@@ -65,8 +65,8 @@
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/smp.h>
+#include <linux/efi.h>
 
-#include <asm/efi.h>
 #include <asm/uaccess.h>
 
 MODULE_AUTHOR("Matt Domsch <Matt_Domsch@Dell.com>");

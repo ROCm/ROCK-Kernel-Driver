@@ -92,12 +92,12 @@
 # define IRQ_EXIT_OFFSET HARDIRQ_OFFSET
 #endif
 
-#define irq_exit()								\
-do {										\
-		preempt_count() -= IRQ_EXIT_OFFSET;				\
-		if (!in_interrupt() && softirq_pending(smp_processor_id()))	\
-			do_softirq();						\
-		preempt_enable_no_resched();					\
+#define irq_exit()						\
+do {								\
+		preempt_count() -= IRQ_EXIT_OFFSET;		\
+		if (!in_interrupt() && local_softirq_pending())	\
+			do_softirq();				\
+		preempt_enable_no_resched();			\
 } while (0)
 
 #ifdef CONFIG_SMP

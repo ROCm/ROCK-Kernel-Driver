@@ -2,14 +2,13 @@
 #define _ASM_IA64_TYPES_H
 
 /*
- * This file is never included by application software unless
- * explicitly requested (e.g., via linux/types.h) in which case the
- * application is Linux specific so (user-) name space pollution is
- * not a major issue.  However, for interoperability, libraries still
+ * This file is never included by application software unless explicitly requested (e.g.,
+ * via linux/types.h) in which case the application is Linux specific so (user-) name
+ * space pollution is not a major issue.  However, for interoperability, libraries still
  * need to be careful to avoid a name clashes.
  *
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2000, 2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #ifdef __ASSEMBLY__
@@ -18,9 +17,6 @@
 #else
 # define __IA64_UL(x)		((unsigned long)(x))
 # define __IA64_UL_CONST(x)	x##UL
-#endif
-
-#ifndef __ASSEMBLY__
 
 typedef unsigned int umode_t;
 

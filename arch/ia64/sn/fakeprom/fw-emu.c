@@ -36,7 +36,7 @@
  * http://oss.sgi.com/projects/GenInfo/NoticeExplan
  */
 #include <linux/config.h>
-#include <asm/efi.h>
+#include <linux/efi.h>
 #include <asm/pal.h>
 #include <asm/sal.h>
 #include <asm/sn/sn_sal.h>

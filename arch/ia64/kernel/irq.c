@@ -802,8 +802,7 @@ static struct proc_dir_entry * irq_dir [NR_IRQS];
 
 #define HEX_DIGITS 8
 
-static unsigned int parse_hex_value (const char *buffer,
-		unsigned long count, unsigned long *ret)
+static int parse_hex_value (const char *buffer, unsigned long count, unsigned long *ret)
 {
 	unsigned char hexnum [HEX_DIGITS];
 	unsigned long value;
@@ -846,11 +845,11 @@ static struct proc_dir_entry * smp_affinity_entry [NR_IRQS];
 static unsigned long irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = ~0UL };
 static char irq_redir [NR_IRQS]; // = { [0 ... NR_IRQS-1] = 1 };
 
-void set_irq_affinity_info(int irq, int hwid, int redir)
+void set_irq_affinity_info (unsigned int irq, int hwid, int redir)
 {
 	unsigned long mask = 1UL<<cpu_logical_id(hwid);
 
-	if (irq >= 0 && irq < NR_IRQS) {
+	if (irq < NR_IRQS) {
 		irq_affinity[irq] = mask;
 		irq_redir[irq] = (char) (redir & 0xff);
 	}
@@ -861,14 +860,15 @@ static int irq_affinity_read_proc (char *page, char **start, off_t off,
 {
 	if (count < HEX_DIGITS+3)
 		return -EINVAL;
-	return sprintf (page, "%s%08lx\n", irq_redir[(long)data] ? "r " : "",
-			irq_affinity[(long)data]);
+	return sprintf (page, "%s%08lx\n", irq_redir[(unsigned long)data] ? "r " : "",
+			irq_affinity[(unsigned long)data]);
 }
 
 static int irq_affinity_write_proc (struct file *file, const char *buffer,
 					unsigned long count, void *data)
 {
-	int irq = (long) data, full_count = count, err;
+	unsigned int irq = (unsigned long) data;
+	int full_count = count, err;
 	unsigned long new_value;
 	const char *buf = buffer;
 	int redir;
@@ -884,6 +884,8 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 		redir = 0;
 
 	err = parse_hex_value(buf, count, &new_value);
+	if (err)
+		return err;
 
 	/*
 	 * Do not allow disabling IRQs completely - it's a too easy
@@ -893,7 +895,7 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	if (!(new_value & cpu_online_map))
 		return -EINVAL;
 
-	irq_desc(irq)->handler->set_affinity(irq | (redir?(1<<31):0), new_value);
+	irq_desc(irq)->handler->set_affinity(irq | (redir? IA64_IRQ_REDIRECTED : 0), new_value);
 
 	return full_count;
 }
@@ -912,7 +914,8 @@ static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
 static int prof_cpu_mask_write_proc (struct file *file, const char *buffer,
 					unsigned long count, void *data)
 {
-	unsigned long *mask = (unsigned long *) data, full_count = count, err;
+	unsigned long *mask = (unsigned long *) data;
+	int full_count = count, err;
 	unsigned long new_value;
 
 	err = parse_hex_value(buffer, count, &new_value);
@@ -946,7 +949,7 @@ static void register_irq_proc (unsigned int irq)
 
 		if (entry) {
 			entry->nlink = 1;
-			entry->data = (void *)(long)irq;
+			entry->data = (void *)(unsigned long)irq;
 			entry->read_proc = irq_affinity_read_proc;
 			entry->write_proc = irq_affinity_write_proc;
 		}

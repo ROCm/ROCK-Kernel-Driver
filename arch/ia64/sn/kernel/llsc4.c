@@ -17,7 +17,7 @@
 #include <linux/mm.h>
 #include <linux/delay.h>
 #include <linux/string.h>
-#include <asm/efi.h>
+#include <linux/efi.h>
 #include <asm/page.h>
 #include <linux/threads.h>
 #include <asm/sn/simulator.h>
