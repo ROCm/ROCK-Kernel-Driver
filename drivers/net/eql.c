@@ -600,7 +600,7 @@ static int __init eql_init_module(void)
 
 	err = register_netdev(dev_eql);
 	if (err) 
-		kfree(dev_eql);
+		free_netdev(dev_eql);
 	return err;
 }
 

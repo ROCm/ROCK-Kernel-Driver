@@ -726,8 +726,6 @@ static int wanrouter_device_new_if(struct wan_device *wandev,
 
 		if (dev->name == NULL) {
 			err = -EINVAL;
-		} else if (dev_get(dev->name)) {
-			err = -EEXIST;	/* name already exists */
 		} else {
 
 			#ifdef WANDEBUG

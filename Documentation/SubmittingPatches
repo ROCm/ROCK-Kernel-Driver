@@ -241,7 +241,7 @@ Let the compiler optimize away the "no-op" case.
 
 Simple example, of poor code:
 
-	dev = init_etherdev (NULL, 0);
+	dev = alloc_etherdev (sizeof(struct funky_private));
 	if (!dev)
 		return -ENODEV;
 	#ifdef CONFIG_NET_FUNKINESS
@@ -256,7 +256,7 @@ Cleaned-up example:
 	#endif
 
 (in the code itself)
-	dev = init_etherdev (NULL, 0);
+	dev = alloc_etherdev (sizeof(struct funky_private));
 	if (!dev)
 		return -ENODEV;
 	init_funky_net(dev);

@@ -40,63 +40,62 @@
    ethernet adaptor have the name "eth[0123...]".
    */
 
-extern int ne2_probe(struct net_device *dev);
-extern int hp100_probe(struct net_device *dev);
-extern int ultra_probe(struct net_device *dev);
-extern int ultra32_probe(struct net_device *dev);
-extern int wd_probe(struct net_device *dev);
-extern int el2_probe(struct net_device *dev);
-extern int ne_probe(struct net_device *dev);
-extern int hp_probe(struct net_device *dev);
-extern int hp_plus_probe(struct net_device *dev);
-extern int express_probe(struct net_device *);
-extern int eepro_probe(struct net_device *);
-extern int at1500_probe(struct net_device *);
-extern int at1700_probe(struct net_device *);
-extern int fmv18x_probe(struct net_device *);
-extern int eth16i_probe(struct net_device *);
-extern int i82596_probe(struct net_device *);
-extern int ewrk3_probe(struct net_device *);
-extern int el1_probe(struct net_device *);
-extern int wavelan_probe(struct net_device *);
-extern int arlan_probe(struct net_device *);
-extern int el16_probe(struct net_device *);
-extern int elmc_probe(struct net_device *);
-extern int skmca_probe(struct net_device *);
-extern int elplus_probe(struct net_device *);
-extern int ac3200_probe(struct net_device *);
-extern int es_probe(struct net_device *);
-extern int lne390_probe(struct net_device *);
-extern int e2100_probe(struct net_device *);
-extern int ni5010_probe(struct net_device *);
-extern int ni52_probe(struct net_device *);
-extern int ni65_probe(struct net_device *);
-extern int sonic_probe(struct net_device *);
-extern int SK_init(struct net_device *);
-extern int seeq8005_probe(struct net_device *);
-extern int smc_init( struct net_device * );
-extern int atarilance_probe(struct net_device *);
-extern int sun3lance_probe(struct net_device *);
-extern int sun3_82586_probe(struct net_device *);
-extern int apne_probe(struct net_device *);
-extern int bionet_probe(struct net_device *);
-extern int pamsnet_probe(struct net_device *);
-extern int cs89x0_probe(struct net_device *dev);
-extern int hplance_probe(struct net_device *dev);
-extern int bagetlance_probe(struct net_device *);
-extern int mvme147lance_probe(struct net_device *dev);
-extern int tc515_probe(struct net_device *dev);
-extern int lance_probe(struct net_device *dev);
-extern int mace_probe(struct net_device *dev);
-extern int macsonic_probe(struct net_device *dev);
-extern int mac8390_probe(struct net_device *dev);
-extern int mac89x0_probe(struct net_device *dev);
-extern int mc32_probe(struct net_device *dev);
+extern struct net_device *ne2_probe(int unit);
+extern struct net_device *hp100_probe(int unit);
+extern struct net_device *ultra_probe(int unit);
+extern struct net_device *ultra32_probe(int unit);
+extern struct net_device *wd_probe(int unit);
+extern struct net_device *el2_probe(int unit);
+extern struct net_device *ne_probe(int unit);
+extern struct net_device *hp_probe(int unit);
+extern struct net_device *hp_plus_probe(int unit);
+extern struct net_device *express_probe(int unit);
+extern struct net_device *eepro_probe(int unit);
+extern struct net_device *at1700_probe(int unit);
+extern struct net_device *fmv18x_probe(int unit);
+extern struct net_device *eth16i_probe(int unit);
+extern struct net_device *i82596_probe(int unit);
+extern struct net_device *ewrk3_probe(int unit);
+extern struct net_device *el1_probe(int unit);
+extern struct net_device *wavelan_probe(int unit);
+extern struct net_device *arlan_probe(int unit);
+extern struct net_device *el16_probe(int unit);
+extern struct net_device *elmc_probe(int unit);
+extern struct net_device *skmca_probe(int unit);
+extern struct net_device *elplus_probe(int unit);
+extern struct net_device *ac3200_probe(int unit);
+extern struct net_device *es_probe(int unit);
+extern struct net_device *lne390_probe(int unit);
+extern struct net_device *e2100_probe(int unit);
+extern struct net_device *ni5010_probe(int unit);
+extern struct net_device *ni52_probe(int unit);
+extern struct net_device *ni65_probe(int unit);
+extern struct net_device *sonic_probe(int unit);
+extern struct net_device *SK_init(int unit);
+extern struct net_device *seeq8005_probe(int unit);
+extern struct net_device *smc_init(int unit);
+extern struct net_device *atarilance_probe(struct net_device *);
+extern struct net_device *sun3lance_probe(int unit);
+extern struct net_device *sun3_82586_probe(int unit);
+extern struct net_device *apne_probe(int unit);
+extern struct net_device *bionet_probe(int unit);
+extern struct net_device *pamsnet_probe(int unit);
+extern struct net_device *cs89x0_probe(int unit);
+extern struct net_device *hplance_probe(int unit);
+extern struct net_device *bagetlance_probe(int unit);
+extern struct net_device *mvme147lance_probe(int unit);
+extern struct net_device *tc515_probe(int unit);
+extern struct net_device *lance_probe(int unit);
+extern struct net_device *mace_probe(struct net_device *dev);
+extern struct net_device *macsonic_probe(int unit);
+extern struct net_device *mac8390_probe(int unit);
+extern struct net_device *mac89x0_probe(int unit);
+extern struct net_device *mc32_probe(int unit);
 extern struct net_device *cops_probe(int unit);
 extern struct net_device *ltpc_probe(void);
   
 /* Detachable devices ("pocket adaptors") */
-extern int de620_probe(struct net_device *);
+extern struct net_device *de620_probe(int unit);
 
 /* Fibre Channel adapters */
 extern int iph5526_probe(struct net_device *dev);
@@ -104,33 +103,22 @@ extern int iph5526_probe(struct net_device *dev);
 /* SBNI adapters */
 extern int sbni_probe(int unit);
 
-struct devprobe
-{
-	int (*probe)(struct net_device *dev);
+struct devprobe2 {
+	struct net_device *(*probe)(int unit);
 	int status;	/* non-zero if autoprobe has failed */
 };
 
-/*
- * probe_list walks a list of probe functions and calls each so long
- * as a non-zero ioaddr is given, or as long as it hasn't already failed 
- * to find a card in the past (as recorded by "status") when asked to
- * autoprobe (i.e. a probe that fails to find a card when autoprobing
- * will not be asked to autoprobe again).  It exits when a card is found.
- */
-static int __init probe_list(struct net_device *dev, struct devprobe *plist)
+static int __init probe_list2(int unit, struct devprobe2 *p, int autoprobe)
 {
-	struct devprobe *p = plist;
-	unsigned long base_addr = dev->base_addr;
-
-	while (p->probe != NULL) {
-		if (base_addr && p->probe(dev) == 0) 	/* probe given addr */
+	struct net_device *dev;
+	for (; p->probe; p++) {
+		if (autoprobe && p->status)
+			continue;
+		dev = p->probe(unit);
+		if (!IS_ERR(dev))
 			return 0;
-		else if (p->status == 0) {		/* has autoprobe failed yet? */
-			p->status = p->probe(dev);	/* no, try autoprobe */
-			if (p->status == 0)
-				return 0;
-		}
-		p++;
+		if (autoprobe)
+			p->status = PTR_ERR(dev);
 	}
 	return -ENODEV;
 }
@@ -141,7 +129,8 @@ static int __init probe_list(struct net_device *dev, struct devprobe *plist)
  * drivers that probe for EISA cards (in the ISA group).  These are the
  * legacy EISA only driver probes, and also the legacy PCI probes
  */
-static struct devprobe eisa_probes[] __initdata = {
+
+static struct devprobe2 eisa_probes[] __initdata = {
 #ifdef CONFIG_ULTRA32 
 	{ultra32_probe, 0},	
 #endif
@@ -157,8 +146,7 @@ static struct devprobe eisa_probes[] __initdata = {
 	{NULL, 0},
 };
 
-
-static struct devprobe mca_probes[] __initdata = {
+static struct devprobe2 mca_probes[] __initdata = {
 #ifdef CONFIG_NE2_MCA
 	{ne2_probe, 0},
 #endif
@@ -178,7 +166,7 @@ static struct devprobe mca_probes[] __initdata = {
  * ISA probes that touch addresses < 0x400 (including those that also
  * look for EISA/PCI/MCA cards in addition to ISA cards).
  */
-static struct devprobe isa_probes[] __initdata = {
+static struct devprobe2 isa_probes[] __initdata = {
 #ifdef CONFIG_HP100 		/* ISA, EISA & PCI */
 	{hp100_probe, 0},
 #endif	
@@ -214,9 +202,6 @@ static struct devprobe isa_probes[] __initdata = {
 #endif
 #ifdef CONFIG_SEEQ8005 
 	{seeq8005_probe, 0},
-#endif
-#ifdef CONFIG_AT1500
-	{at1500_probe, 0},
 #endif
 #ifdef CONFIG_CS89x0
  	{cs89x0_probe, 0},
@@ -272,14 +257,14 @@ static struct devprobe isa_probes[] __initdata = {
 	{NULL, 0},
 };
 
-static struct devprobe parport_probes[] __initdata = {
+static struct devprobe2 parport_probes[] __initdata = {
 #ifdef CONFIG_DE620		/* D-Link DE-620 adapter */
 	{de620_probe, 0},
 #endif
 	{NULL, 0},
 };
 
-static struct devprobe m68k_probes[] __initdata = {
+static struct devprobe2 m68k_probes[] __initdata = {
 #ifdef CONFIG_ATARILANCE	/* Lance-based Atari ethernet boards */
 	{atarilance_probe, 0},
 #endif
@@ -319,7 +304,7 @@ static struct devprobe m68k_probes[] __initdata = {
 	{NULL, 0},
 };
 
-static struct devprobe mips_probes[] __initdata = {
+static struct devprobe2 mips_probes[] __initdata = {
 #ifdef CONFIG_MIPS_JAZZ_SONIC
 	{sonic_probe, 0},
 #endif
@@ -334,51 +319,40 @@ static struct devprobe mips_probes[] __initdata = {
  * per bus interface. This drives the legacy devices only for now.
  */
  
-static int __init ethif_probe(int unit)
+static void __init ethif_probe2(int unit)
 {
-	struct net_device *dev;
-	int err = -ENODEV;
+	unsigned long base_addr = netdev_boot_base("eth", unit);
 
-	dev = alloc_etherdev(0);
-	if (!dev)
-		return -ENOMEM;
+	if (base_addr == 1)
+		return;
 
-	sprintf(dev->name, "eth%d", unit);
-	netdev_boot_setup_check(dev);
-
-	/* 
-	 * Backwards compatibility - historically an I/O base of 1 was 
-	 * used to indicate not to probe for this ethN interface 
-	 */
-	if (__dev_get_by_name(dev->name) || dev->base_addr == 1) {
-		free_netdev(dev);
-		return -ENXIO;
-	}
-
-	/* 
-	 * The arch specific probes are 1st so that any on-board ethernet
-	 * will be probed before other ISA/EISA/MCA/PCI bus cards.
-	 */
-	if (probe_list(dev, m68k_probes) == 0 ||
-	    probe_list(dev, mips_probes) == 0 ||
-	    probe_list(dev, eisa_probes) == 0 ||
-	    probe_list(dev, mca_probes) == 0 ||
-	    probe_list(dev, isa_probes) == 0 ||
-	    probe_list(dev, parport_probes) == 0) 
-		err = register_netdev(dev);
-
-	if (err)
-		free_netdev(dev);
-	return err;
-
+	probe_list2(unit, m68k_probes, base_addr == 0) &&
+	probe_list2(unit, mips_probes, base_addr == 0) &&
+	probe_list2(unit, eisa_probes, base_addr == 0) &&
+	probe_list2(unit, mca_probes, base_addr == 0) &&
+	probe_list2(unit, isa_probes, base_addr == 0) &&
+	probe_list2(unit, parport_probes, base_addr == 0);
 }
 
 #ifdef CONFIG_TR
 /* Token-ring device probe */
 extern int ibmtr_probe(struct net_device *);
-extern int sk_isa_probe(struct net_device *);
-extern int proteon_probe(struct net_device *);
-extern int smctr_probe(struct net_device *);
+extern struct net_device *sk_isa_probe(int unit);
+extern struct net_device *proteon_probe(int unit);
+extern struct net_device *smctr_probe(int unit);
+
+static struct devprobe2 tr_probes2[] __initdata = {
+#ifdef CONFIG_SKISA
+	{sk_isa_probe, 0},
+#endif
+#ifdef CONFIG_PROTEON
+	{proteon_probe, 0},
+#endif
+#ifdef CONFIG_SMCTR
+	{smctr_probe, 0},
+#endif
+	{NULL, 0},
+};
 
 static __init int trif_probe(int unit)
 {
@@ -395,15 +369,6 @@ static __init int trif_probe(int unit)
 #ifdef CONFIG_IBMTR
 	    ibmtr_probe(dev) == 0  ||
 #endif
-#ifdef CONFIG_SKISA
-	    sk_isa_probe(dev) == 0 || 
-#endif
-#ifdef CONFIG_PROTEON
-	    proteon_probe(dev) == 0 ||
-#endif
-#ifdef CONFIG_SMCTR
-	    smctr_probe(dev) == 0 ||
-#endif
 	    0 ) 
 		err = register_netdev(dev);
 		
@@ -411,6 +376,15 @@ static __init int trif_probe(int unit)
 		free_netdev(dev);
 	return err;
 
+}
+
+static void __init trif_probe2(int unit)
+{
+	unsigned long base_addr = netdev_boot_base("tr", unit);
+
+	if (base_addr == 1)
+		return;
+	probe_list2(unit, tr_probes2, base_addr == 0);
 }
 #endif
 
@@ -437,10 +411,11 @@ static int __init net_olddevs_init(void)
 #endif
 #ifdef CONFIG_TR
 	for (num = 0; num < 8; ++num)
-		trif_probe(num);
+		if (!trif_probe(num))
+			trif_probe2(num);
 #endif
 	for (num = 0; num < 8; ++num)
-		ethif_probe(num);
+		ethif_probe2(num);
 
 #ifdef CONFIG_COPS
 	cops_probe(0);

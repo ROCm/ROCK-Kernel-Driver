@@ -57,7 +57,7 @@ static const char version[] =
 #include <asm/io.h>
 #include <asm/dma.h>
 
-static int fmv18x_probe_list[] __initdata = {
+static unsigned fmv18x_probe_list[] __initdata = {
 	0x220, 0x240, 0x260, 0x280, 0x2a0, 0x2c0, 0x300, 0x340, 0
 };
 
@@ -109,8 +109,6 @@ struct net_local {
 
 /* Index to functions, as function prototypes. */
 
-extern int fmv18x_probe(struct net_device *dev);
-
 static int fmv18x_probe1(struct net_device *dev, short ioaddr);
 static int net_open(struct net_device *dev);
 static int net_send_packet(struct sk_buff *skb, struct net_device *dev);
@@ -129,23 +127,50 @@ static void set_multicast_list(struct net_device *dev);
    (detachable devices only).
    */
 
-int __init fmv18x_probe(struct net_device *dev)
+static int io = 0x220;
+static int irq;
+
+struct net_device * __init fmv18x_probe(int unit)
 {
-	int i;
-	int base_addr = dev->base_addr;
+	struct net_device *dev = alloc_etherdev(sizeof(struct net_local));
+	unsigned *port;
+	int err = 0;
+
+	if (!dev)
+		return ERR_PTR(-ENODEV);
+
+	if (unit >= 0) {
+		sprintf(dev->name, "eth%d", unit);
+		netdev_boot_setup_check(dev);
+		io = dev->base_addr;
+		irq = dev->irq;
+	}
 
 	SET_MODULE_OWNER(dev);
 
-	if (base_addr > 0x1ff)		/* Check a single specified location. */
-		return fmv18x_probe1(dev, base_addr);
-	else if (base_addr != 0)	/* Don't probe at all. */
-		return -ENXIO;
-
-	for (i = 0; fmv18x_probe_list[i]; i++)
-		if (fmv18x_probe1(dev, fmv18x_probe_list[i]) == 0)
-			return 0;
-
-	return -ENODEV;
+	if (io > 0x1ff) {	/* Check a single specified location. */
+		err = fmv18x_probe1(dev, io);
+	} else if (io != 0) {	/* Don't probe at all. */
+		err = -ENXIO;
+	} else {
+		for (port = fmv18x_probe_list; *port; port++)
+			if (fmv18x_probe1(dev, *port) == 0)
+				break;
+		if (!*port)
+			err = -ENODEV;
+	}
+	if (err)
+		goto out;
+	err = register_netdev(dev);
+	if (err)
+		goto out1;
+	return dev;
+out1:
+	free_irq(dev->irq, dev);
+	release_region(dev->base_addr, FMV18X_IO_EXTENT);
+out:
+	free_netdev(dev);
+	return ERR_PTR(err);
 }
 
 /* The Fujitsu datasheet suggests that the NIC be probed for by checking its
@@ -160,7 +185,7 @@ static int __init fmv18x_probe1(struct net_device *dev, short ioaddr)
 {
 	char irqmap[4] = {3, 7, 10, 15};
 	char irqmap_pnp[8] = {3, 4, 5, 7, 9, 10, 11, 15};
-	unsigned int i, irq, retval;
+	unsigned int i, retval;
 	struct net_local *lp;
 
 	/* Resetting the chip doesn't reset the ISA interface, so don't bother.
@@ -169,6 +194,9 @@ static int __init fmv18x_probe1(struct net_device *dev, short ioaddr)
 
 	if (!request_region(ioaddr, FMV18X_IO_EXTENT, dev->name))
 		return -EBUSY;
+
+	dev->irq = irq;
+	dev->base_addr = ioaddr;
 
 	/* Check I/O address configuration and Fujitsu vendor code */
 	if (inb(ioaddr+FJ_MACADDR  ) != 0x00
@@ -181,9 +209,8 @@ static int __init fmv18x_probe1(struct net_device *dev, short ioaddr)
 	/* Check PnP mode for FMV-183/184/183A/184A. */
 	/* This PnP routine is very poor. IO and IRQ should be known. */
 	if (inb(ioaddr + FJ_STATUS1) & 0x20) {
-		irq = dev->irq;
 		for (i = 0; i < 8; i++) {
-			if (irq == irqmap_pnp[i])
+			if (dev->irq == irqmap_pnp[i])
 				break;
 		}
 		if (i == 8) {
@@ -193,22 +220,19 @@ static int __init fmv18x_probe1(struct net_device *dev, short ioaddr)
 	} else {
 		if (fmv18x_probe_list[inb(ioaddr + FJ_CONFIG0) & 0x07] != ioaddr)
 			return -ENODEV;
-		irq = irqmap[(inb(ioaddr + FJ_CONFIG0)>>6) & 0x03];
+		dev->irq = irqmap[(inb(ioaddr + FJ_CONFIG0)>>6) & 0x03];
 	}
 
 	/* Snarf the interrupt vector now. */
-	retval = request_irq(irq, &net_interrupt, 0, dev->name, dev);
+	retval = request_irq(dev->irq, &net_interrupt, 0, dev->name, dev);
 	if (retval) {
 		printk ("FMV-18x found at %#3x, but it's unusable due to a conflict on"
-				"IRQ %d.\n", ioaddr, irq);
+				"IRQ %d.\n", ioaddr, dev->irq);
 		goto out;
 	}
 
 	printk("%s: FMV-18x found at %#3x, IRQ %d, address ", dev->name,
-		   ioaddr, irq);
-
-	dev->base_addr = ioaddr;
-	dev->irq = irq;
+		   ioaddr, dev->irq);
 
 	for(i = 0; i < 6; i++) {
 		unsigned char val = inb(ioaddr + FJ_MACADDR + i);
@@ -279,14 +303,10 @@ static int __init fmv18x_probe1(struct net_device *dev, short ioaddr)
 	dev->watchdog_timeo	= HZ/10;
 	dev->get_stats		= net_get_stats;
 	dev->set_multicast_list = set_multicast_list;
-
-	/* Fill in the fields of 'dev' with ethernet-generic values. */
-
-	ether_setup(dev);
 	return 0;
 
 out_irq:
-	free_irq(irq, dev);
+	free_irq(dev->irq, dev);
 out:
 	release_region(ioaddr, FMV18X_IO_EXTENT);
 	return retval;
@@ -413,9 +433,7 @@ static int net_send_packet(struct sk_buff *skb, struct net_device *dev)
 		lp->tx_queue_len = 0;
 		dev->trans_start = jiffies;
 		lp->tx_started = 1;
-	} else if (lp->tx_queue_len < 4096 - 1502)
-		/* Yes, there is room for one more packet. */
-	else
+	} else if (lp->tx_queue_len >= 4096 - 1502) /* No room for a packet */
 		netif_stop_queue(dev);
 
 	dev_kfree_skb(skb);
@@ -628,9 +646,7 @@ static void set_multicast_list(struct net_device *dev)
 }
 
 #ifdef MODULE
-static struct net_device dev_fmv18x;
-static int io = 0x220;
-static int irq;
+static struct net_device *dev_fmv18x;
 
 MODULE_PARM(io, "i");
 MODULE_PARM(irq, "i");
@@ -644,26 +660,19 @@ int init_module(void)
 {
 	if (io == 0)
 		printk("fmv18x: You should not use auto-probing with insmod!\n");
-	dev_fmv18x.base_addr	= io;
-	dev_fmv18x.irq		= irq;
-	dev_fmv18x.init		= fmv18x_probe;
-	if (register_netdev(&dev_fmv18x) != 0) {
-		printk("fmv18x: register_netdev() returned non-zero.\n");
-		return -EIO;
-	}
+	dev_fmv18x = fmv18x_probe(-1);
+	if (IS_ERR(dev_fmv18x))
+		return PTR_ERR(dev_fmv18x);
 	return 0;
 }
 
 void
 cleanup_module(void)
 {
-	unregister_netdev(&dev_fmv18x);
-	kfree(dev_fmv18x.priv);
-	dev_fmv18x.priv = NULL;
-
-	/* If we don't do this, we can't re-insmod it later. */
-	free_irq(dev_fmv18x.irq, &dev_fmv18x);
-	release_region(dev_fmv18x.base_addr, FMV18X_IO_EXTENT);
+	unregister_netdev(dev_fmv18x);
+	free_irq(dev_fmv18x->irq, dev_fmv18x);
+	release_region(dev_fmv18x->base_addr, FMV18X_IO_EXTENT);
+	free_netdev(dev_fmv18x);
 }
 #endif /* MODULE */
 

@@ -372,10 +372,8 @@ static int __init znet_probe (void)
 	struct znet_private *znet;
 	struct net_device *dev;
 	char *p;
+	int err = -ENOMEM;
 
-	if (znet_dev)				/* Only look for a single adaptor */
-		return -ENODEV;
-	
 	/* This code scans the region 0xf0000 to 0xfffff for a "NETIDBLK". */
 	for(p = (char *)phys_to_virt(0xf0000); p < (char *)phys_to_virt(0x100000); p++)
 		if (*p == 'N'  &&  strncmp(p, "NETIDBLK", 8) == 0)
@@ -387,12 +385,14 @@ static int __init znet_probe (void)
 		return -ENODEV;
 	}
 
-	if (!(znet_dev = dev = init_etherdev(0, sizeof(struct znet_private))))
-			return -ENOMEM;
+	dev = alloc_etherdev(sizeof(struct znet_private));
+	if (!dev)
+		return -ENOMEM;
+
+	SET_MODULE_OWNER (dev);
 
 	znet = dev->priv;
 
-	SET_MODULE_OWNER (dev);
 	netinfo = (struct netidblk *)p;
 	dev->base_addr = netinfo->iobase1;
 	dev->irq = netinfo->irq1;
@@ -430,7 +430,7 @@ static int __init znet_probe (void)
 	znet->io_size  = 2;
 
 	if (!(znet->rx_start = kmalloc (DMA_BUF_SIZE, GFP_KERNEL | GFP_DMA)))
-		goto free_netdev;
+		goto free_dev;
 	if (!(znet->tx_start = kmalloc (DMA_BUF_SIZE, GFP_KERNEL | GFP_DMA)))
 		goto free_rx;
 
@@ -452,19 +452,19 @@ static int __init znet_probe (void)
 	dev->set_multicast_list = &znet_set_multicast_list;
 	dev->tx_timeout = znet_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
-
+	err = register_netdev(dev);
+	if (err)
+		goto free_tx;
+	znet_dev = dev;
 	return 0;
 
  free_tx:
-	kfree (znet->tx_start);
+	kfree(znet->tx_start);
  free_rx:
-	kfree (znet->rx_start);
- free_netdev:
-	unregister_netdev (dev);
-	kfree (dev);
-	znet_dev = NULL;
-
-	return -ENOMEM;
+	kfree(znet->rx_start);
+ free_dev:
+	free_netdev(dev);
+	return err;
 }
 
 
@@ -934,16 +934,14 @@ static void update_stop_hit(short ioaddr, unsigned short rx_stop_offset)
 
 static __exit void znet_cleanup (void)
 {
-#ifdef MODULE
 	if (znet_dev) {
 		struct znet_private *znet = znet_dev->priv;
 
+		unregister_netdev (znet_dev);
 		kfree (znet->rx_start);
 		kfree (znet->tx_start);
-		unregister_netdev (znet_dev);
 		free_netdev (znet_dev);
 	}
-#endif
 }
 
 module_init (znet_probe);
