@@ -239,6 +239,7 @@ int snd_sbdsp_create(snd_card_t *card,
 	if (request_irq(irq, irq_handler, hardware == SB_HW_ALS4000 ?
 			SA_INTERRUPT | SA_SHIRQ : SA_INTERRUPT,
 			"SoundBlaster", (void *) chip)) {
+		snd_printk(KERN_ERR "sb: can't grab irq %d\n", irq);
 		snd_sbdsp_free(chip);
 		return -EBUSY;
 	}
@@ -248,12 +249,14 @@ int snd_sbdsp_create(snd_card_t *card,
 		goto __skip_allocation;
 	
 	if ((chip->res_port = request_region(port, 16, "SoundBlaster")) == NULL) {
+		snd_printk(KERN_ERR "sb: can't grab port 0x%lx\n", port);
 		snd_sbdsp_free(chip);
 		return -EBUSY;
 	}
 
 #ifdef CONFIG_ISA
 	if (dma8 >= 0 && request_dma(dma8, "SoundBlaster - 8bit")) {
+		snd_printk(KERN_ERR "sb: can't grab DMA8 %d\n", dma8);
 		snd_sbdsp_free(chip);
 		return -EBUSY;
 	}
@@ -263,6 +266,7 @@ int snd_sbdsp_create(snd_card_t *card,
 			/* no duplex */
 			dma16 = -1;
 		} else if (request_dma(dma16, "SoundBlaster - 16bit")) {
+			snd_printk(KERN_ERR "sb: can't grab DMA16 %d\n", dma16);
 			snd_sbdsp_free(chip);
 			return -EBUSY;
 		}

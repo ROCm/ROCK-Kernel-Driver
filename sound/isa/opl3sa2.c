@@ -236,8 +236,10 @@ static int __init snd_opl3sa2_detect(opl3sa2_t *chip)
 
 	card = chip->card;
 	port = chip->port;
-	if ((chip->res_port = request_region(port, 2, "OPL3-SA control")) == NULL)
+	if ((chip->res_port = request_region(port, 2, "OPL3-SA control")) == NULL) {
+		snd_printk(KERN_ERR "opl3sa2: can't grab port 0x%lx\n", port);
 		return -EBUSY;
+	}
 	// snd_printk("REG 0A = 0x%x\n", snd_opl3sa2_read(chip, 0x0a));
 	chip->version = 0;
 	tmp = snd_opl3sa2_read(chip, OPL3SA2_MISC);
@@ -771,6 +773,7 @@ static int __devinit snd_opl3sa2_probe(int dev,
 	if ((err = snd_opl3sa2_detect(chip)) < 0)
 		goto __error;
 	if (request_irq(xirq, snd_opl3sa2_interrupt, SA_INTERRUPT, "OPL3-SA2/3", (void *)chip)) {
+		snd_printk(KERN_ERR "opl3sa2: can't grab IRQ %d\n", xirq);
 		err = -ENODEV;
 		goto __error;
 	}

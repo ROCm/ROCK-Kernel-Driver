@@ -952,15 +952,18 @@ int snd_ad1848_create(snd_card_t * card,
 	memcpy(&chip->image, &snd_ad1848_original_image, sizeof(snd_ad1848_original_image));
 	
 	if ((chip->res_port = request_region(port, 4, "AD1848")) == NULL) {
+		snd_printk(KERN_ERR "ad1848: can't grab port 0x%lx\n", port);
 		snd_ad1848_free(chip);
 		return -EBUSY;
 	}
 	if (request_irq(irq, snd_ad1848_interrupt, SA_INTERRUPT, "AD1848", (void *) chip)) {
+		snd_printk(KERN_ERR "ad1848: can't grab IRQ %d\n", irq);
 		snd_ad1848_free(chip);
 		return -EBUSY;
 	}
 	chip->irq = irq;
 	if (request_dma(dma, "AD1848")) {
+		snd_printk(KERN_ERR "ad1848: can't grab DMA %d\n", dma);
 		snd_ad1848_free(chip);
 		return -EBUSY;
 	}
