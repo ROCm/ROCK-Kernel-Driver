@@ -310,7 +310,7 @@ static void ohci_rh_resume (void *_hcd)
 
 static void ohci_rh_resume (void *_hcd)
 {
-	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
+	struct ohci_hcd	*ohci = hcd_to_ohci (_hcd);
 	ohci_dbg(ohci, "rh_resume ??\n");
 }
 
