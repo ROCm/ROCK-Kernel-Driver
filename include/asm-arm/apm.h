@@ -41,7 +41,7 @@ struct apm_power_info {
 	unsigned char	ac_line_status;
 	unsigned char	battery_status;
 	unsigned char	battery_flag;
-	unsigned char	battery_life;
+	int		battery_life;
 	int		time;
 	int		units;
 };

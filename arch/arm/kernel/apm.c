@@ -433,7 +433,7 @@ static int apm_get_info(char *buf, char **start, off_t fpos, int length)
 	info.ac_line_status = 0xff;
 	info.battery_status = 0xff;
 	info.battery_flag   = 0xff;
-	info.battery_life   = 255;
+	info.battery_life   = -1;
 	info.time	    = -1;
 	info.units	    = -1;
 
