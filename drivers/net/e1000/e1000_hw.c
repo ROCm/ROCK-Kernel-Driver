@@ -1457,7 +1457,7 @@ e1000_phy_force_speed_duplex(struct e1000_hw *hw)
     if((ret_val = e1000_write_phy_reg(hw, PHY_CTRL, mii_ctrl_reg)))
         return ret_val;
 
-    usec_delay(1);
+    udelay(1);
 
     /* The wait_autoneg_complete flag may be a little misleading here.
      * Since we are forcing speed and duplex, Auto-Neg is not enabled.
