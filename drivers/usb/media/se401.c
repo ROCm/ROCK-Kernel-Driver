@@ -428,16 +428,37 @@ static void se401_auto_resetlevel(struct usb_se401 *se401)
 static void se401_button_irq(struct urb *urb)
 {
 	struct usb_se401 *se401 = urb->context;
+	int status;
 	
 	if (!se401->dev) {
 		info("ohoh: device vapourished");
 		return;
 	}
 	
-	if (urb->actual_length >=2 && !urb->status) {
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
+		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
+	}
+
+	if (urb->actual_length >=2) {
 		if (se401->button)
 			se401->buttonpressed=1;
 	}
+exit:
+	status = usb_submit_urb (urb, GFP_ATOMIC);
+	if (status)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, status);
 }
 
 static void se401_video_irq(struct urb *urb)
