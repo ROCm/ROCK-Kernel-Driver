@@ -341,6 +341,7 @@ static struct dentry * reiserfs_lookup (struct inode * dir, struct dentry * dent
             REISERFS_SB(dir->i_sb)->priv_root &&
             REISERFS_SB(dir->i_sb)->priv_root->d_inode &&
 	    de.de_objectid == le32_to_cpu (INODE_PKEY(REISERFS_SB(dir->i_sb)->priv_root->d_inode)->k_objectid)) {
+	  reiserfs_write_unlock (dir->i_sb);
 	  return ERR_PTR (-EACCES);
 	}
 
@@ -1091,6 +1092,7 @@ static int reiserfs_link (struct dentry * old_dentry, struct inode * dir, struct
 	return -EMLINK;
     }
     if (inode->i_nlink == 0) {
+        reiserfs_write_unlock(dir->i_sb);
         return -ENOENT;
     }
 
