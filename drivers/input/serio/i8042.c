@@ -63,6 +63,13 @@ module_param_named(noacpi, i8042_noacpi, bool, 0);
 MODULE_PARM_DESC(noacpi, "Do not use ACPI to detect controller settings");
 #endif
 
+#define DEBUG
+#ifdef DEBUG
+static int i8042_debug;
+module_param_named(debug, i8042_debug, bool, 600);
+MODULE_PARM_DESC(debug, "Turn i8042 debugging mode on and off");
+#endif
+
 __obsolete_setup("i8042_noaux");
 __obsolete_setup("i8042_nomux");
 __obsolete_setup("i8042_unlock");
@@ -70,7 +77,6 @@ __obsolete_setup("i8042_reset");
 __obsolete_setup("i8042_direct");
 __obsolete_setup("i8042_dumbkbd");
 
-#undef DEBUG
 #include "i8042.h"
 
 spinlock_t i8042_lock = SPIN_LOCK_UNLOCKED;
