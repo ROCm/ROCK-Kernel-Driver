@@ -3,7 +3,7 @@
 *
 * Author:	Arnaldo Carvalho de Melo <acme@conectiva.com.br>
 *
-* Copyright:	(c) 1998-2001 Arnaldo Carvalho de Melo
+* Copyright:	(c) 1998-2003 Arnaldo Carvalho de Melo
 *
 * Based on sdlamain.c by Gene Kozin <genek@compuserve.com> &
 *			 Jaspreet Singh	<jaspreet@sangoma.com>
@@ -75,7 +75,7 @@ static int shutdown(struct wan_device *wandev);
 static int ioctl(struct wan_device *wandev, unsigned cmd, unsigned long arg);
 
 /* Miscellaneous functions */
-static irqreturn_t cycx_isr (int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t cycx_isr(int irq, void *dev_id, struct pt_regs *regs);
 
 /* Global Data
  * Note: All data must be explicitly initialized!!!
@@ -103,7 +103,7 @@ static struct cycx_device *card_array;	/* adapter data space */
  *		< 0	error.
  * Context:	process
  */
-int __init cyclomx_init (void)
+int __init cyclomx_init(void)
 {
 	int cnt, err = -ENOMEM;
 
@@ -156,7 +156,7 @@ out:	return err;
  * o unregister all adapters from the WAN router
  * o release all remaining system resources
  */
-static void __exit cyclomx_cleanup (void)
+static void __exit cyclomx_cleanup(void)
 {
 	int i = 0;
 
@@ -188,7 +188,7 @@ static int setup(struct wan_device *wandev, wandev_conf_t *conf)
 	int irq;
 
 	/* Sanity checks */
-	
+
 	if (!wandev || !wandev->private || !conf)
 		goto out;
 
@@ -243,14 +243,14 @@ static int setup(struct wan_device *wandev, wandev_conf_t *conf)
 	/* Protocol-specific initialization */
 	switch (card->hw.fwid) {
 #ifdef CONFIG_CYCLOMX_X25
-		case CFID_X25_2X:
-			err = cyx_init(card, conf);
-			break;
+	case CFID_X25_2X:
+		err = cyx_init(card, conf);
+		break;
 #endif
-		default:
-			printk(KERN_ERR "%s: this firmware is not supported!\n",
-					wandev->name);
-			err = -EINVAL;
+	default:
+		printk(KERN_ERR "%s: this firmware is not supported!\n",
+				wandev->name);
+		err = -EINVAL;
 	}
 
 	if (err) {
@@ -266,7 +266,7 @@ out_irq:
 }
 
 /*
- * Shut down WAN link driver. 
+ * Shut down WAN link driver.
  * o shut down adapter hardware
  * o release system resources.
  *
@@ -296,7 +296,7 @@ out:	return ret;
 }
 
 /*
- * Driver I/O control. 
+ * Driver I/O control.
  * o verify arguments
  * o perform requested action
  *
@@ -316,7 +316,7 @@ static int ioctl(struct wan_device *wandev, unsigned cmd, unsigned long arg)
  * o acknowledge Cyclom 2X hardware interrupt.
  * o call protocol-specific interrupt service routine, if any.
  */
-static irqreturn_t cycx_isr (int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t cycx_isr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct cycx_device *card = (struct cycx_device *)dev_id;
 
@@ -345,15 +345,13 @@ void cyclomx_set_state(struct cycx_device *card, int state)
 
 	if (card->wandev.state != state) {
 		switch (state) {
-			case WAN_CONNECTED:
-				string_state = "connected!";
-				break;
-
-			case WAN_DISCONNECTED:
-				string_state = "disconnected!";
-				break;
+		case WAN_CONNECTED:
+			string_state = "connected!";
+			break;
+		case WAN_DISCONNECTED:
+			string_state = "disconnected!";
+			break;
 		}
-
 		printk(KERN_INFO "%s: link %s\n", card->devname, string_state);
 		card->wandev.state = state;
 	}
