@@ -941,7 +941,14 @@ renameRetry:
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
 		cFYI(1, ("Send error in rename = %d", rc));
+	} 
+
+#ifdef CONFIG_CIFS_STATS
+	  else {
+		atomic_inc(&tcon->num_renames);
 	}
+#endif
+
 	if (pSMB)
 		cifs_buf_release(pSMB);
 
@@ -1017,7 +1024,11 @@ int CIFSSMBRenameOpenFile(const int xid,struct cifsTconInfo *pTcon,
 	if (rc) {
 		cFYI(1,("Send error in Rename (by file handle) = %d", rc));
 	}
-
+#ifdef CONFIG_CIFS_STATS
+	  else {
+		atomic_inc(&pTcon->num_t2renames);
+	}
+#endif
 	if (pSMB)
 		cifs_buf_release(pSMB);
 
