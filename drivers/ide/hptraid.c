@@ -74,61 +74,19 @@ static struct hptraid raid[16];
 static int hptraid_ioctl(struct inode *inode, struct file *file,
 			 unsigned int cmd, unsigned long arg)
 {
-	unsigned int minor;
-	unsigned char val;
-	unsigned long sectors;
+	unsigned int minor = minor(inode->i_rdev) >> SHIFT;
+	struct hd_geometry *geometry = (struct hd_geometry *) arg;
+	struct hd_geometry g;
 
-	if (!inode || kdev_none(inode->i_rdev))
+	if (cmd != HDIO_GETGEO)
 		return -EINVAL;
 
-	minor = minor(inode->i_rdev) >> SHIFT;
-
-	switch (cmd) {
-	case BLKGETSIZE:	/* Return device size */
-		if (!arg)
-			return -EINVAL;
-		sectors =
-		    ataraid_gendisk.part[minor(inode->i_rdev)].nr_sects;
-		if (minor(inode->i_rdev) & 15)
-			return put_user(sectors, (unsigned long *) arg);
-		return put_user(raid[minor].sectors,
-				(unsigned long *) arg);
-		break;
-
-
-	case HDIO_GETGEO:
-		{
-			struct hd_geometry *loc =
-			    (struct hd_geometry *) arg;
-			unsigned short bios_cyl;
-
-			if (!loc)
-				return -EINVAL;
-			val = 255;
-			if (put_user(val, (u8 *) & loc->heads))
-				return -EFAULT;
-			val = 63;
-			if (put_user(val, (u8 *) & loc->sectors))
-				return -EFAULT;
-			bios_cyl = raid[minor].sectors / 63 / 255;
-			if (put_user
-			    (bios_cyl, (unsigned short *) &loc->cylinders))
-				return -EFAULT;
-			if (put_user
-			    ((unsigned) ataraid_gendisk.
-			     part[minor(inode->i_rdev)].start_sect,
-			     (unsigned long *) &loc->start))
-				return -EFAULT;
-			return 0;
-		}
-
-	default:
-		return -EINVAL;
-	};
-
-	return 0;
+	g.heads = 255;
+	g.sectors = 63;
+	g.cylinders = raid[minor].sectors / 63 / 255;
+	g.start = get_start_sect(inode->i_bdev);
+	return copy_to_user(geometry, &g, sizeof g) ? -EFAULT : 0;
 }
-
 
 static int hptraid_make_request(request_queue_t * q, int rw,
 				struct buffer_head *bh)
@@ -159,10 +117,6 @@ static int hptraid_make_request(request_queue_t * q, int rw,
 	thisraid = &raid[device];
 	if (thisraid->stride == 0)
 		thisraid->stride = 1;
-
-	/* Partitions need adding of the start sector of the partition to the requested sector */
-
-	rsect += ataraid_gendisk.part[minor(bh->b_rdev)].start_sect;
 
 	/* Woops we need to split the request to avoid crossing a stride barrier */
 	if ((rsect / thisraid->stride) !=
@@ -273,7 +227,6 @@ static void __init probedisk(int major, int minor, int device)
 {
 	int i;
 	struct block_device *bdev = bdget(mk_kdev(major, minor));
-	struct gendisk *gd;
 
 	if (!bdev)
 		return;
@@ -301,19 +254,9 @@ static void __init probedisk(int major, int minor, int device)
 	if (i > 8)
 		goto out;
 
+	if (bd_claim(bdev, &raid[device].disk[i]) < 0)
+		goto out;
 	raid[device].disk[i].bdev = bdev;
-	/* This is supposed to prevent others from stealing our underlying disks */
-	/* now blank the /proc/partitions table for the wrong partition table,
-	   so that scripts don't accidentally mount it and crash the kernel */
-	/* XXX: the 0 is an utter hack  --hch */
-	gd = get_gendisk(mk_kdev(major, 0));
-	if (gd != NULL) {
-		int j;
-		for (j = 1 + (minor << gd->minor_shift);
-		     j < ((minor + 1) << gd->minor_shift); j++)
-			gd->part[j].nr_sects = 0;
-	}
-
 	raid[device].disk[i].device = mk_kdev(major, minor);
 	raid[device].disk[i].sectors = maxsectors(major, minor);
 	raid[device].stride = (1 << prom.raid0_shift);
@@ -367,10 +310,6 @@ static __init int hptraid_init_one(int device)
 
 	fill_cutoff(device);
 
-	/* Initialize the gendisk structure */
-
-	ataraid_register_disk(device, raid[device].sectors);
-
 	count = 0;
 	printk(KERN_INFO
 	       "Highpoint HPT370 Softwareraid driver for linux version 0.01\n");
@@ -383,6 +322,7 @@ static __init int hptraid_init_one(int device)
 		}
 	}
 	if (count) {
+		ataraid_register_disk(device, raid[device].sectors);
 		printk(KERN_INFO "Raid array consists of %i drives. \n",
 		       count);
 		return 0;
@@ -414,11 +354,15 @@ static void __exit hptraid_exit(void)
 			struct block_device *bdev =
 			    raid[device].disk[i].bdev;
 			raid[device].disk[i].bdev = NULL;
-			if (bdev)
+			if (bdev) {
+				bd_release(bdev);
 				blkdev_put(bdev, BDEV_RAW);
+			}
 		}
-		if (raid[device].sectors)
+		if (raid[device].sectors) {
+			ataraid_unregister_disk(device);
 			ataraid_release_device(device);
+		}
 	}
 }
 

@@ -251,6 +251,9 @@ static inline void balance_irq(int irq)
 	irq_balance_t *entry = irq_balance + irq;
 	unsigned long now = jiffies;
 
+	if (clustered_apic_mode)
+		return;
+
 	if (entry->timestamp != now) {
 		unsigned long allowed_mask;
 		int random_number;

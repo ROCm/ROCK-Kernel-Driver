@@ -28,6 +28,7 @@
 #include <linux/ioctl.h>
 #include <linux/kdev_t.h>
 #include <linux/swap.h>
+#include <linux/buffer_head.h>
 
 #include <linux/ide.h>
 #include <asm/uaccess.h>
@@ -44,7 +45,9 @@ static void ataraid_split_request(request_queue_t * q, int rw,
 				  struct buffer_head *bh);
 
 
-struct gendisk ataraid_gendisk;
+static struct gendisk ataraid_gendisk[16];
+static struct hd_struct *ataraid_part;
+static char *ataraid_names;
 static int ataraid_readahead[256];
 
 static struct block_device_operations ataraid_fops = {
@@ -229,9 +232,28 @@ void ataraid_release_device(int device)
 
 void ataraid_register_disk(int device, long size)
 {
-	register_disk(&ataraid_gendisk, mk_kdev(ATAMAJOR, 16 * device), 16,
-		      &ataraid_fops, size);
+	struct gendisk *disk = ataraid_gendisk + device;
+	char *name = ataraid_names + 12 * device;
 
+	sprintf(name, "ataraid/d%d", device);
+	disk->part = ataraid_part + 16 * device;
+	disk->major = ATAMAJOR;
+	disk->first_minor = 16 * device;
+	disk->major_name = name;
+	disk->minor_shift = 4;
+	disk->nr_real = 1;
+	disk->fops = &ataraid_fops;
+
+	add_gendisk(disk);
+	register_disk(disk,
+		      mk_kdev(disk->major, disk->first_minor),
+		      1 << disk->minor_shift,
+		      disk->fops, size);
+}
+
+void ataraid_unregister_disk(int device)
+{
+	del_gendisk(&ataraid_gendisk[device]);
 }
 
 static __init int ataraid_init(void)
@@ -241,34 +263,25 @@ static __init int ataraid_init(void)
 		ataraid_readahead[i] = 1023;
 
 	/* setup the gendisk structure */
-	ataraid_gendisk.part =
-	    kmalloc(256 * sizeof(struct hd_struct), GFP_KERNEL);
-	if (ataraid_gendisk.part == NULL) {
+	ataraid_part = kmalloc(256 * sizeof(struct hd_struct), GFP_KERNEL);
+	ataraid_names = kmalloc(16 * 12, GFP_KERNEL);
+	if (!ataraid_part || !ataraid_names) {
+		kfree(ataraid_part);
+		kfree(ataraid_names);
 		printk(KERN_ERR
 		       "ataraid: Couldn't allocate memory, aborting \n");
 		return -1;
 	}
 
-	memset(&ataraid_gendisk.part[0], 0,
-	       256 * sizeof(struct hd_struct));
-
-
-	ataraid_gendisk.major = ATAMAJOR;
-	ataraid_gendisk.major_name = "ataraid";
-	ataraid_gendisk.minor_shift = 4;
-	ataraid_gendisk.nr_real = 16;
-	ataraid_gendisk.fops = &ataraid_fops;
-
-
-	add_gendisk(&ataraid_gendisk);
+	memset(ataraid_part, 0, 256 * sizeof(struct hd_struct));
 
 	if (register_blkdev(ATAMAJOR, "ataraid", &ataraid_fops)) {
+		kfree(ataraid_part);
+		kfree(ataraid_names);
 		printk(KERN_ERR "ataraid: Could not get major %d \n",
 		       ATAMAJOR);
 		return -1;
 	}
-
-
 
 	blk_queue_make_request(BLK_DEFAULT_QUEUE(ATAMAJOR),
 			       ataraid_make_request);
@@ -276,26 +289,18 @@ static __init int ataraid_init(void)
 	return 0;
 }
 
-
 static void __exit ataraid_exit(void)
 {
 	unregister_blkdev(ATAMAJOR, "ataraid");
-
-	del_gendisk(&ataraid_gendisk);
-
-	if (ataraid_gendisk.part) {
-		kfree(ataraid_gendisk.part);
-		ataraid_gendisk.part = NULL;
-	}
+	kfree(ataraid_part);
+	kfree(ataraid_names);
 }
 
 module_init(ataraid_init);
 module_exit(ataraid_exit);
 
-
-
 EXPORT_SYMBOL(ataraid_get_device);
 EXPORT_SYMBOL(ataraid_release_device);
-EXPORT_SYMBOL(ataraid_gendisk);
 EXPORT_SYMBOL(ataraid_register_disk);
+EXPORT_SYMBOL(ataraid_unregister_disk);
 MODULE_LICENSE("GPL");

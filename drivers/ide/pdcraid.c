@@ -103,117 +103,17 @@ static struct pdcraid raid[16];
 static int pdcraid_ioctl(struct inode *inode, struct file *file,
 			 unsigned int cmd, unsigned long arg)
 {
-	unsigned int minor;
-	unsigned long sectors;
-
-	if (!inode || kdev_none(inode->i_rdev))
+	unsigned int minor = minor(inode->i_rdev) >> SHIFT;
+	struct hd_geometry *geometry = (struct hd_geometry *) arg;
+	struct hd_geometry g;
+	if (cmd != HDIO_GETGEO)
 		return -EINVAL;
-
-	minor = minor(inode->i_rdev) >> SHIFT;
-
-	switch (cmd) {
-
-	case BLKGETSIZE:	/* Return device size */
-		if (!arg)
-			return -EINVAL;
-		sectors =
-		    ataraid_gendisk.part[minor(inode->i_rdev)].nr_sects;
-		if (minor(inode->i_rdev) & 15)
-			return put_user(sectors, (unsigned long *) arg);
-		return put_user(raid[minor].sectors,
-				(unsigned long *) arg);
-		break;
-
-
-	case HDIO_GETGEO:
-		{
-			struct hd_geometry *loc =
-			    (struct hd_geometry *) arg;
-			unsigned short bios_cyl = raid[minor].geom.cylinders;	/* truncate */
-
-			if (!loc)
-				return -EINVAL;
-			if (put_user
-			    (raid[minor].geom.heads,
-			     (u8 *) & loc->heads))
-				return -EFAULT;
-			if (put_user
-			    (raid[minor].geom.sectors,
-			     (u8 *) & loc->sectors))
-				return -EFAULT;
-			if (put_user
-			    (bios_cyl, (unsigned short *) &loc->cylinders))
-				return -EFAULT;
-			if (put_user
-			    ((unsigned) ataraid_gendisk.
-			     part[minor(inode->i_rdev)].start_sect,
-			     (unsigned long *) &loc->start))
-				return -EFAULT;
-			return 0;
-		}
-
-	default:
-		printk("Invalid ioctl \n");
-		return -EINVAL;
-	};
-
-	return 0;
+	g.heads = raid[minor].geom.heads;
+	g.sectors = raid[minor].geom.sectors;
+	g.cylinders = raid[minor].geom.cylinders;
+	g.start = get_start_sect(inode->i_bdev);
+	return copy_to_user(geometry, &g, sizeof g) ? -EFAULT : 0;
 }
-
-
-unsigned long partition_map_normal(unsigned long block,
-				   unsigned long partition_off,
-				   unsigned long partition_size,
-				   int stride)
-{
-	return block + partition_off;
-}
-
-unsigned long partition_map_linux(unsigned long block,
-				  unsigned long partition_off,
-				  unsigned long partition_size, int stride)
-{
-	unsigned long newblock;
-
-	newblock = stride - (partition_off % stride);
-	if (newblock == stride)
-		newblock = 0;
-	newblock += block;
-	newblock = newblock % partition_size;
-	newblock += partition_off;
-
-	return newblock;
-}
-
-static int funky_remap[8] = { 0, 1, 2, 3, 4, 5, 6, 7 };
-
-unsigned long partition_map_linux_raid0_4disk(unsigned long block,
-					      unsigned long partition_off,
-					      unsigned long partition_size,
-					      int stride)
-{
-	unsigned long newblock, temp, temp2;
-
-	newblock = stride - (partition_off % stride);
-	if (newblock == stride)
-		newblock = 0;
-
-	if (block < (partition_size / (8 * stride)) * 8 * stride) {
-		temp = block % stride;
-		temp2 = block / stride;
-		temp2 = ((temp2 >> 3) << 3) | (funky_remap[temp2 & 7]);
-		block = temp2 * stride + temp;
-	}
-
-
-	newblock += block;
-	newblock = newblock % partition_size;
-	newblock += partition_off;
-
-	return newblock;
-}
-
-
 
 static int pdcraid0_make_request(request_queue_t * q, int rw,
 				 struct buffer_head *bh)
@@ -240,19 +140,10 @@ static int pdcraid0_make_request(request_queue_t * q, int rw,
 	 * point, we have to divide by one less.
 	 */
 
-	device = (bh->b_rdev >> SHIFT) & MAJOR_MASK;
+	device = minor(bh->b_rdev) >> SHIFT;
 	thisraid = &raid[device];
 	if (thisraid->stride == 0)
 		thisraid->stride = 1;
-
-	/* Partitions need adding of the start sector of the partition to the requested sector */
-
-	rsect =
-	    partition_map_normal(rsect,
-				 ataraid_gendisk.part[MINOR(bh->b_rdev)].
-				 start_sect,
-				 ataraid_gendisk.part[MINOR(bh->b_rdev)].
-				 nr_sects, thisraid->stride);
 
 	/* Woops we need to split the request to avoid crossing a stride barrier */
 	if ((rsect / thisraid->stride) !=
@@ -320,7 +211,7 @@ static int pdcraid1_write_request(request_queue_t * q, int rw,
 	int device;
 	int i;
 
-	device = (bh->b_rdev >> SHIFT) & MAJOR_MASK;
+	device = minor(bh->b_rdev) >> SHIFT;
 	private = ataraid_get_private();
 	if (private == NULL)
 		BUG();
@@ -341,7 +232,6 @@ static int pdcraid1_write_request(request_queue_t * q, int rw,
 
 		bh1->b_end_io = ataraid_end_request;
 		bh1->b_private = private;
-		bh1->b_rsector += ataraid_gendisk.part[MINOR(bh->b_rdev)].start_sect;	/* partition offset */
 		bh1->b_rdev = raid[device].disk[i].device;
 
 		/* update the last known head position for the drive */
@@ -361,14 +251,12 @@ static int pdcraid1_read_request(request_queue_t * q, int rw,
 	int bestsofar, bestdist, i;
 	static int previous;
 
+	device = minor(bh->b_rdev) >> SHIFT;
+
 	/* Reads are simple in principle. Pick a disk and go. 
 	   Initially I cheat by just picking the one which the last known
 	   head position is closest by.
 	   Later on, online/offline checking and performance needs adding */
-
-	device = (bh->b_rdev >> SHIFT) & MAJOR_MASK;
-	bh->b_rsector +=
-	    ataraid_gendisk.part[MINOR(bh->b_rdev)].start_sect;
 
 	bestsofar = 0;
 	bestdist = raid[device].disk[0].last_pos - bh->b_rsector;
@@ -575,6 +463,7 @@ static void __init fill_cutoff(int device)
 static __init int pdcraid_init_one(int device, int raidlevel)
 {
 	int i, count;
+	struct pdcraid *p = raid + device;
 
 	for (i = 0; i < 14; i++)
 		probedisk(i, device, raidlevel);
@@ -582,22 +471,19 @@ static __init int pdcraid_init_one(int device, int raidlevel)
 	if (raidlevel == 0)
 		fill_cutoff(device);
 
-	/* Initialize the gendisk structure */
-
-	ataraid_register_disk(device, raid[device].sectors);
-
 	count = 0;
 
 	for (i = 0; i < 8; i++) {
-		if (raid[device].disk[i].device != 0) {
+		if (p->disk[i].device != 0) {
 			printk(KERN_INFO "Drive %i is %li Mb (%i / %i) \n",
-			       i, raid[device].disk[i].sectors / 2048,
-			       major(raid[device].disk[i].device),
-			       minor(raid[device].disk[i].device));
+			       i, p->disk[i].sectors / 2048,
+			       major(p->disk[i].device),
+			       minor(p->disk[i].device));
 			count++;
 		}
 	}
 	if (count) {
+		ataraid_register_disk(device, p->sectors);
 		printk(KERN_INFO "Raid%i array consists of %i drives. \n",
 		       raidlevel, count);
 		return 0;
@@ -660,8 +546,10 @@ static void __exit pdcraid_exit(void)
 			if (bdev)
 				blkdev_put(bdev, BDEV_RAW);
 		}
-		if (raid[device].sectors)
+		if (raid[device].sectors) {
+			ataraid_unregister_disk(device);
 			ataraid_release_device(device);
+		}
 	}
 }
 
