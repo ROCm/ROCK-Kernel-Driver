@@ -891,6 +891,7 @@ generic_file_aio_read(struct kiocb *iocb, char *buf, size_t count, loff_t pos)
 	BUG_ON(iocb->ki_pos != pos);
 	return __generic_file_aio_read(iocb, &local_iov, 1, &iocb->ki_pos);
 }
+EXPORT_SYMBOL(generic_file_aio_read);
 
 ssize_t
 generic_file_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
@@ -1650,6 +1651,7 @@ ssize_t generic_file_aio_write(struct kiocb *iocb, const char *buf,
 {
 	return generic_file_write(iocb->ki_filp, buf, count, &iocb->ki_pos);
 }
+EXPORT_SYMBOL(generic_file_aio_write);
 
 ssize_t generic_file_write(struct file *file, const char *buf,
 			   size_t count, loff_t *ppos)
