@@ -284,6 +284,26 @@ static inline int is_confirmed(struct ip_conntrack *ct)
 }
 
 extern unsigned int ip_conntrack_htable_size;
+ 
+struct ip_conntrack_stat
+{
+	unsigned int searched;
+	unsigned int found;
+	unsigned int new;
+	unsigned int invalid;
+	unsigned int ignore;
+	unsigned int delete;
+	unsigned int delete_list;
+	unsigned int insert;
+	unsigned int insert_failed;
+	unsigned int drop;
+	unsigned int early_drop;
+	unsigned int icmp_error;
+	unsigned int expect_new;
+	unsigned int expect_create;
+	unsigned int expect_delete;
+};
+
 
 /* eg. PROVIDES_CONNTRACK(ftp); */
 #define PROVIDES_CONNTRACK(name)                        \

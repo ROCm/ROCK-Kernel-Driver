@@ -21,6 +21,7 @@
 #include <linux/skbuff.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/percpu.h>
 #ifdef CONFIG_SYSCTL
 #include <linux/sysctl.h>
 #endif
@@ -43,6 +44,9 @@
 #endif
 
 MODULE_LICENSE("GPL");
+
+extern atomic_t ip_conntrack_count;
+DECLARE_PER_CPU(struct ip_conntrack_stat, ip_conntrack_stat);
 
 static int kill_proto(const struct ip_conntrack *i, void *data)
 {
@@ -281,6 +285,86 @@ static struct file_operations exp_file_ops = {
 	.read    = seq_read,
 	.llseek  = seq_lseek,
 	.release = seq_release
+};
+
+static void *ct_cpu_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	int cpu;
+
+	for (cpu = *pos; cpu < NR_CPUS; ++cpu) {
+		if (!cpu_possible(cpu))
+			continue;
+		*pos = cpu;
+		return &per_cpu(ip_conntrack_stat, cpu);
+	}
+
+	return NULL;
+}
+
+static void *ct_cpu_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	int cpu;
+
+	for (cpu = *pos + 1; cpu < NR_CPUS; ++cpu) {
+		if (!cpu_possible(cpu))
+			continue;
+		*pos = cpu;
+		return &per_cpu(ip_conntrack_stat, cpu);
+	}
+
+	return NULL;
+}
+
+static void ct_cpu_seq_stop(struct seq_file *seq, void *v)
+{
+}
+
+static int ct_cpu_seq_show(struct seq_file *seq, void *v)
+{
+	unsigned int nr_conntracks = atomic_read(&ip_conntrack_count);
+	struct ip_conntrack_stat *st = v;
+
+	seq_printf(seq, "%08x  %08x %08x %08x %08x %08x %08x %08x "
+			"%08x %08x %08x %08x %08x  %08x %08x %08x \n",
+		   nr_conntracks,
+		   st->searched,
+		   st->found,
+		   st->new,
+		   st->invalid,
+		   st->ignore,
+		   st->delete,
+		   st->delete_list,
+		   st->insert,
+		   st->insert_failed,
+		   st->drop,
+		   st->early_drop,
+		   st->icmp_error,
+
+		   st->expect_new,
+		   st->expect_create,
+		   st->expect_delete
+		);
+	return 0;
+}
+
+static struct seq_operations ct_cpu_seq_ops = {
+	.start  = ct_cpu_seq_start,
+	.next   = ct_cpu_seq_next,
+	.stop   = ct_cpu_seq_stop,
+	.show   = ct_cpu_seq_show,
+};
+
+static int ct_cpu_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &ct_cpu_seq_ops);
+}
+
+static struct file_operations ct_cpu_seq_fops = {
+	.owner   = THIS_MODULE,
+	.open    = ct_cpu_seq_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release_private,
 };
 
 static unsigned int ip_confirm(unsigned int hooknum,
@@ -608,7 +692,7 @@ static ctl_table ip_ct_net_table[] = {
 #endif
 static int init_or_cleanup(int init)
 {
-	struct proc_dir_entry *proc, *proc_exp;
+	struct proc_dir_entry *proc, *proc_exp, *proc_stat;
 	int ret = 0;
 
 	if (!init) goto cleanup;
@@ -625,10 +709,16 @@ static int init_or_cleanup(int init)
 	if (!proc_exp) goto cleanup_proc;
 	proc_exp->proc_fops = &exp_file_ops;
 
+	proc_stat = proc_net_fops_create("ip_conntrack_stat", S_IRUGO,
+					 &ct_cpu_seq_fops);
+	if (!proc_stat)
+		goto cleanup_proc_exp;
+	proc_stat->owner = THIS_MODULE;
+
 	ret = nf_register_hook(&ip_conntrack_defrag_ops);
 	if (ret < 0) {
 		printk("ip_conntrack: can't register pre-routing defrag hook.\n");
-		goto cleanup_proc_exp;
+		goto cleanup_proc_stat;
 	}
 	ret = nf_register_hook(&ip_conntrack_defrag_local_out_ops);
 	if (ret < 0) {
@@ -680,6 +770,8 @@ static int init_or_cleanup(int init)
 	nf_unregister_hook(&ip_conntrack_defrag_local_out_ops);
  cleanup_defragops:
 	nf_unregister_hook(&ip_conntrack_defrag_ops);
+ cleanup_proc_stat:
+	proc_net_remove("ip_conntrack_stat");
 cleanup_proc_exp:
 	proc_net_remove("ip_conntrack_exp");
  cleanup_proc:
