@@ -51,6 +51,7 @@
 
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <scsi/scsi_devinfo.h>
 
 
 /***********************************************************************
@@ -64,10 +65,6 @@ static const char* host_info(struct Scsi_Host *host)
 
 static int slave_configure (struct scsi_device *sdev)
 {
-	/* set device to use 10-byte commands where possible */
-	sdev->use_10_for_ms = 1;
-	sdev->use_10_for_rw = 1;
-
 	/* this is to satisify the compiler, tho I don't think the 
 	 * return code is ever checked anywhere. */
 	return 0;
@@ -323,6 +320,9 @@ struct scsi_host_template usb_stor_host_template = {
 
 	/* emulated HBA */
 	.emulated =			TRUE,
+
+	/* modify scsi_device bits on probe */
+	.flags = (BLIST_MS_SKIP_PAGE_08 | BLIST_USE_10_BYTE_MS),
 
 	/* module management */
 	.module =			THIS_MODULE

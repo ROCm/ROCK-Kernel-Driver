@@ -124,6 +124,8 @@ static int sg_set_reserved_size(request_queue_t *q, int *p)
 	if (err)
 		return err;
 
+	if (size < 0)
+		return -EINVAL;
 	if (size > (q->max_sectors << 9))
 		return -EINVAL;
 
