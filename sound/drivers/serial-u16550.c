@@ -347,8 +347,10 @@ static int __init snd_uart16550_detect(snd_uart16550_t *uart)
 	}
 
 	uart->res_base = request_region(io_base, 8, "Serial MIDI");
-	if (uart->res_base == NULL)
+	if (uart->res_base == NULL) {
+		snd_printk(KERN_ERR "u16550: can't grab port 0x%lx\n", io_base);
 		return -EBUSY;
+	}
 
 	ok = 1;			/* uart detected unless one of the following tests should fail */
 	/* 8 data-bits, 1 stop-bit, parity off, DLAB = 0 */

@@ -621,11 +621,11 @@ static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 		return err;
 	}
 	/* check, if we can restrict PCI DMA transfers to 24 bits */
-	if (!pci_dma_supported(pci, 0x00ffffff)) {
+	if (pci_set_dma_mask(pci, 0x00ffffff) < 0 ||
+	    pci_set_consistent_dma_mask(pci, 0x00ffffff) < 0) {
 		snd_printk("architecture does not support 24bit PCI busmaster DMA\n");
 		return -ENXIO;
 	}
-	pci_set_consistent_dma_mask(pci, 0x00ffffff);
 
 	gcr = pci_resource_start(pci, 0);
 	if ((res_gcr_port = request_region(gcr, 0x40, "ALS4000")) == NULL) {
@@ -684,9 +684,15 @@ static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 
 	chip->pci = pci;
 	chip->alt_port = gcr;
+	snd_card_set_dev(card, &pci->dev);
 
 	snd_als4000_configure(chip);
-	
+
+	strcpy(card->driver, "ALS4000");
+	strcpy(card->shortname, "Avance Logic ALS4000");
+	sprintf(card->longname, "%s at 0x%lx, irq %i",
+		card->shortname, chip->alt_port, chip->irq);
+
 	if ((err = snd_mpu401_uart_new( card, 0, MPU401_HW_ALS4000,
 				        gcr+0x30, 1, pci->irq, 0,
 				        &chip->rmidi)) < 0) {
@@ -721,10 +727,6 @@ static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 		gameport_register_port(&acard->gameport);
 	}
 #endif
-	strcpy(card->driver, "ALS4000");
-	strcpy(card->shortname, "Avance Logic ALS4000");
-	sprintf(card->longname, "%s at 0x%lx, irq %i",
-		card->shortname, chip->alt_port, chip->irq);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);

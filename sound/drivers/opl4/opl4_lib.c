@@ -206,6 +206,7 @@ int snd_opl4_create(snd_card_t *card,
 	opl4->res_fm_port = request_region(fm_port, 8, "OPL4 FM");
 	opl4->res_pcm_port = request_region(pcm_port, 8, "OPL4 PCM/MIX");
 	if (!opl4->res_fm_port || !opl4->res_pcm_port) {
+		snd_printk(KERN_ERR "opl4: can't grab ports 0x%lx, 0x%lx\n", fm_port, pcm_port);
 		snd_opl4_free(opl4);
 		return -EBUSY;
 	}

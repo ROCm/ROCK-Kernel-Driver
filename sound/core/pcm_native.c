@@ -1546,7 +1546,7 @@ static int snd_pcm_unlink(snd_pcm_substream_t *substream)
 
 	write_lock_irq(&snd_pcm_link_rwlock);
 	if (!snd_pcm_stream_linked(substream)) {
-		res = -EINVAL;
+		res = -EALREADY;
 		goto _end;
 	}
 	list_del(&substream->link_list);

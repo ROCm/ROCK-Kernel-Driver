@@ -666,6 +666,10 @@ static int tumbler_put_mute_switch(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_
 	pmac_tumbler_t *mix;
 	pmac_gpio_t *gp;
 	int val;
+#ifdef PMAC_SUPPORT_AUTOMUTE
+	if (chip->update_automute && chip->auto_mute)
+		return 0; /* don't touch in the auto-mute mode */
+#endif	
 	if (! (mix = chip->mixer_data))
 		return -ENODEV;
 	gp = (kcontrol->private_value == TUMBLER_MUTE_HP) ? &mix->hp_mute : &mix->amp_mute;

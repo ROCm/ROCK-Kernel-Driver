@@ -247,6 +247,12 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 #ifdef SUPPORT_JOYSTICK
 	chip->joystick_res = joystick_res;
 #endif
+	strcpy(card->driver, str);
+	sprintf(card->shortname, "Yamaha DS-XG (%s)", str);
+	sprintf(card->longname, "%s at 0x%lx, irq %i",
+		card->shortname,
+		chip->reg_area_phys,
+		chip->irq);
 	if ((err = snd_ymfpci_pcm(chip, 0, NULL)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -300,12 +306,6 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 		gameport_register_port(&chip->gameport);
 	}
 #endif
-	strcpy(card->driver, str);
-	sprintf(card->shortname, "Yamaha DS-XG PCI (%s)", str);
-	sprintf(card->longname, "%s at 0x%lx, irq %i",
-		card->shortname,
-		chip->reg_area_phys,
-		chip->irq);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);

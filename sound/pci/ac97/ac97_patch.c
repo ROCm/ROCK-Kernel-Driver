@@ -953,15 +953,15 @@ int patch_ad1985(ac97_t * ac97)
 {
 	unsigned short misc;
 	
-	patch_ad1881(ac97);
 	ac97->build_ops = &patch_ad1985_build_ops;
 	misc = snd_ac97_read(ac97, AC97_AD_MISC);
 	/* switch front/surround line-out/hp-out */
-	/* center/LFE, surround in High-Z mode */
+	/* center/LFE, mic in 3.75V mode */
 	/* AD-compatible mode */
 	/* Stereo mutes enabled */
+	/* in accordance with ADI driver: misc | 0x5c28 */
 	snd_ac97_write_cache(ac97, AC97_AD_MISC, misc |
-			     AC97_AD198X_VREFD |
+			     AC97_AD198X_VREFH |
 			     AC97_AD198X_LOSEL |
 			     AC97_AD198X_HPSEL |
 			     AC97_AD198X_CLDIS |
@@ -1381,5 +1381,16 @@ int patch_it2646(ac97_t * ac97)
 	/* full DAC volume */
 	snd_ac97_write_cache(ac97, 0x5E, 0x0808);
 	snd_ac97_write_cache(ac97, 0x7A, 0x0808);
+	return 0;
+}
+
+/* Si3036/8 specific registers */
+#define AC97_SI3036_CHIP_ID     0x5a
+
+int mpatch_si3036(ac97_t * ac97)
+{
+	//printk("mpatch_si3036: chip id = %x\n", snd_ac97_read(ac97, 0x5a));
+	snd_ac97_write_cache(ac97, 0x5c, 0xf210 );
+	snd_ac97_write_cache(ac97, 0x68, 0);
 	return 0;
 }

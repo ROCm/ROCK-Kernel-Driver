@@ -498,6 +498,7 @@ int snd_mpu401_uart_new(snd_card_t * card, int device,
 	if (!integrated) {
 		int res_size = hardware == MPU401_HW_PC98II ? 4 : 2;
 		if ((mpu->res = request_region(port, res_size, "MPU401 UART")) == NULL) {
+			snd_printk(KERN_ERR "mpu401_uart: unable to grab port 0x%lx size %d\n", port, res_size);
 			snd_device_free(card, rmidi);
 			return -EBUSY;
 		}
@@ -519,7 +520,7 @@ int snd_mpu401_uart_new(snd_card_t * card, int device,
 		mpu->cport = port + 1;
 	if (irq >= 0 && irq_flags) {
 		if (request_irq(irq, snd_mpu401_uart_interrupt, irq_flags, "MPU401 UART", (void *) mpu)) {
-			snd_printk("unable to grab IRQ %d\n", irq);
+			snd_printk(KERN_ERR "mpu401_uart: unable to grab IRQ %d\n", irq);
 			snd_device_free(card, rmidi);
 			return -EBUSY;
 		}

@@ -106,6 +106,30 @@ static int __devinit snd_trident_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
+
+	switch (trident->device) {
+	case TRIDENT_DEVICE_ID_DX:
+		str = "TRID4DWAVEDX";
+		break;
+	case TRIDENT_DEVICE_ID_NX:
+		str = "TRID4DWAVENX";
+		break;
+	case TRIDENT_DEVICE_ID_SI7018:
+		str = "SI7018";
+		break;
+	default:
+		str = "Unknown";
+	}
+	strcpy(card->driver, str);
+	if (trident->device == TRIDENT_DEVICE_ID_SI7018) {
+		strcpy(card->shortname, "SiS ");
+	} else {
+		strcpy(card->shortname, "Trident ");
+	}
+	strcat(card->shortname, card->driver);
+	sprintf(card->longname, "%s PCI Audio at 0x%lx, irq %d",
+		card->shortname, trident->port, trident->irq);
+
 	if ((err = snd_trident_pcm(trident, pcm_dev++, NULL)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -140,29 +164,6 @@ static int __devinit snd_trident_probe(struct pci_dev *pci,
 #endif
 
 	snd_trident_gameport(trident);
-
-	switch (trident->device) {
-	case TRIDENT_DEVICE_ID_DX:
-		str = "TRID4DWAVEDX";
-		break;
-	case TRIDENT_DEVICE_ID_NX:
-		str = "TRID4DWAVENX";
-		break;
-	case TRIDENT_DEVICE_ID_SI7018:
-		str = "SI7018";
-		break;
-	default:
-		str = "Unknown";
-	}
-	strcpy(card->driver, str);
-	if (trident->device == TRIDENT_DEVICE_ID_SI7018) {
-		strcpy(card->shortname, "SiS ");
-	} else {
-		strcpy(card->shortname, "Trident ");
-	}
-	strcat(card->shortname, card->driver);
-	sprintf(card->longname, "%s PCI Audio at 0x%lx, irq %d",
-		card->shortname, trident->port, trident->irq);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);

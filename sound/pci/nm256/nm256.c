@@ -1560,6 +1560,8 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0)
 		goto __error;
 
+	snd_card_set_dev(card, &pci->dev);
+
 	*chip_ret = chip;
 	return 0;
 

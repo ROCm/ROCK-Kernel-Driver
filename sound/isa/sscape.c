@@ -1174,6 +1174,7 @@ static int __devinit create_sscape(const struct params *params, snd_card_t **rca
 	 * can detect and control this hardware ...
 	 */
 	if ((io_res = request_region(params->port, 8, "SoundScape")) == NULL) {
+		snd_printk(KERN_ERR "sscape: can't grab port 0x%x\n", params->port);
 		return -EBUSY;
 	}
 
@@ -1181,6 +1182,7 @@ static int __devinit create_sscape(const struct params *params, snd_card_t **rca
 	 * Grab both DMA channels (OK, only one for now) ...
 	 */
 	if ((err = request_dma(params->dma1, "SoundScape")) < 0) {
+		snd_printk(KERN_ERR "sscape: can't grab DMA %d\n", params->dma1);
 		goto _release_region;
 	}
 
@@ -1407,6 +1409,7 @@ static int __devinit sscape_pnp_detect(struct pnp_card_link *pcard,
 			ret = create_sscape(this, &card);
 			if (ret < 0)
 				return ret;
+			snd_card_set_dev(card, &pcard->card->dev);
 			pnp_set_card_drvdata(pcard, card);
 			++sscape_cards;
 			++idx;

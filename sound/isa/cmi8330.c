@@ -481,10 +481,13 @@ static int __devinit snd_cmi8330_probe(int dev,
 	acard->card = card;
 
 #ifdef CONFIG_PNP
-	if (isapnp[dev] && (err = snd_cmi8330_pnp(dev, acard, pcard, pid)) < 0) {
-		snd_printk("PnP detection failed\n");
-		snd_card_free(card);
-		return err;
+	if (isapnp[dev]) {
+		if ((err = snd_cmi8330_pnp(dev, acard, pcard, pid)) < 0) {
+			snd_printk("PnP detection failed\n");
+			snd_card_free(card);
+			return err;
+		}
+		snd_card_set_dev(card, &pcard->card->dev);
 	}
 #endif
 

@@ -232,8 +232,10 @@ static int __devinit snd_interwave_detect_stb(struct snd_interwave *iwcard,
 	} else {
 		iwcard->i2c_res = request_region(port, 1, "InterWave (I2C bus)");
 	}
-	if (iwcard->i2c_res == NULL)
+	if (iwcard->i2c_res == NULL) {
+		snd_printk(KERN_ERR "interwave: can't grab i2c bus port\n");
 		return -ENODEV;
+	}
 
 	sprintf(name, "InterWave-%i", card->number);
 	if ((err = snd_i2c_bus_create(card, name, NULL, &bus)) < 0)
@@ -699,9 +701,12 @@ static int __devinit snd_interwave_probe(int dev, struct pnp_card_link *pcard,
 	iwcard->irq = -1;
 	card->private_free = snd_interwave_free;
 #ifdef CONFIG_PNP
-	if (isapnp[dev] && snd_interwave_pnp(dev, iwcard, pcard, pid)) {
-		snd_card_free(card);
-		return -ENODEV;
+	if (isapnp[dev]) {
+		if (snd_interwave_pnp(dev, iwcard, pcard, pid)) {
+			snd_card_free(card);
+			return -ENODEV;
+		}
+		snd_card_set_dev(card, &pcard->card->dev);
 	}
 #endif
 	xirq = irq[dev];

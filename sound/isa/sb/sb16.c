@@ -77,7 +77,7 @@ static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_ISAPNP; /* Enable this car
 static int isapnp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
 #endif
 static long port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x220,0x240,0x260,0x280 */
-static long mpu_port[SNDRV_CARDS] = {0x330, 0x300,[2 ... (SNDRV_CARDS - 1)] = -1};
+static long mpu_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x330,0x300 */
 static long fm_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;
 #ifdef SNDRV_SBAWE_EMU8000
 static long awe_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;
@@ -156,6 +156,8 @@ struct snd_card_sb16 {
 };
 
 static snd_card_t *snd_sb16_legacy[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
+
+#ifdef CONFIG_PNP
 
 static struct pnp_card_device_id snd_sb16_pnpids[] = {
 #ifndef SNDRV_SBAWE
@@ -249,6 +251,8 @@ static struct pnp_card_device_id snd_sb16_pnpids[] = {
 };
 
 MODULE_DEVICE_TABLE(pnp_card, snd_sb16_pnpids);
+
+#endif /* CONFIG_PNP */
 
 #ifdef SNDRV_SBAWE_EMU8000
 #define DRIVER_NAME	"snd-card-sbawe"
@@ -393,6 +397,7 @@ static int __init snd_sb16_probe(int dev,
 			snd_card_free(card);
 			return err;
 		}
+		snd_card_set_dev(card, &pcard->card->dev);
 	}
 #endif
 
@@ -465,6 +470,22 @@ static int __init snd_sb16_probe(int dev,
 		return -ENXIO;
 	}
 
+	strcpy(card->driver,
+#ifdef SNDRV_SBAWE_EMU8000
+			awe_port[dev] > 0 ? "SB AWE" :
+#endif
+			"SB16");
+	strcpy(card->shortname, chip->name);
+	sprintf(card->longname, "%s at 0x%lx, irq %i, dma ",
+		chip->name,
+		chip->port,
+		xirq);
+	if (xdma8 >= 0)
+		sprintf(card->longname + strlen(card->longname), "%d", xdma8);
+	if (xdma16 >= 0)
+		sprintf(card->longname + strlen(card->longname), "%s%d",
+			xdma8 >= 0 ? "&" : "", xdma16);
+
 	if (chip->mpu_port > 0 && chip->mpu_port != SNDRV_AUTO_PORT) {
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_SB,
 					       chip->mpu_port, 0,
@@ -483,7 +504,7 @@ static int __init snd_sb16_probe(int dev,
 	if (fm_port[dev] > 0 && fm_port[dev] != SNDRV_AUTO_PORT) {
 		if (snd_opl3_create(card, fm_port[dev], fm_port[dev] + 2,
 				    OPL3_HW_OPL3,
-				    fm_port[dev] == port[dev] || fm_port[dev] == 0x388,
+				    acard->fm_res != NULL || fm_port[dev] == port[dev],
 				    &opl3) < 0) {
 			snd_printk(KERN_ERR PFX "no OPL device at 0x%lx-0x%lx\n",
 				   fm_port[dev], fm_port[dev] + 2);
@@ -535,21 +556,6 @@ static int __init snd_sb16_probe(int dev,
 		(mic_agc[dev] ? 0x00 : 0x01));
 	spin_unlock_irqrestore(&chip->mixer_lock, flags);
 
-	strcpy(card->driver, 
-#ifdef SNDRV_SBAWE_EMU8000
-			awe_port[dev] > 0 ? "SB AWE" :
-#endif
-			"SB16");
-	strcpy(card->shortname, chip->name);
-	sprintf(card->longname, "%s at 0x%lx, irq %i, dma ",
-		chip->name,
-		chip->port,
-		xirq);
-	if (xdma8 >= 0)
-		sprintf(card->longname + strlen(card->longname), "%d", xdma8);
-	if (xdma16 >= 0)
-		sprintf(card->longname + strlen(card->longname), "%s%d",
-			xdma8 >= 0 ? "&" : "", xdma16);
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
 		return err;

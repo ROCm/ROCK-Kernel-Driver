@@ -2504,6 +2504,7 @@ snd_rme96_probe(struct pci_dev *pci,
 	rme96 = (rme96_t *)card->private_data;	
 	rme96->card = card;
 	rme96->pci = pci;
+	snd_card_set_dev(card, &pci->dev);
 	if ((err = snd_rme96_create(rme96)) < 0) {
 		snd_card_free(card);
 		return err;

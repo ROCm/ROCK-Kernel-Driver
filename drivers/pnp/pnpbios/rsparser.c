@@ -49,7 +49,7 @@ static void
 pnpbios_parse_allocated_irqresource(struct pnp_resource_table * res, int irq)
 {
 	int i = 0;
-	while ((res->irq_resource[i].flags & IORESOURCE_IRQ) && i < PNP_MAX_IRQ) i++;
+	while (!(res->irq_resource[i].flags & IORESOURCE_UNSET) && i < PNP_MAX_IRQ) i++;
 	if (i < PNP_MAX_IRQ) {
 		res->irq_resource[i].flags = IORESOURCE_IRQ;  // Also clears _UNSET flag
 		if (irq == -1) {
@@ -65,7 +65,7 @@ static void
 pnpbios_parse_allocated_dmaresource(struct pnp_resource_table * res, int dma)
 {
 	int i = 0;
-	while ((res->dma_resource[i].flags & IORESOURCE_DMA) && i < PNP_MAX_DMA) i++;
+	while (!(res->dma_resource[i].flags & IORESOURCE_UNSET) && i < PNP_MAX_DMA) i++;
 	if (i < PNP_MAX_DMA) {
 		res->dma_resource[i].flags = IORESOURCE_DMA;  // Also clears _UNSET flag
 		if (dma == -1) {
@@ -81,7 +81,7 @@ static void
 pnpbios_parse_allocated_ioresource(struct pnp_resource_table * res, int io, int len)
 {
 	int i = 0;
-	while ((res->port_resource[i].flags & IORESOURCE_IO) && i < PNP_MAX_PORT) i++;
+	while (!(res->port_resource[i].flags & IORESOURCE_UNSET) && i < PNP_MAX_PORT) i++;
 	if (i < PNP_MAX_PORT) {
 		res->port_resource[i].flags = IORESOURCE_IO;  // Also clears _UNSET flag
 		if (len <= 0 || (io + len -1) >= 0x10003) {
@@ -97,7 +97,7 @@ static void
 pnpbios_parse_allocated_memresource(struct pnp_resource_table * res, int mem, int len)
 {
 	int i = 0;
-	while ((res->mem_resource[i].flags & IORESOURCE_MEM) && i < PNP_MAX_MEM) i++;
+	while (!(res->mem_resource[i].flags & IORESOURCE_UNSET) && i < PNP_MAX_MEM) i++;
 	if (i < PNP_MAX_MEM) {
 		res->mem_resource[i].flags = IORESOURCE_MEM;  // Also clears _UNSET flag
 		if (len <= 0) {

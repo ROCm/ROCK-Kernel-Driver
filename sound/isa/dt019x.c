@@ -210,6 +210,7 @@ static int __devinit snd_card_dt019x_probe(int dev, struct pnp_card_link *pcard,
 		return -ENOMEM;
 	acard = (struct snd_card_dt019x *)card->private_data;
 
+	snd_card_set_dev(card, &pcard->card->dev);
 	if ((error = snd_card_dt019x_pnp(dev, acard, pcard, pid))) {
 		snd_card_free(card);
 		return error;
@@ -225,6 +226,12 @@ static int __devinit snd_card_dt019x_probe(int dev, struct pnp_card_link *pcard,
 		snd_card_free(card);
 		return error;
 	}
+
+	strcpy(card->driver, "DT-019X");
+	strcpy(card->shortname, "Diamond Tech. DT-019X");
+	sprintf(card->longname, "%s, %s at 0x%lx, irq %d, dma %d",
+		card->shortname, chip->name, chip->port,
+		irq[dev], dma8[dev]);
 
 	if ((error = snd_sb16dsp_pcm(chip, 0, NULL)) < 0) {
 		snd_card_free(card);
@@ -267,11 +274,6 @@ static int __devinit snd_card_dt019x_probe(int dev, struct pnp_card_link *pcard,
 		}
 	}
 
-	strcpy(card->driver, "DT-019X");
-	strcpy(card->shortname, "Diamond Tech. DT-019X");
-	sprintf(card->longname, "%s soundcard, %s at 0x%lx, irq %d, dma %d",
-		card->shortname, chip->name, chip->port,
-		irq[dev], dma8[dev]);
 	if ((error = snd_card_register(card)) < 0) {
 		snd_card_free(card);
 		return error;

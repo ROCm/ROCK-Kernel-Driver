@@ -1,7 +1,7 @@
 		NOTES ON KERNEL OSS-EMULATION
 		=============================
 
-		Jan. 9, 2003  Takashi Iwai <tiwai@suse.de>
+		Jan. 22, 2004  Takashi Iwai <tiwai@suse.de>
 
 
 Modules
@@ -13,32 +13,20 @@ as add-on kernel modules, snd-pcm-oss, snd-mixer-oss and snd-seq-oss.
 When you need to access the OSS PCM, mixer or sequencer devices, the
 corresponding module has to be loaded.
 
-For loading these modules automatically, define the aliases in
-/etc/modules.conf like below:
+These modules are loaded automatically when the corresponding service
+is called.  The alias is defined sound-service-x-y, where x and y are
+the card number and the minor unit number.  Usually you don't have to
+define these aliases by yourself.
 
-	alias sound-service-0-0 snd-mixer-oss
-	alias sound-service-0-1 snd-seq-oss
-	alias sound-service-0-3 snd-pcm-oss
-	alias sound-service-0-8 snd-seq-oss
-	alias sound-service-0-12 snd-pcm-oss
+Only necessary step for auto-loading of OSS modules is to define the
+card alias in /etc/modprobe.conf, such as
 
-Then the access to an OSS device file such as /dev/dsp0 triggers to
-load the necessary module via KMOD.
+	alias sound-slot-0 snd-emu10k1
 
-For auto-loading the secondary card device like /dev/dsp1, the
-following aliases are necessary in addition:
-
-	alias sound-service-1-0 snd-mixer-oss
-	alias sound-service-1-3 snd-pcm-oss
-	alias sound-service-1-12 snd-pcm-oss
-
-Here you don't need to define service-1-1 and service-1-8 because
-there is only one sequencer device.
-Similarly, you can add definitions for the third or later cards as
-sound-service-X-Y.
-
-The OSS-MIDI is emulated directly in the ALSA rawmidi module,
-therefore no extra module exists for that purpose.
+As the second card, define sound-slot-1 as well.
+Note that you can't use the aliased name as the target name (i.e.
+"alias sound-slot-0 snd-card-0" doesn't work any more like the old
+modutils).
 
 The currently available OSS configuration is shown in
 /proc/asound/oss/sndstat.  This shows in the same syntax of
@@ -187,7 +175,7 @@ for OSS devices, define like the following:
 
 	options snd-pcm-oss nonblock_open=1
 
-The whole-frag and no-silence commands have been added recently.
+The partial-frag and no-silence commands have been added recently.
 Both commands are for optimization use only.  The former command
 specifies to invoke the write transfer only when the whole fragment is
 filled.  The latter stops writing the silence data ahead

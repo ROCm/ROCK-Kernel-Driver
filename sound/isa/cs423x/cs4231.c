@@ -117,6 +117,14 @@ static int __init snd_card_cs4231_probe(int dev)
 		snd_card_free(card);
 		return err;
 	}
+
+	strcpy(card->driver, "CS4231");
+	strcpy(card->shortname, pcm->name);
+	sprintf(card->longname, "%s at 0x%lx, irq %d, dma %d",
+		pcm->name, chip->port, irq[dev], dma1[dev]);
+	if (dma2[dev] >= 0)
+		sprintf(card->longname + strlen(card->longname), "&%d", dma2[dev]);
+
 	if ((err = snd_cs4231_mixer(chip)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -136,12 +144,6 @@ static int __init snd_card_cs4231_probe(int dev)
 					NULL) < 0)
 			printk(KERN_ERR "cs4231: MPU401 not detected\n");
 	}
-	strcpy(card->driver, "CS4231");
-	strcpy(card->shortname, pcm->name);
-	sprintf(card->longname, "%s at 0x%lx, irq %d, dma %d",
-		pcm->name, chip->port, irq[dev], dma1[dev]);
-	if (dma2[dev] >= 0)
-		sprintf(card->longname + strlen(card->longname), "&%d", dma2[dev]);
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
 		return err;

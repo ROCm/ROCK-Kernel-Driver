@@ -230,7 +230,6 @@ int snd_register_device(int type, snd_card_t * card, int dev, snd_minor_t * reg,
 		return -EBUSY;
 	}
 	list_add_tail(&preg->list, &snd_minors_hash[SNDRV_MINOR_CARD(minor)]);
-
 	if (strncmp(name, "controlC", 8) || card->number >= cards_limit) {
 		devfs_mk_cdev(MKDEV(major, minor), S_IFCHR | device_mode, "snd/%s", name);
 		if (card)
@@ -266,7 +265,7 @@ int snd_unregister_device(int type, snd_card_t * card, int dev)
 		return -EINVAL;
 	}
 
-	if (strncmp(mptr->name, "controlC", 8) || card->number >= cards_limit) {
+	if (strncmp(mptr->name, "controlC", 8) || card->number >= cards_limit) { /* created in sound.c */
 		devfs_remove("snd/%s", mptr->name);
 		class_simple_device_remove(MKDEV(major, minor));
 	}

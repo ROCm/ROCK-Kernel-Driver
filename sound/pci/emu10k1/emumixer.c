@@ -458,6 +458,56 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 	int err, pcm;
 	snd_kcontrol_t *kctl;
 	snd_card_t *card = emu->card;
+	char **c;
+	static char *emu10k1_remove_ctls[] = {
+		/* no AC97 mono, surround, center/lfe */
+		"Master Mono Playback Switch",
+		"Master Mono Playback Volume",
+		"PCM Out Path & Mute",
+		"Mono Output Select",
+		"Surround Playback Switch",
+		"Surround Playback Volume",
+		"Center Playback Switch",
+		"Center Playback Volume",
+		"LFE Playback Switch",
+		"LFE Playback Volume",
+		NULL
+	};
+	static char *emu10k1_rename_ctls[] = {
+		"Surround Digital Playback Volume", "Surround Playback Volume",
+		"Center Digital Playback Volume", "Center Playback Volume",
+		"LFE Digital Playback Volume", "LFE Playback Volume",
+		NULL
+	};
+	static char *audigy_remove_ctls[] = {
+		/* Master/PCM controls on ac97 of Audigy has no effect */
+		"PCM Playback Switch",
+		"PCM Playback Volume",
+		"Master Mono Playback Switch",
+		"Master Mono Playback Volume",
+		"Master Playback Switch",
+		"Master Playback Volume",
+		"PCM Out Path & Mute",
+		"Mono Output Select",
+		/* remove unused AC97 capture controls */
+		"Capture Source",
+		"Capture Switch",
+		"Capture Volume",
+		"Mic Select",
+		"Video Playback Switch",
+		"Video Playback Volume",
+		"Mic Playback Switch",
+		"Mic Playback Volume",
+		NULL
+	};
+	static char *audigy_rename_ctls[] = {
+		/* use conventional names */
+		"Wave Playback Volume", "PCM Playback Volume",
+		/* "Wave Capture Volume", "PCM Capture Volume", */
+		"Wave Master Playback Volume", "Master Playback Volume",
+		"AMic Playback Volume", "Mic Playback Volume",
+		NULL
+	};
 
 	if (!emu->no_ac97) {
 		ac97_bus_t bus, *pbus;
@@ -475,32 +525,19 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 		if ((err = snd_ac97_mixer(pbus, &ac97, &emu->ac97)) < 0)
 			return err;
 		if (emu->audigy) {
-			/* Master/PCM controls on ac97 of Audigy has no effect */
-			/* pcm controls are removed */
-			remove_ctl(card, "PCM Playback Switch");
-			remove_ctl(card, "PCM Playback Volume");
-			remove_ctl(card, "Master Mono Playback Switch");
-			remove_ctl(card, "Master Mono Playback Volume");
-			remove_ctl(card, "Master Playback Switch");
-			remove_ctl(card, "Master Playback Volume");
-			remove_ctl(card, "PCM Out Path & Mute");
-			remove_ctl(card, "Mono Output Select");
-			
 			/* set master volume to 0 dB */
 			snd_ac97_write(emu->ac97, AC97_MASTER, 0x0202);
 			/* set capture source to mic */
 			snd_ac97_write(emu->ac97, AC97_REC_SEL, 0x0000);
-			
-			/* remove unused AC97 capture controls */
-			remove_ctl(card, "Capture Source");
-			remove_ctl(card, "Capture Switch");
-			remove_ctl(card, "Capture Volume");
-			remove_ctl(card, "Mic Select");
-			remove_ctl(card, "Video Playback Switch");
-			remove_ctl(card, "Video Playback Volume");
-			remove_ctl(card, "Mic Playback Switch");
-			remove_ctl(card, "Mic Playback Volume");
+			c = audigy_remove_ctls;
+		} else {
+			/* remove unused AC97 controls */
+			snd_ac97_write(emu->ac97, AC97_SURROUND_MASTER, 0x0202);
+			snd_ac97_write(emu->ac97, AC97_CENTER_LFE_MASTER, 0x0202);
+			c = emu10k1_remove_ctls;
 		}
+		for (; *c; c++)
+			remove_ctl(card, *c);
 	} else {
 		if (emu->APS)
 			strcpy(emu->card->mixername, "EMU APS");
@@ -510,13 +547,12 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 			strcpy(emu->card->mixername, "Emu10k1");
 	}
 
-	if (emu->audigy) {
-		/* use the conventional names */
-		rename_ctl(card, "Wave Playback Volume", "PCM Playback Volume");
-		/* rename_ctl(card, "Wave Capture Volume", "PCM Capture Volume"); */
-		rename_ctl(card, "Wave Master Playback Volume", "Master Playback Volume");
-		rename_ctl(card, "AMic Playback Volume", "Mic Playback Volume");
-	}
+	if (emu->audigy)
+		c = audigy_rename_ctls;
+	else
+		c = emu10k1_rename_ctls;
+	for (; *c; c += 2)
+		rename_ctl(card, c[0], c[1]);
 
 	if ((kctl = emu->ctl_send_routing = snd_ctl_new1(&snd_emu10k1_send_routing_control, emu)) == NULL)
 		return -ENOMEM;

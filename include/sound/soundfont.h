@@ -68,7 +68,7 @@ typedef struct snd_soundfont {
  * Type of the sample access callback
  */
 typedef int (*snd_sf_sample_new_t)(void *private_data, snd_sf_sample_t *sp,
-				   snd_util_memhdr_t *hdr, const void *buf, long count);
+				   snd_util_memhdr_t *hdr, const void __user *buf, long count);
 typedef int (*snd_sf_sample_free_t)(void *private_data, snd_sf_sample_t *sp,
 				    snd_util_memhdr_t *hdr);
 typedef void (*snd_sf_sample_reset_t)(void *private);
@@ -101,8 +101,8 @@ typedef struct snd_sf_list {
 } snd_sf_list_t;
 
 /* Prototypes for soundfont.c */
-int snd_soundfont_load(snd_sf_list_t *sflist, const void *data, long count, int client);
-int snd_soundfont_load_guspatch(snd_sf_list_t *sflist, const char *data,
+int snd_soundfont_load(snd_sf_list_t *sflist, const void __user *data, long count, int client);
+int snd_soundfont_load_guspatch(snd_sf_list_t *sflist, const char __user *data,
 				long count, int client);
 int snd_soundfont_close_check(snd_sf_list_t *sflist, int client);
 
