@@ -1728,8 +1728,8 @@ dbg( "digi_startup: TOP" );
 		init_waitqueue_head( &priv->dp_flush_wait );
 		priv->dp_in_close = 0;
 		init_waitqueue_head( &priv->dp_close_wait );
-		INIT_WORK(&priv->dp_wakeup_work, (void *)digi_wakeup_write_lock,
-				(void *)(&serial->port[i]));
+		INIT_WORK(&priv->dp_wakeup_work,
+				digi_wakeup_write_lock, serial->port[i]);
 
 		/* initialize write wait queue for this port */
 		init_waitqueue_head( &serial->port[i]->write_wait );
