@@ -1677,6 +1677,9 @@ pagebuf_daemon(
 					break;
 				}
 
+				pb->pb_flags &= ~PBF_DELWRI;
+				pb->pb_flags |= PBF_WRITE;
+
 				list_del(&pb->pb_list);
 				list_add(&pb->pb_list, &tmp);
 
@@ -1688,8 +1691,6 @@ pagebuf_daemon(
 		while (!list_empty(&tmp)) {
 			pb = list_entry(tmp.next, page_buf_t, pb_list);
 			list_del_init(&pb->pb_list);
-			pb->pb_flags &= ~PBF_DELWRI;
-			pb->pb_flags |= PBF_WRITE;
 
 			pagebuf_iostrategy(pb);
 		}
@@ -1720,6 +1721,7 @@ pagebuf_delwri_flush(
 	int			flush_cnt = 0;
 
 	pagebuf_runall_queues(pagebuf_dataio_workqueue);
+	pagebuf_runall_queues(pagebuf_logio_workqueue);
 
 	spin_lock(&pbd_delwrite_lock);
 	INIT_LIST_HEAD(&tmp);
@@ -1742,28 +1744,23 @@ pagebuf_delwri_flush(
 			continue;
 		}
 
-		if (flags & PBDF_TRYLOCK) {
-			if (!pagebuf_cond_lock(pb)) {
-				pincount++;
-				continue;
-			}
-		}
-
-		list_del_init(&pb->pb_list);
-		if (flags & PBDF_WAIT) {
-			list_add(&pb->pb_list, &tmp);
-			pb->pb_flags &= ~PBF_ASYNC;
-		}
-
-		spin_unlock(&pbd_delwrite_lock);
-
-		if ((flags & PBDF_TRYLOCK) == 0) {
-			pagebuf_lock(pb);
-		}
-
 		pb->pb_flags &= ~PBF_DELWRI;
 		pb->pb_flags |= PBF_WRITE;
+		list_move(&pb->pb_list, &tmp);
+	}
+	/* ok found all the items that can be worked on 
+	 * drop the lock and process the private list */
+	spin_unlock(&pbd_delwrite_lock);
 
+	list_for_each_safe(curr, next, &tmp) {
+		pb = list_entry(curr, page_buf_t, pb_list);
+
+		if (flags & PBDF_WAIT)
+			pb->pb_flags &= ~PBF_ASYNC;
+		else
+			list_del_init(curr);
+
+		pagebuf_lock(pb);
 		pagebuf_iostrategy(pb);
 		if (++flush_cnt > 32) {
 			blk_run_queues();
@@ -1772,12 +1769,6 @@ pagebuf_delwri_flush(
 	}
 
 	blk_run_queues();
-
-	if (pinptr)
-		*pinptr = pincount;
-
-	if ((flags & PBDF_WAIT) == 0)
-		return;
 
 	while (!list_empty(&tmp)) {
 		pb = list_entry(tmp.next, page_buf_t, pb_list);
@@ -1788,6 +1779,9 @@ pagebuf_delwri_flush(
 			pagebuf_unlock(pb);
 		pagebuf_rele(pb);
 	}
+
+	if (pinptr)
+		*pinptr = pincount;
 }
 
 STATIC int
