@@ -1052,12 +1052,11 @@ access_uarea (struct task_struct *child, unsigned long addr,
 
 		ptr += regnum;
 
-		if (write_access)
+		if ((regnum & 1) && write_access) {
 			/* don't let the user set kernel-level breakpoints: */
 			*ptr = *data & ~(7UL << 56);
-		else
-			*data = *ptr;
-		return 0;
+			return 0;
+		}
 	}
 	if (write_access)
 		*ptr = *data;
@@ -1521,13 +1520,7 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data)
 			goto out_tsk;
 		child->exit_code = SIGKILL;
 
-		/*
-		 * Make sure the single step/take-branch trap bits are
-		 * not set:
-		 */
-		ia64_psr(pt)->ss = 0;
-		ia64_psr(pt)->tb = 0;
-
+		ptrace_disable(child);
 		wake_up_process(child);
 		ret = 0;
 		goto out_tsk;
