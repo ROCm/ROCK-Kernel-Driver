@@ -435,6 +435,20 @@ cifs_read_wrapper(struct file * file, char __user *read_data, size_t read_size,
 		return -EIO;
 
 	cFYI(1,("In read_wrapper size %zd at %lld",read_size,*poffset));
+
+#ifdef CIFS_EXPERIMENTAL    /* BB fixme - fix user char * to kernel char * mapping here BB */
+	/* check whether we can cache writes locally */
+	if(file->f_dentry->d_sb) {
+		struct cifs_sb_info *cifs_sb;
+		cifs_sb = CIFS_SB(file->f_dentry->d_sb);
+		if(cifs_sb != NULL) {
+			if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_DIRECT_IO)
+				return cifs_read(file,read_data,
+							read_size,poffset);
+		}
+	}
+#endif /* CIFS_EXPERIMENTAL */
+
 	if(CIFS_I(file->f_dentry->d_inode)->clientCanCacheRead) {
 		return generic_file_read(file,read_data,read_size,poffset);
 	} else {
@@ -467,7 +481,18 @@ cifs_write_wrapper(struct file * file, const char __user *write_data,
 
 	cFYI(1,("In write_wrapper size %zd at %lld",write_size,*poffset));
 
+#ifdef CIFS_EXPERIMENTAL    /* BB fixme - fix user char * to kernel char * mapping here BB */
 	/* check whether we can cache writes locally */
+	if(file->f_dentry->d_sb) {
+		struct cifs_sb_info *cifs_sb;
+		cifs_sb = CIFS_SB(file->f_dentry->d_sb);
+		if(cifs_sb != NULL) {
+			if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_DIRECT_IO)
+				return cifs_write(file,write_data,
+							write_size,poffset);
+		}
+	}
+#endif /* CIFS_EXPERIMENTAL */
 	written = generic_file_write(file,write_data,write_size,poffset);
 	if(!CIFS_I(file->f_dentry->d_inode)->clientCanCacheAll)  {
 		if(file->f_dentry->d_inode->i_mapping) {

@@ -71,6 +71,7 @@ struct smb_vol {
 	unsigned noperm:1;
 	unsigned no_psx_acl:1; /* set if posix acl support should be disabled */
 	unsigned server_ino:1; /* use inode numbers from server ie UniqueId */
+	unsigned direct_io:1;
 	unsigned int rsize;
 	unsigned int wsize;
 	unsigned int sockopt;
@@ -792,6 +793,10 @@ cifs_parse_mount_options(char *options, const char *devname,struct smb_vol *vol)
 			vol->no_psx_acl = 0;
 		} else if (strnicmp(data, "noacl",5) == 0) {
 			vol->no_psx_acl = 1;
+		} else if (strnicmp(data, "direct",6) == 0) {
+			vol->direct_io = 1;
+		} else if (strnicmp(data, "forcedirectio",13) == 0) {
+			vol->direct_io = 1;
 		} else if (strnicmp(data, "noac", 4) == 0) {
 			printk(KERN_WARNING "CIFS: Mount option noac not supported. Instead set /proc/fs/cifs/LookupCacheEnabled to 0\n");
 		} else
@@ -1407,6 +1412,10 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			cifs_sb->mnt_cifs_flags |= CIFS_MOUNT_SET_UID;
 		if(volume_info.server_ino)
 			cifs_sb->mnt_cifs_flags |= CIFS_MOUNT_SERVER_INUM;
+		if(volume_info.direct_io) {
+			cFYI(1,("mounting share using direct i/o"));
+			cifs_sb->mnt_cifs_flags |= CIFS_MOUNT_DIRECT_IO;
+		}
 
 		tcon =
 		    find_unc(sin_server.sin_addr.s_addr, volume_info.UNC,

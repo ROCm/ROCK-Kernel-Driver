@@ -1067,6 +1067,17 @@ int cifs_file_mmap(struct file * file, struct vm_area_struct * vma)
 	struct dentry * dentry = file->f_dentry;
 	int	rc, xid;
 
+#ifdef CIFS_EXPERIMENTAL   /* BB fixme reenable when cifs_read_wrapper fixed */
+	if(dentry->d_sb) {
+		struct cifs_sb_info *cifs_sb;
+		cifs_sb = CIFS_SB(sb);
+		if(cifs_sb != NULL) {
+			if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_DIRECT_IO)
+				return -ENODEV
+		}
+	}
+#endif /* CIFS_EXPERIMENTAL */
+
 	xid = GetXid();
 	rc = cifs_revalidate(dentry);
 	if (rc) {

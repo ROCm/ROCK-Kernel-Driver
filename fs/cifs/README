@@ -115,11 +115,20 @@ cifs client, and that EA support is present in later versions of Samba (e.g.
 3.0.6 and later (also EA support works in all versions of Windows, at least to
 shares on NTFS filesystems).  Extended Attribute (xattr) support is an optional
 feature of most Linux filesystems which may require enabling via
-make menuconfig
+make menuconfig.
+
+The CIFS client can get and set POSIX ACLs (getfacl, setfacl) to Samba servers
+version 3.10 and later.  Setting POSIX ACLs requires enabling both XATTR and 
+then POSIX support in the CIFS configuration options when building the cifs
+module.
  
 Some administrators may want to change Samba's smb.conf "map archive" and 
-"create mask" parameters from the default.  Creating special devices (mknod) 
-remotely may require specifying a mkdev function to Samba if you are not using 
+"create mask" parameters from the default.  Unless the create mask is changed
+newly created files can end up with an unnecessarily restrictive default mode,
+which may not be what you want, although if the CIFS Unix extensions are
+enabled on the server and client, subsequent setattr calls (e.g. chmod) can
+fix the mode.  Note that creating special devices (mknod) remotely 
+may require specifying a mkdev function to Samba if you are not using 
 Samba 3.0.6 or later.  For more information on these see the manual pages
 ("man smb.conf") on the Samba server system.  Note that the cifs vfs,
 unlike the smbfs vfs, does not read the smb.conf on the client system 
@@ -324,6 +333,23 @@ A partial list of the supported mount options follows:
 		the client) set the uid and gid is the default. This
 		parameter has no effect if the CIFS Unix Extensions are not
 		negotiated.
+  netbiosname   When mounting to servers via port 139, specifies the RFC1001
+		source name to use to represent the client netbios machine 
+		name when doing the RFC1001 netbios session initialize.
+  direct        Do not do inode data caching on files opened on this mount.
+		This precludes mmaping files on this mount. In some cases
+		with fast networks and little or no caching benefits on the
+		client (e.g. when the application is doing large sequential
+		reads bigger than page size without rereading the same data) 
+		this can provide better performance than the default
+		behavior which caches reads (reaadahead) and writes 
+		(writebehind) through the local Linux client pagecache 
+		if oplock (caching token) is granted and held. Note that
+		direct allows write operations larger than page size
+		to be sent to the server.
+  acl   	Allow setfacl and getfacl to manage posix ACLs if server
+		supports them.  (default)
+  noacl 	Do not allow setfacl and getfacl calls on this mount
 		
 The mount.cifs mount helper also accepts a few mount options before -o
 including:
@@ -402,7 +428,7 @@ require enabling an ifdef (e.g. by  adding "#define CIFS_FCNTL" in cifsglob.h)
 	CONFIG_CIFS_FCNTL  (fcntl needed for support of directory change 
 			    notification and perhaps later for file leases)
 
-Per share (per client mount) statistics are available in /proc/fs/cifs/DebugData
+Per share (per client mount) statistics are available in /proc/fs/cifs/Stats
 if the kernel was configured with cifs statistics enabled.  The statistics
 represent the number of successful (ie non-zero return code from the server) 
 SMB responses to some of the more common commands (open, delete, mkdir etc.).
