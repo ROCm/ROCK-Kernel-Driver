@@ -598,10 +598,7 @@ nomem:
 /* A helper function for delayed processing of INET ECN CE bit. */
 static void sctp_do_ecn_ce_work(sctp_association_t *asoc, __u32 lowest_tsn)
 {
-	/*
-	 * Save the TSN away for comparison when we receive CWR
-	 * Note: dp->TSN is expected in host endian
-	 */
+	/* Save the TSN away for comparison when we receive CWR */
 
 	asoc->last_ecne_tsn = lowest_tsn;
 	asoc->need_ecne = 1;
@@ -624,7 +621,6 @@ static sctp_chunk_t *sctp_do_ecn_ecne_work(sctp_association_t *asoc,
 					   sctp_chunk_t *chunk)
 {
 	sctp_chunk_t *repl;
-	sctp_transport_t *transport;
 
 	/* Our previously transmitted packet ran into some congestion
 	 * so we should take action by reducing cwnd and ssthresh
@@ -632,43 +628,28 @@ static sctp_chunk_t *sctp_do_ecn_ecne_work(sctp_association_t *asoc,
 	 * sending a CWR.
 	 */
 
-	/* Find which transport's congestion variables
-	 * need to be adjusted.
+	/* First, try to determine if we want to actually lower
+	 * our cwnd variables.  Only lower them if the ECNE looks more
+	 * recent than the last response.
 	 */
+	if (TSN_lt(asoc->last_cwr_tsn, lowest_tsn)) {
+		sctp_transport_t *transport;
 
-	transport = sctp_assoc_lookup_tsn(asoc, lowest_tsn);
+		/* Find which transport's congestion variables
+		 * need to be adjusted.
+		 */
+		transport = sctp_assoc_lookup_tsn(asoc, lowest_tsn);
 
-	/* Update the congestion variables. */
-	if (transport)
-		sctp_transport_lower_cwnd(transport, SCTP_LOWER_CWND_ECNE);
+		/* Update the congestion variables. */
+		if (transport)
+			sctp_transport_lower_cwnd(transport,
+						  SCTP_LOWER_CWND_ECNE);
+		asoc->last_cwr_tsn = lowest_tsn;
+	}
 
-	/* Save away a rough idea of when we last sent out a CWR.
-	 * We compare against this value (see above) to decide if
-	 * this is a fairly new request.
-	 * Note that this is not a perfect solution.  We may
-	 * have moved beyond the window (several times) by the
-	 * next time we get an ECNE.  However, it is cute.  This idea
-	 * came from Randy's reference code.
-	 *
-	 * Here's what RFC 2960 has to say about CWR.  This is NOT
-	 * what we do.
-	 *
-	 * RFC 2960 Appendix A
-	 *
-	 *    CWR:
-	 *
-	 *    RFC 2481 details a specific bit for a sender to send in
-	 *    the header of its next outbound TCP segment to indicate
-	 *    to its peer that it has reduced its congestion window.
-	 *    This is termed the CWR bit.  For SCTP the same
-	 *    indication is made by including the CWR chunk.  This
-	 *    chunk contains one data element, i.e. the TSN number
-	 *    that was sent in the ECNE chunk.  This element
-	 *    represents the lowest TSN number in the datagram that
-	 *    was originally marked with the CE bit.
+	/* Always try to quiet the other end.  In case of lost CWR,
+	 * resend last_cwr_tsn.  
 	 */
-	asoc->last_cwr_tsn = asoc->next_tsn - 1;
-
 	repl = sctp_make_cwr(asoc, asoc->last_cwr_tsn, chunk);
 
 	/* If we run out of memory, it will look like a lost CWR.  We'll
@@ -1050,7 +1031,7 @@ static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *commands,
 
 	if (event_type == SCTP_EVENT_T_PRIMITIVE)
 		error = SCTP_ERROR_USER_ABORT;
-	
+
 	if (chunk && (SCTP_CID_ABORT == chunk->chunk_hdr->type) &&
 	    (ntohs(chunk->chunk_hdr->length) >= (sizeof(struct sctp_chunkhdr) +
 				 		 sizeof(struct sctp_errhdr)))) {

@@ -866,9 +866,9 @@ sctp_disposition_t sctp_sf_backbeat_8_3(const sctp_endpoint_t *ep,
 /* Helper function to send out an abort for the restart
  * condition.
  */
-static int sctp_sf_send_restart_abort(sockaddr_storage_t *ssa, 
+static int sctp_sf_send_restart_abort(sockaddr_storage_t *ssa,
 				      sctp_chunk_t *init,
-				      sctp_cmd_seq_t *commands) 
+				      sctp_cmd_seq_t *commands)
 {
 	int len;
 	sctp_packet_t *pkt;
@@ -882,7 +882,7 @@ static int sctp_sf_send_restart_abort(sockaddr_storage_t *ssa,
 	 */
 	errhdr = (sctp_errhdr_t *)buffer;
 	addrparm = (sctp_addr_param_t *)errhdr->variable;
-	
+
 	/* Copy into a parm format. */
 	len = sockaddr2sctp_addr(ssa, addrparm);
 	len += sizeof(sctp_errhdr_t);
@@ -898,7 +898,7 @@ static int sctp_sf_send_restart_abort(sockaddr_storage_t *ssa,
 	 */
 	pkt = sctp_abort_pkt_new(ep, NULL, init, errhdr, len);
 
-	if (!pkt) 
+	if (!pkt)
 		goto out;
 	sctp_add_cmd_sf(commands, SCTP_CMD_SEND_PKT, SCTP_PACKET(pkt));
 
@@ -907,18 +907,18 @@ static int sctp_sf_send_restart_abort(sockaddr_storage_t *ssa,
 
 out:
 	/* Even if there is no memory, treat as a failure so
-	 * the packet will get dropped. 
+	 * the packet will get dropped.
 	 */
 	return 0;
 }
 
-/* A restart is occuring, check to make sure no new addresses 
+/* A restart is occuring, check to make sure no new addresses
  * are being added as we may be under a takeover attack.
  */
 static int sctp_sf_check_restart_addrs(const sctp_association_t *new_asoc,
 				       const sctp_association_t *asoc,
 				       sctp_chunk_t *init,
-				       sctp_cmd_seq_t *commands) 
+				       sctp_cmd_seq_t *commands)
 {
 	sctp_transport_t *new_addr, *addr;
 	struct list_head *pos, *pos2;
@@ -957,8 +957,8 @@ static int sctp_sf_check_restart_addrs(const sctp_association_t *new_asoc,
 	if (!found && new_addr) {
 		sctp_sf_send_restart_abort(&new_addr->ipaddr, init, commands);
 	}
-	
-	/* Return success if all addresses were found. */   
+
+	/* Return success if all addresses were found. */
 	return found;
 }
 
@@ -1054,7 +1054,7 @@ static char sctp_tietags_compare(sctp_association_t *new_asoc,
  */
 static sctp_disposition_t sctp_sf_do_unexpected_init(
 	const sctp_endpoint_t *ep,
-	const sctp_association_t *asoc, 
+	const sctp_association_t *asoc,
 	const sctp_subtype_t type,
 	void *arg, sctp_cmd_seq_t *commands)
 {
@@ -1131,10 +1131,10 @@ static sctp_disposition_t sctp_sf_do_unexpected_init(
 	/* Make sure no new addresses are being added during the
 	 * restart.   Do not do this check for COOKIE-WAIT state,
 	 * since there are no peer addresses to check against.
-	 * Upon return an ABORT will have been sent if needed.  
+	 * Upon return an ABORT will have been sent if needed.
 	 */
 	if (asoc->state != SCTP_STATE_COOKIE_WAIT) {
-		if (!sctp_sf_check_restart_addrs(new_asoc, asoc, chunk, 
+		if (!sctp_sf_check_restart_addrs(new_asoc, asoc, chunk,
 						 commands)) {
 			retval = SCTP_DISPOSITION_CONSUME;
 			goto cleanup_asoc;
@@ -1334,9 +1334,9 @@ static sctp_disposition_t sctp_sf_do_dupcook_a(const sctp_endpoint_t *ep,
 	 * since you'd have to get inside the cookie.
 	 */
 	if (!sctp_sf_check_restart_addrs(new_asoc, asoc, chunk, commands)) {
-		printk("cookie echo check\n"); 
+		printk("cookie echo check\n");
 		return SCTP_DISPOSITION_CONSUME;
-	}	
+	}
 
 	/* For now, fail any unsent/unacked data.  Consider the optional
 	 * choice of resending of this data.
@@ -1543,7 +1543,7 @@ sctp_disposition_t sctp_sf_do_5_2_4_dupcook(const sctp_endpoint_t *ep,
 	 * are in good shape.
 	 */
         chunk->subh.cookie_hdr = (sctp_signed_cookie_t *)chunk->skb->data;
-	skb_pull(chunk->skb, ntohs(chunk->chunk_hdr->length) - 
+	skb_pull(chunk->skb, ntohs(chunk->chunk_hdr->length) -
 		 sizeof(sctp_chunkhdr_t));
 
 	/* In RFC 2960 5.2.4 3, if both Verification Tags in the State Cookie
@@ -2099,18 +2099,11 @@ sctp_disposition_t sctp_sf_do_ecne(const sctp_endpoint_t *ep,
 
 	ecne = (sctp_ecnehdr_t *) chunk->skb->data;
 	skb_pull(chunk->skb, sizeof(sctp_ecnehdr_t));
-	ecne->lowest_tsn = ntohl(ecne->lowest_tsn);
-
-	/* Casting away the const, as we are just modifying the spinlock,
-	 * not the association itself.   This should go away in the near
-	 * future when we move to an endpoint based lock.
-	 */
 
 	/* If this is a newer ECNE than the last CWR packet we sent out */
-	if (TSN_lt(asoc->last_cwr_tsn, ecne->lowest_tsn)) {
-		sctp_add_cmd_sf(commands, SCTP_CMD_ECN_ECNE,
-				SCTP_U32(ecne->lowest_tsn));
-	}
+	sctp_add_cmd_sf(commands, SCTP_CMD_ECN_ECNE,
+			SCTP_U32(ntohl(ecne->lowest_tsn)));
+
 	return SCTP_DISPOSITION_CONSUME;
 }
 
@@ -2642,7 +2635,7 @@ sctp_disposition_t sctp_sf_operr_notify(const sctp_endpoint_t *ep,
 	sctp_ulpevent_t *ev;
 
 	while (chunk->chunk_end > chunk->skb->data) {
-		ev = sctp_ulpevent_make_remote_error(asoc, chunk, 0, 
+		ev = sctp_ulpevent_make_remote_error(asoc, chunk, 0,
 						     GFP_ATOMIC);
 		if (!ev)
 			goto nomem;
