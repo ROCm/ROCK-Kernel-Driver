@@ -71,9 +71,6 @@ static struct buffer_head *ext3_append(handle_t *handle,
 #define swap(x, y) do { typeof(x) z = x; x = y; y = z; } while (0)
 #endif
 
-typedef struct { u32 v; } le_u32;
-typedef struct { u16 v; } le_u16;
-
 #ifdef DX_DEBUG
 #define dxtrace(command) command
 #else
@@ -82,22 +79,22 @@ typedef struct { u16 v; } le_u16;
 
 struct fake_dirent
 {
-	/*le*/u32 inode;
-	/*le*/u16 rec_len;
+	__le32 inode;
+	__le16 rec_len;
 	u8 name_len;
 	u8 file_type;
 };
 
 struct dx_countlimit
 {
-	le_u16 limit;
-	le_u16 count;
+	__le16 limit;
+	__le16 count;
 };
 
 struct dx_entry
 {
-	le_u32 hash;
-	le_u32 block;
+	__le32 hash;
+	__le32 block;
 };
 
 /*
@@ -114,7 +111,7 @@ struct dx_root
 	char dotdot_name[4];
 	struct dx_root_info
 	{
-		le_u32 reserved_zero;
+		__le32 reserved_zero;
 		u8 hash_version;
 		u8 info_length; /* 8 */
 		u8 indirect_levels;
@@ -184,42 +181,42 @@ static int ext3_dx_add_entry(handle_t *handle, struct dentry *dentry,
 
 static inline unsigned dx_get_block (struct dx_entry *entry)
 {
-	return le32_to_cpu(entry->block.v) & 0x00ffffff;
+	return le32_to_cpu(entry->block) & 0x00ffffff;
 }
 
 static inline void dx_set_block (struct dx_entry *entry, unsigned value)
 {
-	entry->block.v = cpu_to_le32(value);
+	entry->block = cpu_to_le32(value);
 }
 
 static inline unsigned dx_get_hash (struct dx_entry *entry)
 {
-	return le32_to_cpu(entry->hash.v);
+	return le32_to_cpu(entry->hash);
 }
 
 static inline void dx_set_hash (struct dx_entry *entry, unsigned value)
 {
-	entry->hash.v = cpu_to_le32(value);
+	entry->hash = cpu_to_le32(value);
 }
 
 static inline unsigned dx_get_count (struct dx_entry *entries)
 {
-	return le16_to_cpu(((struct dx_countlimit *) entries)->count.v);
+	return le16_to_cpu(((struct dx_countlimit *) entries)->count);
 }
 
 static inline unsigned dx_get_limit (struct dx_entry *entries)
 {
-	return le16_to_cpu(((struct dx_countlimit *) entries)->limit.v);
+	return le16_to_cpu(((struct dx_countlimit *) entries)->limit);
 }
 
 static inline void dx_set_count (struct dx_entry *entries, unsigned value)
 {
-	((struct dx_countlimit *) entries)->count.v = cpu_to_le16(value);
+	((struct dx_countlimit *) entries)->count = cpu_to_le16(value);
 }
 
 static inline void dx_set_limit (struct dx_entry *entries, unsigned value)
 {
-	((struct dx_countlimit *) entries)->limit.v = cpu_to_le16(value);
+	((struct dx_countlimit *) entries)->limit = cpu_to_le16(value);
 }
 
 static inline unsigned dx_root_limit (struct inode *dir, unsigned infosize)
@@ -2258,7 +2255,7 @@ static int ext3_rename (struct inode * old_dir, struct dentry *old_dentry,
 	} else {
 		BUFFER_TRACE(new_bh, "get write access");
 		ext3_journal_get_write_access(handle, new_bh);
-		new_de->inode = le32_to_cpu(old_inode->i_ino);
+		new_de->inode = cpu_to_le32(old_inode->i_ino);
 		if (EXT3_HAS_INCOMPAT_FEATURE(new_dir->i_sb,
 					      EXT3_FEATURE_INCOMPAT_FILETYPE))
 			new_de->file_type = old_de->file_type;
@@ -2313,7 +2310,7 @@ static int ext3_rename (struct inode * old_dir, struct dentry *old_dentry,
 	if (dir_bh) {
 		BUFFER_TRACE(dir_bh, "get_write_access");
 		ext3_journal_get_write_access(handle, dir_bh);
-		PARENT_INO(dir_bh->b_data) = le32_to_cpu(new_dir->i_ino);
+		PARENT_INO(dir_bh->b_data) = cpu_to_le32(new_dir->i_ino);
 		BUFFER_TRACE(dir_bh, "call ext3_journal_dirty_metadata");
 		ext3_journal_dirty_metadata(handle, dir_bh);
 		old_dir->i_nlink--;

@@ -55,8 +55,8 @@ MODULE_LICENSE("GPL");
 struct vortex {
 	struct gameport gameport;
 	struct pci_dev *dev;
-        unsigned char *base;
-        unsigned char *io;
+        unsigned char __iomem *base;
+        unsigned char __iomem *io;
 	char phys[32];
 };
 

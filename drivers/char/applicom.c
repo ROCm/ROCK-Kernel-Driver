@@ -89,7 +89,7 @@ MODULE_SUPPORTED_DEVICE("ac");
 
 static struct applicom_board {
 	unsigned long PhysIO;
-	unsigned long RamIO;
+	void __iomem *RamIO;
 	wait_queue_head_t FlagSleepSend;
 	long irq;
 	spinlock_t mutex;
@@ -127,7 +127,7 @@ static struct miscdevice ac_miscdev = {
 
 static int dummy;	/* dev_id for request_irq() */
 
-static int ac_register_board(unsigned long physloc, unsigned long loc, 
+static int ac_register_board(unsigned long physloc, void __iomem *loc, 
 		      unsigned char boardno)
 {
 	volatile unsigned char byte_reset_it;
@@ -179,11 +179,11 @@ void cleanup_module(void)
 
 		if (!apbs[i].RamIO)
 			continue;
-		
-		iounmap((void *) apbs[i].RamIO);
 
 		if (apbs[i].irq)
 			free_irq(apbs[i].irq, &dummy);
+
+		iounmap(apbs[i].RamIO);
 	}
 }
 
@@ -193,7 +193,7 @@ int __init applicom_init(void)
 {
 	int i, numisa = 0;
 	struct pci_dev *dev = NULL;
-	void *RamIO;
+	void __iomem *RamIO;
 	int boardno;
 
 	printk(KERN_INFO "Applicom driver: $Id: ac.c,v 1.30 2000/03/22 16:03:57 dwmw2 Exp $\n");
@@ -223,8 +223,8 @@ int __init applicom_init(void)
 		       applicom_pci_devnames[dev->device-1], dev->resource[0].start, 
 		       dev->irq);
 
-		if (!(boardno = ac_register_board(dev->resource[0].start,
-						  (unsigned long)RamIO,0))) {
+		boardno = ac_register_board(dev->resource[0].start, RamIO,0);
+		if (!boardno) {
 			printk(KERN_INFO "ac.o: PCI Applicom device doesn't have correct signature.\n");
 			iounmap(RamIO);
 			pci_disable_device(dev);
@@ -235,7 +235,7 @@ int __init applicom_init(void)
 			printk(KERN_INFO "Could not allocate IRQ %d for PCI Applicom device.\n", dev->irq);
 			iounmap(RamIO);
 			pci_disable_device(dev);
-			apbs[boardno - 1].RamIO = 0;
+			apbs[boardno - 1].RamIO = NULL;
 			continue;
 		}
 
@@ -270,7 +270,7 @@ int __init applicom_init(void)
 		}
 
 		if (!(boardno = ac_register_board((unsigned long)mem+ (LEN_RAM_IO*i),
-						  (unsigned long)RamIO,i+1))) {
+						  RamIO,i+1))) {
 			iounmap(RamIO);
 			continue;
 		}
@@ -280,8 +280,8 @@ int __init applicom_init(void)
 		if (!numisa) {
 			if (request_irq(irq, &ac_interrupt, SA_SHIRQ, "Applicom ISA", &dummy)) {
 				printk(KERN_WARNING "Could not allocate IRQ %d for ISA Applicom device.\n", irq);
-				iounmap((void *) RamIO);
-				apbs[boardno - 1].RamIO = 0;
+				iounmap(RamIO);
+				apbs[boardno - 1].RamIO = NULL;
 			}
 			else
 				apbs[boardno - 1].irq = irq;
@@ -449,7 +449,7 @@ static ssize_t ac_write(struct file *file, const char __user *buf, size_t count,
 	   because it works with 2.2 still */
 	{
 		unsigned char *from = (unsigned char *) &tmpmailbox;
-		unsigned long to = (unsigned long) apbs[IndexCard].RamIO + RAM_FROM_PC;
+		void __iomem *to = apbs[IndexCard].RamIO + RAM_FROM_PC;
 		int c;
 
 		for (c = 0; c < sizeof(struct mailbox); c++)
@@ -470,7 +470,7 @@ static ssize_t ac_write(struct file *file, const char __user *buf, size_t count,
 static int do_ac_read(int IndexCard, char __user *buf,
 		struct st_ram_io *st_loc, struct mailbox *mailbox)
 {
-	unsigned long from = (unsigned long)apbs[IndexCard].RamIO + RAM_TO_PC;
+	void __iomem *from = apbs[IndexCard].RamIO + RAM_TO_PC;
 	unsigned char *to = (unsigned char *)&mailbox;
 #ifdef DEBUG
 	int c;
@@ -685,7 +685,7 @@ static int ac_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 {				/* @ ADG ou ATO selon le cas */
 	int i;
 	unsigned char IndexCard;
-	unsigned long pmem;
+	void __iomem *pmem;
 	int ret = 0;
 	volatile unsigned char byte_reset_it;
 	struct st_ram_io *adgl;

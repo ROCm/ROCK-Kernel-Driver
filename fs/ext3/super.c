@@ -138,7 +138,7 @@ static void ext3_handle_error(struct super_block *sb)
 	struct ext3_super_block *es = EXT3_SB(sb)->s_es;
 
 	EXT3_SB(sb)->s_mount_state |= EXT3_ERROR_FS;
-	es->s_state |= cpu_to_le32(EXT3_ERROR_FS);
+	es->s_state |= cpu_to_le16(EXT3_ERROR_FS);
 
 	if (sb->s_flags & MS_RDONLY)
 		return;
@@ -377,7 +377,7 @@ static void dump_orphan_list(struct super_block *sb, struct ext3_sb_info *sbi)
 		       "inode %s:%ld at %p: mode %o, nlink %d, next %d\n",
 		       inode->i_sb->s_id, inode->i_ino, inode,
 		       inode->i_mode, inode->i_nlink, 
-		       le32_to_cpu(NEXT_ORPHAN(inode)));
+		       NEXT_ORPHAN(inode));
 	}
 }
 
@@ -391,7 +391,7 @@ void ext3_put_super (struct super_block * sb)
 	journal_destroy(sbi->s_journal);
 	if (!(sb->s_flags & MS_RDONLY)) {
 		EXT3_CLEAR_INCOMPAT_FEATURE(sb, EXT3_FEATURE_INCOMPAT_RECOVER);
-		es->s_state = le16_to_cpu(sbi->s_mount_state);
+		es->s_state = cpu_to_le16(sbi->s_mount_state);
 		BUFFER_TRACE(sbi->s_sbh, "marking dirty");
 		mark_buffer_dirty(sbi->s_sbh);
 		ext3_commit_super(sb, es, 1);
@@ -964,8 +964,7 @@ static int ext3_setup_super(struct super_block *sb, struct ext3_super_block *es,
 	es->s_state = cpu_to_le16(le16_to_cpu(es->s_state) & ~EXT3_VALID_FS);
 #endif
 	if (!(__s16) le16_to_cpu(es->s_max_mnt_count))
-		es->s_max_mnt_count =
-			(__s16) cpu_to_le16(EXT3_DFL_MAX_MNT_COUNT);
+		es->s_max_mnt_count = cpu_to_le16(EXT3_DFL_MAX_MNT_COUNT);
 	es->s_mnt_count=cpu_to_le16(le16_to_cpu(es->s_mnt_count) + 1);
 	es->s_mtime = cpu_to_le32(get_seconds());
 	ext3_update_dynamic_rev(sb);
@@ -1221,6 +1220,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	int db_count;
 	int i;
 	int needs_recovery;
+	__le32 features;
 
 	sbi = kmalloc(sizeof(*sbi), GFP_KERNEL);
 	if (!sbi)
@@ -1313,17 +1313,18 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	 * previously didn't change the revision level when setting the flags,
 	 * so there is a chance incompat flags are set on a rev 0 filesystem.
 	 */
-	if ((i = EXT3_HAS_INCOMPAT_FEATURE(sb, ~EXT3_FEATURE_INCOMPAT_SUPP))) {
+	features = EXT3_HAS_INCOMPAT_FEATURE(sb, ~EXT3_FEATURE_INCOMPAT_SUPP);
+	if (features) {
 		printk(KERN_ERR "EXT3-fs: %s: couldn't mount because of "
 		       "unsupported optional features (%x).\n",
-		       sb->s_id, i);
+		       sb->s_id, le32_to_cpu(features));
 		goto failed_mount;
 	}
-	if (!(sb->s_flags & MS_RDONLY) &&
-	    (i = EXT3_HAS_RO_COMPAT_FEATURE(sb, ~EXT3_FEATURE_RO_COMPAT_SUPP))){
+	features = EXT3_HAS_RO_COMPAT_FEATURE(sb, ~EXT3_FEATURE_RO_COMPAT_SUPP);
+	if (!(sb->s_flags & MS_RDONLY) && features) {
 		printk(KERN_ERR "EXT3-fs: %s: couldn't mount RDWR because of "
 		       "unsupported optional features (%x).\n",
-		       sb->s_id, i);
+		       sb->s_id, le32_to_cpu(features));
 		goto failed_mount;
 	}
 	blocksize = BLOCK_SIZE << le32_to_cpu(es->s_log_block_size);
@@ -1360,7 +1361,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		}
 		es = (struct ext3_super_block *)(((char *)bh->b_data) + offset);
 		sbi->s_es = es;
-		if (es->s_magic != le16_to_cpu(EXT3_SUPER_MAGIC)) {
+		if (es->s_magic != cpu_to_le16(EXT3_SUPER_MAGIC)) {
 			printk (KERN_ERR 
 				"EXT3-fs: Magic mismatch, very weird !\n");
 			goto failed_mount;
@@ -1737,10 +1738,10 @@ static journal_t *ext3_get_dev_journal(struct super_block *sb,
 		printk(KERN_ERR "EXT3-fs: I/O error on journal device\n");
 		goto out_journal;
 	}
-	if (ntohl(journal->j_superblock->s_nr_users) != 1) {
+	if (be32_to_cpu(journal->j_superblock->s_nr_users) != 1) {
 		printk(KERN_ERR "EXT3-fs: External journal has more than one "
 					"user (unsupported) - %d\n",
-			ntohl(journal->j_superblock->s_nr_users));
+			be32_to_cpu(journal->j_superblock->s_nr_users));
 		goto out_journal;
 	}
 	EXT3_SB(sb)->journal_bdev = bdev;
@@ -2065,13 +2066,13 @@ int ext3_remount (struct super_block * sb, int * flags, char * data)
 
 			ext3_mark_recovery_complete(sb, es);
 		} else {
-			int ret;
+			__le32 ret;
 			if ((ret = EXT3_HAS_RO_COMPAT_FEATURE(sb,
 					~EXT3_FEATURE_RO_COMPAT_SUPP))) {
 				printk(KERN_WARNING "EXT3-fs: %s: couldn't "
 				       "remount RDWR because of unsupported "
 				       "optional features (%x).\n",
-				       sb->s_id, ret);
+				       sb->s_id, le32_to_cpu(ret));
 				return -EROFS;
 			}
 			/*

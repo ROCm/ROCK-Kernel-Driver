@@ -27,19 +27,19 @@ extern size_t RXRPC_MAX_PACKET_SIZE;
  */
 struct rxrpc_header
 {
-	uint32_t	epoch;		/* client boot timestamp */
+	__be32		epoch;		/* client boot timestamp */
 
-	uint32_t	cid;		/* connection and channel ID */
+	__be32		cid;		/* connection and channel ID */
 #define RXRPC_MAXCALLS		4			/* max active calls per conn */
 #define RXRPC_CHANNELMASK	(RXRPC_MAXCALLS-1)	/* mask for channel ID */
 #define RXRPC_CIDMASK		(~RXRPC_CHANNELMASK)	/* mask for connection ID */
 #define RXRPC_CIDSHIFT		2			/* shift for connection ID */
 
-	uint32_t	callNumber;	/* call ID (0 for connection-level packets) */
+	__be32		callNumber;	/* call ID (0 for connection-level packets) */
 #define RXRPC_PROCESS_MAXCALLS	(1<<2)	/* maximum number of active calls per conn (power of 2) */
 
-	uint32_t	seq;		/* sequence number of pkt in call stream */
-	uint32_t	serial;		/* serial number of pkt sent to network */
+	__be32		seq;		/* sequence number of pkt in call stream */
+	__be32		serial;		/* serial number of pkt sent to network */
 
 	uint8_t		type;		/* packet type */
 #define RXRPC_PACKET_TYPE_DATA		1	/* data */
@@ -62,8 +62,8 @@ struct rxrpc_header
 
 	uint8_t		userStatus;	/* app-layer defined status */
 	uint8_t		securityIndex;	/* security protocol ID */
-	uint16_t	_rsvd;		/* reserved (used by kerberos security as cksum) */
-	uint16_t	serviceId;	/* service ID */
+	__be16		_rsvd;		/* reserved (used by kerberos security as cksum) */
+	__be16		serviceId;	/* service ID */
 
 } __attribute__((packed));
 
@@ -85,7 +85,7 @@ struct rxrpc_jumbo_header
 {
 	uint8_t		flags;		/* packet flags (as per rxrpc_header) */
 	uint8_t		pad;
-	uint16_t	_rsvd;		/* reserved (used by kerberos security as cksum) */
+	__be16		_rsvd;		/* reserved (used by kerberos security as cksum) */
 };
 
 #define RXRPC_JUMBO_DATALEN	1412	/* non-terminal jumbo packet data length */
@@ -97,12 +97,12 @@ struct rxrpc_jumbo_header
  */
 struct rxrpc_ackpacket
 {
-	uint16_t	bufferSpace;	/* number of packet buffers available */
-	uint16_t	maxSkew;	/* diff between serno being ACK'd and highest serial no
+	__be16		bufferSpace;	/* number of packet buffers available */
+	__be16		maxSkew;	/* diff between serno being ACK'd and highest serial no
 					 * received */
-	uint32_t	firstPacket;	/* sequence no of first ACK'd packet in attached list */
-	uint32_t	previousPacket;	/* sequence no of previous packet received */
-	uint32_t	serial;		/* serial no of packet that prompted this ACK */
+	__be32		firstPacket;	/* sequence no of first ACK'd packet in attached list */
+	__be32		previousPacket;	/* sequence no of previous packet received */
+	__be32		serial;		/* serial no of packet that prompted this ACK */
 
 	uint8_t		reason;		/* reason for ACK */
 #define RXRPC_ACK_REQUESTED		1	/* ACK was requested on packet */

@@ -253,7 +253,7 @@ net2280_enable (struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
 	return 0;
 }
 
-static int handshake (u32 *ptr, u32 mask, u32 done, int usec)
+static int handshake (u32 __iomem *ptr, u32 mask, u32 done, int usec)
 {
 	u32	result;
 
@@ -272,7 +272,7 @@ static int handshake (u32 *ptr, u32 mask, u32 done, int usec)
 
 static struct usb_ep_ops net2280_ep_ops;
 
-static void ep_reset (struct net2280_regs *regs, struct net2280_ep *ep)
+static void ep_reset (struct net2280_regs __iomem *regs, struct net2280_ep *ep)
 {
 	u32		tmp;
 
@@ -512,7 +512,7 @@ net2280_free_buffer (
 static void
 write_fifo (struct net2280_ep *ep, struct usb_request *req)
 {
-	struct net2280_ep_regs	*regs = ep->regs;
+	struct net2280_ep_regs	__iomem *regs = ep->regs;
 	u8			*buf;
 	u32			tmp;
 	unsigned		count, total;
@@ -572,7 +572,8 @@ write_fifo (struct net2280_ep *ep, struct usb_request *req)
  */
 static void out_flush (struct net2280_ep *ep)
 {
-	u32	*statp, tmp;
+	u32	__iomem *statp;
+	u32	tmp;
 
 	ASSERT_OUT_NAKING (ep);
 
@@ -605,7 +606,7 @@ static void out_flush (struct net2280_ep *ep)
 static int
 read_fifo (struct net2280_ep *ep, struct net2280_request *req)
 {
-	struct net2280_ep_regs	*regs = ep->regs;
+	struct net2280_ep_regs	__iomem *regs = ep->regs;
 	u8			*buf = req->req.buf + req->req.actual;
 	unsigned		count, tmp, is_short;
 	unsigned		cleanup = 0, prevent = 0;
@@ -732,12 +733,12 @@ static const u32 dmactl_default =
 		/* erratum 0116 workaround part 2 (no AUTOSTART) */
 		| (1 << DMA_ENABLE);
 
-static inline void spin_stop_dma (struct net2280_dma_regs *dma)
+static inline void spin_stop_dma (struct net2280_dma_regs __iomem *dma)
 {
 	handshake (&dma->dmactl, (1 << DMA_ENABLE), 0, 50);
 }
 
-static inline void stop_dma (struct net2280_dma_regs *dma)
+static inline void stop_dma (struct net2280_dma_regs __iomem *dma)
 {
 	writel (readl (&dma->dmactl) & ~(1 << DMA_ENABLE), &dma->dmactl);
 	spin_stop_dma (dma);
@@ -745,7 +746,7 @@ static inline void stop_dma (struct net2280_dma_regs *dma)
 
 static void start_queue (struct net2280_ep *ep, u32 dmactl, u32 td_dma)
 {
-	struct net2280_dma_regs	*dma = ep->dma;
+	struct net2280_dma_regs	__iomem *dma = ep->dma;
 
 	writel ((1 << VALID_BIT) | (ep->is_in << DMA_DIRECTION),
 			&dma->dmacount);
@@ -766,7 +767,7 @@ static void start_queue (struct net2280_ep *ep, u32 dmactl, u32 td_dma)
 static void start_dma (struct net2280_ep *ep, struct net2280_request *req)
 {
 	u32			tmp;
-	struct net2280_dma_regs	*dma = ep->dma;
+	struct net2280_dma_regs	__iomem *dma = ep->dma;
 
 	/* FIXME can't use DMA for ZLPs */
 
@@ -2579,7 +2580,7 @@ static void handle_stat1_irqs (struct net2280 *dev, u32 stat)
 	stat &= ~DMA_INTERRUPTS;
 	scratch >>= 9;
 	for (num = 0; scratch; num++) {
-		struct net2280_dma_regs	*dma;
+		struct net2280_dma_regs	__iomem *dma;
 
 		tmp = 1 << num;
 		if ((tmp & scratch) == 0)
@@ -2748,7 +2749,7 @@ static int net2280_probe (struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct net2280		*dev;
 	unsigned long		resource, len;
-	void			*base = NULL;
+	void			__iomem *base = NULL;
 	int			retval, i;
 	char			buf [8], *bufp;
 
@@ -2806,12 +2807,12 @@ static int net2280_probe (struct pci_dev *pdev, const struct pci_device_id *id)
 		retval = -EFAULT;
 		goto done;
 	}
-	dev->regs = (struct net2280_regs *) base;
-	dev->usb = (struct net2280_usb_regs *) (base + 0x0080);
-	dev->pci = (struct net2280_pci_regs *) (base + 0x0100);
-	dev->dma = (struct net2280_dma_regs *) (base + 0x0180);
-	dev->dep = (struct net2280_dep_regs *) (base + 0x0200);
-	dev->epregs = (struct net2280_ep_regs *) (base + 0x0300);
+	dev->regs = (struct net2280_regs __iomem *) base;
+	dev->usb = (struct net2280_usb_regs __iomem *) (base + 0x0080);
+	dev->pci = (struct net2280_pci_regs __iomem *) (base + 0x0100);
+	dev->dma = (struct net2280_dma_regs __iomem *) (base + 0x0180);
+	dev->dep = (struct net2280_dep_regs __iomem *) (base + 0x0200);
+	dev->epregs = (struct net2280_ep_regs __iomem *) (base + 0x0300);
 
 	/* put into initial config, link up all endpoints */
 	writel (0, &dev->usb->usbctl);

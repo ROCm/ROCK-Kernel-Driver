@@ -2,6 +2,10 @@
 #define _SYSV_H
 
 #include <linux/buffer_head.h>
+
+typedef __u16 __bitwise __fs16;
+typedef __u32 __bitwise __fs32;
+
 #include <linux/sysv_fs.h>
 
 /*
@@ -38,14 +42,14 @@ struct sysv_sb_info {
 	   different superblock layout. */
 	char *         s_sbd1;		/* entire superblock data, for part 1 */
 	char *         s_sbd2;		/* entire superblock data, for part 2 */
-	u16            *s_sb_fic_count;	/* pointer to s_sbd->s_ninode */
-        u16            *s_sb_fic_inodes; /* pointer to s_sbd->s_inode */
-	u16            *s_sb_total_free_inodes; /* pointer to s_sbd->s_tinode */
-	u16            *s_bcache_count;	/* pointer to s_sbd->s_nfree */
-	u32	       *s_bcache;	/* pointer to s_sbd->s_free */
-	u32            *s_free_blocks;	/* pointer to s_sbd->s_tfree */
-	u32            *s_sb_time;	/* pointer to s_sbd->s_time */
-	u32            *s_sb_state;	/* pointer to s_sbd->s_state, only FSTYPE_SYSV */
+	__fs16         *s_sb_fic_count;	/* pointer to s_sbd->s_ninode */
+        sysv_ino_t     *s_sb_fic_inodes; /* pointer to s_sbd->s_inode */
+	__fs16         *s_sb_total_free_inodes; /* pointer to s_sbd->s_tinode */
+	__fs16         *s_bcache_count;	/* pointer to s_sbd->s_nfree */
+	sysv_zone_t    *s_bcache;	/* pointer to s_sbd->s_free */
+	__fs32         *s_free_blocks;	/* pointer to s_sbd->s_tfree */
+	__fs32         *s_sb_time;	/* pointer to s_sbd->s_time */
+	__fs32         *s_sb_state;	/* pointer to s_sbd->s_state, only FSTYPE_SYSV */
 	/* We keep those superblock entities that don't change here;
 	   this saves us an indirection and perhaps a conversion. */
 	u32            s_firstinodezone; /* index of first inode zone */
@@ -61,7 +65,7 @@ struct sysv_sb_info {
  * SystemV/V7/Coherent FS inode data in memory
  */
 struct sysv_inode_info {
-	u32		i_data[13];
+	__fs32		i_data[13];
 	u32		i_dir_start_lookup;
 	struct inode	vfs_inode;
 };
@@ -126,8 +130,8 @@ extern void sysv_free_inode(struct inode *);
 extern unsigned long sysv_count_free_inodes(struct super_block *);
 
 /* balloc.c */
-extern u32 sysv_new_block(struct super_block *);
-extern void sysv_free_block(struct super_block *, u32);
+extern sysv_zone_t sysv_new_block(struct super_block *);
+extern void sysv_free_block(struct super_block *, sysv_zone_t);
 extern unsigned long sysv_count_free_blocks(struct super_block *);
 
 /* itree.c */
@@ -181,58 +185,60 @@ static inline u32 PDP_swab(u32 x)
 #endif
 }
 
-static inline u32 fs32_to_cpu(struct sysv_sb_info *sbi, u32 n)
+static inline __u32 fs32_to_cpu(struct sysv_sb_info *sbi, __fs32 n)
 {
 	if (sbi->s_bytesex == BYTESEX_PDP)
-		return PDP_swab(n);
+		return PDP_swab((__force __u32)n);
 	else if (sbi->s_bytesex == BYTESEX_LE)
-		return le32_to_cpu(n);
+		return le32_to_cpu((__force __le32)n);
 	else
-		return be32_to_cpu(n);
+		return be32_to_cpu((__force __be32)n);
 }
 
-static inline u32 cpu_to_fs32(struct sysv_sb_info *sbi, u32 n)
+static inline __fs32 cpu_to_fs32(struct sysv_sb_info *sbi, __u32 n)
 {
 	if (sbi->s_bytesex == BYTESEX_PDP)
-		return PDP_swab(n);
+		return (__force __fs32)PDP_swab(n);
 	else if (sbi->s_bytesex == BYTESEX_LE)
-		return cpu_to_le32(n);
+		return (__force __fs32)cpu_to_le32(n);
 	else
-		return cpu_to_be32(n);
+		return (__force __fs32)cpu_to_be32(n);
 }
 
-static inline u32 fs32_add(struct sysv_sb_info *sbi, u32 *n, int d)
+static inline __fs32 fs32_add(struct sysv_sb_info *sbi, __fs32 *n, int d)
 {
 	if (sbi->s_bytesex == BYTESEX_PDP)
-		return *n = PDP_swab(PDP_swab(*n)+d);
+		*(__u32*)n = PDP_swab(PDP_swab(*(__u32*)n)+d);
 	else if (sbi->s_bytesex == BYTESEX_LE)
-		return *n = cpu_to_le32(le32_to_cpu(*n)+d);
+		*(__le32*)n = cpu_to_le32(le32_to_cpu(*(__le32*)n)+d);
 	else
-		return *n = cpu_to_be32(be32_to_cpu(*n)+d);
+		*(__be32*)n = cpu_to_be32(be32_to_cpu(*(__be32*)n)+d);
+	return *n;
 }
 
-static inline u16 fs16_to_cpu(struct sysv_sb_info *sbi, u16 n)
+static inline __u16 fs16_to_cpu(struct sysv_sb_info *sbi, __fs16 n)
 {
 	if (sbi->s_bytesex != BYTESEX_BE)
-		return le16_to_cpu(n);
+		return le16_to_cpu((__force __le16)n);
 	else
-		return be16_to_cpu(n);
+		return be16_to_cpu((__force __be16)n);
 }
 
-static inline u16 cpu_to_fs16(struct sysv_sb_info *sbi, u16 n)
+static inline __fs16 cpu_to_fs16(struct sysv_sb_info *sbi, __u16 n)
 {
 	if (sbi->s_bytesex != BYTESEX_BE)
-		return cpu_to_le16(n);
+		return (__force __fs16)cpu_to_le16(n);
 	else
-		return cpu_to_be16(n);
+		return (__force __fs16)cpu_to_be16(n);
 }
 
-static inline u16 fs16_add(struct sysv_sb_info *sbi, u16 *n, int d)
+static inline __fs16 fs16_add(struct sysv_sb_info *sbi, __fs16 *n, int d)
 {
 	if (sbi->s_bytesex != BYTESEX_BE)
-		return *n = cpu_to_le16(le16_to_cpu(*n)+d);
+		*(__le16*)n = cpu_to_le16(le16_to_cpu(*(__le16 *)n)+d);
 	else
-		return *n = cpu_to_be16(be16_to_cpu(*n)+d);
+		*(__be16*)n = cpu_to_be16(be16_to_cpu(*(__be16 *)n)+d);
+	return *n;
 }
 
 #endif /* _SYSV_H */

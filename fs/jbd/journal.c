@@ -326,8 +326,8 @@ repeat:
 	/*
 	 * Check for escaping
 	 */
-	if (*((unsigned int *)(mapped_data + new_offset)) ==
-				htonl(JFS_MAGIC_NUMBER)) {
+	if (*((__be32 *)(mapped_data + new_offset)) ==
+				cpu_to_be32(JFS_MAGIC_NUMBER)) {
 		need_copy_out = 1;
 		do_escape = 1;
 	}
@@ -809,8 +809,8 @@ static int journal_reset(journal_t *journal)
 	journal_superblock_t *sb = journal->j_superblock;
 	unsigned int first, last;
 
-	first = ntohl(sb->s_first);
-	last = ntohl(sb->s_maxlen);
+	first = be32_to_cpu(sb->s_first);
+	last = be32_to_cpu(sb->s_maxlen);
 
 	journal->j_first = first;
 	journal->j_last = last;
@@ -887,12 +887,12 @@ int journal_create(journal_t *journal)
 	/* OK, fill in the initial static fields in the new superblock */
 	sb = journal->j_superblock;
 
-	sb->s_header.h_magic	 = htonl(JFS_MAGIC_NUMBER);
-	sb->s_header.h_blocktype = htonl(JFS_SUPERBLOCK_V2);
+	sb->s_header.h_magic	 = cpu_to_be32(JFS_MAGIC_NUMBER);
+	sb->s_header.h_blocktype = cpu_to_be32(JFS_SUPERBLOCK_V2);
 
-	sb->s_blocksize	= htonl(journal->j_blocksize);
-	sb->s_maxlen	= htonl(journal->j_maxlen);
-	sb->s_first	= htonl(1);
+	sb->s_blocksize	= cpu_to_be32(journal->j_blocksize);
+	sb->s_maxlen	= cpu_to_be32(journal->j_maxlen);
+	sb->s_first	= cpu_to_be32(1);
 
 	journal->j_transaction_sequence = 1;
 
@@ -935,9 +935,9 @@ void journal_update_superblock(journal_t *journal, int wait)
 	jbd_debug(1,"JBD: updating superblock (start %ld, seq %d, errno %d)\n",
 		  journal->j_tail, journal->j_tail_sequence, journal->j_errno);
 
-	sb->s_sequence = htonl(journal->j_tail_sequence);
-	sb->s_start    = htonl(journal->j_tail);
-	sb->s_errno    = htonl(journal->j_errno);
+	sb->s_sequence = cpu_to_be32(journal->j_tail_sequence);
+	sb->s_start    = cpu_to_be32(journal->j_tail);
+	sb->s_errno    = cpu_to_be32(journal->j_errno);
 	spin_unlock(&journal->j_state_lock);
 
 	BUFFER_TRACE(bh, "marking dirty");
@@ -988,13 +988,13 @@ static int journal_get_superblock(journal_t *journal)
 
 	err = -EINVAL;
 
-	if (sb->s_header.h_magic != htonl(JFS_MAGIC_NUMBER) ||
-	    sb->s_blocksize != htonl(journal->j_blocksize)) {
+	if (sb->s_header.h_magic != cpu_to_be32(JFS_MAGIC_NUMBER) ||
+	    sb->s_blocksize != cpu_to_be32(journal->j_blocksize)) {
 		printk(KERN_WARNING "JBD: no valid journal superblock found\n");
 		goto out;
 	}
 
-	switch(ntohl(sb->s_header.h_blocktype)) {
+	switch(be32_to_cpu(sb->s_header.h_blocktype)) {
 	case JFS_SUPERBLOCK_V1:
 		journal->j_format_version = 1;
 		break;
@@ -1006,9 +1006,9 @@ static int journal_get_superblock(journal_t *journal)
 		goto out;
 	}
 
-	if (ntohl(sb->s_maxlen) < journal->j_maxlen)
-		journal->j_maxlen = ntohl(sb->s_maxlen);
-	else if (ntohl(sb->s_maxlen) > journal->j_maxlen) {
+	if (be32_to_cpu(sb->s_maxlen) < journal->j_maxlen)
+		journal->j_maxlen = be32_to_cpu(sb->s_maxlen);
+	else if (be32_to_cpu(sb->s_maxlen) > journal->j_maxlen) {
 		printk (KERN_WARNING "JBD: journal file too short\n");
 		goto out;
 	}
@@ -1036,11 +1036,11 @@ static int load_superblock(journal_t *journal)
 
 	sb = journal->j_superblock;
 
-	journal->j_tail_sequence = ntohl(sb->s_sequence);
-	journal->j_tail = ntohl(sb->s_start);
-	journal->j_first = ntohl(sb->s_first);
-	journal->j_last = ntohl(sb->s_maxlen);
-	journal->j_errno = ntohl(sb->s_errno);
+	journal->j_tail_sequence = be32_to_cpu(sb->s_sequence);
+	journal->j_tail = be32_to_cpu(sb->s_start);
+	journal->j_first = be32_to_cpu(sb->s_first);
+	journal->j_last = be32_to_cpu(sb->s_maxlen);
+	journal->j_errno = be32_to_cpu(sb->s_errno);
 
 	return 0;
 }
@@ -1253,7 +1253,7 @@ int journal_update_format (journal_t *journal)
 
 	sb = journal->j_superblock;
 
-	switch (ntohl(sb->s_header.h_blocktype)) {
+	switch (be32_to_cpu(sb->s_header.h_blocktype)) {
 	case JFS_SUPERBLOCK_V2:
 		return 0;
 	case JFS_SUPERBLOCK_V1:
@@ -1275,7 +1275,7 @@ static int journal_convert_superblock_v1(journal_t *journal,
 
 	/* Pre-initialise new fields to zero */
 	offset = ((char *) &(sb->s_feature_compat)) - ((char *) sb);
-	blocksize = ntohl(sb->s_blocksize);
+	blocksize = be32_to_cpu(sb->s_blocksize);
 	memset(&sb->s_feature_compat, 0, blocksize-offset);
 
 	sb->s_nr_users = cpu_to_be32(1);

@@ -21,6 +21,8 @@
 
 typedef uint32_t	rxrpc_seq_t;	/* Rx message sequence number */
 typedef uint32_t	rxrpc_serial_t;	/* Rx message serial number */
+typedef __be32	rxrpc_seq_net_t; /* on-the-wire Rx message sequence number */
+typedef __be32	rxrpc_serial_net_t; /* on-the-wire Rx message serial number */
 
 struct rxrpc_call;
 struct rxrpc_connection;

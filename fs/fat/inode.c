@@ -857,7 +857,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		brelse(bh);
 		goto out_invalid;
 	}
-	logical_sector_size = CF_LE_W(get_unaligned((u16 *)&b->sector_size));
+	logical_sector_size = CF_LE_W(get_unaligned((__le16 *)&b->sector_size));
 	if (!logical_sector_size
 	    || (logical_sector_size & (logical_sector_size - 1))
 	    || (logical_sector_size < 512)
@@ -957,7 +957,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	sbi->dir_per_block_bits = ffs(sbi->dir_per_block) - 1;
 
 	sbi->dir_start = sbi->fat_start + sbi->fats * sbi->fat_length;
-	sbi->dir_entries = CF_LE_W(get_unaligned((u16 *)&b->dir_entries));
+	sbi->dir_entries = CF_LE_W(get_unaligned((__le16 *)&b->dir_entries));
 	if (sbi->dir_entries & (sbi->dir_per_block - 1)) {
 		if (!silent)
 			printk(KERN_ERR "FAT: bogus directroy-entries per block"
@@ -969,7 +969,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	rootdir_sectors = sbi->dir_entries
 		* sizeof(struct msdos_dir_entry) / sb->s_blocksize;
 	sbi->data_start = sbi->dir_start + rootdir_sectors;
-	total_sectors = CF_LE_W(get_unaligned((u16 *)&b->sectors));
+	total_sectors = CF_LE_W(get_unaligned((__le16 *)&b->sectors));
 	if (total_sectors == 0)
 		total_sectors = CF_LE_L(b->total_sect);
 

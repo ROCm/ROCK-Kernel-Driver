@@ -714,7 +714,7 @@ int fat_new_dir(struct inode *dir, struct inode *parent, int is_vfat)
 {
 	struct buffer_head *bh;
 	struct msdos_dir_entry *de;
-	__u16 date, time;
+	__le16 date, time;
 
 	bh = fat_extend_dir(dir);
 	if (IS_ERR(bh))
