@@ -69,6 +69,10 @@ m8260_setup_arch(void)
 #ifdef CONFIG_PCI_8260
 	m8260_find_bridges();
 #endif
+#ifdef CONFIG_BLK_DEV_INITRD
+	if (initrd_start)
+		ROOT_DEV = Root_RAM0;
+#endif
 }
 
 /* The decrementer counts at the system (internal) clock frequency
