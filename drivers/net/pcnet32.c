@@ -360,6 +360,7 @@ static void pcnet32_tx_timeout (struct net_device *dev);
 static irqreturn_t pcnet32_interrupt(int, void *, struct pt_regs *);
 static int  pcnet32_close(struct net_device *);
 static struct net_device_stats *pcnet32_get_stats(struct net_device *);
+static void pcnet32_load_multicast(struct net_device *dev);
 static void pcnet32_set_multicast_list(struct net_device *);
 static int  pcnet32_ioctl(struct net_device *, struct ifreq *, int);
 static void pcnet32_watchdog(struct net_device *);
@@ -627,33 +628,39 @@ static int pcnet32_loopback_test(struct net_device *dev, uint64_t *data1)
     struct pcnet32_access *a = &lp->a;	/* access to registers */
     ulong ioaddr = dev->base_addr;	/* card base I/O address */
     struct sk_buff *skb;		/* sk buff */
-    int x, y, i;			/* counters */
+    int x, i;				/* counters */
     int numbuffs = 4;			/* number of TX/RX buffers and descs */
     u16 status = 0x8300;		/* TX ring status */
+    u16 teststatus;			/* test of ring status */
     int rc;				/* return code */
     int size;				/* size of packets */
     unsigned char *packet;		/* source packet data */
     static int data_len = 60;		/* length of source packets */
     unsigned long flags;
+    unsigned long ticks;
 
     *data1 = 1;			/* status of test, default to fail */
     rc = 1;			/* default to fail */
 
+    if (netif_running(dev))
+	pcnet32_close(dev);
+
     spin_lock_irqsave(&lp->lock, flags);
-    lp->a.write_csr(ioaddr, 0, 0x7904);
 
-    del_timer_sync(&lp->watchdog_timer);
+    /* Reset the PCNET32 */
+    lp->a.reset (ioaddr);
 
-    netif_stop_queue(dev);
+    /* switch pcnet32 to 32bit mode */
+    lp->a.write_bcr (ioaddr, 20, 2);
+
+    lp->init_block.mode = le16_to_cpu((lp->options & PCNET32_PORT_PORTSEL) << 7);
+    lp->init_block.filter[0] = 0;
+    lp->init_block.filter[1] = 0;
 
     /* purge & init rings but don't actually restart */
     pcnet32_restart(dev, 0x0000);
 
     lp->a.write_csr(ioaddr, 0, 0x0004);	/* Set STOP bit */
-
-    x = a->read_bcr(ioaddr, 32);	/* set internal loopback in BSR32 */
-    x = x | 0x00000002;
-    a->write_bcr(ioaddr, 32, x);
 
     /* Initialize Transmit buffers. */
     size = data_len + 15;
@@ -668,19 +675,21 @@ static int pcnet32_loopback_test(struct net_device *dev, uint64_t *data1)
 	    skb_put(skb, size);		/* create space for data */
 	    lp->tx_skbuff[x] = skb;
 	    lp->tx_ring[x].length = le16_to_cpu(-skb->len);
-	    lp->tx_ring[x].misc = 0x00000000;
+	    lp->tx_ring[x].misc = 0;
 
-	    /* put DA and SA into the skb */
-	    for (i=0; i<12; i++)
-		*packet++ = 0xff;
+            /* put DA and SA into the skb */
+	    for (i=0; i<6; i++)
+		*packet++ = dev->dev_addr[i];
+	    for (i=0; i<6; i++)
+		*packet++ = dev->dev_addr[i]; 
 	    /* type */
 	    *packet++ = 0x08;
 	    *packet++ = 0x06;
 	    /* packet number */
 	    *packet++ = x;
 	    /* fill packet with data */
-	    for (y=0; y<data_len; y++)
-		*packet++ = y;
+	    for (i=0; i<data_len; i++)
+		*packet++ = i;
 
 	    lp->tx_dma_addr[x] = pci_map_single(lp->pci_dev, skb->data,
 		    skb->len, PCI_DMA_TODEVICE);
@@ -690,20 +699,41 @@ static int pcnet32_loopback_test(struct net_device *dev, uint64_t *data1)
 	}
     }
 
-    lp->a.write_csr(ioaddr, 0, 0x0002);	/* Set STRT bit */
-    spin_unlock_irqrestore(&lp->lock, flags);
+    x = a->read_bcr(ioaddr, 32);	/* set internal loopback in BSR32 */
+    x = x | 0x0002;
+    a->write_bcr(ioaddr, 32, x);
 
-    mdelay(50);				/* wait a bit */
+    lp->a.write_csr (ioaddr, 15, 0x0044);	/* set int loopback in CSR15 */
 
-    spin_lock_irqsave(&lp->lock, flags);
-    lp->a.write_csr(ioaddr, 0, 0x0004);	/* Set STOP bit */
+    teststatus = le16_to_cpu(0x8000);
+    lp->a.write_csr(ioaddr, 0, 0x0002);		/* Set STRT bit */
 
+    /* Check status of descriptors */
+    for (x=0; x<numbuffs; x++) {
+	ticks = 0;
+	rmb();
+	while ((lp->rx_ring[x].status & teststatus) && (ticks < 200)) {
+	    spin_unlock_irqrestore(&lp->lock, flags);
+	    mdelay(1);
+	    spin_lock_irqsave(&lp->lock, flags);
+	    rmb();
+	    ticks++;
+	}
+	if (ticks == 200) {
+	    if (netif_msg_hw(lp))
+		printk("%s: Desc %d failed to reset!\n",dev->name,x);
+	    break;
+	}
+    }
+
+    lp->a.write_csr(ioaddr, 0, 0x0004);		/* Set STOP bit */
+    wmb();
     if (netif_msg_hw(lp) && netif_msg_pktdata(lp)) {
 	printk(KERN_DEBUG "%s: RX loopback packets:\n", dev->name);
 
 	for (x=0; x<numbuffs; x++) {
 	    printk(KERN_DEBUG "%s: Packet %d:\n", dev->name, x);
-	    skb=lp->rx_skbuff[x];
+	    skb = lp->rx_skbuff[x];
 	    for (i=0; i<size; i++) {
 		printk("%02x ", *(skb->data+i));
 	    }
@@ -736,18 +766,16 @@ clean_up:
     a->write_csr(ioaddr, 15, (x & ~0x0044));	/* reset bits 6 and 2 */
 
     x = a->read_bcr(ioaddr, 32);		/* reset internal loopback */
-    x = x & ~0x00000002;
+    x = x & ~0x0002;
     a->write_bcr(ioaddr, 32, x);
 
-    pcnet32_restart(dev, 0x0042);		/* resume normal operation */
-
-    netif_wake_queue(dev);
-
-    mod_timer(&(lp->watchdog_timer), PCNET32_WATCHDOG_TIMEOUT);
-
-    /* Clear interrupts, and set interrupt enable. */
-    lp->a.write_csr(ioaddr, 0, 0x7940);
     spin_unlock_irqrestore(&lp->lock, flags);
+
+    if (netif_running(dev)) {
+	pcnet32_open(dev);
+    } else {
+	lp->a.write_bcr (ioaddr, 20, 4);	/* return to 16bit mode */
+    }
 
     return(rc);
 } /* end pcnet32_loopback_test  */
@@ -1056,7 +1084,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
 
     if (pcnet32_debug & NETIF_MSG_PROBE) {
 	for (i = 0; i < 6; i++)
-	    printk(" %2.2x", dev->dev_addr[i] );
+	    printk(" %2.2x", dev->dev_addr[i]);
 
 	/* Version 0x2623 and 0x2624 */
 	if (((chip_version + 1) & 0xfffe) == 0x2624) {
@@ -1244,6 +1272,7 @@ pcnet32_open(struct net_device *dev)
     u16 val;
     int i;
     int rc;
+    unsigned long flags;
 
     if (dev->irq == 0 ||
 	request_irq(dev->irq, &pcnet32_interrupt,
@@ -1251,6 +1280,7 @@ pcnet32_open(struct net_device *dev)
 	return -EAGAIN;
     }
 
+    spin_lock_irqsave(&lp->lock, flags);
     /* Check for a valid station address */
     if (!is_valid_ether_addr(dev->dev_addr)) {
 	rc = -EINVAL;
@@ -1331,8 +1361,8 @@ pcnet32_open(struct net_device *dev)
     }
 
     lp->init_block.mode = le16_to_cpu((lp->options & PCNET32_PORT_PORTSEL) << 7);
-    lp->init_block.filter[0] = 0x00000000;
-    lp->init_block.filter[1] = 0x00000000;
+    pcnet32_load_multicast(dev);
+
     if (pcnet32_init_ring(dev)) {
 	rc = -ENOMEM;
 	goto err_free_ring;
@@ -1371,6 +1401,7 @@ pcnet32_open(struct net_device *dev)
 		    offsetof(struct pcnet32_private, init_block)),
 		lp->a.read_csr(ioaddr, 0));
 
+    spin_unlock_irqrestore(&lp->lock, flags);
 
     return 0;	/* Always succeed */
 
@@ -1393,6 +1424,7 @@ err_free_ring:
     lp->a.write_bcr (ioaddr, 20, 4);
 
 err_free_irq:
+    spin_unlock_irqrestore(&lp->lock, flags);
     free_irq(dev->irq, dev);
     return rc;
 }
@@ -1885,10 +1917,13 @@ pcnet32_close(struct net_device *dev)
     unsigned long ioaddr = dev->base_addr;
     struct pcnet32_private *lp = dev->priv;
     int i;
+    unsigned long flags;
 
     del_timer_sync(&lp->watchdog_timer);
 
     netif_stop_queue(dev);
+
+    spin_lock_irqsave(&lp->lock, flags);
 
     lp->stats.rx_missed_errors = lp->a.read_csr (ioaddr, 112);
 
@@ -1904,6 +1939,8 @@ pcnet32_close(struct net_device *dev)
      * DOS packet driver after a warm reboot
      */
     lp->a.write_bcr (ioaddr, 20, 4);
+
+    spin_unlock_irqrestore(&lp->lock, flags);
 
     free_irq(dev->irq, dev);
 
