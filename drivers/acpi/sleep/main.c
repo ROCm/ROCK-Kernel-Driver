@@ -1,11 +1,11 @@
 /*
  * sleep.c - ACPI sleep support.
- * 
- *  Copyright (c) 2000-2003 Patrick Mochel
  *
- *  Portions are
- *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
- *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
+ * Copyright (c) 2000-2003 Patrick Mochel
+ * Copyright (c) 2003 Open Source Development Lab
+ *
+ * This file is released under the GPLv2.
+ *
  */
 
 #include <linux/delay.h>
@@ -32,6 +32,9 @@ static u32 acpi_suspend_states[] = {
  *	acpi_pm_prepare - Do preliminary suspend work.
  *	@state:		suspend state we're entering.
  *
+ *	Make sure we support the state. If we do, and we need it, set the
+ *	firmware waking vector and do arch-specific nastiness to get the 
+ *	wakeup code to the waking vector. 
  */
 
 static int acpi_pm_prepare(u32 state)
@@ -69,6 +72,15 @@ static int acpi_pm_prepare(u32 state)
 }
 
 
+/**
+ *	acpi_pm_enter - Actually enter a sleep state.
+ *	@state:		State we're entering.
+ *
+ *	Flush caches and go to sleep. For STR or STD, we have to call 
+ *	arch-specific assembly, which in turn call acpi_enter_sleep_state().
+ *	It's unfortunate, but it works. Please fix if you're feeling frisky.
+ */
+
 static int acpi_pm_enter(u32 state)
 {
 	acpi_status status = AE_OK;
@@ -98,6 +110,15 @@ static int acpi_pm_enter(u32 state)
 
 	return ACPI_SUCCESS(status) ? 0 : -EFAULT;
 }
+
+
+/**
+ *	acpi_pm_finish - Finish up suspend sequence.
+ *	@state:		State we're coming out of.
+ *
+ *	This is called after we wake back up (or if entering the sleep state
+ *	failed). 
+ */
 
 static int acpi_pm_finish(u32 state)
 {
