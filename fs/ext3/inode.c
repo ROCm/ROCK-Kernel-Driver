@@ -1327,7 +1327,13 @@ static int ext3_writepage(struct page *page)
 out_fail:
 	
 	unlock_kernel();
-	set_page_dirty(page);
+
+	/*
+	 * We have to fail this writepage to avoid cross-fs transactions.
+	 * Put the page back on mapping->dirty_pages, but leave its buffer's
+	 * dirty state as-is.
+	 */
+	__set_page_dirty_nobuffers(page);
 	unlock_page(page);
 	return ret;
 }
