@@ -26,6 +26,7 @@
 #include <asm/procinfo.h>
 #include <asm/setup.h>
 #include <asm/mach-types.h>
+#include <asm/tlbflush.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/irq.h>
@@ -255,7 +256,7 @@ static void __init setup_processor(void)
 	cpu_user = *list->user;
 #endif
 
-	printk("Processor: %s %s revision %d\n",
+	printk("CPU: %s %s revision %d\n",
 	       proc_info.manufacturer, proc_info.cpu_name,
 	       (int)processor_id & 15);
 
