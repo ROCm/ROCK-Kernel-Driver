@@ -3075,7 +3075,6 @@ out:
 /* tp->lock is held. */
 static void tg3_chip_reset(struct tg3 *tp)
 {
-	unsigned long flags;
 	u32 val;
 
 	/* Force NVRAM to settle.
@@ -3093,15 +3092,14 @@ static void tg3_chip_reset(struct tg3 *tp)
 		}
 	}
 
-	/* Use indirect register writes for this so that there are
-	 * no PCI write posting issues.
+	tw32(GRC_MISC_CFG, GRC_MISC_CFG_CORECLK_RESET);
+
+	/* Flush PCI posted writes.  The normal MMIO registers
+	 * are inaccessible at this time so this is the only
+	 * way to make this reliably.  I tried to use indirect
+	 * register read/write but this upset some 5701 variants.
 	 */
-	spin_lock_irqsave(&tp->indirect_lock, flags);
-	pci_write_config_dword(tp->pdev, TG3PCI_REG_BASE_ADDR,
-			       GRC_MISC_CFG);
-	pci_write_config_dword(tp->pdev, TG3PCI_REG_DATA,
-			       GRC_MISC_CFG_CORECLK_RESET);
-	spin_unlock_irqrestore(&tp->indirect_lock, flags);
+	pci_read_config_dword(tp->pdev, PCI_COMMAND, &val);
 
 	udelay(40);
 	udelay(40);
