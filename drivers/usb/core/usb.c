@@ -836,7 +836,7 @@ show_config (struct device *dev, char *buf, size_t count, loff_t off)
 	return sprintf (buf, "%u\n", udev->actconfig->bConfigurationValue);
 }
 
-static DEVICE_ATTR(config,"configuration",S_IRUGO,show_config,NULL);
+static DEVICE_ATTR(configuration,S_IRUGO,show_config,NULL);
 
 /* interfaces have one current setting; alternates
  * can have different endpoints and class info.
@@ -851,7 +851,7 @@ show_altsetting (struct device *dev, char *buf, size_t count, loff_t off)
 	interface = to_usb_interface (dev);
 	return sprintf (buf, "%u\n", interface->altsetting->bAlternateSetting);
 }
-static DEVICE_ATTR(altsetting,"altsetting",S_IRUGO,show_altsetting,NULL);
+static DEVICE_ATTR(altsetting,S_IRUGO,show_altsetting,NULL);
 
 /* product driverfs file */
 static ssize_t show_product (struct device *dev, char *buf, size_t count, loff_t off)
@@ -870,7 +870,7 @@ static ssize_t show_product (struct device *dev, char *buf, size_t count, loff_t
 	buf[len+1] = 0;
 	return len+1;
 }
-static DEVICE_ATTR(product,"product",S_IRUGO,show_product,NULL);
+static DEVICE_ATTR(product,S_IRUGO,show_product,NULL);
 
 /* manufacturer driverfs file */
 static ssize_t
@@ -890,7 +890,7 @@ show_manufacturer (struct device *dev, char *buf, size_t count, loff_t off)
 	buf[len+1] = 0;
 	return len+1;
 }
-static DEVICE_ATTR(manufacturer,"manufacturer",S_IRUGO,show_manufacturer,NULL);
+static DEVICE_ATTR(manufacturer,S_IRUGO,show_manufacturer,NULL);
 
 /* serial number driverfs file */
 static ssize_t
@@ -910,7 +910,7 @@ show_serial (struct device *dev, char *buf, size_t count, loff_t off)
 	buf[len+1] = 0;
 	return len+1;
 }
-static DEVICE_ATTR(serial,"serial",S_IRUGO,show_serial,NULL);
+static DEVICE_ATTR(serial,S_IRUGO,show_serial,NULL);
 
 /*
  * This entrypoint gets called for each new device.
@@ -1440,7 +1440,7 @@ int usb_new_device(struct usb_device *dev)
 	err = device_register (&dev->dev);
 	if (err)
 		return err;
-	device_create_file (&dev->dev, &dev_attr_config);
+	device_create_file (&dev->dev, &dev_attr_configuration);
 	if (dev->descriptor.iManufacturer)
 		device_create_file (&dev->dev, &dev_attr_manufacturer);
 	if (dev->descriptor.iProduct)

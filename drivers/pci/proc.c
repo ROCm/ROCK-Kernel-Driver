@@ -378,7 +378,7 @@ static ssize_t pci_show_irq(struct device * dev, char * buf, size_t count, loff_
 	return off ? 0 : sprintf(buf,"%u\n",pci_dev->irq);
 }
 
-static DEVICE_ATTR(irq,"irq",S_IRUGO,pci_show_irq,NULL);
+static DEVICE_ATTR(irq,S_IRUGO,pci_show_irq,NULL);
 
 static ssize_t pci_show_resources(struct device * dev, char * buf, size_t count, loff_t off)
 {
@@ -402,7 +402,7 @@ static ssize_t pci_show_resources(struct device * dev, char * buf, size_t count,
 	return (str - buf);
 }
 
-static DEVICE_ATTR(resource,"resource",S_IRUGO,pci_show_resources,NULL);
+static DEVICE_ATTR(resource,S_IRUGO,pci_show_resources,NULL);
 
 int pci_proc_attach_device(struct pci_dev *dev)
 {
