@@ -43,7 +43,6 @@
 #include <net/atmclip.h>
 #endif
 #include <net/ip.h>
-#include <net/tcp.h>
 #include <net/icmp.h>
 #include <net/inet_common.h>
 #include <linux/inet.h>
@@ -168,16 +167,7 @@ EXPORT_SYMBOL(ip_queue_xmit);
 EXPORT_SYMBOL(memcpy_fromiovecend);
 EXPORT_SYMBOL(csum_partial_copy_fromiovecend);
 /* UDP/TCP exported functions for TCPv6 */
-EXPORT_SYMBOL(tcp_init_xmit_timers);
-EXPORT_SYMBOL(tcp_clear_xmit_timers);
-EXPORT_SYMBOL(tcp_statistics);
-EXPORT_SYMBOL(tcp_delete_keepalive_timer);
-EXPORT_SYMBOL(tcp_reset_keepalive_timer);
 EXPORT_SYMBOL(net_statistics); 
-
-#ifdef CONFIG_SYSCTL
-extern int sysctl_tcp_tw_recycle;
-#endif
 
 EXPORT_SYMBOL(ip_generic_getfrag);
 #endif
