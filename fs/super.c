@@ -232,10 +232,10 @@ void generic_shutdown_super(struct super_block *sb)
 		dput(root);
 		fsync_super(sb);
 		lock_super(sb);
-		lock_kernel();
 		sb->s_flags &= ~MS_ACTIVE;
 		/* bad name - it should be evict_inodes() */
 		invalidate_inodes(sb);
+		lock_kernel();
 
 		if (sop->write_super && sb->s_dirt)
 			sop->write_super(sb);
