@@ -177,11 +177,11 @@ skpinv:	addi	r4,r4,1				/* Increment */
 	rfi
 
 	/* If necessary, invalidate original entry we used */
-3:	cmpwi	r23,62
+3:	cmpwi	r23,63
 	beq	4f
 	li	r6,0
 	tlbwe   r6,r23,PPC44x_TLB_PAGEID
-	sync
+	isync
 
 4:
 #ifdef CONFIG_SERIAL_TEXT_DEBUG

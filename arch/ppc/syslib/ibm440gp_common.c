@@ -30,7 +30,8 @@ void __init ibm440gp_get_clocks(struct ibm44x_clocks* p,
 {
 	u32 cpc0_sys0 = mfdcr(DCRN_CPC0_SYS0);
 	u32 cpc0_cr0 = mfdcr(DCRN_CPC0_CR0);
-	u32 opdv, epdv;
+	u32 opdv = ((cpc0_sys0 >> 10) & 0x3) + 1;
+	u32 epdv = ((cpc0_sys0 >> 8) & 0x3) + 1;
 
 	if (cpc0_sys0 & 0x2){
 		/* Bypass system PLL */
@@ -59,9 +60,6 @@ void __init ibm440gp_get_clocks(struct ibm44x_clocks* p,
 		p->cpu = vco / fwdva;
 		p->plb = vco / fwdvb;
 	}
-
-	opdv = ((cpc0_sys0 >> 10) & 0x3) + 1;
-	epdv = ((cpc0_sys0 >> 8) & 0x3) + 1;
 
 	p->opb = p->plb / opdv;
 	p->ebc = p->opb / epdv;
