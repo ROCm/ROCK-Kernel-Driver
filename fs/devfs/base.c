@@ -2228,59 +2228,17 @@ const char *devfs_get_name (devfs_handle_t de, unsigned int *namelen)
 
 
 /**
- *	devfs_should_register_chrdev - should we register a conventional character driver.
+ *	devfs_only - returns if "devfs=only" is a boot option
  *
- *	If "devfs=only" this function will return -1, otherwise 0 is returned.
+ *	If "devfs=only" this function will return 1, otherwise 0 is returned.
  */
-int devfs_should_register_chrdev (void)
+int devfs_only (void)
 {
     if (boot_options & OPTION_ONLY)
-	    return -1;
+	    return 1;
     return 0;
 }
 
-
-/**
- *	devfs_should_register_blkdev - should we register a conventional block driver.
- *
- *	If the "devfs=only" option was provided at boot time, this function will
- *	return -1, otherwise 0 is returned.
- */
-
-int devfs_should_register_blkdev (void)
-{
-    if (boot_options & OPTION_ONLY)
-	    return -1;
-    return 0;
-}
-
-
-/**
- *	devfs_should_unregister_chrdev - should we unregister a conventional character driver.
- *
- *	If "devfs=only" this function will return -1, otherwise 0 is returned
- */
-int devfs_should_unregister_chrdev (void)
-{
-    if (boot_options & OPTION_ONLY)
-	    return -1;
-    return 0;
-}
-
-
-/**
- *	devfs_should_unregister_blkdev - should we unregister a conventional block driver.
- *
- *	If the "devfs=only" option was provided at boot time, this function will
- *	return -1, otherwise 0 is returned.
- */
-
-int devfs_should_unregister_blkdev (void)
-{
-    if (boot_options & OPTION_ONLY)
-	    return -1;
-    return 0;
-}
 
 /**
  *	devfs_setup - Process kernel boot options.

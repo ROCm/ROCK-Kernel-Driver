@@ -94,10 +94,7 @@ extern devfs_handle_t devfs_get_next_sibling (devfs_handle_t de);
 extern void devfs_auto_unregister (devfs_handle_t master,devfs_handle_t slave);
 extern devfs_handle_t devfs_get_unregister_slave (devfs_handle_t master);
 extern const char *devfs_get_name (devfs_handle_t de, unsigned int *namelen);
-extern int devfs_should_register_chrdev (void);
-extern int devfs_should_register_blkdev (void);
-extern int devfs_should_unregister_chrdev (void);
-extern int devfs_should_unregister_blkdev (void);
+extern int devfs_only (void);
 
 extern void devfs_register_tape (devfs_handle_t de);
 extern void devfs_register_series (devfs_handle_t dir, const char *format,
@@ -237,19 +234,7 @@ static inline const char *devfs_get_name (devfs_handle_t de,
 {
     return NULL;
 }
-static inline int devfs_should_register_chrdev (void)
-{
-    return 0;
-}
-static inline int devfs_should_register_blkdev (void)
-{
-    return 0;
-}
-static inline int devfs_should_unregister_chrdev (void)
-{
-    return 0;
-}
-static inline int devfs_should_unregister_blkdev (void)
+static inline int devfs_only (void)
 {
     return 0;
 }
