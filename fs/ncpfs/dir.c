@@ -929,10 +929,10 @@ int ncp_create_new(struct inode *dir, struct dentry *dentry, int mode,
 	finfo.access = opmode;
 	if (ncp_is_nfs_extras(server, finfo.volume)) {
 		finfo.i.nfs.mode = mode;
-		finfo.i.nfs.rdev = rdev;
+		finfo.i.nfs.rdev = old_encode_dev(rdev);
 		if (ncp_modify_nfs_info(server, finfo.volume,
 					finfo.i.dirEntNum,
-					mode, rdev) != 0)
+					mode, old_encode_dev(rdev)) != 0)
 			goto out;
 	}
 

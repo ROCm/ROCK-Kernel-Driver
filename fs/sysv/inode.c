@@ -164,10 +164,8 @@ static void sysv_read_inode(struct inode *inode)
 	struct buffer_head * bh;
 	struct sysv_inode * raw_inode;
 	struct sysv_inode_info * si;
-	unsigned int block, ino;
-	dev_t rdev = 0;
+	unsigned int block, ino = inode->i_ino;
 
-	ino = inode->i_ino;
 	if (!ino || ino > sbi->s_ninodes) {
 		printk("Bad inode number on dev %s: %d is out of range\n",
 		       inode->i_sb->s_id, ino);
@@ -198,10 +196,12 @@ static void sysv_read_inode(struct inode *inode)
 		read3byte(sbi, &raw_inode->i_data[3*block],
 				(u8 *)&si->i_data[block]);
 	brelse(bh);
-	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
-		rdev = (u16)fs32_to_cpu(sbi, si->i_data[0]);
 	si->i_dir_start_lookup = 0;
-	sysv_set_inode(inode, rdev);
+	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
+		sysv_set_inode(inode,
+			       old_decode_dev(fs32_to_cpu(sbi, si->i_data[0])));
+	else
+		sysv_set_inode(inode, 0);
 	return;
 
 bad_inode:
@@ -241,7 +241,7 @@ static struct buffer_head * sysv_update_inode(struct inode * inode)
 
 	si = SYSV_I(inode);
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
-		si->i_data[0] = cpu_to_fs32(sbi, inode->i_rdev);
+		si->i_data[0] = cpu_to_fs32(sbi, old_encode_dev(inode->i_rdev));
 	for (block = 0; block < 10+1+1+1; block++)
 		write3byte(sbi, (u8 *)&si->i_data[block],
 			&raw_inode->i_data[3*block]);

@@ -279,7 +279,8 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 		int	is_borc = 0;
 		u32	size = attr->ia_size;
 
-		rdev = (dev_t) size;
+		/* may need to change when we widen dev_t */
+		rdev = old_decode_dev(size);
 		if (type != S_IFBLK && type != S_IFCHR) {
 			rdev = 0;
 		} else if (type == S_IFCHR && !(attr->ia_valid & ATTR_SIZE)) {

@@ -392,7 +392,7 @@ static void V1_minix_read_inode(struct inode * inode)
 	inode->i_blocks = inode->i_blksize = 0;
 	for (i = 0; i < 9; i++)
 		minix_inode->u.i1_data[i] = raw_inode->i_zone[i];
-	minix_set_inode(inode, raw_inode->i_zone[0]);
+	minix_set_inode(inode, old_decode_dev(raw_inode->i_zone[0]));
 	brelse(bh);
 }
 
@@ -425,7 +425,7 @@ static void V2_minix_read_inode(struct inode * inode)
 	inode->i_blocks = inode->i_blksize = 0;
 	for (i = 0; i < 10; i++)
 		minix_inode->u.i2_data[i] = raw_inode->i_zone[i];
-	minix_set_inode(inode, raw_inode->i_zone[0]);
+	minix_set_inode(inode, old_decode_dev(raw_inode->i_zone[0]));
 	brelse(bh);
 }
 
@@ -460,7 +460,7 @@ static struct buffer_head * V1_minix_update_inode(struct inode * inode)
 	raw_inode->i_size = inode->i_size;
 	raw_inode->i_time = inode->i_mtime.tv_sec;
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
-		raw_inode->i_zone[0] = inode->i_rdev;
+		raw_inode->i_zone[0] = old_encode_dev(inode->i_rdev);
 	else for (i = 0; i < 9; i++)
 		raw_inode->i_zone[i] = minix_inode->u.i1_data[i];
 	mark_buffer_dirty(bh);
@@ -489,7 +489,7 @@ static struct buffer_head * V2_minix_update_inode(struct inode * inode)
 	raw_inode->i_atime = inode->i_atime.tv_sec;
 	raw_inode->i_ctime = inode->i_ctime.tv_sec;
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
-		raw_inode->i_zone[0] = inode->i_rdev;
+		raw_inode->i_zone[0] = old_encode_dev(inode->i_rdev);
 	else for (i = 0; i < 10; i++)
 		raw_inode->i_zone[i] = minix_inode->u.i2_data[i];
 	mark_buffer_dirty(bh);

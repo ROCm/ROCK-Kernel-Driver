@@ -147,7 +147,8 @@ void jffs2_read_inode (struct inode *inode)
 	case S_IFSOCK:
 	case S_IFIFO:
 		inode->i_op = &jffs2_file_inode_operations;
-		init_special_inode(inode, inode->i_mode, MKDEV(je16_to_cpu(rdev)>>8, je16_to_cpu(rdev)&0xff));
+		init_special_inode(inode, inode->i_mode,
+			old_decode_dev(je16_to_cpu(rdev)));
 		break;
 
 	default:

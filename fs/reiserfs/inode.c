@@ -1003,7 +1003,7 @@ static void init_inode (struct inode * inode, struct path * path)
 	inode->i_mapping->a_ops = &reiserfs_address_space_operations;
     } else {
 	inode->i_blocks = 0;
-	init_special_inode(inode, inode->i_mode, rdev) ;
+	init_special_inode(inode, inode->i_mode, old_decode_dev(rdev));
     }
 }
 
@@ -1024,7 +1024,7 @@ static void inode2sd (void * sd, struct inode * inode)
     set_sd_v2_ctime(sd_v2, inode->i_ctime.tv_sec );
     set_sd_v2_blocks(sd_v2, inode->i_blocks );
     if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
-	set_sd_v2_rdev(sd_v2, inode->i_rdev);
+	set_sd_v2_rdev(sd_v2, old_encode_dev(inode->i_rdev));
     else
 	set_sd_v2_generation(sd_v2, inode->i_generation);
     flags = REISERFS_I(inode)->i_attrs;
@@ -1048,7 +1048,7 @@ static void inode2sd_v1 (void * sd, struct inode * inode)
     set_sd_v1_mtime(sd_v1, inode->i_mtime.tv_sec );
 
     if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
-        set_sd_v1_rdev(sd_v1, inode->i_rdev);
+        set_sd_v1_rdev(sd_v1, old_encode_dev(inode->i_rdev));
     else
         set_sd_v1_blocks(sd_v1, inode->i_blocks );
 
