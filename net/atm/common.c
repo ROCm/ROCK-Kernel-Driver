@@ -62,6 +62,13 @@ int (*pppoatm_ioctl_hook)(struct atm_vcc *, unsigned int, unsigned long);
 EXPORT_SYMBOL(pppoatm_ioctl_hook);
 #endif
 
+#if defined(CONFIG_ATM_BR2684) || defined(CONFIG_ATM_BR2684_MODULE)
+int (*br2684_ioctl_hook)(struct atm_vcc *, unsigned int, unsigned long);
+#ifdef CONFIG_ATM_BR2684_MODULE
+EXPORT_SYMBOL(br2684_ioctl_hook);
+#endif
+#endif
+
 #include "resources.h"		/* atm_find_dev */
 #include "common.h"		/* prototypes */
 #include "protocols.h"		/* atm_init_<transport> */
@@ -781,6 +788,13 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 #if defined(CONFIG_PPPOATM) || defined(CONFIG_PPPOATM_MODULE)
 	if (pppoatm_ioctl_hook) {
 		ret_val = pppoatm_ioctl_hook(vcc, cmd, arg);
+		if (ret_val != -ENOIOCTLCMD)
+			goto done;
+	}
+#endif
+#if defined(CONFIG_ATM_BR2684) || defined(CONFIG_ATM_BR2684_MODULE)
+	if (br2684_ioctl_hook) {
+		ret_val = br2684_ioctl_hook(vcc, cmd, arg);
 		if (ret_val != -ENOIOCTLCMD)
 			goto done;
 	}
