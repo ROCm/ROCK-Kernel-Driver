@@ -186,7 +186,7 @@ TABLE 5
 #define BIT_LOAD	0x00100000
 
 /* masks for load/store */
-#define MASK_CPDT		0x0c000000  /* data processing opcode */
+#define MASK_CPDT		0x0c000000	/* data processing opcode */
 #define MASK_OFFSET		0x000000ff
 #define MASK_TRANSFER_LENGTH	0x00408000
 #define MASK_REGISTER_COUNT	MASK_TRANSFER_LENGTH
@@ -236,7 +236,7 @@ TABLE 5
 #define MONADIC_INSTRUCTION(opcode)	((opcode & BIT_MONADIC) != 0)
 
 /* instruction identification masks */
-#define MASK_CPDO		0x0e000000  /* arithmetic opcode */
+#define MASK_CPDO		0x0e000000	/* arithmetic opcode */
 #define MASK_ARITHMETIC_OPCODE	0x00f08000
 #define MASK_DESTINATION_SIZE	0x00080080
 
@@ -282,7 +282,7 @@ TABLE 5
 ===
 */
 
-#define MASK_CPRT		0x0e000010  /* register transfer opcode */
+#define MASK_CPRT		0x0e000010	/* register transfer opcode */
 #define MASK_CPRT_CODE		0x00f00000
 #define FLT_CODE		0x00000000
 #define FIX_CODE		0x00100000
@@ -368,21 +368,21 @@ TABLE 5
 
 static inline const floatx80 getExtendedConstant(const unsigned int nIndex)
 {
-   extern const floatx80 floatx80Constant[];
-   return floatx80Constant[nIndex];
-} 
+	extern const floatx80 floatx80Constant[];
+	return floatx80Constant[nIndex];
+}
 
 static inline const float64 getDoubleConstant(const unsigned int nIndex)
 {
-   extern const float64 float64Constant[];
-   return float64Constant[nIndex];
-} 
+	extern const float64 float64Constant[];
+	return float64Constant[nIndex];
+}
 
 static inline const float32 getSingleConstant(const unsigned int nIndex)
 {
-   extern const float32 float32Constant[];
-   return float32Constant[nIndex];
-} 
+	extern const float32 float32Constant[];
+	return float32Constant[nIndex];
+}
 
 extern unsigned int getRegisterCount(const unsigned int opcode);
 extern unsigned int getDestinationSize(const unsigned int opcode);

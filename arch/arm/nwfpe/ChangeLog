@@ -1,3 +1,7 @@
+2003-03-22  Ralph Siemsen <ralphs@netwinder.org>
+	* Reformat all but softfloat files to get a consistent coding style.
+	  Used "indent -kr -i8 -ts8 -sob -l132 -ss" and a few manual fixups.
+
 2002-01-19  Russell King <rmk@arm.linux.org.uk>
 
 	* fpa11.h - Add documentation

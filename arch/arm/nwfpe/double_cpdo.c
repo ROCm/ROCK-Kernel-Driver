@@ -23,10 +23,9 @@
 #include "softfloat.h"
 #include "fpopcode.h"
 
-union float64_components
-{
-   float64 f64;
-   unsigned int i[2];
+union float64_components {
+	float64 f64;
+	unsigned int i[2];
 };
 
 float64 float64_exp(float64 Fm);
@@ -38,139 +37,125 @@ float64 float64_arctan(float64 rFm);
 float64 float64_log(float64 rFm);
 float64 float64_tan(float64 rFm);
 float64 float64_arccos(float64 rFm);
-float64 float64_pow(float64 rFn,float64 rFm);
-float64 float64_pol(float64 rFn,float64 rFm);
+float64 float64_pow(float64 rFn, float64 rFm);
+float64 float64_pol(float64 rFn, float64 rFm);
 
 static float64 float64_rsf(float64 rFn, float64 rFm)
 {
-   return float64_sub(rFm, rFn);
+	return float64_sub(rFm, rFn);
 }
 
 static float64 float64_rdv(float64 rFn, float64 rFm)
 {
-   return float64_div(rFm, rFn);
+	return float64_div(rFm, rFn);
 }
 
-static float64 (* const dyadic_double[16])(float64 rFn, float64 rFm) =
-{
-   [ADF_CODE >> 20] = float64_add,
-   [MUF_CODE >> 20] = float64_mul,
-   [SUF_CODE >> 20] = float64_sub,
-   [RSF_CODE >> 20] = float64_rsf,
-   [DVF_CODE >> 20] = float64_div,
-   [RDF_CODE >> 20] = float64_rdv,
-   [RMF_CODE >> 20] = float64_rem,
+static float64 (*const dyadic_double[16])(float64 rFn, float64 rFm) = {
+	[ADF_CODE >> 20] = float64_add,
+	[MUF_CODE >> 20] = float64_mul,
+	[SUF_CODE >> 20] = float64_sub,
+	[RSF_CODE >> 20] = float64_rsf,
+	[DVF_CODE >> 20] = float64_div,
+	[RDF_CODE >> 20] = float64_rdv,
+	[RMF_CODE >> 20] = float64_rem,
 
-   /* strictly, these opcodes should not be implemented */
-   [FML_CODE >> 20] = float64_mul,
-   [FDV_CODE >> 20] = float64_div,
-   [FRD_CODE >> 20] = float64_rdv,
+	/* strictly, these opcodes should not be implemented */
+	[FML_CODE >> 20] = float64_mul,
+	[FDV_CODE >> 20] = float64_div,
+	[FRD_CODE >> 20] = float64_rdv,
 };
 
 static float64 float64_mvf(float64 rFm)
 {
-   return rFm;
+	return rFm;
 }
 
 static float64 float64_mnf(float64 rFm)
 {
-   union float64_components u;
+	union float64_components u;
 
-   u.f64 = rFm;
-   u.i[1] ^= 0x80000000;
+	u.f64 = rFm;
+	u.i[1] ^= 0x80000000;
 
-   return u.f64;
+	return u.f64;
 }
 
 static float64 float64_abs(float64 rFm)
 {
-   union float64_components u;
+	union float64_components u;
 
-   u.f64 = rFm;
-   u.i[1] &= 0x7fffffff;
+	u.f64 = rFm;
+	u.i[1] &= 0x7fffffff;
 
-   return u.f64;
+	return u.f64;
 }
 
-static float64 (* const monadic_double[16])(float64 rFm) =
-{
-   [MVF_CODE >> 20] = float64_mvf,
-   [MNF_CODE >> 20] = float64_mnf,
-   [ABS_CODE >> 20] = float64_abs,
-   [RND_CODE >> 20] = float64_round_to_int,
-   [URD_CODE >> 20] = float64_round_to_int,
-   [SQT_CODE >> 20] = float64_sqrt,
-   [NRM_CODE >> 20] = float64_mvf,
+static float64 (*const monadic_double[16])(float64 rFm) = {
+	[MVF_CODE >> 20] = float64_mvf,
+	[MNF_CODE >> 20] = float64_mnf,
+	[ABS_CODE >> 20] = float64_abs,
+	[RND_CODE >> 20] = float64_round_to_int,
+	[URD_CODE >> 20] = float64_round_to_int,
+	[SQT_CODE >> 20] = float64_sqrt,
+	[NRM_CODE >> 20] = float64_mvf,
 };
 
-unsigned int DoubleCPDO(const unsigned int opcode, FPREG *rFd)
+unsigned int DoubleCPDO(const unsigned int opcode, FPREG * rFd)
 {
-   FPA11 *fpa11 = GET_FPA11();
-   float64 rFm;
-   unsigned int Fm, opc;
+	FPA11 *fpa11 = GET_FPA11();
+	float64 rFm;
+	unsigned int Fm, opc;
 
-   //printk("DoubleCPDO(0x%08x)\n",opcode);
-   
-   Fm = getFm(opcode);
-   if (CONSTANT_FM(opcode))
-   {
-     rFm = getDoubleConstant(Fm);
-   }
-   else
-   {  
-     switch (fpa11->fType[Fm])
-     {
-        case typeSingle:
-          rFm = float32_to_float64(fpa11->fpreg[Fm].fSingle);
-        break;
+	//printk("DoubleCPDO(0x%08x)\n",opcode);
 
-        case typeDouble:
-          rFm = fpa11->fpreg[Fm].fDouble;
-        break;
+	Fm = getFm(opcode);
+	if (CONSTANT_FM(opcode)) {
+		rFm = getDoubleConstant(Fm);
+	} else {
+		switch (fpa11->fType[Fm]) {
+		case typeSingle:
+			rFm = float32_to_float64(fpa11->fpreg[Fm].fSingle);
+			break;
 
-        default: return 0;
-     }
-   }
+		case typeDouble:
+			rFm = fpa11->fpreg[Fm].fDouble;
+			break;
 
-   opc = opcode & MASK_ARITHMETIC_OPCODE;
-   if (!MONADIC_INSTRUCTION(opcode))
-   {
-      unsigned int Fn = getFn(opcode);
-      float64 rFn;
+		default:
+			return 0;
+		}
+	}
 
-      switch (fpa11->fType[Fn])
-      {
-        case typeSingle:
-          rFn = float32_to_float64(fpa11->fpreg[Fn].fSingle);
-        break;
+	opc = opcode & MASK_ARITHMETIC_OPCODE;
+	if (!MONADIC_INSTRUCTION(opcode)) {
+		unsigned int Fn = getFn(opcode);
+		float64 rFn;
 
-        case typeDouble:
-          rFn = fpa11->fpreg[Fn].fDouble;
-        break;
-        
-        default: return 0;
-      }
+		switch (fpa11->fType[Fn]) {
+		case typeSingle:
+			rFn = float32_to_float64(fpa11->fpreg[Fn].fSingle);
+			break;
 
-      if (dyadic_double[opc >> 20])
-      {
-         rFd->fDouble = dyadic_double[opc >> 20](rFn, rFm);
-      }
-      else
-      {
-         return 0;
-      }
-   }
-   else
-   {
-      if (monadic_double[opc >> 20])
-      {
-         rFd->fDouble = monadic_double[opc >> 20](rFm);
-      }
-      else
-      {
-         return 0;
-      }
-   }
+		case typeDouble:
+			rFn = fpa11->fpreg[Fn].fDouble;
+			break;
 
-   return 1;
+		default:
+			return 0;
+		}
+
+		if (dyadic_double[opc >> 20]) {
+			rFd->fDouble = dyadic_double[opc >> 20](rFn, rFm);
+		} else {
+			return 0;
+		}
+	} else {
+		if (monadic_double[opc >> 20]) {
+			rFd->fDouble = monadic_double[opc >> 20](rFm);
+		} else {
+			return 0;
+		}
+	}
+
+	return 1;
 }

@@ -184,9 +184,9 @@ INLINE float32 packFloat32( flag zSign, int16 zExp, bits32 zSig )
 {
 #if 0
    float32 f;
-   __asm__("@ packFloat32;		\n\
-   	    mov %0, %1, asl #31;	\n\
-   	    orr %0, %2, asl #23;	\n\
+   __asm__("@ packFloat32				\n\
+   	    mov %0, %1, asl #31				\n\
+   	    orr %0, %2, asl #23				\n\
    	    orr %0, %3"
    	    : /* no outputs */
    	    : "g" (f), "g" (zSign), "g" (zExp), "g" (zSig)

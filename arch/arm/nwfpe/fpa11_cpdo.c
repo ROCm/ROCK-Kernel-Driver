@@ -22,98 +22,100 @@
 #include "fpa11.h"
 #include "fpopcode.h"
 
-unsigned int SingleCPDO(const unsigned int opcode, FPREG *rfd);
-unsigned int DoubleCPDO(const unsigned int opcode, FPREG *rfd);
-unsigned int ExtendedCPDO(const unsigned int opcode, FPREG *rfd);
+unsigned int SingleCPDO(const unsigned int opcode, FPREG * rfd);
+unsigned int DoubleCPDO(const unsigned int opcode, FPREG * rfd);
+unsigned int ExtendedCPDO(const unsigned int opcode, FPREG * rfd);
 
 unsigned int EmulateCPDO(const unsigned int opcode)
 {
-   FPA11 *fpa11 = GET_FPA11();
-   FPREG *rFd;
-   unsigned int nType, nDest, nRc;
-   
-   //printk("EmulateCPDO(0x%08x)\n",opcode);
+	FPA11 *fpa11 = GET_FPA11();
+	FPREG *rFd;
+	unsigned int nType, nDest, nRc;
 
-   /* Get the destination size.  If not valid let Linux perform
-      an invalid instruction trap. */
-   nDest = getDestinationSize(opcode);
-   if (typeNone == nDest) return 0;
-   
-   SetRoundingMode(opcode);
-     
-   /* Compare the size of the operands in Fn and Fm.
-      Choose the largest size and perform operations in that size,
-      in order to make use of all the precision of the operands. 
-      If Fm is a constant, we just grab a constant of a size 
-      matching the size of the operand in Fn. */
-   if (MONADIC_INSTRUCTION(opcode))
-     nType = nDest;
-   else
-     nType = fpa11->fType[getFn(opcode)];
-   
-   if (!CONSTANT_FM(opcode))
-   {
-     register unsigned int Fm = getFm(opcode);
-     if (nType < fpa11->fType[Fm])
-     {
-        nType = fpa11->fType[Fm];
-     }
-   }
+	//printk("EmulateCPDO(0x%08x)\n",opcode);
 
-   rFd = &fpa11->fpreg[getFd(opcode)];
+	/* Get the destination size.  If not valid let Linux perform
+	   an invalid instruction trap. */
+	nDest = getDestinationSize(opcode);
+	if (typeNone == nDest)
+		return 0;
 
-   switch (nType)
-   {
-      case typeSingle   : nRc = SingleCPDO(opcode, rFd);   break;
-      case typeDouble   : nRc = DoubleCPDO(opcode, rFd);   break;
-      case typeExtended : nRc = ExtendedCPDO(opcode, rFd); break;
-      default           : nRc = 0;
-   }
+	SetRoundingMode(opcode);
 
-   /* The CPDO functions used to always set the destination type
-      to be the same as their working size. */
+	/* Compare the size of the operands in Fn and Fm.
+	   Choose the largest size and perform operations in that size,
+	   in order to make use of all the precision of the operands.
+	   If Fm is a constant, we just grab a constant of a size
+	   matching the size of the operand in Fn. */
+	if (MONADIC_INSTRUCTION(opcode))
+		nType = nDest;
+	else
+		nType = fpa11->fType[getFn(opcode)];
 
-   if (nRc != 0)
-   {
-      /* If the operation succeeded, check to see if the result in the
-         destination register is the correct size.  If not force it
-         to be. */
+	if (!CONSTANT_FM(opcode)) {
+		register unsigned int Fm = getFm(opcode);
+		if (nType < fpa11->fType[Fm]) {
+			nType = fpa11->fType[Fm];
+		}
+	}
 
-      fpa11->fType[getFd(opcode)] = nDest;
+	rFd = &fpa11->fpreg[getFd(opcode)];
 
-      if (nDest != nType)
-      {
-         switch (nDest)
-         {
-           case typeSingle:
-           {
-             if (typeDouble == nType)
-               rFd->fSingle = float64_to_float32(rFd->fDouble);
-             else
-               rFd->fSingle = floatx80_to_float32(rFd->fExtended);
-           }
-           break;
+	switch (nType) {
+	case typeSingle:
+		nRc = SingleCPDO(opcode, rFd);
+		break;
+	case typeDouble:
+		nRc = DoubleCPDO(opcode, rFd);
+		break;
+	case typeExtended:
+		nRc = ExtendedCPDO(opcode, rFd);
+		break;
+	default:
+		nRc = 0;
+	}
 
-           case typeDouble:
-           {
-             if (typeSingle == nType)
-               rFd->fDouble = float32_to_float64(rFd->fSingle);
-             else
-               rFd->fDouble = floatx80_to_float64(rFd->fExtended);
-           }
-           break;
+	/* The CPDO functions used to always set the destination type
+	   to be the same as their working size. */
 
-           case typeExtended:
-           {
-             if (typeSingle == nType)
-               rFd->fExtended = float32_to_floatx80(rFd->fSingle);
-             else
-               rFd->fExtended = float64_to_floatx80(rFd->fDouble);
-           }
-           break;
-         }
-      }
-   }
+	if (nRc != 0) {
+		/* If the operation succeeded, check to see if the result in the
+		   destination register is the correct size.  If not force it
+		   to be. */
 
-   return nRc;
+		fpa11->fType[getFd(opcode)] = nDest;
+
+		if (nDest != nType) {
+			switch (nDest) {
+			case typeSingle:
+				{
+					if (typeDouble == nType)
+						rFd->fSingle = float64_to_float32(rFd->fDouble);
+					else
+						rFd->fSingle = floatx80_to_float32(rFd->fExtended);
+				}
+				break;
+
+			case typeDouble:
+				{
+					if (typeSingle == nType)
+						rFd->fDouble = float32_to_float64(rFd->fSingle);
+					else
+						rFd->fDouble = floatx80_to_float64(rFd->fExtended);
+				}
+				break;
+
+			case typeExtended:
+				{
+					if (typeSingle == nType)
+						rFd->fExtended = float32_to_floatx80(rFd->fSingle);
+					else
+						rFd->fExtended = float64_to_floatx80(rFd->fDouble);
+				}
+				break;
+			}
+		}
+	}
+
+	return nRc;
 }
