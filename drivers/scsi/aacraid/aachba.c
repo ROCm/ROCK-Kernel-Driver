@@ -1094,7 +1094,7 @@ static int query_disk(struct aac_dev *dev, void *arg)
 		qd.cnum = TARGET_LUN_TO_CONTAINER(qd.target, qd.lun);
 	else if ((qd.bus == -1) && (qd.target == -1) && (qd.lun == -1)) 
 	{
-		if (qd.cnum < 0 || qd.cnum > MAXIMUM_NUM_CONTAINERS)
+		if (qd.cnum < 0 || qd.cnum >= MAXIMUM_NUM_CONTAINERS)
 			return -EINVAL;
 		qd.instance = dev->scsi_host_ptr->host_no;
 		qd.bus = 0;
@@ -1129,7 +1129,7 @@ static int force_delete_disk(struct aac_dev *dev, void *arg)
 	if (copy_from_user(&dd, arg, sizeof (struct aac_delete_disk)))
 		return -EFAULT;
 
-	if (dd.cnum > MAXIMUM_NUM_CONTAINERS)
+	if (dd.cnum >= MAXIMUM_NUM_CONTAINERS)
 		return -EINVAL;
 	/*
 	 *	Mark this container as being deleted.
@@ -1152,7 +1152,7 @@ static int delete_disk(struct aac_dev *dev, void *arg)
 	if (copy_from_user(&dd, arg, sizeof (struct aac_delete_disk)))
 		return -EFAULT;
 
-	if (dd.cnum > MAXIMUM_NUM_CONTAINERS)
+	if (dd.cnum >= MAXIMUM_NUM_CONTAINERS)
 		return -EINVAL;
 	/*
 	 *	If the container is locked, it can not be deleted by the API.

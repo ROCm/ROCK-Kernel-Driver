@@ -1763,7 +1763,7 @@ static int scc_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 			if (hwcfg.irq == 2) hwcfg.irq = 9;
 
-			if (hwcfg.irq <0 || hwcfg.irq > NR_IRQS)
+			if (hwcfg.irq < 0 || hwcfg.irq >= NR_IRQS)
 				return -EINVAL;
 				
 			if (!Ivec[hwcfg.irq].used && hwcfg.irq)

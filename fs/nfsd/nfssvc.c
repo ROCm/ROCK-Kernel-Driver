@@ -173,8 +173,7 @@ nfsd(struct svc_rqst *rqstp)
 	/* Lock module and set up kernel thread */
 	MOD_INC_USE_COUNT;
 	lock_kernel();
-	daemonize();
-	sprintf(current->comm, "nfsd");
+	daemonize("nfsd");
 	current->rlim[RLIMIT_FSIZE].rlim_cur = RLIM_INFINITY;
 
 	siginitsetinv(&shutdown_mask, SHUTDOWN_SIGS);

@@ -290,14 +290,7 @@ ecard_task(void * unused)
 {
 	struct task_struct *tsk = current;
 
-	/*
-	 * We don't want /any/ signals, not even SIGKILL
-	 */
-	sigfillset(&tsk->blocked);
-	sigemptyset(&tsk->pending.signal);
-	recalc_sigpending();
-	strcpy(tsk->comm, "kecardd");
-	daemonize();
+	daemonize("kecardd");
 
 	/*
 	 * Allocate a mm.  We're not a lazy-TLB kernel task since we need

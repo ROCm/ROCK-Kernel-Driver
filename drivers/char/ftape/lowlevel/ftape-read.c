@@ -589,6 +589,8 @@ TRACE(ft_t_info, "the famous ??? bug: max_floppy_track off by one !");
 		(max_floppy_track != 254 || max_floppy_sector != 128))
 #endif
 	   ) {
+		char segperheadz = ftape_segments_per_head ? ' ' : '?';
+		char segpercylz  = ftape_segments_per_cylinder ? ' ' : '?';
 		TRACE(ft_t_err,"Tape parameters inconsistency, please report");
 		TRACE(ft_t_err, "reported = %d/%d/%d/%d/%d/%d",
 		      ft_format_code,
@@ -597,14 +599,20 @@ TRACE(ft_t_info, "the famous ??? bug: max_floppy_track off by one !");
 		      max_floppy_side,
 		      max_floppy_track,
 		      max_floppy_sector);
-		TRACE(ft_t_err, "required = %d/%d/%d/%d/%d/%d",
+		TRACE(ft_t_err, "required = %d/%d/%d/%d%c/%d%c/%d",
 		      ft_format_code,
 		      ft_segments_per_track,
 		      ft_tracks_per_tape,
+		      ftape_segments_per_head ?
 		      ((ft_segments_per_track * ft_tracks_per_tape -1) / 
-		       ftape_segments_per_head ),
+		       ftape_segments_per_head ) :
+			(ft_segments_per_track * ft_tracks_per_tape -1),
+			segperheadz,
+		      ftape_segments_per_cylinder ?
 		      (ftape_segments_per_head / 
-		       ftape_segments_per_cylinder - 1 ),
+		       ftape_segments_per_cylinder - 1 ) :
+			ftape_segments_per_head - 1,
+			segpercylz,
 		      (ftape_segments_per_cylinder * FT_SECTORS_PER_SEGMENT));
 		TRACE_EXIT -EIO;
 	}

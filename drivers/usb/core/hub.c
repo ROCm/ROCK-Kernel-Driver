@@ -1083,10 +1083,8 @@ static int usb_hub_thread(void *__hub)
 	 * so get rid of all our resources
 	 */
 
-	daemonize();
-
-	/* Setup a nice name */
-	strcpy(current->comm, "khubd");
+	daemonize("khubd");
+	allow_signal(SIGKILL);
 
 	/* Send me a signal to get me die (for debugging) */
 	do {

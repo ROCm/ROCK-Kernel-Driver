@@ -71,17 +71,10 @@ static int kafstimod(void *arg)
 	afs_timer_t *timer;
 
 	printk("kAFS: Started kafstimod %d\n",current->pid);
-	strcpy(current->comm,"kafstimod");
 
-	daemonize();
+	daemonize("kafstimod");
 
 	complete(&kafstimod_alive);
-
-	/* only certain signals are of interest */
-	spin_lock_irq(&current->sighand->siglock);
-	siginitsetinv(&current->blocked,0);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
 
 	/* loop around looking for things to attend to */
  loop:

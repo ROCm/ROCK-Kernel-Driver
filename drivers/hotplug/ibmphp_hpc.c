@@ -1125,13 +1125,9 @@ static int process_changeinlatch (u8 old, u8 new, struct controller *ctrl)
 static int hpc_poll_thread (void *data)
 {
 	debug ("%s - Entry\n", __FUNCTION__);
-	lock_kernel ();
-	daemonize ();
 
-	//  New name
-	strcpy (current->comm, "hpc_poll");
-
-	unlock_kernel ();
+	daemonize("hpc_poll");
+	allow_signal(SIGKILL);
 
 	poll_hpc ();
 

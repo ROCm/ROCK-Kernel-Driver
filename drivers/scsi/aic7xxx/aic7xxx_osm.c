@@ -2355,16 +2355,10 @@ ahc_linux_dv_thread(void *data)
 #endif
 
 	/*
-	 * Don't care about any signals.
-	 */
-	siginitsetinv(&current->blocked, 0);
-
-	/*
 	 * Complete thread creation.
 	 */
 	lock_kernel();
-	daemonize();
-	sprintf(current->comm, "ahc_dv_%d", ahc->unit);
+	daemonize("ahc_dv_%d", ahc->unit);
 	unlock_kernel();
 
 	while (1) {

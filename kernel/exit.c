@@ -249,7 +249,7 @@ void reparent_to_init(void)
 	/* signals? */
 	security_task_reparent_to_init(current);
 	memcpy(current->rlim, init_task.rlim, sizeof(*(current->rlim)));
-	current->user = INIT_USER;
+	switch_uid(INIT_USER);
 
 	write_unlock_irq(&tasklist_lock);
 }
@@ -278,14 +278,36 @@ void set_special_pids(pid_t session, pid_t pgrp)
 }
 
 /*
+ * Let kernel threads use this to say that they
+ * allow a certain signal (since daemonize() will
+ * have disabled all of them by default).
+ */
+int allow_signal(int sig)
+{
+	if (sig < 1 || sig > _NSIG)
+		return -EINVAL;
+
+	spin_lock_irq(&current->sighand->siglock);
+	sigdelset(&current->blocked, sig);
+	recalc_sigpending();
+	spin_unlock_irq(&current->sighand->siglock);
+	return 0;
+}
+	
+
+/*
  *	Put all the gunge required to become a kernel thread without
  *	attached user resources in one place where it belongs.
  */
 
-void daemonize(void)
+void daemonize(const char *name, ...)
 {
+	va_list args;
 	struct fs_struct *fs;
+	sigset_t blocked;
 
+	va_start(args, name);
+	vsnprintf(current->comm, sizeof(current->comm), name, args);
 
 	/*
 	 * If we were started as result of loading a module, close all of the
@@ -296,6 +318,11 @@ void daemonize(void)
 
 	set_special_pids(1, 1);
 	current->tty = NULL;
+
+	/* Block and flush all signals */
+	sigfillset(&blocked);
+	sigprocmask(SIG_BLOCK, &blocked, NULL);
+	flush_signals(current);
 
 	/* Become as one with the init task */
 

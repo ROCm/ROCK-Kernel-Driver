@@ -300,17 +300,14 @@ static int ksoftirqd(void * __bind_cpu)
 {
 	int cpu = (int) (long) __bind_cpu;
 
-	daemonize();
+	daemonize("ksoftirqd/%d", cpu);
 	set_user_nice(current, 19);
 	current->flags |= PF_IOTHREAD;
-	sigfillset(&current->blocked);
 
 	/* Migrate to the right CPU */
 	set_cpus_allowed(current, 1UL << cpu);
 	if (smp_processor_id() != cpu)
 		BUG();
-
-	sprintf(current->comm, "ksoftirqd/%d", cpu);
 
 	__set_current_state(TASK_INTERRUPTIBLE);
 	mb();

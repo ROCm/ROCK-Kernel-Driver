@@ -38,7 +38,6 @@
 #include <linux/proc_fs.h>
 
 EXPORT_SYMBOL(journal_start);
-EXPORT_SYMBOL(journal_try_start);
 EXPORT_SYMBOL(journal_restart);
 EXPORT_SYMBOL(journal_extend);
 EXPORT_SYMBOL(journal_stop);
@@ -203,14 +202,9 @@ int kjournald(void *arg)
 
 	current_journal = journal;
 
-	lock_kernel();
-	daemonize();
-	spin_lock_irq(&current->sighand->siglock);
-	sigfillset(&current->blocked);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
+	daemonize("kjournald");
 
-	sprintf(current->comm, "kjournald");
+	lock_kernel();
 
 	/* Set up an interval timer which can be used to trigger a
            commit wakeup after the commit interval expires */

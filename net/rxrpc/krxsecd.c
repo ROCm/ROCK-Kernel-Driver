@@ -54,15 +54,8 @@ static int rxrpc_krxsecd(void *arg)
 	int die;
 
 	printk("Started krxsecd %d\n",current->pid);
-	strcpy(current->comm,"krxsecd");
 
-	daemonize();
-
-	/* only certain signals are of interest */
-	spin_lock_irq(&current->sighand->siglock);
-	siginitsetinv(&current->blocked,0);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
+	daemonize("krxsecd");
 
 	/* loop around waiting for work to do */
 	do {

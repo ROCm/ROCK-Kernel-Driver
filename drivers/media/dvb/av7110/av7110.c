@@ -349,13 +349,13 @@ static int arm_thread(void *data)
     
 	lock_kernel();
 #if 0
-	daemonize();
+	daemonize("arm_mon");
 #else
         exit_mm(current);
         current->session=current->pgrp=1;
-#endif
 	sigfillset(&current->blocked);
 	strcpy(current->comm, "arm_mon");
+#endif
 	av7110->arm_thread = current;
 	unlock_kernel();
 
@@ -3243,7 +3243,7 @@ StopHWFilter(struct dvb_demux_filter *dvbdmxfilter)
         u16 handle;
                 
         handle=dvbdmxfilter->hw_handle;
-        if (handle>32) {
+        if (handle >= MAXFILT) {
                 dprintk("dvb: StopHWFilter tried to stop invalid filter %d.\n",
                        handle);
                 dprintk("dvb: filter type = %d\n",  dvbdmxfilter->type);
@@ -4408,7 +4408,7 @@ dvb_register(av7110_t *av7110)
         dvbdemux->priv=(void *) av7110;
 
         if (av7110->saa->card_type==DVB_CARD_TT_SIEMENS) {
-                for (i=0; i<32; i++)
+                for (i = 0; i < MAXFILT; i++)
                         av7110->handle2filter[i]=NULL;
 
                 dvbdemux->filternum=32;

@@ -962,14 +962,8 @@ rpciod(void *ptr)
 	rpciod_pid = current->pid;
 	up(&rpciod_running);
 
-	daemonize();
-
-	spin_lock_irq(&current->sighand->siglock);
-	siginitsetinv(&current->blocked, sigmask(SIGKILL));
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
-
-	strcpy(current->comm, "rpciod");
+	daemonize("rpciod");
+	allow_signal(SIGKILL);
 
 	dprintk("RPC: rpciod starting (pid %d)\n", rpciod_pid);
 	while (rpciod_users) {

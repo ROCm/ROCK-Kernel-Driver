@@ -272,9 +272,7 @@ static int chip_thread(void *data)
 #ifdef CONFIG_SMP
 	lock_kernel();
 #endif
-	daemonize();
-	sigfillset(&current->blocked);
-	strcpy(current->comm,chip->c.name);
+	daemonize("%s", chip->c.name);
 	chip->thread = current;
 #ifdef CONFIG_SMP
 	unlock_kernel();

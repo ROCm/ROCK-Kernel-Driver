@@ -224,9 +224,6 @@ static struct devprobe isa_probes[] __initdata = {
 #ifdef CONFIG_EL2 		/* 3c503 */
 	{el2_probe, 0},
 #endif
-#ifdef CONFIG_EL3
-	{el3_probe, 0},
-#endif
 #ifdef CONFIG_HPLAN
 	{hp_probe, 0},
 #endif
