@@ -40,8 +40,10 @@ LDFLAGS_vmlinux := -e stext
 CFLAGS += -mno-red-zone
 CFLAGS += -mcmodel=kernel
 CFLAGS += -pipe
-# this makes reading assembly source easier
+# this makes reading assembly source easier, but produces worse code
+# disable for production kernel
 CFLAGS += -fno-reorder-blocks	
+# should lower this a lot and see how much .text is saves	
 CFLAGS += -finline-limit=2000
 #CFLAGS += -g
 

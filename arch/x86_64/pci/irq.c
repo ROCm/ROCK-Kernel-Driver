@@ -296,7 +296,6 @@ static int pirq_sis_set(struct pci_dev *router, struct pci_dev *dev, int pirq, i
 	return 1;
 }
 
-#if 0 /* kept as reference */
 /* Support for AMD756 PCI IRQ Routing
  * Jhon H. Caicedo <jhcaiced@osso.org.co>
  * Jun/21/2001 0.2.0 Release, fixed to use "nybble" functions... (jhcaiced)
@@ -304,8 +303,6 @@ static int pirq_sis_set(struct pci_dev *router, struct pci_dev *dev, int pirq, i
  * The AMD756 pirq rules are nibble-based
  * offset 0x56 0-3 PIRQA  4-7  PIRQB
  * offset 0x57 0-3 PIRQC  4-7  PIRQD
- *
- * AMD8111 is similar NIY.
  */
 static int pirq_amd756_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
 {
@@ -315,14 +312,14 @@ static int pirq_amd756_get(struct pci_dev *router, struct pci_dev *dev, int pirq
 	{
 		irq = read_config_nybble(router, 0x56, pirq - 1);
 	}
-	printk(KERN_INFO "AMD756: dev %04x:%04x, router pirq : %d get irq : %2d\n",
+	printk(KERN_INFO "AMD: dev %04x:%04x, router pirq : %d get irq : %2d\n",
 		dev->vendor, dev->device, pirq, irq);
 	return irq;
 }
 
 static int pirq_amd756_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
 {
-	printk(KERN_INFO "AMD756: dev %04x:%04x, router pirq : %d SET irq : %2d\n", 
+	printk(KERN_INFO "AMD: dev %04x:%04x, router pirq : %d SET irq : %2d\n", 
 		dev->vendor, dev->device, pirq, irq);
 	if (pirq <= 4)
 	{
@@ -330,13 +327,25 @@ static int pirq_amd756_set(struct pci_dev *router, struct pci_dev *dev, int pirq
 	}
 	return 1;
 }
-#endif
 
 static struct irq_router pirq_routers[] = {
+#if 0 /* all these do not exist on Hammer currently, but keep one example
+	 for each. All these vendors have announced K8 chipsets, so we'll
+	 eventually need a router for them. Luckily they tend to use the
+	 same ones, so with luck just enabling the existing ones will work
+	 when you know the final PCI ids.  */ 
+
+	{ "ALI", PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M1533, pirq_ali_get, pirq_ali_set },
+
 	{ "VIA", PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C586_0, pirq_via_get, pirq_via_set },
-	{ "VIA", PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C596, pirq_via_get, pirq_via_set },
-	{ "VIA", PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C686, pirq_via_get, pirq_via_set },
+
 	{ "SIS", PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_503, pirq_sis_get, pirq_sis_set },
+
+#endif
+
+	{ "AMD756 VIPER", PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_740B,
+		pirq_amd756_get, pirq_amd756_set },
+
 	{ "default", 0, 0, NULL, NULL }
 };
 
@@ -347,14 +356,6 @@ static void __init pirq_find_router(void)
 {
 	struct irq_routing_table *rt = pirq_table;
 	struct irq_router *r;
-
-#ifdef CONFIG_PCI_BIOS
-	if (!rt->signature) {
-		printk(KERN_INFO "PCI: Using BIOS for IRQ routing\n");
-		pirq_router = &pirq_bios_router;
-		return;
-	}
-#endif
 
 	DBG("PCI: Attempting to find IRQ router for %04x:%04x\n",
 	    rt->rtr_vendor, rt->rtr_device);
@@ -528,38 +529,7 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	return 1;
 }
 
-static int __init pcibios_irq_init(void)
-{
-	DBG("PCI: IRQ init\n");
-
-	if (pcibios_enable_irq)
-		return 0;
-
-	pirq_table = pirq_find_routing_table();
-
-	if (pirq_table) {
-		pirq_peer_trick();
-		pirq_find_router();
-		if (pirq_table->exclusive_irqs) {
-			int i;
-			for (i=0; i<16; i++)
-				if (!(pirq_table->exclusive_irqs & (1 << i)))
-					pirq_penalty[i] += 100;
-		}
-		/* If we're using the I/O APIC, avoid using the PCI IRQ routing table */
-		if (io_apic_assign_pci_irqs)
-			pirq_table = NULL;
-	}
-
-	pcibios_enable_irq = pirq_enable_irq;
-
-	pcibios_fixup_irqs();
-	return 0;
-}
-
-subsys_initcall(pcibios_irq_init);
-
-void __init pcibios_fixup_irqs(void)
+static void __init pcibios_fixup_irqs(void)
 {
 	struct pci_dev *dev;
 	u8 pin;
@@ -625,6 +595,38 @@ void __init pcibios_fixup_irqs(void)
 	}
 }
 
+static int __init pcibios_irq_init(void)
+{
+	DBG("PCI: IRQ init\n");
+
+	if (pcibios_enable_irq)
+		return 0;
+
+	pirq_table = pirq_find_routing_table();
+
+	if (pirq_table) {
+		pirq_peer_trick();
+		pirq_find_router();
+		if (pirq_table->exclusive_irqs) {
+			int i;
+			for (i=0; i<16; i++)
+				if (!(pirq_table->exclusive_irqs & (1 << i)))
+					pirq_penalty[i] += 100;
+		}
+		/* If we're using the I/O APIC, avoid using the PCI IRQ routing table */
+		if (io_apic_assign_pci_irqs)
+			pirq_table = NULL;
+	}
+
+	pcibios_enable_irq = pirq_enable_irq;
+
+	pcibios_fixup_irqs();
+	return 0;
+}
+
+subsys_initcall(pcibios_irq_init);
+
+
 void pcibios_penalize_isa_irq(int irq)
 {
 	/*
@@ -640,12 +642,8 @@ int pirq_enable_irq(struct pci_dev *dev)
 	pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
 	if (pin && !pcibios_lookup_irq(dev, 1) && !dev->irq) {
 		char *msg;
-		if (io_apic_assign_pci_irqs)
-			msg = " Probably buggy MP table.";
-		else
-			msg = "";
-		printk(KERN_WARNING "PCI: No IRQ known for interrupt pin %c of device %s.%s\n",
-		       'A' + pin - 1, dev->slot_name, msg);
+		printk(KERN_WARNING "PCI: No IRQ known for interrupt pin %c of device %s.\n",
+		       'A' + pin - 1, dev->slot_name);
 	}
 
 	return 0;

@@ -668,7 +668,7 @@ void __init init_apic_mappings(void)
 		apic_phys = mp_lapic_addr;
 
 	set_fixmap_nocache(FIX_APIC_BASE, apic_phys);
-	Dprintk("mapped APIC to %08lx (%08lx)\n", APIC_BASE, apic_phys);
+	Dprintk("mapped APIC to %16lx (%16lx)\n", APIC_BASE, apic_phys);
 
 	/*
 	 * Fetch the APIC ID of the BSP in case we have a
@@ -690,7 +690,7 @@ void __init init_apic_mappings(void)
 				ioapic_phys = __pa(ioapic_phys);
 			}
 			set_fixmap_nocache(idx, ioapic_phys);
-			Dprintk("mapped IOAPIC to %08lx (%08lx)\n",
+			Dprintk("mapped IOAPIC to %016lx (%016lx)\n",
 					__fix_to_virt(idx), ioapic_phys);
 			idx++;
 		}

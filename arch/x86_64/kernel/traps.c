@@ -173,7 +173,7 @@ void show_trace(unsigned long *stack)
 	int i;
 
 	printk("\nCall Trace:");
-	i = 0; 
+	i = 12; 
 	
 	estack_end = in_exception_stack(cpu, (unsigned long)stack); 
 	if (estack_end) { 

@@ -71,3 +71,6 @@ void pcibios_fixup_irqs(void);
 int pirq_enable_irq(struct pci_dev *dev);
 
 extern int (*pcibios_enable_irq)(struct pci_dev *dev);
+
+/* legacy.c */
+extern void pcibios_fixup_peer_bridges(void);

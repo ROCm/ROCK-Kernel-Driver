@@ -22,6 +22,18 @@
 extern unsigned long table_start, table_end;
 extern char _end[];
 
+/* 
+ * end_pfn only includes RAM, while end_pfn_map includes all e820 entries.
+ * The direct mapping extends to end_pfn_map, so that we can directly access
+ * ACPI and other tables without having to play with fixmaps.
+ */ 
+unsigned long end_pfn_map; 
+
+/* 
+ * Last pfn which the user wants to use.
+ */
+unsigned long end_user_pfn = MAXMEM>>PAGE_SHIFT;  
+
 extern struct resource code_resource, data_resource, vram_resource;
 
 /* Check for some hardcoded bad areas that early boot is not allowed to touch */ 
@@ -137,21 +149,32 @@ void __init e820_end_of_ram(void)
 {
 	int i;
 	end_pfn = 0;
+	
 	for (i = 0; i < e820.nr_map; i++) {
 		struct e820entry *ei = &e820.map[i]; 
 		unsigned long start, end;
 
-		/* count all types of areas for now to map ACPI easily */
 		start = round_up(ei->addr, PAGE_SIZE); 
 		end = round_down(ei->addr + ei->size, PAGE_SIZE); 
 		if (start >= end)
 			continue;
+		if (ei->type == E820_RAM) { 
 		if (end > end_pfn<<PAGE_SHIFT)
 			end_pfn = end>>PAGE_SHIFT;
+		} else { 
+			if (end > end_pfn_map<<PAGE_SHIFT) 
+				end_pfn_map = end>>PAGE_SHIFT;
+		} 
 	}
 
-	if (end_pfn > MAXMEM >> PAGE_SHIFT)
-		end_pfn = MAXMEM >> PAGE_SHIFT;
+	if (end_pfn > end_pfn_map) 
+		end_pfn_map = end_pfn;
+	if (end_pfn_map > MAXMEM>>PAGE_SHIFT)
+		end_pfn_map = MAXMEM>>PAGE_SHIFT;
+	if (end_pfn > end_user_pfn)
+		end_pfn = end_user_pfn;
+	if (end_pfn > end_pfn_map) 
+		end_pfn = end_pfn_map; 
 }
 
 /* 
@@ -482,46 +505,23 @@ void __init setup_memory_region(void)
 	e820_print_map(who);
 }
 
-static int usermem __initdata; 
-
-void __init parse_memopt(char *p) 
+void __init parse_memopt(char *p, char **from) 
 { 
-	if (!strncmp(p,"exactmap",8)) { 
-		e820.nr_map = 0;
-		usermem = 1; 
-	} else { 
-	       	/* If the user specifies memory size, we
-		 * blow away any automatically generated
-		 * size
-		 */
-		unsigned long long start_at, mem_size;
-		
-		if (usermem == 0) {
-			/* first time in: zap the whitelist
-			 * and reinitialize it with the
-			 * standard low-memory region.
+	/*
+	 * mem=XXX[kKmM] limits kernel memory to XXX+1MB
+	 *
+	 * It would be more logical to count from 0 instead of from
+	 * HIGH_MEMORY, but we keep that for now for i386 compatibility. 
+	 *	
+	 * No support for custom mapping like i386.  The reason is
+	 * that we need to read the e820 map anyways to handle the
+	 * ACPI mappings in the direct map.  Also on x86-64 there
+	 * should be always a good e820 map. This is only an upper
+	 * limit, you cannot force usage of memory not in e820.
+	 *
+	 * -AK
 			 */
-			e820.nr_map = 0;
-			usermem = 1;
-			add_memory_region(0, LOWMEMSIZE(), E820_RAM);
-		}
-		mem_size = memparse(p, &p);
-		if (*p == '@')
-			start_at = memparse(p+1, &p);
-		else {
-			start_at = HIGH_MEMORY;
-			mem_size -= HIGH_MEMORY;
-			usermem=0;
-		}
-		add_memory_region(start_at, mem_size, E820_RAM);
-	}
-		
+	end_user_pfn = memparse(p, from) + HIGH_MEMORY;
+	end_user_pfn >>= PAGE_SHIFT;	
 } 
 
-void __init print_user_map(void)
-{ 
-	if (usermem) {
-		printk(KERN_INFO "user-defined physical RAM map:\n");
-		e820_print_map("user");
-	}
-}

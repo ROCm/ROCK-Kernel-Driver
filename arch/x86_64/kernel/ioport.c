@@ -64,7 +64,6 @@ asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 	if (turn_on && !capable(CAP_SYS_RAWIO))
 		return -EPERM;
 
-	tss  = init_tss + get_cpu();
 	if (!t->io_bitmap_ptr) { 
 		t->io_bitmap_ptr = kmalloc((IO_BITMAP_SIZE+1)*4, GFP_KERNEL);
 		if (!t->io_bitmap_ptr) { 
@@ -72,8 +71,11 @@ asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 			goto out;
 		}
 		memset(t->io_bitmap_ptr,0xff,(IO_BITMAP_SIZE+1)*4);
+		tss  = init_tss + get_cpu();
 		tss->io_map_base = IO_BITMAP_OFFSET;
+		put_cpu(); 
 	}
+	tss = init_tss + get_cpu();
 
 	/*
 	 * do it in the per-thread copy and in the TSS ...
