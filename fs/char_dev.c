@@ -19,122 +19,183 @@
 
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>
-#include <linux/tty.h>
-
-/* serial module kmod load support */
-struct tty_driver *get_tty_driver(kdev_t device);
-#define is_a_tty_dev(ma)	(ma == TTY_MAJOR || ma == TTYAUX_MAJOR)
-#define need_serial(ma,mi) (get_tty_driver(mk_kdev(ma,mi)) == NULL)
 #endif
 
-struct device_struct {
-	const char * name;
-	struct file_operations * fops;
-};
+#define MAX_PROBE_HASH 255	/* random */
 
 static rwlock_t chrdevs_lock = RW_LOCK_UNLOCKED;
-static struct device_struct chrdevs[MAX_CHRDEV];
 
+static struct char_device_struct {
+	struct char_device_struct *next;
+	unsigned int major;
+	unsigned int baseminor;
+	int minorct;
+	const char *name;
+	struct file_operations *fops;
+} *chrdevs[MAX_PROBE_HASH];
+
+/* index in the above */
+static inline int major_to_index(int major)
+{
+	return major % MAX_PROBE_HASH;
+}
+
+/* get char device names in somewhat random order */
 int get_chrdev_list(char *page)
 {
-	int i;
-	int len;
+	struct char_device_struct *cd;
+	int i, len;
 
 	len = sprintf(page, "Character devices:\n");
+
 	read_lock(&chrdevs_lock);
-	for (i = 0; i < MAX_CHRDEV ; i++) {
-		if (chrdevs[i].fops) {
+	for (i = 0; i < ARRAY_SIZE(chrdevs) ; i++) {
+		for (cd = chrdevs[i]; cd; cd = cd->next)
 			len += sprintf(page+len, "%3d %s\n",
-				       i, chrdevs[i].name);
-		}
+				       cd->major, cd->name);
 	}
 	read_unlock(&chrdevs_lock);
+
 	return len;
 }
 
 /*
- *	Return the function table of a device.
- *	Load the driver if needed.
- *	Increment the reference count of module in question.
+ * Return the function table of a device, if present.
+ * Increment the reference count of module in question.
+ */
+static struct file_operations *
+lookup_chrfops(unsigned int major, unsigned int minor)
+{
+	struct char_device_struct *cd;
+	struct file_operations *ret = NULL;
+	int i;
+
+	i = major_to_index(major);
+
+	read_lock(&chrdevs_lock);
+	for (cd = chrdevs[i]; cd; cd = cd->next) {
+		if (major == cd->major &&
+		    minor - cd->baseminor < cd->minorct) {
+			ret = fops_get(cd->fops);
+			break;
+		}
+	}
+	read_unlock(&chrdevs_lock);
+
+	return ret;
+}
+
+/*
+ * Return the function table of a device, if present.
+ * Load the driver if needed.
+ * Increment the reference count of module in question.
  */
 static struct file_operations *
 get_chrfops(unsigned int major, unsigned int minor)
 {
-	struct file_operations *ret;
+	struct file_operations *ret = NULL;
 
-	if (!major || major >= MAX_CHRDEV)
+	if (!major)
 		return NULL;
 
-	read_lock(&chrdevs_lock);
-	ret = fops_get(chrdevs[major].fops);
-	read_unlock(&chrdevs_lock);
+	ret = lookup_chrfops(major, minor);
+
 #ifdef CONFIG_KMOD
-	if (ret && is_a_tty_dev(major)) {
-		lock_kernel();
-		if (need_serial(major,minor)) {
-			/* Force request_module anyway, but what for? */
-			/* The reason is that we may have a driver for
-			   /dev/tty1 already, but need one for /dev/ttyS1. */
-			fops_put(ret);
-			ret = NULL;
-		}
-		unlock_kernel();
-	}
 	if (!ret) {
-		char name[20];
+		char name[32];
 		sprintf(name, "char-major-%d", major);
 		request_module(name);
 
 		read_lock(&chrdevs_lock);
-		ret = fops_get(chrdevs[major].fops);
+		ret = lookup_chrfops(major, minor);
 		read_unlock(&chrdevs_lock);
 	}
 #endif
 	return ret;
 }
 
+/*
+ * Register a single major with a specified minor range
+ */
+int register_chrdev_region(unsigned int major, unsigned int baseminor,
+			   int minorct, const char *name,
+			   struct file_operations *fops)
+{
+	struct char_device_struct *cd, **cp;
+	int ret = 0;
+	int i;
+
+	/* temporary */
+	if (major == 0) {
+		read_lock(&chrdevs_lock);
+		for (i = ARRAY_SIZE(chrdevs)-1; i > 0; i--)
+			if (chrdevs[i] == NULL)
+				break;
+		read_unlock(&chrdevs_lock);
+
+		if (i == 0)
+			return -EBUSY;
+		ret = major = i;
+	}
+
+	cd = kmalloc(sizeof(struct char_device_struct), GFP_KERNEL);
+	if (cd == NULL)
+		return -ENOMEM;
+
+	cd->major = major;
+	cd->baseminor = baseminor;
+	cd->minorct = minorct;
+	cd->name = name;
+	cd->fops = fops;
+
+	i = major_to_index(major);
+
+	write_lock(&chrdevs_lock);
+	for (cp = &chrdevs[i]; *cp; cp = &(*cp)->next)
+		if ((*cp)->major > major ||
+		    ((*cp)->major == major && (*cp)->baseminor >= baseminor))
+			break;
+	if (*cp && (*cp)->major == major &&
+	    (*cp)->baseminor < baseminor + minorct) {
+		ret = -EBUSY;
+	} else {
+		cd->next = *cp;
+		*cp = cd;
+	}
+	write_unlock(&chrdevs_lock);
+
+	return ret;
+}
+
 int register_chrdev(unsigned int major, const char *name,
 		    struct file_operations *fops)
 {
-	if (major == 0) {
-		write_lock(&chrdevs_lock);
-		for (major = MAX_CHRDEV-1; major > 0; major--) {
-			if (chrdevs[major].fops == NULL) {
-				chrdevs[major].name = name;
-				chrdevs[major].fops = fops;
-				write_unlock(&chrdevs_lock);
-				return major;
-			}
-		}
-		write_unlock(&chrdevs_lock);
-		return -EBUSY;
-	}
-	if (major >= MAX_CHRDEV)
-		return -EINVAL;
-	write_lock(&chrdevs_lock);
-	if (chrdevs[major].fops && chrdevs[major].fops != fops) {
-		write_unlock(&chrdevs_lock);
-		return -EBUSY;
-	}
-	chrdevs[major].name = name;
-	chrdevs[major].fops = fops;
-	write_unlock(&chrdevs_lock);
-	return 0;
+	return register_chrdev_region(major, 0, 256, name, fops);
 }
 
+/* todo: make void - error printk here */
 int unregister_chrdev(unsigned int major, const char * name)
 {
-	if (major >= MAX_CHRDEV)
-		return -EINVAL;
+	struct char_device_struct *cd, **cp;
+	int ret = 0;
+	int i;
+
+	i = major_to_index(major);
+
 	write_lock(&chrdevs_lock);
-	if (!chrdevs[major].fops || strcmp(chrdevs[major].name, name)) {
-		write_unlock(&chrdevs_lock);
-		return -EINVAL;
+	for (cp = &chrdevs[i]; *cp; cp = &(*cp)->next)
+		if ((*cp)->major == major)
+			break;
+	if (!*cp || strcmp((*cp)->name, name))
+		ret = -EINVAL;
+	else {
+		cd = *cp;
+		*cp = cd->next;
+		kfree(cd);
 	}
-	chrdevs[major].name = NULL;
-	chrdevs[major].fops = NULL;
 	write_unlock(&chrdevs_lock);
-	return 0;
+
+	return ret;
 }
 
 /*
@@ -165,13 +226,23 @@ struct file_operations def_chr_fops = {
 	.open = chrdev_open,
 };
 
-const char * cdevname(kdev_t dev)
+const char *cdevname(kdev_t dev)
 {
-	static char buffer[32];
-	const char * name = chrdevs[major(dev)].name;
+	static char buffer[40];
+	const char *name = "unknown-char";
+	unsigned int major = major(dev);
+	unsigned int minor = minor(dev);
+	int i = major_to_index(major);
+	struct char_device_struct *cd;
 
-	if (!name)
-		name = "unknown-char";
-	sprintf(buffer, "%s(%d,%d)", name, major(dev), minor(dev));
+	read_lock(&chrdevs_lock);
+	for (cd = chrdevs[i]; cd; cd = cd->next)
+		if (cd->major == major)
+			break;
+	if (cd)
+		name = cd->name;
+	sprintf(buffer, "%s(%d,%d)", name, major, minor);
+	read_unlock(&chrdevs_lock);
+
 	return buffer;
 }

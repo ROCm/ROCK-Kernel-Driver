@@ -1055,7 +1055,10 @@ extern void bd_release(struct block_device *);
 extern void blk_run_queues(void);
 
 /* fs/char_dev.c */
-extern int register_chrdev(unsigned int, const char *, struct file_operations *);
+extern int register_chrdev_region(unsigned int, unsigned int, int,
+				  const char *, struct file_operations *);
+extern int register_chrdev(unsigned int, const char *,
+			   struct file_operations *);
 extern int unregister_chrdev(unsigned int, const char *);
 extern int chrdev_open(struct inode *, struct file *);
 

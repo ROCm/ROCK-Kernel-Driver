@@ -2118,7 +2118,8 @@ int tty_register_driver(struct tty_driver *driver)
 	if (driver->flags & TTY_DRIVER_INSTALLED)
 		return 0;
 
-	error = register_chrdev(driver->major, driver->name, &tty_fops);
+	error = register_chrdev_region(driver->major, driver->minor_start,
+				       driver->num, driver->name, &tty_fops);
 	if (error < 0)
 		return error;
 	else if(driver->major == 0)
