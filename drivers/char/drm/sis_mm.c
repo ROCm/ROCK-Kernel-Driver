@@ -407,6 +407,7 @@ int sis_final_context(struct drm_device *dev, int context)
 
 void DRM(driver_register_fns)(drm_device_t *dev)
 {
+	dev->driver_features = DRIVER_USE_AGP | DRIVER_USE_MTRR;
 	dev->fn_tbl.context_ctor = sis_init_context;
 	dev->fn_tbl.context_dtor = sis_final_context;
 }

@@ -36,9 +36,6 @@
 
 /* General customization:
  */
-#define __HAVE_AGP		1
-#define __MUST_HAVE_AGP		1
-#define __HAVE_MTRR		1
 #define __HAVE_CTX_BITMAP	1
 
 #define DRIVER_AUTHOR		"Gareth Hughes, VA Linux Systems Inc."

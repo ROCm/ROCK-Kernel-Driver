@@ -130,13 +130,13 @@ int DRM(addmap)( struct inode *inode, struct file *filp,
 #ifdef __alpha__
 		map->offset += dev->hose->mem_space->start;
 #endif
-#if __REALLY_HAVE_MTRR
-		if ( map->type == _DRM_FRAME_BUFFER ||
-		     (map->flags & _DRM_WRITE_COMBINING) ) {
-			map->mtrr = mtrr_add( map->offset, map->size,
-					      MTRR_TYPE_WRCOMB, 1 );
+		if (drm_core_has_MTRR(dev)) {
+			if ( map->type == _DRM_FRAME_BUFFER ||
+			     (map->flags & _DRM_WRITE_COMBINING) ) {
+				map->mtrr = mtrr_add( map->offset, map->size,
+						      MTRR_TYPE_WRCOMB, 1 );
+			}
 		}
-#endif
 		if (map->type == _DRM_REGISTERS)
 			map->handle = DRM(ioremap)( map->offset, map->size,
 						    dev );
@@ -162,15 +162,15 @@ int DRM(addmap)( struct inode *inode, struct file *filp,
 			dev->lock.hw_lock = map->handle; /* Pointer to lock */
 		}
 		break;
-#if __REALLY_HAVE_AGP
 	case _DRM_AGP:
+		if (drm_core_has_AGP(dev)) {
 #ifdef __alpha__
-		map->offset += dev->hose->mem_space->start;
+			map->offset += dev->hose->mem_space->start;
 #endif
-		map->offset += dev->agp->base;
-		map->mtrr   = dev->agp->agp_mtrr; /* for getmap */
+			map->offset += dev->agp->base;
+			map->mtrr   = dev->agp->agp_mtrr; /* for getmap */
+		}
 		break;
-#endif
 	case _DRM_SCATTER_GATHER:
 		if (!dev->sg) {
 			DRM(free)(map, sizeof(*map), DRM_MEM_MAPS);
@@ -270,15 +270,15 @@ int DRM(rmmap)(struct inode *inode, struct file *filp,
 		switch (map->type) {
 		case _DRM_REGISTERS:
 		case _DRM_FRAME_BUFFER:
-#if __REALLY_HAVE_MTRR
-			if (map->mtrr >= 0) {
-				int retcode;
-				retcode = mtrr_del(map->mtrr,
-						   map->offset,
-						   map->size);
-				DRM_DEBUG("mtrr_del = %d\n", retcode);
+		  if (drm_core_has_MTRR(dev)) {
+				if (map->mtrr >= 0) {
+					int retcode;
+					retcode = mtrr_del(map->mtrr,
+							   map->offset,
+							   map->size);
+					DRM_DEBUG("mtrr_del = %d\n", retcode);
+				}
 			}
-#endif
 			DRM(ioremapfree)(map->handle, map->size, dev);
 			break;
 		case _DRM_SHM:
@@ -340,7 +340,7 @@ static void DRM(cleanup_buf_error)(drm_buf_entry_t *entry)
 	}
 }
 
-#if __REALLY_HAVE_AGP
+#if __OS_HAS_AGP
 /**
  * Add AGP buffers for DMA transfers (ioctl).
  *
@@ -517,7 +517,7 @@ int DRM(addbufs_agp)( struct inode *inode, struct file *filp,
 	atomic_dec( &dev->buf_alloc );
 	return 0;
 }
-#endif /* __REALLY_HAVE_AGP */
+#endif /* __OS_HAS_AGP */
 
 #if __HAVE_PCI_DMA
 int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
@@ -940,7 +940,7 @@ int DRM(addbufs)( struct inode *inode, struct file *filp,
 			     sizeof(request) ) )
 		return -EFAULT;
 
-#if __REALLY_HAVE_AGP
+#if __OS_HAS_AGP
 	if ( request.flags & _DRM_AGP_BUFFER )
 		return DRM(addbufs_agp)( inode, filp, cmd, arg );
 	else
@@ -1185,8 +1185,8 @@ int DRM(mapbufs)( struct inode *inode, struct file *filp,
 		return -EFAULT;
 
 	if ( request.count >= dma->buf_count ) {
-		if ( (__HAVE_AGP && (dma->flags & _DRM_DMA_USE_AGP)) ||
-		     (__HAVE_SG && (dma->flags & _DRM_DMA_USE_SG)) ) {
+		if ((drm_core_has_AGP(dev) && (dma->flags & _DRM_DMA_USE_AGP)) ||
+		    (__HAVE_SG && (dma->flags & _DRM_DMA_USE_SG)) ) {
 			drm_map_t *map = dev->agp_buffer_map;
 
 			if ( !map ) {
