@@ -112,6 +112,13 @@
 		* Get rid of cable_magic flag
 		* use new (National provided) solution for cable magic issue
 
+	version 1.0.16:
+		* call netdev_rx() for RxErrors (Manfred Spraul)
+		* formatting and cleanups
+		* change options and full_duplex arrays to be zero
+		  initialized
+		* enable only the WoL and PHY interrupts in wol mode
+
 	TODO:
 	* big endian support with CFG:BEM instead of cpu_to_le32
 	* support for an external PHY
@@ -150,8 +157,8 @@
 #include <asm/uaccess.h>
 
 #define DRV_NAME	"natsemi"
-#define DRV_VERSION	"1.07+LK1.0.15"
-#define DRV_RELDATE	"Jul 23, 2002"
+#define DRV_VERSION	"1.07+LK1.0.16"
+#define DRV_RELDATE	"Aug 28, 2002"
 
 /* Updated to recommendations in pci-skeleton v2.03. */
 
@@ -196,8 +203,8 @@ static int rx_copybreak;
    The media type is usually passed in 'options[]'.
 */
 #define MAX_UNITS 8		/* More are supported, limit only on options */
-static int options[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
-static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
+static int options[MAX_UNITS];
+static int full_duplex[MAX_UNITS];
 
 /* Operational parameters that are set at compile time. */
 
@@ -781,7 +788,7 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 		option = dev->mem_start;
 
 	/* The lower four bits are the media type. */
-	if (option > 0) {
+	if (option) {
 		if (option & 0x200)
 			np->full_duplex = 1;
 		if (option & 15)
@@ -789,7 +796,7 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 				"%s: ignoring user supplied media type %d",
 				dev->name, option & 15);
 	}
-	if (find_cnt < MAX_UNITS  &&  full_duplex[find_cnt] > 0)
+	if (find_cnt < MAX_UNITS  &&  full_duplex[find_cnt])
 		np->full_duplex = 1;
 
 	/* The chip-specific entries in the device structure. */
@@ -1388,8 +1395,8 @@ static int alloc_ring(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
 	np->rx_ring = pci_alloc_consistent(np->pci_dev,
-				sizeof(struct netdev_desc) * (RX_RING_SIZE+TX_RING_SIZE),
-				&np->ring_dma);
+	    sizeof(struct netdev_desc) * (RX_RING_SIZE+TX_RING_SIZE),
+	    &np->ring_dma);
 	if (!np->rx_ring)
 		return -ENOMEM;
 	np->tx_ring = &np->rx_ring[RX_RING_SIZE];
@@ -1593,10 +1600,14 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 		if (intr_status == 0)
 			break;
 
-		if (intr_status & (IntrRxDone | IntrRxIntr | RxStatusFIFOOver | IntrRxErr | IntrRxOverrun ))
+		if (intr_status &
+		   (IntrRxDone | IntrRxIntr | RxStatusFIFOOver |
+		    IntrRxErr | IntrRxOverrun)) {
 			netdev_rx(dev);
+		}
 
-		if (intr_status & (IntrTxDone | IntrTxIntr | IntrTxIdle | IntrTxErr) ) {
+		if (intr_status & 
+		   (IntrTxDone | IntrTxIntr | IntrTxIdle | IntrTxErr)) {
 			spin_lock(&np->lock);
 			netdev_tx_done(dev);
 			spin_unlock(&np->lock);
@@ -1607,16 +1618,16 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 			netdev_error(dev, intr_status);
 
 		if (--boguscnt < 0) {
-			printk(KERN_WARNING "%s: Too much work at interrupt, "
-				   "status=%#08x.\n",
-				   dev->name, intr_status);
+			if (netif_msg_intr(np))
+				printk(KERN_WARNING 
+				    "%s: Too much work at interrupt, "
+				    "status=%#08x.\n", dev->name, intr_status);
 			break;
 		}
 	} while (1);
 
 	if (netif_msg_intr(np))
-		printk(KERN_DEBUG "%s: exiting interrupt.\n",
-			   dev->name);
+		printk(KERN_DEBUG "%s: exiting interrupt.\n", dev->name);
 }
 
 /* This routine is logically part of the interrupt handler, but separated
@@ -2392,7 +2403,8 @@ static void enable_wol_mode(struct net_device *dev, int enable_intr)
 		/* enable the WOL interrupt.
 		 * Could be used to send a netlink message.
 		 */
-		writel(readl(ioaddr + IntrMask) | WOLPkt, ioaddr + IntrMask);
+		writel(WOLPkt | LinkChange, ioaddr + IntrMask);
+		writel(1, ioaddr + IntrEnable);
 	}
 }
 
@@ -2451,7 +2463,7 @@ static int netdev_close(struct net_device *dev)
 	drain_ring(dev);
 	free_ring(dev);
 
-	 {
+	{
 		u32 wol = readl(ioaddr + WOLCmd) & WakeOptsSummary;
 		if (wol) {
 			/* restart the NIC in WOL mode.
