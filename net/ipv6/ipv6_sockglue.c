@@ -53,7 +53,7 @@
 
 struct ipv6_mib ipv6_statistics[NR_CPUS*2];
 
-struct packet_type ipv6_packet_type =
+static struct packet_type ipv6_packet_type =
 {
 	__constant_htons(ETH_P_IPV6), 
 	NULL,					/* All devices */

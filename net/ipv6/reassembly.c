@@ -46,10 +46,10 @@
 #include <net/ndisc.h>
 #include <net/addrconf.h>
 
-int sysctl_ip6frag_high_thresh = 256*1024;
-int sysctl_ip6frag_low_thresh = 192*1024;
+static int sysctl_ip6frag_high_thresh = 256*1024;
+static int sysctl_ip6frag_low_thresh = 192*1024;
 
-int sysctl_ip6frag_time = IPV6_FRAG_TIMEOUT;
+static int sysctl_ip6frag_time = IPV6_FRAG_TIMEOUT;
 
 struct ip6frag_skb_cb
 {

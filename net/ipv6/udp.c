@@ -371,7 +371,7 @@ static void udpv6_close(struct sock *sk, long timeout)
  * 	return it, otherwise we block.
  */
 
-int udpv6_recvmsg(struct sock *sk, struct msghdr *msg, int len,
+static int udpv6_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 		  int noblock, int flags, int *addr_len)
 {
 	struct ipv6_pinfo *np = inet6_sk(sk);
@@ -470,7 +470,7 @@ csum_copy_err:
 	goto out_free;
 }
 
-void udpv6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
+static void udpv6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	       int type, int code, int offset, __u32 info)
 {
 	struct ipv6_pinfo *np;
@@ -603,7 +603,7 @@ free_skb:
 	read_unlock(&udp_hash_lock);
 }
 
-int udpv6_rcv(struct sk_buff *skb)
+static int udpv6_rcv(struct sk_buff *skb)
 {
 	struct sock *sk;
   	struct udphdr *uh;

@@ -59,13 +59,13 @@
 #endif
 
 
-int ip6_rt_max_size = 4096;
-int ip6_rt_gc_min_interval = 5*HZ;
-int ip6_rt_gc_timeout = 60*HZ;
+static int ip6_rt_max_size = 4096;
+static int ip6_rt_gc_min_interval = 5*HZ;
+static int ip6_rt_gc_timeout = 60*HZ;
 int ip6_rt_gc_interval = 30*HZ;
-int ip6_rt_gc_elasticity = 9;
-int ip6_rt_mtu_expires = 10*60*HZ;
-int ip6_rt_min_advmss = IPV6_MIN_MTU - 20 - 40;
+static int ip6_rt_gc_elasticity = 9;
+static int ip6_rt_mtu_expires = 10*60*HZ;
+static int ip6_rt_min_advmss = IPV6_MIN_MTU - 20 - 40;
 
 static struct rt6_info * ip6_rt_copy(struct rt6_info *ort);
 static struct dst_entry	*ip6_dst_check(struct dst_entry *dst, u32 cookie);
@@ -77,7 +77,7 @@ static int		 ip6_dst_gc(void);
 static int		ip6_pkt_discard(struct sk_buff *skb);
 static void		ip6_link_failure(struct sk_buff *skb);
 
-struct dst_ops ip6_dst_ops = {
+static struct dst_ops ip6_dst_ops = {
 	AF_INET6,
 	__constant_htons(ETH_P_IPV6),
 	1024,
@@ -820,7 +820,7 @@ int ip6_del_rt(struct rt6_info *rt)
 	return err;
 }
 
-int ip6_route_del(struct in6_rtmsg *rtmsg)
+static int ip6_route_del(struct in6_rtmsg *rtmsg)
 {
 	struct fib6_node *fn;
 	struct rt6_info *rt;

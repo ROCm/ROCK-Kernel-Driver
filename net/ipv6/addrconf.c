@@ -90,7 +90,7 @@ static rwlock_t	addrconf_hash_lock = RW_LOCK_UNLOCKED;
 /* Protects inet6 devices */
 rwlock_t addrconf_lock = RW_LOCK_UNLOCKED;
 
-void addrconf_verify(unsigned long);
+static void addrconf_verify(unsigned long);
 
 static struct timer_list addr_chk_timer = { function: addrconf_verify };
 
@@ -588,7 +588,7 @@ int ipv6_get_lladdr(struct net_device *dev, struct in6_addr *addr)
 	return err;
 }
 
-int ipv6_count_addresses(struct inet6_dev *idev)
+static int ipv6_count_addresses(struct inet6_dev *idev)
 {
 	int cnt = 0;
 	struct inet6_ifaddr *ifp;
@@ -1613,7 +1613,7 @@ done:
  *	Periodic address status verification
  */
 
-void addrconf_verify(unsigned long foo)
+static void addrconf_verify(unsigned long foo)
 {
 	struct inet6_ifaddr *ifp;
 	unsigned long now = jiffies;
