@@ -76,6 +76,7 @@ remove_list(struct string_list **pb, struct string_list **pe)
 %token UNSIGNED_KEYW
 %token VOID_KEYW
 %token VOLATILE_KEYW
+%token TYPEOF_KEYW
 
 %token EXPORT_SYMBOL_KEYW
 
@@ -196,6 +197,7 @@ storage_class_specifier:
 type_specifier:
 	simple_type_specifier
 	| cvar_qualifier
+	| TYPEOF_KEYW '(' type_specifier ')'
 
 	/* References to s/u/e's defined elsewhere.  Rearrange things
 	   so that it is easier to expand the definition fully later.  */

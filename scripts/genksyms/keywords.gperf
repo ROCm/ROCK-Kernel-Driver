@@ -46,3 +46,5 @@ union, UNION_KEYW
 unsigned, UNSIGNED_KEYW
 void, VOID_KEYW
 volatile, VOLATILE_KEYW
+typeof, TYPEOF_KEYW
+__typeof__, TYPEOF_KEYW

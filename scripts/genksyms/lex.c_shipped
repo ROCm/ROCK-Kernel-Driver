@@ -2061,21 +2061,22 @@ fini:
 #define	UNSIGNED_KEYW	278
 #define	VOID_KEYW	279
 #define	VOLATILE_KEYW	280
-#define	EXPORT_SYMBOL_KEYW	281
-#define	ASM_PHRASE	282
-#define	ATTRIBUTE_PHRASE	283
-#define	BRACE_PHRASE	284
-#define	BRACKET_PHRASE	285
-#define	EXPRESSION_PHRASE	286
-#define	CHAR	287
-#define	DOTS	288
-#define	IDENT	289
-#define	INT	290
-#define	REAL	291
-#define	STRING	292
-#define	TYPE	293
-#define	OTHER	294
-#define	FILENAME	295
+#define	TYPEOF_KEYW	281
+#define	EXPORT_SYMBOL_KEYW	282
+#define	ASM_PHRASE	283
+#define	ATTRIBUTE_PHRASE	284
+#define	BRACE_PHRASE	285
+#define	BRACKET_PHRASE	286
+#define	EXPRESSION_PHRASE	287
+#define	CHAR	288
+#define	DOTS	289
+#define	IDENT	290
+#define	INT	291
+#define	REAL	292
+#define	STRING	293
+#define	TYPE	294
+#define	OTHER	295
+#define	FILENAME	296
 
 
 extern YYSTYPE yylval;
