@@ -7,14 +7,10 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.6 $
- *
- * History of changes
- * 05/04/02 split from dasd.c, code restructuring.
+ * $Revision: 1.9 $
  */
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/ctype.h>
 #include <linux/init.h>
 
@@ -27,12 +23,12 @@
 
 #include "dasd_int.h"
 
-dasd_ccw_req_t *
+struct dasd_ccw_req *
 dasd_alloc_erp_request(char *magic, int cplength, int datasize,
-		       dasd_device_t * device)
+		       struct dasd_device * device)
 {
 	unsigned long flags;
-	dasd_ccw_req_t *cqr;
+	struct dasd_ccw_req *cqr;
 	char *data;
 	int size;
 
@@ -45,18 +41,19 @@ dasd_alloc_erp_request(char *magic, int cplength, int datasize,
 	debug_int_event ( dasd_debug_area, 1, cplength);
 	debug_int_event ( dasd_debug_area, 1, datasize);
 
-	size = (sizeof(dasd_ccw_req_t) + 7L) & -8L;
+	size = (sizeof(struct dasd_ccw_req) + 7L) & -8L;
 	if (cplength > 0)
 		size += cplength * sizeof(struct ccw1);
 	if (datasize > 0)
 		size += datasize;
 	spin_lock_irqsave(&device->mem_lock, flags);
-	cqr = (dasd_ccw_req_t *) dasd_alloc_chunk(&device->erp_chunks, size);
+	cqr = (struct dasd_ccw_req *)
+		dasd_alloc_chunk(&device->erp_chunks, size);
 	spin_unlock_irqrestore(&device->mem_lock, flags);
 	if (cqr == NULL)
 		return ERR_PTR(-ENOMEM);
-	memset(cqr, 0, sizeof(dasd_ccw_req_t));
-	data = (char *) cqr + ((sizeof(dasd_ccw_req_t) + 7L) & -8L);
+	memset(cqr, 0, sizeof(struct dasd_ccw_req));
+	data = (char *) cqr + ((sizeof(struct dasd_ccw_req) + 7L) & -8L);
 	cqr->cpaddr = NULL;
 	if (cplength > 0) {
 		cqr->cpaddr = (struct ccw1 *) data;
@@ -75,7 +72,7 @@ dasd_alloc_erp_request(char *magic, int cplength, int datasize,
 }
 
 void
-dasd_free_erp_request(dasd_ccw_req_t * cqr, dasd_device_t * device)
+dasd_free_erp_request(struct dasd_ccw_req * cqr, struct dasd_device * device)
 {
 	unsigned long flags;
 
@@ -91,8 +88,8 @@ dasd_free_erp_request(dasd_ccw_req_t * cqr, dasd_device_t * device)
 
 /*
  * DESCRIPTION
- *   sets up the default-ERP dasd_ccw_req_t, namely one, which performs a TIC
- *   to the original channel program with a retry counter of 16
+ *   sets up the default-ERP struct dasd_ccw_req, namely one, which performs
+ *   a TIC to the original channel program with a retry counter of 16
  *
  * PARAMETER
  *   cqr		failed CQR
@@ -100,11 +97,11 @@ dasd_free_erp_request(dasd_ccw_req_t * cqr, dasd_device_t * device)
  * RETURN VALUES
  *   erp		CQR performing the ERP
  */
-dasd_ccw_req_t *
-dasd_default_erp_action(dasd_ccw_req_t * cqr)
+struct dasd_ccw_req *
+dasd_default_erp_action(struct dasd_ccw_req * cqr)
 {
-	dasd_device_t *device;
-	dasd_ccw_req_t *erp;
+	struct dasd_device *device;
+	struct dasd_ccw_req *erp;
 
 	MESSAGE(KERN_DEBUG, "%s", "Default ERP called... ");
 	device = cqr->device;
@@ -147,10 +144,10 @@ dasd_default_erp_action(dasd_ccw_req_t * cqr)
  * RETURN VALUES
  *   cqr		pointer to the original CQR
  */
-dasd_ccw_req_t *
-dasd_default_erp_postaction(dasd_ccw_req_t * cqr)
+struct dasd_ccw_req *
+dasd_default_erp_postaction(struct dasd_ccw_req * cqr)
 {
-	dasd_device_t *device;
+	struct dasd_device *device;
 	int success;
 
 	if (cqr->refers == NULL || cqr->function == NULL)
@@ -161,7 +158,7 @@ dasd_default_erp_postaction(dasd_ccw_req_t * cqr)
 
 	/* free all ERPs - but NOT the original cqr */
 	while (cqr->refers != NULL) {
-		dasd_ccw_req_t *refers;
+		struct dasd_ccw_req *refers;
 
 		refers = cqr->refers;
 		/* remove the request from the device queue */
@@ -189,7 +186,7 @@ dasd_default_erp_postaction(dasd_ccw_req_t * cqr)
  * real request.
  */
 static inline void
-hex_dump_memory(dasd_device_t *device, void *data, int len)
+hex_dump_memory(struct dasd_device *device, void *data, int len)
 {
 	int *pint;
 
@@ -203,9 +200,9 @@ hex_dump_memory(dasd_device_t *device, void *data, int len)
 }
 
 void
-dasd_log_sense(dasd_ccw_req_t *cqr, struct irb *irb)
+dasd_log_sense(struct dasd_ccw_req *cqr, struct irb *irb)
 {
-	dasd_device_t *device;
+	struct dasd_device *device;
 
 	device = cqr->device;
 	/* dump sense data */
@@ -214,10 +211,10 @@ dasd_log_sense(dasd_ccw_req_t *cqr, struct irb *irb)
 }
 
 void
-dasd_log_ccw(dasd_ccw_req_t * cqr, int caller, __u32 cpa)
+dasd_log_ccw(struct dasd_ccw_req * cqr, int caller, __u32 cpa)
 {
-	dasd_device_t *device;
-	dasd_ccw_req_t *lcqr;
+	struct dasd_device *device;
+	struct dasd_ccw_req *lcqr;
 	struct ccw1 *ccw;
 	int cplength;
 
@@ -227,7 +224,7 @@ dasd_log_ccw(dasd_ccw_req_t * cqr, int caller, __u32 cpa)
 		DEV_MESSAGE(KERN_ERR, device,
 			    "(%s) ERP chain report for req: %p",
 			    caller == 0 ? "EXAMINE" : "ACTION", lcqr);
-		hex_dump_memory(device, lcqr, sizeof(dasd_ccw_req_t));
+		hex_dump_memory(device, lcqr, sizeof(struct dasd_ccw_req));
 
 		cplength = 1;
 		ccw = lcqr->cpaddr;

@@ -5,10 +5,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.6 $
- *
- * History of changes 
- * 
+ * $Revision: 1.8 $
  */
 
 #ifndef DASD_ECKD_H
@@ -52,49 +49,49 @@
  * SECTION: Type Definitions
  ******************************************************************************/
 
-typedef struct eckd_count_t {
+struct eckd_count {
 	__u16 cyl;
 	__u16 head;
 	__u8 record;
 	__u8 kl;
 	__u16 dl;
-} __attribute__ ((packed)) eckd_count_t;
+} __attribute__ ((packed));
 
-typedef struct ch_t {
+struct ch_t {
 	__u16 cyl;
 	__u16 head;
-} __attribute__ ((packed)) ch_t;
+} __attribute__ ((packed));
 
-typedef struct chs_t {
+struct chs_t {
 	__u16 cyl;
 	__u16 head;
 	__u32 sector;
-} __attribute__ ((packed)) chs_t;
+} __attribute__ ((packed));
 
-typedef struct chr_t {
+struct chr_t {
 	__u16 cyl;
 	__u16 head;
 	__u8 record;
-} __attribute__ ((packed)) chr_t;
+} __attribute__ ((packed));
 
-typedef struct geom_t {
+struct geom_t {
 	__u16 cyl;
 	__u16 head;
 	__u32 sector;
-} __attribute__ ((packed)) geom_t;
+} __attribute__ ((packed));
 
-typedef struct eckd_home_t {
+struct eckd_home {
 	__u8 skip_control[14];
 	__u16 cell_number;
 	__u8 physical_addr[3];
 	__u8 flag;
-	ch_t track_addr;
+	struct ch_t track_addr;
 	__u8 reserved;
 	__u8 key_length;
 	__u8 reserved2[2];
-} __attribute__ ((packed)) eckd_home_t;
+} __attribute__ ((packed));
 
-typedef struct DE_eckd_data_t {
+struct DE_eckd_data {
 	struct {
 		unsigned char perm:2;	/* Permissions on this extent */
 		unsigned char reserved:1;
@@ -113,15 +110,15 @@ typedef struct DE_eckd_data_t {
 	__u16 fast_write_id;
 	__u8 ga_additional;	/* Global Attributes Additional */
 	__u8 ga_extended;	/* Global Attributes Extended	*/
-	ch_t beg_ext;
-	ch_t end_ext;
+	struct ch_t beg_ext;
+	struct ch_t end_ext;
 	unsigned long long ep_sys_time; /* Extended Parameter - System Time Stamp */
 	__u8 ep_format;        /* Extended Parameter format byte       */
 	__u8 ep_prio;          /* Extended Parameter priority I/O byte */
 	__u8 ep_reserved[6];   /* Extended Parameter Reserved          */
-} __attribute__ ((packed)) DE_eckd_data_t;
+} __attribute__ ((packed));
 
-typedef struct LO_eckd_data_t {
+struct LO_eckd_data {
 	struct {
 		unsigned char orientation:2;
 		unsigned char operation:6;
@@ -133,13 +130,13 @@ typedef struct LO_eckd_data_t {
 	} __attribute__ ((packed)) auxiliary;
 	__u8 unused;
 	__u8 count;
-	ch_t seek_addr;
-	chr_t search_arg;
+	struct ch_t seek_addr;
+	struct chr_t search_arg;
 	__u8 sector;
 	__u16 length;
-} __attribute__ ((packed)) LO_eckd_data_t;
+} __attribute__ ((packed));
 
-typedef struct dasd_eckd_characteristics_t {
+struct dasd_eckd_characteristics {
 	__u16 cu_type;
 	struct {
 		unsigned char support:2;
@@ -210,9 +207,9 @@ typedef struct dasd_eckd_characteristics_t {
 	__u8 factor8;
 	__u8 reserved2[3];
 	__u8 reserved3[10];
-} __attribute__ ((packed)) dasd_eckd_characteristics_t;
+} __attribute__ ((packed));
 
-typedef struct dasd_eckd_confdata_t {
+struct dasd_eckd_confdata {
 	struct {
 		struct {
 			unsigned char identifier:2;
@@ -327,17 +324,17 @@ typedef struct dasd_eckd_confdata_t {
 		__u8 log_dev_address;
 		unsigned char reserved2[12];
 	} __attribute__ ((packed)) neq;
-} __attribute__ ((packed)) dasd_eckd_confdata_t;
+} __attribute__ ((packed));
 
 /*
  * Perform Subsystem Function - Prepare for Read Subsystem Data	 
  */
-typedef struct dasd_psf_prssd_data_t {
+struct dasd_psf_prssd_data {
 	unsigned char order;
 	unsigned char flags;
 	unsigned char reserved[4];
 	unsigned char suborder;
 	unsigned char varies[9];
-} __attribute__ ((packed)) dasd_psf_prssd_data_t;
+} __attribute__ ((packed));
 
 #endif				/* DASD_ECKD_H */

@@ -6,12 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.38 $
- *
- * History of changes (starts July 2000)
- * 02/01/01 added dynamic registration of ioctls
- * 2002/01/04 Created 2.4-2.5 compatibility mode
- * 05/04/02 code restructuring.
+ * $Revision: 1.40 $
  */
 
 #ifndef DASD_INT_H
@@ -24,7 +19,7 @@
 
 /*
  * States a dasd device can have:
- *   new: the dasd_device_t structure is allocated.
+ *   new: the dasd_device structure is allocated.
  *   known: the discipline for the device is identified.
  *   basic: the device can do basic i/o.
  *   accept: the device is analysed (format is known).
@@ -70,16 +65,16 @@
 /*
  * SECTION: Type definitions
  */
-struct dasd_device_t;
+struct dasd_device;
 
 typedef int (*dasd_ioctl_fn_t) (struct block_device *bdev, int no, long args);
 
-typedef struct {
+struct dasd_ioctl {
 	struct list_head list;
 	struct module *owner;
 	int no;
 	dasd_ioctl_fn_t handler;
-} dasd_ioctl_list_t;
+};
 
 typedef enum {
 	dasd_era_fatal = -1,	/* no chance to recover		     */
@@ -154,12 +149,12 @@ do { \
 	DBF_EVENT(DBF_ALERT, d_string, d_args); \
 } while(0)
 
-typedef struct dasd_ccw_req_t {
+struct dasd_ccw_req {
 	unsigned int magic;		/* Eye catcher */
         struct list_head list;		/* list_head for request queueing. */
 
 	/* Where to execute what... */
-	struct dasd_device_t *device;	/* device the request is for */
+	struct dasd_device *device;	/* device the request is for */
 	struct ccw1 *cpaddr;		/* address of channel program */
 	char status;	        	/* status of this request */
 	short retries;			/* A retry counter */
@@ -171,7 +166,7 @@ typedef struct dasd_ccw_req_t {
 
 	/* these are important for recovering erroneous requests          */
 	struct irb *dstat;		/* device status in case of an error */
-	struct dasd_ccw_req_t *refers;	/* ERP-chain queueing. */
+	struct dasd_ccw_req *refers;	/* ERP-chain queueing. */
 	void *function; 		/* originating ERP action */
 
 	unsigned long long buildclk;	/* TOD-clock of request generation */
@@ -180,12 +175,12 @@ typedef struct dasd_ccw_req_t {
 	unsigned long long endclk;	/* TOD-clock of request termination */
 
         /* Callback that is called after reaching final status. */
-        void (*callback)(struct dasd_ccw_req_t *, void *data);
+        void (*callback)(struct dasd_ccw_req *, void *data);
         void *callback_data;
-} dasd_ccw_req_t;
+};
 
 /* 
- * dasd_ccw_req_t -> status can be:
+ * dasd_ccw_req -> status can be:
  */
 #define DASD_CQR_FILLED   0x00	/* request is ready to be processed */
 #define DASD_CQR_QUEUED   0x01	/* request is queued to be processed */
@@ -196,15 +191,15 @@ typedef struct dasd_ccw_req_t {
 #define DASD_CQR_PENDING  0x06  /* request is waiting for interrupt - ERP only */ 
 
 /* Signature for error recovery functions. */
-typedef dasd_ccw_req_t *(*dasd_erp_fn_t) (dasd_ccw_req_t * cqr);
+typedef struct dasd_ccw_req *(*dasd_erp_fn_t) (struct dasd_ccw_req *);
 
 /*
- * the dasd_discipline_t is
+ * the struct dasd_discipline is
  * sth like a table of virtual functions, if you think of dasd_eckd
  * inheriting dasd...
  * no, currently we are not planning to reimplement the driver in C++
  */
-typedef struct dasd_discipline_t {
+struct dasd_discipline {
 	struct module *owner;
 	char ebcname[8];	/* a name used for tagging and printks */
 	char name[8];		/* a name used for tagging and printks */
@@ -223,8 +218,8 @@ typedef struct dasd_discipline_t {
          * -EAGAIN if do_analysis started a ccw that needs to complete
          * before the analysis may be repeated.
          */
-        int (*check_device)(struct dasd_device_t *);
-	int (*do_analysis) (struct dasd_device_t *);
+        int (*check_device)(struct dasd_device *);
+	int (*do_analysis) (struct dasd_device *);
 
         /*
          * Device operation functions. build_cp creates a ccw chain for
@@ -232,11 +227,12 @@ typedef struct dasd_discipline_t {
          * term_IO cancels it (e.g. in case of a timeout). format_device
          * returns a ccw chain to be used to format the device.
          */
-	dasd_ccw_req_t *(*build_cp) (struct dasd_device_t *, struct request *);
-	int (*start_IO) (dasd_ccw_req_t *);
-	int (*term_IO) (dasd_ccw_req_t *);
-	dasd_ccw_req_t *(*format_device) (struct dasd_device_t *,
-                                          struct format_data_t *);
+	struct dasd_ccw_req *(*build_cp) (struct dasd_device *,
+					  struct request *);
+	int (*start_IO) (struct dasd_ccw_req *);
+	int (*term_IO) (struct dasd_ccw_req *);
+	struct dasd_ccw_req *(*format_device) (struct dasd_device *,
+					       struct format_data_t *);
 
         /*
          * Error recovery functions. examine_error() returns a value that
@@ -247,25 +243,25 @@ typedef struct dasd_discipline_t {
          * is called for every error condition to print the sense data
          * to the console.
          */
-	dasd_era_t(*examine_error) (dasd_ccw_req_t *, struct irb *);
-	dasd_erp_fn_t(*erp_action) (dasd_ccw_req_t *);
-	dasd_erp_fn_t(*erp_postaction) (dasd_ccw_req_t *);
-	void (*dump_sense) (struct dasd_device_t *, dasd_ccw_req_t *,
+	dasd_era_t(*examine_error) (struct dasd_ccw_req *, struct irb *);
+	dasd_erp_fn_t(*erp_action) (struct dasd_ccw_req *);
+	dasd_erp_fn_t(*erp_postaction) (struct dasd_ccw_req *);
+	void (*dump_sense) (struct dasd_device *, struct dasd_ccw_req *,
 			    struct irb *);
 
         /* i/o control functions. */
-	int (*fill_geometry) (struct dasd_device_t *, struct hd_geometry *);
-	int (*fill_info) (struct dasd_device_t *, dasd_information2_t *);
-} dasd_discipline_t;
+	int (*fill_geometry) (struct dasd_device *, struct hd_geometry *);
+	int (*fill_info) (struct dasd_device *, struct dasd_information2_t *);
+};
 
-extern dasd_discipline_t dasd_diag_discipline;
+extern struct dasd_discipline dasd_diag_discipline;
 #ifdef CONFIG_DASD_DIAG
 #define dasd_diag_discipline_pointer (&dasd_diag_discipline)
 #else
 #define dasd_diag_discipline_pointer (0)
 #endif
 
-typedef struct dasd_device_t {
+struct dasd_device {
 	/* Block device stuff. */
 	struct gendisk *gdp;
 	devfs_handle_t devfs_entry;
@@ -279,7 +275,7 @@ typedef struct dasd_device_t {
 
 
 	/* Device discipline stuff. */
-	dasd_discipline_t *discipline;
+	struct dasd_discipline *discipline;
 	char *private;
 
 	/* Device state and target state. */
@@ -307,23 +303,23 @@ typedef struct dasd_device_t {
 	struct ccw_device *cdev;
 
 #ifdef CONFIG_DASD_PROFILE
-	dasd_profile_info_t profile;
+	struct dasd_profile_info_t profile;
 #endif
-} dasd_device_t;
+};
 
-void dasd_put_device_wake(dasd_device_t *);
+void dasd_put_device_wake(struct dasd_device *);
 
 /*
  * Reference count inliners
  */
 static inline void
-dasd_get_device(dasd_device_t *device)
+dasd_get_device(struct dasd_device *device)
 {
 	atomic_inc(&device->ref_count);
 }
 
 static inline void
-dasd_put_device(dasd_device_t *device)
+dasd_put_device(struct dasd_device *device)
 {
 	if (atomic_dec_return(&device->ref_count) == 0)
 		dasd_put_device_wake(device);
@@ -333,40 +329,38 @@ dasd_put_device(dasd_device_t *device)
  * The static memory in ccw_mem and erp_mem is managed by a sorted
  * list of free memory chunks.
  */
-typedef struct dasd_mchunk_t
+struct dasd_mchunk
 {
 	struct list_head list;
 	unsigned long size;
-} __attribute__ ((aligned(8))) dasd_mchunk_t;
+} __attribute__ ((aligned(8)));
 
 static inline void
 dasd_init_chunklist(struct list_head *chunk_list, void *mem,
 		    unsigned long size)
 {
-	dasd_mchunk_t *chunk;
+	struct dasd_mchunk *chunk;
 
 	INIT_LIST_HEAD(chunk_list);
-	chunk = (dasd_mchunk_t *) mem;
-	chunk->size = size - sizeof(dasd_mchunk_t);
+	chunk = (struct dasd_mchunk *) mem;
+	chunk->size = size - sizeof(struct dasd_mchunk);
 	list_add(&chunk->list, chunk_list);
 }
 
 static inline void *
 dasd_alloc_chunk(struct list_head *chunk_list, unsigned long size)
 {
-	dasd_mchunk_t *chunk, *tmp;
-	struct list_head *l;
+	struct dasd_mchunk *chunk, *tmp;
 
 	size = (size + 7L) & -8L;
-	list_for_each(l, chunk_list) {
-		chunk = list_entry(l, dasd_mchunk_t, list);
+	list_for_each_entry(chunk, chunk_list, list) {
 		if (chunk->size < size)
 			continue;
-		if (chunk->size > size + sizeof(dasd_mchunk_t)) {
+		if (chunk->size > size + sizeof(struct dasd_mchunk)) {
 			char *endaddr = (char *) (chunk + 1) + chunk->size;
-			tmp = (dasd_mchunk_t *) (endaddr - size) - 1;
+			tmp = (struct dasd_mchunk *) (endaddr - size) - 1;
 			tmp->size = size;
-			chunk->size -= size + sizeof(dasd_mchunk_t);
+			chunk->size -= size + sizeof(struct dasd_mchunk);
 			chunk = tmp;
 		} else
 			list_del(&chunk->list);
@@ -378,30 +372,31 @@ dasd_alloc_chunk(struct list_head *chunk_list, unsigned long size)
 static inline void
 dasd_free_chunk(struct list_head *chunk_list, void *mem)
 {
-	dasd_mchunk_t *chunk, *tmp;
+	struct dasd_mchunk *chunk, *tmp;
 	struct list_head *p, *left;
 
-	chunk = (dasd_mchunk_t *)((char *) mem - sizeof(dasd_mchunk_t));
+	chunk = (struct dasd_mchunk *)
+		((char *) mem - sizeof(struct dasd_mchunk));
 	/* Find out the left neighbour in chunk_list. */
 	left = chunk_list;
 	list_for_each(p, chunk_list) {
-		if (list_entry(p, dasd_mchunk_t, list) > chunk)
+		if (list_entry(p, struct dasd_mchunk, list) > chunk)
 			break;
 		left = p;
 	}
 	/* Try to merge with right neighbour = next element from left. */
 	if (left->next != chunk_list) {
-		tmp = list_entry(left->next, dasd_mchunk_t, list);
+		tmp = list_entry(left->next, struct dasd_mchunk, list);
 		if ((char *) (chunk + 1) + chunk->size == (char *) tmp) {
 			list_del(&tmp->list);
-			chunk->size += tmp->size + sizeof(dasd_mchunk_t);
+			chunk->size += tmp->size + sizeof(struct dasd_mchunk);
 		}
 	}
 	/* Try to merge with left neighbour. */
 	if (left != chunk_list) {
-		tmp = list_entry(left, dasd_mchunk_t, list);
+		tmp = list_entry(left, struct dasd_mchunk, list);
 		if ((char *) (tmp + 1) + tmp->size == (char *) chunk) {
-			tmp->size += chunk->size + sizeof(dasd_mchunk_t);
+			tmp->size += chunk->size + sizeof(struct dasd_mchunk);
 			return;
 		}
 	}
@@ -424,44 +419,44 @@ dasd_check_blocksize(int bsize)
 #define DASD_PROFILE_OFF 0
 
 extern debug_info_t *dasd_debug_area;
-extern dasd_profile_info_t dasd_global_profile;
+extern struct dasd_profile_info_t dasd_global_profile;
 extern unsigned int dasd_profile_level;
 extern struct block_device_operations dasd_device_operations;
 
-dasd_ccw_req_t *dasd_kmalloc_request(char *, int, int, dasd_device_t *); /* unused */
-dasd_ccw_req_t *dasd_smalloc_request(char *, int, int, dasd_device_t *);
-void dasd_kfree_request(dasd_ccw_req_t *, dasd_device_t *);
-void dasd_sfree_request(dasd_ccw_req_t *, dasd_device_t *);
+struct dasd_ccw_req *
+dasd_kmalloc_request(char *, int, int, struct dasd_device *);
+struct dasd_ccw_req *
+dasd_smalloc_request(char *, int, int, struct dasd_device *);
+void dasd_kfree_request(struct dasd_ccw_req *, struct dasd_device *);
+void dasd_sfree_request(struct dasd_ccw_req *, struct dasd_device *);
 
 static inline int
-dasd_kmalloc_set_cda(struct ccw1 *ccw, void *cda, dasd_device_t *device)
+dasd_kmalloc_set_cda(struct ccw1 *ccw, void *cda, struct dasd_device *device)
 {
 	return set_normalized_cda(ccw, cda);
 }
 
-dasd_device_t *dasd_alloc_device(unsigned int devindex);
-void dasd_free_device(dasd_device_t *);
+struct dasd_device *dasd_alloc_device(unsigned int devindex);
+void dasd_free_device(struct dasd_device *);
 
-void dasd_enable_device(dasd_device_t *);
-void dasd_set_target_state(dasd_device_t *, int);
-void dasd_kick_device(dasd_device_t *);
+void dasd_enable_device(struct dasd_device *);
+void dasd_set_target_state(struct dasd_device *, int);
+void dasd_kick_device(struct dasd_device *);
 
-void dasd_add_request_head(dasd_ccw_req_t *);
-void dasd_add_request_tail(dasd_ccw_req_t *); /* unused */
-int  dasd_start_IO(dasd_ccw_req_t *);
-int  dasd_term_IO(dasd_ccw_req_t *);
-void dasd_schedule_bh(dasd_device_t *);
-int  dasd_sleep_on(dasd_ccw_req_t *);
-int  dasd_sleep_on_immediatly(dasd_ccw_req_t *);
-int  dasd_sleep_on_interruptible(dasd_ccw_req_t *);
-void dasd_set_timer(dasd_device_t *, int);
-void dasd_clear_timer(dasd_device_t *);
-int  dasd_cancel_req(dasd_ccw_req_t *); /* unused */
-int dasd_generic_probe (struct ccw_device *cdev, 
-			dasd_discipline_t *discipline);
+void dasd_add_request_head(struct dasd_ccw_req *);
+void dasd_add_request_tail(struct dasd_ccw_req *);
+int  dasd_start_IO(struct dasd_ccw_req *);
+int  dasd_term_IO(struct dasd_ccw_req *);
+void dasd_schedule_bh(struct dasd_device *);
+int  dasd_sleep_on(struct dasd_ccw_req *);
+int  dasd_sleep_on_immediatly(struct dasd_ccw_req *);
+int  dasd_sleep_on_interruptible(struct dasd_ccw_req *);
+void dasd_set_timer(struct dasd_device *, int);
+void dasd_clear_timer(struct dasd_device *);
+int  dasd_cancel_req(struct dasd_ccw_req *);
+int dasd_generic_probe (struct ccw_device *, struct dasd_discipline *);
 int dasd_generic_remove (struct ccw_device *cdev);
-int dasd_generic_set_online(struct ccw_device *cdev, 
-			    dasd_discipline_t *discipline);
+int dasd_generic_set_online(struct ccw_device *, struct dasd_discipline *);
 int dasd_generic_set_offline (struct ccw_device *cdev);
 void dasd_generic_auto_online (struct ccw_driver *);
 
@@ -473,11 +468,11 @@ extern int dasd_autodetect;
 int dasd_devmap_init(void);
 void dasd_devmap_exit(void);
 
-dasd_device_t *dasd_create_device(struct ccw_device *);
-void dasd_delete_device(dasd_device_t *);
+struct dasd_device *dasd_create_device(struct ccw_device *);
+void dasd_delete_device(struct dasd_device *);
 
-kdev_t dasd_get_kdev(dasd_device_t *);
-dasd_device_t *dasd_device_from_devindex(int);
+kdev_t dasd_get_kdev(struct dasd_device *);
+struct dasd_device *dasd_device_from_devindex(int);
 
 int dasd_parse(void);
 int dasd_add_range(int, int, int);
@@ -488,8 +483,8 @@ int  dasd_gendisk_init(void);
 void dasd_gendisk_exit(void);
 int  dasd_gendisk_index_major(int);
 struct gendisk *dasd_gendisk_alloc(int);
-void dasd_setup_partitions(dasd_device_t *);
-void dasd_destroy_partitions(dasd_device_t *);
+void dasd_setup_partitions(struct dasd_device *);
+void dasd_destroy_partitions(struct dasd_device *);
 
 /* externals in dasd_ioctl.c */
 int  dasd_ioctl_init(void);
@@ -503,26 +498,26 @@ int dasd_proc_init(void);
 void dasd_proc_exit(void);
 
 /* externals in dasd_erp.c */
-dasd_ccw_req_t *dasd_default_erp_action(dasd_ccw_req_t *);
-dasd_ccw_req_t *dasd_default_erp_postaction(dasd_ccw_req_t *);
-dasd_ccw_req_t *dasd_alloc_erp_request(char *, int, int, dasd_device_t *);
-void dasd_free_erp_request(dasd_ccw_req_t *, dasd_device_t *);
-void dasd_log_sense(dasd_ccw_req_t *, struct irb *);
-void dasd_log_ccw(dasd_ccw_req_t *, int, __u32);
+struct dasd_ccw_req *dasd_default_erp_action(struct dasd_ccw_req *);
+struct dasd_ccw_req *dasd_default_erp_postaction(struct dasd_ccw_req *);
+struct dasd_ccw_req *dasd_alloc_erp_request(char *, int, int, struct dasd_device *);
+void dasd_free_erp_request(struct dasd_ccw_req *, struct dasd_device *);
+void dasd_log_sense(struct dasd_ccw_req *, struct irb *);
+void dasd_log_ccw(struct dasd_ccw_req *, int, __u32);
 
 /* externals in dasd_3370_erp.c */
-dasd_era_t dasd_3370_erp_examine(dasd_ccw_req_t *, struct irb *);
+dasd_era_t dasd_3370_erp_examine(struct dasd_ccw_req *, struct irb *);
 
 /* externals in dasd_3990_erp.c */
-dasd_era_t dasd_3990_erp_examine(dasd_ccw_req_t *, struct irb *);
-dasd_ccw_req_t *dasd_3990_erp_action(dasd_ccw_req_t *);
+dasd_era_t dasd_3990_erp_examine(struct dasd_ccw_req *, struct irb *);
+struct dasd_ccw_req *dasd_3990_erp_action(struct dasd_ccw_req *);
 
 /* externals in dasd_9336_erp.c */
-dasd_era_t dasd_9336_erp_examine(dasd_ccw_req_t *, struct irb *);
+dasd_era_t dasd_9336_erp_examine(struct dasd_ccw_req *, struct irb *);
 
 /* externals in dasd_9336_erp.c */
-dasd_era_t dasd_9343_erp_examine(dasd_ccw_req_t *, struct irb *);
-dasd_ccw_req_t *dasd_9343_erp_action(dasd_ccw_req_t *);
+dasd_era_t dasd_9343_erp_examine(struct dasd_ccw_req *, struct irb *);
+struct dasd_ccw_req *dasd_9343_erp_action(struct dasd_ccw_req *);
 
 #endif				/* __KERNEL__ */
 

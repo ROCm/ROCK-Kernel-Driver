@@ -8,8 +8,6 @@
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
  * i/o controls for the dasd driver.
- *
- * 05/04/02 split from dasd.c, code restructuring.
  */
 #include <linux/config.h>
 #include <linux/interrupt.h>
@@ -34,15 +32,14 @@ static struct list_head dasd_ioctl_list = LIST_HEAD_INIT(dasd_ioctl_list);
 /*
  * Find the ioctl with number no.
  */
-static dasd_ioctl_list_t *
+static struct dasd_ioctl *
 dasd_find_ioctl(int no)
 {
-	struct list_head *curr;
-	list_for_each (curr, &dasd_ioctl_list) {
-		if (list_entry (curr, dasd_ioctl_list_t, list)->no == no) {
-			return list_entry (curr, dasd_ioctl_list_t, list);
-		}
-	}
+	struct dasd_ioctl *ioctl;
+
+	list_for_each_entry (ioctl, &dasd_ioctl_list, list)
+		if (ioctl->no == no)
+			return ioctl;
 	return NULL;
 }
 
@@ -52,10 +49,10 @@ dasd_find_ioctl(int no)
 int
 dasd_ioctl_no_register(struct module *owner, int no, dasd_ioctl_fn_t handler)
 {
-	dasd_ioctl_list_t *new;
+	struct dasd_ioctl *new;
 	if (dasd_find_ioctl(no))
 		return -EBUSY;
-	new = kmalloc(sizeof (dasd_ioctl_list_t), GFP_KERNEL);
+	new = kmalloc(sizeof (struct dasd_ioctl), GFP_KERNEL);
 	if (new == NULL)
 		return -ENOMEM;
 	new->owner = owner;
@@ -72,7 +69,7 @@ dasd_ioctl_no_register(struct module *owner, int no, dasd_ioctl_fn_t handler)
 int
 dasd_ioctl_no_unregister(struct module *owner, int no, dasd_ioctl_fn_t handler)
 {
-	dasd_ioctl_list_t *old = dasd_find_ioctl(no);
+	struct dasd_ioctl *old = dasd_find_ioctl(no);
 	if (old == NULL)
 		return -ENOENT;
 	if (old->no != no || old->handler != handler || owner != old->owner)
@@ -88,9 +85,8 @@ dasd_ioctl(struct inode *inp, struct file *filp,
 	   unsigned int no, unsigned long data)
 {
 	struct block_device *bdev = inp->i_bdev;
-	dasd_device_t *device = bdev->bd_disk->private_data;
-	dasd_ioctl_list_t *ioctl;
-	struct list_head *l;
+	struct dasd_device *device = bdev->bd_disk->private_data;
+	struct dasd_ioctl *ioctl;
 	const char *dir;
 	int rc;
 
@@ -106,8 +102,7 @@ dasd_ioctl(struct inode *inp, struct file *filp,
 		      "ioctl 0x%08x %s'0x%x'%d(%d) with data %8lx", no,
 		      dir, _IOC_TYPE(no), _IOC_NR(no), _IOC_SIZE(no), data);
 	/* Search for ioctl no in the ioctl list. */
-	list_for_each(l, &dasd_ioctl_list) {
-		ioctl = list_entry(l, dasd_ioctl_list_t, list);
+	list_for_each_entry(ioctl, &dasd_ioctl_list, list) {
 		if (ioctl->no == no) {
 			/* Found a matching ioctl. Call it. */
 			if (!try_module_get(ioctl->owner))
@@ -139,7 +134,7 @@ dasd_ioctl_api_version(struct block_device *bdev, int no, long args)
 static int
 dasd_ioctl_enable(struct block_device *bdev, int no, long args)
 {
-	dasd_device_t *device;
+	struct dasd_device *device;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
@@ -156,7 +151,7 @@ dasd_ioctl_enable(struct block_device *bdev, int no, long args)
 static int
 dasd_ioctl_disable(struct block_device *bdev, int no, long args)
 {
-	dasd_device_t *device;
+	struct dasd_device *device;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
@@ -182,9 +177,9 @@ dasd_ioctl_disable(struct block_device *bdev, int no, long args)
  * devices this means CCWs are generated to format a single track.
  */
 static int
-dasd_format(dasd_device_t * device, format_data_t * fdata)
+dasd_format(struct dasd_device * device, struct format_data_t * fdata)
 {
-	dasd_ccw_req_t *cqr;
+	struct dasd_ccw_req *cqr;
 	int rc;
 
 	if (device->discipline->format_device == NULL)
@@ -226,8 +221,8 @@ dasd_format(dasd_device_t * device, format_data_t * fdata)
 static int
 dasd_ioctl_format(struct block_device *bdev, int no, long args)
 {
-	dasd_device_t *device;
-	format_data_t fdata;
+	struct dasd_device *device;
+	struct format_data_t fdata;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
@@ -240,7 +235,8 @@ dasd_ioctl_format(struct block_device *bdev, int no, long args)
 		return -ENODEV;
 	if (device->ro_flag)
 		return -EROFS;
-	if (copy_from_user(&fdata, (void *) args, sizeof (format_data_t)))
+	if (copy_from_user(&fdata, (void *) args,
+			   sizeof (struct format_data_t)))
 		return -EFAULT;
 	if (bdev != bdev->bd_contains) {
 		DEV_MESSAGE(KERN_WARNING, device, "%s",
@@ -257,7 +253,7 @@ dasd_ioctl_format(struct block_device *bdev, int no, long args)
 static int
 dasd_ioctl_reset_profile(struct block_device *bdev, int no, long args)
 {
-	dasd_device_t *device;
+	struct dasd_device *device;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
@@ -266,7 +262,7 @@ dasd_ioctl_reset_profile(struct block_device *bdev, int no, long args)
 	if (device == NULL)
 		return -ENODEV;
 
-	memset(&device->profile, 0, sizeof (dasd_profile_info_t));
+	memset(&device->profile, 0, sizeof (struct dasd_profile_info_t));
 	return 0;
 }
 
@@ -276,14 +272,14 @@ dasd_ioctl_reset_profile(struct block_device *bdev, int no, long args)
 static int
 dasd_ioctl_read_profile(struct block_device *bdev, int no, long args)
 {
-	dasd_device_t *device;
+	struct dasd_device *device;
 
 	device = bdev->bd_disk->private_data;
 	if (device == NULL)
 		return -ENODEV;
 
 	if (copy_to_user((long *) args, (long *) &device->profile,
-			 sizeof (dasd_profile_info_t)))
+			 sizeof (struct dasd_profile_info_t)))
 		return -EFAULT;
 	return 0;
 }
@@ -307,8 +303,8 @@ dasd_ioctl_read_profile(struct block_device *bdev, int no, long args)
 static int
 dasd_ioctl_information(struct block_device *bdev, int no, long args)
 {
-	dasd_device_t *device;
-	dasd_information2_t *dasd_info;
+	struct dasd_device *device;
+	struct dasd_information2_t *dasd_info;
 	unsigned long flags;
 	int rc;
 	struct ccw_device *cdev;
@@ -320,7 +316,7 @@ dasd_ioctl_information(struct block_device *bdev, int no, long args)
 	if (!device->discipline->fill_info)
 		return -EINVAL;
 
-	dasd_info = kmalloc(sizeof(dasd_information2_t), GFP_KERNEL);
+	dasd_info = kmalloc(sizeof(struct dasd_information2_t), GFP_KERNEL);
 	if (dasd_info == NULL)
 		return -ENOMEM;
 
@@ -379,8 +375,8 @@ dasd_ioctl_information(struct block_device *bdev, int no, long args)
 	rc = 0;
 	if (copy_to_user((long *) args, (long *) dasd_info,
 			 ((no == (unsigned int) BIODASDINFO2) ?
-			  sizeof (dasd_information2_t) :
-			  sizeof (dasd_information_t))))
+			  sizeof (struct dasd_information2_t) :
+			  sizeof (struct dasd_information_t))))
 		rc = -EFAULT;
 	kfree(dasd_info);
 	return rc;
@@ -392,7 +388,7 @@ dasd_ioctl_information(struct block_device *bdev, int no, long args)
 static int
 dasd_ioctl_set_ro(struct block_device *bdev, int no, long args)
 {
-	dasd_device_t *device;
+	struct dasd_device *device;
 	int intval;
 
 	if (!capable(CAP_SYS_ADMIN))
@@ -417,7 +413,7 @@ static int
 dasd_ioctl_getgeo(struct block_device *bdev, int no, long args)
 {
 	struct hd_geometry geo = { 0, };
-	dasd_device_t *device;
+	struct dasd_device *device;
 
 	device =  bdev->bd_disk->private_data;
 	if (device == NULL)
