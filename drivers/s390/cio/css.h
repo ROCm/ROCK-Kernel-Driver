@@ -91,6 +91,10 @@ struct ccw_device_private {
 	struct work_struct kick_work;
 	wait_queue_head_t wait_q;
 	struct timer_list timer;
+	void *cmb;			/* measurement information */
+	struct list_head cmb_list;	/* list of measured devices */
+	u64 cmb_start_time;		/* clock value of cmb reset */
+	void *cmb_wait;			/* deferred cmb enable/disable */
 };
 
 /*

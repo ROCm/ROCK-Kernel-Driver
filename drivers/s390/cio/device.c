@@ -404,6 +404,7 @@ static DEVICE_ATTR(devtype, 0444, devtype_show, NULL);
 static DEVICE_ATTR(cutype, 0444, cutype_show, NULL);
 static DEVICE_ATTR(online, 0644, online_show, online_store);
 static DEVICE_ATTR(steal_lock, 0200, NULL, stlck_store);
+extern struct device_attribute dev_attr_cmb_enable;
 static DEVICE_ATTR(availability, 0444, available_show, NULL);
 
 /* A device has been unboxed. Start device recognition. */
@@ -449,6 +450,7 @@ static struct attribute * ccwdev_attrs[] = {
 	&dev_attr_devtype.attr,
 	&dev_attr_cutype.attr,
 	&dev_attr_online.attr,
+	&dev_attr_cmb_enable.attr,
 	&dev_attr_availability.attr,
 	NULL,
 };
@@ -634,6 +636,7 @@ io_subchannel_recog(struct ccw_device *cdev, struct subchannel *sch)
 		.devno	= sch->schib.pmcw.dev,
 		.irq	= sch->irq,
 		.state	= DEV_STATE_NOT_OPER,
+		.cmb_list = LIST_HEAD_INIT(cdev->private->cmb_list),
 	};
 	init_waitqueue_head(&cdev->private->wait_q);
 	init_timer(&cdev->private->timer);

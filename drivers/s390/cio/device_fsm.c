@@ -995,6 +995,15 @@ ccw_device_offline_irq(struct ccw_device *cdev, enum dev_event dev_event)
 	cio_disable_subchannel(sch);
 }
 
+static void
+ccw_device_change_cmfstate(struct ccw_device *cdev, enum dev_event dev_event)
+{
+	retry_set_schib(cdev);
+	cdev->private->state = DEV_STATE_ONLINE;
+	dev_fsm_event(cdev, dev_event);
+}
+
+
 /*
  * No operation action. This is used e.g. to ignore a timeout event in
  * state offline.
@@ -1104,6 +1113,12 @@ fsm_func_t *dev_jumptable[NR_DEV_STATES][NR_DEV_EVENTS] = {
 		[DEV_EVENT_INTERRUPT]	ccw_device_sense_id_irq,
 		[DEV_EVENT_TIMEOUT]	ccw_device_recog_timeout,
 		[DEV_EVENT_VERIFY]	ccw_device_nop,
+	},
+	[DEV_STATE_CMFCHANGE] {
+		[DEV_EVENT_NOTOPER]	ccw_device_change_cmfstate,
+		[DEV_EVENT_INTERRUPT]	ccw_device_change_cmfstate,
+		[DEV_EVENT_TIMEOUT]	ccw_device_change_cmfstate,
+		[DEV_EVENT_VERIFY]	ccw_device_change_cmfstate,
 	},
 };
 

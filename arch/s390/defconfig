@@ -139,6 +139,7 @@ CONFIG_DASD=y
 CONFIG_DASD_ECKD=y
 CONFIG_DASD_FBA=y
 CONFIG_DASD_DIAG=y
+# CONFIG_DASD_CMB is not set
 
 #
 # Multi-device support (RAID and LVM)
