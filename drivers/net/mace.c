@@ -25,15 +25,15 @@
 static struct net_device *mace_devs;
 static int port_aaui = -1;
 
-MODULE_PARM(port_aaui, "i");
-MODULE_PARM_DESC(port_aaui, "MACE uses AAUI port (0-1)");
-
 #define N_RX_RING	8
 #define N_TX_RING	6
 #define MAX_TX_ACTIVE	1
 #define NCMDS_TX	1	/* dma commands per element in tx ring */
 #define RX_BUFLEN	(ETH_FRAME_LEN + 8)
 #define TX_TIMEOUT	HZ	/* 1 second */
+
+/* Chip rev needs workaround on HW & multicast addr change */
+#define BROKEN_ADDRCHG_REV	0x0941
 
 /* Bits in transmit DMA status */
 #define TX_DMA_ERR	0x80
@@ -60,6 +60,8 @@ struct mace_data {
     struct timer_list tx_timeout;
     int timeout_active;
     int port_aaui;
+    int chipid;
+    struct device_node* of_node;
     struct net_device *next_mace;
 };
 
@@ -153,6 +155,22 @@ static void __init mace_probe1(struct device_node *mace)
 	SET_MODULE_OWNER(dev);
 
 	mp = dev->priv;
+	mp->of_node = mace;
+	
+	if (!request_OF_resource(mace, 0, " (mace)")) {
+		printk(KERN_ERR "MACE: can't request IO resource !\n");
+		goto err_out;
+	}
+	if (!request_OF_resource(mace, 1, " (mace tx dma)")) {
+		printk(KERN_ERR "MACE: can't request TX DMA resource !\n");
+		goto err_out;
+	}
+
+	if (!request_OF_resource(mace, 2, " (mace tx dma)")) {
+		printk(KERN_ERR "MACE: can't request RX DMA resource !\n");
+		goto err_out;
+	}
+
 	dev->base_addr = mace->addrs[0].address;
 	mp->mace = (volatile struct mace *)
 		ioremap(mace->addrs[0].address, 0x1000);
@@ -164,8 +182,10 @@ static void __init mace_probe1(struct device_node *mace)
 		dev->dev_addr[j] = rev? bitrev(addr[j]): addr[j];
 		printk("%c%.2x", (j? ':': ' '), dev->dev_addr[j]);
 	}
-	printk(", chip revision %d.%d\n",
-		in_8(&mp->mace->chipid_hi), in_8(&mp->mace->chipid_lo));
+	mp->chipid = (in_8(&mp->mace->chipid_hi) << 8) |
+			in_8(&mp->mace->chipid_lo);
+	printk(", chip revision %d.%d\n", mp->chipid >> 8, mp->chipid & 0xff);
+		
 
 	mp = (struct mace_data *) dev->priv;
 	mp->maccc = ENXMT | ENRCV;
@@ -222,6 +242,16 @@ static void __init mace_probe1(struct device_node *mace)
 
 	mp->next_mace = mace_devs;
 	mace_devs = dev;
+	return;
+	
+err_out:
+	unregister_netdev(dev);
+	if (mp->of_node) {
+		release_OF_resource(mp->of_node, 0);
+		release_OF_resource(mp->of_node, 1);
+		release_OF_resource(mp->of_node, 2);
+	}
+	kfree(dev);
 }
 
 static void dbdma_reset(volatile struct dbdma_regs *dma)
@@ -274,14 +304,19 @@ static void mace_reset(struct net_device *dev)
     __mace_set_address(dev, dev->dev_addr);
 
     /* clear the multicast filter */
-    out_8(&mb->iac, ADDRCHG | LOGADDR);
-    while ((in_8(&mb->iac) & ADDRCHG) != 0)
-	;
-    for (i = 0; i < 8; ++i) {
-	out_8(&mb->ladrf, 0);
+    if (mp->chipid == BROKEN_ADDRCHG_REV)
+	out_8(&mb->iac, LOGADDR);
+    else {
+	out_8(&mb->iac, ADDRCHG | LOGADDR);
+	while ((in_8(&mb->iac) & ADDRCHG) != 0)
+		;
     }
+    for (i = 0; i < 8; ++i)
+	out_8(&mb->ladrf, 0);
+
     /* done changing address */
-    out_8(&mb->iac, 0);
+    if (mp->chipid != BROKEN_ADDRCHG_REV)
+	out_8(&mb->iac, 0);
 
     if (mp->port_aaui)
     	out_8(&mb->plscc, PORTSEL_AUI + ENPLSIO);
@@ -291,16 +326,23 @@ static void mace_reset(struct net_device *dev)
 
 static void __mace_set_address(struct net_device *dev, void *addr)
 {
-    volatile struct mace *mb = ((struct mace_data *) dev->priv)->mace;
+    struct mace_data *mp = (struct mace_data *) dev->priv;
+    volatile struct mace *mb = mp->mace;
     unsigned char *p = addr;
     int i;
 
     /* load up the hardware address */
-    out_8(&mb->iac, ADDRCHG | PHYADDR);
-    while ((in_8(&mb->iac) & ADDRCHG) != 0)
-	;
+    if (mp->chipid == BROKEN_ADDRCHG_REV)
+    	out_8(&mb->iac, PHYADDR);
+    else {
+    	out_8(&mb->iac, ADDRCHG | PHYADDR);
+	while ((in_8(&mb->iac) & ADDRCHG) != 0)
+	    ;
+    }
     for (i = 0; i < 6; ++i)
 	out_8(&mb->padr, dev->dev_addr[i] = p[i]);
+    if (mp->chipid != BROKEN_ADDRCHG_REV)
+        out_8(&mb->iac, 0);
 }
 
 static int mace_set_address(struct net_device *dev, void *addr)
@@ -313,7 +355,6 @@ static int mace_set_address(struct net_device *dev, void *addr)
 
     __mace_set_address(dev, addr);
 
-    out_8(&mb->iac, 0);
     /* note: setting ADDRCHG clears ENRCV */
     out_8(&mb->maccc, mp->maccc);
 
@@ -543,12 +584,17 @@ static void mace_set_multicast(struct net_device *dev)
 	printk("\n");
 #endif
 
-	out_8(&mb->iac, ADDRCHG | LOGADDR);
-	while ((in_8(&mb->iac) & ADDRCHG) != 0)
-	    ;
-	for (i = 0; i < 8; ++i) {
-	    out_8(&mb->ladrf, multicast_filter[i]);
+	if (mp->chipid == BROKEN_ADDRCHG_REV)
+	    out_8(&mb->iac, LOGADDR);
+	else {
+	    out_8(&mb->iac, ADDRCHG | LOGADDR);
+	    while ((in_8(&mb->iac) & ADDRCHG) != 0)
+		;
 	}
+	for (i = 0; i < 8; ++i)
+	    out_8(&mb->ladrf, multicast_filter[i]);
+	if (mp->chipid != BROKEN_ADDRCHG_REV)
+	    out_8(&mb->iac, 0);
     }
     /* reset maccc */
     out_8(&mb->maccc, mp->maccc);
@@ -899,7 +945,10 @@ static void mace_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 MODULE_AUTHOR("Paul Mackerras");
 MODULE_DESCRIPTION("PowerMac MACE driver.");
+MODULE_PARM(port_aaui, "i");
+MODULE_PARM_DESC(port_aaui, "MACE uses AAUI port (0-1)");
 MODULE_LICENSE("GPL");
+EXPORT_NO_SYMBOLS;
 
 static void __exit mace_cleanup (void)
 {
@@ -907,19 +956,23 @@ static void __exit mace_cleanup (void)
     struct mace_data *mp;
 
     while ((dev = mace_devs) != 0) {
-	mp = (struct mace_data *) mace_devs->priv;
-	mace_devs = mp->next_mace;
+		mp = (struct mace_data *) mace_devs->priv;
+		mace_devs = mp->next_mace;
 
-	free_irq(dev->irq, dev);
-	free_irq(mp->tx_dma_intr, dev);
-	free_irq(mp->rx_dma_intr, dev);
+		unregister_netdev(dev);
+		free_irq(dev->irq, dev);
+		free_irq(mp->tx_dma_intr, dev);
+		free_irq(mp->rx_dma_intr, dev);
 
-	unregister_netdev(dev);
-	kfree(dev);
+		release_OF_resource(mp->of_node, 0);
+		release_OF_resource(mp->of_node, 1);
+		release_OF_resource(mp->of_node, 2);
+
+		kfree(dev);
     }
     if (dummy_buf != NULL) {
-	kfree(dummy_buf);
-	dummy_buf = NULL;
+		kfree(dummy_buf);
+		dummy_buf = NULL;
     }
 }
 

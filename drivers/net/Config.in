@@ -37,7 +37,6 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
         bool '    Use AAUI port instead of TP by default' CONFIG_MACE_AAUI_PORT
       fi
       dep_tristate '  BMAC (G3 ethernet) support' CONFIG_BMAC $CONFIG_ALL_PPC
-      dep_tristate '  GMAC (G4/iBook ethernet) support' CONFIG_GMAC $CONFIG_ALL_PPC
       tristate '  National DP83902AV (Oak ethernet) support' CONFIG_OAKNET
    fi
    if [ "$CONFIG_ZORRO" = "y" ]; then
