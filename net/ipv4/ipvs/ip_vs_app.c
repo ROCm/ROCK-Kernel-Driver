@@ -485,8 +485,6 @@ int ip_vs_app_pkt_in(struct ip_vs_conn *cp, struct sk_buff *skb)
 /*
  *	/proc/net/ip_vs_app entry function
  */
-#define SEQ_START_TOKEN	((void *)1)
-
 static struct ip_vs_app *ip_vs_app_idx(loff_t pos)
 {
 	loff_t off = 0;

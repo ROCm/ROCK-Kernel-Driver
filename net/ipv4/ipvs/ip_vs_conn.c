@@ -616,8 +616,6 @@ ip_vs_conn_new(int proto, __u32 caddr, __u16 cport, __u32 vaddr, __u16 vport,
  */
 #ifdef CONFIG_PROC_FS
 
-#define SEQ_START_TOKEN	((void *)1)
-
 static void *ip_vs_conn_array(struct seq_file *seq, loff_t pos)
 {
 	struct list_head *e;

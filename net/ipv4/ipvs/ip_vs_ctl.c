@@ -1516,8 +1516,6 @@ struct ip_vs_iter {
 	int bucket;
 };
 
-
-#define SEQ_START_TOKEN	((void *)1)
 /*
  *	Write the contents of the VS rule table to a PROCfs file.
  *	(It is kept just for backward compatibility)
