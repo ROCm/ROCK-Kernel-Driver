@@ -769,7 +769,7 @@ e100_set_fc(struct e100_private *bdp)
  * Arguments:  bdp - Pointer to the e100_private structure for the board
  *
  * Returns: true if link state was changed
- *	    B_FLASE otherwise
+ *	   false otherwise
  *
  */
 unsigned char
