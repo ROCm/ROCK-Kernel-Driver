@@ -714,3 +714,4 @@ static void __exit atm_exit(void)
 
 module_init(atm_init)
 module_exit(atm_exit)
+MODULE_LICENSE("GPL");
