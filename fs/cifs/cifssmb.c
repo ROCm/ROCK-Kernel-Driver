@@ -618,6 +618,7 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 	LOCK_REQ *pSMB = NULL;
 	LOCK_RSP *pSMBr = NULL;
 	int bytes_returned;
+	int timeout = 0;
 
 	cFYI(1, ("In CIFSSMBLock"));
 
@@ -625,6 +626,9 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 		      (void **) &pSMBr);
 	if (rc)
 		return rc;
+
+	if(lockType == LOCKING_ANDX_OPLOCK_RELEASE)
+		timeout = -1; /* no response expected */
 
 	pSMB->NumberOfLocks = cpu_to_le32(numLock);
 	pSMB->NumberOfUnlocks = cpu_to_le32(numUnlock);
@@ -640,7 +644,7 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
 
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
-			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
+			 (struct smb_hdr *) pSMBr, &bytes_returned, timeout);
 
 	if (rc) {
 		cERROR(1, ("Send error in Lock = %d", rc));

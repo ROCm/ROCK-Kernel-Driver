@@ -1,3 +1,9 @@
+Version 0.82
+------------
+Add support for mknod of block or character devices.  Fix oplock
+code (distributed caching) to properly send response to oplock
+break from server.
+
 Version 0.81
 ------------
 Finish up CIFS packet digital signing for the default

@@ -338,13 +338,8 @@ is_valid_oplock_break(struct smb_hdr *buf)
 				netfile = list_entry(tmp1,struct cifsFileInfo,tlist);
 				if(pSMB->Fid == netfile->netfid) {
 					struct cifsInodeInfo *pCifsInode;
-			/* BB Add following logic: 
-			  2) look up inode from tcon->openFileList->file->f_dentry->d_inode
-			  3) flush dirty pages and cached byte range locks and mark inode
-			  4) depending on break type change to r/o caching or no caching
-                  cifsinode->clientCanCacheAll = 0
-              5)  inode->i_data.a_ops = &cifs_addr_ops_writethrough;
-			  6) send oplock break response to server */
+			/* BB Add following logic to mark inode for write through 
+              		    inode->i_data.a_ops = &cifs_addr_ops_writethrough; */
 					read_unlock(&GlobalSMBSeslock);
 					cFYI(1,("Matching file id, processing oplock break"));
 					pCifsInode = 
@@ -354,7 +349,7 @@ is_valid_oplock_break(struct smb_hdr *buf)
 						pCifsInode->clientCanCacheRead = FALSE;
 					pCifsInode->oplockPending = TRUE;
 					AllocOplockQEntry(netfile->pfile, tcon);
-                    cFYI(1,("about to wake up oplock thd"));
+					cFYI(1,("about to wake up oplock thd"));
 					wake_up_process(oplockThread);               
 					return TRUE;
 				}

@@ -466,7 +466,14 @@ static int cifs_oplock_thread(void * dummyarg)
 					CIFS_I(pfile->f_dentry->d_inode)->write_behind_rc 
 						= rc;
 				cFYI(1,("Oplock flush file %p rc %d",pfile,rc));
-				/* send oplock break */
+				if(pfile->private_data) {
+					rc = CIFSSMBLock(0, pTcon, 
+						((struct cifsFileInfo *) pfile->private_data)->netfid,
+						0 /* len */ , 0 /* offset */, 0, 
+						0, LOCKING_ANDX_OPLOCK_RELEASE,
+						0 /* wait flag */);
+					cFYI(1,("Oplock release rc = %d ",rc));
+				}
 				write_lock(&GlobalMid_Lock);
 			} else
 				break;
