@@ -33,7 +33,6 @@ struct amba_kmi_port {
 	unsigned int		irq;
 	unsigned int		divisor;
 	unsigned int		open;
-	struct resource		*res;
 };
 
 static irqreturn_t amba_kmi_int(int irq, void *dev_id, struct pt_regs *regs)
@@ -97,10 +96,17 @@ static void amba_kmi_close(struct serio *io)
 static int amba_kmi_probe(struct amba_device *dev, void *id)
 {
 	struct amba_kmi_port *kmi;
+	int ret;
+
+	ret = amba_request_regions(dev, NULL);
+	if (ret)
+		return ret;
 
 	kmi = kmalloc(sizeof(struct amba_kmi_port), GFP_KERNEL);
-	if (!kmi)
-		return -ENOMEM;
+	if (!kmi) {
+		ret = -ENOMEM;
+		goto out;
+	}
 
 	memset(kmi, 0, sizeof(struct amba_kmi_port));
 
@@ -112,26 +118,24 @@ static int amba_kmi_probe(struct amba_device *dev, void *id)
 	kmi->io.phys	= dev->dev.bus_id;
 	kmi->io.driver	= kmi;
 
-	kmi->res	= request_mem_region(dev->res.start, KMI_SIZE, "kmi-pl050");
-	if (!kmi->res) {
-		kfree(kmi);
-		return -EBUSY;
-	}
-
 	kmi->base	= ioremap(dev->res.start, KMI_SIZE);
 	if (!kmi->base) {
-		release_resource(kmi->res);
-		kfree(kmi);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto out;
 	}
 
-	kmi->irq	= dev->irq;
+	kmi->irq	= dev->irq[0];
 	kmi->divisor	= 24 / 8 - 1;
 
 	amba_set_drvdata(dev, kmi);
 
 	serio_register_port(&kmi->io);
 	return 0;
+
+ out:
+	kfree(kmi);
+	amba_release_regions(dev);
+	return ret;
 }
 
 static int amba_kmi_remove(struct amba_device *dev)
@@ -142,8 +146,8 @@ static int amba_kmi_remove(struct amba_device *dev)
 
 	serio_unregister_port(&kmi->io);
 	iounmap(kmi->base);
-	release_resource(kmi->res);
 	kfree(kmi);
+	amba_release_regions(dev);
 	return 0;
 }
 
