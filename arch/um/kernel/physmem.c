@@ -285,7 +285,6 @@ int init_maps(unsigned long physmem, unsigned long iomem, unsigned long highmem)
 		p = &map[i];
 		set_page_count(p, 0);
 		SetPageReserved(p);
-		INIT_LIST_HEAD(&p->list);
 	}
 
 	mem_map = map;
