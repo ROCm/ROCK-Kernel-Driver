@@ -51,6 +51,10 @@ static inline int ioapic_setup_disabled(void) { return 0; }
 
 #endif	/* X86 */
 
+#define BAD_MADT_ENTRY(entry, end) (					    \
+		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
+		((acpi_table_entry_header *)entry)->length != sizeof(*entry))
+
 #define PREFIX			"ACPI: "
 
 #ifdef CONFIG_ACPI_PCI
@@ -204,12 +208,13 @@ acpi_parse_madt (
 
 static int __init
 acpi_parse_lapic (
-	acpi_table_entry_header *header)
+	acpi_table_entry_header *header, const unsigned long end)
 {
 	struct acpi_table_lapic	*processor = NULL;
 
 	processor = (struct acpi_table_lapic*) header;
-	if (!processor)
+
+	if (BAD_MADT_ENTRY(processor, end))
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
@@ -225,15 +230,15 @@ acpi_parse_lapic (
 	return 0;
 }
 
-
 static int __init
 acpi_parse_lapic_addr_ovr (
-	acpi_table_entry_header *header)
+	acpi_table_entry_header *header, const unsigned long end)
 {
 	struct acpi_table_lapic_addr_ovr *lapic_addr_ovr = NULL;
 
 	lapic_addr_ovr = (struct acpi_table_lapic_addr_ovr*) header;
-	if (!lapic_addr_ovr)
+
+	if (BAD_MADT_ENTRY(lapic_addr_ovr, end))
 		return -EINVAL;
 
 	acpi_lapic_addr = lapic_addr_ovr->address;
@@ -243,12 +248,13 @@ acpi_parse_lapic_addr_ovr (
 
 static int __init
 acpi_parse_lapic_nmi (
-	acpi_table_entry_header *header)
+	acpi_table_entry_header *header, const unsigned long end)
 {
 	struct acpi_table_lapic_nmi *lapic_nmi = NULL;
 
 	lapic_nmi = (struct acpi_table_lapic_nmi*) header;
-	if (!lapic_nmi)
+
+	if (BAD_MADT_ENTRY(lapic_nmi, end))
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
@@ -266,12 +272,13 @@ acpi_parse_lapic_nmi (
 
 static int __init
 acpi_parse_ioapic (
-	acpi_table_entry_header *header)
+	acpi_table_entry_header *header, const unsigned long end)
 {
 	struct acpi_table_ioapic *ioapic = NULL;
 
 	ioapic = (struct acpi_table_ioapic*) header;
-	if (!ioapic)
+
+	if (BAD_MADT_ENTRY(ioapic, end))
 		return -EINVAL;
  
 	acpi_table_print_madt_entry(header);
@@ -320,12 +327,13 @@ acpi_sci_ioapic_setup(u32 gsi, u16 polarity, u16 trigger)
 
 static int __init
 acpi_parse_int_src_ovr (
-	acpi_table_entry_header *header)
+	acpi_table_entry_header *header, const unsigned long end)
 {
 	struct acpi_table_int_src_ovr *intsrc = NULL;
 
 	intsrc = (struct acpi_table_int_src_ovr*) header;
-	if (!intsrc)
+
+	if (BAD_MADT_ENTRY(intsrc, end))
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
@@ -354,12 +362,13 @@ acpi_parse_int_src_ovr (
 
 static int __init
 acpi_parse_nmi_src (
-	acpi_table_entry_header *header)
+	acpi_table_entry_header *header, const unsigned long end)
 {
 	struct acpi_table_nmi_src *nmi_src = NULL;
 
 	nmi_src = (struct acpi_table_nmi_src*) header;
-	if (!nmi_src)
+
+	if (BAD_MADT_ENTRY(nmi_src, end))
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
@@ -728,6 +737,13 @@ acpi_process_madt(void)
 				smp_found_config = 1;
 				clustered_apic_check();
 			}
+		}
+		if (error == -EINVAL) {
+			/*
+			 * Dell Precision Workstation 410, 610 come here.
+			 */
+			printk(KERN_ERR PREFIX "Invalid BIOS MADT, disabling ACPI\n");
+			disable_acpi();
 		}
 	}
 #endif
