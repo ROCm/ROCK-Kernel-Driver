@@ -1,0 +1,153 @@
+#
+# USB Gadget support on a system involves
+#    (a) a peripheral controller, and
+#    (b) the gadget driver using it.
+#
+# for 2.5 kbuild, drivers/usb/gadget/Kconfig
+# source this at the end of drivers/usb/Kconfig
+#
+menuconfig USB_GADGET
+	tristate "Support for USB Gadgets"
+	depends on EXPERIMENTAL
+	help
+	   USB is a master/slave protocol, organized with with one master
+	   host (such as a PC) controlling up to 127 peripheral devices.
+	   The USB hardware is asymmetric, which makes it easier to set up:
+	   you can't connect two "to-the-host" connectors to each other.
+
+	   Linux can run in the host, or in the peripheral.  In both cases
+	   you need a low level bus controller driver, and some software
+	   talking to it.  Peripheral controllers are often discrete silicon,
+	   or are integrated with the CPU in a microcontroller.  The more
+	   familiar host side controllers have names like like "EHCI", "OHCI",
+	   or "UHCI", and are usually integrated into southbridges on PC
+	   motherboards.
+
+	   Enable this configuration option if you want to run Linux inside
+	   a USB peripheral device.  Configure one hardware driver for your
+	   peripheral/device side bus controller, and a "gadget driver" for
+	   your peripheral protocol.  (If you use modular gadget drivers,
+	   you may configure more than one.)
+
+	   If in doubt, say "N" and don't enable these drivers; most people
+	   don't have this kind of hardware (except maybe inside Linux PDAs).
+
+#
+# USB Peripheral Controller Support
+#
+# FIXME convert to tristate choice when "choice" behaves as specified
+#
+comment "USB Peripheral Controller Support"
+	depends on USB_GADGET
+
+config USB_NET2280
+	tristate "NetChip 2280 USB Peripheral Controller"
+	depends on PCI && USB_GADGET
+	help
+	   NetChip 2280 is a PCI based USB peripheral controller which
+	   supports both full and high speed USB 2.0 data transfers.  
+	   
+	   It has six configurable endpoints, as well as endpoint zero
+	   (for control transfers) and several endpoints with dedicated
+	   functions.
+
+	   Say "y" to link the driver statically, or "m" to build a
+	   dynamically linked module called "net2280" and force all
+	   gadget drivers to also be dynamically linked.
+
+#
+# USB Gadget Drivers
+#
+# FIXME only one of these may be statically linked; choice/endchoice.
+#
+comment "USB Gadget Drivers"
+	depends on USB_GADGET
+
+# FIXME want better dependency/config approach for drivers.  with only
+# two knobs to tweak (driver y/m/n, and a hardware symbol) there's no
+# good excuse for Kconfig to cause such trouble here.  there are clear
+# bugs (coredumps, multiple choices enabled, and more) in its (boolean)
+# "choice" logic too ...
+
+config USB_ZERO
+	tristate "Gadget Zero (DEVELOPMENT)"
+	depends on USB_GADGET && (USB_DUMMY_HCD || USB_NET2280 || USB_PXA250 || USB_SA1100)
+	help
+	  Gadget Zero is a two-configuration device.  It either sinks and
+	  sources bulk data; or it loops back a configurable number of
+	  transfers.  It also implements control requests, for "chapter 9"
+	  conformance.  The driver needs only two bulk-capable endpoints, so
+	  it can work on top of most device-side usb controllers.  It's
+	  useful for testing, and is also a working example showing how
+	  USB "gadget drivers" can be written.
+
+	  Make this be the first driver you try using on top of any new
+	  USB peripheral controller driver.  Then you can use host-side
+	  test software, like the "usbtest" driver, to put your hardware
+	  and its driver through a basic set of functional tests.
+
+	  Gadget Zero also works with the host-side "usb-skeleton" driver,
+	  and with many kinds of host-side test software.  You may need
+	  to tweak product and vendor IDs before host software knows about
+	  this device, and arrange to select an appropriate configuration.
+
+	  Say "y" to link the driver statically, or "m" to build a
+	  dynamically linked module called "g_zero".
+
+config USB_ZERO_NET2280
+	bool
+	# for now, treat the "dummy" hcd as if it were a net2280
+	depends on USB_ZERO && (USB_NET2280 || USB_DUMMY_HCD)
+	default y
+
+config USB_ZERO_PXA250
+	bool
+	depends on USB_ZERO && USB_PXA250
+	default y
+
+config USB_ZERO_SA1100
+	bool
+	depends on USB_ZERO && USB_SA1100
+	default y
+
+
+config USB_ETH
+	tristate "Ethernet Gadget"
+	depends on USB_GADGET && (USB_DUMMY_HCD || USB_NET2280 || USB_PXA250 || USB_SA1100)
+	help
+	  This driver implements the "Communication Device Class" (CDC)
+	  Ethernet Control Model.  That protocol is often avoided with pure
+	  Ethernet adapters, in favor of simpler vendor-specific hardware,
+	  but is widely suppored by firmware for smart network devices.
+
+	  Within the USB device, this gadget driver exposes a network device
+	  "usbX", where X depends on what other networking devices you have.
+	  Treat it like a two-node Ethernet link:  host, and gadget.
+
+	  The Linux-USB host-side "usbnet" driver interoperates with this
+	  driver, so that deep I/O queues can be supported.  (On 2.4 kernels,
+	  use "CDCEther" instead.)  Deep queues are especially important with
+	  high speed devices.  It should also interoperate with standard CDC
+	  Ethernet class drivers on other host operating systems.
+
+	  Say "y" to link the driver statically, or "m" to build a
+	  dynamically linked module called "g_ether".
+
+
+config USB_ETH_NET2280
+	bool
+	# for now, treat the "dummy" hcd as if it were a net2280
+	depends on USB_ETH && (USB_NET2280 || USB_DUMMY_HCD)
+	default y
+
+config USB_ETH_PXA250
+	bool
+	depends on USB_ETH && USB_PXA250
+	default y
+
+config USB_ETH_SA1100
+	bool
+	depends on USB_ETH && USB_SA1100
+	default y
+
+# endmenuconfig
