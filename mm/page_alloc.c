@@ -15,11 +15,9 @@
 #include <linux/config.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
-#include <linux/swapctl.h>
 #include <linux/interrupt.h>
 #include <linux/pagemap.h>
 #include <linux/bootmem.h>
-#include <linux/slab.h>
 #include <linux/compiler.h>
 #include <linux/module.h>
 #include <linux/suspend.h>
