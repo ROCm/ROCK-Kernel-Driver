@@ -32,7 +32,7 @@ MODULE_PARM(loose, "i");
 
 static int try_rfc959(const char *, size_t, u_int32_t [], char);
 static int try_eprt(const char *, size_t, u_int32_t [], char);
-static int try_espv_response(const char *, size_t, u_int32_t [], char);
+static int try_epsv_response(const char *, size_t, u_int32_t [], char);
 
 static struct ftp_search {
 	enum ip_conntrack_dir dir;
@@ -65,7 +65,7 @@ static struct ftp_search {
 		IP_CT_DIR_REPLY,
 		"229 ", sizeof("229 ") - 1, '(', ')',
 		IP_CT_FTP_EPSV,
-		try_espv_response,
+		try_epsv_response,
 	},
 };
 
@@ -157,7 +157,7 @@ static int try_eprt(const char *data, size_t dlen, u_int32_t array[6],
 }
 
 /* Returns 0, or length of numbers: |||6446| */
-static int try_espv_response(const char *data, size_t dlen, u_int32_t array[6],
+static int try_epsv_response(const char *data, size_t dlen, u_int32_t array[6],
 			     char term)
 {
 	char delim;
