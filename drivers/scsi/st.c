@@ -74,6 +74,9 @@ static int try_direct_io = TRY_DIRECT_IO;
 static int try_rdio = TRUE;
 static int try_wdio = TRUE;
 
+static int st_dev_max;
+static int st_nr_dev;
+
 MODULE_AUTHOR("Kai Makisara");
 MODULE_DESCRIPTION("SCSI Tape Driver");
 MODULE_LICENSE("GPL");
@@ -976,7 +979,7 @@ static int st_open(struct inode *inode, struct file *filp)
 	char *name;
 
 	write_lock(&st_dev_arr_lock);
-	if (dev >= st_template.dev_max || scsi_tapes == NULL ||
+	if (dev >= st_dev_max || scsi_tapes == NULL ||
 	    ((STp = scsi_tapes[dev]) == NULL)) {
 		write_unlock(&st_dev_arr_lock);
 		return (-ENXIO);
@@ -3664,6 +3667,9 @@ static int st_attach(Scsi_Device * SDp)
 		return 1;
 	}
 
+	if (scsi_slave_attach(SDp))
+		return 1;
+
 	i = SDp->host->sg_tablesize;
 	if (st_max_sg_segs < i)
 		i = st_max_sg_segs;
@@ -3680,20 +3686,20 @@ static int st_attach(Scsi_Device * SDp)
 	}
 
 	write_lock(&st_dev_arr_lock);
-	if (st_template.nr_dev >= st_template.dev_max) {
+	if (st_nr_dev >= st_dev_max) {
 		Scsi_Tape **tmp_da;
 		ST_buffer **tmp_ba;
 		int tmp_dev_max;
 
-		tmp_dev_max = st_template.nr_dev + ST_DEV_ARR_LUMP;
+		tmp_dev_max = st_nr_dev + ST_DEV_ARR_LUMP;
 		if (tmp_dev_max > ST_MAX_TAPES)
 			tmp_dev_max = ST_MAX_TAPES;
-		if (tmp_dev_max <= st_template.nr_dev) {
-			SDp->attached--;
+		if (tmp_dev_max <= st_nr_dev) {
 			write_unlock(&st_dev_arr_lock);
 			printk(KERN_ERR "st: Too many tape devices (max. %d).\n",
 			       ST_MAX_TAPES);
 			put_disk(disk);
+			scsi_slave_detach(SDp);
 			return 1;
 		}
 
@@ -3704,36 +3710,36 @@ static int st_attach(Scsi_Device * SDp)
 				kfree(tmp_da);
 			if (tmp_ba != NULL)
 				kfree(tmp_ba);
-			SDp->attached--;
 			write_unlock(&st_dev_arr_lock);
 			printk(KERN_ERR "st: Can't extend device array.\n");
 			put_disk(disk);
+			scsi_slave_detach(SDp);
 			return 1;
 		}
 
 		memset(tmp_da, 0, tmp_dev_max * sizeof(Scsi_Tape *));
 		if (scsi_tapes != NULL) {
 			memcpy(tmp_da, scsi_tapes,
-			       st_template.dev_max * sizeof(Scsi_Tape *));
+			       st_dev_max * sizeof(Scsi_Tape *));
 			kfree(scsi_tapes);
 		}
 		scsi_tapes = tmp_da;
 
-		st_template.dev_max = tmp_dev_max;
+		st_dev_max = tmp_dev_max;
 	}
 
-	for (i = 0; i < st_template.dev_max; i++)
+	for (i = 0; i < st_dev_max; i++)
 		if (scsi_tapes[i] == NULL)
 			break;
-	if (i >= st_template.dev_max)
+	if (i >= st_dev_max)
 		panic("scsi_devices corrupt (st)");
 
 	tpnt = kmalloc(sizeof(Scsi_Tape), GFP_ATOMIC);
 	if (tpnt == NULL) {
-		SDp->attached--;
 		write_unlock(&st_dev_arr_lock);
 		printk(KERN_ERR "st: Can't allocate device descriptor.\n");
 		put_disk(disk);
+		scsi_slave_detach(SDp);
 		return 1;
 	}
 	memset(tpnt, 0, sizeof(Scsi_Tape));
@@ -3821,7 +3827,7 @@ static int st_attach(Scsi_Device * SDp)
 	    tpnt->blksize_changed = FALSE;
 	init_MUTEX(&tpnt->lock);
 
-	st_template.nr_dev++;
+	st_nr_dev++;
 	write_unlock(&st_dev_arr_lock);
 
 	for (mode = 0; mode < ST_NBR_MODES; ++mode) {
@@ -3883,7 +3889,6 @@ static int st_detect(Scsi_Device * SDp)
 {
 	if (SDp->type != TYPE_TAPE || st_incompatible(SDp))
 		return 0;
-        st_template.dev_noticed++;
 	return 1;
 }
 
@@ -3893,7 +3898,7 @@ static void st_detach(Scsi_Device * SDp)
 	int i, mode;
 
 	write_lock(&st_dev_arr_lock);
-	for (i = 0; i < st_template.dev_max; i++) {
+	for (i = 0; i < st_dev_max; i++) {
 		tpnt = scsi_tapes[i];
 		if (tpnt != NULL && tpnt->device == SDp) {
 			tpnt->device = NULL;
@@ -3904,9 +3909,8 @@ static void st_detach(Scsi_Device * SDp)
 				tpnt->de_n[mode] = NULL;
 			}
 			scsi_tapes[i] = 0;
-			SDp->attached--;
-			st_template.nr_dev--;
-			st_template.dev_noticed--;
+			scsi_slave_detach(SDp);
+			st_nr_dev--;
 			write_unlock(&st_dev_arr_lock);
 
 			for (mode = 0; mode < ST_NBR_MODES; ++mode) {
@@ -3962,14 +3966,13 @@ static void __exit exit_st(void)
 	scsi_unregister_device(&st_template);
 	unregister_chrdev(SCSI_TAPE_MAJOR, "st");
 	if (scsi_tapes != NULL) {
-		for (i=0; i < st_template.dev_max; ++i)
+		for (i=0; i < st_dev_max; ++i)
 			if (scsi_tapes[i]) {
 				put_disk(scsi_tapes[i]->disk);
 				kfree(scsi_tapes[i]);
 			}
 		kfree(scsi_tapes);
 	}
-	st_template.dev_max = 0;
 	printk(KERN_INFO "st: Unloaded.\n");
 }
 

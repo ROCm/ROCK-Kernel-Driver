@@ -8,6 +8,7 @@
 # Copyright (C) 1995-2001 by Russell King
 
 LDFLAGS_vmlinux	:=-p -X
+LDFLAGS_BLOB	:=--format binary
 AFLAGS_vmlinux.lds.o = -DTEXTADDR=$(TEXTADDR) -DDATAADDR=$(DATAADDR)
 OBJCOPYFLAGS	:=-O binary -R .note -R .comment -S
 GZFLAGS		:=-9
@@ -60,6 +61,7 @@ AFLAGS		+=$(apcs-y) $(arch-y) -mno-fpu -msoft-float -Wa,-mno-fpu
 ifeq ($(CONFIG_CPU_26),y)
 PROCESSOR	:= armo
 HEAD		:= arch/arm/mach-arc/head.o arch/arm/kernel/init_task.o
+LDFLAGS_BLOB	+= --oformat elf26-littlearm
   ifeq ($(CONFIG_ROM_KERNEL),y)
     DATAADDR	 = 0x02080000
     TEXTADDR	 = 0x03800000
@@ -72,6 +74,7 @@ ifeq ($(CONFIG_CPU_32),y)
 PROCESSOR	 = armv
 HEAD		:= arch/arm/kernel/head.o arch/arm/kernel/init_task.o
 TEXTADDR	 = 0xC0008000
+LDFLAGS_BLOB	+= --oformat elf32-littlearm
 endif
 
 ifeq ($(CONFIG_ARCH_ARCA5K),y)

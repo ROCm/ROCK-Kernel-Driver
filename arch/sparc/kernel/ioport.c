@@ -514,7 +514,7 @@ void *pci_alloc_consistent(struct pci_dev *pdev, size_t len, dma_addr_t *pba)
 
 	mmu_inval_dma_area(va, len_total);
 
-#if 1
+#if 0
 /* P3 */ printk("pci_alloc_consistent: kva %lx uncva %lx phys %lx size %x\n",
   (long)va, (long)res->start, (long)virt_to_phys(va), len_total);
 #endif

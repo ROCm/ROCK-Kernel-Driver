@@ -57,7 +57,7 @@
 
 	|section	8
 	
-	.include "fpsp.h"
+#include "fpsp.h"
 
 	.set	X,FP_SCR5
 	.set	XDCARE,X+2

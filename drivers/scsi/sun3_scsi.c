@@ -1,7 +1,7 @@
 /*
  * Sun3 SCSI stuff by Erik Verbruggen (erik@bigmama.xtdnet.nl)
  *
- * Sun3 DMA routines added by Sam Creasey (sammy@oh.verio.com)
+ * Sun3 DMA routines added by Sam Creasey (sammy@sammy.net)
  *
  * Adapted from mac_scsinew.c:
  */
@@ -79,8 +79,10 @@
 #include "sun3_scsi.h"
 #include "NCR5380.h"
 
+/* #define OLDDMA */
+
 #define USE_WRAPPER
-#define RESET_BOOT
+/*#define RESET_BOOT */
 #define DRIVER_SETUP
 
 #define NDEBUG 0
@@ -93,7 +95,7 @@
 #undef DRIVER_SETUP
 #endif
 
-#undef SUPPORT_TAGS
+/* #define SUPPORT_TAGS */
 
 #define	ENABLE_IRQ()	enable_irq( IRQ_SUN3_SCSI ); 
 
@@ -103,12 +105,17 @@ static inline unsigned char sun3scsi_read(int reg);
 static inline void sun3scsi_write(int reg, int value);
 
 static int setup_can_queue = -1;
+MODULE_PARM(setup_can_queue, "i");
 static int setup_cmd_per_lun = -1;
+MODULE_PARM(setup_cmd_per_lun, "i");
 static int setup_sg_tablesize = -1;
+MODULE_PARM(setup_sg_tablesize, "i");
 #ifdef SUPPORT_TAGS
 static int setup_use_tagged_queuing = -1;
+MODULE_PARM(setup_use_tagged_queuing, "i");
 #endif
 static int setup_hostid = -1;
+MODULE_PARM(setup_hostid, "i");
 
 static Scsi_Cmnd *sun3_dma_setup_done = NULL;
 
@@ -125,7 +132,9 @@ static Scsi_Cmnd *sun3_dma_setup_done = NULL;
 
 static volatile unsigned char *sun3_scsi_regp;
 static volatile struct sun3_dma_regs *dregs;
+#ifdef OLDDMA
 static unsigned char *dmabuf = NULL; /* dma memory buffer */
+#endif
 static struct sun3_udc_regs *udc_regs = NULL;
 static unsigned char *sun3_dma_orig_addr = NULL;
 static unsigned long sun3_dma_orig_count = 0;
@@ -187,8 +196,7 @@ static struct Scsi_Host *default_instance;
  
 int sun3scsi_detect(Scsi_Host_Template * tpnt)
 {
-	unsigned long ioaddr, iopte;
-	int count = 0;
+	unsigned long ioaddr;
 	static int called = 0;
 	struct Scsi_Host *instance;
 
@@ -222,28 +230,9 @@ int sun3scsi_detect(Scsi_Host_Template * tpnt)
 		tpnt->this_id = 7;
 	}
 
-	/* Taken from Sammy's lance driver: */
-        /* IOBASE_SUN3_SCSI can be found within the IO pmeg with some effort */
-        for(ioaddr = 0xfe00000; ioaddr < (0xfe00000 + SUN3_PMEG_SIZE);
-            ioaddr += SUN3_PTE_SIZE) {
-
-                iopte = sun3_get_pte(ioaddr);
-                if(!(iopte & SUN3_PAGE_TYPE_IO)) /* this an io page? */
-                        continue;
-
-                if(((iopte & SUN3_PAGE_PGNUM_MASK) << PAGE_SHIFT) ==
-                   IOBASE_SUN3_SCSI) {
-                        count = 1;
-                        break;
-                }
-        }
-
-	if(!count) {
-		printk("No Sun3 NCR5380 found!\n");
-		return 0;
-	}
-
+	ioaddr = (unsigned long)ioremap(IOBASE_SUN3_SCSI, PAGE_SIZE);
 	sun3_scsi_regp = (unsigned char *)ioaddr;
+
 	dregs = (struct sun3_dma_regs *)(((unsigned char *)ioaddr) + 8);
 
 	if((udc_regs = dvma_malloc(sizeof(struct sun3_udc_regs)))
@@ -259,7 +248,7 @@ int sun3scsi_detect(Scsi_Host_Template * tpnt)
 #endif
 #ifdef SUPPORT_TAGS
 	if (setup_use_tagged_queuing < 0)
-		setup_use_tagged_queuing = DEFAULT_USE_TAGGED_QUEUING;
+		setup_use_tagged_queuing = USE_TAGGED_QUEUING;
 #endif
 
 	instance = scsi_register (tpnt, sizeof(struct NCR5380_hostdata));
@@ -309,16 +298,25 @@ int sun3scsi_detect(Scsi_Host_Template * tpnt)
 	dregs->fifo_count = 0;
 
 	called = 1;
+
+#ifdef RESET_BOOT
+	sun3_scsi_reset_boot(instance);
+#endif
+
 	return 1;
 }
 
+#ifdef MODULE
 int sun3scsi_release (struct Scsi_Host *shpnt)
 {
 	if (shpnt->irq != IRQ_NONE)
 		free_irq (shpnt->irq, NULL);
 
+	iounmap(sun3_scsi_regp);
+
 	return 0;
 }
+#endif
 
 #ifdef RESET_BOOT
 /*
@@ -340,7 +338,7 @@ static void sun3_scsi_reset_boot(struct Scsi_Host *instance)
 	printk( "Sun3 SCSI: resetting the SCSI bus..." );
 
 	/* switch off SCSI IRQ - catch an interrupt without IRQ bit set else */
-       	sun3_disable_irq( IRQ_SUN3_SCSI );
+//       	sun3_disable_irq( IRQ_SUN3_SCSI );
 
 	/* get in phase */
 	NCR5380_write( TARGET_COMMAND_REG,
@@ -360,7 +358,7 @@ static void sun3_scsi_reset_boot(struct Scsi_Host *instance)
 		barrier();
 
 	/* switch on SCSI IRQ again */
-       	sun3_enable_irq( IRQ_SUN3_SCSI );
+//       	sun3_enable_irq( IRQ_SUN3_SCSI );
 
 	printk( " done\n" );
 }
@@ -426,8 +424,12 @@ static unsigned long sun3scsi_dma_setup(void *data, unsigned long count, int wri
 #else
 	void *addr;
 
+	if(sun3_dma_orig_addr != NULL)
+		dvma_unmap(sun3_dma_orig_addr);
+
 //	addr = sun3_dvma_page((unsigned long)data, (unsigned long)dmabuf);
 	addr = (void *)dvma_map((unsigned long) data, count);
+		
 	sun3_dma_orig_addr = addr;
 	sun3_dma_orig_count = count;
 #endif
@@ -453,7 +455,6 @@ static unsigned long sun3scsi_dma_setup(void *data, unsigned long count, int wri
 	dregs->csr &= ~CSR_FIFO;
 	dregs->csr |= CSR_FIFO;
 	
-
 	if(dregs->fifo_count != count) { 
 		printk("scsi%d: fifo_mismatch %04x not %04x\n",
 		       default_instance->host_no, dregs->fifo_count,
@@ -518,10 +519,18 @@ static inline unsigned long sun3scsi_dma_residual(struct Scsi_Host *instance)
 static inline unsigned long sun3scsi_dma_xfer_len(unsigned long wanted, Scsi_Cmnd *cmd,
 				    int write_flag)
 {
-	if((cmd->request->cmd == 0) || (cmd->request->cmd == 1))
+	if(cmd->request->flags & REQ_CMD)
  		return wanted;
 	else
 		return 0;
+}
+
+static inline int sun3scsi_dma_start(unsigned long count, unsigned char *data)
+{
+
+    sun3_udc_write(UDC_CHN_START, UDC_CSR);
+    
+    return 0;
 }
 
 /* clean up after our dma is done */
@@ -532,7 +541,7 @@ static int sun3scsi_dma_finish(int write_flag)
 	int ret = 0;
 	
 	sun3_dma_active = 0;
-
+#if 1
 	// check to empty the fifo on a read
 	if(!write_flag) {
 		int tmo = 200000; /* 2 sec */
@@ -541,13 +550,15 @@ static int sun3scsi_dma_finish(int write_flag)
 			if(dregs->csr & CSR_FIFO_EMPTY)
 				break;
 
-			if(--tmo <= 0) 
+			if(--tmo <= 0) {
+				printk("sun3scsi: fifo failed to empty!\n");
 				return 1;
-
+			}
 			udelay(10);
 		}
 	}
 		
+#endif
 
 	count = sun3scsi_dma_count(default_instance);
 #ifdef OLDDMA
@@ -587,6 +598,7 @@ static int sun3scsi_dma_finish(int write_flag)
 	}
 
 	dvma_unmap(sun3_dma_orig_addr);
+	sun3_dma_orig_addr = NULL;
 #endif
 	sun3_udc_write(UDC_RESET, UDC_CSR);
 	dregs->fifo_count = 0;

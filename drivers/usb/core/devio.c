@@ -751,7 +751,7 @@ static int proc_submiturb(struct dev_state *ps, void *arg)
 	struct async *as;
 	struct usb_ctrlrequest *dr = NULL;
 	unsigned int u, totlen, isofrmlen;
-	int ret;
+	int ret, interval = 0;
 
 	if (copy_from_user(&uurb, arg, sizeof(uurb)))
 		return -EFAULT;
@@ -838,6 +838,9 @@ static int proc_submiturb(struct dev_state *ps, void *arg)
 
 	case USBDEVFS_URB_TYPE_INTERRUPT:
 		uurb.number_of_packets = 0;
+		if (!(ep_desc = usb_epnum_to_ep_desc(ps->dev, uurb.endpoint)))
+			return -ENOENT;
+		interval = ep_desc->bInterval;
 		if (uurb.buffer_length > 16384)
 			return -EINVAL;
 		if (!access_ok((uurb.endpoint & USB_DIR_IN) ? VERIFY_WRITE : VERIFY_READ, uurb.buffer, uurb.buffer_length))
@@ -869,6 +872,7 @@ static int proc_submiturb(struct dev_state *ps, void *arg)
 	as->urb->setup_packet = (unsigned char*)dr;
 	as->urb->start_frame = uurb.start_frame;
 	as->urb->number_of_packets = uurb.number_of_packets;
+	as->urb->interval = interval;
         as->urb->context = as;
         as->urb->complete = async_completed;
 	for (totlen = u = 0; u < uurb.number_of_packets; u++) {

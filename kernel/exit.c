@@ -416,19 +416,31 @@ void end_lazy_tlb(struct mm_struct *mm)
  */
 static inline void __exit_mm(struct task_struct * tsk)
 {
-	struct mm_struct * mm = tsk->mm;
+	struct mm_struct *mm = tsk->mm;
 
 	mm_release();
-	if (mm) {
-		atomic_inc(&mm->mm_count);
-		if (mm != tsk->active_mm) BUG();
-		/* more a memory barrier than a real lock */
-		task_lock(tsk);
-		tsk->mm = NULL;
-		enter_lazy_tlb(mm, current, smp_processor_id());
-		task_unlock(tsk);
-		mmput(mm);
+	if (!mm)
+		return;
+	/*
+	 * Serialize with any possible pending coredump:
+	 */
+	if (!mm->dumpable) {
+		current->core_waiter = 1;
+		atomic_inc(&mm->core_waiters);
+		if (atomic_read(&mm->core_waiters) ==atomic_read(&mm->mm_users))
+			wake_up(&mm->core_wait);
+		down(&mm->core_sem);
+		up(&mm->core_sem);
+		atomic_dec(&mm->core_waiters);
 	}
+	atomic_inc(&mm->mm_count);
+	if (mm != tsk->active_mm) BUG();
+	/* more a memory barrier than a real lock */
+	task_lock(tsk);
+	tsk->mm = NULL;
+	enter_lazy_tlb(mm, current, smp_processor_id());
+	task_unlock(tsk);
+	mmput(mm);
 }
 
 void exit_mm(struct task_struct *tsk)

@@ -32,7 +32,7 @@
 #ifndef __XFS_SUPER_H__
 #define __XFS_SUPER_H__
 
-#ifdef CONFIG_FS_POSIX_ACL
+#ifdef CONFIG_XFS_POSIX_ACL
 # define XFS_ACL_STRING		"ACLs, "
 #else
 # define XFS_ACL_STRING
@@ -73,15 +73,20 @@
 				XFS_QUOTA_STRING XFS_VNTRACE_STRING \
 				XFS_DBG_STRING /* DBG must be last */
 
-
 #define LINVFS_GET_VFS(s) \
 	(vfs_t *)((s)->s_fs_info)
 #define LINVFS_SET_VFS(s, vfsp) \
 	((s)->s_fs_info = vfsp)
 
+struct pb_target;
+struct block_device;
 
-extern void
-linvfs_set_inode_ops(
-	struct inode	*inode);
+extern void xfs_initialize_vnode (bhv_desc_t *, vnode_t *, bhv_desc_t *, int);
+
+extern int  xfs_blkdev_get (const char *, struct block_device **);
+extern void xfs_blkdev_put (struct block_device *);
+
+extern struct pb_target *xfs_alloc_buftarg (struct block_device *);
+extern void xfs_free_buftarg (struct pb_target *);
 
 #endif	/* __XFS_SUPER_H__ */

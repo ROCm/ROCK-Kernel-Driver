@@ -1240,7 +1240,7 @@ static int wd7000_adapter_reset(Adapter * host)
 	host->control = 0;	/* this must always shadow ASC_CONTROL */
 
 	if (WAIT(host->iobase + ASC_STAT, ASC_STATMASK, CMD_RDY, 0)) {
-		printk("wd7000_init: WAIT timed out.\n");
+		printk(KERN_ERR "wd7000_init: WAIT timed out.\n");
 		return -1;	/* -1 = not ok */
 	}
 
@@ -1249,25 +1249,25 @@ static int wd7000_adapter_reset(Adapter * host)
 
 		switch (diag) {
 		case 2:
-			printk("RAM failure.\n");
+			printk(KERN_ERR "RAM failure.\n");
 			break;
 		case 3:
-			printk("FIFO R/W failed\n");
+			printk(KERN_ERR "FIFO R/W failed\n");
 			break;
 		case 4:
-			printk("SBIC register R/W failed\n");
+			printk(KERN_ERR "SBIC register R/W failed\n");
 			break;
 		case 5:
-			printk("Initialization D-FF failed.\n");
+			printk(KERN_ERR "Initialization D-FF failed.\n");
 			break;
 		case 6:
-			printk("Host IRQ D-FF failed.\n");
+			printk(KERN_ERR "Host IRQ D-FF failed.\n");
 			break;
 		case 7:
-			printk("ROM checksum error.\n");
+			printk(KERN_ERR "ROM checksum error.\n");
 			break;
 		default:
-			printk("diagnostic code 0x%02Xh received.\n", diag);
+			printk(KERN_ERR "diagnostic code 0x%02Xh received.\n", diag);
 		}
 		return -1;
 	}

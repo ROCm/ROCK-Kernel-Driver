@@ -685,6 +685,7 @@ static void wd_brokentimer(unsigned long data)
 
 	if(tripped) {
 		/* there is at least one timer brokenstopped-- reschedule */
+		init_timer(&wd_timer);
 		wd_timer.expires = WD_BTIMEOUT;
 		add_timer(&wd_timer);
 	}

@@ -242,10 +242,10 @@ static int show_partition(struct seq_file *part, void *v)
 }
 
 struct seq_operations partitions_op = {
-	start:	part_start,
-	next:	part_next,
-	stop:	part_stop,
-	show:	show_partition
+	.start =part_start,
+	.next =	part_next,
+	.stop =	part_stop,
+	.show =	show_partition
 };
 #endif
 

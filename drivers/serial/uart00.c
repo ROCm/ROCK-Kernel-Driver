@@ -193,7 +193,8 @@ static void uart00_tx_chars(struct uart_port *port)
 	int count;
 
 	if (port->x_char) {
-		while ((UART_GET_TSR(port) & UART_TSR_TX_LEVEL_MSK) == 15);
+		while ((UART_GET_TSR(port) & UART_TSR_TX_LEVEL_MSK) == 15)
+			barrier();
 		UART_PUT_CHAR(port, port->x_char);
 		port->icount.tx++;
 		port->x_char = 0;
@@ -206,7 +207,8 @@ static void uart00_tx_chars(struct uart_port *port)
 
 	count = port->fifosize >> 1;
 	do {
-		while ((UART_GET_TSR(port) & UART_TSR_TX_LEVEL_MSK) == 15);
+		while ((UART_GET_TSR(port) & UART_TSR_TX_LEVEL_MSK) == 15)
+			barrier();
 		UART_PUT_CHAR(port, xmit->buf[xmit->tail]);
 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
 		port->icount.tx++;

@@ -1209,6 +1209,35 @@ void format_corename(char *corename, const char *pattern, long signr)
 	*out_ptr = 0;
 }
 
+static void zap_threads (struct mm_struct *mm)
+{
+	struct task_struct *g, *p;
+
+	/* give other threads a chance to run: */
+	yield();
+
+	read_lock(&tasklist_lock);
+	do_each_thread(g,p)
+		if (mm == p->mm && !p->core_waiter)
+			force_sig_specific(SIGKILL, p);
+	while_each_thread(g,p);
+	read_unlock(&tasklist_lock);
+}
+
+static void coredump_wait(struct mm_struct *mm)
+{
+	DECLARE_WAITQUEUE(wait, current);
+
+	atomic_inc(&mm->core_waiters);
+	add_wait_queue(&mm->core_wait, &wait);
+	zap_threads(mm);
+	current->state = TASK_UNINTERRUPTIBLE;
+	if (atomic_read(&mm->core_waiters) != atomic_read(&mm->mm_users))
+		schedule();
+	else
+		current->state = TASK_RUNNING;
+}
+
 int do_coredump(long signr, struct pt_regs * regs)
 {
 	struct linux_binfmt * binfmt;
@@ -1224,13 +1253,16 @@ int do_coredump(long signr, struct pt_regs * regs)
 	if (!current->mm->dumpable)
 		goto fail;
 	current->mm->dumpable = 0;
+	if (down_trylock(&current->mm->core_sem))
+		BUG();
+	coredump_wait(current->mm);
 	if (current->rlim[RLIMIT_CORE].rlim_cur < binfmt->min_coredump)
-		goto fail;
+		goto fail_unlock;
 
  	format_corename(corename, core_pattern, signr);
 	file = filp_open(corename, O_CREAT | 2 | O_NOFOLLOW, 0600);
 	if (IS_ERR(file))
-		goto fail;
+		goto fail_unlock;
 	inode = file->f_dentry->d_inode;
 	if (inode->i_nlink > 1)
 		goto close_fail;	/* multiple links - don't dump */
@@ -1250,6 +1282,8 @@ int do_coredump(long signr, struct pt_regs * regs)
 
 close_fail:
 	filp_close(file, NULL);
+fail_unlock:
+	up(&current->mm->core_sem);
 fail:
 	unlock_kernel();
 	return retval;

@@ -45,13 +45,9 @@
 #include "scsi.h"
 #include "hosts.h"
 
-LIST_HEAD(scsi_host_tmpl_list);
-LIST_HEAD(scsi_host_hn_list);
-
-LIST_HEAD(scsi_host_list);
-spinlock_t scsi_host_list_lock = SPIN_LOCK_UNLOCKED;
-
-struct Scsi_Device_Template * scsi_devicelist;
+static LIST_HEAD(scsi_host_hn_list);
+static LIST_HEAD(scsi_host_list);
+static spinlock_t scsi_host_list_lock = SPIN_LOCK_UNLOCKED;
 
 static int scsi_host_next_hn;		/* host_no for next new host */
 static int scsi_hosts_registered;	/* cnt of registered scsi hosts */
@@ -94,7 +90,7 @@ int scsi_tp_for_each_host(Scsi_Host_Template *shost_tp, int
  * 	This is the default case for the release function.  Its completely
  *	useless for anything but old ISA adapters
  **/
-static void scsi_host_generic_release(struct Scsi_Host *shost)
+static void scsi_host_legacy_release(struct Scsi_Host *shost)
 {
 	if (shost->irq)
 		free_irq(shost->irq, NULL);
@@ -104,19 +100,35 @@ static void scsi_host_generic_release(struct Scsi_Host *shost)
 		release_region(shost->io_port, shost->n_io_port);
 }
 
+static int scsi_remove_legacy_host(struct Scsi_Host *shost)
+{
+	int error, pcount = scsi_hosts_registered;
+
+	error = scsi_remove_host(shost);
+	if (error)
+		return error;
+
+	if (shost->hostt->release)
+		(*shost->hostt->release)(shost);
+	else
+		scsi_host_legacy_release(shost);
+
+	if (pcount == scsi_hosts_registered)
+		scsi_unregister(shost);
+	return 0;
+}
+
 /**
- * scsi_host_chk_and_release - check a scsi host for release and release
+ * scsi_remove_host - check a scsi host for release and release
  * @shost:	a pointer to a scsi host to release
  *
  * Return value:
  * 	0 on Success / 1 on Failure
  **/
-int scsi_host_chk_and_release(struct Scsi_Host *shost)
+int scsi_remove_host(struct Scsi_Host *shost)
 {
-	int pcount;
-	Scsi_Device *sdev;
-	struct Scsi_Device_Template *sdev_tp;
-	Scsi_Cmnd *scmd;
+	struct scsi_device *sdev;
+	struct scsi_cmnd *scmd;
 
 	/*
 	 * Current policy is all shosts go away on unregister.
@@ -175,10 +187,7 @@ int scsi_host_chk_and_release(struct Scsi_Host *shost)
 	 * structures
 	 */
 	for (sdev = shost->host_queue; sdev; sdev = sdev->next) {
-		for (sdev_tp = scsi_devicelist; sdev_tp;
-		     sdev_tp = sdev_tp->next)
-			if (sdev_tp->detach)
-				(*sdev_tp->detach) (sdev);
+		scsi_detach_device(sdev);
 
 		/* If something still attached, punt */
 		if (sdev->attached) {
@@ -186,10 +195,6 @@ int scsi_host_chk_and_release(struct Scsi_Host *shost)
 			       sdev->attached);
 			return 1;
 		}
-
-		if (shost->hostt->slave_detach)
-			(*shost->hostt->slave_detach) (sdev);
-
 		devfs_unregister(sdev->de);
 		device_unregister(&sdev->sdev_driverfs_dev);
 	}
@@ -198,7 +203,6 @@ int scsi_host_chk_and_release(struct Scsi_Host *shost)
 
 	for (sdev = shost->host_queue; sdev;
 	     sdev = shost->host_queue) {
-		scsi_release_commandblocks(sdev);
 		blk_cleanup_queue(&sdev->request_queue);
 		/* Next free up the Scsi_Device structures for this host */
 		shost->host_queue = sdev->next;
@@ -207,18 +211,30 @@ int scsi_host_chk_and_release(struct Scsi_Host *shost)
 		kfree(sdev);
 	}
 
-	/* Remove the instance of the individual hosts */
-	pcount = scsi_hosts_registered;
-	if (shost->hostt->release)
-		(*shost->hostt->release) (shost);
-	else {
-		scsi_host_generic_release(shost);
+	return 0;
+}
+
+int scsi_add_host(struct Scsi_Host *shost)
+{
+	Scsi_Host_Template *sht = shost->hostt;
+	struct scsi_device *sdev;
+	int error = 0;
+
+	printk(KERN_INFO "scsi%d : %s\n", shost->host_no,
+			sht->info ? sht->info(shost) : sht->name);
+
+	device_register(&shost->host_driverfs_dev);
+	scan_scsis(shost, 0, 0, 0, 0);
+			
+	for (sdev = shost->host_queue; sdev; sdev = sdev->next) {
+		if (sdev->host->hostt != sht)
+			continue; /* XXX(hch): can this really happen? */
+		error = scsi_attach_device(sdev);
+		if (error)
+			break;
 	}
 
-	if (pcount == scsi_hosts_registered)
-		scsi_unregister(shost);
-
-	return 0;
+	return error;
 }
 
 /**
@@ -459,7 +475,6 @@ found:
 	return shost;
 }
 
-
 /**
  * scsi_register_host - register a low level host driver
  * @shost_tp:	pointer to a scsi host driver template
@@ -469,13 +484,8 @@ found:
  **/
 int scsi_register_host(Scsi_Host_Template *shost_tp)
 {
-	int cur_cnt;
-	Scsi_Device *sdev;
-	struct Scsi_Device_Template *sdev_tp;
-	struct list_head *lh;
 	struct Scsi_Host *shost;
-
-	INIT_LIST_HEAD(&shost_tp->shtp_list);
+	int cur_cnt;
 
 	/*
 	 * Check no detect routine.
@@ -503,79 +513,39 @@ int scsi_register_host(Scsi_Host_Template *shost_tp)
 	 * registration code below.
 	 */
 	shost_tp->detect(shost_tp);
+	if (!shost_tp->present)
+		return 0;
 
-	if (shost_tp->present) {
-			/*
-			 * FIXME Who needs manual registration and why???
-			 */
-		if (cur_cnt == scsi_hosts_registered) {
-			if (shost_tp->present > 1) {
-				printk(KERN_ERR "scsi: Failure to register"
-				       "low-level scsi driver");
-				scsi_unregister_host(shost_tp);
-				return 1;
-			}
-			/*
-			 * The low-level driver failed to register a driver.
-			 * We can do this now.
-			 */
-			if(scsi_register(shost_tp, 0)==NULL) {
-				printk(KERN_ERR "scsi: register failed.\n");
-				scsi_unregister_host(shost_tp);
-				return 1;
-			}
-		}
-
-		list_add_tail(&shost_tp->shtp_list, &scsi_host_tmpl_list);
-
-		/* The next step is to call scan_scsis here.  This generates the
-		 * Scsi_Devices entries
-		 */
-		list_for_each(lh, &scsi_host_list) {
-			shost = list_entry(lh, struct Scsi_Host, sh_list);
-			if (shost->hostt == shost_tp) {
-				const char *dm_name;
-				if (shost_tp->info) {
-					dm_name = shost_tp->info(shost);
-				} else {
-					dm_name = shost_tp->name;
-				}
-				printk(KERN_INFO "scsi%d : %s\n",
-				       shost->host_no, dm_name);
-
-				/* first register parent with driverfs */
-				device_register(&shost->host_driverfs_dev);
-				scan_scsis(shost, 0, 0, 0, 0);
-			}
-		}
-
-		for (sdev_tp = scsi_devicelist; sdev_tp;
-		     sdev_tp = sdev_tp->next) {
-			if (sdev_tp->init && sdev_tp->dev_noticed)
-				(*sdev_tp->init) ();
+	if (cur_cnt == scsi_hosts_registered) {
+		if (shost_tp->present > 1) {
+			printk(KERN_ERR "scsi: Failure to register"
+			       "low-level scsi driver");
+			scsi_unregister_host(shost_tp);
+			return 1;
 		}
 
 		/*
-		 * Next we create the Scsi_Cmnd structures for this host 
+		 * The low-level driver failed to register a driver.
+		 * We can do this now.
+		 *
+	 	 * XXX Who needs manual registration and why???
 		 */
-		list_for_each(lh, &scsi_host_list) {
-			shost = list_entry(lh, struct Scsi_Host, sh_list);
-			for (sdev = shost->host_queue; sdev; sdev = sdev->next)
-				if (sdev->host->hostt == shost_tp) {
-					scsi_build_commandblocks(sdev);
-					if (sdev->current_queue_depth == 0)
-						goto out_of_space;
-					for (sdev_tp = scsi_devicelist;
-					     sdev_tp;
-					     sdev_tp = sdev_tp->next)
-						if (sdev_tp->attach)
-							(*sdev_tp->attach) (sdev);
-					if (!sdev->attached) {
-                                                scsi_release_commandblocks(sdev);
-					}
-				}
+		if (!scsi_register(shost_tp, 0)) {
+			printk(KERN_ERR "scsi: register failed.\n");
+			scsi_unregister_host(shost_tp);
+			return 1;
 		}
 	}
+
+	
+	/*
+	 * XXX(hch) use scsi_tp_for_each_host() once it propagates
+	 *	    error returns properly.
+	 */
+	list_for_each_entry(shost, &scsi_host_list, sh_list)
+		if (shost->hostt == shost_tp)
+			if (scsi_add_host(shost))
+				goto out_of_space;
 
 	return 0;
 
@@ -608,19 +578,11 @@ int scsi_unregister_host(Scsi_Host_Template *shost_tp)
 
 	pcount = scsi_hosts_registered;
 
-	scsi_tp_for_each_host(shost_tp, scsi_host_chk_and_release);
+	scsi_tp_for_each_host(shost_tp, scsi_remove_legacy_host);
 
 	if (pcount != scsi_hosts_registered)
 		printk(KERN_INFO "scsi : %d host%s left.\n", scsi_hosts_registered,
 		       (scsi_hosts_registered == 1) ? "" : "s");
-
-	/*
-	 * Remove it from the list if all
-	 * hosts were successfully removed (ie preset == 0)
-	 */
-	if (!shost_tp->present) {
-		list_del(&shost_tp->shtp_list);
-	}
 
 	MOD_DEC_USE_COUNT;
 

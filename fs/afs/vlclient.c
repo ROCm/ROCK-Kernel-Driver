@@ -626,7 +626,7 @@ static void afs_rxvl_get_entry_by_id_attn(struct rxrpc_call *call)
 	case RXRPC_CSTATE_CLNT_GOT_REPLY:
 		if (call->app_read_count==0)
 			break;
-		printk("kAFS: Reply bigger than expected {cst=%u asyn=%d mark=%d rdy=%u pr=%u%s}",
+		printk("kAFS: Reply bigger than expected {cst=%u asyn=%d mark=%Zu rdy=%Zu pr=%u%s}",
 		       call->app_call_state,
 		       call->app_async_read,
 		       call->app_mark,

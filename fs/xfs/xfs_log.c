@@ -480,9 +480,17 @@ xfs_log_mount(xfs_mount_t	*mp,
 	 * just worked.
 	 */
 	if (!(mp->m_flags & XFS_MOUNT_NORECOVERY)) {
-		int    error;
+		int	error;
+		vfs_t	*vfsp = XFS_MTOVFS(mp);
+		int	readonly = (vfsp->vfs_flag & VFS_RDONLY);
 
-		error = xlog_recover(log,XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY);
+		if (readonly)
+			vfsp->vfs_flag &= ~VFS_RDONLY;
+
+		error = xlog_recover(log, readonly);
+
+		if (readonly)
+			vfsp->vfs_flag |= VFS_RDONLY;
 		if (error) {
 			cmn_err(CE_WARN, "XFS: log mount/recovery failed");
 			xlog_unalloc_log(log);

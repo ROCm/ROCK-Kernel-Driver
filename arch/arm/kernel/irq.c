@@ -305,7 +305,7 @@ do_level_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 	desc->chip->ack(irq);
 
 	if (likely(desc->enabled)) {
-		kstat.irqs[cpu][irq]++;
+		kstat_cpu(cpu).irqs[irq]++;
 
 		/*
 		 * Return with this interrupt masked if no action

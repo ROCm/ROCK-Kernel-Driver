@@ -327,7 +327,7 @@ struct alpha_machine_vector cabriolet_mv __initmv = {
 	DO_APECS_IO,
 	DO_APECS_BUS,
 	.machine_check		= apecs_machine_check,
-	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
 	.min_mem_address	= APECS_AND_LCA_DEFAULT_MEM_BASE,
 
@@ -338,7 +338,6 @@ struct alpha_machine_vector cabriolet_mv __initmv = {
 	.init_irq		= cabriolet_init_irq,
 	.init_rtc		= common_init_rtc,
 	.init_pci		= cabriolet_init_pci,
-	.kill_arch		= NULL,
 	.pci_map_irq		= cabriolet_map_irq,
 	.pci_swizzle		= common_swizzle,
 };
@@ -355,7 +354,7 @@ struct alpha_machine_vector eb164_mv __initmv = {
 	DO_CIA_IO,
 	DO_CIA_BUS,
 	.machine_check		= cia_machine_check,
-	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
 	.min_mem_address	= CIA_DEFAULT_MEM_BASE,
 
@@ -366,6 +365,7 @@ struct alpha_machine_vector eb164_mv __initmv = {
 	.init_irq		= cabriolet_init_irq,
 	.init_rtc		= common_init_rtc,
 	.init_pci		= cia_cab_init_pci,
+	.kill_arch		= cia_kill_arch,
 	.pci_map_irq		= cabriolet_map_irq,
 	.pci_swizzle		= common_swizzle,
 };
@@ -380,7 +380,7 @@ struct alpha_machine_vector eb66p_mv __initmv = {
 	DO_LCA_IO,
 	DO_LCA_BUS,
 	.machine_check		= lca_machine_check,
-	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
 	.min_mem_address	= APECS_AND_LCA_DEFAULT_MEM_BASE,
 
@@ -405,7 +405,7 @@ struct alpha_machine_vector lx164_mv __initmv = {
 	DO_PYXIS_IO,
 	DO_CIA_BUS,
 	.machine_check		= cia_machine_check,
-	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
 	.min_mem_address	= DEFAULT_MEM_BASE,
 	.pci_dac_offset		= PYXIS_DAC_OFFSET,
@@ -417,6 +417,7 @@ struct alpha_machine_vector lx164_mv __initmv = {
 	.init_irq		= cabriolet_init_irq,
 	.init_rtc		= common_init_rtc,
 	.init_pci		= alphapc164_init_pci,
+	.kill_arch		= cia_kill_arch,
 	.pci_map_irq		= alphapc164_map_irq,
 	.pci_swizzle		= common_swizzle,
 };
@@ -431,7 +432,7 @@ struct alpha_machine_vector pc164_mv __initmv = {
 	DO_CIA_IO,
 	DO_CIA_BUS,
 	.machine_check		= cia_machine_check,
-	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
 	.min_mem_address	= CIA_DEFAULT_MEM_BASE,
 
@@ -442,6 +443,7 @@ struct alpha_machine_vector pc164_mv __initmv = {
 	.init_irq		= pc164_init_irq,
 	.init_rtc		= common_init_rtc,
 	.init_pci		= alphapc164_init_pci,
+	.kill_arch		= cia_kill_arch,
 	.pci_map_irq		= alphapc164_map_irq,
 	.pci_swizzle		= common_swizzle,
 };

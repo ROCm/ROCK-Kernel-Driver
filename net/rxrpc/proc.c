@@ -22,13 +22,6 @@
 #include <rxrpc/message.h>
 #include "internal.h"
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
-static inline struct proc_dir_entry *PDE(const struct inode *inode)
-{
-	return (struct proc_dir_entry *)inode->u.generic_ip;
-}
-#endif
-
 static struct proc_dir_entry *proc_rxrpc;
 
 static int rxrpc_proc_transports_open(struct inode *inode, struct file *file);
@@ -379,14 +372,14 @@ static int rxrpc_proc_peers_show(struct seq_file *m, void *v)
 	if (!list_empty(&peer->timeout.link))
 		timeout = (signed long)peer->timeout.timo_jif - (signed long)jiffies;
 
-	seq_printf(m,"%5hu %08x %5d %5d %8ld %5u %7lu\n",
+	seq_printf(m,"%5hu %08x %5d %5d %8ld %5Zu %7lu\n",
 		   peer->trans->port,
 		   ntohl(peer->addr.s_addr),
 		   atomic_read(&peer->usage),
 		   atomic_read(&peer->conn_count),
 		   timeout,
 		   peer->if_mtu,
-		   peer->rtt
+		   (long) peer->rtt
 		   );
 
 	return 0;
@@ -484,7 +477,7 @@ static int rxrpc_proc_conns_show(struct seq_file *m, void *v)
 	if (!list_empty(&conn->timeout.link))
 		timeout = (signed long)conn->timeout.timo_jif - (signed long)jiffies;
 
-	seq_printf(m,"%5hu %08x %5hu %04hx %08x %-3.3s %08x %08x %5u %8ld\n",
+	seq_printf(m,"%5hu %08x %5hu %04hx %08x %-3.3s %08x %08x %5Zu %8ld\n",
 		   conn->trans->port,
 		   ntohl(conn->addr.sin_addr.s_addr),
 		   ntohs(conn->addr.sin_port),

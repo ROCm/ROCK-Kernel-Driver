@@ -9,24 +9,30 @@ config CRYPTO
 	help
 	  This option provides the core Cryptographic API.
 
+config CRYPTO_HMAC
+	bool "HMAC support"
+	depends on CRYPTO
+	help
+	  HMAC: Keyed-Hashing for Message Authentication (RFC2104).
+	  This is required for IPSec.
+
 config CRYPTO_MD4
 	tristate "MD4 digest algorithm"
 	depends on CRYPTO
 	help
-	  MD4 message digest algorithm (RFC1320), including HMAC (RFC2104).
-	  
+	  MD4 message digest algorithm (RFC1320).
 
 config CRYPTO_MD5
 	tristate "MD5 digest algorithm"
 	depends on CRYPTO
 	help
-	  MD5 message digest algorithm (RFC1321), including HMAC (RFC2104, RFC2403).
+	  MD5 message digest algorithm (RFC1321).
 
 config CRYPTO_SHA1
 	tristate "SHA-1 digest algorithm"
 	depends on CRYPTO
 	help
-	  SHA-1 secure hash standard (FIPS 180-1), including HMAC (RFC2104, RFC2404).
+	  SHA-1 secure hash standard (FIPS 180-1).
 
 config CRYPTO_DES
 	tristate "DES and Triple DES EDE cipher algorithms"

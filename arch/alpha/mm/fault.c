@@ -89,7 +89,8 @@ do_page_fault(unsigned long address, unsigned long mmcsr,
 	struct vm_area_struct * vma;
 	struct mm_struct *mm = current->mm;
 	unsigned int fixup;
-	int fault;
+	int fault, si_code = SEGV_MAPERR;
+	siginfo_t info;
 
 	/* As of EV6, a load into $31/$f31 is a prefetch, and never faults
 	   (or is suppressed by the PALcode).  Support that for older CPUs
@@ -129,6 +130,7 @@ do_page_fault(unsigned long address, unsigned long mmcsr,
 	/* Ok, we have a good vm_area for this memory access, so
 	   we can handle it.  */
  good_area:
+	si_code = SEGV_ACCERR;
 	if (cause < 0) {
 		if (!(vma->vm_flags & VM_EXEC))
 			goto bad_area;
@@ -148,10 +150,20 @@ do_page_fault(unsigned long address, unsigned long mmcsr,
 	fault = handle_mm_fault(mm, vma, address, cause > 0);
 	up_read(&mm->mmap_sem);
 
-	if (fault < 0)
-		goto out_of_memory;
-	if (fault == 0)
+	switch (fault) {
+	      case VM_FAULT_MINOR:
+		current->min_flt++;
+		break;
+	      case VM_FAULT_MAJOR:
+		current->maj_flt++;
+		break;
+	      case VM_FAULT_SIGBUS:
 		goto do_sigbus;
+	      case VM_FAULT_OOM:
+		goto out_of_memory;
+	      default:
+		BUG();
+	}
 	return;
 
 	/* Something tried to access memory that isn't in our memory map.
@@ -159,20 +171,14 @@ do_page_fault(unsigned long address, unsigned long mmcsr,
  bad_area:
 	up_read(&mm->mmap_sem);
 
-	if (user_mode(regs)) {
-		force_sig(SIGSEGV, current);
-		return;
-	}
+	if (user_mode(regs))
+		goto do_sigsegv;
 
  no_context:
 	/* Are we prepared to handle this fault as an exception?  */
 	if ((fixup = search_exception_table(regs->pc, regs->gp)) != 0) {
 		unsigned long newpc;
 		newpc = fixup_exception(dpf_reg, fixup, regs->pc);
-#if 0
-		printk("%s: Exception at [<%lx>] (%lx) handled successfully\n",
-		       current->comm, regs->pc, newpc);
-#endif
 		regs->pc = newpc;
 		return;
 	}
@@ -201,17 +207,28 @@ do_page_fault(unsigned long address, unsigned long mmcsr,
  do_sigbus:
 	/* Send a sigbus, regardless of whether we were in kernel
 	   or user mode.  */
-	force_sig(SIGBUS, current);
+	info.si_signo = SIGBUS;
+	info.si_errno = 0;
+	info.si_code = BUS_ADRERR;
+	info.si_addr = (void *) address;
+	force_sig_info(SIGBUS, &info, current);
 	if (!user_mode(regs))
 		goto no_context;
 	return;
 
+ do_sigsegv:
+	info.si_signo = SIGSEGV;
+	info.si_errno = 0;
+	info.si_code = si_code;
+	info.si_addr = (void *) address;
+	force_sig_info(SIGSEGV, &info, current);
+	return;
+
 #ifdef CONFIG_ALPHA_LARGE_VMALLOC
  vmalloc_fault:
-	if (user_mode(regs)) {
-		force_sig(SIGSEGV, current);
-		return;
-	} else {
+	if (user_mode(regs))
+		goto do_sigsegv;
+	else {
 		/* Synchronize this task's top level page-table
 		   with the "reference" page table from init.  */
 		long offset = __pgd_offset(address);

@@ -13,6 +13,7 @@
  * dentry, don't worry--they have been taken care of.
  *
  * Copyright (C) 1995-1999 Olaf Kirch <okir@monad.swb.de>
+ * Zerocpy NFS support (C) 2002 Hirokazu Takahashi <taka@valinux.co.jp>
  */
 
 #include <linux/config.h>
@@ -28,6 +29,7 @@
 #include <linux/net.h>
 #include <linux/unistd.h>
 #include <linux/slab.h>
+#include <linux/pagemap.h>
 #include <linux/in.h>
 #include <linux/module.h>
 #include <linux/namei.h>
@@ -571,6 +573,61 @@ found:
 }
 
 /*
+ * Grab and keep cached pages assosiated with a file in the svc_rqst
+ * so that they can be passed to the netowork sendmsg/sendpage routines
+ * directrly. They will be released after the sending has completed.
+ */
+static int
+nfsd_read_actor(read_descriptor_t *desc, struct page *page, unsigned long offset , unsigned long size)
+{
+	unsigned long count = desc->count;
+	struct svc_rqst *rqstp = (struct svc_rqst *)desc->buf;
+
+	if (size > count)
+		size = count;
+
+	if (rqstp->rq_res.page_len == 0) {
+		get_page(page);
+		rqstp->rq_respages[rqstp->rq_resused++] = page;
+		rqstp->rq_res.page_base = offset;
+		rqstp->rq_res.page_len = size;
+	} else if (page != rqstp->rq_respages[rqstp->rq_resused-1]) {
+		get_page(page);
+		rqstp->rq_respages[rqstp->rq_resused++] = page;
+		rqstp->rq_res.page_len += size;
+	} else {
+		rqstp->rq_res.page_len += size;
+	}
+
+	desc->count = count - size;
+	desc->written += size;
+	return size;
+}
+
+static inline ssize_t
+nfsd_getpages(struct file *filp, struct svc_rqst *rqstp, unsigned long count)
+{
+	read_descriptor_t desc;
+	ssize_t	retval;
+
+	if (!count)
+		return 0;
+
+	svc_pushback_unused_pages(rqstp);
+
+	desc.written = 0;
+	desc.count = count;
+	desc.buf = (char *)rqstp;
+	desc.error = 0;
+	do_generic_file_read(filp, &filp->f_pos, &desc, nfsd_read_actor);
+
+	retval = desc.written;
+	if (!retval)
+		retval = desc.error;
+	return retval;
+}
+
+/*
  * Read data from a file. count must contain the requested read count
  * on entry. On return, *count contains the number of bytes actually read.
  * N.B. After this call fhp needs an fh_put
@@ -601,10 +658,15 @@ nfsd_read(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	if (ra)
 		file.f_ra = ra->p_ra;
 
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
-	err = vfs_readv(&file, vec, vlen, *count, &offset);
-	set_fs(oldfs);
+	if (inode->i_mapping->a_ops->readpage) {
+		file.f_pos = offset;
+		err = nfsd_getpages(&file, rqstp, *count);
+	} else {
+		oldfs = get_fs();
+		set_fs(KERNEL_DS);
+		err = vfs_readv(&file, vec, vlen, *count, &offset);
+		set_fs(oldfs);
+	}
 
 	/* Write back readahead params */
 	if (ra)

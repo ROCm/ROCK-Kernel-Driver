@@ -153,7 +153,7 @@ do { (CALL)->app_scr_alloc = (CALL)->app_scratch; } while(0)
 	(CALL)->app_scr_alloc += (SIZE);						\
 	if ((SIZE)>RXRPC_CALL_SCRATCH_SIZE ||						\
 	    (size_t)((CALL)->app_scr_alloc - (u8*)(CALL)) > RXRPC_CALL_SCRATCH_SIZE) {	\
-		printk("rxrpc_call_alloc_scratch(%p,%u)\n",(CALL),(SIZE));		\
+		printk("rxrpc_call_alloc_scratch(%p,%Zu)\n",(CALL),(size_t)(SIZE));	\
 		BUG();									\
 	}										\
 	ptr;										\
@@ -167,7 +167,7 @@ do { (CALL)->app_scr_alloc = (CALL)->app_scratch; } while(0)
 	(CALL)->app_scr_alloc += size;							\
 	if (size>RXRPC_CALL_SCRATCH_SIZE ||						\
 	    (size_t)((CALL)->app_scr_alloc - (u8*)(CALL)) > RXRPC_CALL_SCRATCH_SIZE) {	\
-		printk("rxrpc_call_alloc_scratch(%p,%u)\n",(CALL),size);		\
+		printk("rxrpc_call_alloc_scratch(%p,%Zu)\n",(CALL),size);		\
 		BUG();									\
 	}										\
 	ptr;										\

@@ -5,6 +5,14 @@
 
 mainmenu "Linux Kernel Configuration"
 
+config MMU
+	bool
+	default y
+
+config SWAP
+	bool
+	default y
+
 source "init/Kconfig"
 
 

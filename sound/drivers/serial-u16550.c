@@ -785,6 +785,7 @@ static int __init snd_uart16550_create(snd_card_t * card,
 	uart->prev_in = 0;
 	uart->rstatus = 0;
 	memset(uart->prev_status, 0x80, sizeof(unsigned char) * SNDRV_SERIAL_MAX_OUTS);
+	init_timer(&uart->buffer_timer);
 	uart->buffer_timer.function = snd_uart16550_buffer_timer;
 	uart->buffer_timer.data = (unsigned long)uart;
 	uart->timer_running = 0;

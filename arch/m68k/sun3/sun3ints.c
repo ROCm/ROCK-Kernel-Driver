@@ -18,6 +18,7 @@
 #include <linux/seq_file.h>
 
 extern void sun3_leds (unsigned char);
+static void sun3_inthandle(int irq, void *dev_id, struct pt_regs *fp);
 
 void sun3_disable_interrupts(void)
 {
@@ -63,11 +64,6 @@ inline void sun3_do_irq(int irq, struct pt_regs *fp)
 	*sun3_intreg |=  (1<<irq);
 }
 
-int show_sun3_interrupts(struct seq_file *p, void *v)
-{
-	return 0;
-}
-
 static void sun3_int7(int irq, void *dev_id, struct pt_regs *fp)
 {
 	sun3_do_irq(irq,fp);
@@ -95,13 +91,38 @@ static void sun3_int5(int irq, void *dev_id, struct pt_regs *fp)
 
 /* handle requested ints, excepting 5 and 7, which always do the same
    thing */
+void (*sun3_default_handler[SYS_IRQS])(int, void *, struct pt_regs *) = {
+	sun3_inthandle, sun3_inthandle, sun3_inthandle, sun3_inthandle,
+	sun3_inthandle, sun3_int5, sun3_inthandle, sun3_int7
+};
+
+static const char *dev_names[SYS_IRQS] = { NULL, NULL, NULL, NULL, 
+				     NULL, "timer", NULL, "int7 handler" };
 static void *dev_ids[SYS_IRQS];
 static void (*sun3_inthandler[SYS_IRQS])(int, void *, struct pt_regs *) = {
 	NULL, NULL, NULL, NULL, NULL, sun3_int5, NULL, sun3_int7
 };
-static void (*sun3_vechandler[192])(int, void *, struct pt_regs *);
-static void *vec_ids[192];
-static char *vec_names[192];
+static void (*sun3_vechandler[SUN3_INT_VECS])(int, void *, struct pt_regs *);
+static void *vec_ids[SUN3_INT_VECS];
+static const char *vec_names[SUN3_INT_VECS];
+static int vec_ints[SUN3_INT_VECS];
+
+
+int show_sun3_interrupts(struct seq_file *p, void *v)
+{
+	int i;
+
+	for(i = 0; i < (SUN3_INT_VECS-1); i++) {
+		if(sun3_vechandler[i] != NULL) {
+			seq_printf(p, "vec %3d: %10u %s\n", i+64, 
+				   vec_ints[i],
+				   (vec_names[i]) ? vec_names[i] :
+				   "sun3_vechandler");
+		}
+	}
+
+	return 0;
+}
 
 static void sun3_inthandle(int irq, void *dev_id, struct pt_regs *fp)
 {
@@ -118,14 +139,6 @@ static void sun3_vec255(int irq, void *dev_id, struct pt_regs *fp)
 {
 //	intersil_clear();
 }
-
-void (*sun3_default_handler[SYS_IRQS])(int, void *, struct pt_regs *) = {
-	sun3_inthandle, sun3_inthandle, sun3_inthandle, sun3_inthandle,
-	sun3_inthandle, sun3_int5, sun3_inthandle, sun3_int7
-};
-
-static char *dev_names[SYS_IRQS] = { NULL, NULL, NULL, NULL, 
-				     NULL, "timer", NULL, NULL };
 
 void sun3_init_IRQ(void)
 {
@@ -177,6 +190,7 @@ int sun3_request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_re
 			sun3_vechandler[vec] = handler;
 			vec_ids[vec] = dev_id;
 			vec_names[vec] = devname;
+			vec_ints[vec] = 0;
 			
 			return 0;
 		}
@@ -223,7 +237,8 @@ void sun3_process_int(int irq, struct pt_regs *regs)
 		vec = irq - 64;
 		if(sun3_vechandler[vec] == NULL) 
 			panic ("bad interrupt vector %d received\n",irq);
-			
+
+		vec_ints[vec]++;
 		sun3_vechandler[vec](irq, vec_ids[vec], regs);
 		return;
 	} else {

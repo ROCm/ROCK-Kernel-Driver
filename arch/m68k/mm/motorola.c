@@ -196,9 +196,6 @@ map_chunk (unsigned long addr, long size)
 	return virtaddr;
 }
 
-extern unsigned long empty_bad_page_table;
-extern unsigned long empty_bad_page;
-
 /*
  * paging_init() continues the virtual memory environment setup which
  * was begun by the code in arch/head.S.

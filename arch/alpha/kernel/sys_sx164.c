@@ -160,7 +160,7 @@ struct alpha_machine_vector sx164_mv __initmv = {
 	DO_PYXIS_IO,
 	DO_CIA_BUS,
 	.machine_check		= cia_machine_check,
-	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
 	.min_mem_address	= DEFAULT_MEM_BASE,
 	.pci_dac_offset		= PYXIS_DAC_OFFSET,
@@ -172,7 +172,7 @@ struct alpha_machine_vector sx164_mv __initmv = {
 	.init_irq		= sx164_init_irq,
 	.init_rtc		= common_init_rtc,
 	.init_pci		= sx164_init_pci,
-	.kill_arch		= NULL,
+	.kill_arch		= cia_kill_arch,
 	.pci_map_irq		= sx164_map_irq,
 	.pci_swizzle		= common_swizzle,
 };

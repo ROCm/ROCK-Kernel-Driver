@@ -561,7 +561,7 @@ cpu_sa110_info:
  */
 	.type	sa1100_processor_functions, #object
 ENTRY(sa1100_processor_functions)
-	.word	armv4_early_abort
+	.word	v4_early_abort
 	.word	cpu_sa1100_check_bugs
 	.word	cpu_sa1100_proc_init
 	.word	cpu_sa1100_proc_fin

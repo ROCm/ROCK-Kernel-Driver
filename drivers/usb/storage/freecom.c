@@ -127,7 +127,7 @@ freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
         /* Issue the transfer command. */
         result = usb_stor_bulk_msg (us, fxfr, opipe,
                         FCM_PACKET_LENGTH, &partial);
-        if (result != 0) {
+        if (result != USB_STOR_XFER_GOOD) {
                 US_DEBUGP ("Freecom readdata xpot failure: r=%d, p=%d\n",
                                 result, partial);
 
@@ -146,7 +146,9 @@ freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
 	result = usb_stor_bulk_transfer_srb(us, ipipe, srb, count);
         US_DEBUGP("freecom_readdata done!\n");
 
-        return result;
+	if (result > USB_STOR_XFER_SHORT)
+		return USB_STOR_TRANSPORT_ERROR;
+	return USB_STOR_TRANSPORT_GOOD;
 }
 
 static int
@@ -168,7 +170,7 @@ freecom_writedata (Scsi_Cmnd *srb, struct us_data *us,
         /* Issue the transfer command. */
         result = usb_stor_bulk_msg (us, fxfr, opipe,
                         FCM_PACKET_LENGTH, &partial);
-        if (result != 0) {
+        if (result != USB_STOR_XFER_GOOD) {
                 US_DEBUGP ("Freecom writedata xpot failure: r=%d, p=%d\n",
                                 result, partial);
 
@@ -188,7 +190,9 @@ freecom_writedata (Scsi_Cmnd *srb, struct us_data *us,
 	result = usb_stor_bulk_transfer_srb(us, opipe, srb, count);
 
         US_DEBUGP("freecom_writedata done!\n");
-        return result;
+	if (result > USB_STOR_XFER_SHORT)
+		return USB_STOR_TRANSPORT_ERROR;
+	return USB_STOR_TRANSPORT_GOOD;
 }
 
 /*
@@ -231,7 +235,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
         /* The Freecom device will only fail if there is something wrong in
          * USB land.  It returns the status in its own registers, which
          * come back in the bulk pipe. */
-        if (result != 0) {
+        if (result != USB_STOR_XFER_GOOD) {
                 US_DEBUGP ("freecom xport failure: r=%d, p=%d\n",
                                 result, partial);
 
@@ -255,6 +259,8 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 		US_DEBUGP("freecom_transport(): transfer aborted\n");
 		return USB_STOR_TRANSPORT_ABORTED;
 	}
+	if (result != USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
         US_DEBUG(pdump ((void *) fst, partial));
 
@@ -284,7 +290,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 		 * wrong in USB land.  It returns the status in its own
 		 * registers, which come back in the bulk pipe.
 		 */
-		if (result != 0) {
+		if (result != USB_STOR_XFER_GOOD) {
 			US_DEBUGP ("freecom xport failure: r=%d, p=%d\n",
 					result, partial);
 
@@ -308,13 +314,14 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 			US_DEBUGP("freecom_transport(): transfer aborted\n");
 			return USB_STOR_TRANSPORT_ABORTED;
 		}
+		if (result > USB_STOR_XFER_SHORT)
+	                return USB_STOR_TRANSPORT_ERROR;
 
 		US_DEBUG(pdump ((void *) fst, partial));
 	}
 
-        if (partial != 4 || result != 0) {
+        if (partial != 4)
                 return USB_STOR_TRANSPORT_ERROR;
-        }
         if ((fst->Status & 1) != 0) {
                 US_DEBUGP("operation failed\n");
                 return USB_STOR_TRANSPORT_FAILED;
@@ -369,7 +376,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
                         US_DEBUGP ("freecom_transport: transfer aborted\n");
                         return USB_STOR_TRANSPORT_ABORTED;
                 }
-                if (partial != 4 || result != 0)
+                if (partial != 4 || result > USB_STOR_XFER_SHORT)
                         return USB_STOR_TRANSPORT_ERROR;
                 if ((fst->Status & ERR_STAT) != 0) {
                         US_DEBUGP("operation failed\n");
@@ -398,7 +405,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
                         US_DEBUGP ("freecom_transport: transfer aborted\n");
                         return USB_STOR_TRANSPORT_ABORTED;
                 }
-                if (partial != 4 || result != 0)
+                if (partial != 4 || result > USB_STOR_XFER_SHORT)
                         return USB_STOR_TRANSPORT_ERROR;
                 if ((fst->Status & ERR_STAT) != 0) {
                         US_DEBUGP("operation failed\n");

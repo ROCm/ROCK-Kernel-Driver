@@ -67,9 +67,10 @@ static int crypto_init_flags(struct crypto_tfm *tfm, u32 flags)
 		return crypto_init_compress_flags(tfm, flags);
 	
 	default:
-		BUG();
+		break;
 	}
 	
+	BUG();
 	return -EINVAL;
 }
 
@@ -99,19 +100,15 @@ struct crypto_tfm *crypto_alloc_tfm(const char *name, u32 flags)
 	struct crypto_tfm *tfm = NULL;
 	struct crypto_alg *alg;
 
-	alg = crypto_alg_lookup(name);
-#ifdef CONFIG_KMOD
-	if (alg == NULL) {
-		crypto_alg_autoload(name);
-		alg = crypto_alg_lookup(name);
-	}
-#endif
+	alg = crypto_alg_mod_lookup(name);
 	if (alg == NULL)
 		goto out;
 	
 	tfm = kmalloc(sizeof(*tfm), GFP_KERNEL);
 	if (tfm == NULL)
 		goto out_put;
+
+	memset(tfm, 0, sizeof(*tfm));
 
 	if (alg->cra_ctxsize) {
 		tfm->crt_ctx = kmalloc(alg->cra_ctxsize, GFP_KERNEL);
@@ -121,12 +118,23 @@ struct crypto_tfm *crypto_alloc_tfm(const char *name, u32 flags)
 
 	tfm->__crt_alg = alg;
 	
+	if (alg->cra_blocksize) {
+		tfm->crt_work_block = kmalloc(alg->cra_blocksize + 1,
+					      GFP_KERNEL);
+		if (tfm->crt_work_block == NULL)
+			goto out_free_ctx;
+	}
+
 	if (crypto_init_flags(tfm, flags))
-		goto out_free_ctx;
+		goto out_free_work_block;
 		
 	crypto_init_ops(tfm);
 	
 	goto out;
+
+out_free_work_block:
+	if (tfm->__crt_alg->cra_blocksize)
+		kfree(tfm->crt_work_block);
 
 out_free_ctx:
 	if (tfm->__crt_alg->cra_ctxsize)
@@ -144,6 +152,9 @@ void crypto_free_tfm(struct crypto_tfm *tfm)
 {
 	if (tfm->__crt_alg->cra_ctxsize)
 		kfree(tfm->crt_ctx);
+		
+	if (tfm->__crt_alg->cra_blocksize)
+		kfree(tfm->crt_work_block);
 		
 	if (crypto_tfm_alg_type(tfm) == CRYPTO_ALG_TYPE_CIPHER)
 		if (tfm->crt_cipher.cit_iv)
@@ -204,6 +215,19 @@ int crypto_unregister_alg(struct crypto_alg *alg)
 	}
 out:	
 	up_write(&crypto_alg_sem);
+	return ret;
+}
+
+int crypto_alg_available(const char *name, u32 flags)
+{
+	int ret = 0;
+	struct crypto_alg *alg = crypto_alg_mod_lookup(name);
+	
+	if (alg) {
+		crypto_alg_put(alg);
+		ret = 1;
+	}
+	
 	return ret;
 }
 
@@ -296,3 +320,4 @@ EXPORT_SYMBOL_GPL(crypto_register_alg);
 EXPORT_SYMBOL_GPL(crypto_unregister_alg);
 EXPORT_SYMBOL_GPL(crypto_alloc_tfm);
 EXPORT_SYMBOL_GPL(crypto_free_tfm);
+EXPORT_SYMBOL_GPL(crypto_alg_available);

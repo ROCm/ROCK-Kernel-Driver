@@ -15,7 +15,7 @@
     rights and limitations under the License.
 
     The initial developer of the original code is David A. Hinds
-    <dhinds@pcmcia.sourceforge.org>.  Portions created by David A. Hinds
+    <dahinds@users.sourceforge.net>.  Portions created by David A. Hinds
     are Copyright (C) 1999 David A. Hinds.  All Rights Reserved.
 
     Alternatively, the contents of this file may be used under the
@@ -1003,6 +1003,7 @@ static void pcic_interrupt(int irq, void *dev,
 static void pcic_interrupt_wrapper(u_long data)
 {
     pcic_interrupt(0, NULL, NULL);
+    init_timer(&poll_timer);
     poll_timer.expires = jiffies + poll_interval;
     add_timer(&poll_timer);
 }

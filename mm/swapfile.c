@@ -16,7 +16,9 @@
 #include <linux/shm.h>
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>
+#include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/init.h>
 
 #include <asm/pgtable.h>
 #include <linux/swapops.h>
@@ -1121,12 +1123,35 @@ static int swap_show(struct seq_file *swap, void *v)
 	return 0;
 }
 
-struct seq_operations swaps_op = {
+static struct seq_operations swaps_op = {
 	.start =	swap_start,
 	.next =		swap_next,
 	.stop =		swap_stop,
 	.show =		swap_show
 };
+
+static int swaps_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &swaps_op);
+}
+
+static struct file_operations proc_swaps_operations = {
+	.open		= swaps_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
+
+static int __init procswaps_init(void)
+{
+	struct proc_dir_entry *entry;
+
+	entry = create_proc_entry("swaps", 0, NULL);
+	if (entry)
+		entry->proc_fops = &proc_swaps_operations;
+	return 0;
+}
+__initcall(procswaps_init);
 #endif /* CONFIG_PROC_FS */
 
 /*

@@ -87,6 +87,7 @@ static void
 iiEllisInit(void)
 {
 	pDelayTimer = kmalloc ( sizeof (struct timer_list), GFP_KERNEL );
+	init_timer(pDelayTimer);
 	init_waitqueue_head(&pDelayWait);
 	LOCK_INIT(&Dl_spinlock);
 }

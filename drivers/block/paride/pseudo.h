@@ -49,7 +49,7 @@ static int ps_nice = 0;
 
 static spinlock_t ps_spinlock __attribute__((unused)) = SPIN_LOCK_UNLOCKED;
 
-static struct timer_list ps_timer = { function: ps_timer_int };
+static struct timer_list ps_timer = TIMER_INITIALIZER(ps_timer_int, 0, 0);
 static DECLARE_WORK(ps_tq, ps_tq_int, NULL);
 
 static void ps_set_intr( void (*continuation)(void), 

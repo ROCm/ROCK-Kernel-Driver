@@ -26,8 +26,6 @@ int (*sun3x_mayget)(void);
 int (*sun3x_mayput)(int);
 void (*sun3x_prom_reboot)(void);
 e_vector sun3x_prom_abort;
-struct idprom *idprom;
-static struct idprom idprom_buffer;
 struct linux_romvec *romvec;
 
 /* prom vector table */
@@ -107,8 +105,6 @@ static struct console sun3x_debug = {
 void sun3x_prom_init(void)
 {
     /* Read the vector table */
-	int i;
-
 
     sun3x_putchar = *(void (**)(int)) (SUN3X_P_PUTCHAR);
     sun3x_getchar = *(int (**)(void)) (SUN3X_P_GETCHAR);
@@ -118,13 +114,11 @@ void sun3x_prom_init(void)
     sun3x_prom_abort = *(e_vector *)  (SUN3X_P_ABORT);
     romvec = (struct linux_romvec *)SUN3X_PROM_BASE;
 
-    /* make a copy of the idprom structure */
-    for(i = 0; i < sizeof(struct idprom); i++) 
-	    ((unsigned char *)(&idprom_buffer))[i] = ((unsigned char *)SUN3X_IDPROM)[i];
-    idprom = &idprom_buffer;
+    idprom_init();
 
-    if((idprom->id_machtype & SM_ARCH_MASK) != SM_SUN3X) {
-	    printk("Warning: machine reports strange type %02x\n");
+    if(!((idprom->id_machtype & SM_ARCH_MASK) == SM_SUN3X)) {
+	    printk("Warning: machine reports strange type %02x\n",
+		   idprom->id_machtype);
 	    printk("Pretending it's a 3/80, but very afraid...\n");
 	    idprom->id_machtype = SM_SUN3X | SM_3_80;
     }
@@ -161,4 +155,20 @@ void prom_printf(char *fmt, ...)
 void prom_halt (void)
 {
 	sun3x_halt();
+}
+
+/* Get the idprom and stuff it into buffer 'idbuf'.  Returns the
+ * format type.  'num_bytes' is the number of bytes that your idbuf
+ * has space for.  Returns 0xff on error.
+ */
+unsigned char
+prom_get_idprom(char *idbuf, int num_bytes)
+{
+        int i;
+
+	/* make a copy of the idprom structure */
+	for(i = 0; i < num_bytes; i++) 
+		idbuf[i] = ((char *)SUN3X_IDPROM)[i];
+
+        return idbuf[0];
 }

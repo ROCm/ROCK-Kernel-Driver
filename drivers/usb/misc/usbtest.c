@@ -51,14 +51,10 @@ struct usbtest_info {
 };
 
 /* this is accessed only through usbfs ioctl calls.
- * one ioctl to issue a test ... no locking needed!!!
+ * one ioctl to issue a test ... one lock per device.
  * tests create other threads if they need them.
  * urbs and buffers are allocated dynamically,
  * and data generated deterministically.
- *
- * there's a minor complication on rmmod, since
- * usbfs.disconnect() waits till our ioctl completes.
- * unplug works fine since we'll see real i/o errors.
  */
 struct usbtest_dev {
 	struct usb_interface	*intf;
@@ -66,6 +62,7 @@ struct usbtest_dev {
 	char			id [32];
 	int			in_pipe;
 	int			out_pipe;
+	struct semaphore	sem;
 
 #define TBUF_SIZE	256
 	u8			*buf;
@@ -282,6 +279,10 @@ static int perform_sglist (
  * or remote wakeup (which needs human interaction).
  */
 
+static int realworld = 1;
+MODULE_PARM (realworld, "i");
+MODULE_PARM_DESC (realworld, "clear to demand stricter ch9 compliance");
+
 static int get_altsetting (struct usbtest_dev *dev)
 {
 	struct usb_interface	*iface = dev->intf;
@@ -366,13 +367,11 @@ static int is_good_config (char *buf, int len)
 	case USB_DT_OTHER_SPEED_CONFIG:
 		if (config->bLength != 9)
 			return 0;
-#if 0
 		/* this bit 'must be 1' but often isn't */
-		if (!(config->bmAttributes & 0x80)) {
+		if (!realworld && !(config->bmAttributes & 0x80)) {
 			dbg ("high bit of config attributes not set");
 			return 0;
 		}
-#endif
 		if (config->bmAttributes & 0x1f)	/* reserved == 0 */
 			return 0;
 		break;
@@ -424,7 +423,7 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 		}
 
 		/* [real world] get/set unimplemented if there's only one */
-		if (iface->num_altsetting == 1)
+		if (realworld && iface->num_altsetting == 1)
 			continue;
 
 		/* [9.4.10] set_interface */
@@ -446,7 +445,7 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 	}
 
 	/* [real world] get_config unimplemented if there's only one */
-	if (udev->descriptor.bNumConfigurations != 1) {
+	if (!realworld || udev->descriptor.bNumConfigurations != 1) {
 		int	expected = udev->actconfig->desc.bConfigurationValue;
 
 		/* [9.4.2] get_configuration always works
@@ -454,7 +453,8 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 		 * won't return config descriptors except before set_config.
 		 */
 		retval = usb_control_msg (udev, usb_rcvctrlpipe (udev, 0),
-				USB_REQ_GET_CONFIGURATION, USB_RECIP_DEVICE,
+				USB_REQ_GET_CONFIGURATION,
+				USB_DIR_IN | USB_RECIP_DEVICE,
 				0, 0, dev->buf, 1, HZ * USB_CTRL_GET_TIMEOUT);
 		if (retval != 1 || dev->buf [0] != expected) {
 			dbg ("%s get config --> %d (%d)", dev->id, retval,
@@ -563,7 +563,8 @@ static int ch9_postconfig (struct usbtest_dev *dev)
  * threads and request completion.
  */
 
-static int usbtest_ioctl (struct usb_interface *intf, unsigned int code, void *buf)
+static int
+usbtest_ioctl (struct usb_interface *intf, unsigned int code, void *buf)
 {
 	struct usbtest_dev	*dev = dev_get_drvdata (&intf->dev);
 	struct usb_device	*udev = testdev_to_usbdev (dev);
@@ -584,6 +585,9 @@ static int usbtest_ioctl (struct usb_interface *intf, unsigned int code, void *b
 			|| param->sglen < 0 || param->vary < 0)
 		return -EINVAL;
 
+	if (down_interruptible (&dev->sem))
+		return -ERESTARTSYS;
+
 	/* some devices, like ez-usb default devices, need a non-default
 	 * altsetting to have any active endpoints.  some tests change
 	 * altsettings; force a default so most tests don't need to check.
@@ -591,12 +595,15 @@ static int usbtest_ioctl (struct usb_interface *intf, unsigned int code, void *b
 	if (dev->info->alt >= 0) {
 	    	int	res;
 
-		if (intf->altsetting->desc.bInterfaceNumber)
+		if (intf->altsetting->desc.bInterfaceNumber) {
+			up (&dev->sem);
 			return -ENODEV;
+		}
 		res = set_altsetting (dev, dev->info->alt);
 		if (res) {
 			err ("%s: set altsetting to %d failed, %d",
 					dev->id, dev->info->alt, res);
+			up (&dev->sem);
 			return res;
 		}
 	}
@@ -770,6 +777,7 @@ static int usbtest_ioctl (struct usb_interface *intf, unsigned int code, void *b
 		param->duration.tv_usec += 1000 * 1000;
 		param->duration.tv_sec -= 1;
 	}
+	up (&dev->sem);
 	return retval;
 }
 
@@ -819,6 +827,7 @@ usbtest_probe (struct usb_interface *intf, const struct usb_device_id *id)
 	memset (dev, 0, sizeof *dev);
 	info = (struct usbtest_info *) id->driver_info;
 	dev->info = info;
+	init_MUTEX (&dev->sem);
 
 	/* use the same kind of id the hid driver shows */
 	snprintf (dev->id, sizeof dev->id, "%s-%s:%d",
@@ -873,6 +882,8 @@ usbtest_probe (struct usb_interface *intf, const struct usb_device_id *id)
 static void usbtest_disconnect (struct usb_interface *intf)
 {
 	struct usbtest_dev	*dev = dev_get_drvdata (&intf->dev);
+
+	down (&dev->sem);
 
 	dev_set_drvdata (&intf->dev, 0);
 	info ("unbound %s", dev->id);

@@ -324,14 +324,6 @@ mb_cache_create(const char *name, struct mb_cache_op *cache_op,
 		goto fail;
 
 	spin_lock(&mb_cache_spinlock);
-	if (list_empty(&mb_cache_list)) {
-		if (mb_shrinker) {
-			printk(KERN_ERR "%s: already have a shrinker!\n",
-					__FUNCTION__);
-			remove_shrinker(mb_shrinker);
-		}
-		mb_shrinker = set_shrinker(DEFAULT_SEEKS, mb_cache_shrink_fn);
-	}
 	list_add(&cache->c_cache_list, &mb_cache_list);
 	spin_unlock(&mb_cache_spinlock);
 	return cache;
@@ -414,10 +406,6 @@ mb_cache_destroy(struct mb_cache *cache)
 		}
 	}
 	list_del(&cache->c_cache_list);
-	if (list_empty(&mb_cache_list) && mb_shrinker) {
-		remove_shrinker(mb_shrinker);
-		mb_shrinker = 0;
-	}
 	spin_unlock(&mb_cache_spinlock);
 
 	l = free_list.prev;
@@ -700,3 +688,18 @@ mb_cache_entry_find_next(struct mb_cache_entry *prev, int index,
 }
 
 #endif  /* !defined(MB_CACHE_INDEXES_COUNT) || (MB_CACHE_INDEXES_COUNT > 0) */
+
+static int __init init_mbcache(void)
+{
+	mb_shrinker = set_shrinker(DEFAULT_SEEKS, mb_cache_shrink_fn);
+	return 0;
+}
+
+static void __exit exit_mbcache(void)
+{
+	remove_shrinker(mb_shrinker);
+}
+
+module_init(init_mbcache)
+module_exit(exit_mbcache)
+

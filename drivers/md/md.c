@@ -34,7 +34,6 @@
 #include <linux/raid/md.h>
 #include <linux/sysctl.h>
 #include <linux/bio.h>
-#include <linux/raid/xor.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/buffer_head.h> /* for invalidate_bdev */
 
@@ -995,8 +994,10 @@ static void sync_sbs(mddev_t * mddev)
 	mdk_rdev_t *rdev;
 	struct list_head *tmp;
 
-	ITERATE_RDEV(mddev,rdev,tmp)
+	ITERATE_RDEV(mddev,rdev,tmp) {
 		super_90_sync(mddev, rdev);
+		rdev->sb_loaded = 1;
+	}
 }
 
 static void md_update_sb(mddev_t * mddev)
@@ -1531,7 +1532,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 	int err = 0;
 	struct gendisk *disk = disks[mdidx(mddev)];
 
-	if (atomic_read(&mddev->active)>1) {
+	if (atomic_read(&mddev->active)>2) {
 		printk(STILL_IN_USE, mdidx(mddev));
 		err = -EBUSY;
 		goto out;
@@ -1561,6 +1562,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 					set_disk_ro(disk, 1);
 				goto out;
 			}
+			mddev->pers = NULL;
 			if (mddev->ro)
 				mddev->ro = 0;
 		}
@@ -1736,16 +1738,25 @@ static int autostart_array(dev_t startdev)
 	start_rdev = md_import_device(startdev, 1);
 	if (IS_ERR(start_rdev)) {
 		printk(KERN_WARNING "md: could not import %s!\n", partition_name(startdev));
-		goto abort;
+		return err;
+	}
+
+	/* NOTE: this can only work for 0.90.0 superblocks */
+	sb = (mdp_super_t*)page_address(start_rdev->sb_page);
+	if (sb->major_version != 0 ||
+	    sb->minor_version != 90 ) {
+		printk(KERN_WARNING "md: can only autostart 0.90.0 arrays\n");
+		export_rdev(start_rdev);
+		return err;
 	}
 
 	if (start_rdev->faulty) {
 		printk(KERN_WARNING "md: can not autostart based on faulty %s!\n",
 						bdev_partition_name(start_rdev->bdev));
-		goto abort;
+		export_rdev(start_rdev);
+		return err;
 	}
 	list_add(&start_rdev->same_set, &pending_raid_disks);
-
 
 	for (i = 0; i < MD_SB_DISKS; i++) {
 		mdp_disk_t *desc;
@@ -1773,10 +1784,6 @@ static int autostart_array(dev_t startdev)
 	autorun_devices();
 	return 0;
 
-abort:
-	if (start_rdev)
-		export_rdev(start_rdev);
-	return err;
 }
 
 #undef BAD_VERSION
@@ -2693,9 +2700,9 @@ static int md_status_read_proc(char *page, char **start, off_t off,
 		sz += mddev->pers->status (page+sz, mddev);
 
 		sz += sprintf(page+sz, "\n      ");
-		if (mddev->curr_resync > 1)
+		if (mddev->curr_resync > 2)
 			sz += status_resync (page+sz, mddev);
-		else if (mddev->curr_resync == 1)
+		else if (mddev->curr_resync == 1 || mddev->curr_resync == 2)
 				sz += sprintf(page + sz, "	resync=DELAYED");
 
 		sz += sprintf(page + sz, "\n");
@@ -3050,7 +3057,6 @@ int md_notify_reboot(struct notifier_block *this,
 	if ((code == SYS_DOWN) || (code == SYS_HALT) || (code == SYS_POWER_OFF)) {
 
 		printk(KERN_INFO "md: stopping all md devices.\n");
-		return NOTIFY_DONE;
 
 		ITERATE_MDDEV(mddev,tmp)
 			if (mddev_trylock(mddev)==0)

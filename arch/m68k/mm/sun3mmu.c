@@ -33,8 +33,6 @@ extern void mmu_emu_init (unsigned long bootmem_end);
 
 const char bad_pmd_string[] = "Bad pmd in pte_alloc: %08lx\n";
 
-extern unsigned long empty_bad_page_table;
-extern unsigned long empty_bad_page;
 extern unsigned long num_pages;
 
 void free_initmem(void)
@@ -59,8 +57,8 @@ void __init paging_init(void)
 #ifdef TEST_VERIFY_AREA
 	wp_works_ok = 0;
 #endif
-	empty_zero_page = (unsigned long)alloc_bootmem_pages(PAGE_SIZE);
-	memset((void *)empty_zero_page, 0, PAGE_SIZE);
+	empty_zero_page = alloc_bootmem_pages(PAGE_SIZE);
+	memset(empty_zero_page, 0, PAGE_SIZE);
 
 	address = PAGE_OFFSET;
 	pg_dir = swapper_pg_dir;

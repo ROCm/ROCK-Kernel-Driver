@@ -60,6 +60,7 @@
 #include <linux/xfs_super.h>
 #include <linux/xfs_globals.h>
 #include <linux/xfs_fs_subr.h>
+#include <linux/xfs_lrw.h>
 
 #include <pagebuf/page_buf.h>
 
@@ -152,11 +153,8 @@ typedef struct xfs_dirent {		/* data from readdir() */
 #define EFSCORRUPTED	990		/* Filesystem is corrupted */
 
 #define SYNCHRONIZE()	barrier()
-#define lbolt		jiffies
 #define rootdev		ROOT_DEV
 #define __return_address __builtin_return_address(0)
-#define LONGLONG_MAX	9223372036854775807LL	/* max "long long int" */
-#define nopkg()		( ENOSYS )
 
 /* IRIX uses a dynamic sizing algorithm (ndquot = 200 + numprocs*2) */
 /* we may well need to fine-tune this if it ever becomes an issue.  */

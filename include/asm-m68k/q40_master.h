@@ -10,7 +10,6 @@
 
 
 #define q40_master_addr 0xff000000
-#define q40_rtc_addr    0xff021ffc
 
 #define IIRQ_REG            0x0       /* internal IRQ reg */
 #define EIRQ_REG            0x4       /* external ... */
@@ -43,28 +42,25 @@
 #define master_inb(_reg_)      in_8((unsigned char *)q40_master_addr+_reg_)
 #define master_outb(_b_,_reg_)  out_8((unsigned char *)q40_master_addr+_reg_,_b_)
 
+/* RTC defines */
+
+#define Q40_RTC_BASE	    (0xff021ffc)
+
+#define Q40_RTC_YEAR        (*(volatile unsigned char *)(Q40_RTC_BASE+0))
+#define Q40_RTC_MNTH        (*(volatile unsigned char *)(Q40_RTC_BASE-4))
+#define Q40_RTC_DATE        (*(volatile unsigned char *)(Q40_RTC_BASE-8))
+#define Q40_RTC_DOW         (*(volatile unsigned char *)(Q40_RTC_BASE-12))
+#define Q40_RTC_HOUR        (*(volatile unsigned char *)(Q40_RTC_BASE-16))
+#define Q40_RTC_MINS        (*(volatile unsigned char *)(Q40_RTC_BASE-20))
+#define Q40_RTC_SECS        (*(volatile unsigned char *)(Q40_RTC_BASE-24))
+#define Q40_RTC_CTRL        (*(volatile unsigned char *)(Q40_RTC_BASE-28))
+
+/* some control bits */
+#define Q40_RTC_READ   64  /* prepare for reading */
+#define Q40_RTC_WRITE  128
 
 /* define some Q40 specific ints */
 #include "q40ints.h"
-
-/* RTC defines */
-
-#define Q40_RTC_BASE (q40_rtc_addr)
-
-#define RTC_YEAR        (*(unsigned char *)(Q40_RTC_BASE+0))
-#define RTC_MNTH        (*(unsigned char *)(Q40_RTC_BASE-4))
-#define RTC_DATE        (*(unsigned char *)(Q40_RTC_BASE-8))
-#define RTC_DOW         (*(unsigned char *)(Q40_RTC_BASE-12))
-#define RTC_HOUR        (*(unsigned char *)(Q40_RTC_BASE-16))
-#define RTC_MINS        (*(unsigned char *)(Q40_RTC_BASE-20))
-#define RTC_SECS        (*(unsigned char *)(Q40_RTC_BASE-24))
-#define RTC_CTRL        (*(unsigned char *)(Q40_RTC_BASE-28))
-
-
-/* some control bits */
-#define RTC_READ   64  /* prepare for reading */
-#define RTC_WRITE  128
-
 
 /* misc defs */
 #define DAC_LEFT  ((unsigned char *)0xff008000)

@@ -62,7 +62,7 @@ void __init amiga_init_sound(void)
 }
 
 static void nosound( unsigned long ignored );
-static struct timer_list sound_timer = { function: nosound };
+static struct timer_list sound_timer = TIMER_INITIALIZER(nosound, 0, 0);
 
 void amiga_mksound( unsigned int hz, unsigned int ticks )
 {
@@ -71,8 +71,7 @@ void amiga_mksound( unsigned int hz, unsigned int ticks )
 	if (!snd_data)
 		return;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	del_timer( &sound_timer );
 
 	if (hz > 20 && hz < 32767) {
@@ -100,7 +99,7 @@ void amiga_mksound( unsigned int hz, unsigned int ticks )
 	} else
 		nosound( 0 );
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 

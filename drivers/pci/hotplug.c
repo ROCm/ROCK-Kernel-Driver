@@ -71,8 +71,7 @@ int pci_hotplug (struct device *dev, char **envp, int num_envp,
  * @bus: where to insert it
  *
  * Link the device to both the global PCI device chain and the 
- * per-bus list of devices, add the /proc entry, and notify
- * userspace (/sbin/hotplug).
+ * per-bus list of devices, add the /proc entry.
  */
 void
 pci_insert_device(struct pci_dev *dev, struct pci_bus *bus)

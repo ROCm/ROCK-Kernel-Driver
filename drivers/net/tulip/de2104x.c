@@ -2014,6 +2014,7 @@ static int __init de_init_one (struct pci_dev *pdev,
 	dev->watchdog_timeo = TX_TIMEOUT;
 
 	dev->irq = pdev->irq;
+	init_timer(&de->media_timer);
 
 	de = dev->priv;
 	de->de21040 = ent->driver_data == 0 ? 1 : 0;
@@ -2216,6 +2217,7 @@ static struct pci_driver de_driver = {
 	.name		= DRV_NAME,
 	.id_table	= de_pci_tbl,
 	.probe		= de_init_one,
+#warning only here to fix build.  should be __exit_p not __devexit_p.
 	.remove		= __devexit_p(de_remove_one),
 #ifdef CONFIG_PM
 	.suspend	= de_suspend,

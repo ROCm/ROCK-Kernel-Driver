@@ -761,23 +761,19 @@ vicam_open(struct inode *inode, struct file *file)
 		return -EBUSY;
 	}
 
+	cam->raw_image = kmalloc(VICAM_MAX_READ_SIZE, GFP_KERNEL);
 	if (!cam->raw_image) {
-		cam->raw_image = kmalloc(VICAM_MAX_READ_SIZE, GFP_KERNEL);
-		if (!cam->raw_image) {
-			up(&cam->busy_lock);
-			return -ENOMEM;
-		}
+		up(&cam->busy_lock);
+		return -ENOMEM;
 	}
 
+	cam->framebuf = rvmalloc(VICAM_MAX_FRAME_SIZE * VICAM_FRAMES);
 	if (!cam->framebuf) {
-		cam->framebuf =
-		    rvmalloc(VICAM_MAX_FRAME_SIZE * VICAM_FRAMES);
-		if (!cam->framebuf) {
-			kfree(cam->raw_image);
-			up(&cam->busy_lock);
-			return -ENOMEM;
-		}
+		kfree(cam->raw_image);
+		up(&cam->busy_lock);
+		return -ENOMEM;
 	}
+
 	// First upload firmware, then turn the camera on
 
 	if (!cam->is_initialized) {
@@ -804,6 +800,9 @@ vicam_close(struct inode *inode, struct file *file)
 	struct vicam_camera *cam = file->private_data;
 	DBG("close\n");
 	set_camera_power(cam, 0);
+
+	kfree(cam->raw_image);
+	rvfree(cam->framebuf, VICAM_MAX_FRAME_SIZE * VICAM_FRAMES);
 
 	cam->open_count--;
 
@@ -989,6 +988,7 @@ vicam_read( struct file *file, char *buf, size_t count, loff_t *ppos )
 
 	if (*ppos >= VICAM_MAX_FRAME_SIZE) {
 		*ppos = 0;
+		up(&cam->busy_lock);
 		return 0;
 	}
 
@@ -1037,15 +1037,6 @@ vicam_mmap(struct file *file, struct vm_area_struct *vma)
 	/* make this _really_ smp-safe */
 	if (down_interruptible(&cam->busy_lock))
 		return -EINTR;
-
-	if (!cam->framebuf) {	/* we do lazy allocation */
-		cam->framebuf =
-		    rvmalloc(VICAM_MAX_FRAME_SIZE * VICAM_FRAMES);
-		if (!cam->framebuf) {
-			up(&cam->busy_lock);
-			return -ENOMEM;
-		}
-	}
 
 	pos = (unsigned long)cam->framebuf;
 	while (size > 0) {
@@ -1319,7 +1310,6 @@ vicam_disconnect(struct usb_interface *intf)
 	struct vicam_camera *cam = dev_get_drvdata(&intf->dev);
 
 	dev_set_drvdata ( &intf->dev, NULL );
-	usb_put_dev(cam->udev);
 	
 	cam->udev = NULL;
 	
@@ -1328,12 +1318,6 @@ vicam_disconnect(struct usb_interface *intf)
 #ifdef CONFIG_PROC_FS
 	vicam_destroy_proc_entry(cam);
 #endif
-
-	if (cam->raw_image)
-		kfree(cam->raw_image);
-	if (cam->framebuf)
-		rvfree(cam->framebuf,
-		       VICAM_MAX_FRAME_SIZE * VICAM_FRAMES);
 
 	kfree(cam);
 

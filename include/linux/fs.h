@@ -297,7 +297,7 @@ struct address_space_operations {
 	/* Set a page dirty */
 	int (*set_page_dirty)(struct page *page);
 
-	int (*readpages)(struct address_space *mapping,
+	int (*readpages)(struct file *filp, struct address_space *mapping,
 			struct list_head *pages, unsigned nr_pages);
 
 	/*
@@ -506,10 +506,6 @@ struct file {
 
 	/* needed for tty driver, and maybe others */
 	void			*private_data;
-
-	/* file callback list */
-	rwlock_t f_cblock;
-	struct list_head f_cblist;
 };
 extern spinlock_t files_lock;
 #define file_list_lock() spin_lock(&files_lock);

@@ -33,7 +33,7 @@
 
 #define	BLS	(&aic7xxx_buffer[size])
 #define HDRB \
-"             0 - 4K     4 - 16K    16 - 64K   64 - 256K   256K - 1M    1M+"
+"               0 - 4K   4 - 16K   16 - 64K  64 - 256K  256K - 1M        1M+"
 
 #ifdef PROC_DEBUG
 extern int vsprintf(char *, const char *, va_list);
@@ -90,7 +90,6 @@ aic7xxx_proc_info ( char *buffer, char **start, off_t offset, int length,
   int    size = 0;
   unsigned char i;
   unsigned char tindex;
-  struct list_head *list_item;
 
   HBAptr = NULL;
 
@@ -132,10 +131,8 @@ aic7xxx_proc_info ( char *buffer, char **start, off_t offset, int length,
    */
 
   size = 4096;
-  list_for_each(list_item, &p->aic_devs)
-  {
+  list_for_each_entry(aic_dev, &p->aic_devs, list)
     size += 512;
-  }
   if (aic7xxx_buffer_size != size)
   {
     if (aic7xxx_buffer != NULL) 
@@ -157,13 +154,6 @@ aic7xxx_proc_info ( char *buffer, char **start, off_t offset, int length,
   size += sprintf(BLS, "Adaptec AIC7xxx driver version: ");
   size += sprintf(BLS, "%s/", AIC7XXX_C_VERSION);
   size += sprintf(BLS, "%s", AIC7XXX_H_VERSION);
-  size += sprintf(BLS, "\n");
-  size += sprintf(BLS, "Compile Options:\n");
-#ifdef CONFIG_AIC7XXX_OLD_TCQ_ON_BY_DEFAULT
-  size += sprintf(BLS, "  TCQ Enabled By Default : Enabled\n");
-#else
-  size += sprintf(BLS, "  TCQ Enabled By Default : Disabled\n");
-#endif
   size += sprintf(BLS, "\n");
   size += sprintf(BLS, "Adapter Configuration:\n");
   size += sprintf(BLS, "           SCSI Adapter: %s\n",
@@ -263,7 +253,7 @@ aic7xxx_proc_info ( char *buffer, char **start, off_t offset, int length,
   {
     size += sprintf(BLS, "     Ultra Enable Flags: 0x%04x\n", p->ultraenb);
   }
-  size += sprintf(BLS, "Default Tag Queue Depth: %d\n", AIC7XXX_CMDS_PER_DEVICE);
+  size += sprintf(BLS, "Default Tag Queue Depth: %d\n", aic7xxx_default_queue_depth);
   size += sprintf(BLS, "    Tagged Queue By Device array for aic7xxx host "
                        "instance %d:\n", p->instance);
   size += sprintf(BLS, "      {");
@@ -273,9 +263,8 @@ aic7xxx_proc_info ( char *buffer, char **start, off_t offset, int length,
 
   size += sprintf(BLS, "\n");
   size += sprintf(BLS, "Statistics:\n\n");
-  list_for_each(list_item, &p->aic_devs)
+  list_for_each_entry(aic_dev, &p->aic_devs, list)
   {
-    aic_dev = list_entry(list_item, struct aic_dev_data, list);
     sdptr = aic_dev->SDptr;
     tindex = sdptr->channel << 3 | sdptr->id;
     size += sprintf(BLS, "(scsi%d:%d:%d:%d)\n",
@@ -322,24 +311,32 @@ aic7xxx_proc_info ( char *buffer, char **start, off_t offset, int length,
                     p->user[tindex].offset,
                     p->user[tindex].width,
                     p->user[tindex].options);
-    size += sprintf(BLS, "  Total transfers %ld (%ld reads and %ld writes)\n",
-      aic_dev->r_total + aic_dev->w_total, aic_dev->r_total, aic_dev->w_total);
+    if(sdptr->simple_tags)
+    {
+      size += sprintf(BLS, "  Tagged Command Queueing Enabled, Ordered Tags %s\n", sdptr->ordered_tags ? "Enabled" : "Disabled");
+    }
+    if(aic_dev->barrier_total)
+      size += sprintf(BLS, "  Total transfers %ld:\n    (%ld/%ld/%ld/%ld reads/writes/REQ_BARRIER/Ordered Tags)\n",
+        aic_dev->r_total+aic_dev->w_total, aic_dev->r_total, aic_dev->w_total,
+        aic_dev->barrier_total, aic_dev->ordered_total);
+    else
+      size += sprintf(BLS, "  Total transfers %ld:\n    (%ld/%ld reads/writes)\n",
+        aic_dev->r_total+aic_dev->w_total, aic_dev->r_total, aic_dev->w_total);
     size += sprintf(BLS, "%s\n", HDRB);
     size += sprintf(BLS, "   Reads:");
     for (i = 0; i < NUMBER(aic_dev->r_bins); i++)
     {
-      size += sprintf(BLS, " %7ld", aic_dev->r_bins[i]);
+      size += sprintf(BLS, " %10ld", aic_dev->r_bins[i]);
     }
     size += sprintf(BLS, "\n");
     size += sprintf(BLS, "  Writes:");
     for (i = 0; i < NUMBER(aic_dev->w_bins); i++)
     {
-      size += sprintf(BLS, " %7ld", aic_dev->w_bins[i]);
+      size += sprintf(BLS, " %10ld", aic_dev->w_bins[i]);
     }
     size += sprintf(BLS, "\n");
     size += sprintf(BLS, "\n\n");
   }
-
   if (size >= aic7xxx_buffer_size)
   {
     printk(KERN_WARNING "aic7xxx: Overflow in aic7xxx_proc.c\n");

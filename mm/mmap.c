@@ -96,7 +96,7 @@ int vm_enough_memory(long pages)
 		 * this compensates for the swap-space over-allocation
 		 * (ie "nr_swap_pages" being too small).
 		 */
-		free += swapper_space.nrpages;
+		free += total_swapcache_pages;
 
 		/*
 		 * The code below doesn't account for free space in the
@@ -1282,8 +1282,6 @@ void exit_mmap(struct mm_struct * mm)
 	struct vm_area_struct * mpnt;
 
 	profile_exit_mmap(mm);
- 
-	release_segments(mm);
  
 	spin_lock(&mm->page_table_lock);
 

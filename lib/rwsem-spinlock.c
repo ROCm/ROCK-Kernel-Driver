@@ -290,7 +290,7 @@ void __up_write(struct rw_semaphore *sem)
  */
 void __downgrade_write(struct rw_semaphore *sem)
 {
-	rwsemtrace(sem,"Entering __rwsem_downgrade");
+	rwsemtrace(sem,"Entering __downgrade_write");
 
 	spin_lock(&sem->wait_lock);
 
@@ -300,7 +300,7 @@ void __downgrade_write(struct rw_semaphore *sem)
 
 	spin_unlock(&sem->wait_lock);
 
-	rwsemtrace(sem,"Leaving __rwsem_downgrade");
+	rwsemtrace(sem,"Leaving __downgrade_write");
 }
 
 EXPORT_SYMBOL(init_rwsem);

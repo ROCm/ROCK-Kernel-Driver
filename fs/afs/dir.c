@@ -38,19 +38,17 @@ struct file_operations afs_dir_file_operations = {
 
 struct inode_operations afs_dir_inode_operations = {
 	.lookup		= afs_dir_lookup,
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 	.getattr	= afs_inode_getattr,
-#else
-	.revalidate	= afs_inode_revalidate,
+#if 0 /* TODO */
+	.create		= afs_dir_create,
+	.link		= afs_dir_link,
+	.unlink		= afs_dir_unlink,
+	.symlink	= afs_dir_symlink,
+	.mkdir		= afs_dir_mkdir,
+	.rmdir		= afs_dir_rmdir,
+	.mknod		= afs_dir_mknod,
+	.rename		= afs_dir_rename,
 #endif
-//	.create		= afs_dir_create,
-//	.link		= afs_dir_link,
-//	.unlink		= afs_dir_unlink,
-//	.symlink	= afs_dir_symlink,
-//	.mkdir		= afs_dir_mkdir,
-//	.rmdir		= afs_dir_rmdir,
-//	.mknod		= afs_dir_mknod,
-//	.rename		= afs_dir_rename,
 };
 
 static struct dentry_operations afs_fs_dentry_operations = {
@@ -250,7 +248,7 @@ static int afs_dir_iterate_block(unsigned *fpos,
 
 		/* skip entries marked unused in the bitmap */
 		if (!(block->pagehdr.bitmap[offset/8] & (1 << (offset % 8)))) {
-			_debug("ENT[%u.%u]: unused\n",blkoff/sizeof(afs_dir_block_t),offset);
+			_debug("ENT[%Zu.%u]: unused\n",blkoff/sizeof(afs_dir_block_t),offset);
 			if (offset>=curr)
 				*fpos = blkoff + next * sizeof(afs_dirent_t);
 			continue;
@@ -260,26 +258,26 @@ static int afs_dir_iterate_block(unsigned *fpos,
 		dire = &block->dirents[offset];
 		nlen = strnlen(dire->parts.name,sizeof(*block) - offset*sizeof(afs_dirent_t));
 
-		_debug("ENT[%u.%u]: %s %u \"%.*s\"\n",
+		_debug("ENT[%Zu.%u]: %s %Zu \"%s\"\n",
 		       blkoff/sizeof(afs_dir_block_t),offset,
-		       offset<curr ? "skip" : "fill",
-		       nlen,nlen,dire->name);
+		       (offset<curr ? "skip" : "fill"),
+		       nlen,dire->u.name);
 
 		/* work out where the next possible entry is */
 		for (tmp=nlen; tmp>15; tmp-=sizeof(afs_dirent_t)) {
 			if (next>=AFS_DIRENT_PER_BLOCK) {
-				_debug("ENT[%u.%u]:"
-				       " %u travelled beyond end dir block (len %u/%u)\n",
+				_debug("ENT[%Zu.%u]:"
+				       " %u travelled beyond end dir block (len %u/%Zu)\n",
 				       blkoff/sizeof(afs_dir_block_t),offset,next,tmp,nlen);
 				return -EIO;
 			}
 			if (!(block->pagehdr.bitmap[next/8] & (1 << (next % 8)))) {
-				_debug("ENT[%u.%u]: %u unmarked extension (len %u/%u)\n",
+				_debug("ENT[%Zu.%u]: %u unmarked extension (len %u/%Zu)\n",
 				       blkoff/sizeof(afs_dir_block_t),offset,next,tmp,nlen);
 				return -EIO;
 			}
 
-			_debug("ENT[%u.%u]: ext %u/%u\n",
+			_debug("ENT[%Zu.%u]: ext %u/%Zu\n",
 			       blkoff/sizeof(afs_dir_block_t),next,tmp,nlen);
 			next++;
 		}
@@ -397,7 +395,7 @@ static int afs_dir_lookup_filldir(void *_cookie, const char *name, int nlen, lof
 {
 	struct afs_dir_lookup_cookie *cookie = _cookie;
 
-	_enter("{%s,%u},%s,%u,,%lu,%u",cookie->name,cookie->nlen,name,nlen,ino,ntohl(dtype));
+	_enter("{%s,%Zu},%s,%u,,%lu,%u",cookie->name,cookie->nlen,name,nlen,ino,ntohl(dtype));
 
 	if (cookie->nlen != nlen || memcmp(cookie->name,name,nlen)!=0) {
 		_leave(" = 0 [no]");
@@ -471,7 +469,7 @@ static struct dentry *afs_dir_lookup(struct inode *dir, struct dentry *dentry)
 	}
 
 	dentry->d_op = &afs_fs_dentry_operations;
-	dentry->d_fsdata = (void*) (unsigned) vnode->status.version;
+	dentry->d_fsdata = (void*) (unsigned long) vnode->status.version;
 
 	d_add(dentry,inode);
 	_leave(" = 0 { vn=%u u=%u } -> { ino=%lu v=%lu }",
@@ -500,15 +498,9 @@ static int afs_d_revalidate(struct dentry *dentry, int flags)
 	_enter("%s,%x",dentry->d_name.name,flags);
 
 	/* lock down the parent dentry so we can peer at it */
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 	read_lock(&dparent_lock);
 	parent = dget(dentry->d_parent);
 	read_unlock(&dparent_lock);
-#else
-	lock_kernel();
-	parent = dget(dentry->d_parent);
-	unlock_kernel();
-#endif
 
 	dir = parent->d_inode;
 	inode = dentry->d_inode;
@@ -541,10 +533,10 @@ static int afs_d_revalidate(struct dentry *dentry, int flags)
 		goto out_bad;
 	}
 
-	if ((unsigned)dentry->d_fsdata != (unsigned)AFS_FS_I(dir)->status.version) {
-		_debug("%s: parent changed %u -> %u",
+	if ((unsigned long)dentry->d_fsdata != (unsigned long)AFS_FS_I(dir)->status.version) {
+		_debug("%s: parent changed %lu -> %u",
 		       dentry->d_name.name,
-		       (unsigned)dentry->d_fsdata,
+		       (unsigned long)dentry->d_fsdata,
 		       (unsigned)AFS_FS_I(dir)->status.version);
 
 		/* search the directory for this vnode */
@@ -585,7 +577,7 @@ static int afs_d_revalidate(struct dentry *dentry, int flags)
 			goto out_bad;
 		}
 
-		dentry->d_fsdata = (void*) (unsigned) AFS_FS_I(dir)->status.version;
+		dentry->d_fsdata = (void*) (unsigned long) AFS_FS_I(dir)->status.version;
 	}
 
  out_valid:

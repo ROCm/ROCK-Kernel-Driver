@@ -12,6 +12,14 @@ config ALPHA
 	  port. The Alpha Linux project has a home page at
 	  <http://www.alphalinux.org/>.
 
+config MMU
+	bool
+	default y
+
+config SWAP
+	bool
+	default y
+
 config UID16
 	bool
 
@@ -521,6 +529,9 @@ config ALPHA_LARGE_VMALLOC
 	  much vmalloc space as is available.
 
 	  Say N unless you know you need gobs and gobs of vmalloc space.
+
+config VERBOSE_MCHECK
+	bool "Verbose Machine Checks"
 
 source "drivers/pci/Kconfig"
 

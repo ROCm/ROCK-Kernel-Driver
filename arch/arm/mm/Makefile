@@ -34,7 +34,7 @@ p-$(CONFIG_CPU_SA110)	+= proc-sa110.o   tlb-v4wb.o copypage-v4wb.o abort-ev4.o  
 p-$(CONFIG_CPU_SA1100)	+= proc-sa110.o   tlb-v4wb.o copypage-v4mc.o abort-ev4.o   minicache.o
 
 # ARMv5
-p-$(CONFIG_CPU_ARM926T)	+= proc-arm926.o  tlb-v4wb.o copypage-v4wb.o abort-ev5ej.o
+p-$(CONFIG_CPU_ARM926T)	+= proc-arm926.o  tlb-v4wb.o copypage-v4wb.o abort-ev5tej.o
 p-$(CONFIG_CPU_XSCALE)	+= proc-xscale.o  tlb-v4wb.o copypage-xscale.o abort-xscale.o minicache.o
 
 obj-y		+= $(sort $(p-y))

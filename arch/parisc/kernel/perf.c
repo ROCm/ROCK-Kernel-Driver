@@ -49,11 +49,11 @@
 #include <linux/miscdevice.h>
 #include <linux/spinlock.h>
 
-#include <asm/gsc.h>
 #include <asm/uaccess.h>
 #include <asm/perf.h>
 #include <asm/processor.h>
 #include <asm/runway.h>
+#include <asm/io.h>		/* for __raw_read() */
 
 #include "perf_images.h"
 

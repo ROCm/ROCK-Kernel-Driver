@@ -213,14 +213,29 @@ expand(struct zone *zone, struct page *page,
 	return page;
 }
 
+static inline void set_page_refs(struct page *page, int order)
+{
+#ifdef CONFIG_MMU
+	set_page_count(page, 1);
+#else
+	int i;
+
+	/*
+	 * We need to reference all the pages for this order, otherwise if
+	 * anyone accesses one of the pages with (get/put) it will be freed.
+	 */
+	for (i = 0; i < (1 << order); i++)
+		set_page_count(page+i, 1);
+#endif /* CONFIG_MMU */
+}
+
 /*
  * This page is about to be returned from the page allocator
  */
-static void prep_new_page(struct page *page)
+static void prep_new_page(struct page *page, int order)
 {
-	if (	page->mapping ||
-		page_mapped(page) ||
-		(page->flags & (
+	if (page->mapping || page_mapped(page) ||
+	    (page->flags & (
 			1 << PG_private	|
 			1 << PG_locked	|
 			1 << PG_lru	|
@@ -232,7 +247,7 @@ static void prep_new_page(struct page *page)
 	page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
 			1 << PG_referenced | 1 << PG_arch_1 |
 			1 << PG_checked);
-	set_page_count(page, 1);
+	set_page_refs(page, order);
 }
 
 /* 
@@ -299,7 +314,7 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 	list_for_each(curr, &temp) {
 		page = list_entry(curr, struct page, list);
 		BUG_ON(bad_range(zone, page));
-		prep_new_page(page);
+		prep_new_page(page, order);
 	}
 	list_splice(&temp, list->prev);
 	return allocated;
@@ -390,7 +405,7 @@ static struct page *buffered_rmqueue(struct zone *zone, int order, int cold)
 
 	if (page != NULL) {
 		BUG_ON(bad_range(zone, page));
-		prep_new_page(page);
+		prep_new_page(page, order);
 	}
 	return page;
 }

@@ -426,7 +426,7 @@ int afs_rxfs_fetch_file_data(afs_server_t *server,
 	int ret;
 	u32 *bp;
 
-	_enter("%p,{fid={%u,%u,%u},sz=%u,of=%lu}",
+	_enter("%p,{fid={%u,%u,%u},sz=%Zu,of=%lu}",
 	       server,
 	       desc->fid.vid,
 	       desc->fid.vnode,

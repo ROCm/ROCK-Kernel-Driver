@@ -14,6 +14,14 @@ config SUPERH
 	  gaming console.  The SuperH port has a home page at
 	  <http://www.sh-linux.org/>.
 
+config MMU
+	bool
+	default y
+
+config SWAP
+	bool
+	default y
+
 config UID16
 	bool
 	default y

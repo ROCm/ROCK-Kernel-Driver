@@ -73,10 +73,8 @@ struct system_cpuinfo_parisc {
 ** Per CPU data structure - ie varies per CPU.
 */
 struct cpuinfo_parisc {
-
-	struct irq_region *region;
-	unsigned long it_value;     /* Interval Timer value at last timer Intr */
-	unsigned long it_delta;     /* Interval Timer delta (tic_10ms / HZ * 100) */
+	unsigned long it_value;     /* Interval Timer at last timer Intr */
+	unsigned long it_delta;     /* Interval delta (tic_10ms / HZ * 100) */
 	unsigned long irq_count;    /* number of IRQ's since boot */
 	unsigned long irq_max_cr16; /* longest time to handle a single IRQ */
 	unsigned long cpuid;        /* aka slot_number or set to NO_PROC_ID */
@@ -296,12 +294,6 @@ extern void release_thread(struct task_struct *);
 extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 
 extern void map_hpux_gateway_page(struct task_struct *tsk, struct mm_struct *mm);
-
-#define copy_segments(tsk, mm)  do { \
-					if (tsk->personality == PER_HPUX)  \
-					    map_hpux_gateway_page(tsk,mm); \
-				} while (0)
-#define release_segments(mm)	do { } while (0)
 
 static inline unsigned long get_wchan(struct task_struct *p)
 {

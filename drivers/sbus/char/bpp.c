@@ -303,6 +303,7 @@ static void bpp_wake_up(unsigned long val)
 
 static void snooze(unsigned long snooze_time, unsigned minor)
 {
+      init_timer(&instances[minor].timer_list);
       instances[minor].timer_list.expires = jiffies + snooze_time + 1;
       instances[minor].timer_list.data    = minor;
       add_timer(&instances[minor].timer_list);

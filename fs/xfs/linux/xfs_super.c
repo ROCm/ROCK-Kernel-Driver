@@ -34,6 +34,8 @@
 #include <linux/bitops.h>
 #include <linux/blkdev.h>
 #include <linux/namei.h>
+#include <linux/pagemap.h>
+#include <linux/major.h>
 #include <linux/init.h>
 #include <linux/ctype.h>
 #include <linux/seq_file.h>
@@ -43,6 +45,10 @@
 extern int  xfs_init(void);
 extern void xfs_cleanup(void);
 
+#ifndef EVMS_MAJOR
+# define EVMS_MAJOR		117
+#endif
+
 /* For kernels which have the s_maxbytes field - set it */
 #ifdef MAX_NON_LFS
 # define set_max_bytes(sb)	((sb)->s_maxbytes = XFS_MAX_FILE_OFFSET)
@@ -50,7 +56,7 @@ extern void xfs_cleanup(void);
 # define set_max_bytes(sb)	do { } while (0)
 #endif
 
-#ifdef CONFIG_FS_POSIX_ACL
+#ifdef CONFIG_XFS_POSIX_ACL
 # define set_posix_acl(sb)	((sb)->s_flags |= MS_POSIXACL)
 #else
 # define set_posix_acl(sb)	do { } while (0)
@@ -113,13 +119,9 @@ xfs_parseargs(
 	struct xfs_mount_args	*args)
 {
 	char			*this_char, *value, *eov;
-	int			logbufs = -1;
-	int			logbufsize = -1;
 	int			dsunit, dswidth, vol_dsunit, vol_dswidth;
+	int			logbufs, logbufsize;
 	int			iosize;
-	int			rval = 1;	/* failure is default */
-
-	iosize = dsunit = dswidth = vol_dsunit = vol_dswidth = 0;
 
 	/* Default to 32 bit inodes on linux all the time */
 	args->flags |= XFSMNT_32BITINODES;
@@ -129,10 +131,12 @@ xfs_parseargs(
 		args->flags |= XFSMNT_NOATIME;
 
 	if (!options) {
-		args->logbufs = logbufs;
-		args->logbufsize = logbufsize;
+		args->logbufs = args->logbufsize = -1;
 		return 0;
 	}
+
+	logbufs = logbufsize = -1;
+	iosize = dsunit = dswidth = vol_dsunit = vol_dswidth = 0;
 
 	while ((this_char = strsep(&options, ",")) != NULL) {
 		if (!*this_char)
@@ -141,10 +145,20 @@ xfs_parseargs(
 			*value++ = 0;
 
 		if (!strcmp(this_char, MNTOPT_LOGBUFS)) {
+			if (!value || !*value) {
+				printk("XFS: %s option requires an argument\n",
+					MNTOPT_LOGBUFS);
+				return -EINVAL;
+			}
 			logbufs = simple_strtoul(value, &eov, 10);
 		} else if (!strcmp(this_char, MNTOPT_LOGBSIZE)) {
-			int in_kilobytes = 0;
+			int	in_kilobytes = 0;
 
+			if (!value || !*value) {
+				printk("XFS: %s option requires an argument\n",
+					MNTOPT_LOGBSIZE);
+				return -EINVAL;
+			}
 			if (toupper(value[strlen(value)-1]) == 'K') {
 				in_kilobytes = 1;
 				value[strlen(value)-1] = '\0';
@@ -153,8 +167,18 @@ xfs_parseargs(
 			if (in_kilobytes)
 				logbufsize = logbufsize * 1024;
 		} else if (!strcmp(this_char, MNTOPT_LOGDEV)) {
+			if (!value || !*value) {
+				printk("XFS: %s option requires an argument\n",
+					MNTOPT_LOGDEV);
+				return -EINVAL;
+			}
 			strncpy(args->logname, value, MAXNAMELEN);
 		} else if (!strcmp(this_char, MNTOPT_MTPT)) {
+			if (!value || !*value) {
+				printk("XFS: %s option requires an argument\n",
+					MNTOPT_MTPT);
+				return -EINVAL;
+			}
 			strncpy(args->mtpt, value, MAXNAMELEN);
 #if CONFIG_XFS_DMAPI
 		} else if (!strcmp(this_char, MNTOPT_DMAPI)) {
@@ -165,11 +189,21 @@ xfs_parseargs(
 		} else if (!strcmp(this_char, MNTOPT_DMAPI) ||
 			   !strcmp(this_char, MNTOPT_XDSM)) {
 			printk("XFS: this kernel does not support dmapi/xdsm.\n");
-			return rval;
+			return -EINVAL;
 #endif
 		} else if (!strcmp(this_char, MNTOPT_RTDEV)) {
+			if (!value || !*value) {
+				printk("XFS: %s option requires an argument\n",
+					MNTOPT_RTDEV);
+				return -EINVAL;
+			}
 			strncpy(args->rtname, value, MAXNAMELEN);
 		} else if (!strcmp(this_char, MNTOPT_BIOSIZE)) {
+			if (!value || !*value) {
+				printk("XFS: %s option requires an argument\n",
+					MNTOPT_BIOSIZE); 
+				return -EINVAL;
+			}
 			iosize = simple_strtoul(value, &eov, 10);
 			args->flags |= XFSMNT_IOSIZE;
 			args->iosizelog = (uint8_t) iosize;
@@ -183,8 +217,9 @@ xfs_parseargs(
 #ifdef XFS_BIG_FILESYSTEMS
 			args->flags |= XFSMNT_INO64;
 #else
-			printk("XFS: ino64 option not allowed on this system\n");
-			return rval;
+			printk("XFS: %s option not allowed on this system\n",
+				MNTOPT_INO64);
+			return -EINVAL;
 #endif
 		} else if (!strcmp(this_char, MNTOPT_UQUOTA)) {
 			args->flags |= XFSMNT_UQUOTA | XFSMNT_UQUOTAENF;
@@ -204,8 +239,18 @@ xfs_parseargs(
 		} else if (!strcmp(this_char, MNTOPT_NOALIGN)) {
 			args->flags |= XFSMNT_NOALIGN;
 		} else if (!strcmp(this_char, MNTOPT_SUNIT)) {
+			if (!value || !*value) {
+				printk("XFS: %s option requires an argument\n",
+					MNTOPT_SUNIT);
+				return -EINVAL;
+			}
 			dsunit = simple_strtoul(value, &eov, 10);
 		} else if (!strcmp(this_char, MNTOPT_SWIDTH)) {
+			if (!value || !*value) {
+				printk("XFS: %s option requires an argument\n",
+					MNTOPT_SWIDTH);
+				return -EINVAL;
+			}
 			dswidth = simple_strtoul(value, &eov, 10);
 		} else if (!strcmp(this_char, MNTOPT_NOUUID)) {
 			args->flags |= XFSMNT_NOUUID;
@@ -218,33 +263,33 @@ printk("XFS: osyncisdsync is now the default, option is deprecated.\n");
 printk("XFS: irixsgid is now a sysctl(2) variable, option is deprecated.\n");
 		} else {
 			printk("XFS: unknown mount option [%s].\n", this_char);
-			return rval;
+			return -EINVAL;
 		}
 	}
 
 	if (args->flags & XFSMNT_NORECOVERY) {
 		if ((flags & MS_RDONLY) == 0) {
 			printk("XFS: no-recovery mounts must be read-only.\n");
-			return rval;
+			return -EINVAL;
 		}
 	}
 
 	if ((args->flags & XFSMNT_NOALIGN) && (dsunit || dswidth)) {
 		printk(
 	"XFS: sunit and swidth options incompatible with the noalign option\n");
-		return rval;
+		return -EINVAL;
 	}
 
 	if ((dsunit && !dswidth) || (!dsunit && dswidth)) {
 		printk("XFS: sunit and swidth must be specified together\n");
-		return rval;
+		return -EINVAL;
 	}
 
 	if (dsunit && (dswidth % dsunit != 0)) {
 		printk(
 	"XFS: stripe width (%d) must be a multiple of the stripe unit (%d)\n",
 			dswidth, dsunit);
-		return rval;
+		return -EINVAL;
 	}
 
 	if ((args->flags & XFSMNT_NOALIGN) != XFSMNT_NOALIGN) {
@@ -332,6 +377,160 @@ xfs_showargs(
 	return 0;
 }
 
+STATIC __inline__ void
+xfs_set_inodeops(
+	struct inode		*inode)
+{
+	vnode_t			*vp = LINVFS_GET_VP(inode);
+
+	if (vp->v_type == VNON) {
+		make_bad_inode(inode);
+	} else if (S_ISREG(inode->i_mode)) {
+		inode->i_op = &linvfs_file_inode_operations;
+		inode->i_fop = &linvfs_file_operations;
+		inode->i_mapping->a_ops = &linvfs_aops;
+	} else if (S_ISDIR(inode->i_mode)) {
+		inode->i_op = &linvfs_dir_inode_operations;
+		inode->i_fop = &linvfs_dir_operations;
+	} else if (S_ISLNK(inode->i_mode)) {
+		inode->i_op = &linvfs_symlink_inode_operations;
+		if (inode->i_blocks)
+			inode->i_mapping->a_ops = &linvfs_aops;
+	} else {
+		inode->i_op = &linvfs_file_inode_operations;
+		init_special_inode(inode, inode->i_mode,
+					kdev_t_to_nr(inode->i_rdev));
+	}
+}
+
+STATIC __inline__ void
+xfs_revalidate_inode(
+	xfs_mount_t	*mp,
+	vnode_t		*vp,
+	xfs_inode_t	*ip)
+{
+	struct inode	*inode = LINVFS_GET_IP(vp);
+
+	inode->i_mode	= (ip->i_d.di_mode & MODEMASK) | VTTOIF(vp->v_type);
+	inode->i_nlink	= ip->i_d.di_nlink;
+	inode->i_uid	= ip->i_d.di_uid;
+	inode->i_gid 	= ip->i_d.di_gid;
+	if (((1 << vp->v_type) & ((1<<VBLK) | (1<<VCHR))) == 0) {
+		inode->i_rdev	= NODEV;
+	} else {
+		xfs_dev_t dev = ip->i_df.if_u2.if_rdev;
+		inode->i_rdev	= XFS_DEV_TO_KDEVT(dev);
+	}
+	inode->i_blksize = PAGE_CACHE_SIZE;
+	inode->i_generation = ip->i_d.di_gen;
+	inode->i_size	= ip->i_d.di_size;
+	inode->i_blocks =
+		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
+	inode->i_atime	= ip->i_d.di_atime.t_sec;
+	inode->i_mtime	= ip->i_d.di_mtime.t_sec;
+	inode->i_ctime	= ip->i_d.di_ctime.t_sec;
+
+	vp->v_flag &= ~VMODIFIED;
+}
+
+void
+xfs_initialize_vnode(
+	bhv_desc_t	*bdp,
+	vnode_t		*vp,
+	bhv_desc_t	*inode_bhv,
+	int		unlock)
+{
+	xfs_inode_t	*ip = XFS_BHVTOI(inode_bhv);
+	struct inode	*inode = LINVFS_GET_IP(vp);
+
+	if (vp->v_fbhv == NULL) {
+		vp->v_vfsp = bhvtovfs(bdp);
+		bhv_desc_init(&(ip->i_bhv_desc), ip, vp, &xfs_vnodeops);
+		bhv_insert_initial(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
+	}
+
+	vp->v_type = IFTOVT(ip->i_d.di_mode);
+	/* Have we been called during the new inode create process,
+	 * in which case we are too early to fill in the linux inode.
+	 */
+	if (vp->v_type == VNON)
+		return;
+
+	xfs_revalidate_inode(XFS_BHVTOM(bdp), vp, ip);
+
+	/* For new inodes we need to set the ops vectors,
+	 * and unlock the inode.
+	 */
+	if (unlock && (inode->i_state & I_NEW)) {
+		xfs_set_inodeops(inode);
+		unlock_new_inode(inode);
+	}
+}
+
+int
+xfs_blkdev_get(
+	const char		*name,
+	struct block_device	**bdevp)
+{
+	struct nameidata	nd;
+	int			error;
+
+	error = path_lookup(name, LOOKUP_FOLLOW, &nd);
+	if (error) {
+		printk("XFS: Invalid device [%s], error=%d\n", name, error);
+		return -error;
+	}
+
+	/* I think we actually want bd_acquire here..  --hch */
+	*bdevp = bdget(kdev_t_to_nr(nd.dentry->d_inode->i_rdev));
+	if (*bdevp) {
+		error = blkdev_get(*bdevp, FMODE_READ|FMODE_WRITE, 0, BDEV_FS);
+	} else {
+		error = -ENOMEM;
+	}
+
+	path_release(&nd);
+	return -error;
+}
+
+void
+xfs_blkdev_put(
+	struct block_device	*bdev)
+{
+	if (bdev)
+		blkdev_put(bdev, BDEV_FS);
+}
+
+void
+xfs_free_buftarg(
+	xfs_buftarg_t		*btp)
+{
+	pagebuf_delwri_flush(btp, PBDF_WAIT, NULL);
+	kfree(btp);
+}
+
+xfs_buftarg_t *
+xfs_alloc_buftarg(
+	struct block_device	*bdev)
+{
+	xfs_buftarg_t		*btp;
+
+	btp = kmem_zalloc(sizeof(*btp), KM_SLEEP);
+
+	btp->pbr_dev =  bdev->bd_dev;
+	btp->pbr_bdev = bdev;
+	btp->pbr_mapping = bdev->bd_inode->i_mapping;
+	btp->pbr_blocksize = PAGE_CACHE_SIZE;
+
+	switch (MAJOR(btp->pbr_dev)) {
+	case MD_MAJOR:
+	case EVMS_MAJOR:
+		btp->pbr_flags = PBR_ALIGNED_ONLY;
+		break;
+	}
+
+	return btp;
+}
 
 STATIC kmem_cache_t * linvfs_inode_cachep;
 
@@ -452,6 +651,7 @@ linvfs_fill_super(
 	sb->s_dirt = 1;
 	sb->s_blocksize = statvfs.f_bsize;
 	sb->s_blocksize_bits = ffs(statvfs.f_bsize) - 1;
+	set_posix_acl(sb);
 
 	VFS_ROOT(vfsp, &rootvp, error);
 	if (error)
@@ -479,9 +679,8 @@ linvfs_fill_super(
 			goto fail_vnrele;
 		}
 	}
-	set_posix_acl(sb);
 
-	vn_trace_exit(rootvp, "linvfs_read_super", (inst_t *)__return_address);
+	vn_trace_exit(rootvp, __FUNCTION__, (inst_t *)__return_address);
 
 	kfree(args);
 	return 0;
@@ -505,38 +704,12 @@ out_null:
 	return -error;
 }
 
-void
-linvfs_set_inode_ops(
-	struct inode		*inode)
-{
-	vnode_t			*vp = LINVFS_GET_VP(inode);
-
-	if (vp->v_type == VNON) {
-		make_bad_inode(inode);
-	} else if (S_ISREG(inode->i_mode)) {
-		inode->i_op = &linvfs_file_inode_operations;
-		inode->i_fop = &linvfs_file_operations;
-		inode->i_mapping->a_ops = &linvfs_aops;
-	} else if (S_ISDIR(inode->i_mode)) {
-		inode->i_op = &linvfs_dir_inode_operations;
-		inode->i_fop = &linvfs_dir_operations;
-	} else if (S_ISLNK(inode->i_mode)) {
-		inode->i_op = &linvfs_symlink_inode_operations;
-		if (inode->i_blocks)
-			inode->i_mapping->a_ops = &linvfs_aops;
-	} else {
-		inode->i_op = &linvfs_file_inode_operations;
-		init_special_inode(inode, inode->i_mode,
-					kdev_t_to_nr(inode->i_rdev));
-	}
-}
-
 /*
  * We do not actually write the inode here, just mark the
  * super block dirty so that sync_supers calls us and
  * forces the flush.
  */
-void
+STATIC void
 linvfs_write_inode(
 	struct inode		*inode,
 	int			sync)
@@ -545,9 +718,7 @@ linvfs_write_inode(
 	int			error, flags = FLUSH_INODE;
 
 	if (vp) {
-		vn_trace_entry(vp, "linvfs_write_inode",
-					(inst_t *)__return_address);
-
+		vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
 		if (sync)
 			flags |= FLUSH_SYNC;
 		VOP_IFLUSH(vp, flags, error);
@@ -556,7 +727,7 @@ linvfs_write_inode(
 	}
 }
 
-void
+STATIC void
 linvfs_clear_inode(
 	struct inode		*inode)
 {
@@ -564,17 +735,15 @@ linvfs_clear_inode(
 
 	if (vp) {
 		vn_rele(vp);
-		vn_trace_entry(vp, "linvfs_clear_inode",
-					(inst_t *)__return_address);
+		vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
 		/*
 		 * Do all our cleanup, and remove this vnode.
 		 */
-		vp->v_flag |= VPURGE;
 		vn_remove(vp);
 	}
 }
 
-void
+STATIC void
 linvfs_put_inode(
 	struct inode		*ip)
 {
@@ -585,7 +754,7 @@ linvfs_put_inode(
 		VOP_RELEASE(vp, error);
 }
 
-void
+STATIC void
 linvfs_put_super(
 	struct super_block	*sb)
 {
@@ -595,14 +764,14 @@ linvfs_put_super(
 	VFS_DOUNMOUNT(vfsp, 0, NULL, NULL, error);
 	if (error) {
 		printk("XFS unmount got error %d\n", error);
-		printk("linvfs_put_super: vfsp/0x%p left dangling!\n", vfsp);
+		printk("%s: vfsp/0x%p left dangling!\n", __FUNCTION__, vfsp);
 		return;
 	}
 
 	vfs_deallocate(vfsp);
 }
 
-void
+STATIC void
 linvfs_write_super(
 	struct super_block	*sb)
 {
@@ -616,7 +785,7 @@ linvfs_write_super(
 		NULL, error);
 }
 
-int
+STATIC int
 linvfs_statfs(
 	struct super_block	*sb,
 	struct statfs		*statp)
@@ -625,11 +794,10 @@ linvfs_statfs(
 	int			error;
 
 	VFS_STATVFS(vfsp, statp, NULL, error);
-
 	return error;
 }
 
-int
+STATIC int
 linvfs_remount(
 	struct super_block	*sb,
 	int			*flags,
@@ -677,7 +845,7 @@ out:
 	return error;
 }
 
-void
+STATIC void
 linvfs_freeze_fs(
 	struct super_block	*sb)
 {
@@ -693,7 +861,7 @@ linvfs_freeze_fs(
 	VN_RELE(vp);
 }
 
-void
+STATIC void
 linvfs_unfreeze_fs(
 	struct super_block	*sb)
 {
@@ -706,7 +874,6 @@ linvfs_unfreeze_fs(
 	VOP_IOCTL(vp, LINVFS_GET_IP(vp), NULL, XFS_IOC_THAW, 0, error);
 	VN_RELE(vp);
 }
-
 
 STATIC struct dentry *
 linvfs_get_parent(
@@ -744,6 +911,37 @@ linvfs_get_parent(
 	return parent;
 }
 
+STATIC struct dentry *
+linvfs_get_dentry(
+	struct super_block	*sb,
+	void			*data)
+{
+	vnode_t			*vp;
+	struct inode		*inode;
+	struct dentry		*result;
+	xfs_fid2_t		xfid;
+	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
+	int			error;
+
+	xfid.fid_len = sizeof(xfs_fid2_t) - sizeof(xfid.fid_len);
+	xfid.fid_pad = 0;
+	xfid.fid_gen = ((__u32 *)data)[1];
+	xfid.fid_ino = ((__u32 *)data)[0];
+
+	VFS_VGET(vfsp, &vp, (fid_t *)&xfid, error);
+	if (error || vp == NULL)
+		return ERR_PTR(-ESTALE) ;
+
+	inode = LINVFS_GET_IP(vp);
+	result = d_alloc_anon(inode);
+        if (!result) {
+		iput(inode);
+		return ERR_PTR(-ENOMEM);
+	}
+	result->d_vfs_flags |= DCACHE_REFERENCED;
+	return result;
+}
+
 STATIC struct super_block *
 linvfs_get_sb(
 	struct file_system_type	*fs_type,
@@ -754,10 +952,6 @@ linvfs_get_sb(
 	return get_sb_bdev(fs_type, flags, dev_name, data, linvfs_fill_super);
 }
 
-STATIC struct export_operations linvfs_export_ops = {
-	.get_parent		= linvfs_get_parent,
-};
-
 STATIC int
 linvfs_show_options(
 	struct seq_file		*m,
@@ -767,6 +961,11 @@ linvfs_show_options(
 
 	return xfs_showargs(vfsp, m);
 }
+
+STATIC struct export_operations linvfs_export_ops = {
+	.get_parent		= linvfs_get_parent,
+	.get_dentry		= linvfs_get_dentry,
+};
 
 STATIC struct super_operations linvfs_sops = {
 	.alloc_inode		= linvfs_alloc_inode,

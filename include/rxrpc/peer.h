@@ -57,8 +57,8 @@ struct rxrpc_peer
 	/* calculated RTT cache */
 #define RXRPC_RTT_CACHE_SIZE 32
 	suseconds_t		rtt;		/* current RTT estimate (in uS) */
-	unsigned short		rtt_point;	/* next entry at which to insert */
-	unsigned short		rtt_usage;	/* amount of cache actually used */
+	unsigned		rtt_point;	/* next entry at which to insert */
+	unsigned		rtt_usage;	/* amount of cache actually used */
 	suseconds_t		rtt_cache[RXRPC_RTT_CACHE_SIZE]; /* calculated RTT cache */
 };
 

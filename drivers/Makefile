@@ -6,6 +6,7 @@
 #
 
 obj-$(CONFIG_PCI)		+= pci/
+obj-$(CONFIG_PARISC)		+= parisc/
 obj-$(CONFIG_ACPI)		+= acpi/
 obj-y				+= serial/
 obj-$(CONFIG_PARPORT)		+= parport/

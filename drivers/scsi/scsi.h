@@ -164,8 +164,6 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 #define SCSI_OWNER_BH_HANDLER     0x104
 #define SCSI_OWNER_NOBODY         0x105
 
-#define COMMAND_SIZE(opcode) scsi_command_size[((opcode) >> 5) & 7]
-
 #define IDENTIFY_BASE       0x80
 #define IDENTIFY(can_disconnect, lun)   (IDENTIFY_BASE |\
 		     ((can_disconnect) ?  0x40 : 0) |\
@@ -415,7 +413,6 @@ extern unsigned int scsi_dma_free_sectors;	/* How much room do we have left */
 extern unsigned int scsi_need_isa_buffer;	/* True if some devices need indirection
 						   * buffers */
 extern volatile int in_scan_scsis;
-extern const unsigned char scsi_command_size[8];
 
 extern struct bus_type scsi_driverfs_bus_type;
 
@@ -469,6 +466,8 @@ extern void scsi_bottom_half_handler(void);
 extern void scsi_release_commandblocks(Scsi_Device * SDpnt);
 extern void scsi_build_commandblocks(Scsi_Device * SDpnt);
 extern void scsi_adjust_queue_depth(Scsi_Device *, int, int);
+extern int scsi_slave_attach(struct scsi_device *sdev);
+extern void scsi_slave_detach(struct scsi_device *sdev);
 extern void scsi_done(Scsi_Cmnd * SCpnt);
 extern void scsi_finish_command(Scsi_Cmnd *);
 extern int scsi_retry_command(Scsi_Cmnd *);
@@ -481,6 +480,9 @@ extern void scsi_do_cmd(Scsi_Cmnd *, const void *cmnd,
 			int timeout, int retries);
 extern int scsi_dev_init(void);
 extern int scsi_mlqueue_insert(struct scsi_cmnd *, int);
+extern void scsi_detect_device(struct scsi_device *);
+extern int scsi_attach_device(struct scsi_device *);
+extern void scsi_detach_device(struct scsi_device *);
 
 /*
  * Newer request-based interfaces.

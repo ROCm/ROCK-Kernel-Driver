@@ -292,7 +292,7 @@ void __init sun4c_probe_vac(void)
 		switch (idprom->id_machtype) {
 
 		case (SM_SUN4|SM_4_110):
-			sun4c_vacinfo.type = NONE;
+			sun4c_vacinfo.type = VAC_NONE;
 			sun4c_vacinfo.num_bytes = 0;
 			sun4c_vacinfo.linesize = 0;
 			sun4c_vacinfo.do_hwflushes = 0;
@@ -301,21 +301,21 @@ void __init sun4c_probe_vac(void)
 			break;
 
 		case (SM_SUN4|SM_4_260):
-			sun4c_vacinfo.type = WRITE_BACK;
+			sun4c_vacinfo.type = VAC_WRITE_BACK;
 			sun4c_vacinfo.num_bytes = 128 * 1024;
 			sun4c_vacinfo.linesize = 16;
 			sun4c_vacinfo.do_hwflushes = 0;
 			break;
 
 		case (SM_SUN4|SM_4_330):
-			sun4c_vacinfo.type = WRITE_THROUGH;
+			sun4c_vacinfo.type = VAC_WRITE_THROUGH;
 			sun4c_vacinfo.num_bytes = 128 * 1024;
 			sun4c_vacinfo.linesize = 16;
 			sun4c_vacinfo.do_hwflushes = 0;
 			break;
 
 		case (SM_SUN4|SM_4_470):
-			sun4c_vacinfo.type = WRITE_BACK;
+			sun4c_vacinfo.type = VAC_WRITE_BACK;
 			sun4c_vacinfo.num_bytes = 128 * 1024;
 			sun4c_vacinfo.linesize = 32;
 			sun4c_vacinfo.do_hwflushes = 0;
@@ -326,7 +326,7 @@ void __init sun4c_probe_vac(void)
 			prom_halt();
 		};
 	} else {
-		sun4c_vacinfo.type = WRITE_THROUGH;
+		sun4c_vacinfo.type = VAC_WRITE_THROUGH;
 
 		if ((idprom->id_machtype == (SM_SUN4C | SM_4C_SS1)) ||
 		    (idprom->id_machtype == (SM_SUN4C | SM_4C_SS1PLUS))) {

@@ -33,7 +33,7 @@
 #include <xfs.h>
 #include <linux/posix_acl_xattr.h>
 
-STATIC int	xfs_acl_setmode(vnode_t *, xfs_acl_t *);
+STATIC int	xfs_acl_setmode(vnode_t *, xfs_acl_t *, int *);
 STATIC void	xfs_acl_filter_mode(mode_t, xfs_acl_t *);
 STATIC void	xfs_acl_get_endian(xfs_acl_t *);
 STATIC int	xfs_acl_access(uid_t, gid_t, xfs_acl_t *, mode_t, cred_t *);
@@ -279,6 +279,7 @@ xfs_acl_vset(
 	posix_acl_xattr_header	*ext_acl = acl;
 	xfs_acl_t		*xfs_acl;
 	int			error;
+	int			basicperms = 0; /* more than std unix perms? */
 
 	if (!acl)
 		return -EINVAL;
@@ -303,8 +304,21 @@ xfs_acl_vset(
 
 	/* Incoming ACL exists, set file mode based on its value */
 	if (kind == _ACL_TYPE_ACCESS)
-		xfs_acl_setmode(vp, xfs_acl);
-	xfs_acl_set_attr(vp, xfs_acl, kind, &error);
+		xfs_acl_setmode(vp, xfs_acl, &basicperms);
+
+	/*
+	 * If we have more than std unix permissions, set up the actual attr.
+	 * Otherwise, delete any existing attr.  This prevents us from
+	 * having actual attrs for permissions that can be stored in the
+	 * standard permission bits.
+	 */
+	if (!basicperms) {
+		xfs_acl_set_attr(vp, xfs_acl, kind, &error);
+	} else {
+		xfs_acl_vremove(vp, _ACL_TYPE_ACCESS);
+	}
+		
+
 out:
 	VN_RELE(vp);
 	_ACL_FREE(xfs_acl);
@@ -368,6 +382,38 @@ xfs_acl_allow_set(
 }
 
 /*
+ * Look for any effective exec access, to allow CAP_DAC_OVERRIDE for exec.
+ * Ignore checking for exec in USER_OBJ when there is no mask, because
+ * in this "minimal acl" case we don't have any actual acls, and we
+ * won't even be here.
+ */
+STATIC int
+xfs_acl_find_any_exec(
+	xfs_acl_t	*fap)
+{
+	int		i;
+	int		masked_aces = 0;
+	int		mask = 0;
+
+	for (i = 0; i < fap->acl_cnt; i++) {
+		if (fap->acl_entry[i].ae_perm & ACL_EXECUTE) {
+			if (fap->acl_entry[i].ae_tag & (ACL_USER_OBJ|ACL_OTHER))
+				return 1;
+
+			if (fap->acl_entry[i].ae_tag == ACL_MASK)
+				mask = fap->acl_entry[i].ae_perm;
+			else
+				masked_aces |= fap->acl_entry[i].ae_perm;
+
+			if ((mask & masked_aces) & ACL_EXECUTE)
+				return 1;
+		}
+	}
+
+	return 0;
+}
+
+/*
  * The access control process to determine the access permission:
  *	if uid == file owner id, use the file owner bits.
  *	if gid == file owner group id, use the file group bits.
@@ -376,19 +422,25 @@ xfs_acl_allow_set(
  *	until all acl entries are exhausted. The final permission produced
  *	by matching acl entry or entries needs to be & with group permission.
  *	if not owner, owning group, or matching entry in ACL, use file
- *	other bits.
+ *	other bits.  Don't allow CAP_DAC_OVERRIDE on exec access unless
+ *	there is some effective exec access somewhere.
  */
 STATIC int
 xfs_acl_capability_check(
 	mode_t		mode,
-	cred_t		*cr)
+	cred_t		*cr,
+	xfs_acl_t	*fap)
 {
 	if ((mode & ACL_READ) && !capable_cred(cr, CAP_DAC_READ_SEARCH))
 		return EACCES;
 	if ((mode & ACL_WRITE) && !capable_cred(cr, CAP_DAC_OVERRIDE))
 		return EACCES;
-	if ((mode & ACL_EXECUTE) && !capable_cred(cr, CAP_DAC_OVERRIDE))
+	if ((mode & ACL_EXECUTE) &&
+	    (!capable_cred(cr, CAP_DAC_OVERRIDE) ||
+             !xfs_acl_find_any_exec(fap))) {
 		return EACCES;
+	}
+
 	return 0;
 }
 
@@ -493,7 +545,8 @@ xfs_acl_access(
 	case 0:
 		break;
 	}
-	return xfs_acl_capability_check(md, cr);
+
+	return xfs_acl_capability_check(md, cr, fap);
 }
 
 /*
@@ -679,6 +732,7 @@ xfs_acl_inherit(
 {
 	xfs_acl_t	*cacl;
 	int		error = 0;
+	int		basicperms = 0;
 
 	/*
 	 * If the parent does not have a default ACL, or it's an
@@ -702,7 +756,7 @@ xfs_acl_inherit(
 
 	memcpy(cacl, pdaclp, sizeof(xfs_acl_t));
 	xfs_acl_filter_mode(vap->va_mode, cacl);
-	xfs_acl_setmode(vp, cacl);
+	xfs_acl_setmode(vp, cacl, &basicperms);
 
 	/*
 	 * Set the Default and Access ACL on the file.	The mode is already
@@ -713,7 +767,7 @@ xfs_acl_inherit(
 	 */
 	if (vp->v_type == VDIR)
 		xfs_acl_set_attr(vp, pdaclp, _ACL_TYPE_DEFAULT, &error);
-	if (!error)
+	if (!error && !basicperms)
 		xfs_acl_set_attr(vp, cacl, _ACL_TYPE_ACCESS, &error);
 	_ACL_FREE(cacl);
 	return error;
@@ -729,12 +783,15 @@ xfs_acl_inherit(
 STATIC int
 xfs_acl_setmode(
 	vnode_t		*vp,
-	xfs_acl_t	*acl)
+	xfs_acl_t	*acl,
+	int		*basicperms)
 {
 	vattr_t		va;
 	xfs_acl_entry_t *ap;
 	xfs_acl_entry_t *gap = NULL;
 	int		i, error, nomask = 1;
+
+	*basicperms = 1;
 
 	if (acl->acl_cnt == XFS_ACL_NOT_PRESENT)
 		return 0;
@@ -759,14 +816,16 @@ xfs_acl_setmode(
 		case ACL_GROUP_OBJ:
 			gap = ap;
 			break;
-		case ACL_MASK:
+		case ACL_MASK:	/* more than just standard modes */
 			nomask = 0;
 			va.va_mode |= ap->ae_perm << 3;
+			*basicperms = 0;
 			break;
 		case ACL_OTHER:
 			va.va_mode |= ap->ae_perm;
 			break;
-		default:
+		default:	/* more than just standard modes */
+			*basicperms = 0;
 			break;
 		}
 		ap++;

@@ -143,7 +143,7 @@
  * Yunzhou Li <yunzhou@strat.iol.unh.edu> finished this work.
  * Joe Finney <joe@comp.lancs.ac.uk> patched the driver to start
  * 2.00 cards correctly (2.4 GHz with frequency selection).
- * David Hinds <dhinds@hyper.stanford.edu> integrated the whole in his
+ * David Hinds <dahinds@users.sourceforge.net> integrated the whole in his
  * PCMCIA package (and bug corrections).
  *
  * I (Jean Tourrilhes - jt@hplb.hpl.hp.com) then started to make some

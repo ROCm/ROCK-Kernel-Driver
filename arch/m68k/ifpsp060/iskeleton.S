@@ -304,4 +304,4 @@ _I_CALL_TOP:
 |###########################################################################
 
 | 060 INTEGER KERNEL PACKAGE MUST GO HERE!!!
-	.include "isp.sa"
+#include "isp.sa"

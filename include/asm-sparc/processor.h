@@ -140,10 +140,6 @@ extern __inline__ void start_thread(struct pt_regs * regs, unsigned long pc,
 #define release_thread(tsk)		do { } while(0)
 extern pid_t kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 
-
-#define copy_segments(tsk, mm)		do { } while (0)
-#define release_segments(mm)		do { } while (0)
-
 #define get_wchan(__TSK) \
 ({	extern void scheduling_functions_start_here(void); \
 	extern void scheduling_functions_end_here(void); \

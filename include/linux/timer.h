@@ -3,6 +3,7 @@
 
 #include <linux/config.h>
 #include <linux/list.h>
+#include <linux/spinlock.h>
 
 struct tvec_t_base_s;
 
@@ -10,11 +11,25 @@ struct timer_list {
 	struct list_head entry;
 	unsigned long expires;
 
+	spinlock_t lock;
+	unsigned long magic;
+
 	void (*function)(unsigned long);
 	unsigned long data;
 
 	struct tvec_t_base_s *base;
 };
+
+#define TIMER_MAGIC	0x4b87ad6e
+
+#define TIMER_INITIALIZER(_function, _expires, _data) {		\
+		.function = (_function),			\
+		.expires = (_expires),				\
+		.data = (_data),				\
+		.base = NULL,					\
+		.magic = TIMER_MAGIC,				\
+		.lock = SPIN_LOCK_UNLOCKED,			\
+	}
 
 /***
  * init_timer - initialize a timer.
@@ -26,6 +41,8 @@ struct timer_list {
 static inline void init_timer(struct timer_list * timer)
 {
 	timer->base = NULL;
+	timer->magic = TIMER_MAGIC;
+	spin_lock_init(&timer->lock);
 }
 
 /***

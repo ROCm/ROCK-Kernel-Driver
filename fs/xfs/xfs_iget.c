@@ -31,8 +31,6 @@
  */
 
 #include <xfs.h>
-#include <linux/pagemap.h>
-
 
 /*
  * Initialize the inode hash table for the newly mounted file system.
@@ -108,36 +106,6 @@ xfs_chash_free(xfs_mount_t *mp)
 
 	kmem_free(mp->m_chash, mp->m_chsize*sizeof(xfs_chash_t));
 	mp->m_chash = NULL;
-}
-
-void
-xfs_revalidate_inode(
-	xfs_mount_t	*mp,
-	vnode_t		*vp,
-	xfs_inode_t	*ip)
-{
-	struct inode	*inode = LINVFS_GET_IP(vp);
-
-	inode->i_mode	= (ip->i_d.di_mode & MODEMASK) | VTTOIF(vp->v_type);
-	inode->i_nlink	= ip->i_d.di_nlink;
-	inode->i_uid	= ip->i_d.di_uid;
-	inode->i_gid 	= ip->i_d.di_gid;
-	if (((1 << vp->v_type) & ((1<<VBLK) | (1<<VCHR))) == 0) {
-		inode->i_rdev	= NODEV;
-	} else {
-		xfs_dev_t dev = ip->i_df.if_u2.if_rdev;
-		inode->i_rdev	= XFS_DEV_TO_KDEVT(dev);
-	}
-	inode->i_blksize = PAGE_CACHE_SIZE;
-	inode->i_generation = ip->i_d.di_gen;
-	inode->i_size	= ip->i_d.di_size;
-	inode->i_blocks =
-		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
-	inode->i_atime	= ip->i_d.di_atime.t_sec;
-	inode->i_mtime	= ip->i_d.di_mtime.t_sec;
-	inode->i_ctime	= ip->i_d.di_ctime.t_sec;
-
-	vp->v_flag &= ~VMODIFIED;
 }
 
 /*
