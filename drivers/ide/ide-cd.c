@@ -2906,7 +2906,6 @@ static struct ata_operations ide_cdrom_driver = {
 	check_media_change:	ide_cdrom_check_media_change,
 	revalidate:		ide_cdrom_revalidate,
 	capacity:		ide_cdrom_capacity,
-	proc:			NULL
 };
 
 /* options */

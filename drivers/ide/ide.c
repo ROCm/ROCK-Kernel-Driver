@@ -1921,12 +1921,6 @@ static int ide_release(struct inode * inode, struct file * file)
 	return 0;
 }
 
-#ifdef CONFIG_PROC_FS
-ide_proc_entry_t generic_subdriver_entries[] = {
-	{ NULL, 0, NULL, NULL }
-};
-#endif
-
 void ide_unregister(struct ata_channel *ch)
 {
 	struct gendisk *gd;
@@ -1983,9 +1977,6 @@ void ide_unregister(struct ata_channel *ch)
 			}
 		}
 	}
-#ifdef CONFIG_PROC_FS
-	destroy_proc_ide_drives(ch);
-#endif
 	spin_lock_irqsave(&ide_lock, flags);
 
 	/*
@@ -2208,9 +2199,6 @@ found:
 	if (!initializing) {
 		ideprobe_init();
 		revalidate_drives();
-#ifdef CONFIG_PROC_FS
-		create_proc_ide_interfaces();
-#endif
 		/* FIXME: Do we really have to call it second time here?! */
 		ide_driver_module();
 	}
@@ -3198,11 +3186,7 @@ int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driv
 	}
 	drive->revalidate = 1;
 	drive->suspend_reset = 0;
-#ifdef CONFIG_PROC_FS
-	ide_add_proc_entries(drive->proc, generic_subdriver_entries, drive);
-	if (ata_ops(drive))
-		ide_add_proc_entries(drive->proc, ata_ops(drive)->proc, drive);
-#endif
+
 	return 0;
 }
 
@@ -3232,11 +3216,6 @@ int ide_unregister_subdriver(struct ata_device *drive)
 
 #if defined(CONFIG_BLK_DEV_ISAPNP) && defined(CONFIG_ISAPNP) && defined(MODULE)
 	pnpide_init(0);
-#endif
-#ifdef CONFIG_PROC_FS
-	if (ata_ops(drive))
-		ide_remove_proc_entries(drive->proc, ata_ops(drive)->proc);
-	ide_remove_proc_entries(drive->proc, generic_subdriver_entries);
 #endif
 	auto_remove_settings(drive);
 	drive->driver = NULL;
@@ -3315,10 +3294,6 @@ EXPORT_SYMBOL(ide_revalidate_disk);
 EXPORT_SYMBOL(ide_cmd);
 EXPORT_SYMBOL(ide_delay_50ms);
 EXPORT_SYMBOL(ide_stall_queue);
-#ifdef CONFIG_PROC_FS
-EXPORT_SYMBOL(ide_add_proc_entries);
-EXPORT_SYMBOL(ide_remove_proc_entries);
-#endif
 EXPORT_SYMBOL(ide_add_setting);
 EXPORT_SYMBOL(ide_remove_setting);
 
@@ -3484,10 +3459,6 @@ static int __init ata_module_init(void)
 # endif
 #endif
 
-#ifdef CONFIG_PROC_FS
-	proc_ide_create();
-#endif
-
 	/*
 	 * Initialize all device type driver modules.
 	 */
@@ -3553,9 +3524,6 @@ static void __exit cleanup_ata(void)
 		ide_unregister(&ide_hwifs[h]);
 	}
 
-# ifdef CONFIG_PROC_FS
-	proc_ide_destroy();
-# endif
 	devfs_unregister(ide_devfs_handle);
 }
 

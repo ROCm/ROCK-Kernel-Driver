@@ -379,8 +379,7 @@ struct ata_device {
 
 	void		*driver_data;	/* extra driver data */
 	devfs_handle_t	de;		/* directory for device */
-	struct proc_dir_entry *proc;	/* /proc/ide/ directory entry */
-	struct ide_settings_s *settings;    /* /proc/ide/ drive settings */
+	struct ide_settings_s *settings;    /* ioctl entires */
 	char		driver_req[10];	/* requests specific driver */
 
 	int		last_lun;	/* last logical unit */
@@ -612,43 +611,7 @@ extern int ide_read_setting(struct ata_device *, ide_settings_t *);
 extern int ide_write_setting(struct ata_device *, ide_settings_t *, int);
 extern void ide_add_generic_settings(struct ata_device *);
 
-/*
- * /proc/ide interface
- */
-typedef struct {
-	const char	*name;
-	mode_t		mode;
-	read_proc_t	*read_proc;
-	write_proc_t	*write_proc;
-} ide_proc_entry_t;
-
-#ifdef CONFIG_PROC_FS
-void proc_ide_create(void);
-void proc_ide_destroy(void);
-void destroy_proc_ide_drives(struct ata_channel *);
-void create_proc_ide_interfaces(void);
-void ide_add_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p, void *data);
-void ide_remove_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p);
-read_proc_t proc_ide_read_geometry;
-
-/*
- * Standard exit stuff:
- */
-#define PROC_IDE_READ_RETURN(page,start,off,count,eof,len) \
-{					\
-	len -= off;			\
-	if (len < count) {		\
-		*eof = 1;		\
-		if (len <= 0)		\
-			return 0;	\
-	} else				\
-		len = count;		\
-	*start = page + off;		\
-	return len;			\
-}
-#else
-# define PROC_IDE_READ_RETURN(page,start,off,count,eof,len) return 0;
-#endif
+#define PROC_IDE_READ_RETURN(page,start,off,count,eof,len) return 0;
 
 /*
  * This structure describes the operations possible on a particular device type
@@ -671,8 +634,6 @@ struct ata_operations {
 	void (*revalidate)(struct ata_device *);
 
 	sector_t (*capacity)(struct ata_device *);
-
-	ide_proc_entry_t *proc;
 };
 
 /* Alas, no aliases. Too much hassle with bringing module.h everywhere */
@@ -863,7 +824,6 @@ void do_ide_request (request_queue_t * q);
 void ide_init_subdrivers (void);
 
 extern struct block_device_operations ide_fops[];
-extern ide_proc_entry_t generic_subdriver_entries[];
 
 #ifdef CONFIG_BLK_DEV_IDE
 /* Probe for devices attached to the systems host controllers.

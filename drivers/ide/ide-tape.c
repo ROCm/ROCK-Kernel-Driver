@@ -6108,31 +6108,6 @@ static int idetape_cleanup (ide_drive_t *drive)
 	return 0;
 }
 
-#ifdef CONFIG_PROC_FS
-
-static int proc_idetape_read_name
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	ide_drive_t	*drive = (ide_drive_t *) data;
-	idetape_tape_t	*tape = drive->driver_data;
-	char		*out = page;
-	int		len;
-
-	len = sprintf(out, "%s\n", tape->name);
-	PROC_IDE_READ_RETURN(page, start, off, count, eof, len);
-}
-
-static ide_proc_entry_t idetape_proc[] = {
-	{ "name",	S_IFREG|S_IRUGO,	proc_idetape_read_name,	NULL },
-	{ NULL, 0, NULL, NULL }
-};
-
-#else
-
-#define	idetape_proc	NULL
-
-#endif
-
 static void idetape_revalidate(ide_drive_t *_dummy)
 {
 	/* We don't have to handle any partition information here, which is the
@@ -6154,7 +6129,6 @@ static struct ata_operations idetape_driver = {
 	release:		idetape_blkdev_release,
 	check_media_change:	NULL,
 	revalidate:		idetape_revalidate,
-	proc:			idetape_proc
 };
 
 /*

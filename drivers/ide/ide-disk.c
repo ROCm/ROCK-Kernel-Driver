@@ -419,68 +419,6 @@ static sector_t idedisk_capacity(struct ata_device *drive)
 	return drive->capacity - drive->sect0;
 }
 
-#ifdef CONFIG_PROC_FS
-
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-static int proc_idedisk_read_tcq
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	struct ata_device *drive = (struct ata_device *) data;
-	char		*out = page;
-	int		len, cmds, i;
-	unsigned long	flags;
-
-	if (!blk_queue_tagged(&drive->queue)) {
-		len = sprintf(out, "not configured\n");
-		PROC_IDE_READ_RETURN(page, start, off, count, eof, len);
-	}
-
-	spin_lock_irqsave(&ide_lock, flags);
-
-	len = sprintf(out, "TCQ currently on:\t%s\n", drive->using_tcq ? "yes" : "no");
-	len += sprintf(out+len, "Max queue depth:\t%d\n",drive->queue_depth);
-	len += sprintf(out+len, "Max achieved depth:\t%d\n",drive->max_depth);
-	len += sprintf(out+len, "Max depth since last:\t%d\n",drive->max_last_depth);
-	len += sprintf(out+len, "Current depth:\t\t%d\n", ata_pending_commands(drive));
-	len += sprintf(out+len, "Active tags:\t\t[ ");
-	for (i = 0, cmds = 0; i < drive->queue_depth; i++) {
-		struct request *rq = blk_queue_tag_request(&drive->queue, i);
-
-		if (!rq)
-			continue;
-
-		len += sprintf(out+len, "%d, ", i);
-		cmds++;
-	}
-	len += sprintf(out+len, "]\n");
-
-	len += sprintf(out+len, "Queue:\t\t\treleased [ %lu ] - started [ %lu ]\n", drive->immed_rel, drive->immed_comp);
-
-	if (ata_pending_commands(drive) != cmds)
-		len += sprintf(out+len, "pending request and queue count mismatch (counted: %d)\n", cmds);
-
-	len += sprintf(out+len, "DMA status:\t\t%srunning\n", test_bit(IDE_DMA, &HWGROUP(drive)->flags) ? "" : "not ");
-
-	drive->max_last_depth = 0;
-
-	spin_unlock_irqrestore(&ide_lock, flags);
-	PROC_IDE_READ_RETURN(page, start, off, count, eof, len);
-}
-#endif
-
-static ide_proc_entry_t idedisk_proc[] = {
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-	{ "tcq",		S_IFREG|S_IRUSR,	proc_idedisk_read_tcq,			NULL },
-#endif
-	{ NULL, 0, NULL, NULL }
-};
-
-#else
-
-# define	idedisk_proc	NULL
-
-#endif
-
 /*
  * This is tightly woven into the driver->special can not touch.
  * DON'T do it again until a total personality rewrite is committed.
@@ -1099,7 +1037,6 @@ static struct ata_operations idedisk_driver = {
 	check_media_change:	idedisk_check_media_change,
 	revalidate:		NULL, /* use default method */
 	capacity:		idedisk_capacity,
-	proc:			idedisk_proc
 };
 
 MODULE_DESCRIPTION("ATA DISK Driver");
@@ -1116,10 +1053,6 @@ static void __exit idedisk_exit (void)
 		}
 		/* We must remove proc entries defined in this module.
 		   Otherwise we oops while accessing these entries */
-#ifdef CONFIG_PROC_FS
-		if (drive->proc)
-			ide_remove_proc_entries(drive->proc, idedisk_proc);
-#endif
 	}
 }
 

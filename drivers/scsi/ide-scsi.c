@@ -557,7 +557,6 @@ static struct ata_operations idescsi_driver = {
 	check_media_change:	NULL,
 	revalidate:		idescsi_revalidate,
 	capacity:		NULL,
-	proc:			NULL
 };
 
 /*

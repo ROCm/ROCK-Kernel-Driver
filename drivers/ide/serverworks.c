@@ -93,15 +93,16 @@
 
 #include "ata-timing.h"
 
-#define DISPLAY_SVWKS_TIMINGS	1
+#undef DISPLAY_SVWKS_TIMINGS
 #undef SVWKS_DEBUG_DRIVE_INFO
+
+static u8 svwks_revision = 0;
 
 #if defined(DISPLAY_SVWKS_TIMINGS) && defined(CONFIG_PROC_FS)
 #include <linux/stat.h>
 #include <linux/proc_fs.h>
 
 static struct pci_dev *bmide_dev;
-static byte svwks_revision = 0;
 
 static int svwks_get_info(char *, char **, off_t, int);
 extern int (*svwks_display_info)(char *, char **, off_t, int); /* ide-proc.c */

@@ -79,7 +79,7 @@
 #define UDIDETCR1	0x7B
 #define DTPR1		0x7C
 
-#define DISPLAY_CMD64X_TIMINGS
+#undef DISPLAY_CMD64X_TIMINGS
 
 #if defined(DISPLAY_CMD64X_TIMINGS) && defined(CONFIG_PROC_FS)
 #include <linux/stat.h>

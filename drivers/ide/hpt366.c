@@ -65,7 +65,7 @@
 
 #include "ata-timing.h"
 
-#define DISPLAY_HPT366_TIMINGS
+#undef DISPLAY_HPT366_TIMINGS
 
 /* various tuning parameters */
 #define HPT_RESET_STATE_ENGINE

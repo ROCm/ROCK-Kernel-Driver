@@ -72,8 +72,6 @@ obj-$(CONFIG_BLK_DEV_ATARAID)		+= ataraid.o
 obj-$(CONFIG_BLK_DEV_ATARAID_PDC)	+= pdcraid.o
 obj-$(CONFIG_BLK_DEV_ATARAID_HPT)	+= hptraid.o
 
-ide-obj-$(CONFIG_PROC_FS)		+= ide-proc.o
-
 ide-mod-objs		:= ide-taskfile.o ide.o ide-probe.o ide-geometry.o ide-features.o ata-timing.o $(ide-obj-y)
 
 include $(TOPDIR)/Rules.make
