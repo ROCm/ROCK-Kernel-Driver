@@ -31,12 +31,10 @@
 
 static const char *version = __FILE__ ": v0.98.5 22 Sep 2001 Brad Hards and another";
 
-/* We need to be selective about what we try to match on, to avoiding loading for a CDC
- * ACM (ISDN or PSTN) modem */
+/* Take any CDC device, and sort it out in probe() */
 static struct usb_device_id CDCEther_ids[] = {
-        { match_flags: (USB_DEVICE_ID_MATCH_INT_CLASS | USB_DEVICE_ID_MATCH_INT_SUBCLASS),
-          bInterfaceClass: USB_CLASS_COMM, bInterfaceSubClass: 6},
-        { } /* Terminating null entry */
+	{ USB_DEVICE_INFO(USB_CLASS_COMM, 0, 0) },
+	{ } /* Terminating null entry */
 };
 
 /* 

@@ -1,5 +1,5 @@
 
-# $Id: Config.in,v 1.70 2001/08/11 16:13:38 dwmw2 Exp $
+# $Id: Config.in,v 1.71 2001/10/03 11:38:38 dwmw2 Exp $
 
 mainmenu_option next_comment
 comment 'Memory Technology Devices (MTD)'
@@ -13,8 +13,10 @@ if [ "$CONFIG_MTD" = "y" -o "$CONFIG_MTD" = "m" ]; then
    fi
    dep_tristate '  MTD partitioning support' CONFIG_MTD_PARTITIONS $CONFIG_MTD
    dep_tristate '  RedBoot partition table parsing' CONFIG_MTD_REDBOOT_PARTS $CONFIG_MTD_PARTITIONS
+if [ "$CONFIG_ARM" = "y" ]; then
    dep_tristate '  Compaq bootldr partition table parsing' CONFIG_MTD_BOOTLDR_PARTS $CONFIG_MTD_PARTITIONS
    dep_tristate '  ARM Firmware Suite partition parsing' CONFIG_MTD_AFS_PARTS $CONFIG_MTD_PARTITIONS
+fi
 
 comment 'User Modules And Translation Layers'
    dep_tristate '  Direct char device access to MTD devices' CONFIG_MTD_CHAR $CONFIG_MTD

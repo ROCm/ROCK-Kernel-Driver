@@ -59,7 +59,7 @@ obj-$(CONFIG_USB_SCANNER)	+= scanner.o
 obj-$(CONFIG_USB_ACM)		+= acm.o
 obj-$(CONFIG_USB_PRINTER)	+= printer.o
 obj-$(CONFIG_USB_AUDIO)		+= audio.o
-obj-$(CONFIG_USB_IBMCAM)	+= ibmcam.o
+obj-$(CONFIG_USB_IBMCAM)	+= ibmcam.o usbvideo.o ultracam.o
 obj-$(CONFIG_USB_PWC)		+= pwc.o
 obj-$(CONFIG_USB_DC2XX)		+= dc2xx.o
 obj-$(CONFIG_USB_MDC800)	+= mdc800.o
@@ -74,6 +74,7 @@ obj-$(CONFIG_USB_CDCETHER)	+= CDCEther.o
 obj-$(CONFIG_USB_RIO500)	+= rio500.o
 obj-$(CONFIG_USB_DSBR)		+= dsbr100.o
 obj-$(CONFIG_USB_MICROTEK)	+= microtek.o
+obj-$(CONFIG_USB_HPUSBSCSI)	+= hpusbscsi.o
 obj-$(CONFIG_USB_BLUETOOTH)	+= bluetooth.o
 obj-$(CONFIG_USB_USBNET)	+= usbnet.o
 

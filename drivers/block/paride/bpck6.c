@@ -25,7 +25,6 @@ int verbose=0; /* set this to 1 to see debugging messages and whatnot */
 
 #define BACKPACK_VERSION "2.0.2"
 
-#define EXPORT_SYMTAB 
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>

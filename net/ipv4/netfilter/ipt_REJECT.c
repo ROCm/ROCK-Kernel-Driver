@@ -325,7 +325,7 @@ static int check(const char *tablename,
 {
  	const struct ipt_reject_info *rejinfo = targinfo;
 
- 	if (targinfosize != IPT_ALIGN(sizeof(struct ipt_icmp))) {
+ 	if (targinfosize != IPT_ALIGN(sizeof(struct ipt_reject_info))) {
   		DEBUGP("REJECT: targinfosize %u != 0\n", targinfosize);
   		return 0;
   	}

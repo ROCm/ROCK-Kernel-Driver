@@ -192,11 +192,7 @@ COMPILING the kernel:
    to the place where your regular bootable kernel is found. 
 
    For some, this is on a floppy disk, in which case you can copy the
-   kernel bzImage file to /dev/fd0 to make a bootable floppy. Please note
-   that you can not boot a kernel by directly dumping it to a 720k
-   double-density 3.5" floppy.  In this case, it is highly recommended
-   that you install LILO on your double-density boot floppy or switch to
-   high-density floppies.
+   kernel bzImage file to /dev/fd0 to make a bootable floppy.
 
    If you boot Linux from the hard drive, chances are you use LILO which
    uses the kernel image as specified in the file /etc/lilo.conf.  The

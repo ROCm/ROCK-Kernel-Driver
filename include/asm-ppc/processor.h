@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.processor.h 1.28 08/17/01 15:23:17 paulus
+ * BK Id: SCCS/s.processor.h 1.31 10/05/01 16:26:22 paulus
  */
 #ifdef __KERNEL__
 #ifndef __ASM_PPC_PROCESSOR_H
@@ -654,6 +654,27 @@ void ll_puts(const char *);
 
 /* In misc.c */
 void _nmask_and_or_msr(unsigned long nmask, unsigned long or_val);
+
+#define cpu_relax()	do { } while (0)
+
+/*
+ * Prefetch macros.
+ */
+#define ARCH_HAS_PREFETCH
+#define ARCH_HAS_PREFETCHW
+#define ARCH_HAS_SPINLOCK_PREFETCH
+
+extern inline void prefetch(const void *x)
+{
+	 __asm__ __volatile__ ("dcbt 0,%0" : : "r" (x));
+}
+
+extern inline void prefetchw(const void *x)
+{
+	 __asm__ __volatile__ ("dcbtst 0,%0" : : "r" (x));
+}
+
+#define spin_lock_prefetch(x)	prefetchw(x)
 
 #endif /* !__ASSEMBLY__ */
 

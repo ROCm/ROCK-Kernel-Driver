@@ -2575,10 +2575,10 @@ CONFIG_AGP
   module, say M here and read Documentation/modules.txt. The module
   will be called agpgart.o.
 
-Intel 440LX/BX/GX/815/840/850 support
+Intel 440LX/BX/GX/815/830M/840/850 support
 CONFIG_AGP_INTEL
   This option gives you AGP support for the GLX component of the
-  XFree86 4.x on Intel 440LX/BX/GX, 815, 840 and 850 chipsets.
+  XFree86 4.x on Intel 440LX/BX/GX, 815, 830M, 840 and 850 chipsets.
 
   For the moment, you should probably say N, unless you want to test
   the GLX component for XFree86 3.3.6, which can be downloaded from
@@ -2586,9 +2586,9 @@ CONFIG_AGP_INTEL
 
 Intel I810/I810 DC100/I810e support
 CONFIG_AGP_I810
-  This option gives you AGP support for the Xserver on the Intel 810
-  and 815 chipset boards for their on-board integrated graphics. This
-  is required to do any useful video modes with these boards.
+  This option gives you AGP support for the Xserver on the Intel 810,
+  830M and 815 chipset boards for their on-board integrated graphics.
+  This is required to do any useful video modes with these boards.
 
 VIA chipset support
 CONFIG_AGP_VIA

@@ -30,6 +30,7 @@
 #include <linux/in_route.h>
 #include <linux/rtnetlink.h>
 #include <linux/route.h>
+#include <linux/cache.h>
 
 #ifndef __KERNEL__
 #warning This file is not supposed to be used outside of kernel.
@@ -105,7 +106,7 @@ struct rt_cache_stat
         unsigned int out_hit;
         unsigned int out_slow_tot;
         unsigned int out_slow_mc;
-};
+} ____cacheline_aligned_in_smp;
 
 extern struct ip_rt_acct *ip_rt_acct;
 

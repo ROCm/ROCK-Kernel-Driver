@@ -546,6 +546,9 @@ static int shrink_caches(int priority, zone_t * classzone, unsigned int gfp_mask
 
 	shrink_dcache_memory(priority, gfp_mask);
 	shrink_icache_memory(priority, gfp_mask);
+#ifdef CONFIG_QUOTA
+	shrink_dqcache_memory(DEF_PRIORITY, gfp_mask);
+#endif
 
 	return nr_pages;
 }
@@ -553,14 +556,16 @@ static int shrink_caches(int priority, zone_t * classzone, unsigned int gfp_mask
 int try_to_free_pages(zone_t * classzone, unsigned int gfp_mask, unsigned int order)
 {
 	int ret = 0;
+	int priority = DEF_PRIORITY;
 	int nr_pages = SWAP_CLUSTER_MAX;
 
-	nr_pages = shrink_caches(DEF_PRIORITY, classzone, gfp_mask, nr_pages);
+	do {
+		nr_pages = shrink_caches(priority, classzone, gfp_mask, nr_pages);
+		if (nr_pages <= 0)
+			return 1;
 
-	if (nr_pages < SWAP_CLUSTER_MAX)
-		ret |= 1;
-
-	ret |= swap_out(DEF_PRIORITY, classzone, gfp_mask, SWAP_CLUSTER_MAX << 2);
+		ret |= swap_out(priority, classzone, gfp_mask, SWAP_CLUSTER_MAX << 2);
+	} while (--priority);
 
 	return ret;
 }

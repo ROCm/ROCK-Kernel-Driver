@@ -969,6 +969,8 @@ ia64_thash (__u64 addr)
 	return result;
 }
 
+#define cpu_relax()	do { } while (0)
+
 
 #define ARCH_HAS_PREFETCH
 #define ARCH_HAS_PREFETCHW

@@ -247,7 +247,8 @@ static inline int load_block_bitmap (struct super_block * sb,
 	return slot;
 }
 
-void ext2_free_blocks (const struct inode * inode, unsigned long block,
+/* Free given blocks, update quota and i_blocks field */
+void ext2_free_blocks (struct inode * inode, unsigned long block,
 		       unsigned long count)
 {
 	struct buffer_head * bh;
@@ -318,7 +319,7 @@ do_more:
 				      "bit already cleared for block %lu",
 				      block + i);
 		else {
-			DQUOT_FREE_BLOCK(sb, inode, 1);
+			DQUOT_FREE_BLOCK(inode, 1);
 			gdp->bg_free_blocks_count =
 				cpu_to_le16(le16_to_cpu(gdp->bg_free_blocks_count)+1);
 			es->s_free_blocks_count =
@@ -351,8 +352,9 @@ error_return:
  * is allocated.  Otherwise a forward search is made for a free block; within 
  * each block group the search first looks for an entire free byte in the block
  * bitmap, and then for any free bit if that fails.
+ * This function also updates quota and i_blocks field.
  */
-int ext2_new_block (const struct inode * inode, unsigned long goal,
+int ext2_new_block (struct inode * inode, unsigned long goal,
     u32 * prealloc_count, u32 * prealloc_block, int * err)
 {
 	struct buffer_head * bh;
@@ -508,7 +510,7 @@ got_block:
 	/*
 	 * Check quota for allocation of this block.
 	 */
-	if(DQUOT_ALLOC_BLOCK(sb, inode, 1)) {
+	if(DQUOT_ALLOC_BLOCK(inode, 1)) {
 		*err = -EDQUOT;
 		goto out;
 	}
@@ -526,7 +528,7 @@ got_block:
 	if (ext2_set_bit (j, bh->b_data)) {
 		ext2_warning (sb, "ext2_new_block",
 			      "bit already set for block %d", j);
-		DQUOT_FREE_BLOCK(sb, inode, 1);
+		DQUOT_FREE_BLOCK(inode, 1);
 		goto repeat;
 	}
 
@@ -549,13 +551,13 @@ got_block:
 		for (k = 1;
 		     k < prealloc_goal && (j + k) < EXT2_BLOCKS_PER_GROUP(sb);
 		     k++, next_block++) {
-			if (DQUOT_PREALLOC_BLOCK(sb, inode, 1))
+			if (DQUOT_PREALLOC_BLOCK(inode, 1))
 				break;
 			/* Writer: ->i_prealloc* */
 			if (*prealloc_block + *prealloc_count != next_block ||
 			    ext2_set_bit (j + k, bh->b_data)) {
 				/* Writer: end */
-				DQUOT_FREE_BLOCK(sb, inode, 1);
+				DQUOT_FREE_BLOCK(inode, 1);
  				break;
 			}
 			(*prealloc_count)++;

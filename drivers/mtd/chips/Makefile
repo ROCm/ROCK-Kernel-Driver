@@ -1,11 +1,11 @@
 #
 # linux/drivers/chips/Makefile
 #
-# $Id: Makefile,v 1.6 2001/09/02 18:57:01 dwmw2 Exp $
+# $Id: Makefile,v 1.7 2001/10/05 06:53:51 dwmw2 Exp $
 
 O_TARGET	:= chipslink.o
 
-export-objs	:= chipreg.o
+export-objs	:= chipreg.o gen_probe.o
 
 #                       *** BIG UGLY NOTE ***
 #

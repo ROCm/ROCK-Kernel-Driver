@@ -12,7 +12,7 @@
 
 #ifdef __KERNEL__
 
-#include <asm/compiler.h>
+#include <linux/compiler.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
 

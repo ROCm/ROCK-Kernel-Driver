@@ -795,19 +795,7 @@ static int scan_scsis_single(unsigned int channel, unsigned int dev,
 	 * other settings, and scan all of them.
 	 */
 	if (bflags & BLIST_SPARSELUN) {
-		/*
-		 * Scanning MAX_SCSI_LUNS units would be a bad idea.
-		 * Any better idea?
-		 * I think we need REPORT LUNS in future to avoid scanning
-		 * of unused LUNs. But, that is another item.
-		 *
-		 * FIXME(eric) - perhaps this should be a kernel configurable?
-		 */
-		if (*max_dev_lun < shpnt->max_lun)
-			*max_dev_lun = shpnt->max_lun;
-		else 	if ((max_scsi_luns >> 1) >= *max_dev_lun)
-				*max_dev_lun += shpnt->max_lun;
-			else	*max_dev_lun = max_scsi_luns;
+		*max_dev_lun = shpnt->max_lun;
 		*sparse_lun = 1;
 		return 1;
 	}

@@ -482,7 +482,7 @@ static void __init parse_options(char *line)
 extern void setup_arch(char **);
 extern void cpu_idle(void);
 
-volatile unsigned long wait_init_idle = 0UL;
+unsigned long wait_init_idle;
 
 #ifndef CONFIG_SMP
 
@@ -505,18 +505,18 @@ static void __init smp_init(void)
 	smp_boot_cpus();
 	wait_init_idle = cpu_online_map;
 	clear_bit(current->processor, &wait_init_idle); /* Don't wait on me! */
-	printk("Waiting on wait_init_idle (map = 0x%lx)\n", wait_init_idle);
+
 	smp_threads_ready=1;
 	smp_commence();
 
 	/* Wait for the other cpus to set up their idle processes */
-        while (1) {
-                if (!wait_init_idle)
-                        break;
-                rep_nop();
-        }
+	printk("Waiting on wait_init_idle (map = 0x%lx)\n", wait_init_idle);
+	while (wait_init_idle) {
+		cpu_relax();
+		barrier();
+	}
 	printk("All processors have done init_idle\n");
-}		
+}
 
 #endif
 

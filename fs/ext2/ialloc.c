@@ -196,7 +196,7 @@ void ext2_free_inode (struct inode * inode)
 	 */
 	if (!is_bad_inode(inode)) {
 		/* Quota is already initialized in iput() */
-	    	DQUOT_FREE_INODE(sb, inode);
+	    	DQUOT_FREE_INODE(inode);
 		DQUOT_DROP(inode);
 	}
 
@@ -454,7 +454,7 @@ repeat:
 	mark_inode_dirty(inode);
 
 	unlock_super (sb);
-	if(DQUOT_ALLOC_INODE(sb, inode)) {
+	if(DQUOT_ALLOC_INODE(inode)) {
 		DQUOT_DROP(inode);
 		inode->i_flags |= S_NOQUOTA;
 		inode->i_nlink = 0;

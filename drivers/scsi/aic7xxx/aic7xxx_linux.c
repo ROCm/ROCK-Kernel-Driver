@@ -1175,6 +1175,7 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 	host->irq = ahc->platform_data->irq;
 	host->max_id = (ahc->features & AHC_WIDE) ? 16 : 8;
 	host->max_channel = (ahc->features & AHC_TWIN) ? 1 : 0;
+	host->max_lun = AHC_NUM_LUNS;
 	ahc_set_unit(ahc, ahc_linux_next_unit());
 	sprintf(buf, "scsi%d", host->host_no);
 	new_name = malloc(strlen(buf) + 1, M_DEVBUF, M_NOWAIT);

@@ -108,6 +108,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define MS_NOATIME	1024	/* Do not update access times. */
 #define MS_NODIRATIME	2048	/* Do not update directory access times */
 #define MS_BIND		4096
+#define MS_REC		16384
 #define MS_NOUSER	(1<<31)
 
 /*
@@ -919,11 +920,11 @@ static inline void mark_inode_dirty_pages(struct inode *inode)
 struct dquot_operations {
 	void (*initialize) (struct inode *, short);
 	void (*drop) (struct inode *);
-	int (*alloc_block) (const struct inode *, unsigned long, char);
+	int (*alloc_block) (struct inode *, unsigned long, char);
 	int (*alloc_inode) (const struct inode *, unsigned long);
-	void (*free_block) (const struct inode *, unsigned long);
+	void (*free_block) (struct inode *, unsigned long);
 	void (*free_inode) (const struct inode *, unsigned long);
-	int (*transfer) (struct dentry *, struct iattr *);
+	int (*transfer) (struct inode *, struct iattr *);
 };
 
 struct file_system_type {

@@ -44,7 +44,6 @@
 #include <linux/sys.h>
 #include <linux/linkage.h>
 #include <asm/segment.h>
-#define ASSEMBLY
 #include <asm/smp.h>
 
 EBX		= 0x00

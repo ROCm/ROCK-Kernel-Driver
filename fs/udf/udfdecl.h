@@ -165,15 +165,15 @@ extern int udf_get_filename(struct super_block *, Uint8 *, Uint8 *, int);
 
 /* ialloc.c */
 extern void udf_free_inode(struct inode *);
-extern struct inode * udf_new_inode (const struct inode *, int, int *);
+extern struct inode * udf_new_inode (struct inode *, int, int *);
 
 /* truncate.c */
 extern void udf_truncate_extents(struct inode *);
 
 /* balloc.c */
-extern void udf_free_blocks(const struct inode *, lb_addr, Uint32, Uint32);
-extern int udf_prealloc_blocks(const struct inode *, Uint16, Uint32, Uint32);
-extern int udf_new_block(const struct inode *, Uint16, Uint32, int *);
+extern void udf_free_blocks(struct inode *, lb_addr, Uint32, Uint32);
+extern int udf_prealloc_blocks(struct inode *, Uint16, Uint32, Uint32);
+extern int udf_new_block(struct inode *, Uint16, Uint32, int *);
 
 /* fsync.c */
 extern int udf_fsync_file(struct file *, struct dentry *, int);

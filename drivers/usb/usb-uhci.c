@@ -71,9 +71,6 @@
 #define DEBUG_SYMBOLS
 #ifdef DEBUG_SYMBOLS
 	#define _static
-	#ifndef EXPORT_SYMTAB
-		#define EXPORT_SYMTAB
-	#endif
 #else
 	#define _static static
 #endif

@@ -27,58 +27,71 @@
 
 #include <linux/kernel.h>
 #include <linux/sched.h>
-#include <linux/list.h>
-#include <linux/slab.h>
-#include <linux/mm.h>
-#include <linux/smp_lock.h>
-#include <linux/videodev.h>
-#include <linux/vmalloc.h>
 #include <linux/wrapper.h>
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/spinlock.h>
-#include <linux/usb.h>
 
-#include <asm/io.h>
+#include "usbvideo.h"
 
-#include "ibmcam.h"
+#define	IBMCAM_VENDOR_ID	0x0545
+#define	IBMCAM_PRODUCT_ID	0x8080
+#define NETCAM_PRODUCT_ID	0x8002	/* IBM NetCamera, close to model 2 */
+
+#define MAX_IBMCAM		4	/* How many devices we allow to connect */
+#define USES_IBMCAM_PUTPIXEL    0       /* 0=Fast/oops 1=Slow/secure */
+
+/* Header signatures */
+
+/* Model 1 header: 00 FF 00 xx */
+#define HDRSIG_MODEL1_128x96	0x06	/* U Y V Y ... */
+#define HDRSIG_MODEL1_176x144	0x0e	/* U Y V Y ... */
+#define HDRSIG_MODEL1_352x288	0x00	/* V Y U Y ... */
+
+#define	IBMCAM_MODEL_1	1	/* XVP-501, 3 interfaces, rev. 0.02 */
+#define IBMCAM_MODEL_2	2	/* KSX-X9903, 2 interfaces, rev. 3.0a */
+#define IBMCAM_MODEL_3	3	/* KSX-X9902, 2 interfaces, rev. 3.01 */
+#define	IBMCAM_MODEL_4	4	/* IBM NetCamera, 0545/8002/3.0a */
+
+/* Video sizes supported */
+#define	VIDEOSIZE_128x96	VIDEOSIZE(128, 96)
+#define	VIDEOSIZE_176x144	VIDEOSIZE(176,144)
+#define	VIDEOSIZE_352x288	VIDEOSIZE(352,288)
+#define	VIDEOSIZE_320x240	VIDEOSIZE(320,240)
+#define	VIDEOSIZE_352x240	VIDEOSIZE(352,240)
+#define	VIDEOSIZE_640x480	VIDEOSIZE(640,480)
+#define	VIDEOSIZE_160x120	VIDEOSIZE(160,120)
+
+/* Video sizes supported */
+enum {
+	SIZE_128x96 = 0,
+	SIZE_160x120,
+	SIZE_176x144,
+	SIZE_320x240,
+	SIZE_352x240,
+	SIZE_352x288,
+	SIZE_640x480,
+	/* Add/remove/rearrange items before this line */
+	SIZE_LastItem
+};
 
 /*
- * Version Information
+ * This structure lives in uvd_t->user field.
  */
-#define DRIVER_VERSION "v1.0.0"
-#define DRIVER_AUTHOR "http://www.linux-usb.org/ibmcam/"
-#define DRIVER_DESC "IBM/Xirlink C-it USB Camera Driver for Linux (c) 2000"
+typedef struct {
+	int initialized;	/* Had we already sent init sequence? */
+	int camera_model;	/* What type of IBM camera we got? */
+	int has_hdr;
+} ibmcam_t;
+#define	IBMCAM_T(uvd)	((ibmcam_t *)((uvd)->user_data))
 
-#define	ENABLE_HEXDUMP	0	/* Enable if you need it */
+usbvideo_t *cams = NULL;
+
 static int debug = 0;
-
-static int video_nr = -1;
-
-/* Completion states of the data parser */
-typedef enum {
-	scan_Continue,		/* Just parse next item */
-	scan_NextFrame,		/* Frame done, send it to V4L */
-	scan_Out,		/* Not enough data for frame */
-	scan_EndParse		/* End parsing */
-} scan_state_t;
-
-/* Bit flags (options) */
-#define FLAGS_RETRY_VIDIOCSYNC		(1 << 0)
-#define	FLAGS_MONOCHROME		(1 << 1)
-#define FLAGS_DISPLAY_HINTS		(1 << 2)
-#define FLAGS_OVERLAY_STATS		(1 << 3)
-#define FLAGS_FORCE_TESTPATTERN		(1 << 4)
-#define FLAGS_SEPARATE_FRAMES		(1 << 5)
-#define FLAGS_CLEAN_FRAMES		(1 << 6)
 
 static int flags = 0; /* FLAGS_DISPLAY_HINTS | FLAGS_OVERLAY_STATS; */
 
-/* This is the size of V4L frame that we provide */
-static const int imgwidth = V4L_FRAME_WIDTH_USED;
-static const int imgheight = V4L_FRAME_HEIGHT;
-static const int min_imgwidth  = 8;
-static const int min_imgheight = 4;
+static const int min_canvasWidth  = 8;
+static const int min_canvasHeight = 4;
 
 static int lighting = 1; /* Medium */
 
@@ -88,27 +101,9 @@ static int sharpness = 4; /* Low noise, good details */
 
 #define FRAMERATE_MIN	0
 #define FRAMERATE_MAX	6
-static int framerate = 2; /* Lower, reliable frame rate (8-12 fps) */
+static int framerate = -1;
 
-enum {
-	VIDEOSIZE_128x96 = 0,
-	VIDEOSIZE_176x144,
-	VIDEOSIZE_352x288,
-	VIDEOSIZE_320x240,
-	VIDEOSIZE_352x240,
-};
-
-static int videosize = VIDEOSIZE_352x288;
-
-/*
- * The value of 'scratchbufsize' affects quality of the picture
- * in many ways. Shorter buffers may cause loss of data when client
- * is too slow. Larger buffers are memory-consuming and take longer
- * to work with. This setting can be adjusted, but the default value
- * should be OK for most desktop users.
- */
-#define DEFAULT_SCRATCH_BUF_SIZE	(0x10000)	/* 64 KB */
-static const int scratchbufsize = DEFAULT_SCRATCH_BUF_SIZE;
+static int size = SIZE_352x288;
 
 /*
  * Here we define several initialization variables. They may
@@ -131,42 +126,51 @@ static int init_hue = 128;
 static int hue_correction = 128;
 
 /* Settings for camera model 2 */
-static int init_model2_rg = -1;
 static int init_model2_rg2 = -1;
 static int init_model2_sat = -1;
 static int init_model2_yb = -1;
 
+/* 01.01.08 - Added for RCA video in support -LO */
+/* Settings for camera model 3 */
+static int init_model3_input = 0;
+
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug level: 0-9 (default=0)");
 MODULE_PARM(flags, "i");
-MODULE_PARM_DESC(flags, "Bitfield: 0=VIDIOCSYNC, 1=B/W, 2=show hints, 3=show stats, 4=test pattern, 5=seperate frames, 6=clean frames");
+MODULE_PARM_DESC(flags, "Bitfield: 0=VIDIOCSYNC, 1=B/W, 2=show hints, 3=show stats, 4=test pattern, 5=separate frames, 6=clean frames");
 MODULE_PARM(framerate, "i");
 MODULE_PARM_DESC(framerate, "Framerate setting: 0=slowest, 6=fastest (default=2)");
 MODULE_PARM(lighting, "i");
 MODULE_PARM_DESC(lighting, "Photosensitivity: 0=bright, 1=medium (default), 2=low light");
 MODULE_PARM(sharpness, "i");
 MODULE_PARM_DESC(sharpness, "Model1 noise reduction: 0=smooth, 6=sharp (default=4)");
-MODULE_PARM(videosize, "i");
-MODULE_PARM_DESC(videosize, "Image size: 0=128x96, 1=176x144, 2=352x288, 3=320x240, 4=352x240 (default=1)");
+MODULE_PARM(size, "i");
+MODULE_PARM_DESC(size, "Image size: 0=128x96 1=160x120 2=176x144 3=320x240 4=352x240 5=352x288 6=640x480  (default=5)");
 MODULE_PARM(init_brightness, "i");
 MODULE_PARM_DESC(init_brightness, "Brightness preconfiguration: 0-255 (default=128)");
 MODULE_PARM(init_contrast, "i");
 MODULE_PARM_DESC(init_contrast, "Contrast preconfiguration: 0-255 (default=192)");
 MODULE_PARM(init_color, "i");
-MODULE_PARM_DESC(init_color, "Dolor preconfiguration: 0-255 (default=128)");
+MODULE_PARM_DESC(init_color, "Color preconfiguration: 0-255 (default=128)");
 MODULE_PARM(init_hue, "i");
 MODULE_PARM_DESC(init_hue, "Hue preconfiguration: 0-255 (default=128)");
 MODULE_PARM(hue_correction, "i");
 MODULE_PARM_DESC(hue_correction, "YUV colorspace regulation: 0-255 (default=128)");
 
-MODULE_PARM(init_model2_rg, "i");
-MODULE_PARM_DESC(init_model2_rg, "Model2 preconfiguration: 0-255 (default=112)");
 MODULE_PARM(init_model2_rg2, "i");
 MODULE_PARM_DESC(init_model2_rg2, "Model2 preconfiguration: 0-255 (default=47)");
 MODULE_PARM(init_model2_sat, "i");
 MODULE_PARM_DESC(init_model2_sat, "Model2 preconfiguration: 0-255 (default=52)");
 MODULE_PARM(init_model2_yb, "i");
 MODULE_PARM_DESC(init_model2_yb, "Model2 preconfiguration: 0-255 (default=160)");
+
+/* 01.01.08 - Added for RCA video in support -LO */
+MODULE_PARM(init_model3_input, "i");
+MODULE_PARM_DESC(init_model3_input, "Model3 input: 0=CCD 1=RCA");
+
+MODULE_AUTHOR ("Dmitri");
+MODULE_DESCRIPTION ("IBM/Xirlink C-it USB Camera Driver for Linux (c) 2000");
+MODULE_LICENSE("GPL");
 
 /* Still mysterious i2c commands */
 static const unsigned short unknown_88 = 0x0088;
@@ -182,594 +186,326 @@ static const unsigned short mod2_set_framerate = 0x001c;	/* 0 (fast).. $1F (slow
 static const unsigned short mod2_color_balance_rg2 = 0x001e;	/* 0 (red) .. $7F (green) */
 static const unsigned short mod2_saturation = 0x0020;		/* 0 (b/w) - $7F (full color) */
 static const unsigned short mod2_color_balance_yb = 0x0022;	/* 0..$7F, $50 is about right */
-static const unsigned short mod2_color_balance_rg = 0x0024;	/* 0..$7F, $70 is about right */
+static const unsigned short mod2_hue = 0x0024;			/* 0..$7F, $70 is about right */
 static const unsigned short mod2_sensitivity = 0x0028;		/* 0 (min) .. $1F (max) */
 
-#define MAX_IBMCAM	4
-
-struct usb_ibmcam cams[MAX_IBMCAM];
-
-/*******************************/
-/* Memory management functions */
-/*******************************/
-
-#define MDEBUG(x)	do { } while(0)		/* Debug memory management */
-
-static struct usb_driver ibmcam_driver;
-static void usb_ibmcam_release(struct usb_ibmcam *ibmcam);
-
-/* Given PGD from the address space's page table, return the kernel
- * virtual mapping of the physical memory mapped at ADR.
- */
-static inline unsigned long uvirt_to_kva(pgd_t *pgd, unsigned long adr)
-{
-	unsigned long ret = 0UL;
-	pmd_t *pmd;
-	pte_t *ptep, pte;
-
-	if (!pgd_none(*pgd)) {
-		pmd = pmd_offset(pgd, adr);
-		if (!pmd_none(*pmd)) {
-			ptep = pte_offset(pmd, adr);
-			pte = *ptep;
-			if (pte_present(pte)) {
-				ret = (unsigned long) page_address(pte_page(pte));
-				ret |= (adr & (PAGE_SIZE - 1));
-			}
-		}
-	}
-	MDEBUG(printk("uv2kva(%lx-->%lx)", adr, ret));
-	return ret;
-}
-
-static inline unsigned long uvirt_to_bus(unsigned long adr)
-{
-	unsigned long kva, ret;
-
-	kva = uvirt_to_kva(pgd_offset(current->mm, adr), adr);
-	ret = virt_to_bus((void *)kva);
-	MDEBUG(printk("uv2b(%lx-->%lx)", adr, ret));
-	return ret;
-}
-
-static inline unsigned long kvirt_to_bus(unsigned long adr)
-{
-	unsigned long va, kva, ret;
-
-	va = VMALLOC_VMADDR(adr);
-	kva = uvirt_to_kva(pgd_offset_k(va), va);
-	ret = virt_to_bus((void *)kva);
-	MDEBUG(printk("kv2b(%lx-->%lx)", adr, ret));
-	return ret;
-}
-
-/* Here we want the physical address of the memory.
- * This is used when initializing the contents of the
- * area and marking the pages as reserved.
- */
-static inline unsigned long kvirt_to_pa(unsigned long adr)
-{
-	unsigned long va, kva, ret;
-
-	va = VMALLOC_VMADDR(adr);
-	kva = uvirt_to_kva(pgd_offset_k(va), va);
-	ret = __pa(kva);
-	MDEBUG(printk("kv2pa(%lx-->%lx)", adr, ret));
-	return ret;
-}
-
-static void *rvmalloc(unsigned long size)
-{
-	void *mem;
-	unsigned long adr, page;
-
-	/* Round it off to PAGE_SIZE */
-	size += (PAGE_SIZE - 1);
-	size &= ~(PAGE_SIZE - 1);
-
-	mem = vmalloc_32(size);
-	if (!mem)
-		return NULL;
-
-	memset(mem, 0, size); /* Clear the ram out, no junk to the user */
-	adr = (unsigned long) mem;
-	while (size > 0) {
-		page = kvirt_to_pa(adr);
-		mem_map_reserve(virt_to_page(__va(page)));
-		adr += PAGE_SIZE;
-		if (size > PAGE_SIZE)
-			size -= PAGE_SIZE;
-		else
-			size = 0;
-	}
-
-	return mem;
-}
-
-static void rvfree(void *mem, unsigned long size)
-{
-	unsigned long adr, page;
-
-	if (!mem)
-		return;
-
-	size += (PAGE_SIZE - 1);
-	size &= ~(PAGE_SIZE - 1);
-
-	adr=(unsigned long) mem;
-	while (size > 0) {
-		page = kvirt_to_pa(adr);
-		mem_map_unreserve(virt_to_page(__va(page)));
-		adr += PAGE_SIZE;
-		if (size > PAGE_SIZE)
-			size -= PAGE_SIZE;
-		else
-			size = 0;
-	}
-	vfree(mem);
-}
-
-#if ENABLE_HEXDUMP
-static void ibmcam_hexdump(const unsigned char *data, int len)
-{
-	char tmp[80];
-	int i, k;
-
-	for (i=k=0; len > 0; i++, len--) {
-		if (i > 0 && (i%16 == 0)) {
-			printk("%s\n", tmp);
-			k=0;
-		}
-		k += sprintf(&tmp[k], "%02x ", data[i]);
-	}
-	if (k > 0)
-		printk("%s\n", tmp);
-}
-#endif
+struct struct_initData {
+	unsigned char req;
+	unsigned short value;
+	unsigned short index;
+};
 
 /*
- * usb_ibmcam_overlaychar()
+ * ibmcam_size_to_videosize()
  *
- * History:
- * 1/2/00   Created.
+ * This procedure converts module option 'size' into the actual
+ * videosize_t that defines the image size in pixels. We need
+ * simplified 'size' because user wants a simple enumerated list
+ * of choices, not an infinite set of possibilities.
  */
-void usb_ibmcam_overlaychar(
-	struct usb_ibmcam *ibmcam,
-	struct ibmcam_frame *frame,
-	int x, int y, int ch)
+static videosize_t ibmcam_size_to_videosize(int size)
 {
-	static const unsigned short digits[16] = {
-		0xF6DE, /* 0 */
-		0x2492, /* 1 */
-		0xE7CE, /* 2 */
-		0xE79E, /* 3 */
-		0xB792, /* 4 */
-		0xF39E, /* 5 */
-		0xF3DE, /* 6 */
-		0xF492, /* 7 */
-		0xF7DE, /* 8 */
-		0xF79E, /* 9 */
-		0x77DA, /* a */
-		0xD75C, /* b */
-		0xF24E, /* c */
-		0xD6DC, /* d */
-		0xF34E, /* e */
-		0xF348  /* f */
-	};
-	unsigned short digit;
-	int ix, iy;
-
-	if ((ibmcam == NULL) || (frame == NULL))
-		return;
-
-	if (ch >= '0' && ch <= '9')
-		ch -= '0';
-	else if (ch >= 'A' && ch <= 'F')
-		ch = 10 + (ch - 'A');
-	else if (ch >= 'a' && ch <= 'f')
-		ch = 10 + (ch - 'a');
-	else
-		return;
-	digit = digits[ch];
-
-	for (iy=0; iy < 5; iy++) {
-		for (ix=0; ix < 3; ix++) {
-			if (digit & 0x8000) {
-				IBMCAM_PUTPIXEL(frame, x+ix, y+iy, 0xFF, 0xFF, 0xFF);
-			}
-			digit = digit << 1;
-		}
-	}
-}
-
-/*
- * usb_ibmcam_overlaystring()
- *
- * History:
- * 1/2/00   Created.
- */
-void usb_ibmcam_overlaystring(
-	struct usb_ibmcam *ibmcam,
-	struct ibmcam_frame *frame,
-	int x, int y, const char *str)
-{
-	while (*str) {
-		usb_ibmcam_overlaychar(ibmcam, frame, x, y, *str);
-		str++;
-		x += 4; /* 3 pixels character + 1 space */
-	}
-}
-
-/*
- * usb_ibmcam_overlaystats()
- *
- * Overlays important debugging information.
- *
- * History:
- * 1/2/00   Created.
- */
-void usb_ibmcam_overlaystats(struct usb_ibmcam *ibmcam, struct ibmcam_frame *frame)
-{
-	const int y_diff = 8;
-	char tmp[16];
-	int x = 10;
-	int y = 10;
-
-	sprintf(tmp, "%8x", ibmcam->frame_num);
-	usb_ibmcam_overlaystring(ibmcam, frame, x, y, tmp);
-	y += y_diff;
-
-	sprintf(tmp, "%8lx", ibmcam->urb_count);
-	usb_ibmcam_overlaystring(ibmcam, frame, x, y, tmp);
-	y += y_diff;
-
-	sprintf(tmp, "%8lx", ibmcam->urb_length);
-	usb_ibmcam_overlaystring(ibmcam, frame, x, y, tmp);
-	y += y_diff;
-
-	sprintf(tmp, "%8lx", ibmcam->data_count);
-	usb_ibmcam_overlaystring(ibmcam, frame, x, y, tmp);
-	y += y_diff;
-
-	sprintf(tmp, "%8lx", ibmcam->header_count);
-	usb_ibmcam_overlaystring(ibmcam, frame, x, y, tmp);
-	y += y_diff;
-
-	sprintf(tmp, "%8lx", ibmcam->scratch_ovf_count);
-	usb_ibmcam_overlaystring(ibmcam, frame, x, y, tmp);
-	y += y_diff;
-
-	sprintf(tmp, "%8lx", ibmcam->iso_skip_count);
-	usb_ibmcam_overlaystring(ibmcam, frame, x, y, tmp);
-	y += y_diff;
-
-	sprintf(tmp, "%8lx", ibmcam->iso_err_count);
-	usb_ibmcam_overlaystring(ibmcam, frame, x, y, tmp);
-	y += y_diff;
-
-	sprintf(tmp, "%8x", ibmcam->vpic.colour);
-	usb_ibmcam_overlaystring(ibmcam, frame, x, y, tmp);
-	y += y_diff;
-
-	sprintf(tmp, "%8x", ibmcam->vpic.hue);
-	usb_ibmcam_overlaystring(ibmcam, frame, x, y, tmp);
-	y += y_diff;
-
-	sprintf(tmp, "%8x", ibmcam->vpic.brightness >> 8);
-	usb_ibmcam_overlaystring(ibmcam, frame, x, y, tmp);
-	y += y_diff;
-
-	sprintf(tmp, "%8x", ibmcam->vpic.contrast >> 12);
-	usb_ibmcam_overlaystring(ibmcam, frame, x, y, tmp);
-	y += y_diff;
-
-	sprintf(tmp, "%8d", ibmcam->vpic.whiteness >> 8);
-	usb_ibmcam_overlaystring(ibmcam, frame, x, y, tmp);
-	y += y_diff;
-}
-
-/*
- * usb_ibmcam_testpattern()
- *
- * Procedure forms a test pattern (yellow grid on blue background).
- *
- * Parameters:
- * fullframe:   if TRUE then entire frame is filled, otherwise the procedure
- *	      continues from the current scanline.
- * pmode	0: fill the frame with solid blue color (like on VCR or TV)
- *	      1: Draw a colored grid
- *
- * History:
- * 1/2/00   Created.
- */
-void usb_ibmcam_testpattern(struct usb_ibmcam *ibmcam, int fullframe, int pmode)
-{
-	static const char proc[] = "usb_ibmcam_testpattern";
-	struct ibmcam_frame *frame;
-	unsigned char *f;
-	int num_cell = 0;
-	int scan_length = 0;
-	static int num_pass = 0;
-
-	if (ibmcam == NULL) {
-		printk(KERN_ERR "%s: ibmcam == NULL\n", proc);
-		return;
-	}
-	if ((ibmcam->curframe < 0) || (ibmcam->curframe >= IBMCAM_NUMFRAMES)) {
-		printk(KERN_ERR "%s: ibmcam->curframe=%d.\n", proc, ibmcam->curframe);
-		return;
-	}
-
-	/* Grab the current frame */
-	frame = &ibmcam->frame[ibmcam->curframe];
-
-	/* Optionally start at the beginning */
-	if (fullframe) {
-		frame->curline = 0;
-		frame->scanlength = 0;
-	}
-
-	/* Form every scan line */
-	for (; frame->curline < imgheight; frame->curline++) {
-		int i;
-
-		f = frame->data + (imgwidth * 3 * frame->curline);
-		for (i=0; i < imgwidth; i++) {
-			unsigned char cb=0x80;
-			unsigned char cg = 0;
-			unsigned char cr = 0;
-
-			if (pmode == 1) {
-				if (frame->curline % 32 == 0)
-					cb = 0, cg = cr = 0xFF;
-				else if (i % 32 == 0) {
-					if (frame->curline % 32 == 1)
-						num_cell++;
-					cb = 0, cg = cr = 0xFF;
-				} else {
-					cb = ((num_cell*7) + num_pass) & 0xFF;
-					cg = ((num_cell*5) + num_pass*2) & 0xFF;
-					cr = ((num_cell*3) + num_pass*3) & 0xFF;
-				}
-			} else {
-				/* Just the blue screen */
-			}
-				
-			*f++ = cb;
-			*f++ = cg;
-			*f++ = cr;
-			scan_length += 3;
-		}
-	}
-
-	frame->grabstate = FRAME_DONE;
-	frame->scanlength += scan_length;
-	++num_pass;
-
-	/* We do this unconditionally, regardless of FLAGS_OVERLAY_STATS */
-	usb_ibmcam_overlaystats(ibmcam, frame);
-}
-
-static unsigned char *ibmcam_model1_find_header(unsigned char hdr_sig, unsigned char *data, int len)
-{
-	while (len >= 4)
-	{
-		if ((data[0] == 0x00) && (data[1] == 0xFF) && (data[2] == 0x00))
-		{
-#if 0
-			/* This code helps to detect new frame markers */
-			printk(KERN_DEBUG "Header sig: 00 FF 00 %02X\n", data[3]);
-#endif
-			if (data[3] == hdr_sig) {
-				if (debug > 2)
-					printk(KERN_DEBUG "Header found.\n");
-				return data+4;
-			}
-		}
-		++data;
-		--len;
-	}
-	return NULL;
-}
-
-static unsigned char *ibmcam_model2_find_header(unsigned char hdr_sig, unsigned char *data, int len)
-{
-	int marker_len = 0;
-
-	switch (videosize) {
-	case VIDEOSIZE_176x144:
-		marker_len = 10;
+	videosize_t vs = VIDEOSIZE_352x288;
+	RESTRICT_TO_RANGE(size, 0, (SIZE_LastItem-1));
+	switch (size) {
+	case SIZE_128x96:
+		vs = VIDEOSIZE_128x96;
+		break;
+	case SIZE_160x120:
+		vs = VIDEOSIZE_160x120;
+		break;
+	case SIZE_176x144:
+		vs = VIDEOSIZE_176x144;
+		break;
+	case SIZE_320x240:
+		vs = VIDEOSIZE_320x240;
+		break;
+	case SIZE_352x240:
+		vs = VIDEOSIZE_352x240;
+		break;
+	case SIZE_352x288:
+		vs = VIDEOSIZE_352x288;
+		break;
+	case SIZE_640x480:
+		vs = VIDEOSIZE_640x480;
 		break;
 	default:
-		marker_len = 2;
+		err("size=%d. is not valid", size);
 		break;
 	}
-	while (len >= marker_len)
-	{
-		if ((data[0] == 0x00) && (data[1] == 0xFF))
-		{
-#if 0
-			/* This code helps to detect new frame markers */
-			static int pass = 0;
-			if (pass++ == 0)
-				ibmcam_hexdump(data, (len > 16) ? 16 : len);
-#endif
-			if (debug > 2)
-				printk(KERN_DEBUG "Header found.\n");
-			return data+marker_len;
-		}
-		++data;
-		--len;
-	}
-	return NULL;
-}
-
-/* How much data is left in the scratch buf? */
-#define scratch_left(x)	(ibmcam->scratchlen - (int)((char *)x - (char *)ibmcam->scratch))
-
-/* Grab the remaining */
-static void usb_ibmcam_align_scratch(struct usb_ibmcam *ibmcam, unsigned char *data)
-{
-	unsigned long left;
-
-	left = scratch_left(data);
-	memmove(ibmcam->scratch, data, left);
-	ibmcam->scratchlen = left;
+	return vs;
 }
 
 /*
- * usb_ibmcam_find_header()
+ * ibmcam_find_header()
  *
- * Locate one of supported header markers in the scratch buffer.
+ * Locate one of supported header markers in the queue.
  * Once found, remove all preceding bytes AND the marker (4 bytes)
- * from the scratch buffer. Whatever follows must be video lines.
+ * from the data pump queue. Whatever follows must be video lines.
  *
  * History:
  * 1/21/00  Created.
  */
-static scan_state_t usb_ibmcam_find_header(struct usb_ibmcam *ibmcam)
+static ParseState_t ibmcam_find_header(uvd_t *uvd) /* FIXME: Add frame here */
 {
-	struct ibmcam_frame *frame;
-	unsigned char *data, *tmp;
+	usbvideo_frame_t *frame;
+	ibmcam_t *icam;
 
-	data = ibmcam->scratch;
-	frame = &ibmcam->frame[ibmcam->curframe];
-
-	if (ibmcam->camera_model == IBMCAM_MODEL_1)
-		tmp = ibmcam_model1_find_header(frame->hdr_sig, data, scratch_left(data));
-	else if (ibmcam->camera_model == IBMCAM_MODEL_2)
-		tmp = ibmcam_model2_find_header(frame->hdr_sig, data, scratch_left(data));
-	else
-		tmp = NULL;
-
-	if (tmp == NULL) {
-		/* No header - entire scratch buffer is useless! */
-		if (debug > 2)
-			printk(KERN_DEBUG "Skipping frame, no header\n");
-		ibmcam->scratchlen = 0;
+	if ((uvd->curframe) < 0 || (uvd->curframe >= USBVIDEO_NUMFRAMES)) {
+		err("ibmcam_find_header: Illegal frame %d.", uvd->curframe);
 		return scan_EndParse;
 	}
-	/* Header found */
-	data = tmp;
+	icam = IBMCAM_T(uvd);
+	assert(icam != NULL);
+	frame = &uvd->frame[uvd->curframe];
+	icam->has_hdr = 0;
+	switch (icam->camera_model) {
+	case IBMCAM_MODEL_1:
+	{
+		const int marker_len = 4;
+		while (RingQueue_GetLength(&uvd->dp) >= marker_len) {
+			if ((RING_QUEUE_PEEK(&uvd->dp, 0) == 0x00) &&
+			    (RING_QUEUE_PEEK(&uvd->dp, 1) == 0xFF) &&
+			    (RING_QUEUE_PEEK(&uvd->dp, 2) == 0x00))
+			{
+#if 0				/* This code helps to detect new frame markers */
+				info("Header sig: 00 FF 00 %02X", RING_QUEUE_PEEK(&uvd->dp, 3));
+#endif
+				frame->header = RING_QUEUE_PEEK(&uvd->dp, 3);
+				if ((frame->header == HDRSIG_MODEL1_128x96) ||
+				    (frame->header == HDRSIG_MODEL1_176x144) ||
+				    (frame->header == HDRSIG_MODEL1_352x288))
+				{
+#if 0
+					info("Header found.");
+#endif
+					RING_QUEUE_DEQUEUE_BYTES(&uvd->dp, marker_len);
+					icam->has_hdr = 1;
+					break;
+				}
+			}
+			/* If we are still here then this doesn't look like a header */
+			RING_QUEUE_DEQUEUE_BYTES(&uvd->dp, 1);
+		}
+		break;
+	}
+	case IBMCAM_MODEL_2:
+case IBMCAM_MODEL_4:
+	{
+		int marker_len = 0;
+		switch (uvd->videosize) {
+		case VIDEOSIZE_176x144:
+			marker_len = 10;
+			break;
+		default:
+			marker_len = 2;
+			break;
+		}
+		while (RingQueue_GetLength(&uvd->dp) >= marker_len) {
+			if ((RING_QUEUE_PEEK(&uvd->dp, 0) == 0x00) &&
+			    (RING_QUEUE_PEEK(&uvd->dp, 1) == 0xFF))
+			{
+#if 0
+				info("Header found.");
+#endif
+				RING_QUEUE_DEQUEUE_BYTES(&uvd->dp, marker_len);
+				icam->has_hdr = 1;
+				frame->header = HDRSIG_MODEL1_176x144;
+				break;
+			}
+			/* If we are still here then this doesn't look like a header */
+			RING_QUEUE_DEQUEUE_BYTES(&uvd->dp, 1);
+		}
+		break;
+	}
+	case IBMCAM_MODEL_3:
+	{	/*
+		 * Headers: (one precedes every frame). nc=no compression,
+		 * bq=best quality bf=best frame rate.
+		 *
+		 * 176x144: 00 FF 02 { 0A=nc CA=bq EA=bf }
+		 * 320x240: 00 FF 02 { 08=nc 28=bq 68=bf }
+		 * 640x480: 00 FF 03 { 08=nc 28=bq 68=bf }
+		 *
+		 * Bytes '00 FF' seem to indicate header. Other two bytes
+		 * encode the frame type. This is a set of bit fields that
+		 * encode image size, compression type etc. These fields
+		 * do NOT contain frame number because all frames carry
+		 * the same header.
+		 */
+		const int marker_len = 4;
+		while (RingQueue_GetLength(&uvd->dp) >= marker_len) {
+			if ((RING_QUEUE_PEEK(&uvd->dp, 0) == 0x00) &&
+			    (RING_QUEUE_PEEK(&uvd->dp, 1) == 0xFF) &&
+			    (RING_QUEUE_PEEK(&uvd->dp, 2) != 0xFF))
+			{
+				/*
+				 * Combine 2 bytes of frame type into one
+				 * easy to use value
+				 */
+				unsigned long byte3, byte4;
 
-	ibmcam->has_hdr = 1;
-	ibmcam->header_count++;
-	frame->scanstate = STATE_LINES;
+				byte3 = RING_QUEUE_PEEK(&uvd->dp, 2);
+				byte4 = RING_QUEUE_PEEK(&uvd->dp, 3);
+				frame->header = (byte3 << 8) | byte4;
+#if 0
+				info("Header found.");
+#endif
+				RING_QUEUE_DEQUEUE_BYTES(&uvd->dp, marker_len);
+				icam->has_hdr = 1;
+				break;
+			}
+			/* If we are still here then this doesn't look like a header */
+			RING_QUEUE_DEQUEUE_BYTES(&uvd->dp, 1);
+		}
+		break;
+	}
+	default:
+		break;
+	}
+	if (!icam->has_hdr) {
+		if (uvd->debug > 2)
+			info("Skipping frame, no header");
+		return scan_EndParse;
+	}
+
+	/* Header found */
+	icam->has_hdr = 1;
+	uvd->stats.header_count++;
+	frame->scanstate = ScanState_Lines;
 	frame->curline = 0;
 
 	if (flags & FLAGS_FORCE_TESTPATTERN) {
-		usb_ibmcam_testpattern(ibmcam, 1, 1);
+		usbvideo_TestPattern(uvd, 1, 1);
 		return scan_NextFrame;
 	}
-	usb_ibmcam_align_scratch(ibmcam, data);
 	return scan_Continue;
 }
 
 /*
- * usb_ibmcam_parse_lines()
+ * ibmcam_parse_lines()
  *
- * Parse one line (TODO: more than one!) from the scratch buffer, put
- * decoded RGB value into the current frame buffer and add the written
- * number of bytes (RGB) to the *pcopylen.
+ * Parse one line (interlaced) from the buffer, put
+ * decoded RGB value into the current frame buffer
+ * and add the written number of bytes (RGB) to
+ * the *pcopylen.
  *
  * History:
- * 1/21/00  Created.
+ * 21-Jan-2000 Created.
+ * 12-Oct-2000 Reworked to reflect interlaced nature of the data.
  */
-static scan_state_t usb_ibmcam_parse_lines(struct usb_ibmcam *ibmcam, long *pcopylen)
+static ParseState_t ibmcam_parse_lines(
+	uvd_t *uvd,
+	usbvideo_frame_t *frame,
+	long *pcopylen)
 {
-	struct ibmcam_frame *frame;
-	unsigned char *data, *f, *chromaLine;
-	unsigned int len;
-	const int v4l_linesize = imgwidth * V4L_BYTES_PER_PIXEL;	/* V4L line offset */
-	const int hue_corr  = (ibmcam->vpic.hue - 0x8000) >> 10;	/* -32..+31 */
+	unsigned char *f;
+	ibmcam_t *icam;
+	unsigned int len, scanLength, scanHeight, order_uv, order_yc;
+	int v4l_linesize; /* V4L line offset */
+	const int hue_corr  = (uvd->vpic.hue - 0x8000) >> 10;	/* -32..+31 */
 	const int hue2_corr = (hue_correction - 128) / 4;		/* -32..+31 */
 	const int ccm = 128; /* Color correction median - see below */
-	int y, u, v, i, frame_done=0, mono_plane, color_corr;
+	int y, u, v, i, frame_done=0, color_corr;
+	static unsigned char lineBuffer[640*3];
+	unsigned const char *chromaLine, *lumaLine;
 
-	color_corr = (ibmcam->vpic.colour - 0x8000) >> 8; /* -128..+127 = -ccm..+(ccm-1)*/
+	assert(uvd != NULL);
+	assert(frame != NULL);
+	icam = IBMCAM_T(uvd);
+	assert(icam != NULL);
+	color_corr = (uvd->vpic.colour - 0x8000) >> 8; /* -128..+127 = -ccm..+(ccm-1)*/
 	RESTRICT_TO_RANGE(color_corr, -ccm, ccm+1);
-	data = ibmcam->scratch;
-	frame = &ibmcam->frame[ibmcam->curframe];
 
-	len = frame->frmwidth * 3; /* 1 line of mono + 1 line of color */
-	/*printk(KERN_DEBUG "len=%d. left=%d.\n",len,scratch_left(data));*/
+	v4l_linesize = VIDEOSIZE_X(frame->request) * V4L_BYTES_PER_PIXEL;
 
-	mono_plane = ((frame->curline & 1) == 0);
+	if (IBMCAM_T(uvd)->camera_model == IBMCAM_MODEL_4) {
+		/* Model 4 frame markers do not carry image size identification */
+		switch (uvd->videosize) {
+		case VIDEOSIZE_128x96:
+		case VIDEOSIZE_160x120:
+		case VIDEOSIZE_176x144:
+			scanLength = VIDEOSIZE_X(uvd->videosize);
+			scanHeight = VIDEOSIZE_Y(uvd->videosize);
+			break;
+		default:
+			err("ibmcam_parse_lines: Wrong mode.");
+			return scan_Out;
+		}
+		order_yc = 1;	/* order_yc: true=Yc false=cY ('c'=either U or V) */
+		order_uv = 1;	/* Always true in this algorithm */
+	} else {
+		switch (frame->header) {
+		case HDRSIG_MODEL1_128x96:
+			scanLength = 128;
+			scanHeight = 96;
+			order_uv = 1;	/* U Y V Y ... */
+			break;
+		case HDRSIG_MODEL1_176x144:
+			scanLength = 176;
+			scanHeight = 144;
+			order_uv = 1;	/* U Y V Y ... */
+			break;
+		case HDRSIG_MODEL1_352x288:
+			scanLength = 352;
+			scanHeight = 288;
+			order_uv = 0;	/* Y V Y V ... */
+			break;
+		default:
+			err("Unknown header signature 00 FF 00 %02lX", frame->header);
+			return scan_NextFrame;
+		}
+		/* order_yc: true=Yc false=cY ('c'=either U or V) */
+		order_yc = (IBMCAM_T(uvd)->camera_model == IBMCAM_MODEL_2);
+	}
+
+	len = scanLength * 3;
+	assert(len <= sizeof(lineBuffer));
 
 	/*
-	 * Lines are organized this way (or are they?)
+	 * Lines are organized this way:
 	 *
 	 * I420:
 	 * ~~~~
+	 * <scanLength->
 	 * ___________________________________
 	 * |-----Y-----|---UVUVUV...UVUV-----| \
 	 * |-----------+---------------------|  \
-	 * |<-- 176 -->|<------ 176*2 ------>|  Total 72. pairs of lines
-	 * |...	   ...	     ...|  /
+	 * |<-- 176 -->|<------ 176*2 ------>|  Total 72. lines (interlaced)
+	 * |...	   ... |        ...          |  /
+	 * |<-- 352 -->|<------ 352*2 ------>|  Total 144. lines (interlaced)
 	 * |___________|_____________________| /
-	 *  - odd line- ------- even line ---
-	 *
-	 * another format:
-	 * ~~~~~~~~~~~~~~
-	 * ___________________________________
-	 * |-----Y-----|---UVUVUV...UVUV-----| \
-	 * |-----------+---------------------|  \
-	 * |<-- 352 -->|<------ 352*2 ------>|  Total 144. pairs of lines
-	 * |...	   ...	     ...|  /
-	 * |___________|_____________________| /
-	 *  - odd line- ------- even line ---
+	 *  \           \
+	 *   lumaLine    chromaLine
 	 */
 
 	/* Make sure there's enough data for the entire line */
-	if (scratch_left(data) < (len+1024)) {
-		/*printk(KERN_DEBUG "out of data, need %u.\n", len);*/
+	if (RingQueue_GetLength(&uvd->dp) < len)
 		return scan_Out;
-	}
 
-#if 0
-	{	/* This code prints beginning of the source frame */
-		static int pass = 0;
-		if ((pass++ % 3000) == 0)
-			ibmcam_hexdump(data, 16);
-	}
-#endif
+	/* Suck one line out of the ring queue */
+	RingQueue_Dequeue(&uvd->dp, lineBuffer, len);
 
-#if 0
-	if (frame->curline == 10 || frame->curline == 11) {
-		/* This code prints beginning of 10th (mono), 11th (chroma) line */
-		static int pass = 0;
-		if ((pass % 100) == 0)
-			ibmcam_hexdump(data, 16);
-		if (frame->curline == 11)
-			pass++;
-	}
-#endif
 	/*
 	 * Make sure that our writing into output buffer
 	 * will not exceed the buffer. Mind that we may write
 	 * not into current output scanline but in several after
 	 * it as well (if we enlarge image vertically.)
 	 */
-	if ((frame->curline + 1) >= V4L_FRAME_HEIGHT)
+	if ((frame->curline + 2) >= VIDEOSIZE_Y(frame->request))
 		return scan_NextFrame;
 
 	/*
-	 * Now we are sure that entire line (representing all 'frame->frmwidth'
-	 * pixels from the camera) is available in the scratch buffer. We
-	 * start copying the line left-aligned to the V4L buffer (which
-	 * might be larger - not smaller, hopefully). If the camera
-	 * line is shorter then we should pad the V4L buffer with something
-	 * (black in this case) to complete the line.
+	 * Now we are sure that entire line (representing all 'scanLength'
+	 * pixels from the camera) is available in the buffer. We
+	 * start copying the line left-aligned to the V4L buffer.
+	 * If the camera line is shorter then we should pad the V4L
+	 * buffer with something (black) to complete the line.
 	 */
+	assert(frame->data != NULL);
 	f = frame->data + (v4l_linesize * frame->curline);
 
 	/*
-	 * chromaLine points to 1st pixel of the line with chrominance.
-	 * If current line is monochrome then chromaLine points to next
-	 * line after monochrome one. If current line has chrominance
-	 * then chromaLine points to this very line. Such method allows
-	 * to access chrominance data uniformly.
-	 *
 	 * To obtain chrominance data from the 'chromaLine' use this:
 	 *   v = chromaLine[0]; // 0-1:[0], 2-3:[4], 4-5:[8]...
 	 *   u = chromaLine[2]; // 0-1:[2], 2-3:[6], 4-5:[10]...
@@ -778,40 +514,16 @@ static scan_state_t usb_ibmcam_parse_lines(struct usb_ibmcam *ibmcam, long *pcop
 	 * v_index = (i >> 1) << 2;
 	 * u_index = (i >> 1) << 2 + 2;
 	 *
-	 * where 'i' is the column number [0..frame->frmwidth-1]
+	 * where 'i' is the column number [0..VIDEOSIZE_X(frame->request)-1]
 	 */
-	chromaLine = data;
-	if (mono_plane)
-		chromaLine += frame->frmwidth;
-
-	for (i = 0; i < frame->frmwidth; i++, data += (mono_plane ? 1 : 2))
+	lumaLine = lineBuffer;
+	chromaLine = lineBuffer + scanLength;
+	for (i = 0; i < VIDEOSIZE_X(frame->request); i++)
 	{
 		unsigned char rv, gv, bv;	/* RGB components */
 
-		/*
-		 * Search for potential Start-Of-Frame marker. It should
-		 * not be here, of course, but if your formats don't match
-		 * you might exceed the frame. We must match the marker to
-		 * each byte of multi-byte data element if it is multi-byte.
-		 */
-#if 1
-		if ((ibmcam->camera_model == IBMCAM_MODEL_1) && (scratch_left(data) >= (4+2))) {
-			unsigned char *dp;
-			int j;
-
-			for (j=0, dp=data; j < 2; j++, dp++) {
-				if ((dp[0] == 0x00) && (dp[1] == 0xFF) &&
-				    (dp[2] == 0x00) && (dp[3] == frame->hdr_sig)) {
-					ibmcam->has_hdr = 2;
-					frame_done++;
-					break;
-				}
-			}
-		}
-#endif
-
 		/* Check for various visual debugging hints (colorized pixels) */
-		if ((flags & FLAGS_DISPLAY_HINTS) && (ibmcam->has_hdr)) {
+		if ((flags & FLAGS_DISPLAY_HINTS) && (icam->has_hdr)) {
 			/*
 			 * This is bad and should not happen. This means that
 			 * we somehow overshoot the line and encountered new
@@ -819,7 +531,7 @@ static scan_state_t usb_ibmcam_parse_lines(struct usb_ibmcam *ibmcam, long *pcop
 			 * of whack. This cyan dot will help you to figure
 			 * out where exactly the new frame arrived.
 			 */
-			if (ibmcam->has_hdr == 1) {
+			if (icam->has_hdr == 1) {
 				bv = 0; /* Yellow marker */
 				gv = 0xFF;
 				rv = 0xFF;
@@ -828,15 +540,27 @@ static scan_state_t usb_ibmcam_parse_lines(struct usb_ibmcam *ibmcam, long *pcop
 				gv = 0xFF;
 				rv = 0;
 			}
-			ibmcam->has_hdr = 0;
+			icam->has_hdr = 0;
 			goto make_pixel;
 		}
 
-		if (mono_plane || frame->order_yc)
-			y = data[0];
-		else
-			y = data[1];
+		/*
+		 * Check if we are still in range. We may be out of range if our
+		 * V4L canvas is wider or taller than the camera "native" image.
+		 * Then we quickly fill the remainder of the line with zeros to
+		 * make black color and quit the horizontal scanning loop.
+		 */
+		if (((frame->curline + 2) >= scanHeight) || (i >= scanLength)) {
+			const int j = i * V4L_BYTES_PER_PIXEL;
+#if USES_IBMCAM_PUTPIXEL
+			/* Refresh 'f' because we don't use it much with PUTPIXEL */
+			f = frame->data + (v4l_linesize * frame->curline) + j;
+#endif
+			memset(f, 0, v4l_linesize - j);
+			break;
+		}
 
+		y = lumaLine[i];
 		if (flags & FLAGS_MONOCHROME) /* Use monochrome for debugging */
 			rv = gv = bv = y;
 		else {
@@ -845,11 +569,11 @@ static scan_state_t usb_ibmcam_parse_lines(struct usb_ibmcam *ibmcam, long *pcop
 			off_0 = (i >> 1) << 2;
 			off_2 = off_0 + 2;
 
-			if (frame->order_yc) {
+			if (order_yc) {
 				off_0++;
 				off_2++;
 			}
-			if (!frame->order_uv) {
+			if (!order_uv) {
 				off_0 += 2;
 				off_2 -= 2;
 			}
@@ -877,7 +601,7 @@ static scan_state_t usb_ibmcam_parse_lines(struct usb_ibmcam *ibmcam, long *pcop
 		 * (in this order).
 		 */
 #if USES_IBMCAM_PUTPIXEL
-		IBMCAM_PUTPIXEL(frame, i, frame->curline, rv, gv, bv);
+		RGB24_PUTPIXEL(frame, i, frame->curline, rv, gv, bv);
 #else
 		*f++ = bv;
 		*f++ = gv;
@@ -899,18 +623,19 @@ static scan_state_t usb_ibmcam_parse_lines(struct usb_ibmcam *ibmcam, long *pcop
 	 * may fill more than one output scanline if we do vertical
 	 * enlargement.
 	 */
-	frame->curline++;
-	*pcopylen += v4l_linesize;
-	usb_ibmcam_align_scratch(ibmcam, data);
+	frame->curline += 2;
+	if (pcopylen != NULL)
+		*pcopylen += 2 * v4l_linesize;
+	frame->deinterlace = Deinterlace_FillOddLines;
 
-	if (frame_done || (frame->curline >= frame->frmheight))
+	if (frame_done || (frame->curline >= VIDEOSIZE_Y(frame->request)))
 		return scan_NextFrame;
 	else
 		return scan_Continue;
 }
 
 /*
- * usb_ibmcam_model2_parse_lines()
+ * ibmcam_model2_320x240_parse_lines()
  *
  * This procedure deals with a weird RGB format that is produced by IBM
  * camera model 2 in modes 320x240 and above; 'x' below is 159 or 175,
@@ -918,15 +643,15 @@ static scan_state_t usb_ibmcam_parse_lines(struct usb_ibmcam *ibmcam, long *pcop
  *
  * <--- 160 or 176 pairs of RA,RB bytes ----->
  * *-----------------------------------------* \
- * | RA0 | RB0 | RA1 | RB1 | ... | RAx | RBx |  \
- * |-----+-----+-----+-----+ ... +-----+-----|   *- This is pair of horizontal lines,
- * | B0  | G0  | B1  | G1  | ... | Bx  | Gx  |  /   total 240 or 288 lines (120 or 144
- * |=====+=====+=====+=====+ ... +=====+=====| /    such pairs).
+ * | RA0 | RB0 | RA1 | RB1 | ... | RAx | RBx |  \   This is pair of horizontal lines,
+ * |-----+-----+-----+-----+ ... +-----+-----|   *- or one interlaced line, total
+ * | B0  | G0  | B1  | G1  | ... | Bx  | Gx  |  /   120 or 144 such pairs which yield
+ * |=====+=====+=====+=====+ ... +=====+=====| /    240 or 288 lines after deinterlacing.
  *
  * Each group of FOUR bytes (RAi, RBi, Bi, Gi) where i=0..frame_width/2-1
  * defines ONE pixel. Therefore this format yields 176x144 "decoded"
  * resolution at best. I do not know why camera sends such format - the
- * previous model just used I420 and everyone was happy.
+ * previous model (1) just used interlaced I420 and everyone was happy.
  *
  * I do not know what is the difference between RAi and RBi bytes. Both
  * seemingly represent R component, but slightly vary in value (so that
@@ -934,29 +659,42 @@ static scan_state_t usb_ibmcam_parse_lines(struct usb_ibmcam *ibmcam, long *pcop
  * them both as R component in attempt to at least partially recover the
  * lost resolution.
  */
-static scan_state_t usb_ibmcam_model2_parse_lines(struct usb_ibmcam *ibmcam, long *pcopylen)
+static ParseState_t ibmcam_model2_320x240_parse_lines(
+	uvd_t *uvd,
+	usbvideo_frame_t *frame,
+	long *pcopylen)
 {
-	struct ibmcam_frame *frame;
-	unsigned char *data, *f, *la, *lb;
+	unsigned char *f, *la, *lb;
 	unsigned int len;
-	const int v4l_linesize = imgwidth * V4L_BYTES_PER_PIXEL;	/* V4L line offset */
+	int v4l_linesize; /* V4L line offset */
 	int i, j, frame_done=0, color_corr;
+	int scanLength, scanHeight;
+	static unsigned char lineBuffer[352*2];
 
-	color_corr = (ibmcam->vpic.colour) >> 8; /* 0..+255 */
-
-	data = ibmcam->scratch;
-	frame = &ibmcam->frame[ibmcam->curframe];
-
-	/* Here we deal with pairs of horizontal lines */
-
-	len = frame->frmwidth * 2; /* 2 lines */
-	/*printk(KERN_DEBUG "len=%d. left=%d.\n",len,scratch_left(data));*/
-
-	/* Make sure there's enough data for the entire line */
-	if (scratch_left(data) < (len+32)) {
-		/*printk(KERN_DEBUG "out of data, need %u.\n", len);*/
+	switch (uvd->videosize) {
+	case VIDEOSIZE_320x240:
+	case VIDEOSIZE_352x240:
+	case VIDEOSIZE_352x288:
+		scanLength = VIDEOSIZE_X(uvd->videosize);
+		scanHeight = VIDEOSIZE_Y(uvd->videosize);
+		break;
+	default:
+		err("ibmcam_model2_320x240_parse_lines: Wrong mode.");
 		return scan_Out;
 	}
+
+	color_corr = (uvd->vpic.colour) >> 8; /* 0..+255 */
+	v4l_linesize = VIDEOSIZE_X(frame->request) * V4L_BYTES_PER_PIXEL;
+
+	len = scanLength * 2; /* See explanation above */
+	assert(len <= sizeof(lineBuffer));
+
+	/* Make sure there's enough data for the entire line */
+	if (RingQueue_GetLength(&uvd->dp) < len)
+		return scan_Out;
+
+	/* Suck one line out of the ring queue */
+	RingQueue_Dequeue(&uvd->dp, lineBuffer, len);
 
 	/*
 	 * Make sure that our writing into output buffer
@@ -964,19 +702,15 @@ static scan_state_t usb_ibmcam_model2_parse_lines(struct usb_ibmcam *ibmcam, lon
 	 * not into current output scanline but in several after
 	 * it as well (if we enlarge image vertically.)
 	 */
-	if ((frame->curline + 1) >= V4L_FRAME_HEIGHT)
+	if ((frame->curline + 2) >= VIDEOSIZE_Y(frame->request))
 		return scan_NextFrame;
 
-	if ((frame->curline & 1) == 0) {
-		la = data;
-		lb = data + frame->frmwidth;
-	} else {
-		la = data + frame->frmwidth;
-		lb = data;
-	}
+	la = lineBuffer;
+	lb = lineBuffer + scanLength;
 
 	/*
-	 * Now we are sure that entire line (representing all 'frame->frmwidth'
+	 * Now we are sure that entire line (representing all
+	 *         VIDEOSIZE_X(frame->request)
 	 * pixels from the camera) is available in the scratch buffer. We
 	 * start copying the line left-aligned to the V4L buffer (which
 	 * might be larger - not smaller, hopefully). If the camera
@@ -986,14 +720,14 @@ static scan_state_t usb_ibmcam_model2_parse_lines(struct usb_ibmcam *ibmcam, lon
 	f = frame->data + (v4l_linesize * frame->curline);
 
 	/* Fill the 2-line strip */
-	for (i = 0; i < frame->frmwidth; i++) {
+	for (i = 0; i < VIDEOSIZE_X(frame->request); i++) {
 		int y, rv, gv, bv;	/* RGB components */
 
 		j = i & (~1);
 
 		/* Check for various visual debugging hints (colorized pixels) */
-		if ((flags & FLAGS_DISPLAY_HINTS) && (ibmcam->has_hdr)) {
-			if (ibmcam->has_hdr == 1) {
+		if ((flags & FLAGS_DISPLAY_HINTS) && (IBMCAM_T(uvd)->has_hdr)) {
+			if (IBMCAM_T(uvd)->has_hdr == 1) {
 				bv = 0; /* Yellow marker */
 				gv = 0xFF;
 				rv = 0xFF;
@@ -1002,8 +736,24 @@ static scan_state_t usb_ibmcam_model2_parse_lines(struct usb_ibmcam *ibmcam, lon
 				gv = 0xFF;
 				rv = 0;
 			}
-			ibmcam->has_hdr = 0;
+			IBMCAM_T(uvd)->has_hdr = 0;
 			goto make_pixel;
+		}
+
+		/*
+		 * Check if we are still in range. We may be out of range if our
+		 * V4L canvas is wider or taller than the camera "native" image.
+		 * Then we quickly fill the remainder of the line with zeros to
+		 * make black color and quit the horizontal scanning loop.
+		 */
+		if (((frame->curline + 2) >= scanHeight) || (i >= scanLength)) {
+			const int j = i * V4L_BYTES_PER_PIXEL;
+#if USES_IBMCAM_PUTPIXEL
+			/* Refresh 'f' because we don't use it much with PUTPIXEL */
+			f = frame->data + (v4l_linesize * frame->curline) + j;
+#endif
+			memset(f, 0, v4l_linesize - j);
+			break;
 		}
 
 		/*
@@ -1045,8 +795,7 @@ static scan_state_t usb_ibmcam_model2_parse_lines(struct usb_ibmcam *ibmcam, lon
 		}
 
 	make_pixel:
-		IBMCAM_PUTPIXEL(frame, i, frame->curline, rv, gv, bv);
-		IBMCAM_PUTPIXEL(frame, i, frame->curline+1, rv, gv, bv);
+		RGB24_PUTPIXEL(frame, i, frame->curline, rv, gv, bv);
 	}
 	/*
 	 * Account for number of bytes that we wrote into output V4L frame.
@@ -1056,50 +805,286 @@ static scan_state_t usb_ibmcam_model2_parse_lines(struct usb_ibmcam *ibmcam, lon
 	 */
 	frame->curline += 2;
 	*pcopylen += v4l_linesize * 2;
-	data += frame->frmwidth * 2;
-	usb_ibmcam_align_scratch(ibmcam, data);
+	frame->deinterlace = Deinterlace_FillOddLines;
 
-	if (frame_done || (frame->curline >= frame->frmheight))
+	if (frame_done || (frame->curline >= VIDEOSIZE_Y(frame->request)))
 		return scan_NextFrame;
 	else
 		return scan_Continue;
 }
 
+static ParseState_t ibmcam_model3_parse_lines(
+	uvd_t *uvd,
+	usbvideo_frame_t *frame,
+	long *pcopylen)
+{
+	unsigned char *data;
+	const unsigned char *color;
+	unsigned int len;
+	int v4l_linesize; /* V4L line offset */
+	const int hue_corr  = (uvd->vpic.hue - 0x8000) >> 10;	/* -32..+31 */
+	const int hue2_corr = (hue_correction - 128) / 4;		/* -32..+31 */
+	const int ccm = 128; /* Color correction median - see below */
+	int i, u, v, rw, data_w=0, data_h=0, color_corr;
+	static unsigned char lineBuffer[640*3];
+
+	color_corr = (uvd->vpic.colour - 0x8000) >> 8; /* -128..+127 = -ccm..+(ccm-1)*/
+	RESTRICT_TO_RANGE(color_corr, -ccm, ccm+1);
+
+	v4l_linesize = VIDEOSIZE_X(frame->request) * V4L_BYTES_PER_PIXEL;
+
+	/* The header tells us what sort of data is in this frame */
+	switch (frame->header) {
+		/*
+		 * Uncompressed modes (that are easy to decode).
+		 */
+	case 0x0308:
+		data_w = 640;
+		data_h = 480;
+		break;
+	case 0x0208:
+		data_w = 320;
+		data_h = 240;
+		break;
+	case 0x020A:
+		data_w = 160;
+		data_h = 120;
+		break;
+		/*
+		 * Compressed modes (ViCE - that I don't know how to decode).
+		 */
+	case 0x0328:	/* 640x480, best quality compression */
+	case 0x0368:	/* 640x480, best frame rate compression */
+	case 0x0228:	/* 320x240, best quality compression */
+	case 0x0268:	/* 320x240, best frame rate compression */
+	case 0x02CA:	/* 160x120, best quality compression */
+	case 0x02EA:	/* 160x120, best frame rate compression */
+		/* Do nothing with this - not supported */
+		err("Unsupported mode $%04lx", frame->header);
+		return scan_NextFrame;
+	default:
+		/* Catch unknown headers, may help in learning new headers */
+		err("Strange frame->header=$%08lx", frame->header);
+		return scan_NextFrame;
+	}
+
+	/*
+	 * Make sure that our writing into output buffer
+	 * will not exceed the buffer. Note that we may write
+	 * not into current output scanline but in several after
+	 * it as well (if we enlarge image vertically.)
+	 */
+	if ((frame->curline + 1) >= data_h) {
+		if (uvd->debug >= 3)
+			info("Reached line %d. (frame is done)", frame->curline);
+		return scan_NextFrame;
+	}
+
+	/* Make sure there's enough data for the entire line */
+	len = 3 * data_w; /* <y-data> <uv-data> */
+	assert(len <= sizeof(lineBuffer));
+
+	/* Make sure there's enough data for the entire line */
+	if (RingQueue_GetLength(&uvd->dp) < len)
+		return scan_Out;
+
+	/* Suck one line out of the ring queue */
+	RingQueue_Dequeue(&uvd->dp, lineBuffer, len);
+
+	data = lineBuffer;
+	color = data + data_w;		/* Point to where color planes begin */
+
+	/* Bottom-to-top scanning */
+	rw = (int)VIDEOSIZE_Y(frame->request) - (int)(frame->curline) - 1;
+	RESTRICT_TO_RANGE(rw, 0, VIDEOSIZE_Y(frame->request)-1);
+
+	for (i = 0; i < VIDEOSIZE_X(frame->request); i++) {
+		int y, rv, gv, bv;	/* RGB components */
+
+		if (i < data_w) {
+			y = data[i];	/* Luminosity is the first line */
+
+			/* Apply static color correction */
+			u = color[i*2] + hue_corr;
+			v = color[i*2 + 1] + hue2_corr;
+
+			/* Apply color correction */
+			if (color_corr != 0) {
+				/* Magnify up to 2 times, reduce down to zero saturation */
+				u = 128 + ((ccm + color_corr) * (u - 128)) / ccm;
+				v = 128 + ((ccm + color_corr) * (v - 128)) / ccm;
+			}
+		} else
+			y = 0, u = v = 128;
+
+		YUV_TO_RGB_BY_THE_BOOK(y, u, v, rv, gv, bv);
+		RGB24_PUTPIXEL(frame, i, rw, rv, gv, bv); /* Done by deinterlacing now */
+	}
+	frame->deinterlace = Deinterlace_FillEvenLines;
+
+	/*
+	 * Account for number of bytes that we wrote into output V4L frame.
+	 * We do it here, after we are done with the scanline, because we
+	 * may fill more than one output scanline if we do vertical
+	 * enlargement.
+	 */
+	frame->curline += 2;
+	*pcopylen += 2 * v4l_linesize;
+
+	if (frame->curline >= VIDEOSIZE_Y(frame->request)) {
+		if (uvd->debug >= 3) {
+			info("All requested lines (%ld.) done.",
+			     VIDEOSIZE_Y(frame->request));
+		}
+		return scan_NextFrame;
+	} else
+		return scan_Continue;
+}
+
 /*
- * ibmcam_parse_data()
+ * ibmcam_model4_128x96_parse_lines()
  *
- * Generic routine to parse the scratch buffer. It employs either
- * usb_ibmcam_find_header() or usb_ibmcam_parse_lines() to do most
+ * This decoder is for one strange data format that is produced by Model 4
+ * camera only in 128x96 mode. This is RGB format and here is its description.
+ * First of all, this is non-interlaced stream, meaning that all scan lines
+ * are present in the datastream. There are 96 consecutive blocks of data
+ * that describe all 96 lines of the image. Each block is 5*128 bytes long
+ * and carries R, G, B components. The format of the block is shown in the
+ * code below. First 128*2 bytes are interleaved R and G components. Then
+ * we have a gap (junk data) 64 bytes long. Then follow B and something
+ * else, also interleaved (this makes another 128*2 bytes). After that
+ * probably another 64 bytes of junk follow.
+ *
+ * History:
+ * 10-Feb-2001 Created.
+ */
+static ParseState_t ibmcam_model4_128x96_parse_lines(
+	uvd_t *uvd,
+	usbvideo_frame_t *frame,
+	long *pcopylen)
+{
+	const unsigned char *data_rv, *data_gv, *data_bv;
+	unsigned int len;
+	int i, v4l_linesize; /* V4L line offset */
+	const int data_w=128, data_h=96;
+	static unsigned char lineBuffer[128*5];
+
+	v4l_linesize = VIDEOSIZE_X(frame->request) * V4L_BYTES_PER_PIXEL;
+
+	/*
+	 * Make sure that our writing into output buffer
+	 * will not exceed the buffer. Note that we may write
+	 * not into current output scanline but in several after
+	 * it as well (if we enlarge image vertically.)
+	 */
+	if ((frame->curline + 1) >= data_h) {
+		if (uvd->debug >= 3)
+			info("Reached line %d. (frame is done)", frame->curline);
+		return scan_NextFrame;
+	}
+
+	/*
+	 * RGRGRG .... RGRG_____________B?B?B? ... B?B?____________
+	 * <---- 128*2 ---><---- 64 ---><--- 128*2 ---><--- 64 --->
+	 */
+
+	/* Make sure there's enough data for the entire line */
+	len = 5 * data_w;
+	assert(len <= sizeof(lineBuffer));
+
+	/* Make sure there's enough data for the entire line */
+	if (RingQueue_GetLength(&uvd->dp) < len)
+		return scan_Out;
+
+	/* Suck one line out of the ring queue */
+	RingQueue_Dequeue(&uvd->dp, lineBuffer, len);
+
+	data_rv = lineBuffer;
+	data_gv = lineBuffer + 1;
+	data_bv = lineBuffer + data_w*2 + data_w/2;
+	for (i = 0; i < VIDEOSIZE_X(frame->request); i++) {
+		int rv, gv, bv;	/* RGB components */
+		if (i < data_w) {
+			const int j = i * 2;
+			gv = data_rv[j];
+			rv = data_gv[j];
+			bv = data_bv[j];
+			if (flags & FLAGS_MONOCHROME) {
+				unsigned long y;
+				y = rv + gv + bv;
+				y /= 3;
+				if (y > 0xFF)
+					y = 0xFF;
+				rv = gv = bv = (unsigned char) y;
+			}
+		} else {
+			rv = gv = bv = 0;
+		}
+		RGB24_PUTPIXEL(frame, i, frame->curline, rv, gv, bv);
+	}
+	frame->deinterlace = Deinterlace_None;
+	frame->curline++;
+	*pcopylen += v4l_linesize;
+
+	if (frame->curline >= VIDEOSIZE_Y(frame->request)) {
+		if (uvd->debug >= 3) {
+			info("All requested lines (%ld.) done.",
+			     VIDEOSIZE_Y(frame->request));
+		}
+		return scan_NextFrame;
+	} else
+		return scan_Continue;
+}
+
+/*
+ * ibmcam_ProcessIsocData()
+ *
+ * Generic routine to parse the ring queue data. It employs either
+ * ibmcam_find_header() or ibmcam_parse_lines() to do most
  * of work.
  *
  * History:
  * 1/21/00  Created.
  */
-static void ibmcam_parse_data(struct usb_ibmcam *ibmcam)
+void ibmcam_ProcessIsocData(uvd_t *uvd, usbvideo_frame_t *frame)
 {
-	struct ibmcam_frame *frame;
-	unsigned char *data = ibmcam->scratch;
-	scan_state_t newstate;
+	ParseState_t newstate;
 	long copylen = 0;
-
-	/* Grab the current frame and the previous frame */
-	frame = &ibmcam->frame[ibmcam->curframe];
-
-	/* printk(KERN_DEBUG "parsing %u.\n", ibmcam->scratchlen); */
+	int mod = IBMCAM_T(uvd)->camera_model;
 
 	while (1) {
-
 		newstate = scan_Out;
-		if (scratch_left(data)) {
-			if (frame->scanstate == STATE_SCANNING)
-				newstate = usb_ibmcam_find_header(ibmcam);
-			else if (frame->scanstate == STATE_LINES) {
-				if ((ibmcam->camera_model == IBMCAM_MODEL_2) &&
-				    (videosize >= VIDEOSIZE_352x288)) {
-					newstate = usb_ibmcam_model2_parse_lines(ibmcam, &copylen);
-				}
-				else {
-					newstate = usb_ibmcam_parse_lines(ibmcam, &copylen);
+		if (RingQueue_GetLength(&uvd->dp) > 0) {
+			if (frame->scanstate == ScanState_Scanning) {
+				newstate = ibmcam_find_header(uvd);
+			} else if (frame->scanstate == ScanState_Lines) {
+				if ((mod == IBMCAM_MODEL_2) &&
+				    ((uvd->videosize == VIDEOSIZE_352x288) ||
+				     (uvd->videosize == VIDEOSIZE_320x240) ||
+				     (uvd->videosize == VIDEOSIZE_352x240)))
+				{
+					newstate = ibmcam_model2_320x240_parse_lines(
+						uvd, frame, &copylen);
+				} else if (mod == IBMCAM_MODEL_4) {
+					/*
+					 * Model 4 cameras (IBM NetCamera) use Model 2 decoder (RGB)
+					 * for 320x240 and above; 160x120 and 176x144 uses Model 1
+					 * decoder (YUV), and 128x96 mode uses ???
+					 */
+					if ((uvd->videosize == VIDEOSIZE_352x288) ||
+					    (uvd->videosize == VIDEOSIZE_320x240) ||
+					    (uvd->videosize == VIDEOSIZE_352x240))
+					{
+						newstate = ibmcam_model2_320x240_parse_lines(uvd, frame, &copylen);
+					} else if (uvd->videosize == VIDEOSIZE_128x96) {
+						newstate = ibmcam_model4_128x96_parse_lines(uvd, frame, &copylen);
+					} else {
+						newstate = ibmcam_parse_lines(uvd, frame, &copylen);
+					}
+				} else if (mod == IBMCAM_MODEL_3) {
+					newstate = ibmcam_model3_parse_lines(uvd, frame, &copylen);
+				} else {
+					newstate = ibmcam_parse_lines(uvd, frame, &copylen);
 				}
 			}
 		}
@@ -1112,201 +1097,50 @@ static void ibmcam_parse_data(struct usb_ibmcam *ibmcam)
 	}
 
 	if (newstate == scan_NextFrame) {
-		frame->grabstate = FRAME_DONE;
-		ibmcam->curframe = -1;
-		ibmcam->frame_num++;
-
-		/* Optionally display statistics on the screen */
-		if (flags & FLAGS_OVERLAY_STATS)
-			usb_ibmcam_overlaystats(ibmcam, frame);
-
-		/* This will cause the process to request another frame. */
-		if (waitqueue_active(&frame->wq))
-			wake_up_interruptible(&frame->wq);
+		frame->frameState = FrameState_Done;
+		uvd->curframe = -1;
+		uvd->stats.frame_num++;
+		if ((mod == IBMCAM_MODEL_2) || (mod == IBMCAM_MODEL_4)) {
+			/* Need software contrast adjustment for those cameras */
+			frame->flags |= USBVIDEO_FRAME_FLAG_SOFTWARE_CONTRAST;
+		}
 	}
 
 	/* Update the frame's uncompressed length. */
-	frame->scanlength += copylen;
+	frame->seqRead_Length += copylen;
+
+#if 0
+	{
+		static unsigned char j=0;
+		memset(frame->data, j++, uvd->max_frame_size);
+		frame->frameState = FrameState_Ready;
+	}
+#endif
 }
 
 /*
- * Make all of the blocks of data contiguous
- */
-static int ibmcam_compress_isochronous(struct usb_ibmcam *ibmcam, urb_t *urb)
-{
-	unsigned char *cdata, *data, *data0;
-	int i, totlen = 0;
-
-	data = data0 = ibmcam->scratch + ibmcam->scratchlen;
-	for (i = 0; i < urb->number_of_packets; i++) {
-		int n = urb->iso_frame_desc[i].actual_length;
-		int st = urb->iso_frame_desc[i].status;
-		
-		cdata = urb->transfer_buffer + urb->iso_frame_desc[i].offset;
-
-		/* Detect and ignore errored packets */
-		if (st < 0) {
-			if (debug >= 1) {
-				printk(KERN_ERR "ibmcam data error: [%d] len=%d, status=%X\n",
-				       i, n, st);
-			}
-			ibmcam->iso_err_count++;
-			continue;
-		}
-
-		/* Detect and ignore empty packets */
-		if (n <= 0) {
-			ibmcam->iso_skip_count++;
-			continue;
-		}
-
-		/*
-		 * If camera continues to feed us with data but there is no
-		 * consumption (if, for example, V4L client fell asleep) we
-		 * may overflow the buffer. We have to move old data over to
-		 * free room for new data. This is bad for old data. If we
-		 * just drop new data then it's bad for new data... choose
-		 * your favorite evil here.
-		 */
-		if ((ibmcam->scratchlen + n) > scratchbufsize) {
-#if 0
-			ibmcam->scratch_ovf_count++;
-			if (debug >= 3)
-				printk(KERN_ERR "ibmcam: scratch buf overflow! "
-				       "scr_len: %d, n: %d\n", ibmcam->scratchlen, n );
-			return totlen;
-#else
-			int mv;
-
-			ibmcam->scratch_ovf_count++;
-			if (debug >= 3) {
-				printk(KERN_ERR "ibmcam: scratch buf overflow! "
-				       "scr_len: %d, n: %d\n", ibmcam->scratchlen, n );
-			}
-			mv  = (ibmcam->scratchlen + n) - scratchbufsize;
-			if (ibmcam->scratchlen >= mv) {
-				int newslen = ibmcam->scratchlen - mv;
-				memmove(ibmcam->scratch, ibmcam->scratch + mv, newslen);
-				ibmcam->scratchlen = newslen;
-				data = data0 = ibmcam->scratch + ibmcam->scratchlen;
-			} else {
-				printk(KERN_ERR "ibmcam: scratch buf too small\n");
-				return totlen;
-			}
-#endif
-		}
-
-		/* Now we know that there is enough room in scratch buffer */
-		memmove(data, cdata, n);
-		data += n;
-		totlen += n;
-		ibmcam->scratchlen += n;
-	}
-#if 0
-	if (totlen > 0) {
-		static int foo=0;
-		if (foo < 1) {
-			printk(KERN_DEBUG "+%d.\n", totlen);
-			ibmcam_hexdump(data0, (totlen > 64) ? 64:totlen);
-			++foo;
-		}
-	}
-#endif
-	return totlen;
-}
-
-static void ibmcam_isoc_irq(struct urb *urb)
-{
-	int len;
-	struct usb_ibmcam *ibmcam = urb->context;
-	struct ibmcam_sbuf *sbuf;
-	int i;
-
-	/* We don't want to do anything if we are about to be removed! */
-	if (!IBMCAM_IS_OPERATIONAL(ibmcam))
-		return;
-
-#if 0
-	if (urb->actual_length > 0) {
-		printk(KERN_DEBUG "ibmcam_isoc_irq: %p status %d, "
-		       " errcount = %d, length = %d\n", urb, urb->status,
-		       urb->error_count, urb->actual_length);
-	} else {
-		static int c = 0;
-		if (c++ % 100 == 0)
-			printk(KERN_DEBUG "ibmcam_isoc_irq: no data\n");
-	}
-#endif
-
-	if (!ibmcam->streaming) {
-		if (debug >= 1)
-			printk(KERN_DEBUG "ibmcam: oops, not streaming, but interrupt\n");
-		return;
-	}
-	
-	sbuf = &ibmcam->sbuf[ibmcam->cursbuf];
-
-	/* Copy the data received into our scratch buffer */
-	len = ibmcam_compress_isochronous(ibmcam, urb);
-
-	ibmcam->urb_count++;
-	ibmcam->urb_length = len;
-	ibmcam->data_count += len;
-
-#if 0   /* This code prints few initial bytes of ISO data: used to decode markers */
-	if (ibmcam->urb_count % 64 == 1) {
-		if (ibmcam->urb_count == 1) {
-			ibmcam_hexdump(ibmcam->scratch,
-				       (ibmcam->scratchlen > 32) ? 32 : ibmcam->scratchlen);
-		}
-	}
-#endif
-
-	/* If we collected enough data let's parse! */
-	if (ibmcam->scratchlen) {
-		/* If we don't have a frame we're current working on, complain */
-		if (ibmcam->curframe >= 0)
-			ibmcam_parse_data(ibmcam);
-		else {
-			if (debug >= 1)
-				printk(KERN_DEBUG "ibmcam: received data, but no frame available\n");
-		}
-	}
-
-	for (i = 0; i < FRAMES_PER_DESC; i++) {
-		sbuf->urb->iso_frame_desc[i].status = 0;
-		sbuf->urb->iso_frame_desc[i].actual_length = 0;
-	}
-
-	/* Move to the next sbuf */
-	ibmcam->cursbuf = (ibmcam->cursbuf + 1) % IBMCAM_NUMSBUF;
-
-	return;
-}
-
-/*
- * usb_ibmcam_veio()
+ * ibmcam_veio()
  *
  * History:
  * 1/27/00  Added check for dev == NULL; this happens if camera is unplugged.
  */
-static int usb_ibmcam_veio(
-	struct usb_ibmcam *ibmcam,
+static int ibmcam_veio(
+	uvd_t *uvd,
 	unsigned char req,
 	unsigned short value,
 	unsigned short index)
 {
-	static const char proc[] = "usb_ibmcam_veio";
+	static const char proc[] = "ibmcam_veio";
 	unsigned char cp[8] /* = { 0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef } */;
 	int i;
 
-	if (!IBMCAM_IS_OPERATIONAL(ibmcam))
+	if (!CAMERA_IS_OPERATIONAL(uvd))
 		return 0;
 
 	if (req == 1) {
 		i = usb_control_msg(
-			ibmcam->dev,
-			usb_rcvctrlpipe(ibmcam->dev, 0),
+			uvd->dev,
+			usb_rcvctrlpipe(uvd->dev, 0),
 			req,
 			USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_ENDPOINT,
 			value,
@@ -1315,15 +1149,15 @@ static int usb_ibmcam_veio(
 			sizeof(cp),
 			HZ);
 #if 0
-		printk(KERN_DEBUG "USB => %02x%02x%02x%02x%02x%02x%02x%02x "
-		       "(req=$%02x val=$%04x ind=$%04x)\n",
+		info("USB => %02x%02x%02x%02x%02x%02x%02x%02x "
+		       "(req=$%02x val=$%04x ind=$%04x)",
 		       cp[0],cp[1],cp[2],cp[3],cp[4],cp[5],cp[6],cp[7],
 		       req, value, index);
 #endif
 	} else {
 		i = usb_control_msg(
-			ibmcam->dev,
-			usb_sndctrlpipe(ibmcam->dev, 0),
+			uvd->dev,
+			usb_sndctrlpipe(uvd->dev, 0),
 			req,
 			USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_ENDPOINT,
 			value,
@@ -1333,15 +1167,15 @@ static int usb_ibmcam_veio(
 			HZ);
 	}
 	if (i < 0) {
-		printk(KERN_ERR "%s: ERROR=%d. Camera stopped - "
-		       "reconnect or reload driver.\n", proc, i);
-		ibmcam->last_error = i;
+		err("%s: ERROR=%d. Camera stopped; Reconnect or reload driver.",
+		    proc, i);
+		uvd->last_error = i;
 	}
 	return i;
 }
 
 /*
- * usb_ibmcam_calculate_fps()
+ * ibmcam_calculate_fps()
  *
  * This procedure roughly calculates the real frame rate based
  * on FPS code (framerate=NNN option). Actual FPS differs
@@ -1358,13 +1192,13 @@ static int usb_ibmcam_veio(
  * History:
  * 1/18/00  Created.
  */
-static int usb_ibmcam_calculate_fps(void)
+static int ibmcam_calculate_fps(uvd_t *uvd)
 {
 	return 3 + framerate*4 + framerate/2;
 }
 
 /*
- * usb_ibmcam_send_FF_04_02()
+ * ibmcam_send_FF_04_02()
  *
  * This procedure sends magic 3-command prefix to the camera.
  * The purpose of this prefix is not known.
@@ -1372,108 +1206,140 @@ static int usb_ibmcam_calculate_fps(void)
  * History:
  * 1/2/00   Created.
  */
-static void usb_ibmcam_send_FF_04_02(struct usb_ibmcam *ibmcam)
+static void ibmcam_send_FF_04_02(uvd_t *uvd)
 {
-	usb_ibmcam_veio(ibmcam, 0, 0x00FF, 0x0127);
-	usb_ibmcam_veio(ibmcam, 0, 0x0004, 0x0124);
-	usb_ibmcam_veio(ibmcam, 0, 0x0002, 0x0124);
+	ibmcam_veio(uvd, 0, 0x00FF, 0x0127);
+	ibmcam_veio(uvd, 0, 0x0004, 0x0124);
+	ibmcam_veio(uvd, 0, 0x0002, 0x0124);
 }
 
-static void usb_ibmcam_send_00_04_06(struct usb_ibmcam *ibmcam)
+static void ibmcam_send_00_04_06(uvd_t *uvd)
 {
-	usb_ibmcam_veio(ibmcam, 0, 0x0000, 0x0127);
-	usb_ibmcam_veio(ibmcam, 0, 0x0004, 0x0124);
-	usb_ibmcam_veio(ibmcam, 0, 0x0006, 0x0124);
+	ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+	ibmcam_veio(uvd, 0, 0x0004, 0x0124);
+	ibmcam_veio(uvd, 0, 0x0006, 0x0124);
 }
 
-static void usb_ibmcam_send_x_00(struct usb_ibmcam *ibmcam, unsigned short x)
+static void ibmcam_send_x_00(uvd_t *uvd, unsigned short x)
 {
-	usb_ibmcam_veio(ibmcam, 0, x,      0x0127);
-	usb_ibmcam_veio(ibmcam, 0, 0x0000, 0x0124);
+	ibmcam_veio(uvd, 0, x,      0x0127);
+	ibmcam_veio(uvd, 0, 0x0000, 0x0124);
 }
 
-static void usb_ibmcam_send_x_00_05(struct usb_ibmcam *ibmcam, unsigned short x)
+static void ibmcam_send_x_00_05(uvd_t *uvd, unsigned short x)
 {
-	usb_ibmcam_send_x_00(ibmcam, x);
-	usb_ibmcam_veio(ibmcam, 0, 0x0005, 0x0124);
+	ibmcam_send_x_00(uvd, x);
+	ibmcam_veio(uvd, 0, 0x0005, 0x0124);
 }
 
-static void usb_ibmcam_send_x_00_05_02(struct usb_ibmcam *ibmcam, unsigned short x)
+static void ibmcam_send_x_00_05_02(uvd_t *uvd, unsigned short x)
 {
-	usb_ibmcam_veio(ibmcam, 0, x,      0x0127);
-	usb_ibmcam_veio(ibmcam, 0, 0x0000, 0x0124);
-	usb_ibmcam_veio(ibmcam, 0, 0x0005, 0x0124);
-	usb_ibmcam_veio(ibmcam, 0, 0x0002, 0x0124);
+	ibmcam_veio(uvd, 0, x,      0x0127);
+	ibmcam_veio(uvd, 0, 0x0000, 0x0124);
+	ibmcam_veio(uvd, 0, 0x0005, 0x0124);
+	ibmcam_veio(uvd, 0, 0x0002, 0x0124);
 }
 
-static void usb_ibmcam_send_x_01_00_05(struct usb_ibmcam *ibmcam, unsigned short x)
+static void ibmcam_send_x_01_00_05(uvd_t *uvd, unsigned short x)
 {
-	usb_ibmcam_veio(ibmcam, 0, x,      0x0127);
-	usb_ibmcam_veio(ibmcam, 0, 0x0001, 0x0124);
-	usb_ibmcam_veio(ibmcam, 0, 0x0000, 0x0124);
-	usb_ibmcam_veio(ibmcam, 0, 0x0005, 0x0124);
+	ibmcam_veio(uvd, 0, x,      0x0127);
+	ibmcam_veio(uvd, 0, 0x0001, 0x0124);
+	ibmcam_veio(uvd, 0, 0x0000, 0x0124);
+	ibmcam_veio(uvd, 0, 0x0005, 0x0124);
 }
 
-static void usb_ibmcam_send_x_00_05_02_01(struct usb_ibmcam *ibmcam, unsigned short x)
+static void ibmcam_send_x_00_05_02_01(uvd_t *uvd, unsigned short x)
 {
-	usb_ibmcam_veio(ibmcam, 0, x,      0x0127);
-	usb_ibmcam_veio(ibmcam, 0, 0x0000, 0x0124);
-	usb_ibmcam_veio(ibmcam, 0, 0x0005, 0x0124);
-	usb_ibmcam_veio(ibmcam, 0, 0x0002, 0x0124);
-	usb_ibmcam_veio(ibmcam, 0, 0x0001, 0x0124);
+	ibmcam_veio(uvd, 0, x,      0x0127);
+	ibmcam_veio(uvd, 0, 0x0000, 0x0124);
+	ibmcam_veio(uvd, 0, 0x0005, 0x0124);
+	ibmcam_veio(uvd, 0, 0x0002, 0x0124);
+	ibmcam_veio(uvd, 0, 0x0001, 0x0124);
 }
 
-static void usb_ibmcam_send_x_00_05_02_08_01(struct usb_ibmcam *ibmcam, unsigned short x)
+static void ibmcam_send_x_00_05_02_08_01(uvd_t *uvd, unsigned short x)
 {
-	usb_ibmcam_veio(ibmcam, 0, x,      0x0127);
-	usb_ibmcam_veio(ibmcam, 0, 0x0000, 0x0124);
-	usb_ibmcam_veio(ibmcam, 0, 0x0005, 0x0124);
-	usb_ibmcam_veio(ibmcam, 0, 0x0002, 0x0124);
-	usb_ibmcam_veio(ibmcam, 0, 0x0008, 0x0124);
-	usb_ibmcam_veio(ibmcam, 0, 0x0001, 0x0124);
+	ibmcam_veio(uvd, 0, x,      0x0127);
+	ibmcam_veio(uvd, 0, 0x0000, 0x0124);
+	ibmcam_veio(uvd, 0, 0x0005, 0x0124);
+	ibmcam_veio(uvd, 0, 0x0002, 0x0124);
+	ibmcam_veio(uvd, 0, 0x0008, 0x0124);
+	ibmcam_veio(uvd, 0, 0x0001, 0x0124);
 }
 
-static void usb_ibmcam_Packet_Format1(struct usb_ibmcam *ibmcam, unsigned char fkey, unsigned char val)
+static void ibmcam_Packet_Format1(uvd_t *uvd, unsigned char fkey, unsigned char val)
 {
-	usb_ibmcam_send_x_01_00_05	(ibmcam, unknown_88);
-	usb_ibmcam_send_x_00_05		(ibmcam, fkey);
-	usb_ibmcam_send_x_00_05_02_08_01(ibmcam, val);
-	usb_ibmcam_send_x_00_05		(ibmcam, unknown_88);
-	usb_ibmcam_send_x_00_05_02_01	(ibmcam, fkey);
-	usb_ibmcam_send_x_00_05		(ibmcam, unknown_89);
-	usb_ibmcam_send_x_00		(ibmcam, fkey);
-	usb_ibmcam_send_00_04_06	(ibmcam);
-	usb_ibmcam_veio			(ibmcam, 1, 0x0000, 0x0126);
-	usb_ibmcam_send_FF_04_02	(ibmcam);
+	ibmcam_send_x_01_00_05(uvd, unknown_88);
+	ibmcam_send_x_00_05(uvd, fkey);
+	ibmcam_send_x_00_05_02_08_01(uvd, val);
+	ibmcam_send_x_00_05(uvd, unknown_88);
+	ibmcam_send_x_00_05_02_01(uvd, fkey);
+	ibmcam_send_x_00_05(uvd, unknown_89);
+	ibmcam_send_x_00(uvd, fkey);
+	ibmcam_send_00_04_06(uvd);
+	ibmcam_veio(uvd, 1, 0x0000, 0x0126);
+	ibmcam_send_FF_04_02(uvd);
 }
 
-static void usb_ibmcam_PacketFormat2(struct usb_ibmcam *ibmcam, unsigned char fkey, unsigned char val)
+static void ibmcam_PacketFormat2(uvd_t *uvd, unsigned char fkey, unsigned char val)
 {
-	usb_ibmcam_send_x_01_00_05	(ibmcam, unknown_88);
-	usb_ibmcam_send_x_00_05		(ibmcam, fkey);
-	usb_ibmcam_send_x_00_05_02	(ibmcam, val);
+	ibmcam_send_x_01_00_05	(uvd, unknown_88);
+	ibmcam_send_x_00_05	(uvd, fkey);
+	ibmcam_send_x_00_05_02	(uvd, val);
 }
 
-static void usb_ibmcam_model2_Packet2(struct usb_ibmcam *ibmcam)
+static void ibmcam_model2_Packet2(uvd_t *uvd)
 {
-	usb_ibmcam_veio(ibmcam, 0, 0x00ff, 0x012d);
-	usb_ibmcam_veio(ibmcam, 0, 0xfea3, 0x0124);
+	ibmcam_veio(uvd, 0, 0x00ff, 0x012d);
+	ibmcam_veio(uvd, 0, 0xfea3, 0x0124);
 }
 
-static void usb_ibmcam_model2_Packet1(struct usb_ibmcam *ibmcam, unsigned short v1, unsigned short v2)
+static void ibmcam_model2_Packet1(uvd_t *uvd, unsigned short v1, unsigned short v2)
 {
-	usb_ibmcam_veio(ibmcam, 0, 0x00aa, 0x012d);
-	usb_ibmcam_veio(ibmcam, 0, 0x00ff, 0x012e);
-	usb_ibmcam_veio(ibmcam, 0, v1, 	   0x012f);
-	usb_ibmcam_veio(ibmcam, 0, 0x00ff, 0x0130);
-	usb_ibmcam_veio(ibmcam, 0, 0xc719, 0x0124);
-	usb_ibmcam_veio(ibmcam, 0, v2,     0x0127);
+	ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+	ibmcam_veio(uvd, 0, 0x00ff, 0x012e);
+	ibmcam_veio(uvd, 0, v1,     0x012f);
+	ibmcam_veio(uvd, 0, 0x00ff, 0x0130);
+	ibmcam_veio(uvd, 0, 0xc719, 0x0124);
+	ibmcam_veio(uvd, 0, v2,     0x0127);
 
-	usb_ibmcam_model2_Packet2(ibmcam);
+	ibmcam_model2_Packet2(uvd);
 }
 
 /*
- * usb_ibmcam_adjust_contrast()
+ * ibmcam_model3_Packet1()
+ *
+ * 00_0078_012d	
+ * 00_0097_012f
+ * 00_d141_0124	
+ * 00_0096_0127
+ * 00_fea8_0124	
+*/
+static void ibmcam_model3_Packet1(uvd_t *uvd, unsigned short v1, unsigned short v2)
+{
+	ibmcam_veio(uvd, 0, 0x0078, 0x012d);
+	ibmcam_veio(uvd, 0, v1,     0x012f);
+	ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+	ibmcam_veio(uvd, 0, v2,     0x0127);
+	ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+}
+
+static void ibmcam_model4_BrightnessPacket(uvd_t *uvd, int i)
+{
+	ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+	ibmcam_veio(uvd, 0, 0x0026, 0x012f);
+	ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+	ibmcam_veio(uvd, 0, i,      0x0127);
+	ibmcam_veio(uvd, 0, 0x00aa, 0x0130);
+	ibmcam_veio(uvd, 0, 0x82a8, 0x0124);
+	ibmcam_veio(uvd, 0, 0x0038, 0x012d);
+	ibmcam_veio(uvd, 0, 0x0004, 0x012f);
+	ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+	ibmcam_veio(uvd, 0, 0xfffa, 0x0124);
+}
+
+/*
+ * ibmcam_adjust_contrast()
  *
  * The contrast value changes from 0 (high contrast) to 15 (low contrast).
  * This is in reverse to usual order of things (such as TV controls), so
@@ -1484,30 +1350,65 @@ static void usb_ibmcam_model2_Packet1(struct usb_ibmcam *ibmcam, unsigned short 
  * History:
  * 1/2/00   Created.
  */
-static void usb_ibmcam_adjust_contrast(struct usb_ibmcam *ibmcam)
+static void ibmcam_adjust_contrast(uvd_t *uvd)
 {
-	unsigned char new_contrast = ibmcam->vpic.contrast >> 12;
-	const int ntries = 5;
+	unsigned char a_contrast = uvd->vpic.contrast >> 12;
+	unsigned char new_contrast;
 
-	if (new_contrast >= 16)
-		new_contrast = 15;
-	new_contrast = 15 - new_contrast;
-	if (new_contrast != ibmcam->vpic_old.contrast) {
-		ibmcam->vpic_old.contrast = new_contrast;
-		if (ibmcam->camera_model == IBMCAM_MODEL_1) {
-			int i;
-			for (i=0; i < ntries; i++) {
-				usb_ibmcam_Packet_Format1(ibmcam, contrast_14, new_contrast);
-				usb_ibmcam_send_FF_04_02(ibmcam);
-			}
-		} else {
-			/* Camera model 2 does not have this control; implemented in software. */
+	if (a_contrast >= 16)
+		a_contrast = 15;
+	new_contrast = 15 - a_contrast;
+	if (new_contrast == uvd->vpic_old.contrast)
+		return;
+	uvd->vpic_old.contrast = new_contrast;
+	switch (IBMCAM_T(uvd)->camera_model) {
+	case IBMCAM_MODEL_1:
+	{
+		const int ntries = 5;
+		int i;
+		for (i=0; i < ntries; i++) {
+			ibmcam_Packet_Format1(uvd, contrast_14, new_contrast);
+			ibmcam_send_FF_04_02(uvd);
 		}
+		break;
+	}
+	case IBMCAM_MODEL_2:
+	case IBMCAM_MODEL_4:
+		/* Models 2, 4 do not have this control; implemented in software. */
+		break;
+	case IBMCAM_MODEL_3:
+	{	/* Preset hardware values */
+		static const struct {
+			unsigned short cv1;
+			unsigned short cv2;
+			unsigned short cv3;
+		} cv[7] = {
+			{ 0x05, 0x05, 0x0f },	/* Minimum */
+			{ 0x04, 0x04, 0x16 },
+			{ 0x02, 0x03, 0x16 },
+			{ 0x02, 0x08, 0x16 },
+			{ 0x01, 0x0c, 0x16 },
+			{ 0x01, 0x0e, 0x16 },
+			{ 0x01, 0x10, 0x16 }	/* Maximum */
+		};
+		int i = a_contrast / 2;
+		RESTRICT_TO_RANGE(i, 0, 6);
+		ibmcam_veio(uvd, 0, 0x0000, 0x010c);	/* Stop */
+		ibmcam_model3_Packet1(uvd, 0x0067, cv[i].cv1);
+		ibmcam_model3_Packet1(uvd, 0x005b, cv[i].cv2);
+		ibmcam_model3_Packet1(uvd, 0x005c, cv[i].cv3);
+		ibmcam_veio(uvd, 0, 0x0001, 0x0114);
+		ibmcam_veio(uvd, 0, 0x00c0, 0x010c);	/* Go! */
+		usb_clear_halt(uvd->dev, usb_rcvisocpipe(uvd->dev, uvd->video_endp));
+		break;
+	}
+	default:
+		break;
 	}
 }
 
 /*
- * usb_ibmcam_change_lighting_conditions()
+ * ibmcam_change_lighting_conditions()
  *
  * Camera model 1:
  * We have 3 levels of lighting conditions: 0=Bright, 1=Medium, 2=Low.
@@ -1524,19 +1425,24 @@ static void usb_ibmcam_adjust_contrast(struct usb_ibmcam *ibmcam)
  * 1/5/00   Created.
  * 2/20/00  Added support for Model 2 cameras.
  */
-static void usb_ibmcam_change_lighting_conditions(struct usb_ibmcam *ibmcam)
+static void ibmcam_change_lighting_conditions(uvd_t *uvd)
 {
-	static const char proc[] = "usb_ibmcam_change_lighting_conditions";
+	static const char proc[] = "ibmcam_change_lighting_conditions";
 
 	if (debug > 0)
-		printk(KERN_INFO "%s: Set lighting to %hu.\n", proc, lighting);
+		info("%s: Set lighting to %hu.", proc, lighting);
 
-	if (ibmcam->camera_model == IBMCAM_MODEL_1) {
+	switch (IBMCAM_T(uvd)->camera_model) {
+	case IBMCAM_MODEL_1:
+	{
 		const int ntries = 5;
 		int i;
 		for (i=0; i < ntries; i++)
-			usb_ibmcam_Packet_Format1(ibmcam, light_27, (unsigned short) lighting);
-	} else {
+			ibmcam_Packet_Format1(uvd, light_27, (unsigned short) lighting);
+		break;
+	}
+	case IBMCAM_MODEL_2:
+#if 0
 		/*
 		 * This command apparently requires camera to be stopped. My
 		 * experiments showed that it -is- possible to alter the lighting
@@ -1546,385 +1452,549 @@ static void usb_ibmcam_change_lighting_conditions(struct usb_ibmcam *ibmcam)
 		 * is commented out because it does not work at -any- moment, so its
 		 * presence makes no sense. You may use it for experiments.
 		 */
-#if 0
-		usb_ibmcam_veio(ibmcam, 0, 0x0000, 0x010c);	/* Stop camera */
-		usb_ibmcam_model2_Packet1(ibmcam, mod2_sensitivity, lighting);
-		usb_ibmcam_veio(ibmcam, 0, 0x00c0, 0x010c);	/* Start camera */
+		ibmcam_veio(uvd, 0, 0x0000, 0x010c);	/* Stop camera */
+		ibmcam_model2_Packet1(uvd, mod2_sensitivity, lighting);
+		ibmcam_veio(uvd, 0, 0x00c0, 0x010c);	/* Start camera */
 #endif
+		break;
+	case IBMCAM_MODEL_3:
+	case IBMCAM_MODEL_4:
+	default:
+		break;
 	}
 }
 
 /*
- * usb_ibmcam_set_sharpness()
+ * ibmcam_set_sharpness()
  *
  * Cameras model 1 have internal smoothing feature. It is controlled by value in
  * range [0..6], where 0 is most smooth and 6 is most sharp (raw image, I guess).
  * Recommended value is 4. Cameras model 2 do not have this feature at all.
  */
-static void usb_ibmcam_set_sharpness(struct usb_ibmcam *ibmcam)
+static void ibmcam_set_sharpness(uvd_t *uvd)
 {
-	static const char proc[] = "usb_ibmcam_set_sharpness";
+	static const char proc[] = "ibmcam_set_sharpness";
 
-	if (ibmcam->camera_model == IBMCAM_MODEL_1) {
+	switch (IBMCAM_T(uvd)->camera_model) {
+	case IBMCAM_MODEL_1:
+	{
 		static const unsigned short sa[] = { 0x11, 0x13, 0x16, 0x18, 0x1a, 0x8, 0x0a };
 		unsigned short i, sv;
 
 		RESTRICT_TO_RANGE(sharpness, SHARPNESS_MIN, SHARPNESS_MAX);
 		if (debug > 0)
-			printk(KERN_INFO "%s: Set sharpness to %hu.\n", proc, sharpness);
+			info("%s: Set sharpness to %hu.", proc, sharpness);
 
 		sv = sa[sharpness - SHARPNESS_MIN];
 		for (i=0; i < 2; i++) {
-			usb_ibmcam_send_x_01_00_05	(ibmcam, unknown_88);
-			usb_ibmcam_send_x_00_05		(ibmcam, sharp_13);
-			usb_ibmcam_send_x_00_05_02	(ibmcam, sv);
+			ibmcam_send_x_01_00_05	(uvd, unknown_88);
+			ibmcam_send_x_00_05		(uvd, sharp_13);
+			ibmcam_send_x_00_05_02	(uvd, sv);
 		}
-	} else {
-		/* Camera model 2 does not have this control */
+		break;
+	}
+	case IBMCAM_MODEL_2:
+	case IBMCAM_MODEL_4:
+		/* Models 2, 4 do not have this control */
+		break;
+	case IBMCAM_MODEL_3:
+	{	/*
+		 * "Use a table of magic numbers.
+		 *  This setting doesn't really change much.
+		 *  But that's how Windows does it."
+		 */
+		static const struct {
+			unsigned short sv1;
+			unsigned short sv2;
+			unsigned short sv3;
+			unsigned short sv4;
+		} sv[7] = {
+			{ 0x00, 0x00, 0x05, 0x14 },	/* Smoothest */
+			{ 0x01, 0x04, 0x05, 0x14 },
+			{ 0x02, 0x04, 0x05, 0x14 },
+			{ 0x03, 0x04, 0x05, 0x14 },
+			{ 0x03, 0x05, 0x05, 0x14 },
+			{ 0x03, 0x06, 0x05, 0x14 },
+			{ 0x03, 0x07, 0x05, 0x14 }	/* Sharpest */
+		};
+		RESTRICT_TO_RANGE(sharpness, SHARPNESS_MIN, SHARPNESS_MAX);
+		RESTRICT_TO_RANGE(sharpness, 0, 6);
+		ibmcam_veio(uvd, 0, 0x0000, 0x010c);	/* Stop */
+		ibmcam_model3_Packet1(uvd, 0x0060, sv[sharpness].sv1);
+		ibmcam_model3_Packet1(uvd, 0x0061, sv[sharpness].sv2);
+		ibmcam_model3_Packet1(uvd, 0x0062, sv[sharpness].sv3);
+		ibmcam_model3_Packet1(uvd, 0x0063, sv[sharpness].sv4);
+		ibmcam_veio(uvd, 0, 0x0001, 0x0114);
+		ibmcam_veio(uvd, 0, 0x00c0, 0x010c);	/* Go! */
+		usb_clear_halt(uvd->dev, usb_rcvisocpipe(uvd->dev, uvd->video_endp));
+		ibmcam_veio(uvd, 0, 0x0001, 0x0113);
+		break;
+	}
+	default:
+		break;
 	}
 }
 
 /*
- * usb_ibmcam_set_brightness()
+ * ibmcam_set_brightness()
  *
  * This procedure changes brightness of the picture.
  */
-static void usb_ibmcam_set_brightness(struct usb_ibmcam *ibmcam)
+static void ibmcam_set_brightness(uvd_t *uvd)
 {
-	static const char proc[] = "usb_ibmcam_set_brightness";
+	static const char proc[] = "ibmcam_set_brightness";
 	static const unsigned short n = 1;
-	unsigned short i, j, bv[3];
-
-	bv[0] = bv[1] = bv[2] = ibmcam->vpic.brightness >> 10;
-	if (bv[0] == (ibmcam->vpic_old.brightness >> 10))
-		return;
-	ibmcam->vpic_old.brightness = ibmcam->vpic.brightness;
 
 	if (debug > 0)
-		printk(KERN_INFO "%s: Set brightness to (%hu,%hu,%hu)\n",
-		       proc, bv[0], bv[1], bv[2]);
+		info("%s: Set brightness to %hu.", proc, uvd->vpic.brightness);
 
-	if (ibmcam->camera_model == IBMCAM_MODEL_1) {
+	switch (IBMCAM_T(uvd)->camera_model) {
+	case IBMCAM_MODEL_1:
+	{
+		unsigned short i, j, bv[3];
+		bv[0] = bv[1] = bv[2] = uvd->vpic.brightness >> 10;
+		if (bv[0] == (uvd->vpic_old.brightness >> 10))
+			return;
+		uvd->vpic_old.brightness = bv[0];
 		for (j=0; j < 3; j++)
 			for (i=0; i < n; i++)
-				usb_ibmcam_Packet_Format1(ibmcam, bright_3x[j], bv[j]);
-	} else {
-		i = ibmcam->vpic.brightness >> 12;	/* 0 .. 15 */
+				ibmcam_Packet_Format1(uvd, bright_3x[j], bv[j]);
+		break;
+	}
+	case IBMCAM_MODEL_2:
+	{
+		unsigned short i, j;
+		i = uvd->vpic.brightness >> 12;	/* 0 .. 15 */
 		j = 0x60 + i * ((0xee - 0x60) / 16);	/* 0x60 .. 0xee or so */
-		usb_ibmcam_model2_Packet1(ibmcam, mod2_brightness, j);
+		if (uvd->vpic_old.brightness == j)
+			break;
+		uvd->vpic_old.brightness = j;
+		ibmcam_model2_Packet1(uvd, mod2_brightness, j);
+		break;
+	}
+	case IBMCAM_MODEL_3:
+	{
+		/* Model 3: Brightness range 'i' in [0x0C..0x3F] */
+		unsigned short i =
+			0x0C + (uvd->vpic.brightness / (0xFFFF / (0x3F - 0x0C + 1)));
+		RESTRICT_TO_RANGE(i, 0x0C, 0x3F);
+		if (uvd->vpic_old.brightness == i)
+			break;
+		uvd->vpic_old.brightness = i;
+		ibmcam_veio(uvd, 0, 0x0000, 0x010c);	/* Stop */
+		ibmcam_model3_Packet1(uvd, 0x0036, i);
+		ibmcam_veio(uvd, 0, 0x0001, 0x0114);
+		ibmcam_veio(uvd, 0, 0x00c0, 0x010c);	/* Go! */
+		usb_clear_halt(uvd->dev, usb_rcvisocpipe(uvd->dev, uvd->video_endp));
+		ibmcam_veio(uvd, 0, 0x0001, 0x0113);
+		break;
+	}
+	case IBMCAM_MODEL_4:
+	{
+		/* Model 4: Brightness range 'i' in [0x04..0xb4] */
+		unsigned short i = 0x04 + (uvd->vpic.brightness / (0xFFFF / (0xb4 - 0x04 + 1)));
+		RESTRICT_TO_RANGE(i, 0x04, 0xb4);
+		if (uvd->vpic_old.brightness == i)
+			break;
+		uvd->vpic_old.brightness = i;
+		ibmcam_model4_BrightnessPacket(uvd, i);
+		break;
+	}
+	default:
+		break;
 	}
 }
 
-static void usb_ibmcam_model2_set_hue(struct usb_ibmcam *ibmcam)
+static void ibmcam_set_hue(uvd_t *uvd)
 {
-	unsigned short hue = ibmcam->vpic.hue >> 9; /* 0 .. 7F */
+	switch (IBMCAM_T(uvd)->camera_model) {
+	case IBMCAM_MODEL_2:
+	{
+		unsigned short hue = uvd->vpic.hue >> 9; /* 0 .. 7F */
+		if (uvd->vpic_old.hue == hue)
+			return;
+		uvd->vpic_old.hue = hue;
+		ibmcam_model2_Packet1(uvd, mod2_hue, hue);
+		/* ibmcam_model2_Packet1(uvd, mod2_saturation, sat); */
+		break;
+	}
+	case IBMCAM_MODEL_3:
+	{
+#if 0 /* This seems not to work. No problem, will fix programmatically */
+		unsigned short hue = 0x05 + (uvd->vpic.hue / (0xFFFF / (0x37 - 0x05 + 1)));
+		RESTRICT_TO_RANGE(hue, 0x05, 0x37);
+		if (uvd->vpic_old.hue == hue)
+			return;
+		uvd->vpic_old.hue = hue;
+		ibmcam_veio(uvd, 0, 0x0000, 0x010c);	/* Stop */
+		ibmcam_model3_Packet1(uvd, 0x007e, hue);
+		ibmcam_veio(uvd, 0, 0x0001, 0x0114);
+		ibmcam_veio(uvd, 0, 0x00c0, 0x010c);	/* Go! */
+		usb_clear_halt(uvd->dev, usb_rcvisocpipe(uvd->dev, uvd->video_endp));
+		ibmcam_veio(uvd, 0, 0x0001, 0x0113);
+#endif
+		break;
+	}
+	case IBMCAM_MODEL_4:
+	{
+		unsigned short r_gain, g_gain, b_gain, hue;
 
-	usb_ibmcam_model2_Packet1(ibmcam, mod2_color_balance_rg, hue);
-	/* usb_ibmcam_model2_Packet1(ibmcam, mod2_saturation, sat); */
+		/*
+		 * I am not sure r/g/b_gain variables exactly control gain
+		 * of those channels. Most likely they subtly change some
+		 * very internal image processing settings in the camera.
+		 * In any case, here is what they do, and feel free to tweak:
+		 *
+		 * r_gain: seriously affects red gain
+		 * g_gain: seriously affects green gain
+		 * b_gain: seriously affects blue gain
+		 * hue: changes average color from violet (0) to red (0xFF)
+		 *
+		 * These settings are preset for a decent white balance in
+		 * 320x240, 352x288 modes. Low-res modes exhibit higher contrast
+		 * and therefore may need different values here.
+		 */
+		hue = 20 + (uvd->vpic.hue >> 9);
+		switch (uvd->videosize) {
+		case VIDEOSIZE_128x96:
+			r_gain = 90;
+			g_gain = 166;
+			b_gain = 175;
+			break;
+		case VIDEOSIZE_160x120:
+			r_gain = 70;
+			g_gain = 166;
+			b_gain = 185;
+			break;
+		case VIDEOSIZE_176x144:
+			r_gain = 160;
+			g_gain = 175;
+			b_gain = 185;
+			break;
+		default:
+			r_gain = 120;
+			g_gain = 166;
+			b_gain = 175;
+			break;
+		}
+		RESTRICT_TO_RANGE(hue, 1, 0x7f);
+
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x001e, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, g_gain, 0x0127);	/* Green gain */
+		ibmcam_veio(uvd, 0, r_gain, 0x012e);	/* Red gain */
+		ibmcam_veio(uvd, 0, b_gain, 0x0130);	/* Blue gain */
+		ibmcam_veio(uvd, 0, 0x8a28, 0x0124);
+		ibmcam_veio(uvd, 0, hue,    0x012d);	/* Hue */
+		ibmcam_veio(uvd, 0, 0xf545, 0x0124);
+		break;
+	}
+	default:
+		break;
+	}
 }
 
 /*
- * usb_ibmcam_adjust_picture()
+ * ibmcam_adjust_picture()
  *
  * This procedure gets called from V4L interface to update picture settings.
  * Here we change brightness and contrast.
  */
-static void usb_ibmcam_adjust_picture(struct usb_ibmcam *ibmcam)
+static void ibmcam_adjust_picture(uvd_t *uvd)
 {
-	usb_ibmcam_adjust_contrast(ibmcam);
-	usb_ibmcam_set_brightness(ibmcam);
-	if (ibmcam->camera_model == IBMCAM_MODEL_2) {
-		usb_ibmcam_model2_set_hue(ibmcam);
-	}
+	ibmcam_adjust_contrast(uvd);
+	ibmcam_set_brightness(uvd);
+	ibmcam_set_hue(uvd);
 }
 
-static int usb_ibmcam_model1_setup(struct usb_ibmcam *ibmcam)
+static int ibmcam_model1_setup(uvd_t *uvd)
 {
 	const int ntries = 5;
 	int i;
 
-	usb_ibmcam_veio(ibmcam, 1, 0x00, 0x0128);
-	usb_ibmcam_veio(ibmcam, 1, 0x00, 0x0100);
-	usb_ibmcam_veio(ibmcam, 0, 0x01, 0x0100);	/* LED On  */
-	usb_ibmcam_veio(ibmcam, 1, 0x00, 0x0100);
-	usb_ibmcam_veio(ibmcam, 0, 0x81, 0x0100);	/* LED Off */
-	usb_ibmcam_veio(ibmcam, 1, 0x00, 0x0100);
-	usb_ibmcam_veio(ibmcam, 0, 0x01, 0x0100);	/* LED On  */
-	usb_ibmcam_veio(ibmcam, 0, 0x01, 0x0108);
+	ibmcam_veio(uvd, 1, 0x00, 0x0128);
+	ibmcam_veio(uvd, 1, 0x00, 0x0100);
+	ibmcam_veio(uvd, 0, 0x01, 0x0100);	/* LED On  */
+	ibmcam_veio(uvd, 1, 0x00, 0x0100);
+	ibmcam_veio(uvd, 0, 0x81, 0x0100);	/* LED Off */
+	ibmcam_veio(uvd, 1, 0x00, 0x0100);
+	ibmcam_veio(uvd, 0, 0x01, 0x0100);	/* LED On  */
+	ibmcam_veio(uvd, 0, 0x01, 0x0108);
 
-	usb_ibmcam_veio(ibmcam, 0, 0x03, 0x0112);
-	usb_ibmcam_veio(ibmcam, 1, 0x00, 0x0115);
-	usb_ibmcam_veio(ibmcam, 0, 0x06, 0x0115);
-	usb_ibmcam_veio(ibmcam, 1, 0x00, 0x0116);
-	usb_ibmcam_veio(ibmcam, 0, 0x44, 0x0116);
-	usb_ibmcam_veio(ibmcam, 1, 0x00, 0x0116);
-	usb_ibmcam_veio(ibmcam, 0, 0x40, 0x0116);
-	usb_ibmcam_veio(ibmcam, 1, 0x00, 0x0115);
-	usb_ibmcam_veio(ibmcam, 0, 0x0e, 0x0115);
-	usb_ibmcam_veio(ibmcam, 0, 0x19, 0x012c);
+	ibmcam_veio(uvd, 0, 0x03, 0x0112);
+	ibmcam_veio(uvd, 1, 0x00, 0x0115);
+	ibmcam_veio(uvd, 0, 0x06, 0x0115);
+	ibmcam_veio(uvd, 1, 0x00, 0x0116);
+	ibmcam_veio(uvd, 0, 0x44, 0x0116);
+	ibmcam_veio(uvd, 1, 0x00, 0x0116);
+	ibmcam_veio(uvd, 0, 0x40, 0x0116);
+	ibmcam_veio(uvd, 1, 0x00, 0x0115);
+	ibmcam_veio(uvd, 0, 0x0e, 0x0115);
+	ibmcam_veio(uvd, 0, 0x19, 0x012c);
 
-	usb_ibmcam_Packet_Format1(ibmcam, 0x00, 0x1e);
-	usb_ibmcam_Packet_Format1(ibmcam, 0x39, 0x0d);
-	usb_ibmcam_Packet_Format1(ibmcam, 0x39, 0x09);
-	usb_ibmcam_Packet_Format1(ibmcam, 0x3b, 0x00);
-	usb_ibmcam_Packet_Format1(ibmcam, 0x28, 0x22);
-	usb_ibmcam_Packet_Format1(ibmcam, light_27, 0);
-	usb_ibmcam_Packet_Format1(ibmcam, 0x2b, 0x1f);
-	usb_ibmcam_Packet_Format1(ibmcam, 0x39, 0x08);
-
-	for (i=0; i < ntries; i++)
-		usb_ibmcam_Packet_Format1(ibmcam, 0x2c, 0x00);
+	ibmcam_Packet_Format1(uvd, 0x00, 0x1e);
+	ibmcam_Packet_Format1(uvd, 0x39, 0x0d);
+	ibmcam_Packet_Format1(uvd, 0x39, 0x09);
+	ibmcam_Packet_Format1(uvd, 0x3b, 0x00);
+	ibmcam_Packet_Format1(uvd, 0x28, 0x22);
+	ibmcam_Packet_Format1(uvd, light_27, 0);
+	ibmcam_Packet_Format1(uvd, 0x2b, 0x1f);
+	ibmcam_Packet_Format1(uvd, 0x39, 0x08);
 
 	for (i=0; i < ntries; i++)
-		usb_ibmcam_Packet_Format1(ibmcam, 0x30, 0x14);
-
-	usb_ibmcam_PacketFormat2(ibmcam, 0x39, 0x02);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x01, 0xe1);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x02, 0xcd);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x03, 0xcd);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x04, 0xfa);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x3f, 0xff);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x39, 0x00);
-
-	usb_ibmcam_PacketFormat2(ibmcam, 0x39, 0x02);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x0a, 0x37);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x0b, 0xb8);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x0c, 0xf3);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x0d, 0xe3);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x0e, 0x0d);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x0f, 0xf2);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x10, 0xd5);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x11, 0xba);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x12, 0x53);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x3f, 0xff);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x39, 0x00);
-
-	usb_ibmcam_PacketFormat2(ibmcam, 0x39, 0x02);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x16, 0x00);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x17, 0x28);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x18, 0x7d);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x19, 0xbe);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x3f, 0xff);
-	usb_ibmcam_PacketFormat2(ibmcam, 0x39, 0x00);
+		ibmcam_Packet_Format1(uvd, 0x2c, 0x00);
 
 	for (i=0; i < ntries; i++)
-		usb_ibmcam_Packet_Format1(ibmcam, 0x00, 0x18);
+		ibmcam_Packet_Format1(uvd, 0x30, 0x14);
+
+	ibmcam_PacketFormat2(uvd, 0x39, 0x02);
+	ibmcam_PacketFormat2(uvd, 0x01, 0xe1);
+	ibmcam_PacketFormat2(uvd, 0x02, 0xcd);
+	ibmcam_PacketFormat2(uvd, 0x03, 0xcd);
+	ibmcam_PacketFormat2(uvd, 0x04, 0xfa);
+	ibmcam_PacketFormat2(uvd, 0x3f, 0xff);
+	ibmcam_PacketFormat2(uvd, 0x39, 0x00);
+
+	ibmcam_PacketFormat2(uvd, 0x39, 0x02);
+	ibmcam_PacketFormat2(uvd, 0x0a, 0x37);
+	ibmcam_PacketFormat2(uvd, 0x0b, 0xb8);
+	ibmcam_PacketFormat2(uvd, 0x0c, 0xf3);
+	ibmcam_PacketFormat2(uvd, 0x0d, 0xe3);
+	ibmcam_PacketFormat2(uvd, 0x0e, 0x0d);
+	ibmcam_PacketFormat2(uvd, 0x0f, 0xf2);
+	ibmcam_PacketFormat2(uvd, 0x10, 0xd5);
+	ibmcam_PacketFormat2(uvd, 0x11, 0xba);
+	ibmcam_PacketFormat2(uvd, 0x12, 0x53);
+	ibmcam_PacketFormat2(uvd, 0x3f, 0xff);
+	ibmcam_PacketFormat2(uvd, 0x39, 0x00);
+
+	ibmcam_PacketFormat2(uvd, 0x39, 0x02);
+	ibmcam_PacketFormat2(uvd, 0x16, 0x00);
+	ibmcam_PacketFormat2(uvd, 0x17, 0x28);
+	ibmcam_PacketFormat2(uvd, 0x18, 0x7d);
+	ibmcam_PacketFormat2(uvd, 0x19, 0xbe);
+	ibmcam_PacketFormat2(uvd, 0x3f, 0xff);
+	ibmcam_PacketFormat2(uvd, 0x39, 0x00);
+
 	for (i=0; i < ntries; i++)
-		usb_ibmcam_Packet_Format1(ibmcam, 0x13, 0x18);
+		ibmcam_Packet_Format1(uvd, 0x00, 0x18);
 	for (i=0; i < ntries; i++)
-		usb_ibmcam_Packet_Format1(ibmcam, 0x14, 0x06);
+		ibmcam_Packet_Format1(uvd, 0x13, 0x18);
+	for (i=0; i < ntries; i++)
+		ibmcam_Packet_Format1(uvd, 0x14, 0x06);
 
 	/* This is default brightness */
 	for (i=0; i < ntries; i++)
-		usb_ibmcam_Packet_Format1(ibmcam, 0x31, 0x37);
+		ibmcam_Packet_Format1(uvd, 0x31, 0x37);
 	for (i=0; i < ntries; i++)
-		usb_ibmcam_Packet_Format1(ibmcam, 0x32, 0x46);
+		ibmcam_Packet_Format1(uvd, 0x32, 0x46);
 	for (i=0; i < ntries; i++)
-		usb_ibmcam_Packet_Format1(ibmcam, 0x33, 0x55);
+		ibmcam_Packet_Format1(uvd, 0x33, 0x55);
 
-	usb_ibmcam_Packet_Format1(ibmcam, 0x2e, 0x04);
+	ibmcam_Packet_Format1(uvd, 0x2e, 0x04);
 	for (i=0; i < ntries; i++)
-		usb_ibmcam_Packet_Format1(ibmcam, 0x2d, 0x04);
+		ibmcam_Packet_Format1(uvd, 0x2d, 0x04);
 	for (i=0; i < ntries; i++)
-		usb_ibmcam_Packet_Format1(ibmcam, 0x29, 0x80);
-	usb_ibmcam_Packet_Format1(ibmcam, 0x2c, 0x01);
-	usb_ibmcam_Packet_Format1(ibmcam, 0x30, 0x17);
-	usb_ibmcam_Packet_Format1(ibmcam, 0x39, 0x08);
+		ibmcam_Packet_Format1(uvd, 0x29, 0x80);
+	ibmcam_Packet_Format1(uvd, 0x2c, 0x01);
+	ibmcam_Packet_Format1(uvd, 0x30, 0x17);
+	ibmcam_Packet_Format1(uvd, 0x39, 0x08);
 	for (i=0; i < ntries; i++)
-		usb_ibmcam_Packet_Format1(ibmcam, 0x34, 0x00);
+		ibmcam_Packet_Format1(uvd, 0x34, 0x00);
 
-	usb_ibmcam_veio(ibmcam, 0, 0x00, 0x0101);
-	usb_ibmcam_veio(ibmcam, 0, 0x00, 0x010a);
+	ibmcam_veio(uvd, 0, 0x00, 0x0101);
+	ibmcam_veio(uvd, 0, 0x00, 0x010a);
 
-	switch (videosize) {
+	switch (uvd->videosize) {
 	case VIDEOSIZE_128x96:
-		usb_ibmcam_veio(ibmcam, 0, 0x80, 0x0103);
-		usb_ibmcam_veio(ibmcam, 0, 0x60, 0x0105);
-		usb_ibmcam_veio(ibmcam, 0, 0x0c, 0x010b);
-		usb_ibmcam_veio(ibmcam, 0, 0x04, 0x011b);	/* Same everywhere */
-		usb_ibmcam_veio(ibmcam, 0, 0x0b, 0x011d);
-		usb_ibmcam_veio(ibmcam, 0, 0x00, 0x011e);	/* Same everywhere */
-		usb_ibmcam_veio(ibmcam, 0, 0x00, 0x0129);
+		ibmcam_veio(uvd, 0, 0x80, 0x0103);
+		ibmcam_veio(uvd, 0, 0x60, 0x0105);
+		ibmcam_veio(uvd, 0, 0x0c, 0x010b);
+		ibmcam_veio(uvd, 0, 0x04, 0x011b);	/* Same everywhere */
+		ibmcam_veio(uvd, 0, 0x0b, 0x011d);
+		ibmcam_veio(uvd, 0, 0x00, 0x011e);	/* Same everywhere */
+		ibmcam_veio(uvd, 0, 0x00, 0x0129);
 		break;
 	case VIDEOSIZE_176x144:
-		usb_ibmcam_veio(ibmcam, 0, 0xb0, 0x0103);
-		usb_ibmcam_veio(ibmcam, 0, 0x8f, 0x0105);
-		usb_ibmcam_veio(ibmcam, 0, 0x06, 0x010b);
-		usb_ibmcam_veio(ibmcam, 0, 0x04, 0x011b);	/* Same everywhere */
-		usb_ibmcam_veio(ibmcam, 0, 0x0d, 0x011d);
-		usb_ibmcam_veio(ibmcam, 0, 0x00, 0x011e);	/* Same everywhere */
-		usb_ibmcam_veio(ibmcam, 0, 0x03, 0x0129);
+		ibmcam_veio(uvd, 0, 0xb0, 0x0103);
+		ibmcam_veio(uvd, 0, 0x8f, 0x0105);
+		ibmcam_veio(uvd, 0, 0x06, 0x010b);
+		ibmcam_veio(uvd, 0, 0x04, 0x011b);	/* Same everywhere */
+		ibmcam_veio(uvd, 0, 0x0d, 0x011d);
+		ibmcam_veio(uvd, 0, 0x00, 0x011e);	/* Same everywhere */
+		ibmcam_veio(uvd, 0, 0x03, 0x0129);
 		break;
 	case VIDEOSIZE_352x288:
-		usb_ibmcam_veio(ibmcam, 0, 0xb0, 0x0103);
-		usb_ibmcam_veio(ibmcam, 0, 0x90, 0x0105);
-		usb_ibmcam_veio(ibmcam, 0, 0x02, 0x010b);
-		usb_ibmcam_veio(ibmcam, 0, 0x04, 0x011b);	/* Same everywhere */
-		usb_ibmcam_veio(ibmcam, 0, 0x05, 0x011d);
-		usb_ibmcam_veio(ibmcam, 0, 0x00, 0x011e);	/* Same everywhere */
-		usb_ibmcam_veio(ibmcam, 0, 0x00, 0x0129);
+		ibmcam_veio(uvd, 0, 0xb0, 0x0103);
+		ibmcam_veio(uvd, 0, 0x90, 0x0105);
+		ibmcam_veio(uvd, 0, 0x02, 0x010b);
+		ibmcam_veio(uvd, 0, 0x04, 0x011b);	/* Same everywhere */
+		ibmcam_veio(uvd, 0, 0x05, 0x011d);
+		ibmcam_veio(uvd, 0, 0x00, 0x011e);	/* Same everywhere */
+		ibmcam_veio(uvd, 0, 0x00, 0x0129);
 		break;
 	}
 
-	usb_ibmcam_veio(ibmcam, 0, 0xff, 0x012b);
+	ibmcam_veio(uvd, 0, 0xff, 0x012b);
 
 	/* This is another brightness - don't know why */
 	for (i=0; i < ntries; i++)
-		usb_ibmcam_Packet_Format1(ibmcam, 0x31, 0xc3);
+		ibmcam_Packet_Format1(uvd, 0x31, 0xc3);
 	for (i=0; i < ntries; i++)
-		usb_ibmcam_Packet_Format1(ibmcam, 0x32, 0xd2);
+		ibmcam_Packet_Format1(uvd, 0x32, 0xd2);
 	for (i=0; i < ntries; i++)
-		usb_ibmcam_Packet_Format1(ibmcam, 0x33, 0xe1);
+		ibmcam_Packet_Format1(uvd, 0x33, 0xe1);
 
 	/* Default contrast */
 	for (i=0; i < ntries; i++)
-		usb_ibmcam_Packet_Format1(ibmcam, contrast_14, 0x0a);
+		ibmcam_Packet_Format1(uvd, contrast_14, 0x0a);
 
 	/* Default sharpness */
 	for (i=0; i < 2; i++)
-		usb_ibmcam_PacketFormat2(ibmcam, sharp_13, 0x1a);	/* Level 4 FIXME */
+		ibmcam_PacketFormat2(uvd, sharp_13, 0x1a);	/* Level 4 FIXME */
 
 	/* Default lighting conditions */
-	usb_ibmcam_Packet_Format1(ibmcam, light_27, lighting); /* 0=Bright 2=Low */
+	ibmcam_Packet_Format1(uvd, light_27, lighting); /* 0=Bright 2=Low */
 
 	/* Assorted init */
 
-	switch (videosize) {
+	switch (uvd->videosize) {
 	case VIDEOSIZE_128x96:
-		usb_ibmcam_Packet_Format1(ibmcam, 0x2b, 0x1e);
-		usb_ibmcam_veio(ibmcam, 0, 0xc9, 0x0119);	/* Same everywhere */
-		usb_ibmcam_veio(ibmcam, 0, 0x80, 0x0109);	/* Same everywhere */
-		usb_ibmcam_veio(ibmcam, 0, 0x36, 0x0102);
-		usb_ibmcam_veio(ibmcam, 0, 0x1a, 0x0104);
-		usb_ibmcam_veio(ibmcam, 0, 0x04, 0x011a);	/* Same everywhere */
-		usb_ibmcam_veio(ibmcam, 0, 0x2b, 0x011c);
-		usb_ibmcam_veio(ibmcam, 0, 0x23, 0x012a);	/* Same everywhere */
+		ibmcam_Packet_Format1(uvd, 0x2b, 0x1e);
+		ibmcam_veio(uvd, 0, 0xc9, 0x0119);	/* Same everywhere */
+		ibmcam_veio(uvd, 0, 0x80, 0x0109);	/* Same everywhere */
+		ibmcam_veio(uvd, 0, 0x36, 0x0102);
+		ibmcam_veio(uvd, 0, 0x1a, 0x0104);
+		ibmcam_veio(uvd, 0, 0x04, 0x011a);	/* Same everywhere */
+		ibmcam_veio(uvd, 0, 0x2b, 0x011c);
+		ibmcam_veio(uvd, 0, 0x23, 0x012a);	/* Same everywhere */
 #if 0
-		usb_ibmcam_veio(ibmcam, 0, 0x00, 0x0106);
-		usb_ibmcam_veio(ibmcam, 0, 0x38, 0x0107);
+		ibmcam_veio(uvd, 0, 0x00, 0x0106);
+		ibmcam_veio(uvd, 0, 0x38, 0x0107);
 #else
-		usb_ibmcam_veio(ibmcam, 0, 0x02, 0x0106);
-		usb_ibmcam_veio(ibmcam, 0, 0x2a, 0x0107);
+		ibmcam_veio(uvd, 0, 0x02, 0x0106);
+		ibmcam_veio(uvd, 0, 0x2a, 0x0107);
 #endif
 		break;
 	case VIDEOSIZE_176x144:
-		usb_ibmcam_Packet_Format1(ibmcam, 0x2b, 0x1e);
-		usb_ibmcam_veio(ibmcam, 0, 0xc9, 0x0119);	/* Same everywhere */
-		usb_ibmcam_veio(ibmcam, 0, 0x80, 0x0109);	/* Same everywhere */
-		usb_ibmcam_veio(ibmcam, 0, 0x04, 0x0102);
-		usb_ibmcam_veio(ibmcam, 0, 0x02, 0x0104);
-		usb_ibmcam_veio(ibmcam, 0, 0x04, 0x011a);	/* Same everywhere */
-		usb_ibmcam_veio(ibmcam, 0, 0x2b, 0x011c);
-		usb_ibmcam_veio(ibmcam, 0, 0x23, 0x012a);	/* Same everywhere */
-		usb_ibmcam_veio(ibmcam, 0, 0x01, 0x0106);
-		usb_ibmcam_veio(ibmcam, 0, 0xca, 0x0107);
+		ibmcam_Packet_Format1(uvd, 0x2b, 0x1e);
+		ibmcam_veio(uvd, 0, 0xc9, 0x0119);	/* Same everywhere */
+		ibmcam_veio(uvd, 0, 0x80, 0x0109);	/* Same everywhere */
+		ibmcam_veio(uvd, 0, 0x04, 0x0102);
+		ibmcam_veio(uvd, 0, 0x02, 0x0104);
+		ibmcam_veio(uvd, 0, 0x04, 0x011a);	/* Same everywhere */
+		ibmcam_veio(uvd, 0, 0x2b, 0x011c);
+		ibmcam_veio(uvd, 0, 0x23, 0x012a);	/* Same everywhere */
+		ibmcam_veio(uvd, 0, 0x01, 0x0106);
+		ibmcam_veio(uvd, 0, 0xca, 0x0107);
 		break;
 	case VIDEOSIZE_352x288:
-		usb_ibmcam_Packet_Format1(ibmcam, 0x2b, 0x1f);
-		usb_ibmcam_veio(ibmcam, 0, 0xc9, 0x0119);	/* Same everywhere */
-		usb_ibmcam_veio(ibmcam, 0, 0x80, 0x0109);	/* Same everywhere */
-		usb_ibmcam_veio(ibmcam, 0, 0x08, 0x0102);
-		usb_ibmcam_veio(ibmcam, 0, 0x01, 0x0104);
-		usb_ibmcam_veio(ibmcam, 0, 0x04, 0x011a);	/* Same everywhere */
-		usb_ibmcam_veio(ibmcam, 0, 0x2f, 0x011c);
-		usb_ibmcam_veio(ibmcam, 0, 0x23, 0x012a);	/* Same everywhere */
-		usb_ibmcam_veio(ibmcam, 0, 0x03, 0x0106);
-		usb_ibmcam_veio(ibmcam, 0, 0xf6, 0x0107);
+		ibmcam_Packet_Format1(uvd, 0x2b, 0x1f);
+		ibmcam_veio(uvd, 0, 0xc9, 0x0119);	/* Same everywhere */
+		ibmcam_veio(uvd, 0, 0x80, 0x0109);	/* Same everywhere */
+		ibmcam_veio(uvd, 0, 0x08, 0x0102);
+		ibmcam_veio(uvd, 0, 0x01, 0x0104);
+		ibmcam_veio(uvd, 0, 0x04, 0x011a);	/* Same everywhere */
+		ibmcam_veio(uvd, 0, 0x2f, 0x011c);
+		ibmcam_veio(uvd, 0, 0x23, 0x012a);	/* Same everywhere */
+		ibmcam_veio(uvd, 0, 0x03, 0x0106);
+		ibmcam_veio(uvd, 0, 0xf6, 0x0107);
 		break;
 	}
-	return IBMCAM_IS_OPERATIONAL(ibmcam);
+	return (CAMERA_IS_OPERATIONAL(uvd) ? 0 : -EFAULT);
 }
 
-static int usb_ibmcam_model2_setup(struct usb_ibmcam *ibmcam)
+static int ibmcam_model2_setup(uvd_t *uvd)
 {
-	usb_ibmcam_veio(ibmcam, 0, 0x0000, 0x0100);	/* LED on */
-	usb_ibmcam_veio(ibmcam, 1, 0x0000, 0x0116);
-	usb_ibmcam_veio(ibmcam, 0, 0x0060, 0x0116);
-	usb_ibmcam_veio(ibmcam, 0, 0x0002, 0x0112);
-	usb_ibmcam_veio(ibmcam, 0, 0x00bc, 0x012c);
-	usb_ibmcam_veio(ibmcam, 0, 0x0008, 0x012b);
-	usb_ibmcam_veio(ibmcam, 0, 0x0000, 0x0108);
-	usb_ibmcam_veio(ibmcam, 0, 0x0001, 0x0133);
-	usb_ibmcam_veio(ibmcam, 0, 0x0001, 0x0102);
-	switch (videosize) {
+	ibmcam_veio(uvd, 0, 0x0000, 0x0100);	/* LED on */
+	ibmcam_veio(uvd, 1, 0x0000, 0x0116);
+	ibmcam_veio(uvd, 0, 0x0060, 0x0116);
+	ibmcam_veio(uvd, 0, 0x0002, 0x0112);
+	ibmcam_veio(uvd, 0, 0x00bc, 0x012c);
+	ibmcam_veio(uvd, 0, 0x0008, 0x012b);
+	ibmcam_veio(uvd, 0, 0x0000, 0x0108);
+	ibmcam_veio(uvd, 0, 0x0001, 0x0133);
+	ibmcam_veio(uvd, 0, 0x0001, 0x0102);
+	switch (uvd->videosize) {
 	case VIDEOSIZE_176x144:
-		usb_ibmcam_veio(ibmcam, 0, 0x002c, 0x0103);	/* All except 320x240 */
-		usb_ibmcam_veio(ibmcam, 0, 0x0000, 0x0104);	/* Same */
-		usb_ibmcam_veio(ibmcam, 0, 0x0024, 0x0105);	/* 176x144, 352x288 */
-		usb_ibmcam_veio(ibmcam, 0, 0x00b9, 0x010a);	/* Unique to this mode */
-		usb_ibmcam_veio(ibmcam, 0, 0x0038, 0x0119);	/* Unique to this mode */
-		usb_ibmcam_veio(ibmcam, 0, 0x0003, 0x0106);	/* Same */
-		usb_ibmcam_veio(ibmcam, 0, 0x0090, 0x0107);	/* Unique to every mode*/
+		ibmcam_veio(uvd, 0, 0x002c, 0x0103);	/* All except 320x240 */
+		ibmcam_veio(uvd, 0, 0x0000, 0x0104);	/* Same */
+		ibmcam_veio(uvd, 0, 0x0024, 0x0105);	/* 176x144, 352x288 */
+		ibmcam_veio(uvd, 0, 0x00b9, 0x010a);	/* Unique to this mode */
+		ibmcam_veio(uvd, 0, 0x0038, 0x0119);	/* Unique to this mode */
+		ibmcam_veio(uvd, 0, 0x0003, 0x0106);	/* Same */
+		ibmcam_veio(uvd, 0, 0x0090, 0x0107);	/* Unique to every mode*/
 		break;
 	case VIDEOSIZE_320x240:
-		usb_ibmcam_veio(ibmcam, 0, 0x0028, 0x0103);	/* Unique to this mode */
-		usb_ibmcam_veio(ibmcam, 0, 0x0000, 0x0104);	/* Same */
-		usb_ibmcam_veio(ibmcam, 0, 0x001e, 0x0105);	/* 320x240, 352x240 */
-		usb_ibmcam_veio(ibmcam, 0, 0x0039, 0x010a);	/* All except 176x144 */
-		usb_ibmcam_veio(ibmcam, 0, 0x0070, 0x0119);	/* All except 176x144 */
-		usb_ibmcam_veio(ibmcam, 0, 0x0003, 0x0106);	/* Same */
-		usb_ibmcam_veio(ibmcam, 0, 0x0098, 0x0107);	/* Unique to every mode*/
+		ibmcam_veio(uvd, 0, 0x0028, 0x0103);	/* Unique to this mode */
+		ibmcam_veio(uvd, 0, 0x0000, 0x0104);	/* Same */
+		ibmcam_veio(uvd, 0, 0x001e, 0x0105);	/* 320x240, 352x240 */
+		ibmcam_veio(uvd, 0, 0x0039, 0x010a);	/* All except 176x144 */
+		ibmcam_veio(uvd, 0, 0x0070, 0x0119);	/* All except 176x144 */
+		ibmcam_veio(uvd, 0, 0x0003, 0x0106);	/* Same */
+		ibmcam_veio(uvd, 0, 0x0098, 0x0107);	/* Unique to every mode*/
 		break;
 	case VIDEOSIZE_352x240:
-		usb_ibmcam_veio(ibmcam, 0, 0x002c, 0x0103);	/* All except 320x240 */
-		usb_ibmcam_veio(ibmcam, 0, 0x0000, 0x0104);	/* Same */
-		usb_ibmcam_veio(ibmcam, 0, 0x001e, 0x0105);	/* 320x240, 352x240 */
-		usb_ibmcam_veio(ibmcam, 0, 0x0039, 0x010a);	/* All except 176x144 */
-		usb_ibmcam_veio(ibmcam, 0, 0x0070, 0x0119);	/* All except 176x144 */
-		usb_ibmcam_veio(ibmcam, 0, 0x0003, 0x0106);	/* Same */
-		usb_ibmcam_veio(ibmcam, 0, 0x00da, 0x0107);	/* Unique to every mode*/
+		ibmcam_veio(uvd, 0, 0x002c, 0x0103);	/* All except 320x240 */
+		ibmcam_veio(uvd, 0, 0x0000, 0x0104);	/* Same */
+		ibmcam_veio(uvd, 0, 0x001e, 0x0105);	/* 320x240, 352x240 */
+		ibmcam_veio(uvd, 0, 0x0039, 0x010a);	/* All except 176x144 */
+		ibmcam_veio(uvd, 0, 0x0070, 0x0119);	/* All except 176x144 */
+		ibmcam_veio(uvd, 0, 0x0003, 0x0106);	/* Same */
+		ibmcam_veio(uvd, 0, 0x00da, 0x0107);	/* Unique to every mode*/
 		break;
 	case VIDEOSIZE_352x288:
-		usb_ibmcam_veio(ibmcam, 0, 0x002c, 0x0103);	/* All except 320x240 */
-		usb_ibmcam_veio(ibmcam, 0, 0x0000, 0x0104);	/* Same */
-		usb_ibmcam_veio(ibmcam, 0, 0x0024, 0x0105);	/* 176x144, 352x288 */
-		usb_ibmcam_veio(ibmcam, 0, 0x0039, 0x010a);	/* All except 176x144 */
-		usb_ibmcam_veio(ibmcam, 0, 0x0070, 0x0119);	/* All except 176x144 */
-		usb_ibmcam_veio(ibmcam, 0, 0x0003, 0x0106);	/* Same */
-		usb_ibmcam_veio(ibmcam, 0, 0x00fe, 0x0107);	/* Unique to every mode*/
+		ibmcam_veio(uvd, 0, 0x002c, 0x0103);	/* All except 320x240 */
+		ibmcam_veio(uvd, 0, 0x0000, 0x0104);	/* Same */
+		ibmcam_veio(uvd, 0, 0x0024, 0x0105);	/* 176x144, 352x288 */
+		ibmcam_veio(uvd, 0, 0x0039, 0x010a);	/* All except 176x144 */
+		ibmcam_veio(uvd, 0, 0x0070, 0x0119);	/* All except 176x144 */
+		ibmcam_veio(uvd, 0, 0x0003, 0x0106);	/* Same */
+		ibmcam_veio(uvd, 0, 0x00fe, 0x0107);	/* Unique to every mode*/
 		break;
 	}
-	return IBMCAM_IS_OPERATIONAL(ibmcam);
+	return (CAMERA_IS_OPERATIONAL(uvd) ? 0 : -EFAULT);
 }
 
 /*
- * usb_ibmcam_model1_setup_after_video_if()
+ * ibmcam_model1_setup_after_video_if()
  *
  * This code adds finishing touches to the video data interface.
  * Here we configure the frame rate and turn on the LED.
  */
-static void usb_ibmcam_model1_setup_after_video_if(struct usb_ibmcam *ibmcam)
+static void ibmcam_model1_setup_after_video_if(uvd_t *uvd)
 {
 	unsigned short internal_frame_rate;
 
 	RESTRICT_TO_RANGE(framerate, FRAMERATE_MIN, FRAMERATE_MAX);
 	internal_frame_rate = FRAMERATE_MAX - framerate; /* 0=Fast 6=Slow */
-	usb_ibmcam_veio(ibmcam, 0, 0x01, 0x0100);	/* LED On  */
-	usb_ibmcam_veio(ibmcam, 0, internal_frame_rate, 0x0111);
-	usb_ibmcam_veio(ibmcam, 0, 0x01, 0x0114);
-	usb_ibmcam_veio(ibmcam, 0, 0xc0, 0x010c);
+	ibmcam_veio(uvd, 0, 0x01, 0x0100);	/* LED On  */
+	ibmcam_veio(uvd, 0, internal_frame_rate, 0x0111);
+	ibmcam_veio(uvd, 0, 0x01, 0x0114);
+	ibmcam_veio(uvd, 0, 0xc0, 0x010c);
 }
 
-static void usb_ibmcam_model2_setup_after_video_if(struct usb_ibmcam *ibmcam)
+static void ibmcam_model2_setup_after_video_if(uvd_t *uvd)
 {
-	unsigned short setup_model2_rg, setup_model2_rg2, setup_model2_sat, setup_model2_yb;
+	unsigned short setup_model2_rg2, setup_model2_sat, setup_model2_yb;
 
-	usb_ibmcam_veio(ibmcam, 0, 0x0000, 0x0100);	/* LED on */
+	ibmcam_veio(uvd, 0, 0x0000, 0x0100);	/* LED on */
 
-	switch (videosize) {
+	switch (uvd->videosize) {
 	case VIDEOSIZE_176x144:
-		usb_ibmcam_veio(ibmcam, 0, 0x0050, 0x0111);
-		usb_ibmcam_veio(ibmcam, 0, 0x00d0, 0x0111);
+		ibmcam_veio(uvd, 0, 0x0050, 0x0111);
+		ibmcam_veio(uvd, 0, 0x00d0, 0x0111);
 		break;
 	case VIDEOSIZE_320x240:
 	case VIDEOSIZE_352x240:
 	case VIDEOSIZE_352x288:
-		usb_ibmcam_veio(ibmcam, 0, 0x0040, 0x0111);
-		usb_ibmcam_veio(ibmcam, 0, 0x00c0, 0x0111);
+		ibmcam_veio(uvd, 0, 0x0040, 0x0111);
+		ibmcam_veio(uvd, 0, 0x00c0, 0x0111);
 		break;
 	}
-	usb_ibmcam_veio(ibmcam, 0, 0x009b, 0x010f);
-	usb_ibmcam_veio(ibmcam, 0, 0x00bb, 0x010f);
+	ibmcam_veio(uvd, 0, 0x009b, 0x010f);
+	ibmcam_veio(uvd, 0, 0x00bb, 0x010f);
 
 	/*
 	 * Hardware settings, may affect CMOS sensor; not user controls!
@@ -1939,52 +2009,52 @@ static void usb_ibmcam_model2_setup_after_video_if(struct usb_ibmcam *ibmcam)
 	 * 0x002c: hardware setting (related to scan lines)
 	 * 0x002e: stops video stream, probably important h/w setting
 	 */
-	usb_ibmcam_model2_Packet1(ibmcam, 0x000a, 0x005c);
-	usb_ibmcam_model2_Packet1(ibmcam, 0x0004, 0x0000);
-	usb_ibmcam_model2_Packet1(ibmcam, 0x0006, 0x00fb);
-	usb_ibmcam_model2_Packet1(ibmcam, 0x0008, 0x0000);
-	usb_ibmcam_model2_Packet1(ibmcam, 0x000c, 0x0009);
-	usb_ibmcam_model2_Packet1(ibmcam, 0x0012, 0x000a);
-	usb_ibmcam_model2_Packet1(ibmcam, 0x002a, 0x0000);
-	usb_ibmcam_model2_Packet1(ibmcam, 0x002c, 0x0000);
-	usb_ibmcam_model2_Packet1(ibmcam, 0x002e, 0x0008);
+	ibmcam_model2_Packet1(uvd, 0x000a, 0x005c);
+	ibmcam_model2_Packet1(uvd, 0x0004, 0x0000);
+	ibmcam_model2_Packet1(uvd, 0x0006, 0x00fb);
+	ibmcam_model2_Packet1(uvd, 0x0008, 0x0000);
+	ibmcam_model2_Packet1(uvd, 0x000c, 0x0009);
+	ibmcam_model2_Packet1(uvd, 0x0012, 0x000a);
+	ibmcam_model2_Packet1(uvd, 0x002a, 0x0000);
+	ibmcam_model2_Packet1(uvd, 0x002c, 0x0000);
+	ibmcam_model2_Packet1(uvd, 0x002e, 0x0008);
 
 	/*
 	 * Function 0x0030 pops up all over the place. Apparently
 	 * it is a hardware control register, with every bit assigned to
 	 * do something.
 	 */
-	usb_ibmcam_model2_Packet1(ibmcam, 0x0030, 0x0000);
+	ibmcam_model2_Packet1(uvd, 0x0030, 0x0000);
 
 	/*
 	 * Magic control of CMOS sensor. Only lower values like
 	 * 0-3 work, and picture shifts left or right. Don't change.
 	 */
-	switch (videosize) {
+	switch (uvd->videosize) {
 	case VIDEOSIZE_176x144:
-		usb_ibmcam_model2_Packet1(ibmcam, 0x0014, 0x0002);
-		usb_ibmcam_model2_Packet1(ibmcam, 0x0016, 0x0002); /* Horizontal shift */
-		usb_ibmcam_model2_Packet1(ibmcam, 0x0018, 0x004a); /* Another hardware setting */
+		ibmcam_model2_Packet1(uvd, 0x0014, 0x0002);
+		ibmcam_model2_Packet1(uvd, 0x0016, 0x0002); /* Horizontal shift */
+		ibmcam_model2_Packet1(uvd, 0x0018, 0x004a); /* Another hardware setting */
 		break;
 	case VIDEOSIZE_320x240:
-		usb_ibmcam_model2_Packet1(ibmcam, 0x0014, 0x0009);
-		usb_ibmcam_model2_Packet1(ibmcam, 0x0016, 0x0005); /* Horizontal shift */
-		usb_ibmcam_model2_Packet1(ibmcam, 0x0018, 0x0044); /* Another hardware setting */
+		ibmcam_model2_Packet1(uvd, 0x0014, 0x0009);
+		ibmcam_model2_Packet1(uvd, 0x0016, 0x0005); /* Horizontal shift */
+		ibmcam_model2_Packet1(uvd, 0x0018, 0x0044); /* Another hardware setting */
 		break;
 	case VIDEOSIZE_352x240:
 		/* This mode doesn't work as Windows programs it; changed to work */
-		usb_ibmcam_model2_Packet1(ibmcam, 0x0014, 0x0009); /* Windows sets this to 8 */
-		usb_ibmcam_model2_Packet1(ibmcam, 0x0016, 0x0003); /* Horizontal shift */
-		usb_ibmcam_model2_Packet1(ibmcam, 0x0018, 0x0044); /* Windows sets this to 0x0045 */
+		ibmcam_model2_Packet1(uvd, 0x0014, 0x0009); /* Windows sets this to 8 */
+		ibmcam_model2_Packet1(uvd, 0x0016, 0x0003); /* Horizontal shift */
+		ibmcam_model2_Packet1(uvd, 0x0018, 0x0044); /* Windows sets this to 0x0045 */
 		break;
 	case VIDEOSIZE_352x288:
-		usb_ibmcam_model2_Packet1(ibmcam, 0x0014, 0x0003);
-		usb_ibmcam_model2_Packet1(ibmcam, 0x0016, 0x0002); /* Horizontal shift */
-		usb_ibmcam_model2_Packet1(ibmcam, 0x0018, 0x004a); /* Another hardware setting */
+		ibmcam_model2_Packet1(uvd, 0x0014, 0x0003);
+		ibmcam_model2_Packet1(uvd, 0x0016, 0x0002); /* Horizontal shift */
+		ibmcam_model2_Packet1(uvd, 0x0018, 0x004a); /* Another hardware setting */
 		break;
 	}
 
-	usb_ibmcam_model2_Packet1(ibmcam, mod2_brightness, 0x005a);
+	ibmcam_model2_Packet1(uvd, mod2_brightness, 0x005a);
 
 	/*
 	 * We have our own frame rate setting varying from 0 (slowest) to 6 (fastest).
@@ -2008,7 +2078,7 @@ static void usb_ibmcam_model2_setup_after_video_if(struct usb_ibmcam *ibmcam)
 
 		RESTRICT_TO_RANGE(framerate, FRAMERATE_MIN, FRAMERATE_MAX);
 		i_framerate = FRAMERATE_MAX - framerate + FRAMERATE_MIN;
-		switch (videosize) {
+		switch (uvd->videosize) {
 		case VIDEOSIZE_176x144:
 			hw_fps = 6 + i_framerate*4;
 			break;
@@ -2022,10 +2092,10 @@ static void usb_ibmcam_model2_setup_after_video_if(struct usb_ibmcam *ibmcam)
 			hw_fps = 28 + i_framerate/2;
 			break;
 		}
-		if (debug > 0)
-			printk(KERN_DEBUG "Framerate (hardware): %hd.\n", hw_fps);
+		if (uvd->debug > 0)
+			info("Framerate (hardware): %hd.", hw_fps);
 		RESTRICT_TO_RANGE(hw_fps, 0, 31);
-		usb_ibmcam_model2_Packet1(ibmcam, mod2_set_framerate, hw_fps);
+		ibmcam_model2_Packet1(uvd, mod2_set_framerate, hw_fps);
 	}
 
 	/*
@@ -2034,28 +2104,22 @@ static void usb_ibmcam_model2_setup_after_video_if(struct usb_ibmcam *ibmcam)
 	 * does not allow arbitrary values and apparently is a bit mask, to
 	 * be activated only at appropriate time. Don't change it randomly!
 	 */
-	switch (videosize) {
+	switch (uvd->videosize) {
 	case VIDEOSIZE_176x144:
-		usb_ibmcam_model2_Packet1(ibmcam, 0x0026, 0x00c2);
+		ibmcam_model2_Packet1(uvd, 0x0026, 0x00c2);
 		break;
 	case VIDEOSIZE_320x240:
-		usb_ibmcam_model2_Packet1(ibmcam, 0x0026, 0x0044);
+		ibmcam_model2_Packet1(uvd, 0x0026, 0x0044);
 		break;
 	case VIDEOSIZE_352x240:
-		usb_ibmcam_model2_Packet1(ibmcam, 0x0026, 0x0046);
+		ibmcam_model2_Packet1(uvd, 0x0026, 0x0046);
 		break;
 	case VIDEOSIZE_352x288:
-		usb_ibmcam_model2_Packet1(ibmcam, 0x0026, 0x0048);
+		ibmcam_model2_Packet1(uvd, 0x0026, 0x0048);
 		break;
 	}
 
-	usb_ibmcam_model2_Packet1(ibmcam, mod2_sensitivity, lighting);
-
-	if (init_model2_rg >= 0) {
-		RESTRICT_TO_RANGE(init_model2_rg, 0, 255);
-		setup_model2_rg = init_model2_rg;
-	} else
-		setup_model2_rg = 0x0070;
+	ibmcam_model2_Packet1(uvd, mod2_sensitivity, lighting);
 
 	if (init_model2_rg2 >= 0) {
 		RESTRICT_TO_RANGE(init_model2_rg2, 0, 255);
@@ -2075,53 +2139,1402 @@ static void usb_ibmcam_model2_setup_after_video_if(struct usb_ibmcam *ibmcam)
 	} else
 		setup_model2_yb = 0x00a0;
 
-	usb_ibmcam_model2_Packet1(ibmcam, mod2_color_balance_rg2, setup_model2_rg2);
-	usb_ibmcam_model2_Packet1(ibmcam, mod2_saturation, setup_model2_sat);
-	usb_ibmcam_model2_Packet1(ibmcam, mod2_color_balance_yb, setup_model2_yb);
-	usb_ibmcam_model2_Packet1(ibmcam, mod2_color_balance_rg, setup_model2_rg);
+	ibmcam_model2_Packet1(uvd, mod2_color_balance_rg2, setup_model2_rg2);
+	ibmcam_model2_Packet1(uvd, mod2_saturation, setup_model2_sat);
+	ibmcam_model2_Packet1(uvd, mod2_color_balance_yb, setup_model2_yb);
+	ibmcam_model2_Packet1(uvd, mod2_hue, uvd->vpic.hue >> 9); /* 0 .. 7F */;
 
 	/* Hardware control command */
-	usb_ibmcam_model2_Packet1(ibmcam, 0x0030, 0x0004);
+	ibmcam_model2_Packet1(uvd, 0x0030, 0x0004);
 
-	usb_ibmcam_veio(ibmcam, 0, 0x00c0, 0x010c);	/* Go camera, go! */
-	usb_clear_halt(ibmcam->dev, ibmcam->video_endp);
+	ibmcam_veio(uvd, 0, 0x00c0, 0x010c);	/* Go camera, go! */
+	usb_clear_halt(uvd->dev, usb_rcvisocpipe(uvd->dev, uvd->video_endp));
+}
+
+static void ibmcam_model4_setup_after_video_if(uvd_t *uvd)
+{
+	switch (uvd->videosize) {
+	case VIDEOSIZE_128x96:
+		ibmcam_veio(uvd, 0, 0x0000, 0x0100);
+		ibmcam_veio(uvd, 0, 0x00c0, 0x0111);
+		ibmcam_veio(uvd, 0, 0x00bc, 0x012c);
+		ibmcam_veio(uvd, 0, 0x0080, 0x012b);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0108);
+		ibmcam_veio(uvd, 0, 0x0001, 0x0133);
+		ibmcam_veio(uvd, 0, 0x009b, 0x010f);
+		ibmcam_veio(uvd, 0, 0x00bb, 0x010f);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0038, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x000a, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x005c, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0004, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00fb, 0x012e);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd055, 0x0124);
+		ibmcam_veio(uvd, 0, 0x000c, 0x0127);
+		ibmcam_veio(uvd, 0, 0x0009, 0x012e);
+		ibmcam_veio(uvd, 0, 0xaa28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0012, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0008, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0130);
+		ibmcam_veio(uvd, 0, 0x82a8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x002a, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0000, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0xfffa, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0034, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0070, 0x0119);
+		ibmcam_veio(uvd, 0, 0x00d2, 0x0107);
+		ibmcam_veio(uvd, 0, 0x0003, 0x0106);
+		ibmcam_veio(uvd, 0, 0x005e, 0x0107);
+		ibmcam_veio(uvd, 0, 0x0003, 0x0106);
+		ibmcam_veio(uvd, 0, 0x00d0, 0x0111);
+		ibmcam_veio(uvd, 0, 0x0039, 0x010a);
+		ibmcam_veio(uvd, 0, 0x0001, 0x0102);
+		ibmcam_veio(uvd, 0, 0x0028, 0x0103);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0104);
+		ibmcam_veio(uvd, 0, 0x001e, 0x0105);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0016, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x000a, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0130);
+		ibmcam_veio(uvd, 0, 0x82a8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0014, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0008, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012e);
+		ibmcam_veio(uvd, 0, 0x001a, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a0a, 0x0124);
+		ibmcam_veio(uvd, 0, 0x005a, 0x012d);
+		ibmcam_veio(uvd, 0, 0x9545, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0127);
+		ibmcam_veio(uvd, 0, 0x0018, 0x012e);
+		ibmcam_veio(uvd, 0, 0x0043, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd055, 0x0124);
+		ibmcam_veio(uvd, 0, 0x001c, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00eb, 0x012e);
+		ibmcam_veio(uvd, 0, 0xaa28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0032, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0130);
+		ibmcam_veio(uvd, 0, 0x82a8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0036, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0008, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0xfffa, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x001e, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0017, 0x0127);
+		ibmcam_veio(uvd, 0, 0x0013, 0x012e);
+		ibmcam_veio(uvd, 0, 0x0031, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0017, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0078, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0038, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0004, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00c0, 0x010c);
+		break;
+	case VIDEOSIZE_160x120:
+		ibmcam_veio(uvd, 0, 0x0000, 0x0100);
+		ibmcam_veio(uvd, 0, 0x00c0, 0x0111);
+		ibmcam_veio(uvd, 0, 0x00bc, 0x012c);
+		ibmcam_veio(uvd, 0, 0x0080, 0x012b);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0108);
+		ibmcam_veio(uvd, 0, 0x0001, 0x0133);
+		ibmcam_veio(uvd, 0, 0x009b, 0x010f);
+		ibmcam_veio(uvd, 0, 0x00bb, 0x010f);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0038, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x000a, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x005c, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0004, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00fb, 0x012e);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd055, 0x0124);
+		ibmcam_veio(uvd, 0, 0x000c, 0x0127);
+		ibmcam_veio(uvd, 0, 0x0009, 0x012e);
+		ibmcam_veio(uvd, 0, 0xaa28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0012, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0008, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0130);
+		ibmcam_veio(uvd, 0, 0x82a8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x002a, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0000, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0xfffa, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0034, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0038, 0x0119);
+		ibmcam_veio(uvd, 0, 0x00d8, 0x0107);
+		ibmcam_veio(uvd, 0, 0x0002, 0x0106);
+		ibmcam_veio(uvd, 0, 0x00d0, 0x0111);
+		ibmcam_veio(uvd, 0, 0x00b9, 0x010a);
+		ibmcam_veio(uvd, 0, 0x0001, 0x0102);
+		ibmcam_veio(uvd, 0, 0x0028, 0x0103);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0104);
+		ibmcam_veio(uvd, 0, 0x001e, 0x0105);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0016, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x000b, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0130);
+		ibmcam_veio(uvd, 0, 0x82a8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0014, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0008, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012e);
+		ibmcam_veio(uvd, 0, 0x001a, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a0a, 0x0124);
+		ibmcam_veio(uvd, 0, 0x005a, 0x012d);
+		ibmcam_veio(uvd, 0, 0x9545, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0127);
+		ibmcam_veio(uvd, 0, 0x0018, 0x012e);
+		ibmcam_veio(uvd, 0, 0x0043, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd055, 0x0124);
+		ibmcam_veio(uvd, 0, 0x001c, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00c7, 0x012e);
+		ibmcam_veio(uvd, 0, 0xaa28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0032, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0025, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0130);
+		ibmcam_veio(uvd, 0, 0x82a8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0036, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0008, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0xfffa, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x001e, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0048, 0x0127);
+		ibmcam_veio(uvd, 0, 0x0035, 0x012e);
+		ibmcam_veio(uvd, 0, 0x00d0, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0048, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0090, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0001, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0038, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0004, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00c0, 0x010c);
+		break;
+	case VIDEOSIZE_176x144:
+		ibmcam_veio(uvd, 0, 0x0000, 0x0100);
+		ibmcam_veio(uvd, 0, 0x00c0, 0x0111);
+		ibmcam_veio(uvd, 0, 0x00bc, 0x012c);
+		ibmcam_veio(uvd, 0, 0x0080, 0x012b);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0108);
+		ibmcam_veio(uvd, 0, 0x0001, 0x0133);
+		ibmcam_veio(uvd, 0, 0x009b, 0x010f);
+		ibmcam_veio(uvd, 0, 0x00bb, 0x010f);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0038, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x000a, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x005c, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0004, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00fb, 0x012e);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd055, 0x0124);
+		ibmcam_veio(uvd, 0, 0x000c, 0x0127);
+		ibmcam_veio(uvd, 0, 0x0009, 0x012e);
+		ibmcam_veio(uvd, 0, 0xaa28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0012, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0008, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0130);
+		ibmcam_veio(uvd, 0, 0x82a8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x002a, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0000, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0xfffa, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0034, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0038, 0x0119);
+		ibmcam_veio(uvd, 0, 0x00d6, 0x0107);
+		ibmcam_veio(uvd, 0, 0x0003, 0x0106);
+		ibmcam_veio(uvd, 0, 0x0018, 0x0107);
+		ibmcam_veio(uvd, 0, 0x0003, 0x0106);
+		ibmcam_veio(uvd, 0, 0x00d0, 0x0111);
+		ibmcam_veio(uvd, 0, 0x00b9, 0x010a);
+		ibmcam_veio(uvd, 0, 0x0001, 0x0102);
+		ibmcam_veio(uvd, 0, 0x002c, 0x0103);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0104);
+		ibmcam_veio(uvd, 0, 0x0024, 0x0105);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0016, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0007, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0130);
+		ibmcam_veio(uvd, 0, 0x82a8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0014, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0001, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012e);
+		ibmcam_veio(uvd, 0, 0x001a, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a0a, 0x0124);
+		ibmcam_veio(uvd, 0, 0x005e, 0x012d);
+		ibmcam_veio(uvd, 0, 0x9545, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0127);
+		ibmcam_veio(uvd, 0, 0x0018, 0x012e);
+		ibmcam_veio(uvd, 0, 0x0049, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd055, 0x0124);
+		ibmcam_veio(uvd, 0, 0x001c, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00c7, 0x012e);
+		ibmcam_veio(uvd, 0, 0xaa28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0032, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0028, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0130);
+		ibmcam_veio(uvd, 0, 0x82a8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0036, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0008, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0xfffa, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x001e, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0010, 0x0127);
+		ibmcam_veio(uvd, 0, 0x0013, 0x012e);
+		ibmcam_veio(uvd, 0, 0x002a, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0010, 0x012d);
+		ibmcam_veio(uvd, 0, 0x006d, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0001, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0038, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0004, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00c0, 0x010c);
+		break;
+	case VIDEOSIZE_320x240:
+		ibmcam_veio(uvd, 0, 0x0000, 0x0100);
+		ibmcam_veio(uvd, 0, 0x00c0, 0x0111);
+		ibmcam_veio(uvd, 0, 0x00bc, 0x012c);
+		ibmcam_veio(uvd, 0, 0x0080, 0x012b);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0108);
+		ibmcam_veio(uvd, 0, 0x0001, 0x0133);
+		ibmcam_veio(uvd, 0, 0x009b, 0x010f);
+		ibmcam_veio(uvd, 0, 0x00bb, 0x010f);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0038, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x000a, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x005c, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0004, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00fb, 0x012e);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd055, 0x0124);
+		ibmcam_veio(uvd, 0, 0x000c, 0x0127);
+		ibmcam_veio(uvd, 0, 0x0009, 0x012e);
+		ibmcam_veio(uvd, 0, 0xaa28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0012, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0008, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0130);
+		ibmcam_veio(uvd, 0, 0x82a8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x002a, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0000, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0xfffa, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0034, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0070, 0x0119);
+		ibmcam_veio(uvd, 0, 0x00d2, 0x0107);
+		ibmcam_veio(uvd, 0, 0x0003, 0x0106);
+		ibmcam_veio(uvd, 0, 0x005e, 0x0107);
+		ibmcam_veio(uvd, 0, 0x0003, 0x0106);
+		ibmcam_veio(uvd, 0, 0x00d0, 0x0111);
+		ibmcam_veio(uvd, 0, 0x0039, 0x010a);
+		ibmcam_veio(uvd, 0, 0x0001, 0x0102);
+		ibmcam_veio(uvd, 0, 0x0028, 0x0103);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0104);
+		ibmcam_veio(uvd, 0, 0x001e, 0x0105);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0016, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x000a, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0130);
+		ibmcam_veio(uvd, 0, 0x82a8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0014, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0008, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012e);
+		ibmcam_veio(uvd, 0, 0x001a, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a0a, 0x0124);
+		ibmcam_veio(uvd, 0, 0x005a, 0x012d);
+		ibmcam_veio(uvd, 0, 0x9545, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0127);
+		ibmcam_veio(uvd, 0, 0x0018, 0x012e);
+		ibmcam_veio(uvd, 0, 0x0043, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd055, 0x0124);
+		ibmcam_veio(uvd, 0, 0x001c, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00eb, 0x012e);
+		ibmcam_veio(uvd, 0, 0xaa28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0032, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0130);
+		ibmcam_veio(uvd, 0, 0x82a8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0036, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0008, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0xfffa, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x001e, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0017, 0x0127);
+		ibmcam_veio(uvd, 0, 0x0013, 0x012e);
+		ibmcam_veio(uvd, 0, 0x0031, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0017, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0078, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0038, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0004, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00c0, 0x010c);
+		break;
+	case VIDEOSIZE_352x288:
+		ibmcam_veio(uvd, 0, 0x0000, 0x0100);
+		ibmcam_veio(uvd, 0, 0x00c0, 0x0111);
+		ibmcam_veio(uvd, 0, 0x00bc, 0x012c);
+		ibmcam_veio(uvd, 0, 0x0080, 0x012b);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0108);
+		ibmcam_veio(uvd, 0, 0x0001, 0x0133);
+		ibmcam_veio(uvd, 0, 0x009b, 0x010f);
+		ibmcam_veio(uvd, 0, 0x00bb, 0x010f);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0038, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x000a, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x005c, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0004, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00fb, 0x012e);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd055, 0x0124);
+		ibmcam_veio(uvd, 0, 0x000c, 0x0127);
+		ibmcam_veio(uvd, 0, 0x0009, 0x012e);
+		ibmcam_veio(uvd, 0, 0xaa28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0012, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0008, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0130);
+		ibmcam_veio(uvd, 0, 0x82a8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x002a, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0000, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0xfffa, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0034, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0070, 0x0119);
+		ibmcam_veio(uvd, 0, 0x00f2, 0x0107);
+		ibmcam_veio(uvd, 0, 0x0003, 0x0106);
+		ibmcam_veio(uvd, 0, 0x008c, 0x0107);
+		ibmcam_veio(uvd, 0, 0x0003, 0x0106);
+		ibmcam_veio(uvd, 0, 0x00c0, 0x0111);
+		ibmcam_veio(uvd, 0, 0x0039, 0x010a);
+		ibmcam_veio(uvd, 0, 0x0001, 0x0102);
+		ibmcam_veio(uvd, 0, 0x002c, 0x0103);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0104);
+		ibmcam_veio(uvd, 0, 0x0024, 0x0105);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0016, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0006, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0130);
+		ibmcam_veio(uvd, 0, 0x82a8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0014, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0002, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012e);
+		ibmcam_veio(uvd, 0, 0x001a, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a0a, 0x0124);
+		ibmcam_veio(uvd, 0, 0x005e, 0x012d);
+		ibmcam_veio(uvd, 0, 0x9545, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0127);
+		ibmcam_veio(uvd, 0, 0x0018, 0x012e);
+		ibmcam_veio(uvd, 0, 0x0049, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd055, 0x0124);
+		ibmcam_veio(uvd, 0, 0x001c, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00cf, 0x012e);
+		ibmcam_veio(uvd, 0, 0xaa28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0032, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x0130);
+		ibmcam_veio(uvd, 0, 0x82a8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0036, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0008, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0xfffa, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x001e, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0010, 0x0127);
+		ibmcam_veio(uvd, 0, 0x0013, 0x012e);
+		ibmcam_veio(uvd, 0, 0x0025, 0x0130);
+		ibmcam_veio(uvd, 0, 0x8a28, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0010, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0048, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd145, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00aa, 0x012d);
+		ibmcam_veio(uvd, 0, 0x0038, 0x012f);
+		ibmcam_veio(uvd, 0, 0xd141, 0x0124);
+		ibmcam_veio(uvd, 0, 0x0004, 0x0127);
+		ibmcam_veio(uvd, 0, 0xfea8, 0x0124);
+		ibmcam_veio(uvd, 0, 0x00c0, 0x010c);
+		break; 
+	}
+	usb_clear_halt(uvd->dev, usb_rcvisocpipe(uvd->dev, uvd->video_endp));
+}
+
+static void ibmcam_model3_setup_after_video_if(uvd_t *uvd)
+{
+	int i;
+	/*
+	 * 01.01.08 - Added for RCA video in support -LO
+	 * This struct is used to init the Model3 cam to use the RCA video in port
+	 * instead of the CCD sensor.
+	 */
+	static const struct struct_initData initData[] = {
+		{0, 0x0000, 0x010c},
+		{0, 0x0006, 0x012c},
+		{0, 0x0078, 0x012d},
+		{0, 0x0046, 0x012f},
+		{0, 0xd141, 0x0124},
+		{0, 0x0000, 0x0127},
+		{0, 0xfea8, 0x0124},
+		{1, 0x0000, 0x0116},
+		{0, 0x0064, 0x0116},
+		{1, 0x0000, 0x0115},
+		{0, 0x0003, 0x0115},
+		{0, 0x0008, 0x0123},
+		{0, 0x0000, 0x0117},
+		{0, 0x0000, 0x0112},
+		{0, 0x0080, 0x0100},
+		{0, 0x0000, 0x0100},
+		{1, 0x0000, 0x0116},
+		{0, 0x0060, 0x0116},
+		{0, 0x0002, 0x0112},
+		{0, 0x0000, 0x0123},
+		{0, 0x0001, 0x0117},
+		{0, 0x0040, 0x0108},
+		{0, 0x0019, 0x012c},
+		{0, 0x0040, 0x0116},
+		{0, 0x000a, 0x0115},
+		{0, 0x000b, 0x0115},
+		{0, 0x0078, 0x012d},
+		{0, 0x0046, 0x012f},
+		{0, 0xd141, 0x0124},
+		{0, 0x0000, 0x0127},
+		{0, 0xfea8, 0x0124},
+		{0, 0x0064, 0x0116},
+		{0, 0x0000, 0x0115},
+		{0, 0x0001, 0x0115},
+		{0, 0xffff, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x00aa, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0000, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xffff, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x00f2, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x000f, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xffff, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x00f8, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x00fc, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xffff, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x00f9, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x003c, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xffff, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0027, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0019, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0037, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0000, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0021, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0038, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0006, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0045, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0037, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0001, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x002a, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0038, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0000, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x000e, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0037, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0001, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x002b, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0038, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0001, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x00f4, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0037, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0001, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x002c, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0038, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0001, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0004, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0037, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0001, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x002d, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0038, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0000, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0014, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0037, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0001, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x002e, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0038, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0003, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0000, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0037, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0001, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x002f, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0038, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0003, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0014, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0037, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0001, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0040, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0038, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0000, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0040, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0037, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0001, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0053, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0038, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0000, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0038, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0x0000, 0x0101},
+		{0, 0x00a0, 0x0103},
+		{0, 0x0078, 0x0105},
+		{0, 0x0000, 0x010a},
+		{0, 0x0024, 0x010b},
+		{0, 0x0028, 0x0119},
+		{0, 0x0088, 0x011b},
+		{0, 0x0002, 0x011d},
+		{0, 0x0003, 0x011e},
+		{0, 0x0000, 0x0129},
+		{0, 0x00fc, 0x012b},
+		{0, 0x0008, 0x0102},
+		{0, 0x0000, 0x0104},
+		{0, 0x0008, 0x011a},
+		{0, 0x0028, 0x011c},
+		{0, 0x0021, 0x012a},
+		{0, 0x0000, 0x0118},
+		{0, 0x0000, 0x0132},
+		{0, 0x0000, 0x0109},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0037, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0001, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0031, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0038, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0000, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0000, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0037, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0001, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0040, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0038, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0000, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0040, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0037, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0000, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x00dc, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0038, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0000, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0000, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0037, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0001, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0032, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0038, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0001, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0020, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0037, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0001, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0040, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0038, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0000, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0040, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0037, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0000, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0030, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0xfff9, 0x0124},
+		{0, 0x0086, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0038, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0008, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0x0000, 0x0127},
+		{0, 0xfff8, 0x0124},
+		{0, 0xfffd, 0x0124},
+		{0, 0xfffa, 0x0124},
+		{0, 0x0003, 0x0106},
+		{0, 0x0062, 0x0107},
+		{0, 0x0003, 0x0111},
+	};
+#define NUM_INIT_DATA 
+
+	unsigned short compression = 0;	/* 0=none, 7=best frame rate  */
+	int f_rate; /* 0=Fastest 7=slowest */
+
+	if (IBMCAM_T(uvd)->initialized)
+		return;
+
+	/* Internal frame rate is controlled by f_rate value */
+	f_rate = 7 - framerate;
+	RESTRICT_TO_RANGE(f_rate, 0, 7);
+
+	ibmcam_veio(uvd, 0, 0x0000, 0x0100);
+	ibmcam_veio(uvd, 1, 0x0000, 0x0116);
+	ibmcam_veio(uvd, 0, 0x0060, 0x0116);
+	ibmcam_veio(uvd, 0, 0x0002, 0x0112);
+	ibmcam_veio(uvd, 0, 0x0000, 0x0123);
+	ibmcam_veio(uvd, 0, 0x0001, 0x0117);
+	ibmcam_veio(uvd, 0, 0x0040, 0x0108);
+	ibmcam_veio(uvd, 0, 0x0019, 0x012c);
+	ibmcam_veio(uvd, 0, 0x0060, 0x0116);
+	ibmcam_veio(uvd, 0, 0x0002, 0x0115);
+	ibmcam_veio(uvd, 0, 0x0003, 0x0115);
+	ibmcam_veio(uvd, 1, 0x0000, 0x0115);
+	ibmcam_veio(uvd, 0, 0x000b, 0x0115);
+	ibmcam_model3_Packet1(uvd, 0x000a, 0x0040);
+	ibmcam_model3_Packet1(uvd, 0x000b, 0x00f6);
+	ibmcam_model3_Packet1(uvd, 0x000c, 0x0002);
+	ibmcam_model3_Packet1(uvd, 0x000d, 0x0020);
+	ibmcam_model3_Packet1(uvd, 0x000e, 0x0033);
+	ibmcam_model3_Packet1(uvd, 0x000f, 0x0007);
+	ibmcam_model3_Packet1(uvd, 0x0010, 0x0000);
+	ibmcam_model3_Packet1(uvd, 0x0011, 0x0070);
+	ibmcam_model3_Packet1(uvd, 0x0012, 0x0030);
+	ibmcam_model3_Packet1(uvd, 0x0013, 0x0000);
+	ibmcam_model3_Packet1(uvd, 0x0014, 0x0001);
+	ibmcam_model3_Packet1(uvd, 0x0015, 0x0001);
+	ibmcam_model3_Packet1(uvd, 0x0016, 0x0001);
+	ibmcam_model3_Packet1(uvd, 0x0017, 0x0001);
+	ibmcam_model3_Packet1(uvd, 0x0018, 0x0000);
+	ibmcam_model3_Packet1(uvd, 0x001e, 0x00c3);
+	ibmcam_model3_Packet1(uvd, 0x0020, 0x0000);
+	ibmcam_model3_Packet1(uvd, 0x0028, 0x0010);
+	ibmcam_model3_Packet1(uvd, 0x0029, 0x0054);
+	ibmcam_model3_Packet1(uvd, 0x002a, 0x0013);
+	ibmcam_model3_Packet1(uvd, 0x002b, 0x0007);
+	ibmcam_model3_Packet1(uvd, 0x002d, 0x0028);
+	ibmcam_model3_Packet1(uvd, 0x002e, 0x0000);
+	ibmcam_model3_Packet1(uvd, 0x0031, 0x0000);
+	ibmcam_model3_Packet1(uvd, 0x0032, 0x0000);
+	ibmcam_model3_Packet1(uvd, 0x0033, 0x0000);
+	ibmcam_model3_Packet1(uvd, 0x0034, 0x0000);
+	ibmcam_model3_Packet1(uvd, 0x0035, 0x0038);
+	ibmcam_model3_Packet1(uvd, 0x003a, 0x0001);
+	ibmcam_model3_Packet1(uvd, 0x003c, 0x001e);
+	ibmcam_model3_Packet1(uvd, 0x003f, 0x000a);
+	ibmcam_model3_Packet1(uvd, 0x0041, 0x0000);
+	ibmcam_model3_Packet1(uvd, 0x0046, 0x003f);
+	ibmcam_model3_Packet1(uvd, 0x0047, 0x0000);
+	ibmcam_model3_Packet1(uvd, 0x0050, 0x0005);
+	ibmcam_model3_Packet1(uvd, 0x0052, 0x001a);
+	ibmcam_model3_Packet1(uvd, 0x0053, 0x0003);
+	ibmcam_model3_Packet1(uvd, 0x005a, 0x006b);
+	ibmcam_model3_Packet1(uvd, 0x005d, 0x001e);
+	ibmcam_model3_Packet1(uvd, 0x005e, 0x0030);
+	ibmcam_model3_Packet1(uvd, 0x005f, 0x0041);
+	ibmcam_model3_Packet1(uvd, 0x0064, 0x0008);
+	ibmcam_model3_Packet1(uvd, 0x0065, 0x0015);
+	ibmcam_model3_Packet1(uvd, 0x0068, 0x000f);
+	ibmcam_model3_Packet1(uvd, 0x0079, 0x0000);
+	ibmcam_model3_Packet1(uvd, 0x007a, 0x0000);
+	ibmcam_model3_Packet1(uvd, 0x007c, 0x003f);
+	ibmcam_model3_Packet1(uvd, 0x0082, 0x000f);
+	ibmcam_model3_Packet1(uvd, 0x0085, 0x0000);
+	ibmcam_model3_Packet1(uvd, 0x0099, 0x0000);
+	ibmcam_model3_Packet1(uvd, 0x009b, 0x0023);
+	ibmcam_model3_Packet1(uvd, 0x009c, 0x0022);
+	ibmcam_model3_Packet1(uvd, 0x009d, 0x0096);
+	ibmcam_model3_Packet1(uvd, 0x009e, 0x0096);
+	ibmcam_model3_Packet1(uvd, 0x009f, 0x000a);
+
+	switch (uvd->videosize) {
+	case VIDEOSIZE_160x120:
+		ibmcam_veio(uvd, 0, 0x0000, 0x0101); /* Same on 176x144, 320x240 */
+		ibmcam_veio(uvd, 0, 0x00a0, 0x0103); /* Same on 176x144, 320x240 */
+		ibmcam_veio(uvd, 0, 0x0078, 0x0105); /* Same on 176x144, 320x240 */
+		ibmcam_veio(uvd, 0, 0x0000, 0x010a); /* Same */
+		ibmcam_veio(uvd, 0, 0x0024, 0x010b); /* Differs everywhere */
+		ibmcam_veio(uvd, 0, 0x00a9, 0x0119);
+		ibmcam_veio(uvd, 0, 0x0016, 0x011b);
+		ibmcam_veio(uvd, 0, 0x0002, 0x011d); /* Same on 176x144, 320x240 */
+		ibmcam_veio(uvd, 0, 0x0003, 0x011e); /* Same on 176x144, 640x480 */
+		ibmcam_veio(uvd, 0, 0x0000, 0x0129); /* Same */
+		ibmcam_veio(uvd, 0, 0x00fc, 0x012b); /* Same */
+		ibmcam_veio(uvd, 0, 0x0018, 0x0102);
+		ibmcam_veio(uvd, 0, 0x0004, 0x0104);
+		ibmcam_veio(uvd, 0, 0x0004, 0x011a);
+		ibmcam_veio(uvd, 0, 0x0028, 0x011c);
+		ibmcam_veio(uvd, 0, 0x0022, 0x012a); /* Same */
+		ibmcam_veio(uvd, 0, 0x0000, 0x0118);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0132);
+		ibmcam_model3_Packet1(uvd, 0x0021, 0x0001); /* Same */
+		ibmcam_veio(uvd, 0, compression, 0x0109);
+		break;
+	case VIDEOSIZE_320x240:
+		ibmcam_veio(uvd, 0, 0x0000, 0x0101); /* Same on 176x144, 320x240 */
+		ibmcam_veio(uvd, 0, 0x00a0, 0x0103); /* Same on 176x144, 320x240 */
+		ibmcam_veio(uvd, 0, 0x0078, 0x0105); /* Same on 176x144, 320x240 */
+		ibmcam_veio(uvd, 0, 0x0000, 0x010a); /* Same */
+		ibmcam_veio(uvd, 0, 0x0028, 0x010b); /* Differs everywhere */
+		ibmcam_veio(uvd, 0, 0x0002, 0x011d); /* Same */
+		ibmcam_veio(uvd, 0, 0x0000, 0x011e);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0129); /* Same */
+		ibmcam_veio(uvd, 0, 0x00fc, 0x012b); /* Same */
+		/* 4 commands from 160x120 skipped */
+		ibmcam_veio(uvd, 0, 0x0022, 0x012a); /* Same */
+		ibmcam_model3_Packet1(uvd, 0x0021, 0x0001); /* Same */
+		ibmcam_veio(uvd, 0, compression, 0x0109);
+		ibmcam_veio(uvd, 0, 0x00d9, 0x0119);
+		ibmcam_veio(uvd, 0, 0x0006, 0x011b);
+		ibmcam_veio(uvd, 0, 0x0021, 0x0102); /* Same on 320x240, 640x480 */
+		ibmcam_veio(uvd, 0, 0x0010, 0x0104);
+		ibmcam_veio(uvd, 0, 0x0004, 0x011a);
+		ibmcam_veio(uvd, 0, 0x003f, 0x011c);
+		ibmcam_veio(uvd, 0, 0x001c, 0x0118);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0132);
+		break;
+	case VIDEOSIZE_640x480:
+		ibmcam_veio(uvd, 0, 0x00f0, 0x0105);
+		ibmcam_veio(uvd, 0, 0x0000, 0x010a); /* Same */
+		ibmcam_veio(uvd, 0, 0x0038, 0x010b); /* Differs everywhere */
+		ibmcam_veio(uvd, 0, 0x00d9, 0x0119); /* Same on 320x240, 640x480 */
+		ibmcam_veio(uvd, 0, 0x0006, 0x011b); /* Same on 320x240, 640x480 */
+		ibmcam_veio(uvd, 0, 0x0004, 0x011d); /* NC */
+		ibmcam_veio(uvd, 0, 0x0003, 0x011e); /* Same on 176x144, 640x480 */
+		ibmcam_veio(uvd, 0, 0x0000, 0x0129); /* Same */
+		ibmcam_veio(uvd, 0, 0x00fc, 0x012b); /* Same */
+		ibmcam_veio(uvd, 0, 0x0021, 0x0102); /* Same on 320x240, 640x480 */
+		ibmcam_veio(uvd, 0, 0x0016, 0x0104); /* NC */
+		ibmcam_veio(uvd, 0, 0x0004, 0x011a); /* Same on 320x240, 640x480 */
+		ibmcam_veio(uvd, 0, 0x003f, 0x011c); /* Same on 320x240, 640x480 */
+		ibmcam_veio(uvd, 0, 0x0022, 0x012a); /* Same */
+		ibmcam_veio(uvd, 0, 0x001c, 0x0118); /* Same on 320x240, 640x480 */
+		ibmcam_model3_Packet1(uvd, 0x0021, 0x0001); /* Same */
+		ibmcam_veio(uvd, 0, compression, 0x0109);
+		ibmcam_veio(uvd, 0, 0x0040, 0x0101);
+		ibmcam_veio(uvd, 0, 0x0040, 0x0103);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0132); /* Same on 320x240, 640x480 */
+		break;
+	}
+	ibmcam_model3_Packet1(uvd, 0x007e, 0x000e);	/* Hue */
+	ibmcam_model3_Packet1(uvd, 0x0036, 0x0011);	/* Brightness */
+	ibmcam_model3_Packet1(uvd, 0x0060, 0x0002);	/* Sharpness */
+	ibmcam_model3_Packet1(uvd, 0x0061, 0x0004);	/* Sharpness */
+	ibmcam_model3_Packet1(uvd, 0x0062, 0x0005);	/* Sharpness */
+	ibmcam_model3_Packet1(uvd, 0x0063, 0x0014);	/* Sharpness */
+	ibmcam_model3_Packet1(uvd, 0x0096, 0x00a0);	/* Red gain */
+	ibmcam_model3_Packet1(uvd, 0x0097, 0x0096);	/* Blue gain */
+	ibmcam_model3_Packet1(uvd, 0x0067, 0x0001);	/* Contrast */
+	ibmcam_model3_Packet1(uvd, 0x005b, 0x000c);	/* Contrast */
+	ibmcam_model3_Packet1(uvd, 0x005c, 0x0016);	/* Contrast */
+	ibmcam_model3_Packet1(uvd, 0x0098, 0x000b);
+	ibmcam_model3_Packet1(uvd, 0x002c, 0x0003);	/* Was 1, broke 640x480 */
+	ibmcam_model3_Packet1(uvd, 0x002f, 0x002a);
+	ibmcam_model3_Packet1(uvd, 0x0030, 0x0029);
+	ibmcam_model3_Packet1(uvd, 0x0037, 0x0002);
+	ibmcam_model3_Packet1(uvd, 0x0038, 0x0059);
+	ibmcam_model3_Packet1(uvd, 0x003d, 0x002e);
+	ibmcam_model3_Packet1(uvd, 0x003e, 0x0028);
+	ibmcam_model3_Packet1(uvd, 0x0078, 0x0005);
+	ibmcam_model3_Packet1(uvd, 0x007b, 0x0011);
+	ibmcam_model3_Packet1(uvd, 0x007d, 0x004b);
+	ibmcam_model3_Packet1(uvd, 0x007f, 0x0022);
+	ibmcam_model3_Packet1(uvd, 0x0080, 0x000c);
+	ibmcam_model3_Packet1(uvd, 0x0081, 0x000b);
+	ibmcam_model3_Packet1(uvd, 0x0083, 0x00fd);
+	ibmcam_model3_Packet1(uvd, 0x0086, 0x000b);
+	ibmcam_model3_Packet1(uvd, 0x0087, 0x000b);
+	ibmcam_model3_Packet1(uvd, 0x007e, 0x000e);
+	ibmcam_model3_Packet1(uvd, 0x0096, 0x00a0);	/* Red gain */
+	ibmcam_model3_Packet1(uvd, 0x0097, 0x0096);	/* Blue gain */
+	ibmcam_model3_Packet1(uvd, 0x0098, 0x000b);
+
+	switch (uvd->videosize) {
+	case VIDEOSIZE_160x120:
+		ibmcam_veio(uvd, 0, 0x0002, 0x0106);
+		ibmcam_veio(uvd, 0, 0x0008, 0x0107);
+		ibmcam_veio(uvd, 0, f_rate, 0x0111);	/* Frame rate */
+		ibmcam_model3_Packet1(uvd, 0x001f, 0x0000); /* Same */
+		ibmcam_model3_Packet1(uvd, 0x0039, 0x001f); /* Same */
+		ibmcam_model3_Packet1(uvd, 0x003b, 0x003c); /* Same */
+		ibmcam_model3_Packet1(uvd, 0x0040, 0x000a);
+		ibmcam_model3_Packet1(uvd, 0x0051, 0x000a);
+		break;
+	case VIDEOSIZE_320x240:
+		ibmcam_veio(uvd, 0, 0x0003, 0x0106);
+		ibmcam_veio(uvd, 0, 0x0062, 0x0107);
+		ibmcam_veio(uvd, 0, f_rate, 0x0111);	/* Frame rate */
+		ibmcam_model3_Packet1(uvd, 0x001f, 0x0000); /* Same */
+		ibmcam_model3_Packet1(uvd, 0x0039, 0x001f); /* Same */
+		ibmcam_model3_Packet1(uvd, 0x003b, 0x003c); /* Same */
+		ibmcam_model3_Packet1(uvd, 0x0040, 0x0008);
+		ibmcam_model3_Packet1(uvd, 0x0051, 0x000b);
+		break;
+	case VIDEOSIZE_640x480:
+		ibmcam_veio(uvd, 0, 0x0002, 0x0106);	/* Adjustments */
+		ibmcam_veio(uvd, 0, 0x00b4, 0x0107);	/* Adjustments */
+		ibmcam_veio(uvd, 0, f_rate, 0x0111);	/* Frame rate */
+		ibmcam_model3_Packet1(uvd, 0x001f, 0x0002); /* !Same */
+		ibmcam_model3_Packet1(uvd, 0x0039, 0x003e); /* !Same */
+		ibmcam_model3_Packet1(uvd, 0x0040, 0x0008);
+		ibmcam_model3_Packet1(uvd, 0x0051, 0x000a);
+		break;
+	}
+
+	/* 01.01.08 - Added for RCA video in support -LO */
+	if(init_model3_input) {
+		if (debug > 0)
+			info("Setting input to RCA.");
+		for (i=0; i < (sizeof(initData)/sizeof(initData[0])); i++) {
+			ibmcam_veio(uvd, initData[i].req, initData[i].value, initData[i].index);
+		}
+	}
+
+	ibmcam_veio(uvd, 0, 0x0001, 0x0114);
+	ibmcam_veio(uvd, 0, 0x00c0, 0x010c);
+	usb_clear_halt(uvd->dev, usb_rcvisocpipe(uvd->dev, uvd->video_endp));
 }
 
 /*
- * usb_ibmcam_setup_video_stop()
+ * ibmcam_video_stop()
  *
  * This code tells camera to stop streaming. The interface remains
  * configured and bandwidth - claimed.
  */
-static void usb_ibmcam_setup_video_stop(struct usb_ibmcam *ibmcam)
+static void ibmcam_video_stop(uvd_t *uvd)
 {
-	if (ibmcam->camera_model == IBMCAM_MODEL_1) {
-		usb_ibmcam_veio(ibmcam, 0, 0x00, 0x010c);
-		usb_ibmcam_veio(ibmcam, 0, 0x00, 0x010c);
-		usb_ibmcam_veio(ibmcam, 0, 0x01, 0x0114);
-		usb_ibmcam_veio(ibmcam, 0, 0xc0, 0x010c);
-		usb_ibmcam_veio(ibmcam, 0, 0x00, 0x010c);
-		usb_ibmcam_send_FF_04_02(ibmcam);
-		usb_ibmcam_veio(ibmcam, 1, 0x00, 0x0100);
-		usb_ibmcam_veio(ibmcam, 0, 0x81, 0x0100);	/* LED Off */
-	} else if (ibmcam->camera_model == IBMCAM_MODEL_2) {
-		usb_ibmcam_veio(ibmcam, 0, 0x0000, 0x010c);	/* Stop the camera */
+	switch (IBMCAM_T(uvd)->camera_model) {
+	case IBMCAM_MODEL_1:
+		ibmcam_veio(uvd, 0, 0x00, 0x010c);
+		ibmcam_veio(uvd, 0, 0x00, 0x010c);
+		ibmcam_veio(uvd, 0, 0x01, 0x0114);
+		ibmcam_veio(uvd, 0, 0xc0, 0x010c);
+		ibmcam_veio(uvd, 0, 0x00, 0x010c);
+		ibmcam_send_FF_04_02(uvd);
+		ibmcam_veio(uvd, 1, 0x00, 0x0100);
+		ibmcam_veio(uvd, 0, 0x81, 0x0100);	/* LED Off */
+		break;
+	case IBMCAM_MODEL_2:
+case IBMCAM_MODEL_4:
+		ibmcam_veio(uvd, 0, 0x0000, 0x010c);	/* Stop the camera */
 
-		usb_ibmcam_model2_Packet1(ibmcam, 0x0030, 0x0004);
+		ibmcam_model2_Packet1(uvd, 0x0030, 0x0004);
 
-		usb_ibmcam_veio(ibmcam, 0, 0x0080, 0x0100);	/* LED Off */
-		usb_ibmcam_veio(ibmcam, 0, 0x0020, 0x0111);
-		usb_ibmcam_veio(ibmcam, 0, 0x00a0, 0x0111);
+		ibmcam_veio(uvd, 0, 0x0080, 0x0100);	/* LED Off */
+		ibmcam_veio(uvd, 0, 0x0020, 0x0111);
+		ibmcam_veio(uvd, 0, 0x00a0, 0x0111);
 
-		usb_ibmcam_model2_Packet1(ibmcam, 0x0030, 0x0002);
+		ibmcam_model2_Packet1(uvd, 0x0030, 0x0002);
 
-		usb_ibmcam_veio(ibmcam, 0, 0x0020, 0x0111);
-		usb_ibmcam_veio(ibmcam, 0, 0x0000, 0x0112);
-	}
+		ibmcam_veio(uvd, 0, 0x0020, 0x0111);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0112);
+		break;
+	case IBMCAM_MODEL_3:
+#if 1
+		ibmcam_veio(uvd, 0, 0x0000, 0x010c);
+
+		/* Here we are supposed to select video interface alt. setting 0 */
+		ibmcam_veio(uvd, 0, 0x0006, 0x012c);
+
+		ibmcam_model3_Packet1(uvd, 0x0046, 0x0000);
+
+		ibmcam_veio(uvd, 1, 0x0000, 0x0116);
+		ibmcam_veio(uvd, 0, 0x0064, 0x0116);
+		ibmcam_veio(uvd, 1, 0x0000, 0x0115);
+		ibmcam_veio(uvd, 0, 0x0003, 0x0115);
+		ibmcam_veio(uvd, 0, 0x0008, 0x0123);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0117);
+		ibmcam_veio(uvd, 0, 0x0000, 0x0112);
+		ibmcam_veio(uvd, 0, 0x0080, 0x0100);
+		IBMCAM_T(uvd)->initialized = 0;
+#endif
+		break;
+	} /* switch */
 }
 
 /*
- * usb_ibmcam_reinit_iso()
+ * ibmcam_reinit_iso()
  *
  * This procedure sends couple of commands to the camera and then
  * resets the video pipe. This sequence was observed to reinit the
@@ -2130,751 +3543,65 @@ static void usb_ibmcam_setup_video_stop(struct usb_ibmcam *ibmcam)
  * History:
  * 1/2/00   Created.
  */
-static void usb_ibmcam_reinit_iso(struct usb_ibmcam *ibmcam, int do_stop)
+static void ibmcam_reinit_iso(uvd_t *uvd, int do_stop)
 {
-	if (ibmcam->camera_model == IBMCAM_MODEL_1) {
+	switch (IBMCAM_T(uvd)->camera_model) {
+	case IBMCAM_MODEL_1:
 		if (do_stop)
-			usb_ibmcam_setup_video_stop(ibmcam);
-		usb_ibmcam_veio(ibmcam, 0, 0x0001, 0x0114);
-		usb_ibmcam_veio(ibmcam, 0, 0x00c0, 0x010c);
-		usb_clear_halt(ibmcam->dev, ibmcam->video_endp);
-		usb_ibmcam_model1_setup_after_video_if(ibmcam);
-	} else if (ibmcam->camera_model == IBMCAM_MODEL_2) {
-		usb_ibmcam_model2_setup_after_video_if(ibmcam);
-	}
-}
-
-/*
- * ibmcam_init_isoc()
- *
- * History:
- * 1/27/00  Used ibmcam->iface, ibmcam->ifaceAltActive instead of hardcoded values.
- *          Simplified by using for loop, allowed any number of URBs.
- */
-static int ibmcam_init_isoc(struct usb_ibmcam *ibmcam)
-{
-	struct usb_device *dev = ibmcam->dev;
-	int i, err;
-
-	if (!IBMCAM_IS_OPERATIONAL(ibmcam))
-		return -EFAULT;
-
-	ibmcam->compress = 0;
-	ibmcam->curframe = -1;
-	ibmcam->cursbuf = 0;
-	ibmcam->scratchlen = 0;
-
-	/* Alternate interface 1 is is the biggest frame size */
-	i = usb_set_interface(dev, ibmcam->iface, ibmcam->ifaceAltActive);
-	if (i < 0) {
-		printk(KERN_ERR "usb_set_interface error\n");
-		ibmcam->last_error = i;
-		return -EBUSY;
-	}
-	usb_ibmcam_change_lighting_conditions(ibmcam);
-	usb_ibmcam_set_sharpness(ibmcam);
-	usb_ibmcam_reinit_iso(ibmcam, 0);
-
-	/* We double buffer the Iso lists */
-
-	for (i=0; i < IBMCAM_NUMSBUF; i++) {
-		int j, k;
-		urb_t *urb;
-
-		urb = usb_alloc_urb(FRAMES_PER_DESC);
-		if (urb == NULL) {
-			printk(KERN_ERR "ibmcam_init_isoc: usb_init_isoc() failed.\n");
-			return -ENOMEM;
-		}
-		ibmcam->sbuf[i].urb = urb;
-		urb->dev = dev;
-		urb->context = ibmcam;
-		urb->pipe = usb_rcvisocpipe(dev, ibmcam->video_endp);
-		urb->transfer_flags = USB_ISO_ASAP;
-		urb->transfer_buffer = ibmcam->sbuf[i].data;
-		urb->complete = ibmcam_isoc_irq;
-		urb->number_of_packets = FRAMES_PER_DESC;
-		urb->transfer_buffer_length = ibmcam->iso_packet_len * FRAMES_PER_DESC;
-		for (j=k=0; j < FRAMES_PER_DESC; j++, k += ibmcam->iso_packet_len) {
-			urb->iso_frame_desc[j].offset = k;
-			urb->iso_frame_desc[j].length = ibmcam->iso_packet_len;
-		}
-	}
-
-	/* Link URBs into a ring so that they invoke each other infinitely */
-	for (i=0; i < IBMCAM_NUMSBUF; i++) {
-		if ((i+1) < IBMCAM_NUMSBUF)
-			ibmcam->sbuf[i].urb->next = ibmcam->sbuf[i+1].urb;
-		else
-			ibmcam->sbuf[i].urb->next = ibmcam->sbuf[0].urb;
-	}
-
-	/* Submit all URBs */
-	for (i=0; i < IBMCAM_NUMSBUF; i++) {
-		err = usb_submit_urb(ibmcam->sbuf[i].urb);
-		if (err)
-			printk(KERN_ERR "ibmcam_init_isoc: usb_run_isoc(%d) ret %d\n",
-			       i, err);
-	}
-
-	ibmcam->streaming = 1;
-	/* printk(KERN_DEBUG "streaming=1 ibmcam->video_endp=$%02x\n", ibmcam->video_endp); */
-	return 0;
-}
-
-/*
- * ibmcam_stop_isoc()
- *
- * This procedure stops streaming and deallocates URBs. Then it
- * activates zero-bandwidth alt. setting of the video interface.
- *
- * History:
- * 1/22/00  Corrected order of actions to work after surprise removal.
- * 1/27/00  Used ibmcam->iface, ibmcam->ifaceAltInactive instead of hardcoded values.
- */
-static void ibmcam_stop_isoc(struct usb_ibmcam *ibmcam)
-{
-	static const char proc[] = "ibmcam_stop_isoc";
-	int i, j;
-
-	if (!ibmcam->streaming || (ibmcam->dev == NULL))
-		return;
-
-	/* Unschedule all of the iso td's */
-	for (i=0; i < IBMCAM_NUMSBUF; i++) {
-		j = usb_unlink_urb(ibmcam->sbuf[i].urb);
-		if (j < 0)
-			printk(KERN_ERR "%s: usb_unlink_urb() error %d.\n", proc, j);
-	}
-	/* printk(KERN_DEBUG "streaming=0\n"); */
-	ibmcam->streaming = 0;
-
-	/* Delete them all */
-	for (i=0; i < IBMCAM_NUMSBUF; i++)
-		usb_free_urb(ibmcam->sbuf[i].urb);
-
-	if (!ibmcam->remove_pending) {
-		usb_ibmcam_setup_video_stop(ibmcam);
-
-		/* Set packet size to 0 */
-		j = usb_set_interface(ibmcam->dev, ibmcam->iface, ibmcam->ifaceAltInactive);
-		if (j < 0) {
-			printk(KERN_ERR "%s: usb_set_interface() error %d.\n", proc, j);
-			ibmcam->last_error = j;
-		}
-	}
-}
-
-/*
- * ibmcam_new_frame()
- *
- * History:
- * 29-Mar-00 Added copying of previous frame into the current one.
- */
-static int ibmcam_new_frame(struct usb_ibmcam *ibmcam, int framenum)
-{
-	struct ibmcam_frame *frame;
-	int n, width, height;
-
-	/* If we're not grabbing a frame right now and the other frame is */
-	/*  ready to be grabbed into, then use it instead */
-	if (ibmcam->curframe != -1)
-		return 0;
-
-	n = (framenum - 1 + IBMCAM_NUMFRAMES) % IBMCAM_NUMFRAMES;
-	if (ibmcam->frame[n].grabstate == FRAME_READY)
-		framenum = n;
-
-	frame = &ibmcam->frame[framenum];
-
-	frame->grabstate = FRAME_GRABBING;
-	frame->scanstate = STATE_SCANNING;
-	frame->scanlength = 0;		/* Accumulated in ibmcam_parse_data() */
-	ibmcam->curframe = framenum;
-
-	/*
-	 * Normally we would want to copy previous frame into the current one
-	 * before we even start filling it with data; this allows us to stop
-	 * filling at any moment; top portion of the frame will be new and
-	 * bottom portion will stay as it was in previous frame. If we don't
-	 * do that then missing chunks of video stream will result in flickering
-	 * portions of old data whatever it was before.
-	 *
-	 * If we choose not to copy previous frame (to, for example, save few
-	 * bus cycles - the frame can be pretty large!) then we have an option
-	 * to clear the frame before using. If we experience losses in this
-	 * mode then missing picture will be black (no flickering).
-	 *
-	 * Finally, if user chooses not to clean the current frame before
-	 * filling it with data then the old data will be visible if we fail
-	 * to refill entire frame with new data.
-	 */
-	if (!(flags & FLAGS_SEPARATE_FRAMES)) {
-		/* This copies previous frame into this one to mask losses */
-		memmove(frame->data, ibmcam->frame[1-framenum].data,  MAX_FRAME_SIZE);
-	} else {
-		if (flags & FLAGS_CLEAN_FRAMES) {
-			/* This provides a "clean" frame but slows things down */
-			memset(frame->data, 0, MAX_FRAME_SIZE);
-		}
-	}
-	switch (videosize) {
-	case VIDEOSIZE_128x96:
-		frame->frmwidth = 128;
-		frame->frmheight = 96;
-		frame->order_uv = 1;	/* U Y V Y ... */
-		frame->hdr_sig = 0x06;	/* 00 FF 00 06 */
+			ibmcam_video_stop(uvd);
+		ibmcam_veio(uvd, 0, 0x0001, 0x0114);
+		ibmcam_veio(uvd, 0, 0x00c0, 0x010c);
+		usb_clear_halt(uvd->dev, usb_rcvisocpipe(uvd->dev, uvd->video_endp));
+		ibmcam_model1_setup_after_video_if(uvd);
 		break;
-	case VIDEOSIZE_176x144:
-		frame->frmwidth = 176;
-		frame->frmheight = 144;
-		frame->order_uv = 1;	/* U Y V Y ... */
-		frame->hdr_sig = 0x0E;	/* 00 FF 00 0E */
+	case IBMCAM_MODEL_2:
+		ibmcam_model2_setup_after_video_if(uvd);
 		break;
-	case VIDEOSIZE_320x240:		/* For model 2 only */
-		frame->frmwidth = 320;
-		frame->frmheight = 240;
+	case IBMCAM_MODEL_3:
+		ibmcam_video_stop(uvd);
+		ibmcam_model3_setup_after_video_if(uvd);
 		break;
-	case VIDEOSIZE_352x240:		/* For model 2 only */
-		frame->frmwidth = 352;
-		frame->frmheight = 240;
-		break;
-	case VIDEOSIZE_352x288:
-		frame->frmwidth = 352;
-		frame->frmheight = 288;
-		frame->order_uv = 0;	/* V Y U Y ... */
-		frame->hdr_sig = 0x00;	/* 00 FF 00 00 */
+	case IBMCAM_MODEL_4:
+		ibmcam_model4_setup_after_video_if(uvd);
 		break;
 	}
-	frame->order_yc = (ibmcam->camera_model == IBMCAM_MODEL_2);
+}
 
-	width = frame->width;
-	RESTRICT_TO_RANGE(width, min_imgwidth, imgwidth);
-	width &= ~7;		/* Multiple of 8 */
-
-	height = frame->height;
-	RESTRICT_TO_RANGE(height, min_imgheight, imgheight);
-	height &= ~3;		/* Multiple of 4 */
-
-	return 0;
+static void ibmcam_video_start(uvd_t *uvd)
+{
+	ibmcam_change_lighting_conditions(uvd);
+	ibmcam_set_sharpness(uvd);
+	ibmcam_reinit_iso(uvd, 0);
 }
 
 /*
- * ibmcam_open()
- *
- * This is part of Video 4 Linux API. The driver can be opened by one
- * client only (checks internal counter 'ibmcam->user'). The procedure
- * then allocates buffers needed for video processing.
- *
- * History:
- * 1/22/00  Rewrote, moved scratch buffer allocation here. Now the
- *          camera is also initialized here (once per connect), at
- *          expense of V4L client (it waits on open() call).
- * 1/27/00  Used IBMCAM_NUMSBUF as number of URB buffers.
- * 5/24/00  Corrected to prevent race condition (MOD_xxx_USE_COUNT).
+ * Return negative code on failure, 0 on success.
  */
-static int ibmcam_open(struct video_device *dev, int flags)
+static int ibmcam_setup_on_open(uvd_t *uvd)
 {
-	struct usb_ibmcam *ibmcam = (struct usb_ibmcam *)dev;
-	const int sb_size = FRAMES_PER_DESC * ibmcam->iso_packet_len;
-	int i, err = 0;
-
-	MOD_INC_USE_COUNT;
-	down(&ibmcam->lock);
-
-	if (ibmcam->user)
-		err = -EBUSY;
-	else {
-		/* Clean pointers so we know if we allocated something */
-		for (i=0; i < IBMCAM_NUMSBUF; i++)
-			ibmcam->sbuf[i].data = NULL;
-
-		/* Allocate memory for the frame buffers */
-		ibmcam->fbuf_size = IBMCAM_NUMFRAMES * MAX_FRAME_SIZE;
-		ibmcam->fbuf = rvmalloc(ibmcam->fbuf_size);
-		ibmcam->scratch = kmalloc(scratchbufsize, GFP_KERNEL);
-		ibmcam->scratchlen = 0;
-		if ((ibmcam->fbuf == NULL) || (ibmcam->scratch == NULL))
-			err = -ENOMEM;
-		else {
-			/* Allocate all buffers */
-			for (i=0; i < IBMCAM_NUMFRAMES; i++) {
-				ibmcam->frame[i].grabstate = FRAME_UNUSED;
-				ibmcam->frame[i].data = ibmcam->fbuf + i*MAX_FRAME_SIZE;
-				/*
-				 * Set default sizes in case IOCTL (VIDIOCMCAPTURE)
-				 * is not used (using read() instead).
-				 */
-				ibmcam->frame[i].width = imgwidth;
-				ibmcam->frame[i].height = imgheight;
-				ibmcam->frame[i].bytes_read = 0;
-			}
-			for (i=0; i < IBMCAM_NUMSBUF; i++) {
-				ibmcam->sbuf[i].data = kmalloc(sb_size, GFP_KERNEL);
-				if (ibmcam->sbuf[i].data == NULL) {
-					err = -ENOMEM;
-					break;
-				}
-			}
+	int setup_ok = 0; /* Success by default */
+	/* Send init sequence only once, it's large! */
+	if (!IBMCAM_T(uvd)->initialized) { /* FIXME rename */
+		switch (IBMCAM_T(uvd)->camera_model) {
+		case IBMCAM_MODEL_1:
+			setup_ok = ibmcam_model1_setup(uvd);
+			break;
+		case IBMCAM_MODEL_2:
+			setup_ok = ibmcam_model2_setup(uvd);
+			break;
+		case IBMCAM_MODEL_3:
+		case IBMCAM_MODEL_4:
+			/* We do all setup when Isoc stream is requested */
+			break;
 		}
-		if (err) {
-			/* Have to free all that memory */
-			if (ibmcam->fbuf != NULL) {
-				rvfree(ibmcam->fbuf, ibmcam->fbuf_size);
-				ibmcam->fbuf = NULL;
-			}
-			if (ibmcam->scratch != NULL) {
-				kfree(ibmcam->scratch);
-				ibmcam->scratch = NULL;
-			}
-			for (i=0; i < IBMCAM_NUMSBUF; i++) {
-				if (ibmcam->sbuf[i].data != NULL) {
-					kfree (ibmcam->sbuf[i].data);
-					ibmcam->sbuf[i].data = NULL;
-				}
-			}
-		}
+		IBMCAM_T(uvd)->initialized = (setup_ok != 0);
 	}
-
-	/* If so far no errors then we shall start the camera */
-	if (!err) {
-		err = ibmcam_init_isoc(ibmcam);
-		if (!err) {
-			/* Send init sequence only once, it's large! */
-			if (!ibmcam->initialized) {
-				int setup_ok = 0;
-				if (ibmcam->camera_model == IBMCAM_MODEL_1)
-					setup_ok = usb_ibmcam_model1_setup(ibmcam);
-				else if (ibmcam->camera_model == IBMCAM_MODEL_2)
-					setup_ok = usb_ibmcam_model2_setup(ibmcam);
-				if (setup_ok)
-					ibmcam->initialized = 1;
-				else
-					err = -EBUSY;
-			}
-			if (!err)
-				ibmcam->user++;
-		}
-	}
-	up(&ibmcam->lock);
-	if (err)
-		MOD_DEC_USE_COUNT;
-	return err;
+	return setup_ok;
 }
 
-/*
- * ibmcam_close()
- *
- * This is part of Video 4 Linux API. The procedure
- * stops streaming and deallocates all buffers that were earlier
- * allocated in ibmcam_open().
- *
- * History:
- * 1/22/00  Moved scratch buffer deallocation here.
- * 1/27/00  Used IBMCAM_NUMSBUF as number of URB buffers.
- * 5/24/00  Moved MOD_DEC_USE_COUNT outside of code that can sleep.
- */
-static void ibmcam_close(struct video_device *dev)
+static void ibmcam_configure_video(uvd_t *uvd)
 {
-	struct usb_ibmcam *ibmcam = (struct usb_ibmcam *)dev;
-	int i;
-
-	down(&ibmcam->lock);	
-
-	ibmcam_stop_isoc(ibmcam);
-
-	rvfree(ibmcam->fbuf, ibmcam->fbuf_size);
-	kfree(ibmcam->scratch);
-	for (i=0; i < IBMCAM_NUMSBUF; i++)
-		kfree(ibmcam->sbuf[i].data);
-
-	ibmcam->user--;
-
-	if (ibmcam->remove_pending) {
-		printk(KERN_INFO "ibmcam_close: Final disconnect.\n");
-		usb_ibmcam_release(ibmcam);
-	}
-	up(&ibmcam->lock);
-	MOD_DEC_USE_COUNT;
-}
-
-static long ibmcam_write(struct video_device *dev, const char *buf, unsigned long count, int noblock)
-{
-	return -EINVAL;
-}
-
-/*
- * ibmcam_ioctl()
- *
- * This is part of Video 4 Linux API. The procedure handles ioctl() calls.
- *
- * History:
- * 1/22/00  Corrected VIDIOCSPICT to reject unsupported settings.
- */
-static int ibmcam_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
-{
-	struct usb_ibmcam *ibmcam = (struct usb_ibmcam *)dev;
-
-	if (!IBMCAM_IS_OPERATIONAL(ibmcam))
-		return -EFAULT;
-
-	switch (cmd) {
-		case VIDIOCGCAP:
-		{
-			if (copy_to_user(arg, &ibmcam->vcap, sizeof(ibmcam->vcap)))
-				return -EFAULT;
-			return 0;
-		}
-		case VIDIOCGCHAN:
-		{
-			if (copy_to_user(arg, &ibmcam->vchan, sizeof(ibmcam->vchan)))
-				return -EFAULT;
-			return 0;
-		}
-		case VIDIOCSCHAN:
-		{
-			int v;
-
-			if (copy_from_user(&v, arg, sizeof(v)))
-				return -EFAULT;
-			if ((v < 0) || (v >= 3)) /* 3 grades of lighting conditions */
-				return -EINVAL;
-			if (v != ibmcam->vchan.channel) {
-				ibmcam->vchan.channel = v;
-				usb_ibmcam_change_lighting_conditions(ibmcam);
-			}
-			return 0;
-		}
-		case VIDIOCGPICT:
-		{
-			if (copy_to_user(arg, &ibmcam->vpic, sizeof(ibmcam->vpic)))
-				return -EFAULT;
-			return 0;
-		}
-		case VIDIOCSPICT:
-		{
-			struct video_picture tmp;
-			/*
-			 * Use temporary 'video_picture' structure to preserve our
-			 * own settings (such as color depth, palette) that we
-			 * aren't allowing everyone (V4L client) to change.
-			 */
-			if (copy_from_user(&tmp, arg, sizeof(tmp)))
-				return -EFAULT;
-			ibmcam->vpic.brightness = tmp.brightness;
-			ibmcam->vpic.hue = tmp.hue;
-			ibmcam->vpic.colour = tmp.colour;
-			ibmcam->vpic.contrast = tmp.contrast;
-			usb_ibmcam_adjust_picture(ibmcam);
-			return 0;
-		}
-		case VIDIOCSWIN:
-		{
-			struct video_window vw;
-
-			if (copy_from_user(&vw, arg, sizeof(vw)))
-				return -EFAULT;
-			if (vw.flags)
-				return -EINVAL;
-			if (vw.clipcount)
-				return -EINVAL;
-			if (vw.height != imgheight)
-				return -EINVAL;
-			if (vw.width != imgwidth)
-				return -EINVAL;
-
-			ibmcam->compress = 0;
-
-			return 0;
-		}
-		case VIDIOCGWIN:
-		{
-			struct video_window vw;
-
-			memset(&vw, 0, sizeof(vw));
-			vw.x = 0;
-			vw.y = 0;
-			vw.width = imgwidth;
-			vw.height = imgheight;
-			vw.flags = usb_ibmcam_calculate_fps();
-
-			if (copy_to_user(arg, &vw, sizeof(vw)))
-				return -EFAULT;
-
-			return 0;
-		}
-		case VIDIOCGMBUF:
-		{
-			struct video_mbuf vm;
-
-			memset(&vm, 0, sizeof(vm));
-			vm.size = MAX_FRAME_SIZE * 2;
-			vm.frames = 2;
-			vm.offsets[0] = 0;
-			vm.offsets[1] = MAX_FRAME_SIZE;
-
-			if (copy_to_user((void *)arg, (void *)&vm, sizeof(vm)))
-				return -EFAULT;
-
-			return 0;
-		}
-		case VIDIOCMCAPTURE:
-		{
-			struct video_mmap vm;
-
-			if (copy_from_user((void *)&vm, (void *)arg, sizeof(vm)))
-				return -EFAULT;
-
-			if (debug >= 1)
-				printk(KERN_DEBUG "frame: %d, size: %dx%d, format: %d\n",
-					vm.frame, vm.width, vm.height, vm.format);
-
-			if (vm.format != VIDEO_PALETTE_RGB24)
-				return -EINVAL;
-
-			if ((vm.frame != 0) && (vm.frame != 1))
-				return -EINVAL;
-
-			if (ibmcam->frame[vm.frame].grabstate == FRAME_GRABBING)
-				return -EBUSY;
-
-			/* Don't compress if the size changed */
-			if ((ibmcam->frame[vm.frame].width != vm.width) ||
-			    (ibmcam->frame[vm.frame].height != vm.height))
-				ibmcam->compress = 0;
-
-			ibmcam->frame[vm.frame].width = vm.width;
-			ibmcam->frame[vm.frame].height = vm.height;
-
-			/* Mark it as ready */
-			ibmcam->frame[vm.frame].grabstate = FRAME_READY;
-
-			return ibmcam_new_frame(ibmcam, vm.frame);
-		}
-		case VIDIOCSYNC:
-		{
-			int frame;
-
-			if (copy_from_user((void *)&frame, arg, sizeof(int)))
-				return -EFAULT;
-
-			if ((unsigned)frame >= IBMCAM_NUMFRAMES) {
-				err("VIDIOCSYNC: invalid frame %d.", frame);
-				return -EINVAL;
-			}
-
-			if (debug >= 1)
-				printk(KERN_DEBUG "ibmcam: syncing to frame %d\n", frame);
-
-			switch (ibmcam->frame[frame].grabstate) {
-			case FRAME_UNUSED:
-				return -EINVAL;
-			case FRAME_READY:
-			case FRAME_GRABBING:
-			case FRAME_ERROR:
-			{
-				int ntries;
-		redo:
-				if (!IBMCAM_IS_OPERATIONAL(ibmcam))
-					return -EIO;
-				ntries = 0; 
-				do {
-					interruptible_sleep_on(&ibmcam->frame[frame].wq);
-					if (signal_pending(current)) {
-						if (flags & FLAGS_RETRY_VIDIOCSYNC) {
-							/* Polling apps will destroy frames with that! */
-							ibmcam_new_frame(ibmcam, frame);
-							usb_ibmcam_testpattern(ibmcam, 1, 0);
-							ibmcam->curframe = -1;
-							ibmcam->frame_num++;
-
-							/* This will request another frame. */
-							if (waitqueue_active(&ibmcam->frame[frame].wq))
-								wake_up_interruptible(&ibmcam->frame[frame].wq);
-							return 0;
-						} else {
-							/* Standard answer: not ready yet! */
-							return -EINTR;
-						}
-					}
-				} while (ibmcam->frame[frame].grabstate == FRAME_GRABBING);
-
-				if (ibmcam->frame[frame].grabstate == FRAME_ERROR) {
-					int ret = ibmcam_new_frame(ibmcam, frame);
-					if (ret < 0)
-						return ret;
-					goto redo;
-				}
-			}
-			case FRAME_DONE:
-				ibmcam->frame[frame].grabstate = FRAME_UNUSED;
-				break;
-			}
-
-			ibmcam->frame[frame].grabstate = FRAME_UNUSED;
-
-			return 0;
-		}
-		case VIDIOCGFBUF:
-		{
-			struct video_buffer vb;
-
-			memset(&vb, 0, sizeof(vb));
-			vb.base = NULL;	/* frame buffer not supported, not used */
-
-			if (copy_to_user((void *)arg, (void *)&vb, sizeof(vb)))
-				return -EFAULT;
-
- 			return 0;
- 		}
-		case VIDIOCKEY:
-			return 0;
-
-		case VIDIOCCAPTURE:
-			return -EINVAL;
-
-		case VIDIOCSFBUF:
-
-		case VIDIOCGTUNER:
-		case VIDIOCSTUNER:
-
-		case VIDIOCGFREQ:
-		case VIDIOCSFREQ:
-
-		case VIDIOCGAUDIO:
-		case VIDIOCSAUDIO:
-			return -EINVAL;
-
-		default:
-			return -ENOIOCTLCMD;
-	}
-	return 0;
-}
-
-static long ibmcam_read(struct video_device *dev, char *buf, unsigned long count, int noblock)
-{
-	struct usb_ibmcam *ibmcam = (struct usb_ibmcam *)dev;
-	int frmx = -1;
-	volatile struct ibmcam_frame *frame;
-
-	if (debug >= 1)
-		printk(KERN_DEBUG "ibmcam_read: %ld bytes, noblock=%d\n", count, noblock);
-
-	if (!IBMCAM_IS_OPERATIONAL(ibmcam) || (buf == NULL))
-		return -EFAULT;
-
-	/* See if a frame is completed, then use it. */
-	if (ibmcam->frame[0].grabstate >= FRAME_DONE)	/* _DONE or _ERROR */
-		frmx = 0;
-	else if (ibmcam->frame[1].grabstate >= FRAME_DONE)/* _DONE or _ERROR */
-		frmx = 1;
-
-	if (noblock && (frmx == -1))
-		return -EAGAIN;
-
-	/* If no FRAME_DONE, look for a FRAME_GRABBING state. */
-	/* See if a frame is in process (grabbing), then use it. */
-	if (frmx == -1) {
-		if (ibmcam->frame[0].grabstate == FRAME_GRABBING)
-			frmx = 0;
-		else if (ibmcam->frame[1].grabstate == FRAME_GRABBING)
-			frmx = 1;
-	}
-
-	/* If no frame is active, start one. */
-	if (frmx == -1)
-		ibmcam_new_frame(ibmcam, frmx = 0);
-
-	frame = &ibmcam->frame[frmx];
-
-restart:
-	if (!IBMCAM_IS_OPERATIONAL(ibmcam))
-		return -EIO;
-	while (frame->grabstate == FRAME_GRABBING) {
-		interruptible_sleep_on((void *)&frame->wq);
-		if (signal_pending(current))
-			return -EINTR;
-	}
-
-	if (frame->grabstate == FRAME_ERROR) {
-		frame->bytes_read = 0;
-		if (ibmcam_new_frame(ibmcam, frmx))
-			printk(KERN_ERR "ibmcam_read: ibmcam_new_frame error\n");
-		goto restart;
-	}
-
-	if (debug >= 1)
-		printk(KERN_DEBUG "ibmcam_read: frmx=%d, bytes_read=%ld, scanlength=%ld\n",
-			frmx, frame->bytes_read, frame->scanlength);
-
-	/* copy bytes to user space; we allow for partials reads */
-	if ((count + frame->bytes_read) > frame->scanlength)
-		count = frame->scanlength - frame->bytes_read;
-
-	if (copy_to_user(buf, frame->data + frame->bytes_read, count))
-		return -EFAULT;
-
-	frame->bytes_read += count;
-	if (debug >= 1)
-		printk(KERN_DEBUG "ibmcam_read: {copy} count used=%ld, new bytes_read=%ld\n",
-			count, frame->bytes_read);
-
-	if (frame->bytes_read >= frame->scanlength) { /* All data has been read */
-		frame->bytes_read = 0;
-
-		/* Mark it as available to be used again. */
-		ibmcam->frame[frmx].grabstate = FRAME_UNUSED;
-		if (ibmcam_new_frame(ibmcam, frmx ? 0 : 1))
-			printk(KERN_ERR "ibmcam_read: ibmcam_new_frame returned error\n");
-	}
-
-	return count;
-}
-
-static int ibmcam_mmap(struct video_device *dev, const char *adr, unsigned long size)
-{
-	struct usb_ibmcam *ibmcam = (struct usb_ibmcam *)dev;
-	unsigned long start = (unsigned long)adr;
-	unsigned long page, pos;
-
-	if (!IBMCAM_IS_OPERATIONAL(ibmcam))
-		return -EFAULT;
-
-	if (size > (((2 * MAX_FRAME_SIZE) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1)))
-		return -EINVAL;
-
-	pos = (unsigned long)ibmcam->fbuf;
-	while (size > 0) {
-		page = kvirt_to_pa(pos);
-		if (remap_page_range(start, page, PAGE_SIZE, PAGE_SHARED))
-			return -EAGAIN;
-
-		start += PAGE_SIZE;
-		pos += PAGE_SIZE;
-		if (size > PAGE_SIZE)
-			size -= PAGE_SIZE;
-		else
-			size = 0;
-	}
-
-	return 0;
-}
-
-static struct video_device ibmcam_template = {
-	name:		"CPiA USB Camera",
-	type:		VID_TYPE_CAPTURE,
-	hardware:	VID_HARDWARE_CPIA,
-	open:		ibmcam_open,
-	close:		ibmcam_close,
-	read:		ibmcam_read,
-	write:		ibmcam_write,
-	ioctl:		ibmcam_ioctl,
-	mmap:		ibmcam_mmap,
-};
-
-static void usb_ibmcam_configure_video(struct usb_ibmcam *ibmcam)
-{
-	if (ibmcam == NULL)
+	if (uvd == NULL)
 		return;
 
 	RESTRICT_TO_RANGE(init_brightness, 0, 255);
@@ -2883,90 +3610,68 @@ static void usb_ibmcam_configure_video(struct usb_ibmcam *ibmcam)
 	RESTRICT_TO_RANGE(init_hue, 0, 255);
 	RESTRICT_TO_RANGE(hue_correction, 0, 255);
 
-	memset(&ibmcam->vpic, 0, sizeof(ibmcam->vpic));
-	memset(&ibmcam->vpic_old, 0x55, sizeof(ibmcam->vpic_old));
+	memset(&uvd->vpic, 0, sizeof(uvd->vpic));
+	memset(&uvd->vpic_old, 0x55, sizeof(uvd->vpic_old));
 
-	ibmcam->vpic.colour = init_color << 8;
-	ibmcam->vpic.hue = init_hue << 8;
-	ibmcam->vpic.brightness = init_brightness << 8;
-	ibmcam->vpic.contrast = init_contrast << 8;
-	ibmcam->vpic.whiteness = 105 << 8; /* This one isn't used */
-	ibmcam->vpic.depth = 24;
-	ibmcam->vpic.palette = VIDEO_PALETTE_RGB24;
+	uvd->vpic.colour = init_color << 8;
+	uvd->vpic.hue = init_hue << 8;
+	uvd->vpic.brightness = init_brightness << 8;
+	uvd->vpic.contrast = init_contrast << 8;
+	uvd->vpic.whiteness = 105 << 8; /* This one isn't used */
+	uvd->vpic.depth = 24;
+	uvd->vpic.palette = VIDEO_PALETTE_RGB24;
 
-	memset(&ibmcam->vcap, 0, sizeof(ibmcam->vcap));
-	strcpy(ibmcam->vcap.name, "IBM USB Camera");
-	ibmcam->vcap.type = VID_TYPE_CAPTURE;
-	ibmcam->vcap.channels = 1;
-	ibmcam->vcap.audios = 0;
-	ibmcam->vcap.maxwidth = imgwidth;
-	ibmcam->vcap.maxheight = imgheight;
-	ibmcam->vcap.minwidth = min_imgwidth;
-	ibmcam->vcap.minheight = min_imgheight;
+	memset(&uvd->vcap, 0, sizeof(uvd->vcap));
+	strcpy(uvd->vcap.name, "IBM USB Camera");
+	uvd->vcap.type = VID_TYPE_CAPTURE;
+	uvd->vcap.channels = 1;
+	uvd->vcap.audios = 0;
+	uvd->vcap.maxwidth = VIDEOSIZE_X(uvd->canvas);
+	uvd->vcap.maxheight = VIDEOSIZE_Y(uvd->canvas);
+	uvd->vcap.minwidth = min_canvasWidth;
+	uvd->vcap.minheight = min_canvasHeight;
 
-	memset(&ibmcam->vchan, 0, sizeof(ibmcam->vchan));
-	ibmcam->vchan.flags = 0;
-	ibmcam->vchan.tuners = 0;
-	ibmcam->vchan.channel = 0;
-	ibmcam->vchan.type = VIDEO_TYPE_CAMERA;
-	strcpy(ibmcam->vchan.name, "Camera");
+	memset(&uvd->vchan, 0, sizeof(uvd->vchan));
+	uvd->vchan.flags = 0;
+	uvd->vchan.tuners = 0;
+	uvd->vchan.channel = 0;
+	uvd->vchan.type = VIDEO_TYPE_CAMERA;
+	strcpy(uvd->vchan.name, "Camera");
 }
 
 /*
- * ibmcam_find_struct()
- *
- * This code searches the array of preallocated (static) structures
- * and returns index of the first one that isn't in use. Returns -1
- * if there are no free structures.
- *
- * History:
- * 1/27/00  Created.
- */
-static int ibmcam_find_struct(void)
-{
-	int i, u;
-
-	for (u = 0; u < MAX_IBMCAM; u++) {
-		struct usb_ibmcam *ibmcam = &cams[u];
-		if (!ibmcam->ibmcam_used) /* This one is free */
-		{
-			ibmcam->ibmcam_used = 1;	/* In use now */
-			for (i=0; i < IBMCAM_NUMFRAMES; i++)
-				init_waitqueue_head(&ibmcam->frame[i].wq);
-			init_MUTEX(&ibmcam->lock);	/* to 1 == available */
-			ibmcam->dev = NULL;
-			memcpy(&ibmcam->vdev, &ibmcam_template, sizeof(ibmcam_template));
-			return u;
-		}
-	}
-	return -1;
-}
-
-/*
- * usb_ibmcam_probe()
+ * ibmcam_probe()
  *
  * This procedure queries device descriptor and accepts the interface
  * if it looks like IBM C-it camera.
  *
  * History:
- * 1/22/00  Moved camera init code to ibmcam_open()
- * 1/27/00  Changed to use static structures, added locking.
- * 5/24/00  Corrected to prevent race condition (MOD_xxx_USE_COUNT).
- * 7/3/00   Fixed endianness bug.
+ * 22-Jan-2000 Moved camera init code to ibmcam_open()
+ * 27=Jan-2000 Changed to use static structures, added locking.
+ * 24-May-2000 Corrected to prevent race condition (MOD_xxx_USE_COUNT).
+ * 03-Jul-2000 Fixed endianness bug.
+ * 12-Nov-2000 Reworked to comply with new probe() signature.
+ * 23-Jan-2001 Added compatibility with 2.2.x kernels.
  */
-static void *usb_ibmcam_probe(struct usb_device *dev, unsigned int ifnum,
-			 const struct usb_device_id *id)
+static void *ibmcam_probe(struct usb_device *dev, unsigned int ifnum, const struct usb_device_id *devid)
 {
-	struct usb_ibmcam *ibmcam = NULL;
-	const struct usb_interface_descriptor *interface;
-	const struct usb_endpoint_descriptor *endpoint;
-	int devnum, model=0;
+	uvd_t *uvd = NULL;
+	int i, nas, model=0, canvasX=0, canvasY=0;
+	int actInterface=-1, inactInterface=-1, maxPS=0;
+	unsigned char video_ep = 0;
 
 	if (debug >= 1)
-		printk(KERN_DEBUG "ibmcam_probe(%p,%u.)\n", dev, ifnum);
+		info("ibmcam_probe(%p,%u.)", dev, ifnum);
 
 	/* We don't handle multi-config cameras */
 	if (dev->descriptor.bNumConfigurations != 1)
+		return NULL;
+
+	/* Is it an IBM camera? */
+	if (dev->descriptor.idVendor != IBMCAM_VENDOR_ID)
+		return NULL;
+	if ((dev->descriptor.idProduct != IBMCAM_PRODUCT_ID) &&
+	    (dev->descriptor.idProduct != NETCAM_PRODUCT_ID))
 		return NULL;
 
 	/* Check the version/revision */
@@ -2974,195 +3679,247 @@ static void *usb_ibmcam_probe(struct usb_device *dev, unsigned int ifnum,
 	case 0x0002:
 		if (ifnum != 2)
 			return NULL;
-		printk(KERN_INFO "IBM USB camera found (model 1, rev. 0x%04x).\n",
-			dev->descriptor.bcdDevice);
 		model = IBMCAM_MODEL_1;
 		break;
 	case 0x030A:
 		if (ifnum != 0)
 			return NULL;
-		printk(KERN_INFO "IBM USB camera found (model 2, rev. 0x%04x).\n",
-			dev->descriptor.bcdDevice);
-		model = IBMCAM_MODEL_2;
+		if (dev->descriptor.idProduct == NETCAM_PRODUCT_ID)
+			model = IBMCAM_MODEL_4;
+		else
+			model = IBMCAM_MODEL_2;
 		break;
-
-	/* ibmcam_table contents prevents any other values from ever
-	   being passed to us, so no need for "default" case. */
+	case 0x0301:
+		if (ifnum != 0)
+			return NULL;
+		model = IBMCAM_MODEL_3;
+		break;
+	default:
+		err("IBM camera with revision 0x%04x is not supported.",
+			dev->descriptor.bcdDevice);
+		return NULL;
 	}
+	info("IBM USB camera found (model %d, rev. 0x%04x)",
+		model, dev->descriptor.bcdDevice);
 
 	/* Validate found interface: must have one ISO endpoint */
-	interface = &dev->actconfig->interface[ifnum].altsetting[0];
-	if (interface->bNumEndpoints != 1) {
-		printk(KERN_ERR "IBM camera: interface %d. has %u. endpoints!\n",
-		       ifnum, (unsigned)(interface->bNumEndpoints));
+	nas = dev->actconfig->interface[ifnum].num_altsetting;
+	if (debug > 0)
+		info("Number of alternate settings=%d.", nas);
+	if (nas < 2) {
+		err("Too few alternate settings for this camera!");
 		return NULL;
 	}
-	endpoint = &interface->endpoint[0];
-	if ((endpoint->bmAttributes & 0x03) != 0x01) {
-		printk(KERN_ERR "IBM camera: interface %d. has non-ISO endpoint!\n", ifnum);
-		return NULL;
+	/* Validate all alternate settings */
+	for (i=0; i < nas; i++) {
+		const struct usb_interface_descriptor *interface;
+		const struct usb_endpoint_descriptor *endpoint;
+
+		interface = &dev->actconfig->interface[ifnum].altsetting[i];
+		if (interface->bNumEndpoints != 1) {
+			err("Interface %d. has %u. endpoints!",
+			    ifnum, (unsigned)(interface->bNumEndpoints));
+			return NULL;
+		}
+		endpoint = &interface->endpoint[0];
+		if (video_ep == 0)
+			video_ep = endpoint->bEndpointAddress;
+		else if (video_ep != endpoint->bEndpointAddress) {
+			err("Alternate settings have different endpoint addresses!");
+			return NULL;
+		}
+		if ((endpoint->bmAttributes & 0x03) != 0x01) {
+			err("Interface %d. has non-ISO endpoint!", ifnum);
+			return NULL;
+		}
+		if ((endpoint->bEndpointAddress & 0x80) == 0) {
+			err("Interface %d. has ISO OUT endpoint!", ifnum);
+			return NULL;
+		}
+		if (endpoint->wMaxPacketSize == 0) {
+			if (inactInterface < 0)
+				inactInterface = i;
+			else {
+				err("More than one inactive alt. setting!");
+				return NULL;
+			}
+		} else {
+			if (actInterface < 0) {
+				actInterface = i;
+				maxPS = endpoint->wMaxPacketSize;
+				if (debug > 0)
+					info("Active setting=%d. maxPS=%d.", i, maxPS);
+			} else
+				err("More than one active alt. setting! Ignoring #%d.", i);
+		}
 	}
-	if ((endpoint->bEndpointAddress & 0x80) == 0) {
-		printk(KERN_ERR "IBM camera: interface %d. has ISO OUT endpoint!\n", ifnum);
+	if ((maxPS <= 0) || (actInterface < 0) || (inactInterface < 0)) {
+		err("Failed to recognize the camera!");
 		return NULL;
 	}
 
 	/* Validate options */
-	if (model == IBMCAM_MODEL_1) {
+	switch (model) {
+	case IBMCAM_MODEL_1:
 		RESTRICT_TO_RANGE(lighting, 0, 2);
-		RESTRICT_TO_RANGE(videosize, VIDEOSIZE_128x96, VIDEOSIZE_352x288);
-	} else {
+		RESTRICT_TO_RANGE(size, SIZE_128x96, SIZE_352x288);
+		if (framerate < 0)
+			framerate = 2;
+		canvasX = 352;
+		canvasY = 288;
+		break;
+	case IBMCAM_MODEL_2:
 		RESTRICT_TO_RANGE(lighting, 0, 15);
-		RESTRICT_TO_RANGE(videosize, VIDEOSIZE_176x144, VIDEOSIZE_352x240);
+		RESTRICT_TO_RANGE(size, SIZE_176x144, SIZE_352x240);
+		if (framerate < 0)
+			framerate = 2;
+		canvasX = 352;
+		canvasY = 240;
+		break;
+	case IBMCAM_MODEL_3:
+		RESTRICT_TO_RANGE(lighting, 0, 15); /* FIXME */
+		switch (size) {
+		case SIZE_160x120:
+			canvasX = 160;
+			canvasY = 120;
+			if (framerate < 0)
+				framerate = 2;
+			RESTRICT_TO_RANGE(framerate, 0, 5);
+			break;
+		default:
+			info("IBM camera: using 320x240");
+			size = SIZE_320x240;
+			/* No break here */
+		case SIZE_320x240:
+			canvasX = 320;
+			canvasY = 240;
+			if (framerate < 0)
+				framerate = 3;
+			RESTRICT_TO_RANGE(framerate, 0, 5);
+			break;
+		case SIZE_640x480:
+			canvasX = 640;
+			canvasY = 480;
+			framerate = 0;	/* Slowest, and maybe even that is too fast */
+			break;
+		}
+		break;
+	case IBMCAM_MODEL_4:
+		RESTRICT_TO_RANGE(lighting, 0, 2);
+		switch (size) {
+		case SIZE_128x96:
+			canvasX = 128;
+			canvasY = 96;
+			break;
+		case SIZE_160x120:
+			canvasX = 160;
+			canvasY = 120;
+			break;
+		default:
+			info("IBM NetCamera: using 176x144");
+			size = SIZE_176x144;
+			/* No break here */
+		case SIZE_176x144:
+			canvasX = 176;
+			canvasY = 144;
+			break;
+		case SIZE_320x240:
+			canvasX = 320;
+			canvasY = 240;
+			break;
+		case SIZE_352x288:
+			canvasX = 352;
+			canvasY = 288;
+			break;
+		}
+		break;
+	default:
+		err("IBM camera: Model %d. not supported!", model);
+		return NULL;
 	}
 
 	/* Code below may sleep, need to lock module while we are here */
 	MOD_INC_USE_COUNT;
+	uvd = usbvideo_AllocateDevice(cams);
+	if (uvd != NULL) {
+		/* Here uvd is a fully allocated uvd_t object */
+		uvd->flags = flags;
+		uvd->debug = debug;
+		uvd->dev = dev;
+		uvd->iface = ifnum;
+		uvd->ifaceAltInactive = inactInterface;
+		uvd->ifaceAltActive = actInterface;
+		uvd->video_endp = video_ep;
+		uvd->iso_packet_len = maxPS;
+		uvd->paletteBits = 1L << VIDEO_PALETTE_RGB24;
+		uvd->defaultPalette = VIDEO_PALETTE_RGB24;
+		uvd->canvas = VIDEOSIZE(canvasX, canvasY);
+		uvd->videosize = ibmcam_size_to_videosize(size);
 
-	devnum = ibmcam_find_struct();
-	if (devnum == -1) {
-		printk(KERN_INFO "IBM USB camera driver: Too many devices!\n");
-		ibmcam = NULL; /* Do not free, it's preallocated */
-		goto probe_done;
+		/* Initialize ibmcam-specific data */
+		assert(IBMCAM_T(uvd) != NULL);
+		IBMCAM_T(uvd)->camera_model = model;
+		IBMCAM_T(uvd)->initialized = 0;
+
+		ibmcam_configure_video(uvd);
+
+		i = usbvideo_RegisterVideoDevice(uvd);
+		if (i != 0) {
+			err("usbvideo_RegisterVideoDevice() failed.");
+			uvd = NULL;
+		}
 	}
-	ibmcam = &cams[devnum];
-
-	down(&ibmcam->lock);
-	ibmcam->camera_model = model;
-	ibmcam->remove_pending = 0;
-	ibmcam->last_error = 0;
-	ibmcam->dev = dev;
-	ibmcam->iface = ifnum;
-	ibmcam->ifaceAltInactive = 0;
-	ibmcam->ifaceAltActive = 1;
-	ibmcam->video_endp = endpoint->bEndpointAddress;
-	ibmcam->iso_packet_len = 1014;
-	ibmcam->compress = 0;
-	ibmcam->user=0; 
-
-	usb_ibmcam_configure_video(ibmcam);
-	up (&ibmcam->lock);
-
-	if (video_register_device(&ibmcam->vdev, VFL_TYPE_GRABBER, video_nr) == -1) {
-		printk(KERN_ERR "video_register_device failed\n");
-		ibmcam = NULL; /* Do not free, it's preallocated */
-	}
-	if (debug > 1)
-		printk(KERN_DEBUG "video_register_device() successful\n");
-probe_done:
 	MOD_DEC_USE_COUNT;
-	return ibmcam;
+	return uvd;
 }
 
 /*
- * usb_ibmcam_release()
- *
- * This code does final release of struct usb_ibmcam. This happens
- * after the device is disconnected -and- all clients closed their files.
- *
- * History:
- * 1/27/00  Created.
- */
-static void usb_ibmcam_release(struct usb_ibmcam *ibmcam)
-{
-	video_unregister_device(&ibmcam->vdev);
-	if (debug > 0)
-		printk(KERN_DEBUG "usb_ibmcam_release: Video unregistered.\n");
-	ibmcam->ibmcam_used = 0;
-	ibmcam->initialized = 0;
-}
-
-/*
- * usb_ibmcam_disconnect()
- *
- * This procedure stops all driver activity, deallocates interface-private
- * structure (pointed by 'ptr') and after that driver should be removable
- * with no ill consequences.
- *
- * This code handles surprise removal. The ibmcam->user is a counter which
- * increments on open() and decrements on close(). If we see here that
- * this counter is not 0 then we have a client who still has us opened.
- * We set ibmcam->remove_pending flag as early as possible, and after that
- * all access to the camera will gracefully fail. These failures should
- * prompt client to (eventually) close the video device, and then - in
- * ibmcam_close() - we decrement ibmcam->ibmcam_used and usage counter.
- *
- * History:
- * 1/22/00  Added polling of MOD_IN_USE to delay removal until all users gone.
- * 1/27/00  Reworked to allow pending disconnects; see ibmcam_close()
- * 5/24/00  Corrected to prevent race condition (MOD_xxx_USE_COUNT).
- */
-static void usb_ibmcam_disconnect(struct usb_device *dev, void *ptr)
-{
-	static const char proc[] = "usb_ibmcam_disconnect";
-	struct usb_ibmcam *ibmcam = (struct usb_ibmcam *) ptr;
-
-	MOD_INC_USE_COUNT;
-
-	if (debug > 0)
-		printk(KERN_DEBUG "%s(%p,%p.)\n", proc, dev, ptr);
-
-	down(&ibmcam->lock);
-	ibmcam->remove_pending = 1; /* Now all ISO data will be ignored */
-
-	/* At this time we ask to cancel outstanding URBs */
-	ibmcam_stop_isoc(ibmcam);
-
-	ibmcam->dev = NULL;    	    /* USB device is no more */
-
-	if (ibmcam->user)
-		printk(KERN_INFO "%s: In use, disconnect pending.\n", proc);
-	else
-		usb_ibmcam_release(ibmcam);
-	up(&ibmcam->lock);
-	printk(KERN_INFO "IBM USB camera disconnected.\n");
-
-	MOD_DEC_USE_COUNT;
-}
-
-static struct usb_device_id ibmcam_table [] = {
-	{ USB_DEVICE_VER(0x0545, 0x8080, 0x0002, 0x0002) },
-	{ USB_DEVICE_VER(0x0545, 0x8080, 0x030a, 0x030a) },
-	{ }						/* Terminating entry */
-};
-
-MODULE_DEVICE_TABLE (usb, ibmcam_table);
-
-static struct usb_driver ibmcam_driver = {
-	name:		"ibmcam",
-	probe:		usb_ibmcam_probe,
-	disconnect:	usb_ibmcam_disconnect,
-	id_table:	ibmcam_table,
-};
-
-/*
- * usb_ibmcam_init()
+ * ibmcam_init()
  *
  * This code is run to initialize the driver.
  *
  * History:
- * 1/27/00  Reworked to use statically allocated usb_ibmcam structures.
+ * 1/27/00  Reworked to use statically allocated ibmcam structures.
+ * 21/10/00 Completely redesigned to use usbvideo services.
  */
-static int __init usb_ibmcam_init(void)
+static int __init ibmcam_init(void)
 {
-	unsigned u;
-
-	/* Initialize struct */
-	for (u = 0; u < MAX_IBMCAM; u++) {
-		struct usb_ibmcam *ibmcam = &cams[u];
-		memset (ibmcam, 0, sizeof(struct usb_ibmcam));
-	}
-	info(DRIVER_VERSION ":" DRIVER_DESC);
-	return usb_register(&ibmcam_driver);
+	usbvideo_cb_t cbTbl;
+	memset(&cbTbl, 0, sizeof(cbTbl));
+	cbTbl.probe = ibmcam_probe;
+	cbTbl.setupOnOpen = ibmcam_setup_on_open;
+	cbTbl.videoStart = ibmcam_video_start;
+	cbTbl.videoStop = ibmcam_video_stop;
+	cbTbl.processData = ibmcam_ProcessIsocData;
+	cbTbl.postProcess = usbvideo_DeinterlaceFrame;
+	cbTbl.adjustPicture = ibmcam_adjust_picture;
+	cbTbl.getFPS = ibmcam_calculate_fps;
+	return usbvideo_register(
+		&cams,
+		MAX_IBMCAM,
+		sizeof(ibmcam_t),
+		"ibmcam",
+		&cbTbl,
+		THIS_MODULE);
 }
 
-static void __exit usb_ibmcam_cleanup(void)
+static void __exit ibmcam_cleanup(void)
 {
-	usb_deregister(&ibmcam_driver);
+	usbvideo_Deregister(&cams);
 }
 
-module_init(usb_ibmcam_init);
-module_exit(usb_ibmcam_cleanup);
+#if defined(usb_device_id_ver)
 
-MODULE_AUTHOR( DRIVER_AUTHOR );
-MODULE_DESCRIPTION( DRIVER_DESC );
+static __devinitdata struct usb_device_id id_table[] = {
+	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, IBMCAM_PRODUCT_ID, 0x0002, 0x0002) },	/* Model 1 */
+	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, IBMCAM_PRODUCT_ID, 0x030a, 0x030a) },	/* Model 2 */
+	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, IBMCAM_PRODUCT_ID, 0x0301, 0x0301) },	/* Model 3 */
+	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, NETCAM_PRODUCT_ID, 0x030a, 0x030a) },	/* Model 4 */
+	{ }  /* Terminating entry */
+};
+MODULE_DEVICE_TABLE(usb, id_table);
+
+#endif /* defined(usb_device_id_ver) */
+
+module_init(ibmcam_init);
+module_exit(ibmcam_cleanup);

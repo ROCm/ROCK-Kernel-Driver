@@ -80,7 +80,7 @@ extern __inline__ int get_order(unsigned long size)
 	return order;
 }
 
-#endif /* !ASSEMBLY */
+#endif /* !__ASSEMBLY__ */
 
 /* to align the pointer to the (next) page boundary */
 #define PAGE_ALIGN(addr)	(((addr)+PAGE_SIZE-1)&PAGE_MASK)

@@ -357,6 +357,7 @@ struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_
 
 	/* here we're in the low on memory slow path */
 
+rebalance:
 	if (current->flags & PF_MEMALLOC) {
 		zone = zonelist->zones;
 		for (;;) {
@@ -371,48 +372,28 @@ struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_
 		return NULL;
 	}
 
- rebalance:
 	page = balance_classzone(classzone, gfp_mask, order, &freed);
 	if (page)
 		return page;
 
 	zone = zonelist->zones;
-	if (likely(freed)) {
-		for (;;) {
-			zone_t *z = *(zone++);
-			if (!z)
-				break;
+	for (;;) {
+		zone_t *z = *(zone++);
+		if (!z)
+			break;
 
-			if (zone_free_pages(z, order) > z->pages_min) {
-				page = rmqueue(z, order);
-				if (page)
-					return page;
-			}
+		if (zone_free_pages(z, order) > z->pages_min) {
+			page = rmqueue(z, order);
+			if (page)
+				return page;
 		}
-		goto rebalance;
-	} else {
-		/* 
-		 * Check that no other task is been killed meanwhile,
-		 * in such a case we can succeed the allocation.
-		 */
-		for (;;) {
-			zone_t *z = *(zone++);
-			if (!z)
-				break;
-
-			if (zone_free_pages(z, order) > z->pages_min) {
-				page = rmqueue(z, order);
-				if (page)
-					return page;
-			}
-		}
-		
-		goto rebalance;
 	}
 
-	printk(KERN_NOTICE "__alloc_pages: %u-order allocation failed (gfp=0x%x/%i) from %p\n",
-	       order, gfp_mask, !!(current->flags & PF_MEMALLOC), __builtin_return_address(0));
-	return NULL;
+	/* Yield for kswapd, and try again */
+	current->policy |= SCHED_YIELD;
+	__set_current_state(TASK_RUNNING);
+	schedule();
+	goto rebalance;
 }
 
 /*

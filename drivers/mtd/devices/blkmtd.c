@@ -59,11 +59,6 @@
 #include <linux/mtd/compatmac.h>
 #include <linux/mtd/mtd.h>
 
-#if CONFIG_MODVERSION==1
-#define MODVERSIONS
-#include <linux/modversions.h>
-#endif
-
 /* Default erase size in K, always make it a multiple of PAGE_SIZE */
 #define CONFIG_MTD_BLKDEV_ERASESIZE 128
 #define VERSION "1.1"

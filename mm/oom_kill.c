@@ -241,13 +241,12 @@ int out_of_memory(void)
 		return 0;
 
 	/*
-	 * If the buffer and page cache (excluding swap cache) are over
+	 * If the buffer and page cache (including swap cache) are over
 	 * their (/proc tunable) minimum, we're still not OOM.  We test
 	 * this to make sure we don't return OOM when the system simply
 	 * has a hard time with the cache.
 	 */
 	cache_mem = atomic_read(&page_cache_size);
-	cache_mem -= swapper_space.nrpages;
 	limit = 2;
 	limit *= num_physpages / 100;
 

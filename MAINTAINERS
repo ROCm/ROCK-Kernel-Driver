@@ -337,6 +337,12 @@ P:	H. Peter Anvin
 M:	hpa@zytor.com
 S:	Maintained
 
+CRAMFS FILESYSTEM
+P:	Daniel Quinlan
+M:	quinlan@transmeta.com
+W:	http://sourceforge.net/projects/cramfs/
+S:	Maintained
+
 CREDITS FILE
 P:	John A. Martin
 M:	jam@acm.org
@@ -1481,7 +1487,6 @@ S:	Supported
 
 USB HUB
 P:	Johannes Erdfelt
-M:	jerdfelt@valinux.com
 M:	johannes@erdfelt.com
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
@@ -1586,7 +1591,6 @@ W:	http://misc.nu/hugh/keyspan/
 
 USB SUBSYSTEM
 P:	Johannes Erdfelt
-M:	jerdfelt@valinux.com
 M:	johannes@erdfelt.com
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net

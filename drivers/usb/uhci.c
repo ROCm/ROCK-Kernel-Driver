@@ -61,7 +61,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION ""
+#define DRIVER_VERSION "v1.1"
 #define DRIVER_AUTHOR "Linus 'Frodo Rabbit' Torvalds, Johannes Erdfelt, Randy Dunlap, Georg Acher, Deti Fliegl, Thomas Sailer, Roman Weissgaerber"
 #define DRIVER_DESC "USB Universal Host Controller Interface driver"
 
@@ -1258,20 +1258,37 @@ static int uhci_submit_bulk(struct urb *urb, struct urb *eurb)
 			return -ENOMEM;
 
 		uhci_add_td_to_urb(urb, td);
-		uhci_fill_td(td, status, destination | ((pktsze - 1) << 21) |
+		uhci_fill_td(td, status, destination |
+			(((pktsze - 1) & UHCI_NULL_DATA_SIZE) << 21) |
 			(usb_gettoggle(urb->dev, usb_pipeendpoint(urb->pipe),
 			 usb_pipeout(urb->pipe)) << TD_TOKEN_TOGGLE),
 			data);
 
 		data += pktsze;
-		len -= maxsze;
-
-		if (len <= 0)
-			td->status |= TD_CTRL_IOC;
+		len -= pktsze;
 
 		usb_dotoggle(urb->dev, usb_pipeendpoint(urb->pipe),
 			usb_pipeout(urb->pipe));
 	} while (len > 0);
+
+	if (usb_pipeout(urb->pipe) && (urb->transfer_flags & USB_ZERO_PACKET) &&
+	   urb->transfer_buffer_length) {
+		td = uhci_alloc_td(uhci, urb->dev);
+		if (!td)
+			return -ENOMEM;
+
+		uhci_add_td_to_urb(urb, td);
+		uhci_fill_td(td, status, destination | UHCI_NULL_DATA_SIZE |
+			(usb_gettoggle(urb->dev, usb_pipeendpoint(urb->pipe),
+			 usb_pipeout(urb->pipe)) << TD_TOKEN_TOGGLE),
+			data);
+
+		usb_dotoggle(urb->dev, usb_pipeendpoint(urb->pipe),
+			usb_pipeout(urb->pipe));
+	}
+
+	/* Set the flag on the last packet */
+	td->status |= TD_CTRL_IOC;
 
 	qh = uhci_alloc_qh(uhci, urb->dev);
 	if (!qh)
@@ -2343,11 +2360,11 @@ static void uhci_interrupt(int irq, void *__uhci, struct pt_regs *regs)
 
 	if (status & ~(USBSTS_USBINT | USBSTS_ERROR | USBSTS_RD)) {
 		if (status & USBSTS_HSE)
-			printk(KERN_ERR "uhci: host system error, PCI problems?\n");
+			err("%x: host system error, PCI problems?", io_addr);
 		if (status & USBSTS_HCPE)
-			printk(KERN_ERR "uhci: host controller process error. something bad happened\n");
+			err("%x: host controller process error. something bad happened", io_addr);
 		if ((status & USBSTS_HCH) && !uhci->is_suspended) {
-			printk(KERN_ERR "uhci: host controller halted. very bad\n");
+			err("%x: host controller halted. very bad", io_addr);
 			/* FIXME: Reset the controller, fix the offending TD */
 		}
 	}
@@ -2463,36 +2480,73 @@ static void start_hc(struct uhci *uhci)
 	outw(USBCMD_RS | USBCMD_CF | USBCMD_MAXP, io_addr + USBCMD);
 }
 
-static int uhci_alloc_root_hub(struct uhci *uhci)
-{
-	struct usb_device *dev;
-
-	dev = usb_alloc_dev(NULL, uhci->bus);
-	if (!dev)
-		return -1;
-
-	uhci->bus->root_hub = dev;
-	uhci->rh.dev = dev;
-
-	return 0;
-}
-
-static int uhci_start_root_hub(struct uhci *uhci)
-{
-	usb_connect(uhci->rh.dev);
-
-	if (usb_new_device(uhci->rh.dev) != 0) {
-		usb_free_dev(uhci->rh.dev);
-
-		return -1;
-	}
-
-	return 0;
-}
-
 #ifdef CONFIG_PROC_FS
 static int uhci_num = 0;
 #endif
+
+static void free_uhci(struct uhci *uhci)
+{
+	kfree(uhci);
+}
+
+/*
+ * De-allocate all resources..
+ */
+static void release_uhci(struct uhci *uhci)
+{
+	int i;
+#ifdef CONFIG_PROC_FS
+	char buf[8];
+#endif
+
+	if (uhci->irq >= 0) {
+		free_irq(uhci->irq, uhci);
+		uhci->irq = -1;
+	}
+
+	for (i = 0; i < UHCI_NUM_SKELQH; i++)
+		if (uhci->skelqh[i]) {
+			uhci_free_qh(uhci, uhci->skelqh[i]);
+			uhci->skelqh[i] = NULL;
+		}
+
+	for (i = 0; i < UHCI_NUM_SKELTD; i++)
+		if (uhci->skeltd[i]) {
+			uhci_free_td(uhci, uhci->skeltd[i]);
+			uhci->skeltd[i] = NULL;
+		}
+
+	if (uhci->qh_pool) {
+		pci_pool_destroy(uhci->qh_pool);
+		uhci->qh_pool = NULL;
+	}
+
+	if (uhci->td_pool) {
+		pci_pool_destroy(uhci->td_pool);
+		uhci->td_pool = NULL;
+	}
+
+	if (uhci->fl) {
+		pci_free_consistent(uhci->dev, sizeof(*uhci->fl), uhci->fl, uhci->fl->dma_handle);
+		uhci->fl = NULL;
+	}
+
+	if (uhci->bus) {
+		usb_free_bus(uhci->bus);
+		uhci->bus = NULL;
+	}
+
+#ifdef CONFIG_PROC_FS
+	if (uhci->proc_entry) {
+		sprintf(buf, "hc%d", uhci->num);
+
+		remove_proc_entry(buf, uhci_proc_root);
+		uhci->proc_entry = NULL;
+	}
+#endif
+
+	free_uhci(uhci);
+}
 
 /*
  * Allocate a frame list, and then setup the skeleton
@@ -2504,27 +2558,96 @@ static int uhci_num = 0;
  *  - any isochronous events handled before any
  *    of the queues. We don't do that here, because
  *    we'll create the actual TD entries on demand.
- *  - The first queue is the "interrupt queue".
- *  - The second queue is the "control queue", split into low and high speed
- *  - The third queue is "bulk data".
+ *  - The first queue is the interrupt queue.
+ *  - The second queue is the control queue, split into low and high speed
+ *  - The third queue is bulk queue.
+ *  - The fourth queue is the bandwidth reclamation queue, which loops back
+ *    to the high speed control queue.
  */
-static struct uhci *alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsigned int io_size)
+static int alloc_uhci(struct pci_dev *dev, int irq, unsigned int io_addr, unsigned int io_size)
 {
-	int i, port;
 	struct uhci *uhci;
+	int retval = -EBUSY;
+	char buf[8], *bufp = buf;
+	int i, port;
 	struct usb_bus *bus;
 	dma_addr_t dma_handle;
+#ifdef CONFIG_PROC_FS
+	struct proc_dir_entry *ent;
+#endif
+
+	if (!request_region(io_addr, io_size, "usb-uhci")) {
+		err("couldn't allocate I/O range %x - %x", io_addr,
+			io_addr + io_size - 1);
+		goto err_request_region;
+	}
+
+	if (!dev->irq) {
+		err("found UHCI device with no IRQ assigned. check BIOS settings!");
+		retval = -EINVAL;
+		goto err_invalid_irq;
+	}
+
+	if (!pci_dma_supported(dev, 0xFFFFFFFF)) {
+		err("PCI subsystem doesn't support 32 bit addressing?");
+		retval = -ENODEV;
+		goto err_pci_dma_supported;
+	}
+
+	if (pci_enable_device(dev) < 0) {
+		err("couldn't enable PCI device");
+		goto err_enable_device;
+	}
+
+	pci_set_master(dev);
+
+#ifndef __sparc__
+	sprintf(buf, "%d", irq);
+#else
+	bufp = __irq_itoa(irq);
+#endif
+	printk(KERN_INFO __FILE__ ": USB UHCI at I/O 0x%x, IRQ %s\n",
+		io_addr, bufp);
+
+	if (pci_set_dma_mask(dev, 0xFFFFFFFF)) {
+		err("couldn't set PCI dma mask");
+		retval = -ENODEV;
+		goto err_pci_set_dma_mask;
+	}
 
 	uhci = kmalloc(sizeof(*uhci), GFP_KERNEL);
-	if (!uhci)
-		return NULL;
-
-	memset(uhci, 0, sizeof(*uhci));
+	if (!uhci) {
+		err("couldn't allocate uhci structure");
+		retval = -ENOMEM;
+		goto err_alloc_uhci;
+	}
 
 	uhci->dev = dev;
-	uhci->irq = -1;
 	uhci->io_addr = io_addr;
 	uhci->io_size = io_size;
+	dev->driver_data = uhci;
+
+#ifdef CONFIG_PROC_FS
+	uhci->num = uhci_num++;
+
+	sprintf(buf, "hc%d", uhci->num);
+
+	ent = create_proc_entry(buf, S_IFREG|S_IRUGO|S_IWUSR, uhci_proc_root);
+	if (!ent) {
+		err("couldn't create uhci proc entry");
+		retval = -ENOMEM;
+		goto err_create_proc_entry;
+	}
+
+	ent->data = uhci;
+	ent->proc_fops = &uhci_proc_operations;
+	ent->size = 0;
+	uhci->proc_entry = ent;
+#endif
+
+	/* Reset here so we don't get any interrupts from an old setup */
+	/*  or broken setup */
+	reset_hc(uhci);
 
 	spin_lock_init(&uhci->qh_remove_list_lock);
 	INIT_LIST_HEAD(&uhci->qh_remove_list);
@@ -2542,10 +2665,13 @@ static struct uhci *alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsign
 
 	/* We need exactly one page (per UHCI specs), how convenient */
 	/* We assume that one page is atleast 4k (1024 frames * 4 bytes) */
+#if PAGE_SIZE < (4 * 1024)
+#error PAGE_SIZE is not atleast 4k
+#endif
 	uhci->fl = pci_alloc_consistent(uhci->dev, sizeof(*uhci->fl), &dma_handle);
 	if (!uhci->fl) {
-		printk(KERN_ERR "Unable to allocate consistent memory for frame list\n");
-		goto free_uhci;
+		err("unable to allocate consistent memory for frame list");
+		goto err_alloc_fl;
 	}
 
 	memset((void *)uhci->fl, 0, sizeof(*uhci->fl));
@@ -2555,23 +2681,27 @@ static struct uhci *alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsign
 	uhci->td_pool = pci_pool_create("uhci_td", uhci->dev,
 		sizeof(struct uhci_td), 16, 0, GFP_DMA | GFP_ATOMIC);
 	if (!uhci->td_pool) {
-		printk(KERN_ERR "Unable to create td pci_pool\n");
-		goto free_fl;
+		err("unable to create td pci_pool");
+		goto err_create_td_pool;
 	}
 
 	uhci->qh_pool = pci_pool_create("uhci_qh", uhci->dev,
 		sizeof(struct uhci_qh), 16, 0, GFP_DMA | GFP_ATOMIC);
 	if (!uhci->qh_pool) {
-		printk(KERN_ERR "Unable to create qh pci_pool\n");
-		goto free_td_pool;
+		err("unable to create qh pci_pool");
+		goto err_create_qh_pool;
 	}
 
 	bus = usb_alloc_bus(&uhci_device_operations);
-	if (!bus)
-		goto free_qh_pool;
+	if (!bus) {
+		err("unable to allocate bus");
+		goto err_alloc_bus;
+	}
 
 	uhci->bus = bus;
 	bus->hcpriv = uhci;
+
+	usb_register_bus(uhci->bus);
 
 	/* Initialize the root hub */
 
@@ -2579,10 +2709,10 @@ static struct uhci *alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsign
 	/*  they may have more but give no way to determine how many they */
 	/*  have. However, according to the UHCI spec, Bit 7 is always set */
 	/*  to 1. So we try to use this to our advantage */
-	for (port = 0; port < (io_size - 0x10) / 2; port++) {
+	for (port = 0; port < (uhci->io_size - 0x10) / 2; port++) {
 		unsigned int portstatus;
 
-		portstatus = inw(io_addr + 0x10 + (port * 2));
+		portstatus = inw(uhci->io_addr + 0x10 + (port * 2));
 		if (!(portstatus & 0x0080))
 			break;
 	}
@@ -2598,15 +2728,16 @@ static struct uhci *alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsign
 
 	uhci->rh.numports = port;
 
-	if (uhci_alloc_root_hub(uhci)) {
+	uhci->bus->root_hub = uhci->rh.dev = usb_alloc_dev(NULL, uhci->bus);
+	if (!uhci->rh.dev) {
 		err("unable to allocate root hub");
-		goto free_fl;
+		goto err_alloc_root_hub;
 	}
 
 	uhci->skeltd[0] = uhci_alloc_td(uhci, uhci->rh.dev);
 	if (!uhci->skeltd[0]) {
 		err("unable to allocate TD 0");
-		goto free_fl;
+		goto err_alloc_skeltd;
 	}
 
 	/*
@@ -2619,7 +2750,7 @@ static struct uhci *alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsign
 		td = uhci->skeltd[i] = uhci_alloc_td(uhci, uhci->rh.dev);
 		if (!td) {
 			err("unable to allocate TD %d", i);
-			goto free_tds;
+			goto err_alloc_skeltd;
 		}
 
 		uhci_fill_td(td, 0, (UHCI_NULL_DATA_SIZE << 21) | (0x7f << 8) | USB_PID_IN, 0);
@@ -2628,15 +2759,15 @@ static struct uhci *alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsign
 
 	uhci->skel_term_td = uhci_alloc_td(uhci, uhci->rh.dev);
 	if (!uhci->skel_term_td) {
-		err("unable to allocate TD 0");
-		goto free_fl;
+		err("unable to allocate skel TD term");
+		goto err_alloc_skeltd;
 	}
 
 	for (i = 0; i < UHCI_NUM_SKELQH; i++) {
 		uhci->skelqh[i] = uhci_alloc_qh(uhci, uhci->rh.dev);
 		if (!uhci->skelqh[i]) {
 			err("unable to allocate QH %d", i);
-			goto free_qhs;
+			goto err_alloc_skelqh;
 		}
 	}
 
@@ -2695,157 +2826,88 @@ static struct uhci *alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsign
 		uhci->fl->frame[i] =  uhci->skeltd[irq]->dma_handle;
 	}
 
-	return uhci;
+	start_hc(uhci);
+
+	if (request_irq(irq, uhci_interrupt, SA_SHIRQ, "usb-uhci", uhci))
+		goto err_request_irq;
+
+	uhci->irq = irq;
+
+	/* disable legacy emulation */
+	pci_write_config_word(uhci->dev, USBLEGSUP, 0);
+
+	usb_connect(uhci->rh.dev);
+
+	if (usb_new_device(uhci->rh.dev) != 0) {
+		err("unable to start root hub");
+		retval = -ENOMEM;
+		goto err_start_root_hub;
+	}
+
+	return 0;
 
 /*
  * error exits:
  */
-free_qhs:
+err_start_root_hub:
+	free_irq(uhci->irq, uhci);
+	uhci->irq = -1;
+
+err_request_irq:
 	for (i = 0; i < UHCI_NUM_SKELQH; i++)
 		if (uhci->skelqh[i]) {
 			uhci_free_qh(uhci, uhci->skelqh[i]);
 			uhci->skelqh[i] = NULL;
 		}
 
-free_tds:
+err_alloc_skelqh:
 	for (i = 0; i < UHCI_NUM_SKELTD; i++)
 		if (uhci->skeltd[i]) {
 			uhci_free_td(uhci, uhci->skeltd[i]);
 			uhci->skeltd[i] = NULL;
 		}
 
-free_qh_pool:
-	pci_pool_destroy(uhci->qh_pool);
+err_alloc_skeltd:
+	usb_free_dev(uhci->rh.dev);
+	uhci->rh.dev = NULL;
 
-free_td_pool:
-	pci_pool_destroy(uhci->td_pool);
-
-free_fl:
-	pci_free_consistent(uhci->dev, sizeof(*uhci->fl), uhci->fl, uhci->fl->dma_handle);
-
-free_uhci:
-	kfree(uhci);
-
-	return NULL;
-}
-
-/*
- * De-allocate all resources..
- */
-static void release_uhci(struct uhci *uhci)
-{
-	int i;
-#ifdef CONFIG_PROC_FS
-	char buf[8];
-#endif
-
-	if (uhci->irq >= 0) {
-		free_irq(uhci->irq, uhci);
-		uhci->irq = -1;
-	}
-
-	for (i = 0; i < UHCI_NUM_SKELQH; i++)
-		if (uhci->skelqh[i]) {
-			uhci_free_qh(uhci, uhci->skelqh[i]);
-			uhci->skelqh[i] = NULL;
-		}
-
-	for (i = 0; i < UHCI_NUM_SKELTD; i++)
-		if (uhci->skeltd[i]) {
-			uhci_free_td(uhci, uhci->skeltd[i]);
-			uhci->skeltd[i] = NULL;
-		}
-
-	if (uhci->qh_pool) {
-		pci_pool_destroy(uhci->qh_pool);
-		uhci->qh_pool = NULL;
-	}
-
-	if (uhci->td_pool) {
-		pci_pool_destroy(uhci->td_pool);
-		uhci->td_pool = NULL;
-	}
-
-	if (uhci->fl) {
-		pci_free_consistent(uhci->dev, sizeof(*uhci->fl), uhci->fl, uhci->fl->dma_handle);
-		uhci->fl = NULL;
-	}
-
+err_alloc_root_hub:
 	usb_free_bus(uhci->bus);
+	uhci->bus = NULL;
 
+err_alloc_bus:
+	pci_pool_destroy(uhci->qh_pool);
+	uhci->qh_pool = NULL;
+
+err_create_qh_pool:
+	pci_pool_destroy(uhci->td_pool);
+	uhci->td_pool = NULL;
+
+err_create_td_pool:
+	pci_free_consistent(uhci->dev, sizeof(*uhci->fl), uhci->fl, uhci->fl->dma_handle);
+	uhci->fl = NULL;
+
+err_alloc_fl:
 #ifdef CONFIG_PROC_FS
-	sprintf(buf, "hc%d", uhci->num);
-
 	remove_proc_entry(buf, uhci_proc_root);
 	uhci->proc_entry = NULL;
+
+err_create_proc_entry:
+	free_uhci(uhci);
 #endif
 
-	kfree(uhci);
-}
+err_alloc_uhci:
 
-/*
- * If we've successfully found a UHCI, now is the time to return success..
- */
-static int setup_uhci(struct pci_dev *dev, int irq, unsigned int io_addr, unsigned int io_size)
-{
-	int retval;
-	struct uhci *uhci;
-	char buf[8], *bufp = buf;
-#ifdef CONFIG_PROC_FS
-	struct proc_dir_entry *ent;
-#endif
+err_pci_set_dma_mask:
 
-#ifndef __sparc__
-	sprintf(buf, "%d", irq);
-#else
-	bufp = __irq_itoa(irq);
-#endif
-	printk(KERN_INFO __FILE__ ": USB UHCI at I/O 0x%x, IRQ %s\n",
-		io_addr, bufp);
+err_enable_device:
 
-	uhci = alloc_uhci(dev, io_addr, io_size);
-	if (!uhci)
-		return -ENOMEM;
+err_pci_dma_supported:
+	release_region(io_addr, io_size);
 
-	dev->driver_data = uhci;
+err_invalid_irq:
 
-#ifdef CONFIG_PROC_FS
-	uhci->num = uhci_num++;
-
-	sprintf(buf, "hc%d", uhci->num);
-
-	ent = create_proc_entry(buf, S_IFREG|S_IRUGO|S_IWUSR, uhci_proc_root);
-	if (!ent)
-		return -ENOMEM;
-
-	ent->data = uhci;
-	ent->proc_fops = &uhci_proc_operations;
-	ent->size = 0;
-	uhci->proc_entry = ent;
-#endif
-
-	request_region(uhci->io_addr, io_size, "usb-uhci");
-
-	reset_hc(uhci);
-
-	usb_register_bus(uhci->bus);
-	start_hc(uhci);
-
-	retval = -EBUSY;
-	if (request_irq(irq, uhci_interrupt, SA_SHIRQ, "usb-uhci", uhci) == 0) {
-		uhci->irq = irq;
-
-		pci_write_config_word(dev, USBLEGSUP, USBLEGSUP_DEFAULT);
-
-		if (!uhci_start_root_hub(uhci))
-			return 0;
-	}
-
-	/* Couldn't allocate IRQ if we got here */
-
-	reset_hc(uhci);
-	release_region(uhci->io_addr, uhci->io_size);
-	release_uhci(uhci);
+err_request_region:
 
 	return retval;
 }
@@ -2853,23 +2915,6 @@ static int setup_uhci(struct pci_dev *dev, int irq, unsigned int io_addr, unsign
 static int __devinit uhci_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	int i;
-
-	if (!pci_dma_supported(dev, 0xFFFFFFFF)) {
-		err("PCI subsystem doesn't support 32 bit addressing?");
-		return -ENODEV;
-	}
-	dev->dma_mask = 0xFFFFFFFF;
-
-	/* disable legacy emulation */
-	pci_write_config_word(dev, USBLEGSUP, 0);
-
-	if (pci_enable_device(dev) < 0)
-		return -ENODEV;
-
-	if (!dev->irq) {
-		err("found UHCI device with no IRQ assigned. check BIOS settings!");
-		return -ENODEV;
-	}
 
 	/* Search for the IO base address.. */
 	for (i = 0; i < 6; i++) {
@@ -2880,12 +2925,7 @@ static int __devinit uhci_pci_probe(struct pci_dev *dev, const struct pci_device
 		if (!(pci_resource_flags(dev, i) & IORESOURCE_IO))
 			continue;
 
-		/* Is it already in use? */
-		if (check_region(io_addr, io_size))
-			break;
-
-		pci_set_master(dev);
-		return setup_uhci(dev, dev->irq, io_addr, io_size);
+		return alloc_uhci(dev, dev->irq, io_addr, io_size);
 	}
 
 	return -ENODEV;
@@ -2945,11 +2985,11 @@ static const struct pci_device_id __devinitdata uhci_pci_ids[] = { {
 	}, { /* end: all zeroes */ }
 };
 
-MODULE_DEVICE_TABLE (pci, uhci_pci_ids);
+MODULE_DEVICE_TABLE(pci, uhci_pci_ids);
 
 static struct pci_driver uhci_pci_driver = {
 	name:		"usb-uhci",
-	id_table:	&uhci_pci_ids [0],
+	id_table:	uhci_pci_ids,
 
 	probe:		uhci_pci_probe,
 	remove:		uhci_pci_remove,
@@ -2964,6 +3004,8 @@ static struct pci_driver uhci_pci_driver = {
 static int __init uhci_hcd_init(void)
 {
 	int retval = -ENOMEM;
+
+	info(DRIVER_DESC " " DRIVER_VERSION);
 
 	if (debug) {
 		errbuf = kmalloc(ERRBUF_LEN, GFP_KERNEL);
@@ -2986,8 +3028,6 @@ static int __init uhci_hcd_init(void)
 	if (retval)
 		goto init_failed;
 
-	info(DRIVER_VERSION ":" DRIVER_DESC);
-
 	return 0;
 
 init_failed:
@@ -3009,7 +3049,7 @@ errbuf_failed:
 	return retval;
 }
 
-static void __exit uhci_hcd_cleanup (void) 
+static void __exit uhci_hcd_cleanup(void) 
 {
 	pci_unregister_driver(&uhci_pci_driver);
 	
@@ -3027,6 +3067,6 @@ static void __exit uhci_hcd_cleanup (void)
 module_init(uhci_hcd_init);
 module_exit(uhci_hcd_cleanup);
 
-MODULE_AUTHOR( DRIVER_AUTHOR );
-MODULE_DESCRIPTION( DRIVER_DESC );
-
+MODULE_AUTHOR(DRIVER_AUTHOR);
+MODULE_DESCRIPTION(DRIVER_DESC);
+MODULE_LICENSE("GPL");

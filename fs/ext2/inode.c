@@ -28,6 +28,7 @@
 #include <linux/smp_lock.h>
 #include <linux/sched.h>
 #include <linux/highuid.h>
+#include <linux/quotaops.h>
 
 static int ext2_update_inode(struct inode * inode, int do_sync);
 
@@ -445,7 +446,7 @@ static inline int ext2_splice_branch(struct inode *inode,
 
 	/* Verify that place we are splicing to is still there and vacant */
 
-	/* Writer: pointers, ->i_next_alloc*, ->i_blocks */
+	/* Writer: pointers, ->i_next_alloc* */
 	if (!verify_chain(chain, where-1) || *where->p)
 		/* Writer: end */
 		goto changed;
@@ -455,7 +456,6 @@ static inline int ext2_splice_branch(struct inode *inode,
 	*where->p = where->key;
 	inode->u.ext2_i.i_next_alloc_block = block;
 	inode->u.ext2_i.i_next_alloc_goal = le32_to_cpu(where[num-1].key);
-	inode->i_blocks += num * inode->i_sb->s_blocksize/512;
 
 	/* Writer: end */
 
@@ -702,7 +702,6 @@ no_top:
  */
 static inline void ext2_free_data(struct inode *inode, u32 *p, u32 *q)
 {
-	int blocks = inode->i_sb->s_blocksize / 512;
 	unsigned long block_to_free = 0, count = 0;
 	unsigned long nr;
 
@@ -716,9 +715,6 @@ static inline void ext2_free_data(struct inode *inode, u32 *p, u32 *q)
 			else if (block_to_free == nr - count)
 				count++;
 			else {
-				/* Writer: ->i_blocks */
-				inode->i_blocks -= blocks * count;
-				/* Writer: end */
 				mark_inode_dirty(inode);
 				ext2_free_blocks (inode, block_to_free, count);
 			free_this:
@@ -728,9 +724,6 @@ static inline void ext2_free_data(struct inode *inode, u32 *p, u32 *q)
 		}
 	}
 	if (count > 0) {
-		/* Writer: ->i_blocks */
-		inode->i_blocks -= blocks * count;
-		/* Writer: end */
 		mark_inode_dirty(inode);
 		ext2_free_blocks (inode, block_to_free, count);
 	}
@@ -775,9 +768,6 @@ static void ext2_free_branches(struct inode *inode, u32 *p, u32 *q, int depth)
 					   (u32*)bh->b_data + addr_per_block,
 					   depth);
 			bforget(bh);
-			/* Writer: ->i_blocks */
-			inode->i_blocks -= inode->i_sb->s_blocksize / 512;
-			/* Writer: end */
 			ext2_free_blocks(inode, nr, 1);
 			mark_inode_dirty(inode);
 		}
@@ -1177,7 +1167,9 @@ int ext2_notify_change(struct dentry *dentry, struct iattr *iattr)
 		goto out;
 
 	retval = inode_change_ok(inode, iattr);
-	if (retval != 0)
+	if (retval != 0 || (((iattr->ia_valid & ATTR_UID && iattr->ia_uid != inode->i_uid) ||
+	    (iattr->ia_valid & ATTR_GID && iattr->ia_gid != inode->i_gid)) &&
+	    DQUOT_TRANSFER(inode, iattr)))
 		goto out;
 
 	inode_setattr(inode, iattr);

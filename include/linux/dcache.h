@@ -178,6 +178,9 @@ extern void prune_dcache(int);
 extern int shrink_icache_memory(int, int);
 extern void prune_icache(int);
 
+/* quota cache memory management (defined in linux/fs/dquot.c) */
+extern int shrink_dqcache_memory(int, unsigned int);
+
 /* only used at mount-time */
 extern struct dentry * d_alloc_root(struct inode *);
 

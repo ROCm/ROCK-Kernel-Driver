@@ -259,6 +259,8 @@ unsigned long get_wchan(struct task_struct *p);
 #define init_task	(init_task_union.task)
 #define init_stack	(init_task_union.stack)
 
+#define cpu_relax()	do { } while (0)
+
 #endif /* !defined (_LANGUAGE_ASSEMBLY) */
 #endif /* __KERNEL__ */
 

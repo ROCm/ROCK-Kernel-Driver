@@ -116,6 +116,7 @@
  *	20010320 check return value of scsi_register()
  *	20010320 Version 0.4.3
  *	20010408 Identify version on module load.
+ *	20011003 Fix multiple requests
  */
 
 #include <linux/module.h>
@@ -500,7 +501,6 @@ void mts_int_submit_urb (struct urb* transfer,
 		      context
 		);
 
-	transfer->transfer_flags = USB_ASYNC_UNLINK;
 	transfer->status = 0;
 
 	res = usb_submit_urb( transfer );
@@ -520,7 +520,6 @@ static void mts_transfer_cleanup( struct urb *transfer )
 
 	if ( context->final_callback )
 		context->final_callback(context->srb);
-	up( &context->instance->lock );
 
 }
 
@@ -710,7 +709,6 @@ int mts_scsi_queuecommand( Scsi_Cmnd *srb, mts_scsi_cmnd_callback callback )
 		goto out;
 	}
 
-	down(&desc->lock);
 	
 	FILL_BULK_URB(&desc->urb,
 		      desc->usb_dev,
@@ -733,7 +731,6 @@ int mts_scsi_queuecommand( Scsi_Cmnd *srb, mts_scsi_cmnd_callback callback )
 
 		if(callback)
 			callback(srb);
-	        up(&desc->lock);
 
 	}
 

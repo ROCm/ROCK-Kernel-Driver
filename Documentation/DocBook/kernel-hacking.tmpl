@@ -976,17 +976,35 @@ foo_open (...)
    </para>
   </sect1>
 
-  <sect1 id="sym-exportsymtab">
-   <title><function>EXPORT_SYMTAB</function></title>
+  <sect1 id="sym-exportnosymbols">
+   <title><symbol>EXPORT_NO_SYMBOLS</symbol>
+    <filename class=headerfile>include/linux/module.h</filename></title>
 
    <para>
-    For convenience, a module usually exports all non-file-scope
-    symbols (ie. all those not declared <type>static</type>).  If this
-    is defined before
+    If a module exports no symbols then you can specify
+    <programlisting>
+EXPORT_NO_SYMBOLS;
+    </programlisting>
+    anywhere in the module.
+    In kernel 2.4 and earlier, if a module contains neither
+    <function>EXPORT_SYMBOL()</function> nor
+    <symbol>EXPORT_NO_SYMBOLS</symbol> then the module defaults to
+    exporting all non-static global symbols.
+    In kernel 2.5 onwards you must explicitly specify whether a module
+    exports symbols or not.
+   </para>
+  </sect1>
 
-    <filename class=headerfile>include/linux/module.h</filename> is
-    included, then only symbols explicit exported with
-    <function>EXPORT_SYMBOL()</function> will be exported.
+  <sect1 id="sym-exportsymbols-gpl">
+   <title><function>EXPORT_SYMBOL_GPL()</function>
+    <filename class=headerfile>include/linux/module.h</filename></title>
+
+   <para>
+    Similar to <function>EXPORT_SYMBOL()</function> except that the
+    symbols exported by <function>EXPORT_SYMBOL_GPL()</function> can
+    only be seen by modules with a
+    <function>MODULE_LICENCE()</function> that specifies a GPL
+    compatible license.
    </para>
   </sect1>
  </chapter>
@@ -1241,9 +1259,19 @@ static struct block_device_operations opt_fops = {
      Edit the <filename>Makefile</filename>: the CONFIG variables are
      exported here so you can conditionalize compilation with `ifeq'.
      If your file exports symbols then add the names to
-     <varname>MX_OBJS</varname> or <varname>OX_OBJS</varname> instead
-     of <varname>M_OBJS</varname> or <varname>O_OBJS</varname>, so
-     that genksyms will find them.
+     <varname>export-objs</varname> so that genksyms will find them.
+     <caution>
+      <para>
+       There is a restriction on the kernel build system that objects
+       which export symbols must have globally unique names.
+       If your object does not have a globally unique name then the
+       standard fix is to move the
+       <function>EXPORT_SYMBOL()</function> statements to their own
+       object with a unique name.
+       This is why several systems have separate exporting objects,
+       usually suffixed with ksyms.
+      </para>
+     </caution>
     </para>
    </listitem>
 

@@ -588,7 +588,7 @@ sub output_function_sgml(%) {
     } else {
 	print "  <void>\n";
     }
-    print "  </funcsynopsis>\n";
+    print "  </funcprototype></funcsynopsis>\n";
     print "</refsynopsisdiv>\n";
 
     # print parameters

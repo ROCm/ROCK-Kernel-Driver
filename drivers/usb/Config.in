@@ -59,6 +59,7 @@ comment 'USB Controllers'
    dep_tristate '  USB Mustek MDC800 Digital Camera support (EXPERIMENTAL)' CONFIG_USB_MDC800 $CONFIG_USB $CONFIG_EXPERIMENTAL
    dep_tristate '  USB Scanner support' CONFIG_USB_SCANNER $CONFIG_USB
    dep_tristate '  Microtek X6USB scanner support' CONFIG_USB_MICROTEK $CONFIG_USB $CONFIG_SCSI
+   dep_tristate '  HP53xx USB scanner support (EXPERIMENTAL)' CONFIG_USB_HPUSBSCSI $CONFIG_USB $CONFIG_SCSI $CONFIG_EXPERIMENTAL
 
    comment 'USB Multimedia devices'
    dep_tristate '  USB IBM (Xirlink) C-it Camera support' CONFIG_USB_IBMCAM $CONFIG_USB $CONFIG_VIDEO_DEV

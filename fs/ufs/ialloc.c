@@ -100,7 +100,7 @@ void ufs_free_inode (struct inode * inode)
 
 	is_directory = S_ISDIR(inode->i_mode);
 
-	DQUOT_FREE_INODE(sb, inode);
+	DQUOT_FREE_INODE(inode);
 	DQUOT_DROP(inode);
 
 	clear_inode (inode);
@@ -278,8 +278,9 @@ cg_found:
 
 	unlock_super (sb);
 
-	if(DQUOT_ALLOC_INODE(sb, inode)) {
-		sb->dq_op->drop(inode);
+	if (DQUOT_ALLOC_INODE(inode)) {
+		DQUOT_DROP(inode);
+		inode->i_flags |= S_NOQUOTA;
 		inode->i_nlink = 0;
 		iput(inode);
 		*err = -EDQUOT;
@@ -293,6 +294,7 @@ cg_found:
 
 failed:
 	unlock_super (sb);
+	make_bad_inode(inode);
 	iput (inode);
 	UFSD(("EXIT (FAILED)\n"))
 	return NULL;

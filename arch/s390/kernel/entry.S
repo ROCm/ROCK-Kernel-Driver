@@ -9,8 +9,6 @@
  *               Denis Joseph Barrow (djbarrow@de.ibm.com,barrow_dj@yahoo.com),
  */
 
-#define ASSEMBLY
-
 #include <linux/sys.h>
 #include <linux/linkage.h>
 #include <linux/config.h>

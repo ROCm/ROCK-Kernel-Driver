@@ -1,9 +1,9 @@
 /*
- * acm.c  Version 0.20
+ * acm.c  Version 0.21
  *
  * Copyright (c) 1999 Armin Fuerst	<fuerst@in.tum.de>
  * Copyright (c) 1999 Pavel Machek	<pavel@suse.cz>
- * Copyright (c) 1999 Johannes Erdfelt	<jerdfelt@valinux.com>
+ * Copyright (c) 1999 Johannes Erdfelt	<johannes@erdfelt.com>
  * Copyright (c) 2000 Vojtech Pavlik	<vojtech@suse.cz>
  *
  * USB Abstract Control Model driver for USB modems and ISDN adapters
@@ -22,7 +22,8 @@
  *	v0.17 - added new style probing
  *	v0.18 - fixed new style probing for devices with more configurations
  *	v0.19 - fixed CLOCAL handling (thanks to Richard Shih-Ping Chan)
- *      v0.20 - switched to probing on interface (rather than device) class
+ *	v0.20 - switched to probing on interface (rather than device) class
+ *	v0.21 - revert to probing on device for devices with multiple configs
  */
 
 /*
@@ -60,7 +61,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.20"
+#define DRIVER_VERSION "v0.21"
 #define DRIVER_AUTHOR "Armin Fuerst, Pavel Machek, Johannes Erdfelt, Vojtech Pavlik"
 #define DRIVER_DESC "USB Abstract Control Model driver for USB modems and ISDN adapters"
 
@@ -648,8 +649,7 @@ static void acm_disconnect(struct usb_device *dev, void *ptr)
  */
 
 static struct usb_device_id acm_ids[] = {
-	{match_flags: (USB_DEVICE_ID_MATCH_INT_CLASS | USB_DEVICE_ID_MATCH_INT_SUBCLASS),
-	bInterfaceClass: USB_CLASS_COMM, bInterfaceSubClass: 2},
+	{ USB_DEVICE_INFO(USB_CLASS_COMM, 0, 0) },
 	{ }
 };
 

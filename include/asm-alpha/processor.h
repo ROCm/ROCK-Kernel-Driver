@@ -148,6 +148,8 @@ unsigned long get_wchan(struct task_struct *p);
 #define init_task	(init_task_union.task)
 #define init_stack	(init_task_union.stack)
 
+#define cpu_relax()	do { } while (0)
+
 #define ARCH_HAS_PREFETCH
 #define ARCH_HAS_PREFETCHW
 #define ARCH_HAS_SPINLOCK_PREFETCH

@@ -629,6 +629,7 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 	if (++serial_number == 0)
 		serial_number = 1;
 	SCpnt->serial_number = serial_number;
+	SCpnt->pid = scsi_pid++;
 
 	/*
 	 * We will wait MIN_RESET_DELAY clock ticks after the last reset so
@@ -968,6 +969,7 @@ void scsi_do_cmd(Scsi_Cmnd * SCpnt, const void *cmnd,
 
 	ASSERT_LOCK(&io_request_lock, 0);
 
+	SCpnt->pid = scsi_pid++;
 	SCpnt->owner = SCSI_OWNER_MIDLEVEL;
 
 	SCSI_LOG_MLQUEUE(4,

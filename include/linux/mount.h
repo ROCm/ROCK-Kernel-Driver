@@ -29,7 +29,6 @@ struct vfsmount
 	int mnt_flags;
 	char *mnt_devname;		/* Name of device e.g. /dev/dsk/hda1 */
 	struct list_head mnt_list;
-	uid_t mnt_owner;
 };
 
 static inline struct vfsmount *mntget(struct vfsmount *mnt)

@@ -3,9 +3,9 @@
  *
  * Supports CPiA based Video Camera's.
  *
- * (C) Copyright 1999-2000 Peter Pregler,
- * (C) Copyright 1999-2000 Scott J. Bertin,
- * (C) Copyright 1999-2000 Johannes Erdfelt, jerdfelt@valinux.com
+ * (C) Copyright 1999-2000 Peter Pregler
+ * (C) Copyright 1999-2000 Scott J. Bertin
+ * (C) Copyright 1999-2000 Johannes Erdfelt <johannes@erdfelt.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -56,7 +56,7 @@ static int video_nr = -1;
 
 #ifdef MODULE
 MODULE_PARM(video_nr,"i");
-MODULE_AUTHOR("Scott J. Bertin <sbertin@mindspring.com> & Peter Pregler <Peter_Pregler@email.com> & Johannes Erdfelt <jerdfelt@valinux.com>");
+MODULE_AUTHOR("Scott J. Bertin <sbertin@mindspring.com> & Peter Pregler <Peter_Pregler@email.com> & Johannes Erdfelt <johannes@erdfelt.com>");
 MODULE_DESCRIPTION("V4L-driver for Vision CPiA based cameras");
 MODULE_SUPPORTED_DEVICE("video");
 #endif

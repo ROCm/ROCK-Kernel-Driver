@@ -24,7 +24,8 @@
 #include <linux/nfs_mount.h>
 
 struct vfsmount *do_kern_mount(char *type, int flags, char *name, void *data);
-int do_remount_sb(struct super_block *sb, int flags, char * data);
+int do_remount_sb(struct super_block *sb, int flags, void * data);
+void kill_super(struct super_block *sb);
 
 static struct list_head *mount_hashtable;
 static int hash_mask, hash_bits;
@@ -54,7 +55,6 @@ struct vfsmount *alloc_vfsmnt(void)
 		INIT_LIST_HEAD(&mnt->mnt_child);
 		INIT_LIST_HEAD(&mnt->mnt_mounts);
 		INIT_LIST_HEAD(&mnt->mnt_list);
-		mnt->mnt_owner = current->uid;
 	}
 	return mnt;
 }
@@ -64,6 +64,18 @@ void free_vfsmnt(struct vfsmount *mnt)
 	if (mnt->mnt_devname)
 		kfree(mnt->mnt_devname);
 	kmem_cache_free(mnt_cache, mnt);
+}
+
+void set_devname(struct vfsmount *mnt, const char *name)
+{
+	if (name) {
+		int size = strlen(name)+1;
+		char * newname = kmalloc(size, GFP_KERNEL);
+		if (newname) {
+			memcpy(newname, name, size);
+			mnt->mnt_devname = newname;
+		}
+	}
 }
 
 struct vfsmount *lookup_mnt(struct vfsmount *mnt, struct dentry *dentry)
@@ -129,6 +141,30 @@ static struct vfsmount *next_mnt(struct vfsmount *p, struct vfsmount *root)
 	return list_entry(next, struct vfsmount, mnt_child);
 }
 
+static struct vfsmount *
+clone_mnt(struct vfsmount *old, struct dentry *root)
+{
+	struct super_block *sb = old->mnt_sb;
+	struct vfsmount *mnt = alloc_vfsmnt();
+
+	if (mnt) {
+		mnt->mnt_flags = old->mnt_flags;
+		set_devname(mnt, old->mnt_devname);
+		atomic_inc(&sb->s_active);
+		mnt->mnt_sb = sb;
+		mnt->mnt_root = dget(root);
+	}
+	return mnt;
+}
+
+void __mntput(struct vfsmount *mnt)
+{
+	struct super_block *sb = mnt->mnt_sb;
+	dput(mnt->mnt_root);
+	free_vfsmnt(mnt);
+	kill_super(sb);
+}
+
 /* Use octal escapes, like mount does, for embedded spaces etc. */
 static unsigned char need_escaping[] = { ' ', '\t', '\n', '\\' };
 
@@ -188,31 +224,6 @@ static struct proc_nfs_info {
 	{ NFS_MOUNT_BROKEN_SUID, ",broken_suid", "" },
 	{ 0, NULL, NULL }
 };
-
-static struct vfsmount *clone_mnt(struct vfsmount *old, struct dentry *root)
-{
-	char *name = old->mnt_devname;
-	struct vfsmount *mnt = alloc_vfsmnt();
-	struct super_block *sb = old->mnt_sb;
-
-	if (!mnt)
-		goto out;
-
-	if (name) {
-		mnt->mnt_devname = kmalloc(strlen(name)+1, GFP_KERNEL);
-		if (mnt->mnt_devname)
-			strcpy(mnt->mnt_devname, name);
-	}
-	mnt->mnt_sb = sb;
-	mnt->mnt_root = dget(root);
-	mnt->mnt_mountpoint = mnt->mnt_root;
-	mnt->mnt_parent = mnt;
-	mnt->mnt_flags = old->mnt_flags;
-
-	atomic_inc(&sb->s_active);
-out:
-	return mnt;
-}
 
 int get_filesystem_info( char *buf )
 {
@@ -374,24 +385,22 @@ static int do_umount(struct vfsmount *mnt, int flags)
 	 * somewhat bogus. Suggestions for better replacement?
 	 * Ho-hum... In principle, we might treat that as umount + switch
 	 * to rootfs. GC would eventually take care of the old vfsmount.
-	 * The problem being: we have to implement rootfs and GC for that ;-)
 	 * Actually it makes sense, especially if rootfs would contain a
 	 * /reboot - static binary that would close all descriptors and
 	 * call reboot(9). Then init(8) could umount root and exec /reboot.
 	 */
 	if (mnt == current->fs->rootmnt && !(flags & MNT_DETACH)) {
-		int retval = 0;
 		/*
 		 * Special case for "unmounting" root ...
 		 * we just try to remount it readonly.
 		 */
+		down_write(&sb->s_umount);
 		if (!(sb->s_flags & MS_RDONLY)) {
-			down_write(&sb->s_umount);
 			lock_kernel();
 			retval = do_remount_sb(sb, MS_RDONLY, 0);
 			unlock_kernel();
-			up_write(&sb->s_umount);
 		}
+		up_write(&sb->s_umount);
 		return retval;
 	}
 
@@ -448,12 +457,10 @@ asmlinkage long sys_umount(char * name, int flags)
 		goto dput_and_out;
 
 	retval = -EPERM;
-	if (!capable(CAP_SYS_ADMIN) && current->uid!=nd.mnt->mnt_owner)
+	if (!capable(CAP_SYS_ADMIN))
 		goto dput_and_out;
 
 	retval = do_umount(nd.mnt, flags);
-	path_release(&nd);
-	goto out;
 dput_and_out:
 	path_release(&nd);
 out:
@@ -487,9 +494,48 @@ static int mount_is_safe(struct nameidata *nd)
 #endif
 }
 
+static struct vfsmount *copy_tree(struct vfsmount *mnt, struct dentry *dentry)
+{
+	struct vfsmount *p, *next, *q, *res;
+	struct nameidata nd;
+
+	p = mnt;
+	res = nd.mnt = q = clone_mnt(p, dentry);
+	if (!q)
+		goto Enomem;
+	q->mnt_parent = q;
+	q->mnt_mountpoint = p->mnt_mountpoint;
+
+	while ( (next = next_mnt(p, mnt)) != NULL) {
+		while (p != next->mnt_parent) {
+			p = p->mnt_parent;
+			q = q->mnt_parent;
+		}
+		p = next;
+		nd.mnt = q;
+		nd.dentry = p->mnt_mountpoint;
+		q = clone_mnt(p, p->mnt_root);
+		if (!q)
+			goto Enomem;
+		spin_lock(&dcache_lock);
+		list_add_tail(&q->mnt_list, &res->mnt_list);
+		attach_mnt(q, &nd);
+		spin_unlock(&dcache_lock);
+	}
+	return res;
+Enomem:
+	if (res) {
+		spin_lock(&dcache_lock);
+		umount_tree(res);
+		spin_unlock(&dcache_lock);
+	}
+	return NULL;
+}
+
 /* Will become static */
 int graft_tree(struct vfsmount *mnt, struct nameidata *nd)
 {
+	int err;
 	if (mnt->mnt_sb->s_flags & MS_NOUSER)
 		return -EINVAL;
 
@@ -497,43 +543,38 @@ int graft_tree(struct vfsmount *mnt, struct nameidata *nd)
 	      S_ISDIR(mnt->mnt_root->d_inode->i_mode))
 		return -ENOTDIR;
 
+	err = -ENOENT;
 	down(&nd->dentry->d_inode->i_zombie);
 	if (IS_DEADDIR(nd->dentry->d_inode))
-		goto fail1;
+		goto out_unlock;
 
 	spin_lock(&dcache_lock);
-	if (!IS_ROOT(nd->dentry) && d_unhashed(nd->dentry))
-		goto fail;
-
-	attach_mnt(mnt, nd);
-	list_add(&mnt->mnt_list, vfsmntlist.prev);
+	if (IS_ROOT(nd->dentry) || !d_unhashed(nd->dentry)) {
+		struct list_head head;
+		attach_mnt(mnt, nd);
+		list_add_tail(&head, &mnt->mnt_list);
+		list_splice(&head, vfsmntlist.prev);
+		mntget(mnt);
+		err = 0;
+	}
 	spin_unlock(&dcache_lock);
+out_unlock:
 	up(&nd->dentry->d_inode->i_zombie);
-	mntget(mnt);
-	return 0;
-fail:
-	spin_unlock(&dcache_lock);
-fail1:
-	up(&nd->dentry->d_inode->i_zombie);
-	return -ENOENT;
+	return err;
 }
 
 /*
  * do loopback mount.
  */
-static int do_loopback(struct nameidata *nd, char *old_name)
+static int do_loopback(struct nameidata *nd, char *old_name, int recurse)
 {
 	struct nameidata old_nd;
 	struct vfsmount *mnt = NULL;
-	int err;
-
-	err = mount_is_safe(nd);
+	int err = mount_is_safe(nd);
 	if (err)
 		return err;
-
 	if (!old_name || !*old_name)
 		return -EINVAL;
-
 	if (path_init(old_name, LOOKUP_POSITIVE|LOOKUP_FOLLOW, &old_nd))
 		err = path_walk(old_name, &old_nd);
 	if (err)
@@ -541,12 +582,18 @@ static int do_loopback(struct nameidata *nd, char *old_name)
 
 	down(&mount_sem);
 	err = -EINVAL;
-	if (check_mnt(nd->mnt)) {
+	if (check_mnt(nd->mnt) && (!recurse || check_mnt(old_nd.mnt))) {
 		err = -ENOMEM;
-		mnt = clone_mnt(old_nd.mnt, old_nd.dentry);
+		if (recurse)
+			mnt = copy_tree(old_nd.mnt, old_nd.dentry);
+		else
+			mnt = clone_mnt(old_nd.mnt, old_nd.dentry);
 	}
+
 	if (mnt) {
 		err = graft_tree(mnt, nd);
+		if (err && recurse)
+			umount_tree(mnt);
 		mntput(mnt);
 	}
 
@@ -557,10 +604,11 @@ static int do_loopback(struct nameidata *nd, char *old_name)
 
 /*
  * change filesystem flags. dir should be a physical root of filesystem.
+ * If you've mounted a non-root directory somewhere and want to do remount
  * on it - tough luck.
  */
 
-static int do_remount(struct nameidata *nd,int flags,int mnt_flags,char *data)
+static int do_remount(struct nameidata *nd,int flags,int mnt_flags,void *data)
 {
 	int err;
 	struct super_block * sb = nd->mnt->mnt_sb;
@@ -694,10 +742,10 @@ long do_mount(char * dev_name, char * dir_name, char *type_page,
 		return retval;
 
 	if (flags & MS_REMOUNT)
-		retval = do_remount(&nd, flags&~MS_REMOUNT, mnt_flags,
-				  (char *)data_page);
+		retval = do_remount(&nd, flags & ~MS_REMOUNT, mnt_flags,
+				    data_page);
 	else if (flags & MS_BIND)
-		retval = do_loopback(&nd, dev_name);
+		retval = do_loopback(&nd, dev_name, flags & MS_REC);
 	else
 		retval = do_add_mount(&nd, type_page, flags, mnt_flags,
 				      dev_name, data_page);

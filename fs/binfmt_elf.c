@@ -32,6 +32,7 @@
 #include <linux/highuid.h>
 #include <linux/smp_lock.h>
 #include <linux/compiler.h>
+#include <linux/limits.h>
 
 #include <asm/uaccess.h>
 #include <asm/param.h>
@@ -444,9 +445,11 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	/* Now read in all of the header information */
 
 	retval = -ENOMEM;
-	size = ((unsigned int)elf_ex.e_phentsize) * elf_ex.e_phnum;
-	if (size > 65536)
+	if (elf_ex.e_phentsize != sizeof(struct elf_phdr))
 		goto out;
+	if (elf_ex.e_phnum > 65536U / sizeof(struct elf_phdr))
+		goto out;
+	size = elf_ex.e_phnum * sizeof(struct elf_phdr);
 	elf_phdata = (struct elf_phdr *) kmalloc(size, GFP_KERNEL);
 	if (!elf_phdata)
 		goto out;
@@ -472,16 +475,14 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 
 	for (i = 0; i < elf_ex.e_phnum; i++) {
 		if (elf_ppnt->p_type == PT_INTERP) {
-			retval = -EINVAL;
-		  	if (elf_interpreter)
-				goto out_free_dentry;
-
 			/* This is the program interpreter used for
 			 * shared libraries - for now assume that this
 			 * is an a.out format binary
 			 */
 
 			retval = -ENOMEM;
+			if (elf_ppnt->p_filesz > PATH_MAX)
+				goto out_free_file;
 			elf_interpreter = (char *) kmalloc(elf_ppnt->p_filesz,
 							   GFP_KERNEL);
 			if (!elf_interpreter)
@@ -536,6 +537,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 			/* Get the exec headers */
 			interp_ex = *((struct exec *) bprm->buf);
 			interp_elf_ex = *((struct elfhdr *) bprm->buf);
+			break;
 		}
 		elf_ppnt++;
 	}
@@ -805,7 +807,7 @@ out_free_ph:
 static int load_elf_library(struct file *file)
 {
 	struct elf_phdr *elf_phdata;
-	unsigned long elf_bss = 0, bss, len, k;
+	unsigned long elf_bss, bss, len;
 	int retval, error, i, j;
 	struct elfhdr elf_ex;
 
@@ -825,19 +827,18 @@ static int load_elf_library(struct file *file)
 	/* Now read in all of the header information */
 
 	j = sizeof(struct elf_phdr) * elf_ex.e_phnum;
-	if (j > ELF_MIN_ALIGN)
-		goto out;
+	/* j < ELF_MIN_ALIGN because elf_ex.e_phnum <= 2 */
 
 	error = -ENOMEM;
 	elf_phdata = (struct elf_phdr *) kmalloc(j, GFP_KERNEL);
 	if (!elf_phdata)
 		goto out;
 
-	/* N.B. check for error return?? */
-	retval = kernel_read(file, elf_ex.e_phoff, (char *) elf_phdata,
-			   sizeof(struct elf_phdr) * elf_ex.e_phnum);
-
 	error = -ENOEXEC;
+	retval = kernel_read(file, elf_ex.e_phoff, (char *) elf_phdata, j);
+	if (retval != j)
+		goto out_free_ph;
+
 	for (j = 0, i = 0; i<elf_ex.e_phnum; i++)
 		if ((elf_phdata + i)->p_type == PT_LOAD) j++;
 	if (j != 1)
@@ -859,9 +860,7 @@ static int load_elf_library(struct file *file)
 	if (error != ELF_PAGESTART(elf_phdata->p_vaddr))
 		goto out_free_ph;
 
-	k = elf_phdata->p_vaddr + elf_phdata->p_filesz;
-	if (k > elf_bss)
-		elf_bss = k;
+	elf_bss = elf_phdata->p_vaddr + elf_phdata->p_filesz;
 	padzero(elf_bss);
 
 	len = ELF_PAGESTART(elf_phdata->p_filesz + elf_phdata->p_vaddr + ELF_MIN_ALIGN - 1);

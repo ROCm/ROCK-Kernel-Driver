@@ -103,8 +103,6 @@ static void wbflush_kn03(void)
 {
 }
 
-#ifdef EXPORT_SYMTAB
 #include <linux/module.h>
 
 EXPORT_SYMBOL(__wbflush);
-#endif

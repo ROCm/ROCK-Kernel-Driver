@@ -68,9 +68,6 @@ static char *serial_revdate = "2001-02-08";
  * End of serial driver configuration section.
  */
 
-#ifdef MODVERSIONS
-#include <linux/modversions.h>
-#endif
 #include <linux/module.h>
 
 #include <linux/types.h>

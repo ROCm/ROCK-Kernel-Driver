@@ -1,4 +1,4 @@
-/* $Id: head.S,v 1.81 2001/09/07 23:00:15 kanoj Exp $
+/* $Id: head.S,v 1.82 2001/10/04 23:37:04 davem Exp $
  * head.S: Initial boot code for the Sparc64 port of Linux.
  *
  * Copyright (C) 1996,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -590,7 +590,8 @@ not_starfire:
 
 	ldxa		[%g0] ASI_SAFARI_CONFIG, %g1
 	srlx		%g1, 17, %g1
-	and		%g1, 0x3ff, %g1		! 10bit Safari Agent ID
+	ba,pt		%xcc, set_worklist
+	 and		%g1, 0x3ff, %g1		! 10bit Safari Agent ID
 
 not_cheetah:
 	ldxa	[%g0] ASI_UPA_CONFIG, %g1

@@ -133,6 +133,10 @@ struct agp_bridge_data {
 #define INREG16(mmap, addr)         __raw_readw((mmap)+(addr))
 #define INREG8(mmap, addr)         __raw_readb((mmap)+(addr))
 
+#define KB(x) ((x) * 1024)
+#define MB(x) (KB (KB (x)))
+#define GB(x) (MB (KB (x)))
+
 #define CACHE_FLUSH	agp_bridge.cache_flush
 #define A_SIZE_8(x)	((aper_size_info_8 *) x)
 #define A_SIZE_16(x)	((aper_size_info_16 *) x)
@@ -195,6 +199,12 @@ struct agp_bridge_data {
 #endif
 #ifndef PCI_DEVICE_ID_INTEL_815_1
 #define PCI_DEVICE_ID_INTEL_815_1       0x1132
+#endif
+#ifndef PCI_DEVICE_ID_INTEL_830_M_0
+#define PCI_DEVICE_ID_INTEL_830_M_0     0x3575
+#endif
+#ifndef PCI_DEVICE_ID_INTEL_830_M_1
+#define PCI_DEVICE_ID_INTEL_830_M_1     0x3577
 #endif
 #ifndef PCI_DEVICE_ID_INTEL_82443GX_1
 #define PCI_DEVICE_ID_INTEL_82443GX_1   0x71a1
@@ -266,6 +276,22 @@ struct agp_bridge_data {
 #define I810_DRAM_CTL          0x3000
 #define I810_DRAM_ROW_0        0x00000001
 #define I810_DRAM_ROW_0_SDRAM  0x00000001
+
+/* intel i830 registers */
+#define I830_GMCH_CTRL             0x52
+#define I830_GMCH_ENABLED          0x4
+#define I830_GMCH_MEM_MASK         0x1
+#define I830_GMCH_MEM_64M          0x1
+#define I830_GMCH_MEM_128M         0
+#define I830_GMCH_GMS_MASK         0x70
+#define I830_GMCH_GMS_DISABLED     0x00
+#define I830_GMCH_GMS_LOCAL        0x10
+#define I830_GMCH_GMS_STOLEN_512   0x20
+#define I830_GMCH_GMS_STOLEN_1024  0x30
+#define I830_GMCH_GMS_STOLEN_8192  0x40
+#define I830_RDRAM_CHANNEL_TYPE    0x03010
+#define I830_RDRAM_ND(x)           (((x) & 0x20) >> 5)
+#define I830_RDRAM_DDT(x)          (((x) & 0x18) >> 3)
 
 /* VIA register */
 #define VIA_APBASE      0x10

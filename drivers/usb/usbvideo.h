@@ -255,13 +255,7 @@ typedef struct {
  * that default to usbvideo-provided methods.
  */
 typedef struct {
-#if defined(usb_device_id_ver)
-	/* New style probe (for 2.4.x kernels with hotplugging) */
 	void *(*probe)(struct usb_device *, unsigned int,const struct usb_device_id *);
-#else
-	/* Old style probe (for 2.2.x kernels) */
-	void *(*probe)(struct usb_device *, unsigned int);
-#endif
 	void (*userFree)(uvd_t *);
 	void (*disconnect)(struct usb_device *, void *);
 	int (*setupOnOpen)(uvd_t *);

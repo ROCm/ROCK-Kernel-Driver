@@ -11,6 +11,7 @@
 #include <linux/smp_lock.h>
 #include <linux/dnotify.h>
 #include <linux/fcntl.h>
+#include <linux/quotaops.h>
 
 /* Taken over from the old code... */
 
@@ -131,8 +132,13 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 		error = inode->i_op->setattr(dentry, attr);
 	else {
 		error = inode_change_ok(inode, attr);
-		if (!error)
-			inode_setattr(inode, attr);
+		if (!error) {
+			if ((ia_valid & ATTR_UID && attr->ia_uid != inode->i_uid) ||
+			    (ia_valid & ATTR_GID && attr->ia_gid != inode->i_gid))
+				error = DQUOT_TRANSFER(inode, attr) ? -EDQUOT : 0;
+			if (!error)
+				inode_setattr(inode, attr);
+		}
 	}
 	unlock_kernel();
 	if (!error) {

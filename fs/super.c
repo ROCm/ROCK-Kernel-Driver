@@ -46,7 +46,7 @@ extern void wait_for_keypress(void);
 
 extern int root_mountflags;
 
-int do_remount_sb(struct super_block *sb, int flags, char * data);
+int do_remount_sb(struct super_block *sb, int flags, void * data);
 
 /* this is initialized in init/main.c */
 kdev_t ROOT_DEV;
@@ -273,22 +273,11 @@ struct file_system_type *get_fs_type(const char *name)
 
 struct vfsmount *alloc_vfsmnt(void);
 void free_vfsmnt(struct vfsmount *mnt);
-void umount_tree(struct vfsmount *mnt);
+void set_devname(struct vfsmount *mnt, const char *name);
 
 /* Will go away */
 extern struct vfsmount *root_vfsmnt;
 extern int graft_tree(struct vfsmount *mnt, struct nameidata *nd);
-
-static void kill_super(struct super_block *);
-
-void __mntput(struct vfsmount *mnt)
-{
-	struct super_block *sb = mnt->mnt_sb;
-
-	dput(mnt->mnt_root);
-	free_vfsmnt(mnt);
-	kill_super(sb);
-}
 
 static inline void __put_super(struct super_block *sb)
 {
@@ -404,9 +393,7 @@ asmlinkage long sys_ustat(dev_t dev, struct ustat * ubuf)
         struct statfs sbuf;
 	int err = -EINVAL;
 
-	lock_kernel();
         s = get_super(to_kdev_t(dev));
-	unlock_kernel();
         if (s == NULL)
                 goto out;
 	err = vfs_statfs(s, &sbuf);
@@ -727,7 +714,7 @@ retry:
 	}
 }
 
-static void kill_super(struct super_block *sb)
+void kill_super(struct super_block *sb)
 {
 	struct block_device *bdev;
 	kdev_t dev;
@@ -789,7 +776,7 @@ static void kill_super(struct super_block *sb)
  * is used as a reference - file system type and the device are ignored.
  */
 
-int do_remount_sb(struct super_block *sb, int flags, char *data)
+int do_remount_sb(struct super_block *sb, int flags, void *data)
 {
 	int retval;
 	
@@ -846,12 +833,7 @@ struct vfsmount *do_kern_mount(char *type, int flags, char *name, void *data)
 		mnt = ERR_PTR(-ENOMEM);
 		goto fs_out;
 	}
-	if (name) {
-		mnt->mnt_devname = kmalloc(strlen(name)+1, GFP_KERNEL);
-		if (mnt->mnt_devname)
-			strcpy(mnt->mnt_devname, name);
-	}
-
+	set_devname(mnt, name);
 	/* get locked superblock */
 	if (fstype->fs_flags & FS_REQUIRES_DEV)
 		sb = get_sb_bdev(fstype, name, flags, data);
@@ -1042,9 +1024,7 @@ mount_it:
 	if (!vfsmnt)
 		panic("VFS: alloc_vfsmnt failed for root fs");
 
-	vfsmnt->mnt_devname = kmalloc(strlen(name)+1, GFP_KERNEL);
-	if (vfsmnt->mnt_devname)
-		strcpy(vfsmnt->mnt_devname, name);
+	set_devname(vfsmnt, name);
 	vfsmnt->mnt_sb = sb;
 	vfsmnt->mnt_root = dget(sb->s_root);
 

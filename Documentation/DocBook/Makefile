@@ -141,17 +141,18 @@ LOG	:=	$(patsubst %.sgml, %.log, $(BOOKS))
 OUT	:=	$(patsubst %.sgml, %.out, $(BOOKS))
 
 clean:
-	-$(RM) core *~
-	-$(RM) $(BOOKS)
-	-$(RM) $(DVI) $(AUX) $(TEX) $(LOG) $(OUT)
-	-$(RM) $(JPG-parportbook) $(EPS-parportbook)
-	-$(RM) $(C-procfs-example)
+	rm -f core *~
+	rm -f $(BOOKS)
+	rm -f $(DVI) $(AUX) $(TEX) $(LOG) $(OUT)
+	rm -f $(JPG-parportbook) $(EPS-parportbook)
+	rm -f $(C-procfs-example)
 
 mrproper: clean
-	-$(RM) $(PS) $(PDF)
-	-$(RM) -r $(HTML)
-	-$(RM) .depend
-	-$(RM) $(TOPDIR)/scripts/mkdep-docbook
+	rm -f $(PS) $(PDF)
+	rm -f -r $(HTML)
+	rm -f .depend
+	rm -f $(TOPDIR)/scripts/mkdep-docbook
+	rm -rf DBTOHTML_OUTPUT*
 
 %.ps : %.sgml
 	@(which db2ps > /dev/null 2>&1) || \
@@ -169,7 +170,7 @@ mrproper: clean
 	@(which db2html > /dev/null 2>&1) || \
 	 (echo "*** You need to install DocBook stylesheets ***"; \
 	  exit 1)
-	-$(RM) -r $@
+	rm -rf $@
 	db2html $<
 	if [ ! -z "$(JPG-$@)" ]; then cp $(JPG-$@) $@; fi
 

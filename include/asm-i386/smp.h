@@ -4,14 +4,14 @@
 /*
  * We need the APIC definitions automatically as part of 'smp.h'
  */
-#ifndef ASSEMBLY
+#ifndef __ASSEMBLY__
 #include <linux/config.h>
 #include <linux/threads.h>
 #include <linux/ptrace.h>
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
-#ifndef ASSEMBLY
+#ifndef __ASSEMBLY__
 #include <asm/fixmap.h>
 #include <asm/bitops.h>
 #include <asm/mpspec.h>
@@ -22,7 +22,7 @@
 #endif
 #endif
 
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 # ifdef CONFIG_MULTIQUAD
 #  define TARGET_CPUS 0xf     /* all CPUs in *THIS* quad */
 #  define INT_DELIVERY_MODE 0     /* physical delivery on LOCAL quad */
@@ -31,11 +31,22 @@
 #  define INT_DELIVERY_MODE 1     /* logical delivery broadcast to all procs */
 # endif
 #else
+# define INT_DELIVERY_MODE 0     /* physical delivery on LOCAL quad */
 # define TARGET_CPUS 0x01
 #endif
 
+#ifndef clustered_apic_mode
+ #ifdef CONFIG_MULTIQUAD
+  #define clustered_apic_mode (1)
+  #define esr_disable (1)
+ #else /* !CONFIG_MULTIQUAD */
+  #define clustered_apic_mode (0)
+  #define esr_disable (0)
+ #endif /* CONFIG_MULTIQUAD */
+#endif 
+
 #ifdef CONFIG_SMP
-#ifndef ASSEMBLY
+#ifndef __ASSEMBLY__
 
 /*
  * Private routines/data
@@ -77,16 +88,6 @@ extern volatile int physical_apicid_to_cpu[MAX_APICID];
 extern volatile int cpu_to_logical_apicid[NR_CPUS];
 extern volatile int logical_apicid_to_cpu[MAX_APICID];
 
-#ifndef clustered_apic_mode
- #ifdef CONFIG_MULTIQUAD
-  #define clustered_apic_mode (1)
-  #define esr_disable (1)
- #else /* !CONFIG_MULTIQUAD */
-  #define clustered_apic_mode (0)
-  #define esr_disable (0)
- #endif /* CONFIG_MULTIQUAD */
-#endif 
-
 /*
  * General functions that each host system must provide.
  */
@@ -114,7 +115,7 @@ extern __inline int logical_smp_processor_id(void)
 	return GET_APIC_LOGICAL_ID(*(unsigned long *)(APIC_BASE+APIC_LDR));
 }
 
-#endif /* !ASSEMBLY */
+#endif /* !__ASSEMBLY__ */
 
 #define NO_PROC_ID		0xFF		/* No processor magic marker */
 

@@ -476,6 +476,8 @@ static inline void rep_nop(void)
 	__asm__ __volatile__("rep;nop");
 }
 
+#define cpu_relax()	rep_nop()
+
 /* Prefetch instructions for Pentium III and AMD Athlon */
 #ifdef 	CONFIG_MPENTIUMIII
 

@@ -296,16 +296,6 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 
 
 	iap->ia_valid |= ATTR_CTIME;
-#ifdef CONFIG_QUOTA
-	/* DQUOT_TRANSFER needs both ia_uid and ia_gid defined */
-	if (iap->ia_valid & (ATTR_UID|ATTR_GID)) {
-		if (! (iap->ia_valid & ATTR_UID))
-			iap->ia_uid = inode->i_uid;
-		if (! (iap->ia_valid & ATTR_GID))
-			iap->ia_gid = inode->i_gid;
-		iap->ia_valid |= ATTR_UID|ATTR_GID;
-	}
-#endif /* CONFIG_QUOTA */
 
 	if (iap->ia_valid & ATTR_SIZE) {
 		fh_lock(fhp);
@@ -313,12 +303,7 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 	}
 	err = nfserr_notsync;
 	if (!check_guard || guardtime == inode->i_ctime) {
-#ifdef CONFIG_QUOTA
-		if (iap->ia_valid & (ATTR_UID|ATTR_GID)) 
-			err = DQUOT_TRANSFER(dentry, iap);
-		else
-#endif
-			err = notify_change(dentry, iap);
+		err = notify_change(dentry, iap);
 		err = nfserrno(err);
 	}
 	if (size_change) {

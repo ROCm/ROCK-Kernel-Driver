@@ -1309,7 +1309,7 @@ void daemonize(void)
 	atomic_inc(&current->files->count);
 }
 
-extern volatile unsigned long wait_init_idle;
+extern unsigned long wait_init_idle;
 
 void __init init_idle(void)
 {

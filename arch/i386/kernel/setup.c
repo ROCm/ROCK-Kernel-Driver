@@ -2416,17 +2416,16 @@ int get_cpuinfo(char * buffer)
 	struct cpuinfo_x86 *c = cpu_data;
 	int i, n;
 
-	/* 
-	 * WARNING - nasty evil hack ... if we print > 8, it overflows the
-	 * page buffer and corrupts memory - this needs fixing properly
-	 */
-	for (n = 0; n < 8; n++, c++) {
-	/* for (n = 0; n < NR_CPUS; n++, c++) { */
+	for (n = 0; n < NR_CPUS; n++, c++) {
 		int fpu_exception;
 #ifdef CONFIG_SMP
 		if (!(cpu_online_map & (1<<n)))
 			continue;
 #endif
+		/* Stupid hack */
+		if (p - buffer > (3*PAGE_SIZE)/4)
+			break;
+
 		p += sprintf(p,"processor\t: %d\n"
 			"vendor_id\t: %s\n"
 			"cpu family\t: %d\n"

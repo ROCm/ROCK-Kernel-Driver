@@ -81,13 +81,6 @@
 #define QUOTAFILENAME "quota"
 #define QUOTAGROUP "staff"
 
-extern int nr_dquots, nr_free_dquots;
-extern int max_dquots;
-extern int dquot_root_squash;
-
-#define NR_DQHASH 43            /* Just an arbitrary number */
-#define NR_DQUOTS 1024          /* Maximum number of quotas active at one time (Configurable from /proc/sys/fs) */
-
 /*
  * Command definitions for the 'quotactl' system call.
  * The commands are broken into a main command defined below
@@ -151,26 +144,23 @@ struct dqstats {
 
 #ifdef __KERNEL__
 
-/*
- * Maximum length of a message generated in the quota system,
- * that needs to be kicked onto the tty.
- */
-#define MAX_QUOTA_MESSAGE 75
+extern int nr_dquots, nr_free_dquots;
+extern int dquot_root_squash;
 
-#define DQ_LOCKED     0x01	/* locked for update */
-#define DQ_WANT       0x02	/* wanted for update */
-#define DQ_MOD        0x04	/* dquot modified since read */
+#define NR_DQHASH 43            /* Just an arbitrary number */
+
+#define DQ_LOCKED     0x01	/* dquot under IO */
+#define DQ_MOD        0x02	/* dquot modified since read */
 #define DQ_BLKS       0x10	/* uid/gid has been warned about blk limit */
 #define DQ_INODES     0x20	/* uid/gid has been warned about inode limit */
 #define DQ_FAKE       0x40	/* no limits only usage */
 
 struct dquot {
-	struct dquot *dq_next;		/* Pointer to next dquot */
-	struct dquot **dq_pprev;
-	struct list_head dq_free;	/* free list element */
-	struct dquot *dq_hash_next;	/* Pointer to next in dquot_hash */
-	struct dquot **dq_hash_pprev;	/* Pointer to previous in dquot_hash */
-	wait_queue_head_t dq_wait;	/* Pointer to waitqueue */
+	struct list_head dq_hash;	/* Hash list in memory */
+	struct list_head dq_inuse;	/* List of all quotas */
+	struct list_head dq_free;	/* Free list element */
+	wait_queue_head_t dq_wait_lock;	/* Pointer to waitqueue on dquot lock */
+	wait_queue_head_t dq_wait_free;	/* Pointer to waitqueue for quota to be unused */
 	int dq_count;			/* Reference count */
 
 	/* fields after this point are cleared when invalidating */
@@ -189,7 +179,6 @@ struct dquot {
 /*
  * Flags used for set_dqblk.
  */
-#define QUOTA_SYSCALL     0x01
 #define SET_QUOTA         0x02
 #define SET_USE           0x04
 #define SET_QLIMIT        0x08

@@ -4,7 +4,7 @@
  * Supports CPiA based parallel port Video Camera's.
  *
  * Copyright (C) 1999        Jochen Scharrlach <Jochen.Scharrlach@schwaben.de>
- * Copyright (C) 1999, 2000  Johannes Erdfelt <jerdfelt@valinux.com>
+ * Copyright (C) 1999, 2000  Johannes Erdfelt <johannes@erdfelt.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
