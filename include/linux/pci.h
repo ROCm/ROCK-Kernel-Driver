@@ -439,6 +439,7 @@ struct pci_bus {
 
 extern struct list_head pci_root_buses;	/* list of all known PCI buses */
 extern struct list_head pci_devices;	/* list of all devices */
+extern struct bus_type pci_bus_type;
 
 /*
  * Error values that may be returned by PCI functions.

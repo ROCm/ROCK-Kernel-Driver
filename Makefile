@@ -104,8 +104,8 @@ DRIVERS-y :=
 DRIVERS-m :=
 DRIVERS-  :=
 
-DRIVERS-$(CONFIG_ACPI) += drivers/acpi/acpi.o
 DRIVERS-$(CONFIG_PCI) += drivers/pci/driver.o
+DRIVERS-$(CONFIG_ACPI) += drivers/acpi/acpi.o
 DRIVERS-$(CONFIG_PARPORT) += drivers/parport/driver.o
 DRIVERS-y += drivers/base/base.o \
 	drivers/char/char.o \
