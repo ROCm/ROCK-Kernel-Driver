@@ -133,6 +133,9 @@ static ctl_table fs_table[];
 static ctl_table debug_table[];
 static ctl_table dev_table[];
 extern ctl_table random_table[];
+#ifdef CONFIG_UNIX98_PTYS
+extern ctl_table pty_table[];
+#endif
 
 /* /proc declarations: */
 
@@ -518,6 +521,14 @@ static ctl_table kern_table[] = {
 		.mode		= 0555,
 		.child		= random_table,
 	},
+#ifdef CONFIG_UNIX98_PTYS
+	{
+		.ctl_name	= KERN_PTY,
+		.procname	= "pty",
+		.mode		= 0555,
+		.child		= pty_table,
+	},
+#endif
 	{
 		.ctl_name	= KERN_OVERFLOWUID,
 		.procname	= "overflowuid",
