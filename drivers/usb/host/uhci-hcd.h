@@ -190,6 +190,7 @@ struct uhci_td {
 	struct urb *urb;
 
 	struct list_head list;		/* P: urb->lock */
+	struct list_head remove_list;	/* P: uhci->td_remove_list_lock */
 
 	int frame;			/* for iso: what frame? */
 	struct list_head fl_list;	/* P: uhci->frame_list_lock */
@@ -349,6 +350,10 @@ struct uhci_hcd {
 	/* List of QH's that are done, but waiting to be unlinked (race) */
 	spinlock_t qh_remove_list_lock;
 	struct list_head qh_remove_list;	/* P: uhci->qh_remove_list_lock */
+
+	/* List of TD's that are done, but waiting to be freed (race) */
+	spinlock_t td_remove_list_lock;
+	struct list_head td_remove_list;	/* P: uhci->td_remove_list_lock */
 
 	/* List of asynchronously unlinked URB's */
 	spinlock_t urb_remove_list_lock;
