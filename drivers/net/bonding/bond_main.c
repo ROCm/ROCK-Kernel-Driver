@@ -455,12 +455,20 @@
  *
  * 2003/12/30 - Amir Noam <amir.noam at intel dot com>
  *	- Fixed: Cannot remove and re-enslave the original active slave.
- *	- Fixed: Releasing the original active slave causes mac address duplication.
+ *	- Fixed: Releasing the original active slave causes mac address
+ *		 duplication.
  *	- Add support for slaves that use ethtool_ops.
  *	  Set version to 2.5.3.
  *
  * 2004/01/05 - Amir Noam <amir.noam at intel dot com>
  *	- Save bonding parameters per bond instead of using the global values.
+ *	  Set version to 2.5.4.
+ *
+ * 2004/01/14 - Shmulik Hen <shmulik.hen at intel dot com>
+ *	- Enhance VLAN support:
+ *	  * Add support for VLAN hardware acceleration capable slaves.
+ *	  * Add capability to tag self generated packets in ALB/TLB modes.
+ *	  Set version to 2.6.0.
  */
 
 //#define BONDING_DEBUG 1
