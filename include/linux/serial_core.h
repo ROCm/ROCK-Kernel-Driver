@@ -16,8 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- *  $Id: serial_core.h,v 1.49 2002/07/20 18:06:32 rmk Exp $
  */
 
 /*
@@ -186,7 +184,6 @@ struct uart_port {
 
 	unsigned int		flags;
 
-#define UPF_HUP_NOTIFY		(1 << 0)
 #define UPF_FOURPORT		(1 << 1)
 #define UPF_SAK			(1 << 2)
 #define UPF_SPD_MASK		(0x1030)
