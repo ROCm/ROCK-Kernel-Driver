@@ -246,7 +246,7 @@ static inline int sctp_v6_addr_match_len(union sctp_addr *s1,
 void sctp_v6_get_saddr(struct sctp_association *asoc, struct dst_entry *dst,
 		       union sctp_addr *daddr, union sctp_addr *saddr)
 {
-	sctp_bind_addr_t *bp;
+	struct sctp_bind_addr *bp;
 	rwlock_t *addr_lock;
 	struct sockaddr_storage_list *laddr;
 	struct list_head *pos;

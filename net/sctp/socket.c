@@ -82,7 +82,7 @@
 /* Forward declarations for internal helper functions. */
 static int sctp_writeable(struct sock *sk);
 static inline int sctp_wspace(struct sctp_association *asoc);
-static inline void sctp_set_owner_w(sctp_chunk_t *chunk);
+static inline void sctp_set_owner_w(struct sctp_chunk *chunk);
 static void sctp_wfree(struct sk_buff *skb);
 static int sctp_wait_for_sndbuf(struct sctp_association *, long *timeo_p,
 				int msg_len);
@@ -195,7 +195,7 @@ SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *addr, int len)
 {
 	struct sctp_opt *sp = sctp_sk(sk);
 	struct sctp_endpoint *ep = sp->ep;
-	sctp_bind_addr_t *bp = &ep->base.bind_addr;
+	struct sctp_bind_addr *bp = &ep->base.bind_addr;
 	struct sctp_af *af;
 	unsigned short snum;
 	int ret = 0;
@@ -488,7 +488,7 @@ int sctp_bindx_rem(struct sock *sk, struct sockaddr_storage *addrs, int addrcnt)
 	struct sctp_opt *sp = sctp_sk(sk);
 	struct sctp_endpoint *ep = sp->ep;
 	int cnt;
-	sctp_bind_addr_t *bp = &ep->base.bind_addr;
+	struct sctp_bind_addr *bp = &ep->base.bind_addr;
 	int retval = 0;
 	union sctp_addr saveaddr;
 
@@ -750,7 +750,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	struct sctp_endpoint *ep;
 	struct sctp_association *new_asoc=NULL, *asoc=NULL;
 	struct sctp_transport *transport;
-	sctp_chunk_t *chunk = NULL;
+	struct sctp_chunk *chunk = NULL;
 	union sctp_addr to;
 	struct sockaddr *msg_name = NULL;
 	struct sctp_sndrcvinfo default_sinfo = { 0 };
@@ -1020,7 +1020,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	}
 
 	/* Now send the (possibly) fragmented message. */
-	while ((chunk = (sctp_chunk_t *)__skb_dequeue(&chunks))) {
+	while ((chunk = (struct sctp_chunk *)__skb_dequeue(&chunks))) {
 
 		/* Do accounting for the write space.  */
 		sctp_set_owner_w(chunk);
@@ -2177,7 +2177,7 @@ static int sctp_getsockopt_local_addrs_num(struct sock *sk, int len,
 						char *optval, int *optlen)
 {
 	sctp_assoc_t id;
-	sctp_bind_addr_t *bp;
+	struct sctp_bind_addr *bp;
 	struct sctp_association *asoc;
 	struct list_head *pos;
 	int cnt = 0;
@@ -2215,7 +2215,7 @@ static int sctp_getsockopt_local_addrs_num(struct sock *sk, int len,
 static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
 					char *optval, int *optlen)
 {
-	sctp_bind_addr_t *bp;
+	struct sctp_bind_addr *bp;
 	struct sctp_association *asoc;
 	struct list_head *pos;
 	int cnt = 0;
@@ -3200,7 +3200,7 @@ static inline int sctp_wspace(struct sctp_association *asoc)
  * destructor in the data chunk skb for the purpose of the sndbuf space
  * tracking.
  */
-static inline void sctp_set_owner_w(sctp_chunk_t *chunk)
+static inline void sctp_set_owner_w(struct sctp_chunk *chunk)
 {
 	struct sctp_association *asoc = chunk->asoc;
 	struct sock *sk = asoc->base.sk;
@@ -3210,7 +3210,7 @@ static inline void sctp_set_owner_w(sctp_chunk_t *chunk)
 
 	chunk->skb->destructor = sctp_wfree;
 	/* Save the chunk pointer in skb for sctp_wfree to use later.  */
-	*((sctp_chunk_t **)(chunk->skb->cb)) = chunk;
+	*((struct sctp_chunk **)(chunk->skb->cb)) = chunk;
 
 	asoc->sndbuf_used += SCTP_DATA_SNDSIZE(chunk);
 	sk->wmem_queued += SCTP_DATA_SNDSIZE(chunk);
@@ -3248,11 +3248,11 @@ static void __sctp_write_space(struct sctp_association *asoc)
 static void sctp_wfree(struct sk_buff *skb)
 {
 	struct sctp_association *asoc;
-	sctp_chunk_t *chunk;
+	struct sctp_chunk *chunk;
 	struct sock *sk;
 
 	/* Get the saved chunk pointer.  */
-	chunk = *((sctp_chunk_t **)(skb->cb));
+	chunk = *((struct sctp_chunk **)(skb->cb));
 	asoc = chunk->asoc;
 	sk = asoc->base.sk;
 	asoc->sndbuf_used -= SCTP_DATA_SNDSIZE(chunk);

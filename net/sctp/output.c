@@ -327,7 +327,6 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 	sh->vtag     = htonl(packet->vtag);
 	sh->checksum = 0;
 
-
 	/* 2) Calculate the Adler-32 checksum of the whole packet,
 	 *    including the SCTP common header and all the
 	 *    chunks.
@@ -358,10 +357,11 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 	 */
 	SCTP_DEBUG_PRINTK("***sctp_transmit_packet***\n");
 	while ((chunk = (struct sctp_chunk *)__skb_dequeue(&packet->chunks))) {
-		chunk->num_times_sent++;
-		chunk->sent_at = jiffies;
+
 		if (sctp_chunk_is_data(chunk)) {
-			sctp_chunk_assign_tsn(chunk);
+
+			if (!chunk->has_tsn) {
+				sctp_chunk_assign_tsn(chunk);
 
 			/* 6.3.1 C4) When data is in flight and when allowed
 			 * by rule C5, a new RTT measurement MUST be made each
@@ -369,23 +369,27 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 			 * SHOULD be made no more than once per round-trip
 			 * for a given destination transport address.
 			 */
-			if ((1 == chunk->num_times_sent) &&
-			    (!tp->rto_pending)) {
-				chunk->rtt_in_progress = 1;
-				tp->rto_pending = 1;
-			}
+
+				if (!tp->rto_pending) {
+					chunk->rtt_in_progress = 1;
+					tp->rto_pending = 1;
+				}
+			} else
+				chunk->resent = 1;
+
+			chunk->sent_at = jiffies;
 			has_data = 1;
 		}
+
 		padding = WORD_ROUND(chunk->skb->len) - chunk->skb->len;
 		if (padding)
-			memset(skb_put(chunk->skb, padding), 0, padding);      
+			memset(skb_put(chunk->skb, padding), 0, padding);
 
 		crc32 = sctp_update_copy_cksum(skb_put(nskb, chunk->skb->len),
-					       chunk->skb->data, 
+					       chunk->skb->data,
 					       chunk->skb->len, crc32);
-		
-		SCTP_DEBUG_PRINTK("%s %p[%s] %s 0x%x, %s %d, %s %d, %s %d, "
-				  "%s %d\n",
+
+		SCTP_DEBUG_PRINTK("%s %p[%s] %s 0x%x, %s %d, %s %d, %s %d\n",
 				  "*** Chunk", chunk,
 				  sctp_cname(SCTP_ST_CHUNK(
 					  chunk->chunk_hdr->type)),
@@ -394,7 +398,6 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 				  ntohl(chunk->subh.data_hdr->tsn) : 0,
 				  "length", ntohs(chunk->chunk_hdr->length),
 				  "chunk->skb->len", chunk->skb->len,
-				  "num_times_sent", chunk->num_times_sent,
 				  "rtt_in_progress", chunk->rtt_in_progress);
 
 		/*
