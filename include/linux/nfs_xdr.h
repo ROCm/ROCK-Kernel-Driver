@@ -1,6 +1,8 @@
 #ifndef _LINUX_NFS_XDR_H
 #define _LINUX_NFS_XDR_H
 
+#include <linux/sunrpc/xprt.h>
+
 struct nfs_fattr {
 	unsigned short		valid;		/* which fields are valid */
 	__u64			pre_size;	/* pre_op_attr.size	  */
@@ -57,10 +59,14 @@ struct nfs_fsinfo {
 	__u32			namelen;/* max name length */
 };
 
-/* Arguments to the read call.
- * Note that NFS_READ_MAXIOV must be <= (MAX_IOVEC-2) from sunrpc/xprt.h
+/*
+ * Arguments to the read call.
  */
-#define NFS_READ_MAXIOV 8
+
+#define NFS_READ_MAXIOV		(9U)
+#if (NFS_READ_MAXIOV > (MAX_IOVEC -2))
+#error "NFS_READ_MAXIOV is too large"
+#endif
 
 struct nfs_readargs {
 	struct nfs_fh *		fh;
@@ -76,10 +82,14 @@ struct nfs_readres {
 	int                     eof;
 };
 
-/* Arguments to the write call.
- * Note that NFS_WRITE_MAXIOV must be <= (MAX_IOVEC-2) from sunrpc/xprt.h
+/*
+ * Arguments to the write call.
  */
-#define NFS_WRITE_MAXIOV        8
+#define NFS_WRITE_MAXIOV	(9U)
+#if (NFS_WRITE_MAXIOV > (MAX_IOVEC -2))
+#error "NFS_WRITE_MAXIOV is too large"
+#endif
+
 struct nfs_writeargs {
 	struct nfs_fh *		fh;
 	__u64			offset;

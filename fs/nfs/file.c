@@ -199,7 +199,10 @@ struct address_space_operations nfs_file_aops = {
 	.sync_page = nfs_sync_page,
 	.writepage = nfs_writepage,
 	.prepare_write = nfs_prepare_write,
-	.commit_write = nfs_commit_write
+	.commit_write = nfs_commit_write,
+#ifdef CONFIG_NFS_DIRECTIO
+	.direct_IO = nfs_direct_IO,
+#endif
 };
 
 /* 

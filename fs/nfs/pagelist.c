@@ -176,6 +176,26 @@ nfs_release_request(struct nfs_page *req)
 }
 
 /**
+ * nfs_release_list - cleanly dispose of an unattached list of page requests
+ * @list: list of doomed page requests
+ */
+void
+nfs_release_list(struct list_head *list)
+{
+	while (!list_empty(list)) {
+		struct nfs_page *req = nfs_list_entry(list);
+
+		nfs_list_remove_request(req);
+
+		page_cache_release(req->wb_page);
+
+		/* Release struct file or cached credential */
+		nfs_clear_request(req);
+		nfs_page_free(req);
+	}
+}
+
+/**
  * nfs_list_add_request - Insert a request into a sorted list
  * @req: request
  * @head: head of list into which to insert the request.
@@ -221,6 +241,37 @@ nfs_wait_on_request(struct nfs_page *req)
 	if (!NFS_WBACK_BUSY(req))
 		return 0;
 	return nfs_wait_event(clnt, req->wb_wait, !NFS_WBACK_BUSY(req));
+}
+
+/**
+ * nfs_wait_for_reads - wait for outstanding requests to complete
+ * @head: list of page requests to wait for
+ */
+int
+nfs_wait_for_reads(struct list_head *head)
+{
+	struct list_head *p = head->next;
+	unsigned int res = 0;
+
+	while (p != head) {
+		struct nfs_page *req = nfs_list_entry(p);
+		int error;
+
+		if (!NFS_WBACK_BUSY(req))
+			continue;
+
+		req->wb_count++;
+		error = nfs_wait_on_request(req);
+		if (error < 0)
+			return error;
+		nfs_list_remove_request(req);
+		nfs_clear_request(req);
+		nfs_page_free(req);
+
+		p = head->next;
+		res++;
+	}
+	return res;
 }
 
 /**
