@@ -50,6 +50,15 @@ config BRIDGE_EBT_T_NAT
 #
 # matches
 #
+config BRIDGE_EBT_802_3
+	tristate "ebt: 802.3 filter support"
+	depends on BRIDGE_NF_EBTABLES
+	help
+	  This option adds matching support for 802.3 Ethernet frames.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
 config BRIDGE_EBT_ARP
 	tristate "ebt: ARP filter support"
 	depends on BRIDGE_NF_EBTABLES
