@@ -134,14 +134,20 @@ int die(const char *str, struct pt_regs *regs, long err)
 }
 
 static void
-_exception(int signr, siginfo_t *info, struct pt_regs *regs)
+_exception(int signr, struct pt_regs *regs, int code, unsigned long addr)
 {
+	siginfo_t info;
+
 	if (!user_mode(regs)) {
 		if (die("Exception in kernel mode", regs, signr))
 			return;
 	}
 
-	force_sig_info(signr, info, current);
+	memset(&info, 0, sizeof(info));
+	info.si_signo = signr;
+	info.si_code = code;
+	info.si_addr = (void __user *) addr;
+	force_sig_info(signr, &info, current);
 }
 
 #ifdef CONFIG_PPC_PSERIES
@@ -213,8 +219,6 @@ SystemResetException(struct pt_regs *regs)
  */
 static int recover_mce(struct pt_regs *regs, struct rtas_error_log err)
 {
-	siginfo_t info;
-
 	if (err.disposition == DISP_FULLY_RECOVERED) {
 		/* Platform corrected itself */
 		return 1;
@@ -226,14 +230,10 @@ static int recover_mce(struct pt_regs *regs, struct rtas_error_log err)
 		   err.type == TYPE_ECC_UNCORR &&
 		   !(current->pid == 0 || current->pid == 1)) {
 		/* Kill off a user process with an ECC error */
-		info.si_signo = SIGBUS;
-		info.si_errno = 0;
-		/* XXX something better for ECC error? */
-		info.si_code = BUS_ADRERR;
-		info.si_addr = (void __user *)regs->nip;
 		printk(KERN_ERR "MCE: uncorrectable ecc error for pid %d\n",
 		       current->pid);
-		_exception(SIGBUS, &info, regs);
+		/* XXX something better for ECC error? */
+		_exception(SIGBUS, regs, BUS_ADRERR, regs->nip);
 		return 1;
 	}
 	return 0;
@@ -278,35 +278,46 @@ MachineCheckException(struct pt_regs *regs)
 void
 UnknownException(struct pt_regs *regs)
 {
-	siginfo_t info;
-
 	printk("Bad trap at PC: %lx, SR: %lx, vector=%lx\n",
 	       regs->nip, regs->msr, regs->trap);
 
-	info.si_signo = SIGTRAP;
-	info.si_errno = 0;
-	info.si_code = 0;
-	info.si_addr = NULL;
-	_exception(SIGTRAP, &info, regs);	
+	_exception(SIGTRAP, regs, 0, 0);
 }
 
 void
 InstructionBreakpointException(struct pt_regs *regs)
 {
-	siginfo_t info;
-
 	if (debugger_iabr_match(regs))
 		return;
-	info.si_signo = SIGTRAP;
-	info.si_errno = 0;
-	info.si_code = TRAP_BRKPT;
-	info.si_addr = (void __user *)regs->nip;
-	_exception(SIGTRAP, &info, regs);
+	_exception(SIGTRAP, regs, TRAP_BRKPT, regs->nip);
+}
+
+void
+SingleStepException(struct pt_regs *regs)
+{
+	regs->msr &= ~MSR_SE;  /* Turn off 'trace' bit */
+
+	if (debugger_sstep(regs))
+		return;
+
+	_exception(SIGTRAP, regs, TRAP_TRACE, regs->nip);
+}
+
+/*
+ * After we have successfully emulated an instruction, we have to
+ * check if the instruction was being single-stepped, and if so,
+ * pretend we got a single-step exception.  This was pointed out
+ * by Kumar Gala.  -- paulus
+ */
+static inline void emulate_single_step(struct pt_regs *regs)
+{
+	if (regs->msr & MSR_SE)
+		SingleStepException(regs);
 }
 
 static void parse_fpe(struct pt_regs *regs)
 {
-	siginfo_t info;
+	int code = 0;
 	unsigned long fpscr;
 
 	flush_fp_to_thread(current);
@@ -315,31 +326,84 @@ static void parse_fpe(struct pt_regs *regs)
 
 	/* Invalid operation */
 	if ((fpscr & FPSCR_VE) && (fpscr & FPSCR_VX))
-		info.si_code = FPE_FLTINV;
+		code = FPE_FLTINV;
 
 	/* Overflow */
 	else if ((fpscr & FPSCR_OE) && (fpscr & FPSCR_OX))
-		info.si_code = FPE_FLTOVF;
+		code = FPE_FLTOVF;
 
 	/* Underflow */
 	else if ((fpscr & FPSCR_UE) && (fpscr & FPSCR_UX))
-		info.si_code = FPE_FLTUND;
+		code = FPE_FLTUND;
 
 	/* Divide by zero */
 	else if ((fpscr & FPSCR_ZE) && (fpscr & FPSCR_ZX))
-		info.si_code = FPE_FLTDIV;
+		code = FPE_FLTDIV;
 
 	/* Inexact result */
 	else if ((fpscr & FPSCR_XE) && (fpscr & FPSCR_XX))
-		info.si_code = FPE_FLTRES;
+		code = FPE_FLTRES;
 
-	else
-		info.si_code = 0;
+	_exception(SIGFPE, regs, code, regs->nip);
+}
 
-	info.si_signo = SIGFPE;
-	info.si_errno = 0;
-	info.si_addr = (void __user *)regs->nip;
-	_exception(SIGFPE, &info, regs);
+/*
+ * Illegal instruction emulation support.  Return non-zero if we can't
+ * emulate, or -EFAULT if the associated memory access caused an access
+ * fault.  Return zero on success.
+ */
+
+#define INST_DCBA		0x7c0005ec
+#define INST_DCBA_MASK		0x7c0007fe
+
+#define INST_MCRXR		0x7c000400
+#define INST_MCRXR_MASK		0x7c0007fe
+
+static int emulate_instruction(struct pt_regs *regs)
+{
+	unsigned int instword;
+
+	if (!user_mode(regs))
+		return -EINVAL;
+
+	CHECK_FULL_REGS(regs);
+
+	if (get_user(instword, (unsigned int __user *)(regs->nip)))
+		return -EFAULT;
+
+	/* Emulating the dcba insn is just a no-op.  */
+	if ((instword & INST_DCBA_MASK) == INST_DCBA) {
+		static int warned;
+
+		if (!warned) {
+			printk(KERN_WARNING
+			       "process %d (%s) uses obsolete 'dcba' insn\n",
+			       current->pid, current->comm);
+			warned = 1;
+		}
+		return 0;
+	}
+
+	/* Emulate the mcrxr insn.  */
+	if ((instword & INST_MCRXR_MASK) == INST_MCRXR) {
+		static int warned;
+		unsigned int shift;
+
+		if (!warned) {
+			printk(KERN_WARNING
+			       "process %d (%s) uses obsolete 'mcrxr' insn\n",
+			       current->pid, current->comm);
+			warned = 1;
+		}
+
+		shift = (instword >> 21) & 0x1c;
+		regs->ccr &= ~(0xf0000000 >> shift);
+		regs->ccr |= (regs->xer & 0xf0000000) >> shift;
+		regs->xer &= ~0xf0000000;
+		return 0;
+	}
+
+	return -EINVAL;
 }
 
 /*
@@ -395,20 +459,14 @@ check_bug_trap(struct pt_regs *regs)
 void
 ProgramCheckException(struct pt_regs *regs)
 {
-	siginfo_t info;
-
 	if (regs->msr & 0x100000) {
 		/* IEEE FP exception */
-
 		parse_fpe(regs);
+
 	} else if (regs->msr & 0x40000) {
 		/* Privileged instruction */
+		_exception(SIGILL, regs, ILL_PRVOPC, regs->nip);
 
-		info.si_signo = SIGILL;
-		info.si_errno = 0;
-		info.si_code = ILL_PRVOPC;
-		info.si_addr = (void __user *)regs->nip;
-		_exception(SIGILL, &info, regs);
 	} else if (regs->msr & 0x20000) {
 		/* trap exception */
 
@@ -419,19 +477,24 @@ ProgramCheckException(struct pt_regs *regs)
 			regs->nip += 4;
 			return;
 		}
-		info.si_signo = SIGTRAP;
-		info.si_errno = 0;
-		info.si_code = TRAP_BRKPT;
-		info.si_addr = (void __user *)regs->nip;
-		_exception(SIGTRAP, &info, regs);
-	} else {
-		/* Illegal instruction */
+		_exception(SIGTRAP, regs, TRAP_BRKPT, regs->nip);
 
-		info.si_signo = SIGILL;
-		info.si_errno = 0;
-		info.si_code = ILL_ILLTRP;
-		info.si_addr = (void __user *)regs->nip;
-		_exception(SIGILL, &info, regs);
+	} else {
+		/* Illegal instruction; try to emulate it.  */
+		switch (emulate_instruction(regs)) {
+		case 0:
+			regs->nip += 4;
+			emulate_single_step(regs);
+			break;
+
+		case -EFAULT:
+			_exception(SIGSEGV, regs, SEGV_MAPERR, regs->nip);
+			break;
+
+		default:
+			_exception(SIGILL, regs, ILL_ILLOPC, regs->nip);
+			break;
+		}
 	}
 }
 
@@ -448,48 +511,13 @@ void AltivecUnavailableException(struct pt_regs *regs)
 	if (user_mode(regs)) {
 		/* A user program has executed an altivec instruction,
 		   but this kernel doesn't support altivec. */
-		siginfo_t info;
-
-		memset(&info, 0, sizeof(info));
-		info.si_signo = SIGILL;
-		info.si_code = ILL_ILLOPC;
-		info.si_addr = (void *) regs->nip;
-		_exception(SIGILL, &info, regs);
+		_exception(SIGILL, regs, ILL_ILLOPC, regs->nip);
 		return;
 	}
 #endif
 	printk(KERN_EMERG "Unrecoverable VMX/Altivec Unavailable Exception "
 			  "%lx at %lx\n", regs->trap, regs->nip);
 	die("Unrecoverable VMX/Altivec Unavailable Exception", regs, SIGABRT);
-}
-
-void
-SingleStepException(struct pt_regs *regs)
-{
-	siginfo_t info;
-
-	regs->msr &= ~MSR_SE;  /* Turn off 'trace' bit */
-
-	if (debugger_sstep(regs))
-		return;
-
-	info.si_signo = SIGTRAP;
-	info.si_errno = 0;
-	info.si_code = TRAP_TRACE;
-	info.si_addr = (void __user *)regs->nip;
-	_exception(SIGTRAP, &info, regs);	
-}
-
-/*
- * After we have successfully emulated an instruction, we have to
- * check if the instruction was being single-stepped, and if so,
- * pretend we got a single-step exception.  This was pointed out
- * by Kumar Gala.  -- paulus
- */
-static inline void emulate_single_step(struct pt_regs *regs)
-{
-	if (regs->msr & MSR_SE)
-		SingleStepException(regs);
 }
 
 static void dummy_perf(struct pt_regs *regs)
@@ -508,7 +536,6 @@ void
 AlignmentException(struct pt_regs *regs)
 {
 	int fixed;
-	siginfo_t info;
 
 	fixed = fix_alignment(regs);
 
@@ -521,11 +548,7 @@ AlignmentException(struct pt_regs *regs)
 	/* Operand address was bad */	
 	if (fixed == -EFAULT) {
 		if (user_mode(regs)) {
-			info.si_signo = SIGSEGV;
-			info.si_errno = 0;
-			info.si_code = SEGV_MAPERR;
-			info.si_addr = (void __user *)regs->dar;
-			force_sig_info(SIGSEGV, &info, current);
+			_exception(SIGSEGV, regs, SEGV_MAPERR, regs->dar);
 		} else {
 			/* Search exception table */
 			bad_page_fault(regs, regs->dar, SIGSEGV);
@@ -534,11 +557,7 @@ AlignmentException(struct pt_regs *regs)
 		return;
 	}
 
-	info.si_signo = SIGBUS;
-	info.si_errno = 0;
-	info.si_code = BUS_ADRALN;
-	info.si_addr = (void __user *)regs->nip;
-	_exception(SIGBUS, &info, regs);	
+	_exception(SIGBUS, regs, BUS_ADRALN, regs->nip);
 }
 
 #ifdef CONFIG_ALTIVEC
