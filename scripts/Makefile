@@ -11,6 +11,11 @@
 
 EXTRA_TARGETS := fixdep split-include docproc conmakehash
 
+# Yikes. We need to build this stuff here even if the user only wants
+# modules.
+
+KBUILD_BUILTIN := 1
+
 # The following temporary rule will make sure that people's
 # trees get updated to the right permissions, since patch(1)
 # can't do it
