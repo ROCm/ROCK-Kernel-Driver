@@ -195,8 +195,8 @@ S:	Maintained
 
 AD1816 SOUND DRIVER
 P:	Thorsten Knabe
-W:	http://www.student.informatik.tu-darmstadt.de/~tek/projects/linux.html
-W:	http://www.tu-darmstadt.de/~tek01/projects/linux.html
+M:	Thorsten Knabe <linux@thorsten-knabe.de>
+W:	http://linux.thorsten-knabe.de
 S:	Maintained
 
 ADT746X FAN DRIVER
