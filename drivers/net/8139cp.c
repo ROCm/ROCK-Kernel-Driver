@@ -20,7 +20,6 @@
 	TODO, in rough priority order:
 	* dev->tx_timeout
 	* LinkChg interrupt
-	* ETHTOOL_[GS]SET
 	* Support forcing media type with a module parameter,
 	  like dl2k.c/sundance.c
 	* Implement PCI suspend/resume
@@ -33,18 +32,19 @@
 	* Rx checksumming
 	* Tx checksumming
 	* ETHTOOL_GREGS, ETHTOOL_[GS]WOL,
-	  ETHTOOL_[GS]MSGLVL, ETHTOOL_NWAY_RST
 	* Jumbo frames / dev->change_mtu
 	* Investigate using skb->priority with h/w VLAN priority
 	* Investigate using High Priority Tx Queue with skb->priority
 	* Adjust Rx FIFO threshold and Max Rx DMA burst on Rx FIFO error
 	* Adjust Tx FIFO threshold and Max Tx DMA burst on Tx FIFO error
+        * Implement Tx software interrupt mitigation via
+	          Tx descriptor bit
 
  */
 
 #define DRV_NAME		"8139cp"
-#define DRV_VERSION		"0.0.5"
-#define DRV_RELDATE		"Oct 19, 2001"
+#define DRV_VERSION		"0.0.6cvs"
+#define DRV_RELDATE		"Nov 19, 2001"
 
 
 #include <linux/module.h>
@@ -56,6 +56,7 @@
 #include <linux/delay.h>
 #include <linux/ethtool.h>
 #include <linux/crc32.h>
+#include <linux/mii.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
@@ -94,10 +95,10 @@ MODULE_PARM_DESC (multicast_filter_limit, "8139cp maximum number of filtered mul
 	(((CP)->tx_tail <= (CP)->tx_head) ?			\
 	  (CP)->tx_tail + (CP_TX_RING_SIZE - 1) - (CP)->tx_head :	\
 	  (CP)->tx_tail - (CP)->tx_head - 1)
-#define CP_CHIP_VERSION		0x76
 
 #define PKT_BUF_SZ		1536	/* Size of each temporary Rx buffer.*/
 #define RX_OFFSET		2
+#define CP_INTERNAL_PHY		32
 
 /* The following settings are log_2(bytes)-4:  0 == 16 bytes .. 6==1024, 7==end of packet. */
 #define RX_FIFO_THRESH		5	/* Rx buffer level before first PCI xfer.  */
@@ -126,6 +127,11 @@ enum {
 	Config3		= 0x59, /* Config3 */
 	Config4		= 0x5A, /* Config4 */
 	MultiIntr	= 0x5C, /* Multiple interrupt select */
+	BasicModeCtrl	= 0x62,	/* MII BMCR */
+	BasicModeStatus	= 0x64, /* MII BMSR */
+	NWayAdvert	= 0x66, /* MII ADVERTISE */
+	NWayLPAR	= 0x68, /* MII LPA */
+	NWayExpansion	= 0x6A, /* MII Expansion */
 	Config5		= 0xD8,	/* Config5 */
 	TxPoll		= 0xD9,	/* Tell chip to check Tx descriptors for work */
 	CpCmd		= 0xE0, /* C+ Command register (C+ mode only) */
@@ -279,6 +285,8 @@ struct cp_private {
 
 	struct sk_buff		*frag_skb;
 	unsigned		dropping_frag : 1;
+
+	struct mii_if_info	mii_if;
 };
 
 #define cpr8(reg)	readb(cp->regs + (reg))
@@ -985,6 +993,39 @@ static int cp_close (struct net_device *dev)
 	return 0;
 }
 
+static char mii_2_8139_map[8] = {
+	BasicModeCtrl,
+	BasicModeStatus,
+	0,
+	0,
+	NWayAdvert,
+	NWayLPAR,
+	NWayExpansion,
+	0
+};
+
+static int mdio_read(struct net_device *dev, int phy_id, int location)
+{
+	struct cp_private *cp = dev->priv;
+
+	return location < 8 && mii_2_8139_map[location] ?
+	       readw(cp->regs + mii_2_8139_map[location]) : 0;
+}
+
+
+static void mdio_write(struct net_device *dev, int phy_id, int location,
+		       int value)
+{
+	struct cp_private *cp = dev->priv;
+
+	if (location == 0) {
+		cpw8(Cfg9346, Cfg9346_Unlock);
+		cpw16(BasicModeCtrl, value);
+		cpw8(Cfg9346, Cfg9346_Lock);
+	} else if (location < 8 && mii_2_8139_map[location])
+		cpw16(mii_2_8139_map[location], value);
+}
+
 static int cp_ethtool_ioctl (struct cp_private *cp, void *useraddr)
 {
 	u32 ethcmd;
@@ -992,21 +1033,71 @@ static int cp_ethtool_ioctl (struct cp_private *cp, void *useraddr)
 	/* dev_ioctl() in ../../net/core/dev.c has already checked
 	   capable(CAP_NET_ADMIN), so don't bother with that here.  */
 
-	if (copy_from_user (&ethcmd, useraddr, sizeof (ethcmd)))
+	if (get_user(ethcmd, (u32 *)useraddr))
 		return -EFAULT;
 
 	switch (ethcmd) {
 
-	case ETHTOOL_GDRVINFO:
-		{
-			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-			strcpy (info.driver, DRV_NAME);
-			strcpy (info.version, DRV_VERSION);
-			strcpy (info.bus_info, cp->pdev->slot_name);
-			if (copy_to_user (useraddr, &info, sizeof (info)))
-				return -EFAULT;
-			return 0;
-		}
+	case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
+		strcpy (info.driver, DRV_NAME);
+		strcpy (info.version, DRV_VERSION);
+		strcpy (info.bus_info, cp->pdev->slot_name);
+		if (copy_to_user (useraddr, &info, sizeof (info)))
+			return -EFAULT;
+		return 0;
+	}
+
+	/* get settings */
+	case ETHTOOL_GSET: {
+		struct ethtool_cmd ecmd = { ETHTOOL_GSET };
+		spin_lock_irq(&cp->lock);
+		mii_ethtool_gset(&cp->mii_if, &ecmd);
+		spin_unlock_irq(&cp->lock);
+		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
+			return -EFAULT;
+		return 0;
+	}
+	/* set settings */
+	case ETHTOOL_SSET: {
+		int r;
+		struct ethtool_cmd ecmd;
+		if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
+			return -EFAULT;
+		spin_lock_irq(&cp->lock);
+		r = mii_ethtool_sset(&cp->mii_if, &ecmd);
+		spin_unlock_irq(&cp->lock);
+		return r;
+	}
+	/* restart autonegotiation */
+	case ETHTOOL_NWAY_RST: {
+		return mii_nway_restart(&cp->mii_if);
+	}
+	/* get link status */
+	case ETHTOOL_GLINK: {
+		struct ethtool_value edata = {ETHTOOL_GLINK};
+		edata.data = mii_link_ok(&cp->mii_if);
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+
+	/* get message-level */
+	case ETHTOOL_GMSGLVL: {
+		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
+		edata.data = cp->msg_enable;
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	/* set message-level */
+	case ETHTOOL_SMSGLVL: {
+		struct ethtool_value edata;
+		if (copy_from_user(&edata, useraddr, sizeof(edata)))
+			return -EFAULT;
+		cp->msg_enable = edata.data;
+		return 0;
+	}
 
 	default:
 		break;
@@ -1136,6 +1227,10 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 	cp->dev = dev;
 	cp->msg_enable = (debug < 0 ? CP_DEF_MSG_ENABLE : debug);
 	spin_lock_init (&cp->lock);
+	cp->mii_if.dev = dev;
+	cp->mii_if.mdio_read = mdio_read;
+	cp->mii_if.mdio_write = mdio_write;
+	cp->mii_if.phy_id = CP_INTERNAL_PHY;
 
 	rc = pci_enable_device(pdev);
 	if (rc)

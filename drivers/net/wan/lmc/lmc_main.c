@@ -175,7 +175,7 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
 
     case LMCIOCSINFO: /*fold01*/
         sp = &((struct ppp_device *) dev)->sppp;
-        if (!suser ()) {
+        if (!capable(CAP_NET_ADMIN)) {
             ret = -EPERM;
             break;
         }
@@ -210,7 +210,7 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
             u_int16_t	old_type = sc->if_type;
             u_int16_t	new_type;
 
-	    if (!suser ()) {
+	    if (!capable(CAP_NET_ADMIN)) {
 		ret = -EPERM;
 		break;
 	    }
@@ -290,7 +290,7 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
         break;
 
     case LMCIOCCLEARLMCSTATS: /*fold01*/
-        if (!suser ()){
+        if (!capable(CAP_NET_ADMIN)){
             ret = -EPERM;
             break;
         }
@@ -304,7 +304,7 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
         break;
 
     case LMCIOCSETCIRCUIT: /*fold01*/
-        if (!suser ()){
+        if (!capable(CAP_NET_ADMIN)){
             ret = -EPERM;
             break;
         }
@@ -322,7 +322,7 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
         break;
 
     case LMCIOCRESET: /*fold01*/
-        if (!suser ()){
+        if (!capable(CAP_NET_ADMIN)){
             ret = -EPERM;
             break;
         }
@@ -355,7 +355,7 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
         {
             struct lmc_xilinx_control xc; /*fold02*/
 
-            if (!suser ()){
+            if (!capable(CAP_NET_ADMIN)){
                 ret = -EPERM;
                 break;
             }

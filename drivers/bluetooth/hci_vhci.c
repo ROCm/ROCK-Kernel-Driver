@@ -291,7 +291,7 @@ static int hci_vhci_chr_close(struct inode *inode, struct file *file)
 
 static struct file_operations hci_vhci_fops = {
 	owner:	THIS_MODULE,	
-	llseek:	no_lseek,
+	llseek:	no_llseek,
 	read:	hci_vhci_chr_read,
 	write:	hci_vhci_chr_write,
 	poll:	hci_vhci_chr_poll,

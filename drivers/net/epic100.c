@@ -53,11 +53,18 @@
 	LK1.1.10:
 	* revert MII transceiver init change (jgarzik)
 
+	LK1.1.11:
+	* implement ETHTOOL_[GS]SET, _NWAY_RST, _[GS]MSGLVL, _GLINK (jgarzik)
+	* replace some MII-related magic numbers with constants
+
+	LK1.1.12:
+	* fix power-up sequence
+
 */
 
 #define DRV_NAME	"epic100"
-#define DRV_VERSION	"1.11+LK1.1.10"
-#define DRV_RELDATE	"July 6, 2001"
+#define DRV_VERSION	"1.11+LK1.1.12"
+#define DRV_RELDATE	"Jan 18, 2002"
 
 
 /* The user-configurable values.
@@ -318,12 +325,9 @@ struct epic_private {
 	/* Ring pointers. */
 	spinlock_t lock;				/* Group with Tx control cache line. */
 	unsigned int cur_tx, dirty_tx;
-	struct descriptor  *last_tx_desc;
 
 	unsigned int cur_rx, dirty_rx;
 	unsigned int rx_buf_sz;				/* Based on MTU+slack. */
-	struct descriptor  *last_rx_desc;
-	long last_rx_time;					/* Last Rx, in jiffies. */
 
 	struct pci_dev *pci_dev;			/* PCI bus location. */
 	int chip_id, chip_flags;
@@ -335,13 +339,9 @@ struct epic_private {
 	signed char phys[4];				/* MII device addresses. */
 	u16 advertising;					/* NWay media advertisement */
 	int mii_phy_cnt;
+	struct mii_if_info mii;
 	unsigned int tx_full:1;				/* The Tx queue is full. */
-	unsigned int full_duplex:1;			/* Current duplex setting. */
-	unsigned int duplex_lock:1;			/* Duplex forced by the user. */
 	unsigned int default_port:4;		/* Last dev->if_port value. */
-	unsigned int media2:4;				/* Secondary monitored media port. */
-	unsigned int medialock:1;			/* Don't sense media type. */
-	unsigned int mediasense:1;			/* Media sensing in progress. */
 };
 
 static int epic_open(struct net_device *dev);
@@ -420,6 +420,9 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 
 	pci_set_drvdata(pdev, dev);
 	ep = dev->priv;
+	ep->mii.dev = dev;
+	ep->mii.mdio_read = mdio_read;
+	ep->mii.mdio_write = mdio_write;
 
 	ring_space = pci_alloc_consistent(pdev, TX_TOTAL_SIZE, &ring_dma);
 	if (!ring_space)
@@ -481,7 +484,7 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	{
 		int phy, phy_idx = 0;
 		for (phy = 1; phy < 32 && phy_idx < sizeof(ep->phys); phy++) {
-			int mii_status = mdio_read(dev, phy, 1);
+			int mii_status = mdio_read(dev, phy, MII_BMSR);
 			if (mii_status != 0xffff  &&  mii_status != 0x0000) {
 				ep->phys[phy_idx++] = phy;
 				printk(KERN_INFO DRV_NAME "(%s): MII transceiver #%d control "
@@ -492,16 +495,17 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 		ep->mii_phy_cnt = phy_idx;
 		if (phy_idx != 0) {
 			phy = ep->phys[0];
-			ep->advertising = mdio_read(dev, phy, 4);
+			ep->mii.advertising = mdio_read(dev, phy, MII_ADVERTISE);
 			printk(KERN_INFO DRV_NAME "(%s): Autonegotiation advertising %4.4x link "
 				   "partner %4.4x.\n",
-				   pdev->slot_name, ep->advertising, mdio_read(dev, phy, 5));
+				   pdev->slot_name, ep->mii.advertising, mdio_read(dev, phy, 5));
 		} else if ( ! (ep->chip_flags & NO_MII)) {
 			printk(KERN_WARNING DRV_NAME "(%s): ***WARNING***: No MII transceiver found!\n",
 			       pdev->slot_name);
 			/* Use the known PHY address of the EPII. */
 			ep->phys[0] = 3;
 		}
+		ep->mii.phy_id = ep->phys[0];
 	}
 
 	/* Turn off the MII xcvr (175 only!), leave the chip in low-power mode. */
@@ -511,13 +515,11 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 
 	/* The lower four bits are the media type. */
 	if (duplex) {
-		ep->duplex_lock = ep->full_duplex = 1;
+		ep->mii.duplex_lock = ep->mii.full_duplex = 1;
 		printk(KERN_INFO DRV_NAME "(%s):  Forced full duplex operation requested.\n",
 		       pdev->slot_name);
 	}
 	dev->if_port = ep->default_port = option;
-	if (ep->default_port)
-		ep->medialock = 1;
 
 	/* The Epic-specific entries in the device structure. */
 	dev->open = &epic_open;
@@ -676,9 +678,8 @@ static int epic_open(struct net_device *dev)
 	   required by the details of which bits are reset and the transceiver
 	   wiring on the Ositech CardBus card.
 	*/
-#if 0
-	outl(dev->if_port == 1 ? 0x13 : 0x12, ioaddr + MIICfg);
-#endif
+
+	outl(0x12, ioaddr + MIICfg);
 	if (ep->chip_flags & MII_PWRDWN)
 		outl((inl(ioaddr + NVCTL) & ~0x003C) | 0x4800, ioaddr + NVCTL);
 
@@ -700,29 +701,29 @@ static int epic_open(struct net_device *dev)
 
 	if (media2miictl[dev->if_port & 15]) {
 		if (ep->mii_phy_cnt)
-			mdio_write(dev, ep->phys[0], 0, media2miictl[dev->if_port&15]);
+			mdio_write(dev, ep->phys[0], MII_BMCR, media2miictl[dev->if_port&15]);
 		if (dev->if_port == 1) {
 			if (debug > 1)
 				printk(KERN_INFO "%s: Using the 10base2 transceiver, MII "
 					   "status %4.4x.\n",
-					   dev->name, mdio_read(dev, ep->phys[0], 1));
+					   dev->name, mdio_read(dev, ep->phys[0], MII_BMSR));
 		}
 	} else {
-		int mii_reg5 = mdio_read(dev, ep->phys[0], 5);
-		if (mii_reg5 != 0xffff) {
-			if ((mii_reg5 & 0x0100) || (mii_reg5 & 0x01C0) == 0x0040)
-				ep->full_duplex = 1;
-			else if (! (mii_reg5 & 0x4000))
-				mdio_write(dev, ep->phys[0], 0, 0x1200);
+		int mii_lpa = mdio_read(dev, ep->phys[0], MII_LPA);
+		if (mii_lpa != 0xffff) {
+			if ((mii_lpa & LPA_100FULL) || (mii_lpa & 0x01C0) == LPA_10FULL)
+				ep->mii.full_duplex = 1;
+			else if (! (mii_lpa & LPA_LPACK))
+				mdio_write(dev, ep->phys[0], MII_BMCR, BMCR_ANENABLE|BMCR_ANRESTART);
 			if (debug > 1)
 				printk(KERN_INFO "%s: Setting %s-duplex based on MII xcvr %d"
 					   " register read of %4.4x.\n", dev->name,
-					   ep->full_duplex ? "full" : "half",
-					   ep->phys[0], mii_reg5);
+					   ep->mii.full_duplex ? "full" : "half",
+					   ep->phys[0], mii_lpa);
 		}
 	}
 
-	outl(ep->full_duplex ? 0x7F : 0x79, ioaddr + TxCtrl);
+	outl(ep->mii.full_duplex ? 0x7F : 0x79, ioaddr + TxCtrl);
 	outl(ep->rx_ring_dma, ioaddr + PRxCDAR);
 	outl(ep->tx_ring_dma, ioaddr + PTxCDAR);
 
@@ -742,7 +743,7 @@ static int epic_open(struct net_device *dev)
 		printk(KERN_DEBUG "%s: epic_open() ioaddr %lx IRQ %d status %4.4x "
 			   "%s-duplex.\n",
 			   dev->name, ioaddr, dev->irq, (int)inl(ioaddr + GENCTL),
-			   ep->full_duplex ? "full" : "half");
+			   ep->mii.full_duplex ? "full" : "half");
 
 	/* Set the timer to switch to check for link beat and perhaps switch
 	   to an alternate media type. */
@@ -811,7 +812,7 @@ static void epic_restart(struct net_device *dev)
 
 	ep->tx_threshold = TX_FIFO_THRESH;
 	outl(ep->tx_threshold, ioaddr + TxThresh);
-	outl(ep->full_duplex ? 0x7F : 0x79, ioaddr + TxCtrl);
+	outl(ep->mii.full_duplex ? 0x7F : 0x79, ioaddr + TxCtrl);
 	outl(ep->rx_ring_dma + (ep->cur_rx%RX_RING_SIZE)*
 		sizeof(struct epic_rx_desc), ioaddr + PRxCDAR);
 	outl(ep->tx_ring_dma + (ep->dirty_tx%TX_RING_SIZE)*
@@ -837,20 +838,20 @@ static void check_media(struct net_device *dev)
 {
 	struct epic_private *ep = dev->priv;
 	long ioaddr = dev->base_addr;
-	int mii_reg5 = ep->mii_phy_cnt ? mdio_read(dev, ep->phys[0], 5) : 0;
-	int negotiated = mii_reg5 & ep->advertising;
+	int mii_lpa = ep->mii_phy_cnt ? mdio_read(dev, ep->phys[0], MII_LPA) : 0;
+	int negotiated = mii_lpa & ep->mii.advertising;
 	int duplex = (negotiated & 0x0100) || (negotiated & 0x01C0) == 0x0040;
 
-	if (ep->duplex_lock)
+	if (ep->mii.duplex_lock)
 		return;
-	if (mii_reg5 == 0xffff)		/* Bogus read */
+	if (mii_lpa == 0xffff)		/* Bogus read */
 		return;
-	if (ep->full_duplex != duplex) {
-		ep->full_duplex = duplex;
+	if (ep->mii.full_duplex != duplex) {
+		ep->mii.full_duplex = duplex;
 		printk(KERN_INFO "%s: Setting %s-duplex based on MII #%d link"
 			   " partner capability of %4.4x.\n", dev->name,
-			   ep->full_duplex ? "full" : "half", ep->phys[0], mii_reg5);
-		outl(ep->full_duplex ? 0x7F : 0x79, ioaddr + TxCtrl);
+			   ep->mii.full_duplex ? "full" : "half", ep->phys[0], mii_lpa);
+		outl(ep->mii.full_duplex ? 0x7F : 0x79, ioaddr + TxCtrl);
 	}
 }
 
@@ -914,7 +915,6 @@ static void epic_init_ring(struct net_device *dev)
 	ep->lock = (spinlock_t) SPIN_LOCK_UNLOCKED;
 	ep->dirty_tx = ep->cur_tx = 0;
 	ep->cur_rx = ep->dirty_rx = 0;
-	ep->last_rx_time = jiffies;
 	ep->rx_buf_sz = (dev->mtu <= 1500 ? PKT_BUF_SZ : dev->mtu + 32);
 
 	/* Initialize all Rx descriptors. */
@@ -1351,17 +1351,66 @@ static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		return -EFAULT;
 
 	switch (ethcmd) {
-	case ETHTOOL_GDRVINFO:
-		{
-			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-			strcpy (info.driver, DRV_NAME);
-			strcpy (info.version, DRV_VERSION);
-			strcpy (info.bus_info, np->pci_dev->slot_name);
-			if (copy_to_user (useraddr, &info, sizeof (info)))
-				return -EFAULT;
-			return 0;
-		}
+	case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
+		strcpy (info.driver, DRV_NAME);
+		strcpy (info.version, DRV_VERSION);
+		strcpy (info.bus_info, np->pci_dev->slot_name);
+		if (copy_to_user (useraddr, &info, sizeof (info)))
+			return -EFAULT;
+		return 0;
+	}
 
+	/* get settings */
+	case ETHTOOL_GSET: {
+		struct ethtool_cmd ecmd = { ETHTOOL_GSET };
+		spin_lock_irq(&np->lock);
+		mii_ethtool_gset(&np->mii, &ecmd);
+		spin_unlock_irq(&np->lock);
+		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
+			return -EFAULT;
+		return 0;
+	}
+	/* set settings */
+	case ETHTOOL_SSET: {
+		int r;
+		struct ethtool_cmd ecmd;
+		if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
+			return -EFAULT;
+		spin_lock_irq(&np->lock);
+		r = mii_ethtool_sset(&np->mii, &ecmd);
+		spin_unlock_irq(&np->lock);
+		return r;
+	}
+	/* restart autonegotiation */
+	case ETHTOOL_NWAY_RST: {
+		return mii_nway_restart(&np->mii);
+	}
+	/* get link status */
+	case ETHTOOL_GLINK: {
+		struct ethtool_value edata = {ETHTOOL_GLINK};
+		edata.data = mii_link_ok(&np->mii);
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+
+	/* get message-level */
+	case ETHTOOL_GMSGLVL: {
+		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
+		edata.data = debug;
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	/* set message-level */
+	case ETHTOOL_SMSGLVL: {
+		struct ethtool_value edata;
+		if (copy_from_user(&edata, useraddr, sizeof(edata)))
+			return -EFAULT;
+		debug = edata.data;
+		return 0;
+	}
 	default:
 		break;
 	}
@@ -1380,12 +1429,10 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
 
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
-	case SIOCDEVPRIVATE:		/* for binary compat, remove in 2.5 */
 		data->phy_id = ep->phys[0] & 0x1f;
 		/* Fall Through */
 
 	case SIOCGMIIREG:		/* Read MII PHY register. */
-	case SIOCDEVPRIVATE+1:		/* for binary compat, remove in 2.5 */
 		if (! netif_running(dev)) {
 			outl(0x0200, ioaddr + GENCTL);
 			outl((inl(ioaddr + NVCTL) & ~0x003C) | 0x4800, ioaddr + NVCTL);
@@ -1400,7 +1447,6 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		return 0;
 
 	case SIOCSMIIREG:		/* Write MII PHY register. */
-	case SIOCDEVPRIVATE+2:		/* for binary compat, remove in 2.5 */
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
 		if (! netif_running(dev)) {
@@ -1412,11 +1458,11 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			switch (data->reg_num) {
 			case 0:
 				/* Check for autonegotiation on or reset. */
-				ep->duplex_lock = (value & 0x9000) ? 0 : 1;
-				if (ep->duplex_lock)
-					ep->full_duplex = (value & 0x0100) ? 1 : 0;
+				ep->mii.duplex_lock = (value & 0x9000) ? 0 : 1;
+				if (ep->mii.duplex_lock)
+					ep->mii.full_duplex = (value & 0x0100) ? 1 : 0;
 				break;
-			case 4: ep->advertising = value; break;
+			case 4: ep->mii.advertising = value; break;
 			}
 			/* Perhaps check_duplex(dev), depending on chip semantics. */
 		}

@@ -1,7 +1,7 @@
 
     D-Link DL2000-based Gigabit Ethernet Adapter Installation
     for Linux
-    Nov 12, 2001
+    Jan 02, 2002
 
 Contents
 ========
@@ -182,7 +182,7 @@ driver.
 mtu=packet_size			- Specifies the maximum packet size. default
 				  is 1500.
 
-media=xxxxxxxxx			- Specifies the media type the NIC operates at.
+media=media_type		- Specifies the media type the NIC operates at.
 				  autosense	Autosensing active media.
 				  10mbps_hd	10Mbps half duplex.
 				  10mbps_fd	10Mbps full duplex.
@@ -195,28 +195,41 @@ media=xxxxxxxxx			- Specifies the media type the NIC operates at.
 				  2		10Mbps full duplex.
 				  3		100Mbps half duplex.
 				  4		100Mbps full duplex.
-				  5          	1000Mbps full duplex.
-				  6          	1000Mbps half duplex.
+				  5          	1000Mbps half duplex.
+				  6          	1000Mbps full duplex.
 
 				  By default, the NIC operates at autosense.
 				  Note that only 1000mbps_fd and 1000mbps_hd
 				  types are available for fiber adapter.
 
-vlan=x				- Specifies the VLAN ID. If vlan=0, the
+vlan=[0|1]			- Specifies the VLAN ID. If vlan=0, the
 				  Virtual Local Area Network (VLAN) function is
 				  disable.
 
-jumbo=x				- Specifies the jumbo frame support. If jumbo=1,
+jumbo=[0|1]			- Specifies the jumbo frame support. If jumbo=1,
 				  the NIC accept jumbo frames. By default, this
 				  function is disabled.
 				  Jumbo frame usually improve the performance
 				  int gigabit.
 				  
-int_count			- Rx frame count each interrupt.
-int_timeout			- Rx DMA wait time for an interrupt. Proper 
-				  values of int_count and int_timeout bring 
-				  a conspicuous performance in the fast machine. 
-				  Ex. int_count=5 and int_timeout=750 
+rx_coalesce=n			- Rx frame count each interrupt.
+rx_timeout=n			- Rx DMA wait time for an interrupt. Proper 
+				  values of rx_coalesce and rx_timeout bring 
+				  a conspicuous performance in the fast machine.
+				  Ex. rx_coalesce=5 and rx_timeout=750 
+
+tx_coalesce=n			- Tx transmit count each TxComp interrupt.
+				  Setting value larger than 1 will improve 
+				  performance, but this is possible to lower 
+				  stability in slow UP machines. By default, 
+				  tx_coalesce=1. (dl2k)
+				  
+tx_flow=[1|0]			- Specifies the Tx flow control. If tx_flow=1, 
+				  the Tx flow control enable.
+				  
+rx_flow=[1|0]			- Specifies the Rx flow control. If rx_flow=1, 
+				  the Rx flow control enable.
+
 
 Configuration Script Sample
 ===========================

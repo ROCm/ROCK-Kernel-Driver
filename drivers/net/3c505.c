@@ -35,7 +35,12 @@
  *                      Philip Blundell <Philip.Blundell@pobox.com>
  *              Multicard/soft configurable dma channel/rev 2 hardware support
  *                      by Christopher Collins <ccollins@pcug.org.au>
+ *		Ethtool support (jgarzik), 11/17/2001
  */
+
+#define DRV_NAME	"3c505"
+#define DRV_VERSION	"1.10a"
+
 
 /* Theory of operation:
  *
@@ -103,6 +108,9 @@
 #include <linux/slab.h>
 #include <linux/ioport.h>
 #include <linux/spinlock.h>
+#include <linux/ethtool.h>
+
+#include <asm/uaccess.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
@@ -148,10 +156,11 @@ static char couldnot_msg[] __initdata = "%s: 3c505 not found\n";
  *********************************************************/
 
 #ifdef ELP_DEBUG
-static const int elp_debug = ELP_DEBUG;
+static int elp_debug = ELP_DEBUG;
 #else
-static const int elp_debug;
+static int elp_debug;
 #endif
+#define debug elp_debug
 
 /*
  *  0 = no messages (well, some)
@@ -1260,6 +1269,87 @@ static void elp_set_mc_list(struct net_device *dev)
 	}
 }
 
+/**
+ * netdev_ethtool_ioctl: Handle network interface SIOCETHTOOL ioctls
+ * @dev: network interface on which out-of-band action is to be performed
+ * @useraddr: userspace address to which data is to be read and returned
+ *
+ * Process the various commands of the SIOCETHTOOL interface.
+ */
+
+static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
+{
+	u32 ethcmd;
+
+	/* dev_ioctl() in ../../net/core/dev.c has already checked
+	   capable(CAP_NET_ADMIN), so don't bother with that here.  */
+
+	if (get_user(ethcmd, (u32 *)useraddr))
+		return -EFAULT;
+
+	switch (ethcmd) {
+
+	case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
+		strcpy (info.driver, DRV_NAME);
+		strcpy (info.version, DRV_VERSION);
+		sprintf(info.bus_info, "ISA 0x%lx", dev->base_addr);
+		if (copy_to_user (useraddr, &info, sizeof (info)))
+			return -EFAULT;
+		return 0;
+	}
+
+	/* get message-level */
+	case ETHTOOL_GMSGLVL: {
+		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
+		edata.data = debug;
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	/* set message-level */
+	case ETHTOOL_SMSGLVL: {
+		struct ethtool_value edata;
+		if (copy_from_user(&edata, useraddr, sizeof(edata)))
+			return -EFAULT;
+		debug = edata.data;
+		return 0;
+	}
+
+	default:
+		break;
+	}
+
+	return -EOPNOTSUPP;
+}
+
+/**
+ * netdev_ioctl: Handle network interface ioctls
+ * @dev: network interface on which out-of-band action is to be performed
+ * @rq: user request data
+ * @cmd: command issued by user
+ *
+ * Process the various out-of-band ioctls passed to this driver.
+ */
+
+static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
+{
+	int rc = 0;
+
+	switch (cmd) {
+	case SIOCETHTOOL:
+		rc = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		break;
+
+	default:
+		rc = -EOPNOTSUPP;
+		break;
+	}
+
+	return rc;
+}
+ 
+
 /******************************************************
  *
  * initialise Etherlink Plus board
@@ -1280,6 +1370,7 @@ static inline void elp_init(struct net_device *dev)
 	dev->tx_timeout = elp_timeout;			/* local */
 	dev->watchdog_timeo = 10*HZ;
 	dev->set_multicast_list = elp_set_mc_list;	/* local */
+	dev->do_ioctl = netdev_ioctl;			/* local */
 
 	/* Setup the generic properties */
 	ether_setup(dev);

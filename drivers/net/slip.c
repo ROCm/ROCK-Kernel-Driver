@@ -483,7 +483,7 @@ static void sl_tx_timeout(struct net_device *dev)
 		 *      14 Oct 1994 Dmitry Gorodchanin.
 		 */
 #ifdef SL_CHECK_TRANSMIT
-		if (jiffies - dev->trans_start  < 20 * HZ)  {
+		if (time_before(jiffies, dev->trans_start + 20 * HZ))  {
 			/* 20 sec timeout not reached */
 			goto out;
 		}
@@ -1387,7 +1387,7 @@ cleanup_module(void)
 	int i;
 
 	if (slip_ctrls != NULL) {
-		unsigned long start = jiffies;
+		unsigned long timeout = jiffies + HZ;
 		int busy = 0;
 
 		/* First of all: check for active disciplines and hangup them.
@@ -1410,7 +1410,7 @@ cleanup_module(void)
 				spin_unlock(&slc->ctrl.lock);
 			}
 			local_bh_enable();
-		} while (busy && jiffies - start < 1*HZ);
+		} while (busy && time_before(jiffies, timeout));
 
 		busy = 0;
 		for (i = 0; i < slip_maxdev; i++) {

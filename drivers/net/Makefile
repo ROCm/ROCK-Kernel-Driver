@@ -68,7 +68,7 @@ obj-$(CONFIG_NE2K_PCI) += ne2k-pci.o 8390.o
 obj-$(CONFIG_PCNET32) += pcnet32.o
 obj-$(CONFIG_EEPRO100) += eepro100.o
 obj-$(CONFIG_TLAN) += tlan.o
-obj-$(CONFIG_EPIC100) += epic100.o
+obj-$(CONFIG_EPIC100) += epic100.o mii.o
 obj-$(CONFIG_SIS900) += sis900.o
 obj-$(CONFIG_DM9102) += dmfe.o
 obj-$(CONFIG_YELLOWFIN) += yellowfin.o
@@ -77,7 +77,7 @@ obj-$(CONFIG_VETH) += veth.o
 obj-$(CONFIG_NATSEMI) += natsemi.o
 obj-$(CONFIG_NS83820) += ns83820.o
 obj-$(CONFIG_STNIC) += stnic.o 8390.o
-obj-$(CONFIG_FEALNX) += fealnx.o
+obj-$(CONFIG_FEALNX) += fealnx.o mii.o
 
 ifeq ($(CONFIG_SK98LIN),y)
 obj-y += sk98lin/sk98lin.o
@@ -87,7 +87,7 @@ ifeq ($(CONFIG_SKFP),y)
   obj-y += skfp/skfp.o
 endif
 
-obj-$(CONFIG_VIA_RHINE) += via-rhine.o
+obj-$(CONFIG_VIA_RHINE) += via-rhine.o mii.o
 obj-$(CONFIG_ADAPTEC_STARFIRE) += starfire.o
 
 #
@@ -100,7 +100,7 @@ obj-$(CONFIG_AIRONET4500_NONCS)  += aironet4500_card.o
 obj-$(CONFIG_AIRONET4500_PROC)	+= aironet4500_proc.o
 obj-$(CONFIG_AIRONET4500_CS)	+= aironet4500_proc.o
 
-obj-$(CONFIG_WINBOND_840) += winbond-840.o
+obj-$(CONFIG_WINBOND_840) += winbond-840.o mii.o
 obj-$(CONFIG_SUNDANCE) += sundance.o
 obj-$(CONFIG_HAMACHI) += hamachi.o
 obj-$(CONFIG_NET) += Space.o setup.o net_init.o loopback.o
@@ -164,8 +164,8 @@ obj-$(CONFIG_EL3) += 3c509.o
 obj-$(CONFIG_3C515) += 3c515.o
 obj-$(CONFIG_EEXPRESS) += eexpress.o
 obj-$(CONFIG_EEXPRESS_PRO) += eepro.o
-obj-$(CONFIG_8139CP) += 8139cp.o
-obj-$(CONFIG_8139TOO) += 8139too.o
+obj-$(CONFIG_8139CP) += 8139cp.o mii.o
+obj-$(CONFIG_8139TOO) += 8139too.o mii.o
 obj-$(CONFIG_ARLAN) += arlan.o arlan-proc.o
 obj-$(CONFIG_ZNET) += znet.o
 obj-$(CONFIG_LAN_SAA9730) += saa9730.o

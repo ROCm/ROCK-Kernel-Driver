@@ -1,4 +1,4 @@
-#define VERSION "0.13"
+#define VERSION "0.14"
 /* ns83820.c by Benjamin LaHaise <bcrl@redhat.com>
  *
  * $Revision: 1.34.2.8 $
@@ -45,6 +45,7 @@
  *			0.12 - add statistics counters
  *			     - add allmulti/promisc support
  *	20011009	0.13 - hotplug support, other smaller pci api cleanups
+ *	20011117	0.14 - ethtool GDRVINFO, GLINK support
  *
  * Driver Overview
  * ===============
@@ -86,9 +87,11 @@
 #include <linux/in.h>	/* for IPPROTO_... */
 #include <linux/eeprom.h>
 #include <linux/compiler.h>
+#include <linux/ethtool.h>
 //#include <linux/skbrefill.h>
 
 #include <asm/io.h>
+#include <asm/uaccess.h>
 
 /* Dprintk is used for more interesting debug events */
 #undef Dprintk
@@ -1007,6 +1010,59 @@ static struct net_device_stats *ns83820_get_stats(struct net_device *_dev)
 	return &dev->stats;
 }
 
+static int ns83820_ethtool_ioctl (struct ns83820 *dev, void *useraddr)
+{
+	u32 ethcmd;
+
+	if (copy_from_user (&ethcmd, useraddr, sizeof (ethcmd)))
+		return -EFAULT;
+
+	switch (ethcmd) {
+	case ETHTOOL_GDRVINFO:
+		{
+			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
+			strcpy (info.driver, "ns83820");
+			strcpy (info.version, VERSION);
+			strcpy (info.bus_info, dev->pci_dev->slot_name);
+			if (copy_to_user (useraddr, &info, sizeof (info)))
+				return -EFAULT;
+			return 0;
+		}
+
+	/* get link status */
+	case ETHTOOL_GLINK: {
+		struct ethtool_value edata = {ETHTOOL_GLINK};
+		u32 cfg = readl(dev->base + CFG) ^ SPDSTS_POLARITY;
+
+		if (cfg & CFG_LNKSTS)
+			edata.data = 1;
+		else
+			edata.data = 0;
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+
+	default:
+		break;
+	}
+
+	return -EOPNOTSUPP;
+}
+
+static int ns83820_ioctl(struct net_device *_dev, struct ifreq *rq, int cmd)
+{
+	struct ns83820 *dev = _dev->priv;
+
+	switch(cmd) {
+	case SIOCETHTOOL:
+		return ns83820_ethtool_ioctl(dev, (void *) rq->ifr_data);
+
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
 static void ns83820_irq(int foo, void *data, struct pt_regs *regs)
 {
 	struct ns83820 *dev = data;
@@ -1294,6 +1350,7 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 	dev->net_dev.get_stats = ns83820_get_stats;
 	dev->net_dev.change_mtu = ns83820_change_mtu;
 	dev->net_dev.set_multicast_list = ns83820_set_multicast;
+	dev->net_dev.do_ioctl = ns83820_ioctl;
 	//FIXME: dev->net_dev.tx_timeout = ns83820_tx_timeout;
 
 	pci_set_drvdata(pci_dev, dev);

@@ -1472,21 +1472,18 @@ static int xircom_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	/* Legacy mii-diag interface */
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
-	case SIOCDEVPRIVATE:		/* for binary compat, remove in 2.5 */
 		if (tp->mii_cnt)
 			data[0] = phy;
 		else
 			return -ENODEV;
 		return 0;
 	case SIOCGMIIREG:		/* Read MII PHY register. */
-	case SIOCDEVPRIVATE+1:		/* for binary compat, remove in 2.5 */
 		save_flags(flags);
 		cli();
 		data[3] = mdio_read(dev, data[0] & 0x1f, data[1] & 0x1f);
 		restore_flags(flags);
 		return 0;
 	case SIOCSMIIREG:		/* Write MII PHY register. */
-	case SIOCDEVPRIVATE+2:		/* for binary compat, remove in 2.5 */
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
 		save_flags(flags);
