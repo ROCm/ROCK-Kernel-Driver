@@ -286,9 +286,16 @@ skip_copy_pte_range:
 					goto cont_copy_pte_range_noset;
 				}
 				pfn = pte_pfn(pte);
+				/* the pte points outside of valid memory, the
+				 * mapping is assumed to be good, meaningful
+				 * and not mapped via rmap - duplicate the
+				 * mapping as is.
+				 */
+				if (!pfn_valid(pfn)) {
+					set_pte(dst_pte, pte);
+					goto cont_copy_pte_range_noset;
+				}
 				page = pfn_to_page(pfn);
-				if (!pfn_valid(pfn))
-					goto cont_copy_pte_range;
 				if (PageReserved(page))
 					goto cont_copy_pte_range;
 
