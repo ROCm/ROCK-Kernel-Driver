@@ -1280,26 +1280,26 @@ asmlinkage long sys_accept(int fd, struct sockaddr *upeer_sockaddr, int *upeer_a
 	 * We don't need try_module_get here, as the listening socket (sock)
 	 * has the protocol module (sock->ops->owner) held.
 	 */
-	__module_get(sock->ops->owner);
+	__module_get(newsock->ops->owner);
 
 	err = sock->ops->accept(sock, newsock, sock->file->f_flags);
 	if (err < 0)
-		goto out_module_put;
+		goto out_release;
 
 	if (upeer_sockaddr) {
 		if(newsock->ops->getname(newsock, (struct sockaddr *)address, &len, 2)<0) {
 			err = -ECONNABORTED;
-			goto out_module_put;
+			goto out_release;
 		}
 		err = move_addr_to_user(address, len, upeer_sockaddr, upeer_addrlen);
 		if (err < 0)
-			goto out_module_put;
+			goto out_release;
 	}
 
 	/* File flags are not inherited via accept() unlike another OSes. */
 
 	if ((err = sock_map_fd(newsock)) < 0)
-		goto out_module_put;
+		goto out_release;
 
 	security_socket_post_accept(sock, newsock);
 
@@ -1307,8 +1307,6 @@ out_put:
 	sockfd_put(sock);
 out:
 	return err;
-out_module_put:
-	module_put(sock->ops->owner);
 out_release:
 	sock_release(newsock);
 	goto out_put;
