@@ -942,3 +942,47 @@ void ntfs_attr_put_search_ctx(ntfs_attr_search_ctx *ctx)
 	kmem_cache_free(ntfs_attr_ctx_cache, ctx);
 	return;
 }
+
+/**
+ * ntfs_attr_record_resize - resize an attribute record
+ * @m:		mft record containing attribute record
+ * @a:		attribute record to resize
+ * @new_size:	new size in bytes to which to resize the attribute record @a
+ *
+ * Resize the attribute record @a, i.e. the resident part of the attribute, in
+ * the mft record @m to @new_size bytes.
+ *
+ * Return 0 on success and -errno on error.  The following error codes are
+ * defined:
+ *	-ENOSPC	- Not enough space in the mft record @m to perform the resize.
+ *
+ * Note: On error, no modifications have been performed whatsoever.
+ *
+ * Warning: If you make a record smaller without having copied all the data you
+ *	    are interested in the data may be overwritten.
+ */
+int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size)
+{
+	ntfs_debug("Entering for new_size %u.", new_size);
+	/* Align to 8 bytes if it is not already done. */
+	if (new_size & 7)
+		new_size = (new_size + 7) & ~7;
+	/* If the actual attribute length has changed, move things around. */
+	if (new_size != le32_to_cpu(a->length)) {
+		u32 new_muse = le32_to_cpu(m->bytes_in_use) -
+				le32_to_cpu(a->length) + new_size;
+		/* Not enough space in this mft record. */
+		if (new_muse > le32_to_cpu(m->bytes_allocated))
+			return -ENOSPC;
+		/* Move attributes following @a to their new location. */
+		memmove((u8*)a + new_size, (u8*)a + le32_to_cpu(a->length),
+				le32_to_cpu(m->bytes_in_use) - ((u8*)a -
+				(u8*)m) - le32_to_cpu(a->length));
+		/* Adjust @m to reflect the change in used space. */
+		m->bytes_in_use = cpu_to_le32(new_muse);
+		/* Adjust @a to reflect the new size. */
+		if (new_size >= offsetof(ATTR_REC, length) + sizeof(a->length))
+			a->length = cpu_to_le32(new_size);
+	}
+	return 0;
+}

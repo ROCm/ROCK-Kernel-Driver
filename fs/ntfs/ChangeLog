@@ -35,10 +35,11 @@ ToDo/Notes:
 	  ntfs_get_size_for_mapping_pairs(), ntfs_write_significant_bytes(),
 	  and ntfs_mapping_pairs_build(), adapted from libntfs.
 	- Make fs/ntfs/lcnalloc.c::ntfs_cluster_free_from_rl_nolock() not
-	  static, add a declaration for it to lcnalloc.h.
+	  static and add a declaration for it to lcnalloc.h.
 	- Add fs/ntfs/lcnalloc.h::ntfs_cluster_free_from_rl() which is a static
 	  inline wrapper for ntfs_cluster_free_from_rl_nolock() which takes the
 	  cluster bitmap lock for the duration of the call.
+	- Add fs/ntfs/attrib.[hc]::ntfs_attr_record_resize().
 
 2.1.19 - Many cleanups, improvements, and a minor bug fix.
 
