@@ -77,7 +77,7 @@ fail:
 /* Initialize an ULP event from an given skb.  */
 void sctp_ulpevent_init(struct sctp_ulpevent *event, int msg_flags)
 {
-	memset(event, sizeof(struct sctp_ulpevent), 0x00);
+	memset(event, 0, sizeof(struct sctp_ulpevent));
 	event->msg_flags = msg_flags;
 }
 
