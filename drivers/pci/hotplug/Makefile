@@ -55,13 +55,6 @@ shpchp-objs		:=	shpchp_core.o	\
 				shpchp_sysfs.o	\
 				shpchp_hpc.o
 
-ifdef CONFIG_HOTPLUG_PCI_ACPI
-  EXTRA_CFLAGS  += -D_LINUX -I$(TOPDIR)/drivers/acpi
-  ifdef CONFIG_ACPI_DEBUG
-    EXTRA_CFLAGS += -DACPI_DEBUG_OUTPUT
-  endif
-endif
-
 ifeq ($(CONFIG_HOTPLUG_PCI_COMPAQ_NVRAM),y)
 	cpqphp-objs += cpqphp_nvram.o
 endif
@@ -70,16 +63,14 @@ ifeq ($(CONFIG_HOTPLUG_PCI_PCIE_PHPRM_NONACPI),y)
   pciehp-objs += pciehprm_nonacpi.o
 else
   pciehp-objs += pciehprm_acpi.o
-  EXTRA_CFLAGS  += -D_LINUX -I$(TOPDIR)/drivers/acpi -I$(TOPDIR)/drivers/acpi/include 
 endif
 
 ifeq ($(CONFIG_HOTPLUG_PCI_SHPC_PHPRM_LEGACY),y)
   shpchp-objs += shpchprm_legacy.o
 else
-   ifeq ($(CONFIG_HOTPLUG_PCI_SHPC_PHPRM_NONACPI),y)
-     shpchp-objs += shpchprm_nonacpi.o
-   else
-      shpchp-objs += shpchprm_acpi.o
-      EXTRA_CFLAGS  += -D_LINUX -I$(TOPDIR)/drivers/acpi 
-   endif
+  ifeq ($(CONFIG_HOTPLUG_PCI_SHPC_PHPRM_NONACPI),y)
+    shpchp-objs += shpchprm_nonacpi.o
+  else
+    shpchp-objs += shpchprm_acpi.o
+  endif
 endif
