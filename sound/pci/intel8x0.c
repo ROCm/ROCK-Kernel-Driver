@@ -1580,8 +1580,11 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 		goto __skip_secondary;
 	for (i = 1; i < codecs; i++) {
 		ac97.num = i;
-		if ((err = snd_ac97_mixer(chip->card, &ac97, &x97)) < 0)
-			return err;
+		if ((err = snd_ac97_mixer(chip->card, &ac97, &x97)) < 0) {
+			snd_printk("Unable to initialize codec #%i [device = %i, GLOB_STA = 0x%x]\n", i, chip->device_type, glob_sta);
+			codecs = i;
+			break;
+		}
 		chip->ac97[i] = x97;
 		if (chip->device_type == DEVICE_INTEL_ICH4 && chip->ichd[ICHD_PCM2IN].ac97 == NULL)
 			chip->ichd[ICHD_PCM2IN].ac97 = x97;

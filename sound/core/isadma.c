@@ -30,8 +30,6 @@
 #include <sound/core.h>
 #include <asm/dma.h>
 
-#ifdef CONFIG_ISA
-
 /*
  *
  */
@@ -78,5 +76,3 @@ unsigned int snd_dma_residue(unsigned long dma)
 	release_dma_lock(flags);
 	return result;
 }
-
-#endif /* CONFIG_ISA */

@@ -545,35 +545,36 @@ int copy_from_user_toio(unsigned long dst, const void *src, size_t count)
  *
  * since pci_alloc_consistent always tries GFP_DMA when the requested
  * pci memory region is below 32bit, it happens quite often that even
- * 2 order or pages cannot be allocated.
+ * 2 order of pages cannot be allocated.
  *
- * so in the following, GFP_DMA is used only when the first allocation
- * doesn't match the requested region.
+ * so in the following, we allocate at first without dma_mask, so that
+ * allocation will be done without GFP_DMA.  if the area doesn't match
+ * with the requested region, then realloate with the original dma_mask
+ * again.
  */
-#ifdef __i386__
-#define get_phys_addr(x) virt_to_phys(x)
-#else /* ppc and x86-64 */
-#define get_phys_addr(x) virt_to_bus(x)
-#endif
+
+#undef pci_alloc_consistent
+
 void *snd_pci_hack_alloc_consistent(struct pci_dev *hwdev, size_t size,
 				    dma_addr_t *dma_handle)
 {
 	void *ret;
-	int gfp = GFP_ATOMIC;
+	u64 dma_mask;
+	unsigned long rmask;
 
 	if (hwdev == NULL)
-		gfp |= GFP_DMA;
-	ret = (void *)__get_free_pages(gfp, get_order(size));
-	if (ret) {
-		if (hwdev && ((get_phys_addr(ret) + size - 1) & ~hwdev->dma_mask)) {
-			free_pages((unsigned long)ret, get_order(size));
-			ret = (void *)__get_free_pages(gfp | GFP_DMA, get_order(size));
-		}
+		return pci_alloc_consistent(hwdev, size, dma_handle);
+	dma_mask = hwdev->dma_mask;
+	rmask = ~((unsigned long)dma_mask);
+	hwdev->dma_mask = 0xffffffff; /* do without masking */
+	ret = pci_alloc_consistent(hwdev, size, dma_handle);
+	if (ret && ((*dma_handle + size - 1) & rmask)) {
+		pci_free_consistent(hwdev, size, ret, *dma_handle);
+		ret = 0;
 	}
-	if (ret) {
-		memset(ret, 0, size);
-		*dma_handle = get_phys_addr(ret);
-	}
+	hwdev->dma_mask = dma_mask; /* restore */
+	if (! ret)
+		ret = pci_alloc_consistent(hwdev, size, dma_handle);
 	return ret;
 }
 #endif /* hack */

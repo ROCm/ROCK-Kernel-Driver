@@ -1,5 +1,5 @@
 /*
- * Driver for ESS Maestro3/Allegro soundcards.
+ * Driver for ESS Maestro3/Allegro (ES1988) soundcards.
  * Copyright (c) 2000 by Zach Brown <zab@zabbo.net>
  *                       Takashi Iwai <tiwai@suse.de>
  *
@@ -52,6 +52,7 @@ MODULE_DESCRIPTION("ESS Maestro3 PCI");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
 MODULE_DEVICES("{{ESS,Maestro3 PCI},"
+		"{ESS,ES1988},"
 		"{ESS,Allegro PCI},"
 		"{ESS,Allegro-1 PCI},"
 	        "{ESS,Canyon3D-2/LE PCI}}");

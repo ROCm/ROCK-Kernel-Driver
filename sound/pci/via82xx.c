@@ -124,7 +124,7 @@ MODULE_PARM_SYNTAX(snd_ac97_clock, SNDRV_ENABLED ",default:48000");
 #define   VIA8233_REG_TYPE_16BIT	0x00200000	/* RW */
 #define   VIA8233_REG_TYPE_STEREO	0x00100000	/* RW */
 #define VIA_REG_OFFSET_CURR_COUNT	0x0c	/* dword - channel current count (24 bit) */
-#define VIA_REG_OFFSET_CURR_INDEX	0x0f	/* byte - channel current index */
+#define VIA_REG_OFFSET_CURR_INDEX	0x0f	/* byte - channel current index (for via8233 only) */
 
 #define DEFINE_VIA_REGSET(name,val) \
 enum {\
@@ -159,8 +159,8 @@ DEFINE_VIA_REGSET(FM, 0x20);
 #define VIA_REG_SGD_SHADOW		0x84	/* dword */
 
 /* multi-channel and capture registers for via8233 */
-DEFINE_VIA_REGSET(MULTPLAY, 0x20);
-DEFINE_VIA_REGSET(CAPTURE_8233, 0x10);
+DEFINE_VIA_REGSET(MULTPLAY, 0x40);
+DEFINE_VIA_REGSET(CAPTURE_8233, 0x60);
 
 /* via8233-specific registers */
 #define VIA_REG_PLAYBACK_VOLUME_L	0x02	/* byte */
@@ -183,66 +183,83 @@ DEFINE_VIA_REGSET(CAPTURE_8233, 0x10);
  * pcm stream
  */
 
+struct snd_via_sg_table {
+	unsigned int offset;
+	unsigned int size;
+} ;
+
+#define VIA_TABLE_SIZE	255
+
 typedef struct {
 	unsigned long reg_offset;
         snd_pcm_substream_t *substream;
 	int running;
-        unsigned int size;
-        unsigned int fragsize;
-	unsigned int frags;
-	unsigned int lastptr;
-	unsigned int lastcount;
-	unsigned int page_per_frag;
-	unsigned int curidx;
-	unsigned int tbl_entries;	/* number of descriptor table entries */
-	unsigned int tbl_size;		/* size of a table entry */
+	unsigned int tbl_entries; /* # descriptors */
 	u32 *table; /* physical address + flag */
 	dma_addr_t table_addr;
+	struct snd_via_sg_table *idx_table;
 } viadev_t;
 
 
 static int build_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
 			   struct pci_dev *pci)
 {
-	int i, size;
+	int i, idx, ofs, rest, fragsize;
+	snd_pcm_runtime_t *runtime = substream->runtime;
 	struct snd_sg_buf *sgbuf = snd_magic_cast(snd_pcm_sgbuf_t, substream->dma_private, return -EINVAL);
 
-	if (dev->table) {
-		snd_free_pci_pages(pci, PAGE_ALIGN(dev->tbl_entries * 8), dev->table, dev->table_addr);
-		dev->table = NULL;
+	if (! dev->table) {
+		/* the start of each lists must be aligned to 8 bytes,
+		 * but the kernel pages are much bigger, so we don't care
+		 */
+		dev->table = (u32*)snd_malloc_pci_pages(pci, PAGE_ALIGN(VIA_TABLE_SIZE * 2 * 8), &dev->table_addr);
+		if (! dev->table)
+			return -ENOMEM;
+	}
+	if (! dev->idx_table) {
+		dev->idx_table = kmalloc(sizeof(unsigned int) * VIA_TABLE_SIZE, GFP_KERNEL);
+		if (! dev->idx_table)
+			return -ENOMEM;
 	}
 
-	/* allocate buffer descriptor lists */
-	if (dev->fragsize < PAGE_SIZE) {
-		dev->tbl_size = dev->fragsize;
-		dev->tbl_entries = dev->frags;
-		dev->page_per_frag = 1;
-	} else {
-		dev->tbl_size = PAGE_SIZE;
-		dev->tbl_entries = sgbuf->pages;
-		dev->page_per_frag = dev->fragsize >> PAGE_SHIFT;
+	/* fill the entries */
+	fragsize = snd_pcm_lib_period_bytes(substream);
+	idx = 0;
+	ofs = 0;
+	for (i = 0; i < runtime->periods; i++) {
+		rest = fragsize;
+		/* fill descriptors for a period.
+		 * a period can be split to several descriptors if it's
+		 * over page boundary.
+		 */
+		do {
+			int r;
+			unsigned int flag;
+			dev->table[idx << 1] = cpu_to_le32((u32)snd_pcm_sgbuf_get_addr(sgbuf, ofs));
+			r = PAGE_SIZE - (ofs % PAGE_SIZE);
+			if (rest < r)
+				r = rest;
+			rest -= r;
+			if (! rest) {
+				if (i == runtime->periods - 1)
+					flag = VIA_TBL_BIT_EOL; /* buffer boundary */
+				else
+					flag = VIA_TBL_BIT_FLAG; /* period boundary */
+			} else
+				flag = 0; /* period continues to the next */
+			// printk("via: tbl %d: at %d  size %d (rest %d)\n", idx, ofs, r, rest);
+			dev->table[(idx<<1) + 1] = cpu_to_le32(r | flag);
+			dev->idx_table[idx].offset = ofs;
+			dev->idx_table[idx].size = r;
+			ofs += r;
+			idx++;
+			if (idx >= VIA_TABLE_SIZE) {
+				snd_printk(KERN_ERR "via82xx: too much table size!\n");
+				return -EINVAL;
+			}
+		} while (rest > 0);
 	}
-	/* the start of each lists must be aligned to 8 bytes,
-	 * but the kernel pages are much bigger, so we don't care
-	 */
-	dev->table = (u32*)snd_malloc_pci_pages(pci, PAGE_ALIGN(dev->tbl_entries * 8), &dev->table_addr);
-	if (! dev->table)
-		return -ENOMEM;
-
-	if (dev->tbl_size < PAGE_SIZE) {
-		for (i = 0; i < dev->tbl_entries; i++)
-			dev->table[i << 1] = cpu_to_le32((u32)sgbuf->table[0].addr + dev->fragsize * i);
-	} else {
-		for (i = 0; i < dev->tbl_entries; i++)
-			dev->table[i << 1] = cpu_to_le32((u32)sgbuf->table[i].addr);
-	}
-	size = dev->size;
-	for (i = 0; i < dev->tbl_entries - 1; i++) {
-		dev->table[(i << 1) + 1] = cpu_to_le32(VIA_TBL_BIT_FLAG | dev->tbl_size);
-		size -= dev->tbl_size;
-	}
-	dev->table[(dev->tbl_entries << 1) - 1] = cpu_to_le32(VIA_TBL_BIT_EOL | size);
-
+	dev->tbl_entries = idx;
 	return 0;
 }
 
@@ -254,13 +271,17 @@ static void clean_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
 		snd_free_pci_pages(pci, PAGE_ALIGN(dev->tbl_entries * 8), dev->table, dev->table_addr);
 		dev->table = NULL;
 	}
+	if (dev->idx_table) {
+		kfree(dev->idx_table);
+		dev->idx_table = NULL;
+	}
 }
 
 
 /*
  */
 
-enum { TYPE_VIA686, TYPE_VIA8233 };
+enum { TYPE_VIA686 = 1, TYPE_VIA8233 };
 
 typedef struct _snd_via82xx via82xx_t;
 #define chip_t via82xx_t
@@ -295,8 +316,8 @@ struct _snd_via82xx {
 };
 
 static struct pci_device_id snd_via82xx_ids[] __devinitdata = {
-	{ 0x1106, 0x3058, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },	/* 686A */
-	{ 0x1106, 0x3059, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },	/* VT8233 */
+	{ 0x1106, 0x3058, PCI_ANY_ID, PCI_ANY_ID, 0, 0, TYPE_VIA686, },	/* 686A */
+	{ 0x1106, 0x3059, PCI_ANY_ID, PCI_ANY_ID, 0, 0, TYPE_VIA8233, },	/* VT8233 */
 	{ 0, }
 };
 
@@ -456,21 +477,7 @@ static int snd_via82xx_setup_periods(via82xx_t *chip, viadev_t *viadev,
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	unsigned long port = chip->port + viadev->reg_offset;
-	int v, err;
-
-	viadev->size = snd_pcm_lib_buffer_bytes(substream);
-	viadev->fragsize = snd_pcm_lib_period_bytes(substream);
-	viadev->frags = runtime->periods;
-	viadev->lastptr = ~0;
-	viadev->lastcount = ~0;
-	viadev->curidx = 0;
-
-	/* the period size must be in power of 2 */
-	v = ld2(viadev->fragsize);
-	if (viadev->fragsize != (1 << v)) {
-		snd_printd(KERN_ERR "invalid fragment size %d\n", viadev->fragsize);
-		return -EINVAL;
-	}
+	int err;
 
 	snd_via82xx_channel_reset(chip, viadev);
 
@@ -478,7 +485,6 @@ static int snd_via82xx_setup_periods(via82xx_t *chip, viadev_t *viadev,
 	if (err < 0)
 		return err;
 
-	runtime->dma_bytes = viadev->size;
 	outl((u32)viadev->table_addr, port + VIA_REG_OFFSET_TABLE_PTR);
 	switch (chip->chip_type) {
 	case TYPE_VIA686:
@@ -524,13 +530,9 @@ static inline void snd_via82xx_update(via82xx_t *chip, viadev_t *viadev)
 {
 	outb(VIA_REG_STAT_FLAG | VIA_REG_STAT_EOL, VIAREG(chip, OFFSET_STATUS) + viadev->reg_offset);
 	if (viadev->substream && viadev->running) {
-		viadev->curidx++;
-		if (viadev->curidx >= viadev->page_per_frag) {
-			viadev->curidx = 0;
-			spin_unlock(&chip->reg_lock);
-			snd_pcm_period_elapsed(viadev->substream);
-			spin_lock(&chip->reg_lock);
-		}
+		spin_unlock(&chip->reg_lock);
+		snd_pcm_period_elapsed(viadev->substream);
+		spin_lock(&chip->reg_lock);
 	}
 }
 
@@ -613,10 +615,8 @@ static int snd_via82xx_capture_prepare(snd_pcm_substream_t * substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	snd_ac97_set_rate(chip->ac97, AC97_PCM_LR_ADC_RATE, runtime->rate);
-	if (chip->chip_type == TYPE_VIA8233) {
-		outb(VIA_REG_CAPTURE_CHANNEL_LINE, VIAREG(chip, CAPTURE_CHANNEL));
+	if (chip->chip_type == TYPE_VIA8233)
 		outb(VIA_REG_CAPTURE_FIFO_ENABLE, VIAREG(chip, CAPTURE_FIFO));
-	}
 	return snd_via82xx_setup_periods(chip, &chip->capture, substream);
 }
 
@@ -624,43 +624,33 @@ static inline unsigned int snd_via82xx_cur_ptr(via82xx_t *chip, viadev_t *viadev
 {
 	unsigned int val, ptr, count;
 	
-	ptr = inl(VIAREG(chip, OFFSET_CURR_PTR) + viadev->reg_offset)/* & 0xffffff*/;
+	snd_assert(viadev->tbl_entries, return 0);
+	if (!(inb(VIAREG(chip, OFFSET_STATUS) + viadev->reg_offset) & VIA_REG_STAT_ACTIVE))
+		return 0;
+
+	count = inl(VIAREG(chip, OFFSET_CURR_COUNT) + viadev->reg_offset) & 0xffffff;
 	switch (chip->chip_type) {
 	case TYPE_VIA686:
-		count = inl(VIAREG(chip, OFFSET_CURR_COUNT) + viadev->reg_offset);
-		if (ptr == viadev->lastptr && count > viadev->lastcount)
-			ptr += 8;
-		if (!(inb(VIAREG(chip, OFFSET_STATUS) + viadev->reg_offset) & VIA_REG_STAT_ACTIVE))
-			return 0;
-		snd_assert(viadev->tbl_entries, return 0);
-		/* get index */
+		/* The via686a does not have the current index register,
+		 * so we need to calculate the index from CURR_PTR.
+		 */
+		ptr = inl(VIAREG(chip, OFFSET_CURR_PTR) + viadev->reg_offset);
 		if (ptr <= (unsigned int)viadev->table_addr)
 			val = 0;
-		else
+		else /* CURR_PTR holds the address + 8 */
 			val = ((ptr - (unsigned int)viadev->table_addr) / 8 - 1) % viadev->tbl_entries;
-		viadev->lastptr = ptr;
-		viadev->lastcount = count;
 		break;
 
 	case TYPE_VIA8233:
 	default:
-		count = inl(VIAREG(chip, OFFSET_CURR_COUNT) + viadev->reg_offset) & 0xffffff;
-		/* The via686a does not have this current index register,
-		 * this register makes life easier for us here. */
+		/* ah, this register makes life easier for us here. */
 		val = inb(VIAREG(chip, OFFSET_CURR_INDEX) + viadev->reg_offset) % viadev->tbl_entries;
 		break;
 	}
 
 	/* convert to the linear position */
-	if (val < viadev->tbl_entries - 1) {
-		val *= viadev->tbl_size;
-		val += viadev->tbl_size - count;
-	} else {
-		val *= viadev->tbl_size;
-		val += (viadev->size % viadev->tbl_size) + 1 - count;
-	}
-	// printk("pointer: ptr = 0x%x (%i), count = 0x%x, val = 0x%x\n", ptr, count, val);
-	return val;
+	return viadev->idx_table[val].offset +
+		viadev->idx_table[val].size - count;
 }
 
 static snd_pcm_uframes_t snd_via82xx_playback_pointer(snd_pcm_substream_t * substream)
@@ -691,7 +681,7 @@ static snd_pcm_hardware_t snd_via82xx_playback =
 	.period_bytes_min =	32,
 	.period_bytes_max =	128 * 1024,
 	.periods_min =		2,
-	.periods_max =		128,
+	.periods_max =		VIA_TABLE_SIZE / 2,
 	.fifo_size =		0,
 };
 
@@ -710,7 +700,7 @@ static snd_pcm_hardware_t snd_via82xx_capture =
 	.period_bytes_min =	32,
 	.period_bytes_max =	128 * 1024,
 	.periods_min =		2,
-	.periods_max =		128,
+	.periods_max =		VIA_TABLE_SIZE / 2,
 	.fifo_size =		0,
 };
 
@@ -739,18 +729,10 @@ static int snd_via82xx_playback_open(snd_pcm_substream_t * substream)
 		runtime->hw.rate_min = 48000;
 	if ((err = snd_pcm_sgbuf_init(substream, chip->pci, 32)) < 0)
 		return err;
-	if ((err = snd_pcm_hw_constraint_pow2(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_BYTES)) < 0)
-		return err;
 	/* we may remove following constaint when we modify table entries
 	   in interrupt */
-#if 0
-	/* applying the following constraint together with the power-of-2 rule
-	 * above may result in too narrow space.
-	 * this one is not strictly necessary, so let's disable it.
-	 */
 	if ((err = snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS)) < 0)
 		return err;
-#endif
 	if (chip->chip_type == TYPE_VIA8233) {
 		runtime->hw.channels_max = 6;
 		snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS, &hw_constraints_channels);
@@ -771,12 +753,8 @@ static int snd_via82xx_capture_open(snd_pcm_substream_t * substream)
 		runtime->hw.rate_min = 48000;
 	if ((err = snd_pcm_sgbuf_init(substream, chip->pci, 32)) < 0)
 		return err;
-	if ((err = snd_pcm_hw_constraint_pow2(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_BYTES)) < 0)
-		return err;
-#if 0
 	if ((err = snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS)) < 0)
 		return err;
-#endif
 	return 0;
 }
 
@@ -863,6 +841,52 @@ static int __devinit snd_via82xx_pcm(via82xx_t *chip, int device, snd_pcm_t ** r
 /*
  *  Mixer part
  */
+
+static int snd_via8233_capture_source_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
+{
+	static char *texts[2] = {
+		"Line", "Mic"
+	};
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
+	uinfo->count = 1;
+	uinfo->value.enumerated.items = 2;
+	if (uinfo->value.enumerated.item >= 2)
+		uinfo->value.enumerated.item = 1;
+	strcpy(uinfo->value.enumerated.name, texts[uinfo->value.enumerated.item]);
+	return 0;
+}
+
+static int snd_via8233_capture_source_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	via82xx_t *chip = snd_kcontrol_chip(kcontrol);
+	ucontrol->value.enumerated.item[0] = inb(VIAREG(chip, CAPTURE_CHANNEL)) & VIA_REG_CAPTURE_CHANNEL_MIC ? 1 : 0;
+	return 0;
+}
+
+static int snd_via8233_capture_source_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	via82xx_t *chip = snd_kcontrol_chip(kcontrol);
+	unsigned long flags;
+	u8 val, oval;
+
+	spin_lock_irqsave(&chip->reg_lock, flags);
+	oval = inb(VIAREG(chip, CAPTURE_CHANNEL));
+	val = oval & ~VIA_REG_CAPTURE_CHANNEL_MIC;
+	if (ucontrol->value.enumerated.item[0])
+		val |= VIA_REG_CAPTURE_CHANNEL_MIC;
+	if (val != oval)
+		outb(val, VIAREG(chip, CAPTURE_CHANNEL));
+	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	return val != oval;
+}
+
+static snd_kcontrol_new_t snd_via8233_capture_source __devinitdata = {
+	.name = "Input Source Select",
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.info = snd_via8233_capture_source_info,
+	.get = snd_via8233_capture_source_get,
+	.put = snd_via8233_capture_source_put,
+};
 
 static void snd_via82xx_mixer_free_ac97(ac97_t *ac97)
 {
@@ -1267,6 +1291,14 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 	
 		/* card switches */
 		err = snd_ctl_add(card, snd_ctl_new1(&snd_via82xx_joystick_control, chip));
+		if (err < 0) {
+			snd_card_free(card);
+			return err;
+		}
+
+	} else {
+		/* VIA8233 */
+		err = snd_ctl_add(card, snd_ctl_new1(&snd_via8233_capture_source, chip));
 		if (err < 0) {
 			snd_card_free(card);
 			return err;

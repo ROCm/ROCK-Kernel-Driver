@@ -446,7 +446,7 @@ static int snd_dummy_volume_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	left = ucontrol->value.integer.value[0] % 101;
 	right = ucontrol->value.integer.value[1] % 101;
 	spin_lock_irqsave(&dummy->mixer_lock, flags);
-	change = dummy->mixer_volume[addr][0] != left &&
+	change = dummy->mixer_volume[addr][0] != left ||
 	         dummy->mixer_volume[addr][1] != right;
 	dummy->mixer_volume[addr][0] = left;
 	dummy->mixer_volume[addr][1] = right;

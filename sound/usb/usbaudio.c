@@ -766,6 +766,7 @@ static int init_substream_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *run
 		subs->curpacksize = subs->maxpacksize;
 	else
 		subs->curpacksize = maxsize;
+	subs->curframesize = bytes_to_frames(runtime, subs->curpacksize);
 
 	/* allocate a temporary buffer for playback */
 	if (is_playback) {

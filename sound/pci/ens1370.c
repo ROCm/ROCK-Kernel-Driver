@@ -1319,7 +1319,10 @@ static int snd_ensoniq_1371_mixer(ensoniq_t * ensoniq)
 		if (ensoniq->pci->vendor == es1371_spdif_present[idx].vid &&
 		    ensoniq->pci->device == es1371_spdif_present[idx].did &&
 		    ensoniq->rev == es1371_spdif_present[idx].rev) {
-			snd_ctl_add(card, snd_ctl_new1(&snd_es1371_mixer_spdif, ensoniq));
+		    	snd_kcontrol_t *kctl = snd_ctl_new1(&snd_es1371_mixer_spdif, ensoniq); 
+		    	if (ensoniq->u.es1371.ac97->ext_id & AC97_EI_SPDIF)
+			    	kctl->id.index = 1;
+			snd_ctl_add(card, kctl);
 			break;
 		}
 	return 0;

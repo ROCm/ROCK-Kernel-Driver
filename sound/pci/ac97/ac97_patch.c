@@ -31,6 +31,7 @@
 #include <sound/ac97_codec.h>
 #include <sound/asoundef.h>
 #include <sound/initval.h>
+#include "ac97_patch.h"
 
 /*
  *  Chip specific initialization
@@ -321,5 +322,17 @@ int patch_ad1886(ac97_t * ac97)
 	/* Presario700 workaround */
 	/* for Jack Sense/SPDIF Register misetting causing */
 	snd_ac97_write_cache(ac97, AC97_AD_JACK_SPDIF, 0x0010);
+	return 0;
+}
+
+int patch_ad1980(ac97_t * ac97)
+{
+	unsigned short misc;
+	
+	patch_ad1881(ac97);
+	/* Switch FRONT/SURROUND LINE-OUT/HP-OUT default connection */
+	/* it seems that most vendors connect line-out connector to headphone out of AC'97 */
+	misc = snd_ac97_read(ac97, AC97_AD_MISC);
+	snd_ac97_write_cache(ac97, AC97_AD_MISC, misc | 0x0420);
 	return 0;
 }
