@@ -981,14 +981,14 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 	int cpu, this_cpu, success = 0;
 	unsigned long flags;
 	long old_state;
-	runqueue_t *rq;
+	runqueue_t *rq, *old_rq;
 #ifdef CONFIG_SMP
 	unsigned long load, this_load;
 	struct sched_domain *sd;
 	int new_cpu;
 #endif
 
-	rq = task_rq_lock(p, &flags);
+	old_rq = rq = task_rq_lock(p, &flags);
 	schedstat_inc(rq, ttwu_cnt);
 	old_state = p->state;
 	if (!(old_state & state))
@@ -1083,7 +1083,7 @@ out_set_cpu:
 out_activate:
 #endif /* CONFIG_SMP */
 	if (old_state == TASK_UNINTERRUPTIBLE) {
-		rq->nr_uninterruptible--;
+		old_rq->nr_uninterruptible--;
 		/*
 		 * Tasks on involuntary sleep don't earn
 		 * sleep_avg beyond just interactive state.
