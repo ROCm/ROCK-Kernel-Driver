@@ -170,8 +170,7 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
 	/*
 	 *  Allocate new instance of the driver
 	 */
-	dev = alloc_netdev(sizeof(struct w83977af_ir), "irda%d",
-			   irda_device_setup);
+	dev = alloc_irdadev(sizeof(struct w83977af_ir));
 	if (dev == NULL) {
 		printk( KERN_ERR "IrDA: Can't allocate memory for "
 			"IrDA control block!\n");
