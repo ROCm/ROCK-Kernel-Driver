@@ -1287,7 +1287,7 @@ typedef struct smb_com_transaction2_ffirst_req {
 
 typedef struct smb_com_transaction2_ffirst_rsp {
 	struct smb_hdr hdr;	/* wct = 10 */
-	struct trans2_req t2;
+	struct trans2_resp t2;
 	__u16 ByteCount;
 } TRANSACTION2_FFIRST_RSP;
 
@@ -1329,17 +1329,7 @@ typedef struct smb_com_transaction2_fnext_req {
 
 typedef struct smb_com_transaction2_fnext_rsp {
 	struct smb_hdr hdr;	/* wct = 10 */
-	__le16 TotalParameterCount;
-	__le16 TotalDataCount;
-	__u16 Reserved;
-	__le16 ParameterCount;
-	__le16 ParameterOffset;
-	__le16 ParameterDisplacement;
-	__le16 DataCount;
-	__le16 DataOffset;
-	__le16 DataDisplacement;
-	__u8 SetupCount;
-	__u8 Reserved1;		/* should be zero setup words following */
+	struct trans2_resp t2;
 	__u16 ByteCount;
 } TRANSACTION2_FNEXT_RSP;
 
@@ -1388,17 +1378,7 @@ typedef struct smb_com_transaction2_qfsi_req {
 
 typedef struct smb_com_transaction_qfsi_rsp {
 	struct smb_hdr hdr;	/* wct = 10 + SetupCount */
-	__le16 TotalParameterCount;
-	__le16 TotalDataCount;
-	__u16 Reserved;
-	__le16 ParameterCount;
-	__le16 ParameterOffset;
-	__le16 ParameterDisplacement;
-	__le16 DataCount;
-	__le16 DataOffset;
-	__le16 DataDisplacement;
-	__u8 SetupCount;
-	__u8 Reserved1;		/* should be zero setup words following */
+	struct trans2_resp t2;
 	__u16 ByteCount;
 	__u8 Pad;		/* may be three bytes *//* followed by data area */
 } TRANSACTION2_QFSI_RSP;

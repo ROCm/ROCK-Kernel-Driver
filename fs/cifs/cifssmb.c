@@ -2132,12 +2132,12 @@ CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 			*pUnicodeFlag = FALSE;
 		memcpy(findParms,
 		       (char *) &pSMBr->hdr.Protocol +
-		       le16_to_cpu(pSMBr->ParameterOffset),
+		       le16_to_cpu(pSMBr->t2.ParameterOffset),
 		       sizeof (T2_FNEXT_RSP_PARMS));
 		response_data =
 		    (char *) &pSMBr->hdr.Protocol +
-		    le16_to_cpu(pSMBr->DataOffset);
-		memcpy(findData, response_data, le16_to_cpu(pSMBr->DataCount));
+		    le16_to_cpu(pSMBr->t2.DataOffset);
+		memcpy(findData,response_data,le16_to_cpu(pSMBr->t2.DataCount));
 	}
 	if (pSMB)
 		cifs_buf_release(pSMB);
@@ -2431,7 +2431,7 @@ QFSInfoRetry:
 	if (rc) {
 		cERROR(1, ("Send error in QFSInfo = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
+		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 		cFYI(1,
 		     ("Decoding qfsinfo response.  BCC: %d  Offset %d",
 		      pSMBr->ByteCount, data_offset));
@@ -2513,7 +2513,7 @@ QFSAttributeRetry:
 	if (rc) {
 		cERROR(1, ("Send error in QFSAttributeInfo = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
+		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 		if ((pSMBr->ByteCount < 13) || (data_offset > 512)) {	/* BB also check enough bytes returned */
 			rc = -EIO;	/* bad smb */
 		} else {
@@ -2582,7 +2582,7 @@ QFSDeviceRetry:
 	if (rc) {
 		cFYI(1, ("Send error in QFSDeviceInfo = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
+		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 		if ((pSMBr->ByteCount < sizeof (FILE_SYSTEM_DEVICE_INFO))
                  || (data_offset > 512))
 			rc = -EIO;	/* bad smb */
@@ -2651,7 +2651,7 @@ QFSUnixRetry:
 	if (rc) {
 		cERROR(1, ("Send error in QFSUnixInfo = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
+		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 		if ((pSMBr->ByteCount < 13) || (data_offset > 512)) {
 			rc = -EIO;	/* bad smb */
 		} else {
