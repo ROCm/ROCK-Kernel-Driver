@@ -863,9 +863,11 @@ static ssize_t show_product (struct device *dev, char *buf, size_t count, loff_t
 		return 0;
 	udev = to_usb_device (dev);
 
-	len = usb_string(udev, udev->descriptor.iProduct, buf, PAGE_SIZE); 
+	len = usb_string(udev, udev->descriptor.iProduct, buf, PAGE_SIZE);
+	if (len < 0)
+		return 0;
 	buf[len] = '\n';
-	buf[len+1] = 0x00;
+	buf[len+1] = 0;
 	return len+1;
 }
 static DEVICE_ATTR(product,"product",S_IRUGO,show_product,NULL);
@@ -881,9 +883,11 @@ show_manufacturer (struct device *dev, char *buf, size_t count, loff_t off)
 		return 0;
 	udev = to_usb_device (dev);
 
-	len = usb_string(udev, udev->descriptor.iManufacturer, buf, PAGE_SIZE); 
+	len = usb_string(udev, udev->descriptor.iManufacturer, buf, PAGE_SIZE);
+	if (len < 0)
+		return 0;
 	buf[len] = '\n';
-	buf[len+1] = 0x00;
+	buf[len+1] = 0;
 	return len+1;
 }
 static DEVICE_ATTR(manufacturer,"manufacturer",S_IRUGO,show_manufacturer,NULL);
@@ -899,9 +903,11 @@ show_serial (struct device *dev, char *buf, size_t count, loff_t off)
 		return 0;
 	udev = to_usb_device (dev);
 
-	len = usb_string(udev, udev->descriptor.iSerialNumber, buf, PAGE_SIZE); 
+	len = usb_string(udev, udev->descriptor.iSerialNumber, buf, PAGE_SIZE);
+	if (len < 0)
+		return 0;
 	buf[len] = '\n';
-	buf[len+1] = 0x00;
+	buf[len+1] = 0;
 	return len+1;
 }
 static DEVICE_ATTR(serial,"serial",S_IRUGO,show_serial,NULL);
@@ -918,13 +924,13 @@ static void usb_find_drivers(struct usb_device *dev)
 	unsigned claimed = 0;
 
 	/* FIXME should get called for each new configuration not just the
-	 * first one for a device. switching configs (or altesettings) should
+	 * first one for a device. switching configs (or altsettings) should
 	 * undo driverfs and HCD state for the previous interfaces.
 	 */
 	for (ifnum = 0; ifnum < dev->actconfig->bNumInterfaces; ifnum++) {
 		struct usb_interface *interface = &dev->actconfig->interface[ifnum];
 		struct usb_interface_descriptor *desc = interface->altsetting;
-		
+
 		/* register this interface with driverfs */
 		interface->dev.parent = &dev->dev;
 		interface->dev.bus = &usb_bus_type;
