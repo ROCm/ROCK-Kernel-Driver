@@ -8,7 +8,7 @@ obj-$(CONFIG_USB_GOKU)		+= goku_udc.o
 #
 # USB gadget drivers
 #
-g_zero-objs			:= zero.o usbstring.o
+g_zero-objs			:= zero.o usbstring.o config.o
 g_ether-objs			:= ether.o usbstring.o config.o
 g_serial-objs			:= serial.o usbstring.o
 gadgetfs-objs			:= inode.o usbstring.o
