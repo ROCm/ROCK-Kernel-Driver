@@ -2624,6 +2624,17 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	return 0;
 }
 
+static inline void tg3_set_mtu(struct net_device *dev, struct tg3 *tp,
+			       int new_mtu)
+{
+	dev->mtu = new_mtu;
+
+	if (new_mtu > ETH_DATA_LEN)
+		tp->tg3_flags |= TG3_FLAG_JUMBO_ENABLE;
+	else
+		tp->tg3_flags &= ~TG3_FLAG_JUMBO_ENABLE;
+}
+
 static int tg3_change_mtu(struct net_device *dev, int new_mtu)
 {
 	struct tg3 *tp = dev->priv;
@@ -2635,7 +2646,7 @@ static int tg3_change_mtu(struct net_device *dev, int new_mtu)
 		/* We'll just catch it later when the
 		 * device is up'd.
 		 */
-		dev->mtu = new_mtu;
+		tg3_set_mtu(dev, tp, new_mtu);
 		return 0;
 	}
 
@@ -2644,12 +2655,7 @@ static int tg3_change_mtu(struct net_device *dev, int new_mtu)
 
 	tg3_halt(tp);
 
-	dev->mtu = new_mtu;
-
-	if (new_mtu > ETH_DATA_LEN)
-		tp->tg3_flags |= TG3_FLAG_JUMBO_ENABLE;
-	else
-		tp->tg3_flags &= ~TG3_FLAG_JUMBO_ENABLE;
+	tg3_set_mtu(dev, tp, new_mtu);
 
 	tg3_init_rings(tp);
 	tg3_init_hw(tp);
