@@ -3,7 +3,7 @@
 #define __PPC_UNALIGNED_H
 
 /*
- * The PowerPC can do unaligned accesses itself in big endian mode. 
+ * The PowerPC can do unaligned accesses itself in big endian mode.
  *
  * The strange macros are there to make sure these can't
  * be misused in a way that makes them not work on other

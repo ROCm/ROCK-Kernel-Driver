@@ -17,7 +17,7 @@ struct macio_chip;
  * within a MacIO ASIC. It's typically provided by a macio_pci_asic
  * PCI device, but could be provided differently as well (nubus
  * machines using a fake OF tree).
- * 
+ *
  * The pdev field can be NULL on non-PCI machines
  */
 struct macio_bus
@@ -26,7 +26,7 @@ struct macio_bus
 	int			index;		/* macio chip index in system */
 #ifdef CONFIG_PCI
 	struct pci_dev		*pdev;		/* PCI device hosting this bus */
-#endif	
+#endif
 };
 
 /*

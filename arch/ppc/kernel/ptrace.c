@@ -114,12 +114,12 @@ static inline int set_vrregs(struct task_struct *task, unsigned long *data)
 
 	/* copy AltiVec registers VR[0] .. VR[31] */
 	for (i = 0; i < 32; i++)
-		for (j = 0; j < 4; j++, data++) 
+		for (j = 0; j < 4; j++, data++)
 			if (__get_user(task->thread.vr[i].u[j], data))
 				return -EFAULT;
 
 	/* copy VSCR */
-	for (i = 0; i < 4; i++, data++) 
+	for (i = 0; i < 4; i++, data++)
 		if (__get_user(task->thread.vscr.u[i], data))
 			return -EFAULT;
 
@@ -213,7 +213,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 
 	switch (request) {
 	/* when I and D space are separate, these will need to be fixed. */
-	case PTRACE_PEEKTEXT: /* read word at location addr. */ 
+	case PTRACE_PEEKTEXT: /* read word at location addr. */
 	case PTRACE_PEEKDATA: {
 		unsigned long tmp;
 		int copied;
@@ -303,8 +303,8 @@ int sys_ptrace(long request, long pid, long addr, long data)
 	}
 
 /*
- * make the child exit.  Best I can do is send it a sigkill. 
- * perhaps it should be put in the status that it wants to 
+ * make the child exit.  Best I can do is send it a sigkill.
+ * perhaps it should be put in the status that it wants to
  * exit.
  */
 	case PTRACE_KILL: {

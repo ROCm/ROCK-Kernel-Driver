@@ -2,16 +2,16 @@
 # Makefile for the PowerPC 4xx linux kernel.
 
 obj-$(CONFIG_ASH)		+= ash.o
-obj-$(CONFIG_BEECH)		+= beech.o 
+obj-$(CONFIG_BEECH)		+= beech.o
 obj-$(CONFIG_CEDAR)		+= cedar.o
 obj-$(CONFIG_CPCI405)		+= cpci405.o
-obj-$(CONFIG_EBONY)		+= ebony.o 
+obj-$(CONFIG_EBONY)		+= ebony.o
 obj-$(CONFIG_EP405)		+= ep405.o
 obj-$(CONFIG_OAK)		+= oak.o
 obj-$(CONFIG_OCOTEA)		+= ocotea.o
 obj-$(CONFIG_REDWOOD_4)		+= redwood.o
 obj-$(CONFIG_REDWOOD_5)		+= redwood5.o
-obj-$(CONFIG_REDWOOD_6)		+= redwood6.o 
+obj-$(CONFIG_REDWOOD_6)		+= redwood6.o
 obj-$(CONFIG_SYCAMORE)		+= sycamore.o
 obj-$(CONFIG_WALNUT)		+= walnut.o
 

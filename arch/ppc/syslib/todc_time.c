@@ -1,6 +1,6 @@
 /*
  * arch/ppc/syslib/todc_time.c
- * 
+ *
  * Time of Day Clock support for the M48T35, M48T37, M48T59, and MC146818
  * Real Time Clocks/Timekeepers.
  *
@@ -84,7 +84,7 @@ todc_direct_read_val(int addr)
 {
 	return readb(todc_info->nvram_data + addr);
 }
-  
+
 void
 todc_direct_write_val(int addr, unsigned char val)
 {
@@ -100,7 +100,7 @@ todc_m48txx_read_val(int addr)
 	outb(addr>>todc_info->as0_bits, todc_info->nvram_as1);
 	return inb(todc_info->nvram_data);
 }
-  
+
 void
 todc_m48txx_write_val(int addr, unsigned char val)
 {
@@ -117,7 +117,7 @@ todc_mc146818_read_val(int addr)
 	outb(addr, todc_info->nvram_as0);
 	return inb(todc_info->nvram_data);
 }
-  
+
 void
 todc_mc146818_write_val(int addr, unsigned char val)
 {
@@ -273,7 +273,7 @@ todc_get_rtc_time(void)
 	if (todc_info->rtc_type != TODC_TYPE_MC146818) {
 		switch (todc_info->rtc_type) {
 			case TODC_TYPE_DS1557:
-			case TODC_TYPE_DS1743:	
+			case TODC_TYPE_DS1743:
 			case TODC_TYPE_DS1746:	/* XXXX BAD HACK -> FIX */
 			case TODC_TYPE_DS1747:
 				break;
@@ -347,7 +347,7 @@ todc_set_rtc_time(unsigned long nowtime)
 	ppc_md.nvram_write_val(todc_info->month,        tm.tm_mon);
 	ppc_md.nvram_write_val(todc_info->day_of_month, tm.tm_mday);
 	ppc_md.nvram_write_val(todc_info->year,         tm.tm_year);
-	
+
 	ppc_md.nvram_write_val(todc_info->control_a, save_control);
 
 	if (todc_info->rtc_type == TODC_TYPE_MC146818) {
@@ -394,7 +394,7 @@ static unsigned char __init todc_read_timereg(int addr)
 	}
 
 	return val;
-} 
+}
 
 /*
  * This was taken from prep_setup.c
@@ -407,7 +407,7 @@ todc_calibrate_decr(void)
 	ulong	tbl, tbu;
         long	i, loop_count;
         u_char	sec;
- 
+
 	todc_time_init();
 
 	/*

@@ -1,7 +1,7 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <asm/uaccess.h>
- 
+
 int
 stfd(void *frS, void *ea)
 {

@@ -97,11 +97,11 @@ static int __pmac
 cpu_750fx_cpu_speed(int low_speed)
 {
 #ifdef DEBUG_FREQ
-	printk(KERN_DEBUG "HID1, before: %x\n", mfspr(SPRN_HID1));	
+	printk(KERN_DEBUG "HID1, before: %x\n", mfspr(SPRN_HID1));
 #endif
 	low_choose_750fx_pll(low_speed);
 #ifdef DEBUG_FREQ
-	printk(KERN_DEBUG "HID1, after: %x\n", mfspr(SPRN_HID1));	
+	printk(KERN_DEBUG "HID1, after: %x\n", mfspr(SPRN_HID1));
 	debug_calc_bogomips();
 #endif
 
@@ -116,9 +116,9 @@ pmu_set_cpu_speed(unsigned int low_speed)
 	struct adb_request req;
 	unsigned long save_l2cr;
 	unsigned long save_l3cr;
-	
+
 #ifdef DEBUG_FREQ
-	printk(KERN_DEBUG "HID1, before: %x\n", mfspr(SPRN_HID1));	
+	printk(KERN_DEBUG "HID1, before: %x\n", mfspr(SPRN_HID1));
 #endif
 	/* Disable all interrupt sources on openpic */
 	openpic_suspend(NULL, 1);
@@ -158,12 +158,12 @@ pmu_set_cpu_speed(unsigned int low_speed)
 
 	/* Prepare the northbridge for the speed transition */
 	pmac_call_feature(PMAC_FTR_SLEEP_STATE,NULL,1,1);
-	
+
 	/* Call low level code to backup CPU state and recover from
 	 * hardware reset
 	 */
 	low_sleep_handler();
-	
+
 	/* Restore the northbridge */
 	pmac_call_feature(PMAC_FTR_SLEEP_STATE,NULL,1,0);
 
@@ -178,7 +178,7 @@ pmu_set_cpu_speed(unsigned int low_speed)
 	set_context(current->active_mm->context, current->active_mm->pgd);
 
 #ifdef DEBUG_FREQ
-	printk(KERN_DEBUG "HID1, after: %x\n", mfspr(SPRN_HID1));	
+	printk(KERN_DEBUG "HID1, after: %x\n", mfspr(SPRN_HID1));
 #endif
 
 	/* Restore low level PMU operations */
@@ -205,7 +205,7 @@ do_set_cpu_speed(int speed_mode)
 {
 	struct cpufreq_freqs freqs;
 	int rc;
-	
+
 	freqs.old = cur_freq;
 	freqs.new = (speed_mode == PMAC_CPU_HIGH_SPEED) ? hi_freq : low_freq;
 	freqs.cpu = smp_processor_id();
@@ -273,7 +273,7 @@ static struct cpufreq_driver pmac_cpufreq_driver = {
 };
 
 /* Currently, we support the following machines:
- * 
+ *
  *  - Titanium PowerBook 800 (PMU based, 667Mhz & 800Mhz)
  *  - Titanium PowerBook 500 (PMU based, 300Mhz & 500Mhz)
  *  - iBook2 500 (PMU based, 400Mhz & 500Mhz)
@@ -281,11 +281,11 @@ static struct cpufreq_driver pmac_cpufreq_driver = {
  */
 static int __init
 pmac_cpufreq_setup(void)
-{	
+{
 	struct device_node	*cpunode;
 	u32			*value;
 	int			has_freq_ctl = 0;
-       
+
 	if (strstr(cmd_line, "nocpufreq"))
 		return 0;
 
@@ -312,11 +312,11 @@ pmac_cpufreq_setup(void)
 		 * here */
 		if (low_freq < 100000)
 			low_freq *= 10;
-		
+
 		value = (u32 *)get_property(cpunode, "max-clock-frequency", NULL);
 		if (!value)
 			goto out;
-		hi_freq = (*value) / 1000;			
+		hi_freq = (*value) / 1000;
 		has_freq_ctl = 1;
 		cpufreq_uses_pmu = 1;
 	}
@@ -343,7 +343,7 @@ pmac_cpufreq_setup(void)
 	/* Else check for 750FX */
 	else if (PVR_VER(mfspr(PVR)) == 0x7000) {
 		if (get_property(cpunode, "dynamic-power-step", NULL) == NULL)
-			goto out;	
+			goto out;
 		hi_freq = cur_freq;
 		value = (u32 *)get_property(cpunode, "reduced-clock-frequency", NULL);
 		if (!value)
@@ -355,7 +355,7 @@ pmac_cpufreq_setup(void)
 out:
 	if (!has_freq_ctl)
 		return -ENODEV;
-	
+
 	pmac_cpu_freqs[CPUFREQ_LOW].frequency = low_freq;
 	pmac_cpu_freqs[CPUFREQ_HIGH].frequency = hi_freq;
 

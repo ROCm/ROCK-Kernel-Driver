@@ -144,7 +144,7 @@ ebony_calibrate_decr(void)
 			freq = EBONY_440GP_RC_SYSCLK;
 			break;
 	}
-	
+
 	tb_ticks_per_jiffy = freq / HZ;
 	tb_to_us = mulhwu_scale_factor(freq, 1000000);
 
@@ -173,7 +173,7 @@ ebony_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 {
 	static char pci_irq_table[][4] =
 	/*
-	 *	PCI IDSEL/INTPIN->INTLINE 
+	 *	PCI IDSEL/INTPIN->INTLINE
 	 * 	   A   B   C   D
 	 */
 	{
@@ -209,7 +209,7 @@ ebony_setup_pcix(void)
 	PCIX_WRITEL(0, PCIX0_PIM0SA);
 	PCIX_WRITEL(0, PCIX0_PIM1SA);
 	PCIX_WRITEL(0, PCIX0_PIM2SA);
-	
+
 	/* Setup 2GB PLB->PCI outbound mem window (3_8000_0000->0_8000_0000) */
 	PCIX_WRITEL(0x00000003, PCIX0_POM0LAH);
 	PCIX_WRITEL(0x80000000, PCIX0_POM0LAL);
@@ -331,7 +331,7 @@ ebony_setup_arch(void)
 	 */
 	ibm440gp_get_clocks(&clocks, 33333333, 6 * 1843200);
 	__res.bi_opb_busfreq = clocks.opb;
-	
+
 	/* Use IIC in standard (100 kHz) mode */
 	__res.bi_iic_fast[0] = __res.bi_iic_fast[1] = 0;
 

@@ -1,6 +1,6 @@
 /*
  * LANTEC board specific definitions
- * 
+ *
  * Copyright (c) 2001 Wolfgang Denk (wd@denx.de)
  */
 
@@ -8,7 +8,7 @@
 #define __MACH_LANTEC_H
 
 #include <linux/config.h>
- 
+
 #include <asm/ppcboot.h>
 
 #define	IMAP_ADDR	0xFFF00000	/* physical base address of IMMR area	*/

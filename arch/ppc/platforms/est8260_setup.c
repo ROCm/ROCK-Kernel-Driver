@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/est8260_setup.c
- * 
+ *
  * EST8260 platform support
  *
  * Author: Allen Curtis <acurtis@onz.com>
@@ -24,7 +24,7 @@ static void (*callback_setup_arch)(void);
 
 extern unsigned char __res[sizeof(bd_t)];
 
-extern void m8260_init(unsigned long r3, unsigned long r4, 
+extern void m8260_init(unsigned long r3, unsigned long r4,
 	unsigned long r5, unsigned long r6, unsigned long r7);
 
 static int

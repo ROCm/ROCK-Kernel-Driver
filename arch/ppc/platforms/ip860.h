@@ -1,6 +1,6 @@
 /*
  * MicroSys IP860 VMEBus board specific definitions
- * 
+ *
  * Copyright (c) 2000, 2001 Wolfgang Denk (wd@denx.de)
  */
 
@@ -8,7 +8,7 @@
 #define __MACH_IP860_H
 
 #include <linux/config.h>
- 
+
 #include <asm/ppcboot.h>
 
 #define	IP860_IMMR_BASE	0xF1000000	/* phys. addr of IMMR			*/

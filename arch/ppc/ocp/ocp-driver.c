@@ -1,7 +1,7 @@
 /*
  * FILE NAME: ocp-driver.c
  *
- * BRIEF MODULE DESCRIPTION: 
+ * BRIEF MODULE DESCRIPTION:
  * driver callback, id matching and registration
  * Based on drivers/pci/pci-driver, Copyright (c) 1997--1999 Martin Mares
  *
@@ -105,7 +105,7 @@ ocp_device_resume(struct device *dev, u32 level)
  * of the IDs listed for a given OCP driver.
  * @dev: the generic device struct for the OCP device
  * @drv: the generic driver struct for the OCP driver
- * 
+ *
  * Used by a driver to check whether a OCP device present in the
  * system is in its list of supported devices.  Returns 1 for a
  * match, or 0 if there is no match.
@@ -150,7 +150,7 @@ postcore_initcall(ocp_driver_init);
 /**
  * ocp_register_driver - register a new ocp driver
  * @drv: the driver structure to register
- * 
+ *
  * Adds the driver structure to the list of registered drivers
  * Returns the number of ocp devices which were claimed by the driver
  * during registration.  The driver remains registered even if the
@@ -177,7 +177,7 @@ ocp_register_driver(struct ocp_driver *drv)
 /**
  * ocp_unregister_driver - unregister a ocp driver
  * @drv: the driver structure to unregister
- * 
+ *
  * Deletes the driver structure from the list of registered OCP drivers,
  * gives it a chance to clean up by calling its remove() function for
  * each device it was responsible for, and marks those devices as

@@ -112,7 +112,7 @@ pal4_setup_arch(void)
 {
 	unsigned long l2;
 
-	TODC_INIT(TODC_TYPE_MK48T37, 0, 0, 
+	TODC_INIT(TODC_TYPE_MK48T37, 0, 0,
 		  ioremap(PAL4_NVRAM, PAL4_NVRAM_SIZE), 8);
 
 	pal4_find_bridges();
@@ -151,10 +151,10 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	isa_io_base = 0 /*PAL4_ISA_IO_BASE*/;
 	pci_dram_offset = 0 /*PAL4_PCI_SYS_MEM_BASE*/;
-	
+
 	ppc_md.setup_arch = pal4_setup_arch;
 	ppc_md.show_cpuinfo = pal4_show_cpuinfo;
-	
+
 	ppc_md.setup_io_mappings = pal4_map_io;
 
 	ppc_md.init_IRQ = cpc700_init_IRQ;

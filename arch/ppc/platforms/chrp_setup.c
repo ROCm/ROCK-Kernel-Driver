@@ -73,7 +73,7 @@ extern int of_show_percpuinfo(struct seq_file *, int);
  * XXX this should be in xmon.h, but putting it there means xmon.h
  * has to include <linux/interrupt.h> (to get irqreturn_t), which
  * causes all sorts of problems.  -- paulus
- */ 
+ */
 extern irqreturn_t xmon_irq(int, void *, struct pt_regs *);
 
 extern dev_t boot_dev;
@@ -227,7 +227,7 @@ chrp_setup_arch(void)
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* this is fine for chrp */
 	initrd_below_start_ok = 1;
-	
+
 	if (initrd_start)
 		ROOT_DEV = Root_RAM0;
 	else
@@ -290,7 +290,7 @@ chrp_event_scan(void)
 		   __pa(log), 1024 );
 	ppc_md.heartbeat_count = ppc_md.heartbeat_reset;
 }
-	
+
 void __chrp
 chrp_restart(char *cmd)
 {
@@ -385,7 +385,7 @@ void __init chrp_init_IRQ(void)
 	int i;
 	unsigned long chrp_int_ack;
 	unsigned char init_senses[NR_IRQS - NUM_8259_INTERRUPTS];
-#if defined(CONFIG_VT) && defined(CONFIG_INPUT_ADBHID) && defined(XMON)	
+#if defined(CONFIG_VT) && defined(CONFIG_INPUT_ADBHID) && defined(XMON)
 	struct device_node *kbd;
 #endif
 
@@ -428,7 +428,7 @@ void __init chrp_init_IRQ(void)
 void __init
 chrp_init2(void)
 {
-#ifdef CONFIG_NVRAM  
+#ifdef CONFIG_NVRAM
 // XX replace this in a more saner way
 //	pmac_nvram_init();
 #endif
@@ -509,7 +509,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	/*
 	 * Print the banner, then scroll down so boot progress
-	 * can be printed.  -- Cort 
+	 * can be printed.  -- Cort
 	 */
 	if (ppc_md.progress) ppc_md.progress("Linux/PPC "UTS_RELEASE"\n", 0x0);
 }

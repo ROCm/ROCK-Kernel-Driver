@@ -1,8 +1,8 @@
 /*
  * arch/ppc/platforms/4xx/ash.c
- * 
+ *
  * Support for the IBM NP405H ash eval board
- * 
+ *
  * Author: Armin Kuster <akuster@mvista.com>
  *
  * 2001-2002 (c) MontaVista, Software, Inc.  This file is licensed under
@@ -172,7 +172,7 @@ bios_fixup(struct pci_controller *hose, struct pcil0_regs *pcip)
 	out_le32((void *) &(pcip->pmm[2].pcila), 0x00000000);
 	out_le32((void *) &(pcip->pmm[2].pciha), 0x00000000);
 	out_le32((void *) &(pcip->pmm[2].ma), 0x00000000);
-	
+
 	/* Enable PTM1 and PTM2, mapped to PLB address 0. */
 
 	out_le32((void *) &(pcip->ptm1la), 0x00000000);
@@ -183,7 +183,7 @@ bios_fixup(struct pci_controller *hose, struct pcil0_regs *pcip)
 	/* Write zero to PTM1 BAR. */
 
 	early_write_config_dword(hose, hose->first_busno,
-				 PCI_FUNC(hose->first_busno), 
+				 PCI_FUNC(hose->first_busno),
 				 PCI_BASE_ADDRESS_1,
 				 0x00000000);
 

@@ -1,7 +1,7 @@
 /*
  *  arch/ppc/kernel/signal.c
  *
- *  PowerPC version 
+ *  PowerPC version
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
  *
  *  Derived from "arch/i386/kernel/signal.c"
@@ -109,7 +109,7 @@ sys_sigaltstack(const stack_t __user *uss, stack_t __user *uoss, int r5,
 	return do_sigaltstack(uss, uoss, regs->gpr[1]);
 }
 
-int 
+int
 sys_sigaction(int sig, const struct old_sigaction __user *act,
 	      struct old_sigaction __user *oact)
 {
@@ -324,7 +324,7 @@ handle_rt_signal(unsigned long sig, struct k_sigaction *ka,
 	    || __put_user(0, &rt_sf->uc.uc_flags)
 	    || __put_user(0, &rt_sf->uc.uc_link)
 	    || __put_user(current->sas_ss_sp, &rt_sf->uc.uc_stack.ss_sp)
-	    || __put_user(sas_ss_flags(regs->gpr[1]), 
+	    || __put_user(sas_ss_flags(regs->gpr[1]),
 			  &rt_sf->uc.uc_stack.ss_flags)
 	    || __put_user(current->sas_ss_size, &rt_sf->uc.uc_stack.ss_size)
 	    || __put_user(&rt_sf->uc.uc_mcontext, &rt_sf->uc.uc_regs)

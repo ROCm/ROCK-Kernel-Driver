@@ -1,5 +1,5 @@
 /*
- *  PowerPC version 
+ *  PowerPC version
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
  *
  *  Rewritten by Cort Dougan (cort@cs.nmt.edu) for PReP
@@ -66,7 +66,7 @@
 	mtspr	DBAT##n##U,RA;		\
 	mtspr	DBAT##n##L,RB;		\
 1:
-#endif /* CONFIG_PPC64BRIDGE */	 
+#endif /* CONFIG_PPC64BRIDGE */
 
 	.text
 	.stabs	"arch/ppc/kernel/",N_SO,0,0,0f
@@ -82,7 +82,7 @@ _stext:
 	.text
 	.globl	_start
 _start:
-	/* 
+	/*
 	 * These are here for legacy reasons, the kernel used to
 	 * need to look like a coff function entry for the pmac
 	 * but we're always started by some kind of bootloader now.
@@ -144,12 +144,12 @@ __start:
  * early_init() does the early machine identification and does
  * the necessary low-level setup and clears the BSS
  *  -- Cort <cort@fsmlabs.com>
- */ 
+ */
 	bl	early_init
 
 #ifdef CONFIG_APUS
-/* On APUS the __va/__pa constants need to be set to the correct 
- * values before continuing. 
+/* On APUS the __va/__pa constants need to be set to the correct
+ * values before continuing.
  */
 	mr	r4,r30
 	bl	fix_mem_constants
@@ -179,7 +179,7 @@ __after_mmu_off:
 	bl	init_idle_6xx
 #endif /* CONFIG_6xx */
 
-	
+
 #ifndef CONFIG_APUS
 /*
  * We need to run with _start at physical address 0.
@@ -1103,7 +1103,7 @@ fix_mem_constants:
 
 /*
  * Map the memory where the exception handlers will
- * be copied to when hash constants have been patched.  
+ * be copied to when hash constants have been patched.
  */
 #ifdef CONFIG_APUS_FAST_EXCEPT
 	lis	r8,0xfff0
@@ -1416,13 +1416,13 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	isync
 	blr
 
-/* 
+/*
  * An undocumented "feature" of 604e requires that the v bit
  * be cleared before changing BAT values.
  *
  * Also, newer IBM firmware does not clear bat3 and 4 so
  * this makes sure it's done.
- *  -- Cort 
+ *  -- Cort
  */
 clear_bats:
 	li	r10,0

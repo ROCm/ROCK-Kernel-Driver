@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/k2_pci.c
- * 
+ *
  * PCI support for SBS K2
  *
  * Author: Matt Porter <mporter@mvista.com>
@@ -45,7 +45,7 @@ k2_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 	{
 		static char pci_irq_table[][4] =
 			/*
-			 * 	PCI IDSEL/INTPIN->INTLINE 
+			 * 	PCI IDSEL/INTPIN->INTLINE
 			 * 	A	B	C	D
 			 */
 		{
@@ -72,7 +72,7 @@ k2_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 	{
 		static char pci_irq_table[][4] =
 		/*
-		 * 	PCI IDSEL/INTPIN->INTLINE 
+		 * 	PCI IDSEL/INTPIN->INTLINE
 		 * 	A	B	C	D
 		 */
 		{
@@ -86,11 +86,11 @@ k2_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 		};
 		const long min_idsel = 15, max_idsel = 21, irqs_per_slot = 4;
 		return PCI_IRQ_TABLE_LOOKUP;
-	}	
+	}
 }
 
 void k2_pcibios_fixup(void)
-{ 
+{
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 	struct pci_dev *ide_dev;
 
@@ -118,7 +118,7 @@ void k2_pcibios_fixup_resources(struct pci_dev *dev)
 
 	if ((dev->vendor == PCI_VENDOR_ID_IBM) &&
 			(dev->device == PCI_DEVICE_ID_IBM_CPC710_PCI64))
-	{	
+	{
 		DBG("Fixup CPC710 resources\n");
 		for (i=0; i<DEVICE_COUNT_RESOURCE; i++)
 		{
@@ -160,7 +160,7 @@ void k2_setup_hoses(void)
 	__raw_writel(0x80100000, K2_PCI32_BAR+TIODLK);
 	__raw_writel(0xe0008000, K2_PCI32_BAR+DLKCTRL);
 	__raw_writel(0xffffffff, K2_PCI32_BAR+DLKDEV);
-	
+
 	/* PCI64 mappings */
 	__raw_writel(0x00100000, K2_PCI64_BAR+PIBAR);	/* PCI I/O base */
 	__raw_writel(0x10000000, K2_PCI64_BAR+PMBAR);	/* PCI Mem base */

@@ -72,7 +72,7 @@ static int __smp_call_function(void (*func) (void *info), void *info,
 extern void __save_cpu_setup(void);
 
 /* Since OpenPIC has only 4 IPIs, we use slightly different message numbers.
- * 
+ *
  * Make sure this matches openpic_request_IPIs in open_pic.c, or what shows up
  * in /proc/interrupts will be wrong!!! --Troy */
 #define PPC_MSG_CALL_FUNCTION	0
@@ -86,7 +86,7 @@ extern void __save_cpu_setup(void);
 	     smp_ops->message_pass((t),(m),(d),(w)); \
        } while(0)
 
-/* 
+/*
  * Common functions
  */
 void smp_local_timer_interrupt(struct pt_regs * regs)
@@ -102,12 +102,12 @@ void smp_local_timer_interrupt(struct pt_regs * regs)
 void smp_message_recv(int msg, struct pt_regs *regs)
 {
 	atomic_inc(&ipi_recv);
-	
+
 	switch( msg ) {
 	case PPC_MSG_CALL_FUNCTION:
 		smp_call_function_interrupt();
 		break;
-	case PPC_MSG_RESCHEDULE: 
+	case PPC_MSG_RESCHEDULE:
 		set_need_resched();
 		break;
 	case PPC_MSG_INVALIDATE_TLB:
@@ -424,7 +424,7 @@ int __cpu_up(unsigned int cpu)
 
 	/* wake up cpu */
 	smp_ops->kick_cpu(cpu);
-		
+	
 	/*
 	 * wait to see if the cpu made a callin (is actually up).
 	 * use this value that I found through experimentation.

@@ -50,7 +50,7 @@ boot(int a1, int a2, void *prom)
     void *dst;
     unsigned char *im;
     unsigned int initrd_size, initrd_start;
-    
+
     printf("chrpboot starting: loaded at 0x%p\n\r", &_start);
 
     initrd_size = &__ramdisk_end - &__ramdisk_begin;
@@ -89,7 +89,7 @@ boot(int a1, int a2, void *prom)
     flush_cache(dst, len);
     make_bi_recs(((unsigned long) dst + len), "chrpboot", _MACH_chrp,
 		    (PROG_START + PROG_SIZE));
-    
+
     sa = PROG_START;
     printf("start address = 0x%x\n\r", sa);
 

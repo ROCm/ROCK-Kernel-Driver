@@ -1,6 +1,6 @@
 /*
  * TQM8xx(L) board specific definitions
- * 
+ *
  * Copyright (c) 1999-2002 Wolfgang Denk (wd@denx.de)
  */
 
@@ -9,7 +9,7 @@
 #define __MACH_TQM8xx_H
 
 #include <linux/config.h>
- 
+
 #include <asm/ppcboot.h>
 
 #ifndef __ASSEMBLY__

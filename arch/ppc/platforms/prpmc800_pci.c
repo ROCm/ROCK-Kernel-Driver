@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/prpmc800_pci.c
- * 
+ *
  * PCI support for Motorola PrPMC800
  *
  * Author: Dale Farnsworth <dale.farnsworth@mvista.com>
@@ -36,7 +36,7 @@ prpmc_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 	/*
 	 *      PCI IDSEL/INTPIN->INTLINE
 	 *      A       B       C       D
-	 */ 
+	 */
 	{
 		{12,	0,	0,	0},  /* IDSEL 14 - Ethernet, base */
 		{0,	0,	0,	0},  /* IDSEL 15 - unused */

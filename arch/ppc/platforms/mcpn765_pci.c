@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/mcpn765_pci.c
- * 
+ *
  * PCI setup routines for the Motorola MCG MCPN765 cPCI board.
  *
  * Author: Mark A. Greer
@@ -35,7 +35,7 @@ mcpn765_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 {
 	static char pci_irq_table[][4] =
 	/*
-	 *	PCI IDSEL/INTPIN->INTLINE 
+	 *	PCI IDSEL/INTPIN->INTLINE
 	 * 	   A   B   C   D
 	 */
 	{

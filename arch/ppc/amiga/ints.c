@@ -77,8 +77,8 @@ irq_node_t *new_irq_node(void)
 	return NULL;
 }
 
-int sys_request_irq(unsigned int irq, 
-                    void (*handler)(int, void *, struct pt_regs *), 
+int sys_request_irq(unsigned int irq,
+                    void (*handler)(int, void *, struct pt_regs *),
                     unsigned long flags, const char *devname, void *dev_id)
 {
 	if (irq < IRQ1 || irq > IRQ7) {

@@ -66,7 +66,7 @@ typedef struct boot_infos
     __u32       version;
     /* backward compatible down to version: */
     __u32       compatible_version;
-    
+
     /* NEW (vers. 2) this holds the current _logical_ base addr of
        the frame buffer (for use by early boot message) */
     __u8*       logicalDisplayBase;
@@ -76,7 +76,7 @@ typedef struct boot_infos
 
     /* NEW (vers. 4) Detected hw architecture */
     __u32       architecture;
-    
+
     /* The device tree (internal addresses relative to the beginning of the tree,
      * device tree offset relative to the beginning of this structure).
      * On pre-PCI macintosh (BOOT_ARCH_PCI bit set to 0 in architecture), this
@@ -84,7 +84,7 @@ typedef struct boot_infos
      */
     __u32       deviceTreeOffset;        /* Device tree offset */
     __u32       deviceTreeSize;          /* Size of the device tree */
-        
+
     /* Some infos about the current MacOS display */
     __u32       dispDeviceRect[4];       /* left,top,right,bottom */
     __u32       dispDeviceDepth;         /* (8, 16 or 32) */
@@ -98,23 +98,23 @@ typedef struct boot_infos
     /* Optional pointer to boot ramdisk (offset from this structure) */
     __u32       ramDisk;
     __u32       ramDiskSize;             /* size of ramdisk image */
-    
+
     /* Kernel command line arguments (offset from this structure) */
     __u32       kernelParamsOffset;
-    
+
     /* ALL BELOW NEW (vers. 4) */
-    
+
     /* This defines the physical memory. Valid with BOOT_ARCH_NUBUS flag
        (non-PCI) only. On PCI, memory is contiguous and it's size is in the
        device-tree. */
     boot_info_map_entry_t
     	        physMemoryMap[MAX_MEM_MAP_SIZE]; /* Where the phys memory is */
     __u32       physMemoryMapSize;               /* How many entries in map */
-    
-				
+
+
     /* The framebuffer size (optional, currently 0) */
     __u32       frameBufferSize;         /* Represents a max size, can be 0. */
-    
+
     /* NEW (vers. 5) */
 
     /* Total params size (args + colormap + device tree + ramdisk) */

@@ -19,7 +19,7 @@
 
 
 /*
- * Define all of the IRQ senses and polarities.  
+ * Define all of the IRQ senses and polarities.
  */
 
 static u_char redwood6_IRQ_initsenses[] __initdata = {

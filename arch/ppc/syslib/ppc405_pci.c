@@ -22,7 +22,7 @@
 #include <asm/pci-bridge.h>
 #include <asm/ibm_ocp_pci.h>
 
- 
+
 extern void bios_fixup(struct pci_controller *, struct pcil0_regs *);
 extern int ppc405_map_irq(struct pci_dev *dev, unsigned char idsel,
 			  unsigned char pin);
@@ -137,7 +137,7 @@ ppc4xx_find_bridges(void)
 			tmp_addr = tmp_addr +
 				(0xffffffff - (tmp_size & 0xffffc000));
 			if (tmp_addr > PPC405_PCI_UPPER_MEM) {
-				new_pmm_max = tmp_addr;	// PPC405_PCI_UPPER_MEM 
+				new_pmm_max = tmp_addr;	// PPC405_PCI_UPPER_MEM
 			} else {
 				new_pmm_max = PPC405_PCI_UPPER_MEM;
 			}

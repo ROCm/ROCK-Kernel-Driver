@@ -323,7 +323,7 @@ static void __init amiga_identify(void)
 
   case AMI_DRACO:
     panic("No support for Draco yet");
- 
+
   default:
     panic("Unknown Amiga Model");
   }
@@ -620,7 +620,7 @@ static int amiga_hwclk(int op, struct hwclk_time *t)
 		volatile struct tod2000 *tod = TOD_2000;
 
 		tod->cntrl1 = TOD2000_CNTRL1_HOLD;
-	    
+	
 		while (tod->cntrl1 & TOD2000_CNTRL1_BUSY)
 			;
 
@@ -685,13 +685,13 @@ static int amiga_set_clock_mmss (unsigned long nowtime)
 		tod->second2 = real_seconds % 10;
 		tod->minute1 = real_minutes / 10;
 		tod->minute2 = real_minutes % 10;
-		
+
 		tod->cntrl1 = TOD3000_CNTRL1_FREE;
 	} else /* if (AMIGAHW_PRESENT(A2000_CLK)) */ {
 		volatile struct tod2000 *tod = TOD_2000;
 
 		tod->cntrl1 = TOD2000_CNTRL1_HOLD;
-	    
+	
 		while (tod->cntrl1 & TOD2000_CNTRL1_BUSY)
 			;
 
@@ -950,7 +950,7 @@ int get_hardware_list(char *buffer)
 		mach_get_model(model);
 	else
 		strcpy(model, "Unknown PowerPC");
-	
+
 	len += sprintf(buffer+len, "Model:\t\t%s\n", model);
 	len += get_cpuinfo(buffer+len);
 	for (mem = 0, i = 0; i < m68k_realnum_memory; i++)

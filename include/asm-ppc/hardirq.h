@@ -7,9 +7,9 @@
 #include <linux/smp_lock.h>
 #include <asm/irq.h>
 
-/* The __last_jiffy_stamp field is needed to ensure that no decrementer 
- * interrupt is lost on SMP machines. Since on most CPUs it is in the same 
- * cache line as local_irq_count, it is cheap to access and is also used on UP 
+/* The __last_jiffy_stamp field is needed to ensure that no decrementer
+ * interrupt is lost on SMP machines. Since on most CPUs it is in the same
+ * cache line as local_irq_count, it is cheap to access and is also used on UP
  * for uniformity.
  */
 typedef struct {

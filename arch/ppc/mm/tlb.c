@@ -1,10 +1,10 @@
 /*
  * This file contains the routines for TLB flushing.
  * On machines where the MMU uses a hash table to store virtual to
- * physical translations, these routines flush entries from the 
+ * physical translations, these routines flush entries from the
  * hash table also.
  *  -- paulus
- * 
+ *
  *  Derived from arch/ppc/mm/init.c:
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
  *

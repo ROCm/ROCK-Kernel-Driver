@@ -32,12 +32,12 @@ OBJCOPYFLAGS	:= -O elf32-powerpc
 LIBS 		:= $(common)/lib.a $(bootlib)/lib.a
 
 targets		:= $(boot-y) dummy.o ../simple/legacy.o
-OBJS		:= $(addprefix $(obj)/,$(boot-y)) $(simple)/legacy.o 
+OBJS		:= $(addprefix $(obj)/,$(boot-y)) $(simple)/legacy.o
 
 # Extra include search dirs
 CFLAGS_kbd.o			+= -Idrivers/char
 
-zImage: initrd := 
+zImage: initrd :=
 zImage: $(images)/zImage.prep
 	@echo '  kernel: $@ is ready ($<)'
 

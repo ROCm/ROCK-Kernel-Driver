@@ -537,14 +537,14 @@ set_phys_avail(unsigned long total_memory)
 	 * memory as high as possible (it must be outside of the
 	 * bus address seen as the AGP aperture). It will be used
 	 * by the r128 DRM driver
-	 * 
+	 *
 	 * FIXME: We need to make sure that page doesn't overlap any of the\
 	 * above. This could be done by improving mem_pieces_find to be able
 	 * to do a backward search from the end of the list.
 	 */
 	if (_machine == _MACH_Pmac && find_devices("uni-north-agp")) {
 		agp_special_page = (total_memory - PAGE_SIZE);
-		mem_pieces_remove(&phys_avail, agp_special_page, PAGE_SIZE, 0);	
+		mem_pieces_remove(&phys_avail, agp_special_page, PAGE_SIZE, 0);
 		agp_special_page = (unsigned long)__va(agp_special_page);
 	}
 #endif /* CONFIG_PPC_PMAC */

@@ -189,10 +189,10 @@ config RPXLITE
 	  Embedded Planet RPX Lite. PC104 form-factor SBC based on the MPC823.
 
 	  RPX-Classic:
-	  Embedded Planet RPX Classic Low-fat. Credit-card-size SBC based on 
+	  Embedded Planet RPX Classic Low-fat. Credit-card-size SBC based on
 	  the MPC 860
 
-	  BSE-IP: 
+	  BSE-IP:
 	  Bright Star Engineering ip-Engine.
 
 	  TQM823L:
@@ -234,7 +234,7 @@ config RPXLITE
 	  URL: <http://www.speech-design.de/>
 
 	  IVML24:
-	  MPC860 based board used in the "Integrated Voice Mail System", 
+	  MPC860 based board used in the "Integrated Voice Mail System",
 	  Large Version (24 voice channels)
 	  Manufacturer: Speech Design, <http://www.speech-design.de/>
 	  Date of Release: March 2001  (?)
@@ -256,7 +256,7 @@ config RPXLITE
 	  End of life: -
 	  URL: <http://www.multidata.de/english/products/hpro.htm>
 
-	  IP860:	
+	  IP860:
 	  VMEBus IP (Industry Pack) carrier board with MPC860
 	  Manufacturer: MicroSys GmbH, <http://www.microsys.de/>
 	  Date of Release: ?
@@ -676,7 +676,7 @@ config MATH_EMULATION
 	bool "Math emulation"
 	depends on 4xx || 8xx
 	---help---
-	  Some PowerPC chips designed for embedded applications do not have 
+	  Some PowerPC chips designed for embedded applications do not have
 	  a floating-point unit and therefore do not implement the
 	  floating-point instructions in the PowerPC instruction set.  If you
 	  say Y here, the kernel will include code to emulate a floating-point
@@ -711,10 +711,10 @@ config CPU_FREQ_PROC_INTF
 	help
 	  This enables the /proc/cpufreq interface for controlling
 	  CPUFreq. Please note that it is recommended to use the sysfs
-	  interface instead (which is built automatically). 
-	  
-	  For details, take a look at linux/Documentation/cpufreq. 
-	  
+	  interface instead (which is built automatically).
+	
+	  For details, take a look at linux/Documentation/cpufreq.
+	
 	  If in doubt, say N.
 
 config CPU_FREQ_24_API
@@ -723,11 +723,11 @@ config CPU_FREQ_24_API
 	help
 	  This enables the /proc/sys/cpu/ sysctl interface for controlling
 	  CPUFreq, as known from the 2.4.-kernel patches for CPUFreq. 2.5
-	  uses a sysfs interface instead. Please note that some drivers do 
+	  uses a sysfs interface instead. Please note that some drivers do
 	  not work well with the 2.4. /proc/sys/cpu sysctl interface,
 	  so if in doubt, say N here.
 
-	  For details, take a look at linux/Documentation/cpufreq. 
+	  For details, take a look at linux/Documentation/cpufreq.
 
 	  If in doubt, say N.
 
@@ -1409,7 +1409,7 @@ config DEBUG_SPINLOCK_SLEEP
 	depends on DEBUG_KERNEL
 	help
 	  If you say Y here, various routines which may sleep will become very
-	  noisy if they are called with a spinlock held.	
+	  noisy if they are called with a spinlock held.
 
 config KGDB
 	bool "Include kgdb kernel debugger"
@@ -1488,7 +1488,7 @@ config OCP
 	bool
 	depends on IBM_OCP
 	default y
-	
+
 endmenu
 
 source "security/Kconfig"

@@ -141,15 +141,15 @@ unsigned char * PnP_INTERFACES[] __initdata = {
   "\001\002\006CHRP_Floppy",          /* CHRP Floppy in PR*P system         */
 
   "\001\003\000GeneralIPI",
-  
+
   "\002\000\000GeneralEther",
   "\002\001\000GeneralToken",
   "\002\002\000GeneralFDDI",
-  
+
   "\003\000\000GeneralVGA",
   "\003\001\000GeneralSVGA",
   "\003\002\000GeneralXGA",
-  
+
   "\004\000\000GeneralVideo",
   "\004\001\000GeneralAudio",
   "\004\001\001CS4232Audio",            /* CS 4232 Plug 'n Play Configured    */
@@ -159,7 +159,7 @@ unsigned char * PnP_INTERFACES[] __initdata = {
   "\005\000\000PCIMemoryController",    /* PCI Config Method                  */
   "\005\000\001RS6KMemoryController",   /* RS6K Config Method                 */
   "\005\001\000GeneralFLASH",
-  
+
   "\006\000\000GeneralHostBridge",
   "\006\001\000GeneralISABridge",
   "\006\002\000GeneralEISABridge",
@@ -170,7 +170,7 @@ unsigned char * PnP_INTERFACES[] __initdata = {
   "\006\004\002PCIBridgeRS6K",
   "\006\005\000GeneralPCMCIABridge",
   "\006\006\000GeneralVMEBridge",
-  
+
   "\007\000\000GeneralRS232",
   "\007\000\001COMx",
   "\007\000\002Compatible16450",
@@ -190,7 +190,7 @@ unsigned char * PnP_INTERFACES[] __initdata = {
   "\007\001\003NS26EParPort",         /* Ports 26E and 26F                  */
   "\007\001\004NS15CParPort",         /* Ports 15C and 15D                  */
   "\007\001\005NS2EParPort",          /* Ports 2E and 2F                    */
-  
+
   "\010\000\000GeneralPIC",
   "\010\000\001ISA_PIC",
   "\010\000\002EISA_PIC",
@@ -206,7 +206,7 @@ unsigned char * PnP_INTERFACES[] __initdata = {
   "\010\002\002EISA_Timer",
   "\010\003\000GeneralRTC",
   "\010\003\001ISA_RTC",
-  
+
   "\010\004\001StoreThruOnly",
   "\010\004\002StoreInEnabled",
   "\010\004\003RS6KL2Cache",
@@ -218,7 +218,7 @@ unsigned char * PnP_INTERFACES[] __initdata = {
   "\010\006\000GeneralPowerManagement",
   "\010\006\001EPOWPowerManagement",
   "\010\006\002PowerControl",         // d1378
-  
+
   "\010\007\000GeneralCMOS",
 
   "\010\010\000GeneralOPPanel",
@@ -233,30 +233,30 @@ unsigned char * PnP_INTERFACES[] __initdata = {
   "\010\011\000GeneralServiceProcessor",
   "\010\012\000GeneralServiceProcessor",
   "\010\013\000GeneralServiceProcessor",
-  
+
   "\010\014\001TransferData",
   "\010\014\002IGMC32",
   "\010\014\003IGMC64",
-  
+
   "\010\017\000GeneralSystemPlanar",   /* 10/5/95                            */
   NULL
   };
 
-static const unsigned char __init *PnP_SUB_TYPE_STR(unsigned char BaseType, 
+static const unsigned char __init *PnP_SUB_TYPE_STR(unsigned char BaseType,
 					     unsigned char SubType) {
 	unsigned char ** s=PnP_SUB_TYPES;
-	while (*s && !((*s)[0]==BaseType 
+	while (*s && !((*s)[0]==BaseType
 		       && (*s)[1]==SubType)) s++;
 	if (*s) return *s+2;
 	else return("Unknown !");
 };
 
-static const unsigned char __init *PnP_INTERFACE_STR(unsigned char BaseType, 
+static const unsigned char __init *PnP_INTERFACE_STR(unsigned char BaseType,
 					      unsigned char SubType,
 					      unsigned char Interface) {
 	unsigned char ** s=PnP_INTERFACES;
-	while (*s && !((*s)[0]==BaseType 
-		       && (*s)[1]==SubType 
+	while (*s && !((*s)[0]==BaseType
+		       && (*s)[1]==SubType
 		       && (*s)[2]==Interface)) s++;
 	if (*s) return *s+3;
 	else return NULL;
@@ -293,7 +293,7 @@ static void __init printsmallpacket(PnP_TAG_PACKET * pkt, int size) {
 
 	switch (tag_small_item_name(pkt->S1_Pack.Tag)) {
 	case PnPVersion:
-	  printk("    PnPversion 0x%x.%x\n", 
+	  printk("    PnPversion 0x%x.%x\n",
 		 pkt->S1_Pack.Version[0], /* How to interpret version ? */
 		 pkt->S1_Pack.Version[1]);
 	  break;
@@ -303,7 +303,7 @@ static void __init printsmallpacket(PnP_TAG_PACKET * pkt, int size) {
 	  break;
 	case IRQFormat:
 #define p pkt->S4_Pack
-	  printk("    IRQ Mask 0x%4.4x, %s %s sensitive\n", 
+	  printk("    IRQ Mask 0x%4.4x, %s %s sensitive\n",
 		 ld_le16((unsigned short *)p.IRQMask),
 		 intlevel[(size>3) ? !(p.IRQInfo&0x05) : 0],
 		 intsense[(size>3) ? !(p.IRQInfo&0x03) : 0]);
@@ -328,7 +328,7 @@ static void __init printsmallpacket(PnP_TAG_PACKET * pkt, int size) {
 		 p.IOInfo&ISAAddr16bit?16:10,
 		 ld_le16((unsigned short *)p.RangeMin),
  		 ld_le16((unsigned short *)p.RangeMax),
-		 p.IOAlign, p.IONum); 
+		 p.IOAlign, p.IONum);
 #undef p
 	  break;
 	case FixedIOPort:
@@ -336,20 +336,20 @@ static void __init printsmallpacket(PnP_TAG_PACKET * pkt, int size) {
 	  printk("    Fixed (10 decoded bits) I/O port from %3.3x to %3.3x\n",
 		 (p.Range[1]<<8)|p.Range[0],
 		 ((p.Range[1]<<8)|p.Range[0])+p.IONum-1);
-#undef p		 
+#undef p
 	  break;
 	case Res1:
 	case Res2:
 	case Res3:
-	  printk("    Undefined packet type %d!\n", 
+	  printk("    Undefined packet type %d!\n",
 		 tag_small_item_name(pkt->S1_Pack.Tag));
 	  break;
 	case SmallVendorItem:
 	  printsmallvendor(pkt,size);
 	  break;
 	default:
-	  printk("    Type 0x2.2x%d, size=%d\n", 
-		 pkt->S1_Pack.Tag, size);    
+	  printk("    Type 0x2.2x%d, size=%d\n",
+		 pkt->S1_Pack.Tag, size);
 	  break;
 	}
 }
@@ -431,7 +431,7 @@ static void __init printlargevendor(PnP_TAG_PACKET * pkt, int size) {
 	  break;
 	case 7:
 	  printk("    SCSI buses: %d, id(s):", p.PPCData[0]);
-	  for(i=1; i<=p.PPCData[0]; i++) 
+	  for(i=1; i<=p.PPCData[0]; i++)
 	    printk(" %d%c", p.PPCData[i], i==p.PPCData[0] ? '\n' : ',');
 	  break;
 	case 9:
@@ -447,11 +447,11 @@ static void __init printlargevendor(PnP_TAG_PACKET * pkt, int size) {
 		  p.PPCData[1]);
 
 	  printk("    ISA interrupts routed to %s\n"
-		 "      lines", 
+		 "      lines",
 		 tmpstr);
 	  for(i=0; i<16; i++) {
 	  	int line=ld_le16((unsigned short *)p.PPCData+i+1);
-		if (line!=0xffff) printk(" %d(IRQ%d)", line, i); 
+		if (line!=0xffff) printk(" %d(IRQ%d)", line, i);
 	  }
 	  printk("\n");
 	  break;
@@ -470,8 +470,8 @@ static void __init printlargepacket(PnP_TAG_PACKET * pkt, int size) {
 	  printlargevendor(pkt, size);
 	  break;
 	default:
-	  printk("    Type 0x2.2x%d, size=%d\n", 
-		 pkt->S1_Pack.Tag, size);    
+	  printk("    Type 0x2.2x%d, size=%d\n",
+		 pkt->S1_Pack.Tag, size);
 	  break;
 	}
 }
@@ -487,7 +487,7 @@ static void __init printpackets(PnP_TAG_PACKET * pkt, const char * cat)
 		int size;
 		if (tag_type(pkt->S1_Pack.Tag)) {
 		  	size= 3 +
-			  pkt->L1_Pack.Count0 + 
+			  pkt->L1_Pack.Count0 +
 			  pkt->L1_Pack.Count1*256;
 			printlargepacket(pkt, size);
 		} else {
@@ -503,11 +503,11 @@ void __init print_residual_device_info(void)
 	int i;
 	PPC_DEVICE *dev;
 #define did dev->DeviceId
-	
+
 	/* make sure we have residual data first */
 	if ( res->ResidualLength == 0 )
 		return;
-	
+
 	printk("Residual: %ld devices\n", res->ActualNumDevices);
 	for ( i = 0;
 	      i < res->ActualNumDevices ;
@@ -516,23 +516,23 @@ void __init print_residual_device_info(void)
 	  	char decomp[4], sn[20];
 		const char * s;
 		dev = &res->Devices[i];
-		s = PnP_INTERFACE_STR(did.BaseType, did.SubType, 
+		s = PnP_INTERFACE_STR(did.BaseType, did.SubType,
 				      did.Interface);
 		if(!s) {
 			sprintf(sn, "interface %d", did.Interface);
 			s=sn;
 		}
-		if ( did.BusId & PCIDEVICE ) 
+		if ( did.BusId & PCIDEVICE )
 		  printk("PCI Device, Bus %d, DevFunc 0x%x:",
 			 dev->BusAccess.PCIAccess.BusNumber,
 			 dev->BusAccess.PCIAccess.DevFuncNumber);
 	       	if ( did.BusId & PNPISADEVICE ) printk("PNPISA Device:");
-		if ( did.BusId & ISADEVICE ) 
+		if ( did.BusId & ISADEVICE )
 		  printk("ISA Device, Slot %d, LogicalDev %d:",
 			 dev->BusAccess.ISAAccess.SlotNumber,
 			 dev->BusAccess.ISAAccess.LogicalDevNumber);
 		if ( did.BusId & EISADEVICE ) printk("EISA Device:");
-		if ( did.BusId & PROCESSORDEVICE ) 
+		if ( did.BusId & PROCESSORDEVICE )
 		  printk("ProcBus Device, Bus %d, BUID %d: ",
 			 dev->BusAccess.ProcBusAccess.BusNumber,
 			 dev->BusAccess.ProcBusAccess.BUID);
@@ -545,7 +545,7 @@ void __init print_residual_device_info(void)
 		decomp[1]='A'-1+((did.DevId>>21)&0x1F);
 		decomp[2]='A'-1+((did.DevId>>16)&0x1F);
 		decomp[3]=0;
-		printk(" %s%4.4lX, %s, %s, %s\n", 
+		printk(" %s%4.4lX, %s, %s, %s\n",
 		       decomp, did.DevId&0xffff,
 		       PnP_BASE_TYPES[did.BaseType],
 		       PnP_SUB_TYPE_STR(did.BaseType,did.SubType),
@@ -573,15 +573,15 @@ static void __init printVPD(void) {
 	static const char* Usage[]={
 	  "FirmwareStack",  "FirmwareHeap",  "FirmwareCode", "BootImage",
 	  "Free", "Unpopulated", "ISAAddr", "PCIConfig",
-	  "IOMemory", "SystemIO", "SystemRegs", "PCIAddr", 
-	  "UnPopSystemRom", "SystemROM", "ResumeBlock", "Other" 
+	  "IOMemory", "SystemIO", "SystemRegs", "PCIAddr",
+	  "UnPopSystemRom", "SystemROM", "ResumeBlock", "Other"
 	};
 	static const unsigned char *FWMan[]={
 	  "IBM", "Motorola", "FirmWorks", "Bull"
 	};
 	static const unsigned char *FWFlags[]={
 	  "Conventional", "OpenFirmware", "Diagnostics", "LowDebug",
-	  "MultiBoot", "LowClient", "Hex41", "FAT", 
+	  "MultiBoot", "LowClient", "Hex41", "FAT",
 	  "ISO9660", "SCSI_ID_Override", "Tape_Boot", "FW_Boot_Path"
 	};
 	static const unsigned char *ESM[]={
@@ -597,15 +597,15 @@ static void __init printVPD(void) {
 	printk("FirmwareFlags:");
 	for(j=0; j<12; j++) {
 	  	if (vpd.FirmwareSupports & (1<<j)) {
-			printk(" %s%c", FWFlags[j], 
+			printk(" %s%c", FWFlags[j],
 			       vpd.FirmwareSupports&(-2<<j) ? ',' : '\n');
 		}
 	}
 	printk("NVRamSize: %ld\n", vpd.NvramSize);
 	printk("SIMMslots: %ld\n", vpd.NumSIMMSlots);
-	printk("EndianSwitchMethod: %s\n", 
+	printk("EndianSwitchMethod: %s\n",
 	       ESM[vpd.EndianSwitchMethod>2 ? 2 : vpd.EndianSwitchMethod]);
-	printk("SpreadIOMethod: %s\n", 
+	printk("SpreadIOMethod: %s\n",
 	       SIOM[vpd.SpreadIOMethod>3 ? 3 : vpd.SpreadIOMethod]);
 	printk("Processor/Bus frequencies (Hz): %ld/%ld\n",
 	       vpd.ProcessorHz, vpd.ProcessorBusHz);
@@ -615,7 +615,7 @@ static void __init printVPD(void) {
 	       vpd.CoherenceBlockSize, vpd.GranuleSize);
 	for (i=0; i<res->ActualNumMemSegs; i++) {
 		int mask=res->Segs[i].Usage, first, j;
-		printk("%8.8lx-%8.8lx ", 
+		printk("%8.8lx-%8.8lx ",
 		       res->Segs[i].BasePage*ps,
 		       (res->Segs[i].PageCount+res->Segs[i].BasePage)*ps-1);
 		for(j=15, first=1; j>=0; j--) {
@@ -638,7 +638,7 @@ void print_residual_device_info(void)
 	union _PnP_TAG_PACKET *pkt;
 	PPC_DEVICE *dev;
 #define did dev->DeviceId
-	
+
 	/* make sure we have residual data first */
 	if ( res->ResidualLength == 0 )
 		return;
@@ -665,7 +665,7 @@ void print_residual_device_info(void)
 				       pci_strdev(did.DevId>>16,
 						  did.DevId&0xffff)
 					);
-			
+
 			if ( did.BusId & PNPISADEVICE )
 			{
 				printk(" pnp:");
@@ -694,7 +694,7 @@ void print_residual_device_info(void)
 			       did.BaseType, did.SubType);
 			printk("\n");
 			continue;
-		}		
+		}
 		/*
 		 * eisa devices
 		 */
@@ -704,7 +704,7 @@ void print_residual_device_info(void)
 			       did.BaseType, did.SubType);
 			printk("\n");
 			continue;
-		}		
+		}
 		/*
 		 * proc bus devices
 		 */
@@ -724,26 +724,26 @@ void print_residual_device_info(void)
 			       did.BaseType, did.SubType);
 			printk("\n");
 			continue;
-		}		
+		}
 		printk("Unknown bus access device: busid %lx\n",
 		       did.BusId);
 	}
 }
-#endif	
+#endif
 
-/* Returns the device index in the residual data, 
+/* Returns the device index in the residual data,
    any of the search items may be set as -1 for wildcard,
-   DevID number field (second halfword) is big endian ! 
+   DevID number field (second halfword) is big endian !
 
    Examples:
    - search for the Interrupt controller (8259 type), 2 methods:
-     1) i8259 = residual_find_device(~0, 
-                                     NULL, 
-				     SystemPeripheral, 
-				     ProgrammableInterruptController, 
-				     ISA_PIC, 
+     1) i8259 = residual_find_device(~0,
+                                     NULL,
+				     SystemPeripheral,
+				     ProgrammableInterruptController,
+				     ISA_PIC,
 				     0);
-     2) i8259 = residual_find_device(~0, "PNP0000", -1, -1, -1, 0) 
+     2) i8259 = residual_find_device(~0, "PNP0000", -1, -1, -1, 0)
 
    - search for the first two serial devices, whatever their type)
      iserial1 = residual_find_device(~0,NULL,
@@ -755,8 +755,8 @@ void print_residual_device_info(void)
 				     RS232Device,
 				     -1, 1)
    - but search for typical COM1 and COM2 is not easy due to the
-     fact that the interface may be anything and the name "PNP0500" or 
-     "PNP0501". Quite bad. 
+     fact that the interface may be anything and the name "PNP0500" or
+     "PNP0501". Quite bad.
 
 */
 
@@ -769,7 +769,7 @@ two very similar functions */
 
 static int __init same_DevID(unsigned short vendor,
 	       unsigned short Number,
-	       char * str) 
+	       char * str)
 {
 	static unsigned const char hexdigit[]="0123456789ABCDEF";
 	if (strlen(str)!=7) return 0;
@@ -837,11 +837,11 @@ PnP_TAG_PACKET *PnP_find_packet(unsigned char *p,
 	if (tag_type(packet_tag)) mask=0xff; else mask=0xF8;
 	masked_tag = packet_tag&mask;
 	for(; *p != END_TAG; p+=size) {
-		if ((*p & mask) == masked_tag && !(n--)) 
+		if ((*p & mask) == masked_tag && !(n--))
 			return (PnP_TAG_PACKET *) p;
 		if (tag_type(*p))
 			size=ld_le16((unsigned short *)(p+1))+3;
-		else 
+		else
 			size=tag_small_count(*p)+1;
 	}
 	return 0; /* not found */
@@ -854,7 +854,7 @@ PnP_TAG_PACKET __init *PnP_find_small_vendor_packet(unsigned char *p,
 	int next=0;
 	while (p) {
 		p = (unsigned char *) PnP_find_packet(p, 0x70, next);
-		if (p && p[1]==packet_type && !(n--)) 
+		if (p && p[1]==packet_type && !(n--))
 			return (PnP_TAG_PACKET *) p;
 		next = 1;
 	};
@@ -868,7 +868,7 @@ PnP_TAG_PACKET __init *PnP_find_large_vendor_packet(unsigned char *p,
 	int next=0;
 	while (p) {
 		p = (unsigned char *) PnP_find_packet(p, 0x84, next);
-		if (p && p[3]==packet_type && !(n--)) 
+		if (p && p[3]==packet_type && !(n--))
 			return (PnP_TAG_PACKET *) p;
 		next = 1;
 	};
