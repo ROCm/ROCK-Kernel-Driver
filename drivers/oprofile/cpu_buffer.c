@@ -36,8 +36,10 @@ static void __free_cpu_buffers(int num)
 {
 	int i;
  
-	for_each_online_cpu(i)
-		vfree(cpu_buffer[i].buffer);
+	for_each_online_cpu(i) {
+		if (cpu_buffer[i].buffer)
+			vfree(cpu_buffer[i].buffer);
+	}
 }
  
  
