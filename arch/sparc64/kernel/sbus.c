@@ -813,7 +813,7 @@ unsigned int sbus_build_irq(void *buscookie, unsigned int ino)
 #define  SYSIO_UEAFSR_SIZE	0x00001c0000000000 /* Bad transfer size is 2**SIZE */
 #define  SYSIO_UEAFSR_MID	0x000003e000000000 /* UPA MID causing the fault    */
 #define  SYSIO_UEAFSR_RESV2	0x0000001fffffffff /* Reserved                     */
-static void sysio_ue_handler(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sysio_ue_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct sbus_bus *sbus = dev_id;
 	struct sbus_iommu *iommu = sbus->iommu;
@@ -867,6 +867,8 @@ static void sysio_ue_handler(int irq, void *dev_id, struct pt_regs *regs)
 	if (!reported)
 		printk("(none)");
 	printk("]\n");
+
+	return IRQ_HANDLED;
 }
 
 #define SYSIO_CE_AFSR	0x0040UL
@@ -883,7 +885,7 @@ static void sysio_ue_handler(int irq, void *dev_id, struct pt_regs *regs)
 #define  SYSIO_CEAFSR_SIZE	0x00001c0000000000 /* Bad transfer size is 2**SIZE */
 #define  SYSIO_CEAFSR_MID	0x000003e000000000 /* UPA MID causing the fault    */
 #define  SYSIO_CEAFSR_RESV2	0x0000001fffffffff /* Reserved                     */
-static void sysio_ce_handler(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sysio_ce_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct sbus_bus *sbus = dev_id;
 	struct sbus_iommu *iommu = sbus->iommu;
@@ -942,6 +944,8 @@ static void sysio_ce_handler(int irq, void *dev_id, struct pt_regs *regs)
 	if (!reported)
 		printk("(none)");
 	printk("]\n");
+
+	return IRQ_HANDLED;
 }
 
 #define SYSIO_SBUS_AFSR		0x2010UL
@@ -958,7 +962,7 @@ static void sysio_ce_handler(int irq, void *dev_id, struct pt_regs *regs)
 #define  SYSIO_SBAFSR_SIZE	0x00001c0000000000 /* Size of transfer             */
 #define  SYSIO_SBAFSR_MID	0x000003e000000000 /* MID causing the error        */
 #define  SYSIO_SBAFSR_RESV3	0x0000001fffffffff /* Reserved                     */
-static void sysio_sbus_error_handler(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sysio_sbus_error_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct sbus_bus *sbus = dev_id;
 	struct sbus_iommu *iommu = sbus->iommu;
@@ -1013,6 +1017,8 @@ static void sysio_sbus_error_handler(int irq, void *dev_id, struct pt_regs *regs
 	printk("]\n");
 
 	/* XXX check iommu/strbuf for further error status XXX */
+
+	return IRQ_HANDLED;
 }
 
 #define ECC_CONTROL	0x0020UL

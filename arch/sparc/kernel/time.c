@@ -120,7 +120,7 @@ __volatile__ unsigned int *master_l10_limit;
 
 #define TICK_SIZE (tick_nsec / 1000)
 
-void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	/* last time the cmos clock got updated */
 	static long last_rtc_update;
@@ -156,6 +156,8 @@ void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	    last_rtc_update = xtime.tv_sec - 600; /* do it again in 60 s */
 	}
 	write_sequnlock(&xtime_lock);
+
+	return IRQ_HANDLED;
 }
 
 /* Kick start a stopped clock (procedure from the Sun NVRAM/hostid FAQ). */

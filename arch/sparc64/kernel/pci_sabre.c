@@ -744,7 +744,7 @@ static void sabre_check_iommu_error(struct pci_controller_info *p,
 	spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
-static void sabre_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sabre_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct pci_controller_info *p = dev_id;
 	unsigned long afsr_reg = p->controller_regs + SABRE_UE_AFSR;
@@ -762,7 +762,7 @@ static void sabre_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
 		 SABRE_UEAFSR_SDRD | SABRE_UEAFSR_SDWR |
 		 SABRE_UEAFSR_SDTE | SABRE_UEAFSR_PDTE);
 	if (!error_bits)
-		return;
+		return IRQ_NONE;
 	sabre_write(afsr_reg, error_bits);
 
 	/* Log the error. */
@@ -800,9 +800,11 @@ static void sabre_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 	/* Interrogate IOMMU for error status. */
 	sabre_check_iommu_error(p, afsr, afar);
+
+	return IRQ_HANDLED;
 }
 
-static void sabre_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sabre_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct pci_controller_info *p = dev_id;
 	unsigned long afsr_reg = p->controller_regs + SABRE_CE_AFSR;
@@ -819,7 +821,7 @@ static void sabre_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 		(SABRE_CEAFSR_PDRD | SABRE_CEAFSR_PDWR |
 		 SABRE_CEAFSR_SDRD | SABRE_CEAFSR_SDWR);
 	if (!error_bits)
-		return;
+		return IRQ_NONE;
 	sabre_write(afsr_reg, error_bits);
 
 	/* Log the error. */
@@ -854,9 +856,11 @@ static void sabre_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 	if (!reported)
 		printk("(none)");
 	printk("]\n");
+
+	return IRQ_HANDLED;
 }
 
-static void sabre_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sabre_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct pci_controller_info *p = dev_id;
 	unsigned long afsr_reg, afar_reg;
@@ -877,7 +881,7 @@ static void sabre_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 		 SABRE_PIOAFSR_SMA | SABRE_PIOAFSR_STA |
 		 SABRE_PIOAFSR_SRTRY | SABRE_PIOAFSR_SPERR);
 	if (!error_bits)
-		return;
+		return IRQ_NONE;
 	sabre_write(afsr_reg, error_bits);
 
 	/* Log the error. */
@@ -947,6 +951,8 @@ static void sabre_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 		pci_scan_for_parity_error(p, &p->pbm_A, p->pbm_A.pci_bus);
 		pci_scan_for_parity_error(p, &p->pbm_B, p->pbm_B.pci_bus);
 	}
+
+	return IRQ_HANDLED;
 }
 
 /* XXX What about PowerFail/PowerManagement??? -DaveM */

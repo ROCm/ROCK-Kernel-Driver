@@ -672,7 +672,7 @@ static void schizo_check_iommu_error(struct pci_controller_info *p,
 #define SCHIZO_UEAFSR_MTAG	0x000000000000e000UL
 #define SCHIZO_UEAFSR_ECCSYND	0x00000000000001ffUL
 
-static void schizo_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t schizo_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct pci_controller_info *p = dev_id;
 	unsigned long afsr_reg = p->controller_regs + SCHIZO_UE_AFSR;
@@ -697,7 +697,7 @@ static void schizo_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
 		(SCHIZO_UEAFSR_PPIO | SCHIZO_UEAFSR_PDRD | SCHIZO_UEAFSR_PDWR |
 		 SCHIZO_UEAFSR_SPIO | SCHIZO_UEAFSR_SDMA);
 	if (!error_bits)
-		return;
+		return IRQ_NONE;
 	schizo_write(afsr_reg, error_bits);
 
 	/* Log the error. */
@@ -740,6 +740,8 @@ static void schizo_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
 	schizo_check_iommu_error(p, UE_ERR);
 
 	schizo_clear_other_err_intr(irq);
+
+	return IRQ_HANDLED;
 }
 
 #define SCHIZO_CE_AFSR	0x10040UL
@@ -760,7 +762,7 @@ static void schizo_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
 #define SCHIZO_CEAFSR_MTAG	0x000000000000e000UL
 #define SCHIZO_CEAFSR_ECCSYND	0x00000000000001ffUL
 
-static void schizo_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t schizo_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct pci_controller_info *p = dev_id;
 	unsigned long afsr_reg = p->controller_regs + SCHIZO_CE_AFSR;
@@ -785,7 +787,7 @@ static void schizo_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 		(SCHIZO_CEAFSR_PPIO | SCHIZO_CEAFSR_PDRD | SCHIZO_CEAFSR_PDWR |
 		 SCHIZO_CEAFSR_SPIO | SCHIZO_CEAFSR_SDMA);
 	if (!error_bits)
-		return;
+		return IRQ_NONE;
 	schizo_write(afsr_reg, error_bits);
 
 	/* Log the error. */
@@ -829,6 +831,8 @@ static void schizo_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 	printk("]\n");
 
 	schizo_clear_other_err_intr(irq);
+
+	return IRQ_HANDLED;
 }
 
 #define SCHIZO_PCI_AFSR	0x2010UL
@@ -852,7 +856,7 @@ static void schizo_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 #define SCHIZO_PCIAFSR_MEM	0x0000000020000000UL
 #define SCHIZO_PCIAFSR_IO	0x0000000010000000UL
 
-static void schizo_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t schizo_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct pci_pbm_info *pbm = dev_id;
 	struct pci_controller_info *p = pbm->parent;
@@ -886,7 +890,7 @@ static void schizo_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 		 SCHIZO_PCIAFSR_SRTRY | SCHIZO_PCIAFSR_SPERR |
 		 SCHIZO_PCIAFSR_STTO | SCHIZO_PCIAFSR_SUNUS);
 	if (!error_bits)
-		return;
+		return IRQ_NONE;
 	schizo_write(afsr_reg, error_bits);
 
 	/* Log the error. */
@@ -974,6 +978,8 @@ static void schizo_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 		pci_scan_for_parity_error(p, pbm, pbm->pci_bus);
 
 	schizo_clear_other_err_intr(irq);
+
+	return IRQ_HANDLED;
 }
 
 #define SCHIZO_SAFARI_ERRLOG	0x10018UL
@@ -1002,7 +1008,7 @@ static void schizo_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 /* We only expect UNMAP errors here.  The rest of the Safari errors
  * are marked fatal and thus cause a system reset.
  */
-static void schizo_safarierr_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t schizo_safarierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct pci_controller_info *p = dev_id;
 	u64 errlog;
@@ -1016,7 +1022,7 @@ static void schizo_safarierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 		       p->index, errlog);
 
 		schizo_clear_other_err_intr(irq);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	printk("SCHIZO%d: Safari interrupt, UNMAPPED error, interrogating IOMMUs.\n",
@@ -1024,6 +1030,7 @@ static void schizo_safarierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 	schizo_check_iommu_error(p, SAFARI_ERR);
 
 	schizo_clear_other_err_intr(irq);
+	return IRQ_HANDLED;
 }
 
 /* Nearly identical to PSYCHO equivalents... */
