@@ -89,4 +89,4 @@ obj-$(CONFIG_FB_TCX)               += tcx.o sbuslib.o cfbimgblt.o cfbcopyarea.o 
 				      cfbfillrect.o
 obj-$(CONFIG_FB_LEO)               += leo.o sbuslib.o cfbimgblt.o cfbcopyarea.o \
 				      cfbfillrect.o
-
+obj-$(CONFIG_FB_PXA)		   += pxafb.o cfbimgblt.o cfbcopyarea.o cfbfillrect.o
