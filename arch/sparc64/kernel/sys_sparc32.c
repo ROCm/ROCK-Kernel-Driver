@@ -1397,7 +1397,7 @@ out_nofds:
 	return ret;
 }
 
-static int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
+int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 {
 	int err;
 
