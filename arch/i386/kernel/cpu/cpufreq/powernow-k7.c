@@ -162,9 +162,8 @@ static int check_powernow(void)
 
 static int get_ranges (unsigned char *pst)
 {
-	int j;
+	unsigned int j, speed;
 	u8 fid, vid;
-	unsigned int speed;
 
 	powernow_table = kmalloc((sizeof(struct cpufreq_frequency_table) * (number_scales + 1)), GFP_KERNEL);
 	if (!powernow_table)
