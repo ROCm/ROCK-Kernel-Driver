@@ -85,43 +85,46 @@
 /* The maximum address for ISA DMA transfer on Alpha XL, due to an
    hardware SIO limitation, is 64MB.
 */
-#define ALPHA_XL_MAX_DMA_ADDRESS	(IDENT_ADDR+0x04000000UL)
+#define ALPHA_XL_MAX_ISA_DMA_ADDRESS		0x04000000UL
 
-/* The maximum address for ISA DMA transfer on RUFFIAN and NAUTILUS,
+/* The maximum address for ISA DMA transfer on RUFFIAN,
    due to an hardware SIO limitation, is 16MB.
 */
-#define ALPHA_RUFFIAN_MAX_DMA_ADDRESS	(IDENT_ADDR+0x01000000UL)
-#define ALPHA_NAUTILUS_MAX_DMA_ADDRESS	(IDENT_ADDR+0x01000000UL)
+#define ALPHA_RUFFIAN_MAX_ISA_DMA_ADDRESS	0x01000000UL
 
 /* The maximum address for ISA DMA transfer on SABLE, and some ALCORs,
    due to an hardware SIO chip limitation, is 2GB.
 */
-#define ALPHA_SABLE_MAX_DMA_ADDRESS	(IDENT_ADDR+0x80000000UL)
-#define ALPHA_ALCOR_MAX_DMA_ADDRESS	(IDENT_ADDR+0x80000000UL)
+#define ALPHA_SABLE_MAX_ISA_DMA_ADDRESS		0x80000000UL
+#define ALPHA_ALCOR_MAX_ISA_DMA_ADDRESS		0x80000000UL
 
 /*
   Maximum address for all the others is the complete 32-bit bus
   address space.
 */
-#define ALPHA_MAX_DMA_ADDRESS		(IDENT_ADDR+0x100000000UL)
+#define ALPHA_MAX_ISA_DMA_ADDRESS		0x100000000UL
 
 #ifdef CONFIG_ALPHA_GENERIC
-# define MAX_DMA_ADDRESS		(alpha_mv.max_dma_address)
+# define MAX_ISA_DMA_ADDRESS		(alpha_mv.max_isa_dma_address)
 #else
 # if defined(CONFIG_ALPHA_XL)
-#  define MAX_DMA_ADDRESS		ALPHA_XL_MAX_DMA_ADDRESS
+#  define MAX_ISA_DMA_ADDRESS		ALPHA_XL_MAX_ISA_DMA_ADDRESS
 # elif defined(CONFIG_ALPHA_RUFFIAN)
-#  define MAX_DMA_ADDRESS		ALPHA_RUFFIAN_MAX_DMA_ADDRESS
-# elif defined(CONFIG_ALPHA_NAUTILUS)
-#  define MAX_DMA_ADDRESS		ALPHA_NAUTILUS_MAX_DMA_ADDRESS
+#  define MAX_ISA_DMA_ADDRESS		ALPHA_RUFFIAN_MAX_ISA_DMA_ADDRESS
 # elif defined(CONFIG_ALPHA_SABLE)
-#  define MAX_DMA_ADDRESS		ALPHA_SABLE_MAX_DMA_ADDRESS
+#  define MAX_ISA_DMA_ADDRESS		ALPHA_SABLE_MAX_DMA_ISA_ADDRESS
 # elif defined(CONFIG_ALPHA_ALCOR)
-#  define MAX_DMA_ADDRESS		ALPHA_ALCOR_MAX_DMA_ADDRESS
+#  define MAX_ISA_DMA_ADDRESS		ALPHA_ALCOR_MAX_DMA_ISA_ADDRESS
 # else
-#  define MAX_DMA_ADDRESS		ALPHA_MAX_DMA_ADDRESS
+#  define MAX_ISA_DMA_ADDRESS		ALPHA_MAX_ISA_DMA_ADDRESS
 # endif
 #endif
+
+/* If we have the iommu, we don't have any address limitations on DMA.
+   Otherwise (Nautilus, RX164), we have to have 0-16 Mb DMA zone
+   like i386. */
+#define MAX_DMA_ADDRESS		(alpha_mv.mv_pci_tbi ?	\
+				 ~0UL : IDENT_ADDR + 0x01000000)
 
 /* 8237 DMA controllers */
 #define IO_DMA1_BASE	0x00	/* 8 bit slave DMA, channels 0..3 */
