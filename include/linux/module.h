@@ -284,6 +284,9 @@ struct module
 	char *args;
 };
 
+/* Locate a module by name. */
+extern struct module *get_module(const char *name);
+
 /* FIXME: It'd be nice to isolate modules during init, too, so they
    aren't used before they (may) fail.  But presently too much code
    (IDE & SCSI) require entry into the module during init.*/

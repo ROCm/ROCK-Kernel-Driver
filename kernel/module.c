@@ -253,6 +253,19 @@ static struct module *find_module(const char *name)
 	return NULL;
 }
 
+struct module *get_module(const char *name)
+{
+	struct module *mod;
+
+	if (down_interruptible(&module_mutex) != 0)
+		return NULL;
+
+	mod = find_module(name);
+	up(&module_mutex);
+	return mod;
+}
+EXPORT_SYMBOL(get_module);
+
 #ifdef CONFIG_SMP
 /* Number of blocks used and allocated. */
 static unsigned int pcpu_num_used, pcpu_num_allocated;

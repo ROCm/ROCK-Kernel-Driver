@@ -27,6 +27,7 @@
 #include <linux/swap.h>
 #include <linux/smp.h>
 #include <linux/notifier.h>
+#include <linux/string.h>
 #ifdef CONFIG_MAGIC_SYSRQ
 #include <linux/sysrq.h>
 #endif
@@ -176,20 +177,18 @@ static inline void unlink_module(struct dp_module_struct *m)
 	return;
 }
 
-/*
- * copied from kernel/module.c find_module().
- */
 static struct module * find_kmodule(const char *name)
 {
-	struct module *kmod = NULL;
-#if 0
-	extern struct list_head *modules;
-	list_for_each_entry(kmod, modules, list) {
-		if (!strcmp(kmod->name, name))
-			break;
-	}
-#endif
-	return kmod;
+	char modname[MODULE_NAME_LEN];
+	char *lastdot;
+
+	/* strip off the extension */
+	strlcpy(modname, name, MODULE_NAME_LEN);
+	lastdot = strrchr(modname, '.');
+	if (lastdot)
+		*lastdot = '\0';
+
+	return get_module(modname);
 }
 
 /*
