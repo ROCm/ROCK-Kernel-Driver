@@ -214,7 +214,7 @@ static int __init orinoco_tmd_init(void)
 	return pci_module_init(&orinoco_tmd_driver);
 }
 
-void __exit orinoco_tmd_exit(void)
+static void __exit orinoco_tmd_exit(void)
 {
 	pci_unregister_driver(&orinoco_tmd_driver);
 	current->state = TASK_UNINTERRUPTIBLE;

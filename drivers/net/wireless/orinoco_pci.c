@@ -387,7 +387,7 @@ static int __init orinoco_pci_init(void)
 	return pci_module_init(&orinoco_pci_driver);
 }
 
-void __exit orinoco_pci_exit(void)
+static void __exit orinoco_pci_exit(void)
 {
 	pci_unregister_driver(&orinoco_pci_driver);
 }

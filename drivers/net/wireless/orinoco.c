@@ -507,7 +507,7 @@ MODULE_PARM(suppress_linkstatus, "i");
 /********************************************************************/
 
 /* The frequency of each channel in MHz */
-const long channel_frequency[] = {
+static const long channel_frequency[] = {
 	2412, 2417, 2422, 2427, 2432, 2437, 2442,
 	2447, 2452, 2457, 2462, 2467, 2472, 2484
 };
@@ -515,7 +515,7 @@ const long channel_frequency[] = {
 
 /* This tables gives the actual meanings of the bitrate IDs returned
  * by the firmware. */
-struct {
+static struct {
 	int bitrate; /* in 100s of kilobits */
 	int automatic;
 	u16 agere_txratectrl;
@@ -643,14 +643,14 @@ int orinoco_stop(struct net_device *dev)
 	return err;
 }
 
-struct net_device_stats *orinoco_get_stats(struct net_device *dev)
+static struct net_device_stats *orinoco_get_stats(struct net_device *dev)
 {
 	struct orinoco_private *priv = netdev_priv(dev);
 	
 	return &priv->stats;
 }
 
-struct iw_statistics *orinoco_get_wireless_stats(struct net_device *dev)
+static struct iw_statistics *orinoco_get_wireless_stats(struct net_device *dev)
 {
 	struct orinoco_private *priv = netdev_priv(dev);
 	hermes_t *hw = &priv->hw;
@@ -985,9 +985,9 @@ static inline void orinoco_spy_gather(struct net_device *dev, u_char *mac,
 		}
 }
 
-void orinoco_stat_gather(struct net_device *dev,
-			 struct sk_buff *skb,
-			 struct hermes_rx_descriptor *desc)
+static void orinoco_stat_gather(struct net_device *dev,
+				struct sk_buff *skb,
+				struct hermes_rx_descriptor *desc)
 {
 	struct orinoco_private *priv = netdev_priv(dev);
 

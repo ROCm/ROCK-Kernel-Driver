@@ -341,7 +341,7 @@ static int __init orinoco_plx_init(void)
 	return pci_module_init(&orinoco_plx_driver);
 }
 
-void __exit orinoco_plx_exit(void)
+static void __exit orinoco_plx_exit(void)
 {
 	pci_unregister_driver(&orinoco_plx_driver);
 	current->state = TASK_UNINTERRUPTIBLE;
