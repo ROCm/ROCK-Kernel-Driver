@@ -203,8 +203,22 @@
 		1000 0530  MegaRAID 530 SCSI 320-0X RAID Controller
 		1000 0531  MegaRAID 531 SCSI 320-4X RAID Controller
 		1000 0532  MegaRAID 532 SCSI 320-2X RAID Controller
-		1028 0533  PowerEgde Expandable RAID Controller 4/QC
-		8086 0532  Storage RAID Controller SRCU42X
+		1028 0531  PowerEgde Expandable RAID Controller 4/QC
+		8086 0530  MegaRAID Intel RAID Controller SRCZCRX
+		8086 0532  MegaRAID Intel RAID Controller SRCU42X
+	0408  MegaRAID
+		1000 0001  MegaRAID SCSI 320-1E RAID Controller
+		1000 0002  MegaRAID SCSI 320-2E RAID Controller
+		1028 0001  Dell PowerEdge RAID Controller PERC4e/SC
+		1028 0002  Dell PowerEdge RAID Controller PERC4e/DC
+		1734 1065  FSC MegaRAID PCI Express ROMB
+		8086 0002  MegaRAID Intel RAID Controller SRCU42E
+	0409  MegaRAID
+		1000 3004  MegaRAID SATA 300-4X RAID Controller
+		1000 3008  MegaRAID SATA 300-8X RAID Controller
+		8086 3008  MegaRAID Intel RAID Controller SRCS28X
+		8086 3431  MegaRAID Intel RAID Controller Alief SROMBU42E
+		8086 3499  MegaRAID Intel RAID Controller Harwich SROMBU42E
 	0621  FC909 Fibre Channel Adapter
 	0622  FC929 Fibre Channel Adapter
 		1000 1020  44929 O Dual Fibre Channel card
@@ -228,13 +242,15 @@
 	1960  MegaRAID
 		1000 0518  MegaRAID 518 SCSI 320-2 Controller
 		1000 0520  MegaRAID 520 SCSI 320-1 Controller
-		1000 0522  MegaRAID 522 i4133 RAID Controller
+		1000 0522  MegaRAID 522 i4 133 RAID Controller
 		1000 0523  MegaRAID SATA 150-6 RAID Controller
 		1000 4523  MegaRAID SATA 150-4 RAID Controller
 		1000 a520  MegaRAID ZCR SCSI 320-0 Controller
 		1028 0518  MegaRAID 518 DELL PERC 4/DC RAID Controller
 		1028 0520  MegaRAID 520 DELL PERC 4/SC RAID Controller
 		1028 0531  PowerEdge Expandable RAID Controller 4/QC
+		8086 0520  MegaRAID Intel RAID Controller SRCU41L
+		8086 0523  MegaRAID Intel RAID Controller SRCS16
 1001  Kolter Electronic
 	0010  PCI 1616 Measurement card with 32 digital I/O lines
 	0011  OPTO-PCI Opto-Isolated digital I/O board
@@ -1210,6 +1226,12 @@
 		1028 014a  PowerEdge Expandable RAID Controller 4/Di
 		1028 014c  MegaRAID DELL PERC 4/Di RAID On Motherboard
 		1028 014d  MegaRAID DELL PERC 4/Di RAID On Motherboard
+	0013  PowerEdge Expandable RAID controller 4
+		1028 016c  PowerEdge Expandable RAID Controller 4e/Si
+		1028 016d  PowerEdge Expandable RAID Controller 4e/Di
+		1028 016e  PowerEdge Expandable RAID Controller 4e/Di
+		1028 016f  PowerEdge Expandable RAID Controller 4e/Di
+		1028 0170  PowerEdge Expandable RAID Controller 4e/Di
 1029  Siemens Nixdorf IS
 102a  LSI Logic
 	0000  HYDRA

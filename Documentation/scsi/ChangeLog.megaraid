@@ -1,42 +1,59 @@
-### Version 2.00.3
-Wed Jan 29 09:13:44 EST 200 - Atul Mukker <atulm@lsil.com>
-i.	Change the handshake in ISR while acknowledging interrupts. Write the
-	valid interrupt pattern 0x10001234 as soon as it is read from the
-	outdoor register. In existing driver and on certain platform, invalid
-	command ids were being returned.
+Release Date	: Mon Jun 21 19:53:54 EDT 2004 - Atul Mukker <atulm@lsil.com>
+Current Version	: 2.20.0.0
+Older Version	: megaraid 2.20.0.rc2 and 2.00.3
 
-	Also, do not wait on status be become 0xFF, since FW can return this
-	status in certain circumstances.
+i.	Independent module to interact with userland applications and
+	multiplex command to low level RAID module(s).
 
-	Initialize the numstatus field of mailbox to 0xFF so that we can wait
-	on this wait in next interrupt. Firmware does not change its value
-	unless there are some status to be posted
+	"Shared code in a third module, a "library module", is an acceptable
+	solution. modprobe automatically loads dependent modules, so users
+	running "modprobe driver1" or "modprobe driver2" would automatically
+	load the shared library module."
 
-ii.	Specify the logical drive number while issuing the RESERVATION_STATUS
+		- Jeff Garzik <jgarzik@pobox.com> 02.25.2004 LKML
 
-iii.	Reduce the default mailbox busy wait time from 300us to 10us. This is
-	done to avaoid a possible deadlock in FW because of longer bust waits.
+	"As Jeff hinted, if your userspace<->driver API is consistent between
+	your new MPT-based RAID controllers and your existing megaraid driver,
+	then perhaps you need a single small helper module (lsiioctl or some
+	better name), loaded by both mptraid and megaraid automatically, which
+	handles registering the /dev/megaraid node dynamically. In this case,
+	both mptraid and megaraid would register with lsiioctl for each
+	adapter discovered, and lsiioctl would essentially be a switch,
+	redirecting userspace tool ioctls to the appropriate driver."
 
-iv.	The max outstanding commands are reduced to 126 because that't the
-	safest value on all FW.
+		- Matt Domsch <Matt_Domsch@dell.com> 02.25.2004 LKML
 
-v.	Number of sectors per IO are reduced to 128 (64kb), becuase FW needs
-	resources in special circumstances like check consistency, rebuilds
-	etc.
+ii.	Remove C99 initializations from pci_device id.
 
-vi.	max_commands is no longer a module parameter because of iv.
+	"pci_id_table_g would be much more readable when not using C99
+	initializers.
+	PCI table doesn't change, there's lots of users that prefer the more
+	readable variant.  And it's really far less and much easier to grok
+	lines without C99 initializers."
 
-### Version: 2.00.2
-i.	Intermediate release with kernel specific code
+		- Christoph Hellwig <hch@infradead.org>, 05.28.2004 linux-scsi
 
+iii.	Many fixes as suggested by Christoph Hellwig <hch@infradead.org> on
+	linux-scsi, 05.28.2004
 
-### Version: 2.00.1i
-Wed Dec  4 14:34:51 EST 2002 - Atul Mukker <atulm@lsil.com>
-i.	Making the older IO based controllers to work with this driver
+iv.	We now support up to 32 parallel ioctl commands instead of current 1.
+	There is a conscious effort to let memory allocation not fail for ioctl
+	commands.
 
+v.	Do away with internal memory management. Use pci_pool_(create|alloc)
+	instead.
 
-### Version 2.00.1
-Fri Nov 15 10:59:44 EST 2002 - Atul Mukker <atulm@lsil.com>
-i.	Release host lock before issuing internal command to reset
-	reservations in megaraid_reset() and reacquire after internal command
-	is completed.
+vi.	Kill tasklet when unloading the driver.
+
+vii.	Do not use "host_lock', driver has fine-grain locks now to protect all
+	data structures.
+
+viii.	Optimize the build scatter-gather list routine. The callers already
+	know the data transfer address and length.
+
+ix.	Better implementation of error handling and recovery. Driver now
+	performs extended errors recovery for instances like scsi cable pull.
+
+x.	Disassociate the management commands with an overlaid scsi command.
+	Driver now treats the mangement packets as special packets and has a
+	dedicated callback routine.

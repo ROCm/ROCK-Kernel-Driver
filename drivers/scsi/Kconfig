@@ -395,15 +395,7 @@ config SCSI_IN2000
 	  To compile this driver as a module, choose M here: the
 	  module will be called in2000.
 
-config SCSI_MEGARAID
-	tristate "AMI MegaRAID support"
-	depends on PCI && SCSI
-	help
-	  This driver supports the AMI MegaRAID 418, 428, 438, 466, 762, 490
-	  and 467 SCSI host adapters.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called megaraid.
+source "drivers/scsi/megaraid/Kconfig.megaraid"
 
 config SCSI_SATA
 	bool "Serial ATA (SATA) support"
