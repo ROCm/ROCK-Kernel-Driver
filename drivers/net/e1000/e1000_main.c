@@ -534,7 +534,8 @@ e1000_remove(struct pci_dev *pdev)
 	struct e1000_adapter *adapter = netdev->priv;
 	uint32_t manc;
 
-	if(adapter->hw.mac_type >= e1000_82540) {
+	if(adapter->hw.mac_type >= e1000_82540 &&
+	   adapter->hw.media_type == e1000_media_type_copper) {
 		manc = E1000_READ_REG(&adapter->hw, MANC);
 		if(manc & E1000_MANC_SMBUS_EN) {
 			manc |= E1000_MANC_ARP_EN;
@@ -2797,7 +2798,8 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 
 	pci_save_state(pdev, adapter->pci_state);
 
-	if(adapter->hw.mac_type >= e1000_82540) {
+	if(adapter->hw.mac_type >= e1000_82540 &&
+	   adapter->hw.media_type == e1000_media_type_copper) {
 		manc = E1000_READ_REG(&adapter->hw, MANC);
 		if(manc & E1000_MANC_SMBUS_EN) {
 			manc |= E1000_MANC_ARP_EN;
@@ -2835,7 +2837,8 @@ e1000_resume(struct pci_dev *pdev)
 
 	netif_device_attach(netdev);
 
-	if(adapter->hw.mac_type >= e1000_82540) {
+	if(adapter->hw.mac_type >= e1000_82540 &&
+	   adapter->hw.media_type == e1000_media_type_copper) {
 		manc = E1000_READ_REG(&adapter->hw, MANC);
 		manc &= ~(E1000_MANC_ARP_EN);
 		E1000_WRITE_REG(&adapter->hw, MANC, manc);
