@@ -239,7 +239,6 @@ long sys32_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	int ret;
 	elf_gregset_t32 saved_regs;  /* an array of ELF_NGREG unsigned ints (32 bits) */
 	sigset_t set;
-	unsigned int prevsp;
 
 	sc = (struct sigcontext32_struct *)(regs->gpr[1] + __SIGNAL_FRAMESIZE32);
 	if (copy_from_user(&sigctx, sc, sizeof(sigctx)))
@@ -1150,7 +1149,7 @@ handle_signal32(unsigned long sig, struct k_sigaction *ka,
 			goto badframe; 
 		}
 	} else {
-		/* Put another sigcontext on the stack */
+		/* Put a sigcontext on the stack */
 		*newspp -= sizeof(*sc);
 		sc = (struct sigcontext32_struct *)(u64)*newspp;
 		if (verify_area(VERIFY_WRITE, sc, sizeof(*sc)))
