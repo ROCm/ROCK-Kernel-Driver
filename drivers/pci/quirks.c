@@ -647,6 +647,37 @@ static void __init quirk_eisa_bridge(struct pci_dev *dev)
 }
 
 /*
+ * SiS 96x south bridge: BIOS typically hides SMBus device...
+ */
+static void __init quirk_sis_96x_smbus(struct pci_dev *dev)
+{
+	u8 val = 0;
+	printk(KERN_INFO "Enabling SiS 96x SMBus.\n");
+	pci_read_config_byte(dev, 0x77, &val);
+	pci_write_config_byte(dev, 0x77, val & ~0x10);
+	pci_read_config_byte(dev, 0x77, &val);
+}
+
+/*
+ * ... This is further complicated by the fact that some SiS96x south
+ * bridges pretend to be 85C503/5513 instead.  In that case see if we
+ * spotted a compatible north bridge to make sure.
+ * (pci_find_device doesn't work yet)
+ */
+static int __devinitdata sis_96x_compatible = 0;
+
+static void __init quirk_sis_503_smbus(struct pci_dev *dev)
+{
+	if (sis_96x_compatible)
+		quirk_sis_96x_smbus(dev);
+}
+
+static void __init quirk_sis_96x_compatible(struct pci_dev *dev)
+{
+	sis_96x_compatible = 1;
+}
+
+/*
  *  The main table of quirks.
  */
 
@@ -679,6 +710,15 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_INTEL, 	PCI_DEVICE_ID_INTEL_82443BX_2, 	quirk_natoma },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5597,		quirk_nopcipci },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_496,		quirk_nopcipci },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_503,		quirk_sis_503_smbus },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_645,		quirk_sis_96x_compatible },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_646,		quirk_sis_96x_compatible },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_648,		quirk_sis_96x_compatible },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_650,		quirk_sis_96x_compatible },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_651,		quirk_sis_96x_compatible },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_961,		quirk_sis_96x_smbus },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_962,		quirk_sis_96x_smbus },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_963,		quirk_sis_96x_smbus },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_AL, 	PCI_DEVICE_ID_AL_M1647, 	quirk_alimagik },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_AL, 	PCI_DEVICE_ID_AL_M1651, 	quirk_alimagik },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8363_0,	quirk_vialatency },
