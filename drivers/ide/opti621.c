@@ -142,7 +142,7 @@ static void compute_pios(ide_drive_t *drive, byte pio)
  */
 {
 	int d;
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 
 	if (pio == PIO_DONT_KNOW)
 		drive->drive_data = min(ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0, OPTI621_MAX_PIO);
@@ -252,7 +252,7 @@ static void opti621_tune_drive (ide_drive_t *drive, byte pio)
 	pio_clocks_t first, second;
 	int ax, drdy;
 	byte cycle1, cycle2, misc;
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 
 	/* sets drive->drive_data for both drives */
 	compute_pios(drive, pio);
@@ -310,7 +310,7 @@ static void opti621_tune_drive (ide_drive_t *drive, byte pio)
 /*
  * ide_init_opti621() is called once for each hwif found at boot.
  */
-void __init ide_init_opti621 (ide_hwif_t *hwif)
+void __init ide_init_opti621(struct ata_channel *hwif)
 {
 	hwif->drives[0].drive_data = PIO_DONT_KNOW;
 	hwif->drives[1].drive_data = PIO_DONT_KNOW;

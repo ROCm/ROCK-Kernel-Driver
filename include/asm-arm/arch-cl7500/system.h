@@ -18,6 +18,6 @@ static void arch_idle(void)
 	do {					\
 		iomd_writeb(0, IOMD_ROMCR0);	\
 		cpu_reset(0);			\
-	} while (0);
+	} while (0)
 
 #endif

@@ -293,6 +293,9 @@ BTFIXUPDEF_CALL_CONST(pte_t, pte_mkyoung, pte_t)
 #define page_pte_prot(page, prot)	mk_pte(page, prot)
 #define page_pte(page)			page_pte_prot(page, __pgprot(0))
 
+/* Permanent address of a page. */
+#define page_address(page)  ((page)->virtual)
+
 BTFIXUPDEF_CALL(struct page *, pte_page, pte_t)
 #define pte_page(pte) BTFIXUP_CALL(pte_page)(pte)
 

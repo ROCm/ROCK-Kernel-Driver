@@ -171,7 +171,7 @@ _static void uhci_switch_timer_int(uhci_t *s)
 #ifdef CONFIG_USB_UHCI_HIGH_BANDWIDTH
 _static void enable_desc_loop(uhci_t *s, struct urb *urb)
 {
-	int flags;
+	unsigned long flags;
 
 	if (urb->transfer_flags & USB_NO_FSBR)
 		return;
@@ -186,7 +186,7 @@ _static void enable_desc_loop(uhci_t *s, struct urb *urb)
 /*-------------------------------------------------------------------*/
 _static void disable_desc_loop(uhci_t *s, struct urb *urb)
 {
-	int flags;
+	unsigned long flags;
 
 	if (urb->transfer_flags & USB_NO_FSBR)
 		return;

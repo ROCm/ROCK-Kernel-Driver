@@ -83,7 +83,7 @@ struct device {
 					   device */
 	void		*driver_data;	/* data private to the driver */
 	void		*platform_data;	/* Platform specific data (e.g. ACPI,
-					   BIOS data relevant to device */
+					   BIOS data relevant to device) */
 
 	u32		current_state;  /* Current operating state. In
 					   ACPI-speak, this is D0-D3, D0

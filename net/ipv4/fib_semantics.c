@@ -56,6 +56,8 @@ int fib_info_cnt;
 
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
 
+static spinlock_t fib_multipath_lock = SPIN_LOCK_UNLOCKED;
+
 #define for_nexthops(fi) { int nhsel; const struct fib_nh * nh; \
 for (nhsel=0, nh = (fi)->fib_nh; nhsel < (fi)->fib_nhs; nh++, nhsel++)
 
@@ -869,8 +871,14 @@ int fib_sync_down(u32 local, struct net_device *dev, int force)
 					 nh->nh_scope != scope) {
 					nh->nh_flags |= RTNH_F_DEAD;
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
+					spin_lock_bh(&fib_multipath_lock);
 					fi->fib_power -= nh->nh_power;
 					nh->nh_power = 0;
+					spin_unlock_bh(&fib_multipath_lock);
+					if (force && nh->nh_dev) {
+						dev_put(nh->nh_dev);
+						nh->nh_dev = NULL;
+					}
 #endif
 					dead++;
 				}
@@ -906,13 +914,19 @@ int fib_sync_up(struct net_device *dev)
 				alive++;
 				continue;
 			}
+			if (nh->nh_dev == NULL && nh->nh_oif == dev->ifindex) {
+				dev_hold(dev);
+				nh->nh_dev = dev;
+			}
 			if (nh->nh_dev == NULL || !(nh->nh_dev->flags&IFF_UP))
 				continue;
 			if (nh->nh_dev != dev || __in_dev_get(dev) == NULL)
 				continue;
 			alive++;
+			spin_lock_bh(&fib_multipath_lock);
 			nh->nh_power = 0;
 			nh->nh_flags &= ~RTNH_F_DEAD;
+			spin_unlock_bh(&fib_multipath_lock);
 		} endfor_nexthops(fi)
 
 		if (alive > 0) {
@@ -933,6 +947,7 @@ void fib_select_multipath(const struct rt_key *key, struct fib_result *res)
 	struct fib_info *fi = res->fi;
 	int w;
 
+	spin_lock_bh(&fib_multipath_lock);
 	if (fi->fib_power <= 0) {
 		int power = 0;
 		change_nexthops(fi) {
@@ -942,12 +957,12 @@ void fib_select_multipath(const struct rt_key *key, struct fib_result *res)
 			}
 		} endfor_nexthops(fi);
 		fi->fib_power = power;
-#if 1
 		if (power <= 0) {
-			printk(KERN_CRIT "impossible 777\n");
+			spin_unlock_bh(&fib_multipath_lock);
+			/* Race condition: route has just become dead. */
+			res->nh_sel = 0;
 			return;
 		}
-#endif
 	}
 
 
@@ -963,15 +978,15 @@ void fib_select_multipath(const struct rt_key *key, struct fib_result *res)
 				nh->nh_power--;
 				fi->fib_power--;
 				res->nh_sel = nhsel;
+				spin_unlock_bh(&fib_multipath_lock);
 				return;
 			}
 		}
 	} endfor_nexthops(fi);
 
-#if 1
-	printk(KERN_CRIT "impossible 888\n");
-#endif
-	return;
+	/* Race condition: route has just become dead. */
+	res->nh_sel = 0;
+	spin_unlock_bh(&fib_multipath_lock);
 }
 #endif
 

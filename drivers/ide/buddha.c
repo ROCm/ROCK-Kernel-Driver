@@ -116,7 +116,7 @@ typedef enum BuddhaType_Enum BuddhaType;
      *  Check and acknowledge the interrupt status
      */
 
-static int buddha_ack_intr(ide_hwif_t *hwif)
+static int buddha_ack_intr(struct ata_channel *hwif)
 {
     unsigned char ch;
 
@@ -126,7 +126,7 @@ static int buddha_ack_intr(ide_hwif_t *hwif)
     return 1;
 }
 
-static int xsurf_ack_intr(ide_hwif_t *hwif)
+static int xsurf_ack_intr(struct ata_channel *hwif)
 {
     unsigned char ch;
 

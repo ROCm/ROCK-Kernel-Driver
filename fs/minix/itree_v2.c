@@ -1,7 +1,5 @@
-#include <linux/fs.h>
-#include <linux/minix_fs.h>
+#include "minix.h"
 #include <linux/locks.h>
-#include <linux/smp_lock.h>
 
 enum {DIRECT = 7, DEPTH = 4};	/* Have triple indirect */
 

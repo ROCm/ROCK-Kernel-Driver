@@ -47,6 +47,7 @@
 #include <linux/locks.h>
 #include <linux/vmalloc.h>
 #include <linux/smp_lock.h>
+#include <linux/completion.h>
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
 #include "jfs_metapage.h"
@@ -2777,6 +2778,7 @@ int jfs_lazycommit(void)
 	complete(&jfsIOwait);
 
 	do {
+		LAZY_LOCK(flags);
 restart:
 		WorkDone = 0;
 		while ((tblk = TxAnchor.unlock_queue)) {
@@ -2788,7 +2790,6 @@ restart:
 			 */
 			WorkDone = 1;
 
-			LAZY_LOCK(flags);
 			/*
 			 * Remove first transaction from queue
 			 */
@@ -2808,11 +2809,13 @@ restart:
 				current->state = TASK_RUNNING;
 				schedule();
 			}
+			LAZY_LOCK(flags);
 		}
 
 		if (WorkDone)
 			goto restart;
-		
+
+		LAZY_UNLOCK(flags);
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule();
 	} while (!jfs_thread_stopped());

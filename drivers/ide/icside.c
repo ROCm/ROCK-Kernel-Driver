@@ -224,7 +224,7 @@ static iftype_t __init icside_identifyif (struct expansion_card *ec)
 #define NR_ENTRIES 256
 #define TABLE_SIZE (NR_ENTRIES * 8)
 
-static int ide_build_sglist(ide_hwif_t *hwif, struct request *rq)
+static int ide_build_sglist(struct ata_channel *hwif, struct request *rq)
 {
 	request_queue_t *q = &hwif->drives[DEVICE_NR(rq->rq_dev) & 1].queue;
 	struct scatterlist *sg = hwif->sg_table;
@@ -245,16 +245,16 @@ static int ide_build_sglist(ide_hwif_t *hwif, struct request *rq)
 static int
 icside_build_dmatable(ide_drive_t *drive, int reading)
 {
-	return HWIF(drive)->sg_nents = ide_build_sglist(HWIF(drive), HWGROUP(drive)->rq);
+	return drive->channel->sg_nents = ide_build_sglist(drive->channel, HWGROUP(drive)->rq);
 }
 
 /* Teardown mappings after DMA has completed.  */
 static void icside_destroy_dmatable(ide_drive_t *drive)
 {
-	struct scatterlist *sg = HWIF(drive)->sg_table;
-	int nents = HWIF(drive)->sg_nents;
+	struct scatterlist *sg = drive->channel->sg_table;
+	int nents = drive->channel->sg_nents;
 
-	pci_unmap_sg(NULL, sg, nents, HWIF(drive)->sg_dma_direction);
+	pci_unmap_sg(NULL, sg, nents, drive->channel->sg_dma_direction);
 }
 
 /*
@@ -333,7 +333,7 @@ static ide_startstop_t icside_dmaintr(ide_drive_t *drive)
 	int i;
 	byte stat, dma_stat;
 
-	dma_stat = HWIF(drive)->dmaproc(ide_dma_end, drive);
+	dma_stat = drive->channel->dmaproc(ide_dma_end, drive);
 	stat = GET_STAT();			/* get drive status */
 	if (OK_STAT(stat,DRIVE_READY,drive->bad_wstat|DRQ_STAT)) {
 		if (!dma_stat) {
@@ -356,7 +356,7 @@ static int
 icside_dma_check(ide_drive_t *drive)
 {
 	struct hd_driveid *id = drive->id;
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	int autodma = hwif->autodma;
 	int xfer_mode = XFER_PIO_2;
 	int func = ide_dma_off_quietly;
@@ -397,7 +397,7 @@ icside_dma_verbose(ide_drive_t *drive)
 static int
 icside_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	int count, reading = 0;
 
 	switch (func) {
@@ -436,14 +436,15 @@ icside_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 		 */
 		set_dma_speed(hwif->hw.dma, drive->drive_data);
 
-		set_dma_sg(hwif->hw.dma, HWIF(drive)->sg_table, count);
+		set_dma_sg(hwif->hw.dma, drive->channel->sg_table, count);
 		set_dma_mode(hwif->hw.dma, reading ? DMA_MODE_READ
 			     : DMA_MODE_WRITE);
 
 		drive->waiting_for_dma = 1;
-		if (drive->media != ide_disk)
+		if (drive->type != ATA_DISK)
 			return 0;
 
+		BUG_ON(HWGROUP(drive)->handler);
 		ide_set_handler(drive, &icside_dmaintr, WAIT_CMD, NULL);
 		OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA,
 			 IDE_COMMAND_REG);
@@ -473,7 +474,7 @@ icside_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 }
 
 static int
-icside_setup_dma(ide_hwif_t *hwif, int autodma)
+icside_setup_dma(struct ata_channel *hwif, int autodma)
 {
 	printk("    %s: SG-DMA", hwif->name);
 
@@ -498,7 +499,7 @@ failed:
 	return 0;
 }
 
-void ide_release_dma(ide_hwif_t *hwif)
+void ide_release_dma(struct ata_channel *hwif)
 {
 	if (hwif->sg_table) {
 		kfree(hwif->sg_table);
@@ -507,10 +508,10 @@ void ide_release_dma(ide_hwif_t *hwif)
 }
 #endif
 
-static ide_hwif_t *
+static struct ata_channel *
 icside_find_hwif(unsigned long dataport)
 {
-	ide_hwif_t *hwif;
+	struct ata_channel *hwif;
 	int index;
 
 	for (index = 0; index < MAX_HWIFS; ++index) {
@@ -530,11 +531,11 @@ found:
 	return hwif;
 }
 
-static ide_hwif_t *
+static struct ata_channel *
 icside_setup(unsigned long base, struct cardinfo *info, int irq)
 {
 	unsigned long port = base + info->dataoffset;
-	ide_hwif_t *hwif;
+	struct ata_channel *hwif;
 
 	hwif = icside_find_hwif(base);
 	if (hwif) {
@@ -562,7 +563,7 @@ icside_setup(unsigned long base, struct cardinfo *info, int irq)
 static int __init icside_register_v5(struct expansion_card *ec, int autodma)
 {
 	unsigned long slot_port;
-	ide_hwif_t *hwif;
+	struct ata_channel *hwif;
 
 	slot_port = ecard_address(ec, ECARD_MEMC, 0);
 
@@ -584,7 +585,8 @@ static int __init icside_register_v5(struct expansion_card *ec, int autodma)
 static int __init icside_register_v6(struct expansion_card *ec, int autodma)
 {
 	unsigned long slot_port, port;
-	ide_hwif_t *hwif, *mate;
+	struct ata_channel *hwif;
+	struct ata_channel *mate;
 	int sel = 0;
 
 	slot_port = ecard_address(ec, ECARD_IOC, ECARD_FAST);
@@ -620,7 +622,7 @@ static int __init icside_register_v6(struct expansion_card *ec, int autodma)
 			hwif->hw.dma  = ec->dma;
 			hwif->hw.priv = (void *)
 					(port + ICS_ARCIN_V6_INTRSTAT_1);
-			hwif->channel = 0;
+			hwif->unit = 0;
 			icside_setup_dma(hwif, autodma);
 		}
 		if (mate) {
@@ -629,7 +631,7 @@ static int __init icside_register_v6(struct expansion_card *ec, int autodma)
 			mate->hw.dma  = ec->dma;
 			mate->hw.priv = (void *)
 					(port + ICS_ARCIN_V6_INTRSTAT_2);
-			mate->channel = 1;
+			mate->unit = 1;
 			icside_setup_dma(mate, autodma);
 		}
 	}

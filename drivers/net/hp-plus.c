@@ -230,8 +230,8 @@ static int __init hpp_probe1(struct net_device *dev, int ioaddr)
 		ei_status.block_output = &hpp_mem_block_output;
 		ei_status.get_8390_hdr = &hpp_mem_get_8390_hdr;
 		dev->mem_start = mem_start;
-		dev->rmem_start = dev->mem_start + TX_2X_PAGES*256;
-		dev->mem_end = dev->rmem_end
+		ei_status.rmem_start = dev->mem_start + TX_2X_PAGES*256;
+		dev->mem_end = ei_status.rmem_end
 			= dev->mem_start + (HP_STOP_PG - HP_START_PG)*256;
 	}
 

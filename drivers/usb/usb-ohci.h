@@ -454,7 +454,7 @@ static int rh_init_int_timer(struct urb * urb);
 
 
 /* Recover a TD/ED using its collision chain */
-static inline void *
+static void *
 dma_to_ed_td (struct hash_list_t * entry, dma_addr_t dma)
 {
 	struct hash_t * scan = entry->head;
@@ -465,14 +465,14 @@ dma_to_ed_td (struct hash_list_t * entry, dma_addr_t dma)
 	return scan->virt;
 }
 
-static inline struct ed *
+static struct ed *
 dma_to_ed (struct ohci * hc, dma_addr_t ed_dma)
 {
 	return (struct ed *) dma_to_ed_td(&(hc->ed_hash[ED_HASH_FUNC(ed_dma)]),
 				      ed_dma);
 }
 
-static inline struct td *
+static struct td *
 dma_to_td (struct ohci * hc, dma_addr_t td_dma)
 {
 	return (struct td *) dma_to_ed_td(&(hc->td_hash[TD_HASH_FUNC(td_dma)]),
@@ -480,7 +480,7 @@ dma_to_td (struct ohci * hc, dma_addr_t td_dma)
 }
 
 /* Add a hash entry for a TD/ED; return true on success */
-static inline int
+static int
 hash_add_ed_td(struct hash_list_t * entry, void * virt, dma_addr_t dma)
 {
 	struct hash_t * scan;
@@ -502,14 +502,14 @@ hash_add_ed_td(struct hash_list_t * entry, void * virt, dma_addr_t dma)
 	return 1;
 }
 
-static inline int
+static int
 hash_add_ed (struct ohci * hc, struct ed * ed)
 {
 	return hash_add_ed_td (&(hc->ed_hash[ED_HASH_FUNC(ed->dma)]),
 			ed, ed->dma);
 }
 
-static inline int
+static int
 hash_add_td (struct ohci * hc, struct td * td)
 {
 	return hash_add_ed_td (&(hc->td_hash[TD_HASH_FUNC(td->td_dma)]),
@@ -517,7 +517,7 @@ hash_add_td (struct ohci * hc, struct td * td)
 }
 
 
-static inline void
+static void
 hash_free_ed_td (struct hash_list_t * entry, void * virt)
 {
 	struct hash_t *scan, *prev;
@@ -543,13 +543,13 @@ hash_free_ed_td (struct hash_list_t * entry, void * virt)
 	}
 }
 
-static inline void
+static void
 hash_free_ed (struct ohci * hc, struct ed * ed)
 {
 	hash_free_ed_td (&(hc->ed_hash[ED_HASH_FUNC(ed->dma)]), ed);
 }
 
-static inline void
+static void
 hash_free_td (struct ohci * hc, struct td * td)
 {
 	hash_free_ed_td (&(hc->td_hash[TD_HASH_FUNC(td->td_dma)]), td);
@@ -588,7 +588,7 @@ static void ohci_mem_cleanup (struct ohci *ohci)
 }
 
 /* TDs ... */
-static inline struct td *
+static struct td *
 td_alloc (struct ohci *hc, int mem_flags)
 {
 	dma_addr_t	dma;
@@ -616,7 +616,7 @@ td_free (struct ohci *hc, struct td *td)
 
 
 /* DEV + EDs ... only the EDs need to be consistent */
-static inline struct ohci_device *
+static struct ohci_device *
 dev_alloc (struct ohci *hc, int mem_flags)
 {
 	dma_addr_t		dma;

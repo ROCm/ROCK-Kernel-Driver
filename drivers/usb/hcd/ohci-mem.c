@@ -5,7 +5,7 @@
  * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
  * 
  * This file is licenced under the GPL.
- * $Id: ohci-mem.c,v 1.2 2002/01/19 00:22:13 dbrownell Exp $
+ * $Id: ohci-mem.c,v 1.3 2002/03/22 16:04:54 dbrownell Exp $
  */
 
 /*-------------------------------------------------------------------------*/
@@ -42,12 +42,6 @@ static void ohci_hcd_free (struct usb_hcd *hcd)
 
 /*-------------------------------------------------------------------------*/
 
-#ifdef	CONFIG_DEBUG_SLAB
-#	define OHCI_MEM_FLAGS	SLAB_POISON
-#else
-#	define OHCI_MEM_FLAGS	0
-#endif
- 
 #ifndef CONFIG_PCI
 #	error "usb-ohci currently requires PCI-based controllers"
 	/* to support non-PCI OHCIs, you need custom bus/mem/... glue */
@@ -169,14 +163,14 @@ static int ohci_mem_init (struct ohci_hcd *ohci)
 		sizeof (struct td),
 		32 /* byte alignment */,
 		0 /* no page-crossing issues */,
-		GFP_KERNEL | OHCI_MEM_FLAGS);
+		GFP_KERNEL);
 	if (!ohci->td_cache)
 		return -ENOMEM;
 	ohci->ed_cache = pci_pool_create ("ohci_ed", ohci->hcd.pdev,
 		sizeof (struct ed),
 		16 /* byte alignment */,
 		0 /* no page-crossing issues */,
-		GFP_KERNEL | OHCI_MEM_FLAGS);
+		GFP_KERNEL);
 	if (!ohci->ed_cache) {
 		pci_pool_destroy (ohci->td_cache);
 		return -ENOMEM;

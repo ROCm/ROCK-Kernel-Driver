@@ -71,6 +71,9 @@ enum {
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 
+# define BAD_DMA_DRIVE		0
+# define GOOD_DMA_DRIVE		1
+
 typedef struct {
 	int	accessTime;
 	int	cycleTime;
@@ -124,10 +127,10 @@ struct pmu_sleep_notifier idepmac_sleep_notifier = {
 static int
 pmac_ide_find(ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	ide_ioreg_t base;
 	int i;
-	
+
 	for (i=0; i<pmac_ide_count; i++) {
 		base = pmac_ide[i].regbase;
 		if (base && base == hwif->io_ports[0])
@@ -258,8 +261,8 @@ pmac_ide_do_setfeature(ide_drive_t *drive, byte command)
 	save_flags(flags);
 	cli();
 	udelay(1);
-	SELECT_DRIVE(HWIF(drive), drive);
-	SELECT_MASK(HWIF(drive), drive, 0);
+	SELECT_DRIVE(drive->channel, drive);
+	SELECT_MASK(drive->channel, drive, 0);
 	udelay(1);
 	if(wait_for_ready(drive)) {
 		printk(KERN_ERR "pmac_ide_do_setfeature disk not ready before SET_FEATURE!\n");
@@ -507,7 +510,7 @@ pmac_ide_probe(void)
 	struct device_node *p, **pp, *removables, **rp;
 	unsigned long base;
 	int irq, big_delay;
-	ide_hwif_t *hwif;
+	struct ata_channel *hwif;
 
 	if (_machine != _MACH_Pmac)
 		return;
@@ -928,12 +931,12 @@ pmac_ide_check_dma(ide_drive_t *drive)
 	int enable = 1;
 
 	drive->using_dma = 0;
-	
+
 	idx = pmac_ide_find(drive);
 	if (idx < 0)
 		return 0;
-		
-	if (drive->media == ide_floppy)
+
+	if (drive->type == ATA_FLOPPY)
 		enable = 0;
 	if (((id->capability & 1) == 0) && !check_drive_lists(drive, GOOD_DMA_DRIVE))
 		enable = 0;
@@ -942,9 +945,9 @@ pmac_ide_check_dma(ide_drive_t *drive)
 
 	udma = 0;
 	ata4 = (pmac_ide[idx].kind == controller_kl_ata4);
-			
+
 	if(enable) {
-		if (ata4 && (drive->media == ide_disk) &&
+		if (ata4 && (drive->type == ATA_DISK) &&
 		    (id->field_valid & 0x0004) && (id->dma_ultra & 0x17)) {
 			/* UltraDMA modes. */
 			drive->using_dma = pmac_ide_udma_enable(drive, idx);
@@ -991,8 +994,9 @@ int pmac_ide_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 		if (!pmac_ide_build_dmatable(drive, ix, func==ide_dma_write))
 			return 1;
 		drive->waiting_for_dma = 1;
-		if (drive->media != ide_disk)
+		if (drive->type != ATA_DISK)
 			return 0;
+		BUG_ON(HWGROUP(drive)->handler);
 		ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
 		OUT_BYTE(func==ide_dma_write? WIN_WRITEDMA: WIN_READDMA,
 			 IDE_COMMAND_REG);
@@ -1051,12 +1055,12 @@ int pmac_ide_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 static void idepmac_sleep_device(ide_drive_t *drive, int i, unsigned base)
 {
 	int j;
-	
+
 	/* FIXME: We only handle the master IDE disk, we shoud
 	 *        try to fix CD-ROMs here
 	 */
-	switch (drive->media) {
-	case ide_disk:
+	switch (drive->type) {
+	case ATA_DISK:
 		/* Spin down the drive */
 		outb(0xa0, base+0x60);
 		outb(0x0, base+0x30);
@@ -1064,7 +1068,7 @@ static void idepmac_sleep_device(ide_drive_t *drive, int i, unsigned base)
 		outb(0x0, base+0x40);
 		outb(0x0, base+0x50);
 		outb(0xe0, base+0x70);
-		outb(0x2, base+0x160);   
+		outb(0x2, base+0x160);
 		for (j = 0; j < 10; j++) {
 			int status;
 			mdelay(100);
@@ -1073,10 +1077,10 @@ static void idepmac_sleep_device(ide_drive_t *drive, int i, unsigned base)
 				break;
 		}
 		break;
-	case ide_cdrom:
+	case ATA_ROM:
 		// todo
 		break;
-	case ide_floppy:
+	case ATA_FLOPPY:
 		// todo
 		break;
 	}
@@ -1094,7 +1098,7 @@ static void idepmac_wake_device(ide_drive_t *drive, int used_dma)
 		DRIVER(drive)->media_change(drive);
 
 	/* We kick the VFS too (see fix in ide.c revalidate) */
-	check_disk_change(MKDEV(HWIF(drive)->major, (drive->select.b.unit) << PARTN_BITS));
+	check_disk_change(MKDEV(drive->channel->major, (drive->select.b.unit) << PARTN_BITS));
 	
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 	/* We re-enable DMA on the drive if it was active. */
@@ -1198,7 +1202,7 @@ static int idepmac_notify_sleep(struct pmu_sleep_notifier *self, int when)
 		break;
 	case PBOOK_SLEEP_NOW:
 		for (i = 0; i < pmac_ide_count; ++i) {
-			ide_hwif_t *hwif;
+			struct ata_channel *hwif;
 			ide_drive_t *drive;
 			int unlock = 0;
 
@@ -1258,8 +1262,8 @@ static int idepmac_notify_sleep(struct pmu_sleep_notifier *self, int when)
 			mdelay(IDE_WAKEUP_DELAY_MS);
 	
 		for (i = 0; i < pmac_ide_count; ++i) {
-			ide_hwif_t *hwif;
-			ide_drive_t *drive;			
+			struct ata_channel *hwif;
+			ide_drive_t *drive;
 			int j, used_dma;
 			
 			if ((base = pmac_ide[i].regbase) == 0)

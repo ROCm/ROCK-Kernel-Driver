@@ -642,10 +642,6 @@ struct ace_private
 	struct ace_skb		*skb;
 	dma_addr_t		info_dma;	/* 32/64 bit */
 
-#if ACENIC_DO_VLAN
-	struct vlan_group	*vlgrp;
-#endif
-
 	int			version, link;
 	int			promisc, mcast_all;
 
@@ -655,7 +651,6 @@ struct ace_private
 	struct tx_desc		*tx_ring;
 	u32			tx_prd;
 	volatile u32		tx_ret_csm;
-	struct timer_list	timer;
 	int			tx_ring_entries;
 
 	/*
@@ -674,6 +669,10 @@ struct ace_private
 	struct rx_desc		*rx_jumbo_ring;
 	struct rx_desc		*rx_mini_ring;
 	struct rx_desc		*rx_return_ring;
+
+#if ACENIC_DO_VLAN
+	struct vlan_group	*vlgrp;
+#endif
 
 	int			tasklet_pending, jumbo;
 	struct tasklet_struct	ace_tasklet;

@@ -1739,7 +1739,7 @@ static void __init init_tsunami(void)
 static void __init poke_viking(void)
 {
 	unsigned long mreg = srmmu_get_mmureg();
-	static int smp_catch = 0;
+	static int smp_catch;
 
 	if(viking_mxcc_present) {
 		unsigned long mxcc_control = mxcc_get_creg();
@@ -1963,7 +1963,7 @@ extern unsigned long srmmu_fault;
 		iaddr = &(insn); \
 		daddr = &(dest); \
 		*iaddr = SPARC_BRANCH((unsigned long) daddr, (unsigned long) iaddr); \
-	} while(0);
+	} while(0)
 
 static void __init patch_window_trap_handlers(void)
 {

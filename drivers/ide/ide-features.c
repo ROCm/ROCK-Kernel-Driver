@@ -2,7 +2,7 @@
  * linux/drivers/block/ide-features.c	Version 0.04	June 9, 2000
  *
  *  Copyright (C) 1999-2000	Linus Torvalds & authors (see below)
- *  
+ *
  *  Copyright (C) 1999-2000	Andre Hedrick <andre@linux-ide.org>
  *
  *  Extracts if ide.c to address the evolving transfer rate code for
@@ -134,7 +134,7 @@ int ide_driveid_update (ide_drive_t *drive)
 	struct hd_driveid *id;
 	unsigned long timeout, flags;
 
-	SELECT_MASK(HWIF(drive), drive, 1);
+	SELECT_MASK(drive->channel, drive, 1);
 	if (IDE_CONTROL_REG)
 		OUT_BYTE(drive->ctl,IDE_CONTROL_REG);
 	ide_delay_50ms();
@@ -142,20 +142,20 @@ int ide_driveid_update (ide_drive_t *drive)
 	timeout = jiffies + WAIT_WORSTCASE;
 	do {
 		if (0 < (signed long)(jiffies - timeout)) {
-			SELECT_MASK(HWIF(drive), drive, 0);
+			SELECT_MASK(drive->channel, drive, 0);
 			return 0;	/* drive timed-out */
 		}
 		ide_delay_50ms();	/* give drive a breather */
 	} while (IN_BYTE(IDE_ALTSTATUS_REG) & BUSY_STAT);
 	ide_delay_50ms();	/* wait for IRQ and DRQ_STAT */
 	if (!OK_STAT(GET_STAT(),DRQ_STAT,BAD_R_STAT)) {
-		SELECT_MASK(HWIF(drive), drive, 0);
+		SELECT_MASK(drive->channel, drive, 0);
 		printk("%s: CHECK for good STATUS\n", drive->name);
 		return 0;
 	}
 	__save_flags(flags);	/* local CPU only */
 	__cli();		/* local CPU only; some systems need this */
-	SELECT_MASK(HWIF(drive), drive, 0);
+	SELECT_MASK(drive->channel, drive, 0);
 	id = kmalloc(SECTOR_WORDS*4, GFP_ATOMIC);
 	if (!id) {
 		__restore_flags(flags);	/* local CPU only */
@@ -186,11 +186,11 @@ int ide_driveid_update (ide_drive_t *drive)
  */
 int ide_ata66_check (ide_drive_t *drive, ide_task_t *args)
 {
-	if ((args->tfRegister[IDE_COMMAND_OFFSET] == WIN_SETFEATURES) &&
-	    (args->tfRegister[IDE_SECTOR_OFFSET] > XFER_UDMA_2) &&
-	    (args->tfRegister[IDE_FEATURE_OFFSET] == SETFEATURES_XFER)) {
-		if (!HWIF(drive)->udma_four) {
-			printk("%s: Speed warnings UDMA 3/4/5 is not functional.\n", HWIF(drive)->name);
+	if ((args->taskfile.command == WIN_SETFEATURES) &&
+	    (args->taskfile.sector_number > XFER_UDMA_2) &&
+	    (args->taskfile.feature == SETFEATURES_XFER)) {
+		if (!drive->channel->udma_four) {
+			printk("%s: Speed warnings UDMA 3/4/5 is not functional.\n", drive->channel->name);
 			return 1;
 		}
 #ifndef CONFIG_IDEDMA_IVB
@@ -213,9 +213,9 @@ int ide_ata66_check (ide_drive_t *drive, ide_task_t *args)
  */
 int set_transfer (ide_drive_t *drive, ide_task_t *args)
 {
-	if ((args->tfRegister[IDE_COMMAND_OFFSET] == WIN_SETFEATURES) &&
-	    (args->tfRegister[IDE_SECTOR_OFFSET] >= XFER_SW_DMA_0) &&
-	    (args->tfRegister[IDE_FEATURE_OFFSET] == SETFEATURES_XFER) &&
+	if ((args->taskfile.command == WIN_SETFEATURES) &&
+	    (args->taskfile.sector_number >= XFER_SW_DMA_0) &&
+	    (args->taskfile.feature == SETFEATURES_XFER) &&
 	    (drive->id->dma_ultra ||
 	     drive->id->dma_mword ||
 	     drive->id->dma_1word))
@@ -229,7 +229,7 @@ int set_transfer (ide_drive_t *drive, ide_task_t *args)
  */
 byte eighty_ninty_three (ide_drive_t *drive)
 {
-	return ((byte) ((HWIF(drive)->udma_four) &&
+	return ((byte) ((drive->channel->udma_four) &&
 #ifndef CONFIG_IDEDMA_IVB
 			(drive->id->hw_config & 0x4000) &&
 #endif /* CONFIG_IDEDMA_IVB */
@@ -249,8 +249,9 @@ byte eighty_ninty_three (ide_drive_t *drive)
  */
 int ide_config_drive_speed (ide_drive_t *drive, byte speed)
 {
-	ide_hwif_t *hwif = HWIF(drive);
-	int	i, error = 1;
+	struct ata_channel *hwif = drive->channel;
+	int i;
+	int error = 1;
 	byte stat;
 
 #if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
@@ -269,8 +270,8 @@ int ide_config_drive_speed (ide_drive_t *drive, byte speed)
          */
 	disable_irq(hwif->irq);	/* disable_irq_nosync ?? */
 	udelay(1);
-	SELECT_DRIVE(HWIF(drive), drive);
-	SELECT_MASK(HWIF(drive), drive, 0);
+	SELECT_DRIVE(drive->channel, drive);
+	SELECT_MASK(drive->channel, drive, 0);
 	udelay(1);
 	if (IDE_CONTROL_REG)
 		OUT_BYTE(drive->ctl | 2, IDE_CONTROL_REG);
@@ -310,7 +311,7 @@ int ide_config_drive_speed (ide_drive_t *drive, byte speed)
 		}
 	}
 
-	SELECT_MASK(HWIF(drive), drive, 0);
+	SELECT_MASK(drive->channel, drive, 0);
 
 	enable_irq(hwif->irq);
 

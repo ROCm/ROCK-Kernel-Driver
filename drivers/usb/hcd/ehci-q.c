@@ -436,14 +436,6 @@ qh_urb_transaction (
 
 	if (usb_pipecontrol (urb->pipe)) {
 		/* control request data is passed in the "setup" pid */
-
-		/* NOTE:  this isn't smart about 64bit DMA, since it uses the
-		 * default (32bit) mask rather than using the whole address
-		 * space.  we could set pdev->dma_mask to all-ones while
-		 * getting this mapping, locking it and restoring before
-		 * allocating qtd/qh/... or maybe only do that for the main
-		 * data phase (below).
-		 */
 		qtd->buf_dma = pci_map_single (
 					ehci->hcd.pdev,
 					urb->setup_packet,
@@ -472,7 +464,6 @@ qh_urb_transaction (
 	 */
 	len = urb->transfer_buffer_length;
 	if (likely (len > 0)) {
-		/* NOTE:  sub-optimal mapping with 64bit DMA (see above) */
 		buf = map_buf = pci_map_single (ehci->hcd.pdev,
 			urb->transfer_buffer, len,
 			usb_pipein (urb->pipe)

@@ -51,6 +51,12 @@
  *		Bugfix for HT (Hyper-Threading) enabled processors
  *		whereby processor resources are shared by all logical processors
  *		in a single CPU package.
+ *	1.10	28 Feb 2002 Asit K Mallick <asit.k.mallick@intel.com> and
+ *		Tigran Aivazian <tigran@veritas.com>,
+ *		Serialize updates as required on HT processors due to speculative
+ *		nature of implementation.
+ *	1.11	22 Mar 2001 Tigran Aivazian <tigran@veritas.com>
+ *		Fix the panic when writing zero-length microcode chunk.
  */
 
 #include <linux/init.h>
@@ -60,12 +66,16 @@
 #include <linux/vmalloc.h>
 #include <linux/miscdevice.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/spinlock.h>
 
 #include <asm/msr.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>
 
-#define MICROCODE_VERSION 	"1.09"
+
+static spinlock_t microcode_update_lock = SPIN_LOCK_UNLOCKED;
+
+#define MICROCODE_VERSION 	"1.11"
 
 MODULE_DESCRIPTION("Intel CPU (IA-32) microcode update driver");
 MODULE_AUTHOR("Tigran Aivazian <tigran@veritas.com>");
@@ -195,7 +205,8 @@ static void do_update_one(void *unused)
 	struct cpuinfo_x86 *c = cpu_data + cpu_num;
 	struct update_req *req = update_req + cpu_num;
 	unsigned int pf = 0, val[2], rev, sig;
-	int i,found=0;
+	unsigned long flags;
+	int i;
 
 	req->err = 1; /* assume update will fail on this cpu */
 
@@ -216,8 +227,9 @@ static void do_update_one(void *unused)
 	for (i=0; i<microcode_num; i++)
 		if (microcode[i].sig == sig && microcode[i].pf == pf &&
 		    microcode[i].ldrver == 1 && microcode[i].hdrver == 1) {
-
-			found=1;
+			int sum = 0;
+			struct microcode *m = &microcode[i];
+			unsigned int *sump = (unsigned int *)(m+1);
 
 			printf("Microcode\n");
 			printf("   Header Revision %d\n",microcode[i].hdrver);
@@ -234,53 +246,68 @@ static void do_update_one(void *unused)
 			printf("   Loader Revision %x\n",microcode[i].ldrver);
 			printf("   Processor Flags %x\n\n",microcode[i].pf);
 
+			req->slot = i;
+
+			/* serialize access to update decision */
+			spin_lock_irqsave(&microcode_update_lock, flags);          
+
 			/* trick, to work even if there was no prior update by the BIOS */
 			wrmsr(MSR_IA32_UCODE_REV, 0, 0);
 			__asm__ __volatile__ ("cpuid" : : : "ax", "bx", "cx", "dx");
 
 			/* get current (on-cpu) revision into rev (ignore val[0]) */
 			rdmsr(MSR_IA32_UCODE_REV, val[0], rev);
+			
 			if (microcode[i].rev < rev) {
+				spin_unlock_irqrestore(&microcode_update_lock, flags);
 				printk(KERN_ERR 
-					"microcode: CPU%d not 'upgrading' to earlier revision"
-					" %d (current=%d)\n", cpu_num, microcode[i].rev, rev);
-			} else {
-				int sum = 0;
-				struct microcode *m = &microcode[i];
-				unsigned int *sump = (unsigned int *)(m+1);
-
-				while (--sump >= (unsigned int *)m)
-					sum += *sump;
-				if (sum != 0) {
-					printk(KERN_ERR "microcode: CPU%d aborting, "
-							"bad checksum\n", cpu_num);
-					break;
-				}
-
-				/* write microcode via MSR 0x79 */
-				wrmsr(MSR_IA32_UCODE_WRITE, (unsigned int)(m->bits), 0);
-
-				/* serialize */
-				__asm__ __volatile__ ("cpuid" : : : "ax", "bx", "cx", "dx");
-
-				/* get the current revision from MSR 0x8B */
-				rdmsr(MSR_IA32_UCODE_REV, val[0], val[1]);
-
+				       "microcode: CPU%d not 'upgrading' to earlier revision"
+				       " %d (current=%d)\n", cpu_num, microcode[i].rev, rev);
+				return;
+			} else if (microcode[i].rev == rev) {
 				/* notify the caller of success on this cpu */
 				req->err = 0;
-				req->slot = i;
-
-				printk(KERN_INFO "microcode: CPU%d updated from revision "
-						"%d to %d, date=%08x\n", 
-						cpu_num, rev, val[1], m->date);
+				spin_unlock_irqrestore(&microcode_update_lock, flags);
+				printk(KERN_ERR 
+					"microcode: CPU%d already at revision"
+					" %d (current=%d)\n", cpu_num, microcode[i].rev, rev);
+				return;
 			}
-			break;
-		}
 
-	if(!found)
-		printk(KERN_ERR "microcode: CPU%d no microcode found! (sig=%x, pflags=%d)\n",
-				cpu_num, sig, pf);
+			/* Verify the checksum */
+			while (--sump >= (unsigned int *)m)
+				sum += *sump;
+			if (sum != 0) {
+				req->err = 1;
+				spin_unlock_irqrestore(&microcode_update_lock, flags);
+				printk(KERN_ERR "microcode: CPU%d aborting, "
+				       "bad checksum\n", cpu_num);
+				return;
+			}
+			
+			/* write microcode via MSR 0x79 */
+			wrmsr(MSR_IA32_UCODE_WRITE, (unsigned int)(m->bits), 0);
+
+			/* serialize */
+			__asm__ __volatile__ ("cpuid" : : : "ax", "bx", "cx", "dx");
+
+			/* get the current revision from MSR 0x8B */
+			rdmsr(MSR_IA32_UCODE_REV, val[0], val[1]);
+
+			/* notify the caller of success on this cpu */
+			req->err = 0;
+			spin_unlock_irqrestore(&microcode_update_lock, flags);
+			printk(KERN_INFO "microcode: CPU%d updated from revision "
+			       "%d to %d, date=%08x\n", 
+			       cpu_num, rev, val[1], microcode[i].date);
+			return;
+		}
+	
+	printk(KERN_ERR
+	       "microcode: CPU%d no microcode found! (sig=%x, pflags=%d)\n", 
+	       cpu_num, sig, pf);
 }
+
 
 static ssize_t microcode_read(struct file *file, char *buf, size_t len, loff_t *ppos)
 {
@@ -305,9 +332,13 @@ static ssize_t microcode_write(struct file *file, const char *buf, size_t len, l
 {
 	ssize_t ret;
 
-	if (len % sizeof(struct microcode) != 0) {
+	if (!len || len % sizeof(struct microcode) != 0) {
 		printk(KERN_ERR "microcode: can only write in N*%d bytes units\n", 
 			sizeof(struct microcode));
+		return -EINVAL;
+	}
+	if ((len >> PAGE_SHIFT) > num_physpages) {
+		printk(KERN_ERR "microcode: too much data (max %d pages)\n", num_physpages);
 		return -EINVAL;
 	}
 	down_write(&microcode_rwsem);

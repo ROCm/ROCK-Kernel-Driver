@@ -1020,7 +1020,7 @@ static struct file_operations usbvideo_fops = {
 	release:  usbvideo_v4l_close,
 	read:     usbvideo_v4l_read,
 	mmap:     usbvideo_v4l_mmap,
-	ioctl:    video_generic_ioctl,
+	ioctl:    usbvideo_v4l_ioctl,
 	llseek:   no_llseek,
 };
 static struct video_device usbvideo_template = {
@@ -1028,7 +1028,6 @@ static struct video_device usbvideo_template = {
 	type:         VID_TYPE_CAPTURE,
 	hardware:     VID_HARDWARE_CPIA,
 	fops:         &usbvideo_fops,
-	kernel_ioctl: usbvideo_v4l_ioctl,
 };
 
 uvd_t *usbvideo_AllocateDevice(usbvideo_t *cams)
@@ -1349,8 +1348,8 @@ int usbvideo_v4l_close(struct inode *inode, struct file *file)
  * History:
  * 22-Jan-2000 Corrected VIDIOCSPICT to reject unsupported settings.
  */
-int usbvideo_v4l_ioctl(struct inode *inode, struct file *file,
-		       unsigned int cmd, void *arg)
+static int usbvideo_v4l_do_ioctl(struct inode *inode, struct file *file,
+				 unsigned int cmd, void *arg)
 {
 	uvd_t *uvd = file->private_data;
 
@@ -1553,6 +1552,12 @@ int usbvideo_v4l_ioctl(struct inode *inode, struct file *file,
 			return -ENOIOCTLCMD;
 	}
 	return 0;
+}
+
+int usbvideo_v4l_ioctl(struct inode *inode, struct file *file,
+		       unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, usbvideo_v4l_do_ioctl);
 }
 
 /*

@@ -56,7 +56,6 @@
 #define PRINTD(level, card, fmt, args...) do {} while (0)
 #endif
 
-
 static struct hpsb_host_driver *lynx_driver;
 static unsigned int card_id;
 
@@ -636,7 +635,7 @@ static void aux_setup_pcls(struct ti_lynx *lynx)
 
 static int mem_open(struct inode *inode, struct file *file)
 {
-        int cid = MINOR(inode->i_rdev);
+        int cid = minor(inode->i_rdev);
         enum { t_rom, t_aux, t_ram } type;
         struct memdata *md;
         

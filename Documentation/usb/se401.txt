@@ -40,7 +40,7 @@ net frequency. Valid options for this option are 0, 50 and 60. (0=disable,
 KNOWN PROBLEMS:
 
 The driver works fine with the usb-ohci and uhci host controller drivers,
-the default settings also work with usb-uhci. But sending more then one bulk
+the default settings also work with usb-uhci. But sending more than one bulk
 transfer at a time with usb-uhci doesn't work yet.
 Users of usb-ohci and uhci can safely enlarge SE401_NUMSBUF in se401.h in
 order to increase the throughput (and thus framerate).

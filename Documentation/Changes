@@ -55,7 +55,7 @@ o  util-linux             2.10o                   # fdformat --version
 o  modutils               2.4.2                   # insmod -V
 o  e2fsprogs              1.25                    # tune2fs
 o  jfsutils               1.0.14                  # fsck.jfs -V
-o  reiserfsprogs          3.x.0j                  # reiserfsck 2>&1|grep reiserfsprogs
+o  reiserfsprogs          3.x.1b                  # reiserfsck 2>&1|grep reiserfsprogs
 o  pcmcia-cs              3.1.21                  # cardmgr -V
 o  PPP                    2.4.0                   # pppd --version
 o  isdn4k-utils           3.1pre1                 # isdnctrl 2>&1|grep version
@@ -107,8 +107,8 @@ assembling the 16-bit boot code, removing the need for as86 to compile
 your kernel.  This change does, however, mean that you need a recent
 release of binutils.
 
-System utililities
-==================
+System utilities
+================
 
 Architectural changes
 ---------------------
@@ -320,7 +320,7 @@ o  <http://oss.software.ibm.com/jfs>
 
 Reiserfsprogs
 -------------
-o  <ftp://ftp.namesys.com/pub/reiserfsprogs/reiserfsprogs-3.x.0j.tar.gz>
+o  <ftp://ftp.namesys.com/pub/reiserfsprogs/reiserfsprogs-3.x.0b.tar.gz>
 
 LVM toolset
 -----------

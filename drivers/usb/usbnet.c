@@ -989,9 +989,8 @@ static int net1080_rx_fixup (struct usbnet *dev, struct sk_buff *skb)
 			|| skb->len > FRAMED_SIZE (dev->net.mtu)) {
 		dev->stats.rx_frame_errors++;
 		dbg ("rx framesize %d range %d..%d mtu %d", skb->len,
-			MIN_FRAMED, FRAMED_SIZE (dev->net.mtu),
-			dev->net.mtu
-			);
+			(int)MIN_FRAMED, (int)FRAMED_SIZE (dev->net.mtu),
+			dev->net.mtu);
 		return 0;
 	}
 

@@ -124,6 +124,7 @@ static struct usb_device_id usb_klsi_table[] = {
 	{ USB_DEVICE(0x0557, 0x2002) }, /* ATEN USB Ethernet */ 
 	{ USB_DEVICE(0x0557, 0x4000) }, /* D-Link DSB-650C */ 
 	{ USB_DEVICE(0x0565, 0x0002) }, /* Peracom Enet */
+	{ USB_DEVICE(0x0565, 0x0003) }, /* Optus@Home UEP1045A */
 	{ USB_DEVICE(0x0565, 0x0005) }, /* Peracom Enet2 */ 
 	{ USB_DEVICE(0x05e9, 0x0008) }, /* KLSI KL5KUSB101B */
 	{ USB_DEVICE(0x05e9, 0x0009) }, /* KLSI KL5KUSB101B (Board change) */

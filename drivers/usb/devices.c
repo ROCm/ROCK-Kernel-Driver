@@ -105,8 +105,8 @@ static char *format_iface =
   "I:  If#=%2d Alt=%2d #EPs=%2d Cls=%02x(%-5s) Sub=%02x Prot=%02x Driver=%s\n";
 
 static char *format_endpt =
-/* E:  Ad=xx(s) Atr=xx(ssss) MxPS=dddd Ivl=dddms */
-  "E:  Ad=%02x(%c) Atr=%02x(%-4s) MxPS=%4d Ivl=%3dms\n";
+/* E:  Ad=xx(s) Atr=xx(ssss) MxPS=dddd Ivl=D?s */
+  "E:  Ad=%02x(%c) Atr=%02x(%-4s) MxPS=%4d Ivl=%d%cs\n";
 
 
 /*
@@ -166,24 +166,71 @@ static const char *class_decode(const int class)
 	return (clas_info[ix].class_name);
 }
 
-static char *usb_dump_endpoint_descriptor(char *start, char *end, const struct usb_endpoint_descriptor *desc)
+static char *usb_dump_endpoint_descriptor (
+	int speed,
+	char *start,
+	char *end,
+	const struct usb_endpoint_descriptor *desc
+)
 {
-	char *EndpointType [4] = {"Ctrl", "Isoc", "Bulk", "Int."};
+	char dir, unit, *type;
+	unsigned interval, in, bandwidth = 1;
 
 	if (start > end)
 		return start;
-	start += sprintf(start, format_endpt, desc->bEndpointAddress,
-			 (desc->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) == USB_ENDPOINT_XFER_CONTROL
-			 	? 'B' :			/* bidirectional */
-			 (desc->bEndpointAddress & USB_DIR_IN) ? 'I' : 'O',
-			 desc->bmAttributes, EndpointType[desc->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK],
-			 desc->wMaxPacketSize, desc->bInterval);
-	return start;
-}
+	in = (desc->bEndpointAddress & USB_DIR_IN);
+	dir = in ? 'I' : 'O';
+	if (speed == USB_SPEED_HIGH) {
+		switch (desc->wMaxPacketSize & (0x03 << 11)) {
+		case 1 << 11:	bandwidth = 2; break;
+		case 2 << 11:	bandwidth = 3; break;
+		}
+	}
 
-static char *usb_dump_endpoint(char *start, char *end, const struct usb_endpoint_descriptor *endpoint)
-{
-	return usb_dump_endpoint_descriptor(start, end, endpoint);
+	/* this isn't checking for illegal values */
+	switch (desc->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) {
+	case USB_ENDPOINT_XFER_CONTROL:
+		type = "Ctrl";
+		if (speed == USB_SPEED_HIGH) 	/* uframes per NAK */
+			interval = desc->bInterval;
+		else
+			interval = 0;
+		dir = 'B';			/* ctrl is bidirectional */
+		break;
+	case USB_ENDPOINT_XFER_ISOC:
+		type = "Isoc";
+		interval = 1 << (desc->bInterval - 1);
+		break;
+	case USB_ENDPOINT_XFER_BULK:
+		type = "Bulk";
+		if (speed == USB_SPEED_HIGH && !in)	/* uframes per NAK */
+			interval = desc->bInterval;
+		else
+			interval = 0;
+		break;
+	case USB_ENDPOINT_XFER_INT:
+		type = "Int.";
+		if (speed == USB_SPEED_HIGH) {
+			interval = 1 << (desc->bInterval - 1);
+		} else
+			interval = desc->bInterval;
+		break;
+	default:	/* "can't happen" */
+		return start;
+	}
+	interval *= (speed == USB_SPEED_HIGH) ? 125 : 1000;
+	if (interval % 1000)
+		unit = 'u';
+	else {
+		unit = 'm';
+		interval /= 1000;
+	}
+
+	start += sprintf(start, format_endpt, desc->bEndpointAddress, dir,
+			 desc->bmAttributes, type,
+			 (desc->wMaxPacketSize & 0x07ff) * bandwidth,
+			 interval, unit);
+	return start;
 }
 
 static char *usb_dump_interface_descriptor(char *start, char *end, const struct usb_interface *iface, int setno)
@@ -204,8 +251,13 @@ static char *usb_dump_interface_descriptor(char *start, char *end, const struct 
 	return start;
 }
 
-static char *usb_dump_interface(char *start, char *end, const struct usb_interface *iface, int setno)
-{
+static char *usb_dump_interface(
+	int speed,
+	char *start,
+	char *end,
+	const struct usb_interface *iface,
+	int setno
+) {
 	struct usb_interface_descriptor *desc = &iface->altsetting[setno];
 	int i;
 
@@ -213,7 +265,8 @@ static char *usb_dump_interface(char *start, char *end, const struct usb_interfa
 	for (i = 0; i < desc->bNumEndpoints; i++) {
 		if (start > end)
 			return start;
-		start = usb_dump_endpoint(start, end, desc->endpoint + i);
+		start = usb_dump_endpoint_descriptor(speed,
+				start, end, desc->endpoint + i);
 	}
 	return start;
 }
@@ -238,7 +291,13 @@ static char *usb_dump_config_descriptor(char *start, char *end, const struct usb
 	return start;
 }
 
-static char *usb_dump_config(char *start, char *end, const struct usb_config_descriptor *config, int active)
+static char *usb_dump_config (
+	int speed,
+	char *start,
+	char *end,
+	const struct usb_config_descriptor *config,
+	int active
+)
 {
 	int i, j;
 	struct usb_interface *interface;
@@ -255,7 +314,8 @@ static char *usb_dump_config(char *start, char *end, const struct usb_config_des
 		for (j = 0; j < interface->num_altsetting; j++) {
 			if (start > end)
 				return start;
-			start = usb_dump_interface(start, end, interface, j);
+			start = usb_dump_interface(speed,
+					start, end, interface, j);
 		}
 	}
 	return start;
@@ -336,8 +396,10 @@ static char *usb_dump_desc(char *start, char *end, struct usb_device *dev)
 	for (i = 0; i < dev->descriptor.bNumConfigurations; i++) {
 		if (start > end)
 			return start;
-		start = usb_dump_config(start, end, dev->config + i,
-					(dev->config + i) == dev->actconfig); /* active ? */
+		start = usb_dump_config(dev->speed,
+				start, end, dev->config + i,
+				/* active ? */
+				(dev->config + i) == dev->actconfig);
 	}
 	return start;
 }
@@ -429,16 +491,27 @@ static ssize_t usb_device_dump(char **buffer, size_t *nbytes, loff_t *skip_bytes
 	 * count = device count at this level
 	 */
 	/* If this is the root hub, display the bandwidth information */
-	    /* FIXME high speed reserves 20% frametime for non-periodic,
-	     * while full/low speed reserves only 10% ... so this is wrong
-	     * for high speed busses.  also, change how bandwidth is recorded.
-	     */
-	if (level == 0)
-		data_end += sprintf(data_end, format_bandwidth, bus->bandwidth_allocated,
-				FRAME_TIME_MAX_USECS_ALLOC,
-				(100 * bus->bandwidth_allocated + FRAME_TIME_MAX_USECS_ALLOC / 2) / FRAME_TIME_MAX_USECS_ALLOC,
-			         bus->bandwidth_int_reqs, bus->bandwidth_isoc_reqs);
+	if (level == 0) {
+		int	max;
+
+		/* high speed reserves 80%, full/low reserves 90% */
+		if (usbdev->speed == USB_SPEED_HIGH)
+			max = 800;
+		else
+			max = FRAME_TIME_MAX_USECS_ALLOC;
+
+		/* report "average" periodic allocation over a microsecond.
+		 * the schedules are actually bursty, HCDs need to deal with
+		 * that and just compute/report this average.
+		 */
+		data_end += sprintf(data_end, format_bandwidth,
+				bus->bandwidth_allocated, max,
+				(100 * bus->bandwidth_allocated + max / 2)
+					/ max,
+			         bus->bandwidth_int_reqs,
+				 bus->bandwidth_isoc_reqs);
 	
+	}
 	data_end = usb_dump_desc(data_end, pages_start + (2 * PAGE_SIZE) - 256, usbdev);
 	
 	if (data_end > (pages_start + (2 * PAGE_SIZE) - 256))

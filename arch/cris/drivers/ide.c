@@ -271,10 +271,10 @@ init_e100_ide (void)
 
 	printk("ide: ETRAX 100LX built-in ATA DMA controller\n");
 
-	/* first fill in some stuff in the ide_hwifs fields */
+	/* first initialize the channel interface data */
 	
 	for(h = 0; h < MAX_HWIFS; h++) {
-		ide_hwif_t *hwif = &ide_hwifs[h];
+		struct ata_channel *hwif = &ide_hwifs[h];
 		hwif->chipset = ide_etrax100;
 		hwif->tuneproc = &tune_e100_ide;
 		hwif->dmaproc = &e100_dmaproc;
@@ -355,7 +355,7 @@ init_e100_ide (void)
 	printk("ide: waiting %d seconds for drives to regain consciousness\n", CONFIG_ETRAX_IDE_DELAY);
 
 	h = jiffies + (CONFIG_ETRAX_IDE_DELAY * HZ);
-	while(jiffies < h) ;
+	while(time_before(jiffies, h)) ;
 
   /* reset the dma channels we will use */
 
@@ -717,7 +717,7 @@ static ide_startstop_t etrax_dma_intr (ide_drive_t *drive)
 	LED_DISK_READ(0);
 	LED_DISK_WRITE(0);
 
-	dma_stat = HWIF(drive)->dmaproc(ide_dma_end, drive);
+	dma_stat = drive->channel->dmaproc(ide_dma_end, drive);
 	stat = GET_STAT();			/* get drive status */
 	if (OK_STAT(stat,DRIVE_READY,drive->bad_wstat|DRQ_STAT)) {
 		if (!dma_stat) {
@@ -798,7 +798,7 @@ static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 	 * not a diskdrive.
 	 */
 
-        if (drive->media != ide_disk)
+        if (drive->type != ATA_DISK)
                 return 0;
 
  dma_begin:
@@ -809,7 +809,7 @@ static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 		WAIT_DMA(ATA_RX_DMA_NBR);
 
 		/* set up the Etrax DMA descriptors */
-		
+
 		if(e100_ide_build_dmatable (drive))
 			return 1;
 
@@ -902,7 +902,7 @@ static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
  * --- Marcin Dalecki
  */
 
-void ide_release_dma (ide_hwif_t *hwif)
+void ide_release_dma(struct ata_channel *hwif)
 {
 	/* empty */
 }

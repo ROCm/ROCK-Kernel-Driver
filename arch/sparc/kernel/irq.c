@@ -91,7 +91,7 @@ void (*init_timers)(void (*)(int, void *,struct pt_regs *)) =
  */
 #define MAX_STATIC_ALLOC	4
 struct irqaction static_irqaction[MAX_STATIC_ALLOC];
-int static_irq_count = 0;
+int static_irq_count;
 
 struct irqaction *irq_action[NR_IRQS+1] = {
 	  NULL, NULL, NULL, NULL, NULL, NULL , NULL, NULL,

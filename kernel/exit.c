@@ -14,9 +14,7 @@
 #include <linux/personality.h>
 #include <linux/tty.h>
 #include <linux/namespace.h>
-#ifdef CONFIG_BSD_PROCESS_ACCT
 #include <linux/acct.h>
-#endif
 #include <linux/file.h>
 #include <linux/binfmts.h>
 
@@ -492,13 +490,15 @@ NORET_TYPE void do_exit(long code)
 	tsk->flags |= PF_EXITING;
 	del_timer_sync(&tsk->real_timer);
 
+	if (unlikely(preempt_get_count()))
+		printk(KERN_ERR "error: %s[%d] exited with preempt_count %d\n",
+				current->comm, current->pid,
+				preempt_get_count());
+
 fake_volatile:
-#ifdef CONFIG_BSD_PROCESS_ACCT
 	acct_process(code);
-#endif
 	__exit_mm(tsk);
 
-	lock_kernel();
 	sem_exit();
 	__exit_files(tsk);
 	__exit_fs(tsk);

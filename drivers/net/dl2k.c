@@ -1,6 +1,6 @@
 /*  D-Link DL2000-based Gigabit Ethernet Adapter Linux driver */
 /*
-    Copyright (c) 2001 by D-Link Corporation
+    Copyright (c) 2001,2002 by D-Link Corporation
     Written by Edward Peng.<edward_peng@dlink.com.tw>
     Created 03-May-2001, base on Linux' sundance.c.
 
@@ -27,12 +27,14 @@
 				Added tx_coalesce paramter.
     1.07	2002/01/03	Fixed miscount of RX frame error.
     1.08	2002/01/17	Fixed the multicast bug.
+    1.09	2002/03/07	Move rx-poll-now to re-fill loop.	
+    				Added rio_timer() to watch rx buffers. 
  */
 
 #include "dl2k.h"
 
 static char version[] __devinitdata =
-    KERN_INFO "D-Link DL2000-based linux driver v1.08 2002/01/17\n";
+    KERN_INFO "D-Link DL2000-based linux driver v1.09 2002/03/07\n";
 
 #define MAX_UNITS 8
 static int mtu[MAX_UNITS];
@@ -42,9 +44,10 @@ static char *media[MAX_UNITS];
 static int tx_flow[MAX_UNITS];
 static int rx_flow[MAX_UNITS];
 static int copy_thresh;
-static int rx_coalesce = DEFAULT_RXC;
-static int rx_timeout = DEFAULT_RXT;	
-static int tx_coalesce = DEFAULT_TXC;	
+static int rx_coalesce;			/* Rx frame count each interrupt */
+static int rx_timeout; 			/* Rx DMA wait time in 64ns increments */
+static int tx_coalesce = DEFAULT_TXC; 	/* HW xmit count each TxComplete [1-8] */
+
 
 MODULE_AUTHOR ("Edward Peng");
 MODULE_DESCRIPTION ("D-Link DL2000-based Gigabit Ethernet Adapter");
@@ -71,6 +74,7 @@ static int max_intrloop = 50;
 static int multicast_filter_limit = 0x40;
 
 static int rio_open (struct net_device *dev);
+static void rio_timer (unsigned long data);
 static void tx_timeout (struct net_device *dev);
 static void alloc_list (struct net_device *dev);
 static int start_xmit (struct sk_buff *skb, struct net_device *dev);
@@ -146,6 +150,7 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 	np->chip_id = chip_idx;
 	np->pdev = pdev;
 	spin_lock_init (&np->lock);
+	spin_lock_init (&np->rx_lock);
 
 	/* Parse manual configuration */
 	np->an_enable = 1;
@@ -260,6 +265,7 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 			np->an_enable = 1;
 		mii_set_media (dev);
 	}
+	pci_read_config_byte(pdev, PCI_REVISION_ID, &np->pci_rev_id);
 
 	/* Reset all logic functions */
 	writew (GlobalReset | DMAReset | FIFOReset | NetworkReset | HostReset,
@@ -340,7 +346,7 @@ parse_eeprom (struct net_device *dev)
 	}
 
 	/* Check CRC */
-	crc = ~ether_crc_le(256 - 4, sromdata);
+ 	crc = ~ether_crc_le(256 - 4, sromdata);
 	if (psrom->crc != crc) {
 		printk (KERN_ERR "%s: EEPROM data CRC error.\n", dev->name);
 		return -1;
@@ -421,8 +427,10 @@ rio_open (struct net_device *dev)
 			ioaddr + RxDMAIntCtrl);
 	}
 	/* Set RIO to poll every N*320nsec. */
-	writeb (0xff, ioaddr + RxDMAPollPeriod);
+	writeb (0x20, ioaddr + RxDMAPollPeriod);
 	writeb (0xff, ioaddr + TxDMAPollPeriod);
+	writeb (0x30, ioaddr + RxDMABurstThresh);
+	writeb (0x30, ioaddr + RxDMAUrgentThresh);
 	netif_start_queue (dev);
 	writel (StatsEnable | RxEnable | TxEnable, ioaddr + MACCtrl);
 	/* VLAN supported */
@@ -445,9 +453,59 @@ rio_open (struct net_device *dev)
 
 	/* clear statistics */
 	get_stats (dev);
+	init_timer (&np->timer);
+	np->timer.expires = jiffies + 1*HZ;
+	np->timer.data = (unsigned long) dev;
+	np->timer.function = &rio_timer;
+	add_timer (&np->timer);
 	return 0;
 }
+static void 
+rio_timer (unsigned long data)
+{
+	struct net_device *dev = (struct net_device *)data;
+	struct netdev_private *np = dev->priv;
+	unsigned int entry;
+	int next_tick = 1*HZ;
+	unsigned long flags;
 
+	/* Recover rx ring exhausted error */
+	if (np->cur_rx - np->old_rx >= RX_RING_SIZE) {
+		printk(KERN_INFO "Try to recover rx ring exhausted...\n");
+		spin_lock_irqsave(&np->rx_lock, flags);
+		/* Re-allocate skbuffs to fill the descriptor ring */
+		for (; np->cur_rx - np->old_rx > 0; np->old_rx++) {
+			struct sk_buff *skb;
+			entry = np->old_rx % RX_RING_SIZE;
+			/* Dropped packets don't need to re-allocate */
+			if (np->rx_skbuff[entry] == NULL) {
+				skb = dev_alloc_skb (np->rx_buf_sz);
+				if (skb == NULL) {
+					np->rx_ring[entry].fraginfo = 0;
+					printk (KERN_INFO
+						"%s: Still unable to re-allocate Rx skbuff.#%d\n",
+						dev->name, entry);
+					break;
+				}
+				np->rx_skbuff[entry] = skb;
+				skb->dev = dev;
+				/* 16 byte align the IP header */
+				skb_reserve (skb, 2);
+				np->rx_ring[entry].fraginfo =
+				    cpu_to_le64 (pci_map_single
+					 (np->pdev, skb->tail, np->rx_buf_sz,
+					  PCI_DMA_FROMDEVICE));
+			}
+			np->rx_ring[entry].fraginfo |=
+			    cpu_to_le64 (np->rx_buf_sz) << 48;
+			np->rx_ring[entry].status = 0;
+		} /* end for */
+		spin_unlock_irqrestore (&np->rx_lock, flags);
+	} /* end if */
+	np->timer.expires = jiffies + next_tick;
+	add_timer(&np->timer);
+}
+	
 static void
 tx_timeout (struct net_device *dev)
 {
@@ -499,16 +557,14 @@ alloc_list (struct net_device *dev)
 		np->tx_ring[i].status = cpu_to_le64 (TFDDone);
 		np->tx_ring[i].next_desc = cpu_to_le64 (np->tx_ring_dma +
 					      ((i+1)%TX_RING_SIZE) *
-					      sizeof (struct
-					      netdev_desc));
+					      sizeof (struct netdev_desc));
 	}
 
 	/* Initialize Rx descriptors */
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		np->rx_ring[i].next_desc = cpu_to_le64 (np->rx_ring_dma +
 						((i + 1) % RX_RING_SIZE) *
-						sizeof (struct
-						netdev_desc));
+						sizeof (struct netdev_desc));
 		np->rx_ring[i].status = 0;
 		np->rx_ring[i].fraginfo = 0;
 		np->rx_skbuff[i] = 0;
@@ -529,8 +585,8 @@ alloc_list (struct net_device *dev)
 		skb_reserve (skb, 2);	/* 16 byte align the IP header. */
 		/* Rubicon now supports 40 bits of addressing space. */
 		np->rx_ring[i].fraginfo =
-		    cpu_to_le64 (pci_map_single
-				 (np->pdev, skb->tail, np->rx_buf_sz,
+		    cpu_to_le64 ( pci_map_single (
+			 	  np->pdev, skb->tail, np->rx_buf_sz,
 				  PCI_DMA_FROMDEVICE));
 		np->rx_ring[i].fraginfo |= cpu_to_le64 (np->rx_buf_sz) << 48;
 	}
@@ -773,6 +829,8 @@ receive_packet (struct net_device *dev)
 	int entry = np->cur_rx % RX_RING_SIZE;
 	int cnt = np->old_rx + RX_RING_SIZE - np->cur_rx;
 	int rx_shift;
+
+	spin_lock (&np->rx_lock);
 	if (np->old_rx > RX_RING_SIZE) {
 		rx_shift = RX_RING_SIZE;
 		np->old_rx -= rx_shift;
@@ -828,12 +886,14 @@ receive_packet (struct net_device *dev)
 				skb_put (skb, pkt_len);
 			}
 			skb->protocol = eth_type_trans (skb, dev);
-#if 0
+#if 0			
 			/* Checksum done by hw, but csum value unavailable. */
-			if (!(frame_status & (TCPError | UDPError | IPError))) {
+			if (np->pci_rev_id >= 0x0c && 
+				!(frame_status & (TCPError | UDPError | IPError))) {
 				skb->ip_summed = CHECKSUM_UNNECESSARY;
-			}
+			} 
 #endif
+					
 			netif_rx (skb);
 			dev->last_rx = jiffies;
 		}
@@ -849,9 +909,10 @@ receive_packet (struct net_device *dev)
 			skb = dev_alloc_skb (np->rx_buf_sz);
 			if (skb == NULL) {
 				np->rx_ring[entry].fraginfo = 0;
-				printk (KERN_ERR
-					"%s: Allocate Rx buffer error!",
-					dev->name);
+				printk (KERN_INFO
+					"%s: receive_packet: "
+					"Unable to re-allocate Rx skbuff.#%d\n",
+					dev->name, entry);
 				break;
 			}
 			np->rx_skbuff[entry] = skb;
@@ -866,13 +927,12 @@ receive_packet (struct net_device *dev)
 		np->rx_ring[entry].fraginfo |=
 		    cpu_to_le64 (np->rx_buf_sz) << 48;
 		np->rx_ring[entry].status = 0;
+		/* RxDMAPollNow */
+		writel (readl (dev->base_addr + DMACtrl) | 0x00000010,
+			dev->base_addr + DMACtrl);
 	}
-
-	/* RxDMAPollNow */
-	writel (readl (dev->base_addr + DMACtrl) | 0x00000010,
-		dev->base_addr + DMACtrl);
-
 	DEBUG_RFD_DUMP (np, 2);
+	spin_unlock(&np->rx_lock);
 	return 0;
 }
 
@@ -1006,7 +1066,7 @@ set_multicast (struct net_device *dev)
 	
 	hash_table[0] = hash_table[1] = 0;
 	/* RxFlowcontrol DA: 01-80-C2-00-00-01. Hash index=0x39 */
-	hash_table[1] |= 0x02000000;
+	hash_table[1] |= cpu_to_le32(0x02000000);
 	if (dev->flags & IFF_PROMISC) {
 		/* Receive all frames promiscuously. */
 		rx_mode = ReceiveAllFrames;
@@ -1020,11 +1080,16 @@ set_multicast (struct net_device *dev)
 		rx_mode =
 		    ReceiveBroadcast | ReceiveMulticastHash | ReceiveUnicast;
 		for (i=0, mclist = dev->mc_list; mclist && i < dev->mc_count; 
-				i++, mclist=mclist->next) {
+			i++, mclist=mclist->next) {
+
 			crc = ether_crc_le (ETH_ALEN, mclist->dmi_addr);
-			for (index=0, bit=0; bit<6; bit++, crc<<=1) {
-				if (crc & 0x80000000) index |= 1 << bit;
-			}
+
+			/* The inverted high significant 6 bits of CRC are
+			   used as an index to hashtable */
+			for (index = 0, bit = 0; bit < 6; bit++)
+				if (test_bit(31 - bit, &crc))
+					set_bit(bit, &index);
+
 			hash_table[index / 32] |= (1 << (index % 32));
 		}
 	} else {
@@ -1094,6 +1159,7 @@ rio_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 		     np->old_rx);
 		break;
 	case SIOCDEVPRIVATE + 8:
+		printk("TX ring:\n");
 		for (i = 0; i < TX_RING_SIZE; i++) {
 			desc = &np->tx_ring[i];
 			printk
@@ -1629,7 +1695,8 @@ rio_close (struct net_device *dev)
 	writel (TxDisable | RxDisable | StatsDisable, ioaddr + MACCtrl);
 	synchronize_irq ();
 	free_irq (dev->irq, dev);
-
+	del_timer_sync (&np->timer);
+	
 	/* Free all the skbuffs in the queue. */
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		np->rx_ring[i].status = 0;
@@ -1679,10 +1746,10 @@ rio_remove1 (struct pci_dev *pdev)
 }
 
 static struct pci_driver rio_driver = {
-	name:"dl2k",
-	id_table:rio_pci_tbl,
-	probe:rio_probe1,
-	remove: __devexit_p(rio_remove1),
+	name:		"dl2k",
+	id_table:	rio_pci_tbl,
+	probe:		rio_probe1,
+	remove:		__devexit_p(rio_remove1),
 };
 
 static int __init

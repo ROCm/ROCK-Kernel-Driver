@@ -62,6 +62,8 @@
 
 #include <asm/uaccess.h>
 
+#define IPV6_MAX_ADDRESSES 16
+
 /* Set to 3 to get tracing... */
 #define ACONF_DEBUG 2
 
@@ -586,6 +588,18 @@ int ipv6_get_lladdr(struct net_device *dev, struct in6_addr *addr)
 	return err;
 }
 
+int ipv6_count_addresses(struct inet6_dev *idev)
+{
+	int cnt = 0;
+	struct inet6_ifaddr *ifp;
+
+	read_lock_bh(&idev->lock);
+	for (ifp=idev->addr_list; ifp; ifp=ifp->if_next)
+		cnt++;
+	read_unlock_bh(&idev->lock);
+	return cnt;
+}
+
 int ipv6_chk_addr(struct in6_addr *addr, struct net_device *dev)
 {
 	struct inet6_ifaddr * ifp;
@@ -895,8 +909,12 @@ ok:
 		ifp = ipv6_get_ifaddr(&addr, dev);
 
 		if (ifp == NULL && valid_lft) {
-			ifp = ipv6_add_addr(in6_dev, &addr, pinfo->prefix_len,
-					    addr_type&IPV6_ADDR_SCOPE_MASK, 0);
+			/* Do not allow to create too much of autoconfigured
+			 * addresses; this would be too easy way to crash kernel.
+			 */
+			if (ipv6_count_addresses(in6_dev) < IPV6_MAX_ADDRESSES)
+				ifp = ipv6_add_addr(in6_dev, &addr, pinfo->prefix_len,
+						    addr_type&IPV6_ADDR_SCOPE_MASK, 0);
 
 			if (ifp == NULL) {
 				in6_dev_put(in6_dev);

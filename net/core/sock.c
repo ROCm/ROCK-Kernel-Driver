@@ -108,6 +108,7 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/poll.h>
+#include <linux/tcp.h>
 #include <linux/init.h>
 
 #include <asm/uaccess.h>

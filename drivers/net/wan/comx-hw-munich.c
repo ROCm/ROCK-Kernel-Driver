@@ -1397,15 +1397,6 @@ udelay(10000);
     return;
 }
 
-void free_stuff(munich_board_t *board, struct comx_channel *ch)
-{
-/* Free CCB and the interrupt queues */
-    if (board->ccb) kfree((void *)board->ccb);
-    if (board->tiq) kfree((void *)board->tiq);
-    if (board->riq) kfree((void *)board->riq);
-    if (board->piq) kfree((void *)board->piq);
-}
-
 /* 
  * Hardware open routine.
  * Called by comx (upper) layer when the user wants to bring up the interface
@@ -1488,7 +1479,6 @@ static int MUNICH_open(struct net_device *dev)
 	if (board->tiq == NULL)
 	{
 	    spin_unlock_irqrestore(&mister_lock, flags);
-	    free_stuff(board, ch);
 	    return -ENOMEM;
 	}
 	memset((void *)board->tiq, 0, MUNICH_INTQSIZE);
@@ -1497,7 +1487,6 @@ static int MUNICH_open(struct net_device *dev)
 	if (board->riq == NULL)
 	{
 	    spin_unlock_irqrestore(&mister_lock, flags);
-	    free_stuff(board, ch);
 	    return -ENOMEM;
 	}
 	memset((void *)board->riq, 0, MUNICH_INTQSIZE);
@@ -1506,7 +1495,6 @@ static int MUNICH_open(struct net_device *dev)
 	if (board->piq == NULL)
 	{
 	    spin_unlock_irqrestore(&mister_lock, flags);
-	    free_stuff(board, ch);
 	    return -ENOMEM;
 	}
 	memset((void *)board->piq, 0, MUNICH_PIQSIZE);
@@ -1527,7 +1515,6 @@ static int MUNICH_open(struct net_device *dev)
 		   board->pci->irq);
 	    /* TOD: free other resources (a sok malloc feljebb)                     */
 	    spin_unlock_irqrestore(&mister_lock, flags);
-	    free_stuff(board, ch);
 	    return -EAGAIN;
 	}
 	board->irq = board->pci->irq;	/* csak akkor legyen != 0, ha tenyleg le van foglalva nekunk */
@@ -1597,7 +1584,6 @@ static int MUNICH_open(struct net_device *dev)
 	    free_irq(board->irq, (void *)board);	/* TOD: free other resources too *//* maybe shut down hw? */
 	    board->irq = 0;
 	    spin_unlock_irqrestore(&mister_lock, flags);
-	    free_stuff(board, ch);
 	    return -EAGAIN;
 	}
 	else if (!(stat & STAT_PCMA))
@@ -1608,7 +1594,6 @@ static int MUNICH_open(struct net_device *dev)
 	    free_irq(board->irq, (void *)board);	/* TOD: free other resources too *//* maybe shut off the hw? */
 	    board->irq = 0;
 	    spin_unlock_irqrestore(&mister_lock, flags);
-	    free_stuff(board, ch);
 	    return -EIO;
 	}
 
@@ -1670,7 +1655,7 @@ static int MUNICH_open(struct net_device *dev)
     spin_unlock_irqrestore(&mister_lock, flags);
 
     dev->irq = board->irq;	/* hogy szep legyen az ifconfig outputja */
-    ccb = board->ccb;		/* TOD: ez igy csunya egy kicsit hogy benn is meg kinn is beletoltom :( */
+    ccb = board->ccb;		/* TODO: ez igy csunya egy kicsit hogy benn is meg kinn is beletoltom :( */
 
     spin_lock_irqsave(&mister_lock, flags);
 
@@ -1680,13 +1665,12 @@ static int MUNICH_open(struct net_device *dev)
     /* Check if the selected timeslots aren't used already */
 
     for (i = 0; i < 32; i++)
-	if (((1 << i) & timeslots) && ccb->timeslot_spec[i].tti == 0)
+	if (((1 << i) & timeslots) && !ccb->timeslot_spec[i].tti)
 	{
 	    printk("MUNICH_open: %s: timeslot %d already used by %s\n",
 		   dev->name, i, board->twins[ccb->timeslot_spec[i].txchannel]->name);
 	    spin_unlock_irqrestore(&mister_lock, flags);
-	    free_stuff(board, ch);
-	    return -EBUSY;	/* TOD: lehet hogy valami mas errno kellene? */
+	    return -EBUSY;	/* TODO: lehet hogy valami mas errno kellene? */
 	}
 
     /* find a free channel: */
@@ -1700,7 +1684,6 @@ static int MUNICH_open(struct net_device *dev)
 		("MUNICH_open: %s: FATAL: can not find a free channel - this should not happen!\n",
 		 dev->name);
 	    spin_unlock_irqrestore(&mister_lock, flags);
-	    free_stuff(board, ch);
 	    return -ENODEV;
 	}
 	if (board->twins[channel] == NULL)
@@ -1998,7 +1981,7 @@ static int MUNICH_close(struct net_device *dev)
 
     spin_lock_irqsave(&mister_lock, flags);
 
-    board->use_count--;
+    if (board->use_count) board->use_count--;
 
     if (!board->use_count)	/* we were the last user of the board */
     {
@@ -2020,7 +2003,12 @@ static int MUNICH_close(struct net_device *dev)
 	    free_irq(board->irq, (void *)board);	/* Ha nem inicializalta magat, akkor meg nincs irq */
 	board->irq = 0;
 
-	free_stuff(board, ch);
+	/* Free CCB and the interrupt queues */
+	if (board->ccb) kfree((void *)board->ccb);
+	if (board->tiq) kfree((void *)board->tiq);
+	if (board->riq) kfree((void *)board->riq);
+	if (board->piq) kfree((void *)board->piq);
+	board->ccb = board->tiq = board->riq = board->piq = NULL;
     }
 
     /* Enable setting of hw parameters */

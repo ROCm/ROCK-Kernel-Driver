@@ -541,7 +541,7 @@ static int mtdblock_ioctl(struct inode * inode, struct file * file,
 			return -EACCES;
 #endif
 		fsync_bdev(inode->i_bdev);
-		invalidate_buffers(inode->i_rdev);
+		invalidate_bdev(inode->b_rdev, 0);
 		down(&mtdblk->cache_sem);
 		write_cached_data(mtdblk);
 		up(&mtdblk->cache_sem);

@@ -43,7 +43,7 @@ do {	unsigned int *dest = &(__elf_regs[0]);		\
 	dest[34] = (unsigned int) src->tnpc;		\
 	dest[35] = src->y;				\
 	dest[36] = dest[37] = 0; /* XXX */		\
-} while(0);
+} while(0)
 
 typedef struct {
 	union {

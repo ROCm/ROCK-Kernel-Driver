@@ -15,7 +15,7 @@
  *
  *	(c) Copyright 1995    Alan Cox <alan@lxorguk.ukuu.org.uk>
  *
- *	Release 0.08.
+ *	Release 0.09.
  *
  *	Fixes
  *		Dave Gregorich	:	Modularisation and minor bugs
@@ -27,6 +27,7 @@
  *		Tim Hockin	:	Added insmod parameters, comment cleanup
  *					Parameterized timeout
  *		Tigran Aivazian	:	Restructured wdt_init() to handle failures
+ *		Matt Domsch	:	added nowayout and timeout module options
  */
 
 #include <linux/config.h>
@@ -61,6 +62,26 @@ static int io=0x240;
 static int irq=11;
 
 #define WD_TIMO (100*60)		/* 1 minute */
+
+static int timeout_val = WD_TIMO;	/* value passed to card */
+static int timeout = 60;	        /* in seconds */
+MODULE_PARM(timeout,"i");
+MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default=60)");
+
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+
+MODULE_PARM(nowayout,"i");
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
+
+static void __init
+wdt_validate_timeout(void)
+{
+	timeout_val = timeout * 100;
+}
 
 #ifndef MODULE
 
@@ -216,7 +237,7 @@ static void wdt_ping(void)
 	/* Write a watchdog value */
 	inb_p(WDT_DC);
 	wdt_ctr_mode(1,2);
-	wdt_ctr_load(1,WD_TIMO);		/* Timeout */
+	wdt_ctr_load(1,timeout_val);		/* Timeout */
 	outb_p(0, WDT_DC);
 }
 
@@ -339,6 +360,9 @@ static int wdt_open(struct inode *inode, struct file *file)
 		case WATCHDOG_MINOR:
 			if(test_and_set_bit(0, &wdt_is_open))
 				return -EBUSY;
+			if (nowayout) {
+				MOD_INC_USE_COUNT;
+			}
 			/*
 			 *	Activate 
 			 */
@@ -348,7 +372,7 @@ static int wdt_open(struct inode *inode, struct file *file)
 			wdt_ctr_mode(1,2);
 			wdt_ctr_mode(2,0);
 			wdt_ctr_load(0, 8948);		/* count at 100Hz */
-			wdt_ctr_load(1,WD_TIMO);	/* Timeout 120 seconds */
+			wdt_ctr_load(1,timeout_val);	/* Timeout */
 			wdt_ctr_load(2,65535);
 			outb_p(0, WDT_DC);	/* Enable */
 			return 0;
@@ -375,10 +399,10 @@ static int wdt_release(struct inode *inode, struct file *file)
 {
 	if(minor(inode->i_rdev)==WATCHDOG_MINOR)
 	{
-#ifndef CONFIG_WATCHDOG_NOWAYOUT	
-		inb_p(WDT_DC);		/* Disable counters */
-		wdt_ctr_load(2,0);	/* 0 length reset pulses now */
-#endif		
+		if (!nowayout) {
+			inb_p(WDT_DC);		/* Disable counters */
+			wdt_ctr_load(2,0);	/* 0 length reset pulses now */
+		}
 		clear_bit(0, &wdt_is_open);
 	}
 	return 0;
@@ -484,6 +508,7 @@ static int __init wdt_init(void)
 {
 	int ret;
 
+	wdt_validate_timeout();
 	ret = misc_register(&wdt_miscdev);
 	if (ret) {
 		printk(KERN_ERR "wdt: can't misc_register on minor=%d\n", WATCHDOG_MINOR);

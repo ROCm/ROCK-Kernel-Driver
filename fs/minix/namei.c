@@ -4,9 +4,7 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
-#include <linux/fs.h>
-#include <linux/minix_fs.h>
-#include <linux/pagemap.h>
+#include "minix.h"
 
 static inline void inc_count(struct inode *inode)
 {

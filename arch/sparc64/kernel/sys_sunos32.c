@@ -210,7 +210,7 @@ static char *vstrings[] = {
 
 asmlinkage void sunos_vadvise(u32 strategy)
 {
-	static int count = 0;
+	static int count;
 
 	/* I wanna see who uses this... */
 	if (count++ < 5)

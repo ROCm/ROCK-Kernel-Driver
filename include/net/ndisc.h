@@ -42,11 +42,7 @@ extern struct neigh_table nd_tbl;
 struct nd_msg {
         struct icmp6hdr	icmph;
         struct in6_addr	target;
-        struct {
-                __u8	opt_type;
-                __u8	opt_len;
-                __u8	link_addr[MAX_ADDR_LEN];
-        } opt;
+	__u8		opt[0];
 };
 
 struct ra_msg {

@@ -18,10 +18,10 @@ normalised event interface - see Documentation/input/input.txt
 The data flow for a HID event produced by a device is something like
 the following :
 
- usb.c ---> hid.c  ----> input.c ----> [keyboard/mouse/joystick/event]
-                    |
-                    |
-                    --> hiddev.c ----> POWER / MONITOR CONTROL 
+ usb.c ---> hid-core.c  ----> input.c ----> [keyboard/mouse/joystick/event]
+                         |
+                         |
+                          --> hiddev.c ----> POWER / MONITOR CONTROL 
 
 In addition, other subsystems (apart from USB) can potentially feed
 events into the input subsystem, but these have no effect on the hid
@@ -63,12 +63,18 @@ conveniently linked of http://www.linux-usb.org.
 
 The hiddev API uses a read() interface, and a set of ioctl() calls.
 
+HID devices exchange data with the host computer using data
+bundles called "reports".  Each report is divided into "fields",
+each of which can have one or more "usages".  In the hid-core,
+each one of these usages has a single signed 32 bit value.
 
 read():
-This is the event interface. When the HID device performs an
-interrupt transfer, indicating a change of state, data will be made
-available at the associated hiddev device with the content of a struct
-hiddev_event: 
+This is the event interface.  When the HID device's state changes,
+it performs an interrupt transfer containing a report which contains
+the changed value.  The hid-core.c module parses the report, and
+returns to hiddev.c the individual usages that have changed within
+the report.  In its basic mode, the hiddev will make these individual
+usage changes available to the reader using a struct hiddev_event:
 
        struct hiddev_event {
            unsigned hid;
@@ -78,7 +84,10 @@ hiddev_event:
 containing the HID usage identifier for the status that changed, and
 the value that it was changed to. Note that the structure is defined
 within <linux/hiddev.h>, along with some other useful #defines and
-structures. 
+structures.  The HID usage identifier is a composite of the HID usage
+page shifted to the 16 high order bits ORed with the usage code.  The
+behavior of the read() function can be modified using the HIDIOCSFLAG
+ioctl() described below.
 
 
 ioctl(): 
@@ -108,7 +117,9 @@ HIDIOCINITREPORT - (none)
 Instructs the kernel to retrieve all input and feature report values
 from the device. At this point, all the usage structures will contain
 current values for the device, and will maintain it as the device
-changes.
+changes.  Note that the use of this ioctl is unnecessary in general,
+since later kernels automatically initialize the reports from the
+device at attach time.
 
 HIDIOCGNAME - string (variable length)
 Gets the device name
@@ -116,12 +127,12 @@ Gets the device name
 HIDIOCGREPORT - struct hiddev_report_info (write)
 Instructs the kernel to get a feature or input report from the device,
 in order to selectively update the usage structures (in contrast to
-INITREPORT). 
+INITREPORT).
 
 HIDIOCSREPORT - struct hiddev_report_info (write)
 Instructs the kernel to send a report to the device. This report can
 be filled in by the user through HIDIOCSUSAGE calls (below) to fill in
-individual usage values in the report beforesending the report in full
+individual usage values in the report before sending the report in full
 to the device. 
 
 HIDIOCGREPORTINFO - struct hiddev_report_info (read/write)
@@ -157,6 +168,25 @@ filled in with the report and field infomation associated with this
 usage if it is found. 
 
 HIDIOCSUSAGE - struct hiddev_usage_ref (write)
-Sets the value of a usage in an output report.
+Sets the value of a usage in an output report.  The user fills in
+the hiddev_usage_ref structure as above, but additionally fills in
+the value field.
 
+HIDIOCGFLAG - int (read)
+HIDIOCSFLAG - int (write)
+These operations respectively inspect and replace the mode flags
+that influence the read() call above.  The flags are as follows:
 
+    HIDDEV_FLAG_UREF - read() calls will now return 
+        struct hiddev_usage_ref instead of struct hiddev_event.
+        This is a larger structure, but in situations where the
+        device has more than one usage in its reports with the
+        same usage code, this mode serves to resolve such
+        ambiguity.
+
+    HIDDEV_FLAG_REPORT - This flag can only be used in conjunction
+        with HIDDEV_FLAG_UREF.  With this flag set, when the device
+        sends a report, a struct hiddev_usage_ref will be returned
+        to read() filled in with the report_type and report_id, but 
+        with field_index set to FIELD_INDEX_NONE.  This serves as
+        additional notification when the device has sent a report.

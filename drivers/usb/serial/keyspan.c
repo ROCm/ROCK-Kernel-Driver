@@ -852,7 +852,7 @@ static int keyspan_open (struct usb_serial_port *port, struct file *filp)
 	struct keyspan_serial_private 	*s_priv;
 	struct usb_serial 		*serial = port->serial;
 	const struct keyspan_device_details	*d_details;
-	int				i, already_active, err;
+	int				i, err;
 	struct urb			*urb;
 
 	s_priv = (struct keyspan_serial_private *)(serial->private);
@@ -860,12 +860,6 @@ static int keyspan_open (struct usb_serial_port *port, struct file *filp)
 	d_details = s_priv->device_details;
 	
 	dbg("keyspan_open called for port%d.\n", port->number); 
-
-	already_active = port->open_count;
-	++port->open_count;
-
-	if (already_active)
-		return 0;
 
 	p_priv = (struct keyspan_port_private *)(port->private);
 	
@@ -924,19 +918,16 @@ static void keyspan_close(struct usb_serial_port *port, struct file *filp)
 	p_priv->out_flip = 0;
 	p_priv->in_flip = 0;
 
-	if (--port->open_count <= 0) {
-		if (serial->dev) {
-			/* Stop reading/writing urbs */
-			stop_urb(p_priv->inack_urb);
-			stop_urb(p_priv->outcont_urb);
-			for (i = 0; i < 2; i++) {
-				stop_urb(p_priv->in_urbs[i]);
-				stop_urb(p_priv->out_urbs[i]);
-			}
+	if (serial->dev) {
+		/* Stop reading/writing urbs */
+		stop_urb(p_priv->inack_urb);
+		stop_urb(p_priv->outcont_urb);
+		for (i = 0; i < 2; i++) {
+			stop_urb(p_priv->in_urbs[i]);
+			stop_urb(p_priv->out_urbs[i]);
 		}
-		port->open_count = 0;
-		port->tty = 0;
 	}
+	port->tty = 0;
 }
 
 
@@ -1762,9 +1753,6 @@ static void keyspan_shutdown (struct usb_serial *serial)
 	/* Now free per port private data */
 	for (i = 0; i < serial->num_ports; i++) {
 		port = &serial->port[i];
-		while (port->open_count > 0) {
-			--port->open_count;
-		}
 		kfree(port->private);
 	}
 }

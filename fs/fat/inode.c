@@ -177,7 +177,6 @@ void fat_put_super(struct super_block *sb)
 		fat_clusters_flush(sb);
 	}
 	fat_cache_inval_dev(sb);
-	set_blocksize (sb->s_dev,BLOCK_SIZE);
 	if (sbi->nls_disk) {
 		unload_nls(sbi->nls_disk);
 		sbi->nls_disk = NULL;
@@ -225,8 +224,9 @@ static int parse_options(char *options, int *debug,
 		goto out;
 	save = 0;
 	savep = NULL;
-	for (this_char = strtok(options,","); this_char;
-	     this_char = strtok(NULL,",")) {
+	while ((this_char = strsep(&options,",")) != NULL) {
+		if (!*this_char)
+			continue;
 		if ((value = strchr(this_char,'=')) != NULL) {
 			save = *value;
 			savep = value;

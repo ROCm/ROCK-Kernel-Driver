@@ -39,45 +39,45 @@
 
 #ifdef CONFIG_BLK_DEV_AEC62XX
 extern unsigned int pci_init_aec62xx(struct pci_dev *);
-extern unsigned int ata66_aec62xx(ide_hwif_t *);
-extern void ide_init_aec62xx(ide_hwif_t *);
-extern void ide_dmacapable_aec62xx(ide_hwif_t *, unsigned long);
+extern unsigned int ata66_aec62xx(struct ata_channel *);
+extern void ide_init_aec62xx(struct ata_channel *);
+extern void ide_dmacapable_aec62xx(struct ata_channel *, unsigned long);
 #endif
 
 #ifdef CONFIG_BLK_DEV_ALI15X3
 extern unsigned int pci_init_ali15x3(struct pci_dev *);
-extern unsigned int ata66_ali15x3(ide_hwif_t *);
-extern void ide_init_ali15x3(ide_hwif_t *);
-extern void ide_dmacapable_ali15x3(ide_hwif_t *, unsigned long);
+extern unsigned int ata66_ali15x3(struct ata_channel *);
+extern void ide_init_ali15x3(struct ata_channel *);
+extern void ide_dmacapable_ali15x3(struct ata_channel *, unsigned long);
 #endif
 
 #ifdef CONFIG_BLK_DEV_AMD74XX
 extern unsigned int pci_init_amd74xx(struct pci_dev *);
-extern unsigned int ata66_amd74xx(ide_hwif_t *);
-extern void ide_init_amd74xx(ide_hwif_t *);
-extern void ide_dmacapable_amd74xx(ide_hwif_t *, unsigned long);
+extern unsigned int ata66_amd74xx(struct ata_channel *);
+extern void ide_init_amd74xx(struct ata_channel *);
+extern void ide_dmacapable_amd74xx(struct ata_channel *, unsigned long);
 #endif
 
 #ifdef CONFIG_BLK_DEV_CMD64X
 extern unsigned int pci_init_cmd64x(struct pci_dev *);
-extern unsigned int ata66_cmd64x(ide_hwif_t *);
-extern void ide_init_cmd64x(ide_hwif_t *);
-extern void ide_dmacapable_cmd64x(ide_hwif_t *, unsigned long);
+extern unsigned int ata66_cmd64x(struct ata_channel *);
+extern void ide_init_cmd64x(struct ata_channel *);
+extern void ide_dmacapable_cmd64x(struct ata_channel *, unsigned long);
 #endif
 
 #ifdef CONFIG_BLK_DEV_CY82C693
 extern unsigned int pci_init_cy82c693(struct pci_dev *);
-extern void ide_init_cy82c693(ide_hwif_t *);
+extern void ide_init_cy82c693(struct ata_channel *);
 #endif
 
 #ifdef CONFIG_BLK_DEV_CS5530
 extern unsigned int pci_init_cs5530(struct pci_dev *);
-extern void ide_init_cs5530(ide_hwif_t *);
+extern void ide_init_cs5530(struct ata_channel *);
 #endif
 
 #ifdef CONFIG_BLK_DEV_HPT34X
 extern unsigned int pci_init_hpt34x(struct pci_dev *);
-extern void ide_init_hpt34x(ide_hwif_t *);
+extern void ide_init_hpt34x(struct ata_channel *);
 #endif
 
 #ifdef CONFIG_BLK_DEV_HPT366
@@ -85,9 +85,9 @@ extern byte hpt363_shared_irq;
 extern byte hpt363_shared_pin;
 
 extern unsigned int pci_init_hpt366(struct pci_dev *);
-extern unsigned int ata66_hpt366(ide_hwif_t *);
-extern void ide_init_hpt366(ide_hwif_t *);
-extern void ide_dmacapable_hpt366(ide_hwif_t *, unsigned long);
+extern unsigned int ata66_hpt366(struct ata_channel *);
+extern void ide_init_hpt366(struct ata_channel *);
+extern void ide_dmacapable_hpt366(struct ata_channel *, unsigned long);
 #else
 /* FIXME: those have to be killed */
 static byte hpt363_shared_irq;
@@ -95,69 +95,69 @@ static byte hpt363_shared_pin;
 #endif
 
 #ifdef CONFIG_BLK_DEV_NS87415
-extern void ide_init_ns87415(ide_hwif_t *);
+extern void ide_init_ns87415(struct ata_channel *);
 #endif
 
 #ifdef CONFIG_BLK_DEV_OPTI621
-extern void ide_init_opti621(ide_hwif_t *);
+extern void ide_init_opti621(struct ata_channel *);
 #endif
 
 #ifdef CONFIG_BLK_DEV_PDC_ADMA
 extern unsigned int pci_init_pdcadma(struct pci_dev *);
-extern unsigned int ata66_pdcadma(ide_hwif_t *);
-extern void ide_init_pdcadma(ide_hwif_t *);
-extern void ide_dmacapable_pdcadma(ide_hwif_t *, unsigned long);
+extern unsigned int ata66_pdcadma(struct ata_channel *);
+extern void ide_init_pdcadma(struct ata_channel *);
+extern void ide_dmacapable_pdcadma(struct ata_channel *, unsigned long);
 #endif
 
 #ifdef CONFIG_BLK_DEV_PDC202XX
 extern unsigned int pci_init_pdc202xx(struct pci_dev *);
-extern unsigned int ata66_pdc202xx(ide_hwif_t *);
-extern void ide_init_pdc202xx(ide_hwif_t *);
+extern unsigned int ata66_pdc202xx(struct ata_channel *);
+extern void ide_init_pdc202xx(struct ata_channel *);
 #endif
 
 #ifdef CONFIG_BLK_DEV_PIIX
 extern unsigned int pci_init_piix(struct pci_dev *);
-extern unsigned int ata66_piix(ide_hwif_t *);
-extern void ide_init_piix(ide_hwif_t *);
-extern void ide_dmacapable_piix(ide_hwif_t *, unsigned long);
+extern unsigned int ata66_piix(struct ata_channel *);
+extern void ide_init_piix(struct ata_channel *);
+extern void ide_dmacapable_piix(struct ata_channel *, unsigned long);
 #endif
 
 #ifdef CONFIG_BLK_DEV_IT8172
 extern unsigned int pci_init_it8172(struct pci_dev *);
-extern void ide_init_it8172(ide_hwif_t *);
+extern void ide_init_it8172(struct ata_channel *);
 #endif
 
 #ifdef CONFIG_BLK_DEV_RZ1000
-extern void ide_init_rz1000(ide_hwif_t *);
+extern void ide_init_rz1000(struct ata_channel *);
 #endif
 
 #ifdef CONFIG_BLK_DEV_SVWKS
 extern unsigned int pci_init_svwks(struct pci_dev *);
-extern unsigned int ata66_svwks(ide_hwif_t *);
-extern void ide_init_svwks(ide_hwif_t *);
+extern unsigned int ata66_svwks(struct ata_channel *);
+extern void ide_init_svwks(struct ata_channel *);
 #endif
 
 #ifdef CONFIG_BLK_DEV_SIS5513
 extern unsigned int pci_init_sis5513(struct pci_dev *);
-extern unsigned int ata66_sis5513(ide_hwif_t *);
-extern void ide_init_sis5513(ide_hwif_t *);
+extern unsigned int ata66_sis5513(struct ata_channel *);
+extern void ide_init_sis5513(struct ata_channel *);
 #endif
 
 #ifdef CONFIG_BLK_DEV_SL82C105
 extern unsigned int pci_init_sl82c105(struct pci_dev *);
-extern void dma_init_sl82c105(ide_hwif_t *, unsigned long);
-extern void ide_init_sl82c105(ide_hwif_t *);
+extern void dma_init_sl82c105(struct ata_channel *, unsigned long);
+extern void ide_init_sl82c105(struct ata_channel *);
 #endif
 
 #ifdef CONFIG_BLK_DEV_TRM290
-extern void ide_init_trm290(ide_hwif_t *);
+extern void ide_init_trm290(struct ata_channel *);
 #endif
 
 #ifdef CONFIG_BLK_DEV_VIA82CXXX
 extern unsigned int pci_init_via82cxxx(struct pci_dev *);
-extern unsigned int ata66_via82cxxx(ide_hwif_t *);
-extern void ide_init_via82cxxx(ide_hwif_t *);
-extern void ide_dmacapable_via82cxxx(ide_hwif_t *, unsigned long);
+extern unsigned int ata66_via82cxxx(struct ata_channel *);
+extern void ide_init_via82cxxx(struct ata_channel *);
+extern void ide_dmacapable_via82cxxx(struct ata_channel *, unsigned long);
 #endif
 
 typedef struct ide_pci_enablebit_s {
@@ -181,9 +181,9 @@ typedef struct ide_pci_device_s {
 	unsigned short		vendor;
 	unsigned short		device;
 	unsigned int		(*init_chipset)(struct pci_dev *dev);
-	unsigned int		(*ata66_check)(ide_hwif_t *hwif);
-	void			(*init_hwif)(ide_hwif_t *hwif);
-	void			(*dma_init)(ide_hwif_t *hwif, unsigned long dmabase);
+	unsigned int		(*ata66_check)(struct ata_channel *hwif);
+	void			(*init_hwif)(struct ata_channel *hwif);
+	void			(*dma_init)(struct ata_channel *hwif, unsigned long dmabase);
 	ide_pci_enablebit_t	enablebits[2];
 	unsigned int		bootable;
 	unsigned int		extra;
@@ -229,6 +229,7 @@ static ide_pci_device_t pci_chipsets[] __initdata = {
 	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20268R, pci_init_pdc202xx, ata66_pdc202xx, ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ  | ATA_F_DMA },
 	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20269, pci_init_pdc202xx, ata66_pdc202xx, ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_DMA },
 	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20275, pci_init_pdc202xx, ata66_pdc202xx,	ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_DMA },
+	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20276, pci_init_pdc202xx, ata66_pdc202xx,	ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_DMA },
 #endif
 #ifdef CONFIG_BLK_DEV_RZ1000
 	{PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_RZ1000, NULL, NULL,	ide_init_rz1000, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
@@ -328,10 +329,10 @@ static unsigned int __init trust_pci_irq(ide_pci_device_t *d, struct pci_dev *de
  * Match a PCI IDE port against an entry in ide_hwifs[],
  * based on io_base port if possible.
  */
-static ide_hwif_t __init *lookup_hwif (unsigned long io_base, int bootable, const char *name)
+static struct ata_channel __init *lookup_hwif (unsigned long io_base, int bootable, const char *name)
 {
 	int h;
-	ide_hwif_t *hwif;
+	struct ata_channel *hwif;
 
 	/*
 	 * Look for a hwif with matching io_base specified using
@@ -430,7 +431,7 @@ static int __init setup_pci_baseregs (struct pci_dev *dev, const char *name)
 /*
  * Fetch the DMA Bus-Master-I/O-Base-Address (BMIBA) from PCI space:
  */
-static unsigned long __init get_dma_base(ide_hwif_t *hwif, int extra, const char *name)
+static unsigned long __init get_dma_base(struct ata_channel *hwif, int extra, const char *name)
 {
 	unsigned long	dma_base = 0;
 	struct pci_dev	*dev = hwif->pci_dev;
@@ -441,7 +442,7 @@ static unsigned long __init get_dma_base(ide_hwif_t *hwif, int extra, const char
 	 */
 
 	if (hwif->mate && hwif->mate->dma_base)
-		dma_base = hwif->mate->dma_base - (hwif->channel ? 0 : 8);
+		dma_base = hwif->mate->dma_base - (hwif->unit ? 0 : 8);
 	else
 		dma_base = pci_resource_start(dev, 4);
 
@@ -451,7 +452,7 @@ static unsigned long __init get_dma_base(ide_hwif_t *hwif, int extra, const char
 	if (extra) /* PDC20246, PDC20262, HPT343, & HPT366 */
 		request_region(dma_base + 16, extra, name);
 
-	dma_base += hwif->channel ? 8 : 0;
+	dma_base += hwif->unit ? 8 : 0;
 	hwif->dma_extra = extra;
 
 	if ((dev->vendor == PCI_VENDOR_ID_AL && dev->device == PCI_DEVICE_ID_AL_M5219) ||
@@ -484,11 +485,11 @@ static unsigned long __init get_dma_base(ide_hwif_t *hwif, int extra, const char
 /*
  * Setup DMA transfers on a channel.
  */
-static void __init setup_channel_dma(ide_hwif_t *hwif, struct pci_dev *dev,
+static void __init setup_channel_dma(struct ata_channel *hwif, struct pci_dev *dev,
 		ide_pci_device_t *d,
 		int port,
 		u8 class_rev,
-		int pciirq, ide_hwif_t **mate,
+		int pciirq, struct ata_channel **mate,
 		int autodma, unsigned short *pcicmd)
 {
 	unsigned long dma_base;
@@ -535,14 +536,15 @@ static int __init setup_host_channel(struct pci_dev *dev,
 		ide_pci_device_t *d,
 		int port,
 		u8 class_rev,
-		int pciirq, ide_hwif_t **mate,
+		int pciirq,
+		struct ata_channel **mate,
 		int autodma,
 		unsigned short *pcicmd)
 {
 	unsigned long base = 0;
 	unsigned long ctl = 0;
 	ide_pci_enablebit_t *e = &(d->enablebits[port]);
-	ide_hwif_t *hwif;
+	struct ata_channel *hwif;
 
 	u8 tmp;
 	if (port == 1) {
@@ -608,7 +610,7 @@ controller_ok:
 
 	hwif->chipset = ide_pci;
 	hwif->pci_dev = dev;
-	hwif->channel = port;
+	hwif->unit = port;
 	if (!hwif->irq)
 		hwif->irq = pciirq;
 
@@ -669,7 +671,7 @@ static void __init setup_pci_device(struct pci_dev *dev, ide_pci_device_t *d)
 	int pciirq = 0;
 	unsigned short pcicmd = 0;
 	unsigned short tried_config = 0;
-	ide_hwif_t *mate = NULL;
+	struct ata_channel *mate = NULL;
 	unsigned int class_rev;
 
 #ifdef CONFIG_IDEDMA_AUTO

@@ -28,7 +28,7 @@
 
 #ifdef CONFIG_BLK_DEV_IDEPCI
 
-void __init ide_init_rz1000 (ide_hwif_t *hwif)	/* called from ide-pci.c */
+void __init ide_init_rz1000(struct ata_channel *hwif)	/* called from ide-pci.c */
 {
 	unsigned short reg;
 	struct pci_dev *dev = hwif->pci_dev;
@@ -62,7 +62,7 @@ static void __init init_rz1000 (struct pci_dev *dev, const char *name)
 		printk("IDE: disabled chipset read-ahead (buggy %s)\n", name);
 	} else {
 		for (h = 0; h < MAX_HWIFS; ++h) {
-			ide_hwif_t *hwif = &ide_hwifs[h];
+			struct ata_channel *hwif = &ide_hwifs[h];
 			if ((hwif->io_ports[IDE_DATA_OFFSET] == 0x1f0 || hwif->io_ports[IDE_DATA_OFFSET] == 0x170)
 			 && (hwif->chipset == ide_unknown || hwif->chipset == ide_generic))
 			{
@@ -71,7 +71,7 @@ static void __init init_rz1000 (struct pci_dev *dev, const char *name)
 				hwif->drives[0].no_unmask = 1;
 				hwif->drives[1].no_unmask = 1;
 				if (hwif->io_ports[IDE_DATA_OFFSET] == 0x170)
-					hwif->channel = 1;
+					hwif->unit = 1;
 				printk("%s: serialized, disabled unmasking (buggy %s)\n", hwif->name, name);
 			}
 		}

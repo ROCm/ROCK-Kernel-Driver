@@ -48,7 +48,7 @@
  *          Added module parameter pss_firmware to allow the user to tell 
  *          the driver where the fireware file is located.  The default 
  *          setting is the previous hardcoded setting "/etc/sound/pss_synth".
- * 00-03-03: Christoph Hellwig <chhellwig@gmx.net>
+ * 00-03-03: Christoph Hellwig <chhellwig@infradead.org>
  *	    Adapted to module_init/module_exit
  * 11-10-2000: Bartlomiej Zolnierkiewicz <bkz@linux-ide.org>
  *	    Added __init to probe_pss(), attach_pss() and probe_pss_mpu()

@@ -1330,7 +1330,7 @@ i2DrainOutput(i2ChanStrPtr pCh, int timeout)
 
 	// if expires == 0 then timer poped, then do not need to del_timer
 	if ((timeout > 0) && pCh->BookmarkTimer.expires && 
-				(pCh->BookmarkTimer.expires > jiffies)) {
+	                     time_before(jiffies, pCh->BookmarkTimer.expires)) {
 		del_timer( &(pCh->BookmarkTimer) );
 		pCh->BookmarkTimer.expires = 0;
 
