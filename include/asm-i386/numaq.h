@@ -28,8 +28,6 @@
 
 #ifdef CONFIG_X86_NUMAQ
 
-extern int physnode_map[];
-
 #define MAX_NUMNODES		8
 extern void get_memcfg_numaq(void);
 #define get_memcfg_numa() get_memcfg_numaq()

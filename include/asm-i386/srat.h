@@ -27,7 +27,6 @@
 #ifndef _ASM_SRAT_H_
 #define _ASM_SRAT_H_
 
-extern int physnode_map[];
 #define MAX_NUMNODES		8
 extern void get_memcfg_from_srat(void);
 extern unsigned long *get_zholes_size(int);

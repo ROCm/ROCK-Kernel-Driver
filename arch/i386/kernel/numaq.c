@@ -64,8 +64,6 @@ static void __init smp_dump_qct(void)
 	}
 }
 
-extern int physnode_map[];
-
 /*
  * for each node mark the regions
  *        TOPOFMEM = hi_shrd_mem_start + hi_shrd_mem_size
