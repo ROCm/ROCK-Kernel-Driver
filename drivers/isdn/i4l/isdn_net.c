@@ -41,7 +41,7 @@
 enum {
 	ST_0,
 	ST_1,
-	ST_2,
+	ST_2_UNUSED,
 	ST_3,
 	ST_4,
 	ST_5,
@@ -507,7 +507,8 @@ init_dialout(isdn_net_local *lp)
 		lp->dialstarted = jiffies;
 		lp->dialwait_timer = 0;
 	}
-	lp->dialstate = ST_2;
+	lp->dialretry = 0;
+	lp->dialstate = ST_3;
 	return 1;
 }
 
@@ -691,16 +692,6 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 		case EV_NET_DIAL:
 			if (init_dialout(lp) == 0)
 				return 0;
-			lp->dialstate = ST_2;
-			goto st_2_net_dial;
-		}
-		break;
-	case ST_2:
-		switch (pr) {
-		case EV_NET_DIAL:
-		st_2_net_dial:
-			lp->dialretry = 0;
-			lp->dialstate = ST_3;
 			goto st_3_net_dial;
 		}
 		break;
