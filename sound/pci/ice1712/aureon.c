@@ -866,7 +866,7 @@ static int __devinit aureon_init(ice1712_t *ice)
  */
 
 static unsigned char aureon51_eeprom[] __devinitdata = {
-	0x2a,	/* SYSCONF: clock 512, mpu401, spdif-in/ADC, 3DACs */
+	0x0a,	/* SYSCONF: clock 512, spdif-in/ADC, 3DACs */
 	0x80,	/* ACLINK: I2S */
 	0xf8,	/* I2S: vol, 96k, 24bit, 192k */
 	0xc3,	/* SPDIF: out-en, out-int, spdif-in */
@@ -882,7 +882,7 @@ static unsigned char aureon51_eeprom[] __devinitdata = {
 };
 
 static unsigned char aureon71_eeprom[] __devinitdata = {
-	0x2b,	/* SYSCONF: clock 512, mpu401, spdif-in/ADC, 4DACs */
+	0x0b,	/* SYSCONF: clock 512, spdif-in/ADC, 4DACs */
 	0x80,	/* ACLINK: I2S */
 	0xf8,	/* I2S: vol, 96k, 24bit, 192k */
 	0xc3,	/* SPDIF: out-en, out-int, spdif-in */
@@ -898,7 +898,7 @@ static unsigned char aureon71_eeprom[] __devinitdata = {
 };
 
 static unsigned char prodigy71_eeprom[] __devinitdata = {
-	0x2b,	/* SYSCONF: clock 512, mpu401, spdif-in/ADC, 4DACs */
+	0x0b,	/* SYSCONF: clock 512, spdif-in/ADC, 4DACs */
 	0x80,	/* ACLINK: I2S */
 	0xf8,	/* I2S: vol, 96k, 24bit, 192k */
 	0xc3,	/* SPDIF: out-en, out-int, spdif-in */
