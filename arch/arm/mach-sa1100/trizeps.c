@@ -213,7 +213,7 @@ static struct map_desc trizeps_io_desc[] __initdata = {
 	{ 0xF2000000l, 0x38000000l, 0x00800000l, MT_DEVICE },
 };
 
-void __init trizeps_map_io(void)
+static void __init trizeps_map_io(void)
 {
 	sa1100_map_io();
 	iotable_init(trizeps_io_desc, ARRAY_SIZE(trizeps_io_desc));
