@@ -69,14 +69,11 @@ EXPORT_SYMBOL(destroy_EII_client);
 /* Internet layer registration */
 EXPORT_SYMBOL(inet_add_protocol);
 EXPORT_SYMBOL(inet_del_protocol);
-EXPORT_SYMBOL(ip_route_output_key);
-EXPORT_SYMBOL(ip_route_input);
 EXPORT_SYMBOL(icmp_send);
 EXPORT_SYMBOL(icmp_statistics);
 EXPORT_SYMBOL(icmp_err_convert);
 EXPORT_SYMBOL(ip_options_compile);
 EXPORT_SYMBOL(ip_options_undo);
-EXPORT_SYMBOL(__ip_select_ident);
 EXPORT_SYMBOL(in_aton);
 EXPORT_SYMBOL(ip_mc_inc_group);
 EXPORT_SYMBOL(ip_mc_dec_group);
