@@ -631,7 +631,7 @@ static struct file_operations dmapi_fops = {
 };
 
 static struct miscdevice dmapi_dev = {
-	.minor		= MISC_DYNAMIC_MINOR,
+	.minor		= DMAPI_MINOR,
 	.name		= "xfs_dmapi",
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	.devfs_name	= "xfs_dmapi",
