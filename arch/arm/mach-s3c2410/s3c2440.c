@@ -120,6 +120,20 @@ static struct platform_device *uart_devices[] __initdata = {
 	&s3c_uart2
 };
 
+/* s3c2440 specific clock sources */
+
+static struct clk s3c2440_clk_cam = {
+	.name		= "camera",
+	.enable		= s3c2410_clkcon_enable,
+	.ctrlbit	= S3C2440_CLKCON_CAMERA
+};
+
+static struct clk s3c2440_clk_ac97 = {
+	.name		= "ac97",
+	.enable		= s3c2410_clkcon_enable,
+	.ctrlbit	= S3C2440_CLKCON_CAMERA
+};
+
 void __init s3c2440_map_io(struct map_desc *mach_desc, int size)
 {
 	unsigned long clkdiv;
@@ -167,6 +181,23 @@ void __init s3c2440_map_io(struct map_desc *mach_desc, int size)
 	printk("S3C2440: core %ld.%03ld MHz, memory %ld.%03ld MHz, peripheral %ld.%03ld MHz\n",
 	       print_mhz(s3c24xx_fclk), print_mhz(s3c24xx_hclk),
 	       print_mhz(s3c24xx_pclk));
+
+	/* initialise the clocks here, to allow other things like the
+	 * console to use them, and to add new ones after the initialisation
+	 */
+
+	s3c2410_init_clocks();
+
+	/* add s3c2440 specific clocks */
+
+	s3c2440_clk_cam.parent = clk_get(NULL, "hclk");
+	s3c2440_clk_ac97.parent = clk_get(NULL, "pclk");
+
+	s3c2410_register_clock(&clk_ac97);
+	s3c2410_register_clock(&clk_cam);
+
+	clk_disable(&clk_ac97);
+	clk_disable(&clk_cam);
 }
 
 
@@ -178,11 +209,6 @@ int __init s3c2440_init(void)
 	printk("S3C2440: Initialising architecture\n");
 
 	ret = platform_add_devices(uart_devices, ARRAY_SIZE(uart_devices));
-	if (ret)
-		return ret;
-
-	// todo: board specific inits?
-
 	return ret;
 }
 

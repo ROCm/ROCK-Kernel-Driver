@@ -48,8 +48,10 @@
  */
 
 /* TESTED ON:
- *  - 1611B H2 (with usb1 mini-AB)
- *  - 1510 Innovator with built-in transceiver (custom cable feeding 5V VBUS)
+ *  - 1611B H2 (with usb1 mini-AB) using standard Mini-B or OTG cables
+ *  - 1510 Innovator UDC with bundled usb0 cable
+ *  - 1510 Innovator OHCI with bundled usb1/usb2 cable
+ *  - 1510 Innovator OHCI with custom usb0 cable, feeding 5V VBUS
  *  - 1710 custom development board using alternate pin group
  */
 
@@ -92,7 +94,10 @@ static u32 __init omap_usb0_init(unsigned nwires, unsigned is_device)
 	u32	syscon1 = 0;
 
 	if (nwires == 0) {
-		USB_TRANSCEIVER_CTRL_REG &= ~(1 << 3);
+		if (!cpu_is_omap15xx()) {
+			/* pulldown D+/D- */
+			USB_TRANSCEIVER_CTRL_REG &= ~(3 << 1);
+		}
 		return 0;
 	}
 
@@ -101,36 +106,30 @@ static u32 __init omap_usb0_init(unsigned nwires, unsigned is_device)
 	 * USB0_VP and USB0_VM are always set on 1510, there's no muxing
 	 * available for them.
 	 */
-	if (nwires >= 2 && !cpu_is_omap1510()) {
+	if (nwires >= 2 && !cpu_is_omap15xx()) {
 		omap_cfg_reg(AA9_USB0_VP);
 		omap_cfg_reg(R9_USB0_VM);
 	}
+	if (is_device)
+		omap_cfg_reg(W4_USB_PUEN);
 
 	/* internal transceiver */
 	if (nwires == 2) {
-		if (cpu_is_omap1510()) {
-			/* This works for OHCI on 1510-Innovator, nothing to mux */
+		if (cpu_is_omap15xx()) {
+			/* This works for OHCI on 1510-Innovator */
 			return 0;
 		}
 
-#if 0
 		/* NOTE:  host OR device mode for now, no OTG */
-		USB_TRANSCEIVER_CTRL_REG &= ~(3 << 4);
+		USB_TRANSCEIVER_CTRL_REG &= ~(7 << 4);
 		if (is_device) {
-			omap_cfg_reg(W4_USB_PUEN);
 			omap_cfg_reg(R18_1510_USB_GPIO0);
 			// omap_cfg_reg(USB0_VBUS);
-			// omap_cfg_reg(USB0_PUEN);
 			// USB_TRANSCEIVER_CTRL_REG.CONF_USB0_PORT_R = 7
-			// when USB0_PUEN is needed
 		} else /* host mode needs D+ and D- pulldowns */
 			USB_TRANSCEIVER_CTRL_REG &= ~(3 << 1);
+
 		return 3 << 16;
-#else
-		/* FIXME: 1610 needs to return the right value here */
-		printk(KERN_ERR "usb0 internal transceiver, nyet\n");
-		return 0;
-#endif
 	}
 
 	/* alternate pin config, external transceiver */
@@ -170,7 +169,7 @@ static u32 __init omap_usb1_init(unsigned nwires)
 {
 	u32	syscon1 = 0;
 
-	if (nwires != 6)
+	if (nwires != 6 && !cpu_is_omap15xx())
 		USB_TRANSCEIVER_CTRL_REG &= ~CONF_USB1_UNI_R;
 	if (nwires == 0)
 		return 0;
@@ -178,11 +177,11 @@ static u32 __init omap_usb1_init(unsigned nwires)
 	/* external transceiver */
 	omap_cfg_reg(USB1_TXD);
 	omap_cfg_reg(USB1_TXEN);
-	if (cpu_is_omap1510()) {
+	if (cpu_is_omap15xx()) {
 		omap_cfg_reg(USB1_SEO);
 		omap_cfg_reg(USB1_SPEED);
 		// SUSP
-	} else if (cpu_is_omap1610() || cpu_is_omap5912() || cpu_is_omap1710()) {
+	} else if (cpu_is_omap16xx()) {
 		omap_cfg_reg(W13_1610_USB1_SE0);
 		omap_cfg_reg(R13_1610_USB1_SPEED);
 		// SUSP
@@ -203,7 +202,8 @@ static u32 __init omap_usb1_init(unsigned nwires)
 		syscon1 = 3;
 		omap_cfg_reg(USB1_VP);
 		omap_cfg_reg(USB1_VM);
-		USB_TRANSCEIVER_CTRL_REG |= CONF_USB1_UNI_R;
+		if (!cpu_is_omap15xx())
+			USB_TRANSCEIVER_CTRL_REG |= CONF_USB1_UNI_R;
 		break;
 	default:
 		printk(KERN_ERR "illegal usb%d %d-wire transceiver\n",
@@ -216,31 +216,32 @@ static u32 __init omap_usb2_init(unsigned nwires, unsigned alt_pingroup)
 {
 	u32	syscon1 = 0;
 
-	if (alt_pingroup)
+	if (alt_pingroup || nwires == 0)
 		return 0;
-	if (nwires != 6)
+	if (nwires != 6 && !cpu_is_omap15xx())
 		USB_TRANSCEIVER_CTRL_REG &= ~CONF_USB2_UNI_R;
 	if (nwires == 0)
 		return 0;
 
 	/* external transceiver */
-	if (cpu_is_omap1510()) {
+	if (cpu_is_omap15xx()) {
 		omap_cfg_reg(USB2_TXD);
 		omap_cfg_reg(USB2_TXEN);
 		omap_cfg_reg(USB2_SEO);
 		if (nwires != 3)
 			omap_cfg_reg(USB2_RCV);
-	} else if (cpu_is_omap1610() || cpu_is_omap5912() || cpu_is_omap1710()) {
+		/* there is no USB2_SPEED */
+	} else if (cpu_is_omap16xx()) {
 		omap_cfg_reg(V6_USB2_TXD);
 		omap_cfg_reg(W9_USB2_TXEN);
 		omap_cfg_reg(W5_USB2_SE0);
 		if (nwires != 3)
 			omap_cfg_reg(Y5_USB2_RCV);
+		// FIXME omap_cfg_reg(USB2_SPEED);
 	} else {
 		pr_debug("usb unrecognized\n");
 	}
 	// omap_cfg_reg(USB2_SUSP);
-	// FIXME omap_cfg_reg(USB2_SPEED);
 
 	switch (nwires) {
 	case 3:
@@ -251,14 +252,14 @@ static u32 __init omap_usb2_init(unsigned nwires, unsigned alt_pingroup)
 		break;
 	case 6:
 		syscon1 = 3;
-		if (cpu_is_omap1510()) {
+		if (cpu_is_omap15xx()) {
 			omap_cfg_reg(USB2_VP);
 			omap_cfg_reg(USB2_VM);
 		} else {
 			omap_cfg_reg(AA9_USB2_VP);
 			omap_cfg_reg(R9_USB2_VM);
+			USB_TRANSCEIVER_CTRL_REG |= CONF_USB2_UNI_R;
 		}
-		USB_TRANSCEIVER_CTRL_REG |= CONF_USB2_UNI_R;
 		break;
 	default:
 		printk(KERN_ERR "illegal usb%d %d-wire transceiver\n",
@@ -337,7 +338,7 @@ static struct platform_device ohci_device = {
 	.dev = {
 		.release		= usb_release,
 		.dma_mask		= &ohci_dmamask,
-		.coherent_dma_mask	= 0x0fffffff,
+		.coherent_dma_mask	= 0xffffffff,
 	},
 	.num_resources	= ARRAY_SIZE(ohci_resources),
 	.resource		= ohci_resources,
@@ -375,7 +376,11 @@ static struct platform_device otg_device = {
 
 // FIXME correct answer depends on hmc_mode,
 // as does any nonzero value for config->otg port number
+#ifdef	CONFIG_USB_GADGET_OMAP
+#define	is_usb0_device(config)	1
+#else
 #define	is_usb0_device(config)	0
+#endif
 
 /*-------------------------------------------------------------------------*/
 
@@ -420,7 +425,7 @@ omap_otg_init(struct omap_usb_config *config)
 	if (alt_pingroup)
 		printk(", usb2 alt %d wires", config->pins[2]);
 	else if (config->pins[0])
-		printk(", usb0 %d wires%s", config->pins[2],
+		printk(", usb0 %d wires%s", config->pins[0],
 			is_usb0_device(config) ? " (dev)" : "");
 	if (config->pins[1])
 		printk(", usb1 %d wires", config->pins[1]);
@@ -477,6 +482,19 @@ static inline void omap_otg_init(struct omap_usb_config *config) {}
 
 #ifdef	CONFIG_ARCH_OMAP1510
 
+#define ULPD_SOFT_REQ_REG	__REG16(ULPD_SOFT_REQ)
+#define SOFT_UDC_REQ		(1 << 4)
+#define SOFT_DPLL_REQ		(1 << 0)
+
+#define ULPD_DPLL_CTRL_REG	__REG16(ULPD_DPLL_CTRL)
+#define DPLL_IOB		(1 << 13)
+#define DPLL_PLL_ENABLE		(1 << 4)
+#define DPLL_LOCK		(1 << 0)
+
+#define ULPD_APLL_CTRL_REG	__REG16(ULPD_APLL_CTRL)
+#define APLL_NDPLL_SWITCH	(1 << 0)
+
+
 static void __init omap_1510_usb_init(struct omap_usb_config *config)
 {
 	int status;
@@ -490,16 +508,43 @@ static void __init omap_1510_usb_init(struct omap_usb_config *config)
 	val |= (config->hmc_mode << 1);
 	omap_writel(val, MOD_CONF_CTRL_0);
 
-	// FIXME this has a UDC controller too
+	printk("USB: hmc %d", config->hmc_mode);
+	if (config->pins[0])
+		printk(", usb0 %d wires%s", config->pins[0],
+			is_usb0_device(config) ? " (dev)" : "");
+	if (config->pins[1])
+		printk(", usb1 %d wires", config->pins[1]);
+	if (config->pins[2])
+		printk(", usb2 %d wires", config->pins[2]);
+	printk("\n");
+
+	/* use DPLL for 48 MHz function clock */
+	pr_debug("APLL %04x DPLL %04x REQ %04x\n", ULPD_APLL_CTRL_REG,
+			ULPD_DPLL_CTRL_REG, ULPD_SOFT_REQ_REG);
+	ULPD_APLL_CTRL_REG &= ~APLL_NDPLL_SWITCH;
+	ULPD_DPLL_CTRL_REG |= DPLL_IOB | DPLL_PLL_ENABLE;
+	ULPD_SOFT_REQ_REG |= SOFT_UDC_REQ | SOFT_DPLL_REQ;
+	while (!(ULPD_DPLL_CTRL_REG & DPLL_LOCK))
+		cpu_relax();
+
+#ifdef	CONFIG_USB_GADGET_OMAP
+	if (config->register_dev) {
+		udc_device.dev.platform_data = config;
+		status = platform_device_register(&udc_device);
+		if (status)
+			pr_debug("can't register UDC device, %d\n", status);
+		/* udc driver gates 48MHz by D+ pullup */
+	}
+#endif
 
 #if	defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
-	if (config->otg || config->register_host) {
+	if (config->register_host) {
 		ohci_device.dev.platform_data = config;
 		status = platform_device_register(&ohci_device);
 		if (status)
 			pr_debug("can't register OHCI device, %d\n", status);
+		/* hcd explicitly gates 48MHz */
 	}
-	// FIXME completely untested ...
 #endif
 
 }
@@ -524,12 +569,9 @@ omap_usb_init(void)
 	}
 	platform_data = *config;
 
-	if (cpu_is_omap730()
-			|| cpu_is_omap1610()
-			|| cpu_is_omap1710()
-			|| cpu_is_omap5912())
+	if (cpu_is_omap730() || cpu_is_omap16xx())
 		omap_otg_init(&platform_data);
-	else if (cpu_is_omap1510())
+	else if (cpu_is_omap15xx())
 		omap_1510_usb_init(&platform_data);
 	else {
 		printk(KERN_ERR "USB: No init for your chip yet\n");

@@ -80,7 +80,7 @@ static int mmc_queue_thread(void *d)
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!blk_queue_plugged(q))
 			mq->req = req = elv_next_request(q);
-		spin_unlock(q->queue_lock);
+		spin_unlock_irq(q->queue_lock);
 
 		if (!req) {
 			if (mq->flags & MMC_QUEUE_EXIT)
@@ -147,19 +147,31 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card, spinlock_t *lock
 	mq->queue->queuedata = mq;
 	mq->req = NULL;
 
+	mq->sg = kmalloc(sizeof(struct scatterlist) * host->max_phys_segs,
+			 GFP_KERNEL);
+	if (!mq->sg) {
+		ret = -ENOMEM;
+		goto cleanup;
+	}
+
 	init_completion(&mq->thread_complete);
 	init_waitqueue_head(&mq->thread_wq);
 	init_MUTEX(&mq->thread_sem);
 
 	ret = kernel_thread(mmc_queue_thread, mq, CLONE_KERNEL);
-	if (ret < 0) {
-		blk_cleanup_queue(mq->queue);
-	} else {
+	if (ret >= 0) {
 		wait_for_completion(&mq->thread_complete);
 		init_completion(&mq->thread_complete);
 		ret = 0;
+		goto out;
 	}
 
+ cleanup:
+	kfree(mq->sg);
+	mq->sg = NULL;
+
+	blk_cleanup_queue(mq->queue);
+ out:
 	return ret;
 }
 EXPORT_SYMBOL(mmc_init_queue);
@@ -169,6 +181,10 @@ void mmc_cleanup_queue(struct mmc_queue *mq)
 	mq->flags |= MMC_QUEUE_EXIT;
 	wake_up(&mq->thread_wq);
 	wait_for_completion(&mq->thread_complete);
+
+	kfree(mq->sg);
+	mq->sg = NULL;
+
 	blk_cleanup_queue(mq->queue);
 
 	mq->card = NULL;

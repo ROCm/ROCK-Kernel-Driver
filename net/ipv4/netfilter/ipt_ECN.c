@@ -86,7 +86,7 @@ set_ect_tcp(struct sk_buff **pskb, const struct ipt_ECN_info *einfo, int inward)
 		memcpy((*pskb)->data + (*pskb)->nh.iph->ihl*4,
 		       &_tcph, sizeof(_tcph));
 		if ((*pskb)->ip_summed == CHECKSUM_HW)
-			if (skb_checksum_help(pskb, inward))
+			if (skb_checksum_help(*pskb, inward))
 				return 0;
 		(*pskb)->nfcache |= NFC_ALTERED;
 	}

@@ -8,8 +8,9 @@
  * the License, or (at your option) any later version.
  *
  *  Changelog:
- *    01-08-2004	initial creation
- *    12-09-2004	cleanup for submission
+ *    01-08-2004	Initial creation
+ *    12-09-2004	Cleanup for submission
+ *    24-10-2004	Fixed S3C2410_UDC_MAXP_REG definition
  */
 
 #ifndef __ASM_ARCH_REGS_UDC_H
@@ -68,7 +69,7 @@
 
 /* indexed registers */
 
-#define S3C2410_UDC_MAXP_REG		S3C2410_USBDREG(0x018c)
+#define S3C2410_UDC_MAXP_REG		S3C2410_USBDREG(0x0180)
 
 #define S3C2410_UDC_EP0_CSR_REG		S3C2410_USBDREG(0x0184)
 

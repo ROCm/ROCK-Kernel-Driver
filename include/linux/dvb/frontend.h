@@ -258,6 +258,8 @@ struct dvb_frontend_event {
 #define FE_GET_FRONTEND            _IOR('o', 77, struct dvb_frontend_parameters)
 #define FE_GET_EVENT               _IOR('o', 78, struct dvb_frontend_event)
 
+#define FE_DISHNETWORK_SEND_LEGACY_CMD _IO('o', 80) /* unsigned int */
+
 
 #endif /*_DVBFRONTEND_H_*/
 

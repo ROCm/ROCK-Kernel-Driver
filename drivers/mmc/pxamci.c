@@ -44,6 +44,10 @@
 #define DBG(x...)	do { } while (0)
 #endif
 
+#define DRIVER_NAME	"pxa2xx-mci"
+
+#define NR_SG	1
+
 struct pxamci_host {
 	struct mmc_host		*mmc;
 	spinlock_t		lock;
@@ -63,9 +67,8 @@ struct pxamci_host {
 
 	dma_addr_t		sg_dma;
 	struct pxa_dma_desc	*sg_cpu;
+	unsigned int		dma_len;
 
-	dma_addr_t		dma_buf;
-	unsigned int		dma_size;
 	unsigned int		dma_dir;
 };
 
@@ -122,10 +125,9 @@ static void pxamci_disable_irq(struct pxamci_host *host, unsigned int mask)
 static void pxamci_setup_data(struct pxamci_host *host, struct mmc_data *data)
 {
 	unsigned int nob = data->blocks;
-	unsigned int timeout, size;
-	dma_addr_t dma;
+	unsigned int timeout;
 	u32 dcmd;
-	int i;
+	int i, len;
 
 	host->data = data;
 
@@ -152,35 +154,22 @@ static void pxamci_setup_data(struct pxamci_host *host, struct mmc_data *data)
 
 	dcmd |= DCMD_BURST32 | DCMD_WIDTH1;
 
-	host->dma_size = data->blocks << data->blksz_bits;
-	host->dma_buf = dma_map_single(mmc_dev(host->mmc), data->req->buffer,
-				       host->dma_size, host->dma_dir);
+	host->dma_len = dma_map_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
+				   host->dma_dir);
 
-	for (i = 0, size = host->dma_size, dma = host->dma_buf; size; i++) {
-		u32 len = size;
-
-		if (len > DCMD_LENGTH)
-			len = 0x1000;
-
+	for (i = 0; i < host->dma_len; i++) {
 		if (data->flags & MMC_DATA_READ) {
 			host->sg_cpu[i].dsadr = host->res->start + MMC_RXFIFO;
-			host->sg_cpu[i].dtadr = dma;
+			host->sg_cpu[i].dtadr = sg_dma_address(&data->sg[i]);
 		} else {
-			host->sg_cpu[i].dsadr = dma;
+			host->sg_cpu[i].dsadr = sg_dma_address(&data->sg[i]);
 			host->sg_cpu[i].dtadr = host->res->start + MMC_TXFIFO;
 		}
-		host->sg_cpu[i].dcmd = dcmd | len;
-
-		dma += len;
-		size -= len;
-
-		if (size) {
-			host->sg_cpu[i].ddadr = host->sg_dma + (i + 1) *
-						 sizeof(struct pxa_dma_desc);
-		} else {
-			host->sg_cpu[i].ddadr = DDADR_STOP;
-		}
+		host->sg_cpu[i].dcmd = dcmd | sg_dma_len(&data->sg[i]);
+		host->sg_cpu[i].ddadr = host->sg_dma + (i + 1) *
+					sizeof(struct pxa_dma_desc);
 	}
+	host->sg_cpu[host->dma_len - 1].ddadr = DDADR_STOP;
 	wmb();
 
 	DDADR(host->dma) = host->sg_dma;
@@ -276,8 +265,8 @@ static int pxamci_data_done(struct pxamci_host *host, unsigned int stat)
 		return 0;
 
 	DCSR(host->dma) = 0;
-	dma_unmap_single(mmc_dev(host->mmc), host->dma_buf, host->dma_size,
-			 host->dma_dir);
+	dma_unmap_sg(mmc_dev(host->mmc), data->sg, host->dma_len,
+		     host->dma_dir);
 
 	if (stat & STAT_READ_TIME_OUT)
 		data->error = MMC_ERR_TIMEOUT;
@@ -429,7 +418,7 @@ static int pxamci_probe(struct device *dev)
 	if (!r || irq == NO_IRQ)
 		return -ENXIO;
 
-	r = request_mem_region(r->start, SZ_4K, "PXAMCI");
+	r = request_mem_region(r->start, SZ_4K, DRIVER_NAME);
 	if (!r)
 		return -EBUSY;
 
@@ -442,6 +431,17 @@ static int pxamci_probe(struct device *dev)
 	mmc->ops = &pxamci_ops;
 	mmc->f_min = 312500;
 	mmc->f_max = 20000000;
+
+	/*
+	 * We can do SG-DMA, but we don't because we never know how much
+	 * data we successfully wrote to the card.
+	 */
+	mmc->max_phys_segs = NR_SG;
+
+	/*
+	 * Our hardware DMA can handle a maximum of one page per SG entry.
+	 */
+	mmc->max_seg_size = PAGE_SIZE;
 
 	host = mmc_priv(mmc);
 	host->mmc = mmc;
@@ -482,13 +482,14 @@ static int pxamci_probe(struct device *dev)
 	pxa_gpio_mode(GPIO8_MMCCS0_MD);
 	pxa_set_cken(CKEN12_MMC, 1);
 
-	host->dma = pxa_request_dma("PXAMCI", DMA_PRIO_LOW, pxamci_dma_irq, host);
+	host->dma = pxa_request_dma(DRIVER_NAME, DMA_PRIO_LOW,
+				    pxamci_dma_irq, host);
 	if (host->dma < 0) {
 		ret = -EBUSY;
 		goto out;
 	}
 
-	ret = request_irq(host->irq, pxamci_irq, 0, "PXAMCI", host);
+	ret = request_irq(host->irq, pxamci_irq, 0, DRIVER_NAME, host);
 	if (ret)
 		goto out;
 
@@ -579,7 +580,7 @@ static int pxamci_resume(struct device *dev, u32 level)
 #endif
 
 static struct device_driver pxamci_driver = {
-	.name		= "pxa2xx-mci",
+	.name		= DRIVER_NAME,
 	.bus		= &platform_bus_type,
 	.probe		= pxamci_probe,
 	.remove		= pxamci_remove,

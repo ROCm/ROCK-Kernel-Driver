@@ -16,6 +16,7 @@
  *     21-Aug-2004 BJD  Added struct s3c2410_board
  *     06-Aug-2004 BJD  Fixed call to time initialisation
  *     05-Apr-2004 BJD  Copied to make mach-vr1000.c
+ *     18-Oct-2004 BJD  Updated board struct
 */
 
 #include <linux/kernel.h>
@@ -151,7 +152,7 @@ static struct platform_device *vr1000_devices[] __initdata = {
 	&s3c_device_iis,
 };
 
-static struct s3c2410_board vr1000_board __initdata = {
+static struct s3c24xx_board vr1000_board __initdata = {
 	.devices       = vr1000_devices,
 	.devices_count = ARRAY_SIZE(vr1000_devices)
 };
@@ -161,7 +162,7 @@ void __init vr1000_map_io(void)
 {
 	s3c24xx_init_io(vr1000_iodesc, ARRAY_SIZE(vr1000_iodesc));
 	s3c2410_init_uarts(vr1000_uartcfgs, ARRAY_SIZE(vr1000_uartcfgs));
-	s3c2410_set_board(&vr1000_board);
+	s3c24xx_set_board(&vr1000_board);
 	usb_simtec_init();
 }
 

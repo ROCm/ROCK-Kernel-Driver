@@ -50,12 +50,15 @@ obj-$(CONFIG_IBMVIO)		+= vio.o
 obj-$(CONFIG_PPC_PMAC)		+= pmac_setup.o pmac_feature.o pmac_pci.o \
 				   pmac_time.o pmac_nvram.o pmac_low_i2c.o
 
+obj-$(CONFIG_PPC_MAPLE)		+= maple_setup.o maple_pci.o maple_time.o
+
 obj-$(CONFIG_U3_DART)		+= u3_iommu.o
 
 ifdef CONFIG_SMP
 obj-$(CONFIG_PPC_PMAC)		+= pmac_smp.o smp-tbsync.o
 obj-$(CONFIG_PPC_ISERIES)	+= iSeries_smp.o
 obj-$(CONFIG_PPC_PSERIES)	+= pSeries_smp.o
+obj-$(CONFIG_PPC_MAPLE)		+= smp-tbsync.o
 endif
 
 obj-$(CONFIG_ALTIVEC)		+= vecemu.o vector.o

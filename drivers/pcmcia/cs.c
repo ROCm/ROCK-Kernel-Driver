@@ -364,10 +364,6 @@ static void shutdown_socket(struct pcmcia_socket *s)
     s->irq.AssignedIRQ = s->irq.Config = 0;
     s->lock_count = 0;
     destroy_cis_cache(s);
-    if (s->fake_cis) {
-	kfree(s->fake_cis);
-	s->fake_cis = NULL;
-    }
 #ifdef CONFIG_CARDBUS
     cb_free(s);
 #endif
@@ -613,10 +609,18 @@ static int socket_resume(struct pcmcia_socket *skt)
 		 * FIXME: need a better check here for cardbus cards.
 		 */
 		if (verify_cis_cache(skt) != 0) {
+			cs_dbg(skt, 4, "cis mismatch - different card\n");
 			socket_remove_drivers(skt);
 			destroy_cis_cache(skt);
+			/*
+			 * Workaround: give DS time to schedule removal.
+			 * Remove me once the 100ms delay is eliminated
+			 * in ds.c
+			 */
+			msleep(200);
 			send_event(skt, CS_EVENT_CARD_INSERTION, CS_EVENT_PRI_LOW);
 		} else {
+			cs_dbg(skt, 4, "cis matches cache\n");
 			send_event(skt, CS_EVENT_PM_RESUME, CS_EVENT_PRI_LOW);
 		}
 	} else {

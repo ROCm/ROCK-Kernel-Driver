@@ -867,7 +867,7 @@ ENTRY(sys_call_table)
 	.long sys_mq_getsetattr
 	.long sys_ni_syscall		/* reserved for kexec */
 	.long sys_waitid
-	.long sys_setaltroot		/* 285 */
+	.long sys_ni_syscall		/* 285 */ /* available */
 	.long sys_add_key
 	.long sys_request_key
 	.long sys_keyctl

@@ -194,11 +194,19 @@ enum {
 	OMAP_LCD_DMA_B2_BOTTOM
 };
 
-enum {
+enum omap_dma_burst_mode {
+	OMAP_DMA_DATA_BURST_DIS = 0,
 	OMAP_DMA_DATA_BURST_4,
 	OMAP_DMA_DATA_BURST_8
 };
 
+enum omap_dma_color_mode {
+	OMAP_DMA_COLOR_DIS = 0,
+	OMAP_DMA_CONSTANT_FILL,
+	OMAP_DMA_TRANSPARENT_COPY
+};
+
+extern void omap_set_dma_priority(int dst_port, int priority);
 extern int omap_request_dma(int dev_id, const char *dev_name,
 			    void (* callback)(int lch, u16 ch_status, void *data),
 			    void *data, int *dma_ch);
@@ -210,20 +218,22 @@ extern void omap_stop_dma(int lch);
 extern void omap_set_dma_transfer_params(int lch, int data_type,
 					 int elem_count, int frame_count,
 					 int sync_mode);
-extern void omap_set_dma_constant_fill(int lch, u32 color);
-extern void omap_set_dma_transparent_copy(int lch, u32 color);
+extern void omap_set_dma_color_mode(int lch, enum omap_dma_color_mode mode,
+				    u32 color);
 
 extern void omap_set_dma_src_params(int lch, int src_port, int src_amode,
 				    unsigned long src_start);
 extern void omap_set_dma_src_index(int lch, int eidx, int fidx);
 extern void omap_set_dma_src_data_pack(int lch, int enable);
-extern void omap_set_dma_src_burst_mode(int lch, int burst_mode);
+extern void omap_set_dma_src_burst_mode(int lch,
+					enum omap_dma_burst_mode burst_mode);
 
 extern void omap_set_dma_dest_params(int lch, int dest_port, int dest_amode,
 				     unsigned long dest_start);
 extern void omap_set_dma_dest_index(int lch, int eidx, int fidx);
 extern void omap_set_dma_dest_data_pack(int lch, int enable);
-extern void omap_set_dma_dest_burst_mode(int lch, int burst_mode);
+extern void omap_set_dma_dest_burst_mode(int lch,
+					 enum omap_dma_burst_mode burst_mode);
 
 extern void omap_dma_link_lch (int lch_head, int lch_queue);
 extern void omap_dma_unlink_lch (int lch_head, int lch_queue);
@@ -235,10 +245,16 @@ extern int omap_dma_in_1510_mode(void);
 extern int omap_request_lcd_dma(void (* callback)(u16 status, void *data),
 				void *data);
 extern void omap_free_lcd_dma(void);
-extern void omap_start_lcd_dma(void);
+extern void omap_setup_lcd_dma(void);
+extern void omap_enable_lcd_dma(void);
 extern void omap_stop_lcd_dma(void);
+extern void omap_set_lcd_dma_ext_controller(int external);
+extern void omap_set_lcd_dma_single_transfer(int single);
 extern void omap_set_lcd_dma_b1(unsigned long addr, u16 fb_xres, u16 fb_yres,
 				int data_type);
 extern void omap_set_lcd_dma_b1_rotation(int rotate);
+extern void omap_set_lcd_dma_b1_vxres(unsigned long vxres);
+extern void omap_set_lcd_dma_b1_mirror(int mirror);
+extern void omap_set_lcd_dma_b1_scale(unsigned int xscale, unsigned int yscale);
 
 #endif /* __ASM_ARCH_DMA_H */

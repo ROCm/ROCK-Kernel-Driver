@@ -275,7 +275,7 @@ static int rtas_log_release(struct inode * inode, struct file * file)
  * know that we can safely clear the events in NVRAM.
  * Next we'll sit and wait for something else to log.
  */
-static ssize_t rtas_log_read(struct file * file, char * buf,
+static ssize_t rtas_log_read(struct file * file, char __user * buf,
 			 size_t count, loff_t *ppos)
 {
 	int error;

@@ -13,6 +13,13 @@
 
 extern int budget_debug;
 
+#ifdef dprintk
+#undef dprintk
+#endif
+
+#define dprintk(level,args...) \
+            do { if ((budget_debug & level)) { printk("%s: %s(): ",__stringify(KBUILD_MODNAME), __FUNCTION__); printk(args); } } while (0)
+
 struct budget_info {
 	char *name;
 	int type;

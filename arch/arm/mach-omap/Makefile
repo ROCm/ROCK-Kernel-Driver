@@ -3,7 +3,7 @@
 #
 
 # Common support
-obj-y := common.o time.o irq.o dma.o clocks.o mux.o gpio.o mcbsp.o
+obj-y := common.o time.o irq.o dma.o clock.o mux.o gpio.o mcbsp.o usb.o
 obj-m :=
 obj-n :=
 obj-  :=
@@ -18,9 +18,7 @@ obj-$(CONFIG_MACH_OMAP_OSK) += board-osk.o
 obj-$(CONFIG_MACH_OMAP_H3) += board-h3.o
 
 # OCPI interconnect support for 1710, 1610 and 5912
-obj-$(CONFIG_ARCH_OMAP1710) += ocpi.o
-obj-$(CONFIG_ARCH_OMAP1610) += ocpi.o
-obj-$(CONFIG_ARCH_OMAP5912) += ocpi.o
+obj-$(CONFIG_ARCH_OMAP16XX) += ocpi.o
 
 # LEDs support
 led-$(CONFIG_MACH_OMAP_H2) += leds-h2p2-debug.o

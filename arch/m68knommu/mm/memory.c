@@ -24,7 +24,6 @@
 #include <asm/pgtable.h>
 #include <asm/system.h>
 #include <asm/traps.h>
-#include <asm/shglcore.h>
 #include <asm/io.h>
 
 /*

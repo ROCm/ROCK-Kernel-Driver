@@ -1802,6 +1802,7 @@ static int tcp_v6_xmit(struct sk_buff *skb, int ipfragok)
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct flowi fl;
 	struct dst_entry *dst;
+	struct in6_addr *final_p = NULL, final;
 
 	memset(&fl, 0, sizeof(fl));
 	fl.proto = IPPROTO_TCP;
@@ -1815,7 +1816,9 @@ static int tcp_v6_xmit(struct sk_buff *skb, int ipfragok)
 
 	if (np->opt && np->opt->srcrt) {
 		struct rt0_hdr *rt0 = (struct rt0_hdr *) np->opt->srcrt;
+		ipv6_addr_copy(&final, &fl.fl6_dst);
 		ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
+		final_p = &final;
 	}
 
 	dst = __sk_dst_check(sk, np->dst_cookie);
@@ -1827,6 +1830,9 @@ static int tcp_v6_xmit(struct sk_buff *skb, int ipfragok)
 			sk->sk_err_soft = -err;
 			return err;
 		}
+
+		if (final_p)
+			ipv6_addr_copy(&fl.fl6_dst, final_p);
 
 		if ((err = xfrm_lookup(&dst, &fl, sk, 0)) < 0) {
 			sk->sk_route_caps = 0;

@@ -127,19 +127,18 @@ static int saa7113_init (struct budget_av *budget_av)
 	const u8 *data = saa7113_tab;
 
         if (i2c_writereg (&budget->i2c_adap, 0x4a, 0x01, 0x08) != 1) {
-                DEB_D(("saa7113: not found on KNC card\n"));
+                dprintk(1, "saa7113 not found on KNC card\n");
                 return -ENODEV;
         }
 
-        INFO(("saa7113: detected and initializing\n"));
+        dprintk(1, "saa7113 detected and initializing\n");
 
 	while (*data != 0xff) {
                 i2c_writereg(&budget->i2c_adap, 0x4a, *data, *(data+1));
                 data += 2;
         }
 
-	DEB_D(("saa7113: status=%02x\n",
-	      i2c_readreg(&budget->i2c_adap, 0x4a, 0x1f)));
+	dprintk(1, "saa7113  status=%02x\n", i2c_readreg(&budget->i2c_adap, 0x4a, 0x1f));
 
 	return 0;
 }
@@ -171,7 +170,7 @@ static int budget_av_detach (struct saa7146_dev *dev)
 	struct budget_av *budget_av = (struct budget_av*) dev->ext_priv;
 	int err;
 
-	DEB_EE(("dev: %p\n",dev));
+	dprintk(2, "dev: %p\n", dev);
 
 	if ( 1 == budget_av->has_saa7113 ) {
 	saa7146_setgpio(dev, 0, SAA7146_GPIO_OUTLO);
@@ -198,7 +197,7 @@ static int budget_av_attach (struct saa7146_dev* dev,
 	u8 *mac;
 	int err;
 
-	DEB_EE(("dev: %p\n",dev));
+	dprintk(2, "dev: %p\n", dev);
 
 	if (bi->type != BUDGET_KNC1 && bi->type != BUDGET_CIN1200) {
 		return -ENODEV;
@@ -299,7 +298,7 @@ static int av_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg)
 	{
 		struct v4l2_input *i = arg;
 		
-		DEB_EE(("VIDIOC_ENUMINPUT %d.\n",i->index));
+		dprintk(1, "VIDIOC_ENUMINPUT %d.\n", i->index);
 		if( i->index < 0 || i->index >= KNC1_INPUTS) {
 			return -EINVAL;
 		}
@@ -312,19 +311,16 @@ static int av_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg)
 
 		*input = budget_av->cur_input;
 
-		DEB_EE(("VIDIOC_G_INPUT %d.\n",*input));
+		dprintk(1, "VIDIOC_G_INPUT %d.\n", *input);
 		return 0;		
 	}	
 	case VIDIOC_S_INPUT:
 	{
 		int input = *(int *)arg;
-		DEB_EE(("VIDIOC_S_INPUT %d.\n", input));
+		dprintk(1, "VIDIOC_S_INPUT %d.\n", input);
 		return saa7113_setinput (budget_av, input);
 	}
 	default:
-/*
-		DEB2(printk("does not handle this ioctl.\n"));
-*/
 		return -ENOIOCTLCMD;
 	}
 	return 0;
@@ -384,21 +380,13 @@ static struct saa7146_extension budget_extension = {
 	.irq_func	= ttpci_budget_irq10_handler,
 };	
 
-
 static int __init budget_av_init(void) 
 {
-	DEB_EE((".\n"));
-
-	if (saa7146_register_extension(&budget_extension))
-		return -ENODEV;
-	
-	return 0;
+	return saa7146_register_extension(&budget_extension);
 }
-
 
 static void __exit budget_av_exit(void)
 {
-	DEB_EE((".\n"));
 	saa7146_unregister_extension(&budget_extension); 
 }
 

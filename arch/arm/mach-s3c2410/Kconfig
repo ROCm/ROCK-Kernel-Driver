@@ -72,4 +72,31 @@ config S3C2410_DMA_DEBUG
 	  the CPU time doing so.
 
 
+config S3C2410_PM_DEBUG
+	bool "S3C2410 PM Suspend debug"
+	depends on ARCH_S3C2410 && PM
+	help
+	  Say Y here if you want verbose debugging from the PM Suspend and
+	  Resume code. See `Documentation/arm/Samsing-S3C24XX/Suspend.txt`
+	  for more information.
+
+config S3C2410_PM_CHECK
+	bool "S3C2410 PM Suspend Memory CRC"
+	depends on ARCH_S3C2410 && PM && CRC32
+	help
+ 	  Enable the PM code's memory area checksum over sleep. This option
+	  will generate CRCs of all blocks of memory, and store them before
+	  going to sleep. The blocks are then checked on resume for any
+	  errors.
+
+config S3C2410_PM_CHECK_CHUNKSIZE
+	int "S3C2410 PM Suspend CRC Chunksize (KiB)"
+	depends on ARCH_S3C2410 && PM && S3C2410_PM_CHECK
+	default 64
+	help
+	  Set the chunksize in Kilobytes of the CRC for checking memory
+	  corruption over suspend and resume. A smaller value will mean that
+	  the CRC data block will take more memory, but wil identify any
+	  faults with better precision.
+
 endif

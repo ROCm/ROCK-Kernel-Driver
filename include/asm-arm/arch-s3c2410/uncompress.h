@@ -13,21 +13,29 @@
  *  22-May-2003 BJD  Created
  *  08-Sep-2003 BJD  Moved to linux v2.6
  *  12-Mar-2004 BJD  Updated header protection
+ *  12-Oct-2004 BJD  Take account of debug uart configuration
 */
 
 #ifndef __ASM_ARCH_UNCOMPRESS_H
 #define __ASM_ARCH_UNCOMPRESS_H
 
+#include <config/debug/s3c2410/port.h>
+
 /* defines for UART registers */
 #include "asm/arch/regs-serial.h"
+#include "asm/arch/regs-gpio.h"
 
 #include <asm/arch/map.h>
+
+/* working in physical space... */
+#undef S3C2410_GPIOREG
+#define S3C2410_GPIOREG(x) ((S3C2410_PA_GPIO + (x)))
 
 /* how many bytes we allow into the FIFO at a time in FIFO mode */
 #define FIFO_MAX	 (14)
 
 #if 1
-#define uart_base S3C2410_PA_UART
+#define uart_base S3C2410_PA_UART + (0x4000 * CONFIG_DEBUG_S3C2410_UART)
 #else
 static unsigned int uart_base = S3C2410_PA_UART;
 #endif
@@ -74,6 +82,10 @@ arch_decomp_setup(void)
 static void
 putc(char ch)
 {
+	int cpuid = *((volatile unsigned int *)S3C2410_GSTATUS1);
+
+	cpuid &= S3C2410_GSTATUS1_IDMASK;
+
 	if (ch == '\n')
 		putc('\r');    /* expand newline to \r\n */
 
@@ -82,8 +94,14 @@ putc(char ch)
 
 		while (1) {
 			level = uart_rd(S3C2410_UFSTAT);
-			level &= S3C2410_UFSTAT_TXMASK;
-			level >>= S3C2410_UFSTAT_TXSHIFT;
+
+			if (cpuid == S3C2410_GSTATUS1_2440) {
+				level &= S3C2440_UFSTAT_TXMASK;
+				level >>= S3C2440_UFSTAT_TXSHIFT;
+			} else {
+				level &= S3C2410_UFSTAT_TXMASK;
+				level >>= S3C2410_UFSTAT_TXSHIFT;
+			}
 
 			if (level < FIFO_MAX)
 				break;
@@ -92,7 +110,7 @@ putc(char ch)
 	} else {
 		/* not using fifos */
 
-		while ((uart_rd(S3C2410_UTRSTAT) & S3C2410_UTRSTAT_TXFE) != S3C2410_UTRSTAT_TXFE);
+		while ((uart_rd(S3C2410_UTRSTAT) & S3C2410_UTRSTAT_TXE) != S3C2410_UTRSTAT_TXE);
 	}
 
 	/* write byte to transmission register */

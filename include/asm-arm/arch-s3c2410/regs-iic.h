@@ -13,8 +13,8 @@
  *	03-Oct-2004  BJD  Initial include for Linux
 */
 
-#ifndef __ASM_ARCH_IIC_H
-#define __ASM_ARCH_IIC_H __FILE__
+#ifndef __ASM_ARCH_REGS_IIC_H
+#define __ASM_ARCH_REGS_IIC_H __FILE__
 
 /* see s3c2410x user guide, v1.1, section 9 (p447) for more info */
 
@@ -47,4 +47,4 @@
 #define S3C2410_IICSTAT_ADDR0		(1<<1)
 #define S3C2410_IICSTAT_LASTBIT		(1<<0)
 
-#endif /* __ASM_ARCH_IIC_H */
+#endif /* __ASM_ARCH_REGS_IIC_H */

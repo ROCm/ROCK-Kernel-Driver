@@ -97,6 +97,17 @@ usage(void)
 	exit(1);
 }
 
+/*
+ * This ignores the intensely annoying "mapping symbols" found
+ * in ARM ELF files: $a, $t and $d.
+ */
+static inline int
+is_arm_mapping_symbol(const char *str)
+{
+	return str[0] == '$' && strchr("atd", str[1])
+	       && (str[2] == '\0' || str[2] == '.');
+}
+
 static int
 read_symbol(FILE *in, struct sym_entry *s)
 {
@@ -121,7 +132,8 @@ read_symbol(FILE *in, struct sym_entry *s)
 		_sinittext = s->addr;
 	else if (strcmp(str, "_einittext") == 0)
 		_einittext = s->addr;
-	else if (toupper(s->type) == 'A' || toupper(s->type) == 'U')
+	else if (toupper(s->type) == 'A' || toupper(s->type) == 'U' ||
+		 is_arm_mapping_symbol(str))
 		return -1;
 
 	/* include the type field in the symbol name, so that it gets

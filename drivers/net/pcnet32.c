@@ -359,9 +359,9 @@ struct pcnet32_private {
     struct net_device_stats stats;
     char		tx_full;
     int			options;
-    int	shared_irq:1,			/* shared irq possible */
-	dxsuflo:1,			/* disable transmit stop on uflo */
-	mii:1;				/* mii port available */
+    unsigned int	shared_irq:1,	/* shared irq possible */
+			dxsuflo:1,	/* disable transmit stop on uflo */
+			mii:1;		/* mii port available */
     struct net_device	*next;
     struct mii_if_info	mii_if;
     struct timer_list	watchdog_timer;
