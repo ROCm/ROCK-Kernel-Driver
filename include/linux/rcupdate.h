@@ -87,20 +87,20 @@ static inline int rcu_batch_after(long a, long b)
  */
 struct rcu_data {
 	/* 1) quiescent state handling : */
-        long		quiescbatch;     /* Batch # for grace period */
+	long		quiescbatch;     /* Batch # for grace period */
 	long		qsctr;		 /* User-mode/idle loop etc. */
-        long            last_qsctr;	 /* value of qsctr at beginning */
-                                         /* of rcu grace period */
+	long            last_qsctr;	 /* value of qsctr at beginning */
+					 /* of rcu grace period */
 	int		qs_pending;	 /* core waits for quiesc state */
 
 	/* 2) batch handling */
-        long  	       	batch;           /* Batch # for current RCU batch */
-        struct rcu_head *nxtlist;
+	long  	       	batch;           /* Batch # for current RCU batch */
+	struct rcu_head *nxtlist;
 	struct rcu_head **nxttail;
-        struct rcu_head *curlist;
-        struct rcu_head **curtail;
-        struct rcu_head *donelist;
-        struct rcu_head **donetail;
+	struct rcu_head *curlist;
+	struct rcu_head **curtail;
+	struct rcu_head *donelist;
+	struct rcu_head **donetail;
 	int cpu;
 };
 
