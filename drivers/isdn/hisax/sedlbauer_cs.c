@@ -53,7 +53,6 @@
 #include <pcmcia/cistpl.h>
 #include <pcmcia/cisreg.h>
 #include <pcmcia/ds.h>
-#include <pcmcia/bus_ops.h>
 
 MODULE_DESCRIPTION("ISDN4Linux: PCMCIA client driver for Sedlbauer cards");
 MODULE_AUTHOR("Marcus Niemann");
@@ -171,17 +170,12 @@ static dev_link_t *dev_list = NULL;
    "stopped" due to a power management event, or card ejection.  The
    device IO routines can use a flag like this to throttle IO to a
    card that is not ready to accept it.
-
-   The bus_operations pointer is used on platforms for which we need
-   to use special socket-specific versions of normal IO primitives
-   (inb, outb, readb, writeb, etc) for card IO.
 */
    
 typedef struct local_info_t {
     dev_link_t		link;
     dev_node_t		node;
     int			stop;
-    struct bus_operations *bus;
 } local_info_t;
 
 /*====================================================================*/
@@ -620,7 +614,6 @@ static int sedlbauer_event(event_t event, int priority,
 	break;
     case CS_EVENT_CARD_INSERTION:
 	link->state |= DEV_PRESENT | DEV_CONFIG_PENDING;
-	dev->bus = args->bus;
 	sedlbauer_config(link);
 	break;
     case CS_EVENT_PM_SUSPEND:

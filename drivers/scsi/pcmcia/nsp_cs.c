@@ -62,7 +62,6 @@
 #include <pcmcia/cistpl.h>
 #include <pcmcia/cisreg.h>
 #include <pcmcia/ds.h>
-#include <pcmcia/bus_ops.h>
 
 #include "nsp_cs.h"
 
@@ -93,7 +92,6 @@ typedef struct scsi_info_t {
 	int	               ndev;
 	dev_node_t             node[8];
 	int                    stop;
-	struct bus_operations *bus;
 } scsi_info_t;
 
 
@@ -1948,7 +1946,6 @@ static int nsp_cs_event(event_t		       event,
 	case CS_EVENT_CARD_INSERTION:
 		DEBUG(0, " event: insert\n");
 		link->state |= DEV_PRESENT | DEV_CONFIG_PENDING;
-		info->bus    =  args->bus;
 		nsp_cs_config(link);
 		break;
 

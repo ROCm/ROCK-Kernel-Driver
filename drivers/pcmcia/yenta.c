@@ -514,7 +514,6 @@ static void yenta_get_socket_capabilities(pci_socket_t *socket, u32 isa_irq_mask
 	socket->cap.pci_irq = socket->cb_irq;
 	socket->cap.irq_mask = yenta_probe_irq(socket, isa_irq_mask);
 	socket->cap.cb_dev = socket->dev;
-	socket->cap.bus = NULL;
 
 	printk("Yenta IRQ list %04x, PCI irq%d\n", socket->cap.irq_mask, socket->cb_irq);
 }

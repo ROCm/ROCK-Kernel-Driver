@@ -98,7 +98,6 @@ typedef struct event_callback_args_t {
     void	*buffer;
     void	*misc;
     void	*client_data;
-    struct bus_operations *bus;
 } event_callback_args_t;
 
 /* for GetConfigurationInfo */

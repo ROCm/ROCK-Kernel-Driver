@@ -49,7 +49,6 @@
 #include <asm/byteorder.h>
 
 #include <pcmcia/cs_types.h>
-#include <pcmcia/bus_ops.h>
 #include <pcmcia/ss.h>
 #include <pcmcia/cs.h>
 #include <pcmcia/bulkmem.h>
@@ -103,9 +102,8 @@ static void set_cis_map(socket_info_t *s, pccard_mem_map *mem)
     s->ss_entry->set_mem_map(s->sock, mem);
     if (s->cap.features & SS_CAP_STATIC_MAP) {
 	if (s->cis_virt)
-	    bus_iounmap(s->cap.bus, s->cis_virt);
-	s->cis_virt = bus_ioremap(s->cap.bus, mem->sys_start,
-				  s->cap.map_size);
+	    iounmap(s->cis_virt);
+	s->cis_virt = ioremap(mem->sys_start, s->cap.map_size);
     }
 }
 
@@ -130,13 +128,13 @@ int read_cis_mem(socket_info_t *s, int attr, u_int addr,
 	mem->card_start = 0; mem->flags = MAP_ACTIVE;
 	set_cis_map(s, mem);
 	sys = s->cis_virt;
-	bus_writeb(s->cap.bus, flags, sys+CISREG_ICTRL0);
-	bus_writeb(s->cap.bus, addr & 0xff, sys+CISREG_IADDR0);
-	bus_writeb(s->cap.bus, (addr>>8) & 0xff, sys+CISREG_IADDR1);
-	bus_writeb(s->cap.bus, (addr>>16) & 0xff, sys+CISREG_IADDR2);
-	bus_writeb(s->cap.bus, (addr>>24) & 0xff, sys+CISREG_IADDR3);
+	writeb(flags, sys+CISREG_ICTRL0);
+	writeb(addr & 0xff, sys+CISREG_IADDR0);
+	writeb((addr>>8) & 0xff, sys+CISREG_IADDR1);
+	writeb((addr>>16) & 0xff, sys+CISREG_IADDR2);
+	writeb((addr>>24) & 0xff, sys+CISREG_IADDR3);
 	for ( ; len > 0; len--, buf++)
-	    *buf = bus_readb(s->cap.bus, sys+CISREG_IDATA0);
+	    *buf = readb(sys+CISREG_IDATA0);
     } else {
 	u_int inc = 1;
 	if (attr) { mem->flags |= MAP_ATTRIB; inc++; addr *= 2; }
@@ -147,7 +145,7 @@ int read_cis_mem(socket_info_t *s, int attr, u_int addr,
 	    sys = s->cis_virt + (addr & (s->cap.map_size-1));
 	    for ( ; len > 0; len--, buf++, sys += inc) {
 		if (sys == s->cis_virt+s->cap.map_size) break;
-		*buf = bus_readb(s->cap.bus, sys);
+		*buf = readb(sys);
 	    }
 	    mem->card_start += s->cap.map_size;
 	    addr = 0;
@@ -177,13 +175,13 @@ void write_cis_mem(socket_info_t *s, int attr, u_int addr,
 	mem->card_start = 0; mem->flags = MAP_ACTIVE;
 	set_cis_map(s, mem);
 	sys = s->cis_virt;
-	bus_writeb(s->cap.bus, flags, sys+CISREG_ICTRL0);
-	bus_writeb(s->cap.bus, addr & 0xff, sys+CISREG_IADDR0);
-	bus_writeb(s->cap.bus, (addr>>8) & 0xff, sys+CISREG_IADDR1);
-	bus_writeb(s->cap.bus, (addr>>16) & 0xff, sys+CISREG_IADDR2);
-	bus_writeb(s->cap.bus, (addr>>24) & 0xff, sys+CISREG_IADDR3);
+	writeb(flags, sys+CISREG_ICTRL0);
+	writeb(addr & 0xff, sys+CISREG_IADDR0);
+	writeb((addr>>8) & 0xff, sys+CISREG_IADDR1);
+	writeb((addr>>16) & 0xff, sys+CISREG_IADDR2);
+	writeb((addr>>24) & 0xff, sys+CISREG_IADDR3);
 	for ( ; len > 0; len--, buf++)
-	    bus_writeb(s->cap.bus, *buf, sys+CISREG_IDATA0);
+	    writeb(*buf, sys+CISREG_IDATA0);
     } else {
 	int inc = 1;
 	if (attr & IS_ATTR) { mem->flags |= MAP_ATTRIB; inc++; addr *= 2; }
@@ -193,7 +191,7 @@ void write_cis_mem(socket_info_t *s, int attr, u_int addr,
 	    sys = s->cis_virt + (addr & (s->cap.map_size-1));
 	    for ( ; len > 0; len--, buf++, sys += inc) {
 		if (sys == s->cis_virt+s->cap.map_size) break;
-		bus_writeb(s->cap.bus, *buf, sys);
+		writeb(*buf, sys);
 	    }
 	    mem->card_start += s->cap.map_size;
 	    addr = 0;
@@ -218,18 +216,19 @@ static int cis_readable(u_long base)
     int ret;
     vs->cis_mem.sys_start = base;
     vs->cis_mem.sys_stop = base+vs->cap.map_size-1;
-    vs->cis_virt = bus_ioremap(vs->cap.bus, base, vs->cap.map_size);
+    vs->cis_virt = ioremap(base, vs->cap.map_size);
     ret = pcmcia_validate_cis(vs->clients, &info1);
     /* invalidate mapping and CIS cache */
-    bus_iounmap(vs->cap.bus, vs->cis_virt); vs->cis_used = 0;
+    iounmap(vs->cis_virt);
+    vs->cis_used = 0;
     if ((ret != 0) || (info1.Chains == 0))
 	return 0;
     vs->cis_mem.sys_start = base+vs->cap.map_size;
     vs->cis_mem.sys_stop = base+2*vs->cap.map_size-1;
-    vs->cis_virt = bus_ioremap(vs->cap.bus, base+vs->cap.map_size,
-			       vs->cap.map_size);
+    vs->cis_virt = ioremap(base+vs->cap.map_size, vs->cap.map_size);
     ret = pcmcia_validate_cis(vs->clients, &info2);
-    bus_iounmap(vs->cap.bus, vs->cis_virt); vs->cis_used = 0;
+    iounmap(vs->cis_virt);
+    vs->cis_used = 0;
     return ((ret == 0) && (info1.Chains == info2.Chains));
 }
 
@@ -239,17 +238,17 @@ static int checksum(u_long base)
     int i, a, b, d;
     vs->cis_mem.sys_start = base;
     vs->cis_mem.sys_stop = base+vs->cap.map_size-1;
-    vs->cis_virt = bus_ioremap(vs->cap.bus, base, vs->cap.map_size);
+    vs->cis_virt = ioremap(base, vs->cap.map_size);
     vs->cis_mem.card_start = 0;
     vs->cis_mem.flags = MAP_ACTIVE;
     vs->ss_entry->set_mem_map(vs->sock, &vs->cis_mem);
     /* Don't bother checking every word... */
     a = 0; b = -1;
     for (i = 0; i < vs->cap.map_size; i += 44) {
-	d = bus_readl(vs->cap.bus, vs->cis_virt+i);
+	d = readl(vs->cis_virt+i);
 	a += d; b &= d;
     }
-    bus_iounmap(vs->cap.bus, vs->cis_virt);
+    iounmap(vs->cis_virt);
     return (b == -1) ? -1 : (a>>1);
 }
 
@@ -274,8 +273,7 @@ static int setup_cis_mem(socket_info_t *s)
 	    return -1;
 	}
 	s->cis_mem.sys_stop = s->cis_mem.sys_start+s->cap.map_size-1;
-	s->cis_virt = bus_ioremap(s->cap.bus, s->cis_mem.sys_start,
-				  s->cap.map_size);
+	s->cis_virt = ioremap(s->cis_mem.sys_start, s->cap.map_size);
     }
     return 0;
 }
@@ -287,7 +285,7 @@ void release_cis_mem(socket_info_t *s)
 	s->ss_entry->set_mem_map(s->sock, &s->cis_mem);
 	if (!(s->cap.features & SS_CAP_STATIC_MAP))
 	    release_mem_region(s->cis_mem.sys_start, s->cap.map_size);
-	bus_iounmap(s->cap.bus, s->cis_virt);
+	iounmap(s->cis_virt);
 	s->cis_mem.sys_start = 0;
 	s->cis_virt = NULL;
     }

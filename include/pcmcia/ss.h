@@ -58,7 +58,6 @@ typedef struct socket_cap_t {
     ioaddr_t	io_offset;
     u_char	pci_irq;
     struct pci_dev *cb_dev;
-    struct bus_operations *bus;
 } socket_cap_t;
 
 /* InquireSocket capabilities */

@@ -76,7 +76,6 @@
 #include <pcmcia/cistpl.h>
 #include <pcmcia/cisreg.h>
 #include <pcmcia/ds.h>
-#include <pcmcia/bus_ops.h>
 
 #ifdef CONFIG_SYNCLINK_SYNCPPP_MODULE
 #define CONFIG_SYNCLINK_SYNCPPP 1
@@ -241,7 +240,6 @@ typedef struct _mgslpc_info {
 	dev_link_t	      link;
 	dev_node_t	      node;
 	int		      stop;
-	struct bus_operations *bus;
 
 	/* SPPP/Cisco HDLC device parts */
 	int netcount;
@@ -826,7 +824,6 @@ static int mgslpc_event(event_t event, int priority,
 	    break;
     case CS_EVENT_CARD_INSERTION:
 	    link->state |= DEV_PRESENT | DEV_CONFIG_PENDING;
-	    info->bus = args->bus;
 	    mgslpc_config(link);
 	    break;
     case CS_EVENT_PM_SUSPEND:

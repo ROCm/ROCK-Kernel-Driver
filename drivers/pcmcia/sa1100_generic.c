@@ -52,7 +52,6 @@
 #include <pcmcia/cs_types.h>
 #include <pcmcia/cs.h>
 #include <pcmcia/ss.h>
-#include <pcmcia/bus_ops.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
