@@ -69,7 +69,7 @@ __asm__ __volatile__(
 	"testb %%al,%%al\n\t"
 	"jne 1b"
 	: "=&S" (d0), "=&D" (d1), "=&a" (d2), "=&c" (d3)
-	: "0" (src), "1" (dest), "2" (0), "3" (0xffffffff):"memory");
+	: "0" (src), "1" (dest), "2" (0), "3" (0xffffffffu):"memory");
 return dest;
 }
 
@@ -91,7 +91,7 @@ __asm__ __volatile__(
 	"2:\txorl %2,%2\n\t"
 	"stosb"
 	: "=&S" (d0), "=&D" (d1), "=&a" (d2), "=&c" (d3)
-	: "0" (src),"1" (dest),"2" (0),"3" (0xffffffff), "g" (count)
+	: "0" (src),"1" (dest),"2" (0),"3" (0xffffffffu), "g" (count)
 	: "memory");
 return dest;
 }
@@ -186,7 +186,7 @@ __asm__ __volatile__(
 	"scasb\n\t"
 	"notl %0\n\t"
 	"decl %0"
-	:"=c" (__res), "=&D" (d0) :"1" (s),"a" (0), "0" (0xffffffff));
+	:"=c" (__res), "=&D" (d0) :"1" (s),"a" (0), "0" (0xffffffffu));
 return __res;
 }
 
