@@ -21,6 +21,11 @@ config MPC8540_ADS
 	help
 	  This option enables support for the MPC 8540 ADS evaluation board.
 
+config MPC8555_CDS
+	bool "Freescale MPC8555 CDS"
+	help
+	  This option enablese support for the MPC8555 CDS evaluation board.
+
 config MPC8560_ADS
 	bool "Freescale MPC8560 ADS"
 	help
@@ -42,9 +47,19 @@ config MPC8540
 	depends on MPC8540_ADS
 	default y
 
+config MPC8555
+	bool
+	depends on MPC8555_CDS
+	default y
+
 config MPC8560
 	bool
 	depends on SBC8560 || MPC8560_ADS
+	default y
+
+config 85xx_PCI2
+	bool "Supprt for 2nd PCI host controller"
+	depends on MPC8555_CDS
 	default y
 
 config FSL_OCP
@@ -54,7 +69,7 @@ config FSL_OCP
 
 config PPC_GEN550
 	bool
-	depends on MPC8540 || SBC8560
+	depends on MPC8540 || SBC8560 || MPC8555
 	default y
 
 endmenu
