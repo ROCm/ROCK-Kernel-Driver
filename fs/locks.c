@@ -397,10 +397,8 @@ locks_same_owner(struct file_lock *fl1, struct file_lock *fl2)
  */
 static void locks_delete_block(struct file_lock *waiter)
 {
-	list_del(&waiter->fl_block);
-	INIT_LIST_HEAD(&waiter->fl_block);
-	list_del(&waiter->fl_link);
-	INIT_LIST_HEAD(&waiter->fl_link);
+	list_del_init(&waiter->fl_block);
+	list_del_init(&waiter->fl_link);
 	waiter->fl_next = NULL;
 }
 
