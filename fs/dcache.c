@@ -812,6 +812,7 @@ struct dentry *d_splice_alias(struct inode *inode, struct dentry *dentry)
 	struct dentry *new = NULL;
 
 	if (inode && S_ISDIR(inode->i_mode)) {
+		lock_kernel(); /* for d_move */
 		spin_lock(&dcache_lock);
 		if (!list_empty(&inode->i_dentry)) {
 			new = list_entry(inode->i_dentry.next, struct dentry, d_alias);
@@ -827,6 +828,7 @@ struct dentry *d_splice_alias(struct inode *inode, struct dentry *dentry)
 			spin_unlock(&dcache_lock);
 			d_rehash(dentry);
 		}
+		unlock_kernel();
 	} else
 		d_add(dentry, inode);
 	return new;
