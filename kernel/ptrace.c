@@ -277,9 +277,20 @@ static int ptrace_setoptions(struct task_struct *child, long data)
 	else
 		child->ptrace &= ~PT_TRACE_EXEC;
 
+	if (data & PTRACE_O_TRACEVFORKDONE)
+		child->ptrace |= PT_TRACE_VFORK_DONE;
+	else
+		child->ptrace &= ~PT_TRACE_VFORK_DONE;
+
+	if (data & PTRACE_O_TRACEEXIT)
+		child->ptrace |= PT_TRACE_EXIT;
+	else
+		child->ptrace &= ~PT_TRACE_EXIT;
+
 	if ((data & (PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACEFORK
 		    | PTRACE_O_TRACEVFORK | PTRACE_O_TRACECLONE
-		    | PTRACE_O_TRACEEXEC))
+		    | PTRACE_O_TRACEEXEC | PTRACE_O_TRACEEXIT
+		    | PTRACE_O_TRACEVFORKDONE))
 	    != data)
 		return -EINVAL;
 

@@ -1046,9 +1046,11 @@ struct task_struct *do_fork(unsigned long clone_flags,
 			ptrace_notify ((trace << 8) | SIGTRAP);
 		}
 
-		if (clone_flags & CLONE_VFORK)
+		if (clone_flags & CLONE_VFORK) {
 			wait_for_completion(&vfork);
-		else
+			if (unlikely (current->ptrace & PT_TRACE_VFORK_DONE))
+				ptrace_notify ((PTRACE_EVENT_VFORK_DONE << 8) | SIGTRAP);
+		} else
 			/*
 			 * Let the child process run first, to avoid most of the
 			 * COW overhead when the child exec()s afterwards.
