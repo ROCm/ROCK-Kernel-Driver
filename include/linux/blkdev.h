@@ -343,15 +343,24 @@ extern inline void blk_clear(int major)
 	blksize_size[major] = NULL;
 }
 
-extern inline int get_hardsect_size(kdev_t dev)
+extern inline int queue_hardsect_size(request_queue_t *q)
 {
-	request_queue_t *q = blk_get_queue(dev);
 	int retval = 512;
 
 	if (q && q->hardsect_size)
 		retval = q->hardsect_size;
 
 	return retval;
+}
+
+extern inline int get_hardsect_size(kdev_t dev)
+{
+	return queue_hardsect_size(blk_get_queue(dev));
+}
+
+extern inline int bdev_hardsect_size(struct block_device *bdev)
+{
+	return queue_hardsect_size(blk_get_queue(to_kdev_t(bdev->bd_dev)));
 }
 
 #define blk_finished_io(nsects)	do { } while (0)

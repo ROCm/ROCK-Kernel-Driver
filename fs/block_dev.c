@@ -106,7 +106,7 @@ int sb_set_blocksize(struct super_block *sb, int size)
 
 int sb_min_blocksize(struct super_block *sb, int size)
 {
-	int minsize = get_hardsect_size(sb->s_dev);
+	int minsize = bdev_hardsect_size(sb->s_bdev);
 	if (size < minsize)
 		size = minsize;
 	return sb_set_blocksize(sb, size);

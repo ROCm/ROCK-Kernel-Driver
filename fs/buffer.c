@@ -2351,7 +2351,7 @@ static int grow_buffers(struct block_device *bdev, unsigned long block, int size
 	int sizebits;
 
 	/* Size must be multiple of hard sectorsize */
-	if (size & (get_hardsect_size(to_kdev_t(bdev->bd_dev))-1))
+	if (size & (bdev_hardsect_size(bdev)-1))
 		BUG();
 	/* Size must be within 512 bytes and PAGE_SIZE */
 	if (size < 512 || size > PAGE_SIZE)

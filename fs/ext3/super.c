@@ -943,7 +943,6 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	unsigned long logic_sb_block = 1;
 	unsigned long offset = 0;
 	unsigned long journal_inum = 0;
-	kdev_t dev = sb->s_dev;
 	int blocksize;
 	int hblock;
 	int db_count;
@@ -1033,7 +1032,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 
 	sb->s_maxbytes = ext3_max_size(sb->s_blocksize_bits);
 
-	hblock = get_hardsect_size(dev);
+	hblock = bdev_hardsect_size(sb->s_bdev);
 	if (sb->s_blocksize != blocksize) {
 		/*
 		 * Make sure the blocksize for the filesystem is larger
@@ -1322,7 +1321,7 @@ static journal_t *ext3_get_dev_journal(struct super_block *sb,
 		return NULL;
 
 	blocksize = sb->s_blocksize;
-	hblock = get_hardsect_size(j_dev);
+	hblock = bdev_hardsect_size(bdev);
 	if (blocksize < hblock) {
 		printk(KERN_ERR
 			"EXT3-fs: blocksize too small for journal device.\n");

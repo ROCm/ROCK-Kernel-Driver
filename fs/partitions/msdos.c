@@ -117,7 +117,7 @@ static void extended_partition(struct gendisk *hd, struct block_device *bdev,
 	unsigned char *data;
 	unsigned long first_sector, this_sector, this_size;
 	int mask = (1 << hd->minor_shift) - 1;
-	int sector_size = get_hardsect_size(to_kdev_t(bdev->bd_dev)) / 512;
+	int sector_size = bdev_hardsect_size(bdev) / 512;
 	int loopct = 0;		/* number of links followed
 				   without finding a data partition */
 	int i;
@@ -522,7 +522,7 @@ int msdos_partition(struct gendisk *hd, struct block_device *bdev,
 	struct partition *p;
 	unsigned char *data;
 	int mask = (1 << hd->minor_shift) - 1;
-	int sector_size = get_hardsect_size(to_kdev_t(bdev->bd_dev)) / 512;
+	int sector_size = bdev_hardsect_size(bdev) / 512;
 	int current_minor = first_part_minor;
 	int err;
 

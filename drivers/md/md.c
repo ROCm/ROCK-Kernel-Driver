@@ -1711,8 +1711,8 @@ static int do_md_run(mddev_t * mddev)
 			continue;
 		invalidate_device(rdev->dev, 1);
 		md_blocksizes[mdidx(mddev)] = 1024;
-		if (get_hardsect_size(rdev->dev) > md_blocksizes[mdidx(mddev)])
-			md_blocksizes[mdidx(mddev)] = get_hardsect_size(rdev->dev);
+		if (bdev_hardsect_size(rdev->bdev) > md_blocksizes[mdidx(mddev)])
+			md_blocksizes[mdidx(mddev)] = bdev_hardsect_size(rdev->bdev);
 	}
 	mddev->pers = pers[pnum];
 

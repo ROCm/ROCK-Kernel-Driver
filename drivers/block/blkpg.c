@@ -266,7 +266,7 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 
 		case BLKSSZGET:
 			/* get block device hardware sector size */
-			intval = get_hardsect_size(dev);
+			intval = bdev_hardsect_size(bdev);
 			return put_user(intval, (int *) arg);
 
 		case BLKGETSIZE:

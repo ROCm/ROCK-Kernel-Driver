@@ -363,7 +363,7 @@ void blk_dump_rq_flags(struct request *rq, char *msg)
  */
 int ll_10byte_cmd_build(request_queue_t *q, struct request *rq)
 {
-	int hard_sect = get_hardsect_size(rq->rq_dev);
+	int hard_sect = queue_hardsect_size(q);
 	sector_t block = rq->hard_sector / (hard_sect >> 9);
 	unsigned long blocks = rq->hard_nr_sectors / (hard_sect >> 9);
 
@@ -1501,7 +1501,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 	major = major(bhs[0]->b_dev);
 
 	/* Determine correct block size for this device. */
-	correct_size = get_hardsect_size(bhs[0]->b_dev);
+	correct_size = bdev_hardsect_size(bhs[0]->b_bdev);
 
 	/* Verify requested block sizes. */
 	for (i = 0; i < nr; i++) {

@@ -857,7 +857,7 @@ static int lvm_blk_ioctl(struct inode *inode, struct file *file,
 	switch (command) {
 	case BLKSSZGET:
 		/* get block device sector size as needed e.g. by fdisk */
-		return put_user(get_hardsect_size(inode->i_rdev), (int *) arg);
+		return put_user(bdev_hardsect_size(inode->i_bdev), (int *) arg);
 
 	case BLKGETSIZE:
 		/* return device size */
