@@ -812,7 +812,7 @@ static int rs_init_drivers(void)
 }
 
 
-void __init tx3912_rs_init(void)
+static void __init tx3912_rs_init(void)
 {
 	int rc;
 
@@ -877,6 +877,7 @@ void __init tx3912_rs_init(void)
 
 	func_exit();
 }
+module_init(tx3912_rs_init);
 
 /*
  * Begin serial console routines

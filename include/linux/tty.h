@@ -347,23 +347,7 @@ extern int fg_console, last_console, want_console;
 extern int kmsg_redirect;
 
 extern void console_init(void);
-
-extern int lp_init(void);
-extern int pty_init(void);
-extern int mxser_init(void);
-extern int moxa_init(void);
-extern int ip2_init(void);
-extern int pcxe_init(void);
-extern int pc_init(void);
 extern int vcs_init(void);
-extern int rp_init(void);
-extern int cy_init(void);
-extern int stl_init(void);
-extern int stli_init(void);
-extern int specialix_init(void);
-extern int espserial_init(void);
-extern int macserial_init(void);
-extern int a2232board_init(void);
 
 extern int tty_paranoia_check(struct tty_struct *tty, struct inode *inode,
 			      const char *routine);
