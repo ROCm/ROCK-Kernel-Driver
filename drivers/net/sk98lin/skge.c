@@ -4032,7 +4032,7 @@ int	l;
 
 #endif /* DEBUG */
 
-static struct pci_device_id skge_pci_tbl[] __devinitdata = {
+static struct pci_device_id skge_pci_tbl[] = {
 	{ PCI_VENDOR_ID_SYSKONNECT, PCI_DEVICE_ID_SYSKONNECT_GE,
 		PCI_ANY_ID, PCI_ANY_ID, },
 	{ 0,}

@@ -77,7 +77,7 @@ static char *rcsid = "$Id: toshoboe.c,v 1.91 1999/06/29 14:21:06 root Exp $";
 
 #define PCI_DEVICE_ID_FIR701b  0x0d01
 
-static struct pci_device_id toshoboe_pci_tbl[] __initdata = {
+static struct pci_device_id toshoboe_pci_tbl[] = {
 	{ PCI_VENDOR_ID_TOSHIBA, PCI_DEVICE_ID_FIR701, PCI_ANY_ID, PCI_ANY_ID, },
 	{ PCI_VENDOR_ID_TOSHIBA, PCI_DEVICE_ID_FIR701b, PCI_ANY_ID, PCI_ANY_ID, },
 	{ }			/* Terminating entry */

@@ -401,7 +401,7 @@ static struct via_rhine_chip_info via_rhine_chip_info[] __devinitdata =
 	  CanHaveMII | HasWOL },
 };
 
-static struct pci_device_id via_rhine_pci_tbl[] __devinitdata =
+static struct pci_device_id via_rhine_pci_tbl[] =
 {
 	{0x1106, 0x3043, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VT86C100A},
 	{0x1106, 0x3065, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VT6102},

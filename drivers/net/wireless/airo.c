@@ -47,7 +47,7 @@
 #include <asm/uaccess.h>
 
 #ifdef CONFIG_PCI
-static struct pci_device_id card_ids[] __devinitdata = {
+static struct pci_device_id card_ids[] = {
 	{ 0x14b9, 1, PCI_ANY_ID, PCI_ANY_ID, },
 	{ 0x14b9, 0x4500, PCI_ANY_ID, PCI_ANY_ID },
 	{ 0x14b9, 0x4800, PCI_ANY_ID, PCI_ANY_ID, },

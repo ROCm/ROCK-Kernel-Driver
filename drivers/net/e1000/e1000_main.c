@@ -61,7 +61,7 @@ char e1000_copyright[] = "Copyright (c) 1999-2003 Intel Corporation.";
  * { Vendor ID, Device ID, SubVendor ID, SubDevice ID,
  *   Class, Class Mask, private data (not used) }
  */
-static struct pci_device_id e1000_pci_tbl[] __devinitdata = {
+static struct pci_device_id e1000_pci_tbl[] = {
 	{0x8086, 0x1000, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1004, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},

@@ -212,7 +212,7 @@ static struct {
 };
 
 
-static struct pci_device_id netdrv_pci_tbl[] __devinitdata = {
+static struct pci_device_id netdrv_pci_tbl[] = {
 	{0x10ec, 0x8139, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139 },
 	{0x10ec, 0x8138, PCI_ANY_ID, PCI_ANY_ID, 0, 0, NETDRV_CB },
 	{0x1113, 0x1211, PCI_ANY_ID, PCI_ANY_ID, 0, 0, SMC1211TX },
