@@ -1338,7 +1338,7 @@ static int tg3_setup_fiber_phy(struct tg3 *tp)
 		tg3_writephy(tp, 0x16, 0x8007);
 
 		/* SW reset */
-		tg3_writephy(tp, 0x00, 0x8000);
+		tg3_writephy(tp, MII_BMCR, BMCR_RESET);
 
 		/* Wait for reset to complete. */
 		/* XXX schedule_timeout() ... */
@@ -1382,7 +1382,8 @@ static int tg3_setup_fiber_phy(struct tg3 *tp)
 
 	current_link_up = 0;
 	if (tr32(MAC_STATUS) & MAC_STATUS_PCS_SYNCED) {
-		if (tp->link_config.autoneg == AUTONEG_ENABLE) {
+		if (tp->link_config.autoneg == AUTONEG_ENABLE &&
+		    !(tp->tg3_flags & TG3_FLAG_GOT_SERDES_FLOWCTL)) {
 			struct tg3_fiber_aneginfo aninfo;
 			int status = ANEG_FAILED;
 			unsigned int tick;
@@ -1429,6 +1430,8 @@ static int tg3_setup_fiber_phy(struct tg3 *tp)
 
 				tg3_setup_flow_control(tp, local_adv, remote_adv);
 
+				tp->tg3_flags |=
+					TG3_FLAG_GOT_SERDES_FLOWCTL;
 				current_link_up = 1;
 			}
 			for (i = 0; i < 60; i++) {
@@ -1461,11 +1464,12 @@ static int tg3_setup_fiber_phy(struct tg3 *tp)
 		 (tp->hw_status->status & ~SD_STATUS_LINK_CHG));
 
 	for (i = 0; i < 100; i++) {
+		udelay(20);
 		tw32(MAC_STATUS,
 		     (MAC_STATUS_SYNC_CHANGED |
 		      MAC_STATUS_CFG_CHANGED));
-		udelay(5);
 
+		udelay(20);
 		if ((tr32(MAC_STATUS) &
 		     (MAC_STATUS_SYNC_CHANGED |
 		      MAC_STATUS_CFG_CHANGED)) == 0)
@@ -3840,18 +3844,25 @@ static void tg3_timer(unsigned long __opaque)
 			if (phy_event)
 				tg3_setup_phy(tp);
 		} else if (tp->tg3_flags & TG3_FLAG_POLL_SERDES) {
-			u32 mac_stat = tr32 (MAC_STATUS);
+			u32 mac_stat = tr32(MAC_STATUS);
 			int need_setup = 0;
 
 			if (netif_carrier_ok(tp->dev) &&
-			    (mac_stat & MAC_STATUS_LNKSTATE_CHANGED))
+			    (mac_stat & MAC_STATUS_LNKSTATE_CHANGED)) {
 				need_setup = 1;
+			}
 			if (! netif_carrier_ok(tp->dev) &&
-			    (mac_stat & MAC_STATUS_PCS_SYNCED))
+			    (mac_stat & MAC_STATUS_PCS_SYNCED)) {
 				need_setup = 1;
-
-			if (need_setup)
+			}
+			if (need_setup) {
+				tw32(MAC_MODE,
+				     (tp->mac_mode &
+				      ~MAC_MODE_PORT_MODE_MASK));
+				udelay(40);
+				tw32(MAC_MODE, tp->mac_mode);
 				tg3_setup_phy(tp);
+			}
 		}
 
 		tp->timer_counter = tp->timer_multiplier;
@@ -4207,7 +4218,10 @@ static int tg3_close(struct net_device *dev)
 
 	tg3_halt(tp);
 	tg3_free_rings(tp);
-	tp->tg3_flags &= ~TG3_FLAG_INIT_COMPLETE;
+	tp->tg3_flags &=
+		~(TG3_FLAG_INIT_COMPLETE |
+		  TG3_FLAG_GOT_SERDES_FLOWCTL);
+	netif_carrier_off(tp->dev);
 
 	spin_unlock_irq(&tp->lock);
 
