@@ -21,7 +21,7 @@
 
 extern void css_process_crw(int);
 extern void chsc_process_crw(void);
-extern void chp_process_crw(int);
+extern void chp_process_crw(int, int);
 
 static void
 s390_handle_damage(char *msg)
@@ -62,7 +62,17 @@ s390_collect_crw_info(void)
 			break;
 		case CRW_RSC_CPATH:
 			pr_debug("source is channel path %02X\n", crw.rsid);
-			chp_process_crw(crw.rsid);
+			switch (crw.erc) {
+			case CRW_ERC_IPARM: /* Path has come. */
+				chp_process_crw(crw.rsid, 1);
+				break;
+			case CRW_ERC_PERRI: /* Path has gone. */
+				chp_process_crw(crw.rsid, 0);
+				break;
+			default:
+				pr_debug("Don't know how to handle erc=%x\n",
+					 crw.erc);
+			}
 			break;
 		case CRW_RSC_CONFIG:
 			pr_debug("source is configuration-alert facility\n");

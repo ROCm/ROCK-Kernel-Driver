@@ -198,11 +198,13 @@ __ccw_device_sense_id_start(struct ccw_device *cdev)
 			/* 0x00E2C9C4 == ebcdic "SID" */
 			ret = cio_start (sch, cdev->private->iccws,
 					 0x00E2C9C4, cdev->private->imask);
-			/* ret is 0, -EBUSY or -ENODEV */
-			if (ret != -EBUSY)
+			/* ret is 0, -EBUSY, -EACCES or -ENODEV */
+			if (ret == -EBUSY) {
+				udelay(100);
+				continue;
+			}
+			if (ret != -EACCES)
 				return ret;
-			udelay(100);
-			continue;
 		}
 		cdev->private->imask >>= 1;
 		cdev->private->iretry = 5;

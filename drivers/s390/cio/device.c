@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.50 $
+ *   $Revision: 1.53 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -18,6 +18,7 @@
 #include <linux/slab.h>
 #include <linux/list.h>
 #include <linux/device.h>
+#include <linux/workqueue.h>
 
 #include <asm/ccwdev.h>
 #include <asm/cio.h>
@@ -126,14 +127,32 @@ static struct css_driver io_subchannel_driver = {
 	.irq = io_subchannel_irq,
 };
 
+struct workqueue_struct *ccw_device_work;
+static wait_queue_head_t ccw_device_init_wq;
+static atomic_t ccw_device_init_count;
+
 static int __init
 init_ccw_bus_type (void)
 {
 	int ret;
+
+	init_waitqueue_head(&ccw_device_init_wq);
+	atomic_set(&ccw_device_init_count, 0);
+
+	ccw_device_work = create_workqueue("cio");
+	if (!ccw_device_work)
+		return -ENOMEM; /* FIXME: better errno ? */
+
 	if ((ret = bus_register (&ccw_bus_type)))
 		return ret;
 
-	return driver_register(&io_subchannel_driver.drv);
+	if ((ret = driver_register(&io_subchannel_driver.drv)))
+		return ret;
+
+	wait_event(ccw_device_init_wq,
+		   atomic_read(&ccw_device_init_count) == 0);
+	flush_workqueue(ccw_device_work);
+	return 0;
 }
 
 static void __exit
@@ -141,6 +160,7 @@ cleanup_ccw_bus_type (void)
 {
 	driver_unregister(&io_subchannel_driver.drv);
 	bus_unregister(&ccw_bus_type);
+	destroy_workqueue(ccw_device_work);
 }
 
 subsys_initcall(init_ccw_bus_type);
@@ -360,7 +380,7 @@ ccw_device_release(struct device *dev)
 /*
  * Register recognized device.
  */
-void
+static void
 io_subchannel_register(void *data)
 {
 	struct ccw_device *cdev;
@@ -387,6 +407,42 @@ io_subchannel_register(void *data)
 		       __func__, sch->irq);
 out:
 	put_device(&sch->dev);
+}
+
+/*
+ * subchannel recognition done. Called from the state machine.
+ */
+void
+io_subchannel_recog_done(struct ccw_device *cdev)
+{
+	struct subchannel *sch;
+
+	if (css_init_done == 0)
+		return;
+	switch (cdev->private->state) {
+	case DEV_STATE_NOT_OPER:
+		/* Remove device found not operational. */
+		sch = to_subchannel(cdev->dev.parent);
+		sch->dev.driver_data = 0;
+		put_device(&sch->dev);
+		if (cdev->dev.release)
+			cdev->dev.release(&cdev->dev);
+		break;
+	case DEV_STATE_OFFLINE:
+		/* 
+		 * We can't register the device in interrupt context so
+		 * we schedule a work item.
+		 */
+		INIT_WORK(&cdev->private->kick_work,
+			  io_subchannel_register, (void *) cdev);
+		queue_work(ccw_device_work, &cdev->private->kick_work);
+		break;
+	case DEV_STATE_BOXED:
+		/* Device did not respond in time. */
+		break;
+	}
+	if (atomic_dec_and_test(&ccw_device_init_count))
+		wake_up(&ccw_device_init_wq);
 }
 
 static void
@@ -419,6 +475,9 @@ io_subchannel_recog(struct ccw_device *cdev, struct subchannel *sch)
 	/* Do first half of device_register. */
 	device_initialize(&cdev->dev);
 
+	/* Increase counter of devices currently in recognition. */
+	atomic_inc(&ccw_device_init_count);
+
 	/* Start async. device sensing. */
 	spin_lock_irq(cdev->ccwlock);
 	rc = ccw_device_recognition(cdev);
@@ -428,6 +487,8 @@ io_subchannel_recog(struct ccw_device *cdev, struct subchannel *sch)
 		put_device(&sch->dev);
 		if (cdev->dev.release)
 			cdev->dev.release(&cdev->dev);
+		if (atomic_dec_and_test(&ccw_device_init_count))
+			wake_up(&ccw_device_init_wq);
 	}
 }
 
@@ -452,7 +513,8 @@ io_subchannel_probe (struct device *pdev)
 	if (!cdev)
 		return -ENOMEM;
 	memset(cdev, 0, sizeof(struct ccw_device));
-	cdev->private = kmalloc(sizeof(struct ccw_device_private), GFP_DMA);
+	cdev->private = kmalloc(sizeof(struct ccw_device_private), 
+				GFP_KERNEL | GFP_DMA);
 	if (!cdev->private) {
 		kfree(cdev);
 		return -ENOMEM;

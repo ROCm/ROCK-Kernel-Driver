@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/css.c
  *  driver for channel subsystem
- *   $Revision: 1.40 $
+ *   $Revision: 1.43 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -41,7 +41,7 @@ css_alloc_subchannel(int irq)
 		/* There already is a struct subchannel for this irq. */
 		return -EBUSY;
 
-	sch = kmalloc (sizeof (*sch), GFP_DMA);
+	sch = kmalloc (sizeof (*sch), GFP_KERNEL | GFP_DMA);
 	if (sch == NULL)
 		return -ENOMEM;
 	ret = cio_validate_subchannel (sch, irq);
@@ -161,7 +161,7 @@ css_process_crw(int irq)
 
 	sch = ioinfo[irq];
 	if (sch == NULL) {
-		schedule_work(&work);
+		queue_work(ccw_device_work, &work);
 		return;
 	}
 	if (!sch->dev.driver_data)
@@ -172,7 +172,7 @@ css_process_crw(int irq)
 	ccode = stsch(irq, &sch->schib);
 	if (!ccode)
 		if (devno != sch->schib.pmcw.dev)
-			schedule_work(&work);
+			queue_work(ccw_device_work, &work);
 }
 
 /*

@@ -49,12 +49,15 @@ ccw_device_clear(struct ccw_device *cdev, unsigned long intparm)
 		return -ENODEV;
 	if (cdev->private->state != DEV_STATE_ONLINE &&
 	    cdev->private->state != DEV_STATE_W4SENSE &&
-	    cdev->private->state != DEV_STATE_QDIO_ACTIVE)
+	    cdev->private->state != DEV_STATE_ONLINE_VERIFY &&
+	    cdev->private->state != DEV_STATE_W4SENSE_VERIFY)
 		return -EINVAL;
 	sch = to_subchannel(cdev->dev.parent);
 	if (!sch)
 		return -ENODEV;
-	ret = cio_clear(sch, intparm);
+	ret = cio_clear(sch);
+	if (ret == 0)
+		cdev->private->intparm = intparm;
 	return ret;
 }
 
@@ -67,17 +70,35 @@ ccw_device_start(struct ccw_device *cdev, struct ccw1 *cpa,
 
 	if (!cdev)
 		return -ENODEV;
-	if (cdev->private->state != DEV_STATE_ONLINE &&
-	    cdev->private->state != DEV_STATE_W4SENSE &&
-	    cdev->private->state != DEV_STATE_QDIO_INIT)
-		return -EINVAL;
 	sch = to_subchannel(cdev->dev.parent);
 	if (!sch)
 		return -ENODEV;
+	if (cdev->private->state != DEV_STATE_ONLINE ||
+	    sch->schib.scsw.actl != 0)
+		return -EBUSY;
 	ret = cio_set_options (sch, flags);
 	if (ret)
 		return ret;
-	ret = cio_start (sch, cpa, intparm, lpm);
+	/* 0xe4e2c5d9 == ebcdic "USER" */
+	ret = cio_start (sch, cpa, 0xe4e2c5d9, lpm);
+	if (ret == 0)
+		cdev->private->intparm = intparm;
+	return ret;
+}
+
+int
+ccw_device_start_timeout(struct ccw_device *cdev, struct ccw1 *cpa,
+			 unsigned long intparm, __u8 lpm, unsigned long flags,
+			 int expires)
+{
+	int ret;
+
+	if (!cdev)
+		return -ENODEV;
+	ccw_device_set_timeout(cdev, expires);
+	ret = ccw_device_start(cdev, cpa, intparm, lpm, flags);
+	if (ret != 0)
+		ccw_device_set_timeout(cdev, 0);
 	return ret;
 }
 
@@ -90,12 +111,16 @@ ccw_device_halt(struct ccw_device *cdev, unsigned long intparm)
 	if (!cdev)
 		return -ENODEV;
 	if (cdev->private->state != DEV_STATE_ONLINE &&
-	    cdev->private->state != DEV_STATE_W4SENSE)
+	    cdev->private->state != DEV_STATE_W4SENSE &&
+	    cdev->private->state != DEV_STATE_ONLINE_VERIFY &&
+	    cdev->private->state != DEV_STATE_W4SENSE_VERIFY)
 		return -EINVAL;
 	sch = to_subchannel(cdev->dev.parent);
 	if (!sch)
 		return -ENODEV;
-	ret = cio_halt(sch, intparm);
+	ret = cio_halt(sch);
+	if (ret == 0)
+		cdev->private->intparm = intparm;
 	return ret;
 }
 
@@ -106,12 +131,12 @@ ccw_device_resume(struct ccw_device *cdev)
 
 	if (!cdev)
 		return -ENODEV;
-	if (cdev->private->state != DEV_STATE_ONLINE &&
-	    cdev->private->state != DEV_STATE_W4SENSE)
-		return -EINVAL;
 	sch = to_subchannel(cdev->dev.parent);
 	if (!sch)
 		return -ENODEV;
+	if (cdev->private->state != DEV_STATE_ONLINE ||
+	    !(sch->schib.scsw.actl & SCSW_ACTL_SUSPENDED))
+		return -EINVAL;
 	return cio_resume(sch);
 }
 
@@ -123,15 +148,6 @@ ccw_device_call_handler(struct ccw_device *cdev)
 {
 	struct subchannel *sch;
 	unsigned int stctl;
-	void (*handler)(struct ccw_device *, unsigned long, struct irb *);
-
-	if (cdev->private->state == DEV_STATE_QDIO_ACTIVE) {
-		if (cdev->private->qdio_data)
-			handler = cdev->private->qdio_data->handler;
-		else
-			handler = NULL;
-	} else
-		handler = cdev->handler;
 
 	sch = to_subchannel(cdev->dev.parent);
 
@@ -154,8 +170,9 @@ ccw_device_call_handler(struct ccw_device *cdev)
 	/*
 	 * Now we are ready to call the device driver interrupt handler.
 	 */
-	if (handler)
-		handler(cdev, sch->u_intparm, &cdev->private->irb);
+	if (cdev->handler)
+		cdev->handler(cdev, cdev->private->intparm,
+			      &cdev->private->irb);
 
 	/*
 	 * Clear the old and now useless interrupt response block.
@@ -192,6 +209,11 @@ ccw_device_get_path_mask(struct ccw_device *cdev)
 static void
 ccw_device_wake_up(struct ccw_device *cdev, unsigned long ip, struct irb *irb)
 {
+	struct subchannel *sch;
+
+	sch = to_subchannel(cdev->dev.parent);
+	if (!IS_ERR(irb))
+		memcpy(&sch->schib.scsw, &irb->scsw, sizeof(struct scsw));
 	wake_up(&cdev->private->wait_q);
 }
 
@@ -218,8 +240,7 @@ read_dev_chars (struct ccw_device *cdev, void **buffer, int length)
 
 	if (!cdev)
 		return -ENODEV;
-	if (cdev->private->state != DEV_STATE_ONLINE &&
-	    cdev->private->state != DEV_STATE_W4SENSE)
+	if (cdev->private->state != DEV_STATE_ONLINE)
 		return -EINVAL;
 	if (!buffer || !length)
 		return -EINVAL;
@@ -251,7 +272,13 @@ read_dev_chars (struct ccw_device *cdev, void **buffer, int length)
 			wait_event(cdev->private->wait_q,
 				   sch->schib.scsw.actl == 0);
 			spin_lock_irqsave(&sch->lock, flags);
-			/* FIXME: Check if we got sensible stuff. */
+			/* Check at least for channel end / device end */
+			if ((sch->schib.scsw.dstat !=
+			     (DEV_STAT_CHN_END|DEV_STAT_DEV_END)) ||
+			    (sch->schib.scsw.cstat != 0)) {
+				ret = -EIO;
+				continue;
+			}
 			break;
 		}
 	}
@@ -281,8 +308,7 @@ read_conf_data (struct ccw_device *cdev, void **buffer, int *length)
 
 	if (!cdev)
 		return -ENODEV;
-	if (cdev->private->state != DEV_STATE_ONLINE &&
-	    cdev->private->state != DEV_STATE_W4SENSE)
+	if (cdev->private->state != DEV_STATE_ONLINE)
 		return -EINVAL;
 	if (cdev->private->flags.esid == 0)
 		return -EOPNOTSUPP;
@@ -300,7 +326,7 @@ read_conf_data (struct ccw_device *cdev, void **buffer, int *length)
 	if (!ciw || ciw->cmd == 0)
 		return -EOPNOTSUPP;
 
-	rcd_buf = kmalloc(ciw->count, GFP_DMA);
+	rcd_buf = kmalloc(ciw->count, GFP_KERNEL | GFP_DMA);
  	if (!rcd_buf)
 		return -ENOMEM;
  	memset (rcd_buf, 0, ciw->count);
@@ -325,7 +351,13 @@ read_conf_data (struct ccw_device *cdev, void **buffer, int *length)
 		spin_unlock_irqrestore(&sch->lock, flags);
 		wait_event(cdev->private->wait_q, sch->schib.scsw.actl == 0);
 		spin_lock_irqsave(&sch->lock, flags);
-		/* FIXME: Check if we got sensible stuff. */
+		/* Check at least for channel end / device end */
+		if ((sch->schib.scsw.dstat != 
+		     (DEV_STAT_CHN_END|DEV_STAT_DEV_END)) ||
+		    (sch->schib.scsw.cstat != 0)) {
+			ret = -EIO;
+			continue;
+		}
 		break;
 	}
 	/* Restore interrupt handler. */
@@ -363,13 +395,15 @@ _ccw_device_get_device_number(struct ccw_device *cdev)
 
 
 MODULE_LICENSE("GPL");
+EXPORT_SYMBOL(ccw_device_set_options);
 EXPORT_SYMBOL(ccw_device_clear);
 EXPORT_SYMBOL(ccw_device_halt);
 EXPORT_SYMBOL(ccw_device_resume);
+EXPORT_SYMBOL(ccw_device_start_timeout);
 EXPORT_SYMBOL(ccw_device_start);
 EXPORT_SYMBOL(ccw_device_get_ciw);
 EXPORT_SYMBOL(ccw_device_get_path_mask);
-EXPORT_SYMBOL (read_conf_data);
-EXPORT_SYMBOL (read_dev_chars);
+EXPORT_SYMBOL(read_conf_data);
+EXPORT_SYMBOL(read_dev_chars);
 EXPORT_SYMBOL(_ccw_device_get_subchannel_number);
 EXPORT_SYMBOL(_ccw_device_get_device_number);

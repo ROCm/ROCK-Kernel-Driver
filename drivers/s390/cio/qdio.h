@@ -1,7 +1,7 @@
 #ifndef _CIO_QDIO_H
 #define _CIO_QDIO_H
 
-#define VERSION_CIO_QDIO_H "$Revision: 1.11 $"
+#define VERSION_CIO_QDIO_H "$Revision: 1.16 $"
 
 //#define QDIO_DBF_LIKE_HELL
 
@@ -48,25 +48,25 @@
 #define QDIO_STATS_CLASSES 2
 #define QDIO_STATS_COUNT_NEEDED 2*/
 
-#define QDIO_ACTIVATE_DELAY 5 /* according to brenton belmar and paul
-				 gioquindo it can take up to 5ms before
-				 queues are really active */
-
 #define QDIO_NO_USE_COUNT_TIME 10
 #define QDIO_NO_USE_COUNT_TIMEOUT 1000 /* wait for 1 sec on each q before
 					  exiting without having use_count
 					  of the queue to 0 */
 
 #define QDIO_ESTABLISH_TIMEOUT 1000
-#define QDIO_ACTIVATE_TIMEOUT 100
+#define QDIO_ACTIVATE_TIMEOUT 5
 #define QDIO_CLEANUP_CLEAR_TIMEOUT 20000
 #define QDIO_CLEANUP_HALT_TIMEOUT 10000
 
-#define QDIO_IRQ_STATE_FRESH 0 /* must be 0 -> memset has set it to 0 */
-#define QDIO_IRQ_STATE_INACTIVE 1
-#define QDIO_IRQ_STATE_ESTABLISHED 2
-#define QDIO_IRQ_STATE_ACTIVE 3
-#define QDIO_IRQ_STATE_STOPPED 4
+enum qdio_irq_states {
+	QDIO_IRQ_STATE_INACTIVE,
+	QDIO_IRQ_STATE_ESTABLISHED,
+	QDIO_IRQ_STATE_ACTIVE,
+	QDIO_IRQ_STATE_STOPPED,
+	QDIO_IRQ_STATE_CLEANUP,
+	QDIO_IRQ_STATE_ERR,
+	NR_QDIO_IRQ_STATES,
+};
 
 /* used as intparm in do_IO: */
 #define QDIO_DOING_SENSEID 0
@@ -443,81 +443,6 @@ do_clear_global_summary(void)
 #define CHSC_FLAG_SIGA_SYNC_DONE_ON_THININTS 0x08
 #define CHSC_FLAG_SIGA_SYNC_DONE_ON_OUTB_PCIS 0x04
 
-struct qdio_chsc_area {
-	struct {
-		/* word 0 */
-		__u16 command_code1;
-		__u16 command_code2;
-		/* word 1 */
-		__u16 operation_code;
-		__u16 first_sch;
-		/* word 2 */
-		__u8 reserved1;
-		__u8 image_id;
-		__u16 last_sch;
-		/* word 3 */
-		__u32 reserved2;
-
-		/* word 4 */
-		union {
-			struct {
-				/* word 4&5 */
-				__u64 summary_indicator_addr;
-				/* word 6&7 */
-				__u64 subchannel_indicator_addr;
-				/* word 8 */
-				int ks:4;
-				int kc:4;
-				int reserved1:21;
-				int isc:3;
-				/* word 9&10 */
-				__u32 reserved2[2];
-				/* word 11 */
-				__u32 subsystem_id;
-				/* word 12-1015 */
-				__u32 reserved3[1004];
-			} __attribute__ ((packed,aligned(4))) set_chsc;
-			struct {
-				/* word 4&5 */
-				__u32 reserved1[2];	
-				/* word 6 */
-				__u32 delay_target;
-				/* word 7-1015 */
-				__u32 reserved4[1009];
-			} __attribute__ ((packed,aligned(4))) set_chsc_fast;
-			struct {
-				/* word 0 */
-				__u16 length;
-				__u16 response_code;
-				/* word 1 */
-				__u32 reserved1;
-				/* words 2 to 9 for st sch qdio data */
-				__u8 flags;
-				__u8 reserved2;
-				__u16 sch;
-				__u8 qfmt;
-				__u8 reserved3;
-				__u8 qdioac;
-				__u8 sch_class;
-				__u8 reserved4;
-				__u8 icnt;
-				__u8 reserved5;
-				__u8 ocnt;
-				/* plus 5 words of reserved fields */
-			} __attribute__ ((packed,aligned(8)))
-			store_qdio_data_response;
-		} operation_data_area;
-	} __attribute__ ((packed,aligned(8))) request_block;
-	struct {
-		/* word 0 */
-		__u16 length;
-		__u16 response_code;
-		/* word 1 */
-		__u32 reserved1;
-	} __attribute__ ((packed,aligned(8))) response_block;
-} __attribute__ ((packed,aligned(PAGE_SIZE)));
-
-
 #ifdef QDIO_PERFORMANCE_STATS
 struct qdio_perf_stats {
 	unsigned int tl_runs;
@@ -623,7 +548,7 @@ struct qdio_q {
 	struct tasklet_struct tasklet;
 #endif /* QDIO_USE_TIMERS_FOR_POLLING */
 
-	unsigned int state;
+	enum qdio_irq_states state;
 
 	/* used to store the error condition during a data transfer */
 	unsigned int qdio_error;
@@ -674,7 +599,7 @@ struct qdio_irq {
 	unsigned int hydra_gives_outbound_pcis;
 	unsigned int sync_done_on_outb_pcis;
 
-	unsigned int state;
+	enum qdio_irq_states state;
 	struct semaphore setting_up_sema;
 
 	unsigned int no_input_qs;
@@ -694,13 +619,8 @@ struct qdio_irq {
 
 	struct qib qib;
 	
-	/* Functions called via the generic cio layer */
-	void (*cleanup_irq) (struct ccw_device *, unsigned long, struct irb *);
-	void (*cleanup_timeout) (struct ccw_device *);
-	void (*establish_irq) (struct ccw_device *, unsigned long,
-			       struct irb *);
-	void (*establish_timeout) (struct ccw_device *);
-	void (*handler) (struct ccw_device *, unsigned long, struct irb *);
+ 	void (*original_int_handler) (struct ccw_device *,
+ 				      unsigned long, struct irb *);
 
 };
 #endif

@@ -14,13 +14,11 @@ enum dev_state {
 	DEV_STATE_W4SENSE,
 	DEV_STATE_DISBAND_PGID,
 	DEV_STATE_BOXED,
-	/* special states for qdio */
-	DEV_STATE_QDIO_INIT,
-	DEV_STATE_QDIO_ACTIVE,
-	DEV_STATE_QDIO_CLEANUP,
 	/* states to wait for i/o completion before doing something */
 	DEV_STATE_ONLINE_VERIFY,
 	DEV_STATE_W4SENSE_VERIFY,
+	DEV_STATE_CLEAR_VERIFY,
+	DEV_STATE_TIMEOUT_KILL,
 	/* last element! */
 	NR_DEV_STATES
 };
@@ -63,7 +61,9 @@ dev_fsm_final_state(struct ccw_device *cdev)
 		cdev->private->state == DEV_STATE_BOXED);
 }
 
-void io_subchannel_register(void *data);
+extern struct workqueue_struct *ccw_device_work;
+
+void io_subchannel_recog_done(struct ccw_device *cdev);
 
 int ccw_device_recognition(struct ccw_device *);
 int ccw_device_online(struct ccw_device *);

@@ -81,14 +81,14 @@ ccw_device_cancel_halt_clear(struct ccw_device *cdev)
 	if (!(sch->schib.scsw.actl & SCSW_ACTL_CLEAR_PEND)) {
 		/* Stage 2: halt io. */
 		while (cdev->private->iretry-- > 0)
-			if (cio_halt (sch, 0xC8C1D3E3) == 0)
+			if (cio_halt (sch) == 0)
 				return -EBUSY;
 		/* halt io unsuccessful. */
 		cdev->private->iretry = 255;	/* 255 clear retries. */
 	}
 	/* Stage 3: clear io. */
 	while (cdev->private->iretry-- > 0)
-		if (cio_clear (sch, 0x40C3D3D9) == 0)
+		if (cio_clear (sch) == 0)
 			return -EBUSY;
 	panic("Can't stop i/o on subchannel.\n");
 }
@@ -112,10 +112,6 @@ ccw_device_recog_done(struct ccw_device *cdev, int state)
 		CIO_DEBUG(KERN_WARNING, 2,
 			  "SenseID : unknown device %04X on subchannel %04X\n",
 			  sch->schib.pmcw.dev, sch->irq);
-		sch->dev.driver_data = 0;
-		put_device(&sch->dev);
-		if (cdev->dev.release)
-			cdev->dev.release(&cdev->dev);
 		break;
 	case DEV_STATE_OFFLINE:
 		/* fill out sense information */
@@ -131,11 +127,6 @@ ccw_device_recog_done(struct ccw_device *cdev, int state)
 			  "%04X/%02X\n", sch->schib.pmcw.dev,
 			  cdev->id.cu_type, cdev->id.cu_model,
 			  cdev->id.dev_type, cdev->id.dev_model);
-		if (css_init_done == 0)
-			break;
-		INIT_WORK(&cdev->private->kick_work,
-			  io_subchannel_register, (void *) cdev);
-		schedule_work(&cdev->private->kick_work);
 		break;
 	case DEV_STATE_BOXED:
 		CIO_DEBUG(KERN_WARNING, 2,
@@ -143,6 +134,7 @@ ccw_device_recog_done(struct ccw_device *cdev, int state)
 			  sch->schib.pmcw.dev, sch->irq);
 		break;
 	}
+	io_subchannel_recog_done(cdev);
 	wake_up(&cdev->private->wait_q);
 }
 
@@ -219,9 +211,6 @@ ccw_device_recognition(struct ccw_device *cdev)
 static void
 ccw_device_recog_timeout(struct ccw_device *cdev, enum dev_event dev_event)
 {
-	struct subchannel *sch;
-
-	sch = to_subchannel(cdev->dev.parent);
 	if (ccw_device_cancel_halt_clear(cdev) == 0)
 		ccw_device_recog_done(cdev, DEV_STATE_BOXED);
 	else
@@ -349,9 +338,6 @@ ccw_device_offline(struct ccw_device *cdev)
 static void
 ccw_device_onoff_timeout(struct ccw_device *cdev, enum dev_event dev_event)
 {
-	struct subchannel *sch;
-
-	sch = to_subchannel(cdev->dev.parent);
 	if (ccw_device_cancel_halt_clear(cdev) == 0)
 		ccw_device_done(cdev, DEV_STATE_BOXED);
 	else
@@ -393,8 +379,8 @@ ccw_device_online_notoper(struct ccw_device *cdev, enum dev_event dev_event)
 		// FIXME: not-oper indication to device driver ?
 		ccw_device_call_handler(cdev);
 	}
-	device_unregister(&cdev->dev);
 	wake_up(&cdev->private->wait_q);
+	device_unregister(&cdev->dev);
 }
 
 /*
@@ -438,12 +424,37 @@ ccw_device_irq(struct ccw_device *cdev, enum dev_event dev_event)
 	/* Accumulate status and find out if a basic sense is needed. */
 	ccw_device_accumulate_irb(cdev, irb);
 	if (cdev->private->flags.dosense) {
-		if (ccw_device_do_sense(cdev, irb) == 0)
-			cdev->private->state = DEV_STATE_W4SENSE;
+		if (ccw_device_do_sense(cdev, irb) == 0) {
+			/* Check if we have to trigger path verification. */
+			if (irb->esw.esw0.erw.pvrf)
+				cdev->private->state = DEV_STATE_W4SENSE_VERIFY;
+			else
+				cdev->private->state = DEV_STATE_W4SENSE;
+		}
 		return;
 	}
+	if (irb->esw.esw0.erw.pvrf)
+		/* Try to start path verification. */
+		ccw_device_online_verify(cdev, 0);
 	/* No basic sense required, call the handler. */
 	ccw_device_call_handler(cdev);
+}
+
+/*
+ * Got an timeout in online state.
+ */
+static void
+ccw_device_online_timeout(struct ccw_device *cdev, enum dev_event dev_event)
+{
+	ccw_device_set_timeout(cdev, 0);
+	if (ccw_device_cancel_halt_clear(cdev) != 0) {
+		ccw_device_set_timeout(cdev, 3*HZ);
+		cdev->private->state = DEV_STATE_TIMEOUT_KILL;
+		return;
+	}
+	if (cdev->handler)
+		cdev->handler(cdev, cdev->private->intparm,
+			      ERR_PTR(-ETIMEDOUT));
 }
 
 static void
@@ -491,11 +502,17 @@ ccw_device_w4sense(struct ccw_device *cdev, enum dev_event dev_event)
 	/* Add basic sense info to irb. */
 	ccw_device_accumulate_basic_sense(cdev, irb);
 	if (cdev->private->flags.dosense) {
+		/* Check if we have to trigger path verification. */
+		if (irb->esw.esw0.erw.pvrf)
+			cdev->private->state = DEV_STATE_W4SENSE_VERIFY;
 		/* Another basic sense is needed. */
 		ccw_device_do_sense(cdev, irb);
 		return;
 	}
 	cdev->private->state = DEV_STATE_ONLINE;
+	if (irb->esw.esw0.erw.pvrf)
+		/* Try to start path verification. */
+		ccw_device_online_verify(cdev, 0);
 	/* Call the handler. */
 	ccw_device_call_handler(cdev);
 }
@@ -527,6 +544,50 @@ ccw_device_w4sense_verify(struct ccw_device *cdev, enum dev_event dev_event)
 	ccw_device_call_handler(cdev);
 }
 
+static void
+ccw_device_clear_verify(struct ccw_device *cdev, enum dev_event dev_event)
+{
+	struct irb *irb;
+
+	irb = (struct irb *) __LC_IRB;
+	/* Check for unsolicited interrupt. */
+	if (irb->scsw.stctl ==
+	    		(SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS)) {
+		if (cdev->handler)
+			cdev->handler (cdev, 0, irb);
+		return;
+	}
+	/* Accumulate status. We don't do basic sense. */
+	ccw_device_accumulate_irb(cdev, irb);
+	/* Try to start delayed device verification. */
+	ccw_device_online_verify(cdev, 0);
+	/* Note: Don't call handler for cio initiated clear! */
+}
+
+static void
+ccw_device_killing_irq(struct ccw_device *cdev, enum dev_event dev_event)
+{
+	/* OK, i/o is dead now. Call interrupt handler. */
+	cdev->private->state = DEV_STATE_ONLINE;
+	if (cdev->handler)
+		cdev->handler(cdev, cdev->private->intparm,
+			      ERR_PTR(-ETIMEDOUT));
+}
+
+static void
+ccw_device_killing_timeout(struct ccw_device *cdev, enum dev_event dev_event)
+{
+	if (ccw_device_cancel_halt_clear(cdev) != 0) {
+		ccw_device_set_timeout(cdev, 3*HZ);
+		return;
+	}
+	//FIXME: Can we get here?
+	cdev->private->state = DEV_STATE_ONLINE;
+	if (cdev->handler)
+		cdev->handler(cdev, cdev->private->intparm,
+			      ERR_PTR(-ETIMEDOUT));
+}
+
 /*
  * No operation action. This is used e.g. to ignore a timeout event in
  * state offline.
@@ -545,85 +606,6 @@ ccw_device_bug(struct ccw_device *cdev, enum dev_event dev_event)
 	printk(KERN_EMERG "dev_jumptable[%i][%i] == NULL\n",
 	       cdev->private->state, dev_event);
 	BUG();
-}
-
-/*
- * We've got an interrupt on establish queues. Check for errors and
- * accordingly retry or move on.
- */
-static void
-ccw_device_qdio_init_irq(struct ccw_device *cdev, enum dev_event dev_event)
-{
-	struct irb *irb;
-	struct subchannel *sch;
-
-	irb = (struct irb *) __LC_IRB;
-	/* Check for unsolicited interrupt. */
-	if (irb->scsw.stctl ==
-	    		(SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS)) {
-		if (cdev->private->qdio_data && 
-		    cdev->private->qdio_data->establish_irq)
-			cdev->private->qdio_data->establish_irq(cdev, 0, irb);
-		wake_up(&cdev->private->wait_q);
-		return;
-	}
-	ccw_device_accumulate_irb(cdev, irb);
-	//FIXME: Basic sense?
-	sch = to_subchannel(cdev->dev.parent);
-	if (cdev->private->qdio_data && cdev->private->qdio_data->establish_irq)
-		cdev->private->qdio_data->establish_irq(cdev, sch->u_intparm,
-							&cdev->private->irb);
-	wake_up(&cdev->private->wait_q);
-}
-
-/*
- * Run into a timeout after establish queues, retry if needed.
- */
-static void
-ccw_device_qdio_init_timeout(struct ccw_device *cdev, enum dev_event dev_event)
-{
-	ccw_device_set_timeout(cdev, 0);
-	if (cdev->private->qdio_data &&
-	    cdev->private->qdio_data->establish_timeout)
-		cdev->private->qdio_data->establish_timeout(cdev);
-	wake_up(&cdev->private->wait_q);
-}
-
-static void
-ccw_device_qdio_cleanup_irq(struct ccw_device *cdev,
-			    enum dev_event dev_event)
-{
-	struct irb *irb;
-	struct subchannel *sch;
-
-	irb = (struct irb *) __LC_IRB;
-	/* Check for unsolicited interrupt. */
-	if (irb->scsw.stctl ==
-	    		(SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS)) {
-		if (cdev->private->qdio_data && 
-		    cdev->private->qdio_data->cleanup_irq)
-			cdev->private->qdio_data->cleanup_irq(cdev, 0, irb);
-		wake_up(&cdev->private->wait_q);
-		return;
-	}
-	ccw_device_accumulate_irb(cdev, irb);
-	//FIXME: Basic sense?
-	sch = to_subchannel(cdev->dev.parent);
-	if (cdev->private->qdio_data && cdev->private->qdio_data->cleanup_irq)
-		cdev->private->qdio_data->cleanup_irq(cdev, sch->u_intparm,
-						      &cdev->private->irb);
-	wake_up(&cdev->private->wait_q);
-}
-
-static void
-ccw_device_qdio_cleanup_timeout(struct ccw_device *cdev,
-				enum dev_event dev_event)
-{
-	ccw_device_set_timeout(cdev, 0);
-	if (cdev->private->qdio_data &&
-	    cdev->private->qdio_data->cleanup_timeout)
-		cdev->private->qdio_data->cleanup_timeout(cdev);
-	wake_up(&cdev->private->wait_q);
 }
 
 /*
@@ -663,7 +645,7 @@ fsm_func_t *dev_jumptable[NR_DEV_STATES][NR_DEV_EVENTS] = {
 	[DEV_STATE_ONLINE] {
 		[DEV_EVENT_NOTOPER]	ccw_device_online_notoper,
 		[DEV_EVENT_INTERRUPT]	ccw_device_irq,
-		[DEV_EVENT_TIMEOUT]	ccw_device_nop,
+		[DEV_EVENT_TIMEOUT]	ccw_device_online_timeout,
 		[DEV_EVENT_VERIFY]	ccw_device_online_verify,
 	},
 	[DEV_STATE_W4SENSE] {
@@ -684,25 +666,6 @@ fsm_func_t *dev_jumptable[NR_DEV_STATES][NR_DEV_EVENTS] = {
 		[DEV_EVENT_TIMEOUT]	ccw_device_nop,
 		[DEV_EVENT_VERIFY]	ccw_device_nop,
 	},
-	/* special states for qdio */
-	[DEV_STATE_QDIO_INIT] {
-		[DEV_EVENT_NOTOPER]     ccw_device_online_notoper,
-		[DEV_EVENT_INTERRUPT]   ccw_device_qdio_init_irq,
-		[DEV_EVENT_TIMEOUT]     ccw_device_qdio_init_timeout,
-		[DEV_EVENT_VERIFY]      ccw_device_nop,
-	},
-	[DEV_STATE_QDIO_ACTIVE] {
-		[DEV_EVENT_NOTOPER]     ccw_device_online_notoper,
-		[DEV_EVENT_INTERRUPT]   ccw_device_irq,
-		[DEV_EVENT_TIMEOUT]     ccw_device_nop,
-		[DEV_EVENT_VERIFY]      ccw_device_nop,
-	},
-	[DEV_STATE_QDIO_CLEANUP] {
-		[DEV_EVENT_NOTOPER]     ccw_device_online_notoper,
-		[DEV_EVENT_INTERRUPT]   ccw_device_qdio_cleanup_irq,
-		[DEV_EVENT_TIMEOUT]     ccw_device_qdio_cleanup_timeout,
-		[DEV_EVENT_VERIFY]      ccw_device_nop,
-	},
 	/* states to wait for i/o completion before doing something */
 	[DEV_STATE_ONLINE_VERIFY] {
 		[DEV_EVENT_NOTOPER]	ccw_device_online_notoper,
@@ -715,6 +678,18 @@ fsm_func_t *dev_jumptable[NR_DEV_STATES][NR_DEV_EVENTS] = {
 		[DEV_EVENT_INTERRUPT]	ccw_device_w4sense_verify,
 		[DEV_EVENT_TIMEOUT]	ccw_device_nop,
 		[DEV_EVENT_VERIFY]	ccw_device_nop,
+	},
+	[DEV_STATE_CLEAR_VERIFY] {
+		[DEV_EVENT_NOTOPER]     ccw_device_online_notoper,
+		[DEV_EVENT_INTERRUPT]   ccw_device_clear_verify,
+		[DEV_EVENT_TIMEOUT]	ccw_device_nop,
+		[DEV_EVENT_VERIFY]	ccw_device_nop,
+	},
+	[DEV_STATE_TIMEOUT_KILL] {
+		[DEV_EVENT_NOTOPER]	ccw_device_online_notoper,
+		[DEV_EVENT_INTERRUPT]	ccw_device_killing_irq,
+		[DEV_EVENT_TIMEOUT]	ccw_device_killing_timeout,
+		[DEV_EVENT_VERIFY]	ccw_device_nop, //FIXME
 	},
 };
 
@@ -736,3 +711,4 @@ io_subchannel_irq (struct device *pdev)
 	dev_fsm_event(cdev, DEV_EVENT_INTERRUPT);
 }
 
+EXPORT_SYMBOL_GPL(ccw_device_set_timeout);

@@ -2,7 +2,7 @@
  *  drivers/s390/cio/airq.c
  *   S/390 common I/O routines -- support for adapter interruptions
  *
- *   $Revision: 1.10 $
+ *   $Revision: 1.11 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -87,14 +87,14 @@ s390_unregister_adapter_interrupt (adapter_int_handler_t handler)
 }
 
 void
-do_adapter_IO (__u32 intparm)
+do_adapter_IO (void)
 {
 	CIO_TRACE_EVENT (4, "doaio");
 
 	spin_lock (&adapter_lock);
 
 	if (adapter_handler)
-		(*adapter_handler) (intparm);
+		(*adapter_handler) ();
 
 	spin_unlock (&adapter_lock);
 

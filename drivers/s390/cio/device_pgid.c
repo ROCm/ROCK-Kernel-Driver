@@ -51,14 +51,23 @@ __ccw_device_sense_pgid_start(struct ccw_device *cdev)
 			/* 0xe2d5c9c4 == ebcdic "SNID" */
 			ret = cio_start (sch, cdev->private->iccws, 
 					 0xE2D5C9C4, cdev->private->imask);
-			/* ret is 0, -EBUSY or -ENODEV */
-			if (ret != -EBUSY)
+			/* ret is 0, -EBUSY, -EACCES or -ENODEV */
+			if (ret == -EBUSY) {
+				CIO_MSG_EVENT(2, 
+					      "SNID - device %04X, start_io() "
+					      "reports rc : %d, retrying ...\n",
+					      sch->schib.pmcw.dev, ret);
+				udelay(100);
+				continue;
+			}
+			if (ret != -EACCES)
 				return ret;
-			CIO_MSG_EVENT(2, "SNID - device %04X, start_io() "
-				      "reports rc : %d, retrying ...\n",
-				      sch->schib.pmcw.dev, ret);
-			udelay(100);
-			continue;
+			CIO_MSG_EVENT(2, "SNID - Device %04X on Subchannel "
+				      "%04X, lpm %02X, became 'not "
+				      "operational'\n",
+				      sch->schib.pmcw.dev, sch->irq,
+				      cdev->private->imask);
+
 		}
 		cdev->private->imask >>= 1;
 		cdev->private->iretry = 5;
@@ -231,7 +240,9 @@ __ccw_device_do_pgid(struct ccw_device *cdev, __u8 func)
 		/* 0xE2D7C9C4 == ebcdic "SPID" */
 		ret = cio_start (sch, cdev->private->iccws,
 				 0xE2D7C9C4, cdev->private->imask);
-		/* ret is 0, -EBUSY or -ENODEV */
+		/* ret is 0, -EBUSY, -EACCES or -ENODEV */
+		if (ret == -EACCES)
+			break;
 		if (ret != -EBUSY)
 			return ret;
 		udelay(100);

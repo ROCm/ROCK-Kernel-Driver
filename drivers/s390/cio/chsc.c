@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/chsc.c
  *   S/390 common I/O routines -- channel subsystem call
- *   $Revision: 1.57 $
+ *   $Revision: 1.67 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -76,53 +76,77 @@ static int
 chsc_get_sch_desc_irq(int irq)
 {
 	int ccode, chpid, j;
+	int ret;
 
-	/* FIXME: chsc_area_sei cannot be on the stack since it needs to
-	 * be page-aligned. Implement proper locking or dynamic
-	 * allocation or prove that this function does not have to be
-	 * reentrant! */
-	static struct ssd_area chsc_area_ssd 
-		__attribute__ ((aligned(PAGE_SIZE)));
+	struct {
+		struct chsc_header request;
+		u16 reserved1;
+		u16 f_sch;	  /* first subchannel */
+		u16 reserved2;
+		u16 l_sch;	  /* last subchannel */
+		u32 reserved3;
+		struct chsc_header response;
+		u32 reserved4;
+		u8 sch_valid : 1;
+		u8 dev_valid : 1;
+		u8 st	     : 3; /* subchannel type */
+		u8 zeroes    : 3;
+		u8  unit_addr;	  /* unit address */
+		u16 devno;	  /* device number */
+		u8 path_mask;
+		u8 fla_valid_mask;
+		u16 sch;	  /* subchannel */
+		u8 chpid[8];	  /* chpids 0-7 */
+		u16 fla[8];	  /* full link addresses 0-7 */
+	} *ssd_area;
 
-	typeof (chsc_area_ssd.response_block)
-		*ssd_res = &chsc_area_ssd.response_block;
-
-	chsc_area_ssd = (struct ssd_area) {
-		.request_block = {
-			.command_code1 = 0x0010,
-			.command_code2 = 0x0004,
-			.f_sch = irq,
-			.l_sch = irq,
-		}
-	};
-
-	ccode = chsc(&chsc_area_ssd);
-	if (ccode > 0) {
-		pr_debug("chsc returned with ccode = %d\n", ccode);
-		if (ccode == 3)
-			return -ENODEV;
-		return -EBUSY;
+	ssd_area = (void *)get_zeroed_page(GFP_KERNEL | GFP_DMA);
+	if (!ssd_area) {
+		CIO_CRW_EVENT(0, "No memory for ssd area!\n");
+		return -ENOMEM;
 	}
 
-	switch (chsc_area_ssd.response_block.response_code) {
+	ssd_area->request = (struct chsc_header) {
+		.length = 0x0010,
+		.code   = 0x0004,
+	};
+
+	ssd_area->f_sch = irq;
+	ssd_area->l_sch = irq;
+
+	ccode = chsc(ssd_area);
+	if (ccode > 0) {
+		pr_debug("chsc returned with ccode = %d\n", ccode);
+		ret = (ccode == 3) ? -ENODEV : -EBUSY;
+		goto out;
+	}
+
+	switch (ssd_area->response.code) {
 	case 0x0001: /* everything ok */
+		ret = 0;
 		break;
 	case 0x0002:
 		CIO_CRW_EVENT(2, "Invalid command!\n");
 	case 0x0003:
 		CIO_CRW_EVENT(2, "Error in chsc request block!\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		break;
 	case 0x0004:
 		CIO_CRW_EVENT(2, "Model does not provide ssd\n");
-		return -EOPNOTSUPP;
+		ret = -EOPNOTSUPP;
+		break;
 	default:
 		CIO_CRW_EVENT(2, "Unknown CHSC response %d\n",
-			      chsc_area_ssd.response_block.response_code);
-		return -EIO;
+			      ssd_area->response.code);
+		ret = -EIO;
+		break;
 	}
 
+	if (ret != 0)
+		goto out;
+
 	/*
-	 * ssd_res->st stores the type of the detected
+	 * ssd_area->st stores the type of the detected
 	 * subchannel, with the following definitions:
 	 *
 	 * 0: I/O subchannel:	  All fields have meaning
@@ -135,43 +159,45 @@ chsc_get_sch_desc_irq(int irq)
 	 *
 	 * Other types are currently undefined.
 	 */
-	if (ssd_res->st > 3) { /* uhm, that looks strange... */
+	if (ssd_area->st > 3) { /* uhm, that looks strange... */
 		CIO_CRW_EVENT(0, "Strange subchannel type %d"
-			      " for sch %x\n", ssd_res->st, irq);
+			      " for sch %x\n", ssd_area->st, irq);
 		/*
 		 * There may have been a new subchannel type defined in the
 		 * time since this code was written; since we don't know which
 		 * fields have meaning and what to do with it we just jump out
 		 */
-		return 0;
+		goto out;
 	} else {
-		const char type[4][8] = {"I/O", "chsc", "message", "ADM"};
+		const char *type[4] = {"I/O", "chsc", "message", "ADM"};
 		CIO_CRW_EVENT(6, "ssd: sch %x is %s subchannel\n",
-			      irq, type[ssd_res->st]);
+			      irq, type[ssd_area->st]);
 		if (ioinfo[irq] == NULL)
 			/* FIXME: we should do device rec. here... */
-			return 0;
+			goto out;
 
 		ioinfo[irq]->ssd_info.valid = 1;
-		ioinfo[irq]->ssd_info.type = ssd_res->st;
+		ioinfo[irq]->ssd_info.type = ssd_area->st;
 	}
 
-	if (ssd_res->st == 0 || ssd_res->st == 2) {
+	if (ssd_area->st == 0 || ssd_area->st == 2) {
 		for (j = 0; j < 8; j++) {
-			if (!((0x80 >> j) & ssd_res->path_mask &
-			      ssd_res->fla_valid_mask))
+			if (!((0x80 >> j) & ssd_area->path_mask &
+			      ssd_area->fla_valid_mask))
 				continue;
-			chpid = ssd_res->chpid[j];
+			chpid = ssd_area->chpid[j];
 			if (chpid
 			    && (!test_and_set_bit (chpid, chpids_known))
 			    && (test_bit (chpid, chpids_logical)))
 				set_bit	 (chpid, chpids);
 
 			ioinfo[irq]->ssd_info.chpid[j] = chpid;
-			ioinfo[irq]->ssd_info.fla[j]   = ssd_res->fla[j];
+			ioinfo[irq]->ssd_info.fla[j]   = ssd_area->fla[j];
 		}
 	}
-	return 0;
+out:
+	free_page ((unsigned long) ssd_area);
+	return ret;
 }
 
 static int
@@ -216,6 +242,7 @@ static inline void
 s390_subchannel_remove_chpid(struct subchannel *sch, __u8 chpid)
 {
 	int j;
+	int mask;
 
 	for (j = 0; j < 8; j++)
 		if (sch->schib.pmcw.chpid[j] == chpid)
@@ -223,16 +250,68 @@ s390_subchannel_remove_chpid(struct subchannel *sch, __u8 chpid)
 	if (j >= 8)
 		return;
 
+	mask = 0x80 >> j;
 	spin_lock(&sch->lock);
 
 	chsc_validate_chpids(sch);
 
-	/* just to be sure... */
-	sch->lpm &= ~(0x80>>j);
+	stsch(sch->irq, &sch->schib);
+	if (sch->vpm == mask) {
+		dev_fsm_event(sch->dev.driver_data, DEV_EVENT_NOTOPER);
+		goto out_unlock;
+	}
+	if ((sch->schib.scsw.actl & (SCSW_ACTL_CLEAR_PEND |
+				     SCSW_ACTL_HALT_PEND |
+				     SCSW_ACTL_START_PEND |
+				     SCSW_ACTL_RESUME_PEND)) &&
+	    (sch->schib.pmcw.lpum == mask)) {
+		int cc = cio_cancel(sch);
+		
+		if (cc == -ENODEV) {
+			dev_fsm_event(sch->dev.driver_data, DEV_EVENT_NOTOPER);
+			goto out_unlock;
+		}
+
+		if (cc == -EINVAL) {
+			struct ccw_device *cdev;
+
+			cc = cio_clear(sch);
+			if (cc == -ENODEV) {
+				dev_fsm_event(sch->dev.driver_data,
+					      DEV_EVENT_NOTOPER);
+				goto out_unlock;
+			}
+			/* Call handler. */
+			cdev = sch->dev.driver_data;
+			cdev->private->state = DEV_STATE_CLEAR_VERIFY;
+			if (cdev->handler)
+				cdev->handler(cdev, cdev->private->intparm,
+					      ERR_PTR(-EIO));
+			goto out_unlock;
+		}
+	} else if ((sch->schib.scsw.actl & SCSW_ACTL_DEVACT) &&
+		   (sch->schib.scsw.actl & SCSW_ACTL_SCHACT) &&
+		   (sch->schib.pmcw.lpum == mask)) {
+		struct ccw_device *cdev;
+		int cc;
+
+		cc = cio_clear(sch);
+		if (cc == -ENODEV) {
+			dev_fsm_event(sch->dev.driver_data, DEV_EVENT_NOTOPER);
+			goto out_unlock;
+		}
+		/* Call handler. */
+		cdev = sch->dev.driver_data;
+		cdev->private->state = DEV_STATE_CLEAR_VERIFY;
+		if (cdev->handler)
+			cdev->handler(cdev, cdev->private->intparm,
+				      ERR_PTR(-EIO));
+		goto out_unlock;
+	}
 
 	/* trigger path verification. */
 	dev_fsm_event(sch->dev.driver_data, DEV_EVENT_VERIFY);
-
+out_unlock:
 	spin_unlock(&sch->lock);
 }
 
@@ -265,7 +344,7 @@ s390_set_chpid_offline( __u8 chpid)
 		sch = ioinfo[irq];
 		if (sch == NULL)
 			continue;  /* we don't know the device anyway */
-		/* FIXME: Kill pending I/O. */
+
 		s390_subchannel_remove_chpid(sch, chpid);
 	}
 #endif
@@ -349,7 +428,7 @@ s390_process_res_acc (u8 chpid, __u16 fla, u32 fla_mask)
 	if (!test_bit(chpid, chpids_logical))
 		return; /* no need to do the rest */
 
-	for (irq = 0; irq <= __MAX_SUBCHANNELS; irq++) {
+	for (irq = 0; irq < __MAX_SUBCHANNELS; irq++) {
 		int chp_mask;
 
 		sch = ioinfo[irq];
@@ -369,7 +448,6 @@ s390_process_res_acc (u8 chpid, __u16 fla, u32 fla_mask)
 			continue;
 		}
 	
-		/* FIXME: Kill pending I/O. */
 		spin_lock_irq(&sch->lock);
 
 		chp_mask = s390_process_res_acc_sch(chpid, fla, fla_mask, sch);
@@ -402,92 +480,97 @@ s390_process_res_acc (u8 chpid, __u16 fla, u32 fla_mask)
 static void
 do_process_crw(void *ignore)
 {
-	int do_sei;
+	struct {
+		struct chsc_header request;
+		u32 reserved1;
+		u32 reserved2;
+		u32 reserved3;
+		struct chsc_header response;
+		u32 reserved4;
+		u8  flags;
+		u8  vf;		/* validity flags */
+		u8  rs;		/* reporting source */
+		u8  cc;		/* content code */
+		u16 fla;	/* full link address */
+		u16 rsid;	/* reporting source id */
+		u32 reserved5;
+		u32 reserved6;
+		u32 ccdf;	/* content-code dependent field */
+		u32 reserved7;
+		u32 reserved8;
+		u32 reserved9;
+	} *sei_area;
 
 	/*
 	 * build the chsc request block for store event information
 	 * and do the call
 	 */
+	sei_area = (void *)get_zeroed_page(GFP_KERNEL | GFP_DMA);
 
-	/* FIXME: chsc_area_sei cannot be on the stack since it needs to
-	 * be page-aligned. Implement proper locking or dynamic
-	 * allocation or prove that this function does not have to be
-	 * reentrant! */
-	static struct sei_area chsc_area_sei
-		__attribute__ ((aligned(PAGE_SIZE))) = {
-			.request_block = {
-				.command_code1 = 0x0010,
-				.command_code2 = 0x000e
-			}
-		};
-
-	typeof (chsc_area_sei.response_block)
-		*sei_res = &chsc_area_sei.response_block;
-
+	if (!sei_area) {
+		CIO_CRW_EVENT(0, "No memory for sei area!\n");
+		return;
+	}
 
 	CIO_TRACE_EVENT( 2, "prcss");
 
-	do_sei = 1;
-
-	while (do_sei) {
+	do {
 		int ccode;
+		memset(sei_area, 0, sizeof(*sei_area));
 
-		ccode = chsc(&chsc_area_sei);
+		sei_area->request = (struct chsc_header) {
+			.length = 0x0010,
+			.code   = 0x000e,
+		};
+
+		ccode = chsc(sei_area);
 		if (ccode > 0)
-			return;
+			goto out;
 
-		switch (sei_res->response_code) {
+		switch (sei_area->response.code) {
 			/* for debug purposes, check for problems */
 		case 0x0001:
+			CIO_CRW_EVENT(4, "chsc_process_crw: event information "
+					"successfully stored\n");
 			break; /* everything ok */
 		case 0x0002:
 			CIO_CRW_EVENT(2,
 				      "chsc_process_crw: invalid command!\n");
-			return;
+			goto out;
 		case 0x0003:
 			CIO_CRW_EVENT(2, "chsc_process_crw: error in chsc "
 				      "request block!\n");
-			return;
+			goto out;
 		case 0x0005:
 			CIO_CRW_EVENT(2, "chsc_process_crw: no event "
 				      "information stored\n");
-			return;
+			goto out;
 		default:
 			CIO_CRW_EVENT(2, "chsc_process_crw: chsc response %d\n",
-				      sei_res->response_code);
-			return;
+				      sei_area->response.code);
+			goto out;
 		}
-		
-		CIO_CRW_EVENT(4, "chsc_process_crw: event information "
-			      "successfully stored\n");
-
-		/* Check if there is more event information pending. */
-		if (sei_res->flags & 0x80)
-			CIO_CRW_EVENT( 2, "chsc_process_crw: "
-				       "further event information pending\n");
-		else
-			do_sei = 0;
 
 		/* Check if we might have lost some information. */
-		if (sei_res->flags & 0x40)
-			CIO_CRW_EVENT( 2, "chsc_process_crw: Event information "
+		if (sei_area->flags & 0x40)
+			CIO_CRW_EVENT(2, "chsc_process_crw: Event information "
 				       "has been lost due to overflow!\n");
 
-		if (sei_res->rs != 4) {
+		if (sei_area->rs != 4) {
 			CIO_CRW_EVENT(2, "chsc_process_crw: reporting source "
 				      "(%04X) isn't a chpid!\n",
-				      sei_res->rsid);
+				      sei_area->rsid);
 			continue;
 		}
-		
+
 		/* which kind of information was stored? */
-		switch (sei_res->cc) {
+		switch (sei_area->cc) {
 		case 1: /* link incident*/
 			CIO_CRW_EVENT(4, "chsc_process_crw: "
 				      "channel subsystem reports link incident,"
-				      " source is chpid %x\n", sei_res->rsid);
+				      " source is chpid %x\n", sei_area->rsid);
 			
-			s390_set_chpid_offline(sei_res->rsid);
+			s390_set_chpid_offline(sei_area->rsid);
 			break;
 			
 		case 2: /* i/o resource accessibiliy */
@@ -495,27 +578,27 @@ do_process_crw(void *ignore)
 				      "channel subsystem reports some I/O "
 				      "devices may have become accessible\n");
 			pr_debug("Data received after sei: \n");
-			pr_debug("Validity flags: %x\n", sei_res->vf);
+			pr_debug("Validity flags: %x\n", sei_area->vf);
 			
 			/* allocate a new channel path structure, if needed */
-			if (chps[sei_res->rsid] == NULL)
-				new_channel_path(sei_res->rsid, CHP_ONLINE);
+			if (chps[sei_area->rsid] == NULL)
+				new_channel_path(sei_area->rsid, CHP_ONLINE);
 			else
-				set_chp_status(sei_res->rsid, CHP_ONLINE);
+				set_chp_status(sei_area->rsid, CHP_ONLINE);
 			
-			if ((sei_res->vf & 0x80) == 0) {
-				pr_debug("chpid: %x\n", sei_res->rsid);
-				s390_process_res_acc(sei_res->rsid, 0, 0);
-			} else if ((sei_res->vf & 0xc0) == 0x80) {
+			if ((sei_area->vf & 0x80) == 0) {
+				pr_debug("chpid: %x\n", sei_area->rsid);
+				s390_process_res_acc(sei_area->rsid, 0, 0);
+			} else if ((sei_area->vf & 0xc0) == 0x80) {
 				pr_debug("chpid: %x link addr: %x\n",
-					 sei_res->rsid, sei_res->fla);
-				s390_process_res_acc(sei_res->rsid,
-						     sei_res->fla, 0xff00);
-			} else if ((sei_res->vf & 0xc0) == 0xc0) {
+					 sei_area->rsid, sei_area->fla);
+				s390_process_res_acc(sei_area->rsid,
+						     sei_area->fla, 0xff00);
+			} else if ((sei_area->vf & 0xc0) == 0xc0) {
 				pr_debug("chpid: %x full link addr: %x\n",
-					 sei_res->rsid, sei_res->fla);
-				s390_process_res_acc(sei_res->rsid,
-						     sei_res->fla, 0xffff);
+					 sei_area->rsid, sei_area->fla);
+				s390_process_res_acc(sei_area->rsid,
+						     sei_area->fla, 0xffff);
 			}
 			pr_debug("\n");
 			
@@ -523,15 +606,13 @@ do_process_crw(void *ignore)
 			
 		default: /* other stuff */
 			CIO_CRW_EVENT(4, "chsc_process_crw: event %d\n",
-				      sei_res->cc);
+				      sei_area->cc);
 			break;
 		}
-		if (do_sei) {
-			memset(&chsc_area_sei, 0, sizeof(struct sei_area));
-			chsc_area_sei.request_block.command_code1 = 0x0010;
-			chsc_area_sei.request_block.command_code2 = 0x000e;
-		}
-	}
+	} while (sei_area->flags & 0x80);
+
+out:
+	free_page((unsigned long)sei_area);
 }
 
 void
@@ -539,7 +620,7 @@ chsc_process_crw(void)
 {
 	static DECLARE_WORK(work, do_process_crw, 0);
 
-	schedule_work(&work);
+	queue_work(ccw_device_work, &work);
 }
 
 static void
@@ -555,7 +636,7 @@ chp_add(int chpid)
 	sprintf(dbf_txt, "cadd%x", chpid);
 	CIO_TRACE_EVENT(2, dbf_txt);
 
-	for (irq = 0; irq <= __MAX_SUBCHANNELS; irq++) {
+	for (irq = 0; irq < __MAX_SUBCHANNELS; irq++) {
 		int i;
 
 		sch = ioinfo[irq];
@@ -567,7 +648,6 @@ chp_add(int chpid)
 			continue;
 		}
 	
-		/* FIXME: Kill pending I/O. */
 		spin_lock(&sch->lock);
 		for (i=0; i<8; i++)
 			if (sch->schib.pmcw.chpid[i] == chpid) {
@@ -599,26 +679,9 @@ chp_add(int chpid)
  * Handling of crw machine checks with channel path source.
  */
 void
-chp_process_crw(int chpid)
+chp_process_crw(int chpid, int on)
 {
-	/*
-	 * Update our descriptions. We need this since we don't always
-	 * get machine checks for path come and can't rely on our information
-	 * being consistent otherwise.
-	 */
-	chsc_get_sch_descriptions();
-	if (!cio_chsc_desc_avail) {
-		/*
-		 * Something went wrong...
-		 * We can't reliably say whether a path was there before.
-		 */
-		CIO_CRW_EVENT(0, "Error: Could not retrieve "
-			      "subchannel descriptions, will not process chp"
-			      "machine check...\n");
-		return;
-	}
-
-	if (!test_bit(chpid, chpids)) {
+	if (on == 0) {
 		/* Path has gone. We use the link incident routine.*/
 		s390_set_chpid_offline(chpid);
 	} else {
@@ -645,9 +708,6 @@ s390_vary_chpid( __u8 chpid, int on)
 	char dbf_text[15];
 	struct subchannel *sch;
 	int irq;
-
-	if (chpid <=0 || chpid >= NR_CHPIDS)
-		return -EINVAL;
 
 	sprintf(dbf_text, on?"varyon%x":"varyoff%x", chpid);
 	CIO_TRACE_EVENT( 2, dbf_text);

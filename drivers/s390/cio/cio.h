@@ -98,8 +98,6 @@ struct subchannel {
 
 	__u8 vpm;		/* verified path mask */
 	__u8 lpm;		/* logical path mask */
-	// TODO: intparm for second start i/o
-	unsigned long u_intparm;	/* user interruption parameter */
 	struct schib schib;	/* subchannel information block */
 	struct orb orb;		/* operation request block */
 	struct ccw1 sense_ccw;	/* static ccw for sense command */
@@ -116,11 +114,10 @@ extern int cio_validate_subchannel (struct subchannel *, unsigned int);
 extern int cio_enable_subchannel (struct subchannel *, unsigned int);
 extern int cio_disable_subchannel (struct subchannel *);
 extern int cio_cancel (struct subchannel *);
-extern int cio_clear (struct subchannel *, unsigned long);
-extern int cio_do_io (struct subchannel *, struct ccw1 *, unsigned long, __u8);
+extern int cio_clear (struct subchannel *);
 extern int cio_resume (struct subchannel *);
-extern int cio_halt (struct subchannel *, unsigned long);
-extern int cio_start (struct subchannel *, struct ccw1 *, unsigned long, __u8);
+extern int cio_halt (struct subchannel *);
+extern int cio_start (struct subchannel *, struct ccw1 *, unsigned int, __u8);
 extern int cio_cancel (struct subchannel *);
 extern int cio_set_options (struct subchannel *, int);
 extern int cio_get_options (struct subchannel *);

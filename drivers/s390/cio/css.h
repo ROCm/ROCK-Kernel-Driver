@@ -79,6 +79,7 @@ struct ccw_device_private {
 		unsigned int esid:1;        /* Ext. SenseID supported by HW */
 		unsigned int dosense:1;	    /* delayed SENSE required */
 	} __attribute__((packed)) flags;
+	unsigned long intparm;	/* user interruption parameter */
 	struct qdio_irq *qdio_data;
 	struct irb irb;		/* device status */
 	struct senseid senseid;	/* SenseID info */

@@ -167,7 +167,7 @@ ccw_device_accumulate_esw(struct ccw_device *cdev, struct irb *irb)
 
 	/* Copy authorization bit. */
 	cdev_irb->esw.esw0.erw.auth = irb->esw.esw0.erw.auth;
-	/* Copy path verification required flag. FIXME: how to verify ?? */
+	/* Copy path verification required flag. */
 	cdev_irb->esw.esw0.erw.pvrf = irb->esw.esw0.erw.pvrf;
 	/* Copy concurrent sense bit. */
 	cdev_irb->esw.esw0.erw.cons = irb->esw.esw0.erw.cons;
@@ -309,7 +309,7 @@ ccw_device_do_sense(struct ccw_device *cdev, struct irb *irb)
 	sch->sense_ccw.flags = CCW_FLAG_SLI;
 
 	/* 0xe2C5D5E2 == "SENS" in ebcdic */
-	return cio_start (sch, &sch->sense_ccw, 0xE2C5D5E2, 0);
+	return cio_start (sch, &sch->sense_ccw, 0xE2C5D5E2, 0xff);
 }
 
 /*

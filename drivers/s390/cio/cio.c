@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/cio.c
  *   S/390 common I/O routines -- low level i/o calls
- *   $Revision: 1.91 $
+ *   $Revision: 1.97 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -176,13 +176,13 @@ cio_start_handle_notoper(struct subchannel *sch, __u8 lpm)
 	CIO_TRACE_EVENT(0, dbf_text);
 	CIO_HEX_EVENT(0, &sch->schib, sizeof (struct schib));
 
-	return -ENODEV;
+	return (sch->lpm ? -EACCES : -ENODEV);
 }
 
 int
 cio_start (struct subchannel *sch,	/* subchannel structure */
 	   struct ccw1 * cpa,		/* logical channel prog addr */
-	   unsigned long intparm,	/* interruption parameter */
+	   unsigned int intparm,	/* interruption parameter */
 	   __u8 lpm)			/* logical path mask */
 {
 	char dbf_txt[15];
@@ -191,7 +191,7 @@ cio_start (struct subchannel *sch,	/* subchannel structure */
 	sprintf (dbf_txt, "stIO%x", sch->irq);
 	CIO_TRACE_EVENT (4, dbf_txt);
 
-	sch->orb.intparm = (__u32) (long) &sch->u_intparm;
+	sch->orb.intparm = intparm;
 	sch->orb.fmt = 1;
 
 	sch->orb.pfch = sch->options.prefetch == 0;
@@ -219,7 +219,6 @@ cio_start (struct subchannel *sch,	/* subchannel structure */
 		/*
 		 * initialize device status information
 		 */
-		sch->u_intparm = intparm;
 		sch->schib.scsw.actl |= SCSW_ACTL_START_PEND;
 		return 0;
 	case 1:		/* status pending */
@@ -265,13 +264,10 @@ cio_resume (struct subchannel *sch)
 }
 
 /*
- * Note: The "intparm" parameter is not used by the halt_IO() function
- *	 itself, as no ORB is built for the HSCH instruction. However,
- *	 it allows the device interrupt handler to associate the upcoming
- *	 interrupt with the halt_IO() request.
+ * halt I/O operation
  */
 int
-cio_halt(struct subchannel *sch, unsigned long intparm)
+cio_halt(struct subchannel *sch)
 {
 	char dbf_txt[15];
 	int ccode;
@@ -297,7 +293,6 @@ cio_halt(struct subchannel *sch, unsigned long intparm)
 
 	switch (ccode) {
 	case 0:
-		sch->u_intparm = intparm;
 		sch->schib.scsw.actl |= SCSW_ACTL_HALT_PEND;
 		return 0;
 	case 1:		/* status pending */
@@ -309,13 +304,10 @@ cio_halt(struct subchannel *sch, unsigned long intparm)
 }
 
 /*
- * Note: The "intparm" parameter is not used by the clear_IO() function
- *	 itself, as no ORB is built for the CSCH instruction. However,
- *	 it allows the device interrupt handler to associate the upcoming
- *	 interrupt with the clear_IO() request.
+ * Clear I/O operation
  */
 int
-cio_clear(struct subchannel *sch, unsigned long intparm)
+cio_clear(struct subchannel *sch)
 {
 	char dbf_txt[15];
 	int ccode;
@@ -340,7 +332,6 @@ cio_clear(struct subchannel *sch, unsigned long intparm)
 
 	switch (ccode) {
 	case 0:
-		sch->u_intparm = intparm;
 		sch->schib.scsw.actl |= SCSW_ACTL_CLEAR_PEND;
 		return 0;
 	default:		/* device not operational */
@@ -374,6 +365,8 @@ cio_cancel (struct subchannel *sch)
 
 	switch (ccode) {
 	case 0:		/* success */
+		/* Update information in scsw. */
+		stsch (sch->irq, &sch->schib);
 		return 0;
 	case 1:		/* status pending */
 		return -EBUSY;
@@ -620,7 +613,7 @@ do_IRQ (struct pt_regs regs)
 		 */
 		if (tpi_info->adapter_IO == 1 &&
 		    tpi_info->int_type == IO_INTERRUPT_TYPE) {
-			do_adapter_IO (tpi_info->intparm);
+			do_adapter_IO();
 			continue;
 		}
 		sch = ioinfo[tpi_info->irq];
