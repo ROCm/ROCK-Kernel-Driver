@@ -544,20 +544,20 @@ static int scsi_send_eh_cmnd(struct scsi_cmnd *scmd, int timeout)
 static int scsi_request_sense(struct scsi_cmnd *scmd)
 {
 	static unsigned char generic_sense[6] =
-	{REQUEST_SENSE, 0, 0, 0, 255, 0};
-	unsigned char scsi_result0[256], *scsi_result = &scsi_result0[0];
+	{REQUEST_SENSE, 0, 0, 0, 254, 0};
+	unsigned char *scsi_result;
 	int saved_result;
 	int rtn;
 
 	memcpy(scmd->cmnd, generic_sense, sizeof(generic_sense));
 
-	if (scmd->device->host->hostt->unchecked_isa_dma) {
-		scsi_result = kmalloc(512, GFP_ATOMIC | __GFP_DMA);
-		if (unlikely(!scsi_result)) {
-			printk(KERN_ERR "%s: cannot allocate scsi_result.\n",
-					__FUNCTION__);
-			return FAILED;
-		}
+	scsi_result = kmalloc(254, GFP_ATOMIC | (scmd->device->host->hostt->unchecked_isa_dma) ? __GFP_DMA : 0);
+
+
+	if (unlikely(!scsi_result)) {
+		printk(KERN_ERR "%s: cannot allocate scsi_result.\n",
+		       __FUNCTION__);
+		return FAILED;
 	}
 
 	/*
@@ -567,11 +567,11 @@ static int scsi_request_sense(struct scsi_cmnd *scmd)
 	 * address (db).  0 is not a valid sense code. 
 	 */
 	memset(scmd->sense_buffer, 0, sizeof(scmd->sense_buffer));
-	memset(scsi_result, 0, 256);
+	memset(scsi_result, 0, 254);
 
 	saved_result = scmd->result;
 	scmd->request_buffer = scsi_result;
-	scmd->request_bufflen = 256;
+	scmd->request_bufflen = 254;
 	scmd->use_sg = 0;
 	scmd->cmd_len = COMMAND_SIZE(scmd->cmnd[0]);
 	scmd->sc_data_direction = SCSI_DATA_READ;
@@ -580,13 +580,12 @@ static int scsi_request_sense(struct scsi_cmnd *scmd)
 	rtn = scsi_send_eh_cmnd(scmd, SENSE_TIMEOUT);
 
 	/* last chance to have valid sense data */
-	if (!SCSI_SENSE_VALID(scmd)) {
+	if(!SCSI_SENSE_VALID(scmd)) {
 		memcpy(scmd->sense_buffer, scmd->request_buffer,
-				sizeof(scmd->sense_buffer));
+		       sizeof(scmd->sense_buffer));
 	}
 
-	if (scsi_result != &scsi_result0[0])
-		kfree(scsi_result);
+	kfree(scsi_result);
 
 	/*
 	 * when we eventually call scsi_finish, we really wish to complete
