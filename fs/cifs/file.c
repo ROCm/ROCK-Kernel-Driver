@@ -393,7 +393,7 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 {
 	struct address_space *mapping = page->mapping;
 	loff_t offset = (loff_t)page->index << PAGE_CACHE_SHIFT;
-	char * write_data = kmap(page);
+	char * write_data;
 	int rc = -EFAULT;
 	int bytes_written = 0;
 	struct cifs_sb_info *cifs_sb;
@@ -411,8 +411,9 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 
 	/* figure out which file struct to use 
 	if (file->private_data == NULL) {
-	   FreeXid(xid);
-	   return -EBADF;
+		kunmap(page);
+		FreeXid(xid);
+		return -EBADF;
 	}     
 	 */
 	if (!mapping) {
@@ -424,15 +425,17 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 	}
 
 	offset += (loff_t)from;
+	write_data = kmap(page);
 	write_data += from;
 
 	if((to > PAGE_CACHE_SIZE) || (from > to) || (offset > mapping->host->i_size)) {
+		kunmap(page);
 		FreeXid(xid);
 		return -EIO;
 	}
 
 	/* check to make sure that we are not extending the file */
-    if(mapping->host->i_size - offset < (loff_t)to)
+	if(mapping->host->i_size - offset < (loff_t)to)
 		to = (unsigned)(mapping->host->i_size - offset); 
 		
 
@@ -459,6 +462,7 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 		rc = -EIO;
 	}
 
+	kunmap(page);
 	FreeXid(xid);
 	return rc;
 }
@@ -604,6 +608,7 @@ cifs_read(struct file * file, char *read_data, size_t read_size,
 	int rc = -EACCES;
 	int bytes_read = 0;
 	int total_read;
+	int current_read_size;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	int xid;
@@ -620,10 +625,11 @@ cifs_read(struct file * file, char *read_data, size_t read_size,
 
 	for (total_read = 0,current_offset=read_data; read_size > total_read;
 				total_read += bytes_read,current_offset+=bytes_read) {
+		current_read_size = min_t(const int,read_size - total_read,cifs_sb->rsize);
 		rc = CIFSSMBRead(xid, pTcon,
 				 ((struct cifsFileInfo *) file->
 				  private_data)->netfid,
-				 read_size - total_read, *poffset,
+				 current_read_size, *poffset,
 				 &bytes_read, &current_offset);
 		if (rc || (bytes_read == 0)) {
 			if (total_read) {
@@ -740,6 +746,8 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 			num_pages-i, (unsigned long) offset)); 
 		
 		read_size = (num_pages - i) * PAGE_CACHE_SIZE;
+		/* Read size needs to be in multiples of one page */
+		read_size = min_t(const unsigned int,read_size,cifs_sb->rsize & PAGE_CACHE_MASK);
 		rc = CIFSSMBRead(xid, pTcon,
 			((struct cifsFileInfo *) file->
 			 private_data)->netfid,
@@ -1061,11 +1069,11 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 
 	xid = GetXid();
 
-	data = kmalloc(4096, GFP_KERNEL);
-	pfindData = (FILE_DIRECTORY_INFO *) data;
-
 	cifs_sb = CIFS_SB(file->f_dentry->d_sb);
 	pTcon = cifs_sb->tcon;
+	data = kmalloc(pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE,
+			GFP_KERNEL);
+	pfindData = (FILE_DIRECTORY_INFO *) data;
 
 	full_path = build_wildcard_path_from_dentry(file->f_dentry);
 

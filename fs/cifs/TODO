@@ -42,13 +42,24 @@ extra copy in/out of the socket buffers in some cases.
 
 m) finish support for IPv6
 
-KNOWN BUGS (updated February 15, 2003)
+n) send oplock break response when sent (oplock currently disabled in
+/proc/fs/cifs)
+
+o) remove calls to set end of file by name when we already have file open
+(use the existing handle since some servers only support that and it
+reduces the oplock breaks coming from windows).  Piggyback identical
+file opens on top of each other by incrementing reference count rather
+than resending (helps reduce server resource utilization and avoid
+spurious oplock breaks).
+
+KNOWN BUGS (updated March 7, 2003)
 ====================================
 1) existing symbolic links (Windows reparse points) are recognized but
 can not be created remotely. They are implemented for Samba and those that
 support the CIFS Unix extensions but Samba has a bug currently handling
 symlink text beginning with slash
 2) delete of file with read-only attribute set will fail (may be ok)
+3) mount helper syntax not quite matching man page
 
 Misc testing to do
 =================

@@ -1,3 +1,16 @@
+Version 0.70
+------------
+Fix oops in get dfs referral (triggered when null path sent in to
+mount).  Add support for overriding rsize at mount time.
+
+Version 0.69
+------------
+Fix buffer overrun in readdir which caused intermittent kernel oopses.
+Fix writepage code to release kmap on write data.  Allow "-ip=" new 
+mount option to be passed in on parameter distinct from the first part
+(server name portion of) the UNC name.  Allow override of the
+tcp port of the target server via new mount option "-port="  
+
 Version 0.68
 ------------
 Fix search handle leak on rewind.  Fix setuid and gid so that they are 
