@@ -1,6 +1,6 @@
 # Makefile for the Linux MCA bus support
 
-obj-y	:= mca-bus.o mca-legacy.o
+obj-y	:= mca-bus.o mca-device.o mca-legacy.o
 
 obj-$(CONFIG_PROC_FS)	+= mca-proc.o
 

@@ -198,10 +198,7 @@ unsigned char mca_read_stored_pos(int slot, int reg)
 	if(!mca_dev)
 		return 0;
 
-	if(reg < 0 || reg >= 8)
-		return 0;
-
-	return mca_dev->pos[reg];
+	return mca_device_read_stored_pos(mca_dev, reg);
 }
 EXPORT_SYMBOL(mca_read_stored_pos);
 
@@ -220,40 +217,11 @@ EXPORT_SYMBOL(mca_read_stored_pos);
 unsigned char mca_read_pos(int slot, int reg)
 {
 	struct mca_device *mca_dev = mca_find_device_by_slot(slot);
-	char byte;
-	unsigned long flags;
 
 	if(!mca_dev)
 		return 0;
 
-	if(reg < 0 || reg >= 8)
-		return 0;
-
-	spin_lock_irqsave(&mca_lock, flags);
-	if(mca_dev->pos_register) {
-		/* Disable adapter setup, enable motherboard setup */
-
-		outb_p(0, MCA_ADAPTER_SETUP_REG);
-		outb_p(mca_dev->pos_register, MCA_MOTHERBOARD_SETUP_REG);
-
-		byte = inb_p(MCA_POS_REG(reg));
-		outb_p(0xff, MCA_MOTHERBOARD_SETUP_REG);
-	} else {
-
-		/* Make sure motherboard setup is off */
-
-		outb_p(0xff, MCA_MOTHERBOARD_SETUP_REG);
-
-		/* Read the appropriate register */
-
-		outb_p(0x8|(mca_dev->slot & 0xf), MCA_ADAPTER_SETUP_REG);
-		byte = inb_p(MCA_POS_REG(reg));
-		outb_p(0, MCA_ADAPTER_SETUP_REG);
-	}
-	spin_unlock_irqrestore(&mca_lock, flags);
-	mca_dev->pos[reg] = byte;
-
-	return byte;
+	return mca_device_read_pos(mca_dev, reg);
 }
 EXPORT_SYMBOL(mca_read_pos);
 
@@ -285,31 +253,11 @@ EXPORT_SYMBOL(mca_read_pos);
 void mca_write_pos(int slot, int reg, unsigned char byte)
 {
 	struct mca_device *mca_dev = mca_find_device_by_slot(slot);
-	unsigned long flags;
 
 	if(!mca_dev)
 		return;
 
-	if(reg < 0 || reg >= 8)
-		return;
-
-	spin_lock_irqsave(&mca_lock, flags);
-
-	/* Make sure motherboard setup is off */
-
-	outb_p(0xff, MCA_MOTHERBOARD_SETUP_REG);
-
-	/* Read in the appropriate register */
-
-	outb_p(0x8|(slot&0xf), MCA_ADAPTER_SETUP_REG);
-	outb_p(byte, MCA_POS_REG(reg));
-	outb_p(0, MCA_ADAPTER_SETUP_REG);
-
-	spin_unlock_irqrestore(&mca_lock, flags);
-
-	/* Update the global register list, while we have the byte */
-
-	mca_dev->pos[reg] = byte;
+	mca_device_write_pos(mca_dev, reg, byte);
 }
 EXPORT_SYMBOL(mca_write_pos);
 
@@ -368,7 +316,7 @@ int mca_is_adapter_used(int slot)
 	if(!mca_dev)
 		return 0;
 
-	return mca_dev->driver_loaded;
+	return mca_device_claimed(mca_dev);
 }
 EXPORT_SYMBOL(mca_is_adapter_used);
 
@@ -391,10 +339,10 @@ int mca_mark_as_used(int slot)
 		/* FIXME: this is actually a severe error */
 		return 1;
 
-	if(mca_dev->driver_loaded)
+	if(mca_device_claimed(mca_dev))
 		return 1;
 
-	mca_dev->driver_loaded = 1;
+	mca_device_set_claim(mca_dev, 1);
 
 	return 0;
 }
@@ -414,7 +362,7 @@ void mca_mark_as_unused(int slot)
 	if(!mca_dev)
 		return;
 
-	mca_dev->driver_loaded = 0;
+	mca_device_set_claim(mca_dev, 0);
 }
 EXPORT_SYMBOL(mca_mark_as_unused);
 
@@ -429,12 +377,15 @@ EXPORT_SYMBOL(mca_mark_as_unused);
 int mca_isadapter(int slot)
 {
 	struct mca_device *mca_dev = mca_find_device_by_slot(slot);
+	enum MCA_AdapterStatus status;
 
 	if(!mca_dev)
 		return 0;
 
-	return mca_dev->status == MCA_ADAPTER_NORMAL
-		|| mca_dev->status == MCA_ADAPTER_DISABLED;
+	status = mca_device_status(mca_dev);
+
+	return status == MCA_ADAPTER_NORMAL
+		|| status == MCA_ADAPTER_DISABLED;
 }
 EXPORT_SYMBOL(mca_isadapter);
 
@@ -453,5 +404,5 @@ int mca_isenabled(int slot)
 	if(!mca_dev)
 		return 0;
 
-	return mca_dev->status == MCA_ADAPTER_NORMAL;
+	return mca_device_status(mca_dev) == MCA_ADAPTER_NORMAL;
 }

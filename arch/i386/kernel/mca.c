@@ -158,6 +158,86 @@ static int mca_read_and_store_pos(unsigned char *pos) {
 	return found;
 }
 
+static unsigned char mca_pc_read_pos(struct mca_device *mca_dev, int reg)
+{
+	unsigned char byte;
+	unsigned long flags;
+
+	if(reg < 0 || reg >= 8)
+		return 0;
+
+	spin_lock_irqsave(&mca_lock, flags);
+	if(mca_dev->pos_register) {
+		/* Disable adapter setup, enable motherboard setup */
+
+		outb_p(0, MCA_ADAPTER_SETUP_REG);
+		outb_p(mca_dev->pos_register, MCA_MOTHERBOARD_SETUP_REG);
+
+		byte = inb_p(MCA_POS_REG(reg));
+		outb_p(0xff, MCA_MOTHERBOARD_SETUP_REG);
+	} else {
+
+		/* Make sure motherboard setup is off */
+
+		outb_p(0xff, MCA_MOTHERBOARD_SETUP_REG);
+
+		/* Read the appropriate register */
+
+		outb_p(0x8|(mca_dev->slot & 0xf), MCA_ADAPTER_SETUP_REG);
+		byte = inb_p(MCA_POS_REG(reg));
+		outb_p(0, MCA_ADAPTER_SETUP_REG);
+	}
+	spin_unlock_irqrestore(&mca_lock, flags);
+
+	mca_dev->pos[reg] = byte;
+
+	return byte;
+}
+
+static void mca_pc_write_pos(struct mca_device *mca_dev, int reg,
+			     unsigned char byte)
+{
+	unsigned long flags;
+
+	if(reg < 0 || reg >= 8)
+		return;
+
+	spin_lock_irqsave(&mca_lock, flags);
+
+	/* Make sure motherboard setup is off */
+
+	outb_p(0xff, MCA_MOTHERBOARD_SETUP_REG);
+
+	/* Read in the appropriate register */
+
+	outb_p(0x8|(mca_dev->slot&0xf), MCA_ADAPTER_SETUP_REG);
+	outb_p(byte, MCA_POS_REG(reg));
+	outb_p(0, MCA_ADAPTER_SETUP_REG);
+
+	spin_unlock_irqrestore(&mca_lock, flags);
+
+	/* Update the global register list, while we have the byte */
+
+	mca_dev->pos[reg] = byte;
+
+}
+
+/* for the primary MCA bus, we have identity transforms */
+static int mca_dummy_transform_irq(struct mca_device * mca_dev, int irq)
+{
+	return irq;
+}
+
+static int mca_dummy_transform_ioport(struct mca_device * mca_dev, int port)
+{
+	return port;
+}
+
+static void *mca_dummy_transform_memory(struct mca_device * mca_dev, void *mem)
+{
+	return mem;
+}
+
 
 static int __init mca_init(void)
 {
@@ -189,6 +269,11 @@ static int __init mca_init(void)
 	/* All MCA systems have at least a primary bus */
 	bus = mca_attach_bus(MCA_PRIMARY_BUS);
 	bus->default_dma_mask = 0xffffffffLL;
+	bus->f.mca_write_pos = mca_pc_write_pos;
+	bus->f.mca_read_pos = mca_pc_read_pos;
+	bus->f.mca_transform_irq = mca_dummy_transform_irq;
+	bus->f.mca_transform_ioport = mca_dummy_transform_ioport;
+	bus->f.mca_transform_memory = mca_dummy_transform_memory;
 
 	/* get the motherboard device */
 	mca_dev = kmalloc(sizeof(struct mca_device), GFP_KERNEL);
