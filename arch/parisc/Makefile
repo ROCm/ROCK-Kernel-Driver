@@ -56,7 +56,6 @@ head-y			:= arch/parisc/kernel/head.o
 head-$(CONFIG_PARISC64)	:= arch/parisc/kernel/head64.o
 
 CFLAGS	+= $(cflags-y)
-HEAD	:= $(head-y)
 
 core-y	+= $(addprefix arch/parisc/, kernel/pdc_cons.o kernel/process.o   \
 		mm/ kernel/ hpux/ math-emu/ kernel/init_task.o )

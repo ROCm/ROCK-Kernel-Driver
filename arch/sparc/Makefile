@@ -37,7 +37,8 @@ endif
 #  Actual linking is done with "make image".
 LDFLAGS_vmlinux = -r
 
-HEAD := arch/sparc/kernel/head.o arch/sparc/kernel/init_task.o
+head-y := arch/sparc/kernel/head.o arch/sparc/kernel/init_task.o
+HEAD := $(head-y)
 
 core-y += arch/sparc/kernel/ arch/sparc/mm/ arch/sparc/math-emu/
 libs-y += arch/sparc/prom/ arch/sparc/lib/

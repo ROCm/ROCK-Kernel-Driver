@@ -22,7 +22,7 @@ CFLAGS		+= -msoft-float -pipe \
 		-Wno-uninitialized -mminimal-toc -mtraceback=full \
 		-finline-limit-2000 -mcpu=power4
 
-HEAD := arch/ppc64/kernel/head.o
+head-y := arch/ppc64/kernel/head.o
 
 libs-y				+= arch/ppc64/lib/
 core-y				+= arch/ppc64/kernel/

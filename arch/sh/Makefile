@@ -53,7 +53,7 @@ endif
 #
 CFLAGS		+= -pipe
 
-HEAD := arch/sh/kernel/head.o arch/sh/kernel/init_task.o
+head-y := arch/sh/kernel/head.o arch/sh/kernel/init_task.o
 
 LIBGCC := $(shell $(CC) $(CFLAGS) -print-libgcc-file-name)
 

@@ -31,7 +31,7 @@ cflags-$(CONFIG_ITANIUM_BSTEP_SPECIFIC)	+= -mb-step
 cflags-$(CONFIG_IA64_SGI_SN)		+= -DBRINGUP
 
 CFLAGS += $(cflags-y)
-HEAD := arch/ia64/kernel/head.o arch/ia64/kernel/init_task.o
+head-y := arch/ia64/kernel/head.o arch/ia64/kernel/init_task.o
 
 libs-y				+= arch/ia64/lib/
 core-y				+= arch/ia64/kernel/ arch/ia64/mm/

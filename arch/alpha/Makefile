@@ -90,7 +90,7 @@ endif
 # BWX is most important, but we don't really want any emulation ever.
 CFLAGS += $(cflags-y) -Wa,-mev6
 
-HEAD := arch/alpha/kernel/head.o
+head-y := arch/alpha/kernel/head.o
 
 core-y			+= arch/alpha/kernel/ arch/alpha/mm/
 core-$(CONFIG_MATHEMU)  += arch/alpha/math-emu/

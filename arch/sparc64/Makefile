@@ -61,7 +61,7 @@ ifeq ($(CONFIG_MCOUNT),y)
   CFLAGS := $(CFLAGS) -pg
 endif
 
-HEAD := arch/sparc64/kernel/head.o arch/sparc64/kernel/init_task.o
+head-y := arch/sparc64/kernel/head.o arch/sparc64/kernel/init_task.o
 
 core-y				+= arch/sparc64/kernel/ arch/sparc64/mm/
 core-$(CONFIG_SOLARIS_EMUL)	+= arch/sparc64/solaris/

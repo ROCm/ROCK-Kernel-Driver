@@ -54,9 +54,9 @@ CFLAGS := $(subst -fomit-frame-pointer,,$(CFLAGS)) -g
 endif
 
 ifndef CONFIG_SUN3
-HEAD := arch/m68k/kernel/head.o
+head-y := arch/m68k/kernel/head.o
 else
-HEAD := arch/m68k/kernel/sun3-head.o
+head-y := arch/m68k/kernel/sun3-head.o
 endif 
 
 core-y				+= arch/m68k/kernel/	arch/m68k/mm/
