@@ -823,7 +823,7 @@ void __init unflatten_device_tree(void)
 			strlcpy(cmd_line, p, min(l, COMMAND_LINE_SIZE));
 	}
 #ifdef CONFIG_CMDLINE
-	if (l == 0) /* dbl check */
+	if (l == 0 || (l == 1 && (*p) == 0))
 		strlcpy(cmd_line, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
 #endif /* CONFIG_CMDLINE */
 
