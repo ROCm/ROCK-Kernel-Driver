@@ -33,128 +33,19 @@
 
 #include "power.h"
 
-
-extern asmlinkage int pmdisk_arch_suspend(int resume);
-
-/* Variables to be preserved over suspend */
-extern int pagedir_order_check;
-extern int nr_copy_pages_check;
-
 /* For resume= kernel option */
 static char resume_file[256] = CONFIG_PM_DISK_PARTITION;
 
 static dev_t resume_device;
-/* Local variables that should not be affected by save */
-extern unsigned int nr_copy_pages;
 
-/* Suspend pagedir is allocated before final copy, therefore it
-   must be freed after resume 
-
-   Warning: this is evil. There are actually two pagedirs at time of
-   resume. One is "pagedir_save", which is empty frame allocated at
-   time of suspend, that must be freed. Second is "pagedir_nosave", 
-   allocated at time of resume, that travels through memory not to
-   collide with anything.
- */
-extern suspend_pagedir_t *pagedir_nosave;
 extern suspend_pagedir_t *pagedir_save;
-extern int pagedir_order;
-
-extern struct swsusp_info swsusp_info;
-
-
-/*
- * XXX: We try to keep some more pages free so that I/O operations succeed
- * without paging. Might this be more?
- */
-#define PAGES_FOR_IO	512
-
 
 /*
  * Saving part...
  */
 
 
-/* We memorize in swapfile_used what swap devices are used for suspension */
-#define SWAPFILE_UNUSED    0
-#define SWAPFILE_SUSPEND   1	/* This is the suspending device */
-#define SWAPFILE_IGNORED   2	/* Those are other swap devices ignored for suspension */
-
-extern int swsusp_swap_check(void);
 extern void swsusp_swap_lock(void);
-
-
-extern int swsusp_write_page(unsigned long addr, swp_entry_t * entry);
-extern int swsusp_data_write(void);
-extern void swsusp_data_free(void);
-
-/**
- *	free_pagedir - Free pages used by the page directory.
- */
-
-static void free_pagedir_entries(void)
-{
-	int num = swsusp_info.pagedir_pages;
-	int i;
-
-	for (i = 0; i < num; i++)
-		swap_free(swsusp_info.pagedir[i]);
-}
-
-
-/**
- *	write_pagedir - Write the array of pages holding the page directory.
- *	@last:	Last swap entry we write (needed for header).
- */
-
-static int write_pagedir(void)
-{
-	unsigned long addr = (unsigned long)pagedir_nosave;
-	int error = 0;
-	int n = SUSPEND_PD_PAGES(nr_copy_pages);
-	int i;
-
-	swsusp_info.pagedir_pages = n;
-	printk( "Writing pagedir (%d pages)\n", n);
-	for (i = 0; i < n && !error; i++, addr += PAGE_SIZE)
-		error = swsusp_write_page(addr,&swsusp_info.pagedir[i]);
-	return error;
-}
-
-extern void swsusp_init_header(void);
-extern int swsusp_close_swap(void);
-
-/**
- *	write_suspend_image - Write entire image and metadata.
- *
- */
-
-static int write_suspend_image(void)
-{
-	int error;
-
-	swsusp_init_header();
-	if ((error = swsusp_data_write()))
-		goto FreeData;
-
-	if ((error = write_pagedir()))
-		goto FreePagedir;
-
-	if ((error = swsusp_close_swap()))
-		goto FreePagedir;
- Done:
-	return error;
- FreePagedir:
-	free_pagedir_entries();
- FreeData:
-	swsusp_data_free();
-	goto Done;
-}
-
-
-extern void free_suspend_pagedir(unsigned long);
-
-
 
 /**
  *	suspend_save_image - Prepare and write saved image to swap.
@@ -172,6 +63,7 @@ extern void free_suspend_pagedir(unsigned long);
 
 static int suspend_save_image(void)
 {
+	extern int write_suspend_image(void);
 	int error;
 	device_resume();
 	swsusp_swap_lock();
@@ -184,56 +76,9 @@ static int suspend_save_image(void)
 /* More restore stuff */
 
 extern struct block_device * resume_bdev;
-extern int bio_read_page(pgoff_t page_off, void * page);
-extern int bio_write_page(pgoff_t page_off, void * page);
 
 extern dev_t __init name_to_dev_t(const char *line);
 
-
-static int __init read_pagedir(void)
-{
-	unsigned long addr;
-	int i, n = swsusp_info.pagedir_pages;
-	int error = 0;
-
-	pagedir_order = get_bitmask_order(n);
-
-	addr =__get_free_pages(GFP_ATOMIC, pagedir_order);
-	if (!addr)
-		return -ENOMEM;
-	pagedir_nosave = (struct pbe *)addr;
-
-	pr_debug("pmdisk: Reading pagedir (%d Pages)\n",n);
-
-	for (i = 0; i < n && !error; i++, addr += PAGE_SIZE) {
-		unsigned long offset = swp_offset(swsusp_info.pagedir[i]);
-		if (offset)
-			error = bio_read_page(offset, (void *)addr);
-		else
-			error = -EFAULT;
-	}
-	if (error)
-		free_pages((unsigned long)pagedir_nosave,pagedir_order);
-	return error;
-}
-
-
-static int __init read_suspend_image(void)
-{
-	extern int swsusp_data_read(void);
-	extern int swsusp_verify(void);
-
-	int error = 0;
-
-	if ((error = swsusp_verify()))
-		return error;
-	if ((error = read_pagedir()))
-		return error;
-	if ((error = swsusp_data_read())) {
-		free_pages((unsigned long)pagedir_nosave,pagedir_order);
-	}
-	return error;
-}
 
 
 /**
@@ -258,6 +103,7 @@ int pmdisk_write(void)
 
 int __init pmdisk_read(void)
 {
+	extern int read_suspend_image(void);
 	int error;
 
 	if (!strlen(resume_file))
@@ -288,6 +134,7 @@ int __init pmdisk_read(void)
 
 int pmdisk_free(void)
 {
+	extern void free_suspend_pagedir(unsigned long this_pagedir);
 	pr_debug( "Freeing prev allocated pagedir\n" );
 	free_suspend_pagedir((unsigned long)pagedir_save);
 	return 0;

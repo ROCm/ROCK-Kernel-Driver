@@ -122,16 +122,6 @@ struct swsusp_header {
 
 struct swsusp_info swsusp_info;
 
-struct link {
-	char dummy[PAGE_SIZE - sizeof(swp_entry_t)];
-	swp_entry_t next;
-};
-
-union diskpage {
-	union swap_header swh;
-	struct link link;
-};
-
 /*
  * XXX: We try to keep some more pages free so that I/O operations succeed
  * without paging. Might this be more?
@@ -283,7 +273,7 @@ void swsusp_swap_lock(void)
  *	errors, though we need to eventually fix the damn code.
  */
 
-int swsusp_write_page(unsigned long addr, swp_entry_t * loc)
+static int write_page(unsigned long addr, swp_entry_t * loc)
 {
 	swp_entry_t entry;
 	int error = 0;
@@ -309,7 +299,7 @@ int swsusp_write_page(unsigned long addr, swp_entry_t * loc)
  *	Walk the list of used swap entries and free each one. 
  */
 
-void swsusp_data_free(void)
+static void data_free(void)
 {
 	swp_entry_t entry;
 	int i;
@@ -331,7 +321,7 @@ void swsusp_data_free(void)
  *	Walk the list of pages in the image and sync each one to swap.
  */
 
-int swsusp_data_write(void)
+static int data_write(void)
 {
 	int error = 0;
 	int i;
@@ -340,7 +330,7 @@ int swsusp_data_write(void)
 	for (i = 0; i < nr_copy_pages && !error; i++) {
 		if (!(i%100))
 			printk( "." );
-		error = swsusp_write_page((pagedir_nosave+i)->address,
+		error = write_page((pagedir_nosave+i)->address,
 					  &((pagedir_nosave+i)->swap_address));
 	}
 	printk(" %d Pages done.\n",i);
@@ -369,7 +359,7 @@ static void dump_info(void)
 }
 #endif
 
-void swsusp_init_header(void)
+static void init_header(void)
 {
 	memset(&swsusp_info,0,sizeof(swsusp_info));
 	swsusp_info.version_code = LINUX_VERSION_CODE;
@@ -394,11 +384,11 @@ void swsusp_init_header(void)
 
 static int write_header(swp_entry_t * entry)
 {
-	return swsusp_write_page((unsigned long)&swsusp_info,entry);
+	return write_page((unsigned long)&swsusp_info,entry);
 }
 
 
-int swsusp_close_swap(void)
+static int close_swap(void)
 {
 	swp_entry_t entry;
 	int error;
@@ -412,49 +402,65 @@ int swsusp_close_swap(void)
 }
 
 /**
- *    write_suspend_image - Write entire image to disk.
- *
- *    After writing suspend signature to the disk, suspend may no
- *    longer fail: we have ready-to-run image in swap, and rollback
- *    would happen on next reboot -- corrupting data.
- *
- *    Note: The buffer we allocate to use to write the suspend header is
- *    not freed; its not needed since the system is going down anyway
- *    (plus it causes an oops and I'm lazy^H^H^H^Htoo busy).
+ *	free_pagedir - Free pages used by the page directory.
  */
-static int write_suspend_image(void)
+
+static void free_pagedir_entries(void)
 {
+	int num = swsusp_info.pagedir_pages;
 	int i;
-	int error = 0;
-	swp_entry_t entry = { 0 };
-	int nr_pgdir_pages = SUSPEND_PD_PAGES(nr_copy_pages);
-	union diskpage *cur,  *buffer = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
-	unsigned long addr;
 
-	if (!buffer)
-		return -ENOMEM;
-
-	swsusp_data_write();
-	swsusp_init_header();
-
-	printk( "Writing pagedir (%d pages): ", nr_pgdir_pages);
-	addr = (unsigned long)pagedir_nosave;
-	for (i=0; i<nr_pgdir_pages && !error; i++, addr += PAGE_SIZE) {
-		cur = (union diskpage *)addr;
-		cur->link.next = entry;
-		printk( "." );
-		error = swsusp_write_page(addr,&entry);
-	}
-	printk("H");
-	BUG_ON (sizeof(union diskpage) != PAGE_SIZE);
-	BUG_ON (sizeof(struct link) != PAGE_SIZE);
-
-	swsusp_info.pagedir[0] = entry;
-	swsusp_close_swap();
-
-	MDELAY(1000);
-	return 0;
+	for (i = 0; i < num; i++)
+		swap_free(swsusp_info.pagedir[i]);
 }
+
+
+/**
+ *	write_pagedir - Write the array of pages holding the page directory.
+ *	@last:	Last swap entry we write (needed for header).
+ */
+
+static int write_pagedir(void)
+{
+	unsigned long addr = (unsigned long)pagedir_nosave;
+	int error = 0;
+	int n = SUSPEND_PD_PAGES(nr_copy_pages);
+	int i;
+
+	swsusp_info.pagedir_pages = n;
+	printk( "Writing pagedir (%d pages)\n", n);
+	for (i = 0; i < n && !error; i++, addr += PAGE_SIZE)
+		error = write_page(addr,&swsusp_info.pagedir[i]);
+	return error;
+}
+
+/**
+ *	write_suspend_image - Write entire image and metadata.
+ *
+ */
+
+int write_suspend_image(void)
+{
+	int error;
+
+	init_header();
+	if ((error = data_write()))
+		goto FreeData;
+
+	if ((error = write_pagedir()))
+		goto FreePagedir;
+
+	if ((error = close_swap()))
+		goto FreePagedir;
+ Done:
+	return error;
+ FreePagedir:
+	free_pagedir_entries();
+ FreeData:
+	data_free();
+	goto Done;
+}
+
 
 #ifdef CONFIG_HIGHMEM
 struct highmem_page {
@@ -1258,7 +1264,7 @@ static int __init check_sig(void)
 }
 
 
-int __init swsusp_verify(void)
+int __init verify(void)
 {
 	int error;
 
@@ -1275,7 +1281,7 @@ int __init swsusp_verify(void)
  *	already did that.
  */
 
-int __init swsusp_data_read(void)
+static int __init data_read(void)
 {
 	struct pbe * p;
 	int error;
@@ -1298,58 +1304,48 @@ int __init swsusp_data_read(void)
 
 extern dev_t __init name_to_dev_t(const char *line);
 
-static int __init __read_suspend_image(int noresume)
+static int __init read_pagedir(void)
 {
-	union diskpage *cur;
-	swp_entry_t next;
-	int i, nr_pgdir_pages;
-	int error;
+	unsigned long addr;
+	int i, n = swsusp_info.pagedir_pages;
+	int error = 0;
 
-	if ((error = swsusp_verify()))
-		return error;
-	
-	cur = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
-	if (!cur)
+	pagedir_order = get_bitmask_order(n);
+
+	addr =__get_free_pages(GFP_ATOMIC, pagedir_order);
+	if (!addr)
 		return -ENOMEM;
+	pagedir_nosave = (struct pbe *)addr;
 
-#define PREPARENEXT \
-	{	next = cur->link.next; \
-		next.val = swp_offset(next); \
-        }
+	pr_debug("pmdisk: Reading pagedir (%d Pages)\n",n);
 
-	if (noresume)
-		return 0;
-
-	next = swsusp_info.pagedir[0];
-	next.val = swp_offset(next);
-
-	pagedir_save = swsusp_info.suspend_pagedir;
-	nr_copy_pages = swsusp_info.image_pages;
-	nr_pgdir_pages = SUSPEND_PD_PAGES(nr_copy_pages);
-	pagedir_order = get_bitmask_order(nr_pgdir_pages);
-
-	pagedir_nosave = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC, pagedir_order);
-	if (!pagedir_nosave)
-		return -ENOMEM;
-
-	PRINTK( "%sReading pagedir, ", name_resume );
-
-	/* We get pages in reverse order of saving! */
-	for (i=nr_pgdir_pages-1; i>=0; i--) {
-		BUG_ON (!next.val);
-		cur = (union diskpage *)((char *) pagedir_nosave)+i;
-		if (bio_read_page(next.val, cur)) return -EIO;
-		PREPARENEXT;
+	for (i = 0; i < n && !error; i++, addr += PAGE_SIZE) {
+		unsigned long offset = swp_offset(swsusp_info.pagedir[i]);
+		if (offset)
+			error = bio_read_page(offset, (void *)addr);
+		else
+			error = -EFAULT;
 	}
-	BUG_ON (next.val);
-
-	error = swsusp_data_read();
-	if (!error)
-		printk( "|\n" );
-	return 0;
+	if (error)
+		free_pages((unsigned long)pagedir_nosave,pagedir_order);
+	return error;
 }
 
-static int __init read_suspend_image(const char * specialfile, int noresume)
+int __init read_suspend_image(void)
+{
+	int error = 0;
+
+	if ((error = verify()))
+		return error;
+	if ((error = read_pagedir()))
+		return error;
+	if ((error = data_read())) {
+		free_pages((unsigned long)pagedir_nosave,pagedir_order);
+	}
+	return error;
+}
+
+static int __init __read_suspend_image(const char * specialfile)
 {
 	int error;
 	char b[BDEVNAME_SIZE];
@@ -1359,7 +1355,7 @@ static int __init read_suspend_image(const char * specialfile, int noresume)
 	resume_bdev = open_by_devnum(resume_device, FMODE_READ);
 	if (!IS_ERR(resume_bdev)) {
 		set_blocksize(resume_bdev, PAGE_SIZE);
-		error = __read_suspend_image(noresume);
+		error = read_suspend_image();
 		blkdev_put(resume_bdev);
 	} else
 		error = PTR_ERR(resume_bdev);
@@ -1391,9 +1387,10 @@ static int __init software_resume(void)
 
 	printk( "%s", name_resume );
 	if (resume_status == NORESUME) {
-		if(resume_file[0])
-			read_suspend_image(resume_file, 1);
-		printk( "disabled\n" );
+		/*
+		 * FIXME: If noresume is specified, we need to handle by finding
+		 * the right partition and resettting the signature.
+		 */
 		return 0;
 	}
 	MDELAY(1000);
@@ -1407,7 +1404,7 @@ static int __init software_resume(void)
 	}
 
 	printk( "resuming from %s\n", resume_file);
-	if (read_suspend_image(resume_file, 0))
+	if (__read_suspend_image(resume_file))
 		goto read_failure;
 	/* FIXME: Should we stop processes here, just to be safer? */
 	disable_nonboot_cpus();
