@@ -687,7 +687,7 @@ static int resp_mode_sense(unsigned char * cmd, int target,
 	pcontrol = (cmd[2] & 0xc0) >> 6;
 	pcode = cmd[2] & 0x3f;
 	msense_6 = (MODE_SENSE == cmd[0]);
-	alloc_len = msense_6 ? cmd[4] : ((cmd[7] << 8) | cmd[6]);
+	alloc_len = msense_6 ? cmd[4] : ((cmd[7] << 8) | cmd[8]);
 	/* printk(KERN_INFO "msense: dbd=%d pcontrol=%d pcode=%d "
 		"msense_6=%d alloc_len=%d\n", dbd, pcontrol, pcode, "
 		"msense_6, alloc_len); */
