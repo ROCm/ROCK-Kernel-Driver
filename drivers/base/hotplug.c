@@ -149,6 +149,7 @@ int dev_hotplug (struct device *dev, const char *action)
 int class_hotplug (struct device *dev, const char *action)
 {
 	struct device_class * cls;
+	int retval;
 
 	pr_debug ("%s\n", __FUNCTION__);
 
@@ -162,5 +163,9 @@ int class_hotplug (struct device *dev, const char *action)
 	if (!cls)
 		return -ENODEV;
 
-	return do_hotplug (dev, cls->name, action, cls->hotplug);
+	retval = do_hotplug (dev, cls->name, action, cls->hotplug);
+
+	put_devclass(cls);
+
+	return retval;
 }
