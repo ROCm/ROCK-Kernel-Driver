@@ -650,7 +650,7 @@ extern void select_idle_routine(const struct cpuinfo_x86 *c);
 
 #ifdef CONFIG_SCHED_SMT
 #define ARCH_HAS_SCHED_DOMAIN
-#define ARCH_HAS_SCHED_WAKE_BALANCE
+#define ARCH_HAS_SCHED_WAKE_IDLE
 #endif
 
 #endif /* __ASM_I386_PROCESSOR_H */

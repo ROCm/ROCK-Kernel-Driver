@@ -1162,9 +1162,9 @@ __init void arch_init_sched_domains(void)
 		first_cpu = last_cpu = NULL;
 
 		if (i != first_cpu(cpu_domain->span)) {
-			cpu_sched_domain(i)->flags |= SD_FLAG_SHARE_CPUPOWER;
+			cpu_sched_domain(i)->flags |= SD_SHARE_CPUPOWER;
 			cpu_sched_domain(first_cpu(cpu_domain->span))->flags |=
-				SD_FLAG_SHARE_CPUPOWER;
+				SD_SHARE_CPUPOWER;
 			continue;
 		}
 
@@ -1258,7 +1258,7 @@ __init void arch_init_sched_domains(void)
 		cpu_domain->groups = cpu_group;
 	}
 }
-#else /* CONFIG_NUMA */
+#else /* !CONFIG_NUMA */
 static struct sched_group sched_group_cpus[NR_CPUS];
 static struct sched_group sched_group_phys[NR_CPUS];
 static DEFINE_PER_CPU(struct sched_domain, phys_domains);
@@ -1286,9 +1286,9 @@ __init void arch_init_sched_domains(void)
 		first_cpu = last_cpu = NULL;
 
 		if (i != first_cpu(cpu_domain->span)) {
-			cpu_sched_domain(i)->flags |= SD_FLAG_SHARE_CPUPOWER;
+			cpu_sched_domain(i)->flags |= SD_SHARE_CPUPOWER;
 			cpu_sched_domain(first_cpu(cpu_domain->span))->flags |=
-				SD_FLAG_SHARE_CPUPOWER;
+				SD_SHARE_CPUPOWER;
 			continue;
 		}
 
