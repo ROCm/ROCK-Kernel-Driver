@@ -51,9 +51,9 @@ void module_free(struct module *mod, void *module_region)
            table entries. */
 }
 
-int module_frob_arch_sections(const Elf_Ehdr *hdr,
-			      const Elf_Shdr *sechdrs,
-			      const char *secstrings,
+int module_frob_arch_sections(Elf_Ehdr *hdr,
+			      Elf_Shdr *sechdrs,
+			      char *secstrings,
 			      struct module *mod)
 {
 	// FIXME: add space needed for GOT/PLT
