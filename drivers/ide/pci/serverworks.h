@@ -31,7 +31,7 @@ static u8 svwks_proc;
 
 static int svwks_get_info(char *, char **, off_t, int);
 
-static ide_pci_host_proc_t svwks_procs[] __initdata = {
+static ide_pci_host_proc_t svwks_procs[] = {
 {
 		.name		= "svwks",
 		.set		= 1,

@@ -1421,5 +1421,25 @@ static inline ino_t parent_ino(struct dentry *dentry)
 /* kernel/fork.c */
 extern int unshare_files(void);
 
+#ifdef CONFIG_SECURITY
+static inline char *alloc_secdata(void)
+{
+	return (char *)get_zeroed_page(GFP_KERNEL);
+}
+
+static inline void free_secdata(void *secdata)
+{
+	free_page((unsigned long)secdata);
+}
+#else
+static inline char *alloc_secdata(void)
+{
+	return (char *)1;
+}
+
+static inline void free_secdata(void *secdata)
+{ }
+#endif	/* CONFIG_SECURITY */
+
 #endif /* __KERNEL__ */
 #endif /* _LINUX_FS_H */

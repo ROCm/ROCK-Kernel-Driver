@@ -74,14 +74,7 @@
 
 #include "i2c-keywest.h"
 
-/* Currently, we don't deal with the weird interrupt cascade of the G5
- * machines with the ppc64 kernel, so use Polled mode on these
- */
-#ifdef CONFIG_PPC64
-#define POLLED_MODE
-#else
 #undef POLLED_MODE
-#endif
 
 /* Some debug macros */
 #define WRONG_STATE(name) do {\

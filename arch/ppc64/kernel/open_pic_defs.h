@@ -279,40 +279,6 @@ extern volatile struct OpenPIC *OpenPIC;
 #define Vector_Priority			_Vector_Priority.Reg
 #define Destination			_Destination.Reg
 
-/*
- *  Local (static) OpenPIC Operations
- */
-
-
-/* Global Operations */
-static void openpic_reset(void);
-static void openpic_enable_8259_pass_through(void);
-static void openpic_disable_8259_pass_through(void);
-static u_int openpic_irq(void);
-static void openpic_eoi(void);
-static u_int openpic_get_priority(void);
-static void openpic_set_priority(u_int pri);
-static u_int openpic_get_spurious(void);
-static void openpic_set_spurious(u_int vector);
-
-#ifdef CONFIG_SMP
-/* Interprocessor Interrupts */
-static void openpic_initipi(u_int ipi, u_int pri, u_int vector);
-static irqreturn_t openpic_ipi_action(int cpl, void *dev_id,
-					struct pt_regs *regs);
-#endif
-
-/* Timer Interrupts */
-static void openpic_inittimer(u_int timer, u_int pri, u_int vector);
-static void openpic_maptimer(u_int timer, u_int cpumask);
-
-/* Interrupt Sources */
-static void openpic_enable_irq(u_int irq);
-static void openpic_disable_irq(u_int irq);
-static void openpic_initirq(u_int irq, u_int pri, u_int vector, int polarity,
-			    int is_level);
-static void openpic_mapirq(u_int irq, u_int cpumask);
-static void openpic_set_sense(u_int irq, int sense);
 
 #endif /* __KERNEL__ */
 

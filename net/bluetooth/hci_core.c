@@ -237,6 +237,9 @@ static void hci_init_req(struct hci_dev *hdev, unsigned long opt)
 	/* Read BD Address */
 	hci_send_cmd(hdev, OGF_INFO_PARAM, OCF_READ_BD_ADDR, 0, NULL);
 
+	/* Read Voice Setting */
+	hci_send_cmd(hdev, OGF_HOST_CTL, OCF_READ_VOICE_SETTING, 0, NULL);
+
 	/* Optional initialization */
 
 	/* Clear Event Filters */
@@ -713,22 +716,20 @@ int hci_get_dev_list(unsigned long arg)
 	struct hci_dev_list_req *dl;
 	struct hci_dev_req *dr;
 	struct list_head *p;
-	int n = 0, size;
+	int n = 0, size, err;
 	__u16 dev_num;
 
 	if (get_user(dev_num, (__u16 *) arg))
 		return -EFAULT;
 
-	if (!dev_num)
+	if (!dev_num || dev_num > (PAGE_SIZE * 2) / sizeof(*dr))
 		return -EINVAL;
-	
-	size = dev_num * sizeof(*dr) + sizeof(*dl);
 
-	if (verify_area(VERIFY_WRITE, (void *) arg, size))
-		return -EFAULT;
+	size = sizeof(*dl) + dev_num * sizeof(*dr);
 
 	if (!(dl = kmalloc(size, GFP_KERNEL)))
 		return -ENOMEM;
+
 	dr = dl->dev_req;
 
 	read_lock_bh(&hci_dev_list_lock);
@@ -743,12 +744,12 @@ int hci_get_dev_list(unsigned long arg)
 	read_unlock_bh(&hci_dev_list_lock);
 
 	dl->dev_num = n;
-	size = n * sizeof(*dr) + sizeof(*dl);
+	size = sizeof(*dl) + n * sizeof(*dr);
 
-	copy_to_user((void *) arg, dl, size);
+	err = copy_to_user((void *) arg, dl, size);
 	kfree(dl);
 
-	return 0;
+	return err ? -EFAULT : 0;
 }
 
 int hci_get_dev_info(unsigned long arg)

@@ -409,8 +409,6 @@ static void kobil_read_int_callback( struct urb *purb, struct pt_regs *regs)
 	// someone sets the dev to 0 if the close method has been called
 	port->interrupt_in_urb->dev = port->serial->dev;
 
-	// usb_dump_urb(port->interrupt_in_urb);
-
 	result = usb_submit_urb( port->interrupt_in_urb, GFP_ATOMIC ); 
 	dbg("%s - port %d Send read URB returns: %i", __FUNCTION__, port->number, result);
 }
@@ -496,8 +494,6 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 		port->interrupt_in_urb->dev = port->serial->dev;
 		
 		// start reading
-		//usb_dump_urb(port->interrupt_in_urb);
-
 		result = usb_submit_urb( port->interrupt_in_urb, GFP_ATOMIC ); 
 		dbg("%s - port %d Send read URB returns: %i", __FUNCTION__, port->number, result);
 	}

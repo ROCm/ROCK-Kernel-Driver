@@ -291,7 +291,6 @@ static int __devinit cs5520_init_one(struct pci_dev *dev, const struct pci_devic
 		probe_hwif_init(&ide_hwifs[index.b.low]);
 	if((index.b.high & 0xf0) != 0xf0)
 		probe_hwif_init(&ide_hwifs[index.b.high]);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -312,13 +311,7 @@ static int cs5520_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void cs5520_ide_exit(void)
-{
-	return ide_pci_unregister_driver(&driver);
-}
-
 module_init(cs5520_ide_init);
-module_exit(cs5520_ide_exit);
 
 MODULE_AUTHOR("Alan Cox");
 MODULE_DESCRIPTION("PCI driver module for Cyrix 5510/5520 IDE");

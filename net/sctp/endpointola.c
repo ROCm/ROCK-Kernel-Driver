@@ -147,14 +147,6 @@ struct sctp_endpoint *sctp_endpoint_init(struct sctp_endpoint *ep,
 	ep->timeouts[SCTP_EVENT_TIMEOUT_AUTOCLOSE] =
 		sp->autoclose * HZ;
 
-	/* Set up the default send/receive buffer space.  */
-
-	/* FIXME - Should the min and max window size be configurable
-	 * sysctl parameters as opposed to be constants?
-	 */
-	sk->sk_rcvbuf = SCTP_DEFAULT_MAXWINDOW;
-	sk->sk_sndbuf = SCTP_DEFAULT_MAXWINDOW * 2;
-
 	/* Use SCTP specific send buffer space queues.  */
 	sk->sk_write_space = sctp_write_space;
 	sk->sk_use_write_queue = 1;

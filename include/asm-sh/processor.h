@@ -12,6 +12,7 @@
 #include <asm/types.h>
 #include <asm/cache.h>
 #include <linux/threads.h>
+#include <asm/ptrace.h>
 
 /*
  * Default implementation of macro that returns current
@@ -167,7 +168,7 @@ extern int ubc_usercnt;
 #define start_thread(regs, new_pc, new_sp)	 \
 	set_fs(USER_DS);			 \
 	regs->pr = 0;   		 	 \
-	regs->sr = 0;		/* User mode. */ \
+	regs->sr = SR_FD;	/* User mode. */ \
 	regs->pc = new_pc;			 \
 	regs->regs[15] = new_sp
 
@@ -200,7 +201,7 @@ extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
  * FPU lazy state save handling.
  */
 
-static __inline__ void release_fpu(void)
+static __inline__ void disable_fpu(void)
 {
 	unsigned long __dummy;
 
@@ -212,7 +213,7 @@ static __inline__ void release_fpu(void)
 			     : "r" (SR_FD));
 }
 
-static __inline__ void grab_fpu(void)
+static __inline__ void enable_fpu(void)
 {
 	unsigned long __dummy;
 
@@ -224,22 +225,32 @@ static __inline__ void grab_fpu(void)
 			     : "r" (~SR_FD));
 }
 
+static __inline__ void release_fpu(struct pt_regs *regs)
+{
+	regs->sr |= SR_FD;
+}
+
+static __inline__ void grab_fpu(struct pt_regs *regs)
+{
+	regs->sr &= ~SR_FD;
+}
+
 #ifdef CONFIG_CPU_SH4
-extern void save_fpu(struct task_struct *__tsk);
+extern void save_fpu(struct task_struct *__tsk, struct pt_regs *regs);
 #else
 #define save_fpu(tsk)	do { } while (0)
 #endif
 
-#define unlazy_fpu(tsk) do { 				\
+#define unlazy_fpu(tsk, regs) do { 				\
 	if (test_tsk_thread_flag(tsk, TIF_USEDFPU)) {	\
-		save_fpu(tsk); 				\
+		save_fpu(tsk, regs); 				\
 	}						\
 } while (0)
 
-#define clear_fpu(tsk) do { 					\
+#define clear_fpu(tsk, regs) do { 					\
 	if (test_tsk_thread_flag(tsk, TIF_USEDFPU)) { 		\
 		clear_tsk_thread_flag(tsk, TIF_USEDFPU); 	\
-		release_fpu();					\
+		release_fpu(regs);					\
 	}							\
 } while (0)
 

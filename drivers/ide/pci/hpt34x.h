@@ -21,7 +21,7 @@ static u8 hpt34x_proc;
 
 static int hpt34x_get_info(char *, char **, off_t, int);
 
-static ide_pci_host_proc_t hpt34x_procs[] __initdata = {
+static ide_pci_host_proc_t hpt34x_procs[] = {
 	{
 		.name		= "hpt34x",
 		.set		= 1,

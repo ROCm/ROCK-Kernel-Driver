@@ -9,49 +9,14 @@
  *	2 of the License, or (at your option) any later version.
  */
 
-#include <linux/config.h>
+/*
+ * Note:  currently there's only stubs for framebuffer_alloc and
+ * framebuffer_release here.  The reson for that is that until all drivers
+ * are converted to use it a sysfsification will open OOPSable races.
+ */
+
 #include <linux/kernel.h>
 #include <linux/fb.h>
-
-#define to_fb_info(class) container_of(class, struct fb_info, class_dev)
-
-static void release_fb_info(struct class_device *class_dev)
-{
-	struct fb_info *info = to_fb_info(class_dev);
-
-	/* This doesn't harm */
-	fb_dealloc_cmap(&info->cmap);
-
-	kfree(info);
-}
-
-struct class fb_class = {
-	.name 		= "graphics",
-	.release 	= &release_fb_info,
-};
-
-static ssize_t show_dev(struct class_device *class_dev, char *buf)
-{
-	struct fb_info *info = to_fb_info(class_dev);
-
-	return sprintf(buf, "%u:%u\n", FB_MAJOR, info->node);
-}
-
-static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
-
-int fb_add_class_device(struct fb_info *info)
-{
-	int retval;
-
-	info->class_dev.class = &fb_class;
-	snprintf(info->class_dev.class_id, BUS_ID_SIZE, "fb%d",
-		 info->node);
-	retval = class_device_register(&info->class_dev);
-	if (retval)
-		return retval;
-	return class_device_create_file(&info->class_dev,
-					&class_device_attr_dev);
-}
 
 /**
  * framebuffer_alloc - creates a new frame buffer info structure
@@ -82,7 +47,6 @@ struct fb_info *framebuffer_alloc(size_t size, struct device *dev)
 		return NULL;
 	memset(p, 0, fb_info_size + size);
 	info = (struct fb_info *) p;
-	info->class_dev.dev = dev;
 
 	if (size)
 		info->par = p + fb_info_size;
@@ -103,7 +67,7 @@ struct fb_info *framebuffer_alloc(size_t size, struct device *dev)
  */
 void framebuffer_release(struct fb_info *info)
 {
-	class_device_put(&info->class_dev);
+	kfree(info);
 }
 
 EXPORT_SYMBOL(framebuffer_release);

@@ -1683,10 +1683,23 @@ static int sctp_setsockopt_peer_addr_params(struct sock *sk,
  */
 static int sctp_setsockopt_initmsg(struct sock *sk, char *optval, int optlen)
 {
+	struct sctp_initmsg sinit;
+	struct sctp_opt *sp = sctp_sk(sk);
+
 	if (optlen != sizeof(struct sctp_initmsg))
 		return -EINVAL;
-	if (copy_from_user(&sctp_sk(sk)->initmsg, optval, optlen))
+	if (copy_from_user(&sinit, optval, optlen))
 		return -EFAULT;
+
+	if (sinit.sinit_num_ostreams)
+		sp->initmsg.sinit_num_ostreams = sinit.sinit_num_ostreams;	
+	if (sinit.sinit_max_instreams)
+		sp->initmsg.sinit_max_instreams = sinit.sinit_max_instreams;	
+	if (sinit.sinit_max_attempts)
+		sp->initmsg.sinit_max_attempts = sinit.sinit_max_attempts;	
+	if (sinit.sinit_max_init_timeo)
+		sp->initmsg.sinit_max_init_timeo = sinit.sinit_max_init_timeo;	
+
 	return 0;
 }
 
@@ -2880,6 +2893,7 @@ static int sctp_getsockopt_peer_addrs(struct sock *sk, int len,
 		memcpy(&temp, &from->ipaddr, sizeof(temp));
 		sctp_get_pf_specific(sk->sk_family)->addr_v4map(sp, &temp);
 		addrlen = sctp_get_af_specific(sk->sk_family)->sockaddr_len;
+		temp.v4.sin_port = htons(temp.v4.sin_port);
 		if (copy_to_user(to, &temp, addrlen))
 			return -EFAULT;
 		to += addrlen ;
@@ -2974,6 +2988,7 @@ static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
 		memcpy(&temp, &from->a, sizeof(temp));
 		sctp_get_pf_specific(sk->sk_family)->addr_v4map(sp, &temp);
 		addrlen = sctp_get_af_specific(temp.sa.sa_family)->sockaddr_len;
+		temp.v4.sin_port = htons(temp.v4.sin_port);
 		if (copy_to_user(to, &temp, addrlen))
 			return -EFAULT;
 		to += addrlen;

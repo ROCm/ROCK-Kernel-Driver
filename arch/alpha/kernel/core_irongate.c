@@ -9,26 +9,22 @@
  * Code common to all IRONGATE core logic chips.
  */
 
-#include <linux/kernel.h>
-#include <linux/types.h>
-#include <linux/pci.h>
-#include <linux/sched.h>
-#include <linux/init.h>
-#include <linux/initrd.h>
-
-#include <asm/ptrace.h>
-#include <asm/system.h>
-#include <asm/pci.h>
-#include <asm/hwrpb.h>
-#include <asm/cacheflush.h>
-#include <asm/tlbflush.h>
-
 #define __EXTERN_INLINE inline
 #include <asm/io.h>
 #include <asm/core_irongate.h>
 #undef __EXTERN_INLINE
 
+#include <linux/types.h>
+#include <linux/pci.h>
+#include <linux/sched.h>
+#include <linux/init.h>
+#include <linux/initrd.h>
 #include <linux/bootmem.h>
+
+#include <asm/ptrace.h>
+#include <asm/pci.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 
 #include "proto.h"
 #include "pci_impl.h"

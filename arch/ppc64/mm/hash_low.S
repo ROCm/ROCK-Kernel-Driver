@@ -95,7 +95,7 @@ _GLOBAL(__hash_page)
 	/* Write the linux PTE atomically (setting busy) */
 	stdcx.	r30,0,r6
 	bne-	1b
-	
+	isync
 
 	/* Step 2:
 	 *

@@ -207,17 +207,55 @@ unsigned int speedstep_detect_processor (void)
 		if (c->x86_model != 2)
 			return 0;
 
-		if ((c->x86_mask != 4) && /* B-stepping [M-P4-M] */
-			(c->x86_mask != 7) && /* C-stepping [M-P4-M] */
-			(c->x86_mask != 9))   /* D-stepping [M-P4-M or M-P4/533] */
-			return 0;
-
 		ebx = cpuid_ebx(0x00000001);
 		ebx &= 0x000000FF;
-		if ((ebx != 0x0e) && (ebx != 0x0f))
-			return 0;
 
-		return SPEEDSTEP_PROCESSOR_P4M;
+		dprintk(KERN_INFO "ebx value is %x, x86_mask is %x\n", ebx, c->86_mask);
+
+		switch (c->x86_mask) {
+		case 4: 
+			/*
+			 * B-stepping [M-P4-M] 
+			 * sample has ebx = 0x0f, production has 0x0e.
+			 */
+			if ((ebx == 0x0e) || (ebx == 0x0f))
+				return SPEEDSTEP_PROCESSOR_P4M;
+			break;
+		case 7: 
+			/*
+			 * C-stepping [M-P4-M]
+			 * needs to have ebx=0x0e, else it's a celeron:
+			 * cf. 25130917.pdf / page 7, footnote 5 even
+			 * though 25072120.pdf / page 7 doesn't say
+			 * samples are only of B-stepping...
+			 */
+			if (ebx == 0x0e)
+				return SPEEDSTEP_PROCESSOR_P4M;
+			break;
+		case 9:
+			/*
+			 * D-stepping [M-P4-M or M-P4/533]
+			 *
+			 * this is totally strange: CPUID 0x0F29 is
+			 * used by M-P4-M, M-P4/533 and(!) Celeron CPUs.
+			 * The latter need to be sorted out as they don't
+			 * support speedstep.
+			 * Celerons with CPUID 0x0F29 may have either
+			 * ebx=0x8 or 0xf -- 25130917.pdf doesn't say anything
+			 * specific.
+			 * M-P4-Ms may have either ebx=0xe or 0xf [see above]
+			 * M-P4/533 have either ebx=0xe or 0xf. [25317607.pdf]
+			 * So, how to distinguish all those processors with
+			 * ebx=0xf? I don't know. Sort them out, and wait
+			 * for someone to complain.
+			 */
+			if (ebx == 0x0e)
+				return SPEEDSTEP_PROCESSOR_P4M;
+			break;
+		default:
+			break;
+		}
+		return 0;
 	}
 
 	switch (c->x86_model) {

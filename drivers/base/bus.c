@@ -158,17 +158,19 @@ decl_subsys(bus,&ktype_bus,NULL);
 int bus_for_each_dev(struct bus_type * bus, struct device * start, 
 		     void * data, int (*fn)(struct device *, void *))
 {
-	struct list_head * head, * entry;
+	struct device *dev;
+	struct list_head * head;
 	int error = 0;
 
 	if (!(bus = get_bus(bus)))
 		return -EINVAL;
 
-	head = start ? &start->bus_list : &bus->devices.list;
+	head = &bus->devices.list;
+	dev = list_prepare_entry(start, head, bus_list);
 
 	down_read(&bus->subsys.rwsem);
-	list_for_each(entry,head) {
-		struct device * dev = get_device(to_dev(entry));
+	list_for_each_entry_continue(dev, head, bus_list) {
+		get_device(dev);
 		error = fn(dev,data);
 		put_device(dev);
 		if (error)
@@ -202,17 +204,19 @@ int bus_for_each_dev(struct bus_type * bus, struct device * start,
 int bus_for_each_drv(struct bus_type * bus, struct device_driver * start,
 		     void * data, int (*fn)(struct device_driver *, void *))
 {
-	struct list_head * head, * entry;
+	struct list_head * head;
+	struct device_driver *drv;
 	int error = 0;
 
 	if(!(bus = get_bus(bus)))
 		return -EINVAL;
 
-	head = start ? &start->kobj.entry : &bus->drivers.list;
+	head = &bus->drivers.list;
+	drv = list_prepare_entry(start, head, kobj.entry);
 
 	down_read(&bus->subsys.rwsem);
-	list_for_each(entry,head) {
-		struct device_driver * drv = get_driver(to_drv(entry));
+	list_for_each_entry_continue(drv, head, kobj.entry) {
+		get_driver(drv);
 		error = fn(drv,data);
 		put_driver(drv);
 		if(error)

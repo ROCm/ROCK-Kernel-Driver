@@ -303,14 +303,6 @@ sgiioc4_ide_dma_on(ide_drive_t * drive)
 }
 
 static int
-sgiioc4_ide_dma_off(ide_drive_t * drive)
-{
-	printk(KERN_INFO "%s: DMA disabled\n", drive->name);
-
-	return HWIF(drive)->ide_dma_off_quietly(drive);
-}
-
-static int
 sgiioc4_ide_dma_off_quietly(ide_drive_t * drive)
 {
 	drive->using_dma = 0;
@@ -644,14 +636,10 @@ ide_init_sgiioc4(ide_hwif_t * hwif)
 	hwif->ide_dma_end = &sgiioc4_ide_dma_end;
 	hwif->ide_dma_check = &sgiioc4_ide_dma_check;
 	hwif->ide_dma_on = &sgiioc4_ide_dma_on;
-	hwif->ide_dma_off = &sgiioc4_ide_dma_off;
 	hwif->ide_dma_off_quietly = &sgiioc4_ide_dma_off_quietly;
 	hwif->ide_dma_test_irq = &sgiioc4_ide_dma_test_irq;
 	hwif->ide_dma_host_on = &sgiioc4_ide_dma_host_on;
 	hwif->ide_dma_host_off = &sgiioc4_ide_dma_host_off;
-	hwif->ide_dma_bad_drive = &__ide_dma_bad_drive;
-	hwif->ide_dma_good_drive = &__ide_dma_good_drive;
-	hwif->ide_dma_count = &__ide_dma_count;
 	hwif->ide_dma_verbose = &sgiioc4_ide_dma_verbose;
 	hwif->ide_dma_lostirq = &sgiioc4_ide_dma_lostirq;
 	hwif->ide_dma_timeout = &__ide_dma_timeout;
@@ -794,8 +782,6 @@ sgiioc4_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 	if (pci_init_sgiioc4(dev, d))
 		return 0;
 
-	MOD_INC_USE_COUNT;
-
 	return 0;
 }
 
@@ -817,14 +803,7 @@ sgiioc4_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void
-sgiioc4_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(sgiioc4_ide_init);
-module_exit(sgiioc4_ide_exit);
 
 MODULE_AUTHOR("Aniket Malatpure - Silicon Graphics Inc. (SGI)");
 MODULE_DESCRIPTION("PCI driver module for SGI IOC4 Base-IO Card");

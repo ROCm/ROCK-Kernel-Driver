@@ -72,8 +72,10 @@ unsigned long (*gettimeoffset)(void) = dummy_gettimeoffset;
 
 /*
  * Scheduler clock - returns current time in nanosec units.
+ * This is the default implementation.  Sub-architecture
+ * implementations can override this.
  */
-unsigned long long sched_clock(void)
+unsigned long long __attribute__((weak)) sched_clock(void)
 {
 	return (unsigned long long)jiffies * (1000000000 / HZ);
 }
@@ -114,7 +116,7 @@ static inline void do_set_rtc(void)
 		return;
 
 	if (next_rtc_update &&
-	    time_before(xtime.tv_sec, next_rtc_update))
+	    time_before((unsigned long)xtime.tv_sec, next_rtc_update))
 		return;
 
 	if (xtime.tv_nsec < 500000000 - ((unsigned) tick_nsec >> 1) &&

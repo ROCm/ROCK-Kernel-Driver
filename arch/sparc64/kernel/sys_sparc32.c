@@ -2713,6 +2713,9 @@ struct __sysctl_args32 {
 
 asmlinkage long sys32_sysctl(struct __sysctl_args32 *args)
 {
+#ifndef CONFIG_SYSCTL
+	return -ENOSYS;
+#else
 	struct __sysctl_args32 tmp;
 	int error;
 	size_t oldlen, *oldlenp = NULL;
@@ -2747,6 +2750,7 @@ asmlinkage long sys32_sysctl(struct __sysctl_args32 *args)
 		copy_to_user(args->__unused, tmp.__unused, sizeof(tmp.__unused));
 	}
 	return error;
+#endif
 }
 
 extern long sys_lookup_dcookie(u64 cookie64, char *buf, size_t len);

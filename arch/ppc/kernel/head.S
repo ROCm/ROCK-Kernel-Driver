@@ -1657,7 +1657,7 @@ m8260_gorom:
 	andc	r11, r11, r10
 	mtspr	HID0, r11
 	isync
-	li	r5, MSR_
+	li	r5, MSR_ME|MSR_RI
 	lis	r6,2f@h
 	addis	r6,r6,-KERNELBASE@h
 	ori	r6,r6,2f@l

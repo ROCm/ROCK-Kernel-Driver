@@ -114,6 +114,7 @@ enum radeon_chips {
 	RADEON_Ie,
 	RADEON_If,
 	RADEON_Ig,
+	RADEON_Ya,
 	RADEON_Yd,
 	RADEON_Ld,
 	RADEON_Le,
@@ -208,6 +209,7 @@ static struct pci_device_id radeonfb_pci_table[] = {
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_Ie, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_Ie},
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_If, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_If},
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_Ig, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_Ig},
+	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_Ya, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_Ya},
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_Yd, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_Yd},
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_Ld, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_Ld},
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_Le, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_Le},
@@ -232,7 +234,7 @@ typedef struct {
 /* these common regs are cleared before mode setting so they do not
  * interfere with anything
  */
-reg_val common_regs[] = {
+static reg_val common_regs[] = {
 	{ OVR_CLR, 0 },	
 	{ OVR_WID_LEFT_RIGHT, 0 },
 	{ OVR_WID_TOP_BOTTOM, 0 },
@@ -244,7 +246,7 @@ reg_val common_regs[] = {
 	{ CAP0_TRIG_CNTL, 0 },
 };
 
-reg_val common_regs_m6[] = {
+static reg_val common_regs_m6[] = {
 	{ OVR_CLR,      0 },
 	{ OVR_WID_LEFT_RIGHT,   0 },
 	{ OVR_WID_TOP_BOTTOM,   0 },
@@ -836,7 +838,7 @@ static void radeon_get_pllinfo(struct radeonfb_info *rinfo, char *bios_seg)
 		if (radeon_read_OF(rinfo)) {
 			unsigned int tmp, Nx, M, ref_div, xclk;
 
-			tmp = INPLL(M_SPLL_REF_FB_DIV);
+			tmp = INPLL(X_MPLL_REF_FB_DIV);
 			ref_div = INPLL(PPLL_REF_DIV) & 0x3ff;
 
 			Nx = (tmp & 0xff00) >> 8;
@@ -924,7 +926,7 @@ static void radeon_get_moninfo (struct radeonfb_info *rinfo)
 		return;
 	}
 
-	tmp = INREG(RADEON_BIOS_4_SCRATCH);
+	tmp = INREG(BIOS_4_SCRATCH);
 	printk(KERN_DEBUG "radeon_get_moninfo: bios 4 scratch = %x\n", tmp);
 	
 	if (rinfo->hasCRTC2) {
@@ -2074,7 +2076,7 @@ static int radeonfb_set_par (struct fb_info *info)
 			/* DFP */
 			newmode.fp_gen_cntl |= (FP_FPON | FP_TMDS_EN);
 			newmode.tmds_transmitter_cntl = (TMDS_RAN_PAT_RST |
-							 ICHCSEL | TMDS_PLL_EN) &
+							 TMDS_ICHCSEL | TMDS_PLL_EN) &
 							 ~(TMDS_PLLRST);
 			newmode.crtc_ext_cntl &= ~CRTC_CRT_ON;
 		}
@@ -3132,19 +3134,19 @@ static struct pci_driver radeonfb_driver = {
 };
 
 
-int __init radeonfb_init (void)
+int __init radeonfb_old_init (void)
 {
 	return pci_module_init (&radeonfb_driver);
 }
 
 
-void __exit radeonfb_exit (void)
+void __exit radeonfb_old_exit (void)
 {
 	pci_unregister_driver (&radeonfb_driver);
 }
 
 
-int __init radeonfb_setup (char *options)
+int __init radeonfb_old_setup (char *options)
 {
         char *this_opt;
 
@@ -3172,8 +3174,8 @@ int __init radeonfb_setup (char *options)
 }
 
 #ifdef MODULE
-module_init(radeonfb_init);
-module_exit(radeonfb_exit);
+module_init(radeonfb_old_init);
+module_exit(radeonfb_old_exit);
 #endif
 
 

@@ -170,6 +170,24 @@ error:
 EXPORT_SYMBOL(class_simple_device_add);
 
 /**
+ * class_simple_set_hotplug - set the hotplug callback in the embedded struct class
+ * @cs: pointer to the struct class_simple to hold the pointer
+ * @hotplug: function pointer to the hotplug function
+ *
+ * Implement and set a hotplug function to add environment variables specific to this 
+ * class on the hotplug event.
+ */
+int class_simple_set_hotplug(struct class_simple *cs, 
+	int (*hotplug)(struct class_device *dev, char **envp, int num_envp, char *buffer, int buffer_size))
+{
+	if ((cs == NULL) || (IS_ERR(cs)))
+		return -ENODEV;
+	cs->class.hotplug = hotplug;
+	return 0;
+}
+EXPORT_SYMBOL(class_simple_set_hotplug);
+
+/**
  * class_simple_device_remove - removes a class device that was created with class_simple_device_add()
  * @dev: the dev_t of the device that was previously registered.
  *
@@ -179,12 +197,10 @@ EXPORT_SYMBOL(class_simple_device_add);
 void class_simple_device_remove(dev_t dev)
 {
 	struct simple_dev *s_dev = NULL;
-	struct list_head *tmp;
 	int found = 0;
 
 	spin_lock(&simple_dev_list_lock);
-	list_for_each(tmp, &simple_dev_list) {
-		s_dev = list_entry(tmp, struct simple_dev, node);
+	list_for_each_entry(s_dev, &simple_dev_list, node) {
 		if (s_dev->dev == dev) {
 			found = 1;
 			break;

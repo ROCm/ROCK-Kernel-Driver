@@ -276,7 +276,7 @@ static struct sk_buff *igmpv3_newpack(struct net_device *dev, int size)
 	struct iphdr *pip;
 	struct igmpv3_report *pig;
 
-	skb = alloc_skb(size + dev->hard_header_len + 15, GFP_ATOMIC);
+	skb = alloc_skb(size + LL_RESERVED_SPACE(dev), GFP_ATOMIC);
 	if (skb == NULL)
 		return 0;
 
@@ -298,7 +298,7 @@ static struct sk_buff *igmpv3_newpack(struct net_device *dev, int size)
 	skb->dst = &rt->u.dst;
 	skb->dev = dev;
 
-	skb_reserve(skb, (dev->hard_header_len+15)&~15);
+	skb_reserve(skb, LL_RESERVED_SPACE(dev));
 
 	skb->nh.iph = pip =(struct iphdr *)skb_put(skb, sizeof(struct iphdr)+4);
 

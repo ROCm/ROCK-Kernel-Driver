@@ -36,7 +36,7 @@ extern void pnpid32_to_pnpid(u32 id, char *str);
 extern void pnpbios_print_status(const char * module, u16 status);
 extern void pnpbios_calls_init(union pnp_bios_install_struct * header);
 
-#ifdef CONFIG_PROC_FS
+#ifdef CONFIG_PNPBIOS_PROC_FS
 extern int pnpbios_interface_attach_device(struct pnp_bios_node * node);
 extern int pnpbios_proc_init (void);
 extern void pnpbios_proc_exit (void);
@@ -44,4 +44,4 @@ extern void pnpbios_proc_exit (void);
 static inline int pnpbios_interface_attach_device(struct pnp_bios_node * node) { return 0; }
 static inline int pnpbios_proc_init (void) { return 0; }
 static inline void pnpbios_proc_exit (void) { ; }
-#endif /* CONFIG_PROC */
+#endif /* CONFIG_PNPBIOS_PROC_FS */

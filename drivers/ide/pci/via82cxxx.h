@@ -15,7 +15,7 @@ static u8 via_proc;
 
 static int via_get_info(char *, char **, off_t, int);
 
-static ide_pci_host_proc_t via_procs[] __initdata = {
+static ide_pci_host_proc_t via_procs[] = {
 	{
 		.name		= "via",
 		.set		= 1,

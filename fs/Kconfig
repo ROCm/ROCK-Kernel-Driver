@@ -344,17 +344,29 @@ config XFS_QUOTA
 	  with or without the generic quota support enabled (CONFIG_QUOTA) -
 	  they are completely independent subsystems.
 
-config XFS_POSIX_ACL
-	bool "ACL support"
+config XFS_SECURITY
+	bool "Security Label support"
 	depends on XFS_FS
 	help
-	  Posix Access Control Lists (ACLs) support permissions for users and
+	  Security labels support alternative access control models
+	  implemented by security modules like SELinux.  This option
+	  enables an extended attribute namespace for inode security
+	  labels in the XFS filesystem.
+
+	  If you are not using a security module that requires using
+	  extended attributes for inode security labels, say N.
+
+config XFS_POSIX_ACL
+	bool "POSIX ACL support"
+	depends on XFS_FS
+	help
+	  POSIX Access Control Lists (ACLs) support permissions for users and
 	  groups beyond the owner/group/world scheme.
 
-	  To learn more about Access Control Lists, visit the Posix ACLs for
+	  To learn more about Access Control Lists, visit the POSIX ACLs for
 	  Linux website <http://acl.bestbits.at/>.
 
-	  If you don't know what Access Control Lists are, say N
+	  If you don't know what Access Control Lists are, say N.
 
 config MINIX_FS
 	tristate "Minix fs support"

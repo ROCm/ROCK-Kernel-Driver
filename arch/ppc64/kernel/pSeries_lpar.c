@@ -296,6 +296,8 @@ void pSeriesLP_init_early(void)
 {
 	pSeries_lpar_mm_init();
 
+	tce_init_pSeries();
+
 	ppc_md.tce_build	 = tce_build_pSeriesLP;
 	ppc_md.tce_free_one	 = tce_free_one_pSeriesLP;
 

@@ -58,15 +58,13 @@
 #include <asm/i8259.h>
 #include <asm/open_pic.h>
 #include <asm/pci-bridge.h>
+#include <asm/todc.h>
+
+TODC_ALLOC();
 
 unsigned char ucSystemType;
 unsigned char ucBoardRev;
 unsigned char ucBoardRevMaj, ucBoardRevMin;
-
-extern unsigned long mc146818_get_rtc_time(void);
-extern int mc146818_set_rtc_time(unsigned long nowtime);
-extern unsigned long mk48t59_get_rtc_time(void);
-extern int mk48t59_set_rtc_time(unsigned long nowtime);
 
 extern unsigned char prep_nvram_read_val(int addr);
 extern void prep_nvram_write_val(int addr,
@@ -814,12 +812,12 @@ prep_setup_arch(void)
 }
 
 /*
- * Determine the decrementer frequency from the residual data
- * This allows for a faster boot as we do not need to calibrate the
- * decrementer against another clock. This is important for embedded systems.
+ * First, see if we can get this information from the residual data.
+ * This is important on some IBM PReP systems.  If we cannot, we let the
+ * TODC code handle doing this.
  */
-static int __init
-prep_res_calibrate_decr(void)
+static void __init
+prep_calibrate_decr(void)
 {
 #ifdef CONFIG_PREP_RESIDUAL
 	unsigned long freq, divisor = 4;
@@ -831,149 +829,9 @@ prep_res_calibrate_decr(void)
 				(freq/divisor)%1000000);
 		tb_to_us = mulhwu_scale_factor(freq/divisor, 1000000);
 		tb_ticks_per_jiffy = freq / HZ / divisor;
-		return 0;
 	} else
 #endif
-		return 1;
-}
-
-/*
- * Uses the on-board timer to calibrate the on-chip decrementer register
- * for prep systems.  On the pmac the OF tells us what the frequency is
- * but on prep we have to figure it out.
- * -- Cort
- */
-/* Done with 3 interrupts: the first one primes the cache and the
- * 2 following ones measure the interval. The precision of the method
- * is still doubtful due to the short interval sampled.
- */
-static volatile int calibrate_steps __initdata = 3;
-static unsigned tbstamp __initdata = 0;
-
-static irqreturn_t __init
-prep_calibrate_decr_handler(int irq, void *dev, struct pt_regs *regs)
-{
-	unsigned long t, freq;
-	int step=--calibrate_steps;
-
-	t = get_tbl();
-	if (step > 0) {
-		tbstamp = t;
-	} else {
-		freq = (t - tbstamp)*HZ;
-		printk("time_init: decrementer frequency = %lu.%.6lu MHz\n",
-			 freq/1000000, freq%1000000);
-		tb_ticks_per_jiffy = freq / HZ;
-		tb_to_us = mulhwu_scale_factor(freq, 1000000);
-	}
-	return IRQ_HANDLED;
-}
-
-static void __init
-prep_calibrate_decr(void)
-{
-	int res;
-
-	/* Try and get this from the residual data. */
-	res = prep_res_calibrate_decr();
-
-	/* If we didn't get it from the residual data, try this. */
-	if ( res ) {
-#define TIMER0_COUNT 0x40
-#define TIMER_CONTROL 0x43
-		/* set timer to periodic mode */
-		outb_p(0x34,TIMER_CONTROL);/* binary, mode 2, LSB/MSB, ch 0 */
-		/* set the clock to ~100 Hz */
-		outb_p(LATCH & 0xff , TIMER0_COUNT);	/* LSB */
-		outb(LATCH >> 8 , TIMER0_COUNT);	/* MSB */
-
-		if (request_irq(0, prep_calibrate_decr_handler, 0, "timer", NULL) != 0)
-			panic("Could not allocate timer IRQ!");
-		local_irq_enable();
-		/* wait for calibrate */
-		while ( calibrate_steps )
-			;
-		local_irq_disable();
-		free_irq( 0, NULL);
-	}
-}
-
-static long __init
-mk48t59_init(void) {
-	unsigned char tmp;
-
-	tmp = ppc_md.nvram_read_val(MK48T59_RTC_CONTROLB);
-	if (tmp & MK48T59_RTC_CB_STOP) {
-		printk("Warning: RTC was stopped, date will be wrong.\n");
-		ppc_md.nvram_write_val(MK48T59_RTC_CONTROLB,
-					 tmp & ~MK48T59_RTC_CB_STOP);
-		/* Low frequency crystal oscillators may take a very long
-		 * time to startup and stabilize. For now just ignore the
-		 * the issue, but attempting to calibrate the decrementer
-		 * from the RTC just after this wakeup is likely to be very
-		 * inaccurate. Firmware should not allow to load
-		 * the OS with the clock stopped anyway...
-		 */
-	}
-	/* Ensure that the clock registers are updated */
-	tmp = ppc_md.nvram_read_val(MK48T59_RTC_CONTROLA);
-	tmp &= ~(MK48T59_RTC_CA_READ | MK48T59_RTC_CA_WRITE);
-	ppc_md.nvram_write_val(MK48T59_RTC_CONTROLA, tmp);
-	return 0;
-}
-
-/* We use the NVRAM RTC to time a second to calibrate the decrementer,
- * the RTC registers have just been set up in the right state by the
- * preceding routine.
- */
-static void __init
-mk48t59_calibrate_decr(void)
-{
-	unsigned long freq;
-	unsigned long t1;
-	unsigned char save_control;
-	long i;
-	unsigned char sec;
-
-	
-	/* Make sure the time is not stopped. */
-	save_control = ppc_md.nvram_read_val(MK48T59_RTC_CONTROLB);
-
-	ppc_md.nvram_write_val(MK48T59_RTC_CONTROLA,
-			(save_control & (~MK48T59_RTC_CB_STOP)));
-
-	/* Now make sure the read bit is off so the value will change. */
-	save_control = ppc_md.nvram_read_val(MK48T59_RTC_CONTROLA);
-	save_control &= ~MK48T59_RTC_CA_READ;
-	ppc_md.nvram_write_val(MK48T59_RTC_CONTROLA, save_control);
-
-
-	/* Read the seconds value to see when it changes. */
-	sec = ppc_md.nvram_read_val(MK48T59_RTC_SECONDS);
-	/* Actually this is bad for precision, we should have a loop in
-	 * which we only read the seconds counter. nvram_read_val writes
-	 * the address bytes on every call and this takes a lot of time.
-	 * Perhaps an nvram_wait_change method returning a time
-	 * stamp with a loop count as parameter would be the  solution.
-	 */
-	for (i = 0 ; i < 1000000 ; i++)	{ /* may take up to 1 second... */
-		t1 = get_tbl();
-		if (ppc_md.nvram_read_val(MK48T59_RTC_SECONDS) != sec) {
-			break;
-		}
-	}
-
-	sec = ppc_md.nvram_read_val(MK48T59_RTC_SECONDS);
-	for (i = 0 ; i < 1000000 ; i++)	{ /* Should take up 1 second... */
-		freq = get_tbl()-t1;
-		if (ppc_md.nvram_read_val(MK48T59_RTC_SECONDS) != sec)
-			break;
-	}
-
-	printk("time_init: decrementer frequency = %lu.%.6lu MHz\n",
-		 freq/1000000, freq%1000000);
-	tb_ticks_per_jiffy = freq / HZ;
-	tb_to_us = mulhwu_scale_factor(freq, 1000000);
+		todc_calibrate_decr();
 }
 
 static unsigned int __prep
@@ -1163,17 +1021,18 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.nvram_read_val = prep_nvram_read_val;
 	ppc_md.nvram_write_val = prep_nvram_write_val;
 
-	ppc_md.time_init      = NULL;
+	ppc_md.time_init      = todc_time_init;
 	if (_prep_type == _PREP_IBM) {
-		ppc_md.set_rtc_time   = mc146818_set_rtc_time;
-		ppc_md.get_rtc_time   = mc146818_get_rtc_time;
-		ppc_md.calibrate_decr = prep_calibrate_decr;
+		TODC_INIT(TODC_TYPE_MC146818, PREP_NVRAM_AS0, PREP_NVRAM_AS1,
+				PREP_NVRAM_DATA, 8);
 	} else {
-		ppc_md.set_rtc_time   = mk48t59_set_rtc_time;
-		ppc_md.get_rtc_time   = mk48t59_get_rtc_time;
-		ppc_md.calibrate_decr = mk48t59_calibrate_decr;
-		ppc_md.time_init      = mk48t59_init;
+		TODC_INIT(TODC_TYPE_MK48T59, PREP_NVRAM_AS0, PREP_NVRAM_AS1,
+				PREP_NVRAM_DATA, 8);
 	}
+
+	ppc_md.calibrate_decr = prep_calibrate_decr;
+	ppc_md.set_rtc_time   = todc_set_rtc_time;
+	ppc_md.get_rtc_time   = todc_get_rtc_time;
 
 	ppc_md.setup_io_mappings = prep_map_io;
 

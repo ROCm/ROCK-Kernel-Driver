@@ -390,4 +390,4 @@ module_exit(amdtco_exit);
 MODULE_AUTHOR("Zwane Mwaikambo <zwane@holomorphy.com>");
 MODULE_DESCRIPTION("AMD 766/768 TCO Timer Driver");
 MODULE_LICENSE("GPL");
-
+MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);

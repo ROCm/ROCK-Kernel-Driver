@@ -20,7 +20,8 @@
  * mount-to-kernel version compatibility.  Some of these aren't used yet
  * but here they are anyway.
  */
-#define NFS_MOUNT_VERSION	5
+#define NFS_MOUNT_VERSION	6
+#define NFS_MAX_CONTEXT_LEN	256
 
 struct nfs_mount_data {
 	int		version;		/* 1 */
@@ -41,6 +42,7 @@ struct nfs_mount_data {
 	unsigned int	bsize;			/* 3 */
 	struct nfs3_fh	root;			/* 4 */
 	int		pseudoflavor;		/* 5 */
+	char		context[NFS_MAX_CONTEXT_LEN + 1];	/* 6 */
 };
 
 /* bits in the flags field */
