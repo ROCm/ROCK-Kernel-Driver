@@ -72,12 +72,15 @@ ia64_tlb_flush_mmu (mmu_gather_t *tlb, unsigned long start, unsigned long end)
 {
 	unsigned long nr;
 
-	if (end - start >= 1024*1024*1024*1024UL) {
+	if (unlikely (end - start >= 1024*1024*1024*1024UL
+		      || rgn_index(start) != rgn_index(end - 1)))
+	{
 		/*
-		 * If we flush more than a tera-byte, we're probably better off just
-		 * flushing the entire address space.
+		 * If we flush more than a tera-byte or across regions, we're probably
+		 * better off just flushing the entire TLB(s).  This should be very rare
+		 * and is not worth optimizing for.
 		 */
-		flush_tlb_mm(tlb->mm);
+		flush_tlb_all();
 	} else {
 		/*
 		 * XXX fix me: flush_tlb_range() should take an mm pointer instead of a
