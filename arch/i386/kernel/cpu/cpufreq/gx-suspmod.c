@@ -75,7 +75,6 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h> 
-#include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/smp.h>
 #include <linux/cpufreq.h>
