@@ -2576,8 +2576,6 @@ int __init blk_dev_init(void)
 	return 0;
 }
 
-static atomic_t nr_io_contexts = ATOMIC_INIT(0);
-
 /*
  * IO Context helper functions
  */
@@ -2592,7 +2590,6 @@ void put_io_context(struct io_context *ioc)
 		if (ioc->aic && ioc->aic->dtor)
 			ioc->aic->dtor(ioc->aic);
 		kfree(ioc);
-		atomic_dec(&nr_io_contexts);
 	}
 }
 
@@ -2633,7 +2630,6 @@ struct io_context *get_io_context(int gfp_flags)
 	if (ret == NULL) {
 		ret = kmalloc(sizeof(*ret), GFP_ATOMIC);
 		if (ret) {
-			atomic_inc(&nr_io_contexts);
 			atomic_set(&ret->refcount, 1);
 			ret->pid = tsk->pid;
 			ret->last_waited = jiffies; /* doesn't matter... */

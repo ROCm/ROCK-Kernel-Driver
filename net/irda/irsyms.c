@@ -150,6 +150,7 @@ EXPORT_SYMBOL(irlap_close);
 EXPORT_SYMBOL(irda_init_max_qos_capabilies);
 EXPORT_SYMBOL(irda_qos_bits_to_value);
 EXPORT_SYMBOL(irda_device_setup);
+EXPORT_SYMBOL(alloc_irdadev);
 EXPORT_SYMBOL(irda_device_set_media_busy);
 EXPORT_SYMBOL(irda_device_txqueue_empty);
 

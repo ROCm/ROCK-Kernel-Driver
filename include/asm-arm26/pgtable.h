@@ -173,7 +173,6 @@ extern struct page *empty_zero_page;
  * area for the same reason. ;) FIXME: surely 1 page not 4k ?
  */
 #define VMALLOC_START     0x01a00000
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
 #define VMALLOC_END       0x01c00000
 
 /* Is pmd_page supposed to return a pointer to a page in some arches? ours seems to

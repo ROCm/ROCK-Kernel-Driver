@@ -173,13 +173,10 @@ static kmem_cache_t *arq_pool;
 /*
  * IO Context helper functions
  */
-/* Debug */
-static atomic_t nr_as_io_requests = ATOMIC_INIT(0);
 
 /* Called to deallocate the as_io_context */
 static void free_as_io_context(struct as_io_context *aic)
 {
-	atomic_dec(&nr_as_io_requests);
 	kfree(aic);
 }
 
@@ -195,7 +192,6 @@ static struct as_io_context *alloc_as_io_context(void)
 
 	ret = kmalloc(sizeof(*ret), GFP_ATOMIC);
 	if (ret) {
-		atomic_inc(&nr_as_io_requests);
 		ret->dtor = free_as_io_context;
 		ret->exit = exit_as_io_context;
 		ret->state = 1 << AS_TASK_RUNNING;
@@ -914,6 +910,8 @@ static void as_completed_request(request_queue_t *q, struct request *rq)
 	struct as_rq *arq = RQ_DATA(rq);
 	struct as_io_context *aic;
 
+	WARN_ON(!list_empty(&rq->queuelist));
+
 	if (unlikely(arq->state != AS_RQ_DISPATCHED))
 		return;
 
@@ -926,6 +924,7 @@ static void as_completed_request(request_queue_t *q, struct request *rq)
 		if (ad->batch_data_dir == REQ_SYNC)
 			ad->new_batch = 1;
 	}
+	WARN_ON(ad->nr_dispatched == 0);
 	ad->nr_dispatched--;
 
 	/*
@@ -1140,8 +1139,6 @@ static void as_move_to_dispatch(struct as_data *ad, struct as_rq *arq)
 	/*
 	 * take it off the sort and fifo list, add to dispatch queue
 	 */
-	as_remove_queued_request(ad->q, rq);
-
 	insert = ad->dispatch->prev;
 
 	while (!list_empty(&rq->queuelist)) {
@@ -1159,6 +1156,7 @@ static void as_move_to_dispatch(struct as_data *ad, struct as_rq *arq)
 		ad->nr_dispatched++;
 	}
 
+	as_remove_queued_request(ad->q, rq);
 	list_add(&rq->queuelist, insert);
 	if (arq->io_context && arq->io_context->aic)
 		atomic_inc(&arq->io_context->aic->nr_dispatched);
@@ -1325,12 +1323,27 @@ static struct request *as_next_request(request_queue_t *q)
 static inline void
 as_add_aliased_request(struct as_data *ad, struct as_rq *arq, struct as_rq *alias)
 {
+	struct request  *req = arq->request;
+	struct list_head *insert = alias->request->queuelist.prev;
+
+	/*
+	 * Transfer list of aliases
+	 */
+	while (!list_empty(&req->queuelist)) {
+		struct request *__rq = list_entry_rq(req->queuelist.next);
+		struct as_rq *__arq = RQ_DATA(__rq);
+
+		list_move_tail(&__rq->queuelist, &alias->request->queuelist);
+
+		WARN_ON(__arq->state != AS_RQ_QUEUED);
+	}
+
 	/*
 	 * Another request with the same start sector on the rbtree.
 	 * Link this request to that sector. They are untangled in
 	 * as_move_to_dispatch
 	 */
-	list_add_tail(&arq->request->queuelist, &alias->request->queuelist);
+	list_add(&arq->request->queuelist, insert);
 
 	/*
 	 * Don't want to have to handle merges.
@@ -1389,9 +1402,6 @@ static void as_add_request(struct as_data *ad, struct as_rq *arq)
 				as_antic_stop(ad);
 		}
 	}
-
-
-
 
 	arq->state = AS_RQ_QUEUED;
 }
@@ -1596,7 +1606,8 @@ static void as_merged_request(request_queue_t *q, struct request *req)
 		 */
 	}
 
-	q->last_merge = req;
+	if (arq->on_hash)
+		q->last_merge = req;
 }
 
 static void

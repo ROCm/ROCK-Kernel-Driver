@@ -12,7 +12,6 @@
  */
 #define VMALLOC_OFFSET	  (8*1024*1024)
 #define VMALLOC_START	  (((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
 #define VMALLOC_END       (PAGE_OFFSET + 0x1c000000)
 
 #define MODULE_START	(PAGE_OFFSET - 16*1048576)

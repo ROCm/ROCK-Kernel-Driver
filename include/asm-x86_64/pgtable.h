@@ -126,7 +126,6 @@ static inline void set_pml4(pml4_t *dst, pml4_t val)
 #ifndef __ASSEMBLY__
 #define VMALLOC_START    0xffffff0000000000
 #define VMALLOC_END      0xffffff7fffffffff
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
 #define MODULES_VADDR    0xffffffffa0000000
 #define MODULES_END      0xffffffffafffffff
 #define MODULES_LEN   (MODULES_END - MODULES_VADDR)

@@ -219,7 +219,7 @@ int permission(struct inode * inode,int mask, struct nameidata *nd)
 	if (retval)
 		return retval;
 
-	return security_inode_permission(inode, mask);
+	return security_inode_permission(inode, mask, nd);
 }
 
 /*
@@ -303,7 +303,8 @@ static struct dentry * cached_lookup(struct dentry * parent, struct qstr * name,
  * short-cut DAC fails, then call permission() to do more
  * complete permission check.
  */
-static inline int exec_permission_lite(struct inode *inode)
+static inline int exec_permission_lite(struct inode *inode,
+				       struct nameidata *nd)
 {
 	umode_t	mode = inode->i_mode;
 
@@ -326,7 +327,7 @@ static inline int exec_permission_lite(struct inode *inode)
 
 	return -EACCES;
 ok:
-	return security_inode_permission(inode, MAY_EXEC);
+	return security_inode_permission(inode, MAY_EXEC, nd);
 }
 
 /*
@@ -585,7 +586,7 @@ int link_path_walk(const char * name, struct nameidata *nd)
 		struct qstr this;
 		unsigned int c;
 
-		err = exec_permission_lite(inode);
+		err = exec_permission_lite(inode, nd);
 		if (err == -EAGAIN) { 
 			err = permission(inode, MAY_EXEC, nd);
 		}

@@ -56,7 +56,7 @@ void (*pm_power_off) (void);
 
 unsigned char acpi_kbd_controller_present = 1;
 
-int acpi_disabled __initdata;	/* XXX this shouldn't be needed---we can't boot without ACPI! */
+int acpi_disabled;	/* XXX this shouldn't be needed---we can't boot without ACPI! */
 
 const char *
 acpi_get_sysname (void)

@@ -643,6 +643,8 @@ int wake_up_process(task_t * p)
 	return try_to_wake_up(p, TASK_STOPPED | TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0, 0);
 }
 
+EXPORT_SYMBOL(wake_up_process);
+
 int wake_up_process_kick(task_t * p)
 {
 	return try_to_wake_up(p, TASK_STOPPED | TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0, 1);
@@ -1586,6 +1588,8 @@ switch_tasks:
 		goto need_resched;
 }
 
+EXPORT_SYMBOL(schedule);
+
 #ifdef CONFIG_PREEMPT
 /*
  * this is is the entry point to schedule() from in-kernel preemption
@@ -1613,6 +1617,8 @@ need_resched:
 	if (unlikely(test_thread_flag(TIF_NEED_RESCHED)))
 		goto need_resched;
 }
+
+EXPORT_SYMBOL(preempt_schedule);
 #endif /* CONFIG_PREEMPT */
 
 int default_wake_function(wait_queue_t *curr, unsigned mode, int sync)
@@ -1620,6 +1626,8 @@ int default_wake_function(wait_queue_t *curr, unsigned mode, int sync)
 	task_t *p = curr->task;
 	return try_to_wake_up(p, mode, sync, 0);
 }
+
+EXPORT_SYMBOL(default_wake_function);
 
 /*
  * The core wakeup function.  Non-exclusive wakeups (nr_exclusive == 0) just
@@ -1661,6 +1669,8 @@ void __wake_up(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 
+EXPORT_SYMBOL(__wake_up);
+
 /*
  * Same as __wake_up but called with the spinlock in wait_queue_head_t held.
  */
@@ -1697,6 +1707,8 @@ void __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 
+EXPORT_SYMBOL(__wake_up_sync);
+
 void complete(struct completion *x)
 {
 	unsigned long flags;
@@ -1706,6 +1718,8 @@ void complete(struct completion *x)
 	__wake_up_common(&x->wait, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 1, 0);
 	spin_unlock_irqrestore(&x->wait.lock, flags);
 }
+
+EXPORT_SYMBOL(complete);
 
 void complete_all(struct completion *x)
 {
@@ -1738,6 +1752,8 @@ void wait_for_completion(struct completion *x)
 	spin_unlock_irq(&x->wait.lock);
 }
 
+EXPORT_SYMBOL(wait_for_completion);
+
 #define	SLEEP_ON_VAR				\
 	unsigned long flags;			\
 	wait_queue_t wait;			\
@@ -1764,6 +1780,8 @@ void interruptible_sleep_on(wait_queue_head_t *q)
 	SLEEP_ON_TAIL
 }
 
+EXPORT_SYMBOL(interruptible_sleep_on);
+
 long interruptible_sleep_on_timeout(wait_queue_head_t *q, long timeout)
 {
 	SLEEP_ON_VAR
@@ -1777,6 +1795,8 @@ long interruptible_sleep_on_timeout(wait_queue_head_t *q, long timeout)
 	return timeout;
 }
 
+EXPORT_SYMBOL(interruptible_sleep_on_timeout);
+
 void sleep_on(wait_queue_head_t *q)
 {
 	SLEEP_ON_VAR
@@ -1787,6 +1807,8 @@ void sleep_on(wait_queue_head_t *q)
 	schedule();
 	SLEEP_ON_TAIL
 }
+
+EXPORT_SYMBOL(sleep_on);
 
 long sleep_on_timeout(wait_queue_head_t *q, long timeout)
 {
@@ -1800,6 +1822,8 @@ long sleep_on_timeout(wait_queue_head_t *q, long timeout)
 
 	return timeout;
 }
+
+EXPORT_SYMBOL(sleep_on_timeout);
 
 void scheduling_functions_end_here(void) { }
 
@@ -1849,6 +1873,8 @@ void set_user_nice(task_t *p, long nice)
 out_unlock:
 	task_rq_unlock(rq, &flags);
 }
+
+EXPORT_SYMBOL(set_user_nice);
 
 #ifndef __alpha__
 
@@ -1916,6 +1942,8 @@ int task_nice(task_t *p)
 	return TASK_NICE(p);
 }
 
+EXPORT_SYMBOL(task_nice);
+
 /**
  * task_curr - is this task currently executing on a CPU?
  * @p: the task in question.
@@ -1933,6 +1961,8 @@ int idle_cpu(int cpu)
 {
 	return cpu_curr(cpu) == cpu_rq(cpu)->idle;
 }
+
+EXPORT_SYMBOL(idle_cpu);
 
 /**
  * find_process_by_pid - find a process with a matching PID value.
@@ -2261,6 +2291,8 @@ void __cond_resched(void)
 	schedule();
 }
 
+EXPORT_SYMBOL(__cond_resched);
+
 /**
  * yield - yield the current processor to other threads.
  *
@@ -2272,6 +2304,8 @@ void yield(void)
 	set_current_state(TASK_RUNNING);
 	sys_sched_yield();
 }
+
+EXPORT_SYMBOL(yield);
 
 /*
  * This task is about to go to sleep on IO.  Increment rq->nr_iowait so
@@ -2288,6 +2322,8 @@ void io_schedule(void)
 	schedule();
 	atomic_dec(&rq->nr_iowait);
 }
+
+EXPORT_SYMBOL(io_schedule);
 
 long io_schedule_timeout(long timeout)
 {
@@ -2574,7 +2610,8 @@ int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 	wait_for_completion(&req.done);
 	return 0;
 }
-EXPORT_SYMBOL(set_cpus_allowed);
+
+EXPORT_SYMBOL_GPL(set_cpus_allowed);
 
 /* Move (not current) task off this cpu, onto dest cpu. */
 static void move_task_away(struct task_struct *p, int dest_cpu)
@@ -2821,6 +2858,7 @@ void __might_sleep(char *file, int line)
 	}
 #endif
 }
+EXPORT_SYMBOL(__might_sleep);
 #endif
 
 
@@ -2849,6 +2887,8 @@ void __preempt_spin_lock(spinlock_t *lock)
 	} while (!_raw_spin_trylock(lock));
 }
 
+EXPORT_SYMBOL(__preempt_spin_lock);
+
 void __preempt_write_lock(rwlock_t *lock)
 {
 	if (preempt_count() > 1) {
@@ -2863,33 +2903,6 @@ void __preempt_write_lock(rwlock_t *lock)
 		preempt_disable();
 	} while (!_raw_write_trylock(lock));
 }
-#endif
 
-EXPORT_SYMBOL(__cond_resched);
-EXPORT_SYMBOL(__wake_up);
-EXPORT_SYMBOL(__wake_up_sync);
-EXPORT_SYMBOL(complete);
-EXPORT_SYMBOL(default_wake_function);
-EXPORT_SYMBOL(idle_cpu);
-EXPORT_SYMBOL(interruptible_sleep_on);
-EXPORT_SYMBOL(interruptible_sleep_on_timeout);
-EXPORT_SYMBOL(io_schedule);
-EXPORT_SYMBOL(schedule);
-EXPORT_SYMBOL(set_user_nice);
-EXPORT_SYMBOL(sleep_on);
-EXPORT_SYMBOL(sleep_on_timeout);
-EXPORT_SYMBOL(task_nice);
-EXPORT_SYMBOL(wait_for_completion);
-EXPORT_SYMBOL(wake_up_process);
-EXPORT_SYMBOL(yield);
-
-#ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
-EXPORT_SYMBOL(__might_sleep);
-#endif
-#ifdef CONFIG_PREEMPT
-#ifdef CONFIG_SMP
-EXPORT_SYMBOL(__preempt_spin_lock);
 EXPORT_SYMBOL(__preempt_write_lock);
-#endif
-EXPORT_SYMBOL(preempt_schedule);
-#endif
+#endif /* defined(CONFIG_SMP) && defined(CONFIG_PREEMPT) */

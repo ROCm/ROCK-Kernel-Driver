@@ -39,7 +39,7 @@ static __inline__ int scm_send(struct socket *sock, struct msghdr *msg,
 	memset(scm, 0, sizeof(*scm));
 	scm->creds.uid = current->uid;
 	scm->creds.gid = current->gid;
-	scm->creds.pid = current->pid;
+	scm->creds.pid = current->tgid;
 	if (msg->msg_controllen <= 0)
 		return 0;
 	return __scm_send(sock, msg, scm);

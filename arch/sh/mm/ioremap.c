@@ -149,7 +149,7 @@ void * p3_ioremap(unsigned long phys_addr, unsigned long size, unsigned long fla
 	if (!area)
 		return NULL;
 	addr = area->addr;
-	if (remap_area_pages(VMALLOC_VMADDR(addr), phys_addr, size, flags)) {
+	if (remap_area_pages((unsigned long) addr, phys_addr, size, flags)) {
 		vfree(addr);
 		return NULL;
 	}

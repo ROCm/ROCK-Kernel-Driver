@@ -91,11 +91,12 @@ struct acpi_walk_state
 	struct acpi_namespace_node          arguments[ACPI_METHOD_NUM_ARGS];    /* Control method arguments */
 	union acpi_operand_object           **caller_return_desc;
 	union acpi_generic_state            *control_state;                     /* List of control states (nested IFs) */
+	struct acpi_namespace_node          *deferred_node;                      /* Used when executing deferred opcodes */
 	struct acpi_namespace_node          local_variables[ACPI_METHOD_NUM_LOCALS];    /* Control method locals */
 	struct acpi_namespace_node          *method_call_node;                  /* Called method Node*/
 	union acpi_parse_object             *method_call_op;                    /* method_call Op if running a method */
 	union acpi_operand_object           *method_desc;                       /* Method descriptor if running a method */
-	struct acpi_namespace_node          *method_node;                       /* Method Node if running a method */
+	struct acpi_namespace_node          *method_node;                       /* Method node if running a method. */
 	union acpi_parse_object             *op;                                /* Current parser op */
 	union acpi_operand_object           *operands[ACPI_OBJ_NUM_OPERANDS+1]; /* Operands passed to the interpreter (+1 for NULL terminator) */
 	const struct acpi_opcode_info       *op_info;                           /* Info on current opcode */

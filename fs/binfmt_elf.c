@@ -134,7 +134,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	elf_addr_t *sp, *u_platform;
 	const char *k_platform = ELF_PLATFORM;
 	int items;
-	elf_addr_t elf_info[40];
+	elf_addr_t *elf_info;
 	int ei_index = 0;
 	struct task_struct *tsk = current;
 
@@ -169,6 +169,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	}
 
 	/* Create the ELF interpreter info */
+	elf_info = current->mm->saved_auxv;
 #define NEW_AUX_ENT(id, val) \
 	do { elf_info[ei_index++] = id; elf_info[ei_index++] = val; } while (0)
 
@@ -1186,7 +1187,7 @@ static int elf_dump_thread_status(long signr, struct task_struct * p, struct lis
  */
 static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 {
-#define	NUM_NOTES	5
+#define	NUM_NOTES	6
 	int has_dumped = 0;
 	mm_segment_t fs;
 	int segs;
@@ -1196,7 +1197,7 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 	struct elfhdr *elf = NULL;
 	off_t offset = 0, dataoff;
 	unsigned long limit = current->rlim[RLIMIT_CORE].rlim_cur;
-	int numnote = NUM_NOTES;
+	int numnote;
 	struct memelfnote *notes = NULL;
 	struct elf_prstatus *prstatus = NULL;	/* NT_PRSTATUS */
 	struct elf_prpsinfo *psinfo = NULL;	/* NT_PRPSINFO */
@@ -1287,18 +1288,24 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 	
 	fill_note(notes +2, "CORE", NT_TASKSTRUCT, sizeof(*current), current);
   
+	numnote = 3;
+
+	i = 0;
+	do
+		i += 2;
+	while (current->mm->saved_auxv[i - 2] != AT_NULL);
+	fill_note(&notes[numnote++], "CORE", NT_AUXV,
+		  i * sizeof current->mm->saved_auxv[0],
+		  current->mm->saved_auxv);
+
   	/* Try to dump the FPU. */
 	if ((prstatus->pr_fpvalid = elf_core_copy_task_fpregs(current, regs, fpu)))
-		fill_note(notes +3, "CORE", NT_PRFPREG, sizeof(*fpu), fpu);
-	else
-		--numnote;
+		fill_note(notes + numnote++,
+			  "CORE", NT_PRFPREG, sizeof(*fpu), fpu);
 #ifdef ELF_CORE_COPY_XFPREGS
 	if (elf_core_copy_task_xfpregs(current, xfpu))
-		fill_note(notes +4, "LINUX", NT_PRXFPREG, sizeof(*xfpu), xfpu);
-	else
-		--numnote;
-#else
-	numnote--;
+		fill_note(notes + numnote++,
+			  "LINUX", NT_PRXFPREG, sizeof(*xfpu), xfpu);
 #endif	
   
 	fs = get_fs();

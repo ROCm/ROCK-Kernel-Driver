@@ -56,6 +56,11 @@ BTFIXUPDEF_CALL(void, flush_cache_page, struct vm_area_struct *, unsigned long)
 
 #define flush_icache_user_range(vma,pg,adr,len)	do { } while (0)
 
+#define copy_to_user_page(vma, page, vaddr, dst, src, len) \
+	memcpy(dst, src, len)
+#define copy_from_user_page(vma, page, vaddr, dst, src, len) \
+	memcpy(dst, src, len)
+
 BTFIXUPDEF_CALL(void, __flush_page_to_ram, unsigned long)
 BTFIXUPDEF_CALL(void, flush_sig_insns, struct mm_struct *, unsigned long)
 
@@ -65,5 +70,8 @@ BTFIXUPDEF_CALL(void, flush_sig_insns, struct mm_struct *, unsigned long)
 extern void sparc_flush_page_to_ram(struct page *page);
 
 #define flush_dcache_page(page)			sparc_flush_page_to_ram(page)
+
+#define flush_cache_vmap(start, end)		flush_cache_all()
+#define flush_cache_vunmap(start, end)		flush_cache_all()
 
 #endif /* _SPARC_CACHEFLUSH_H */

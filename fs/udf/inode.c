@@ -127,6 +127,7 @@ no_delete:
 void udf_clear_inode(struct inode *inode)
 {
 	kfree(UDF_I_DATA(inode));
+	UDF_I_DATA(inode) = NULL;
 }
 
 void udf_discard_prealloc(struct inode * inode)

@@ -437,7 +437,6 @@ acpi_ps_parse_loop (
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-
 	parser_state = &walk_state->parser_state;
 	walk_state->arg_types = 0;
 
@@ -705,10 +704,9 @@ acpi_ps_parse_loop (
 				walk_state->arg_types = 0;
 				break;
 
-
 			default:
 
-				/* Op is not a constant or string, append each argument */
+				/* Op is not a constant or string, append each argument to the Op */
 
 				while (GET_CURRENT_ARG_TYPE (walk_state->arg_types) &&
 						!walk_state->arg_count) {
@@ -727,23 +725,23 @@ acpi_ps_parse_loop (
 					INCREMENT_ARG_LIST (walk_state->arg_types);
 				}
 
+				/* Special processing for certain opcodes */
+
 				switch (op->common.aml_opcode) {
 				case AML_METHOD_OP:
 
-					/* For a method, save the length and address of the body */
-
 					/*
-					 * Skip parsing of control method or opregion body,
+					 * Skip parsing of control method
 					 * because we don't have enough info in the first pass
-					 * to parse them correctly.
+					 * to parse it correctly.
+					 *
+					 * Save the length and address of the body
 					 */
 					op->named.data   = parser_state->aml;
 					op->named.length = (u32) (parser_state->pkg_end - parser_state->aml);
-					/*
-					 * Skip body of method.  For op_regions, we must continue
-					 * parsing because the opregion is not a standalone
-					 * package (We don't know where the end is).
-					 */
+
+					/* Skip body of method */
+
 					parser_state->aml   = parser_state->pkg_end;
 					walk_state->arg_count = 0;
 					break;
@@ -756,15 +754,15 @@ acpi_ps_parse_loop (
 						(op->common.parent->common.aml_opcode == AML_NAME_OP) &&
 						(walk_state->descending_callback != acpi_ds_exec_begin_op)) {
 						/*
-						 * Skip parsing of
+						 * Skip parsing of Buffers and Packages
 						 * because we don't have enough info in the first pass
 						 * to parse them correctly.
 						 */
 						op->named.data   = aml_op_start;
 						op->named.length = (u32) (parser_state->pkg_end - aml_op_start);
-						/*
-						 * Skip body
-						 */
+
+						/* Skip body */
+
 						parser_state->aml   = parser_state->pkg_end;
 						walk_state->arg_count = 0;
 					}
@@ -778,6 +776,7 @@ acpi_ps_parse_loop (
 					break;
 
 				default:
+
 					/* No action for all other opcodes */
 					break;
 				}

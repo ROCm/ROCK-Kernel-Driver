@@ -43,7 +43,15 @@ extern void (*flush_icache_page)(struct vm_area_struct *vma,
 extern void (*flush_icache_range)(unsigned long start, unsigned long end);
 #define flush_icache_user_range(vma, page, addr, len)   \
 					flush_icache_page(vma, page)
+#define flush_cache_vmap(start, end)		flush_cache_all()
+#define flush_cache_vunmap(start, end)		flush_cache_all()
 
+#define copy_to_user_page(vma, page, vaddr, dst, src, len) \
+do { memcpy(dst, src, len); \
+     flush_icache_user_range(vma, page, vaddr, len); \
+} while (0)
+#define copy_from_user_page(vma, page, vaddr, dst, src, len) \
+	memcpy(dst, src, len)
 
 extern void (*flush_cache_sigtramp)(unsigned long addr);
 extern void (*flush_icache_all)(void);

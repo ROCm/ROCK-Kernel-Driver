@@ -286,7 +286,7 @@ acpi_ex_create_region (
 	ACPI_FUNCTION_TRACE ("ex_create_region");
 
 
-	/* Get the Node from the object stack  */
+	/* Get the Namespace Node */
 
 	node = walk_state->op->common.node;
 
@@ -310,7 +310,6 @@ acpi_ex_create_region (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_LOAD, "Region Type - %s (%X)\n",
 			  acpi_ut_get_region_name (region_space), region_space));
-
 
 	/* Create the region descriptor */
 
@@ -375,6 +374,7 @@ acpi_ex_create_table_region (
 
 	ACPI_FUNCTION_TRACE ("ex_create_table_region");
 
+
 	/* Get the Node from the object stack  */
 
 	node = walk_state->op->common.node;
@@ -392,7 +392,6 @@ acpi_ex_create_table_region (
 	status = acpi_tb_find_table (operand[1]->string.pointer,
 			   operand[2]->string.pointer,
 			   operand[3]->string.pointer, &table);
-
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -489,7 +488,6 @@ acpi_ex_create_processor (
 	status = acpi_ns_attach_object ((struct acpi_namespace_node *) operand[0],
 			  obj_desc, ACPI_TYPE_PROCESSOR);
 
-
 	/* Remove local reference to the object */
 
 	acpi_ut_remove_reference (obj_desc);
@@ -539,7 +537,6 @@ acpi_ex_create_power_resource (
 
 	status = acpi_ns_attach_object ((struct acpi_namespace_node *) operand[0],
 			  obj_desc, ACPI_TYPE_POWER);
-
 
 	/* Remove local reference to the object */
 
@@ -609,7 +606,6 @@ acpi_ex_create_method (
 		obj_desc->method.concurrency = (u8)
 				  (((method_flags & METHOD_FLAGS_SYNCH_LEVEL) >> 4) + 1);
 	}
-
 	else {
 		obj_desc->method.concurrency = INFINITE_CONCURRENCY;
 	}

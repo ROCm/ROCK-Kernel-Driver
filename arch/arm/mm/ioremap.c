@@ -150,7 +150,7 @@ __ioremap(unsigned long phys_addr, size_t size, unsigned long flags,
 	if (!area)
 		return NULL;
 	addr = area->addr;
-	if (remap_area_pages(VMALLOC_VMADDR(addr), phys_addr, size, flags)) {
+	if (remap_area_pages((unsigned long) addr, phys_addr, size, flags)) {
 		vfree(addr);
 		return NULL;
 	}

@@ -140,10 +140,8 @@ static const char *driver_name = "smsc-ircc2";
 
 static int smsc_ircc_open(unsigned int firbase, unsigned int sirbase, u8 dma, u8 irq);
 static int smsc_ircc_present(unsigned int fir_base, unsigned int sir_base);
-static int smsc_ircc_setup_io(struct smsc_ircc_cb *self, unsigned int fir_base, unsigned int sir_base, u8 dma, u8 irq);
-static int smsc_ircc_setup_buffers(struct smsc_ircc_cb *self);
+static void smsc_ircc_setup_io(struct smsc_ircc_cb *self, unsigned int fir_base, unsigned int sir_base, u8 dma, u8 irq);
 static void smsc_ircc_setup_qos(struct smsc_ircc_cb *self);
-static int smsc_ircc_setup_netdev(struct smsc_ircc_cb *self);
 static void smsc_ircc_init_chip(struct smsc_ircc_cb *self);
 static int __exit smsc_ircc_close(struct smsc_ircc_cb *self);
 static int  smsc_ircc_dma_receive(struct smsc_ircc_cb *self, int iobase); 
@@ -163,7 +161,6 @@ static void smsc_ircc_sir_stop(struct smsc_ircc_cb *self);
 #endif
 static void smsc_ircc_sir_write_wakeup(struct smsc_ircc_cb *self);
 static int  smsc_ircc_sir_write(int iobase, int fifo_size, __u8 *buf, int len);
-static int  smsc_ircc_net_init(struct net_device *dev);
 static int  smsc_ircc_net_open(struct net_device *dev);
 static int  smsc_ircc_net_close(struct net_device *dev);
 static int  smsc_ircc_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
@@ -366,38 +363,81 @@ int __init smsc_ircc_init(void)
 static int __init smsc_ircc_open(unsigned int fir_base, unsigned int sir_base, u8 dma, u8 irq)
 {
 	struct smsc_ircc_cb *self;
+	struct net_device *dev;
 	int err;
 	
 	IRDA_DEBUG(1, "%s\n", __FUNCTION__);
 
-	err= smsc_ircc_present(fir_base, sir_base);
-	if(err) return -ENODEV;
+	err = smsc_ircc_present(fir_base, sir_base);
+	if(err) 
+		goto err_out;
 		
-	if (dev_count>DIM(dev_self)) {
+	err = -ENOMEM;
+	if (dev_count > DIM(dev_self)) {
 	        WARNING("%s(), too many devices!\n", __FUNCTION__);
-		return -ENOMEM;
+		goto err_out1;
 	}
 
 	/*
 	 *  Allocate new instance of the driver
 	 */
-	self = kmalloc(sizeof(struct smsc_ircc_cb), GFP_KERNEL);
-	if (self == NULL) {
-		ERROR("%s, Can't allocate memory for control block!\n",
-                      driver_name);
-		return -ENOMEM;
+	dev = alloc_irdadev(sizeof(struct smsc_ircc_cb));
+	if (!dev) {
+		WARNING("%s() can't allocate net device\n", __FUNCTION__);
+		goto err_out1;
 	}
-	memset(self, 0, sizeof(struct smsc_ircc_cb));
+
+	SET_MODULE_OWNER(dev);
+
+	dev->hard_start_xmit = smsc_ircc_hard_xmit_sir;
+#if SMSC_IRCC2_C_NET_TIMEOUT
+	dev->tx_timeout	     = smsc_ircc_timeout;
+	dev->watchdog_timeo  = HZ*2;  /* Allow enough time for speed change */
+#endif
+	dev->open            = smsc_ircc_net_open;
+	dev->stop            = smsc_ircc_net_close;
+	dev->do_ioctl        = smsc_ircc_net_ioctl;
+	dev->get_stats	     = smsc_ircc_net_get_stats;
+	
+	self = dev->priv;
+	self->netdev = dev;
+
+	/* Make ifconfig display some details */
+	dev->base_addr = self->io.fir_base = fir_base;
+	dev->irq = self->io.irq = irq;
 
 	/* Need to store self somewhere */
 	dev_self[dev_count++] = self;
 	spin_lock_init(&self->lock);
 
-	err = smsc_ircc_setup_buffers(self);
-	if(err) return err;
+	self->rx_buff.truesize = SMSC_IRCC2_RX_BUFF_TRUESIZE; 
+	self->tx_buff.truesize = SMSC_IRCC2_TX_BUFF_TRUESIZE;
+
+	self->rx_buff.head = (u8 *) kmalloc(self->rx_buff.truesize,
+					      GFP_KERNEL|GFP_DMA);
+	if (self->rx_buff.head == NULL) {
+		ERROR("%s, Can't allocate memory for receive buffer!\n",
+                      driver_name);
+		goto err_out2;
+	}
+
+	self->tx_buff.head = (u8 *) kmalloc(self->tx_buff.truesize, 
+					      GFP_KERNEL|GFP_DMA);
+	if (self->tx_buff.head == NULL) {
+		ERROR("%s, Can't allocate memory for transmit buffer!\n",
+                      driver_name);
+		goto err_out3;
+	}
+
+	memset(self->rx_buff.head, 0, self->rx_buff.truesize);
+	memset(self->tx_buff.head, 0, self->tx_buff.truesize);
+
+	self->rx_buff.in_frame = FALSE;
+	self->rx_buff.state = OUTSIDE_FRAME;
+	self->tx_buff.data = self->tx_buff.head;
+	self->rx_buff.data = self->rx_buff.head;
 	   
-	err= smsc_ircc_setup_io(self, fir_base, sir_base, dma, irq);
-	if(err) return err;
+	smsc_ircc_setup_io(self, fir_base, sir_base, dma, irq);
 
 	smsc_ircc_setup_qos(self);
 
@@ -405,17 +445,38 @@ static int __init smsc_ircc_open(unsigned int fir_base, unsigned int sir_base, u
 		
 	smsc_ircc_init_chip(self);
 	
-	if(ircc_transceiver > 0 && ircc_transceiver < SMSC_IRCC2_C_NUMBER_OF_TRANSCEIVERS) self->transceiver = ircc_transceiver;
-	else smsc_ircc_probe_transceiver(self);
+	if(ircc_transceiver > 0  && 
+	   ircc_transceiver < SMSC_IRCC2_C_NUMBER_OF_TRANSCEIVERS)
+		self->transceiver = ircc_transceiver;
+	else
+		smsc_ircc_probe_transceiver(self);
 
-	err = smsc_ircc_setup_netdev(self);
-	if(err) return err;
+	err = register_netdev(self->netdev);
+	if(err) {
+		ERROR("%s, Network device registration failed!\n",
+		      driver_name);
+		goto err_out4;
+	}
 
 	self->pmdev = pm_register(PM_SYS_DEV, PM_SYS_IRDA, smsc_ircc_pmproc);
 	if (self->pmdev)
 		self->pmdev->data = self;
 
+	MESSAGE("IrDA: Registered device %s\n", dev->name);
+
 	return 0;
+ err_out4:
+	kfree(self->tx_buff.head);
+ err_out3:
+	kfree(self->rx_buff.head);
+ err_out2:
+	free_netdev(self->netdev);
+	dev_self[--dev_count] = NULL;
+ err_out1:
+	release_region(fir_base, SMSC_IRCC2_FIR_CHIP_IO_EXTENT);
+	release_region(sir_base, SMSC_IRCC2_SIR_CHIP_IO_EXTENT);
+ err_out:
+	return err;
 }
 
 /*
@@ -428,18 +489,19 @@ static int smsc_ircc_present(unsigned int fir_base, unsigned int sir_base)
 {
 	unsigned char low, high, chip, config, dma, irq, version;
 
-	if (check_region(fir_base, SMSC_IRCC2_FIR_CHIP_IO_EXTENT) < 0) {
+	if (!request_region(fir_base, SMSC_IRCC2_FIR_CHIP_IO_EXTENT,
+			    driver_name)) {
 		WARNING("%s: can't get fir_base of 0x%03x\n",
 			__FUNCTION__, fir_base);
-		return -ENODEV;
+		goto out1;
 	}
-#if POSSIBLE_USED_BY_SERIAL_DRIVER
-	if (check_region(sir_base, SMSC_IRCC2_SIR_CHIP_IO_EXTENT) < 0) {
+
+	if (!request_region(sir_base, SMSC_IRCC2_SIR_CHIP_IO_EXTENT,
+			    driver_name)) {
 		WARNING("%s: can't get sir_base of 0x%03x\n",
 			__FUNCTION__, sir_base);
-		return -ENODEV;
+		goto out2;
 	}
-#endif
 
 	register_bank(fir_base, 3);
 
@@ -454,54 +516,19 @@ static int smsc_ircc_present(unsigned int fir_base, unsigned int sir_base)
 	if (high != 0x10 || low != 0xb8 || (chip != 0xf1 && chip != 0xf2)) { 
 	        WARNING("%s(), addr 0x%04x - no device found!\n",
 			__FUNCTION__, fir_base);
-		return -ENODEV;
+		goto out3;
 	}
 	MESSAGE("SMsC IrDA Controller found\n IrCC version %d.%d, "
 		"firport 0x%03x, sirport 0x%03x dma=%d, irq=%d\n",
 		chip & 0x0f, version, fir_base, sir_base, dma, irq);
 
 	return 0;
-}
-
-/*
- * Function smsc_ircc_setup_buffers(self)
- *
- *    Setup RX/TX buffers
- *
- */
-static int smsc_ircc_setup_buffers(struct smsc_ircc_cb *self)
-{
-	self->rx_buff.truesize = SMSC_IRCC2_RX_BUFF_TRUESIZE; 
-	self->tx_buff.truesize = SMSC_IRCC2_TX_BUFF_TRUESIZE;
-
-	self->rx_buff.head = (u8 *) kmalloc(self->rx_buff.truesize,
-					      GFP_KERNEL|GFP_DMA);
-	if (self->rx_buff.head == NULL) {
-		ERROR("%s, Can't allocate memory for receive buffer!\n",
-                      driver_name);
-		kfree(self);
-		return -ENOMEM;
-	}
-
-	self->tx_buff.head = (u8 *) kmalloc(self->tx_buff.truesize, 
-					      GFP_KERNEL|GFP_DMA);
-	if (self->tx_buff.head == NULL) {
-		ERROR("%s, Can't allocate memory for transmit buffer!\n",
-                      driver_name);
-		kfree(self->rx_buff.head);
-		kfree(self);
-		return -ENOMEM;
-	}
-
-	memset(self->rx_buff.head, 0, self->rx_buff.truesize);
-	memset(self->tx_buff.head, 0, self->tx_buff.truesize);
-
-	self->rx_buff.in_frame = FALSE;
-	self->rx_buff.state = OUTSIDE_FRAME;
-	self->tx_buff.data = self->tx_buff.head;
-	self->rx_buff.data = self->rx_buff.head;
-
-	return 0;
+ out3:
+	release_region(fir_base, SMSC_IRCC2_FIR_CHIP_IO_EXTENT);
+ out2:
+	release_region(fir_base, SMSC_IRCC2_FIR_CHIP_IO_EXTENT);
+ out1:
+	return -ENODEV;
 }
 
 /*
@@ -510,10 +537,11 @@ static int smsc_ircc_setup_buffers(struct smsc_ircc_cb *self)
  *    Setup I/O
  *
  */
-static int smsc_ircc_setup_io(struct smsc_ircc_cb *self, unsigned int fir_base, unsigned int sir_base, u8 dma, u8 irq)
+static void smsc_ircc_setup_io(struct smsc_ircc_cb *self, 
+			       unsigned int fir_base, unsigned int sir_base, 
+			       u8 dma, u8 irq)
 {
 	unsigned char config, chip_dma, chip_irq;
-	void *ret;
 
 	register_bank(fir_base, 3);
 	config  = inb(fir_base+IRCC_INTERFACE);
@@ -545,27 +573,6 @@ static int smsc_ircc_setup_io(struct smsc_ircc_cb *self, unsigned int fir_base, 
 	else
 		self->io.dma = chip_dma;
 
-	ret = request_region(self->io.fir_base, self->io.fir_ext, driver_name);
-	if (!ret) { 
-		WARNING("%s(), can't get iobase of 0x%03x\n",
-			__FUNCTION__, self->io.fir_base);
-		kfree(self->tx_buff.head);
-		kfree(self->rx_buff.head);
-		kfree(self);
-		return -ENODEV;
-	}
-	ret = request_region(self->io.sir_base, self->io.sir_ext, driver_name);
-	if (!ret) { 
-		WARNING("%s(), can't get iobase of 0x%03x\n",
-			__FUNCTION__, self->io.sir_base);
-		release_region(self->io.fir_base, self->io.fir_ext);
-		kfree(self->tx_buff.head);
-		kfree(self->rx_buff.head);
-		kfree(self);
-		return -ENODEV;
-	}
-
-	return 0;
 }
 
 /*
@@ -632,59 +639,6 @@ static void smsc_ircc_init_chip(struct smsc_ircc_cb *self)
 	
 	/* Power on device */
 	outb(0x00, iobase+IRCC_MASTER);
-}
-
-/*
- * Function smsc_ircc_setup_netdev(self)
- *
- *    Alloc and setup network device
- *
- */
-static int smsc_ircc_setup_netdev(struct smsc_ircc_cb *self)
-{
-	struct net_device *dev;
-	int err;
-	/* Alloc netdev */
-
-	if (!(dev = dev_alloc("irda%d", &err))) {
-		ERROR("%s(), dev_alloc() failed!\n", __FUNCTION__);
-		kfree(self->tx_buff.head);
-		kfree(self->rx_buff.head);
-		kfree(self);
-		return -ENOMEM;
-	}
-
-	dev->priv = (void *) self;
-	self->netdev = dev;
-
-	dev->init            = smsc_ircc_net_init;
-	dev->hard_start_xmit = smsc_ircc_hard_xmit_sir;
-	#if SMSC_IRCC2_C_NET_TIMEOUT
-	dev->tx_timeout	     = smsc_ircc_timeout;
-	dev->watchdog_timeo  = HZ*2;  /* Allow enough time for speed change */
-	#endif
-	dev->open            = smsc_ircc_net_open;
-	dev->stop            = smsc_ircc_net_close;
-	dev->do_ioctl        = smsc_ircc_net_ioctl;
-	dev->get_stats	     = smsc_ircc_net_get_stats;
-	
-	/* Make ifconfig display some details */
-	dev->base_addr = self->io.fir_base;
-	dev->irq = self->io.irq;
-
-	rtnl_lock();
-	err = register_netdevice(dev);
-	rtnl_unlock();
-	if (err) {
-		ERROR("%s(), register_netdev() failed!\n", __FUNCTION__);
-		kfree(self->tx_buff.head);
-		kfree(self->rx_buff.head);
-		kfree(self);
-		return -ENODEV;
-	}
-	MESSAGE("IrDA: Registered device %s\n", dev->name);
-
-	return 0;
 }
 
 /*
@@ -1571,18 +1525,6 @@ static int ircc_is_receiving(struct smsc_ircc_cb *self)
 }
 #endif /* unused */
 
-static int smsc_ircc_net_init(struct net_device *dev)
-{
-	/* Keep track of module usage */
-	SET_MODULE_OWNER(dev);
-
-	/* Set up to be a normal IrDA network device driver */
-	irda_device_setup(dev);
-
-	/* Insert overrides below this line! */
-
-	return 0;
-}
 
 /*
  * Function smsc_ircc_net_open (dev)
@@ -1745,11 +1687,7 @@ static int __exit smsc_ircc_close(struct smsc_ircc_cb *self)
 		pm_unregister(self->pmdev);
 
 	/* Remove netdevice */
-	if (self->netdev) {
-		rtnl_lock();
-		unregister_netdevice(self->netdev);
-		rtnl_unlock();
-	}
+	unregister_netdev(self->netdev);
 
 	/* Make sure the irq handler is not exectuting */
 	spin_lock_irqsave(&self->lock, flags);
@@ -1784,7 +1722,7 @@ static int __exit smsc_ircc_close(struct smsc_ircc_cb *self)
 	if (self->rx_buff.head)
 		kfree(self->rx_buff.head);
 
-	kfree(self);
+	free_netdev(self->netdev);
 
 	return 0;
 }
@@ -2269,32 +2207,36 @@ static const smsc_chip_t * __init smsc_ircc_probe(unsigned short cfg_base,u8 reg
 
 static int __init smsc_superio_fdc(unsigned short cfg_base)
 {
-	if (check_region(cfg_base, 2) < 0) {
+	int ret = -1;
+
+	if (!request_region(cfg_base, 2, driver_name)) {
 		WARNING("%s: can't get cfg_base of 0x%03x\n",
 			__FUNCTION__, cfg_base);
-		return -1;
+	} else {
+		if (!smsc_superio_flat(fdc_chips_flat,cfg_base,"FDC")
+		    ||!smsc_superio_paged(fdc_chips_paged,cfg_base,"FDC"))
+			ret =  0;
+
+		release_region(cfg_base, 2);
 	}
 
-	if (!smsc_superio_flat(fdc_chips_flat,cfg_base,"FDC")||!smsc_superio_paged(fdc_chips_paged,cfg_base,"FDC"))
-		return 0;
-
-	return -1;
+	return ret;
 }
 
 static int __init smsc_superio_lpc(unsigned short cfg_base)
 {
-#if 0
-	if (check_region(cfg_base, 2) < 0) {
-		IRDA_DEBUG(0, __FUNCTION__ ": can't get cfg_base of 0x%03x\n",
-			   cfg_base);
-		return -1;
+	int ret = -1;
+
+	if (!request_region(cfg_base, 2, driver_name)) {
+		WARNING("%s: can't get cfg_base of 0x%03x\n",
+			__FUNCTION__, cfg_base);
+	} else {
+		if (!smsc_superio_flat(lpc_chips_flat,cfg_base,"LPC")
+		    ||!smsc_superio_paged(lpc_chips_paged,cfg_base,"LPC"))
+			ret = 0;
+		release_region(cfg_base, 2);
 	}
-#endif
-
-	if (!smsc_superio_flat(lpc_chips_flat,cfg_base,"LPC")||!smsc_superio_paged(lpc_chips_paged,cfg_base,"LPC"))
-		return 0;
-
-	return -1;
+	return ret;
 }
 
 /************************************************

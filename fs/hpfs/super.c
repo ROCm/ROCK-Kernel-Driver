@@ -10,6 +10,7 @@
 #include <linux/string.h>
 #include "hpfs_fn.h"
 #include <linux/module.h>
+#include <linux/parser.h>
 #include <linux/init.h>
 #include <linux/vfs.h>
 
@@ -219,15 +220,52 @@ static struct super_operations hpfs_sops =
 
 /*
  * A tiny parser for option strings, stolen from dosfs.
- *
  * Stolen again from read-only hpfs.
+ * And updated for table-driven option parsing.
  */
+
+enum {
+	Opt_help, Opt_uid, Opt_gid, Opt_umask, Opt_case_lower, Opt_case_asis,
+	Opt_conv_binary, Opt_conv_text, Opt_conv_auto,
+	Opt_check_none, Opt_check_normal, Opt_check_strict,
+	Opt_err_cont, Opt_err_ro, Opt_err_panic,
+	Opt_eas_no, Opt_eas_ro, Opt_eas_rw,
+	Opt_chkdsk_no, Opt_chkdsk_errors, Opt_chkdsk_always,
+	Opt_timeshift, Opt_err,
+};
+
+static match_table_t tokens = {
+	{Opt_help, "help"},
+	{Opt_uid, "uid=%u"},
+	{Opt_gid, "gid=%u"},
+	{Opt_umask, "umask=%o"},
+	{Opt_case_lower, "case=lower"},
+	{Opt_case_asis, "case=asis"},
+	{Opt_conv_binary, "conv=binary"},
+	{Opt_conv_text, "conv=text"},
+	{Opt_conv_auto, "conv=auto"},
+	{Opt_check_none, "check=none"},
+	{Opt_check_normal, "check=normal"},
+	{Opt_check_strict, "check=strict"},
+	{Opt_err_cont, "errors=continue"},
+	{Opt_err_ro, "errors=remount-ro"},
+	{Opt_err_panic, "errors=panic"},
+	{Opt_eas_no, "eas=no"},
+	{Opt_eas_ro, "eas=ro"},
+	{Opt_eas_rw, "eas=rw"},
+	{Opt_chkdsk_no, "chkdsk=no"},
+	{Opt_chkdsk_errors, "chkdsk=errors"},
+	{Opt_chkdsk_always, "chkdsk=always"},
+	{Opt_timeshift, "timeshift=%d"},
+	{Opt_err, NULL},
+};
 
 int parse_opts(char *opts, uid_t *uid, gid_t *gid, umode_t *umask,
 	       int *lowercase, int *conv, int *eas, int *chk, int *errs,
 	       int *chkdsk, int *timeshift)
 {
-	char *p, *rhs;
+	char *p;
+	int option;
 
 	if (!opts)
 		return 1;
@@ -235,34 +273,85 @@ int parse_opts(char *opts, uid_t *uid, gid_t *gid, umode_t *umask,
 	/*printk("Parsing opts: '%s'\n",opts);*/
 
 	while ((p = strsep(&opts, ",")) != NULL) {
+		substring_t args[MAX_OPT_ARGS];
+		int token;
 		if (!*p)
 			continue;
-		if ((rhs = strchr(p, '=')) != 0)
-			*rhs++ = '\0';
-		if (!strcmp(p, "help")) return 2;
-		if (!strcmp(p, "uid")) {
-			if (!rhs || !*rhs)
+
+		token = match_token(p, tokens, args);
+		switch (token) {
+		case Opt_help:
+			return 2;
+		case Opt_uid:
+			if (match_int(args, &option))
 				return 0;
-			*uid = simple_strtoul(rhs, &rhs, 0);
-			if (*rhs)
+			*uid = option;
+			break;
+		case Opt_gid:
+			if (match_int(args, &option))
 				return 0;
-		}
-		else if (!strcmp(p, "gid")) {
-			if (!rhs || !*rhs)
+			*gid = option;
+			break;
+		case Opt_umask:
+			if (match_octal(args, &option))
 				return 0;
-			*gid = simple_strtoul(rhs, &rhs, 0);
-			if (*rhs)
-				return 0;
-		}
-		else if (!strcmp(p, "umask")) {
-			if (!rhs || !*rhs)
-				return 0;
-			*umask = simple_strtoul(rhs, &rhs, 8);
-			if (*rhs)
-				return 0;
-		}
-		else if (!strcmp(p, "timeshift")) {
+			*umask = option;
+			break;
+		case Opt_case_lower:
+			*lowercase = 1;
+			break;
+		case Opt_case_asis:
+			*lowercase = 0;
+			break;
+		case Opt_conv_binary:
+			*conv = CONV_BINARY;
+			break;
+		case Opt_conv_text:
+			*conv = CONV_TEXT;
+			break;
+		case Opt_conv_auto:
+			*conv = CONV_AUTO;
+			break;
+		case Opt_check_none:
+			*chk = 0;
+			break;
+		case Opt_check_normal:
+			*chk = 1;
+			break;
+		case Opt_check_strict:
+			*chk = 2;
+			break;
+		case Opt_err_cont:
+			*errs = 0;
+			break;
+		case Opt_err_ro:
+			*errs = 1;
+			break;
+		case Opt_err_panic:
+			*errs = 2;
+			break;
+		case Opt_eas_no:
+			*eas = 0;
+			break;
+		case Opt_eas_ro:
+			*eas = 1;
+			break;
+		case Opt_eas_rw:
+			*eas = 2;
+			break;
+		case Opt_chkdsk_no:
+			*chkdsk = 0;
+			break;
+		case Opt_chkdsk_errors:
+			*chkdsk = 1;
+			break;
+		case Opt_chkdsk_always:
+			*chkdsk = 2;
+			break;
+		case Opt_timeshift:
+		{
 			int m = 1;
+			char *rhs = args[0].from;
 			if (!rhs || !*rhs)
 				return 0;
 			if (*rhs == '-') m = -1;
@@ -270,79 +359,11 @@ int parse_opts(char *opts, uid_t *uid, gid_t *gid, umode_t *umask,
 			*timeshift = simple_strtoul(rhs, &rhs, 0) * m;
 			if (*rhs)
 				return 0;
+			break;
 		}
-		else if (!strcmp(p, "case")) {
-			if (!rhs || !*rhs)
-				return 0;
-			if (!strcmp(rhs, "lower"))
-				*lowercase = 1;
-			else if (!strcmp(rhs, "asis"))
-				*lowercase = 0;
-			else
-				return 0;
-		}
-		else if (!strcmp(p, "conv")) {
-			if (!rhs || !*rhs)
-				return 0;
-			if (!strcmp(rhs, "binary"))
-				*conv = CONV_BINARY;
-			else if (!strcmp(rhs, "text"))
-				*conv = CONV_TEXT;
-			else if (!strcmp(rhs, "auto"))
-				*conv = CONV_AUTO;
-			else
-				return 0;
-		}
-		else if (!strcmp(p, "check")) {
-			if (!rhs || !*rhs)
-				return 0;
-			if (!strcmp(rhs, "none"))
-				*chk = 0;
-			else if (!strcmp(rhs, "normal"))
-				*chk = 1;
-			else if (!strcmp(rhs, "strict"))
-				*chk = 2;
-			else
-				return 0;
-		}
-		else if (!strcmp(p, "errors")) {
-			if (!rhs || !*rhs)
-				return 0;
-			if (!strcmp(rhs, "continue"))
-				*errs = 0;
-			else if (!strcmp(rhs, "remount-ro"))
-				*errs = 1;
-			else if (!strcmp(rhs, "panic"))
-				*errs = 2;
-			else
-				return 0;
-		}
-		else if (!strcmp(p, "eas")) {
-			if (!rhs || !*rhs)
-				return 0;
-			if (!strcmp(rhs, "no"))
-				*eas = 0;
-			else if (!strcmp(rhs, "ro"))
-				*eas = 1;
-			else if (!strcmp(rhs, "rw"))
-				*eas = 2;
-			else
-				return 0;
-		}
-		else if (!strcmp(p, "chkdsk")) {
-			if (!rhs || !*rhs)
-				return 0;
-			if (!strcmp(rhs, "no"))
-				*chkdsk = 0;
-			else if (!strcmp(rhs, "errors"))
-				*chkdsk = 1;
-			else if (!strcmp(rhs, "always"))
-				*chkdsk = 2;
-			else
-				return 0;
-		}
-		else
+		default:
 			return 0;
+		}
 	}
 	return 1;
 }

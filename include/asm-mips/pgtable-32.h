@@ -79,7 +79,6 @@ extern int add_temporary_entry(unsigned long entrylo0, unsigned long entrylo1,
 #define FIRST_USER_PGD_NR	0
 
 #define VMALLOC_START     KSEG2
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
 
 #if CONFIG_HIGHMEM
 # define VMALLOC_END	(PKMAP_BASE-2*PAGE_SIZE)
