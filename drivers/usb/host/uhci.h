@@ -126,7 +126,7 @@ struct uhci_qh {
 
 #define uhci_maxlen(token)	((token) >> 21)
 #define uhci_expected_length(info) (((info >> 21) + 1) & TD_TOKEN_EXPLEN_MASK) /* 1-based */
-#define uhci_toggle(token)	(((token) >> TD_TOKEN_TOGGLE) & 1)
+#define uhci_toggle(token)	(((token) >> TD_TOKEN_TOGGLE_SHIFT) & 1)
 #define uhci_endpoint(token)	(((token) >> 15) & 0xf)
 #define uhci_devaddr(token)	(((token) >> 8) & 0x7f)
 #define uhci_devep(token)	(((token) >> 8) & 0x7ff)
