@@ -730,6 +730,7 @@ out:
 	return inode;
 
 out_unlock:
+	ei->pde = NULL;
 	iput(inode);
 	return NULL;
 }
