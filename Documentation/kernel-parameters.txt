@@ -885,6 +885,13 @@ running once the system is up.
 		noacpi			[IA-32] Do not use ACPI for IRQ routing
 					or for PCI scanning.
 
+		firmware		[ARM] Do not re-enumerate the bus but
+					instead just use the configuration
+					from the bootloader. This is currently
+					used on IXP2000 systems where the
+					bus has to be configured a certain way
+					for adjunct CPUs.
+
 	pcmv=		[HW,PCMCIA] BadgePAD 4
 
 	pd.		[PARIDE]
