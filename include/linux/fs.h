@@ -89,6 +89,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 
 /* public flags for file_system_type */
 #define FS_REQUIRES_DEV 1 
+#define FS_BINARY_MOUNTDATA 2
 #define FS_REVAL_DOT	16384	/* Check the paths ".", ".." for staleness */
 #define FS_ODD_RENAME	32768	/* Temporary stuff; will go away as soon
 				  * as nfs_rename() will be cleaned up

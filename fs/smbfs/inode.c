@@ -779,6 +779,7 @@ static struct file_system_type smb_fs_type = {
 	.name		= "smbfs",
 	.get_sb		= smb_get_sb,
 	.kill_sb	= kill_anon_super,
+	.fs_flags	= FS_BINARY_MOUNTDATA,
 };
 
 static int __init init_smb_fs(void)
