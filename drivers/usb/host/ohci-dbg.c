@@ -9,7 +9,7 @@
  */
  
 /*-------------------------------------------------------------------------*/
- 
+
 #ifdef DEBUG
 
 #define edstring(ed_type) ({ char *temp; \
@@ -396,24 +396,21 @@ show_list (struct ohci_hcd *ohci, char *buf, size_t count, struct ed *ed)
 }
 
 static ssize_t
-show_async (struct device *dev, char *buf, size_t count, loff_t off)
+show_async (struct device *dev, char *buf)
 {
 	struct ohci_hcd		*ohci;
 	size_t			temp;
 	unsigned long		flags;
 
-	if (off != 0)
-		return 0;
-
 	ohci = dev_to_ohci(dev);
 
 	/* display control and bulk lists together, for simplicity */
 	spin_lock_irqsave (&ohci->lock, flags);
-	temp = show_list (ohci, buf, count, ohci->ed_controltail);
-	count = show_list (ohci, buf + temp, count - temp, ohci->ed_bulktail);
+	temp = show_list (ohci, buf, PAGE_SIZE, ohci->ed_controltail);
+	temp += show_list (ohci, buf + temp, PAGE_SIZE - temp, ohci->ed_bulktail);
 	spin_unlock_irqrestore (&ohci->lock, flags);
 
-	return temp + count;
+	return temp;
 }
 static DEVICE_ATTR (async, S_IRUGO, show_async, NULL);
 
@@ -421,7 +418,7 @@ static DEVICE_ATTR (async, S_IRUGO, show_async, NULL);
 #define DBG_SCHED_LIMIT 64
 
 static ssize_t
-show_periodic (struct device *dev, char *buf, size_t count, loff_t off)
+show_periodic (struct device *dev, char *buf)
 {
 	struct ohci_hcd		*ohci;
 	struct ed		**seen, *ed;
@@ -430,15 +427,13 @@ show_periodic (struct device *dev, char *buf, size_t count, loff_t off)
 	char			*next;
 	unsigned		i;
 
-	if (off != 0)
-		return 0;
 	if (!(seen = kmalloc (DBG_SCHED_LIMIT * sizeof *seen, SLAB_ATOMIC)))
 		return 0;
 	seen_count = 0;
 
 	ohci = dev_to_ohci(dev);
 	next = buf;
-	size = count;
+	size = PAGE_SIZE;
 
 	temp = snprintf (next, size, "size = %d\n", NUM_INTS);
 	size -= temp;
@@ -506,9 +501,10 @@ show_periodic (struct device *dev, char *buf, size_t count, loff_t off)
 	spin_unlock_irqrestore (&ohci->lock, flags);
 	kfree (seen);
 
-	return count - size;
+	return PAGE_SIZE - size;
 }
 static DEVICE_ATTR (periodic, S_IRUGO, show_periodic, NULL);
+
 
 #undef DBG_SCHED_LIMIT
 
