@@ -242,7 +242,6 @@ struct ip_tunnel * ipip_tunnel_locate(struct ip_tunnel_parm *parms, int create)
 	nt = (struct ip_tunnel*)dev->priv;
 	nt->dev = dev;
 	dev->init = ipip_tunnel_init;
-	dev->features |= NETIF_F_DYNALLOC;
 	memcpy(&nt->parms, parms, sizeof(*parms));
 	nt->parms.name[IFNAMSIZ-1] = '\0';
 	strcpy(dev->name, nt->parms.name);
@@ -274,6 +273,7 @@ failed:
 static void ipip_tunnel_destructor(struct net_device *dev)
 {
 	if (dev != &ipip_fb_tunnel_dev) {
+		kfree(dev);
 		MOD_DEC_USE_COUNT;
 	}
 }

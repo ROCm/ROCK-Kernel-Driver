@@ -2639,12 +2639,10 @@ int netdev_finish_unregister(struct net_device *dev)
 	}
 #ifdef NET_REFCNT_DEBUG
 	printk(KERN_DEBUG "netdev_finish_unregister: %s%s.\n", dev->name,
-	       (dev->features & NETIF_F_DYNALLOC)?"":", old style");
+	       (dev->destructor != NULL)?"":", old style");
 #endif
 	if (dev->destructor)
 		dev->destructor(dev);
-	if (dev->features & NETIF_F_DYNALLOC)
-		kfree(dev);
 	return 0;
 }
 
@@ -2724,7 +2722,7 @@ int unregister_netdevice(struct net_device *dev)
 	free_divert_blk(dev);
 #endif
 
-	if (dev->features & NETIF_F_DYNALLOC) {
+	if (dev->destructor != NULL) {
 #ifdef NET_REFCNT_DEBUG
 		if (atomic_read(&dev->refcnt) != 1)
 			printk(KERN_DEBUG "unregister_netdevice: holding %s "

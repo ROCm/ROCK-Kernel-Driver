@@ -365,7 +365,6 @@ struct net_device
 #define NETIF_F_IP_CSUM		2	/* Can checksum only TCP/UDP over IPv4. */
 #define NETIF_F_NO_CSUM		4	/* Does not require checksum. F.e. loopack. */
 #define NETIF_F_HW_CSUM		8	/* Can checksum all the packets. */
-#define NETIF_F_DYNALLOC	16	/* Self-dectructable device. */
 #define NETIF_F_HIGHDMA		32	/* Can DMA to high memory. */
 #define NETIF_F_FRAGLIST	64	/* Scatter/gather IO. */
 #define NETIF_F_HW_VLAN_TX	128	/* Transmit VLAN hw acceleration */

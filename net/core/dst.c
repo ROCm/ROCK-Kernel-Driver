@@ -228,7 +228,7 @@ static int dst_dev_event(struct notifier_block *this, unsigned long event, void 
 				   _race_ _condition_.
 				 */
 				if (event!=NETDEV_DOWN &&
-				    !(dev->features & NETIF_F_DYNALLOC) &&
+				    dev->destructor == NULL &&
 				    dst->output == dst_blackhole) {
 					dst->dev = &loopback_dev;
 					dev_put(dev);
