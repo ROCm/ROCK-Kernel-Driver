@@ -5456,7 +5456,9 @@
 14f9  AG COMMUNICATIONS
 14fa  WANDEL & GOCHERMANN
 14fb  TRANSAS MARINE (UK) Ltd
-14fc  QUADRICS Supercomputers World
+14fc  Quadrics Ltd
+	0000  QsNet Elan3 Network Adapter
+	0001  QsNetII Elan4 Network Adapter
 14fd  JAPAN Computer Industry Inc
 14fe  ARCHTEK TELECOM Corp
 14ff  TWINHEAD INTERNATIONAL Corp
