@@ -135,7 +135,7 @@ static struct softscsi_data softscsi_data[NR_CPUS] __cacheline_aligned;
 /*
  * List of all highlevel drivers.
  */
-static struct Scsi_Device_Template *scsi_devicelist;
+LIST_HEAD(scsi_devicelist);
 static DECLARE_RWSEM(scsi_devicelist_mutex);
 
 /*
@@ -1963,9 +1963,15 @@ void scsi_detect_device(struct scsi_device *sdev)
 	struct Scsi_Device_Template *sdt;
 
 	down_read(&scsi_devicelist_mutex);
-	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
-		if (sdt->detect)
-			(*sdt->detect)(sdev);
+	list_for_each_entry(sdt, &scsi_devicelist, list)
+		if (sdt->detect) {
+			if(try_module_get(sdt->module)) {
+				(*sdt->detect)(sdev);
+				module_put(sdt->module);
+			} else {
+				printk(KERN_WARNING "SCSI module %s not ready, skipping detection.\n", sdt->name);
+			}
+		}
 	up_read(&scsi_devicelist_mutex);
 }
 
@@ -1974,14 +1980,20 @@ int scsi_attach_device(struct scsi_device *sdev)
 	struct Scsi_Device_Template *sdt;
 
 	down_read(&scsi_devicelist_mutex);
-	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
-		if (sdt->attach)
+	list_for_each_entry(sdt, &scsi_devicelist, list)
+		if (sdt->attach) {
 			/*
 			 * XXX check result when the upper level attach
 			 * return values are fixed, and on failure goto
 			 * fail.
 			 */
-			(*sdt->attach) (sdev);
+			if(try_module_get(sdt->module)) {
+				(*sdt->attach)(sdev);
+				module_put(sdt->module);
+			} else {
+				printk(KERN_WARNING "SCSI module %s not ready, skipping attach.\n", sdt->name);
+			}
+		}
 	up_read(&scsi_devicelist_mutex);
 	return 0;
 
@@ -1997,9 +2009,15 @@ void scsi_detach_device(struct scsi_device *sdev)
 	struct Scsi_Device_Template *sdt;
 
 	down_read(&scsi_devicelist_mutex);
-	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
-		if (sdt->detach)
-			(*sdt->detach)(sdev);
+	list_for_each_entry(sdt, &scsi_devicelist, list)
+		if (sdt->detach) {
+			if(try_module_get(sdt->module)) {
+				(*sdt->detach)(sdev);
+				module_put(sdt->module);
+			} else {
+				printk(KERN_WARNING "SCSI module %s not ready, skipping detach.\n", sdt->name);
+			}
+		}
 	up_read(&scsi_devicelist_mutex);
 }
 
@@ -2064,24 +2082,34 @@ void scsi_slave_detach(struct scsi_device *sdev)
 /*
  * This entry point should be called by a loadable module if it is trying
  * add a high level scsi driver to the system.
+ *
+ * This entry point is called from the upper level module's module_init()
+ * routine.  That implies that when this function is called, the
+ * scsi_mod module is locked down because of upper module layering and
+ * that the high level driver module is locked down by being in it's
+ * init routine.  So, the *only* thing we have to do to protect adds 
+ * we perform in this function is to make sure that all call's
+ * to the high level driver's attach() and detach() call in points, other
+ * than via scsi_register_device and scsi_unregister_device which are in
+ * the module_init and module_exit code respectively and therefore already
+ * locked down by the kernel module loader, are wrapped by try_module_get()
+ * and module_put() to avoid races on device adds and removes.
  */
 int scsi_register_device(struct Scsi_Device_Template *tpnt)
 {
 	Scsi_Device *SDpnt;
 	struct Scsi_Host *shpnt;
-	int out_of_space = 0;
 
 #ifdef CONFIG_KMOD
 	if (scsi_host_get_next(NULL) == NULL)
 		request_module("scsi_hostadapter");
 #endif
 
-	if (tpnt->next)
+	if (!list_empty(&tpnt->list))
 		return 1;
 
 	down_write(&scsi_devicelist_mutex);
-	tpnt->next = scsi_devicelist;
-	scsi_devicelist = tpnt;
+	list_add_tail(&tpnt->list, &scsi_devicelist);
 	up_write(&scsi_devicelist_mutex);
 
 	tpnt->scsi_driverfs_driver.name = (char *)tpnt->tag;
@@ -2120,13 +2148,6 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 		}
 	}
 
-	MOD_INC_USE_COUNT;
-
-	if (out_of_space) {
-		scsi_unregister_device(tpnt);	/* easiest way to clean up?? */
-		return 1;
-	}
-
 	return 0;
 }
 
@@ -2134,16 +2155,7 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 {
 	Scsi_Device *SDpnt;
 	struct Scsi_Host *shpnt;
-	struct Scsi_Device_Template *spnt;
-	struct Scsi_Device_Template *prev_spnt;
 	
-	lock_kernel();
-	/*
-	 * If we are busy, this is not going to fly.
-	 */
-	if (GET_USE_COUNT(tpnt->module) != 0)
-		goto error_out;
-
 	driver_unregister(&tpnt->scsi_driverfs_driver);
 
 	/*
@@ -2162,28 +2174,14 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 	 * Extract the template from the linked list.
 	 */
 	down_write(&scsi_devicelist_mutex);
-	spnt = scsi_devicelist;
-	prev_spnt = NULL;
-	while (spnt != tpnt) {
-		prev_spnt = spnt;
-		spnt = spnt->next;
-	}
-	if (prev_spnt == NULL)
-		scsi_devicelist = tpnt->next;
-	else
-		prev_spnt->next = spnt->next;
+	list_del(&tpnt->list);
 	up_write(&scsi_devicelist_mutex);
 
-	MOD_DEC_USE_COUNT;
-	unlock_kernel();
 	/*
 	 * Final cleanup for the driver is done in the driver sources in the
 	 * cleanup function.
 	 */
 	return 0;
-error_out:
-	unlock_kernel();
-	return -1;
 }
 
 #ifdef CONFIG_PROC_FS
@@ -2379,11 +2377,11 @@ static int __init init_scsi(void)
 
 		sgp->slab = kmem_cache_create(sgp->name, size, 0, SLAB_HWCACHE_ALIGN, NULL, NULL);
 		if (!sgp->slab)
-			panic("SCSI: can't init sg slab\n");
+			printk(KERN_ERR "SCSI: can't init sg slab %s\n", sgp->name);
 
 		sgp->pool = mempool_create(SG_MEMPOOL_SIZE, scsi_pool_alloc, scsi_pool_free, sgp->slab);
 		if (!sgp->pool)
-			panic("SCSI: can't init sg mempool\n");
+			printk(KERN_ERR "SCSI: can't init sg mempool %s\n", sgp->name);
 	}
 
 	/*
@@ -2393,13 +2391,12 @@ static int __init init_scsi(void)
 	proc_scsi = proc_mkdir("scsi", 0);
 	if (!proc_scsi) {
 		printk (KERN_ERR "cannot init /proc/scsi\n");
-		return -ENOMEM;
+		goto out_error;
 	}
 	generic = create_proc_info_entry ("scsi/scsi", 0, 0, scsi_proc_info);
 	if (!generic) {
 		printk (KERN_ERR "cannot init /proc/scsi/scsi\n");
-		remove_proc_entry("scsi", 0);
-		return -ENOMEM;
+		goto out_proc_error;
 	}
 	generic->write_proc = proc_scsi_gen_write;
 #endif
@@ -2414,6 +2411,19 @@ static int __init init_scsi(void)
 	open_softirq(SCSI_SOFTIRQ, scsi_softirq, NULL);
 
 	return 0;
+#ifdef CONFIG_PROC_FS
+out_proc_error:
+	remove_proc_entry("scsi", 0);
+#endif
+out_error:
+	for (i = 0; i < SG_MEMPOOL_NR; i++) {
+		struct scsi_host_sg_pool *sgp = scsi_sg_pools + i;
+		mempool_destroy(sgp->pool);
+		kmem_cache_destroy(sgp->slab);
+		sgp->pool = NULL;
+		sgp->slab = NULL;
+	}
+	return -ENOMEM;
 }
 
 static void __exit exit_scsi(void)

@@ -549,7 +549,7 @@ extern void scsi_mark_host_reset(struct Scsi_Host *);
 
 struct Scsi_Device_Template
 {
-    struct Scsi_Device_Template * next;
+    struct list_head list;
     const char * name;
     const char * tag;
     struct module * module;	  /* Used for loadable modules */
