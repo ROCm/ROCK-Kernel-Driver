@@ -295,6 +295,7 @@ pci_create_resource_files(struct pci_dev *pdev)
 
 		res_attr = kmalloc(sizeof(*res_attr) + 10, GFP_ATOMIC);
 		if (res_attr) {
+			memset(res_attr, 0, sizeof(*res_attr) + 10);
 			pdev->res_attr[i] = res_attr;
 			/* Allocated above after the res_attr struct */
 			res_attr->attr.name = (char *)(res_attr + 1);
