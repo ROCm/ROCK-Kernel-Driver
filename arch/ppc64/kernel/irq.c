@@ -910,4 +910,37 @@ int virt_irq_create_mapping(unsigned int real_irq)
 	return NO_IRQ;
 }
 
+/*
+ * In most cases will get a hit on the very first slot checked in the
+ * virt_irq_to_real_map.  Only when there are a large number of
+ * IRQs will this be expensive.
+ */
+unsigned int real_irq_to_virt_slowpath(unsigned int real_irq)
+{
+	unsigned int virq;
+	unsigned int first_virq;
+
+	virq = real_irq;
+
+	if (virq > MAX_VIRT_IRQ)
+		virq = (virq % NR_VIRT_IRQS) + MIN_VIRT_IRQ;
+
+	first_virq = virq;
+
+	do {
+		if (virt_irq_to_real_map[virq] == real_irq)
+			return virq;
+
+		virq++;
+
+		if (virq >= MAX_VIRT_IRQ)
+			virq = 0;
+
+	} while (first_virq != virq);
+
+	return NO_IRQ;
+
+}
+
+
 #endif
