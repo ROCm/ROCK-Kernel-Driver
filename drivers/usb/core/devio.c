@@ -261,7 +261,6 @@ static void async_completed(struct urb *urb, struct pt_regs *regs)
         spin_lock(&ps->lock);
         list_move_tail(&as->asynclist, &ps->async_completed);
         spin_unlock(&ps->lock);
-        wake_up(&ps->wait);
 	if (as->signr) {
 		sinfo.si_signo = as->signr;
 		sinfo.si_errno = as->urb->status;
@@ -269,6 +268,7 @@ static void async_completed(struct urb *urb, struct pt_regs *regs)
 		sinfo.si_addr = (void *)as->userurb;
 		send_sig_info(as->signr, &sinfo, as->task);
 	}
+        wake_up(&ps->wait);
 }
 
 static void destroy_async (struct dev_state *ps, struct list_head *list)
