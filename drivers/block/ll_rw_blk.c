@@ -2997,14 +2997,41 @@ queue_requests_store(struct request_queue *q, const char *page, size_t count)
 	return ret;
 }
 
+static ssize_t queue_ra_show(struct request_queue *q, char *page)
+{
+	int ra_kb = q->backing_dev_info.ra_pages << (PAGE_CACHE_SHIFT - 10);
+
+	return queue_var_show(ra_kb, (page));
+}
+
+static ssize_t
+queue_ra_store(struct request_queue *q, const char *page, size_t count)
+{
+	unsigned long ra_kb;
+	ssize_t ret = queue_var_store(&ra_kb, page, count);
+
+	if (ra_kb > (q->max_sectors >> 1))
+		ra_kb = (q->max_sectors >> 1);
+
+	q->backing_dev_info.ra_pages = ra_kb >> (PAGE_CACHE_SHIFT - 10);
+	return ret;
+}
+
 static struct queue_sysfs_entry queue_requests_entry = {
 	.attr = {.name = "nr_requests", .mode = S_IRUGO | S_IWUSR },
 	.show = queue_requests_show,
 	.store = queue_requests_store,
 };
 
+static struct queue_sysfs_entry queue_ra_entry = {
+	.attr = {.name = "read_ahead_kb", .mode = S_IRUGO | S_IWUSR },
+	.show = queue_ra_show,
+	.store = queue_ra_store,
+};
+
 static struct attribute *default_attrs[] = {
 	&queue_requests_entry.attr,
+	&queue_ra_entry.attr,
 	NULL,
 };
 
