@@ -37,7 +37,7 @@
  * String handling code courtesy of Gerard Roudier's <groudier@club-internet.fr>
  * sym driver.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_proc.c#11 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_proc.c#14 $
  */
 #include "aic79xx_osm.h"
 #include "aic79xx_inline.h"
@@ -124,8 +124,12 @@ ahd_format_transinfo(struct info_str *info, struct ahd_transinfo *tinfo)
 
 		printed_options = 0;
 		copy_info(info, " (%d.%03dMHz", freq / 1000, freq % 1000);
+		if ((tinfo->ppr_options & MSG_EXT_PPR_RD_STRM) != 0) {
+			copy_info(info, " RDSTRM");
+			printed_options++;
+		}
 		if ((tinfo->ppr_options & MSG_EXT_PPR_DT_REQ) != 0) {
-			copy_info(info, " DT");
+			copy_info(info, "%s", printed_options ? "|DT" : " DT");
 			printed_options++;
 		}
 		if ((tinfo->ppr_options & MSG_EXT_PPR_IU_REQ) != 0) {
@@ -258,7 +262,8 @@ ahd_proc_write_seeprom(struct ahd_softc *ahd, char *buffer, int length)
 		ahd_write_seeprom(ahd, (u_int16_t *)buffer, start_addr,
 				  sizeof(struct seeprom_config)/2);
 		ahd_read_seeprom(ahd, (uint16_t *)ahd->seep_config,
-				 start_addr, sizeof(struct seeprom_config)/2);
+				 start_addr, sizeof(struct seeprom_config)/2,
+				 /*ByteStream*/FALSE);
 		ahd_release_seeprom(ahd);
 		written = length;
 	}
@@ -311,6 +316,7 @@ ahd_linux_proc_info(char *buffer, char **start, off_t offset,
 
 	copy_info(&info, "Adaptec AIC79xx driver version: %s\n",
 		  AIC79XX_DRIVER_VERSION);
+	copy_info(&info, "%s\n", ahd->description);
 	ahd_controller_info(ahd, ahd_info);
 	copy_info(&info, "%s\n\n", ahd_info);
 

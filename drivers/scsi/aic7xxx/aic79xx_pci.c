@@ -38,7 +38,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx_pci.c#61 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx_pci.c#70 $
  *
  * $FreeBSD$
  */
@@ -80,6 +80,7 @@ ahd_compose_id(u_int device, u_int vendor, u_int subdevice, u_int subvendor)
 #define ID_AIC7902_B			0x801D9005FFFF9005ull
 #define ID_AIC7902_B_IROC		0x809D9005FFFF9005ull
 #define ID_AHA_39320			0x8010900500409005ull
+#define ID_AHA_39320A			0x8016900500409005ull
 #define ID_AHA_39320D			0x8011900500419005ull
 #define ID_AHA_39320D_B			0x801C900500419005ull
 #define ID_AHA_39320D_HP		0x8011900500AC0E11ull
@@ -135,6 +136,12 @@ struct ahd_pci_identity ahd_pci_ident_table [] =
 		ID_AHA_39320,
 		ID_ALL_MASK,
 		"Adaptec 39320 Ultra320 SCSI adapter",
+		ahd_aic7902_setup
+	},
+	{
+		ID_AHA_39320A,
+		ID_ALL_MASK,
+		"Adaptec 39320A Ultra320 SCSI adapter",
 		ahd_aic7902_setup
 	},
 	{
@@ -378,12 +385,10 @@ ahd_pci_config(struct ahd_softc *ahd, struct ahd_pci_identity *entry)
 int
 ahd_pci_test_register_access(struct ahd_softc *ahd)
 {
-	ahd_mode_state	saved_modes;
 	uint32_t	cmd;
 	int		error;
 	uint8_t		hcntrl;
 
-	saved_modes = ahd_save_modes(ahd);
 	error = EIO;
 
 	/*
@@ -449,7 +454,6 @@ fail:
 		ahd_outb(ahd, CLRINT, CLRPCIINT);
 	}
 
-	ahd_restore_modes(ahd, saved_modes);
 	ahd_outb(ahd, SEQCTL0, PERRORDIS|FAILDIS);
 	ahd_pci_write_config(ahd->dev_softc, PCIR_COMMAND, cmd, /*bytes*/2);
 	return (error);
@@ -462,6 +466,7 @@ fail:
 static int
 ahd_check_extport(struct ahd_softc *ahd)
 {
+	struct	vpd_config vpd;
 	struct	seeprom_config *sc;
 	u_int	adapter_control;
 	int	have_seeprom;
@@ -472,6 +477,27 @@ ahd_check_extport(struct ahd_softc *ahd)
 	if (have_seeprom) {
 		u_int start_addr;
 
+		/*
+		 * Fetch VPD for this function and parse it.
+		 */
+		if (bootverbose) 
+			printf("%s: Reading VPD from SEEPROM...",
+			       ahd_name(ahd));
+
+		/* Address is always in units of 16bit words */
+		start_addr = ((2 * sizeof(*sc))
+			    + (sizeof(vpd) * (ahd->channel - 'A'))) / 2;
+
+		error = ahd_read_seeprom(ahd, (uint16_t *)&vpd,
+					 start_addr, sizeof(vpd)/2,
+					 /*bytestream*/TRUE);
+		if (error == 0)
+			error = ahd_parse_vpddata(ahd, &vpd);
+		if (bootverbose) 
+			printf("%s: VPD parsing %s\n",
+			       ahd_name(ahd),
+			       error == 0 ? "successful" : "failed");
+
 		if (bootverbose) 
 			printf("%s: Reading SEEPROM...", ahd_name(ahd));
 
@@ -479,7 +505,8 @@ ahd_check_extport(struct ahd_softc *ahd)
 		start_addr = (sizeof(*sc) / 2) * (ahd->channel - 'A');
 
 		error = ahd_read_seeprom(ahd, (uint16_t *)sc,
-					 start_addr, sizeof(*sc)/2);
+					 start_addr, sizeof(*sc)/2,
+					 /*bytestream*/FALSE);
 
 		if (error != 0) {
 			printf("Unable to read SEEPROM\n");
@@ -698,7 +725,7 @@ static const char *split_status_strings[] =
 	"%s: Split completion data bucket in %s\n",
 	"%s: Split completion address error in %s\n",
 	"%s: Split completion byte count error in %s\n",
-	"%s: Signaled Target-abort to early terminate a split in %s\n",
+	"%s: Signaled Target-abort to early terminate a split in %s\n"
 };
 
 static const char *pci_status_strings[] =
@@ -799,7 +826,7 @@ ahd_pci_split_intr(struct ahd_softc *ahd, u_int intstat)
 		/* Clear latched errors.  So our interrupt deasserts. */
 		ahd_outb(ahd, DCHSPLTSTAT0, split_status[i]);
 		ahd_outb(ahd, DCHSPLTSTAT1, split_status1[i]);
-		if (i != 0)
+		if (i > 1)
 			continue;
 		sg_split_status[i] = ahd_inb(ahd, SGSPLTSTAT0);
 		sg_split_status1[i] = ahd_inb(ahd, SGSPLTSTAT1);
@@ -821,7 +848,7 @@ ahd_pci_split_intr(struct ahd_softc *ahd, u_int intstat)
 				       split_status_source[i]);
 			}
 
-			if (i != 0)
+			if (i > 1)
 				continue;
 
 			if ((sg_split_status[i] & (0x1 << bit)) != 0) {
@@ -879,11 +906,12 @@ ahd_aic7902_setup(struct ahd_softc *ahd)
 			  |  AHD_NLQICRC_DELAYED_BUG|AHD_SCSIRST_BUG
 			  |  AHD_LQO_ATNO_BUG|AHD_AUTOFLUSH_BUG
 			  |  AHD_CLRLQO_AUTOCLR_BUG|AHD_PCIX_MMAPIO_BUG
-			  |  AHD_PCIX_CHIPRST_BUG|AHD_PKTIZED_STATUS_BUG
-			  |  AHD_PKT_LUN_BUG|AHD_MDFF_WSCBPTR_BUG
-			  |  AHD_REG_SLOW_SETTLE_BUG|AHD_SET_MODE_BUG
-			  |  AHD_BUSFREEREV_BUG|AHD_NONPACKFIFO_BUG
-			  |  AHD_PACED_NEGTABLE_BUG;
+			  |  AHD_PCIX_CHIPRST_BUG|AHD_PCIX_SCBRAM_RD_BUG
+			  |  AHD_PKTIZED_STATUS_BUG|AHD_PKT_LUN_BUG
+			  |  AHD_MDFF_WSCBPTR_BUG|AHD_REG_SLOW_SETTLE_BUG
+			  |  AHD_SET_MODE_BUG|AHD_BUSFREEREV_BUG
+			  |  AHD_NONPACKFIFO_BUG|AHD_PACED_NEGTABLE_BUG
+			  |  AHD_FAINT_LED_BUG;
 
 		/*
 		 * IO Cell paramter setup.
@@ -898,7 +926,7 @@ ahd_aic7902_setup(struct ahd_softc *ahd)
 		ahd->features |= AHD_RTI|AHD_NEW_IOCELL_OPTS
 			      |  AHD_NEW_DFCNTRL_OPTS;
 		ahd->bugs |= AHD_LQOOVERRUN_BUG|AHD_ABORT_LQI_BUG
-			  |  AHD_INTCOLLISION_BUG;
+			  |  AHD_INTCOLLISION_BUG|AHD_EARLY_REQ_BUG;
 
 		/*
 		 * IO Cell paramter setup.
