@@ -129,7 +129,7 @@ static void sd_rw_intr(Scsi_Cmnd * SCpnt);
 static Scsi_Disk * sd_get_sdisk(int index);
 
 
-#if defined(CONFIG_PPC)
+#if defined(CONFIG_PPC32)
 /**
  *	sd_find_target - find kdev_t of first scsi disk that matches
  *	given host and scsi_id. 
@@ -149,7 +149,7 @@ sd_find_target(void *hp, int scsi_id)
 {
 	Scsi_Disk *sdkp;
 	Scsi_Device *sdp;
-	Scsi_Host *shp = hp;
+	struct Scsi_Host *shp = hp;
 	int dsk_nr;
 	unsigned long iflags;
 
@@ -162,7 +162,7 @@ sd_find_target(void *hp, int scsi_id)
 		sdp = sdkp->device;
 		if (sdp && (sdp->host == shp) && (sdp->id == scsi_id)) {
 			read_unlock_irqrestore(&sd_dsk_arr_lock, iflags);
-			return MKDEV_SD(k);
+			return MKDEV_SD(dsk_nr);
 		}
 	}
 	read_unlock_irqrestore(&sd_dsk_arr_lock, iflags);
