@@ -9,7 +9,6 @@
 
 #include <linux/config.h>
 #include <linux/threads.h>
-#include <linux/brlock.h>
 #include <linux/spinlock.h>
 #include <linux/cache.h>
 
