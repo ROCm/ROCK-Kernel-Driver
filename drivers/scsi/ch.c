@@ -321,7 +321,7 @@ find_device(struct Scsi_Host *host, u_char channel, u_char id, u_char lun)
 	struct list_head *item;
 	Scsi_Device *device;
 
-	list_for_each(item,&host->my_devices) {
+	list_for_each(item,&host->__devices) {
 		device = list_entry(item, Scsi_Device, siblings);
 		if (device->channel == channel &&
 		    device->id      == id      &&
@@ -732,7 +732,7 @@ ch_is_busy(scsi_changer *ch, int type, int unit)
 		return 0;
 	if (!ch->dt[unit])
 		return 0;
-	return atomic_read(&ch->dt[unit]->access_count);
+	return 1;
 }
 
 static int ch_ioctl(struct inode * inode, struct file * file,
