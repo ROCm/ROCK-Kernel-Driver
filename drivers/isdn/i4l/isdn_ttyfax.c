@@ -18,21 +18,6 @@
 
 #define PARSE_ERROR1 { isdn_tty_fax_modem_result(1, info); return 1; }
 
-static char *
-isdn_getrev(const char *revision)
-{
-	char *rev;
-	char *p;
-
-	if ((p = strchr(revision, ':'))) {
-		rev = p + 2;
-		p = strchr(rev, '$');
-		*--p = 0;
-	} else
-		rev = "???";
-	return rev;
-}
-
 /*
  * Fax Class 2 Modem results
  *
@@ -1059,8 +1044,7 @@ isdn_tty_cmd_FCLASS2(char **p, modem_info * info)
 #ifdef ISDN_TTY_FAX_STAT_DEBUG
 		printk(KERN_DEBUG "isdn_tty: FREV?\n");
 #endif
-		strcpy(rss, isdn_tty_fax_revision);
-		sprintf(rs, "\r\nRev: %s", isdn_getrev(rss));
+		sprintf(rs, "\r\nRev: 1.0");
 		isdn_tty_at_cout(rs, info);
 		return 0;
 	}
