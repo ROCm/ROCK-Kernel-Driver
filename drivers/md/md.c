@@ -2742,7 +2742,7 @@ int unregister_md_personality(int pnum)
 
 void md_sync_acct(mdk_rdev_t *rdev, unsigned long nr_sectors)
 {
-	rdev->bdev->bd_disk->sync_io += nr_sectors;
+	rdev->bdev->bd_contains->bd_disk->sync_io += nr_sectors;
 }
 
 static int is_mddev_idle(mddev_t *mddev)
@@ -2754,7 +2754,7 @@ static int is_mddev_idle(mddev_t *mddev)
 
 	idle = 1;
 	ITERATE_RDEV(mddev,rdev,tmp) {
-		struct gendisk *disk = rdev->bdev->bd_disk;
+		struct gendisk *disk = rdev->bdev->bd_contains->bd_disk;
 		curr_events = disk->read_sectors + disk->write_sectors - disk->sync_io;
 		if ((curr_events - rdev->last_events) > 32) {
 			rdev->last_events = curr_events;
