@@ -885,5 +885,6 @@ ENTRY(sys_call_table)
 	.long sys_mq_timedreceive	/* 280 */
 	.long sys_mq_notify
 	.long sys_mq_getsetattr
+	.long sys_ni_syscall		/* reserved for kexec */
 
 syscall_table_size=(.-sys_call_table)
