@@ -183,6 +183,8 @@ export CPPFLAGS NOSTDINC_FLAGS OBJCOPYFLAGS LDFLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
 export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
+export MODVERDIR := .tmp_versions
+
 # The temporary file to save gcc -MD generated dependencies must not
 # contain a comma
 depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
@@ -271,8 +273,6 @@ ifneq ($(KBUILD_BUILTIN),1)
 endif
 endif
 endif
-
-export MODVERDIR := .tmp_versions
 
 #
 # INSTALL_PATH specifies where to place the updated kernel and system map
