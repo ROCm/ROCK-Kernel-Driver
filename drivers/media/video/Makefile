@@ -11,7 +11,7 @@ zr36067-objs	:=	zoran_procfs.o zoran_device.o \
 obj-$(CONFIG_VIDEO_DEV) += videodev.o v4l2-common.o v4l1-compat.o
 
 obj-$(CONFIG_VIDEO_BT848) += bttv.o msp3400.o tvaudio.o \
-	tda7432.o tda9875.o
+	tda7432.o tda9875.o ir-kbd-i2c.o ir-kbd-gpio.o
 obj-$(CONFIG_SOUND_TVMIXER) += tvmixer.o
 
 obj-$(CONFIG_VIDEO_ZR36120) += zoran.o
