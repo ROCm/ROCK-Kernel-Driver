@@ -91,6 +91,7 @@ static int xics_irq_8259_cascade_real = 0;
 static unsigned int default_server = 0xFF;
 /* also referenced in smp.c... */
 unsigned int default_distrib_server = 0;
+unsigned int interrupt_server_size = 8;
 
 /*
  * XICS only has a single IPI, so encode the messages per CPU
@@ -511,6 +512,10 @@ nextnode:
 				default_server = ireg[0];
 				default_distrib_server = ireg[i-1]; /* take last element */
 			}
+			ireg = (uint *)get_property(np,
+					"ibm,interrupt-server#-size", NULL);
+			if (ireg)
+				interrupt_server_size = *ireg;
 			break;
 		}
 	}
@@ -650,9 +655,9 @@ void xics_migrate_irqs_away(void)
 	ops->cppr_info(cpu, 0);
 	iosync();
 
-	/* Refuse any new interrupts... */
+	/* remove ourselves from the global interrupt queue */
 	status = rtas_set_indicator(GLOBAL_INTERRUPT_QUEUE,
-				    hard_smp_processor_id(), 0);
+		(1UL << interrupt_server_size) - 1 - default_distrib_server, 0);
 	WARN_ON(status != 0);
 
 	/* Allow IPIs again... */

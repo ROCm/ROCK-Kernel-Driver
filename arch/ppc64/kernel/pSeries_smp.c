@@ -265,7 +265,8 @@ static void __devinit smp_xics_setup_cpu(int cpu)
 	 * necessary from a secondary thread as the OF start-cpu interface
 	 * performs this function for us on primary threads.
 	 */
-	rtas_set_indicator(GLOBAL_INTERRUPT_QUEUE, default_distrib_server, 1);
+	rtas_set_indicator(GLOBAL_INTERRUPT_QUEUE,
+		(1UL << interrupt_server_size) - 1 - default_distrib_server, 1);
 #endif
 }
 
