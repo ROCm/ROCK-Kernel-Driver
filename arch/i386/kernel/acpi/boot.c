@@ -141,6 +141,10 @@ acpi_parse_lapic (
 
 	acpi_table_print_madt_entry(header);
 
+	/* no utility in registering a disabled processor */
+	if (processor->flags.enabled == 0)
+		return 0;
+
 	mp_register_lapic (
 		processor->id,					   /* APIC ID */
 		processor->flags.enabled);			  /* Enabled? */

@@ -2037,7 +2037,7 @@ static int get_mem_for_virtual_node (struct tree_balance * tb)
 	tb->vn_buf_size = size;
 
 	/* get memory for virtual item */
-	buf = reiserfs_kmalloc(size, GFP_ATOMIC, tb->tb_sb);
+	buf = reiserfs_kmalloc(size, GFP_ATOMIC | __GFP_NOWARN, tb->tb_sb);
 	if ( ! buf ) {
 	    /* getting memory with GFP_KERNEL priority may involve
                balancing now (due to indirect_to_direct conversion on
