@@ -43,7 +43,7 @@ static int pcspkr_event(struct input_dev *dev, unsigned int type, unsigned int c
 	} 
 
 	if (value > 20 && value < 32767)
-		count = 1193182 / value;
+		count = CLOCK_TICK_RATE / value;
 	
 	spin_lock_irqsave(&i8253_beep_lock, flags);
 
