@@ -182,7 +182,8 @@ static inline void init_stripe(struct stripe_head *sh, unsigned long sector, int
 		BUG();
 	
 	CHECK_DEVLOCK();
-	PRINTK("init_stripe called, stripe %llu\n", (unsigned long long)sh->sector);
+	PRINTK("init_stripe called, stripe %llu\n", 
+		(unsigned long long)sh->sector);
 
 	remove_hash(sh);
 	
@@ -338,7 +339,9 @@ static int raid5_end_read_request (struct bio * bi, unsigned int bytes_done,
 		if (bi == &sh->dev[i].req)
 			break;
 
-	PRINTK("end_read_request %llu/%d, count: %d, uptodate %d.\n", (unsigned long long)sh->sector, i, atomic_read(&sh->count), uptodate);
+	PRINTK("end_read_request %llu/%d, count: %d, uptodate %d.\n", 
+		(unsigned long long)sh->sector, i, atomic_read(&sh->count), 
+		uptodate);
 	if (i == disks) {
 		BUG();
 		return 0;
@@ -409,7 +412,9 @@ static int raid5_end_write_request (struct bio *bi, unsigned int bytes_done,
 		if (bi == &sh->dev[i].req)
 			break;
 
-	PRINTK("end_write_request %llu/%d, count %d, uptodate: %d.\n", (unsigned long long)sh->sector, i, atomic_read(&sh->count), uptodate);
+	PRINTK("end_write_request %llu/%d, count %d, uptodate: %d.\n", 
+		(unsigned long long)sh->sector, i, atomic_read(&sh->count),
+		uptodate);
 	if (i == disks) {
 		BUG();
 		return 0;
@@ -533,7 +538,8 @@ static unsigned long raid5_compute_sector(sector_t r_sector, unsigned int raid_d
 			*dd_idx = (*pd_idx + 1 + *dd_idx) % raid_disks;
 			break;
 		default:
-			printk ("raid5: unsupported algorithm %d\n", conf->algorithm);
+			printk("raid5: unsupported algorithm %d\n",
+				conf->algorithm);
 	}
 
 	/*
@@ -573,7 +579,8 @@ static sector_t compute_blocknr(struct stripe_head *sh, int i)
 			i -= (sh->pd_idx + 1);
 			break;
 		default:
-			printk ("raid5: unsupported algorithm %d\n", conf->algorithm);
+			printk("raid5: unsupported algorithm %d\n",
+				conf->algorithm);
 	}
 
 	chunk_number = stripe * data_disks + i;
@@ -655,7 +662,8 @@ static void compute_block(struct stripe_head *sh, int dd_idx)
 	int i, count, disks = conf->raid_disks;
 	void *ptr[MAX_XOR_BLOCKS], *p;
 
-	PRINTK("compute_block, stripe %llu, idx %d\n", (unsigned long long)sh->sector, dd_idx);
+	PRINTK("compute_block, stripe %llu, idx %d\n", 
+		(unsigned long long)sh->sector, dd_idx);
 
 	ptr[0] = page_address(sh->dev[dd_idx].page);
 	memset(ptr[0], 0, STRIPE_SIZE);
@@ -667,7 +675,9 @@ static void compute_block(struct stripe_head *sh, int dd_idx)
 		if (test_bit(R5_UPTODATE, &sh->dev[i].flags))
 			ptr[count++] = p;
 		else
-			printk("compute_block() %d, stripe %llu, %d not present\n", dd_idx, (unsigned long long)sh->sector, i);
+			printk("compute_block() %d, stripe %llu, %d"
+				" not present\n", dd_idx,
+				(unsigned long long)sh->sector, i);
 
 		check_xor();
 	}
@@ -683,7 +693,8 @@ static void compute_parity(struct stripe_head *sh, int method)
 	void *ptr[MAX_XOR_BLOCKS];
 	struct bio *chosen;
 
-	PRINTK("compute_parity, stripe %llu, method %d\n", (unsigned long long)sh->sector, method);
+	PRINTK("compute_parity, stripe %llu, method %d\n",
+		(unsigned long long)sh->sector, method);
 
 	count = 1;
 	ptr[0] = page_address(sh->dev[pd_idx].page);
@@ -768,7 +779,9 @@ static void add_stripe_bio (struct stripe_head *sh, struct bio *bi, int dd_idx, 
 	struct bio **bip;
 	raid5_conf_t *conf = sh->raid_conf;
 
-	PRINTK("adding bh b#%llu to stripe s#%llu\n", (unsigned long long)bi->bi_sector, (unsigned long long)sh->sector);
+	PRINTK("adding bh b#%llu to stripe s#%llu\n",
+		(unsigned long long)bi->bi_sector,
+		(unsigned long long)sh->sector);
 
 
 	spin_lock(&sh->lock);
@@ -789,7 +802,9 @@ static void add_stripe_bio (struct stripe_head *sh, struct bio *bi, int dd_idx, 
 	spin_unlock_irq(&conf->device_lock);
 	spin_unlock(&sh->lock);
 
-	PRINTK("added bi b#%llu to stripe s#%llu, disk %d.\n", (unsigned long long)bi->bi_sector, (unsigned long long)sh->sector, dd_idx);
+	PRINTK("added bi b#%llu to stripe s#%llu, disk %d.\n",
+		(unsigned long long)bi->bi_sector,
+		(unsigned long long)sh->sector, dd_idx);
 
 	if (forwrite) {
 		/* check if page is coverred */
@@ -838,7 +853,9 @@ static void handle_stripe(struct stripe_head *sh)
 	int failed_num=0;
 	struct r5dev *dev;
 
-	PRINTK("handling stripe %llu, cnt=%d, pd_idx=%d\n", (unsigned long long)sh->sector, atomic_read(&sh->count), sh->pd_idx);
+	PRINTK("handling stripe %llu, cnt=%d, pd_idx=%d\n",
+		(unsigned long long)sh->sector, atomic_read(&sh->count),
+		sh->pd_idx);
 
 	spin_lock(&sh->lock);
 	clear_bit(STRIPE_HANDLE, &sh->state);
@@ -853,8 +870,8 @@ static void handle_stripe(struct stripe_head *sh)
 		clear_bit(R5_Insync, &dev->flags);
 		clear_bit(R5_Syncio, &dev->flags);
 
-		PRINTK("check %d: state 0x%lx read %p write %p written %p\n", i, 
-		       dev->flags, dev->toread, dev->towrite, dev->written);
+		PRINTK("check %d: state 0x%lx read %p write %p written %p\n",
+			i, dev->flags, dev->toread, dev->towrite, dev->written);
 		/* maybe we can reply to a read */
 		if (test_bit(R5_UPTODATE, &dev->flags) && dev->toread) {
 			struct bio *rbi, *rbi2;
@@ -895,8 +912,9 @@ static void handle_stripe(struct stripe_head *sh)
 		} else
 			set_bit(R5_Insync, &dev->flags);
 	}
-	PRINTK("locked=%d uptodate=%d to_read=%d to_write=%d failed=%d failed_num=%d\n",
-	       locked, uptodate, to_read, to_write, failed, failed_num);
+	PRINTK("locked=%d uptodate=%d to_read=%d"
+		" to_write=%d failed=%d failed_num=%d\n",
+		locked, uptodate, to_read, to_write, failed, failed_num);
 	/* check if the array has lost two devices and, if so, some requests might
 	 * need to be failed
 	 */
@@ -1015,7 +1033,8 @@ static void handle_stripe(struct stripe_head *sh)
 					}
 #endif
 					locked++;
-					PRINTK("Reading block %d (sync=%d)\n", i, syncing);
+					PRINTK("Reading block %d (sync=%d)\n", 
+						i, syncing);
 					if (syncing)
 						md_sync_acct(conf->disks[i].rdev, STRIPE_SECTORS);
 				}
@@ -1055,7 +1074,8 @@ static void handle_stripe(struct stripe_head *sh)
 				else rcw += 2*disks;
 			}
 		}
-		PRINTK("for sector %llu, rmw=%d rcw=%d\n", (unsigned long long)sh->sector, rmw, rcw);
+		PRINTK("for sector %llu, rmw=%d rcw=%d\n", 
+			(unsigned long long)sh->sector, rmw, rcw);
 		set_bit(STRIPE_HANDLE, &sh->state);
 		if (rmw < rcw && rmw > 0)
 			/* prefer read-modify-write, but need to get some data */
@@ -1204,7 +1224,8 @@ static void handle_stripe(struct stripe_head *sh)
 				md_sync_acct(rdev, STRIPE_SECTORS);
 
 			bi->bi_bdev = rdev->bdev;
-			PRINTK("for %llu schedule op %ld on disc %d\n", (unsigned long long)sh->sector, bi->bi_rw, i);
+			PRINTK("for %llu schedule op %ld on disc %d\n",
+				(unsigned long long)sh->sector, bi->bi_rw, i);
 			atomic_inc(&sh->count);
 			bi->bi_sector = sh->sector + rdev->data_offset;
 			bi->bi_flags = 1 << BIO_UPTODATE;
@@ -1217,7 +1238,8 @@ static void handle_stripe(struct stripe_head *sh)
 			bi->bi_next = NULL;
 			generic_make_request(bi);
 		} else {
-			PRINTK("skip op %ld on disc %d for sector %llu\n", bi->bi_rw, i, (unsigned long long)sh->sector);
+			PRINTK("skip op %ld on disc %d for sector %llu\n",
+				bi->bi_rw, i, (unsigned long long)sh->sector);
 			clear_bit(R5_LOCKED, &sh->dev[i].flags);
 			set_bit(STRIPE_HANDLE, &sh->state);
 		}
@@ -1285,8 +1307,9 @@ static int make_request (request_queue_t *q, struct bio * bi)
 		new_sector = raid5_compute_sector(logical_sector,
 						  raid_disks, data_disks, &dd_idx, &pd_idx, conf);
 
-		PRINTK("raid5: make_request, sector %Lu logical %Lu\n", 
-		       (unsigned long long)new_sector, (unsigned long long)logical_sector);
+		PRINTK("raid5: make_request, sector %Lu logical %Lu\n",
+			(unsigned long long)new_sector, 
+			(unsigned long long)logical_sector);
 
 		sh = get_active_stripe(conf, new_sector, pd_idx, (bi->bi_rw&RWA_MASK));
 		if (sh) {
@@ -1450,7 +1473,9 @@ static int run (mddev_t *mddev)
 		disk->rdev = rdev;
 
 		if (rdev->in_sync) {
-			printk(KERN_INFO "raid5: device %s operational as raid disk %d\n", bdev_partition_name(rdev->bdev), raid_disk);
+			printk(KERN_INFO "raid5: device %s operational as raid"
+				" disk %d\n", bdev_partition_name(rdev->bdev),
+				raid_disk);
 			conf->working_disks++;
 		}
 	}
@@ -1467,48 +1492,62 @@ static int run (mddev_t *mddev)
 	conf->max_nr_stripes = NR_STRIPES;
 
 	if (!conf->chunk_size || conf->chunk_size % 4) {
-		printk(KERN_ERR "raid5: invalid chunk size %d for md%d\n", conf->chunk_size, mdidx(mddev));
+		printk(KERN_ERR "raid5: invalid chunk size %d for md%d\n",
+			conf->chunk_size, mdidx(mddev));
 		goto abort;
 	}
 	if (conf->algorithm > ALGORITHM_RIGHT_SYMMETRIC) {
-		printk(KERN_ERR "raid5: unsupported parity algorithm %d for md%d\n", conf->algorithm, mdidx(mddev));
+		printk(KERN_ERR 
+			"raid5: unsupported parity algorithm %d for md%d\n",
+			conf->algorithm, mdidx(mddev));
 		goto abort;
 	}
 	if (mddev->degraded > 1) {
-		printk(KERN_ERR "raid5: not enough operational devices for md%d (%d/%d failed)\n", mdidx(mddev), conf->failed_disks, conf->raid_disks);
+		printk(KERN_ERR "raid5: not enough operational devices for md%d"
+			" (%d/%d failed)\n",
+			mdidx(mddev), conf->failed_disks, conf->raid_disks);
 		goto abort;
 	}
 
 	if (mddev->degraded == 1 &&
 	    mddev->recovery_cp != MaxSector) {
-		printk(KERN_ERR "raid5: cannot start dirty degraded array for md%d\n", mdidx(mddev));
+		printk(KERN_ERR 
+			"raid5: cannot start dirty degraded array for md%d\n",
+			mdidx(mddev));
 		goto abort;
 	}
 
 	{
 		mddev->thread = md_register_thread(raid5d, mddev, "md%d_raid5");
 		if (!mddev->thread) {
-			printk(KERN_ERR "raid5: couldn't allocate thread for md%d\n", mdidx(mddev));
+			printk(KERN_ERR 
+				"raid5: couldn't allocate thread for md%d\n",
+				mdidx(mddev));
 			goto abort;
 		}
 	}
-
-	memory = conf->max_nr_stripes * (sizeof(struct stripe_head) +
+memory = conf->max_nr_stripes * (sizeof(struct stripe_head) +
 		 conf->raid_disks * ((sizeof(struct bio) + PAGE_SIZE))) / 1024;
 	if (grow_stripes(conf, conf->max_nr_stripes)) {
-		printk(KERN_ERR "raid5: couldn't allocate %dkB for buffers\n", memory);
+		printk(KERN_ERR 
+			"raid5: couldn't allocate %dkB for buffers\n", memory);
 		shrink_stripes(conf);
 		md_unregister_thread(mddev->thread);
 		goto abort;
 	} else
-		printk(KERN_INFO "raid5: allocated %dkB for md%d\n", memory, mdidx(mddev));
+		printk(KERN_INFO "raid5: allocated %dkB for md%d\n",
+			memory, mdidx(mddev));
 
 	if (mddev->degraded == 0)
-		printk("raid5: raid level %d set md%d active with %d out of %d devices, algorithm %d\n", conf->level, mdidx(mddev), 
-		       mddev->raid_disks-mddev->degraded, mddev->raid_disks, conf->algorithm);
+		printk("raid5: raid level %d set md%d active with %d out of %d"
+			" devices, algorithm %d\n", conf->level, mdidx(mddev), 
+			mddev->raid_disks-mddev->degraded, mddev->raid_disks,
+			conf->algorithm);
 	else
-		printk(KERN_ALERT "raid5: raid level %d set md%d active with %d out of %d devices, algorithm %d\n", conf->level, mdidx(mddev),
-		       mddev->raid_disks - mddev->degraded, mddev->raid_disks, conf->algorithm);
+		printk(KERN_ALERT "raid5: raid level %d set md%d active with %d"
+			" out of %d devices, algorithm %d\n", conf->level,
+			mdidx(mddev), mddev->raid_disks - mddev->degraded,
+			mddev->raid_disks, conf->algorithm);
 
 	print_raid5_conf(conf);
 
@@ -1549,11 +1588,14 @@ static void print_sh (struct stripe_head *sh)
 {
 	int i;
 
-	printk("sh %llu, pd_idx %d, state %ld.\n", (unsigned long long)sh->sector, sh->pd_idx, sh->state);
-	printk("sh %llu,  count %d.\n", (unsigned long long)sh->sector, atomic_read(&sh->count));
+	printk("sh %llu, pd_idx %d, state %ld.\n",
+		(unsigned long long)sh->sector, sh->pd_idx, sh->state);
+	printk("sh %llu,  count %d.\n",
+		(unsigned long long)sh->sector, atomic_read(&sh->count));
 	printk("sh %llu, ", (unsigned long long)sh->sector);
 	for (i = 0; i < sh->raid_conf->raid_disks; i++) {
-		printk("(cache%d: %p %ld) ", i, sh->dev[i].page, sh->dev[i].flags);
+		printk("(cache%d: %p %ld) ", 
+			i, sh->dev[i].page, sh->dev[i].flags);
 	}
 	printk("\n");
 }

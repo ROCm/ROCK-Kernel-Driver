@@ -193,7 +193,7 @@ static int linear_make_request (request_queue_t *q, struct bio *bio)
 	block = bio->bi_sector >> 1;
   
 	if (unlikely(!tmp_dev)) {
-		printk ("linear_make_request : hash->dev1==NULL for block %llu\n",
+		printk("linear_make_request: hash->dev1==NULL for block %llu\n",
 			(unsigned long long)block);
 		bio_io_error(bio, bio->bi_size);
 		return 0;
@@ -203,7 +203,7 @@ static int linear_make_request (request_queue_t *q, struct bio *bio)
 		     || block < tmp_dev->offset)) {
 		char b[BDEVNAME_SIZE];
 
-		printk ("linear_make_request: Block %llu out of bounds on "
+		printk("linear_make_request: Block %llu out of bounds on "
 			"dev %s size %ld offset %ld\n",
 			(unsigned long long)block,
 			bdevname(tmp_dev->rdev->bdev, b),

@@ -43,12 +43,15 @@ static int create_strip_zones (mddev_t *mddev)
 	conf->nr_strip_zones = 0;
  
 	ITERATE_RDEV(mddev,rdev1,tmp1) {
-		printk("raid0: looking at %s\n", bdev_partition_name(rdev1->bdev));
+		printk("raid0: looking at %s\n",
+			bdev_partition_name(rdev1->bdev));
 		c = 0;
 		ITERATE_RDEV(mddev,rdev2,tmp2) {
 			printk("raid0:   comparing %s(%llu) with %s(%llu)\n",
-			       bdev_partition_name(rdev1->bdev), (unsigned long long)rdev1->size,
-			       bdev_partition_name(rdev2->bdev), (unsigned long long)rdev2->size);
+				bdev_partition_name(rdev1->bdev),
+				(unsigned long long)rdev1->size,
+				bdev_partition_name(rdev2->bdev),
+				(unsigned long long)rdev2->size);
 			if (rdev2 == rdev1) {
 				printk("raid0:   END\n");
 				break;
@@ -94,7 +97,8 @@ static int create_strip_zones (mddev_t *mddev)
 			goto abort;
 		}
 		if (zone->dev[j]) {
-			printk("raid0: multiple devices for %d - aborting!\n", j);
+			printk("raid0: multiple devices for %d - aborting!\n",
+				j);
 			goto abort;
 		}
 		zone->dev[j] = rdev1;
@@ -103,8 +107,8 @@ static int create_strip_zones (mddev_t *mddev)
 		cnt++;
 	}
 	if (cnt != mddev->raid_disks) {
-		printk("raid0: too few disks (%d of %d) - aborting!\n", cnt, 
-		       mddev->raid_disks);
+		printk("raid0: too few disks (%d of %d) - aborting!\n",
+			cnt, mddev->raid_disks);
 		goto abort;
 	}
 	zone->nb_dev = cnt;
@@ -136,7 +140,7 @@ static int create_strip_zones (mddev_t *mddev)
 				if (!smallest || (rdev->size <smallest->size)) {
 					smallest = rdev;
 					printk("  (%llu) is smallest!.\n", 
-					       (unsigned long long)rdev->size);
+						(unsigned long long)rdev->size);
 				}
 			} else
 				printk(" nope.\n");
@@ -144,7 +148,8 @@ static int create_strip_zones (mddev_t *mddev)
 
 		zone->nb_dev = c;
 		zone->size = (smallest->size - current_offset) * c;
-		printk("raid0: zone->nb_dev: %d, size: %llu\n",zone->nb_dev, (unsigned long long)zone->size);
+		printk("raid0: zone->nb_dev: %d, size: %llu\n",
+			zone->nb_dev, (unsigned long long)zone->size);
 
 		if (!conf->smallest || (zone->size < conf->smallest->size))
 			conf->smallest = zone;
@@ -153,7 +158,8 @@ static int create_strip_zones (mddev_t *mddev)
 		curr_zone_offset += zone->size;
 
 		current_offset = smallest->size;
-		printk("raid0: current zone offset: %llu\n", (unsigned long long)current_offset);
+		printk("raid0: current zone offset: %llu\n",
+			(unsigned long long)current_offset);
 	}
 	printk("raid0: done.\n");
 	return 0;
@@ -201,8 +207,10 @@ static int raid0_run (mddev_t *mddev)
 	if (create_strip_zones (mddev)) 
 		goto out_free_conf;
 
-	printk("raid0 : md_size is %llu blocks.\n", (unsigned long long)md_size[mdidx(mddev)]);
-	printk("raid0 : conf->smallest->size is %llu blocks.\n", (unsigned long long)conf->smallest->size);
+	printk("raid0 : md_size is %llu blocks.\n", 
+		(unsigned long long)md_size[mdidx(mddev)]);
+	printk("raid0 : conf->smallest->size is %llu blocks.\n",
+		(unsigned long long)conf->smallest->size);
 	{
 #if __GNUC__ < 3
 		volatile
@@ -357,16 +365,21 @@ static int raid0_make_request (request_queue_t *q, struct bio *bio)
 	return 1;
 
 bad_map:
-	printk ("raid0_make_request bug: can't convert block across chunks or bigger than %dk %llu %d\n", chunk_size, (unsigned long long)bio->bi_sector, bio->bi_size >> 10);
+	printk("raid0_make_request bug: can't convert block across chunks"
+		" or bigger than %dk %llu %d\n", chunk_size, 
+		(unsigned long long)bio->bi_sector, bio->bi_size >> 10);
 	goto outerr;
 bad_hash:
-	printk("raid0_make_request bug: hash==NULL for block %llu\n", (unsigned long long)block);
+	printk("raid0_make_request bug: hash==NULL for block %llu\n",
+		(unsigned long long)block);
 	goto outerr;
 bad_zone0:
-	printk ("raid0_make_request bug: hash->zone0==NULL for block %llu\n", (unsigned long long)block);
+	printk("raid0_make_request bug: hash->zone0==NULL for block %llu\n",
+		(unsigned long long)block);
 	goto outerr;
 bad_zone1:
-	printk ("raid0_make_request bug: hash->zone1==NULL for block %llu\n", (unsigned long long)block);
+	printk("raid0_make_request bug: hash->zone1==NULL for block %llu\n",
+			(unsigned long long)block);
  outerr:
 	bio_io_error(bio, bio->bi_size);
 	return 0;
