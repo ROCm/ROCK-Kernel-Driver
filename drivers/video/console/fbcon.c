@@ -1512,9 +1512,10 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 		if (!info->fbops->fb_set_par)
 			return -EINVAL;
 
-		sprintf(mode, "%dx%d", var.xres, var.yres);
-		err = fb_find_mode(&var, info, mode, NULL, 0, NULL,
-					info->var.bits_per_pixel);
+		snprintf(mode, 40, "%ix%i", var.xres, var.yres);
+		err = fb_find_mode(&var, info, mode, info->monspecs.modedb,
+				   info->monspecs.modedb_len, NULL,
+				   info->var.bits_per_pixel);
 		if (!err || width > var.xres/fw || height > var.yres/fh)
 			return -EINVAL;
 		DPRINTK("resize now %ix%i\n", var.xres, var.yres);
