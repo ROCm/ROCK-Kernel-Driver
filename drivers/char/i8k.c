@@ -621,32 +621,35 @@ static int __init dmi_table(u32 base, int len, int num, void (*fn)(DMIHeader*))
 
 static int __init dmi_iterate(void (*decode)(DMIHeader *))
 {
-    unsigned char buf[20];
-    long fp = 0x000e0000L;
-    fp -= 16;
+	unsigned char buf[20];
+	void __iomem *p = ioremap(0xe0000, 0x20000), *q;
 
-    while (fp < 0x000fffffL) {
-	fp += 16;
-	isa_memcpy_fromio(buf, fp, 20);
-	if (memcmp(buf, "_DMI_", 5)==0) {
-	    u16 num  = buf[13]<<8  | buf[12];
-	    u16 len  = buf [7]<<8  | buf [6];
-	    u32 base = buf[11]<<24 | buf[10]<<16 | buf[9]<<8 | buf[8];
+	if (!p)
+		return -1;
+
+	for (q = p; q < p + 0x20000; q += 16) {
+		memcpy_fromio(buf, q, 20);
+		if (memcmp(buf, "_DMI_", 5)==0) {
+			u16 num  = buf[13]<<8  | buf[12];
+			u16 len  = buf [7]<<8  | buf [6];
+			u32 base = buf[11]<<24 | buf[10]<<16 | buf[9]<<8 | buf[8];
 #ifdef I8K_DEBUG
-	    printk(KERN_INFO "DMI %d.%d present.\n",
-		   buf[14]>>4, buf[14]&0x0F);
-	    printk(KERN_INFO "%d structures occupying %d bytes.\n",
-		   buf[13]<<8 | buf[12],
-		   buf [7]<<8 | buf[6]);
-	    printk(KERN_INFO "DMI table at 0x%08X.\n",
-		   buf[11]<<24 | buf[10]<<16 | buf[9]<<8 | buf[8]);
+			printk(KERN_INFO "DMI %d.%d present.\n",
+			   buf[14]>>4, buf[14]&0x0F);
+			printk(KERN_INFO "%d structures occupying %d bytes.\n",
+			   buf[13]<<8 | buf[12],
+			   buf [7]<<8 | buf[6]);
+			printk(KERN_INFO "DMI table at 0x%08X.\n",
+			   buf[11]<<24 | buf[10]<<16 | buf[9]<<8 | buf[8]);
 #endif
-	    if (dmi_table(base, len, num, decode)==0) {
-		return 0;
-	    }
+			if (dmi_table(base, len, num, decode)==0) {
+				iounmap(p);
+				return 0;
+			}
+		}
 	}
-    }
-    return -1;
+	iounmap(p);
+	return -1;
 }
 /* end of DMI code */
 

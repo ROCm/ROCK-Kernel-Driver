@@ -1004,9 +1004,11 @@ static void __init set_task_gate(unsigned int n, unsigned int gdt_entry)
 void __init trap_init(void)
 {
 #ifdef CONFIG_EISA
-	if (isa_readl(0x0FFFD9) == 'E'+('I'<<8)+('S'<<16)+('A'<<24)) {
+	void __iomem *p = ioremap(0x0FFFD9, 4);
+	if (readl(p) == 'E'+('I'<<8)+('S'<<16)+('A'<<24)) {
 		EISA_bus = 1;
 	}
+	iounmap(p);
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
