@@ -1616,7 +1616,8 @@ static int __make_request(request_queue_t *q, struct bio *bio)
 
 	sector = bio->bi_sector;
 	nr_sectors = bio_sectors(bio);
-	cur_nr_sectors = bio_iovec(bio)->bv_len >> 9;
+	cur_nr_sectors = bio_cur_sectors(bio);
+
 	rw = bio_data_dir(bio);
 
 	/*
@@ -1672,7 +1673,10 @@ again:
 			}
 
 			bio->bi_next = req->bio;
-			req->bio = bio;
+			req->cbio = req->bio = bio;
+			req->nr_cbio_segments = bio_segments(bio);
+			req->nr_cbio_sectors = bio_sectors(bio);
+
 			/*
 			 * may not be valid. if the low level driver said
 			 * it didn't need a bounce buffer then it better
@@ -1740,9 +1744,11 @@ get_rq:
 	req->current_nr_sectors = req->hard_cur_sectors = cur_nr_sectors;
 	req->nr_phys_segments = bio_phys_segments(q, bio);
 	req->nr_hw_segments = bio_hw_segments(q, bio);
+	req->nr_cbio_segments = bio_segments(bio);
+	req->nr_cbio_sectors = bio_sectors(bio);
 	req->buffer = bio_data(bio);	/* see ->buffer comment above */
 	req->waiting = NULL;
-	req->bio = req->biotail = bio;
+	req->cbio = req->bio = req->biotail = bio;
 	req->rq_disk = bio->bi_bdev->bd_disk;
 	req->start_time = jiffies;
 
@@ -1914,6 +1920,81 @@ int submit_bio(int rw, struct bio *bio)
 	return 1;
 }
 
+/**
+ * blk_rq_next_segment
+ * @rq:		the request being processed
+ *
+ * Description:
+ *	Points to the next segment in the request if the current segment
+ *	is complete. Leaves things unchanged if this segment is not over
+ *	or if no more segments are left in this request.
+ *
+ *	Meant to be used for bio traversal during I/O submission
+ *	Does not affect any I/O completions or update completion state
+ *	in the request, and does not modify any bio fields.
+ *
+ *	Decrementing rq->nr_sectors, rq->current_nr_sectors and
+ *	rq->nr_cbio_sectors as data is transferred is the caller's
+ *	responsibility and should be done before calling this routine.
+ **/
+void blk_rq_next_segment(struct request *rq)
+{
+	if (rq->current_nr_sectors > 0)
+		return;
+
+	if (rq->nr_cbio_sectors > 0) {
+		--rq->nr_cbio_segments;
+		rq->current_nr_sectors = blk_rq_vec(rq)->bv_len >> 9;
+	} else {
+		if ((rq->cbio = rq->cbio->bi_next)) {
+			rq->nr_cbio_segments = bio_segments(rq->cbio);
+			rq->nr_cbio_sectors = bio_sectors(rq->cbio);
+ 			rq->current_nr_sectors = bio_cur_sectors(rq->cbio);
+		}
+ 	}
+
+	/* remember the size of this segment before we start I/O */
+	rq->hard_cur_sectors = rq->current_nr_sectors;
+}
+
+/**
+ * process_that_request_first	-	process partial request submission
+ * @req:	the request being processed
+ * @nr_sectors:	number of sectors I/O has been submitted on
+ *
+ * Description:
+ *	May be used for processing bio's while submitting I/O without
+ *	signalling completion. Fails if more data is requested than is
+ *	available in the request in which case it doesn't advance any
+ *	pointers.
+ *
+ *	Assumes a request is correctly set up. No sanity checks.
+ *
+ * Return:
+ *	0 - no more data left to submit (not processed)
+ *	1 - data available to submit for this request (processed)
+ **/
+int process_that_request_first(struct request *req, unsigned int nr_sectors)
+{
+	unsigned int nsect;
+
+	if (req->nr_sectors < nr_sectors)
+		return 0;
+
+	req->nr_sectors -= nr_sectors;
+	req->sector += nr_sectors;
+	while (nr_sectors) {
+		nsect = min_t(unsigned, req->current_nr_sectors, nr_sectors);
+		req->current_nr_sectors -= nsect;
+		nr_sectors -= nsect;
+		if (req->cbio) {
+			req->nr_cbio_sectors -= nsect;
+			blk_rq_next_segment(req);
+		}
+	}
+	return 1;
+}
+
 void blk_recalc_rq_segments(struct request *rq)
 {
 	struct bio *bio;
@@ -1921,8 +2002,6 @@ void blk_recalc_rq_segments(struct request *rq)
 
 	if (!rq->bio)
 		return;
-
-	rq->buffer = bio_data(rq->bio);
 
 	nr_phys_segs = nr_hw_segs = 0;
 	rq_for_each_bio(bio, rq) {
@@ -1941,11 +2020,24 @@ void blk_recalc_rq_sectors(struct request *rq, int nsect)
 {
 	if (blk_fs_request(rq)) {
 		rq->hard_sector += nsect;
-		rq->nr_sectors = rq->hard_nr_sectors -= nsect;
-		rq->sector = rq->hard_sector;
+		rq->hard_nr_sectors -= nsect;
 
-		rq->current_nr_sectors = bio_iovec(rq->bio)->bv_len >> 9;
-		rq->hard_cur_sectors = rq->current_nr_sectors;
+		/*
+		 * Move the I/O submission pointers ahead if required,
+		 * i.e. for drivers not aware of rq->cbio.
+		 */
+		if ((rq->nr_sectors >= rq->hard_nr_sectors) &&
+		    (rq->sector <= rq->hard_sector)) {
+			rq->sector = rq->hard_sector;
+			rq->nr_sectors = rq->hard_nr_sectors;
+			rq->hard_cur_sectors = bio_cur_sectors(rq->bio);
+			rq->current_nr_sectors = rq->hard_cur_sectors;
+			rq->nr_cbio_segments = bio_segments(rq->bio);
+			rq->nr_cbio_sectors = bio_sectors(rq->bio);
+			rq->buffer = bio_data(rq->bio);
+
+			rq->cbio = rq->bio;
+		}
 
 		/*
 		 * if total number of sectors is less than the first segment
@@ -2139,9 +2231,27 @@ void blk_rq_bio_prep(request_queue_t *q, struct request *rq, struct bio *bio)
 	rq->current_nr_sectors = bio_cur_sectors(bio);
 	rq->hard_cur_sectors = rq->current_nr_sectors;
 	rq->hard_nr_sectors = rq->nr_sectors = bio_sectors(bio);
+	rq->nr_cbio_segments = bio_segments(bio);
+	rq->nr_cbio_sectors = bio_sectors(bio);
 	rq->buffer = bio_data(bio);
 
-	rq->bio = rq->biotail = bio;
+	rq->cbio = rq->bio = rq->biotail = bio;
+}
+
+void blk_rq_prep_restart(struct request *rq)
+{
+	struct bio *bio;
+
+	bio = rq->cbio = rq->bio;
+	if (bio) {
+		rq->nr_cbio_segments = bio_segments(bio);
+		rq->nr_cbio_sectors = bio_sectors(bio);
+		rq->hard_cur_sectors = bio_cur_sectors(bio);
+		rq->buffer = bio_data(bio);
+	}
+	rq->sector = rq->hard_sector;
+	rq->nr_sectors = rq->hard_nr_sectors;
+	rq->current_nr_sectors = rq->hard_cur_sectors;
 }
 
 int __init blk_dev_init(void)
@@ -2169,6 +2279,7 @@ int __init blk_dev_init(void)
 	return 0;
 };
 
+EXPORT_SYMBOL(process_that_request_first);
 EXPORT_SYMBOL(end_that_request_first);
 EXPORT_SYMBOL(end_that_request_chunk);
 EXPORT_SYMBOL(end_that_request_last);

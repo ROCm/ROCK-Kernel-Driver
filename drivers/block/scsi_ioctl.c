@@ -212,7 +212,7 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 		}
 	}
 
-	rq = blk_get_request(q, WRITE, __GFP_WAIT);
+	rq = blk_get_request(q, writing ? WRITE : READ, __GFP_WAIT);
 
 	/*
 	 * fill in request structure
@@ -227,8 +227,6 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 	rq->sense_len = 0;
 
 	rq->flags |= REQ_BLOCK_PC;
-	if (writing)
-		rq->flags |= REQ_RW;
 
 	rq->hard_nr_sectors = rq->nr_sectors = nr_sectors;
 	rq->hard_cur_sectors = rq->current_nr_sectors = nr_sectors;
@@ -329,7 +327,7 @@ static int sg_scsi_ioctl(request_queue_t *q, struct block_device *bdev,
 		memset(buffer, 0, bytes);
 	}
 
-	rq = blk_get_request(q, WRITE, __GFP_WAIT);
+	rq = blk_get_request(q, in_len ? WRITE : READ, __GFP_WAIT);
 
 	cmdlen = COMMAND_SIZE(opcode);
 
@@ -373,8 +371,6 @@ static int sg_scsi_ioctl(request_queue_t *q, struct block_device *bdev,
 	rq->data = buffer;
 	rq->data_len = bytes;
 	rq->flags |= REQ_BLOCK_PC;
-	if (in_len)
-		rq->flags |= REQ_RW;
 
 	blk_do_rq(q, bdev, rq);
 	err = rq->errors & 0xff;	/* only 8 bit SCSI status */
