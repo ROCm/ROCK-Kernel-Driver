@@ -246,6 +246,11 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 	 */
 	asoc->peer.sack_needed = 1;
 
+	/* Assume that the peer recongizes ASCONF until reported otherwise
+	 * via an ERROR chunk.
+	 */
+	asoc->peer.asconf_capable = 1;
+
 	/* Create an input queue.  */
 	sctp_inq_init(&asoc->base.inqueue);
 	sctp_inq_set_th_handler(&asoc->base.inqueue,
