@@ -55,6 +55,9 @@ extern int minix_new_block(struct inode * inode);
 extern void minix_free_block(struct inode * inode, int block);
 extern unsigned long minix_count_free_blocks(struct minix_sb_info *sbi);
 
+extern int minix_getattr(struct vfsmount *, struct dentry *, struct kstat *);
+
+extern void V2_minix_truncate(struct inode *);
 extern void V1_minix_truncate(struct inode *);
 extern void V2_minix_truncate(struct inode *);
 extern void minix_truncate(struct inode *);
@@ -62,6 +65,8 @@ extern int minix_sync_inode(struct inode *);
 extern void minix_set_inode(struct inode *, dev_t);
 extern int V1_minix_get_block(struct inode *, long, struct buffer_head *, int);
 extern int V2_minix_get_block(struct inode *, long, struct buffer_head *, int);
+extern unsigned V1_minix_blocks(loff_t);
+extern unsigned V2_minix_blocks(loff_t);
 
 extern struct minix_dir_entry *minix_find_entry(struct dentry*, struct page**);
 extern int minix_add_link(struct dentry*, struct inode*);

@@ -783,7 +783,7 @@ struct inode_operations {
 	int (*permission) (struct inode *, int);
 	int (*revalidate) (struct dentry *);
 	int (*setattr) (struct dentry *, struct iattr *);
-	int (*getattr) (struct dentry *, struct iattr *);
+	int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
 	int (*setxattr) (struct dentry *, const char *, void *, size_t, int);
 	ssize_t (*getxattr) (struct dentry *, const char *, void *, size_t);
 	ssize_t (*listxattr) (struct dentry *, char *, size_t);
@@ -1283,6 +1283,7 @@ extern int vfs_follow_link(struct nameidata *, const char *);
 extern int page_readlink(struct dentry *, char *, int);
 extern int page_follow_link(struct dentry *, struct nameidata *);
 extern struct inode_operations page_symlink_inode_operations;
+extern void generic_fillattr(struct inode *, struct kstat *);
 
 extern int vfs_readdir(struct file *, filldir_t, void *);
 

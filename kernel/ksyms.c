@@ -258,6 +258,7 @@ EXPORT_SYMBOL(vfs_lstat);
 EXPORT_SYMBOL(lock_rename);
 EXPORT_SYMBOL(unlock_rename);
 EXPORT_SYMBOL(generic_read_dir);
+EXPORT_SYMBOL(generic_fillattr);
 EXPORT_SYMBOL(generic_file_llseek);
 EXPORT_SYMBOL(remote_llseek);
 EXPORT_SYMBOL(no_llseek);

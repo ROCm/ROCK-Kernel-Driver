@@ -20,22 +20,14 @@
 static __inline__ int
 do_revalidate(struct dentry *dentry)
 {
-	struct inode * inode = dentry->d_inode;
-	if (inode->i_op && inode->i_op->revalidate)
+	struct inode *inode = dentry->d_inode;
+	if (inode->i_op->revalidate)
 		return inode->i_op->revalidate(dentry);
 	return 0;
 }
 
-static int do_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
+void generic_fillattr(struct inode *inode, struct kstat *stat)
 {
-	int res = 0;
-	unsigned int blocks, indirect;
-	struct inode *inode = dentry->d_inode;
-
-	res = do_revalidate(dentry);
-	if (res)
-		return res;
-
 	stat->dev = kdev_t_to_nr(inode->i_dev);
 	stat->ino = inode->i_ino;
 	stat->mode = inode->i_mode;
@@ -48,41 +40,29 @@ static int do_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat 
 	stat->ctime = inode->i_ctime;
 	stat->ctime = inode->i_ctime;
 	stat->size = inode->i_size;
-/*
- * st_blocks and st_blksize are approximated with a simple algorithm if
- * they aren't supported directly by the filesystem. The minix and msdos
- * filesystems don't keep track of blocks, so they would either have to
- * be counted explicitly (by delving into the file itself), or by using
- * this simple algorithm to get a reasonable (although not 100% accurate)
- * value.
- */
+	stat->blocks = inode->i_blocks;
+	stat->blksize = inode->i_blksize;
+}
 
-/*
- * Use minix fs values for the number of direct and indirect blocks.  The
- * count is now exact for the minix fs except that it counts zero blocks.
- * Everything is in units of BLOCK_SIZE until the assignment to
- * tmp.st_blksize.
- */
-#define D_B   7
-#define I_B   (BLOCK_SIZE / sizeof(unsigned short))
+static int do_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
+{
+	int res = 0;
+	struct inode *inode = dentry->d_inode;
 
-	if (!inode->i_blksize) {
-		blocks = (stat->size + BLOCK_SIZE - 1) >> BLOCK_SIZE_BITS;
-		if (blocks > D_B) {
-			indirect = (blocks - D_B + I_B - 1) / I_B;
-			blocks += indirect;
-			if (indirect > 1) {
-				indirect = (indirect - 1 + I_B - 1) / I_B;
-				blocks += indirect;
-				if (indirect > 1)
-					blocks++;
-			}
-		}
-		stat->blocks = (BLOCK_SIZE / 512) * blocks;
-		stat->blksize = BLOCK_SIZE;
-	} else {
-		stat->blocks = inode->i_blocks;
-		stat->blksize = inode->i_blksize;
+	if (inode->i_op->getattr)
+		return inode->i_op->getattr(mnt, dentry, stat);
+
+	res = do_revalidate(dentry);
+	if (res)
+		return res;
+
+	generic_fillattr(inode, stat);
+	if (!stat->blksize) {
+		struct super_block *s = inode->i_sb;
+		unsigned blocks;
+		blocks = (stat->size+s->s_blocksize-1) >> s->s_blocksize_bits;
+		stat->blocks = (s->s_blocksize / 512) * blocks;
+		stat->blksize = s->s_blocksize;
 	}
 	return 0;
 }

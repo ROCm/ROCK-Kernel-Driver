@@ -24,6 +24,7 @@ struct file_operations minix_file_operations = {
 
 struct inode_operations minix_file_inode_operations = {
 	truncate:	minix_truncate,
+	getattr:	minix_getattr,
 };
 
 int minix_sync_file(struct file * file, struct dentry *dentry, int datasync)

@@ -317,4 +317,5 @@ struct inode_operations sysv_dir_inode_operations = {
 	rmdir:		sysv_rmdir,
 	mknod:		sysv_mknod,
 	rename:		sysv_rename,
+	getattr:	sysv_getattr,
 };

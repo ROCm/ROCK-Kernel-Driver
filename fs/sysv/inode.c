@@ -132,6 +132,7 @@ static inline void write3byte(struct sysv_sb_info *sbi,
 static struct inode_operations sysv_symlink_inode_operations = {
 	readlink:	page_readlink,
 	follow_link:	page_follow_link,
+	getattr:	sysv_getattr,
 };
 
 void sysv_set_inode(struct inode *inode, dev_t rdev)
