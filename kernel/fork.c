@@ -1030,7 +1030,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	p->pdeath_signal = 0;
 
 	/* Perform scheduler related setup */
-	sched_fork(p, clone_flags);
+	sched_fork(p);
 
 	/*
 	 * Ok, make it visible to the rest of the system.

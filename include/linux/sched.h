@@ -574,11 +574,10 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 
 #define SD_BALANCE_NEWIDLE	1	/* Balance when about to become idle */
 #define SD_BALANCE_EXEC		2	/* Balance on exec */
-#define SD_BALANCE_CLONE	4	/* Balance on clone */
-#define SD_WAKE_IDLE		8	/* Wake to idle CPU on task wakeup */
-#define SD_WAKE_AFFINE		16	/* Wake task to waking CPU */
-#define SD_WAKE_BALANCE		32	/* Perform balancing at task wakeup */
-#define SD_SHARE_CPUPOWER	64	/* Domain members share cpu power */
+#define SD_WAKE_IDLE		4	/* Wake to idle CPU on task wakeup */
+#define SD_WAKE_AFFINE		8	/* Wake task to waking CPU */
+#define SD_WAKE_BALANCE		16	/* Perform balancing at task wakeup */
+#define SD_SHARE_CPUPOWER	32	/* Domain members share cpu power */
 
 struct sched_group {
 	struct sched_group *next;	/* Must be a circular list */
@@ -759,7 +758,7 @@ extern void FASTCALL(wake_up_new_task(struct task_struct * tsk,
 #else
  static inline void kick_process(struct task_struct *tsk) { }
 #endif
-extern void FASTCALL(sched_fork(task_t * p, unsigned long clone_flags));
+extern void FASTCALL(sched_fork(task_t * p));
 extern void FASTCALL(sched_exit(task_t * p));
 
 extern int in_group_p(gid_t);

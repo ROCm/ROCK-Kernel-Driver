@@ -874,30 +874,10 @@ static int find_idlest_cpu(struct task_struct *p, int this_cpu,
  * Perform scheduler related setup for a newly forked process p.
  * p is forked by current. The cpu hotplug lock is held.
  */
-void fastcall sched_fork(task_t *p, unsigned long clone_flags)
+void fastcall sched_fork(task_t *p)
 {
-	int cpu;
-#ifdef CONFIG_SMP
-	struct sched_domain *tmp, *sd = NULL;
-	preempt_disable();
-	cpu = smp_processor_id();
+	int cpu = smp_processor_id();
 
-	if ((clone_flags & (CLONE_VM|CLONE_VFORK)) == CLONE_VM) {
-		/*
-		 * New thread that is not a vfork.
-		 * Find the largest domain that this CPU is part of that
-		 * is willing to balance on clone:
-		 */
-		for_each_domain(cpu, tmp)
-			if (tmp->flags & SD_BALANCE_CLONE)
-				sd = tmp;
-		if (sd)
-			cpu = find_idlest_cpu(p, cpu, sd);
-	}
-	preempt_enable();
-#else
-	cpu = smp_processor_id();
-#endif
 	/*
 	 * The task hasn't been attached yet, so cpus_allowed mask cannot
 	 * change. The cpus_allowed mask of the parent may have changed
