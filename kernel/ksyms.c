@@ -405,8 +405,6 @@ EXPORT_SYMBOL(proc_doulongvec_ms_jiffies_minmax);
 EXPORT_SYMBOL(proc_doulongvec_minmax);
 
 /* interrupt handling */
-EXPORT_SYMBOL(add_timer);
-EXPORT_SYMBOL(del_timer);
 EXPORT_SYMBOL(request_irq);
 EXPORT_SYMBOL(free_irq);
 
@@ -433,7 +431,10 @@ EXPORT_SYMBOL(probe_irq_off);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(del_timer_sync);
 #endif
+EXPORT_SYMBOL(add_timer);
+EXPORT_SYMBOL(del_timer);
 EXPORT_SYMBOL(mod_timer);
+EXPORT_SYMBOL(__mod_timer);
 
 #ifdef HAVE_DISABLE_HLT
 EXPORT_SYMBOL(disable_hlt);

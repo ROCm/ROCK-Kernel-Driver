@@ -144,78 +144,7 @@ static void internal_add_timer(tvec_base_t *base, struct timer_list *timer)
 	list_add_tail(&timer->entry, vec);
 }
 
-/***
- * add_timer - start a timer
- * @timer: the timer to be added
- *
- * The kernel will do a ->function(->data) callback from the
- * timer interrupt at the ->expired point in the future. The
- * current time is 'jiffies'.
- *
- * The timer's ->expired, ->function (and if the handler uses it, ->data)
- * fields must be set prior calling this function.
- *
- * Timers with an ->expired field in the past will be executed in the next
- * timer tick. It's illegal to add an already pending timer.
- */
-void add_timer(struct timer_list *timer)
-{
-	tvec_base_t *base = &get_cpu_var(tvec_bases);
-  	unsigned long flags;
-  
-  	BUG_ON(timer_pending(timer) || !timer->function);
-
-	check_timer(timer);
-
-	spin_lock_irqsave(&base->lock, flags);
-	internal_add_timer(base, timer);
-	timer->base = base;
-	spin_unlock_irqrestore(&base->lock, flags);
-	put_cpu_var(tvec_bases);
-}
-
-/***
- * add_timer_on - start a timer on a particular CPU
- * @timer: the timer to be added
- * @cpu: the CPU to start it on
- *
- * This is not very scalable on SMP.
- */
-void add_timer_on(struct timer_list *timer, int cpu)
-{
-	tvec_base_t *base = &per_cpu(tvec_bases, cpu);
-  	unsigned long flags;
-  
-  	BUG_ON(timer_pending(timer) || !timer->function);
-
-	check_timer(timer);
-
-	spin_lock_irqsave(&base->lock, flags);
-	internal_add_timer(base, timer);
-	timer->base = base;
-	spin_unlock_irqrestore(&base->lock, flags);
-}
-
-/***
- * mod_timer - modify a timer's timeout
- * @timer: the timer to be modified
- *
- * mod_timer is a more efficient way to update the expire field of an
- * active timer (if the timer is inactive it will be activated)
- *
- * mod_timer(timer, expires) is equivalent to:
- *
- *     del_timer(timer); timer->expires = expires; add_timer(timer);
- *
- * Note that if there are multiple unserialized concurrent users of the
- * same timer, then mod_timer() is the only safe way to modify the timeout,
- * since add_timer() cannot modify an already running timer.
- *
- * The function returns whether it has modified a pending timer or not.
- * (ie. mod_timer() of an inactive timer returns 0, mod_timer() of an
- * active timer returns 1.)
- */
-int mod_timer(struct timer_list *timer, unsigned long expires)
+int __mod_timer(struct timer_list *timer, unsigned long expires)
 {
 	tvec_base_t *old_base, *new_base;
 	unsigned long flags;
@@ -224,14 +153,6 @@ int mod_timer(struct timer_list *timer, unsigned long expires)
 	BUG_ON(!timer->function);
 
 	check_timer(timer);
-
-	/*
-	 * This is a common optimization triggered by the
-	 * networking code - if the timer is re-modified
-	 * to be the same thing then just return:
-	 */
-	if (timer->expires == expires && timer_pending(timer))
-		return 1;
 
 	spin_lock_irqsave(&timer->lock, flags);
 	new_base = &__get_cpu_var(tvec_bases);
@@ -279,6 +200,64 @@ repeat:
 	spin_unlock_irqrestore(&timer->lock, flags);
 
 	return ret;
+}
+
+/***
+ * add_timer_on - start a timer on a particular CPU
+ * @timer: the timer to be added
+ * @cpu: the CPU to start it on
+ *
+ * This is not very scalable on SMP. Double adds are not possible.
+ */
+void add_timer_on(struct timer_list *timer, int cpu)
+{
+	tvec_base_t *base = &per_cpu(tvec_bases, cpu);
+  	unsigned long flags;
+  
+  	BUG_ON(timer_pending(timer) || !timer->function);
+
+	check_timer(timer);
+
+	spin_lock_irqsave(&base->lock, flags);
+	internal_add_timer(base, timer);
+	timer->base = base;
+	spin_unlock_irqrestore(&base->lock, flags);
+}
+
+/***
+ * mod_timer - modify a timer's timeout
+ * @timer: the timer to be modified
+ *
+ * mod_timer is a more efficient way to update the expire field of an
+ * active timer (if the timer is inactive it will be activated)
+ *
+ * mod_timer(timer, expires) is equivalent to:
+ *
+ *     del_timer(timer); timer->expires = expires; add_timer(timer);
+ *
+ * Note that if there are multiple unserialized concurrent users of the
+ * same timer, then mod_timer() is the only safe way to modify the timeout,
+ * since add_timer() cannot modify an already running timer.
+ *
+ * The function returns whether it has modified a pending timer or not.
+ * (ie. mod_timer() of an inactive timer returns 0, mod_timer() of an
+ * active timer returns 1.)
+ */
+int mod_timer(struct timer_list *timer, unsigned long expires)
+{
+	BUG_ON(!timer->function);
+
+	check_timer(timer);
+
+	/*
+	 * This is a common optimization triggered by the
+	 * networking code - if the timer is re-modified
+	 * to be the same thing then just return:
+	 */
+	if (timer->expires == expires && timer_pending(timer))
+		return 1;
+
+	return __mod_timer(timer, expires);
 }
 
 /***
