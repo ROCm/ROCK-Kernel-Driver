@@ -1137,19 +1137,25 @@ static int shmem_rmdir(struct inode * dir, struct dentry *dentry)
  */
 static int shmem_rename(struct inode * old_dir, struct dentry *old_dentry, struct inode * new_dir,struct dentry *new_dentry)
 {
-	int error = -ENOTEMPTY;
+	struct inode *inode;
 
-	if (shmem_empty(new_dentry)) {
-		struct inode *inode = new_dentry->d_inode;
-		if (inode) {
-			inode->i_ctime = CURRENT_TIME;
-			inode->i_nlink--;
-			dput(new_dentry);
-		}
-		error = 0;
-		old_dentry->d_inode->i_ctime = old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME;
+	if (!shmem_empty(new_dentry)) 
+		return -ENOTEMPTY;
+
+	inode = new_dentry->d_inode;
+	if (inode) {
+		inode->i_ctime = CURRENT_TIME;
+		inode->i_nlink--;
+		dput(new_dentry);
 	}
-	return error;
+	inode = old_dentry->d_inode;
+	if (S_ISDIR(inode->i_mode)) {
+		old_dir->i_nlink--;
+		new_dir->i_nlink++;
+	}
+
+	inode->i_ctime = old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME;
+	return 0;
 }
 
 static int shmem_symlink(struct inode * dir, struct dentry *dentry, const char * symname)
