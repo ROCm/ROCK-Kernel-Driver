@@ -61,6 +61,7 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent);
 static void sil_dev_config(struct ata_port *ap, struct ata_device *dev);
 static u32 sil_scr_read (struct ata_port *ap, unsigned int sc_reg);
 static void sil_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val);
+static void sil_post_set_mode (struct ata_port *ap);
 
 static struct pci_device_id sil_pci_tbl[] = {
 	{ 0x1095, 0x3112, PCI_ANY_ID, PCI_ANY_ID, 0, 0, sil_3112 },
@@ -124,6 +125,7 @@ static struct ata_port_operations sil_ops = {
 	.check_status		= ata_check_status_mmio,
 	.exec_command		= ata_exec_command_mmio,
 	.phy_reset		= sata_phy_reset,
+	.post_set_mode		= sil_post_set_mode,
 	.bmdma_start            = ata_bmdma_start_mmio,
 	.fill_sg		= ata_fill_sg,
 	.eng_timeout		= ata_eng_timeout,
@@ -141,7 +143,7 @@ static struct ata_port_info sil_port_info[] = {
 		.host_flags	= ATA_FLAG_SATA | ATA_FLAG_NO_LEGACY |
 				  ATA_FLAG_SRST | ATA_FLAG_MMIO,
 		.pio_mask	= 0x03,			/* pio3-4 */
-		.udma_mask	= 0x7f,			/* udma0-6; FIXME */
+		.udma_mask	= 0x3f,			/* udma0-5 */
 		.port_ops	= &sil_ops,
 	}, /* sil_3114 */
 	{
@@ -149,7 +151,7 @@ static struct ata_port_info sil_port_info[] = {
 		.host_flags	= ATA_FLAG_SATA | ATA_FLAG_NO_LEGACY |
 				  ATA_FLAG_SRST | ATA_FLAG_MMIO,
 		.pio_mask	= 0x03,			/* pio3-4 */
-		.udma_mask	= 0x7f,			/* udma0-6; FIXME */
+		.udma_mask	= 0x3f,			/* udma0-5 */
 		.port_ops	= &sil_ops,
 	},
 };
@@ -162,17 +164,47 @@ static const struct {
 	unsigned long bmdma;	/* DMA register block */
 	unsigned long scr;	/* SATA control register block */
 	unsigned long sien;	/* SATA Interrupt Enable register */
+	unsigned long xfer_mode;/* data transfer mode register */
 } sil_port[] = {
-	{ 0x80, 0x8A, 0x00, 0x100, 0x148 },	/* port 0 ... */
-	{ 0xC0, 0xCA, 0x08, 0x180, 0x1c8 },
-	{ 0x280, 0x28A, 0x200, 0x300, 0x348 },
-	{ 0x2C0, 0x2CA, 0x208, 0x380, 0x3c8 },	/* ... port 3 */
+	/* port 0 ... */
+	{ 0x80, 0x8A, 0x00, 0x100, 0x148, 0xb4 },
+	{ 0xC0, 0xCA, 0x08, 0x180, 0x1c8, 0xf4 },
+	{ 0x280, 0x28A, 0x200, 0x300, 0x348, 0x2b4 },
+	{ 0x2C0, 0x2CA, 0x208, 0x380, 0x3c8, 0x2f4 },
+	/* ... port 3 */
 };
 
 MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("low-level driver for Silicon Image SATA controller");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, sil_pci_tbl);
+
+static void sil_post_set_mode (struct ata_port *ap)
+{
+	struct ata_host_set *host_set = ap->host_set;
+	struct ata_device *dev;
+	void *addr = host_set->mmio_base + sil_port[ap->port_no].xfer_mode;
+	u32 tmp, dev_mode[2];
+	unsigned int i;
+
+	for (i = 0; i < 2; i++) {
+		dev = &ap->device[i];
+		if (!ata_dev_present(dev))
+			dev_mode[i] = 0;	/* PIO0/1/2 */
+		else if (dev->flags & ATA_DFLAG_PIO)
+			dev_mode[i] = 1;	/* PIO3/4 */
+		else
+			dev_mode[i] = 3;	/* UDMA */
+		/* value 2 indicates MDMA */
+	}
+
+	tmp = readl(addr);
+	tmp &= ~((1<<5) | (1<<4) | (1<<1) | (1<<0));
+	tmp |= dev_mode[0];
+	tmp |= (dev_mode[1] << 4);
+	writel(tmp, addr);
+	readl(addr);	/* flush */
+}
 
 static inline unsigned long sil_scr_addr(struct ata_port *ap, unsigned int sc_reg)
 {

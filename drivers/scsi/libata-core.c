@@ -1159,6 +1159,8 @@ static void ata_set_mode(struct ata_port *ap)
 			return;
 	}
 
+	if (ap->ops->post_set_mode)
+		ap->ops->post_set_mode(ap);
 }
 
 /**

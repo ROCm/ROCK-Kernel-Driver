@@ -362,6 +362,7 @@ struct ata_port_operations {
 	u8   (*check_status)(struct ata_port *ap);
 
 	void (*phy_reset) (struct ata_port *ap);
+	void (*post_set_mode) (struct ata_port *ap);
 
 	void (*bmdma_start) (struct ata_queued_cmd *qc);
 	void (*fill_sg) (struct ata_queued_cmd *qc);
