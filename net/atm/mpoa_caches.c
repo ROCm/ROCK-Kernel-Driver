@@ -212,7 +212,7 @@ static void in_cache_remove_entry(in_cache_entry *entry,
 			client->eg_ops->put(eg_entry);
 			return;
 		}
-		atm_async_release_vcc(vcc, -EPIPE);
+		vcc_release_async(vcc, -EPIPE);
 	}
 
 	return;
@@ -447,7 +447,7 @@ static void eg_cache_remove_entry(eg_cache_entry *entry,
 			client->in_ops->put(in_entry);
 			return;
 		}
-		atm_async_release_vcc(vcc, -EPIPE);
+		vcc_release_async(vcc, -EPIPE);
 	}
 
 	return;

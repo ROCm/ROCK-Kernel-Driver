@@ -124,14 +124,16 @@ static int sigd_send(struct atm_vcc *vcc,struct sk_buff *skb)
 			clear_bit(ATM_VF_REGIS,&vcc->flags);
 			clear_bit(ATM_VF_READY,&vcc->flags);
 			vcc->reply = msg->reply;
+			vcc->sk->sk_err = -msg->reply;
 			break;
 		case as_indicate:
 			vcc = *(struct atm_vcc **) &msg->listen_vcc;
 			DPRINTK("as_indicate!!!\n");
+			lock_sock(vcc->sk);
 			if (vcc->sk->sk_ack_backlog ==
 			    vcc->sk->sk_max_ack_backlog) {
 				sigd_enq(0,as_reject,vcc,NULL,NULL);
-				return 0;
+				goto as_indicate_complete;
 			}
 			vcc->sk->sk_ack_backlog++;
 			skb_queue_tail(&vcc->sk->sk_receive_queue, skb);
@@ -140,11 +142,14 @@ static int sigd_send(struct atm_vcc *vcc,struct sk_buff *skb)
 				    &vcc->sleep);
 				vcc->callback(vcc);
 			}
+as_indicate_complete:
+			release_sock(vcc->sk);
 			return 0;
 		case as_close:
 			set_bit(ATM_VF_RELEASED,&vcc->flags);
 			clear_bit(ATM_VF_READY,&vcc->flags);
 			vcc->reply = msg->reply;
+			vcc->sk->sk_err = -msg->reply;
 			break;
 		case as_modify:
 			modify_qos(vcc,msg);
@@ -202,6 +207,7 @@ static void purge_vccs(struct atm_vcc *vcc)
 		    !test_bit(ATM_VF_META,&vcc->flags)) {
 			set_bit(ATM_VF_RELEASED,&vcc->flags);
 			vcc->reply = -EUNATCH;
+			vcc->sk->sk_err = EUNATCH;
 			wake_up(&vcc->sleep);
 		}
 		vcc = vcc->next;

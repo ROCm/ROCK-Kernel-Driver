@@ -239,15 +239,16 @@ int atm_release(struct socket *sock)
 }
 
 
-void atm_async_release_vcc(struct atm_vcc *vcc,int reply)
+void vcc_release_async(struct atm_vcc *vcc, int reply)
 {
-	set_bit(ATM_VF_CLOSE,&vcc->flags);
+	set_bit(ATM_VF_CLOSE, &vcc->flags);
 	vcc->reply = reply;
+	vcc->sk->sk_err = -reply;
 	wake_up(&vcc->sleep);
 }
 
 
-EXPORT_SYMBOL(atm_async_release_vcc);
+EXPORT_SYMBOL(vcc_release_async);
 
 
 static int adjust_tp(struct atm_trafprm *tp,unsigned char aal)
@@ -276,8 +277,8 @@ static int adjust_tp(struct atm_trafprm *tp,unsigned char aal)
 }
 
 
-static int atm_do_connect_dev(struct atm_vcc *vcc,struct atm_dev *dev,int vpi,
-    int vci)
+static int __vcc_connect(struct atm_vcc *vcc, struct atm_dev *dev, int vpi,
+			 int vci)
 {
 	int error;
 
@@ -334,29 +335,26 @@ static int atm_do_connect_dev(struct atm_vcc *vcc,struct atm_dev *dev,int vpi,
 }
 
 
-static int atm_do_connect(struct atm_vcc *vcc,int itf,int vpi,int vci)
+int vcc_connect(struct socket *sock, int itf, short vpi, int vci)
 {
 	struct atm_dev *dev;
-	int return_val;
+	struct atm_vcc *vcc = ATM_SD(sock);
+	int error;
 
-	dev = atm_dev_lookup(itf);
-	if (!dev)
-		return_val =  -ENODEV;
-	else {
-		return_val = atm_do_connect_dev(vcc,dev,vpi,vci);
-		if (return_val) atm_dev_release(dev);
-	}
+	DPRINTK("vcc_connect (vpi %d, vci %d)\n",vpi,vci);
+	if (sock->state == SS_CONNECTED)
+		return -EISCONN;
+	if (sock->state != SS_UNCONNECTED)
+		return -EINVAL;
+	if (!(vpi || vci))
+		return -EINVAL;
 
-	return return_val;
-}
-
-
-int atm_connect_vcc(struct atm_vcc *vcc,int itf,short vpi,int vci)
-{
 	if (vpi != ATM_VPI_UNSPEC && vci != ATM_VCI_UNSPEC)
 		clear_bit(ATM_VF_PARTIAL,&vcc->flags);
-	else if (test_bit(ATM_VF_PARTIAL,&vcc->flags)) return -EINVAL;
-	DPRINTK("atm_connect (TX: cl %d,bw %d-%d,sdu %d; "
+	else
+		if (test_bit(ATM_VF_PARTIAL,&vcc->flags))
+			return -EINVAL;
+	DPRINTK("vcc_connect (TX: cl %d,bw %d-%d,sdu %d; "
 	    "RX: cl %d,bw %d-%d,sdu %d,AAL %s%d)\n",
 	    vcc->qos.txtp.traffic_class,vcc->qos.txtp.min_pcr,
 	    vcc->qos.txtp.max_pcr,vcc->qos.txtp.max_sdu,
@@ -364,141 +362,135 @@ int atm_connect_vcc(struct atm_vcc *vcc,int itf,short vpi,int vci)
 	    vcc->qos.rxtp.max_pcr,vcc->qos.rxtp.max_sdu,
 	    vcc->qos.aal == ATM_AAL5 ? "" : vcc->qos.aal == ATM_AAL0 ? "" :
 	    " ??? code ",vcc->qos.aal == ATM_AAL0 ? 0 : vcc->qos.aal);
-	if (!test_bit(ATM_VF_HASQOS,&vcc->flags)) return -EBADFD;
+	if (!test_bit(ATM_VF_HASQOS, &vcc->flags))
+		return -EBADFD;
 	if (vcc->qos.txtp.traffic_class == ATM_ANYCLASS ||
 	    vcc->qos.rxtp.traffic_class == ATM_ANYCLASS)
 		return -EINVAL;
 	if (itf != ATM_ITF_ANY) {
-		int error;
-
-		error = atm_do_connect(vcc,itf,vpi,vci);
-		if (error) return error;
-	}
-	else {
-		struct atm_dev *dev = NULL;
+		dev = atm_dev_lookup(itf);
+		error = __vcc_connect(vcc, dev, vpi, vci);
+		if (error) {
+			atm_dev_release(dev);
+			return error;
+		}
+	} else {
 		struct list_head *p, *next;
 
+		dev = NULL;
 		spin_lock(&atm_dev_lock);
 		list_for_each_safe(p, next, &atm_devs) {
 			dev = list_entry(p, struct atm_dev, dev_list);
 			atm_dev_hold(dev);
 			spin_unlock(&atm_dev_lock);
-			if (!atm_do_connect_dev(vcc,dev,vpi,vci))
+			if (!__vcc_connect(vcc, dev, vpi, vci))
 				break;
 			atm_dev_release(dev);
 			dev = NULL;
 			spin_lock(&atm_dev_lock);
 		}
 		spin_unlock(&atm_dev_lock);
-		if (!dev) return -ENODEV;
+		if (!dev)
+			return -ENODEV;
 	}
 	if (vpi == ATM_VPI_UNSPEC || vci == ATM_VCI_UNSPEC)
 		set_bit(ATM_VF_PARTIAL,&vcc->flags);
-	return 0;
-}
-
-
-int atm_connect(struct socket *sock,int itf,short vpi,int vci)
-{
-	int error;
-
-	DPRINTK("atm_connect (vpi %d, vci %d)\n",vpi,vci);
-	if (sock->state == SS_CONNECTED) return -EISCONN;
-	if (sock->state != SS_UNCONNECTED) return -EINVAL;
-	if (!(vpi || vci)) return -EINVAL;
-	error = atm_connect_vcc(ATM_SD(sock),itf,vpi,vci);
-	if (error) return error;
 	if (test_bit(ATM_VF_READY,&ATM_SD(sock)->flags))
 		sock->state = SS_CONNECTED;
 	return 0;
 }
 
 
-int atm_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
-		int total_len, int flags)
+int vcc_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
+		int size, int flags)
 {
-	DECLARE_WAITQUEUE(wait,current);
+	struct sock *sk = sock->sk;
 	struct atm_vcc *vcc;
 	struct sk_buff *skb;
-	int eff_len,error;
-	void *buff;
-	int size;
+	int copied, error = -EINVAL;
 
-	if (sock->state != SS_CONNECTED) return -ENOTCONN;
-	if (flags & ~MSG_DONTWAIT) return -EOPNOTSUPP;
-	if (m->msg_iovlen != 1) return -ENOSYS; /* fix this later @@@ */
-	buff = m->msg_iov->iov_base;
-	size = m->msg_iov->iov_len;
+	if (sock->state != SS_CONNECTED)
+		return -ENOTCONN;
+	if (flags & ~MSG_DONTWAIT)		/* only handle MSG_DONTWAIT */
+		return -EOPNOTSUPP;
 	vcc = ATM_SD(sock);
-	add_wait_queue(&vcc->sleep,&wait);
-	set_current_state(TASK_INTERRUPTIBLE);
-	error = 1; /* <= 0 is error */
-	while (!(skb = skb_dequeue(&vcc->sk->sk_receive_queue))) {
-		if (test_bit(ATM_VF_RELEASED,&vcc->flags) ||
-		    test_bit(ATM_VF_CLOSE,&vcc->flags)) {
-			error = vcc->reply;
-			break;
-		}
-		if (!test_bit(ATM_VF_READY,&vcc->flags)) {
-			error = 0;
-			break;
-		}
-		if (flags & MSG_DONTWAIT) {
-			error = -EAGAIN;
-			break;
-		}
-		schedule();
-		set_current_state(TASK_INTERRUPTIBLE);
-		if (signal_pending(current)) {
-			error = -ERESTARTSYS;
-			break;
-		}
+	if (test_bit(ATM_VF_RELEASED,&vcc->flags) ||
+	    test_bit(ATM_VF_CLOSE,&vcc->flags))
+		return vcc->reply;
+	if (!test_bit(ATM_VF_READY, &vcc->flags))
+		return 0;
+
+	skb = skb_recv_datagram(sk, flags, flags & MSG_DONTWAIT, &error);
+	if (!skb)
+		return error;
+
+	copied = skb->len; 
+	if (copied > size) {
+		copied = size; 
+		msg->msg_flags |= MSG_TRUNC;
 	}
-	set_current_state(TASK_RUNNING);
-	remove_wait_queue(&vcc->sleep,&wait);
-	if (error <= 0) return error;
-	sock_recv_timestamp(m, vcc->sk, skb);
-	eff_len = skb->len > size ? size : skb->len;
-	if (skb->len > size) /* Not fit ?  Report it... */
-		m->msg_flags |= MSG_TRUNC;
-	if (vcc->dev->ops->feedback)
-		vcc->dev->ops->feedback(vcc,skb,(unsigned long) skb->data,
-		    (unsigned long) buff,eff_len);
-	DPRINTK("RcvM %d -= %d\n", atomic_read(&vcc->sk->sk_rmem_alloc),
-		skb->truesize);
-	atm_return(vcc,skb->truesize);
-	error = copy_to_user(buff,skb->data,eff_len) ? -EFAULT : 0;
-	kfree_skb(skb);
-	return error ? error : eff_len;
+
+        error = skb_copy_datagram_iovec(skb, 0, msg->msg_iov, copied);
+        if (error)
+                return error;
+        sock_recv_timestamp(msg, sk, skb);
+        if (vcc->dev->ops->feedback)
+                vcc->dev->ops->feedback(vcc, skb, (unsigned long) skb->data,
+                    (unsigned long) msg->msg_iov->iov_base, copied);
+        DPRINTK("RcvM %d -= %d\n", atomic_read(&vcc->sk->rmem_alloc), skb->truesize);
+        atm_return(vcc, skb->truesize);
+        skb_free_datagram(sk, skb);
+        return copied;
 }
 
 
-int atm_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
+int vcc_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 		int total_len)
 {
-	DECLARE_WAITQUEUE(wait,current);
+	struct sock *sk = sock->sk;
+	DEFINE_WAIT(wait);
 	struct atm_vcc *vcc;
 	struct sk_buff *skb;
 	int eff,error;
 	const void *buff;
 	int size;
 
-	if (sock->state != SS_CONNECTED) return -ENOTCONN;
-	if (m->msg_name) return -EISCONN;
-	if (m->msg_iovlen != 1) return -ENOSYS; /* fix this later @@@ */
+	lock_sock(sk);
+	if (sock->state != SS_CONNECTED) {
+		error = -ENOTCONN;
+		goto out;
+	}
+	if (m->msg_name) {
+		error = -EISCONN;
+		goto out;
+	}
+	if (m->msg_iovlen != 1) {
+		error = -ENOSYS; /* fix this later @@@ */
+		goto out;
+	}
 	buff = m->msg_iov->iov_base;
 	size = m->msg_iov->iov_len;
 	vcc = ATM_SD(sock);
-	if (test_bit(ATM_VF_RELEASED,&vcc->flags) ||
-	    test_bit(ATM_VF_CLOSE,&vcc->flags))
-		return vcc->reply;
-	if (!test_bit(ATM_VF_READY,&vcc->flags)) return -EPIPE;
-	if (!size) return 0;
-	if (size < 0 || size > vcc->qos.txtp.max_sdu) return -EMSGSIZE;
+	if (test_bit(ATM_VF_RELEASED, &vcc->flags) ||
+	    test_bit(ATM_VF_CLOSE, &vcc->flags)) {
+		error = vcc->reply;
+		goto out;
+	}
+	if (!test_bit(ATM_VF_READY, &vcc->flags)) {
+		error = -EPIPE;
+		goto out;
+	}
+	if (!size) {
+		error = 0;
+		goto out;
+	}
+	if (size < 0 || size > vcc->qos.txtp.max_sdu) {
+		error = -EMSGSIZE;
+		goto out;
+	}
 	/* verify_area is done by net/socket.c */
 	eff = (size+3) & ~3; /* align to word boundary */
-	add_wait_queue(&vcc->sleep,&wait);
-	set_current_state(TASK_INTERRUPTIBLE);
+	prepare_to_wait(&vcc->sleep, &wait, TASK_INTERRUPTIBLE);
 	error = 0;
 	while (!(skb = alloc_tx(vcc,eff))) {
 		if (m->msg_flags & MSG_DONTWAIT) {
@@ -506,7 +498,6 @@ int atm_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 			break;
 		}
 		schedule();
-		set_current_state(TASK_INTERRUPTIBLE);
 		if (signal_pending(current)) {
 			error = -ERESTARTSYS;
 			break;
@@ -520,19 +511,24 @@ int atm_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 			error = -EPIPE;
 			break;
 		}
+		prepare_to_wait(&vcc->sleep, &wait, TASK_INTERRUPTIBLE);
 	}
-	set_current_state(TASK_RUNNING);
-	remove_wait_queue(&vcc->sleep,&wait);
-	if (error) return error;
+	finish_wait(&vcc->sleep, &wait);
+	if (error)
+		goto out;
 	skb->dev = NULL; /* for paths shared with net_device interfaces */
 	ATM_SKB(skb)->atm_options = vcc->atm_options;
 	if (copy_from_user(skb_put(skb,size),buff,size)) {
 		kfree_skb(skb);
-		return -EFAULT;
+		error = -EFAULT;
+		goto out;
 	}
 	if (eff != size) memset(skb->data+size,0,eff-size);
 	error = vcc->dev->ops->send(vcc,skb);
-	return error ? error : size;
+	error = error ? error : size;
+out:
+	release_sock(sk);
+	return error;
 }
 
 
@@ -880,13 +876,15 @@ static int check_qos(struct atm_qos *qos)
 	return check_tp(&qos->rxtp);
 }
 
-
-static int atm_do_setsockopt(struct socket *sock,int level,int optname,
-    void *optval,int optlen)
+int vcc_setsockopt(struct socket *sock, int level, int optname,
+		   char *optval, int optlen)
 {
 	struct atm_vcc *vcc;
 	unsigned long value;
 	int error;
+
+	if (__SO_LEVEL_MATCH(optname, level) && optlen != __SO_SIZE(optname))
+		return -EINVAL;
 
 	vcc = ATM_SD(sock);
 	switch (optname) {
@@ -921,10 +919,16 @@ static int atm_do_setsockopt(struct socket *sock,int level,int optname,
 }
 
 
-static int atm_do_getsockopt(struct socket *sock,int level,int optname,
-    void *optval,int optlen)
+int vcc_getsockopt(struct socket *sock, int level, int optname,
+		   char *optval, int *optlen)
 {
 	struct atm_vcc *vcc;
+	int len;
+
+	if (get_user(len, optlen))
+		return -EFAULT;
+	if (__SO_LEVEL_MATCH(optname, level) && len != __SO_SIZE(optname))
+		return -EINVAL;
 
 	vcc = ATM_SD(sock);
 	switch (optname) {
@@ -955,28 +959,7 @@ static int atm_do_getsockopt(struct socket *sock,int level,int optname,
 			break;
 	}
 	if (!vcc->dev || !vcc->dev->ops->getsockopt) return -EINVAL;
-	return vcc->dev->ops->getsockopt(vcc,level,optname,optval,optlen);
-}
-
-
-int atm_setsockopt(struct socket *sock,int level,int optname,char *optval,
-    int optlen)
-{
-	if (__SO_LEVEL_MATCH(optname, level) && optlen != __SO_SIZE(optname))
-		return -EINVAL;
-	return atm_do_setsockopt(sock,level,optname,optval,optlen);
-}
-
-
-int atm_getsockopt(struct socket *sock,int level,int optname,
-    char *optval,int *optlen)
-{
-	int len;
-
-	if (get_user(len,optlen)) return -EFAULT;
-	if (__SO_LEVEL_MATCH(optname, level) && len != __SO_SIZE(optname))
-		return -EINVAL;
-	return atm_do_getsockopt(sock,level,optname,optval,len);
+	return vcc->dev->ops->getsockopt(vcc, level, optname, optval, len);
 }
 
 

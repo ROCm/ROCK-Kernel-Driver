@@ -31,20 +31,29 @@ static int pvc_shutdown(struct socket *sock,int how)
 static int pvc_bind(struct socket *sock,struct sockaddr *sockaddr,
     int sockaddr_len)
 {
+	struct sock *sk = sock->sk;
 	struct sockaddr_atmpvc *addr;
 	struct atm_vcc *vcc;
+	int error;
 
 	if (sockaddr_len != sizeof(struct sockaddr_atmpvc)) return -EINVAL;
 	addr = (struct sockaddr_atmpvc *) sockaddr;
 	if (addr->sap_family != AF_ATMPVC) return -EAFNOSUPPORT;
+	lock_sock(sk);
 	vcc = ATM_SD(sock);
-	if (!test_bit(ATM_VF_HASQOS,&vcc->flags)) return -EBADFD;
+	if (!test_bit(ATM_VF_HASQOS, &vcc->flags)) {
+		error = -EBADFD;
+		goto out;
+	}
 	if (test_bit(ATM_VF_PARTIAL,&vcc->flags)) {
 		if (vcc->vpi != ATM_VPI_UNSPEC) addr->sap_addr.vpi = vcc->vpi;
 		if (vcc->vci != ATM_VCI_UNSPEC) addr->sap_addr.vci = vcc->vci;
 	}
-	return atm_connect(sock,addr->sap_addr.itf,addr->sap_addr.vpi,
-	    addr->sap_addr.vci);
+	error = vcc_connect(sock, addr->sap_addr.itf, addr->sap_addr.vpi,
+			    addr->sap_addr.vci);
+out:
+	release_sock(sk);
+	return error;
 }
 
 
@@ -52,6 +61,31 @@ static int pvc_connect(struct socket *sock,struct sockaddr *sockaddr,
     int sockaddr_len,int flags)
 {
 	return pvc_bind(sock,sockaddr,sockaddr_len);
+}
+
+static int pvc_setsockopt(struct socket *sock, int level, int optname,
+			  char *optval, int optlen)
+{
+	struct sock *sk = sock->sk;
+	int error;
+
+	lock_sock(sk);
+	error = vcc_setsockopt(sock, level, optname, optval, optlen);
+	release_sock(sk);
+	return error;
+}
+
+
+static int pvc_getsockopt(struct socket *sock, int level, int optname,
+		          char *optval, int *optlen)
+{
+	struct sock *sk = sock->sk;
+	int error;
+
+	lock_sock(sk);
+	error = vcc_getsockopt(sock, level, optname, optval, optlen);
+	release_sock(sk);
+	return error;
 }
 
 
@@ -72,7 +106,7 @@ static int pvc_getname(struct socket *sock,struct sockaddr *sockaddr,
 }
 
 
-static struct proto_ops SOCKOPS_WRAPPED(pvc_proto_ops) = {
+static struct proto_ops pvc_proto_ops = {
 	.family =	PF_ATMPVC,
 
 	.release =	atm_release,
@@ -85,17 +119,13 @@ static struct proto_ops SOCKOPS_WRAPPED(pvc_proto_ops) = {
 	.ioctl =	vcc_ioctl,
 	.listen =	sock_no_listen,
 	.shutdown =	pvc_shutdown,
-	.setsockopt =	atm_setsockopt,
-	.getsockopt =	atm_getsockopt,
-	.sendmsg =	atm_sendmsg,
-	.recvmsg =	atm_recvmsg,
+	.setsockopt =	pvc_setsockopt,
+	.getsockopt =	pvc_getsockopt,
+	.sendmsg =	vcc_sendmsg,
+	.recvmsg =	vcc_recvmsg,
 	.mmap =		sock_no_mmap,
 	.sendpage =	sock_no_sendpage,
 };
-
-
-#include <linux/smp_lock.h>
-SOCKOPS_WRAP(pvc_proto, PF_ATMPVC);
 
 
 static int pvc_create(struct socket *sock,int protocol)

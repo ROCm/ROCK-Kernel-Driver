@@ -12,19 +12,18 @@
 
 int atm_create(struct socket *sock,int protocol,int family);
 int atm_release(struct socket *sock);
-int atm_connect(struct socket *sock,int itf,short vpi,int vci);
-int atm_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
-		int total_len, int flags);
-int atm_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
+int vcc_connect(struct socket *sock, int itf, short vpi, int vci);
+int vcc_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
+		int size, int flags);
+int vcc_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 		int total_len);
 unsigned int atm_poll(struct file *file,struct socket *sock,poll_table *wait);
 int vcc_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg);
-int atm_setsockopt(struct socket *sock,int level,int optname,char *optval,
-    int optlen);
-int atm_getsockopt(struct socket *sock,int level,int optname,char *optval,
-    int *optlen);
+int vcc_setsockopt(struct socket *sock, int level, int optname, char *optval,
+		   int optlen);
+int vcc_getsockopt(struct socket *sock, int level, int optname, char *optval,
+		   int *optlen);
 
-int atm_connect_vcc(struct atm_vcc *vcc,int itf,short vpi,int vci);
 void atm_release_vcc_sk(struct sock *sk,int free_sk);
 void atm_shutdown_dev(struct atm_dev *dev);
 
