@@ -11,6 +11,7 @@
 #include <linux/pci.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>
+#include "pci.h"
 
 spinlock_t pci_bus_lock = SPIN_LOCK_UNLOCKED;
 
@@ -343,6 +344,39 @@ exit:
 	spin_unlock(&pci_bus_lock);
 	return dev;
 }
+
+/**
+ * pci_dev_present - Returns 1 if device matching the device list is present, 0 if not.
+ * @ids: A pointer to a null terminated list of struct pci_device_id structures
+ * that describe the type of PCI device the caller is trying to find.
+ *
+ * Obvious fact: You do not have a reference to any device that might be found
+ * by this function, so if that device is removed from the system right after
+ * this function is finished, the value will be stale.  Use this function to
+ * find devices that are usually built into a system, or for a general hint as
+ * to if another device happens to be present at this specific moment in time.
+ */
+int pci_dev_present(const struct pci_device_id *ids)
+{
+	struct pci_dev *dev;
+	int found = 0;
+
+	WARN_ON(in_interrupt());
+	spin_lock(&pci_bus_lock);
+	while (ids->vendor || ids->subvendor || ids->class_mask) {
+		list_for_each_entry(dev, &pci_devices, global_list) {
+			if (pci_match_one_device(ids, dev)) {
+				found = 1;
+				goto exit;
+			}
+		}
+		ids++;
+	}
+exit:				
+	spin_unlock(&pci_bus_lock);
+	return found;
+}
+EXPORT_SYMBOL(pci_dev_present);
 
 EXPORT_SYMBOL(pci_find_bus);
 EXPORT_SYMBOL(pci_find_device);
