@@ -713,7 +713,7 @@ static void super_90_sync(mddev_t *mddev, mdk_rdev_t *rdev)
 	sb->disks[0].state = (1<<MD_DISK_REMOVED);
 	ITERATE_RDEV(mddev,rdev2,tmp) {
 		mdp_disk_t *d;
-		if (rdev2->raid_disk >= 0)
+		if (rdev2->raid_disk >= 0 && rdev2->in_sync && !rdev2->faulty)
 			rdev2->desc_nr = rdev2->raid_disk;
 		else
 			rdev2->desc_nr = next_spare++;
@@ -722,7 +722,7 @@ static void super_90_sync(mddev_t *mddev, mdk_rdev_t *rdev)
 		d->number = rdev2->desc_nr;
 		d->major = MAJOR(rdev2->bdev->bd_dev);
 		d->minor = MINOR(rdev2->bdev->bd_dev);
-		if (rdev2->raid_disk >= 0)
+		if (rdev2->raid_disk >= 0 && rdev->in_sync && !rdev2->faulty)
 			d->raid_disk = rdev2->raid_disk;
 		else
 			d->raid_disk = rdev2->desc_nr; /* compatibility */
@@ -3020,9 +3020,13 @@ static void md_do_sync(mddev_t *mddev)
 	       sysctl_speed_limit_max);
 
 	is_mddev_idle(mddev); /* this also initializes IO event counters */
+	if (test_bit(MD_RECOVERY_SYNC, &mddev->recovery))
+		j = mddev->recovery_cp;
+	else
+		j = 0;
 	for (m = 0; m < SYNC_MARKS; m++) {
 		mark[m] = jiffies;
-		mark_cnt[m] = mddev->recovery_cp;
+		mark_cnt[m] = j;
 	}
 	last_mark = 0;
 	mddev->resync_mark = mark[last_mark];
@@ -3039,10 +3043,10 @@ static void md_do_sync(mddev_t *mddev)
 	init_waitqueue_head(&mddev->recovery_wait);
 	last_check = 0;
 
-	if (mddev->recovery_cp)
+	if (j)
 		printk(KERN_INFO "md: resuming recovery of md%d from checkpoint.\n", mdidx(mddev));
 
-	for (j = mddev->recovery_cp; j < max_sectors;) {
+	while (j < max_sectors) {
 		int sectors;
 
 		sectors = mddev->pers->sync_request(mddev, j, currspeed < sysctl_speed_limit_min);
