@@ -287,16 +287,16 @@ struct virt_root_hub {
 struct uhci {
 	struct pci_dev *dev;
 
+#ifdef CONFIG_PROC_FS
 	/* procfs */
 	int num;
 	struct proc_dir_entry *proc_entry;
+#endif
 
 	/* Grabbed from PCI */
 	int irq;
 	unsigned int io_addr;
 	unsigned int io_size;
-
-	struct list_head uhci_list;
 
 	struct pci_pool *qh_pool;
 	struct pci_pool *td_pool;

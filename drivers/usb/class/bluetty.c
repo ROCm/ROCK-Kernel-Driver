@@ -1,10 +1,10 @@
 /*
- * bluetooth.c   Version 0.13
+ * bluetty.c   Version 0.13
  *
  * Copyright (c) 2000, 2001 Greg Kroah-Hartman	<greg@kroah.com>
  * Copyright (c) 2000 Mark Douglas Corner	<mcorner@umich.edu>
  *
- * USB Bluetooth driver, based on the Bluetooth Spec version 1.0B
+ * USB Bluetooth TTY driver, based on the Bluetooth Spec version 1.0B
  * 
  * (2001/11/30) Version 0.13 gkh
  *	- added locking patch from Masoodur Rahman <rmasoodu@in.ibm.com>
@@ -237,7 +237,7 @@ static struct usb_device_id usb_bluetooth_ids [] = {
 MODULE_DEVICE_TABLE (usb, usb_bluetooth_ids);
 
 static struct usb_driver usb_bluetooth_driver = {
-	name:		"bluetooth",
+	name:		"bluetty",
 	probe:		usb_bluetooth_probe,
 	disconnect:	usb_bluetooth_disconnect,
 	id_table:	usb_bluetooth_ids,

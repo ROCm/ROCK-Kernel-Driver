@@ -597,33 +597,31 @@ static int proc_bulk(struct dev_state *ps, void *arg)
 	if (!usb_maxpacket(dev, pipe, !(bulk.ep & USB_DIR_IN)))
 		return -EINVAL;
 	len1 = bulk.len;
-	if (len1 > PAGE_SIZE)
-		return -EINVAL;
-	if (!(tbuf = (unsigned char *)__get_free_page(GFP_KERNEL)))
+	if (!(tbuf = kmalloc(len1, GFP_KERNEL)))
 		return -ENOMEM;
 	tmo = (bulk.timeout * HZ + 999) / 1000;
 	if (bulk.ep & 0x80) {
 		if (len1 && !access_ok(VERIFY_WRITE, bulk.data, len1)) {
-			free_page((unsigned long)tbuf);
+			kfree(tbuf);
 			return -EINVAL;
 		}
 		i = usb_bulk_msg(dev, pipe, tbuf, len1, &len2, tmo);
 		if (!i && len2) {
 			if (copy_to_user(bulk.data, tbuf, len2)) {
-				free_page((unsigned long)tbuf);
+				kfree(tbuf);
 				return -EFAULT;
 			}
 		}
 	} else {
 		if (len1) {
 			if (copy_from_user(tbuf, bulk.data, len1)) {
-				free_page((unsigned long)tbuf);
+				kfree(tbuf);
 				return -EFAULT;
 			}
 		}
 		i = usb_bulk_msg(dev, pipe, tbuf, len1, &len2, tmo);
 	}
-	free_page((unsigned long)tbuf);
+	kfree(tbuf);
 	if (i < 0) {
 		printk(KERN_WARNING "usbfs: USBDEVFS_BULK failed dev %d ep 0x%x len %u ret %d\n", 
 		       dev->devnum, bulk.ep, bulk.len, i);
@@ -1059,6 +1057,8 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 	int			size;
 	void			*buf = 0;
 	int			retval = 0;
+       struct usb_interface    *ifp = 0;
+       struct usb_driver       *driver = 0;
 
 	/* get input parameters and alloc buffer */
 	if (copy_from_user(&ctrl, (void *) arg, sizeof (ctrl)))
@@ -1076,33 +1076,41 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 		}
 	}
 
-	/* ioctl to device */
-	if (ctrl.ifno < 0) {
-		switch (ctrl.ioctl_code) {
-		/* access/release token for issuing control messages
-		 * ask a particular driver to bind/unbind, ... etc
-		 */
-		}
-		retval = -ENOSYS;
+       if (!ps->dev)
+               retval = -ENODEV;
+       else if (!(ifp = usb_ifnum_to_if (ps->dev, ctrl.ifno)))
+               retval = -EINVAL;
+       else switch (ctrl.ioctl_code) {
 
-	/* ioctl to the driver which has claimed a given interface */
-	} else {
-		struct usb_interface	*ifp = 0;
-		if (!ps->dev)
-			retval = -ENODEV;
-		else if (ctrl.ifno >= ps->dev->actconfig->bNumInterfaces)
+       /* disconnect kernel driver from interface, leaving it unbound.  */
+       case USBDEVFS_DISCONNECT:
+               driver = ifp->driver;
+               if (driver) {
+                       down (&driver->serialize);
+                       dbg ("disconnect '%s' from dev %d interface %d",
+                               driver->name, ps->dev->devnum, ctrl.ifno);
+                       driver->disconnect (ps->dev, ifp->private_data);
+                       usb_driver_release_interface (driver, ifp);
+                       up (&driver->serialize);
+               } else
 			retval = -EINVAL;
+               break;
+
+       /* let kernel drivers try to (re)bind to the interface */
+       case USBDEVFS_CONNECT:
+               usb_find_interface_driver_for_ifnum (ps->dev, ctrl.ifno);
+               break;
+
+       /* talk directly to the interface's driver */
+       default:
+               driver = ifp->driver;
+               if (driver == 0 || driver->ioctl == 0)
+                       retval = -ENOSYS;
 		else {
-			if (!(ifp = usb_ifnum_to_if (ps->dev, ctrl.ifno)))
-				retval = -EINVAL;
-			else if (ifp->driver == 0 || ifp->driver->ioctl == 0)
-				retval = -ENOSYS;
-		}
-		if (retval == 0) {
 			if (ifp->driver->owner)
 				__MOD_INC_USE_COUNT(ifp->driver->owner);
 			/* ifno might usefully be passed ... */
-			retval = ifp->driver->ioctl (ps->dev, ctrl.ioctl_code, buf);
+                       retval = driver->ioctl (ps->dev, ctrl.ioctl_code, buf);
 			/* size = min_t(int, size, retval)? */
 			if (ifp->driver->owner)
 				__MOD_DEC_USE_COUNT(ifp->driver->owner);

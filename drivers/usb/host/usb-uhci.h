@@ -11,7 +11,7 @@ static __inline__ void uhci_wait_ms(unsigned int ms)
 {
 	if(!in_interrupt())
 	{
-		current->state = TASK_UNINTERRUPTIBLE;
+		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1 + ms * HZ / 1000);
 	}
 	else
