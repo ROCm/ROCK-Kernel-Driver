@@ -149,6 +149,8 @@ static struct address_info cfg[OPL3SA2_CARDS_MAX];
 static struct address_info cfg_mss[OPL3SA2_CARDS_MAX];
 static struct address_info cfg_mpu[OPL3SA2_CARDS_MAX];
 
+static spinlock_t	lock=SPIN_LOCK_UNLOCKED;
+
 /* Our parameters */
 static int __initdata io	= -1;
 static int __initdata mss_io	= -1;
@@ -927,8 +929,7 @@ static int opl3sa2_suspend(struct pm_dev *pdev, unsigned char pm_mode)
 	if (!pdev)
 		return -EINVAL;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock,flags);
 
 	p = (opl3sa2_mixerdata *) pdev->data;
 	p->in_suspend = 1;
@@ -951,7 +952,7 @@ static int opl3sa2_suspend(struct pm_dev *pdev, unsigned char pm_mode)
 	opl3sa2_read(p->cfg_port, OPL3SA2_PM, &p->reg);
 	opl3sa2_write(p->cfg_port, OPL3SA2_PM, p->reg | pm_mode);
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 	return 0;
 }
 
@@ -964,15 +965,14 @@ static int opl3sa2_resume(struct pm_dev *pdev)
 		return -EINVAL;
 
 	p = (opl3sa2_mixerdata *) pdev->data;
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock,flags);	
 
 	/* I don't think this is necessary */
 	opl3sa2_write(p->cfg_port, OPL3SA2_PM, p->reg);
 	opl3sa2_mixer_restore(p, p->card);
 	p->in_suspend = 0;
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 	return 0;
 }
 
