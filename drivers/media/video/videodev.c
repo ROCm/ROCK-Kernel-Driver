@@ -397,12 +397,21 @@ static struct file_operations video_fops=
  
 static int __init videodev_init(void)
 {
+	int ret;
+
 	printk(KERN_INFO "Linux video capture interface: v1.00\n");
-	if (register_chrdev(VIDEO_MAJOR,VIDEO_NAME, &video_fops)) {
-		printk("video_dev: unable to get major %d\n", VIDEO_MAJOR);
+	if (register_chrdev(VIDEO_MAJOR, VIDEO_NAME, &video_fops)) {
+		printk(KERN_WARNING "video_dev: unable to get major %d\n", VIDEO_MAJOR);
 		return -EIO;
 	}
-	class_register(&video_class);
+
+	ret = class_register(&video_class);
+	if (ret < 0) {
+		unregister_chrdev(VIDEO_MAJOR, VIDEO_NAME);
+		printk(KERN_WARNING "video_dev: class_register failed\n");
+		return -EIO;
+	}
+
 	return 0;
 }
 
