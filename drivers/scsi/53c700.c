@@ -691,15 +691,17 @@ NCR_700_scsi_done(struct NCR_700_Host_Parameters *hostdata,
 		}
 
 		free_slot(slot, hostdata);
-
-		SCp->host_scribble = NULL;
-		SCp->result = result;
-		SCp->scsi_done(SCp);
+#ifdef NCR_700_DEBUG
 		if(NCR_700_get_depth(SCp->device) == 0 ||
 		   NCR_700_get_depth(SCp->device) > NCR_700_MAX_TAGS)
 			printk(KERN_ERR "Invalid depth in NCR_700_scsi_done(): %d\n",
 			       NCR_700_get_depth(SCp->device));
+#endif /* NCR_700_DEBUG */
 		NCR_700_set_depth(SCp->device, NCR_700_get_depth(SCp->device) - 1);
+
+		SCp->host_scribble = NULL;
+		SCp->result = result;
+		SCp->scsi_done(SCp);
 	} else {
 		printk(KERN_ERR "53c700: SCSI DONE HAS NULL SCp\n");
 	}
@@ -1895,6 +1897,10 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 				printk(KERN_WARNING "scsi%d (%d:%d) Target is suffering from tag starvation.\n", SCp->host->host_no, SCp->target, SCp->lun);
 				NCR_700_set_flag(SCp->device, NCR_700_DEV_TAG_STARVATION_WARNED);
 			}
+			/* Release the slot and ajust the depth before refusing
+			 * the command */
+			free_slot(slot, hostdata);
+			NCR_700_set_depth(SCp->device, NCR_700_get_depth(SCp->device) - 1);
 			return 1;
 		}
 		slot->tag = SCp->device->current_tag++;
