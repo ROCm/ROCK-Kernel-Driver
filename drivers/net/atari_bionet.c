@@ -114,8 +114,6 @@ static char version[] =
 #include <asm/atari_stdma.h>
 
 
-extern struct net_device *init_etherdev(struct net_device *dev, int sizeof_private);
-
 /* use 0 for production, 1 for verification, >2 for debug
  */
 #ifndef NET_DEBUG
