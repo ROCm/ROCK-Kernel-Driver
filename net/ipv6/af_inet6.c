@@ -667,8 +667,8 @@ snmp6_mib_free(void *ptr[2])
 
 static int __init init_ipv6_mibs(void)
 {
-	if (snmp6_mib_init((void **)ipv6_statistics, sizeof (struct ipv6_mib),
-			   __alignof__(struct ipv6_mib)) < 0)
+	if (snmp6_mib_init((void **)ipv6_statistics, sizeof (struct ipstats_mib),
+			   __alignof__(struct ipstats_mib)) < 0)
 		goto err_ip_mib;
 	if (snmp6_mib_init((void **)icmpv6_statistics, sizeof (struct icmpv6_mib),
 			   __alignof__(struct icmpv6_mib)) < 0)
