@@ -1,0 +1,96 @@
+.TH PS 1 "September 14, 2004"
+.SH NAME
+ps \- Display processes
+.SH SYNOPSIS
+ps [ DRSTCZEUIMA ]
+.SH DESCRIPTION
+The
+.B ps
+command displays the status of all processes in the desired state.
+This command does not take any locks (all cpus should be frozen while
+kdb is running) so it can safely be used to debug lock problems with
+the process table.
+.P
+Without any parameters, \fBps\fP displays all the interesting
+processes, excluding idle tasks and sleeping system daemons.
+If a parameter is specified, it is a single string consisting of the
+letters D, R, S, T, C, Z, E, U, I and M, in any order.
+Each letter selects processes in a specific state, when multiple
+letters are specified, a process will be displayed if it is in any of
+the specified states.
+The states are\ :-
+.P
+.DS
+.TS
+box, center;
+l | l
+l | l.
+D	Uninterruptible sleep
+R	Running
+S	Interruptible sleep
+T	Stopped
+C	Traced
+Z	Zombie
+E	Dead
+U	Unrunnable
+I	Idle task
+M	Sleeping system daemon
+A	All
+.TE
+.DE
+.P
+For state R (running), the process may not be on a cpu at the moment,
+but it is ready to run.
+The header line above the backtrace contains '1' in the fourth field if
+the process is actually on a cpu.
+.P
+The idle task is run on each cpu when there is no work for that cpu to do.
+Unless the idle task is servicing an interrupt, there is no point in
+printing the idle task.
+An idle task that is not servicing a interrupt is marked as state I,
+while servicing an interrupt it is in state R.
+By default, idle tasks are not printed, use \fBps\ I\fR to print them.
+If the idle tasks are not being printed, the start of the \fBps\R
+output contains a list of which cpus are idle.
+.P
+Each cpu has one or more system daemons to handle per cpu work such as
+soft irqs.
+A system daemon (idenified by a NULL mm pointer) that is sleeping is
+marked as state M.
+These processes rarely have any useful data and generate a lot of
+output on large machines, so sleeping system daemons are not printed by
+default.
+Use \fBps\ M\fR to print them.
+.P
+At the start of the \fBps\fR output is a line giving the cpu status,
+see the kdb \fBcpu\fR command.
+.SH LIMITATIONS
+None.
+.SH ENVIRONMENT
+.TP 8
+PS
+This environment variable (default=DRSTCZEU) is used when \fBps\fR
+is issued with no parameters.
+
+.SH SMP CONSIDERATIONS
+None.
+.SH EXAMPLES
+.TP 8
+\fBps\fR
+displays the useful tasks, suppressing idle tasks and sleeping
+system daemons.
+
+.TP 8
+\fBps\ RD\fR
+displays only tasks that are running or are in an uninterruptible
+sleep.
+
+.TP 8
+\fBps\ DRSTCZEUIM\fR
+displays all tasks.
+
+.TP 8
+\fBps\ A\fR
+displays all tasks.
+This is easier than remembering DRSTCZEUIM.
+

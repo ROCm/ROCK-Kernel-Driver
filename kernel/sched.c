@@ -4894,3 +4894,10 @@ void normalize_rt_tasks(void)
 }
 
 #endif /* CONFIG_MAGIC_SYSRQ */
+
+#ifdef	CONFIG_KDB
+task_t *kdb_cpu_curr(int cpu)
+{
+	return(cpu_curr(cpu));
+}
+#endif
