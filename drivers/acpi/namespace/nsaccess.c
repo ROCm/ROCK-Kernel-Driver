@@ -105,8 +105,15 @@ acpi_ns_root_initialize (void)
 		"Entering predefined entries into namespace\n"));
 
 	for (init_val = acpi_gbl_pre_defined_names; init_val->name; init_val++) {
+		/* _OSI is optional for now, will be permanent later */
+
+		if (!ACPI_STRCMP (init_val->name, "_OSI") && !acpi_gbl_create_osi_method) {
+			continue;
+		}
+
 		status = acpi_ns_lookup (NULL, init_val->name, init_val->type,
-				  ACPI_IMODE_LOAD_PASS2, ACPI_NS_NO_UPSEARCH, NULL, &new_node);
+				  ACPI_IMODE_LOAD_PASS2, ACPI_NS_NO_UPSEARCH,
+				  NULL, &new_node);
 
 		if (ACPI_FAILURE (status) || (!new_node)) /* Must be on same line for code converter */ {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
@@ -122,7 +129,8 @@ acpi_ns_root_initialize (void)
 		if (init_val->val) {
 			status = acpi_os_predefined_override (init_val, &val);
 			if (ACPI_FAILURE (status)) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not override predefined %s\n",
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"Could not override predefined %s\n",
 					init_val->name));
 			}
 
@@ -147,15 +155,20 @@ acpi_ns_root_initialize (void)
 			 */
 			switch (init_val->type) {
 			case ACPI_TYPE_METHOD:
-				obj_desc->method.param_count =
-						(u8) ACPI_STRTOUL (val, NULL, 10);
+				obj_desc->method.param_count = (u8) ACPI_STRTOUL
+						  (val, NULL, 10);
 				obj_desc->common.flags |= AOPOBJ_DATA_VALID;
 
-#if defined (ACPI_NO_METHOD_EXECUTION) || defined (ACPI_CONSTANT_EVAL_ONLY)
+#if defined (_ACPI_ASL_COMPILER) || defined (_ACPI_DUMP_App)
 
-				/* Compiler cheats by putting parameter count in the owner_iD */
+				/* i_aSL Compiler cheats by putting parameter count in the owner_iD */
 
 				new_node->owner_id = obj_desc->method.param_count;
+#else
+				/* Mark this as a very SPECIAL method */
+
+				obj_desc->method.method_flags = AML_METHOD_INTERNAL_ONLY;
+				obj_desc->method.implementation = acpi_ut_osi_implementation;
 #endif
 				break;
 
@@ -180,8 +193,8 @@ acpi_ns_root_initialize (void)
 			case ACPI_TYPE_MUTEX:
 
 				obj_desc->mutex.node = new_node;
-				obj_desc->mutex.sync_level =
-						 (u16) ACPI_STRTOUL (val, NULL, 10);
+				obj_desc->mutex.sync_level = (u16) ACPI_STRTOUL
+						  (val, NULL, 10);
 
 				if (ACPI_STRCMP (init_val->name, "_GL_") == 0) {
 					/*
@@ -213,6 +226,7 @@ acpi_ns_root_initialize (void)
 
 
 			default:
+
 				ACPI_REPORT_ERROR (("Unsupported initial type value %X\n",
 					init_val->type));
 				acpi_ut_remove_reference (obj_desc);
