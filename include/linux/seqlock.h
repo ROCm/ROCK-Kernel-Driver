@@ -115,7 +115,8 @@ static inline int read_seqretry(const seqlock_t *sl, unsigned iv)
 	({ local_irq_save(flags);   read_seqbegin(lock); })
 
 #define read_seqretry_irqrestore(lock, iv, flags)			\
-	({int ret = read_seqretry(&(lock)->seq, iv);			\
+	({								\
+		int ret = read_seqretry(lock, iv);			\
 		local_irq_restore(flags);				\
 		ret;							\
 	})
