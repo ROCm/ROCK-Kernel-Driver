@@ -677,9 +677,11 @@ static int probe_irq __initdata = 0;
  *	used by the IRQ probe code.
  */
  
-static void __init probe_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t __init probe_intr(int irq, void *dev_id,
+					struct pt_regs *regs)
 {
 	probe_irq = irq;
+	return IRQ_HANDLED;
 }
 
 /**
@@ -1191,7 +1193,7 @@ static void NCR5380_main(void *p)
 	Scsi_Cmnd *tmp, *prev;
 	struct Scsi_Host *instance;
 	int done;
-	unsigned long flags;
+	unsigned long flags = 0;
 	
 	/*
 	 * We run (with interrupts disabled) until we're sure that none of 
@@ -1327,13 +1329,14 @@ static void NCR5380_main(void *p)
  *	Locks: takes the needed instance locks
  */
 
-static void NCR5380_intr(int irq, void *dev_id, struct pt_regs *regs) 
+static irqreturn_t NCR5380_intr(int irq, void *dev_id, struct pt_regs *regs) 
 {
 	NCR5380_local_declare();
 	struct Scsi_Host *instance;
 	int done;
 	unsigned char basr;
 	struct NCR5380_hostdata *hostdata;
+	int handled = 0;
 
 	dprintk(NDEBUG_INTR, ("scsi : NCR5380 irq %d triggered\n", irq));
 
@@ -1345,6 +1348,7 @@ static void NCR5380_intr(int irq, void *dev_id, struct pt_regs *regs)
 		{
 			instance = hostdata->host;
 			if (instance->irq == irq) {
+				handled = 1;
 				spin_lock_irq(instance->host_lock);
 				/* Look for pending interrupts */
 				NCR5380_setup(instance);
@@ -1402,6 +1406,7 @@ static void NCR5380_intr(int irq, void *dev_id, struct pt_regs *regs)
 			}	/* if (instance->irq == irq) */
 		}
 	} while (!done);
+	return IRQ_RETVAL(handled);
 }
 
 #endif 

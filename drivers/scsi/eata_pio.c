@@ -213,7 +213,8 @@ static void IncStat(Scsi_Pointer * SCp, uint Increment)
 
 static void eata_pio_int_handler(int irq, void *dev_id, struct pt_regs *regs);
 
-static void do_eata_pio_int_handler(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t do_eata_pio_int_handler(int irq, void *dev_id,
+						struct pt_regs *regs)
 {
 	unsigned long flags;
 	struct Scsi_Host *dev = dev_id;
@@ -221,6 +222,7 @@ static void do_eata_pio_int_handler(int irq, void *dev_id, struct pt_regs *regs)
 	spin_lock_irqsave(dev->host_lock, flags);
 	eata_pio_int_handler(irq, dev_id, regs);
 	spin_unlock_irqrestore(dev->host_lock, flags);
+	return IRQ_HANDLED;
 }
 
 static void eata_pio_int_handler(int irq, void *dev_id, struct pt_regs *regs)

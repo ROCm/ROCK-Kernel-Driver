@@ -213,7 +213,6 @@ static int tw_chrdev_open(struct inode *inode, struct file *file);
 static int tw_chrdev_release(struct inode *inode, struct file *file);
 static int tw_copy_info(TW_Info *info, char *fmt, ...);
 static void tw_copy_mem_info(TW_Info *info, char *data, int len);
-static void tw_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
 static int tw_halt(struct notifier_block *nb, ulong event, void *buf);
 static int tw_map_scsi_sg_data(struct pci_dev *pdev, Scsi_Cmnd *cmd);
 static u32 tw_map_scsi_single_data(struct pci_dev *pdev, Scsi_Cmnd *cmd);
@@ -1471,7 +1470,8 @@ int tw_initialize_units(TW_Device_Extension *tw_dev)
 } /* End tw_initialize_units() */
 
 /* This function is the interrupt service routine */
-static void tw_interrupt(int irq, void *dev_instance, struct pt_regs *regs) 
+static irqreturn_t tw_interrupt(int irq, void *dev_instance,
+					struct pt_regs *regs) 
 {
 	int request_id;
 	u32 status_reg_addr, status_reg_value;
@@ -1481,12 +1481,13 @@ static void tw_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	int error = 0, retval = 0;
 	unsigned long flags = 0;
 	TW_Command *command_packet;
+	int handled = 0;
 
 	dprintk(KERN_WARNING "3w-xxxx: tw_interrupt()\n");
 
 	/* See if we are already running on another processor */
 	if (test_and_set_bit(TW_IN_INTR, &tw_dev->flags))
-		return;
+		return IRQ_NONE;
 
 	/* Get the host lock for io completions */
 	spin_lock_irqsave(tw_dev->host->host_lock, flags);
@@ -1494,6 +1495,7 @@ static void tw_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	/* See if the interrupt matches this instance */
 	if (tw_dev->tw_pci_dev->irq == irq) {
 
+		handled = 1;
 		/* Make sure io isn't queueing */
 		spin_lock(&tw_dev->tw_lock);
 
@@ -1683,6 +1685,7 @@ tw_interrupt_bail:
 
 	spin_unlock_irqrestore(tw_dev->host->host_lock, flags);
 	clear_bit(TW_IN_INTR, &tw_dev->flags);
+	return IRQ_RETVAL(handled);
 } /* End tw_interrupt() */
 
 /* This function handles ioctls from userspace to the driver */

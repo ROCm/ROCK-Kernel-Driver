@@ -283,7 +283,7 @@ static struct fd_mcs_adapters_struct fd_mcs_adapters[] = {
 
 #define FD_BRDS sizeof(fd_mcs_adapters)/sizeof(struct fd_mcs_adapters_struct)
 
-static void fd_mcs_intr(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t fd_mcs_intr(int irq, void *dev_id, struct pt_regs *regs);
 
 static unsigned long addresses[] = { 0xc8000, 0xca000, 0xce000, 0xde000 };
 static unsigned short ports[] = { 0x140, 0x150, 0x160, 0x170 };
@@ -679,7 +679,7 @@ static void my_done(struct Scsi_Host *shpnt, int error)
 }
 
 /* only my_done needs to be protected  */
-static void fd_mcs_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t fd_mcs_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
 	int status;
@@ -699,7 +699,7 @@ static void fd_mcs_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 	/* return if some other device on this IRQ caused the interrupt */
 	if (!shpnt) {
-		return;
+		return IRQ_NONE;
 	}
 
 	INTR_Processed++;
@@ -711,7 +711,7 @@ static void fd_mcs_intr(int irq, void *dev_id, struct pt_regs *regs)
 #if DEBUG_ABORT
 		printk("Interrupt after abort, ignoring\n");
 #endif
-		/* return; */
+		/* return IRQ_HANDLED; */
 	}
 #if DEBUG_RACE
 	++in_interrupt_flag;
@@ -726,7 +726,7 @@ static void fd_mcs_intr(int irq, void *dev_id, struct pt_regs *regs)
 			spin_lock_irqsave(shpnt->host_lock, flags);
 			my_done(shpnt, DID_BUS_BUSY << 16);
 			spin_unlock_irqrestore(shpnt->host_lock, flags);
-			return;
+			return IRQ_HANDLED;
 		}
 		current_SC->SCp.phase = in_selection;
 
@@ -752,7 +752,7 @@ static void fd_mcs_intr(int irq, void *dev_id, struct pt_regs *regs)
 				spin_lock_irqsave(shpnt->host_lock, flags);
 				my_done(shpnt, DID_NO_CONNECT << 16);
 				spin_unlock_irqrestore(shpnt->host_lock, flags);
-				return;
+				return IRQ_HANDLED;
 			} else {
 #if EVERY_ACCESS
 				printk(" AltSel ");
@@ -767,7 +767,7 @@ static void fd_mcs_intr(int irq, void *dev_id, struct pt_regs *regs)
 #if DEBUG_RACE
 		in_interrupt_flag = 0;
 #endif
-		return;
+		return IRQ_HANDLED;
 	}
 
 	/* current_SC->SCp.phase == in_other: this is the body of the routine */
@@ -1117,7 +1117,7 @@ static void fd_mcs_intr(int irq, void *dev_id, struct pt_regs *regs)
 #if DEBUG_RACE
 	in_interrupt_flag = 0;
 #endif
-	return;
+	return IRQ_HANDLED;
 }
 
 static int fd_mcs_release(struct Scsi_Host *shpnt)

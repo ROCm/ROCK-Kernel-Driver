@@ -115,6 +115,7 @@
 #include <linux/ioport.h>
 #include <linux/isapnp.h>
 #include <linux/delay.h>
+#include <linux/interrupt.h>
 
 #define NCR_NOT_SET 0
 static int ncr_irq = NCR_NOT_SET;

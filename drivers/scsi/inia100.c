@@ -108,7 +108,7 @@ static int setup_called = 0;
 #define NUMBER(arr)     (sizeof(arr) / sizeof(arr[0]))
 static char *setup_str = (char *) NULL;
 
-static void inia100_intr(int, void *, struct pt_regs *);
+static irqreturn_t inia100_intr(int, void *, struct pt_regs *);
 static void inia100_panic(char *msg);
 
 /* ---- EXTERNAL FUNCTIONS ---- */
@@ -659,7 +659,7 @@ void inia100SCBPost(BYTE * pHcb, BYTE * pScb)
 /*
  * Interrupt handler (main routine of the driver)
  */
-static void inia100_intr(int irqno, void *devid, struct pt_regs *regs)
+static irqreturn_t inia100_intr(int irqno, void *devid, struct pt_regs *regs)
 {
 	struct Scsi_Host *host = (struct Scsi_Host *)devid;
 	ORC_HCS *pHcb;
@@ -669,6 +669,7 @@ static void inia100_intr(int irqno, void *devid, struct pt_regs *regs)
 	spin_lock_irqsave(host->host_lock, flags);
 	orc_interrupt(pHcb);
 	spin_unlock_irqrestore(host->host_lock, flags);
+	return IRQ_HANDLED;
 }
 
 /* 

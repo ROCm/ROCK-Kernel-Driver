@@ -26,6 +26,7 @@
 #include <linux/ioport.h>
 #include <linux/major.h>
 #include <linux/blk.h>
+#include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/ctype.h>
@@ -291,8 +292,8 @@ static void __devexit nsp32_remove(struct pci_dev *);
 static int __init init_nsp32(void);
 static void __exit exit_nsp32(void);
 
-static void nsp32_message(char *, int, char *, char *, ...);
-static void nsp32_dmessage(char *, int, int, char *, ...);
+static void nsp32_message(const char *, int, char *, char *, ...);
+static void nsp32_dmessage(const char *, int, int, char *, ...);
 static void nsp32_build_identify(nsp32_hw_data *, Scsi_Cmnd *);
 static void nsp32_build_sdtr(nsp32_hw_data *, unsigned char, unsigned char);
 static void nsp32_build_nop(nsp32_hw_data *);
@@ -318,7 +319,6 @@ static void nsp32_wait_sack(nsp32_hw_data *, int);
 static void nsp32_sack_assert(nsp32_hw_data *);
 static void nsp32_sack_negate(nsp32_hw_data *);
 static void nsp32_do_bus_reset(nsp32_hw_data *);
-static void do_nsp32_isr(int, void *, struct pt_regs *);
 
 static int nsp32_getprom_param(nsp32_hw_data *);
 static int nsp32_getprom_new(nsp32_hw_data *);
@@ -398,7 +398,7 @@ static Scsi_Host_Template driver_template = {
 
 #define NSP32_DEBUG_BUF_LEN		100
 
-static void nsp32_message(char *func, int line, char *type, char *fmt, ...)
+static void nsp32_message(const char *func, int line, char *type, char *fmt, ...)
 {
 	va_list args;
 	char buf[NSP32_DEBUG_BUF_LEN];
@@ -414,7 +414,7 @@ static void nsp32_message(char *func, int line, char *type, char *fmt, ...)
 #endif
 }
 
-static void nsp32_dmessage(char *func, int line, int mask, char *fmt, ...)
+static void nsp32_dmessage(const char *func, int line, int mask, char *fmt, ...)
 {
 	va_list args;
 	char buf[NSP32_DEBUG_BUF_LEN];
@@ -1263,7 +1263,7 @@ static int nsp32hw_init(struct Scsi_Host *host)
 
 
 /* interrupt routine */
-static void do_nsp32_isr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t do_nsp32_isr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	nsp32_hw_data *data = dev_id;
 	unsigned int base = data->BaseAddress;
@@ -1272,6 +1272,7 @@ static void do_nsp32_isr(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned char busmon, busphase;
 	unsigned long flags;
 	int ret;
+	int handled = 0;
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 	struct Scsi_Host *host = data->Host;
@@ -1291,6 +1292,7 @@ static void do_nsp32_isr(int irq, void *dev_id, struct pt_regs *regs)
 		nsp32_msg(KERN_INFO, "spurious interrupt: irq other 0x%x", irq_stat);
 		goto out2;
 	}
+	handled = 1;
 	nsp32_write2(base, IRQ_CONTROL, IRQ_CONTROL_ALL_IRQ_MASK);
 
 	busmon = nsp32_read1(base, SCSI_BUS_MONITOR);
@@ -1547,7 +1549,7 @@ static void do_nsp32_isr(int irq, void *dev_id, struct pt_regs *regs)
 
 	nsp32_dbg(NSP32_DEBUG_INTR, "exit");
 
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 #undef SPRINTF
