@@ -280,6 +280,7 @@ struct isd200_info {
 
 	/* maximum number of LUNs supported */
 	unsigned char MaxLUNs;
+	struct scsi_cmnd srb;
 };
 
 
@@ -404,15 +405,15 @@ static int isd200_action( struct us_data *us, int action,
 			  void* pointer, int value )
 {
 	union ata_cdb ata;
-	struct scsi_cmnd srb;
 	struct scsi_device srb_dev;
 	struct isd200_info *info = (struct isd200_info *)us->extra;
+	struct scsi_cmnd *srb = &info->srb;
 	int status;
 
 	memset(&ata, 0, sizeof(ata));
-	memset(&srb, 0, sizeof(srb));
 	memset(&srb_dev, 0, sizeof(srb_dev));
-	srb.device = &srb_dev;
+	srb->device = &srb_dev;
+	++srb->serial_number;
 
 	ata.generic.SignatureByte0 = info->ConfigData.ATAMajorCommand;
 	ata.generic.SignatureByte1 = info->ConfigData.ATAMinorCommand;
@@ -425,9 +426,9 @@ static int isd200_action( struct us_data *us, int action,
 		ata.generic.RegisterSelect =
 		  REG_CYLINDER_LOW | REG_CYLINDER_HIGH |
 		  REG_STATUS | REG_ERROR;
-		srb.sc_data_direction = SCSI_DATA_READ;
-		srb.request_buffer = pointer;
-		srb.request_bufflen = value;
+		srb->sc_data_direction = SCSI_DATA_READ;
+		srb->request_buffer = pointer;
+		srb->request_bufflen = value;
 		break;
 
 	case ACTION_ENUM:
@@ -437,7 +438,7 @@ static int isd200_action( struct us_data *us, int action,
 					   ACTION_SELECT_5;
 		ata.generic.RegisterSelect = REG_DEVICE_HEAD;
 		ata.write.DeviceHeadByte = value;
-		srb.sc_data_direction = SCSI_DATA_NONE;
+		srb->sc_data_direction = SCSI_DATA_NONE;
 		break;
 
 	case ACTION_RESET:
@@ -446,7 +447,7 @@ static int isd200_action( struct us_data *us, int action,
 					   ACTION_SELECT_3|ACTION_SELECT_4;
 		ata.generic.RegisterSelect = REG_DEVICE_CONTROL;
 		ata.write.DeviceControlByte = ATA_DC_RESET_CONTROLLER;
-		srb.sc_data_direction = SCSI_DATA_NONE;
+		srb->sc_data_direction = SCSI_DATA_NONE;
 		break;
 
 	case ACTION_REENABLE:
@@ -455,7 +456,7 @@ static int isd200_action( struct us_data *us, int action,
 					   ACTION_SELECT_3|ACTION_SELECT_4;
 		ata.generic.RegisterSelect = REG_DEVICE_CONTROL;
 		ata.write.DeviceControlByte = ATA_DC_REENABLE_CONTROLLER;
-		srb.sc_data_direction = SCSI_DATA_NONE;
+		srb->sc_data_direction = SCSI_DATA_NONE;
 		break;
 
 	case ACTION_SOFT_RESET:
@@ -464,16 +465,16 @@ static int isd200_action( struct us_data *us, int action,
 		ata.generic.RegisterSelect = REG_DEVICE_HEAD | REG_COMMAND;
 		ata.write.DeviceHeadByte = info->DeviceHead;
 		ata.write.CommandByte = WIN_SRST;
-		srb.sc_data_direction = SCSI_DATA_NONE;
+		srb->sc_data_direction = SCSI_DATA_NONE;
 		break;
 
 	case ACTION_IDENTIFY:
 		US_DEBUGP("   isd200_action(IDENTIFY)\n");
 		ata.generic.RegisterSelect = REG_COMMAND;
 		ata.write.CommandByte = WIN_IDENTIFY;
-		srb.sc_data_direction = SCSI_DATA_READ;
-		srb.request_buffer = (void *)&info->drive;
-		srb.request_bufflen = sizeof(struct hd_driveid);
+		srb->sc_data_direction = SCSI_DATA_READ;
+		srb->request_buffer = (void *)&info->drive;
+		srb->request_bufflen = sizeof(struct hd_driveid);
 		break;
 
 	default:
@@ -481,9 +482,9 @@ static int isd200_action( struct us_data *us, int action,
 		break;
 	}
 
-	memcpy(srb.cmnd, &ata, sizeof(ata.generic));
-	srb.cmd_len = sizeof(ata.generic);
-	status = usb_stor_Bulk_transport(&srb, us);
+	memcpy(srb->cmnd, &ata, sizeof(ata.generic));
+	srb->cmd_len = sizeof(ata.generic);
+	status = usb_stor_Bulk_transport(srb, us);
 	if (status == USB_STOR_TRANSPORT_GOOD)
 		status = ISD200_GOOD;
 	else {
@@ -834,7 +835,7 @@ static int isd200_try_enum(struct us_data *us, unsigned char master_slave,
 			   int detect )
 {
 	int status = ISD200_GOOD;
-	unsigned char regs[8];
+	unsigned char *regs = us->iobuf;
 	unsigned long endTime;
 	struct isd200_info *info = (struct isd200_info *)us->extra;
 	int recheckAsMaster = FALSE;
@@ -856,7 +857,7 @@ static int isd200_try_enum(struct us_data *us, unsigned char master_slave,
 			break;
 
 		status = isd200_action( us, ACTION_READ_STATUS, 
-					regs, sizeof(regs) );
+					regs, 8 );
 		if ( status != ISD200_GOOD )
 			break;
 

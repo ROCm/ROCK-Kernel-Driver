@@ -507,7 +507,7 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	struct usb_endpoint_descriptor *endpoint;
 	size_t buffer_size;
 	int i;
-	int retval;
+	int retval = -ENOMEM;
 
 	/* See if the device offered us matches what we can accept */
 	if ((udev->descriptor.idVendor != USB_SKEL_VENDOR_ID) ||
@@ -515,18 +515,11 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 		return -ENODEV;
 	}
 
-	retval = usb_register_dev (interface, &skel_class);
-	if (retval) {
-		/* something prevented us from registering this driver */
-		err ("Not able to get a minor for this device.");
-		goto exit;
-	}
-
 	/* allocate memory for our device state and initialize it */
 	dev = kmalloc (sizeof(struct usb_skel), GFP_KERNEL);
 	if (dev == NULL) {
 		err ("Out of memory");
-		goto exit_minor;
+		goto error;
 	}
 	memset (dev, 0x00, sizeof (*dev));
 
@@ -603,24 +596,24 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	/* allow device read, write and ioctl */
 	dev->present = 1;
 
+	/* we can register the device now, as it is ready */
+	usb_set_intfdata (interface, dev);
+	retval = usb_register_dev (interface, &skel_class);
+	if (retval) {
+		/* something prevented us from registering this driver */
+		err ("Not able to get a minor for this device.");
+		usb_set_intfdata (interface, NULL);
+		goto error;
+	}
+
+
 	/* let the user know what node this device is now attached to */
 	info ("USB Skeleton device now attached to USBSkel-%d", dev->minor);
-
-	goto exit;
+	return 0;
 
 error:
 	skel_delete (dev);
-	dev = NULL;
-
-exit_minor:
-	usb_deregister_dev (interface, &skel_class);
-
-exit:
-	if (dev) {
-		usb_set_intfdata (interface, dev);
-		return 0;
-	}
-	return -ENODEV;
+	return retval;
 }
 
 

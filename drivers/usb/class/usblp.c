@@ -359,7 +359,6 @@ static int usblp_open(struct inode *inode, struct file *file)
 	file->private_data = usblp;
 
 	usblp->writeurb->transfer_buffer_length = 0;
-	usblp->writeurb->status = 0;
 	usblp->wcomplete = 1; /* we begin writeable */
 	usblp->rcomplete = 0;
 
@@ -833,22 +832,15 @@ static int usblp_probe(struct usb_interface *intf,
 	init_waitqueue_head(&usblp->wait);
 	usblp->ifnum = intf->altsetting->desc.bInterfaceNumber;
 
-	retval = usb_register_dev(intf, &usblp_class);
-	if (retval) {
-		err("Not able to get a minor for this device.");
-		goto abort;
-	}
-	usblp->minor = intf->minor;
-
 	usblp->writeurb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!usblp->writeurb) {
 		err("out of memory");
-		goto abort_minor;
+		goto abort;
 	}
 	usblp->readurb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!usblp->readurb) {
 		err("out of memory");
-		goto abort_minor;
+		goto abort;
 	}
 
 	/* Malloc device ID string buffer to the largest expected length,
@@ -856,7 +848,7 @@ static int usblp_probe(struct usb_interface *intf,
 	 * could change in length. */
 	if (!(usblp->device_id_string = kmalloc(USBLP_DEVICE_ID_SIZE, GFP_KERNEL))) {
 		err("out of memory for device_id_string");
-		goto abort_minor;
+		goto abort;
 	}
 
 	usblp->writebuf = usblp->readbuf = NULL;
@@ -868,19 +860,19 @@ static int usblp_probe(struct usb_interface *intf,
 	if (!(usblp->writebuf = usb_buffer_alloc(dev, USBLP_BUF_SIZE,
 				GFP_KERNEL, &usblp->writeurb->transfer_dma))) {
 		err("out of memory for write buf");
-		goto abort_minor;
+		goto abort;
 	}
 	if (!(usblp->readbuf = usb_buffer_alloc(dev, USBLP_BUF_SIZE,
 				GFP_KERNEL, &usblp->readurb->transfer_dma))) {
 		err("out of memory for read buf");
-		goto abort_minor;
+		goto abort;
 	}
 
 	/* Allocate buffer for printer status */
 	usblp->statusbuf = kmalloc(STATUS_BUF_SIZE, GFP_KERNEL);
 	if (!usblp->statusbuf) {
 		err("out of memory for statusbuf");
-		goto abort_minor;
+		goto abort;
 	}
 
 	/* Lookup quirks for this printer. */
@@ -894,12 +886,12 @@ static int usblp_probe(struct usb_interface *intf,
 		dbg("incompatible printer-class device 0x%4.4X/0x%4.4X",
 			dev->descriptor.idVendor,
 			dev->descriptor.idProduct);
-		goto abort_minor;
+		goto abort;
 	}
 
 	/* Setup the selected alternate setting and endpoints. */
 	if (usblp_set_protocol(usblp, protocol) < 0)
-		goto abort_minor;
+		goto abort;
 
 	/* Retrieve and store the device ID string. */
 	usblp_cache_device_id_string(usblp);
@@ -920,10 +912,17 @@ static int usblp_probe(struct usb_interface *intf,
 
 	usblp->present = 1;
 
+	retval = usb_register_dev(intf, &usblp_class);
+	if (retval) {
+		err("Not able to get a minor for this device.");
+		goto abort_intfdata;
+	}
+	usblp->minor = intf->minor;
+
 	return 0;
 
-abort_minor:
-	usb_deregister_dev(intf, &usblp_class);
+abort_intfdata:
+	usb_set_intfdata (intf, NULL);
 abort:
 	if (usblp) {
 		if (usblp->writebuf)

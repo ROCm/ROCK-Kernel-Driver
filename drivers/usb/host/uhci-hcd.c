@@ -2007,19 +2007,17 @@ static int suspend_allowed(struct uhci_hcd *uhci)
 	unsigned int io_addr = uhci->io_addr;
 	int i;
 
-	if (!uhci->hcd.pdev ||
-	     uhci->hcd.pdev->vendor != PCI_VENDOR_ID_INTEL ||
-	     uhci->hcd.pdev->device != PCI_DEVICE_ID_INTEL_82371AB_2)
+	if (!uhci->hcd.pdev || uhci->hcd.pdev->vendor != PCI_VENDOR_ID_INTEL)
 		return 1;
 
-	/* This is a 82371AB/EB/MB USB controller which has a bug that
-	 * causes false resume indications if any port has an
-	 * over current condition.  To prevent problems, we will not
-	 * allow a global suspend if any ports are OC.
+	/* Some of Intel's USB controllers have a bug that causes false
+	 * resume indications if any port has an over current condition.
+	 * To prevent problems, we will not allow a global suspend if
+	 * any ports are OC.
 	 *
-	 * Some motherboards using the 82371AB/EB/MB (but not the USB portion)
-	 * appear to hardwire the over current inputs active to disable
-	 * the USB ports.
+	 * Some motherboards using Intel's chipsets (but not using all
+	 * the USB ports) appear to hardwire the over current inputs active
+	 * to disable the USB ports.
 	 */
 
 	/* check for over current condition on any port */
