@@ -172,7 +172,7 @@ struct namespace;
 struct kioctx;
 struct mm_struct {
 	struct vm_area_struct * mmap;		/* list of VMAs */
-	rb_root_t mm_rb;
+	struct rb_root mm_rb;
 	struct vm_area_struct * mmap_cache;	/* last find_vma result */
 	pgd_t * pgd;
 	atomic_t mm_users;			/* How many users with user space? */
