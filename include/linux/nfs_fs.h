@@ -472,6 +472,36 @@ extern void * nfs_root_data(void);
 
 #define NFS_JUKEBOX_RETRY_TIME (5 * HZ)
 
+#ifdef CONFIG_NFS_V4
+
+extern struct nfs4_client *nfs4_get_client(void);
+extern void nfs4_put_client(struct nfs4_client *clp);
+
+struct nfs4_mount_data;
+static inline int
+create_nfsv4_state(struct nfs_server *server, struct nfs4_mount_data *data)
+{
+	server->nfs4_state = NULL;
+	return 0;
+}
+
+static inline void
+destroy_nfsv4_state(struct nfs_server *server)
+{
+	if (server->mnt_path) {
+		kfree(server->mnt_path);
+		server->mnt_path = NULL;
+	}
+	if (server->nfs4_state) {
+		nfs4_put_client(server->nfs4_state);
+		server->nfs4_state = NULL;
+	}
+}
+#else
+#define create_nfsv4_state(server, data)  0
+#define destroy_nfsv4_state(server)       do { } while (0)
+#endif
+
 #endif /* __KERNEL__ */
 
 /*

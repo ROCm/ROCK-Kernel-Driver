@@ -28,6 +28,7 @@
 #include <linux/sunrpc/stats.h>
 #include <linux/nfs_fs.h>
 #include <linux/nfs_mount.h>
+#include <linux/nfs4_mount.h>
 #include <linux/nfs_flushd.h>
 #include <linux/lockd/bind.h>
 #include <linux/smp_lock.h>
@@ -157,6 +158,7 @@ nfs_put_super(struct super_block *sb)
 		lockd_down();	/* release rpc.lockd */
 	rpciod_down();		/* release rpciod */
 
+	destroy_nfsv4_state(server);
 	kfree(server->hostname);
 }
 
@@ -1283,6 +1285,239 @@ static struct file_system_type nfs_fs_type = {
 	.fs_flags	= FS_ODD_RENAME,
 };
 
+#ifdef CONFIG_NFS_V4
+
+static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data, int silent)
+{
+	struct nfs_server *server;
+	struct rpc_xprt *xprt = NULL;
+	struct rpc_clnt *clnt = NULL;
+	struct rpc_timeout timeparms;
+	rpc_authflavor_t authflavour;
+	int proto, err = -EIO;
+
+	sb->s_blocksize_bits = 0;
+	sb->s_blocksize = 0;
+	server = NFS_SB(sb);
+	if (data->rsize != 0)
+		server->rsize = nfs_block_size(data->rsize, NULL);
+	if (data->wsize != 0)
+		server->wsize = nfs_block_size(data->wsize, NULL);
+	server->flags = data->flags & NFS_MOUNT_FLAGMASK;
+
+	/* NFSv4 doesn't use NLM locking */
+	server->flags |= NFS_MOUNT_NONLM;
+
+	server->acregmin = data->acregmin*HZ;
+	server->acregmax = data->acregmax*HZ;
+	server->acdirmin = data->acdirmin*HZ;
+	server->acdirmax = data->acdirmax*HZ;
+
+	server->rpc_ops = &nfs_v4_clientops;
+	/* Initialize timeout values */
+
+	timeparms.to_initval = data->timeo * HZ / 10;
+	timeparms.to_retries = data->retrans;
+	timeparms.to_exponential = 1;
+	if (!timeparms.to_retries)
+		timeparms.to_retries = 5;
+
+	proto = data->proto;
+	/* Which IP protocol do we use? */
+	switch (proto) {
+	case IPPROTO_TCP:
+		timeparms.to_maxval  = RPC_MAX_TCP_TIMEOUT;
+		if (!timeparms.to_initval)
+			timeparms.to_initval = 600 * HZ / 10;
+		break;
+	case IPPROTO_UDP:
+		timeparms.to_maxval  = RPC_MAX_UDP_TIMEOUT;
+		if (!timeparms.to_initval)
+			timeparms.to_initval = 11 * HZ / 10;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	/* Now create transport and client */
+	xprt = xprt_create_proto(proto, &server->addr, &timeparms);
+	if (xprt == NULL) {
+		printk(KERN_WARNING "NFS: cannot create RPC transport.\n");
+		goto out_fail;
+	}
+
+	authflavour = RPC_AUTH_UNIX;
+	if (data->auth_flavourlen != 0) {
+		if (data->auth_flavourlen > 1)
+			printk(KERN_INFO "NFS: cannot yet deal with multiple auth flavours.\n");
+		if (copy_from_user(authflavour, data->auth_flavours, sizeof(authflavour))) {
+			err = -EFAULT;
+			goto out_fail;
+		}
+	}
+	clnt = rpc_create_client(xprt, server->hostname, &nfs_program,
+				 server->rpc_ops->version, authflavour);
+	if (clnt == NULL) {
+		printk(KERN_WARNING "NFS: cannot create RPC client.\n");
+		xprt_destroy(xprt);
+		goto out_fail;
+	}
+
+	clnt->cl_intr     = (server->flags & NFS4_MOUNT_INTR) ? 1 : 0;
+	clnt->cl_softrtry = (server->flags & NFS4_MOUNT_SOFT) ? 1 : 0;
+	clnt->cl_chatty   = 1;
+	server->client    = clnt;
+
+	/* Fire up rpciod if not yet running */
+	if (rpciod_up() != 0) {
+		printk(KERN_WARNING "NFS: couldn't start rpciod!\n");
+		goto out_shutdown;
+	}
+
+	if (create_nfsv4_state(server, data))
+		goto out_shutdown;
+
+	err = nfs_sb_init(sb);
+	if (err == 0)
+		return 0;
+	rpciod_down();
+	destroy_nfsv4_state(server);
+out_shutdown:
+	rpc_shutdown_client(server->client);
+out_fail:
+	return err;
+}
+
+static int nfs4_compare_super(struct super_block *sb, void *data)
+{
+	struct nfs_server *server = data;
+	struct nfs_server *old = NFS_SB(sb);
+
+	if (strcmp(server->hostname, old->hostname) != 0)
+		return 0;
+	if (strcmp(server->mnt_path, old->mnt_path) != 0)
+		return 0;
+	return 1;
+}
+
+static void *
+nfs_copy_user_string(char *dst, struct nfs_string *src, int maxlen)
+{
+	void *p = NULL;
+
+	if (!src->len)
+		return ERR_PTR(-EINVAL);
+	if (src->len < maxlen)
+		maxlen = src->len;
+	if (dst == NULL) {
+		p = dst = kmalloc(maxlen + 1, GFP_KERNEL);
+		if (p == NULL)
+			return ERR_PTR(-ENOMEM);
+	}
+	if (copy_from_user(dst, src->data, maxlen)) {
+		if (p != NULL)
+			kfree(p);
+		return ERR_PTR(-EFAULT);
+	}
+	dst[maxlen] = '\0';
+	return dst;
+}
+
+static struct super_block *nfs4_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *raw_data)
+{
+	int error;
+	struct nfs_server *server;
+	struct super_block *s;
+	struct nfs4_mount_data *data = raw_data;
+	void *p;
+
+	if (!data) {
+		printk("nfs_read_super: missing data argument\n");
+		return ERR_PTR(-EINVAL);
+	}
+
+	server = kmalloc(sizeof(struct nfs_server), GFP_KERNEL);
+	if (!server)
+		return ERR_PTR(-ENOMEM);
+	memset(server, 0, sizeof(struct nfs_server));
+
+	if (data->version != NFS4_MOUNT_VERSION) {
+		printk("nfs warning: mount version %s than kernel\n",
+			data->version < NFS_MOUNT_VERSION ? "older" : "newer");
+	}
+
+	p = nfs_copy_user_string(NULL, &data->hostname, 256);
+	if (IS_ERR(p))
+		goto out_err;
+	server->hostname = p;
+
+	p = nfs_copy_user_string(NULL, &data->mnt_path, 1024);
+	if (IS_ERR(p))
+		goto out_err;
+	server->mnt_path = p;
+
+	p = nfs_copy_user_string(server->ip_addr, &data->client_addr,
+			sizeof(server->ip_addr));
+	if (IS_ERR(p))
+		goto out_err;
+
+	/* We now require that the mount process passes the remote address */
+	if (data->host_addrlen != sizeof(server->addr)) {
+		s = ERR_PTR(-EINVAL);
+		goto out_free;
+	}
+	if (copy_from_user(&server->addr, data->host_addr, sizeof(server->addr))) {
+		s = ERR_PTR(-EFAULT);
+		goto out_free;
+	}
+	if (server->addr.sin_family != AF_INET ||
+	    server->addr.sin_addr.s_addr == INADDR_ANY) {
+		printk("NFS: mount program didn't pass remote IP address!\n");
+		s = ERR_PTR(-EINVAL);
+		goto out_free;
+	}
+
+	s = sget(fs_type, nfs4_compare_super, nfs_set_super, server);
+
+	if (IS_ERR(s) || s->s_root)
+		goto out_free;
+
+	s->s_flags = flags;
+
+	error = nfs4_fill_super(s, data, flags & MS_VERBOSE ? 1 : 0);
+	if (error) {
+		up_write(&s->s_umount);
+		deactivate_super(s);
+		return ERR_PTR(error);
+	}
+	s->s_flags |= MS_ACTIVE;
+	return s;
+out_err:
+	s = (struct super_block *)p;
+out_free:
+	if (server->mnt_path)
+		kfree(server->mnt_path);
+	if (server->hostname)
+		kfree(server->hostname);
+	kfree(server);
+	return s;
+}
+
+static struct file_system_type nfs4_fs_type = {
+	.owner		= THIS_MODULE,
+	.name		= "nfs4",
+	.get_sb		= nfs4_get_sb,
+	.kill_sb	= nfs_kill_super,
+	.fs_flags	= FS_ODD_RENAME,
+};
+#define register_nfs4fs() register_filesystem(&nfs4_fs_type)
+#define unregister_nfs4fs() unregister_filesystem(&nfs4_fs_type)
+#else
+#define register_nfs4fs() (0)
+#define unregister_nfs4fs()
+#endif
+
 extern int nfs_init_nfspagecache(void);
 extern void nfs_destroy_nfspagecache(void);
 extern int nfs_init_readpagecache(void);
@@ -1374,6 +1609,8 @@ static int __init init_nfs_fs(void)
         err = register_filesystem(&nfs_fs_type);
 	if (err)
 		goto out;
+	if ((err = register_nfs4fs()) != 0)
+		goto out;
 	return 0;
 out:
 	rpc_proc_unregister("nfs");
@@ -1398,6 +1635,7 @@ static void __exit exit_nfs_fs(void)
 	rpc_proc_unregister("nfs");
 #endif
 	unregister_filesystem(&nfs_fs_type);
+	unregister_nfs4fs();
 }
 
 /* Not quite true; I just maintain it */
