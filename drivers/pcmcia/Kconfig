@@ -120,6 +120,13 @@ config PCMCIA_SA1111
 
 	  This driver is also available as a module called sa1111_cs.
 
+config PCMCIA_PXA2XX
+	tristate "PXA2xx support"
+	depends on ARM && ARCH_PXA && PCMCIA
+	help
+	  Say Y here to include support for the PXA2xx PCMCIA controller
+
+
 config PCMCIA_PROBE
 	bool
 	default y if ISA && !ARCH_SA1100 && !ARCH_CLPS711X

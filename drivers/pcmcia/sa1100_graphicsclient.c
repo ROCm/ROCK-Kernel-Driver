@@ -38,7 +38,7 @@ static struct pcmcia_irqs irqs[] = {
 	{ 0, S0_CD_IRQ, "PCMCIA 0 CD" },
 };
 
-static int gcplus_pcmcia_init(struct sa1100_pcmcia_socket *skt)
+static int gcplus_pcmcia_init(struct soc_pcmcia_socket *skt)
 {
 	// Reset PCMCIA
 	// Reset Timing for CPLD(U2) version 8001E or later
@@ -54,10 +54,10 @@ static int gcplus_pcmcia_init(struct sa1100_pcmcia_socket *skt)
 	skt->irq = S0_STS_IRQ;
 
 	/* Register interrupts */
-	return sa11xx_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	return soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-static void gcplus_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
+static void gcplus_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
 {
 	/* disable IRQs */
 	free_irq(S0_CD_IRQ, skt);
@@ -68,7 +68,7 @@ static void gcplus_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
 }
 
 static void
-gcplus_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt, struct pcmcia_state *state)
+gcplus_pcmcia_socket_state(struct soc_pcmcia_socket *skt, struct pcmcia_state *state)
 {
 	unsigned long levels = *PCMCIA_Status;
 
@@ -82,7 +82,7 @@ gcplus_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt, struct pcmcia_state
 }
 
 static int
-gcplus_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
+gcplus_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
 			       const socket_state_t *state)
 {
 	unsigned long flags;
@@ -125,11 +125,11 @@ gcplus_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
 	return 0;
 }
 
-static void gcplus_pcmcia_socket_init(struct sa1100_pcmcia_socket *skt)
+static void gcplus_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
 {
 }
 
-static void gcplus_pcmcia_socket_suspend(struct sa1100_pcmcia_socket *skt)
+static void gcplus_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
 {
 }
 

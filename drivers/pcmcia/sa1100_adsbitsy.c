@@ -20,7 +20,7 @@
 
 #include "sa1111_generic.h"
 
-static int adsbitsy_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
+static int adsbitsy_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
 {
 	/* Set GPIO_A<3:0> to be outputs for PCMCIA/CF power controller: */
 	PA_DDR &= ~(GPIO_GPIO0 | GPIO_GPIO1 | GPIO_GPIO2 | GPIO_GPIO3);
@@ -35,7 +35,7 @@ static int adsbitsy_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
 }
 
 static int
-adsbitsy_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt, const socket_state_t *state)
+adsbitsy_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_state_t *state)
 {
 	unsigned int pa_dwr_mask, pa_dwr_set;
 	int ret;
