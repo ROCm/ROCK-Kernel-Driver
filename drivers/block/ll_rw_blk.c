@@ -1232,11 +1232,14 @@ static elevator_t *chosen_elevator =
 	&iosched_as;
 #elif defined(CONFIG_IOSCHED_DEADLINE)
 	&iosched_deadline;
-#else
+#elif defined(CONFIG_IOSCHED_NOOP)
 	&elevator_noop;
+#else
+	NULL;
+#error "You must have at least 1 I/O scheduler selected"
 #endif
 
-#if defined(CONFIG_IOSCHED_AS) || defined(CONFIG_IOSCHED_DEADLINE)
+#if defined(CONFIG_IOSCHED_AS) || defined(CONFIG_IOSCHED_DEADLINE) || defined (CONFIG_IOSCHED_NOOP)
 static int __init elevator_setup(char *str)
 {
 #ifdef CONFIG_IOSCHED_DEADLINE
@@ -1247,11 +1250,15 @@ static int __init elevator_setup(char *str)
 	if (!strcmp(str, "as"))
 		chosen_elevator = &iosched_as;
 #endif
+#ifdef CONFIG_IOSCHED_NOOP
+	if (!strcmp(str, "noop"))
+		chosen_elevator = &elevator_noop;
+#endif
 	return 1;
 }
 
 __setup("elevator=", elevator_setup);
-#endif /* CONFIG_IOSCHED_AS || CONFIG_IOSCHED_DEADLINE */
+#endif /* CONFIG_IOSCHED_AS || CONFIG_IOSCHED_DEADLINE || CONFIG_IOSCHED_NOOP */
 
 request_queue_t *blk_alloc_queue(int gfp_mask)
 {
