@@ -45,9 +45,6 @@
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 
-/* set if new pid should be 0 (kernel only)*/
-#define CLONE_IDLETASK	0x00001000
-
 /* The idle threads do not count..
  * Protected by write_lock_irq(&tasklist_lock)
  */
@@ -897,7 +894,8 @@ static task_t *copy_process(unsigned long clone_flags,
 				 struct pt_regs *regs,
 				 unsigned long stack_size,
 				 int __user *parent_tidptr,
-				 int __user *child_tidptr)
+				 int __user *child_tidptr,
+				 int pid)
 {
 	int retval;
 	struct task_struct *p = NULL;
@@ -957,13 +955,7 @@ static task_t *copy_process(unsigned long clone_flags,
 
 	p->did_exec = 0;
 	copy_flags(clone_flags, p);
-	if (clone_flags & CLONE_IDLETASK)
-		p->pid = 0;
-	else {
-		p->pid = alloc_pidmap();
-		if (p->pid == -1)
-			goto bad_fork_cleanup;
-	}
+	p->pid = pid;
 	retval = -EFAULT;
 	if (clone_flags & CLONE_PARENT_SETTID)
 		if (put_user(p->pid, parent_tidptr))
@@ -1166,8 +1158,6 @@ bad_fork_cleanup_policy:
 	mpol_free(p->mempolicy);
 #endif
 bad_fork_cleanup:
-	if (p->pid > 0)
-		free_pidmap(p->pid);
 	if (p->binfmt)
 		module_put(p->binfmt->module);
 bad_fork_cleanup_put_domain:
@@ -1181,13 +1171,18 @@ bad_fork_free:
 	goto fork_out;
 }
 
+struct pt_regs * __init __attribute__((weak)) idle_regs(struct pt_regs *regs)
+{
+	memset(regs, 0, sizeof(struct pt_regs));
+	return regs;
+}
+
 task_t * __init fork_idle(int cpu)
 {
 	task_t *task;
 	struct pt_regs regs;
 
-	memset(&regs, 0, sizeof(struct pt_regs));
-	task = copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
+	task = copy_process(CLONE_VM, 0, idle_regs(&regs), 0, NULL, NULL, 0);
 	if (!task)
 		return ERR_PTR(-ENOMEM);
 	init_idle(task, cpu);
@@ -1226,22 +1221,21 @@ long do_fork(unsigned long clone_flags,
 {
 	struct task_struct *p;
 	int trace = 0;
-	long pid;
+	long pid = alloc_pidmap();
 
-	clone_flags &= ~CLONE_IDLETASK;
+	if (pid < 0)
+		return -EAGAIN;
 	if (unlikely(current->ptrace)) {
 		trace = fork_traceflag (clone_flags);
 		if (trace)
 			clone_flags |= CLONE_PTRACE;
 	}
 
-	p = copy_process(clone_flags, stack_start, regs, stack_size, parent_tidptr, child_tidptr);
+	p = copy_process(clone_flags, stack_start, regs, stack_size, parent_tidptr, child_tidptr, pid);
 	/*
 	 * Do this prior waking up the new thread - the thread pointer
 	 * might get invalid after that point, if the thread exits quickly.
 	 */
-	pid = IS_ERR(p) ? PTR_ERR(p) : p->pid;
-
 	if (!IS_ERR(p)) {
 		struct completion vfork;
 
@@ -1274,6 +1268,9 @@ long do_fork(unsigned long clone_flags,
 			if (unlikely (current->ptrace & PT_TRACE_VFORK_DONE))
 				ptrace_notify ((PTRACE_EVENT_VFORK_DONE << 8) | SIGTRAP);
 		}
+	} else {
+		free_pidmap(pid);
+		pid = PTR_ERR(p);
 	}
 	return pid;
 }

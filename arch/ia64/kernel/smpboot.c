@@ -356,6 +356,11 @@ start_secondary (void *unused)
 	return cpu_idle();
 }
 
+struct pt_regs * __init idle_regs(struct pt_regs *regs)
+{
+	return NULL;
+}
+
 struct create_idle {
 	struct task_struct *idle;
 	struct completion done;
