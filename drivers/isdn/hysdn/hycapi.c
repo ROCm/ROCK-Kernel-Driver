@@ -701,8 +701,6 @@ static struct capi_driver hycapi_driver = {
 	procinfo: hycapi_procinfo,
 	ctr_read_proc: hycapi_read_proc,
 	driver_read_proc: 0,	/* use standard driver_read_proc */
-
-	add_card: 0, /* no add_card function */
 };
 
 

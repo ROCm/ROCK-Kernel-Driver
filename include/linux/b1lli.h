@@ -61,7 +61,7 @@ typedef struct avmb1_extcarddef {
 } avmb1_extcarddef;
 
 #define	AVMB1_LOAD		0	/* load image to card */
-#define AVMB1_ADDCARD		1	/* add a new card */
+#define AVMB1_ADDCARD		1	/* add a new card - OBSOLETE */
 #define AVMB1_RESETCARD		2	/* reset a card */
 #define	AVMB1_LOAD_AND_CONFIG	3	/* load image and config to card */
 #define	AVMB1_ADDCARD_WITH_TYPE	4	/* add a new card, with cardtype */

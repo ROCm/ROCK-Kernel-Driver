@@ -1135,54 +1135,13 @@ static struct capi_driver *find_driver(char *name)
 static int old_capi_manufacturer(unsigned int cmd, void *data)
 {
 	avmb1_loadandconfigdef ldef;
-	avmb1_extcarddef cdef;
 	avmb1_resetdef rdef;
 	avmb1_getdef gdef;
-	struct capi_driver *driver;
 	struct capi_ctr *card;
-	capicardparams cparams;
 	capiloaddata ldata;
 	int retval;
 
 	switch (cmd) {
-	case AVMB1_ADDCARD:
-	case AVMB1_ADDCARD_WITH_TYPE:
-		if (cmd == AVMB1_ADDCARD) {
-		   if ((retval = copy_from_user((void *) &cdef, data,
-					    sizeof(avmb1_carddef))))
-			   return retval;
-		   cdef.cardtype = AVM_CARDTYPE_B1;
-		} else {
-		   if ((retval = copy_from_user((void *) &cdef, data,
-					    sizeof(avmb1_extcarddef))))
-			   return retval;
-		}
-		cparams.port = cdef.port;
-		cparams.irq = cdef.irq;
-		cparams.cardnr = cdef.cardnr;
-
-                switch (cdef.cardtype) {
-			case AVM_CARDTYPE_B1:
-				driver = find_driver("b1isa");
-				break;
-			case AVM_CARDTYPE_T1:
-				driver = find_driver("t1isa");
-				break;
-			default:
-				driver = 0;
-				break;
-		}
-		if (!driver) {
-			printk(KERN_ERR "kcapi: driver not loaded.\n");
-			return -EIO;
-		}
-		if (!driver->add_card) {
-			printk(KERN_ERR "kcapi: driver has no add card function.\n");
-			return -EIO;
-		}
-
-		return driver->add_card(driver, &cparams);
-
 	case AVMB1_LOAD:
 	case AVMB1_LOAD_AND_CONFIG:
 
@@ -1327,8 +1286,6 @@ static int capi_manufacturer(unsigned int cmd, void *data)
 
 	switch (cmd) {
 #ifdef CONFIG_AVMB1_COMPAT
-	case AVMB1_ADDCARD:
-	case AVMB1_ADDCARD_WITH_TYPE:
 	case AVMB1_LOAD:
 	case AVMB1_LOAD_AND_CONFIG:
 	case AVMB1_RESETCARD:
@@ -1352,37 +1309,6 @@ static int capi_manufacturer(unsigned int cmd, void *data)
 		printk(KERN_INFO "kcapi: contr %d set trace=%d\n",
 			card->cnr, card->traceflag);
 		return 0;
-	}
-
-	case KCAPI_CMD_ADDCARD:
-	{
-		struct capi_driver *driver;
-		capicardparams cparams;
-		kcapi_carddef cdef;
-
-		if ((retval = copy_from_user((void *) &cdef, data,
-							sizeof(cdef))))
-			return retval;
-
-		cparams.port = cdef.port;
-		cparams.irq = cdef.irq;
-		cparams.membase = cdef.membase;
-		cparams.cardnr = cdef.cardnr;
-		cparams.cardtype = 0;
-		cdef.driver[sizeof(cdef.driver)-1] = 0;
-
-		if ((driver = find_driver(cdef.driver)) == 0) {
-			printk(KERN_ERR "kcapi: driver \"%s\" not loaded.\n",
-					cdef.driver);
-			return -ESRCH;
-		}
-
-		if (!driver->add_card) {
-			printk(KERN_ERR "kcapi: driver \"%s\" has no add card function.\n", cdef.driver);
-			return -EIO;
-		}
-
-		return driver->add_card(driver, &cparams);
 	}
 
 	default:

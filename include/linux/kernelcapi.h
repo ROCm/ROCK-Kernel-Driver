@@ -32,7 +32,7 @@ typedef struct kcapi_carddef {
 
 /* new ioctls >= 10 */
 #define KCAPI_CMD_TRACE		10
-#define KCAPI_CMD_ADDCARD	11	/* add card to named driver */
+#define KCAPI_CMD_ADDCARD	11	/* OBSOLETE */
 
 /* 
  * flag > 2 => trace also data

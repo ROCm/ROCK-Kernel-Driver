@@ -92,8 +92,6 @@ struct capi_driver {
 	int (*driver_read_proc)(char *page, char **start, off_t off,
 				int count, int *eof, struct capi_driver *driver);
 	
-	int (*add_card)(struct capi_driver *driver, capicardparams *data);
-	
 	/* intitialized by kcapi */
 	struct list_head contr_head;		/* list of controllers */
 	struct list_head driver_list;
