@@ -882,7 +882,7 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 }
 
 static int
-buffer_setup(struct file *file, int *count, int *size)
+buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
 {
 	struct saa7134_fh *fh = file->private_data;
 

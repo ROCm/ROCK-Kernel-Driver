@@ -509,7 +509,7 @@ static int notify_cmd(char cmd, short ignore_ex)
 static int wait_for_ready(time_t timeout)
 {
 	int stat;
-	time_t spin_t;
+	unsigned long spin_t;
 
 	/* Wait for ready or exception, without driving the loadavg up too much.
 	 * In most cases, the tape drive already has READY asserted,

@@ -1048,8 +1048,10 @@ static int sprintf_neighbours(char *buffer, MetricomNodeTable * table,
 		if (table->num_nodes)
 			ptr += sprintf(ptr, "\n %s\n", title);
 		for (i = 0; i < table->num_nodes; i++) {
+			MetricomNode node;
+
 			spin_lock_irqsave(&strip_lock, flags);
-			MetricomNode node = table->node[i];
+			node = table->node[i];
 			spin_unlock_irqrestore(&strip_lock, flags);
 			ptr += sprintf(ptr, "  %s\n", node.c);
 		}

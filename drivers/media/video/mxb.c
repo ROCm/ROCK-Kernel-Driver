@@ -426,7 +426,7 @@ static int mxb_init_done(struct saa7146_dev* dev)
 	if( 1 == (err = i2c_transfer(&mxb->i2c_adapter, &msg, 1))) {
 		for(i = 1;;i++) {
 			msg.len = saa7740_init[i].length;		
-			if( -1 == msg.len ) {
+			if (msg.len == -1U) {
 				break;
 			}
 			msg.buf = &saa7740_init[i].data[0];
