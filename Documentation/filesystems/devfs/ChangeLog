@@ -1957,3 +1957,11 @@ Changes for patch v216
   <devfs_get_handle>
 
 - Removed deprecated <devfs_find_handle>
+===============================================================================
+Changes for patch v217
+
+- Exported <devfs_find_and_unregister> and <devfs_only> to modules
+
+- Updated README from master HTML file
+
+- Fixed module unload race in <devfs_open>
