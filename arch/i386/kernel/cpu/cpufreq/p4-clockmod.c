@@ -268,21 +268,15 @@ static int cpufreq_p4_cpu_exit(struct cpufreq_policy *policy)
 
 static unsigned int cpufreq_p4_get(unsigned int cpu)
 {
-	unsigned int hyperthreading;
 	cpumask_t cpus_allowed, affected_cpu_map;
 	u32 l, h;
 
-	hyperthreading = 0;
-
 	/* only run on CPU to be set, or on its sibling */
 	cpus_allowed = current->cpus_allowed;
-	affected_cpu_map = cpumask_of_cpu(cpu);
-#ifdef CONFIG_X86_HT
-	hyperthreading = ((cpu_has_ht) && (smp_num_siblings == 2));
-	if (hyperthreading) {
-		sibling = cpu_sibling_map[cpu];
-		cpu_set(sibling, affected_cpu_map);
-	}
+#ifdef CONFIG_SMP
+        affected_cpu_map = cpu_sibling_map[cpu];
+#else
+        affected_cpu_map = cpumask_of_cpu(cpu);
 #endif
 	set_cpus_allowed(current, affected_cpu_map);
         BUG_ON(!cpu_isset(smp_processor_id(), affected_cpu_map));
