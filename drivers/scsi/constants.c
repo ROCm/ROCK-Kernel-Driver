@@ -1006,13 +1006,13 @@ print_sense_internal(const char * devclass,
 void print_sense(const char * devclass, Scsi_Cmnd * SCpnt)
 {
 	print_sense_internal(devclass, SCpnt->sense_buffer,
-			     SCpnt->request.rq_dev);
+			     SCpnt->request->rq_dev);
 }
 
 void print_req_sense(const char * devclass, Scsi_Request * SRpnt)
 {
 	print_sense_internal(devclass, SRpnt->sr_sense_buffer,
-			     SRpnt->sr_request.rq_dev);
+			     SRpnt->sr_request->rq_dev);
 }
 
 #if (CONSTANTS & CONST_MSG) 

@@ -668,7 +668,7 @@ static inline int should_transform(struct ata_device *drive, Scsi_Cmnd *cmd)
 	struct Scsi_Host *host = drive->driver_data;
 	idescsi_scsi_t *scsi = idescsi_private(host);
 
-	if (major(cmd->request.rq_dev) == SCSI_GENERIC_MAJOR)
+	if (major(cmd->request->rq_dev) == SCSI_GENERIC_MAJOR)
 		return test_bit(IDESCSI_SG_TRANSFORM, &scsi->transform);
 	return test_bit(IDESCSI_TRANSFORM, &scsi->transform);
 }

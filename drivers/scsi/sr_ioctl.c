@@ -93,7 +93,7 @@ int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflen
 	SRpnt->sr_data_direction = readwrite;
 
 	/* use ISA DMA buffer if necessary */
-	SRpnt->sr_request.buffer = buffer;
+	SRpnt->sr_request->buffer = buffer;
 	if (buffer && SRpnt->sr_host->unchecked_isa_dma &&
 	    (virt_to_phys(buffer) + buflength - 1 > ISA_DMA_THRESHOLD)) {
 		bounce_buffer = (char *) kmalloc(buflength, GFP_DMA);
@@ -112,7 +112,7 @@ int sr_do_ioctl(int target, unsigned char *sr_cmd, void *buffer, unsigned buflen
 	scsi_wait_req(SRpnt, (void *) sr_cmd, (void *) buffer, buflength,
 		      IOCTL_TIMEOUT, IOCTL_RETRIES);
 
-	req = &SRpnt->sr_request;
+	req = SRpnt->sr_request;
 	if (SRpnt->sr_buffer && req->buffer && SRpnt->sr_buffer != req->buffer) {
 		memcpy(req->buffer, SRpnt->sr_buffer, SRpnt->sr_bufflen);
 		kfree(SRpnt->sr_buffer);
