@@ -87,7 +87,7 @@ extern struct rt6_info *	rt6_get_dflt_router(struct in6_addr *addr,
 extern struct rt6_info *	rt6_add_dflt_router(struct in6_addr *gwaddr,
 						    struct net_device *dev);
 
-extern void			rt6_purge_dflt_routers(int lst_resort);
+extern void			rt6_purge_dflt_routers(void);
 
 extern void			rt6_reset_dflt_pointer(struct rt6_info *rt);
 

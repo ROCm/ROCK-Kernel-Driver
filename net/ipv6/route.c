@@ -1288,17 +1288,14 @@ struct rt6_info *rt6_add_dflt_router(struct in6_addr *gwaddr,
 	return rt6_get_dflt_router(gwaddr, dev);
 }
 
-void rt6_purge_dflt_routers(int last_resort)
+void rt6_purge_dflt_routers(void)
 {
 	struct rt6_info *rt;
-	u32 flags;
-
-	flags = RTF_DEFAULT | RTF_ADDRCONF;	
 
 restart:
 	read_lock_bh(&rt6_lock);
 	for (rt = ip6_routing_table.leaf; rt; rt = rt->u.next) {
-		if (rt->rt6i_flags & flags) {
+		if (rt->rt6i_flags & (RTF_DEFAULT | RTF_ADDRCONF)) {
 			dst_hold(&rt->u.dst);
 
 			rt6_reset_dflt_pointer(NULL);
