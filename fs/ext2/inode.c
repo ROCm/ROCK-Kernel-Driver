@@ -655,7 +655,6 @@ struct address_space_operations ext2_aops = {
 	.bmap			= ext2_bmap,
 	.direct_IO		= ext2_direct_IO,
 	.writepages		= ext2_writepages,
-	.vm_writeback		= generic_vm_writeback,
 };
 
 /*

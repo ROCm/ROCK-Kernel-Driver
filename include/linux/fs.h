@@ -285,9 +285,6 @@ struct address_space_operations {
 	/* Write back some dirty pages from this mapping. */
 	int (*writepages)(struct address_space *, struct writeback_control *);
 
-	/* Perform a writeback as a memory-freeing operation. */
-	int (*vm_writeback)(struct page *, struct writeback_control *);
-
 	/* Set a page dirty */
 	int (*set_page_dirty)(struct page *page);
 
@@ -1255,9 +1252,6 @@ extern loff_t no_llseek(struct file *file, loff_t offset, int origin);
 extern loff_t generic_file_llseek(struct file *file, loff_t offset, int origin);
 extern loff_t remote_llseek(struct file *file, loff_t offset, int origin);
 extern int generic_file_open(struct inode * inode, struct file * filp);
-
-extern int generic_vm_writeback(struct page *page,
-				struct writeback_control *wbc);
 
 static inline void do_generic_file_read(struct file * filp, loff_t *ppos,
 					read_descriptor_t * desc,

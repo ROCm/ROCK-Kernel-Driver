@@ -285,12 +285,6 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 #endif /* CONFIG_SWAP */
 
 		/*
-		 * FIXME: this is CPU-inefficient for shared mappings.
-		 * try_to_unmap() will set the page dirty and ->vm_writeback
-		 * will write it.  So we're back to page-at-a-time writepage
-		 * in LRU order.
-		 */
-		/*
 		 * If the page is dirty, only perform writeback if that write
 		 * will be non-blocking.  To prevent this allocation from being
 		 * stalled by pagecache activity.  But note that there may be
@@ -308,13 +302,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		 * See swapfile.c:page_queue_congested().
 		 */
 		if (PageDirty(page)) {
-			int (*writeback)(struct page *,
-					struct writeback_control *);
 			struct backing_dev_info *bdi;
-			const int cluster_size = SWAP_CLUSTER_MAX;
-			struct writeback_control wbc = {
-				.nr_to_write = cluster_size,
-			};
 
 			if (!is_page_cache_freeable(page))
 				goto keep_locked;
@@ -326,13 +314,15 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 			if (bdi != current->backing_dev_info &&
 					bdi_write_congested(bdi))
 				goto keep_locked;
+			if (test_clear_page_dirty(page)) {
+				write_lock(&mapping->page_lock);
+				list_move(&page->list, &mapping->locked_pages);
+				write_unlock(&mapping->page_lock);
 
-			writeback = mapping->a_ops->vm_writeback;
-			if (writeback == NULL)
-				writeback = generic_vm_writeback;
-			(*writeback)(page, &wbc);
-			*max_scan -= (cluster_size - wbc.nr_to_write);
-			goto keep;
+				if (mapping->a_ops->writepage(page) == -EAGAIN)
+					__set_page_dirty_nobuffers(page);
+				goto keep;
+			}
 		}
 
 		/*

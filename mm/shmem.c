@@ -717,14 +717,6 @@ static int shmem_writepages(struct address_space *mapping, struct writeback_cont
 	return 0;
 }
 
-static int shmem_vm_writeback(struct page *page, struct writeback_control *wbc)
-{
-	clear_page_dirty(page);
-	if (shmem_writepage(page) < 0)
-		set_page_dirty(page);
-	return 0;
-}
-
 /*
  * shmem_getpage - either get the page from swap or allocate a new one
  *
@@ -1811,7 +1803,6 @@ static void destroy_inodecache(void)
 static struct address_space_operations shmem_aops = {
 	.writepage	= shmem_writepage,
 	.writepages	= shmem_writepages,
-	.vm_writeback	= shmem_vm_writeback,
 	.set_page_dirty	= __set_page_dirty_nobuffers,
 #ifdef CONFIG_TMPFS
 	.readpage	= shmem_readpage,

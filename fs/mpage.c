@@ -614,12 +614,6 @@ mpage_writepages(struct address_space *mapping,
 				bio = mpage_writepage(bio, page, get_block,
 						&last_block_in_bio, &ret);
 			}
-			if ((current->flags & PF_MEMALLOC) &&
-					!PageActive(page) && PageLRU(page)) {
-				if (!pagevec_add(&pvec, page))
-					pagevec_deactivate_inactive(&pvec);
-				page = NULL;
-			}
 			if (ret || (--(wbc->nr_to_write) <= 0))
 				done = 1;
 			if (wbc->nonblocking && bdi_write_congested(bdi)) {
@@ -630,16 +624,13 @@ mpage_writepages(struct address_space *mapping,
 		} else {
 			unlock_page(page);
 		}
-
-		if (page)
-			page_cache_release(page);
+		page_cache_release(page);
 		write_lock(&mapping->page_lock);
 	}
 	/*
 	 * Leave any remaining dirty pages on ->io_pages
 	 */
 	write_unlock(&mapping->page_lock);
-	pagevec_deactivate_inactive(&pvec);
 	if (bio)
 		mpage_bio_submit(WRITE, bio);
 	return ret;
