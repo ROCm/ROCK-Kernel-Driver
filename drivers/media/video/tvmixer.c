@@ -87,7 +87,7 @@ static int tvmixer_ioctl(struct inode *inode, struct file *file, unsigned int cm
         if (cmd == SOUND_MIXER_INFO) {
                 mixer_info info;
                 strncpy(info.id, "tv card", sizeof(info.id));
-                strncpy(info.name, client->name, sizeof(info.name));
+                strncpy(info.name, client->dev.name, sizeof(info.name));
                 info.modify_counter = 42 /* FIXME */;
                 if (copy_to_user((void *)arg, &info, sizeof(info)))
                         return -EFAULT;
@@ -96,7 +96,7 @@ static int tvmixer_ioctl(struct inode *inode, struct file *file, unsigned int cm
         if (cmd == SOUND_OLD_MIXER_INFO) {
                 _old_mixer_info info;
                 strncpy(info.id, "tv card", sizeof(info.id));
-                strncpy(info.name, client->name, sizeof(info.name));
+                strncpy(info.name, client->dev.name, sizeof(info.name));
                 if (copy_to_user((void *)arg, &info, sizeof(info)))
                         return -EFAULT;
                 return 0;
@@ -237,7 +237,7 @@ static int tvmixer_adapters(struct i2c_adapter *adap)
 	int i;
 
 	if (debug)
-		printk("tvmixer: adapter %s\n",adap->name);
+		printk("tvmixer: adapter %s\n",adap->dev.name);
 	for (i=0; i<I2C_CLIENT_MAX; i++) {
 		if (!adap->clients[i])
 			continue;
@@ -261,10 +261,10 @@ static int tvmixer_clients(struct i2c_client *client)
 		/* ignore that one */
 		if (debug)
 			printk("tvmixer: %s is not a tv card\n",
-			       client->adapter->name);
+			       client->adapter->dev.name);
 		return -1;
 	}
-	printk("tvmixer: debug: %s\n",client->name);
+	printk("tvmixer: debug: %s\n",client->dev.name);
 
 	/* unregister ?? */
 	for (i = 0; i < DEV_MAX; i++) {
@@ -273,7 +273,7 @@ static int tvmixer_clients(struct i2c_client *client)
 			unregister_sound_mixer(devices[i].minor);
 			devices[i].dev = NULL;
 			devices[i].minor = -1;
-			printk("tvmixer: %s unregistered (#1)\n",client->name);
+			printk("tvmixer: %s unregistered (#1)\n",client->dev.name);
 			return 0;
 		}
 	}
@@ -298,13 +298,13 @@ static int tvmixer_clients(struct i2c_client *client)
 	if (0 != client->driver->command(client,VIDIOCGAUDIO,&va)) {
 		if (debug)
 			printk("tvmixer: %s: VIDIOCGAUDIO failed\n",
-			       client->name);
+			       client->dev.name);
 		return -1;
 	}
 	if (0 == (va.flags & VIDEO_AUDIO_VOLUME)) {
 		if (debug)
 			printk("tvmixer: %s: has no volume control\n",
-			       client->name);
+			       client->dev.name);
 		return -1;
 	}
 
@@ -318,7 +318,7 @@ static int tvmixer_clients(struct i2c_client *client)
 	devices[i].count = 0;
 	devices[i].dev   = client;
 	printk("tvmixer: %s (%s) registered with minor %d\n",
-	       client->name,client->adapter->name,minor);
+	       client->dev.name,client->adapter->dev.name,minor);
 	
 	return 0;
 }
@@ -344,7 +344,7 @@ static void tvmixer_cleanup_module(void)
 		if (devices[i].minor != -1) {
 			unregister_sound_mixer(devices[i].minor);
 			printk("tvmixer: %s unregistered (#2)\n",
-			       devices[i].dev->name);
+			       devices[i].dev->dev.name);
 		}
 	}
 }

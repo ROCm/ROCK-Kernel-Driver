@@ -29,7 +29,6 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
-#include <linux/proc_fs.h>
 #include <linux/i2c.h>
 #include <linux/init.h>
 #include <linux/seq_file.h>
@@ -45,15 +44,6 @@ static DECLARE_MUTEX(core_lists);
 
 /**** debug level */
 static int i2c_debug;
-
-#ifdef CONFIG_PROC_FS
-static int i2cproc_register(struct i2c_adapter *adap, int bus);
-static void i2cproc_remove(int bus);
-#else
-# define i2cproc_register(adap, bus)	0
-# define i2cproc_remove(bus)		do { } while (0)
-#endif /* CONFIG_PROC_FS */
-
 
 int i2c_device_probe(struct device *dev)
 {
@@ -97,10 +87,6 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 		res = -ENOMEM;
 		goto out_unlock;
 	}
-
-	res = i2cproc_register(adap, i);
-	if (res)
-		goto out_unlock;
 
 	adapters[i] = adap;
 
@@ -179,8 +165,6 @@ int i2c_del_adapter(struct i2c_adapter *adap)
 			}
 		}
 	}
-
-	i2cproc_remove(i);
 
 	/* clean up the sysfs representation */
 	device_unregister(&adap->dev);
@@ -392,7 +376,8 @@ int i2c_attach_client(struct i2c_client *client)
 	client->dev.driver = &client->driver->driver;
 	client->dev.bus = &i2c_bus_type;
 	
-	snprintf(&client->dev.bus_id[0], sizeof(client->dev.bus_id), "i2c_dev_%d", i);
+	snprintf(&client->dev.bus_id[0], sizeof(client->dev.bus_id),
+		"%d-%04x", i2c_adapter_id(adapter), client->addr);
 	printk("registering %s\n", client->dev.bus_id);
 	device_register(&client->dev);
 	
@@ -494,173 +479,6 @@ int i2c_release_client(struct i2c_client *client)
 	return 0;
 }
 
-#ifdef CONFIG_PROC_FS
-/* This function generates the output for /proc/bus/i2c-? */
-static ssize_t i2cproc_bus_read(struct file *file, char *buf,
-				size_t count, loff_t *ppos)
-{
-	struct inode *inode = file->f_dentry->d_inode;
-	char *kbuf;
-	struct i2c_client *client;
-	int i,j,k,order_nr,len=0;
-	size_t len_total;
-	int order[I2C_CLIENT_MAX];
-#define OUTPUT_LENGTH_PER_LINE 70
-
-	len_total = file->f_pos + count;
-	if (len_total > (I2C_CLIENT_MAX * OUTPUT_LENGTH_PER_LINE) )
-		/* adjust to maximum file size */
-		len_total = (I2C_CLIENT_MAX * OUTPUT_LENGTH_PER_LINE);
-	for (i = 0; i < I2C_ADAP_MAX; i++)
-		if (adapters[i]->inode == inode->i_ino) {
-		/* We need a bit of slack in the kernel buffer; this makes the
-		   sprintf safe. */
-			if (! (kbuf = kmalloc(len_total +
-			                      OUTPUT_LENGTH_PER_LINE,
-			                      GFP_KERNEL)))
-				return -ENOMEM;
-			/* Order will hold the indexes of the clients
-			   sorted by address */
-			order_nr=0;
-			for (j = 0; j < I2C_CLIENT_MAX; j++) {
-				if ((client = adapters[i]->clients[j]) && 
-				    (client->driver->id != I2C_DRIVERID_I2CDEV))  {
-					for(k = order_nr; 
-					    (k > 0) && 
-					    adapters[i]->clients[order[k-1]]->
-					             addr > client->addr; 
-					    k--)
-						order[k] = order[k-1];
-					order[k] = j;
-					order_nr++;
-				}
-			}
-
-
-			for (j = 0; (j < order_nr) && (len < len_total); j++) {
-				client = adapters[i]->clients[order[j]];
-				len += sprintf(kbuf+len,"%02x\t%-32s\t%-32s\n",
-				              client->addr,
-				              client->dev.name,
-				              client->driver->name);
-			}
-			len = len - file->f_pos;
-			if (len > count)
-				len = count;
-			if (len < 0) 
-				len = 0;
-			if (copy_to_user (buf,kbuf+file->f_pos, len)) {
-				kfree(kbuf);
-				return -EFAULT;
-			}
-			file->f_pos += len;
-			kfree(kbuf);
-			return len;
-		}
-	return -ENOENT;
-}
-
-static struct file_operations i2cproc_operations = {
-	.read		= i2cproc_bus_read,
-};
-
-/* This function generates the output for /proc/bus/i2c */
-static int bus_i2c_show(struct seq_file *s, void *p)
-{
-	int i;
-
-	down(&core_lists);
-	for (i = 0; i < I2C_ADAP_MAX; i++) {
-		struct i2c_adapter *adapter = adapters[i];
-
-		if (!adapter)
-			continue;
-
-		seq_printf(s, "i2c-%d\t", i);
-
-		if (adapter->algo->smbus_xfer) {
-			if (adapter->algo->master_xfer)
-				seq_printf(s, "smbus/i2c");
-			else
-				seq_printf(s, "smbus    ");
-		} else if (adapter->algo->master_xfer)
-			seq_printf(s ,"i2c       ");
-		else
-			seq_printf(s, "dummy     ");
-
-		seq_printf(s, "\t%-32s\t%-32s\n",
-			      adapter->dev.name, adapter->algo->name);
-	}
-	up(&core_lists);
-
-	return 0;
-}
-
-static int bus_i2c_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, bus_i2c_show, NULL);
-}
-
-static struct file_operations bus_i2c_fops = {
-	.open		= bus_i2c_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
- };
-
-static int i2cproc_register(struct i2c_adapter *adap, int bus)
-{
-	struct proc_dir_entry *proc_entry;
-	char name[8];
-
-	sprintf(name, "i2c-%d", bus);
-
-	proc_entry = create_proc_entry(name, 0, proc_bus);
-	if (!proc_entry)
-		goto fail;
-
-	proc_entry->proc_fops = &i2cproc_operations;
-	proc_entry->owner = adap->owner;
-	adap->inode = proc_entry->low_ino;
-	return 0;
- fail:
-	printk(KERN_ERR "i2c-core.o: Could not create /proc/bus/%s\n", name);
-	return -ENOENT;
-}
-
-static void i2cproc_remove(int bus)
-{
-	char name[8];
-
-	sprintf(name,"i2c-%d", bus);
-	remove_proc_entry(name, proc_bus);
-}
-
-static int __init i2cproc_init(void)
-{
-	struct proc_dir_entry *proc_bus_i2c;
-
-	proc_bus_i2c = create_proc_entry("i2c", 0, proc_bus);
-	if (!proc_bus_i2c)
-		goto fail;
-	proc_bus_i2c->proc_fops = &bus_i2c_fops;
- 	proc_bus_i2c->owner = THIS_MODULE;
- 	return 0;
-
- fail:
-	printk(KERN_ERR "i2c-core.o: Could not create /proc/bus/i2c");
-	return -ENOENT;
-}
-
-static void __exit i2cproc_cleanup(void)
-{
-	remove_proc_entry("i2c",proc_bus);
-}
-#else
-static int __init i2cproc_init(void) { return 0; }
-static void __exit i2cproc_cleanup(void) { }
-#endif /* CONFIG_PROC_FS */
-
 /* match always succeeds, as we want the probe() to tell if we really accept this match */
 static int i2c_device_match(struct device *dev, struct device_driver *drv)
 {
@@ -675,13 +493,11 @@ struct bus_type i2c_bus_type = {
 
 static int __init i2c_init(void)
 {
-	bus_register(&i2c_bus_type);
-	return i2cproc_init();
+	return bus_register(&i2c_bus_type);
 }
 
 static void __exit i2c_exit(void)
 {
-	i2cproc_cleanup();
 	bus_unregister(&i2c_bus_type);
 }
 
