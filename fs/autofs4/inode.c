@@ -187,6 +187,7 @@ int autofs4_fill_super(struct super_block *s, void *data, int silent)
 	struct file * pipe;
 	int pipefd;
 	struct autofs_sb_info *sbi;
+	struct autofs_info *ino;
 	int minproto, maxproto;
 
 	sbi = (struct autofs_sb_info *) kmalloc(sizeof(*sbi), GFP_KERNEL);
@@ -213,7 +214,11 @@ int autofs4_fill_super(struct super_block *s, void *data, int silent)
 	/*
 	 * Get the root inode and dentry, but defer checking for errors.
 	 */
-	root_inode = autofs4_get_inode(s, autofs4_mkroot(sbi));
+	ino = autofs4_mkroot(sbi);
+	if (!ino)
+		goto fail_free;
+	root_inode = autofs4_get_inode(s, ino);
+	kfree(ino);
 	if (!root_inode)
 		goto fail_free;
 

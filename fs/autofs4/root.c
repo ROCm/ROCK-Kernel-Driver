@@ -78,10 +78,9 @@ static int try_to_fill_dentry(struct dentry *dentry,
            when expiration is done to trigger mount request with a new
            dentry */
 	if (de_info && (de_info->flags & AUTOFS_INF_EXPIRING)) {
-		DPRINTK(("try_to_fill_entry: waiting for expire %p name=%.*s, flags&PENDING=%s de_info=%p de_info->flags=%x\n",
-			 dentry, dentry->d_name.len, dentry->d_name.name, 
-			 dentry->d_flags & DCACHE_AUTOFS_PENDING?"t":"f",
-			 de_info, de_info?de_info->flags:0));
+		DPRINTK(("try_to_fill_entry: waiting for expire %p name=%.*s\n",
+			 dentry, dentry->d_name.len, dentry->d_name.name));
+
 		status = autofs4_wait(sbi, &dentry->d_name, NFY_NONE);
 		
 		DPRINTK(("try_to_fill_entry: expire done status=%d\n", status));
@@ -170,7 +169,7 @@ static int autofs4_root_revalidate(struct dentry * dentry, struct nameidata *nd)
 	if (S_ISDIR(dentry->d_inode->i_mode) &&
 	    !d_mountpoint(dentry) && 
 	    list_empty(&dentry->d_subdirs)) {
-		DPRINTK(("autofs_root_revalidate: dentry=%p %.*s, emptydir\n",
+		DPRINTK(("autofs4_root_revalidate: dentry=%p %.*s, emptydir\n",
 			 dentry, dentry->d_name.len, dentry->d_name.name));
 		spin_unlock(&dcache_lock);
 		if (oz_mode)
@@ -248,7 +247,7 @@ static struct dentry *autofs4_root_lookup(struct inode *dir, struct dentry *dent
 	struct autofs_sb_info *sbi;
 	int oz_mode;
 
-	DPRINTK(("autofs_root_lookup: name = %.*s\n", 
+	DPRINTK(("autofs4_root_lookup: name = %.*s\n",
 		 dentry->d_name.len, dentry->d_name.name));
 
 	if (dentry->d_name.len > NAME_MAX)
@@ -258,7 +257,7 @@ static struct dentry *autofs4_root_lookup(struct inode *dir, struct dentry *dent
 
 	lock_kernel();
 	oz_mode = autofs4_oz_mode(sbi);
-	DPRINTK(("autofs_lookup: pid = %u, pgrp = %u, catatonic = %d, oz_mode = %d\n",
+	DPRINTK(("autofs4_lookup: pid = %u, pgrp = %u, catatonic = %d, oz_mode = %d\n",
 		 current->pid, process_group(current), sbi->catatonic, oz_mode));
 
 	/*
@@ -326,7 +325,7 @@ static int autofs4_dir_symlink(struct inode *dir,
 	struct inode *inode;
 	char *cp;
 
-	DPRINTK(("autofs_dir_symlink: %s <- %.*s\n", symname, 
+	DPRINTK(("autofs4_dir_symlink: %s <- %.*s\n", symname,
 		 dentry->d_name.len, dentry->d_name.name));
 
 	lock_kernel();
@@ -383,7 +382,7 @@ static int autofs4_dir_symlink(struct inode *dir,
  * If a process is blocked on the dentry waiting for the expire to finish,
  * it will invalidate the dentry and try to mount with a new one.
  *
- * Also see autofs_dir_rmdir().. 
+ * Also see autofs4_dir_rmdir()..
  */
 static int autofs4_dir_unlink(struct inode *dir, struct dentry *dentry)
 {
@@ -457,7 +456,7 @@ static int autofs4_dir_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		return -EACCES;
 	}
 
-	DPRINTK(("autofs_dir_mkdir: dentry %p, creating %.*s\n",
+	DPRINTK(("autofs4_dir_mkdir: dentry %p, creating %.*s\n",
 		 dentry, dentry->d_name.len, dentry->d_name.name));
 
 	ino = autofs4_init_ino(ino, sbi, S_IFDIR | 0555);
@@ -509,7 +508,7 @@ static inline int autofs4_get_protover(struct autofs_sb_info *sbi, int *p)
 	return put_user(sbi->version, p);
 }
 
-/* Identify autofs_dentries - this is so we can tell if there's
+/* Identify autofs4_dentries - this is so we can tell if there's
    an extra dentry refcount or not.  We only hold a refcount on the
    dentry if its non-negative (ie, d_inode != NULL)
 */
@@ -530,7 +529,7 @@ static int autofs4_root_ioctl(struct inode *inode, struct file *filp,
 {
 	struct autofs_sb_info *sbi = autofs4_sbi(inode->i_sb);
 
-	DPRINTK(("autofs_ioctl: cmd = 0x%08x, arg = 0x%08lx, sbi = %p, pgrp = %u\n",
+	DPRINTK(("autofs4_root_ioctl: cmd = 0x%08x, arg = 0x%08lx, sbi = %p, pgrp = %u\n",
 		 cmd,arg,sbi,process_group(current)));
 
 	if ( _IOC_TYPE(cmd) != _IOC_TYPE(AUTOFS_IOC_FIRST) ||

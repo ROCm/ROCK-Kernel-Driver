@@ -90,7 +90,7 @@ static void autofs4_notify_daemon(struct autofs_sb_info *sbi,
 	union autofs_packet_union pkt;
 	size_t pktsz;
 
-	DPRINTK(("autofs_notify: wait id = 0x%08lx, name = %.*s, type=%d\n",
+	DPRINTK(("autofs4_notify_daemon: wait id = 0x%08lx, name = %.*s, type=%d\n",
 		 wq->wait_queue_token, wq->len, wq->name, type));
 
 	memset(&pkt,0,sizeof pkt); /* For security reasons */
@@ -116,7 +116,7 @@ static void autofs4_notify_daemon(struct autofs_sb_info *sbi,
 		memcpy(ep->name, wq->name, wq->len);
 		ep->name[wq->len] = '\0';
 	} else {
-		printk("autofs_notify_daemon: bad type %d!\n", type);
+		printk("autofs4_notify_daemon: bad type %d!\n", type);
 		return;
 	}
 
@@ -167,19 +167,20 @@ int autofs4_wait(struct autofs_sb_info *sbi, struct qstr *name,
 		wq->next = sbi->queues;
 		sbi->queues = wq;
 
-		DPRINTK(("autofs_wait: new wait id = 0x%08lx, name = %.*s, nfy=%d\n",
-			 wq->wait_queue_token, wq->len, wq->name, notify));
+		DPRINTK(("autofs4_wait: new wait id = 0x%08lx, name = %.*s, nfy=%d\n",
+			 (unsigned long) wq->wait_queue_token, wq->len, wq->name, notify));
 		/* autofs4_notify_daemon() may block */
 		wq->wait_ctr = 2;
 		if (notify != NFY_NONE) {
 			autofs4_notify_daemon(sbi,wq, 
-					      notify == NFY_MOUNT ? autofs_ptype_missing :
-								    autofs_ptype_expire_multi);
+					notify == NFY_MOUNT ?
+						  autofs_ptype_missing :
+						  autofs_ptype_expire_multi);
 		}
 	} else {
 		wq->wait_ctr++;
-		DPRINTK(("autofs_wait: existing wait id = 0x%08lx, name = %.*s, nfy=%d\n",
-			 wq->wait_queue_token, wq->len, wq->name, notify));
+		DPRINTK(("autofs4_wait: existing wait id = 0x%08lx, name = %.*s, nfy=%d\n",
+			 (unsigned long) wq->wait_queue_token, wq->len, wq->name, notify));
 	}
 
 	/* wq->name is NULL if and only if the lock is already released */
@@ -211,7 +212,7 @@ int autofs4_wait(struct autofs_sb_info *sbi, struct qstr *name,
 		recalc_sigpending();
 		spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
 	} else {
-		DPRINTK(("autofs_wait: skipped sleeping\n"));
+		DPRINTK(("autofs4_wait: skipped sleeping\n"));
 	}
 
 	status = wq->status;
