@@ -16,6 +16,9 @@
 #include <linux/cpu.h>
 #include <linux/kthread.h>
 
+#ifdef CONFIG_KDB
+#include <linux/kdb.h>
+#endif
 /*
    - No shared variables, all the data are CPU local.
    - If a softirq needs serialization, let it serialize itself
@@ -77,6 +80,11 @@ asmlinkage void do_softirq(void)
 
 	if (in_interrupt())
 		return;
+#ifdef	CONFIG_KDB
+	if (KDB_IS_RUNNING())
+	    return;
+#endif	/*CONFIG_KDB */
+
 
 	local_irq_save(flags);
 

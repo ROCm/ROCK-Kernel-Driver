@@ -44,9 +44,10 @@
 #define dprintk(x)
 #endif
 
-static void parport_sunbpp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t parport_sunbpp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	parport_generic_irq(irq, (struct parport *) dev_id, regs);
+	return IRQ_HANDLED;
 }
 
 static void parport_sunbpp_disable_irq(struct parport *p)
@@ -384,7 +385,7 @@ static int __init parport_sunbpp_init(void)
 
 static void __exit parport_sunbpp_exit(void)
 {
-	while (!list_empty(port_list)) {
+	while (!list_empty(&port_list)) {
 		Node *node = list_entry(port_list.next, Node, list);
 		struct parport *p = node->port;
 		struct parport_operations *ops = p->ops;

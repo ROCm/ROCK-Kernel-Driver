@@ -50,7 +50,7 @@
 #include <net/bluetooth/l2cap.h>
 #include <net/bluetooth/rfcomm.h>
 
-#define VERSION "1.1"
+#define VERSION "1.2"
 
 #ifndef CONFIG_BT_RFCOMM_DEBUG
 #undef  BT_DBG

@@ -36,6 +36,8 @@
 #include "privinst.h"
 #include <asm/uaccess.h>
 #include <asm/machdep.h>
+#include <asm/prom.h>
+#include "../kernel/pci.h"  // for traverse_all_pci_devices()
 
 extern const char *kdb_diemsg;
 unsigned long cpus_in_kdb=0;
@@ -732,7 +734,6 @@ extern inline void sync(void)
 	asm volatile("sync; isync");
 }
 
-extern void (*debugger_fault_handler)(struct pt_regs *);
 extern void longjmp(u_int *, int);
 
 unsigned long
@@ -1272,11 +1273,6 @@ becomes this:
 
 #define EOF	(-1)
 
-/* for traverse_all_pci_devices */
-#include "../kernel/pci.h"
-/* for NUM_TCE_LEVELS */
-#include <asm/pci_dma.h>
-
 
 /* prototypes */
 int scanhex(unsigned long *);
@@ -1620,10 +1616,11 @@ kdba_super_regs(int argc, const char **argv, const char **envp, struct pt_regs *
 }
 
 
+#ifdef TCE_HAS_CHANGED_FIX_LATER
 
-	
 int
-kdba_dump_tce_table(int argc, const char **argv, const char **envp, struct pt_regs *regs){
+kdba_dump_tce_table(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+{
     struct TceTable kt; 
     long tce_table_address;
     int nr;
@@ -1708,6 +1705,7 @@ kdba_dump_tce_table(int argc, const char **argv, const char **envp, struct pt_re
     kdb_printf("\n");
     return 0;
 }
+#endif
 
 int
 kdba_kernelversion(int argc, const char **argv, const char **envp, struct pt_regs *regs){
@@ -1737,7 +1735,8 @@ kdba_dump_pci(struct device_node *dn, void *data)
     kdb_printf("    full_name: %s\n",dn->full_name);
     kdb_printf("    busno    : 0x%x\n",dn->busno);
     kdb_printf("    devfn    : 0x%x\n",dn->devfn);
-    kdb_printf("    tce_table: %p\n",dn->tce_table);
+	 // XXX fix me later, bring up to date
+    // kdb_printf("    tce_table: %p\n",dn->tce_table);
     return NULL;
 }
 
@@ -1922,7 +1921,7 @@ kdb_reset_debugger(struct pt_regs *regs) {
     }
 }
 
-void
+int
 kdb_debugger(struct pt_regs *regs) {
     if (regs)
 	if (regs->trap==0x100) {
@@ -1931,6 +1930,8 @@ kdb_debugger(struct pt_regs *regs) {
 	    kdb(KDB_REASON_ENTER,regs->trap,regs);   /* ok */
     else  /* regs invalid */
 	kdb(KDB_REASON_SILENT,0,regs);
+
+	return 0;
 }
 
 int
@@ -1999,7 +2000,6 @@ kdba_state(int argc, const char **argv, const char **envp, struct pt_regs *fp)
 	    if KDB_STATE_CPU(WAIT_IPI,i) kdb_printf("WAIT_IPI,");
 	    if KDB_STATE_CPU(RECURSE,i) kdb_printf("RECURSE,");
 	    if KDB_STATE_CPU(IP_ADJUSTED,i) kdb_printf("IP_ADJUSTED,");
-	    if KDB_STATE_CPU(NO_BP_DELAY,i) kdb_printf("NO_BP_DELAY");
 	    kdb_printf("]\n");
 	}
     }
@@ -2028,12 +2028,12 @@ kdba_init(void)
 	kdb_map_scc();		/* map sysrq key */
 #endif
 
-	debugger = kdb_debugger;
-	debugger_bpt = kdb_debugger_bpt;
-	debugger_sstep = kdb_debugger_sstep;
-	debugger_iabr_match = kdb_debugger_iabr_match;
-	debugger_dabr_match = kdb_debugger_dabr_match;
-	debugger_fault_handler = NULL; /* this guy is normally off. */
+	__debugger = kdb_debugger;
+	__debugger_bpt = kdb_debugger_bpt;
+	__debugger_sstep = kdb_debugger_sstep;
+	__debugger_iabr_match = kdb_debugger_iabr_match;
+	__debugger_dabr_match = kdb_debugger_dabr_match;
+	__debugger_fault_handler = NULL; /* this guy is normally off. */
 				    /* = kdb_debugger_fault_handler; */
 
 	kdba_enable_lbr();
@@ -2041,7 +2041,8 @@ kdba_init(void)
 	kdb_register("superreg", kdba_super_regs, "superreg", "display super_regs", 0);
 	kdb_register("msr", kdba_dissect_msr, "msr", "dissect msr", 0);
 	kdb_register("halt", kdba_halt, "halt", "halt machine", 0);
-	kdb_register("tce_table", kdba_dump_tce_table, "tce_table <addr> [full]", "dump the tce table located at <addr>", 0);
+	// XXX fix me later, tce has changed radically
+	// kdb_register("tce_table", kdba_dump_tce_table, "tce_table <addr> [full]", "dump the tce table located at <addr>", 0);
 	kdb_register("kernel", kdba_kernelversion, "version", "display running kernel version", 0);
 	kdb_register("pci_info", kdba_dump_pci_info, "dump_pci_info", "dump pci device info", 0);
 	kdb_register("dump", kdba_dump, "dump (all|basic)", "dump all info", 0); 

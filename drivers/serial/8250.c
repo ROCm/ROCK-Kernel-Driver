@@ -16,12 +16,8 @@
  *
  * A note about mapbase / membase
  *
- *  mapbase is the physical address of the IO port.  Currently, we don't
- *  support this very well, and it may well be dropped from this driver
- *  in future.  As such, mapbase should be NULL.
- *
- *  membase is an 'ioremapped' cookie.  This is compatible with the old
- *  serial.c driver, and is currently the preferred form.
+ *  mapbase is the physical address of the IO port.
+ *  membase is an 'ioremapped' cookie.
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -2004,6 +2000,8 @@ static int __init serial8250_console_setup(struct console *co, char *options)
 	if (co->index >= UART_NR)
 		co->index = 0;
 	port = &serial8250_ports[co->index].port;
+	if (!port->ops)
+		return -ENODEV;
 
 #ifdef	CONFIG_KDB
 	/*
@@ -2063,6 +2061,14 @@ static int __init serial8250_console_init(void)
 	return 0;
 }
 console_initcall(serial8250_console_init);
+
+static int __init serial8250_late_console_init(void)
+{
+	if (!(serial8250_console.flags & CON_ENABLED))
+		register_console(&serial8250_console);
+	return 0;
+}
+late_initcall(serial8250_late_console_init);
 
 #define SERIAL8250_CONSOLE	&serial8250_console
 #else

@@ -79,9 +79,9 @@ register struct thread_info *current_thread_info_reg asm("g6");
 /*
  * thread information allocation
  */
-#ifdef CONFIG_SUN4
+#if PAGE_SHIFT == 13
 #define THREAD_INFO_ORDER  0
-#else
+#else /* PAGE_SHIFT */
 #define THREAD_INFO_ORDER  1
 #endif
 

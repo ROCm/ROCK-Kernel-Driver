@@ -62,7 +62,7 @@ struct kdb_serial kdb_serial;
 
 int inchar(void);
 
-
+#if 0
 char *
 kdba_read(char *buffer, size_t bufsize)
 {
@@ -96,6 +96,42 @@ kdba_read(char *buffer, size_t bufsize)
 		}
 	}
 }
+#endif 
+
+static int
+kdba_get_char(void)
+{
+	// don't use ppc_md.udbg_getc(), it blocks if no chars.
+	int key = ppc_md.udbg_getc_poll();
+
+	/* Echo is done in the low level functions */
+	if (0 == key) return -1; /* check for NULL from udbg_getc */
+	return key;
+}
+
+// XXX do we need to do something special for HVC consoles?
+//
+get_char_func poll_funcs[] = 
+{
+  kdba_get_char,
+#if defined(CONFIG_VT_CONSOLE_XXX) // should we do anything here?
+  get_kbd_char,
+#endif
+#if defined(CONFIG_SERIAL_CONSOLE_XXX) // should we do anything here?
+  get_serial_char,
+#endif
+#ifdef  CONFIG_KDB_USB_XXX // should copy i386 USB code
+  get_usb_char,
+#endif
+  NULL
+};
 
 
+void kdba_local_arch_setup(void)
+{
+}
+
+void kdba_local_arch_cleanup(void)
+{
+}
 

@@ -157,7 +157,6 @@ EXPORT_SYMBOL(___change_bit);
 
 #ifdef CONFIG_SMP
 /* IRQ implementation. */
-EXPORT_SYMBOL(global_irq_holder);
 EXPORT_SYMBOL(synchronize_irq);
 
 /* Misc SMP information */

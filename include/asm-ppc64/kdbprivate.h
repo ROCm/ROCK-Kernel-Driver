@@ -74,11 +74,10 @@ extern kdbhard_bp_t	kdb_hardbreaks[/* KDB_MAXHARDBPT */];
 typedef struct __kdb_jmp_buf {
 	unsigned int regs[100];
 } kdb_jmp_buf;
-extern int kdb_setjmp(kdb_jmp_buf *);
+extern int kdba_setjmp(kdb_jmp_buf *);
 extern void kdba_longjmp(kdb_jmp_buf *, int);
-extern kdb_jmp_buf  kdbjmpbuf[];
+extern kdb_jmp_buf  *kdbjmpbuf;
 #endif	/* KDB_HAVE_LONGJMP */
-
 
 /*
  A traceback table typically follows each function.
@@ -116,5 +115,21 @@ typedef struct {
     kdb_symtab_t	symtab;		/* fake symtab entry */
 } kdbtbtable_t;
 int kdba_find_tb_table(kdb_machreg_t eip, kdbtbtable_t *tab);
+
+/* Arch specific data saved for running processes */
+
+struct kdba_running_process {
+	int dummy[0];  /* Everything is in pt_regs for i386 */
+};
+
+static inline
+void kdba_save_running(struct kdba_running_process *k, struct pt_regs *regs)
+{
+}
+
+static inline
+void kdba_unsave_running(struct kdba_running_process *k, struct pt_regs *regs)
+{
+}
 
 #endif	/* !_ASM_KDBPRIVATE_H */

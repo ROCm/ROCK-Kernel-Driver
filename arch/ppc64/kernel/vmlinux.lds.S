@@ -84,6 +84,10 @@ SECTIONS
 	__con_initcall_end = .;
 	}
 
+  __kdb_initcall_start = .;
+  .kdb_initcall.init : { *(.kdb_initcall.init) }
+  __kdb_initcall_end = .;
+
   SECURITY_INIT
 
   . = ALIGN(4096);

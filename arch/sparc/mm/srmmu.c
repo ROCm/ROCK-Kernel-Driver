@@ -627,8 +627,15 @@ static void srmmu_unmapiorange(unsigned long virt_addr, unsigned int len)
  */
 struct thread_info *srmmu_alloc_thread_info(void)
 {
-	return (struct thread_info *)
-	    __get_free_pages(GFP_KERNEL, THREAD_INFO_ORDER);
+	struct thread_info *ret;
+
+	ret = (struct thread_info *)__get_free_pages(GFP_KERNEL,
+						     THREAD_INFO_ORDER);
+#ifdef CONFIG_DEBUG_STACK_USAGE
+	memset(ret, 0, PAGE_SIZE << THREAD_INFO_ORDER);
+#endif /* DEBUG_STACK_USAGE */
+
+	return ret;
 }
 
 static void srmmu_free_thread_info(struct thread_info *ti)

@@ -232,6 +232,9 @@ static void hci_cc_host_ctl(struct hci_dev *hdev, __u16 ocf, struct sk_buff *skb
 			hdev->voice_setting = setting;
 
 			BT_DBG("%s: voice setting 0x%04x", hdev->name, setting);
+
+			if (hdev->notify)
+				hdev->notify(hdev, HCI_NOTIFY_VOICE_SETTING);
 		}
 		break;
 
@@ -247,6 +250,9 @@ static void hci_cc_host_ctl(struct hci_dev *hdev, __u16 ocf, struct sk_buff *skb
 			hdev->voice_setting = setting;
 
 			BT_DBG("%s: voice setting 0x%04x", hdev->name, setting);
+
+			if (hdev->notify)
+				hdev->notify(hdev, HCI_NOTIFY_VOICE_SETTING);
 		}
 		hci_req_complete(hdev, status);
 		break;

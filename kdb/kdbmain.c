@@ -219,7 +219,11 @@ static const int __nenv = (sizeof(__env) / sizeof(char *));
  * with '\' in strings.  CML2 would have been able to do it but we lost CML2.
  * KAO.
  */
+#ifdef __powerpc__
+const char kdb_serial_str[] = "startKDB";
+#else
 const char kdb_serial_str[] = "\001";
+#endif
 
 /*
  * kdbgetenv

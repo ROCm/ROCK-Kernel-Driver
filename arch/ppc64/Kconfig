@@ -386,6 +386,14 @@ config KDB
 	  Include in-kernel hooks for the kdb kernel monitor/debugger.
 	  Unless you are intending to debug the kernel, say N here.
 
+config KDB_MODULES
+	bool "Enable additional KDB modules"
+	depends on KDB
+	help
+	  Include additional KDB support for viewing buffer heads,
+	  pages, inodes, dentrys, vm areas and scsi devices and
+	  scsi commands.
+
 endchoice
 
 

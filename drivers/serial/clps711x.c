@@ -49,18 +49,9 @@
 
 #define UART_NR		2
 
-#ifndef CONFIG_SERIAL_CLPS711X_OLD_NAME
 #define SERIAL_CLPS711X_MAJOR	204
 #define SERIAL_CLPS711X_MINOR	40
 #define SERIAL_CLPS711X_NR	UART_NR
-
-#else
-#warning The old names/device number for this driver if compatabity is needed
-#define SERIAL_CLPS711X_MAJOR   204
-#define SERIAL_CLPS711X_MINOR   16
-#define SERIAL_CLPS711X_NR      UART_NR
-
-#endif
 
 /*
  * We use the relevant SYSCON register as a base address for these ports.

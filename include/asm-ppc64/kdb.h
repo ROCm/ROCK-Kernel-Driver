@@ -79,4 +79,13 @@ kdba_verify_rw(unsigned long addr, size_t size)
 	return(kdba_getarea_size(data, addr, size) || kdba_putarea_size(addr, data, size));
 }
 
+static inline unsigned long
+kdba_funcptr_value(void *fp)
+{
+	// XXX is this right? or is this fpdesc, of which we should 
+	// return the first of the three pointers? (i.e. *fp) ???
+	return (unsigned long)fp;
+}
+					 
+
 #endif	/* ASM_KDB_H */

@@ -411,7 +411,7 @@ static unsigned short risc_code_addr01 = 0x1000 ;
    if that mbox should be copied as input.  For example 0x2 would mean
    only copy mbox1. */
 
-const u_char mbox_param[] =
+static const u_char mbox_param[] =
 {
 	0x01,			/* MBOX_NO_OP */
 	0x1f,			/* MBOX_LOAD_RAM */

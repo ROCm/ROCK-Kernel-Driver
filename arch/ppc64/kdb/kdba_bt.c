@@ -207,7 +207,12 @@ kdba_bt_stack_ppc(struct pt_regs *regs, kdb_machreg_t *addr, int argcount,
 				/* pull exception regs from the stack */
 				struct pt_regs eregs;
 				kdba_getmem(esp+STACK_FRAME_OVERHEAD, &eregs, sizeof(eregs));
-				kdb_printf("  [exception: %lx:%s regs 0x%lx] nip:[0x%lx] gpr[1]:[0x%x]\n", eregs.trap,getvecname(eregs.trap), esp+STACK_FRAME_OVERHEAD,(unsigned int)eregs.nip,(unsigned int)eregs.gpr[1]);
+				kdb_printf("  [exception: %lx:%s regs 0x%lx] "
+				           "nip:[0x%lx] gpr[1]:[0x%lx]\n", 
+				           eregs.trap,getvecname(eregs.trap), 
+				           esp+STACK_FRAME_OVERHEAD,
+				           (unsigned long int)eregs.nip,
+				           (unsigned long int)eregs.gpr[1]);
 				old_esp = esp;
 				esp = kdba_getword(esp, 8);
 				if (!esp)
@@ -269,6 +274,47 @@ kdba_bt_stack(struct pt_regs *regs, kdb_machreg_t *addr, int argcount,
 	return(kdba_bt_stack_ppc(regs, addr, argcount, p, 0));
 }
 
+/*
+ * kdba_bt_address
+ *
+ *	Do a backtrace starting at a specified stack address.  Use this if the
+ *	heuristics get the i386 stack decode wrong.
+ *
+ * Inputs:
+ *	addr	Address provided to 'bt' command.
+ *	argcount
+ * Outputs:
+ *	None.
+ * Returns:
+ *	zero for success, a kdb diagnostic if error
+ * Locking:
+ *	none.
+ * Remarks:
+ *	mds %esp comes in handy when examining the stack to do a manual
+ *	traceback.
+ */
+
+int
+kdba_bt_address(kdb_machreg_t addr, int argcount)
+{
+	return kdba_bt_stack(NULL, &addr, argcount, NULL);
+}
+
+/*
+ * kdba_bt_process
+ *
+ *	Do a backtrace for a specified process.
+ *
+ * Inputs:
+ *	p	Struct task pointer extracted by 'bt' command.
+ *	argcount
+ * Outputs:
+ *	None.
+ * Returns:
+ *	zero for success, a kdb diagnostic if error
+ * Locking:
+ *	none.
+ */
 int
 kdba_bt_process(struct task_struct *p, int argcount)
 {

@@ -341,6 +341,7 @@ int uart_resume_port(struct uart_driver *reg, struct uart_port *port);
 #define uart_tx_stopped(port)		\
 	((port)->info->tty->stopped || (port)->info->tty->hw_stopped)
 
+
 /*
  * The following are helper functions for the low level drivers.
  */
