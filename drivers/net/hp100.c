@@ -201,6 +201,7 @@ static struct eisa_device_id hp100_eisa_tbl[] = {
 	{ "HWP1990" }, /* HP J2577 */
 	{ "CPX0301" }, /* ReadyLink ENET100-VG4 */
 	{ "CPX0401" }, /* FreedomLine 100/VG */
+	{ "" }	       /* Mandatory final entry ! */
 };
 MODULE_DEVICE_TABLE(eisa, hp100_eisa_tbl);
 #endif
