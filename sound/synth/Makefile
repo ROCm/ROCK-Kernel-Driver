@@ -15,5 +15,3 @@ ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
 endif
 
 obj-$(CONFIG_SND) += emux/
-
-include $(TOPDIR)/Rules.make

@@ -5,5 +5,3 @@
 L_TARGET := lib.a
 
 obj-y	:= init.o
-
-include $(TOPDIR)/Rules.make

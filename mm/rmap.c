@@ -26,6 +26,7 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/rmap-locking.h>
+#include <linux/cache.h>
 
 #include <asm/pgalloc.h>
 #include <asm/rmap.h>
@@ -48,7 +49,7 @@
 struct pte_chain {
 	struct pte_chain *next;
 	pte_addr_t ptes[NRPTE];
-};
+} ____cacheline_aligned;
 
 static kmem_cache_t	*pte_chain_cache;
 

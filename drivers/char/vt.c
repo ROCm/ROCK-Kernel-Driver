@@ -262,7 +262,7 @@ static void scrup(int currcons, unsigned int t, unsigned int b, int nr)
 		return;
 	d = (unsigned short *) (origin+video_size_row*t);
 	s = (unsigned short *) (origin+video_size_row*(t+nr));
-	scr_memcpyw(d, s, (b-t-nr) * video_size_row);
+	scr_memmovew(d, s, (b-t-nr) * video_size_row);
 	scr_memsetw(d + (b-t-nr) * video_num_columns, video_erase_char, video_size_row*nr);
 }
 

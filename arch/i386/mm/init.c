@@ -134,8 +134,10 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 	pgd = pgd_base + pgd_ofs;
 	pfn = 0;
 
-	for (; pgd_ofs < PTRS_PER_PGD && pfn < max_low_pfn; pgd++, pgd_ofs++) {
+	for (; pgd_ofs < PTRS_PER_PGD; pgd++, pgd_ofs++) {
 		pmd = one_md_table_init(pgd);
+		if (pfn >= max_low_pfn)
+			continue;
 		for (pmd_ofs = 0; pmd_ofs < PTRS_PER_PMD && pfn < max_low_pfn; pmd++, pmd_ofs++) {
 			/* Map with big pages if possible, otherwise create normal page tables. */
 			if (cpu_has_pse) {

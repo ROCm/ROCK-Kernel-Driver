@@ -54,7 +54,6 @@ struct jfs_inode_info {
 	lid_t	atlhead;	/* anonymous tlock list head	*/
 	lid_t	atltail;	/* anonymous tlock list tail	*/
 	struct list_head anon_inode_list; /* inodes having anonymous txns */
-	struct list_head mp_list; /* metapages in inode's address space */
 	/*
 	 * rdwrlock serializes xtree between reads & writes and synchronizes
 	 * changes to special inodes.  It's use would be redundant on
@@ -117,7 +116,6 @@ enum cflags {
 	COMMIT_Inlineea,	/* commit inode inline EA */
 	COMMIT_Freewmap,	/* free WMAP at iClose() */
 	COMMIT_Dirty,		/* Inode is really dirty */
-	COMMIT_Holdlock,	/* Hold the IWRITE_LOCK until commit is done */
 	COMMIT_Dirtable,	/* commit changes to di_dirtable */
 	COMMIT_Stale,		/* data extent is no longer valid */
 	COMMIT_Synclist,	/* metadata pages on group commit synclist */

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsaccess - Top-level functions for accessing ACPI namespace
- *              $Revision: 165 $
+ *              $Revision: 167 $
  *
  ******************************************************************************/
 
@@ -234,7 +234,7 @@ unlock_and_exit:
 acpi_status
 acpi_ns_lookup (
 	acpi_generic_state      *scope_info,
-	NATIVE_CHAR             *pathname,
+	char                    *pathname,
 	acpi_object_type        type,
 	acpi_interpreter_mode   interpreter_mode,
 	u32                     flags,
@@ -242,7 +242,7 @@ acpi_ns_lookup (
 	acpi_namespace_node     **return_node)
 {
 	acpi_status             status;
-	NATIVE_CHAR             *path = pathname;
+	char                    *path = pathname;
 	acpi_namespace_node     *prefix_node;
 	acpi_namespace_node     *current_node = NULL;
 	acpi_namespace_node     *this_node = NULL;

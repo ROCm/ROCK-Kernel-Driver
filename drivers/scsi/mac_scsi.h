@@ -65,19 +65,19 @@ int macscsi_proc_info (char *buffer, char **start, off_t offset,
 #include <scsi/scsicam.h>
 
 #define MAC_NCR5380 {						\
-name:			"Macintosh NCR5380 SCSI",			\
-detect:			macscsi_detect,					\
-release:		macscsi_release,	/* Release */		\
-info:			macscsi_info,					\
-queuecommand:		macscsi_queue_command,				\
-abort:			macscsi_abort,			 		\
-reset:			macscsi_reset,					\
-can_queue:		CAN_QUEUE,		/* can queue */		\
-this_id:		7,			/* id */		\
-sg_tablesize:		SG_ALL,			/* sg_tablesize */	\
-cmd_per_lun:		CMD_PER_LUN,		/* cmd per lun */	\
-unchecked_isa_dma:	0,			/* unchecked_isa_dma */	\
-use_clustering:		DISABLE_CLUSTERING				\
+.name			= "Macintosh NCR5380 SCSI",			\
+.detect			= macscsi_detect,					\
+.release		= macscsi_release,	/* Release */		\
+.info			= macscsi_info,					\
+.queuecommand		= macscsi_queue_command,				\
+.abort			= macscsi_abort,			 		\
+.reset			= macscsi_reset,					\
+.can_queue		= CAN_QUEUE,		/* can queue */		\
+.this_id		= 7,			/* id */		\
+.sg_tablesize		= SG_ALL,			/* sg_tablesize */	\
+.cmd_per_lun		= CMD_PER_LUN,		/* cmd per lun */	\
+.unchecked_isa_dma	= 0,			/* unchecked_isa_dma */	\
+.use_clustering		= DISABLE_CLUSTERING				\
 	}
 
 #ifndef HOSTS_C

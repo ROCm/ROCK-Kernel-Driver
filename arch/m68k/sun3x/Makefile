@@ -5,5 +5,3 @@
 export-objs	:= sun3x_ksyms.o
 
 obj-y		:= config.o time.o dvma.o prom.o
-
-include $(TOPDIR)/Rules.make

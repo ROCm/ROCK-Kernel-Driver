@@ -88,7 +88,6 @@ unsigned char software_suspend_enabled = 0;
 extern char _text, _etext, _edata, __bss_start, _end;
 extern char __nosave_begin, __nosave_end;
 
-extern int console_loglevel;
 extern int is_head_of_free_region(struct page *);
 
 /* Locks */

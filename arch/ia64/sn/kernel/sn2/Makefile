@@ -35,6 +35,3 @@
 obj-y := cache.o iomv.o sn2_smp.o
 
 EXTRA_CFLAGS    := -DLITTLE_ENDIAN
-
-include $(TOPDIR)/Rules.make
-

@@ -7,5 +7,3 @@ obj-y    := sbus.o dvma.o
 endif
 
 obj-$(CONFIG_SBUSCHAR) += char/
-
-include $(TOPDIR)/Rules.make

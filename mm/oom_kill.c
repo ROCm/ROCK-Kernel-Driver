@@ -172,8 +172,10 @@ static void oom_kill(void)
 	p = select_bad_process();
 
 	/* Found nothing?!?! Either we hang forever, or we panic. */
-	if (p == NULL)
+	if (!p) {
+		show_free_areas();
 		panic("Out of memory and no killable processes...\n");
+	}
 
 	oom_kill_task(p);
 	/*

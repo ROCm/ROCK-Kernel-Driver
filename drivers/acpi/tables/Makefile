@@ -6,5 +6,3 @@ obj-y := tbconvrt.o  tbget.o     tbrsdt.o   tbxface.o  \
 	 tbgetall.o  tbinstal.o  tbutils.o  tbxfroot.o
 
 EXTRA_CFLAGS += $(ACPI_CFLAGS)
-
-include $(TOPDIR)/Rules.make

@@ -14,7 +14,5 @@ USER_SINGLE_OBJS = $(foreach f,$(patsubst %.o,%,$(obj-y)),$($(f)-objs))
 
 USER_OBJS = $(filter %_user.o,$(obj-y) $(USER_SINGLE_OBJS))
 
-include $(TOPDIR)/Rules.make
-
 $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$@) $(USER_CFLAGS) -c -o $@ $<

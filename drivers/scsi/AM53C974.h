@@ -51,20 +51,20 @@ struct AM53C974_hostdata {
 };
 
 #define AM53C974 {				  \
-    proc_name:      "am53c974",    	          \
-    name:           "AM53C974",        		  \
-    detect:         AM53C974_pci_detect,	  \
-    release:        AM53C974_release,		  \
-    info:           AM53C974_info,     		  \
-    command:        AM53C974_command,  		  \
-    queuecommand:   AM53C974_queue_command,	  \
-    abort:          AM53C974_abort,    		  \
-    reset:          AM53C974_reset,    		  \
-    can_queue:      12,                 	  \
-    this_id:        -1,                           \
-    sg_tablesize:   SG_ALL,            		  \
-    cmd_per_lun:    1,                 		  \
-    use_clustering: DISABLE_CLUSTERING 		  \
+    .proc_name      = "am53c974",    	          \
+    .name           = "AM53C974",        		  \
+    .detect         = AM53C974_pci_detect,	  \
+    .release        = AM53C974_release,		  \
+    .info           = AM53C974_info,     		  \
+    .command        = AM53C974_command,  		  \
+    .queuecommand   = AM53C974_queue_command,	  \
+    .abort          = AM53C974_abort,    		  \
+    .reset          = AM53C974_reset,    		  \
+    .can_queue      = 12,                 	  \
+    .this_id        = -1,                           \
+    .sg_tablesize   = SG_ALL,            		  \
+    .cmd_per_lun    = 1,                 		  \
+    .use_clustering = DISABLE_CLUSTERING 		  \
     }
 
 static int AM53C974_pci_detect(Scsi_Host_Template * tpnt);

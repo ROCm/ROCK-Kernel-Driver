@@ -8,5 +8,3 @@ obj-y := nsaccess.o  nsdumpdv.o  nsload.o    nssearch.o  nsxfeval.o \
 	 nsparse.o
 
 EXTRA_CFLAGS += $(ACPI_CFLAGS)
-
-include $(TOPDIR)/Rules.make

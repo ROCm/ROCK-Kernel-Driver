@@ -1,6 +1,12 @@
 /*
  *      u14-34f.c - Low-level driver for UltraStor 14F/34F SCSI host adapters.
  *
+ *      12 Nov 2002 Rev. 8.02 for linux 2.5.47
+ *        + Release driver_lock before calling scsi_register.
+ *
+ *      11 Nov 2002 Rev. 8.01 for linux 2.5.47
+ *        + Fixed bios_param and scsicam_bios_param calling parameters.
+ *
  *      28 Oct 2002 Rev. 8.00 for linux 2.5.44-ac4
  *        + Use new tcq and adjust_queue_depth api.
  *        + New command line option (tm:[0-2]) to choose the type of tags:
@@ -841,7 +847,9 @@ static int port_detect \
 
    if (have_old_firmware) tpnt->use_clustering = DISABLE_CLUSTERING;
 
+   spin_unlock(&driver_lock);
    sh[j] = scsi_register(tpnt, sizeof(struct hostdata));
+   spin_lock(&driver_lock);
 
    if (sh[j] == NULL) {
       printk("%s: unable to register host, detaching.\n", name);
@@ -1488,8 +1496,8 @@ static int u14_34f_eh_host_reset(Scsi_Cmnd *SCarg) {
    return SUCCESS;
 }
 
-static int u14_34f_bios_param(struct scsi_device *disk, struct block_device *bdev,
-	sector_t capacity, int *dkinfo) {
+static int u14_34f_bios_param(struct scsi_device *disk,
+                 struct block_device *bdev, sector_t capacity, int *dkinfo) {
    unsigned int j = 0;
    unsigned int size = capacity;
 

@@ -29,8 +29,10 @@
 #include <asm/uaccess.h>
 
 #include <linux/errno.h>
+#include <linux/fs.h>
+#include <linux/fsfilter.h>
 
-#include <linux/intermezzo_fs.h>
+#include "intermezzo_fs.h"
 
 /*
  * this file contains a hash table of replicators/clients for a

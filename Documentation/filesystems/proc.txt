@@ -989,42 +989,58 @@ for writeout by the pdflush daemons.  It is expressed in 100'ths of a second.
 Data which has been dirty in-memory for longer than this interval will be
 written out next time a pdflush daemon wakes up.
 
+lower_zone_protection
+---------------------
 
-kswapd
-------
+For some specialised workloads on highmem machines it is dangerous for
+the kernel to allow process memory to be allocated from the "lowmem"
+zone.  This is because that memory could then be pinned via the mlock()
+system call, or by unavailability of swapspace.
 
-Kswapd is  the  kernel  swap  out daemon. That is, kswapd is that piece of the
-kernel that  frees  memory when it gets fragmented or full. Since every system
-is different, you'll probably want some control over this piece of the system.
+And on large highmem machines this lack of reclaimable lowmem memory
+can be fatal.
 
-The file contains three numbers:
+So the Linux page allocator has a mechanism which prevents allocations
+which _could_ use highmem from using too much lowmem.  This means that
+a certain amount of lowmem is defended from the possibility of being
+captured into pinned user memory.
 
-tries_base
-----------
+(The same argument applies to the old 16 megabyte ISA DMA region.  This
+mechanism will also defend that region from allocations which could use
+highmem or lowmem).
 
-The maximum  number  of  pages kswapd tries to free in one round is calculated
-from this  number.  Usually  this  number  will  be  divided  by  4  or 8 (see
-mm/vmscan.c), so it isn't as big as it looks.
+The `lower_zone_protection' tunable determines how aggressive the kernel is
+in defending these lower zones.  The default value is zero - no
+protection at all.
 
-When you  need to increase the bandwidth to/from swap, you'll want to increase
-this number.
+If you have a machine which uses highmem or ISA DMA and your
+applications are using mlock(), or if you are running with no swap then
+you probably should increase the lower_zone_protection setting.
 
-tries_min
----------
+The units of this tunable are fairly vague.  It is approximately equal
+to "megabytes".  So setting lower_zone_protection=100 will protect around 100
+megabytes of the lowmem zone from user allocations.  It will also make
+those 100 megabytes unavaliable for use by applications and by
+pagecache, so there is a cost.
 
-This is  the  minimum number of times kswapd tries to free a page each time it
-is called. Basically it's just there to make sure that kswapd frees some pages
-even when it's being called with minimum priority.
+The effects of this tunable may be observed by monitoring
+/proc/meminfo:LowFree.  Write a single huge file and observe the point
+at which LowFree ceases to fall.
 
-swap_cluster
+A reasonable value for lower_zone_protection is 100.
+
+page-cluster
 ------------
 
-This is probably the greatest influence on system performance.
+page-cluster controls the number of pages which are written to swap in
+a single attempt.  The swap I/O size.
 
-swap_cluster is  the  number  of  pages kswapd writes in one turn. You'll want
-this value  to  be  large  so that kswapd does its I/O in large chunks and the
-disk doesn't  have  to  seek  as  often, but you don't want it to be too large
-since that would flood the request queue.
+It is a logarithmic value - setting it to zero means "1 page", setting
+it to 1 means "2 pages", setting it to 2 means "4 pages", etc.
+
+The default value is three (eight pages at a time).  There may be some
+small benefits in tuning this to a different value if your workload is
+swap-intensive.
 
 overcommit_memory
 -----------------

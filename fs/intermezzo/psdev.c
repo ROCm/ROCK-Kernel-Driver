@@ -51,8 +51,8 @@
 #include <asm/uaccess.h>
 #include <linux/miscdevice.h>
 
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 
 
 #ifdef PRESTO_DEVEL

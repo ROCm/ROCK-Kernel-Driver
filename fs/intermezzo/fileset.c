@@ -43,8 +43,8 @@
 #include <linux/init.h>
 #include <linux/module.h>
 
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 
 static inline struct presto_file_set *presto_dentry2fset(struct dentry *dentry)
 {

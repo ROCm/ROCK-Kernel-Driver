@@ -135,7 +135,6 @@ static int ramfs_symlink(struct inode * dir, struct dentry *dentry, const char *
 
 static struct address_space_operations ramfs_aops = {
 	.readpage	= simple_readpage,
-	.writepage	= fail_writepage,
 	.prepare_write	= simple_prepare_write,
 	.commit_write	= simple_commit_write
 };

@@ -33,6 +33,7 @@
 #include <linux/quotaops.h>
 #include <linux/string.h>
 #include <linux/buffer_head.h>
+#include <linux/writeback.h>
 #include <linux/mpage.h>
 #include <linux/uio.h>
 #include "xattr.h"
@@ -1287,7 +1288,7 @@ static int bget_one(handle_t *handle, struct buffer_head *bh)
  * disastrous.  Any write() or metadata operation will sync the fs for
  * us.
  */
-static int ext3_writepage(struct page *page)
+static int ext3_writepage(struct page *page, struct writeback_control *wbc)
 {
 	struct inode *inode = page->mapping->host;
 	struct buffer_head *page_bufs;
@@ -1308,7 +1309,7 @@ static int ext3_writepage(struct page *page)
 		goto out_fail;
 
 	needed = ext3_writepage_trans_blocks(inode);
-	if (current->flags & PF_MEMALLOC)
+	if (wbc->for_reclaim)
 		handle = ext3_journal_try_start(inode, needed);
 	else
 		handle = ext3_journal_start(inode, needed);
@@ -1339,7 +1340,7 @@ static int ext3_writepage(struct page *page)
 				PAGE_CACHE_SIZE, NULL, bget_one);
 	}
 
-	ret = block_write_full_page(page, ext3_get_block);
+	ret = block_write_full_page(page, ext3_get_block, wbc);
 
 	/*
 	 * The page can become unlocked at any point now, and
@@ -1371,11 +1372,10 @@ out_fail:
 
 	/*
 	 * We have to fail this writepage to avoid cross-fs transactions.
-	 * Return EAGAIN so the caller will the page back on
-	 * mapping->dirty_pages.  The page's buffers' dirty state will be left
-	 * as-is.
+	 * Put the page back on mapping->dirty_pages.  The page's buffers'
+	 * dirty state will be left as-is.
 	 */
-	ret = -EAGAIN;
+	__set_page_dirty_nobuffers(page);
 	unlock_page(page);
 	return ret;
 }
@@ -2698,7 +2698,7 @@ void ext3_dirty_inode(struct inode *inode)
 	handle_t *handle;
 
 	lock_kernel();
-	handle = ext3_journal_start(inode, 1);
+	handle = ext3_journal_start(inode, 2);
 	if (IS_ERR(handle))
 		goto out;
 	if (current_handle &&

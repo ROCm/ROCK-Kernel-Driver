@@ -34,5 +34,3 @@ obj-$(CONFIG_BLK_DEV_VIA82CXXX)		+= via82cxxx.o
 obj-$(CONFIG_BLK_DEV_GENERIC)          += generic.o
 
 EXTRA_CFLAGS	:= -Idrivers/ide
-
-include $(TOPDIR)/Rules.make

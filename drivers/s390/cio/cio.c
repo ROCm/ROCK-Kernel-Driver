@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/cio.c
  *   S/390 common I/O routines -- low level i/o calls
- *   $Revision: 1.89 $
+ *   $Revision: 1.90 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -609,6 +609,7 @@ do_IRQ (struct pt_regs regs)
 	struct subchannel *sch;
 	struct irb *irb;
 
+	irq_enter ();
 	/*
 	 * Get interrupt information from lowcore
 	 */
@@ -620,28 +621,23 @@ do_IRQ (struct pt_regs regs)
 		 */
 		if (tpi_info->adapter_IO == 1 &&
 		    tpi_info->int_type == IO_INTERRUPT_TYPE) {
-			irq_enter ();
 			do_adapter_IO (tpi_info->intparm);
-			irq_exit ();
 			continue;
 		}
-		/* Store interrupt response block to lowcore. */
-		if (tsch (tpi_info->irq, irb) != 0)
-			/* Not status pending or not operational. */
-			continue;
-
 		sch = ioinfo[tpi_info->irq];
-		if (!sch)
-			continue;
-
-		irq_enter ();
-		spin_lock(&sch->lock);
-		memcpy (&sch->schib.scsw, &irb->scsw, sizeof (irb->scsw));
-		if (sch->driver && sch->driver->irq)
-			sch->driver->irq(&sch->dev);
-		spin_unlock(&sch->lock);
-		irq_exit ();
-
+		if (sch)
+			spin_lock(&sch->lock);
+		/* Store interrupt response block to lowcore. */
+		if (tsch (tpi_info->irq, irb) == 0 && sch) {
+			/* Keep subchannel information word up to date. */
+			memcpy (&sch->schib.scsw, &irb->scsw,
+				sizeof (irb->scsw));
+			/* Call interrupt handler if there is one. */
+			if (sch->driver && sch->driver->irq)
+				sch->driver->irq(&sch->dev);
+		}
+		if (sch)
+			spin_unlock(&sch->lock);
 		/*
 		 * Are more interrupts pending?
 		 * If so, the tpi instruction will update the lowcore
@@ -650,6 +646,7 @@ do_IRQ (struct pt_regs regs)
 		 * out of the sie which costs more cycles than it saves.
 		 */
 	} while (!MACHINE_IS_VM && tpi (NULL) != 0);
+	irq_exit ();
 }
 
 #ifdef CONFIG_CCW_CONSOLE

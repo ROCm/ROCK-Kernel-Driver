@@ -36,7 +36,5 @@ else
   CMODEL_CFLAG := -m64 -mcmodel=medlow
 endif
 
-include $(TOPDIR)/Rules.make
-
 head.o: head.S ttable.S itlb_base.S dtlb_base.S dtlb_backend.S dtlb_prot.S \
 	etrap.S rtrap.S winfixup.S entry.S

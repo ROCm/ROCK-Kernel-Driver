@@ -242,7 +242,6 @@ static int __init powernow_k6_init(void)
 	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
 #ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_min_freq[0]  = busfreq * 20;
 	driver->cpu_cur_freq[0]  = busfreq * max_multiplier;
 #endif
 
@@ -253,7 +252,9 @@ static int __init powernow_k6_init(void)
 	driver->policy[0].min    = busfreq * 20;
 	driver->policy[0].max    = busfreq * max_multiplier;
 	driver->policy[0].policy = CPUFREQ_POLICY_PERFORMANCE;
-	driver->policy[0].max_cpu_freq  = busfreq * max_multiplier;
+	driver->policy[0].cpuinfo.max_freq = busfreq * max_multiplier;
+	driver->policy[0].cpuinfo.min_freq = busfreq * 20;
+	driver->policy[0].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 
 	powernow_driver = driver;
 

@@ -141,8 +141,6 @@ cpqfc-objs	:= cpqfcTSinit.o cpqfcTScontrol.o cpqfcTSi2c.o \
 clean-files :=	53c8xx_d.h  53c7xx_d.h sim710_d.h  53c700_d.h	\
 		53c8xx_u.h  53c7xx_u.h sim710_u.h 53c700_u.h
 
-include $(TOPDIR)/Rules.make
-
 $(obj)/53c7,8xx.o: $(obj)/53c8xx_d.h $(obj)/53c8xx_u.h
 $(obj)/53c7xx.o:   $(obj)/53c7xx_d.h $(obj)/53c7xx_u.h
 $(obj)/sim710.o:   $(obj)/sim710_d.h

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbinstal - ACPI table installation and removal
- *              $Revision: 64 $
+ *              $Revision: 65 $
  *
  *****************************************************************************/
 
@@ -48,7 +48,7 @@
 
 acpi_status
 acpi_tb_match_signature (
-	NATIVE_CHAR             *signature,
+	char                    *signature,
 	acpi_table_desc         *table_info,
 	u8                      search_type)
 {

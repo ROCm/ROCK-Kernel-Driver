@@ -768,35 +768,49 @@ void usb_hub_port_disable(struct usb_device *hub, int port)
  * Not covered by the spec - but easy to deal with.
  *
  * This implementation uses 400ms minimum debounce timeout and checks
- * every 100ms for transient disconnects to restart the delay.
+ * every 25ms for transient disconnects to restart the delay.
  */
 
 #define HUB_DEBOUNCE_TIMEOUT	400
-#define HUB_DEBOUNCE_STEP	100
+#define HUB_DEBOUNCE_STEP	 25
+#define HUB_DEBOUNCE_STABLE	  4
 
 /* return: -1 on error, 0 on success, 1 on disconnect.  */
 static int usb_hub_port_debounce(struct usb_device *hub, int port)
 {
 	int ret;
-	unsigned delay_time;
+	int delay_time, stable_count;
 	u16 portchange, portstatus;
+	unsigned connection;
 
-	for (delay_time = 0; delay_time < HUB_DEBOUNCE_TIMEOUT; /* empty */ ) {
-
-		/* wait debounce step increment */
+	connection = 0;
+	stable_count = 0;
+	for (delay_time = 0; delay_time < HUB_DEBOUNCE_TIMEOUT; delay_time += HUB_DEBOUNCE_STEP) {
 		wait_ms(HUB_DEBOUNCE_STEP);
 
 		ret = usb_hub_port_status(hub, port, &portstatus, &portchange);
 		if (ret < 0)
 			return -1;
 
+		if ((portstatus & USB_PORT_STAT_CONNECTION) == connection) {
+			if (connection) {
+				if (++stable_count == HUB_DEBOUNCE_STABLE)
+					break;
+			}
+		} else {
+			stable_count = 0;
+		}
+		connection = portstatus & USB_PORT_STAT_CONNECTION;
+
 		if ((portchange & USB_PORT_STAT_C_CONNECTION)) {
 			usb_clear_port_feature(hub, port+1, USB_PORT_FEAT_C_CONNECTION);
-			delay_time = 0;
 		}
-		else
-			delay_time += HUB_DEBOUNCE_STEP;
 	}
+
+	/* XXX Replace this with dbg() when 2.6 is about to ship. */
+	info("debounce: hub %d port %d: delay %dms stable %d status 0x%x\n",
+	    hub->devnum, port, delay_time, stable_count, portstatus);
+
 	return ((portstatus&USB_PORT_STAT_CONNECTION)) ? 0 : 1;
 }
 

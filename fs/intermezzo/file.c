@@ -50,9 +50,9 @@
 #define __NO_VERSION__
 #include <linux/module.h>
 
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
 #include <linux/fsfilter.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 /*
  * these are initialized in super.c
  */
@@ -61,7 +61,7 @@ extern int presto_permission(struct inode *inode, int mask);
 
 static int presto_open_upcall(int minor, struct dentry *de)
 {
-        int rc;
+        int rc = 0;
         char *path, *buffer;
         struct presto_file_set *fset;
         int pathlen;

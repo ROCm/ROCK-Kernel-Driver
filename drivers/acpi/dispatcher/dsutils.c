@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsutils - Dispatcher utilities
- *              $Revision: 97 $
+ *              $Revision: 98 $
  *
  ******************************************************************************/
 
@@ -339,7 +339,7 @@ acpi_ds_create_operand (
 	u32                     arg_index)
 {
 	acpi_status             status = AE_OK;
-	NATIVE_CHAR             *name_string;
+	char                    *name_string;
 	u32                     name_length;
 	acpi_operand_object     *obj_desc;
 	acpi_parse_object       *parent_op;

@@ -1012,7 +1012,7 @@ static struct net_device_stats *cops_get_stats(struct net_device *dev)
 }
 
 #ifdef MODULE
-static struct net_device cops0_dev = { init: cops_probe };
+static struct net_device cops0_dev = { .init = cops_probe };
 
 MODULE_LICENSE("GPL");
 MODULE_PARM(io, "i");

@@ -20,10 +20,6 @@
 #include <asm/module.h>
 #include <asm/uaccess.h> /* For struct exception_table_entry */
 
-/* Indirect stringification */
-#define __MODULE_STRING_1(x)	#x
-#define __MODULE_STRING(x)	__MODULE_STRING_1(x)
-
 /* Not Yet Implemented */
 #define MODULE_LICENSE(name)
 #define MODULE_AUTHOR(name)
@@ -116,10 +112,16 @@ struct module_ref
 	atomic_t count;
 } ____cacheline_aligned;
 
+enum module_state
+{
+	MODULE_STATE_LIVE,
+	MODULE_STATE_COMING,
+	MODULE_STATE_GOING,
+};
+
 struct module
 {
-	/* Am I live (yet)? */
-	int live;
+	enum module_state state;
 
 	/* Member of list of modules */
 	struct list_head list;
@@ -177,6 +179,14 @@ struct module
 	char args[0];
 };
 
+/* FIXME: It'd be nice to isolate modules during init, too, so they
+   aren't used before they (may) fail.  But presently too much code
+   (IDE & SCSI) require entry into the module during init.*/
+static inline int module_is_live(struct module *mod)
+{
+	return mod->state != MODULE_STATE_GOING;
+}
+
 #ifdef CONFIG_MODULE_UNLOAD
 
 void __symbol_put(const char *symbol);
@@ -195,7 +205,7 @@ static inline int try_module_get(struct module *module)
 
 	if (module) {
 		unsigned int cpu = get_cpu();
-		if (likely(module->live))
+		if (likely(module_is_live(module)))
 			local_inc(&module->ref[cpu].count);
 		else
 			ret = 0;
@@ -210,7 +220,7 @@ static inline void module_put(struct module *module)
 		unsigned int cpu = get_cpu();
 		local_dec(&module->ref[cpu].count);
 		/* Maybe they're waiting for us to drop reference? */
-		if (unlikely(!module->live))
+		if (unlikely(!module_is_live(module)))
 			wake_up_process(module->waiter);
 		put_cpu();
 	}
@@ -219,7 +229,7 @@ static inline void module_put(struct module *module)
 #else /*!CONFIG_MODULE_UNLOAD*/
 static inline int try_module_get(struct module *module)
 {
-	return !module || module->live;
+	return !module || module_is_live(module);
 }
 static inline void module_put(struct module *module)
 {
@@ -291,6 +301,21 @@ extern spinlock_t modlist_lock;
 #define __MOD_DEC_USE_COUNT(mod) module_put(mod)
 #define SET_MODULE_OWNER(dev) ((dev)->owner = THIS_MODULE)
 
+struct obsolete_modparm {
+	char name[64];
+	char type[64-sizeof(void *)];
+	void *addr;
+};
+#ifdef MODULE
+/* DEPRECATED: Do not use. */
+#define MODULE_PARM(var,type)						    \
+struct obsolete_modparm __parm_##var __attribute__((section("__obsparm"))) = \
+{ __stringify(var), type };
+
+#else
+#define MODULE_PARM(var,type)
+#endif
+
 /* People do this inside their init routines, when the module isn't
    "live" yet.  They should no longer be doing that, but
    meanwhile... */
@@ -303,11 +328,11 @@ extern spinlock_t modlist_lock;
 #endif
 #define MOD_DEC_USE_COUNT module_put(THIS_MODULE)
 #define try_inc_mod_count(mod) try_module_get(mod)
-#define MODULE_PARM(parm,string)
 #define EXPORT_NO_SYMBOLS
 extern int module_dummy_usage;
 #define GET_USE_COUNT(module) (module_dummy_usage)
 #define MOD_IN_USE 0
+#define __MODULE_STRING(x) __stringify(x)
 #define __mod_between(a_start, a_len, b_start, b_len)		\
 (((a_start) >= (b_start) && (a_start) <= (b_start)+(b_len))	\
  || ((a_start)+(a_len) >= (b_start)				\

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nssearch - Namespace search
- *              $Revision: 92 $
+ *              $Revision: 94 $
  *
  ******************************************************************************/
 
@@ -74,7 +74,7 @@ acpi_ns_search_node (
 
 #ifdef ACPI_DEBUG_OUTPUT
 	if (ACPI_LV_NAMES & acpi_dbg_level) {
-		NATIVE_CHAR         *scope_name;
+		char                *scope_name;
 
 		scope_name = acpi_ns_get_external_pathname (node);
 		if (scope_name) {

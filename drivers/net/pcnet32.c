@@ -392,13 +392,13 @@ static int pcnet32_wio_check (unsigned long addr)
 }
 
 static struct pcnet32_access pcnet32_wio = {
-    read_csr:	pcnet32_wio_read_csr,
-    write_csr:	pcnet32_wio_write_csr,
-    read_bcr:	pcnet32_wio_read_bcr,
-    write_bcr:	pcnet32_wio_write_bcr,
-    read_rap:	pcnet32_wio_read_rap,
-    write_rap:	pcnet32_wio_write_rap,
-    reset:	pcnet32_wio_reset
+    .read_csr	= pcnet32_wio_read_csr,
+    .write_csr	= pcnet32_wio_write_csr,
+    .read_bcr	= pcnet32_wio_read_bcr,
+    .write_bcr	= pcnet32_wio_write_bcr,
+    .read_rap	= pcnet32_wio_read_rap,
+    .write_rap	= pcnet32_wio_write_rap,
+    .reset	= pcnet32_wio_reset
 };
 
 static u16 pcnet32_dwio_read_csr (unsigned long addr, int index)
@@ -447,13 +447,13 @@ static int pcnet32_dwio_check (unsigned long addr)
 }
 
 static struct pcnet32_access pcnet32_dwio = {
-    read_csr:	pcnet32_dwio_read_csr,
-    write_csr:	pcnet32_dwio_write_csr,
-    read_bcr:	pcnet32_dwio_read_bcr,
-    write_bcr:	pcnet32_dwio_write_bcr,
-    read_rap:	pcnet32_dwio_read_rap,
-    write_rap:	pcnet32_dwio_write_rap,
-    reset:	pcnet32_dwio_reset
+    .read_csr	= pcnet32_dwio_read_csr,
+    .write_csr	= pcnet32_dwio_write_csr,
+    .read_bcr	= pcnet32_dwio_read_bcr,
+    .write_bcr	= pcnet32_dwio_write_bcr,
+    .read_rap	= pcnet32_dwio_read_rap,
+    .write_rap	= pcnet32_dwio_write_rap,
+    .reset	= pcnet32_dwio_reset
 };
 
 
@@ -1682,9 +1682,9 @@ static void pcnet32_watchdog(struct net_device *dev)
 }
 
 static struct pci_driver pcnet32_driver = {
-    name:	DRV_NAME,
-    probe:	pcnet32_probe_pci,
-    id_table:	pcnet32_pci_tbl,
+    .name	= DRV_NAME,
+    .probe	= pcnet32_probe_pci,
+    .id_table	= pcnet32_pci_tbl,
 };
 
 MODULE_PARM(debug, "i");

@@ -24,6 +24,3 @@ obj-$(CONFIG_GART_IOMMU) += pci-gart.o aperture.o
 obj-$(CONFIG_DUMMY_IOMMU) += pci-nommu.o
 
 EXTRA_AFLAGS := -traditional
-
-include $(TOPDIR)/Rules.make
-

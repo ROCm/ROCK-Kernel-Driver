@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: aclocal.h - Internal data types used across the ACPI subsystem
- *       $Revision: 182 $
+ *       $Revision: 183 $
  *
  *****************************************************************************/
 
@@ -78,7 +78,7 @@ typedef u32                             ACPI_MUTEX_HANDLE;
 
 /* Names for the mutexes used in the subsystem */
 
-static NATIVE_CHAR          *acpi_gbl_mutex_names[] =
+static char                 *acpi_gbl_mutex_names[] =
 {
 	"ACPI_MTX_Execute",
 	"ACPI_MTX_Interpreter",
@@ -227,7 +227,7 @@ typedef struct acpi_table_desc
 
 typedef struct
 {
-	NATIVE_CHAR             *search_for;
+	char                    *search_for;
 	acpi_handle             *list;
 	u32                     *count;
 
@@ -245,9 +245,9 @@ typedef struct
  */
 typedef struct
 {
-	NATIVE_CHAR             *name;
+	char                    *name;
 	u8                      type;
-	NATIVE_CHAR             *val;
+	char                    *val;
 
 } acpi_predefined_names;
 
@@ -262,9 +262,9 @@ typedef struct
 
 typedef struct acpi_namestring_info
 {
-	NATIVE_CHAR             *external_name;
-	NATIVE_CHAR             *next_external_char;
-	NATIVE_CHAR             *internal_name;
+	char                    *external_name;
+	char                    *next_external_char;
+	char                    *internal_name;
 	u32                     length;
 	u32                     num_segments;
 	u32                     num_carats;
@@ -566,7 +566,7 @@ acpi_status (*ACPI_EXECUTE_OP) (
 typedef struct acpi_opcode_info
 {
 #if defined(ACPI_DISASSEMBLER) || defined(ACPI_DEBUG_OUTPUT)
-	NATIVE_CHAR             *name;          /* Opcode name (disassembler/debug only) */
+	char                    *name;          /* Opcode name (disassembler/debug only) */
 #endif
 	u32                     parse_args;     /* Grammar/Parse time arguments */
 	u32                     runtime_args;   /* Interpret time arguments */
@@ -586,9 +586,9 @@ typedef union acpi_parse_val
 	u16                     integer16;      /* integer constant, 16 bits only */
 	u8                      integer8;       /* integer constant, 8 bits only */
 	u32                     size;           /* bytelist or field size */
-	NATIVE_CHAR             *string;        /* NULL terminated string */
+	char                    *string;        /* NULL terminated string */
 	u8                      *buffer;        /* buffer or string */
-	NATIVE_CHAR             *name;          /* NULL terminated string */
+	char                    *name;          /* NULL terminated string */
 	union acpi_parse_obj    *arg;           /* arguments and contained ops */
 
 } acpi_parse_value;
@@ -604,7 +604,7 @@ typedef union acpi_parse_val
 	ACPI_DISASM_ONLY_MEMBERS (\
 	u8                      disasm_flags;   /* Used during AML disassembly */\
 	u8                      disasm_opcode;  /* Subtype used for disassembly */\
-	NATIVE_CHAR             aml_op_name[16]) /* op name (debug only) */\
+	char                    aml_op_name[16]) /* op name (debug only) */\
 			  /* NON-DEBUG members below: */\
 	acpi_namespace_node     *node;          /* for use by interpreter */\
 	acpi_parse_value        value;          /* Value or args associated with the opcode */\
@@ -890,11 +890,11 @@ typedef struct
 typedef struct dbmethodinfo
 {
 	acpi_handle             thread_gate;
-	NATIVE_CHAR             *name;
-	NATIVE_CHAR             **args;
+	char                    *name;
+	char                    **args;
 	u32                     flags;
 	u32                     num_loops;
-	NATIVE_CHAR             pathname[128];
+	char                    pathname[128];
 
 } acpi_db_method_info;
 
@@ -913,8 +913,8 @@ typedef struct dbmethodinfo
 typedef struct
 {
 	u32                     component_id;
-	NATIVE_CHAR             *proc_name;
-	NATIVE_CHAR             *module_name;
+	char                    *proc_name;
+	char                    *module_name;
 
 } acpi_debug_print_info;
 
@@ -931,7 +931,7 @@ typedef struct
 	u32                         size; \
 	u32                         component; \
 	u32                         line; \
-	NATIVE_CHAR                 module[ACPI_MAX_MODULE_NAME]; \
+	char                        module[ACPI_MAX_MODULE_NAME]; \
 	u8                          alloc_type;
 
 typedef struct

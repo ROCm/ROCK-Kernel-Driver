@@ -33,7 +33,6 @@
  *	This table stores the address info for each vector handler.
  */
 irq_handler_t irq_list[SYS_IRQS];
-unsigned int *mach_kstat_irqs;
 
 #define NUM_IRQ_NODES 16
 static irq_node_t nodes[NUM_IRQ_NODES];
@@ -82,8 +81,6 @@ void __init init_IRQ(void)
 
 	if (mach_init_IRQ)
 		mach_init_IRQ();
-
-	mach_kstat_irqs = &kstat.irqs[0][0];
 }
 
 irq_node_t *new_irq_node(void)
@@ -233,7 +230,7 @@ asmlinkage void process_int(unsigned long vec, struct pt_regs *fp)
 {
 	if (vec >= VEC_INT1 && vec <= VEC_INT7) {
 		vec -= VEC_SPUR;
-		kstat.irqs[0][vec]++;
+		kstat_cpu(0).irqs[vec]++;
 		irq_list[vec].handler(vec, irq_list[vec].dev_id, fp);
 	} else {
 		if (mach_process_int)
@@ -254,7 +251,7 @@ int show_interrupts(struct seq_file *p, void *v)
 			continue;
 
 		seq_printf(p, "%3d: %10u ", i,
-			(i ? kstat.irqs[0][i] : num_spurious));
+			(i ? kstat_cpu(0).irqs[i] : num_spurious));
 		if (irq_list[i].flags & IRQ_FLG_LOCK)
 			seq_printf(p, "L ");
 		else

@@ -792,7 +792,7 @@ lock_retry_remap:
  *
  * Return 0 on success and -errno on error.
  */
-static int ntfs_writepage(struct page *page)
+static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 {
 	s64 attr_pos;
 	struct inode *vi;

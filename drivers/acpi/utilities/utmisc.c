@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmisc - common utility procedures
- *              $Revision: 90 $
+ *              $Revision: 92 $
  *
  ******************************************************************************/
 
@@ -283,7 +283,7 @@ u8
 acpi_ut_valid_acpi_name (
 	u32                     name)
 {
-	NATIVE_CHAR             *name_ptr = (NATIVE_CHAR *) &name;
+	char                    *name_ptr = (char *) &name;
 	u32                     i;
 
 
@@ -316,7 +316,7 @@ acpi_ut_valid_acpi_name (
 
 u8
 acpi_ut_valid_acpi_character (
-	NATIVE_CHAR             character)
+	char                    character)
 {
 
 	ACPI_FUNCTION_ENTRY ();
@@ -345,7 +345,7 @@ acpi_ut_valid_acpi_character (
 
 acpi_status
 acpi_ut_strtoul64 (
-	NATIVE_CHAR             *string,
+	char                    *string,
 	u32                     base,
 	acpi_integer            *ret_integer)
 {
@@ -485,11 +485,11 @@ error_exit:
  *
  ******************************************************************************/
 
-NATIVE_CHAR *
+char *
 acpi_ut_strupr (
-	NATIVE_CHAR             *src_string)
+	char                    *src_string)
 {
-	NATIVE_CHAR             *string;
+	char                    *string;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -1420,7 +1420,7 @@ acpi_ut_get_resource_end_tag (
 
 void
 acpi_ut_report_error (
-	NATIVE_CHAR             *module_name,
+	char                    *module_name,
 	u32                     line_number,
 	u32                     component_id)
 {
@@ -1447,7 +1447,7 @@ acpi_ut_report_error (
 
 void
 acpi_ut_report_warning (
-	NATIVE_CHAR             *module_name,
+	char                    *module_name,
 	u32                     line_number,
 	u32                     component_id)
 {
@@ -1473,7 +1473,7 @@ acpi_ut_report_warning (
 
 void
 acpi_ut_report_info (
-	NATIVE_CHAR             *module_name,
+	char                    *module_name,
 	u32                     line_number,
 	u32                     component_id)
 {

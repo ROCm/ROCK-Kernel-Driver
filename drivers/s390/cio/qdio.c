@@ -53,8 +53,9 @@
 #include "device.h"
 #include "airq.h"
 #include "qdio.h"
+#include "ioasm.h"
 
-#define VERSION_QDIO_C "$Revision: 1.16 $"
+#define VERSION_QDIO_C "$Revision: 1.18 $"
 
 /****************** MODULE PARAMETER VARIABLES ********************/
 MODULE_AUTHOR("Utz Bacher <utz.bacher@de.ibm.com>");
@@ -1573,33 +1574,33 @@ qdio_handler(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 {
 	struct qdio_irq *irq_ptr;
 	struct qdio_q *q;
-	int irq;
 	int cstat,dstat;
-	char dbf_text[15]="qintXXXX";
+	char dbf_text[15];
 
-	irq = cdev->private->irq; /* FIXME: use different dbg */
         cstat = irb->scsw.cstat;
         dstat = irb->scsw.dstat;
 
-	*((int*)(&dbf_text[4]))=irq;
-	QDIO_DBF_HEX4(0,trace,dbf_text,QDIO_DBF_TRACE_LEN);
+	QDIO_DBF_TEXT4(0, trace, "qint");
+	sprintf(dbf_text, "%s", cdev->dev.bus_id);
+	QDIO_DBF_TEXT4(0, trace, dbf_text);
 	
 	if (!intparm || !cdev) {
 		QDIO_PRINT_STUPID("got unsolicited interrupt in qdio " \
-				  "handler, irq 0x%x\n",irq);
+				  "handler, device %s\n", cdev->dev.bus_id);
 		return;
 	}
 
 	irq_ptr = cdev->private->qdio_data;
 	if (!irq_ptr) {
-		sprintf(dbf_text,"uint%4x",irq);
+		QDIO_DBF_TEXT2(1, trace, "uint");
+		sprintf(dbf_text,"%s", cdev->dev.bus_id);
 		QDIO_DBF_TEXT2(1,trace,dbf_text);
-		QDIO_PRINT_ERR("received interrupt on unused irq 0x%04x!\n",
-			       irq);
+		QDIO_PRINT_ERR("received interrupt on unused device %s!\n",
+			       cdev->dev.bus_id);
 		return;
 	}
 
-	qdio_irq_check_sense(irq, irb);
+	qdio_irq_check_sense(irq_ptr->irq, irb);
 
 	if (cstat & SCHN_STAT_PCI) {
 		qdio_handle_pci(irq_ptr);
@@ -1607,21 +1608,22 @@ qdio_handler(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 	}
 
 	if ((cstat&~SCHN_STAT_PCI)||dstat) {
-		sprintf(dbf_text,"ick2%4x",irq);
+		QDIO_DBF_TEXT2(1, trace, "ick2");
+		sprintf(dbf_text,"%s", cdev->dev.bus_id);
 		QDIO_DBF_TEXT2(1,trace,dbf_text);
 		QDIO_DBF_HEX2(0,trace,&intparm,sizeof(int));
 		QDIO_DBF_HEX2(0,trace,&dstat,sizeof(int));
 		QDIO_DBF_HEX2(0,trace,&cstat,sizeof(int));
 		QDIO_PRINT_ERR("received check condition on activate " \
-			       "queues on irq 0x%x (cs=x%x, ds=x%x).\n",
-			       irq,cstat,dstat);
+			       "queues on device %s (cs=x%x, ds=x%x).\n",
+			       cdev->dev.bus_id, cstat, dstat);
 		if (irq_ptr->no_input_qs) {
 			q=irq_ptr->input_qs[0];
 		} else if (irq_ptr->no_output_qs) {
 			q=irq_ptr->output_qs[0];
 		} else {
-			QDIO_PRINT_ERR("oops... no queue registered on irq " \
-				  "0x%x!?\n",irq);
+			QDIO_PRINT_ERR("oops... no queue registered for " \
+				       "device %s!?\n", cdev->dev.bus_id);
 			goto omit_handler_call;
 		}
 		q->handler(q->irq,QDIO_STATUS_ACTIVATE_CHECK_CONDITION|

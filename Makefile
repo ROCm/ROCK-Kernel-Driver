@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 5
-SUBLEVEL = 51
+SUBLEVEL = 52
 EXTRAVERSION =
 
 # *DOCUMENTATION*
@@ -157,6 +157,7 @@ OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
 AWK		= awk
 GENKSYMS	= /sbin/genksyms
+DEPMOD		= /sbin/depmod
 KALLSYMS	= scripts/kallsyms
 PERL		= perl
 MODFLAGS	= -DMODULE
@@ -534,7 +535,7 @@ modules: $(SUBDIRS)
 #	Install modules
 
 .PHONY: modules_install
-modules_install: _modinst_ $(patsubst %, _modinst_%, $(SUBDIRS))
+modules_install: _modinst_ $(patsubst %, _modinst_%, $(SUBDIRS)) _modinst_post
 
 .PHONY: _modinst_
 _modinst_:
@@ -542,6 +543,20 @@ _modinst_:
 	@rm -f $(MODLIB)/build
 	@mkdir -p $(MODLIB)/kernel
 	@ln -s $(TOPDIR) $(MODLIB)/build
+
+# If System.map exists, run depmod.  This deliberately does not have a
+# dependency on System.map since that would run the dependency tree on
+# vmlinux.  This depmod is only for convenience to give the initial
+# boot a modules.dep even before / is mounted read-write.  However the
+# boot script depmod is the master version.
+ifeq "$(strip $(INSTALL_MOD_PATH))" ""
+depmod_opts	:=
+else
+depmod_opts	:= -b $(INSTALL_MOD_PATH) -r
+endif
+.PHONY: _modinst_post
+_modinst_post:
+	if [ -r System.map ]; then $(DEPMOD) -ae -F System.map $(depmod_opts) $(KERNELRELEASE); fi
 
 .PHONY: $(patsubst %, _modinst_%, $(SUBDIRS))
 $(patsubst %, _modinst_%, $(SUBDIRS)) :

@@ -5,5 +5,3 @@
 obj-$(CONFIG_IRLAN) += irlan.o
 
 irlan-objs := irlan_common.o irlan_eth.o irlan_event.o irlan_client.o irlan_provider.o irlan_filter.o irlan_provider_event.o irlan_client_event.o
-
-include $(TOPDIR)/Rules.make

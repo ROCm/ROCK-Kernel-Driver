@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exnames - interpreter/scanner name load/execute
- *              $Revision: 92 $
+ *              $Revision: 93 $
  *
  *****************************************************************************/
 
@@ -57,13 +57,13 @@
  *
  ******************************************************************************/
 
-NATIVE_CHAR *
+char *
 acpi_ex_allocate_name_string (
 	u32                     prefix_count,
 	u32                     num_name_segs)
 {
-	NATIVE_CHAR             *temp_ptr;
-	NATIVE_CHAR             *name_string;
+	char                    *temp_ptr;
+	char                    *name_string;
 	u32                      size_needed;
 
 	ACPI_FUNCTION_TRACE ("Ex_allocate_name_string");
@@ -145,7 +145,7 @@ acpi_ex_allocate_name_string (
 acpi_status
 acpi_ex_name_segment (
 	u8                      **in_aml_address,
-	NATIVE_CHAR             *name_string)
+	char                    *name_string)
 {
 	char                    *aml_address = (void *) *in_aml_address;
 	acpi_status             status = AE_OK;
@@ -233,12 +233,12 @@ acpi_status
 acpi_ex_get_name_string (
 	acpi_object_type        data_type,
 	u8                      *in_aml_address,
-	NATIVE_CHAR             **out_name_string,
+	char                    **out_name_string,
 	u32                     *out_name_length)
 {
 	acpi_status             status = AE_OK;
 	u8                      *aml_address = in_aml_address;
-	NATIVE_CHAR             *name_string = NULL;
+	char                    *name_string = NULL;
 	u32                     num_segments;
 	u32                     prefix_count = 0;
 	u8                      has_prefix = FALSE;

@@ -1793,7 +1793,7 @@ kdbm_pb_flags(int argc, const char **argv, const char **envp, struct pt_regs *re
 static int
 kdbm_pb(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 {
-	page_buf_private_t bp;
+	page_buf_t bp;
 	unsigned long addr;
 	long	offset=0;
 	int nextarg;
@@ -1808,43 +1808,43 @@ kdbm_pb(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		return diag;
 
 	kdb_printf("page_buf_t at 0x%lx\n", addr);
-	kdb_printf("  pb_flags %s\n", pb_flags(bp.pb_common.pb_flags));
+	kdb_printf("  pb_flags %s\n", pb_flags(bp.pb_flags));
 	kdb_printf("  pb_target 0x%p pb_hold %d pb_next 0x%p pb_prev 0x%p\n",
-		   bp.pb_common.pb_target, bp.pb_common.pb_hold.counter,
-		   bp.pb_common.pb_list.next, bp.pb_common.pb_list.prev);
+		   bp.pb_target, bp.pb_hold.counter,
+		   bp.pb_list.next, bp.pb_list.prev);
 	kdb_printf("  pb_hash_index %d pb_hash_next 0x%p pb_hash_prev 0x%p\n",
-		   bp.pb_common.pb_hash_index,
-		   bp.pb_common.pb_hash_list.next,
-		   bp.pb_common.pb_hash_list.prev);
+		   bp.pb_hash_index,
+		   bp.pb_hash_list.next,
+		   bp.pb_hash_list.prev);
 	kdb_printf("  pb_file_offset 0x%llx pb_buffer_length 0x%llx pb_addr 0x%p\n",
-		   (unsigned long long) bp.pb_common.pb_file_offset,
-		   (unsigned long long) bp.pb_common.pb_buffer_length,
-		   bp.pb_common.pb_addr);
+		   (unsigned long long) bp.pb_file_offset,
+		   (unsigned long long) bp.pb_buffer_length,
+		   bp.pb_addr);
 	kdb_printf("  pb_bn 0x%Lx pb_count_desired 0x%lx\n",
-		   bp.pb_common.pb_bn,
-		   (unsigned long) bp.pb_common.pb_count_desired);
+		   bp.pb_bn,
+		   (unsigned long) bp.pb_count_desired);
 	kdb_printf("  pb_io_remaining %d pb_error %u\n",
-		   bp.pb_common.pb_io_remaining.counter,
-		   bp.pb_common.pb_error);
+		   bp.pb_io_remaining.counter,
+		   bp.pb_error);
 	kdb_printf("  pb_page_count %u pb_offset 0x%x pb_pages 0x%p\n",
-		bp.pb_common.pb_page_count, bp.pb_common.pb_offset,
-		bp.pb_common.pb_pages);
+		bp.pb_page_count, bp.pb_offset,
+		bp.pb_pages);
 #ifdef PAGEBUF_LOCK_TRACKING
 	kdb_printf("  pb_iodonesema (%d,%d) pb_sema (%d,%d) pincount (%d) last holder %d\n",
-		   bp.pb_common.pb_iodonesema.count.counter,
-		   bp.pb_common.pb_iodonesema.sleepers,
+		   bp.pb_iodonesema.count.counter,
+		   bp.pb_iodonesema.sleepers,
 		   bp.pb_sema.count.counter, bp.pb_sema.sleepers,
 		   bp.pb_pin_count.counter, bp.pb_last_holder);
 #else
 	kdb_printf("  pb_iodonesema (%d,%d) pb_sema (%d,%d) pincount (%d)\n",
-		   bp.pb_common.pb_iodonesema.count.counter,
-		   bp.pb_common.pb_iodonesema.sleepers,
+		   bp.pb_iodonesema.count.counter,
+		   bp.pb_iodonesema.sleepers,
 		   bp.pb_sema.count.counter, bp.pb_sema.sleepers,
 		   bp.pb_pin_count.counter);
 #endif
-	if (bp.pb_common.pb_fspriv || bp.pb_common.pb_fspriv2) {
+	if (bp.pb_fspriv || bp.pb_fspriv2) {
 		kdb_printf(  "pb_fspriv 0x%p pb_fspriv2 0x%p\n",
-			   bp.pb_common.pb_fspriv, bp.pb_common.pb_fspriv2);
+			   bp.pb_fspriv, bp.pb_fspriv2);
 	}
 
 	return 0;

@@ -314,8 +314,8 @@ static int
 acpi_system_write_sleep (
 	struct file		*file,
 	const char		*buffer,
-	unsigned long		count,
-	void			*data)
+	size_t			count,
+	loff_t			*ppos)
 {
 	acpi_status		status = AE_OK;
 	char			state_string[12] = {'\0'};
@@ -465,8 +465,8 @@ static int
 acpi_system_write_alarm (
 	struct file		*file,
 	const char		*buffer,
-	unsigned long		count,
-	void			*data)
+	size_t			count,
+	loff_t			*ppos)
 {
 	int			result = 0;
 	char			alarm_string[30] = {'\0'};
@@ -674,7 +674,7 @@ static int __init acpi_sleep_init(void)
 			ACPI_SYSTEM_FILE_SLEEP));
 	else {
 		entry->proc_fops = &acpi_system_sleep_fops;
-		entry->write_proc = acpi_system_write_sleep;
+		entry->proc_fops->write = acpi_system_write_sleep;
 	}
 
 	/* 'alarm' [R/W] */
@@ -686,7 +686,7 @@ static int __init acpi_sleep_init(void)
 			ACPI_SYSTEM_FILE_ALARM));
 	else {
 		entry->proc_fops = &acpi_system_alarm_fops;
-		entry->write_proc = acpi_system_write_alarm;
+		entry->proc_fops->write = acpi_system_write_alarm;
 	}
 
 	/* Install the soft-off (S5) handler. */

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsdump - table dumping routines for debug
- *              $Revision: 149 $
+ *              $Revision: 150 $
  *
  *****************************************************************************/
 
@@ -93,7 +93,7 @@ acpi_ns_print_pathname (
 void
 acpi_ns_dump_pathname (
 	acpi_handle             handle,
-	NATIVE_CHAR             *msg,
+	char                    *msg,
 	u32                     level,
 	u32                     component)
 {

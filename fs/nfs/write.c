@@ -240,7 +240,7 @@ nfs_writepage_async(struct file *file, struct inode *inode, struct page *page,
  * Write an mmapped page to the server.
  */
 int
-nfs_writepage(struct page *page)
+nfs_writepage(struct page *page, struct writeback_control *wbc)
 {
 	struct inode *inode = page->mapping->host;
 	unsigned long end_index;

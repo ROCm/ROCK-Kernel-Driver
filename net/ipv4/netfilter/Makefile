@@ -93,5 +93,3 @@ obj-$(CONFIG_IP_NF_COMPAT_IPCHAINS) += ipchains.o
 obj-$(CONFIG_IP_NF_COMPAT_IPFWADM) += ipfwadm.o
 
 obj-$(CONFIG_IP_NF_QUEUE) += ip_queue.o
-
-include $(TOPDIR)/Rules.make

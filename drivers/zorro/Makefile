@@ -12,8 +12,6 @@ host-progs 		:= gen-devlist
 # Files generated that shall be removed upon make clean
 clean-files := devlist.h
 
-include $(TOPDIR)/Rules.make
-
 # Dependencies on generated files need to be listed explicitly
 
 $(obj)/names.o: $(obj)/devlist.h

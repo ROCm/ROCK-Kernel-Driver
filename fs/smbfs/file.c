@@ -170,7 +170,7 @@ smb_writepage_sync(struct inode *inode, struct page *page,
  * We are called with the page locked and we unlock it when done.
  */
 static int
-smb_writepage(struct page *page)
+smb_writepage(struct page *page, struct writeback_control *wbc)
 {
 	struct address_space *mapping = page->mapping;
 	struct inode *inode;

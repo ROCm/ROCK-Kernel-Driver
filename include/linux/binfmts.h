@@ -57,7 +57,7 @@ extern int setup_arg_pages(struct linux_binprm * bprm);
 extern int copy_strings(int argc,char ** argv,struct linux_binprm *bprm); 
 extern int copy_strings_kernel(int argc,char ** argv,struct linux_binprm *bprm);
 extern void compute_creds(struct linux_binprm *binprm);
-extern int do_coredump(long signr, struct pt_regs * regs);
+extern int do_coredump(long signr, int exit_code, struct pt_regs * regs);
 extern void set_binfmt(struct linux_binfmt *new);
 
 

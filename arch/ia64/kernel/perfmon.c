@@ -783,7 +783,6 @@ pfm_smpl_buffer_alloc(pfm_context_t *ctx, unsigned long *which_pmds, unsigned lo
 	vma->vm_ops	     = &pfm_vm_ops; /* necesarry to get the close() callback */
 	vma->vm_pgoff	     = 0;
 	vma->vm_file	     = NULL;
-	vma->vm_raend	     = 0;
 	vma->vm_private_data = psb;	/* information needed by the pfm_vm_close() function */
 
 	/*

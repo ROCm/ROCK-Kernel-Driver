@@ -44,8 +44,8 @@
 #include <linux/ext3_jbd.h>
 #endif
 
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 
 #if defined(CONFIG_EXT3_FS) || defined (CONFIG_EXT3_FS_MODULE)
 

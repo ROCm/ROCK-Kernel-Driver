@@ -51,19 +51,19 @@ int atari_scsi_release (struct Scsi_Host *);
 #define	DEFAULT_USE_TAGGED_QUEUING	0
 
 
-#define ATARI_SCSI {    proc_info:         atari_scsi_proc_info,	\
-			name:              "Atari native SCSI",		\
-			detect:            atari_scsi_detect,		\
-			release:           atari_scsi_release,		\
-			info:              atari_scsi_info,		\
-			queuecommand:      atari_scsi_queue_command,	\
-			abort:             atari_scsi_abort,		\
-			reset:             atari_scsi_reset,		\
-			can_queue:         0, /* initialized at run-time */	\
-			this_id:           0, /* initialized at run-time */	\
-			sg_tablesize:      0, /* initialized at run-time */	\
-			cmd_per_lun:       0, /* initialized at run-time */	\
-			use_clustering:	   DISABLE_CLUSTERING }
+#define ATARI_SCSI {    .proc_info         = atari_scsi_proc_info,	\
+			.name              = "Atari native SCSI",		\
+			.detect            = atari_scsi_detect,		\
+			.release           = atari_scsi_release,		\
+			.info              = atari_scsi_info,		\
+			.queuecommand      = atari_scsi_queue_command,	\
+			.abort             = atari_scsi_abort,		\
+			.reset             = atari_scsi_reset,		\
+			.can_queue         = 0, /* initialized at run-time */	\
+			.this_id           = 0, /* initialized at run-time */	\
+			.sg_tablesize      = 0, /* initialized at run-time */	\
+			.cmd_per_lun       = 0, /* initialized at run-time */	\
+			.use_clustering	   = DISABLE_CLUSTERING }
 
 #define	NCR5380_implementation_fields	/* none */
 

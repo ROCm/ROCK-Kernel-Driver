@@ -22,5 +22,3 @@ obj-$(CONFIG_IOP310_AAU) += aau.o
 obj-$(CONFIG_IOP310_DMA) += dma.o
 obj-$(CONFIG_IOP310_MU) += message.o
 obj-$(CONFIG_IOP310_PMON) += pmon.o
-
-include $(TOPDIR)/Rules.make

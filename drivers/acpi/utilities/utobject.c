@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utobject - ACPI object create/delete/size/cache routines
- *              $Revision: 79 $
+ *              $Revision: 81 $
  *
  *****************************************************************************/
 
@@ -56,7 +56,7 @@
 
 acpi_operand_object  *
 acpi_ut_create_internal_object_dbg (
-	NATIVE_CHAR             *module_name,
+	char                    *module_name,
 	u32                     line_number,
 	u32                     component_id,
 	acpi_object_type        type)
@@ -248,7 +248,7 @@ acpi_ut_valid_internal_object (
 
 void *
 acpi_ut_allocate_object_desc_dbg (
-	NATIVE_CHAR             *module_name,
+	char                    *module_name,
 	u32                     line_number,
 	u32                     component_id)
 {

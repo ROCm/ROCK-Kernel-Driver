@@ -151,9 +151,10 @@ MODULE_PARM(wqs, "i");
 /* Page cache stuff */
 
 /* writepage() - should never be called - catch it anyway */
-static int blkmtd_writepage(struct page *page)
+static int blkmtd_writepage(struct page *page, struct writeback_control *wbc)
 {
   printk("blkmtd: writepage called!!!\n");
+  unlock_page(page);
   return -EIO;
 }
 

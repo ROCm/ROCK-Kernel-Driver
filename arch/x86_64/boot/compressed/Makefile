@@ -14,8 +14,6 @@ EXTRA_AFLAGS	:= -traditional -m32
 CFLAGS := -m32 -D__KERNEL__ -I$(TOPDIR)/include -O2  
 LDFLAGS := -m elf_i386
 
-include $(TOPDIR)/Rules.make
-
 LDFLAGS_vmlinux := -Ttext $(IMAGE_OFFSET) -e startup_32 -m elf_i386
 
 $(obj)/vmlinux: $(obj)/head.o $(obj)/misc.o $(obj)/piggy.o FORCE
