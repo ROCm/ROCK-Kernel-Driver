@@ -42,48 +42,15 @@ struct proc_dir_entry *proc_scsi;
 EXPORT_SYMBOL(proc_scsi);
 
 
-/* Used if the driver currently has no own support for /proc/scsi */
-static int generic_proc_info(char *buffer, char **start, off_t offset,
-			     int count, const char *(*info)(struct Scsi_Host *),
-			     struct Scsi_Host *shost)
-{
-	int len, pos, begin = 0;
-	static const char noprocfs[] =
-		"The driver does not yet support the proc-fs\n";
-
-	if (info && shost)
-		len = sprintf(buffer, "%s\n", info(shost));
-	else
-		len = sprintf(buffer, "%s\n", noprocfs);
-
-	pos = len;
-	if (pos < offset) {
-		len = 0;
-		begin = pos;
-	}
-
-	*start = buffer + (offset - begin);
-	len -= (offset - begin);
-	if (len > count)
-		len = count;
-
-	return len;
-}
-
 static int proc_scsi_read(char *buffer, char **start, off_t offset,
 			  int length, int *eof, void *data)
 {
 	struct Scsi_Host *shost = data;
 	int n;
 
-	if (shost->hostt->proc_info == NULL)
-		n = generic_proc_info(buffer, start, offset, length,
-				      shost->hostt->info, shost);
-	else
-		n = shost->hostt->proc_info(shost, buffer, start, offset,
-					   length, 0);
-
+	n = shost->hostt->proc_info(shost, buffer, start, offset, length, 0);
 	*eof = (n < length);
+
 	return n;
 }
 
@@ -95,8 +62,6 @@ static int proc_scsi_write_proc(struct file *file, const char *buf,
 	char *page;
 	char *start;
     
-	if (!shost->hostt->proc_info)
-		return -ENOSYS;
 	if (count > PROC_BLOCK_SIZE)
 		return -EOVERFLOW;
 
@@ -118,6 +83,9 @@ void scsi_proc_host_add(struct Scsi_Host *shost)
 	struct proc_dir_entry *p;
 	char name[10];
 
+	if (!sht->proc_info)
+		return;
+
 	if (!sht->proc_dir) {
 		sht->proc_dir = proc_mkdir(sht->proc_name, proc_scsi);
         	if (!sht->proc_dir) {
@@ -130,27 +98,29 @@ void scsi_proc_host_add(struct Scsi_Host *shost)
 
 	sprintf(name,"%d", shost->host_no);
 	p = create_proc_read_entry(name, S_IFREG | S_IRUGO | S_IWUSR,
-			shost->hostt->proc_dir, proc_scsi_read, shost);
+			sht->proc_dir, proc_scsi_read, shost);
 	if (!p) {
 		printk(KERN_ERR "%s: Failed to register host %d in"
 		       "%s\n", __FUNCTION__, shost->host_no,
-		       shost->hostt->proc_name);
+		       sht->proc_name);
 		return;
 	} 
 
 	p->write_proc = proc_scsi_write_proc;
 	p->owner = shost->hostt->module;
-
 }
 
 void scsi_proc_host_rm(struct Scsi_Host *shost)
 {
+	Scsi_Host_Template *sht = shost->hostt;
 	char name[10];
 
-	sprintf(name,"%d", shost->host_no);
-	remove_proc_entry(name, shost->hostt->proc_dir);
-	if (!shost->hostt->present)
-		remove_proc_entry(shost->hostt->proc_name, proc_scsi);
+	if (sht->proc_info) {
+		sprintf(name,"%d", shost->host_no);
+		remove_proc_entry(name, sht->proc_dir);
+		if (!sht->present)
+			remove_proc_entry(sht->proc_name, proc_scsi);
+	}
 }
 
 static int proc_print_scsidevice(struct device *dev, void *data)
