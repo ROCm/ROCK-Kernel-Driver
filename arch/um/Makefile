@@ -209,3 +209,9 @@ $(ARCH_DIR)/util: FORCE
 	$(Q)$(MAKE) $(build)=$@
 
 export SUBARCH USER_CFLAGS OS
+
+all: linux
+
+define archhelp
+  echo  '* linux	- Binary kernel image (./linux)'
+endef
