@@ -985,6 +985,9 @@ MODULE_LICENSE ("GPL");
 static int __init init (void) 
 {
 	dbg (DRIVER_INFO);
+	if (usb_disabled())
+		return -ENODEV;
+
 	dbg ("block sizes: qh %Zd qtd %Zd itd %Zd sitd %Zd",
 		sizeof (struct ehci_qh), sizeof (struct ehci_qtd),
 		sizeof (struct ehci_itd), sizeof (struct ehci_sitd));

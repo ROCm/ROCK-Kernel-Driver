@@ -108,72 +108,9 @@ struct freecom_status {
 /* All packets (except for status) are 64 bytes long. */
 #define FCM_PACKET_LENGTH	64
 
-/*
- * Transfer an entire SCSI command's worth of data payload over the bulk
- * pipe.
- *
- * Note that this uses usb_stor_transfer_partial to achieve it's goals -- this
- * function simply determines if we're going to use scatter-gather or not,
- * and acts appropriately.  For now, it also re-interprets the error codes.
- */
-static void us_transfer_freecom(Scsi_Cmnd *srb, struct us_data* us, int transfer_amount)
-{
-	int i;
-	int result = -1;
-	struct scatterlist *sg;
-	unsigned int total_transferred = 0;
-
-	/* was someone foolish enough to request more data than available
-	 * buffer space? */
-	if (transfer_amount > srb->request_bufflen)
-		transfer_amount = srb->request_bufflen;
-
-	/* are we scatter-gathering? */
-	if (srb->use_sg) {
-
-		/* loop over all the scatter gather structures and 
-		 * make the appropriate requests for each, until done
-		 */
-		sg = (struct scatterlist *) srb->request_buffer;
-		for (i = 0; i < srb->use_sg; i++) {
-
-			US_DEBUGP("transfer_amount: %d and total_transferred: %d\n", transfer_amount, total_transferred);
-
-			/* End this if we're done */
-			if (transfer_amount == total_transferred)
-				break;
-
-			/* transfer the lesser of the next buffer or the
-			 * remaining data */
-			if (transfer_amount - total_transferred >= 
-					sg[i].length) {
-				result = usb_stor_transfer_partial(us,
-						sg_address(sg[i]), sg[i].length);
-				total_transferred += sg[i].length;
-			} else {
-				result = usb_stor_transfer_partial(us,
-						sg_address(sg[i]),
-						transfer_amount - total_transferred);
-				total_transferred += transfer_amount - total_transferred;
-			}
-
-			/* if we get an error, end the loop here */
-			if (result)
-				break;
-		}
-	}
-	else
-		/* no scatter-gather, just make the request */
-		result = usb_stor_transfer_partial(us, srb->request_buffer, 
-					     transfer_amount);
-
-	/* return the result in the data structure itself */
-	srb->result = result;
-}
-
 static int
 freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
-                int ipipe, int opipe, int count)
+                unsigned int ipipe, unsigned int opipe, int count)
 {
         freecom_udata_t extra = (freecom_udata_t) us->extra;
         struct freecom_xfer_wrap *fxfr =
@@ -206,15 +143,15 @@ freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
 
         /* Now transfer all of our blocks. */
 	US_DEBUGP("Start of read\n");
-	us_transfer_freecom(srb, us, count);
+	result = usb_stor_bulk_transfer_srb(us, ipipe, srb, count);
         US_DEBUGP("freecom_readdata done!\n");
 
-        return USB_STOR_TRANSPORT_GOOD;
+        return result;
 }
 
 static int
 freecom_writedata (Scsi_Cmnd *srb, struct us_data *us,
-                int ipipe, int opipe, int count)
+                int unsigned ipipe, unsigned int opipe, int count)
 {
         freecom_udata_t extra = (freecom_udata_t) us->extra;
         struct freecom_xfer_wrap *fxfr =
@@ -248,10 +185,10 @@ freecom_writedata (Scsi_Cmnd *srb, struct us_data *us,
 
         /* Now transfer all of our blocks. */
 	US_DEBUGP("Start of write\n");
-	us_transfer_freecom(srb, us, count);
+	result = usb_stor_bulk_transfer_srb(us, opipe, srb, count);
 
         US_DEBUGP("freecom_writedata done!\n");
-        return USB_STOR_TRANSPORT_GOOD;
+        return result;
 }
 
 /*
@@ -262,7 +199,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 {
         struct freecom_cb_wrap *fcb;
         struct freecom_status  *fst;
-        int ipipe, opipe;             /* We need both pipes. */
+        unsigned int ipipe, opipe;             /* We need both pipes. */
         int result;
         int partial;
         int length;
@@ -276,8 +213,8 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
         US_DEBUGP("Freecom TRANSPORT STARTED\n");
 
         /* Get handles for both transports. */
-        opipe = usb_sndbulkpipe (us->pusb_dev, us->ep_out);
-        ipipe = usb_rcvbulkpipe (us->pusb_dev, us->ep_in);
+        opipe = us->send_bulk_pipe;
+        ipipe = us->recv_bulk_pipe;
 
         /* The ATAPI Command always goes out first. */
         fcb->Type = FCM_PACKET_ATAPI | 0x00;
@@ -515,8 +452,7 @@ freecom_init (struct us_data *us)
                 }
         }
 
-	result = usb_control_msg(us->pusb_dev,
-			usb_rcvctrlpipe(us->pusb_dev, 0),
+	result = usb_control_msg(us->pusb_dev, us->recv_ctrl_pipe,
 			0x4c, 0xc0, 0x4346, 0x0, buffer, 0x20, 3*HZ);
 	buffer[32] = '\0';
 	US_DEBUGP("String returned from FC init is: %s\n", buffer);
@@ -528,8 +464,7 @@ freecom_init (struct us_data *us)
 	 */
 
 	/* send reset */
-	result = usb_control_msg(us->pusb_dev,
-			usb_sndctrlpipe(us->pusb_dev, 0),
+	result = usb_control_msg(us->pusb_dev, us->send_ctrl_pipe,
 			0x4d, 0x40, 0x24d8, 0x0, NULL, 0x0, 3*HZ);
 	US_DEBUGP("result from activate reset is %d\n", result);
 
@@ -537,8 +472,7 @@ freecom_init (struct us_data *us)
 	mdelay(250);
 
 	/* clear reset */
-	result = usb_control_msg(us->pusb_dev,
-			usb_sndctrlpipe(us->pusb_dev, 0),
+	result = usb_control_msg(us->pusb_dev, us->send_ctrl_pipe,
 			0x4d, 0x40, 0x24f8, 0x0, NULL, 0x0, 3*HZ);
 	US_DEBUGP("result from clear reset is %d\n", result);
 

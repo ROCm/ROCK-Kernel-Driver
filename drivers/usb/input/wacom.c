@@ -402,7 +402,6 @@ static int wacom_probe(struct usb_interface *intf, const struct usb_device_id *i
 	struct usb_device *dev = interface_to_usbdev(intf);
 	struct usb_endpoint_descriptor *endpoint;
 	struct wacom *wacom;
-	char rep_data[2] = {0x02, 0x02};
 	char path[64];
 
 	if (!(wacom = kmalloc(sizeof(struct wacom), GFP_KERNEL)))

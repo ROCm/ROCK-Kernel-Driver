@@ -365,6 +365,9 @@ static struct pci_driver ohci_pci_driver = {
 static int __init ohci_hcd_pci_init (void) 
 {
 	dbg (DRIVER_INFO " (PCI)");
+	if (usb_disabled())
+		return -ENODEV;
+
 	dbg ("block sizes: ed %d td %d",
 		sizeof (struct ed), sizeof (struct td));
 	return pci_module_init (&ohci_pci_driver);

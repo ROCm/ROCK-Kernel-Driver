@@ -115,7 +115,7 @@ struct bulk_cs_wrap {
 #define US_BULK_GET_MAX_LUN	0xfe
 
 /*
- * usb_stor_transfer() return codes, in order of severity
+ * usb_stor_bulk_transfer_xxx() return codes, in order of severity
  */
 #define USB_STOR_XFER_GOOD		0  /* good transfer                 */
 #define USB_STOR_XFER_SHORT		1  /* transfered less than expected */
@@ -151,14 +151,26 @@ extern int usb_stor_Bulk_reset(struct us_data*);
 extern unsigned int usb_stor_transfer_length(Scsi_Cmnd*);
 extern void usb_stor_invoke_transport(Scsi_Cmnd*, struct us_data*);
 extern void usb_stor_abort_transport(struct us_data*);
-extern int usb_stor_transfer_partial(struct us_data*, char*, int);
 
-extern int usb_stor_bulk_msg(struct us_data *us, void *data, int pipe,
-		unsigned int len, unsigned int *act_len);
+extern int usb_stor_bulk_msg(struct us_data *us, void *data,
+		unsigned int pipe, unsigned int len, unsigned int *act_len);
 extern int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 		u8 request, u8 requesttype, u16 value, u16 index,
 		void *data, u16 size);
 
-extern int usb_stor_clear_halt(struct us_data*, int );
-extern void usb_stor_transfer(Scsi_Cmnd*, struct us_data*);
+extern int usb_stor_clear_halt(struct us_data*, unsigned int pipe);
+extern int usb_stor_ctrl_transfer(struct us_data *us, unsigned int pipe,
+		u8 request, u8 requesttype, u16 value, u16 index,
+		void *data, u16 size);
+extern int usb_stor_bulk_transfer_buf(struct us_data *us, unsigned int pipe,
+		char *buf, unsigned int length, unsigned int *act_len);
+extern int usb_stor_bulk_transfer_sg(struct us_data *us, unsigned int pipe,
+		char *buf, unsigned int length, int use_sg, int *residual);
+
+static __inline__ int usb_stor_bulk_transfer_srb(struct us_data *us,
+		unsigned int pipe, Scsi_Cmnd *srb, unsigned int length) {
+	return usb_stor_bulk_transfer_sg(us, pipe, srb->request_buffer,
+			length, srb->use_sg, &srb->resid);
+}
+
 #endif

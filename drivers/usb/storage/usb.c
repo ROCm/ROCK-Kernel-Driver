@@ -525,6 +525,12 @@ static int usb_stor_allocate_urbs(struct us_data *ss)
 	int maxp;
 	int result;
 
+	/* calculate and store the pipe values */
+	ss->send_bulk_pipe = usb_sndbulkpipe(ss->pusb_dev, ss->ep_out);
+	ss->recv_bulk_pipe = usb_rcvbulkpipe(ss->pusb_dev, ss->ep_in);
+	ss->send_ctrl_pipe = usb_sndctrlpipe(ss->pusb_dev, 0);
+	ss->recv_ctrl_pipe = usb_rcvctrlpipe(ss->pusb_dev, 0);
+
 	/* allocate the usb_ctrlrequest for control packets */
 	US_DEBUGP("Allocating usb_ctrlrequest\n");
 	ss->dr = kmalloc(sizeof(struct usb_ctrlrequest), GFP_NOIO);
