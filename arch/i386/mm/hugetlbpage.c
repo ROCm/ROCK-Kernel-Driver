@@ -546,6 +546,13 @@ int set_hugetlb_mem_size(int count)
 	return (int) htlbzone_pages;
 }
 
+int hugetlb_sysctl_handler(ctl_table *table, int write, struct file *file, void *buffer, size_t *length)
+{
+	proc_dointvec(table, write, file, buffer, length);
+	htlbpage_max = set_hugetlb_mem_size(htlbpage_max);
+	return 0;
+}
+
 static int __init hugetlb_setup(char *s)
 {
 	if (sscanf(s, "%d", &htlbpage_max) <= 0)

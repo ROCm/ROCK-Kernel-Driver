@@ -31,7 +31,7 @@
 #include <linux/sysrq.h>
 #include <linux/highuid.h>
 #include <linux/writeback.h>
-
+#include <linux/hugetlb.h>
 #include <asm/uaccess.h>
 
 #ifdef CONFIG_ROOT_NFS
@@ -97,11 +97,6 @@ int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 
 #ifdef CONFIG_BSD_PROCESS_ACCT
 extern int acct_parm[];
-#endif
-
-#ifdef CONFIG_HUGETLB_PAGE
-extern int htlbpage_max;
-extern int set_hugetlb_mem_size(int);
 #endif
 
 static int parse_table(int *, int, void *, size_t *, void *, size_t,
@@ -315,8 +310,7 @@ static ctl_table vm_table[] = {
 	 0644, NULL, &proc_dointvec_minmax, &sysctl_intvec, NULL, &zero,
 	 &one_hundred },
 #ifdef CONFIG_HUGETLB_PAGE
-	 {VM_HUGETLB_PAGES, "nr_hugepages", &htlbpage_max, sizeof(int), 0644, NULL, 
-	  &proc_dointvec},
+	 {VM_HUGETLB_PAGES, "nr_hugepages", &htlbpage_max, sizeof(int), 0644, NULL, &hugetlb_sysctl_handler},
 #endif
 	{0}
 };
@@ -907,10 +901,6 @@ static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
 				val = -val;
 			buffer += len;
 			left -= len;
-#ifdef CONFIG_HUGETLB_PAGE
-			if (i == &htlbpage_max)
-				val = set_hugetlb_mem_size(val);
-#endif
 			switch(op) {
 			case OP_SET:	*i = val; break;
 			case OP_AND:	*i &= val; break;
