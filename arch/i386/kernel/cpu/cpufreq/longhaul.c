@@ -559,12 +559,8 @@ static int __init longhaul_init (void)
 		return -ENODEV;
 
 	switch (c->x86_model) {
-	case 6 ... 8:
+	case 6 ... 9:
 		return cpufreq_register_driver(&longhaul_driver);
-	case 9:
-		printk (KERN_INFO PFX "Nehemiah unsupported: Waiting on working silicon "
-						"from VIA before this is usable.\n");
-		break;
 	default:
 		printk (KERN_INFO PFX "Unknown VIA CPU. Contact davej@codemonkey.org.uk\n");
 	}
