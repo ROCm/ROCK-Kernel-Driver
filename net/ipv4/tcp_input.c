@@ -3693,6 +3693,10 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 
 		tcp_sync_mss(sk, tp->pmtu_cookie);
 		tcp_initialize_rcv_mss(sk);
+
+		/* Make sure socket is routed, for correct metrics.  */
+		tp->af_specific->rebuild_header(sk);
+
 		tcp_init_metrics(sk);
 		tcp_init_buffer_space(sk);
 
@@ -3958,6 +3962,11 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 
 				if (tp->tstamp_ok)
 					tp->advmss -= TCPOLEN_TSTAMP_ALIGNED;
+
+				/* Make sure socket is routed, for
+				 * correct metrics.
+				 */
+				tp->af_specific->rebuild_header(sk);
 
 				tcp_init_metrics(sk);
 				tcp_initialize_rcv_mss(sk);
