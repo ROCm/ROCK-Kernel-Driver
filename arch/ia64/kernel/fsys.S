@@ -345,40 +345,33 @@ ENTRY(fsys_rt_sigprocmask)
 	.altrp b6
 	.body
 
-	mf					// ensure reading of current->blocked is ordered
 	add r2=IA64_TASK_BLOCKED_OFFSET,r16
 	add r9=TI_FLAGS+IA64_TASK_SIZE,r16
-	;;
-	/*
-	 * Since we're only reading a single word, we can do it
-	 * atomically without acquiring current->sighand->siglock.  To
-	 * be on the safe side, we need a fully-ordered load, though:
-	 */
-	ld8.acq r3=[r2]				// read/prefetch current->blocked
-	ld4 r9=[r9]
+	cmp4.ltu p6,p0=SIG_SETMASK,r32
+
+	cmp.ne p15,p0=r0,r34			// oset != NULL?
+	tnat.nz p8,p0=r34
 	add r31=IA64_TASK_SIGHAND_OFFSET,r16
+	;;
+	ld8 r3=[r2]				// read/prefetch current->blocked
+	ld4 r9=[r9]
+	tnat.nz.or p6,p0=r35
+
+	cmp.ne.or p6,p0=_NSIG_WORDS*8,r35
+	tnat.nz.or p6,p0=r32
+(p6)	br.spnt.few .fail_einval		// fail with EINVAL
 	;;
 #ifdef CONFIG_SMP
 	ld8 r31=[r31]				// r31 <- current->sighand
 #endif
 	and r9=TIF_ALLWORK_MASK,r9
-	tnat.nz p6,p0=r32
+	tnat.nz.or p8,p0=r33
 	;;
 	cmp.ne p7,p0=0,r9
-	tnat.nz.or p6,p0=r35
-	tnat.nz p8,p0=r34
-	;;
-	cmp.ne p15,p0=r0,r34			// oset != NULL?
-	cmp.ne.or p6,p0=_NSIG_WORDS*8,r35
-	tnat.nz.or p8,p0=r33
-
-(p6)	br.spnt.few .fail_einval		// fail with EINVAL
-(p7)	br.spnt.many fsys_fallback_syscall	// got pending kernel work...
-(p8)	br.spnt.few .fail_efault		// fail with EFAULT
-	;;
-
-	cmp.eq p6,p7=r0,r33			// set == NULL?
+	cmp.eq p6,p0=r0,r33			// set == NULL?
 	add r31=IA64_SIGHAND_SIGLOCK_OFFSET,r31	// r31 <- current->sighand->siglock
+(p8)	br.spnt.few .fail_efault		// fail with EFAULT
+(p7)	br.spnt.many fsys_fallback_syscall	// got pending kernel work...
 (p6)	br.dpnt.many .store_mask		// -> short-circuit to just reading the signal mask
 
 	/* Argh, we actually have to do some work and _update_ the signal mask: */
@@ -462,12 +455,10 @@ EX(.fail_efault, ld8 r14=[r33])			// r14 <- *set
 	st4.rel [r31]=r0			// release the lock
 #endif
 	ssm psr.i
-	cmp.ne p9,p0=r8,r0			// check for bad HOW value
 	;;
 
 	srlz.d					// ensure psr.i is set again
 	mov r18=0					// i must not leak kernel bits...
-(p9)	br.spnt.few .fail_einval		// bail out for bad HOW value
 
 .store_mask:
 EX(.fail_efault, (p15) probe.w.fault r34, 3)	// verify user has write-access to *oset
