@@ -1511,9 +1511,9 @@ static void svc_revisit(struct cache_deferred_req *dreq, int too_many)
 	dprintk("revisit queued\n");
 	svsk = dr->svsk;
 	dr->svsk = NULL;
-	spin_lock(&serv->sv_lock);
+	spin_lock_bh(&serv->sv_lock);
 	list_add(&dr->handle.recent, &svsk->sk_deferred);
-	spin_unlock(&serv->sv_lock);
+	spin_unlock_bh(&serv->sv_lock);
 	set_bit(SK_DEFERRED, &svsk->sk_flags);
 	svc_sock_enqueue(svsk);
 	svc_sock_put(svsk);
@@ -1544,10 +1544,10 @@ svc_defer(struct cache_req *req)
 		dr->argslen = rqstp->rq_arg.len >> 2;
 		memcpy(dr->args, rqstp->rq_arg.head[0].iov_base-skip, dr->argslen<<2);
 	}
-	spin_lock(&rqstp->rq_server->sv_lock);
+	spin_lock_bh(&rqstp->rq_server->sv_lock);
 	rqstp->rq_sock->sk_inuse++;
 	dr->svsk = rqstp->rq_sock;
-	spin_unlock(&rqstp->rq_server->sv_lock);
+	spin_unlock_bh(&rqstp->rq_server->sv_lock);
 
 	dr->handle.revisit = svc_revisit;
 	return &dr->handle;
@@ -1577,7 +1577,7 @@ static struct svc_deferred_req *svc_deferred_dequeue(struct svc_sock *svsk)
 	
 	if (!test_bit(SK_DEFERRED, &svsk->sk_flags))
 		return NULL;
-	spin_lock(&serv->sv_lock);
+	spin_lock_bh(&serv->sv_lock);
 	clear_bit(SK_DEFERRED, &svsk->sk_flags);
 	if (!list_empty(&svsk->sk_deferred)) {
 		dr = list_entry(svsk->sk_deferred.next,
@@ -1586,6 +1586,6 @@ static struct svc_deferred_req *svc_deferred_dequeue(struct svc_sock *svsk)
 		list_del_init(&dr->handle.recent);
 		set_bit(SK_DEFERRED, &svsk->sk_flags);
 	}
-	spin_unlock(&serv->sv_lock);
+	spin_unlock_bh(&serv->sv_lock);
 	return dr;
 }
