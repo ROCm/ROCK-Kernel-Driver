@@ -162,7 +162,7 @@ nicstar_read_eprom_status( virt_addr_t base )
  */
  
 static u_int8_t 
-read_eprom_byte(u_int32_t base, u_int8_t offset)
+read_eprom_byte(virt_addr_t base, u_int8_t offset)
 {
    u_int32_t val = 0;
    int i,j=0;

@@ -477,7 +477,7 @@ struct fs_dev {
 	struct timer_list timer;
 
 	unsigned long hw_base;		/* mem base address */
-	unsigned long base;             /* Mapping of base address */
+	void __iomem *base;             /* Mapping of base address */
 	int channo;
 	unsigned long channel_mask;
 
