@@ -127,6 +127,7 @@ static int smp_iSeries_numProcs(void)
 			cpu_set(i, cpu_available_map);
 			cpu_set(i, cpu_possible_map);
 			cpu_set(i, cpu_present_at_boot);
+			cpu_set(i, cpu_present_map);
                         ++np;
                 }
         }

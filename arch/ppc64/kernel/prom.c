@@ -943,6 +943,7 @@ static void __init prom_hold_cpus(unsigned long mem)
 			cpu_set(cpuid, RELOC(cpu_available_map));
 			cpu_set(cpuid, RELOC(cpu_possible_map));
 			cpu_set(cpuid, RELOC(cpu_present_at_boot));
+			cpu_set(cpuid, RELOC(cpu_present_map));
 			if (reg == 0)
 				cpu_set(cpuid, RELOC(cpu_online_map));
 #endif /* CONFIG_SMP */
@@ -1045,6 +1046,7 @@ static void __init prom_hold_cpus(unsigned long mem)
 				cpu_set(cpuid, RELOC(cpu_available_map));
 				cpu_set(cpuid, RELOC(cpu_possible_map));
 				cpu_set(cpuid, RELOC(cpu_present_at_boot));
+				cpu_set(cpuid, RELOC(cpu_present_map));
 #endif
 			} else {
 				prom_printf("... failed: %x\n", *acknowledge);
@@ -1057,6 +1059,7 @@ static void __init prom_hold_cpus(unsigned long mem)
 			cpu_set(cpuid, RELOC(cpu_possible_map));
 			cpu_set(cpuid, RELOC(cpu_online_map));
 			cpu_set(cpuid, RELOC(cpu_present_at_boot));
+			cpu_set(cpuid, RELOC(cpu_present_map));
 		}
 #endif
 next:
@@ -1072,6 +1075,7 @@ next:
 			if (_naca->smt_state) {
 				cpu_set(cpuid, RELOC(cpu_available_map));
 				cpu_set(cpuid, RELOC(cpu_present_at_boot));
+				cpu_set(cpuid, RELOC(cpu_present_map));
 				prom_printf("available\n");
 			} else {
 				prom_printf("not available\n");
@@ -1103,6 +1107,7 @@ next:
 			}
 /* 			cpu_set(i+1, cpu_online_map); */
 			cpu_set(i+1, RELOC(cpu_possible_map));
+			cpu_set(i+1, RELOC(cpu_present_map));
 		}
 		_systemcfg->processorCount *= 2;
 	} else {
