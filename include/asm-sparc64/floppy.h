@@ -340,12 +340,12 @@ static void sun_pci_fd_enable_dma(void)
 			       sun_pci_dma_current.len,
 			       sun_pci_dma_current.direction);
 
+	ebus_dma_enable(&sun_pci_fd_ebus_dma, 1);
+
 	if (ebus_dma_request(&sun_pci_fd_ebus_dma,
 			     sun_pci_dma_current.addr,
 			     sun_pci_dma_current.len))
 		BUG();
-
-	ebus_dma_enable(&sun_pci_fd_ebus_dma, 1);
 }
 
 static void sun_pci_fd_disable_dma(void)
@@ -361,6 +361,11 @@ static void sun_pci_fd_disable_dma(void)
 
 static void sun_pci_fd_set_dma_mode(int mode)
 {
+	if (mode == DMA_MODE_WRITE)
+		sun_pci_dma_pending.direction = PCI_DMA_TODEVICE;
+	else
+		sun_pci_dma_pending.direction = PCI_DMA_FROMDEVICE;
+
 	ebus_dma_prepare(&sun_pci_fd_ebus_dma, mode != DMA_MODE_WRITE);
 }
 
@@ -630,11 +635,9 @@ static unsigned long __init sun_floppy_init(void)
 
 		prom_getproperty(edev->prom_node, "status",
 				 state, sizeof(state));
-		if(!strncmp(state, "disabled", 8))
+		if (!strncmp(state, "disabled", 8))
 			return 0;
 			
-		/* XXX ioremap */
-		sun_fdc = (struct sun_flpy_controller *)edev->resource[0].start;
 		FLOPPY_IRQ = edev->irqs[0];
 
 		/* Make sure the high density bit is set, some systems
@@ -646,17 +649,23 @@ static unsigned long __init sun_floppy_init(void)
 		sun_pci_ebus_dev = ebus->self;
 
 		spin_lock_init(&sun_pci_fd_ebus_dma.lock);
+
 		/* XXX ioremap */
 		sun_pci_fd_ebus_dma.regs = edev->resource[1].start;
 		if (!sun_pci_fd_ebus_dma.regs)
 			return 0;
-		sun_pci_fd_ebus_dma.flags = EBUS_DMA_FLAG_USE_EBDMA_HANDLER;
+
+		sun_pci_fd_ebus_dma.flags = (EBUS_DMA_FLAG_USE_EBDMA_HANDLER |
+					     EBUS_DMA_FLAG_TCI_DISABLE);
 		sun_pci_fd_ebus_dma.callback = sun_pci_fd_dma_callback;
 		sun_pci_fd_ebus_dma.client_cookie = NULL;
 		sun_pci_fd_ebus_dma.irq = FLOPPY_IRQ;
 		strcpy(sun_pci_fd_ebus_dma.name, "floppy");
 		if (ebus_dma_register(&sun_pci_fd_ebus_dma))
 			return 0;
+
+		/* XXX ioremap */
+		sun_fdc = (struct sun_flpy_controller *)edev->resource[0].start;
 
 		sun_fdops.fd_inb = sun_pci_fd_inb;
 		sun_fdops.fd_outb = sun_pci_fd_outb;
