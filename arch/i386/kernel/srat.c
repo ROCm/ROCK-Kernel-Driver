@@ -57,8 +57,7 @@ static int num_memory_chunks;		/* total number of memory chunks */
 static int zholes_size_init;
 static unsigned long zholes_size[MAX_NUMNODES * MAX_NR_ZONES];
 
-unsigned long node_start_pfn[MAX_NUMNODES];
-unsigned long node_end_pfn[MAX_NUMNODES];
+extern unsigned long node_start_pfn[], node_end_pfn[];
 
 extern void * boot_ioremap(unsigned long, unsigned long);
 
@@ -182,30 +181,19 @@ static __init void chunk_to_zones(unsigned long cstart, unsigned long cend,
 	}
 }
 
-/*
- * physnode_map keeps track of the physical memory layout of the
- * numaq nodes on a 256Mb break (each element of the array will
- * represent 256Mb of memory and will be marked by the node id.  so,
- * if the first gig is on node 0, and the second gig is on node 1
- * physnode_map will contain:
- * physnode_map[0-3] = 0;
- * physnode_map[4-7] = 1;
- * physnode_map[8- ] = -1;
- */
-int pfnnode_map[MAX_ELEMENTS] = { [0 ... (MAX_ELEMENTS - 1)] = -1};
-EXPORT_SYMBOL(pfnnode_map);
-
-static void __init initialize_pfnnode_map(void)
+static void __init initialize_physnode_map(void)
 {
-	unsigned long topofchunk, cur = 0;
 	int i;
-	
-	for (i = 0; i < num_memory_chunks; i++) {
-		cur = node_memory_chunk[i].start_pfn;
-		topofchunk = node_memory_chunk[i].end_pfn;
-		while (cur < topofchunk) {
-			pfnnode_map[PFN_TO_ELEMENT(cur)] = node_memory_chunk[i].nid;
-			cur ++;
+	unsigned long pfn;
+	struct node_memory_chunk_s *nmcp;
+
+	/* Run the list of memory chunks and fill in the phymap. */
+	nmcp = node_memory_chunk;
+	for (i = num_memory_chunks; --i >= 0; nmcp++) {
+		for (pfn = nmcp->start_pfn; pfn <= nmcp->end_pfn;
+						pfn += PAGES_PER_ELEMENT)
+		{
+			physnode_map[pfn / PAGES_PER_ELEMENT] = (int)nmcp->nid;
 		}
 	}
 }
@@ -272,7 +260,7 @@ static int __init acpi20_parse_srat(struct acpi_table_srat *sratp)
 	for (i = 0; i < num_memory_chunks; i++)
 		node_memory_chunk[i].nid = pxm_to_nid_map[node_memory_chunk[i].pxm];
 
-	initialize_pfnnode_map();
+	initialize_physnode_map();
 	
 	printk("pxm bitmap: ");
 	for (i = 0; i < sizeof(pxm_bitmap); i++) {

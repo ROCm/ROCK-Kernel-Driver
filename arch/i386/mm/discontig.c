@@ -36,11 +36,36 @@
 struct pglist_data *node_data[MAX_NUMNODES];
 bootmem_data_t node0_bdata;
 
+/*
+ * numa interface - we expect the numa architecture specfic code to have
+ *                  populated the following initialisation.
+ *
+ * 1) numnodes         - the total number of nodes configured in the system
+ * 2) physnode_map     - the mapping between a pfn and owning node
+ * 3) node_start_pfn   - the starting page frame number for a node
+ * 3) node_end_pfn     - the ending page fram number for a node
+ */
+
+/*
+ * physnode_map keeps track of the physical memory layout of a generic
+ * numa node on a 256Mb break (each element of the array will
+ * represent 256Mb of memory and will be marked by the node id.  so,
+ * if the first gig is on node 0, and the second gig is on node 1
+ * physnode_map will contain:
+ *
+ *     physnode_map[0-3] = 0;
+ *     physnode_map[4-7] = 1;
+ *     physnode_map[8- ] = -1;
+ */
+int physnode_map[MAX_ELEMENTS] = { [0 ... (MAX_ELEMENTS - 1)] = -1};
+
+unsigned long node_start_pfn[MAX_NUMNODES];
+unsigned long node_end_pfn[MAX_NUMNODES];
+
 extern unsigned long find_max_low_pfn(void);
 extern void find_max_pfn(void);
 extern void one_highpage_init(struct page *, int, int);
 
-extern unsigned long node_start_pfn[], node_end_pfn[];
 extern struct e820map e820;
 extern char _end;
 extern unsigned long highend_pfn, highstart_pfn;

@@ -10,14 +10,6 @@
 
 #ifdef CONFIG_DISCONTIGMEM
 
-#ifdef CONFIG_X86_NUMAQ
-#include <asm/numaq.h>
-#elif CONFIG_X86_SUMMIT
-#include <asm/srat.h>
-#else
-#define pfn_to_nid(pfn)		(0)
-#endif /* CONFIG_X86_NUMAQ */
-
 extern struct pglist_data *node_data[];
 
 /*
@@ -101,5 +93,38 @@ extern struct pglist_data *node_data[];
  * ( pfn_to_pgdat(pfn) && ((pfn) < node_end_pfn(pfn_to_nid(pfn))) ) 
  */ 
 #define pfn_valid(pfn)          ((pfn) < num_physpages)
+
+/*
+ * generic node memory support, the following assumptions apply:
+ *
+ * 1) memory comes in 256Mb contigious chunks which are either present or not
+ * 2) we will not have more than 64Gb in total
+ *
+ * for now assume that 64Gb is max amount of RAM for whole system
+ *    64Gb / 4096bytes/page = 16777216 pages
+ */
+#define MAX_NR_PAGES 16777216
+#define MAX_ELEMENTS 256
+#define PAGES_PER_ELEMENT (MAX_NR_PAGES/MAX_ELEMENTS)
+
+extern int physnode_map[];
+
+static inline int pfn_to_nid(unsigned long pfn)
+{
+	return(physnode_map[(pfn) / PAGES_PER_ELEMENT]);
+}
+static inline struct pglist_data *pfn_to_pgdat(unsigned long pfn)
+{
+	return(NODE_DATA(pfn_to_nid(pfn)));
+}
+
+#ifdef CONFIG_X86_NUMAQ
+#include <asm/numaq.h>
+#elif CONFIG_X86_SUMMIT
+#include <asm/srat.h>
+#else
+#define pfn_to_nid(pfn)		(0)
+#endif /* CONFIG_X86_NUMAQ */
+
 #endif /* CONFIG_DISCONTIGMEM */
 #endif /* _ASM_MMZONE_H_ */
