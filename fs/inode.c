@@ -16,6 +16,7 @@
 #include <linux/backing-dev.h>
 #include <linux/wait.h>
 #include <linux/hash.h>
+#include <linux/security.h>
 
 /*
  * This is needed for the following functions:
@@ -100,6 +101,14 @@ static struct inode *alloc_inode(struct super_block *sb)
 	if (inode) {
 		struct address_space * const mapping = &inode->i_data;
 
+		inode->i_security = NULL;
+		if (security_ops->inode_alloc_security(inode)) {
+			if (inode->i_sb->s_op->destroy_inode)
+				inode->i_sb->s_op->destroy_inode(inode);
+			else
+				kmem_cache_free(inode_cachep, (inode));
+			return NULL;
+		}
 		inode->i_sb = sb;
 		inode->i_dev = sb->s_dev;
 		inode->i_blkbits = sb->s_blocksize_bits;
@@ -137,6 +146,7 @@ static void destroy_inode(struct inode *inode)
 {
 	if (inode_has_buffers(inode))
 		BUG();
+	security_ops->inode_free_security(inode);
 	if (inode->i_sb->s_op->destroy_inode)
 		inode->i_sb->s_op->destroy_inode(inode);
 	else
@@ -792,6 +802,8 @@ void generic_delete_inode(struct inode *inode)
 
 	if (inode->i_data.nrpages)
 		truncate_inode_pages(&inode->i_data, 0);
+
+	security_ops->inode_delete(inode);
 
 	if (op && op->delete_inode) {
 		void (*delete)(struct inode *) = op->delete_inode;

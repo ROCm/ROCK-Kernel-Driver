@@ -195,6 +195,7 @@ asmlinkage long sys_acct(const char *name)
 {
 	struct file *file = NULL;
 	char *tmp;
+	int error;
 
 	if (!capable(CAP_SYS_PACCT))
 		return -EPERM;
@@ -220,6 +221,10 @@ asmlinkage long sys_acct(const char *name)
 			return (-EIO);
 		}
 	}
+
+	error = security_ops->acct(file);
+	if (error)
+		return error;
 
 	spin_lock(&acct_globals.lock);
 	acct_file_reopen(file);

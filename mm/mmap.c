@@ -14,6 +14,7 @@
 #include <linux/file.h>
 #include <linux/fs.h>
 #include <linux/personality.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -475,6 +476,10 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr, unsigned lon
 		}
 	}
 
+	error = security_ops->file_mmap(file, prot, flags);
+	if (error)
+		return error;
+		
 	/* Clear old maps */
 	error = -ENOMEM;
 munmap_back:

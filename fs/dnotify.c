@@ -68,6 +68,7 @@ int fcntl_dirnotify(int fd, struct file *filp, unsigned long arg)
 	struct dnotify_struct **prev;
 	struct inode *inode;
 	fl_owner_t id = current->files;
+	int error;
 
 	if ((arg & ~DN_MULTISHOT) == 0) {
 		dnotify_flush(filp, id);
@@ -93,6 +94,13 @@ int fcntl_dirnotify(int fd, struct file *filp, unsigned long arg)
 		}
 		prev = &odn->dn_next;
 	}
+
+	error = security_ops->file_set_fowner(filp);
+	if (error) {
+		write_unlock(&dn_lock);
+		return error;
+	}
+
 	filp->f_owner.pid = current->pid;
 	filp->f_owner.uid = current->uid;
 	filp->f_owner.euid = current->euid;
