@@ -2164,8 +2164,7 @@ int end_that_request_chunk(struct request *req, int uptodate, int nr_bytes)
 void end_that_request_last(struct request *req)
 {
 	struct gendisk *disk = req->rq_disk;
-	if (req->waiting)
-		complete(req->waiting);
+	struct completion *waiting = req->waiting;
 
 	if (disk) {
 		unsigned long duration = jiffies - req->start_time;
@@ -2183,6 +2182,9 @@ void end_that_request_last(struct request *req)
 		disk_stat_dec(disk, in_flight);
 	}
 	__blk_put_request(req->q, req);
+	/* Do this LAST! The structure may be freed immediately afterwards */
+	if (waiting)
+		complete(waiting);
 }
 
 int __init blk_dev_init(void)
