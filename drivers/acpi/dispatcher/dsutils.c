@@ -102,7 +102,7 @@ acpi_ds_is_result_used (
 		 * NOTE: this is optional because the ASL language does not actually
 		 * support this behavior.
 		 */
-		if ((acpi_gbl_enable_interpeter_slack) &&
+		if ((acpi_gbl_enable_interpreter_slack) &&
 			(walk_state->parser_state.aml >= walk_state->parser_state.aml_end)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
 					"Result of [%s] will be implicitly returned\n",

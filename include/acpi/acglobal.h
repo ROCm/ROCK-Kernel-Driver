@@ -94,7 +94,7 @@ extern      u32                                 acpi_gbl_nesting_level;
  * interpreter strictly follows the ACPI specification.  Setting to TRUE
  * allows the interpreter to forgive certain bad AML constructs.
  */
-ACPI_EXTERN u8       ACPI_INIT_GLOBAL (acpi_gbl_enable_interpeter_slack, FALSE);
+ACPI_EXTERN u8       ACPI_INIT_GLOBAL (acpi_gbl_enable_interpreter_slack, FALSE);
 
 /*
  * Automatically serialize ALL control methods? Default is FALSE, meaning
