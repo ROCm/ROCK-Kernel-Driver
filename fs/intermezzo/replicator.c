@@ -25,7 +25,6 @@
 
 #define __NO_VERSION__
 #include <linux/module.h>
-#include <stdarg.h>
 #include <asm/uaccess.h>
 
 #include <linux/errno.h>

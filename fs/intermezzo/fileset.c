@@ -23,7 +23,6 @@
  */
 
 #define __NO_VERSION__
-#include <stdarg.h>
 
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
