@@ -214,6 +214,7 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		hpet.ticks = min_t(long, max_t(long, (t  - hpet.last_tsc) * (1000000L / HZ) / (1000000L / HZ - hpet.offset),
 				cpu_khz * 1000/HZ * 15 / 16), cpu_khz * 1000/HZ * 16 / 15); 
 		hpet.last_tsc = t;
+		timeoffset = 0;
 	}
 
 /*
