@@ -441,7 +441,7 @@ void simple_release_fs(struct vfsmount **mount, int *count)
 }
 
 ssize_t simple_read_from_buffer(void __user *to, size_t count, loff_t *ppos,
-				void *from, size_t available)
+				const void *from, size_t available)
 {
 	loff_t pos = *ppos;
 	if (pos < 0)
