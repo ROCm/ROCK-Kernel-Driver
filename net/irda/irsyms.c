@@ -68,17 +68,6 @@ extern void irsock_cleanup(void);
 extern int  irlap_driver_rcv(struct sk_buff *, struct net_device *, 
 			     struct packet_type *);
 
-/* IrTTP */
-EXPORT_SYMBOL(irttp_open_tsap);
-EXPORT_SYMBOL(irttp_close_tsap);
-EXPORT_SYMBOL(irttp_connect_response);
-EXPORT_SYMBOL(irttp_data_request);
-EXPORT_SYMBOL(irttp_disconnect_request);
-EXPORT_SYMBOL(irttp_flow_request);
-EXPORT_SYMBOL(irttp_connect_request);
-EXPORT_SYMBOL(irttp_udata_request);
-EXPORT_SYMBOL(irttp_dup);
-
 /* Main IrDA module */
 #ifdef CONFIG_IRDA_DEBUG
 EXPORT_SYMBOL(irda_debug);
