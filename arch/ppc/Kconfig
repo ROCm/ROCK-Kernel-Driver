@@ -97,6 +97,11 @@ config PTE_64BIT
 	depends on 44x
 	default y
 
+config PHYS_64BIT
+	bool
+	depends on 44x
+	default y
+
 config ALTIVEC
 	bool "AltiVec Support"
 	depends on 6xx || POWER4

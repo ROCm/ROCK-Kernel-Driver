@@ -19,6 +19,7 @@
 #include <linux/time.h>
 #include <linux/types.h>
 #include <linux/serial.h>
+#include <linux/module.h>
 
 #include <asm/ibm44x.h>
 #include <asm/mmu.h>
@@ -47,6 +48,7 @@ phys_addr_t fixup_bigphys_addr(phys_addr_t addr, phys_addr_t size)
 
 	return (page_4gb | addr);
 };
+EXPORT_SYMBOL(fixup_bigphys_addr);
 
 void __init ibm44x_calibrate_decr(unsigned int freq)
 {
