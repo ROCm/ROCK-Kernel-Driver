@@ -210,11 +210,7 @@ typedef long		psched_tdiff_t;
 #define PSCHED_US2JIFFIE(usecs) (((usecs)+(1000000/HZ-1))/(1000000/HZ))
 #define PSCHED_JIFFIE2US(delay) ((delay)*(1000000/HZ))
 
-#define PSCHED_EXPORTLIST EXPORT_SYMBOL(psched_tod_diff);
-
 #else /* PSCHED_CLOCK_SOURCE != PSCHED_GETTIMEOFDAY */
-
-#define PSCHED_EXPORTLIST PSCHED_EXPORTLIST_1 PSCHED_EXPORTLIST_2
 
 typedef u64	psched_time_t;
 typedef long	psched_tdiff_t;
@@ -235,8 +231,6 @@ extern psched_time_t	psched_time_base;
 #define PSCHED_JSCALE 10
 #endif
 
-#define PSCHED_EXPORTLIST_2
-
 #if BITS_PER_LONG <= 32
 
 #define PSCHED_WATCHER unsigned long
@@ -245,14 +239,9 @@ extern PSCHED_WATCHER psched_time_mark;
 
 #define PSCHED_GET_TIME(stamp) ((stamp) = psched_time_base + (((unsigned long)(jiffies-psched_time_mark))<<PSCHED_JSCALE))
 
-#define PSCHED_EXPORTLIST_1 EXPORT_SYMBOL(psched_time_base); \
-                            EXPORT_SYMBOL(psched_time_mark);
-
 #else
 
 #define PSCHED_GET_TIME(stamp) ((stamp) = (jiffies<<PSCHED_JSCALE))
-
-#define PSCHED_EXPORTLIST_1 
 
 #endif
 
@@ -264,9 +253,6 @@ extern PSCHED_WATCHER psched_time_mark;
 extern psched_tdiff_t psched_clock_per_hz;
 extern int psched_clock_scale;
 
-#define PSCHED_EXPORTLIST_2 EXPORT_SYMBOL(psched_clock_per_hz); \
-                            EXPORT_SYMBOL(psched_clock_scale);
-
 #define PSCHED_US2JIFFIE(delay) (((delay)+psched_clock_per_hz-1)/psched_clock_per_hz)
 #define PSCHED_JIFFIE2US(delay) ((delay)*psched_clock_per_hz)
 
@@ -277,8 +263,6 @@ extern int psched_clock_scale;
    rdtscll(__cur); \
    (stamp) = __cur>>psched_clock_scale; \
 })
-
-#define PSCHED_EXPORTLIST_1
 
 #elif defined (__alpha__)
 
@@ -293,9 +277,6 @@ extern PSCHED_WATCHER psched_time_mark;
    psched_time_mark = __res; \
    (stamp) = (psched_time_base + __res)>>psched_clock_scale; \
 })
-
-#define PSCHED_EXPORTLIST_1 EXPORT_SYMBOL(psched_time_base); \
-                            EXPORT_SYMBOL(psched_time_mark);
 
 #else
 
