@@ -319,19 +319,19 @@ static struct file_operations presence_file_operations = {
 /* file ops for the "max bus speed" files */
 static ssize_t max_bus_speed_read_file (struct file *file, char *buf, size_t count, loff_t *offset);
 static struct file_operations max_bus_speed_file_operations = {
-	read:		max_bus_speed_read_file,
-	write:		default_write_file,
-	open:		default_open,
-	llseek:		default_file_lseek,
+	.read		= max_bus_speed_read_file,
+	.write		= default_write_file,
+	.open		= default_open,
+	.llseek		= default_file_lseek,
 };
 
 /* file ops for the "current bus speed" files */
 static ssize_t cur_bus_speed_read_file (struct file *file, char *buf, size_t count, loff_t *offset);
 static struct file_operations cur_bus_speed_file_operations = {
-	read:		cur_bus_speed_read_file,
-	write:		default_write_file,
-	open:		default_open,
-	llseek:		default_file_lseek,
+	.read		= cur_bus_speed_read_file,
+	.write		= default_write_file,
+	.open		= default_open,
+	.llseek		= default_file_lseek,
 };
 
 /* file ops for the "test" files */
