@@ -27,7 +27,7 @@ obj-y               :=	ppc_ksyms.o setup.o entry.o traps.o irq.o idle.o \
 			pmc.o mf_proc.o proc_pmc.o iSeries_setup.o \
 			ItLpQueue.o hvCall.o mf.o HvLpEvent.o ras.o \
 			iSeries_proc.o HvCall.o HvLpConfig.o \
-			rtc.o init_task.o
+			rtc.o init_task.o pSeries_htab.o
 
 obj-$(CONFIG_PCI) +=  pci.o pci_dn.o pci_dma.o
 obj-$(CONFIG_PPC_EEH) += eeh.o
@@ -38,17 +38,12 @@ endif
 ifeq ($(CONFIG_PPC_PSERIES),y)
 obj-$(CONFIG_PCI) += pSeries_pci.o pSeries_lpar.o pSeries_hvCall.o
 
-obj-y += rtasd.o 
+obj-y += rtasd.o nvram.o
 endif
 
 obj-$(CONFIG_KGDB) += ppc-stub.o
 
 obj-$(CONFIG_SMP) += smp.o
-
-# tibit: for matrox_init2()
-ifeq ($(CONFIG_NVRAM),y)
-   obj-$(CONFIG_NVRAM) += pmac_nvram.o
-endif
 
 obj-y += prom.o lmb.o rtas.o rtas-proc.o chrp_setup.o i8259.o
 

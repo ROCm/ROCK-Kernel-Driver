@@ -67,7 +67,6 @@
 /* Default erase size in K, always make it a multiple of PAGE_SIZE */
 #define CONFIG_MTD_BLKDEV_ERASESIZE 128
 #define VERSION "1.7"
-extern int *blk_size[];
 
 /* Info for the block device */
 typedef struct mtd_raw_dev_data_s {
@@ -1062,7 +1061,7 @@ static int __init init_blkmtd(void)
 
   int maj, min;
   int i, blocksize, blocksize_bits;
-  loff_t size = 0;
+  loff_t size;
   int readonly = 0;
   int erase_size = CONFIG_MTD_BLKDEV_ERASESIZE;
   kdev_t rdev;
@@ -1143,14 +1142,8 @@ static int __init init_blkmtd(void)
     i >>= 1;
   }
 
-  if(count) {
-    size = count;
-  } else {
-    if (blk_size[maj]) {
-      size = ((loff_t) blk_size[maj][min] << BLOCK_SIZE_BITS) >> blocksize_bits;
-    }
-  }
-  size *= blocksize;
+  size = (count ? count*blocksize : blkdev_size_in_bytes(rdev));
+
   DEBUG(1, "blkmtd: size = %ld\n", (long int)size);
 
   if(size == 0) {

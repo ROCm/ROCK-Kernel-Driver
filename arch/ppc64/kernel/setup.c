@@ -277,6 +277,9 @@ void machine_halt(void)
 	ppc_md.halt();
 }
 
+unsigned long ppc_proc_freq;
+unsigned long ppc_tb_freq;
+
 static int show_cpuinfo(struct seq_file *m, void *v)
 {
 	unsigned long cpu_id = (unsigned long)v - 1;
@@ -286,10 +289,6 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 
 #ifdef CONFIG_SMP
 	if (cpu_id == NR_CPUS) {
-		unsigned long bogosum = smp_num_cpus * loops_per_jiffy;
-		seq_printf(m, "total bogomips\t: %lu.%02lu\n",
-			   bogosum/(500000/HZ),
-			   bogosum/(5000/HZ) % 100);
 
 		if (ppc_md.get_cpuinfo != NULL)
 			ppc_md.get_cpuinfo(m);
@@ -357,10 +356,6 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 
 	seq_printf(m, "revision\t: %hd.%hd\n", maj, min);
 	
-	seq_printf(m, "bogomips\t: %lu.%02lu\n\n",
-		   loops_per_jiffy/(500000/HZ),
-		   loops_per_jiffy/(5000/HZ) % 100);
-
 	return 0;
 }
 

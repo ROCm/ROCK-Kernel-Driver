@@ -32,6 +32,7 @@
 #include <asm/pci_dma.h>
 #include <linux/pci.h>
 #include <asm/Naca.h>
+#include <asm/tlbflush.h>
 
 /* Status return values */
 #define H_Success	0
@@ -51,6 +52,7 @@
 #define H_R_XLATE		(1UL<<(63-25))	/* include a valid logical page num in the pte if the valid bit is set */
 #define H_READ_4		(1UL<<(63-26))	/* Return 4 PTEs */
 #define H_AVPN			(1UL<<(63-32))	/* An avpn is provided as a sanity test */
+#define H_ANDCOND		(1UL<<(63-33))
 #define H_ICACHE_INVALIDATE	(1UL<<(63-40))	/* icbi, etc.  (ignored for IO pages) */
 #define H_ICACHE_SYNCHRONIZE	(1UL<<(63-41))	/* dcbst, icbi, etc (ignored for IO pages */
 #define H_ZERO_PAGE		(1UL<<(63-48))	/* zero the page before mapping (ignored for IO pages) */
@@ -212,357 +214,6 @@ long plpar_xirr(unsigned long *xirr_ret)
 	unsigned long dummy;
 	return plpar_hcall(H_XIRR, 0, 0, 0, 0,
 			   xirr_ret, &dummy, &dummy);
-}
-
-/*
- * The following section contains code that ultimately should
- * be put in the relavent file (htab.c, xics.c, etc).  It has
- * been put here for the time being in order to ease maintainence
- * of the pSeries LPAR code until it can all be put into CVS.
- */
-static void hpte_invalidate_pSeriesLP(unsigned long slot)
-{
-	HPTE old_pte;
-	unsigned long lpar_rc;
-	unsigned long flags = 0;
-			
-	lpar_rc = plpar_pte_remove(flags,
-				   slot,
-				   0,
-				   &old_pte.dw0.dword0, 
-				   &old_pte.dw1.dword1);
-	if (lpar_rc != H_Success) BUG();
-}
-
-/* NOTE: for updatepp ops we are fortunate that the linux "newpp" bits and
- * the low 3 bits of flags happen to line up.  So no transform is needed.
- * We can probably optimize here and assume the high bits of newpp are
- * already zero.  For now I am paranoid.
- */
-static void hpte_updatepp_pSeriesLP(long slot, unsigned long newpp, unsigned long va)
-{
-	unsigned long lpar_rc;
-	unsigned long flags;
-	flags =   newpp & 3;
-	lpar_rc = plpar_pte_protect( flags,
-				     slot,
-				     0);
-	if (lpar_rc != H_Success) {
-		udbg_printf( " bad return code from pte protect rc = %lx \n", lpar_rc); 
-		for (;;);
-	}
-}
-
-static void hpte_updateboltedpp_pSeriesLP(unsigned long newpp, unsigned long ea)
-{
-	unsigned long lpar_rc;
-	unsigned long vsid,va,vpn,flags;
-	long slot;
-
-	vsid = get_kernel_vsid( ea );
-	va = ( vsid << 28 ) | ( ea & 0x0fffffff );
-	vpn = va >> PAGE_SHIFT;
-
-	slot = ppc_md.hpte_find( vpn );
-	flags =   newpp & 3;
-	lpar_rc = plpar_pte_protect( flags,
-				     slot,
-				     0);
-	if (lpar_rc != H_Success) {
-		udbg_printf( " bad return code from pte bolted protect rc = %lx \n", lpar_rc); 
-		for (;;);
-	}
-}
-
-
-static unsigned long hpte_getword0_pSeriesLP(unsigned long slot)
-{
-	unsigned long dword0;
-	unsigned long lpar_rc;
-	unsigned long dummy_word1;
-	unsigned long flags;
-	/* Read 1 pte at a time                        */
-	/* Do not need RPN to logical page translation */
-	/* No cross CEC PFT access                     */
-	flags = 0;
-	
-	lpar_rc = plpar_pte_read(flags,
-				 slot,
-				 &dword0, &dummy_word1);
-	if (lpar_rc != H_Success) {
-		udbg_printf(" error on pte read in get_hpte0 rc = %lx \n", lpar_rc);
-		for (;;);
-	}
-
-	return(dword0);
-}
-
-static long hpte_selectslot_pSeriesLP(unsigned long vpn)
-{
-	unsigned long primary_hash;
-	unsigned long hpteg_slot;
-	unsigned i, k;
-	unsigned long flags;
-	HPTE  pte_read;
-	unsigned long lpar_rc;
-
-	/* Search the primary group for an available slot */
-	primary_hash = hpt_hash(vpn, 0);
-
-	hpteg_slot = ( primary_hash & htab_data.htab_hash_mask ) * HPTES_PER_GROUP;
-
-	/* Read 1 pte at a time                        */
-	/* Do not need RPN to logical page translation */
-	/* No cross CEC PFT access                     */
-	flags = 0;
-	for (i=0; i<HPTES_PER_GROUP; ++i) {
-		/* read the hpte entry from the slot */
-		lpar_rc = plpar_pte_read(flags,
-					 hpteg_slot + i,
-					 &pte_read.dw0.dword0, &pte_read.dw1.dword1);
-		if (lpar_rc != H_Success) {
-			udbg_printf(" read of hardware page table failed rc = %lx \n", lpar_rc); 
-			for (;;);
-		}
-		if ( pte_read.dw0.dw0.v == 0 ) {
-			/* If an available slot found, return it */
-			return hpteg_slot + i;
-		}
-
-	}
-
-
-	/* Search the secondary group for an available slot */
-	hpteg_slot = ( ~primary_hash & htab_data.htab_hash_mask ) * HPTES_PER_GROUP;
-
-
-	for (i=0; i<HPTES_PER_GROUP; ++i) {
-		/* read the hpte entry from the slot */
-		lpar_rc = plpar_pte_read(flags,
-					 hpteg_slot + i,
-					 &pte_read.dw0.dword0, &pte_read.dw1.dword1);
-		if (lpar_rc != H_Success) {
-			udbg_printf(" read of hardware page table failed2 rc = %lx  \n", lpar_rc); 
-			for (;;);
-		}
-		if ( pte_read.dw0.dw0.v == 0 ) {
-			/* If an available slot found, return it */
-			return hpteg_slot + i;
-		}
-
-	}
-
-	/* No available entry found in secondary group */
-
-
-	/* Select an entry in the primary group to replace */
-
-	hpteg_slot = ( primary_hash & htab_data.htab_hash_mask ) * HPTES_PER_GROUP;
-
-	k = htab_data.next_round_robin++ & 0x7;
-
-	for (i=0; i<HPTES_PER_GROUP; ++i) {
-		if (k == HPTES_PER_GROUP)
-			k = 0;
-
-		lpar_rc = plpar_pte_read(flags,
-					 hpteg_slot + k,
-					 &pte_read.dw0.dword0, &pte_read.dw1.dword1);
-		if (lpar_rc != H_Success) {
-			udbg_printf( " pte read failed - rc = %lx", lpar_rc); 
-			for (;;);
-		}
-		if (  ! pte_read.dw0.dw0.bolted)
-		{
-			hpteg_slot += k;
-			/* Invalidate the current entry */
-			ppc_md.hpte_invalidate(hpteg_slot); 
-			return hpteg_slot;
-		}
-		++k;
-	}
-
-	/* No non-bolted entry found in primary group - time to panic */
-	udbg_printf("select_hpte_slot - No non-bolted HPTE in group 0x%lx! \n", hpteg_slot/HPTES_PER_GROUP);
-	udbg_printf("No non-bolted HPTE in group %lx", (unsigned long)hpteg_slot/HPTES_PER_GROUP);
-	for (;;);
-
-	/* never executes - avoid compiler errors */
-	return 0;
-}
-
-
-static void hpte_create_valid_pSeriesLP(unsigned long slot, unsigned long vpn,
-					unsigned long prpn, unsigned hash, 
-					void *ptep, unsigned hpteflags, 
-					unsigned bolted)
-{
-	/* Local copy of HPTE */
-	struct {
-		/* Local copy of first doubleword of HPTE */
-		union {
-			unsigned long d;
-			Hpte_dword0   h;
-		} dw0;
-		/* Local copy of second doubleword of HPTE */
-		union {
-			unsigned long     d;
-			Hpte_dword1       h;
-			Hpte_dword1_flags f;
-		} dw1;
-	} lhpte;
-	
-	unsigned long avpn = vpn >> 11;
-	unsigned long arpn = physRpn_to_absRpn( prpn );
-
-	unsigned long lpar_rc;
-	unsigned long flags;
-	HPTE ret_hpte;
-
-	/* Fill in the local HPTE with absolute rpn, avpn and flags */
-	lhpte.dw1.d        = 0;
-	lhpte.dw1.h.rpn    = arpn;
-	lhpte.dw1.f.flags  = hpteflags;
-
-	lhpte.dw0.d        = 0;
-	lhpte.dw0.h.avpn   = avpn;
-	lhpte.dw0.h.h      = hash;
-	lhpte.dw0.h.bolted = bolted;
-	lhpte.dw0.h.v      = 1;
-
-	/* Now fill in the actual HPTE */
-	/* Set CEC cookie to 0                  */
-	/* Large page = 0                       */
-	/* Zero page = 0                        */
-	/* I-cache Invalidate = 0               */
-	/* I-cache synchronize = 0              */
-	/* Exact = 1 - only modify exact entry  */
-	flags = H_EXACT;
-
-	if (hpteflags & (_PAGE_GUARDED|_PAGE_NO_CACHE))
-		lhpte.dw1.f.flags &= ~_PAGE_COHERENT;
-#if 1
-	__asm__ __volatile__ (
-		 H_ENTER_r3
-		 "mr	4, %1\n"
-		 "mr	5, %2\n"
-		 "mr	6, %3\n"
-		 "mr	7, %4\n"
-		 HSC
-		 "mr	%0, 3\n"
-		 : "=r" (lpar_rc)
-		 : "r" (flags), "r" (slot), "r" (lhpte.dw0.d), "r" (lhpte.dw1.d)
-		 : "r3", "r4", "r5", "r6", "r7", "cc");
-#else
-	lpar_rc =  plpar_pte_enter(flags,
-				   slot,
-				   lhpte.dw0.d,
-				   lhpte.dw1.d,
-				   &ret_hpte.dw0.dword0,
-				   &ret_hpte.dw1.dword1);
-#endif
-	if (lpar_rc != H_Success) {
-		udbg_printf("error on pte enter lapar rc = %ld\n",lpar_rc);
-		udbg_printf("ent: s=%lx, dw0=%lx, dw1=%lx\n", slot, lhpte.dw0.d, lhpte.dw1.d);
-		/* xmon_backtrace("backtrace"); */
-		for (;;);
-	}
-}
-
-static long hpte_find_pSeriesLP(unsigned long vpn)
-{
-	union {
-		unsigned long d;
-		Hpte_dword0   h;
-	} hpte_dw0;
-	long slot;
-	unsigned long hash;
-	unsigned long i,j;
-
-	hash = hpt_hash(vpn, 0);
-	for ( j=0; j<2; ++j ) {
-		slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
-		for ( i=0; i<HPTES_PER_GROUP; ++i ) {
-			hpte_dw0.d = hpte_getword0_pSeriesLP( slot );
-			if ( ( hpte_dw0.h.avpn == ( vpn >> 11 ) ) &&
-			     ( hpte_dw0.h.v ) &&
-			     ( hpte_dw0.h.h == j ) ) {
-				/* HPTE matches */
-				if ( j )
-					slot = -slot;
-				return slot;
-			}
-			++slot;
-		}
-		hash = ~hash;
-	}
-	return -1;
-} 
-
-/*
- * Create a pte - LPAR .  Used during initialization only.
- * We assume the PTE will fit in the primary PTEG.
- */
-void make_pte_LPAR(HPTE *htab,
-		   unsigned long va, unsigned long pa, int mode,
-		   unsigned long hash_mask, int large)
-{
-	HPTE  local_hpte, ret_hpte;
-	unsigned long hash, slot, flags,lpar_rc, vpn;
-
-	if (large)
-		vpn = va >> 24;
-	else
-		vpn = va >> 12;
-
-	hash = hpt_hash(vpn, large);
-
-	slot = ((hash & hash_mask)*HPTES_PER_GROUP);
-
-	local_hpte.dw1.dword1 = pa | mode;
-	local_hpte.dw0.dword0 = 0;
-	local_hpte.dw0.dw0.avpn = va >> 23;
-	local_hpte.dw0.dw0.bolted = 1;				/* bolted */
-	local_hpte.dw0.dw0.v = 1;
-
-	/* Set CEC cookie to 0                   */
-	/* Large page = 0                        */
-	/* Zero page = 0                         */
-	/* I-cache Invalidate = 0                */
-	/* I-cache synchronize = 0               */
-	/* Exact = 0 - modify any entry in group */
-	flags = 0;
-#if 1
-	__asm__ __volatile__ (
-		 H_ENTER_r3
-		 "mr	4, %1\n"
-		 "mr	5, %2\n"
-		 "mr	6, %3\n"
-		 "mr	7, %4\n"
-		 HSC
-		 "mr	%0, 3\n"
-		 : "=r" (lpar_rc)
-		 : "r" (flags), "r" (slot), "r" (local_hpte.dw0.dword0), "r" (local_hpte.dw1.dword1)
-		 : "r3", "r4", "r5", "r6", "r7", "cc");
-#else
-	lpar_rc =  plpar_pte_enter(flags,
-				   slot,
-				   local_hpte.dw0.dword0,
-				   local_hpte.dw1.dword1,
-				   &ret_hpte.dw0.dword0,
-				   &ret_hpte.dw1.dword1);
-#endif
-#if 0 /* NOTE: we explicitly do not check return status here because it is
-       * "normal" for early boot code to map io regions for which a partition
-       * has no access.  However, we will die if we actually fault on these
-       * "permission denied" pages.
-       */
-	if (lpar_rc != H_Success) {
-		/* pSeriesLP_init_early(); */
-		udbg_printf("flags=%lx, slot=%lx, dword0=%lx, dword1=%lx, rc=%d\n", flags, slot, local_hpte.dw0.dword0,local_hpte.dw1.dword1, lpar_rc);
-		BUG();
-	}
-#endif
 }
 
 static void tce_build_pSeriesLP(struct TceTable *tbl, long tcenum, 
@@ -785,19 +436,14 @@ static unsigned char udbg_getcLP(void)
 	}
 }
 
+void pSeries_lpar_mm_init(void);
 
 /* This is called early in setup.c.
  * Use it to setup page table ppc_md stuff as well as udbg.
  */
 void pSeriesLP_init_early(void)
 {
-	ppc_md.hpte_invalidate   = hpte_invalidate_pSeriesLP;
-	ppc_md.hpte_updatepp     = hpte_updatepp_pSeriesLP;
-	ppc_md.hpte_updateboltedpp  = hpte_updateboltedpp_pSeriesLP;
-	ppc_md.hpte_getword0     = hpte_getword0_pSeriesLP;
-	ppc_md.hpte_selectslot   = hpte_selectslot_pSeriesLP;
-	ppc_md.hpte_create_valid = hpte_create_valid_pSeriesLP;
-	ppc_md.hpte_find	 = hpte_find_pSeriesLP;
+	pSeries_lpar_mm_init();
 
 	ppc_md.tce_build	 = tce_build_pSeriesLP;
 	ppc_md.tce_free		 = tce_free_pSeriesLP;
@@ -890,4 +536,319 @@ int hvc_count(int *start_termno)
 		}
 	}
 	return 0;
+}
+
+
+
+
+
+
+/*
+ * Create a pte - LPAR .  Used during initialization only.
+ * We assume the PTE will fit in the primary PTEG.
+ */
+void pSeries_lpar_make_pte(HPTE *htab, unsigned long va, unsigned long pa,
+			   int mode, unsigned long hash_mask, int large)
+{
+	HPTE local_hpte;
+	unsigned long hash, slot, flags, lpar_rc, vpn;
+	unsigned long dummy1, dummy2;
+
+	if (large)
+		vpn = va >> LARGE_PAGE_SHIFT;
+	else
+		vpn = va >> PAGE_SHIFT;
+
+	hash = hpt_hash(vpn, large);
+
+	slot = ((hash & hash_mask)*HPTES_PER_GROUP);
+
+	local_hpte.dw1.dword1 = pa | mode;
+	local_hpte.dw0.dword0 = 0;
+	local_hpte.dw0.dw0.avpn = va >> 23;
+	local_hpte.dw0.dw0.bolted = 1;		/* bolted */
+	if (large) {
+		local_hpte.dw0.dw0.l = 1;	/* large page */
+		local_hpte.dw0.dw0.avpn &= ~0x1UL;
+	}
+	local_hpte.dw0.dw0.v = 1;
+
+	/* Set CEC cookie to 0                   */
+	/* Zero page = 0                         */
+	/* I-cache Invalidate = 0                */
+	/* I-cache synchronize = 0               */
+	/* Exact = 0 - modify any entry in group */
+	flags = 0;
+
+	lpar_rc =  plpar_pte_enter(flags, slot, local_hpte.dw0.dword0,
+				   local_hpte.dw1.dword1, &dummy1, &dummy2);
+
+	if (lpar_rc == H_PTEG_Full) {
+		while(1)
+			;
+	}
+
+	/*
+	 * NOTE: we explicitly do not check return status here because it is
+	 * "normal" for early boot code to map io regions for which a partition
+	 * has no access.  However, we will die if we actually fault on these
+	 * "permission denied" pages.
+	 */
+}
+
+static long pSeries_lpar_insert_hpte(unsigned long hpte_group,
+				     unsigned long vpn, unsigned long prpn,
+				     int secondary, unsigned long hpteflags,
+				     int bolted, int large)
+{
+	unsigned long avpn = vpn >> 11;
+	unsigned long arpn = physRpn_to_absRpn(prpn);
+	unsigned long lpar_rc;
+	unsigned long flags;
+	unsigned long slot;
+	HPTE lhpte;
+
+	/* Fill in the local HPTE with absolute rpn, avpn and flags */
+	lhpte.dw1.dword1      = 0;
+	lhpte.dw1.dw1.rpn     = arpn;
+	lhpte.dw1.flags.flags = hpteflags;
+
+	lhpte.dw0.dword0      = 0;
+	lhpte.dw0.dw0.avpn    = avpn;
+	lhpte.dw0.dw0.h       = secondary;
+	lhpte.dw0.dw0.bolted  = bolted;
+	lhpte.dw0.dw0.v       = 1;
+
+	if (large)
+		lhpte.dw0.dw0.l = 1;
+
+	/* Now fill in the actual HPTE */
+	/* Set CEC cookie to 0         */
+	/* Large page = 0              */
+	/* Zero page = 0               */
+	/* I-cache Invalidate = 0      */
+	/* I-cache synchronize = 0     */
+	/* Exact = 0                   */
+	flags = 0;
+
+	/* XXX why is this here? - Anton */
+	if (hpteflags & (_PAGE_GUARDED|_PAGE_NO_CACHE))
+		lhpte.dw1.flags.flags &= ~_PAGE_COHERENT;
+
+	__asm__ __volatile__ (
+		H_ENTER_r3
+		"mr    4, %2\n"
+                "mr    5, %3\n"
+                "mr    6, %4\n"
+                "mr    7, %5\n"
+                HSC    
+                "mr    %0, 3\n"
+                "mr    %1, 4\n"
+		: "=r" (lpar_rc), "=r" (slot)
+		: "r" (flags), "r" (hpte_group), "r" (lhpte.dw0.dword0),
+		"r" (lhpte.dw1.dword1)
+		: "r3", "r4", "r5", "r6", "r7", "cc");
+
+	if (lpar_rc == H_PTEG_Full)
+		return -1;
+
+	if (lpar_rc != H_Success)
+		panic("Bad return code from pte enter rc = %lx\n", lpar_rc);
+
+	return slot;
+}
+
+static spinlock_t pSeries_lpar_tlbie_lock = SPIN_LOCK_UNLOCKED;
+
+static long pSeries_lpar_remove_hpte(unsigned long hpte_group)
+{
+	unsigned long slot_offset;
+	unsigned long lpar_rc;
+	int i;
+	unsigned long dummy1, dummy2;
+
+	/* pick a random slot to start at */
+	slot_offset = mftb() & 0x7;
+
+	for (i = 0; i < HPTES_PER_GROUP; i++) {
+
+		/* dont remove a bolted entry */
+		lpar_rc = plpar_pte_remove(H_ANDCOND, hpte_group + slot_offset,
+					   (0x1UL << 4), &dummy1, &dummy2);
+
+		if (lpar_rc == H_Success)
+			return i;
+
+		if (lpar_rc != H_Not_Found)
+			panic("Bad return code from pte remove rc = %lx\n",
+			      lpar_rc);
+
+		slot_offset++;
+		slot_offset &= 0x7;
+	}
+
+	return -1;
+}
+
+/*
+ * NOTE: for updatepp ops we are fortunate that the linux "newpp" bits and
+ * the low 3 bits of flags happen to line up.  So no transform is needed.
+ * We can probably optimize here and assume the high bits of newpp are
+ * already zero.  For now I am paranoid.
+ */
+static long pSeries_lpar_hpte_updatepp(unsigned long slot, unsigned long newpp,
+				       unsigned long va, int large)
+{
+	unsigned long lpar_rc;
+	unsigned long flags;
+	flags = (newpp & 3) | H_AVPN;
+	unsigned long vpn = va >> PAGE_SHIFT;
+
+	udbg_printf("updatepp\n");
+
+	lpar_rc = plpar_pte_protect(flags, slot, (vpn >> 4) & ~0x7fUL);
+
+	if (lpar_rc == H_Not_Found) {
+		udbg_printf("updatepp missed\n");
+		return -1;
+	}
+
+	if (lpar_rc != H_Success)
+		panic("bad return code from pte protect rc = %lx\n", lpar_rc);
+
+	return 0;
+}
+
+static unsigned long pSeries_lpar_hpte_getword0(unsigned long slot)
+{
+	unsigned long dword0;
+	unsigned long lpar_rc;
+	unsigned long dummy_word1;
+	unsigned long flags;
+
+	/* Read 1 pte at a time                        */
+	/* Do not need RPN to logical page translation */
+	/* No cross CEC PFT access                     */
+	flags = 0;
+	
+	lpar_rc = plpar_pte_read(flags, slot, &dword0, &dummy_word1);
+
+	if (lpar_rc != H_Success)
+		panic("Error on pte read in get_hpte0 rc = %lx\n", lpar_rc);
+
+	return dword0;
+}
+
+static long pSeries_lpar_hpte_find(unsigned long vpn)
+{
+	unsigned long hash;
+	unsigned long i, j;
+	long slot;
+	union {
+		unsigned long dword0;
+		Hpte_dword0 dw0;
+	} hpte_dw0;
+	Hpte_dword0 dw0;
+
+	hash = hpt_hash(vpn, 0);
+
+	for (j = 0; j < 2; j++) {
+		slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
+		for (i = 0; i < HPTES_PER_GROUP; i++) {
+			hpte_dw0.dword0 = pSeries_lpar_hpte_getword0(slot);
+			dw0 = hpte_dw0.dw0;
+
+			if ((dw0.avpn == (vpn >> 11)) && dw0.v &&
+			    (dw0.h == j)) {
+				/* HPTE matches */
+				if (j)
+					slot = -slot;
+				return slot;
+			}
+			++slot;
+		}
+		hash = ~hash;
+	}
+
+	return -1;
+} 
+
+static void pSeries_lpar_hpte_updateboltedpp(unsigned long newpp,
+					     unsigned long ea)
+{
+	unsigned long lpar_rc;
+	unsigned long vsid, va, vpn, flags;
+	long slot;
+
+	vsid = get_kernel_vsid(ea);
+	va = (vsid << 28) | (ea & 0x0fffffff);
+	vpn = va >> PAGE_SHIFT;
+
+	slot = pSeries_lpar_hpte_find(vpn);
+	if (slot == -1)
+		panic("updateboltedpp: Could not find page to bolt\n");
+
+	flags = newpp & 3;
+	lpar_rc = plpar_pte_protect(flags, slot, 0);
+
+	if (lpar_rc != H_Success)
+		panic("Bad return code from pte bolted protect rc = %lx\n",
+		      lpar_rc); 
+}
+
+static void pSeries_lpar_hpte_invalidate(unsigned long slot, unsigned long va,
+					 int large, int local)
+{
+	unsigned long vpn, avpn;
+	unsigned long lpar_rc;
+	unsigned long dummy1, dummy2;
+
+	if (large)
+		vpn = va >> LARGE_PAGE_SHIFT;
+	else
+		vpn = va >> PAGE_SHIFT;
+
+	avpn = vpn >> 11;
+
+	lpar_rc = plpar_pte_remove(H_AVPN, slot, (vpn >> 4) & ~0x7fUL, &dummy1,
+				   &dummy2);
+
+	if (lpar_rc == H_Not_Found) {
+		udbg_printf("invalidate missed\n");
+		return;
+	}
+
+	if (lpar_rc != H_Success)
+		panic("Bad return code from invalidate rc = %lx\n", lpar_rc);
+}
+
+/*
+ * Take a spinlock around flushes to avoid bouncing the hypervisor tlbie
+ * lock.
+ */
+void pSeries_lpar_flush_hash_range(unsigned long context, unsigned long number,
+				   int local)
+{
+	int i;
+	struct tlb_batch_data *ptes =
+		&tlb_batch_array[smp_processor_id()][0];
+	unsigned long flags;
+
+	spin_lock_irqsave(&pSeries_lpar_tlbie_lock, flags);
+	for (i = 0; i < number; i++) {
+		flush_hash_page(context, ptes->addr, ptes->pte, local);
+		ptes++;
+	}
+	spin_unlock_irqrestore(&pSeries_lpar_tlbie_lock, flags);
+}
+
+void pSeries_lpar_mm_init(void)
+{
+	ppc_md.hpte_invalidate  = pSeries_lpar_hpte_invalidate;
+	ppc_md.hpte_updatepp    = pSeries_lpar_hpte_updatepp;
+	ppc_md.hpte_updateboltedpp = pSeries_lpar_hpte_updateboltedpp;
+	ppc_md.insert_hpte      = pSeries_lpar_insert_hpte;
+	ppc_md.remove_hpte      = pSeries_lpar_remove_hpte;
+	ppc_md.make_pte         = pSeries_lpar_make_pte;
+	ppc_md.flush_hash_range	= pSeries_lpar_flush_hash_range;
 }

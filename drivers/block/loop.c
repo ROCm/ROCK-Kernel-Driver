@@ -154,14 +154,20 @@ struct loop_func_table *xfer_funcs[MAX_LO_CRYPT] = {
 
 #define MAX_DISK_SIZE 1024*1024*1024
 
-static unsigned long compute_loop_size(struct loop_device *lo, struct dentry * lo_dentry, kdev_t lodev)
+static unsigned long
+compute_loop_size(struct loop_device *lo,
+		  struct dentry * lo_dentry, kdev_t lodev)
 {
-	if (S_ISREG(lo_dentry->d_inode->i_mode))
-		return (lo_dentry->d_inode->i_size - lo->lo_offset) >> BLOCK_SIZE_BITS;
-	if (blk_size[major(lodev)])
-		return blk_size[major(lodev)][minor(lodev)] -
-                                (lo->lo_offset >> BLOCK_SIZE_BITS);
-	return MAX_DISK_SIZE;
+	loff_t size = 0;
+
+	if (S_ISREG(lo_dentry->d_inode->i_mode)) {
+		size = lo_dentry->d_inode->i_size;
+	} else {
+		size = blkdev_size_in_bytes(lodev);
+		if (size == 0)
+			return MAX_DISK_SIZE;
+	}
+	return (size - lo->lo_offset) >> BLOCK_SIZE_BITS;
 }
 
 static void figure_loop_size(struct loop_device *lo)

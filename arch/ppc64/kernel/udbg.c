@@ -209,10 +209,10 @@ udbg_printf(const char *fmt, ...)
 
 /* Special print used by PPCDBG() macro */
 void
-udbg_ppcdbg(unsigned long flags, const char *fmt, ...)
+udbg_ppcdbg(unsigned long debug_flags, const char *fmt, ...)
 {
 	unsigned long flags;
-	unsigned long active_debugs = flags & naca->debug_switch;
+	unsigned long active_debugs = debug_flags & naca->debug_switch;
 
 	if ( active_debugs ) {
 		va_list ap;

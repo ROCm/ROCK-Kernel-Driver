@@ -53,6 +53,8 @@ struct HvLpEvent * ItLpQueue_getNextLpEvent( struct ItLpQueue * lpQueue )
 	struct HvLpEvent * nextLpEvent = 
 		(struct HvLpEvent *)lpQueue->xSlicCurEventPtr;
 	if ( nextLpEvent->xFlags.xValid ) {
+		/* rmb() needed only for weakly consistent machines (regatta) */
+		rmb();
 		/* Set pointer to next potential event */
 		lpQueue->xSlicCurEventPtr += ((nextLpEvent->xSizeMinus1 +
 				      LpEventAlign ) /

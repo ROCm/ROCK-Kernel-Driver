@@ -342,12 +342,15 @@ chrp_progress(char *s, unsigned short hex)
 
 extern void setup_default_decr(void);
 
+extern unsigned long ppc_proc_freq;
+extern unsigned long ppc_tb_freq;
+
 void __init pSeries_calibrate_decr(void)
 {
 	struct device_node *cpu;
 	struct div_result divres;
 	int *fp;
-	unsigned long freq;
+	unsigned long freq, processor_freq;
 
 	/*
 	 * The cpu node should have a timebase-frequency property
@@ -360,8 +363,19 @@ void __init pSeries_calibrate_decr(void)
 		if (fp != 0)
 			freq = *fp;
 	}
+	ppc_tb_freq = freq;
+	processor_freq = freq;
+	if (cpu != 0) {
+		fp = (int *) get_property(cpu, "clock-frequency", NULL);
+		if (fp != 0)
+			processor_freq = *fp;
+	}
+	ppc_proc_freq = processor_freq;
+	
         printk("time_init: decrementer frequency = %lu.%.6lu MHz\n", 
 	       freq/1000000, freq%1000000 );
+	printk("time_init: processor frequency   = %lu.%.6lu MHz\n",
+		processor_freq/1000000, processor_freq%1000000 );
 
 	tb_ticks_per_jiffy = freq / HZ;
 	tb_ticks_per_sec = tb_ticks_per_jiffy * HZ;

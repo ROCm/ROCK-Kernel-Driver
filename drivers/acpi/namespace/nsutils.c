@@ -2,7 +2,7 @@
  *
  * Module Name: nsutils - Utilities for accessing ACPI namespace, accessing
  *                        parents and siblings and Scope manipulation
- *              $Revision: 104 $
+ *              $Revision: 105 $
  *
  *****************************************************************************/
 
@@ -254,7 +254,6 @@ acpi_ns_build_internal_name (
 			result = &internal_name[3];
 		}
 	}
-
 	else {
 		/*
 		 * Not fully qualified.
@@ -280,7 +279,6 @@ acpi_ns_build_internal_name (
 			result = &internal_name[i+2];
 		}
 	}
-
 
 	/* Build the name (minus path separators) */
 
@@ -319,11 +317,11 @@ acpi_ns_build_internal_name (
 
 	if (info->fully_qualified) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "returning [%p] (abs) \"\\%s\"\n",
-			internal_name, &internal_name[0]));
+			internal_name, internal_name));
 	}
 	else {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "returning [%p] (rel) \"%s\"\n",
-			internal_name, &internal_name[2]));
+			internal_name, internal_name));
 	}
 
 	return_ACPI_STATUS (AE_OK);
@@ -823,8 +821,8 @@ acpi_ns_find_parent_name (
 				child_node, (char *) &child_node->name,
 				parent_node, (char *) &parent_node->name));
 
-			if (parent_node->name) {
-				return_VALUE (parent_node->name);
+			if (parent_node->name.integer) {
+				return_VALUE (parent_node->name.integer);
 			}
 		}
 
@@ -863,7 +861,7 @@ acpi_ns_exist_downstream_sibling (
 		return (FALSE);
 	}
 
-	if (node->name) {
+	if (node->name.integer) {
 		return (TRUE);
 	}
 

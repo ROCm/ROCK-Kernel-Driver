@@ -29,7 +29,6 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
-extern int *blk_size[];
 extern struct timezone sys_tz;
 
 static int affs_statfs(struct super_block *sb, struct statfs *buf);
@@ -321,7 +320,7 @@ static int affs_fill_super(struct super_block *sb, void *data, int silent)
 	 */
 
 	size = sb->s_bdev->bd_inode->i_size >> 9;
-	pr_debug("AFFS: initial blksize=%d, blocks=%d\n", 512, blocks);
+	pr_debug("AFFS: initial blocksize=%d, #blocks=%d\n", 512, size);
 
 	affs_set_blocksize(sb, PAGE_SIZE);
 	/* Try to find root block. Its location depends on the block size. */

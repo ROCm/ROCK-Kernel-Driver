@@ -116,3 +116,10 @@ FS_LITTER is gone - just remove it from fs_flags.
 	FS_SINGLE is gone (actually, that had happened back when ->get_sb()
 went in - and hadn't been documented ;-/).  Just remove it from fs_flags
 (and see ->get_sb() entry for other actions).
+
+---
+[mandatory]
+
+->setattr() is called without BKL now.  Caller _always_ holds ->i_sem, so
+watch for ->i_sem-grabbing code that might be used by your ->setattr().
+Callers of notify_change() need ->i_sem now.

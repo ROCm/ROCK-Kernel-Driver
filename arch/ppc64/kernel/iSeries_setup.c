@@ -26,6 +26,7 @@
 #include <linux/string.h>
 #include <linux/bootmem.h>
 #include <linux/blk.h>
+#include <linux/seq_file.h>
 
 #include <asm/processor.h>
 #include <asm/machdep.h>
@@ -587,6 +588,7 @@ static void __init build_iSeries_Memory_Map(void)
 
 	lmb_init();
 	lmb_add( 0, naca->physicalMemorySize );
+	lmb_analyze();	/* ?? */
 	lmb_reserve( 0, __pa(klimit));
 
 	/* 
@@ -603,8 +605,10 @@ static void __init build_iSeries_Memory_Map(void)
 static void __init setup_iSeries_cache_sizes(void)
 {
 	unsigned i,n;
-	naca->iCacheL1LineSize = xIoHriProcessorVpd[0].xInstCacheOperandSize;
-	naca->dCacheL1LineSize = xIoHriProcessorVpd[0].xDataCacheOperandSize;
+	unsigned procIx = get_paca()->xLpPaca.xDynHvPhysicalProcIndex;
+
+	naca->iCacheL1LineSize = xIoHriProcessorVpd[procIx].xInstCacheOperandSize;
+	naca->dCacheL1LineSize = xIoHriProcessorVpd[procIx].xDataCacheOperandSize;
 	naca->iCacheL1LinesPerPage = PAGE_SIZE / naca->iCacheL1LineSize;
 	naca->dCacheL1LinesPerPage = PAGE_SIZE / naca->dCacheL1LineSize;
 	i = naca->iCacheL1LineSize;
@@ -652,6 +656,9 @@ static void __init iSeries_bolt_kernel(unsigned long saddr, unsigned long eaddr)
 }
 #endif /* CONFIG_PPC_ISERIES */
 
+extern unsigned long ppc_proc_freq;
+extern unsigned long ppc_tb_freq;
+
 /*
  * Document me.
  */
@@ -659,7 +666,8 @@ void __init
 iSeries_setup_arch(void)
 {
 	void *	eventStack;
-	
+	unsigned procIx = get_paca()->xLpPaca.xDynHvPhysicalProcIndex;
+
 	/* Setup the Lp Event Queue */
 
 	/* Allocate a page for the Event Stack
@@ -685,14 +693,18 @@ iSeries_setup_arch(void)
 	xItLpQueue.xIndex = 0;
 	
 	/* Compute processor frequency */
-	procFreqHz = (((1UL<<34) * 1000000) / xIoHriProcessorVpd[0].xProcFreq );
+	procFreqHz = (((1UL<<34) * 1000000) / xIoHriProcessorVpd[procIx].xProcFreq );
 	procFreqMhz = procFreqHz / 1000000;
 	procFreqMhzHundreths = (procFreqHz/10000) - (procFreqMhz*100);
 
+	ppc_proc_freq = procFreqHz;
+
 	/* Compute time base frequency */
-	tbFreqHz = (((1UL<<32) * 1000000) / xIoHriProcessorVpd[0].xTimeBaseFreq );
+	tbFreqHz = (((1UL<<32) * 1000000) / xIoHriProcessorVpd[procIx].xTimeBaseFreq );
 	tbFreqMhz = tbFreqHz / 1000000;
 	tbFreqMhzHundreths = (tbFreqHz/10000) - (tbFreqMhz*100);
+
+	ppc_tb_freq = tbFreqHz;
 
 	printk("Max  logical processors = %d\n", 
 			itVpdAreas.xSlicMaxLogicalProcs );
@@ -705,12 +717,12 @@ iSeries_setup_arch(void)
 			tbFreqMhz,
 			tbFreqMhzHundreths );
 	printk("Processor version = %x\n",
-			xIoHriProcessorVpd[0].xPVR );
+			xIoHriProcessorVpd[procIx].xPVR );
 
 }
 
 /*
- * int iSeries_setup_residual()
+ * int as400_setup_residual()
  *
  * Description:
  *   This routine pretty-prints CPU information gathered from the VPD    
@@ -726,20 +738,25 @@ iSeries_setup_arch(void)
  *   The number of bytes copied into 'buffer' if OK, otherwise zero or less
  *   on error.
  */
-void
-iSeries_setup_residual(struct seq_file *m, unsigned long cpu_id)
+void iSeries_setup_residual(struct seq_file *m)
 {
-	seq_printf(m, "clock\t\t: %lu.%02luMhz\n", procFreqMhz,
-			procFreqMhzHundreths);
-	seq_printf(m, "time base\t: %lu.%02luMHz\n", tbFreqMhz,
-			tbFreqMhzHundreths);
-	seq_printf(m, "i-cache\t\t: %d\n", naca->iCacheL1LineSize);
-	seq_printf(m, "d-cache\t\t: %d\n", naca->dCacheL1LineSize);
+	
+	seq_printf(m,"clock\t\t: %lu.%02luMhz\n",
+		procFreqMhz, procFreqMhzHundreths );
+	seq_printf(m,"time base\t: %lu.%02luMHz\n",
+		tbFreqMhz, tbFreqMhzHundreths );
+	seq_printf(m,"i-cache\t\t: %d\n",
+		naca->iCacheL1LineSize);
+	seq_printf(m,"d-cache\t\t: %d\n",
+		naca->dCacheL1LineSize);
+
 }
 
 void iSeries_get_cpuinfo(struct seq_file *m)
 {
-	seq_printf(m, "machine\t\t: 64-bit iSeries Logical Partition\n");
+
+	seq_printf(m,"machine\t\t: 64-bit iSeries Logical Partition\n");
+
 }
 
 /*
@@ -805,29 +822,29 @@ extern void setup_default_decr(void);
 void __init
 iSeries_calibrate_decr(void)
 {
-	unsigned long	freq;
 	unsigned long	cyclesPerUsec;
-	unsigned long	tbf;
 
 	struct div_result divres;
 	
 	/* Compute decrementer (and TB) frequency 
 	 * in cycles/sec 
 	 */
-	
-	tbf = xIoHriProcessorVpd[0].xTimeBaseFreq;
-	
-	freq = 0x0100000000;
-	freq *= 1000000;		/* 2^32 * 10^6 */
-	freq = freq / tbf;		/* cycles / sec */
-	cyclesPerUsec = freq / 1000000;	/* cycles / usec */
+
+	cyclesPerUsec = ppc_tb_freq / 1000000;	/* cycles / usec */
 
 	/* Set the amount to refresh the decrementer by.  This
 	 * is the number of decrementer ticks it takes for 
 	 * 1/HZ seconds.
 	 */
 
-	tb_ticks_per_jiffy = freq / HZ;
+	tb_ticks_per_jiffy = ppc_tb_freq / HZ;
+
+#if 0
+	/* TEST CODE FOR ADJTIME */
+	tb_ticks_per_jiffy += tb_ticks_per_jiffy / 5000;
+	/* END OF TEST CODE */
+#endif
+
 	/*
 	 * tb_ticks_per_sec = freq; would give better accuracy
 	 * but tb_ticks_per_sec = tb_ticks_per_jiffy*HZ; assures
@@ -836,7 +853,7 @@ iSeries_calibrate_decr(void)
 	 */
 	tb_ticks_per_sec   = tb_ticks_per_jiffy * HZ;
 	tb_ticks_per_usec = cyclesPerUsec;
-	tb_to_us = mulhwu_scale_factor(freq, 1000000);
+	tb_to_us = mulhwu_scale_factor(ppc_tb_freq, 1000000);
 	div128_by_32( 1024*1024, 0, tb_ticks_per_sec, &divres );
 	tb_to_xs = divres.result_low;
 	setup_default_decr();

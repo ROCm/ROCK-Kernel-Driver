@@ -27,33 +27,22 @@
 static unsigned long max_block(kdev_t dev)
 {
 	unsigned int retval = ~0U;
-	int major = major(dev);
+	loff_t sz = blkdev_size_in_bytes(dev);
 
-	if (blk_size[major]) {
-		int minor = minor(dev);
-		unsigned int blocks = blk_size[major][minor];
-		if (blocks) {
-			unsigned int size = block_size(dev);
-			unsigned int sizebits = blksize_bits(size);
-			blocks += (size-1) >> BLOCK_SIZE_BITS;
-			retval = blocks << (BLOCK_SIZE_BITS - sizebits);
-			if (sizebits > BLOCK_SIZE_BITS)
-				retval = blocks >> (sizebits - BLOCK_SIZE_BITS);
-		}
+	if (sz) {
+		unsigned int size = block_size(dev);
+		unsigned int sizebits = blksize_bits(size);
+		retval = (sz >> sizebits);
 	}
 	return retval;
 }
 
 static loff_t blkdev_size(kdev_t dev)
 {
-	unsigned int blocks = ~0U;
-	int major = major(dev);
-
-	if (blk_size[major]) {
-		int minor = minor(dev);
-		blocks = blk_size[major][minor];
-	}
-	return (loff_t) blocks << BLOCK_SIZE_BITS;
+	loff_t sz = blkdev_size_in_bytes(dev);
+	if (sz)
+		return sz;
+	return ~0ULL;
 }
 
 /* Kill _all_ buffers, dirty or not.. */

@@ -68,6 +68,8 @@ static inline struct thread_info *current_thread_info(void)
 #define TI_FLAGS	8
 #define TI_CPU		12
 
+#define PREEMPT_ACTIVE		0x4000000
+
 /*
  * thread information flag bit numbers
  */

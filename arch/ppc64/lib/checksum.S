@@ -17,8 +17,6 @@
 #include <asm/errno.h>
 #include "../kernel/ppc_asm.tmpl"
 
-	.text
-
 /*
  * ip_fast_csum(r3=buf, r4=len) -- Optimized for IP header
  * len is in words and is always >= 5.

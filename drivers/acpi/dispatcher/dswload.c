@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswload - Dispatcher namespace load callbacks
- *              $Revision: 61 $
+ *              $Revision: 62 $
  *
  *****************************************************************************/
 
@@ -167,7 +167,7 @@ acpi_ds_load1_begin_op (
 
 	/* Initialize */
 
-	((acpi_parse2_object *)op)->name = node->name;
+	((acpi_parse2_object *)op)->name = node->name.integer;
 
 	/*
 	 * Put the Node in the "op" object that the parser uses, so we
@@ -381,7 +381,7 @@ acpi_ds_load2_begin_op (
 
 			/* Initialize the new op */
 
-			((acpi_parse2_object *)op)->name = node->name;
+			((acpi_parse2_object *)op)->name = node->name.integer;
 			*out_op = op;
 		}
 

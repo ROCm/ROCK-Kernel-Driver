@@ -1689,8 +1689,10 @@ void __init migration_init(void)
 	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
 		int logical = cpu_logical_map(cpu);
 
-		while (!cpu_rq(logical)->migration_thread)
+		while (!cpu_rq(logical)->migration_thread) {
+			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(2);
+		}
 	}
 	if (migration_mask)
 		BUG();

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utdelete - object deletion and reference count utilities
- *              $Revision: 87 $
+ *              $Revision: 88 $
  *
  ******************************************************************************/
 
@@ -68,10 +68,9 @@ acpi_ut_delete_internal_obj (
 	 * actual ACPI objects (for example, a raw buffer pointer).
 	 */
 	switch (object->common.type) {
-
 	case ACPI_TYPE_STRING:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "**** String %p, ptr %p\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "**** String %p, ptr %p\n",
 			object, object->string.pointer));
 
 		/* Free the actual string buffer */
@@ -84,7 +83,7 @@ acpi_ut_delete_internal_obj (
 
 	case ACPI_TYPE_BUFFER:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "**** Buffer %p, ptr %p\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "**** Buffer %p, ptr %p\n",
 			object, object->buffer.pointer));
 
 		/* Free the actual buffer */
@@ -95,7 +94,7 @@ acpi_ut_delete_internal_obj (
 
 	case ACPI_TYPE_PACKAGE:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, " **** Package of count %X\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, " **** Package of count %X\n",
 			object->package.count));
 
 		/*
@@ -111,7 +110,7 @@ acpi_ut_delete_internal_obj (
 
 	case ACPI_TYPE_MUTEX:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "***** Mutex %p, Semaphore %p\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "***** Mutex %p, Semaphore %p\n",
 			object, object->mutex.semaphore));
 
 		acpi_ex_unlink_mutex (object);
@@ -121,7 +120,7 @@ acpi_ut_delete_internal_obj (
 
 	case ACPI_TYPE_EVENT:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "***** Event %p, Semaphore %p\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "***** Event %p, Semaphore %p\n",
 			object, object->event.semaphore));
 
 		acpi_os_delete_semaphore (object->event.semaphore);
@@ -131,7 +130,7 @@ acpi_ut_delete_internal_obj (
 
 	case ACPI_TYPE_METHOD:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "***** Method %p\n", object));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "***** Method %p\n", object));
 
 		/* Delete the method semaphore if it exists */
 
@@ -144,7 +143,7 @@ acpi_ut_delete_internal_obj (
 
 	case ACPI_TYPE_REGION:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "***** Region %p\n", object));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "***** Region %p\n", object));
 
 		second_desc = acpi_ns_get_secondary_object (object);
 		if (second_desc) {
@@ -168,7 +167,7 @@ acpi_ut_delete_internal_obj (
 
 	case ACPI_TYPE_BUFFER_FIELD:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "***** Buffer Field %p\n", object));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "***** Buffer Field %p\n", object));
 
 		second_desc = acpi_ns_get_secondary_object (object);
 		if (second_desc) {
@@ -185,14 +184,14 @@ acpi_ut_delete_internal_obj (
 	/* Free any allocated memory (pointer within the object) found above */
 
 	if (obj_pointer) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Deleting Object Subptr %p\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Deleting Object Subptr %p\n",
 				obj_pointer));
 		ACPI_MEM_FREE (obj_pointer);
 	}
 
 	/* Now the object can be safely deleted */
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Deleting Object %p [%s]\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Deleting Object %p [%s]\n",
 			object, acpi_ut_get_type_name (object->common.type)));
 
 	acpi_ut_delete_object_desc (object);
@@ -232,7 +231,6 @@ acpi_ut_delete_internal_object_list (
 	/* Free the combined parameter pointer list and object array */
 
 	ACPI_MEM_FREE (obj_list);
-
 	return_ACPI_STATUS (AE_OK);
 }
 
@@ -261,10 +259,10 @@ acpi_ut_update_ref_count (
 
 	ACPI_FUNCTION_NAME ("Ut_update_ref_count");
 
+
 	if (!object) {
 		return;
 	}
-
 
 	count = object->common.reference_count;
 	new_count = count;
@@ -279,7 +277,7 @@ acpi_ut_update_ref_count (
 		new_count++;
 		object->common.reference_count = new_count;
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Obj %p Refs=%X, [Incremented]\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Obj %p Refs=%X, [Incremented]\n",
 			object, new_count));
 		break;
 
@@ -287,21 +285,20 @@ acpi_ut_update_ref_count (
 	case REF_DECREMENT:
 
 		if (count < 1) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Obj %p Refs=%X, can't decrement! (Set to 0)\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Obj %p Refs=%X, can't decrement! (Set to 0)\n",
 				object, new_count));
 
 			new_count = 0;
 		}
-
 		else {
 			new_count--;
 
-			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Obj %p Refs=%X, [Decremented]\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Obj %p Refs=%X, [Decremented]\n",
 				object, new_count));
 		}
 
 		if (object->common.type == ACPI_TYPE_METHOD) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Method Obj %p Refs=%X, [Decremented]\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Method Obj %p Refs=%X, [Decremented]\n",
 				object, new_count));
 		}
 
@@ -315,7 +312,7 @@ acpi_ut_update_ref_count (
 
 	case REF_FORCE_DELETE:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Obj %p Refs=%X, Force delete! (Set to 0)\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Obj %p Refs=%X, Force delete! (Set to 0)\n",
 			object, count));
 
 		new_count = 0;
@@ -329,7 +326,6 @@ acpi_ut_update_ref_count (
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown action (%X)\n", action));
 		break;
 	}
-
 
 	/*
 	 * Sanity check the reference count, for debug purposes only.
@@ -394,7 +390,7 @@ acpi_ut_update_object_reference (
 	 * Make sure that this isn't a namespace handle
 	 */
 	if (ACPI_GET_DESCRIPTOR_TYPE (object) == ACPI_DESC_TYPE_NAMED) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Object %p is NS handle\n", object));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Object %p is NS handle\n", object));
 		return_ACPI_STATUS (AE_OK);
 	}
 
@@ -566,7 +562,6 @@ acpi_ut_add_reference (
 	 * We have a valid ACPI internal object, now increment the reference count
 	 */
 	acpi_ut_update_object_reference (object, REF_INCREMENT);
-
 	return_VOID;
 }
 
@@ -607,7 +602,7 @@ acpi_ut_remove_reference (
 		return_VOID;
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Obj %p Refs=%X\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Obj %p Refs=%X\n",
 			object, object->common.reference_count));
 
 	/*

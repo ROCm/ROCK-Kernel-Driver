@@ -7,6 +7,7 @@
  */
 
 #ifndef __ASSEMBLY__
+#include <linux/threads.h>
 #include <asm/processor.h>		/* For TASK_SIZE */
 #include <asm/mmu.h>
 #include <asm/page.h>
@@ -93,13 +94,15 @@
 #define _PAGE_WRITETHRU	0x040UL	/* W: cache write-through */
 #define _PAGE_DIRTY	0x080UL	/* C: page changed */
 #define _PAGE_ACCESSED	0x100UL	/* R: page referenced */
+#if 0
 #define _PAGE_HPTENOIX	0x200UL /* software: pte HPTE slot unknown */
+#endif
 #define _PAGE_HASHPTE	0x400UL	/* software: pte has an associated HPTE */
 #define _PAGE_EXEC	0x800UL	/* software: i-cache coherence required */
 #define _PAGE_SECONDARY 0x8000UL /* software: HPTE is in secondary group */
 #define _PAGE_GROUP_IX  0x7000UL /* software: HPTE index within group */
 /* Bits 0x7000 identify the index within an HPT Group */
-#define _PAGE_HPTEFLAGS (_PAGE_HASHPTE | _PAGE_HPTENOIX | _PAGE_SECONDARY | _PAGE_GROUP_IX)
+#define _PAGE_HPTEFLAGS (_PAGE_HASHPTE | _PAGE_SECONDARY | _PAGE_GROUP_IX)
 /* PAGE_MASK gives the right answer below, but only by accident */
 /* It should be preserving the high 48 bits and then specifically */
 /* preserving _PAGE_SECONDARY | _PAGE_GROUP_IX */
@@ -201,8 +204,8 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 #define	pmd_bad(pmd)		((pmd_val(pmd)) == 0)
 #define	pmd_present(pmd)	((pmd_val(pmd)) != 0)
 #define	pmd_clear(pmdp)		(pmd_val(*(pmdp)) = 0)
-#define pmd_page(pmd)		(__bpn_to_ba(pmd_val(pmd)))
-#define pmd_page_kernel(pmd)	pmd_page(pmd)
+#define pmd_page_kernel(pmd)	(__bpn_to_ba(pmd_val(pmd)))
+#define pmd_page(pmd)		virt_to_page(pmd_page_kernel(pmd))
 #define pgd_set(pgdp, pmdp)	(pgd_val(*(pgdp)) = (__ba_to_bpn(pmdp)))
 #define pgd_none(pgd)		(!pgd_val(pgd))
 #define pgd_bad(pgd)		((pgd_val(pgd)) == 0)
@@ -224,7 +227,7 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 
 /* Find an entry in the third-level page table.. */
 #define pte_offset_kernel(dir,addr) \
-  ((pte_t *) pmd_page(*(dir)) + (((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)))
+  ((pte_t *) pmd_page_kernel(*(dir)) + (((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)))
 
 #define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
 #define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir), (addr))
@@ -336,43 +339,6 @@ static inline void pte_clear(pte_t * ptep)
 	pte_update(ptep, ~_PAGE_HPTEFLAGS, 0);
 }
 
-struct mm_struct;
-struct vm_area_struct;
-extern void local_flush_tlb_all(void);
-extern void local_flush_tlb_mm(struct mm_struct *mm);
-extern void local_flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr);
-extern void local_flush_tlb_range(struct mm_struct *mm,
-			    unsigned long start, unsigned long end);
-
-#define flush_tlb_all local_flush_tlb_all
-#define flush_tlb_mm local_flush_tlb_mm
-#define flush_tlb_page local_flush_tlb_page
-#define flush_tlb_range(vma, start, end) local_flush_tlb_range(vma->vm_mm, start, end)
-
-extern inline void flush_tlb_pgtables(struct mm_struct *mm,
-				unsigned long start, unsigned long end)
-{
-	/* PPC has hw page tables. */
-}
-
-/*
- * No cache flushing is required when address mappings are
- * changed, because the caches on PowerPCs are physically
- * addressed.
- */
-#define flush_cache_all()		do { } while (0)
-#define flush_cache_mm(mm)		do { } while (0)
-#define flush_cache_range(vma, a, b)	do { } while (0)
-#define flush_cache_page(vma, p)	do { } while (0)
-#define flush_page_to_ram(page)		do { } while (0)
-
-extern void flush_icache_user_range(struct vm_area_struct *vma,
-			struct page *page, unsigned long addr, int len);
-extern void flush_icache_range(unsigned long, unsigned long);
-extern void __flush_dcache_icache(void *page_va);
-extern void flush_dcache_page(struct page *page);
-extern void flush_icache_page(struct vm_area_struct *vma, struct page *page);
-
 extern unsigned long va_to_phys(unsigned long address);
 extern pte_t *va_to_pte(unsigned long address);
 extern unsigned long ioremap_bot, ioremap_base;
@@ -397,6 +363,7 @@ extern void paging_init(void);
  * as entries are faulted into the hash table by the low-level
  * data/instruction access exception handlers.
  */
+#if 0
 /*
  * We won't be able to use update_mmu_cache to update the 
  * hardware page table because we need to update the pte
@@ -404,9 +371,16 @@ extern void paging_init(void);
  * its value.
  */
 #define update_mmu_cache(vma, addr, pte)	do { } while (0)
-
-extern void flush_hash_segments(unsigned low_vsid, unsigned high_vsid);
-extern void flush_hash_page(unsigned long context, unsigned long ea, pte_t pte);
+#else
+/*
+ * This gets called at the end of handling a page fault, when
+ * the kernel has put a new PTE into the page table for the process.
+ * We use it to put a corresponding HPTE into the hash table
+ * ahead of time, instead of waiting for the inevitable extra
+ * hash-table miss exception.
+ */
+extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
+#endif
 
 /* Encode and de-code a swap entry */
 #define SWP_TYPE(entry)			(((entry).val >> 1) & 0x3f)

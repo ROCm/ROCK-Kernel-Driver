@@ -1885,3 +1885,23 @@ Changes for patch v208
 - Cleaned up declaration of <stat_read>
 
 - Updated README from master HTML file
+===============================================================================
+Changes for patch v209
+
+- Updated README from master HTML file
+
+- Removed silently introduced calls to lock_kernel() and
+  unlock_kernel() due to recent VFS locking changes. BKL isn't
+  required in devfs 
+
+- Changed <devfs_rmdir> to allow later additions if not yet empty
+
+- Added calls to <devfs_register_partitions> in drivers/block/blkpc.c
+  <add_partition> and <del_partition>
+
+- Fixed bug in <devfs_alloc_unique_number>: was clearing beyond
+  bitfield
+
+- Fixed bitfield data type for <devfs_*alloc_devnum>
+
+- Made major bitfield type and initialiser 64 bit safe

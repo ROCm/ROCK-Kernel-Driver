@@ -3,6 +3,8 @@
 #ifdef __KERNEL__
 
 #include <linux/types.h>
+#include <linux/string.h>
+#include <asm/semaphore.h>
 
 struct seq_operations;
 struct file;

@@ -224,7 +224,6 @@ static int rtasd(void *unused)
 
 	cpu = 0;
 	set_cpus_allowed(current, 1UL << cpu_logical_map(cpu));
-	schedule();
 
 	while(1) {
 		do {
@@ -262,9 +261,7 @@ static int rtasd(void *unused)
 
 
 		/* Check all cpus for pending events before sleeping*/
-		if (first_pass) {
-			schedule();
-		} else {
+		if (!first_pass) {
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout((HZ*60/rtas_event_scan_rate) / 2);
 		}
@@ -277,7 +274,7 @@ error:
 	return -EINVAL;
 }
 
-static void __init rtas_init(void)
+static int __init rtas_init(void)
 {
 	struct proc_dir_entry *rtas_dir, *entry;
 
@@ -296,6 +293,8 @@ static void __init rtas_init(void)
 		printk(KERN_ERR "Failed to start RTAS daemon\n");
 
 	printk(KERN_ERR "RTAS daemon started\n");
+
+	return 0;
 }
 
 static int __init surveillance_setup(char *str)

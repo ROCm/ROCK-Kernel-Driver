@@ -34,9 +34,6 @@
 #include <asm/bitops.h>
 #include <asm/checksum.h>
 #include <asm/pgtable.h>
-#include <linux/adb.h>
-#include <linux/cuda.h>
-#include <linux/pmu.h>
 #include <asm/prom.h>
 #include <asm/system.h>
 #include <asm/pci-bridge.h>
@@ -45,9 +42,8 @@
 #include <asm/machdep.h>
 #include <asm/hw_irq.h>
 #include <asm/abs_addr.h>
-#ifdef CONFIG_SMP
 #include <asm/smplock.h>
-#endif /* CONFIG_SMP */
+#include <asm/cacheflush.h>
 #ifdef CONFIG_PPC_ISERIES
 #include <asm/iSeries/iSeries_pci.h>
 #include <asm/iSeries/iSeries_proc.h>
@@ -109,7 +105,6 @@ EXPORT_SYMBOL(strncat);
 EXPORT_SYMBOL(strchr);
 EXPORT_SYMBOL(strrchr);
 EXPORT_SYMBOL(strpbrk);
-EXPORT_SYMBOL(strtok);
 EXPORT_SYMBOL(strstr);
 EXPORT_SYMBOL(strlen);
 EXPORT_SYMBOL(strnlen);
@@ -238,9 +233,6 @@ EXPORT_SYMBOL(machine_is_compatible);
 EXPORT_SYMBOL(find_all_nodes);
 EXPORT_SYMBOL(get_property);
 
-#ifndef CONFIG_PPC_ISERIES
-EXPORT_SYMBOL_NOVERS(sys_ctrler); /* tibit */
-#endif
 #ifdef CONFIG_NVRAM
 EXPORT_SYMBOL(nvram_read_byte);
 EXPORT_SYMBOL(nvram_write_byte);

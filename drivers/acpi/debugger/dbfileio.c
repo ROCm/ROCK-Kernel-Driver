@@ -2,7 +2,7 @@
  *
  * Module Name: dbfileio - Debugger file I/O commands.  These can't usually
  *              be used when running the debugger in Ring 0 (Kernel mode)
- *              $Revision: 59 $
+ *              $Revision: 60 $
  *
  ******************************************************************************/
 
@@ -308,27 +308,14 @@ ae_local_load_table (
 }
 
 
-/*******************************************************************************
- *
- * FUNCTION:    Acpi_db_load_acpi_table
- *
- * PARAMETERS:  Filname         - File where table is located
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Load an ACPI table from a file
- *
- ******************************************************************************/
-
+#ifdef ACPI_APPLICATION
 acpi_status
-acpi_db_load_acpi_table (
+acpi_db_get_acpi_table (
 	NATIVE_CHAR             *filename)
 {
-#ifdef ACPI_APPLICATION
 	FILE                    *fp;
-	acpi_status             status;
 	u32                     table_length;
-
+	acpi_status             status;
 
 	/* Open the file */
 
@@ -350,7 +337,35 @@ acpi_db_load_acpi_table (
 		return (status);
 	}
 
-	/* Attempt to recognize and install the table */
+	return (AE_OK);
+ }
+#endif
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_db_load_acpi_table
+ *
+ * PARAMETERS:  Filname         - File where table is located
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Load an ACPI table from a file
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_db_load_acpi_table (
+	NATIVE_CHAR             *filename) {
+#ifdef ACPI_APPLICATION
+	acpi_status             status;
+
+
+	status = acpi_db_get_acpi_table (filename);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
+   /* Attempt to recognize and install the table */
 
 	status = ae_local_load_table (acpi_gbl_db_table_ptr);
 	if (ACPI_FAILURE (status)) {

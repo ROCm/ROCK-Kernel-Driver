@@ -2,7 +2,7 @@
  *
  * Module Name: tbxface - Public interfaces to the ACPI subsystem
  *                         ACPI table oriented interfaces
- *              $Revision: 51 $
+ *              $Revision: 52 $
  *
  *****************************************************************************/
 
@@ -51,7 +51,7 @@
 acpi_status
 acpi_load_tables (void)
 {
-	ACPI_PHYSICAL_ADDRESS   rsdp_physical_address;
+	ACPI_POINTER            rsdp_address;
 	acpi_status             status;
 	u32                     number_of_tables = 0;
 
@@ -62,7 +62,7 @@ acpi_load_tables (void)
 	/* Get the RSDP */
 
 	status = acpi_os_get_root_pointer (ACPI_LOGICAL_ADDRESSING,
-			  &rsdp_physical_address);
+			  &rsdp_address);
 	if (ACPI_FAILURE (status)) {
 		ACPI_REPORT_ERROR (("Acpi_load_tables: Could not get RSDP, %s\n",
 				  acpi_format_exception (status)));
@@ -71,7 +71,9 @@ acpi_load_tables (void)
 
 	/* Map and validate the RSDP */
 
-	status = acpi_tb_verify_rsdp (rsdp_physical_address);
+	acpi_gbl_table_flags = rsdp_address.pointer_type;
+
+	status = acpi_tb_verify_rsdp (&rsdp_address);
 	if (ACPI_FAILURE (status)) {
 		ACPI_REPORT_ERROR (("Acpi_load_tables: RSDP Failed validation: %s\n",
 				  acpi_format_exception (status)));
@@ -141,6 +143,7 @@ acpi_load_table (
 {
 	acpi_status             status;
 	acpi_table_desc         table_info;
+	ACPI_POINTER            address;
 
 
 	ACPI_FUNCTION_TRACE ("Acpi_load_table");
@@ -152,7 +155,10 @@ acpi_load_table (
 
 	/* Copy the table to a local buffer */
 
-	status = acpi_tb_get_table (0, table_ptr, &table_info);
+	address.pointer_type    = ACPI_LOGICAL_POINTER;
+	address.pointer.logical = table_ptr;
+
+	status = acpi_tb_get_table (&address, &table_info);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}

@@ -993,6 +993,7 @@ SLB_NUM_ENTRIES = 64
 	li      r21,0
 	rldimi  r21,r20,12,0
 	ori     r20,r21,1024
+	ori	r20,r20,128    /* set class bit for kernel region */
 #ifndef CONFIG_PPC_ISERIES
 	ori	r20,r20,256    /* map kernel region with large ptes */
 #endif
@@ -1824,10 +1825,10 @@ ioremap_dir:
 hardware_int_paca0:
 	.space	8*4096
 
-/* 1 page segment table per cpu (max 48) */
+/* 1 page segment table per cpu (max 48, cpu0 allocated at 0x5000) */
 	.globl	stab_array
 stab_array:
-	.space	4096 * 48
+	.space	4096 * 47
 	
 /*
  * This space gets a copy of optional info passed to us by the bootstrap

@@ -38,7 +38,9 @@ struct rtas_args {
 	u32 nargs;
 	u32 nret; 
 	rtas_arg_t args[16];
+#if 0
 	spinlock_t lock;
+#endif
 	rtas_arg_t *rets;     /* Pointer to return values in args[]. */
 };  
 

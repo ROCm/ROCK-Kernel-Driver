@@ -131,8 +131,12 @@ u8 iSeries_Get_Bus( struct pci_dev * dv )
 	return 0;
 }
 
-static inline struct TceTable *get_tce_table(struct pci_dev *dev) {
-
+static inline struct TceTable *get_tce_table(struct pci_dev *dev)
+{
+	if (!dev)
+		dev = ppc64_isabridge_dev;
+	if (!dev)
+		return NULL;
 	if ( ( _machine == _MACH_iSeries ) && ( dev->bus ) ) 
 		return tceTables[dev->bus->number];
 	/* On the iSeries, the virtual bus will take this path.  There is a */

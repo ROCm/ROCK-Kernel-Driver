@@ -7,12 +7,11 @@
  *      2 of the License, or (at your option) any later version.
  */
 #include <linux/string.h>
+#include <linux/kernel.h>
+#include <linux/sysrq.h>
 #include <asm/machdep.h>
 #include <asm/io.h>
 #include <asm/page.h>
-#include <linux/pmu.h>
-#include <linux/kernel.h>
-#include <linux/sysrq.h>
 #include <asm/prom.h>
 #include <asm/processor.h>
 

@@ -217,22 +217,24 @@
 #define __NR_mincore		206
 #define __NR_gettid		207
 #define __NR_tkill		208
+#define __NR_setxattr		209
+#define __NR_lsetxattr		210
+#define __NR_fsetxattr		211
+#define __NR_getxattr		212
+#define __NR_lgetxattr		213
+#define __NR_fgetxattr		214
+#define __NR_listxattr		215
+#define __NR_llistxattr		216
+#define __NR_flistxattr		217
+#define __NR_removexattr	218
+#define __NR_lremovexattr	219
+#define __NR_fremovexattr	220
+#define __NR_futex		221
 
-#if 0 /* Remind paulus to add these into ppc32 */
+#if 0
+/* Remind paulus to add these into ppc32 */
 __NR_security
 __NR_readahead
-__NR_setxattr
-__NR_lsetxattr
-__NR_fsetxattr
-__NR_getxattr
-__NR_lgetxattr
-__NR_fgetxattr
-__NR_listxattr
-__NR_llistxattr
-__NR_flistxattr
-__NR_removexattr
-__NR_lremovexattr
-__NR_fremovexattr
 #endif
 
 #define __NR(n)	#n
@@ -441,5 +443,13 @@ static inline pid_t wait(int * wait_stat)
 }
 
 #endif /* __KERNEL_SYSCALLS__ */
+
+/*
+ * "Conditional" syscalls
+ *
+ * What we want is __attribute__((weak,alias("sys_ni_syscall"))),
+ * but it doesn't work on all toolchains, so we just do it by hand
+ */
+#define cond_syscall(x) asm(".weak\t." #x "\n\t.set\t." #x ",sys_ni_syscall");
 
 #endif /* _ASM_PPC_UNISTD_H_ */

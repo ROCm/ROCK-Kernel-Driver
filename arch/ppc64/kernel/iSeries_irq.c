@@ -106,7 +106,7 @@ int __init iSeries_allocate_IRQ(HvBusNumber busNumber, HvSubBusNumber subBusNumb
 {
 	u8 idsel = (deviceId >> 4);
 	u8 function = deviceId & 0x0F;
-	int irq = ((((busNumber-1)*16 + (idsel-1)*8 + function)*9/8) % 254) + 1;
+	int irq = ((((busNumber-1)*16 + (idsel-1)*8 + function)*9/8) % 253) + 2;
 	return irq;
 }
 

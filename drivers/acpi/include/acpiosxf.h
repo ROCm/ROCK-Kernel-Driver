@@ -83,10 +83,20 @@ acpi_status
 acpi_os_terminate (
 	void);
 
+
+/*
+ * ACPI Table interfaces
+ */
+
 acpi_status
 acpi_os_get_root_pointer (
 	u32                     flags,
-	ACPI_PHYSICAL_ADDRESS   *rsdp_physical_address);
+	ACPI_POINTER            *address);
+
+acpi_status
+acpi_os_table_override (
+	acpi_table_header       *existing_table,
+	acpi_table_header       **new_table);
 
 
 /*

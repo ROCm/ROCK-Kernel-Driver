@@ -1,5 +1,5 @@
 /*
- *  acpi_pci_root.c - ACPI PCI Root Bridge Driver ($Revision: 22 $)
+ *  acpi_pci_root.c - ACPI PCI Root Bridge Driver ($Revision: 30 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -48,6 +48,7 @@ extern struct pci_ops *pci_root_ops;
 
 static int acpi_pci_root_add (struct acpi_device *device);
 static int acpi_pci_root_remove (struct acpi_device *device, int type);
+static int acpi_pci_root_bind (struct acpi_device *device);
 
 static struct acpi_driver acpi_pci_root_driver = {
         name:                   ACPI_PCI_ROOT_DRIVER_NAME,
@@ -56,18 +57,18 @@ static struct acpi_driver acpi_pci_root_driver = {
         ops:                    {
                                         add:    acpi_pci_root_add,
                                         remove: acpi_pci_root_remove,
+					bind:	acpi_pci_root_bind,
                                 },
 };
 
-struct acpi_pci_root_context {
-	acpi_handle		handle;
-	struct {
-		u8			seg;	/* Root's segment number */
-		u8			bus;	/* Root's bus number */
-		u8			sub;	/* Max subordinate bus */
-	}			id;
-	struct pci_bus		*bus;
+struct acpi_pci_data {
+	acpi_pci_id		id;
 	struct pci_dev		*dev;
+};
+
+struct acpi_pci_root {
+	acpi_handle		handle;
+	struct acpi_pci_data	data;
 };
 
 struct acpi_prt_list		acpi_prts;
@@ -77,25 +78,33 @@ struct acpi_prt_list		acpi_prts;
                         PCI Routing Table (PRT) Support
    -------------------------------------------------------------------------- */
 
-static struct acpi_prt_entry *
+static int
 acpi_prt_find_entry (
-	struct pci_dev		*dev,
-	u8			pin)
+	acpi_pci_id		*id,
+	u8			pin,
+	struct acpi_prt_entry	**entry)
 {
-	struct acpi_prt_entry	*entry = NULL;
 	struct list_head	*node = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_prt_find_entry");
 
+	if (!id || !entry)
+		return_VALUE(-ENODEV);
+
 	/* TBD: Locking */
 	list_for_each(node, &acpi_prts.entries) {
-		entry = list_entry(node, struct acpi_prt_entry, node);
-		if ((entry->id.dev == PCI_SLOT(dev->devfn)) 
-			&& (entry->id.pin == pin))
-			return_PTR(entry);
+		(*entry) = list_entry(node, struct acpi_prt_entry, node);
+		/* TBD: Include check for segment when supported by pci_dev */
+		if ((id->bus == (*entry)->id.bus) 
+			&& (id->device == (*entry)->id.dev)
+			&& (pin == (*entry)->id.pin)) {
+			return_VALUE(0);
+		}
 	}
 
-	return_PTR(NULL);
+	(*entry) = NULL;
+
+	return_VALUE(-ENODEV);
 }
 
 
@@ -107,23 +116,49 @@ acpi_prt_get_irq (
 {
 	int			result = 0;
 	struct acpi_prt_entry	*entry = NULL;
+	acpi_pci_id		id = {0, 0, 0, 0};
 
-	ACPI_FUNCTION_TRACE("acpi_pci_get_current_irq");
+	ACPI_FUNCTION_TRACE("acpi_prt_get_irq");
 
 	if (!dev || !irq)
 		return_VALUE(-ENODEV);
 
-	entry = acpi_prt_find_entry(dev, pin);
-	if (!entry)
-		return_VALUE(-ENODEV);
+	if (!dev->bus) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"Device has invalid 'bus' field\n"));
+		return_VALUE(-EFAULT);
+	}
+
+	id.segment = 0;
+	id.bus = dev->bus->number;
+	id.device = PCI_SLOT(dev->devfn);
+	id.function = PCI_FUNC(dev->devfn);
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+		"Resolving IRQ for %02x:%02x:%02x.%02x[%c]\n",
+		id.segment, id.bus, id.device, id.function, ('A'+pin)));
+
+	result = acpi_prt_find_entry(&id, pin, &entry);
+	if (0 != result)
+		return_VALUE(result);
 
 	/* Type 1: Dynamic (e.g. PCI Link Device) */
 	if (entry->source.handle)
 		result = acpi_pci_link_get_irq(entry, irq);
+
 	/* Type 2: Static (e.g. I/O [S]APIC Direct) */
-	else
-		*irq = entry->source.index;
+	else {
+		if (entry->source.index)
+			*irq = entry->source.index;
+		else
+			result = -ENODEV;
+	}
 	
+	if (0 == result)
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found IRQ %d\n", *irq));
+	else
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Unable to reslove IRQ\n"));
+
 	return_VALUE(0);
 }
 
@@ -135,18 +170,32 @@ acpi_prt_set_irq (
 	int			irq)
 {
 	int			result = 0;
-	int			i = 0;
-	int			valid = 0;
 	struct acpi_prt_entry	*entry = NULL;
+	acpi_pci_id		id = {0, 0, 0, 0};
 
-	ACPI_FUNCTION_TRACE("acpi_pci_set_current_irq");
+	ACPI_FUNCTION_TRACE("acpi_pci_set_irq");
 
 	if (!dev || !irq)
 		return_VALUE(-EINVAL);
 
-	entry = acpi_prt_find_entry(dev, pin);
-	if (!entry)
-		return_VALUE(-ENODEV);
+	if (!dev->bus) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"Device has invalid 'bus' field\n"));
+		return_VALUE(-EFAULT);
+	}
+
+	id.segment = 0;
+	id.bus = dev->bus->number;
+	id.device = PCI_SLOT(dev->devfn);
+	id.function = PCI_FUNC(dev->devfn);
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+		"Setting %02x:%02x:%02x.%02x[%c] to IRQ%d\n",
+		id.segment, id.bus, id.device, id.function, ('A'+pin), irq));
+
+	result = acpi_prt_find_entry(&id, pin, &entry);
+	if (0 != result)
+		return_VALUE(result);
 
 	/* Type 1: Dynamic (e.g. PCI Link Device) */
 	if (entry->source.handle)
@@ -155,6 +204,11 @@ acpi_prt_set_irq (
 	else
 		result = -EFAULT;
 	
+	if (0 == result)
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "IRQ set\n"));
+	else
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Unable to set IRQ\n"));
+
 	return_VALUE(result);
 }
 
@@ -212,9 +266,9 @@ acpi_prt_add_entry (
 	 *       namespace).
 	 */
 
-	printk(KERN_INFO "      %02X:%02X:%02X[%c] -> %s[%d]\n", 
+	ACPI_DEBUG_PRINT_RAW((ACPI_DB_OK, "      %02X:%02X:%02X[%c] -> %s[%d]\n", 
 		entry->id.seg, entry->id.bus, entry->id.dev, 
-		('A' + entry->id.pin), prt->source, entry->source.index);
+		('A' + entry->id.pin), prt->source, entry->source.index));
 
 	/* TBD: Acquire/release lock */
 	list_add_tail(&entry->node, &acpi_prts.entries);
@@ -225,56 +279,22 @@ acpi_prt_add_entry (
 }
 
 
-static acpi_status
-acpi_prt_callback (
-	acpi_handle             handle,
-	u32                     nesting_level,
-	void                    *context,
-	void                    **return_value)
+static int
+acpi_prt_parse (
+	acpi_handle		handle,
+	u8			seg,
+	u8			bus)
 {
 	acpi_status		status = AE_OK;
-	acpi_handle		prt_handle = NULL;
 	char			pathname[PATHNAME_MAX] = {0};
 	acpi_buffer		buffer = {0, NULL};
 	acpi_pci_routing_table	*prt = NULL;
-	unsigned long		sta = 0;
-	struct acpi_pci_root_context *root = (struct acpi_pci_root_context *) context;
-	u8			bus_number = 0;
 
-	ACPI_FUNCTION_TRACE("acpi_prt_callback");
-
-	if (!root)
-		return_VALUE(AE_BAD_PARAMETER);
-
-	status = acpi_get_handle(handle, METHOD_NAME__PRT, &prt_handle);
-	if (ACPI_FAILURE(status))
-		return_VALUE(AE_OK);
+	ACPI_FUNCTION_TRACE("acpi_prt_parse");
 
 	buffer.length = sizeof(pathname);
 	buffer.pointer = pathname;
 	acpi_get_name(handle, ACPI_FULL_PATHNAME, &buffer);
-
-	/* 
-	 * Evalute _STA to see if the device containing this _PRT is present.
-	 */
-	status = acpi_evaluate_integer(handle, METHOD_NAME__STA, NULL, &sta);
-	switch (status) {
-	case AE_OK:
-		if (!(sta & 0x01)) {
-			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
-				"Found _PRT but device [%s] not present\n", 
-				pathname));
-			return_VALUE(AE_OK);
-		}
-		break;
-	case AE_NOT_FOUND:
-		/* assume present */
-		break;
-	default:
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Error evaluating %s._STA [%s]\n", 
-			pathname, acpi_format_exception(status)));
-		return_VALUE(status);
-	}
 
 	printk(KERN_INFO PREFIX "%s [%s._PRT]\n", ACPI_PCI_PRT_DEVICE_NAME, 
 		pathname);
@@ -287,9 +307,10 @@ acpi_prt_callback (
 	buffer.pointer = NULL;
 	status = acpi_get_irq_routing_table(handle, &buffer);
 	if (status != AE_BUFFER_OVERFLOW) {
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Error evaluating _PRT [%s]\n", 
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"Error evaluating _PRT [%s]\n",
 			acpi_format_exception(status)));
-		return_VALUE(status);
+		return_VALUE(-ENODEV);
 	}
 
 	prt = kmalloc(buffer.length, GFP_KERNEL);
@@ -300,25 +321,233 @@ acpi_prt_callback (
 
 	status = acpi_get_irq_routing_table(handle, &buffer);
 	if (ACPI_FAILURE(status)) {
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Error evaluating _PRT [%s]\n", 
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"Error evaluating _PRT [%s]\n",
 			acpi_format_exception(status)));
 		kfree(buffer.pointer);
-		return_VALUE(status);
-	}
-
-	if (root->handle == handle)
-		bus_number = root->id.bus;
-	else {
-		ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Need to get subordinate bus number!\n"));
-		/* get the bus number for this device */
+		return_VALUE(-ENODEV);
 	}
 
 	while (prt && (prt->length > 0)) {
-		acpi_prt_add_entry(handle, root->id.seg, bus_number, prt);
+		acpi_prt_add_entry(handle, seg, bus, prt);
 		prt = (acpi_pci_routing_table*)((unsigned long)prt + prt->length);
 	}
 
-	return_VALUE(AE_OK);
+	return_VALUE(0);
+}
+
+
+/* --------------------------------------------------------------------------
+                             PCI Device Binding
+   -------------------------------------------------------------------------- */
+
+static void
+acpi_pci_data_handler (
+	acpi_handle		handle,
+	u32			function,
+	void			*context)
+{
+	ACPI_FUNCTION_TRACE("acpi_pci_data_handler");
+
+	/* TBD: Anything we need to do here? */
+
+	return_VOID;
+}
+
+
+/**
+ * acpi_os_get_pci_id
+ * ------------------
+ * This function gets used by the ACPI Interpreter (a.k.a. Core Subsystem)
+ * to resolve PCI information for ACPI-PCI devices defined in the namespace.
+ */
+acpi_status
+acpi_os_get_pci_id (
+	acpi_handle		handle,
+	acpi_pci_id		*id)
+{
+	int			result = 0;
+	acpi_status		status = AE_OK;
+	struct acpi_device	*device = NULL;
+	struct acpi_pci_data	*data = NULL;
+
+	ACPI_FUNCTION_TRACE("acpi_os_get_pci_id");
+
+	if (!id)
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
+
+	result = acpi_bus_get_device(handle, &device);
+	if (0 != result) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"Invalid ACPI Bus context for device %s\n",
+			acpi_device_bid(device)));
+		return_ACPI_STATUS(AE_NOT_EXIST);
+	}
+
+	status = acpi_get_data(handle, acpi_pci_data_handler, (void**) &data);
+	if (ACPI_FAILURE(status) || !data || !data->dev) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"Invalid ACPI-PCI context for device %s\n",
+			acpi_device_bid(device)));
+		return_ACPI_STATUS(status);
+	}
+	
+	id->segment = data->id.segment;
+	id->bus = data->id.bus;
+	id->device = data->id.device;
+	id->function = data->id.function;
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+		"Device %s has PCI address %02x:%02x:%02x.%02x\n", 
+		acpi_device_bid(device), id->segment, id->bus, 
+		id->device, id->function));
+
+	return_ACPI_STATUS(AE_OK);
+}
+
+	
+static int
+acpi_pci_root_bind (
+	struct acpi_device	*device)
+{
+	int			result = 0;
+	acpi_status		status = AE_OK;
+	struct acpi_pci_data	*data = NULL;
+	struct acpi_pci_data	*parent_data = NULL;
+	acpi_handle		handle = NULL;
+
+	ACPI_FUNCTION_TRACE("acpi_pci_root_bind");
+
+	if (!device || !device->parent)
+		return_VALUE(-EINVAL);
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Attempting to bind PCI device %s.%s\n", 
+		acpi_device_bid(device->parent), acpi_device_bid(device)));
+
+	data = kmalloc(sizeof(struct acpi_pci_data), GFP_KERNEL);
+	if (!data)
+		return_VALUE(-ENOMEM);
+	memset(data, 0, sizeof(struct acpi_pci_data));
+
+	/* 
+	 * Segment & Bus
+	 * -------------
+	 * These are obtained via the parent device's ACPI-PCI context..
+	 * Note that PCI root bridge devices don't have a 'dev->subordinate'.
+	 */
+	status = acpi_get_data(device->parent->handle, acpi_pci_data_handler, 
+		(void**) &parent_data);
+	if (ACPI_FAILURE(status) || !parent_data || !parent_data->dev) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"Invalid ACPI-PCI context for parent device %s\n",
+			acpi_device_bid(device->parent)));
+		result = -ENODEV;
+		goto end;
+	}
+
+	data->id.segment = parent_data->id.segment;
+
+	if (parent_data->dev->subordinate)	       /* e.g. PCI-PCI bridge */
+		data->id.bus = parent_data->dev->subordinate->number;
+	else if (parent_data->dev->bus)			   /* PCI root bridge */
+		data->id.bus = parent_data->dev->bus->number;
+	else {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"Parent device %s is not a PCI bridge\n",
+			acpi_device_bid(device->parent)));
+		result = -ENODEV;
+		goto end;
+	}
+
+	/*
+	 * Device & Function
+	 * -----------------
+	 * These are simply obtained from the device's _ADR method.  Note
+	 * that a value of zero is valid.
+	 */
+	data->id.device = device->pnp.bus_address >> 16;
+	data->id.function = device->pnp.bus_address & 0xFFFF;
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+		"Binding device %s.%s to %02x:%02x:%02x.%02x\n", 
+		acpi_device_bid(device->parent), acpi_device_bid(device), 
+		data->id.segment, data->id.bus, data->id.device, 
+		data->id.function));
+
+	/* 
+	 * Locate PCI Device
+	 * -----------------
+	 * Locate matching device in PCI namespace.  If it doesn't exist
+	 * this typically means that the device isn't currently inserted
+	 * (e.g. docking station, port replicator, etc.).
+	 */
+	data->dev = pci_find_slot(data->id.bus, 
+		PCI_DEVFN(data->id.device, data->id.function));
+	if (!data->dev) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"Device %02x:%02x:%02x.%02x not present in PCI namespace\n",
+			data->id.segment, data->id.bus, 
+			data->id.device, data->id.function));
+		result = -ENODEV;
+		goto end;
+	}
+	if (!data->dev->bus) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"Device %02x:%02x:%02x.%02x has invalid 'bus' field\n",
+			data->id.segment, data->id.bus, 
+			data->id.device, data->id.function));
+		result = -ENODEV;
+		goto end;
+	}
+
+	/*
+	 * Attach ACPI-PCI Context
+	 * -----------------------
+	 * Thus binding the ACPI and PCI devices.
+	 */
+	status = acpi_attach_data(device->handle, acpi_pci_data_handler, data);
+	if (ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+			"Unable to attach ACPI-PCI context to device %s\n",
+			acpi_device_bid(device)));
+		result = -ENODEV;
+		goto end;
+	}
+
+	/*
+	 * PCI Bridge?
+	 * -----------
+	 * If so, install the 'bind' function to facilitate callbacks for
+	 * all of its children.
+	 */
+	if (data->dev->subordinate)
+		device->ops.bind = acpi_pci_root_bind;
+
+	/*
+	 * PCI Routing Table
+	 * -----------------
+	 * Evaluate and parse _PRT, if exists.  This code is independent of 
+	 * PCI bridges (above) to allow parsing of _PRT objects within the
+	 * scope of non-bridge devices.  Note that _PRTs within the scope of
+	 * a PCI bridge assume the bridge's subordinate bus number.
+	 *
+	 * TBD: Can _PRTs exist within the scope of non-bridge PCI devices?
+	 */
+	status = acpi_get_handle(device->handle, METHOD_NAME__PRT, &handle);
+	if (ACPI_SUCCESS(status)) {
+		if (data->dev->subordinate)		    /* PCI-PCI bridge */
+			acpi_prt_parse(device->handle, data->id.segment, 
+				data->dev->subordinate->number);
+		else				     /* non-bridge PCI device */
+			acpi_prt_parse(device->handle, data->id.segment,
+				data->id.bus);
+	}
+
+end:
+	if (0 != result)
+		kfree(data);
+
+	return_VALUE(result);
 }
 
 
@@ -326,118 +555,167 @@ acpi_prt_callback (
                                 Driver Interface
    -------------------------------------------------------------------------- */
 
-int
+static int
 acpi_pci_root_add (
 	struct acpi_device	*device)
 {
+	int			result = 0;
+	struct acpi_pci_root	*root = NULL;
 	acpi_status		status = AE_OK;
-	struct acpi_pci_root_context *context = NULL;
-	unsigned long		temp = 0;
+	unsigned long		value = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_pci_root_add");
 
 	if (!device)
 		return_VALUE(-EINVAL);
 
-	context = kmalloc(sizeof(struct acpi_pci_root_context), GFP_KERNEL);
-	if (!context)
+	root = kmalloc(sizeof(struct acpi_pci_root), GFP_KERNEL);
+	if (!root)
 		return_VALUE(-ENOMEM);
-	memset(context, 0, sizeof(struct acpi_pci_root_context));
+	memset(root, 0, sizeof(struct acpi_pci_root));
 
-	context->handle = device->handle;
+	root->handle = device->handle;
 	sprintf(acpi_device_name(device), "%s", ACPI_PCI_ROOT_DEVICE_NAME);
 	sprintf(acpi_device_class(device), "%s", ACPI_PCI_ROOT_CLASS);
-	acpi_driver_data(device) = context;
-
-	status = acpi_evaluate_integer(context->handle, METHOD_NAME__SEG, 
-		NULL, &temp);
-	if (ACPI_SUCCESS(status))
-		context->id.seg = temp;
-	else
-		context->id.seg = 0;
-
-	status = acpi_evaluate_integer(context->handle, METHOD_NAME__BBN, 
-		NULL, &temp);
-	if (ACPI_SUCCESS(status))
-		context->id.bus = temp;
-	else
-		context->id.bus = 0;
-
-	/* TBD: Evaluate _CRS for bus range of child P2P (bus min/max/len) */
-
-	printk(KERN_INFO PREFIX "%s [%s] (%02x:%02x)\n", 
-		acpi_device_name(device), acpi_device_bid(device),
-		context->id.seg, context->id.bus);
+	acpi_driver_data(device) = root;
 
 	/*
-	 * Scan all devices on this root bridge.  Note that this must occur
-	 * now to get the correct bus number assignments for subordinate
-	 * PCI-PCI bridges.
+	 * TBD: Doesn't the bus driver automatically set this?
 	 */
-	pci_scan_bus(context->id.bus, pci_root_ops, NULL);
+	device->ops.bind = acpi_pci_root_bind;
 
-	/* Evaluate _PRT for this root bridge. */
-	acpi_prt_callback(context->handle, 0, context, NULL);
+	/* 
+	 * Segment
+	 * -------
+	 * Obtained via _SEG, if exists, otherwise assumed to be zero (0).
+	 */
+	status = acpi_evaluate_integer(root->handle, METHOD_NAME__SEG, NULL, 
+		&value);
+	switch (status) {
+	case AE_OK:
+		root->data.id.segment = (u16) value;
+		break;
+	case AE_NOT_FOUND:
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Assuming segment 0 (no _SEG)\n"));
+		root->data.id.segment = 0;
+		break;
+	default:
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _SEG\n"));
+		result = -ENODEV;
+		goto end;
+	}
 
-	/* Evaluate all subordinate _PRTs. */
-	acpi_walk_namespace(ACPI_TYPE_DEVICE, context->handle, ACPI_UINT32_MAX, 
-		acpi_prt_callback, context, NULL);
+	/* 
+	 * Bus
+	 * ---
+	 * Obtained via _BBN, if exists, otherwise assumed to be zero (0).
+	 */
+	status = acpi_evaluate_integer(root->handle, METHOD_NAME__BBN, NULL, 
+		&value);
+	switch (status) {
+	case AE_OK:
+		root->data.id.bus = (u16) value;
+		break;
+	case AE_NOT_FOUND:
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Assuming bus 0 (no _BBN)\n"));
+		root->data.id.bus = 0;
+		break;
+	default:
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _BBN\n"));
+		result = -ENODEV;
+		goto end;
+	}
 
-	return_VALUE(0);
+	/*
+	 * Device & Function
+	 * -----------------
+	 * Obtained from _ADR (which has already been evaluated for us).
+	 */
+	root->data.id.device = device->pnp.bus_address >> 16;
+	root->data.id.function = device->pnp.bus_address & 0xFFFF;
+
+	/*
+	 * TBD: Evaluate _CRS to get root bridge resources
+	 * TBD: Need PCI interface for enumeration/configuration of roots.
+	 */
+
+	printk(KERN_INFO PREFIX "%s [%s] (%02x:%02x:%02x.%02x)\n", 
+		acpi_device_name(device), acpi_device_bid(device),
+		root->data.id.segment, root->data.id.bus, 
+		root->data.id.device, root->data.id.function);
+
+	/*
+	 * Scan the Root Bridge
+	 * --------------------
+	 * Must do this prior to any attempt to bind the root device, as the
+	 * PCI namespace does not get created until this call is made (and 
+	 * thus the root bridge's pci_dev does not exist).
+	 */
+	pci_scan_bus(root->data.id.bus, pci_root_ops, NULL);
+
+	/* 
+	 * Locate PCI Device
+	 * -----------------
+	 * Locate the matching PCI root bridge device in the PCI namespace.
+	 */
+	root->data.dev = pci_find_slot(root->data.id.bus, 
+		PCI_DEVFN(root->data.id.device, root->data.id.function));
+	if (!root->data.dev) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"Device %02x:%02x:%02x.%02x not present\n", 
+			root->data.id.segment, root->data.id.bus, 
+			root->data.id.device, root->data.id.function));
+		result = -ENODEV;
+		goto end;
+	}
+
+	/*
+	 * Attach ACPI-PCI Context
+	 * -----------------------
+	 * Thus binding the ACPI and PCI devices.
+	 */
+	status = acpi_attach_data(root->handle, acpi_pci_data_handler, 
+		&root->data);
+	if (ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+			"Unable to attach ACPI-PCI context to device %s\n",
+			acpi_device_bid(device)));
+		result = -ENODEV;
+		goto end;
+	}
+
+	/*
+	 * PCI Routing Table
+	 * -----------------
+	 * Evaluate and parse _PRT, if exists.  Note that root bridges
+	 * must have a _PRT (optional for subordinate bridges).
+	 */
+	result = acpi_prt_parse(device->handle, root->data.id.segment, 
+		root->data.id.bus);
+
+end:
+	if (0 != result)
+		kfree(root);
+
+	return_VALUE(result);
 }
 
 
-int
+static int
 acpi_pci_root_remove (
 	struct acpi_device	*device,
 	int			type)
 {
-	struct acpi_pci_dev_context *context = NULL;
+	struct acpi_pci_root	*root = NULL;
 
-	if (!device)
-		return -EINVAL;
+	ACPI_FUNCTION_TRACE("acpi_pci_root_remove");
 
-	if (device->driver_data)
-		/* Root bridge */
-		kfree(device->driver_data);
-	else {
-		/* Standard PCI device */
-		context = acpi_driver_data(device);
-		if (context)
-			kfree(context);
-	}
+	if (!device || !acpi_driver_data(device))
+		return_VALUE(-EINVAL);
 
-	return 0;
-}
+	root = (struct acpi_pci_root *) acpi_driver_data(device);
 
-
-int __init 
-acpi_pci_irq_init (void)
-{
-	int			result = 0;
-	acpi_status		status = AE_OK;
-	acpi_object		arg = {ACPI_TYPE_INTEGER};
-	acpi_object_list        arg_list = {1, &arg};
-	int			irq_model = 0;
-
-	ACPI_FUNCTION_TRACE("acpi_pci_irq_init");
-
-	/* 
-	 * Let the system know what interrupt model we are using by
-	 * evaluating the \_PIC object, if exists.
-	 */
-
-	result = acpi_get_interrupt_model(&irq_model);
-	if (0 != result)
-		return_VALUE(result);
-
-	arg.integer.value = irq_model;
-
-	status = acpi_evaluate_object(NULL, "\\_PIC", &arg_list, NULL);
-	if (ACPI_FAILURE(status) && (status != AE_NOT_FOUND)) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _PIC\n"));
-		return_VALUE(-ENODEV);
-	}
+	kfree(root);
 
 	return_VALUE(0);
 }
@@ -446,16 +724,10 @@ acpi_pci_irq_init (void)
 int __init
 acpi_pci_root_init (void)
 {
-	int			result = 0;
-
 	ACPI_FUNCTION_TRACE("acpi_pci_root_init");
 
 	acpi_prts.count = 0;
 	INIT_LIST_HEAD(&acpi_prts.entries);
-
-	result = acpi_pci_irq_init();
-	if (0 != result)
-		return_VALUE(result);
 
 	if (0 > acpi_bus_register_driver(&acpi_pci_root_driver))
 		return_VALUE(-ENODEV);
@@ -470,5 +742,6 @@ acpi_pci_root_exit (void)
 	ACPI_FUNCTION_TRACE("acpi_pci_root_exit");
 
 	acpi_bus_unregister_driver(&acpi_pci_root_driver);
-}
 
+	return_VOID;
+}

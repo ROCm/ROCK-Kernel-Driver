@@ -50,6 +50,7 @@ struct gettimeofday_struct {
 	unsigned long tb_ticks_per_sec;
 	struct gettimeofday_vars vars[2];
 	struct gettimeofday_vars * volatile varp;
+	unsigned      var_idx;
 	unsigned      tb_to_us;
 };
 

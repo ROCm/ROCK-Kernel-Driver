@@ -28,6 +28,7 @@
 #include <linux/types.h>
 #include <linux/vmalloc.h>
 #include <linux/init.h>
+#include <linux/highmem.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -55,6 +56,70 @@ void setbat(int index, unsigned long virt, unsigned long phys,
 #define v_mapped_by_bats(x)	(0UL)
 #define p_mapped_by_bats(x)	(0UL)
 #endif /* HAVE_BATS */
+
+pgd_t *pgd_alloc(struct mm_struct *mm)
+{
+	pgd_t *ret;
+
+	if ((ret = (pgd_t *)__get_free_page(GFP_KERNEL)) != NULL)
+		clear_page(ret);
+	return ret;
+}
+
+void pgd_free(pgd_t *pgd)
+{
+	free_page((unsigned long)pgd);
+}
+
+pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
+{
+	pte_t *pte;
+	extern int mem_init_done;
+	extern void *early_get_page(void);
+	int timeout = 0;
+
+	if (mem_init_done) {
+		while ((pte = (pte_t *) __get_free_page(GFP_KERNEL)) == NULL
+		       && ++timeout < 10) {
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(HZ);
+		}
+	} else
+		pte = (pte_t *) early_get_page();
+	if (pte != NULL)
+		clear_page(pte);
+	return pte;
+}
+
+struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
+{
+	struct page *pte;
+	int timeout = 0;
+#ifdef CONFIG_HIGHPTE
+	int flags = GFP_KERNEL | __GFP_HIGHMEM;
+#else
+	int flags = GFP_KERNEL;
+#endif
+
+	while ((pte = alloc_pages(flags, 0)) == NULL) {
+		if (++timeout >= 10)
+			return NULL;
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(HZ);
+	}
+	clear_highpage(pte);
+	return pte;
+}
+
+void pte_free_kernel(pte_t *pte)
+{
+	free_page((unsigned long)pte);
+}
+
+void pte_free(struct page *pte)
+{
+	__free_page(pte);
+}
 
 #ifndef CONFIG_PPC_ISERIES
 void *

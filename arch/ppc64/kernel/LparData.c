@@ -144,7 +144,9 @@ struct ItLpNaca itLpNaca = {
 
 struct ItIplParmsReal xItIplParmsReal = {};
 
-struct IoHriProcessorVpd xIoHriProcessorVpd[maxProcessors] = {
+#define maxPhysicalProcessors 32
+
+struct IoHriProcessorVpd xIoHriProcessorVpd[maxPhysicalProcessors] = {
 	{
 		xInstCacheOperandSize: 32,
 		xDataCacheOperandSize: 32,
@@ -172,7 +174,7 @@ struct ItVpdAreas itVpdAreas = {
 	0, 0,
 	26,		/* # VPD array entries */
 	10,		/* # DMA array entries */
-	maxProcessors*2, maxProcessors,	/* Max logical, physical procs */
+	maxProcessors*2, maxPhysicalProcessors,	/* Max logical, physical procs */
 	offsetof(struct ItVpdAreas,xPlicDmaToks),/* offset to DMA toks */
 	offsetof(struct ItVpdAreas,xSlicVpdAdrs),/* offset to VPD addrs */
 	offsetof(struct ItVpdAreas,xPlicDmaLens),/* offset to DMA lens */

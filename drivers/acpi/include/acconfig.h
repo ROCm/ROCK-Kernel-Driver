@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acconfig.h - Global configuration constants
- *       $Revision: 94 $
+ *       $Revision: 96 $
  *
  *****************************************************************************/
 
@@ -54,7 +54,7 @@
 
 /* Version string */
 
-#define ACPI_CA_VERSION             0x20020308
+#define ACPI_CA_VERSION             0x20020403
 
 /* Version of ACPI supported */
 

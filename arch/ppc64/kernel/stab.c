@@ -18,10 +18,10 @@
 #include <asm/Naca.h>
 #include <asm/pmc.h>
 
-inline int make_ste(unsigned long stab, 
-		    unsigned long esid, unsigned long vsid);
-inline void make_slbe(unsigned long esid, unsigned long vsid,
-		      int large);
+int make_ste(unsigned long stab, 
+	     unsigned long esid, unsigned long vsid);
+void make_slbe(unsigned long esid, unsigned long vsid,
+	       int large);
 extern struct Naca *naca;
 
 /*
@@ -56,8 +56,7 @@ void stab_initialize(unsigned long stab)
 /*
  * Create a segment table entry for the given esid/vsid pair.
  */ 
-inline int
-make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
+int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 {
 	unsigned long entry, group, old_esid, castout_entry, i;
 	unsigned int global_entry;
@@ -146,11 +145,11 @@ make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 
 /*
  * Create a segment buffer entry for the given esid/vsid pair.
- */ 
-inline void make_slbe(unsigned long esid, unsigned long vsid, int large)
+ */
+void make_slbe(unsigned long esid, unsigned long vsid, int large)
 {
+	int kernel_segment = 0;
 	unsigned long entry, castout_entry;
-	slb_dword0 castout_esid_data;
 	union {
 		unsigned long word0;
 		slb_dword0    data;
@@ -159,7 +158,10 @@ inline void make_slbe(unsigned long esid, unsigned long vsid, int large)
 		unsigned long word0;
 		slb_dword1    data;
 	} vsid_data;
-	
+
+	if (REGION_ID(esid << SID_SHIFT) >= KERNEL_REGION_ID)
+		kernel_segment = 1;
+
 	/*
 	 * Find an empty entry, if one exists.
 	 */
@@ -175,6 +177,8 @@ inline void make_slbe(unsigned long esid, unsigned long vsid, int large)
 			vsid_data.data.kp = 1;
 			if (large)
 				vsid_data.data.l = 1;
+			if (kernel_segment)
+				vsid_data.data.c = 1;
 
 			esid_data.word0 = 0;
 			esid_data.data.esid = esid;
@@ -200,21 +204,13 @@ inline void make_slbe(unsigned long esid, unsigned long vsid, int large)
 	PMC_SW_PROCESSOR(stab_capacity_castouts); 
 
 	castout_entry = get_paca()->xStab_data.next_round_robin;
-	__asm__ __volatile__("slbmfee  %0,%1" 
-			     : "=r" (castout_esid_data) 
-			     : "r" (castout_entry)); 
-
 	entry = castout_entry; 
 	castout_entry++; 
-	if(castout_entry >= naca->slb_size) {
+	if (castout_entry >= naca->slb_size)
 		castout_entry = 1; 
-	}
 	get_paca()->xStab_data.next_round_robin = castout_entry;
 
-	/* Invalidate the old entry. */
-	castout_esid_data.v = 0; /* Set the class to 0 */
 	/* slbie not needed as the previous mapping is still valid. */
-	__asm__ __volatile__("slbie  %0" : : "r" (castout_esid_data)); 
 	
 	/* 
 	 * Write the new SLB entry.
@@ -224,6 +220,8 @@ inline void make_slbe(unsigned long esid, unsigned long vsid, int large)
 	vsid_data.data.kp = 1;
 	if (large)
 		vsid_data.data.l = 1;
+	if (kernel_segment)
+		vsid_data.data.c = 1;
 	
 	esid_data.word0 = 0;
 	esid_data.data.esid = esid;
@@ -300,7 +298,7 @@ int ste_allocate ( unsigned long ea,
 
 #define STAB_PRESSURE 0
 
-void flush_stab(void)
+void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
 {
 	STE *stab = (STE *) get_paca()->xStab_data.virt;
 	unsigned char *segments = get_paca()->xSegments;
@@ -349,12 +347,57 @@ void flush_stab(void)
 		/* Force flush to complete.  */
 		__asm__ __volatile__ ("sync" : : : "memory");  
 	} else {
+/* XXX The commented out code will only work for 32 bit tasks */
+#if 1
 		unsigned long flags;
-
-		PMC_SW_PROCESSOR(stab_invalidations); 
-
 		__save_and_cli(flags);
 		__asm__ __volatile__("isync; slbia; isync":::"memory");
 		__restore_flags(flags);
+#else
+		union {
+			unsigned long word0;
+			slb_dword0 data;
+		} esid_data;
+		unsigned long esid;
+
+		__asm__ __volatile__("isync" : : : "memory");
+		for (esid = 0; esid < 16; esid++) {
+			esid_data.word0 = 0;
+			esid_data.data.esid = esid;
+			__asm__ __volatile__("slbie %0" : : "r" (esid_data));
+		}
+		__asm__ __volatile__("isync" : : : "memory");
+#endif
+
+		PMC_SW_PROCESSOR(stab_invalidations);
+
+		if (test_tsk_thread_flag(tsk, TIF_32BIT)) {
+			unsigned long esid, vsid;
+
+			for (esid = 0; esid < 16; esid++) {
+				vsid = get_vsid(mm->context, esid << SID_SHIFT);
+				make_slbe(esid, vsid, 0);
+			}
+		} else {
+			unsigned long pc = KSTK_EIP(tsk);
+			unsigned long stack = KSTK_ESP(tsk);
+			unsigned long pc_segment = pc & ~SID_MASK;
+			unsigned long stack_segment = stack & ~SID_MASK;
+			unsigned long vsid;
+
+			if (pc) {
+				if (REGION_ID(pc) >= KERNEL_REGION_ID)
+					BUG();
+				vsid = get_vsid(mm->context, pc);
+				make_slbe(GET_ESID(pc), vsid, 0);
+			}
+
+			if (stack && (pc_segment != stack_segment)) {
+				if (REGION_ID(stack) >= KERNEL_REGION_ID)
+					BUG();
+				vsid = get_vsid(mm->context, stack);
+				make_slbe(GET_ESID(stack), vsid, 0);
+			}
+		}
 	}
 }

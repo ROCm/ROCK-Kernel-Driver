@@ -516,8 +516,7 @@ _GLOBAL(kernel_thread)
 
 #ifdef CONFIG_BINFMT_ELF32
 /* Why isn't this a) automatic, b) written in 'C'? */	
-	.data
-	.align 8
+	.balign 8
 _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall	/* 0  -  old "setup()" system call */
 	.llong .sys32_exit
@@ -544,7 +543,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_oldumount
 	.llong .sys_setuid
 	.llong .sys_getuid
-	.llong .ppc64_sys_stime		/* 25 */
+	.llong .ppc64_sys32_stime       /* 25 */
 	.llong .sys32_ptrace
 	.llong .sys_alarm
 	.llong .sys32_fstat
@@ -728,12 +727,25 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_mincore		/* 206 */
 	.llong .sys_gettid		/* 207 */
 	.llong .sys_tkill		/* 208 */
-	.rept NR_syscalls-208
+	.llong .sys_setxattr
+	.llong .sys_lsetxattr	/* 210 */
+	.llong .sys_fsetxattr
+	.llong .sys_getxattr
+	.llong .sys_lgetxattr
+	.llong .sys_fgetxattr
+	.llong .sys_listxattr	/* 215 */
+	.llong .sys_llistxattr
+	.llong .sys_flistxattr
+	.llong .sys_removexattr
+	.llong .sys_lremovexattr
+	.llong .sys_fremovexattr	/* 220 */
+	.llong .sys_futex
+	.rept NR_syscalls-221
 		.llong .sys_ni_syscall
 	.endr
 #endif
-	.data
-	.align 8
+
+	.balign 8
 _GLOBAL(sys_call_table)
 	.llong .sys_ni_syscall	/* 0  -  old "setup()" system call */
 	.llong .sys_exit
@@ -944,6 +956,19 @@ _GLOBAL(sys_call_table)
 	.llong .sys_mincore		/* 206 */
 	.llong .sys_gettid		/* 207 */
 	.llong .sys_tkill		/* 208 */
-	.rept NR_syscalls-208
+	.llong .sys_setxattr
+	.llong .sys_lsetxattr	/* 210 */
+	.llong .sys_fsetxattr
+	.llong .sys_getxattr
+	.llong .sys_lgetxattr
+	.llong .sys_fgetxattr
+	.llong .sys_listxattr	/* 215 */
+	.llong .sys_llistxattr
+	.llong .sys_flistxattr
+	.llong .sys_removexattr
+	.llong .sys_lremovexattr
+	.llong .sys_fremovexattr	/* 220 */
+	.llong .sys_futex
+	.rept NR_syscalls-221
 	.llong .sys_ni_syscall
 	.endr

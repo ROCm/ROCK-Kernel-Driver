@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsutils - Dispatcher utilities
- *              $Revision: 88 $
+ *              $Revision: 89 $
  *
  ******************************************************************************/
 
@@ -133,7 +133,11 @@ acpi_ds_is_result_used (
 	case AML_CLASS_NAMED_OBJECT:
 
 		if ((op->parent->opcode == AML_REGION_OP)       ||
-			(op->parent->opcode == AML_DATA_REGION_OP)) {
+			(op->parent->opcode == AML_DATA_REGION_OP)  ||
+			(op->parent->opcode == AML_PACKAGE_OP)      ||
+			(op->parent->opcode == AML_VAR_PACKAGE_OP)  ||
+			(op->parent->opcode == AML_BUFFER_OP)       ||
+			(op->parent->opcode == AML_INT_EVAL_SUBTREE_OP)) {
 			/*
 			 * These opcodes allow Term_arg(s) as operands and therefore
 			 * the operands can be method calls.  The result is used.
@@ -144,11 +148,12 @@ acpi_ds_is_result_used (
 		goto result_not_used;
 
 
-	/*
-	 * In all other cases. the parent will actually use the return
-	 * object, so keep it.
-	 */
 	default:
+
+		/*
+		 * In all other cases. the parent will actually use the return
+		 * object, so keep it.
+		 */
 		goto result_used;
 	}
 

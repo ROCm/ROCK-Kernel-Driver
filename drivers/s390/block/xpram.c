@@ -1045,7 +1045,7 @@ int xpram_init(void)
 		for (i=0; i < xpram_devs; i++) 
 			if (xpram_sizes[i] == 0) xpram_sizes[i] = mem_auto;
 	}
-	blk_size[major]=xpram_sizes;
+	blk_size[major] = xpram_sizes;
 
 	xpram_offsets = kmalloc(xpram_devs * sizeof(int), GFP_KERNEL);
 	if (!xpram_offsets) {

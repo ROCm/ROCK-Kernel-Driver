@@ -90,6 +90,31 @@ CONFIG_IEEE1394_RAWIO
   say M here and read <file:Documentation/modules.txt>.  The module
   will be called raw1394.o.
 
+CONFIG_IEEE1394_ETH1394
+  Extremely Experimental! This driver is a Linux specific way to use your
+  IEEE1394 Host as an Ethernet type device. This is _NOT_ IP1394.
+
+CONFIG_IEEE1394_AMDTP
+  This option enables the Audio & Music Data Transmission Protocol
+  (IEC61883-6) driver, which implements audio transmission over
+  IEEE1394.
+
+  The userspace interface is documented in amdtp.h.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called amdtp.o.
+
+CONFIG_IEEE1394_CMP
+  This option enables the Connection Management Procedures
+  (IEC61883-1) driver, which implements input and output plugs.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called amdtp.o.
+
 CONFIG_IEEE1394_VERBOSEDEBUG
   If you say Y here, you will get very verbose debugging logs from the
   subsystem which includes a dump of the header of every sent and
@@ -99,4 +124,3 @@ CONFIG_IEEE1394_VERBOSEDEBUG
 
   Say Y if you really want or need the debugging output, everyone else
   says N.
-

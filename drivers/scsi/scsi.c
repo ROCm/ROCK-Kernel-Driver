@@ -2387,7 +2387,7 @@ static void scsi_dump_status(int level)
 				       kdevname(SCpnt->request.rq_dev),
 				       SCpnt->request.sector,
 				       SCpnt->request.nr_sectors,
-				       SCpnt->request.current_nr_sectors,
+				       (long)SCpnt->request.current_nr_sectors,
 				       SCpnt->request.rq_status,
 				       SCpnt->use_sg,
 

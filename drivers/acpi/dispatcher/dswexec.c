@@ -2,7 +2,7 @@
  *
  * Module Name: dswexec - Dispatcher method execution callbacks;
  *                        dispatch to interpreter.
- *              $Revision: 89 $
+ *              $Revision: 90 $
  *
  *****************************************************************************/
 
@@ -495,6 +495,50 @@ acpi_ds_exec_end_op (
 			}
 
 			status = acpi_ds_eval_buffer_field_operands (walk_state, op);
+			break;
+
+
+		case AML_TYPE_CREATE_OBJECT:
+
+			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
+				"Executing Create_object (Buffer/Package) Op=%p\n", op));
+
+			switch (op->parent->opcode) {
+			case AML_NAME_OP:
+
+				/*
+				 * Put the Node on the object stack (Contains the ACPI Name of
+				 * this object)
+				 */
+				walk_state->operands[0] = (void *) op->parent->node;
+				walk_state->num_operands = 1;
+
+				status = acpi_ds_create_node (walk_state, op->parent->node, op->parent);
+				if (ACPI_FAILURE (status)) {
+					break;
+				}
+
+				/* Fall through */
+
+			case AML_INT_EVAL_SUBTREE_OP:
+
+				status = acpi_ds_eval_data_object_operands (walk_state, op, acpi_ns_get_attached_object (op->parent->node));
+				break;
+
+			default:
+
+				status = acpi_ds_eval_data_object_operands (walk_state, op, NULL);
+				break;
+			}
+
+			/*
+			 * If a result object was returned from above, push it on the
+			 * current result stack
+			 */
+			if (ACPI_SUCCESS (status) &&
+				walk_state->result_obj) {
+				status = acpi_ds_result_push (walk_state->result_obj, walk_state);
+			}
 			break;
 
 

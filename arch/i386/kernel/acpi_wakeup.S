@@ -18,6 +18,8 @@ wakeup_code:
 
 	addw	$(wakeup_data - wakeup_code) >> 4, %ax
 	movw	%ax, %ds
+	movw	%ax, %ss
+	mov	$(wakeup_stack - wakeup_data), %sp		# Private stack is needed for ASUS board
 
 	# set up page table
 	movl	(real_save_cr3 - wakeup_data), %eax

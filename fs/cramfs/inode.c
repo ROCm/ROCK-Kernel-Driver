@@ -112,8 +112,6 @@ static void *cramfs_read(struct super_block *sb, unsigned int offset, unsigned i
 	struct buffer_head * read_array[BLKS_PER_BUF];
 	unsigned i, blocknr, buffer, unread;
 	unsigned long devsize;
-	unsigned int major, minor;
-
 	char *data;
 
 	if (!len)
@@ -136,12 +134,9 @@ static void *cramfs_read(struct super_block *sb, unsigned int offset, unsigned i
 		return read_buffers[i] + blk_offset;
 	}
 
-	devsize = ~0UL;
-	major = major(sb->s_dev);
-	minor = minor(sb->s_dev);
-
-	if (blk_size[major])
-		devsize = blk_size[major][minor] >> 2;
+	devsize = blkdev_size_in_bytes(sb->s_dev) >> 12;
+	if (!devsize)
+		devsize = ~0UL;
 
 	/* Ok, read in BLKS_PER_BUF pages completely first. */
 	unread = 0;

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exfldio - Aml Field I/O
- *              $Revision: 82 $
+ *              $Revision: 84 $
  *
  *****************************************************************************/
 
@@ -148,7 +148,7 @@ acpi_ex_access_region (
 	ACPI_PHYSICAL_ADDRESS   address;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_ex_access_region");
+	ACPI_FUNCTION_TRACE ("Ex_access_region");
 
 
 	/*
@@ -672,7 +672,7 @@ acpi_ex_extract_from_field (
 	 */
 	byte_field_length = ACPI_ROUND_BITS_UP_TO_BYTES (obj_desc->common_field.bit_length);
 	if (byte_field_length > buffer_length) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
 			"Field size %X (bytes) too large for buffer (%X)\n",
 			byte_field_length, buffer_length));
 
@@ -684,7 +684,7 @@ acpi_ex_extract_from_field (
 	datum_count = ACPI_ROUND_UP_TO (byte_field_length,
 			   obj_desc->common_field.access_byte_width);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
 		"Byte_len=%x, Datum_len=%x, Byte_gran=%x\n",
 		byte_field_length, datum_count,obj_desc->common_field.access_byte_width));
 
@@ -852,7 +852,7 @@ acpi_ex_insert_into_field (
 	 */
 	byte_field_length = ACPI_ROUND_BITS_UP_TO_BYTES (obj_desc->common_field.bit_length);
 	if (buffer_length < byte_field_length) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Buffer length %X too small for field %X\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "Buffer length %X too small for field %X\n",
 			buffer_length, byte_field_length));
 
 		return_ACPI_STATUS (AE_BUFFER_OVERFLOW);
@@ -862,7 +862,7 @@ acpi_ex_insert_into_field (
 
 	datum_count = ACPI_ROUND_UP_TO (byte_field_length, obj_desc->common_field.access_byte_width);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
 		"Byte_len=%x, Datum_len=%x, Byte_gran=%x\n",
 		byte_field_length, datum_count, obj_desc->common_field.access_byte_width));
 

@@ -283,10 +283,7 @@ char * partition_name(kdev_t dev)
 static unsigned int calc_dev_sboffset(kdev_t dev, mddev_t *mddev,
 						int persistent)
 {
-	unsigned int size = 0;
-
-	if (blk_size[major(dev)])
-		size = blk_size[major(dev)][minor(dev)];
+	unsigned int size = (blkdev_size_in_bytes(dev) >> BLOCK_SIZE_BITS);
 	if (persistent)
 		size = MD_NEW_SIZE_BLOCKS(size);
 	return size;
@@ -1106,12 +1103,11 @@ static int md_import_device(kdev_t newdev, int on_disk)
 	rdev->desc_nr = -1;
 	rdev->faulty = 0;
 
-	size = 0;
-	if (blk_size[major(newdev)])
-		size = blk_size[major(newdev)][minor(newdev)];
+	size = (blkdev_size_in_bytes(newdev) >> BLOCK_SIZE_BITS);
 	if (!size) {
-		printk(KERN_WARNING "md: %s has zero size, marking faulty!\n",
-				partition_name(newdev));
+		printk(KERN_WARNING
+		       "md: %s has zero or unknown size, marking faulty!\n",
+		       partition_name(newdev));
 		err = -EINVAL;
 		goto abort_free;
 	}

@@ -3,7 +3,7 @@ Devfs (Device File System) FAQ
 
 Linux Devfs (Device File System) FAQ
 Richard Gooch
-24-JAN-2002
+4-APR-2002
 
 
 Document languages:
@@ -803,12 +803,19 @@ devfsd /dev
 
 add the following lines to your /etc/devfsd.conf file:
 
-REGISTER	^pt[sy]/.*	IGNORE
-CHANGE		^pt[sy]/.*	IGNORE
+REGISTER	^pt[sy]		IGNORE
+CREATE		^pt[sy]		IGNORE
+CHANGE		^pt[sy]		IGNORE
+DELETE		^pt[sy]		IGNORE
 REGISTER	.*		COPY	/dev-state/$devname $devpath
-CHANGE		.*		COPY	$devpath /dev-state/$devname
 CREATE		.*		COPY	$devpath /dev-state/$devname
+CHANGE		.*		COPY	$devpath /dev-state/$devname
+DELETE		.*		CFUNCTION GLOBAL unlink /dev-state/$devname
+RESTORE		/dev-state
 
+Note that the sample devfsd.conf file contains these lines,
+as well as other sample configurations you may find useful. See the
+devfsd distribution
 
 
 reboot.
@@ -872,7 +879,8 @@ You can then slowly migrate your system to using the new device names
 (for example, by starting with /etc/fstab), and then limiting the
 compatibility entries that devfsd creates.
 
-MAKE SURE YOU INSTALL DEVFSD BEFORE YOU BOOT A DEVFS-ENABLED KERNEL!
+IF YOU CONFIGURE TO MOUNT DEVFS AT BOOT, MAKE SURE YOU INSTALL DEVFSD
+BEFORE YOU BOOT A DEVFS-ENABLED KERNEL!
 
 Now that devfs has gone into the 2.3.46 kernel, I'm getting a lot of
 reports back. Many of these are because people are trying to run
@@ -1565,6 +1573,24 @@ character device, named pipe, etc.) may change without notice. Only
 the existence of the entry should be relied upon.
 
 
+When I start devfsd, I see the error:
+Error opening file: ".devfsd"   No such file or directory?
+
+This means that devfs is not mounted. Make sure you have devfs mounted.
+
+
+How do I mount devfs?
+
+First make sure you have devfs compiled into your kernel (see
+above). Then you will either need to:
+
+set CONFIG_DEVFS_MOUNT=y in your kernel config
+pass devfs=mount to your boot loader
+mount devfs manually in your boot scripts with:
+mount -t none devfs /dev
+
+
+
 
 
 
@@ -1760,6 +1786,15 @@ steps below:
 
 
 
+make sure you have enabled debugging output when configuring your
+kernel. You will need to set (at least) the following config options:
+
+CONFIG_DEVFS_DEBUG=y
+CONFIG_DEBUG_KERNEL=y
+CONFIG_DEBUG_SLAB=y
+
+
+
 please make sure you have the latest devfs patches applied. The
 latest kernel version might not have the latest devfs patches applied
 yet (Linus is very busy)
@@ -1768,7 +1803,10 @@ yet (Linus is very busy)
 save a copy of your complete kernel logs (preferably by
 using the dmesg programme) for later inclusion in your bug
 report. You may need to use the -s switch to increase the
-internal buffer size so you can capture all the boot messages
+internal buffer size so you can capture all the boot messages.
+Don't edit or trim the dmesg output
+
+
 
 
 try booting with devfs=dall passed to the kernel boot
@@ -1925,7 +1963,7 @@ http://www.atnf.csiro.au/~rgooch/linux/docs/devfs.html
 
 A Korean translation by viatoris@nownuri.net is available at
 
-http://viatoris.new21.org/devfs/devfs.html
+http://your.destiny.pe.kr/devfs/devfs.html
 
 
 

@@ -54,7 +54,7 @@ struct unique_numspace
     unsigned char sem_initialised;
     unsigned int num_free;          /*  Num free in bits       */
     unsigned int length;            /*  Array length in bytes  */
-    __u32 *bits;
+    unsigned long *bits;
     struct semaphore semaphore;
 };
 

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nssearch - Namespace search
- *              $Revision: 83 $
+ *              $Revision: 84 $
  *
  ******************************************************************************/
 
@@ -95,7 +95,7 @@ acpi_ns_search_node (
 	while (next_node) {
 		/* Check for match against the name */
 
-		if (next_node->name == target_name) {
+		if (next_node->name.integer == target_name) {
 			/*
 			 * Found matching entry.  Capture the type if appropriate, before
 			 * returning the entry.
@@ -146,8 +146,8 @@ acpi_ns_search_node (
 
 	/* Searched entire table, not found */
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Name %4.4s (type %X) not found at %p\n",
-		(char *) &target_name, type, next_node));
+	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Name %4.4s Type [%s] not found at %p\n",
+		(char *) &target_name, acpi_ut_get_type_name (type), next_node));
 
 	return_ACPI_STATUS (AE_NOT_FOUND);
 }
@@ -206,8 +206,8 @@ acpi_ns_search_parent_tree (
 		}
 
 		if (acpi_ns_local (type)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "[%4.4s] type %X is local(no search)\n",
-				(char *) &target_name, type));
+			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "[%4.4s] type [%s] must be local to this scope (no parent search)\n",
+				(char *) &target_name, acpi_ut_get_type_name (type)));
 		}
 
 		return_ACPI_STATUS (AE_NOT_FOUND);

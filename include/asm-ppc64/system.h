@@ -78,7 +78,6 @@ extern void load_up_altivec(struct task_struct *);
 extern void cvt_fd(float *from, double *to, unsigned long *fpscr);
 extern void cvt_df(double *from, float *to, unsigned long *fpscr);
 extern int abs(int);
-extern void cacheable_memzero(void *p, unsigned int nb);
 
 struct device_node;
 

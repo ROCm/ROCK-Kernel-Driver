@@ -24,26 +24,33 @@ struct machdep_calls {
 	/* High use functions in the first cachelines, low use functions
 	 * follow.  DRENG collect profile data.
 	 */
-	void            (*hpte_invalidate)(unsigned long slot);
-
-	void            (*hpte_updatepp)(long slot, 
+	void            (*hpte_invalidate)(unsigned long slot,
+					   unsigned long va,
+					   int large,
+					   int local);
+	long		(*hpte_updatepp)(unsigned long slot, 
 					 unsigned long newpp, 
-					 unsigned long va);
+					 unsigned long va,
+					 int large);
 	void            (*hpte_updateboltedpp)(unsigned long newpp, 
 					       unsigned long ea);
-	unsigned long	(*hpte_getword0)(unsigned long slot);
+	long		(*insert_hpte)(unsigned long hpte_group,
+				       unsigned long vpn,
+				       unsigned long prpn,
+				       int secondary, 
+				       unsigned long hpteflags, 
+				       int bolted,
+				       int large);
+	long		(*remove_hpte)(unsigned long hpte_group);
+	void		(*flush_hash_range)(unsigned long context,
+					    unsigned long number,
+					    int local);
+	void		(*make_pte)(void *htab, unsigned long va,
+				    unsigned long pa,
+				    int mode,
+				    unsigned long hash_mask,
+				    int large);
 
-	long		(*hpte_find)( unsigned long vpn );
-
-	long		(*hpte_selectslot)(unsigned long vpn); 
-
-	void		(*hpte_create_valid)(unsigned long slot,
-					     unsigned long vpn,
-					     unsigned long prpn,
-					     unsigned hash, 
-					     void * ptep,
-					     unsigned hpteflags, 
-					     unsigned bolted);
 	void		(*tce_build)(struct TceTable * tbl,
 				     long tcenum,
 				     unsigned long uaddr,
@@ -147,18 +154,6 @@ extern struct machdep_calls ppc_md;
 extern char cmd_line[512];
 
 extern void setup_pci_ptrs(void);
-
-/*
- * Power macintoshes have either a CUDA or a PMU controlling
- * system reset, power, NVRAM, RTC.
- */
-typedef enum sys_ctrler_kind {
-	SYS_CTRLER_UNKNOWN = 0,
-	SYS_CTRLER_CUDA = 1,
-	SYS_CTRLER_PMU = 2,
-} sys_ctrler_t;
-
-extern sys_ctrler_t sys_ctrler;
 
 #endif /* _PPC_MACHDEP_H */
 #endif /* __KERNEL__ */

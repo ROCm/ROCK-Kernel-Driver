@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acenv.h - Generation environment specific items
- *       $Revision: 85 $
+ *       $Revision: 86 $
  *
  *****************************************************************************/
 
@@ -284,11 +284,9 @@ typedef char *va_list;
 #define ACPI_INTERNAL_VAR_XFACE
 
 #define ACPI_ASM_MACROS
-#define causeinterrupt(level)
 #define BREAKPOINT3
-#define acpi_disable_irqs()
-#define acpi_enable_irqs()
-#define halt()
+#define ACPI_DISABLE_IRQS()
+#define ACPI_ENABLE_IRQS()
 #define ACPI_ACQUIRE_GLOBAL_LOCK(Glptr, acq)
 #define ACPI_RELEASE_GLOBAL_LOCK(Glptr, acq)
 
@@ -299,9 +297,7 @@ typedef char *va_list;
 
 /* Don't want software interrupts within a ring3 application */
 
-#undef causeinterrupt
 #undef BREAKPOINT3
-#define causeinterrupt(level)
 #define BREAKPOINT3
 #endif
 

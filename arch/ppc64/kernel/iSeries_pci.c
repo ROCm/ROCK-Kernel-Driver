@@ -21,6 +21,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
+#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/list.h> 
 #include <linux/string.h>
@@ -36,12 +37,12 @@
 #include <asm/ppcdebug.h>
 #include <asm/Naca.h>
 #include <asm/flight_recorder.h>
+#include <asm/pci_dma.h>
 
 #include <asm/iSeries/HvCallPci.h>
 #include <asm/iSeries/HvCallSm.h>
 #include <asm/iSeries/HvCallXm.h>
 #include <asm/iSeries/LparData.h>
-#include <asm/iSeries/iSeries_dma.h>
 #include <asm/iSeries/iSeries_irq.h>
 #include <asm/iSeries/iSeries_pci.h>
 #include <asm/iSeries/mf.h>
@@ -92,12 +93,12 @@ struct        pci_controller* alloc_phb(struct device_node *dev, char *model, un
 
 void  iSeries_Scan_PHBs_Slots(struct pci_controller* Phb);
 void  iSeries_Scan_EADs_Bridge(HvBusNumber Bus, HvSubBusNumber SubBus, int IdSel);
-int   iSeries_Scan_Bridge_Slot(HvBusNumber Bus, HvSubBusNumber SubBus, int MaxAgents);
+int   iSeries_Scan_Bridge_Slot(HvBusNumber Bus, struct HvCallPci_BridgeInfo* Info);
 void  list_device_nodes(void);
 
 struct pci_dev;
 
-LIST_HEAD(Global_Device_List);
+extern struct list_head iSeries_Global_Device_List;
 
 int DeviceCount = 0;
 
@@ -138,6 +139,9 @@ void dumpDevice_Node(struct iSeries_Device_Node* DevNode)
 		    ISERIES_SUBBUS(DevNode),
 		    DevNode->AgentId,
 		    DevNode->DevFn);
+	udbg_printf("     - LSlot     = 0x%02X\n",DevNode->LogicalSlot);
+	udbg_printf("     - TceTable  = 0x%p\n  ",DevNode->DevTceTable);
+
 	udbg_printf("     - DSA       = 0x%04X\n",ISERIES_DSA(DevNode)>>32 );
 
 	udbg_printf("                 = Irq:0x%02X Vendor:0x%04X  Flags:0x%02X\n",
@@ -145,14 +149,16 @@ void dumpDevice_Node(struct iSeries_Device_Node* DevNode)
 		    DevNode->Vendor,
 		    DevNode->Flags );
 	udbg_printf("     - Location  = %s\n",DevNode->CardLocation);
+
+
 }
 /**********************************************************************************
  * Walk down the device node chain 
  **********************************************************************************/
 void  list_device_nodes(void)
 {
-	struct list_head* Device_Node_Ptr = Global_Device_List.next;
-	while(Device_Node_Ptr != &Global_Device_List) {
+	struct list_head* Device_Node_Ptr = iSeries_Global_Device_List.next;
+	while(Device_Node_Ptr != &iSeries_Global_Device_List) {
 		dumpDevice_Node( (struct iSeries_Device_Node*)Device_Node_Ptr );
 		Device_Node_Ptr = Device_Node_Ptr->next;
 	}
@@ -167,13 +173,13 @@ struct iSeries_Device_Node* build_device_node(HvBusNumber Bus, HvSubBusNumber  S
 {
 	struct iSeries_Device_Node*  DeviceNode;
 
-	PPCDBG(PPCDBG_BUSWALK,"- "__FUNCTION__" 0x%02X.%02X.%02X Function: %02X\n",Bus,SubBus,AgentId, Function);
+	PPCDBG(PPCDBG_BUSWALK,"-build_device_node 0x%02X.%02X.%02X Function: %02X\n",Bus,SubBus,AgentId, Function);
 
 	DeviceNode = kmalloc(sizeof(struct iSeries_Device_Node), GFP_KERNEL);
 	if(DeviceNode == NULL) return NULL;
 
 	memset(DeviceNode,0,sizeof(struct iSeries_Device_Node) );
-	list_add_tail(&DeviceNode->Device_List,&Global_Device_List);
+	list_add_tail(&DeviceNode->Device_List,&iSeries_Global_Device_List);
 	/*DeviceNode->DsaAddr      = ((u64)Bus<<48)+((u64)SubBus<<40)+((u64)0x10<<32); */
 	ISERIES_BUS(DeviceNode)       = Bus;
 	ISERIES_SUBBUS(DeviceNode)    = SubBus;
@@ -224,7 +230,7 @@ unsigned long __init find_and_init_phbs(void)
 	struct      pci_controller* phb;
 	HvBusNumber BusNumber;
 
-	PPCDBG(PPCDBG_BUSWALK,__FUNCTION__" Entry\n");
+	PPCDBG(PPCDBG_BUSWALK,"find_and_init_phbs Entry\n");
 
 	/* Check all possible buses. */
 	for (BusNumber = 0; BusNumber < 256; BusNumber++) {
@@ -239,7 +245,7 @@ unsigned long __init find_and_init_phbs(void)
 			phb->pci_mem_offset = phb->local_number = BusNumber;
 			phb->first_busno  = BusNumber;
 			phb->last_busno   = BusNumber;
-			phb->ops = &iSeries_pci_ops;
+			phb->ops          = &iSeries_pci_ops;
 
 			PPCDBG(PPCDBG_BUSWALK, "PCI:Create iSeries pci_controller(%p), Bus: %04X\n",phb,BusNumber);
 			PCIFR("Create iSeries PHB controller: %04X",BusNumber);
@@ -276,26 +282,15 @@ unsigned long __init find_and_init_phbs(void)
  ***********************************************************************/
 void iSeries_pcibios_init(void)
 {
-	struct pci_controller *phb;
-	PPCDBG(PPCDBG_BUSWALK,__FUNCTION__" Entry.\n"); 
+	PPCDBG(PPCDBG_BUSWALK,"iSeries_pcibios_init Entry.\n"); 
 
 	iSeries_IoMmTable_Initialize();
 
 	find_and_init_phbs();
 
-	/* Create the TCE Tables */
-	phb = hose_head;
-	while(phb != NULL) {
-		create_pci_bus_tce_table(phb->local_number);
-		PCIFR("Bus 0x%04X TCE Table %p",phb->local_number,tceTables[phb->local_number] );
-		phb = phb->next;
-	}
-
-
 	pci_assign_all_busses = 0;
-	PPCDBG(PPCDBG_BUSWALK,__FUNCTION__" Exit.\n"); 
+	PPCDBG(PPCDBG_BUSWALK,"iSeries_pcibios_init Exit.\n"); 
 }
-
 /***********************************************************************
  * iSeries_pcibios_fixup(void)  
  ***********************************************************************/
@@ -306,11 +301,12 @@ void __init iSeries_pcibios_fixup(void)
 	char   Buffer[256];
     	int    DeviceCount = 0;
 
-	PPCDBG(PPCDBG_BUSWALK,__FUNCTION__" Entry.\n"); 
-
+	PPCDBG(PPCDBG_BUSWALK,"iSeries_pcibios_fixup Entry.\n"); 
 	/******************************************************/
 	/* Fix up at the device node and pci_dev relationship */
 	/******************************************************/
+	mf_displaySrc(0xC9000100);
+
 	pci_for_each_dev(PciDev) {
 		DeviceNode = find_Device_Node(PciDev);
 		if(DeviceNode != NULL) {
@@ -327,6 +323,7 @@ void __init iSeries_pcibios_fixup(void)
 			iSeries_Device_Information(PciDev,Buffer, sizeof(Buffer) );
 			printk("%d. %s\n",DeviceCount,Buffer);
 
+			create_pci_bus_tce_table((unsigned long)DeviceNode);
 		} else {
 			printk("PCI: Device Tree not found for 0x%016lX\n",(unsigned long)PciDev);
 		}
@@ -335,36 +332,17 @@ void __init iSeries_pcibios_fixup(void)
 
 	iSeries_activate_IRQs();
 
-	// This is test code. 
-	//mf_displaySrc(0xC9000100);
-	//Pci_IoTest();
-	// Pci_CfgIoTest(); 
-	// mf_displaySrc(0xC9000500);
-	// Pci_MMIoTest(); 
-	//mf_displaySrc(0xC9000999);
-}	
+	mf_displaySrc(0xC9000200);
+}
+
 /***********************************************************************
  * iSeries_pcibios_fixup_bus(int Bus)
  *
  ***********************************************************************/
 void iSeries_pcibios_fixup_bus(struct pci_bus* PciBus)
 {
-	PPCDBG(PPCDBG_BUSWALK,__FUNCTION__"(0x%04X) Entry.\n",PciBus->number); 
+	PPCDBG(PPCDBG_BUSWALK,"iSeries_pcibios_fixup_bus(0x%04X) Entry.\n",PciBus->number); 
 
-}
-/***********************************************************************
- * find_floppy(void) 
- *	
- * Finds the default floppy device, if the system has one, and returns 
- * the pci_dev for the isa bridge for the floppy device.  
- *
- * Note: On iSeries there will only be a virtual diskette. 
- ***********************************************************************/
-struct pci_dev*
-find_floppy(void)
-{
-	PPCDBG(PPCDBG_BUSWALK,"- Find Floppy pci_dev.. None on iSeries.\n");
-	return NULL;
 }
 
 
@@ -374,7 +352,7 @@ find_floppy(void)
  ***********************************************************************/
 void fixup_resources(struct pci_dev *PciDev)
 {
-	PPCDBG(PPCDBG_BUSWALK,__FUNCTION__" PciDev %p\n",PciDev);
+	PPCDBG(PPCDBG_BUSWALK,"fixup_resources PciDev %p\n",PciDev);
 }   
 
 
@@ -409,7 +387,6 @@ void  iSeries_Scan_PHBs_Slots(struct pci_controller* Phb)
 	kfree(DevInfo);
 }
 
-
 /********************************************************************************
 * 
 *********************************************************************************/
@@ -432,18 +409,26 @@ void  iSeries_Scan_EADs_Bridge(HvBusNumber Bus, HvSubBusNumber SubBus, int IdSel
  		if (HvRc == 0) {
   			/*  Connect EADs: 0x18.00.12 = 0x00 */
 			PPCDBG(PPCDBG_BUSWALK,"PCI:Connect EADs: 0x%02X.%02X.%02X\n",Bus, SubBus, AgentId);
-			PCIFR(                "Connect EADs: 0x%02X.%02X.%02X",  Bus, SubBus, AgentId);
+			PCIFR(                    "Connect EADs: 0x%02X.%02X.%02X",  Bus, SubBus, AgentId);
 	    		HvRc = HvCallPci_getBusUnitInfo(Bus, SubBus, AgentId, 
 			                                REALADDR(BridgeInfo), sizeof(struct HvCallPci_BridgeInfo));
 	 		if (HvRc == 0) {
-				PPCDBG(PPCDBG_BUSWALK,"PCI: BridgeInfo, Type: 0x%02X, SubBus 0x%02X, MaxAgents 0x%02X\n",
-				                        BridgeInfo->busUnitInfo.deviceType,
-				                         BridgeInfo->subBusNumber,
-				                          BridgeInfo->maxAgents);
+				PPCDBG(PPCDBG_BUSWALK,"PCI: BridgeInfo, Type:0x%02X, SubBus:0x%02X, MaxAgents:0x%02X, MaxSubBus: 0x%02X, LSlot: 0x%02X\n",
+				       BridgeInfo->busUnitInfo.deviceType,
+				       BridgeInfo->subBusNumber,
+				       BridgeInfo->maxAgents,
+				       BridgeInfo->maxSubBusNumber,
+				       BridgeInfo->logicalSlotNumber);
+				PCIFR(                     "BridgeInfo, Type:0x%02X, SubBus:0x%02X, MaxAgents:0x%02X, MaxSubBus: 0x%02X, LSlot: 0x%02X",
+				       BridgeInfo->busUnitInfo.deviceType,
+				       BridgeInfo->subBusNumber,
+				       BridgeInfo->maxAgents,
+				       BridgeInfo->maxSubBusNumber,
+				       BridgeInfo->logicalSlotNumber);
 
 				if (BridgeInfo->busUnitInfo.deviceType == HvCallPci_BridgeDevice)  {
 					/* Scan_Bridge_Slot...: 0x18.00.12 */
-					iSeries_Scan_Bridge_Slot(Bus,BridgeInfo->subBusNumber,BridgeInfo->maxAgents);
+					iSeries_Scan_Bridge_Slot(Bus,BridgeInfo);
 				}
 				else printk("PCI: Invalid Bridge Configuration(0x%02X)",BridgeInfo->busUnitInfo.deviceType);
 			}
@@ -458,17 +443,18 @@ void  iSeries_Scan_EADs_Bridge(HvBusNumber Bus, HvSubBusNumber SubBus, int IdSel
 * This assumes that the node slot is always on the primary bus!
 *
 *********************************************************************************/
-int iSeries_Scan_Bridge_Slot(HvBusNumber Bus, HvSubBusNumber SubBus, int MaxAgents)
+int iSeries_Scan_Bridge_Slot(HvBusNumber Bus, struct HvCallPci_BridgeInfo* BridgeInfo)
 {
-     struct iSeries_Device_Node* DeviceNode;
-	u16       VendorId   = 0;
-	int       HvRc       = 0;
-	int       Irq        = 0;
-	int       IdSel      = ISERIES_GET_DEVICE_FROM_SUBBUS(SubBus);
-	int       Function   = ISERIES_GET_FUNCTION_FROM_SUBBUS(SubBus);
-	HvAgentId AgentId    = ISERIES_PCI_AGENTID(IdSel, Function);
-	HvAgentId EADsIdSel  = ISERIES_PCI_AGENTID(IdSel, Function);
-	int       FirstSlotId= 0; 	
+	struct iSeries_Device_Node* DeviceNode;
+	HvSubBusNumber SubBus = BridgeInfo->subBusNumber;
+	u16       VendorId    = 0;
+	int       HvRc        = 0;
+	int       Irq         = 0;
+	int       IdSel       = ISERIES_GET_DEVICE_FROM_SUBBUS(SubBus);
+	int       Function    = ISERIES_GET_FUNCTION_FROM_SUBBUS(SubBus);
+	HvAgentId AgentId     = ISERIES_PCI_AGENTID(IdSel, Function);
+	HvAgentId EADsIdSel   = ISERIES_PCI_AGENTID(IdSel, Function);
+	int       FirstSlotId = 0; 	
 
 	/**********************************************************/
 	/* iSeries_allocate_IRQ.: 0x18.00.12(0xA3)                */
@@ -480,7 +466,7 @@ int iSeries_Scan_Bridge_Slot(HvBusNumber Bus, HvSubBusNumber SubBus, int MaxAgen
 	/****************************************************************************
 	 * Connect all functions of any device found.  
 	 ****************************************************************************/
-  	for (IdSel = 1; IdSel <= MaxAgents; ++IdSel) {
+  	for (IdSel = 1; IdSel <= BridgeInfo->maxAgents; ++IdSel) {
     		for (Function = 0; Function < 8; ++Function) {
 			AgentId = ISERIES_PCI_AGENTID(IdSel, Function);
 			HvRc = HvCallXm_connectBusUnit(Bus, SubBus, AgentId, Irq);
@@ -494,10 +480,13 @@ int iSeries_Scan_Bridge_Slot(HvBusNumber Bus, HvSubBusNumber SubBus, int MaxAgen
 					PPCDBG(PPCDBG_BUSWALK,"PCI:- FoundDevice: 0x%02X.%02X.%02X = 0x%04X\n",
 					                                       Bus, SubBus, AgentId, VendorId);
 					++DeviceCount;
-					PCIFR("Device(%4d): 0x%02X.%02X.%02X",DeviceCount,Bus, SubBus, AgentId);
 					DeviceNode = build_device_node(Bus, SubBus, EADsIdSel, Function);
-					DeviceNode->Vendor = VendorId;
-					DeviceNode->Irq    = Irq;
+					DeviceNode->Vendor      = VendorId;
+					DeviceNode->Irq         = Irq;
+					DeviceNode->LogicalSlot = BridgeInfo->logicalSlotNumber;
+					PCIFR("Device(%4d): 0x%02X.%02X.%02X 0x%02X 0x%04X",
+					      DeviceCount,Bus, SubBus, AgentId,
+					      DeviceNode->LogicalSlot,DeviceNode->Vendor);
 
 					/***********************************************************
 					 * On the first device/function, assign irq to slot
@@ -557,11 +546,11 @@ void* iSeries_memcpy_fromio(void *dest, void *source, size_t count)
  **********************************************************************************/
 struct iSeries_Device_Node* find_Device_Node(struct pci_dev* PciDev)
 {
-	struct list_head* Device_Node_Ptr = Global_Device_List.next;
+	struct list_head* Device_Node_Ptr = iSeries_Global_Device_List.next;
 	int Bus   = PciDev->bus->number;
 	int DevFn = PciDev->devfn;
 	
-	while(Device_Node_Ptr != &Global_Device_List) { 
+	while(Device_Node_Ptr != &iSeries_Global_Device_List) { 
 		struct iSeries_Device_Node* DevNode = (struct iSeries_Device_Node*)Device_Node_Ptr;
 		if(Bus == ISERIES_BUS(DevNode) && DevFn == DevNode->DevFn) {
 			return DevNode;

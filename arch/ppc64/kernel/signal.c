@@ -35,6 +35,7 @@
 #include <asm/pgtable.h>
 #include <asm/ppcdebug.h>
 #include <asm/unistd.h>
+#include <asm/cacheflush.h>
 
 #define DEBUG_SIG 0
 
@@ -676,8 +677,8 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 				info.si_signo = signr;
 				info.si_errno = 0;
 				info.si_code = SI_USER;
-				info.si_pid = current->p_pptr->pid;
-				info.si_uid = current->p_pptr->uid;
+				info.si_pid = current->parent->pid;
+				info.si_uid = current->parent->uid;
 			}
 
 			/* If the (new) signal is now blocked, requeue it.  */
@@ -722,7 +723,7 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 			case SIGSTOP:
 				current->state = TASK_STOPPED;
 				current->exit_code = signr;
-				if (!(current->p_pptr->sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
+				if (!(current->parent->sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();
 				continue;
