@@ -62,7 +62,7 @@
 }                                     
 
 #define MAYBE_CONTINUE(LABEL,DEV) \
-  {if (buffer) kfree(buffer); \
+  {if (buffer) { kfree(buffer); buffer = NULL; } \
   if (cont_extent){ \
     int block, offset, offset1; \
     struct buffer_head * pbh; \
