@@ -2368,7 +2368,7 @@ int dtRelocate(tid_t tid, struct inode *ip, s64 lmxaddr, pxd_t * opxd,
 	xlen = lengthPXD(opxd);
 
 	jEVENT(0, ("dtRelocate: lmxaddr:%Ld xaddr:%Ld:%Ld xlen:%d\n",
-		   lmxaddr, oxaddr, nxaddr, xlen));
+		   (long long)lmxaddr, (long long)oxaddr, (long long)nxaddr, xlen));
 
 	/*
 	 *      1. get the internal parent dtpage covering
@@ -3044,7 +3044,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 				if (d_namleft == 0) {
 					jERROR(1,("JFS:Dtree error: "
 					  "ino = %ld, bn=%Ld, index = %d\n",
-						  ip->i_ino, bn, i));
+						  (long)ip->i_ino, (long long)bn, i));
 					updateSuper(ip->i_sb, FM_DIRTY);
 					goto skip_one;
 				}
@@ -3101,6 +3101,7 @@ skip_one:
       out:
 	kfree(d_name);
 	DT_PUTPAGE(mp);
+
 	return rc;
 }
 

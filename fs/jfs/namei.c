@@ -1437,19 +1437,19 @@ struct dentry *jfs_get_parent(struct dentry *dentry)
 }
 
 struct inode_operations jfs_dir_inode_operations = {
-	create:		jfs_create,
-	lookup:		jfs_lookup,
-	link:		jfs_link,
-	unlink:		jfs_unlink,
-	symlink:	jfs_symlink,
-	mkdir:		jfs_mkdir,
-	rmdir:		jfs_rmdir,
-	mknod:		jfs_mknod,
-	rename:		jfs_rename,
+	.create		= jfs_create,
+	.lookup		= jfs_lookup,
+	.link		= jfs_link,
+	.unlink		= jfs_unlink,
+	.symlink	= jfs_symlink,
+	.mkdir		= jfs_mkdir,
+	.rmdir		= jfs_rmdir,
+	.mknod		= jfs_mknod,
+	.rename		= jfs_rename,
 };
 
 struct file_operations jfs_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	jfs_readdir,
-	fsync:		jfs_fsync,
+	.read		= generic_read_dir,
+	.readdir	= jfs_readdir,
+	.fsync		= jfs_fsync,
 };

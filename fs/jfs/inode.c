@@ -300,11 +300,11 @@ static int jfs_direct_IO(int rw, struct inode *inode, char *buf,
 }
 
 struct address_space_operations jfs_aops = {
-	readpage:	jfs_readpage,
-	writepage:	jfs_writepage,
-	sync_page:	block_sync_page,
-	prepare_write:	jfs_prepare_write,
-	commit_write:	generic_commit_write,
-	bmap:		jfs_bmap,
-	direct_IO:	jfs_direct_IO,
+	.readpage	= jfs_readpage,
+	.writepage	= jfs_writepage,
+	.sync_page	= block_sync_page,
+	.prepare_write	= jfs_prepare_write,
+	.commit_write	= generic_commit_write,
+	.bmap		= jfs_bmap,
+	.direct_IO	= jfs_direct_IO,
 };

@@ -1080,8 +1080,8 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	 * file system to log have 1-to-1 relationship;
 	 */
 
-	log->bdev = sb->s_bdev;
 	log->flag = JFS_INLINELOG;
+	log->bdev = sb->s_bdev;
 	log->base = addressPXD(&JFS_SBI(sb)->logpxd);
 	log->size = lengthPXD(&JFS_SBI(sb)->logpxd) >>
 	    (L2LOGPSIZE - sb->s_blocksize_bits);

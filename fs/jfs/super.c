@@ -36,6 +36,10 @@ MODULE_LICENSE("GPL");
 
 static kmem_cache_t * jfs_inode_cachep;
 
+static struct super_operations jfs_super_operations;
+static struct export_operations jfs_export_operations;
+static struct file_system_type jfs_fs_type;
+
 int jfs_stop_threads;
 static pid_t jfsIOthread;
 static pid_t jfsCommitThread;
@@ -223,21 +227,6 @@ int jfs_remount(struct super_block *sb, int *flags, char *data)
 	return 0;
 }
 
-static struct super_operations jfs_super_operations = {
-	alloc_inode:	jfs_alloc_inode,
-	destroy_inode:	jfs_destroy_inode,
-	dirty_inode:	jfs_dirty_inode,
-	write_inode:	jfs_write_inode,
-	delete_inode:	jfs_delete_inode,
-	put_super:	jfs_put_super,
-	statfs:		jfs_statfs,
-	remount_fs:	jfs_remount,
-};
-
-static struct export_operations jfs_export_operations = {
-	get_parent:	jfs_get_parent,
-};
-
 static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct jfs_sb_info *sbi;
@@ -362,12 +351,27 @@ static struct super_block *jfs_get_sb(struct file_system_type *fs_type,
 	return get_sb_bdev(fs_type, flags, dev_name, data, jfs_fill_super);
 }
 
+static struct super_operations jfs_super_operations = {
+	.alloc_inode	= jfs_alloc_inode,
+	.destroy_inode	= jfs_destroy_inode,
+	.dirty_inode	= jfs_dirty_inode,
+	.write_inode	= jfs_write_inode,
+	.delete_inode	= jfs_delete_inode,
+	.put_super	= jfs_put_super,
+	.statfs		= jfs_statfs,
+	.remount_fs	= jfs_remount,
+};
+
+static struct export_operations jfs_export_operations = {
+	.get_parent	= jfs_get_parent,
+};
+
 static struct file_system_type jfs_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"jfs",
-	get_sb:		jfs_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	.owner		= THIS_MODULE,
+	.name		= "jfs",
+	.get_sb		= jfs_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
 };
 
 extern int metapage_init(void);
