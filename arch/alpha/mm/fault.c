@@ -211,7 +211,7 @@ do_page_fault(unsigned long address, unsigned long mmcsr,
 	info.si_signo = SIGBUS;
 	info.si_errno = 0;
 	info.si_code = BUS_ADRERR;
-	info.si_addr = (void *) address;
+	info.si_addr = (void __user *) address;
 	force_sig_info(SIGBUS, &info, current);
 	if (!user_mode(regs))
 		goto no_context;
@@ -221,7 +221,7 @@ do_page_fault(unsigned long address, unsigned long mmcsr,
 	info.si_signo = SIGSEGV;
 	info.si_errno = 0;
 	info.si_code = si_code;
-	info.si_addr = (void *) address;
+	info.si_addr = (void __user *) address;
 	force_sig_info(SIGSEGV, &info, current);
 	return;
 

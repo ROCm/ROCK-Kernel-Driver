@@ -326,7 +326,7 @@ bad_area_nosemaphore:
 		info.si_errno = 0;
 		/* info.si_code set above to make clear whether
 		   this was a SEGV_MAPERR or SEGV_ACCERR fault.  */
-		info.si_addr = (void *) compute_si_addr(regs, text_fault);
+		info.si_addr = (void __user *)compute_si_addr(regs, text_fault);
 		info.si_trapno = 0;
 		force_sig_info (SIGSEGV, &info, tsk);
 		return;
@@ -380,7 +380,7 @@ do_sigbus:
 	info.si_signo = SIGBUS;
 	info.si_errno = 0;
 	info.si_code = BUS_ADRERR;
-	info.si_addr = (void *) compute_si_addr(regs, text_fault);
+	info.si_addr = (void __user *) compute_si_addr(regs, text_fault);
 	info.si_trapno = 0;
 	force_sig_info (SIGBUS, &info, tsk);
 	if (!from_user)
@@ -549,7 +549,7 @@ bad_area:
 	info.si_errno = 0;
 	/* info.si_code set above to make clear whether
 	   this was a SEGV_MAPERR or SEGV_ACCERR fault.  */
-	info.si_addr = (void *) address;
+	info.si_addr = (void __user *) address;
 	info.si_trapno = 0;
 	force_sig_info (SIGSEGV, &info, tsk);
 	return;
@@ -559,7 +559,7 @@ do_sigbus:
 	info.si_signo = SIGBUS;
 	info.si_errno = 0;
 	info.si_code = BUS_ADRERR;
-	info.si_addr = (void *) address;
+	info.si_addr = (void __user *) address;
 	info.si_trapno = 0;
 	force_sig_info (SIGBUS, &info, tsk);
 }

@@ -228,7 +228,7 @@ do_entArith(unsigned long summary, unsigned long write_mask,
 	info.si_signo = SIGFPE;
 	info.si_errno = 0;
 	info.si_code = si_code;
-	info.si_addr = (void *) regs->pc;
+	info.si_addr = (void __user *) regs->pc;
 	send_sig_info(SIGFPE, &info, current);
 }
 
@@ -256,7 +256,7 @@ do_entIF(unsigned long type, struct pt_regs *regs)
 		info.si_errno = 0;
 		info.si_code = TRAP_BRKPT;
 		info.si_trapno = 0;
-		info.si_addr = (void *) regs->pc;
+		info.si_addr = (void __user *) regs->pc;
 
 		if (ptrace_cancel_bpt(current)) {
 			regs->pc -= 4;	/* make pc point to former bpt */
@@ -269,13 +269,13 @@ do_entIF(unsigned long type, struct pt_regs *regs)
 		info.si_signo = SIGTRAP;
 		info.si_errno = 0;
 		info.si_code = __SI_FAULT;
-		info.si_addr = (void *) regs->pc;
+		info.si_addr = (void __user *) regs->pc;
 		info.si_trapno = 0;
 		send_sig_info(SIGTRAP, &info, current);
 		return;
 		
 	      case 2: /* gentrap */
-		info.si_addr = (void *) regs->pc;
+		info.si_addr = (void __user *) regs->pc;
 		info.si_trapno = regs->r16;
 		switch ((long) regs->r16) {
 		case GEN_INTOVF:
@@ -337,7 +337,7 @@ do_entIF(unsigned long type, struct pt_regs *regs)
 		info.si_signo = signo;
 		info.si_errno = 0;
 		info.si_code = code;
-		info.si_addr = (void *) regs->pc;
+		info.si_addr = (void __user *) regs->pc;
 		send_sig_info(signo, &info, current);
 		return;
 
@@ -365,7 +365,7 @@ do_entIF(unsigned long type, struct pt_regs *regs)
 				info.si_signo = SIGFPE;
 				info.si_errno = 0;
 				info.si_code = si_code;
-				info.si_addr = (void *) regs->pc;
+				info.si_addr = (void __user *) regs->pc;
 				send_sig_info(SIGFPE, &info, current);
 				return;
 			}
@@ -394,7 +394,7 @@ do_entIF(unsigned long type, struct pt_regs *regs)
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_ILLOPC;
-	info.si_addr = (void *) regs->pc;
+	info.si_addr = (void __user *) regs->pc;
 	send_sig_info(SIGILL, &info, current);
 }
 
@@ -415,7 +415,7 @@ do_entDbg(struct pt_regs *regs)
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_ILLOPC;
-	info.si_addr = (void *) regs->pc;
+	info.si_addr = (void __user *) regs->pc;
 	force_sig_info(SIGILL, &info, current);
 }
 
@@ -765,7 +765,7 @@ static int unauser_reg_offsets[32] = {
 #undef R
 
 asmlinkage void
-do_entUnaUser(void * va, unsigned long opcode,
+do_entUnaUser(void __user * va, unsigned long opcode,
 	      unsigned long reg, struct pt_regs *regs)
 {
 	static int cnt = 0;

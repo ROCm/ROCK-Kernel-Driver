@@ -461,7 +461,7 @@ asmlinkage void do_rt_sigreturn32(struct pt_regs *regs)
 		err |= restore_fpu_state32(regs, &sf->fpu_state);
 	err |= copy_from_user(&seta, &sf->mask, sizeof(compat_sigset_t));
 	err |= __get_user(u_ss_sp, &sf->stack.ss_sp);
-	st.ss_sp = (void *) (long) u_ss_sp;
+	st.ss_sp = compat_ptr(u_ss_sp);
 	err |= __get_user(st.ss_flags, &sf->stack.ss_flags);
 	err |= __get_user(st.ss_size, &sf->stack.ss_size);
 	if (err)
@@ -520,7 +520,7 @@ setup_frame32(struct sigaction *sa, struct pt_regs *regs, int signr, sigset_t *o
 	struct sigcontext32 __user *sc;
 	unsigned int seta[_COMPAT_NSIG_WORDS];
 	int err = 0;
-	void *sig_address;
+	void __user *sig_address;
 	int sig_code;
 	unsigned long pc = regs->tpc;
 	unsigned long npc = regs->tnpc;
@@ -1031,7 +1031,7 @@ asmlinkage int svr4_setcontext(svr4_ucontext_t __user *c, struct pt_regs *regs)
 		set.sig[1] = setv.sigbits[2] | (((long)setv.sigbits[3]) << 32);
 	
 	err |= __get_user(u_ss_sp, &c->stack.sp);
-	st.ss_sp = (void *) (long) u_ss_sp;
+	st.ss_sp = compat_ptr(u_ss_sp);
 	err |= __get_user(st.ss_flags, &c->stack.flags);
 	err |= __get_user(st.ss_size, &c->stack.size);
 	if (err)
@@ -1360,7 +1360,7 @@ asmlinkage long do_sys32_sigaltstack(u32 ussa, u32 uossa, unsigned long sp)
 		    __get_user(uss.ss_flags, &((stack_t32 __user *)(long)ussa)->ss_flags) ||
 		    __get_user(uss.ss_size, &((stack_t32 __user *)(long)ussa)->ss_size)))
 		return -EFAULT;
-	uss.ss_sp = (void *) (long) u_ss_sp;
+	uss.ss_sp = compat_ptr(u_ss_sp);
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 	ret = do_sigaltstack(ussa ? (stack_t __user *) &uss : NULL,

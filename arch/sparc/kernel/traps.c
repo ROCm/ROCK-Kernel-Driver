@@ -147,7 +147,7 @@ void do_hw_interrupt(struct pt_regs *regs, unsigned long type)
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_ILLTRP;
-	info.si_addr = (void *)regs->pc;
+	info.si_addr = (void __user *)regs->pc;
 	info.si_trapno = type - 0x80;
 	force_sig_info(SIGILL, &info, current);
 }
@@ -170,7 +170,7 @@ void do_illegal_instruction(struct pt_regs *regs, unsigned long pc, unsigned lon
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_ILLOPC;
-	info.si_addr = (void *)pc;
+	info.si_addr = (void __user *)pc;
 	info.si_trapno = 0;
 	send_sig_info(SIGILL, &info, current);
 }
@@ -185,7 +185,7 @@ void do_priv_instruction(struct pt_regs *regs, unsigned long pc, unsigned long n
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_PRVOPC;
-	info.si_addr = (void *)pc;
+	info.si_addr = (void __user *)pc;
 	info.si_trapno = 0;
 	send_sig_info(SIGILL, &info, current);
 }
@@ -354,7 +354,7 @@ void do_fpe_trap(struct pt_regs *regs, unsigned long pc, unsigned long npc,
 	fsr = fpt->thread.fsr;
 	info.si_signo = SIGFPE;
 	info.si_errno = 0;
-	info.si_addr = (void *)pc;
+	info.si_addr = (void __user *)pc;
 	info.si_trapno = 0;
 	info.si_code = __SI_FAULT;
 	if ((fsr & 0x1c000) == (1 << 14)) {
@@ -388,7 +388,7 @@ void handle_tag_overflow(struct pt_regs *regs, unsigned long pc, unsigned long n
 	info.si_signo = SIGEMT;
 	info.si_errno = 0;
 	info.si_code = EMT_TAGOVF;
-	info.si_addr = (void *)pc;
+	info.si_addr = (void __user *)pc;
 	info.si_trapno = 0;
 	send_sig_info(SIGEMT, &info, current);
 }
@@ -417,7 +417,7 @@ void handle_reg_access(struct pt_regs *regs, unsigned long pc, unsigned long npc
 	info.si_signo = SIGBUS;
 	info.si_errno = 0;
 	info.si_code = BUS_OBJERR;
-	info.si_addr = (void *)pc;
+	info.si_addr = (void __user *)pc;
 	info.si_trapno = 0;
 	force_sig_info(SIGBUS, &info, current);
 }
@@ -430,7 +430,7 @@ void handle_cp_disabled(struct pt_regs *regs, unsigned long pc, unsigned long np
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_COPROC;
-	info.si_addr = (void *)pc;
+	info.si_addr = (void __user *)pc;
 	info.si_trapno = 0;
 	send_sig_info(SIGILL, &info, current);
 }
@@ -447,7 +447,7 @@ void handle_cp_exception(struct pt_regs *regs, unsigned long pc, unsigned long n
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_COPROC;
-	info.si_addr = (void *)pc;
+	info.si_addr = (void __user *)pc;
 	info.si_trapno = 0;
 	send_sig_info(SIGILL, &info, current);
 }
@@ -460,7 +460,7 @@ void handle_hw_divzero(struct pt_regs *regs, unsigned long pc, unsigned long npc
 	info.si_signo = SIGFPE;
 	info.si_errno = 0;
 	info.si_code = FPE_INTDIV;
-	info.si_addr = (void *)pc;
+	info.si_addr = (void __user *)pc;
 	info.si_trapno = 0;
 	send_sig_info(SIGFPE, &info, current);
 }

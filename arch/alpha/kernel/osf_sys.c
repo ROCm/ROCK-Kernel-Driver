@@ -588,7 +588,7 @@ osf_sigstack(struct sigstack __user *uss, struct sigstack __user *uoss)
 	int error;
 
 	if (uss) {
-		void *ss_sp;
+		void __user *ss_sp;
 
 		error = -EFAULT;
 		if (get_user(ss_sp, &uss->ss_sp))

@@ -6,7 +6,7 @@
 
 typedef union sigval {
 	int sival_int;
-	void *sival_ptr;
+	void __user *sival_ptr;
 } sigval_t;
 
 /*
@@ -78,7 +78,7 @@ typedef struct siginfo {
 
 		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
 		struct {
-			void *_addr; /* faulting insn/memory ref. */
+			void __user *_addr; /* faulting insn/memory ref. */
 #ifdef __ARCH_SI_TRAPNO
 			int _trapno;	/* TRAP # which caused the signal */
 #endif

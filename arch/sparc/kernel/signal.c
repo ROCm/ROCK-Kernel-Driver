@@ -439,7 +439,7 @@ setup_frame(struct sigaction *sa, struct pt_regs *regs, int signr, sigset_t *old
 	unsigned long pc = regs->pc;
 	unsigned long npc = regs->npc;
 	struct thread_info *tp = current_thread_info();
-	void *sig_address;
+	void __user *sig_address;
 	int sig_code;
 
 	synchronize_user_stack();
