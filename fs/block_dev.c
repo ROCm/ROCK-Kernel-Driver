@@ -525,7 +525,8 @@ EXPORT_SYMBOL(check_disk_change);
 static void bd_set_size(struct block_device *bdev, loff_t size)
 {
 	unsigned bsize = bdev_hardsect_size(bdev);
-	i_size_write(bdev->bd_inode, size);
+
+	bdev->bd_inode->i_size = size;
 	while (bsize < PAGE_CACHE_SIZE) {
 		if (size & bsize)
 			break;
