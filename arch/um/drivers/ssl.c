@@ -83,12 +83,12 @@ static void ssl_close(struct tty_struct *tty, struct file * filp)
 static int ssl_write(struct tty_struct * tty, int from_user,
 		     const unsigned char *buf, int count)
 {
-	return(line_write(serial_lines, tty, buf, count));
+	return(line_write(serial_lines, tty, from_user, buf, count));
 }
 
 static void ssl_put_char(struct tty_struct *tty, unsigned char ch)
 {
-	line_write(serial_lines, tty, &ch, sizeof(ch));
+	line_write(serial_lines, tty, 0, &ch, sizeof(ch));
 }
 
 static void ssl_flush_chars(struct tty_struct *tty)

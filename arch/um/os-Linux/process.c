@@ -75,9 +75,12 @@ void os_stop_process(int pid)
 	kill(pid, SIGSTOP);
 }
 
-void os_kill_process(int pid)
+void os_kill_process(int pid, int reap_child)
 {
 	kill(pid, SIGKILL);
+	if(reap_child)
+		waitpid(pid, NULL, 0);
+		
 }
 
 void os_usr1_process(int pid)

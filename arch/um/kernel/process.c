@@ -164,19 +164,18 @@ static int ptrace_child(void *arg)
 
 	if(ptrace(PTRACE_TRACEME, 0, 0, 0) < 0){
 		perror("ptrace");
-		_exit(1);
+		os_kill_process(pid, 0);
 	}
 	os_stop_process(pid);
 	_exit(os_getpid() == pid);
 }
 
-void __init check_ptrace(void)
+static int start_ptraced_child(void **stack_out)
 {
 	void *stack;
 	unsigned long sp;
-	int status, pid, n, syscall;
-
-	printk("Checking that ptrace can change system call numbers...");
+	int pid, n, status;
+	
 	stack = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC,
 		     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if(stack == MAP_FAILED)
@@ -191,6 +190,33 @@ void __init check_ptrace(void)
 	if(!WIFSTOPPED(status) || (WSTOPSIG(status) != SIGSTOP))
 		panic("check_ptrace : expected SIGSTOP, got status = %d",
 		      status);
+
+	*stack_out = stack;
+	return(pid);
+}
+
+static void stop_ptraced_child(int pid, void *stack, int exitcode)
+{
+	int status, n;
+
+	if(ptrace(PTRACE_CONT, pid, 0, 0) < 0)
+		panic("check_ptrace : ptrace failed, errno = %d", errno);
+	n = waitpid(pid, &status, 0);
+	if(!WIFEXITED(status) || (WEXITSTATUS(status) != exitcode))
+		panic("check_ptrace : child exited with status 0x%x", status);
+
+	if(munmap(stack, PAGE_SIZE) < 0)
+		panic("check_ptrace : munmap failed, errno = %d", errno);
+}
+
+void __init check_ptrace(void)
+{
+	void *stack;
+	int pid, syscall, n, status;
+
+	printk("Checking that ptrace can change system call numbers...");
+	pid = start_ptraced_child(&stack);
+
 	while(1){
 		if(ptrace(PTRACE_SYSCALL, pid, 0, 0) < 0)
 			panic("check_ptrace : ptrace failed, errno = %d", 
@@ -213,23 +239,19 @@ void __init check_ptrace(void)
 			break;
 		}
 	}
-	if(ptrace(PTRACE_CONT, pid, 0, 0) < 0)
-		panic("check_ptrace : ptrace failed, errno = %d", errno);
-	n = waitpid(pid, &status, 0);
-	if(!WIFEXITED(status) || (WEXITSTATUS(status) != 0))
-		panic("check_ptrace : child exited with status 0x%x", status);
-
-	if(munmap(stack, PAGE_SIZE) < 0)
-		panic("check_ptrace : munmap failed, errno = %d", errno);
+ 	stop_ptraced_child(pid, stack, 0);
 	printk("OK\n");
 }
 
 int run_kernel_thread(int (*fn)(void *), void *arg, void **jmp_ptr)
 {
 	jmp_buf buf;
+ 	int n;
 
 	*jmp_ptr = &buf;
-	if(setjmp(buf)) return(1);
+ 	n = setjmp(buf);
+ 	if(n != 0)
+ 		return(n);
 	(*fn)(arg);
 	return(0);
 }
@@ -242,6 +264,65 @@ void forward_pending_sigio(int target)
 		panic("forward_pending_sigio : sigpending failed");
 	if(sigismember(&sigs, SIGIO))
 		kill(target, SIGIO);
+}
+
+#ifdef CONFIG_MODE_SKAS
+static void init_registers(int pid)
+{
+	int err;
+
+	if(ptrace(PTRACE_GETREGS, pid, 0, exec_regs) < 0)
+		panic("check_ptrace : PTRACE_GETREGS failed, errno = %d", 
+		      errno);
+
+	err = ptrace(PTRACE_GETFPXREGS, pid, 0, exec_fpx_regs);
+	if(!err)
+		return;
+
+	have_fpx_regs = 0;
+	if(errno != EIO)
+		panic("check_ptrace : PTRACE_GETFPXREGS failed, errno = %d", 
+		      errno);
+
+	err = ptrace(PTRACE_GETFPREGS, pid, 0, exec_fp_regs);
+	if(err)
+		panic("check_ptrace : PTRACE_GETFPREGS failed, errno = %d", 
+		      errno);
+}
+#endif	
+
+int can_do_skas(void)
+{
+	struct ptrace_faultinfo fi;
+	void *stack;
+	int pid, n, ret = 1;
+
+	printk("Checking for the skas3 patch in the host...");
+	pid = start_ptraced_child(&stack);
+
+	n = ptrace(PTRACE_FAULTINFO, pid, 0, &fi);
+	if(n < 0){
+		if(errno == EIO)
+			printk("not found\n");
+		else printk("No (unexpected errno - %d)\n", errno);
+		ret = 0;
+	}
+	else printk("found\n");
+
+	init_registers(pid);
+	stop_ptraced_child(pid, stack, 1);
+
+	printk("Checking for /proc/mm...");
+	if(access("/proc/mm", W_OK)){
+		printk("not found\n");
+		ret = 0;
+	}
+	else printk("found\n");
+
+	return(ret);
+#else
+	return(0);
+#endif	
 }
 
 /*

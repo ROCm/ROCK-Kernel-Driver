@@ -21,13 +21,12 @@
 
 void set_sigstack(void *sig_stack, int size)
 {
-	stack_t stack;
+	stack_t stack = ((stack_t) { .ss_flags	= 0,
+				     .ss_sp	= (__ptr_t) sig_stack,
+				     .ss_size 	= size - sizeof(void *) });
 
-	stack.ss_sp = (__ptr_t) sig_stack;
-	stack.ss_flags = 0;
-	stack.ss_size = size - sizeof(void *);
 	if(sigaltstack(&stack, NULL) != 0)
-		panic("sigaltstack failed");
+		panic("enabling signal stack failed, errno = %d\n", errno);
 }
 
 void set_handler(int sig, void (*handler)(int), int flags, ...)
@@ -92,6 +91,15 @@ static int enable_mask(sigset_t *mask)
 	sigs |= sigismember(mask, SIGVTALRM) ? 0 : 1 << SIGVTALRM_BIT;
 	sigs |= sigismember(mask, SIGALRM) ? 0 : 1 << SIGVTALRM_BIT;
 	return(sigs);
+}
+
+int get_signals(void)
+{
+	sigset_t mask;
+	
+	if(sigprocmask(SIG_SETMASK, NULL, &mask) < 0)
+		panic("Failed to get signal mask");
+	return(enable_mask(&mask));
 }
 
 int get_signals(void)
