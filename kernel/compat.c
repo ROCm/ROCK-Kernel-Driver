@@ -377,18 +377,19 @@ asmlinkage long compat_sys_sched_setaffinity(compat_pid_t pid,
 					     unsigned int len,
 					     compat_ulong_t *user_mask_ptr)
 {
-	unsigned long kernel_mask;
+	cpumask_t kernel_mask;
 	mm_segment_t old_fs;
 	int ret;
 
-	if (get_user(kernel_mask, user_mask_ptr))
+	memset(&kernel_mask,0,sizeof(kernel_mask));
+	if (copy_from_user(&kernel_mask, user_mask_ptr, min((unsigned int)sizeof(kernel_mask),len)))
 		return -EFAULT;
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 	ret = sys_sched_setaffinity(pid,
 				    sizeof(kernel_mask),
-				    &kernel_mask);
+				    (unsigned long*)&kernel_mask);
 	set_fs(old_fs);
 
 	return ret;
@@ -397,7 +398,7 @@ asmlinkage long compat_sys_sched_setaffinity(compat_pid_t pid,
 asmlinkage int compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
 					    compat_ulong_t *user_mask_ptr)
 {
-	unsigned long kernel_mask;
+	cpumask_t kernel_mask;
 	mm_segment_t old_fs;
 	int ret;
 
@@ -405,12 +406,12 @@ asmlinkage int compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
 	set_fs(KERNEL_DS);
 	ret = sys_sched_getaffinity(pid,
 				    sizeof(kernel_mask),
-				    &kernel_mask);
+				    (unsigned long*)&kernel_mask);
 	set_fs(old_fs);
 
 	if (ret > 0) {
-		ret = sizeof(compat_ulong_t);
-		if (put_user(kernel_mask, user_mask_ptr))
+	    	ret = min(len,(unsigned int)sizeof(kernel_mask));
+		if (copy_to_user(user_mask_ptr, &kernel_mask, ret))
 			return -EFAULT;
 	}
 
