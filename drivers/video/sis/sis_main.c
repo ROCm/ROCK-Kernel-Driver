@@ -4512,7 +4512,9 @@ static char         *queuemode = NULL;
 static int          pdc = 0;
 static int          noaccel = -1;
 static int          noypan  = -1;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 static int          inverse = 0;
+#endif
 static int          userom = 1;
 static int          useoem = -1;
 static char         *tvstandard = NULL;
@@ -4690,8 +4692,9 @@ int init_module(void)
 	/* TW: Panning only with acceleration */
 	if(sisfb_accel == 0)  sisfb_ypan = 0;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	if(inverse)           sisfb_inverse = 1;
-
+#endif
 	if(mem)		      sisfb_mem = mem;
 
 	sisfb_userom = userom;
