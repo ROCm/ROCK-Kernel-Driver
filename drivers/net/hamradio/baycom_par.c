@@ -274,9 +274,6 @@ static void par96_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	struct net_device *dev = (struct net_device *)dev_id;
 	struct baycom_state *bc = netdev_priv(dev);
 
-	if (!dev || !bc || bc->hdrv.magic != HDLCDRV_MAGIC)
-		return;
-
 	baycom_int_freq(bc);
 	/*
 	 * check if transmitter active
