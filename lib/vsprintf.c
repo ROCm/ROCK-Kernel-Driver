@@ -618,7 +618,7 @@ int vsscanf(const char * buf, const char * fmt, va_list args)
 				field_width = 1;
 			do {
 				*s++ = *str++;
-			} while(field_width-- > 0 && *str);
+			} while (--field_width > 0 && *str);
 			num++;
 		}
 		continue;
