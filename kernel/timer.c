@@ -1411,10 +1411,10 @@ static inline u64 time_interpolator_get_cycles(unsigned int src)
 			return x();
 
 		case TIME_SOURCE_MMIO64	:
-			return readq(time_interpolator->addr);
+			return readq((void __iomem *) time_interpolator->addr);
 
 		case TIME_SOURCE_MMIO32	:
-			return readl(time_interpolator->addr);
+			return readl((void __iomem *) time_interpolator->addr);
 
 		default: return get_cycles();
 	}
