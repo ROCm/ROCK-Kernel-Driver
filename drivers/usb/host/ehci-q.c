@@ -986,13 +986,10 @@ static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	struct ehci_qh	*prev;
 
 #ifdef DEBUG
+	assert_spin_locked(&ehci->lock);
 	if (ehci->reclaim
 			|| (qh->qh_state != QH_STATE_LINKED
 				&& qh->qh_state != QH_STATE_UNLINK_WAIT)
-#ifdef CONFIG_SMP
-// this macro lies except on SMP compiles
-			|| !spin_is_locked (&ehci->lock)
-#endif
 			)
 		BUG ();
 #endif

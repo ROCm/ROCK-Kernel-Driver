@@ -62,7 +62,7 @@
 #define RAID6_PARANOIA	1	/* Check spinlocks */
 #define RAID6_DUMPSTATE 0	/* Include stripe cache state in /proc/mdstat */
 #if RAID6_PARANOIA && defined(CONFIG_SMP)
-# define CHECK_DEVLOCK() if (!spin_is_locked(&conf->device_lock)) BUG()
+# define CHECK_DEVLOCK() assert_spin_locked(&conf->device_lock)
 #else
 # define CHECK_DEVLOCK()
 #endif
