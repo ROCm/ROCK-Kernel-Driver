@@ -739,11 +739,9 @@ stop_activity (struct dummy *dum, struct usb_gadget_driver *driver)
 	struct dummy_ep	*ep;
 
 	/* prevent any more requests */
-	dum->hdev = 0;
 	dum->address = 0;
 
-	/* this might not succeed ... */
-	del_timer (&dum->timer);
+	/* The timer is left running so that outstanding URBs can fail */
 
 	/* nuke any pending requests first, so driver i/o is quiesced */
 	list_for_each_entry (ep, &dum->gadget.ep_list, ep.ep_list)
@@ -784,7 +782,6 @@ usb_gadget_unregister_driver (struct usb_gadget_driver *driver)
 
 	driver_unregister (&driver->driver);
 
-	del_timer_sync (&dum->timer);
 	return 0;
 }
 EXPORT_SYMBOL (usb_gadget_unregister_driver);
