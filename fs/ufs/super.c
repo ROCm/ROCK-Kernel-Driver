@@ -1129,7 +1129,7 @@ static int ufs_statfs (struct super_block *sb, struct kstatfs *buf)
 	flags = UFS_SB(sb)->s_flags;
 	if ((flags & UFS_TYPE_MASK) == UFS_TYPE_UFS2) {
 		buf->f_type = UFS2_MAGIC;
-		buf->f_blocks = usb->fs_u11.fs_u2.fs_dsize;
+		buf->f_blocks = fs64_to_cpu(sb, usb->fs_u11.fs_u2.fs_dsize);
 		buf->f_bfree = ufs_blkstofrags(fs64_to_cpu(sb, usb->fs_u11.fs_u2.fs_cstotal.cs_nbfree)) +
 			fs64_to_cpu(sb, usb->fs_u11.fs_u2.fs_cstotal.cs_nffree);
 		buf->f_ffree = fs64_to_cpu(sb,

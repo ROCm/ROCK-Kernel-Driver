@@ -412,7 +412,7 @@ ufs_add_fragments (struct inode * inode, unsigned fragment,
 	count = newcount - oldcount;
 	
 	cgno = ufs_dtog(fragment);
-	if (UFS_SB(sb)->fs_cs(cgno).cs_nffree < count)
+	if (fs32_to_cpu(sb, UFS_SB(sb)->fs_cs(cgno).cs_nffree) < count)
 		return 0;
 	if ((ufs_fragnum (fragment) + newcount) > uspi->s_fpb)
 		return 0;
