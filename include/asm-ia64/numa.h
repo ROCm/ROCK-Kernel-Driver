@@ -4,7 +4,7 @@
  * for more details.
  *
  * This file contains NUMA specific prototypes and definitions.
- * 
+ *
  * 2002/08/05 Erich Focht <efocht@ess.nec.de>
  *
  */
@@ -12,12 +12,17 @@
 #define _ASM_IA64_NUMA_H
 
 #include <linux/config.h>
-#include <linux/cpumask.h>
 
 #ifdef CONFIG_NUMA
 
-#include <linux/numa.h>
 #include <linux/cache.h>
+#include <linux/cache.h>
+#include <linux/cpumask.h>
+#include <linux/numa.h>
+#include <linux/smp.h>
+#include <linux/threads.h>
+
+#include <asm/mmzone.h>
 
 extern volatile char cpu_to_node_map[NR_CPUS] __cacheline_aligned;
 extern volatile cpumask_t node_to_cpu_mask[MAX_NUMNODES] __cacheline_aligned;

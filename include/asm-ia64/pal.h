@@ -405,10 +405,11 @@ typedef struct pal_process_state_info_s {
 						 * generated.
 						 * (Trap Lost )
 						 */
-			op		: 3,	/* Operation that
-						 * caused the machine
-						 * check
+			mi		: 1,	/* More information available
+						 * call PAL_MC_ERROR_INFO
 						 */
+			pi		: 1,	/* Precise instruction pointer */
+			pm		: 1,	/* Precise min-state save area */
 
 			dy		: 1,	/* Processor dynamic
 						 * state valid
@@ -450,11 +451,12 @@ typedef struct pal_process_state_info_s {
 						 * by the processor
 						 */
 
-			reserved2	: 12,
+			reserved2	: 11,
 			cc		: 1,	/* Cache check */
 			tc		: 1,	/* TLB check */
 			bc		: 1,	/* Bus check */
-			uc		: 1;	/* Unknown check */
+			rc		: 1,	/* Register file check */
+			uc		: 1;	/* Uarch check */
 
 } pal_processor_state_info_t;
 

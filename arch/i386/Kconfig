@@ -1170,26 +1170,6 @@ config MAGIC_SYSRQ
 	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
 	  unless you really know what this hack does.
 
-config EARLY_PRINTK
-	bool "Early console support"
-	default n
-	depends on DEBUG_KERNEL
-	help
-	  Write kernel log output directly into the VGA buffer or serial port. 
-	  This is useful for kernel debugging when your machine crashes very 
-	  early before the console code is initialized. For normal operation 
-	  it is not recommended because it looks ugly and doesn't cooperate 
-	  with klogd/syslogd or the X server.You should normally N here, 
-	  unless you want to debug such a crash.
-
-	  Syntax: earlyprintk=vga
-		  earlyprintk=serial[,ttySn[,baudrate]] 
-	  Append ,keep to not disable it when the real console takes over.
-	  Only vga or serial at a time, not both.
-	  Currently only ttyS0 and ttyS1 are supported. 
-	  Interaction with the standard serial driver is not very good. 
-	  The VGA output is eventually overwritten by the real console.
-
 config DEBUG_SPINLOCK
 	bool "Spinlock debugging"
 	depends on DEBUG_KERNEL

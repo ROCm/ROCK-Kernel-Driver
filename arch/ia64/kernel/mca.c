@@ -828,7 +828,7 @@ ia64_mca_wakeup_ipi_wait(void)
 			irr = ia64_getreg(_IA64_REG_CR_IRR3);
 			break;
 		}
-	} while (!(irr & (1 << irr_bit))) ;
+	} while (!(irr & (1UL << irr_bit))) ;
 }
 
 /*

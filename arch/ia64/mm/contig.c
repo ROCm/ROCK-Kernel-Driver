@@ -25,6 +25,10 @@
 #include <asm/pgtable.h>
 #include <asm/sections.h>
 
+#ifdef CONFIG_VIRTUAL_MEM_MAP
+static unsigned long num_dma_physpages;
+#endif
+
 /**
  * show_mem - display a memory statistics summary
  *
@@ -160,4 +164,134 @@ find_memory (void)
 	reserve_bootmem(bootmap_start, bootmap_size);
 
 	find_initrd();
+}
+
+#ifdef CONFIG_SMP
+/**
+ * per_cpu_init - setup per-cpu variables
+ *
+ * Allocate and setup per-cpu data areas.
+ */
+void *
+per_cpu_init (void)
+{
+	void *cpu_data;
+	int cpu;
+
+	/*
+	 * get_free_pages() cannot be used before cpu_init() done.  BSP
+	 * allocates "NR_CPUS" pages for all CPUs to avoid that AP calls
+	 * get_zeroed_page().
+	 */
+	if (smp_processor_id() == 0) {
+		cpu_data = __alloc_bootmem(PERCPU_PAGE_SIZE * NR_CPUS,
+					   PERCPU_PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
+		for (cpu = 0; cpu < NR_CPUS; cpu++) {
+			memcpy(cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
+			__per_cpu_offset[cpu] = (char *) cpu_data - __per_cpu_start;
+			cpu_data += PERCPU_PAGE_SIZE;
+			per_cpu(local_per_cpu_offset, cpu) = __per_cpu_offset[cpu];
+		}
+	}
+	return __per_cpu_start + __per_cpu_offset[smp_processor_id()];
+}
+#endif /* CONFIG_SMP */
+
+static int
+count_pages (u64 start, u64 end, void *arg)
+{
+	unsigned long *count = arg;
+
+	*count += (end - start) >> PAGE_SHIFT;
+	return 0;
+}
+
+#ifdef CONFIG_VIRTUAL_MEM_MAP
+static int
+count_dma_pages (u64 start, u64 end, void *arg)
+{
+	unsigned long *count = arg;
+
+	if (end <= MAX_DMA_ADDRESS)
+		*count += (end - start) >> PAGE_SHIFT;
+	return 0;
+}
+#endif
+
+/*
+ * Set up the page tables.
+ */
+
+void
+paging_init (void)
+{
+	unsigned long max_dma;
+	unsigned long zones_size[MAX_NR_ZONES];
+#ifdef CONFIG_VIRTUAL_MEM_MAP
+	unsigned long zholes_size[MAX_NR_ZONES];
+	unsigned long max_gap;
+#endif
+
+	/* initialize mem_map[] */
+
+	memset(zones_size, 0, sizeof(zones_size));
+
+	num_physpages = 0;
+	efi_memmap_walk(count_pages, &num_physpages);
+
+	max_dma = virt_to_phys((void *) MAX_DMA_ADDRESS) >> PAGE_SHIFT;
+
+#ifdef CONFIG_VIRTUAL_MEM_MAP
+	memset(zholes_size, 0, sizeof(zholes_size));
+
+	num_dma_physpages = 0;
+	efi_memmap_walk(count_dma_pages, &num_dma_physpages);
+
+	if (max_low_pfn < max_dma) {
+		zones_size[ZONE_DMA] = max_low_pfn;
+		zholes_size[ZONE_DMA] = max_low_pfn - num_dma_physpages;
+	} else {
+		zones_size[ZONE_DMA] = max_dma;
+		zholes_size[ZONE_DMA] = max_dma - num_dma_physpages;
+		if (num_physpages > num_dma_physpages) {
+			zones_size[ZONE_NORMAL] = max_low_pfn - max_dma;
+			zholes_size[ZONE_NORMAL] =
+				((max_low_pfn - max_dma) -
+				 (num_physpages - num_dma_physpages));
+		}
+	}
+
+	max_gap = 0;
+	efi_memmap_walk(find_largest_hole, (u64 *)&max_gap);
+	if (max_gap < LARGE_GAP) {
+		vmem_map = (struct page *) 0;
+		free_area_init_node(0, &contig_page_data, NULL, zones_size, 0,
+				    zholes_size);
+		mem_map = contig_page_data.node_mem_map;
+	} else {
+		unsigned long map_size;
+
+		/* allocate virtual_mem_map */
+
+		map_size = PAGE_ALIGN(max_low_pfn * sizeof(struct page));
+		vmalloc_end -= map_size;
+		vmem_map = (struct page *) vmalloc_end;
+		efi_memmap_walk(create_mem_map_page_table, 0);
+
+		free_area_init_node(0, &contig_page_data, vmem_map, zones_size,
+				    0, zholes_size);
+
+		mem_map = contig_page_data.node_mem_map;
+		printk("Virtual mem_map starts at 0x%p\n", mem_map);
+	}
+#else /* !CONFIG_VIRTUAL_MEM_MAP */
+	if (max_low_pfn < max_dma)
+		zones_size[ZONE_DMA] = max_low_pfn;
+	else {
+		zones_size[ZONE_DMA] = max_dma;
+		zones_size[ZONE_NORMAL] = max_low_pfn - max_dma;
+	}
+	free_area_init(zones_size);
+#endif /* !CONFIG_VIRTUAL_MEM_MAP */
+	zero_page_memmap_ptr = virt_to_page(ia64_imva(empty_zero_page));
 }

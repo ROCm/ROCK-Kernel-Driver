@@ -38,7 +38,6 @@
 #include <linux/moduleparam.h>
 #include <linux/writeback.h>
 #include <linux/cpu.h>
-#include <linux/early_printk.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -395,8 +394,6 @@ asmlinkage void __init start_kernel(void)
  */
 	lock_kernel();
 	printk(linux_banner);
-	setup_early_printk();
-	
 	setup_arch(&command_line);
 	setup_per_zone_pages_min();
 	setup_per_cpu_areas();

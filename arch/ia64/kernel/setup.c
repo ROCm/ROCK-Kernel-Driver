@@ -30,6 +30,8 @@
 #include <linux/string.h>
 #include <linux/threads.h>
 #include <linux/tty.h>
+#include <linux/serial.h>
+#include <linux/serial_core.h>
 #include <linux/efi.h>
 #include <linux/initrd.h>
 
@@ -43,6 +45,7 @@
 #include <asm/processor.h>
 #include <asm/sal.h>
 #include <asm/sections.h>
+#include <asm/serial.h>
 #include <asm/smp.h>
 #include <asm/system.h>
 #include <asm/unistd.h>
@@ -101,7 +104,7 @@ int
 filter_rsvd_memory (unsigned long start, unsigned long end, void *arg)
 {
 	unsigned long range_start, range_end, prev_start;
-	void (*func)(unsigned long, unsigned long);
+	void (*func)(unsigned long, unsigned long, int);
 	int i;
 
 #if IGNORE_PFN0
@@ -122,11 +125,7 @@ filter_rsvd_memory (unsigned long start, unsigned long end, void *arg)
 		range_end   = min(end, rsvd_region[i].start);
 
 		if (range_start < range_end)
-#ifdef CONFIG_DISCONTIGMEM
-			call_pernode_memory(__pa(range_start), __pa(range_end), func);
-#else
-			(*func)(__pa(range_start), range_end - range_start);
-#endif
+			call_pernode_memory(__pa(range_start), range_end - range_start, func);
 
 		/* nothing more available in this segment */
 		if (range_end == end) return 0;
@@ -225,6 +224,25 @@ find_initrd (void)
 #endif
 }
 
+#ifdef CONFIG_SERIAL_8250_CONSOLE
+static void __init
+setup_serial_legacy (void)
+{
+	struct uart_port port;
+	unsigned int i, iobase[] = {0x3f8, 0x2f8};
+
+	printk(KERN_INFO "Registering legacy COM ports for serial console\n");
+	memset(&port, 0, sizeof(port));
+	port.iotype = SERIAL_IO_PORT;
+	port.uartclk = BASE_BAUD * 16;
+	for (i = 0; i < ARRAY_SIZE(iobase); i++) {
+		port.line = i;
+		port.iobase = iobase[i];
+		early_serial_setup(&port);
+	}
+}
+#endif
+
 void __init
 setup_arch (char **cmdline_p)
 {
@@ -239,7 +257,6 @@ setup_arch (char **cmdline_p)
 	strlcpy(saved_command_line, *cmdline_p, sizeof(saved_command_line));
 
 	efi_init();
-	find_memory();
 
 #ifdef CONFIG_ACPI_BOOT
 	/* Initialize the ACPI boot-time table parser */
@@ -252,6 +269,8 @@ setup_arch (char **cmdline_p)
 	smp_build_cpu_map();	/* happens, e.g., with the Ski simulator */
 # endif
 #endif /* CONFIG_APCI_BOOT */
+
+	find_memory();
 
 	/* process SAL system table: */
 	ia64_sal_init(efi.sal_systab);
@@ -297,11 +316,22 @@ setup_arch (char **cmdline_p)
 #ifdef CONFIG_SERIAL_8250_HCDP
 	if (efi.hcdp) {
 		void setup_serial_hcdp(void *);
-
-		/* Setup the serial ports described by HCDP */
 		setup_serial_hcdp(efi.hcdp);
 	}
 #endif
+#ifdef CONFIG_SERIAL_8250_CONSOLE
+	/*
+	 * Without HCDP, we won't discover any serial ports until the serial driver looks
+	 * in the ACPI namespace.  If ACPI claims there are some legacy devices, register
+	 * the legacy COM ports so serial console works earlier.  This is slightly dangerous
+	 * because we don't *really* know whether there's anything there, but we hope that
+	 * all new boxes will implement HCDP.
+	 */
+	extern unsigned char acpi_legacy_devices;
+	if (!efi.hcdp && acpi_legacy_devices)
+		setup_serial_legacy();
+#endif
+
 #ifdef CONFIG_VT
 # if defined(CONFIG_DUMMY_CONSOLE)
 	conswitchp = &dummy_con;
@@ -544,28 +574,7 @@ cpu_init (void)
 	struct cpuinfo_ia64 *cpu_info;
 	void *cpu_data;
 
-#ifdef CONFIG_SMP
-	int cpu;
-
-	/*
-	 * get_free_pages() cannot be used before cpu_init() done.  BSP allocates
-	 * "NR_CPUS" pages for all CPUs to avoid that AP calls get_zeroed_page().
-	 */
-	if (smp_processor_id() == 0) {
-		cpu_data = __alloc_bootmem(PERCPU_PAGE_SIZE * NR_CPUS, PERCPU_PAGE_SIZE,
-					   __pa(MAX_DMA_ADDRESS));
-		for (cpu = 0; cpu < NR_CPUS; cpu++) {
-			memcpy(cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
-			__per_cpu_offset[cpu] = (char *) cpu_data - __per_cpu_start;
-			cpu_data += PERCPU_PAGE_SIZE;
-
-			per_cpu(local_per_cpu_offset, cpu) = __per_cpu_offset[cpu];
-		}
-	}
-	cpu_data = __per_cpu_start + __per_cpu_offset[smp_processor_id()];
-#else /* !CONFIG_SMP */
-	cpu_data = __phys_per_cpu_start;
-#endif /* !CONFIG_SMP */
+	cpu_data = per_cpu_init();
 
 	get_max_cacheline_size();
 
@@ -576,9 +585,6 @@ cpu_init (void)
 	 * accessing cpu_data() through the canonical per-CPU address.
 	 */
 	cpu_info = cpu_data + ((char *) &__ia64_per_cpu_var(cpu_info) - __per_cpu_start);
-#ifdef CONFIG_NUMA
-	cpu_info->node_data = get_node_data_ptr();
-#endif
 	identify_cpu(cpu_info);
 
 #ifdef CONFIG_MCKINLEY

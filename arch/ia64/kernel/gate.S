@@ -118,8 +118,7 @@ GLOBAL_ENTRY(__kernel_syscall_via_epc)
 
 	mov r10=-1
 	mov r8=ENOSYS
-	MCKINLEY_E9_WORKAROUND
-	br.ret.sptk.many b6
+	FSYS_RETURN
 END(__kernel_syscall_via_epc)
 
 #	define ARG0_OFF		(16 + IA64_SIGFRAME_ARG0_OFFSET)

@@ -65,8 +65,12 @@ itc_update (long delta_nsec)
 }
 
 /*
- * Return the number of nano-seconds that elapsed since the last update to jiffy.  The
- * xtime_lock must be at least read-locked when calling this routine.
+ * Return the number of nano-seconds that elapsed since the last
+ * update to jiffy.  It is quite possible that the timer interrupt
+ * will interrupt this and result in a race for any of jiffies,
+ * wall_jiffies or itm_next.  Thus, the xtime_lock must be at least
+ * read synchronised when calling this routine (see do_gettimeofday()
+ * below for an example).
  */
 unsigned long
 itc_get_offset (void)
@@ -77,11 +81,6 @@ itc_get_offset (void)
 	last_tick = (cpu_data(TIME_KEEPER_ID)->itm_next
 		     - (lost + 1)*cpu_data(TIME_KEEPER_ID)->itm_delta);
 
-	if (unlikely((long) (now - last_tick) < 0)) {
-		printk(KERN_ERR "CPU %d: now < last_tick (now=0x%lx,last_tick=0x%lx)!\n",
-		       smp_processor_id(), now, last_tick);
-		return last_nsec_offset;
-	}
 	elapsed_cycles = now - last_tick;
 	return (elapsed_cycles*local_cpu_data->nsec_per_cyc) >> IA64_NSEC_PER_CYC_SHIFT;
 }
