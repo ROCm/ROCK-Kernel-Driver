@@ -33,6 +33,8 @@
 
 /* ------------------------------------------------------------------ */
 
+#define TS_PACKET_SIZE 188 /* TS packets 188 bytes */
+
 static unsigned int ts_debug  = 0;
 MODULE_PARM(ts_debug,"i");
 MODULE_PARM_DESC(ts_debug,"enable debug messages [ts]");
@@ -41,8 +43,9 @@ static unsigned int tsbufs = 4;
 MODULE_PARM(tsbufs,"i");
 MODULE_PARM_DESC(tsbufs,"number of ts buffers, range 2-32");
 
-#define TS_PACKET_SIZE 188 /* TS packets 188 bytes */
-#define TS_NR_PACKETS 312
+static unsigned int ts_nr_packets = 30;
+MODULE_PARM(ts_nr_packets,"i");
+MODULE_PARM_DESC(ts_nr_packets,"size of a ts buffers (in ts packets)");
 
 #define dprintk(fmt, arg...)	if (ts_debug) \
 	printk(KERN_DEBUG "%s/ts: " fmt, dev->name , ## arg)
@@ -96,7 +99,7 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 	dprintk("buffer_prepare [%p,%s]\n",buf,v4l2_field_names[field]);
 
 	llength = TS_PACKET_SIZE;
-	lines = TS_NR_PACKETS;
+	lines = ts_nr_packets;
 	
 	size = lines * llength;
 	if (0 != buf->vb.baddr  &&  buf->vb.bsize < size)
@@ -135,7 +138,7 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 static int
 buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
 {
-	*size = TS_PACKET_SIZE * TS_NR_PACKETS;
+	*size = TS_PACKET_SIZE * ts_nr_packets;
 	if (0 == *count)
 		*count = tsbufs;
 	*count = saa7134_buffer_count(*size,*count);
@@ -353,7 +356,7 @@ static int ts_do_ioctl(struct inode *inode, struct file *file,
 		f->fmt.pix.width        = 720; /* D1 */
 		f->fmt.pix.height       = 576;
 		f->fmt.pix.pixelformat  = V4L2_PIX_FMT_MPEG;
-		f->fmt.pix.sizeimage    = TS_PACKET_SIZE*TS_NR_PACKETS;
+		f->fmt.pix.sizeimage    = TS_PACKET_SIZE*ts_nr_packets;
 		return 0;
 	}
 	
@@ -379,7 +382,7 @@ static int ts_do_ioctl(struct inode *inode, struct file *file,
 		f->fmt.pix.width        = 720; /* D1 */
 		f->fmt.pix.height       = 576;
 		f->fmt.pix.pixelformat  = V4L2_PIX_FMT_MPEG;
-		f->fmt.pix.sizeimage    = TS_PACKET_SIZE*TS_NR_PACKETS;
+		f->fmt.pix.sizeimage    = TS_PACKET_SIZE*ts_nr_packets;
 		return 0;
 	}
 
@@ -408,7 +411,7 @@ static int ts_do_ioctl(struct inode *inode, struct file *file,
 
 	case MPEG_SETPARAMS:
 		return ts_init_encoder(dev, arg);
-	  
+
 	default:
 		return -ENOIOCTLCMD;
 	}
@@ -455,6 +458,10 @@ int saa7134_ts_init1(struct saa7134_dev *dev)
 		tsbufs = 2;
 	if (tsbufs > VIDEO_MAX_FRAME)
 		tsbufs = VIDEO_MAX_FRAME;
+	if (ts_nr_packets < 4)
+		ts_nr_packets = 4;
+	if (ts_nr_packets > 312)
+		ts_nr_packets = 312;
 
 	INIT_LIST_HEAD(&dev->ts_q.queue);
 	init_timer(&dev->ts_q.timeout);
@@ -472,9 +479,9 @@ int saa7134_ts_init1(struct saa7134_dev *dev)
 	saa_writeb(SAA7134_TS_SERIAL1, 0x00);  /* deactivate TS softreset */
 	saa_writeb(SAA7134_TS_PARALLEL, 0xec); /* TSSOP high active, TSVAL high active, TSLOCK ignored */
 	saa_writeb(SAA7134_TS_PARALLEL_SERIAL, (TS_PACKET_SIZE-1));
-	saa_writeb(SAA7134_TS_DMA0, ((TS_NR_PACKETS-1)&0xff));
-	saa_writeb(SAA7134_TS_DMA1, (((TS_NR_PACKETS-1)>>8)&0xff));
-	saa_writeb(SAA7134_TS_DMA2, ((((TS_NR_PACKETS-1)>>16)&0x3f) | 0x00)); /* TSNOPIT=0, TSCOLAP=0 */	 
+	saa_writeb(SAA7134_TS_DMA0, ((ts_nr_packets-1)&0xff));
+	saa_writeb(SAA7134_TS_DMA1, (((ts_nr_packets-1)>>8)&0xff));
+	saa_writeb(SAA7134_TS_DMA2, ((((ts_nr_packets-1)>>16)&0x3f) | 0x00)); /* TSNOPIT=0, TSCOLAP=0 */
  
 	return 0;
 }

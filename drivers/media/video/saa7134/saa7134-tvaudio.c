@@ -37,10 +37,6 @@ static unsigned int audio_debug = 0;
 MODULE_PARM(audio_debug,"i");
 MODULE_PARM_DESC(audio_debug,"enable debug messages [tv audio]");
 
-static unsigned int audio_carrier = 0;
-MODULE_PARM(audio_carrier,"i");
-MODULE_PARM_DESC(audio_carrier,"audio carrier location");
-
 static unsigned int audio_ddep = 0;
 MODULE_PARM(audio_ddep,"i");
 MODULE_PARM_DESC(audio_ddep,"audio ddep overwrite");
@@ -66,6 +62,30 @@ MODULE_PARM_DESC(audio_clock_tweak, "Audio clock tick fine tuning for cards with
 
 /* ------------------------------------------------------------------ */
 /* saa7134 code                                                       */
+
+static struct mainscan {
+	char         *name;
+	v4l2_std_id  std;
+	int          carr;
+} mainscan[] = {
+	{
+		.name = "M",
+		.std  = V4L2_STD_NTSC | V4L2_STD_PAL_M,
+		.carr = 4500,
+	},{
+		.name = "BG",
+		.std  = V4L2_STD_PAL_BG,
+		.carr = 5500,
+	},{
+		.name = "I",
+		.std  = V4L2_STD_PAL_I,
+		.carr = 6000,
+	},{
+		.name = "DKL",
+		.std  = V4L2_STD_PAL_DK | V4L2_STD_SECAM,
+		.carr = 6500,
+	}
+};
 
 static struct saa7134_tvaudio tvaudio[] = {
 	{
@@ -314,15 +334,15 @@ static int tvaudio_sleep(struct saa7134_dev *dev, int timeout)
 	return dev->thread.scan1 != dev->thread.scan2;
 }
 
-static int tvaudio_checkcarrier(struct saa7134_dev *dev, int carrier)
+static int tvaudio_checkcarrier(struct saa7134_dev *dev, struct mainscan *scan)
 {
 	__s32 left,right,value;
 
 	if (audio_debug > 1) {
 		int i;
-		dprintk("debug %d:",carrier);
+		dprintk("debug %d:",scan->carr);
 		for (i = -150; i <= 150; i += 30) {
-			tvaudio_setcarrier(dev,carrier+i,carrier+i);
+			tvaudio_setcarrier(dev,scan->carr+i,scan->carr+i);
 			saa_readl(SAA7134_LEVEL_READOUT1 >> 2);
 			if (tvaudio_sleep(dev,SCAN_SAMPLE_DELAY))
 				return -1;
@@ -334,24 +354,31 @@ static int tvaudio_checkcarrier(struct saa7134_dev *dev, int carrier)
 		}
 		printk("\n");
 	}
-	
-	tvaudio_setcarrier(dev,carrier-90,carrier-90);
-	saa_readl(SAA7134_LEVEL_READOUT1 >> 2);
-	if (tvaudio_sleep(dev,SCAN_SAMPLE_DELAY))
-		return -1;
-	left = saa_readl(SAA7134_LEVEL_READOUT1 >> 2);
 
-	tvaudio_setcarrier(dev,carrier+90,carrier+90);
-	saa_readl(SAA7134_LEVEL_READOUT1 >> 2);
-	if (tvaudio_sleep(dev,SCAN_SAMPLE_DELAY))
-		return -1;
-	right = saa_readl(SAA7134_LEVEL_READOUT1 >> 2);
+	if (dev->tvnorm->id & scan->std) {
+		tvaudio_setcarrier(dev,scan->carr-90,scan->carr-90);
+		saa_readl(SAA7134_LEVEL_READOUT1 >> 2);
+		if (tvaudio_sleep(dev,SCAN_SAMPLE_DELAY))
+			return -1;
+		left = saa_readl(SAA7134_LEVEL_READOUT1 >> 2);
 
-	left >>= 16;
-        right >>= 16;
-	value = left > right ? left - right : right - left;
-	dprintk("scanning %d.%03d MHz =>  dc is %5d [%d/%d]\n",
-		carrier/1000,carrier%1000,value,left,right);
+		tvaudio_setcarrier(dev,scan->carr+90,scan->carr+90);
+		saa_readl(SAA7134_LEVEL_READOUT1 >> 2);
+		if (tvaudio_sleep(dev,SCAN_SAMPLE_DELAY))
+			return -1;
+		right = saa_readl(SAA7134_LEVEL_READOUT1 >> 2);
+
+		left >>= 16;
+		right >>= 16;
+		value = left > right ? left - right : right - left;
+		dprintk("scanning %d.%03d MHz [%4s] =>  dc is %5d [%d/%d]\n",
+			scan->carr / 1000, scan->carr % 1000,
+			scan->name, value, left, right);
+	} else {
+		value = 0;
+		dprintk("skipping %d.%03d MHz [%4s]\n",
+			scan->carr / 1000, scan->carr % 1000, scan->name);
+	}
 	return value;
 }
 
@@ -384,6 +411,7 @@ static int tvaudio_getstereo(struct saa7134_dev *dev, struct saa7134_tvaudio *au
 	case TVAUDIO_FM_K_STEREO:
 	case TVAUDIO_FM_BG_STEREO:
 		idp = (saa_readb(SAA7134_IDENT_SIF) & 0xe0) >> 5;
+		dprintk("getstereo: fm/stereo: idp=0x%x\n",idp);
 		if (0x03 == (idp & 0x03))
 			retval = V4L2_TUNER_SUB_LANG1 | V4L2_TUNER_SUB_LANG2;
 		else if (0x05 == (idp & 0x05))
@@ -397,6 +425,7 @@ static int tvaudio_getstereo(struct saa7134_dev *dev, struct saa7134_tvaudio *au
 	case TVAUDIO_NICAM_FM:
 	case TVAUDIO_NICAM_AM:
 		nicam = saa_readb(SAA7134_NICAM_STATUS);
+		dprintk("getstereo: nicam=0x%x\n",nicam);
 		switch (nicam & 0x0b) {
 		case 0x08:
 			retval = V4L2_TUNER_SUB_MONO;
@@ -458,16 +487,10 @@ static int tvaudio_setstereo(struct saa7134_dev *dev, struct saa7134_tvaudio *au
 
 static int tvaudio_thread(void *data)
 {
-#define MAX_SCAN 4
-	static const int carr_pal[MAX_SCAN]     = { 5500, 6000, 6500 };
-	static const int carr_ntsc[MAX_SCAN]    = { 4500 };
-	static const int carr_secam[MAX_SCAN]   = { 6500 };
-	static const int carr_default[MAX_SCAN] = { 4500, 5500, 6000, 6500 };
 	struct saa7134_dev *dev = data;
-	const int *carr_scan;
-	int carr_vals[4];
-	unsigned int i, audio;
-	int max1,max2,carrier,rx,mode,lastmode;
+	int carr_vals[ARRAY_SIZE(mainscan)];
+	unsigned int i, audio, nscan;
+	int max1,max2,carrier,rx,mode,lastmode,default_carrier;
 
 	daemonize("%s", dev->name);
 	allow_signal(SIGTERM);
@@ -488,32 +511,40 @@ static int tvaudio_thread(void *data)
 		if (tvaudio_sleep(dev,SCAN_INITIAL_DELAY))
 			goto restart;
 
-		/* find the main carrier */
-		carr_scan = carr_default;
-		if (dev->tvnorm->id & V4L2_STD_PAL)
-			carr_scan = carr_pal;
-		if (dev->tvnorm->id & V4L2_STD_NTSC)
-			carr_scan = carr_ntsc;
-		if (dev->tvnorm->id & V4L2_STD_SECAM)
-			carr_scan = carr_secam;
-		saa_writeb(SAA7134_MONITOR_SELECT,0x00);
-		tvaudio_setmode(dev,&tvaudio[0],NULL);
-		for (i = 0; i < MAX_SCAN; i++) {
-			if (!carr_scan[i])
+		max1 = 0;
+		max2 = 0;
+		nscan = 0;
+		carrier = 0;
+		default_carrier = 0;
+		for (i = 0; i < ARRAY_SIZE(mainscan); i++) {
+			if (!(dev->tvnorm->id & mainscan[i].std))
 				continue;
-			carr_vals[i] = tvaudio_checkcarrier(dev,carr_scan[i]);
-			if (dev->thread.scan1 != dev->thread.scan2)
-				goto restart;
+			if (!default_carrier)
+				default_carrier = mainscan[i].carr;
+			nscan++;
 		}
-		for (carrier = 0, max1 = 0, max2 = 0, i = 0; i < MAX_SCAN; i++) {
-			if (!carr_scan[i])
-				continue;
-			if (max1 < carr_vals[i]) {
-				max2 = max1;
-				max1 = carr_vals[i];
-				carrier = carr_scan[i];
-			} else if (max2 < carr_vals[i]) {
-				max2 = carr_vals[i];
+
+		if (1 == nscan) {
+			/* only one candidate -- skip scan ;) */
+			max1 = 12345;
+			carrier = default_carrier;
+		} else {
+			/* scan for the main carrier */
+			saa_writeb(SAA7134_MONITOR_SELECT,0x00);
+			tvaudio_setmode(dev,&tvaudio[0],NULL);
+			for (i = 0; i < ARRAY_SIZE(mainscan); i++) {
+				carr_vals[i] = tvaudio_checkcarrier(dev, mainscan+i);
+				if (dev->thread.scan1 != dev->thread.scan2)
+					goto restart;
+			}
+			for (max1 = 0, max2 = 0, i = 0; i < ARRAY_SIZE(mainscan); i++) {
+				if (max1 < carr_vals[i]) {
+					max2 = max1;
+					max1 = carr_vals[i];
+					carrier = mainscan[i].carr;
+				} else if (max2 < carr_vals[i]) {
+					max2 = carr_vals[i];
+				}
 			}
 		}
 
@@ -523,21 +554,17 @@ static int tvaudio_thread(void *data)
 				dev->tvnorm->name, carrier/1000, carrier%1000,
 				max1, max2);
 			dev->last_carrier = carrier;
-		} else if (0 != audio_carrier) {
-			/* no carrier -- try insmod option as fallback */
-			carrier = audio_carrier;
-			printk(KERN_WARNING "%s/audio: audio carrier scan failed, "
-			       "using %d.%03d MHz [insmod option]\n",
-			       dev->name, carrier/1000, carrier%1000);
+
 		} else if (0 != dev->last_carrier) {
 			/* no carrier -- try last detected one as fallback */
 			carrier = dev->last_carrier;
 			printk(KERN_WARNING "%s/audio: audio carrier scan failed, "
 			       "using %d.%03d MHz [last detected]\n",
 			       dev->name, carrier/1000, carrier%1000);
+
 		} else {
-			/* no carrier + no fallback -- try first in list */
-			carrier = carr_scan[0];
+			/* no carrier + no fallback -- use default */
+			carrier = default_carrier;
 			printk(KERN_WARNING "%s/audio: audio carrier scan failed, "
 			       "using %d.%03d MHz [default]\n",
 			       dev->name, carrier/1000, carrier%1000);
@@ -550,7 +577,7 @@ static int tvaudio_thread(void *data)
 		/* find the exact tv audio norm */
 		for (audio = UNSET, i = 0; i < TVAUDIO; i++) {
 			if (dev->tvnorm->id != UNSET &&
-			    dev->tvnorm->id != tvaudio[i].std)
+			    !(dev->tvnorm->id & tvaudio[i].std))
 				continue;
 			if (tvaudio[i].carr1 != carrier)
 				continue;
@@ -722,10 +749,15 @@ static int mute_input_7133(struct saa7134_dev *dev)
 static int tvaudio_thread_ddep(void *data)
 {
 	struct saa7134_dev *dev = data;
-	u32 value, norms;
+	u32 value, norms, clock;
 
 	daemonize("%s", dev->name);
 	allow_signal(SIGTERM);
+
+	clock = saa7134_boards[dev->board].audio_clock;
+	if (UNSET != audio_clock_override)
+		clock = audio_clock_override;
+	saa_writel(0x598 >> 2, clock);
 
 	/* unmute */
 	saa_dsp_writel(dev, 0x474 >> 2, 0x00);
@@ -769,9 +801,11 @@ static int tvaudio_thread_ddep(void *data)
 				(norms & 0x40) ? " M"    : "");
 		}
 
-		/* quick & dirty -- to be fixed up later ... */
+		/* kick automatic standard detection */
 		saa_dsp_writel(dev, 0x454 >> 2, 0);
 		saa_dsp_writel(dev, 0x454 >> 2, norms | 0x80);
+
+		/* setup crossbars */
 		saa_dsp_writel(dev, 0x464 >> 2, 0x000000);
 		saa_dsp_writel(dev, 0x470 >> 2, 0x101010);
 
