@@ -682,4 +682,9 @@ static inline Scsi_Cmnd *scsi_find_tag(Scsi_Device *SDpnt, int tag) {
 
 int scsi_set_medium_removal(Scsi_Device *dev, char state);
 
+extern int scsi_sysfs_modify_sdev_attribute(struct device_attribute ***dev_attrs,
+					    struct device_attribute *attr);
+extern int scsi_sysfs_modify_shost_attribute(struct class_device_attribute ***class_attrs,
+					     struct class_device_attribute *attr);
+
 #endif /* _SCSI_H */

@@ -356,6 +356,16 @@ typedef struct	SHT
      * FIXME: This should probably be a value in the template */
     #define SCSI_DEFAULT_HOST_BLOCKED	7
 
+    /*
+     * pointer to the sysfs class properties for this host
+     */
+    struct class_device_attribute **shost_attrs;
+
+    /*
+     * Pointer to the SCSI device properties for this host
+     */
+    struct device_attribute **sdev_attrs;
+
 } Scsi_Host_Template;
 
 /*
@@ -587,5 +597,7 @@ static inline Scsi_Device *scsi_find_device(struct Scsi_Host *shost,
                         return sdev;
         return NULL;
 }
+
+extern void scsi_sysfs_release_attributes(struct SHT *hostt);
 
 #endif

@@ -131,4 +131,9 @@ extern void scsi_sysfs_remove_host(struct Scsi_Host *);
 extern int scsi_sysfs_register(void);
 extern void scsi_sysfs_unregister(void);
 
+/* definitions for the linker default sections covering the host
+ * class and device attributes */
+extern struct class_device_attribute *scsi_sysfs_shost_attrs[];
+extern struct device_attribute *scsi_sysfs_sdev_attrs[];
+
 #endif /* _SCSI_PRIV_H */
