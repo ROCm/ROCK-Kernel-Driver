@@ -107,8 +107,6 @@ static int NR_HD;
 
 static struct hd_struct hd[MAX_HD<<6];
 static int hd_sizes[MAX_HD<<6];
-static int hd_blocksizes[MAX_HD<<6];
-
 
 static struct timer_list device_timer;
 
@@ -727,10 +725,6 @@ static void __init hd_geninit(void)
 {
 	int drive;
 
-	for(drive=0; drive < (MAX_HD << 6); drive++)
-		hd_blocksizes[drive] = 1024;
-
-	blksize_size[MAJOR_NR] = hd_blocksizes;
 	blk_queue_hardsect_size(QUEUE, 512);
 
 #ifdef __i386__

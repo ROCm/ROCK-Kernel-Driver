@@ -202,7 +202,6 @@ static struct archy_disk_type {
 #define MAX_DISK_SIZE 720
 
 static int floppy_sizes[256];
-static int floppy_blocksizes[256];
 
 /* current info on each unit */
 static struct archy_floppy_struct {
@@ -1614,7 +1613,6 @@ int fd1772_init(void)
 			floppy_sizes[i] = MAX_DISK_SIZE;
 
 	blk_size[MAJOR_NR] = floppy_sizes;
-	blksize_size[MAJOR_NR] = floppy_blocksizes;
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request);
 
 	config_types();

@@ -83,7 +83,6 @@ struct hd_struct *sd;
 
 static Scsi_Disk *rscsi_disks;
 static int *sd_sizes;
-static int *sd_blocksizes;
 static int *sd_max_sectors;
 
 static int check_scsidisk_media_change(kdev_t);
@@ -946,19 +945,7 @@ static int sd_init_onedisk(int i)
 			 */
 			rscsi_disks[i].capacity = 0;
 		}
-		if (sector_size > 1024) {
-			int m;
-
-			/*
-			 * We must fix the sd_blocksizes and sd_hardsizes
-			 * to allow us to read the partition tables.
-			 * The disk reading code does not allow for reading
-			 * of partial sectors.
-			 */
-			for (m = i << 4; m < ((i + 1) << 4); m++) {
-				sd_blocksizes[m] = sector_size;
-			}
-		} {
+		{
 			/*
 			 * The msdos fs needs to know the hardware sector size
 			 * So I have created this table. See ll_rw_blk.c
@@ -1090,12 +1077,11 @@ static int sd_init()
 
 	init_mem_lth(rscsi_disks, sd_template.dev_max);
 	init_mem_lth(sd_sizes, maxparts);
-	init_mem_lth(sd_blocksizes, maxparts);
 	init_mem_lth(sd, maxparts);
 	init_mem_lth(sd_gendisks, N_USED_SD_MAJORS);
 	init_mem_lth(sd_max_sectors, sd_template.dev_max << 4);
 
-	if (!rscsi_disks || !sd_sizes || !sd_blocksizes || !sd || !sd_gendisks)
+	if (!rscsi_disks || !sd_sizes || !sd || !sd_gendisks)
 		goto cleanup_mem;
 
 	zero_mem_lth(rscsi_disks, sd_template.dev_max);
@@ -1103,7 +1089,6 @@ static int sd_init()
 	zero_mem_lth(sd, maxparts);
 
 	for (i = 0; i < maxparts; i++) {
-		sd_blocksizes[i] = 1024;
 		/*
 		 * Allow lowlevel device drivers to generate 512k large scsi
 		 * commands if they know what they're doing and they ask for it
@@ -1114,10 +1099,6 @@ static int sd_init()
 
 	for (i = 0; i < N_USED_SD_MAJORS; i++) {
 		request_queue_t *q = blk_get_queue(mk_kdev(SD_MAJOR(i), 0));
-		int parts_per_major = (SCSI_DISKS_PER_MAJOR << 4);
-
-		blksize_size[SD_MAJOR(i)] =
-			sd_blocksizes + i * parts_per_major;
 		blk_queue_hardsect_size(q, 512);
  	}
 
@@ -1157,7 +1138,6 @@ cleanup_gendisks:
 cleanup_mem:
 	kfree(sd_gendisks);
 	kfree(sd);
-	kfree(sd_blocksizes);
 	kfree(sd_sizes);
 	kfree(rscsi_disks);
 	for (i = 0; i < N_USED_SD_MAJORS; i++) {
@@ -1331,7 +1311,6 @@ static void __exit exit_sd(void)
 	if (rscsi_disks != NULL) {
 		kfree(rscsi_disks);
 		kfree(sd_sizes);
-		kfree(sd_blocksizes);
 		kfree((char *) sd);
 	}
 	for (i = 0; i < N_USED_SD_MAJORS; i++) {

@@ -89,8 +89,6 @@ static struct Scsi_Device_Template sr_template =
 Scsi_CD *scsi_CDs;
 static int *sr_sizes;
 
-static int *sr_blocksizes;
-
 static int sr_open(struct cdrom_device_info *, int);
 void get_sectorsize(int);
 void get_capabilities(int);
@@ -724,18 +722,6 @@ static int sr_init()
 	if (!sr_sizes)
 		goto cleanup_cds;
 	memset(sr_sizes, 0, sr_template.dev_max * sizeof(int));
-
-	sr_blocksizes = kmalloc(sr_template.dev_max * sizeof(int), GFP_ATOMIC);
-	if (!sr_blocksizes)
-		goto cleanup_sizes;
-
-	/*
-	 * These are good guesses for the time being.
-	 */
-	for (i = 0; i < sr_template.dev_max; i++)
-		sr_blocksizes[i] = 2048;
-
-	blksize_size[MAJOR_NR] = sr_blocksizes;
 	return 0;
 cleanup_sizes:
 	kfree(sr_sizes);
@@ -845,9 +831,6 @@ static void __exit exit_sr(void)
 
 		kfree(sr_sizes);
 		sr_sizes = NULL;
-
-		kfree(sr_blocksizes);
-		sr_blocksizes = NULL;
 	}
 	blk_clear(MAJOR_NR);
 

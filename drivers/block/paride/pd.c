@@ -286,7 +286,6 @@ static void pd_eject( int unit);
 
 static struct hd_struct pd_hd[PD_DEVS];
 static int pd_sizes[PD_DEVS];
-static int pd_blocksizes[PD_DEVS];
 
 #define PD_NAMELEN	8
 
@@ -399,9 +398,6 @@ int pd_init (void)
 	pd_gendisk.major = major;
 	pd_gendisk.major_name = name;
 	add_gendisk(&pd_gendisk);
-
-	for(i=0;i<PD_DEVS;i++) pd_blocksizes[i] = 1024;
-	blksize_size[MAJOR_NR] = pd_blocksizes;
 
 	printk("%s: %s version %s, major %d, cluster %d, nice %d\n",
 		name,name,PD_VERSION,major,cluster,nice);

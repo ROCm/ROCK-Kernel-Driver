@@ -66,25 +66,13 @@ int set_blocksize(struct block_device *bdev, int size)
 	if (size < get_hardsect_size(dev))
 		return -EINVAL;
 
-	/* No blocksize array? Implies hardcoded BLOCK_SIZE */
-	if (!blksize_size[major(dev)]) {
-		if (size == BLOCK_SIZE)
-			return 0;
-		return -EINVAL;
-	}
-
-	oldsize = blksize_size[major(dev)][minor(dev)];
+	oldsize = bdev->bd_block_size;
 	if (oldsize == size)
 		return 0;
 
-	if (!oldsize && size == BLOCK_SIZE) {
-		blksize_size[major(dev)][minor(dev)] = size;
-		return 0;
-	}
-
 	/* Ok, we're actually changing the blocksize.. */
 	sync_blockdev(bdev);
-	blksize_size[major(dev)][minor(dev)] = size;
+	bdev->bd_block_size = size;
 	bdev->bd_inode->i_blkbits = blksize_bits(size);
 	kill_bdev(bdev);
 	return 0;
@@ -615,9 +603,18 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		if (ret)
 			goto out2;
 	}
-	bdev->bd_openers++;
 	bdev->bd_inode->i_size = blkdev_size(dev);
-	bdev->bd_inode->i_blkbits = blksize_bits(block_size(bdev));
+	if (!bdev->bd_openers) {
+		unsigned bsize = bdev_hardsect_size(bdev);
+		while (bsize < PAGE_CACHE_SIZE) {
+			if (bdev->bd_inode->i_size & bsize)
+				break;
+			bsize <<= 1;
+		}
+		bdev->bd_block_size = bsize;
+		bdev->bd_inode->i_blkbits = blksize_bits(bsize);
+	}
+	bdev->bd_openers++;
 	unlock_kernel();
 	up(&bdev->bd_sem);
 	return 0;

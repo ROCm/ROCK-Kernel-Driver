@@ -781,12 +781,6 @@ static void init_gendisk(struct ata_channel *hwif)
 		goto err_kmalloc_gd_part;
 	memset(gd->part, 0, minors * sizeof(struct hd_struct));
 
-	blksize_size[hwif->major] = kmalloc (minors*sizeof(int), GFP_KERNEL);
-	if (!blksize_size[hwif->major])
-		goto err_kmalloc_bs;
-	for (i = 0; i < minors; ++i)
-	    blksize_size[hwif->major][i] = BLOCK_SIZE;
-
 	for (unit = 0; unit < MAX_DRIVES; ++unit)
 		hwif->drives[unit].part = &gd->part[unit << PARTN_BITS];
 

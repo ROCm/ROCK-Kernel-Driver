@@ -317,7 +317,6 @@ extern void blk_dump_rq_flags(struct request *, char *);
 extern void generic_unplug_device(void *);
 
 extern int * blk_size[MAX_BLKDEV];	/* in units of 1024 bytes */
-extern int * blksize_size[MAX_BLKDEV];
 
 #define MAX_PHYS_SEGMENTS 128
 #define MAX_HW_SEGMENTS 128
@@ -335,7 +334,6 @@ extern inline void blk_clear(int major)
 #if 0
 	blk_size_in_bytes[major] = NULL;
 #endif
-	blksize_size[major] = NULL;
 }
 
 extern inline int queue_hardsect_size(request_queue_t *q)
@@ -374,16 +372,7 @@ extern inline unsigned int blksize_bits(unsigned int size)
 
 extern inline unsigned int block_size(struct block_device *bdev)
 {
-	int retval = BLOCK_SIZE;
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
-	int major = major(dev);
-
-	if (blksize_size[major]) {
-		int minor = minor(dev);
-		if (blksize_size[major][minor])
-			retval = blksize_size[major][minor];
-	}
-	return retval;
+	return bdev->bd_block_size;
 }
 
 static inline loff_t blkdev_size_in_bytes(kdev_t dev)

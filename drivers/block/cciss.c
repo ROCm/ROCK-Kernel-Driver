@@ -349,11 +349,6 @@ static void cciss_geninit( int ctlr)
 			continue;
 		hba[ctlr]->hd[i << NWD_SHIFT].nr_sects = 
 		hba[ctlr]->sizes[i << NWD_SHIFT] = drv->nr_blocks;
-
-		/* for each partition */ 
-		for(j=0; j<MAX_PART; j++)
-			hba[ctlr]->blocksizes[(i<<NWD_SHIFT) + j] = 1024; 
-
 		//hba[ctlr]->gendisk.nr_real++;
 		(BLK_DEFAULT_QUEUE(MAJOR_NR + ctlr))->hardsect_size = drv->block_size;
 	}
@@ -834,7 +829,6 @@ static int revalidate_allvol(kdev_t dev)
          */
 	memset(hba[ctlr]->hd,         0, sizeof(struct hd_struct) * 256);
         memset(hba[ctlr]->sizes,      0, sizeof(int) * 256);
-        memset(hba[ctlr]->blocksizes, 0, sizeof(int) * 256);
         memset(hba[ctlr]->drv,        0, sizeof(drive_info_struct)
 						* CISS_MAX_LUN);
         hba[ctlr]->gendisk.nr_real = 0;
@@ -1343,9 +1337,6 @@ static int register_new_disk(kdev_t dev, int ctlr)
                 invalidate_device(kdev, 1);
                 gdev->part[minor].start_sect = 0;
                 gdev->part[minor].nr_sects = 0;
-
-                /* reset the blocksize so we can read the partition table */
-                blksize_size[MAJOR_NR+ctlr][minor] = 1024;
         }
 
 	++hba[ctlr]->num_luns;
@@ -2539,9 +2530,6 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 	blk_queue_max_phys_segments(q, MAXSGENTRIES);
 
 	blk_queue_max_sectors(q, 512);
-
-	/* fill in the other Kernel structs */
-	blksize_size[MAJOR_NR+i] = hba[i]->blocksizes;
 
 	/* Fill in the gendisk data */ 	
 	hba[i]->gendisk.major = MAJOR_NR + i;

@@ -107,9 +107,6 @@
 #define mcd_port mcd		/* for compatible parameter passing with "insmod" */
 #include "mcd.h"
 
-static int mcd_blocksizes[1];
-
-
 /* I added A flag to drop to 1x speed if too many errors 0 = 1X ; 1 = 2X */
 static int mcdDouble;
 
@@ -1072,7 +1069,6 @@ int __init mcd_init(void)
 		return -EIO;
 	}
 
-	blksize_size[MAJOR_NR] = mcd_blocksizes;
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_mcd_request,
 		       &mcd_spinlock);
 

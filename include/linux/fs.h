@@ -343,6 +343,7 @@ struct block_device {
 	void *			bd_holder;
 	int			bd_holders;
 	struct block_device *	bd_contains;
+	unsigned		bd_block_size;
 };
 
 struct inode {

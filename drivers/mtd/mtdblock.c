@@ -55,8 +55,6 @@ static struct mtdblk_dev {
 static spinlock_t mtdblks_lock;
 
 static int mtd_sizes[MAX_MTD_DEVICES];
-static int mtd_blksizes[MAX_MTD_DEVICES];
-
 
 /*
  * Cache stuff...
@@ -346,10 +344,6 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 
 	mtdblks[dev] = mtdblk;
 	mtd_sizes[dev] = mtdblk->mtd->size/1024;
-	if (mtdblk->mtd->erasesize)
-		mtd_blksizes[dev] = mtdblk->mtd->erasesize;
-	if (mtd_blksizes[dev] > PAGE_SIZE)
-		mtd_blksizes[dev] = PAGE_SIZE;
 	set_device_ro (inode->i_rdev, !(mtdblk->mtd->flags & MTD_WRITEABLE));
 	
 	spin_unlock(&mtdblks_lock);
@@ -626,13 +620,9 @@ int __init init_mtdblock(void)
 #endif
 	
 	/* We fill it in at open() time. */
-	for (i=0; i< MAX_MTD_DEVICES; i++) {
+	for (i=0; i< MAX_MTD_DEVICES; i++)
 		mtd_sizes[i] = 0;
-		mtd_blksizes[i] = BLOCK_SIZE;
-	}
 	init_waitqueue_head(&thr_wq);
-	/* Allow the block size to default to BLOCK_SIZE. */
-	blksize_size[MAJOR_NR] = mtd_blksizes;
 	blk_size[MAJOR_NR] = mtd_sizes;
 	
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), &mtdblock_request, &mtddev_lock);
@@ -653,7 +643,6 @@ static void __exit cleanup_mtdblock(void)
 	unregister_blkdev(MAJOR_NR,DEVICE_NAME);
 #endif
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-	blksize_size[MAJOR_NR] = NULL;
 	blk_size[MAJOR_NR] = NULL;
 }
 
