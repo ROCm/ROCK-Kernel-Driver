@@ -542,6 +542,7 @@ int check_disk_change(struct block_device *bdev)
 		bdops->revalidate(dev);
 	if (disk && disk->minors > 1)
 		bdev->bd_invalidated = 1;
+	put_disk(disk);
 	return 1;
 }
 
@@ -553,7 +554,9 @@ int full_check_disk_change(struct block_device *bdev)
 		BUG();
 	down(&bdev->bd_sem);
 	if (check_disk_change(bdev)) {
-		rescan_partitions(get_gendisk(bdev->bd_dev, &n), bdev);
+		struct gendisk *disk = get_gendisk(bdev->bd_dev, &n);
+		rescan_partitions(disk, bdev);
+		put_disk(disk);
 		res = 1;
 	}
 	up(&bdev->bd_sem);
@@ -622,13 +625,18 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			struct block_device *disk;
 			disk = bdget(MKDEV(g->major, g->first_minor));
 			ret = -ENOMEM;
-			if (!disk)
+			if (!disk) {
+				put_disk(g);
 				goto out1;
+			}
 			ret = blkdev_get(disk, file->f_mode, file->f_flags, BDEV_RAW);
-			if (ret)
+			if (ret) {
+				put_disk(g);
 				goto out1;
+			}
 			bdev->bd_contains = disk;
 		}
+		put_disk(g);
 	}
 	if (bdev->bd_contains == bdev) {
 		int part;
@@ -643,8 +651,10 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 
 		if (bdev->bd_op->open) {
 			ret = bdev->bd_op->open(inode, file);
-			if (ret)
+			if (ret) {
+				put_disk(g);
 				goto out2;
+			}
 		}
 		if (!bdev->bd_openers) {
 			struct backing_dev_info *bdi;
@@ -662,6 +672,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		}
 		if (bdev->bd_invalidated)
 			rescan_partitions(g, bdev);
+		put_disk(g);
 	} else {
 		down(&bdev->bd_contains->bd_sem);
 		bdev->bd_contains->bd_part_count++;
@@ -673,15 +684,17 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			inode->i_data.backing_dev_info =
 			   bdev->bd_inode->i_data.backing_dev_info =
 			   bdev->bd_contains->bd_inode->i_data.backing_dev_info;
-			if (!p->nr_sects) {
+			if (!(g->flags & GENHD_FL_UP) || !p->nr_sects) {
 				bdev->bd_contains->bd_part_count--;
 				up(&bdev->bd_contains->bd_sem);
+				put_disk(g);
 				ret = -ENXIO;
 				goto out2;
 			}
 			bdev->bd_queue = bdev->bd_contains->bd_queue;
 			bdev->bd_offset = p->start_sect;
 			bd_set_size(bdev, (loff_t) p->nr_sects << 9);
+			put_disk(g);
 		}
 		up(&bdev->bd_contains->bd_sem);
 	}

@@ -25,13 +25,17 @@ static int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg *arg)
 	disk = get_gendisk(bdev->bd_dev, &part);
 	if (!disk)
 		return -ENXIO;
-	if (bdev != bdev->bd_contains)
+	if (bdev != bdev->bd_contains) {
+		put_disk(disk);
 		return -EINVAL;
+	}
 	if (part)
 		BUG();
 	part = p.pno;
-	if (part <= 0 || part >= disk->minors)
+	if (part <= 0 || part >= disk->minors) {
+		put_disk(disk);
 		return -EINVAL;
+	}
 
 	switch (a.op) {
 		case BLKPG_ADD_PARTITION:
@@ -42,34 +46,46 @@ static int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg *arg)
 			    sizeof(long long) > sizeof(long)) {
 				long pstart = start, plength = length;
 				if (pstart != start || plength != length
-				    || pstart < 0 || plength < 0)
+				    || pstart < 0 || plength < 0) {
+					put_disk(disk);
 					return -EINVAL;
+				}
 			}
 
 			/* partition number in use? */
-			if (disk->part[part - 1].nr_sects != 0)
+			if (disk->part[part - 1].nr_sects != 0) {
+				put_disk(disk);
 				return -EBUSY;
+			}
 
 			/* overlap? */
 			for (i = 0; i < disk->minors - 1; i++) {
 				struct hd_struct *s = &disk->part[i];
 				if (!(start+length <= s->start_sect ||
-				      start >= s->start_sect + s->nr_sects))
+				      start >= s->start_sect + s->nr_sects)) {
+					put_disk(disk);
 					return -EBUSY;
+				}
 			}
 			/* all seems OK */
 			add_partition(disk, part, start, length);
+			put_disk(disk);
 			return 0;
 		case BLKPG_DEL_PARTITION:
-			if (disk->part[part - 1].nr_sects == 0)
+			if (disk->part[part - 1].nr_sects == 0) {
+				put_disk(disk);
 				return -ENXIO;
+			}
 
 			/* partition in use? Incomplete check for now. */
 			bdevp = bdget(MKDEV(disk->major, disk->first_minor) + part);
-			if (!bdevp)
+			if (!bdevp) {
+				put_disk(disk);
 				return -ENOMEM;
+			}
 			if (bd_claim(bdevp, &holder) < 0) {
 				bdput(bdevp);
+				put_disk(disk);
 				return -EBUSY;
 			}
 
@@ -80,8 +96,10 @@ static int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg *arg)
 			delete_partition(disk, part);
 			bd_release(bdevp);
 			bdput(bdevp);
+			put_disk(disk);
 			return 0;
 		default:
+			put_disk(disk);
 			return -EINVAL;
 	}
 }
@@ -92,16 +110,25 @@ static int blkdev_reread_part(struct block_device *bdev)
 	struct gendisk *disk = get_gendisk(bdev->bd_dev, &part);
 	int res = 0;
 
-	if (!disk || disk->minors == 1 || bdev != bdev->bd_contains)
+	if (!disk)
 		return -EINVAL;
+	if (disk->minors == 1 || bdev != bdev->bd_contains) {
+		put_disk(disk);
+		return -EINVAL;
+	}
 	if (part)
 		BUG();
-	if (!capable(CAP_SYS_ADMIN))
+	if (!capable(CAP_SYS_ADMIN)) {
+		put_disk(disk);
 		return -EACCES;
-	if (down_trylock(&bdev->bd_sem))
+	}
+	if (down_trylock(&bdev->bd_sem)) {
+		put_disk(disk);
 		return -EBUSY;
+	}
 	res = rescan_partitions(disk, bdev);
 	up(&bdev->bd_sem);
+	put_disk(disk);
 	return res;
 }
 

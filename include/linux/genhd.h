@@ -266,6 +266,7 @@ extern void add_partition(struct gendisk *, int, sector_t, sector_t);
 extern void delete_partition(struct gendisk *, int);
 
 extern struct gendisk *alloc_disk(int minors);
+extern struct gendisk *get_disk(struct gendisk *disk);
 extern void put_disk(struct gendisk *disk);
 
 /* will go away */
@@ -273,9 +274,11 @@ extern void blk_set_probe(int major, struct gendisk *(p)(int));
 
 static inline unsigned int disk_index (kdev_t dev)
 {
-	int part;
+	int part, res;
 	struct gendisk *g = get_gendisk(kdev_t_to_nr(dev), &part);
-	return g ? (minor(dev) >> g->minor_shift) : 0;
+	res = g ? (minor(dev) >> g->minor_shift) : 0;
+	put_disk(g);
+	return res;
 }
 
 #endif

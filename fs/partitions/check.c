@@ -616,6 +616,7 @@ char *partition_name(dev_t dev)
 	dname->name = NULL;
 	if (hd)
 		dname->name = disk_name(hd, part, dname->namebuf);
+	put_disk(hd);
 	if (!dname->name) {
 		sprintf(dname->namebuf, "[dev %s]", kdevname(to_kdev_t(dev)));
 		dname->name = dname->namebuf;

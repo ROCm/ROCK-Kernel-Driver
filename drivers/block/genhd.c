@@ -100,6 +100,8 @@ get_gendisk(dev_t dev, int *part)
 	read_lock(&gendisk_lock);
 	if (gendisks[major].get) {
 		disk = gendisks[major].get(minor);
+		if (disk)
+			get_disk(disk);
 		read_unlock(&gendisk_lock);
 		return disk;
 	}
@@ -109,6 +111,7 @@ get_gendisk(dev_t dev, int *part)
 			continue;
 		if (disk->first_minor + disk->minors <= minor)
 			continue;
+		get_disk(disk);
 		read_unlock(&gendisk_lock);
 		*part = minor - disk->first_minor;
 		return disk;
@@ -244,6 +247,12 @@ struct gendisk *alloc_disk(int minors)
 	return disk;
 }
 
+struct gendisk *get_disk(struct gendisk *disk)
+{
+	atomic_inc(&disk->disk_dev.refcount);
+	return disk;
+}
+
 void put_disk(struct gendisk *disk)
 {
 	if (disk)
@@ -251,4 +260,5 @@ void put_disk(struct gendisk *disk)
 }
 
 EXPORT_SYMBOL(alloc_disk);
+EXPORT_SYMBOL(get_disk);
 EXPORT_SYMBOL(put_disk);
