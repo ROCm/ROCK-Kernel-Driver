@@ -3,7 +3,7 @@
 #
 
 bttv-objs	:=	bttv-driver.o bttv-cards.o bttv-if.o \
-			bttv-risc.o bttv-vbi.o
+			bttv-risc.o bttv-vbi.o bttv-i2c.o bttv-gpio.o
 zoran-objs      :=	zr36120.o zr36120_i2c.o zr36120_mem.o
 zr36067-objs	:=	zoran_procfs.o zoran_device.o \
 			zoran_driver.o zoran_card.o
