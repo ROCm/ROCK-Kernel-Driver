@@ -18,6 +18,7 @@
 #include <linux/fcdevice.h>
 #include <linux/ioport.h>
 #include <linux/tty.h>
+#include <linux/ethtool.h>
 #include <net/neighbour.h>
 #include <net/snmp.h>
 #include <net/dst.h>
