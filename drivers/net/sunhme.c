@@ -14,7 +14,7 @@
  */
 
 static char version[] =
-        "sunhme.c:v2.00 20/Mar/2002 David S. Miller (davem@redhat.com)\n";
+        "sunhme.c:v2.01 26/Mar/2002 David S. Miller (davem@redhat.com)\n";
 
 #include <linux/module.h>
 
@@ -697,7 +697,7 @@ no_response:
 	return 1;
 }
 
-static int happy_meal_init(struct happy_meal *hp, int from_irq);
+static int happy_meal_init(struct happy_meal *hp);
 
 static int is_lucent_phy(struct happy_meal *hp)
 {
@@ -708,12 +708,8 @@ static int is_lucent_phy(struct happy_meal *hp)
 	mr2 = happy_meal_tcvr_read(hp, tregs, 2);
 	mr3 = happy_meal_tcvr_read(hp, tregs, 3);
 	if ((mr2 & 0xffff) == 0x0180 &&
-	    ((mr3 & 0xffff) >> 10) == 0x1d) {
-#if 0
-		printk("HMEDEBUG: Lucent PHY detected.\n");
-#endif
+	    ((mr3 & 0xffff) >> 10) == 0x1d)
 		ret = 1;
-	}
 
 	return ret;
 }
@@ -723,6 +719,8 @@ static void happy_meal_timer(unsigned long data)
 	struct happy_meal *hp = (struct happy_meal *) data;
 	unsigned long tregs = hp->tcvregs;
 	int restart_timer = 0;
+
+	spin_lock_irq(&hp->happy_lock);
 
 	hp->timer_ticks++;
 	switch(hp->timer_state) {
@@ -853,13 +851,13 @@ static void happy_meal_timer(unsigned long data)
 					printk(KERN_NOTICE "%s: Link down, cable problem?\n",
 					       hp->dev->name);
 
-					ret = happy_meal_init(hp, 0);
+					ret = happy_meal_init(hp);
 					if (ret) {
 						/* ho hum... */
 						printk(KERN_ERR "%s: Error, cannot re-init the "
 						       "Happy Meal.\n", hp->dev->name);
 					}
-					return;
+					goto out;
 				}
 				if (!is_lucent_phy(hp)) {
 					hp->sw_csconfig = happy_meal_tcvr_read(hp, tregs,
@@ -891,11 +889,15 @@ static void happy_meal_timer(unsigned long data)
 		hp->happy_timer.expires = jiffies + ((12 * HZ)/10); /* 1.2 sec. */
 		add_timer(&hp->happy_timer);
 	}
+
+out:
+	spin_unlock_irq(&hp->happy_lock);
 }
 
 #define TX_RESET_TRIES     32
 #define RX_RESET_TRIES     32
 
+/* hp->happy_lock must be held */
 static void happy_meal_tx_reset(struct happy_meal *hp, unsigned long bregs)
 {
 	int tries = TX_RESET_TRIES;
@@ -915,6 +917,7 @@ static void happy_meal_tx_reset(struct happy_meal *hp, unsigned long bregs)
 	HMD(("done\n"));
 }
 
+/* hp->happy_lock must be held */
 static void happy_meal_rx_reset(struct happy_meal *hp, unsigned long bregs)
 {
 	int tries = RX_RESET_TRIES;
@@ -936,6 +939,7 @@ static void happy_meal_rx_reset(struct happy_meal *hp, unsigned long bregs)
 
 #define STOP_TRIES         16
 
+/* hp->happy_lock must be held */
 static void happy_meal_stop(struct happy_meal *hp, unsigned long gregs)
 {
 	int tries = STOP_TRIES;
@@ -955,6 +959,7 @@ static void happy_meal_stop(struct happy_meal *hp, unsigned long gregs)
 	HMD(("done\n"));
 }
 
+/* hp->happy_lock must be held */
 static void happy_meal_get_counters(struct happy_meal *hp, unsigned long bregs)
 {
 	struct net_device_stats *stats = &hp->net_stats;
@@ -977,53 +982,7 @@ static void happy_meal_get_counters(struct happy_meal *hp, unsigned long bregs)
 	hme_write32(hp, bregs + BMAC_LTCTR, 0);
 }
 
-#if 0
-static void happy_meal_poll_start(struct happy_meal *hp, unsigned long tregs)
-{
-	u32 tmp;
-	int speed;
-
-	ASD(("happy_meal_poll_start: "));
-	if (!(hp->happy_flags & HFLAG_POLLENABLE)) {
-		HMD(("polling disabled, return\n"));
-		return;
-	}
-
-	/* Start the MIF polling on the external transceiver. */
-	ASD(("polling on, "));
-	tmp = hme_read32(hp, tregs + TCVR_CFG);
-	tmp &= ~(TCV_CFG_PDADDR | TCV_CFG_PREGADDR);
-	tmp |= ((hp->paddr & 0x1f) << 10);
-	tmp |= (TCV_PADDR_ETX << 3);
-	tmp |= TCV_CFG_PENABLE;
-	hme_write32(hp, tregs + TCVR_CFG, tmp);
-
-	/* Let the bits set. */
-	udelay(200);
-
-	/* We are polling now. */
-	ASD(("now polling, "));
-	hp->happy_flags |= HFLAG_POLL;
-
-	/* Clear the poll flags, get the basic status as of now. */
-	hp->poll_flag = 0;
-	hp->poll_data = hme_read32(hp, tregs + TCVR_STATUS) >> 16;
-
-	if (hp->happy_flags & HFLAG_AUTO)
-		speed = hp->auto_speed;
-	else
-		speed = hp->forced_speed;
-
-	/* Listen only for the MIF interrupts we want to hear. */
-	ASD(("mif ints on, "));
-	if (speed == 100)
-		hme_write32(hp, tregs + TCVR_IMASK, 0xfffb);
-	else
-		hme_write32(hp, tregs + TCVR_IMASK, 0xfff9);
-	ASD(("done\n"));
-}
-#endif
-
+/* hp->happy_lock must be held */
 static void happy_meal_poll_stop(struct happy_meal *hp, unsigned long tregs)
 {
 	ASD(("happy_meal_poll_stop: "));
@@ -1058,6 +1017,7 @@ static void happy_meal_poll_stop(struct happy_meal *hp, unsigned long tregs)
 #define TCVR_RESET_TRIES       16 /* It should reset quickly        */
 #define TCVR_UNISOLATE_TRIES   32 /* Dis-isolation can take longer. */
 
+/* hp->happy_lock must be held */
 static int happy_meal_tcvr_reset(struct happy_meal *hp, unsigned long tregs)
 {
 	u32 tconfig;
@@ -1152,7 +1112,10 @@ static int happy_meal_tcvr_reset(struct happy_meal *hp, unsigned long tregs)
 	return 0;
 }
 
-/* Figure out whether we have an internal or external transceiver. */
+/* Figure out whether we have an internal or external transceiver.
+ *
+ * hp->happy_lock must be held
+ */
 static void happy_meal_transceiver_check(struct happy_meal *hp, unsigned long tregs)
 {
 	unsigned long tconfig = hme_read32(hp, tregs + TCVR_CFG);
@@ -1304,14 +1267,12 @@ static void happy_meal_clean_rings(struct happy_meal *hp)
 	}
 }
 
-static void happy_meal_init_rings(struct happy_meal *hp, int from_irq)
+/* hp->happy_lock must be held */
+static void happy_meal_init_rings(struct happy_meal *hp)
 {
 	struct hmeal_init_block *hb = hp->happy_block;
 	struct net_device *dev = hp->dev;
-	int i, gfp_flags = GFP_KERNEL;
-
-	if (from_irq || in_interrupt())
-		gfp_flags = GFP_ATOMIC;
+	int i;
 
 	HMD(("happy_meal_init_rings: counters to zero, "));
 	hp->rx_new = hp->rx_old = hp->tx_new = hp->tx_old = 0;
@@ -1325,7 +1286,7 @@ static void happy_meal_init_rings(struct happy_meal *hp, int from_irq)
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		struct sk_buff *skb;
 
-		skb = happy_meal_alloc_skb(RX_BUF_ALLOC_SIZE, gfp_flags);
+		skb = happy_meal_alloc_skb(RX_BUF_ALLOC_SIZE, GFP_ATOMIC);
 		if (!skb) {
 			hme_write_rxd(hp, &hb->happy_meal_rxd[i], 0, 0);
 			continue;
@@ -1348,6 +1309,7 @@ static void happy_meal_init_rings(struct happy_meal *hp, int from_irq)
 	HMD(("done\n"));
 }
 
+/* hp->happy_lock must be held */
 static void happy_meal_begin_auto_negotiation(struct happy_meal *hp,
 					      unsigned long tregs,
 					      struct ethtool_cmd *ep)
@@ -1471,7 +1433,8 @@ force_link:
 	add_timer(&hp->happy_timer);
 }
 
-static int happy_meal_init(struct happy_meal *hp, int from_irq)
+/* hp->happy_lock must be held */
+static int happy_meal_init(struct happy_meal *hp)
 {
 	unsigned long gregs        = hp->gregs;
 	unsigned long etxregs      = hp->etxregs;
@@ -1502,7 +1465,7 @@ static int happy_meal_init(struct happy_meal *hp, int from_irq)
 
 	/* Alloc and reset the tx/rx descriptor chains. */
 	HMD(("happy_meal_init: to happy_meal_init_rings\n"));
-	happy_meal_init_rings(hp, from_irq);
+	happy_meal_init_rings(hp);
 
 	/* Shut up the MIF. */
 	HMD(("happy_meal_init: Disable all MIF irqs (old[%08x]), ",
@@ -1619,6 +1582,17 @@ static int happy_meal_init(struct happy_meal *hp, int from_irq)
 	hme_write32(hp, etxregs + ETX_RING,
 		    ((__u32)hp->hblock_dvma + hblock_offset(happy_meal_txd, 0)));
 
+	/* Parity issues in the ERX unit of some HME revisions can cause some
+	 * registers to not be written unless their parity is even.  Detect such
+	 * lost writes and simply rewrite with a low bit set (which will be ignored
+	 * since the rxring needs to be 2K aligned).
+	 */
+	if (hme_read32(hp, erxregs + ERX_RING) !=
+	    ((__u32)hp->hblock_dvma + hblock_offset(happy_meal_rxd, 0)))
+		hme_write32(hp, erxregs + ERX_RING,
+			    ((__u32)hp->hblock_dvma + hblock_offset(happy_meal_rxd, 0))
+			    | 0x4);
+
 	/* Set the supported burst sizes. */
 	HMD(("happy_meal_init: old[%08x] bursts<",
 	     hme_read32(hp, gregs + GREG_CFG)));
@@ -1699,7 +1673,7 @@ static int happy_meal_init(struct happy_meal *hp, int from_irq)
 	/* Enable Big Mac hash table filter. */
 	HMD(("happy_meal_init: enable hash rx_cfg_old[%08x], ",
 	     hme_read32(hp, bregs + BMAC_RXCFG)));
-	rxcfg = BIGMAC_RXCFG_HENABLE;
+	rxcfg = BIGMAC_RXCFG_HENABLE | BIGMAC_RXCFG_REJME;
 	if (hp->dev->flags & IFF_PROMISC)
 		rxcfg |= BIGMAC_RXCFG_PMISC;
 	hme_write32(hp, bregs + BMAC_RXCFG, rxcfg);
@@ -1712,7 +1686,14 @@ static int happy_meal_init(struct happy_meal *hp, int from_irq)
 	regtmp = 0;
 	if (hp->happy_flags & HFLAG_FULL)
 		regtmp |= BIGMAC_TXCFG_FULLDPLX;
-	hme_write32(hp, bregs + BMAC_TXCFG, regtmp | BIGMAC_TXCFG_DGIVEUP);
+
+	/* Don't turn on the "don't give up" bit for now.  It could cause hme
+	 * to deadlock with the PHY if a Jabber occurs.
+	 */
+	hme_write32(hp, bregs + BMAC_TXCFG, regtmp /*| BIGMAC_TXCFG_DGIVEUP*/);
+
+	/* Give up after 16 TX attempts. */
+	hme_write32(hp, bregs + BMAC_ALIMIT, 16);
 
 	/* Enable the output drivers no matter what. */
 	regtmp = BIGMAC_XCFG_ODENABLE;
@@ -1745,6 +1726,7 @@ static int happy_meal_init(struct happy_meal *hp, int from_irq)
 	return 0;
 }
 
+/* hp->happy_lock must be held */
 static void happy_meal_set_initial_advertisement(struct happy_meal *hp)
 {
 	unsigned long tregs	= hp->tcvregs;
@@ -1802,6 +1784,8 @@ static void happy_meal_set_initial_advertisement(struct happy_meal *hp)
 
 /* Once status is latched (by happy_meal_interrupt) it is cleared by
  * the hardware, so we cannot re-read it and get a correct value.
+ *
+ * hp->happy_lock must be held
  */
 static int happy_meal_is_not_so_happy(struct happy_meal *hp, u32 status)
 {
@@ -1910,12 +1894,13 @@ static int happy_meal_is_not_so_happy(struct happy_meal *hp, u32 status)
 
 	if (reset) {
 		printk(KERN_NOTICE "%s: Resetting...\n", hp->dev->name);
-		happy_meal_init(hp, 1);
+		happy_meal_init(hp);
 		return 1;
 	}
 	return 0;
 }
 
+/* hp->happy_lock must be held */
 static void happy_meal_mif_interrupt(struct happy_meal *hp)
 {
 	unsigned long tregs = hp->tcvregs;
@@ -1949,14 +1934,13 @@ static void happy_meal_mif_interrupt(struct happy_meal *hp)
 #define TXD(x)
 #endif
 
+/* hp->happy_lock must be held */
 static void happy_meal_tx(struct happy_meal *hp)
 {
 	struct happy_meal_txd *txbase = &hp->happy_block->happy_meal_txd[0];
 	struct happy_meal_txd *this;
 	struct net_device *dev = hp->dev;
 	int elem;
-
-	spin_lock(&hp->happy_lock);
 
 	elem = hp->tx_old;
 	TXD(("TX<"));
@@ -2001,10 +1985,8 @@ static void happy_meal_tx(struct happy_meal *hp)
 	TXD((">"));
 
 	if (netif_queue_stopped(dev) &&
-	    TX_BUFFS_AVAIL(hp) > 0)
+	    TX_BUFFS_AVAIL(hp) > (MAX_SKB_FRAGS + 1))
 		netif_wake_queue(dev);
-
-	spin_unlock(&hp->happy_lock);
 }
 
 #ifdef RXDEBUG
@@ -2019,6 +2001,8 @@ static void happy_meal_tx(struct happy_meal *hp)
  * with all of the packets it has DMA'd in.  So now I just drop the entire
  * ring when we cannot get a new skb and give them all back to the happy meal,
  * maybe things will be "happier" now.
+ *
+ * hp->happy_lock must be held
  */
 static void happy_meal_rx(struct happy_meal *hp, struct net_device *dev)
 {
@@ -2128,10 +2112,12 @@ static void happy_meal_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	HMD(("happy_meal_interrupt: status=%08x ", happy_status));
 
+	spin_lock(&hp->happy_lock);
+
 	if (happy_status & GREG_STAT_ERRORS) {
 		HMD(("ERRORS "));
 		if (happy_meal_is_not_so_happy(hp, /* un- */ happy_status))
-			return;
+			goto out;
 	}
 
 	if (happy_status & GREG_STAT_MIFIRQ) {
@@ -2150,6 +2136,8 @@ static void happy_meal_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	HMD(("done\n"));
+out:
+	spin_unlock(&hp->happy_lock);
 }
 
 #ifdef CONFIG_SBUS
@@ -2171,10 +2159,12 @@ static void quattro_sbus_interrupt(int irq, void *cookie, struct pt_regs *ptregs
 				      GREG_STAT_RXTOHOST)))
 			continue;
 
+		spin_lock(&hp->happy_lock);
+
 		if (happy_status & GREG_STAT_ERRORS) {
 			HMD(("ERRORS "));
 			if (happy_meal_is_not_so_happy(hp, happy_status))
-				break;
+				goto next;
 		}
 
 		if (happy_status & GREG_STAT_MIFIRQ) {
@@ -2191,6 +2181,9 @@ static void quattro_sbus_interrupt(int irq, void *cookie, struct pt_regs *ptregs
 			HMD(("RXTOHOST "));
 			happy_meal_rx(hp, dev);
 		}
+
+	next:
+		spin_unlock(&hp->happy_lock);
 	}
 	HMD(("done\n"));
 }
@@ -2223,7 +2216,11 @@ static int happy_meal_open(struct net_device *dev)
 	}
 
 	HMD(("to happy_meal_init\n"));
-	res = happy_meal_init(hp, 0);
+
+	spin_lock_irq(&hp->happy_lock);
+	res = happy_meal_init(hp);
+	spin_unlock_irq(&hp->happy_lock);
+
 	if (res && ((hp->happy_flags & (HFLAG_QUATTRO|HFLAG_PCI)) != HFLAG_QUATTRO))
 		free_irq(dev->irq, dev);
 	return res;
@@ -2233,11 +2230,14 @@ static int happy_meal_close(struct net_device *dev)
 {
 	struct happy_meal *hp = dev->priv;
 
+	spin_lock_irq(&hp->happy_lock);
 	happy_meal_stop(hp, hp->gregs);
 	happy_meal_clean_rings(hp);
 
 	/* If auto-negotiation timer is running, kill it. */
 	del_timer(&hp->happy_timer);
+
+	spin_unlock_irq(&hp->happy_lock);
 
 	/* On Quattro QFE cards, all hme interrupts are concentrated
 	 * into a single source which we register handling at probe
@@ -2255,7 +2255,6 @@ static int happy_meal_close(struct net_device *dev)
 #define SXD(x)
 #endif
 
-#ifdef CONFIG_SBUS
 static void happy_meal_tx_timeout(struct net_device *dev)
 {
 	struct happy_meal *hp = dev->priv;
@@ -2266,10 +2265,13 @@ static void happy_meal_tx_timeout(struct net_device *dev)
 		hme_read32(hp, hp->gregs + GREG_STAT),
 		hme_read32(hp, hp->etxregs + ETX_CFG),
 		hme_read32(hp, hp->bigmacregs + BMAC_TXCFG));
-	happy_meal_init(hp, 0);
+
+	spin_lock_irq(&hp->happy_lock);
+	happy_meal_init(hp);
+	spin_unlock_irq(&hp->happy_lock);
+
 	netif_wake_queue(dev);
 }
-#endif
 
 static int happy_meal_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
@@ -2294,6 +2296,8 @@ static int happy_meal_start_xmit(struct sk_buff *skb, struct net_device *dev)
  	if (TX_BUFFS_AVAIL(hp) <= (skb_shinfo(skb)->nr_frags + 1)) {
 		netif_stop_queue(dev);
 		spin_unlock_irq(&hp->happy_lock);
+		printk(KERN_ERR "%s: BUG! Tx Ring full when queue awake!\n",
+		       dev->name);
 		return 1;
 	}
 
@@ -2346,7 +2350,7 @@ static int happy_meal_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	hp->tx_new = entry;
 
-	if (TX_BUFFS_AVAIL(hp) <= 0)
+	if (TX_BUFFS_AVAIL(hp) <= (MAX_SKB_FRAGS + 1))
 		netif_stop_queue(dev);
 
 	/* Get it going. */
@@ -2364,7 +2368,10 @@ static struct net_device_stats *happy_meal_get_stats(struct net_device *dev)
 {
 	struct happy_meal *hp = dev->priv;
 
+	spin_lock_irq(&hp->happy_lock);
 	happy_meal_get_counters(hp, hp->bigmacregs);
+	spin_unlock_irq(&hp->happy_lock);
+
 	return &hp->net_stats;
 }
 
@@ -2377,7 +2384,8 @@ static void happy_meal_set_multicast(struct net_device *dev)
 	int i;
 	u32 crc;
 
-	/* Lock out others. */
+	spin_lock_irq(&hp->happy_lock);
+
 	netif_stop_queue(dev);
 
 	if ((dev->flags & IFF_ALLMULTI) || (dev->mc_count > 64)) {
@@ -2411,8 +2419,9 @@ static void happy_meal_set_multicast(struct net_device *dev)
 		hme_write32(hp, bregs + BMAC_HTABLE3, hash_table[3]);
 	}
 
-	/* Let us get going again. */
 	netif_wake_queue(dev);
+
+	spin_unlock_irq(&hp->happy_lock);
 }
 
 /* Ethtool support... */
@@ -2440,8 +2449,11 @@ static int happy_meal_ioctl(struct net_device *dev,
 		ecmd.phy_address = 0; /* XXX fixed PHYAD */
 
 		/* Record PHY settings. */
+		spin_lock_irq(&hp->happy_lock);
 		hp->sw_bmcr = happy_meal_tcvr_read(hp, hp->tcvregs, MII_BMCR);
 		hp->sw_lpa = happy_meal_tcvr_read(hp, hp->tcvregs, MII_LPA);
+		spin_unlock_irq(&hp->happy_lock);
+
 		if (hp->sw_bmcr & BMCR_ANENABLE) {
 			ecmd.autoneg = AUTONEG_ENABLE;
 			ecmd.speed =
@@ -2483,10 +2495,12 @@ static int happy_meal_ioctl(struct net_device *dev,
 			return -EINVAL;
 
 		/* Ok, do it to it. */
+		spin_lock_irq(&hp->happy_lock);
 		del_timer(&hp->happy_timer);
 		happy_meal_begin_auto_negotiation(hp,
 						  hp->tcvregs,
 						  &ecmd);
+		spin_unlock_irq(&hp->happy_lock);
 
 		return 0;
 	} else
@@ -2808,7 +2822,9 @@ static int __init happy_meal_sbus_init(struct sbus_dev *sdev, int is_qfe)
 	/* Grrr, Happy Meal comes up by default not advertising
 	 * full duplex 100baseT capabilities, fix this.
 	 */
+	spin_lock_irq(&hp->happy_lock);
 	happy_meal_set_initial_advertisement(hp);
+	spin_unlock_irq(&hp->happy_lock);
 
 	if (register_netdev(hp->dev)) {
 		printk(KERN_ERR "happymeal: Cannot register net device, "
@@ -3121,6 +3137,8 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 	dev->hard_start_xmit = &happy_meal_start_xmit;
 	dev->get_stats = &happy_meal_get_stats;
 	dev->set_multicast_list = &happy_meal_set_multicast;
+	dev->tx_timeout = &happy_meal_tx_timeout;
+	dev->watchdog_timeo = 5*HZ;
 	dev->do_ioctl = &happy_meal_ioctl;
 	dev->irq = pdev->irq;
 	dev->dma = 0;
@@ -3143,7 +3161,9 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 	/* Grrr, Happy Meal comes up by default not advertising
 	 * full duplex 100baseT capabilities, fix this.
 	 */
+	spin_lock_irq(&hp->happy_lock);
 	happy_meal_set_initial_advertisement(hp);
+	spin_unlock_irq(&hp->happy_lock);
 
 	if (register_netdev(hp->dev)) {
 		printk(KERN_ERR "happymeal(PCI): Cannot register net device, "
