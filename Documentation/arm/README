@@ -1,14 +1,17 @@
-			   ARM Linux 2.4
+			   ARM Linux 2.6
 			   =============
 
-    Please check ftp.arm.linux.org.uk:/pub/armlinux for latest updates.
+    Please check <ftp://ftp.arm.linux.org.uk/pub/armlinux> for
+    updates.
 
 Compilation of kernel
 ---------------------
 
   In order to compile ARM Linux, you will need a compiler capable of
-  generating ARM ELF code with GNU extensions.  GCC 2.95.1 and EGCS 1.1.2
-  are good compilers.
+  generating ARM ELF code with GNU extensions.  GCC 2.95.1, EGCS
+  1.1.2, and GCC 3.3 are known to be good compilers.  Fortunately, you
+  needn't guess.  The kernel will report an error if your compiler is
+  a recognized offender.
 
   To build ARM Linux natively, you shouldn't have to alter the ARCH = line
   in the top level Makefile.  However, if you don't have the ARM Linux ELF
@@ -147,19 +150,32 @@ ST506 hard drives
   are welcome.
 
 
+CONFIG_MACH_ and CONFIG_ARCH_
+-----------------------------
+  A change was made in 2003 to the macro names for new machines.
+  Historically, CONFIG_ARCH_ was used for the bonafide architecture,
+  e.g. SA1100, as well as implementations of the architecture,
+  e.g. Assabet.  It was decided to change the implementation macros
+  to read CONFIG_MACH_ for clarity.  Moreover, a retroactive fixup has
+  not been made because it would complicate patching.
+
+  Previous registrations may be found online.
+
+    <http://www.arm.linux.org.uk/developer/machines/>
+
 Kernel entry (head-armv.S)
 --------------------------
   The initial entry into the kernel made via head-armv.S uses architecture
-  independent code.  The architecture is selected by the value of 'r1' on
-  entry, which must be kept unique.  You can register a new architecture
+  independent code.  The machine is selected by the value of 'r1' on
+  entry, which must be kept unique.  You can register a new machine
   by mailing the following details to rmk@arm.linux.org.uk  Please give
-  the mail a subject of 'Register new architecture':
+  the mail a subject of 'Register new machine':
 
-    Name: <name of your architecture>
+    Name: <name of your machine>
     ArchDir: <name of include/asm-arm/arch-* directory>
     Type: <MACH_TYPE_* macro name>
     Description:
-    <description of your architecture>
+    <description of your machine>
 
   Please follow this format - it is an automated system.  You should
   receive a reply in short order.
