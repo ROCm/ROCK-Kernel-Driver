@@ -395,6 +395,12 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 		return val;
 	}
 
+        /* Make sure we aren't ISA */
+        if (!strcmp(dn->type, "isa")) {
+                pci_dev_put(dev);
+                return val;
+        }
+
 	if (!dn->eeh_config_addr) {
 		pci_dev_put(dev);
 		return val;
