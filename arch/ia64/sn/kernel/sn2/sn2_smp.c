@@ -506,7 +506,7 @@ sn_send_IPI_phys(long physid, int vector, int delivery_mode)
 	pio_phys_write_mmr(p, val);
 
 #ifndef CONFIG_SHUB_1_0_SPECIFIC
-	/* doesnt work on shub 1.0 */
+	/* doesn't work on shub 1.0 */
 	wait_piowc();
 #endif
 }

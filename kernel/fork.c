@@ -901,7 +901,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 
 	/*
 	 * Share the timeslice between parent and child, thus the
-	 * total amount of pending timeslices in the system doesnt change,
+	 * total amount of pending timeslices in the system doesn't change,
 	 * resulting in more scheduling fairness.
 	 */
 	local_irq_disable();

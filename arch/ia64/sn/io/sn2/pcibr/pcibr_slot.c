@@ -852,7 +852,7 @@ pcibr_slot_info_init(devfs_handle_t 	pcibr_vhdl,
 	}
 
 	/* Get the PCI-X capability if running in PCI-X mode.  If the func
-	 * doesnt have a pcix capability, allocate a PCIIO_VENDOR_ID_NONE
+	 * doesn't have a pcix capability, allocate a PCIIO_VENDOR_ID_NONE
 	 * pcibr_info struct so the device driver for that function is not
 	 * called.
 	 */

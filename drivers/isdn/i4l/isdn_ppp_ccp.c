@@ -197,7 +197,7 @@ ippp_ccp_reset_xmit(struct ippp_ccp *ccp,
 		   and increase ids only when an Ack is received for a
 		   given id */
 		id = ccp->reset->lastid++;
-		/* We always expect an Ack if the decompressor doesnt
+		/* We always expect an Ack if the decompressor doesn't
 		   know	better */
 		rp->expra = 1;
 		rp->dtval = 0;

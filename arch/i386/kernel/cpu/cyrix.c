@@ -49,7 +49,7 @@ void __init do_cyrix_devid(unsigned char *dir0, unsigned char *dir1)
  * Cx86_dir0_msb is a HACK needed by check_cx686_cpuid/slop in bugs.h in
  * order to identify the Cyrix CPU model after we're out of setup.c
  *
- * Actually since bugs.h doesnt even reference this perhaps someone should
+ * Actually since bugs.h doesn't even reference this perhaps someone should
  * fix the documentation ???
  */
 static unsigned char Cx86_dir0_msb __initdata = 0;

@@ -81,7 +81,7 @@
  *  v0.14.9a
  *	Aug 6 2001 Alan Cox
  *	0.14.9 crashed on rmmod due to a timer/bh left running. Simplified
- *	the existing logic (the BH doesnt help as ac97 is lock_irqsave)
+ *	the existing logic (the BH doesn't help as ac97 is lock_irqsave)
  *	and used del_timer_sync to clean up
  *	Fixed a problem where the ALi change broke my generic card
  *  v0.14.9
