@@ -26,10 +26,15 @@ COFF_LD_ARGS = -T $(boot)/ld.script -e _start -Ttext 0x00700000 -Bstatic
 CHRP_LD_ARGS = -T $(boot)/ld.script -e _start -Ttext 0x00800000
 NEWWORLD_LD_ARGS = -T $(boot)/ld.script -e _start -Ttext 0x01000000
 
-COMMONOBJS = $(obj)/start.o $(obj)/misc.o $(obj)/common.o
-COFFOBJS = $(obj)/coffcrt0.o $(COMMONOBJS) $(obj)/coffmain.o
-CHRPOBJS = $(obj)/crt0.o $(COMMONOBJS) $(obj)/chrpmain.o
-NEWWORLDOBJS = $(obj)/crt0.o $(COMMONOBJS) $(obj)/newworldmain.o
+COMMONOBJS	:= start.o misc.o common.o
+COFFOBJS	:= coffcrt0.o $(COMMONOBJS) coffmain.o
+CHRPOBJS	:= crt0.o $(COMMONOBJS) chrpmain.o
+NEWWORLDOBJS	:= crt0.o $(COMMONOBJS) newworldmain.o
+
+EXTRA_TARGETS := $(COFFOBJS) $(CHRPOBJS) $(NEWWORLDOBJS)
+COFFOBJS	:= $(addprefix $(obj)/, $(COFFOBJS))
+CHRPOBJS	:= $(addprefix $(obj)/, $(CHRPOBJS))
+NEWWORLDOBJS	:= $(addprefix $(obj)/, $(NEWWORLDOBJS))
 
 LIBS = lib/lib.a $(bootlib)/lib.a $(of1275)/lib.a $(common)/lib.a
 

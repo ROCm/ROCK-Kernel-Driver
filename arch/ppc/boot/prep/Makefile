@@ -35,7 +35,8 @@ of1275 := $(boot)/of1275
 images := $(boot)/images
 simple := $(boot)/simple
 
-OBJS	:= $(addprefix $(obj)/,$(boot-y)) $(simple)/legacy.o 
+EXTRA_TARGETS	:= $(boot-y) ../simple/legacy.o
+OBJS		:= $(addprefix $(obj)/,$(boot-y)) $(simple)/legacy.o 
 
 # Tools
 MKPREP				:= $(utils)/mkprep

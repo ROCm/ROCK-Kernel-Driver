@@ -64,5 +64,3 @@ obj-$(CONFIG_ZX4500)		+= indirect_pci.o pci_auto.o mpc10x_common.o \
 obj-$(CONFIG_8260)		+= m8260_setup.o ppc8260_pic.o
 obj-$(CONFIG_BOOTX_TEXT)	+= btext.o
 
-find_name : find_name.c
-	$(HOSTCC) $(HOSTCFLAGS) -o find_name find_name.c
