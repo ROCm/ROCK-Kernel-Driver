@@ -28,6 +28,7 @@
 #include <linux/smp.h>
 #include <linux/sysctl.h>
 #include <linux/cpu.h>
+#include <linux/quotaops.h>
 
 /*
  * The maximum number of pages to writeout in a single bdflush/kupdate
@@ -80,6 +81,16 @@ int dirty_writeback_centisecs = 5 * 100;
  * The longest number of centiseconds for which data is allowed to remain dirty
  */
 int dirty_expire_centisecs = 30 * 100;
+
+/*
+ * Flag that makes the machine dump writes/reads and block dirtyings.
+ */
+int block_dump;
+
+/*
+ * Flag that puts the machine in "laptop mode".
+ */
+int laptop_mode;
 
 /* End of sysctl-exported parameters */
 
@@ -195,7 +206,7 @@ static void balance_dirty_pages(struct address_space *mapping)
 	if (nr_reclaimable + ps.nr_writeback <= dirty_thresh)
 		dirty_exceeded = 0;
 
-	if (!writeback_in_progress(bdi) && nr_reclaimable > background_thresh)
+	if (!unlikely(laptop_mode) && !writeback_in_progress(bdi) && nr_reclaimable > background_thresh)
 		pdflush_operation(background_writeout, 0);
 }
 
@@ -289,7 +300,17 @@ int wakeup_bdflush(long nr_pages)
 	return pdflush_operation(background_writeout, nr_pages);
 }
 
-static struct timer_list wb_timer;
+
+static void wb_timer_fn(unsigned long unused);
+
+/*
+ * Both timers share the same handler
+ */
+static struct timer_list wb_timer =
+			TIMER_INITIALIZER(wb_timer_fn, 0, 0);
+static struct timer_list laptop_mode_wb_timer =
+			TIMER_INITIALIZER(wb_timer_fn, 0, 0);
+
 
 /*
  * Periodic writeback of "old" data.
@@ -328,6 +349,8 @@ static void wb_kupdate(unsigned long arg)
 	oldest_jif = jiffies - (dirty_expire_centisecs * HZ) / 100;
 	start_jif = jiffies;
 	next_jif = start_jif + (dirty_writeback_centisecs * HZ) / 100;
+	if (laptop_mode)
+		wbc.older_than_this = NULL;
 	nr_to_write = ps.nr_dirty + ps.nr_unstable +
 			(inodes_stat.nr_inodes - inodes_stat.nr_unused);
 	while (nr_to_write > 0) {
@@ -346,7 +369,9 @@ static void wb_kupdate(unsigned long arg)
 		next_jif = jiffies + HZ;
 	if (dirty_writeback_centisecs)
 		mod_timer(&wb_timer, next_jif);
+	del_timer(&laptop_mode_wb_timer); /* May have been set as a result of our writes. */
 }
+
 
 /*
  * sysctl handler for /proc/sys/vm/dirty_writeback_centisecs
@@ -364,12 +389,30 @@ int dirty_writeback_centisecs_handler(ctl_table *table, int write,
 	return 0;
 }
 
+/*
+ * We've spun up the disk and we're in laptop mode: schedule writeback
+ * of all dirty data in 5 seconds.
+ *
+ * Laptop mode writeback will be delayed if it has previously been
+ * scheduled to occur within 5 seconds. That way, the writeback will
+ * only be triggered if the system is truly quiet again.
+ */
+void disk_is_spun_up(int postpone_writeback)
+{
+	if (postpone_writeback || !timer_pending(&laptop_mode_wb_timer))
+		mod_timer(&laptop_mode_wb_timer, jiffies + 5 * HZ);
+}
+
+
+/*
+ * Handler for wb_timer and laptop_mode_wb_timer.
+ */
 static void wb_timer_fn(unsigned long unused)
 {
 	if (pdflush_operation(wb_kupdate, 0) < 0)
 		mod_timer(&wb_timer, jiffies + HZ); /* delay 1 second */
-
 }
+
 
 /*
  * If ratelimit_pages is too high then we can get into dirty-data overload
@@ -430,11 +473,9 @@ void __init page_writeback_init(void)
 		vm_dirty_ratio /= 100;
 	}
 
-	init_timer(&wb_timer);
 	wb_timer.expires = jiffies + (dirty_writeback_centisecs * HZ) / 100;
-	wb_timer.data = 0;
-	wb_timer.function = wb_timer_fn;
 	add_timer(&wb_timer);
+
 	set_ratelimit();
 	register_cpu_notifier(&ratelimit_nb);
 }
@@ -526,6 +567,8 @@ int __set_page_dirty_nobuffers(struct page *page)
 				__mark_inode_dirty(mapping->host,
 							I_DIRTY_PAGES);
 		}
+		if (unlikely(block_dump))
+			printk("%s(%d): dirtied page\n", current->comm, current->pid);
 	}
 	return ret;
 }

@@ -27,6 +27,7 @@
 #include <linux/completion.h>
 #include <linux/slab.h>
 #include <linux/swap.h>
+#include <linux/writeback.h>
 
 static void blk_unplug_work(void *data);
 static void blk_unplug_timeout(unsigned long data);
@@ -2305,6 +2306,15 @@ int submit_bio(int rw, struct bio *bio)
 		mod_page_state(pgpgout, count);
 	else
 		mod_page_state(pgpgin, count);
+
+	if (unlikely(block_dump)) {
+		char b[BDEVNAME_SIZE];
+		printk("%s(%d): %s block %Lu on %s\n",
+			current->comm, current->pid,
+			(rw & WRITE) ? "WRITE" : "READ",
+			(unsigned long long)bio->bi_sector, bdevname(bio->bi_bdev,b));
+	}
+
 	generic_make_request(bio);
 	return 1;
 }
@@ -2592,10 +2602,22 @@ void end_that_request_last(struct request *req)
 		unsigned long duration = jiffies - req->start_time;
 		switch (rq_data_dir(req)) {
 		    case WRITE:
+			/*
+			 * schedule the writeout of pending dirty data when the disk is idle.
+			 * (Writeback is not postponed by writes, only by reads.)
+			 */
+			if (unlikely(laptop_mode))
+				disk_is_spun_up(0);
 			disk_stat_inc(disk, writes);
 			disk_stat_add(disk, write_ticks, duration);
 			break;
 		    case READ:
+			/*
+			 * schedule the writeout of pending dirty data when the disk is idle.
+			 * (postpone writeback until system is quiescent again.)
+			 */
+			if (unlikely(laptop_mode))
+				disk_is_spun_up(1);
 			disk_stat_inc(disk, reads);
 			disk_stat_add(disk, read_ticks, duration);
 			break;

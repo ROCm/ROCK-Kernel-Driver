@@ -869,10 +869,13 @@ int __set_page_dirty_buffers(struct page *page)
 		struct buffer_head *bh = head;
 
 		do {
-			if (buffer_uptodate(bh))
+			if (buffer_uptodate(bh)) {
 				set_buffer_dirty(bh);
-			else
+				if (unlikely(block_dump))
+					printk("%s(%d): dirtied buffer\n", current->comm, current->pid);
+			} else {
 				buffer_error();
+			}
 			bh = bh->b_this_page;
 		} while (bh != head);
 	}
