@@ -1745,10 +1745,12 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 		rc = CIFSFindFirst(xid, pTcon, full_path, pfindData,
 				&findParms, cifs_sb->local_nls,
 				&Unicode, &UnixSearch);
-		cFYI(1, ("Count: %d  End: %d ", findParms.SearchCount,
-			findParms.EndofSearch));
+		cFYI(1, ("Count: %d  End: %d ",
+			le16_to_cpu(findParms.SearchCount),
+			le16_to_cpu(findParms.EndofSearch)));
  
 		if (rc == 0) {
+			__u16 count = le16_to_cpu(findParms.SearchCount);
 			searchHandle = findParms.SearchHandle;
 			if(file->private_data == NULL)
 				file->private_data =
@@ -1769,7 +1771,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 			renew_parental_timestamps(file->f_dentry);
 			lastFindData = 
 				(FILE_DIRECTORY_INFO *) ((char *) pfindData + 
-					findParms.LastNameOffset);
+					le16_to_cpu(findParms.LastNameOffset));
 			if((char *)lastFindData > (char *)pfindData + bufsize) {
 				cFYI(1,("last search entry past end of packet"));
 				rc = -EIO;
@@ -1832,7 +1834,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 					pfindDataUnix->FileName, 
 					cifsFile->resume_name_length);
 			}
-			for (i = 2; i < (unsigned int)findParms.SearchCount + 2; i++) {
+			for (i = 2; i < count + 2; i++) {
 				if (UnixSearch == FALSE) {
 					__u32 len = le32_to_cpu(pfindData->FileNameLength);
 					if (Unicode == TRUE)
@@ -1914,7 +1916,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 			}	/* end for loop */
 			if ((findParms.EndofSearch != 0) && cifsFile) {
 				cifsFile->endOfSearch = TRUE;
-				if(findParms.SearchCount == 2)
+				if(findParms.SearchCount == cpu_to_le16(2))
 					cifsFile->emptyDir = TRUE;
 			}
 		} else {
@@ -1945,13 +1947,14 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 				cifsFile->resume_key,
 				&Unicode, &UnixSearch);
 			cFYI(1,("Count: %d  End: %d ",
-			      findNextParms.SearchCount,
-			      findNextParms.EndofSearch));
+			      le16_to_cpu(findNextParms.SearchCount),
+			      le16_to_cpu(findNextParms.EndofSearch)));
 			if ((rc == 0) && (findNextParms.SearchCount != 0)) {
 			/* BB save off resume key, key name and name length  */
+				__u16 count = le16_to_cpu(findNextParms.SearchCount);
 				lastFindData = 
 					(FILE_DIRECTORY_INFO *) ((char *) pfindData 
-						+ findNextParms.LastNameOffset);
+					+ le16_to_cpu(findNextParms.LastNameOffset));
 				if((char *)lastFindData > (char *)pfindData + bufsize) {
 					cFYI(1,("last search entry past end of packet"));
 					rc = -EIO;
@@ -2028,7 +2031,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 						cifsFile->resume_name_length);
 				}
 
-				for (i = 0; i < findNextParms.SearchCount; i++) {
+				for (i = 0; i < count; i++) {
 					__u32 len = le32_to_cpu(pfindData->
 							FileNameLength);
 					if (UnixSearch == FALSE) {

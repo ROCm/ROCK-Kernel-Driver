@@ -1890,11 +1890,6 @@ findFirstRetry:
 		       (char *) &pSMBr->hdr.Protocol +
 		       le16_to_cpu(pSMBr->ParameterOffset),
 		       sizeof (T2_FFIRST_RSP_PARMS));
-		/* search handle can stay LE and EAoffset not needed so not converted */
-		findParms->EndofSearch = le16_to_cpu(findParms->EndofSearch);
-		findParms->LastNameOffset =
-		    le16_to_cpu(findParms->LastNameOffset);
-		findParms->SearchCount = le16_to_cpu(findParms->SearchCount);
 		response_data =
 		    (char *) &pSMBr->hdr.Protocol +
 		    le16_to_cpu(pSMBr->DataOffset);
@@ -1998,10 +1993,6 @@ CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 		       (char *) &pSMBr->hdr.Protocol +
 		       le16_to_cpu(pSMBr->ParameterOffset),
 		       sizeof (T2_FNEXT_RSP_PARMS));
-		findParms->EndofSearch = le16_to_cpu(findParms->EndofSearch);
-		findParms->LastNameOffset =
-		    le16_to_cpu(findParms->LastNameOffset);
-		findParms->SearchCount = le16_to_cpu(findParms->SearchCount);
 		response_data =
 		    (char *) &pSMBr->hdr.Protocol +
 		    le16_to_cpu(pSMBr->DataOffset);

@@ -1284,10 +1284,10 @@ typedef struct smb_com_transaction2_ffirst_rsp {
 
 typedef struct smb_com_transaction2_ffirst_rsp_parms {
 	__u16 SearchHandle;
-	__u16 SearchCount;
-	__u16 EndofSearch;
-	__u16 EAErrorOffset;
-	__u16 LastNameOffset;
+	__le16 SearchCount;
+	__le16 EndofSearch;
+	__le16 EAErrorOffset;
+	__le16 LastNameOffset;
 } T2_FFIRST_RSP_PARMS;
 
 typedef struct smb_com_transaction2_fnext_req {
@@ -1335,10 +1335,10 @@ typedef struct smb_com_transaction2_fnext_rsp {
 } TRANSACTION2_FNEXT_RSP;
 
 typedef struct smb_com_transaction2_fnext_rsp_parms {
-	__u16 SearchCount;
-	__u16 EndofSearch;
-	__u16 EAErrorOffset;
-	__u16 LastNameOffset;
+	__le16 SearchCount;
+	__le16 EndofSearch;
+	__le16 EAErrorOffset;
+	__le16 LastNameOffset;
 } T2_FNEXT_RSP_PARMS;
 
 /* QFSInfo Levels */
