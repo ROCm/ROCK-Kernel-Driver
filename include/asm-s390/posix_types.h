@@ -60,13 +60,13 @@ typedef struct {
 #endif
 
 #undef  __FD_SET
-#define __FD_SET(fd,fdsetp)  set_bit(fd,fdsetp)
+#define __FD_SET(fd,fdsetp)  set_bit(fd,fdsetp->fds_bits)
 
 #undef  __FD_CLR
-#define __FD_CLR(fd,fdsetp)  clear_bit(fd,fdsetp)
+#define __FD_CLR(fd,fdsetp)  clear_bit(fd,fdsetp->fds_bits)
 
 #undef  __FD_ISSET
-#define __FD_ISSET(fd,fdsetp)  test_bit(fd,fdsetp)
+#define __FD_ISSET(fd,fdsetp)  test_bit(fd,fdsetp->fds_bits)
 
 #undef  __FD_ZERO
 #define __FD_ZERO(fdsetp) (memset (fdsetp, 0, sizeof(*(fd_set *)fdsetp)))

@@ -40,7 +40,6 @@ extern spinlock_t modlist_lock;
 unsigned long
 search_exception_table(unsigned long addr)
 {
-	struct list_head *i;
 	unsigned long ret = 0;
 	
 #ifndef CONFIG_MODULES
