@@ -18,6 +18,7 @@
 #include <linux/netdevice.h>
 #include <net/neighbour.h>
 #include <net/arp.h>
+#include <net/udp.h>
 #include <linux/rtnetlink.h>
 #include <linux/route.h>
 #include <net/ip_fib.h>
@@ -29,7 +30,6 @@ extern int snmp_get_info(char *, char **, off_t, int);
 extern int netstat_get_info(char *, char **, off_t, int);
 extern int afinet_get_info(char *, char **, off_t, int);
 extern int tcp_get_info(char *, char **, off_t, int);
-extern int udp_get_info(char *, char **, off_t, int);
 
 #ifdef CONFIG_PROC_FS
 #ifdef CONFIG_AX25
@@ -38,7 +38,7 @@ extern int udp_get_info(char *, char **, off_t, int);
 /*
  *	ax25 -> ASCII conversion
  */
-char *ax2asc2(ax25_address *a, char *buf)
+static char *ax2asc2(ax25_address *a, char *buf)
 {
 	char c, *s;
 	int n;
@@ -198,18 +198,79 @@ static int fib_seq_show(struct seq_file *seq, void *v)
 
 /* ------------------------------------------------------------------------ */
 
-struct seq_operations arp_seq_ops = {
+static void *udp_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	read_lock(&udp_hash_lock);
+	return (void *)(unsigned long)++*pos;
+}
+
+static void *udp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	return (void *)(unsigned long)((++*pos) >=
+				       (UDP_HTABLE_SIZE - 1) ? 0 : *pos);
+}
+
+static void udp_seq_stop(struct seq_file *seq, void *v)
+{
+	read_unlock(&udp_hash_lock);
+}
+
+static void udp_format_sock(struct sock *sp, char *tmpbuf, int i)
+{
+	struct inet_opt *inet = inet_sk(sp);
+	unsigned int dest = inet->daddr;
+	unsigned int src  = inet->rcv_saddr;
+	__u16 destp	  = ntohs(inet->dport);
+	__u16 srcp	  = ntohs(inet->sport);
+
+	sprintf(tmpbuf, "%4d: %08X:%04X %08X:%04X"
+		" %02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %p",
+		i, src, srcp, dest, destp, sp->state, 
+		atomic_read(&sp->wmem_alloc), atomic_read(&sp->rmem_alloc),
+		0, 0L, 0, sock_i_uid(sp), 0, sock_i_ino(sp),
+		atomic_read(&sp->refcnt), sp);
+}
+
+static int udp_seq_show(struct seq_file *seq, void *v)
+{
+	char tmpbuf[129];
+	struct sock *sk;
+	unsigned long l = (unsigned long)v - 1;
+
+	if (!l)
+		seq_printf(seq, "%-127s\n",
+			   "  sl  local_address rem_address   st tx_queue "
+			   "rx_queue tr tm->when retrnsmt   uid  timeout inode");
+
+	for (sk = udp_hash[l]; sk; sk = sk->next) {
+		if (sk->family != PF_INET)
+			continue;
+		udp_format_sock(sk, tmpbuf, l);
+		seq_printf(seq, "%-127s\n", tmpbuf);
+	}
+	return 0;
+}
+/* ------------------------------------------------------------------------ */
+
+static struct seq_operations arp_seq_ops = {
 	.start  = arp_seq_start,
 	.next   = arp_seq_next,
 	.stop   = arp_seq_stop,
 	.show   = arp_seq_show,
 };
 
-struct seq_operations fib_seq_ops = {
+static struct seq_operations fib_seq_ops = {
 	.start  = fib_seq_start,
 	.next   = fib_seq_next,
 	.stop   = fib_seq_stop,
 	.show   = fib_seq_show,
+};
+
+static struct seq_operations udp_seq_ops = {
+	.start  = udp_seq_start,
+	.next   = udp_seq_next,
+	.stop   = udp_seq_stop,
+	.show   = udp_seq_show,
 };
 
 static int arp_seq_open(struct inode *inode, struct file *file)
@@ -222,6 +283,11 @@ static int fib_seq_open(struct inode *inode, struct file *file)
 	return seq_open(file, &fib_seq_ops);
 }
 
+static int udp_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &udp_seq_ops);
+}
+
 static struct file_operations arp_seq_fops = {
 	.open           = arp_seq_open,
 	.read           = seq_read,
@@ -231,6 +297,13 @@ static struct file_operations arp_seq_fops = {
 
 static struct file_operations fib_seq_fops = {
 	.open           = fib_seq_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release	= seq_release,
+};
+
+static struct file_operations udp_seq_fops = {
+	.open           = udp_seq_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,
 	.release	= seq_release,
@@ -258,8 +331,10 @@ int __init ipv4_proc_init(void)
 	if (!proc_net_create("tcp", 0, tcp_get_info))
 		goto out_tcp;
 
-	if (!proc_net_create("udp", 0, udp_get_info))
+	p = create_proc_entry("udp", S_IRUGO, proc_net);
+	if (!p)
 		goto out_udp;
+	p->proc_fops = &udp_seq_fops;
 
 	p = create_proc_entry("arp", S_IRUGO, proc_net);
 	if (!p)
@@ -275,7 +350,7 @@ out:
 out_route:
 	remove_proc_entry("route", proc_net);
 out_arp:
-	proc_net_remove("udp");
+	remove_proc_entry("udp", proc_net);
 out_udp:
 	proc_net_remove("tcp");
 out_tcp:
