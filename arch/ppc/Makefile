@@ -65,6 +65,8 @@ makeboot = $(call descend,arch/ppc/boot,$(1))
 
 BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd pImage vmlinux.sm
 
+.PHONY: $(BOOT_TARGETS) clean archclean archmrproper
+
 AFLAGS_vmlinux.lds.o	:= -Upowerpc
 
 # All the instructions talk about "make bzImage".
@@ -78,7 +80,7 @@ $(BOOT_TARGETS): vmlinux
 	cp -f arch/ppc/configs/$(@:config=defconfig) .config
 
 archclean:
-	+@$(call makeboot,clean)
+	$(MAKE) -f scripts/Makefile.clean obj=arch/ppc/boot
 
 archmrproper:
 
