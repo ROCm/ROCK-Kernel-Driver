@@ -83,6 +83,9 @@
 #define PORT_SCIF	53
 #define PORT_IRDA	54
 
+/* IBM icom */
+#define PORT_ICOM	52
+
 #ifdef __KERNEL__
 
 #include <linux/config.h>

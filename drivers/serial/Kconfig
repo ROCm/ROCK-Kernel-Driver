@@ -562,5 +562,17 @@ config SERIAL_PMACZILOG_CONSOLE
 	  on your PowerMac as the console, you can do so by answering
 	  Y to this option.
 
+config SERIAL_ICOM
+	tristate "IBM Multiport Serial Adapter"
+	depends on PPC_ISERIES
+	select SERIAL_CORE
+	help
+	  This driver is for a family of multiport serial adapters
+	  including 2 port RVX, 2 port internal modem, 4 port internal
+	  modem and a split 1 port RVX and 1 port internal modem.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called icom.
+
 endmenu
 
