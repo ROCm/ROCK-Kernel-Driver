@@ -1171,15 +1171,17 @@ static inline void wl3501_md_ind_interrupt(struct net_device *dev,
 	this->rssi = rssi <= 63 ? (rssi * 100) / 64 : 255;
 
 	if (this->llc_type == 1) {
-		u16 tmp;
+		unsigned char addr4[ETH_ALEN];
 
 		wl3501_get_from_wla(this,
-				    sig.data + sizeof(struct wl3501_rx_hdr) - 6,
-				    &tmp, sizeof(tmp));
-		if (tmp == 0xaaaa) {
+				    sig.data +
+				    	offsetof(struct wl3501_rx_hdr, addr4),
+				    &addr4, sizeof(addr4));
+		if (addr4[0] == 0xAA && addr4[1] == 0xAA &&
+		    addr4[2] == 0x03 && addr4[4] == 0x00) {
 			pkt_len = sig.size + 12 - 24 - 4 - 6;
 			this->ether_type = ARPHRD_ETHER;
-		} else if (tmp == 0xe0e0) {
+		} else if (addr4[0] == 0xE0 && addr4[1] == 0xE0) {
 			pkt_len = sig.size + 12 - 24 - 4 + 2;
 			this->ether_type = ARPHRD_IEEE80211; /* FIXME */
 		} else {
