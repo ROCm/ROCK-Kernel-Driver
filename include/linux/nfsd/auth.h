@@ -21,7 +21,7 @@
  * Set the current process's fsuid/fsgid etc to those of the NFS
  * client user
  */
-void		nfsd_setuser(struct svc_rqst *, struct svc_export *);
+int nfsd_setuser(struct svc_rqst *, struct svc_export *);
 
 #endif /* __KERNEL__ */
 #endif /* LINUX_NFSD_AUTH_H */

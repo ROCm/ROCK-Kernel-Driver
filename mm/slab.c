@@ -357,8 +357,8 @@ struct kmem_cache_s {
 #define	RED_ACTIVE	0x170FC2A5UL	/* when obj is active */
 
 /* ...and for poisoning */
-#define	POISON_BEFORE	0x5a	/* for use-uninitialised poisoning */
-#define POISON_AFTER	0x6b	/* for use-after-free poisoning */
+#define	POISON_INUSE	0x5a	/* for use-uninitialised poisoning */
+#define POISON_FREE	0x6b	/* for use-after-free poisoning */
 #define	POISON_END	0xa5	/* end-byte of poisoning */
 
 /* memory layout of objects:
@@ -887,60 +887,105 @@ static void poison_obj(kmem_cache_t *cachep, void *addr, unsigned char val)
 	*(unsigned char *)(addr+size-1) = POISON_END;
 }
 
-static void *scan_poisoned_obj(unsigned char* addr, unsigned int size)
+static void dump_line(char *data, int offset, int limit)
 {
-	unsigned char *end;
-	
-	end = addr + size - 1;
-
-	for (; addr < end; addr++) {
-		if (*addr != POISON_BEFORE && *addr != POISON_AFTER)
-			return addr;
+	int i;
+	printk(KERN_ERR "%03x:", offset);
+	for (i=0;i<limit;i++) {
+		printk(" %02x", (unsigned char)data[offset+i]);
 	}
-	if (*addr != POISON_END)
-		return addr;
-	return NULL;
+	printk("\n");
 }
+#endif
+
+static void print_objinfo(kmem_cache_t *cachep, void *objp, int lines)
+{
+#if DEBUG
+	int i, size;
+	char *realobj;
+
+	if (cachep->flags & SLAB_RED_ZONE) {
+		printk(KERN_ERR "Redzone: 0x%lx/0x%lx.\n",
+			*dbg_redzone1(cachep, objp),
+			*dbg_redzone2(cachep, objp));
+	}
+
+	if (cachep->flags & SLAB_STORE_USER) {
+		printk(KERN_ERR "Last user: [<%p>]", *dbg_userword(cachep, objp));
+		print_symbol("(%s)", (unsigned long)*dbg_userword(cachep, objp));
+		printk("\n");
+	}
+	realobj = (char*)objp+obj_dbghead(cachep);
+	size = cachep->objsize;
+	for (i=0; i<size && lines;i+=16, lines--) {
+		int limit;
+		limit = 16;
+		if (i+limit > size)
+			limit = size-i;
+		dump_line(realobj, i, limit);
+	}
+#endif
+}
+
+#if DEBUG
 
 static void check_poison_obj(kmem_cache_t *cachep, void *objp)
 {
-	void *end;
-	void *realobj;
-	int size = obj_reallen(cachep);
+	char *realobj;
+	int size, i;
+	int lines = 0;
 
-	realobj = objp+obj_dbghead(cachep);
+	realobj = (char*)objp+obj_dbghead(cachep);
+	size = obj_reallen(cachep);
 
-	end = scan_poisoned_obj(realobj, size);
-	if (end) {
-		int s;
-		printk(KERN_ERR "Slab corruption: start=%p, expend=%p, "
-				"problemat=%p\n", realobj, realobj+size-1, end);
-		if (cachep->flags & SLAB_STORE_USER) {
-			printk(KERN_ERR "Last user: [<%p>]", *dbg_userword(cachep, objp));
-			print_symbol("(%s)", (unsigned long)*dbg_userword(cachep, objp));
-			printk("\n");
+	for (i=0;i<size;i++) {
+		char exp = POISON_FREE;
+		if (i == size-1)
+			exp = POISON_END;
+		if (realobj[i] != exp) {
+			int limit;
+			/* Mismatch ! */
+			/* Print header */
+			if (lines == 0) {
+				printk(KERN_ERR "Slab corruption: start=%p, len=%d\n",
+						realobj, size);
+				print_objinfo(cachep, objp, 0);
+			}
+			/* Hexdump the affected line */
+			i = (i/16)*16;
+			limit = 16;
+			if (i+limit > size)
+				limit = size-i;
+			dump_line(realobj, i, limit);
+			i += 16;
+			lines++;
+			/* Limit to 5 lines */
+			if (lines > 5)
+				break;
 		}
-		printk(KERN_ERR "Data: ");
-		for (s = 0; s < size; s++) {
-			if (((char*)realobj)[s] == POISON_BEFORE)
-				printk(".");
-			else if (((char*)realobj)[s] == POISON_AFTER)
-				printk("*");
-			else
-				printk("%02X ", ((unsigned char*)realobj)[s]);
+	}
+	if (lines != 0) {
+		/* Print some data about the neighboring objects, if they
+		 * exist:
+		 */
+		struct slab *slabp = GET_PAGE_SLAB(virt_to_page(objp));
+		int objnr;
+
+		objnr = (objp-slabp->s_mem)/cachep->objsize;
+		if (objnr) {
+			objp = slabp->s_mem+(objnr-1)*cachep->objsize;
+			realobj = (char*)objp+obj_dbghead(cachep);
+			printk(KERN_ERR "Prev obj: start=%p, len=%d\n",
+						realobj, size);
+			print_objinfo(cachep, objp, 2);
 		}
-		printk("\n");
-		printk(KERN_ERR "Next: ");
-		for (; s < size + 32; s++) {
-			if (((char*)realobj)[s] == POISON_BEFORE)
-				printk(".");
-			else if (((char*)realobj)[s] == POISON_AFTER)
-				printk("*");
-			else
-				printk("%02X ", ((unsigned char*)realobj)[s]);
+		if (objnr+1 < cachep->num) {
+			objp = slabp->s_mem+(objnr+1)*cachep->objsize;
+			realobj = (char*)objp+obj_dbghead(cachep);
+			printk(KERN_ERR "Next obj: start=%p, len=%d\n",
+						realobj, size);
+			print_objinfo(cachep, objp, 2);
 		}
-		printk("\n");
-		slab_error(cachep, "object was modified after freeing");
 	}
 }
 #endif
@@ -1030,7 +1075,6 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 	unsigned long flags, void (*ctor)(void*, kmem_cache_t *, unsigned long),
 	void (*dtor)(void*, kmem_cache_t *, unsigned long))
 {
-	const char *func_nm = KERN_ERR "kmem_create: ";
 	size_t left_over, align, slab_size;
 	kmem_cache_t *cachep = NULL;
 
@@ -1042,14 +1086,18 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 		(size < BYTES_PER_WORD) ||
 		(size > (1<<MAX_OBJ_ORDER)*PAGE_SIZE) ||
 		(dtor && !ctor) ||
-		(offset < 0 || offset > size))
+		(offset < 0 || offset > size)) {
+			printk(KERN_ERR "%s: Early error in slab %s\n",
+					__FUNCTION__, name);
 			BUG();
+		}
 
 #if DEBUG
 	WARN_ON(strchr(name, ' '));	/* It confuses parsers */
 	if ((flags & SLAB_DEBUG_INITIAL) && !ctor) {
 		/* No constructor, but inital state check requested */
-		printk("%sNo con, but init state check requested - %s\n", func_nm, name);
+		printk(KERN_ERR "%s: No con, but init state check "
+				"requested - %s\n", __FUNCTION__, name);
 		flags &= ~SLAB_DEBUG_INITIAL;
 	}
 
@@ -1094,7 +1142,6 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 	if (size & (BYTES_PER_WORD-1)) {
 		size += (BYTES_PER_WORD-1);
 		size &= ~(BYTES_PER_WORD-1);
-		printk("%sForcing size word alignment - %s\n", func_nm, name);
 	}
 	
 #if DEBUG
@@ -1493,7 +1540,7 @@ static void cache_init_objs (kmem_cache_t * cachep,
 #if DEBUG
 		/* need to poison the objs? */
 		if (cachep->flags & SLAB_POISON)
-			poison_obj(cachep, objp, POISON_BEFORE);
+			poison_obj(cachep, objp, POISON_FREE);
 		if (cachep->flags & SLAB_STORE_USER)
 			*dbg_userword(cachep, objp) = NULL;
 
@@ -1712,13 +1759,13 @@ static inline void *cache_free_debugcheck (kmem_cache_t * cachep, void * objp, v
 	if (cachep->flags & SLAB_POISON) {
 #ifdef CONFIG_DEBUG_PAGEALLOC
 		if ((cachep->objsize % PAGE_SIZE) == 0 && OFF_SLAB(cachep)) {
-			store_stackinfo(cachep, objp, POISON_AFTER);
+			store_stackinfo(cachep, objp, (unsigned long)caller);
 	       		kernel_map_pages(virt_to_page(objp), cachep->objsize/PAGE_SIZE, 0);
 		} else {
-			poison_obj(cachep, objp, POISON_AFTER);
+			poison_obj(cachep, objp, POISON_FREE);
 		}
 #else
-		poison_obj(cachep, objp, POISON_AFTER);
+		poison_obj(cachep, objp, POISON_FREE);
 #endif
 	}
 #endif
@@ -1875,7 +1922,7 @@ cache_alloc_debugcheck_after(kmem_cache_t *cachep,
 #else
 		check_poison_obj(cachep, objp);
 #endif
-		poison_obj(cachep, objp, POISON_BEFORE);
+		poison_obj(cachep, objp, POISON_INUSE);
 	}
 	if (cachep->flags & SLAB_STORE_USER)
 		*dbg_userword(cachep, objp) = caller;
@@ -2866,14 +2913,7 @@ void ptrinfo(unsigned long addr)
 			kernel_map_pages(virt_to_page(objp),
 					c->objsize/PAGE_SIZE, 1);
 
-			if (c->flags & SLAB_RED_ZONE)
-				printk("redzone: 0x%lx/0x%lx.\n",
-					*dbg_redzone1(c, objp),
-					*dbg_redzone2(c, objp));
-
-			if (c->flags & SLAB_STORE_USER)
-				printk("Last user: %p.\n",
-					*dbg_userword(c, objp));
+			print_objinfo(c, objp, 2);
 		}
 		spin_unlock_irqrestore(&c->spinlock, flags);
 

@@ -59,8 +59,8 @@ Module parameters
 =================
 
 There are several parameters which may be provided to the driver when
-its module is loaded.  These are usually placed in /etc/modules.conf
-(used to be conf.modules).  Example:
+its module is loaded.  These are usually placed in /etc/modprobe.conf
+(/etc/modules.conf in 2.4).  Example:
 
 options 3c59x debug=3 rx_copybreak=300
 
@@ -215,6 +215,19 @@ watchdog=N
   This is mainly for debugging purposes, although it may be advantageous
   to increase this value on LANs which have very high collision rates.
   The default value is 5000 (5.0 seconds).
+
+enable_wol=N1,N2,N3,...
+
+  Enable Wake-on-LAN support for the relevant interface.  Donald
+  Becker's `ether-wake' application may be used to wake suspended
+  machines.
+
+  Also enables the NIC's power management support.
+
+global_enable_wol=N
+
+  Sets enable_wol mode for all 3c59x NICs in the machine.  Entries in
+  the `enable_wol' array above will override any setting of this.
 
 Media selection
 ---------------
@@ -413,9 +426,9 @@ steps you should take:
 
       1) Increase the debug level.  Usually this is done via:
 
-         a) modprobe driver.o debug=7
-         b) In /etc/conf.modules (or modules.conf):
-            options driver_name debug=7
+         a) modprobe driver debug=7
+         b) In /etc/modprobe.conf (or /etc/modules.conf for 2.4):
+            options driver debug=7
 
       2) Recreate the problem with the higher debug level,
          send all logs to the maintainer.

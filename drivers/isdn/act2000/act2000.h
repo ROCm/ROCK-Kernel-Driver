@@ -147,34 +147,36 @@ typedef union irq_data {
  * Per card driver data
  */
 typedef struct act2000_card {
-        unsigned short port;             /* Base-port-address                */
-        unsigned short irq;              /* Interrupt                        */
-        u_char ptype;                    /* Protocol type (1TR6 or Euro)     */
-        u_char bus;                      /* Cardtype (ISA, MCA, PCMCIA)      */
-        struct act2000_card *next;	 /* Pointer to next device struct    */
-        int myid;                        /* Driver-Nr. assigned by linklevel */
-        unsigned long flags;             /* Statusflags                      */
-        unsigned long ilock;             /* Semaphores for IRQ-Routines      */
-	struct sk_buff_head rcvq;        /* Receive-Message queue            */
-	struct sk_buff_head sndq;        /* Send-Message queue               */
-	struct sk_buff_head ackq;        /* Data-Ack-Message queue           */
-	u_char *ack_msg;                 /* Ptr to User Data in User skb     */
-	__u16 need_b3ack;                /* Flag: Need ACK for current skb   */
-	struct sk_buff *sbuf;            /* skb which is currently sent      */
-	struct timer_list ptimer;        /* Poll timer                       */
-	struct work_struct snd_tq;         /* Task struct for xmit bh          */
-	struct work_struct rcv_tq;         /* Task struct for rcv bh           */
-	struct work_struct poll_tq;        /* Task struct for polled rcv bh    */
+	unsigned short port;		/* Base-port-address                */
+	unsigned short irq;		/* Interrupt                        */
+	u_char ptype;			/* Protocol type (1TR6 or Euro)     */
+	u_char bus;			/* Cardtype (ISA, MCA, PCMCIA)      */
+	struct act2000_card *next;	/* Pointer to next device struct    */
+	spinlock_t lock;		/* protect critical operations      */
+	int myid;			/* Driver-Nr. assigned by linklevel */
+	unsigned long flags;		/* Statusflags                      */
+	unsigned long ilock;		/* Semaphores for IRQ-Routines      */
+	struct sk_buff_head rcvq;	/* Receive-Message queue            */
+	struct sk_buff_head sndq;	/* Send-Message queue               */
+	struct sk_buff_head ackq;	/* Data-Ack-Message queue           */
+	u_char *ack_msg;		/* Ptr to User Data in User skb     */
+	__u16 need_b3ack;		/* Flag: Need ACK for current skb   */
+	struct sk_buff *sbuf;		/* skb which is currently sent      */
+	struct timer_list ptimer;	/* Poll timer                       */
+	struct work_struct snd_tq;	/* Task struct for xmit bh          */
+	struct work_struct rcv_tq;	/* Task struct for rcv bh           */
+	struct work_struct poll_tq;	/* Task struct for polled rcv bh    */
 	msn_entry *msn_list;
-	unsigned short msgnum;           /* Message number fur sending       */
-	act2000_chan bch[ACT2000_BCH];   /* B-Channel status/control         */
-	char   status_buf[256];          /* Buffer for status messages       */
+	unsigned short msgnum;		/* Message number for sending       */
+	spinlock_t mnlock;		/* lock for msgnum                  */
+	act2000_chan bch[ACT2000_BCH];	/* B-Channel status/control         */
+	char   status_buf[256];		/* Buffer for status messages       */
 	char   *status_buf_read;
 	char   *status_buf_write;
 	char   *status_buf_end;
-	irq_data idat;                   /* Data used for IRQ handler        */
-        isdn_if interface;               /* Interface to upper layer         */
-        char regname[35];                /* Name used for request_region     */
+	irq_data idat;			/* Data used for IRQ handler        */
+	isdn_if interface;		/* Interface to upper layer         */
+	char regname[35];		/* Name used for request_region     */
 } act2000_card;
 
 extern __inline__ void act2000_schedule_tx(act2000_card *card)

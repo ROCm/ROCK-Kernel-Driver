@@ -24,15 +24,11 @@
  *
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
-#include <asm/system.h>
-#include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/skbuff.h>
 #include <linux/in.h>
 #include <linux/ip.h>
-#include <linux/init.h>
 #include <net/protocol.h>
 #include <net/tcp.h>
 

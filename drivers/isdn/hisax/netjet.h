@@ -1,4 +1,4 @@
-/* $Id: netjet.h,v 2.5.6.3 2001/09/23 22:24:50 kai Exp $
+/* $Id: netjet.h,v 2.8.2.2 2004/01/12 22:52:28 keil Exp $
  *
  * NETjet common header file
  *
@@ -57,12 +57,10 @@ extern const char *CardType[];
 
 #define HDLC_FLAG_VALUE	0x7e
 
-extern struct dc_hw_ops netjet_dc_ops;
-
-u8 NETjet_ReadIC(struct IsdnCardState *cs, u8 offset);
-void NETjet_WriteIC(struct IsdnCardState *cs, u8 offset, u8 value);
-void NETjet_ReadICfifo(struct IsdnCardState *cs, u8 *data, int size);
-void NETjet_WriteICfifo(struct IsdnCardState *cs, u8 *data, int size);
+u_char NETjet_ReadIC(struct IsdnCardState *cs, u_char offset);
+void NETjet_WriteIC(struct IsdnCardState *cs, u_char offset, u_char value);
+void NETjet_ReadICfifo(struct IsdnCardState *cs, u_char *data, int size);
+void NETjet_WriteICfifo(struct IsdnCardState *cs, u_char *data, int size);
 
 void read_tiger(struct IsdnCardState *cs);
 void write_tiger(struct IsdnCardState *cs);
@@ -70,5 +68,5 @@ void write_tiger(struct IsdnCardState *cs);
 void netjet_fill_dma(struct BCState *bcs);
 void netjet_interrupt(int intno, void *dev_id, struct pt_regs *regs);
 void inittiger(struct IsdnCardState *cs);
-void netjet_release(struct IsdnCardState *cs);
+void release_io_netjet(struct IsdnCardState *cs);
 

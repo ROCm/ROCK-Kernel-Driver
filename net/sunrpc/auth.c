@@ -255,34 +255,41 @@ retry:
 struct rpc_cred *
 rpcauth_lookupcred(struct rpc_auth *auth, int taskflags)
 {
-	struct auth_cred acred = {
-		.uid = current->fsuid,
-		.gid = current->fsgid,
-		.ngroups = current->ngroups,
-		.groups = current->groups,
-	};
+	struct auth_cred acred;
+	struct rpc_cred *ret;
+
+	get_group_info(current->group_info);
+	acred.uid = current->fsuid;
+	acred.gid = current->fsgid;
+	acred.group_info = current->group_info;
+
 	dprintk("RPC:     looking up %s cred\n",
 		auth->au_ops->au_name);
-	return rpcauth_lookup_credcache(auth, &acred, taskflags);
+	ret = rpcauth_lookup_credcache(auth, &acred, taskflags);
+	put_group_info(current->group_info);
+	return ret;
 }
 
 struct rpc_cred *
 rpcauth_bindcred(struct rpc_task *task)
 {
 	struct rpc_auth *auth = task->tk_auth;
-	struct auth_cred acred = {
-		.uid = current->fsuid,
-		.gid = current->fsgid,
-		.ngroups = current->ngroups,
-		.groups = current->groups,
-	};
+	struct auth_cred acred;
+	struct rpc_cred *ret;
+
+	get_group_info(current->group_info);
+	acred.uid = current->fsuid;
+	acred.gid = current->fsgid;
+	acred.group_info = current->group_info;
 
 	dprintk("RPC: %4d looking up %s cred\n",
 		task->tk_pid, task->tk_auth->au_ops->au_name);
 	task->tk_msg.rpc_cred = rpcauth_lookup_credcache(auth, &acred, task->tk_flags);
 	if (task->tk_msg.rpc_cred == 0)
 		task->tk_status = -ENOMEM;
-	return task->tk_msg.rpc_cred;
+	ret = task->tk_msg.rpc_cred;
+	put_group_info(current->group_info);
+	return ret;
 }
 
 void

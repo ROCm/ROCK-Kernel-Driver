@@ -399,7 +399,7 @@ void ip6ip6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	__u16 len;
 
 	/* If the packet doesn't contain the original IPv6 header we are 
-	   in trouble since we might need the source address for furter 
+	   in trouble since we might need the source address for further 
 	   processing of the error. */
 
 	read_lock(&ip6ip6_lock);

@@ -173,7 +173,7 @@ struct net_device loopback_dev = {
 	.rebuild_header		= eth_rebuild_header,
 	.flags			= IFF_LOOPBACK,
 	.features 		= NETIF_F_SG|NETIF_F_FRAGLIST
-				  |NETIF_F_NO_CSUM|NETIF_F_HIGHDMA|NETIF_F_TSO,
+				  |NETIF_F_NO_CSUM|NETIF_F_HIGHDMA,
 };
 
 /* Setup and register the of the LOOPBACK device. */

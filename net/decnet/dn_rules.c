@@ -381,7 +381,7 @@ static int dn_fib_fill_rule(struct sk_buff *skb, struct dn_fib_rule *r, struct n
 
 nlmsg_failure:
 rtattr_failure:
-	skb_put(skb, b - skb->tail);
+	skb_trim(skb, b - skb->data);
 	return -1;
 }
 

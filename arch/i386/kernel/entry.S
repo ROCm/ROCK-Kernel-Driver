@@ -515,8 +515,8 @@ ENTRY(nmi)
 	/* Do not access memory above the end of our stack page,
 	 * it might not exist.
 	 */
-	andl $0x1fff,%eax
-	cmpl $0x1fec,%eax
+	andl $(THREAD_SIZE-1),%eax
+	cmpl $(THREAD_SIZE-20),%eax
 	popl %eax
 	jae nmi_stack_correct
 	cmpl $sysenter_entry,12(%esp)

@@ -595,10 +595,10 @@ nfsd3_proc_commit(struct svc_rqst * rqstp, struct nfsd3_commitargs *argp,
 {
 	int	nfserr;
 
-	dprintk("nfsd: COMMIT(3)   %s %d@%ld\n",
+	dprintk("nfsd: COMMIT(3)   %s %u@%Lu\n",
 				SVCFH_fmt(&argp->fh),
 				argp->count,
-				(unsigned long) argp->offset);
+				(unsigned long long) argp->offset);
 
 	if (argp->offset > NFS_OFFSET_MAX)
 		RETURN_STATUS(nfserr_inval);

@@ -418,6 +418,7 @@ int do_settimeofday(struct timespec *tv)
 	}
 
 	write_sequnlock_irqrestore(&xtime_lock, flags);
+	clock_was_set();
 	return 0;
 }
 

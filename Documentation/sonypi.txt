@@ -43,7 +43,7 @@ Driver options:
 ---------------
 
 Several options can be passed to the sonypi driver, either by adding them
-to /etc/modules.conf file, when the driver is compiled as a module or by
+to /etc/modprobe.conf file, when the driver is compiled as a module or by
 adding the following to the kernel command line (in your bootloader):
 
 	sonypi=minor[,verbose[,fnkeyinit[,camera[,compat[,mask[,useinput]]]]]]
@@ -109,7 +109,7 @@ Module use:
 -----------
 
 In order to automatically load the sonypi module on use, you can put those
-lines in your /etc/modules.conf file:
+lines in your /etc/modprobe.conf file:
 
 	alias char-major-10-250 sonypi
 	options sonypi minor=250

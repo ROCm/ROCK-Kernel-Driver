@@ -1327,6 +1327,16 @@ void wake_up_inode(struct inode *inode)
 		wake_up_all(wq);
 }
 
+static __initdata unsigned long ihash_entries;
+static int __init set_ihash_entries(char *str)
+{
+	if (!str)
+		return 0;
+	ihash_entries = simple_strtoul(str, &str, 0);
+	return 1;
+}
+__setup("ihash_entries=", set_ihash_entries);
+
 /*
  * Initialize the waitqueues and inode hash table.
  */
@@ -1340,9 +1350,13 @@ void __init inode_init(unsigned long mempages)
 	for (i = 0; i < ARRAY_SIZE(i_wait_queue_heads); i++)
 		init_waitqueue_head(&i_wait_queue_heads[i].wqh);
 
-	mempages >>= (14 - PAGE_SHIFT);
-	mempages *= sizeof(struct hlist_head);
-	for (order = 0; ((1UL << order) << PAGE_SHIFT) < mempages; order++)
+	if (!ihash_entries)
+		ihash_entries = PAGE_SHIFT < 14 ?
+				mempages >> (14 - PAGE_SHIFT) :
+				mempages << (PAGE_SHIFT - 14);
+
+	ihash_entries *= sizeof(struct hlist_head);
+	for (order = 0; ((1UL << order) << PAGE_SHIFT) < ihash_entries; order++)
 		;
 
 	do {

@@ -19,7 +19,7 @@ MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_CARDS) "i");
 MODULE_PARM(ram, "1-" __MODULE_STRING(MAX_CARDS) "i");
 MODULE_PARM(do_reset, "i");
 
-board *adapter[MAX_CARDS];
+board *sc_adapter[MAX_CARDS];
 int cinst;
 
 static char devname[] = "scX";
@@ -305,78 +305,84 @@ static int __init sc_init(void)
 		/*
 		 * Allocate the board structure
 		 */
-		adapter[cinst] = kmalloc(sizeof(board), GFP_KERNEL);
-		if (adapter[cinst] == NULL) {
+		sc_adapter[cinst] = kmalloc(sizeof(board), GFP_KERNEL);
+		if (sc_adapter[cinst] == NULL) {
 			/*
 			 * Oops, can't alloc memory for the board
 			 */
 			kfree(interface);
 			continue;
 		}
-		memset(adapter[cinst], 0, sizeof(board));
-		spin_lock_init(&adapter[cinst]->lock);
+		memset(sc_adapter[cinst], 0, sizeof(board));
+		spin_lock_init(&sc_adapter[cinst]->lock);
 
 		if(!register_isdn(interface)) {
 			/*
 			 * Oops, couldn't register for some reason
 			 */
 			kfree(interface);
-			kfree(adapter[cinst]);
+			kfree(sc_adapter[cinst]);
 			continue;
 		}
 
-		adapter[cinst]->card = interface;
-		adapter[cinst]->driverId = interface->channels;
-		strcpy(adapter[cinst]->devicename, interface->id);
-		adapter[cinst]->nChannels = channels;
-		adapter[cinst]->ramsize = memsize;
-		adapter[cinst]->shmem_magic = magic;
-		adapter[cinst]->shmem_pgport = pgport;
-		adapter[cinst]->StartOnReset = 1;
+		sc_adapter[cinst]->card = interface;
+		sc_adapter[cinst]->driverId = interface->channels;
+		strcpy(sc_adapter[cinst]->devicename, interface->id);
+		sc_adapter[cinst]->nChannels = channels;
+		sc_adapter[cinst]->ramsize = memsize;
+		sc_adapter[cinst]->shmem_magic = magic;
+		sc_adapter[cinst]->shmem_pgport = pgport;
+		sc_adapter[cinst]->StartOnReset = 1;
 
 		/*
 		 * Allocate channels status structures
 		 */
-		adapter[cinst]->channel = kmalloc(sizeof(bchan) * channels, GFP_KERNEL);
-		if (adapter[cinst]->channel == NULL) {
+		sc_adapter[cinst]->channel = kmalloc(sizeof(bchan) * channels, GFP_KERNEL);
+		if (sc_adapter[cinst]->channel == NULL) {
 			/*
 			 * Oops, can't alloc memory for the channels
 			 */
 			indicate_status(cinst, ISDN_STAT_UNLOAD, 0, NULL);	/* Fix me */
 			kfree(interface);
-			kfree(adapter[cinst]);
+			kfree(sc_adapter[cinst]);
 			continue;
 		}
-		memset(adapter[cinst]->channel, 0, sizeof(bchan) * channels);
+		memset(sc_adapter[cinst]->channel, 0, sizeof(bchan) * channels);
 
 		/*
 		 * Lock down the hardware resources
 		 */
-		adapter[cinst]->interrupt = irq[b];
-		if (request_irq(adapter[cinst]->interrupt, interrupt_handler, SA_INTERRUPT, 
-			interface->id, NULL))
+		sc_adapter[cinst]->interrupt = irq[b];
+		if (request_irq(sc_adapter[cinst]->interrupt, interrupt_handler,
+				SA_INTERRUPT, interface->id, NULL))
 		{
-			kfree(adapter[cinst]->channel);
+			kfree(sc_adapter[cinst]->channel);
 			indicate_status(cinst, ISDN_STAT_UNLOAD, 0, NULL);	/* Fix me */
 			kfree(interface);
-			kfree(adapter[cinst]);
+			kfree(sc_adapter[cinst]);
 			continue;
 			
 		}
-		adapter[cinst]->iobase = io[b];
+		sc_adapter[cinst]->iobase = io[b];
 		for(i = 0 ; i < MAX_IO_REGS - 1 ; i++) {
-			adapter[cinst]->ioport[i] = io[b] + i * 0x400;
-			request_region(adapter[cinst]->ioport[i], 1, interface->id);
-			pr_debug("Requesting I/O Port %#x\n", adapter[cinst]->ioport[i]);
+			sc_adapter[cinst]->ioport[i] = io[b] + i * 0x400;
+			request_region(sc_adapter[cinst]->ioport[i], 1,
+					interface->id);
+			pr_debug("Requesting I/O Port %#x\n",
+				sc_adapter[cinst]->ioport[i]);
 		}
-		adapter[cinst]->ioport[IRQ_SELECT] = io[b] + 0x2;
-		request_region(adapter[cinst]->ioport[IRQ_SELECT], 1, interface->id);
-		pr_debug("Requesting I/O Port %#x\n", adapter[cinst]->ioport[IRQ_SELECT]);
-		adapter[cinst]->rambase = ram[b];
-		request_region(adapter[cinst]->rambase, SRAM_PAGESIZE, interface->id);
+		sc_adapter[cinst]->ioport[IRQ_SELECT] = io[b] + 0x2;
+		request_region(sc_adapter[cinst]->ioport[IRQ_SELECT], 1,
+				interface->id);
+		pr_debug("Requesting I/O Port %#x\n",
+				sc_adapter[cinst]->ioport[IRQ_SELECT]);
+		sc_adapter[cinst]->rambase = ram[b];
+		request_region(sc_adapter[cinst]->rambase, SRAM_PAGESIZE,
+				interface->id);
 
 		pr_info("  %s (%d) - %s %d channels IRQ %d, I/O Base 0x%x, RAM Base 0x%lx\n", 
-			adapter[cinst]->devicename, adapter[cinst]->driverId, 
+			sc_adapter[cinst]->devicename,
+			sc_adapter[cinst]->driverId,
 			boardname[model], channels, irq[b], io[b], ram[b]);
 		
 		/*
@@ -401,8 +407,8 @@ static void __exit sc_exit(void)
 		/*
 		 * kill the timers
 		 */
-		del_timer(&(adapter[i]->reset_timer));
-		del_timer(&(adapter[i]->stat_timer));
+		del_timer(&(sc_adapter[i]->reset_timer));
+		del_timer(&(sc_adapter[i]->stat_timer));
 
 		/*
 		 * Tell I4L we're toast
@@ -413,34 +419,36 @@ static void __exit sc_exit(void)
 		/*
 		 * Release shared RAM
 		 */
-		release_region(adapter[i]->rambase, SRAM_PAGESIZE);
+		release_region(sc_adapter[i]->rambase, SRAM_PAGESIZE);
 
 		/*
 		 * Release the IRQ
 		 */
-		FREE_IRQ(adapter[i]->interrupt, NULL);
+		FREE_IRQ(sc_adapter[i]->interrupt, NULL);
 
 		/*
 		 * Reset for a clean start
 		 */
-		outb(0xFF, adapter[i]->ioport[SFT_RESET]);
+		outb(0xFF, sc_adapter[i]->ioport[SFT_RESET]);
 
 		/*
 		 * Release the I/O Port regions
 		 */
 		for(j = 0 ; j < MAX_IO_REGS - 1; j++) {
-			release_region(adapter[i]->ioport[j], 1);
-			pr_debug("Releasing I/O Port %#x\n", adapter[i]->ioport[j]);
+			release_region(sc_adapter[i]->ioport[j], 1);
+			pr_debug("Releasing I/O Port %#x\n",
+				sc_adapter[i]->ioport[j]);
 		}
-		release_region(adapter[i]->ioport[IRQ_SELECT], 1);
-		pr_debug("Releasing I/O Port %#x\n", adapter[i]->ioport[IRQ_SELECT]);
+		release_region(sc_adapter[i]->ioport[IRQ_SELECT], 1);
+		pr_debug("Releasing I/O Port %#x\n",
+			sc_adapter[i]->ioport[IRQ_SELECT]);
 
 		/*
 		 * Release any memory we alloced
 		 */
-		kfree(adapter[i]->channel);
-		kfree(adapter[i]->card);
-		kfree(adapter[i]);
+		kfree(sc_adapter[i]->channel);
+		kfree(sc_adapter[i]->card);
+		kfree(sc_adapter[i]);
 	}
 	pr_info("SpellCaster ISA ISDN Adapter Driver Unloaded.\n");
 }

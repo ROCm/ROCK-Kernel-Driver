@@ -64,7 +64,7 @@ It may be modular or statically linked.  If it is modular it should be
 installed with the rest of the modules for the kernel on the system.
 Typically this will be in /lib/modules/ somewhere.  'alias sound-slot-0
 maestro3' should also be added to your module configs (typically
-/etc/modules.conf) if you're using modular OSS/Lite sound and want to
+/etc/modprobe.conf) if you're using modular OSS/Lite sound and want to
 default to using a maestro3 chip.
 
 There are very few options to the driver.  One is 'debug' which will 

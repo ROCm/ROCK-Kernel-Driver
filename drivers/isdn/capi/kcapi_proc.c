@@ -243,16 +243,84 @@ create_seq_entry(char *name, mode_t mode, struct file_operations *f)
 
 // ---------------------------------------------------------------------------
 
+
+static __inline__ struct capi_driver *capi_driver_get_idx(loff_t pos)
+{
+	struct capi_driver *drv = 0;
+	struct list_head *l;
+	loff_t i;
+
+	i = 0;
+	list_for_each(l, &capi_drivers) {
+		drv = list_entry(l, struct capi_driver, list);
+		if (i++ == pos)
+			return drv;
+	}
+	return 0;
+}
+
+static void *capi_driver_start(struct seq_file *seq, loff_t *pos)
+{
+	struct capi_driver *drv;
+	read_lock(&capi_drivers_list_lock);
+	drv = capi_driver_get_idx(*pos);
+	return drv;
+}
+
+static void *capi_driver_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct capi_driver *drv = (struct capi_driver *)v;
+	++*pos;
+	if (drv->list.next == &capi_drivers) return 0;
+	return list_entry(drv->list.next, struct capi_driver, list);
+}
+
+static void capi_driver_stop(struct seq_file *seq, void *v)
+{
+	read_unlock(&capi_drivers_list_lock);
+}
+
+static int capi_driver_show(struct seq_file *seq, void *v)
+{
+	struct capi_driver *drv = (struct capi_driver *)v;
+	seq_printf(seq, "%-32s %s\n", drv->name, drv->revision);
+	return 0;
+}
+
+struct seq_operations seq_capi_driver_ops = {
+	.start	= capi_driver_start,
+	.next	= capi_driver_next,
+	.stop	= capi_driver_stop,
+	.show	= capi_driver_show,
+};
+
+static int
+seq_capi_driver_open(struct inode *inode, struct file *file)
+{
+	int err;
+	err = seq_open(file, &seq_capi_driver_ops);
+	return err;
+}
+
+static struct file_operations proc_driver_ops = {
+	.open		= seq_capi_driver_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
+
+// ---------------------------------------------------------------------------
+
 void __init 
 kcapi_proc_init(void)
 {
 	proc_mkdir("capi",             NULL);
 	proc_mkdir("capi/controllers", NULL);
-	proc_mkdir("capi/drivers",     NULL);
 	create_seq_entry("capi/controller",   0, &proc_controller_ops);
 	create_seq_entry("capi/contrstats",   0, &proc_contrstats_ops);
 	create_seq_entry("capi/applications", 0, &proc_applications_ops);
 	create_seq_entry("capi/applstats",    0, &proc_applstats_ops);
+	create_seq_entry("capi/driver",       0, &proc_driver_ops);
 }
 
 void __exit
@@ -263,7 +331,6 @@ kcapi_proc_exit(void)
 	remove_proc_entry("capi/contrstats",   NULL);
 	remove_proc_entry("capi/applications", NULL);
 	remove_proc_entry("capi/applstats",    NULL);
-	remove_proc_entry("capi/drivers",      NULL);
 	remove_proc_entry("capi/controllers",  NULL);
 	remove_proc_entry("capi",              NULL);
 }

@@ -1,6 +1,6 @@
 
 menu "Passive cards"
-	depends on ISDN
+	depends on ISDN_I4L
 
 config ISDN_DRV_HISAX
 	tristate "HiSax SiemensChipSet driver support"
@@ -341,8 +341,8 @@ config HISAX_HFC_SX
 #      bool '  TESTEMULATOR (EXPERIMENTAL)' CONFIG_HISAX_TESTEMU
 
 config HISAX_ENTERNOW_PCI
-	bool "Formula-n enter:now PCI card (EXPERIMENTAL)"
-	depends on PCI && EXPERIMENTAL
+	bool "Formula-n enter:now PCI card"
+	depends on PCI
 	help
 	  This enables HiSax support for the Formula-n enter:now PCI
 	  ISDN card.
@@ -365,6 +365,8 @@ config HISAX_DEBUG
 	  the ST5481 USB driver currently. 
 	  If in doubt, say yes.
 
+comment "HiSax PCMCIA card service modules"
+
 config HISAX_SEDLBAUER_CS
 	tristate "Sedlbauer PCMCIA cards"
 	depends on PCMCIA && HISAX_SEDLBAUER
@@ -374,17 +376,25 @@ config HISAX_SEDLBAUER_CS
 
 config HISAX_ELSA_CS
 	tristate "ELSA PCMCIA MicroLink cards"
-	depends on PCMCIA
+	depends on PCMCIA && HISAX_ELSA
 	help
 	  This enables the PCMCIA client driver for the Elsa PCMCIA MicroLink
 	  card.
 
 config HISAX_AVM_A1_CS
 	tristate "AVM A1 PCMCIA cards"
-	depends on PCMCIA
+	depends on PCMCIA && ISDN_DRV_HISAX
 	help
 	  This enables the PCMCIA client driver for the AVM A1 / Fritz!Card
 	  PCMCIA cards.
+
+config HISAX_TELES_CS
+	tristate "TELES PCMCIA cards"
+	depends on PCMCIA && HISAX_16_3
+	help
+	  This enables the PCMCIA client driver for the Teles PCMCIA cards.
+
+comment "HiSax sub driver modules"
 
 config HISAX_ST5481
 	tristate "ST5481 USB ISDN modem (EXPERIMENTAL)"
@@ -392,6 +402,12 @@ config HISAX_ST5481
 	help
 	  This enables the driver for ST5481 based USB ISDN adapters,
 	  e.g. the BeWan Gazel 128 USB
+
+config HISAX_HFCUSB
+	tristate "HFC USB based ISDN modems (EXPERIMENTAL)"
+	depends on USB && EXPERIMENTAL
+	help
+	  This enables the driver for HFC USB based ISDN modems.
 
 config HISAX_FRITZ_PCIPNP
 	tristate "AVM Fritz!Card PCI/PCIv2/PnP support (EXPERIMENTAL)"
@@ -402,18 +418,15 @@ config HISAX_FRITZ_PCIPNP
 	  (the latter also needs you to select "ISA Plug and Play support"
 	  from the menu "Plug and Play configuration")
 
-config HISAX_FRITZ_CLASSIC
-	tristate "AVM Fritz!Card classic support (EXPERIMENTAL)"
-	depends on ISA && EXPERIMENTAL
-	help
-	  This enables the driver for the AVM Fritz!Card classic, formerly
-	  known as AVM A1.
+config HISAX_HDLC
+	bool
+	depends on HISAX_ST5481
+	default y
 
-config HISAX_HFCPCI
-	tristate "HFC PCI support (EXPERIMENTAL)"
-	depends on PCI && EXPERIMENTAL
-	help
-	  This enables the driver for CCD HFC PCI based cards.
+config HISAX_AVM_A1_PCMCIA
+	bool
+	depends on HISAX_AVM_A1_CS
+	default y
 
 endif
 

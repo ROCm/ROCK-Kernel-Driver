@@ -11,8 +11,6 @@
 #include <linux/config.h>
 #include <linux/mm.h>
 #include <linux/miscdevice.h>
-#include <linux/tpqic02.h>
-#include <linux/ftape.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/mman.h>

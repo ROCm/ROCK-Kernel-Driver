@@ -48,9 +48,13 @@ static struct oprofile_operations nmi_timer_ops = {
 	.cpu_type = "timer"
 };
 
- 
 int __init nmi_timer_init(struct oprofile_operations ** ops)
 {
+	extern int nmi_active;
+
+	if (nmi_active <= 0)
+		return -ENODEV;
+
 	*ops = &nmi_timer_ops;
 	printk(KERN_INFO "oprofile: using NMI timer interrupt.\n");
 	return 0;

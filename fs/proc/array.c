@@ -176,8 +176,10 @@ static inline char * task_state(struct task_struct *p, char *buffer)
 		p->files ? p->files->max_fds : 0);
 	task_unlock(p);
 
-	for (g = 0; g < p->ngroups; g++)
-		buffer += sprintf(buffer, "%d ", p->groups[g]);
+	get_group_info(p->group_info);
+	for (g = 0; g < min(p->group_info->ngroups,NGROUPS_SMALL); g++)
+		buffer += sprintf(buffer, "%d ", GROUP_AT(p->group_info,g));
+	put_group_info(p->group_info);
 
 	buffer += sprintf(buffer, "\n");
 	return buffer;

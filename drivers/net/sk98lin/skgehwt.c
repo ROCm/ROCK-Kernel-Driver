@@ -2,6 +2,8 @@
  *
  * Name:	skgehwt.c
  * Project:	Gigabit Ethernet Adapters, Event Scheduler Module
+ * Version:	$Revision: 1.15 $
+ * Date:	$Date: 2003/09/16 13:41:23 $
  * Purpose:	Hardware Timer
  *
  ******************************************************************************/

@@ -186,7 +186,8 @@ struct mddev_s
 {
 	void				*private;
 	mdk_personality_t		*pers;
-	int				__minor;
+	dev_t				unit;
+	int				md_minor;
 	struct list_head 		disks;
 	int				sb_dirty;
 	int				ro;
@@ -235,6 +236,7 @@ struct mddev_s
 	struct semaphore		reconfig_sem;
 	atomic_t			active;
 
+	int				changed;	/* true if we might need to reread partition info */
 	int				degraded;	/* whether md should consider
 							 * adding a spare
 							 */
@@ -272,15 +274,6 @@ struct mdk_personality_s
 };
 
 
-/*
- * Currently we index md_array directly, based on the minor
- * number. This will have to change to dynamic allocation
- * once we start supporting partitioning of md devices.
- */
-static inline int mdidx (mddev_t * mddev)
-{
-	return mddev->__minor;
-}
 static inline char * mdname (mddev_t * mddev)
 {
 	return mddev->gendisk ? mddev->gendisk->disk_name : "mdX";

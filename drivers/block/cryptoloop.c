@@ -87,43 +87,49 @@ typedef int (*encdec_ecb_t)(struct crypto_tfm *tfm,
 
 
 static int
-cryptoloop_transfer_ecb(struct loop_device *lo, int cmd, char *raw_buf,
-		     char *loop_buf, int size, sector_t IV)
+cryptoloop_transfer_ecb(struct loop_device *lo, int cmd,
+			struct page *raw_page, unsigned raw_off,
+			struct page *loop_page, unsigned loop_off,
+			int size, sector_t IV)
 {
 	struct crypto_tfm *tfm = (struct crypto_tfm *) lo->key_data;
 	struct scatterlist sg_out = { 0, };
 	struct scatterlist sg_in = { 0, };
 
 	encdec_ecb_t encdecfunc;
-	char const *in;
-	char *out;
+	struct page *in_page, *out_page;
+	unsigned in_offs, out_offs;
 
 	if (cmd == READ) {
-		in = raw_buf;
-		out = loop_buf;
+		in_page = raw_page;
+		in_offs = raw_off;
+		out_page = loop_page;
+		out_offs = loop_off;
 		encdecfunc = tfm->crt_u.cipher.cit_decrypt;
 	} else {
-		in = loop_buf;
-		out = raw_buf;
+		in_page = loop_page;
+		in_offs = loop_off;
+		out_page = raw_page;
+		out_offs = raw_off;
 		encdecfunc = tfm->crt_u.cipher.cit_encrypt;
 	}
 
 	while (size > 0) {
 		const int sz = min(size, LOOP_IV_SECTOR_SIZE);
 
-		sg_in.page = virt_to_page(in);
-		sg_in.offset = (unsigned long)in & ~PAGE_MASK;
+		sg_in.page = in_page;
+		sg_in.offset = in_offs;
 		sg_in.length = sz;
 
-		sg_out.page = virt_to_page(out);
-		sg_out.offset = (unsigned long)out & ~PAGE_MASK;
+		sg_out.page = out_page;
+		sg_out.offset = out_offs;
 		sg_out.length = sz;
 
 		encdecfunc(tfm, &sg_out, &sg_in, sz);
 
 		size -= sz;
-		in += sz;
-		out += sz;
+		in_offs += sz;
+		out_offs += sz;
 	}
 
 	return 0;
@@ -135,24 +141,30 @@ typedef int (*encdec_cbc_t)(struct crypto_tfm *tfm,
 			unsigned int nsg, u8 *iv);
 
 static int
-cryptoloop_transfer_cbc(struct loop_device *lo, int cmd, char *raw_buf,
-		     char *loop_buf, int size, sector_t IV)
+cryptoloop_transfer_cbc(struct loop_device *lo, int cmd,
+			struct page *raw_page, unsigned raw_off,
+			struct page *loop_page, unsigned loop_off,
+			int size, sector_t IV)
 {
 	struct crypto_tfm *tfm = (struct crypto_tfm *) lo->key_data;
 	struct scatterlist sg_out = { 0, };
 	struct scatterlist sg_in = { 0, };
 
 	encdec_cbc_t encdecfunc;
-	char const *in;
-	char *out;
+	struct page *in_page, *out_page;
+	unsigned in_offs, out_offs;
 
 	if (cmd == READ) {
-		in = raw_buf;
-		out = loop_buf;
+		in_page = raw_page;
+		in_offs = raw_off;
+		out_page = loop_page;
+		out_offs = loop_off;
 		encdecfunc = tfm->crt_u.cipher.cit_decrypt_iv;
 	} else {
-		in = loop_buf;
-		out = raw_buf;
+		in_page = loop_page;
+		in_offs = loop_off;
+		out_page = raw_page;
+		out_offs = raw_off;
 		encdecfunc = tfm->crt_u.cipher.cit_encrypt_iv;
 	}
 
@@ -161,39 +173,43 @@ cryptoloop_transfer_cbc(struct loop_device *lo, int cmd, char *raw_buf,
 		u32 iv[4] = { 0, };
 		iv[0] = cpu_to_le32(IV & 0xffffffff);
 
-		sg_in.page = virt_to_page(in);
-		sg_in.offset = offset_in_page(in);
+		sg_in.page = in_page;
+		sg_in.offset = in_offs;
 		sg_in.length = sz;
 
-		sg_out.page = virt_to_page(out);
-		sg_out.offset = offset_in_page(out);
+		sg_out.page = out_page;
+		sg_out.offset = out_offs;
 		sg_out.length = sz;
 
 		encdecfunc(tfm, &sg_out, &sg_in, sz, (u8 *)iv);
 
 		IV++;
 		size -= sz;
-		in += sz;
-		out += sz;
+		in_offs += sz;
+		out_offs += sz;
 	}
 
 	return 0;
 }
 
 static int
-cryptoloop_transfer(struct loop_device *lo, int cmd, char *raw_buf,
-		     char *loop_buf, int size, sector_t IV)
+cryptoloop_transfer(struct loop_device *lo, int cmd,
+		    struct page *raw_page, unsigned raw_off,
+		    struct page *loop_page, unsigned loop_off,
+		    int size, sector_t IV)
 {
 	struct crypto_tfm *tfm = (struct crypto_tfm *) lo->key_data;
 	if(tfm->crt_cipher.cit_mode == CRYPTO_TFM_MODE_ECB)
 	{
 		lo->transfer = cryptoloop_transfer_ecb;
-		return cryptoloop_transfer_ecb(lo, cmd, raw_buf, loop_buf, size, IV);
+		return cryptoloop_transfer_ecb(lo, cmd, raw_page, raw_off,
+					       loop_page, loop_off, size, IV);
 	}	
 	if(tfm->crt_cipher.cit_mode == CRYPTO_TFM_MODE_CBC)
 	{	
 		lo->transfer = cryptoloop_transfer_cbc;
-		return cryptoloop_transfer_cbc(lo, cmd, raw_buf, loop_buf, size, IV);
+		return cryptoloop_transfer_cbc(lo, cmd, raw_page, raw_off,
+					       loop_page, loop_off, size, IV);
 	}
 	
 	/*  This is not supposed to happen */

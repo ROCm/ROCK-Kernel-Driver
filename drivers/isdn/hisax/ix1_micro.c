@@ -1,4 +1,4 @@
-/* $Id: ix1_micro.c,v 2.10.6.2 2001/09/23 22:24:49 kai Exp $
+/* $Id: ix1_micro.c,v 2.12.2.4 2004/01/13 23:48:39 keil Exp $
  *
  * low level stuff for ITK ix1-micro Rev.2 isdn cards
  * derived from the original file teles3.c from Karsten Keil
@@ -25,8 +25,7 @@
 #include "isdnl1.h"
 
 extern const char *CardType[];
-const char *ix1_revision = "$Revision: 2.10.6.2 $";
-static spinlock_t ix1_micro_lock = SPIN_LOCK_UNLOCKED;
+const char *ix1_revision = "$Revision: 2.12.2.4 $";
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
@@ -40,107 +39,137 @@ static spinlock_t ix1_micro_lock = SPIN_LOCK_UNLOCKED;
 
 #define TIMEOUT 50
 
-static inline u8
-readreg(struct IsdnCardState *cs, unsigned int adr, u8 off)
+static inline u_char
+readreg(unsigned int ale, unsigned int adr, u_char off)
 {
-	u8 ret;
-	unsigned long flags;
+	register u_char ret;
 
-	spin_lock_irqsave(&ix1_micro_lock, flags);
-	byteout(cs->hw.ix1.isac_ale, off);
+	byteout(ale, off);
 	ret = bytein(adr);
-	spin_unlock_irqrestore(&ix1_micro_lock, flags);
 	return (ret);
 }
 
 static inline void
-writereg(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 data)
+readfifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&ix1_micro_lock, flags);
-	byteout(cs->hw.ix1.isac_ale, off);
-	byteout(adr, data);
-	spin_unlock_irqrestore(&ix1_micro_lock, flags);
-}
-
-static inline void
-readfifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int size)
-{
-	byteout(cs->hw.ix1.isac_ale, off);
+	byteout(ale, off);
 	insb(adr, data, size);
 }
 
+
 static inline void
-writefifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int size)
+writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
 {
-	byteout(cs->hw.ix1.isac_ale, off);
+	byteout(ale, off);
+	byteout(adr, data);
+}
+
+static inline void
+writefifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
+{
+	byteout(ale, off);
 	outsb(adr, data, size);
 }
 
-static u8
-isac_read(struct IsdnCardState *cs, u8 offset)
+/* Interface functions */
+
+static u_char
+ReadISAC(struct IsdnCardState *cs, u_char offset)
 {
-	return readreg(cs, cs->hw.ix1.isac, offset);
+	return (readreg(cs->hw.ix1.isac_ale, cs->hw.ix1.isac, offset));
 }
 
 static void
-isac_write(struct IsdnCardState *cs, u8 offset, u8 value)
+WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
 {
-	writereg(cs, cs->hw.ix1.isac, offset, value);
+	writereg(cs->hw.ix1.isac_ale, cs->hw.ix1.isac, offset, value);
 }
 
 static void
-isac_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 {
-	readfifo(cs, cs->hw.ix1.isac, 0, data, size);
+	readfifo(cs->hw.ix1.isac_ale, cs->hw.ix1.isac, 0, data, size);
 }
 
 static void
-isac_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 {
-	writefifo(cs, cs->hw.ix1.isac, 0, data, size);
+	writefifo(cs->hw.ix1.isac_ale, cs->hw.ix1.isac, 0, data, size);
 }
 
-static struct dc_hw_ops isac_ops = {
-	.read_reg   = isac_read,
-	.write_reg  = isac_write,
-	.read_fifo  = isac_read_fifo,
-	.write_fifo = isac_write_fifo,
-};
-
-static u8
-hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
+static u_char
+ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
 {
-	return readreg(cs, cs->hw.ix1.hscx, offset + (hscx ? 0x40 : 0));
+	return (readreg(cs->hw.ix1.hscx_ale,
+			cs->hw.ix1.hscx, offset + (hscx ? 0x40 : 0)));
 }
 
 static void
-hscx_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
+WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
 {
-	writereg(cs, cs->hw.ix1.hscx, offset + (hscx ? 0x40 : 0), value);
+	writereg(cs->hw.ix1.hscx_ale,
+		 cs->hw.ix1.hscx, offset + (hscx ? 0x40 : 0), value);
+}
+
+#define READHSCX(cs, nr, reg) readreg(cs->hw.ix1.hscx_ale, \
+		cs->hw.ix1.hscx, reg + (nr ? 0x40 : 0))
+#define WRITEHSCX(cs, nr, reg, data) writereg(cs->hw.ix1.hscx_ale, \
+		cs->hw.ix1.hscx, reg + (nr ? 0x40 : 0), data)
+
+#define READHSCXFIFO(cs, nr, ptr, cnt) readfifo(cs->hw.ix1.hscx_ale, \
+		cs->hw.ix1.hscx, (nr ? 0x40 : 0), ptr, cnt)
+
+#define WRITEHSCXFIFO(cs, nr, ptr, cnt) writefifo(cs->hw.ix1.hscx_ale, \
+		cs->hw.ix1.hscx, (nr ? 0x40 : 0), ptr, cnt)
+
+#include "hscx_irq.c"
+
+static irqreturn_t
+ix1micro_interrupt(int intno, void *dev_id, struct pt_regs *regs)
+{
+	struct IsdnCardState *cs = dev_id;
+	u_char val;
+	u_long flags;
+
+	spin_lock_irqsave(&cs->lock, flags);
+	val = readreg(cs->hw.ix1.hscx_ale, cs->hw.ix1.hscx, HSCX_ISTA + 0x40);
+      Start_HSCX:
+	if (val)
+		hscx_int_main(cs, val);
+	val = readreg(cs->hw.ix1.isac_ale, cs->hw.ix1.isac, ISAC_ISTA);
+      Start_ISAC:
+	if (val)
+		isac_interrupt(cs, val);
+	val = readreg(cs->hw.ix1.hscx_ale, cs->hw.ix1.hscx, HSCX_ISTA + 0x40);
+	if (val) {
+		if (cs->debug & L1_DEB_HSCX)
+			debugl1(cs, "HSCX IntStat after IntRoutine");
+		goto Start_HSCX;
+	}
+	val = readreg(cs->hw.ix1.isac_ale, cs->hw.ix1.isac, ISAC_ISTA);
+	if (val) {
+		if (cs->debug & L1_DEB_ISAC)
+			debugl1(cs, "ISAC IntStat after IntRoutine");
+		goto Start_ISAC;
+	}
+	writereg(cs->hw.ix1.hscx_ale, cs->hw.ix1.hscx, HSCX_MASK, 0xFF);
+	writereg(cs->hw.ix1.hscx_ale, cs->hw.ix1.hscx, HSCX_MASK + 0x40, 0xFF);
+	writereg(cs->hw.ix1.isac_ale, cs->hw.ix1.isac, ISAC_MASK, 0xFF);
+	writereg(cs->hw.ix1.isac_ale, cs->hw.ix1.isac, ISAC_MASK, 0);
+	writereg(cs->hw.ix1.hscx_ale, cs->hw.ix1.hscx, HSCX_MASK, 0);
+	writereg(cs->hw.ix1.hscx_ale, cs->hw.ix1.hscx, HSCX_MASK + 0x40, 0);
+	spin_unlock_irqrestore(&cs->lock, flags);
+	return IRQ_HANDLED;
+}
+
+void
+release_io_ix1micro(struct IsdnCardState *cs)
+{
+	if (cs->hw.ix1.cfg_reg)
+		release_region(cs->hw.ix1.cfg_reg, 4);
 }
 
 static void
-hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
-{
-	readfifo(cs, cs->hw.ix1.hscx, hscx ? 0x40 : 0, data, size);
-}
-
-static void
-hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
-{
-	writefifo(cs, cs->hw.ix1.hscx, hscx ? 0x40 : 0, data, size);
-}
-
-static struct bc_hw_ops hscx_ops = {
-	.read_reg   = hscx_read,
-	.write_reg  = hscx_write,
-	.read_fifo  = hscx_read_fifo,
-	.write_fifo = hscx_write_fifo,
-};
-
-static int
 ix1_reset(struct IsdnCardState *cs)
 {
 	int cnt;
@@ -152,37 +181,32 @@ ix1_reset(struct IsdnCardState *cs)
 		HZDELAY(1);	/* wait >=10 ms */
 	}
 	byteout(cs->hw.ix1.cfg_reg + SPECIAL_PORT_OFFSET, 0);
-	return 0;
 }
 
-static struct card_ops ix1_ops = {
-	.init     = inithscxisac,
-	.reset    = ix1_reset,
-	.release  = hisax_release_resources,
-	.irq_func = hscxisac_irq,
-};
-
-static int __init
-ix1_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+static int
+ix1_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	cs->irq             = card->para[0];
-	cs->hw.ix1.isac_ale = card->para[1] + ISAC_COMMAND_OFFSET;
-	cs->hw.ix1.isac     = card->para[1] + ISAC_DATA_OFFSET;
-	cs->hw.ix1.hscx     = card->para[1] + HSCX_DATA_OFFSET;
-	cs->hw.ix1.cfg_reg  = card->para[1];
-	if (!request_io(&cs->rs, cs->hw.ix1.cfg_reg, 4, "ix1micro cfg"))
-		goto err;
-	
-	printk(KERN_INFO "HiSax: %s config irq:%d io:0x%X\n",
-	       CardType[cs->typ], cs->irq, cs->hw.ix1.cfg_reg);
-	ix1_reset(cs);
-	cs->card_ops = &ix1_ops;
-	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
-		goto err;
-	return 0;
- err:
-	hisax_release_resources(cs);
-	return -EBUSY;
+	u_long flags;
+
+	switch (mt) {
+		case CARD_RESET:
+			spin_lock_irqsave(&cs->lock, flags);
+			ix1_reset(cs);
+			spin_unlock_irqrestore(&cs->lock, flags);
+			return(0);
+		case CARD_RELEASE:
+			release_io_ix1micro(cs);
+			return(0);
+		case CARD_INIT:
+			spin_lock_irqsave(&cs->lock, flags);
+			ix1_reset(cs);
+			inithscxisac(cs, 3);
+			spin_unlock_irqrestore(&cs->lock, flags);
+			return(0);
+		case CARD_TEST:
+			return(0);
+	}
+	return(0);
 }
 
 #ifdef __ISAPNP__
@@ -196,7 +220,7 @@ static struct isapnp_device_id itk_ids[] __initdata = {
 	{ 0, }
 };
 
-static struct isapnp_device_id *idev = &itk_ids[0];
+static struct isapnp_device_id *ipid __initdata = &itk_ids[0];
 static struct pnp_card *pnp_c __devinitdata = NULL;
 #endif
 
@@ -204,64 +228,91 @@ static struct pnp_card *pnp_c __devinitdata = NULL;
 int __init
 setup_ix1micro(struct IsdnCard *card)
 {
+	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
 	strcpy(tmp, ix1_revision);
 	printk(KERN_INFO "HiSax: ITK IX1 driver Rev. %s\n", HiSax_getrev(tmp));
+	if (cs->typ != ISDN_CTYPE_IX1MICROR2)
+		return (0);
 
-	if (card->para[1]) {
-		if (ix1_probe(card->cs, card))
-			return 0;
-		return 1;
-	}
 #ifdef __ISAPNP__
-	if (isapnp_present()) {
-		struct pnp_card *pb;
-		struct pnp_dev *pd;
+	if (!card->para[1] && isapnp_present()) {
+		struct pnp_dev *pnp_d;
+		while(ipid->card_vendor) {
+			if ((pnp_c = pnp_find_card(ipid->card_vendor,
+				ipid->card_device, pnp_c))) {
+				pnp_d = NULL;
+				if ((pnp_d = pnp_find_dev(pnp_c,
+					ipid->vendor, ipid->function, pnp_d))) {
+					int err;
 
-		while(idev->card_vendor) {
-			if ((pb = pnp_find_card(idev->card_vendor,
-						idev->card_device,
-						pnp_c))) {
-				pnp_c = pb;
-				pd = NULL;
-				if ((pd = pnp_find_dev(pnp_c,
-						       idev->vendor,
-						       idev->function,
-						       pd))) {
 					printk(KERN_INFO "HiSax: %s detected\n",
-						(char *)idev->driver_data);
-					if (pnp_device_attach(pd) < 0) {
-						printk(KERN_ERR "ITK PnP: attach failed\n");
-						return 0;
-					}
-					if (pnp_activate_dev(pd) < 0) {
-						printk(KERN_ERR "ITK PnP: activate failed\n");
-						pnp_device_detach(pd);
-						return 0;
-					}
-					if (!pnp_port_valid(pd, 0) || !pnp_irq_valid(pd, 0)) {
-						printk(KERN_ERR "ITK PnP:some resources are missing %ld/%lx\n",
-							pnp_irq(pd, 0), pnp_port_start(pd, 0));
-						pnp_device_detach(pd);
+						(char *)ipid->driver_data);
+					pnp_disable_dev(pnp_d);
+					err = pnp_activate_dev(pnp_d);
+					if (err<0) {
+						printk(KERN_WARNING "%s: pnp_activate_dev ret(%d)\n",
+							__FUNCTION__, err);
 						return(0);
 					}
-					card->para[1] = pnp_port_start(pd, 0);
-					card->para[0] = pnp_irq(pd, 0);
-					if (ix1_probe(card->cs, card))
-						return 0;
-					return 1;
+					card->para[1] = pnp_port_start(pnp_d, 0);
+					card->para[0] = pnp_irq(pnp_d, 0);
+					if (!card->para[0] || !card->para[1]) {
+						printk(KERN_ERR "ITK PnP:some resources are missing %ld/%lx\n",
+							card->para[0], card->para[1]);
+						pnp_disable_dev(pnp_d);
+						return(0);
+					}
+					break;
 				} else {
 					printk(KERN_ERR "ITK PnP: PnP error card found, no device\n");
 				}
 			}
-			idev++;
-			pnp_c=NULL;
+			ipid++;
+			pnp_c = NULL;
 		} 
-		if (!idev->card_vendor) {
+		if (!ipid->card_vendor) {
 			printk(KERN_INFO "ITK PnP: no ISAPnP card found\n");
+			return(0);
 		}
 	}
 #endif
-	return 0;
+	/* IO-Ports */
+	cs->hw.ix1.isac_ale = card->para[1] + ISAC_COMMAND_OFFSET;
+	cs->hw.ix1.hscx_ale = card->para[1] + HSCX_COMMAND_OFFSET;
+	cs->hw.ix1.isac = card->para[1] + ISAC_DATA_OFFSET;
+	cs->hw.ix1.hscx = card->para[1] + HSCX_DATA_OFFSET;
+	cs->hw.ix1.cfg_reg = card->para[1];
+	cs->irq = card->para[0];
+	if (cs->hw.ix1.cfg_reg) {
+		if (!request_region(cs->hw.ix1.cfg_reg, 4, "ix1micro cfg")) {
+			printk(KERN_WARNING
+			  "HiSax: %s config port %x-%x already in use\n",
+			       CardType[card->typ],
+			       cs->hw.ix1.cfg_reg,
+			       cs->hw.ix1.cfg_reg + 4);
+			return (0);
+		}
+	}
+	printk(KERN_INFO "HiSax: %s config irq:%d io:0x%X\n",
+		CardType[cs->typ], cs->irq, cs->hw.ix1.cfg_reg);
+	setup_isac(cs);
+	cs->readisac = &ReadISAC;
+	cs->writeisac = &WriteISAC;
+	cs->readisacfifo = &ReadISACfifo;
+	cs->writeisacfifo = &WriteISACfifo;
+	cs->BC_Read_Reg = &ReadHSCX;
+	cs->BC_Write_Reg = &WriteHSCX;
+	cs->BC_Send_Data = &hscx_fill_fifo;
+	cs->cardmsg = &ix1_card_msg;
+	cs->irq_func = &ix1micro_interrupt;
+	ISACVersion(cs, "ix1-Micro:");
+	if (HscxVersion(cs, "ix1-Micro:")) {
+		printk(KERN_WARNING
+		    "ix1-Micro: wrong HSCX versions check IO address\n");
+		release_io_ix1micro(cs);
+		return (0);
+	}
+	return (1);
 }

@@ -295,8 +295,6 @@ struct oprofile_operations nmi_ops = {
 };
  
 
-#if !defined(CONFIG_X86_64)
-
 static int __init p4_init(void)
 {
 	__u8 cpu_model = current_cpu_data.x86_model;
@@ -335,7 +333,9 @@ static int __init ppro_init(void)
 	if (cpu_model > 0xd)
 		return 0;
 
-	if (cpu_model > 5) {
+	if (cpu_model == 9) {
+		nmi_ops.cpu_type = "i386/p6_mobile";
+	} else if (cpu_model > 5) {
 		nmi_ops.cpu_type = "i386/piii";
 	} else if (cpu_model > 2) {
 		nmi_ops.cpu_type = "i386/pii";
@@ -346,9 +346,6 @@ static int __init ppro_init(void)
 	model = &op_ppro_spec;
 	return 1;
 }
-
-#endif /* !CONFIG_X86_64 */
- 
 
 /* in order to get driverfs right */
 static int using_nmi;
@@ -381,7 +378,6 @@ int __init nmi_init(struct oprofile_operations ** ops)
 			}
 			break;
  
-#if !defined(CONFIG_X86_64)
 		case X86_VENDOR_INTEL:
 			switch (family) {
 				/* Pentium IV */
@@ -400,7 +396,6 @@ int __init nmi_init(struct oprofile_operations ** ops)
 					return -ENODEV;
 			}
 			break;
-#endif /* !CONFIG_X86_64 */
 
 		default:
 			return -ENODEV;

@@ -1,4 +1,4 @@
-/* $Id: isdnl3.c,v 2.17.6.5 2001/09/23 22:24:49 kai Exp $
+/* $Id: isdnl3.c,v 2.22.2.3 2004/01/13 14:31:25 keil Exp $
  *
  * Author       Karsten Keil
  *              based on the teles driver from Jan den Ouden
@@ -20,7 +20,7 @@
 #include "isdnl3.h"
 #include <linux/config.h>
 
-const char *l3_revision = "$Revision: 2.17.6.5 $";
+const char *l3_revision = "$Revision: 2.22.2.3 $";
 
 static struct Fsm l3fsm;
 
@@ -77,11 +77,11 @@ l3m_debug(struct FsmInst *fi, char *fmt, ...)
 	va_end(args);
 }
 
-u8 *
-findie(u8 * p, int size, u8 ie, int wanted_set)
+u_char *
+findie(u_char * p, int size, u_char ie, int wanted_set)
 {
 	int l, codeset, maincodeset;
-	u8 *pend = p + size;
+	u_char *pend = p + size;
 
 	/* skip protocol discriminator, callref and message type */
 	p++;
@@ -123,7 +123,7 @@ findie(u8 * p, int size, u8 ie, int wanted_set)
 }
 
 int
-getcallref(u8 * p)
+getcallref(u_char * p)
 {
 	int l, cr = 0;
 
@@ -162,7 +162,7 @@ newl3state(struct l3_process *pc, int state)
 static void
 L3ExpireTimer(struct L3Timer *t)
 {
-	t->pc->st->l3.l4l3(t->pc->st, t->event, t->pc);
+	t->pc->st->lli.l4l3(t->pc->st, t->event, t->pc);
 }
 
 void
@@ -354,7 +354,7 @@ setstack_l3dc(struct PStack *st, struct Channel *chanp)
 	st->l3.l3m.printdebug = l3m_debug;
         FsmInitTimer(&st->l3.l3m, &st->l3.l3m_timer);
 	strcpy(st->l3.debug_id, "L3DC ");
-	st->l3.l4l3_proto = no_l3_proto_spec;
+	st->lli.l4l3_proto = no_l3_proto_spec;
 
 #ifdef	CONFIG_HISAX_EURO
 	if (st->protocol == ISDN_PTYPE_EURO) {
@@ -372,13 +372,13 @@ setstack_l3dc(struct PStack *st, struct Channel *chanp)
 	} else
 #endif
 	if (st->protocol == ISDN_PTYPE_LEASED) {
-		st->l3.l4l3 = no_l3_proto;
-		st->l3.l2l3 = no_l3_proto;
+		st->lli.l4l3 = no_l3_proto;
+		st->l2.l2l3 = no_l3_proto;
                 st->l3.l3ml3 = no_l3_proto;
 		printk(KERN_INFO "HiSax: Leased line mode\n");
 	} else {
-		st->l3.l4l3 = no_l3_proto;
-		st->l3.l2l3 = no_l3_proto;
+		st->lli.l4l3 = no_l3_proto;
+		st->l2.l2l3 = no_l3_proto;
                 st->l3.l3ml3 = no_l3_proto;
 		sprintf(tmp, "protocol %s not supported",
 			(st->protocol == ISDN_PTYPE_1TR6) ? "1tr6" :
@@ -392,7 +392,7 @@ setstack_l3dc(struct PStack *st, struct Channel *chanp)
 
 void
 isdnl3_trans(struct PStack *st, int pr, void *arg) {
-	L3L2(st, pr, arg);
+	st->l3.l3l2(st, pr, arg);
 }
 
 void
@@ -423,7 +423,7 @@ setstack_l3bc(struct PStack *st, struct Channel *chanp)
 	st->l3.l3m.userint = 0;
 	st->l3.l3m.printdebug = l3m_debug;
 	strcpy(st->l3.debug_id, "L3BC ");
-	st->l3.l4l3 = isdnl3_trans;
+	st->lli.l4l3 = isdnl3_trans;
 }
 
 #define DREL_TIMER_VALUE 40000
@@ -434,7 +434,7 @@ lc_activate(struct FsmInst *fi, int event, void *arg)
 	struct PStack *st = fi->userdata;
 
 	FsmChangeState(fi, ST_L3_LC_ESTAB_WAIT);
-	L3L2(st, DL_ESTABLISH | REQUEST, NULL);
+	st->l3.l3l2(st, DL_ESTABLISH | REQUEST, NULL);
 }
 
 static void
@@ -446,7 +446,7 @@ lc_connect(struct FsmInst *fi, int event, void *arg)
 
 	FsmChangeState(fi, ST_L3_LC_ESTAB);
 	while ((skb = skb_dequeue(&st->l3.squeue))) {
-		L3L2(st, DL_DATA | REQUEST, skb);
+		st->l3.l3l2(st, DL_DATA | REQUEST, skb);
 		dequeued++;
 	}
 	if ((!st->l3.proc) &&  dequeued) {
@@ -467,7 +467,7 @@ lc_connected(struct FsmInst *fi, int event, void *arg)
 	FsmDelTimer(&st->l3.l3m_timer, 51);
 	FsmChangeState(fi, ST_L3_LC_ESTAB);
 	while ((skb = skb_dequeue(&st->l3.squeue))) {
-		L3L2(st, DL_DATA | REQUEST, skb);
+		st->l3.l3l2(st, DL_DATA | REQUEST, skb);
 		dequeued++;
 	}
 	if ((!st->l3.proc) &&  dequeued) {
@@ -511,7 +511,7 @@ lc_release_req(struct FsmInst *fi, int event, void *arg)
 		FsmAddTimer(&st->l3.l3m_timer, DREL_TIMER_VALUE, EV_TIMEOUT, NULL, 51);
 	} else {
 		FsmChangeState(fi, ST_L3_LC_REL_WAIT);
-		L3L2(st, DL_RELEASE | REQUEST, NULL);
+		st->l3.l3l2(st, DL_RELEASE | REQUEST, NULL);
 	}
 }
 
@@ -564,7 +564,7 @@ l3_msg(struct PStack *st, int pr, void *arg)
 	switch (pr) {
 		case (DL_DATA | REQUEST):
 			if (st->l3.l3m.state == ST_L3_LC_ESTAB) {
-				L3L2(st, pr, arg);
+				st->l3.l3l2(st, pr, arg);
 			} else {
 				struct sk_buff *skb = arg;
 

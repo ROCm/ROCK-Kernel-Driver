@@ -24,7 +24,6 @@
 #define RTF_CACHE	0x01000000	/* cache entry			*/
 #define RTF_FLOW	0x02000000	/* flow significant route	*/
 #define RTF_POLICY	0x04000000	/* policy route			*/
-#define RTF_NDISC	0x08000000	/* ndisc route			*/
 
 #define RTF_LOCAL	0x80000000
 

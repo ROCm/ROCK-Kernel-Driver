@@ -2,6 +2,8 @@
  *
  * Name:	xmac_ii.h
  * Project:	Gigabit Ethernet Adapters, Common Modules
+ * Version:	$Revision: 1.52 $
+ * Date:	$Date: 2003/10/02 16:35:50 $
  * Purpose:	Defines and Macros for Gigabit Ethernet Controller
  *
  ******************************************************************************/

@@ -303,7 +303,7 @@ static int grow_stripes(raid6_conf_t *conf, int num)
 	kmem_cache_t *sc;
 	int devs = conf->raid_disks;
 
-	sprintf(conf->cache_name, "md/raid6-%d", conf->mddev->__minor);
+	sprintf(conf->cache_name, "raid6/%s", mdname(conf->mddev));
 
 	sc = kmem_cache_create(conf->cache_name,
 			       sizeof(struct stripe_head)+(devs-1)*sizeof(struct r5dev),

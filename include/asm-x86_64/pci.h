@@ -72,6 +72,23 @@ extern void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 extern void pci_free_consistent(struct pci_dev *hwdev, size_t size,
 				void *vaddr, dma_addr_t dma_handle);
 
+#ifdef CONFIG_SWIOTLB
+extern int swiotlb; 
+extern dma_addr_t swiotlb_map_single (struct device *hwdev, void *ptr, size_t size, 
+				      int dir);
+extern void swiotlb_unmap_single (struct device *hwdev, dma_addr_t dev_addr,
+				  size_t size, int dir);
+extern void swiotlb_sync_single (struct device *hwdev, dma_addr_t dev_addr, 
+				 size_t size, int dir);
+extern void swiotlb_sync_sg (struct device *hwdev, struct scatterlist *sg, int nelems, 
+			     int dir);
+extern int swiotlb_map_sg(struct device *hwdev, struct scatterlist *sg,
+		      int nents, int direction);
+extern void swiotlb_unmap_sg(struct device *hwdev, struct scatterlist *sg,
+			 int nents, int direction);
+
+#endif
+
 #ifdef CONFIG_GART_IOMMU
 
 /* Map a single buffer of the indicated size for DMA in streaming mode.
@@ -113,6 +130,13 @@ static inline void pci_dma_sync_single(struct pci_dev *hwdev,
 				       size_t size, int direction)
 {
 	BUG_ON(direction == PCI_DMA_NONE); 
+
+#ifdef CONFIG_SWIOTLB
+	if (swiotlb)
+		return swiotlb_sync_single(&hwdev->dev,dma_handle,size,direction);
+#endif
+
+	flush_write_buffers();
 } 
 
 static inline void pci_dma_sync_sg(struct pci_dev *hwdev, 
@@ -120,6 +144,12 @@ static inline void pci_dma_sync_sg(struct pci_dev *hwdev,
 				   int nelems, int direction)
 { 
 	BUG_ON(direction == PCI_DMA_NONE); 
+
+#ifdef CONFIG_SWIOTLB
+	if (swiotlb)
+		return swiotlb_sync_sg(&hwdev->dev,sg,nelems,direction);
+#endif
+	flush_write_buffers();
 } 
 
 /* The PCI address space does equal the physical memory
@@ -271,5 +301,7 @@ static inline void pcibios_add_platform_entries(struct pci_dev *dev)
 
 /* generic pci stuff */
 #include <asm-generic/pci.h>
+
+#include <linux/dma-mapping.h>
 
 #endif /* __x8664_PCI_H */

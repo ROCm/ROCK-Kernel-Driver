@@ -77,16 +77,17 @@ struct thread_info {
 #define init_thread_info	(init_thread_union.thread_info)
 #define init_stack		(init_thread_union.stack)
 
+#define THREAD_SIZE (2*PAGE_SIZE)
+
 /* how to get the thread information struct from C */
 static inline struct thread_info *current_thread_info(void)
 {
 	struct thread_info *ti;
-	__asm__("andl %%esp,%0; ":"=r" (ti) : "0" (~8191UL));
+	__asm__("andl %%esp,%0; ":"=r" (ti) : "0" (~(THREAD_SIZE - 1)));
 	return ti;
 }
 
 /* thread information allocation */
-#define THREAD_SIZE (2*PAGE_SIZE)
 #define alloc_thread_info(task) ((struct thread_info *)kmalloc(THREAD_SIZE, GFP_KERNEL))
 #define free_thread_info(info)	kfree(info)
 #define get_thread_info(ti) get_task_struct((ti)->task)
@@ -94,9 +95,11 @@ static inline struct thread_info *current_thread_info(void)
 
 #else /* !__ASSEMBLY__ */
 
+#define THREAD_SIZE	8192
+
 /* how to get the thread information struct from ASM */
 #define GET_THREAD_INFO(reg) \
-	movl $-8192, reg; \
+	movl $-THREAD_SIZE, reg; \
 	andl %esp, reg
 
 #endif

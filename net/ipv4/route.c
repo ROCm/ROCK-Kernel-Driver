@@ -2717,6 +2717,16 @@ static int ip_rt_acct_read(char *buffer, char **start, off_t offset,
 #endif /* CONFIG_PROC_FS */
 #endif /* CONFIG_NET_CLS_ROUTE */
 
+static __initdata unsigned long rhash_entries;
+static int __init set_rhash_entries(char *str)
+{
+	if (!str)
+		return 0;
+	rhash_entries = simple_strtoul(str, &str, 0);
+	return 1;
+}
+__setup("rhash_entries=", set_rhash_entries);
+
 int __init ip_rt_init(void)
 {
 	int i, order, goal, rc = 0;
@@ -2743,7 +2753,10 @@ int __init ip_rt_init(void)
 		panic("IP: failed to allocate ip_dst_cache\n");
 
 	goal = num_physpages >> (26 - PAGE_SHIFT);
-
+	if (!rhash_entries)
+		goal = min(10, goal);
+	else
+		goal = (rhash_entries * sizeof(struct rt_hash_bucket)) >> PAGE_SHIFT;
 	for (order = 0; (1UL << order) < goal; order++)
 		/* NOTHING */;
 

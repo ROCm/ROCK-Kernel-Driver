@@ -86,6 +86,7 @@ void __put_task_struct(struct task_struct *tsk)
 
 	security_task_free(tsk);
 	free_uid(tsk->user);
+	put_group_info(tsk->group_info);
 	free_task(tsk);
 }
 
@@ -878,6 +879,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 
 	atomic_inc(&p->user->__count);
 	atomic_inc(&p->user->processes);
+	get_group_info(p->group_info);
 
 	/*
 	 * If multiple threads are within copy_process(), then this check
@@ -1084,6 +1086,7 @@ bad_fork_cleanup:
 bad_fork_cleanup_put_domain:
 	module_put(p->thread_info->exec_domain->module);
 bad_fork_cleanup_count:
+	put_group_info(p->group_info);
 	atomic_dec(&p->user->processes);
 	free_uid(p->user);
 bad_fork_free:

@@ -46,7 +46,7 @@
 
   The number of ports to be created can be specified via the module
   parameter "ports".  For example, to create four ports, add the
-  following option in /etc/modules.conf:
+  following option in /etc/modprobe.conf:
 
 	option snd-seq-dummy ports=4
 

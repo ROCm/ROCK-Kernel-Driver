@@ -19,6 +19,9 @@ static struct timer_opts* timers[] = {
 #ifdef CONFIG_HPET_TIMER
 	&timer_hpet,
 #endif
+#ifdef CONFIG_X86_PM_TIMER
+	&timer_pmtmr,
+#endif
 	&timer_tsc,
 	&timer_pit,
 	NULL,

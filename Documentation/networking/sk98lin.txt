@@ -1,10 +1,10 @@
-(C)Copyright 1999-2003 Marvell(R).
+(C)Copyright 1999-2004 Marvell(R).
 All rights reserved
 ===========================================================================
 
-sk98lin.txt created 15-Dec-2003
+sk98lin.txt created 13-Feb-2004
 
-Readme File for sk98lin v6.21
+Readme File for sk98lin v6.23
 Marvell Yukon/SysKonnect SK-98xx Gigabit Ethernet Adapter family driver for LINUX
 
 This file contains
@@ -174,7 +174,7 @@ In some distributions, the configuration tools are able to pass parameters
 to the driver module.
 
 If you use the kernel module loader, you can set driver parameters
-in the file /etc/modules.conf (or old name: /etc/conf.modules).
+in the file /etc/modprobe.conf (or /etc/modules.conf in 2.4 or earlier).
 To set the driver parameters in this file, proceed as follows:
 
 1. Insert a line of the form :

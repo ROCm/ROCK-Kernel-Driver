@@ -26,14 +26,11 @@
 #include <pcmcia/cs.h>
 #include <pcmcia/cistpl.h>
 #include <pcmcia/ds.h>
+#include "hisax_cfg.h"
 
 MODULE_DESCRIPTION("ISDN4Linux: PCMCIA client driver for AVM A1/Fritz!PCMCIA cards");
 MODULE_AUTHOR("Carsten Paeth");
 MODULE_LICENSE("GPL");
-
-int avm_a1_init_pcmcia(void *pcm_iob, int pcm_irq, int *busy_flag, int prot);
-void HiSax_closecard(int cardnr);
-
 
 /*
    All the PCMCIA modules use PCMCIA_DEBUG to control debugging.  If
@@ -156,6 +153,15 @@ static dev_link_t *avma1cs_attach(void)
 	return NULL;
     memset(link, 0, sizeof(struct dev_link_t));
 
+    /* Allocate space for private device-specific data */
+    local = kmalloc(sizeof(local_info_t), GFP_KERNEL);
+    if (!local) {
+	kfree(link);
+	return NULL;
+    }
+    memset(local, 0, sizeof(local_info_t));
+    link->priv = local;
+
     /* The io structure describes IO port mapping */
     link->io.NumPorts1 = 16;
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
@@ -183,15 +189,6 @@ static dev_link_t *avma1cs_attach(void)
     link->conf.ConfigIndex = 1;
     link->conf.Present = PRESENT_OPTION;
 
-    /* Allocate space for private device-specific data */
-    local = kmalloc(sizeof(local_info_t), GFP_KERNEL);
-    if (!local) {
-	kfree(link);
-	return NULL;
-    }
-    memset(local, 0, sizeof(local_info_t));
-    link->priv = local;
-    
     /* Register with Card Services */
     link->next = dev_list;
     dev_list = link;
@@ -252,7 +249,7 @@ static void avma1cs_detach(dev_link_t *link)
 
     /* Break the link with Card Services */
     if (link->handle)
-	pcmcia_deregister_client(link->handle);
+    	pcmcia_deregister_client(link->handle);
     
     /* Unlink device structure, free pieces */
     *linkp = link->next;
@@ -303,8 +300,9 @@ static void avma1cs_config(dev_link_t *link)
     cistpl_cftable_entry_t *cf = &parse.cftable_entry;
     local_info_t *dev;
     int i;
-    u8 buf[64];
+    u_char buf[64];
     char devname[128];
+    IsdnCard_t	icard;
     int busy = 0;
     
     handle = link->handle;
@@ -365,9 +363,9 @@ static void avma1cs_config(dev_link_t *link)
 		link->io.BasePort1 = cf->io.win[0].base;
 		link->io.NumPorts1 = cf->io.win[0].len;
 		link->io.NumPorts2 = 0;
-                printk(KERN_INFO "avma1_cs: testing i/o %#x-%#x\n",
+		printk(KERN_INFO "avma1_cs: testing i/o %#x-%#x\n",
 			link->io.BasePort1,
-		        link->io.BasePort1+link->io.NumPorts1 - 1);
+			link->io.BasePort1+link->io.NumPorts1 - 1);
 		i = pcmcia_request_io(link->handle, &link->io);
 		if (i == CS_SUCCESS) goto found_port;
 	    }
@@ -391,8 +389,8 @@ found_port:
 	}
 	
 	/*
-         * configure the PCMCIA socket
-	  */
+	 * configure the PCMCIA socket
+	 */
 	i = pcmcia_request_configuration(link->handle, &link->conf);
 	if (i != CS_SUCCESS) {
 	    cs_error(link->handle, RequestConfiguration, i);
@@ -421,15 +419,17 @@ found_port:
     printk(KERN_NOTICE "avma1_cs: checking at i/o %#x, irq %d\n",
 				link->io.BasePort1, link->irq.AssignedIRQ);
 
-    if (avm_a1_init_pcmcia((void *)(int)link->io.BasePort1,
-                           link->irq.AssignedIRQ,
-                           &busy, isdnprot) != 0) {
-       printk(KERN_ERR "avma1_cs: failed to initialize AVM A1 PCMCIA %d at i/o %#x\n", i, link->io.BasePort1);
-       return;
+    icard.para[0] = link->irq.AssignedIRQ;
+    icard.para[1] = link->io.BasePort1;
+    icard.protocol = isdnprot;
+    icard.typ = ISDN_CTYPE_A1_PCMCIA;
+    
+    i = hisax_init_pcmcia(link, &busy, &icard);
+    if (i < 0) {
+    	printk(KERN_ERR "avma1_cs: failed to initialize AVM A1 PCMCIA %d at i/o %#x\n", i, link->io.BasePort1);
+	avma1cs_release(link);
+	return;
     }
-
-    i = 0; /* no returncode for cardnr :-( */
-
     dev->node.minor = i;
 
 } /* avma1cs_config */
@@ -486,29 +486,28 @@ static int avma1cs_event(event_t event, int priority,
     DEBUG(1, "avma1cs_event(0x%06x)\n", event);
     
     switch (event) {
-    case CS_EVENT_CARD_REMOVAL:
-	link->state &= ~DEV_PRESENT;
-	if (link->state & DEV_CONFIG)
+	case CS_EVENT_CARD_REMOVAL:
+	    if (link->state & DEV_CONFIG)
 		avma1cs_release(link);
-	break;
-    case CS_EVENT_CARD_INSERTION:
-	link->state |= DEV_PRESENT | DEV_CONFIG_PENDING;
-	avma1cs_config(link);
-	break;
-    case CS_EVENT_PM_SUSPEND:
-	link->state |= DEV_SUSPEND;
-	/* Fall through... */
-    case CS_EVENT_RESET_PHYSICAL:
-	if (link->state & DEV_CONFIG)
-	    pcmcia_release_configuration(link->handle);
-	break;
-    case CS_EVENT_PM_RESUME:
-	link->state &= ~DEV_SUSPEND;
-	/* Fall through... */
-    case CS_EVENT_CARD_RESET:
-	if (link->state & DEV_CONFIG)
-	    pcmcia_request_configuration(link->handle, &link->conf);
-	break;
+	    break;
+	case CS_EVENT_CARD_INSERTION:
+	    link->state |= DEV_PRESENT | DEV_CONFIG_PENDING;
+	    avma1cs_config(link);
+	    break;
+	case CS_EVENT_PM_SUSPEND:
+	    link->state |= DEV_SUSPEND;
+	    /* Fall through... */
+	case CS_EVENT_RESET_PHYSICAL:
+	    if (link->state & DEV_CONFIG)
+		pcmcia_release_configuration(link->handle);
+	    break;
+	case CS_EVENT_PM_RESUME:
+	    link->state &= ~DEV_SUSPEND;
+	    /* Fall through... */
+	case CS_EVENT_CARD_RESET:
+ 	    if (link->state & DEV_CONFIG)
+		pcmcia_request_configuration(link->handle, &link->conf);
+	    break;
     }
     return 0;
 } /* avma1cs_event */
@@ -521,10 +520,12 @@ static struct pcmcia_driver avma1cs_driver = {
 	.attach		= avma1cs_attach,
 	.detach		= avma1cs_detach,
 };
+ 
+/*====================================================================*/
 
 static int __init init_avma1_cs(void)
 {
-	return pcmcia_register_driver(&avma1cs_driver);
+	return(pcmcia_register_driver(&avma1cs_driver));
 }
 
 static void __exit exit_avma1_cs(void)

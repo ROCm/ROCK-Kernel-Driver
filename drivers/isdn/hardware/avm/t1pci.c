@@ -1,4 +1,4 @@
-/* $Id: t1pci.c,v 1.1.4.1.2.1 2001/12/21 15:00:17 kai Exp $
+/* $Id: t1pci.c,v 1.1.2.2 2004/01/16 21:09:27 keil Exp $
  * 
  * Module for AVM T1 PCI-card.
  * 
@@ -29,6 +29,8 @@
 #undef CONFIG_T1PCI_DEBUG
 #undef CONFIG_T1PCI_POLLDEBUG
 
+/* ------------------------------------------------------------- */
+static char *revision = "$Revision: 1.1.2.2 $";
 /* ------------------------------------------------------------- */
 
 static struct pci_device_id t1pci_pci_tbl[] = {
@@ -221,13 +223,36 @@ static struct pci_driver t1pci_pci_driver = {
        .remove         = t1pci_remove,
 };
 
+static struct capi_driver capi_driver_t1pci = {
+	.name		= "t1pci",
+	.revision	= "1.0",
+};
+
 static int __init t1pci_init(void)
 {
-	return pci_module_init(&t1pci_pci_driver);
+	char *p;
+	char rev[32];
+	int err;
+
+	if ((p = strchr(revision, ':')) != 0 && p[1]) {
+		strlcpy(rev, p + 2, 32);
+		if ((p = strchr(rev, '$')) != 0 && p > rev)
+		   *(p-1) = 0;
+	} else
+		strcpy(rev, "1.0");
+
+	err = pci_module_init(&t1pci_pci_driver);
+	if (!err) {
+		strlcpy(capi_driver_t1pci.revision, rev, 32);
+		register_capi_driver(&capi_driver_t1pci);
+		printk(KERN_INFO "t1pci: revision %s\n", rev);
+	}
+	return err;
 }
 
 static void __exit t1pci_exit(void)
 {
+	unregister_capi_driver(&capi_driver_t1pci);
 	pci_unregister_driver(&t1pci_pci_driver);
 }
 

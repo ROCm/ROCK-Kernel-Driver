@@ -34,8 +34,9 @@ struct loop_device {
 	loff_t		lo_sizelimit;
 	int		lo_flags;
 	int		(*transfer)(struct loop_device *, int cmd,
-				    char *raw_buf, char *loop_buf, int size,
-				    sector_t real_block);
+				    struct page *raw_page, unsigned raw_off,
+				    struct page *loop_page, unsigned loop_off,
+				    int size, sector_t real_block);
 	char		lo_file_name[LO_NAME_SIZE];
 	char		lo_crypt_name[LO_NAME_SIZE];
 	char		lo_encrypt_key[LO_KEY_SIZE];
@@ -70,8 +71,7 @@ struct loop_device {
 /*
  * Loop flags
  */
-#define LO_FLAGS_DO_BMAP	1
-#define LO_FLAGS_READ_ONLY	2
+#define LO_FLAGS_READ_ONLY	1
 
 #include <asm/posix_types.h>	/* for __kernel_old_dev_t */
 #include <asm/types.h>		/* for __u64 */
@@ -128,8 +128,10 @@ struct loop_info64 {
 /* Support for loadable transfer modules */
 struct loop_func_table {
 	int number;	/* filter type */ 
-	int (*transfer)(struct loop_device *lo, int cmd, char *raw_buf,
-			char *loop_buf, int size, sector_t real_block);
+	int (*transfer)(struct loop_device *lo, int cmd,
+			struct page *raw_page, unsigned raw_off,
+			struct page *loop_page, unsigned loop_off,
+			int size, sector_t real_block);
 	int (*init)(struct loop_device *, const struct loop_info64 *); 
 	/* release is called from loop_unregister_transfer or clr_fd */
 	int (*release)(struct loop_device *); 

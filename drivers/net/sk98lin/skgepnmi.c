@@ -2,6 +2,8 @@
  *
  * Name:	skgepnmi.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
+ * Version:	$Revision: 1.111 $
+ * Date:	$Date: 2003/09/15 13:35:35 $
  * Purpose:	Private Network Management Interface
  *
  ****************************************************************************/
@@ -19,6 +21,7 @@
  *	The information in this file is provided "AS IS" without warranty.
  *
  ******************************************************************************/
+
 
 #ifndef _lint
 static const char SysKonnectFileId[] =

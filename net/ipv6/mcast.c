@@ -152,8 +152,10 @@ int ip6_mc_leave_src(struct sock *sk, struct ipv6_mc_socklist *iml,
 #define IGMP6_UNSOLICITED_IVAL	(10*HZ)
 #define MLD_QRV_DEFAULT		2
 
-#define MLD_V1_SEEN(idev) ((idev)->mc_v1_seen && \
-		time_before(jiffies, (idev)->mc_v1_seen))
+#define MLD_V1_SEEN(idev) (ipv6_devconf.force_mld_version == 1 || \
+		(idev)->cnf.force_mld_version == 1 || \
+		((idev)->mc_v1_seen && \
+		time_before(jiffies, (idev)->mc_v1_seen)))
 
 #define MLDV2_MASK(value, nb) ((nb)>=32 ? (value) : ((1<<(nb))-1) & (value))
 #define MLDV2_EXP(thresh, nbmant, nbexp, value) \
@@ -901,6 +903,33 @@ int ipv6_dev_mc_dec(struct net_device *dev, struct in6_addr *addr)
 }
 
 /*
+ * identify MLD packets for MLD filter exceptions
+ */
+int ipv6_is_mld(struct sk_buff *skb, int nexthdr)
+{
+	struct icmp6hdr *pic;
+
+	if (nexthdr != IPPROTO_ICMPV6)
+		return 0;
+
+	if (!pskb_may_pull(skb, sizeof(struct icmp6hdr)))
+		return 0;
+
+	pic = (struct icmp6hdr *)skb->h.raw;
+
+	switch (pic->icmp6_type) {
+	case ICMPV6_MGM_QUERY:
+	case ICMPV6_MGM_REPORT:
+	case ICMPV6_MGM_REDUCTION:
+	case ICMPV6_MLD2_REPORT:
+		return 1;
+	default:
+		break;
+	}
+	return 0;
+}
+
+/*
  *	check if the interface/address pair is valid
  */
 int ipv6_chk_mcast_addr(struct net_device *dev, struct in6_addr *group,
@@ -918,7 +947,7 @@ int ipv6_chk_mcast_addr(struct net_device *dev, struct in6_addr *group,
 				break;
 		}
 		if (mc) {
-			if (!ipv6_addr_any(src_addr)) {
+			if (src_addr && !ipv6_addr_any(src_addr)) {
 				struct ip6_sf_list *psf;
 
 				spin_lock_bh(&mc->mca_lock);

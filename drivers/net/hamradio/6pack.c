@@ -178,17 +178,17 @@ static inline struct sixpack *sp_alloc(void)
 	    (sixpack_ctrls[i] = (sixpack_ctrl_t *)kmalloc(sizeof(sixpack_ctrl_t),
 						    GFP_KERNEL)) != NULL) {
 		spp = sixpack_ctrls[i];
-		memset(spp, 0, sizeof(sixpack_ctrl_t));
-
-		/* Initialize channel control data */
-		set_bit(SIXPF_INUSE, &spp->ctrl.flags);
-		spp->ctrl.tty         = NULL;
-		sprintf(spp->dev.name, "sp%d", i);
-		spp->dev.base_addr    = i;
-		spp->dev.priv         = (void *) &spp->ctrl;
-		spp->dev.next         = NULL;
-		spp->dev.init         = sixpack_init;
 	}
+	memset(spp, 0, sizeof(sixpack_ctrl_t));
+
+	/* Initialize channel control data */
+	set_bit(SIXPF_INUSE, &spp->ctrl.flags);
+	spp->ctrl.tty         = NULL;
+	sprintf(spp->dev.name, "sp%d", i);
+	spp->dev.base_addr    = i;
+	spp->dev.priv         = (void *) &spp->ctrl;
+	spp->dev.next         = NULL;
+	spp->dev.init         = sixpack_init;
 
 	if (spp != NULL) {
 		/* register device so that it can be ifconfig'ed       */

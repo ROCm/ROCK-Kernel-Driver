@@ -43,6 +43,15 @@ config X86_PC
 	help
 	  Choose this option if your computer is a standard PC or compatible.
 
+config X86_ELAN
+	bool "AMD Elan"
+	help
+	  Select this for an AMD Elan processor.
+
+	  Do not use this option for K6/Athlon/Opteron processors!
+
+	  If unsure, choose "PC-compatible" instead.
+
 config X86_VOYAGER
 	bool "Voyager (NCR)"
 	help
@@ -129,6 +138,8 @@ config ES7000_CLUSTERED_APIC
 	bool
 	default y
 	depends on SMP && X86_ES7000 && MPENTIUMIII
+
+if !X86_ELAN
 
 choice
 	prompt "Processor family"
@@ -222,14 +233,20 @@ config MPENTIUMIII
 	  extended prefetch instructions in addition to the Pentium II
 	  extensions.
 
-config MPENTIUM4
-	bool "Pentium-4/Celeron(P4-based)/Xeon"
+config MPENTIUMM
+	bool "Pentium M"
 	help
-	  Select this for Intel Pentium 4 chips.  This includes both
-	  the Pentium 4 and P4-based Celeron chips.  This option
-	  enables compile flags optimized for the chip, uses the
-	  correct cache shift, and applies any applicable Pentium III
-	  optimizations.
+	  Select this for Intel Pentium M (not Pentium-4 M)
+	  notebook chips.
+
+config MPENTIUM4
+	bool "Pentium-4/Celeron(P4-based)/Pentium-4 M/Xeon"
+	help
+	  Select this for Intel Pentium 4 chips.  This includes the
+	  Pentium 4, P4-based Celeron and Xeon, and Pentium-4 M
+	  (not Pentium M) chips.  This option enables compile flags
+	  optimized for the chip, uses the correct cache shift, and
+	  applies any applicable Pentium III optimizations.
 
 config MK6
 	bool "K6/K6-II/K6-III"
@@ -312,6 +329,8 @@ config X86_GENERIC
 	  when it has moderate overhead. This is intended for generic 
 	  distributions kernels.
 
+endif
+
 #
 # Define implied options from the CPU selection here
 #
@@ -328,9 +347,9 @@ config X86_XADD
 config X86_L1_CACHE_SHIFT
 	int
 	default "7" if MPENTIUM4 || X86_GENERIC
-	default "4" if MELAN || M486 || M386
+	default "4" if X86_ELAN || M486 || M386
 	default "5" if MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCRUSOE || MCYRIXIII || MK6 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || M586 || MVIAC3_2
-	default "6" if MK7 || MK8
+	default "6" if MK7 || MK8 || MPENTIUMM
 
 config RWSEM_GENERIC_SPINLOCK
 	bool
@@ -374,22 +393,22 @@ config X86_POPAD_OK
 
 config X86_ALIGNMENT_16
 	bool
-	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MELAN || MK6 || M586MMX || M586TSC || M586 || M486 || MVIAC3_2
+	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || X86_ELAN || MK6 || M586MMX || M586TSC || M586 || M486 || MVIAC3_2
 	default y
 
 config X86_GOOD_APIC
 	bool
-	depends on MK7 || MPENTIUM4 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || MK8
+	depends on MK7 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || MK8
 	default y
 
 config X86_INTEL_USERCOPY
 	bool
-	depends on MPENTIUM4 || MPENTIUMIII || MPENTIUMII || M586MMX || X86_GENERIC || MK8 || MK7
+	depends on MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M586MMX || X86_GENERIC || MK8 || MK7
 	default y
 
 config X86_USE_PPRO_CHECKSUM
 	bool
-	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || MPENTIUMII || M686 || MK8 || MVIAC3_2
+	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || MK8 || MVIAC3_2
 	default y
 
 config X86_USE_3DNOW
@@ -513,7 +532,7 @@ config X86_IO_APIC
 
 config X86_TSC
 	bool
-	depends on (MWINCHIP3D || MWINCHIP2 || MCRUSOE || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || MK8 || MVIAC3_2) && !X86_NUMAQ
+	depends on (MWINCHIP3D || MWINCHIP2 || MCRUSOE || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || MK8 || MVIAC3_2) && !X86_NUMAQ
 	default y
 
 config X86_MCE
@@ -603,8 +622,6 @@ config MICROCODE
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called microcode.
-	  If you use modprobe or kmod you may also want to add the line
-	  'alias char-major-10-184 microcode' to your /etc/modules.conf file.
 
 config X86_MSR
 	tristate "/dev/cpu/*/msr - Model-specific register support"
@@ -701,7 +718,7 @@ config X86_PAE
 # Common NUMA Features
 config NUMA
 	bool "Numa Memory Allocation Support"
-	depends on SMP && HIGHMEM64G && (X86_PC || X86_NUMAQ || X86_GENERICARCH || (X86_SUMMIT && ACPI))
+	depends on SMP && HIGHMEM64G && (X86_NUMAQ || X86_GENERICARCH || (X86_SUMMIT && ACPI))
 	default n if X86_PC
 	default y if (X86_NUMAQ || X86_SUMMIT)
 
@@ -809,6 +826,14 @@ config EFI
 	anything about EFI).  However, even with this option, the resultant
 	kernel should continue to boot on existing non-EFI platforms.
 
+config IRQBALANCE
+ 	bool "Enable kernel irq balancing"
+	depends on SMP
+	default y
+	help
+ 	  The defalut yes will allow the kernel to do irq load balancing.
+	  Saying no will keep the kernel from doing irq load balancing.
+
 config HAVE_DEC_LOCK
 	bool
 	depends on (SMP || PREEMPT) && X86_CMPXCHG
@@ -820,6 +845,19 @@ config BOOT_IOREMAP
 	bool
 	depends on (((X86_SUMMIT || X86_GENERICARCH) && NUMA) || (X86 && EFI))
 	default y
+
+config REGPARM
+	bool "Use register arguments (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	default n
+	help
+	Compile the kernel with -mregparm=3. This uses an different ABI
+	and passes the first three arguments of a function call in registers.
+	This will probably break binary only modules.
+
+	This feature is only enabled for gcc-3.0 and later - earlier compilers
+	generate incorrect output with certain kernel constructs when
+	-mregparm=3 is used.
 
 endmenu
 
@@ -1176,6 +1214,19 @@ config DEBUG_KERNEL
 	help
 	  Say Y here if you are developing drivers or trying to debug and
 	  identify kernel problems.
+
+config EARLY_PRINTK
+	bool "Early printk" if EMBEDDED
+	default y
+	help
+	  Write kernel log output directly into the VGA buffer or to a serial
+	  port.
+
+	  This is useful for kernel debugging when your machine crashes very
+	  early before the console code is initialized. For normal operation
+	  it is not recommended because it looks ugly and doesn't cooperate
+	  with klogd/syslogd or the X server. You should normally N here,
+	  unless you want to debug such a crash.
 
 config DEBUG_STACKOVERFLOW
 	bool "Check for stack overflows"

@@ -1111,7 +1111,7 @@ dump_intmask(const char *label, u32 mask, char **next, unsigned *size)
 	int t;
 
 	/* int_status is the same format ... */
-	t = snprintf(*next, *size,
+	t = scnprintf(*next, *size,
 		"%s %05X =" FOURBITS EIGHTBITS EIGHTBITS "\n",
 		label, mask,
 		(mask & INT_PWRDETECT) ? " power" : "",
@@ -1164,7 +1164,7 @@ udc_proc_read(char *buffer, char **start, off_t off, int count,
 	/* basic device status */
 	tmp = readl(&regs->power_detect);
 	is_usb_connected = tmp & PW_DETECT;
-	t = snprintf(next, size,
+	t = scnprintf(next, size,
 		"%s - %s\n"
 		"%s version: %s %s\n"
 		"Gadget driver: %s\n"
@@ -1198,7 +1198,7 @@ udc_proc_read(char *buffer, char **start, off_t off, int count,
 		goto done;
 
 	/* registers for (active) device and ep0 */
-	t = snprintf(next, size, "\nirqs %lu\ndataset %02x "
+	t = scnprintf(next, size, "\nirqs %lu\ndataset %02x "
 			"single.bcs %02x.%02x state %x addr %u\n",
 			dev->irqs, readl(&regs->DataSet),
 			readl(&regs->EPxSingle), readl(&regs->EPxBCS),
@@ -1208,7 +1208,7 @@ udc_proc_read(char *buffer, char **start, off_t off, int count,
 	next += t;
 
 	tmp = readl(&regs->dma_master);
-	t = snprintf(next, size,
+	t = scnprintf(next, size,
 		"dma %03X =" EIGHTBITS "%s %s\n", tmp,
 		(tmp & MST_EOPB_DIS) ? " eopb-" : "",
 		(tmp & MST_EOPB_ENA) ? " eopb+" : "",
@@ -1237,7 +1237,7 @@ udc_proc_read(char *buffer, char **start, off_t off, int count,
 			continue;
 
 		tmp = readl(ep->reg_status);
-		t = snprintf(next, size,
+		t = scnprintf(next, size,
 			"%s %s max %u %s, irqs %lu, "
 			"status %02x (%s) " FOURBITS "\n",
 			ep->ep.name,
@@ -1277,7 +1277,7 @@ udc_proc_read(char *buffer, char **start, off_t off, int count,
 		next += t;
 
 		if (list_empty(&ep->queue)) {
-			t = snprintf(next, size, "\t(nothing queued)\n");
+			t = scnprintf(next, size, "\t(nothing queued)\n");
 			if (t <= 0 || t > size)
 				goto done;
 			size -= t;
@@ -1295,7 +1295,7 @@ udc_proc_read(char *buffer, char **start, off_t off, int count,
 			} else
 				tmp = req->req.actual;
 
-			t = snprintf(next, size,
+			t = scnprintf(next, size,
 				"\treq %p len %u/%u buf %p\n",
 				&req->req, tmp, req->req.length,
 				req->req.buf);
@@ -1913,7 +1913,7 @@ static int goku_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	INFO(dev, "%s\n", driver_desc);
 	INFO(dev, "version: " DRIVER_VERSION " %s\n", dmastr());
 #ifndef __sparc__
-	snprintf(buf, sizeof buf, "%d", pdev->irq);
+	scnprintf(buf, sizeof buf, "%d", pdev->irq);
 	bufp = buf;
 #else
 	bufp = __irq_itoa(pdev->irq);

@@ -32,8 +32,7 @@ config PACKET
 	  to work, choose Y.
 
 	  To compile this driver as a module, choose M here: the module will
-	  be called af_packet. If you use modprobe or kmod, you may also
-	  want to add "alias net-pf-17 af_packet" to /etc/modules.conf.
+	  be called af_packet.
 
 	  If unsure, say Y.
 
@@ -67,11 +66,8 @@ config UNIX
 	  want to say Y here.
 
 	  To compile this driver as a module, choose M here: the module will be
-	  called unix.  If you try building this as a module and you have
-	  said Y to "Kernel module loader support" above, be sure to add
-	  'alias net-pf-1 unix' to your /etc/modules.conf file. Note that
-	  several important services won't work correctly if you say M here
-	  and then neglect to load the module.
+	  called unix.  Note that several important services won't work
+	  correctly if you say M here and then neglect to load the module.
 
 	  Say Y unless you know what you are doing.
 
@@ -127,9 +123,7 @@ config IPV6
 	  in the kernel source.
 
 	  To compile this protocol support as a module, choose M here: the 
-	  module will be called ipv6.  If you try building this as a module 
-	  and you have said Y to "Kernel module loader support" above, 
-	  be sure to add 'alias net-pf-10 ipv6' to your /etc/modules.conf file.
+	  module will be called ipv6.
 
 	  It is safe to say N here for now.
 

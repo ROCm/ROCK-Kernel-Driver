@@ -186,12 +186,13 @@ extern void copy_and_flush(unsigned long dest, unsigned long src,
 
 extern char cmd_line[512];	/* XXX */
 unsigned long dev_tree_size;
+unsigned long _get_PIR(void);
 
 #ifdef CONFIG_HMT
 struct {
 	unsigned int pir;
 	unsigned int threadid;
-} hmt_thread_data[NR_CPUS] = {0};
+} hmt_thread_data[NR_CPUS];
 #endif /* CONFIG_HMT */
 
 char testString[] = "LINUX\n"; 

@@ -1,4 +1,4 @@
-/* $Id: capidrv.c,v 1.39.6.7 2001/09/23 22:24:33 kai Exp $
+/* $Id: capidrv.c,v 1.1.2.2 2004/01/12 23:17:24 keil Exp $
  *
  * ISDN4Linux Driver, using capi20 interface (kernelcapi)
  *
@@ -34,7 +34,7 @@
 #include <linux/isdn/capicmd.h>
 #include "capidrv.h"
 
-static char *revision = "$Revision: 1.39.6.7 $";
+static char *revision = "$Revision: 1.1.2.2 $";
 static int debugmode = 0;
 
 MODULE_DESCRIPTION("CAPI4Linux: Interface to ISDN4Linux");
@@ -1263,6 +1263,10 @@ static void handle_ncci(_cmsg * cmsg)
 		goto ignored;
 
 	case CAPI_DATA_B3_CONF:	/* ncci */
+		if (cmsg->Info) {
+			printk(KERN_WARNING "CAPI_DATA_B3_CONF: Info %x - %s\n",
+				cmsg->Info, capi_info2str(cmsg->Info));
+		}
 		if (!(nccip = find_ncci(card, cmsg->adr.adrNCCI)))
 			goto notfound;
 
@@ -1368,7 +1372,7 @@ static _cmsg s_cmsg;
 static void capidrv_recv_message(struct capi20_appl *ap, struct sk_buff *skb)
 {
 	capi_message2cmsg(&s_cmsg, skb->data);
-	if (debugmode > 2)
+	if (debugmode > 3)
 		printk(KERN_DEBUG "capidrv_signal: applid=%d %s\n",
 		       ap->applid, capi_cmsg2str(&s_cmsg));
 	
@@ -1825,7 +1829,7 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 		       id);
 		return 0;
 	}
-	if (debugmode > 1)
+	if (debugmode > 4)
 		printk(KERN_DEBUG "capidrv-%d: sendbuf len=%d skb=%p doack=%d\n",
 					card->contrnr, len, skb, doack);
 	bchan = &card->bchans[channel % card->nbchan];
@@ -1866,6 +1870,9 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 			nccip->datahandle++;
 			return len;
 		}
+		if (debugmode > 3)
+			printk(KERN_DEBUG "capidrv-%d: sendbuf putmsg ret(%x) - %s\n",
+				card->contrnr, errcode, capi_info2str(errcode));
 	        (void)capidrv_del_ack(nccip, datahandle);
 	        dev_kfree_skb(nskb);
 		return errcode == CAPI_SENDQUEUEFULL ? 0 : -1;
@@ -1876,6 +1883,9 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 			nccip->datahandle++;
 			return len;
 		}
+		if (debugmode > 3)
+			printk(KERN_DEBUG "capidrv-%d: sendbuf putmsg ret(%x) - %s\n",
+				card->contrnr, errcode, capi_info2str(errcode));
 		skb_pull(skb, msglen);
 	        (void)capidrv_del_ack(nccip, datahandle);
 		return errcode == CAPI_SENDQUEUEFULL ? 0 : -1;

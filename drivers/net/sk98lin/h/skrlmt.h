@@ -2,6 +2,8 @@
  *
  * Name:	skrlmt.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
+ * Version:	$Revision: 1.37 $
+ * Date:	$Date: 2003/04/15 09:43:43 $
  * Purpose:	Header file for Redundant Link ManagemenT.
  *
  ******************************************************************************/

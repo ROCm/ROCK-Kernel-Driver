@@ -1,4 +1,4 @@
-/* $Id: q931.c,v 1.10.6.3 2001/09/23 22:24:50 kai Exp $
+/* $Id: q931.c,v 1.12.2.3 2004/01/13 14:31:26 keil Exp $
  *
  * code to decode ITU Q.931 call control messages
  *
@@ -21,9 +21,9 @@
 #include "l3_1tr6.h"
 
 void
-iecpy(u8 * dest, u8 * iestart, int ieoffset)
+iecpy(u_char * dest, u_char * iestart, int ieoffset)
 {
-	u8 *p;
+	u_char *p;
 	int l;
 
 	p = iestart + ieoffset + 2;
@@ -38,7 +38,7 @@ iecpy(u8 * dest, u8 * iestart, int ieoffset)
  */
 static
 struct MessageType {
-	u8 nr;
+	u_char nr;
 	char *descr;
 } mtlist[] = {
 
@@ -198,7 +198,7 @@ struct MessageType mt_n1[] =
 
 
 static int
-prbits(char *dest, u8 b, int start, int len)
+prbits(char *dest, u_char b, int start, int len)
 {
 	char *dp = dest;
 
@@ -214,8 +214,8 @@ prbits(char *dest, u8 b, int start, int len)
 }
 
 static
-u8 *
-skipext(u8 * p)
+u_char *
+skipext(u_char * p)
 {
 	while (!(*p++ & 0x80));
 	return (p);
@@ -230,7 +230,7 @@ skipext(u8 * p)
 
 static
 struct CauseValue {
-	u8 nr;
+	u_char nr;
 	char *edescr;
 	char *ddescr;
 } cvlist[] = {
@@ -442,11 +442,11 @@ struct CauseValue {
 
 static
 int
-prcause(char *dest, u8 * p)
+prcause(char *dest, u_char * p)
 {
-	u8 *end;
+	u_char *end;
 	char *dp = dest;
-	u_int i, cause;
+	int i, cause;
 
 	end = p + p[1] + 1;
 	p += 2;
@@ -519,7 +519,7 @@ struct MessageType cause_1tr6[] =
 int cause_1tr6_len = (sizeof(cause_1tr6) / sizeof(struct MessageType));
 
 static int
-prcause_1tr6(char *dest, u8 * p)
+prcause_1tr6(char *dest, u_char * p)
 {
 	char *dp = dest;
 	int i, cause;
@@ -554,7 +554,7 @@ prcause_1tr6(char *dest, u8 * p)
 }
 
 static int
-prchident(char *dest, u8 * p)
+prchident(char *dest, u_char * p)
 {
 	char *dp = dest;
 
@@ -566,7 +566,7 @@ prchident(char *dest, u8 * p)
 }
 
 static int
-prcalled(char *dest, u8 * p)
+prcalled(char *dest, u_char * p)
 {
 	int l;
 	char *dp = dest;
@@ -583,7 +583,7 @@ prcalled(char *dest, u8 * p)
 	return (dp - dest);
 }
 static int
-prcalling(char *dest, u8 * p)
+prcalling(char *dest, u_char * p)
 {
 	int l;
 	char *dp = dest;
@@ -610,7 +610,7 @@ prcalling(char *dest, u8 * p)
 
 static
 int
-prbearer(char *dest, u8 * p)
+prbearer(char *dest, u_char * p)
 {
 	char *dp = dest, ch;
 
@@ -658,10 +658,10 @@ prbearer(char *dest, u8 * p)
 
 static
 int
-prbearer_ni1(char *dest, u8 * p)
+prbearer_ni1(char *dest, u_char * p)
 {
 	char *dp = dest;
-	u8 len;
+	u_char len;
 
 	p++;
 	len = *p++;
@@ -715,7 +715,7 @@ prbearer_ni1(char *dest, u8 * p)
 }
 
 static int
-general(char *dest, u8 * p)
+general(char *dest, u_char * p)
 {
 	char *dp = dest;
 	char ch = ' ';
@@ -742,7 +742,7 @@ general(char *dest, u8 * p)
 }
 
 static int
-general_ni1(char *dest, u8 * p)
+general_ni1(char *dest, u_char * p)
 {
 	char *dp = dest;
 	char ch = ' ';
@@ -769,7 +769,7 @@ general_ni1(char *dest, u8 * p)
 }
 
 static int
-prcharge(char *dest, u8 * p)
+prcharge(char *dest, u_char * p)
 {
 	char *dp = dest;
 	int l;
@@ -786,7 +786,7 @@ prcharge(char *dest, u8 * p)
 	return (dp - dest);
 }
 static int
-prtext(char *dest, u8 * p)
+prtext(char *dest, u_char * p)
 {
 	char *dp = dest;
 	int l;
@@ -802,7 +802,7 @@ prtext(char *dest, u8 * p)
 }
 
 static int
-prfeatureind(char *dest, u8 * p)
+prfeatureind(char *dest, u_char * p)
 {
 	char *dp = dest;
 
@@ -839,7 +839,7 @@ prfeatureind(char *dest, u8 * p)
 
 static
 struct DTag { /* Display tags */
-	u8 nr;
+	u_char nr;
 	char *descr;
 } dtaglist[] = {
 	{ 0x82, "Continuation" },
@@ -868,11 +868,10 @@ struct DTag { /* Display tags */
 #define DTAGSIZE sizeof(dtaglist)/sizeof(struct DTag)
 
 static int
-disptext_ni1(char *dest, u8 * p)
+disptext_ni1(char *dest, u_char * p)
 {
 	char *dp = dest;
-	int l, tag, len;
-	u_int i;
+	int l, tag, len, i;
 
 	p++;
 	l = *p++ - 1;
@@ -908,7 +907,7 @@ disptext_ni1(char *dest, u8 * p)
 	return (dp - dest);
 }
 static int
-display(char *dest, u8 * p)
+display(char *dest, u_char * p)
 {
 	char *dp = dest;
 	char ch = ' ';
@@ -937,7 +936,7 @@ display(char *dest, u8 * p)
 }
 
 int
-prfacility(char *dest, u8 * p)
+prfacility(char *dest, u_char * p)
 {
 	char *dp = dest;
 	int l, l2;
@@ -968,9 +967,9 @@ prfacility(char *dest, u8 * p)
 
 static
 struct InformationElement {
-	u8 nr;
+	u_char nr;
 	char *descr;
-	int (*f) (char *, u8 *);
+	int (*f) (char *, u_char *);
 } ielist[] = {
 
 	{
@@ -1149,11 +1148,11 @@ static struct InformationElement we_6[] =
 #define WE_6_LEN (sizeof(we_6) / sizeof(struct InformationElement))
 
 int
-QuickHex(char *txt, u8 * p, int cnt)
+QuickHex(char *txt, u_char * p, int cnt)
 {
 	register int i;
 	register char *t = txt;
-	register u8 w;
+	register u_char w;
 
 	for (i = 0; i < cnt; i++) {
 		*t++ = ' ';
@@ -1173,7 +1172,7 @@ QuickHex(char *txt, u8 * p, int cnt)
 }
 
 void
-LogFrame(struct IsdnCardState *cs, u8 * buf, int size)
+LogFrame(struct IsdnCardState *cs, u_char * buf, int size)
 {
 	char *dp;
 
@@ -1197,11 +1196,11 @@ LogFrame(struct IsdnCardState *cs, u8 * buf, int size)
 void
 dlogframe(struct IsdnCardState *cs, struct sk_buff *skb, int dir)
 {
-	u8 *bend, *buf;
+	u_char *bend, *buf;
 	char *dp;
 	unsigned char pd, cr_l, cr, mt;
 	unsigned char sapi, tei, ftyp;
-	u_int i, cset = 0, cs_old = 0, cs_fest = 0;
+	int i, cset = 0, cs_old = 0, cs_fest = 0;
 	int size, finish = 0;
 
 	if (skb->len < 3)

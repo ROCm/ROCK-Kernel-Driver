@@ -155,10 +155,8 @@
 #define IPACX_IND_AIL    0xe
 #define IPACX_IND_DC     0xf
 
-extern void init_ipacx(struct IsdnCardState *cs, int part);
-extern void interrupt_ipacx(struct IsdnCardState *cs);
-extern int  ipacx_setup(struct IsdnCardState *cs,
-			struct dc_hw_ops *ipacx_dc_ops,
-			struct bc_hw_ops *ipacx_bc_ops);
+extern void init_ipacx(struct IsdnCardState *, int);
+extern void interrupt_ipacx(struct IsdnCardState *);
+extern void setup_isac(struct IsdnCardState *);
 
 #endif

@@ -85,7 +85,7 @@ static struct fib6_node * fib6_repair_tree(struct fib6_node *fn);
 
 /*
  *	A routing update causes an increase of the serial number on the
- *	afected subtree. This allows for cached routes to be asynchronously
+ *	affected subtree. This allows for cached routes to be asynchronously
  *	tested when modifications are made to the destination cache as a
  *	result of redirects, path MTU changes, etc.
  */

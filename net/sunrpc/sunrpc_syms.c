@@ -90,10 +90,9 @@ EXPORT_SYMBOL(svc_reserve);
 #ifdef CONFIG_PROC_FS
 EXPORT_SYMBOL(rpc_proc_register);
 EXPORT_SYMBOL(rpc_proc_unregister);
-EXPORT_SYMBOL(rpc_proc_read);
 EXPORT_SYMBOL(svc_proc_register);
 EXPORT_SYMBOL(svc_proc_unregister);
-EXPORT_SYMBOL(svc_proc_read);
+EXPORT_SYMBOL(svc_seq_show);
 #endif
 
 /* caching... */

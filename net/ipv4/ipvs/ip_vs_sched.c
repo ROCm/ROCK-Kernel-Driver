@@ -19,10 +19,7 @@
  *
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
 #include <asm/string.h>

@@ -354,6 +354,11 @@ dma_addr_t pci_map_single(struct pci_dev *dev, void *addr, size_t size, int dir)
 
 	BUG_ON(dir == PCI_DMA_NONE);
 
+#ifdef CONFIG_SWIOTLB
+	if (swiotlb)
+		return swiotlb_map_single(&dev->dev,addr,size,dir);
+#endif
+
 	phys_mem = virt_to_phys(addr); 
 	if (!need_iommu(dev, phys_mem, size))
 		return phys_mem; 
@@ -460,6 +465,12 @@ int pci_map_sg(struct pci_dev *dev, struct scatterlist *sg, int nents, int dir)
 	BUG_ON(dir == PCI_DMA_NONE);
 	if (nents == 0) 
 		return 0;
+
+#ifdef CONFIG_SWIOTLB
+	if (swiotlb)
+		return swiotlb_map_sg(&dev->dev,sg,nents,dir);
+#endif
+
 	out = 0;
 	start = 0;
 	for (i = 0; i < nents; i++) {
@@ -520,6 +531,14 @@ void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
 	unsigned long iommu_page; 
 	int npages;
 	int i;
+
+#ifdef CONFIG_SWIOTLB
+	if (swiotlb) {
+		swiotlb_unmap_single(&hwdev->dev,dma_addr,size,direction);
+		return;
+	}
+#endif
+
 	if (dma_addr < iommu_bus_base + EMERGENCY_PAGES*PAGE_SIZE || 
 	    dma_addr >= iommu_bus_base + iommu_size)
 		return;
@@ -570,7 +589,7 @@ int pci_dma_supported(struct pci_dev *dev, u64 mask)
 		return 0; 
 	}
 
-	if (no_iommu && (mask < (end_pfn << PAGE_SHIFT)))
+	if (no_iommu && (mask < (end_pfn << PAGE_SHIFT)) && !swiotlb)
 		return 0;
 
 	return 1;
@@ -680,6 +699,7 @@ static __init int init_k8_gatt(struct agp_kern_info *info)
 	return 0;
 
  nommu:
+ 	/* Should not happen anymore */
 	printk(KERN_ERR "PCI-DMA: More than 4GB of RAM and no IOMMU\n"
 	       KERN_ERR "PCI-DMA: 32bit PCI IO may malfunction."); 
 	return -1; 
@@ -694,6 +714,7 @@ static int __init pci_iommu_init(void)
 	unsigned long iommu_start;
 	struct pci_dev *dev;
 		
+
 #ifndef CONFIG_AGP_AMD64
 	no_agp = 1; 
 #else
@@ -704,7 +725,14 @@ static int __init pci_iommu_init(void)
 		(agp_copy_info(&info) < 0); 
 #endif	
 
-	if (no_iommu || (!force_iommu && end_pfn < 0xffffffff>>PAGE_SHIFT)) { 
+	if (swiotlb) { 
+		no_iommu = 1;
+		printk(KERN_INFO "PCI-DMA: Using SWIOTLB :-(\n"); 
+		return -1; 
+	} 
+	
+	if (no_iommu || (!force_iommu && end_pfn < 0xffffffff>>PAGE_SHIFT) || 
+	    !iommu_aperture) {
 		printk(KERN_INFO "PCI-DMA: Disabling IOMMU.\n"); 
 		no_iommu = 1;
 		return -1;

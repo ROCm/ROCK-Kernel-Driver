@@ -376,6 +376,37 @@ static int __init acpi_parse_hpet(unsigned long phys, unsigned long size)
 }
 #endif
 
+/* detect the location of the ACPI PM Timer */
+#ifdef CONFIG_X86_PM_TIMER
+extern u32 pmtmr_ioport;
+
+static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
+{
+	struct fadt_descriptor_rev2 *fadt =0;
+
+	fadt = (struct fadt_descriptor_rev2*) __acpi_map_table(phys,size);
+	if(!fadt) {
+		printk(KERN_WARNING PREFIX "Unable to map FADT\n");
+		return 0;
+	}
+
+	if (fadt->revision >= FADT2_REVISION_ID) {
+		/* FADT rev. 2 */
+		if (fadt->xpm_tmr_blk.address_space_id != ACPI_ADR_SPACE_SYSTEM_IO)
+			return 0;
+
+		pmtmr_ioport = fadt->xpm_tmr_blk.address;
+	} else {
+		/* FADT rev. 1 */
+		pmtmr_ioport = fadt->V1_pm_tmr_blk;
+	}
+	if (pmtmr_ioport)
+		printk(KERN_INFO PREFIX "PM-Timer IO Port: %#x\n", pmtmr_ioport);
+	return 0;
+}
+#endif
+
+
 unsigned long __init
 acpi_find_rsdp (void)
 {
@@ -447,6 +478,10 @@ acpi_boot_init (void)
 		acpi_disabled = 1;
 		return result;
 	}
+
+#ifdef CONFIG_X86_PM_TIMER
+	acpi_table_parse(ACPI_FADT, acpi_parse_fadt);
+#endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
 

@@ -2362,6 +2362,7 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 	int agg_id;
 	int i;
 	struct ad_info ad_info;
+	int res = 1;
 
 	/* make sure that the slaves list will
 	 * not change during tx
@@ -2369,12 +2370,12 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 	read_lock(&bond->lock);
 
 	if (!BOND_IS_OK(bond)) {
-		goto free_out;
+		goto out;
 	}
 
 	if (bond_3ad_get_active_agg_info(bond, &ad_info)) {
 		printk(KERN_DEBUG "ERROR: bond_3ad_get_active_agg_info failed\n");
-		goto free_out;
+		goto out;
 	}
 
 	slaves_in_agg = ad_info.ports;
@@ -2383,7 +2384,7 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 	if (slaves_in_agg == 0) {
 		/*the aggregator is empty*/
 		printk(KERN_DEBUG "ERROR: active aggregator is empty\n");
-		goto free_out;
+		goto out;
 	}
 
 	slave_agg_no = (data->h_dest[5]^bond->dev->dev_addr[5]) % slaves_in_agg;
@@ -2401,7 +2402,7 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 
 	if (slave_agg_no >= 0) {
 		printk(KERN_ERR DRV_NAME ": Error: Couldn't find a slave to tx on for aggregator ID %d\n", agg_id);
-		goto free_out;
+		goto out;
 	}
 
 	start_at = slave;
@@ -2414,24 +2415,19 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 			slave_agg_id = agg->aggregator_identifier;
 		}
 
-		if (SLAVE_IS_OK(slave) && 
-		    agg && (slave_agg_id == agg_id)) {
-			skb->dev = slave->dev;			
-			skb->priority = 1;
-			dev_queue_xmit(skb);
-
-			goto out;
+		if (SLAVE_IS_OK(slave) && agg && (slave_agg_id == agg_id)) {
+			res = bond_dev_queue_xmit(bond, skb, slave->dev);
+			break;
 		}
 	}
 
 out:
+	if (res) {
+		/* no suitable interface, frame not sent */
+		dev_kfree_skb(skb);
+	}
 	read_unlock(&bond->lock);
 	return 0;
-
-free_out:
-	/* no suitable interface, frame not sent */
-	dev_kfree_skb(skb);
-	goto out;
 }
 
 int bond_3ad_lacpdu_recv(struct sk_buff *skb, struct net_device *dev, struct packet_type* ptype)

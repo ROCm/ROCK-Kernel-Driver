@@ -198,12 +198,11 @@ drivers can always be compiled as loadable modules, the chipset drivers
 can only be compiled into the kernel, and the core code (ide.c) can be
 compiled as a loadable module provided no chipset support is needed.
 
-When using ide.c/ide-tape.c as modules in combination with kerneld, add:
+When using ide.c as a module in combination with kmod, add:
 
 	alias block-major-3 ide-probe
-	alias char-major-37 ide-tape
 
-respectively to /etc/modules.conf.
+to /etc/modprobe.conf.
 
 When ide.c is used as a module, you can pass command line parameters to the
 driver using the "options=" keyword to insmod, while replacing any ',' with

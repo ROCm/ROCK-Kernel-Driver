@@ -1,4 +1,4 @@
-/* $Id: capi.c,v 1.1.4.1.2.2 2001/12/21 15:00:17 kai Exp $
+/* $Id: capi.c,v 1.1.2.3 2004/01/16 21:09:26 keil Exp $
  *
  * CAPI 2.0 Interface for Linux
  *
@@ -44,7 +44,7 @@
 #include "capifs.h"
 #endif
 
-static char *revision = "$Revision: 1.1.4.1.2.2 $";
+static char *revision = "$Revision: 1.1.2.3 $";
 
 MODULE_DESCRIPTION("CAPI4Linux: Userspace /dev/capi20 interface");
 MODULE_AUTHOR("Carsten Paeth");
@@ -203,7 +203,7 @@ static struct capiminor *capiminor_alloc(struct capi20_appl *ap, u32 ncci)
 	struct list_head *l;
 	unsigned int minor = 0;
 	unsigned long flags;
-  
+
 	mp = kmalloc(sizeof(*mp), GFP_ATOMIC);
   	if (!mp) {
   		printk(KERN_ERR "capi: can't alloc capiminor\n");
@@ -220,19 +220,24 @@ static struct capiminor *capiminor_alloc(struct capi20_appl *ap, u32 ncci)
 	skb_queue_head_init(&mp->outqueue);
 
 	write_lock_irqsave(&capiminor_list_lock, flags);
-	list_for_each(l, &capiminor_list) {
-		p = list_entry(l, struct capiminor, list);
-		if (p->minor > minor) {
-			mp->minor = minor;
-			list_add_tail(&mp->list, &p->list);
-			break;
+	if (list_empty(&capiminor_list)) {
+		list_add(&mp->list, &capiminor_list);
+		write_unlock_irqrestore(&capiminor_list_lock, flags);
+	} else {
+		list_for_each(l, &capiminor_list) {
+			p = list_entry(l, struct capiminor, list);
+			if (p->minor > minor) {
+				mp->minor = minor;
+				list_add_tail(&mp->list, &p->list);
+				break;
+			}
+			minor++;
 		}
-		minor++;
-	}
-	write_unlock_irqrestore(&capiminor_list_lock, flags);
-	if (l == &capiminor_list) {
-		kfree(mp);
-		return NULL;
+		write_unlock_irqrestore(&capiminor_list_lock, flags);
+		if (l == &capiminor_list) {
+			kfree(mp);
+			return NULL;
+		}
 	}
 	return mp;
 }
@@ -297,7 +302,7 @@ static struct capincci *capincci_alloc(struct capidev *cdev, u32 ncci)
 		printk(KERN_DEBUG "set mp->nccip\n");
 #endif
 #if defined(CONFIG_ISDN_CAPI_CAPIFS) || defined(CONFIG_ISDN_CAPI_CAPIFS_MODULE)
-		capifs_new_ncci(0, mp->minor, MKDEV(capi_ttymajor, mp->minor));
+		capifs_new_ncci(mp->minor, MKDEV(capi_ttymajor, mp->minor));
 #endif
 	}
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
@@ -322,8 +327,7 @@ static void capincci_free(struct capidev *cdev, u32 ncci)
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 			if ((mp = np->minorp) != 0) {
 #if defined(CONFIG_ISDN_CAPI_CAPIFS) || defined(CONFIG_ISDN_CAPI_CAPIFS_MODULE)
-				capifs_free_ncci('r', mp->minor);
-				capifs_free_ncci(0, mp->minor);
+				capifs_free_ncci(mp->minor);
 #endif
 				if (mp->tty) {
 					mp->nccip = 0;

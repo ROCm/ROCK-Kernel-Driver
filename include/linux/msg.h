@@ -2,6 +2,7 @@
 #define _LINUX_MSG_H
 
 #include <linux/ipc.h>
+#include <linux/list.h>
 
 /* ipcs ctl commands */
 #define MSG_STAT 11

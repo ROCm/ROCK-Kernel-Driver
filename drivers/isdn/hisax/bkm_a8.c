@@ -1,4 +1,4 @@
-/* $Id: bkm_a8.c,v 1.14.6.7 2001/09/23 22:24:46 kai Exp $
+/* $Id: bkm_a8.c,v 1.22.2.4 2004/01/15 14:02:34 keil Exp $
  *
  * low level stuff for Scitel Quadro (4*S0, passive)
  *
@@ -10,6 +10,7 @@
  *
  */
 
+
 #include <linux/config.h>
 #include <linux/init.h>
 #include "hisax.h"
@@ -20,11 +21,13 @@
 #include <linux/pci.h>
 #include "bkm_ax.h"
 
+#if CONFIG_PCI
+
 #define	ATTEMPT_PCI_REMAPPING	/* Required for PLX rev 1 */
 
 extern const char *CardType[];
-static spinlock_t bkm_a8_lock = SPIN_LOCK_UNLOCKED;
-const char sct_quadro_revision[] = "$Revision: 1.14.6.7 $";
+
+const char sct_quadro_revision[] = "$Revision: 1.22.2.4 $";
 
 static const char *sct_quadro_subtypes[] =
 {
@@ -39,70 +42,174 @@ static const char *sct_quadro_subtypes[] =
 #define wordout(addr,val) outw(val,addr)
 #define wordin(addr) inw(addr)
 
-static inline u8
-ipac_read(struct IsdnCardState *cs, u8 off)
+static inline u_char
+readreg(unsigned int ale, unsigned int adr, u_char off)
 {
-	u8 ret;
-	unsigned long flags;
-
-	spin_lock_irqsave(&bkm_a8_lock, flags);
-	wordout(cs->hw.ax.base, off);
-	ret = wordin(cs->hw.ax.data_adr) & 0xFF;
-	spin_unlock_irqrestore(&bkm_a8_lock, flags);
-	return ret;
+	register u_char ret;
+	wordout(ale, off);
+	ret = wordin(adr) & 0xFF;
+	return (ret);
 }
 
 static inline void
-ipac_write(struct IsdnCardState *cs, u8 off, u8 data)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&bkm_a8_lock, flags);
-	wordout(cs->hw.ax.base, off);
-	wordout(cs->hw.ax.data_adr, data);
-	spin_unlock_irqrestore(&bkm_a8_lock, flags);
-}
-
-static inline void
-ipac_readfifo(struct IsdnCardState *cs, u8 off, u8 *data, int size)
+readfifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
 {
 	int i;
-
-	wordout(cs->hw.ax.base, off);
+	wordout(ale, off);
 	for (i = 0; i < size; i++)
-		data[i] = wordin(cs->hw.ax.data_adr) & 0xFF;
+		data[i] = wordin(adr) & 0xFF;
+}
+
+
+static inline void
+writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
+{
+	wordout(ale, off);
+	wordout(adr, data);
 }
 
 static inline void
-ipac_writefifo(struct IsdnCardState *cs, u8 off, u8 *data, int size)
+writefifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
 {
 	int i;
-
-	wordout(cs->hw.ax.base, off);
+	wordout(ale, off);
 	for (i = 0; i < size; i++)
-		wordout(cs->hw.ax.data_adr, data[i]);
+		wordout(adr, data[i]);
 }
 
-/* This will generate ipac_dc_ops and ipac_bc_ops using the functions
- * above */
+/* Interface functions */
 
-BUILD_IPAC_OPS(ipac);
-  
+static u_char
+ReadISAC(struct IsdnCardState *cs, u_char offset)
+{
+	return (readreg(cs->hw.ax.base, cs->hw.ax.data_adr, offset | 0x80));
+}
+
+static void
+WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+{
+	writereg(cs->hw.ax.base, cs->hw.ax.data_adr, offset | 0x80, value);
+}
+
+static void
+ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+{
+	readfifo(cs->hw.ax.base, cs->hw.ax.data_adr, 0x80, data, size);
+}
+
+static void
+WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+{
+	writefifo(cs->hw.ax.base, cs->hw.ax.data_adr, 0x80, data, size);
+}
+
+
+static u_char
+ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
+{
+	return (readreg(cs->hw.ax.base, cs->hw.ax.data_adr, offset + (hscx ? 0x40 : 0)));
+}
+
+static void
+WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
+{
+	writereg(cs->hw.ax.base, cs->hw.ax.data_adr, offset + (hscx ? 0x40 : 0), value);
+}
+
 /* Set the specific ipac to active */
 static void
 set_ipac_active(struct IsdnCardState *cs, u_int active)
 {
 	/* set irq mask */
-	ipac_write(cs, IPAC_MASK, active ? 0xc0 : 0xff);
+	writereg(cs->hw.ax.base, cs->hw.ax.data_adr, IPAC_MASK,
+		active ? 0xc0 : 0xff);
+}
+
+/*
+ * fast interrupt HSCX stuff goes here
+ */
+
+#define READHSCX(cs, nr, reg) readreg(cs->hw.ax.base, \
+	cs->hw.ax.data_adr, reg + (nr ? 0x40 : 0))
+#define WRITEHSCX(cs, nr, reg, data) writereg(cs->hw.ax.base, \
+	cs->hw.ax.data_adr, reg + (nr ? 0x40 : 0), data)
+#define READHSCXFIFO(cs, nr, ptr, cnt) readfifo(cs->hw.ax.base, \
+	cs->hw.ax.data_adr, (nr ? 0x40 : 0), ptr, cnt)
+#define WRITEHSCXFIFO(cs, nr, ptr, cnt) writefifo(cs->hw.ax.base, \
+	cs->hw.ax.data_adr, (nr ? 0x40 : 0), ptr, cnt)
+
+#include "hscx_irq.c"
+
+static irqreturn_t
+bkm_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
+{
+	struct IsdnCardState *cs = dev_id;
+	u_char ista, val, icnt = 5;
+	u_long flags;
+
+	spin_lock_irqsave(&cs->lock, flags);
+	ista = readreg(cs->hw.ax.base, cs->hw.ax.data_adr, IPAC_ISTA);
+	if (!(ista & 0x3f)) { /* not this IPAC */
+		spin_unlock_irqrestore(&cs->lock, flags);
+		return IRQ_NONE;
+	}
+      Start_IPAC:
+	if (cs->debug & L1_DEB_IPAC)
+		debugl1(cs, "IPAC ISTA %02X", ista);
+	if (ista & 0x0f) {
+		val = readreg(cs->hw.ax.base, cs->hw.ax.data_adr, HSCX_ISTA + 0x40);
+		if (ista & 0x01)
+			val |= 0x01;
+		if (ista & 0x04)
+			val |= 0x02;
+		if (ista & 0x08)
+			val |= 0x04;
+		if (val) {
+			hscx_int_main(cs, val);
+		}
+	}
+	if (ista & 0x20) {
+		val = 0xfe & readreg(cs->hw.ax.base, cs->hw.ax.data_adr, ISAC_ISTA | 0x80);
+		if (val) {
+			isac_interrupt(cs, val);
+		}
+	}
+	if (ista & 0x10) {
+		val = 0x01;
+		isac_interrupt(cs, val);
+	}
+	ista = readreg(cs->hw.ax.base, cs->hw.ax.data_adr, IPAC_ISTA);
+	if ((ista & 0x3f) && icnt) {
+		icnt--;
+		goto Start_IPAC;
+	}
+	if (!icnt)
+		printk(KERN_WARNING "HiSax: %s (%s) IRQ LOOP\n",
+		       CardType[cs->typ],
+		       sct_quadro_subtypes[cs->subtyp]);
+	writereg(cs->hw.ax.base, cs->hw.ax.data_adr, IPAC_MASK, 0xFF);
+	writereg(cs->hw.ax.base, cs->hw.ax.data_adr, IPAC_MASK, 0xC0);
+	spin_unlock_irqrestore(&cs->lock, flags);
+	return IRQ_HANDLED;
+}
+
+void
+release_io_sct_quadro(struct IsdnCardState *cs)
+{
+	release_region(cs->hw.ax.base & 0xffffffc0, 128);
+	if (cs->subtyp == SCT_1)
+		release_region(cs->hw.ax.plx_adr, 64);
 }
 
 static void
 enable_bkm_int(struct IsdnCardState *cs, unsigned bEnable)
 {
-	if (bEnable)
-		wordout(cs->hw.ax.plx_adr + 0x4C, (wordin(cs->hw.ax.plx_adr + 0x4C) | 0x41));
-	else
-		wordout(cs->hw.ax.plx_adr + 0x4C, (wordin(cs->hw.ax.plx_adr + 0x4C) & ~0x41));
+	if (cs->typ == ISDN_CTYPE_SCT_QUADRO) {
+		if (bEnable)
+			wordout(cs->hw.ax.plx_adr + 0x4C, (wordin(cs->hw.ax.plx_adr + 0x4C) | 0x41));
+		else
+			wordout(cs->hw.ax.plx_adr + 0x4C, (wordin(cs->hw.ax.plx_adr + 0x4C) & ~0x41));
+	}
 }
 
 static void
@@ -110,66 +217,88 @@ reset_bkm(struct IsdnCardState *cs)
 {
 	if (cs->subtyp == SCT_1) {
 		wordout(cs->hw.ax.plx_adr + 0x50, (wordin(cs->hw.ax.plx_adr + 0x50) & ~4));
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10 * HZ) / 1000);
+		mdelay(10);
 		/* Remove the soft reset */
 		wordout(cs->hw.ax.plx_adr + 0x50, (wordin(cs->hw.ax.plx_adr + 0x50) | 4));
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10 * HZ) / 1000);
+		mdelay(10);
 	}
 }
 
-static void
-bkm_a8_init(struct IsdnCardState *cs)
-{
-	cs->debug |= L1_DEB_IPAC;
-	set_ipac_active(cs, 1);
-	ipac_init(cs);
-	/* Enable ints */
-	enable_bkm_int(cs, 1);
-}
-
 static int
-bkm_a8_reset(struct IsdnCardState *cs)
+BKM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	/* Disable ints */
-	set_ipac_active(cs, 0);
-	enable_bkm_int(cs, 0);
-	reset_bkm(cs);
-	return 0;
+	u_long flags;
+
+	switch (mt) {
+		case CARD_RESET:
+			spin_lock_irqsave(&cs->lock, flags);
+			/* Disable ints */
+			set_ipac_active(cs, 0);
+			enable_bkm_int(cs, 0);
+			reset_bkm(cs);
+			spin_unlock_irqrestore(&cs->lock, flags);
+			return (0);
+		case CARD_RELEASE:
+			/* Sanity */
+			spin_lock_irqsave(&cs->lock, flags);
+			set_ipac_active(cs, 0);
+			enable_bkm_int(cs, 0);
+			spin_unlock_irqrestore(&cs->lock, flags);
+			release_io_sct_quadro(cs);
+			return (0);
+		case CARD_INIT:
+			spin_lock_irqsave(&cs->lock, flags);
+			cs->debug |= L1_DEB_IPAC;
+			set_ipac_active(cs, 1);
+			inithscxisac(cs, 3);
+			/* Enable ints */
+			enable_bkm_int(cs, 1);
+			spin_unlock_irqrestore(&cs->lock, flags);
+			return (0);
+		case CARD_TEST:
+			return (0);
+	}
+	return (0);
 }
 
-static void
-bkm_a8_release(struct IsdnCardState *cs)
+int __init
+sct_alloc_io(u_int adr, u_int len)
 {
-	set_ipac_active(cs, 0);
-	enable_bkm_int(cs, 0);
-	hisax_release_resources(cs);
+	if (!request_region(adr, len, "scitel")) {
+		printk(KERN_WARNING
+			"HiSax: Scitel port %#x-%#x already in use\n",
+			adr, adr + len);
+		return (1);
+	}
+	return(0);
 }
-
-static struct card_ops bkm_a8_ops = {
-	.init     = bkm_a8_init,
-	.reset    = bkm_a8_reset,
-	.release  = bkm_a8_release,
-	.irq_func = ipac_irq,
-};
 
 static struct pci_dev *dev_a8 __initdata = NULL;
 static u16  sub_vendor_id __initdata = 0;
 static u16  sub_sys_id __initdata = 0;
-static u8 pci_irq __initdata = 0;
+static u_char pci_bus __initdata = 0;
+static u_char pci_device_fn __initdata = 0;
+static u_char pci_irq __initdata = 0;
+
+#endif /* CONFIG_PCI */
 
 int __init
 setup_sct_quadro(struct IsdnCard *card)
 {
+#if CONFIG_PCI
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
-	u8 pci_rev_id;
+	u_char pci_rev_id;
 	u_int found = 0;
 	u_int pci_ioaddr1, pci_ioaddr2, pci_ioaddr3, pci_ioaddr4, pci_ioaddr5;
 
 	strcpy(tmp, sct_quadro_revision);
 	printk(KERN_INFO "HiSax: T-Berkom driver Rev. %s\n", HiSax_getrev(tmp));
+	if (cs->typ == ISDN_CTYPE_SCT_QUADRO) {
+		cs->subtyp = SCT_1;	/* Preset */
+	} else
+		return (0);
+
 	/* Identify subtype by para[0] */
 	if (card->para[0] >= SCT_1 && card->para[0] <= SCT_4)
 		cs->subtyp = card->para[0];
@@ -193,6 +322,8 @@ setup_sct_quadro(struct IsdnCard *card)
 					return(0);
 				pci_ioaddr1 = pci_resource_start(dev_a8, 1);
 				pci_irq = dev_a8->irq;
+				pci_bus = dev_a8->bus->number;
+				pci_device_fn = dev_a8->devfn;
 				found = 1;
 				break;
 			}
@@ -253,31 +384,40 @@ setup_sct_quadro(struct IsdnCard *card)
 	cs->hw.ax.plx_adr = pci_ioaddr1;
 	/* Enter all ipac_base addresses */
 	switch(cs->subtyp) {
-	case 1:
-		cs->hw.ax.base = pci_ioaddr5 + 0x00;
-		if (!request_io(&cs->rs, pci_ioaddr1, 128, "scitel"))
-			goto err;
-		if (!request_io(&cs->rs, pci_ioaddr5, 64, "scitel"))
-			goto err;
-		break;
-	case 2:
-		cs->hw.ax.base = pci_ioaddr4 + 0x08;
-		if (!request_io(&cs->rs, pci_ioaddr4, 64, "scitel"))
-			goto err;
-		break;
-	case 3:
-		cs->hw.ax.base = pci_ioaddr3 + 0x10;
-		if (!request_io(&cs->rs, pci_ioaddr3, 64, "scitel"))
-			goto err;
-		break;
-	case 4:
-		cs->hw.ax.base = pci_ioaddr2 + 0x20;
-		if (!request_io(&cs->rs, pci_ioaddr2, 64, "scitel"))
-			goto err;
-		break;
+		case 1:
+			cs->hw.ax.base = pci_ioaddr5 + 0x00;
+			if (sct_alloc_io(pci_ioaddr1, 128))
+				return(0);
+			if (sct_alloc_io(pci_ioaddr5, 64))
+				return(0);
+			/* disable all IPAC */
+			writereg(pci_ioaddr5, pci_ioaddr5 + 4,
+				IPAC_MASK, 0xFF);
+			writereg(pci_ioaddr4 + 0x08, pci_ioaddr4 + 0x0c,
+				IPAC_MASK, 0xFF);
+			writereg(pci_ioaddr3 + 0x10, pci_ioaddr3 + 0x14,
+				IPAC_MASK, 0xFF);
+			writereg(pci_ioaddr2 + 0x20, pci_ioaddr2 + 0x24,
+				IPAC_MASK, 0xFF);
+			break;
+		case 2:
+			cs->hw.ax.base = pci_ioaddr4 + 0x08;
+			if (sct_alloc_io(pci_ioaddr4, 64))
+				return(0);
+			break;
+		case 3:
+			cs->hw.ax.base = pci_ioaddr3 + 0x10;
+			if (sct_alloc_io(pci_ioaddr3, 64))
+				return(0);
+			break;
+		case 4:
+			cs->hw.ax.base = pci_ioaddr2 + 0x20;
+			if (sct_alloc_io(pci_ioaddr2, 64))
+				return(0);
+			break;
 	}	
+	/* For isac and hscx data path */
 	cs->hw.ax.data_adr = cs->hw.ax.base + 4;
-	ipac_write(cs, IPAC_MASK, 0xFF);
 
 	printk(KERN_INFO "HiSax: %s (%s) configured at 0x%.4lX, 0x%.4lX, 0x%.4lX and IRQ %d\n",
 	       CardType[card->typ],
@@ -287,12 +427,25 @@ setup_sct_quadro(struct IsdnCard *card)
 	       cs->hw.ax.data_adr,
 	       cs->irq);
 
-	cs->card_ops = &bkm_a8_ops;
-	if (ipac_setup(cs, &ipac_dc_ops, &ipac_bc_ops))
-		goto err;
+	test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 
-	return 1;
- err:
-	hisax_release_resources(cs);
-	return 0;
+	cs->readisac = &ReadISAC;
+	cs->writeisac = &WriteISAC;
+	cs->readisacfifo = &ReadISACfifo;
+	cs->writeisacfifo = &WriteISACfifo;
+
+	cs->BC_Read_Reg = &ReadHSCX;
+	cs->BC_Write_Reg = &WriteHSCX;
+	cs->BC_Send_Data = &hscx_fill_fifo;
+	cs->cardmsg = &BKM_card_msg;
+	cs->irq_func = &bkm_interrupt_ipac;
+
+	printk(KERN_INFO "HiSax: %s (%s): IPAC Version %d\n",
+		CardType[card->typ],
+		sct_quadro_subtypes[cs->subtyp],
+		readreg(cs->hw.ax.base, cs->hw.ax.data_adr, IPAC_ID));
+	return (1);
+#else
+	printk(KERN_ERR "HiSax: bkm_a8 only supported on PCI Systems\n");
+#endif /* CONFIG_PCI */
 }

@@ -108,6 +108,7 @@ int do_settimeofday(struct timespec *tv)
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
 	local_irq_restore(flags);
+	clock_was_set();
 	return 0;
 }
 

@@ -829,7 +829,7 @@ static void atmarp_info(struct seq_file *seq, struct net_device *dev,
 	    !clip_vcc || clip_vcc->encap ? "LLC" : "NULL",
 	    (jiffies-(clip_vcc ? clip_vcc->last_use : entry->neigh->used))/HZ);
 
-	off = snprintf(buf, sizeof(buf) - 1, "%d.%d.%d.%d", NIPQUAD(entry->ip));
+	off = scnprintf(buf, sizeof(buf) - 1, "%d.%d.%d.%d", NIPQUAD(entry->ip));
 	while (off < 16)
 		buf[off++] = ' ';
 	buf[off] = '\0';

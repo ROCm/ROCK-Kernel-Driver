@@ -450,7 +450,7 @@ static void isac_empty_fifo(struct isac *isac, int count)
 {
 	// this also works for isacsx, since
 	// CMDR(D) register works the same
-	u8 *ptr;
+	u_char *ptr;
 
 	DBG(DBG_IRQ, "count %d", count);
 
@@ -474,7 +474,7 @@ static void isac_fill_fifo(struct isac *isac)
 
 	int count;
 	unsigned char cmd;
-	u8 *ptr;
+	u_char *ptr;
 
 	if (!isac->tx_skb)
 		BUG();
@@ -770,7 +770,7 @@ void isac_init(struct isac *isac)
 	FsmInitTimer(&isac->l1m, &isac->timer);
 }
 
-void hisax_isac_setup(struct isac *isac)
+void isac_setup(struct isac *isac)
 {
 	int val, eval;
 
@@ -890,7 +890,7 @@ EXPORT_SYMBOL(isac_d_l2l1);
 EXPORT_SYMBOL(isacsx_setup);
 EXPORT_SYMBOL(isacsx_irq);
 
-EXPORT_SYMBOL(hisax_isac_setup);
+EXPORT_SYMBOL(isac_setup);
 EXPORT_SYMBOL(isac_irq);
 
 module_init(hisax_isac_init);

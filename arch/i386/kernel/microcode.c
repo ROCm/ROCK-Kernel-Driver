@@ -371,7 +371,9 @@ static void do_update_one (void * unused)
 	spin_lock_irqsave(&microcode_update_lock, flags);          
 
 	/* write microcode via MSR 0x79 */
-	wrmsr(MSR_IA32_UCODE_WRITE, (unsigned int)(uci->mc->bits), 0);
+	wrmsr(MSR_IA32_UCODE_WRITE,
+		(unsigned long) uci->mc->bits, 
+		(unsigned long) uci->mc->bits >> 16 >> 16);
 	wrmsr(MSR_IA32_UCODE_REV, 0, 0);
 
 	__asm__ __volatile__ ("cpuid" : : : "ax", "bx", "cx", "dx");
@@ -507,3 +509,4 @@ static void __exit microcode_exit (void)
 
 module_init(microcode_init)
 module_exit(microcode_exit)
+MODULE_ALIAS_MISCDEV(MICROCODE_MINOR);

@@ -557,8 +557,7 @@ static int resp_inquiry(unsigned char * cmd, int target, unsigned char * buff,
 		
 		dev_id_num = ((devip->sdbg_host->shost->host_no + 1) * 2000) +
 			     (devip->target * 1000) + devip->lun;
-		len = snprintf(dev_id_str, 6, "%d", dev_id_num);
-		len = (len > 6) ? 6 : len;
+		len = scnprintf(dev_id_str, 6, "%d", dev_id_num);
 		if (0 == cmd[2]) { /* supported vital product data pages */
 			arr[3] = 3;
 			arr[4] = 0x0; /* this page */
@@ -1309,7 +1308,7 @@ static int scsi_debug_proc_info(struct Scsi_Host *host, char *buffer, char **sta
 
 static ssize_t sdebug_delay_show(struct device_driver * ddp, char * buf) 
 {
-        return snprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_delay);
+        return scnprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_delay);
 }
 
 static ssize_t sdebug_delay_store(struct device_driver * ddp, 
@@ -1331,7 +1330,7 @@ DRIVER_ATTR(delay, S_IRUGO | S_IWUSR, sdebug_delay_show,
 
 static ssize_t sdebug_opts_show(struct device_driver * ddp, char * buf) 
 {
-        return snprintf(buf, PAGE_SIZE, "0x%x\n", scsi_debug_opts);
+        return scnprintf(buf, PAGE_SIZE, "0x%x\n", scsi_debug_opts);
 }
 
 static ssize_t sdebug_opts_store(struct device_driver * ddp, 
@@ -1360,7 +1359,7 @@ DRIVER_ATTR(opts, S_IRUGO | S_IWUSR, sdebug_opts_show,
 
 static ssize_t sdebug_num_tgts_show(struct device_driver * ddp, char * buf) 
 {
-        return snprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_num_tgts);
+        return scnprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_num_tgts);
 }
 static ssize_t sdebug_num_tgts_store(struct device_driver * ddp, 
 				     const char * buf, size_t count)
@@ -1378,13 +1377,13 @@ DRIVER_ATTR(num_tgts, S_IRUGO | S_IWUSR, sdebug_num_tgts_show,
 
 static ssize_t sdebug_dev_size_mb_show(struct device_driver * ddp, char * buf) 
 {
-        return snprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_dev_size_mb);
+        return scnprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_dev_size_mb);
 }
 DRIVER_ATTR(dev_size_mb, S_IRUGO, sdebug_dev_size_mb_show, NULL) 
 
 static ssize_t sdebug_every_nth_show(struct device_driver * ddp, char * buf) 
 {
-        return snprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_every_nth);
+        return scnprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_every_nth);
 }
 static ssize_t sdebug_every_nth_store(struct device_driver * ddp, 
 				      const char * buf, size_t count)
@@ -1403,7 +1402,7 @@ DRIVER_ATTR(every_nth, S_IRUGO | S_IWUSR, sdebug_every_nth_show,
 
 static ssize_t sdebug_max_luns_show(struct device_driver * ddp, char * buf) 
 {
-        return snprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_max_luns);
+        return scnprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_max_luns);
 }
 static ssize_t sdebug_max_luns_store(struct device_driver * ddp, 
 				     const char * buf, size_t count)
@@ -1421,13 +1420,13 @@ DRIVER_ATTR(max_luns, S_IRUGO | S_IWUSR, sdebug_max_luns_show,
 
 static ssize_t sdebug_scsi_level_show(struct device_driver * ddp, char * buf) 
 {
-        return snprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_scsi_level);
+        return scnprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_scsi_level);
 }
 DRIVER_ATTR(scsi_level, S_IRUGO, sdebug_scsi_level_show, NULL) 
 
 static ssize_t sdebug_add_host_show(struct device_driver * ddp, char * buf) 
 {
-        return snprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_add_host);
+        return scnprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_add_host);
 }
 
 static ssize_t sdebug_add_host_store(struct device_driver * ddp, 

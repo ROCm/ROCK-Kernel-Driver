@@ -1121,11 +1121,11 @@ int __init pmdisk_read(void)
 	resume_device = name_to_dev_t(resume_file);
 	pr_debug("pmdisk: Resume From Partition: %s\n", resume_file);
 
-	resume_bdev = open_by_devnum(resume_device, FMODE_READ, BDEV_RAW);
+	resume_bdev = open_by_devnum(resume_device, FMODE_READ);
 	if (!IS_ERR(resume_bdev)) {
 		set_blocksize(resume_bdev, PAGE_SIZE);
 		error = read_suspend_image();
-		blkdev_put(resume_bdev, BDEV_RAW);
+		blkdev_put(resume_bdev);
 	} else
 		error = PTR_ERR(resume_bdev);
 

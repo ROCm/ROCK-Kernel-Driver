@@ -104,7 +104,8 @@ struct machdep_calls {
 };
 
 extern struct machdep_calls ppc_md;
-extern char cmd_line[512];
+#define COMMAND_LINE_SIZE 512
+extern char cmd_line[COMMAND_LINE_SIZE];
 
 extern void setup_pci_ptrs(void);
 

@@ -121,7 +121,7 @@ sn_end_irq(unsigned int irq)
 static void
 sn_set_affinity_irq(unsigned int irq, unsigned long cpu)
 {
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 	int redir = 0;
 	struct sn_intr_list_t *p = sn_intr_list[irq];
 	pcibr_intr_t intr;

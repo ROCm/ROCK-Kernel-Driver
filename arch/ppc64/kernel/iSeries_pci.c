@@ -406,7 +406,6 @@ static int iSeries_Scan_Bridge_Slot(HvBusNumber Bus,
 
 	/* iSeries_allocate_IRQ.: 0x18.00.12(0xA3) */
   	Irq = iSeries_allocate_IRQ(Bus, 0, EADsIdSel);
-	iSeries_assign_IRQ(Irq, Bus, 0, EADsIdSel);
 	PPCDBG(PPCDBG_BUSWALK,
 		"PCI:- allocate and assign IRQ 0x%02X.%02X.%02X = 0x%02X\n",
 		Bus, 0, EADsIdSel, Irq);

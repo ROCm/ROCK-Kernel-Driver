@@ -1,7 +1,7 @@
 /*
  *  AMD K7 Powernow driver.
  *  (C) 2003 Dave Jones <davej@codemonkey.org.uk> on behalf of SuSE Labs.
- *  (C) 2003 Dave Jones <davej@redhat.com>
+ *  (C) 2003-2004 Dave Jones <davej@redhat.com>
  *
  *  Licensed under the terms of the GNU GPL License version 2.
  *  Based upon datasheets & sample CPUs kindly provided by AMD.

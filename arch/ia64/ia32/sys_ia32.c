@@ -2413,44 +2413,85 @@ sys32_lseek (unsigned int fd, int offset, unsigned int whence)
 	return sys_lseek(fd, offset, whence);
 }
 
-extern asmlinkage long sys_getgroups (int gidsetsize, gid_t *grouplist);
+static int
+groups16_to_user(short *grouplist, struct group_info *group_info)
+{
+	int i;
+	short group;
+
+	for (i = 0; i < group_info->ngroups; i++) {
+		group = (short)GROUP_AT(group_info, i);
+		if (put_user(group, grouplist+i))
+			return -EFAULT;
+	}
+
+	return 0;
+}
+
+static int
+groups16_from_user(struct group_info *group_info, short *grouplist)
+{
+	int i;
+	short group;
+
+	for (i = 0; i < group_info->ngroups; i++) {
+		if (get_user(group, grouplist+i))
+			return  -EFAULT;
+		GROUP_AT(group_info, i) = (gid_t)group;
+	}
+
+	return 0;
+}
 
 asmlinkage long
 sys32_getgroups16 (int gidsetsize, short *grouplist)
 {
-	mm_segment_t old_fs = get_fs();
-	gid_t gl[NGROUPS];
-	int ret, i;
+	int i;
 
-	set_fs(KERNEL_DS);
-	ret = sys_getgroups(gidsetsize, gl);
-	set_fs(old_fs);
+	if (gidsetsize < 0)
+		return -EINVAL;
 
-	if (gidsetsize && ret > 0 && ret <= NGROUPS)
-		for (i = 0; i < ret; i++, grouplist++)
-			if (put_user(gl[i], grouplist))
-				return -EFAULT;
-	return ret;
+	get_group_info(current->group_info);
+	i = current->group_info->ngroups;
+	if (gidsetsize) {
+		if (i > gidsetsize) {
+			i = -EINVAL;
+			goto out;
+		}
+		if (groups16_to_user(grouplist, current->group_info)) {
+			i = -EFAULT;
+			goto out;
+		}
+	}
+out:
+	put_group_info(current->group_info);
+	return i;
 }
-
-extern asmlinkage long sys_setgroups (int gidsetsize, gid_t *grouplist);
 
 asmlinkage long
 sys32_setgroups16 (int gidsetsize, short *grouplist)
 {
-	mm_segment_t old_fs = get_fs();
-	gid_t gl[NGROUPS];
-	int ret, i;
+	struct group_info *group_info;
+	int retval;
 
-	if ((unsigned) gidsetsize > NGROUPS)
+	if (!capable(CAP_SETGID))
+		return -EPERM;
+	if ((unsigned)gidsetsize > NGROUPS_MAX)
 		return -EINVAL;
-	for (i = 0; i < gidsetsize; i++, grouplist++)
-		if (get_user(gl[i], grouplist))
-			return -EFAULT;
-	set_fs(KERNEL_DS);
-	ret = sys_setgroups(gidsetsize, gl);
-	set_fs(old_fs);
-	return ret;
+
+	group_info = groups_alloc(gidsetsize);
+	if (!group_info)
+		return -ENOMEM;
+	retval = groups16_from_user(group_info, grouplist);
+	if (retval) {
+		put_group_info(group_info);
+		return retval;
+	}
+
+	retval = set_current_groups(group_info);
+	put_group_info(group_info);
+
+	return retval;
 }
 
 asmlinkage long

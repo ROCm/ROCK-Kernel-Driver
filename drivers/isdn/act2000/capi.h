@@ -336,12 +336,11 @@ actcapi_nextsmsg(act2000_card *card)
 	unsigned long flags;
 	unsigned short n;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&card->mnlock, flags);
 	n = card->msgnum;
 	card->msgnum++;
 	card->msgnum &= 0x7fff;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&card->mnlock, flags);
 	return n;
 }
 #define DEBUG_MSG

@@ -5745,7 +5745,7 @@ static int __init de4x5_module_init (void)
 {
 	int err = 0;
 
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 	err = pci_module_init (&de4x5_pci_driver);
 #endif
 #ifdef CONFIG_EISA
@@ -5757,7 +5757,7 @@ static int __init de4x5_module_init (void)
 
 static void __exit de4x5_module_exit (void)
 {
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 	pci_unregister_driver (&de4x5_pci_driver);
 #endif
 #ifdef CONFIG_EISA

@@ -1105,8 +1105,7 @@ int lmLogOpen(struct super_block *sb, struct jfs_log ** logptr)
 	 */
       externalLog:
 
-	bdev = open_by_devnum(JFS_SBI(sb)->logdev,
-					FMODE_READ|FMODE_WRITE, BDEV_FS);
+	bdev = open_by_devnum(JFS_SBI(sb)->logdev, FMODE_READ|FMODE_WRITE);
 	if (IS_ERR(bdev)) {
 		rc = -PTR_ERR(bdev);
 		goto free;
@@ -1145,7 +1144,7 @@ int lmLogOpen(struct super_block *sb, struct jfs_log ** logptr)
 	bd_release(bdev);
 
       close:		/* close external log device */
-	blkdev_put(bdev, BDEV_FS);
+	blkdev_put(bdev);
 
       free:		/* free log descriptor */
 	kfree(log);
@@ -1392,7 +1391,7 @@ int lmLogClose(struct super_block *sb, struct jfs_log * log)
 	rc = lmLogShutdown(log);
 
 	bd_release(bdev);
-	blkdev_put(bdev, BDEV_FS);
+	blkdev_put(bdev);
 
       out:
 	jfs_info("lmLogClose: exit(%d)", rc);

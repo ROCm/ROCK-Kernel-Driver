@@ -13,6 +13,7 @@
 #include <linux/oprofile.h>
 #include <asm/ptrace.h>
 #include <asm/msr.h>
+#include <asm/apic.h>
  
 #include "op_x86_model.h"
 #include "op_counter.h"
@@ -100,6 +101,10 @@ static int ppro_check_ctrs(unsigned int const cpu,
 			CTR_WRITE(reset_value[i], msrs, i);
 		}
 	}
+
+	/* Only P6 based Pentium M need to re-unmask the apic vector but it
+	 * doesn't hurt other P6 variant */
+	apic_write(APIC_LVTPC, apic_read(APIC_LVTPC) & ~APIC_LVT_MASKED);
 
 	/* We can't work out if we really handled an interrupt. We
 	 * might have caught a *second* counter just after overflowing

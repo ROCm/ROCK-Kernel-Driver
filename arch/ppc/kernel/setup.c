@@ -53,7 +53,7 @@ extern void ppc6xx_idle(void);
 extern void power4_idle(void);
 
 extern boot_infos_t *boot_infos;
-char saved_command_line[256];
+char saved_command_line[COMMAND_LINE_SIZE];
 unsigned char aux_device_present;
 struct ide_machdep_calls ppc_ide_md;
 char *sysmap;
@@ -501,7 +501,7 @@ void parse_bootinfo(struct bi_record *rec)
 		ulong *data = rec->data;
 		switch (rec->tag) {
 		case BI_CMD_LINE:
-			memcpy(cmd_line, (void *)data, rec->size);
+			strlcpy(cmd_line, (void *)data, sizeof(cmd_line));
 			break;
 		case BI_SYSMAP:
 			sysmap = (char *)((data[0] >= (KERNELBASE)) ? data[0] :
@@ -538,7 +538,7 @@ machine_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	     unsigned long r6, unsigned long r7)
 {
 #ifdef CONFIG_CMDLINE
-	strcpy(cmd_line, CONFIG_CMDLINE);
+	strlcpy(cmd_line, CONFIG_CMDLINE, sizeof(cmd_line));
 #endif /* CONFIG_CMDLINE */
 
 #ifdef CONFIG_6xx
@@ -676,7 +676,7 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.brk = (unsigned long) klimit;
 
 	/* Save unparsed command line copy for /proc/cmdline */
-	strcpy(saved_command_line, cmd_line);
+	strlcpy(saved_command_line, cmd_line, sizeof(saved_command_line));
 	*cmdline_p = cmd_line;
 
 	/* set up the bootmem stuff with available memory */
