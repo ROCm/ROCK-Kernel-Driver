@@ -873,7 +873,7 @@ e100_phy_set_speed_duplex(struct e100_private *bdp, unsigned char force_restart)
 	e100_set_fc(bdp);
 }
 
-void __devexit
+void
 e100_phy_reset(struct e100_private *bdp)
 {
 	u16 ctrl_reg;
