@@ -18,12 +18,18 @@
 
 static struct subsystem block_subsys;
 
-/* Can be merged with blk_probe or deleted altogether. Later. */
+/*
+ * Can be merged with blk_probe or deleted altogether. Later.
+ *
+ * Modified under both block_subsys.rwsem and major_names_lock.
+ */
 static struct blk_major_name {
 	struct blk_major_name *next;
 	int major;
 	char name[16];
 } *major_names[MAX_PROBE_HASH];
+
+static spinlock_t major_names_lock = SPIN_LOCK_UNLOCKED;
 
 static struct blk_probe {
 	struct blk_probe *next;
@@ -46,6 +52,9 @@ static inline int dev_to_index(dev_t dev)
 	return major_to_index(MAJOR(dev));
 }
 
+/*
+ * __bdevname may be called from interrupts, and must be atomic
+ */
 const char *__bdevname(dev_t dev)
 {
 	static char buffer[40];
@@ -54,15 +63,16 @@ const char *__bdevname(dev_t dev)
 	unsigned int minor = MINOR(dev);
 	int index = major_to_index(major);
 	struct blk_major_name *n;
+	unsigned long flags;
 
-	down_read(&block_subsys.rwsem);
+	spin_lock_irqsave(&major_names_lock, flags);
 	for (n = major_names[index]; n; n = n->next)
 		if (n->major == major)
 			break;
 	if (n)
 		name = &(n->name[0]);
 	sprintf(buffer, "%s(%u,%u)", name, major, minor);
-	up_read(&block_subsys.rwsem);
+	spin_unlock_irqrestore(&major_names_lock, flags);
 
 	return buffer;
 }
@@ -90,6 +100,7 @@ int register_blkdev(unsigned int major, const char *name)
 {
 	struct blk_major_name **n, *p;
 	int index, ret = 0;
+	unsigned long flags;
 
 	/* temporary */
 	if (major == 0) {
@@ -118,6 +129,7 @@ int register_blkdev(unsigned int major, const char *name)
 	index = major_to_index(major);
 
 	down_write(&block_subsys.rwsem);
+	spin_lock_irqsave(&major_names_lock, flags);
 	for (n = &major_names[index]; *n; n = &(*n)->next)
 		if ((*n)->major == major)
 			break;
@@ -125,6 +137,7 @@ int register_blkdev(unsigned int major, const char *name)
 		*n = p;
 	else
 		ret = -EBUSY;
+	spin_unlock_irqrestore(&major_names_lock, flags);
 	up_write(&block_subsys.rwsem);
 
 	if (ret < 0)
@@ -137,11 +150,14 @@ int register_blkdev(unsigned int major, const char *name)
 /* todo: make void - error printk here */
 int unregister_blkdev(unsigned int major, const char *name)
 {
-	struct blk_major_name **n, *p;
+	struct blk_major_name **n;
+	struct blk_major_name *p = NULL;
 	int index = major_to_index(major);
+	unsigned long flags;
 	int ret = 0;
 
 	down_write(&block_subsys.rwsem);
+	spin_lock_irqsave(&major_names_lock, flags);
 	for (n = &major_names[index]; *n; n = &(*n)->next)
 		if ((*n)->major == major)
 			break;
@@ -150,9 +166,10 @@ int unregister_blkdev(unsigned int major, const char *name)
 	else {
 		p = *n;
 		*n = p->next;
-		kfree(p);
 	}
+	spin_unlock_irqrestore(&major_names_lock, flags);
 	up_write(&block_subsys.rwsem);
+	kfree(p);
 
 	return ret;
 }
