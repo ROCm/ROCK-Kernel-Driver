@@ -3,6 +3,7 @@
  *
  *  Copyright (c) 2001, 2002  Hirokazu Takata, Hitoshi Yamamoto, H. Kondo
  *  Copyright (c) 2003  Hitoshi Yamamoto
+ *  Copyright (c) 2004  Hirokazu Takata <takata at linux-m32r.org>
  *
  *  Taken from i386 version.
  *    Copyright (C) 1991, 1992  Linus Torvalds
@@ -798,7 +799,7 @@ ENTRY(sys_call_table)
 	.long sys_swapon
 	.long sys_reboot
 	.long old_readdir
-	.long old_mmap			/* 90 */
+	.long sys_ni_syscall		/* 90 - old_mmap syscall holder */
 	.long sys_munmap
 	.long sys_truncate
 	.long sys_ftruncate
