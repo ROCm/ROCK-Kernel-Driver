@@ -994,7 +994,8 @@ static void carm_handle_array_info(struct carm_host *host,
 	}
 
 	printk(KERN_INFO DRV_NAME "(%s): port %u device %Lu sectors\n",
-	       pci_name(host->pdev), port->port_no, port->capacity);
+	       pci_name(host->pdev), port->port_no,
+	       (unsigned long long) port->capacity);
 	printk(KERN_INFO DRV_NAME "(%s): port %u device \"%s\"\n",
 	       pci_name(host->pdev), port->port_no, port->name);
 
