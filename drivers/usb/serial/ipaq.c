@@ -9,6 +9,10 @@
  *	the Free Software Foundation; either version 2 of the License, or
  *	(at your option) any later version.
  *
+ * (19/3/2002) ganesh
+ *	Don't submit urbs while holding spinlocks. Not strictly necessary
+ *	in 2.5.x.
+ *
  * (8/3/2002) ganesh
  * 	The ipaq sometimes emits a '\0' before the CLIENT string. At this
  * 	point of time, the ppp ldisc is not yet attached to the tty, so
@@ -65,7 +69,7 @@ static int ipaq_write(struct usb_serial_port *port, int from_user, const unsigne
 		       int count);
 static int ipaq_write_bulk(struct usb_serial_port *port, int from_user, const unsigned char *buf,
 			   int count);
-static int ipaq_write_flush(struct usb_serial_port *port);
+static void ipaq_write_gather(struct usb_serial_port *port);
 static void ipaq_read_bulk_callback (struct urb *urb);
 static void ipaq_write_bulk_callback(struct urb *urb);
 static int ipaq_write_room(struct usb_serial_port *port);
@@ -367,17 +371,23 @@ static int ipaq_write_bulk(struct usb_serial_port *port, int from_user, const un
 	priv->queue_len += count;
 	if (priv->active == 0) {
 		priv->active = 1;
-		result = ipaq_write_flush(port);
+		ipaq_write_gather(port);
+		spin_unlock_irqrestore(&write_list_lock, flags);
+		result = usb_submit_urb(port->write_urb, GFP_ATOMIC);
+		if (result) {
+			err(__FUNCTION__ " - failed submitting write urb, error %d", result);
+		}
+	} else {
+		spin_unlock_irqrestore(&write_list_lock, flags);
 	}
-	spin_unlock_irqrestore(&write_list_lock, flags);
 	return result;
 }
 
-static int ipaq_write_flush(struct usb_serial_port *port)
+static void ipaq_write_gather(struct usb_serial_port *port)
 {
 	struct ipaq_private	*priv = (struct ipaq_private *)port->private;
 	struct usb_serial	*serial = port->serial;
-	int			count, room, result;
+	int			count, room;
 	struct ipaq_packet	*pkt;
 	struct urb		*urb = port->write_urb;
 	struct list_head	*tmp;
@@ -385,7 +395,7 @@ static int ipaq_write_flush(struct usb_serial_port *port)
 	if (urb->status == -EINPROGRESS) {
 		/* Should never happen */
 		err(__FUNCTION__ " - flushing while urb is active !");
-		return -EAGAIN;
+		return;
 	}
 	room = URBDATA_SIZE;
 	for (tmp = priv->queue.next; tmp != &priv->queue;) {
@@ -412,11 +422,7 @@ static int ipaq_write_flush(struct usb_serial_port *port)
 		      usb_sndbulkpipe(serial->dev, port->bulk_out_endpointAddress),
 		      port->write_urb->transfer_buffer, count, ipaq_write_bulk_callback,
 		      port);
-	result = usb_submit_urb(urb, GFP_ATOMIC);
-	if (result) {
-		err(__FUNCTION__ " - failed submitting write urb, error %d", result);
-	}
-	return result;
+	return;
 }
 
 static void ipaq_write_bulk_callback(struct urb *urb)
@@ -424,6 +430,7 @@ static void ipaq_write_bulk_callback(struct urb *urb)
 	struct usb_serial_port	*port = (struct usb_serial_port *)urb->context;
 	struct ipaq_private	*priv = (struct ipaq_private *)port->private;
 	unsigned long		flags;
+	int			result;
 
 	if (port_paranoia_check (port, __FUNCTION__)) {
 		return;
@@ -437,11 +444,16 @@ static void ipaq_write_bulk_callback(struct urb *urb)
 
 	spin_lock_irqsave(&write_list_lock, flags);
 	if (!list_empty(&priv->queue)) {
-		ipaq_write_flush(port);
+		ipaq_write_gather(port);
+		spin_unlock_irqrestore(&write_list_lock, flags);
+		result = usb_submit_urb(port->write_urb, GFP_ATOMIC);
+		if (result) {
+			err(__FUNCTION__ " - failed submitting write urb, error %d", result);
+		}
 	} else {
 		priv->active = 0;
+		spin_unlock_irqrestore(&write_list_lock, flags);
 	}
-	spin_unlock_irqrestore(&write_list_lock, flags);
 	queue_task(&port->tqueue, &tq_immediate);
 	mark_bh(IMMEDIATE_BH);
 	
