@@ -59,8 +59,6 @@
 #include <net/esp.h>
 #endif
 
-extern struct net_proto_family inet_family_ops;
-
 #if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE) \
    || defined (CONFIG_IP_SCTP_MODULE)
 #include <linux/in6.h>
@@ -174,8 +172,6 @@ EXPORT_SYMBOL(free_divert_blk);
 EXPORT_SYMBOL(inetdev_lock);
 EXPORT_SYMBOL(inet_add_protocol);
 EXPORT_SYMBOL(inet_del_protocol);
-EXPORT_SYMBOL(inet_register_protosw);
-EXPORT_SYMBOL(inet_unregister_protosw);
 EXPORT_SYMBOL(ip_route_output_key);
 EXPORT_SYMBOL(ip_route_input);
 EXPORT_SYMBOL(icmp_send);
@@ -188,14 +184,11 @@ EXPORT_SYMBOL(arp_broken_ops);
 EXPORT_SYMBOL(__ip_select_ident);
 EXPORT_SYMBOL(ip_send_check);
 EXPORT_SYMBOL(ip_fragment);
-EXPORT_SYMBOL(inet_family_ops);
 EXPORT_SYMBOL(in_aton);
 EXPORT_SYMBOL(ip_mc_inc_group);
 EXPORT_SYMBOL(ip_mc_dec_group);
 EXPORT_SYMBOL(ip_mc_join_group);
 EXPORT_SYMBOL(ip_finish_output);
-EXPORT_SYMBOL(inet_stream_ops);
-EXPORT_SYMBOL(inet_dgram_ops);
 EXPORT_SYMBOL(ip_cmsg_recv);
 EXPORT_SYMBOL(inet_addr_type); 
 EXPORT_SYMBOL(inet_select_addr);
@@ -230,21 +223,6 @@ EXPORT_SYMBOL(flow_cache_genid);
 
 #if defined (CONFIG_IPV6_MODULE) || defined (CONFIG_IP_SCTP_MODULE)
 /* inet functions common to v4 and v6 */
-EXPORT_SYMBOL(inet_release);
-EXPORT_SYMBOL(inet_stream_connect);
-EXPORT_SYMBOL(inet_dgram_connect);
-EXPORT_SYMBOL(inet_accept);
-EXPORT_SYMBOL(inet_listen);
-EXPORT_SYMBOL(inet_shutdown);
-EXPORT_SYMBOL(inet_setsockopt);
-EXPORT_SYMBOL(inet_getsockopt);
-EXPORT_SYMBOL(inet_sendmsg);
-EXPORT_SYMBOL(inet_recvmsg);
-#ifdef INET_REFCNT_DEBUG
-EXPORT_SYMBOL(inet_sock_nr);
-#endif
-EXPORT_SYMBOL(inet_sock_destruct);
-EXPORT_SYMBOL(inet_sock_release);
 
 /* Socket demultiplexing. */
 EXPORT_SYMBOL(udp_hash);
@@ -322,9 +300,6 @@ EXPORT_SYMBOL(tcp_read_sock);
 #ifdef CONFIG_IP_SCTP_MODULE
 EXPORT_SYMBOL(ip_setsockopt);
 EXPORT_SYMBOL(ip_getsockopt);
-EXPORT_SYMBOL(inet_ioctl);
-EXPORT_SYMBOL(inet_bind);
-EXPORT_SYMBOL(inet_getname);
 #endif /* CONFIG_IP_SCTP_MODULE */
 
 EXPORT_SYMBOL(netlink_set_err);
