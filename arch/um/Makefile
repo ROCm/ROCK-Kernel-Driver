@@ -64,12 +64,11 @@ $(ARCH_DIR)/vmlinux.lds.S :
 
 prepare: $(ARCH_SYMLINKS) $(GEN_HEADERS)
 
-
 LDFLAGS_vmlinux = -r $(ARCH_DIR)/main.o
 
 vmlinux: $(ARCH_DIR)/main.o 
 
-$(ARCH_DIR)/uml.lds.s : $(ARCH_DIR)/uml.lds.S scripts
+$(ARCH_DIR)/uml.lds.s : $(ARCH_DIR)/uml.lds.S scripts FORCE
 	$(call if_changed_dep,as_s_S)
 
 AFLAGS_uml.lds.o = -U$(SUBARCH) -DSTART=$$(($(TOP_ADDR) - $(SIZE))) \
