@@ -775,6 +775,12 @@ static void ub_rw_cmd_done(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 	request_queue_t *q = disk->queue;
 	int uptodate;
 
+	if (blk_pc_request(rq)) {
+		/* UB_SENSE_SIZE is smaller than SCSI_SENSE_BUFFERSIZE */
+		memcpy(rq->sense, sc->top_sense, UB_SENSE_SIZE);
+		rq->sense_len = UB_SENSE_SIZE;
+	}
+
 	if (cmd->error == 0)
 		uptodate = 1;
 	else
@@ -832,6 +838,17 @@ static int ub_scsi_cmd_start(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 	int rc;
 
 	bcb = &sc->work_bcb;
+
+	/*
+	 * ``If the allocation length is eighteen or greater, and a device
+	 * server returns less than eithteen bytes of data, the application
+	 * client should assume that the bytes not transferred would have been
+	 * zeroes had the device server returned those bytes.''
+	 *
+	 * We zero sense for all commands so that when a packet request
+	 * fails it does not return a stale sense.
+	 */
+	memset(&sc->top_sense, 0, UB_SENSE_SIZE);
 
 	/* set up the command wrapper */
 	bcb->Signature = cpu_to_le32(US_BULK_CB_SIGN);
@@ -938,7 +955,6 @@ static void ub_scsi_urb_compl(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 {
 	struct urb *urb = &sc->work_urb;
 	struct bulk_cs_wrap *bcs;
-	struct request *rq = cmd->back;
 	int pipe;
 	int rc;
 
@@ -1192,13 +1208,6 @@ static void ub_scsi_urb_compl(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 		(*cmd->done)(sc, cmd);
 
 	} else if (cmd->state == UB_CMDST_SENSE) {
-		if (blk_pc_request(rq)) {
-			/*
-			 * UB_SENSE_SIZE is smaller than SCSI_SENSE_BUFFERSIZE
-			 */
-			memcpy(rq->sense, sc->top_sense, UB_SENSE_SIZE);
-			rq->sense_len = UB_SENSE_SIZE;
-		}
 		ub_state_done(sc, cmd, -EIO);
 
 	} else {
@@ -1283,14 +1292,6 @@ static void ub_state_sense(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 		rc = -EPIPE;
 		goto error;
 	}
-
-	/*
-	 * ``If the allocation length is eighteen or greater, and a device
-	 * server returns less than eithteen bytes of data, the application
-	 * client should assume that the bytes not transferred would have been
-	 * zeroes had the device server returned those bytes.''
-	 */
-	memset(&sc->top_sense, 0, UB_SENSE_SIZE);
 
 	scmd = &sc->top_rqs_cmd;
 	scmd->cdb[0] = REQUEST_SENSE;
