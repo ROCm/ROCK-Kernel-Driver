@@ -1238,8 +1238,12 @@ excessive effort to avoid disturbing the precious VFS code.:-( The
 gods only know how we are going to SMP the code that uses them.
 znodes are the way! */
 
+#define PATH_READA	0x1 /* do read ahead */
+#define PATH_READA_BACK 0x2 /* read backwards */
+
 struct  path {
   int                   path_length;                      	/* Length of the array above.   */
+  int			reada;
   struct  path_element  path_elements[EXTENDED_MAX_HEIGHT];	/* Array of the path elements.  */
   int			pos_in_item;
 };
@@ -1247,7 +1251,7 @@ struct  path {
 #define pos_in_item(path) ((path)->pos_in_item)
 
 #define INITIALIZE_PATH(var) \
-struct path var = {.path_length = ILLEGAL_PATH_ELEMENT_OFFSET,}
+struct path var = {.path_length = ILLEGAL_PATH_ELEMENT_OFFSET, .reada = 0,}
 
 /* Get path element by path and path position. */
 #define PATH_OFFSET_PELEMENT(p_s_path,n_offset)  ((p_s_path)->path_elements +(n_offset))
