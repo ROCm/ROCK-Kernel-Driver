@@ -254,37 +254,6 @@ void uml_net_user_timer_expire(unsigned long _conn)
 #endif
 }
 
-/*
- * default do nothing hard header packet routines for struct net_device init.
- * real ethernet transports will overwrite with real routines.
- */
-static int uml_net_hard_header(struct sk_buff *skb, struct net_device *dev,
-                 unsigned short type, void *daddr, void *saddr, unsigned len)
-{
-	return(0); /* no change */
-}
-
-static int uml_net_rebuild_header(struct sk_buff *skb)
-{
-	return(0); /* ignore */ 
-}
-
-static int uml_net_header_cache(struct neighbour *neigh, struct hh_cache *hh)
-{
-	return(-1); /* fail */
-}
-
-static void uml_net_header_cache_update(struct hh_cache *hh,
-                 struct net_device *dev, unsigned char * haddr)
-{
-	/* ignore */
-}
-
-static int uml_net_header_parse(struct sk_buff *skb, unsigned char *haddr)
-{
-	return(0); /* nothing */
-}
-
 static spinlock_t devices_lock = SPIN_LOCK_UNLOCKED;
 static struct list_head devices = LIST_HEAD_INIT(devices);
 
@@ -335,12 +304,6 @@ static int eth_configure(int n, void *init, char *mac,
 	 */
 	snprintf(dev->name, sizeof(dev->name), "eth%d", n);
 	device->dev = dev;
-
-//        dev->hard_header = uml_net_hard_header;
-        dev->rebuild_header = uml_net_rebuild_header;
-        dev->hard_header_cache = uml_net_header_cache;
-        dev->header_cache_update= uml_net_header_cache_update;
-        dev->hard_header_parse = uml_net_header_parse;
 
 	(*transport->kern->init)(dev, init);
 
@@ -619,7 +582,8 @@ static int net_remove(char *str)
 	unregister_netdev(dev);
 
 	list_del(&device->list);
-	free_netdev(device);
+	kfree(device);
+	free_netdev(dev);
 	return(0);
 }
 

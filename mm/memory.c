@@ -44,8 +44,8 @@
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
 #include <linux/rmap-locking.h>
-#include <linux/module.h>
 #include <linux/init.h>
+#include <linux/module.h>
 
 #include <asm/pgalloc.h>
 #include <asm/rmap.h>

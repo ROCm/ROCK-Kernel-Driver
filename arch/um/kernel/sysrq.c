@@ -11,14 +11,6 @@
 #include "sysrq.h"
 #include "user_util.h"
 
-void show_stack(struct task_struct *task, unsigned long *sp)
-{
-	if(task)
-		show_trace_task(task);
-	else
-		show_trace(sp);
-}
-
 void show_trace(unsigned long * stack)
 {
         int i;
@@ -59,6 +51,14 @@ void show_trace_task(struct task_struct *tsk)
 	if ((esp ^ (unsigned long)tsk) & (PAGE_MASK<<1))
 		return;
 	show_trace((unsigned long *)esp);
+}
+
+void show_stack(struct task_struct *task, unsigned long *sp)
+{
+	if(task)
+		show_trace_task(task);
+	else
+		show_trace(sp);
 }
 
 /*

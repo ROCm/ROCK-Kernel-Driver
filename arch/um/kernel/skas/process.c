@@ -59,11 +59,11 @@ static void handle_trap(int pid, union uml_pt_regs *regs)
 	int err, syscall_nr, status;
 
 	syscall_nr = PT_SYSCALL_NR(regs->skas.regs);
+	UPT_SYSCALL_NR(regs) = syscall_nr;
 	if(syscall_nr < 1){
 		relay_signal(SIGTRAP, regs);
 		return;
 	}
-	UPT_SYSCALL_NR(regs) = syscall_nr;
 
 	err = ptrace(PTRACE_POKEUSER, pid, PT_SYSCALL_NR_OFFSET, __NR_getpid);
 	if(err < 0)

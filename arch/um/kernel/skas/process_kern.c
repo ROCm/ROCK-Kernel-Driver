@@ -134,7 +134,7 @@ int copy_thread_skas(int nr, unsigned long clone_flags, unsigned long sp,
 
 void init_idle_skas(void)
 {
-	cpu_tasks[current->thread_info->cpu].pid = os_getpid();
+	cpu_tasks[current_thread->cpu].pid = os_getpid();
 	default_idle();
 }
 

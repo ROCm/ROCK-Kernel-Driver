@@ -179,7 +179,7 @@ void finish_fork_handler(int sig)
 	if(current->mm != current->parent->mm)
 		protect_memory(uml_reserved, high_physmem - uml_reserved, 1, 
 			       1, 0, 1);
-	task_protections((unsigned long) current->thread_info);
+	task_protections((unsigned long) current_thread);
 
 	free_page(current->thread.temp_stack);
 	local_irq_disable();
@@ -377,8 +377,8 @@ static void mprotect_kernel_mem(int w)
 
 	pages = (1 << CONFIG_KERNEL_STACK_ORDER);
 
-	start = (unsigned long) current->thread_info + PAGE_SIZE;
-	end = (unsigned long) current + PAGE_SIZE * pages;
+	start = (unsigned long) current_thread + PAGE_SIZE;
+	end = (unsigned long) current_thread + PAGE_SIZE * pages;
 	protect_memory(uml_reserved, start - uml_reserved, 1, w, 1, 1);
 	protect_memory(end, high_physmem - end, 1, w, 1, 1);
 

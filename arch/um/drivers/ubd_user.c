@@ -60,7 +60,6 @@ static int backing_file_mismatch(char *file, __u64 size, time_t mtime)
 	long long actual;
 	int err;
 
-	printk("%ld", htonll(size));
   	if(stat64(file, &buf) < 0){
 		printk("Failed to stat backing file \"%s\", errno = %d\n",
 		       file, errno);

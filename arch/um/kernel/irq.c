@@ -645,7 +645,7 @@ static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
 		return -EINVAL;
 	tmp = *mask;
 	for (k = 0; k < sizeof(cpumask_t)/sizeof(u16); ++k) {
-		int j = sprintf(page, "%04hx", cpus_coerce(tmp));
+		int j = sprintf(page, "%04hx", (short) cpus_coerce(tmp));
 		len += j;
 		page += j;
 		cpus_shift_right(tmp, tmp, 16);

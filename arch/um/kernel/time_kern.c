@@ -38,7 +38,7 @@ int __attribute__ ((__section__ (".unprotected"))) missed_ticks[NR_CPUS];
 
 void timer_irq(union uml_pt_regs *regs)
 {
-	int cpu = current->thread_info->cpu, ticks = missed_ticks[cpu];
+	int cpu = current_thread->cpu, ticks = missed_ticks[cpu];
 
         if(!timer_irq_inited) return;
 	missed_ticks[cpu] = 0;
@@ -127,7 +127,7 @@ void timer_handler(int sig, union uml_pt_regs *regs)
 	update_process_times(user_context(UPT_SP(regs)));
 	local_irq_enable();
 #endif
-	if(current->thread_info->cpu == 0)
+	if(current_thread->cpu == 0)
 		timer_irq(regs);
 }
 

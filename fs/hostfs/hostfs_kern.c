@@ -586,8 +586,6 @@ int hostfs_create(struct inode *dir, struct dentry *dentry, int mode,
 	d_instantiate(dentry, inode);
 	return(0);
 
- out_free:
-	kfree(name);
  out_put:
 	iput(inode);
  out:

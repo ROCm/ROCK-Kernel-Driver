@@ -125,7 +125,7 @@ void set_current(void *t)
 		{ external_pid(task), task });
 }
 
-void *switch_to(void *prev, void *next, void *last)
+void *_switch_to(void *prev, void *next, void *last)
 {
 	return(CHOOSE_MODE(switch_to_tt(prev, next), 
 			   switch_to_skas(prev, next)));
@@ -145,7 +145,7 @@ void release_thread(struct task_struct *task)
 void exit_thread(void)
 {
 	CHOOSE_MODE(exit_thread_tt(), exit_thread_skas());
-	unprotect_stack((unsigned long) current->thread_info);
+	unprotect_stack((unsigned long) current_thread);
 }
  
 void *get_current(void)
@@ -371,7 +371,7 @@ int strlen_user_proc(char *str)
 int smp_sigio_handler(void)
 {
 #ifdef CONFIG_SMP
-	int cpu = current->thread_info->cpu;
+	int cpu = current_thread->cpu;
 	IPI_handler(cpu);
 	if(cpu != 0)
 		return(1);
@@ -386,7 +386,7 @@ int um_in_interrupt(void)
 
 int cpu(void)
 {
-	return(current->thread_info->cpu);
+	return(current_thread->cpu);
 }
 
 /*

@@ -112,7 +112,7 @@ int setup_region(struct mem_region *region, void *entry)
 	}
 
 	if(offset >= region->len){
-		printf("%d bytes of physical memory is insufficient\n",
+		printf("%ld bytes of physical memory is insufficient\n",
 		       region->len);
 		exit(1);
 	}

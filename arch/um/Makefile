@@ -103,17 +103,16 @@ CPP_MODE_TT := $(shell [ "$(CONFIG_MODE_TT)" = "y" ] && echo -DMODE_TT)
 CONFIG_KERNEL_STACK_ORDER ?= 2
 STACK_SIZE := $(shell echo $$[ 4096 * (1 << $(CONFIG_KERNEL_STACK_ORDER)) ] )
 
-uml_start:= $(shell echo "$$(( $(TOP_ADDR) - $(SIZE) ))")
-AFLAGS_vmlinux.lds.o = -U$(SUBARCH) \
-	-DSTART=$(uml_start) -DELF_ARCH=$(ELF_ARCH) \
+AFLAGS_vmlinux.lds.o = $(shell echo -U$(SUBARCH) \
+	-DSTART=$$(($(TOP_ADDR) - $(SIZE))) -DELF_ARCH=$(ELF_ARCH) \
 	-DELF_FORMAT=\"$(ELF_FORMAT)\" $(CPP_MODE_TT) \
-	-DKERNEL_STACK_SIZE=$(STACK_SIZE)
+	-DKERNEL_STACK_SIZE=$(STACK_SIZE))
 
-AFLAGS_$(LD_SCRIPT-y:.s=).o = $(AFLAGS_vmlinux.lds.o) -P -C -Uum
+export AFLAGS_$(LD_SCRIPT-y:.s=).o = $(AFLAGS_vmlinux.lds.o) -P -C -Uum
 
 LD_SCRIPT-y := $(ARCH_DIR)/$(LD_SCRIPT-y)
 
-$(LD_SCRIPT-y) : $(LD_SCRIPT-y:.s=.S) scripts FORCE
+#$(LD_SCRIPT-y) : $(LD_SCRIPT-y:.s=.S) scripts FORCE
 #	$(call if_changed_dep,as_s_S)
 
 linux: vmlinux $(LD_SCRIPT-y)

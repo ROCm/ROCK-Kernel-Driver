@@ -22,7 +22,7 @@
 #include "os.h"
 
 /* CPU online map, set by smp_boot_cpus */
-unsigned long cpu_online_map = cpumask_of_cpu(0);
+unsigned long cpu_online_map = CPU_MASK_NONE;
 
 /* Per CPU bogomips and other parameters
  * The only piece used here is the ipi pipe, which is set before SMP is
@@ -97,15 +97,15 @@ void smp_send_stop(void)
 
 	printk(KERN_INFO "Stopping all CPUs...");
 	for(i = 0; i < num_online_cpus(); i++){
-		if(i == current->thread_info->cpu)
+		if(i == current_thread->cpu)
 			continue;
 		write(cpu_data[i].ipi_pipe[1], "S", 1);
 	}
 	printk("done\n");
 }
 
-static cpumask_t smp_commenced_mask;
-static cpumask_t smp_callin_map = CPU_MASK_NONE;
+static cpumask_t smp_commenced_mask = CPU_MASK_NONE;
+static cpumask_t cpu_callin_map = CPU_MASK_NONE;
 
 static int idle_proc(void *cpup)
 {
@@ -120,12 +120,12 @@ static int idle_proc(void *cpup)
 		     current->thread.mode.tt.extern_pid);
  
 	wmb();
-	if (cpu_test_and_set(cpu, &smp_callin_map)) {
+	if (cpu_test_and_set(cpu, cpu_callin_map)) {
 		printk("huh, CPU#%d already present??\n", cpu);
 		BUG();
 	}
 
-	while (!cpu_isset(cpu, &smp_commenced_mask))
+	while (!cpu_isset(cpu, smp_commenced_mask))
 		cpu_relax();
 
 	cpu_set(cpu, cpu_online_map);
@@ -143,7 +143,8 @@ static struct task_struct *idle_thread(int cpu)
 	new_task = copy_process(CLONE_VM | CLONE_IDLETASK, 0, NULL, 0, NULL, 
 				NULL);
 	if(IS_ERR(new_task)) 
-		panic("copy_process failed in idle_thread");
+		panic("copy_process failed in idle_thread, error = %ld",
+		      PTR_ERR(new_task));
 
 	cpu_tasks[cpu] = ((struct cpu_task) 
 		          { .pid = 	new_task->thread.mode.tt.extern_pid,
@@ -160,15 +161,16 @@ void smp_prepare_cpus(unsigned int maxcpus)
 {
 	struct task_struct *idle;
 	unsigned long waittime;
-	int err, cpu;
+	int err, cpu, me = smp_processor_id();
 
-	cpu_set(0, cpu_online_map);
-	cpu_set(0, smp_callin_map);
+	cpu_clear(me, cpu_online_map);
+	cpu_set(me, cpu_online_map);
+	cpu_set(me, cpu_callin_map);
 
-	err = os_pipe(cpu_data[0].ipi_pipe, 1, 1);
+	err = os_pipe(cpu_data[me].ipi_pipe, 1, 1);
 	if(err)	panic("CPU#0 failed to create IPI pipe, errno = %d", -err);
 
-	activate_ipi(cpu_data[0].ipi_pipe[0], 
+	activate_ipi(cpu_data[me].ipi_pipe[0], 
 		     current->thread.mode.tt.extern_pid);
 
 	for(cpu = 1; cpu < ncpus; cpu++){
@@ -180,10 +182,10 @@ void smp_prepare_cpus(unsigned int maxcpus)
 		unhash_process(idle);
 
 		waittime = 200000000;
-		while (waittime-- && !cpu_isset(cpu, smp_callin_map))
+		while (waittime-- && !cpu_isset(cpu, cpu_callin_map))
 			cpu_relax();
 
-		if (cpu_isset(cpu, smp_callin_map))
+		if (cpu_isset(cpu, cpu_callin_map))
 			printk("done\n");
 		else printk("failed\n");
 	}
@@ -257,19 +259,15 @@ void smp_call_function_slave(int cpu)
 	atomic_inc(&scf_finished);
 }
 
-int smp_call_function_on_cpu(void (*_func)(void *info), void *_info, int wait,
-				unsigned long mask)
+int smp_call_function(void (*_func)(void *info), void *_info, int nonatomic, 
+		      int wait)
 {
-	int i, cpu, num_cpus;
+	int cpus = num_online_cpus() - 1;
+	int i;
 
-	cpu = get_cpu();
-	mask &= ~(1UL << cpu);
-	num_cpus = hweight32(mask);
-	if(num_cpus == 0){
-		put_cpu_no_resched();
-		return(0);
-	}
-	
+	if (!cpus)
+		return 0;
+
 	spin_lock_bh(&call_lock);
 	atomic_set(&scf_started, 0);
 	atomic_set(&scf_finished, 0);
@@ -277,7 +275,7 @@ int smp_call_function_on_cpu(void (*_func)(void *info), void *_info, int wait,
 	info = _info;
 
 	for (i=0;i<NR_CPUS;i++)
-		if((i != current->thread_info->cpu) && 
+		if((i != current_thread->cpu) && 
 		   cpu_isset(i, cpu_online_map))
 			write(cpu_data[i].ipi_pipe[1], "C", 1);
 

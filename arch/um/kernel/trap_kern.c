@@ -52,7 +52,7 @@ int handle_page_fault(unsigned long address, unsigned long ip,
 	if(is_write && !(vma->vm_flags & VM_WRITE)) 
 		goto out;
 	page = address & PAGE_MASK;
-	if(page == (unsigned long) current->thread_info + PAGE_SIZE)
+	if(page == (unsigned long) current_thread + PAGE_SIZE)
 		panic("Kernel stack overflow");
 	pgd = pgd_offset(mm, page);
 	pmd = pmd_offset(pgd, page);

@@ -228,9 +228,10 @@ static void ssl_console_write(struct console *c, const char *string,
 		up(&line->sem);
 }
 
-static kdev_t ssl_console_device(struct console *c)
+static struct tty_driver *ssl_console_device(struct console *c, int *index)
 {
-	return mk_kdev(TTY_MAJOR, 64 + c->index);
+	*index = c->index;
+	return ssl_driver;
 }
 
 static int ssl_console_setup(struct console *co, char *options)
@@ -262,7 +263,7 @@ int ssl_init(void)
 	new_title = add_xterm_umid(opts.xterm_title);
 	if(new_title != NULL) opts.xterm_title = new_title;
 
-//	register_console(&ssl_cons);
+	register_console(&ssl_cons);
 	ssl_init_done = 1;
 	return(0);
 }
