@@ -1,17 +1,15 @@
 /*
- * $Id: gamecon.c,v 1.14 2001/04/29 22:42:14 vojtech Exp $
+ * $Id: gamecon.c,v 1.21 2002/01/22 20:27:27 vojtech Exp $
  *
  *  Copyright (c) 1999-2001 Vojtech Pavlik
  *
  *  Based on the work of:
  *  	Andree Borrmann		John Dahlstrom
  *  	David Kuder		Nathan Hand
- *
- *  Sponsored by SuSE
  */
 
 /*
- * NES, SNES, N64, Multi1, Multi2, PSX gamepad driver for Linux
+ * NES, SNES, N64, MultiSystem, PSX gamepad driver for Linux
  */
 
 /*
@@ -30,8 +28,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/kernel.h>
@@ -41,8 +39,10 @@
 #include <linux/parport.h>
 #include <linux/input.h>
 
-MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("NES, SNES, N64, MultiSystem, PSX gamepad driver");
 MODULE_LICENSE("GPL");
+
 MODULE_PARM(gc, "2-6i");
 MODULE_PARM(gc_2,"2-6i");
 MODULE_PARM(gc_3,"2-6i");
@@ -65,6 +65,7 @@ struct gc {
 	struct timer_list timer;
 	unsigned char pads[GC_MAX + 1];
 	int used;
+	char phys[5][32];
 };
 
 static struct gc *gc_base[3];
@@ -585,12 +586,15 @@ static struct gc __init *gc_probe(int *config)
 					default:
 						gc->pads[GC_PSX] &= ~gc_status_bit[i];
 						printk(KERN_WARNING "gamecon.c: Unsupported PSX controller %#x,"
-							" please report to <vojtech@suse.cz>.\n", psx);
+							" please report to <vojtech@ucw.cz>.\n", psx);
 				}
 				break;
 		}
 
+		sprintf(gc->phys[i], "%s/input%d", gc->pd->port->name, i);
+		
                 gc->dev[i].name = gc_names[config[i + 1]];
+		gc->dev[i].phys = gc->phys[i];
                 gc->dev[i].idbus = BUS_PARPORT;
                 gc->dev[i].idvendor = 0x0001;
                 gc->dev[i].idproduct = config[i + 1];
@@ -608,7 +612,7 @@ static struct gc __init *gc_probe(int *config)
 	for (i = 0; i < 5; i++) 
 		if (gc->pads[0] & gc_status_bit[i]) {
 			input_register_device(gc->dev + i);
-			printk(KERN_INFO "input%d: %s on %s\n", gc->dev[i].number, gc->dev[i].name, gc->pd->port->name);
+			printk(KERN_INFO "input: %s on %s\n", gc->dev[i].name, gc->pd->port->name);
 		}
 
 	return gc;

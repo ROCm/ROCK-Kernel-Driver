@@ -115,6 +115,7 @@ static inline unsigned long do_fast_gettimeoffset(void)
 #define TICK_SIZE tick
 
 spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
+EXPORT_SYMBOL(i8253_lock);
 
 extern spinlock_t i8259A_lock;
 

@@ -1,9 +1,7 @@
 /*
- * $Id: serport.c,v 1.7 2001/05/25 19:00:27 jdeneux Exp $
+ * $Id: serport_old.c,v 1.10 2002/01/24 19:52:57 vojtech Exp $
  *
  *  Copyright (c) 1999-2001 Vojtech Pavlik
- *
- *  Sponsored by SuSE
  */
 
 /*
@@ -28,7 +26,7 @@
  * 
  *  Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <asm/uaccess.h>
@@ -39,11 +37,18 @@
 #include <linux/serio.h>
 #include <linux/tty.h>
 
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("Input device TTY line discipline");
+MODULE_LICENSE("GPL");
+
 struct serport {
 	struct tty_struct *tty;
 	wait_queue_head_t wait;
 	struct serio serio;
+	char phys[32];
 };
+
+char serport_name[] = "Serial port";
 
 /*
  * Callback functions from the serio code.
@@ -75,6 +80,8 @@ static void serport_serio_close(struct serio *serio)
 static int serport_ldisc_open(struct tty_struct *tty)
 {
 	struct serport *serport;
+	char ttyname[64];
+	int i;
 
 	MOD_INC_USE_COUNT;
 
@@ -85,8 +92,18 @@ static int serport_ldisc_open(struct tty_struct *tty)
 
 	memset(serport, 0, sizeof(struct serport));
 
+	set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
 	serport->tty = tty;
 	tty->disc_data = serport;
+
+	strcpy(ttyname, tty->driver.name);
+	for (i = 0; ttyname[i] != 0 && ttyname[i] != '/'; i++);
+	ttyname[i] = 0;
+
+	sprintf(serport->phys, "%s%d/serio0", ttyname, minor(tty->device) - tty->driver.minor_start);
+
+	serport->serio.name = serport_name;
+	serport->serio.phys = serport->phys;
 
 	serport->serio.type = SERIO_RS232;
 	serport->serio.write = serport_serio_write;
@@ -156,14 +173,14 @@ static ssize_t serport_ldisc_read(struct tty_struct * tty, struct file * file, u
 
 	serio_register_port(&serport->serio);
 
-	printk(KERN_INFO "serio%d: Serial port %s\n", serport->serio.number, name);
+	printk(KERN_INFO "serio: Serial port %s\n", name);
 
 	add_wait_queue(&serport->wait, &wait);
-	current->state = TASK_INTERRUPTIBLE;
+	set_current_state(TASK_INTERRUPTIBLE);
 
 	while(serport->serio.type && !signal_pending(current)) schedule();
 
-	current->state = TASK_RUNNING;
+	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&serport->wait, &wait);
 
 	serio_unregister_port(&serport->serio);
@@ -187,6 +204,14 @@ static int serport_ldisc_ioctl(struct tty_struct * tty, struct file * file, unsi
 	return -EINVAL;
 }
 
+static void serport_ldisc_write_wakeup(struct tty_struct * tty)
+{
+	struct serport *sp = (struct serport *) tty->disc_data;
+
+	serio_dev_write_wakeup(&sp->serio);
+
+}
+
 /*
  * The line discipline structure.
  */
@@ -199,6 +224,7 @@ static struct tty_ldisc serport_ldisc = {
 	ioctl:		serport_ldisc_ioctl,
 	receive_buf:	serport_ldisc_receive,
 	receive_room:	serport_ldisc_room,
+	write_wakeup:	serport_ldisc_write_wakeup
 };
 
 /*
@@ -222,5 +248,3 @@ void __exit serport_exit(void)
 
 module_init(serport_init);
 module_exit(serport_exit);
-
-MODULE_LICENSE("GPL");

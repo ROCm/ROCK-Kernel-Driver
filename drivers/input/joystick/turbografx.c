@@ -1,12 +1,10 @@
 /*
- * $Id: turbografx.c,v 1.8 2000/05/29 20:39:38 vojtech Exp $
+ * $Id: turbografx.c,v 1.14 2002/01/22 20:30:39 vojtech Exp $
  *
- *  Copyright (c) 1998-2000 Vojtech Pavlik
+ *  Copyright (c) 1998-2001 Vojtech Pavlik
  *
  *  Based on the work of:
  *	Steffen Schwenke
- *
- *  Sponsored by SuSE
  */
 
 /*
@@ -29,8 +27,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  * 
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/kernel.h>
@@ -39,8 +37,10 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
-MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("TurboGraFX parallel port interface driver");
 MODULE_LICENSE("GPL");
+
 MODULE_PARM(tgfx, "2-8i");
 MODULE_PARM(tgfx_2, "2-8i");
 MODULE_PARM(tgfx_3, "2-8i");
@@ -69,6 +69,7 @@ struct tgfx {
 	struct pardevice *pd;
 	struct timer_list timer;
 	struct input_dev dev[7];
+	char phys[7][32];
 	int sticks;
 	int used;
 } *tgfx_base[3];
@@ -174,7 +175,10 @@ static struct tgfx __init *tgfx_probe(int *config)
 			tgfx->dev[i].open = tgfx_open;
 			tgfx->dev[i].close = tgfx_close;
 
+			sprintf(tgfx->phys[i], "%s/input0", tgfx->pd->port->name);
+
 			tgfx->dev[i].name = tgfx_name;
+			tgfx->dev[i].phys = tgfx->phys[i];
 			tgfx->dev[i].idbus = BUS_PARPORT;
 			tgfx->dev[i].idvendor = 0x0003;
 			tgfx->dev[i].idproduct = config[i+1];
@@ -190,8 +194,8 @@ static struct tgfx __init *tgfx_probe(int *config)
 			tgfx->dev[i].absmin[ABS_Y] = -1; tgfx->dev[i].absmax[ABS_Y] = 1;
 
 			input_register_device(tgfx->dev + i);
-			printk(KERN_INFO "input%d: %d-button Multisystem joystick on %s\n",
-				tgfx->dev[i].number, config[i+1], tgfx->pd->port->name);
+			printk(KERN_INFO "input: %d-button Multisystem joystick on %s\n",
+				config[i+1], tgfx->pd->port->name);
 		}
 
         if (!tgfx->sticks) {

@@ -1,9 +1,7 @@
 /*
- * $Id: gameport.c,v 1.5 2000/05/29 10:54:53 vojtech Exp $
+ * $Id: gameport.c,v 1.18 2002/01/22 20:41:14 vojtech Exp $
  *
- *  Copyright (c) 1999-2000 Vojtech Pavlik
- *
- *  Sponsored by SuSE
+ *  Copyright (c) 1999-2001 Vojtech Pavlik
  */
 
 /*
@@ -26,8 +24,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  * 
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <asm/io.h>
@@ -40,7 +38,8 @@
 #include <linux/stddef.h>
 #include <linux/delay.h>
 
-MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("Generic gameport layer");
 MODULE_LICENSE("GPL");
 
 EXPORT_SYMBOL(gameport_register_port);
@@ -54,7 +53,6 @@ EXPORT_SYMBOL(gameport_cooked_read);
 
 static struct gameport *gameport_list;
 static struct gameport_dev *gameport_dev;
-static int gameport_number;
 
 /*
  * gameport_measure_speed() measures the gameport i/o speed.
@@ -122,7 +120,6 @@ void gameport_rescan(struct gameport *gameport)
 
 void gameport_register_port(struct gameport *gameport)
 {
-	gameport->number = gameport_number++;
 	gameport->next = gameport_list;	
 	gameport_list = gameport;
 
@@ -140,8 +137,6 @@ void gameport_unregister_port(struct gameport *gameport)
 
 	if (gameport->dev && gameport->dev->disconnect)
 		gameport->dev->disconnect(gameport);
-
-	gameport_number--;
 }
 
 void gameport_register_device(struct gameport_dev *dev)
