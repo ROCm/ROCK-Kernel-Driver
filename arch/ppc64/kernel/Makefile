@@ -49,7 +49,7 @@ obj-$(CONFIG_HVCS)		+= hvcserver.o
 obj-$(CONFIG_PPC_PMAC)		+= pmac_setup.o pmac_feature.o pmac_pci.o \
 				   pmac_time.o pmac_nvram.o pmac_low_i2c.o \
 				   open_pic_u3.o
-obj-$(CONFIG_PMAC_DART)		+= pmac_iommu.o
+obj-$(CONFIG_U3_DART)		+= u3_iommu.o
 
 ifdef CONFIG_SMP
 obj-$(CONFIG_PPC_PMAC)		+= pmac_smp.o smp-tbsync.o
