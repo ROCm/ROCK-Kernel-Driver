@@ -2683,98 +2683,6 @@ unsigned long sys32_mmap2(unsigned long addr, size_t len,
 	return sys_mmap(addr, len, prot, flags, fd, pgoff << 12);
 }
 
-extern long sys_io_setup(unsigned nr_reqs, aio_context_t *ctx);
-
-long sys32_io_setup(unsigned nr_reqs, u32 *ctx32p)
-{
-	long ret;
-	aio_context_t ctx64;
-	mm_segment_t oldfs = get_fs();
-
-	if (get_user((u32)ctx64, ctx32p))
-		return -EFAULT;
-
-	set_fs(KERNEL_DS);
-	ret = sys_io_setup(nr_reqs, &ctx64);
-	set_fs(oldfs);
-
-	/* truncating is ok because it's a user address */
-	if (!ret)
-		ret = put_user((u32)ctx64, ctx32p);
-
-	return ret;
-}
-
-long sys_io_getevents(aio_context_t ctx_id, long min_nr, long nr,
-		      struct io_event *events, struct timespec *timeout);
-
-long sys32_io_getevents(aio_context_t ctx_id, u32 min_nr, u32 nr,
-			struct io_event *events, struct compat_timespec *t32)
-{
-	struct timespec t;
-	long ret;
-	mm_segment_t oldfs = get_fs();
-
-	if (t32) {
-		if (get_user(t.tv_sec, &t32->tv_sec) ||
-		    __get_user(t.tv_nsec, &t32->tv_nsec))
-			return -EFAULT;
-	}
-
-	if (verify_area(VERIFY_WRITE, events, nr * sizeof(*events)))
-		return -EFAULT;
-
-	set_fs(KERNEL_DS);
-	/* sign extend min_nr and nr */
-	ret = sys_io_getevents(ctx_id, (int)min_nr, (int)nr, events,
-			       t32 ? &t : NULL);
-	set_fs(oldfs);
-
-	return ret;
-}
-
-long sys32_io_submit(aio_context_t ctx_id, u32 number, u32 *iocbpp)
-{
-	struct kioctx *ctx;
-	long ret = 0;
-	int i;
-	int nr = (int)number;	/* sign extend */
-
-	if (unlikely(nr < 0))
-		return -EINVAL;
-
-	if (unlikely(!access_ok(VERIFY_READ, iocbpp, (nr*sizeof(u32)))))
-		return -EFAULT;
-
-	ctx = lookup_ioctx(ctx_id);
-	if (unlikely(!ctx)) {
-		pr_debug("EINVAL: io_submit: invalid context id\n");
-		return -EINVAL;
-	}
-
-	for (i=0; i<nr; i++) {
-		struct iocb tmp;
-		u32 *user_iocb;
-
-		if (unlikely(__get_user((u32)(long)user_iocb, iocbpp + i))) {
-			ret = -EFAULT;
-			break;
-		}
-
-		if (unlikely(copy_from_user(&tmp, user_iocb, sizeof(tmp)))) {
-			ret = -EFAULT;
-			break;
-		}
-
-		ret = io_submit_one(ctx, (struct iocb *)user_iocb, &tmp);
-		if (ret)
-			break;
-	}
-
-	put_ioctx(ctx);
-	return i ? i : ret;
-}
-
 int get_compat_timeval(struct timeval *tv, struct compat_timeval *ctv)
 {
 	return (verify_area(VERIFY_READ, ctv, sizeof(*ctv)) ||
@@ -2878,3 +2786,46 @@ long ppc32_fadvise64(int fd, u32 unused, u32 offset_high, u32 offset_low,
 			     advice);
 }
 
+long ppc32_fadvise64_64(int fd, int advice, u32 offset_high, u32 offset_low,
+			u32 len_high, u32 len_low)
+{
+	return sys_fadvise64(fd, (u64)offset_high << 32 | offset_low,
+			     (u64)len_high << 32 | len_low, advice);
+}
+
+extern long sys_timer_create(clockid_t, sigevent_t *, timer_t *);
+
+long ppc32_timer_create(clockid_t clock,
+			struct compat_sigevent __user *ev32,
+			timer_t __user *timer_id)
+{
+	sigevent_t event;
+	timer_t t;
+	long err;
+	mm_segment_t savefs;
+
+	if (ev32 == NULL)
+		return sys_timer_create(clock, NULL, timer_id);
+
+	memset(&event, 0, sizeof(event));
+	if (!access_ok(VERIFY_READ, ev32, sizeof(struct compat_sigevent))
+	    || __get_user(event.sigev_value.sival_int,
+			  &ev32->sigev_value.sival_int)
+	    || __get_user(event.sigev_signo, &ev32->sigev_signo)
+	    || __get_user(event.sigev_notify, &ev32->sigev_notify)
+	    || __get_user(event.sigev_notify_thread_id,
+			  &ev32->sigev_notify_thread_id))
+		return -EFAULT;
+
+	if (!access_ok(VERIFY_WRITE, timer_id, sizeof(timer_t)))
+		return -EFAULT;
+
+	savefs = get_fs();
+	err = sys_timer_create(clock, &event, &t);
+	set_fs(savefs);
+
+	if (err == 0)
+		err = __put_user(t, timer_id);
+
+	return err;
+}

@@ -825,10 +825,10 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall
 	.llong .sys_ni_syscall		/* 225 - reserved for tux */
 	.llong .sys32_sendfile64
-	.llong .sys32_io_setup
+	.llong .compat_sys_io_setup
 	.llong .sys_io_destroy
-	.llong .sys32_io_getevents
-	.llong .sys32_io_submit
+	.llong .compat_sys_io_getevents
+	.llong .compat_sys_io_submit
 	.llong .sys_io_cancel
 	.llong .sys_set_tid_address
 	.llong .ppc32_fadvise64
@@ -838,20 +838,21 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_epoll_ctl
 	.llong .sys_epoll_wait
 	.llong .sys_remap_file_pages
-	.llong .sys_ni_syscall		/* 240 */
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall		/* 245 */
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
+	.llong .ppc32_timer_create	/* 240 */
+	.llong .compat_timer_settime
+	.llong .compat_timer_gettime
+	.llong .sys_timer_getoverrun
+	.llong .sys_timer_delete
+	.llong .compat_clock_settime	/* 245 */
+	.llong .compat_clock_gettime
+	.llong .compat_clock_getres
+	.llong .compat_clock_nanosleep
 	.llong .sys_ni_syscall
 	.llong .sys32_tgkill		/* 250 */
 	.llong .sys32_utimes
-	.llong .sys_statfs64
-	.llong .sys_fstatfs64
+	.llong .compat_statfs64
+	.llong .compat_fstatfs64
+	.llong .ppc32_fadvise64_64	/* 32bit only fadvise64_64 */
 
 	.balign 8
 _GLOBAL(sys_call_table)
@@ -1109,3 +1110,4 @@ _GLOBAL(sys_call_table)
 	.llong .sys_utimes
 	.llong .sys_statfs64
 	.llong .sys_fstatfs64
+	.llong .sys_ni_syscall		/* 32bit only fadvise64_64 */

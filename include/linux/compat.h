@@ -83,5 +83,10 @@ struct compat_dirent {
 	char		d_name[256];
 };
 
+typedef union compat_sigval {
+	compat_int_t	sival_int;
+	compat_uptr_t	sival_ptr;
+} compat_sigval_t;
+
 #endif /* CONFIG_COMPAT */
 #endif /* _LINUX_COMPAT_H */
