@@ -1076,22 +1076,37 @@ static int hid_submit_ctrl(struct hid_device *hid)
 {
 	struct hid_report *report;
 	unsigned char dir;
+	int len;
 
 	report = hid->ctrl[hid->ctrltail].report;
 	dir = hid->ctrl[hid->ctrltail].dir;
 
-	if (dir == USB_DIR_OUT)
+	len = ((report->size - 1) >> 3) + 1 + (report->id > 0);
+	if (dir == USB_DIR_OUT) {
 		hid_output_report(report, hid->ctrlbuf);
+		hid->urbctrl->pipe = usb_sndctrlpipe(hid->dev, 0);
+		hid->urbctrl->transfer_buffer_length = len;
+	} else {
+		int maxpacket, padlen;
 
-	hid->urbctrl->transfer_buffer_length = ((report->size - 1) >> 3) + 1 + (report->id > 0);
-	hid->urbctrl->pipe = (dir == USB_DIR_OUT) ?  usb_sndctrlpipe(hid->dev, 0) : usb_rcvctrlpipe(hid->dev, 0);
+		hid->urbctrl->pipe = usb_rcvctrlpipe(hid->dev, 0);
+		maxpacket = usb_maxpacket(hid->dev, hid->urbctrl->pipe, 0);
+		if (maxpacket > 0) {
+			padlen = (len + maxpacket - 1) / maxpacket;
+			padlen *= maxpacket;
+			if (padlen > HID_BUFFER_SIZE)
+				padlen = HID_BUFFER_SIZE;
+		} else
+			padlen = 0;
+		hid->urbctrl->transfer_buffer_length = padlen;
+	}
 	hid->urbctrl->dev = hid->dev;
 
 	hid->cr->bRequestType = USB_TYPE_CLASS | USB_RECIP_INTERFACE | dir;
 	hid->cr->bRequest = (dir == USB_DIR_OUT) ? HID_REQ_SET_REPORT : HID_REQ_GET_REPORT;
 	hid->cr->wValue = cpu_to_le16(((report->type + 1) << 8) | report->id);
 	hid->cr->wIndex = cpu_to_le16(hid->ifnum);
-	hid->cr->wLength = cpu_to_le16(hid->urbctrl->transfer_buffer_length);
+	hid->cr->wLength = cpu_to_le16(len);
 
 	dbg("submitting ctrl urb");
 
@@ -1269,7 +1284,6 @@ void hid_init_reports(struct hid_device *hid)
 	struct hid_report_enum *report_enum;
 	struct hid_report *report;
 	struct list_head *list;
-	int len;
 	int err, ret;
 
 	report_enum = hid->report_enum + HID_INPUT_REPORT;
@@ -1304,9 +1318,6 @@ void hid_init_reports(struct hid_device *hid)
 	list = report_enum->report_list.next;
 	while (list != &report_enum->report_list) {
 		report = (struct hid_report *) list;
-		len = ((report->size - 1) >> 3) + 1 + report_enum->numbered;
-		if (len > hid->urbin->transfer_buffer_length)
-			hid->urbin->transfer_buffer_length = len < HID_BUFFER_SIZE ? len : HID_BUFFER_SIZE;
 		usb_control_msg(hid->dev, usb_sndctrlpipe(hid->dev, 0),
 			0x0a, USB_TYPE_CLASS | USB_RECIP_INTERFACE, report->id,
 			hid->ifnum, NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
@@ -1549,12 +1560,17 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 			continue;
 
 		if (endpoint->bEndpointAddress & USB_DIR_IN) {
+			int len;
+
 			if (hid->urbin)
 				continue;
 			if (!(hid->urbin = usb_alloc_urb(0, GFP_KERNEL)))
 				goto fail;
 			pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
-			usb_fill_int_urb(hid->urbin, dev, pipe, hid->inbuf, 0,
+			len = usb_maxpacket(dev, pipe, 0);
+			if (len > HID_BUFFER_SIZE)
+				len = HID_BUFFER_SIZE;
+			usb_fill_int_urb(hid->urbin, dev, pipe, hid->inbuf, len,
 					 hid_irq_in, hid, endpoint->bInterval);
 			hid->urbin->transfer_dma = hid->inbuf_dma;
 			hid->urbin->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
