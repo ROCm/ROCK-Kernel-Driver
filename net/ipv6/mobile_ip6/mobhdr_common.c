@@ -21,6 +21,7 @@
 #include <linux/init.h>
 #include <net/ipv6.h>
 #include <net/ip6_route.h>
+#include <net/ip6_checksum.h>
 #include <net/addrconf.h>
 #include <net/mipv6.h>
 #include <net/checksum.h>

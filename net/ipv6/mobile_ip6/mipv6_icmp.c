@@ -18,6 +18,7 @@
 #include <net/checksum.h>
 #include <net/ipv6.h>
 #include <net/ip6_route.h>
+#include <net/ip6_checksum.h>
 #include <net/mipv6.h>
 #include <net/mipglue.h>
 #include <linux/module.h>
