@@ -153,7 +153,7 @@ __start:
  * like real mode cache inhibit or exception base
  */
 #ifdef CONFIG_POWER4
-	bl	__power4_cpu_preinit
+	bl	__970_cpu_preinit
 #endif /* CONFIG_POWER4 */
 
 #ifdef CONFIG_APUS
@@ -491,15 +491,18 @@ SystemCall:
 /*
  * The Altivec unavailable trap is at 0x0f20.  Foo.
  * We effectively remap it to 0x3000.
+ * We include an altivec unavailable exception vector even if
+ * not configured for Altivec, so that you can't panic a
+ * non-altivec kernel running on a machine with altivec just
+ * by executing an altivec instruction.
  */
 	. = 0xf00
-
-#ifdef CONFIG_ALTIVEC
 	b	Trap_0f
+
 	. = 0xf20
 	b	AltiVecUnavailable
+
 Trap_0f:
-#endif
 	EXCEPTION_PROLOG
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	EXC_XFER_EE(0xf00, UnknownException)
@@ -704,6 +707,7 @@ DataStoreTLBMiss:
 #ifndef CONFIG_ALTIVEC
 #define AltivecAssistException	UnknownException
 #endif
+
 	EXCEPTION(0x1300, Trap_13, InstructionBreakpoint, EXC_XFER_EE)
 	EXCEPTION(0x1400, SMI, SMIException, EXC_XFER_EE)
 	EXCEPTION(0x1500, Trap_15, UnknownException, EXC_XFER_EE)
@@ -745,12 +749,12 @@ DataStoreTLBMiss:
 
 	. = 0x3000
 
-#ifdef CONFIG_ALTIVEC
 AltiVecUnavailable:
 	EXCEPTION_PROLOG
+#ifdef CONFIG_ALTIVEC
 	bne	load_up_altivec		/* if from user, just load it up */
-	EXC_XFER_EE_LITE(0xf20, KernelAltiVec)
 #endif /* CONFIG_ALTIVEC */
+	EXC_XFER_EE_LITE(0xf20, AltivecUnavailException)
 
 #ifdef CONFIG_PPC64BRIDGE
 DataAccess:
@@ -1632,7 +1636,7 @@ initial_mm_power4:
 	blr
 
 #endif /* CONFIG_POWER4 */
-	
+
 #ifdef CONFIG_8260
 /* Jump into the system reset for the rom.
  * We first disable the MMU, and then jump to the ROM reset address.
