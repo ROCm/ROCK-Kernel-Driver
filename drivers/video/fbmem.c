@@ -103,6 +103,8 @@ extern int hgafb_setup(char*);
 extern int matroxfb_init(void);
 extern int matroxfb_setup(char*);
 extern int hpfb_init(void);
+extern int platinumfb_init(void);
+extern int platinumfb_setup(char*);
 extern int control_init(void);
 extern int control_setup(char*);
 extern int platinum_init(void);
@@ -230,7 +232,7 @@ static struct {
 	{ "controlfb", control_init, control_setup },
 #endif
 #ifdef CONFIG_FB_PLATINUM
-	{ "platinumfb", platinum_init, platinum_setup },
+	{ "platinumfb", platinumfb_init, platinumfb_setup },
 #endif
 #ifdef CONFIG_FB_VALKYRIE
 	{ "valkyriefb", valkyriefb_init, valkyriefb_setup },
